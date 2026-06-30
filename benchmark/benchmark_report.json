@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-06-29T00:00:00.000Z",
+  "problemCount": 6,
+  "entries": [
+    {
+      "problemId": "A16",
+      "problemTitle": "脉冲星制动指数（P0/P1）",
+      "domain": "天文学",
+      "science125Tag": "pulsar-braking-index",
+      "verdict": "CONFIRMED",
+      "integrityRoot": "ded47a41e041fad4aa665447d336632ee5d9df7f87d4a8bf91d5a1cae7fee606",
+      "leafCount": 7,
+      "reproHash": "5499caf32171f0a9f7eb44bdefe575a5cb739e17653b6ee802795924a77ab75d",
+      "stagesCompleted": 6,
+      "converged": true,
+      "chainVerified": true,
+      "sourceId": "sc-a16-pulsar-p0-2026"
+    },
+    {
+      "problemId": "A4",
+      "problemTitle": "行星轨道衰减（热木星 dP/dt）",
+      "domain": "天文学",
+      "science125Tag": "hot-jupiter-orbital-decay",
+      "verdict": "INCONCLUSIVE",
+      "integrityRoot": "79fd926d012359a6921013dbad290055db763e89f140168a331cc44c7330d45e",
+      "leafCount": 7,
+      "reproHash": "ad269cabc295b1512ad6aa34c7b9ef2e5c16a1690755d1b73e8e8ea7c0fa46e8",
+      "stagesCompleted": 6,
+      "converged": true,
+      "chainVerified": true,
+      "sourceId": "sc-a4-hotjupiter-2026"
+    },
+    {
+      "problemId": "B7",
+      "problemTitle": "蛋白质折叠（CASP15 FM 靶标）",
+      "domain": "生物",
+      "science125Tag": "protein-folding-hard-targets",
+      "verdict": "REFUTED",
+      "integrityRoot": "b5d38b915c5dd167136b0b58d38c4c79adf4f4745757c1fbc325722597a57b3d",
+      "leafCount": 7,
+      "reproHash": "bde84aa7d988de69bfb9ef1c14365a40c81029bf4392ae59856c4b285f97eceb",
+      "stagesCompleted": 6,
+      "converged": true,
+      "chainVerified": true,
+      "sourceId": "sc-b7-protein-folding-2026"
+    },
+    {
+      "problemId": "C3",
+      "problemTitle": "催化剂活性（DFT+ML TON 预测）",
+      "domain": "化学",
+      "science125Tag": "catalyst-ton-prediction",
+      "verdict": "DEGRADED_SCOPE",
+      "integrityRoot": "ff6ee0b6a5951780caa6429f6bc517df5f294194d7b3db85c5c8b65104449e67",
+      "leafCount": 7,
+      "reproHash": "afe34e332bf2b13c1d5ced3dc23db839bb738f17d73b0feada4bd80d280060bf",
+      "stagesCompleted": 6,
+      "converged": true,
+      "chainVerified": true,
+      "sourceId": "sc-c3-catalyst-2026"
+    },
+    {
+      "problemId": "E2",
+      "problemTitle": "生态系统碳通量（FLUXNET）",
+      "domain": "生态气候",
+      "science125Tag": "ecosystem-carbon-flux",
+      "verdict": "CONFIRMED",
+      "integrityRoot": "7a01b2389c394d943edabd9d0525ec895a93bacfad857e31a7a40d6b4782ce76",
+      "leafCount": 7,
+      "reproHash": "ab0e2cdaf6ed413aae8eb7f361c71537ed25862e4b403ff29da973638ecb1207",
+      "stagesCompleted": 6,
+      "converged": true,
+      "chainVerified": true,
+      "sourceId": "sc-e2-carbon-flux-2026"
+    },
+    {
+      "problemId": "G5",
+      "problemTitle": "地震前兆（ULF/VLF 电磁异常）",
+      "domain": "地学",
+      "science125Tag": "seismic-em-precursor",
+      "verdict": "UNTESTED",
+      "integrityRoot": "0bfffeb8ccb6904421be118e350a1f708e58a13877836e0b17cdd9d409970056",
+      "leafCount": 7,
+      "reproHash": "0f10753e31ebf09be102dad2179a993aec2b48f42cf794af0bf5f8a8bad5e470",
+      "stagesCompleted": 6,
+      "converged": true,
+      "chainVerified": true,
+      "sourceId": "sc-g5-seismic-precursor-2026"
+    }
+  ],
+  "suiteIntegrityRoot": "88f8c2e933d6a56abed79a3fe87132411dac8ca4099ba9401b52c193d7a3e12e",
+  "totalLeaves": 42,
+  "verdictDistribution": {
+    "CONFIRMED": 2,
+    "REFUTED": 1,
+    "INCONCLUSIVE": 1,
+    "DEGRADED_SCOPE": 1,
+    "UNTESTED": 1
+  },
+  "domainDistribution": {
+    "天文学": 2,
+    "生物": 1,
+    "化学": 1,
+    "生态气候": 1,
+    "地学": 1
+  },
+  "gitCommitSha": null,
+  "honestyNotes": [
+    "verdict 由 offline fixture 产出（无真实 LLM 调用·非真实科学裁决）；本榜展示的是证据链的工程完整性广度，非科学结论排名。",
+    "suiteIntegrityRoot 由各 problem 的 integrityRoot 再 Merkle 折叠而成，证明跨问题可聚合审计；它不证明科学正确性。",
+    "各 problem 的 evidence/hypothesis fixture 是领域特定演示数据；真实科研需接通真实 provider（competition adapter 已就绪·core 模型中立）。",
+    "本报告确定性可复现：fresh-clone 跑 generate 脚本得相同 suiteIntegrityRoot（CI golden 锚定）。",
+    "reproHash（链头 currentHash）含 ulid verdictId，是 run 实例标识——每次重新生成报告会不同；CI golden 仅锚 suiteIntegrityRoot（由不含 ulid 的 call_records 折叠·确定可复现）。"
+  ]
+}

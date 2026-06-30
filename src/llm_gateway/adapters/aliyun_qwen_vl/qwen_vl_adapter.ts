@@ -1,0 +1,304 @@
+import OpenAI from 'openai';
+import type {
+  LlmCallCredential,
+  LlmRequest,
+  LlmResponse,
+  ProviderAdapter,
+  ProviderProfile,
+} from '../../types.ts';
+import type {
+  MultimodalContentInput,
+  MultimodalProvider,
+  MultimodalVlmResult,
+  QwenVlModelId,
+} from './types.ts';
+import { QWEN_VL_DEFAULT_MODEL, isQwenVlModel } from './types.ts';
+import { COMPETITION_BASE_URL } from '../aliyun_qwen/snapshot.ts';
+
+// ===== Types =====
+
+export interface QwenVlAdapterConfig {
+  readonly modelId?: QwenVlModelId;
+  readonly baseURL?: string;
+  readonly apiKey?: string;
+  readonly timeoutMs?: number;
+}
+
+type OpenAiChatCompletion = OpenAI.ChatCompletion;
+type OpenAiContentPart = OpenAI.ChatCompletionContentPart;
+
+// ===== Internal helpers =====
+
+function nonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+function resolveApiKey(config: QwenVlAdapterConfig): string | undefined {
+  return config.apiKey ?? process.env.DASHSCOPE_API_KEY;
+}
+
+function isVisionConfigured(config: QwenVlAdapterConfig): boolean {
+  const key = resolveApiKey(config);
+  return key !== undefined && key.length > 0;
+}
+
+/**
+ * 检查 MultimodalContentInput 是否包含图像。
+ */
+function hasImage(input: MultimodalContentInput): boolean {
+  const hasRef = input.imageRef !== undefined && input.imageRef.length > 0;
+  const hasB64 = input.imageBase64 !== undefined && input.imageBase64.length > 0;
+  return hasRef || hasB64;
+}
+
+/**
+ * 将图像解析为 OpenAI Vision API content part 的 image_url。
+ */
+function resolveImageUrl(input: MultimodalContentInput): string | null {
+  if (input.imageRef !== undefined && input.imageRef.length > 0) {
+    return input.imageRef;
+  }
+  if (input.imageBase64 !== undefined && input.imageBase64.length > 0) {
+    const mime = input.mimeType.length > 0 ? input.mimeType : 'image/png';
+    return `data:${mime};base64,${input.imageBase64}`;
+  }
+  return null;
+}
+
+/**
+ * 从 OpenAI ChatCompletion 对象中提取 request_id。
+ * 优先 header（x-request-id），兜底 body（request_id → id）。
+ * DashScope 在响应体中附加 request_id 字段（非 OpenAI 标准字段）。
+ */
+function pullRequestId(
+  data: unknown,
+  responseHeaders: Headers | undefined,
+): string | null {
+  const headerId = responseHeaders?.get('x-request-id')?.trim();
+  if (headerId !== undefined && headerId.length > 0) {
+    return headerId;
+  }
+  if (typeof data !== 'object' || data === null) {
+    return null;
+  }
+  const record = data as Record<string, unknown>;
+  return (
+    nonEmptyString(record.request_id) ??
+    nonEmptyString(record.id)
+  );
+}
+
+/**
+ * 提取 structured claim：从 VLM 响应文本中尝试解析 JSON。
+ */
+function extractStructuredClaim(content: string): unknown {
+  const trimmed = content.trim();
+  const jsonBlock = /```(?:json)?\s*\n?([\s\S]*?)\n?```/.exec(trimmed);
+  if (jsonBlock !== null && jsonBlock[1] !== undefined) {
+    try {
+      return JSON.parse(jsonBlock[1].trim());
+    } catch {
+      // not valid JSON
+    }
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return { rawClaim: trimmed };
+  }
+}
+
+// ===== Factory =====
+
+/**
+ * 创建 Qwen-VL adapter。
+ *
+ * 同时实现 ProviderAdapter（可注册到 LlmGateway）和 MultimodalProvider（vision 调用）。
+ * C10 纪律：Qwen 型号 strings 仅在本文件与 types.ts 出现，不泄露到 core。
+ *
+ * 生产需要 DASHSCOPE_API_KEY；无 key 时 declaresVisionCapability() 返回 false。
+ */
+export function createQwenVlAdapter(config: QwenVlAdapterConfig = {}): ProviderAdapter & MultimodalProvider {
+  const modelId: QwenVlModelId = config.modelId ?? QWEN_VL_DEFAULT_MODEL;
+  if (!isQwenVlModel(modelId)) {
+    throw new Error(`qwen_vl_adapter: unsupported VL model ${modelId}`);
+  }
+
+  const baseURL = config.baseURL ?? COMPETITION_BASE_URL;
+  const profile: ProviderProfile = 'competition_aliyun_qwen';
+
+  // ===== ProviderAdapter implementation（text-only path，一般不走这里） =====
+
+  async function call(request: LlmRequest): Promise<LlmResponse> {
+    const apiKey = resolveApiKey(config);
+    if (apiKey === undefined || apiKey.length === 0) {
+      throw new Error('qwen_vl_adapter: cannot call text path without DASHSCOPE_API_KEY');
+    }
+
+    const client = new OpenAI({
+      apiKey,
+      baseURL,
+      timeout: config.timeoutMs ?? 60_000,
+    });
+
+    const openaiMessages: Array<{
+      role: 'system' | 'user' | 'assistant';
+      content: string;
+    }> = [];
+    for (const msg of request.messages) {
+      if (msg.role === 'tool') {
+        continue; // tool messages not supported in this text path
+      }
+      if (msg.role === 'system' || msg.role === 'user' || msg.role === 'assistant') {
+        openaiMessages.push({
+          role: msg.role,
+          content: msg.content,
+        });
+      }
+    }
+
+    const completion: OpenAiChatCompletion = await client.chat.completions.create({
+      model: modelId,
+      messages: openaiMessages,
+      temperature: request.temperature ?? 0.3,
+      max_tokens: request.maxTokens ?? 2048,
+    });
+
+    const firstChoice = completion.choices[0];
+    const message = firstChoice?.message;
+    const responseContent = typeof message?.content === 'string' ? message.content : '';
+    const usage = completion.usage;
+    const requestId = pullRequestId(completion, undefined);
+
+    return {
+      credential: {
+        providerProfile: profile,
+        providerRequestId: requestId ?? null,
+        modelId,
+        modelVersion: null,
+        capability: 'reasoning' as const,
+        isoTimestamp: new Date().toISOString(),
+        tokenUsage: {
+          inputTokens: usage?.prompt_tokens ?? 0,
+          outputTokens: usage?.completion_tokens ?? 0,
+          totalTokens: usage?.total_tokens ?? 0,
+        },
+      },
+      content: responseContent,
+      raw: completion,
+    };
+  }
+
+  // ===== MultimodalProvider implementation =====
+
+  function declaresVisionCapability(): boolean {
+    return isVisionConfigured(config);
+  }
+
+  async function interpret(input: MultimodalContentInput): Promise<MultimodalVlmResult> {
+    if (!declaresVisionCapability()) {
+      throw new Error(
+        'qwen_vl_adapter: vision capability not available ' +
+        '(DASHSCOPE_API_KEY missing or offline profile)',
+      );
+    }
+
+    if (!hasImage(input)) {
+      throw new Error('qwen_vl_adapter: interpret() requires imageRef or imageBase64');
+    }
+
+    const apiKey = resolveApiKey(config);
+    if (apiKey === undefined || apiKey.length === 0) {
+      throw new Error('qwen_vl_adapter: DASHSCOPE_API_KEY is required for vision calls');
+    }
+
+    const imageUrl = resolveImageUrl(input);
+    if (imageUrl === null) {
+      throw new Error('qwen_vl_adapter: could not resolve image URL');
+    }
+
+    const client = new OpenAI({
+      apiKey,
+      baseURL,
+      timeout: config.timeoutMs ?? 60_000,
+    });
+
+    // Build multimodal message with image content using OpenAI's native content part types.
+    const contentParts: OpenAiContentPart[] = [
+      { type: 'text', text: input.prompt },
+      {
+        type: 'image_url',
+        image_url: { url: imageUrl, detail: 'auto' },
+      },
+    ];
+
+    const completion: OpenAiChatCompletion = await client.chat.completions.create({
+      model: modelId,
+      messages: [
+        {
+          role: 'user',
+          content: contentParts,
+        },
+      ],
+      temperature: input.prompt.includes('结构化') ? 0.1 : 0.3,
+      max_tokens: 2048,
+    });
+
+    const choices = completion.choices;
+    if (choices.length === 0) {
+      throw new Error('qwen_vl_adapter: vision call returned no choices');
+    }
+
+    const firstChoice = choices[0];
+    if (firstChoice === undefined) {
+      throw new Error('qwen_vl_adapter: vision call returned no first choice');
+    }
+
+    const message = firstChoice.message;
+    if (message === undefined) {
+      throw new Error('qwen_vl_adapter: vision call returned no message');
+    }
+
+    const interpretation = typeof message.content === 'string' ? message.content : '';
+    const finishReason = firstChoice.finish_reason ?? 'stop';
+    const usage = completion.usage;
+    const requestId = pullRequestId(completion, undefined);
+
+    const credential: LlmCallCredential = {
+      providerProfile: profile,
+      providerRequestId: requestId ?? null,
+      modelId,
+      modelVersion: null,
+      capability: 'vision',
+      isoTimestamp: new Date().toISOString(),
+      tokenUsage: {
+        inputTokens: usage?.prompt_tokens ?? 0,
+        outputTokens: usage?.completion_tokens ?? 0,
+        totalTokens: usage?.total_tokens ?? 0,
+      },
+      adapterMeta: {
+        qwenVlModel: modelId,
+        imageMimeType: input.mimeType,
+      },
+    };
+
+    return {
+      callRecordSeq: 0, // caller fills in after appendRecord
+      credential,
+      interpretation,
+      structuredClaim: extractStructuredClaim(interpretation),
+      finishReason,
+    };
+  }
+
+  return {
+    profile,
+    call,
+    declaresVisionCapability,
+    interpret,
+  };
+}

@@ -1,0 +1,24 @@
+[project]
+name = "far-chain-repro"
+version = "0.0.0"
+description = "Python deterministic replay helpers for FAR-Chain."
+requires-python = ">=3.11"
+# 依赖锁定按 FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §6.2 / §8.2 规范
+# threadpoolctl：R9 BLAS 线程限定 nthread=1（deterministic_blas_ctx 上下文管理器）
+# numpy：触发 BLAS 加载，threadpool_info() 才能观测 blas 条目（spec §8.2 has_blas fixture）
+dependencies = [
+    "threadpoolctl>=3.5,<4.0",
+    "numpy>=1.24,<2.0",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[tool.pytest.ini_options]
+testpaths = ["repro/tests"]
+
+[tool.setuptools.packages.find]
+where = ["repro"]
+
+[tool.ruff]
+line-length = 100
