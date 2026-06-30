@@ -1,0 +1,41 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+
+# TypeScript build artifacts (tsc -b incremental tracking)
+*.tsbuildinfo
+
+# Local env files — never commit secrets
+*.local
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ---------------------------------------------------------------------------
+# 2026-06-30 隐私/工程整改 (PRIVACY + 工程规范)
+# ---------------------------------------------------------------------------
+# node binary cache (corepack/pnpm residue)
+/0
+/0/

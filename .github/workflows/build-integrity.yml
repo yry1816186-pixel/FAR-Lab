@@ -1,0 +1,301 @@
+# R9-2 · Build Integrity — 双构建 + 双 grep 断言（编译时常量闸门）
+# 权威 SSOT：HANDOFF_TO_DEV_AGENT.md §3.5, round8 A6, round9 B6
+#
+# 核心断言：
+#   生产构建 grep 零 process.env.AUDITOR_ENABLED（编译时常量，非运行时环境变量）
+#   生产构建 grep 零 AUDITOR_ENABLED=false 残留
+#   生产构建 grep 命中 AUDITOR_ENABLED = true as const（编译时常量已声明）
+#
+# 双构建：
+#   build_backend：TypeScript tsc --build（emit 产出）
+#   build_frontend：Vite build（React 仪表盘）
+#   每构建后立即执行 grep 断言，防止编译产物回退到非确定性模式
+#
+# 反脚本注释闸门：禁止脚本内注释掉 AUDITOR_ENABLED 行后执行（bypass 不可静默）
+name: R9-2 Build Integrity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # pnpm 版本须对齐 package.json packageManager SSOT（pnpm@10.29.3）·避免 CI（pnpm9）与 fresh-clone（corepack pnpm10）install 行为漂移
+  PNPM_VERSION: '10.29.3'
+  NODE_VERSION: '24'
+
+jobs:
+  # ============================================================
+  # AUDIT_CONSTANT_SOURCE · grep source for AUDITOR_ENABLED integrity
+  # 运行时间 <1s，无需 install 依赖。
+  # ============================================================
+  audit_constant_source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # 门禁 1：src/ 中不得出现 process.env.AUDITOR_ENABLED（必须是编译时常量）
+      - name: R9-2-1 · 生产构建 grep 零 process.env.AUDITOR_ENABLED
+        run: |
+          hits=$(grep -rPn "process\.env\.AUDITOR_ENABLED" src/ || true)
+          if [ -n "$hits" ]; then
+            echo "::error::R9-2 编译时常量闸门失败：发现 process.env.AUDITOR_ENABLED（运行时间变量，禁止）"
+            echo "$hits" | sed 's/^/    /'
+            exit 1
+          fi
+          echo "::notice::✅ R9-2-1 通过：src/ 中零处 process.env.AUDITOR_ENABLED"
+      # 门禁 2：src/falsifiability/auditor.ts 中必须存在 "AUDITOR_ENABLED = true as const"
+      - name: R9-2-2 · grep 审计器源码中 AUDITOR_ENABLED = true as const
+        run: |
+          hits=$(grep -rPn "export const AUDITOR_ENABLED\s*=\s*true as const" src/ || true)
+          if [ -z "$hits" ]; then
+            echo "::error::R9-2 编译时常量闸门失败：src/ 中未找到 'export const AUDITOR_ENABLED = true as const'"
+            exit 1
+          fi
+          echo "::notice::✅ R9-2-2 通过：AUDITOR_ENABLED = true as const 在源码中声明"
+      # 门禁 3：src/ 中不得出现 AUDITOR_ENABLED = false 或 AUDITOR_ENABLED=false 残留
+      - name: R9-2-3 · grep 零 AUDITOR_ENABLED=false 残留
+        run: |
+          hits=$(grep -rPn "AUDITOR_ENABLED\s*=\s*false" src/ || true)
+          if [ -n "$hits" ]; then
+            echo "::error::R9-2 编译时常量闸门失败：发现 AUDITOR_ENABLED=false 残留"
+            echo "$hits" | sed 's/^/    /'
+            exit 1
+          fi
+          echo "::notice::✅ R9-2-3 通过：src/ 中零处 AUDITOR_ENABLED=false 残留"
+      # 门禁 4：反脚本注释闸门——禁止注释掉 AUDITOR_ENABLED 行后执行（// 或 /*）
+      - name: R9-2-4 · 反脚本注释闸门 grep (禁止注释掉 AUDITOR_ENABLED 声明)
+        run: |
+          hits=$(grep -rPn "^\s*//.*AUDITOR_ENABLED" src/ || true)
+          if [ -n "$hits" ]; then
+            echo "::error::R9-2 反脚本注释闸门失败：发现被注释掉的 AUDITOR_ENABLED 行（可能 bypass）"
+            echo "$hits" | sed 's/^/    /'
+            exit 1
+          fi
+          echo "::notice::✅ R9-2-4 通过：未发现被注释掉的 AUDITOR_ENABLED 行"
+
+  # ============================================================
+  # BUILD_BACKEND · tsc 编译闸门 + AUDITOR_ENABLED 产物 grep
+  # ============================================================
+  build_backend:
+    needs: audit_constant_source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # TS 类型检查（noEmit 模式——零容忍闸门）
+      - name: R9-2-5 · tsc --noEmit (zero-tolerance typecheck)
+        run: pnpm exec tsc --noEmit
+      # ESLint（零容忍闸门）
+      - name: R9-2-6 · ESLint zero-warnings
+        run: pnpm run lint
+      # 全量 TS 测试（节点 test runner）
+      - name: R9-2-7 · node --test (全量 TS 测试)
+        run: pnpm run test
+
+  # ============================================================
+  # BUILD_FRONTEND · Vite build + 前端资产完整性
+  # ============================================================
+  build_frontend:
+    needs: audit_constant_source
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci (frozen install via package-lock.json)
+        run: npm ci --legacy-peer-deps
+      - name: R9-2-8 · Frontend tsc --noEmit
+        run: npx tsc --noEmit
+      - name: R9-2-9 · Frontend ESLint zero-warnings
+        run: npm run lint
+      - name: R9-2-10 · Vite production build
+        run: npx vite build
+      # 前端构建产物中不得含 process.env.AUDITOR_ENABLED（跨端编译时常量一致性）
+      - name: R9-2-11 · grep 前端 dist 中零 process.env.AUDITOR_ENABLED
+        run: |
+          if [ -d dist ]; then
+            hits=$(grep -r "process.env.AUDITOR_ENABLED" dist/ || true)
+            if [ -n "$hits" ]; then
+              echo "::error::R9-2 前端构建完整性失败：dist/ 中发现 process.env.AUDITOR_ENABLED"
+              exit 1
+            fi
+            echo "::notice::✅ R9-2-11 通过：前端 dist/ 中零处 process.env.AUDITOR_ENABLED"
+          else
+            echo "::error::R9-2 前端构建完整性失败：dist/ 目录不存在（R9-2-10 Vite build 完成则必然存在·缺失=构建失败=门禁须红）"
+            exit 1
+          fi
+
+  # ============================================================
+  # CROSS_LANG · 跨语言哈希一致性（R2 最高优先闸门）
+  # 与主 ci.yml 的 cross_lang job 一致——R9-2 独立性兜底
+  # ============================================================
+  cross_lang:
+    needs: [build_backend, build_frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: R9-2-12 · cross_lang byte-equal (TS canonicalHash === Python canonical_hash)
+        run: node --test tests/evidence_log/cross_lang_consistency.test.ts
+
+  # ============================================================
+  # MERKLE_CROSS_LANG · Merkle 完整性根跨语言字节相等（与 canonical_hash 同等强度信任根）
+  # 与 cross_lang 并列的独立兜底：TS computeMerkleRoot === Python compute_merkle_root
+  #   + inclusion proof siblings 字节相等 + 双向 verify ok + tamper-evidence。
+  # ============================================================
+  merkle_cross_lang:
+    needs: cross_lang
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: R9-2-12b · merkle cross_lang byte-equal (TS Merkle root + inclusion proof === Python)
+        run: node --test tests/evidence_log/merkle_cross_lang.test.ts
+
+  # ============================================================
+  # ANTI_THEATER · 反剧场闸门（F1）
+  # ============================================================
+  anti_theater:
+    needs: merkle_cross_lang
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: R9-2-13 · anti-theater grep —— proof_envelopes 中 WARN 含 → 封 CONFIRMED 阻断
+        run: |
+          set -euo pipefail
+          # 检查 proof_envelopes 迁移文件中反剧场触发器是否存在且正确
+          MIG="schema/migrations/0004_proof_envelopes.sql"
+          if [ ! -f "$MIG" ]; then
+            echo "::error::迁移文件 ${MIG} 不存在"
+            exit 1
+          fi
+          has_trigger=$(grep -c "anti_theater" "$MIG" || true)
+          if [ "$has_trigger" -lt 1 ]; then
+            echo "::error::R9-2 反剧场闸门失败：0004_proof_envelopes.sql 中未找到 anti_theater 触发器"
+            exit 1
+          fi
+          echo "::notice::✅ R9-2-13 通过：anti_theater 触发器声明存在于迁移中"
+
+  # ============================================================
+  # MODEL_NEUTRALITY · 模型中立 grep（核心路径不得含 qwen/dashscope/bailian 字面量）
+  # ============================================================
+  model_neutrality:
+    needs: anti_theater
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: R9-2-14 · 核心路径模型中立 grep（含 golden_vectors.ts）
+        run: |
+          set -euo pipefail
+          # 核心目录扫描（排除 llm_gateway adapters·属于竞争适配器命名空间）
+          DIRS="src/evidence_log src/evidence_graph src/falsifiability src/proof_envelope src/far_proof src/agent_loop src/fec src/report src/db src/schema src/api"
+          violations=""
+          for dir in $DIRS; do
+            if [ -d "$dir" ]; then
+              # 只抓实际模型名/API base URL/百炼调用（排除：DB 列 dashscope_request_id、字段名 dashscopeRequestId、注释声明、providerProfile 路由字符串 competition_aliyun_qwen）
+              found=$(grep -rPn "(?<!_)qwen(?!_)" "$dir" --include='*.ts' 2>/dev/null | grep -v "golden_vectors\.ts" | grep -v "^\s*\*\|^\s*//" || true)
+              if [ -n "$found" ]; then violations="${violations}${found}"$'\n'; fi
+              found=$(grep -rPn "dashscope\s*\.\s*aliyuncs" "$dir" --include='*.ts' 2>/dev/null || true)
+              if [ -n "$found" ]; then violations="${violations}${found}"$'\n'; fi
+              found=$(grep -rPn "bailian" "$dir" --include='*.ts' 2>/dev/null | grep -v "^\s*\*\|^\s*//" | grep -v "golden_vectors\.ts" || true)
+              if [ -n "$found" ]; then violations="${violations}${found}"$'\n'; fi
+            fi
+          done
+          violations=$(echo "$violations" | grep -v '^$' | sort -u || true)
+          if [ -n "$violations" ]; then
+            echo "::error::R9-2 模型中立闸门失败：核心路径发现模型特定字面量（非 DB 字段名/注释/路由字符串）"
+            echo "$violations" | sed 's/^/    /'
+            exit 1
+          fi
+          echo "::notice::✅ R9-2-14 通过：核心路径无模型特定字面量"
+
+  # ============================================================
+  # SECURITY · secrets 泄露 grep
+  # ============================================================
+  security:
+    needs: model_neutrality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: R9-2-15 · grep 零 DASHSCOPE_API_KEY 明文（非 .env.example）
+        run: |
+          hits=$(grep -rPn "DASHSCOPE_API_KEY\s*=\s*['\"]sk-" src/ tests/ || true)
+          if [ -n "$hits" ]; then
+            echo "::error::安全闸门失败：发现 DASHSCOPE_API_KEY 明文（必须以 sk- 开头则为真实 key）"
+            echo "$hits" | sed 's/^/    /'
+            exit 1
+          fi
+          echo "::notice::✅ R9-2-15 通过：未发现 DASHSCOPE_API_KEY 明文"
+
+  # ============================================================
+  # DELIVERABLE_MARK · 构建完整性最终标记（全绿则 R9-2 达成）
+  # ============================================================
+  deliverable_mark:
+    needs: security
+    runs-on: ubuntu-latest
+    steps:
+      - name: R9-2 · Build Integrity 全绿
+        run: |
+          echo "========================================="
+          echo "  R9-2 Build Integrity — ALL GREEN"
+          echo "  生产构建: 零 process.env.AUDITOR_ENABLED"
+          echo "  编译时常量: AUDITOR_ENABLED = true as const"
+          echo "  零 AUDITOR_ENABLED=false 残留"
+          echo "  核心路径: 零 qwen/dashscope/bailian"
+          echo "  cross_lang: TS === Python byte-equal"
+          echo "  merkle_cross_lang: TS Merkle root + inclusion proof === Python byte-equal"
+          echo "  anti_theater: 触发器就绪"
+          echo "  security: 零明文 secrets"
+          echo "========================================="

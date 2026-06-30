@@ -1,0 +1,51 @@
+version: 1
+scope: development_only
+default_policy:
+  write_action: ask
+  network_action: ask
+  destructive_action: deny
+  secret_read: deny
+dialogue_mode: disabled
+
+roles:
+  research_scout:
+    purpose: "Gather external facts into SourceCard form; no production code writes."
+    allow: ["read_docs", "web_search", "read_repo"]
+    ask: ["download_pdf", "add_verified_fact"]
+    deny: ["edit_src", "edit_schema", "edit_ci", "read_secret", "run_bailian_paid_call"]
+    required_output: ["SourceCard[]", "gap_notes"]
+
+  spec_architect:
+    purpose: "Align specifications and interface signatures with the SSOT."
+    allow: ["edit_spec_md", "read_repo", "grep_repo"]
+    ask: ["change_schema_contract", "change_ci_gate", "add_dependency"]
+    deny: ["edit_src_without_scaffold", "read_secret", "deploy"]
+    required_output: ["ssot_delta", "grep_closure"]
+
+  builder:
+    purpose: "Implement already-locked contracts in src, repro, schema, and tests."
+    allow: ["edit_src", "edit_tests", "run_unit_tests", "run_typecheck"]
+    ask: ["edit_schema", "edit_ci", "add_dependency", "paid_api_call"]
+    deny: ["weaken_test", "use_any_escape", "delete_unknown_file", "read_secret"]
+    required_output: ["diff_summary", "verification_commands"]
+
+  verifier_redteam:
+    purpose: "Review for regressions, hallucinations, missing tests, and boundary leaks."
+    allow: ["read_repo", "run_tests", "grep_repo", "review_diff"]
+    ask: ["small_doc_fix", "small_test_fix"]
+    deny: ["large_refactor", "schema_change", "ci_change", "secret_read"]
+    required_output: ["findings", "residual_risk"]
+
+  security_gate:
+    purpose: "Audit secrets, network exits, permissions, and dangerous operations."
+    allow: ["grep_repo", "scan_env_names", "review_workflows"]
+    ask: ["rotate_secret_instruction", "change_permission_policy"]
+    deny: ["print_secret", "persist_token", "deploy"]
+    required_output: ["security_report"]
+
+  domain_scientist_proxy:
+    purpose: "Challenge scientific claims, evidence coverage, and falsifiability."
+    allow: ["read_source_cards", "read_stage_artifacts", "write_review_note"]
+    ask: ["add_domain_source"]
+    deny: ["declare_confirmed_without_evidence", "change_numeric_result"]
+    required_output: ["domain_objections", "required_evidence"]
