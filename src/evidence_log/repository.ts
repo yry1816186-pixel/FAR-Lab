@@ -146,7 +146,10 @@ export function appendRecord(
     };
   });
 
-  return append();
+  // IMMEDIATE 事务（CONCURRENCY-1 · APPENDIX_C §3.6）：BEGIN IMMEDIATE 获取 RESERVED 写锁，
+  // 使 chainHead 校验 + INSERT 在跨进程并发下也原子（防两条记录接同一 prevHash 的 TOCTOU 分叉）。
+  // 单进程内 better-sqlite3 同步执行，行为与 deferred 一致；跨进程第二个写入器在校验前即获 SQLITE_BUSY。
+  return append.immediate();
 }
 
 export function getCallRecordBySeq(db: Database.Database, seq: number): CallRecordRow {

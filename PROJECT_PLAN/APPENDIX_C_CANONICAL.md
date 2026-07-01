@@ -371,15 +371,28 @@ function verifyChainHead(records: CallRecord[]): void
 
 ```text
 function appendRecord(input: CanonicalInput, db): string
-  assert input.prevHash === chainHead(db)        // 必须接在链头
-  currentHash = canonicalHash(input)
-  INSERT INTO call_records (
-    seq, prevHash, currentHash, stageId, cred, payloadKind, purposeTag,
-    request_payload, response_payload, finish_reason, usage_tokens_total
-  ) VALUES (...)
-  // 2 个 trigger 守卫：no_update / no_delete（任一触发 RAISE(ABORT)）
+  // IMMEDIATE 事务：chainHead 校验 + INSERT 必须原子（防跨进程 TOCTOU 分叉）
+  BEGIN IMMEDIATE                              // 获取 RESERVED 写锁·序列化并发写入器
+    derivedPrev = chainHead(db)?.currentHash ?? GENESIS_PREV_HASH
+    prevHash    = input.prevHash ?? derivedPrev
+    assert prevHash === derivedPrev            // 校验在写锁内·无 TOCTOU 窗口
+    currentHash = canonicalHash(input)
+    INSERT INTO call_records (
+      seq, prevHash, currentHash, stageId, cred, payloadKind, purposeTag,
+      request_payload, response_payload, finish_reason, usage_tokens_total
+    ) VALUES (...)
+    // 2 个 trigger 守卫：no_update / no_delete（任一触发 RAISE(ABORT)）
+  COMMIT
   return currentHash
+  // 跨进程并发：另一写入器持锁 → BEGIN IMMEDIATE 立即抛 SQLITE_BUSY（在 chainHead 校验前）→ 调用方重试或外层序列化
 ```
+
+**并发合约（CONCURRENCY-1）**：
+
+1. **单写入器串行化**：appendRecord 是链头串行化点——同一 DB 同时只能有一个写入器推进链头（SQLite 单写入器模型 + `BEGIN IMMEDIATE` 共同保证）。
+2. **单进程内原子**：better-sqlite3 同步执行，`db.transaction(fn)` 体在单进程内不被打断（无 TOCTOU）。
+3. **跨进程并发**：两进程同时 appendRecord → `BEGIN IMMEDIATE` 使第二个立即在 chainHead 校验前获 `SQLITE_BUSY`，调用方重试或外层序列化。**禁止**默认 DEFERRED 事务（首个 SELECT 不取写锁 → 两进程都过 prevHash 校验 → 链分叉·不可检测地破坏信任根）。
+4. **触发器守卫不替代事务**：no_update/no_delete trigger 防 UPDATE/DELETE，但不防“两条 INSERT 接同一 prevHash”的分叉——后者只能靠 IMMEDIATE 事务 + 单写入器。
 
 ### 3.7 hash chain 状态
 
@@ -390,6 +403,7 @@ function appendRecord(input: CanonicalInput, db): string
 | TS↔Python byte-equal（白名单对象） | `IMPLEMENTED_VERIFIED`（cross_lang_consistency 守卫） |
 | `verifyChainHead` TS / Python | `IMPLEMENTED_VERIFIED` |
 | append-only trigger（no_update / no_delete） | `IMPLEMENTED_VERIFIED`（SQLite `:memory:` 实测） |
+| appendRecord 跨进程并发（IMMEDIATE 合约） | `DESIGN_LOCKED`（CONCURRENCY-1·单进程已原子·跨进程须 IMMEDIATE·见 §3.6 合约） |
 | 浮点科学计数法跨语言对齐 | `NUMERIC_KNOWN_DIVERGENCE`（§8，V3 迁移 RFC 8785） |
 
 ---
@@ -414,24 +428,24 @@ function appendRecord(input: CanonicalInput, db): string
 | 项 | 规则 |
 |---|---|
 | 叶子 | 每个事件的 `current_hash`（64 hex），按 `event_id` 字典序或写入序（冻结一种，**默认写入序**） |
-| 叶子规范化 | 叶子字符串先 canonicalJson（即 `"..."` 包裹）再 sha256，防止恶意叶子值与内部节点碰撞 |
-| 内部节点 | `sha256(canonicalJson([leftHex, rightHex]))`，即 `[left, right]` 数组的 canonical JSON 的 sha256 |
+| 叶子/节点长度 | 叶子与内部节点均为**固定 64 小写 hex**（32 字节 ASCII）——固定长度是裸拼接无碰撞歧义的安全依据（见“内部节点”行） |
+| 内部节点 | `sha256(utf8(leftHex + rightHex))`，**裸拼接**（不包 canonicalJson）。安全依据：每节点固定 64 字节 → 拼接恒为 128 字节 → 不可能与任一单节点（64 字节）同形 → 无 second-preimage 歧义。与 §3 canonicalHash 四字段白名单**等价强度**（ASCII 定长字节拼接，无浮点 / 无键序歧义），由 `merkle_cross_lang` 三路对拍守卫 |
 | 奇数叶子 | 末尾复制自身（duplicate last leaf）或挂到上一层；**项目冻结：duplicate last leaf** |
-| 空树 | `EMPTY_MERKLE_ROOT = sha256(canonicalJson([])) = sha256("[]")` |
+| 空树 | `ZERO_MERKLE_ROOT = "0".repeat(64)`（全零·诚实占位：空集无完整性，**非** `sha256("[]")`） |
 | 域分离 | V2 新对象（ledger/claim graph/proof envelope 等）的 hash 输入**必须**包含 `hashDomain` tag（见 §9），防不同对象同形 JSON 语义混淆 |
 
 ```text
 function merkleRoot(leafHashes: string[]): string
   if leafHashes.length === 0:
-      return sha256hex(canonicalJson([]))         // = sha256("[]")
+      return ZERO_MERKLE_ROOT                       // "0".repeat(64)，诚实空集占位
   level = leafHashes.map(h => h)                  // 64 hex 字符串数组，写入序
   while level.length > 1:
       nextLevel = []
       i = 0
       while i < level.length:
-          left  = level[i]
+          left  = level[i]                         // 固定 64 hex（32 字节）
           right = (i + 1 < level.length) ? level[i + 1] : level[i]   // 奇数复制末叶
-          parent = sha256hex(canonicalJson([left, right]))
+          parent = sha256hex(left + right)         // 裸拼接（utf8）：定长节点 → 无碰撞歧义
           nextLevel.push(parent)
           i += 2
       level = nextLevel
@@ -490,10 +504,10 @@ function verifyInclusionProof(proof: MerkleInclusionProof): boolean
   computed = proof.leafHash
   for step in proof.path:
       if step.position === "left":
-          // sibling 是左孩子，leaf 是右孩子
-          computed = sha256hex(canonicalJson([step.siblingHash, computed]))
+          // sibling 是左孩子，leaf 是右孩子（裸拼接，与 merkleRoot 同算法）
+          computed = sha256hex(step.siblingHash + computed)
       else: // "right"
-          computed = sha256hex(canonicalJson([computed, step.siblingHash]))
+          computed = sha256hex(computed + step.siblingHash)
   return computed === proof.rootHash
   // 注意：verifier 必须独立用 leafCount 与 leafIndex 重建路径形状，
   //       不得信任 proof.path 的顺序本身（防 path 重排攻击）
@@ -503,7 +517,7 @@ function verifyInclusionProof(proof: MerkleInclusionProof): boolean
 
 | 篡改 | 检测点 |
 |---|---|
-| 改叶子值 | `leafHash` 与 `canonicalJson(叶子内容)` 的 sha256 不符 → 第一层 computed 就错 |
+| 改叶子值 | 叶子是 `call_records.current_hash`（64-hex·无二次 hash）；改叶子值 → 重算根偏离 `rootHash` → verifier 检出（叶子/节点定长 → 裸拼接无碰撞可隐藏篡改） |
 | 改 sibling | 某层 `computed` 偏离 → 最终 `computed !== rootHash` |
 | 改 rootHash | verifier 独立重算 root（从全树或从独立 channel 取 root）即可发现 |
 | 删叶子（声称不在树里其实真不在） | inclusion proof 不存在；不存在性证明 V2 提供（空子树证据） |
@@ -574,19 +588,22 @@ type VerdictKind =
 
 ## 8. 已知数值域分叉（NUMERIC_KNOWN_DIVERGENCE）
 
-> **诚实披露**：TS 与 Python 的 canonical 序列化在**浮点科学计数法零填充**上不一致，这是已知分叉，不是 bug。本附录不掩盖。
+> **诚实披露**：TS 与 Python 的 canonical 序列化在**浮点表示**上有两类已知分叉（均非 bug）：① **指数零填充**——`|exp|<10` 时 Python 补零（`1e-07`）TS 不补（`1e-7`），`|exp|≥10` 时一致；② **定点/科学切换阈值不同**——TS `JSON.stringify` 在 `1e21` 才切科学计数（`[1e16,1e21)` 输出定点整数如 `10000000000000000`），Python `json.dumps` 在 `1e16` 即切（`1e+16`）。本附录不掩盖，下表为 2026-07 实测口径。
 
-| 项 | TS 行为 | Python 行为 | 状态 |
+| 项 | TS 行为（`JSON.stringify`） | Python 行为（`json.dumps`） | 状态 |
 |---|---|---|---|
-| `1e-7` 序列化 | `"1e-7"` | `"1e-07"` | 已知分叉，归 RED |
-| `1e21` 以上 | `"1e+21"` | `"1e+21"`（多数一致） | 边界待核 |
+| 指数零填充 `\|exp\|<10`（`1e-7`） | `"1e-7"` | `"1e-07"` | 已知分叉，归 RED |
+| 指数 `\|exp\|≥10`（`1e-21`） | `"1e-21"` | `"1e-21"` | **一致**（实证 2026-07） |
+| 定点/科学切换（`1e16`、`1e17`） | `"10000000000000000"` / `"100000000000000000"`（定点整数·TS 1e21 才切） | `"1e+16"` / `"1e+17"`（科学·Python 1e16 即切） | 已知分叉，归 RED |
+| `1e21` 及以上（`1e21`、`1e22`） | `"1e+21"` / `"1e+22"` | `"1e+21"` / `"1e+22"` | **一致**（实证 2026-07·订正原“边界待核”） |
+| 定点小数（`0.1`） | `"0.1"` | `"0.1"` | 一致 |
 | NaN / Infinity | `assertNoNaN` 抛错 | `allow_nan=False` 抛 ValueError | 一致（双拒） |
 
 **缓解（V1）**：
 
 1. **四字段白名单结构性排斥浮点**：`call_records` 的 canonical hash 输入（stageId/cred/payloadKind/prevHash）全部是字符串/嵌套字符串对象，**不含浮点**，因此 cross_lang byte-equal 在信任根上成立（`IMPLEMENTED_VERIFIED`）。
 2. **ProofEnvelope 中的数值字段**（pValue、effectSize 等）若进入 proofHash，须在 schema 层声明为字符串承载（如 `"pValue": "0.043"`）或在 V1 显式纳入 NUMERIC_KNOWN_DIVERGENCE 归 RED。
-3. **V3 迁移**：统一迁移到 RFC 8785 JCS（JSON Canonicalization Scheme），消除科学计数法零填充差异；同时处理补充平面 / emoji / ZWJ 序列化边界。
+3. **V3 迁移**：统一迁移到 RFC 8785 JCS（JSON Canonicalization Scheme），同时消除①指数零填充差异与②定点/科学切换阈值差异；并处理补充平面 / emoji / ZWJ 序列化边界。
 
 > **CI 守卫**：`cross_lang_consistency.test.ts` 对拍 golden vectors；白名单对象对拍为真绿，浮点向量按 NUMERIC_KNOWN_DIVERGENCE 诚实归 RED（非设计期故意红，非 bug）。
 
@@ -693,8 +710,11 @@ function domainTaggedHash(domain: HashDomain, obj: object): string
 | 旧“扁平化 hash 输入”写法 | 嵌套 CanonicalInput，Omit `seq`/`currentHash`，保留 `prevHash` | `03_EXISTING_ARCHITECTURE` §4 N1 → 本附录 §3 |
 | `physical interception / 物理拦截` | tamper-evident（非 tamper-proof） | `56` §4 R6 → 本附录 §11 |
 | 跨语言字节相等“已实证 LIVE”（全域） | 四字段白名单已实证；浮点科学计数法已知分叉 | `56` §4 R7 / `digest_C01` → 本附录 §8 |
+| Merkle 内部节点 `sha256(canonicalJson([L,R]))` | `sha256(utf8(L+R))` 裸拼接（定长 hex 安全依据） | **MERKLE-1 收敛（W1）**：本附录 §4.3 旧口径 → §4.3 新口径（改规格对齐三路实现） |
 
 > 旧编号（如 `03_EXISTING_ARCHITECTURE.md`）作为来源溯源保留；其物理档案随 `FINAL_PACKAGE` 退役，备份见 `C:/Users/RichardYuan/FAR-Lab_Backups/`。后续维护引用本附录与 `APPENDIX_A/F` 即可，不再回引旧编号作为有效依赖。
+
+> **MERKLE-1 收敛（W1 信任根规格对齐）**：原 §4.3 规格声明 Merkle 内部节点为 `sha256(canonicalJson([leftHex, rightHex]))`、空树为 `sha256("[]")`、叶子先 canonicalJson 包裹；但三路实现（`src/evidence_log/merkle_root.ts` / `repro/far_chain_repro/merkle_root.py` / `frontend/src/lib/merkle.ts`）均用裸拼接 `sha256(utf8(left + right))`，空树用 `ZERO_MERKLE_ROOT = "0".repeat(64)`。用户裁决（W1）：**改规格对齐实现**——固定 64-hex 节点长度使裸拼接无 second-preimage 歧义（拼接恒 128 字节，不与任一 64 字节单节点同形），与 canonicalHash 四字段白名单等价强度，三路对拍守卫不变。本节 §4.3 / §5.3 / §5.4 已同步订正。
 
 ---
 
