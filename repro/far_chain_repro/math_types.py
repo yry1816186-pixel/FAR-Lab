@@ -1,9 +1,9 @@
 """Math verification layer enum mirrors (spec 38 §1 / §1.1).
 
 These constants MUST stay byte-equal with the TypeScript enums in
-``far-chain/src/math/math_claim.ts`` and the SQL CHECK constraints in
-``far-chain/schema/migrations/0003_math_verification.sql``. Cross-language drift
-(TS ↔ SQL) is guarded by ``far-chain/tests/schema/schema_enum_sync.test.ts``.
+``src/math/math_claim.ts`` and the SQL CHECK constraints in
+``schema/migrations/0003_math_verification.sql``. Cross-language drift
+(TS ↔ SQL) is guarded by ``tests/schema/schema_enum_sync.test.ts``.
 
 Authority: FAR_CHAIN_DEV_SPEC/38_数学可验证层_MATH_VERIFICATION.md §1-§4.5.
 

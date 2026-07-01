@@ -1,6 +1,6 @@
 // scripts/fresh_clone_smoke.mjs
 // 职责：fresh-clone 一键复现集成测试（模拟 fresh-clone 环境·无 secret 跑通 core gate）
-// 权威 SSOT：FAR_CHAIN_DEV_SPEC/22_安装与配置指南_INSTALL_SETUP.md §1
+// 历史溯源：FAR_CHAIN_DEV_SPEC/22_安装与配置指南_INSTALL_SETUP.md §1（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以 package.json scripts + 本脚本为准
 // 无 secret 跑通规则（17§7 第 1 条）：competition_qwen_smoke 在 DASHSCOPE_API_KEY 缺失时 graceful skip（exit 0）
 // 用法：node scripts/fresh_clone_smoke.mjs
 // 退出码：0 = core gate 全绿（skip 项不破坏闭环），1 = 至少一个 hard gate 失败

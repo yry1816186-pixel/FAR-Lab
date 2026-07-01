@@ -1,5 +1,5 @@
 # FAR-Chain CI — 12 步串行 gate + competition_qwen_smoke 条件门 + C8 每日 snapshot 存活监控
-# 权威 SSOT：FAR_CHAIN_DEV_SPEC/10_CI_pipeline.md §2
+# 历史溯源：FAR_CHAIN_DEV_SPEC/10_CI_pipeline.md §2（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本 workflow + package.json 为准
 # 作用域：对抗 LLM 幻觉的工程化兜底。cross_lang 是 R2 最高优先闸门。
 # 命名约定：job id 一律下划线（不用连字符），因 needs.<job_id>.result 表达式里连字符会被解析为减号
 # Action 版本锁：2026 node24 时代（checkout@v5 / setup-node@v6 / setup-python@v6 / pnpm/action-setup@v5）

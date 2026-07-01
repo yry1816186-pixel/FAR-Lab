@@ -3,6 +3,7 @@
 > **Scope**: 竞赛提交前必须由人类 / 真实环境完成的 day-1 实测项。
 > **权威 SSOT**: `FINAL_PACKAGE/30_FINAL_CHECKLIST.md §4`（Day-1 六项实测）、
 > `HANDOFF_TO_DEV_AGENT.md §5.3`、`02_CONSTRAINTS_AND_RED_LINES.md §7.4/§7.5/§10`。
+> 注：`FINAL_PACKAGE/` 为竞赛 PDF 提交层（git-ignored·git clone 不可见）；本清单内容已固化为竞赛 PDF Day-1 实测章 + 本 tracked 文档（运行时 SSOT 以源码 + 本文档为准）。
 > **反幻觉最高元规则（02 §10）**: 每项声称须二选一标注 `[已实证·来源·日期]` 或 `[须day-1核验·方法]`；编造即违反。
 
 ---
@@ -26,7 +27,7 @@
 
 | 字段 | 值 |
 |---|---|
-| **要求** | `GET /v1/models` 确认 `qwen3.7-max-2026-05-20` 在线；确认 ~2026-07-08 维护期不阻塞 |
+| **要求** | `GET /v1/models` 确认 `qwen3.7-max-2026-05-20` 在线；**无官方维护期承诺**，day-0 实测复核（不预设虚构日期，59§6 W0-2） |
 | **状态词** | `NEEDS_REAL_ENV` |
 | **脚手架** | `ci/snapshot_liveness_smoke.ts`（已建·CI STEP 13 计划位） |
 | **运行** | `set DASHSCOPE_API_KEY=sk-xxx && pnpm exec tsx ci/snapshot_liveness_smoke.ts` |
@@ -35,7 +36,7 @@
 
 ### 维护期风险（L3 · `30_FINAL_CHECKLIST.md:117`）
 
-Qwen 维护期 ~2026-07-08 vs 提交 2026-09-05：若 snapshot 下线，所有 golden hex 须重算（E4 + R14 叠加风险）。
+Qwen snapshot **无官方维护期承诺**（团队 2026-06-27 web search verified_live，非代码约束）；提交 2026-09-05 前 day-0 须 `GET /v1/models` 复核——若 snapshot 下线，所有 golden hex 须重算（E4 + R14 叠加风险）。
 **缓解**：FallbackChain（`src/llm_gateway/fallback_chain/`，3 元素 Qwen-only 链 `qwen3.7-max → qwen3-235b-a22b → qwen-plus`·evo-01 已删 deepseek 第4档）已就绪可全测；三档全失败 → verdict=UNTESTED + reason=no_qwen_family_available（绝不切非国产基座）。
 
 ---

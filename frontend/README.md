@@ -7,8 +7,8 @@ FAR-Chain Web UI — Falsifiable Auditable Research-Chain 仪表盘。
 ## 快速开始（fresh-clone）
 
 ```bash
-# 1. 进入前端目录
-cd far-chain/frontend
+# 1. 进入前端目录（从仓库根）
+cd frontend
 
 # 2. 安装依赖
 npm install

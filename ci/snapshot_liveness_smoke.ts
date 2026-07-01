@@ -1,6 +1,6 @@
 // ci/snapshot_liveness_smoke.ts
 // 职责：C8 每日 snapshot 存活监控 smoke（CI STEP 13·仅 schedule/workflow_dispatch 触发）
-// 权威 SSOT：10_CI_pipeline.md §0 ⑧ / 00_项目宪法 §1.4 snapshot 监控 4 点策略第 1 点
+// 历史溯源：10_CI_pipeline.md §0 ⑧ / 00_项目宪法 §1.4 snapshot 监控 4 点策略第 1 点（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本脚本源码 + 实测为准
 //
 // [须day-1核验·E1·方法:配 DASHSCOPE_API_KEY 调 GET /v1/models 确认 snapshot 在线]
 // 状态词（02 §7.4）：NEEDS_REAL_ENV。诚实铁律：无 key graceful skip ≠ 通过（snapshot 未实测在线）。

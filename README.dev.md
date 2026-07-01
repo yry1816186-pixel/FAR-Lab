@@ -1,6 +1,6 @@
 # FAR-Chain Development Scaffold
 
-This directory is the implementation workspace for the FAR-Chain proof core. Design SSOT lives in `FINAL_PACKAGE/` (00-40 numbered specs; the legacy `FAR_CHAIN_DEV_SPEC/` was archived/removed in commit 66e2975); the W3 landed-subsystem design retro-spec is `FINAL_PACKAGE/40_VERIFIABLE_BENCHMARK_AND_LEADERBOARD.md`. Development control plane lives in root `AGENTS.md` + `CLAUDE.md` (authority order: AGENTS §1).
+This directory is the implementation workspace for the FAR-Chain proof core. Design SSOT lives in `FINAL_PACKAGE/` (00-40 numbered specs · **PDF 提交层·git-ignored·git clone 不可见**; the legacy `FAR_CHAIN_DEV_SPEC/` was archived/removed in commit 66e2975; runtime SSOT = 源码 Authority 注释 + 本 README); the W3 landed-subsystem design retro-spec is `FINAL_PACKAGE/40_VERIFIABLE_BENCHMARK_AND_LEADERBOARD.md`. Development control plane lives in root `AGENTS.md` + `CLAUDE.md` (authority order: AGENTS §1).
 
 ## W3 已落地（benchmark + integrity + leaderboard · 规模扩展 · 惊艳核心）
 
@@ -87,5 +87,5 @@ This directory is the implementation workspace for the FAR-Chain proof core. Des
 
 ## Authority
 
-- 设计 SSOT：`FINAL_PACKAGE/`（00-40 编号 spec · 旧 `FAR_CHAIN_DEV_SPEC/` 已于 commit 66e2975 归档删除 · W3 已落地子系统设计见 `40_VERIFIABLE_BENCHMARK_AND_LEADERBOARD.md`）
+- 设计 SSOT：`FINAL_PACKAGE/`（00-40 编号 spec · 竞赛 PDF 提交层 · git-ignored · git clone 不可见 · 物理仅本地可见 · 旧 `FAR_CHAIN_DEV_SPEC/` 已于 commit 66e2975 归档删除 · W3 已落地子系统设计见 `40_VERIFIABLE_BENCHMARK_AND_LEADERBOARD.md`）·运行时 SSOT 以源码 `Authority: FAR_CHAIN_DEV_SPEC/NN` 历史溯源注释 + 本 README 实测为准
 - 开发控制面：根 `AGENTS.md` + `CLAUDE.md`（Ask 层 / 零容忍 / 依赖策略 / 红线）

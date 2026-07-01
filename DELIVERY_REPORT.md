@@ -1,7 +1,7 @@
 # FAR-Chain V1 交付报告
 
 > **状态口径**：`[已实证·来源·日期]` = 本会话以命令输出/git diff 为证；`[须day-1核验·方法]` = 须竞赛现场人工/真实环境核验；`[CI端]` = 门禁定义在 GitHub Actions，本地等价子项已绿，整体须 CI 运行确认。
-> **权威 SSOT**：`FAR_CHAIN_DEV_SPEC/`。本报告为开发交付记录，非运行时科学制品。
+> **权威 SSOT**：源码内 `Authority: FAR_CHAIN_DEV_SPEC/NN` 注释为历史 V1 溯源标注（`FAR_CHAIN_DEV_SPEC/` 已于 commit 66e2975 归档删除·物理不存在）；交付包 SSOT 见 `FINAL_PACKAGE/`（竞赛 PDF 提交层·git-ignored·git clone 不可见）；**运行时 SSOT 以源码 + 本报告命令输出实测为准**。本报告为开发交付记录，非运行时科学制品。
 > **日期**：2026-06-28（初版）/ 2026-06-29（§2-M2+§3-R9-2 对抗终检增量·见 §1.4 / §8）/ 2026-06-30（benchmark + integrity + leaderboard 规模扩展增量·见 §2-M8 / §1.4）。
 
 ---
@@ -155,7 +155,7 @@ $env:DASHSCOPE_API_KEY="sk-xxx"; pnpm run ci-all
 
 - 本报告每一项「已实证」均对应本会话命令输出或 grep 结果，未凭记忆声称。
 - `competition_aliyun_qwen` 经核实为逻辑命名边界（`COMPETITION_*` 常量），非物理目录——已如实表述，未声称目录存在。
-- 「30 项检查清单」SSOT = `FINAL_PACKAGE/30_FINAL_CHECKLIST.md`。本会话以 9 维 workflow（59 agent·skeptic 对抗验证）逐项核验 **44 项：41 P0 VERIFIED_SATISFIED（93.2%）+ 2 个假绿被 skeptic 推翻（§2-M2 死代码 / §3-R9-2 R9-2-4 注释 grep）+ 1 NEEDS_HUMAN_ALIGN（§1-doc5 迁移编号口径）**。**2 个假绿本会话已修复**：§2-M2 接线 FEC contract 预登记回路（registerContract caller + barrel 导出 + 5 单测 + demo 真实预登记·PARTIAL→VERIFIED）+ §3-R9-2 R9-2-4 注释 grep 清零（auditor.ts:154 移除字面量）。修复后 code 层面 P0 全就绪；剩余硬门=GitHub Actions 远程 CI run + day-1 真实 key 实测 + PDF 前人工学术核（非 code agent 可关）。
+- 「30 项检查清单」SSOT = `FINAL_PACKAGE/30_FINAL_CHECKLIST.md`（竞赛 PDF 提交层·git-ignored·git clone 不可见·物理仅本地可见）；运行时核验 SSOT 以本报告 9 维 workflow 结果记录为准。本会话以 9 维 workflow（59 agent·skeptic 对抗验证）逐项核验 **44 项：41 P0 VERIFIED_SATISFIED（93.2%）+ 2 个假绿被 skeptic 推翻（§2-M2 死代码 / §3-R9-2 R9-2-4 注释 grep）+ 1 NEEDS_HUMAN_ALIGN（§1-doc5 迁移编号口径）**。**2 个假绿本会话已修复**：§2-M2 接线 FEC contract 预登记回路（registerContract caller + barrel 导出 + 5 单测 + demo 真实预登记·PARTIAL→VERIFIED）+ §3-R9-2 R9-2-4 注释 grep 清零（auditor.ts:154 移除字面量）。修复后 code 层面 P0 全就绪；剩余硬门=GitHub Actions 远程 CI run + day-1 真实 key 实测 + PDF 前人工学术核（非 code agent 可关）。
 - **对抗式终检反幻觉**：workflow skeptic 独立重验每项 VERIFIED_SATISFIED（不轻信前次结论），主动揪出 2 个假绿——这是"测试声称 vs 真实接线"的典型偏差（contracts.ts 张冠李戴 verdict 测试 / 注释触发 grep）。修复以"接线真实数据流 + 跑通测试"为证，非声称。
 - Z16 覆盖率门禁（Core ≥85% line / ≥75% branch）**本地实测通过**：`scripts/coverage_gate.mjs`（Node 24 原生 `--experimental-test-coverage` · 零新依赖）报 Core 11 目录 **92.80% line / 79.56% branch**（ci-all STEP9 · `[已实证·coverage·2026-06-30]`）。
 - **fresh-clone 可重现性** `[已实证·fresh-clone·2026-06-28]`：删 `node_modules`/`dist`/`frontend/node_modules` → `pnpm install --frozen-lockfile` + `npm ci` → ci-all STEP1–11 全绿（662/67/44/110 · Z16 92.80%/79.56%）+ frontend build EXIT=0（2214 modules）= lock/native 重编译/全门禁可重现。

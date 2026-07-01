@@ -1,6 +1,6 @@
 # CHANGELOG — FAR-Chain V1 推进
 
-> 格式：Keep a Changelog · 权威 SSOT = `FINAL_PACKAGE/`。本文件记录 V1 推进里程碑，不作为运行时科学制品。
+> 格式：Keep a Changelog · 权威 SSOT = 源码 + 本 CHANGELOG 实测记录；`FINAL_PACKAGE/` 为竞赛 PDF 提交层（git-ignored·git clone 不可见）。本文件记录 V1 推进里程碑，不作为运行时科学制品。
 
 ## [V1-push] — 2026-06-30
 

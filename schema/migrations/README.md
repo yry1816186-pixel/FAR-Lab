@@ -4,7 +4,7 @@
 
 ## §1. 为什么是 8 个文件，而非 spec 的 25 个编号
 
-spec（`FINAL_PACKAGE/21_IMPLEMENTATION_ROADMAP.md` §4）锁定的 0001-0025 是 **timeline 占位编号 SSOT**（"编号 ↔ 实体 ↔ Wave"三元映射），**不是"必须有 25 个独立物理 .sql 文件"的硬性要求**。证据：
+spec（`FINAL_PACKAGE/21_IMPLEMENTATION_ROADMAP.md` §4 · PDF 提交层·git-ignored·git clone 不可见）锁定的 0001-0025 是 **timeline 占位编号 SSOT**（实际 contiguous 0001-0008 映射见本文件 §2 内联表，运行时以 `src/db/migrator.ts` 为准）（"编号 ↔ 实体 ↔ Wave"三元映射），**不是"必须有 25 个独立物理 .sql 文件"的硬性要求**。证据：
 
 - `21:143` §4 标题自述为"迁移时间线（编号锁定 · 哪个 wave）"；
 - `21:245` §10 明确区分"编号锁定"与"内容待实现"。
@@ -12,7 +12,7 @@ spec（`FINAL_PACKAGE/21_IMPLEMENTATION_ROADMAP.md` §4）锁定的 0001-0025 �
 实际仓库采用 **contiguous renumber**（从 1 连续无间断），由运行时类型系统强制：
 
 ```ts
-// far-chain/src/db/migrator.ts:112-122
+// src/db/migrator.ts:112-122
 function assertContiguousVersions(migrations: readonly MigrationFile[]): void {
   let expected = 1;
   for (const migration of migrations) {

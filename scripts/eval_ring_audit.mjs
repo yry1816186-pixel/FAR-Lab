@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = dirname(here); // far-chain/
+const repoRoot = dirname(here); // 仓库根（scripts/ 父目录）
 const evalRingDir = join(repoRoot, 'src', 'eval-ring');
 
 // 评测环代码路径层违规 import 模式（命中即评测环直连模型调用层）

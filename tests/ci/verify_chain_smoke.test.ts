@@ -1,6 +1,6 @@
 // tests/ci/verify_chain_smoke.test.ts
 // 职责：CI STEP 12——verify_chain_smoke main() 可执行性 + 链式自验语义独立复现
-// 权威 SSOT：10_CI_pipeline.md §9 STEP 12 + 04_evidence_log.md（appendRecord / verifyChainHead / rowToCallRecord）
+// 历史溯源：10_CI_pipeline.md §9 STEP 12 + 04_evidence_log.md（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本测试 + ci/verify_chain_smoke.ts 源码实测为准（appendRecord / verifyChainHead / rowToCallRecord）
 // 零容忍合规：禁用 any 类型注解、ts-ignore 指令、双重断言、空 catch 块、桩代码返回
 
 import Database from 'better-sqlite3';

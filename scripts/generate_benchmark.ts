@@ -4,7 +4,7 @@
  *
  * 用法：pnpm benchmark:generate（或 npx tsx scripts/generate_benchmark.ts）
  *
- * 产出：far-chain/benchmark/benchmark_report.json（git tracked·确定性·CI golden 锚）。
+ * 产出：benchmark/benchmark_report.json（git tracked·确定性·CI golden 锚）。
  *
  * 确定性：seed 全程 offline_replay + 确定性常量（gitCommitSha/isoTimestamp/reproHashProvider）
  *   → suiteIntegrityRoot 跨 fresh-clone 字节相同（CI 比对 golden 防回归）。
