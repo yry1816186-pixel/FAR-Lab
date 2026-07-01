@@ -1,6 +1,6 @@
 // C2 eval-ring 诚实降级审计：评测环代码路径层 + 数据层双层断言
-// 权威 SSOT：FAR_CHAIN_DEV_SPEC/10_CI_pipeline.md §0 ⑦ + §1 STEP 10
-//           FAR_CHAIN_DEV_SPEC/02_数据契约_DATA_CONTRACT.md §6.6（eval-ring 通道隔离 SSOT）
+// 历史溯源：FAR_CHAIN_DEV_SPEC/10_CI_pipeline.md §0 ⑦ + §1 STEP 10（FAR_CHAIN_DEV_SPEC/ 已归档·见 FINAL_PACKAGE/ PDF 层）
+//           FAR_CHAIN_DEV_SPEC/02_数据契约_DATA_CONTRACT.md §6.6（eval-ring 通道隔离·运行时 SSOT 以 src/audit/eval_ring_audit.ts + scripts/eval_ring_audit.mjs 为准）
 // 降级口径：类型层软隔离（PurposeTag 枚举）+ CI 事后审计，非进程级物理隔离
 
 import type Database from 'better-sqlite3';
@@ -40,7 +40,7 @@ export interface EvalRingCodePathResult {
 }
 
 // 评测环代码路径层违规 import 模式（命中即评测环直连模型调用层·破坏盲评诚实性）
-// 权威：10_CI_pipeline.md §1 STEP 10 头部注释 + 02_数据契约 §6.6
+// 历史溯源：10_CI_pipeline.md §1 STEP 10 头部注释 + 02_数据契约 §6.6（FAR_CHAIN_DEV_SPEC/ 已归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本文件源码实测为准
 const CODE_PATH_VIOLATION_PATTERNS: readonly {
   readonly rule: string;
   readonly pattern: RegExp;
@@ -91,7 +91,7 @@ function walkTsFiles(dir: string): readonly string[] {
  *
  * 评测环模块属 V2 范围，V1 不强制存在；目录缺失时不阻断 CI，但**绑定不变量**由
  * `auditEvalRingDataLayer`（数据层 purpose_tag 审计）+ 单元测试（含正负 fixture）强制。
- * 权威：10_CI_pipeline.md §1 STEP 10 断言 1 + HANDOFF §5.2。
+ * 历史溯源：10_CI_pipeline.md §1 STEP 10 断言 1 + HANDOFF §5.2（FAR_CHAIN_DEV_SPEC/ 已归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本文件源码实测为准。
  */
 export function auditEvalRingCodePath(srcDir: string): EvalRingCodePathResult {
   const evalRingDir = join(srcDir, 'eval-ring');
@@ -140,7 +140,7 @@ export function auditEvalRingCodePath(srcDir: string): EvalRingCodePathResult {
  *   - response_payload JSON 解析成功且含 `dashscope_request_id` 字段 → 违规（原始响应回写）
  *   - response_payload 非 JSON（plain text）→ 不违规（评测环自身结构化输出）
  *
- * 权威：10_CI_pipeline.md §1 STEP 10 断言 2 + 02_数据契约 §6.6。
+ * 历史溯源：10_CI_pipeline.md §1 STEP 10 断言 2 + 02_数据契约 §6.6（FAR_CHAIN_DEV_SPEC/ 已归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本文件源码实测为准。
  */
 export function auditEvalRingDataLayer(db: Database.Database): AuditResult {
   const placeholders = EVAL_RING_PURPOSE_TAGS.map(() => '?').join(', ');

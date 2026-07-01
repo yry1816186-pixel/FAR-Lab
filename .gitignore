@@ -57,4 +57,6 @@ Thumbs.db
 # Project planning documents and benchmarks (temporary)
 FINAL_PACKAGE/
 .benchmarks/
+
+# PowerShell `$null` 误创文件防护（RR-13·`chcp 65001 > $null` 重定向误创字面文件·防再 track）
 $null

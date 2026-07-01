@@ -10,7 +10,9 @@
  *   - compiledBy = 'deterministic_compiler' (禁 LLM, F3)
  *   - measurable_implication NOT NULL (F7 FEC 三件套)
  *
- * 模型中立: 不含 qwen/dashscope/bailian 字面量.
+ * 模型中立（本文件 contracts.ts）: 不含 qwen/dashscope/bailian 字面量.
+ * 注意: 同模块 external_facts.ts 含 `competition_aliyun_qwen` profile 钩子（厂商约束分发，
+ *       非 FEC 算法依赖）；Core 算法（preregistrationHash / canonicalJson）模型中立。
  * 零容忍合规.
  */
 

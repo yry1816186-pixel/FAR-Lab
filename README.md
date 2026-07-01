@@ -5,8 +5,8 @@
 一个面向 AI for Science 的可证伪、可审计、可复现研究框架。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yry1816186-pixel/FAR-Lab)
-[![Test Coverage](https://img.shields.io/badge/coverage-92%25-green.svg)](./tests)
+
+> 测试数、覆盖率等质量指标以 `pnpm run ci-all` 的**实测输出为准**——本 README 不手填精确数字，避免文档与实测漂移（反手填纪律）。
 
 ---
 
@@ -90,7 +90,7 @@ pnpm install && pip install -e ".[dev]"
 # 运行完整测试套件(约3分钟)
 pnpm run ci-all
 
-# 预期结果: 1038 tests pass, 92.80% coverage
+# 预期结果: 以本机 CI 输出为准（测试数与覆盖率由实测产生，不在此手填）
 ```
 
 ### 启动服务
@@ -109,12 +109,14 @@ pnpm run dev:frontend
 
 ## 项目统计
 
-| 指标 | 数值 |
-|------|------|
-| 总测试数 | 1,038 (后端 883 + 前端 155) |
-| 代码覆盖率 | 92.80% line / 79.56% branch |
-| 源代码文件 | 220 files / 31,657 LOC |
-| 测试文件 | 81 files / 17,501 LOC |
+> 所有指标**以 CI 实测为准**，README 不手填易 stale 的精确数字。下表给出指标定义与获取命令；权威值见 `pnpm run ci-all` 输出。
+
+| 指标 | 获取方式 | 说明 |
+|------|---------|------|
+| 测试数 | `pnpm run ci-all` | TypeScript + Python 全量测试 |
+| 代码覆盖率 | `pnpm run ci-all` | line / branch 覆盖率 |
+| 源代码规模 | `git ls-files 'src/**'` | 文件数与行数以 git 工作树为准 |
+| 测试文件规模 | `git ls-files 'tests/**'` | 文件数与行数以 git 工作树为准 |
 
 **技术栈**:
 - Backend: TypeScript, Fastify 5, better-sqlite3

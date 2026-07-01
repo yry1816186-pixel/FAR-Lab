@@ -15,8 +15,8 @@ PR in 30 minutes.
 ### Step 1: Setup (5 minutes)
 
 ```bash
-git clone https://github.com/far-chain/far-chain.git
-cd far-chain
+git clone https://github.com/yry1816186-pixel/FAR-Lab.git
+cd FAR-Lab
 pnpm install
 pip install -e ".[dev]"
 pnpm ci-all        # zero-tolerance → typecheck → smoke-core → test:agent_loop → test:ci
@@ -76,18 +76,20 @@ containing any of these:
 
 ## Development Rules (Mandatory)
 
-1. **Read before coding**: `FAR_CHAIN_DEV_SPEC/14_反幻觉与反回归护栏_GUARDRAILS.md`
+1. **Read before coding**: 本文件 §Zero Tolerance Rules（反幻觉与反回归护栏）
 2. **Model neutrality**: Core (`src/llm_gateway/`) must NOT hard-code Qwen, Bailian, or DashScope.
    See `FAR_CHAIN_DEV_SPEC/16_阿里云参与边界与模型中立策略_ALIYUN_MODEL_NEUTRALITY.md`.
 3. **Casing**: TypeScript/Python in-memory fields use `camelCase`; SQLite physical columns use `snake_case`.
 4. **External facts**: Must be marked `[ref]` with a `SourceCard`; never assert without evidence.
 5. **Auth order**: When specs conflict, follow `AGENTS.md` §1 authority order.
 
+> **设计文档说明**：历史 `FAR_CHAIN_DEV_SPEC/` 工作目录已并入 `FINAL_PACKAGE/` 交付包（编号体系不同，不一一对应）；`FINAL_PACKAGE/` 为竞赛 PDF 提交层（git-ignored·git clone 不可见）。源码内 `Authority: FAR_CHAIN_DEV_SPEC/NN` 注释为 V1 设计溯源标注（非可执行路径），保留作历史来源记录；**运行时 SSOT 以源码 + 本 CONTRIBUTING 为准**。
+
 ---
 
 ## PR Slicing
 
-Keep PRs small and focused. Recommended slice reference (from `FAR_CHAIN_DEV_SPEC/17_FINAL_AUDIT.md` §6):
+Keep PRs small and focused. Recommended slice reference（V1 PR 切片，已落地为 `FINAL_PACKAGE/` 交付包）:
 
 | PR | Scope | Max Size |
 |----|-------|----------|
@@ -174,7 +176,7 @@ pnpm run eval-ring-audit
 
 ## Need Help?
 
-- Open a Discussion: https://github.com/far-chain/far-chain/discussions
-- Email: contributors@far-chain.example.com
-- Read `FAR_CHAIN_DEV_SPEC/HANDOFF.md` for onboarding
+- Open a Discussion: https://github.com/yry1816186-pixel/FAR-Lab/discussions
+- Report a vulnerability: see `SECURITY.md`
+- Read `README.md` for project overview
 - Read `README.dev.md` for development-specific notes

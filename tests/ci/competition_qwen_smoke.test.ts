@@ -1,6 +1,6 @@
 // tests/ci/competition_qwen_smoke.test.ts
 // 职责：CI STEP 11 competition_qwen_smoke 单元测试（离线组件验证 + graceful skip 语义）
-// 权威 SSOT：10_CI_pipeline.md §3 / E6 competition_qwen_smoke
+// 历史溯源：10_CI_pipeline.md §3 / E6 competition_qwen_smoke（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本测试 + ci/competition_qwen_smoke.ts 源码实测为准
 // 设计理由：real API call 需要 DASHSCOPE_API_KEY 且会计费，CI 条件门仅在 key 存在时跑。
 //          本测试覆盖所有无需真实 API key 的离线组件：model 常量、参数构建、
 //          thinking+json_schema 互斥守卫、request id 提取、graceful skip 行为。

@@ -1,6 +1,6 @@
 // scripts/ci_all.mjs
 // 职责：CI 全量检查入口——串联所有 CI gate，失败即停（fail-fast）
-// 权威 SSOT：FAR_CHAIN_DEV_SPEC/10_CI_pipeline.md §1
+// 历史溯源：FAR_CHAIN_DEV_SPEC/10_CI_pipeline.md §1（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以 package.json ci-all + 本脚本为准
 // 等价于 package.json `ci-all` 脚本，但作为独立 .mjs 提供：
 //   - 每步独立报告 PASS/FAIL
 //   - 失败时打印排障指引（回 10_CI_pipeline.md §10）
