@@ -7,8 +7,11 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "bin": {
+    "far": "src/cli/far.ts"
+  },
   "scripts": {
-    "test": "node --test tests/api/*.test.ts tests/audit/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts tests/evidence_log/*.test.ts tests/evidence_graph/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts tests/math/*.test.ts tests/dialogue/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts tests/far_proof/*.test.ts tests/science_harness/*.test.ts tests/proof_envelope/*.test.ts tests/report/*.test.ts tests/trace/*.test.ts",
+    "test": "node --test tests/api/*.test.ts tests/audit/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts tests/evidence_log/*.test.ts tests/evidence_graph/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts tests/math/*.test.ts tests/dialogue/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts tests/far_proof/*.test.ts tests/science_harness/*.test.ts tests/proof_envelope/*.test.ts tests/report/*.test.ts tests/trace/*.test.ts tests/cli/*.test.ts",
     "test:agent_loop": "node --test tests/agent_loop/*.test.ts",
     "test:api": "node --test tests/api/*.test.ts",
     "test:audit": "node --test tests/audit/*.test.ts",
