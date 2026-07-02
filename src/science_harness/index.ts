@@ -55,7 +55,33 @@ export {
   C_ASTRO_CHECK_IDS,
   C_ASTRO_DEFAULT_THRESHOLDS,
   buildCAstroChecks,
+  evaluateOutcome,
   mapChecksToVerdict,
   ROUTE_TO_VERDICT,
 } from './tess_harness.ts';
 export type { CAstroMeasuredValues } from './tess_harness.ts';
+
+// hero_a_harness（hero-A-001 quantitative · 任务 #12）
+export {
+  HERO_A_001_CLAIM,
+  HERO_A_CHECK_IDS,
+  HERO_A_DEFAULT_THRESHOLDS,
+  buildHeroAChecks,
+} from './hero_a_harness.ts';
+export type { HeroAMeasuredValues } from './hero_a_harness.ts';
+
+// hero_b_harness（hero-B-002 causal · 任务 #12）
+export {
+  HERO_B_002_CLAIM,
+  HERO_B_CHECK_IDS,
+  HERO_B_DEFAULT_THRESHOLDS,
+  HERO_B_EXPOSURE,
+  HERO_B_OUTCOME,
+  HERO_B_EVIDENCE_BASIS,
+  HERO_B_CAUSAL_MODEL,
+  buildHeroBChecks,
+} from './hero_b_harness.ts';
+export type { HeroBMeasuredValues } from './hero_b_harness.ts';
+
+// confounding_integration（F6 因果门与 verdict_mapping 集成 · 任务 #12 决策 E）
+export { decideVerdictWithConfounding } from './confounding_integration.ts';

@@ -17,10 +17,15 @@ test('collectStatusDump: phase A cheap 字段从仓库实测', () => {
   // tsFileCount：src/**/*.ts 实测（项目 > 100 个 .ts）
   assert.ok(dump.tsFileCount > 50, `tsFileCount 应 > 50，实际: ${dump.tsFileCount}`);
 
-  // migrationCount：0001-0008 共 8 个（01§4.1 实测，证伪"0018/0026"漂移）
-  assert.strictEqual(dump.migrationCount, 8);
+  // migrationCount：0001-0011 共 11 个（0009 fec_contracts_v2 + 0010 proof_envelopes_v2 + 0011 anti-theater trigger V2；
+  // 01§4.1 原口径"证伪 0018/0026 漂移"仍成立：11 ≠ 18 ≠ 26）。
+  assert.strictEqual(dump.migrationCount, 11);
   assert.ok(dump.migrationFiles.includes('0001_initial.sql'));
   assert.ok(dump.migrationFiles.includes('0008_anti_theater_fail_coverage.sql'));
+  assert.ok(
+    dump.migrationFiles.includes('0011_anti_theater_trigger_v2.sql'),
+    '0011 anti-theater trigger V2 须在 migrationFiles',
+  );
 
   // docCount：PROJECT_PLAN/*.md 实测（01§4.4 当前口径；FINAL_PACKAGE/ 已退役）
   assert.ok(dump.docCount > 0, 'docCount 应 > 0');
@@ -120,11 +125,15 @@ test('collectStatusDump: coverage 可注入实测（CLI 层 spawn 后传入）',
   }
 });
 
-test('TEST_GLOBS: 与 package.json test script 一致（含 tests/cli 自身）', () => {
-  assert.ok(TEST_GLOBS.length >= 18, `TEST_GLOBS 应 >= 18 项，实际: ${TEST_GLOBS.length}`);
+test('TEST_GLOBS: 与 package.json test script 一致（含 tests/cli 自身 + tests/anti_theater + tests/proof_envelope/v2）', () => {
+  assert.ok(TEST_GLOBS.length >= 20, `TEST_GLOBS 应 >= 20 项，实际: ${TEST_GLOBS.length}`);
   assert.ok(
     TEST_GLOBS.every((g) => g.startsWith('tests/') && g.endsWith('.test.ts')),
     'TEST_GLOBS 每项须 tests/ 前缀 + .test.ts 后缀',
   );
   assert.ok(TEST_GLOBS.includes('tests/cli/*.test.ts'), 'TEST_GLOBS 须含 tests/cli（自身测试入口径）');
+  assert.ok(
+    TEST_GLOBS.includes('tests/proof_envelope/v2/*.test.ts'),
+    'TEST_GLOBS 须含 tests/proof_envelope/v2（RULE-PE-010 跨语言对拍 + V2 10-rule validator CI 注册）',
+  );
 });

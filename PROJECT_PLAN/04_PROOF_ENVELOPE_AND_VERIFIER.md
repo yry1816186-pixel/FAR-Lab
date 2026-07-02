@@ -166,7 +166,7 @@ FAR-Chain **不**强制签名，但支持外部签名挂载。签名是对 `proo
 | `RULE-PE-007` | `conclusion_matches_checks` | 无 WARN/FAIL check 时 conclusion 可 CONFIRMED | WARN/FAIL 存在但 conclusion=CONFIRMED（反 theater F1） | WARN/FAIL 存在且 conclusion≠CONFIRMED（正确降级） | `IMPLEMENTED_VERIFIED` |
 | `RULE-PE-008` | `sealed_by_deterministic` | sealedBy 恒 `"deterministic_sealer"`（TS 类型 + DB CHECK + sealer 硬编码三重保证） | V1 违反路径不存在，规则恒 PASS | — | `IMPLEMENTED_VERIFIED` |
 | `RULE-PE-009` | `known_failures_not_hidden` | knownFailures 透明披露 | — | knownFailures 含空串；或 knownFailures 非空但 conclusion=CONFIRMED | `IMPLEMENTED_VERIFIED` |
-| `RULE-PE-010` | `independently_recomputable` | ProofEnvelope 必须可被一条不依赖项目 CI 的路径（CLI / Web Crypto / 离线包）从原始 claim 重算到 `proofHash` 匹配 | 重算不符 | — | `DESIGN_LOCKED`（FI-9 新增协议规则，须走 Ask 阶层确认后实现） |
+| `RULE-PE-010` | `independently_recomputable` | ProofEnvelope 必须可被一条不依赖项目 CI 的路径（CLI / Web Crypto / 离线包）从原始 claim 重算到 `proofHash` 匹配 | 重算不符 | — | `IMPLEMENTED_VERIFIED`（TS `verifyProofHashV2` self-check + Python 镜像 `repro/far_chain_repro/proof_hash.py` 跨语言 byte-equal 对拍·`tests/proof_envelope/v2/cross_lang.test.ts` 5/5 绿·Ask 阶层已确认 TS+Python 双路径） |
 
 `CheckOutcome` enum：`PASS` / `WARN` / `FAIL` / `SKIP`（`<REPOSITORY_ROOT>/src/proof_envelope/types.ts`）。
 
@@ -226,7 +226,7 @@ proofHash 算法 SSOT 见 `APPENDIX_C_CANONICAL.md` §2。本节是其在本章�
 | `verdictTrace.decisiveRuleId` | `VerdictKernelOutput` | 决定性规则 id |
 | `verdictTrace.evidenceSufficiency` | `VerdictKernelOutput` | 证据充分性报告 |
 | `verdictTrace.protocolDeviations` | `VerdictKernelOutput` | 协议偏离日志 |
-| `antiTheaterReport` | `AntiTheaterReport` | 反剧场检查结果（label-only / LLM override / post-hoc threshold / dataset drift / scope laundering 等） |
+| `antiTheaterReport` | `AntiTheaterReport` | 反剧场检查结果（label-only / LLM override / post-hoc threshold / dataset drift / scope laundering 等）；类型权威见 `APPENDIX_A_TYPES.md` §7，运行时由 `runAntiTheaterLint`（`src/anti_theater/lint.ts`）产出并注入此字段 |
 | `ledgerRoot` | ledger | 见 `APPENDIX_C` §4，Merkle 根或 hash chain 链头 |
 | `verdictKernelVersion` | `VerdictKernelOutput` | 裁决内核版本字符串，锁定规则优先级表 |
 | `rulePriorityTableHash` | 裁决内核 | 规则优先级表的 hash（防"偷偷改优先级"） |
@@ -436,9 +436,22 @@ pnpm far verify --claim B7 --full-trace                          # 单 claim 全
 # → exit 0 = 全链重算匹配（PASS）；exit 7 = repro 不匹配（FAIL，篡改或漂移）
 ```
 
-挂接：复用已落地的 `verifyChainHead`（`<REPOSITORY_ROOT>/src/evidence_log/verifier.ts`）+ `canonicalHash` + `computeProofHash` + `validateProofEnvelope`。是既有纯函数的 CLI 壳（CLI 入口由 FI-1 提供）。
+挂接：复用已落地的 `verifyChainHead`（`<REPOSITORY_ROOT>/src/evidence_log/verifier.ts`）+ `canonicalHash` + `verifyProofHashV2`（`<REPOSITORY_ROOT>/src/proof_envelope/v2/proof_hash.ts`）+ `validateProofEnvelopeV2`（`<REPOSITORY_ROOT>/src/proof_envelope/v2/validator.ts`）+ 内嵌 `antiTheaterReport` 一致性校验（源自 `runAntiTheaterLint`·`<REPOSITORY_ROOT>/src/anti_theater/lint.ts`）。是既有纯函数的 CLI 壳（入口 `src/cli/far.ts` → `src/cli/commands/verify.ts`）。
 
-状态：`verifyChainHead` / `canonicalHash` / `validateProofEnvelope` 为 `IMPLEMENTED_VERIFIED`；`far verify` CLI 命令族 `ROADMAP`（待实现，FI-1 提供 CLI 入口）。
+P0 实装命令子集（`IMPLEMENTED_VERIFIED`·task #11）：
+
+```bash
+far verify --envelope <ProofEnvelopeV2.json> [--mode envelope|chain|full] [--json] [--explain]
+far verify --db <evidence_log.sqlite> [--mode chain] [--json]
+far verify --envelope <env.json> --db <db.sqlite> --mode full --json   # envelope + chain
+```
+
+- `--mode` 默认从 flags 推断（仅 `--envelope`→envelope；仅 `--db`→chain；两者→full）。
+- exit 0 = PASS / 7 = FAIL（proofHash 失配 / FAIL 规则 / 链断） / 2 = 参数错误 / 1 = 运行时错误。
+- 10 字段输出 schema 见 §5.2（`recomputation.python/browser = not-run`，跨语言对拍留 Phase 2 / #13）。
+- 诚实边界（反 overclaim）：envelope 模式验封存信封自洽（proofHash 重算 + 10 规则 + 内嵌 anti-theater 报告一致性）；`--lint-input` 提供时独立重算 20 detector 并与内嵌报告深度对比（#11b·`verifiedLevels` 披露 `antiTheaterLint`），否则不重算原始证据。verifier 不校验 lint-input 与 envelope 的语义对齐（评委自负）。
+
+状态：`verifyChainHead` / `verifyProofHashV2` / `validateProofEnvelopeV2` / `runAntiTheaterLint` 为 `IMPLEMENTED_VERIFIED`；`far verify` CLI P0（envelope/chain/full + `--envelope`/`--db`/`--mode`/`--json`/`--explain`）`IMPLEMENTED_VERIFIED`（task #11·15 单测 + 5 CLI smoke 全绿：valid→exit 0 / tampered→exit 7 / bad-arg→exit 2 / missing-file→exit 1 / 空格路径可运行）；上方 `--bundle` / `--vectors` / `--claim --full-trace` 命令形 `ROADMAP`（后续 FI）；`--lint-input`（20-detector 独立重算 + 与内嵌报告深度对比）`IMPLEMENTED_VERIFIED`（task #11b·37 新单测：parser 26 + diff/lint 单测 + 4 CLI smoke·clean→exit 0 / mismatch→exit 7 / malformed→exit 1 / no-envelope→exit 2 全绿）。
 
 ### 5.2 输出 JSON schema（设计态 P0，权威）
 
@@ -488,7 +501,7 @@ pnpm far verify --claim B7 --full-trace                          # 单 claim 全
 }
 ```
 
-`verifiedLevels` 取值：`chain` / `merkle` / `proofEnvelope` / `verdictTrace` / `claimGraph`（对应 §6 七层分层）。`brokenAt` = 断裂的 seq 或 null。
+`verifiedLevels` 取值：`chain` / `merkle` / `proofEnvelope` / `verdictTrace` / `claimGraph`（对应 §6 七层分层）/ `antiTheaterLint`（#11b·`--lint-input` 20-detector 独立重算层·加性轴·透明披露，非 §6 七层之一）。`brokenAt` = 断裂的 seq 或 null。
 
 ### 5.4 CLI exit code 语义（权威）
 
@@ -533,7 +546,7 @@ Level 6: claim graph propagation verifier （依赖传播）
 
 | 等级 | 含义 | 对外口径 | 当前状态 |
 |---|---|---|---|
-| L1 | 同仓库 Node 重算 | 基础 verifier | `verifyChainHead()` / `computeProofHash()` / `validateProofEnvelope()` `IMPLEMENTED_VERIFIED`；`far verify` CLI `ROADMAP` |
+| L1 | 同仓库 Node 重算 | 基础 verifier | `verifyChainHead()` / `verifyProofHashV2()` / `validateProofEnvelopeV2()` `IMPLEMENTED_VERIFIED`；`far verify` CLI P0（envelope/chain/full·`--envelope`/`--db`/`--mode`）`IMPLEMENTED_VERIFIED`（task #11）；`--lint-input`（20-detector 独立重算 + 内嵌报告深度对比）`IMPLEMENTED_VERIFIED`（task #11b）；`--bundle` `ROADMAP`（后续 FI） |
 | L2 | Python 独立实现重算 | 跨语言独立重算 | SQLite / JSON chain verifier、Merkle verifier、`canonical_json.py`（`<REPOSITORY_ROOT>/repro/far_chain_repro/`）`IMPLEMENTED_UNVERIFIED`；proof envelope hash 待 V2 镜像 |
 | L3 | Browser Web Crypto / standalone verifier | 评委本机可视化验真 | `<REPOSITORY_ROOT>/frontend/src/lib/merkle.ts`（`buildMerkleTree` / `verifyInclusionProof` / `ZERO_MERKLE_ROOT` / `assertHex64` / `flipLastHexChar`）`IMPLEMENTED_VERIFIED`；无 proof envelope hash；`verify.html` 待打包 |
 | L4 | Rust / Go / WASM 独立实现 | V2 / V3 加强 | Rust / Go `ROADMAP`（V2）；WASM `ROADMAP`（V3，`packages/wasm-verifier/`） |
@@ -703,7 +716,7 @@ Trust Receipt 是 `[DOC]` 字段，永远不进入裁决决策；其 `verdict` �
 
 | 路径 | 工具 | 断网 | 适合谁 | 状态 |
 |---|---|---|---|---|
-| CLI | `far verify` | 是 | 命令行评委 / 复现者 | `far verify` CLI `ROADMAP`（FI-1 提供 CLI 入口） |
+| CLI | `far verify` | 是 | 命令行评委 / 复现者 | `far verify` CLI P0（envelope/chain/full·`--envelope`/`--db`/`--mode`·exit 0/7）`IMPLEMENTED_VERIFIED`（task #11·`src/cli/commands/verify.ts`）；`--lint-input`（20-detector 重算·exit 7 on divergence）`IMPLEMENTED_VERIFIED`（task #11b）；`--bundle` `ROADMAP`（后续 FI） |
 | Web Crypto | `verify.html`（standalone） | 是 | 浏览器评委 / 非技术背景 | `merkle.ts` `IMPLEMENTED_VERIFIED`；`verify.html` 待打包（W3 后） |
 | 离线包 | `.far-proof.tar.zst` + `verify.sh` | 是 | 想拿走证据信的评委 | `exporter.ts` 九分量 `IMPLEMENTED_UNVERIFIED`；tar.zst 打包 `ROADMAP` |
 

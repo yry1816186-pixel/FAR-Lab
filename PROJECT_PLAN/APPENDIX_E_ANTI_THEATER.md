@@ -79,7 +79,7 @@ DEGRADED_SCOPE > REFUTED > INCONCLUSIVE > CONFIRMED > UNTESTED
 > `AntiTheaterSeverity`（INFO/WARN/FAIL/BLOCK）是**派生展示轴**，不是存储字段。存储 `outcome` 唯一轴为 `ProofCheckOutcome`（A §0 权威枚举）。`severity` 由 `outcome` + finding 上下文派生（映射表见本节末尾）。
 
 ```ts
-// <REPOSITORY_ROOT>/src/anti_theater/types.ts （设计目标路径，状态：DESIGN_LOCKED）
+// <REPOSITORY_ROOT>/src/anti_theater/types.ts （已落地·状态：IMPLEMENTED_VERIFIED·D1 单一存储类型源）
 
 // —— 派生展示轴（不进存储，由 outcome + 上下文派生）——
 export type AntiTheaterSeverity = "INFO" | "WARN" | "FAIL" | "BLOCK";
@@ -173,28 +173,28 @@ export function runAntiTheaterLint(
 
 | attackId | 攻击中文名 | 检测核心（一句话） | expectedVerdict / expectedFail | 状态 |
 |---|---|---|---|---|
-| `AT-FAKE-PASS` | 全 PASS 伪造 | required evidence count + evidence sufficiency 交叉检查 | fail（不可 seal） | `DESIGN_LOCKED` |
-| `AT-LABEL-ONLY` | label-only evidence | evidence type 最低阈值 + 缺 primary raw artifact | `UNTESTED` | `DESIGN_LOCKED` |
-| `AT-JUDGE-OVERRIDE` | LLM reviewer override | `createdBy !== "deterministic_*"` grep → CI fail | fail（CI 阻断） | `DESIGN_LOCKED` |
-| `AT-POSTHOC-THRESHOLD` | post-hoc threshold | frozen threshold hash vs executed threshold | `UNTESTED` | `DESIGN_LOCKED` |
-| `AT-METRIC-SWAP` | metric swapping | primary metric frozen hash vs executed metric | `UNTESTED` | `DESIGN_LOCKED` |
-| `AT-DATA-DRIFT` | dataset drift | contentHash / schemaHash / statsFingerprint mismatch | `DEGRADED_SCOPE` | `DESIGN_LOCKED` |
-| `AT-DATA-HASH-FAKE` | 伪 datasetHash | chunk Merkle root vs 声称 contentHash | fail（verifier RED） | `DESIGN_LOCKED` |
-| `AT-SCOPE-LAUNDER` | scope laundering | verdict 支撑 scope < claim scope → 强制 `DEGRADED_SCOPE` | `DEGRADED_SCOPE` | `DESIGN_LOCKED` |
-| `AT-MISSING-RAW` | missing raw artifact | rawArtifactHashes 缺失 → evidence sufficiency fail | `UNTESTED` | `DESIGN_LOCKED` |
-| `AT-SEED-CHERRY` | seed cherry-picking | seedPolicy hash + run registry 完整性 | `INCONCLUSIVE` 或 fail | `DESIGN_LOCKED` |
-| `AT-WORKFLOW-DIGEST` | workflow digest mismatch | workflowHash / containerDigest / envHash mismatch | fail（verifier RED） | `DESIGN_LOCKED` |
-| `AT-REPORT-MISMATCH` | natural-language verdict mismatch | report verdict string ≠ structured verdict | fail（structured wins） | `DESIGN_LOCKED` |
-| `AT-PHACK-ALPHA` | p-hacking / alpha inflation | frozen alpha vs executed alpha | `UNTESTED` / deviation | `DESIGN_LOCKED` |
-| `AT-PHACK-CORRECTION` | 多重检验未校正 | `measurableImplications.length > 1 && correction === "none"` | `INCONCLUSIVE` | `DESIGN_LOCKED` |
-| `AT-HARK` | HARKing | `hypothesis.sealedAt > experiment.finishedAt` | 禁 `CONFIRMED` → `UNTESTED` | `DESIGN_LOCKED` |
-| `AT-STOPPING-RULE` | stopping-rule 违规 | interim looks vs declared stopping rule | `UNTESTED` | `DESIGN_LOCKED` |
-| `AT-OPTIONAL-STOPPING` | optional stopping | sequential 无 alpha-spending → 禁 `CONFIRMED` | `UNTESTED` / `INCONCLUSIVE` | `DESIGN_LOCKED` |
-| `AT-DEP-FLOAT-DRIFT` | dependency / float drift | lockfile hash / container digest / numeric tolerance hash | fail（verifier RED） | `DESIGN_LOCKED` |
-| `AT-OVERFIT` | benchmark overfitting | hidden/private split 强制（public seed 过不过 hidden） | `DEGRADED_SCOPE` | `ROADMAP` |
-| `AT-FAKE-DEGRADED` | fake degraded scope / null laundering | direct refutation 优先；null result 不得被吞 | `REFUTED` 优先 / `UNTESTED` | `DESIGN_LOCKED` |
+| `AT-FAKE-PASS` | 全 PASS 伪造 | required evidence count + evidence sufficiency 交叉检查 | fail（不可 seal） | `IMPLEMENTED_VERIFIED` |
+| `AT-LABEL-ONLY` | label-only evidence | evidence type 最低阈值 + 缺 primary raw artifact | `UNTESTED` | `IMPLEMENTED_VERIFIED` |
+| `AT-JUDGE-OVERRIDE` | LLM reviewer override | `createdBy !== "deterministic_*"` grep → CI fail | fail（CI 阻断） | `IMPLEMENTED_VERIFIED` |
+| `AT-POSTHOC-THRESHOLD` | post-hoc threshold | frozen threshold hash vs executed threshold | `UNTESTED` | `IMPLEMENTED_VERIFIED` |
+| `AT-METRIC-SWAP` | metric swapping | primary metric frozen hash vs executed metric | `UNTESTED` | `IMPLEMENTED_VERIFIED` |
+| `AT-DATA-DRIFT` | dataset drift | contentHash / schemaHash / statsFingerprint mismatch | `DEGRADED_SCOPE` | `IMPLEMENTED_VERIFIED` |
+| `AT-DATA-HASH-FAKE` | 伪 datasetHash | chunk Merkle root vs 声称 contentHash | fail（verifier RED） | `IMPLEMENTED_VERIFIED`(MVP·R6) |
+| `AT-SCOPE-LAUNDER` | scope laundering | verdict 支撑 scope < claim scope → 强制 `DEGRADED_SCOPE` | `DEGRADED_SCOPE` | `IMPLEMENTED_VERIFIED` |
+| `AT-MISSING-RAW` | missing raw artifact | rawArtifactHashes 缺失 → evidence sufficiency fail | `UNTESTED` | `IMPLEMENTED_VERIFIED` |
+| `AT-SEED-CHERRY` | seed cherry-picking | seedPolicy hash + run registry 完整性 | `INCONCLUSIVE` 或 fail | `IMPLEMENTED_VERIFIED` |
+| `AT-WORKFLOW-DIGEST` | workflow digest mismatch | workflowHash / containerDigest / envHash mismatch | fail（verifier RED） | `IMPLEMENTED_VERIFIED` |
+| `AT-REPORT-MISMATCH` | natural-language verdict mismatch | report verdict string ≠ structured verdict | fail（structured wins） | `IMPLEMENTED_VERIFIED` |
+| `AT-PHACK-ALPHA` | p-hacking / alpha inflation | frozen alpha vs executed alpha | `UNTESTED` / deviation | `IMPLEMENTED_VERIFIED` |
+| `AT-PHACK-CORRECTION` | 多重检验未校正 | `measurableImplications.length > 1 && correction === "none"` | `INCONCLUSIVE` | `IMPLEMENTED_VERIFIED` |
+| `AT-HARK` | HARKing | `hypothesis.sealedAt > experiment.finishedAt` | 禁 `CONFIRMED` → `UNTESTED` | `IMPLEMENTED_VERIFIED` |
+| `AT-STOPPING-RULE` | stopping-rule 违规 | interim looks vs declared stopping rule | `UNTESTED` | `IMPLEMENTED_VERIFIED` |
+| `AT-OPTIONAL-STOPPING` | optional stopping | sequential 无 alpha-spending → 禁 `CONFIRMED` | `UNTESTED` / `INCONCLUSIVE` | `IMPLEMENTED_VERIFIED`(MVP·static prereg) |
+| `AT-DEP-FLOAT-DRIFT` | dependency / float drift | lockfile hash / container digest / numeric tolerance hash | fail（verifier RED） | `IMPLEMENTED_VERIFIED` |
+| `AT-OVERFIT` | benchmark overfitting | hidden/private split 强制（public seed 过不过 hidden） | `DEGRADED_SCOPE` | `IMPLEMENTED_VERIFIED`(受限)/`ROADMAP`(完整) |
+| `AT-FAKE-DEGRADED` | fake degraded scope / null laundering | direct refutation 优先；null result 不得被吞 | `REFUTED` 优先 / `UNTESTED` | `IMPLEMENTED_VERIFIED` |
 
-> 状态说明：19 条 `DESIGN_LOCKED`（设计已定，可进入实现，待 `IMPLEMENTED_VERIFIED`）；`AT-OVERFIT` 因依赖 hidden/private split 机制，标 `ROADMAP`（方向明确，不作为当前完成能力）。
+> 状态说明：19 条 `IMPLEMENTED_VERIFIED`（detector 落地于 `src/anti_theater/detectors/`，21 golden vectors CI 实测全覆盖·W3.2-W3.3）。`AT-OVERFIT` 受限实现（public-only split → WARN + DEGRADED_SCOPE），完整 hidden/private split 机制仍 `ROADMAP`（W4）。`AT-DATA-HASH-FAKE` MVP 退化（contentHash 格式校验·R6，真 Merkle 重算 W4）；`AT-OPTIONAL-STOPPING` MVP 仅 static prereg check（完整 alpha-spending W5）。
 
 ---
 
@@ -892,7 +892,7 @@ def detect_fake_degraded(input: AntiTheaterLintInput) -> list[AntiTheaterFinding
 `runAntiTheaterLint` 是所有 `detect_*` 函数的编排器。它**取严不取宽**地汇总 findings → `AntiTheaterReport`。
 
 ```python
-# <REPOSITORY_ROOT>/src/anti_theater/lint.ts （DESIGN_LOCKED）
+# <REPOSITORY_ROOT>/src/anti_theater/lint.ts （已落地·状态：IMPLEMENTED_VERIFIED）
 # computedBy = "deterministic_compiler"（07 §4 / 13 §3）
 
 DETECTORS = [
@@ -1108,17 +1108,17 @@ export interface AttackCase {
 
 ## §6. CI Gates（与 `68` §5 / `13` §8.1 一致）
 
-| CI gate | 路径（设计目标） | 断言 | 状态 |
+| CI gate | 路径（已落地） | 断言 | 状态 |
 |---|---|---|---|
-| `anti_theater_attack_corpus` | `<REPOSITORY_ROOT>/tests/anti_theater/anti_theater_attack_corpus.test.ts` | 20 attacks 全部被检测（expectedVerifierStatus 命中） | `DESIGN_LOCKED` |
-| `false_green_rate` | `<REPOSITORY_ROOT>/tests/anti_theater/false_green_rate.test.ts` | attack corpus false green rate = 0 | `DESIGN_LOCKED` |
-| `known_failures_transparency` | `<REPOSITORY_ROOT>/tests/anti_theater/known_failures_transparency.test.ts` | known failure + `CONFIRMED` → WARN/FAIL（不隐藏） | `DESIGN_LOCKED` |
-| `report_proof_mismatch` | `<REPOSITORY_ROOT>/tests/anti_theater/report_proof_mismatch.test.ts` | markdown verdict 不可信，proof verdict 为准 | `DESIGN_LOCKED` |
-| `llm_judge_injection` | `<REPOSITORY_ROOT>/tests/anti_theater/llm_judge_injection.test.ts` | prompt injection 不可改 kernel output | `DESIGN_LOCKED` |
-| `no_llm_final_judge_scan` | `<REPOSITORY_ROOT>/.github/workflows/anti-theater.yml` | grep `createdBy[:=]"llm"` 命中即 fail（`13` §8.1） | `DESIGN_LOCKED` |
-| `deterministic_lint_grep` | 同上 workflow | `run_anti_theater_lint` 模块不含 `llm`/`openai`/`chat.completions` 导入（CG-1 同型） | `DESIGN_LOCKED` |
+| `anti_theater_attack_corpus` | `tests/anti_theater/anti_theater_attack_corpus.test.ts` | 20 attacks 全部被检测（attackKind/reasonCode/forcedVerdict/blockSeal 命中） | `IMPLEMENTED_VERIFIED` |
+| `false_green_rate` | `tests/anti_theater/false_green_rate.test.ts` | attack corpus false green rate = 0（全部 `hasFail \|\| blockSeal`） | `IMPLEMENTED_VERIFIED` |
+| `known_failures_transparency` | `tests/anti_theater/known_failures_transparency.test.ts` | known failure + `CONFIRMED` → WARN/FAIL（不隐藏） | `IMPLEMENTED_VERIFIED` |
+| `report_proof_mismatch` | `tests/anti_theater/report_proof_mismatch.test.ts` | markdown verdict 不可信，proof verdict 为准（structured wins） | `IMPLEMENTED_VERIFIED` |
+| `llm_judge_injection` | `tests/anti_theater/llm_judge_injection.test.ts` | prompt injection 不可改 kernel output（`llmOverrideRejected=true`） | `IMPLEMENTED_VERIFIED` |
+| `no_llm_final_judge_scan` | `scripts/no_llm_final_judge_scan.mjs`（ci-04·注册于 `ci_all.mjs` STEP 1b + `.github/workflows/ci.yml`） | src 出现 LLM-as-judge 模式 → exit 1（反 theater F1 硬门） | `IMPLEMENTED_VERIFIED` |
+| `deterministic_lint_grep` | `scripts/anti_theater_deterministic_scan.mjs`（ci-at·注册于 `ci_all.mjs` STEP 1c + `.github/workflows/ci.yml`） | `src/anti_theater` 含 `openai`/`dashscope`/`chat.completions` → exit 1（F3 deterministic） | `IMPLEMENTED_VERIFIED` |
 
-> 数字纪律：上表“20 attacks”“false green rate = 0”是**设计目标断言**，CI 实测通过数写 `Pending`，由 CI 输出回填。
+> 数字纪律：上表断言已由 CI 实测回填——5 测试 gate 随 `pnpm test`（827 TS tests 全绿），2 grep gate 随 `node scripts/ci_all.mjs`（STEP 1b/1c 全绿）。21 golden vectors 命中 20 attackId 全覆盖（`tests/fixtures/anti_theater/golden_vectors.ts`）。
 
 ---
 
@@ -1192,12 +1192,12 @@ ProofEnvelope.antiTheaterReport （04 §2）
 
 | 模块 / 攻击 / CI gate | 状态 | 备注 |
 |---|---|---|
-| `AntiTheaterHarness` 接口（§1） | `DESIGN_LOCKED` | 设计已定，待实现 |
-| 20 类攻击目录（§2） | 19×`DESIGN_LOCKED` + 1×`ROADMAP`（AT-OVERFIT） | 待 `IMPLEMENTED_VERIFIED` |
-| 确定性检测编排器（§3） | `DESIGN_LOCKED` | 取严不取宽，禁 LLM |
-| AntiTheaterScore（§4） | `DESIGN_LOCKED` | 阈值 70/50 与 `68` §7 一致 |
-| 17 个 golden vectors（§5.2） | `DESIGN_LOCKED` | 命中数 `Pending`，CI 回填 |
-| 7 个 CI gates（§6） | `DESIGN_LOCKED` | 通过率 `Pending`，CI 回填 |
+| `AntiTheaterHarness` 接口（§1） | `IMPLEMENTED_VERIFIED` | `src/anti_theater/{types,errors,schemas,finding_factory,utils}.ts` 落地（W3.1） |
+| 20 类攻击目录（§2） | 19×`IMPLEMENTED_VERIFIED` + AT-OVERFIT `IMPLEMENTED_VERIFIED`(受限)/`ROADMAP`(完整) | 20 detectors 落地 `src/anti_theater/detectors/`（W3.2）；AT-OVERFIT 受限于 public-only split 检测，完整 hidden/private split 仍 `ROADMAP` |
+| 确定性检测编排器（§3） | `IMPLEMENTED_VERIFIED` | `runAntiTheaterLint`（`src/anti_theater/lint.ts`）+ 20 detectors 顺序遍历，取严不取宽，禁 LLM（W3.2） |
+| AntiTheaterScore（§4） | `IMPLEMENTED_VERIFIED` | `computeAntiTheaterScore` 7 桶去重扣分，阈值 70/50 与 A §7 一致（W3.2） |
+| golden vectors（§5.2） | `IMPLEMENTED_VERIFIED` | CI 实测 **21/21 命中**（17 P0 + 3 补充 + gv-overfit-01，覆盖全部 20 attackId·`tests/fixtures/anti_theater/golden_vectors.ts`） |
+| 7 个 CI gates（§6） | `IMPLEMENTED_VERIFIED` | CI 实测 **7/7 通过**（`node scripts/ci_all.mjs` 全绿：827 TS + 110 py tests + Z16 coverage 94.12% line / 82.92% branch） |
 | 完整 sequential alpha-spending | `ROADMAP`（W5） | MVP 仅 static prereg check（`11` §4.3） |
 | hidden/private split（AT-OVERFIT） | `ROADMAP` | 方向明确，不作为当前完成能力 |
 | Lean/TLA+ 形式化 anti-theater invariant | `RESEARCH`（F10 非 runtime） | 路线图，不依赖 |

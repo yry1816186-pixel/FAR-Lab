@@ -180,7 +180,7 @@ far status --json       # 机器可读，供文档构建时回填占位符
 | FEC V2 mandatory | `fecAppendClaim` 走 contract-required path；每个 claim 必须有 frozen FEC（含 measurable implication、dataset binding、metric、threshold、direction、alpha、multiple-testing plan、seed、scope） | `DESIGN_LOCKED`（V1 = optional contract，`PARTIAL`） |
 | deterministic verdict kernel | `decideVerdict` 改成 metric-first，输出 rule trace + reason codes；五值优先级稳定；禁 LLM 直接产出 verdict | `IMPLEMENTED_VERIFIED`（pure verdict function 已覆盖五值但规则浅，缺完整 rule trace）→ 升级 `DESIGN_LOCKED` |
 | ProofEnvelope V2 | proofHash 绑定 FEC、dataset binding、workflow binding、statistical plan、evidence IDs、verdict trace、ledger root；TS/Python/browser hash 一致 | `PARTIAL`（V1 有 self-check + proofHash） |
-| `far verify` | `far verify receipt.json` 在 clean checkout 中运行；输出 five-value verdict、proof head、tamper status、scope status、independent recomputation status；Windows/空格/离线路径可演示 | `ROADMAP` |
+| `far verify` | `far verify --envelope <env.json> [--db <db.sqlite>] [--mode chain\|envelope\|full] [--json] [--explain]` 在 clean checkout 中运行；输出 10 字段 schema（status/verdict/proofHash/ledgerRoot/tamperStatus/scopeStatus/recomputation/errors/warnings/verifiedLevels）；Windows/空格/离线路径可演示 | `IMPLEMENTED_VERIFIED`（P0·task #11·envelope/chain/full；`--lint-input` 20-detector 重算 `IMPLEMENTED_VERIFIED`（#11b·加性·须配合 `--envelope`）；`--bundle` 留后续） |
 | Python/browser independent recomputation | Python proofHash verifier；browser ProofEnvelope verifier | `IMPLEMENTED_UNVERIFIED`（chain/Merkle 已实现，proof envelope hash 待补） |
 | FAR-Bench125 | 125 case benchmark + 评分 + 隐藏集 + 泄漏防御 | `DESIGN_LOCKED` |
 | demo receipt | 一个真实 claim 带 FEC V2、evidence、verdict trace、ProofEnvelope V2，被 `far verify` 重算通过 | `ROADMAP` |
@@ -255,7 +255,7 @@ P0 不再写宏大叙事，要把一个 demo claim 从 hypothesis 到 final rece
 |---|---|
 | 工程入口 | `src/cli/far.ts`、`repro/far_chain_repro/verify_chain.py`、browser verifier 入口 |
 | 验收 | `far verify receipt.json` 可在 clean checkout 中运行；输出 five-value verdict、proof head、tamper status、scope status、independent recomputation status；Windows 路径、空格路径、离线模式都可演示 |
-| 状态 | `ROADMAP`（`far status` 已有，`verify/export` 仍是 roadmap） |
+| 状态 | `IMPLEMENTED_VERIFIED`（P0·task #11·`src/cli/commands/verify.ts`·envelope/chain/full + 15 单测 + 5 CLI smoke 全绿；`--lint-input` 20-detector 重算 `IMPLEMENTED_VERIFIED`（#11b·+37 单测）；`--bundle` 留后续）；`far export` 仍 `ROADMAP` |
 
 ### 5.5 P0-5：Anti-theater harness
 
@@ -263,7 +263,8 @@ P0 不再写宏大叙事，要把一个 demo claim 从 hypothesis 到 final rece
 |---|---|
 | 工程入口 | 现有 anti-theater guard、新增 attack corpus、CI smoke |
 | 验收 | 至少覆盖 label-only evidence、post-hoc threshold、dataset drift、scope laundering、missing raw artifact、LLM reviewer override；每个 attack 有 expected verdict 或 expected fail reason；demo 中展示至少三个失败样例 |
-| 状态 | `DESIGN_LOCKED` |
+| 状态 | `IMPLEMENTED_VERIFIED`（任务 #10 W3.1-W3.5） |
+| 落地映射 | `src/anti_theater/`（types/lint/score/constraint + 20 detectors + adapters/kernel_adapter）；21 golden vectors 覆盖全部 20 attackId（`tests/fixtures/anti_theater/golden_vectors.ts`）；5 测试 gate + 2 grep gate（ci-04 `no_llm_final_judge_scan` / ci-at `anti_theater_deterministic_scan`，注册于 `scripts/ci_all.mjs` + `.github/workflows/ci.yml` + `.github/workflows/build-integrity.yml`）；V2 anti-theater trigger（`schema/migrations/0011_anti_theater_trigger_v2.sql`，D10 forward-only）；验收 6 类攻击全覆盖 + 20 attackId 全覆盖；CI 实测 `node scripts/ci_all.mjs` 全绿（827 TS + 110 py tests + Z16 coverage 94.12% line / 82.92% branch） |
 
 > 实施顺序（`76` §7）：① 固化 `FEC_V2_SCHEMA` + migration → ② `fecAppendClaim` 改 contract-required → ③ `decideVerdict` 改 metric-first kernel → ④ 生成 `verdictTrace` 写入 ProofEnvelope → ⑤ 扩展 proofHash canonical input → ⑥ Python proofHash verifier → ⑦ browser ProofEnvelope verifier → ⑧ 实现 `far verify` → ⑨ 接入 golden vectors → ⑩ 接入 anti-theater attack cases → ⑪ 生成 demo receipt → ⑫ clean clone 跑验收脚本。
 

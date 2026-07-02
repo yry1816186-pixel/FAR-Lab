@@ -228,6 +228,27 @@ jobs:
           fi
           echo "::notice::✅ R9-2-13 通过：anti_theater 触发器声明存在于迁移中"
 
+      - name: R9-2-13b · anti-theater V2 trigger —— 0011 hasFail/canSealConfirmed 阻断 CONFIRMED
+        run: |
+          set -euo pipefail
+          # 任务 #10 W3.4 D10：V2 trigger 升级（overallStatus → hasFail/canSealConfirmed·D1 类型统一后）。
+          # 0010 旧 trigger 的 overallStatus 模式在新形状下 no-op（字段不存在）→ 0011 重建恢复 anti-theater F1 物理兜底。
+          MIG="schema/migrations/0011_anti_theater_trigger_v2.sql"
+          if [ ! -f "$MIG" ]; then
+            echo "::error::迁移文件 ${MIG} 不存在（任务 #10 W3.4 未落地）"
+            exit 1
+          fi
+          # V2 trigger 须匹配新字段（"hasFail":true / "canSealConfirmed":false）+ conclusion=CONFIRMED → ABORT。
+          if ! grep -q '"hasFail":true' "$MIG"; then
+            echo "::error::R9-2-13b 失败：0011 中未找到 V2 hasFail 阻断模式"
+            exit 1
+          fi
+          if ! grep -q "cannot seal CONFIRMED" "$MIG"; then
+            echo "::error::R9-2-13b 失败：0011 中未找到 CONFIRMED 阻断 RAISE"
+            exit 1
+          fi
+          echo "::notice::✅ R9-2-13b 通过：anti_theater V2 trigger（hasFail/canSealConfirmed 阻断 CONFIRMED）存在于 0011"
+
   # ============================================================
   # MODEL_NEUTRALITY · 模型中立 grep（核心路径不得含 qwen/dashscope/bailian 字面量）
   # ============================================================
@@ -236,11 +257,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: R9-2-14 · 核心路径模型中立 grep（含 golden_vectors.ts）
+      - name: R9-2-14 · 核心路径模型中立 grep（含 golden_vectors.ts + src/anti_theater + src/confounding_gate）
         run: |
           set -euo pipefail
           # 核心目录扫描（排除 llm_gateway adapters·属于竞争适配器命名空间）
-          DIRS="src/evidence_log src/evidence_graph src/falsifiability src/proof_envelope src/far_proof src/agent_loop src/fec src/report src/db src/schema src/api"
+          # src/anti_theater（任务 #10 W3.5c 加入）：反剧场检测须确定性·模型中立（F3/C1），
+          # 与 ci-at anti_theater_deterministic_scan 互补——后者禁 LLM-client-usage，本门禁模型名/API base 字面量。
+          # src/confounding_gate（任务 #12 W12.4 加入）：F6 因果混杂门须确定性·模型中立（03 §7.5:980），
+          # 与 ci-cg confounding_gate_deterministic_scan 互补——后者禁 LLM-client-usage/禁标识符，本门禁模型名/API base 字面量。
+          DIRS="src/evidence_log src/evidence_graph src/falsifiability src/proof_envelope src/far_proof src/agent_loop src/fec src/report src/db src/schema src/api src/anti_theater src/confounding_gate"
           violations=""
           for dir in $DIRS; do
             if [ -d "$dir" ]; then

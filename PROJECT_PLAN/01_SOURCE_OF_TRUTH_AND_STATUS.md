@@ -412,11 +412,12 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
 | evidence log chain | `PARTIAL` | 已有实现痕迹（append-only + canonicalHash + chain verifier + Merkle root/proof），需以代码和测试确认闭环；payload/evidence/verdict node 不直接进 chain leaf 是已知闭环缺口 |
 | canonical hash / golden vector | `IMPLEMENTED_VERIFIED` | 属于核心信任根，必须保持最高优先级。四字段白名单 + 数值类已实证 byte-equal；浮点科学计数法（`1e-7` 鸿沟）按 `NUMERIC_KNOWN_DIVERGENCE` 诚实归 RED，待 V3 迁移 RFC 8785 JCS |
 | five-value verdict | `PARTIAL` | 语义已锁定（`VerdictKind` 5 值 enum 冻结，禁止第六值）；工程上需升级为 metric-first deterministic kernel（输出 rule trace + reason codes + evidence sufficiency + statistical uncertainty） |
+| ConfoundingGate F6（因果混杂门） | `IMPLEMENTED_VERIFIED`（#12） | `claimType='causal'` 时 verdict kernel 在 R7 CONFIRMED 前调用确定性 d-separation + 后门路径枚举（非 LLM 推理混杂）。`src/confounding_gate/`（Koller-Friedman Bayes-Ball·修正 SSOT §7.5.1 伪代码两处缺陷见 03）+ R-causal 门（`verdict_kernel_v2.ts`·非因果 claim 字节级零回归）+ science_harness hero-B 路径 + CG-1/2/5/6 CI 门（`pnpm run confounding-gate-scan`）。三 claimType hero fixture 全交付（`countDeliveredV1ClaimFixtures()===3`）；claimType 暂为 kernel 输入提示（非哈希保护·封存任务延后） |
 | ProofEnvelope V1 | `PARTIAL` | V1 有 9 rule validator + sealer + proofHash + DB backstop + TS 重算脚本；P0 要升级为 V2 proofHash binding（绑定 SciIR fields + claim graph + cross-language proofHash） |
 | Python verifier | `PARTIAL` | chain/Merkle verifier 已实现；作为独立重算路径之一，需扩展到 ProofEnvelope proofHash + verdict trace + golden vectors |
 | Browser verifier | `PARTIAL` | Merkle/Suite verifier 存在；可用于演示 tamper-evidence，需标注边界（同源 TS，非真正 cross-language；需增 ProofEnvelope verifier + standalone `verify.html`） |
 | `far status` | `IMPLEMENTED_UNVERIFIED` | 应成为状态事实源（本 §5 JSON schema 的产出者）；CLI 入口 `src/cli/far.ts` |
-| `far verify` | `ROADMAP` | P0 必须补齐（评委本机重算 proof head / Merkle inclusion / verdict trace / integrity status）；Windows/空格/离线路径都必须可运行 |
+| `far verify` | `IMPLEMENTED_VERIFIED`（P0） | 已实装 envelope/chain/full 模式（`src/cli/commands/verify.ts`·task #11）；评委本机重算 proofHash（RULE-PE-010）+ 10 规则 + 内嵌 anti-theater 报告一致性 + call_records 链头；Windows/空格/离线路径已 smoke 验证（valid→exit 0 / tampered→exit 7 / bad-arg→exit 2 / missing-file→exit 1）；`--lint-input`（20-detector 独立重算 + 内嵌报告深度对比·任何发散 → exit 7）`IMPLEMENTED_VERIFIED`（task #11b·`src/anti_theater/schemas.ts` + verify.ts lint 轴 + 37 新单测）；`--bundle` 留后续 FI |
 | `far export receipt` | `ROADMAP` | P0 输出 Trust Receipt 包；`humanSummary` 不进 proofHash |
 | FEC（Falsification Evidence Contract） | `PARTIAL` | V1 = optional contract（`fecAppendClaim` 原子链路 + `registerContract` + 0005 append-only contract 表 + `auditContract`）；V2 = mandatory，绑定 statistical plan + evidence requirements + measurement plan；缺 FEC 时不允许输出 CONFIRMED/REFUTED，只能 UNTESTED 或 fail-closed |
 | anti-theater harness | `PARTIAL` | 现有 anti-theater guard（FAIL+CONFIRMED 被 SQLite trigger ABORT）；P0 至少覆盖 10 个攻击样例（label-only evidence / post-hoc threshold / dataset drift / scope laundering / missing raw artifact / LLM reviewer override / metric swapping / seed cherry-picking / workflow digest mismatch / natural-language verdict mismatch） |
@@ -431,7 +432,7 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
 
 | 卖点 | 当前证据 | 真实状态 | 深化方向 |
 |---|---|---|---|
-| **Your Laptop Is The Verifier** | `verifyChainHead` 在 `src/evidence_log/verifier.ts`；Python chain verifier 在 `repro/far_chain_repro/verify_chain.py`；Browser Merkle verifier 在 `frontend/src/lib/merkle.ts` | 部分闭环。链/Merkle 有多路，ProofEnvelope 跨语言 verifier 未闭环；`far verify` 尚未完整实现 | P0 补 `far verify` + Python proofHash verifier + Browser ProofEnvelope verifier |
+| **Your Laptop Is The Verifier** | `verifyChainHead` 在 `src/evidence_log/verifier.ts`；Python chain verifier 在 `repro/far_chain_repro/verify_chain.py`；Browser Merkle verifier 在 `frontend/src/lib/merkle.ts`；`far verify` P0 envelope+chain 在 `src/cli/commands/verify.ts` | 部分闭环。链/Merkle/envelope 重算已多路（TS `far verify` P0 envelope+chain `IMPLEMENTED_VERIFIED`·task #11）；Python/browser proofHash 跨语言对拍 + `--bundle` 全链重算未闭环 | task #11b 接 Python proofHash 对拍 + `--bundle` + Browser ProofEnvelope verifier |
 | **五值 anti-theater verdict** | `src/falsifiability/verdict.ts` 纯规则覆盖五值；SQL enum 同步 | 部分闭环。规则确定，但目前主要消费 `supportsClaim/refutesClaim` 布尔或简单 threshold；统计计划与 rule trace 不够深；存在 LLM evidence label 自举风险 | 升级为 metric-first deterministic kernel（输出 rule trace） |
 | **脱平台密码学主权** | offline replay、hash chain、proofHash、no-LLM final judge scan | 部分闭环。provider 不在 trust root，但部分 agent evidence label 仍来自 LLM | deterministic measurement facts 取代 LLM vote |
 
