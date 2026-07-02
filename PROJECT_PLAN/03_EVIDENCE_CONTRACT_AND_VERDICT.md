@@ -942,6 +942,8 @@ def evaluate_statistics(input: VerdictKernelInput) -> StatisticalReport:
 
 ### 7.5 与 ConfoundingGate（F6 因果）的集成
 
+> **实现状态**：`IMPLEMENTED_VERIFIED(#12)`。`src/confounding_gate/`（d-separation + 后门路径 + `adjudicateConfounding` + `generateRationale`）+ `verdict_kernel_v2.ts` R-causal 门（R7 CONFIRMED 前门控·双 guard `claimType==='causal' && confoundingGateResult!==undefined`·非因果 claim 字节级零回归）+ `science_harness` hero-B 路径（`decideVerdictWithConfounding`）+ CG-1/2/5/6 CI 门（`pnpm run confounding-gate-scan`）已落地。全量验证：TS 946/946、Py 110/110、`ci_all` PASS、反模式扫描零命中。实现与 §7.5.1 伪代码的两处偏差（d-separation collider 语义修正 + 后门路径逐路径阻断）见 §7.5.1 实现偏差披露。
+
 当 `claimType='causal'` 时，verdict kernel 在 R7 CONFIRMED 判定前**额外**调用 ConfoundingGate（算法 SSOT 见本节 §7.5.1（自包含）；36 §3 仅作来源溯源（已退役，备份 `C:/Users/RichardYuan/FAR-Lab_Backups/`））。
 
 **ConfoundingGate outcome 判定规则（缩略表，一句话口径）**：
@@ -984,6 +986,13 @@ def decide_verdict_with_confounding(verdict_mapping_result, confounding_result):
 > 本子节是 `d_separation` / `find_backdoor_paths` / `adjudicate_confounding` 的**自包含 SSOT**（来源：退役档案 `FINAL_PACKAGE/36_CONFOUNDING_GATE_ALGORITHM.md` §3 / §7，已退役，备份 `C:/Users/RichardYuan/FAR-Lab_Backups/`）。本子节之后，§7.5、§10 及其他章节对"ConfoundingGate 算法 SSOT"的引用一律指向本子节；36 §3 仅作来源溯源（已退役）。
 >
 > **字段对齐**：伪代码消费 `APPENDIX_A_TYPES.md` §10 `CausalModel` 字段（`nodes` / `edges` / `controlledConfounders` / `unmeasuredConfoundersSuspected`，camelCase）。`snake_case` 仅作 Python 等价示意，不得用于访问附录对象字段。
+>
+> **实现偏差披露（#12 · 反幻觉·修根因不修症状）**：`src/confounding_gate/` 的运行时实现**未**逐字照抄下方伪代码，两处修正了伪代码的算法缺陷（修正实现 + canonical DAG 单测锁定正确行为，未放宽任何测试期望）：
+>
+> 1. **`d_separation` collider 语义反转（(1) 伪代码 line 1024-1029）**：伪代码对 collider 取 `if (V ∉ Z 且后代 ∉ Z) → pass（通）；否则 → continue（阻断）`，即「collider 未条件化时放行」。这**反转了**标准 d-separation 的 collider 规则——标准是「collider 默认阻断路径，仅当 V 或其后代 ∈ Z 时才打开」。实现改用 Koller-Friedman *Probabilistic Graphical Models* 的 Bayes-Ball / reachability 标准算法（Phase I 祖域闭包 A = Z ∪ ancestors(Z)；Phase II BFS over `(node, 'up'|'down')` 状态对，collider 在 A 中才放行），并以 canonical DAG 单测（chain `A→B→C` / fork `A←B→C` / collider `A→B←C` × Z=∅ / Z={B}）锁定正确语义。偏差依据见 `src/confounding_gate/d_separation.ts` 文件头注释。
+> 2. **`block_backdoor_paths` 路径无关循环（(2) 伪代码 line 1085-1089）**：伪代码 `for path in backdoor_paths: if d_separation(dag, exposure, outcome, Z):` 在每次迭代用**相同参数**调用全局 d-separation（参数不含 `path`）——这是退化 no-op：要么把**所有**后门路径判 blocked、要么全部 unblocked；且当存在 `exposure→outcome` 直接因果边时全局 `d_separation(exposure, outcome, Z)` 恒为 `False`（直接边不可阻断），导致永不出 PASS。实现改用**逐路径阻断** `isPathBlocked(path, Z)`（标准定义：路径被阻断 ⟺ 某中间节点阻断——collider 除非其自身或后代 ∈ Z 否则阻断；非 collider 在 ∈ Z 时阻断），partition 精确到单条路径。偏差依据见 `src/confounding_gate/backdoor.ts` 文件头注释。
+>
+> **结论**：两处修正均使实现更接近因果推断教科书定义；伪代码保留作设计意图来源，运行时以实现 + canonical 单测为准。下游 `adjudicateConfounding`（§7.5.1 (3)）的三值 outcome 口径（PASS/WARN/FAIL）与 outcome→verdict 映射表（§7.5:955-961）**不变**。
 
 #### (1) `d_separation(dag, X, Y, Z)` — Bayes-Ball / reachability 完整伪代码
 

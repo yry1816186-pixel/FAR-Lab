@@ -86,3 +86,33 @@ export type {
   AuditResult,
   AuditRuleId,
 } from './auditor.ts';
+
+// V2 — 确定性五值裁决内核（APPENDIX_B §1 R0-R9 + 03 §7）
+export {
+  VERDICT_FLOAT_TOLERANCE,
+  decideFiveValueVerdict,
+  evaluateScope,
+  evaluateStatistics,
+  verdictGte,
+  verdictLte,
+} from './verdict_kernel_v2.ts';
+export type {
+  KernelAntiTheaterFinding,
+  KernelAntiTheaterFindingSeverity,
+  AssumptionDiagnostic,
+  ContradictionEvidence,
+  CoverageRelation,
+  DatasetBindingSpec,
+  EffectiveDirection,
+  EvidenceSufficiencyReport,
+  EvidenceSufficiencyStatus,
+  PowerStatus,
+  ProtocolDeviation,
+  ScopeReport,
+  StatisticalReport,
+  StatisticalResult,
+  TestStatus,
+  VerdictKernelInput,
+  VerdictKernelOutput,
+  VerdictRuleTrace,
+} from './verdict_kernel_v2.ts';

@@ -14,9 +14,12 @@
  * 诚实边界（ASK-9）：mapChecksToVerdict **可**产出 CONFIRMED（机器裁决）；
  * 但上游 ProofEnvelope 密封会按 ASK-9 降级 CONFIRMED→INCONCLUSIVE（见 far_proof/demo_chain）。
  *
- * evo-03 诚实边界（22 T-W2-06 三 claimType）：本模块仅交付 C-ASTRO-0001 existence。
- *   hero-A-001（quantitative）/ hero-B-002（causal·依赖 T-W2-07）V1 未实现——
- *   V1 claimType 覆盖清单见 claim_fixtures.ts（V1_CLAIM_FIXTURE_ROADMAP·1 delivered / 2 not_implemented）。
+ * evo-03 三 claimType 全交付（22 T-W2-06 + 任务 #12）：
+ *   - C-ASTRO-0001 existence（本模块）。
+ *   - hero-A-001 quantitative（hero_a_harness.ts·MMLU-physics·设计 INCONCLUSIVE via mixed）。
+ *   - hero-B-002 causal（hero_b_harness.ts·CoT 幻觉率·经 confounding_integration F6 降级 DEGRADED_SCOPE）。
+ *   V1 claimType 覆盖清单见 claim_fixtures.ts（V1_CLAIM_FIXTURE_ROADMAP·3 delivered）。
+ *   本模块另导出域无关原语 evaluateOutcome（check 阈值判定）供 hero_a/hero_b 复用（DRY·禁重复实现）。
  *
  * 模型中立。零容忍合规。
  */
@@ -64,8 +67,11 @@ export interface CAstroMeasuredValues {
 /**
  * 根据 M1-M4 默认阈值评估单个检验项的 outcome。
  * 评估语义遵循 threshold.op（<, <=, >, >=, ==）。
+ *
+ * 域无关（hero_a/hero_b 复用·DRY）：阈值 op 判定 → PASS / WARN（不达阈值）。FAIL 由调用方显式注入
+ * （C-ASTRO-0001 全 M-check 经阈值判定只产 PASS/WARN；hero 亦然）。
  */
-function evaluateOutcome(metricValue: number, threshold: ScienceThreshold): ScienceCheckOutcome {
+export function evaluateOutcome(metricValue: number, threshold: ScienceThreshold): ScienceCheckOutcome {
   let passes: boolean;
   switch (threshold.op) {
     case '<':

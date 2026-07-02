@@ -74,6 +74,23 @@ if (!failed && !run('ci-04 no_llm_final_judge_scan', 'pnpm run no-llm-judge-scan
   console.error('\n→ 排障指引：23_CI_AND_VALIDATION.md §6.6.2（ci-04 · no LLM final judge）+ AT-04 审计裁决');
 }
 
+// STEP 1c: ci-at anti_theater_deterministic_scan (anti-theater F3·APPENDIX_E §6 第 2 grep gate)
+//          硬门：src/anti_theater 出现 LLM-client-usage（openai/dashscope/chat.completions）→ exit 1；
+//          deterministic 标记 + runAntiTheaterLint 编排器 regression 守卫。
+if (!failed && !run('ci-at anti_theater_deterministic_scan', 'pnpm run anti-theater-scan')) {
+  failed = true;
+  console.error('\n→ 排障指引：APPENDIX_E_ANTI_THEATER.md §6（ci-at · anti_theater F3 deterministic）');
+}
+
+// STEP 1d: ci-cg confounding_gate_deterministic_scan (F6 因果红线·03 §7.5.1:1133 CG-1/2/5/6)
+//          硬门：src/confounding_gate 出现 LLM-client-usage（CG-1）或 generateConfounders/askLLM（CG-5）→ exit 1；
+//          CG-2 acyclic + CG-6 rationale template + adjudicateConfounding 编排器 regression 守卫。
+//          与 ci-at 互补（APPENDIX_E:1171 anti-theater 不重复混杂检测·defer to §7.5.1）。
+if (!failed && !run('ci-cg confounding_gate_deterministic_scan', 'pnpm run confounding-gate-scan')) {
+  failed = true;
+  console.error('\n→ 排障指引：03_EVIDENCE_CONTRACT_AND_VERDICT.md §7.5.1:1133（ci-cg · F6 deterministic）');
+}
+
 // STEP 2: typecheck
 if (!failed && !run('typecheck (tsc --noEmit)', 'pnpm run typecheck')) {
   failed = true;

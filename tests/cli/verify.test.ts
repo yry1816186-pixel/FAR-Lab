@@ -1,0 +1,563 @@
+// tests/cli/verify.test.ts
+// 测试 far verify 的纯收集器（FI-9 · 04§5）。
+// 直接调 verifyEnvelopeV2 / collectVerifyDump / parseProofEnvelopeV2 / verifyChainHeadResult，
+// 不 spawn 子进程（镜像 status.test.ts）。runVerify 端到端用临时文件验 exit code（0/7 契约）+ 空格路径（R5）。
+
+import { strict as assert } from 'node:assert';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { test } from 'node:test';
+
+import Database from 'better-sqlite3';
+import { runMigrations } from '../../src/db/index.ts';
+import {
+  appendRecord,
+  GENESIS_PREV_HASH,
+  getChainHead,
+  type AppendRecordOptions,
+  type CallAuditData,
+  type ProviderNeutralCredential,
+} from '../../src/evidence_log/index.ts';
+import { runAntiTheaterLint } from '../../src/anti_theater/lint.ts';
+import { parseAntiTheaterLintInput } from '../../src/anti_theater/schemas.ts';
+import type { AntiTheaterReport } from '../../src/anti_theater/types.ts';
+import { sealProofEnvelopeV2 } from '../../src/proof_envelope/v2/sealer.ts';
+import type { ProofEnvelopeV2 } from '../../src/proof_envelope/v2/types.ts';
+import { getGoldenVector, makeCleanBaseInput } from '../fixtures/anti_theater/golden_vectors.ts';
+import { makeValidEnvelopeV2Core } from '../proof_envelope/v2/fixtures.ts';
+import {
+  checkAntiTheaterReportConsistency,
+  collectVerifyDump,
+  diffAntiTheaterReport,
+  parseProofEnvelopeV2,
+  runVerify,
+  verifyAntiTheaterLint,
+  verifyChainHeadResult,
+  verifyEnvelopeV2,
+  type VerifyDump,
+  type VerifyMode,
+} from '../../src/cli/commands/verify.ts';
+
+// ===== envelope 收集器 =====
+
+function sealedEnvelope(): ProofEnvelopeV2 {
+  return sealProofEnvelopeV2(makeValidEnvelopeV2Core()).envelope;
+}
+
+/** #11b：clean base 经 runAntiTheaterLint 的报告（findings=[]·score=100·canSealConfirmed=true·RULE-PE-007 PASS）。 */
+function cleanAntiTheaterReport(): AntiTheaterReport {
+  return runAntiTheaterLint(makeCleanBaseInput());
+}
+
+/** #11b：封存含 clean antiTheaterReport 的 envelope（--lint-input happy-path 的对比基准）。 */
+function sealedEnvelopeWithCleanReport(): ProofEnvelopeV2 {
+  return sealProofEnvelopeV2(
+    makeValidEnvelopeV2Core({ antiTheaterReport: cleanAntiTheaterReport() }),
+  ).envelope;
+}
+
+test('verifyEnvelopeV2: 合法 envelope → tamperStatus clean / 无 FAIL 规则 / antiTheaterConsistent', () => {
+  const result = verifyEnvelopeV2(sealedEnvelope());
+
+  assert.equal(result.proofHashOk, true);
+  assert.equal(result.tamperStatus, 'clean');
+  assert.equal(result.scopeStatus, 'full');
+  assert.equal(result.verdict, 'CONFIRMED');
+  assert.equal(result.checkSummary.FAIL, 0);
+  assert.equal(result.antiTheaterConsistent, true);
+  assert.equal(result.errors.length, 0, `errors 应为空，实际: ${JSON.stringify(result.errors)}`);
+});
+
+test('verifyEnvelopeV2: 篡改 statisticalResults 不改 proofHash → tamperStatus tampered + dump FAIL', () => {
+  const env = sealedEnvelope();
+  const first = env.statisticalResults[0];
+  assert.ok(first, 'fixture statisticalResults 须非空');
+  // 拷贝 + 篡改一个 VC 字段（pValue），proofHash 不重算 → RULE-PE-010 重算捕获。
+  const tampered: ProofEnvelopeV2 = {
+    ...env,
+    statisticalResults: [{ ...first, pValue: 0.999 }],
+  };
+
+  const result = verifyEnvelopeV2(tampered);
+  assert.equal(result.proofHashOk, false);
+  assert.equal(result.tamperStatus, 'tampered');
+
+  const dump = collectVerifyDump(result, undefined, undefined);
+  assert.equal(dump.status, 'FAIL');
+  assert.equal(dump.recomputation.node, 'fail');
+  assert.ok(dump.verifiedLevels.includes('proofEnvelope'));
+});
+
+test('verifyEnvelopeV2: RULE-PE-007 违规（hasFail=true + verdict CONFIRMED）→ RULE-PE-007 FAIL（007 隔离·010 PASS）', () => {
+  // 注入含 FAIL finding 的报告（hasFail=true·failCount=1·自洽）+ verdict 仍 CONFIRMED（fixture 默认）。
+  // sealProofEnvelopeV2 重算 proofHash 使 RULE-PE-010 PASS，隔离 RULE-PE-007。
+  const { envelope } = sealProofEnvelopeV2(
+    makeValidEnvelopeV2Core({
+      antiTheaterReport: {
+        findings: [
+          {
+            findingId: 'F-TEST-POSTHOC',
+            attackKind: 'post-hoc-threshold',
+            outcome: 'FAIL',
+            hasFail: true,
+            evidenceRef: 'statisticalResults[0]',
+            message: 'test post-hoc threshold violation',
+          },
+        ],
+        hasFail: true,
+        failCount: 1,
+        warnCount: 0,
+        llmOverrideRejected: true,
+      },
+    }),
+  );
+
+  const result = verifyEnvelopeV2(envelope);
+  assert.equal(result.proofHashOk, true, 'proofHash 须自洽（隔离 RULE-PE-007·不让 010 抢先）');
+  assert.equal(result.antiTheaterConsistent, true);
+
+  const rule007 = result.checks.find((c) => c.ruleId === 'RULE-PE-007');
+  assert.ok(rule007, 'RULE-PE-007 须存在');
+  assert.equal(rule007.outcome, 'FAIL');
+});
+
+test('verifyEnvelopeV2: anti-theater 内嵌报告自洽（hasFail=false + WARN finding）→ RULE-PE-009 WARN / dump WARN', () => {
+  // 含空 message 的 WARN finding：RULE-PE-009 WARN（findings transparent），无 FAIL → dump status WARN。
+  const { envelope } = sealProofEnvelopeV2(
+    makeValidEnvelopeV2Core({
+      antiTheaterReport: {
+        findings: [
+          {
+            findingId: 'F-TEST-WARN',
+            attackKind: 'post-hoc-threshold',
+            outcome: 'WARN',
+            hasFail: false,
+            evidenceRef: 'statisticalResults[0]',
+            message: '   ',
+          },
+        ],
+        hasFail: false,
+        failCount: 0,
+        warnCount: 1,
+        llmOverrideRejected: true,
+      },
+    }),
+  );
+
+  const result = verifyEnvelopeV2(envelope);
+  assert.equal(result.proofHashOk, true);
+  assert.equal(result.antiTheaterConsistent, true);
+  assert.equal(result.checkSummary.FAIL, 0);
+  assert.ok(result.checkSummary.WARN >= 1, '须至少 1 条 WARN（RULE-PE-009）');
+
+  const dump = collectVerifyDump(result, undefined, undefined);
+  assert.equal(dump.status, 'WARN');
+});
+
+// ===== anti-theater 报告自洽 =====
+
+test('checkAntiTheaterReportConsistency: hasFail 与 FAIL 计数不一致 → inconsistent', () => {
+  const result = checkAntiTheaterReportConsistency({
+    findings: [
+      {
+        findingId: 'F1',
+        attackKind: 'post-hoc-threshold',
+        outcome: 'FAIL',
+        hasFail: true,
+        evidenceRef: 'x',
+        message: 'm',
+      },
+    ],
+    hasFail: false, // 与 count(FAIL)=1 矛盾
+    failCount: 0, // 同上
+    warnCount: 0,
+    llmOverrideRejected: true,
+  });
+  assert.equal(result.consistent, false);
+  assert.ok(result.warnings.length >= 2, 'hasFail + failCount 两处不一致');
+});
+
+test('checkAntiTheaterReportConsistency: 计数自洽 → consistent', () => {
+  const result = checkAntiTheaterReportConsistency({
+    findings: [],
+    hasFail: false,
+    failCount: 0,
+    warnCount: 0,
+    llmOverrideRejected: true,
+  });
+  assert.equal(result.consistent, true);
+  assert.equal(result.warnings.length, 0);
+});
+
+// ===== parseProofEnvelopeV2（untrusted 输入结构校验）=====
+
+test('parseProofEnvelopeV2: 合法 envelope JSON → ok', () => {
+  const json = JSON.parse(JSON.stringify(sealedEnvelope())) as unknown;
+  const parsed = parseProofEnvelopeV2(json);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.envelope.proofHash.length, 64);
+  }
+});
+
+test('parseProofEnvelopeV2: schemaVersion 错 → ok:false（UNSUPPORTED_SCHEMA_VERSION）', () => {
+  const env = sealedEnvelope();
+  const parsed = parseProofEnvelopeV2({ ...env, schemaVersion: 'far.proof_envelope.v1' });
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.match(parsed.error, /schemaVersion/);
+  }
+});
+
+test('parseProofEnvelopeV2: proofHash 非 64-hex → ok:false', () => {
+  const env = sealedEnvelope();
+  const parsed = parseProofEnvelopeV2({ ...env, proofHash: 'not-a-hash' });
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.match(parsed.error, /proofHash/);
+  }
+});
+
+test('parseProofEnvelopeV2: 根节点非对象 → ok:false', () => {
+  const parsed = parseProofEnvelopeV2('not-an-object');
+  assert.equal(parsed.ok, false);
+});
+
+// ===== collectVerifyDump（verifiedLevels + status 转移）=====
+
+test('collectVerifyDump: verifiedLevels 反映执行的校验层', () => {
+  const envResult = verifyEnvelopeV2(sealedEnvelope());
+  assert.deepEqual(collectVerifyDump(envResult, undefined, undefined).verifiedLevels, ['proofEnvelope']);
+  // chain-only：用空 DB（无 call_records → verifyChainHead ok·verifiedCount 0）。
+  const db = openChainDb();
+  try {
+    const chainResult = verifyChainHeadResult(db);
+    assert.deepEqual(collectVerifyDump(undefined, chainResult, undefined).verifiedLevels, ['chain']);
+    assert.deepEqual(
+      collectVerifyDump(envResult, chainResult, undefined).verifiedLevels,
+      ['proofEnvelope', 'chain'],
+    );
+  } finally {
+    db.close();
+  }
+});
+
+// ===== chain 收集器（L2·verifyChainHead 包装）=====
+
+const OFFLINE_OPTIONS: AppendRecordOptions = { providerProfile: 'offline_replay' };
+
+function openChainDb(path = ':memory:'): Database.Database {
+  const db = new Database(path);
+  runMigrations(db);
+  return db;
+}
+
+function credential(index: number): ProviderNeutralCredential {
+  return {
+    modelId: 'offline-replay-fixture',
+    dashscopeRequestId: null,
+    reproHash: `${index}`.repeat(64).slice(0, 64),
+    gitCommitSha: 'b'.repeat(40),
+    isoTimestamp: `2026-06-27T00:00:0${index}.000Z`,
+  };
+}
+
+function audit(index: number): CallAuditData {
+  return {
+    requestPayload: `{"q":${index}}`,
+    responsePayload: `{"a":${index}}`,
+    finishReason: 'stop',
+    usageTokensTotal: index,
+  };
+}
+
+function appendRow(db: Database.Database, index: number): void {
+  appendRecord(
+    db,
+    {
+      stageId: `stage${index}`,
+      cred: credential(index),
+      payloadKind: 'hypothesis',
+      purposeTag: 'hypothesis',
+      prevHash: getChainHead(db)?.currentHash ?? GENESIS_PREV_HASH,
+    },
+    audit(index),
+    OFFLINE_OPTIONS,
+  );
+}
+
+test('verifyChainHeadResult: 合法链 → ok + verifiedCount', () => {
+  const db = openChainDb();
+  try {
+    appendRow(db, 1);
+    appendRow(db, 2);
+    appendRow(db, 3);
+
+    const result = verifyChainHeadResult(db);
+    assert.equal(result.ok, true);
+    assert.equal(result.verifiedCount, 3);
+    assert.equal(result.brokenAtSeq, null);
+  } finally {
+    db.close();
+  }
+});
+
+test('verifyChainHeadResult: current_hash 篡改 → ok:false + brokenAtSeq', () => {
+  const db = openChainDb();
+  try {
+    appendRow(db, 1);
+    // trigger-bypass 后篡改（镜像 append_verify.test.ts）。
+    db.exec('DROP TRIGGER trg_call_records_no_update');
+    db.prepare("UPDATE call_records SET current_hash = 'tampered' WHERE seq = 1").run();
+
+    const result = verifyChainHeadResult(db);
+    assert.equal(result.ok, false);
+    assert.equal(result.brokenAtSeq, 1);
+  } finally {
+    db.close();
+  }
+});
+
+// ===== runVerify 端到端（exit code 契约 + 空格路径 R5）=====
+
+function runVerifyCapture(options: {
+  readonly envelopePath?: string;
+  readonly dbPath?: string;
+  readonly lintInputPath?: string;
+  readonly mode: VerifyMode;
+}): { readonly code: number; readonly stdout: string; readonly stderr: string } {
+  const outChunks: string[] = [];
+  const errChunks: string[] = [];
+  const origOut = process.stdout.write.bind(process.stdout);
+  const origErr = process.stderr.write.bind(process.stderr);
+  // 捕获 stdout + stderr（exit 1/2 的诊断走 stderr）。finally 还原（反回归）。
+  process.stdout.write = ((chunk: unknown): boolean => {
+    outChunks.push(typeof chunk === 'string' ? chunk : String(chunk));
+    return true;
+  }) as typeof process.stdout.write;
+  process.stderr.write = ((chunk: unknown): boolean => {
+    errChunks.push(typeof chunk === 'string' ? chunk : String(chunk));
+    return true;
+  }) as typeof process.stderr.write;
+  let code: number;
+  try {
+    code = runVerify({ ...options, json: true, explain: false });
+  } finally {
+    process.stdout.write = origOut;
+    process.stderr.write = origErr;
+  }
+  return { code, stdout: outChunks.join(''), stderr: errChunks.join('') };
+}
+
+function runVerifyJson(options: {
+  readonly envelopePath?: string;
+  readonly dbPath?: string;
+  readonly lintInputPath?: string;
+  readonly mode: VerifyMode;
+}): { readonly code: number; readonly dump: VerifyDump; readonly stderr: string } {
+  const { code, stdout, stderr } = runVerifyCapture(options);
+  // exit 0/7 恒产 JSON（collectVerifyDump → stdout）；单层 as：runVerify 输出即 VerifyDump（测试上下文）。
+  const dump = JSON.parse(stdout) as VerifyDump;
+  return { code, dump, stderr };
+}
+
+test('runVerify: 合法 envelope 文件（含空格路径）→ exit 0 + status PASS', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far verify dir-')); // 路径含空格（R5）
+  try {
+    const envPath = join(dir, 'envelope.json');
+    writeFileSync(envPath, JSON.stringify(sealedEnvelope(), null, 2));
+
+    const { code, dump } = runVerifyJson({ envelopePath: envPath, mode: 'envelope' });
+    assert.equal(code, 0, 'PASS → exit 0');
+    assert.equal(dump.status, 'PASS');
+    assert.equal(dump.tamperStatus, 'clean');
+    assert.equal(dump.recomputation.node, 'pass');
+    assert.equal(dump.recomputation.python, 'not-run');
+    assert.equal(dump.recomputation.browser, 'not-run');
+    assert.deepEqual(dump.verifiedLevels, ['proofEnvelope']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runVerify: 篡改 envelope 文件 → exit 7 + status FAIL + tamperStatus tampered', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-verify-tampered-'));
+  try {
+    const env = sealedEnvelope();
+    const first = env.statisticalResults[0];
+    assert.ok(first);
+    const tampered = { ...env, statisticalResults: [{ ...first, pValue: 0.999 }] };
+    const envPath = join(dir, 'tampered.json');
+    writeFileSync(envPath, JSON.stringify(tampered, null, 2));
+
+    const { code, dump } = runVerifyJson({ envelopePath: envPath, mode: 'envelope' });
+    assert.equal(code, 7, 'FAIL → exit 7');
+    assert.equal(dump.status, 'FAIL');
+    assert.equal(dump.tamperStatus, 'tampered');
+    assert.equal(dump.recomputation.node, 'fail');
+    assert.ok(dump.errors.length > 0, 'FAIL 须有 errors');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ===== #11b · diffAntiTheaterReport（重算报告 vs envelope 内嵌报告·深度对比）=====
+
+test('diffAntiTheaterReport: clean↔clean → consistent / 无发散', () => {
+  const report = runAntiTheaterLint(makeCleanBaseInput());
+  const { consistent, divergences } = diffAntiTheaterReport(report, report);
+  assert.equal(consistent, true);
+  assert.equal(divergences.length, 0);
+});
+
+test('diffAntiTheaterReport: gv-posthoc 重算 vs clean 内嵌 → not consistent + post-hoc-threshold 发散', () => {
+  const recomputed = runAntiTheaterLint(getGoldenVector('gv-posthoc-threshold-01').build());
+  const embedded = runAntiTheaterLint(makeCleanBaseInput());
+  const { consistent, divergences } = diffAntiTheaterReport(recomputed, embedded);
+  assert.equal(consistent, false);
+  assert.ok(
+    divergences.some((d) => /post-hoc-threshold/.test(d)),
+    `须含 post-hoc-threshold 发散: ${divergences.join(' | ')}`,
+  );
+});
+
+test('diffAntiTheaterReport: embedded 有 antiTheaterScore 且不等 → META 发散', () => {
+  const recomputed = runAntiTheaterLint(makeCleanBaseInput()); // score=100
+  const embedded: AntiTheaterReport = { ...recomputed, antiTheaterScore: 50 }; // META 发散
+  const { consistent, divergences } = diffAntiTheaterReport(recomputed, embedded);
+  assert.equal(consistent, false);
+  assert.ok(divergences.some((d) => /antiTheaterScore/.test(d)));
+});
+
+test('diffAntiTheaterReport: embedded 缺 META（早期 envelope）→ consistent（向后兼容）', () => {
+  const recomputed = runAntiTheaterLint(makeCleanBaseInput());
+  // 早期 envelope 内嵌报告仅 5 VC 核心，无 META 三字段。
+  const embedded: AntiTheaterReport = {
+    findings: recomputed.findings,
+    hasFail: recomputed.hasFail,
+    failCount: recomputed.failCount,
+    warnCount: recomputed.warnCount,
+    llmOverrideRejected: recomputed.llmOverrideRejected,
+  };
+  const { consistent, divergences } = diffAntiTheaterReport(recomputed, embedded);
+  assert.equal(consistent, true, `向后兼容：embedded 缺 META 不算发散: ${divergences.join(' | ')}`);
+  assert.equal(divergences.length, 0);
+});
+
+// ===== #11b · verifyAntiTheaterLint（runAntiTheaterLint 重算 + diff 安全网）=====
+
+test('verifyAntiTheaterLint: clean envelope + clean input → recomputedOk=true / 零发散', () => {
+  const envelope = sealedEnvelopeWithCleanReport();
+  const result = verifyAntiTheaterLint(envelope, makeCleanBaseInput());
+  assert.equal(result.recomputedOk, true);
+  assert.equal(result.divergences.length, 0, `clean 重算应零发散: ${result.divergences.join(' | ')}`);
+});
+
+test('verifyAntiTheaterLint: clean envelope + gv-posthoc input → 发散', () => {
+  const envelope = sealedEnvelopeWithCleanReport();
+  const result = verifyAntiTheaterLint(envelope, getGoldenVector('gv-posthoc-threshold-01').build());
+  assert.equal(result.recomputedOk, true);
+  assert.ok(result.divergences.length > 0, 'gv 攻击 input 重算须与 clean 内嵌报告发散');
+});
+
+test('verifyAntiTheaterLint: 深层损坏 input（删 fec.threshold·骨架不拦）→ 重算中止', () => {
+  // 经 parser 路由（与 loadLintInputFile 一致）：skeleton 过，runAntiTheaterLint 访问 threshold.thresholdSemantics 抛 TypeError。
+  const damagedRaw: Record<string, unknown> = JSON.parse(JSON.stringify(makeCleanBaseInput()));
+  const fec = damagedRaw.fec as Record<string, unknown>; // 单层 as（测试·构造深层损坏 input）
+  delete fec.threshold;
+  const damaged = parseAntiTheaterLintInput(damagedRaw);
+  assert.equal(damaged.ok, true, '骨架须通过（parser 不查 fec.threshold）');
+  if (damaged.ok) {
+    const envelope = sealedEnvelopeWithCleanReport();
+    const result = verifyAntiTheaterLint(envelope, damaged.input);
+    assert.equal(result.recomputedOk, false);
+    assert.ok(
+      result.errors.some((e) => e.includes('重算中止')),
+      `须含「重算中止」: ${result.errors.join(' | ')}`,
+    );
+  }
+});
+
+// ===== #11b · runVerify --lint-input 端到端（exit code 契约 + 空格路径 R5）=====
+
+test('runVerify --lint-input: envelope + clean lint-input（含空格路径）→ exit 0 / PASS / verifiedLevels 含 antiTheaterLint', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far verify lint-')); // 路径含空格（R5）
+  try {
+    const envelope = sealedEnvelopeWithCleanReport();
+    writeFileSync(join(dir, 'envelope.json'), JSON.stringify(envelope, null, 2));
+    writeFileSync(join(dir, 'lint-input.json'), JSON.stringify(makeCleanBaseInput(), null, 2));
+
+    const { code, dump } = runVerifyJson({
+      envelopePath: join(dir, 'envelope.json'),
+      lintInputPath: join(dir, 'lint-input.json'),
+      mode: 'envelope',
+    });
+    assert.equal(code, 0, 'PASS → exit 0');
+    assert.equal(dump.status, 'PASS');
+    assert.ok(dump.verifiedLevels.includes('antiTheaterLint'), '须透明披露 antiTheaterLint 层');
+    assert.equal(dump.errors.length, 0, `PASS 须无 errors: ${JSON.stringify(dump.errors)}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runVerify --lint-input: envelope + 攻击 lint-input（gv-posthoc）→ exit 7 / FAIL / errors 含 divergence', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-verify-lint-mismatch-'));
+  try {
+    const envelope = sealedEnvelopeWithCleanReport();
+    writeFileSync(join(dir, 'envelope.json'), JSON.stringify(envelope, null, 2));
+    writeFileSync(
+      join(dir, 'lint-input.json'),
+      JSON.stringify(getGoldenVector('gv-posthoc-threshold-01').build(), null, 2),
+    );
+
+    const { code, dump } = runVerifyJson({
+      envelopePath: join(dir, 'envelope.json'),
+      lintInputPath: join(dir, 'lint-input.json'),
+      mode: 'envelope',
+    });
+    assert.equal(code, 7, 'FAIL → exit 7');
+    assert.equal(dump.status, 'FAIL');
+    assert.ok(
+      dump.errors.some((e) => /anti-theater lint divergence/.test(e)),
+      '须含 anti-theater lint divergence',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runVerify --lint-input: 骨架非法 lint-input（{bad:1}）→ exit 1 / stderr 含载入失败', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-verify-lint-malformed-'));
+  try {
+    const envPath = join(dir, 'envelope.json');
+    const lintPath = join(dir, 'lint-input.json');
+    writeFileSync(envPath, JSON.stringify(sealedEnvelopeWithCleanReport(), null, 2));
+    writeFileSync(lintPath, JSON.stringify({ bad: 1 }));
+
+    const { code, stderr } = runVerifyCapture({
+      envelopePath: envPath,
+      lintInputPath: lintPath,
+      mode: 'envelope',
+    });
+    assert.equal(code, 1, 'runtime error → exit 1');
+    assert.match(stderr, /载入 lint 输入失败/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runVerify --lint-input: 无 --envelope → exit 2 / stderr 含「须配合 --envelope」', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-verify-lint-noenv-'));
+  try {
+    const lintPath = join(dir, 'lint-input.json');
+    writeFileSync(lintPath, JSON.stringify(makeCleanBaseInput(), null, 2));
+
+    const { code, stderr } = runVerifyCapture({ lintInputPath: lintPath, mode: 'envelope' });
+    assert.equal(code, 2, 'arg error → exit 2');
+    assert.match(stderr, /须配合 --envelope/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

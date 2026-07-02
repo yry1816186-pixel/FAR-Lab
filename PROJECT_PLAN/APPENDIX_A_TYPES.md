@@ -1188,7 +1188,7 @@ interface AntiTheaterVerdictConstraint {
 }
 ```
 
-状态：`DESIGN_LOCKED`。
+状态：`IMPLEMENTED_VERIFIED`。运行时权威落地于 `src/anti_theater/types.ts`（D1 单一存储类型源）；20 detectors + `runAntiTheaterLint` 编排器 + `computeAntiTheaterScore` + `applyVerdictConstraint` 落地于 `src/anti_theater/`（任务 #10 W3.1-W3.2）；21 golden vectors CI 实测全覆盖（`tests/fixtures/anti_theater/golden_vectors.ts`）。kernel 消费投影型 `KernelAntiTheaterFinding`（`src/falsifiability/verdict_kernel_v2.ts`，经 `src/anti_theater/adapters/kernel_adapter.ts` 投影）。
 
 ---
 
@@ -1435,7 +1435,7 @@ interface CausalEdge {
 }
 ```
 
-状态：`DESIGN_LOCKED`；ConfoundingGate 算法 SSOT 见 36 章（本附录仅锁类型契约）。
+状态：`DESIGN_LOCKED`（类型契约不变）；运行时已实现 #12（`src/confounding_gate/types.ts` 落地本节类型；ConfoundingGate 算法 SSOT 见 `03` §7.5.1）。
 
 ---
 

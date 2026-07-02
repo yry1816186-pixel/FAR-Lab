@@ -18,11 +18,12 @@
 
 import { spawnSync } from 'node:child_process';
 
-// Core 11 目录（build-integrity.yml:212 SSOT）。
+// Core 12 目录（build-integrity.yml:212 SSOT + anti_theater）。
 const CORE_DIRS = [
   'evidence_log',
   'evidence_graph',
   'falsifiability',
+  'anti_theater',
   'proof_envelope',
   'far_proof',
   'agent_loop',
@@ -33,7 +34,7 @@ const CORE_DIRS = [
   'api',
 ];
 
-// 与 package.json `test` glob 一致 + tests/agent_loop + tests/proof_envelope。
+// 与 package.json `test` glob 一致 + tests/agent_loop + tests/proof_envelope + tests/anti_theater。
 const TEST_GLOBS = [
   'tests/audit/*.test.ts',
   'tests/llm_gateway/*.test.ts',
@@ -48,7 +49,9 @@ const TEST_GLOBS = [
   'tests/far_proof/*.test.ts',
   'tests/science_harness/*.test.ts',
   'tests/proof_envelope/*.test.ts',
+  'tests/proof_envelope/v2/*.test.ts',
   'tests/agent_loop/*.test.ts',
+  'tests/anti_theater/*.test.ts',
 ];
 
 const includeArgs = CORE_DIRS.flatMap((dir) => [

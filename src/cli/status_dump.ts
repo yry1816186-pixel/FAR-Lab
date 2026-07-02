@@ -24,7 +24,7 @@ import { GOLDEN_VECTORS, REPRO_CONTEXT_FIXTURE_EXPECTED_HEX } from '../evidence_
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-// 与 package.json scripts.test 保持一致（18 目录后端测试 glob，含 tests/cli 自身）。
+// 与 package.json scripts.test 保持一致（20 目录后端测试 glob，含 tests/cli 自身 + tests/anti_theater + tests/proof_envelope/v2）。
 // 变更须同步 package.json —— CI grep 校验（同 coverage_gate.mjs TEST_GLOBS 纪律）。
 // CLI 层（commands/status.ts）phase B runTestCount 复用此常量 spawn `node --test --test-reporter=tap`。
 export const TEST_GLOBS: readonly string[] = [
@@ -43,9 +43,11 @@ export const TEST_GLOBS: readonly string[] = [
   'tests/far_proof/*.test.ts',
   'tests/science_harness/*.test.ts',
   'tests/proof_envelope/*.test.ts',
+  'tests/proof_envelope/v2/*.test.ts',
   'tests/report/*.test.ts',
   'tests/trace/*.test.ts',
   'tests/cli/*.test.ts',
+  'tests/anti_theater/*.test.ts',
 ];
 
 export interface PendingField {

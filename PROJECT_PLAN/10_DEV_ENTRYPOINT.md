@@ -279,13 +279,13 @@ function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput 
 - 决策树优先级 5 路径单测全覆盖；
 - enum 严格 5 值，无隐式第六值。
 
-三 claimType 覆盖（Hero Demo fixture，实现时落实）：
+三 claimType 覆盖（Hero Demo fixture，**已交付 #12** · `countDeliveredV1ClaimFixtures()===3`）：
 
 | Claim | claimType | 域 | 设计性 verdict | 说明 |
 |---|---|---|---|---|
 | `C-ASTRO-0001` | `existence` | TESS astronomy | `INCONCLUSIVE` | TESS 数据本身不可证伪 |
-| `hero-A-001` | `quantitative` | MMLU-physics | `INCONCLUSIVE` | RULE-FS-001 不可证伪 |
-| `hero-B-002` | `causal` | CoT 幻觉率 | `DEGRADED_SCOPE` | L7-L3 ConfoundingGate F6 门控（`unblocked` + `observational_only` → 禁 `CONFIRMED`） |
+| `hero-A-001` | `quantitative` | MMLU-physics | `INCONCLUSIVE` | RULE-FS-001 不可证伪（`buildHeroAChecks`：M1 PASS + M2/M3 WARN → `mixed`） |
+| `hero-B-002` | `causal` | CoT 幻觉率 | `DEGRADED_SCOPE` | L7-L3 ConfoundingGate F6 门控（全 PASS checks 本会 `CONFIRMED` → `decideVerdictWithConfounding(FAIL)` 降级 `DEGRADED_SCOPE`） |
 
 ### 4.5 W3-A：`far verify`
 
