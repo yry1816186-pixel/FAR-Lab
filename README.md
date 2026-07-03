@@ -8,6 +8,10 @@
 
 > 测试数、覆盖率等质量指标以 `pnpm run ci-all` 的**实测输出为准**——本 README 不手填精确数字，避免文档与实测漂移（反手填纪律）。
 
+> ⛔ **ANY AI AGENT (Claude / GPT / Cursor / Copilot / other) — STOP BEFORE WRITING CODE.**
+> Read in order: [`AGENT_ENTRY_PROTOCOL.md`](AGENT_ENTRY_PROTOCOL.md) → [`PROJECT_PLAN/DEPTH_LEDGER.md`](PROJECT_PLAN/DEPTH_LEDGER.md) §A/§C → [`AGENT_ANTISKIM_TRIPWIRES.md`](AGENT_ANTISKIM_TRIPWIRES.md).
+> The depth-wiring gate `scripts/depth_gate.mjs` (run via `pnpm run depth-gate`) is a **CI required check** and currently FAILs by design — no deep feature (V2 verdict kernel / fallback chain / real statistics / FEC mandatory gate) is wired into a production caller yet. Re-running the already-green test suite is zero progress. Take `DEPTH_LEDGER.md` §A `next_action` and wire **one real dependency** (real SymPy / DashScope / venv / hash), with a RED→GREEN test on the real path, or STOP.
+
 ---
 
 ## 项目简介
