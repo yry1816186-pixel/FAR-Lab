@@ -36,6 +36,7 @@
     "no-llm-judge-scan": "node scripts/no_llm_final_judge_scan.mjs",
     "anti-theater-scan": "node scripts/anti_theater_deterministic_scan.mjs",
     "confounding-gate-scan": "node scripts/confounding_gate_deterministic_scan.mjs",
+    "depth-gate": "node scripts/depth_gate.mjs",
     "smoke-core": "pnpm run test && pnpm run test:py",
     "fresh-clone-smoke": "node scripts/fresh_clone_smoke.mjs",
     "day1:verify": "node scripts/day1_verify.mjs",

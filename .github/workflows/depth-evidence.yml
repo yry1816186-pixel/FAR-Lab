@@ -1,0 +1,71 @@
+# .github/workflows/depth-evidence.yml
+# RED→GREEN 双跑物证 bot（AGENT_ANTISKIM_TRIPWIRES.md T5 机检钩子 · 防 ledger 自我消化 / 伪造 RED→GREEN）
+#
+# 目的：agent 不能手填 DEPTH_LEDGER §C 的 status=WIRED_GREEN——必须由本 job 在 CI 实跑证明：
+#   对每个 status=WIRED_RED 行，checkout base SHA 跑其 proof_test 须 FAIL（非 skip 非 pass），
+#   checkout head SHA 跑同测试须 PASS。双跑通过 → 本 job 用 GITHUB_TOKEN 写回 §C 该行
+#   status=WIRED_GREEN + 紧随的 `evidence: <base_sha>→<head_sha>` 行。
+#
+# ⚠️ maintainer 必做（本 job 默认不会生效，需主动启用）：
+#   1. GitHub repo → Settings → Actions → General → Workflow permissions → 选 "Read and write permissions"
+#      （让 GITHUB_TOKEN 能 push 写回 DEPTH_LEDGER.md）。
+#   2. 把 `depth_evidence` 加入 Branch protection → Require status checks（与 depth_gate 并列）。
+#   3. CODEOWNERS：PROJECT_PLAN/DEPTH_LEDGER.md 由本 bot + maintainer own（防 agent 手改 status）。
+#
+# 当前为 scaffold：双跑 + 写回逻辑落 scripts/depth_evidence.mjs（待实现，见该文件 TODO）。
+# 在 scripts/depth_evidence.mjs 实现前，本 job 以 exit 0 + 提示信息运行（不阻断），诚实声明未启用。
+# 实现 priority 低于 depth_gate（depth_gate 已能阻断所有不带真实接线的 PR；本 job 是把 WIRED_RED→GREEN
+# 的升级物证自动化，防 agent 手填，属收紧层）。
+name: depth-evidence
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 写回 DEPTH_LEDGER.md evidence 行（须 maintainer 在 repo settings 启用 write 权限）
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10.29.3'
+
+jobs:
+  depth_evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # 双跑须 checkout base SHA，需完整历史
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: RED→GREEN dual-run evidence (scaffold · 见 scripts/depth_evidence.mjs TODO)
+        run: |
+          if [ ! -f scripts/depth_evidence.mjs ]; then
+            echo "○ depth_evidence: scripts/depth_evidence.mjs 未实现（V1 scaffold）——本 job 当前不阻断。"
+            echo "  启用步骤：(1) 实现 scripts/depth_evidence.mjs（解析 §C WIRED_RED 行 → base/head 双跑 proof_test → 写回 evidence）"
+            echo "           (2) maintainer 在 repo settings 启用 workflow write 权限"
+            echo "           (3) 把 depth_evidence 加入 required status checks"
+            echo "  depth_gate 已独立阻断未接线 PR，本 job 是把 WIRED_RED→GREEN 物证自动化的收紧层。"
+            exit 0
+          fi
+          node scripts/depth_evidence.mjs \
+            --base '${{ github.event.pull_request.base.sha }}' \
+            --head '${{ github.event.pull_request.head.sha }}'
+      - name: Commit back evidence line (若 scripts/depth_evidence.mjs 改了 DEPTH_LEDGER)
+        if: success()
+        run: |
+          if [ -n "$(git status --porcelain PROJECT_PLAN/DEPTH_LEDGER.md)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add PROJECT_PLAN/DEPTH_LEDGER.md
+            git commit -m "chore(depth-evidence): write back WIRED_GREEN evidence (base→head dual-run)"
+            git push
+          else
+            echo "○ 无 WIRED_RED→GREEN 升级，不写回。"
+          fi
