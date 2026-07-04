@@ -9,10 +9,16 @@ requires-python = ">=3.11"
 dependencies = [
     "threadpoolctl>=3.5,<4.0",
     "numpy>=1.24,<2.0",
+    "sympy>=1.13,<2.0",
+    "z3-solver>=4.13,<5.0",
 ]
 
 [project.optional-dependencies]
 dev = []
+# science：C-ASTRO 真实在线数据集获取（P1-6 / Phase 5）。重依赖（astropy 栈），
+# 不进核心 dependencies——仅在真实 TESS 取数场景手动安装（pip install -e .[science]）。
+# 缺失时 dataset_fetch.py 返回 {"ok": false}，fetchOnlineDataset → null → cached_fixture 降级。
+science = ["lightkurve", "astroquery"]
 
 [tool.pytest.ini_options]
 testpaths = ["repro/tests"]

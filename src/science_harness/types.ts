@@ -14,7 +14,7 @@
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */
 
-import type { Verdict } from '../schema/enums.ts';
+import type { NetworkPolicy, Verdict } from '../schema/enums.ts';
 
 // ---------------------------------------------------------------------------
 // 资源规格（spec 12 §1.1 · 复用 02/23 ResourceSpec SSOT 三字段）
@@ -129,6 +129,51 @@ export interface SandboxExecutionInput {
 export interface SandboxAdapter {
   readonly adapterId: string;
   execute(input: SandboxExecutionInput, resources: SandboxResourceSpec): SandboxRunResult;
+}
+
+// ---------------------------------------------------------------------------
+// V2 venv sandbox（P1-6 · 真实 spawn 子进程）
+// ---------------------------------------------------------------------------
+
+/**
+ * venv 沙箱执行输入（V2）。
+ *
+ * 与 V1 `SandboxExecutionInput` 故意分离：V1 接收**预计算**确定性产物（exitCode/stdout/...），
+ * V2 接收**待执行的用户脚本** + 环境配置，由真实 Python 子进程产出 `SandboxRunResult`。
+ * 合并会与 `exactOptionalPropertyTypes` 冲突（script 与 pre-computed output 同接口互斥），
+ * 故分离为两个独立契约，共享 `SandboxRunResult` 输出。
+ *
+ * 诚实边界（07_RISK_REGISTER §188）：进程级 OS 隔离（cgroups/netns）非本层职责——
+ * `networkPolicy` 仅驱动 Python 侧 `_check_host` best-effort + 禁网 env var，**非强隔离**。
+ */
+export interface VenvSandboxInput {
+  /** 待执行的用户 Python 脚本源码（sandbox_runner.py exec）。 */
+  readonly script: string;
+  /** 固定 seed（SR-2，默认 42，进 reproHash）。 */
+  readonly seed?: number;
+  /** 网络策略（默认 'off' · SR-5）。allowlist 时须配 allowedHosts。 */
+  readonly networkPolicy?: NetworkPolicy;
+  /** networkPolicy='allowlist' 时允许的主机白名单（其余阻塞）。 */
+  readonly allowedHosts?: readonly string[];
+  /** 制品工作区（执行后扫描 artifacts manifest；不提供则无 artifacts）。 */
+  readonly workingDir?: string;
+  /** Python 命令（默认按平台 python/python3）。 */
+  readonly pythonCmd?: string;
+  /** 墙钟超时毫秒（SR-4，超时 spawn 强杀子进程）。 */
+  readonly timeoutMs?: number;
+}
+
+/**
+ * V2 venv 沙箱适配器契约（P1-6）。
+ *
+ * 与 V1 `SandboxAdapter.execute`（同步·确定性 hash）共存：`executeAsync` 真起 venv 子进程，
+ * `isAvailable` 让调用方对缺失环境诚实 skip（不当代码 bug · CLAUDE.md §3）。
+ */
+export interface VenvSandboxAdapter {
+  readonly adapterId: string;
+  /** venv 是否可用（spawn 探针）。不可用 → 调用方 skip。 */
+  isAvailable(): boolean;
+  executeAsync(input: VenvSandboxInput, resources: SandboxResourceSpec): Promise<SandboxRunResult>;
 }
 
 // ---------------------------------------------------------------------------

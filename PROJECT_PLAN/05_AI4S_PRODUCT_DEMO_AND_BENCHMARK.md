@@ -37,7 +37,7 @@
 | 可验证套件 Leaderboard（6 seed / `suiteIntegrityRoot`） | `IMPLEMENTED_VERIFIED` | 来源 `40`；浏览器 Web Crypto 独立重算已落地 |
 | Bench-125（体量扩到 125 题） | `ROADMAP` | 来源 `50`；纯增量 seed，`runBenchmark` 一字不改 |
 | Falsifiability Resolution Curve | `PARTIAL`（条件性，R5 三门不过则删） | 来源 `50` §5；自我指涉 theater 风险 |
-| `far` CLI 产品表面（npx 零密钥起跑） | `ROADMAP`（待实现 `packages/cli/`） | 来源 `46`；FI-1 |
+| `far` CLI 产品表面（npx 零密钥起跑） | `PARTIAL`（`src/cli/far.ts` 已有 status/verify/export receipt/bench run；`packages/cli` 与 ask/repl/stream 仍 `ROADMAP`） | 来源 `46`；FI-1 |
 | Workflow / Provenance Adapter（CWL/Nextflow/MLflow/RO-Crate） | `DESIGN_LOCKED` | 来源 `79` / `78`；spec + 接口契约 |
 
 > 工程落地状态一律以 `far status --json` 为准；本章不出现「N 条测试通过」「CI 通过率 X%」类手填统计。
@@ -620,7 +620,7 @@ export function validateFarProofCrate(cratePath: string): ValidationResult;
 
 ## 9. `far` CLI 产品表面（FI-1）
 
-> 来源 `46`，状态 `ROADMAP`（待实现 `packages/cli/`）。
+> 来源 `46`，状态 `PARTIAL`：`src/cli/far.ts` 已提供 `far status` / `far verify` / `far export receipt` / `far bench run`；`packages/cli`、`far ask`、`far repl`、`far stream` 仍为路线图。
 
 ### 9.1 一句话
 
@@ -633,9 +633,10 @@ export function validateFarProofCrate(cratePath: string): ValidationResult;
 | `far ask "<question>"` | 一次性跑完整 6-stage FSM，产出 verdict + `.far-proof` | `offline_replay`（零密钥） | `runAgentLoop` |
 | `far repl` | 交互式：提问、追问、fork 上一次 run | `offline_replay` | `runAgentLoop` + replay |
 | `far stream "<question>"` | 同 `ask` 但 SSE/stdio 流式打印每阶段 | `offline_replay` | `runAgentLoop` + 事件流 |
-| `far verify <proof.far-proof>` | 验证一份 `.far-proof`（重算哈希链 + Merkle 根 + verdict 一致性） | 无（纯验证） | `canonicalHash` + `verifyChainHead` |
+| `far verify --bundle <path>` | 验证一份 `.far-proof` V1 minimal bundle（重算 proofHash + redacted chain + manifest） | 无（纯验证） | `canonicalHash` + `verifyChainHead` |
+| `far export far-proof --demo-chain --out <dir> [--package]` | 导出 V1 `.far-proof` self-verifiable bundle；`--package` 生成 `verify.sh` / `integrity.json` / `.tar.zst` | `offline_replay` | `exportFarProof` + `packageFarProofBundle` |
 | `far replay <run-id>` | 重放某次 run 的证据链（时光机基础） | 无 | `evidence_log` |
-| `far bench [--domain <pack>]` | 跑 DomainPack 的示范 claim | `offline_replay` | `runBenchmark` |
+| `far bench run [--domain <name>] [--json] [--out <path>]` | 跑 6-seed demo benchmark profile，输出 `BenchmarkReport` / `suiteIntegrityRoot` | `offline_replay` | `runBenchmark` |
 | `far court <claim> --models a,b,c` | 跨模型可靠性法庭 | `offline_replay`（多 persona） | `packages/court` |
 | `far arena "<hypothesis>"` | 对抗科学竞技场 | `offline_replay` | `packages/arena` |
 | `far init <domain>` | 初始化一个新 DomainPack 脚手架 | 无 | `DomainPackRegistry` |

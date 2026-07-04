@@ -3,15 +3,17 @@
  *
  * 构造一条**真实**的端到端可证伪证据链，用于 .far-proof 导出 + 重放验证：
  *   FEC appendClaim (C-ASTRO-0001)
- *     → makeVerdict (机器裁决)
+ *     → V2 verdict kernel (机器裁决)
  *     → sealProofEnvelope (确定性密封·禁 LLM)
  *     → 可被 exportFarProof 导出 / recompute_proof_hashes 字节级重算
  *
  * 诚实边界（ASK-9 / 00 §1.4）：
  *   - 代码**不得**密封 CONFIRMED 终审（需人类背书）。
- *   - 若 makeVerdict 返回 CONFIRMED，密封前降级为 INCONCLUSIVE 并记 knownFailure。
- *   - demo 场景刻意构造为 **REFUTED**（metricValue 远低于阈值）—— 这是 FAR-Chain
- *     核心价值（可证伪性）的最诚实演示：一个被证据**推翻**的 claim。
+ *   - 若机器裁决返回 CONFIRMED，密封前降级为 INCONCLUSIVE 并记 knownFailure。
+ *   - demo 证据编码 refutesClaim=true（F1=0.62 远低于 0.80 阈值），但本链走 legacy 适配路径
+ *     （makeLegacyCompatFec + evidenceToStatisticalResult），该降维不注入真实 pValue/adjustedPValue →
+ *     kernel R6 refutes 门不触发 → 机器裁决实为 **UNTESTED**，非 REFUTED。
+ *     真实 REFUTED 需经 statistics 注入（P1-5 hero pipeline 演示，见 tests/science_harness/hero_*_pipeline）。
  *
  * 模型中立：全程 offline_replay，无任何 qwen/dashscope/bailian 字面量。
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
@@ -25,12 +27,15 @@ import type Database from 'better-sqlite3';
 import { runMigrations } from '../db/migrator.ts';
 import { fecAppendClaim } from '../fec/index.ts';
 import { GENESIS_PREV_HASH } from '../evidence_log/index.ts';
+import { makeLegacyCompatFec } from '../falsifiability/index.ts';
 import type {
   EvidenceRecord,
   FalsificationSpec,
   ThresholdSpec,
   Verdict,
+  VerdictKernelOutput,
 } from '../falsifiability/index.ts';
+import type { FecGateDecision } from '../fec/fec_mandate.ts';
 import {
   GENESIS_PROOF_HASH,
   sealProofEnvelope,
@@ -88,7 +93,7 @@ export function computeEnvHash(descriptor: EnvDescriptor): string {
 }
 
 // ---------------------------------------------------------------------------
-// demo 场景定义（C-ASTRO-0001 · REFUTED）
+// demo 场景定义（C-ASTRO-0001 · legacy 路径 UNTESTED）
 // ---------------------------------------------------------------------------
 
 /**
@@ -96,10 +101,11 @@ export function computeEnvHash(descriptor: EnvDescriptor): string {
  *
  * claim: "适配器 A 在 TESS-ASTRO 基准上 F1 ≥ 0.80"
  * 证伪阈值: F1 > 0.80
- * 实测证据: F1 = 0.62（远低于阈值）→ **推翻** claim
+ * 实测证据: F1 = 0.62（远低于阈值），evidence 编码 refutesClaim=true。
  *
- * 这是 FAR-Chain 最核心的演示：一个被证据**证伪**的 claim 被诚实记录、
- * 确定性裁决、密封为不可篡改的 ProofEnvelope。
+ * 诚实声明：legacy 适配路径不注入真实 pValue/adjustedPValue → kernel R6 refutes 门不触发 →
+ *   机器裁决 = UNTESTED（非 REFUTED）。demo_chain 的价值是演示**完整密封链形状**（FEC→kernel→seal），
+ *   非演示真实统计裁决；真实 REFUTED 由 P1-5 hero pipeline（statistics 注入）演示。
  */
 export const DEMO_FALSIFICATION_SPEC: FalsificationSpec = {
   prediction: 'adapter A achieves macro-F1 >= 0.80 on TESS-ASTRO benchmark',
@@ -132,6 +138,10 @@ export interface DemoChainResult {
   readonly claimText: string;
   /** FEC 编排产出的机器裁决（密封前·可能含 CONFIRMED）。 */
   readonly machineVerdict: Verdict;
+  /** V2 kernel 原始输出（demo_chain 经 fecAppendClaim 间接驱动 decideFiveValueVerdict 的物证：reasonCodes/decisiveRuleId/ruleTrace 非空）。 */
+  readonly kernelOutput: VerdictKernelOutput;
+  /** FEC 强制门决策（fail-closed 物证：valid demo 契约 allowed=true）。 */
+  readonly fecGate: FecGateDecision;
   /** 密封信封（确定性·conclusion 已按 ASK-9 降级）。 */
   readonly sealed: SealResult;
   /** 实际密封的 conclusion（绝不等于 CONFIRMED）。 */
@@ -212,6 +222,14 @@ export function buildDemoChain(db: Database.Database): DemoChainResult {
     evidences,
     parentVerdictId: null,
     nodeKind: 'hypothesis',
+    fecV2: {
+      contract: makeLegacyCompatFec({
+        claimId: DEMO_CLAIM_ID,
+        falsificationSpec: DEMO_FALSIFICATION_SPEC,
+        thresholdSpec: DEMO_THRESHOLD_SPEC,
+        frozenAt: DEMO_SOURCE_ANCHOR.isoTimestamp,
+      }),
+    },
     // F8 预登记(§2-M2 接线·spec 11 反 p-hacking):makeVerdict 前锁定可证伪契约 preregistrationHash。
     // falsifiability_contracts 是独立 append-only 表,不进 canonical_hash 白名单(4 键)/不进 .far-proof 9+1 分量,
     // 故 contractId(ulid)的非确定性不影响 demo chain 的 proofHash 字节级重算。
@@ -256,6 +274,8 @@ export function buildDemoChain(db: Database.Database): DemoChainResult {
     claimId: DEMO_CLAIM_ID,
     claimText,
     machineVerdict: fecResult.decision.verdict,
+    kernelOutput: fecResult.kernelOutput,
+    fecGate: fecResult.fecGate,
     sealed,
     sealedConclusion,
   };

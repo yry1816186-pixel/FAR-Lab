@@ -272,8 +272,8 @@ function sha256hex(s: string): string
 | 能力 | 状态 |
 |---|---|
 | `computeProofHash()` TS 实现 | `IMPLEMENTED_VERIFIED`（白名单对象 byte-equal 由 cross_lang 对拍守卫） |
-| Python 侧 ProofEnvelope hash | `IMPLEMENTED_UNVERIFIED`（chain/merkle 已实现，proof envelope hash 待补） |
-| Browser Web Crypto proofHash | `PARTIAL`（Merkle/Suite 已实现，proof envelope hash 待补） |
+| Python 侧 ProofEnvelope hash | `IMPLEMENTED_VERIFIED`（`repro/far_chain_repro/proof_hash.py`，并已接入 `far verify` 的 `recomputation.python`） |
+| Browser Web Crypto proofHash | `IMPLEMENTED_VERIFIED`（standalone `frontend/public/verify.html` 重算 ProofEnvelope V2 proofHash；Merkle/Suite 已实现；不覆盖 raw evidence / RO-Crate 外部认证） |
 | Rust / Go proofHash | `ROADMAP`（V2） |
 | WASM proofHash | `ROADMAP`（V3） |
 

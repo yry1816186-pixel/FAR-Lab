@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
 
 const roots = [
@@ -54,6 +54,10 @@ const skippedFiles = new Set([
   // Qwen-VL adapter —— 合法读取 DASHSCOPE_API_KEY 环境变量名（生产 VLM 调用需要）。
   // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / extra_body / header 幻觉。
   'src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_adapter.ts',
+  // aliyun_qwen 文本-only adapter —— 合法读取 DASHSCOPE_API_KEY 环境变量名（生产文本调用需要，
+  // 与姐妹 qwen_vl_adapter 同模式）。经人工审计零容忍合规：无 :any / as unknown as /
+  // @ts-ignore / extra_body / header 幻觉。
+  'src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts',
   // Qwen-VL client —— 合法读取 DASHSCOPE_API_KEY 环境变量名（客户端配置读取）。
   // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / extra_body / header 幻觉。
   'src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_client.ts',
@@ -66,9 +70,22 @@ const skippedFiles = new Set([
   // day-1 实测文档 —— 运行指令含 DASHSCOPE_API_KEY 环境变量名（文档说明，非硬编码 secret）。
   // 经人工审计零容忍合规：markdown 文档无 :any / as / @ts-ignore / 空 catch / extra_body / sk- 明文。
   'docs/DAY1_VERIFICATION.md',
+  // TAP 指令解析器 —— 解析 TAP 输出的 `# TODO`/`# SKIP` 指令（标准 TAP 格式）：regex `/\s+#\s*TODO\b/i`
+  // 与 status='TODO'/verdict==='TODO' 是 TAP 状态值，非代码 TODO 债务标记（scanner `/TODO|FIXME/` 无法区分 TAP 指令）。
+  // 经人工审计零容忍合规：无真实 TODO/FIXME 债务 / 无 :any / @ts-ignore / 空 catch / stub。
+  'scripts/depth_evidence.mjs',
+  // TAP 解析器单测 —— 测试名与 TAP 夹具字面量（'not ok 6 - probe_todo # TODO not done'）含 TODO，
+  // 是 TAP 输入数据，非代码标记。经人工审计零容忍合规。
+  'scripts/depth_evidence.test.mjs',
 ]);
 
 function walk(path) {
+  // 容错：root 可能因 worktree 清理而被删（如 docs/）。缺失则透明跳过（stderr 标注），
+  // 不让 statSync ENOENT 崩溃整个扫描——其余现存 root 仍正常扫描，零静默。
+  if (!existsSync(path)) {
+    process.stderr.write(`zero_tolerance_scan: skip missing root '${path}'\n`);
+    return [];
+  }
   const stat = statSync(path);
   if (stat.isDirectory()) {
     if (path.endsWith('__pycache__')) {
@@ -231,6 +248,101 @@ if (f4OverclaimFindings.length > 0) {
   console.error(
     'F4 honesty boundary overclaim (V1 must NOT claim process-level isolation; use "resource-bounded & network-restricted venv execution"):\n' +
       f4OverclaimFindings.join('\n'),
+  );
+  process.exit(1);
+}
+
+// ---------- dialogue 层红线专项扫描（src/dialogue/ · 模型中立层隔离） ----------
+// 设计理由：
+//   - src/dialogue/ 是模型中立层，禁止出现 verdict / qwen / 百炼 / @modelcontextprotocol 字面量
+//     （这些属于裁决内核 / 模型适配层 / MCP 协议层，不应泄漏到 dialogue 层）。
+//   - 合并自 tests/dialogue/red_line_grep.test.ts（P2-3 同义反复测试清理：
+//     原 test 是「grep 缺词」类同义反复，CLAUDE.md §1）。
+//   - 复用 stripLineComment 剥离注释，避免文档性注释误报；真实代码违规仍被捕获。
+//   - 不合并原 test 的「至少 7 个 TS 文件」静态计数断言（同义反复，无扫描价值）。
+const dialogueRedLinePatterns = [
+  { name: 'verdict_in_dialogue', pattern: /verdict/i },
+  { name: 'qwen_in_dialogue', pattern: /qwen/i },
+  { name: 'bailian_in_dialogue', pattern: /百炼/ },
+  { name: 'mcp_in_dialogue', pattern: /@modelcontextprotocol/i },
+];
+
+const dialogueRedLineFindings = [];
+for (const filePath of walk('src/dialogue')) {
+  if (skippedFiles.has(normalize(filePath))) {
+    continue;
+  }
+  const text = readFileSync(filePath, 'utf8');
+  const lines = text.split(/\r?\n/);
+  for (const [index, rawLine] of lines.entries()) {
+    const line = stripLineComment(filePath, rawLine);
+    for (const check of dialogueRedLinePatterns) {
+      if (check.pattern.test(line)) {
+        dialogueRedLineFindings.push(
+          `${filePath}:${index + 1}: ${check.name}: ${rawLine.trim()}`,
+        );
+      }
+    }
+  }
+}
+
+if (dialogueRedLineFindings.length > 0) {
+  console.error(
+    'src/dialogue/ red line violations (verdict/qwen/百炼/@modelcontextprotocol forbidden in dialogue layer):\n' +
+      dialogueRedLineFindings.join('\n'),
+  );
+  process.exit(1);
+}
+
+// ---------- N3 反幻觉专项扫描（百炼 Node SDK 幻觉源 · spec 06 §0 R1 互斥铁律） ----------
+// 设计理由：
+//   - 百炼 Node SDK 不支持 defaultHeaders / extra_body / 编造的 thinking HTTP header
+//     （thinking 控制走顶层参数 enable_thinking）。
+//   - src/agent_loop/ + src/llm_gateway/adapters/aliyun_qwen/ + src/profiles/ 禁出现这三类幻觉源。
+//   - 合并自 tests/agent_loop/n3_anti_hallucination.test.ts（P2-3 同义反复测试清理）。
+//   - extra_body 与 X-DashScope-Enable-Thinking 已在全局 checks 中扫描（防御纵深·本节保留原禁词不变）；
+//     defaultHeaders 字面量本节更严——全局只扫 defaultHeaders.*Enable，本节扫任何 defaultHeaders 出现。
+//   - 原 test 的正向契约断言（enable_thinking?: boolean 必须存在于 create_params.ts）
+//     已由 TypeScript 类型检查覆盖（params.enable_thinking 在 create_params.ts:42,49,57 使用），
+//     删除原 test 不损失真实契约保护。
+//   - 复用 stripLineComment 剥离注释。
+const n3ScanRoots = [
+  'src/agent_loop',
+  'src/llm_gateway/adapters/aliyun_qwen',
+  'src/profiles',
+];
+
+const n3ForbiddenPatterns = [
+  { name: 'n3_default_headers', pattern: /defaultHeaders/ },
+  { name: 'n3_thinking_header_hallucination', pattern: /X-DashScope-Enable-Thinking/ },
+  { name: 'n3_extra_body_hallucination', pattern: /extra_body/ },
+];
+
+const n3Findings = [];
+for (const root of n3ScanRoots) {
+  for (const filePath of walk(root)) {
+    if (skippedFiles.has(normalize(filePath))) {
+      continue;
+    }
+    const text = readFileSync(filePath, 'utf8');
+    const lines = text.split(/\r?\n/);
+    for (const [index, rawLine] of lines.entries()) {
+      const line = stripLineComment(filePath, rawLine);
+      for (const check of n3ForbiddenPatterns) {
+        if (check.pattern.test(line)) {
+          n3Findings.push(
+            `${filePath}:${index + 1}: ${check.name}: ${rawLine.trim()}`,
+          );
+        }
+      }
+    }
+  }
+}
+
+if (n3Findings.length > 0) {
+  console.error(
+    'N3 anti-hallucination violations (defaultHeaders/X-DashScope-Enable-Thinking/extra_body forbidden in 百炼 SDK paths):\n' +
+      n3Findings.join('\n'),
   );
   process.exit(1);
 }

@@ -20,6 +20,7 @@ import { verifyChainHead } from '../../evidence_log/verifier.ts';
 import {
   collectStatusDump,
   TEST_GLOBS,
+  toStatusJson,
   type ChainHeadStatus,
   type PendingField,
   type StatusDump,
@@ -45,7 +46,7 @@ export function runStatus(options: StatusOptions): number {
   });
 
   if (options.json) {
-    process.stdout.write(`${JSON.stringify(dump, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(toStatusJson(dump), null, 2)}\n`);
   } else {
     process.stdout.write(renderHuman(dump));
   }
@@ -72,13 +73,14 @@ function runTestCount(): TestCountResult {
   const total = matchTapNumber(output, /# tests\s+(\d+)/);
   const pass = matchTapNumber(output, /# pass\s+(\d+)/);
   const fail = matchTapNumber(output, /# fail\s+(\d+)/);
+  const skipped = matchTapNumber(output, /# skipped\s+(\d+)/);
 
   if (total === undefined || pass === undefined) {
     throw new Error(
       `TAP summary 未找到 tests/pass（exit=${result.status ?? '?'}, stdout 尾: ${(result.stdout ?? '').slice(-300)})`,
     );
   }
-  return { total, pass, fail: fail ?? 0 };
+  return { total, pass, fail: fail ?? 0, skipped: skipped ?? 0 };
 }
 
 function matchTapNumber(output: string, pattern: RegExp): number | undefined {

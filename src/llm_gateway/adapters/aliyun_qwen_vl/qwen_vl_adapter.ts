@@ -12,8 +12,10 @@ import type {
   MultimodalVlmResult,
   QwenVlModelId,
 } from './types.ts';
-import { QWEN_VL_DEFAULT_MODEL, isQwenVlModel } from './types.ts';
+import { QWEN_VL_DEFAULT_MODEL, QWEN_VL_MODELS, isQwenVlModel } from './types.ts';
 import { COMPETITION_BASE_URL } from '../aliyun_qwen/snapshot.ts';
+import { executeFallbackChain } from '../../fallback_chain/index.ts';
+import type { FallbackModelTarget } from '../../fallback_chain/index.ts';
 
 // ===== Types =====
 
@@ -22,10 +24,23 @@ export interface QwenVlAdapterConfig {
   readonly baseURL?: string;
   readonly apiKey?: string;
   readonly timeoutMs?: number;
+  readonly createChatCompletion?: QwenVlChatCompletionCaller;
 }
 
 type OpenAiChatCompletion = OpenAI.ChatCompletion;
 type OpenAiContentPart = OpenAI.ChatCompletionContentPart;
+type OpenAiMessageParam = OpenAI.ChatCompletionMessageParam;
+
+export interface QwenVlChatCompletionRequest {
+  readonly modelId: QwenVlModelId;
+  readonly messages: OpenAiMessageParam[];
+  readonly temperature: number;
+  readonly maxTokens: number;
+}
+
+export type QwenVlChatCompletionCaller = (
+  request: QwenVlChatCompletionRequest,
+) => Promise<OpenAiChatCompletion>;
 
 // ===== Internal helpers =====
 
@@ -44,6 +59,49 @@ function resolveApiKey(config: QwenVlAdapterConfig): string | undefined {
 function isVisionConfigured(config: QwenVlAdapterConfig): boolean {
   const key = resolveApiKey(config);
   return key !== undefined && key.length > 0;
+}
+
+function buildVisionFallbackChain(primary: QwenVlModelId): readonly FallbackModelTarget[] {
+  const ordered = [
+    primary,
+    ...QWEN_VL_MODELS.filter((candidate) => candidate !== primary),
+  ];
+  return ordered.map((targetModelId, index): FallbackModelTarget => ({
+    modelId: targetModelId,
+    role: index === 0 ? 'primary' : `backup_${index}`,
+  }));
+}
+
+function qwenVlTargetModel(target: FallbackModelTarget): QwenVlModelId {
+  if (!isQwenVlModel(target.modelId)) {
+    throw new Error(`qwen_vl_adapter: fallback target is not a Qwen-VL model: ${target.modelId}`);
+  }
+  return target.modelId;
+}
+
+async function createChatCompletion(
+  config: QwenVlAdapterConfig,
+  baseURL: string,
+  request: QwenVlChatCompletionRequest,
+): Promise<OpenAiChatCompletion> {
+  if (config.createChatCompletion !== undefined) {
+    return config.createChatCompletion(request);
+  }
+  const apiKey = resolveApiKey(config);
+  if (apiKey === undefined || apiKey.length === 0) {
+    throw new Error('qwen_vl_adapter: DASHSCOPE_API_KEY is required for model calls');
+  }
+  const client = new OpenAI({
+    apiKey,
+    baseURL,
+    timeout: config.timeoutMs ?? 60_000,
+  });
+  return client.chat.completions.create({
+    model: request.modelId,
+    messages: request.messages,
+    temperature: request.temperature,
+    max_tokens: request.maxTokens,
+  });
 }
 
 /**
@@ -112,6 +170,58 @@ function extractStructuredClaim(content: string): unknown {
   }
 }
 
+function vlmResultFromCompletion(
+  completion: OpenAiChatCompletion,
+  targetModelId: QwenVlModelId,
+  input: MultimodalContentInput,
+): MultimodalVlmResult {
+  const choices = completion.choices;
+  if (choices.length === 0) {
+    throw new Error('qwen_vl_adapter: vision call returned no choices');
+  }
+
+  const firstChoice = choices[0];
+  if (firstChoice === undefined) {
+    throw new Error('qwen_vl_adapter: vision call returned no first choice');
+  }
+
+  const message = firstChoice.message;
+  if (message === undefined) {
+    throw new Error('qwen_vl_adapter: vision call returned no message');
+  }
+
+  const interpretation = typeof message.content === 'string' ? message.content : '';
+  const finishReason = firstChoice.finish_reason ?? 'stop';
+  const usage = completion.usage;
+  const requestId = pullRequestId(completion, undefined);
+
+  const credential: LlmCallCredential = {
+    providerProfile: 'competition_aliyun_qwen',
+    providerRequestId: requestId ?? null,
+    modelId: targetModelId,
+    modelVersion: null,
+    capability: 'vision',
+    isoTimestamp: new Date().toISOString(),
+    tokenUsage: {
+      inputTokens: usage?.prompt_tokens ?? 0,
+      outputTokens: usage?.completion_tokens ?? 0,
+      totalTokens: usage?.total_tokens ?? 0,
+    },
+    adapterMeta: {
+      qwenVlModel: targetModelId,
+      imageMimeType: input.mimeType,
+    },
+  };
+
+  return {
+    callRecordSeq: 0,
+    credential,
+    interpretation,
+    structuredClaim: extractStructuredClaim(interpretation),
+    finishReason,
+  };
+}
+
 // ===== Factory =====
 
 /**
@@ -139,16 +249,7 @@ export function createQwenVlAdapter(config: QwenVlAdapterConfig = {}): ProviderA
       throw new Error('qwen_vl_adapter: cannot call text path without DASHSCOPE_API_KEY');
     }
 
-    const client = new OpenAI({
-      apiKey,
-      baseURL,
-      timeout: config.timeoutMs ?? 60_000,
-    });
-
-    const openaiMessages: Array<{
-      role: 'system' | 'user' | 'assistant';
-      content: string;
-    }> = [];
+    const openaiMessages: OpenAiMessageParam[] = [];
     for (const msg of request.messages) {
       if (msg.role === 'tool') {
         continue; // tool messages not supported in this text path
@@ -161,11 +262,11 @@ export function createQwenVlAdapter(config: QwenVlAdapterConfig = {}): ProviderA
       }
     }
 
-    const completion: OpenAiChatCompletion = await client.chat.completions.create({
-      model: modelId,
+    const completion: OpenAiChatCompletion = await createChatCompletion(config, baseURL, {
+      modelId,
       messages: openaiMessages,
       temperature: request.temperature ?? 0.3,
-      max_tokens: request.maxTokens ?? 2048,
+      maxTokens: request.maxTokens ?? 2048,
     });
 
     const firstChoice = completion.choices[0];
@@ -221,12 +322,6 @@ export function createQwenVlAdapter(config: QwenVlAdapterConfig = {}): ProviderA
       throw new Error('qwen_vl_adapter: could not resolve image URL');
     }
 
-    const client = new OpenAI({
-      apiKey,
-      baseURL,
-      timeout: config.timeoutMs ?? 60_000,
-    });
-
     // Build multimodal message with image content using OpenAI's native content part types.
     const contentParts: OpenAiContentPart[] = [
       { type: 'text', text: input.prompt },
@@ -235,64 +330,34 @@ export function createQwenVlAdapter(config: QwenVlAdapterConfig = {}): ProviderA
         image_url: { url: imageUrl, detail: 'auto' },
       },
     ];
-
-    const completion: OpenAiChatCompletion = await client.chat.completions.create({
-      model: modelId,
-      messages: [
-        {
-          role: 'user',
-          content: contentParts,
-        },
-      ],
-      temperature: input.prompt.includes('结构化') ? 0.1 : 0.3,
-      max_tokens: 2048,
+    const messages: OpenAiMessageParam[] = [
+      {
+        role: 'user',
+        content: contentParts,
+      },
+    ];
+    const chain = buildVisionFallbackChain(modelId);
+    const chainResult = await executeFallbackChain(chain, async (target) => {
+      const targetModelId = qwenVlTargetModel(target);
+      const completion = await createChatCompletion(config, baseURL, {
+        modelId: targetModelId,
+        messages,
+        temperature: input.prompt.includes('结构化') ? 0.1 : 0.3,
+        maxTokens: 2048,
+      });
+      const result = vlmResultFromCompletion(completion, targetModelId, input);
+      return {
+        data: result,
+        dashscopeRequestId: result.credential.providerRequestId,
+      };
     });
 
-    const choices = completion.choices;
-    if (choices.length === 0) {
-      throw new Error('qwen_vl_adapter: vision call returned no choices');
+    if (chainResult.data === null) {
+      const reason = chainResult.degradationSummary ?? 'no Qwen-VL fallback target succeeded';
+      throw new Error(`qwen_vl_adapter: vision fallback failed: ${reason}`);
     }
 
-    const firstChoice = choices[0];
-    if (firstChoice === undefined) {
-      throw new Error('qwen_vl_adapter: vision call returned no first choice');
-    }
-
-    const message = firstChoice.message;
-    if (message === undefined) {
-      throw new Error('qwen_vl_adapter: vision call returned no message');
-    }
-
-    const interpretation = typeof message.content === 'string' ? message.content : '';
-    const finishReason = firstChoice.finish_reason ?? 'stop';
-    const usage = completion.usage;
-    const requestId = pullRequestId(completion, undefined);
-
-    const credential: LlmCallCredential = {
-      providerProfile: profile,
-      providerRequestId: requestId ?? null,
-      modelId,
-      modelVersion: null,
-      capability: 'vision',
-      isoTimestamp: new Date().toISOString(),
-      tokenUsage: {
-        inputTokens: usage?.prompt_tokens ?? 0,
-        outputTokens: usage?.completion_tokens ?? 0,
-        totalTokens: usage?.total_tokens ?? 0,
-      },
-      adapterMeta: {
-        qwenVlModel: modelId,
-        imageMimeType: input.mimeType,
-      },
-    };
-
-    return {
-      callRecordSeq: 0, // caller fills in after appendRecord
-      credential,
-      interpretation,
-      structuredClaim: extractStructuredClaim(interpretation),
-      finishReason,
-    };
+    return chainResult.data;
   }
 
   return {

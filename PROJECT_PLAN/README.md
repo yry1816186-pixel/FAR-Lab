@@ -34,7 +34,7 @@ FAR-Chain 是 AI4S 科学声明的可证伪信任闸门（claim-level verificati
 | `golden vectors` | 固定输入→期望 hex 的回归真值机制 | golden_vector、goldenVector |
 | `VerdictKind`（5 值） | `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` / `DEGRADED_SCOPE` / `UNTESTED`（详见 §五值裁决 enum） | 4 值 `ACCEPTED/REJECTED/DEGRADED/UNTESTED`（已废弃） |
 | `<REPOSITORY_ROOT>/` | 工作区根即实现仓 | `far-chain/`（作为真实实现根，禁用）、`packages/`（V1 多包拆分） |
-| `far` CLI | 命令前缀（`far status` / `far verify` / `far export receipt` / `far bench run`） | `far-chain` CLI、`farlab` |
+| `far` CLI | 命令前缀（`far status` / `far verify` / `far export receipt` / `far export far-proof` / `far bench run`） | `far-chain` CLI、`farlab` |
 | `competition_aliyun_qwen` | 参赛 provider profile | bailian_profile、qwen_profile |
 | `offline_replay` | demo/test profile | production fallback、容灾 profile（非生产兜底） |
 
@@ -188,9 +188,9 @@ claim -> FEC V2 -> dataset/workflow binding -> protocol freeze
 | Five-value verdict | 已有 pure verdict function（`PARTIAL`） | 改成 metric-first deterministic kernel，输出 rule trace 和 reason codes |
 | Evidence log | 有 chain hash、Merkle、TS/Python/browser 局部验证（`PARTIAL`） | 将 payload/evidence/verdict 纳入 canonical proof binding |
 | ProofEnvelope | 有 V1 self-check 和 proofHash（`PARTIAL`） | 增加 SciIR fields、claim graph、cross-language proofHash（V2） |
-| CLI | `far status` 已有，`verify/export` 仍是 roadmap（`PARTIAL`） | 实现 `far verify`、`far export receipt`、`far bench run` |
-| Browser verifier | Merkle 可视化存在（`PARTIAL`） | 增加 ProofEnvelope verifier 和 verdict trace viewer |
-| Python verifier | chain/Merkle verifier 存在（`PARTIAL`） | 增加 proofHash、verdict trace、golden vectors |
+| CLI | `far status` + `far verify` + `far export receipt` + `far export far-proof` + `far bench run` 已有（`IMPLEMENTED_VERIFIED` for these surfaces） | 继续收紧 fresh-clone 留证与完整 demo receipt；`far ask/repl/stream` 仍为产品路线图 |
+| Browser verifier | Merkle/Suite + standalone ProofEnvelope V2 proofHash verifier 已有（`IMPLEMENTED_VERIFIED`） | 增加 verdict trace viewer；raw evidence / RO-Crate 外部认证不在当前浏览器路径内 |
+| Python verifier | chain/Merkle + ProofEnvelope V2 proofHash verifier 已有（`IMPLEMENTED_VERIFIED`） | 增加完整 verdict trace 重放与更多 golden vectors |
 | AI evidence path | LLM label 可进入 verdict（`PARTIAL`） | 改为 metric-first，LLM 只能辅助解释和候选生成 |
 | canonicalHash（四字段白名单） | TS/Python byte-equal `IMPLEMENTED_VERIFIED` | 维持；浮点科学计数法鸿沟按 NUMERIC_KNOWN_DIVERGENCE 诚实归 RED，V3 迁 RFC 8785 JCS |
 

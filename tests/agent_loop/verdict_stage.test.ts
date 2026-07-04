@@ -9,8 +9,8 @@
  *     - convertEvidenceRecords：过滤 neutral + supports/refutes 投票映射 + 不设 metricValue
  *     - resolveThresholdSpec：gt→value / range→lower+upper / range 缺界抛错
  *   runVerdictStage 端到端（真 :memory: DB）：
- *     - 2 supports + 1 neutral → CONFIRMED（demo 同源·过滤 neutral 后全 supports）
- *     - 全 refutes → REFUTED
+ *     - 2 supports + 1 neutral → CONFIRMED（全 supports 投票·legacy 桥接 R7·恢复 V1 契约）
+ *     - 全 refutes → REFUTED（R6 触发·恢复 V1 契约）
  *     - 全 neutral → UNTESTED（过滤后无投票证据）
  *     - 缺 hypothesis → null
  *     - 缺 evidence → null
@@ -237,7 +237,7 @@ test('runVerdictStage: 2 supports + 1 neutral → CONFIRMED + persisted + eviden
       runId: 'run-001',
     });
 
-    // 裁决产出 + CONFIRMED（demo 同源语义·过滤 neutral 后全 supports）
+    // 裁决产出 + CONFIRMED（demo 同源语义·过滤 neutral 后全 supports·legacy 桥接 R7·恢复 V1 契约）。
     assert.ok(verdictNode !== null, 'happy path must produce a non-null verdict');
     assert.equal(verdictNode.verdict, 'CONFIRMED');
     assert.equal(verdictNode.nodeKind, 'root');
@@ -266,7 +266,7 @@ test('runVerdictStage: 2 supports + 1 neutral → CONFIRMED + persisted + eviden
   }
 });
 
-test('runVerdictStage: all refutes → REFUTED', () => {
+test('runVerdictStage: all refutes → REFUTED (R6 fires on decisive vote)', () => {
   const db = openDb();
   seedStage3CallRecord(db);
   try {
@@ -280,6 +280,7 @@ test('runVerdictStage: all refutes → REFUTED', () => {
       runId: 'run-002',
     });
     assert.ok(verdictNode !== null);
+    // evidenceToStatisticalResult 注入 adjustedPValue=0 → refutes 显著 → R6 REFUTED（恢复 V1 契约）。
     assert.equal(verdictNode.verdict, 'REFUTED');
   } finally {
     db.close();

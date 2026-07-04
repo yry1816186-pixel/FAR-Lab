@@ -19,6 +19,7 @@ import {
 } from '../../../src/proof_envelope/v2/index.ts';
 
 const REPRO_DIR = resolve(process.cwd(), 'repro', 'far_chain_repro');
+const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
 
 /** 调 Python compute_proof_hash_v2（stdin JSON → stdout 64 hex）。参数 unknown：JSON.stringify 接受任意值。 */
 function pythonComputeProofHash(envelopeWithoutProofHash: unknown): string {
@@ -29,7 +30,7 @@ function pythonComputeProofHash(envelopeWithoutProofHash: unknown): string {
     'env = json.loads(sys.stdin.read())',
     'print(compute_proof_hash_v2(env))',
   ].join('\n');
-  return execFileSync('python', ['-c', pyCode], {
+  return execFileSync(PYTHON_CMD, ['-c', pyCode], {
     encoding: 'utf8',
     input: JSON.stringify(envelopeWithoutProofHash),
   }).trim();
@@ -44,7 +45,7 @@ function pythonVerifyProofHash(envelope: unknown): boolean {
     'env = json.loads(sys.stdin.read())',
     'print(verify_proof_hash_v2(env))',
   ].join('\n');
-  return execFileSync('python', ['-c', pyCode], {
+  return execFileSync(PYTHON_CMD, ['-c', pyCode], {
     encoding: 'utf8',
     input: JSON.stringify(envelope),
   }).trim() === 'True';
@@ -142,4 +143,3 @@ test('cross-lang byte-equal: antiTheaterReport 含 optional 字段（D9/R1·_fil
   const baseHash = computeProofHashV2(makeValidEnvelopeV2Core());
   assert.notEqual(tsHash, baseHash, 'populated antiTheaterReport 必须改变 proofHash');
 });
-

@@ -1,3 +1,5 @@
+// TAUTOLOGY: 本测试喂硬编码指标给 hero fixture / 桩后端，结构性绿在未建功能上（CLAUDE.md §1）。
+// V2 路线：P1-5 hero fixture 接真实沙箱指标后将重构。
 // tests/science_harness/hero_b_harness.test.ts
 // 测试 hero-B-002 causal harness + F6 降级叙事（22 T-W2-06/07 · 任务 #12 决策 G）。
 //

@@ -21,6 +21,7 @@ import { assemblePaper } from '../../src/agent_loop/paper_assembler.ts';
 import { extractFinishReasonForOfflineReplay } from '../../src/agent_loop/run_stage.ts';
 import { verifyChainHead } from '../../src/evidence_log/verifier.ts';
 import { fecAppendClaim } from '../../src/fec/index.ts';
+import { makeLegacyCompatFec } from '../../src/falsifiability/index.ts';
 import { getSubtree } from '../../src/api/internal/graph_subtree.ts';
 import type { LoopState, ResearchPaperOutput } from '../../src/agent_loop/types.ts';
 import type { SourceAnchor } from '../../src/evidence_log/types.ts';
@@ -355,6 +356,14 @@ export async function runC3Seed(): Promise<DemoSeedResult> {
     evidences: c3Evidences,
     parentVerdictId: null,
     nodeKind: 'hypothesis',
+    fecV2: {
+      contract: makeLegacyCompatFec({
+        claimId: 'C3-CATALYST-ACTIVITY',
+        falsificationSpec: C3_FALSIFICATION_SPEC,
+        thresholdSpec: C3_THRESHOLD_SPEC,
+        frozenAt: C3_SOURCE_ANCHOR.isoTimestamp,
+      }),
+    },
   });
 
   const graphSubtree = getSubtree(db, verdictResult.verdictNode.verdictId);

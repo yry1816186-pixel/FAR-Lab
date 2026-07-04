@@ -117,7 +117,7 @@ far status --json       # 机器可读，供文档构建时回填占位符
 | 四值 verdict（`ACCEPTED/REJECTED/DEGRADED/UNTESTED`，2.txt 原始） | 五值 verdict（`CONFIRMED/REFUTED/INCONCLUSIVE/DEGRADED_SCOPE/UNTESTED`） | 五值是最终 SSOT；禁止第六值 | `02` §F2 / T1 → `03` §5、`APPENDIX_A` §0、`APPENDIX_C` §6 |
 | 所有层一次性实现 | W0-W5 分阶段依赖实现 | 工程可控 | `76` §5/§6 |
 | FAR-Bench 是通用 AI4S 榜单 | FAR-Bench verification protocol / attack corpus（profile_id 永远 `competition_aliyun_qwen`，禁与 CORE-Bench 横向比较） | 避免过度宣称；守 C13 通用 benchmark 红线 | `02` §7.3、`APPENDIX_F` §6.1 D6 |
-| Browser verifier 完整第三方验证 | browser verifier 有明确验证范围（L3 Web Crypto，proof envelope hash 待补） | 避免 same-code 夸大 | `76` §4、`APPENDIX_C` §2.5 |
+| Browser verifier 完整第三方验证 | browser verifier 有明确验证范围（L3 Web Crypto，ProofEnvelope V2 proofHash + Merkle/Suite；非第三语言、非 raw evidence verifier） | 避免 same-code 夸大 | `76` §4、`APPENDIX_C` §2.5 |
 | offline replay 是生产兜底 | offline replay 是无-key 离线 **demo/test profile**（非生产降级兜底） | 避免误导；FallbackChain 三档全为真实 qwen 模型，无 offline_replay 兜底档 | `59` §6 并行项 / `APPENDIX_F` §4.4 |
 
 ### 2.3 物理拦截 / tamper 措辞修正（R6 · W0-3）
@@ -180,10 +180,10 @@ far status --json       # 机器可读，供文档构建时回填占位符
 | FEC V2 mandatory | `fecAppendClaim` 走 contract-required path；每个 claim 必须有 frozen FEC（含 measurable implication、dataset binding、metric、threshold、direction、alpha、multiple-testing plan、seed、scope） | `DESIGN_LOCKED`（V1 = optional contract，`PARTIAL`） |
 | deterministic verdict kernel | `decideVerdict` 改成 metric-first，输出 rule trace + reason codes；五值优先级稳定；禁 LLM 直接产出 verdict | `IMPLEMENTED_VERIFIED`（pure verdict function 已覆盖五值但规则浅，缺完整 rule trace）→ 升级 `DESIGN_LOCKED` |
 | ProofEnvelope V2 | proofHash 绑定 FEC、dataset binding、workflow binding、statistical plan、evidence IDs、verdict trace、ledger root；TS/Python/browser hash 一致 | `PARTIAL`（V1 有 self-check + proofHash） |
-| `far verify` | `far verify --envelope <env.json> [--db <db.sqlite>] [--mode chain\|envelope\|full] [--json] [--explain]` 在 clean checkout 中运行；输出 10 字段 schema（status/verdict/proofHash/ledgerRoot/tamperStatus/scopeStatus/recomputation/errors/warnings/verifiedLevels）；Windows/空格/离线路径可演示 | `IMPLEMENTED_VERIFIED`（P0·task #11·envelope/chain/full；`--lint-input` 20-detector 重算 `IMPLEMENTED_VERIFIED`（#11b·加性·须配合 `--envelope`）；`--bundle` 留后续） |
-| Python/browser independent recomputation | Python proofHash verifier；browser ProofEnvelope verifier | `IMPLEMENTED_UNVERIFIED`（chain/Merkle 已实现，proof envelope hash 待补） |
+| `far verify` | `far verify --envelope <env.json> [--db <db.sqlite>] [--mode chain\|envelope\|full] [--json] [--explain]` 与 `far verify --bundle <.far-proof> [--mode chain\|envelope\|full] [--json]` 在 clean checkout 中运行；输出 10 字段 schema（status/verdict/proofHash/ledgerRoot/tamperStatus/scopeStatus/recomputation/errors/warnings/verifiedLevels）；Windows/空格/离线路径可演示 | `IMPLEMENTED_VERIFIED`（envelope/chain/full；`--lint-input` 20-detector 重算；`--bundle` V1 minimal 自验证，valid→exit 0/WARN，tampered→exit 7） |
+| Python/browser independent recomputation | Python proofHash verifier；browser ProofEnvelope verifier | `IMPLEMENTED_VERIFIED`（Python proof envelope hash 已接入 `far verify`；browser standalone `frontend/public/verify.html` 已重算 ProofEnvelope V2 proofHash） |
 | FAR-Bench125 | 125 case benchmark + 评分 + 隐藏集 + 泄漏防御 | `DESIGN_LOCKED` |
-| demo receipt | 一个真实 claim 带 FEC V2、evidence、verdict trace、ProofEnvelope V2，被 `far verify` 重算通过 | `ROADMAP` |
+| demo receipt | 一个真实 claim 带 FEC V2、evidence、verdict trace、ProofEnvelope V2，被 `far verify` 重算通过 | `PARTIAL`（`far export receipt` 已可从 V2 envelope / V1 `.far-proof` 生成 Trust Receipt；完整 FEC V2 真实 demo claim 仍待闭环） |
 | anti-theater attack corpus | 至少覆盖 label-only evidence / post-hoc threshold / dataset drift / scope laundering / missing raw artifact / LLM reviewer override；每个 attack 有 expected verdict 或 expected fail reason | `DESIGN_LOCKED` |
 
 ### 3.2 V3 才考虑（`76` §6 / `APPENDIX_F` §10 检查表）
@@ -255,7 +255,7 @@ P0 不再写宏大叙事，要把一个 demo claim 从 hypothesis 到 final rece
 |---|---|
 | 工程入口 | `src/cli/far.ts`、`repro/far_chain_repro/verify_chain.py`、browser verifier 入口 |
 | 验收 | `far verify receipt.json` 可在 clean checkout 中运行；输出 five-value verdict、proof head、tamper status、scope status、independent recomputation status；Windows 路径、空格路径、离线模式都可演示 |
-| 状态 | `IMPLEMENTED_VERIFIED`（P0·task #11·`src/cli/commands/verify.ts`·envelope/chain/full + 15 单测 + 5 CLI smoke 全绿；`--lint-input` 20-detector 重算 `IMPLEMENTED_VERIFIED`（#11b·+37 单测）；`--bundle` 留后续）；`far export` 仍 `ROADMAP` |
+| 状态 | `IMPLEMENTED_VERIFIED`（`src/cli/commands/verify.ts`·envelope/chain/full + `--lint-input` + `--bundle` V1 minimal；`src/cli/commands/export_receipt.ts`·`far export receipt` Trust Receipt DOC 投影；`src/cli/commands/export_far_proof.ts`·`far export far-proof` V1 self-verifiable bundle/package；`src/cli/commands/bench.ts`·`far bench run` demo benchmark profile）；外部 RO-Crate/PROV-O validator 合规仍 `NEEDS_EXTERNAL_VERIFICATION` / `ROADMAP` |
 
 ### 5.5 P0-5：Anti-theater harness
 
@@ -280,7 +280,7 @@ P0 不再写宏大叙事，要把一个 demo claim 从 hypothesis 到 final rece
 |---|---|---|---|---|
 | **NOVELTY-C1** | FI-3 novelty 维度归属自相矛盾（`48` 说 40 分科学价值，`43§4` 计入先进性 30 分列，互斥） | `48:6/14/218` vs `43§4` 评分表 | 先进性/novelty 核心声称 | `59` §5 决策①（锁定先进性 30 分） |
 | **NOVELTY-A2** | blindspot typology 五类判据无可复现算法（自然语言，无阈值/伪代码） | `48§3.3` 五类全自然语言；`48§3.1` 现有原语 `verdictAgree`(布尔)+`anchorJaccard`(集合) 无法判定 `citation_split`/`definition_ambiguous` | novelty=0 真解药声称 | `59` §6 并行项（算法化或标超界） |
-| **FRESH-A1** | far CLI + `packages/` + RULE-PE-010 三不存在 → W0/W1/W2 循环依赖 | `package.json` 无 bin/无 commander/yargs；`src/cli/` 不存在；`packages/` 不存在；`validator.ts`+`types.ts` 末条 = RULE-PE-009 | fresh-clone 可验入口为零 | `59` §5 决策②（`src/` 扁平，`packages/` 标 V3） |
+| **FRESH-A1** | 历史盲点：far CLI + `packages/` + RULE-PE-010 三不存在 → W0/W1/W2 循环依赖 | 已关闭 CLI 与 RULE-PE-010：`src/cli/far.ts` / `src/proof_envelope/v2/validator.ts` / `tests/proof_envelope/v2/validator.10-rules-coverage.test.ts`；`packages/` 仍按 `src/` 扁平决策标 V3 | fresh-clone 可验入口曾为零；当前仍需非项目成员 fresh-clone 留证 | `59` §5 决策②（`src/` 扁平，`packages/` 标 V3） |
 | **WOW-A1** | 灵魂时刻④ Arena arbiter + ⑤ npx 入口零代码 = vaporware | `src/` grep arbiter/RefutationPayload 仅命中无关 `math_claim.ts`；`@far-chain/sci` 全仓 0 命中 | 体量与惊艳度（6 灵魂时刻仅 3 个真可演：①③②） | `59` §5 决策③（双轨：最小实现 + mode=vision） |
 | **Z1-SNAPSHOT** | snapshot 07-08 时间炸弹 + 代码层查无此日期 + CI graceful skip 不算通过 | `snapshot.ts:19-20` 只有 `[verified_live: ... as of 2026-06-27]`，无 07-08；`~2026-07-08` 仅 `ci/snapshot_liveness_smoke.ts:7`+`docs/DAY1_VERIFICATION.md:38`；无 key 时 graceful skip 返回 exit 0 | proof-carrying 可演示 | 本文件 §2.9（删 07-08 虚构日期） |
 | **Z2-BOOTSTRAP** | AI-验证-AI 自举循环信任——`18§8` Q&A 无预案 | `18§8` 11 问逐条读过，最接近"hash能证明结果对吗"答"不证正确"，无一条回答"证据链全是 AI 产物，可信性何来" | 诚实护城河 | `59` §6 W0-7（增补第 12 问） |

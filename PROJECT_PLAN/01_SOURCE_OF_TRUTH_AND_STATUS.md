@@ -158,7 +158,7 @@
 | `<MIGRATION_COUNT>` | `migrationCount` | `glob schema/migrations/*.sql` |
 | `<GOLDEN_VECTOR_COUNT>` | `goldenVectorCount` | 读 `golden_vectors.json` |
 | `<COVERAGE_LINE>` / `<COVERAGE_BRANCH>` | `coverageLine` / `coverageBranch` | `pnpm coverage` 实跑 |
-| `<SUITE_INTEGRITY_ROOT>` | `suiteIntegrityRoot` | 实跑 `runBenchmark` |
+| `<SUITE_INTEGRITY_ROOT>` | `suiteIntegrityRoot` | 读取 `benchmark/benchmark_report.json`（由 `runBenchmark` 生成） |
 | `<DOC_COUNT>` | `docCount` | `glob FINAL_PACKAGE/*.md`（历史）或 `PROJECT_PLAN/*.md`（当前） |
 | `<COMMIT_SHA>` | `commitSha` | `git rev-parse HEAD`（若存在） |
 
@@ -187,7 +187,8 @@ far status --json       # 机器可读 JSON，供文档构建时回填占位符
   "type": "object",
   "required": [
     "project", "generatedAt", "commit", "nodeVersion", "platform",
-    "test", "coverage", "capabilities", "warnings"
+    "test", "coverage", "fileCounts", "goldenVectors", "capabilities",
+    "chainHead", "suiteIntegrityRoot", "warnings"
   ],
   "additionalProperties": false,
   "properties": {
@@ -263,7 +264,7 @@ far status --json       # 机器可读 JSON，供文档构建时回填占位符
         "count": { "type": ["number", "string"] },
         "reproContextFixtureExpectedHex": {
           "type": "string",
-          "const": "96a6372bdf04af4abf4",
+          "const": "96a6372bdf040677c26700456856ec365b478f9e3bf8824e4b2b9d123af4abf4",
           "description": "REPRO_CONTEXT_FIXTURE 单向量 expectedHex（非 merkle 根，非 proofHash）。"
         },
         "crossLangByteEqual": {
@@ -278,36 +279,41 @@ far status --json       # 机器可读 JSON，供文档构建时回填占位符
         }
       }
     },
-    "suiteIntegrity": {
+    "chainHead": {
       "type": "object",
-      "description": "benchmark / suite integrity root 实测。",
+      "description": "evidence_log DB 链头验证结果；未传 --db 时为 pending。",
       "properties": {
-        "status": { "type": "string", "enum": ["pass", "fail", "pending"] },
-        "root": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+        "status": { "type": "string", "enum": ["ok", "broken", "pending"] },
+        "reason": { "type": "string" },
+        "verifiedCount": { "type": "number" },
+        "brokenAtSeq": { "type": "number" }
       }
+    },
+    "suiteIntegrityRoot": {
+      "type": "string",
+      "description": "benchmark/benchmark_report.json 中的套件级完整性根；无法读取时为 'Pending'。",
+      "pattern": "^[0-9a-f]{64}$|^Pending$"
     },
     "capabilities": {
       "type": "object",
-      "description": "能力口径表（与 §6 一一对应）。值为本 §3 的 8 个状态标签之一。",
+      "description": "能力口径表（由 src/cli/status_dump.ts 生成）。值为本 §3 的 8 个状态标签之一。",
       "required": [
-        "evidenceLogChain", "canonicalHash", "fiveValueVerdict",
-        "proofEnvelope", "farVerify", "farStatus",
-        "browserVerifier", "pythonVerifier",
-        "fec", "antiTheaterHarness", "farBench"
+        "canonicalHash", "fiveValueVerdict", "fecV2", "proofEnvelopeV2",
+        "farVerify", "farExportReceipt", "farExportFarProof", "farBenchRun",
+        "browserVerifier", "pythonVerifier"
       ],
       "additionalProperties": false,
       "properties": {
-        "evidenceLogChain": { "$ref": "#/$defs/StatusTag" },
         "canonicalHash": { "$ref": "#/$defs/StatusTag" },
         "fiveValueVerdict": { "$ref": "#/$defs/StatusTag" },
-        "proofEnvelope": { "$ref": "#/$defs/StatusTag" },
+        "fecV2": { "$ref": "#/$defs/StatusTag" },
+        "proofEnvelopeV2": { "$ref": "#/$defs/StatusTag" },
         "farVerify": { "$ref": "#/$defs/StatusTag" },
-        "farStatus": { "$ref": "#/$defs/StatusTag" },
+        "farExportReceipt": { "$ref": "#/$defs/StatusTag" },
+        "farExportFarProof": { "$ref": "#/$defs/StatusTag" },
+        "farBenchRun": { "$ref": "#/$defs/StatusTag" },
         "browserVerifier": { "$ref": "#/$defs/StatusTag" },
-        "pythonVerifier": { "$ref": "#/$defs/StatusTag" },
-        "fec": { "$ref": "#/$defs/StatusTag" },
-        "antiTheaterHarness": { "$ref": "#/$defs/StatusTag" },
-        "farBench": { "$ref": "#/$defs/StatusTag" }
+        "pythonVerifier": { "$ref": "#/$defs/StatusTag" }
       }
     },
     "warnings": {
@@ -343,7 +349,7 @@ far status --json       # 机器可读 JSON，供文档构建时回填占位符
 | `migrationCount` | `glob schema/migrations/*.sql` | 替换"0001-0008 vs 0018/0026"矛盾 |
 | `goldenVectorCount` | 读 `golden_vectors.json` | 替换"8/9/10 向量"漂移 |
 | `coverageLine` / `coverageBranch` | `pnpm coverage` 实跑 | 替换"92.80% / 79.56%"漂移 |
-| `suiteIntegrityRoot` | 实跑 `runBenchmark` | 替换 golden 根声称 |
+| `suiteIntegrityRoot` | 读取 `benchmark/benchmark_report.json`（由 `runBenchmark` 生成） | 替换 golden 根声称 |
 | `docCount` | `glob PROJECT_PLAN/*.md`（当前） | 替换"32/39/43 份"漂移 |
 | `commitSha` | `git rev-parse HEAD`（若存在） | 替换旧 `07a8005`（红队核实仓库曾有/无 commit 漂移） |
 | `capabilities.*` | 各能力当前代码 + 测试核实 | 替换 §6 能力口径表中的状态枚举 |
@@ -372,23 +378,23 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
   },
   "goldenVectors": {
     "count": "Pending",
-    "reproContextFixtureExpectedHex": "96a6372bdf04af4abf4",
+    "reproContextFixtureExpectedHex": "96a6372bdf040677c26700456856ec365b478f9e3bf8824e4b2b9d123af4abf4",
     "crossLangByteEqual": "verified",
     "numericKnownDivergence": ["1e-7 科学计数法零填充 (TS→1e-7 / Py→1e-07)"]
   },
-  "suiteIntegrity": { "status": "pending", "root": null },
+  "chainHead": { "status": "pending", "reason": "未提供 --db" },
+  "suiteIntegrityRoot": "Pending",
   "capabilities": {
-    "evidenceLogChain": "PARTIAL",
     "canonicalHash": "IMPLEMENTED_VERIFIED",
-    "fiveValueVerdict": "PARTIAL",
-    "proofEnvelope": "PARTIAL",
-    "farVerify": "ROADMAP",
-    "farStatus": "IMPLEMENTED_UNVERIFIED",
-    "browserVerifier": "PARTIAL",
-    "pythonVerifier": "PARTIAL",
-    "fec": "PARTIAL",
-    "antiTheaterHarness": "PARTIAL",
-    "farBench": "DESIGN_LOCKED"
+    "fiveValueVerdict": "IMPLEMENTED_VERIFIED",
+    "fecV2": "PARTIAL",
+    "proofEnvelopeV2": "PARTIAL",
+    "farVerify": "IMPLEMENTED_VERIFIED",
+    "farExportReceipt": "IMPLEMENTED_VERIFIED",
+    "farExportFarProof": "IMPLEMENTED_VERIFIED",
+    "farBenchRun": "IMPLEMENTED_VERIFIED",
+    "browserVerifier": "IMPLEMENTED_VERIFIED",
+    "pythonVerifier": "IMPLEMENTED_VERIFIED"
   },
   "warnings": [
     "No hand-filled metrics in public materials",
@@ -414,11 +420,13 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
 | five-value verdict | `PARTIAL` | 语义已锁定（`VerdictKind` 5 值 enum 冻结，禁止第六值）；工程上需升级为 metric-first deterministic kernel（输出 rule trace + reason codes + evidence sufficiency + statistical uncertainty） |
 | ConfoundingGate F6（因果混杂门） | `IMPLEMENTED_VERIFIED`（#12） | `claimType='causal'` 时 verdict kernel 在 R7 CONFIRMED 前调用确定性 d-separation + 后门路径枚举（非 LLM 推理混杂）。`src/confounding_gate/`（Koller-Friedman Bayes-Ball·修正 SSOT §7.5.1 伪代码两处缺陷见 03）+ R-causal 门（`verdict_kernel_v2.ts`·非因果 claim 字节级零回归）+ science_harness hero-B 路径 + CG-1/2/5/6 CI 门（`pnpm run confounding-gate-scan`）。三 claimType hero fixture 全交付（`countDeliveredV1ClaimFixtures()===3`）；claimType 暂为 kernel 输入提示（非哈希保护·封存任务延后） |
 | ProofEnvelope V1 | `PARTIAL` | V1 有 9 rule validator + sealer + proofHash + DB backstop + TS 重算脚本；P0 要升级为 V2 proofHash binding（绑定 SciIR fields + claim graph + cross-language proofHash） |
-| Python verifier | `PARTIAL` | chain/Merkle verifier 已实现；作为独立重算路径之一，需扩展到 ProofEnvelope proofHash + verdict trace + golden vectors |
-| Browser verifier | `PARTIAL` | Merkle/Suite verifier 存在；可用于演示 tamper-evidence，需标注边界（同源 TS，非真正 cross-language；需增 ProofEnvelope verifier + standalone `verify.html`） |
-| `far status` | `IMPLEMENTED_UNVERIFIED` | 应成为状态事实源（本 §5 JSON schema 的产出者）；CLI 入口 `src/cli/far.ts` |
-| `far verify` | `IMPLEMENTED_VERIFIED`（P0） | 已实装 envelope/chain/full 模式（`src/cli/commands/verify.ts`·task #11）；评委本机重算 proofHash（RULE-PE-010）+ 10 规则 + 内嵌 anti-theater 报告一致性 + call_records 链头；Windows/空格/离线路径已 smoke 验证（valid→exit 0 / tampered→exit 7 / bad-arg→exit 2 / missing-file→exit 1）；`--lint-input`（20-detector 独立重算 + 内嵌报告深度对比·任何发散 → exit 7）`IMPLEMENTED_VERIFIED`（task #11b·`src/anti_theater/schemas.ts` + verify.ts lint 轴 + 37 新单测）；`--bundle` 留后续 FI |
-| `far export receipt` | `ROADMAP` | P0 输出 Trust Receipt 包；`humanSummary` 不进 proofHash |
+| Python verifier | `IMPLEMENTED_VERIFIED` | chain/Merkle verifier + ProofEnvelope V2 proofHash 镜像已实现；`far verify` 会输出 `recomputation.python`，仍不声称完整 verdict trace / 原始证据重跑 |
+| Browser verifier | `IMPLEMENTED_VERIFIED` | Merkle/Suite verifier + standalone `frontend/public/verify.html` Web Crypto ProofEnvelope V2 proofHash 重算已实现；边界：不是第三种语言实现，不验证原始 evidence，也不等于外部 RO-Crate 认证 |
+| `far status` | `IMPLEMENTED_VERIFIED` | `src/cli/status_dump.ts` + `src/cli/commands/status.ts` 生成机器可读 SSOT；testCount/coverage 由 CLI spawn 实测，suiteIntegrityRoot 读 tracked benchmark report；禁止手填裸数字 |
+| `far verify` | `IMPLEMENTED_VERIFIED`（P0） | 已实装 envelope/chain/full 模式（`src/cli/commands/verify.ts`·task #11）；评委本机重算 proofHash（RULE-PE-010）+ 10 规则 + 内嵌 anti-theater 报告一致性 + call_records 链头；Windows/空格/离线路径已 smoke 验证（valid→exit 0 / tampered→exit 7 / bad-arg→exit 2 / missing-file→exit 1）；`--lint-input`（20-detector 独立重算 + 内嵌报告深度对比·任何发散 → exit 7）`IMPLEMENTED_VERIFIED`；`--bundle`（V1 minimal `.far-proof` 必需文件 + redacted call_records 链 + V1 proofHash 重算；valid→exit 0/WARN，tampered→exit 7）`IMPLEMENTED_VERIFIED` |
+| `far export receipt` | `IMPLEMENTED_VERIFIED` | `src/cli/commands/export_receipt.ts` 输出 Trust Receipt JSON/Markdown；支持 `--envelope` ProofEnvelope V2 与 `--bundle` V1 minimal `.far-proof` 投影；篡改输入拒发（exit 7）；`humanSummary` / receipt 不进 proofHash |
+| `far export far-proof` | `IMPLEMENTED_VERIFIED` | `src/cli/commands/export_far_proof.ts` 从 `--demo-chain` 或已有 `--db` 导出 V1 `.far-proof` 九分量；`--package` 生成 `verify.sh` + `integrity.json` + `.tar.zst`；仍按 V1 minimal 诚实披露，非外部 RO-Crate/PROV-O 认证 |
+| `far bench run` | `IMPLEMENTED_VERIFIED` | `src/cli/commands/bench.ts` 运行 6-seed offline demo benchmark profile；`--json` 输出 `BenchmarkReport`，`--domain` 可筛选，`suiteIntegrityRoot` 可复现；不声称通用 AI4S leaderboard |
 | FEC（Falsification Evidence Contract） | `PARTIAL` | V1 = optional contract（`fecAppendClaim` 原子链路 + `registerContract` + 0005 append-only contract 表 + `auditContract`）；V2 = mandatory，绑定 statistical plan + evidence requirements + measurement plan；缺 FEC 时不允许输出 CONFIRMED/REFUTED，只能 UNTESTED 或 fail-closed |
 | anti-theater harness | `PARTIAL` | 现有 anti-theater guard（FAIL+CONFIRMED 被 SQLite trigger ABORT）；P0 至少覆盖 10 个攻击样例（label-only evidence / post-hoc threshold / dataset drift / scope laundering / missing raw artifact / LLM reviewer override / metric swapping / seed cherry-picking / workflow digest mismatch / natural-language verdict mismatch） |
 | FAR-Bench | `DESIGN_LOCKED` | 当前按 evaluation protocol / attack corpus 处理（profile_id 永远 `competition_aliyun_qwen`），不宣称泛 benchmark 成熟；P0 升级到 FAR-Bench125（V2）；通用 AI4S benchmark / 排行榜属禁用口径（D6） |
@@ -432,7 +440,7 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
 
 | 卖点 | 当前证据 | 真实状态 | 深化方向 |
 |---|---|---|---|
-| **Your Laptop Is The Verifier** | `verifyChainHead` 在 `src/evidence_log/verifier.ts`；Python chain verifier 在 `repro/far_chain_repro/verify_chain.py`；Browser Merkle verifier 在 `frontend/src/lib/merkle.ts`；`far verify` P0 envelope+chain 在 `src/cli/commands/verify.ts` | 部分闭环。链/Merkle/envelope 重算已多路（TS `far verify` P0 envelope+chain `IMPLEMENTED_VERIFIED`·task #11）；Python/browser proofHash 跨语言对拍 + `--bundle` 全链重算未闭环 | task #11b 接 Python proofHash 对拍 + `--bundle` + Browser ProofEnvelope verifier |
+| **Your Laptop Is The Verifier** | `verifyChainHead` 在 `src/evidence_log/verifier.ts`；Python chain verifier 在 `repro/far_chain_repro/verify_chain.py`；Browser Merkle verifier 在 `frontend/src/lib/merkle.ts`；standalone browser verifier 在 `frontend/public/verify.html`；`far verify` P0 envelope+chain+bundle 在 `src/cli/commands/verify.ts`；离线包在 `src/far_proof/offline_package.ts` | 部分闭环。TS/Python/Browser ProofEnvelope V2 proofHash、TS V1 `.far-proof` bundle、`.far-proof.tar.zst` + `verify.sh` + `integrity.json`、chain/Merkle/envelope 重算已闭环；外部 RO-Crate 认证、非项目成员 fresh-clone 留证未闭环 | 非项目成员 fresh-clone 录屏；外部 RO-Crate/PROV-O 校验日志（路径 A）仍为远期项 |
 | **五值 anti-theater verdict** | `src/falsifiability/verdict.ts` 纯规则覆盖五值；SQL enum 同步 | 部分闭环。规则确定，但目前主要消费 `supportsClaim/refutesClaim` 布尔或简单 threshold；统计计划与 rule trace 不够深；存在 LLM evidence label 自举风险 | 升级为 metric-first deterministic kernel（输出 rule trace） |
 | **脱平台密码学主权** | offline replay、hash chain、proofHash、no-LLM final judge scan | 部分闭环。provider 不在 trust root，但部分 agent evidence label 仍来自 LLM | deterministic measurement facts 取代 LLM vote |
 
@@ -529,7 +537,7 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
 | ID | 风险 | 严重度 | 缓解 | 状态 |
 |---|---|---|---|---|
 | RR-1 | 数字 / 路径 / 反向 over-claim 漂移在交付前未消解 → fresh-clone 路径级崩溃 | CRITICAL | 本 01 §1 路径铁律 + §4 禁手填裸统计 + §5 status-dump CLI（W0 硬门） | 进行中 |
-| RR-2 | `.far-proof` 自验证冒充第三方验证 → 击穿 proof-carrying 卖点 | CRITICAL | 路径 A（过 RO-Crate 校验）or 路径 B（"项目自验证离线重算包，V1 minimal"） | 待实现 |
+| RR-2 | `.far-proof` 自验证冒充第三方验证 → 击穿 proof-carrying 卖点 | CRITICAL | 路径 A（过 RO-Crate 校验）or 路径 B（"项目自验证离线重算包，V1 minimal"） | 路径 B 已落地并由 WARN 口径披露；路径 A 仍 `NEEDS_EXTERNAL_VERIFICATION` |
 | RR-5 | WASM `1e-7` 鸿沟现场暴露 → 跨语言字节相等亮点崩塌 | HIGH | 把鸿沟做成 demo 卖点（现场 diff），不掩盖；按 `NUMERIC_KNOWN_DIVERGENCE` 诚实归 RED | 待实现 |
 | RR-7 | snapshot 下线风险（团队 2026-06-27 verified_live，**无百炼官方维护期承诺**） → demo 崩 | HIGH | day-0 实测 GET /v1/models 复核；demo 兜底走 `offline_replay` profile；FallbackChain 接线 | 待实现（本 §7.2） |
 | RR-14 | arXiv 26xx 文献幻觉风险 | MEDIUM | citation_integrity_warning：逐条核作者/机构/原文（本 §7.1） | 待查新 |

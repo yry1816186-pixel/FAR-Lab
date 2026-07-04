@@ -36,6 +36,17 @@ export {
   makeVerdict,
 } from './verdict.ts';
 export {
+  bridgeLegacyEvidencesToStatistics,
+  buildLegacyVerdictKernelInput,
+  makeLegacyCompatFec,
+  makeRealStatsFec,
+  verdictResultFromKernelOutput,
+} from './legacy_kernel_adapter.ts';
+export type {
+  LegacyVerdictKernelInputArgs,
+  RealStatsFecInput,
+} from './legacy_kernel_adapter.ts';
+export {
   renderHonestVerdict,
 } from './render.ts';
 export type {

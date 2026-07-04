@@ -68,7 +68,7 @@ claim
 | `APPENDIX_A_TYPES.md` | 全部类型字段定义（`Claim` / `FecContract` / `DatasetBinding` / `ProofEnvelopeV2` / `VerdictKernelInput/Output` 等），`[VC]`/`[META]` 标注 |
 | `APPENDIX_B_GOLDEN.md` | golden vectors 机制与数值边界（N1-N4、RFC 8785 JCS 迁移路径） |
 | `APPENDIX_C_CANONICAL.md` | canonicalHash 白名单 4 字段 `{stageId, cred, payloadKind, prevHash}`、序列化契约 |
-| `APPENDIX_D_PROOF_BUNDLE.md` | `.far-proof` 七分量与 proofHash 算法 |
+| `APPENDIX_D_PROOF_BUNDLE.md` | `.far-proof` 九分量、离线 package 与 proofHash 算法 |
 | `APPENDIX_E_ANTI_THEATER.md` | 反 theater 规则矩阵、deterministic 标记产出点、F6 因果诚信降级 |
 | `APPENDIX_F_GLOSSARY.md` | 术语 SSOT（FEC / ProofEnvelope / Trust Receipt / canonicalHash / scope laundering 等） |
 
@@ -120,7 +120,7 @@ TESS+证伪 ──────────────────────�
         ▼
 ProofEnvelope+导出 ─────────────────────────────────►
   T-W3-01 ProofEnvelope+proofHash → T-W3-02 Validator 9规则
-  → T-W3-03 repro_deterministic七分量 → T-W3-04 .far-proof导出
+  → T-W3-03 repro_deterministic / proof bundle → T-W3-04 .far-proof导出
   → T-W3-05 README_REPLAY+fresh-clone validator
         │
         ▼
@@ -153,7 +153,7 @@ R2真绿+UQ ──────────────────────�
     "canonicalHash": "IMPLEMENTED_VERIFIED|...",
     "fiveValueVerdict": "IMPLEMENTED_VERIFIED|...",
     "proofEnvelope": "PARTIAL|...",
-    "farVerify": "PARTIAL|...",
+    "farVerify": "IMPLEMENTED_VERIFIED|...",
     "browserVerifier": "PARTIAL|...",
     "pythonVerifier": "PARTIAL|..."
   },
@@ -291,7 +291,7 @@ function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput 
 
 目标：让 `.far-proof` 可以在干净环境中被验证。
 
-`.far-proof` bundle 结构（`04` §4、七分量见 `APPENDIX_D_PROOF_BUNDLE.md`）：
+`.far-proof` bundle 结构（`04` §4、九分量实现态见 `APPENDIX_D_PROOF_BUNDLE.md`）：
 
 ```text
 claim.json
@@ -527,10 +527,10 @@ CausalModel 已对齐 SSOT：`CausalEdgeKind` 3 值（`direct_cause` / `probable
 | canonical hash / golden vector | 属核心信任根，最高优先级 | `DESIGN_LOCKED` |
 | five-value verdict | 语义已锁定，工程上需升级为 metric-first deterministic kernel | `DESIGN_LOCKED` |
 | ProofEnvelope V1 | 视为 partial，P0 升级为 V2 proofHash binding | `PARTIAL` |
-| Python verifier | 独立重算路径之一，需扩展到 ProofEnvelope | `PARTIAL` |
-| Browser verifier | 可演示 tamper-evidence，需标注边界 | `PARTIAL` |
-| `far status` | 应成为状态事实源 | `ROADMAP` |
-| `far verify` | P0 必须补齐 | `ROADMAP` |
+| Python verifier | chain/Merkle + ProofEnvelope V2 proofHash 独立重算已完成；完整 verdict trace 重放仍待补 | `IMPLEMENTED_VERIFIED` |
+| Browser verifier | standalone ProofEnvelope V2 proofHash + Merkle/Suite 已完成；raw evidence / RO-Crate 边界须继续标注 | `IMPLEMENTED_VERIFIED` |
+| `far status` | 已成为状态事实源（JSON 输出由测试覆盖） | `IMPLEMENTED_VERIFIED` |
+| `far verify` | envelope/chain/full/bundle P0 已补齐；fresh-clone 非项目成员留证仍待补 | `IMPLEMENTED_VERIFIED` |
 | FAR-Bench | evaluation protocol / attack corpus，不宣称泛 benchmark 成熟 | `DESIGN_LOCKED` |
 | Rust/Go independent verifier | V2 | `ROADMAP` |
 | full WASM verifier / formal proof / public verifier ecosystem | V3 | `RESEARCH` |

@@ -49,6 +49,7 @@ import { execSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tokenize, codeOnlySource } from './lib/code_analysis.mjs';
+import { parseLedgerTable } from './lib/ledger.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -358,33 +359,9 @@ function gvCasesHaveSchema(relPath, requiredKeys) {
 }
 
 // ---------- 检查原语：DEPTH_LEDGER §C 解析 + 诚实校验（R6 同口径 + R8/R9） ----------
-function parseLedgerTable() {
-  const ledgerPath = join(REPO_ROOT, 'PROJECT_PLAN', 'DEPTH_LEDGER.md');
-  if (!existsSync(ledgerPath)) return { exists: false, rows: [] };
-  const text = readFileSync(ledgerPath, 'utf8');
-  const rows = [];
-  const sectionC = text.split('## §C')[1] || '';
-  const tableMatch = sectionC.match(/\|[^\n]*\|\n([\s\S]*?)(?=\n[^|]|\n## |\n---|$)/);
-  if (!tableMatch) return { exists: true, rows: [] };
-  const body = tableMatch[1];
-  const lineRe = /^\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*\|\s*(src\/[^\s|]+):(\d+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*(\w+)\s*\|\s*([^|]*?)\s*\|\s*$/gm;
-  let m;
-  while ((m = lineRe.exec(body)) !== null) {
-    rows.push({
-      id: m[1].trim(),
-      dep: m[2].trim(),
-      callerFile: m[3].trim(), callerLine: parseInt(m[4], 10),
-      proofTest: m[5].trim(),
-      redCommit: m[6].trim(),
-      status: m[7].trim(),
-      closedBy: m[8].trim(),
-    });
-  }
-  return { exists: true, rows };
-}
-
+// parseLedgerTable 已抽到 scripts/lib/ledger.mjs（R6 单口径：gate 与 depth_evidence bot 共用）。
 function verifyDepthLedger() {
-  const ledger = parseLedgerTable();
+  const ledger = parseLedgerTable(REPO_ROOT);
   if (!ledger.exists) {
     return { passed: false, reason: 'PROJECT_PLAN/DEPTH_LEDGER.md 不存在——无去窗口化深度状态 SSOT，每窗口重新 skim。须创建（schema 见 §C）' };
   }
