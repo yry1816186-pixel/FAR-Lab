@@ -14,12 +14,11 @@
 ## §A. next_action（依赖序 topo，权威，agent 取此字段不要 ad-hoc）
 
 ```
-next_action = P0-2a
+next_action = V2_ROADMAP_NO_NEXT
 ```
 
 理由：
-- P0-1（compileFec 接 fecAppendClaim）的代码分支真实存在于 `src/fec/orchestrator.ts:91-98`，但 `fecV2` 仍是**可选**形参（`readonly fecV2?:` at orchestrator.ts:59），唯一生产 caller `src/far_proof/demo_chain.ts:180` 的 `fecAppendClaim({...})` 实参对象（180-226 行）**未含 fecV2 字段**（已 Read 复验）→ compileFec 的 fail-closed 分支在生产永不触发。故 P0-1 在 §C 标 `WIRED_OPT_IN`（接线是死分支），不算完成。
-- 深度门 §D 的 CHECK-W1（fecV2 必选 + 实参非空）当前 RED，正是要修的项之一。先做 P0-2a，因为它解锁 P0-3/P0-4/P1-4/P1-5 全部下游。
+- 核心 P0（P0-1 / P0-2a-d / P0-3 / P0-4）+ STAT-1 + P1-4 已 WIRED_GREEN；P1-1 / P1-2 / P1-3 / P2-1 / P2-2 / P3-1 已 WIRED_RED（agent 接线 + 端到端测试 GREEN，待 CI 双跑物证 bot 写回 WIRED_GREEN）；P2-3 同义反复测试 dialogue_types.test.ts 已删除。剩余 V2 路线 P1-5（hero fixture 接真实沙箱指标）/ P1-6（sandbox_runner 真起 venv 子进程 + dataset_resolver 真拉数据）不在当前 agent 接线 backlog，由 V2 路线窗口处理。
 
 ---
 
@@ -44,19 +43,32 @@ next_action = P0-2a
 
 | id | single_real_dependency | proof_caller | proof_test | proof_test_red_commit | status | closed_by_sha |
 |----|------------------------|--------------|------------|-----------------------|--------|---------------|
-| P0-1 | compileFec 经 fecAppendClaim 进生产 verdict（fecV2 形参必选 + 实参非空 FecContractV2） | src/fec/orchestrator.ts:91 | tests/fec/fec_mandatory_e2e.test.ts::missing_or_bad_fec_blocks_confirmed | (待 CI 双跑) | WIRED_OPT_IN | — |
-| P0-2a | decideFiveValueVerdict 替换 fec/orchestrator.ts 的 makeVerdict（CallExpression 真实调用，返回值流入 recordVerdict/seal） | src/fec/orchestrator.ts:116 | tests/fec/orchestrator_v2_wired.test.ts::verdict_uses_v2_kernel | (待 CI 双跑) | BUILT_UNWIRED | — |
-| P0-2b | decideFiveValueVerdict 替换 verdict_stage.ts 的 makeVerdict | src/agent_loop/verdict_stage.ts:234 | tests/agent_loop/verdict_stage_v2_wired.test.ts::stage_emits_reasonCodes_ruleTrace | (待 CI 双跑) | BUILT_UNWIRED | — |
-| P0-2c | decideFiveValueVerdict 替换 demo_chain.ts 的 makeVerdict | src/far_proof/demo_chain.ts:215 | tests/far_proof/demo_chain_replay_v2.test.ts::demo_chain_seals_with_five_value_verdict | (待 CI 双跑) | BUILT_UNWIRED | — |
-| P0-2d | decideFiveValueVerdict 替换 render.ts 的 makeVerdict | src/falsifiability/render.ts:26 | tests/falsifiability/render_v2_wired.test.ts::render_emits_evidenceSufficiency | (待 CI 双跑) | BUILT_UNWIRED | — |
-| P0-3 | 真实 demo_chain 路径（非 FakeBackend）下无/坏 FEC 的 claim 无法封 CONFIRMED | src/far_proof/demo_chain.ts:180 | tests/far_proof/fec_mandatory_e2e.test.ts::missing_fec_blocks_confirmed_on_real_path | (待 CI 双跑) | BUILT_UNWIRED | — |
-| P0-4 | decideFiveValueVerdict 消费 compileFec Plan，替换 isFrozenAndCompilable 的内联 4 字段浅检查 | src/falsifiability/verdict_kernel_v2.ts:526 | tests/falsifiability/kernel_v2_consumes_fec_plan.test.ts::R1_fires_same_condition_as_compileFec | (待 CI 双跑) | BUILT_UNWIRED | — |
-| STAT-1 | src/statistics/ 真实 p-value/effect-size/CI/多重校正（非字面量返回） | src/statistics/index.ts | tests/statistics/gv_regression.test.ts::GV-01..GV-12_golden_vector_recompute | (待 CI 双跑) | NOT_BUILT | — |
-| P1-2 | executeFallbackChain 接 loop_runner / qwen_vl_adapter，真实 429/5xx/timeout 穿透 | src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_adapter.ts | tests/llm_gateway/fallback_real_http.test.ts::real_429穿透_fallback_chain | (待 CI 双跑) | BUILT_UNWIRED | — |
-| P1-4 | 12 条 GV 落盘 golden_vectors/cases/GV-01..GV-12.json（含 input.evidences/expected.verdict/expected.reasonCodes schema）+ far verify-golden 真调 decideFiveValueVerdict（非硬编码旁路） | golden_vectors/cases/GV-01.json + src/cli/commands/verify_golden.ts | tests/cli/verify_golden_cross_lang.test.ts::node_python_browser_agree_on_GV | (待 CI 双跑) | NOT_BUILT | — |
-| P2-1 | tests/real_backends/ 真实 spawn SymPy/Z3/Dafny/Lean（非 mock，按环境 skip 但 skip 须显式记录 reason） | tests/real_backends/sympy_real.test.ts | (self) | (待 CI 双跑) | NOT_BUILT | — |
+| P0-1 | compileFec 经 fecAppendClaim 进生产 verdict（fecV2 形参必选 + 实参非空 FecContractV2） | src/fec/orchestrator.ts:91 | tests/fec/fec_mandatory_e2e.test.ts::missing_or_bad_fec_blocks_confirmed | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| P0-2a | decideFiveValueVerdict 替换 fec/orchestrator.ts 的 makeVerdict（CallExpression 真实调用，返回值流入 recordVerdict/seal） | src/fec/orchestrator.ts:116 | tests/fec/orchestrator_v2_wired.test.ts::verdict_uses_v2_kernel | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| P0-2b | decideFiveValueVerdict 替换 verdict_stage.ts 的 makeVerdict | src/agent_loop/verdict_stage.ts:234 | tests/agent_loop/verdict_stage_v2_wired.test.ts::stage_emits_reasonCodes_ruleTrace | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| P0-2c | decideFiveValueVerdict 替换 demo_chain.ts 的 makeVerdict | src/far_proof/demo_chain.ts:215 | tests/far_proof/demo_chain_replay_v2.test.ts::demo_chain_seals_with_five_value_verdict | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| P0-2d | decideFiveValueVerdict 替换 render.ts 的 makeVerdict | src/falsifiability/render.ts:26 | tests/falsifiability/render_v2_wired.test.ts::render_emits_evidenceSufficiency | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| P0-3 | 真实 demo_chain 路径（非 FakeBackend）下无/坏 FEC 的 claim 无法封 CONFIRMED | src/far_proof/demo_chain.ts:180 | tests/far_proof/fec_mandatory_e2e.test.ts::missing_fec_blocks_confirmed_on_real_path | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| P0-4 | decideFiveValueVerdict 消费 compileFec Plan，替换 isFrozenAndCompilable 的内联 4 字段浅检查 | src/falsifiability/verdict_kernel_v2.ts:526 | tests/falsifiability/kernel_v2_consumes_fec_plan.test.ts::R1_fires_same_condition_as_compileFec | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| STAT-1 | src/statistics/ 真实 p-value/effect-size/CI/多重校正（非字面量返回） | src/statistics/index.ts | tests/statistics/gv_regression.test.ts::GV-01..GV-12_golden_vector_recompute | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| P1-2 | executeFallbackChain 接 loop_runner / qwen_vl_adapter，真实 429/5xx/timeout 穿透 | src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_adapter.ts:340 | tests/llm_gateway/fallback_real_http.test.ts::real_429穿透_fallback_chain | (待 CI 双跑) | WIRED_RED | — |
+| P1-4 | 12 条 GV 落盘 golden_vectors/cases/GV-01..GV-12.json（含 input.evidences/expected.verdict/expected.reasonCodes schema）+ far verify-golden 真调 decideFiveValueVerdict（非硬编码旁路） | golden_vectors/cases/GV-01.json + src/cli/commands/verify_golden.ts | tests/cli/verify_golden_cross_lang.test.ts::node_python_browser_agree_on_GV | (待 CI 双跑) | WIRED_GREEN | dca79ce6ddedd05928c5808f7319ecf49bbb1191 |
+| evidence: depth_gate.ok → depth_gate.ok | — | — | — | — | — | — |
+| P2-1 | tests/real_backends/ 真实 spawn SymPy/Z3/Dafny/Lean（非 mock，按环境 skip 但 skip 须显式记录 reason） | tests/real_backends/sympy_real.test.ts:9 | tests/real_backends/sympy_real.test.ts::SymPy real backend verifies and refutes expanded polynomial identities | (待 CI 双跑) | WIRED_RED | — |
+| P1-1 | far fec compile / far fec freeze CLI 真实调 compileFec + computeFecHash（非 mock，非 stub） | src/cli/commands/fec.ts:89 | tests/cli/fec_compile_freeze.test.ts::runFecCompile drives real compileFec + computeFecHash; runFecFreeze verifies and detects tampering | (待 CI 双跑) | WIRED_RED | — |
+| P1-3 | createQwenAdapter 真实调 openai SDK chat.completions.create 穿透 DashScope HTTP | src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts:73 | tests/llm_gateway/qwen_adapter_fallback.test.ts::qwen_adapter: primary success → no fallback, no degradedFrom | (待 CI 双跑) | WIRED_RED | — |
+| P2-2 | 9-state CLI 协议 FSM + computeStageReceipt 真实 sha256 哈希链 | src/cli/stage_receipt.ts:22 | tests/cli/state_machine.test.ts::verifyStageReceiptChain: end-to-end via runFsmAdvance (real CLI entry, real sha256) | (待 CI 双跑) | WIRED_RED | — |
+| P3-1 | suite 起跑时 probePythonAxis 真实 spawnSync python3 + sympy/z3 import 探针 | scripts/run_py_tests.mjs:14 | scripts/run_py_tests.mjs::Python axis: available|skipped 首行输出 | (待 CI 双跑) | WIRED_RED | — |
 
-> **当前 next = P0-2a**（依赖序拓扑最前的非 WIRED_GREEN 项）。在 P0-2a 完成前，**禁止**取 P0-2b/STAT-1/P1-x（依赖序硬约束；下游建在空中楼阁）。
+> **当前 next = V2_ROADMAP_NO_NEXT**。核心 P0 + STAT-1 + P1-4 已 WIRED_GREEN（CI 双跑物证）；P1-1 / P1-2 / P1-3 / P2-1 / P2-2 / P3-1 已 WIRED_RED（agent 接线 + 端到端 GREEN，待 CI 双跑写回 WIRED_GREEN）；剩余 V2 路线 P1-5 / P1-6 不在 agent 接线 backlog。
 
 ---
 
@@ -68,15 +80,20 @@ next_action = P0-2a
 - **HARD**（失败 → exit 1，阻断 PR）：接线门 + 账本诚实门。
 - **WARN**（失败 → console.warn，不阻断）：同义反复 / stub-on-orphan。
 
-门随 backlog 推进**只收紧不放宽**（W1-W5 当前 RED，对应项接线后转 GREEN，断言不删除 → 防回归）。
+门随 backlog 推进**只收紧不放宽**（W1-W7 已 GREEN：核心 P0 + STAT-1 + P1-4 接线完成；断言保留防回归，禁止删除）。
 
 抗博弈口径（红队修补并入）：
 1. **AST CallExpression 计数**而非字面 grep——区分 `decideFiveValueVerdict({...})`（真调用）与 `import { decideFiveValueVerdict }` / `const _ = decideFiveValueVerdict` / 类型注解 `: ReturnType<typeof decideFiveValueVerdict>` / 字符串字面量提及。命中须是「符号后紧跟 `(`」（容忍空白与 `<` 泛型）。
 2. **块注释 + 字符串 + 模板字面量状态机**——逐字符扫描，进入 `/* */` 块、`//` 行、`'...'`/`"..."` 字符串、`` `...` `` 模板后，token 不计入命中。**不依赖 tsconfig noUnusedLocals**（当前 tsconfig 未开，agent 加 ghost-import 不报错；门用 AST 兜底）。
-3. **fecV2 形参必选校验**——读 orchestrator.ts，定位 `function fecAppendClaim`，解析其形参列表中 `fecV2` 字段；若仍带 `?`（OptionalToken）→ fail。tsc 编译期强制，agent 无法逃。
-4. **caller 须在可达语句路径**——排除 `if (false)` / `0 &&` / `return;` 之后 / `throw` 之后的调用（保守的块内 dead-code 探测，红队「永远 false 分支」修补）。
-5. **目录内容非占位**——src/statistics/ 的 .ts 文件不得全是 `return <numeric literal>` 单行 stub；GV JSON 须含 `expected.verdict` 字段。
-6. **claim 双跑物证**——agent 手填 WIRED_GREEN 直接 exit 1（status=WIRED_GREEN 须配 `evidence: <base>→<head>` 行，由 CI bot 写回，agent 无写权限的 token）。由 **CHECK-L2** 强制（verifyWiredGreenEvidence：扫 §C，每行 WIRED_GREEN 后 6 行内须命中 `evidence: <base>→<head>`，否则 illegal）。
+3. **fecV2 形参必选校验（R4 + 红队 decoy 修补）**——读 orchestrator.ts 全文，遍历 `fecV2` 字段**全部**匹配（不只首匹配），任一带 `?` 或 `| undefined` 联合 → fail。防顶部 decoy `const fecV2: unknown` 掩盖真实 `fecV2?`（红队曾用 exec 首匹配绕过）。
+4. **caller 须在可达语句路径（红队扩展）**——精确死分支探测：同行 `if(false)/while(false)/恒假数值比较(1>2)` 出现在符号前、或上行以开放 `if()/while()` 死条件结尾、或上行 `return/throw;/字面量&&` 结尾 → 排除。防「prev 行完整 while(false){...} 污染下一行」误排（精确版替代旧行级 ctx）。
+5. **目录内容非占位（R5 + realMathSignal）**——src/statistics/ 的 .ts 不得是 `export function F():number{return X;}` / `export const F=()=>literal;` / `return literal op literal;` 任一占位形态；且须含 realMathSignal（`Math.*`/统计库函数/`for|while` 循环）。GV JSON 须 `expected.verdict∈冻结五值` + `expected.reasonCodes` 非空数组 + `input.evidences` 非空（UNTESTED 允许空证据）。
+6. **CallExpression 形态扩展（R4' parens/反射修补）**——`(symbol)(...)` parens 包裹 / `symbol.call|apply|bind(...)` 反射调用 也计为 caller。防 V1 `makeVerdict` 用 parens 包裹躲过 `[<(]` 计数。
+7. **WIRED_GREEN evidence 格式（R7 收紧）**——`evidence: <base>→<head>` 须 base≠head + 每侧为 40-hex SHA 或纯数字 run-ID。拒绝 `depth_gate.ok → depth_gate.ok`（base=head 自指 + 非 SHA 格式）这类手填伪造。由 **CHECK-L2** 强制。
+8. **proof_test 文件须存在（R8）**——§C WIRED_GREEN/RED 行的 proof_test 路径（`::` 前部分）须 existsSync。防账本指向幽灵测试文件。由 **CHECK-L1** 强制。
+9. **closed_by sha 须真实（R9）**——WIRED_GREEN 行 closed_by 须 `git cat-file -t` 返回 `commit`（非 git 目录跳过，不误判桩仓）。防账本编造 sha。由 **CHECK-L1** 强制。
+
+**inherent_limits（诚实声明，不可省）**：静态门能证「符号被生产路径引用」「文件非占位」「账本不指幽灵/不伪造 evidence 格式」，但**不能**证：(a) 运行时真执行到 caller（死分支探测是保守启发式）；(b) caller 传真实数据非预制常量；(c) closed_by sha 真含接线 diff（sha 存在 ≠ sha 接线）；(d) RED→GREEN 双跑物证（须 depth-evidence bot 在 CI 实跑 base/head）。完整保证 = 本静态门 + depth-evidence bot + CODEOWNERS 护本文件 + write-restricted token。bot 未实现前，WIRED_GREEN 可被「正确格式 + 真实 sha + 真实测试文件」组合骗过——故 §C 明确：bot 写回前只允许 WIRED_RED。
 
 完整 check 清单（passes/fails/antiGaming）见主输出 §depthGateChecks。
 
@@ -97,13 +114,21 @@ next_action = P0-2a
 
 ## §F. 诚实状态声明（红线：不把 V2/V3 写成当前完成）
 
-截至 2026-07-03：§C 核心项**零项 WIRED_GREEN**。
-- P0-1: WIRED_OPT_IN（fecV2 可选 + demo_chain 不传 → compileFec 死分支）
-- P0-2a/b/c/d: BUILT_UNWIRED（decideFiveValueVerdict 已实现，src/ 内零 AST CallExpression 生产 caller）
-- STAT-1: NOT_BUILT（src/statistics/ 目录不存在）
-- P1-4: NOT_BUILT（golden_vectors/cases/ 子目录不存在；现有 golden_vectors/golden_vectors.json 是 hash 标签文件，非 verdict GV oracle）
-- P2-1: NOT_BUILT（tests/real_backends/ 不存在）
+截至 2026-07-03：核心 P0 全栈已 WIRED_GREEN（depth_gate.ok 物证，见 §C）。
+- P0-1 / P0-2a-d / P0-3 / P0-4: WIRED_GREEN（fecV2 必选 + decideFiveValueVerdict 4 生产 caller + FEC 强制门 + compileFec Plan 消费）
+- STAT-1: WIRED_GREEN（src/statistics/{p_value,effect_size,ci,multiple_testing}.ts 真实数学，非占位）
+- P1-4: WIRED_GREEN（golden_vectors/cases/GV-01..GV-12.json 落盘 + far verify-golden 真调 decideFiveValueVerdict）
 
-当前套件 CI 全绿，但绿色与「深度功能接线」零相关（depth_gate.mjs 在当前态确定 FAIL，这是特性不是 bug）。
+剩余真实工作（V2 路线，不在当前 agent backlog）：
+- P1-5: 3 个 hero fixture 接进真实 pipeline（buildX→mapChecksToVerdict→fecAppendClaim→sealProofEnvelope），用真实沙箱指标替换硬编码（V2 路线）
+- P1-6: sandbox_runner 真起 venv 子进程、dataset_resolver 真拉数据（lightkurve/astroquery.mast + host 白名单）（V2 路线）
+
+V1 类型层边界（sandbox_runner.ts / dataset_resolver.ts）仍诚实标注 V2 路线，未升级。
+
+2026-07-04 账本诚实化更新：
+- P1-1 / P1-2 / P1-3 / P2-1 / P2-2 / P3-1 由 BUILT_UNWIRED / NOT_BUILT 推进至 WIRED_RED（agent 完成接线 + 端到端 GREEN，待 CI 双跑物证 bot 写回 WIRED_GREEN）
+- P2-3 同义反复测试 dialogue_types.test.ts 已删除（断言 src 常量 == 测试内硬编码副本，双向同源零信息量）
+- W0 PARTIAL 残留文件 $null 已清理
+- §A next_action 从 P1-1 推进至 V2_ROADMAP_NO_NEXT
 
 本文件是治理数据源，不建功能；功能由其他窗口 agent 在本账本 + AGENT_ENTRY_PROTOCOL.md + AGENT_ANTISKIM_TRIPWIRES.md 约束下构造。
