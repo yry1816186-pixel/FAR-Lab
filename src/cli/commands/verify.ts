@@ -17,7 +17,7 @@
 //       diffAntiTheaterReport 与 envelope 内嵌 antiTheaterReport 深度对比；任何发散 → FAIL。
 //       verifiedLevels 透明披露 'antiTheaterLint'（不动 recomputation 三轴·保 §5.2 哈希重算契约）。
 //   - exit 0 PASS / 7 FAIL / 2 arg / 1 runtime（D6）。far verify 是 CLI 首个 verdict-bearing 命令（引入 exit 7）。
-//   - recomputation.python/browser = not-run（D7·诚实口径·反 overclaim·Phase 2 / #13 跨语言对拍）。
+//   - recomputation.python 调 Python proof_hash.py 镜像重算；browser = not-run（D7·诚实口径·反 overclaim）。
 //
 // 诚实边界（R2·反 overclaim）：
 //   envelope 模式验封存信封自洽（proofHash 重算 + 10 规则 + 内嵌 anti-theater 报告一致性）；
@@ -28,13 +28,16 @@
 // 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩。untrusted 输入经结构守卫 + try/catch 安全网。
 
 import Database from 'better-sqlite3';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { runAntiTheaterLint } from '../../anti_theater/lint.ts';
 import { parseAntiTheaterLintInput } from '../../anti_theater/schemas.ts';
 import type { AntiTheaterLintInput, AntiTheaterReport } from '../../anti_theater/types.ts';
 import { hashCanonicalJson } from '../../evidence_log/hasher.ts';
 import { verifyChainHead } from '../../evidence_log/verifier.ts';
+import { verifyFarProofBundle, type BundleVerifyResult } from '../../far_proof/bundle_verifier.ts';
 import { verifyProofHashV2 } from '../../proof_envelope/v2/proof_hash.ts';
 import type { ProofCheckResultV2, ProofEnvelopeV2 } from '../../proof_envelope/v2/types.ts';
 import { summarizeChecksV2, validateProofEnvelopeV2 } from '../../proof_envelope/v2/validator.ts';
@@ -45,6 +48,9 @@ import type { ProofCheckOutcome, Verdict } from '../../schema/enums.ts';
 const HEX64 = /^[0-9a-f]{64}$/;
 const PROOF_ENVELOPE_V2_SCHEMA = 'far.proof_envelope.v2';
 const VALID_MODES = new Set<string>(['chain', 'envelope', 'full']);
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const REPRO_PYTHON_DIR = fileURLToPath(new URL('../../../repro/far_chain_repro/', import.meta.url));
+const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
 
 /** far verify 模式（04 §5.1·D2）。VALID_MODES 为运行时校验集合（单一来源）。 */
 export type VerifyMode = 'chain' | 'envelope' | 'full';
@@ -56,7 +62,7 @@ export type TamperStatus = 'clean' | 'tampered' | 'n/a';
 export type ScopeStatus = 'full' | 'degraded' | 'n/a';
 export type RecomputeAxis = 'pass' | 'fail' | 'not-run';
 
-/** recomputation 三轴（04 §5.2）：node=TS proofHash 重算；python/browser=跨语言对拍（P0 not-run）。 */
+/** recomputation 三轴（04 §5.2）：node=TS proofHash 重算；python=Python 镜像；browser=后续 Web Crypto。 */
 export interface RecomputationStatus {
   readonly node: RecomputeAxis;
   readonly python: RecomputeAxis;
@@ -64,7 +70,7 @@ export interface RecomputationStatus {
 }
 
 /** verifier 实际执行的校验层（04 §5.3 verifiedLevels 子集·透明披露）。 */
-export type VerifiedLevel = 'chain' | 'proofEnvelope' | 'antiTheaterLint';
+export type VerifiedLevel = 'bundle' | 'chain' | 'proofEnvelope' | 'pythonProofHash' | 'antiTheaterLint';
 
 /** far verify 10 字段输出 schema（04 §5.2）。 */
 export interface VerifyDump {
@@ -91,6 +97,13 @@ export interface EnvelopeVerifyResult {
   readonly checks: readonly ProofCheckResultV2[];
   readonly checkSummary: Record<'PASS' | 'WARN' | 'FAIL' | 'SKIP', number>;
   readonly antiTheaterConsistent: boolean;
+  readonly errors: readonly string[];
+  readonly warnings: readonly string[];
+}
+
+/** Python ProofEnvelope proofHash 镜像重算结果（RULE-PE-010 跨语言轴）。 */
+export interface PythonProofHashRecomputeResult {
+  readonly axis: RecomputeAxis;
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
 }
@@ -244,6 +257,58 @@ export function verifyEnvelopeV2(envelope: ProofEnvelopeV2): EnvelopeVerifyResul
   };
 }
 
+/**
+ * verifyEnvelopeV2WithPython —— 调 repro/far_chain_repro/proof_hash.py 重算 proofHash。
+ * 这是 IO/spawn 轴，故不放进 verifyEnvelopeV2 纯收集器；Python 不可用时 not-run + warning。
+ */
+export function verifyEnvelopeV2WithPython(envelope: ProofEnvelopeV2): PythonProofHashRecomputeResult {
+  const pyCode = [
+    'import json, sys',
+    `sys.path.insert(0, ${JSON.stringify(REPRO_PYTHON_DIR)})`,
+    'from proof_hash import verify_proof_hash_v2',
+    'env = json.loads(sys.stdin.read())',
+    'print("true" if verify_proof_hash_v2(env) else "false")',
+  ].join('\n');
+  const result = spawnSync(PYTHON_CMD, ['-c', pyCode], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    input: JSON.stringify(envelope),
+    timeout: 10_000,
+  });
+
+  if (result.error !== undefined) {
+    return {
+      axis: 'not-run',
+      errors: [],
+      warnings: [`Python proofHash verifier not-run: failed to spawn ${PYTHON_CMD}: ${result.error.message}`],
+    };
+  }
+  if (result.status !== 0) {
+    return {
+      axis: 'fail',
+      errors: [`Python proofHash verifier exited ${result.status ?? '?'}: ${tail(`${result.stderr ?? ''}\n${result.stdout ?? ''}`)}`],
+      warnings: [],
+    };
+  }
+
+  const stdout = (result.stdout ?? '').trim();
+  if (stdout === 'true') {
+    return { axis: 'pass', errors: [], warnings: [] };
+  }
+  if (stdout === 'false') {
+    return {
+      axis: 'fail',
+      errors: ['Python proofHash verifier reported mismatch'],
+      warnings: [],
+    };
+  }
+  return {
+    axis: 'fail',
+    errors: [`Python proofHash verifier returned unexpected output: ${tail(stdout)}`],
+    warnings: [],
+  };
+}
+
 /** verifyChainHeadResult —— 包 verifyChainHead（L2·call_records 链头验证）。 */
 export function verifyChainHeadResult(db: Database.Database): ChainVerifyResult {
   const result = verifyChainHead(db);
@@ -367,6 +432,8 @@ export function collectVerifyDump(
   envelopeResult: EnvelopeVerifyResult | undefined,
   chainResult: ChainVerifyResult | undefined,
   lintResult: LintRecomputeResult | undefined,
+  pythonResult: PythonProofHashRecomputeResult | undefined = undefined,
+  bundleResult: BundleVerifyResult | undefined = undefined,
 ): VerifyDump {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -378,6 +445,22 @@ export function collectVerifyDump(
   let tamperStatus: TamperStatus = 'n/a';
   let scopeStatus: ScopeStatus = 'n/a';
   let nodeRecompute: RecomputeAxis = 'not-run';
+  let pythonRecompute: RecomputeAxis = 'not-run';
+
+  if (bundleResult !== undefined) {
+    verifiedLevels.push('bundle');
+    if (bundleResult.chainRan) {
+      verifiedLevels.push('chain');
+      ledgerRoot = bundleResult.chain.chainHead;
+    }
+    if (bundleResult.proofEnvelopeRan) {
+      verifiedLevels.push('proofEnvelope');
+    }
+    tamperStatus = bundleResult.ok ? 'clean' : 'tampered';
+    nodeRecompute = bundleResult.ok ? 'pass' : 'fail';
+    errors.push(...bundleResult.errors);
+    warnings.push(...bundleResult.warnings);
+  }
 
   if (envelopeResult !== undefined) {
     verifiedLevels.push('proofEnvelope');
@@ -389,6 +472,15 @@ export function collectVerifyDump(
     nodeRecompute = envelopeResult.proofHashOk ? 'pass' : 'fail';
     errors.push(...envelopeResult.errors);
     warnings.push(...envelopeResult.warnings);
+  }
+
+  if (pythonResult !== undefined) {
+    pythonRecompute = pythonResult.axis;
+    if (pythonResult.axis !== 'not-run') {
+      verifiedLevels.push('pythonProofHash');
+    }
+    errors.push(...pythonResult.errors);
+    warnings.push(...pythonResult.warnings);
   }
 
   if (chainResult !== undefined) {
@@ -419,7 +511,7 @@ export function collectVerifyDump(
     ledgerRoot,
     tamperStatus,
     scopeStatus,
-    recomputation: { node: nodeRecompute, python: 'not-run', browser: 'not-run' },
+    recomputation: { node: nodeRecompute, python: pythonRecompute, browser: 'not-run' },
     errors,
     warnings,
     verifiedLevels,
@@ -429,6 +521,7 @@ export function collectVerifyDump(
 // ===== IO 壳（runVerify·镜像 status.ts）=====
 
 export interface VerifyOptions {
+  readonly bundlePath?: string;
   readonly envelopePath?: string;
   readonly dbPath?: string;
   readonly lintInputPath?: string;
@@ -443,6 +536,21 @@ export interface VerifyOptions {
  */
 export function runVerify(options: VerifyOptions): number {
   const { mode } = options;
+  if (options.bundlePath !== undefined) {
+    if (options.envelopePath !== undefined || options.dbPath !== undefined || options.lintInputPath !== undefined) {
+      process.stderr.write('far verify: --bundle 不能与 --envelope/--db/--lint-input 同时使用\n');
+      return 2;
+    }
+    const bundleResult = verifyFarProofBundle(options.bundlePath, mode);
+    const dump = collectVerifyDump(undefined, undefined, undefined, undefined, bundleResult);
+    if (options.json) {
+      process.stdout.write(`${JSON.stringify(dump, null, 2)}\n`);
+    } else {
+      process.stdout.write(renderVerifyHuman(dump, undefined, undefined, options.explain, bundleResult));
+    }
+    return dump.status === 'FAIL' ? 7 : 0;
+  }
+
   // --lint-input 给定时强制载入+校验 envelope（对比基准在内嵌 antiTheaterReport·须先验基准再对比）。
   const needEnvelope = mode === 'envelope' || mode === 'full' || options.lintInputPath !== undefined;
   const needDb = mode === 'chain' || mode === 'full';
@@ -458,6 +566,7 @@ export function runVerify(options: VerifyOptions): number {
 
   let envelope: ProofEnvelopeV2 | undefined;
   let envelopeResult: EnvelopeVerifyResult | undefined;
+  let pythonResult: PythonProofHashRecomputeResult | undefined;
   let chainResult: ChainVerifyResult | undefined;
   let lintResult: LintRecomputeResult | undefined;
 
@@ -473,6 +582,7 @@ export function runVerify(options: VerifyOptions): number {
     }
     envelope = parsed.envelope;
     envelopeResult = verifyEnvelopeV2(envelope);
+    pythonResult = verifyEnvelopeV2WithPython(envelope);
   }
 
   if (needDb) {
@@ -504,7 +614,7 @@ export function runVerify(options: VerifyOptions): number {
     lintResult = verifyAntiTheaterLint(envelope, loaded.input);
   }
 
-  const dump = collectVerifyDump(envelopeResult, chainResult, lintResult);
+  const dump = collectVerifyDump(envelopeResult, chainResult, lintResult, pythonResult);
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify(dump, null, 2)}\n`);
@@ -579,6 +689,7 @@ function renderVerifyHuman(
   envelopeResult: EnvelopeVerifyResult | undefined,
   lintResult: LintRecomputeResult | undefined,
   explain: boolean,
+  bundleResult: BundleVerifyResult | undefined = undefined,
 ): string {
   const lines: string[] = [
     'FAR-Chain Verify（FI-9 · 第三方独立重算 · 04§5）',
@@ -590,7 +701,7 @@ function renderVerifyHuman(
     `  tamperStatus         : ${dump.tamperStatus}`,
     `  scopeStatus          : ${dump.scopeStatus}`,
     `  recomputation.node   : ${dump.recomputation.node}`,
-    `  recomputation.python : ${dump.recomputation.python}（Phase 2 / #13 未接入）`,
+    `  recomputation.python : ${dump.recomputation.python}`,
     `  recomputation.browser: ${dump.recomputation.browser}（Phase 2 / #13 未接入）`,
     `  verifiedLevels       : ${dump.verifiedLevels.length > 0 ? dump.verifiedLevels.join(', ') : 'none'}`,
   ];
@@ -600,6 +711,23 @@ function renderVerifyHuman(
       ? `重算完成（${lintResult.divergences.length} divergence）`
       : '重算中止（见 errors）';
     lines.push(`  antiTheaterLint      : ${lintSummary}`);
+  }
+
+  if (bundleResult !== undefined) {
+    const chainSummary =
+      bundleResult.mode === 'envelope' || !bundleResult.chainRan
+        ? 'not-run'
+        : `${bundleResult.chain.ok ? 'pass' : 'fail'} (${bundleResult.chain.verifiedCount} records)`;
+    const envelopeSummary =
+      bundleResult.mode === 'chain' || !bundleResult.proofEnvelopeRan
+        ? 'not-run'
+        : `${bundleResult.proofEnvelopeOk ? 'pass' : 'fail'} (${bundleResult.proofEnvelopeCount} checked)`;
+    lines.push(
+      `  bundle              : ${bundleResult.mode} (${bundleResult.bundlePath})`,
+      `  bundle.files        : ${bundleResult.requiredFilesPresent ? 'present' : `missing ${bundleResult.missingFiles.length}`}`,
+      `  bundle.chain        : ${chainSummary}`,
+      `  bundle.envelopes    : ${envelopeSummary}`,
+    );
   }
 
   if (explain && envelopeResult !== undefined) {
@@ -633,7 +761,8 @@ function renderVerifyHuman(
     '    - envelope 模式验封存信封自洽（proofHash 重算 + 10 规则 + 内嵌 anti-theater 报告一致性）。',
     '    - --lint-input 提供时独立重算 20 detector 并与内嵌报告深度对比（#11b·L5）；',
     '      未提供时不重算原始证据。verifier 不校验 lint-input 与 envelope 的语义对齐（评委自负）。',
-    '    - recomputation.python/browser 仍 not-run（Phase 2 / #13 跨语言对拍）。',
+    '    - recomputation.python 由 repro/far_chain_repro/proof_hash.py 镜像重算；Python 不可用时诚实标 not-run。',
+    '    - recomputation.browser 仍 not-run（Phase 2 / #13 浏览器 ProofEnvelope verifier 未接入）。',
     '════════════════════════════════════════════════════════════',
     '',
   );
@@ -680,6 +809,14 @@ export function errorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function tail(text: string, max = 400): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) {
+    return trimmed;
+  }
+  return trimmed.slice(trimmed.length - max);
 }
 
 // re-export 供 far.ts runVerifyFromArgs 复用 mode 校验集合（单一来源）。

@@ -16,11 +16,18 @@
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */
 
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import type {
   DatasetRef,
   DatasetResolution,
   DatasetResolutionStatus,
 } from './types.ts';
+import { buildVenvPythonEnv } from './sandbox_runner.ts';
+
+const DATASET_FETCH_PY = fileURLToPath(
+  new URL('../../repro/science_harness/dataset_fetch.py', import.meta.url),
+);
 
 /** 在线数据集白名单 host（SR-5 · spec 12 §2.2）。 */
 export const DATASET_HOST_WHITELIST = [
@@ -121,4 +128,110 @@ export function datasetStatusToIntegrityFlag(
 /** 类型守卫：purpose_tag 字符串是否属于 baseline_exempt 通道（02 C20）。 */
 export function isBaselineExempt(purposeTag: string): boolean {
   return purposeTag === 'baseline_exempt';
+}
+
+// ---------------------------------------------------------------------------
+// V2 在线数据集获取（P1-6 · 真 spawn dataset_fetch.py）
+// ---------------------------------------------------------------------------
+
+export interface OnlineFetchParams {
+  readonly resolver: 'lightkurve' | 'astroquery.mast';
+  /** 目标 host（TS 侧白名单权威门——非白名单不 spawn）。 */
+  readonly host: string;
+  readonly version: string;
+  readonly ticId?: string;
+  readonly sector?: number;
+  readonly timeoutMs?: number;
+  readonly pythonCmd?: string;
+}
+
+export interface OnlineFetchResult {
+  readonly ref: DatasetRef;
+  readonly hostWhitelisted: boolean;
+}
+
+interface DatasetFetchResponse {
+  readonly ok: boolean;
+  readonly resolver?: string;
+  readonly host?: string;
+  readonly version?: string;
+  readonly contentHash?: string;
+  readonly retrievedAt?: string;
+  readonly ticId?: string;
+  readonly sector?: number;
+  readonly error?: string;
+}
+
+/**
+ * 真 spawn dataset_fetch.py 在线获取数据集（lightkurve / astroquery.mast）。
+ *
+ * 返回 onlineAttempt 形态喂给 resolveDataset；任一失败（非白名单 host / 缺 lightkurve /
+ * 网络不可达 / MAST 限流 / JSON 解析失败）→ null，resolveDataset 据此落 cached_fixture。
+ *
+ * 诚实边界（CLAUDE.md §3）：缺 lightkurve 或网络不可达是**环境问题**，不当代码 bug——
+ * 调用方应据返回 null 走 cached_fixture 降级路径（02 F1 never-fabricate）。
+ */
+export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<OnlineFetchResult | null> {
+  const hostWhitelisted = (DATASET_HOST_WHITELIST as readonly string[]).includes(params.host);
+  if (!hostWhitelisted) {
+    // SR-5 fail-closed：非白名单 host 不 spawn（权威门，节省进程 + 防绕过）。
+    return null;
+  }
+
+  const pythonCmd = params.pythonCmd ?? (process.platform === 'win32' ? 'python' : 'python3');
+  const timeoutMs = params.timeoutMs ?? 30_000;
+  const cfg = {
+    resolver: params.resolver,
+    host: params.host,
+    version: params.version,
+    ticId: params.ticId ?? '',
+    sector: params.sector ?? null,
+    timeoutMs,
+  };
+
+  return new Promise<OnlineFetchResult | null>((promiseResolve) => {
+    const child = spawn(pythonCmd, [DATASET_FETCH_PY], {
+      env: buildVenvPythonEnv(),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: timeoutMs,
+    });
+
+    const stdoutChunks: Buffer[] = [];
+    let settled = false;
+    const finish = (r: OnlineFetchResult | null): void => {
+      if (settled) return;
+      settled = true;
+      promiseResolve(r);
+    };
+
+    child.stdout.on('data', (c: Buffer) => stdoutChunks.push(c));
+    child.on('error', () => finish(null));
+    child.on('close', () => {
+      const text = Buffer.concat(stdoutChunks).toString('utf8').trim();
+      let parsed: DatasetFetchResponse;
+      try {
+        parsed = JSON.parse(text) as DatasetFetchResponse;
+      } catch {
+        finish(null);
+        return;
+      }
+      if (!parsed.ok || typeof parsed.contentHash !== 'string' || typeof parsed.retrievedAt !== 'string') {
+        finish(null);
+        return;
+      }
+      // exactOptionalPropertyTypes：ticId/sector 缺省时不提供 key（条件展开，非 undefined 赋值）。
+      const ref: DatasetRef = {
+        resolver: params.resolver,
+        version: typeof parsed.version === 'string' ? parsed.version : params.version,
+        retrievedAt: parsed.retrievedAt,
+        contentHash: parsed.contentHash,
+        ...(typeof parsed.ticId === 'string' && parsed.ticId.length > 0 ? { ticId: parsed.ticId } : {}),
+        ...(typeof parsed.sector === 'number' ? { sector: parsed.sector } : {}),
+      };
+      finish({ hostWhitelisted: true, ref });
+    });
+
+    child.stdin.write(JSON.stringify(cfg));
+    child.stdin.end();
+  });
 }

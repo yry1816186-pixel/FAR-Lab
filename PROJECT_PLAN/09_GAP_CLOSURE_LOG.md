@@ -115,7 +115,7 @@
     "canonicalHash": "IMPLEMENTED_VERIFIED|...",
     "fiveValueVerdict": "IMPLEMENTED_VERIFIED|...",
     "proofEnvelope": "PARTIAL|...",
-    "farVerify": "PARTIAL|...",
+    "farVerify": "IMPLEMENTED_VERIFIED|...",
     "browserVerifier": "PARTIAL|...",
     "pythonVerifier": "PARTIAL|..."
   },
@@ -179,7 +179,7 @@
 |---|---|---|
 | Core Trust Root | canonicalHash 4 字段白名单 + append-only hash chain + 五值裁决 enum + 0001-0008 migration | `IMPLEMENTED_VERIFIED`（白名单 / chain / enum）/ `IMPLEMENTED_UNVERIFIED`（trigger 实测） |
 | Falsification Layer | FEC + statistical plan + dataset/workflow/run binding + anti-theater harness | `DESIGN_LOCKED` |
-| Proof and Verification Layer | ProofEnvelope V2 + `.far-proof` + `far verify` + L1-L6 verifier | `DESIGN_LOCKED`（V2）/ `PARTIAL`（V1） |
+| Proof and Verification Layer | ProofEnvelope V2 + `.far-proof` + `far verify` + `far export receipt` + `far export far-proof` + L1-L6 verifier | `PARTIAL` / `IMPLEMENTED_VERIFIED`（TS/Python/browser proofHash、CLI verify、V1 bundle/export/package、Trust Receipt 已验证；raw evidence 全重放、Rust/Go/WASM、外部 RO-Crate 认证仍未闭环） |
 | Product and Ecosystem Layer | `Your Laptop Is The Verifier` demo + FAR-Bench protocol + 开源治理 | `DESIGN_LOCKED` |
 
 **V2/V3 路线图降级项**（`08` §3）：
@@ -444,7 +444,7 @@ function computeProofHash(envelope): string
 
 **ProofEnvelope Validator 规则（`04` §2.4 · 9+1 条）**：`RULE-PE-001`（claim_non_empty）/ `002`（verdict_node_exists）/ `003`（falsification_spec_present）/ `004`（source_anchor_present）/ `005`（repro_hash_present · 长度=64）/ `006`（prev_proof_hash_valid · `/^[0-9a-f]{64}$/`）/ `007`（conclusion_matches_checks · 反 theater F1）/ `008`（sealed_by_deterministic · 恒 `deterministic_sealer`）/ `009`（known_failures_not_hidden）/ `010`（independently_recomputable · FI-9 新增协议规则）。
 
-`RULE-PE-010` 是 FI-9 新增的**协议规则**，不是"既有规则测试"。须先 spec 再测；交付前须给全 10 条逐条测试绿（`validator.10-rules-coverage.test.ts`）。
+`RULE-PE-010` 是 FI-9 新增的**协议规则**，不是"既有规则测试"。当前已先 spec 后测试：`validator.10-rules-coverage.test.ts` 覆盖 10 条逐条结果，`cross_lang.test.ts` / browser standalone / 离线包路径覆盖独立重算。
 
 **`far verify` 输出 JSON schema（`04` §5.2 · 设计态 P0 权威）**：
 
@@ -472,13 +472,13 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 | 子能力 | 当前状态 | 闭环不足 |
 |---|---|---|
-| 9 rule validator | `IMPLEMENTED_VERIFIED` | `RULE-PE-010` 待 spec → 测试 |
+| 10 rule validator | `IMPLEMENTED_VERIFIED` | — |
 | sealer / proofHash / DB backstop / TS 重算脚本 | `IMPLEMENTED_VERIFIED` | — |
 | V1 self-check | `PARTIAL` | — |
 | SciIR objectHash / ledgerRoot / inclusionProof | `DESIGN_LOCKED` | 未闭环 |
-| 跨语言 proofHash | `PARTIAL`（TS）/ `IMPLEMENTED_UNVERIFIED`（Python）/ `ROADMAP`（Rust/Go/WASM） | 未闭环 |
+| 跨语言 proofHash | `IMPLEMENTED_VERIFIED`（TS/Python/browser JS/Web Crypto）；Rust/Go/WASM `ROADMAP` | raw evidence / full verdict trace / RO-Crate 外部认证未闭环 |
 
-**状态**：ProofEnvelope V1 `IMPLEMENTED_VERIFIED`；V2 proofHash binding `DESIGN_LOCKED`；`far verify` CLI `ROADMAP`（FI-1 提供 CLI 入口）。
+**状态**：ProofEnvelope V1 `IMPLEMENTED_VERIFIED`；V2 proofHash binding 与 10-rule validator `IMPLEMENTED_VERIFIED`（raw evidence / full verdict trace 仍未闭环）；`far verify` CLI `IMPLEMENTED_VERIFIED`（envelope/chain/full/bundle）。
 
 ---
 
@@ -497,9 +497,9 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 | 等级 | 含义 | 当前状态 |
 |---|---|---|
-| L1 | 同仓库 Node 重算 | `verifyChainHead()` / `computeProofHash()` / `validateProofEnvelope()` `IMPLEMENTED_VERIFIED`；`far verify` CLI `ROADMAP` |
-| L2 | Python 独立实现重算 | SQLite/JSON chain verifier、Merkle verifier、`canonical_json.py`（`<REPOSITORY_ROOT>/repro/far_chain_repro/`）`IMPLEMENTED_UNVERIFIED`；proof envelope hash 待 V2 镜像 |
-| L3 | Browser Web Crypto / standalone verifier | `<REPOSITORY_ROOT>/frontend/src/lib/merkle.ts`（`buildMerkleTree` / `verifyInclusionProof` / `ZERO_MERKLE_ROOT` / `assertHex64` / `flipLastHexChar`）`IMPLEMENTED_VERIFIED`；无 proof envelope hash；`verify.html` 待打包 |
+| L1 | 同仓库 Node 重算 | `verifyChainHead()` / `verifyProofHashV2()` / `validateProofEnvelopeV2()` / `far verify` CLI（envelope/chain/full/bundle）`IMPLEMENTED_VERIFIED` |
+| L2 | Python 独立实现重算 | SQLite/JSON chain verifier、Merkle verifier、`canonical_json.py`、ProofEnvelope V2 `proof_hash.py` `IMPLEMENTED_VERIFIED`；`far verify` 已接 `recomputation.python` |
+| L3 | Browser Web Crypto / standalone verifier | `frontend/src/lib/merkle.ts`（Merkle/Suite）+ `frontend/public/verify.html`（ProofEnvelope V2 proofHash，Web Crypto）`IMPLEMENTED_VERIFIED` |
 | L4 | Rust / Go / WASM 独立实现 | Rust/Go `ROADMAP`（V2）；WASM `ROADMAP`（V3） |
 | L5 | 第三方维护 verifier | `ROADMAP` |
 | L6 | 形式化验证核心 invariant | `RESEARCH`（`04` §14） |
@@ -510,13 +510,13 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 |---|---|
 | TS 编译产物 | 若 browser 使用 TS 编译产物，**不得**包装成完全不同语言实现 |
 | schema 与 canonicalization | Web Crypto 能独立计算 hash，但 schema 和 canonicalization 仍需 golden vectors 锚定 |
-| proof envelope hash | Browser 当前无 proof envelope hash，仅 Merkle / Suite（V2 待补） |
+| proof envelope hash | Browser 覆盖 ProofEnvelope V2 proofHash；不覆盖 raw evidence、V1 `.far-proof` bundle 或外部 RO-Crate 认证 |
 | 页面离线 | 页面必须离线可打开或有 U 盘 Plan B（standalone `verify.html` 零网络依赖） |
 | 篡改演示 | 篡改演示必须**真实修改 verdict-critical 字段**，不得只改 UI |
 
-**诚实口径（`04` §6.3 · `07` D8）**：当前诚实口径是 Node / Python 异语言链路 + Browser 独立环境 Merkle / Suite 重算；Browser **不是**第三种跨语言 ProofEnvelope verifier（它复用 `merkle.ts`，TS 编译产物）。V2 明确补 Rust / Go / ProofEnvelope，V3 补 WASM / formal spec。**不把设计规划伪装成已实现。**
+**诚实口径（`04` §6.3 · `07` D8）**：当前诚实口径是 Node / Python 异语言链路 + Browser 独立环境 Merkle / Suite / ProofEnvelope V2 proofHash 重算；Browser **不是**第三种语言实现（standalone JS + Web Crypto），也不验证 raw evidence 或外部 RO-Crate 合规。V2 明确补 Rust / Go，V3 补 WASM / formal spec。**不把设计规划伪装成已实现。**
 
-**状态**：`merkle.ts`（Merkle/Suite）`IMPLEMENTED_VERIFIED`；standalone `verify.html` `ROADMAP`（W3 后才可作为"断网验真硬证据"引用）。
+**状态**：`merkle.ts`（Merkle/Suite）`IMPLEMENTED_VERIFIED`；standalone `frontend/public/verify.html` ProofEnvelope V2 proofHash verifier `IMPLEMENTED_VERIFIED`（断网可打开，页面内联脚本由 `browser_standalone.test.ts` 直接执行验证）。
 
 ---
 
@@ -545,10 +545,10 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 | 子能力 | 当前状态 | 闭环不足 |
 |---|---|---|
-| demo seeds + benchmark_report | `PARTIAL` | 评委追问样本太少（`71` / `84` 深化） |
+| demo seeds + benchmark_report + `far bench run` | `IMPLEMENTED_VERIFIED` | 6-seed demo profile 可由 CLI 重跑并复现 `suiteIntegrityRoot`；评委追问样本太少仍属规模问题（`71` / `84` 深化） |
 | 规模统计意义 | `PARTIAL` | N 太少 |
 
-**状态**：FAR-Bench protocol `DESIGN_LOCKED`（C33 spec-only）；规模统计意义深化 `PARTIAL`（`71` / `84`）。
+**状态**：FAR-Bench protocol `DESIGN_LOCKED`（C33 spec-only）；6-seed demo runtime + `far bench run` `IMPLEMENTED_VERIFIED`；规模统计意义深化 `PARTIAL`（`71` / `84`）。
 
 ---
 
@@ -567,7 +567,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 | Plan | 触发 | 后备动作 | 诚实话术 |
 |---|---|---|---|
-| **B** | 网络/安装失败 | 预打包 `.far-proof.tar.zst` 离线包 + 预编译 `better-sqlite3` binary（Win/Mac/Linux）+ 预 bundle `verify.html`（esbuild 单文件）+ 离线 `node_modules`；评委无需联网编译，解压即跑 | "为规避环境差异，使用离线包" |
+| **B** | 网络/安装失败 | 预打包 `.far-proof.tar.zst` 离线包（已含 `verify.sh` + `integrity.json` 自验证）+ standalone `verify.html`；预编译 `better-sqlite3` binary / 离线 `node_modules` 属 demo-day 环境包，仍需单独准备 | "为规避环境差异，使用离线包" |
 | **C** | 评委笔记本彻底不可用 | 主讲人自备已验证环境笔记本 HDMI 投屏；评委可上台亲手操作主讲人笔记本 | "为规避环境差异，使用预验证环境，评委可上台亲手操作" |
 | **D** | 极端故障（全黑） | 预录三路验真全流程 4K 录屏兜底；现场至少保留"主讲人翻转一个字符 → 指出哈希链断裂位置"的口算演示（不依赖任何软件） | 直接说"切换到 Plan B/C/D"，**不可掩饰** |
 
@@ -728,10 +728,10 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 | canonical hash / golden vector | 属于核心信任根，必须保持最高优先级 |
 | five-value verdict | 语义已锁定，工程上需升级为 metric-first deterministic kernel |
 | ProofEnvelope V1 | 视为 partial，P0 要升级为 V2 proofHash binding |
-| Python verifier | 作为独立重算路径之一，需扩展到 ProofEnvelope |
-| Browser verifier | 可用于演示 tamper-evidence，需标注边界 |
+| Python verifier | ProofEnvelope V2 proofHash 已扩展完成；完整 verdict trace 重放仍待补 |
+| Browser verifier | standalone ProofEnvelope V2 proofHash 已完成；需继续标注 raw evidence / RO-Crate 边界 |
 | `far status` | 应成为状态事实源 |
-| `far verify` | P0 必须补齐 |
+| `far verify` | P0 envelope/chain/full/bundle 已补齐；fresh-clone 非项目成员留证仍待补 |
 | FAR-Bench | 当前按 evaluation protocol / attack corpus 处理，不宣称泛 benchmark 成熟 |
 
 **状态**：stale 声明订正 `IMPLEMENTED_VERIFIED`（`39` §2.F-07 已闭口）；落地度具体数字 `Pending`（守 D12）。
@@ -801,7 +801,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 | 卖点 | 当前证据 | 真实状态 | 深化方向 |
 |---|---|---|---|
-| Your Laptop Is The Verifier | `verifyChainHead` 在 `<REPOSITORY_ROOT>/src/evidence_log/verifier.ts`；Python chain verifier 在 `<REPOSITORY_ROOT>/repro/far_chain_repro/verify_chain.py`；Browser Merkle verifier 在 `<REPOSITORY_ROOT>/frontend/src/lib/merkle.ts` | 部分闭环。链 / Merkle 有多路，ProofEnvelope 跨语言 verifier 未闭环；`far verify` 尚未完整实现 | `69` / `75` → `04` §10 |
+| Your Laptop Is The Verifier | `verifyChainHead` 在 `<REPOSITORY_ROOT>/src/evidence_log/verifier.ts`；Python chain/proofHash verifier 在 `<REPOSITORY_ROOT>/repro/far_chain_repro/`；Browser Merkle verifier 与 standalone proofHash verifier 在 `<REPOSITORY_ROOT>/frontend/`；离线包在 `<REPOSITORY_ROOT>/src/far_proof/offline_package.ts` | 部分闭环。TS/Python/browser ProofEnvelope V2 proofHash、CLI bundle、离线 tar.zst 均已验证；外部 RO-Crate 认证、raw evidence 全重放、非项目成员 fresh-clone 留证未闭环 | `04` §10 / `APPENDIX_D` §7 |
 | 五值反剧场裁决 | `<REPOSITORY_ROOT>/src/falsifiability/verdict.ts` 纯规则覆盖五值；SQL enum 同步 | 部分闭环。规则确定，但目前主要消费 `supportsClaim` / `refutesClaim` 布尔或简单 threshold；统计计划与 rule trace 不够深 | `66` / `67` / `81` → `03` §6-§9 |
 | 脱平台密码学主权 | offline replay、hash chain、proofHash、no-LLM final judge scan | 部分闭环。provider 不在 trust root，但部分 agent evidence label 仍来自 LLM | `67` / `68` / `82` → `07` §4 |
 
@@ -811,7 +811,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 |---|---|---|---|
 | FEC 闭环 | FEC schema + measurement / statistical plan object + freeze hash | FEC compiler + validator + sandbox measurement + rule trace | 改 alpha / seed / stopping rule 必变 proof head |
 | LLM 自举 | LLM evidence 标成 proposal；不能单独 CONFIRMED / REFUTED | deterministic measurement facts 取代 LLM vote | no-LLM-final-judge scan 覆盖 verdict path |
-| ProofEnvelope verifier | `far verify` 重算 chain / proofHash | Python / Rust / Go / WASM differential verifier | golden + mutation + Windows offline |
+| ProofEnvelope verifier | `far verify` 重算 chain / proofHash；Python/browser/离线包路径已覆盖 | Rust / Go / WASM differential verifier | golden + mutation + Windows offline + 非项目成员 fresh-clone 留证 |
 | Anti-theater | 20 攻击 corpus + lint | hidden failed run / p-hack / null result first-class | false green rate 0 on attack corpus |
 | AI4S adapter | TableDataset + WorkflowRun adapter | CWL / Nextflow / Snakemake / MLflow / DVC / RO-Crate adapters | ingest artifact hash 进入 ProofEnvelope |
 

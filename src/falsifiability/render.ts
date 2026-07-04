@@ -2,7 +2,12 @@ import {
   EmptyScopeSlipError,
   EmptyUntestedReasonError,
 } from './errors.ts';
-import { makeVerdict } from './verdict.ts';
+import {
+  buildLegacyVerdictKernelInput,
+  makeLegacyCompatFec,
+  verdictResultFromKernelOutput,
+} from './legacy_kernel_adapter.ts';
+import { decideFiveValueVerdict } from './verdict_kernel_v2.ts';
 import type {
   EvidenceRecord,
   FalsificationSpec,
@@ -23,7 +28,22 @@ export function renderHonestVerdict(input: {
   readonly falsificationSpec: FalsificationSpec;
   readonly thresholdSpec: ThresholdSpec;
 }): HonestVerdictRender {
-  const decision = makeVerdict(input);
+  const fec = makeLegacyCompatFec({
+    claimId: 'render-honest-verdict',
+    falsificationSpec: input.falsificationSpec,
+    thresholdSpec: input.thresholdSpec,
+    frozenAt: '1970-01-01T00:00:00.000Z',
+  });
+  const kernelOutput = decideFiveValueVerdict(
+    buildLegacyVerdictKernelInput({
+      claim: input.claim,
+      evidences: input.evidences,
+      falsificationSpec: input.falsificationSpec,
+      thresholdSpec: input.thresholdSpec,
+      fec,
+    }),
+  );
+  const decision = verdictResultFromKernelOutput(kernelOutput);
 
   if (decision.verdict === 'DEGRADED_SCOPE') {
     if (decision.scopeSlipText === null || decision.scopeSlipText.trim().length === 0) {

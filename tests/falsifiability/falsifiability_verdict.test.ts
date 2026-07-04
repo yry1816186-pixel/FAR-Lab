@@ -233,7 +233,7 @@ test('renderHonestVerdict emits anti-theater fields', () => {
     thresholdSpec: BASE_THRESHOLD,
   });
   assert.equal(untested.verdict, 'UNTESTED');
-  assert.match(untested.untestedReason, /no evidence/);
+  assert.equal(untested.untestedReason, 'EVIDENCE_MISSING');
 });
 
 test('recordVerdict writes and reads a verdict node with parsed JSON fields', () => {

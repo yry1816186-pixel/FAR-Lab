@@ -3,7 +3,7 @@
 //
 // 验证链路（全 offline·fresh-clone 无 key 可复现）：
 //   buildDemoChain (FEC C-ASTRO-0001 → makeVerdict → sealProofEnvelope)
-//     → exportFarProof (七分量 + code/MANIFEST.md)
+//     → exportFarProof (九分量 + code/MANIFEST.md)
 //     → recomputeProofHashes (字节级重算 proofHash)
 //     → 断言所有分量存在 + 链式 hash 完整 + 重算字节相等 + 诚实降级
 //
@@ -17,13 +17,15 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { zstdDecompressSync } from 'node:zlib';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import Database from 'better-sqlite3';
 
 import { buildDemoChain, computeEnvHash, DEMO_GIT_COMMIT_SHA, DEMO_RUN_ID } from '../../src/far_proof/demo_chain.ts';
-import { exportFarProof } from '../../src/far_proof/index.ts';
+import { exportFarProof, packageFarProofBundle, verifyFarProofPackageIntegrity } from '../../src/far_proof/index.ts';
 import { recomputeProofHashes } from '../../scripts/recompute_proof_hashes.ts';
 import { verifyChainHead } from '../../src/evidence_log/index.ts';
 
@@ -72,12 +74,14 @@ function runExport(tmpDir: string): RunExportOutput {
   }
 }
 
-test('demo chain: C-ASTRO-0001 → REFUTED verdict → machine seal never CONFIRMED (ASK-9)', () => {
+test('demo chain: C-ASTRO-0001 → UNTESTED machine verdict (legacy 路径无统计注入) → seal never CONFIRMED (ASK-9)', () => {
   const db = new Database(':memory:');
   try {
     const chain = buildDemoChain(db);
-    // 机器裁决：实测 F1=0.62 < 0.80 阈值 → 推翻 claim（REFUTED）或降级范围。
-    assert.notEqual(chain.machineVerdict, 'CONFIRMED', 'machine verdict must not be CONFIRMED');
+    // 机器裁决 = UNTESTED（非 REFUTED）：legacy 适配路径不注入 pValue/adjustedPValue → kernel R6 refutes
+    // 门不触发 → NO_DECISION_PATH。demo_chain 演示完整密封链形状，真实 REFUTED 由 P1-5 hero pipeline 演示。
+    // 锁 === 'UNTESTED' 防弱断言（!==CONFIRMED）放任语义漂移。
+    assert.equal(chain.machineVerdict, 'UNTESTED', 'legacy demo path yields UNTESTED (no statistics injection)');
     // 密封结论：ASK-9 绝不 CONFIRMED。
     assert.notEqual(
       chain.sealedConclusion,
@@ -305,6 +309,110 @@ test('verifyChainHead independently confirms exported evidence_log integrity', (
     } finally {
       db.close();
     }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('packageFarProofBundle writes verify.sh + integrity.json + real .tar.zst archive', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-proof-package-'));
+  try {
+    const { outputDir } = runExport(tmp);
+    const packaged = packageFarProofBundle({
+      bundleDir: outputDir,
+      generatedAt: '2026-06-28T00:00:00.000Z',
+    });
+
+    assert.equal(packaged.compression, 'zstd');
+    assert.equal(existsSync(packaged.archivePath), true, 'archive should exist');
+    assert.equal(existsSync(packaged.verifyScriptPath), true, 'verify.sh should exist');
+    assert.equal(existsSync(packaged.integrityPath), true, 'integrity.json should exist');
+    assert.match(packaged.archiveSha256, /^[0-9a-f]{64}$/);
+
+    const integrity = JSON.parse(readFileSync(packaged.integrityPath, 'utf8')) as {
+      integrityHash: string;
+      files: Array<{ path: string; sha256: string; bytes: number }>;
+    };
+    assert.equal(integrity.integrityHash, packaged.integrityHash);
+    assert.ok(integrity.files.some((file) => file.path === 'verify.sh'), 'verify.sh must be integrity-protected');
+    assert.ok(
+      integrity.files.some((file) => file.path === 'proof_envelopes.jsonl'),
+      'proof_envelopes.jsonl must be integrity-protected',
+    );
+    assert.ok(
+      !integrity.files.some((file) => file.path === 'integrity.json'),
+      'integrity.json must be excluded to avoid self-reference',
+    );
+
+    const archiveBytes = readFileSync(packaged.archivePath);
+    assert.deepEqual(
+      Array.from(archiveBytes.subarray(0, 4)),
+      [0x28, 0xb5, 0x2f, 0xfd],
+      '.tar.zst should start with zstd magic bytes',
+    );
+
+    const integrityCheck = verifyFarProofPackageIntegrity(outputDir);
+    assert.equal(integrityCheck.ok, true, integrityCheck.errors.join(' | '));
+    assert.equal(integrityCheck.integrityHash, packaged.integrityHash);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('verifyFarProofPackageIntegrity detects post-package tamper', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-proof-package-tamper-'));
+  try {
+    const { outputDir } = runExport(tmp);
+    packageFarProofBundle({
+      bundleDir: outputDir,
+      generatedAt: '2026-06-28T00:00:00.000Z',
+    });
+    writeFileSync(join(outputDir, 'README_REPLAY.md'), '# tampered\n', 'utf8');
+
+    const integrityCheck = verifyFarProofPackageIntegrity(outputDir);
+    assert.equal(integrityCheck.ok, false);
+    assert.ok(
+      integrityCheck.errors.some((error) => /INTEGRITY_(HASH|FILE)_MISMATCH/.test(error)),
+      `tamper should be reported by integrity verifier: ${integrityCheck.errors.join(' | ')}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('packaged verify.sh runs after .tar.zst extraction (offline verifier path)', (t) => {
+  // 诚实边界（CLAUDE.md §3）：verify.sh 是 POSIX 脚本·Windows 缺 sh → spawnSync ENOENT (status===null) → skip。
+  // 非代码 bug：同 sandbox_real.test.ts 缺 python 的 skip 模式·CI/Linux 有 sh 跑全断言。不禁断言放行。
+  const shProbe = spawnSync('sh', ['-c', 'echo ok'], { encoding: 'utf8' });
+  if (shProbe.error !== undefined || shProbe.status === null) {
+    t.skip('POSIX sh not on PATH (Windows) — verify.sh offline path exercised on CI/Linux');
+    return;
+  }
+  const tmp = mkdtempSync(join(tmpdir(), 'far-proof-package-verify-sh-'));
+  try {
+    const { outputDir } = runExport(tmp);
+    const packaged = packageFarProofBundle({
+      bundleDir: outputDir,
+      generatedAt: '2026-06-28T00:00:00.000Z',
+    });
+
+    const extractDir = join(tmp, 'extract');
+    const tarPath = join(tmp, 'bundle.tar');
+    mkdirSync(extractDir, { recursive: true });
+    writeFileSync(tarPath, zstdDecompressSync(readFileSync(packaged.archivePath)));
+    execFileSync('tar', ['-xf', tarPath, '-C', extractDir]);
+
+    const verifyPath = join(extractDir, basename(outputDir), 'verify.sh');
+    const result = spawnSync('sh', [verifyPath], {
+      cwd: process.cwd(),
+      env: { ...process.env, FAR_REPO_ROOT: process.cwd() },
+      encoding: 'utf8',
+    });
+
+    assert.equal(result.status, 0, `verify.sh stderr:\n${result.stderr}\nstdout:\n${result.stdout}`);
+    assert.match(result.stdout, /integrity OK:/);
+    assert.match(result.stdout, /"status": "WARN"/, 'V1 minimal bundle should verify cleanly with WARN boundary');
+    assert.match(result.stdout, /"tamperStatus": "clean"/);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

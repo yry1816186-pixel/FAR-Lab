@@ -1,0 +1,126 @@
+{
+  "caseId": "GV-04",
+  "status": "DESIGN_LOCKED",
+  "scenario": "missing dataset",
+  "input": {
+    "evidences": [],
+    "kernel": {
+      "fec": {
+        "fecId": "FEC-GV-04",
+        "contractVersion": "FEC/2.0",
+        "claimId": "C-GV-04",
+        "measurableImplication": "Model M achieves BLS power greater than baseline on dataset D",
+        "scope": {
+          "population": "adults 18-65 all sexes",
+          "timeWindow": "2026-01-01..2026-12-31",
+          "domainConstraint": "benchmark D"
+        },
+        "requiredEvidence": [
+          {
+            "evidenceId": "EV-GV-04",
+            "kind": "dataset",
+            "critical": true,
+            "description": "resolved dataset binding",
+            "verificationCheckId": "CHECK-GV-04"
+          }
+        ],
+        "datasetRequirements": [
+          {
+            "name": "D-GV",
+            "contentHashAlgorithm": "sha256",
+            "allowSynthetic": false,
+            "schemaFingerprintRequired": true
+          }
+        ],
+        "workflowRequirements": [
+          {
+            "name": "wf-gv",
+            "engine": "script",
+            "requireContainerDigest": true,
+            "requireCommandHash": true,
+            "expectedNetworkPolicy": "off",
+            "requireFixedSeed": true
+          }
+        ],
+        "metric": {
+          "metricKey": "bls_power",
+          "description": "BLS power",
+          "unit": "unitless",
+          "computationRef": "statistics/bls_power",
+          "isDeterministic": false
+        },
+        "threshold": {
+          "value": 0,
+          "unit": "unitless",
+          "thresholdSemantics": "gt",
+          "preregistered": true
+        },
+        "direction": "greater",
+        "statisticalPlan": {
+          "primaryMetric": "bls_power",
+          "nullHypothesis": "effect <= 0",
+          "alternativeHypothesis": "effect > 0",
+          "alpha": 0.0125,
+          "effectDirection": "greater",
+          "confidenceIntervalMethod": "normal_approximation",
+          "multipleTestingCorrection": "bonferroni",
+          "missingDataPolicy": "listwise_deletion",
+          "outlierPolicy": "none",
+          "stoppingRule": "fixed_n"
+        },
+        "powerPlan": {
+          "targetPower": 0.8,
+          "minimumDetectableEffect": 0.2,
+          "sampleSize": 120,
+          "powerMethod": "normal_approximation",
+          "alphaAssumed": 0.0125
+        },
+        "multipleTestingPlan": {
+          "correction": "bonferroni",
+          "familySize": 8,
+          "adjustedAlpha": 0.0125,
+          "preregistered": true
+        },
+        "seedPolicy": {
+          "fixed": true,
+          "seedValue": 42,
+          "allowCherryPick": false
+        },
+        "deviationPolicy": {
+          "criticalCategories": ["alpha_rewrite", "metric_swap", "stopping_violation", "late_exclusion"],
+          "nonCriticalHandling": "degrade",
+          "requireExplicitLog": true
+        },
+        "freeze": {
+          "fecHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "actor": {
+            "actorKind": "deterministic_freezer",
+            "actorId": "gv-freezer"
+          },
+          "timestamp": "2026-01-01T00:00:00Z",
+          "environmentPolicy": "locked-digest",
+          "deviationPolicyHash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "frozenBy": "deterministic_freezer"
+        },
+        "integrityFlags": []
+      },
+      "datasetBindings": [],
+      "statistics": [],
+      "protocolDeviations": [],
+      "antiTheaterFindings": [],
+      "evidenceSufficiency": {
+        "status": "insufficient",
+        "powerStatus": "unknown"
+      },
+      "contradictionSet": [],
+      "integrityFlags": []
+    }
+  },
+  "expected": {
+    "verdict": "UNTESTED",
+    "decisiveRuleId": "R2_NO_VALID_DATASET_BINDING",
+    "reasonCodes": ["R2_NO_VALID_DATASET_BINDING"],
+    "untestedReason": "EVIDENCE_MISSING",
+    "tamperStatus": "clean"
+  }
+}

@@ -28,6 +28,7 @@ import type {
   ScopeCoverage,
   VerdictKind,
 } from '../fec/fec_contract.ts';
+import { compileFec } from '../fec/compiler.ts';
 import type { ClaimType, ConfoundingGateResult, EvidenceBasis } from '../confounding_gate/types.ts';
 import { confoundingOutcomeVerdictEffect } from '../confounding_gate/adjudicate.ts';
 
@@ -193,7 +194,7 @@ export interface VerdictKernelOutput {
  * 全程无 LLM；按 R0..R9 固定优先级，首条决定性规则胜出。
  */
 export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput {
-  const integrityFlags = [...input.integrityFlags];
+  const inputIntegrityFlags = [...input.integrityFlags];
   const emptyScope: ScopeReport = {
     isDegraded: false,
     coverage: 'none',
@@ -220,23 +221,25 @@ export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernel
       scopeReport: emptyScope,
       statisticalReport: emptyStat,
       evidenceSufficiency: input.evidenceSufficiency,
-      integrityFlags,
+      integrityFlags: inputIntegrityFlags,
       untestedReason: 'SCHEMA_INVALID',
     });
   }
 
-  // ── R1 FEC not compilable（fec===null 未提交·或缺 measurableImplication/metric/threshold/stat plan·GV-03）──
-  if (input.fec === null || !isFrozenAndCompilable(input.fec)) {
+  // ── R1 FEC not compilable（fec===null 未提交·或 compileFec HARD_FAIL·GV-03）──
+  const compiledFec = input.fec === null ? null : compileFec({ fec: input.fec });
+  if (compiledFec === null || !compiledFec.ok) {
     return makeOutput('UNTESTED', ['R1_FEC_NOT_COMPILABLE'], 'R1_FEC_NOT_COMPILABLE', {
       scopeReport: emptyScope,
       statisticalReport: emptyStat,
       evidenceSufficiency: input.evidenceSufficiency,
-      integrityFlags,
+      integrityFlags: inputIntegrityFlags,
       untestedReason: 'FEC_NOT_READY',
     });
   }
 
-  const fec = input.fec;
+  const fec = compiledFec.fec;
+  const integrityFlags = mergeIntegrityFlags(inputIntegrityFlags, compiledFec.plan.integrityFlags);
 
   // ── R2 no valid dataset binding ──
   if (!hasValidDatasetBinding(input)) {
@@ -345,8 +348,17 @@ export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernel
       r7Pass,
     );
     if (causalEffect.verdictEffect === 'degrade_to_degraded_scope') {
+      // R-causal 降级是 scope 降级的一种（可证伪的因果 scope 窄于观测关联 scope）：附 confounding rationale
+      // 作 scopeSlipText，使 recordVerdict（要求 DEGRADED_SCOPE 非空 scopeSlipText）可持久化——
+      // R-causal 路径此前只经 kernel 外 decideVerdictWithConfounding 单测，未端到端接到 recordVerdict/seal。
+      // rationale 由 adjudicateConfounding→generateRationale 确定性产出（CG-6 纯模板·非空·非 LLM）。
+      const causalScopeReport: ScopeReport = {
+        ...scopeReport,
+        isDegraded: true,
+        scopeSlipText: input.confoundingGateResult.rationale,
+      };
       return makeOutput('DEGRADED_SCOPE', causalEffect.reasonCodes, 'R_CAUSAL_CONFOUNDING_FAIL', {
-        scopeReport,
+        scopeReport: causalScopeReport,
         statisticalReport,
         evidenceSufficiency: input.evidenceSufficiency,
         integrityFlags,
@@ -522,19 +534,22 @@ function makeOutput(
   };
 }
 
-/** is_frozen_and_compilable（§7.3 line 822）：FEC 关键 VC 字段非空（GV-03 缺 metric/threshold/measurableImplication）。 */
-function isFrozenAndCompilable(fec: FecContractV2): boolean {
-  return (
-    fec.measurableImplication.trim().length > 0 &&
-    fec.metric.metricKey.trim().length > 0 &&
-    Number.isFinite(fec.threshold.value) &&
-    fec.statisticalPlan.primaryMetric.trim().length > 0
-  );
-}
-
 /** any_valid_dataset_binding（§7.3 line 827）：任一 binding sourceAnchor.resolved=true。 */
 function hasValidDatasetBinding(input: VerdictKernelInput): boolean {
   return input.datasetBindings.some((b) => b.sourceAnchor.resolved);
+}
+
+function mergeIntegrityFlags(
+  inputFlags: readonly string[],
+  compiledFlags: readonly string[],
+): string[] {
+  const merged = [...inputFlags];
+  for (const flag of compiledFlags) {
+    if (!merged.includes(flag)) {
+      merged.push(flag);
+    }
+  }
+  return merged;
 }
 
 /** scope_drift_codes（§7.3 line 847）：R4 额外 reasonCode（GV-06 DATASET_DRIFT_WARN）。 */

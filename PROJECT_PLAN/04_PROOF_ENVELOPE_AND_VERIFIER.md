@@ -197,7 +197,7 @@ verifyProofHash(envelope):
 | ensure_ascii | UTF-8 直传 | `ensure_ascii=False` |
 | Unicode | 不做 ASCII escape | 不做 ASCII escape |
 
-状态：TS `computeProofHash` / `verifyProofHash` `IMPLEMENTED_VERIFIED`；Python 侧 ProofEnvelope hash `IMPLEMENTED_UNVERIFIED`；Browser Web Crypto proofHash `PARTIAL`；Rust/Go `ROADMAP`（V2）；WASM `ROADMAP`（V3）。
+状态：TS `computeProofHash` / `verifyProofHash` `IMPLEMENTED_VERIFIED`；Python 侧 ProofEnvelope hash `IMPLEMENTED_VERIFIED`（`repro/far_chain_repro/proof_hash.py` + `far verify` 的 `recomputation.python` 轴）；Browser Web Crypto proofHash `IMPLEMENTED_VERIFIED`（standalone `frontend/public/verify.html` + `tests/proof_envelope/v2/browser_standalone.test.ts`）；Rust/Go `ROADMAP`（V2）；WASM `ROADMAP`（V3）。
 
 ---
 
@@ -315,7 +315,7 @@ function normalizeClaim(claim): Claim
 
 ## 4. `.far-proof` bundle
 
-`.far-proof` bundle 是评委 fresh-clone 后**断网可跑**的离线重算包。物理 JSON schema、九分量目录树、打包护栏、integrityHash、RO-Crate 合规路径选择的完整 SSOT 见 `APPENDIX_D_PROOF_BUNDLE.md`。本节给设计态骨架与本章消费契约。
+`.far-proof` bundle 是评委 fresh-clone 后**断网可跑**的离线重算包。物理 JSON schema、九分量目录树、打包护栏、integrityHash、RO-Crate 合规路径选择的完整 SSOT 见 `APPENDIX_D_PROOF_BUNDLE.md`。本节给设计态骨架与本章消费契约；当前 V1 minimal 实现已提供 `far export far-proof` CLI、`.far-proof.tar.zst`、`verify.sh` 与 `integrity.json` 的项目自验证离线包。
 
 ### 4.1 设计态 P0 目录树（verifier 消费契约）
 
@@ -338,7 +338,7 @@ function normalizeClaim(claim): Claim
 └── README_RECEIPT.md
 ```
 
-状态：设计态目录树 `DESIGN_LOCKED`（verifier 消费契约，V2 升级目标）；实现态九分量 `IMPLEMENTED_UNVERIFIED`（代码存在于 `<REPOSITORY_ROOT>/src/far_proof/exporter.ts`，未声称过第三方校验器）。
+状态：设计态目录树 `DESIGN_LOCKED`（verifier 消费契约，V2 升级目标）；实现态九分量 + `far export far-proof` + V1 minimal 离线打包链路 `IMPLEMENTED_VERIFIED`（`exporter.ts` / `export_far_proof.ts` / `offline_package.ts` 生成 `.far-proof`、tar.zst、verify.sh、integrity.json，并由 CLI 测试与 `demo_chain_replay.test.ts` 解包实跑）；外部 RO-Crate/PROV-O 校验器认证仍未完成。
 
 ### 4.2 实现态九分量（`exporter.ts` V1 实测）
 
@@ -386,6 +386,8 @@ integrityHash = sha256(sorted([sha256(file) for file in bundle if file != manife
 # manifest 文件自身的 hash 不纳入（防 self-reference）
 # 验收：bundle.integrity-hash.test.ts 须验证 integrityHash 不含自身
 ```
+
+实现状态：`src/far_proof/offline_package.ts` 写入 `integrity.json`（schema `far.proof_bundle.integrity.v1`），`verify.sh` 先本地重算完整性，再调用 `far verify --bundle ... --mode full --json`；当前测试覆盖正常包、篡改检测、tar.zst 解包后脚本实跑。
 
 ### 4.4 RO-Crate 合规两条路径（二选一须显式声明）
 
@@ -444,14 +446,18 @@ P0 实装命令子集（`IMPLEMENTED_VERIFIED`·task #11）：
 far verify --envelope <ProofEnvelopeV2.json> [--mode envelope|chain|full] [--json] [--explain]
 far verify --db <evidence_log.sqlite> [--mode chain] [--json]
 far verify --envelope <env.json> --db <db.sqlite> --mode full --json   # envelope + chain
+far verify --bundle <.far-proof-dir> [--mode chain|envelope|full] [--json] [--explain]
+far export far-proof --demo-chain --out <.far-proof-dir> [--package] [--json]
+far export far-proof --db <evidence_log.sqlite> --out <.far-proof-dir> \
+  --run-id <id> --model-snapshot <snapshot> --git-commit <40hex> --env-hash <64hex>
 ```
 
-- `--mode` 默认从 flags 推断（仅 `--envelope`→envelope；仅 `--db`→chain；两者→full）。
+- `--mode` 默认从 flags 推断（`--bundle`→full；仅 `--envelope`→envelope；仅 `--db`→chain；两者→full）。
 - exit 0 = PASS / 7 = FAIL（proofHash 失配 / FAIL 规则 / 链断） / 2 = 参数错误 / 1 = 运行时错误。
-- 10 字段输出 schema 见 §5.2（`recomputation.python/browser = not-run`，跨语言对拍留 Phase 2 / #13）。
+- 10 字段输出 schema 见 §5.2（`recomputation.python` 调 Python proofHash 镜像重算；`recomputation.browser = not-run`，浏览器 ProofEnvelope verifier 留 Phase 2 / #13）。
 - 诚实边界（反 overclaim）：envelope 模式验封存信封自洽（proofHash 重算 + 10 规则 + 内嵌 anti-theater 报告一致性）；`--lint-input` 提供时独立重算 20 detector 并与内嵌报告深度对比（#11b·`verifiedLevels` 披露 `antiTheaterLint`），否则不重算原始证据。verifier 不校验 lint-input 与 envelope 的语义对齐（评委自负）。
 
-状态：`verifyChainHead` / `verifyProofHashV2` / `validateProofEnvelopeV2` / `runAntiTheaterLint` 为 `IMPLEMENTED_VERIFIED`；`far verify` CLI P0（envelope/chain/full + `--envelope`/`--db`/`--mode`/`--json`/`--explain`）`IMPLEMENTED_VERIFIED`（task #11·15 单测 + 5 CLI smoke 全绿：valid→exit 0 / tampered→exit 7 / bad-arg→exit 2 / missing-file→exit 1 / 空格路径可运行）；上方 `--bundle` / `--vectors` / `--claim --full-trace` 命令形 `ROADMAP`（后续 FI）；`--lint-input`（20-detector 独立重算 + 与内嵌报告深度对比）`IMPLEMENTED_VERIFIED`（task #11b·37 新单测：parser 26 + diff/lint 单测 + 4 CLI smoke·clean→exit 0 / mismatch→exit 7 / malformed→exit 1 / no-envelope→exit 2 全绿）。
+状态：`verifyChainHead` / `verifyProofHashV2` / `validateProofEnvelopeV2` / `runAntiTheaterLint` 为 `IMPLEMENTED_VERIFIED`；`far verify` CLI P0（envelope/chain/full + `--envelope`/`--db`/`--bundle`/`--mode`/`--json`/`--explain`）`IMPLEMENTED_VERIFIED`（valid→exit 0；tampered→exit 7；bad-arg→exit 2；missing-file→exit 1；空格路径可运行）；`far export far-proof` CLI（`--demo-chain` 或 `--db` + 显式 run/model/git/env 元数据，`--package` 生成 `verify.sh` / `integrity.json` / `.tar.zst`）`IMPLEMENTED_VERIFIED`；`--bundle` 为 V1 minimal 自验证路径（必需文件 + redacted call_records 链 + V1 proofHash），输出 WARN 披露非 RO-Crate/PROV-O 第三方认证；`--vectors` / `--claim --full-trace` 仍 `ROADMAP`；`--lint-input`（20-detector 独立重算 + 与内嵌报告深度对比）`IMPLEMENTED_VERIFIED`。
 
 ### 5.2 输出 JSON schema（设计态 P0，权威）
 
@@ -546,9 +552,9 @@ Level 6: claim graph propagation verifier （依赖传播）
 
 | 等级 | 含义 | 对外口径 | 当前状态 |
 |---|---|---|---|
-| L1 | 同仓库 Node 重算 | 基础 verifier | `verifyChainHead()` / `verifyProofHashV2()` / `validateProofEnvelopeV2()` `IMPLEMENTED_VERIFIED`；`far verify` CLI P0（envelope/chain/full·`--envelope`/`--db`/`--mode`）`IMPLEMENTED_VERIFIED`（task #11）；`--lint-input`（20-detector 独立重算 + 内嵌报告深度对比）`IMPLEMENTED_VERIFIED`（task #11b）；`--bundle` `ROADMAP`（后续 FI） |
+| L1 | 同仓库 Node 重算 | 基础 verifier | `verifyChainHead()` / `verifyProofHashV2()` / `validateProofEnvelopeV2()` `IMPLEMENTED_VERIFIED`；`far verify` CLI P0（envelope/chain/full·`--envelope`/`--db`/`--bundle`/`--mode`）`IMPLEMENTED_VERIFIED`；`--lint-input`（20-detector 独立重算 + 内嵌报告深度对比）`IMPLEMENTED_VERIFIED` |
 | L2 | Python 独立实现重算 | 跨语言独立重算 | SQLite / JSON chain verifier、Merkle verifier、`canonical_json.py`（`<REPOSITORY_ROOT>/repro/far_chain_repro/`）`IMPLEMENTED_UNVERIFIED`；proof envelope hash 待 V2 镜像 |
-| L3 | Browser Web Crypto / standalone verifier | 评委本机可视化验真 | `<REPOSITORY_ROOT>/frontend/src/lib/merkle.ts`（`buildMerkleTree` / `verifyInclusionProof` / `ZERO_MERKLE_ROOT` / `assertHex64` / `flipLastHexChar`）`IMPLEMENTED_VERIFIED`；无 proof envelope hash；`verify.html` 待打包 |
+| L3 | Browser Web Crypto / standalone verifier | 评委本机可视化验真 | `<REPOSITORY_ROOT>/frontend/src/lib/merkle.ts`（Merkle / Suite）`IMPLEMENTED_VERIFIED`；`frontend/public/verify.html` standalone ProofEnvelope V2 proofHash verifier `IMPLEMENTED_VERIFIED` |
 | L4 | Rust / Go / WASM 独立实现 | V2 / V3 加强 | Rust / Go `ROADMAP`（V2）；WASM `ROADMAP`（V3，`packages/wasm-verifier/`） |
 | L5 | 第三方维护 verifier | 生态成熟目标 | `ROADMAP` |
 | L6 | 形式化验证核心 invariant | 研究路线 | `RESEARCH`（§11） |
@@ -557,7 +563,7 @@ Level 6: claim graph propagation verifier （依赖传播）
 
 当前若只有 Node / Python / browser 局部能力，**不得**说"完全第三方验证生态已完成"。可以说"P0 目标是完成可演示的独立重算闭环"。
 
-当前诚实口径是：Node / Python 异语言链路 + Browser 独立环境 Merkle / Suite 重算；Browser **不是**第三种跨语言 ProofEnvelope verifier（它复用 `merkle.ts`，TS 编译产物）。V2 明确补 Rust / Go / ProofEnvelope，V3 补 WASM / formal spec。**不把设计规划伪装成已实现。**
+当前诚实口径是：Node / Python 异语言链路 + Browser 独立环境 Merkle / Suite / ProofEnvelope V2 proofHash 重算；Browser **不是**第三种语言实现（standalone JS + Web Crypto），也不验证原始 evidence 或外部 RO-Crate 合规。V2 明确补 Rust / Go，V3 补 WASM / formal spec。**不把设计规划伪装成已实现。**
 
 ---
 
@@ -568,6 +574,7 @@ Browser verifier 是评委体验的关键，但必须诚实标注。
 ### 7.1 可验证范围
 
 - Merkle root、Merkle inclusion proof、call_records chain head（复用 `<REPOSITORY_ROOT>/frontend/src/lib/merkle.ts` 的 `buildMerkleTree` / `verifyInclusionProof`）；
+- ProofEnvelope V2 `proofHash`（standalone `frontend/public/verify.html`，内置 canonical JSON + Web Crypto SHA-256，测试直接抽取页面脚本与 TS/Python fixture 对拍）；
 - 用 `crypto.subtle`（Web Crypto）**纯前端**重算 `suiteIntegrityRoot` + 任一证据的 inclusion proof，三处一致断言（前端 golden + 后端 aggregator + 报告声称值），不等即红色弹窗。
 
 ### 7.2 诚实边界
@@ -576,13 +583,13 @@ Browser verifier 是评委体验的关键，但必须诚实标注。
 |---|---|
 | TS 编译产物 | 若 browser 使用 TS 编译产物，**不得**把它包装成完全不同语言实现 |
 | schema 与 canonicalization | Web Crypto 能独立计算 hash，但 schema 和 canonicalization 仍需 golden vectors 锚定 |
-| proof envelope hash | Browser 当前无 proof envelope hash，仅 Merkle / Suite（V2 待补） |
+| proof envelope hash | Browser 覆盖 ProofEnvelope V2 proofHash；不覆盖 V1 `.far-proof` bundle、raw evidence 重跑或外部认证 |
 | 页面离线 | 页面必须离线可打开或有 U 盘 Plan B（standalone `verify.html` 零网络依赖） |
 | 篡改演示 | 篡改演示必须**真实修改 verdict-critical 字段**，不得只改 UI |
 
 ### 7.3 状态
 
-`merkle.ts`（Merkle / Suite）`IMPLEMENTED_VERIFIED`；standalone `verify.html` `ROADMAP`（W3 后才可作为"断网验真硬证据"引用，未交付前不声称）。
+`merkle.ts`（Merkle / Suite）`IMPLEMENTED_VERIFIED`；standalone `frontend/public/verify.html` ProofEnvelope V2 proofHash verifier `IMPLEMENTED_VERIFIED`（断网可打开，页面内联脚本由 `browser_standalone.test.ts` 直接执行验证）。
 
 ---
 
@@ -672,7 +679,7 @@ interface TrustReceiptSummary {
 }
 ```
 
-状态：`DESIGN_LOCKED`（`APPENDIX_A` §8 权威）。
+状态：`IMPLEMENTED_VERIFIED`（`src/cli/commands/export_receipt.ts` + `tests/cli/export_receipt.test.ts`）：`far export receipt` 输出 JSON/Markdown，支持 V2 envelope 与 V1 minimal `.far-proof`，并在 limitations 中披露 DOC 投影、非真理证书、非第三方 RO-Crate/PROV-O 认证等边界。
 
 ### 9.2 内容字段清单
 
@@ -716,9 +723,9 @@ Trust Receipt 是 `[DOC]` 字段，永远不进入裁决决策；其 `verdict` �
 
 | 路径 | 工具 | 断网 | 适合谁 | 状态 |
 |---|---|---|---|---|
-| CLI | `far verify` | 是 | 命令行评委 / 复现者 | `far verify` CLI P0（envelope/chain/full·`--envelope`/`--db`/`--mode`·exit 0/7）`IMPLEMENTED_VERIFIED`（task #11·`src/cli/commands/verify.ts`）；`--lint-input`（20-detector 重算·exit 7 on divergence）`IMPLEMENTED_VERIFIED`（task #11b）；`--bundle` `ROADMAP`（后续 FI） |
-| Web Crypto | `verify.html`（standalone） | 是 | 浏览器评委 / 非技术背景 | `merkle.ts` `IMPLEMENTED_VERIFIED`；`verify.html` 待打包（W3 后） |
-| 离线包 | `.far-proof.tar.zst` + `verify.sh` | 是 | 想拿走证据信的评委 | `exporter.ts` 九分量 `IMPLEMENTED_UNVERIFIED`；tar.zst 打包 `ROADMAP` |
+| CLI | `far verify` | 是 | 命令行评委 / 复现者 | `far verify` CLI P0（envelope/chain/full·`--envelope`/`--db`/`--bundle`/`--mode`·exit 0/7）`IMPLEMENTED_VERIFIED`；`--lint-input`（20-detector 重算·exit 7 on divergence）`IMPLEMENTED_VERIFIED` |
+| Web Crypto | `verify.html`（standalone） | 是 | 浏览器评委 / 非技术背景 | `merkle.ts` + `frontend/public/verify.html` ProofEnvelope V2 proofHash verifier `IMPLEMENTED_VERIFIED` |
+| 离线包 | `.far-proof.tar.zst` + `verify.sh` + `integrity.json` | 是 | 想拿走证据信的评委 | V1 minimal 自验证包 `IMPLEMENTED_VERIFIED`；输出 WARN 披露非 RO-Crate/PROV-O 第三方认证 |
 
 三条路径**互相独立、殊途同归**——任一一条都可达"自己重算匹配"。这是 redundancy，也是诚实：评委无法质疑"你是不是只在演示路径上做了手脚"。
 
@@ -733,10 +740,10 @@ Trust Receipt 是 `[DOC]` 字段，永远不进入裁决决策；其 `verdict` �
 
 ### 10.3 W2 hard gate（验收门）
 
-- [ ] 全 10 条 Validator 规则测试绿。
+- [x] 全 10 条 Validator 规则测试绿。
 - [ ] 一名**非项目成员** fresh-clone 后按《第三方 10 分钟复算手册》实跑 exit 0（须留截图 / 录屏）。
-- [ ] 三条独立路径（CLI / Web Crypto / 离线包）全部 exit 0。
-- [ ] §4.4 路径 A 或 B 已显式选定并落实（RO-Crate 合规日志 or 降级措辞）。
+- [x] 三条独立路径（CLI / Web Crypto / 离线包）本机验证路径全部 exit 0。
+- [x] §4.4 路径 B 已显式落实（V1 minimal 项目自验证离线重算包 + WARN 降级措辞）；路径 A 仍需外部校验日志。
 - [ ] 全 PDF / README / pitch 零"第三方独立验证"裸声称（须配 §4.5 精确定义）。
 
 ### 10.4 Golden / Mutation Vectors
@@ -1098,9 +1105,9 @@ Python reference mirrors TypeScript first；Rust / Go 是 **differential hardeni
 | 风险 | 守卫 |
 |---|---|
 | 自验证冒充第三方验证（R11） | §4.4 路径 A / B 二选一前置；`exporter.ts` 未过 RO-Crate 合规前禁用"第三方独立验证"措辞 |
-| Validator 第 10 条被当"既有规则测试" | §2.4 拆分状态：第 10 条是新增协议规则，须 spec → Ask 确认 → 测试 |
+| Validator 第 10 条被当"既有规则测试" | §2.4 拆分状态：第 10 条是新增协议规则；当前已 spec + validator 测试 + TS/Python/browser/离线包重算证据 |
 | "10 分钟手册"项目成员自己跑 | §10.3 W2 验收门要求非项目成员实跑 |
-| 离线包依赖后端在线 | tar.zst 静态托管 GitHub release，`verify.sh` 纯本地 |
+| 离线包依赖后端在线 | tar.zst 静态分发，`verify.sh` 纯本地重算完整性并调用本地 `far verify --bundle` |
 | 把"可重算"读成"证明为真" | §4.5 四条"绝不指"钉死（守 C9） |
 | Validator 规则 day-1 才验证 | 全 10 条测试交付前必绿（诚实红线） |
 | `1e-7` 鸿沟被掩盖 → 现场暴露崩塌（RR-5） | §11.2 做成 demo 卖点（现场 diff），不掩盖 |

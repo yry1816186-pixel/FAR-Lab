@@ -18,6 +18,7 @@ import { assemblePaper } from '../../src/agent_loop/paper_assembler.ts';
 import { extractFinishReasonForOfflineReplay } from '../../src/agent_loop/run_stage.ts';
 import { verifyChainHead } from '../../src/evidence_log/verifier.ts';
 import { fecAppendClaim } from '../../src/fec/index.ts';
+import { bridgeLegacyEvidencesToStatistics, makeLegacyCompatFec } from '../../src/falsifiability/index.ts';
 import { getSubtree } from '../../src/api/internal/graph_subtree.ts';
 import type { LoopState, ResearchPaperOutput } from '../../src/agent_loop/types.ts';
 import type { SourceAnchor } from '../../src/evidence_log/types.ts';
@@ -359,8 +360,17 @@ export async function runE2Seed(): Promise<DemoSeedResult> {
     falsificationSpec: E2_FALSIFICATION_SPEC,
     thresholdSpec: E2_THRESHOLD_SPEC,
     evidences: e2Evidences,
+    statistics: bridgeLegacyEvidencesToStatistics(e2Evidences, E2_FALSIFICATION_SPEC, E2_THRESHOLD_SPEC),
     parentVerdictId: null,
     nodeKind: 'hypothesis',
+    fecV2: {
+      contract: makeLegacyCompatFec({
+        claimId: 'E2-CARBON-FLUX',
+        falsificationSpec: E2_FALSIFICATION_SPEC,
+        thresholdSpec: E2_THRESHOLD_SPEC,
+        frozenAt: E2_SOURCE_ANCHOR.isoTimestamp,
+      }),
+    },
   });
 
   const graphSubtree = getSubtree(db, verdictResult.verdictNode.verdictId);

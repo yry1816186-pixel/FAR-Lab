@@ -2,13 +2,13 @@
  * verdict_stage —— runAgentLoop 收敛后的第 7 阶段（裁决接通）。
  *
  * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §8（runAgentLoop 终止后裁决）+
- *            07_falsifiability_verdict.md（makeVerdict + recordVerdict）+
+ *            07_falsifiability_verdict.md（V2 verdict kernel + recordVerdict）+
  *            41_可证伪证据链_FEC.md（hypothesis→VerdictNode 协议）.
  *
  * 职责：六阶段收敛后，把 stage3 hypothesis + stage4 evidence 喂入 falsifiability 引擎，
  *   产出真实 VerdictNode（落 verdict_nodes·关联 evidence_log 行），填入 LoopState.verdictNode。
  *
- *   镜像 fec/orchestrator.fecAppendClaim 的「evidence_log + makeVerdict + recordVerdict」模式，
+ *   镜像 fec/orchestrator.fecAppendClaim 的「evidence_log + V2 verdict kernel + recordVerdict」模式，
  *   但不新建 call_record——裁决是「衍生计算」（复用既有证据链·不增链长·verifiedCount 仍===6）。
  *   hypothesis 落一条 evidence_log 行（关联 stage3 的 call_record seq），既满足 verdict_nodes
  *   的 evidence_id FK，也满足 recordVerdict 对 CONFIRMED 的 assertConfirmedEvidenceExists 守卫
@@ -27,7 +27,7 @@
  *
  * 诚实降级：缺 hypothesis/evidence artifact 或空证据链 → 返回 null。
  *   null 仅用于文档化的「无裁决前提」，不掩盖错误；主循环已收敛，verdictNode=null 不改变
- *   terminationReason（feedback_converged）。计算路径上的真实异常（makeVerdict/recordVerdict 抛错）
+ *   terminationReason（feedback_converged）。计算路径上的真实异常（verdict kernel/recordVerdict 抛错）
  *   会自然向上传播→被 fsm_runner 外层 try 捕获→reason='error'（符合预期·非静默吞错）。
  *
  * 零容忍合规：无 any / ts-ignore / 双重断言 / 空 catch / 桩返回。判别联合用 kind narrow·禁 as 强转。
@@ -38,13 +38,18 @@ import type { Database } from 'better-sqlite3';
 import { appendEvidenceLog, getChainHead } from '../evidence_log/index.ts';
 import { hashCanonicalJson } from '../evidence_log/hasher.ts';
 import type { SourceAnchor } from '../evidence_log/index.ts';
-import { makeVerdict, recordVerdict } from '../falsifiability/index.ts';
+import { decideFiveValueVerdict, recordVerdict } from '../falsifiability/index.ts';
 import type {
   EvidenceRecord as FalsEvidenceRecord,
   FalsificationSpec,
   ThresholdSpec,
   VerdictNode,
 } from '../falsifiability/index.ts';
+import {
+  buildLegacyVerdictKernelInput,
+  makeLegacyCompatFec,
+  verdictResultFromKernelOutput,
+} from '../falsifiability/legacy_kernel_adapter.ts';
 import { toFalsificationSpecAndThreshold } from './stages/stage3_hypothesis.ts';
 import type {
   EvidencePayload,
@@ -94,11 +99,11 @@ export function convertEvidenceRecords(
 }
 
 /**
- * 从 FalsificationSpec 构造 makeVerdict 所需的 ThresholdSpec。
+ * 从 FalsificationSpec 构造 verdict kernel adapter 所需的 ThresholdSpec。
  *
  * toFalsificationSpecAndThreshold 对 range 返回 thresholdSpec（含 lower/upper），
  * 对 gt/lt 返回 undefined（阈值在 spec.falsificationThreshold）。本函数统一为
- * makeVerdict 所需的非空 ThresholdSpec。
+ * legacy adapter 所需的非空 ThresholdSpec。
  *
  * @throws Error range 语义但缺 lower/upper
  */
@@ -170,7 +175,7 @@ function resolveHypothesisCallRecordSeq(db: Database): number | null {
  *   2. toFalsificationSpecAndThreshold（复用 stage3 单一转换权威）+ resolveThresholdSpec。
  *   3. convertEvidenceRecords（过滤 neutral·投票映射）。
  *   4. 解析 hypothesis call_record seq；空链 → 返回 null。
- *   5. 事务内：appendEvidenceLog（hypothesis 证据行）→ makeVerdict → recordVerdict。
+ *   5. 事务内：appendEvidenceLog（hypothesis 证据行）→ V2 verdict kernel → recordVerdict。
  *
  * @returns VerdictNode（落库读回）；缺前提时返回 null（文档化降级·非错误）
  */
@@ -231,12 +236,22 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
       sourceAnchor,
     });
 
-    const decision = makeVerdict({
-      claim: hypothesis.claim,
-      evidences: convertedEvidences,
+    const fec = makeLegacyCompatFec({
+      claimId: args.runId,
       falsificationSpec: spec,
       thresholdSpec,
+      frozenAt: isoTimestamp,
     });
+    const kernelOutput = decideFiveValueVerdict(
+      buildLegacyVerdictKernelInput({
+        claim: hypothesis.claim,
+        evidences: convertedEvidences,
+        falsificationSpec: spec,
+        thresholdSpec,
+        fec,
+      }),
+    );
+    const decision = verdictResultFromKernelOutput(kernelOutput);
 
     return recordVerdict(args.db, {
       evidenceId: evidenceLogEntry.evidenceId,

@@ -1,7 +1,7 @@
 // scripts/replay_demo_chain.ts
 // 职责：构造 demo 证明链（C-ASTRO-0001 REFUTED）→ 导出完整 .far-proof 包 →
 //       调 recompute_proof_hashes 字节级重算 → 打印摘要。
-// 权威 SSOT：FINAL_PACKAGE/15_OPEN_SCIENCE_EXPORT.md §1（七分量导出）+
+// 权威 SSOT：FINAL_PACKAGE/15_OPEN_SCIENCE_EXPORT.md §1（九分量导出）+
 //            09_PROOF_CARRYING_RESEARCH_OBJECT.md（ProofEnvelope 密封）+
 //            17_FINAL_AUDIT.md（拱心石可交付）。
 //
@@ -21,6 +21,7 @@ import { existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { exportFarProof } from '../src/far_proof/index.ts';
+import { packageFarProofBundle } from '../src/far_proof/offline_package.ts';
 import {
   buildDemoChain,
   computeEnvHash,
@@ -64,7 +65,7 @@ function main(): void {
       providerProfile: 'offline_replay',
     });
 
-    // 4. 导出七分量 .far-proof 包。
+    // 4. 导出九分量 .far-proof 包。
     const exportResult = exportFarProof({
       db,
       outputDir,
@@ -89,6 +90,12 @@ function main(): void {
       );
     }
 
+    const packageResult = packageFarProofBundle({
+      bundleDir: outputDir,
+      archivePath: `${outputDir}.tar.zst`,
+      generatedAt: DEMO_EXPORTED_AT,
+    });
+
     // 6. 摘要（人类可读·诚实声明 demo 边界）。
     console.log('=========================================');
     console.log('  FAR-Chain Demo Proof Chain — REPLAY OK');
@@ -105,6 +112,8 @@ function main(): void {
     console.log(`  files written: ${exportResult.filesWritten.length}`);
     console.log(`  chain verify:  OK (${chainVerify.verifiedCount} records)`);
     console.log(`  proofHash recompute: OK (${recompute.checked} envelope(s) byte-equal)`);
+    console.log(`  offline package: ${packageResult.archivePath}`);
+    console.log(`  integrity root:  ${packageResult.integrityHash.slice(0, 16)}…`);
     console.log('');
     console.log('  Honesty: CONFIRMED is never machine-sealed (ASK-9).');
     console.log('           TESS sandbox is type-layer only (F4 · V2 physical isolation).');

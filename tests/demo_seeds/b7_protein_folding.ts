@@ -20,6 +20,7 @@ import { assemblePaper } from '../../src/agent_loop/paper_assembler.ts';
 import { extractFinishReasonForOfflineReplay } from '../../src/agent_loop/run_stage.ts';
 import { verifyChainHead } from '../../src/evidence_log/verifier.ts';
 import { fecAppendClaim } from '../../src/fec/index.ts';
+import { bridgeLegacyEvidencesToStatistics, makeLegacyCompatFec } from '../../src/falsifiability/index.ts';
 import { getSubtree } from '../../src/api/internal/graph_subtree.ts';
 import type { LoopState, ResearchPaperOutput } from '../../src/agent_loop/types.ts';
 import type { SourceAnchor } from '../../src/evidence_log/types.ts';
@@ -347,8 +348,17 @@ export async function runB7Seed(): Promise<DemoSeedResult> {
     falsificationSpec: B7_FALSIFICATION_SPEC,
     thresholdSpec: B7_THRESHOLD_SPEC,
     evidences: b7Evidences,
+    statistics: bridgeLegacyEvidencesToStatistics(b7Evidences, B7_FALSIFICATION_SPEC, B7_THRESHOLD_SPEC),
     parentVerdictId: null,
     nodeKind: 'hypothesis',
+    fecV2: {
+      contract: makeLegacyCompatFec({
+        claimId: 'B7-PROTEIN-FOLDING',
+        falsificationSpec: B7_FALSIFICATION_SPEC,
+        thresholdSpec: B7_THRESHOLD_SPEC,
+        frozenAt: B7_SOURCE_ANCHOR.isoTimestamp,
+      }),
+    },
   });
 
   const graphSubtree = getSubtree(db, verdictResult.verdictNode.verdictId);

@@ -44,6 +44,16 @@ export function sealProofEnvelope(
     );
   }
 
+  // ASK-9 硬门（P1-5 加固）：机器密封禁产 CONFIRMED（需人类背书）。
+  // 主门 machineSealableConclusion 在 caller 层降级 CONFIRMED→INCONCLUSIVE；本门是 sealer 层兜底——
+  // caller 绕过 machineSealableConclusion 直接传 CONFIRMED（含 all-pass checks 的 AT-02 盲区）时 fail-closed。
+  // sealer.ts:27 既有契约「不签发 CONFIRMED 终审」由此为真（原仅 caller 层 + AT-02 hasWarnOrFail 守，all-pass 有盲区）。
+  if (input.conclusion === 'CONFIRMED') {
+    throw new Error(
+      'proof_envelope: cannot seal CONFIRMED (ASK-9: machine sealing forbidden for CONFIRMED, requires human endorsement)',
+    );
+  }
+
   const hasWarnOrFail = checks.some(
     (c) => c.outcome === 'WARN' || c.outcome === 'FAIL',
   );

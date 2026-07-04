@@ -17,6 +17,7 @@ import { assemblePaper } from '../../src/agent_loop/paper_assembler.ts';
 import { extractFinishReasonForOfflineReplay } from '../../src/agent_loop/run_stage.ts';
 import { verifyChainHead } from '../../src/evidence_log/verifier.ts';
 import { fecAppendClaim } from '../../src/fec/index.ts';
+import { bridgeLegacyEvidencesToStatistics, makeLegacyCompatFec } from '../../src/falsifiability/index.ts';
 import { getSubtree } from '../../src/api/internal/graph_subtree.ts';
 import type { LoopState, ResearchPaperOutput } from '../../src/agent_loop/types.ts';
 import type { SourceAnchor } from '../../src/evidence_log/types.ts';
@@ -321,8 +322,17 @@ export async function runA16Seed(): Promise<DemoSeedResult> {
     falsificationSpec: A16_FALSIFICATION_SPEC,
     thresholdSpec: A16_THRESHOLD_SPEC,
     evidences: a16Evidences,
+    statistics: bridgeLegacyEvidencesToStatistics(a16Evidences, A16_FALSIFICATION_SPEC, A16_THRESHOLD_SPEC),
     parentVerdictId: null,
     nodeKind: 'hypothesis',
+    fecV2: {
+      contract: makeLegacyCompatFec({
+        claimId: 'A16-PULSAR-P0',
+        falsificationSpec: A16_FALSIFICATION_SPEC,
+        thresholdSpec: A16_THRESHOLD_SPEC,
+        frozenAt: A16_SOURCE_ANCHOR.isoTimestamp,
+      }),
+    },
   });
 
   const graphSubtree = getSubtree(db, verdictResult.verdictNode.verdictId);

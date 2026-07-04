@@ -413,6 +413,21 @@ test('sealProofEnvelope: FAIL-generating input + CONFIRMED → throws (anti-thea
   );
 });
 
+test('sealProofEnvelope: all-pass checks + CONFIRMED → throws (ASK-9 硬门·AT-02 盲区闭合)', () => {
+  const db = openDb();
+  // AT-02 盲区：checks 全 PASS（无 WARN/FAIL）→ hasAntiTheaterViolation=false → AT-02 不触发。
+  // 旧版 sealer 会成功密封 CONFIRMED（违反 ASK-9「机器密封禁产 CONFIRMED」）。
+  // ASK-9 硬门（P1-5）在 AT-02 之后兜底：conclusion===CONFIRMED 直接 throw，与 hasWarnOrFail 无关。
+  assert.throws(
+    () =>
+      sealProofEnvelope(
+        db,
+        makeBaseInput({ conclusion: 'CONFIRMED', checks: [] }),
+      ),
+    /ASK-9|cannot seal CONFIRMED|CONFIRMED/i,
+  );
+});
+
 test('anti-theater trigger aborts direct SQL INSERT with FAIL + CONFIRMED (physical backstop · AT-02)', () => {
   const db = openDb();
   // 绕过 sealer，直接 INSERT 一个 checks 含 "FAIL"（无 "WARN"）+ CONFIRMED 的 envelope。

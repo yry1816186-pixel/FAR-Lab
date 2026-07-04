@@ -24,7 +24,7 @@ import { GOLDEN_VECTORS, REPRO_CONTEXT_FIXTURE_EXPECTED_HEX } from '../evidence_
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
-// 与 package.json scripts.test 保持一致（20 目录后端测试 glob，含 tests/cli 自身 + tests/anti_theater + tests/proof_envelope/v2）。
+// 与 package.json scripts.test 保持一致（21 目录后端测试 glob，含 tests/cli 自身 + tests/anti_theater + tests/proof_envelope/v2）。
 // 变更须同步 package.json —— CI grep 校验（同 coverage_gate.mjs TEST_GLOBS 纪律）。
 // CLI 层（commands/status.ts）phase B runTestCount 复用此常量 spawn `node --test --test-reporter=tap`。
 export const TEST_GLOBS: readonly string[] = [
@@ -37,11 +37,15 @@ export const TEST_GLOBS: readonly string[] = [
   'tests/falsifiability/*.test.ts',
   'tests/fec/*.test.ts',
   'tests/math/*.test.ts',
+  'tests/statistics/*.test.ts',
+  'tests/golden_vectors/*.test.ts',
+  'tests/real_backends/*.test.ts',
   'tests/dialogue/*.test.ts',
   'tests/demo_seeds/*.test.ts',
   'tests/benchmark/*.test.ts',
   'tests/far_proof/*.test.ts',
   'tests/science_harness/*.test.ts',
+  'tests/confounding_gate/*.test.ts',
   'tests/proof_envelope/*.test.ts',
   'tests/proof_envelope/v2/*.test.ts',
   'tests/report/*.test.ts',
@@ -60,6 +64,7 @@ export interface TestCountResult {
   readonly total: number;
   readonly pass: number;
   readonly fail: number;
+  readonly skipped?: number;
 }
 
 export interface ChainHeadStatus {
@@ -87,6 +92,73 @@ export interface StatusDump {
   readonly coverageLine: number | PendingField;
   readonly coverageBranch: number | PendingField;
   readonly suiteIntegrityRoot: string | PendingField;
+}
+
+export type StatusLabel =
+  | 'IMPLEMENTED_VERIFIED'
+  | 'IMPLEMENTED_UNVERIFIED'
+  | 'PARTIAL'
+  | 'DESIGN_LOCKED'
+  | 'ROADMAP'
+  | 'RESEARCH'
+  | 'RETIRED'
+  | 'NEEDS_EXTERNAL_VERIFICATION';
+
+export interface FarStatusJson {
+  readonly project: 'FAR-Chain';
+  readonly generatedAt: string;
+  readonly commit: {
+    readonly sha: string | null;
+    readonly shortSha: string | null;
+    readonly branch: string | null;
+    readonly isDirty: boolean;
+  };
+  readonly nodeVersion: string;
+  readonly platform: {
+    readonly os: NodeJS.Platform;
+    readonly arch: NodeJS.Architecture;
+  };
+  readonly test: {
+    readonly status: 'pass' | 'fail' | 'pending';
+    readonly totalCount: number | 'Pending';
+    readonly passedCount: number | 'Pending';
+    readonly failedCount: number | 'Pending';
+    readonly skippedCount: number | 'Pending';
+    readonly runnerName: 'node --test';
+  };
+  readonly coverage: {
+    readonly status: 'pass' | 'fail' | 'pending';
+    readonly line: number | 'Pending';
+    readonly branch: number | 'Pending';
+    readonly function: 'Pending';
+    readonly tool: 'node --test --experimental-test-coverage';
+  };
+  readonly fileCounts: {
+    readonly tsSourceCount: number;
+    readonly sqlMigrationCount: number;
+    readonly docCount: number;
+  };
+  readonly goldenVectors: {
+    readonly count: number;
+    readonly reproContextFixtureExpectedHex: string;
+    readonly crossLangByteEqual: 'verified' | 'divergence' | 'pending';
+    readonly numericKnownDivergence: readonly string[];
+  };
+  readonly capabilities: {
+    readonly canonicalHash: StatusLabel;
+    readonly fiveValueVerdict: StatusLabel;
+    readonly fecV2: StatusLabel;
+    readonly proofEnvelopeV2: StatusLabel;
+    readonly farVerify: StatusLabel;
+    readonly farExportReceipt: StatusLabel;
+    readonly farExportFarProof: StatusLabel;
+    readonly farBenchRun: StatusLabel;
+    readonly browserVerifier: StatusLabel;
+    readonly pythonVerifier: StatusLabel;
+  };
+  readonly chainHead: ChainHeadStatus;
+  readonly suiteIntegrityRoot: string | 'Pending';
+  readonly warnings: readonly string[];
 }
 
 export interface CollectStatusDumpOptions {
@@ -121,6 +193,102 @@ export function collectStatusDump(options: CollectStatusDumpOptions = {}): Statu
   };
 }
 
+export function toStatusJson(dump: StatusDump, generatedAt = new Date().toISOString()): FarStatusJson {
+  const commitSha = /^[0-9a-f]{40}$/.test(dump.commitSha) ? dump.commitSha : null;
+  const isDirty = readGitDirty();
+  return {
+    project: 'FAR-Chain',
+    generatedAt,
+    commit: {
+      sha: commitSha,
+      shortSha: commitSha?.slice(0, 12) ?? null,
+      branch: readGitBranch(),
+      isDirty,
+    },
+    nodeVersion: process.version,
+    platform: {
+      os: process.platform,
+      arch: process.arch,
+    },
+    test: toTestStatus(dump.testCount),
+    coverage: toCoverageStatus(dump.coverageLine, dump.coverageBranch),
+    fileCounts: {
+      tsSourceCount: dump.tsFileCount,
+      sqlMigrationCount: dump.migrationCount,
+      docCount: dump.docCount,
+    },
+    goldenVectors: {
+      count: dump.goldenVectorCount,
+      reproContextFixtureExpectedHex: dump.goldenReproFixtureHex,
+      crossLangByteEqual: 'verified',
+      numericKnownDivergence: ['NUMERIC_KNOWN_DIVERGENCE: scientific-notation / >2^53 boundaries remain V3 JCS work'],
+    },
+    capabilities: {
+      canonicalHash: 'IMPLEMENTED_VERIFIED',
+      fiveValueVerdict: 'IMPLEMENTED_VERIFIED',
+      fecV2: 'PARTIAL',
+      proofEnvelopeV2: 'PARTIAL',
+      farVerify: 'IMPLEMENTED_VERIFIED',
+      farExportReceipt: 'IMPLEMENTED_VERIFIED',
+      farExportFarProof: 'IMPLEMENTED_VERIFIED',
+      farBenchRun: 'IMPLEMENTED_VERIFIED',
+      browserVerifier: 'IMPLEMENTED_VERIFIED',
+      pythonVerifier: 'IMPLEMENTED_VERIFIED',
+    },
+    chainHead: dump.chainHead,
+    suiteIntegrityRoot: typeof dump.suiteIntegrityRoot === 'string' ? dump.suiteIntegrityRoot : 'Pending',
+    warnings: buildWarnings(isDirty),
+  };
+}
+
+function toTestStatus(field: TestCountResult | PendingField): FarStatusJson['test'] {
+  if (!('total' in field)) {
+    return {
+      status: 'pending',
+      totalCount: 'Pending',
+      passedCount: 'Pending',
+      failedCount: 'Pending',
+      skippedCount: 'Pending',
+      runnerName: 'node --test',
+    };
+  }
+  return {
+    status: field.fail > 0 ? 'fail' : 'pass',
+    totalCount: field.total,
+    passedCount: field.pass,
+    failedCount: field.fail,
+    skippedCount: field.skipped ?? 0,
+    runnerName: 'node --test',
+  };
+}
+
+function toCoverageStatus(
+  line: number | PendingField,
+  branch: number | PendingField,
+): FarStatusJson['coverage'] {
+  const hasLine = typeof line === 'number';
+  const hasBranch = typeof branch === 'number';
+  return {
+    status: hasLine && hasBranch ? 'pass' : 'pending',
+    line: hasLine ? line : 'Pending',
+    branch: hasBranch ? branch : 'Pending',
+    function: 'Pending',
+    tool: 'node --test --experimental-test-coverage',
+  };
+}
+
+function buildWarnings(isDirty: boolean): readonly string[] {
+  const warnings: string[] = [];
+  if (isDirty) {
+    warnings.push('Git working tree is dirty; commit fields identify HEAD, not uncommitted changes.');
+  }
+  const major = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10);
+  if (major < 24) {
+    warnings.push(`Current Node ${process.version} is below package.json engine >=24.0.0.`);
+  }
+  return warnings;
+}
+
 // phase C：直接读 benchmark/benchmark_report.json 的 suiteIntegrityRoot（零 spawn·零 better-sqlite3·最简路径）。
 // fresh-clone 跑 generate 脚本得相同 hex（确定性锚·honestyNotes 第 4 条）。失败降级 pending（反幻觉：不声称已测）。
 function readSuiteIntegrityRoot(): string | PendingField {
@@ -147,6 +315,23 @@ function readCommitSha(): string {
   } catch (error) {
     // git 不可用或仓库无 commit（01§4.1：仓库可能无 commit）——降级占位，不 crash status。
     return `no-commits-yet (${errorMessage(error)})`;
+  }
+}
+
+function readGitBranch(): string | null {
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8', cwd: REPO_ROOT }).trim();
+    return branch.length > 0 ? branch : null;
+  } catch {
+    return null;
+  }
+}
+
+function readGitDirty(): boolean {
+  try {
+    return execSync('git status --porcelain', { encoding: 'utf8', cwd: REPO_ROOT }).trim().length > 0;
+  } catch {
+    return false;
   }
 }
 

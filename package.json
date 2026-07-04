@@ -11,7 +11,7 @@
     "far": "src/cli/far.ts"
   },
   "scripts": {
-    "test": "node --test tests/api/*.test.ts tests/audit/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts tests/evidence_log/*.test.ts tests/evidence_graph/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts tests/math/*.test.ts tests/dialogue/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts tests/far_proof/*.test.ts tests/science_harness/*.test.ts tests/confounding_gate/*.test.ts tests/proof_envelope/*.test.ts tests/proof_envelope/v2/*.test.ts tests/report/*.test.ts tests/trace/*.test.ts tests/cli/*.test.ts tests/anti_theater/*.test.ts",
+    "test": "node --test tests/api/*.test.ts tests/audit/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts tests/evidence_log/*.test.ts tests/evidence_graph/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts tests/math/*.test.ts tests/statistics/*.test.ts tests/golden_vectors/*.test.ts tests/real_backends/*.test.ts tests/dialogue/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts tests/far_proof/*.test.ts tests/science_harness/*.test.ts tests/science_harness/adapters/*.test.ts tests/confounding_gate/*.test.ts tests/proof_envelope/*.test.ts tests/proof_envelope/v2/*.test.ts tests/report/*.test.ts tests/trace/*.test.ts tests/cli/*.test.ts tests/anti_theater/*.test.ts",
     "test:agent_loop": "node --test tests/agent_loop/*.test.ts",
     "test:api": "node --test tests/api/*.test.ts",
     "test:audit": "node --test tests/audit/*.test.ts",
@@ -24,7 +24,10 @@
     "test:fec": "node --test tests/fec/*.test.ts",
     "test:llm_gateway": "node --test tests/llm_gateway/*.test.ts",
     "test:math": "node --test tests/math/*.test.ts",
-    "test:py": "node scripts/run_py_tests.mjs",
+    "test:statistics": "node --test tests/statistics/*.test.ts",
+    "test:golden_vectors": "node --test tests/golden_vectors/*.test.ts",
+    "test:real_backends": "node --test tests/real_backends/*.test.ts",
+    "test:py": "node scripts/ensure_py_deps.mjs && node scripts/run_py_tests.mjs",
     "test:schema": "node --test tests/schema/*.test.ts",
     "test:science_harness": "node --test tests/science_harness/*.test.ts",
     "test:trace": "node --test tests/trace/*.test.ts",

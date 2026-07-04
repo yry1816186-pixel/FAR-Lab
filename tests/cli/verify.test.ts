@@ -4,7 +4,7 @@
 // 不 spawn 子进程（镜像 status.test.ts）。runVerify 端到端用临时文件验 exit code（0/7 契约）+ 空格路径（R5）。
 
 import { strict as assert } from 'node:assert';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -22,6 +22,8 @@ import {
 import { runAntiTheaterLint } from '../../src/anti_theater/lint.ts';
 import { parseAntiTheaterLintInput } from '../../src/anti_theater/schemas.ts';
 import type { AntiTheaterReport } from '../../src/anti_theater/types.ts';
+import { buildDemoChain, computeEnvHash, DEMO_GIT_COMMIT_SHA, DEMO_RUN_ID } from '../../src/far_proof/demo_chain.ts';
+import { exportFarProof } from '../../src/far_proof/index.ts';
 import { sealProofEnvelopeV2 } from '../../src/proof_envelope/v2/sealer.ts';
 import type { ProofEnvelopeV2 } from '../../src/proof_envelope/v2/types.ts';
 import { getGoldenVector, makeCleanBaseInput } from '../fixtures/anti_theater/golden_vectors.ts';
@@ -35,6 +37,7 @@ import {
   verifyAntiTheaterLint,
   verifyChainHeadResult,
   verifyEnvelopeV2,
+  verifyEnvelopeV2WithPython,
   type VerifyDump,
   type VerifyMode,
 } from '../../src/cli/commands/verify.ts';
@@ -87,6 +90,28 @@ test('verifyEnvelopeV2: 篡改 statisticalResults 不改 proofHash → tamperSta
   assert.equal(dump.status, 'FAIL');
   assert.equal(dump.recomputation.node, 'fail');
   assert.ok(dump.verifiedLevels.includes('proofEnvelope'));
+});
+
+test('verifyEnvelopeV2WithPython: 合法 envelope → Python proofHash 重算 pass', () => {
+  const result = verifyEnvelopeV2WithPython(sealedEnvelope());
+  assert.equal(result.axis, 'pass', `Python verifier 须 pass，errors=${result.errors.join(' | ')}, warnings=${result.warnings.join(' | ')}`);
+});
+
+test('verifyEnvelopeV2WithPython: 篡改 VC 字段不改 proofHash → Python proofHash 重算 fail', () => {
+  const env = sealedEnvelope();
+  const first = env.statisticalResults[0];
+  assert.ok(first, 'fixture statisticalResults 须非空');
+  const tampered: ProofEnvelopeV2 = {
+    ...env,
+    statisticalResults: [{ ...first, pValue: 0.999 }],
+  };
+
+  const result = verifyEnvelopeV2WithPython(tampered);
+  assert.equal(result.axis, 'fail');
+  assert.ok(
+    result.errors.some((e) => /mismatch/.test(e)),
+    `Python verifier fail 须含 mismatch，实际: ${result.errors.join(' | ')}`,
+  );
 });
 
 test('verifyEnvelopeV2: RULE-PE-007 违规（hasFail=true + verdict CONFIRMED）→ RULE-PE-007 FAIL（007 隔离·010 PASS）', () => {
@@ -322,6 +347,7 @@ test('verifyChainHeadResult: current_hash 篡改 → ok:false + brokenAtSeq', ()
 // ===== runVerify 端到端（exit code 契约 + 空格路径 R5）=====
 
 function runVerifyCapture(options: {
+  readonly bundlePath?: string;
   readonly envelopePath?: string;
   readonly dbPath?: string;
   readonly lintInputPath?: string;
@@ -351,6 +377,7 @@ function runVerifyCapture(options: {
 }
 
 function runVerifyJson(options: {
+  readonly bundlePath?: string;
   readonly envelopePath?: string;
   readonly dbPath?: string;
   readonly lintInputPath?: string;
@@ -360,6 +387,30 @@ function runVerifyJson(options: {
   // exit 0/7 恒产 JSON（collectVerifyDump → stdout）；单层 as：runVerify 输出即 VerifyDump（测试上下文）。
   const dump = JSON.parse(stdout) as VerifyDump;
   return { code, dump, stderr };
+}
+
+function writeDemoBundle(parentDir: string): string {
+  const db = new Database(':memory:');
+  try {
+    buildDemoChain(db);
+    const outputDir = join(parentDir, '.far-proof');
+    exportFarProof({
+      db,
+      outputDir,
+      runId: DEMO_RUN_ID,
+      modelSnapshot: 'offline-replay-fixture@v1',
+      gitCommitSha: DEMO_GIT_COMMIT_SHA,
+      envHash: computeEnvHash({
+        schemaVersion: 6,
+        nodeVersion: process.version,
+        providerProfile: 'offline_replay',
+      }),
+      exportedAt: '2026-06-28T00:00:00.000Z',
+    });
+    return outputDir;
+  } finally {
+    db.close();
+  }
 }
 
 test('runVerify: 合法 envelope 文件（含空格路径）→ exit 0 + status PASS', () => {
@@ -373,9 +424,9 @@ test('runVerify: 合法 envelope 文件（含空格路径）→ exit 0 + status 
     assert.equal(dump.status, 'PASS');
     assert.equal(dump.tamperStatus, 'clean');
     assert.equal(dump.recomputation.node, 'pass');
-    assert.equal(dump.recomputation.python, 'not-run');
+    assert.equal(dump.recomputation.python, 'pass');
     assert.equal(dump.recomputation.browser, 'not-run');
-    assert.deepEqual(dump.verifiedLevels, ['proofEnvelope']);
+    assert.deepEqual(dump.verifiedLevels, ['proofEnvelope', 'pythonProofHash']);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -397,6 +448,73 @@ test('runVerify: 篡改 envelope 文件 → exit 7 + status FAIL + tamperStatus 
     assert.equal(dump.tamperStatus, 'tampered');
     assert.equal(dump.recomputation.node, 'fail');
     assert.ok(dump.errors.length > 0, 'FAIL 须有 errors');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runVerify --bundle: V1 .far-proof 包（含空格路径）→ exit 0 + status WARN（诚实边界）', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far verify bundle-'));
+  try {
+    const bundlePath = writeDemoBundle(dir);
+    const { code, dump } = runVerifyJson({ bundlePath, mode: 'full' });
+    assert.equal(code, 0, 'WARN → exit 0');
+    assert.equal(dump.status, 'WARN');
+    assert.equal(dump.tamperStatus, 'clean');
+    assert.equal(dump.recomputation.node, 'pass');
+    assert.equal(dump.recomputation.python, 'not-run', 'V1 bundle proofHash 是 TS 自洽；V2 envelope 才跑 Python 轴');
+    assert.ok(dump.verifiedLevels.includes('bundle'));
+    assert.ok(dump.verifiedLevels.includes('chain'));
+    assert.ok(dump.verifiedLevels.includes('proofEnvelope'));
+    assert.match(dump.ledgerRoot ?? '', /^[0-9a-f]{64}$/);
+    assert.ok(
+      dump.warnings.some((w) => /V1 minimal/.test(w)),
+      `须披露 V1 minimal 诚实边界: ${dump.warnings.join(' | ')}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runVerify --bundle: 篡改 proof_envelopes.jsonl → exit 7 + PROOF_HASH_MISMATCH', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-verify-bundle-tamper-'));
+  try {
+    const bundlePath = writeDemoBundle(dir);
+    const envelopePath = join(bundlePath, 'proof_envelopes.jsonl');
+    const row = JSON.parse(readFileSync(envelopePath, 'utf8').trim()) as Record<string, unknown>;
+    row.proof_hash = 'f'.repeat(64);
+    writeFileSync(envelopePath, `${JSON.stringify(row)}\n`, 'utf8');
+
+    const { code, dump } = runVerifyJson({ bundlePath, mode: 'full' });
+    assert.equal(code, 7, 'FAIL → exit 7');
+    assert.equal(dump.status, 'FAIL');
+    assert.equal(dump.tamperStatus, 'tampered');
+    assert.ok(
+      dump.errors.some((e) => e.includes('PROOF_HASH_MISMATCH')),
+      `须含 PROOF_HASH_MISMATCH: ${dump.errors.join(' | ')}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runVerify --bundle: 篡改 sealed_by → exit 7（deterministic sealer 守卫）', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-verify-bundle-sealed-by-'));
+  try {
+    const bundlePath = writeDemoBundle(dir);
+    const envelopePath = join(bundlePath, 'proof_envelopes.jsonl');
+    const row = JSON.parse(readFileSync(envelopePath, 'utf8').trim()) as Record<string, unknown>;
+    row.sealed_by = 'llm_judge';
+    writeFileSync(envelopePath, `${JSON.stringify(row)}\n`, 'utf8');
+
+    const { code, dump } = runVerifyJson({ bundlePath, mode: 'full' });
+    assert.equal(code, 7, 'FAIL → exit 7');
+    assert.equal(dump.status, 'FAIL');
+    assert.equal(dump.tamperStatus, 'tampered');
+    assert.ok(
+      dump.errors.some((e) => e.includes('sealed_by must be deterministic_sealer')),
+      `须含 sealed_by 守卫错误: ${dump.errors.join(' | ')}`,
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

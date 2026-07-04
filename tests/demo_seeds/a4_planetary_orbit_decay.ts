@@ -17,6 +17,7 @@ import { assemblePaper } from '../../src/agent_loop/paper_assembler.ts';
 import { extractFinishReasonForOfflineReplay } from '../../src/agent_loop/run_stage.ts';
 import { verifyChainHead } from '../../src/evidence_log/verifier.ts';
 import { fecAppendClaim } from '../../src/fec/index.ts';
+import { bridgeLegacyEvidencesToStatistics, makeLegacyCompatFec } from '../../src/falsifiability/index.ts';
 import { getSubtree } from '../../src/api/internal/graph_subtree.ts';
 import type { LoopState } from '../../src/agent_loop/types.ts';
 import type { ResearchPaperOutput } from '../../src/agent_loop/types.ts';
@@ -364,8 +365,17 @@ export async function runA4Seed(): Promise<DemoSeedResult> {
     falsificationSpec: A4_FALSIFICATION_SPEC,
     thresholdSpec: A4_THRESHOLD_SPEC,
     evidences: a4Evidences,
+    statistics: bridgeLegacyEvidencesToStatistics(a4Evidences, A4_FALSIFICATION_SPEC, A4_THRESHOLD_SPEC),
     parentVerdictId: null,
     nodeKind: 'hypothesis',
+    fecV2: {
+      contract: makeLegacyCompatFec({
+        claimId: 'A4-PLANETARY-ORBIT-DECAY',
+        falsificationSpec: A4_FALSIFICATION_SPEC,
+        thresholdSpec: A4_THRESHOLD_SPEC,
+        frozenAt: A4_SOURCE_ANCHOR.isoTimestamp,
+      }),
+    },
   });
 
   // ④ 查 GraphSubtree

@@ -6,7 +6,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
-import { collectStatusDump, TEST_GLOBS } from '../../src/cli/status_dump.ts';
+import { collectStatusDump, TEST_GLOBS, toStatusJson } from '../../src/cli/status_dump.ts';
 
 test('collectStatusDump: phase A cheap 字段从仓库实测', () => {
   const dump = collectStatusDump();
@@ -125,6 +125,48 @@ test('collectStatusDump: coverage 可注入实测（CLI 层 spawn 后传入）',
   }
 });
 
+test('toStatusJson: 输出 PROJECT_PLAN/01 风格机器可读 SSOT，不把 pending 伪装成数字', () => {
+  const json = toStatusJson(collectStatusDump(), '2026-07-02T00:00:00.000Z');
+
+  assert.strictEqual(json.project, 'FAR-Chain');
+  assert.strictEqual(json.generatedAt, '2026-07-02T00:00:00.000Z');
+  assert.strictEqual(json.nodeVersion, process.version);
+  assert.strictEqual(json.platform.os, process.platform);
+  assert.strictEqual(json.test.status, 'pending');
+  assert.strictEqual(json.test.totalCount, 'Pending');
+  assert.strictEqual(json.coverage.status, 'pending');
+  assert.strictEqual(json.coverage.line, 'Pending');
+  assert.strictEqual(json.fileCounts.tsSourceCount > 50, true);
+  assert.strictEqual(
+    json.goldenVectors.reproContextFixtureExpectedHex,
+    '96a6372bdf040677c26700456856ec365b478f9e3bf8824e4b2b9d123af4abf4',
+  );
+  assert.strictEqual(json.capabilities.canonicalHash, 'IMPLEMENTED_VERIFIED');
+  assert.strictEqual(json.capabilities.farVerify, 'IMPLEMENTED_VERIFIED');
+  assert.strictEqual(json.capabilities.farExportReceipt, 'IMPLEMENTED_VERIFIED');
+  assert.strictEqual(json.capabilities.farExportFarProof, 'IMPLEMENTED_VERIFIED');
+  assert.strictEqual(json.capabilities.farBenchRun, 'IMPLEMENTED_VERIFIED');
+  assert.strictEqual(json.capabilities.browserVerifier, 'IMPLEMENTED_VERIFIED');
+  assert.strictEqual(json.capabilities.pythonVerifier, 'IMPLEMENTED_VERIFIED');
+});
+
+test('toStatusJson: 注入 testCount/coverage 后输出实测 pass 字段', () => {
+  const dump = collectStatusDump({
+    testCount: { total: 10, pass: 9, fail: 1, skipped: 2 },
+    coverage: { line: 91.23, branch: 80.5 },
+  });
+  const json = toStatusJson(dump, '2026-07-02T00:00:00.000Z');
+
+  assert.strictEqual(json.test.status, 'fail');
+  assert.strictEqual(json.test.totalCount, 10);
+  assert.strictEqual(json.test.passedCount, 9);
+  assert.strictEqual(json.test.failedCount, 1);
+  assert.strictEqual(json.test.skippedCount, 2);
+  assert.strictEqual(json.coverage.status, 'pass');
+  assert.strictEqual(json.coverage.line, 91.23);
+  assert.strictEqual(json.coverage.branch, 80.5);
+});
+
 test('TEST_GLOBS: 与 package.json test script 一致（含 tests/cli 自身 + tests/anti_theater + tests/proof_envelope/v2）', () => {
   assert.ok(TEST_GLOBS.length >= 20, `TEST_GLOBS 应 >= 20 项，实际: ${TEST_GLOBS.length}`);
   assert.ok(
@@ -135,5 +177,9 @@ test('TEST_GLOBS: 与 package.json test script 一致（含 tests/cli 自身 + t
   assert.ok(
     TEST_GLOBS.includes('tests/proof_envelope/v2/*.test.ts'),
     'TEST_GLOBS 须含 tests/proof_envelope/v2（RULE-PE-010 跨语言对拍 + V2 10-rule validator CI 注册）',
+  );
+  assert.ok(
+    TEST_GLOBS.includes('tests/confounding_gate/*.test.ts'),
+    'TEST_GLOBS 须含 tests/confounding_gate（与 package.json test script 一致）',
   );
 });

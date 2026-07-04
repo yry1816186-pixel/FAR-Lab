@@ -216,11 +216,12 @@ test('A16 脉冲星P0：完整 6-stage agent loop + FEC 编排 → 全部验证�
       'A16 sourceCard.sourceType should be dataset (ATNF catalog)',
     );
 
-    // verdict 应为 CONFIRMED（all evidence supports）
+    // verdict=CONFIRMED：a16Evidences 经 bridgeLegacyEvidencesToStatistics 显式桥接（statistics?）
+    // → 2 supports 显著 → R7。与生产反 theater 路径（fec_orchestrator.test.ts:328·不传 statistics?）隔离。
     assert.equal(
       result.verdictNode.verdict,
       'CONFIRMED',
-      'A16: verdict should be CONFIRMED (all evidence supports claim)',
+      'A16: verdict should be CONFIRMED (2 supporting evidences via explicit statistics bridge)',
     );
   } finally {
     result?.db.close();
@@ -243,13 +244,13 @@ test('E2 碳通量：完整 6-stage agent loop + FEC 编排 → 全部验证通�
       'E2 sourceCard.sourceType should be dataset (FLUXNET)',
     );
 
-    // GraphSubtree nodes[0] decision 应为 CONFIRMED
+    // GraphSubtree nodes[0] decision=CONFIRMED：e2Evidences 经 statistics? 显式桥接 → 2 supports → R7。
     const rootNode = result.graphSubtree.nodes[0];
     assert.ok(rootNode !== undefined, 'E2: graphSubtree should have at least root node');
     assert.equal(
       rootNode.decision,
       'CONFIRMED',
-      'E2: graphSubtree root node decision should be CONFIRMED',
+      'E2: graphSubtree root node decision should be CONFIRMED (2 supporting evidences)',
     );
   } finally {
     result?.db.close();
@@ -272,11 +273,12 @@ test('B7 蛋白质折叠：完整 6-stage agent loop + FEC 编排 → REFUTED', 
       'B7 sourceCard.sourceType should be dataset (CASP15 official assessment)',
     );
 
-    // verdict 应为 REFUTED（所有 metric 0.68–0.71 < 0.85 threshold → 全 refutes）
+    // verdict=REFUTED：b7Evidences 经 statistics? 显式桥接 → 2 refutes 显著 → R6 REFUTED。
+    // 与生产反 theater 路径隔离（registry.ts: B7→REFUTED）。
     assert.equal(
       result.verdictNode.verdict,
       'REFUTED',
-      'B7: verdict should be REFUTED (observed TM-score 0.68-0.71 below 0.85 threshold)',
+      'B7: verdict should be REFUTED (2 refuting evidences via explicit statistics bridge)',
     );
   } finally {
     result?.db.close();

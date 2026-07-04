@@ -10,7 +10,7 @@
 
 > ⛔ **ANY AI AGENT (Claude / GPT / Cursor / Copilot / other) — STOP BEFORE WRITING CODE.**
 > Read in order: [`AGENT_ENTRY_PROTOCOL.md`](AGENT_ENTRY_PROTOCOL.md) → [`PROJECT_PLAN/DEPTH_LEDGER.md`](PROJECT_PLAN/DEPTH_LEDGER.md) §A/§C → [`AGENT_ANTISKIM_TRIPWIRES.md`](AGENT_ANTISKIM_TRIPWIRES.md).
-> The depth-wiring gate `scripts/depth_gate.mjs` (run via `pnpm run depth-gate`) is a **CI required check** and currently FAILs by design — no deep feature (V2 verdict kernel / fallback chain / real statistics / FEC mandatory gate) is wired into a production caller yet. Re-running the already-green test suite is zero progress. Take `DEPTH_LEDGER.md` §A `next_action` and wire **one real dependency** (real SymPy / DashScope / venv / hash), with a RED→GREEN test on the real path, or STOP.
+> The depth-wiring gate `scripts/depth_gate.mjs` (run via `pnpm run depth-gate`) is a **CI required check**. Always run it before claiming progress, and use any failing check as the next real wiring task. Do not hand-fill `WIRED_GREEN` in `DEPTH_LEDGER.md`; CI evidence owns that status.
 
 ---
 

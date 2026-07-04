@@ -214,12 +214,12 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 | 任务 | 验收口径 | 状态 |
 |---|---|---|
-| `far verify`（fresh-clone 单命令验真） | 整条套件链 + 单 claim 全链重算 exit 0 | `IMPLEMENTED_UNVERIFIED` |
-| standalone `verify.html`（Web Crypto，断网可跑） | 拖入 JSON 重算 merkleRoot 匹配 | `PARTIAL`（`frontend` 已有 SuiteVerifier，须复核 standalone） |
-| ProofEnvelope Validator 9 规则 + 第 10 条（独立可重算性） | 全 10 条逐条测试用例绿（第 10 条是新增协议规则，走 Ask 阶层确认） | `DESIGN_LOCKED`（9 规则）/ `ROADMAP`（第 10 条） |
-| Python verifier 扩展到 ProofEnvelope | `repro/far_chain_repro/verify_chain.py` 重算 `proofHash` | `IMPLEMENTED_UNVERIFIED` |
-| `.far-proof` 离线 tar.zst demo bundle | `integrityHash` = 所有文件 sha256（不含自身），评委本地 `verify.sh` 一键重放 | `PARTIAL` |
-| RO-Crate 合规（路径 A）或降级措辞（路径 B）选定 | 路径 A 须通过至少一个独立开源 RO-Crate 校验器；路径 B 显式声明「项目自验证的离线重算包，导出格式 V1 minimal」 | `NEEDS_EXTERNAL_VERIFICATION`（路径 A）/ `DESIGN_LOCKED`（路径 B） |
+| `far verify`（fresh-clone 单命令验真） | 整条套件链 + 单 claim 全链重算 exit 0 | `IMPLEMENTED_VERIFIED`（envelope/chain/full + `--bundle` V1 minimal） |
+| standalone `verify.html`（Web Crypto，断网可跑） | 拖入 / 粘贴 ProofEnvelope V2 JSON，浏览器 Web Crypto 重算 `proofHash`；无外链、无 fetch/import；篡改 VC 字段 → FAIL | `IMPLEMENTED_VERIFIED`（`frontend/public/verify.html` + `browser_standalone.test.ts` 直接执行页面脚本） |
+| ProofEnvelope Validator 9 规则 + 第 10 条（独立可重算性） | 全 10 条逐条测试用例绿（第 10 条是新增协议规则，走 Ask 阶层确认） | `IMPLEMENTED_VERIFIED`（10-rule validator + RULE-PE-010 TS/Python/browser/离线包重算路径） |
+| Python verifier 扩展到 ProofEnvelope | `repro/far_chain_repro/proof_hash.py` 重算 `proofHash`，`far verify` 输出 `recomputation.python` | `IMPLEMENTED_VERIFIED` |
+| `.far-proof` 离线 tar.zst demo bundle | `integrityHash` = 所有文件 sha256（不含自身），评委本地 `verify.sh` 一键重放 | `IMPLEMENTED_VERIFIED`（`offline_package.ts` + tar.zst 解包脚本实跑） |
+| RO-Crate 合规（路径 A）或降级措辞（路径 B）选定 | 路径 A 须通过至少一个独立开源 RO-Crate 校验器；路径 B 显式声明「项目自验证的离线重算包，导出格式 V1 minimal」 | 路径 B `IMPLEMENTED_VERIFIED`；路径 A `NEEDS_EXTERNAL_VERIFICATION` |
 | 《10 分钟复算手册》 | 非项目成员 fresh-clone 实跑 exit 0 留证（截图/录屏） | `ROADMAP` |
 
 ### 4.3 DOD（W2 质量硬门）
@@ -235,7 +235,7 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 - Windows/离线 Plan B 已演练；
 - **非项目成员 fresh-clone exit 0**（这是特等 vs 一等的分水岭——质量门，与时间无关）。
 
-> 诚实护栏（涉及「第三方」声称最严）：绝不可把项目自验证包装成第三方验证；Validator 第 10 条须先 spec 再测走 Ask；手册明示无网络凭证也能 fresh-clone 重放（守 C16）。
+> 诚实护栏（涉及「第三方」声称最严）：绝不可把项目自验证包装成第三方验证；Validator 第 10 条已 spec + 测试验证，但仍必须按路径 B 降级措辞披露；手册明示无网络凭证也能 fresh-clone 重放（守 C16）。
 
 ---
 
@@ -316,9 +316,9 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 | 路径 | 命令 | 复用资产 | 状态 |
 |---|---|---|---|
-| ① Node TypeScript | `far verify --db <path>` | `verifyChainHead`（`<REPOSITORY_ROOT>/src/verifier`） | `PARTIAL` |
+| ① Node TypeScript | `far verify --db <path>` / `far verify --bundle <path>` | `verifyChainHead`（`<REPOSITORY_ROOT>/src/evidence_log/verifier.ts`）+ bundle verifier | `IMPLEMENTED_VERIFIED` |
 | ② Python | `python3 -m far_chain_repro.verify_chain` | `<REPOSITORY_ROOT>/repro/far_chain_repro/verify_chain.py` | `IMPLEMENTED_VERIFIED` |
-| ③ 浏览器 Web Crypto | 打开 `verify.html`，粘 `merkleRoot` + proof | `<REPOSITORY_ROOT>/frontend/src/lib/merkle.ts` | `PARTIAL` |
+| ③ 浏览器 Web Crypto | 打开 `verify.html`，粘 ProofEnvelope V2 JSON，重算 proofHash | `<REPOSITORY_ROOT>/frontend/public/verify.html` + `<REPOSITORY_ROOT>/frontend/src/lib/merkle.ts` | `IMPLEMENTED_VERIFIED`（ProofEnvelope V2 proofHash + Merkle/Suite；不验证 raw evidence） |
 
 #### 第 3 幕 · 灵魂时刻 ② · 翻转一字三路报红
 
@@ -332,8 +332,8 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 | 任务 | 验收口径 | 状态 |
 |---|---|---|
-| 准备 `Your Laptop Is The Verifier` 演示包（含 U 盘离线包） | 评委笔记本无 `DASHSCOPE_API_KEY` 也能跑通三路验真 | `PARTIAL` |
-| 准备 Trust Receipt 一页 | 自然语言解释是次要的，结构化 JSON 才是主口径 | `DESIGN_LOCKED` |
+| 准备 `Your Laptop Is The Verifier` 演示包（含 U 盘离线包） | 评委笔记本无 `DASHSCOPE_API_KEY` 也能跑通三路验真 | `PARTIAL`（核心离线包已 `IMPLEMENTED_VERIFIED`；仍缺非项目成员 fresh-clone 录屏与预编译环境包） |
+| 准备 Trust Receipt 一页 | 自然语言解释是次要的，结构化 JSON 才是主口径 | `IMPLEMENTED_VERIFIED`（`far export receipt` JSON/Markdown；V2 envelope + V1 `.far-proof`，篡改拒发） |
 | 准备风险边界页 | 与 `07_RISK_REGISTER_AND_DO_NOT_CLAIM.md` 一致 | `DESIGN_LOCKED` |
 | 准备 Q&A 防守稿 | 赛道回扣（生成可证伪的假设 vs 生成漂亮的假设） | `PARTIAL` |
 | FI-7 TimeMachine（必做满血） | scrub + fork + deterministic 续跑 + 三跑 byte-equal 录屏（仅 deterministic track，赛道诚实标注：续跑 byte-equal 仅 deterministic track 成立、真实 LLM 轨道不成立） | `ROADMAP` |
@@ -439,8 +439,8 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 1. **CROSS-CUT-003（migration 编号 SSOT 矛盾）**：`§8.0` 冻结 SSOT 止于 `0015`，而 `FINAL_PACKAGE/21` 路线图层引用 `0016-0025`。属 Ask 层裁决（改 Schema），本文件按工作假设编号标注，不裁决归属。状态：`NEEDS_EXTERNAL_VERIFICATION`（须主控复核）。
 2. **0010 双占（`integrity_events` vs `system_prompt_transparency`）**：待 Ask 裁决编号，裁决前两表 DDL 各自正确。状态：`NEEDS_EXTERNAL_VERIFICATION`。
 3. **`far status --json` 输出完整性**：CLI 骨架在 `<REPOSITORY_ROOT>/src/cli/`，但输出字段（测试数 / migration 数 / golden 向量数 / coverage）是否完整须复核。状态：`PARTIAL`。
-4. **standalone `verify.html` 断网可跑**：`frontend` 已有 SuiteVerifier，但是否封装为 standalone（拖入 JSON 重算 `merkleRoot`）须复核。状态：`PARTIAL`。
-5. **ProofEnvelope Validator 第 10 条规则**：新增协议规则（独立可重算性），须走 Ask 阶层确认。状态：`ROADMAP`。
+4. **standalone `verify.html` 断网可跑**：`frontend/public/verify.html` 已封装为零外链 standalone，拖入/粘贴 ProofEnvelope V2 JSON 后用 Web Crypto 重算 `proofHash`；raw evidence / RO-Crate 外部认证不在此路径内。状态：`IMPLEMENTED_VERIFIED`。
+5. **ProofEnvelope Validator 第 10 条规则**：新增协议规则（独立可重算性），已由 `validator.10-rules-coverage.test.ts`、TS/Python/browser proofHash 重算与离线包脚本路径覆盖。状态：`IMPLEMENTED_VERIFIED`。
 6. **C7 单点（modelId 进 hash）**：snapshot 切换触发整链重算，根因消除须改 `verifyChainHead` 白名单四字段（越 Ask 层红线），V3 提 Ask 重新评估。当前仅「事后可复现性兜底」，verdict 落 `DEGRADED_SCOPE`。状态：`RESEARCH`。
 7. **GPU 确定性本质未解**：参赛锁 Qwen 经百炼 API，无法控制百炼后端 GPU reduction；byte-equal 可能本质不可达，V3 UQ 降级是更可能终态。状态：`RESEARCH`。
 8. **数值域 byte-equal（`1e-7` 鸿沟等）**：归 `NUMERIC_KNOWN_DIVERGENCE` 诚实标 RED 待 V3 迁移，非任何方案可代办。状态：`PARTIAL`。

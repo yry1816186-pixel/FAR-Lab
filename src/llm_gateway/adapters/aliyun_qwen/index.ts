@@ -38,3 +38,11 @@ export {
   COMPETITION_PRIMARY_MODEL_ID,
   NO_QWEN_FAMILY_AVAILABLE_REASON,
 } from './fallback_config.ts';
+export {
+  createQwenAdapter,
+} from './qwen_adapter.ts';
+export type {
+  QwenAdapterConfig,
+  QwenChatCompletionCaller,
+  QwenChatCompletionRequest,
+} from './qwen_adapter.ts';
