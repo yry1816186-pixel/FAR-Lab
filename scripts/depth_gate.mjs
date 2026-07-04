@@ -9,35 +9,46 @@
 //   src/ 内零 AST CallExpression 生产 caller。本门把「深度功能是否真接到生产路径」
 //   从软规则（CLAUDE.md §1/§4）变成 CI exit 1。
 //
-// 关键不变式：本门在当前仓库状态（深度功能已建未接线）下必须 FAIL。
-// FAIL 不是 bug 是特性——它强制别的窗口 agent 做真实接线（P0-2/P0-4/STAT-1/P1-2/P1-4），
-// 而非重跑已绿套件找存在感。门随 backlog 推进逐项变 GREEN，从不放宽。
+// 关键不变式：本门在「深度功能已建未接线」态必须 FAIL；在「真接线」态 GREEN。
+//   FAIL 不是 bug 是特性——它强制别的窗口 agent 做真实接线（P0-2/P0-4/STAT-1/P1-2/P1-4），
+//   而非重跑已绿套件找存在感。GREEN 也不等于「深度完成」——见 inherent_limits。
 //
 // 权威依据：CLAUDE.md §1（PROGRESS = 真实依赖端到端接线） / §4（P0-P3 backlog） /
-//   §5 红线 RR（禁手填统计；LLM 不得终裁）。recon 实据（2026-07 Read/Grep 复验）：
-//   decideFiveValueVerdict 定义 src/falsifiability/verdict_kernel_v2.ts:195，src 内零生产 caller
-//   executeFallbackChain 定义 src/llm_gateway/fallback_chain/fallback_chain.ts:78，src 内零生产 caller
-//   compileFec src/fec/orchestrator.ts:93 调用但被 args.fecV2?（orchestrator.ts:59 可选）门控，
-//     demo_chain.ts:180 fecAppendClaim 实参不含 fecV2 字段（180-226 行）→ 生产永不触发
-//   evaluateStatistics verdict_kernel_v2.ts:450 定义，仅被 V2 内部（:264 :277）调用，V2 零生产 caller
-//   src/statistics/ 不存在；golden_vectors/cases/ 不存在；tests/real_backends/ 不存在
-//   tsconfig.json 未开 noUnusedLocals（strict:true 但无 unused 检查）→ 不能靠 tsc 抓 ghost-import
+//   §5 红线 RR（禁手填统计；LLM 不得终裁）。
 //
 // 抗博弈（红队修补并入，逐条对应逃生通道）：
 //   R1 块注释吞噬：自写状态机逐字符扫描，进入 /* */ / // / '...' / "..." / `...` 后 token 不计命中。
 //     不复用 zero_tolerance_scan.mjs 的 stripLineComment（其 :94 自承「多行块注释状态跟踪未实现」）。
 //   R2 ghost-import / 类型注解 / 字符串字面量：命中须是 CallExpression（符号后紧跟 '(' 或 '<'）。
-//   R3 假 caller 在死分支：保守的块内 dead-code 探测（if(false)/0&&/return/throw 之后不计）。
-//   R4 W1 字面 grep 绕过（fecV2: undefined）：fecV2 形参须无 OptionalToken（tsc 编译期强制）。
-//   R5 目录占位（4 个 return 0.03 的 .ts / 12 个 {} 的 .json）：内容校验——非占位函数 + GV schema 字段。
+//   R3 假 caller 在死分支：保守的块内 dead-code 探测（if(false)/while(false)/恒假比较/0&&/return/throw 之后不计）。
+//   R4 W1 字面 grep 绕过（fecV2: undefined / decoy fecV2 掩盖真可选字段）：遍历全部匹配，任一可选即 fail。
+//   R4' parens/反射绕过 caller 计数：(symbol)(...) / symbol.call/apply/bind(...) 也计为 CallExpression。
+//   R5 目录占位（4 个 return 0.03 的 .ts / 12 个 {} 的 .json / 箭头常量 / 字面量算术伪装）：
+//     内容校验——占位函数多形态检测 + realMathSignal（Math.* / 循环 / 库函数）+ GV schema 字段语义。
 //   R6 账本漂移：verifyLedger 与主检查用**同一份** tokenize+stripCode 读文件，禁双口径。
-//   R7 手填 WIRED_GREEN：status=WIRED_GREEN 须配 evidence: 行，agent 无写权限。
+//   R7 手填 WIRED_GREEN：status=WIRED_GREEN 须配 evidence: 行（base≠head + SHA/runID 格式），agent 无写权限。
+//   R8 账本指向幽灵测试：proof_test 路径必须 existsSync（防 ::missing_file 占位）。
+//   R9 账本 closed_by 编造 sha：git rev-parse --verify 校验（非 git 目录跳过）。
 //
-// 零依赖（仅 node:fs / node:path / node:url 内置）。CI 任意环境可跑。
+// inherent_limits（诚实声明，不可省）：
+//   静态门能证「符号被生产路径引用」「文件非占位」「账本不指幽灵」，但**不能**证：
+//     (a) 运行时真执行到该 caller（死分支探测是保守启发式，非完备控制流分析）；
+//     (b) caller 传的是真实数据而非预制常量（content-truth 需运行时探针）；
+//     (c) closed_by sha 真做了接线（sha 存在 ≠ sha 含接线 diff）；
+//     (d) RED→GREEN 双跑物证（须 depth-evidence bot 在 CI 实跑 base/head，本门只校验 evidence 行格式）。
+//   完整保证 = 本静态门 + depth-evidence bot（RED→GREEN 双跑）+ CODEOWNERS 护 DEPTH_LEDGER.md
+//     + write-restricted token（agent 无写 evidence 权限）。bot 未实现前，WIRED_GREEN 在本门可被
+//     「正确格式 + 真实 sha + 真实测试文件」骗过——故 §C 明确：bot 写回前只允许 WIRED_RED。
+//
+// 依赖：node:fs / node:path / node:url / node:child_process 内置 + typescript（devDependency，CI 已安装）。
+// 历史版本曾「零依赖」手写词法状态机（R1），但边界情况易出错且无独立测试；
+// 现改用 TypeScript Compiler API（scripts/lib/code_analysis.mjs），可靠性由官方解析器保障。
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tokenize, codeOnlySource } from './lib/code_analysis.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -60,7 +71,9 @@ function walkUpRepoRoot(startDir) {
   return __dirname;
 }
 
-const REPO_ROOT = walkUpRepoRoot(__dirname);
+// REPO_ROOT 支持环境变量覆盖（DEPTH_GATE_ROOT）：仅用于本门自身对抗测试（scripts/depth_gate.evade.test.mjs
+// 建桩仓验证每条红队规避都被捕获）。生产/CI 不设此变量 → 走 walkUpRepoRoot 真实定位。
+const REPO_ROOT = process.env.DEPTH_GATE_ROOT || walkUpRepoRoot(__dirname);
 
 function walk(relPath) {
   const abs = join(REPO_ROOT, relPath);
@@ -75,130 +88,66 @@ function walk(relPath) {
 const normalize = (p) => p.split(/[\\/]/).join('/');
 const readCode = (rel) => readFileSync(join(REPO_ROOT, rel), 'utf8');
 
-// ---------- R1+R2+R6: 状态机 tokenize ----------
-// 逐字符扫描，区分代码 / 块注释 / 行注释 / 字符串 / 模板字面量。
-// 返回 token 数组，每个 token = { text, kind: 'code'|'comment'|'string', line, col }。
+// ---------- R1+R2+R6: tokenize + codeOnlySource ----------
+// 实现已提取至 scripts/lib/code_analysis.mjs（基于 TypeScript Compiler API）。
+// 接口：tokenize(source) → [{ text, kind: 'code'|'comment'|'string', line, col }]
+//       codeOnlySource(source) → string（注释/字符串替换为等长空白，保留行号）
 // 「kind === 'code'」的 token 才参与符号命中判定。
-function tokenize(source) {
-  const tokens = [];
-  let i = 0;
-  let line = 1;
-  let col = 1;
-  let buf = '';
-  let bufStartLine = 1;
-  let bufStartCol = 1;
-  const flush = (kind) => {
-    if (buf.length > 0) {
-      tokens.push({ text: buf, kind, line: bufStartLine, col: bufStartCol });
-      buf = '';
-    }
-  };
-  while (i < source.length) {
-    const ch = source[i];
-    const next = source[i + 1];
-    // 块注释 /* */
-    if (ch === '/' && next === '*') {
-      flush('code');
-      bufStartLine = line; bufStartCol = col;
-      buf = '/*'; i += 2; col += 2;
-      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) {
-        if (source[i] === '\n') { line++; col = 1; } else col++;
-        buf += source[i]; i++;
-      }
-      if (i < source.length) { buf += '*/'; i += 2; col += 2; }
-      flush('comment');
-      continue;
-    }
-    // 行注释 //
-    if (ch === '/' && next === '/') {
-      flush('code');
-      bufStartLine = line; bufStartCol = col;
-      buf = '//';
-      i += 2; col += 2;
-      while (i < source.length && source[i] !== '\n') { buf += source[i]; i++; col++; }
-      flush('comment');
-      continue;
-    }
-    // 字符串 ' "
-    if (ch === "'" || ch === '"') {
-      flush('code');
-      const quote = ch;
-      bufStartLine = line; bufStartCol = col;
-      buf = ch; i++; col++;
-      while (i < source.length && source[i] !== quote) {
-        if (source[i] === '\\' && i + 1 < source.length) {
-          buf += source[i]; i++; col++;
-          if (source[i] === '\n') { line++; col = 1; } else col++;
-          buf += source[i]; i++;
-          continue;
-        }
-        if (source[i] === '\n') { line++; col = 1; } else col++;
-        buf += source[i]; i++;
-      }
-      if (i < source.length) { buf += source[i]; i++; col++; }
-      flush('string');
-      continue;
-    }
-    // 模板字面量 ` （不追踪 ${}，模板整体当 string，对符号命中已足够保守）
-    if (ch === '`') {
-      flush('code');
-      bufStartLine = line; bufStartCol = col;
-      buf = '`'; i++; col++;
-      while (i < source.length && source[i] !== '`') {
-        if (source[i] === '\\' && i + 1 < source.length) {
-          buf += source[i]; i++; col++;
-          buf += source[i]; i++;
-          if (source[i] === '\n') { line++; col = 1; } else col++;
-          continue;
-        }
-        if (source[i] === '\n') { line++; col = 1; } else col++;
-        buf += source[i]; i++;
-      }
-      if (i < source.length) { buf += source[i]; i++; col++; }
-      flush('string');
-      continue;
-    }
-    if (ch === '\n') { line++; col = 1; buf += ch; i++; continue; }
-    if (buf.length === 0) { bufStartLine = line; bufStartCol = col; }
-    buf += ch; i++; col++;
+
+// ---------- 通用工具（红队修补辅助） ----------
+// 恒假数值比较判定：if(1>2)/if(2<1)/if(0===1) 等——两侧均为数字字面量，求值为假 → 死分支。
+// 求值为真（if(1>0)）不跳过（可达分支）。防红队「永远 false 比较」伪装真实 caller。
+function isConstantFalseComparison(ctx) {
+  const m = ctx.match(/\bif\s*\(\s*(\d+(?:\.\d+)?)\s*([<>=!]+)\s*(\d+(?:\.\d+)?)\s*\)/);
+  if (!m) return false;
+  const a = parseFloat(m[1]);
+  const b = parseFloat(m[3]);
+  switch (m[2]) {
+    case '>': return !(a > b);
+    case '<': return !(a < b);
+    case '>=': return !(a >= b);
+    case '<=': return !(a <= b);
+    case '===': case '==': return !(a === b);
+    case '!==': case '!=': return !(a !== b);
+    default: return false;
   }
-  flush('code');
-  return tokens;
 }
 
-// 把 tokens 里 kind=code 的文本拼回「等效源码」（保留 \n 以维持行号），
-// 注释/字符串替换为等长空白，使行号与原文件一致。
-function codeOnlySource(source) {
-  const tokens = tokenize(source);
-  let out = '';
-  let curLine = 1;
-  let curCol = 1;
-  const padTo = (tLine, tCol) => {
-    while (curLine < tLine) { out += '\n'; curLine++; curCol = 1; }
-    while (curCol < tCol) { out += ' '; curCol++; }
-  };
-  for (const t of tokens) {
-    padTo(t.line, t.col);
-    if (t.kind === 'code') {
-      out += t.text;
-      const lines = t.text.split('\n');
-      if (lines.length > 1) { curLine += lines.length - 1; curCol = lines[lines.length - 1].length + 1; }
-      else curCol += t.text.length;
-    } else {
-      // 注释/字符串 → 等长空白（保留行号与列对齐）
-      const text = t.text;
-      const lines = text.split('\n');
-      for (let k = 0; k < lines.length; k++) {
-        if (k > 0) { out += '\n'; curLine++; curCol = 1; }
-        for (let j = 0; j < lines[k].length; j++) { out += ' '; curCol++; }
-      }
-    }
+// git commit sha 真实性校验（L1 用）：返回 sha 是否是仓库内真实 commit。
+// 非 git 目录（temp 桩仓）→ 返回 'no-git'，调用方跳过（不误判）。防账本 closed_by 编造 sha。
+// 用 `git cat-file -t <sha>` 而非 `rev-parse --verify <sha>^{commit}`：Windows cmd.exe 把
+// ^{commit} 的 ^ 当转义符吞掉，误判真 sha 失败（实测 dca79ce 被 cmd 吞 ^ 后变 dca79ce{commit}）。
+function isRealCommitSha(sha) {
+  if (!existsSync(join(REPO_ROOT, '.git'))) return 'no-git';
+  if (!/^[0-9a-f]{4,64}$/i.test(sha)) return false;
+  try {
+    const out = execSync(`git cat-file -t ${sha}`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+    return out === 'commit';
+  } catch {
+    return false;
   }
-  return out;
 }
+
+// caller 文件是否含某符号的 CallExpression 形态（L1 WARN 用：proof_caller 行号/文件漂移检测）。
+// 仅判「symbol(」形态存在性（含泛型），不排除定义文件——账本 proof_caller 指向定义文件也合法。
+function fileHasCallShaped(symbol, file) {
+  const rel = normalize(file);
+  if (!existsSync(join(REPO_ROOT, rel))) return false;
+  const code = codeOnlySource(readCode(rel));
+  return new RegExp(`\\b${symbol}\\b\\s*(?:<[^>]*>)?\\s*\\(`).test(code);
+}
+
+// 冻结五值裁决枚举（CLAUDE.md §5 红线：禁第六值）。GV/账本引用须命中此集合。
+const FROZEN_VERDICTS = new Set(['CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED']);
+
+// 账本 proof_caller 行可能涉及的接线符号（用于 L1 WARN 漂移检测）。
+const KNOWN_WIRING_SYMBOLS = [
+  'decideFiveValueVerdict', 'makeVerdict', 'compileFec', 'fecAppendClaim',
+  'executeFallbackChain', 'computeFecHash', 'probePythonAxis', 'computeStageReceipt',
+];
 
 // ---------- 检查原语：AST CallExpression 生产 caller 计数 ----------
-// 设计理由（红队 R2 修补）：grep \b${symbol}\b 命中 import / 类型注解 / 字符串字面量 /
+// 设计理由（红队 R2/R4' 修补）：grep \b${symbol}\b 命中 import / 类型注解 / 字符串字面量 /
 //   const _ = X / Identifier-as-value-without-call。命中须是 CallExpression：
 //   「符号 token 后跳过空白与 < ，紧跟 (」。排除：定义自身（export function X / function X）/
 //   re-export（export { X } / export *）/ tests/ / barrel index.ts。
@@ -220,26 +169,45 @@ function countProductionCallers(symbol, opts = {}) {
     const nonEmpty = lines.filter((l) => l.trim() !== '').length;
     const isBarrel = (rel.endsWith('index.ts') || rel.endsWith('index.js')) && reexportLineCount >= Math.max(1, Math.ceil(nonEmpty / 2));
     let callHits = 0;
+    const hitLines = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (defRe.test(line)) continue;
       if (reexportRe.test(line)) continue;
-      // 多次匹配：找 symbol 后是否紧跟 ( 或 <
       const symRe = new RegExp(`\\b${symbol}\\b`, 'g');
       let m;
       while ((m = symRe.exec(line)) !== null) {
         const after = line.slice(m.index + m[0].length);
-        if (/^\s*[<(]/.test(after)) {
-          // R3: 块内死分支探测（保守：本行或前一行含 if(false)/0&&/return/throw 后的跳过）
-          const ctx = (lines[i - 1] || '') + '\n' + line;
-          if (/\bif\s*\(\s*(false|0)\s*\)/.test(ctx)) continue;
-          if (/\b0\s*&&/.test(ctx)) continue;
-          if (/(\breturn\b|\bthrow\b)[^;]*;\s*$/.test(lines[i - 1] || '')) continue;
-          callHits++;
-        }
+        // R4' 红队修补：CallExpression 形态扩展——
+        //   direct:  symbol( / symbol<Gen>(
+        //   parenWrap: (symbol)(  —— 包裹后反射调用，原 [<(] 漏判
+        //   reflect:  symbol.call/apply/bind(  —— 反射调用
+        const direct = /^\s*[<(]/.test(after);
+        const parenWrap = /^\s*\)\s*[<(]/.test(after);
+        const reflectCall = /^\s*\.\s*(?:call|apply|bind)\s*\(/.test(after);
+        if (!direct && !parenWrap && !reflectCall) continue;
+        // R3 死分支探测（红队扩展，精确版——防「prev 行完整 while(false){...} 污染下一行调用」）：
+        //   同行：dead-opener（if(false)/while(false)/恒假数值比较）出现在 symbol 之前 → 死。
+        //   上行：仅当 prev 行以「开放 if()/while() 条件」结尾（body 在本行）且条件死 → 死。
+        //   上行 return/throw; 或 字面量&& 结尾 → 本行不可达。
+        const head = line.slice(0, m.index);
+        const prevTrim = (lines[i - 1] || '').trim();
+        const sameLineDead = /\bif\s*\(\s*(?:false|0|null|undefined)\s*\)/.test(head)
+          || /\bwhile\s*\(\s*(?:false|0|null|undefined)\s*\)/.test(head)
+          || isConstantFalseComparison(head);
+        const openPrevDead = /\b(?:if|while)\s*\([^)]*\)\s*$/.test(prevTrim) && (
+          /\bif\s*\(\s*(?:false|0|null|undefined)\s*\)/.test(prevTrim)
+          || /\bwhile\s*\(\s*(?:false|0|null|undefined)\s*\)/.test(prevTrim)
+          || isConstantFalseComparison(prevTrim)
+        );
+        const prevUnreachable = /(\breturn\b|\bthrow\b)[^;]*;\s*$/.test(prevTrim)
+          || /\b(?:0|false|null|undefined)\s*&&\s*$/.test(prevTrim);
+        if (sameLineDead || openPrevDead || prevUnreachable) continue;
+        callHits++;
+        hitLines.push(i + 1);
       }
     }
-    if (callHits > 0 && !isBarrel) callers.push({ file: rel, callHits });
+    if (callHits > 0 && !isBarrel) callers.push({ file: rel, callHits, hitLines });
   }
   return { count: callers.length, callers, minRequired, passed: callers.length >= minRequired };
 }
@@ -259,14 +227,14 @@ function detectV1StillAlive(v1Symbol, v1DefFile) {
 }
 
 // ---------- 检查原语：fecV2 形参必选校验（R4 修补） ----------
-// 设计理由：detectOptInGate 用「调用块文本含 fecV2 字面」可被 fecV2: undefined 绕过。
-//   门改为：orchestrator.ts 的 fecAppendClaim 形参列表中 fecV2 字段必须非可选（无 ?）。
+// 设计理由：detectOptInGate 用「调用块文本含 fecV2 字面」可被 fecV2: undefined 绕过，
+//   且红队用顶部 decoy `const fecV2: unknown = null` 让 exec() 只取首匹配（ decoy 非可选 → 误判通过），
+//   掩盖下方真实 `fecV2?:`。门改为：遍历 target 内**全部**匹配，任一可选（? 或 | undefined 联合）即 fail。
 //   tsc 在 strict + exactOptionalPropertyTypes 下编译期强制，agent 无法传 undefined
 //   除非用 as any（被 zero_tolerance_scan 抓）。
 // 两阶段查找：fecV2 可能是函数直接形参（function f(fecV2: X)），也可能是 args interface 字段
 // （function f(args: { fecV2?: X })）。当前架构是后者——fecAppendClaim(db, args: FecAppendClaimArgs)，
 // fecV2? 在 FecAppendClaimArgs interface。只扫形参块会漏报，故先扫形参块，找不到再扫全文件 interface 字段。
-// 属性访问 args.fecV2 / args.fecV2?.contract 不匹配（后随 . 或三元 ? ，不跟 :/{ ）。
 function detectOptionalParam(defFile, funcName, paramName) {
   const raw = readCode(defFile);
   const code = codeOnlySource(raw);
@@ -288,43 +256,74 @@ function detectOptionalParam(defFile, funcName, paramName) {
   }
 
   const targets = paramBlock ? [paramBlock, code] : [code];
+  // R4 红队修补：遍历 target 内全部匹配——任一可选即 fail（防 decoy 掩盖真实可选字段）。
+  const optionalHits = [];
+  let anyMatch = false;
   for (const target of targets) {
     fieldRe.lastIndex = 0;
-    const m = fieldRe.exec(target);
-    if (m) {
+    let m;
+    while ((m = fieldRe.exec(target)) !== null) {
+      anyMatch = true;
       const optionalByQ = m[2] === '?';
       // 抗博弈：fecV2: X | undefined 无 ? 但 caller 仍可传 undefined（绕过 ? 检查）—— 取声明后类型文本查 undefined。
       const after = target.slice(m.index + m[0].length, m.index + m[0].length + 80);
       const typeEnd = after.search(/[;,\n}]/);
       const typeText = after.slice(0, typeEnd < 0 ? 80 : typeEnd);
       const optionalByUnion = /\bundefined\b/.test(typeText);
-      const isOptional = optionalByQ || optionalByUnion;
-      const why = optionalByQ ? '带 ?' : '类型含 undefined 联合';
-      return {
-        passed: !isOptional,
-        reason: isOptional ? `${paramName} 仍是可选（${why}）—— 生产 caller 可传 undefined，opt-in 死分支未强制` : 'ok',
-      };
+      if (optionalByQ || optionalByUnion) {
+        const why = optionalByQ ? '带 ?' : '类型含 undefined 联合';
+        const ctxSnippet = target.slice(Math.max(0, m.index - 8), m.index + m[0].length + 24).replace(/\s+/g, ' ').trim();
+        optionalHits.push({ why, ctx: ctxSnippet });
+      }
     }
   }
-  return { passed: false, reason: `${paramName} 字段未在 ${defFile} 找到（既不在 ${funcName} 形参，也不在 args interface）` };
+  if (!anyMatch) {
+    return { passed: false, reason: `${paramName} 字段未在 ${defFile} 找到（既不在 ${funcName} 形参，也不在 args interface）` };
+  }
+  if (optionalHits.length > 0) {
+    return {
+      passed: false,
+      reason: `${paramName} 有 ${optionalHits.length} 处可选声明（${optionalHits[0].why}）—— 生产 caller 可传 undefined，opt-in 死分支未强制。首处: "${optionalHits[0].ctx}"`,
+      optionalHits,
+    };
+  }
+  return { passed: true, reason: 'ok' };
 }
 
-// ---------- 检查原语：目录内容非占位（R5 修补） ----------
+// ---------- 检查原语：目录内容非占位（R5 修补 + realMathSignal） ----------
+// 红队扩展：占位检测覆盖 4 形态——
+//   (1) export function F(...): number { return <literal|ident>; }
+//   (2) export const F = (...) => <literal|ident>;           （箭头单行常量）
+//   (3) return <literal> <op> <literal>;                     （0.5+0 / 0.03*1 常量折叠伪装）
+// realMathSignal：文件含 Math.* / 已知统计库函数 / for|while 循环 → 真实数学信号。
+//   W5 要求 realFileCount≥4 + placeholderCount=0 + realMathSignal（防「4 个非占位但全是无数学的薄壳」）。
 function dirHasRealMath(relPath) {
   const files = walk(relPath).filter((f) => /\.ts$/.test(f) && !/(^|[\\/])index\.(ts|js)$/.test(f));
   const placeholders = [];
+  let realMathSignal = false;
+  const fnRe1 = /export\s+function\s+(\w+)\s*\([^)]*\)\s*:\s*number\s*\{\s*return\s+([0-9.eE+-]+|[_A-Za-z][_A-Za-z0-9]*)\s*;?\s*\}/g;
+  const fnRe2 = /export\s+(?:const|let)\s+(\w+)\s*=[^=]*=>\s*([0-9.eE+-]+|[_A-Za-z][_A-Za-z0-9]*)\s*;?/g;
+  const arithRe = /return\s+([0-9.eE+-]+)\s*([+\-*/])\s*([0-9.eE+-]+)\s*;/g;
   for (const rel of files) {
     const code = codeOnlySource(readCode(rel));
-    // 占位函数：函数体仅 return <numeric literal> / return <identifier>
-    const fnRe = /export\s+function\s+(\w+)\s*\([^)]*\)\s*:\s*number\s*\{\s*return\s+([0-9.eE+-]+|[_A-Za-z][_A-Za-z0-9]*)\s*;?\s*\}/g;
-    let m;
-    while ((m = fnRe.exec(code)) !== null) {
-      placeholders.push({ file: normalize(rel), fn: m[1], body: m[2] });
+    if (
+      /\bMath\.\w+/.test(code) ||
+      /\b(?:erf|normalCdf|normalSurvival|sampleMean|sampleStandardDeviation|tStatistic|chiSquareCdf|holmBonferroni|benjaminiHochberg|bonferroni)\b/.test(code) ||
+      /\bfor\s*\(|\bwhile\s*\(/.test(code)
+    ) {
+      realMathSignal = true;
     }
+    let m;
+    while ((m = fnRe1.exec(code)) !== null) placeholders.push({ file: normalize(rel), fn: m[1], body: m[2], kind: 'fn-literal' });
+    while ((m = fnRe2.exec(code)) !== null) placeholders.push({ file: normalize(rel), fn: m[1], body: m[2], kind: 'arrow-literal' });
+    while ((m = arithRe.exec(code)) !== null) placeholders.push({ file: normalize(rel), fn: '(inline)', body: `${m[1]}${m[2]}${m[3]}`, kind: 'literal-arithmetic' });
   }
-  return { realFileCount: files.length, files: files.map(normalize), placeholderCount: placeholders.length, placeholders };
+  return { realFileCount: files.length, files: files.map(normalize), placeholderCount: placeholders.length, placeholders, realMathSignal };
 }
 
+// ---------- 检查原语：GV schema 校验（R5 修补：字段语义，非仅键存在） ----------
+// 红队扩展：expected.verdict 须命中冻结五值；expected.reasonCodes / input.evidences 须为非空数组。
+//   防「GV-01.json = {expected:{verdict:"CONFIRMED"}, ...} 空证据占位」骗过仅查键存在的旧逻辑。
 function gvCasesHaveSchema(relPath, requiredKeys) {
   const files = walk(relPath).filter((f) => /GV-\d+\.json$/.test(f));
   const bad = [];
@@ -337,11 +336,28 @@ function gvCasesHaveSchema(relPath, requiredKeys) {
       for (const p of parts) { cur = cur?.[p]; if (cur === undefined) break; }
       if (cur === undefined) bad.push({ file: normalize(rel), reason: `缺字段 ${k}` });
     }
+    const verdict = parsed?.expected?.verdict;
+    if (typeof verdict !== 'string' || !FROZEN_VERDICTS.has(verdict)) {
+      bad.push({ file: normalize(rel), reason: `expected.verdict="${String(verdict)}" 非冻结五值枚举（§5 红线）` });
+    }
+    const reasonCodes = parsed?.expected?.reasonCodes;
+    if (!Array.isArray(reasonCodes) || reasonCodes.length === 0) {
+      bad.push({ file: normalize(rel), reason: 'expected.reasonCodes 须为非空数组（防空理由码占位）' });
+    }
+    const evidences = parsed?.input?.evidences;
+    // UNTESTED 允许空证据（合法 missing-FEC/missing-dataset 边界，如 GV-03/GV-04：
+    // fec:null + evidences:[] + reasonCodes:["R1_FEC_NOT_COMPILABLE"] + untestedReason）。
+    // 其余四值须非空证据——空证据却判 CONFIRMED/REFUTED = 占位攻击。
+    if (!Array.isArray(evidences)) {
+      bad.push({ file: normalize(rel), reason: 'input.evidences 须为数组' });
+    } else if (evidences.length === 0 && verdict !== 'UNTESTED') {
+      bad.push({ file: normalize(rel), reason: `verdict=${verdict} 但 input.evidences 为空（仅 UNTESTED 允许空证据）` });
+    }
   }
   return { count: files.length, files: files.map(normalize), badCount: bad.length, bad };
 }
 
-// ---------- 检查原语：DEPTH_LEDGER §C 解析 + 诚实校验（R6 同口径） ----------
+// ---------- 检查原语：DEPTH_LEDGER §C 解析 + 诚实校验（R6 同口径 + R8/R9） ----------
 function parseLedgerTable() {
   const ledgerPath = join(REPO_ROOT, 'PROJECT_PLAN', 'DEPTH_LEDGER.md');
   if (!existsSync(ledgerPath)) return { exists: false, rows: [] };
@@ -377,20 +393,43 @@ function verifyDepthLedger() {
   }
   const stale = [];
   const illegal = [];
+  const callerDrift = []; // WARN：proof_caller 文件不含 dep 提及的接线符号（行号/文件漂移）
   const validStatus = new Set(['NOT_BUILT', 'BUILT_UNWIRED', 'WIRED_OPT_IN', 'WIRED_RED', 'WIRED_GREEN']);
   for (const r of ledger.rows) {
     if (!validStatus.has(r.status)) illegal.push({ id: r.id, reason: `status=${r.status} 非 §B 枚举值` });
-    // R7: status=WIRED_GREEN 须配 evidence 行 + closed_by sha
+    const wiredSet = new Set(['WIRED_GREEN', 'WIRED_RED']);
+    if (wiredSet.has(r.status)) {
+      // R8: proof_test 路径必须存在（防 ::ghost_file 占位）
+      const testPath = r.proofTest.split('::')[0].trim();
+      if (testPath && !existsSync(join(REPO_ROOT, testPath))) {
+        illegal.push({ id: r.id, reason: `proof_test 文件不存在: ${testPath}` });
+      }
+      // proof_caller 文件必须存在
+      if (!existsSync(join(REPO_ROOT, r.callerFile))) {
+        stale.push({ id: r.id, reason: `proof_caller 文件不存在: ${r.callerFile}` });
+      }
+      // WARN: dep 提及的接线符号须在 callerFile 有 CallExpression 形态（行号/文件漂移检测）
+      const mentioned = KNOWN_WIRING_SYMBOLS.filter((s) => r.dep.includes(s) || r.id.includes(s.replace(/.*Verdict$/, 'verdict')));
+      if (mentioned.length > 0 && existsSync(join(REPO_ROOT, r.callerFile))) {
+        const anyPresent = mentioned.some((s) => fileHasCallShaped(s, r.callerFile));
+        if (!anyPresent) {
+          callerDrift.push({ id: r.id, reason: `proof_caller ${r.callerFile}:${r.callerLine} 不含 dep 提及的接线符号 CallExpression（${mentioned.join('/')}）——可能行号漂移或间接路径，请核验` });
+        }
+      }
+    }
     if (r.status === 'WIRED_GREEN') {
       if (!r.closedBy || r.closedBy === '—') illegal.push({ id: r.id, reason: 'WIRED_GREEN 须填 closed_by commit sha' });
-      // 仅校验 proof_caller 文件存在（CI 双跑物证由 depth-evidence.yml 单独负责，本脚本不重复跑测试）
-      if (!existsSync(join(REPO_ROOT, r.callerFile))) stale.push({ id: r.id, reason: `proof_caller 文件不存在: ${r.callerFile}` });
+      // R9: closed_by sha 须是真实 commit（非 git 目录跳过，不误判 temp 桩仓）
+      if (r.closedBy && r.closedBy !== '—') {
+        const rev = isRealCommitSha(r.closedBy);
+        if (rev === false) illegal.push({ id: r.id, reason: `closed_by="${r.closedBy}" 非本仓库真实 commit（git cat-file -t 失败）` });
+      }
     }
   }
   return {
     passed: stale.length === 0 && illegal.length === 0,
     reason: stale.length === 0 && illegal.length === 0 ? `ledger 解析 ${ledger.rows.length} 行，全合法` : `${stale.length} stale + ${illegal.length} illegal`,
-    stale, illegal, rowCount: ledger.rows.length,
+    stale, illegal, callerDrift, rowCount: ledger.rows.length,
   };
 }
 
@@ -398,7 +437,8 @@ function verifyDepthLedger() {
 // 设计理由：§C line 41 + §D 抗博弈 #6 承诺「agent 手填 WIRED_GREEN 直接 exit 1」——
 //   WIRED_GREEN 行须紧随 evidence: <base>→<head> 行，由 depth-evidence bot 用 GITHUB_TOKEN 写回
 //   （agent 无该 token + CODEOWNERS 护 PROJECT_PLAN/DEPTH_LEDGER.md）。无 evidence 行 = 手填 = exit 1。
-//   当前零 WIRED_GREEN 行 → 本检查空过（不破坏诚实态）；行转 GREEN 时强制 evidence。
+// 红队 #5 实时攻击：agent 手填 `evidence: depth_gate.ok → depth_gate.ok`（base=head 自指 + 非 SHA 格式）
+//   骗过旧宽松正则。门收紧：base≠head + 每侧须为 40-hex SHA 或纯数字 run-ID。
 function verifyWiredGreenEvidence() {
   const ledgerPath = join(REPO_ROOT, 'PROJECT_PLAN', 'DEPTH_LEDGER.md');
   if (!existsSync(ledgerPath)) return { passed: true, reason: '无 ledger（CHECK-L1 已报）' };
@@ -406,19 +446,36 @@ function verifyWiredGreenEvidence() {
   const sectionC = text.split('## §C')[1] || '';
   const lines = sectionC.split(/\r?\n/);
   const missing = [];
+  const forged = [];
+  const tokenRe = /^[0-9a-f]{7,40}$/i; // SHA（短 7 位到全 40 位）或下方 runID 判定
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^\|\s*([A-Za-z0-9-]+)\b.*?\|\s*WIRED_GREEN\s*\|/);
     if (m) {
       const tail = lines.slice(i, i + 7).join('\n');
-      if (!/evidence\s*:\s*\S+\s*[→>]\s*\S+/i.test(tail)) {
+      const ev = tail.match(/evidence\s*:\s*(\S+)\s*[→>]\s*(\S+)/i);
+      if (!ev) {
         missing.push({ id: m[1], reason: 'WIRED_GREEN 行后 6 行内无 evidence: <base>→<head>（须 depth-evidence bot 写回，禁 agent 手填，见 §D 抗博弈 #6）' });
+        continue;
+      }
+      const [, base, head] = ev;
+      // 自指伪造（base === head）直接拒绝
+      if (base === head) {
+        forged.push({ id: m[1], reason: `evidence base=head="${base}"（自指伪造，须 base≠head 的真实 CI 双跑）` });
+        continue;
+      }
+      // 每侧须为 SHA（hex）或 GitHub run-ID（纯数字）——拒绝任意字符串（如 depth_gate.ok）
+      const baseOk = tokenRe.test(base) || /^\d+$/.test(base);
+      const headOk = tokenRe.test(head) || /^\d+$/.test(head);
+      if (!baseOk || !headOk) {
+        forged.push({ id: m[1], reason: `evidence token 非法：base="${base}" head="${head}"（须 40-hex SHA 或纯数字 run-ID，禁自由字符串）` });
       }
     }
   }
+  const allBad = [...missing, ...forged];
   return {
-    passed: missing.length === 0,
-    reason: missing.length === 0 ? 'WIRED_GREEN 行均配 evidence 行（或零 WIRED_GREEN）' : `${missing.length} 个 WIRED_GREEN 行缺 evidence`,
-    missing,
+    passed: allBad.length === 0,
+    reason: allBad.length === 0 ? 'WIRED_GREEN 行均配合法 evidence 行（base≠head + SHA/runID 格式）' : `${missing.length} 缺 evidence + ${forged.length} 伪造 evidence`,
+    missing, forged,
   };
 }
 
@@ -474,21 +531,22 @@ hardCheck('CHECK-W3 executeFallbackChain AST 生产 caller ≥ 1 (P1-2)', () =>
 hardCheck('CHECK-W4 makeVerdict 全 src/ 生产 caller = 0 (P0-2 全替换)', () =>
   detectV1StillAlive('makeVerdict', 'src/falsifiability/verdict.ts'));
 
-// CHECK-W5 (HARD): src/statistics/ 存在且非占位实现
-hardCheck('CHECK-W5 src/statistics/ 存在且 ≥4 真实数学模块 (STAT-1)', () => {
+// CHECK-W5 (HARD): src/statistics/ 存在且非占位实现 + realMathSignal
+hardCheck('CHECK-W5 src/statistics/ ≥4 真实数学模块 + realMathSignal (STAT-1)', () => {
   const d = dirHasRealMath('src/statistics');
   return {
-    passed: d.realFileCount >= 4 && d.placeholderCount === 0,
+    passed: d.realFileCount >= 4 && d.placeholderCount === 0 && d.realMathSignal,
     reason: d.realFileCount === 0
       ? 'src/statistics/ 不存在——全仓零真实 p-value/effect-size/CI/多重校正（违反 §5 RR 禁手填统计）'
-      : `realFileCount=${d.realFileCount}（需 ≥4: p_value/effect_size/ci/multiple_testing） placeholderCount=${d.placeholderCount}`,
+      : `realFileCount=${d.realFileCount}（需 ≥4） placeholderCount=${d.placeholderCount} realMathSignal=${d.realMathSignal}`,
     realFileCount: d.realFileCount,
     placeholderCount: d.placeholderCount,
+    realMathSignal: d.realMathSignal,
     placeholders: d.placeholders,
   };
 });
 
-// CHECK-W6 (HARD): golden_vectors/cases/ 有 ≥12 条带 schema 的 GV
+// CHECK-W6 (HARD): golden_vectors/cases/ 有 ≥12 条带 schema 的 GV（字段语义校验）
 hardCheck('CHECK-W6 golden_vectors/cases/ ≥12 条带 schema GV (P1-4)', () => {
   const gv = gvCasesHaveSchema('golden_vectors/cases', ['input.evidences', 'expected.verdict', 'expected.reasonCodes']);
   return {
@@ -502,26 +560,42 @@ hardCheck('CHECK-W6 golden_vectors/cases/ ≥12 条带 schema GV (P1-4)', () => 
   };
 });
 
-// CHECK-W7 (HARD): tests/real_backends/ 存在且非空
-hardCheck('CHECK-W7 tests/real_backends/ 非空 (P2-1)', () => {
+// CHECK-W7 (HARD): tests/real_backends/ 存在 + 真实 spawn/import 信号（防字符串自洽占位）
+hardCheck('CHECK-W7 tests/real_backends/ 非空 + 真实 spawn 信号 (P2-1)', () => {
   const files = walk('tests/real_backends').filter((f) => /\.test\.ts$/.test(f));
+  const hollow = [];
+  for (const rel of files) {
+    const code = codeOnlySource(readCode(rel));
+    // 真实后端信号：child_process spawn 族（调用或 import）。三个真实测试（sympy/dafny/lean）均
+    // `import { spawnSync } from 'node:child_process'` + spawnSync(python/dafny/lean) 真起子进程。
+    // 不接受「字符串里提及 sympy/z3」——expect("sympy").toBe("sympy") 字符串自洽无 spawn 须判 hollow。
+    const hasSpawn = /\b(?:spawnSync|execSync|spawn|fork)\s*\(/.test(code) || /from\s+['"]node:child_process['"]/.test(code);
+    if (!hasSpawn) {
+      hollow.push({ file: normalize(rel), reason: '无 child_process spawn 信号（防字符串自洽占位；真实测试须 spawnSync/execSync 真起子进程）' });
+    }
+  }
   return {
-    passed: files.length >= 1,
-    reason: files.length === 0 ? 'tests/real_backends/ 不存在——零真实后端 RED→GREEN 测试，绿套件无真实依赖锚点' : `${files.length} 个测试文件`,
+    passed: files.length >= 1 && hollow.length === 0,
+    reason: files.length === 0 ? 'tests/real_backends/ 不存在——零真实后端 RED→GREEN 测试，绿套件无真实依赖锚点' : `${files.length} 文件，${hollow.length} 个无真实 spawn 信号`,
     count: files.length,
+    hollow,
   };
 });
 
-// CHECK-L1 (HARD): DEPTH_LEDGER §C 存在且合法
+// CHECK-L1 (HARD): DEPTH_LEDGER §C 存在且合法（含 R8 proof_test 存在 + R9 closed_by sha）
 hardCheck('CHECK-L1 DEPTH_LEDGER §C 存在且合法', () => verifyDepthLedger());
 
-// CHECK-L2 (HARD): WIRED_GREEN 须配 evidence: <base>→<head> 行（禁 agent 手填，见 §D 抗博弈 #6）
-hardCheck('CHECK-L2 WIRED_GREEN 须配 evidence 行 (禁手填)', () => verifyWiredGreenEvidence());
+// CHECK-L2 (HARD): WIRED_GREEN 须配合法 evidence: <base>→<head> 行（base≠head + SHA/runID 格式，禁手填）
+hardCheck('CHECK-L2 WIRED_GREEN 须配合法 evidence 行 (禁手填/禁自指伪造)', () => verifyWiredGreenEvidence());
 
-// WARN（不阻断）：orphan-symbol 测试检测
+// WARN（不阻断）：orphan-symbol 测试检测 + ledger caller 漂移
 {
   const orphan = detectOrphanSymbolTest();
   if (orphan.warnings.length > 0) warnings.push({ category: 'orphan_symbol_tests', items: orphan.warnings });
+  const l1 = hardFailures.find((f) => f.name && f.name.includes('CHECK-L1'));
+  if (l1 && l1.callerDrift && l1.callerDrift.length > 0) {
+    warnings.push({ category: 'ledger_caller_drift', items: l1.callerDrift });
+  }
 }
 
 // =====================================================================
@@ -537,6 +611,9 @@ for (const c of hardFailures) {
   if (c.violations) for (const v of c.violations.slice(0, 8)) console.error(`       violation: ${JSON.stringify(v)}`);
   if (c.placeholders) for (const s of c.placeholders.slice(0, 8)) console.error(`       placeholder: ${JSON.stringify(s)}`);
   if (c.bad) for (const b of c.bad.slice(0, 8)) console.error(`       badGV: ${JSON.stringify(b)}`);
+  if (c.illegal) for (const il of c.illegal.slice(0, 8)) console.error(`       illegal: ${JSON.stringify(il)}`);
+  if (c.missing) for (const mi of c.missing.slice(0, 8)) console.error(`       missing-evidence: ${JSON.stringify(mi)}`);
+  if (c.forged) for (const fg of c.forged.slice(0, 8)) console.error(`       forged-evidence: ${JSON.stringify(fg)}`);
   console.error('');
 }
 
@@ -544,26 +621,27 @@ if (warnings.length > 0) {
   console.log('--- WARN (不阻断 CI) ---');
   for (const w of warnings) {
     console.log(`[WARN] ${w.category}: ${w.items.length} 项`);
-    for (const it of w.items.slice(0, 10)) console.log(`       ${it.file}: ${it.symbol} ${it.note}`);
+    for (const it of w.items.slice(0, 10)) console.log(`       ${it.file ?? it.id}: ${it.reason ?? it.note}`);
   }
   console.log('');
 }
 
 if (hardFailures.length > 0) {
   console.error(`=== depth_gate: ${hardFailures.length} 项 HARD 检查失败 ===`);
-  console.error('深度功能未接线——这是特性（强制 agent 做真实接线，CLAUDE.md §4 P0-P3），不是 bug。');
+  console.error('深度功能未接线 / 账本不诚实——这是特性（强制 agent 做真实接线 + 禁手填 WIRED_GREEN，CLAUDE.md §1/§4/§5），不是 bug。');
   console.error('修复指引：');
-  console.error('  W1 → src/fec/orchestrator.ts:59 fecV2 移除 ?（必选形参）+ demo_chain.ts:180 实参传 fecV2.contract');
-  console.error('  W2 → P0-2: 4 个生产 caller（orchestrator:116/verdict_stage:234/demo_chain:215/render:26）调 decideFiveValueVerdict');
-  console.error('  W3 → P1-2: qwen_vl_adapter 真编排 executeFallbackChain');
+  console.error('  W1 → src/fec/orchestrator.ts fecV2 移除 ? / | undefined（必选形参）');
+  console.error('  W2 → P0-2: 生产 caller（orchestrator/verdict_stage/render/verify_golden）调 decideFiveValueVerdict');
+  console.error('  W3 → P1-2: qwen_adapter/qwen_vl_adapter 真编排 executeFallbackChain');
   console.error('  W4 → 与 W2 互锁：makeVerdict 在 src/ 全部生产 caller = 0');
-  console.error('  W5 → STAT-1: 建 src/statistics/{p_value,effect_size,ci,multiple_testing}.ts（非占位）');
-  console.error('  W6 → P1-4: 落盘 golden_vectors/cases/GV-01..GV-12.json（带 input.evidences/expected.verdict/expected.reasonCodes）');
-  console.error('  W7 → P2-1: 建 tests/real_backends/{sympy,z3,...}.test.ts（真实 spawn）');
-  console.error('  L1 → 建/修 PROJECT_PLAN/DEPTH_LEDGER.md §C 表格（schema 见文件）');
-  console.error('  L2 → WIRED_GREEN 行须紧随 evidence: <base>→<head>（由 depth-evidence bot 写回，禁手填）');
-  console.error('详见 PROJECT_PLAN/DEPTH_LEDGER.md §A (next_action) + AGENT_ENTRY_PROTOCOL.md + AGENT_ANTISKIM_TRIPWIRES.md');
+  console.error('  W5 → STAT-1: 建 src/statistics/{p_value,effect_size,ci,multiple_testing}.ts（非占位 + 真实数学信号）');
+  console.error('  W6 → P1-4: 落盘 golden_vectors/cases/GV-01..GV-12.json（verdict∈五值 + 非空 reasonCodes/evidences）');
+  console.error('  W7 → P2-1: 建 tests/real_backends/*.test.ts（真实 spawn/child_process，非字符串自洽）');
+  console.error('  L1 → 修 PROJECT_PLAN/DEPTH_LEDGER.md §C（proof_test 须存在 + closed_by 须真实 sha + status∈枚举）');
+  console.error('  L2 → WIRED_GREEN 行须紧随 evidence: <base_sha>→<head_sha>（base≠head + SHA/runID 格式，由 depth-evidence bot 写回，禁手填）');
+  console.error('inherent_limits：静态门不证运行时执行/内容真实/RED→GREEN——完整保证须 depth-evidence bot + CODEOWNERS（见文件头）。');
+  console.error('详见 PROJECT_PLAN/DEPTH_LEDGER.md §A (next_action) + §D + AGENT_ENTRY_PROTOCOL.md + AGENT_ANTISKIM_TRIPWIRES.md');
   process.exit(1);
 }
 
-console.log('=== depth_gate: ok（所有 HARD 检查通过） ===');
+console.log('=== depth_gate: ok（所有 HARD 检查通过 · inherent_limits 仍适用，见文件头） ===');
