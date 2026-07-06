@@ -378,6 +378,18 @@ far verify --bundle path/to/.far-proof --explain
 | E5 | threadpool_info() CI BLAS 可观测性（ubuntu+numpy 后端） | 部分 | `NEEDS_REAL_ENV` |
 | E6 | competition_qwen_smoke 真实计费 + 控制台截图 | 不能 | `NEEDS_HUMAN_OPERATION`；CI 上若 skipped ≠ passing |
 
+---
+
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（10_DEV_ENTRYPOINT）相关的融合缺口
+
+- **首批任务延伸·FUSION-OS-1（DESIGN_PROPOSED，最高杠杆，依赖 P0-1 完成）**：当前最大活体缺口 —— `<REPOSITORY_ROOT>/src/anti_theater/lint.ts` 的 20 个反剧场检测器（label-only / seed-cherry / metric-swapping / workflow-digest-mismatch / natural-language-verdict-mismatch 等）仅 `<REPOSITORY_ROOT>/src/cli/commands/verify.ts:412` 离线调用，`<REPOSITORY_ROOT>/src/fec/orchestrator.ts:199` 运行时 verdict 路径硬编码 `antiTheaterFindings:[]`。接线动作：`runAntiTheaterLint(fec, sandbox, statistics)` → `KernelAntiTheaterFinding[]` 注入 `buildVerdictKernelInput`，使 R-anti-theater-fail / seed-cherry / R8-warn 在实时 verdict 生效（Open Science fail-closed 服务门范式：lint 不过则 verdict 不可封 CONFIRMED）。物证须 keystone bot CI 双跑写回 WIRED_GREEN。接线表见 `PROJECT_PLAN/DEPTH_LEDGER.md` §C FUSION-OS-1。
+
+> 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 `<REPOSITORY_ROOT>/CLAUDE.md` §4 P-FUSION。
+
 ## 5. 开发红线
 
 > 违反任何一条 = 任务失败。冲突时按红线优先级裁决链：`L0 任务铁律/CLAUDE.md > L1 宪法 > L2 T1-T12 信任根（R2 最高工程优先）> L2 F1-F12 反 theater > L2 Z1-Z16 零容忍 > L3 DO_NOT_CLAIM/表述口径`。冲突时砍新方案不改红线。

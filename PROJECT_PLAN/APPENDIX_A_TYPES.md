@@ -1484,3 +1484,21 @@ interface CausalEdge {
 | CausalModel / CausalDagNode / CausalEdge | `DESIGN_LOCKED` | 算法 SSOT 见 36 章；类型契约在本附录 |
 
 > 未在本附录列出的类型（如 CausalEdgeKind 的扩展、UQ-Witness 的 ReproCertificate、ledger_events 的 MerkleInclusionProof）属于增量层（L3/L12/L14），其类型 SSOT 见对应细化文档（44 / 09 §7 / 11 §5）。本附录仅锁裁决主链路的 verdict-critical 类型。
+
+---
+
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（APPENDIX_A_TYPES）相关的融合缺口
+
+- **FUSION-OS-13**（候选字段·DESIGN_PROPOSED）：`StatisticalResult.derivationForm: 'literal' | 'derived' | 'formula' | 'auto'` —— 标记统计量来源形态；五值内核在 form 不匹配时即使数值相等也降级（反 sentinel-form 篡改）。
+- **FUSION-OS-7**（候选字段）：`StatisticalResult.executionFingerprint: { wallMs: number, cpuMs: number, peakRssBytes: number }` —— 三元组执行指纹，复算量级差异 >10x 触发 DEGRADED_SCOPE（非 bit-exact）。
+- **FUSION-OS-12**（候选字段）：`VerdictNode.supersededBy: string | null` —— 自指 FK，重评写新行设指针，`WHERE supersededBy IS NULL` 查当前裁决（Open Science memories.superseded_by 范式）。
+- **FUSION-OS-10**（候选字段）：`Evidence.derivable: 0 | 1` —— derivable=1 强制重算验证（Open Science host_call_log.derivable 范式）。
+- **FUSION-OS-6**（候选 enum）：`ProvenanceClass = 'system-derived' | 'llm-asserted' | 'user-uploaded'` —— provenance 来源分类，llm-asserted 强制走系统 hash 重算绑定。
+
+> 以上字段全 DESIGN_PROPOSED，未进当前 schema；落地须走 01 修订程序（同步本附录 + APPENDIX_C + schema migration + golden vectors + 所有 verifier），migration 避开 0013-0015（ProbeAtlas / UQ-Witness / FAR-Bench / multimodal）草案编号。
+
+> 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 CLAUDE.md §4 P-FUSION。

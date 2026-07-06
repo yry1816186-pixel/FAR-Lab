@@ -875,3 +875,19 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 ---
 
 > 本文件冻结 13 类缺漏（含本次合并新增 6 项）+ 浅点审计深化路线的实现级口径。任何修改五值 enum、proofHash 白名单、`purpose_tag` 9 值、路径约定（`<REPOSITORY_ROOT>/`）、状态标签集（8 值）、`packages/` 拆包边界、snapshot 时效口径、novelty 维度归属、Core 中立边界的提议，必须同时修改本文件、`01_SOURCE_OF_TRUTH_AND_STATUS.md`、`03_EVIDENCE_CONTRACT_AND_VERDICT.md`、`04_PROOF_ENVELOPE_AND_VERIFIER.md`、`07_RISK_REGISTER_AND_DO_NOT_CLAIM.md`、`08_TRACEABILITY_MATRIX.md`、`APPENDIX_A_TYPES.md`、`APPENDIX_C_CANONICAL.md`、`APPENDIX_F_GLOSSARY.md`、golden vectors、所有 verifier 与答辩口径——否则不成立。
+
+---
+
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（09_GAP_CLOSURE_LOG）相关的融合缺口
+
+- **融合衍生缺漏（DESIGN_PROPOSED·2026-07-05 发现）**：Open Science 工程范式审计发现 14 项可迁移缺口（FUSION-OS-1..14），全 NOT_BUILT，已落入 `DEPTH_LEDGER.md` §C 末段（机器可读接线表）+ `FUSION_OPEN_SCIENCE_DESIGN.md`（设计全文）。
+- **最高杠杆缺漏**：FUSION-OS-1（反剧场检测器实时接线·当前最大活体缺口 —— 20 个检测器仅 `verify.ts:412` 离线调，`orchestrator.ts:199` 运行时硬编码 `[]`）。
+- **红线级缺漏**：FUSION-OS-11（verdict_nodes.verdict CHECK 约束固化五值 enum·DB 层禁第六值）。
+- **迁移边界**：只迁工程范式，绝不迁 OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。
+- **闭合路径**：每项接线须升 DEPTH_LEDGER §C 行至 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN。
+
+> 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 CLAUDE.md §4 P-FUSION。

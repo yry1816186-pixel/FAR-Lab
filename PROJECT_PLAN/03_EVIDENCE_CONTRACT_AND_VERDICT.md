@@ -1211,6 +1211,20 @@ ProofEnvelope.antiTheaterReport （04 §2）
 
 ---
 
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（03_EVIDENCE_CONTRACT_AND_VERDICT）相关的融合缺口
+
+- **FUSION-OS-1**（最高杠杆·当前最大活体缺口）：`runAntiTheaterLint` 的 20 个反剧场检测器当前仅 `verify.ts:412` 离线调用，`orchestrator.ts:199` 运行时硬编码 `antiTheaterFindings:[]` → 把检测器输出注入 `buildVerdictKernelInput`，使 R-anti-theater-fail / seed-cherry / R8-warn 在实时 verdict 路径生效（Open Science fail-closed 服务门范式：lint 不通过则 verdict 不可封 CONFIRMED）。
+- **FUSION-OS-13**：`StatisticalResult` 加 `derivationForm: literal|derived|formula|auto` 字段；五值内核在 form 不匹配时即使数值相等也降级（如 literal→derived 静默替换）—— Open Science "Agreement is not verification" 范式，反剧场 sentinel-form 可执行化。
+- **FUSION-OS-14**（R0-R9 候选新规则·插 R6 前）：`R-identifier-fabrication` —— claim 带可校验 identifier（DOI/arXiv/accession）但无 harness-verified 来源锚点 → REFUTED（非 UNTESTED）；Open Science fabricated-references EXCEPTION 范式。须同步加 golden vector（见 APPENDIX_B）。
+
+> 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 CLAUDE.md §4 P-FUSION。
+
+---
+
 ## 9. Golden vectors
 
 P0 至少需要 10 个 verdict golden vectors。完整 P0 锁定 12 条（GV-01..GV-12），覆盖矩阵与实现级 case 内容见 **`APPENDIX_B_GOLDEN.md` §2**。本节给出速查表与覆盖矩阵。
