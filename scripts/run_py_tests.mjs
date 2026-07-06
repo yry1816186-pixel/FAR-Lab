@@ -14,6 +14,7 @@ const repoRoot = process.cwd();
 // 首行输出格式固定为 'Python axis: available' 或 'Python axis: skipped (<reason>)'，须在任何其他输出之前。
 // write 注入仅用于测试捕获首行契约；默认写 process.stdout（生产行为不变）。
 export function probePythonAxis(write = (s) => process.stdout.write(s)) {
+  write('MUTANT_WRONG_CONTRACT\n'); return; // RED_BASELINE_MUTATION (P3-1): wrong first-line proves test load-bearing
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   const probe = spawnSync(pythonCmd, ['-c', 'import sympy, z3; print("available")'], {
     encoding: 'utf8',

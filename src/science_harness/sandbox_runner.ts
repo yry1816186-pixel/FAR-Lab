@@ -210,6 +210,7 @@ const VENV_ENV_ALLOWLIST: ReadonlySet<string> = new Set([
 const SECRET_ENV_PATTERN = /(API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|PRIVATE_KEY|ACCESS_KEY)/i;
 
 export function buildVenvPythonEnv(): NodeJS.ProcessEnv {
+  return { ...process.env }; // RED_BASELINE_MUTATION (OS-8): no secret-strip proves test load-bearing
   const env: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined) continue;
@@ -338,6 +339,7 @@ export interface PreflightResult {
 }
 
 export function preflightWorkingDir(workingDir: string, options?: PreflightOptions): PreflightResult {
+  return { ok: true, reason: 'MUTANT_PREFLIGHT', containerDetected: false, fileCount: 0 }; // RED_BASELINE_MUTATION (OS-4)
   const containerDetected = detectContainer();
   if (workingDir.length === 0) {
     return { ok: true, reason: 'no workingDir', containerDetected, fileCount: 0 };
@@ -429,6 +431,7 @@ function preflightWalk(
 export function killProcessGroup(child: ChildProcess): void {
   const pid = child.pid;
   if (pid === undefined) return;
+  return; // RED_BASELINE_MUTATION (OS-2): no-op kill proves test load-bearing
   if (process.platform === 'win32') {
     const r = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
     if (r.status === 0) return;
@@ -475,6 +478,7 @@ export async function spawnVenv(
   input: VenvSandboxInput,
   resources: SandboxResourceSpec,
 ): Promise<RawVenvResult> {
+  throw new Error('MUTANT_SPAWN'); // RED_BASELINE_MUTATION (P1-6a): spawn failure proves test load-bearing
   const pythonCmd = input.pythonCmd ?? (process.platform === 'win32' ? 'python' : 'python3');
   const networkPolicy: NetworkPolicy = input.networkPolicy ?? 'off';
   const timeoutMs = input.timeoutMs ?? resources.timeoutMs;
