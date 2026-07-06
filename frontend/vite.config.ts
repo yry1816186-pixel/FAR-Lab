@@ -7,6 +7,11 @@ import path from 'node:path';
 // API backend default: http://localhost:3000 (spec 24 API gateway)
 export default defineConfig({
   plugins: [react()],
+  // 2026 交付物目标现代浏览器（chrome/edge/firefox/safari 近 2 版）——esbuild 对低目标
+  // （es2020/modules）需降级 destructuring 但不支持，188 errors。es2022 不降级原生语法，构建通过。
+  build: {
+    target: 'es2022',
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
