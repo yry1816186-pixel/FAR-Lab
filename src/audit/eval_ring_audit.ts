@@ -24,7 +24,7 @@ export interface AuditResult {
 }
 
 /**
- * 代码路径层审计的诚实三态（HANDOFF §5.2 / 02 §7.2 反假绿）。
+ * 三态 fail-closed 审计：目录缺失时不得声称通过。
  * - `not_applicable`：eval-ring 模块不存在（V1 无评测环代码）或目录无 .ts 文件——
  *   审计零文件，**禁声称 "passed"**（对空集做空断言却声称通过 = 静默假绿）。
  * - `passed`：实际审计 ≥1 个 .ts 文件且零违规（真断言，非空断言）。
@@ -84,14 +84,14 @@ function walkTsFiles(dir: string): readonly string[] {
  * C2 断言 1（代码路径层）：扫描 `${srcDir}/eval-ring/` 下所有 .ts 文件，
  * 命中违规 import（competition adapter / 旧 provider 出口 / 旧 competition 调用入口）即记录。
  *
- * 诚实三态（HANDOFF §5.2 反假绿·禁 `if [ ! -d ]; exit 0` 静默绿）：
+ * 三态 fail-closed（禁 `if [ ! -d ]; exit 0` 静默绿）：
  *   - 评测环目录不存在 / 无 .ts 文件 → `not_applicable`（审计零文件，禁声称 passed）。
  *   - 审计 ≥1 文件零违规 → `passed`（真断言）。
  *   - 发现违规 → `failed`。
  *
  * 评测环模块属 V2 范围，V1 不强制存在；目录缺失时不阻断 CI，但**绑定不变量**由
  * `auditEvalRingDataLayer`（数据层 purpose_tag 审计）+ 单元测试（含正负 fixture）强制。
- * 历史溯源：10_CI_pipeline.md §1 STEP 10 断言 1 + HANDOFF §5.2（FAR_CHAIN_DEV_SPEC/ 已归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本文件源码实测为准。
+ * 运行时 SSOT 以本文件源码为准。
  */
 export function auditEvalRingCodePath(srcDir: string): EvalRingCodePathResult {
   const evalRingDir = join(srcDir, 'eval-ring');

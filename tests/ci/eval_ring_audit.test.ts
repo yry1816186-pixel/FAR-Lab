@@ -64,7 +64,7 @@ function makeEvalRingDir(base: string): string {
 }
 
 test('auditEvalRingCodePath returns not_applicable (never "passed") when eval-ring directory does not exist', () => {
-  // 反假绿（HANDOFF §5.2）：目录缺失时审计零文件，status 必须是 not_applicable，禁是 passed。
+  // fail-closed：目录缺失时审计零文件，status 必须是 not_applicable，禁是 passed。
   const tmp = mkdtempSync(join(tmpdir(), 'eval-ring-audit-missing-'));
   try {
     const result = auditEvalRingCodePath(tmp);
@@ -253,7 +253,7 @@ test('auditEvalRingDataLayer ignores JSON arrays and primitives in response_payl
 });
 
 test('eval_ring_audit.mjs reports N/A (never "passed") and exits 0 when src/eval-ring/ does not exist', () => {
-  // 反假绿（HANDOFF §5.2）：src/eval-ring/ 不存在时脚本必须打印 N/A（禁 "passed/OK code-path audit"）。
+  // fail-closed：src/eval-ring/ 不存在时脚本必须打印 N/A（禁 "passed/OK code-path audit"）。
   // exit 0 不阻断 CI（评测环属 V2），但绑定不变量由数据层审计 + 本测试套件强制。
   assert.ok(
     !existsSync(join(repoRoot, 'src', 'eval-ring')),

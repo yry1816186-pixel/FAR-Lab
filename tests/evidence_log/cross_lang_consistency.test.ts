@@ -38,7 +38,7 @@ function pythonCanonicalHash(): string {
 }
 
 // 通用跨语言对拍：通过 stdin 传入任意 JSON 对象，Python 侧用 hash_canonical_json / canonical_json 计算。
-// 用于数值边界样本（day-0 cross-lang PoC，spec 23 §80 / HANDOFF §3.3）。
+// Numeric boundary samples for cross-lang hash parity.
 function runPythonCanonical(obj: Record<string, unknown>, mode: 'hash' | 'str'): string {
   const script =
     mode === 'hash'
@@ -91,7 +91,7 @@ test('canonicalHash rejects non-finite numbers before JSON serialization', () =>
 });
 
 test('numeric green vectors: TS hashCanonicalJson === Python (day-0 PoC byte-equal)', () => {
-  // spec 23 §80 / HANDOFF §3.3：golden_vectors 必须含数值样本对拍（禁纯字符串占位蒙混·禁伪绿）。
+  // golden_vectors 必须含数值样本对拍（禁纯字符串占位蒙混）。
   // GREEN 项经 hashCanonicalJson 数值序列化路径，TS fast-json-stable-stringify === Python json.dumps byte-equal。
   for (const v of NUMERIC_GREEN_VECTORS) {
     const tsHex = hashCanonicalJson(v.obj);
