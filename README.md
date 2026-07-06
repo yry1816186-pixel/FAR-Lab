@@ -1,199 +1,170 @@
 # FAR-Lab
 
-**Falsifiable · Auditable · Reproducible Research Framework**
-
-一个面向 AI for Science 的可证伪、可审计、可复现研究框架。
+**可证伪 · 可审计 · 可复现的 AI for Science 研究框架**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> 测试数、覆盖率等质量指标以 `pnpm run ci-all` 的**实测输出为准**——本 README 不手填精确数字，避免文档与实测漂移（反手填纪律）。
+FAR-Lab 是一个面向科学假设生成与验证的研究框架。它不追求"全自动科学家"的叙事，
+而是用确定性的裁决内核与内容寻址的证据链，把 LLM 产出的假设约束在**可证伪、可复算、
+可追溯**的工程边界内。
 
-> ⛔ **ANY AI AGENT (Claude / GPT / Cursor / Copilot / other) — STOP BEFORE WRITING CODE.**
-> Read in order: [`AGENT_ENTRY_PROTOCOL.md`](AGENT_ENTRY_PROTOCOL.md) → [`PROJECT_PLAN/DEPTH_LEDGER.md`](PROJECT_PLAN/DEPTH_LEDGER.md) §A/§C → [`AGENT_ANTISKIM_TRIPWIRES.md`](AGENT_ANTISKIM_TRIPWIRES.md).
-> The depth-wiring gate `scripts/depth_gate.mjs` (run via `pnpm run depth-gate`) is a **CI required check**. Always run it before claiming progress, and use any failing check as the next real wiring task. Do not hand-fill `WIRED_GREEN` in `DEPTH_LEDGER.md`; CI evidence owns that status.
-
----
-
-## 项目简介
-
-FAR-Lab 是一个科学假设生成与验证框架,致力于解决 AI 在科学研究中的可信度问题。不同于传统的 "生成式 AI 科学家" 系统,FAR-Lab 强调:
-
-- **可证伪性**: 每个假设都必须包含可验证的方法
-- **可审计性**: 所有推理过程都有完整的证据链
-- **可复现性**: 跨语言(TS/Python)哈希一致性保证
-
-本项目参加 **XH-202619 揭榜挂帅挑战杯**,赛道一 · 方向 1 · A — "科学假设生成与研究计划设计"。
+> 本文档不手填测试数、覆盖率等会随版本漂移的精确指标。运行 `pnpm ci-all` 获取当前权威值。
 
 ---
 
-## 核心特性
+## 为什么需要它
 
-### 1. 六阶段研究流程
+大模型生成的科学假设普遍存在三类问题：**不可证伪**（无法被实验否定）、**不可复现**
+（换环境结果漂移）、**不可追溯**（结论与证据脱节）。FAR-Lab 用三条机制闭环这三类问题：
+
+- **可证伪性引擎** — 每个假设必须携带可执行的验证方法，否则不予接纳。
+- **五值裁决内核** — 确定性规则（非 LLM 裁决）给出 CONFIRMED / REFUTED /
+  INCONCLUSIVE / DEGRADED_SCOPE / UNTESTED 五种结论。
+- **内容寻址证据链** — 所有证据、裁决轨迹、FEC 契约按 SHA-256 落库，append-only
+  触发器防止篡改，跨语言（TypeScript / Python / 浏览器）哈希字节一致。
+
+---
+
+## 核心能力
+
+### 五值裁决系统
+
+| 裁决 | 语义 |
+|------|------|
+| `CONFIRMED` | 假设通过全部校验 |
+| `REFUTED` | 证据否定假设 |
+| `INCONCLUSIVE` | 证据不足以判断 |
+| `DEGRADED_SCOPE` | 假设范围收窄但仍成立 |
+| `UNTESTED` | 未提交证据 |
+
+裁决由确定性内核 `src/falsifiability/verdict_kernel_v2.ts` 给出。LLM 不参与最终裁决——
+这是框架的硬约束，由 `pnpm no-llm-judge-scan` 在 CI 中强制。
+
+### 六阶段研究流程
 
 ```
 理解 → 整合 → 假设 → 证据 → 计划 → 反馈
 ```
 
-每个阶段都有严格的结构化输出和验证机制。
+每阶段有结构化输出 schema 与状态机约束，事件按因果链持久化。
 
-### 2. 五值裁决系统
+### 可验证的完整性
 
-| 裁决结果 | 含义 |
-|---------|------|
-| `CONFIRMED` | 假设通过所有验证 |
-| `REFUTED` | 假设被证据反驳 |
-| `INCONCLUSIVE` | 证据不足,无法判断 |
-| `DEGRADED_SCOPE` | 假设范围缩小但仍有效 |
-| `UNTESTED` | 未提交证据 |
-
-### 3. 证据链追踪
-
-- 所有 LLM 调用、数据来源、裁决结果都记录在 append-only 哈希链中
-- 跨语言一致性: TypeScript 与 Python 的哈希结果字节完全相同
-- SQLite 触发器强制防篡改
+- 证据哈希链（TS `canonicalHash` ≡ Python `canonical_hash`，字节相等）
+- 套件级 Merkle 聚合根，浏览器侧可用 Web Crypto 独立重算复核
+- 14 条 Golden Vector 用例覆盖五值裁决的全部路径（`golden_vectors/cases/GV-01..14.json`）
 
 ---
 
 ## 技术架构
 
 ```
-Frontend (React + Vite)
+Frontend (React + Vite, 独立 npm 工作区)
     ↓ REST API
-Backend (Fastify + TypeScript)
-    ├── Agent Loop (6-stage FSM)
-    ├── LLM Gateway (model-neutral)
-    ├── Evidence Log (hash chain)
-    ├── Falsifiability Engine
-    └── Verification System
-        ↓
-SQLite (append-only triggers)
+Backend (Fastify 5 + TypeScript)
+    ├── agent_loop      六阶段 FSM
+    ├── llm_gateway     模型无关调度层（competition adapter 隔离厂商耦合）
+    ├── evidence_log    append-only 哈希链
+    ├── falsifiability  可证伪性 + 五值裁决内核
+    ├── fec             证据链编排 + 冻结契约
+    └── anti_theater    反"测试假绿"检测器（20 项）
+    ↓
+SQLite（append-only triggers · 内容寻址 CAS）
 ```
-
-**核心模块**:
-- `agent_loop`: 六阶段 FSM 流程控制
-- `llm_gateway`: 模型无关的 LLM 调度层
-- `evidence_log`: 证据哈希链管理
-- `falsifiability`: 可证伪性检查引擎
-- `benchmark`: Science-125 基准测试套件
 
 ---
 
 ## 快速开始
 
+### 环境要求
+
+- Node.js ≥ 24
+- Python 3.11 / 3.12（可选，启用 SymPy / Z3 数学验证轴）
+- pnpm 10.x
+
 ### 安装
 
 ```bash
-git clone https://github.com/yry1816186-pixel/FAR-Lab.git
+git clone https://github.com/yry1812186-pixel/FAR-Lab.git
 cd FAR-Lab
-pnpm install && pip install -e ".[dev]"
+pnpm install
+node scripts/ensure_py_deps.mjs   # 探测 Python 验证轴，按需安装
 ```
 
 ### 运行测试
 
 ```bash
-# 运行完整测试套件(约3分钟)
-pnpm run ci-all
-
-# 预期结果: 以本机 CI 输出为准（测试数与覆盖率由实测产生，不在此手填）
+pnpm test            # 主回归套件
+pnpm ci-all          # 完整 CI 流水线（含跨语言、覆盖率、扫描门）
+node scripts/depth_gate.mjs   # 深度接线门（AST caller 校验 + 账本一致性）
 ```
 
-### 启动服务
+### 命令行工具
 
 ```bash
-# 启动后端服务
-pnpm run dev:backend
-
-# 启动前端界面
-pnpm run dev:frontend
+far status                # 仓库状态与迁移计数
+far verify-golden --all   # 用真实内核裁决跑全部 Golden Vector
+far fec compile           # 编译证据链冻结契约
+far export far-proof      # 导出可独立复算的证明包
 ```
 
-访问 `http://localhost:5173` 查看 Web 界面。
+前端是 `frontend/` 下的独立工作区：`cd frontend && npm install && npm run dev`。
 
 ---
 
-## 项目统计
+## Science-125 示例
 
-> 所有指标**以 CI 实测为准**，README 不手填易 stale 的精确数字。下表给出指标定义与获取命令；权威值见 `pnpm run ci-all` 输出。
+项目内置覆盖五个领域、五种裁决的基准用例：
 
-| 指标 | 获取方式 | 说明 |
-|------|---------|------|
-| 测试数 | `pnpm run ci-all` | TypeScript + Python 全量测试 |
-| 代码覆盖率 | `pnpm run ci-all` | line / branch 覆盖率 |
-| 源代码规模 | `git ls-files 'src/**'` | 文件数与行数以 git 工作树为准 |
-| 测试文件规模 | `git ls-files 'tests/**'` | 文件数与行数以 git 工作树为准 |
-
-**技术栈**:
-- Backend: TypeScript, Fastify 5, better-sqlite3
-- Frontend: React 18, Vite, shadcn/ui, D3.js
-- Python: reproducible hash verification, SymPy, NumPy
-
----
-
-## 示例演示
-
-项目包含 6 个 Science-125 标准问题的完整验证示例:
-
-| 问题 | 领域 | 裁决结果 |
-|------|------|---------|
+| 问题 | 领域 | 裁决 |
+|------|------|------|
 | 脉冲星 P0 | 天文学 | CONFIRMED |
 | 行星轨道衰减 | 天文学 | INCONCLUSIVE |
-| 蛋白质折叠 | 生物学 | REFUTED |
-| 催化剂活性 | 化学 | DEGRADED_SCOPE |
-| 碳通量 | 生态学 | CONFIRMED |
-| 地震前兆 | 地质学 | UNTESTED |
+| 蛋白质折叠（CASP15） | 生物学 | REFUTED |
+| 催化剂活性（SAC） | 化学 | DEGRADED_SCOPE |
+| 碳通量 | 生态气候 | CONFIRMED |
+| 地震前兆 | 地学 | UNTESTED |
 
-运行示例:
 ```bash
 pnpm test:demo_seeds
 ```
 
 ---
 
-## 评估标准对照
+## 工程治理
 
-针对 XH-202619 赛题的六条评价锚:
+框架用一组机器门把"深度功能是否真接到生产路径"从软规则变成 CI exit code：
 
-| # | 评价标准 | 实现机制 |
-|---|---------|---------|
-| 1 | 闭环链条完整 | 六阶段 FSM + 证据图 DAG |
-| 2 | 计划可执行 | Stage 5 输出可执行检查项 |
-| 3 | 假设有证据支撑 | 强制 falsification_method |
-| 4 | 数据真实影响下轮 | VerdictNode → 下轮调整 |
-| 5 | 迭代过程清楚 | AgentRunEvent 因果追踪 |
-| 6 | 每轮质量逐步提升 | VerdictNode 版本链 |
+- **深度接线门** `scripts/depth_gate.mjs` — AST 校验生产调用方、账本诚实性、统计模块非占位。
+- **反剧场扫描** `pnpm anti-theater-scan` — 检测器确定性、LLM 不在裁决回路。
+- **零容忍扫描** `pnpm zero-tolerance` — `:any` / 硬编码 secret / 空断言等反模式。
+
+接线状态记录在 `PROJECT_PLAN/DEPTH_LEDGER.md`（机器可读）。贡献流程见
+[CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
 
-## 已知限制
+## 已知边界
 
-我们诚实声明项目的当前限制:
-
-1. **数值域哈希**: 字符串键哈希完全证明,浮点序列化边界尚在 RFC 8785 JCS 迁移中
-2. **多模态限制**: 仅支持视觉模态(Qwen-VL),无音频/视频/表格路径
-3. **单机架构**: 当前基于 SQLite,多节点 PostgreSQL 在路线图中
-4. **Pre-1.0**: API 和 schema 可能变化
+1. **浮点序列化** — 字符串键哈希完全证明；浮点序列化正迁移至 RFC 8785 JCS 规范化。
+2. **多模态** — 当前支持视觉模态（Qwen-VL）；音频/视频/表格路径在路线图中。
+3. **单机部署** — 基于 SQLite；多节点 PostgreSQL 为未来工作。
+4. **Pre-1.0** — API 与 schema 可能调整。
 
 ---
 
-## 文档导航
+## 文档
 
-- [开发指南](README.dev.md) - W1/W2/W3 里程碑与命令映射
-- [变更日志](CHANGELOG.md) - V1 版本发布记录
-- [交付报告](DELIVERY_REPORT.md) - 评审提交清单
-- [贡献指南](CONTRIBUTING.md) - 设置与 PR 流程
-- [安全政策](SECURITY.md) - 漏洞报告与密钥策略
-- [前端文档](frontend/README.md) - UI 架构与 API 合约
+- [CONTRIBUTING.md](CONTRIBUTING.md) — 环境搭建、PR 流程、质量门、零容忍规则
+- [CHANGELOG.md](CHANGELOG.md) — 版本变更记录
+- [SECURITY.md](SECURITY.md) — 漏洞报告与密钥策略
+- [PROJECT_PLAN/](PROJECT_PLAN/) — 架构与设计文档
 
 ---
 
 ## 许可证
 
-MIT License - 详见 [LICENSE](LICENSE)
+MIT License — 详见 [LICENSE](LICENSE)。
 
----
-
-## 致谢
-
-本项目为 XH-202619 揭榜挂帅挑战杯参赛作品,由阿里云、NAOC、NADC、塔山跨学科创新协会、集思谱联合命题。
-
-本项目不代表阿里云、DashScope、NAOC、NADC 或任何政府机构的官方背书。
+本项目为 XH-202619 揭榜挂帅挑战杯参赛作品。不代表阿里云、DashScope、NAOC、NADC
+或任何机构的官方立场。
