@@ -15,10 +15,11 @@
 name: R9-2 Build Integrity
 
 on:
+  # 默认分支是 feature/initial-project-setup（非 main）——须覆盖，否则直推默认分支绕过构建完整性门（R1/R2）。
   push:
-    branches: [main]
+    branches: [feature/initial-project-setup, main]
   pull_request:
-    branches: [main]
+    branches: [feature/initial-project-setup, main]
   workflow_dispatch:
 
 concurrency:

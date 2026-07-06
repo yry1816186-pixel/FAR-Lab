@@ -63,6 +63,48 @@ export interface AssumptionDiagnostic {
   readonly severity: 'warn' | 'critical';
 }
 
+/**
+ * FUSION-OS-7：执行资源指纹三元组（Open Science per-cell resource 三元组范式·非 bit-exact）。
+ *
+ * wall=墙钟 / cpu=用户脚本 CPU 时间（time.process_time·排除 sleep/wait）/ peak_rss=峰值驻留集。
+ * 首次执行记录为 StatisticalResult.executionFingerprint 基线；复算观测三元组与之比对，
+ * 任一维度量级差异 > EXECUTION_FINGERPRINT_MAGNITUDE_THRESHOLD（默认 10x）→ 结果不可复现 → DEGRADED_SCOPE。
+ * 0 = 未测量（Windows peak_rss / 类型层 caller 未提供）：比对视为不可比，不触发 mismatch（诚实降级·无误报）。
+ */
+export interface ExecutionFingerprint {
+  readonly wallMs: number;
+  readonly cpuMs: number;
+  readonly peakRssKb: number;
+}
+
+/** FUSION-OS-7：量级差异阈值（>10x 视为复算资源轮廓发散·Open Science per-cell 范式）。 */
+export const EXECUTION_FINGERPRINT_MAGNITUDE_THRESHOLD = 10;
+
+/**
+ * FUSION-OS-7：比对基线与复算观测的执行指纹，任一可比维度量级差异 > threshold → true。
+ *
+ * 纯函数（无 IO·无 LLM·确定性）。0 = 未测量 → 该维度不可比 → 不触发（防 Windows peak_rss=0 误报）。
+ * caller（orchestrator）pre-compute 后设 VerdictKernelInput.executionFingerprintMismatch，镜像 OS-1 antiTheater 模式。
+ */
+export function flagExecutionFingerprintMagnitudeMismatch(
+  baseline: ExecutionFingerprint,
+  observed: ExecutionFingerprint,
+  threshold: number = EXECUTION_FINGERPRINT_MAGNITUDE_THRESHOLD,
+): boolean {
+  return (
+    magnitudeRatioExceeds(baseline.wallMs, observed.wallMs, threshold) ||
+    magnitudeRatioExceeds(baseline.cpuMs, observed.cpuMs, threshold) ||
+    magnitudeRatioExceeds(baseline.peakRssKb, observed.peakRssKb, threshold)
+  );
+}
+
+/** 任一端 ≤ 0（未测量）→ 不可比 → false；否则 max/min > threshold → true。 */
+function magnitudeRatioExceeds(a: number, b: number, threshold: number): boolean {
+  if (a <= 0 || b <= 0) return false;
+  const ratio = a > b ? a / b : b / a;
+  return ratio > threshold;
+}
+
 /** 统计检验结果（EV·单个 test）。testId 须对应 FEC implication / metricKey。 */
 export interface StatisticalResult {
   readonly testId: string;
@@ -73,6 +115,10 @@ export interface StatisticalResult {
   readonly effectSizeObserved?: number;
   readonly confidenceInterval?: readonly [number, number];
   readonly assumptionDiagnostics: readonly AssumptionDiagnostic[];
+  /** FUSION-OS-13：值派生形式。与 FEC statisticalPlan.expectedDerivationForm 不一致 → formMismatch（值相等也降级）。optional·缺省零回归。 */
+  readonly derivationForm?: 'literal' | 'derived' | 'formula' | 'auto';
+  /** FUSION-OS-7：首次执行资源指纹基线。复算时 caller 比对观测三元组，量级差异>10x → executionFingerprintMismatch → DEGRADED_SCOPE。optional·缺省零回归。 */
+  readonly executionFingerprint?: ExecutionFingerprint;
 }
 
 /** 协议偏离（R3·critical → UNTESTED）。 */
@@ -103,6 +149,14 @@ export interface KernelAntiTheaterFinding {
 export interface ContradictionEvidence {
   readonly crossesRefutationThreshold: boolean;
   readonly sameScope: boolean;
+}
+
+/** identifier 声明（R-identifier-fabrication·FUSION-OS-14）。claim 带可校验 identifier 但系统侧 trace 无果 → REFUTED。 */
+export interface IdentifierClaim {
+  readonly kind: 'doi' | 'arxiv' | 'accession' | 'author_year';
+  readonly value: string;
+  readonly resolutionStatus: 'resolved' | 'not_found' | 'unresolved';
+  readonly harnessVerifiedSource: boolean;
 }
 
 export type CoverageRelation = 'full' | 'partial' | 'none';
@@ -138,6 +192,8 @@ export interface StatisticalReport {
   readonly primaryEffectSize: number | null;
   readonly primaryConfidenceInterval: readonly [number, number] | null;
   readonly hasWarnAssumption: boolean;
+  /** FUSION-OS-13：任一 statistical result 的 derivationForm 与 FEC expectedDerivationForm 不一致。true → R-derivation-form INCONCLUSIVE。 */
+  readonly formMismatch: boolean;
 }
 
 // ===== VerdictKernelInput / Output（§7.1 / §7.2）=====
@@ -165,6 +221,10 @@ export interface VerdictKernelInput {
   readonly evidenceBasis?: EvidenceBasis;
   /** [VC] ConfoundingGate 裁决（caller pre-compute via adjudicateConfounding·镜像 evidenceSufficiency 模式）。claimType='causal' 时由调用方提供；R7 判定前 R-causal 门消费。注：claimType 非哈希保护（kernel 输入提示·任务 #12 范围·ClaimEnvelope 哈希扩展延后）。 */
   readonly confoundingGateResult?: ConfoundingGateResult;
+  /** [VC] identifier 声明（FUSION-OS-14·caller pre-compute via resolveIdentifierClaim）。任一 not_found → R-identifier-fabrication REFUTED；任一 unresolved → UNTESTED（环境故障非伪造·unresolved 优先于 not_found）。optional·缺省零回归。 */
+  readonly identifierClaims?: readonly IdentifierClaim[];
+  /** [VC] 执行指纹量级失配（FUSION-OS-7·caller pre-compute via flagExecutionFingerprintMagnitudeMismatch）。true → R-execution-fingerprint DEGRADED_SCOPE（复算资源轮廓发散>10x·结果不可复现）。optional·缺省零回归。 */
+  readonly executionFingerprintMismatch?: boolean;
 }
 
 export interface VerdictRuleTrace {
@@ -212,6 +272,7 @@ export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernel
     primaryEffectSize: null,
     primaryConfidenceInterval: null,
     hasWarnAssumption: false,
+    formMismatch: false,
   };
 
   // ── R0 schema invalid（contractVersion 不被 verifier 支持·§1 line 45：fec 非 null 时）──
@@ -292,6 +353,25 @@ export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernel
     });
   }
 
+  // ── R-execution-fingerprint（FUSION-OS-7·复算资源指纹量级差异>10x → DEGRADED_SCOPE）──
+  // caller pre-compute（flagExecutionFingerprintMagnitudeMismatch）：比较 StatisticalResult.executionFingerprint
+  // 基线三元组与复算观测三元组，任一可比维度量级差异>10x → 结果不可复现（Open Science per-cell 三元组范式·非 bit-exact）。
+  // 优先级 DEGRADED_SCOPE 高于统计结论（R5+）：复算资源轮廓发散则统计结论不可信。
+  // scopeSlipText 须非空（recordVerdict 要求 DEGRADED_SCOPE 非空 rationale·镜像 R-causal line 408-412）。
+  if (input.executionFingerprintMismatch === true) {
+    const fingerprintScopeReport: ScopeReport = {
+      ...scopeReport,
+      isDegraded: true,
+      scopeSlipText: 'execution fingerprint magnitude mismatch (>10x): recomputed resource profile diverges from recorded baseline',
+    };
+    return makeOutput('DEGRADED_SCOPE', ['R_EXECUTION_FINGERPRINT_MISMATCH'], 'R_EXECUTION_FINGERPRINT_MISMATCH', {
+      scopeReport: fingerprintScopeReport,
+      statisticalReport,
+      evidenceSufficiency: input.evidenceSufficiency,
+      integrityFlags,
+    });
+  }
+
   // ── anti-theater hasFail（§7.3 line 852·FAIL → UNTESTED）──
   if (input.antiTheaterFindings.some((f) => f.severity === 'fail')) {
     return makeOutput('UNTESTED', ['ANTI_THEATER_FAIL'], 'ANTI_THEATER_FAIL', {
@@ -313,9 +393,47 @@ export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernel
     });
   }
 
+  // ── R-identifier-fabrication（FUSION-OS-14·claim 带 identifier 无 harness-verified 来源 → REFUTED）──
+  // 三态（design doc line 328-338）：unresolved（环境故障·网络/DB 无法解析）→ UNTESTED（严守边界·非伪造）；
+  // not_found（解析了但追溯无果）→ REFUTED（五值优先级 REFUTED > UNTESTED·反剧场强姿态）；resolved → 不触发。
+  // unresolved 优先于 not_found（环境抖动不误判伪造·落点约束 R3）。precedence：R5（统计矛盾）优先；R6（统计反证）之后。
+  if (input.identifierClaims !== undefined && input.identifierClaims.length > 0) {
+    const hasUnresolved = input.identifierClaims.some((c) => c.resolutionStatus === 'unresolved');
+    if (hasUnresolved) {
+      return makeOutput('UNTESTED', ['R_IDENTIFIER_RESOLUTION_ENV_FAILURE'], 'R_IDENTIFIER_RESOLUTION_ENV_FAILURE', {
+        scopeReport,
+        statisticalReport,
+        evidenceSufficiency: input.evidenceSufficiency,
+        integrityFlags,
+        untestedReason: 'R_IDENTIFIER_RESOLUTION_ENV_FAILURE',
+      });
+    }
+    const hasFabricated = input.identifierClaims.some((c) => c.resolutionStatus === 'not_found');
+    if (hasFabricated) {
+      return makeOutput('REFUTED', ['UNVERIFIED_IDENTIFIER'], 'R_IDENTIFIER_FABRICATION', {
+        scopeReport,
+        statisticalReport,
+        evidenceSufficiency: input.evidenceSufficiency,
+        integrityFlags,
+      });
+    }
+  }
+
   // ── R6 primary test refutes（adjustedP ≤ α 且 direction=refutes·GV-02）──
   if (statisticalReport.refutes) {
     return makeOutput('REFUTED', ['R6_PRIMARY_TEST_REFUTES'], 'R6_PRIMARY_TEST_REFUTES', {
+      scopeReport,
+      statisticalReport,
+      evidenceSufficiency: input.evidenceSufficiency,
+      integrityFlags,
+    });
+  }
+
+  // ── R-derivation-form（FUSION-OS-13·form 不匹配即使值相等也降级 INCONCLUSIVE）──
+  // StatisticalResult.derivationForm 与 FEC statisticalPlan.expectedDerivationForm 不一致 → 值相等也不可信
+  // （Open Science Agreement-is-not-verification 范式·反剧场 sentinel-form）。GV-13。
+  if (statisticalReport.formMismatch) {
+    return makeOutput('INCONCLUSIVE', ['R_DERIVATION_FORM_MISMATCH'], 'R_DERIVATION_FORM_MISMATCH', {
       scopeReport,
       statisticalReport,
       evidenceSufficiency: input.evidenceSufficiency,
@@ -471,6 +589,7 @@ export function evaluateStatistics(input: VerdictKernelInput): StatisticalReport
       primaryEffectSize: null,
       primaryConfidenceInterval: null,
       hasWarnAssumption: false,
+      formMismatch: false,
     };
   }
   const alpha = input.fec.statisticalPlan.alpha;
@@ -492,6 +611,13 @@ export function evaluateStatistics(input: VerdictKernelInput): StatisticalReport
   const primaryFirst = primary[0];
   const effectiveDirection: EffectiveDirection = supports ? 'supports' : refutes ? 'refutes' : 'unknown';
 
+  // FUSION-OS-13：derivationForm 不匹配（值相等也不信·Open Science Agreement-is-not-verification）。
+  // expectedDerivationForm undefined 或所有 result.derivationForm undefined → false（零回归）。
+  const expectedForm = input.fec.statisticalPlan.expectedDerivationForm;
+  const formMismatch =
+    expectedForm !== undefined &&
+    all.some((s) => s.derivationForm !== undefined && s.derivationForm !== expectedForm);
+
   return {
     refutes,
     supports,
@@ -502,6 +628,7 @@ export function evaluateStatistics(input: VerdictKernelInput): StatisticalReport
     primaryEffectSize: primaryFirst?.effectSizeObserved ?? null,
     primaryConfidenceInterval: primaryFirst?.confidenceInterval ?? null,
     hasWarnAssumption,
+    formMismatch,
   };
 }
 

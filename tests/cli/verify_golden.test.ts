@@ -70,8 +70,8 @@ test('collectVerifyGoldenDump: all on-disk GV cases run through V2 kernel and pa
   const dump = collectVerifyGoldenDump();
   assert.equal(dump.status, 'PASS');
   assert.equal(dump.backend, 'node');
-  assert.equal(dump.total, 12);
-  assert.equal(dump.passed, 12);
+  assert.equal(dump.total, 14);
+  assert.equal(dump.passed, 14);
   assert.equal(dump.failed, 0);
   assert.equal(dump.errors.length, 0);
   assert.ok(dump.cases.every((result) => result.status === 'PASS'));
@@ -105,8 +105,8 @@ test('collectVerifyGoldenDump: browser backend loads offline verifier and passes
   const dump = collectVerifyGoldenDump({ backend: 'browser' });
   assert.equal(dump.status, 'PASS');
   assert.equal(dump.backend, 'browser');
-  assert.equal(dump.total, 12);
-  assert.equal(dump.passed, 12);
+  assert.equal(dump.total, 14);
+  assert.equal(dump.passed, 14);
   assert.equal(dump.failed, 0);
 });
 
@@ -196,8 +196,8 @@ test('runVerifyGolden: JSON output uses exit 0 for PASS and includes all cases',
   assert.equal(captured.code, 0);
   const parsed = JSON.parse(captured.stdout) as VerifyGoldenDump;
   assert.equal(parsed.status, 'PASS');
-  assert.equal(parsed.total, 12);
-  assert.equal(parsed.passed, 12);
+  assert.equal(parsed.total, 14);
+  assert.equal(parsed.passed, 14);
 });
 
 test('renderVerifyGoldenText: human output names failing cases', () => {

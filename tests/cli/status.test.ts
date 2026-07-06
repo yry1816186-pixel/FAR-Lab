@@ -17,9 +17,10 @@ test('collectStatusDump: phase A cheap 字段从仓库实测', () => {
   // tsFileCount：src/**/*.ts 实测（项目 > 100 个 .ts）
   assert.ok(dump.tsFileCount > 50, `tsFileCount 应 > 50，实际: ${dump.tsFileCount}`);
 
-  // migrationCount：0001-0011 共 11 个（0009 fec_contracts_v2 + 0010 proof_envelopes_v2 + 0011 anti-theater trigger V2；
-  // 01§4.1 原口径"证伪 0018/0026 漂移"仍成立：11 ≠ 18 ≠ 26）。
-  assert.strictEqual(dump.migrationCount, 11);
+  // migrationCount：0001-0017 共 17 个（0013 verdict enum guard + 0014 verdict supersede +
+  // 0015 far_blob_store CAS + 0016 evidence derivable + 0017 evidence provenance class·FUSION-OS-6/9/10/11/12 接线）。
+  // 01§4.1 原口径"证伪 0018/0026 漂移"仍成立：17 ≠ 18 ≠ 26）。
+  assert.strictEqual(dump.migrationCount, 17);
   assert.ok(dump.migrationFiles.includes('0001_initial.sql'));
   assert.ok(dump.migrationFiles.includes('0008_anti_theater_fail_coverage.sql'));
   assert.ok(

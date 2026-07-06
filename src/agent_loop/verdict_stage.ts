@@ -47,6 +47,7 @@ import type {
 } from '../falsifiability/index.ts';
 import {
   buildLegacyVerdictKernelInput,
+  extractVerdictTrace,
   makeLegacyCompatFec,
   verdictResultFromKernelOutput,
 } from '../falsifiability/legacy_kernel_adapter.ts';
@@ -243,6 +244,10 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
       frozenAt: isoTimestamp,
     });
     const kernelOutput = decideFiveValueVerdict(
+      // FUSION-OS-1:agent_loop 是文献投票路径(输入为文献蕴含 supports/refutes 投票·非实验数据),
+      // anti-theater 检测实验 theater(seed-cherry/p-hacking/metric-swap)对文献投票不适用——无实验数据
+      // 无 theater 风险。故 buildLegacyVerdictKernelInput 不加 anti_theater_not_linted flag(见该函数注释),
+      // 文献 CONFIRMED 语义保持。实验路径的 anti-theater 强制门在 orchestrator fecAppendClaim。
       buildLegacyVerdictKernelInput({
         claim: hypothesis.claim,
         evidences: convertedEvidences,
@@ -266,6 +271,8 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
       untestedReason: decision.untestedReason,
       sourceAnchor,
       replayProver: null,
+      // P0-2-EXT：与 decision 同源 kernelOutput（line 245），落库 trace 供 verdict_nodes 审计 + current_hash 绑定。
+      verdictTrace: extractVerdictTrace(kernelOutput),
     });
   });
 

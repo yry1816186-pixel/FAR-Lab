@@ -45,7 +45,7 @@
 // 现改用 TypeScript Compiler API（scripts/lib/code_analysis.mjs），可靠性由官方解析器保障。
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tokenize, codeOnlySource } from './lib/code_analysis.mjs';
@@ -129,6 +129,25 @@ function isRealCommitSha(sha) {
   }
 }
 
+// R6: closed_by sha 的 diff 是否 touch 指定文件（闭合 inherent_limits (c)：sha 存在 ≠ sha 含接线 diff）。
+// 防 dca79ce6 式攻击——closed_by 指向纯治理 commit（.github/docs/ledger，零 src/ diff）伪造 WIRED_GREEN。
+// 返回 true/false；非 git 目录或 git 不可用 → 'skip'（不误判 temp 桩仓，与 isRealCommitSha 同口径）。
+// 用数组形式 spawnSync 代替 execSync 字符串拼接：sha 已过 isRealCommitSha 的 ^[0-9a-f]{4,64}$ 校验
+// （无 shell 元字符注入面），但数组形式更稳，消除跨平台引用差异。
+function commitTouchesFile(sha, filePath) {
+  if (!existsSync(join(REPO_ROOT, '.git'))) return 'skip';
+  try {
+    const out = execSync(
+      `git diff-tree --no-commit-id --name-only -r ${sha}`,
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    const touched = out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map(normalize);
+    return touched.includes(normalize(filePath));
+  } catch {
+    return 'skip';
+  }
+}
+
 // caller 文件是否含某符号的 CallExpression 形态（L1 WARN 用：proof_caller 行号/文件漂移检测）。
 // 仅判「symbol(」形态存在性（含泛型），不排除定义文件——账本 proof_caller 指向定义文件也合法。
 function fileHasCallShaped(symbol, file) {
@@ -158,6 +177,19 @@ function countProductionCallers(symbol, opts = {}) {
   const srcFiles = walk('src').filter((f) => /\.(ts|tsx|js|mjs)$/.test(f)).map(normalize);
   const defRe = new RegExp(`\\bfunction\\s+${symbol}\\b`);
   const reexportRe = new RegExp(`\\bexport\\s*(\\{[^}]*\\b${symbol}\\b[^}]*\\}|\\*\\s+from)`);
+  // R11 防 import 别名击穿 caller 计数：import { symbol as alias } 后用 alias(...) 调用，
+  // 旧口径只数 symbol 字面 → 别名调用隐形（V1 makeVerdict 可被 import { makeVerdict as mv } + mv() 走私回生产）。
+  // 全 src/ 扫「symbol as <local>」（symbol=导出名）收集别名，与 symbol 等价计入 caller。
+  // 不误捕「foo as symbol」（symbol 作 local 别名指向他者）——该形态 symbol 非导出名，与本符号无关。
+  const aliasRe = new RegExp(String.raw`\bimport\s*(?:type\s*)?\{[^}]*\b${symbol}\s+as\s+([A-Za-z_$][\w$]*)`);
+  const aliases = [symbol];
+  for (const rel of srcFiles) {
+    if (rel.startsWith('tests/')) continue;
+    if (excludeFiles.has(rel)) continue;
+    const m = codeOnlySource(readCode(rel)).match(aliasRe);
+    if (m) aliases.push(m[1]);
+  }
+  const symAlt = aliases.join('|');
   const callers = [];
   for (const rel of srcFiles) {
     if (rel.startsWith('tests/')) continue;
@@ -175,10 +207,11 @@ function countProductionCallers(symbol, opts = {}) {
       const line = lines[i];
       if (defRe.test(line)) continue;
       if (reexportRe.test(line)) continue;
-      const symRe = new RegExp(`\\b${symbol}\\b`, 'g');
+      const symRe = new RegExp(`\\b(?:${symAlt})\\b`, 'g');
       let m;
       while ((m = symRe.exec(line)) !== null) {
         const after = line.slice(m.index + m[0].length);
+        const head = line.slice(0, m.index);
         // R4' 红队修补：CallExpression 形态扩展——
         //   direct:  symbol( / symbol<Gen>(
         //   parenWrap: (symbol)(  —— 包裹后反射调用，原 [<(] 漏判
@@ -186,12 +219,14 @@ function countProductionCallers(symbol, opts = {}) {
         const direct = /^\s*[<(]/.test(after);
         const parenWrap = /^\s*\)\s*[<(]/.test(after);
         const reflectCall = /^\s*\.\s*(?:call|apply|bind)\s*\(/.test(after);
-        if (!direct && !parenWrap && !reflectCall) continue;
+        // R11：symbol 作 Reflect.apply/call 第一参（动态调度）—— head 末尾即 reflect 调用开启，
+        //   symbol 后跟 , 非 (，旧 direct/parenWrap/reflectCall 均漏判。防 Reflect.apply(makeVerdict,null,[]) 走私 V1。
+        const reflectFirstArg = /\b(?:Reflect|Function\.prototype)\.(?:apply|call)\s*\(\s*$/.test(head);
+        if (!direct && !parenWrap && !reflectCall && !reflectFirstArg) continue;
         // R3 死分支探测（红队扩展，精确版——防「prev 行完整 while(false){...} 污染下一行调用」）：
         //   同行：dead-opener（if(false)/while(false)/恒假数值比较）出现在 symbol 之前 → 死。
         //   上行：仅当 prev 行以「开放 if()/while() 条件」结尾（body 在本行）且条件死 → 死。
         //   上行 return/throw; 或 字面量&& 结尾 → 本行不可达。
-        const head = line.slice(0, m.index);
         const prevTrim = (lines[i - 1] || '').trim();
         const sameLineDead = /\bif\s*\(\s*(?:false|0|null|undefined)\s*\)/.test(head)
           || /\bwhile\s*\(\s*(?:false|0|null|undefined)\s*\)/.test(head)
@@ -237,6 +272,11 @@ function detectV1StillAlive(v1Symbol, v1DefFile) {
 // （function f(args: { fecV2?: X })）。当前架构是后者——fecAppendClaim(db, args: FecAppendClaimArgs)，
 // fecV2? 在 FecAppendClaimArgs interface。只扫形参块会漏报，故先扫形参块，找不到再扫全文件 interface 字段。
 function detectOptionalParam(defFile, funcName, paramName) {
+  // 防御：defFile 缺失时 fail-closed 结构化报错（非 ENOENT 崩溃丢诊断）。
+  // 真实仓库该文件恒存在；桩仓 / 被删场景下给出清晰 reason 而非 stack trace。
+  if (!existsSync(join(REPO_ROOT, defFile))) {
+    return { passed: false, reason: `${defFile} 不存在——${funcName} 的 ${paramName} 形参无法校验（接线目标文件缺失）` };
+  }
   const raw = readCode(defFile);
   const code = codeOnlySource(raw);
   const fieldRe = new RegExp(`(readonly\\s+)?${paramName}(\\?)?\\s*[:{]`, 'g');
@@ -291,13 +331,17 @@ function detectOptionalParam(defFile, funcName, paramName) {
   return { passed: true, reason: 'ok' };
 }
 
-// ---------- 检查原语：目录内容非占位（R5 修补 + realMathSignal） ----------
+// ---------- 检查原语：目录内容非占位（R5 修补 + R12 realMathSignal 收紧） ----------
 // 红队扩展：占位检测覆盖 4 形态——
 //   (1) export function F(...): number { return <literal|ident>; }
 //   (2) export const F = (...) => <literal|ident>;           （箭头单行常量）
 //   (3) return <literal> <op> <literal>;                     （0.5+0 / 0.03*1 常量折叠伪装）
-// realMathSignal：文件含 Math.* / 已知统计库函数 / for|while 循环 → 真实数学信号。
-//   W5 要求 realFileCount≥4 + placeholderCount=0 + realMathSignal（防「4 个非占位但全是无数学的薄壳」）。
+// realMathSignal（R12 收紧）：旧口径「文件含 Math.* / 统计库函数 / for|while」被装饰性满足——
+//   攻击者放一个 `const _ = Math.random();` 或空 `for(;;){}` 即过，return 仍是常量/三元。
+//   新口径要求信号在 **return 路径** 或 **实质循环体**：
+//     returnPathMath —— return 表达式含 Math.*(≠random) / 已知统计库函数 / 含标识符的算术 / 函数方法调用；
+//     substantiveLoop —— for/while 体含赋值或自增自减（非空体，排 `for(;;){}` / `while(false){}`）。
+//   Math.random 整体排除：非确定性与确定性统计验证相斥（真实 src/statistics 零 Math.random）。
 function dirHasRealMath(relPath) {
   const files = walk(relPath).filter((f) => /\.ts$/.test(f) && !/(^|[\\/])index\.(ts|js)$/.test(f));
   const placeholders = [];
@@ -305,14 +349,29 @@ function dirHasRealMath(relPath) {
   const fnRe1 = /export\s+function\s+(\w+)\s*\([^)]*\)\s*:\s*number\s*\{\s*return\s+([0-9.eE+-]+|[_A-Za-z][_A-Za-z0-9]*)\s*;?\s*\}/g;
   const fnRe2 = /export\s+(?:const|let)\s+(\w+)\s*=[^=]*=>\s*([0-9.eE+-]+|[_A-Za-z][_A-Za-z0-9]*)\s*;?/g;
   const arithRe = /return\s+([0-9.eE+-]+)\s*([+\-*/])\s*([0-9.eE+-]+)\s*;/g;
+  const STAT_FNS = /\b(?:erf|normalCdf|normalSurvival|sampleMean|sampleStandardDeviation|tStatistic|chiSquareCdf|holmBonferrioni?|benjaminiHochberg|bonferroni|sampleVariance|weightedVariance|clampProbability|wilson|wald|welch)\b/;
+  const MATH_CALL = /\bMath\.(?!random\b)\w+/;
+  const CALL_OR_METHOD = /[_A-Za-z][_A-Za-z0-9.]*\s*\(/;
+  const returnRe = /\breturn\s+([^;{}]+?)\s*[;]/g;
+  const loopRe = /\b(?:for|while)\s*\(([^)]*)\)\s*\{([^{}]*)\}/g;
   for (const rel of files) {
     const code = codeOnlySource(readCode(rel));
-    if (
-      /\bMath\.\w+/.test(code) ||
-      /\b(?:erf|normalCdf|normalSurvival|sampleMean|sampleStandardDeviation|tStatistic|chiSquareCdf|holmBonferroni|benjaminiHochberg|bonferroni)\b/.test(code) ||
-      /\bfor\s*\(|\bwhile\s*\(/.test(code)
-    ) {
-      realMathSignal = true;
+    let rm;
+    while ((rm = returnRe.exec(code)) !== null) {
+      const expr = rm[1];
+      const hasArith = /[+\-*/]/.test(expr) && /[A-Za-z_]/.test(expr);
+      if (MATH_CALL.test(expr) || STAT_FNS.test(expr) || CALL_OR_METHOD.test(expr) || hasArith) {
+        realMathSignal = true;
+      }
+    }
+    let lm;
+    while ((lm = loopRe.exec(code)) !== null) {
+      const header = lm[1].trim();
+      const body = lm[2];
+      if (/^(?:false|0\b|;)/.test(header) || body.trim().length === 0) continue;
+      if (/[+\-*/|&^]?=|[+\-]{2}/.test(body)) {
+        realMathSignal = true;
+      }
     }
     let m;
     while ((m = fnRe1.exec(code)) !== null) placeholders.push({ file: normalize(rel), fn: m[1], body: m[2], kind: 'fn-literal' });
@@ -381,6 +440,17 @@ function verifyDepthLedger() {
       if (testPath && !existsSync(join(REPO_ROOT, testPath))) {
         illegal.push({ id: r.id, reason: `proof_test 文件不存在: ${testPath}` });
       }
+      // R3: proof_test ::test_name 须真实存在于测试文件（防 ::ghost_name 占位——文件存在但测试名编造）。
+      // 兼带闭合 depth_evidence bot 的 NO_MATCH 攻击面：bot 按 TAP verdict 行精确名匹配，
+      // 若账本名与真实 test() 名不符 → bot 报 NO_MATCH（ERROR/fail-closed）→ 该行永不可达 WIRED_GREEN。
+      // 静态预拦在 gate 层，早于 bot 双跑暴露。
+      const nameSep = r.proofTest.indexOf('::');
+      if (nameSep >= 0 && testPath && existsSync(join(REPO_ROOT, testPath))) {
+        const tname = r.proofTest.slice(nameSep + 2).trim();
+        if (tname && !readFileSync(join(REPO_ROOT, testPath), 'utf8').includes(tname)) {
+          illegal.push({ id: r.id, reason: `proof_test 测试名未在 ${testPath} 找到（::ghost_name 占位 / 名字漂移；兼防 bot NO_MATCH）: "${tname.slice(0, 60)}"` });
+        }
+      }
       // proof_caller 文件必须存在
       if (!existsSync(join(REPO_ROOT, r.callerFile))) {
         stale.push({ id: r.id, reason: `proof_caller 文件不存在: ${r.callerFile}` });
@@ -400,6 +470,14 @@ function verifyDepthLedger() {
       if (r.closedBy && r.closedBy !== '—') {
         const rev = isRealCommitSha(r.closedBy);
         if (rev === false) illegal.push({ id: r.id, reason: `closed_by="${r.closedBy}" 非本仓库真实 commit（git cat-file -t 失败）` });
+        // R6: closed_by sha 的 diff 须 touch proof_caller 文件（闭合 inherent_limits (c)）。
+        // 仅在 sha 真实且仓库可 git 时校验（rev===true）——no-git/error 跳过（不误判桩仓）。
+        if (rev === true) {
+          const touches = commitTouchesFile(r.closedBy, r.callerFile);
+          if (touches === false) {
+            illegal.push({ id: r.id, reason: `closed_by="${r.closedBy}" 的 git diff-tree 未 touch proof_caller ${r.callerFile}（sha 存在但不含接线 diff——inherent_limits (c) 活体，防纯治理 commit 伪造 WIRED_GREEN，如 dca79ce6 式攻击）` });
+          }
+        }
       }
     }
   }
@@ -535,6 +613,44 @@ hardCheck('CHECK-W6 golden_vectors/cases/ ≥12 条带 schema GV (P1-4)', () => 
     badCount: gv.badCount,
     bad: gv.bad,
   };
+});
+
+// CHECK-W6b (HARD): GV expected.verdict 与 V2 内核实际裁决逐条一致（R5 运行时校验）
+//   W6 仅静态校 schema（字段在 / verdict∈五值 / 证据非空），证不了「expected.verdict 与内核实际输出一致」——
+//   攻击者改 GV 的 expected.verdict 或改内核规则使两者静默分歧，W6 仍绿。R5 闭合：spawn
+//   `node src/cli/far.ts verify-golden --backend node --all --json`，解析 dump.status/failed，FAIL 即本门 FAIL。
+//   仅当 gate root 含真实 src/cli/far.ts + golden_vectors/cases 时运行（fixture/桩模式 skip——evade 测试隔离）。
+hardCheck('CHECK-W6b GV expected.verdict 与内核一致（R5 运行时·verify_golden）', () => {
+  const farTs = join(REPO_ROOT, 'src/cli/far.ts');
+  const gvDir = join(REPO_ROOT, 'golden_vectors/cases');
+  if (!existsSync(farTs) || !existsSync(gvDir)) {
+    return { passed: true, reason: 'src/cli/far.ts 或 golden_vectors/cases 不存在（fixture/桩模式）——R5 运行时校验仅对真实仓库生效' };
+  }
+  const r = spawnSync('node', [farTs, 'verify-golden', '--backend', 'node', '--all', '--json'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (r.error) {
+    const msg = r.error instanceof Error ? r.error.message : String(r.error);
+    return { passed: false, reason: `verify-golden spawn 错误：${msg}` };
+  }
+  let dump;
+  try {
+    dump = JSON.parse(r.stdout);
+  } catch {
+    return { passed: false, reason: `verify-golden 输出非 JSON（exit=${r.status}）——stdout 头: ${(r.stdout || '').slice(0, 200)} stderr: ${(r.stderr || '').slice(0, 200)}` };
+  }
+  if (dump.status !== 'PASS' || (dump.failed ?? 0) > 0) {
+    const failedCases = (dump.cases ?? [])
+      .filter((c) => c.status === 'FAIL')
+      .map((c) => `${c.caseId}: expected=${c.expectedVerdict} actual=${c.verdict} (${(c.errors ?? []).join('; ')})`);
+    return {
+      passed: false,
+      reason: `GV expected.verdict 与 V2 内核不一致（R5）——${dump.failed ?? '?'} 条分歧：${failedCases.slice(0, 6).join(' | ') || '见 dump'}`,
+    };
+  }
+  return { passed: true, reason: `verify-golden ${dump.passed}/${dump.total} PASS（GV expected.verdict/decisiveRuleId/reasonCodes 与 V2 内核逐条一致）` };
 });
 
 // CHECK-W7 (HARD): tests/real_backends/ 存在 + 真实 spawn/import 信号（防字符串自洽占位）

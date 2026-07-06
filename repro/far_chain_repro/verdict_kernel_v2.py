@@ -163,11 +163,48 @@ def decide_five_value_verdict(kernel_input: dict[str, Any]) -> dict[str, Any]:
             integrity_flags,
         )
 
+    # R-identifier-fabrication (FUSION-OS-14·与 verdict_kernel_v2.ts:335 对齐·R5 后 R6 前)。
+    identifier_claims = kernel_input.get("identifierClaims")
+    if identifier_claims:
+        if any(claim.get("resolutionStatus") == "unresolved" for claim in identifier_claims):
+            return make_output(
+                "UNTESTED",
+                ["R_IDENTIFIER_RESOLUTION_ENV_FAILURE"],
+                "R_IDENTIFIER_RESOLUTION_ENV_FAILURE",
+                scope_report,
+                statistical_report,
+                kernel_input["evidenceSufficiency"],
+                integrity_flags,
+                "R_IDENTIFIER_RESOLUTION_ENV_FAILURE",
+            )
+        if any(claim.get("resolutionStatus") == "not_found" for claim in identifier_claims):
+            return make_output(
+                "REFUTED",
+                ["UNVERIFIED_IDENTIFIER"],
+                "R_IDENTIFIER_FABRICATION",
+                scope_report,
+                statistical_report,
+                kernel_input["evidenceSufficiency"],
+                integrity_flags,
+            )
+
     if statistical_report["refutes"]:
         return make_output(
             "REFUTED",
             ["R6_PRIMARY_TEST_REFUTES"],
             "R6_PRIMARY_TEST_REFUTES",
+            scope_report,
+            statistical_report,
+            kernel_input["evidenceSufficiency"],
+            integrity_flags,
+        )
+
+    # R-derivation-form (FUSION-OS-13·与 verdict_kernel_v2.ts:370 对齐·R6 后 R7 前)。
+    if statistical_report["formMismatch"]:
+        return make_output(
+            "INCONCLUSIVE",
+            ["R_DERIVATION_FORM_MISMATCH"],
+            "R_DERIVATION_FORM_MISMATCH",
             scope_report,
             statistical_report,
             kernel_input["evidenceSufficiency"],
@@ -296,6 +333,7 @@ def evaluate_statistics(kernel_input: dict[str, Any]) -> dict[str, Any]:
             "primaryEffectSize": None,
             "primaryConfidenceInterval": None,
             "hasWarnAssumption": False,
+            "formMismatch": False,
         }
     alpha = float(fec["statisticalPlan"]["alpha"])
     metric_key = fec["metric"]["metricKey"]
@@ -314,6 +352,12 @@ def evaluate_statistics(kernel_input: dict[str, Any]) -> dict[str, Any]:
         for stat in statistics
         for diagnostic in stat.get("assumptionDiagnostics", [])
     ) or any(finding.get("severity") == "warn" for finding in kernel_input.get("antiTheaterFindings", []))
+    # FUSION-OS-13: derivationForm 不匹配（值相等也不信·与 verdict_kernel_v2.ts evaluateStatistics 对齐）。
+    expected_form = fec["statisticalPlan"].get("expectedDerivationForm")
+    form_mismatch = expected_form is not None and any(
+        stat.get("derivationForm") is not None and stat.get("derivationForm") != expected_form
+        for stat in statistics
+    )
     return {
         "refutes": refutes,
         "supports": supports,
@@ -324,6 +368,7 @@ def evaluate_statistics(kernel_input: dict[str, Any]) -> dict[str, Any]:
         "primaryEffectSize": primary_first.get("effectSizeObserved"),
         "primaryConfidenceInterval": primary_first.get("confidenceInterval"),
         "hasWarnAssumption": has_warn_assumption,
+        "formMismatch": form_mismatch,
     }
 
 

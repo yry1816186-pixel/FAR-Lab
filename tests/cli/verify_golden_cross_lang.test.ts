@@ -35,8 +35,8 @@ test('node_python_browser_agree_on_GV: node backend runs all 12 GV through V2 ke
   assert.equal(exit, 0, `runVerifyGolden node backend should exit 0 (PASS), got ${exit}`);
 
   assert.equal(NODE_DUMP.status, 'PASS', `node backend should PASS, errors: ${NODE_DUMP.errors.join('; ')}`);
-  assert.equal(NODE_DUMP.total, 12, `expected 12 golden vectors on disk, got ${NODE_DUMP.total}`);
-  assert.equal(NODE_DUMP.passed, 12, `all 12 GV should pass, got ${NODE_DUMP.passed} passed / ${NODE_DUMP.failed} failed`);
+  assert.equal(NODE_DUMP.total, 14, `expected 14 golden vectors on disk, got ${NODE_DUMP.total}`);
+  assert.equal(NODE_DUMP.passed, 14, `all 14 GV should pass, got ${NODE_DUMP.passed} passed / ${NODE_DUMP.failed} failed`);
   assert.equal(NODE_DUMP.failed, 0);
 
   // 每条 GV 都真调了 decideFiveValueVerdict：decisiveRuleId 非空（非占位）。

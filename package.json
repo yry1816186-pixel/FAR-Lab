@@ -11,7 +11,7 @@
     "far": "src/cli/far.ts"
   },
   "scripts": {
-    "test": "node --test tests/api/*.test.ts tests/audit/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts tests/evidence_log/*.test.ts tests/evidence_graph/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts tests/math/*.test.ts tests/statistics/*.test.ts tests/golden_vectors/*.test.ts tests/real_backends/*.test.ts tests/dialogue/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts tests/far_proof/*.test.ts tests/science_harness/*.test.ts tests/science_harness/adapters/*.test.ts tests/confounding_gate/*.test.ts tests/proof_envelope/*.test.ts tests/proof_envelope/v2/*.test.ts tests/report/*.test.ts tests/trace/*.test.ts tests/cli/*.test.ts tests/anti_theater/*.test.ts",
+    "test": "node --test tests/api/*.test.ts tests/audit/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts tests/evidence_log/*.test.ts tests/evidence_graph/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts tests/math/*.test.ts tests/statistics/*.test.ts tests/golden_vectors/*.test.ts tests/real_backends/*.test.ts tests/dialogue/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts tests/far_proof/*.test.ts tests/science_harness/*.test.ts tests/science_harness/adapters/*.test.ts tests/confounding_gate/*.test.ts tests/proof_envelope/*.test.ts tests/proof_envelope/v2/*.test.ts tests/report/*.test.ts tests/trace/*.test.ts tests/cli/*.test.ts tests/anti_theater/*.test.ts tests/scripts/*.test.mjs",
     "test:agent_loop": "node --test tests/agent_loop/*.test.ts",
     "test:api": "node --test tests/api/*.test.ts",
     "test:audit": "node --test tests/audit/*.test.ts",
@@ -58,6 +58,7 @@
     "fast-json-stable-stringify": "^2.1.0",
     "fastify": "^5.0.0",
     "openai": "^4.85.0",
+    "typescript": "^5.9.3",
     "ulid": "^2.4.0",
     "zod": "^3.23.0",
     "zod-to-json-schema": "^3.23.0"
@@ -68,7 +69,6 @@
     "@types/node": "^24.13.2",
     "eslint": "^10.6.0",
     "tsx": "^4.22.4",
-    "typescript": "^5.9.3",
     "typescript-eslint": "^8.62.0",
     "vitest": "^2.1.9"
   }

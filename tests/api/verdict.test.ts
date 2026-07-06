@@ -17,6 +17,7 @@
  */
 
 import { runMigrations } from '../../src/db/index.ts';
+import { FIXTURE_VERDICT_TRACE } from '../falsifiability/_verdict_trace_fixture.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
@@ -107,6 +108,7 @@ function seedEvidenceAndVerdict(
     untestedReason: decision === 'UNTESTED' ? 'no evidence collected' : null,
     sourceAnchor: SOURCE_ANCHOR,
     replayProver: null,
+    verdictTrace: FIXTURE_VERDICT_TRACE,
   });
 
   return node.verdictId;

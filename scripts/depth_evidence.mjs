@@ -286,7 +286,10 @@ function padCell(orig, newVal) {
 
 function replaceRowCells(line, { status, closedBy }) {
   const parts = line.split('|');
-  if (parts.length !== 9) return line; // §C 行 = 7 cell + 2 border = 9 段；不符则不动（防御）
+  // §C 行段数：8 cell + 2 border = 10 段（R10 含 claimed_by_pr 列）；向后兼容 7 cell + 2 border = 9 段旧行。
+  // status=parts[6]、closedBy=parts[7] 索引在两种列数下恒定（claimed_by_pr 在 parts[8]，原样保留不动）。
+  // 不符（非 §C 行 / 损坏行）则原样返回——防御性不静默改写。
+  if (parts.length !== 10 && parts.length !== 9) return line;
   parts[6] = padCell(parts[6], status);
   parts[7] = padCell(parts[7], closedBy);
   return parts.join('|');

@@ -15,6 +15,7 @@
  */
 
 import { runMigrations } from '../../src/db/index.ts';
+import { FIXTURE_VERDICT_TRACE } from '../falsifiability/_verdict_trace_fixture.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
@@ -195,6 +196,7 @@ test('GET /api/v1/evidence/:id includes verdictNode when verdict exists', async 
     untestedReason: null,
     sourceAnchor: SOURCE_ANCHOR,
     replayProver: null,
+    verdictTrace: FIXTURE_VERDICT_TRACE,
   });
 
   const app = await buildServer({

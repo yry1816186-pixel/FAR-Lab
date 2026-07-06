@@ -6,12 +6,14 @@
 
 import { spawn, spawnSync, execSync } from 'node:child_process';
 import { delimiter, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const repoRoot = process.cwd();
 
 // P3-1: 真实依赖 = spawnSync python3 + 'import sympy, z3'。环境失败 ≠ 代码 bug（CLAUDE.md §3 第3条不变式）。
 // 首行输出格式固定为 'Python axis: available' 或 'Python axis: skipped (<reason>)'，须在任何其他输出之前。
-function probePythonAxis() {
+// write 注入仅用于测试捕获首行契约；默认写 process.stdout（生产行为不变）。
+export function probePythonAxis(write = (s) => process.stdout.write(s)) {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   const probe = spawnSync(pythonCmd, ['-c', 'import sympy, z3; print("available")'], {
     encoding: 'utf8',
@@ -29,10 +31,10 @@ function probePythonAxis() {
     } else {
       reason = `unknown: ${stderr.slice(0, 200)}`;
     }
-    process.stdout.write(`Python axis: skipped (${reason})\n`);
+    write(`Python axis: skipped (${reason})\n`);
     return { available: false, reason };
   }
-  process.stdout.write('Python axis: available\n');
+  write('Python axis: available\n');
   return { available: true };
 }
 
@@ -74,41 +76,46 @@ function failIfCIPRTouchedPyAxis() {
   }
 }
 
-const probe = probePythonAxis();
-if (!probe.available) {
-  failIfCIPRTouchedPyAxis();
+// 直接调用（CLI）才跑探针 + unittest 套件；被 import（单元测试 probePythonAxis）时不跑，
+// 避免 import 触发整套 Python 测试 + process.exit 污染测试进程（与 depth_evidence.mjs 同口径）。
+const invokedDirectly = import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
+if (invokedDirectly) {
+  const probe = probePythonAxis();
+  if (!probe.available) {
+    failIfCIPRTouchedPyAxis();
+  }
+
+  const pythonPath = resolve(repoRoot, 'repro');
+  const pythonDepsPath = resolve(repoRoot, '.python-deps');
+  const existingPythonPath = process.env.PYTHONPATH;
+  const pythonPathParts = [pythonPath, pythonDepsPath];
+  if (existingPythonPath !== undefined && existingPythonPath.length > 0) {
+    pythonPathParts.push(existingPythonPath);
+  }
+
+  const env = {
+    ...process.env,
+    PYTHONPATH: pythonPathParts.join(delimiter),
+  };
+
+  // python3 on Linux/macOS, python on Windows
+  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  const child = spawn(
+    pythonCmd,
+    ['-m', 'unittest', 'discover', '-s', 'repro/tests', '-p', 'test_*.py'],
+    {
+      cwd: repoRoot,
+      env,
+      stdio: 'inherit',
+    },
+  );
+
+  child.on('error', (err) => {
+    console.error(`run_py_tests: failed to spawn ${pythonCmd}:`, err.message);
+    process.exit(1);
+  });
+
+  child.on('close', (code) => {
+    process.exit(code ?? 1);
+  });
 }
-
-const pythonPath = resolve(repoRoot, 'repro');
-const pythonDepsPath = resolve(repoRoot, '.python-deps');
-const existingPythonPath = process.env.PYTHONPATH;
-const pythonPathParts = [pythonPath, pythonDepsPath];
-if (existingPythonPath !== undefined && existingPythonPath.length > 0) {
-  pythonPathParts.push(existingPythonPath);
-}
-
-const env = {
-  ...process.env,
-  PYTHONPATH: pythonPathParts.join(delimiter),
-};
-
-// python3 on Linux/macOS, python on Windows
-const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-const child = spawn(
-  pythonCmd,
-  ['-m', 'unittest', 'discover', '-s', 'repro/tests', '-p', 'test_*.py'],
-  {
-    cwd: repoRoot,
-    env,
-    stdio: 'inherit',
-  },
-);
-
-child.on('error', (err) => {
-  console.error(`run_py_tests: failed to spawn ${pythonCmd}:`, err.message);
-  process.exit(1);
-});
-
-child.on('close', (code) => {
-  process.exit(code ?? 1);
-});

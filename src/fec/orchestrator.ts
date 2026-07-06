@@ -14,6 +14,7 @@ import type {
 import {
   decideFiveValueVerdict,
   evaluateThreshold,
+  extractVerdictTrace,
   falsifiabilityGate,
   recordVerdict,
   registerContract,
@@ -28,23 +29,27 @@ import type {
   StatisticalResult,
   ThresholdSpec,
   VerdictKernelInput,
+  IdentifierClaim,
   VerdictKernelOutput,
   VerdictNode,
   VerdictNodeKind,
   VerdictResult,
 } from '../falsifiability/index.ts';
 import { compileFec } from './compiler.ts';
+import { storeBlob } from '../cas/index.ts';
 import {
   assertFecGate,
   enforceFecMandatoryGate,
   type FecGateDecision,
 } from './fec_mandate.ts';
-import type { FecContractV2 } from './fec_contract.ts';
+import type { CompileFecResult, FecContractV2 } from './fec_contract.ts';
 import type {
   ClaimType,
   ConfoundingGateResult,
   EvidenceBasis,
 } from '../confounding_gate/types.ts';
+import type { AntiTheaterReport } from '../anti_theater/index.ts';
+import { toKernelFindings } from '../anti_theater/index.ts';
 
 export interface FecAppendClaimArgs {
   readonly callRecord: AppendRecordInput;
@@ -87,6 +92,15 @@ export interface FecAppendClaimArgs {
   readonly evidenceBasis?: EvidenceBasis;
   /** ConfoundingGate 裁决（caller pre-compute via adjudicateConfounding·镜像 evidenceSufficiency 模式）。 */
   readonly confoundingGateResult?: ConfoundingGateResult;
+  /** identifier 声明（FUSION-OS-14·caller pre-compute via resolveIdentifierClaim·opt-in）。任一 not_found → R-identifier-fabrication REFUTED；任一 unresolved → UNTESTED。 */
+  readonly identifierClaims?: readonly IdentifierClaim[];
+  /**
+   * 反剧场检测报告(FUSION-OS-1·caller pre-compute via runAntiTheaterLint)。提供时 buildVerdictKernelInput
+   * 内 toKernelFindings 单点投影喂 kernel(反剧场红线:KernelAntiTheaterFinding[] 不暴露为 args·禁 caller
+   * 手填 findings);不提供则 findings 空(向后兼容·等价接线前行为)。强制门跟进 P1-6(multi-seed sandbox
+   * 提供 real anti-theater data),见 buildVerdictKernelInput 注释。
+   */
+  readonly antiTheaterReport?: AntiTheaterReport;
 }
 
 export interface FecAppendClaimResult {
@@ -99,6 +113,16 @@ export interface FecAppendClaimResult {
   readonly contract: FalsifiabilityContract | null;
   /** FEC V2 门禁决策（W2-A 接线）。 */
   readonly fecGate: FecGateDecision;
+  /**
+   * FUSION-OS-9：FEC Plan + kernel trace 在 far_blob_store CAS 的内容寻址 hash（反剧场「artifact hash 即承诺」）。
+   * fecPlanHash 在 compileResult.ok=false 时为 null（无 plan 可寻址）；kernelTraceHash 恒非空。
+   */
+  readonly casReferences: CasReferences;
+}
+
+export interface CasReferences {
+  readonly fecPlanHash: string | null;
+  readonly kernelTraceHash: string;
 }
 
 export function fecAppendClaim(
@@ -135,6 +159,11 @@ export function fecAppendClaim(
         ? compileResult.plan.integrityFlags
         : args.fecV2.contract.integrityFlags;
     const kernelOutput = decideFiveValueVerdict(buildVerdictKernelInput(args, integrityFlags));
+    const verdictTrace = extractVerdictTrace(kernelOutput);
+    // FUSION-OS-9：FEC Plan + kernel trace 内容寻址落 CAS（反剧场红线「artifact hash 即承诺」）。
+    // 同 plan/trace 跨 claim 按 canonical JSON 去重（INSERT OR IGNORE 单行）+ append-only trigger 禁改写 → 篡改可检。
+    // 与 verdict_nodes.verdict_trace DB 列（查询用）正交：CAS 是内容寻址 SSOT（hash 即地址·去重维度）。
+    const casReferences = storeVerdictArtifactsInCas(db, compileResult, kernelOutput, verdictTrace);
     let decision: VerdictResult;
     if (!fecGate.allowed) {
       // 缺/坏 FEC 的 claim 禁止走 kernel：否则 V1 布尔计数器可能在「证据全支持」时落 CONFIRMED，
@@ -162,6 +191,10 @@ export function fecAppendClaim(
       untestedReason: decision.untestedReason,
       sourceAnchor: args.sourceAnchor,
       replayProver: null,
+      // P0-2-EXT：与 decision 同源 kernelOutput（line 137），落库 trace 不可与 verdict 分别伪造。
+      // 缺/坏 FEC 时 kernelOutput 仍由 decideFiveValueVerdict 产出（fail-closed UNTESTED 走 decision，
+      // 但 kernel trace 真实记录 R1 触发——比 verdict=UNTESTED 更可审计）。
+      verdictTrace,
     });
 
     return {
@@ -172,10 +205,29 @@ export function fecAppendClaim(
       verdictNode,
       contract,
       fecGate,
+      casReferences,
     };
   });
 
   return append();
+}
+
+function storeVerdictArtifactsInCas(
+  db: Database.Database,
+  compileResult: CompileFecResult,
+  kernelOutput: VerdictKernelOutput,
+  verdictTrace: ReturnType<typeof extractVerdictTrace>,
+): CasReferences {
+  const fecPlanHash = compileResult.ok
+    ? storeBlob(db, { kind: 'fec_plan', fecId: compileResult.fec.fecId, fecHash: compileResult.fec.freeze.fecHash, plan: compileResult.plan }).hash
+    : null;
+  const kernelTraceHash = storeBlob(db, {
+    kind: 'kernel_trace',
+    decisiveRuleId: kernelOutput.decisiveRuleId,
+    verdict: kernelOutput.verdict,
+    trace: verdictTrace,
+  }).hash;
+  return { fecPlanHash, kernelTraceHash };
 }
 
 function buildVerdictKernelInput(
@@ -191,13 +243,20 @@ function buildVerdictKernelInput(
     datasetBindings: args.evidences.map(evidenceToDatasetBinding),
     statistics,
     protocolDeviations: [],
-    antiTheaterFindings: [],
+    // FUSION-OS-1:caller pre-compute report → toKernelFindings 单点投影(反剧场红线:禁 caller 手填 findings)。
+    // 不加 anti_theater_not_linted flag:经 Explore 实测 4 个生产 caller 中 3 个(demo_chain/hero_a/hero_b)
+    // 无诚实构造 AntiTheaterLintInput 的数据(single-seed fixture / 合成 strata / 无 raw artifact hash)——
+    // 强制 flag 等于"对无力跑 lint 的 caller 强制降级",回退 P1-5 已落地核心演示(hero_a 真实统计 CONFIRMED)。
+    // 通道接通(投影)+ 类型层禁手填 + verifier cross-check(verify.ts:380 diffAntiTheaterReport)已闭合反剧场;
+    // flag 强制门跟进 P1-6(multi-seed venv sandbox 提供 real anti-theater data),那时 caller 有数据可跑 lint。
+    antiTheaterFindings: toKernelFindings(args.antiTheaterReport?.findings ?? []),
     evidenceSufficiency: summarizeEvidenceSufficiency(args, statistics),
     contradictionSet: [],
     integrityFlags,
     ...(args.claimType !== undefined ? { claimType: args.claimType } : {}),
     ...(args.evidenceBasis !== undefined ? { evidenceBasis: args.evidenceBasis } : {}),
     ...(args.confoundingGateResult !== undefined ? { confoundingGateResult: args.confoundingGateResult } : {}),
+    ...(args.identifierClaims !== undefined ? { identifierClaims: args.identifierClaims } : {}),
   };
 }
 

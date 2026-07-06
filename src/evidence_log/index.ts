@@ -32,6 +32,7 @@ export type {
 } from './llm_record.ts';
 export {
   verifyChainHead,
+  verifyEvidencePayloadHashes,
 } from './verifier.ts';
 export {
   GENESIS_PREV_HASH,
@@ -51,9 +52,11 @@ export type {
   EvidenceLogRow,
   HashedRecord,
   PayloadKind,
+  ProvenanceClass,
   PurposeTag,
   ReplayProver,
   SourceAnchor,
   VerifyResult,
+  VerifyEvidencePayloadResult,
   VerifiedCanonicalInput,
 } from './types.ts';

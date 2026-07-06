@@ -130,6 +130,7 @@ export function makeValidEnvelopeV2Core(
         primaryEffectSize: 0.3,
         primaryConfidenceInterval: [0.2, 0.4],
         hasWarnAssumption: false,
+        formMismatch: false,
       },
       evidenceSufficiency: { status: 'sufficient', powerStatus: 'adequate' },
       untestedReason: null,

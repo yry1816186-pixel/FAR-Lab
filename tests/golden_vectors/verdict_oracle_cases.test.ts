@@ -20,11 +20,11 @@ interface ExpectedOracle {
 
 const CASE_DIR = fileURLToPath(new URL('../../golden_vectors/cases/', import.meta.url));
 
-test('on-disk GV-01..GV-12 verdict oracle cases match the V2 kernel', () => {
+test('on-disk GV-01..GV-14 verdict oracle cases match the V2 kernel', () => {
   const files = readdirSync(CASE_DIR)
     .filter((file) => /^GV-\d+\.json$/.test(file))
     .sort();
-  assert.equal(files.length, 12);
+  assert.equal(files.length, 14);
 
   for (const file of files) {
     const parsed = JSON.parse(readFileSync(join(CASE_DIR, file), 'utf8'));

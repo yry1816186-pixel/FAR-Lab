@@ -26,6 +26,7 @@ import Database from 'better-sqlite3';
 
 import { buildDemoChain, computeEnvHash, DEMO_GIT_COMMIT_SHA, DEMO_RUN_ID } from '../../src/far_proof/demo_chain.ts';
 import { exportFarProof, packageFarProofBundle, verifyFarProofPackageIntegrity } from '../../src/far_proof/index.ts';
+import { resolveTar } from '../../src/far_proof/offline_package.ts';
 import { recomputeProofHashes } from '../../scripts/recompute_proof_hashes.ts';
 import { verifyChainHead } from '../../src/evidence_log/index.ts';
 
@@ -400,7 +401,8 @@ test('packaged verify.sh runs after .tar.zst extraction (offline verifier path)'
     const tarPath = join(tmp, 'bundle.tar');
     mkdirSync(extractDir, { recursive: true });
     writeFileSync(tarPath, zstdDecompressSync(readFileSync(packaged.archivePath)));
-    execFileSync('tar', ['-xf', tarPath, '-C', extractDir]);
+    const tar = resolveTar();
+    execFileSync(tar.binary, [...tar.extraArgs, '-xf', tarPath, '-C', extractDir]);
 
     const verifyPath = join(extractDir, basename(outputDir), 'verify.sh');
     const result = spawnSync('sh', [verifyPath], {

@@ -7,6 +7,7 @@ import {
 import {
   canonicalHash,
   canonicalJson,
+  hashCanonicalJson,
 } from './hasher.ts';
 import {
   GENESIS_PREV_HASH,
@@ -25,6 +26,7 @@ import type {
   EvidenceLogRow,
   HashedRecord,
   PayloadKind,
+  ProvenanceClass,
   PurposeTag,
   SourceAnchor,
 } from './types.ts';
@@ -184,13 +186,37 @@ export function appendEvidenceLog(
     const sourceAnchor = canonicalJson(args.sourceAnchor, 'appendEvidenceLog.sourceAnchor');
     const sourceAnchorPath = args.sourceAnchor.codeLocation?.filePath ?? null;
     const sourceAnchorLine = args.sourceAnchor.codeLocation?.lineNumber ?? null;
+    // FUSION-OS-10：derivable=1 时落 evidence_payload_hash（sha256 canonical JSON·内容寻址绑定）。
+    // verifyEvidencePayloadHashes 重算 sha256(stored evidence_payload) 比对，失配 → tampered。
+    // canonicalJson 幂等（stable stringify），故 hashCanonicalJson(payload) === sha256(stored evidence_payload 字节)。
+    const derivable = args.derivable ?? 0;
+    const evidencePayloadHash = derivable === 1 ? hashCanonicalJson(args.evidencePayload) : null;
+
+    // FUSION-OS-6：provenance class tag + LLM-asserted provenance 强制 null + system_claim_hash 绑定（fail-closed）。
+    // llm_generated evidence 须 systemClaimHash 非空（系统侧重算绑定·来源不可自填）+ dashscopeRequestId=null
+    // （LLM 自填字段禁止直通 SourceAnchor·forged marker 检测·反剧场红线「LLM 不作最终裁决者/来源不可自填」）。
+    const provenanceClass = args.provenanceClass ?? 'system_derived';
+    const systemClaimHash = args.systemClaimHash ?? null;
+    if (provenanceClass === 'llm_generated') {
+      if (systemClaimHash === null) {
+        throw new Error(
+          'appendEvidenceLog: provenanceClass=llm_generated requires non-null systemClaimHash (FUSION-OS-6: LLM output must bind system-recomputed hash — 来源不可自填)',
+        );
+      }
+      if (args.sourceAnchor.dashscopeRequestId !== null) {
+        throw new Error(
+          'appendEvidenceLog: provenanceClass=llm_generated requires sourceAnchor.dashscopeRequestId=null (FUSION-OS-6: LLM-asserted provenance field cannot self-fill — forged marker detected)',
+        );
+      }
+    }
 
     db.prepare(
       `INSERT INTO evidence_log (
         evidence_id, call_record_seq, stage_id, payload_kind, evidence_payload,
         source_anchor, source_anchor_git, source_anchor_req, source_anchor_ts,
-        source_anchor_path, source_anchor_lineno
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        source_anchor_path, source_anchor_lineno, derivable, evidence_payload_hash,
+        provenance_class, system_claim_hash
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       evidenceId,
       args.callRecordSeq,
@@ -203,6 +229,10 @@ export function appendEvidenceLog(
       args.sourceAnchor.isoTimestamp,
       sourceAnchorPath,
       sourceAnchorLine,
+      derivable,
+      evidencePayloadHash,
+      provenanceClass,
+      systemClaimHash,
     );
 
     return getEvidenceLogEntry(db, evidenceId);
@@ -216,7 +246,8 @@ export function getEvidenceLogEntry(db: Database.Database, evidenceId: string): 
     .prepare(
       `SELECT evidence_id, call_record_seq, stage_id, payload_kind, evidence_payload,
               source_anchor, source_anchor_git, source_anchor_req, source_anchor_ts,
-              source_anchor_path, source_anchor_lineno, created_at
+              source_anchor_path, source_anchor_lineno, derivable, evidence_payload_hash,
+              provenance_class, system_claim_hash, created_at
        FROM evidence_log
        WHERE evidence_id = ?`,
     )
@@ -238,6 +269,10 @@ export function rowToEvidenceLogEntry(row: EvidenceLogRow): EvidenceLogEntry {
     evidencePayload: row.evidence_payload,
     sourceAnchor: parseSourceAnchorJson(row.source_anchor, row.evidence_id),
     createdAt: row.created_at,
+    derivable: row.derivable === 1 ? 1 : 0,
+    evidencePayloadHash: row.evidence_payload_hash,
+    provenanceClass: parseProvenanceClass(row.provenance_class, row.evidence_id),
+    systemClaimHash: row.system_claim_hash,
   };
 }
 
@@ -287,6 +322,15 @@ function parsePurposeTag(value: string, seq: number): PurposeTag {
     return value as PurposeTag;
   }
   throw new Error(`evidence_log.rowToCallRecord: invalid purpose_tag "${value}" at seq=${seq}`);
+}
+
+const PROVENANCE_CLASSES: readonly ProvenanceClass[] = ['system_derived', 'llm_generated', 'human'];
+
+function parseProvenanceClass(value: string, evidenceId: string): ProvenanceClass {
+  if ((PROVENANCE_CLASSES as readonly string[]).includes(value)) {
+    return value as ProvenanceClass;
+  }
+  throw new Error(`evidence_log.rowToEvidenceLogEntry: invalid provenance_class "${value}" for ${evidenceId}`);
 }
 
 function parseSourceAnchorJson(text: string, evidenceId: string): SourceAnchor {

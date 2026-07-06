@@ -16,6 +16,7 @@ import {
   renderHtml,
 } from '../../src/report/index.ts';
 import type { ReportData } from '../../src/report/index.ts';
+import { FIXTURE_VERDICT_TRACE } from '../falsifiability/_verdict_trace_fixture.ts';
 import {
   appendRecord,
   appendEvidenceLog,
@@ -152,6 +153,7 @@ function seedVerdictNode(
     untestedReason: null,
     sourceAnchor: SOURCE_ANCHOR,
     replayProver: null,
+    verdictTrace: FIXTURE_VERDICT_TRACE,
     ...overrides,
   };
   return recordVerdict(db, args);

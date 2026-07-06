@@ -105,6 +105,10 @@ export interface SandboxRunResult {
   readonly seed: number;
   /** 单线程标志（SR-7·nthread=1）。 */
   readonly singleThreaded: boolean;
+  /** FUSION-OS-7：用户脚本 CPU 时间毫秒（Python time.process_time·跨平台·非墙钟）。0=未测量。不进 reproHash（非确定性）。 */
+  readonly cpuMs: number;
+  /** FUSION-OS-7：峰值驻留集 KB（POSIX resource.getrusage·Windows 降级 0）。0=未测量。不进 reproHash。 */
+  readonly peakRssKb: number;
 }
 
 /**
@@ -120,6 +124,10 @@ export interface SandboxExecutionInput {
   readonly timedOut: boolean;
   readonly seed?: number;
   readonly networkBlocked?: boolean;
+  /** FUSION-OS-7：用户脚本 CPU 时间毫秒（缺省 0=未测量·V1 类型层 caller 不提供）。 */
+  readonly cpuMs?: number;
+  /** FUSION-OS-7：峰值驻留集 KB（缺省 0=未测量）。 */
+  readonly peakRssKb?: number;
 }
 
 /**

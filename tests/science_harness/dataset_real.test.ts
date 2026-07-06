@@ -66,33 +66,65 @@ test('dataset_fetch.py: Python host-gate rejects non-whitelisted host (no networ
   assert.equal(parsed.host, 'evil.example.com');
 });
 
-test('fetchOnlineDataset: whitelisted host returns null-or-result honestly (never throws, never fabricates)', async (t) => {
+test('fetchOnlineDataset: whitelisted host honestly returns null-or-result; spawn is load-bearing', async (t) => {
   const pythonCommand = findPythonCommand();
   if (pythonCommand === null) {
     t.skip('python3/python is not available on PATH');
     return;
   }
+  // lightkurve 是真实在线取数的硬依赖。缺它 → 跳过（非 assert.ok(true) 假绿）：
+  // 区分「本环境无法验证真实取数」与「接线已验证」（02 F1 never-fabricate）。
+  const lightkurveProbe = spawnSync(
+    pythonCommand,
+    ['-c', 'import lightkurve'],
+    { encoding: 'utf8', env: buildVenvPythonEnv(), timeout: 10_000 },
+  );
+  if (lightkurveProbe.status !== 0) {
+    t.skip(`lightkurve unavailable — real online fetch cannot be verified; cached_fixture is the honest fallback (02 F1)`);
+    return;
+  }
+
   const previous = process.env.PYTHONPATH;
   process.env.PYTHONPATH = buildPythonPath(previous);
   try {
-    // 短超时 + 白名单 host：真取数成功 → OnlineFetchResult 形态；网络/无数据/lightkurve 缺 → null。
-    // 两种结果都合法（02 F1：绝不伪造）。本测只验证「不抛 + 形态合法 + 不伪造」。
     const result = await fetchOnlineDataset({
       resolver: 'lightkurve',
       host: 'mast.stsci.edu',
       version: '1.0',
       ticId: 'TIC000000000',
-      timeoutMs: 8_000,
+      timeoutMs: 12_000,
     });
-    if (result === null) {
-      // null 合法：网络不可达 / 无该 TIC 数据 / lightkurve 缺失 → cached_fixture 降级路径。
-      assert.ok(true, 'honest null on unavailable real fetch (cached_fixture fallback, 02 F1)');
-      return;
+
+    // 负载不变式：直接 spawn dataset_fetch.py 证明真实子进程执行了（移除 fetchOnlineDataset 的
+    // spawn → 无 envelope → 本断言失败）。envelope.ok 真实反映取数成败，非预制。
+    const direct = spawnSync(
+      pythonCommand,
+      [DATASET_FETCH_PY],
+      {
+        input: JSON.stringify({ resolver: 'lightkurve', host: 'mast.stsci.edu', version: '1.0', ticId: 'TIC000000000' }),
+        encoding: 'utf8',
+        env: buildVenvPythonEnv(),
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 12_000,
+      },
+    );
+    assert.equal(direct.status, 0, `dataset_fetch.py must exit 0 with an honest envelope (not crash); stderr=${(direct.stderr ?? '').trim().slice(0, 200)}`);
+    const envelope = JSON.parse(direct.stdout.trim()) as { ok: boolean; error?: string; contentHash?: string };
+
+    if (result !== null) {
+      assert.equal(result.hostWhitelisted, true);
+      assert.equal(result.ref.resolver, 'lightkurve');
+      assert.match(result.ref.contentHash, /^[0-9a-f]{64}$/, 'contentHash must be real sha256, never fabricated');
+      assert.ok(result.ref.retrievedAt.length > 0, 'retrievedAt must be populated');
+      assert.equal(envelope.ok, true, 'direct spawn must agree: ok:true when fetchOnlineDataset returned a result');
+    } else {
+      // lightkurve 已装（过 probe）但 null → 网络不可达 / 无该 TIC 数据。spawn 必真跑且诚实报失败。
+      assert.equal(envelope.ok, false, 'direct spawn must report ok:false when fetchOnlineDataset returned null (honest failure, not silently swallowed)');
+      assert.ok(
+        typeof envelope.error === 'string' && envelope.error.length > 0,
+        'honest failure envelope must carry a non-empty real reason (proves spawn ran + script executed)',
+      );
     }
-    assert.equal(result.hostWhitelisted, true);
-    assert.equal(result.ref.resolver, 'lightkurve');
-    assert.match(result.ref.contentHash, /^[0-9a-f]{64}$/, 'contentHash must be real sha256, never fabricated');
-    assert.ok(result.ref.retrievedAt.length > 0, 'retrievedAt must be populated');
   } finally {
     restorePythonPath(previous);
   }

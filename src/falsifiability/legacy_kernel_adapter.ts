@@ -6,17 +6,21 @@ import type {
   EvidenceBasis,
 } from '../confounding_gate/types.ts';
 import { evaluateThreshold } from './threshold_semantics.ts';
+import type { AntiTheaterReport } from '../anti_theater/index.ts';
+import { toKernelFindings } from '../anti_theater/index.ts';
 import type {
   EvidenceRecord,
   FalsificationSpec,
   ThresholdSpec,
   VerdictResult,
+  VerdictTracePersisted,
 } from './types.ts';
 import type {
   DatasetBindingSpec,
   EvidenceSufficiencyReport,
   StatisticalResult,
   VerdictKernelInput,
+  IdentifierClaim,
   VerdictKernelOutput,
 } from './verdict_kernel_v2.ts';
 
@@ -32,6 +36,14 @@ export interface LegacyVerdictKernelInputArgs {
   readonly claimType?: ClaimType;
   readonly evidenceBasis?: EvidenceBasis;
   readonly confoundingGateResult?: ConfoundingGateResult;
+  /** identifier 声明（FUSION-OS-14·caller pre-compute via resolveIdentifierClaim·opt-in）。任一 not_found → REFUTED；任一 unresolved → UNTESTED。 */
+  readonly identifierClaims?: readonly IdentifierClaim[];
+  /**
+   * 反剧场检测报告(FUSION-OS-1·caller pre-compute via runAntiTheaterLint)。提供时内部 toKernelFindings
+   * 单点投影喂 kernel(反剧场红线:KernelAntiTheaterFinding[] 不暴露为 args·禁 caller 手填 findings);
+   * 不提供则加 'anti_theater_not_linted' integrityFlag,经 kernel R7 integrityFlags.length===0 阻断 CONFIRMED。
+   */
+  readonly antiTheaterReport?: AntiTheaterReport;
 }
 
 export function buildLegacyVerdictKernelInput(
@@ -48,13 +60,19 @@ export function buildLegacyVerdictKernelInput(
     datasetBindings: args.evidences.map(evidenceToDatasetBinding),
     statistics,
     protocolDeviations: [],
-    antiTheaterFindings: [],
+    // FUSION-OS-1:caller pre-compute report → toKernelFindings 单点投影(反剧场红线:禁 caller 手填 findings)。
+    // 不加 anti_theater_not_linted flag:legacy adapter 主 caller 是 verdict_stage(AI4S 文献投票路径·
+    // 输入为文献蕴含 supports/refutes 投票·非实验数据)——anti-theater 检测实验 theater(seed-cherry/p-hacking/
+    // metric-swap),文献投票无实验数据无 theater 风险,不适用;强制 flag 会迫使伪造实验数据跑 lint(反剧场)
+    // 或过度降级(破坏文献 CONFIRMED 语义)。实验路径强制门在 orchestrator fecAppendClaim。
+    antiTheaterFindings: toKernelFindings(args.antiTheaterReport?.findings ?? []),
     evidenceSufficiency: summarizeEvidenceSufficiency(args.evidences, statistics, args.fec),
     contradictionSet: [],
     integrityFlags: args.integrityFlags ?? args.fec?.integrityFlags ?? [],
     ...(args.claimType !== undefined ? { claimType: args.claimType } : {}),
     ...(args.evidenceBasis !== undefined ? { evidenceBasis: args.evidenceBasis } : {}),
     ...(args.confoundingGateResult !== undefined ? { confoundingGateResult: args.confoundingGateResult } : {}),
+    ...(args.identifierClaims !== undefined ? { identifierClaims: args.identifierClaims } : {}),
   };
 }
 
@@ -306,6 +324,23 @@ export function verdictResultFromKernelOutput(output: VerdictKernelOutput): Verd
         : null,
     conflictingEvidenceCount: output.statisticalReport.conflicting ? 1 : 0,
     metricValue: output.statisticalReport.primaryEffectSize,
+  };
+}
+
+/**
+ * 投影 VerdictKernelOutput 的 4 个 verdict-critical 字段为持久化形态（P0-2-EXT）。
+ *
+ * 与 verdictResultFromKernelOutput 互补：后者投影 5 标量进 VerdictResult（驱动 verdict_nodes 旧列），
+ * 本函数投影 reasonCodes/ruleTrace/decisiveRuleId/evidenceSufficiency 进 VerdictTracePersisted
+ * （驱动 verdict_nodes.verdict_trace_json + verdict_trace_hash）。两条投影线同源（同一 kernelOutput），
+ * 确保 recordVerdict 落库的 trace 与 decision 来自同一次 decideFiveValueVerdict 调用（不可分别伪造）。
+ */
+export function extractVerdictTrace(output: VerdictKernelOutput): VerdictTracePersisted {
+  return {
+    reasonCodes: output.reasonCodes,
+    ruleTrace: output.ruleTrace,
+    decisiveRuleId: output.decisiveRuleId,
+    evidenceSufficiency: output.evidenceSufficiency,
   };
 }
 

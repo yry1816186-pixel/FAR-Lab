@@ -20,10 +20,12 @@
 name: FAR-Chain CI
 
 on:
+  # 默认分支是 feature/initial-project-setup（非 main）——push/PR trigger 必须覆盖它，
+  # 否则针对默认分支的 PR 连主 12 步 CI 都不跑（R2 最高）。main 历史保留，一并覆盖。
   push:
-    branches: [main]
+    branches: [feature/initial-project-setup, main]
   pull_request:
-    branches: [main]
+    branches: [feature/initial-project-setup, main]
   workflow_dispatch:
   # C8 · snapshot 存活监控：每日 02:17 UTC 触发 snapshot_liveness_smoke job
   # （非 :00/:30，避开 fleet 高峰；cron 5 字段 = 分 时 日 月 周）

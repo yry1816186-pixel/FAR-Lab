@@ -28,6 +28,7 @@ import {
 } from '../../src/evidence_log/index.ts';
 import type { LlmResponse } from '../../src/llm_gateway/index.ts';
 import { runMigrations } from '../../src/db/index.ts';
+import { FIXTURE_VERDICT_TRACE } from './_verdict_trace_fixture.ts';
 
 const SOURCE_ANCHOR: SourceAnchor = {
   gitCommitSha: 'b'.repeat(40),
@@ -253,6 +254,7 @@ test('recordVerdict writes and reads a verdict node with parsed JSON fields', ()
       untestedReason: 'not tested yet',
       sourceAnchor: SOURCE_ANCHOR,
       replayProver: null,
+      verdictTrace: FIXTURE_VERDICT_TRACE,
     });
 
     assert.match(verdict.verdictId, /^[0-9A-HJKMNP-TV-Z]{26}$/);
@@ -288,6 +290,7 @@ test('recordVerdict and SQLite triggers reject anti-theater violations', () => {
           untestedReason: '',
           sourceAnchor: SOURCE_ANCHOR,
           replayProver: null,
+          verdictTrace: FIXTURE_VERDICT_TRACE,
         }),
       EmptyUntestedReasonError,
     );
@@ -306,6 +309,7 @@ test('recordVerdict and SQLite triggers reject anti-theater violations', () => {
           untestedReason: null,
           sourceAnchor: SOURCE_ANCHOR,
           replayProver: null,
+          verdictTrace: FIXTURE_VERDICT_TRACE,
         }),
       EmptyScopeSlipError,
     );
