@@ -1,31 +1,16 @@
 // src/cli/commands/verify.ts
-// 职责：`far verify` 子命令 —— 第三方独立重算验证器（FI-9 · 04§5）。
-// 设计 SSOT：PROJECT_PLAN/04 §5（命令族 + 10 字段 schema + exit code）+ 01 §5（P0 验收：评委本机重算）。
-// 运行时 SSOT 以本文件源码 + far verify 实测为准。
+// `far verify` — third-party independent recomputation verifier.
 //
-// 设计（与 SSOT 对齐的裁决·见 plans/jiggly-squishing-tide.md）：
-//   - 纯收集器 + IO 壳分层（镜像 status.ts 的 collectStatusDump + runStatus）：
-//       verifyEnvelopeV2 / verifyChainHeadResult / checkAntiTheaterReportConsistency /
-//       diffAntiTheaterReport / verifyAntiTheaterLint / collectVerifyDump 为纯函数（不 IO·可直接单测），
-//       runVerify 负责 IO + 渲染 + exit code。
-//   - --envelope <path>：ProofEnvelopeV2 JSON 文件（D1·评委侧最自然输入载体）。
-//       parseProofEnvelopeV2 做结构校验（D3·非裸 as·守卫 + 下游 try/catch 安全网）。
-//   - --db <path>：evidence_log DB（chain/full 模式·verifyChainHead·L2）。
-//   - --mode chain|envelope|full（D2·默认从 flags 推断：仅 --envelope→envelope；仅 --db→chain；两者→full）。
-//   - --lint-input <path>（#11b·04 §5.3 L5·加性轴·须配合 --envelope）：
-//       AntiTheaterLintInput JSON → parseAntiTheaterLintInput 骨架校验 → runAntiTheaterLint 20-detector 独立重算 →
-//       diffAntiTheaterReport 与 envelope 内嵌 antiTheaterReport 深度对比；任何发散 → FAIL。
-//       verifiedLevels 透明披露 'antiTheaterLint'（不动 recomputation 三轴·保 §5.2 哈希重算契约）。
-//   - exit 0 PASS / 7 FAIL / 2 arg / 1 runtime（D6）。far verify 是 CLI 首个 verdict-bearing 命令（引入 exit 7）。
-//   - recomputation.python 调 Python proof_hash.py 镜像重算；browser = not-run（D7·诚实口径·反 overclaim）。
+// Modes (inferred from flags when --mode is omitted):
+//   --envelope <path>   verify a ProofEnvelopeV2 JSON (proofHash recompute + 10 rules + embedded anti-theater report)
+//   --db <path>         verify an evidence_log DB chain head
+//   --lint-input <path> recompute the 20 anti-theater detectors independently and diff against the envelope
 //
-// 诚实边界（R2·反 overclaim）：
-//   envelope 模式验封存信封自洽（proofHash 重算 + 10 规则 + 内嵌 anti-theater 报告一致性）；
-//   --lint-input 提供时独立重算 20 detector 原始证据（#11b），否则不重算。
-//   verifier 不校验 lint-input 与 envelope 的语义对齐（评委须自行保证 lint-input 确是封存时那份 input）。
+// Pure collectors (verifyEnvelopeV2 / verifyChainHeadResult / checkAntiTheaterReportConsistency /
+// diffAntiTheaterReport / verifyAntiTheaterLint) are separated from IO (runVerify) for direct unit testing.
 //
-// 模型中立（F3/C1）：无 qwen/dashscope/openai 字面量，纯确定性重算。
-// 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩。untrusted 输入经结构守卫 + try/catch 安全网。
+// Exit codes: 0 PASS · 7 FAIL · 2 arg error · 1 runtime error.
+// Python recomputation mirrors proof_hash.py; browser recomputation is not run (reported honestly).
 
 import Database from 'better-sqlite3';
 import { spawnSync } from 'node:child_process';
