@@ -1,0 +1,89 @@
+{
+  "fecId": "FEC-LEGACY-C-ASTRO-0001",
+  "contractVersion": "FEC/2.0",
+  "claimId": "C-ASTRO-0001",
+  "measurableImplication": "adapter A achieves macro-F1 >= 0.80 on TESS-ASTRO benchmark",
+  "scope": {
+    "population": "legacy claim scope",
+    "timeWindow": "legacy unspecified time window",
+    "domainConstraint": "legacy falsification method"
+  },
+  "requiredEvidence": [
+    {
+      "evidenceId": "legacy-metric-or-vote",
+      "kind": "measurement",
+      "critical": true,
+      "description": "Legacy EvidenceRecord input adapted for V2 verdict kernel",
+      "verificationCheckId": "legacy-v2-adapter"
+    }
+  ],
+  "datasetRequirements": [
+    {
+      "name": "legacy-evidence-source",
+      "contentHashAlgorithm": "sha256",
+      "allowSynthetic": false,
+      "schemaFingerprintRequired": false
+    }
+  ],
+  "workflowRequirements": [
+    {
+      "name": "legacy-falsifiability-path",
+      "engine": "manual",
+      "requireContainerDigest": false,
+      "requireCommandHash": false,
+      "expectedNetworkPolicy": "off",
+      "requireFixedSeed": false
+    }
+  ],
+  "metric": {
+    "metricKey": "macro_f1",
+    "description": "macro_f1",
+    "unit": "legacy_unit",
+    "computationRef": "legacy EvidenceRecord metricValue",
+    "isDeterministic": true
+  },
+  "threshold": {
+    "value": 0.8,
+    "unit": "legacy_unit",
+    "thresholdSemantics": "gt",
+    "preregistered": false
+  },
+  "direction": "greater",
+  "statisticalPlan": {
+    "primaryMetric": "macro_f1",
+    "nullHypothesis": "adapter A achieves macro-F1 >= 0.80 on TESS-ASTRO benchmark",
+    "alternativeHypothesis": "adapter A achieves macro-F1 >= 0.80 on TESS-ASTRO benchmark",
+    "alpha": 0.05,
+    "effectDirection": "greater",
+    "confidenceIntervalMethod": "not_provided_by_legacy_path",
+    "multipleTestingCorrection": "none",
+    "missingDataPolicy": "not_provided_by_legacy_path",
+    "outlierPolicy": "not_provided_by_legacy_path",
+    "stoppingRule": "not_provided_by_legacy_path"
+  },
+  "seedPolicy": {
+    "fixed": false,
+    "allowCherryPick": false,
+    "justification": "Legacy path has no stochastic run seed."
+  },
+  "deviationPolicy": {
+    "criticalCategories": [
+      "metric_swap",
+      "alpha_rewrite"
+    ],
+    "nonCriticalHandling": "degrade",
+    "requireExplicitLog": true
+  },
+  "freeze": {
+    "fecHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "actor": {
+      "actorKind": "deterministic_freezer",
+      "actorId": "legacy-v2-adapter"
+    },
+    "timestamp": "2026-06-28T00:00:00.000Z",
+    "environmentPolicy": "legacy adapter: no environment lock",
+    "deviationPolicyHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "frozenBy": "deterministic_freezer"
+  },
+  "integrityFlags": []
+}

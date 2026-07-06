@@ -113,7 +113,8 @@ node src/cli/far.ts verify-golden --all
 ```bash
 far status                # 仓库状态与迁移计数
 far verify-golden --all   # 用真实内核裁决跑全部 Golden Vector
-far fec compile           # 编译证据链冻结契约
+far demo                  # 一键演示（14 GVs + demo chain + 真实统计驱动裁决·无需凭据）
+far fec compile           # 编译证据链冻结契约（示例契约见 examples/fec/）
 far export far-proof      # 导出可独立复算的证明包
 ```
 
@@ -124,7 +125,7 @@ pnpm api                  # 终端 1：启动 REST API @ http://localhost:3000�
 cd frontend && npm install && npm run dev   # 终端 2：Vite 开发服务器 @ http://localhost:5173
 ```
 
-前端默认连 `localhost:3000`（可用 `VITE_API_BASE_URL` 覆盖）。API 启动即种子 demo 裁决（C-ASTRO-0001 REFUTED），仪表盘可直接查看证据链与裁决。生产模式：`pnpm api --persist ./far-chain.db --protected`（需 `FAR_JWT_SECRET`）。
+前端默认连 `localhost:3000`（可用 `VITE_API_BASE_URL` 覆盖）。API 启动即种子 demo 裁决（C-ASTRO-0001·机器裁决 UNTESTED：legacy 路径不注入统计→R6 不触发；真实统计驱动的 CONFIRMED 经 `far demo` 或 hero pipeline 演示），仪表盘可直接查看证据链与裁决。生产模式：`pnpm api --persist ./far-chain.db --protected`（需 `FAR_JWT_SECRET`）。
 
 前端是 `frontend/` 下的独立工作区（React + Vite + Radix + d3 + reactflow）。
 
