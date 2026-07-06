@@ -76,3 +76,4 @@ $null
 *.db
 *.db-wal
 *.db-shm
+examples/fec/sample_compiled.json
