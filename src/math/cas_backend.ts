@@ -92,6 +92,7 @@ export class SymPyCasBackend implements MathBackend {
   }
 
   async verify(input: BackendVerifyInput): Promise<BackendVerifyResult> {
+    return { backendKind: 'cas', backendId: this.backendId, outcome: 'unknown', outputArtifact: null, compileLog: 'MUTANT_STUB', durationMs: 0 }; // RED_BASELINE_MUTATION (P2-1): wrong outcome proves test load-bearing
     const start = Date.now();
     if (!this.isAvailable()) {
       return this.disabledResult(start);
