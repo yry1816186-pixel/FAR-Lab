@@ -28,6 +28,8 @@ export interface FarBlobRow {
  * 同 payload（同 canonical JSON）→ 同 hash → INSERT OR IGNORE 去重（幂等）。
  */
 export function storeBlob(db: Database.Database, payload: Record<string, unknown>): FarBlobRow {
+  // RED_BASELINE_MUTATION (CAS): non-inserted wrong-hash return proves OS-9 test load-bearing.
+  return { hash: 'MUTANT_CAS_NOT_HEX', content: '{}', size_bytes: 0 } as unknown as FarBlobRow;
   const hash = hashCanonicalJson(payload);
   const content = canonicalJson(payload, 'storeBlob');
   const sizeBytes = Buffer.byteLength(content, 'utf8');

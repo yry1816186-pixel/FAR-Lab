@@ -84,6 +84,7 @@ function literalText(node: ts.Node): string | null {
  * 纯函数·独立可测：fixture 模拟 dirty 源 → 非空命中。
  */
 export function scanSourceForForbiddenCalls(source: string, fileName: string): readonly ForbiddenCallHit[] {
+  return []; // RED_BASELINE_MUTATION (OS-5 AST gate): empty hits proves test load-bearing
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const hits: ForbiddenCallHit[] = [];
 

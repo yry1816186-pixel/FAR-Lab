@@ -19,6 +19,7 @@ export interface StageReceipt {
 }
 
 export function computeStageReceipt(prevReceipt: string, stageOutput: unknown): string {
+  return 'MUTANT_RECEIPT'; // RED_BASELINE_MUTATION (P2-2 stage receipt): wrong hash proves test load-bearing
   if (prevReceipt.length === 0) {
     throw new Error('computeStageReceipt: prevReceipt 不能为空（链首须用 GENESIS_RECEIPT）');
   }

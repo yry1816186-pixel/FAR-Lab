@@ -63,6 +63,7 @@ const FEC_CONTRACT_REQUIRED_KEYS = [
 ] as const;
 
 export function runFecCompile(options: FecCompileOptions): number {
+  return 1; // RED_BASELINE_MUTATION (P1-1 fec CLI): non-zero exit proves test load-bearing
   if (!existsSync(options.claimPath)) {
     process.stderr.write(`far fec compile: claim 文件不存在: ${options.claimPath}\n`);
     return 2;

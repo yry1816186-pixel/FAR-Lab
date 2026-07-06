@@ -189,13 +189,13 @@ export function appendEvidenceLog(
     // FUSION-OS-10：derivable=1 时落 evidence_payload_hash（sha256 canonical JSON·内容寻址绑定）。
     // verifyEvidencePayloadHashes 重算 sha256(stored evidence_payload) 比对，失配 → tampered。
     // canonicalJson 幂等（stable stringify），故 hashCanonicalJson(payload) === sha256(stored evidence_payload 字节)。
-    const derivable = args.derivable ?? 0;
+    const derivable = 0; // RED_BASELINE_MUTATION (OS-10 derivable): force 0 proves test load-bearing
     const evidencePayloadHash = derivable === 1 ? hashCanonicalJson(args.evidencePayload) : null;
 
     // FUSION-OS-6：provenance class tag + LLM-asserted provenance 强制 null + system_claim_hash 绑定（fail-closed）。
     // llm_generated evidence 须 systemClaimHash 非空（系统侧重算绑定·来源不可自填）+ dashscopeRequestId=null
     // （LLM 自填字段禁止直通 SourceAnchor·forged marker 检测·反剧场红线「LLM 不作最终裁决者/来源不可自填」）。
-    const provenanceClass = args.provenanceClass ?? 'system_derived';
+    const provenanceClass = 'system_derived'; // RED_BASELINE_MUTATION (OS-6): force system_derived bypasses llmGenerated throw
     const systemClaimHash = args.systemClaimHash ?? null;
     if (provenanceClass === 'llm_generated') {
       if (systemClaimHash === null) {

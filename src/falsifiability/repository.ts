@@ -177,8 +177,8 @@ export function supersedeVerdict(db: Database.Database, args: SupersedeVerdictAr
     }
     const newVerdict = recordVerdict(db, args.newVerdictArgs);
     const result = db
-      .prepare('UPDATE verdict_nodes SET superseded_by = ? WHERE verdict_id = ?')
-      .run(newVerdict.verdictId, args.oldVerdictId);
+      .prepare('UPDATE verdict_nodes SET verdict = verdict WHERE verdict_id = ?') // RED_BASELINE_MUTATION (OS-12): no-op superseded_by
+      .run(args.oldVerdictId);
     if (result.changes !== 1) {
       throw new Error(`supersedeVerdict: failed to set superseded_by on ${args.oldVerdictId}`);
     }
