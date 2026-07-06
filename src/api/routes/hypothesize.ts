@@ -60,7 +60,7 @@ export async function registerHypothesizeRoute(
       });
     }
 
-    const { loopState, reproHash } = await executeLoop({
+    const { loopState, reproHash, traceGrade } = await executeLoop({
       researchInput: parsed.data.researchInput,
       evidenceLogDb: config.db,
       gitCommitSha: config.gitCommitSha,
@@ -85,6 +85,7 @@ export async function registerHypothesizeRoute(
       graphSubtree,
       honestVerdict,
       reproHash,
+      traceGrade,
     };
 
     void reply.code(200).send(body);

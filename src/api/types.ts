@@ -12,6 +12,7 @@
 
 import type { LoopState } from '../agent_loop/types.ts';
 import type { EdgeKind } from '../schema/enums.ts';
+import type { TraceGrade } from '../trace/agent_run_event.ts';
 import type {
   HonestVerdictNode,
   SourceAnchor,
@@ -73,6 +74,7 @@ export interface HypothesizeResponse {
   readonly graphSubtree: GraphSubtree;
   readonly honestVerdict: HonestVerdictNode | null;
   readonly reproHash: string;
+  readonly traceGrade: TraceGrade;
 }
 
 /**
