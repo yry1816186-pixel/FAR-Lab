@@ -13,7 +13,7 @@ workflow, and the quality gates every change must pass.
 ## Setup
 
 ```bash
-git clone https://github.com/yry1812186-pixel/FAR-Lab.git
+git clone https://github.com/yry1816186-pixel/FAR-Lab.git
 cd FAR-Lab
 pnpm install
 node scripts/ensure_py_deps.mjs   # probes the Python axis; reports what is missing
@@ -125,6 +125,6 @@ Until these are set, the gates are advisory rather than blocking.
 
 ## Need Help
 
-- Discussions: https://github.com/yry1812186-pixel/FAR-Lab/discussions
+- Discussions: https://github.com/yry1816186-pixel/FAR-Lab/discussions
 - Vulnerabilities: `SECURITY.md`
 - Overview: `README.md`

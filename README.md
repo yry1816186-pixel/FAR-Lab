@@ -85,7 +85,7 @@ SQLite（append-only triggers · 内容寻址 CAS）
 ### 安装
 
 ```bash
-git clone https://github.com/yry1812186-pixel/FAR-Lab.git
+git clone https://github.com/yry1816186-pixel/FAR-Lab.git
 cd FAR-Lab
 pnpm install
 node scripts/ensure_py_deps.mjs   # 探测 Python 验证轴，按需安装
