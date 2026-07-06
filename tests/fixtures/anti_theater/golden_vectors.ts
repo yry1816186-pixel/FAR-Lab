@@ -262,6 +262,7 @@ const BASE_INPUT: AntiTheaterLintInput = {
       // 被 TS 推断为 number[] 而非元组，须 const 断言成 readonly [0.06, 0.24]（元组子类型·兼容）。
       primaryConfidenceInterval: [0.06, 0.24] as const,
       hasWarnAssumption: false,
+      formMismatch: false,
     },
     evidenceSufficiency: { status: 'sufficient', powerStatus: 'adequate' },
     untestedReason: null,

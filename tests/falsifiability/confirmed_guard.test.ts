@@ -26,6 +26,7 @@ import {
   EmptyUntestedReasonError,
 } from '../../src/falsifiability/errors.ts';
 import type { RecordVerdictArgs } from '../../src/falsifiability/types.ts';
+import { FIXTURE_VERDICT_TRACE } from './_verdict_trace_fixture.ts';
 import {
   appendEvidenceLog,
   appendRecord,
@@ -119,6 +120,7 @@ function makeConfirmedArgs(evidenceId: string): RecordVerdictArgs {
     untestedReason: null,
     sourceAnchor: SOURCE_ANCHOR,
     replayProver: null,
+    verdictTrace: FIXTURE_VERDICT_TRACE,
   };
 }
 

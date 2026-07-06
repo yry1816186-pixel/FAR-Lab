@@ -29,6 +29,7 @@ import type {
   Verdict,
   VerdictNode,
   VerdictNodeKind,
+  VerdictTracePersisted,
 } from './types.ts';
 
 export interface VerdictNodeRow {
@@ -45,6 +46,9 @@ export interface VerdictNodeRow {
   readonly untested_reason: string | null;
   readonly source_anchor: string;
   readonly replay_prover: string | null;
+  readonly verdict_trace_json: string;
+  readonly verdict_trace_hash: string;
+  readonly superseded_by: string | null;
   readonly prev_hash: string;
   readonly current_hash: string;
   readonly created_at: string;
@@ -70,6 +74,10 @@ export function recordVerdict(db: Database.Database, args: RecordVerdictArgs): V
     const sourceAnchorJson = canonicalJson(args.sourceAnchor, 'recordVerdict.sourceAnchor');
     const replayProverJson =
       args.replayProver === null ? null : canonicalJson(args.replayProver, 'recordVerdict.replayProver');
+    // P0-2-EXT：裁决内核 trace 4 字段落库（canonical 全文 + sha256 绑定）。hashCanonicalJson 内含
+    // NaN/Infinity 断言（hasher.ts:41），trace 字段含非有限数会早失败（fail-closed）。
+    const verdictTraceJson = canonicalJson(args.verdictTrace, 'recordVerdict.verdictTrace');
+    const verdictTraceHash = hashCanonicalJson({ verdictTraceJson });
     const currentHash = hashCanonicalJson({
       verdictId,
       evidenceId: args.evidenceId,
@@ -79,6 +87,7 @@ export function recordVerdict(db: Database.Database, args: RecordVerdictArgs): V
       thresholdSpecJson,
       sourceAnchorJson,
       prevHash,
+      verdictTraceHash,
     });
     const now = new Date().toISOString();
 
@@ -87,11 +96,13 @@ export function recordVerdict(db: Database.Database, args: RecordVerdictArgs): V
         verdict_id, evidence_id, parent_verdict_id, node_kind, verdict,
         falsification_spec, threshold_spec, metric_value, conflicting_evidence_count,
         scope_slip_text, untested_reason, source_anchor, replay_prover,
+        verdict_trace_json, verdict_trace_hash,
         prev_hash, current_hash, created_at, updated_at
       ) VALUES (
         @verdict_id, @evidence_id, @parent_verdict_id, @node_kind, @verdict,
         @falsification_spec, @threshold_spec, @metric_value, @conflicting_evidence_count,
         @scope_slip_text, @untested_reason, @source_anchor, @replay_prover,
+        @verdict_trace_json, @verdict_trace_hash,
         @prev_hash, @current_hash, @created_at, @updated_at
       )`,
     ).run({
@@ -108,6 +119,8 @@ export function recordVerdict(db: Database.Database, args: RecordVerdictArgs): V
       untested_reason: args.untestedReason,
       source_anchor: sourceAnchorJson,
       replay_prover: replayProverJson,
+      verdict_trace_json: verdictTraceJson,
+      verdict_trace_hash: verdictTraceHash,
       prev_hash: prevHash,
       current_hash: currentHash,
       created_at: now,
@@ -130,6 +143,7 @@ export function getVerdict(db: Database.Database, verdictId: string): VerdictNod
       `SELECT verdict_id, evidence_id, parent_verdict_id, node_kind, verdict,
               falsification_spec, threshold_spec, metric_value, conflicting_evidence_count,
               scope_slip_text, untested_reason, source_anchor, replay_prover,
+              verdict_trace_json, verdict_trace_hash, superseded_by,
               prev_hash, current_hash, created_at, updated_at
        FROM verdict_nodes
        WHERE verdict_id = ?`,
@@ -137,6 +151,63 @@ export function getVerdict(db: Database.Database, verdictId: string): VerdictNod
     .get(verdictId) as VerdictNodeRow | undefined;
 
   return row === undefined ? null : rowToVerdictNode(row);
+}
+
+export interface SupersedeVerdictArgs {
+  readonly oldVerdictId: string;
+  readonly newVerdictArgs: RecordVerdictArgs;
+}
+
+export interface SupersedeVerdictResult {
+  readonly oldVerdict: VerdictNode;
+  readonly newVerdict: VerdictNode;
+}
+
+/**
+ * FUSION-OS-12：重评 supersede —— 写新 verdict 行 + UPDATE 旧行 superseded_by 指针。
+ *
+ * superseded_by 是元数据，不进 old.current_hash 白名单 → old 链完整性不变（verifyVerdictNodes 重算仍匹配）。
+ * 事务性：recordVerdict(new) + UPDATE(old.superseded_by) 原子提交；old 不存在 → 抛错（fail-closed）。
+ */
+export function supersedeVerdict(db: Database.Database, args: SupersedeVerdictArgs): SupersedeVerdictResult {
+  const supersede = db.transaction((): SupersedeVerdictResult => {
+    const existing = getVerdict(db, args.oldVerdictId);
+    if (existing === null) {
+      throw new Error(`supersedeVerdict: old verdict ${args.oldVerdictId} not found`);
+    }
+    const newVerdict = recordVerdict(db, args.newVerdictArgs);
+    const result = db
+      .prepare('UPDATE verdict_nodes SET superseded_by = ? WHERE verdict_id = ?')
+      .run(newVerdict.verdictId, args.oldVerdictId);
+    if (result.changes !== 1) {
+      throw new Error(`supersedeVerdict: failed to set superseded_by on ${args.oldVerdictId}`);
+    }
+    const oldVerdict = getVerdict(db, args.oldVerdictId);
+    if (oldVerdict === null) {
+      throw new Error(`supersedeVerdict: old verdict ${args.oldVerdictId} disappeared after supersede`);
+    }
+    return { oldVerdict, newVerdict };
+  });
+  return supersede();
+}
+
+/**
+ * FUSION-OS-12：查当前活跃裁决（superseded_by IS NULL）。与 getVerdict（按 id 查含旧行·审计）互补。
+ */
+export function getActiveVerdicts(db: Database.Database): readonly VerdictNode[] {
+  const rows = db
+    .prepare(
+      `SELECT verdict_id, evidence_id, parent_verdict_id, node_kind, verdict,
+              falsification_spec, threshold_spec, metric_value, conflicting_evidence_count,
+              scope_slip_text, untested_reason, source_anchor, replay_prover,
+              verdict_trace_json, verdict_trace_hash, superseded_by,
+              prev_hash, current_hash, created_at, updated_at
+       FROM verdict_nodes
+       WHERE superseded_by IS NULL
+       ORDER BY created_at ASC, verdict_id ASC`,
+    )
+    .all() as VerdictNodeRow[];
+  return rows.map(rowToVerdictNode);
 }
 
 export function rowToVerdictNode(row: VerdictNodeRow): VerdictNode {
@@ -164,6 +235,12 @@ export function rowToVerdictNode(row: VerdictNodeRow): VerdictNode {
       row.replay_prover === null
         ? null
         : parseReplayProver(parseJsonObject(row.replay_prover, `verdict ${row.verdict_id} replay_prover`)),
+    verdictTrace: parseVerdictTrace(
+      parseJsonObject(row.verdict_trace_json, `verdict ${row.verdict_id} verdict_trace_json`),
+      row.verdict_id,
+    ),
+    verdictTraceHash: row.verdict_trace_hash,
+    supersededBy: row.superseded_by,
     prevHash: row.prev_hash,
     currentHash: row.current_hash,
     createdAt: row.created_at,
@@ -242,4 +319,80 @@ function parseVerdictNodeKind(value: string, verdictId: string): VerdictNodeKind
     return value as VerdictNodeKind;
   }
   throw new UnknownVerdictError(`rowToVerdictNode: invalid node_kind "${value}" at verdict_id=${verdictId}`);
+}
+
+const EVIDENCE_SUFFICIENCY_STATUSES = new Set(['sufficient', 'insufficient', 'unknown']);
+const POWER_STATUSES = new Set(['adequate', 'underpowered', 'unknown']);
+
+/**
+ * 解析 verdict_trace_json → VerdictTracePersisted（P0-2-EXT）。fail-closed：形状不合法抛错。
+ *
+ * trace 是 verdict-critical 字段（04 §3.4），从 DB 读回时必须严格校验——否则篡改后的 trace
+ * （如 reasonCodes 改成非数组）会被静默接受，破坏 current_hash 绑定的语义。
+ */
+function parseVerdictTrace(value: unknown, verdictId: string): VerdictTracePersisted {
+  if (value === null || typeof value !== 'object') {
+    throw new Error(`parseVerdictTrace: verdict_trace_json must be an object at verdict_id=${verdictId}`);
+  }
+  const v = value as Record<string, unknown>;
+  const reasonCodes = parseStringArray(v.reasonCodes, 'reasonCodes', verdictId);
+  const ruleTrace = parseRuleTrace(v.ruleTrace, verdictId);
+  if (typeof v.decisiveRuleId !== 'string' || v.decisiveRuleId.length === 0) {
+    throw new Error(`parseVerdictTrace: decisiveRuleId must be non-empty string at verdict_id=${verdictId}`);
+  }
+  const evidenceSufficiency = parseEvidenceSufficiency(v.evidenceSufficiency, verdictId);
+  return { reasonCodes, ruleTrace, decisiveRuleId: v.decisiveRuleId, evidenceSufficiency };
+}
+
+function parseStringArray(raw: unknown, field: string, verdictId: string): readonly string[] {
+  if (!Array.isArray(raw)) {
+    throw new Error(`parseVerdictTrace: ${field} must be array at verdict_id=${verdictId}`);
+  }
+  return raw.map((item, index) => {
+    if (typeof item !== 'string') {
+      throw new Error(`parseVerdictTrace: ${field}[${index}] must be string at verdict_id=${verdictId}`);
+    }
+    return item;
+  });
+}
+
+function parseRuleTrace(raw: unknown, verdictId: string): readonly VerdictTracePersisted['ruleTrace'][number][] {
+  if (!Array.isArray(raw)) {
+    throw new Error(`parseVerdictTrace: ruleTrace must be array at verdict_id=${verdictId}`);
+  }
+  return raw.map((item, index) => {
+    if (item === null || typeof item !== 'object') {
+      throw new Error(`parseVerdictTrace: ruleTrace[${index}] must be object at verdict_id=${verdictId}`);
+    }
+    const step = item as Record<string, unknown>;
+    if (typeof step.ruleId !== 'string' || step.ruleId.length === 0) {
+      throw new Error(`parseVerdictTrace: ruleTrace[${index}].ruleId must be non-empty string at verdict_id=${verdictId}`);
+    }
+    if (typeof step.triggered !== 'boolean') {
+      throw new Error(`parseVerdictTrace: ruleTrace[${index}].triggered must be boolean at verdict_id=${verdictId}`);
+    }
+    if (step.details !== undefined && typeof step.details !== 'string') {
+      throw new Error(`parseVerdictTrace: ruleTrace[${index}].details must be string if present at verdict_id=${verdictId}`);
+    }
+    return step.details === undefined
+      ? { ruleId: step.ruleId, triggered: step.triggered }
+      : { ruleId: step.ruleId, triggered: step.triggered, details: step.details };
+  });
+}
+
+function parseEvidenceSufficiency(
+  raw: unknown,
+  verdictId: string,
+): VerdictTracePersisted['evidenceSufficiency'] {
+  if (raw === null || typeof raw !== 'object') {
+    throw new Error(`parseVerdictTrace: evidenceSufficiency must be object at verdict_id=${verdictId}`);
+  }
+  const v = raw as Record<string, unknown>;
+  if (typeof v.status !== 'string' || !EVIDENCE_SUFFICIENCY_STATUSES.has(v.status)) {
+    throw new Error(`parseVerdictTrace: evidenceSufficiency.status invalid at verdict_id=${verdictId}`);
+  }
+  if (typeof v.powerStatus !== 'string' || !POWER_STATUSES.has(v.powerStatus)) {
+    throw new Error(`parseVerdictTrace: evidenceSufficiency.powerStatus invalid at verdict_id=${verdictId}`);
+  }
+  return { status: v.status as VerdictTracePersisted['evidenceSufficiency']['status'], powerStatus: v.powerStatus as VerdictTracePersisted['evidenceSufficiency']['powerStatus'] };
 }

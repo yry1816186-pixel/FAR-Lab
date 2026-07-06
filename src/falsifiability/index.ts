@@ -38,6 +38,7 @@ export {
 export {
   bridgeLegacyEvidencesToStatistics,
   buildLegacyVerdictKernelInput,
+  extractVerdictTrace,
   makeLegacyCompatFec,
   makeRealStatsFec,
   verdictResultFromKernelOutput,
@@ -53,15 +54,39 @@ export type {
   HonestVerdictRender,
 } from './render.ts';
 export {
+  getActiveVerdicts,
   getVerdict,
   recordVerdict,
   rowToVerdictNode,
+  supersedeVerdict,
 } from './repository.ts';
 export type {
   VerdictNodeRow,
 } from './repository.ts';
 export {
+  verifyVerdictNodes,
+} from './verifier.ts';
+export type {
+  VerdictVerifyResult,
+} from './verifier.ts';
+export {
+  VerifierStructuralGateError,
+  assertSourceClean,
+  assertVerifierModulesClean,
+  scanDeterministicModules,
+  scanSourceForForbiddenCalls,
+} from './verifier_structural_gate.ts';
+export type {
+  ForbiddenCallHit,
+  ForbiddenCallKind,
+} from './verifier_structural_gate.ts';
+export {
+  bindProvenance,
   extractExternalFact,
+} from './external_facts.ts';
+export type {
+  BindProvenanceSystemContext,
+  BoundProvenance,
 } from './external_facts.ts';
 export type {
   EvidenceRecord,
@@ -76,6 +101,7 @@ export type {
   VerdictNode,
   VerdictNodeKind,
   VerdictResult,
+  VerdictTracePersisted,
 } from './types.ts';
 export {
   getContractsByClaim,
@@ -100,18 +126,22 @@ export type {
 
 // V2 — 确定性五值裁决内核（APPENDIX_B §1 R0-R9 + 03 §7）
 export {
+  EXECUTION_FINGERPRINT_MAGNITUDE_THRESHOLD,
   VERDICT_FLOAT_TOLERANCE,
   decideFiveValueVerdict,
   evaluateScope,
   evaluateStatistics,
+  flagExecutionFingerprintMagnitudeMismatch,
   verdictGte,
   verdictLte,
 } from './verdict_kernel_v2.ts';
 export type {
+  ExecutionFingerprint,
   KernelAntiTheaterFinding,
   KernelAntiTheaterFindingSeverity,
   AssumptionDiagnostic,
   ContradictionEvidence,
+  IdentifierClaim,
   CoverageRelation,
   DatasetBindingSpec,
   EffectiveDirection,

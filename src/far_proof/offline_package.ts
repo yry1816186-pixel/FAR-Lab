@@ -22,6 +22,7 @@ import {
   rmSync,
   statSync,
   writeFileSync,
+  type Dirent,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
@@ -74,6 +75,47 @@ export interface IntegrityVerificationResult {
   readonly errors: readonly string[];
 }
 
+// Windows 上 PATH 里的 `tar` 常是 MSYS2/Git Bash 的 GNU tar：它把绝对路径中的盘符 `C:`
+// 当 remote host:device（"Cannot connect to C: resolve failed"），又在 `-C` 反斜杠路径上
+// 被 MSYS2 运行时改坏。两者都让 `far export far-proof` 静默产出空/坏归档。
+// 解法：win32 优先用原生 bsdtar（%SystemRoot%\System32\tar.exe·Win10 1803+ 标配），原生处理
+// 盘符+反斜杠，零 flag；找不到则降级 PATH 的 tar（GNU tar 时加 --force-local 兜盘符 bug）。
+// posix 直接用 PATH 的 tar（Linux CI 的 GNU tar 无此问题）。
+export interface TarInvocation {
+  readonly binary: string;
+  readonly extraArgs: readonly string[];
+}
+
+let cachedTar: TarInvocation | undefined;
+
+export function resolveTar(): TarInvocation {
+  if (cachedTar !== undefined) {
+    return cachedTar;
+  }
+  if (process.platform === 'win32') {
+    const sysRoot = process.env.SystemRoot ?? process.env.windir ?? 'C:\\Windows';
+    const nativeTar = join(sysRoot, 'System32', 'tar.exe');
+    if (existsSync(nativeTar)) {
+      cachedTar = { binary: nativeTar, extraArgs: [] };
+      return cachedTar;
+    }
+  }
+  let extraArgs: readonly string[] = [];
+  try {
+    const version = execFileSync('tar', ['--version'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    if (version.includes('GNU tar')) {
+      extraArgs = ['--force-local'];
+    }
+  } catch {
+    // tar --version 不可用：不在此掩盖，让后续真实 tar 调用抛其自身的错。
+  }
+  cachedTar = { binary: 'tar', extraArgs };
+  return cachedTar;
+}
+
 export function packageFarProofBundle(options: FarProofPackageOptions): FarProofPackageResult {
   const bundleDir = resolve(options.bundleDir);
   if (!existsSync(bundleDir) || !statSync(bundleDir).isDirectory()) {
@@ -104,17 +146,35 @@ export function packageFarProofBundle(options: FarProofPackageOptions): FarProof
     throw new Error(`packageFarProofBundle: integrity self-check failed: ${integrityCheck.errors.join(' | ')}`);
   }
 
+  // FUSION-OS-3：seal 承诺点——所有受控写入（verify.sh + integrity.json + self-check）完成后捕获内容快照。
+  // archive 写入后重算比对：任一文件 hash 变化/新增/删除 → post-seal 篡改（TOCTOU 注入检出·fail-closed）。
+  // 用内容哈希而非 mtime 墙钟：NTFS mtime 与 Date.now() 时钟源存在跨毫秒偏移，墙钟比较不可靠（07_RISK_REGISTER §188）。
+  const sealSnapshot = snapshotBundleContent(bundleDir);
+
   const tmp = mkdtempSync(join(tmpdir(), 'far-proof-package-'));
   try {
     const tarPath = join(tmp, 'bundle.tar');
-    execFileSync('tar', ['-cf', tarPath, '-C', dirname(bundleDir), basename(bundleDir)], {
-      stdio: 'ignore',
-    });
+    const tar = resolveTar();
+    execFileSync(
+      tar.binary,
+      [...tar.extraArgs, '-cf', tarPath, '-C', dirname(bundleDir), basename(bundleDir)],
+      {
+        stdio: 'ignore',
+      },
+    );
     const tarBytes = readFileSync(tarPath);
     const compressed = zstdCompressSync(tarBytes);
     writeFileSync(archivePath, compressed);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
+  }
+
+  // FUSION-OS-3：archive 后 staleness 扫描——seal→archive 间内容变更视为 TOCTOU 注入，fail-closed 拒绝。
+  const staleness = detectPostSealStaleness(bundleDir, sealSnapshot);
+  if (!staleness.ok) {
+    throw new Error(
+      `packageFarProofBundle: post-seal content change detected (TOCTOU window): ${staleness.staleFiles.join(', ')}`,
+    );
   }
 
   return {
@@ -151,6 +211,67 @@ export function computeFarProofIntegrity(bundleDir: string, generatedAt: string)
     files,
     integrityHash,
   };
+}
+
+/**
+ * FUSION-OS-3：post-seal 内容篡改检测（Open Science sentinel 重导出在 tar 后范式）。
+ *
+ * packageFarProofBundle 在收割（integrity.json + self-check）后捕获内容快照（seal 承诺点），
+ * archive 写入后重算比对：任一文件 sha256 变化 / 新增 / 删除 → 视为 seal 后篡改（post-seal stale）→ fail-closed。
+ * 收窄 harvest→archive 间 TOCTOU 窗口——并发进程在 seal 后注入/改写/删除文件可被检出（不静默放过）。
+ *
+ * 用内容哈希而非 mtime 墙钟：mtime 与 Date.now() 时钟源存在偏移（NTFS 跨毫秒、NFS clock skew），
+ * 墙钟比较既会误报受控写入（jitter）又会漏报 backdated touch。内容比对确定性、无时钟依赖。
+ */
+export interface BundleContentSnapshot {
+  readonly hashes: ReadonlyMap<string, string>;
+}
+
+export interface StalenessResult {
+  readonly ok: boolean;
+  readonly staleFiles: readonly string[];
+}
+
+export function snapshotBundleContent(bundleDir: string): BundleContentSnapshot {
+  const hashes = new Map<string, string>();
+  visitHash(resolve(bundleDir), resolve(bundleDir), hashes);
+  return { hashes };
+}
+
+export function detectPostSealStaleness(bundleDir: string, baseline: BundleContentSnapshot): StalenessResult {
+  const current = snapshotBundleContent(bundleDir);
+  const stale: string[] = [];
+  for (const [path, hash] of current.hashes) {
+    const base = baseline.hashes.get(path);
+    if (base === undefined) {
+      stale.push(path);
+    } else if (base !== hash) {
+      stale.push(path);
+    }
+  }
+  for (const path of baseline.hashes.keys()) {
+    if (!current.hashes.has(path)) {
+      stale.push(path);
+    }
+  }
+  return { ok: stale.length === 0, staleFiles: stale };
+}
+
+function visitHash(root: string, dir: string, hashes: Map<string, string>): void {
+  let entries: readonly Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      visitHash(root, full, hashes);
+    } else if (entry.isFile()) {
+      hashes.set(relative(root, full).split(sep).join('/'), sha256File(full));
+    }
+  }
 }
 
 export function verifyFarProofPackageIntegrity(bundleDir: string): IntegrityVerificationResult {

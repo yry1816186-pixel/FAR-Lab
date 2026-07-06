@@ -12,10 +12,13 @@
 #   2. 把 `depth_evidence` 加入 Branch protection → Require status checks（与 depth_gate 并列）。
 #   3. CODEOWNERS：PROJECT_PLAN/DEPTH_LEDGER.md 由本 bot + maintainer own（防 agent 手改 status）。
 #
-# 当前为 scaffold：双跑 + 写回逻辑落 scripts/depth_evidence.mjs（待实现，见该文件 TODO）。
-# 在 scripts/depth_evidence.mjs 实现前，本 job 以 exit 0 + 提示信息运行（不阻断），诚实声明未启用。
-# 实现 priority 低于 depth_gate（depth_gate 已能阻断所有不带真实接线的 PR；本 job 是把 WIRED_RED→GREEN
-# 的升级物证自动化，防 agent 手填，属收紧层）。
+# scripts/depth_evidence.mjs 已实现（base/head 双跑 proof_test → UPGRADE 裁决 → 原子写回 evidence；
+# 集成测 4/4 + 单元测 17/17 + live --dry-run 物证）。本 job 在 pull_request 事件实跑：
+#   - 普通 PR（接线早于 base 合并）→ base PASS + head PASS → INFO → 零写回 exit 0（不阻断）
+#   - 接线 PR（base 缺接线 FAIL + head 接线 PASS）→ UPGRADE → 写回 WIRED_GREEN + evidence
+#   - ERROR（NO_MATCH/UNKNOWN/NO_FILE_HEAD）→ fail-closed exit 1（零写回）
+# workflow_dispatch（无 PR base/head）→ 跳过双跑 exit 0（不阻断），供手动 smoke。
+# depth_gate 已独立阻断未接线 PR；本 job 是把 WIRED_RED→GREEN 物证自动化的收紧层。
 name: depth-evidence
 
 on:
@@ -44,19 +47,21 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: RED→GREEN dual-run evidence (scaffold · 见 scripts/depth_evidence.mjs TODO)
+      - name: RED→GREEN dual-run evidence (base/head proof_test 双跑 → UPGRADE 写回)
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ ! -f scripts/depth_evidence.mjs ]; then
-            echo "○ depth_evidence: scripts/depth_evidence.mjs 未实现（V1 scaffold）——本 job 当前不阻断。"
-            echo "  启用步骤：(1) 实现 scripts/depth_evidence.mjs（解析 §C WIRED_RED 行 → base/head 双跑 proof_test → 写回 evidence）"
-            echo "           (2) maintainer 在 repo settings 启用 workflow write 权限"
-            echo "           (3) 把 depth_evidence 加入 required status checks"
-            echo "  depth_gate 已独立阻断未接线 PR，本 job 是把 WIRED_RED→GREEN 物证自动化的收紧层。"
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "○ depth_evidence: 非 PR 触发（$GITHUB_EVENT_NAME）——无 base/head SHA，跳过双跑（不阻断）。"
             exit 0
           fi
-          node scripts/depth_evidence.mjs \
-            --base '${{ github.event.pull_request.base.sha }}' \
-            --head '${{ github.event.pull_request.head.sha }}'
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "○ depth_evidence: PR base/head SHA 为空（fork PR 隐藏 sha / 缺权限）——跳过双跑（不阻断）。"
+            exit 0
+          fi
+          node scripts/depth_evidence.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
       - name: Commit back evidence line (若 scripts/depth_evidence.mjs 改了 DEPTH_LEDGER)
         if: success()
         run: |

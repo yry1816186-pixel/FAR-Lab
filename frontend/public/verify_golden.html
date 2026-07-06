@@ -427,8 +427,53 @@
             );
           }
 
+          // R-identifier-fabrication (FUSION-OS-14·与 verdict_kernel_v2.ts:335 对齐·R5 后 R6 前)。
+          var identifierClaims = input.identifierClaims;
+          if (identifierClaims !== undefined && identifierClaims.length > 0) {
+            if (
+              identifierClaims.some(function (claim) {
+                return claim.resolutionStatus === "unresolved";
+              })
+            ) {
+              return makeOutput(
+                "UNTESTED",
+                ["R_IDENTIFIER_RESOLUTION_ENV_FAILURE"],
+                "R_IDENTIFIER_RESOLUTION_ENV_FAILURE",
+                {
+                  scopeReport,
+                  statisticalReport,
+                  evidenceSufficiency: input.evidenceSufficiency,
+                  integrityFlags,
+                  untestedReason: "R_IDENTIFIER_RESOLUTION_ENV_FAILURE",
+                },
+              );
+            }
+            if (
+              identifierClaims.some(function (claim) {
+                return claim.resolutionStatus === "not_found";
+              })
+            ) {
+              return makeOutput("REFUTED", ["UNVERIFIED_IDENTIFIER"], "R_IDENTIFIER_FABRICATION", {
+                scopeReport,
+                statisticalReport,
+                evidenceSufficiency: input.evidenceSufficiency,
+                integrityFlags,
+              });
+            }
+          }
+
           if (statisticalReport.refutes) {
             return makeOutput("REFUTED", ["R6_PRIMARY_TEST_REFUTES"], "R6_PRIMARY_TEST_REFUTES", {
+              scopeReport,
+              statisticalReport,
+              evidenceSufficiency: input.evidenceSufficiency,
+              integrityFlags,
+            });
+          }
+
+          // R-derivation-form (FUSION-OS-13·与 verdict_kernel_v2.ts:370 对齐·R6 后 R7/R-causal 前)。
+          if (statisticalReport.formMismatch) {
+            return makeOutput("INCONCLUSIVE", ["R_DERIVATION_FORM_MISMATCH"], "R_DERIVATION_FORM_MISMATCH", {
               scopeReport,
               statisticalReport,
               evidenceSufficiency: input.evidenceSufficiency,
@@ -609,6 +654,13 @@
             input.antiTheaterFindings.some(function (finding) {
               return finding.severity === "warn";
             });
+          // FUSION-OS-13: derivationForm 不匹配（值相等也不信·与 verdict_kernel_v2.ts evaluateStatistics 对齐）。
+          const expectedForm = input.fec.statisticalPlan.expectedDerivationForm;
+          const formMismatch =
+            expectedForm !== undefined &&
+            all.some(function (stat) {
+              return stat.derivationForm !== undefined && stat.derivationForm !== expectedForm;
+            });
 
           return {
             refutes,
@@ -622,6 +674,7 @@
             primaryConfidenceInterval:
               primaryFirst && primaryFirst.confidenceInterval !== undefined ? primaryFirst.confidenceInterval : null,
             hasWarnAssumption,
+            formMismatch,
           };
         }
 

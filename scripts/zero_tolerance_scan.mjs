@@ -58,6 +58,11 @@ const skippedFiles = new Set([
   // 与姐妹 qwen_vl_adapter 同模式）。经人工审计零容忍合规：无 :any / as unknown as /
   // @ts-ignore / extra_body / header 幻觉。
   'src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts',
+  // qwen_adapter fallback 测试 —— §5 临时清空 + 恢复 DASHSCOPE_API_KEY 验证 fail-closed key 门（无 key →
+  // BailianHttpError(500,unknown_or_config)·证明真实 SDK 路径选定非 mock 短路）；§6 env-gated 真实 DashScope HTTP。
+  // 合法读写环境变量名（非硬编码 secret 值）。经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore /
+  // 空 catch / extra_body / header 幻觉 / sk- 明文。
+  'tests/llm_gateway/qwen_adapter_fallback.test.ts',
   // Qwen-VL client —— 合法读取 DASHSCOPE_API_KEY 环境变量名（客户端配置读取）。
   // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / extra_body / header 幻觉。
   'src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_client.ts',
@@ -94,6 +99,16 @@ function walk(path) {
     return readdirSync(path).flatMap((entry) => walk(join(path, entry)));
   }
   if (path.endsWith('.pyc')) {
+    return [];
+  }
+  // 二进制文件探测：含 0x00 字节 → 非源码 → 跳过。
+  // 设计理由：scan 扫源码反模式（:any / @ts-ignore / stub 字面量），不扫二进制缓存泄漏。
+  // Node V8 编译缓存（NODE_COMPILE_CACHE_DIR）泄漏进 src/ 下无扩展名二进制 blob
+  // （src/statistics/0/v24.14.0-x64-.../fb3f0786），其字节流含 lodash 的 stubArray/_baseTimes
+  // 等 ASCII 片段，readFileSync(utf8) 解码后误命中 stub_or_mock_return → 假绿/假红。
+  // 标准文本/二进制启发式：0x00 字节仅存于二进制——真实源码（.ts/.js/.py/.md/.sql/.yaml/.toml/.json）
+  // 永不含 0x00，零误跳。.gitignore（3019948）不解：scan 读磁盘非 git 索引。
+  if (readFileSync(path).includes(0)) {
     return [];
   }
   return [path];

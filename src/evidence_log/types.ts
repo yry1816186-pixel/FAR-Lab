@@ -25,6 +25,14 @@ export interface SourceAnchor {
   readonly codeLocation?: CodeLocation;
 }
 
+/**
+ * FUSION-OS-6 provenance class（Open Science data_vid=None + forged marker 范式·来源不可自填红线）。
+ * - system_derived：系统持有 canonical 输入导出（可信·原始终点）。
+ * - llm_generated：LLM 产出（不可信·须配 systemClaimHash 绑定 + dashscopeRequestId 强制 null·不得直接升 CONFIRMED/REFUTED）。
+ * - human：人工录入（外部观测·须人工核验）。
+ */
+export type ProvenanceClass = 'system_derived' | 'llm_generated' | 'human';
+
 export interface ReplayProver {
   readonly modelSnapshot: string;
   readonly messages: readonly unknown[];
@@ -104,6 +112,10 @@ export interface EvidenceLogRow {
   readonly source_anchor_ts: string;
   readonly source_anchor_path: string | null;
   readonly source_anchor_lineno: number | null;
+  readonly derivable: number;
+  readonly evidence_payload_hash: string | null;
+  readonly provenance_class: string;
+  readonly system_claim_hash: string | null;
   readonly created_at: string;
 }
 
@@ -115,6 +127,10 @@ export interface EvidenceLogEntry {
   readonly evidencePayload: string;
   readonly sourceAnchor: SourceAnchor;
   readonly createdAt: string;
+  readonly derivable: 0 | 1;
+  readonly evidencePayloadHash: string | null;
+  readonly provenanceClass: ProvenanceClass;
+  readonly systemClaimHash: string | null;
 }
 
 export interface AppendEvidenceLogArgs {
@@ -122,6 +138,23 @@ export interface AppendEvidenceLogArgs {
   readonly evidencePayload: Record<string, unknown>;
   readonly sourceAnchor: SourceAnchor;
   readonly evidenceId?: string;
+  /**
+   * FUSION-OS-10：derivable 标记（Open Science host_call_log.derivable 范式）。
+   * - 0（缺省）= 不可重算的外部观测（原始终点·字节原样存档·不绑定 hash）。
+   * - 1 = 可由系统 canonical 输入重算 → appendEvidenceLog 落 evidence_payload_hash = sha256(canonical JSON)，
+   *   verifyEvidencePayloadHashes 重算比对，失配 → tampered（反剧场：不信任 workload 自填字节）。
+   * 不进 canonical_hash 4 键白名单（独立内容寻址列·与链式 current_hash 正交·零回归）。
+   */
+  readonly derivable?: 0 | 1;
+  /**
+   * FUSION-OS-6：provenance class tag（Open Science data_vid=None + forged marker 范式）。
+   * - 缺省 system_derived。
+   * - llm_generated：appendEvidenceLog fail-closed 要求 systemClaimHash 非空 + sourceAnchor.dashscopeRequestId=null
+   *   （LLM-asserted provenance 字段不可自填·反剧场红线·forged marker 检测）。
+   */
+  readonly provenanceClass?: ProvenanceClass;
+  /** FUSION-OS-6：系统侧重导出的 claim hash（bindProvenance 由 claimText + canonicalSystemInput + rawResponseHash 重算）。 */
+  readonly systemClaimHash?: string | null;
 }
 
 export type CallRecordHashRow = Omit<
@@ -147,6 +180,17 @@ export interface VerifyResult {
   readonly expectedHash: string | null;
   readonly actualHash: string | null;
   readonly verifiedCount: number;
+}
+
+/**
+ * FUSION-OS-10：evidence_payload 内容寻址重算结果（derivable=1 行的 hash 绑定验证）。
+ * ok=false 时 tamperedEvidenceIds 列出 evidence_payload_hash 与重算 sha256 失配的 evidence_id
+ * （evidence 字节被 DB 文件级篡改·绕过 append-only trigger 的情形）。
+ */
+export interface VerifyEvidencePayloadResult {
+  readonly ok: boolean;
+  readonly verifiedCount: number;
+  readonly tamperedEvidenceIds: readonly string[];
 }
 
 export interface AppendRecordOptions {

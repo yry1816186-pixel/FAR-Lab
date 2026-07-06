@@ -15,12 +15,13 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, type Dirent } from 'node:fs';
-import { delimiter, resolve } from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, statSync, type Dirent, type Stats } from 'node:fs';
+import { delimiter, join, resolve } from 'node:path';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { hashCanonicalJson } from '../evidence_log/index.ts';
 import type { NetworkPolicy } from '../schema/enums.ts';
+import type { ExecutionFingerprint } from '../falsifiability/verdict_kernel_v2.ts';
 import {
   RESOURCE_LIMITS,
   type ArtifactManifest,
@@ -110,6 +111,9 @@ export function computeSandboxRunResult(
 
   const seed = input.seed ?? DEFAULT_SEED;
   const networkBlocked = input.networkBlocked ?? true;
+  // FUSION-OS-7：cpu/peak_rss 透传（缺省 0=未测量）。非负有限守卫——防 Python 侧异常负值/NaN 污染指纹。
+  const cpuMs = sanitizeResourceMetric(input.cpuMs);
+  const peakRssKb = sanitizeResourceMetric(input.peakRssKb);
 
   // SR-4：超时但 exitCode=0 是矛盾的——确定性输入须如实反映。
   // 不强制改写 exitCode（保留调用方真相），但 timedOut 字段独立记录。
@@ -124,7 +128,26 @@ export function computeSandboxRunResult(
     networkBlocked,
     seed,
     singleThreaded: true, // SR-7 · nthread=1 单线程确定性
+    cpuMs,
+    peakRssKb,
   };
+}
+
+/** FUSION-OS-7：资源度量守卫——非负有限数，否则归 0（未测量）。防 NaN/负值/Infinity 污染执行指纹比对。 */
+function sanitizeResourceMetric(value: number | undefined): number {
+  if (value === undefined) return 0;
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return value;
+}
+
+/**
+ * FUSION-OS-7：从 SandboxRunResult 提取执行指纹三元组（wall/cpu/peak_rss）。
+ * 供 caller（orchestrator）记录到 StatisticalResult.executionFingerprint 作复算基线，
+ * 或与复算观测三元组比对（flagExecutionFingerprintMagnitudeMismatch·定义于 verdict_kernel_v2）。
+ * ExecutionFingerprint 类型定义于 verdict_kernel_v2.ts（StatisticalResult 字段的归属内核类型）。
+ */
+export function executionFingerprintFromSandboxResult(result: SandboxRunResult): ExecutionFingerprint {
+  return { wallMs: result.wallClockMs, cpuMs: result.cpuMs, peakRssKb: result.peakRssKb };
 }
 
 /**
@@ -153,16 +176,56 @@ export function computeSandboxReproFingerprint(result: SandboxRunResult): string
 // 诚实边界（07_RISK_REGISTER §188）：networkPolicy 仅驱动 Python 侧 best-effort，非 OS 级隔离。
 
 /**
- * venv 子进程环境：PYTHONPATH 注入 repro/ + .python-deps/（复用 smt_backend.ts:274 模板）。
+ * venv 子进程环境（FUSION-OS-8）：白名单 + secret 剥离 + PYTHONPATH 注入。
+ *
+ * 旧实现 `{ ...process.env }` 把全部环境透传给 Python 子进程，用户脚本可经 `os.environ` 读到
+ * OPENAI_API_KEY / *_TOKEN / *_SECRET —— 来源不可自填红线的注入面。Open Science secret-strip
+ * 范式：显式白名单（Python 启动所需的最小集）+ secret key 正则剥离（纵深防御，Python 侧 apply_env_hardening 二次剥离）。
+ *
  * `.python-deps/` 是 ensure_py_deps.mjs 的本地安装根，让子进程能 import threadpoolctl/numpy 等。
  */
+const VENV_ENV_ALLOWLIST: ReadonlySet<string> = new Set([
+  'PATH',
+  'PATHEXT',
+  'SYSTEMROOT',
+  'SYSTEMDRIVE',
+  'WINDIR',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'HOME',
+  'USERPROFILE',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PYTHONHOME',
+  'PYTHONPATH',
+  'PYTHONUTF8',
+  'PYTHONDONTWRITEBYTECODE',
+  'NO_PROXY',
+]);
+
+const SECRET_ENV_PATTERN = /(API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|PRIVATE_KEY|ACCESS_KEY)/i;
+
 export function buildVenvPythonEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value === undefined) continue;
+    // FUSION-OS-8 secret-strip：剥离 key 名匹配 secret 模式的 env（API_KEY/SECRET/TOKEN/...）。
+    if (SECRET_ENV_PATTERN.test(key)) continue;
+    // 白名单：仅放行 Python 启动 + 确定性执行所需的最小 env 集。
+    if (!VENV_ENV_ALLOWLIST.has(key)) continue;
+    env[key] = value;
+  }
   const existing = process.env.PYTHONPATH;
   const parts = [resolve('repro'), resolve('.python-deps')];
   if (existing !== undefined && existing.length > 0) {
     parts.push(existing);
   }
-  return { ...process.env, PYTHONPATH: parts.join(delimiter) };
+  env.PYTHONPATH = parts.join(delimiter);
+  return env;
 }
 
 let venvAvailableCache: boolean | null = null;
@@ -197,6 +260,8 @@ interface RawVenvResult {
   readonly wallClockMs: number;
   readonly timedOut: boolean;
   readonly networkBlocked: boolean;
+  readonly cpuMs: number;
+  readonly peakRssKb: number;
 }
 
 interface PythonSandboxManifest {
@@ -206,6 +271,8 @@ interface PythonSandboxManifest {
   readonly artifacts?: readonly ArtifactManifest[];
   readonly wallClockMs?: number;
   readonly networkBlocked?: boolean;
+  readonly cpuMs?: number;
+  readonly peakRssKb?: number;
 }
 
 /**
@@ -248,6 +315,154 @@ function walkArtifacts(base: string, dir: string, out: ArtifactManifest[]): void
 }
 
 /**
+ * FUSION-OS-4：spawnVenv 前 workingDir 预算预扫（Open Science gitScanWorker 范式·用户态降级版）。
+ *
+ * 收窄在 spawn 前对 workingDir 的伪造/洪水窗口：拒绝 .git 目录（git flood·artifact 扫描爆量 +
+ * 仓库泄漏）、拒绝任意 symlink（O_NOFOLLOW 策略·永不跟随·防 path traversal 逃逸）、拒绝文件数超 cap
+ * （zip-bomb / 洪水）。container 检测为信息性 best-effort（不拒绝·记录隔离弱化态）。
+ *
+ * 诚实边界（07_RISK_REGISTER §188）：本扫描是用户态字符串/lstat 检查，非 OS 级 fs 隔离（mount namespace /
+ * seccomp）。真 OS 级隔离仍是 V2 路线。本层收窄的是「spawn 前显式拒绝已知恶意形状」，非强隔离保证。
+ */
+export const PREFLIGHT_DEFAULT_FILE_CAP = 5000;
+
+export interface PreflightOptions {
+  readonly fileCap?: number;
+}
+
+export interface PreflightResult {
+  readonly ok: boolean;
+  readonly reason: string;
+  readonly containerDetected: boolean;
+  readonly fileCount: number;
+}
+
+export function preflightWorkingDir(workingDir: string, options?: PreflightOptions): PreflightResult {
+  const containerDetected = detectContainer();
+  if (workingDir.length === 0) {
+    return { ok: true, reason: 'no workingDir', containerDetected, fileCount: 0 };
+  }
+  const base = resolve(workingDir);
+  if (!existsSync(base)) {
+    return { ok: false, reason: `preflight: workingDir not found: ${base}`, containerDetected, fileCount: 0 };
+  }
+  let dirStat: Stats;
+  try {
+    dirStat = statSync(base);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: `preflight: workingDir stat failed: ${message}`, containerDetected, fileCount: 0 };
+  }
+  if (!dirStat.isDirectory()) {
+    return { ok: false, reason: `preflight: workingDir not a directory: ${base}`, containerDetected, fileCount: 0 };
+  }
+  // .git-cap：workingDir 内含 .git（git flood / 仓库泄漏）→ 拒绝。
+  if (existsSync(join(base, '.git'))) {
+    return { ok: false, reason: `preflight: .git not allowed in workingDir (git-flood)`, containerDetected, fileCount: 0 };
+  }
+  const fileCap = options?.fileCap ?? PREFLIGHT_DEFAULT_FILE_CAP;
+  let fileCount = 0;
+  const symlinkHit = preflightWalk(base, base, (entry) => {
+    fileCount += 1;
+    return entry.isFile() || entry.isDirectory();
+  });
+  if (symlinkHit !== null) {
+    return {
+      ok: false,
+      reason: `preflight: symlink not allowed (O_NOFOLLOW): ${symlinkHit}`,
+      containerDetected,
+      fileCount,
+    };
+  }
+  if (fileCount > fileCap) {
+    return {
+      ok: false,
+      reason: `preflight: file count ${fileCount} exceeds cap ${fileCap} (flood/zip-bomb)`,
+      containerDetected,
+      fileCount,
+    };
+  }
+  return { ok: true, reason: 'ok', containerDetected, fileCount };
+}
+
+// O_NOFOLLOW walk：lstatSync 每个条目（永不跟随 symlink）；symlink → 返回相对路径（拒绝信号）。
+// 返回 null = 干净；返回 string = 命中的 symlink 相对路径。
+function preflightWalk(
+  base: string,
+  dir: string,
+  onRegular: (entry: Dirent) => boolean,
+): string | null {
+  let entries: readonly Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    if (entry.isSymbolicLink()) {
+      const full = resolve(dir, entry.name);
+      return full.slice(base.length).replace(/^[\\/]+/, '');
+    }
+    if (entry.isDirectory()) {
+      onRegular(entry);
+      const sub = preflightWalk(base, resolve(dir, entry.name), onRegular);
+      if (sub !== null) return sub;
+    } else if (entry.isFile()) {
+      onRegular(entry);
+    } else {
+      // 非常规非符号链接（FIFO/socket/blk/chr）→ 当未知形状拒绝（fail-closed）。
+      const full = resolve(dir, entry.name);
+      return full.slice(base.length).replace(/^[\\/]+/, '');
+    }
+  }
+  return null;
+}
+
+/**
+ * FUSION-OS-2：跨平台进程组 kill（Open Science setsid+kill -- -$pgid 范式）。
+ *
+ * POSIX：detached=true 让 child 成为新进程组 leader（pgid=child.pid），process.kill(-pid) 组播 SIGKILL，
+ * 杀尽孤孙（numpy/OpenBLAS 线程 / subprocess.Popen 子进程——它们继承父的 group·不 setsid）。
+ * Windows：无 POSIX 进程组，taskkill /T /PID 递归杀进程树（/T=tree /F=force）。
+ * 兜底：组 kill 失败（race 自然退出 / 权限）→ child.kill('SIGKILL') 单进程兜底。
+ */
+export function killProcessGroup(child: ChildProcess): void {
+  const pid = child.pid;
+  if (pid === undefined) return;
+  if (process.platform === 'win32') {
+    const r = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    if (r.status === 0) return;
+    // taskkill 非零（PID 已死 / 权限）→ 落到单进程兜底。
+  } else {
+    try {
+      process.kill(-pid, 'SIGKILL');
+      return;
+    } catch {
+      // ESRCH（组已死）/ EPERM → 落到单进程兜底（race 自然退出·best-effort）。
+    }
+  }
+  try {
+    child.kill('SIGKILL');
+  } catch {
+    // 已死——best-effort，finish 路径不依赖此成功。
+  }
+}
+
+// container 检测（信息性 best-effort·非拒绝）：/.dockerenv 或 /proc/1/cgroup 含 docker/lxc/kubepods。
+function detectContainer(): boolean {
+  try {
+    if (existsSync('/.dockerenv')) return true;
+    const cgroup = '/proc/1/cgroup';
+    if (!existsSync(cgroup)) return false;
+    const text = readFileSync(cgroup, 'utf8');
+    return /docker|lxc|kubepods/.test(text);
+  } catch {
+    // best-effort 信息性检测：cgroup 不可读（权限）→ 视为未检测到。非 fail-closed 路径。
+    return false;
+  }
+}
+
+/**
  * 真 spawn venv 子进程执行用户脚本。
  *
  * 协议：stdin = {script, seed, networkPolicy, allowedHosts, workingDir, timeoutMs}；
@@ -271,6 +486,24 @@ export async function spawnVenv(
     );
   }
 
+  // FUSION-OS-4：spawn 前 workingDir 预扫（.git flood / symlink O_NOFOLLOW / 文件数 cap）。
+  // fail-closed——preflight 拒绝则不 spawn，返回 exitCode 126（与 SR-4 ceiling throw 区分：throw 用于
+  // 调用方编程错误，preflight 拒绝是 sandbox 输入形状拒绝·落 RawVenvResult 让 caller 审计）。
+  const preflight = preflightWorkingDir(input.workingDir ?? '');
+  if (!preflight.ok) {
+    return Promise.resolve({
+      exitCode: 126,
+      stdout: '',
+      stderr: preflight.reason,
+      artifacts: [],
+      wallClockMs: 0,
+      timedOut: false,
+      networkBlocked: networkPolicy === 'off',
+      cpuMs: 0,
+      peakRssKb: 0,
+    });
+  }
+
   const cfg = {
     script: input.script,
     seed: input.seed ?? DEFAULT_SEED,
@@ -281,10 +514,13 @@ export async function spawnVenv(
   };
 
   return new Promise<RawVenvResult>((promiseResolve) => {
+    // FUSION-OS-2：detached=true 让子进程成为独立进程组 leader（POSIX·pgid=child.pid）/ 新 console（win）。
+    // 不用 Node `timeout` 选项——它只对单进程发 SIGTERM，孤孙（numpy/OpenBLAS 线程 / subprocess）逃逸。
+    // 自管 timer + killProcessGroup 组播清理（process.kill(-pgid) POSIX / taskkill /T win）。
     const child = spawn(pythonCmd, [SANDBOX_RUNNER_PY], {
       env: buildVenvPythonEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: timeoutMs,
+      detached: true,
     });
 
     const stdoutChunks: Buffer[] = [];
@@ -293,9 +529,15 @@ export async function spawnVenv(
     let timedOut = false;
     let settled = false;
 
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killProcessGroup(child);
+    }, timeoutMs);
+
     const finish = (result: RawVenvResult): void => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       promiseResolve(result);
     };
 
@@ -316,6 +558,8 @@ export async function spawnVenv(
         wallClockMs: Date.now() - start,
         timedOut: false,
         networkBlocked: networkPolicy === 'off',
+        cpuMs: 0,
+        peakRssKb: 0,
       });
     });
 
@@ -334,6 +578,8 @@ export async function spawnVenv(
           wallClockMs,
           timedOut: true,
           networkBlocked: networkPolicy === 'off',
+          cpuMs: 0,
+          peakRssKb: 0,
         });
         return;
       }
@@ -355,6 +601,8 @@ export async function spawnVenv(
           wallClockMs,
           timedOut: false,
           networkBlocked: networkPolicy === 'off',
+          cpuMs: 0,
+          peakRssKb: 0,
         });
         return;
       }
@@ -368,6 +616,8 @@ export async function spawnVenv(
         timedOut: false,
         networkBlocked:
           typeof parsed.networkBlocked === 'boolean' ? parsed.networkBlocked : networkPolicy === 'off',
+        cpuMs: typeof parsed.cpuMs === 'number' ? parsed.cpuMs : 0,
+        peakRssKb: typeof parsed.peakRssKb === 'number' ? parsed.peakRssKb : 0,
       });
     });
 
@@ -398,6 +648,8 @@ export const venvSandboxAdapter: VenvSandboxAdapter = {
       timedOut: raw.timedOut,
       seed,
       networkBlocked: raw.networkBlocked,
+      cpuMs: raw.cpuMs,
+      peakRssKb: raw.peakRssKb,
     };
     return computeSandboxRunResult(execInput, resources);
   },

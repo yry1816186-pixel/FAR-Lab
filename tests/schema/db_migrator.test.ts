@@ -14,11 +14,11 @@ test('runMigrations applies 0001_initial and records schema version', () => {
   const db = new Database(':memory:');
   try {
     const result = runMigrations(db);
-    assert.deepEqual(result.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    assert.deepEqual(result.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
     assert.deepEqual(result.skipped, []);
 
     const rows = getSchemaMetaRows(db);
-    assert.equal(rows.length, 11);
+    assert.equal(rows.length, 17);
     assert.equal(rows[0]?.version, 1);
     assert.equal(rows[0]?.name, '0001_initial');
     assert.equal(rows[1]?.version, 2);
@@ -41,6 +41,18 @@ test('runMigrations applies 0001_initial and records schema version', () => {
     assert.equal(rows[9]?.name, '0010_proof_envelopes_v2');
     assert.equal(rows[10]?.version, 11);
     assert.equal(rows[10]?.name, '0011_anti_theater_trigger_v2');
+    assert.equal(rows[11]?.version, 12);
+    assert.equal(rows[11]?.name, '0012_verdict_trace_persist');
+    assert.equal(rows[12]?.version, 13);
+    assert.equal(rows[12]?.name, '0013_verdict_enum_guard');
+    assert.equal(rows[13]?.version, 14);
+    assert.equal(rows[13]?.name, '0014_verdict_supersede');
+    assert.equal(rows[14]?.version, 15);
+    assert.equal(rows[14]?.name, '0015_far_blob_store');
+    assert.equal(rows[15]?.version, 16);
+    assert.equal(rows[15]?.name, '0016_evidence_derivable');
+    assert.equal(rows[16]?.version, 17);
+    assert.equal(rows[16]?.name, '0017_evidence_provenance_class');
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -62,7 +74,7 @@ test('runMigrations skips already applied versions', () => {
     runMigrations(db);
     const result = runMigrations(db);
     assert.deepEqual(result.applied, []);
-    assert.deepEqual(result.skipped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    assert.deepEqual(result.skipped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
   } finally {
     db.close();
   }

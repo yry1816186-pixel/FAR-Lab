@@ -13,7 +13,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -25,7 +25,7 @@ import {
   padCell,
   writeBackUpgrades,
 } from './depth_evidence.mjs';
-import { LEDGER_ROW_RE } from './lib/ledger.mjs';
+import { LEDGER_ROW_RE, parseLedgerTable } from './lib/ledger.mjs';
 
 const B = 'a'.repeat(40); // base 40-hex
 const H = 'b'.repeat(40); // head 40-hex（B≠H）
@@ -128,6 +128,51 @@ test('replaceRowCells: 外科替换 status+closed_by，其余 cell 不动，仍�
   // id/dep/caller/proofTest/redCommit cell 内容不变。
   assert.match(out, /P0-1/);
   assert.match(out, /src\/fec\/orchestrator\.ts:99/);
+});
+
+// R10：claimed_by_pr 第 8 列（可选）。replaceRowCells 须改 status+closed_by 而**保留** claimed_by_pr cell。
+test('replaceRowCells: 9-col 行（R10 claimed_by_pr）改 status+closed_by，claimed_by_pr cell 原样保留', () => {
+  const line = '| P0-1 | compileFec ... | src/fec/orchestrator.ts:119 | tests/fec/fec_mandatory_e2e.test.ts::x | (待 CI) | WIRED_RED | — | PR-42 |';
+  const out = replaceRowCells(line, { status: 'WIRED_GREEN', closedBy: H });
+  assert.match(out, /WIRED_GREEN/);
+  assert.match(out, new RegExp(H));
+  // claimed_by_pr cell 保留（PR-42 不被抹掉/移位）。
+  assert.match(out, /PR-42/);
+  // 9 段 → 10 段 split 仍被 guard 接受（非返回原行）。
+  assert.notEqual(out, line);
+  const m = out.match(LEDGER_ROW_RE);
+  assert.ok(m, '9-col rewritten row must match LEDGER_ROW_RE (向后兼容正则)');
+  assert.equal(m[7].trim(), 'WIRED_GREEN');
+  assert.equal(m[8].trim(), H);
+  assert.equal(m[9].trim(), 'PR-42'); // 第 9 列 claimedBy
+});
+
+// R10：parseLedgerTable 须向后兼容——8 列行 claimedBy=undefined，9 列行 claimedBy=<值>。
+test('parseLedgerTable: R10 claimed_by_pr——8 列行 claimedBy=undefined，9 列行 claimedBy=<值>', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'ledger-r10-'));
+  try {
+    mkdirSync(join(tmp, 'PROJECT_PLAN'), { recursive: true });
+    const ledgerPath = join(tmp, 'PROJECT_PLAN', 'DEPTH_LEDGER.md');
+    writeFileSync(
+      ledgerPath,
+      [
+        '# DEPTH_LEDGER', '', '## §C 深度模块接线表（机器解析，schema 严格）', '',
+        '| id | single_real_dependency | proof_caller | proof_test | proof_test_red_commit | status | closed_by_sha | claimed_by_pr |',
+        '|----|------------------------|--------------|------------|-----------------------|--------|---------------|---------------|',
+        '| P-8col | dep | src/foo.ts:1 | tests/foo/t.test.ts::x | (待CI) | WIRED_RED | — |',
+        '| P-9col | dep | src/foo.ts:2 | tests/foo/t.test.ts::y | (待CI) | WIRED_RED | — | PR-7 |',
+        '',
+      ].join('\n'),
+    );
+    const { rows } = parseLedgerTable(tmp);
+    assert.equal(rows.length, 2, '8-col + 9-col 行各解析 1 条');
+    const r8 = rows.find((r) => r.id === 'P-8col');
+    const r9 = rows.find((r) => r.id === 'P-9col');
+    assert.equal(r8.claimedBy, undefined, '8 列行无第 9 列 → claimedBy=undefined（向后兼容）');
+    assert.equal(r9.claimedBy, 'PR-7', '9 列行第 9 列 → claimedBy=PR-7');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('formatEvidenceLine: cell 数正确 + → 两侧空格 + 过 L2 base≠head hex 正则', () => {

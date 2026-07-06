@@ -6,7 +6,8 @@ Protocol (stdin -> stdout, both JSON):
              "allowedHosts": [], "workingDir": "<dir or empty>"}
   Response: {"exitCode": 0, "stdout": "...", "stderr": "...",
              "artifacts": [{"path","contentHash","bytes"}],
-             "wallClockMs": 123, "timedOut": false, "networkBlocked": true}
+             "wallClockMs": 123, "timedOut": false, "networkBlocked": true,
+             "cpuMs": 45, "peakRssKb": 32768}
 
 Executes the user script deterministically: fixed seed (SR-2) + threadpoolctl nthread=1 (SR-7,
 optional dep, degrades gracefully) + best-effort network policy (SR-5). The user script's
@@ -27,6 +28,7 @@ import io
 import json
 import os
 import random
+import re
 import sys
 import time
 import traceback
@@ -69,22 +71,61 @@ def scan_artifacts(working_dir: str) -> list[dict[str, object]]:
     return out
 
 
-def apply_network_policy(network_policy: str) -> bool:
-    """Best-effort egress discouragement (SR-5). Returns the networkBlocked flag.
+def _peak_rss_kb() -> int:
+    """FUSION-OS-7: peak resident set size in KB (Open Science per-cell resource 三元组范式).
+
+    POSIX: resource.getrusage(RUSAGE_SELF).ru_maxrss — Linux reports KB, macOS reports bytes
+    (normalize to KB). Windows: `resource` module is unavailable → return 0 (honest "not measured";
+    TS-side magnitude comparison treats 0 as incomparable, no false mismatch flag).
+    """
+    try:
+        import resource  # POSIX-only; ImportError on Windows.
+    except ImportError:
+        return 0
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform == "darwin":
+        return peak // 1024  # macOS ru_maxrss is in bytes.
+    return peak  # Linux ru_maxrss is already KB.
+
+
+def apply_env_hardening(network_policy: str) -> bool:
+    """Best-effort egress discouragement (SR-5) + secret env strip (FUSION-OS-8).
 
     networkPolicy='off' clears proxy env vars; real OS-level egress blocking is NOT
     provided (07_RISK_REGISTER §188). allowlist enforcement is the user script's job
     (ALLOWED_HOSTS injected into its namespace).
+
+    FUSION-OS-8 secret-strip (defense in depth): the parent spawn (buildVenvPythonEnv)
+    already whitelists + strips secret env, but the sandbox must not trust that the
+    parent actually stripped — strip again here so a user script cannot read
+    OPENAI_API_KEY / *_TOKEN / *_SECRET via os.environ (来源不可自填).
     """
-    if network_policy == "off":
-        for key in (
-            "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
-            "ALL_PROXY", "all_proxy",
-        ):
+    for key in (
+        "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+        "ALL_PROXY", "all_proxy",
+    ):
+        os.environ.pop(key, None)
+    os.environ["NO_PROXY"] = "*"
+    secret_re = re.compile(r"(API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|PRIVATE_KEY|ACCESS_KEY)", re.I)
+    for key in list(os.environ):
+        if secret_re.search(key):
             os.environ.pop(key, None)
-        os.environ["NO_PROXY"] = "*"
-        return True
-    return False
+    return network_policy == "off"
+
+
+# FUSION-OS-8 dlopen/spawn audit hook (Open Science dlopen guard 范式·PEP 578).
+# 拒绝用户脚本加载原生库 / 派生子进程——确定性科学复算不应 ctypes.CDLL 或 subprocess。
+# 事件名取 PEP 578 实际事件（ctypes.dlopen / subprocess.Popen / os.system / os.exec / os.spawn /
+# os.fork）；不含 'exec'（会阻断 sandbox 自身 exec 用户脚本）/ 不含 'import'（numpy C 扩展正常加载）。
+_AUDIT_REJECT_EVENTS = frozenset({
+    "ctypes.dlopen", "subprocess.Popen", "os.system",
+    "os.exec", "os.spawn", "os.fork",
+})
+
+
+def _far_sandbox_audit(event: str, args: object) -> None:
+    if event in _AUDIT_REJECT_EVENTS:
+        sys.exit(126)
 
 
 def main() -> None:
@@ -117,7 +158,7 @@ def main() -> None:
         allowed_hosts = cfg.get("allowedHosts", []) or []
         working_dir = str(cfg.get("workingDir", "") or "")
 
-        network_blocked = apply_network_policy(network_policy)
+        network_blocked = apply_env_hardening(network_policy)
         random.seed(seed)
 
         namespace: dict[str, object] = {
@@ -145,6 +186,11 @@ def main() -> None:
 
         old_stdout, old_stderr = sys.stdout, sys.stderr
         sys.stdout, sys.stderr = out_buf, err_buf
+        # FUSION-OS-8: install audit hook AFTER threadpoolctl setup (its ctypes queries would
+        # otherwise self-trip) so the hook governs only user-script exec — reject dlopen/spawn.
+        sys.addaudithook(_far_sandbox_audit)
+        # FUSION-OS-7: cpu time of user-script exec (cross-platform time.process_time·excludes sleep/wait).
+        cpu_start = time.process_time()
         try:
             try:
                 exec(compile(script, "<sandbox>", "exec"), namespace)
@@ -157,6 +203,7 @@ def main() -> None:
             sys.stdout, sys.stderr = old_stdout, old_stderr
             if thread_ctx is not None:
                 thread_ctx.__exit__(None, None, None)
+        cpu_ms = int((time.process_time() - cpu_start) * 1000)
 
         artifacts = scan_artifacts(working_dir) if working_dir else []
         emit(
@@ -168,6 +215,8 @@ def main() -> None:
                 "wallClockMs": int((time.monotonic() - start) * 1000),
                 "timedOut": False,
                 "networkBlocked": network_blocked,
+                "cpuMs": cpu_ms,
+                "peakRssKb": _peak_rss_kb(),
             }
         )
     except Exception:  # noqa: BLE001

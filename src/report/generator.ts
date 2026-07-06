@@ -67,6 +67,7 @@ function queryVerdictNodes(db: Database.Database): VerdictNode[] {
       `SELECT verdict_id, evidence_id, parent_verdict_id, node_kind, verdict,
               falsification_spec, threshold_spec, metric_value, conflicting_evidence_count,
               scope_slip_text, untested_reason, source_anchor, replay_prover,
+              verdict_trace_json, verdict_trace_hash, superseded_by,
               prev_hash, current_hash, created_at, updated_at
        FROM verdict_nodes
        ORDER BY created_at ASC`,

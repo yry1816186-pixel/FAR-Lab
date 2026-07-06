@@ -133,6 +133,8 @@ export interface StatisticalPlan {
   readonly outlierPolicy: string;
   readonly stoppingRule: string;
   readonly scopeLimitation?: string;
+  /** FUSION-OS-13：期望派生形式。与 StatisticalResult.derivationForm 不一致 → formMismatch → R-derivation-form INCONCLUSIVE。optional·缺省零回归。 */
+  readonly expectedDerivationForm?: 'literal' | 'derived' | 'formula' | 'auto';
 }
 
 export interface PowerPlan {
