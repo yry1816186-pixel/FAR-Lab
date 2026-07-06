@@ -167,6 +167,8 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 
 **当前态**：§C **31 行已升 `WIRED_GREEN`**（全部 P0 P0-1/2a/2b/2c/2d/3/4、STAT-1、P1-1/4/5a/5b/5c/6a、P2-1、P2-2、P3-1、**全部 FUSION-OS-1..14**）；**3 行维持 `WIRED_RED`**（P1-2/P1-3 真实 DashScope HTTP、P1-6b fetchOnlineDataset 网络/lightkurve——均需真实凭据/网络，本地 SKIP，无法 stub 而不失「真实 HTTP/网络集成」本意，须 maintainer CI 带凭据/网络双跑）。
 
+**maintainer 一键产 P1-2/3/6b 物证**：`DASHSCOPE_API_KEY=sk-xxx node scripts/credential_dual_run.mjs`（P1-6b 额外 `FAR_ONLINE=1`+lightkurve）。PASS 物证由 keystone bot `depth-evidence.yml` 双跑写回 WIRED_GREEN。`scripts/python_axis_probe.mjs`（P3-1）在 `pnpm test` 起跑打印 `Python axis: available|skipped`，明示 axis skip=环境非代码 bug。
+
 31 行的 WIRED_GREEN 由 `scripts/depth_evidence.mjs` keystone bot **本地**双跑物证写回（bot 自身写回，非 agent 手填，符合 §B）。各 cluster 用靶向突变 base + 接线 commit 作 head：base = 受控突变 commit（kernel-stub `f9110351` / FEC-gate-stub `42b08ca4` / 综合集群 stub `6ae825f7` / sandbox+probe stub `70057c5c` / schema-trigger stub `52f87a7d` / sympy-backend stub `712dbc2`，均在 `red-wave*` 分支），head = **接线 commit 本身**（P-cluster/sympy → `956381a`，FUSION/CLI/sandbox → `2fcfe04`）。bot 在真实 git worktree 双跑观察到 base=FAIL / head=PASS；`depth_gate` CHECK-L1 校验 closed_by=接线 commit 的 diff-tree 确实 touch 各行 proof_caller（全通过）。
 
 为支持「多 commit 接线需 row 专属 head」，bot 新增 `--only <ids>` 作用域标志（不变量不变：仍须 base-FAIL/head-PASS，仅缩小处理范围使各 cluster 能用接线 commit 作 head 而不被其他 cluster 的 NO_FILE_HEAD fail-closed 阻断）。
