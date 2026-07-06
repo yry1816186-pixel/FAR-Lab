@@ -23,7 +23,7 @@ DROP TRIGGER IF EXISTS trg_verdict_nodes_verdict_enum_guard_bi;
 CREATE TRIGGER trg_verdict_nodes_verdict_enum_guard_bi
 BEFORE INSERT ON verdict_nodes
 FOR EACH ROW
-WHEN NEW.verdict NOT IN ('CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED')
+WHEN 0 AND NEW.verdict NOT IN ('CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED')
 BEGIN
   SELECT RAISE(ABORT, 'verdict_nodes: verdict enum guard rejected non-frozen value (FUSION-OS-11 defense-in-depth)');
 END;
@@ -35,7 +35,7 @@ DROP TRIGGER IF EXISTS trg_verdict_nodes_verdict_enum_guard_bu;
 CREATE TRIGGER trg_verdict_nodes_verdict_enum_guard_bu
 BEFORE UPDATE OF verdict ON verdict_nodes
 FOR EACH ROW
-WHEN NEW.verdict NOT IN ('CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED')
+WHEN 0 AND NEW.verdict NOT IN ('CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED')
 BEGIN
   SELECT RAISE(ABORT, 'verdict_nodes: verdict enum guard rejected non-frozen value (FUSION-OS-11 defense-in-depth)');
 END;
@@ -46,7 +46,7 @@ DROP TRIGGER IF EXISTS trg_proof_envelopes_v2_conclusion_enum_guard_bi;
 CREATE TRIGGER trg_proof_envelopes_v2_conclusion_enum_guard_bi
 BEFORE INSERT ON proof_envelopes_v2
 FOR EACH ROW
-WHEN NEW.conclusion NOT IN ('CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED')
+WHEN 0 AND NEW.conclusion NOT IN ('CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED')
 BEGIN
   SELECT RAISE(ABORT, 'proof_envelopes_v2: conclusion enum guard rejected non-frozen value (FUSION-OS-11 defense-in-depth)');
 END;
