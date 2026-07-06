@@ -101,6 +101,15 @@ node scripts/depth_gate.mjs   # 深度接线门（AST caller 校验 + 账本一�
 
 ### 命令行工具
 
+`far` 命令依赖 Node ≥ 24 原生 type-stripping（bin 直接指向 `src/cli/far.ts`）。克隆后任选其一启用：
+
+```bash
+pnpm link --global          # 注册全局 `far`（推荐）
+# 或免安装直接调用：
+node src/cli/far.ts status          # 等价于 `far status`
+node src/cli/far.ts verify-golden --all
+```
+
 ```bash
 far status                # 仓库状态与迁移计数
 far verify-golden --all   # 用真实内核裁决跑全部 Golden Vector
