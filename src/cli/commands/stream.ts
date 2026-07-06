@@ -126,6 +126,10 @@ export async function runStream(argv: readonly string[]): Promise<number> {
         process.stdout.write(`  ✓ verdict : ${vn.verdict}（${vn.verdictTrace.decisiveRuleId}）\n`);
       }
       process.stdout.write(`  ✓ chain   : ${result.reproHash}\n`);
+      const tg = result.traceGrade;
+      process.stdout.write(
+        `  ✓ grade   : ${tg.score.toFixed(3)}（${tg.gradedBy}）${tg.failureCodes.length > 0 ? ` · failures=${tg.failureCodes.join(',')}` : ''}\n`,
+      );
       process.stdout.write(
         '\n  ⚠ honest : offline_replay fixture 驱动（非真实科学裁决）。裁决由 R0-R9 确定性内核给出（LLM 非裁决者）。\n\n',
       );
@@ -138,6 +142,11 @@ export async function runStream(argv: readonly string[]): Promise<number> {
           verdict: vn === null ? null : vn.verdict,
           decisiveRuleId: vn === null ? null : vn.verdictTrace.decisiveRuleId,
           chainHeadHash: result.reproHash,
+          traceGrade: {
+            score: result.traceGrade.score,
+            gradedBy: result.traceGrade.gradedBy,
+            failureCodes: result.traceGrade.failureCodes,
+          },
         })}\n`,
       );
     }
