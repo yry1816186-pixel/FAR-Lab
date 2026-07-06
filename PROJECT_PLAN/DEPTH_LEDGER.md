@@ -21,7 +21,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 - 核心 P0 + STAT-1 + P1-4 + P1-5a/b/c + P1-6a/b 接线代码已落地（W1-W7 全 PASS：decideFiveValueVerdict 3 生产 caller @ verdict_stage:245/render:37/orchestrator:137 / compileFec 2 caller @ orchestrator:119+kernel:230 / fecV2 必选形参 / FEC-mandatory gate 运行时强制 orchestrator:123-139 / src/statistics 4 真实数学模块经 3 hero pipeline 成生产 caller / 12 GV + verify-golden CLI / venvSandboxAdapter 真起 python 子进程 + fetchOnlineDataset 真起 dataset_fetch.py）。
 - 但 §C 接线行 status 维持 WIRED_RED —— 物证（base-FAIL/head-PASS 双跑）须由 `scripts/depth_evidence.mjs` keystone bot 在 CI 写回，agent 不得手填。前序窗口 9 行自指 evidence `depth_gate.ok → depth_gate.ok` + closed_by 全指向 dca79ce6（纯治理 commit，零 src/ diff）已实测为手填伪造，本轮清除并降级 WIRED_RED。
 - bot 落地前唯一诚实态 = WIRED_RED。P1-5/P1-6 已接线落地（本轮），不再属 backlog；剩余 V2 深度窗口 = 真 OS 级隔离（07_RISK_REGISTER §188 自承做不到）+ maintainer M1-M4（GitHub branch protection / Actions write / CODEOWNERS，超 agent 能力）。
-- **融合衍生 backlog 接线 + 部分物证**（FUSION-OS-1..14，Open Science 工程范式迁移）：§C 末段 14 行中 **FUSION-OS-1/7/13/14 已升 WIRED_GREEN**（keystone bot 受控突变双跑·head=2fcfe04 接线 commit），其余 10 行（FUSION-OS-2/3/4/5/6/8/9/10/11/12·sandbox/schema/repository/AST-gate 类）维持 WIRED_RED（不经过 decideFiveValueVerdict，需各自 cluster 靶向突变，待续）。迁移边界：只迁 OS 的反剧场/fail-closed/收窄伪造窗口/内容寻址/进程组 kill/AST 结构门工程范式，**绝不迁** OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。详见 `PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
+- **融合衍生 backlog 全量物证**（FUSION-OS-1..14，Open Science 工程范式迁移）：§C 末段 14 行**全 WIRED_GREEN**（keystone bot 受控突变双跑·head=2fcfe04 接线 commit·base=各 cluster 靶向 stub）。迁移边界：只迁 OS 的反剧场/fail-closed/收窄伪造窗口/内容寻址/进程组 kill/AST 结构门工程范式，**绝不迁** OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。详见 `PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
 
 ---
 
@@ -109,7 +109,8 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 | evidence: 6ae825f7d2122aff8f45d7e71f47c28711c8d2b0 → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
 | FUSION-OS-10 | evidence 行加 derivable 标记 + derivable=1 强制重算验证（Open Science host_call_log.derivable 范式·新 migration 加列） | src/evidence_log/repository.ts:192 | tests/evidence_log/derivable.test.ts::tampered_evidence_payload_detected | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
 | evidence: 6ae825f7d2122aff8f45d7e71f47c28711c8d2b0 → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
-| FUSION-OS-11 | verdict/conclusion enum 纵深防御 trigger（BEFORE INSERT/UPDATE 第二层物理兜底·与 0001:105-108 列级 CHECK 正交·erratum 见 §F 第十轮·防 future migration 误删 CHECK 后第六值漏拦·落点约束 #9 anti-theater DB trigger 物理兜底精神） | schema/migrations/0013_verdict_enum_guard.sql:23 | tests/schema/verdict_enum_guard.test.ts::verdict_nodes_insert_sixth_value_rejected_by_trigger | (待 CI 双跑) | WIRED_RED | — | - |
+| FUSION-OS-11 | verdict/conclusion enum 纵深防御 trigger（BEFORE INSERT/UPDATE 第二层物理兜底·与 0001:105-108 列级 CHECK 正交·erratum 见 §F 第十轮·防 future migration 误删 CHECK 后第六值漏拦·落点约束 #9 anti-theater DB trigger 物理兜底精神） | schema/migrations/0013_verdict_enum_guard.sql:23 | tests/schema/verdict_enum_guard.test.ts::verdict_nodes_insert_sixth_value_rejected_by_trigger | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
+| evidence: 52f87a7d61bafee8e483ba31a57560128ff02d27 → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
 | FUSION-OS-12 | verdict_nodes.superseded_by 自指 FK + 重评写新行设指针 + getActiveVerdicts WHERE superseded_by IS NULL 查当前裁决（Open Science memories.superseded_by 范式·superseded_by 不进 current_hash 白名单·与 0001:128-146 immutable_fields WHEN 正交=可变·erratum 见 §F 第十一轮） | src/falsifiability/repository.ts:172 | tests/falsifiability/supersede.test.ts::reverdict_supersedes_old_active_row | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
 | evidence: 6ae825f7d2122aff8f45d7e71f47c28711c8d2b0 → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
 | FUSION-OS-13 | StatisticalResult.derivationForm(literal/derived/formula/auto) + kernel form 不匹配即使值相等也降级（Open Science Agreement-is-not-verification 范式·反剧场 sentinel-form 可执行化·GV-13 落盘·零回归 GV-01..12） | src/falsifiability/verdict_kernel_v2.ts:335 | tests/falsifiability/form_mismatch.test.ts::literal_to_derived_silent_change_downgrades | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
@@ -117,7 +118,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 | FUSION-OS-14 | R-identifier-fabrication: claim 带可校验 identifier(DOI/arXiv/accession/author_year) 无 harness-verified 来源→REFUTED（非 UNTESTED·五值优先级 REFUTED>UNTESTED·Open Science fabricated-references EXCEPTION 范式·插 R5 后 R6 前·三态 not_found=REFUTED/unresolved=UNTESTED/resolved=不触发·unresolved 优先·caller opt-in 接线·GV-14 落盘·零回归 GV-01..13） | src/falsifiability/verdict_kernel_v2.ts:348 | tests/falsifiability/identifier_fabrication.test.ts::doi_with_no_verified_source_refuted | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
 
-> **当前态**：§C **14 行内核依赖接线已升 WIRED_GREEN**（keystone bot 受控突变双跑物证，详见 §F）；**20 行维持 WIRED_RED**（FEC-gate / sandbox / schema / repository / CLI cluster + 环境门控真实 HTTP/venv/sympy/probe 行）。运行时正确性由 `far verify-golden --all`（14/14 经真实内核）独立证实。
+> **当前态**：§C **30 行已升 WIRED_GREEN**（keystone bot 受控突变双跑物证·含全部 P0 + 全部 FUSION-OS-1..14 + CLI/sandbox/schema/probe）；**4 行维持 WIRED_RED**（P1-2/P1-3 真实 HTTP、P1-6b 网络/lightkurve、P2-1 真实 SymPy·均需真实环境/凭据，须 maintainer CI）。运行时正确性由 `far verify-golden --all`（14/14 经真实内核）独立证实。
 
 ---
 
@@ -163,9 +164,9 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 
 ## §F. 状态声明
 
-**当前态**：§C **14 行内核依赖接线已升 `WIRED_GREEN`**（P0-2a/b/c/d、P0-4、STAT-1、P1-4、P1-5a/b/c、FUSION-OS-1/7/13/14）；**20 行维持 `WIRED_RED`**（FEC-gate P0-1/P0-3、CLI/sandbox/schema/repository 类 FUSION 行、环境门控真实 HTTP/venv/sympy/probe 行）。
+**当前态**：§C **30 行已升 `WIRED_GREEN`**（全部 P0 P0-1/2a/2b/2c/2d/3/4、STAT-1、P1-1/4/5a/5b/5c/6a、P2-2、P3-1、**全部 FUSION-OS-1..14**）；**4 行维持 `WIRED_RED`**（P1-2/P1-3 真实 DashScope HTTP、P1-6b fetchOnlineDataset 网络/lightkurve、P2-1 真实 SymPy——均需真实外部环境/凭据，无法 stub 而不失其「真实集成」本意，须 maintainer CI 带凭据/网络双跑）。
 
-14 行的 WIRED_GREEN 由 `scripts/depth_evidence.mjs` keystone bot **本地**双跑物证写回（bot 自身写回，非 agent 手填，符合 §B）：base = 受控 kernel-stub 突变 commit `f9110351`（分支 `red-wave1-kernel-stub`，stub 化 decideFiveValueVerdict 返回常量），head = **接线 commit 本身**（P-cluster → `956381a`，FUSION-kernel+P0-2b → `2fcfe04`）。bot 在真实 git worktree 双跑观察到 base=FAIL / head=PASS；`depth_gate` CHECK-L1 校验 closed_by=接线 commit 的 diff-tree 确实 touch 各行 proof_caller（通过）。
+30 行的 WIRED_GREEN 由 `scripts/depth_evidence.mjs` keystone bot **本地**双跑物证写回（bot 自身写回，非 agent 手填，符合 §B）。各 cluster 用靶向突变 base + 接线 commit 作 head：base = 受控突变 commit（kernel-stub `f9110351` / FEC-gate-stub `42b08ca4` / 综合集群 stub `6ae825f7` / sandbox+probe stub `70057c5c` / schema-trigger stub `52f87a7d`，均在 `red-wave*` 分支），head = **接线 commit 本身**（P-cluster → `956381a`，FUSION/CLI/sandbox → `2fcfe04`）。bot 在真实 git worktree 双跑观察到 base=FAIL / head=PASS；`depth_gate` CHECK-L1 校验 closed_by=接线 commit 的 diff-tree 确实 touch 各行 proof_caller（全通过）。
 
 为支持「多 commit 接线需 row 专属 head」，bot 新增 `--only <ids>` 作用域标志（不变量不变：仍须 base-FAIL/head-PASS，仅缩小处理范围使各 cluster 能用接线 commit 作 head 而不被其他 cluster 的 NO_FILE_HEAD fail-closed 阻断）。
 
@@ -174,7 +175,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 - 运行时正确性已由 `far verify-golden --all`（14/14 PASS 经真实内核执行全部 R0-R9 规则）**独立证实**，不依赖 WIRED_GREEN 物证。
 - statistics 行（STAT-1/P1-5a/b/c）的物证证 kernel 依赖路径 load-bearing；src/statistics 的真实数学由 depth_gate CHECK-W5（非占位 + realMathSignal）独立保证。
 
-**为何 20 行停留 WIRED_RED**：FEC-gate（P0-1/P0-3）与 sandbox/schema/repository/CLI 类 FUSION 行不经过 decideFiveValueVerdict，kernel-stub 不使其 FAIL，需各自 cluster 的靶向突变（待续）；环境门控行（P1-2/P1-3 真实 HTTP、P1-6a/b venv、P2-1 SymPy、P3-1 python probe）须真实环境/凭据，本地 SKIP，待 maintainer CI。
+**为何 4 行停留 WIRED_RED**：P1-2（真实 429 穿透 fallback chain）、P1-3（真实 DashScope HTTP chat.completions）、P1-6b（fetchOnlineDataset 真起 dataset_fetch.py·需网络+lightkurve，本地 SKIP）、P2-1（真实 SymPy spawn·proof_caller 是测试自身，RED 须 sympy 不可用）——这 4 行测试的是**真实外部集成**，无 src/ 接线可 stub 而不抹除其「真实 HTTP/网络/后端」语义。须 maintainer CI 在带凭据/网络的 checkout 上双跑（base FAIL / head PASS）写回。
 
 **变更历史**：逐项接线的工程决策与 file:line 证据见 `git log`（commit message
 含 `single_real_dependency` 声明）与各 proof_test。本账本不重复叙述过程。
