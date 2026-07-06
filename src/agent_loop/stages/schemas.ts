@@ -1,8 +1,6 @@
 /**
  * stages/schemas.ts —— 六阶段 zod schema 共享定义。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §3.3-§3.4（payload 类型）+ §5.2（各阶段 schema）.
- *
  * 设计要点：
  *   - 共享 sub-schema（CitationAnchor / FalsificationMethod / AgentEvidenceRecord /
  *     ExecutableCheck / FeedbackSignal）集中定义，避免 6 个 stage 文件重复。

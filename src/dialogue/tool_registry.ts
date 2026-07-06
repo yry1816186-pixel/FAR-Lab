@@ -1,9 +1,6 @@
 /**
  * tool_registry.ts —— 对话层只读工具注册表（4 个工具·readonly=true·零 MCP SDK）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/39 §0#1（确定性 TS 编排 + 受控 LLM 调用）+
- *   15 §8 #8（禁引入外部 agent runtime·自研确定性 TS）。
- *
  * 设计要点：
  *   - 4 个工具全部 readonly=true（无副作用·可安全重复调用）。
  *   - 零 MCP SDK 依赖：不引入 MCP 官方 SDK，自研轻量工具协议。

@@ -1,8 +1,6 @@
 /**
  * stage2_integration —— [2] 知识整合执行器。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2（stage2）+ §5.2（执行器要点）.
- *
  * 职责：把 stage1 的问题理解整合到现有知识图谱 + 标注 gaps（待补的空白）。
  *
  * buildMessages 消费：stage1 产物（problemStatement + keyTerms + falsifiableAngle）。

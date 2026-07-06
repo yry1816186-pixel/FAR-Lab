@@ -1,7 +1,6 @@
 // src/cli/state_machine.ts
 // 职责：9-state CLI 协议 FSM + INITIAL（P2-2）。
 // 真实依赖：纯状态机判定，配合 stage_receipt.ts 形成 sha256 哈希链。
-// Authority: CLAUDE.md §4 P2-2（spec 的 9-state CLI 协议 FSM，CLAIM_CANDIDATE→…→VERIFIED）。
 
 export const CLI_STATES = [
   'INITIAL',

@@ -1,8 +1,6 @@
 /**
  * manifest_draft.ts —— 对话层 manifest 草稿占位类型。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/39 §6（ResearchThoughtFramework 是 stage1 可选参考输入）。
- *
  * 设计理由：ThoughtStructureSynthesizer 产出的 ResearchThoughtFramework 在传入 stage1
  * 之前，需要一个轻量的 manifest 草稿包装类型，用于携带 framework + 降级标记 + provenance。
  * 本类型是对话层内部的传输容器，不持久化为表（与 ResearchThoughtFramework 同纪律·非表）。

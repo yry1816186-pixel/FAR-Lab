@@ -1,8 +1,6 @@
 /**
  * stage1_understanding —— [1] 问题理解执行器。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2（stage1）+ §5.2（执行器要点）.
- *
  * 职责：复述研究问题 + 识别关键术语 + 标注可证伪切入角度。
  *
  * buildMessages 消费：ctx.researchInput（研究问题原文）+ 可选 dialogueContext

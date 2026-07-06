@@ -1,8 +1,6 @@
 /**
  * markdown_renderer.ts —— 将 ReportData 渲染为可复现的 Markdown 报告字符串。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/17_最终设计审计与开发任务包_FINAL_AUDIT.md Epic K-05b.
- *
  * 模型中立：纯字符串拼接，无 LLM 调用。
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。
  */

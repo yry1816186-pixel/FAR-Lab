@@ -1,10 +1,6 @@
 /**
  * anti_theater detector —— AT-JUDGE-OVERRIDE（LLM/评审者作为最终裁决者）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_judge_override 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：不用 LLM-as-judge / 误报率=0）+
- *            03 §7（VerdictKernelOutput.integrityFlags）。
- *
  * 攻击语义：当 verdict kernel 的 integrityFlags 出现 'llm' / 'judge' 标记时，
  *   意味着 LLM 或人工评审者的输出进入了 verdict-critical 路径（可能升 CONFIRMED/REFUTED），
  *   违反 F3（全程无 LLM）+ R7（integrityFlags 必须为空才能 CONFIRMED）。本检测器确定性识别并 BLOCK。

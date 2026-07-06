@@ -1,10 +1,6 @@
 /**
  * verdict_stage —— runAgentLoop 收敛后的第 7 阶段（裁决接通）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §8（runAgentLoop 终止后裁决）+
- *            07_falsifiability_verdict.md（V2 verdict kernel + recordVerdict）+
- *            41_可证伪证据链_FEC.md（hypothesis→VerdictNode 协议）.
- *
  * 职责：六阶段收敛后，把 stage3 hypothesis + stage4 evidence 喂入 falsifiability 引擎，
  *   产出真实 VerdictNode（落 verdict_nodes·关联 evidence_log 行），填入 LoopState.verdictNode。
  *

@@ -1,9 +1,6 @@
 /**
  * anti_theater adapters —— 存储型 AntiTheaterFinding ↔ verdict kernel 输入投影型 转换。
  *
- * Authority: PROJECT_PLAN/APPENDIX_A_TYPES.md §7（存储型权威）+ §7.1（VerdictKernelInput.antiTheaterFindings 消费投影型）+
- *            APPENDIX_E_ANTI_THEATER.md §1（双轴纪律 D2）。
- *
  * 投影规则（D2 存储轴 → kernel 派生展示轴）：
  *   - kind: attackKind kebab-case 字面量直接透传（存储型与 kernel 共用闭合 enum 字面量·窄→宽赋值合法）。
  *   - severity: outcome FAIL→'fail'（R7→UNTESTED）/ WARN→'warn'（R8 INCONCLUSIVE）/ PASS,SKIP→'pass'（无影响）。

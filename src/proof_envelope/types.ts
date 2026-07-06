@@ -1,9 +1,6 @@
 /**
  * ProofEnvelope: sealed evidence package for auditable claim resolution.
  *
- * Authority: FINAL_PACKAGE/09_PROOF_CARRYING_RESEARCH_OBJECT.md §1 +
- *            round8 B1 (proofHash separators + ensure_ascii).
- *
  * V1 scope 裁剪（诚实边界 · 21_IMPLEMENTATION_ROADMAP §0 V1 行 + 09 §10 + 33 CROSS-CUT-004）:
  *   09 §1 完整态字段 nodeId/objectHash/ledgerRoot/inclusionProof 依赖
  *   SciIRNode（08 · migration 0016 = W2）+ Merkle ledger（migration 0022 = V3）。

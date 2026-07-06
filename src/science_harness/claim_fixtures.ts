@@ -15,7 +15,6 @@
  *   （causal/correlational/mechanistic/predictive/existence/optimization/methodological/
  *    measurement/reproducibility）未含 'quantitative'（22↔08 待统一·记 TODO·不在本任务 scope）。
  *
- * Authority: 22 T-W2-06（line 130-138）+ 21 §8 + 33 FP3-ENG-GPU-005 + 任务 #12。
  * 模型中立。零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */
 

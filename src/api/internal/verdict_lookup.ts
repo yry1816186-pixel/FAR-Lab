@@ -1,8 +1,6 @@
 /**
  * verdict_lookup —— 判定节点查询辅助层。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5.3.
- *
  * 设计理由：
  *   - falsifiability 模块导出 getVerdict(db, verdictId)，但无 by_evidence_id 查询。
  *   - API 层需要「按 evidenceId 查判定节点」能力（hypothesize 路由用）。

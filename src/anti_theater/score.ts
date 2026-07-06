@@ -1,8 +1,6 @@
 /**
  * anti_theater score —— 反剧场评分（7 桶去重扣分·APPENDIX_E §4）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §4（score 公式 + 7 桶 + 阈值 70/50）。
- *
  * 评分规则（§4·100 基准，7 桶扣分，每桶命中一次即扣·去重）：
  *   score = 100
  *     - 25 * critical_protocol_deviation   # AT-POSTHOC-THRESHOLD/AT-METRIC-SWAP/AT-PHACK-ALPHA/AT-HARK/AT-STOPPING-RULE/AT-OPTIONAL-STOPPING

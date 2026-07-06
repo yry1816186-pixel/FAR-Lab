@@ -1,9 +1,6 @@
 /**
  * profiles/offline_replay.ts —— FAR-Chain 离线回放 Profile（零 API Key 依赖）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/05_provider.md +
- *   FAR_CHAIN_DEV_SPEC/16_阿里云参与边界与模型中立策略_ALIYUN_MODEL_NEUTRALITY.md。
- *
  * 本 profile 是 Core 默认 profile：无云 key 可跑通所有 Core gates。
  * Competition profile（competition_aliyun_qwen）是完全独立的 entry，不在此文件。
  *

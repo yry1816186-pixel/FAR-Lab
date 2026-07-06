@@ -1,8 +1,6 @@
 /**
  * report 路由——研究报告输出（24§5.3 / 17 Epic K-05a + K-05b）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5.3 / 17 Epic K-05a/K-05b.
- *
  * 路由（两个产物·content-by-path 分离）：
  *   - GET /report/:runId      → HTML 审计报告（Epic K-05b·Content-Type text/html）
  *   - GET /report/:runId/paper → ResearchPaperOutput JSON（Epic K-05a·竞赛 10 字段）

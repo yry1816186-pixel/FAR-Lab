@@ -1,9 +1,6 @@
 /**
  * anti_theater detector —— AT-STOPPING-RULE（停止规则违规 / 未登记的提前停止）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_stopping_rule 伪代码）+
- *            APPENDIX_A_TYPES.md §7（AntiTheaterFinding 存储型）。
- *
  * 检查内容（伪代码三段子路径，list 型，全部 outcome='FAIL'）：
  *   1. stoppingRule 类型近似为 'fixed_n' 且 interim_looks > 1
  *      → STOPPING_RULE_VIOLATION（findingIdSuffix='-INTERIM_FIXED_N'，

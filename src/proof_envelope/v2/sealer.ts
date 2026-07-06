@@ -1,8 +1,6 @@
 /**
  * ProofEnvelope V2 Sealer —— 封存 envelope（compute proofHash + validate 10 rules）。
  *
- * Authority: PROJECT_PLAN/04 §2.1（ProofEnvelopeV2 结构）+ §2.4（10 rules）+ §2.5（proofHash）。
- *
  * 流程：
  *   1. computeProofHashV2(input) → proofHash（§2.4 5 步：normalizeClaim + fecHash 互验 + canonical + sha256）
  *   2. 构造 sealed envelope {...input, proofHash}

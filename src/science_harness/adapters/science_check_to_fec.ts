@@ -1,9 +1,6 @@
 /**
  * science_harness adapters —— ScienceCheck → FEC FalsificationSpec/ThresholdSpec 投影（P1-5）。
  *
- * Authority: PROJECT_PLAN/02_ARCHITECTURE.md（双 pipeline · hero 走 Pipeline B fecAppendClaim）+
- *            11_FALSIFICATION_ENGINE.md §1（FalsificationSpec/ThresholdSpec 字段）+ 12 §3.1（ScienceCheck）。
- *
  * 为什么需要 adapter：ScienceCheck.threshold.op 是 5 值（'<'|'<='|'>'|'>='|'=='），FEC thresholdSemantics
  * 是 3 值（'gt'|'lt'|'range'）。两套枚举不对齐——adapter 单点承载投影，禁调用方散落自造映射（铁律 #1 单口径）。
  *

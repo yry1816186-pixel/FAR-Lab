@@ -1,9 +1,6 @@
 /**
  * verdict_kernel_v2 —— 确定性五值裁决内核（Deterministic Five-Value Verdict Kernel）。
  *
- * Authority: PROJECT_PLAN/03 §7（VerdictKernelInput/Output + R0-R9 伪代码）+ §7.4（evaluate_scope/statistics）+
- *            APPENDIX_B_GOLDEN §1（R0-R9 优先级 SSOT）+ §2（GV-01..GV-12）+ §4.1（浮点容差 1e-7）。
- *
  * 核心契约（F1-F9 红线）：
  *   - **全程无 LLM**：verdict 由 deterministic rule trace 产出，LLM evidence 不得直接升 CONFIRMED/REFUTED（F3）。
  *   - **R0-R9 固定优先级**：DEGRADED_SCOPE > REFUTED > INCONCLUSIVE > CONFIRMED > UNTESTED（§6 F2 锁死）。

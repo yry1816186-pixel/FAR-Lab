@@ -1,10 +1,6 @@
 /**
  * anti_theater detector —— AT-WORKFLOW-DIGEST（工作流摘要伪造检测）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_workflow_digest 伪代码）+
- *            APPENDIX_A_TYPES.md §7（AntiTheaterFinding 权威存储类型）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 / reasonCode / 误报率=0）。
- *
  * 攻击语义（AT-WORKFLOW-DIGEST · workflow-digest-mismatch）：
  *   工作流绑定 trace（WorkflowBindingTrace）声明的工作流三件套摘要
  *   （workflowHash / containerDigest / environmentHash）与预注册时 freeze 的值不一致。

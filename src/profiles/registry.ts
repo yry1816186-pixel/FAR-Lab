@@ -1,9 +1,6 @@
 /**
  * profiles/registry.ts —— FAR-Chain Profile 注册表（模型中立）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/16 §3（llm_gateway core 与 competition profile 边界）+
- *   FAR_CHAIN_DEV_SPEC/05_provider.md。
- *
  * 设计要点：
  *   - 按 name 注册/查找 Profile。
  *   - 支持 Capability-based 查找（如查找所有支持 'reasoning' 的 profile）。

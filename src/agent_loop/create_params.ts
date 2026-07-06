@@ -1,8 +1,6 @@
 /**
  * buildCreateParams —— 构造 LlmRequest 形态的调用参数 + R1 互斥守卫 + N3 反幻觉铁律。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §4（buildCreateParams SSOT）+ §2.2（R1 路由矩阵 SSOT）+ §0（N3 反幻觉铁律）.
- *
  * 适配说明（与 spec §4.2 的差异·按项目实际 LlmRequest 形态优先·AGENTS §1 Authority Order）：
  *   1. spec §4.2 的 BuiltCreateParams 是百炼 Node SDK create() 参数形态（含 response_format 对象 +
  *      enable_thinking + stream）。项目 LlmRequest（llm_gateway/types.ts）是 adapter-agnostic 形态：

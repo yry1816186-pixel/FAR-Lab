@@ -1,7 +1,6 @@
 // src/cli/stage_receipt.ts
 // 职责：per-stage stageReceipt 哈希链（P2-2）。
 // 真实依赖：sha256(prevReceipt + hashCanonicalJson(stageOutput))（node:crypto 真实重算，非 mock）。
-// Authority: CLAUDE.md §4 P2-2 + §5 RR-1（禁手填 hash，必须真实重算）。
 
 import { createHash } from 'node:crypto';
 

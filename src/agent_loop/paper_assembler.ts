@@ -1,8 +1,6 @@
 /**
  * paperAssembler —— 六阶段产物聚合为比赛 10 字段输出。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §5.5.
- *
  * 定位：runAgentLoop 终止后执行的**确定性映射函数**（不经 LLM·禁 LLM-as-judge）。
  * 把六个阶段产出的 UnderstandingPayload / IntegrationPayload / HypothesisPayload /
  * EvidencePayload / PlanPayload / FeedbackPayload 聚合为 ResearchPaperOutput 10 字段。

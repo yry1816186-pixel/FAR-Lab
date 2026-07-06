@@ -1,9 +1,6 @@
 /**
  * anti_theater detector —— AT-OPTIONAL-STOPPING（optional stopping 无 spending function 声明）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_optional_stopping 伪代码）+
- *            APPENDIX_A_TYPES.md §7（AntiTheaterFinding 存储型）。
- *
  * 检查内容（伪代码单段子路径，outcome='FAIL'）：
  *   stoppingRule 类型 ∈ {'group_sequential', 'alpha_spending'} 但未声明 spendingFunction
  *   → OPTIONAL_STOPPING_NO_SPENDING（affected=['fec.statisticalPlan.stoppingRule.spendingFunction']）。

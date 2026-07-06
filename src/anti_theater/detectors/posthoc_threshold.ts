@@ -1,9 +1,6 @@
 /**
  * anti_theater detector —— AT-POSTHOC-THRESHOLD（事后阈值篡改检测）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_posthoc_threshold 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：误报率=0 / 确定性 / 不读 FS）。
- *
  * 攻击语义：阈值方向（threshold.value / direction / threshold.thresholdSemantics）在假设封存后
  *   被偷偷改写以让结果"刚好通过"——这是经典的 p-hacking / post-hoc moving goalpost。
  *   防线：预注册时冻结 canonical(threshold, direction, thresholdSemantics) 的 sha256（thresholdHash），

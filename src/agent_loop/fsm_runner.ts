@@ -1,8 +1,6 @@
 /**
  * fsm_runner —— agent_loop 主循环（runAgentLoop + assertTerminated）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §7.1（assertTerminated）+ §8（runAgentLoop）.
- *
  * 适配说明（与 spec §8 的差异·按项目实际 API 优先）：
  *   1. spec §8 入参 `bailianClient: OpenAI` → 本文件入参 `gateway + profile +
  *      finishReasonExtractor + reproHashProvider + gitCommitSha + appendOptions +

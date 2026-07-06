@@ -1,9 +1,6 @@
 /**
  * confounding_gate/dag —— 因果 DAG 构造 + 拓扑（CG-2 acyclic fail-closed）+ 祖先/后代。
  *
- * Authority: PROJECT_PLAN/03 §7.5.1（d_separation/backdoor 消费 dag.neighbors/has_edge/get_ancestors/get_descendants）+
- *            §7.5.1:1133 CG-2（causalDag 必须无环·拓扑排序验证）。
- *
  * CG-2（acyclic fail-closed）：buildDag 构造后强制 topologicalSort 验证无环；含环 → throw Error。
  * 源码 `A→B→A` 自环或多节点环均被 Kahn 算法检出（processed < nodeIds.length）。
  *

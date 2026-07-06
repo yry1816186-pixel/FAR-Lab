@@ -1,9 +1,6 @@
 /**
  * anti_theater detector: AT-LABEL-ONLY —— 标签证据检测器（primary measurement 缺 rawArtifactHashes）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_label_only 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 / reasonCode / 不用 LLM-as-judge / 误报率=0）。
- *
  * 检测语义（伪代码原意）：
  *   executionTrace.measurements 中 role==='primary' 的条目是裁决载体——primary measurement 必须
  *   携带 rawArtifactHashes（指向真实可复现的原始产物 hash），否则 measurement 仅是"标签"（label-only），

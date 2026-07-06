@@ -50,7 +50,6 @@ export interface VerdictResult extends VerdictDecision {
 /**
  * 裁决内核结构化输出（P0-2-EXT）：持久化进 verdict_nodes 的 4 个 verdict-critical 字段。
  *
- * Authority: PROJECT_PLAN/04 §3.1（proofHash 白名单 verdictTrace.*）+ §3.4（verdict 层 critical）。
  * 来源：decideFiveValueVerdict 的 VerdictKernelOutput（verdict_kernel_v2.ts:176）经
  *       extractVerdictTrace 投影——修复「verdictResultFromKernelOutput 丢弃 4 字段」的缺口
  *       （legacy_kernel_adapter.ts:299 仍只投影 5 个标量进 VerdictResult，本类型走另一条投影线落库）。

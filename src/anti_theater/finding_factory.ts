@@ -1,8 +1,6 @@
 /**
  * anti_theater finding_factory —— detector 产出 DetectorFinding 的统一工厂。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_* 返回 Finding）+ §3.1（severity 五值）。
- *
  * 职责：
  *   - 统一 detector 产出形状（stored: AntiTheaterFinding 存储型 + ext: 派生展示扩展）。
  *   - 自动派生 findingId（attackId + 可选后缀·多 finding 时区分）/ hasFail（outcome=FAIL）/ severity（D2 双轴）。

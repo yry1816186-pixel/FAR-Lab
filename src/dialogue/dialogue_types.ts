@@ -1,8 +1,6 @@
 /**
  * 研究对话层类型定义（camelCase 内存态）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/39 §2/§8 + 02 §3.6-3.8（DDL SSOT）。
- *
  * 设计要点：
  *   - 所有 TS 内存字段 camelCase；SQL 物理列 snake_case（见 schema/migrations/0002_add_dialogue_tables.sql）。
  *   - IntentLabel 8 值与 02 §3.8 CHECK + 0002 migration 字节级一致（CI 断言）。

@@ -1,8 +1,6 @@
 /**
  * proof_envelope/v2 —— ProofEnvelope V2 公共 API（完整证据嵌入 + 10 rules + 12 diff codes + 跨语言 proofHash）。
  *
- * Authority: PROJECT_PLAN/04 §2 + APPENDIX_C §2 + APPENDIX_B GV-10。
- *
  * 与 V1（src/proof_envelope/index.ts）的关系：V1 保留（self-check 简化版），V2 新增（完整证据嵌入 +
  * RULE-PE-010 independently_recomputable + Python 跨语言镜像 repro/far_chain_repro/proof_hash.py）。
  * V1/V2 独立 barrel，避免命名冲突（ProofEnvelope vs ProofEnvelopeV2）。

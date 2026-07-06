@@ -1,8 +1,6 @@
 /**
  * research_dialogue_layer.ts —— 研究对话层总调度（39 §7·7-step 主调度流程）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/39 §7（ResearchDialogueLayer·对接 agent_loop stage0_dialogue）。
- *
  * 7-step 主调度流程：
  *   1. input_analysis —— 解析用户输入·建 session·追加 user turn
  *   2. clarification —— 推断意图·判定是否需澄清·必要时生成澄清提问

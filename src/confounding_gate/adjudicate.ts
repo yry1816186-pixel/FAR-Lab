@@ -1,9 +1,6 @@
 /**
  * confounding_gate/adjudicate —— 三值混杂裁决 + outcome→verdict 共享映射（§7.5.1 (3) + §7.5:955-961）。
  *
- * Authority: PROJECT_PLAN/03 §7.5.1:1093-1129（adjudicate_confounding 自包含 SSOT·三值 outcome）+
- *            §7.5:949-961（outcome → verdict 效应表·F6 因果红线）。
- *
  * 职责：
  *   1. adjudicateConfounding(causalModel, exposure, outcome) → ConfoundingGateResult（确定性·无 LLM）。
  *      buildDag → blockBackdoorPaths → outcome 三值（PASS/WARN/FAIL）+ 8 字段结果。

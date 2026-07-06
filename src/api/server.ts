@@ -1,8 +1,6 @@
 /**
  * server —— Fastify 实例 + 插件注册 + 优雅启停。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §1.3 / §0.
- *
  * 职责：
  *   - 创建 Fastify 5 实例
  *   - 注册插件：helmet / cors / rate-limit / jwt / swagger

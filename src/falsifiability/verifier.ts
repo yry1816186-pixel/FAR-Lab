@@ -10,7 +10,6 @@
  *     sourceAnchorJson, prevHash, verdictTraceHash }
  * verdictTraceHash 是 P0-2-EXT 新增项——篡改 verdict_trace_json → verdict_trace_hash 变 → current_hash 变 → 此处捕获。
  *
- * Authority: PROJECT_PLAN/04 §3.1（proofHash 白名单 verdictTrace.*）+ §3.4（verdict 层 critical → 改变须被察觉）。
  */
 
 import type Database from 'better-sqlite3';

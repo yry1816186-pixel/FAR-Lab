@@ -1,9 +1,6 @@
 /**
  * anti_theater detector: AT-PHACK-ALPHA —— p-hacking via alpha inflation detector.
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_phack_alpha 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：误报率=0 / 确定性 / reasonCode）。
- *
  * 攻击语义：预注册阶段冻结的 alpha 与 FEC.statisticalPlan.alpha（执行端）不一致，
  *           即在结果出来后偷偷放大显著水平（alpha inflation），属 p-hacking 子类。
  *           伪代码 frozen=preregistrationRecord.alpha，executed=fec.statisticalPlan.alpha，

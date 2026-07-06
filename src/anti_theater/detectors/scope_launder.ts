@@ -1,10 +1,6 @@
 /**
  * detect_scope_launder —— AT-SCOPE-LAUNDER 检测器（scope laundering 攻击）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_scope_launder 伪代码）+
- *            03 §7.4 evaluate_scope（ScopeReport.coverage / hasSameScopeRefutation）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：误报率=0 / 反 LLM-as-judge）。
- *
  * 攻击语义：实验证据 scope 被悄悄收窄（claim 是全局，但只在子集上验证），
  *           借此回避同 scope 反证或把未覆盖包装成"已验证"。本检测器在 anti-theater
  *           前置 verdict 的 scopeReport 上做确定性判断，把降级 scope 拉回可见。

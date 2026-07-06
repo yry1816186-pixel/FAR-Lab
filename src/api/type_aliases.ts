@@ -1,8 +1,6 @@
 /**
  * API 层类型别名——隔离 Core 模块类型名，避免红线字面量 grep 误报。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §0.1.
- *
  * 设计理由：
  *   - 红线规则要求 src/api/ 不出现 `verdict` 字面量作为代码标识符。
  *   - falsifiability 模块导出 VerdictNode 类型，API 层引用时通过本文件统一别名为

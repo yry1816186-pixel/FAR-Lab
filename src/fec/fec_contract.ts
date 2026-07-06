@@ -1,8 +1,6 @@
 /**
  * fec_contract —— FEC V2 类型层（Falsification Evidence Contract V2）。
  *
- * Authority: PROJECT_PLAN/03 §1.2（FecContract 16 字段·95-143）+ §1.3 JSON Schema（148-197）+
- *            APPENDIX_A_TYPES.md §1-2（子类型 DESIGN_LOCKED）+ §49-96（ProofCheckOutcome /
  *            EffectComparator / NetworkPolicy / EvidenceDirection enum 权威）。
  *
  * 与 V1（src/falsifiability/contracts.ts FalsifiabilityContract）的关系：

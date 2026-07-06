@@ -1,8 +1,6 @@
 /**
  * evidence 路由——证据日志查询（24§5.3）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5.3.
- *
  * 路由：
  *   - GET /evidence/:id：按 evidenceId 查证据日志条目
  *   - GET /evidence/chain/:headHash：按证据链头 hash 查证据链

@@ -1,8 +1,6 @@
 /**
  * hypothesize 路由——POST /hypothesize（17 Epic K-01）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5 / 17 Epic K-01.
- *
  * 职责：
  *   - 接收 researchInput + mode + dialogueMode
  *   - 调用 executeLoop（适配 runAgentLoop）

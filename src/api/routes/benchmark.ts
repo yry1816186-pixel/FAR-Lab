@@ -1,10 +1,6 @@
 /**
  * benchmark 路由 —— Science-125 完整性广度套件的公开 leaderboard 数据端点。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science125 种子）+
- *            09_可复现性规范_REPRO_DETERMINISM.md §4（integrity root）+
- *            24_API网关与接口规范_API_GATEWAY.md §5.
- *
  * 端点：
  *   GET /benchmark → 返回预生成的 BenchmarkReport（benchmark/benchmark_report.json）。
  *

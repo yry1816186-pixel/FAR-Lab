@@ -1,9 +1,6 @@
 /**
  * ProofEnvelope V2 类型层 —— 完整证据嵌入的封存信封（信任根对外接口）。
  *
- * Authority: PROJECT_PLAN/04 §2.1（V2 目标态·16 字段）+ APPENDIX_C §2.2（proofHash 白名单）+
- *            APPENDIX_A_TYPES §8（ProofEnvelope 类型契约）。
- *
  * 与 V1（src/proof_envelope/types.ts ProofEnvelope）的关系：
  *   - V1 是 self-check 简化版（falsificationSpec/sourceAnchor/reproHash 桥接锚定，9 rules）。
  *   - V2 补全完整证据嵌入（fecSnapshot/protocolFreeze/datasetBindings/workflowBindings/

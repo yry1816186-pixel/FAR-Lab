@@ -1,9 +1,6 @@
 /**
  * merkle_root —— 证据链 Merkle 完整性根 + 包含证明（inclusion proof）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/09_repro_determinism.md §4（integrity root）+
- *            FINAL_PACKAGE/23_CI_AND_VALIDATION.md §5.2（tamper-evident trust root）。
- *
  * 职责（不与 verifyChainHead 重复·互补）：
  *   - verifyChainHead：逐条重算 current_hash + 校验 prev_hash 链式链接（顺序依赖·证明链未断）。
  *   - merkle_root：把整条链折叠成单一 64-hex 摘要（integrityRoot）+ 支持单条包含证明。

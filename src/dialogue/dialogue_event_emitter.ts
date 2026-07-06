@@ -1,8 +1,6 @@
 /**
  * dialogue_event_emitter.ts —— 对话层内部事件系统（6 个内部事件类型）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/39 §9（AgentRunEvent 映射·6 事件）。
- *
  * 设计要点：
  *   - 6 个事件类型独立于 trace/agent_run_event.ts（任务约束：不修改全局枚举）。
  *   - 事件 append-only（禁静默改状态·反幻觉审计·与 18 §AgentRunEvent 守卫同精神）。

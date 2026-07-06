@@ -1,9 +1,6 @@
 /**
  * tool_registry.ts —— FAR-Chain 工具注册表（零 MCP SDK 依赖）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/30_MCP工具协议_TOOL_PROTOCOL.md +
- *   FAR_CHAIN_DEV_SPEC/15 §8 #8（禁引入外部 agent runtime·自研确定性 TS）。
- *
  * 设计要点：
  *   - 单例注册表：register / lookup / execute 三核心操作。
  *   - 白名单门控：execute() 前走 assertToolWhitelisted(name)。

@@ -74,7 +74,6 @@ export interface CallAuditData {
   /**
    * 降级来源模型 id（FallbackChain 降级时由调用方注入；非降级为 null/undefined）。
    * 落库到 call_records.degraded_from 审计列；不进 canonical_hash 白名单（纯审计）。
-   * Authority: 05 §8.2/§9 + 0007_add_degraded_from.sql。
    */
   readonly degradedFrom?: string | null;
 }

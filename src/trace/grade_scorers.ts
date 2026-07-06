@@ -1,8 +1,6 @@
 /**
  * grade_scorers.ts —— M-10 TraceGrade 三种评分器实现。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/18 §5（Trace grading 与失败分类）。
- *
  * 设计要点：
  *   - deterministic_script：纯函数，基于确定性规则计算 0..1 分数。
  *   - human_checkpoint：生成待人类审核的评分占位，不含 LLM 自评。

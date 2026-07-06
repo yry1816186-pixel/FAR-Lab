@@ -1,8 +1,6 @@
 /**
  * verdict 路由——判定节点查询（24§5.3）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5.3.
- *
  * 路由（URL 路径段含 verdict 字面量·24§0 红线注解：URL 非代码标识符·豁免）：
  *   - GET /verdict/:id：按 verdictId 查判定节点
  *   - GET /verdict/by_hypothesis/:hypoId：按假设 evidenceId 查关联判定节点列表

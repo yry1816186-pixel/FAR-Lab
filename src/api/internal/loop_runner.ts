@@ -1,8 +1,6 @@
 /**
  * loop_runner —— runAgentLoop 适配层。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5 / 17 Epic K-01.
- *
  * 设计理由（AGENTS §6 关键实现细节）：
  *   - runAgentLoop 签名复杂（gateway + profile + extractors + providers + appendOptions）。
  *   - API 层用 LoopRunnerArgs 简化入参：只需 researchInput + 模式 + DB + 可选 termination。

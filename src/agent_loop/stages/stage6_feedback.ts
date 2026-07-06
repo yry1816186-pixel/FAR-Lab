@@ -1,8 +1,6 @@
 /**
  * stage6_feedback —— [6] 反馈/收敛执行器（产出 FeedbackSignal 用于 [6]→[3] 回灌）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2（stage6）+ §5.2（执行器要点）.
- *
  * 职责：综合 stage1-stage5 全部产物 + 判断是否继续迭代（continueIteration）。
  *      若 continueIteration=true，fsm_runner 把 FeedbackSignal 回灌给 stage3 再迭代。
  *      若 continueIteration=false，fsm_runner 终止循环（terminationReason='feedback_converged'）。

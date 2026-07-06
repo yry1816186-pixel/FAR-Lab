@@ -1,8 +1,6 @@
 /**
  * tool_whitelist.ts —— T12 工具白名单（10 个工具名·零 MCP SDK 依赖）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/15 §8 #8 + T12 任务包。
- *
  * 设计要点：
  *   - TOOL_WHITELIST 含 10 个工具名：6 已有能力位 + 4 新增 math 工具。
  *   - isToolWhitelisted(name) 已知返回 true，未知返回 false。

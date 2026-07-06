@@ -1,7 +1,6 @@
 /**
  * cas/blob_store —— 内容寻址 blob CAS（Content-addressable Storage·FUSION-OS-9）。
  *
- * Authority: PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-9（Open Science content-addressable CAS 范式）
  *            + PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-9 + schema/migrations/0015_far_blob_store.sql。
  *
  * 设计（内容寻址·去重·append-only）：

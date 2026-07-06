@@ -1,8 +1,6 @@
 /**
  * runStage —— 单阶段执行器通用骨架。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §5.1.
- *
  * 适配说明（与 spec §5.1 的差异·按项目实际 API 优先）：
  *   1. spec §5.1 调用 `callBailianStructured`（项目未实现）——本文件改用项目实际 API：
  *      `gateway.callLlm(profile, request)` → LlmResponse，再 `appendLlmResponseRecord` 落库。

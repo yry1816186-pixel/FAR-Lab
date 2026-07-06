@@ -1,8 +1,6 @@
 /**
  * API 网关共享类型定义。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §1 / §5.
- *
  * 设计原则：
  *   - Core 模型中立：本文件不出现 Qwen / 百炼 / DashScope 字面量（24§0.1 红线）。
  *   - 判定节点引用使用 import 别名（HonestVerdictNode）以避开红线 grep。

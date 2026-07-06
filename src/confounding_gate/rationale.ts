@@ -1,9 +1,6 @@
 /**
  * confounding_gate/rationale —— CG-6 纯模板因果诚信说明（无 LLM）。
  *
- * Authority: PROJECT_PLAN/03 §7.5.1:1133（CG-6 generate_rationale 必须是纯模板函数·fail-closed）+
- *            §7.5.1 (3):1127（adjudicate_confounding 调 generate_rationale）。
- *
  * CG-6 红线：本函数 **仅字符串模板拼接**，禁止任何 LLM 调用 / openai / chat.completions / dashscope。
  * CG-1 grep 门禁 + 元测试守卫。模板措辞诚实——FAIL 时直言「因果声称无法确认」。
  *

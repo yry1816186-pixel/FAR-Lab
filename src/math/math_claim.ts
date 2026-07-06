@@ -1,5 +1,4 @@
 // spec 38 · Math verification layer — type contracts.
-// Authority: FAR_CHAIN_DEV_SPEC/38_数学可验证层_MATH_VERIFICATION.md §1-§4.5
 //
 // Enum values are authoritative per spec 38 §1 / §1.1:
 //   - MathClaimKind: 12 values (8 symbolic + 4 numerical) — spec §1

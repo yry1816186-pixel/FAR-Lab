@@ -1,8 +1,6 @@
 /**
  * stage3_hypothesis —— [3] 候选假设生成执行器（结构化输出 + falsifiability_gate 硬阻断）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2（stage3）+ §5.2-§5.3（执行器要点 + gate）.
- *
  * 职责：生成可证伪假设 + 过 falsifiability_gate 硬阻断（无 falsification_method → throw 降级）。
  *
  * buildMessages 消费：stage2 产物（knowledgeGraphSummary + gaps）+ feedbackSignal（若有回灌）。

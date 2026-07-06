@@ -1,8 +1,6 @@
 /**
  * fork_types.ts —— M-07 Fork 数据结构：VerdictDelta、ForkManifest、ReplayBranchMetadata。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/18 §4（Forkable replay / counterfactual verdict）。
- *
  * 设计要点：
  *   - 原 run 不可被覆盖；fork 永远产生新 runId。
  *   - fork 输入必须记录 mutation 与 baseEventId。

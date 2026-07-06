@@ -1,9 +1,6 @@
 /**
  * demo_fixtures —— 内置 canonical Science-125 hero demo 的六阶段预录 fixture。
  *
- * Authority: FINAL_PACKAGE/28_FINAL_COMPETITION_ABSTRACT.md §1（NASA TESS / Hot Jupiter hero demo）+
- *            FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science125 种子→VerdictNode 协议）。
- *
  * 职责：为 offline_replay adapter 提供「无 API key 默认即可端到端跑通」的内置 demo registry。
  *   - createOfflineReplayAdapter() 无参时，按 request.stageId 命中本 registry 返回对应阶段 fixture。
  *   - 使 loop_runner / API / UI 在 fresh-clone 无云 key 下也能产出真实确定性 verdict。

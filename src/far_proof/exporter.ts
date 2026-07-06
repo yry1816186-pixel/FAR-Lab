@@ -1,9 +1,6 @@
 /**
  * .far-proof export engine: 九分量可信证据包导出 (T-W3-04).
  *
- * Authority: FINAL_PACKAGE/15_OPEN_SCIENCE_EXPORT.md §1 + §7 + §9.1 +
- *            22 §4 T-W3-04 + 09 §5 .far-proof 目录结构.
- *
  * 九分量（09 §5 V1 子集）:
  *   1. ro-crate-metadata.json        [V1基本]
  *   2. prov.ttl                       [V1基本]

@@ -1,9 +1,6 @@
 /**
  * sandbox_manifest.ts —— M-08 分层沙箱清单（工具白名单升级版）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/18 §4 (I4: Sandbox manifest + control-plane split) +
- *   §1 BoxLite/Inspect 外部实践转译。
- *
  * 设计要点：
  *   - SandboxHonestyTier 诚实分层：manifest-only → process-isolation → network-isolation → full-vm-isolation。
  *   - 未实现物理隔离前只标 manifest-only（不夸大隔离等级·遵守 §2.4）。

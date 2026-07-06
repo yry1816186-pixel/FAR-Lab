@@ -1,8 +1,6 @@
 /**
  * anti_theater detectors barrel + DETECTORS 聚合（APPENDIX_E §3 顺序·20 项）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §3（DETECTORS 数组顺序权威）+ §2（20 detect_*）。
- *
  * 顺序纪律（§3）：DETECTORS 数组顺序与 APPENDIX_E §3 伪代码逐字对齐——golden vector 对拍与
  * CI corpus test 依赖此顺序产稳定 findings 列表（确定性·F2）。
  *

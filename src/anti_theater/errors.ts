@@ -1,8 +1,6 @@
 /**
  * anti_theater errors —— 反剧场测试工具错误类层次。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §1（runAntiTheaterLint deterministic_compiler）。
- *
  * 镜像 src/falsifiability/errors.ts 模式：Error 子类层次，纯 throw（非 Result/Outcome）。
  *
  * 模型中立。零容忍合规：无 any / @ts-ignore / 桩。

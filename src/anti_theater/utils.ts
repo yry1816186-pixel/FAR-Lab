@@ -1,8 +1,6 @@
 /**
  * anti_theater utils —— 反剧场 detector 共享纯函数工具。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_* 伪代码调用的工具）+ §4（score 桶去重）。
- *
  * 模型中立。零容忍合规：无 any / @ts-ignore / 桩。纯函数（不 mutate 输入）。
  */
 
