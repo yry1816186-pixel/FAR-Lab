@@ -39,6 +39,7 @@ function printTurn(r: AskRender): void {
   process.stdout.write(
     `  → run ${r.runId} · ${r.stageCount} stages · stop=${r.terminationReason}\n` +
       `  → verdict : ${vn}${rule}\n` +
+      `  → grade  : ${r.traceGrade.score.toFixed(3)}（${r.traceGrade.gradedBy}）${r.traceGrade.failureCodes.length > 0 ? ` · ${r.traceGrade.failureCodes.join(',')}` : ''}\n` +
       `  → chain   : ${r.chainHeadHash ?? '<空链>'}\n`,
   );
   if (r.error !== null) {
