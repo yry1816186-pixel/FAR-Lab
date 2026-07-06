@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { verifyChainHead } from '../../evidence_log/verifier.ts';
+import { hashCanonicalJson } from '../../evidence_log/hasher.ts';
 
 type ChainVerify = Awaited<ReturnType<typeof verifyChainHead>>;
 
@@ -127,6 +128,60 @@ function readFromBundle(dir: string): readonly RecordRow[] {
   return rows;
 }
 
+interface VerdictAudit {
+  readonly verdictId: string;
+  readonly verdict: string;
+  readonly decisiveRuleId: string;
+  readonly reasonCodes: readonly string[];
+  readonly evidenceSufficiencyStatus: string;
+  readonly powerStatus: string;
+  readonly traceHash: string;
+  readonly traceHashMatch: boolean;
+}
+
+interface VerdictTraceRow {
+  readonly verdict_id: string;
+  readonly verdict: string;
+  readonly verdict_trace_json: string;
+  readonly verdict_trace_hash: string;
+}
+
+function queryVerdictAudit(db: Database.Database): VerdictAudit | null {
+  const row = db
+    .prepare(
+      `SELECT verdict_id, verdict, verdict_trace_json, verdict_trace_hash
+       FROM verdict_nodes ORDER BY created_at DESC LIMIT 1`,
+    )
+    .get() as VerdictTraceRow | undefined;
+  if (row === undefined) return null;
+  const trace = JSON.parse(row.verdict_trace_json) as {
+    decisiveRuleId: string;
+    reasonCodes: readonly string[];
+    evidenceSufficiency: { status: string; powerStatus: string };
+  };
+  const recomputed = hashCanonicalJson({ verdictTraceJson: row.verdict_trace_json });
+  return {
+    verdictId: row.verdict_id,
+    verdict: row.verdict,
+    decisiveRuleId: trace.decisiveRuleId,
+    reasonCodes: trace.reasonCodes,
+    evidenceSufficiencyStatus: trace.evidenceSufficiency.status,
+    powerStatus: trace.evidenceSufficiency.powerStatus,
+    traceHash: row.verdict_trace_hash,
+    traceHashMatch: recomputed === row.verdict_trace_hash,
+  };
+}
+
+function renderVerdictAudit(audit: VerdictAudit, json: boolean): void {
+  if (json) return; // JSON 模式已含 records；verdict audit 仅人类可读模式追加
+  process.stdout.write('\n  ─── 裁决审计（verdict_nodes · P0-2-EXT trace）───\n');
+  process.stdout.write(`  verdict      : ${audit.verdict}\n`);
+  process.stdout.write(`  decisiveRule : ${audit.decisiveRuleId}  (${audit.reasonCodes.join(', ')})\n`);
+  process.stdout.write(`  evidenceSuff : ${audit.evidenceSufficiencyStatus} (power=${audit.powerStatus})\n`);
+  const mark = audit.traceHashMatch ? '✓ recomputed match' : '✗ MISMATCH';
+  process.stdout.write(`  traceHash    : ${shortHash(audit.traceHash)}  ${mark}\n`);
+}
+
 export function runReplay(argv: readonly string[]): number {
   const args = parseReplayArgs(argv);
 
@@ -146,6 +201,10 @@ export function runReplay(argv: readonly string[]): number {
         verify = null;
       }
       renderTimeline(rows, args.json, verify);
+      const audit = queryVerdictAudit(db);
+      if (audit !== null) {
+        renderVerdictAudit(audit, args.json);
+      }
       return 0;
     } finally {
       db.close();

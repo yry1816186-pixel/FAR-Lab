@@ -72,6 +72,13 @@ interface ReliabilityCertificate {
   readonly honestNote: string;
 }
 
+export function computeAgreement(verdicts: readonly (string | null)[]): 'unanimous' | 'majority' | 'split' {
+  const distinct = new Set(verdicts);
+  if (distinct.size <= 1) return 'unanimous';
+  if (distinct.size === 2) return 'majority';
+  return 'split';
+}
+
 async function executeCourtSession(args: CourtArgs, gitCommitSha: string): Promise<ReliabilityCertificate> {
   const verdicts: ModelVerdict[] = [];
   for (const model of args.models) {
@@ -102,22 +109,16 @@ async function executeCourtSession(args: CourtArgs, gitCommitSha: string): Promi
     }
   }
 
-  const distinct = Array.from(new Set(verdicts.map((v) => v.verdict)));
-  let agreement: 'unanimous' | 'majority' | 'split';
-  if (distinct.length <= 1) {
-    agreement = 'unanimous';
-  } else if (distinct.length === 2) {
-    agreement = 'majority';
-  } else {
-    agreement = 'split';
-  }
+  const verdictList = verdicts.map((v) => v.verdict);
+  const agreement = computeAgreement(verdictList);
+  const distinctVerdicts = Array.from(new Set(verdictList)).map((v) => v ?? '<null>');
 
   return {
     certificateId: ulid(),
     claim: args.claim,
     modelCount: args.models.length,
     verdicts,
-    distinctVerdicts: distinct.map((v) => v ?? '<null>'),
+    distinctVerdicts,
     agreement,
     honestNote:
       'offline_replay 下所有模型回放同一套 fixture，verdict 必然一致；真实模型分歧需 --models 接真实 provider（凭据门）',
