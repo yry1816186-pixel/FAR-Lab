@@ -1,5 +1,5 @@
 # .github/workflows/entry-protocol-check.yml
-# 入口协议 PR-body 校验（AGENT_ENTRY_PROTOCOL.md 步骤 2 + AGENT_ANTISKIM_TRIPWIRES.md T7/T8 机检钩子）
+# 入口协议 PR-body 校验（.agent/AGENT_ENTRY_PROTOCOL.md 步骤 2 + .agent/AGENT_ANTISKIM_TRIPWIRES.md T7/T8 机检钩子）
 #
 # 目的：把「agent 是否一句话陈述了单一真实依赖 + ledger_item」从软规则变成 PR-level 硬门。
 #   PR body 须含两行（机器 grep，关键词不命中 → exit 1）：

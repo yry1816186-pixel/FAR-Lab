@@ -4,9 +4,9 @@
 > 全局 `~/.claude/CLAUDE.md` 与 `~/.claude/rules/*.md` 仍生效；本文件在其之上追加 FAR-Chain 专属约束。
 
 > ⛔ **STOP — 任何 Agent（Claude / GPT / Cursor / Copilot / 其他）写任何代码前必读三件套**：
-> 1. `<REPOSITORY_ROOT>/AGENT_ENTRY_PROTOCOL.md`（4 步入口协议 + T0-T8 自检）
+> 1. `<REPOSITORY_ROOT>/.agent/AGENT_ENTRY_PROTOCOL.md`（4 步入口协议 + T0-T8 自检）
 > 2. `<REPOSITORY_ROOT>/PROJECT_PLAN/DEPTH_LEDGER.md` §A（next_action）+ §C（机器可读深度接线表）
-> 3. `<REPOSITORY_ROOT>/AGENT_ANTISKIM_TRIPWIRES.md`（逐条 skim 模式 + 机检钩子）
+> 3. `<REPOSITORY_ROOT>/.agent/AGENT_ANTISKIM_TRIPWIRES.md`（逐条 skim 模式 + 机检钩子）
 >
 > 三重硬门由 `scripts/depth_gate.mjs`（CI required job）+ 仓库文件强制。当前态深度功能未接线，depth_gate 确定 exit 1——任何不带真实接线的 PR 都会被拦在 CI 层，与你是哪个 agent 无关。说不出来本次工作驱动的**单一真实依赖**（真实 SymPy / DashScope HTTP / venv 子进程 / 哈希重算 之一）就 STOP，不要动手。
 

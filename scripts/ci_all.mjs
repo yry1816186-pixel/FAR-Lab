@@ -164,7 +164,7 @@ if (!failed) {
 //          排障路径不是「修测试让门绿」，是读 PROJECT_PLAN/DEPTH_LEDGER.md §A 取 next_action 做真实接线。
 if (!failed && !run('depth-gate (深度接线 · 见 DEPTH_LEDGER §A)', 'pnpm run depth-gate')) {
   failed = true;
-  console.error('\n→ 这不是测试失败，是深度功能未接生产路径。读 PROJECT_PLAN/DEPTH_LEDGER.md §A (next_action) + AGENT_ENTRY_PROTOCOL.md');
+  console.error('\n→ 这不是测试失败，是深度功能未接生产路径。读 PROJECT_PLAN/DEPTH_LEDGER.md §A (next_action) + .agent/AGENT_ENTRY_PROTOCOL.md');
 }
 
 // ====================================================================

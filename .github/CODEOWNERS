@@ -32,11 +32,11 @@ scripts/no_llm_final_judge_scan.mjs                 @yry1816186-pixel
 
 # ── 入口协议 + antiskim 红线（防 agent 改 T0-T8 自检 / 放松 tripwire）──
 CLAUDE.md                                       @yry1816186-pixel
-AGENT_ENTRY_PROTOCOL.md                         @yry1816186-pixel
-AGENT_ANTISKIM_TRIPWIRES.md                     @yry1816186-pixel
+.agent/AGENT_ENTRY_PROTOCOL.md                  @yry1816186-pixel
+.agent/AGENT_ANTISKIM_TRIPWIRES.md              @yry1816186-pixel
 
 # ── 跨工具入口路由（R8：防 agent 删 AGENTS.md 的 STOP 门让非 Claude 工具失路由）──
-AGENTS.md                                       @yry1816186-pixel
+.agent/AGENTS.md                                @yry1816186-pixel
 .cursorrules                                    @yry1816186-pixel
 .github/copilot-instructions.md                 @yry1816186-pixel
 
