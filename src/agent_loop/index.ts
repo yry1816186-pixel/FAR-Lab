@@ -1,8 +1,6 @@
 /**
  * agent_loop 桶文件——re-export 六阶段 FSM 全部公共 API。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §1.1.
- *
  * 暴露 API：
  *   - 类型（types.ts）：StageId / PayloadKind / StructuredPayload / StageArtifact /
  *     StageContext / LoopState / AgentLoopError / TerminationCriteria / FeedbackSignal /

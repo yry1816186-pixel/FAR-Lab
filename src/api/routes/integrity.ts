@@ -1,10 +1,6 @@
 /**
  * integrity 路由——证据链完整性信任根（09§4 / 23§5.2）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/09_可复现性规范_REPRO_DETERMINISM.md §4（integrity root）+
- *            23_CI_AND_VALIDATION.md §5.2（tamper-evident trust root）+
- *            24_API网关与接口规范_API_GATEWAY.md §5.3.
- *
  * 三个端点（互补·非重复 verifyChainHead 的逐条校验）：
  *   - GET /integrity/root    → 整链折叠成单一 64-hex Merkle 根（可移植整链指纹）
  *   - GET /integrity/proof/:seq → 单条证据（按 seq）的 Merkle 包含证明（audit path）

@@ -1,8 +1,6 @@
 /**
  * 六阶段 FSM 全部共享类型定义。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §3.
- *
  * 适配说明（与 spec §3 的差异·按 AGENTS §1 Authority Order + 项目实际类型优先）：
  *   1. spec §3.5 引用 `../provider/types.BailianCallResult`——项目已迁移到 llm_gateway，
  *      实际类型为 `LlmResponse`（含 credential + content + raw）。LlmResponse 与

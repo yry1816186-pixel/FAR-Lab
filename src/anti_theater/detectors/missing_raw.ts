@@ -1,8 +1,6 @@
 /**
  * anti_theater detector AT-MISSING-RAW —— 原始产物哈希缺失检测器。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_missing_raw 伪代码）。
- *
  * 攻击语义：测量痕迹（MeasurementTrace）未声明任何原始产物哈希（rawArtifactHashes 缺/空）。
  *           原始产物（raw artifact）是可复现性的根基——无 rawArtifactHashes 即无法证明
  *           metricValue 来自可验证的数据源，承诺失效。list 型：每个违规 measurement 产 1 finding。

@@ -1,8 +1,6 @@
 /**
  * thought_structure_synthesizer.ts —— 思维结构合成器（39 §6）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/39 §6（ThoughtStructureSynthesizer）。
- *
  * 设计要点：
  *   - synthesizeFramework 产出 ResearchThoughtFramework（12 字段·非表·39 §6）。
  *   - 诚实降级：turn<3 或无意图假设 或 all confidence<0.5 时触发降级，

@@ -1,8 +1,6 @@
 /**
  * stage4_evidence —— [4] 证据收集执行器。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2（stage4）+ §5.2（执行器要点）.
- *
  * 职责：基于 stage3 假设的 falsificationMethod 收集证据 + 标注支持/反驳/中立。
  *
  * buildMessages 消费：stage3 产物（claim + falsificationMethod + supportingCitations）。

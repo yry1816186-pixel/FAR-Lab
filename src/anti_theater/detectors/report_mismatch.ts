@@ -1,9 +1,6 @@
 /**
  * anti_theater detector · AT-REPORT-MISMATCH —— 自然语言摘要 vs verdict 强度一致性检查。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_report_mismatch 伪代码）+
- *            AT-REPORT-MISMATCH attackId（natural-language-verdict-mismatch）。
- *
  * 攻击语义：ProofEnvelope.humanSummary 是人类/LLM 可写的自然语言摘要（不进 proofHash），
  *   可能用过强或与 verdict 不一致的措辞误导读者（"proves"/"证明了" 等过度声称）。
  *   本 detector 确定性比对 report 用词与 verdict 允许的强度词集合，捕获两类违规：

@@ -1,9 +1,6 @@
 /**
  * confounding_gate —— 类型层契约（CausalModel + ConfoundingGate 结果）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_A_TYPES.md §10（CausalModel/CausalDagNode/CausalEdge·DESIGN_LOCKED）+
- *            03_EVIDENCE_CONTRACT_AND_VERDICT.md §7.5.1（ConfoundingGate 算法 SSOT·ConfoundingGateResult 8 字段）。
- *
  * 字段对齐（§7.5.1:986）：伪代码消费 APPENDIX_A §10 CausalModel 字段（camelCase）。
  *   - nodes / edges / controlledConfounders / unmeasuredConfoundersSuspected
  * snake_case 仅作 Python 等价示意，不得用于访问附录对象字段。

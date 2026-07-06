@@ -1,9 +1,6 @@
 /**
  * anti_theater detector —— AT-DATA-HASH-FAKE（数据集 contentHash 伪造检测）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_data_hash_fake 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：误报率=0 / 确定性 / 不读 FS）。
- *
  * 攻击语义：实验声明 dataset binding 的 contentHash 是整数据集指纹，但实际底层数据块
  *   的 chunkHashes 重组 Merkle root ≠ contentHash → 说明 contentHash 被伪造
  *   （或底层数据与冻结指纹不一致）。任何一条对不上即阻断 seal（伪造 integrity 根 = 最严重）。

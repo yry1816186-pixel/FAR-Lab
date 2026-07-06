@@ -1,8 +1,6 @@
 /**
  * fec_mandate —— FEC V2 强制门禁（fail-closed mandate gate）。
  *
- * Authority: PROJECT_PLAN/03 §2.3（编译失败的诚实降级）+ 10_DEV_ENTRYPOINT W2-A（FEC V2 强制路径）。
- *
  * 职责：当 claim 缺少有效 FEC 或 FEC 编译失败时，强制 fail-closed（禁 CONFIRMED/REFUTED）。
  *   - 编译通过 → allowed=true（verdict 交 kernel 运行时定）。
  *   - HARD_FAIL_UNTESTED → allowed=false, verdict=UNTESTED, ciBlocked=false（F1 反 theater）。

@@ -2,8 +2,6 @@
  * generator.ts —— 报告生成器：从 evidence_log + falsifiability repository 读取数据，
  * 聚合为 ReportData，不含任何 LLM 调用。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/17_最终设计审计与开发任务包_FINAL_AUDIT.md Epic K-05a/K-05b.
- *
  * 模型中立：本文件不含任何 provider / model 字面量。
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。
  */

@@ -1,9 +1,6 @@
 /**
  * anti_theater lint —— 反剧场检测编排器（runAntiTheaterLint·APPENDIX_E §3）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §3（编排器伪代码 + DETECTORS 顺序 +
- *            canSealConfirmed 三重条件）+ §1（AntiTheaterReport 字段）+ 04 §1（seal 门）。
- *
  * 职责（§3 run_anti_theater_lint）：
  *   1. 按 DETECTORS 顺序遍历 20 个 detector（确定性·无 LLM·computedBy="deterministic_compiler"）。
  *   2. 聚合 DetectorFinding[]（stored + ext）。

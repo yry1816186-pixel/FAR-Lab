@@ -1,7 +1,6 @@
 /**
  * dep_float_drift —— 依赖锁定文件漂移检测器（Dependency float drift detector）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（AT-DEP-FLOAT-DRIFT 伪代码）。
  * attackId: AT-DEP-FLOAT-DRIFT（makeFinding 经 ATTACK_ID_TO_KIND 映射为 'dependency-float-drift'）。
  *
  * 伪代码原意（§2）：

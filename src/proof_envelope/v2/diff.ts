@@ -1,9 +1,6 @@
 /**
  * ProofEnvelope V2 Verifier Diff —— 跨 envelope 字段比较，产出 §3.4 全 12 diff codes。
  *
- * Authority: PROJECT_PLAN/04 §3.4（verdict-critical 字段权威清单·diff report 落点）+
- *            APPENDIX_B GV-10（tampered proof → verifier RED·diff report 定位篡改字段）。
- *
  * 语义：compareEnvelopes(expected, actual) 逐字段比较，找出 actual 相对 expected 的篡改，
  *   每个不一致字段落到一个 DiffReportCode。GV-10 场景：expected=原始 envelope，actual=被篡改 envelope，
  *   diff report 非空 → verifier FAIL（tamperStatus='tampered'）。

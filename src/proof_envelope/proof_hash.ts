@@ -1,9 +1,6 @@
 /**
  * ProofEnvelope proofHash: canonical_json(所有字段 - proofHash) → sha256.
  *
- * Authority: round8 B1 (separators + ensure_ascii 缺则假阴) +
- *            FINAL_PACKAGE/09_PROOF_CARRYING_RESEARCH_OBJECT.md §4.
- *
  * V1 scope（21 §0 V1 + 33 CROSS-CUT-004）:
  *   V1 proofHash = TS 侧 self-check（sealer 计算 + verifyProofHash 重算同一 computeProofHash）。
  *   「第三方跨语言独立重算」需 Python proof envelope 镜像（repro/far_chain_repro/，V2+ 路线图）；

@@ -1,10 +1,6 @@
 /**
  * seed_cherry detector —— 种子挑选攻击检测（AT-SEED-CHERRY / seed-cherry-picking）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_seed_cherry 伪代码）+
- *            03 §2.1 reasonCode #8（PROTOCOL_INCOMPLETE·seed 相关约束）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：确定性 / 误报率=0 / 不用 LLM-as-judge）。
- *
  * 攻击语义：研究者从多个随机种子中只挑选出有利的 run 入报（hidden failed run），
  *           或在 freeze 后偷换 seedPolicy（pre-registration 篡改），从而伪造可复现性。
  *           本检测确定性捕获两类种子攻击：

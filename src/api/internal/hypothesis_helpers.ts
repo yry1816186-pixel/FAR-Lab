@@ -1,8 +1,6 @@
 /**
  * hypothesis_helpers —— hypothesize 路由辅助函数。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5 / 17 Epic K-01.
- *
  * 设计理由：
  *   - extractHypothesisEvidenceId + buildSubtreeFromEvidence 是 hypothesize 路由的
  *     内部辅助函数，抽出独立文件便于测试与维护。

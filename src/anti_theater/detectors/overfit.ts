@@ -1,10 +1,6 @@
 /**
  * overfit detector —— 基准过拟合攻击检测（AT-OVERFIT）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_overfit 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：确定性 / 误报率=0 / 不用 LLM-as-judge）+
- *            09 §9（完整 hidden/private split 机制·W4 ROADMAP）。
- *
  * 攻击语义：仅声明 'public' split 的评估（无 'hidden' split holdout）时，指标可能在 public
  *           benchmark 上过拟合（select-for / tune-on public），缺乏独立 holdout 即视为 benchmark
  *           overfit 风险面。本检测以 WARN（非阻断）方式标记，提示补全独立 holdout 评估。

@@ -1,8 +1,6 @@
 /**
  * confounding_gate/d_separation —— d-separation（Bayes-Ball reachability）。
  *
- * Authority: PROJECT_PLAN/03 §7.5.1 (1)（d_separation 自包含 SSOT）。
- *
  * ⚠️ SSOT 偏差声明（决策 B·铁律：修根因不修症状 + 反幻觉）：
  *   03 §7.5.1 (1) 伪代码的 collider 分支语义与标准 d-separation **相反**：
  *     - 伪代码：「collider 及其后代均不在 Z → 路径通（pass·不阻断）；否则阻断」。

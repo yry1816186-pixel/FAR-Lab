@@ -1,8 +1,6 @@
 /**
  * jwt_middleware —— 可选 JWT 鉴权中间件。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §3.
- *
  * 设计原则：
  *   - offline 模式 skip：无 JWT_SECRET 环境变量时返回 anonymous 主体（不阻断·24§3.1 双轨鉴权）。
  *   - 有 JWT_SECRET 时：验证 Bearer Token，解码后挂载到 request.principal。

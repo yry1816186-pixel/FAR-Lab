@@ -1,8 +1,6 @@
 /**
  * fec_repository —— FEC V2 契约 DB 存储层（表 fec_contracts_v2 · migration 0009）。
  *
- * Authority: PROJECT_PLAN/03 §1.2 + schema/migrations/0009_fec_contracts_v2.sql。
- *
  * 职责：
  *   - registerFecV2：将冻结 FecContractV2 以 canonical JSON 写入 fec_contracts_v2，fec_hash 由 computeFecHash 计算。
  *   - getFecV2ByFecId / getFecV2ByClaim：读取并 type-guard 解析 contract_json 回 FecContractV2。

@@ -1,9 +1,6 @@
 /**
  * anti_theater detector —— AT-DATA-DRIFT（数据集三层 hash 漂移检测）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_dataset_drift 伪代码·AT-DATA-DRIFT）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：误报率=0 / 确定性 / 不读 FS / 不用 LLM-as-judge）。
- *
  * 攻击语义：数据集 binding 声明的 contentHash / schemaHash / statsFingerprint 与预注册时
  *   freeze 的对应字段不一致 → 数据集在 freeze 后被静默替换或漂移（drift），导致实验
  *   在与声明不同的数据上跑通。contentHash/schemaHash 漂移阻断 seal（FAIL）；

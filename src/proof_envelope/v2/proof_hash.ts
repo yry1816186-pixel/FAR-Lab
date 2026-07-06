@@ -1,8 +1,6 @@
 /**
  * ProofEnvelope V2 proofHash —— canonical_json(所有 VC 字段 - proofHash) → sha256。
  *
- * Authority: PROJECT_PLAN/04 §2.5 + APPENDIX_C §2.4（proofHash 计算伪代码）+ §1.9（TS/Python 等价）。
- *
  * 算法（§2.4·5 步）：
  *   1. 提取 VC 子集（白名单 13 字段·self-excluding·normalizeClaim）
  *   2. 断言 FEC 一致性：envelope.fecHash === computeFecHash(envelope.fecSnapshot)

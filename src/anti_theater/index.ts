@@ -1,8 +1,6 @@
 /**
  * anti_theater barrel —— 反剧场测试工具公开 API（镜像 src/falsifiability/index.ts 模板）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §3（runAntiTheaterLint 编排器为入口）。
- *
  * 分阶段导出（W3 路线图）：
  *   - W3.1（本阶段）：types / errors / finding_factory / utils / adapters/kernel_adapter。
  *   - W3.2（后续）：lint / score / constraint / detectors（实现后追加 export）。

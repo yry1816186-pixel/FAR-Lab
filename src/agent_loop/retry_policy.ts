@@ -1,8 +1,6 @@
 /**
  * retry_policy —— 百炼 429/503 退避 + 每阶段 token 上限表。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §7.3（withRetry）+ §7.4（MAX_TOKENS_TABLE）.
- *
  * 设计要点：
  *   - 仅对瞬态错误（429/503）退避重试；400/401/403/404/500/502 立即 fatal（不重试）。
  *   - 指数退避：baseDelayMs * 2^attempt（1s/2s/4s）。

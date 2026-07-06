@@ -1,9 +1,6 @@
 /**
  * tool_protocol.ts —— FAR-Chain T12 工具协议接口（零 MCP SDK 依赖）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/15 §8 #8（禁引入外部 agent runtime·自研确定性 TS）+
- *   T12 任务包（MCP 工具协议·不引入 MCP 官方 SDK 包）。
- *
  * 设计要点：
  *   - 零 MCP SDK 依赖：不引入 MCP 官方 SDK 包，自研轻量工具协议。
  *   - readonly 标志位：true 表示工具不修改状态（可安全重复调用·离线可复现）。

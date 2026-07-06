@@ -18,8 +18,6 @@
  * 模型中立：全程 offline_replay，无任何 qwen/dashscope/bailian 字面量。
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  *
- * Authority: FINAL_PACKAGE/09_PROOF_CARRYING_RESEARCH_OBJECT.md §1-§4 +
- *            15_OPEN_SCIENCE_EXPORT.md §1 + 02 §6.6 + 00 §1.4（ASK-9）。
  */
 
 import { createHash } from 'node:crypto';

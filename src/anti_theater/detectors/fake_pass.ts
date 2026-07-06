@@ -1,9 +1,6 @@
 /**
  * anti_theater detector: AT-FAKE-PASS —— 伪造 PASS / 必需证据缺失检测器。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_fake_pass 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 / reasonCode / 不用 LLM-as-judge / 误报率=0）。
- *
  * 检测语义（伪代码原意）：
  *   FEC 声明 requiredEvidence（每条带 evidenceId），executionTrace.measurements 须通过 requirementId
  *   逐条 resolve。任何 required evidence 在 measurements 中找不到 requirementId 对应条目

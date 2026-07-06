@@ -1,9 +1,6 @@
 /**
  * compiler —— FEC V2 deterministic compiler（deterministic 编译器）。
  *
- * Authority: PROJECT_PLAN/03 §2.1-2.3（编译检查表 + 伪代码 + 诚实降级）+
- *            §5.2（verdict_mapping 五路径→五 verdict·F2 优先级锁死）+ §1.4（六产物·首里程碑交付 3）。
- *
  * 设计要点（与 SSOT 对齐的裁决）：
  *   1. **error collection 而非 short-circuit return**：SSOT §2.2 伪代码用顺序 return（一次只报一个错），
  *      但 CompileFecResult.errors 是数组——本实现收集所有 HARD_FAIL error，让 caller 一次看到全部问题

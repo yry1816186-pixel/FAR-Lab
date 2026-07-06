@@ -1,8 +1,6 @@
 /**
  * schema_gate —— zod parse 运行时收窄 LLM 响应内容为结构化 payload。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §5.1（zod parse 收窄）.
- *
  * 设计要点：
  *   - 流程：JSON.parse(content) → unknown → schema.parse(unknown) → P。
  *   - 用 type guard 从 unknown 安全收窄（禁 as 强转结构·零容忍 #1）。

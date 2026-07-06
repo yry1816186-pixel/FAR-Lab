@@ -1,9 +1,6 @@
 /**
  * anti_theater schemas —— untrusted JSON → AntiTheaterLintInput 骨架结构校验（#11b）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §1（AntiTheaterLintInput 7 字段）+
- *            04 §5.3（L5 anti-theater verifier·--lint-input 独立重算）。
- *
  * 职责：far verify --lint-input 读 AntiTheaterLintInput JSON 文件后，从 unknown 安全解析为
  *       AntiTheaterLintInput 骨架（7 顶层字段存在 + 一层立即子节点 discriminator + 1 literal-const）。
  *

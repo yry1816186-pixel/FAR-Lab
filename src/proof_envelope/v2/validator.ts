@@ -1,8 +1,6 @@
 /**
  * ProofEnvelope V2 Validator —— 10 条规则逐条自检（04 §2.4 全表·含 RULE-PE-010）。
  *
- * Authority: PROJECT_PLAN/04 §2.4（Validator 规则全表 9+1 条）+ APPENDIX_B §4.5（verifier 输出契约）。
- *
  * V2 适配（04 §2.2 命名裁剪许可）：V1 9 规则针对 V1 字段（claimId/verdictNodeId/falsificationSpec/
  * sourceAnchor/reproHash/prevProofHash/checks/knownFailures/sealedBy）。V2 字段不同（claim/fecSnapshot/
  * datasetBindings/verdictTrace/antiTheaterReport/ledgerRoot），故 ruleId 保留（04 §2.4 SSOT）但 check

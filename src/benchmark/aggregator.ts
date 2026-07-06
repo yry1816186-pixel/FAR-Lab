@@ -1,10 +1,6 @@
 /**
  * benchmark 聚合器 —— 跑全部 Science-125 demo seed，聚合为 BenchmarkReport。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science125 种子→VerdictNode）+
- *            09_可复现性规范_REPRO_DETERMINISM.md §4（integrity root）+
- *            17_FINAL_AUDIT.md §7（每个 demo seed 要求）.
- *
  * 职责（纯函数·无副作用·可复现）：
  *   1. 串行跑每个 seed（:memory: db·互不污染）；
  *   2. 对每个 seed 的 db 算 computeChainMerkleRoot → 整链 Merkle 根（integrityRoot）；

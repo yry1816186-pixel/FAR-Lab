@@ -1,8 +1,6 @@
 /**
  * health 路由——存活探针 + 就绪探针（24§5.3）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §0.3 / §5.3.
- *
  * 路由（无鉴权·24§0.3 三探针豁免）：
  *   - GET /health：liveness（进程存活·不查依赖）
  *   - GET /ready：readiness（含 DB ping·DB 不可用时返回 503）

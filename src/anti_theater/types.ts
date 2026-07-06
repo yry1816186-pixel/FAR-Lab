@@ -1,10 +1,6 @@
 /**
  * anti_theater types —— 反剧场测试工具类型层（权威存储类型 + lint 输入 + 依赖类型）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §1（AntiTheaterLintInput + runAntiTheaterLint 设计）+
- *            APPENDIX_A_TYPES.md §7:1055-1191（AntiTheaterFinding/Report/VerdictConstraint 权威存储类型）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 / reasonCode / 不用 LLM-as-judge / 误报率=0）。
- *
  * 类型统一裁决（D1·消除 3 套分裂）：
  *   - 本文件是 AntiTheaterFinding/Report/VerdictConstraint 的**唯一运行时定义点**（APPENDIX_A §7 落地）。
  *   - src/proof_envelope/v2/types.ts 的占位简化版（{findings, overallStatus}）已删除，改 import 本文件。

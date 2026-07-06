@@ -1,8 +1,6 @@
 /**
  * graph_subtree —— 证据图子树查询层（只读）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5.3 / 17 Epic K-01.
- *
  * 设计理由：
  *   - evidence_graph 模块（src/evidence_graph/）仅提供 insertEdge + cycle_guard，
  *     未提供 getSubtree 查询函数。

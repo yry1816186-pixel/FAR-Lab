@@ -1,7 +1,6 @@
 // src/cli/commands/fsm.ts
 // 职责：`far fsm advance` —— 9-state CLI 协议 FSM 推进 + stageReceipt 哈希链追加（P2-2）。
 // 真实依赖：transition（state_machine）+ computeStageReceipt（sha256(prevReceipt + hashCanonicalJson)）。
-// Authority: CLAUDE.md §4 P2-2 + §5 RR-1（禁手填 hash，必须真实重算）。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';

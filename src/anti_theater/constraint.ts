@@ -1,8 +1,6 @@
 /**
  * anti_theater constraint —— 取严后的 verdict 约束（APPENDIX_E §3.2 + 03 §6.1）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §3.2（apply_verdict_constraint 伪代码 +
- *            SEVERITY_TO_FORCED·attackId→forced 映射）+ 03_EVIDENCE_CONTRACT_AND_VERDICT.md
  *            §6.1（优先级原则·REFUTED 不被洗白 + UNTESTED 优先 INCONCLUSIVE）+ §8.2（只降级）。
  *
  * ┌─ 支持度降级模型（D17·本实现核心）─────────────────────────────────────────────┐

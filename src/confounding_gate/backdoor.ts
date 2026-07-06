@@ -1,8 +1,6 @@
 /**
  * confounding_gate/backdoor —— 后门路径枚举 + 阻断判定（§7.5.1 (2)）。
  *
- * Authority: PROJECT_PLAN/03 §7.5.1:1044-1091（find_backdoor_paths / block_backdoor_paths 自包含 SSOT）。
- *
  * ⚠️ SSOT 偏差声明（铁律：修根因不修症状 + 反幻觉）：
  *   03 §7.5.1 (2) `block_backdoor_paths` 伪代码对每条后门路径调用
  *   `d_separation(dag, exposure, outcome, Z)`——但 exposure/outcome/Z 三参在循环中**恒定**，

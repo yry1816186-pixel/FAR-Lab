@@ -1,9 +1,6 @@
 /**
  * anti_theater detector —— AT-METRIC-SWAP（主指标偷换检测）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_metric_swap 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：误报率=0 / 确定性 / 不读 FS）。
- *
  * 攻击语义：FEC 声明的 primary metric（fec.metric：metricKey/description/unit/computationRef/
  *   isDeterministic）在假设封存后被偷换——例如封存时登记的是 accuracy@5，跑完结果后悄悄改成
  *   accuracy@1 让结果"刚好达标"。这是典型的 metric swapping / moving goalpost。

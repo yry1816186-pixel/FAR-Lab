@@ -12,7 +12,6 @@
  * 共享映射：调 confounding_gate.confoundingOutcomeVerdictEffect（决策 D·kernel R-causal 门与本函数共用），
  *   消除两处重复实现 §7.5:955-961 outcome→verdict 表。
  *
- * Authority: PROJECT_PLAN/03 §7.5（ConfoundingGate 与 verdict 集成）+ 任务 #12 决策 D/E。
  * 模型中立。零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。纯函数（不 mutate base）。
  */
 

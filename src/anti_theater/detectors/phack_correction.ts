@@ -1,10 +1,6 @@
 /**
  * phack_correction detector —— 多重检验未校正攻击检测（AT-PHACK-CORRECTION）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_phack_correction 伪代码）+
- *            03 §2.1 reasonCode #7（MULTIPLE_TESTING_UNCORRECTED）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：确定性 / 误报率=0）。
- *
  * 攻击语义：当家族检验数 n>1（多重检验场景）但 statisticalPlan.multipleTestingCorrection === 'none'
  *           时，未做多重检验校正会导致家族-wise I 类错误膨胀（p-hacking 风险面）。本检测确定性
  *           捕获该配置缺陷，fail-closed 拦截 seal。

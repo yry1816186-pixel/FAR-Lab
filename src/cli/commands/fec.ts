@@ -1,8 +1,6 @@
 // src/cli/commands/fec.ts
 // 职责：`far fec compile` / `far fec freeze` —— FEC V2 契约编译与冻结哈希重算（P1-1）。
 // 真实依赖：compileFec（10 项编译检查）+ computeFecHash（sha256(canonical JSON of FEC VC fields)）。
-// Authority: PROJECT_PLAN/03 §2.2（编译器）+ §1.2（[VC] fecHash 字段·verifier 重算互验）+
-//            CLAUDE.md §5 RR-1（禁手填 hash·必须真实重算）。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';

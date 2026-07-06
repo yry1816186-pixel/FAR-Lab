@@ -1,7 +1,6 @@
 /**
  * Falsifiability Contracts: pre-registration of falsifiable claims (FEC V1-must).
  *
- * Authority: FINAL_PACKAGE/11_FALSIFICATION_ENGINE.md + 21 §1 W1 + 22 §2 T-W1-07.
  * Migration: 0005_falsifiability_contracts (SSOT 0018 → renumbered 0005).
  *
  * 关键:

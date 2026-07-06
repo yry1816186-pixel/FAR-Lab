@@ -1,8 +1,6 @@
 /**
  * 报告模块类型定义（T8 报告生成器）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/17_最终设计审计与开发任务包_FINAL_AUDIT.md Epic K-05a/K-05b.
- *
  * 模型中立：无 Qwen / 百炼 / DashScope 字面量。
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。
  */

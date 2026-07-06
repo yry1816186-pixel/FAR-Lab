@@ -1,10 +1,6 @@
 /**
  * benchmark 类型 —— Science-125 完整性广度套件的聚合报告契约。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science125 种子→VerdictNode）+
- *            09_可复现性规范_REPRO_DETERMINISM.md §4（integrity root）+
- *            17_FINAL_AUDIT.md §7（每个 demo seed 要求）.
- *
  * 诚实定位（红线·反幻觉·与 00 §1.4 / 14 §3 一致）：
  *   本报告展示的是**系统的工程完整性广度**，非「科学结论排名」。
  *   每个 problem 的 verdict 由 offline fixture 产出（非真实科学裁决·无真实 LLM 调用）；

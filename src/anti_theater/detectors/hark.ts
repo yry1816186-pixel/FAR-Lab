@@ -1,9 +1,6 @@
 /**
  * anti_theater detector AT-HARK —— Hypothesis Sealed After Result（HARKing：结果出来后才"预注册"假设）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_hark 伪代码）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 / reasonCode / 不用 LLM-as-judge / 误报率=0）。
- *
  * 伪代码（§2）：
  *   hyp_sealed = input.preregistrationRecord.hypothesisSealedAt
  *   exp_finished = max(r.endedAt for r in input.executionTrace.runs if r.endedAt)

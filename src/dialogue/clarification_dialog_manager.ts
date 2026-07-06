@@ -1,8 +1,6 @@
 /**
  * clarification_dialog_manager.ts —— 澄清对话管理器（39 §5）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/39 §5（ClarificationDialogManager）。
- *
  * 设计要点：
  *   - decideClarification 是确定性判定（confidence 阈值比较·非 LLM 调用）。
  *   - askClarification 生成澄清提问（LLM 可选·不可用时降级到确定性模板）。

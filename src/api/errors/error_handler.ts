@@ -1,8 +1,6 @@
 /**
  * error_handler —— 统一错误响应处理（RFC 7807 Problem Details 子集）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §0.6 / §5.
- *
  * 设计原则：
  *   - 所有错误响应包含 source_anchor（fileId / stageId / callRecordId 三元定位·24 红线）。
  *   - 错误体结构：{ error_code, message, source_anchor, detail? }

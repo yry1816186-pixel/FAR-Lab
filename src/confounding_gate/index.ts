@@ -13,7 +13,6 @@
  * F6 红线（§7.5:980）：本模块是确定性图算法（d-separation + 后门路径枚举），**非 LLM 推理混杂**。
  * CG-1 grep 门禁 src/confounding_gate 不得含 openai/chat.completions/dashscope/llm 导入。
  *
- * Authority: PROJECT_PLAN/03 §7.5/§7.5.1 + APPENDIX_A §10。
  */
 
 export type {

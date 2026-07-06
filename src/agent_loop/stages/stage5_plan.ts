@@ -1,8 +1,6 @@
 /**
  * stage5_plan —— [5] 实验规划执行器。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2（stage5）+ §5.2（执行器要点）.
- *
  * 职责：基于 stage3 假设 + stage4 证据，规划可执行的实验方案
  *      （datasetChoices + methodChoices + executableChecks）。
  *

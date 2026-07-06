@@ -1,8 +1,6 @@
 /**
  * clarification_stores.ts —— 澄清提问存储（内存 + SQLite 双后端）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/39 §5（ClarificationDialogManager.askClarification 落表）。
- *
  * 设计要点：
  *   - ClarificationStore 接口统一内存与 SQLite 两种后端。
  *   - InMemoryClarificationStore：Map-based，用于测试与离线场景。

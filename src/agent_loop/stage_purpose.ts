@@ -1,8 +1,6 @@
 /**
  * API-1 · stage→PurposeTag 映射 SSOT。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2 表 + §2.2 路由矩阵。
- *
  * 每阶段的 purpose_tag 由 06 §2 表唯一决定，落 call_records.purpose_tag
  * （NOT NULL·02 §3.1）。本文件是 stage→PurposeTag 的全仓唯一映射源。
  *

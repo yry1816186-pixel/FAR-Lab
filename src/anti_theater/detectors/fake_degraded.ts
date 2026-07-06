@@ -1,10 +1,6 @@
 /**
  * detect_fake_degraded —— AT-FAKE-DEGRADED 检测器（fake degraded scope 攻击）。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（detect_fake_degraded 伪代码）+
- *            03 §7.4 evaluate_scope（ScopeReport.hasSameScopeRefutation）+
- *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：确定性 / 误报率=0 / 不用 LLM-as-judge）。
- *
  * 攻击语义：研究者把本应"REFUTED"（或被同 scope 反证压住）的结论伪装成"DEGRADED_SCOPE"，
  *           借 scope 降级之名行回避反证之实；同时把预登记的 null result（阴性结果）从
  *           ProofEnvelope 中悄悄隐去（不入 proofHash），让已声明的阴性结果对最终裁决"消失"。
