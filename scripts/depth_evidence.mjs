@@ -52,6 +52,7 @@ import {
   rmSync,
   renameSync,
   symlinkSync,
+  lstatSync,
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -165,8 +166,20 @@ function createWorktree(sha, label) {
   return tmp;
 }
 
+// 关键修复（数据丢失 bug）：worktree 内 node_modules 是指向 REPO_ROOT/node_modules 的
+// junction(Win)/symlink(POSIX)。rmSync(tmp,{recursive}) 与 git worktree remove 均会穿越该
+// 链接递归删除主仓 node_modules 真实内容（实测：bot dry-run 后 node_modules 清空，
+// 全量 1122 tests→411/99 fail）。修法：递归删 worktree 前，先非递归删除链接入口（仅删
+// reparse point，目标 node_modules 完整保留）。实证（Node 24 win32）：lstatSync(junction)
+// .isSymbolicLink()===true；非递归 rmSync(link) 删链接不删目标（SENTINEL 存活）。
 function removeWorktree(tmp) {
   if (!tmp) return;
+  const wtNodeModules = join(tmp, 'node_modules');
+  try {
+    if (existsSync(wtNodeModules) && lstatSync(wtNodeModules).isSymbolicLink()) {
+      rmSync(wtNodeModules, { force: true }); // 非递归：仅删链接入口，不跟随目标
+    }
+  } catch { /* 链接已不存在或非链接形态，交由下方常规递归清理 */ }
   gitOk(['worktree', 'remove', '--force', tmp], { reject: false });
   rmSync(tmp, { recursive: true, force: true });
 }
@@ -198,9 +211,18 @@ function parseTap(tapText) {
   return { entries, summary };
 }
 
-// 按精确名查裁决：零命中=NO_MATCH；多命中须一致，否则 UNKNOWN（fail-closed）。
+// 按名查裁决。支持两种账本约定：
+//   (1) 精确全名（testName === TAP verdict 行全名）
+//   (2) 短前缀 + ':' 分隔（testName 是 TAP 名 `short_id: 人类可读描述` 的 short_id 部分）
+// ':' 分隔精确防子串误命中（`foo` 不匹配 `foobar: ...`）。多命中须状态一致，否则 UNKNOWN（fail-closed）。
+// 零命中 = NO_MATCH。本匹配非弱化门——base 仍须 FAIL、head 仍须 PASS，仅对齐账本短名约定。
 function verdictForName(parsed, testName) {
-  const matches = parsed.entries.filter((e) => e.name === testName);
+  const t = testName.trim();
+  const matches = parsed.entries.filter((e) => {
+    if (e.name === t) return true;
+    if (e.name.startsWith(t + ':')) return true; // §C 短前缀 vs TAP `short: desc` 全名
+    return false;
+  });
   if (matches.length === 0) return 'NO_MATCH';
   const statuses = new Set(matches.map((m) => m.status));
   if (statuses.size === 1) return [...statuses][0];
@@ -476,5 +498,6 @@ export {
   formatEvidenceLine,
   padCell,
   writeBackUpgrades,
+  removeWorktree,
 };
 

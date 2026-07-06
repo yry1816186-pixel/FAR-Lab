@@ -13,7 +13,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, symlinkSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -24,6 +24,7 @@ import {
   formatEvidenceLine,
   padCell,
   writeBackUpgrades,
+  removeWorktree,
 } from './depth_evidence.mjs';
 import { LEDGER_ROW_RE, parseLedgerTable } from './lib/ledger.mjs';
 
@@ -71,6 +72,62 @@ test('verdictForName: 同名多行裁决冲突 → UNKNOWN（fail-closed）', ()
   const tap = ['ok 1 - dup', 'not ok 2 - dup', '1..2'].join('\n');
   const p = parseTap(tap);
   assert.equal(verdictForName(p, 'dup'), 'UNKNOWN');
+});
+
+// 回归测试：prefix 名匹配（§C 短名 vs TAP `short: desc` 全名）。
+// 修前 verdictForName 仅精确匹配 → 19 行 NO_MATCH（短前缀名不中全名）。
+test('verdictForName: §C 短前缀名匹配 TAP 全名（冒号分隔防子串误命中）', () => {
+  const tap = [
+    'ok 1 - literal_to_derived_silent_change_downgrades: derivationForm literal→derived 不匹配即使值相等也降级 INCONCLUSIVE',
+    'ok 2 - derivation_form_match_keeps_confirmed: expected=literal actual=literal → CONFIRMED（form 一致不降级）',
+    'ok 3 - unrelated_test: 别的测试',
+    '1..3',
+  ].join('\n');
+  const p = parseTap(tap);
+  // 短前缀 + ':' 分隔 → 命中全名
+  assert.equal(verdictForName(p, 'literal_to_derived_silent_change_downgrades'), 'PASS');
+  assert.equal(verdictForName(p, 'derivation_form_match_keeps_confirmed'), 'PASS');
+  // 精确全名仍命中（双模式向后兼容）
+  assert.equal(
+    verdictForName(p, 'literal_to_derived_silent_change_downgrades: derivationForm literal→derived 不匹配即使值相等也降级 INCONCLUSIVE'),
+    'PASS',
+  );
+  // ':' 分隔防子串误命中：`derivation_form` 不命中 `derivation_form_match_keeps_confirmed`
+  assert.equal(verdictForName(p, 'derivation_form'), 'NO_MATCH');
+  // 无冒号的精确名仍工作
+  assert.equal(verdictForName(p, 'unrelated_test'), 'PASS');
+  assert.equal(verdictForName(p, 'nonexistent'), 'NO_MATCH');
+});
+
+test('verdictForName: 短前缀命中多个同前缀全名且状态冲突 → UNKNOWN', () => {
+  const tap = ['ok 1 - shared: a', 'not ok 2 - shared: b', '1..2'].join('\n');
+  const p = parseTap(tap);
+  assert.equal(verdictForName(p, 'shared'), 'UNKNOWN');
+});
+
+// 回归测试：removeWorktree 不穿越 node_modules junction 删除真实依赖（数据丢失 bug）。
+// 修前 removeWorktree 直接 rmSync(tmp, recursive) + git worktree remove，两者均穿越 junction
+// 递归删掉 REPO_ROOT/node_modules 全部内容（实测 bot dry-run 后 node_modules 清空）。
+test('removeWorktree: node_modules junction 不被穿越——目标 SENTINEL 存活 + tmp 清除', () => {
+  const base = mkdtempSync(join(tmpdir(), 'junc-reg-'));
+  // 真实目标（模拟 REPO_ROOT/node_modules）+ SENTINEL 文件（模拟 typescript 等依赖）
+  const target = join(base, 'real_nm_target');
+  mkdirSync(target);
+  const sentinel = join(target, 'TYPESCRIPT_PACKAGE_MARKER');
+  writeFileSync(sentinel, 'must survive removeWorktree');
+  // worktree 临时目录 + node_modules junction → 真实目标（镜像 createWorktree 行为）
+  const wt = mkdtempSync(join(tmpdir(), 'depth-ev-junc-'));
+  const wtNm = join(wt, 'node_modules');
+  symlinkSync(target, wtNm, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.equal(lstatSync(wtNm).isSymbolicLink(), true, 'junction 应被识别为 symlink');
+
+  removeWorktree(wt); // 不应穿越 junction
+
+  assert.equal(existsSync(sentinel), true, '关键断言：junction 目标 SENTINEL 必须存活（修前被删）');
+  assert.equal(existsSync(target), true, 'junction 目标目录必须存活');
+  assert.equal(existsSync(wt), false, 'worktree 临时目录应被清除');
+  // 清理真实目标（本测试创建，非主仓 node_modules）
+  rmSync(base, { recursive: true, force: true });
 });
 
 // ----- rowOutcome 裁决矩阵（康威不变式：UPGRADE 仅 base-FAIL+head-PASS）-----
