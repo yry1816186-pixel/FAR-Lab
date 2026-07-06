@@ -96,6 +96,11 @@ export function deterministicGrade(input: GradeInput): TraceGrade {
     failureCodes.push('nonreproducible_metric');
   }
 
+  // guardrail_effectiveness: 零 guardrail 事件 = guardrail 未落地（与 countAffectedDimensions 的维度扣分一致）
+  if (input.guardrailBlockedCount === 0) {
+    failureCodes.push('guardrail_missing');
+  }
+
   // security_resilience: 攻击检测
   if (input.hasProviderBoundaryLeak) {
     failureCodes.push('provider_boundary_leak');
@@ -103,7 +108,7 @@ export function deterministicGrade(input: GradeInput): TraceGrade {
 
   // 评分：每个维度占总分 1/7，按失败码扣分
   const dimensions = 7;
-  const passedDimensions = dimensions - countAffectedDimensions(failureCodes, input);
+  const passedDimensions = dimensions - countAffectedDimensions(failureCodes);
   const score = clampScore(passedDimensions / dimensions);
 
   return {
@@ -237,7 +242,7 @@ function clampScore(value: number): number {
 /**
  * 统计受失败码影响的维度数。
  */
-function countAffectedDimensions(failureCodes: readonly TraceFailureCode[], input: GradeInput): number {
+function countAffectedDimensions(failureCodes: readonly TraceFailureCode[]): number {
   const affected = new Set<string>();
 
   for (const code of failureCodes) {
@@ -260,18 +265,15 @@ function countAffectedDimensions(failureCodes: readonly TraceFailureCode[], inpu
         affected.add('reproducibility');
         break;
       case 'provider_boundary_leak':
-      case 'guardrail_missing':
       case 'security_policy_violation':
         affected.add('security_resilience');
+        break;
+      case 'guardrail_missing':
+        affected.add('guardrail_effectiveness');
         break;
       default:
         break;
     }
-  }
-
-  // guardrail_effectiveness 维度：guardrail 缺失
-  if (input.guardrailBlockedCount === 0) {
-    affected.add('guardrail_effectiveness');
   }
 
   return affected.size;

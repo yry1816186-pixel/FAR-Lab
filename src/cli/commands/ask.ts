@@ -97,6 +97,7 @@ export interface AskRender {
   readonly error: { readonly code: string; readonly message: string } | null;
   readonly profile: string;
   readonly honestNote: string;
+  readonly traceGrade: { readonly score: number; readonly gradedBy: string; readonly failureCodes: readonly string[] };
 }
 
 export function buildRender(result: Awaited<ReturnType<typeof executeLoop>>, profile: string, question: string): AskRender {
@@ -118,6 +119,11 @@ export function buildRender(result: Awaited<ReturnType<typeof executeLoop>>, pro
       profile === 'offline_replay'
         ? 'offline_replay fixture 驱动（非真实科学裁决）— 真实推理需 --profile competition_aliyun_qwen + FAR_DASHSCOPE_API_KEY'
         : `profile=${profile}`,
+    traceGrade: {
+      score: result.traceGrade.score,
+      gradedBy: result.traceGrade.gradedBy,
+      failureCodes: result.traceGrade.failureCodes,
+    },
   };
 }
 

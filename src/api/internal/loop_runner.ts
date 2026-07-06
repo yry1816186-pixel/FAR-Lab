@@ -19,6 +19,8 @@ import type { Database } from 'better-sqlite3';
 
 import { runAgentLoop } from '../../agent_loop/fsm_runner.ts';
 import type { LoopState, ReproHashProvider, TerminationCriteria } from '../../agent_loop/types.ts';
+import { gradeRunIntegrity } from './run_grade.ts';
+import type { TraceGrade } from '../../trace/agent_run_event.ts';
 import { extractFinishReasonForOfflineReplay } from '../../agent_loop/run_stage.ts';
 import { createLlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
@@ -67,6 +69,7 @@ export interface LoopRunnerResult {
   readonly loopState: LoopState;
   readonly reproHash: string;
   readonly runId: string;
+  readonly traceGrade: TraceGrade;
 }
 
 /**
@@ -153,8 +156,9 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
   });
 
   const reproHash = resolveReproHash(args.evidenceLogDb);
+  const traceGrade = gradeRunIntegrity(loopState, args.evidenceLogDb);
 
-  return { loopState, reproHash, runId };
+  return { loopState, reproHash, runId, traceGrade };
 }
 
 /**
