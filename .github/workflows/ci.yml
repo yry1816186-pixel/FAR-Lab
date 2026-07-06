@@ -211,6 +211,11 @@ jobs:
         run: pnpm run test
       - name: node --test (agent_loop FSM + N3 反幻觉 + assertTerminated)
         run: pnpm run test:agent_loop
+      # keystone 治理门自测：depth_evidence bot（base-FAIL/head-PASS 双跑 + worktree junction 安全 +
+      # 名匹配）+ depth_gate evade（红队对抗 S1-S5）。修前两 bug（node_modules 数据丢失 + 名 NO_MATCH）
+      # 沉默存在正因这些测试未入 CI；本 step 闭合回归缺口。
+      - name: node --test (keystone depth_evidence bot + depth_gate evade 回归)
+        run: pnpm run test:keystone
       # Z16 · Core 覆盖率门禁（Node 24 原生 coverage · ≥85% line / ≥75% branch · 零新依赖）
       # 与本地 ci-all STEP9 等价；Core 11 目录（排除 llm_gateway adapters 竞争命名空间）。
       # coverage_gate.mjs 跨平台（纯 Node spawnSync API · 路径用 `/` · Linux/macOS/Windows 一致）。

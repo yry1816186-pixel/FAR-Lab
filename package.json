@@ -13,6 +13,7 @@
   "scripts": {
     "test": "node --test tests/api/*.test.ts tests/audit/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts tests/evidence_log/*.test.ts tests/evidence_graph/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts tests/math/*.test.ts tests/statistics/*.test.ts tests/golden_vectors/*.test.ts tests/real_backends/*.test.ts tests/dialogue/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts tests/far_proof/*.test.ts tests/science_harness/*.test.ts tests/science_harness/adapters/*.test.ts tests/confounding_gate/*.test.ts tests/proof_envelope/*.test.ts tests/proof_envelope/v2/*.test.ts tests/report/*.test.ts tests/trace/*.test.ts tests/cli/*.test.ts tests/anti_theater/*.test.ts tests/scripts/*.test.mjs",
     "test:agent_loop": "node --test tests/agent_loop/*.test.ts",
+    "test:keystone": "node --test scripts/depth_evidence.test.mjs scripts/depth_evidence.integration.test.mjs scripts/depth_gate.evade.test.mjs",
     "test:api": "node --test tests/api/*.test.ts",
     "test:audit": "node --test tests/audit/*.test.ts",
     "test:ci": "node --test tests/ci/*.test.ts",
