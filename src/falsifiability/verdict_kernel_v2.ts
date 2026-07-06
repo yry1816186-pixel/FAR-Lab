@@ -251,6 +251,20 @@ export interface VerdictKernelOutput {
  * 全程无 LLM；按 R0..R9 固定优先级，首条决定性规则胜出。
  */
 export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput {
+  // RED_BASELINE_MUTATION (Wave1): constant-stub return proves each proof_test is
+  // load-bearing w.r.t. the real R0-R9 kernel logic (removed after keystone double-run).
+  return {
+    verdict: 'UNTESTED',
+    reasonCodes: ['MUTANT_STUB'],
+    ruleTrace: [],
+    decisiveRuleId: 'MUTANT_STUB',
+    scopeReport: { isDegraded: false, coverage: 'none', impactedScopeEdges: [], scopeSlipText: null, hasSameScopeRefutation: false },
+    statisticalReport: { refutes: false, supports: false, conflicting: false, underpowered: false, effectiveDirection: 'unknown', primaryAdjustedPValue: null, primaryEffectSize: null, primaryConfidenceInterval: null, hasWarnAssumption: false, formMismatch: false },
+    evidenceSufficiency: input.evidenceSufficiency,
+    untestedReason: 'MUTANT_STUB',
+    integrityFlags: [],
+    boundedSupport: false,
+  };
   const inputIntegrityFlags = [...input.integrityFlags];
   const emptyScope: ScopeReport = {
     isDegraded: false,
