@@ -1,5 +1,5 @@
 # .github/workflows/depth-evidence.yml
-# RED→GREEN 双跑物证 bot（AGENT_ANTISKIM_TRIPWIRES.md T5 机检钩子 · 防 ledger 自我消化 / 伪造 RED→GREEN）
+# RED→GREEN 双跑物证 bot（.agent/AGENT_ANTISKIM_TRIPWIRES.md T5 机检钩子 · 防 ledger 自我消化 / 伪造 RED→GREEN）
 #
 # 目的：agent 不能手填 DEPTH_LEDGER §C 的 status=WIRED_GREEN——必须由本 job 在 CI 实跑证明：
 #   对每个 status=WIRED_RED 行，checkout base SHA 跑其 proof_test 须 FAIL（非 skip 非 pass），

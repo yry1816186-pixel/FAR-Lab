@@ -733,7 +733,7 @@ if (hardFailures.length > 0) {
   console.error('  L1 → 修 PROJECT_PLAN/DEPTH_LEDGER.md §C（proof_test 须存在 + closed_by 须真实 sha + status∈枚举）');
   console.error('  L2 → WIRED_GREEN 行须紧随 evidence: <base_sha>→<head_sha>（base≠head + SHA/runID 格式，由 depth-evidence bot 写回，禁手填）');
   console.error('inherent_limits：静态门不证运行时执行/内容真实/RED→GREEN——完整保证须 depth-evidence bot + CODEOWNERS（见文件头）。');
-  console.error('详见 PROJECT_PLAN/DEPTH_LEDGER.md §A (next_action) + §D + AGENT_ENTRY_PROTOCOL.md + AGENT_ANTISKIM_TRIPWIRES.md');
+  console.error('详见 PROJECT_PLAN/DEPTH_LEDGER.md §A (next_action) + §D + .agent/AGENT_ENTRY_PROTOCOL.md + .agent/AGENT_ANTISKIM_TRIPWIRES.md');
   process.exit(1);
 }
 

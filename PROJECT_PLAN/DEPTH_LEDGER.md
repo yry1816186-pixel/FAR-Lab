@@ -1,7 +1,7 @@
 # DEPTH_LEDGER — 跨窗口深度接线账本（agent 无关 SSOT）
 
 > **本文件是 git-tracked 的机器可读 SSOT，不是散文 backlog。**
-> 任何 agent（Claude / GPT / Cursor / Copilot / 其他）落地本仓库，先读本文件 §A（取 next_action）+ §C（机器门），再读 <REPOSITORY_ROOT>/AGENT_ENTRY_PROTOCOL.md 与 <REPOSITORY_ROOT>/AGENT_ANTISKIM_TRIPWIRES.md。
+> 任何 agent（Claude / GPT / Cursor / Copilot / 其他）落地本仓库，先读本文件 §A（取 next_action）+ §C（机器门），再读 <REPOSITORY_ROOT>/.agent/AGENT_ENTRY_PROTOCOL.md 与 <REPOSITORY_ROOT>/.agent/AGENT_ANTISKIM_TRIPWIRES.md。
 >
 > **更新规则**：一项只能由「真实接线」推进，不能由「跑绿测试」「改文档」「加注释」推进。每项推进必须更新 §C 表的 status + closed_by + proof_caller + proof_test_red_commit。
 >

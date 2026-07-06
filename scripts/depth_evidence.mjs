@@ -40,7 +40,7 @@
 //      当前检出态影响；与 base 对称；写回仍落 REPO_ROOT/DEPTH_LEDGER.md，无冲突。
 //   D. 新增 `--dry-run`（跑全流程但不写回，打印将写的行）。理由：安全 + 本地验证。已知参数，不触发「未知参数 exit 2」。
 //
-// Authority: AGENT_ANTISKIM_TRIPWIRES.md T5 + PROJECT_PLAN/DEPTH_LEDGER.md §B/§C/§D inherent_limits (c)(d)
+// Authority: .agent/AGENT_ANTISKIM_TRIPWIRES.md T5 + PROJECT_PLAN/DEPTH_LEDGER.md §B/§C/§D inherent_limits (c)(d)
 //            + .github/workflows/depth-evidence.yml:57-59（CLI 契约）。
 
 import { spawnSync } from 'node:child_process';
