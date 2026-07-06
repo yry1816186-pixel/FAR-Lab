@@ -69,7 +69,7 @@ W0(FI-10 真相统一·质量门) ──不通过则 W1-W5 不启动──► W1
 | 任务 | 验收口径 | 状态标签 |
 |---|---|---|
 | 统一仓库根路径为 `<REPOSITORY_ROOT>/` | grep 全仓 `far-chain/` 仅在「已废弃历史」语境命中 | `IMPLEMENTED_VERIFIED`（须 `far status` 复核） |
-| 建立或补齐 `far status --json`（status-dump SSOT，禁手填） | 占位符全文档回填，零裸数字；输出含测试数/migration 数/golden 向量数/coverage | `PARTIAL`（CLI 骨架在 `src/cli/`，须复核输出完整性） |
+| 建立或补齐 `far status --json`（status-dump SSOT，禁手填） | 占位符全文档回填，零裸数字；输出含测试数/migration 数/golden 向量数/coverage | `IMPLEMENTED_VERIFIED`（`src/cli/status_dump.ts` 实测产出 testCount/coverage/migrationCount/goldenVectorCount/suiteIntegrityRoot/gitCommitSha） |
 | 移除公开材料中的手填测试数 | README/PPT/答辩稿零裸 `1038/662/546/1092` 等漂移数字 | `IMPLEMENTED_UNVERIFIED` |
 | 将旧 `Auditable/Reproducible` 主卖点替换为 `Tamper-Evident/Independently Re-computable` | grep 全仓 `Auditable/Reproducible` 仅在「修正/历史」语境命中 | `PARTIAL` |
 | 明确 ProofEnvelope 不是科学真理证书 | PDF/README 含显式「过程可信证据可机器检验，绝非科学结论为真」一句 | `DESIGN_LOCKED` |
@@ -156,9 +156,9 @@ far replay <run>                                # 确定性续跑（仅 determin
 
 | 任务 | 验收口径 | 状态 |
 |---|---|---|
-| `far ask` / `verify` / `replay` 默认 `offline_replay` profile | fresh-clone `npx` 跑通，零 key | `PARTIAL`（CLI 骨架在 `src/cli/`） |
+| `far` CLI 默认 `offline_replay` profile | fresh-clone 零 key 跑通 | `IMPLEMENTED_VERIFIED`（核心 11 子命令·见 05 §9.2）；`far ask`/`replay` 交互壳仍 `ROADMAP` |
 | 接真实 provider 须显式 `--profile competition_aliyun_qwen` + env key | verdict 由 deterministic `verdict_mapping` 产出，CLI 不自评 | `DESIGN_LOCKED` |
-| CLI e2e 测试 | fresh-clone `npx` exit 0 | `IMPLEMENTED_UNVERIFIED` |
+| CLI e2e 测试 | fresh-clone `npx` exit 0 | `IMPLEMENTED_VERIFIED`（fresh-clone smoke 通过；`competition_qwen_smoke`/`snapshot_liveness_smoke` 需 `DASHSCOPE_API_KEY` 跳过） |
 
 #### 3.2.4 叙事轨（FI-8 进攻性叙事）
 
@@ -364,7 +364,8 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 | 项 | 内容 | 状态 |
 |---|---|---|
-| `far` CLI / REPL 流式产出 `.far-proof` | 30 秒 `npx` 上手（W1 CLI 薄壳轨） | `PARTIAL` |
+| `far` CLI 工具链 | 30 秒 fresh-clone 零密钥上手（status/verify/verify-golden/export/bench/fec/fsm/demo/api） | `IMPLEMENTED_VERIFIED`（见 05 §9.2） |
+| `far ask`/`repl`/`stream` 交互壳 + 流式产出 `.far-proof` | REPL 提问/追问/fork + SSE 流式打印每阶段 | `ROADMAP`（W1 薄壳轨·见 05 §9.2） |
 | 对抗科学竞技场（多 refuter 实时攻击） | deterministic arbiter + 反驳记分板（W3） | `ROADMAP` |
 | 跨模型可靠性法庭 | 同一 claim 跑多模型，结构化检测一致/分歧，颁发 ReliabilityCertificate（W4） | `DESIGN_LOCKED`（persona 档 `PARTIAL`，真实档 `NEEDS_HUMAN_OPERATION`） |
 | Domain Pack 插件架构 | 5+ pack（W4） | `ROADMAP` |
@@ -453,7 +454,7 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 1. **CROSS-CUT-003（migration 编号 SSOT 矛盾）**：`§8.0` 冻结 SSOT 止于 `0015`，而 `FINAL_PACKAGE/21` 路线图层引用 `0016-0025`。属 Ask 层裁决（改 Schema），本文件按工作假设编号标注，不裁决归属。状态：`NEEDS_EXTERNAL_VERIFICATION`（须主控复核）。
 2. **0010 双占（`integrity_events` vs `system_prompt_transparency`）**：待 Ask 裁决编号，裁决前两表 DDL 各自正确。状态：`NEEDS_EXTERNAL_VERIFICATION`。
-3. **`far status --json` 输出完整性**：CLI 骨架在 `<REPOSITORY_ROOT>/src/cli/`，但输出字段（测试数 / migration 数 / golden 向量数 / coverage）是否完整须复核。状态：`PARTIAL`。
+3. **`far status --json` 输出完整性**：`src/cli/status_dump.ts` 实测产出 testCount/coverage/migrationCount/goldenVectorCount/suiteIntegrityRoot/gitCommitSha 等字段（fresh-clone smoke 验证）。状态：`IMPLEMENTED_VERIFIED`。
 4. **standalone `verify.html` 断网可跑**：`frontend/public/verify.html` 已封装为零外链 standalone，拖入/粘贴 ProofEnvelope V2 JSON 后用 Web Crypto 重算 `proofHash`；raw evidence / RO-Crate 外部认证不在此路径内。状态：`IMPLEMENTED_VERIFIED`。
 5. **ProofEnvelope Validator 第 10 条规则**：新增协议规则（独立可重算性），已由 `validator.10-rules-coverage.test.ts`、TS/Python/browser proofHash 重算与离线包脚本路径覆盖。状态：`IMPLEMENTED_VERIFIED`。
 6. **C7 单点（modelId 进 hash）**：snapshot 切换触发整链重算，根因消除须改 `verifyChainHead` 白名单四字段（越 Ask 层红线），V3 提 Ask 重新评估。当前仅「事后可复现性兜底」，verdict 落 `DEGRADED_SCOPE`。状态：`RESEARCH`。

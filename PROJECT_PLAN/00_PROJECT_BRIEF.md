@@ -294,7 +294,7 @@ Propose-Critique-Falsify / CORE-Bench / ScienceAgentBench 是 benchmark 视角�
 
 | FI | 角色 | 状态（规划口径） |
 |---|---|---|
-| FI-1 `far` CLI | "30 秒装起来用"——产品化的存在证明 | `IMPLEMENTED_VERIFIED`（`far status` / `far verify` / `far export receipt` / `far bench run` 已落地）；`far ask/repl/stream` 仍 `ROADMAP` |
+| FI-1 `far` CLI | "30 秒装起来用"——产品化的存在证明 | `IMPLEMENTED_VERIFIED`（核心 11 子命令已落地：`far status` / `far verify` / `far verify-golden` / `far export receipt` / `far export far-proof` / `far bench run` / `far fec compile` / `far fec freeze` / `far fsm advance` / `far demo` / `far api`）；`far ask/repl/stream`、`packages/cli` 仍 `ROADMAP`（见 05 §9.2） |
 | FI-2 Arena | "看 AI 抓 AI 作弊"——诚实最戏剧化的时刻 | `PARTIAL`（anti-theater harness 已有；竞技场产品化辩论为 `ROADMAP`） |
 | FI-3 Court（跨模型法庭） | "标出 AI 可靠性盲区"——真新颖性（只标盲区，不排座次，守 V2-2） | `ROADMAP` |
 | FI-4 DomainPack | "不只是一个天文 demo"——平台体量 | `ROADMAP`（TESS 公开数据 demo 为示范 DomainPack） |

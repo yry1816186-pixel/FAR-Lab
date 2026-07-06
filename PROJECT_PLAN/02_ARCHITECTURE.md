@@ -113,7 +113,7 @@ Claim
 |---|---|---|
 | ProofEnvelope V2 | 结构化封装 claim、FEC、证据、verdict 和 roots（`schemaVersion: "far.proof_envelope.v2"`） | `DESIGN_LOCKED`；V1 `PARTIAL`，P0 须升级 V2 proofHash binding |
 | proofHash | 对 verdict-critical 字段生成稳定摘要（白名单 §2.2 of APPENDIX_C，篡改任一 VC 字段必变） | TS/Python/Browser `IMPLEMENTED_VERIFIED`；Rust/Go/WASM `ROADMAP` |
-| `far verify` / `far export receipt` / `far export far-proof` / `far bench run` | CLI 验证 bundle、envelope、chain，生成 Trust Receipt DOC 投影，导出 V1 `.far-proof` self-verifiable bundle，并运行 6-seed demo benchmark profile（`far bench run --json --generated-at <iso>`） | `IMPLEMENTED_VERIFIED`（`far verify` + `far export receipt` + `far export far-proof` + `far bench run`）；`far ask/repl/stream` 与外部 RO-Crate/PROV-O 认证仍 `ROADMAP` |
+| `far verify` / `far export receipt` / `far export far-proof` / `far bench run` | CLI 验证 bundle、envelope、chain，生成 Trust Receipt DOC 投影，导出 V1 `.far-proof` self-verifiable bundle，并运行 6-seed demo benchmark profile（`far bench run --json --generated-at <iso>`） | `IMPLEMENTED_VERIFIED`（11 子命令：status / verify / verify-golden / export receipt / export far-proof / bench run / fec compile / fec freeze / fsm advance / demo / api）；`far ask/repl/stream` 与外部 RO-Crate/PROV-O 认证仍 `ROADMAP`（见 05 §9.2） |
 | Python verifier | 独立语言复核（`canonical_hash` + `verifyChainHead` + ProofEnvelope V2 `proofHash` byte-equal） | `IMPLEMENTED_VERIFIED` |
 | Browser verifier | 面向评委的可视化验真与 tamper demo（Web Crypto） | Merkle/Suite + ProofEnvelope V2 proofHash `IMPLEMENTED_VERIFIED`；raw evidence / RO-Crate 外部认证不在此路径内 |
 | diff report | 说明哪一个字段导致验证失败（落 `APPENDIX_C` §7 verdict-critical 字段表的一行） | `DESIGN_LOCKED` |
@@ -130,7 +130,8 @@ Claim
 | research object adapters | RO-Crate、PROV、Workflow Run Crate 等映射（`.far-proof` 三重出口） | `DESIGN_LOCKED`（首里程碑基本出口；路线图完整合规） |
 | ML/data adapters | MLflow、DVC、DataLad、W&B 等结果接入 | `ROADMAP`（V2） |
 | FAR-Bench | 验真协议、攻击样例和回归套件（项目内 self-test，**不冒充通用 benchmark** C13） | `ROADMAP`（spec-only，C33） |
-| demo cockpit | 展示 receipt、verdict trace、tamper red（Honesty Wall） | `DESIGN_LOCKED`（Windows offline demo 必达） |
+| REST API server（`src/api/`） | 对外 HTTP API（Fastify）：`/api/v1/verdict`/`/evidence` + `/health`/`/ready` 探针 + JWT/CORS/rate-limit；`far api` 启动器（默认 offline demo·种子 C-ASTRO 裁决·作为 frontend 网关） | `IMPLEMENTED_VERIFIED`（`src/api/server.ts` + `routes/`·OpenAPI schema 暴露于 `/documentation/json`） |
+| Web dashboard（`frontend/`） | React + Vite 仪表盘 9 页（Overview/Viz/Integrity/Leaderboard/HonestyWall/Ablation/Report/DemoMode/About）·d3/reactflow 可视化·Honesty Wall tamper red·连 `localhost:3000` API；`far api` + `npm run dev` 全栈可运行 | `IMPLEMENTED_VERIFIED`（生产构建通过·`demo cockpit` 离线现场演示流程仍 `DESIGN_LOCKED`） |
 | `.far-proof` 三重出口 | `ro-crate-metadata.json` + `prov.ttl` + `otel-trace.jsonl` + `proof_envelopes.jsonl` + `repro_runs.jsonl` + `call_records.redacted.jsonl` + `data_manifest.json` + `README_REPLAY.md` + `verify.sh`/`integrity.json`/`.tar.zst` package | V1 self-verifiable export `IMPLEMENTED_VERIFIED`；外部 RO-Crate/PROV-O validator 合规、`sciir.json`、`ledger_events.jsonl` 仍 `ROADMAP` |
 
 ### 2.5 模块全景矩阵（十五层映射 · 来源溯源）
@@ -154,7 +155,7 @@ Claim
 | L12 | Transparent Science Ledger（`ledger_events` + Merkle root + inclusion proof） | Proof & Verification | `DESIGN_LOCKED`（local，不说区块链） |
 | L13 | Scientific Memory（7 态生命周期） | Product（研究层） | `RESEARCH`（NEEDS_RESEARCH） |
 | L14 | Formal Invariant（TLA+ / Lean / Alloy，只读验证·非 runtime） | Product（路线图） | `ROADMAP`（NEEDS_TOOLCHAIN；F10 不进 runtime 依赖） |
-| L15 | Open Science Export + Governance（`.far-proof` 三重出口 + 开源 + Web Cockpit） | Product & Ecosystem | `DESIGN_LOCKED`（基本导出必达） |
+| L15 | Open Science Export + Governance（`.far-proof` 三重出口 + 开源 + Web Cockpit） | Product & Ecosystem | 基本导出 `IMPLEMENTED_VERIFIED`；Web Cockpit（`frontend/` 仪表盘 + `far api` REST server）`IMPLEMENTED_VERIFIED`（见 §2.4）；开源治理 / 外部 RO-Crate 认证仍 `DESIGN_LOCKED`/`ROADMAP` |
 
 > **消歧约定**（来自旧 `07` §1 round12）：引用 L7 内部子层必须写 `L7-L1`/`L7-L2`/`L7-L3`（带 L7 前缀），禁裸写 L1/L2/L3（与全局层 L1=执行 / L2=证据 撞名）。全局 L3（元创新轴·含 UQ-Witness）vs L7-L3（Causal ConfoundingGate）是**不同实体**。
 
