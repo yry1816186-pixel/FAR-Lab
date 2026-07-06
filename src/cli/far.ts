@@ -17,6 +17,7 @@ import { runStatus } from './commands/status.ts';
 import { runVerify, VALID_MODES, type VerifyMode } from './commands/verify.ts';
 import { runVerifyGolden, type VerifyGoldenBackend } from './commands/verify_golden.ts';
 import { runApi } from './commands/api.ts';
+import { runDemo } from './commands/demo.ts';
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
@@ -36,6 +37,10 @@ async function main(): Promise<void> {
     // server 监听中保持进程存活（startServer 注册了 SIGINT/SIGTERM 优雅关停）。
     await runApi(argv.slice(1));
     return;
+  }
+
+  if (command === 'demo') {
+    process.exit(runDemo());
   }
 
   if (command === 'verify') {
@@ -895,6 +900,8 @@ function errorMessage(error: unknown): string {
 const HELP_TEXT = `FAR-Chain CLI（FI-1 · far 命令家族）
 
 用法：
+  far demo                           一键演示（14 Golden Vectors + 端到端 demo claim·offline 无需凭据）
+
   far status [--db <path>] [--json]    生成单一 SSOT 状态报告（FI-10 · 01§5）
     --db <path>   验证 evidence_log DB 链头（verifyChainHead），不提供则 pending
     --json        机器可读输出（CI 文档构建回填 <X_FROM_STATUS_DUMP> 占位符用）
