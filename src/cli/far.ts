@@ -16,6 +16,7 @@ import { runFsmAdvance } from './commands/fsm.ts';
 import { runStatus } from './commands/status.ts';
 import { runVerify, VALID_MODES, type VerifyMode } from './commands/verify.ts';
 import { runVerifyGolden, type VerifyGoldenBackend } from './commands/verify_golden.ts';
+import { runApi } from './commands/api.ts';
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
@@ -29,6 +30,12 @@ async function main(): Promise<void> {
   if (command === 'status') {
     const exitCode = runStatusFromArgs(argv.slice(1));
     process.exit(exitCode);
+  }
+
+  if (command === 'api') {
+    // server 监听中保持进程存活（startServer 注册了 SIGINT/SIGTERM 优雅关停）。
+    await runApi(argv.slice(1));
+    return;
   }
 
   if (command === 'verify') {
@@ -891,6 +898,15 @@ const HELP_TEXT = `FAR-Chain CLI（FI-1 · far 命令家族）
   far status [--db <path>] [--json]    生成单一 SSOT 状态报告（FI-10 · 01§5）
     --db <path>   验证 evidence_log DB 链头（verifyChainHead），不提供则 pending
     --json        机器可读输出（CI 文档构建回填 <X_FROM_STATUS_DUMP> 占位符用）
+
+  far api [--port <n>] [--db <path>|--persist <path>] [--no-seed] [--protected]
+          启动 REST API server（Fastify·前端默认连 localhost:3000）
+    --port <n>      监听端口（默认 3000·前端 api_client.ts 对齐；可由 PORT 环境变量覆盖）
+    --db <path>     DB 路径（默认 :memory: 临时·每次启动新鲜）
+    --persist <p>   持久化到文件（如 ./far-chain.db·跨重启保留数据）
+    --no-seed       不种子 demo 裁决（默认种子 C-ASTRO-0001 REFUTED 供前端展示）
+    --protected     启用 JWT 鉴权（需 FAR_JWT_SECRET 环境变量；默认 offline 匿名 demo）
+    示例：pnpm api   # 后端 localhost:3000，另起 cd frontend && npm run dev 即全栈
 
   far verify [--bundle <path> | --envelope <path> --db <path>] [--mode chain|envelope|full]
              [--json] [--explain]      第三方独立重算验证（FI-9 · 04§5）
