@@ -73,6 +73,10 @@ interface ArenaResult {
   readonly honestNote: string;
 }
 
+export function detectRefuterAttack(originalVerdict: string | null, refuterVerdict: string | null): boolean {
+  return originalVerdict !== null && refuterVerdict !== null && refuterVerdict !== originalVerdict;
+}
+
 async function runOne(question: string, modelId: string, gitCommitSha: string): Promise<{
   verdict: string | null;
   rule: string | null;
@@ -104,8 +108,7 @@ async function executeArenaSession(args: ArenaArgs, gitCommitSha: string): Promi
   const attempts: RefuteAttempt[] = [];
   for (const refuter of args.refuters) {
     const r = await runOne(`${args.hypothesis} [refute: ${refuter}]`, `arena-refuter-${refuter}`, gitCommitSha);
-    const attackLanded =
-      r.verdict !== null && originalVerdict !== null && r.verdict !== originalVerdict;
+    const attackLanded = detectRefuterAttack(originalVerdict, r.verdict);
     attempts.push({ refuter, verdict: r.verdict, attackLanded, error: r.error });
   }
 
