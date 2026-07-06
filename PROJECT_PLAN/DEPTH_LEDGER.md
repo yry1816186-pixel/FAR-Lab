@@ -46,7 +46,8 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 
 | id | single_real_dependency | proof_caller | proof_test | proof_test_red_commit | status | closed_by_sha | claimed_by_pr |
 |----|------------------------|--------------|------------|-----------------------|--------|---------------|---------------|
-| P0-1 | compileFec 经 fecAppendClaim 进生产 verdict（fecV2 形参必选 + 实参非空 FecContractV2） | src/fec/orchestrator.ts:119 | tests/fec/fec_mandatory_e2e.test.ts::missing_or_bad_fec_blocks_confirmed | (待 CI 双跑) | WIRED_RED | — | - |
+| P0-1 | compileFec 经 fecAppendClaim 进生产 verdict（fecV2 形参必选 + 实参非空 FecContractV2） | src/fec/orchestrator.ts:119 | tests/fec/fec_mandatory_e2e.test.ts::missing_or_bad_fec_blocks_confirmed | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
+| evidence: 42b08ca4d38e48b3a5c90902d162ffbc636a03c9 → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | P0-2a | decideFiveValueVerdict 替换 fec/orchestrator.ts 的 makeVerdict（CallExpression 真实调用，返回值流入 recordVerdict/seal） | src/fec/orchestrator.ts:137 | tests/fec/orchestrator_v2_wired.test.ts::verdict_uses_v2_kernel | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | P0-2b | decideFiveValueVerdict 替换 verdict_stage.ts 的 makeVerdict | src/agent_loop/verdict_stage.ts:245 | tests/agent_loop/verdict_stage_v2_wired.test.ts::stage_wires_v2_kernel_and_persists_confirmed_verdict_via_vote_bridge | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
@@ -55,7 +56,8 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | P0-2d | decideFiveValueVerdict 替换 render.ts 的 makeVerdict | src/falsifiability/render.ts:37 | tests/falsifiability/render_v2_wired.test.ts::render_emits_evidenceSufficiency | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
-| P0-3 | orchestrator fecAppendClaim 内 !fecGate.allowed 分支（:139）强制缺/坏 FEC claim verdict≠CONFIRMED → UNTESTED；demo_chain 经此路径 | src/fec/orchestrator.ts:139 | tests/far_proof/fec_mandatory_e2e.test.ts::missing_fec_blocks_confirmed_on_real_path | (待 CI 双跑) | WIRED_RED | — | - |
+| P0-3 | orchestrator fecAppendClaim 内 !fecGate.allowed 分支（:139）强制缺/坏 FEC claim verdict≠CONFIRMED → UNTESTED；demo_chain 经此路径 | src/fec/orchestrator.ts:139 | tests/far_proof/fec_mandatory_e2e.test.ts::missing_fec_blocks_confirmed_on_real_path | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
+| evidence: 42b08ca4d38e48b3a5c90902d162ffbc636a03c9 → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | P0-4 | decideFiveValueVerdict 消费 compileFec Plan，替换 isFrozenAndCompilable 的内联 4 字段浅检查 | src/falsifiability/verdict_kernel_v2.ts:230 | tests/falsifiability/kernel_v2_consumes_fec_plan.test.ts::kernel R1 fires on the same HARD_FAIL condition as compileFec | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | STAT-1 | src/statistics/ 真实数学（z-test/Cohen's d/置信区间/Bonferroni·Holm·BH-FDR 多重校正），statistics_math.test.ts GREEN；**3 真实生产 caller 经 P1-5a/b/c**——hero_a_pipeline 调 oneSampleZTest、hero_b_pipeline/c_astro_pipeline 调 twoSampleWelchZTest/adjustPValues（经 fecAppendClaim(statistics?) 注入 V2 kernel 消费真实统计量，不再零 caller） | src/science_harness/hero_a_pipeline.ts:138 | tests/science_harness/hero_a_pipeline.test.ts::hero_a_pipeline: real src/statistics drives R7 CONFIRMED -> ASK-9 INCONCLUSIVE seal (P1-5 Phase 2) | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
