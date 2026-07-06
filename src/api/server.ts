@@ -104,6 +104,8 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
       produces: ['application/json', 'application/problem+json', 'text/html'],
     },
   });
+  // @fastify/swagger 9 仅生成 schema 不服务路由（需 swagger-ui 独立包）；手动暴露 OpenAPI JSON 供 API 发现。
+  app.get('/documentation/json', { schema: { hide: true } }, () => app.swagger());
 
   await registerAuthMiddleware(app, { jwtSecret: config.jwtSecret });
 

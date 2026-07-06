@@ -71,3 +71,8 @@ $null
 
 # Agent tooling (pi workspace — local, not part of FAR-Chain deliverable; gates live in package.json + .github/workflows)
 .pi/
+
+# Persisted API/demo SQLite DBs (runtime artifacts)
+*.db
+*.db-wal
+*.db-shm
