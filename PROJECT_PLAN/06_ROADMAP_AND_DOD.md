@@ -403,6 +403,21 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 ---
 
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（06_ROADMAP_AND_DOD）相关的融合缺口
+
+- **P-FUSION 波次（DESIGN_PROPOSED，W0-W5 之后的独立延伸波次）**：迁移 Open Science 工程范式，14 项 FUSION-OS-1..14 全 NOT_BUILT。**不抢 W0-W5 当前优先级**（W0-W5 是 P0 工程闭环 + keystone bot，见 DEPTH_LEDGER §A next_action=KEYSTONE_DEPTH_EVIDENCE_BOT）。
+- **建议取序**：FUSION-OS-1（反剧场实时接线·最高杠杆·闭合当前最大活体缺口）→ FUSION-OS-11（DB CHECK 五值 enum·红线级强制）→ FUSION-OS-13/14（内核 form/identifier 规则）→ FUSION-OS-9/10/12（schema：blob CAS / derivable / supersede）→ FUSION-OS-2/3/4/7/8（sandbox 加固）→ FUSION-OS-5/6（verifier AST 门 + provenance）。
+- **验收门**：每项接线须升 DEPTH_LEDGER §C 对应行至 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN；agent 不得手填。
+- **边界**：真 OS 级网络/cpu/mem 隔离仍 V2（07_RISK_REGISTER §188 自承），P-FUSION 的 sandbox 项是用户态降级，绝不宣称运行时隔离。
+
+> 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 CLAUDE.md §4 P-FUSION。
+
+---
+
 ## 9. PR Checklist
 
 每个工程 PR 必须回答（任一「是」须在 PR 描述显式说明影响与对策）：

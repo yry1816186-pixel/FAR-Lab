@@ -1,0 +1,44 @@
+# CODEOWNERS — FAR-Chain 治理 keystone 文件须 maintainer review
+#
+# 防御目的（CLAUDE.md §0 + HANDOFF §1 M4）：
+#   agent（任何 harness：Claude/GPT/Cursor/Copilot）若能直接 commit 改下列文件，
+#   即可手填 WIRED_GREEN 伪造完成 / 弱化 depth_gate 检查逃避 caller 计数 / 关 workflow trigger。
+#   CODEOWNERS 把这些文件的变更强制走 maintainer review（M4 工件层）。
+#
+# ⚠️ maintainer 必做（工件无法自证生效）：
+#   GitHub repo → Settings → Branches → 对应默认分支 branch protection rule
+#   → 勾 "Require review from Code Owners"。未勾则本文件仅 advisory（请求 reviewer 但不阻断合并）。
+#
+# 每个 PR 若 touch 下列路径，自动请求 @yry1816186-pixel review（owner = git remote 实测 owner）。
+
+# ── 账本 SSOT（M4 核心：防 agent 手填 WIRED_GREEN / 改 status 伪造完成态）──
+PROJECT_PLAN/DEPTH_LEDGER.md                    @yry1816186-pixel
+
+# ── 深度门 keystone 脚本（防 agent 弱化检查 / 放宽正则 / 改 caller 计数逃避接线验证）──
+# 入口协议校验逻辑内联在 .github/workflows/entry-protocol-check.yml（已 protect），无独立 .mjs。
+scripts/depth_gate.mjs                              @yry1816186-pixel
+scripts/depth_evidence.mjs                          @yry1816186-pixel
+scripts/lib/ledger.mjs                              @yry1816186-pixel
+scripts/lib/code_analysis.mjs                       @yry1816186-pixel
+scripts/zero_tolerance_scan.mjs                     @yry1816186-pixel
+scripts/anti_theater_deterministic_scan.mjs         @yry1816186-pixel
+scripts/confounding_gate_deterministic_scan.mjs     @yry1816186-pixel
+scripts/no_llm_final_judge_scan.mjs                 @yry1816186-pixel
+
+# ── 治理 workflow（防 agent 关 trigger 让门寂静 / 降 GITHUB_TOKEN 权限）──
+.github/workflows/depth-gate.yml                @yry1816186-pixel
+.github/workflows/depth-evidence.yml            @yry1816186-pixel
+.github/workflows/entry-protocol-check.yml      @yry1816186-pixel
+
+# ── 入口协议 + antiskim 红线（防 agent 改 T0-T8 自检 / 放松 tripwire）──
+CLAUDE.md                                       @yry1816186-pixel
+AGENT_ENTRY_PROTOCOL.md                         @yry1816186-pixel
+AGENT_ANTISKIM_TRIPWIRES.md                     @yry1816186-pixel
+
+# ── 跨工具入口路由（R8：防 agent 删 AGENTS.md 的 STOP 门让非 Claude 工具失路由）──
+AGENTS.md                                       @yry1816186-pixel
+.cursorrules                                    @yry1816186-pixel
+.github/copilot-instructions.md                 @yry1816186-pixel
+
+# 默认 owner（未匹配上述路径的文件）：当前单人维护，可选——取消下行注释启用作 catch-all
+# *                                             @yry1816186-pixel

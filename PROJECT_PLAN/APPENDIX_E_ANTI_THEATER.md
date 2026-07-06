@@ -477,11 +477,19 @@ def detect_scope_launder(input: AntiTheaterLintInput) -> AntiTheaterFinding | No
                 reason_code="REFUTATION_HIDDEN_BY_SCOPE",
                 affected=["verdictTrace.verdict"],
                 remediation="存在直接反证；verdict 必须为 REFUTED（03 §6 优先级高于 DEGRADED_SCOPE）")
-        return finding(
-            attack_id="AT-SCOPE-LAUNDER", severity="FAIL",
-            reason_code="SCOPE_LAUNDERED",
-            affected=["verdictTrace.supportedScope"],
-            remediation="证据 scope 严格窄于 claim scope；verdict 强制 DEGRADED_SCOPE（03 §8）")
+        # honest-degrade 裁决（TS 实现对齐 D4）：若 kernel 已诚实降级到 DEGRADED_SCOPE/REFUTED/
+        # INCONCLUSIVE/UNTESTED（input.verdict.verdict != 'CONFIRMED'），detector 职责
+        # （expectedVerdict=DEGRADED_SCOPE）已达成，overclaim 不存在 → 放行（return None）。
+        # 仅 verdict='CONFIRMED'（overclaim：claim 全局但证据仅覆盖子集）才产 SCOPE_LAUNDERED。
+        # R4 路径（verdict_kernel_v2 R4）必然产 coverage='partial'，无此裁决则任何诚实 R4
+        # 降级都被误判 theater（违反承诺误报率=0）。详见 src/anti_theater/detectors/scope_launder.ts。
+        if input.verdict.verdict == 'CONFIRMED':
+            return finding(
+                attack_id="AT-SCOPE-LAUNDER", severity="FAIL",
+                reason_code="SCOPE_LAUNDERED",
+                affected=["verdictTrace.supportedScope"],
+                remediation="证据 scope 严格窄于 claim scope；verdict 强制 DEGRADED_SCOPE（03 §8）")
+        return None  # honest degrade：kernel 已降级，非 theater
     return None
 ```
 
@@ -1169,6 +1177,20 @@ ProofEnvelope.antiTheaterReport （04 §2）
 ### §7.4 与 ConfoundingGate（`36`）的集成
 
 因果类 claim（`claimType="causal"`）的 anti-theater 检查由 `36` 的 ConfoundingGate 承担（`unblocked` + `observational_only` → 禁 `CONFIRMED`，F6）。本附录**不**重复混杂检测，仅在 `AT-SCOPE-LAUNDER` 中处理“用 `DEGRADED_SCOPE` 掩盖因果反证”的同型问题。
+
+---
+
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（APPENDIX_E_ANTI_THEATER）相关的融合缺口
+
+- **FUSION-OS-1**（当前最大活体缺口·DESIGN_PROPOSED）：本附录列出的 20 类攻击（label-only / seed-cherry-picking / metric-swapping / workflow-digest-mismatch / natural-language-verdict-mismatch 等）在 `<REPOSITORY_ROOT>/src/anti_theater/lint.ts` 有 20 个检测器实现，但**仅 `<REPOSITORY_ROOT>/src/far_proof/verify.ts:412` 离线调用**；`<REPOSITORY_ROOT>/src/fec/orchestrator.ts:199` 运行时 verdict 路径硬编码 `antiTheaterFindings:[]` —— 即实时 verdict 从不消费检测器输出。FUSION-OS-1 把 `runAntiTheaterLint` 注入 `buildVerdictKernelInput` 闭合此缺口（对应 §7.1 集成图中的 `antiTheaterFindings[]` 通道在运行时为空）。**expected verdict 表（§5.2）不变，但运行时强制生效。**
+- **FUSION-OS-6**（新攻击条目候选·forged-citation·DESIGN_PROPOSED）：LLM 产出虚假 provenance（来源由被验证方自填而非系统重算）—— 加 `provenanceClass` tag + 系统 hash 重算绑定检测。若落地，将作为 §2 攻击目录的第 21 类（attackId 候选 `AT-FORGED-CITATION`），expected verdict 取严映射到 `UNTESTED`（与 `AT-LABEL-ONLY` 同型：label-only 不可作 primary evidence）。
+- **FUSION-OS-14**（expected verdict = REFUTED·DESIGN_PROPOSED）：identifier-fabrication 攻击（claim 带可校验 identifier DOI/arXiv/accession 但无 harness-verified 来源）的 expected verdict 从 `UNTESTED` 升为 **`REFUTED`**（须同步加 GV，见 `APPENDIX_B_GOLDEN_VECTORS.md`）。此为 §2 攻击目录 expected verdict 表的**唯一升严条目**，与 §3.2「anti-theater 只降级不产 REFUTED」纪律不冲突——`REFUTED` 由 verdict kernel `any_refute` 路径产出（§3.2 备注），identifier-fabrication 触发该路径的 deterministic 条件。
+
+> 接线时升 `WIRED_RED`，物证由 keystone bot CI 双跑写回 `WIRED_GREEN`（见 `DEPTH_LEDGER.md` §D）。取序建议见 `CLAUDE.md` §4 P-FUSION（FUSION-OS-1 最高杠杆 → FUSION-OS-11 红线级 → FUSION-OS-13/14 内核规则 → 其余）。当前态：6 收敛点 C-1..C-6（来源不可自填 / 失败闭环门 / LLM-非裁决者 / 自排除规范哈希 / 冻结契约工件 / 从磁盘派生花名册）FAR-Chain 已独立达到，不重复立项。
 
 ---
 

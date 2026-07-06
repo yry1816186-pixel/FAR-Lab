@@ -586,6 +586,22 @@ type VerdictKind =
 
 ---
 
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（APPENDIX_C_CANONICAL）相关的融合缺口
+
+- **FUSION-OS-9**（候选·DESIGN_PROPOSED）：内容寻址 blob CAS（`far_blob_store(hash PK)`）—— evidence / FEC Plan / kernel trace 按 content hash 引用去重；blob hash 不进 proofHash 白名单（去重的是 payload，proofHash 仍绑引用 manifest）。Open Science content_snapshots 范式。
+- **FUSION-OS-7**（proofHash 白名单候选评估）：`executionFingerprint {wall,cpu,peak_rss}` 是否进 proofHash canonical input —— 须评估：进则复算绑定（篡改可检测），但牺牲重算确定性（cpu/rss 非确定）。倾向：进 verdict_trace 但**不进** proofHash 白名单（保持 proofHash bit-exact），executionFingerprint 单独哈希进 verdict_trace_json。Open Science per-cell 三元组范式。
+- **FUSION-OS-13**（canonical 影响）：`derivationForm` 须进 canonical（同值不同 form = 不同 canonical），否则 sentinel-form 静默替换不可检测。
+
+> 以上全 DESIGN_PROPOSED，未改当前四字段白名单（stageId / cred / payloadKind / prevHash）+ proofHash 白名单；落地须走 01 修订程序。
+
+> 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 CLAUDE.md §4 P-FUSION。
+
+---
+
 ## 8. 已知数值域分叉（NUMERIC_KNOWN_DIVERGENCE）
 
 > **诚实披露**：TS 与 Python 的 canonical 序列化在**浮点表示**上有两类已知分叉（均非 bug）：① **指数零填充**——`|exp|<10` 时 Python 补零（`1e-07`）TS 不补（`1e-7`），`|exp|≥10` 时一致；② **定点/科学切换阈值不同**——TS `JSON.stringify` 在 `1e21` 才切科学计数（`[1e16,1e21)` 输出定点整数如 `10000000000000000`），Python `json.dumps` 在 `1e16` 即切（`1e+16`）。本附录不掩盖，下表为 2026-07 实测口径。

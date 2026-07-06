@@ -570,3 +570,17 @@ FAR-CHAIN 错误码 = 字母前缀 + 4 位数字
 | `42_PRIVACY_AND_PROFESSIONALISM_GUIDELINES.md` | 隐私占位词表、R1-R8 诚实职业纪律、AI agent 输出 sanitize | §7.1（最后一项检查） |
 
 > 冲突处理（遵守 `01` §2）：本文件（P0）与上述来源冲突时，以本文件与 `APPENDIX_F_GLOSSARY.md`（P0）为准；旧 `FINAL_PACKAGE` 编号文档（P3）仅作来源。裁决枚举、优先级、路径写法、禁用词以 `APPENDIX_F` §3.1/§3.2/§7/§6 与 `01` §1 为权威。anti-theater reasonCode / attackId 以 `APPENDIX_E` §0.3 为权威。
+
+---
+
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（07_RISK_REGISTER_AND_DO_NOT_CLAIM）相关的融合缺口
+
+- **FUSION-OS-2 / FUSION-OS-4**（§188 OS 隔离风险的用户态缓解）：sandbox spawn 用 detached=true 独立进程组 + 超时 `process.kill(-pgid)` 组播清理（防 numpy/OpenBLAS 子孙成孤儿）+ spawnVenv 前 `preflightWorkingDir` 预算扫描（.git-cap / symlink-O_NOFOLLOW / container 检测）；Open Science setsid + gitScanWorker 范式。**真 OS 级隔离仍 V2（§188 自承做不到），这是用户态降级，绝不宣称运行时隔离。**
+- **FUSION-OS-8**：spawn env 剥离 secret 白名单（`*_API_KEY` / `*_SECRET` / `*_TOKEN`）+ Python `addaudithook` 拒绝可写目录 dlopen；Open Science secret-strip + dlopen guard 范式。
+- **FUSION-OS-6**（假绿 6 条补充·新型假绿）：LLM 自证 provenance（来源由被验证方/工作负载自填而非系统重算）是新型假绿 —— Open Science `data_vid=None` 范式要求来源字段强制 null + 系统 hash 重算绑定 + `provenanceClass` tag。
+
+> 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 CLAUDE.md §4 P-FUSION。

@@ -89,6 +89,23 @@ FAR-Chain = AI4S 科学声明的**声明级验证层**。核心价值是「可�
 ### P3 — 卫生
 - P3-1 suite 起跑时单条 Python-axis 能力探针，打印 `Python axis: available|skipped`〔依赖：无〕
 
+### P-FUSION — Open Science 工程范式迁移（DESIGN_PROPOSED，未来 backlog，不抢 P0-P3 依赖序）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。Open Science 经实证为 Claude Code 分支重品牌化的**执行层 agent 工作区**（sanitize-runtime 长 byte CLAUDE→SCIENC 替换；内部 Anthropic Messages API + universal-llm 翻译网关；science-sonnet-4-6 = claude-*）；FAR-Chain 是**验证层声明级裁决内核**。**层级不同**：迁移 OS 的**工程范式**（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），**绝不迁移** OS 的 LLM-裁决语义。6 项收敛点（C-1..C-6：来源不可自填 / 失败闭环门 / LLM-非裁决者 / 自排除规范哈希 / 冻结契约工件 / 从磁盘派生花名册）FAR-Chain 已独立达到，不重复立项。机器可读接线表见 `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段 FUSION-OS-1..14（全 NOT_BUILT，由 keystone bot CI 双跑写回 WIRED_GREEN，agent 不得手填）。
+
+- **FUSION-OS-1** 反剧场检测器接实时 verdict 路径：`runAntiTheaterLint` 的 20 个检测器当前仅 `verify.ts:412` 离线调，`orchestrator.ts:199` 运行时硬编码 `antiTheaterFindings:[]` → 注入 `buildVerdictKernelInput`，闭合 R-anti-theater-fail / seed-cherry / R8-warn 实时路径。**当前最大活体缺口，最高杠杆。**〔依赖：P0-1〕
+- **FUSION-OS-2/3/4/7/8** sandbox 加固：进程组 kill（detached + kill(-pgid)）/ seal 时序窗口收窄 / spawnVenv 前 fs 预扫（用户态降级，真 OS 隔离仍 V2 见 07 §188）/ wall-cpu-peak_rss 执行指纹 / secret 剥离 + dlopen 防护。〔依赖：P1-6〕
+- **FUSION-OS-5** verifier 加载期 AST 结构门（禁顶层 network/IO/LLM call，TS Compiler API）。〔依赖：无〕
+- **FUSION-OS-6** LLM 产出 provenance 强制 null + 系统 hash 重算绑定 + provenanceClass tag —— 反剧场红线「来源不可自填」可执行化。〔依赖：FUSION-OS-5〕
+- **FUSION-OS-9** 内容寻址 blob CAS 表（far_blob_store hash PK，evidence / FEC Plan / kernel trace 按 hash 去重）。〔依赖：无〕
+- **FUSION-OS-10** evidence derivable 标记 + 强制重算验证。〔依赖：FUSION-OS-9〕
+- **FUSION-OS-11** verdict_nodes.verdict 加 CHECK 约束固化五值枚举（DB 层禁第六值，红线级强制）。〔依赖：无〕
+- **FUSION-OS-12** verdict.superseded_by 前向指针（重评写新行，WHERE superseded_by IS NULL 查当前）。〔依赖：FUSION-OS-11〕
+- **FUSION-OS-13** StatisticalResult.derivationForm（literal/derived/formula/auto）+ kernel form 不匹配即使值相等也降级。〔依赖：P0-2〕
+- **FUSION-OS-14** R-identifier-fabrication：claim 带可校验 identifier（DOI/arXiv/accession）无 harness-verified 来源 → REFUTED（非 UNTESTED，须同步 GV）。〔依赖：P0-2〕
+
+> 取序建议：FUSION-OS-1（最高杠杆）→ FUSION-OS-11（红线级）→ FUSION-OS-13/14（内核规则）→ 其余 sandbox/schema 项。**取任何 FUSION-OS-* 前先确认 P0-P3 当前 next_action 已完成或显式让位**（见 `DEPTH_LEDGER.md` §A）。
+
 ## 5. 不可逾越的项目红线（来自 PROJECT_PLAN，与全局零容忍叠加）
 
 - 五值裁决枚举**固定**：CONFIRMED / REFUTED / INCONCLUSIVE / DEGRADED_SCOPE / UNTESTED，**禁第六值**，优先级 DEGRADED_SCOPE > REFUTED > INCONCLUSIVE > CONFIRMED > UNTESTED
@@ -97,3 +114,4 @@ FAR-Chain = AI4S 科学声明的**声明级验证层**。核心价值是「可�
 - 路径写法用 `<REPOSITORY_ROOT>/` 占位
 - 禁用词：证明科学真理 / 物理不可篡改 / 完全可复现 / 全自动科学家 / 通用 AI4S benchmark / 把 far-chain/ 当实现根 / 裸「第一唯一最新」
 - 不把 V2/V3 路线写成当前完成（状态标签必须诚实）
+- **Open Science 融合迁移边界**：迁移 OS 的工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），**绝不迁移** OS 的 LLM-裁决语义（universal-llm 翻译网关 / LLM-审核者 / skills / MCP / metadata.yaml agent）—— FAR-Chain 红线「LLM 不作最终裁决者，确定性 R0-R9 内核」高于任何融合。Open Science 经实证为 Claude Code 分支重品牌化的执行层 agent 工作区，与 FAR-Chain（验证层）层级不同。详见 `PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。

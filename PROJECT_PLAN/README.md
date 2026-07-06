@@ -80,6 +80,12 @@ FAR-Chain 是 AI4S 科学声明的可证伪信任闸门（claim-level verificati
 | [APPENDIX_D_PROOF_BUNDLE.md](APPENDIX_D_PROOF_BUNDLE.md) | `.far-proof/` bundle 完整结构、打包硬约束（不含密钥 / 不含真实隐私路径 / 离线自验证）、Windows/空格路径/离线模式可运行要求 | DESIGN_LOCKED |
 | [APPENDIX_E_ANTI_THEATER.md](APPENDIX_E_ANTI_THEATER.md) | 反剧场攻击库（label-only / LLM-reviewer-override / post-hoc-threshold / dataset-drift / scope-laundering / missing-raw-artifact / metric-swapping / seed-cherry-picking / workflow-digest-mismatch / natural-language-verdict-mismatch）、expected verdict 表、CI gate | DESIGN_LOCKED |
 
+### 融合设计参考（Open Science 工程范式迁移，DESIGN_PROPOSED）
+
+| 文档 | 作用 | 状态 |
+|---|---|---|
+| [FUSION_OPEN_SCIENCE_DESIGN.md](FUSION_OPEN_SCIENCE_DESIGN.md) | Open Science（Claude Code 分支重品牌化的执行层 agent 工作区）→ FAR-Chain 工程范式融合设计：6 收敛点（C-1..C-6）+ 14 高优先级迁移缺口（FUSION-OS-1..14）+ 12 落地约束 + 执行顺序。**迁移边界**：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），**绝不迁** OS 的 LLM-裁决语义。机器可读接线表见 `DEPTH_LEDGER.md` §C 末段 | DESIGN_PROPOSED |
+
 ### 阅读顺序（推荐路径）
 
 1. **先读红线与边界**：本 README → `00_PROJECT_BRIEF` → `07_RISK_REGISTER_AND_DO_NOT_CLAIM` → `APPENDIX_F_GLOSSARY` §6。
@@ -108,6 +114,8 @@ type VerdictKind =
 ```
 
 **禁止增加第六值**，除非同时修改本 SSOT、APPENDIX_A/C/F、schema、golden vectors、所有 verifier 和答辩口径。`DEGRADED_SCOPE` 必须在 `CONFIRMED` 前判定。SQLite `RAISE(ABORT)` 是数据库触发器操作，**不是**裁决值。
+
+> **DB 层强制（DESIGN_PROPOSED·FUSION-OS-11）**：当前五值 enum 由内核 + 附录冻结；未来在 `verdict_nodes.verdict` 列加 `CHECK(verdict IN ('CONFIRMED','REFUTED','INCONCLUSIVE','DEGRADED_SCOPE','UNTESTED'))` 约束，使 DB 层也拒绝第六值（Open Science `verification_checks` CHECK 范式），与新 migration 重建 trigger 纳入。接线表见 `DEPTH_LEDGER.md` §C FUSION-OS-11。
 
 ---
 
@@ -145,6 +153,8 @@ claim -> FEC V2 -> dataset/workflow binding -> protocol freeze
 | **P0-3 ProofEnvelope V2** | `src/proof_envelope/types.ts`、`src/proof_envelope/validator.ts`、`src/proof_envelope/proof_hash.ts` | proofHash 绑定 FEC / dataset binding / workflow binding / statistical plan / evidence IDs / verdict trace / ledger root；相同 sealed envelope 在 TS/Python/browser 中 hash 一致；改任一关键字段 → verify fail |
 | **P0-4 `far verify`** | `src/cli/far.ts`、`repro/far_chain_repro/verify_chain.py`、browser verifier 入口 | `far verify receipt.json` 可在 clean checkout 中运行；输出 five-value verdict / proof head / tamper status / scope status / independent recomputation status；Windows / 空格 / 离线路径都可演示 |
 | **P0-5 Anti-theater harness** | 现有 anti-theater guard、新增 attack corpus、CI smoke | 至少覆盖 label-only evidence / post-hoc threshold / dataset drift / scope laundering / missing raw artifact / LLM reviewer override；每个 attack 有 expected verdict 或 expected fail reason；demo 中展示至少三个失败样例 |
+
+> **实时接线延伸（DESIGN_PROPOSED·FUSION-OS-1）**：P0-5 覆盖离线 attack corpus + CI smoke；但运行时 verdict 路径当前 `orchestrator.ts:199` 硬编码 `antiTheaterFindings:[]`，20 个检测器（`src/anti_theater/lint.ts`）仅 `verify.ts:412` 离线调用——实时 verdict 不消费检测器输出。FUSION-OS-1 把 `runAntiTheaterLint` 注入 `buildVerdictKernelInput`，闭合 R-anti-theater-fail / seed-cherry / R8-warn 实时路径（当前最大活体缺口，最高杠杆）。接线表见 `DEPTH_LEDGER.md` §C FUSION-OS-1。
 
 ### 直接给工程团队的实施顺序（来自设计阶段完成判定）
 
@@ -193,6 +203,7 @@ claim -> FEC V2 -> dataset/workflow binding -> protocol freeze
 | Python verifier | chain/Merkle + ProofEnvelope V2 proofHash verifier 已有（`IMPLEMENTED_VERIFIED`） | 增加完整 verdict trace 重放与更多 golden vectors |
 | AI evidence path | LLM label 可进入 verdict（`PARTIAL`） | 改为 metric-first，LLM 只能辅助解释和候选生成 |
 | canonicalHash（四字段白名单） | TS/Python byte-equal `IMPLEMENTED_VERIFIED` | 维持；浮点科学计数法鸿沟按 NUMERIC_KNOWN_DIVERGENCE 诚实归 RED，V3 迁 RFC 8785 JCS |
+| Anti-theater 实时接线（FUSION-OS-1） | 20 个检测器仅 `verify.ts:412` 离线调，运行时 `orchestrator.ts:199` 硬编码 `antiTheaterFindings:[]`（`PARTIAL`·当前最大活体缺口） | `runAntiTheaterLint` 注入 `buildVerdictKernelInput`，闭合 R-anti-theater-fail / seed-cherry / R8-warn 实时路径（Open Science fail-closed 服务门范式） |
 
 ---
 
@@ -241,6 +252,8 @@ claim -> FEC V2 -> dataset/workflow binding -> protocol freeze
 **migration 编号体系**：0001-0008 已锁死（禁 ADD COLUMN，除 `verdict_nodes` 经 Ask 裁决的 `uq_grade` / `repro_certificate_id` / `sensitivity_envelope_id` 例外 C29）；0009-0011 已锁或设计冻结；0012-0015（ProbeAtlas / UQ-Witness / FAR-Bench / multimodal）为设计草案，部分待 Ask 确认。migration 必须可逆（up + down），禁 DROP TABLE 无 down，禁破坏 append-only。
 
 > FEC **不新增任何表 / hash / 枚举**，只新增编排协议层（复用 0001 五表 + repro 链，C18）。
+
+> **内容寻址 blob CAS 候选（DESIGN_PROPOSED·FUSION-OS-9）**：未来新增 `far_blob_store(hash PK)` CAS 表，evidence / FEC Plan / kernel trace 按 hash 引用去重（Open Science `content_snapshots` 范式）；新 migration 避开 0013-0015（ProbeAtlas / UQ-Witness / FAR-Bench / multimodal）草案编号。接线表见 `DEPTH_LEDGER.md` §C FUSION-OS-9。
 
 ---
 

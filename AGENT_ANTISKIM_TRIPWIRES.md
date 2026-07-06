@@ -203,3 +203,17 @@ CLAUDE.md §5 红线「不把 V2/V3 写成当前完成（状态标签必须诚�
 | scripts/zero_tolerance_scan.mjs 等 4 scan | 扫代码反模式 token | depth_gate.mjs 扫接线状态，与现有 scan 正交，叠加为 CI required job |
 
 **关键约束**：本文件本身是软文（agent 可不读）。强制力来自两个 agent 无关机制：(1) scripts/depth_gate.mjs 是 CI required job（PR-level，绕不过）；(2) entry_protocol_check 校验 PR body 字段（GitHub-level，对所有 commit 来源等价）。新窗口 agent 即使不读本文件，只要提 PR 就会被门拦下，错误信息指向 DEPTH_LEDGER §A 的下一接线项。
+
+---
+
+## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
+
+> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+
+### 与本文档（AGENT_ANTISKIM_TRIPWIRES）相关的融合缺口
+
+- **融合 skim 钩子 1**（声称迁移但无单一真实依赖）：agent 声称"迁移了 Open Science 模式 X"但说不出来本次工作驱动的**单一真实依赖**（真实反剧场检测器调用 / 真实进程组 kill / 真实 AST 扫描 / 真实 hash 重算 之一）→ 判 skim。机检钩子：DEPTH_LEDGER §C 对应 FUSION-OS-* 行必须存在且 proof_caller:line 指向真实生产 caller。
+- **融合 skim 钩子 2**（越过迁移边界引入 LLM-裁决语义）：agent 以"迁移 OS 模式"为由引入 OS 的 LLM-裁决语义（universal-llm 翻译网关 / LLM-审核者作最终裁决 / skills 替代确定性内核 / MCP 注入 verdict）→ 判红线违规，非 skim。机检钩子：grep src/ 内不得出现 LLM 调用流入 verdict 内核输出的路径（与既有 no-llm-judge 扫描同口径）。
+- **融合 skim 钩子 3**（手填 WIRED_GREEN 冒充融合完成）：FUSION-OS-* 行被手填 WIRED_GREEN + 伪造 evidence → 判 skim（与 §D R7 / inherent_limits 同口径，物证只能由 keystone bot CI 双跑写回）。
+
+> 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 CLAUDE.md §4 P-FUSION。
