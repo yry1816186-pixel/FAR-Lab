@@ -7,6 +7,9 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
     "far": "src/cli/far.ts"
   },

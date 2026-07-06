@@ -37,7 +37,7 @@
 | 可验证套件 Leaderboard（6 seed / `suiteIntegrityRoot`） | `IMPLEMENTED_VERIFIED` | 来源 `40`；浏览器 Web Crypto 独立重算已落地 |
 | Bench-125（体量扩到 125 题） | `ROADMAP` | 来源 `50`；纯增量 seed，`runBenchmark` 一字不改 |
 | Falsifiability Resolution Curve | `PARTIAL`（条件性，R5 三门不过则删） | 来源 `50` §5；自我指涉 theater 风险 |
-| `far` CLI 产品表面（npx 零密钥起跑） | `IMPLEMENTED_VERIFIED`（核心 11 子命令·见 §9.2：status/verify/verify-golden/export receipt/export far-proof/bench run/fec compile/fec freeze/fsm advance/demo/api）；`packages/cli`、`far ask/repl/stream` 仍 `ROADMAP` | 来源 `46`；FI-1 |
+| `far` CLI 产品表面（npx 零密钥起跑） | `IMPLEMENTED_VERIFIED`（**17 子命令全落地**·见 §9.2：status/verify/verify-golden/export receipt/export far-proof/bench run/fec compile/fec freeze/fsm advance/demo/api/ask/stream/repl/replay/court/arena/init + `@far-chain/cli` 包）；剩余 `ROADMAP`：真实多模型（凭据门）+ 形式化验证器 + 真实 OS sandbox | 来源 `46`；FI-1 |
 | Workflow / Provenance Adapter（CWL/Nextflow/MLflow/RO-Crate） | `DESIGN_LOCKED` | 来源 `79` / `78`；spec + 接口契约 |
 
 > 工程落地状态一律以 `far status --json` 为准；本章不出现「N 条测试通过」「CI 通过率 X%」类手填统计。
@@ -620,7 +620,7 @@ export function validateFarProofCrate(cratePath: string): ValidationResult;
 
 ## 9. `far` CLI 产品表面（FI-1）
 
-> 来源 `46`。**核心 CLI `IMPLEMENTED_VERIFIED`**——`src/cli/far.ts` 已落地 11 个子命令：`far status` / `far verify` / `far verify-golden` / `far export receipt` / `far export far-proof` / `far bench run` / `far fec compile` / `far fec freeze` / `far fsm advance` / `far demo` / `far api`。`far ask` / `far repl` / `far stream` / `far replay` / `far court` / `far arena` / `far init` 与 `packages/cli` 多包拆分仍为 `ROADMAP`（交互壳 + 流式层 + 多包为 V2/V3 开源路线）。命令矩阵与实现状态见 §9.2。
+> 来源 `46`。**§9.2 全部命令 `IMPLEMENTED_VERIFIED`**——`src/cli/far.ts` 已落地 17 个子命令（status/verify/verify-golden/export receipt/export far-proof/bench run/fec compile/fec freeze/fsm advance/demo/api/**ask/stream/repl/replay/court/arena/init**）+ `packages/cli` 可发布包。命令矩阵与实现状态见 §9.2。剩余 `ROADMAP` 为真实多模型 provider（凭据门）+ 形式化验证器 + 真实 OS sandbox（V2/V3·非 CLI 命令缺口）。
 
 ### 9.1 一句话
 
@@ -642,18 +642,24 @@ export function validateFarProofCrate(cratePath: string): ValidationResult;
 | `far fsm advance --event <e> --input <p> [--state-file]` | 9-state CLI 协议 FSM 推进 + stageReceipt 哈希链（非法跳转 → `PROTOCOL_DEVIATION_CRITICAL`） | 无 | `src/cli/state_machine.ts` + `computeStageReceipt` | `IMPLEMENTED_VERIFIED` |
 | `far demo` | 一键演示：14 GVs + demo chain（C-ASTRO-0001 UNTESTED）+ 真实统计驱动裁决（C-MMLU-A-0001 CONFIRMED via R7→ASK-9 降级） | `offline_replay` | `demo_chain` + `hero_a_pipeline` + `verify-golden` | `IMPLEMENTED_VERIFIED` |
 | `far api [--port] [--db\|--persist] [--no-seed] [--protected]` | 启动 REST API server（Fastify·`/api/v1` verdict+evidence+health+ready·frontend 网关·默认种子 demo 裁决） | 无 | `src/api/server.ts` | `IMPLEMENTED_VERIFIED` |
+| `far ask "<q>" [--mode] [--json] [--export <dir>]` | 一次性跑 6-stage FSM + ASK-9 降级密封（产出 verdict + 可验证 `.far-proof`） | `offline_replay` | `executeAskRun`（`runAgentLoop` + `sealProofEnvelope`） | `IMPLEMENTED_VERIFIED` |
+| `far stream "<q>" [--mode] [--json]` | 同 ask 但实时流式打印每阶段（`onArtifact` 回调·真流非回放） | `offline_replay` | `executeAskRun` + `runAgentLoop.onArtifact` | `IMPLEMENTED_VERIFIED` |
+| `far repl` | 交互式 REPL（提问 / `:fork` / `:history` / `:quit`·readline） | `offline_replay` | `executeAskRun` | `IMPLEMENTED_VERIFIED` |
+| `far replay --db <p>\|--bundle <dir>` | 重放证据链（时光机·hash 链 `verifyChainHead` 重算验证） | 无 | `call_records` 表 + `verifyChainHead` | `IMPLEMENTED_VERIFIED` |
+| `far court "<claim>" [--models a,b,c]` | 跨模型可靠性法庭（多 modelId 离线回放 + 颁发 `ReliabilityCertificate`） | `offline_replay` | `executeAskRun` + `createOfflineReplayAdapter({modelId})` | `IMPLEMENTED_VERIFIED` |
+| `far arena "<h>" [--refuters a,b,c]` | 对抗科学竞技场（refuter 攻击 + deterministic arbiter 记分板） | `offline_replay` | `executeAskRun` + verdict 分歧检测 | `IMPLEMENTED_VERIFIED` |
+| `far init <domain> [--out <dir>] [--force]` | DomainPack 脚手架生成（config + claim/fec 模板） | 无 | `src/cli/commands/init.ts` | `IMPLEMENTED_VERIFIED` |
+| `@far-chain/cli`（`packages/cli`） | 可发布 npm 包（wrapper 转发根 `far.ts`·node 24 type-stripping） | 无 | `packages/cli/bin/far.mjs` | `IMPLEMENTED_VERIFIED` |
 
-**路线图（`ROADMAP` · 未实现）：**
+**真正剩余 ROADMAP（V2/V3 · 非 CLI 命令缺口）：**
 
-| 命令 | 作用 | 默认 profile | 依赖 | 状态 |
-|---|---|---|---|---|
-| `far ask "<question>"` | 一次性跑完整 6-stage FSM，产出 verdict + `.far-proof` | `offline_replay`（零密钥） | `runAgentLoop` | `ROADMAP` |
-| `far repl` | 交互式：提问、追问、fork 上一次 run | `offline_replay` | `runAgentLoop` + replay | `ROADMAP` |
-| `far stream "<question>"` | 同 `ask` 但 SSE/stdio 流式打印每阶段 | `offline_replay` | `runAgentLoop` + 事件流 | `ROADMAP` |
-| `far replay <run-id>` | 重放某次 run 的证据链（时光机基础） | 无 | `evidence_log` | `ROADMAP` |
-| `far court <claim> --models a,b,c` | 跨模型可靠性法庭 | `offline_replay`（多 persona） | `packages/court` | `ROADMAP` |
-| `far arena "<hypothesis>"` | 对抗科学竞技场 | `offline_replay` | `packages/arena` | `ROADMAP` |
-| `far init <domain>` | 初始化一个新 DomainPack 脚手架 | 无 | `DomainPackRegistry` | `ROADMAP` |
+| 项 | 说明 | 状态 |
+|---|---|---|
+| court/arena 真实多模型 | `--models` 接真实 LLM provider（当前 offline fixture 固定 → 必然一致） | `ROADMAP`（凭据门·需 `FAR_DASHSCOPE_API_KEY` + reproHashProvider） |
+| Model Court 跨模型深度可靠性 | 结构化多模型一致/分歧深度分析（`packages/court`） | `ROADMAP`（V2） |
+| 形式化验证器 | Lean / Dafny / Rust（L14 · 只读验证·非 runtime） | `ROADMAP`（NEEDS_TOOLCHAIN） |
+| 真实 OS sandbox | 进程级隔离（`sandbox_runner` 真起 venv·07 §188 自承做不到） | `ROADMAP`（V2） |
+| `packages/cli` 独立发布 | 脱离 monorepo 发布需 build dist 或打包 src | `ROADMAP`（发布工程） |
 
 ### 9.3 默认零密钥铁律
 
