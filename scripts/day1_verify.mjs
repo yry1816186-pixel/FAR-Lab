@@ -1,6 +1,5 @@
 // scripts/day1_verify.mjs
-// 职责：day-1 实测状态报告器（E1-E6）—— 检查 day-1 证据产物是否存在，诚实报告 NEEDS_* 状态。
-// 权威 SSOT：FINAL_PACKAGE/30_FINAL_CHECKLIST.md §4 / HANDOFF_TO_DEV_AGENT.md §5.3 / 02 §7.4/§10。
+// 职责：day-1 实测状态报告器（E1-E6）—— 检查 day-1 证据产物是否存在，fail-closed 报告 NEEDS_* 状态。
 //
 // 设计原则（反假绿）：
 //   - 本脚本不执行真实百炼调用（避免付费 API · 02 §7.5 Ask 层）。

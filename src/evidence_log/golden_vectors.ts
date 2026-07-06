@@ -185,7 +185,7 @@ export const GOLDEN_VECTORS: ReadonlyArray<{
   },
 ];
 
-// ── Numeric canonical boundary vectors (spec 23 §80 / HANDOFF §3.3 / day-0 cross-lang PoC 2026-06-29) ──
+// Numeric canonical boundary vectors — cross-lang hash parity edge cases.
 // 这些向量走 hashCanonicalJson（底层通用 canonical 函数），而非 canonicalHash（T3 白名单 4 字段）。
 // 原因：canonicalHash 的 cred（ProviderNeutralCredential）5 子字段全为 string（T3 SSOT，types.ts:6-12），永不接触数值；
 // spec 的 N1-N4 数值边界对拍契约针对的是 hashCanonicalJson（proofHash 09§3 也复用它）。
@@ -193,7 +193,7 @@ export const GOLDEN_VECTORS: ReadonlyArray<{
 // day-0 cross-lang PoC 方法论：TS 侧通过 spawnSync stdin 把 JSON 传给 Python（runPythonCanonical），
 // 两侧分别用 hashCanonicalJson / hash_canonical_json 计算并比对。这测的是「同一 JSON 经双向序列化后是否 byte-equal」。
 //
-// 实测关键发现（证据驱动，2026-06-29）：spec HANDOFF §3.3 列的 N1(1.0) 与 N3(2**53+1)「数值差异」是
+// IEEE754 note: N1(1.0) and N3(2**53+1) only "diverge" because
 // JS 引擎在【构造字面量时】的值规约（1.0→1；2**53+1→2**53=...992），规约在【序列化 stdin 之前】就已完成，
 // 因此 Python 侧 json.loads 拿到的是已规约的值（int 1 / ...992），两边序列化 byte-equal —— 它们在本 stdin-harness 下
 // 是 GREEN，不是 RED。声称它们是 RED = 伪造。诚实归类见下方 GREEN 集。
@@ -213,7 +213,7 @@ export const NUMERIC_GREEN_VECTORS: ReadonlyArray<{
   { name: 'unicode_cafe_nfc', obj: { s: 'café' } },
   { name: 'isoTs_ms_string', obj: { t: '2026-07-08T12:00:00.123Z' } },
   // N1(1.0) 与 N3(2**53+1)：JS 值规约在序列化 stdin 前完成，Python 经 json.loads 拿到规约后的值，两边 byte-equal。
-  // 这是【实证】spec HANDOFF §3.3 警告的 IEEE754 值规约现象：规约发生在 JS 语言层，而非跨语言序列化层。
+  // IEEE754 value normalization happens at JS literal construction, before serialization.
   // 归 GREEN 诚实反映 stdin-harness 的真实行为；不伪装成跨语言 RED。
   {
     name: 'N1_float_1.0_normalized',

@@ -1,7 +1,7 @@
 // C2 eval-ring 代码路径层审计脚本（CI gate·10_CI_pipeline.md §1 STEP 10 断言 1）
 // 职责：扫描 src/eval-ring/ 下所有 .ts 文件，命中违规 import（competition adapter /
 //       旧 provider 出口 / 旧 competition 调用入口）即 exit 1。
-// 诚实三态（HANDOFF §5.2 反假绿·禁 `if [ ! -d ]; exit 0` 静默绿）：
+// 三态 fail-closed（禁 `if [ ! -d ]; exit 0` 静默绿）：
 //   - src/eval-ring/ 不存在或无 .ts 文件 → N/A（审计零文件，**绝不打印 "passed/OK"**）。
 //     评测环模块属 V2 范围，V1 不强制存在；exit 0 不阻断 CI，但绑定不变量由
 //     数据层审计（auditEvalRingDataLayer·purpose_tag）+ 单元测试（含正负 fixture）强制。
@@ -45,7 +45,7 @@ function walkTsFiles(dir) {
 }
 
 if (!existsSync(evalRingDir)) {
-  // 反假绿（HANDOFF §5.2）：目录缺失时禁声称 "passed/OK code-path audit"——审计零文件。
+  // fail-closed：目录缺失时禁声称 "passed/OK code-path audit"——审计零文件。
   // 绑定不变量 = 数据层 purpose_tag 审计 + 单元测试（tests/ci/eval_ring_audit.test.ts 含正负 fixture）。
   console.log(
     'EVAL_RING_AUDIT: code-path N/A — src/eval-ring/ 不存在（V1 无评测环模块·无代码路径可审计）',

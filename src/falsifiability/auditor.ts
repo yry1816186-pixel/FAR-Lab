@@ -1,8 +1,6 @@
 /**
- * FalsificationSufficiencyAuditor: 字段充分性元审计 (V1 4-rule regex heuristic).
- *
- * Authority: FINAL_PACKAGE/HANDOFF_TO_DEV_AGENT.md §3.5 + round5 §1.5 + round8 B3/A6
- * Migration: 0006_falsification_audit_events (SSOT 0025 → renumbered 0006)
+ * FalsificationSufficiencyAuditor: field-sufficiency meta-audit (V1 4-rule regex heuristic).
+ * Migration: 0006_falsification_audit_events.
  *
  * 诚实边界:
  *   - V1 是字段充分性审计 (4 字段判定 + 正则启发式)
