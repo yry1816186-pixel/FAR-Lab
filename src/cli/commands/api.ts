@@ -8,10 +8,10 @@
 // （C-ASTRO-0001 REFUTED），前端启动即见真实裁决数据。生产用 --persist/--protected。
 
 import Database from 'better-sqlite3';
-import { spawnSync } from 'node:child_process';
 import { startServer } from '../../api/server.ts';
 import { runMigrations } from '../../db/migrator.ts';
-import { buildDemoChain, DEMO_GIT_COMMIT_SHA } from '../../far_proof/demo_chain.ts';
+import { buildDemoChain } from '../../far_proof/demo_chain.ts';
+import { resolveGitCommitSha } from '../git_commit_sha.ts';
 
 export interface ApiArgs {
   readonly port: number;
@@ -59,15 +59,6 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
     if (Number.isFinite(v) && v > 0) port = v;
   }
   return { port, dbPath, seedDemo, jwtSecret };
-}
-
-function resolveGitCommitSha(): string {
-  const r = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' });
-  if (r.status === 0) {
-    const sha = r.stdout.trim();
-    if (/^[0-9a-f]{40}$/.test(sha)) return sha;
-  }
-  return DEMO_GIT_COMMIT_SHA;
 }
 
 export async function runApi(argv: readonly string[]): Promise<number> {

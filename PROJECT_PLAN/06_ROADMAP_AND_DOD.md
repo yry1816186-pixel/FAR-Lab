@@ -156,7 +156,7 @@ far replay <run>                                # 确定性续跑（仅 determin
 
 | 任务 | 验收口径 | 状态 |
 |---|---|---|
-| `far` CLI 默认 `offline_replay` profile | fresh-clone 零 key 跑通 | `IMPLEMENTED_VERIFIED`（核心 11 子命令·见 05 §9.2）；`far ask`/`replay` 交互壳仍 `ROADMAP` |
+| `far` CLI 默认 `offline_replay` profile | fresh-clone 零 key 跑通 | `IMPLEMENTED_VERIFIED`（**17 子命令全落地**·见 05 §9.2：含 ask/stream/repl/replay/court/arena/init + `@far-chain/cli` 包）；剩余 `ROADMAP`：真实多模型（凭据门）+ 形式化验证器 + 真实 OS sandbox |
 | 接真实 provider 须显式 `--profile competition_aliyun_qwen` + env key | verdict 由 deterministic `verdict_mapping` 产出，CLI 不自评 | `DESIGN_LOCKED` |
 | CLI e2e 测试 | fresh-clone `npx` exit 0 | `IMPLEMENTED_VERIFIED`（fresh-clone smoke 通过；`competition_qwen_smoke`/`snapshot_liveness_smoke` 需 `DASHSCOPE_API_KEY` 跳过） |
 

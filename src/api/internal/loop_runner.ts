@@ -56,6 +56,8 @@ export interface LoopRunnerArgs {
    *   - 其余 profile（competition 等）→ 抛 REPRO_BRIDGE_NOT_CONFIGURED（禁伪造 hash 进生产 evidence_log）
    */
   readonly reproHashProvider?: ReproHashProvider;
+  /** 可选：每阶段 artifact 入链后回调（透传 runAgentLoop.onArtifact·流式输出用）。 */
+  readonly onArtifact?: (artifact: import('../../agent_loop/types.ts').StageArtifact) => void;
 }
 
 /**
@@ -147,6 +149,7 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
     appendOptions,
     evidenceLogDb: args.evidenceLogDb,
     ...(termination === undefined ? {} : { termination }),
+    ...(args.onArtifact === undefined ? {} : { onArtifact: args.onArtifact }),
   });
 
   const reproHash = resolveReproHash(args.evidenceLogDb);

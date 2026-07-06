@@ -4,7 +4,9 @@
 // 权威 SSOT：PROJECT_PLAN/06 §3.2.3（FI-1 CLI 命令集）+ 01 §5（far status）+ 04 §5（far verify）。
 //
 // 已实装子命令：`far status`（01 §5）+ `far verify`（04 §5 · FI-9 第三方独立重算）
-// + `far export receipt`（04 §9 Trust Receipt DOC 投影）+ `far bench run`（05 §5 demo profile）。
+// + `far export receipt`（04 §9 Trust Receipt DOC 投影）+ `far export far-proof` + `far bench run`
+// + `far verify-golden`（14 GV）+ `far fec compile|freeze` + `far fsm advance`（P2-2）
+// + `far demo`（一键演示）+ `far api`（REST server）+ `far ask`（6-stage FSM）。
 // Node 24 原生 type stripping 跑 .ts（package.json engines node>=24；
 // tsconfig noEmit，不构建 dist；bin 直接指向本文件）。
 
@@ -17,7 +19,14 @@ import { runStatus } from './commands/status.ts';
 import { runVerify, VALID_MODES, type VerifyMode } from './commands/verify.ts';
 import { runVerifyGolden, type VerifyGoldenBackend } from './commands/verify_golden.ts';
 import { runApi } from './commands/api.ts';
+import { runAsk } from './commands/ask.ts';
 import { runDemo } from './commands/demo.ts';
+import { runStream } from './commands/stream.ts';
+import { runRepl } from './commands/repl.ts';
+import { runReplay } from './commands/replay.ts';
+import { runCourt } from './commands/court.ts';
+import { runArena } from './commands/arena.ts';
+import { runInit } from './commands/init.ts';
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
@@ -41,6 +50,39 @@ async function main(): Promise<void> {
 
   if (command === 'demo') {
     process.exit(runDemo());
+  }
+
+  if (command === 'ask') {
+    const exitCode = await runAsk(argv.slice(1));
+    process.exit(exitCode);
+  }
+
+  if (command === 'stream') {
+    const exitCode = await runStream(argv.slice(1));
+    process.exit(exitCode);
+  }
+
+  if (command === 'repl') {
+    const exitCode = await runRepl();
+    process.exit(exitCode);
+  }
+
+  if (command === 'replay') {
+    process.exit(runReplay(argv.slice(1)));
+  }
+
+  if (command === 'court') {
+    const exitCode = await runCourt(argv.slice(1));
+    process.exit(exitCode);
+  }
+
+  if (command === 'arena') {
+    const exitCode = await runArena(argv.slice(1));
+    process.exit(exitCode);
+  }
+
+  if (command === 'init') {
+    process.exit(runInit(argv.slice(1)));
   }
 
   if (command === 'verify') {
@@ -993,8 +1035,26 @@ const HELP_TEXT = `FAR-Chain CLI（FI-1 · far 命令家族）
     非法转移不静默覆写：返回 PROTOCOL_DEVIATION_CRITICAL，exit 7（fail-closed 红线）。
     退出码：0 推进成功 / 7 协议偏离 / 2 参数错误 / 1 运行时错误
 
-  后续子命令（W1-W5 路线图）：
-  far ask/repl/stream                       产品化交互壳（FI-1 后续）
+  far ask "<question>" [--mode full|quick] [--json] [--export <dir>]
+                                    一次性跑完整 6-stage FSM（runAgentLoop），产出 verdict + 证据链
+    --mode full|quick             full=最多 3 轮迭代（默认）/ quick=单轮即止
+    --export <dir>                导出 V1 .far-proof self-verifiable bundle 到 <dir>
+    --json                        机器可读输出
+    默认 offline_replay（零密钥·fixture 回放）；真实推理需 --profile competition_aliyun_qwen + 凭据（环境变量名见 far ask）
+    红线：裁决由 R0-R9 确定性内核给出（LLM 非裁决者）。
+    退出码：0 正常终止 / 1 循环错误 / 2 参数错误
+
+  far stream "<question>" [--mode] [--json]   同 ask 但实时流式打印每阶段（onArtifact 回调·真流非回放）
+  far repl                                  交互式 REPL（提问 / :fork <后缀> / :history / :quit）
+  far replay --db <path> | --bundle <dir>   重放证据链（时光机·hash 链 verify）
+  far court "<claim>" [--models a,b,c]      跨模型可靠性法庭（颁发 ReliabilityCertificate）
+  far arena "<hypothesis>" [--refuters]     对抗科学竞技场（refuter 攻击 + deterministic arbiter 记分板）
+  far init <domain> [--out <dir>] [--force] DomainPack 脚手架（config + claim/fec 模板）
+
+  spec §9.2 全部命令已实装。V2/V3 演进（非 CLI 命令缺口）：
+  · 真实多模型 provider（court/arena 的 --models 接真实 LLM·需凭据门）
+  · 形式化验证器（Lean / Dafny / Rust · L14）
+  · 真实 OS 级 sandbox 隔离（07 §188）
   `;
 
 main().catch((error: unknown) => {

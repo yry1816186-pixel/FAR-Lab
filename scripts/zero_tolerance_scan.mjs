@@ -69,6 +69,9 @@ const skippedFiles = new Set([
   // day1 状态报告器 —— 指令字符串含 DASHSCOPE_API_KEY 环境变量名（告诉用户如何配 key 跑 smoke，非硬编码 secret）。
   // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / 空 catch / extra_body / header 幻觉 / sk- 明文。
   'scripts/day1_verify.mjs',
+  // far ask CLI —— profile 凭据门：合法引用 FAR_DASHSCOPE_API_KEY 环境变量名（无 key → fail-closed 指引，
+  // 非 secret 值）。经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / 空 catch / extra_body / header 幻觉 / sk- 明文。
+  'src/cli/commands/ask.ts',
   // E6 成本快照生成器 —— 指令字符串含 DASHSCOPE_API_KEY 环境变量名（非硬编码 secret；脚本本身不读 key）。
   // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / 空 catch / extra_body / header 幻觉 / sk- 明文。
   'scripts/generate_cost_snapshot.mjs',

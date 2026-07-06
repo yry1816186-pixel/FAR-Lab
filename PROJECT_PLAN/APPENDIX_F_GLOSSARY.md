@@ -341,7 +341,7 @@ DEGRADED_SCOPE
 | 主名 | 弃用名 | 说明 |
 |---|---|---|
 | `<REPOSITORY_ROOT>/` | `far-chain/`（作为真实实现根）、`packages/`（V1 多包拆分） | 工作区根即实现仓 |
-| `far` CLI | `far-chain` CLI（命令名）、`farlab` | 命令前缀 `far`（核心 11 子命令·见 05 §9.2：`far status` / `far verify` / `far verify-golden` / `far export receipt` / `far export far-proof` / `far bench run` / `far fec compile` / `far fec freeze` / `far fsm advance` / `far demo` / `far api`；`far ask/repl/stream` 仍 `ROADMAP`） |
+| `far` CLI | `far-chain` CLI（命令名）、`farlab` | 命令前缀 `far`（**17 子命令全落地**·见 05 §9.2：status / verify / verify-golden / export receipt / export far-proof / bench run / fec compile / fec freeze / fsm advance / demo / api / ask / stream / repl / replay / court / arena / init + `@far-chain/cli` 包；剩余 `ROADMAP`：真实多模型凭据门 + 形式化验证器） |
 | `competition_aliyun_qwen` | bailian_profile、qwen_profile | 参赛 provider profile |
 | `offline_replay` | production fallback、容灾 profile | demo/test profile，**不是**生产兜底 |
 

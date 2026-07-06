@@ -1,0 +1,32 @@
+{
+  "name": "@far-chain/cli",
+  "version": "0.1.0",
+  "description": "FAR-Chain CLI — AI4S 科学声明的声明级验证层（确定性 R0-R9 内核 · 防篡改 · 反剧场）",
+  "type": "module",
+  "bin": {
+    "far": "bin/far.mjs"
+  },
+  "files": [
+    "bin/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "keywords": [
+    "ai4s",
+    "scientific-reproducibility",
+    "falsifiability",
+    "verifiable-claims",
+    "evidence-chain"
+  ],
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/earendil-works/far-chain",
+    "directory": "packages/cli"
+  },
+  "scripts": {
+    "far": "node bin/far.mjs"
+  }
+}

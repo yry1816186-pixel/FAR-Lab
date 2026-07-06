@@ -87,6 +87,8 @@ export interface RunAgentLoopArgs {
   readonly appendOptions: AppendRecordOptions;
   readonly evidenceLogDb: Database;
   readonly termination?: TerminationCriteria;
+  /** 可选：每阶段 artifact 入链后回调（流式输出用·向后兼容·默认不调）。 */
+  readonly onArtifact?: (artifact: StageArtifact) => void;
 }
 
 
@@ -109,6 +111,10 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
   const termination: TerminationCriteria = args.termination ?? DEFAULT_TERMINATION;
   const startTime: number = Date.now();
   const artifacts: StageArtifact[] = [];
+  const appendArtifact = (a: StageArtifact): void => {
+    artifacts.push(a);
+    if (args.onArtifact !== undefined) args.onArtifact(a);
+  };
   let feedbackSignal: FeedbackSignal | null = null;
   let tokensConsumed = 0;
   let iteration = 1;
@@ -141,7 +147,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         feedbackSignal: null,
         tokensConsumed,
       });
-      artifacts.push(stage1);
+      appendArtifact(stage1);
       tokensConsumed += extractTotalTokens(stage1.callResult);
 
       const stage2 = await runStage2({
@@ -151,7 +157,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         feedbackSignal: null,
         tokensConsumed,
       });
-      artifacts.push(stage2);
+      appendArtifact(stage2);
       tokensConsumed += extractTotalTokens(stage2.callResult);
 
       // stage3：消费 feedbackSignal（[6]→[3] 回灌·首轮为 null）+ falsifiability_gate 硬阻断
@@ -162,7 +168,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         feedbackSignal,
         tokensConsumed,
       });
-      artifacts.push(stage3);
+      appendArtifact(stage3);
       tokensConsumed += extractTotalTokens(stage3.callResult);
 
       const stage4 = await runStage4({
@@ -172,7 +178,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         feedbackSignal: null,
         tokensConsumed,
       });
-      artifacts.push(stage4);
+      appendArtifact(stage4);
       tokensConsumed += extractTotalTokens(stage4.callResult);
 
       const stage5 = await runStage5({
@@ -182,7 +188,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         feedbackSignal: null,
         tokensConsumed,
       });
-      artifacts.push(stage5);
+      appendArtifact(stage5);
       tokensConsumed += extractTotalTokens(stage5.callResult);
 
       const stage6 = await runStage6({
@@ -192,7 +198,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         feedbackSignal: null,
         tokensConsumed,
       });
-      artifacts.push(stage6);
+      appendArtifact(stage6);
       tokensConsumed += extractTotalTokens(stage6.callResult);
 
       // 取 stage6 的 FeedbackSignal（用 discriminatedUnion narrow·禁 as 强转）
