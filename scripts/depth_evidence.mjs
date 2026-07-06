@@ -87,13 +87,22 @@ const PER_ROW_TIMEOUT_MS = 120_000;
 // CLI 解析（fail-closed：缺参 / 非 40-hex / base=head / 未知参数 → exit 2）
 // ---------------------------------------------------------------------------
 function parseCli(argv) {
-  const opts = { base: null, head: null, dryRun: false };
+  const opts = { base: null, head: null, dryRun: false, only: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--base') { opts.base = argv[++i] ?? null; continue; }
     if (a === '--head') { opts.head = argv[++i] ?? null; continue; }
     if (a === '--dry-run') { opts.dryRun = true; continue; }
-    console.error(`depth_evidence: 未知参数 "${a}"。用法: --base <40-hex sha> --head <40-hex sha> [--dry-run]`);
+    if (a === '--only') {
+      const raw = argv[++i] ?? '';
+      opts.only = new Set(raw.split(',').map((s) => s.trim()).filter(Boolean));
+      if (opts.only.size === 0) {
+        console.error('depth_evidence: --only 须提供逗号分隔的 §C id 列表。');
+        process.exit(2);
+      }
+      continue;
+    }
+    console.error(`depth_evidence: 未知参数 "${a}"。用法: --base <40-hex sha> --head <40-hex sha> [--dry-run] [--only id1,id2]`);
     process.exit(2);
   }
   if (!opts.base || !opts.head) {
@@ -404,7 +413,7 @@ function main() {
   }
 
   // 解析每行 proof_test → {testFile, testName}；跳过非 .test. 文件（P3-1 脚本类，out of scope）。
-  const scoped = [];
+  let scoped = [];
   const skippedNonTest = [];
   for (const r of wiredRedRows) {
     const sep = r.proofTest.indexOf('::');
@@ -423,6 +432,16 @@ function main() {
       continue;
     }
     scoped.push({ row: r, testFile, testName });
+  }
+
+  // --only 作用域：多 commit 接线需 row 专属 head（CHECK-L2 closed_by 须为接线 commit 的 diff-tree
+  // touch proof_caller）。缩小处理范围使 bot 能用 row 接线 commit 作 head 而不被其他 cluster 的
+  // NO_FILE_HEAD fail-closed 阻断。base-FAIL/head-PASS 不变量不变。
+  if (opts.only) {
+    const before = scoped.length;
+    scoped = scoped.filter((s) => opts.only.has(s.row.id));
+    const skippedOnly = before - scoped.length;
+    if (skippedOnly > 0) console.log(`depth_evidence: --only 作用域 ${scoped.length}/${before}（${skippedOnly} 行不在列表，跳过）`);
   }
 
   // 按 worktree × 唯一 testFile 批跑（同文件多行只 spawn 一次 node --test）。
