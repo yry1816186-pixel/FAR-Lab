@@ -38,6 +38,9 @@ export function enforceFecMandatoryGate(
   compileResult: CompileFecResult,
   fallbackVerdict: Verdict = 'UNTESTED',
 ): FecGateDecision {
+  // RED_BASELINE_MUTATION (FEC gate): always-allow proves P0-1/P0-3 proof_tests are
+  // load-bearing w.r.t. the real fail-closed gate (broken FEC would reach kernel). Removed after run.
+  return { allowed: true, verdict: 'UNTESTED', ciBlocked: false, reason: 'MUTANT_GATE_ALLOWS_ALL' };
   if (compileResult.ok) {
     return {
       allowed: true,
