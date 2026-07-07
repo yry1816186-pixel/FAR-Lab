@@ -91,6 +91,13 @@ if (!failed && !run('ci-cg confounding_gate_deterministic_scan', 'pnpm run confo
   console.error('\n→ 排障指引：03_EVIDENCE_CONTRACT_AND_VERDICT.md §7.5.1:1133（ci-cg · F6 deterministic）');
 }
 
+// STEP 1e: lint (eslint src --max-warnings 0 · 10_CI_pipeline.md §10「typecheck / lint」)
+//          零容忍：no-explicit-any / ban-ts-comment / no-unused-vars / no-empty / prefer-const
+if (!failed && !run('lint (eslint src --max-warnings 0)', 'pnpm run lint')) {
+  failed = true;
+  console.error('\n→ 排障指引：10_CI_pipeline.md §10「typecheck / lint」+ CLAUDE.md 零容忍表');
+}
+
 // STEP 2: typecheck
 if (!failed && !run('typecheck (tsc --noEmit)', 'pnpm run typecheck')) {
   failed = true;

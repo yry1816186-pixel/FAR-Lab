@@ -1,14 +1,14 @@
 // tests/cli/verify_golden_cross_lang.test.ts
 //
 // P1-4 端到端物证：far verify-golden（runVerifyGolden @ verify_golden.ts:122）真调 decideFiveValueVerdict
-// 遍历 12 条落盘 GV（golden_vectors/cases/GV-01..GV-12.json），node backend 全 PASS（kernel oracle 自洽）。
+// 遍历 14 条落盘 GV（golden_vectors/cases/GV-01..GV-14.json），node backend 全 PASS（kernel oracle 自洽）。
 // python/browser backend 按环境能力 best-effort：可用则断言跨后端 per-case verdict 一致；不可用则显式 skip（带 reason）。
 //
 // 真实依赖：verify_golden.ts collectVerifyGoldenDump({backend:'node'}) → 每条 GV 调 decideFiveValueVerdict
 // （V2 kernel 真实运行，非硬编码旁路）。proof_caller = verify_golden.ts:122 runVerifyGolden。
-// 反假绿：断言 dump.total===12 + status PASS + per-case decisiveRuleId 非空；python/browser 失败=环境 skip 非代码 bug。
+// 反假绿：断言 dump.total===14 + status PASS + per-case decisiveRuleId 非空；python/browser 失败=环境 skip 非代码 bug。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C P1-4 + APPENDIX_B_GOLDEN §2（GV-01..GV-12）+ 04 §5。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C P1-4 + APPENDIX_B_GOLDEN §2（GV-01..GV-14）+ 04 §5。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +21,7 @@ import {
 
 const NODE_DUMP = collectVerifyGoldenDump({ backend: 'node' });
 
-test('node_python_browser_agree_on_GV: node backend runs all 12 GV through V2 kernel, PASS (P1-4 node axis)', () => {
+test('node_python_browser_agree_on_GV: node backend runs all 14 GV through V2 kernel, PASS (P1-4 node axis)', () => {
   // runVerifyGolden（verify_golden.ts:122）返回 0=PASS / 7=FAIL——证明 CLI 真路径驱动 kernel。
   // 捕获 stdout 避免 JSON 文本污染测试输出（runVerifyGolden 直写 process.stdout）。
   const origWrite = process.stdout.write.bind(process.stdout);

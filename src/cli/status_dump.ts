@@ -83,6 +83,7 @@ export interface StatusDump {
   readonly docCount: number;
   readonly numberedDocCount: number;
   readonly goldenVectorCount: number;
+  readonly verdictGoldenVectorCount: number;
   readonly goldenReproFixtureHex: string;
   readonly chainHead: ChainHeadStatus;
   // phase B：testCount 由 CLI 层注入实测（spawn node --test + TAP 解析），未注入则 pending
@@ -140,6 +141,7 @@ export interface FarStatusJson {
   };
   readonly goldenVectors: {
     readonly count: number;
+    readonly verdictCount: number;
     readonly reproContextFixtureExpectedHex: string;
     readonly crossLangByteEqual: 'verified' | 'divergence' | 'pending';
     readonly numericKnownDivergence: readonly string[];
@@ -181,6 +183,7 @@ export function collectStatusDump(options: CollectStatusDumpOptions = {}): Statu
     docCount: docs.total,
     numberedDocCount: docs.numbered,
     goldenVectorCount: GOLDEN_VECTORS.length,
+    verdictGoldenVectorCount: countVerdictGoldenVectors(),
     goldenReproFixtureHex: REPRO_CONTEXT_FIXTURE_EXPECTED_HEX,
     chainHead: options.chainHead ?? {
       status: 'pending',
@@ -219,6 +222,7 @@ export function toStatusJson(dump: StatusDump, generatedAt = new Date().toISOStr
     },
     goldenVectors: {
       count: dump.goldenVectorCount,
+      verdictCount: dump.verdictGoldenVectorCount,
       reproContextFixtureExpectedHex: dump.goldenReproFixtureHex,
       crossLangByteEqual: 'verified',
       numericKnownDivergence: ['NUMERIC_KNOWN_DIVERGENCE: scientific-notation / >2^53 boundaries remain V3 JCS work'],
@@ -344,6 +348,15 @@ function readMigrationFiles(): readonly string[] {
   return readdirSync(join(REPO_ROOT, 'schema/migrations'), { encoding: 'utf8' })
     .filter((fileName) => fileName.endsWith('.sql'))
     .sort();
+}
+
+// verdict golden vectors：golden_vectors/cases/GV-*.json（far verify-golden 消费的五值裁决用例）。
+// 与 GOLDEN_VECTORS（src 内 canonical-hash 向量）是两套不同制品——这里从磁盘实测避免与 verify-golden 计数脱节。
+// 与 readMigrationFiles/readDocFiles 同口径：缺失=仓库结构破坏（不降级，直接暴露）。
+function countVerdictGoldenVectors(): number {
+  return readdirSync(join(REPO_ROOT, 'golden_vectors/cases'), { encoding: 'utf8' }).filter((f) =>
+    /^GV-\d+\.json$/.test(f),
+  ).length;
 }
 
 // docCount 来源：glob FAR_LAB_MASTER_PLAN/*.md（01§4.4 + §5.3 当前口径；FINAL_PACKAGE/ 已退役见 01§1.2）。

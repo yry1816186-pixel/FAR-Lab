@@ -953,7 +953,7 @@ const HELP_TEXT = `FAR-Chain CLI（FI-1 · far 命令家族）
     --port <n>      监听端口（默认 3000·前端 api_client.ts 对齐；可由 PORT 环境变量覆盖）
     --db <path>     DB 路径（默认 :memory: 临时·每次启动新鲜）
     --persist <p>   持久化到文件（如 ./far-chain.db·跨重启保留数据）
-    --no-seed       不种子 demo 裁决（默认种子 C-ASTRO-0001 REFUTED 供前端展示）
+    --no-seed       不种子 demo 裁决（默认种子 C-ASTRO-0001 UNTESTED·legacy 路径不注入统计→R6 不触发；供前端展示）
     --protected     启用 JWT 鉴权（需 FAR_JWT_SECRET 环境变量；默认 offline 匿名 demo）
     示例：pnpm api   # 后端 localhost:3000，另起 cd frontend && npm run dev 即全栈
 
@@ -972,7 +972,7 @@ const HELP_TEXT = `FAR-Chain CLI（FI-1 · far 命令家族）
 
   far verify-golden [--all | --case GV-01] [--backend node|python|browser] [--json]
                          verdict golden vectors 重算（P1-4）
-    --all               跑 golden_vectors/cases/GV-01..GV-12.json（默认）
+    --all               跑 golden_vectors/cases/GV-01..GV-14.json（默认）
     --case <id>         仅跑单个 case（如 GV-01）
     --case-dir <path>   指定 case 目录（测试/离线包复核用）
     --backend node      执行 Node/V2 kernel 轴，真实调用 decideFiveValueVerdict

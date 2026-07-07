@@ -235,8 +235,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
   const db = new Database(rundbPath);
   db.pragma('journal_mode = WAL');
   runMigrations(db);
-  let result: Awaited<ReturnType<typeof executeLoop>> | null = null;
-  let exitCode = 0;
+  let result: Awaited<ReturnType<typeof executeLoop>> | undefined;
   try {
     const gitCommitSha = resolveGitCommitSha();
     result = await executeAskRun(db, args.question, args.mode, gitCommitSha);
@@ -248,13 +247,17 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
     } else {
       renderHuman(args, render);
     }
-    exitCode = result.loopState.terminationReason === 'error' ? 1 : 0;
   } finally {
     db.close();
   }
 
+  // finally 无 catch 吞异常 → try 抛出时不会到达此行；能到这必是 try 正常完成、result 已赋值。
+  if (result === undefined) {
+    throw new Error('far ask: unreachable — executeAskRun returned without assigning result');
+  }
+
   // db 已关闭，安全导出（force rmSync exportDir 不会撞到打开的句柄）。
-  if (exportDir !== null && result !== null) {
+  if (exportDir !== null) {
     const gitCommitSha = resolveGitCommitSha();
     const exp = runExportFarProof({
       source: {
@@ -285,5 +288,5 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
     }
   }
 
-  return exitCode;
+  return result.loopState.terminationReason === 'error' ? 1 : 0;
 }
