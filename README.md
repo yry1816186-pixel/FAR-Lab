@@ -114,8 +114,10 @@ node src/cli/far.ts verify-golden --all
 far status                # 仓库状态与迁移计数
 far verify-golden --all   # 用真实内核裁决跑全部 Golden Vector
 far demo                  # 一键演示（14 GVs + demo chain + 真实统计驱动裁决·无需凭据）
-far fec compile           # 编译证据链冻结契约（示例契约见 examples/fec/）
-far export far-proof      # 导出可独立复算的证明包
+far fec compile --claim examples/fec/sample_fec_contract.json --out fec.compiled.json
+                          # 编译 FEC 冻结契约（fecHash 重算；示例契约见 examples/fec/）
+far export far-proof --demo-chain --out far-proof-bundle   # 导出可独立复算的证明包
+far verify --bundle far-proof-bundle                      # 第三方独立重算验证导出包
 ```
 
 ### 全栈运行（API + Web 仪表盘）

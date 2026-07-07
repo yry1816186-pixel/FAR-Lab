@@ -5,7 +5,7 @@
 // 本命令让全栈一键可跑：`pnpm api`（或 `far api`）起后端，`cd frontend && npm run dev` 起前端。
 //
 // 默认离线 demo 模式：jwtSecret=null（匿名·无需凭据）+ in-memory DB + 自动种子 demo 裁决
-// （C-ASTRO-0001 REFUTED），前端启动即见真实裁决数据。生产用 --persist/--protected。
+// （C-ASTRO-0001 UNTESTED·legacy 路径不注入统计→R6 不触发），前端启动即见真实裁决数据。生产用 --persist/--protected。
 
 import Database from 'better-sqlite3';
 import { startServer } from '../../api/server.ts';
@@ -79,7 +79,7 @@ export async function runApi(argv: readonly string[]): Promise<number> {
       '  FAR-Chain API server',
       '  ─────────────────────────────────────────────────',
       `  mode     : ${mode}`,
-      `  database : ${args.dbPath}${args.seedDemo ? '  +  demo seed (C-ASTRO-0001 REFUTED)' : ''}`,
+      `  database : ${args.dbPath}${args.seedDemo ? '  +  demo seed (C-ASTRO-0001 UNTESTED)' : ''}`,
       `  commit   : ${gitCommitSha.slice(0, 12)}`,
       '',
       `  ▶ listening on   ${base}`,

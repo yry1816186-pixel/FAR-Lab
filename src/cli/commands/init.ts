@@ -198,7 +198,15 @@ function buildFiles(args: InitArgs): ReadonlyArray<readonly [string, string]> {
 }
 
 export function runInit(argv: readonly string[]): number {
-  const args = parseInitArgs(argv);
+  let args: InitArgs;
+  try {
+    args = parseInitArgs(argv);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`${msg}\n  用法: far init <domain> [--out <dir>] [--force]\n`);
+    return 2;
+  }
+
 
   if (existsSync(args.outDir) && !args.force) {
     process.stderr.write(

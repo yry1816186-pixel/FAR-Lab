@@ -728,7 +728,7 @@ if (hardFailures.length > 0) {
   console.error('  W3 → P1-2: qwen_adapter/qwen_vl_adapter 真编排 executeFallbackChain');
   console.error('  W4 → 与 W2 互锁：makeVerdict 在 src/ 全部生产 caller = 0');
   console.error('  W5 → STAT-1: 建 src/statistics/{p_value,effect_size,ci,multiple_testing}.ts（非占位 + 真实数学信号）');
-  console.error('  W6 → P1-4: 落盘 golden_vectors/cases/GV-01..GV-12.json（verdict∈五值 + 非空 reasonCodes/evidences）');
+  console.error('  W6 → P1-4: 落盘 golden_vectors/cases/GV-01..GV-14.json（verdict∈五值 + 非空 reasonCodes/evidences）');
   console.error('  W7 → P2-1: 建 tests/real_backends/*.test.ts（真实 spawn/child_process，非字符串自洽）');
   console.error('  L1 → 修 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C（proof_test 须存在 + closed_by 须真实 sha + status∈枚举）');
   console.error('  L2 → WIRED_GREEN 行须紧随 evidence: <base_sha>→<head_sha>（base≠head + SHA/runID 格式，由 depth-evidence bot 写回，禁手填）');

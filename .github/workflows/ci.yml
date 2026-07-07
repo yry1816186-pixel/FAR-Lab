@@ -269,7 +269,7 @@ jobs:
         run: pnpm run test
 
   # ============================================================
-  # STEP 8 · repro_check（无 Makefile → test:py 兜底）
+  # STEP 8 · repro_check（Makefile 无 repro target → test:py 兜底）
   # ============================================================
   repro_check:
     needs: test_registry
@@ -284,7 +284,7 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           pip install -e .
-      - name: repro check (Makefile 未实现；跑 test:py 兜底)
+      - name: repro check (Makefile 无 repro target；跑 test:py 兜底)
         run: pnpm run test:py
 
   # ============================================================
