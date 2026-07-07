@@ -2,7 +2,7 @@
 
 本文件说明旧 `00`-`86` 如何被本 SSOT 吸收、修正或废弃，并注明物理档案已退役、备份位置。它是**来源溯源**文档，不是有效事实源——所有有效口径以 `01_SOURCE_OF_TRUTH_AND_STATUS.md`（P0）和 `APPENDIX_A_TYPES.md` / `APPENDIX_C_CANONICAL.md` / `APPENDIX_F_GLOSSARY.md`（附录三权威）为准。
 
-> 物理档案状态：`FINAL_PACKAGE/`（旧 `00`-`86` + `_digest/`）是**已归档历史口径**，物理档案已退役。离线完整备份位于 `C:/Users/RichardYuan/FAR-Lab_Backups/FINAL_PACKAGE/`。本文件中出现的旧编号（`02` / `56` / `59` / `67` / `76` 等）仅作来源溯源，不作为有效依赖——其内容已完整并入 `PROJECT_PLAN/` 顶层或对应附录。
+> 物理档案状态：`FINAL_PACKAGE/`（旧 `00`-`86` + `_digest/`）是**已归档历史口径**，物理档案已退役。离线完整备份位于 `C:/Users/RichardYuan/FAR-Lab_Backups/FINAL_PACKAGE/`。本文件中出现的旧编号（`02` / `56` / `59` / `67` / `76` 等）仅作来源溯源，不作为有效依赖——其内容已完整并入 `FAR_LAB_MASTER_PLAN/` 顶层或对应附录。
 
 ---
 
@@ -12,7 +12,7 @@
 
 | 优先级 | 来源 | 角色 |
 |---|---|---|
-| **P0** | 顶层 `PROJECT_PLAN/`（含附录 A/C/F 三权威与本文件） | 最终规划和执行口径 |
+| **P0** | 顶层 `FAR_LAB_MASTER_PLAN/`（含附录 A/C/F 三权威与本文件） | 最终规划和执行口径 |
 | **P1** | `far status --json`、CI、测试输出 | 实现状态与数量的唯一事实源 |
 | **P2** | 当前代码（`<REPOSITORY_ROOT>/src` 等） | 接口和能力以实际代码为准 |
 | **P3** | 旧 `00`-`86` 与 `_digest/`（物理档案已退役，备份 `C:/Users/RichardYuan/FAR-Lab_Backups/`） | 历史来源，不直接覆盖 P0/P1/P2 |
@@ -67,7 +67,7 @@ far status --json       # 机器可读，供文档构建时回填占位符
 | `goldenVectorCount` | 读 `golden_vectors.json` | 替换"8/9/10 向量"漂移 |
 | `coverageLine` / `coverageBranch` | `pnpm coverage` 实跑 | 替换"92.80% / 79.56%"漂移 |
 | `suiteIntegrityRoot` | 实跑 `runBenchmark` | 替换 golden 根声称 |
-| `docCount` | `glob FINAL_PACKAGE/*.md`（归档前）/ `PROJECT_PLAN/*.md`（归档后） | 替换"32/39/43 份"漂移 |
+| `docCount` | `glob FINAL_PACKAGE/*.md`（归档前）/ `FAR_LAB_MASTER_PLAN/*.md`（归档后） | 替换"32/39/43 份"漂移 |
 | `commitSha` | `git rev-parse HEAD`（若存在） | 替换旧 commit 引用 |
 
 > **构建时回填**：CI 在文档构建阶段跑 `far status --json`，把占位符替换为实测值。**禁手填数字**——这是 W0 验收门的 grep 校验项。
@@ -330,7 +330,7 @@ P0 不再写宏大叙事，要把一个 demo claim 从 hypothesis 到 final rece
 
 新增或修改文档必须遵守：
 
-1. **若是最终口径**，写入顶层 `PROJECT_PLAN/`（P0）；
+1. **若是最终口径**，写入顶层 `FAR_LAB_MASTER_PLAN/`（P0）；
 2. **若是历史补充**，标明 `ARCHIVE` 并注明备份位置 `C:/Users/RichardYuan/FAR-Lab_Backups/`；
 3. **若修改状态**，更新 `01_SOURCE_OF_TRUTH_AND_STATUS.md`；
 4. **若修改架构**，更新 `02_ARCHITECTURE.md`；

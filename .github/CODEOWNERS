@@ -12,7 +12,7 @@
 # 每个 PR 若 touch 下列路径，自动请求 @yry1816186-pixel review（owner = git remote 实测 owner）。
 
 # ── 账本 SSOT（M4 核心：防 agent 手填 WIRED_GREEN / 改 status 伪造完成态）──
-PROJECT_PLAN/DEPTH_LEDGER.md                    @yry1816186-pixel
+FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md                    @yry1816186-pixel
 
 # ── 深度门 keystone 脚本（防 agent 弱化检查 / 放宽正则 / 改 caller 计数逃避接线验证）──
 # 入口协议校验逻辑内联在 .github/workflows/entry-protocol-check.yml（已 protect），无独立 .mjs。

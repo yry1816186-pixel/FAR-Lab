@@ -10,7 +10,7 @@
 #   1. GitHub repo → Settings → Actions → General → Workflow permissions → 选 "Read and write permissions"
 #      （让 GITHUB_TOKEN 能 push 写回 DEPTH_LEDGER.md）。
 #   2. 把 `depth_evidence` 加入 Branch protection → Require status checks（与 depth_gate 并列）。
-#   3. CODEOWNERS：PROJECT_PLAN/DEPTH_LEDGER.md 由本 bot + maintainer own（防 agent 手改 status）。
+#   3. CODEOWNERS：FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md 由本 bot + maintainer own（防 agent 手改 status）。
 #
 # scripts/depth_evidence.mjs 已实现（base/head 双跑 proof_test → UPGRADE 裁决 → 原子写回 evidence；
 # 集成测 4/4 + 单元测 17/17 + live --dry-run 物证）。本 job 在 pull_request 事件实跑：
@@ -65,10 +65,10 @@ jobs:
       - name: Commit back evidence line (若 scripts/depth_evidence.mjs 改了 DEPTH_LEDGER)
         if: success()
         run: |
-          if [ -n "$(git status --porcelain PROJECT_PLAN/DEPTH_LEDGER.md)" ]; then
+          if [ -n "$(git status --porcelain FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add PROJECT_PLAN/DEPTH_LEDGER.md
+            git add FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md
             git commit -m "chore(depth-evidence): write back WIRED_GREEN evidence (base→head dual-run)"
             git push
           else

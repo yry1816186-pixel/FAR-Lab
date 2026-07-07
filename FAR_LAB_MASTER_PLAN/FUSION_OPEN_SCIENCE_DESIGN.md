@@ -483,4 +483,4 @@ FAR-Chain 是 **AI4S 科学声明的声明级验证层**——可独立复算、
 
 **文档版本**：v1.0（2026-07-05，11-agent workflow 证据驱动）
 **驱动 workflow**：`open-science-fusion-research`（`wlf4s4z36`，787114 tokens / 214 工具调用 / 11 agent / 0 错误）
-**证据源**：`<REPOSITORY_ROOT>/../_reference_repos/open-science-mirror/`（OS 镜像）+ FAR-Chain `src/`/`schema/`/`PROJECT_PLAN/` 全量扎根
+**证据源**：`<REPOSITORY_ROOT>/../_reference_repos/open-science-mirror/`（OS 镜像）+ FAR-Chain `src/`/`schema/`/`FAR_LAB_MASTER_PLAN/` 全量扎根

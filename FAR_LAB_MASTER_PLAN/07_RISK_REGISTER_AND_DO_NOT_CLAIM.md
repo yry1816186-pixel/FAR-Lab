@@ -128,7 +128,7 @@ L0 任务铁律 / CLAUDE.md 全局铁律（最高，凌驾一切）
   run: |
     # 全 PDF/README/pitch/摘要 零裸禁用词
     ! rg -q "物理拦截|物理隔离|物理不可篡改|证明.*科学真理|全自动无人|首个(?!.*据我们所知)|已通过 IETF|全系统形式化" \
-        README.md docs/ PROJECT_PLAN/ --glob '!56_*' --glob '!43_*' --glob '!59_*'
+        README.md docs/ FAR_LAB_MASTER_PLAN/ --glob '!56_*' --glob '!43_*' --glob '!59_*'
 ```
 
 例外：`43`（总纲）/`56`（真相统一）/`59`（W0 审计纲领）/本附录自身在"订正清单 / 禁用词表"里引用原措辞是**元层面演示**，不触发门。
@@ -575,7 +575,7 @@ FAR-CHAIN 错误码 = 字母前缀 + 4 位数字
 
 ## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
 
-> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
 
 ### 与本文档（07_RISK_REGISTER_AND_DO_NOT_CLAIM）相关的融合缺口
 

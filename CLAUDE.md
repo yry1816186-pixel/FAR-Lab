@@ -5,7 +5,7 @@
 
 > ⛔ **STOP — 任何 Agent（Claude / GPT / Cursor / Copilot / 其他）写任何代码前必读三件套**：
 > 1. `<REPOSITORY_ROOT>/.agent/AGENT_ENTRY_PROTOCOL.md`（4 步入口协议 + T0-T8 自检）
-> 2. `<REPOSITORY_ROOT>/PROJECT_PLAN/DEPTH_LEDGER.md` §A（next_action）+ §C（机器可读深度接线表）
+> 2. `<REPOSITORY_ROOT>/FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §A（next_action）+ §C（机器可读深度接线表）
 > 3. `<REPOSITORY_ROOT>/.agent/AGENT_ANTISKIM_TRIPWIRES.md`（逐条 skim 模式 + 机检钩子）
 >
 > 三重硬门由 `scripts/depth_gate.mjs`（CI required job）+ 仓库文件强制。当前态深度功能未接线，depth_gate 确定 exit 1——任何不带真实接线的 PR 都会被拦在 CI 层，与你是哪个 agent 无关。说不出来本次工作驱动的**单一真实依赖**（真实 SymPy / DashScope HTTP / venv 子进程 / 哈希重算 之一）就 STOP，不要动手。
@@ -43,7 +43,7 @@ FAR-Chain = AI4S 科学声明的**声明级验证层**。核心价值是「可�
 - 与函数名重复的分区横幅
 - 任何「删掉它读者也不会损失工程信息」的注释
 
-判定法：删掉这条注释后，读者是否在**不变式 / 非显然决策 / 红线**上严格损失信息？是→留；否→删。拿不准时，把理由写进 commit message 或 PROJECT_PLAN 条目，而不是内联注释。
+判定法：删掉这条注释后，读者是否在**不变式 / 非显然决策 / 红线**上严格损失信息？是→留；否→删。拿不准时，把理由写进 commit message 或 FAR_LAB_MASTER_PLAN 条目，而不是内联注释。
 
 ## 3. 验证策略（避免测试循环）
 
@@ -61,7 +61,7 @@ FAR-Chain = AI4S 科学声明的**声明级验证层**。核心价值是「可�
 - 把 Python 环境失败（verifyEnvelopeV2WithPython、cross_lang）或工具缺失（SymPy/Z3/Lean/Dafny）误当代码 bug —— 先读 `scripts/ensure_py_deps.mjs` 探针；axis skipped = 环境问题，不是你的
 - 分不清失败是逻辑还是环境时，单文件 `pnpm vitest <file>` verbose 跑，不要重跑全量套件盯着同一面绿墙
 
-**不需要**（别拿这些当门禁）：纯 doc / PROJECT_PLAN 改动、仅注释改动、重命名局部变量、加无运行时效果的类型。
+**不需要**（别拿这些当门禁）：纯 doc / FAR_LAB_MASTER_PLAN 改动、仅注释改动、重命名局部变量、加无运行时效果的类型。
 
 ## 4. 施工蓝图（依赖序，权威 backlog）
 
@@ -91,7 +91,7 @@ FAR-Chain = AI4S 科学声明的**声明级验证层**。核心价值是「可�
 
 ### P-FUSION — Open Science 工程范式迁移（DESIGN_PROPOSED，未来 backlog，不抢 P0-P3 依赖序）
 
-> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。Open Science 经实证为 Claude Code 分支重品牌化的**执行层 agent 工作区**（sanitize-runtime 长 byte CLAUDE→SCIENC 替换；内部 Anthropic Messages API + universal-llm 翻译网关；science-sonnet-4-6 = claude-*）；FAR-Chain 是**验证层声明级裁决内核**。**层级不同**：迁移 OS 的**工程范式**（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），**绝不迁移** OS 的 LLM-裁决语义。6 项收敛点（C-1..C-6：来源不可自填 / 失败闭环门 / LLM-非裁决者 / 自排除规范哈希 / 冻结契约工件 / 从磁盘派生花名册）FAR-Chain 已独立达到，不重复立项。机器可读接线表见 `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段 FUSION-OS-1..14（全 NOT_BUILT，由 keystone bot CI 双跑写回 WIRED_GREEN，agent 不得手填）。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。Open Science 经实证为 Claude Code 分支重品牌化的**执行层 agent 工作区**（sanitize-runtime 长 byte CLAUDE→SCIENC 替换；内部 Anthropic Messages API + universal-llm 翻译网关；science-sonnet-4-6 = claude-*）；FAR-Chain 是**验证层声明级裁决内核**。**层级不同**：迁移 OS 的**工程范式**（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），**绝不迁移** OS 的 LLM-裁决语义。6 项收敛点（C-1..C-6：来源不可自填 / 失败闭环门 / LLM-非裁决者 / 自排除规范哈希 / 冻结契约工件 / 从磁盘派生花名册）FAR-Chain 已独立达到，不重复立项。机器可读接线表见 `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段 FUSION-OS-1..14（全 NOT_BUILT，由 keystone bot CI 双跑写回 WIRED_GREEN，agent 不得手填）。
 
 - **FUSION-OS-1** 反剧场检测器接实时 verdict 路径：`runAntiTheaterLint` 的 20 个检测器当前仅 `verify.ts:412` 离线调，`orchestrator.ts:199` 运行时硬编码 `antiTheaterFindings:[]` → 注入 `buildVerdictKernelInput`，闭合 R-anti-theater-fail / seed-cherry / R8-warn 实时路径。**当前最大活体缺口，最高杠杆。**〔依赖：P0-1〕
 - **FUSION-OS-2/3/4/7/8** sandbox 加固：进程组 kill（detached + kill(-pgid)）/ seal 时序窗口收窄 / spawnVenv 前 fs 预扫（用户态降级，真 OS 隔离仍 V2 见 07 §188）/ wall-cpu-peak_rss 执行指纹 / secret 剥离 + dlopen 防护。〔依赖：P1-6〕
@@ -106,7 +106,7 @@ FAR-Chain = AI4S 科学声明的**声明级验证层**。核心价值是「可�
 
 > 取序建议：FUSION-OS-1（最高杠杆）→ FUSION-OS-11（红线级）→ FUSION-OS-13/14（内核规则）→ 其余 sandbox/schema 项。**取任何 FUSION-OS-* 前先确认 P0-P3 当前 next_action 已完成或显式让位**（见 `DEPTH_LEDGER.md` §A）。
 
-## 5. 不可逾越的项目红线（来自 PROJECT_PLAN，与全局零容忍叠加）
+## 5. 不可逾越的项目红线（来自 FAR_LAB_MASTER_PLAN，与全局零容忍叠加）
 
 - 五值裁决枚举**固定**：CONFIRMED / REFUTED / INCONCLUSIVE / DEGRADED_SCOPE / UNTESTED，**禁第六值**，优先级 DEGRADED_SCOPE > REFUTED > INCONCLUSIVE > CONFIRMED > UNTESTED
 - **LLM 不得作最终裁决者**（裁决由 R0-R9 确定性内核给出）
@@ -114,4 +114,4 @@ FAR-Chain = AI4S 科学声明的**声明级验证层**。核心价值是「可�
 - 路径写法用 `<REPOSITORY_ROOT>/` 占位
 - 禁用词：证明科学真理 / 物理不可篡改 / 完全可复现 / 全自动科学家 / 通用 AI4S benchmark / 把 far-chain/ 当实现根 / 裸「第一唯一最新」
 - 不把 V2/V3 路线写成当前完成（状态标签必须诚实）
-- **Open Science 融合迁移边界**：迁移 OS 的工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），**绝不迁移** OS 的 LLM-裁决语义（universal-llm 翻译网关 / LLM-审核者 / skills / MCP / metadata.yaml agent）—— FAR-Chain 红线「LLM 不作最终裁决者，确定性 R0-R9 内核」高于任何融合。Open Science 经实证为 Claude Code 分支重品牌化的执行层 agent 工作区，与 FAR-Chain（验证层）层级不同。详见 `PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
+- **Open Science 融合迁移边界**：迁移 OS 的工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），**绝不迁移** OS 的 LLM-裁决语义（universal-llm 翻译网关 / LLM-审核者 / skills / MCP / metadata.yaml agent）—— FAR-Chain 红线「LLM 不作最终裁决者，确定性 R0-R9 内核」高于任何融合。Open Science 经实证为 Claude Code 分支重品牌化的执行层 agent 工作区，与 FAR-Chain（验证层）层级不同。详见 `FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。

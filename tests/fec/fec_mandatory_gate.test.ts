@@ -8,7 +8,7 @@
  *   4. allowed=true 时 verdict=fallbackVerdict 占位。
  *   5. assertFecGate：ciBlocked 时 throw，否则不 throw。
  *
- * 权威：PROJECT_PLAN/03 §2.3。零容忍合规：无 any / @ts-ignore / 改测试期望让实现通过。
+ * 权威：FAR_LAB_MASTER_PLAN/03 §2.3。零容忍合规：无 any / @ts-ignore / 改测试期望让实现通过。
  */
 
 import { test } from 'node:test';

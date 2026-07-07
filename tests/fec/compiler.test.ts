@@ -9,7 +9,7 @@
  *   5. computeFecHash 稳定性 + 字段敏感性。
  *   6. isDescriptivePhrase / involvesRandomness / mapCompileErrorToSeverity。
  *
- * 权威：PROJECT_PLAN/03 §2.1（检查表）+ §2.2（伪代码）+ §2.3（降级）+ §5.2（verdict_mapping）。
+ * 权威：FAR_LAB_MASTER_PLAN/03 §2.1（检查表）+ §2.2（伪代码）+ §2.3（降级）+ §5.2（verdict_mapping）。
  * 零容忍合规：无 any / @ts-ignore / 改测试期望让实现通过。纯函数测试（不读 DB）。
  */
 

@@ -12,8 +12,8 @@
 //     删旧行（违反 append-only）或改旧行 verdict（违反 terminal-rollback + immutable_fields trigger）。
 //   GREEN（接线后）：重评写新行 + 设指针，旧行 append-only 保留（审计）+ getActiveVerdicts 过滤。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-12 +
-//            PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-12（Open Science memories.superseded_by 范式）。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-12 +
+//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-12（Open Science memories.superseded_by 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

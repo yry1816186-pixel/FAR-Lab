@@ -29,7 +29,7 @@
 | §9 FAR-Bench 缺漏 | FAR-Bench 被扩成通用 benchmark | `05_AI4S_PRODUCT_DEMO_AND_BENCHMARK.md` / `07` D6 | `DESIGN_LOCKED` |
 | §10 Demo 缺漏 | demo 散焦且现场环境风险不足 | `05` / `07` §6.3 Plan B/C/D | `DESIGN_LOCKED` |
 | §11 外部事实缺漏 | 旧文档把竞品/论文当永久真理 | `01` §7 / `07` H8 / RK-11 | `NEEDS_EXTERNAL_VERIFICATION` |
-| §12 维护缺漏 | 旧材料未指定后续改动写哪里 | `PROJECT_PLAN/` 顶层 + `08_TRACEABILITY_MATRIX.md` | `IMPLEMENTED_VERIFIED` |
+| §12 维护缺漏 | 旧材料未指定后续改动写哪里 | `FAR_LAB_MASTER_PLAN/` 顶层 + `08_TRACEABILITY_MATRIX.md` | `IMPLEMENTED_VERIFIED` |
 | §13 本次合并新增补齐项 | 跨文档枚举漂移 / stale 零运行时 / packages 路径虚构 / snapshot 时间炸弹 / novelty 维度互斥 | 见 §13 各分项 | 多状态 |
 
 > 本总览表是 13 类缺漏的快速索引；逐类实现级口径见 §1-§13。
@@ -52,7 +52,7 @@
 | `<REPOSITORY_ROOT>/frontend` | 前端或 browser verifier 相关资产 |
 | `<REPOSITORY_ROOT>/repro` | Python 或其他复核实现 |
 | `<REPOSITORY_ROOT>/golden_vectors` | golden vectors |
-| `<REPOSITORY_ROOT>/PROJECT_PLAN` | 最终规划 SSOT |
+| `<REPOSITORY_ROOT>/FAR_LAB_MASTER_PLAN` | 最终规划 SSOT |
 | `<REPOSITORY_ROOT>/FINAL_PACKAGE` | 设计、规划、答辩和交接档案（待退役） |
 
 **禁用口径**（`07` D11）：`far-chain/` 作为真实实现子目录 = 禁用表述。例外：`07` §6 CI grep 门豁免区（`56_*` / `43_*` / `59_*` / 本附录自身在"订正清单 / 禁用词表"中引用原措辞是元层面演示）。
@@ -640,7 +640,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 **处理**：
 
-- 顶层 `PROJECT_PLAN/` 成为最终规划 SSOT；
+- 顶层 `FAR_LAB_MASTER_PLAN/` 成为最终规划 SSOT；
 - 旧 `00`-`86` 成为来源档案（物理档案已退役，备份 `C:/Users/RichardYuan/FAR-Lab_Backups/`）；
 - `08_TRACEABILITY_MATRIX.md` 负责追踪吸收和废弃关系。
 
@@ -648,7 +648,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 | 优先级 | 来源 | 说明 |
 |---|---|---|
-| P0 | 顶层 `PROJECT_PLAN/` | 最终规划和执行口径 |
+| P0 | 顶层 `FAR_LAB_MASTER_PLAN/` | 最终规划和执行口径 |
 | P1 | 可执行状态命令、CI、测试输出 | 实现状态与数量的唯一事实源 |
 | P2 | 当前代码 | 接口和能力以实际代码为准 |
 | P3 | 旧 `00`-`86` 与 `_digest` | 历史来源，不直接覆盖 P0/P1/P2 |
@@ -657,7 +657,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 **后续维护规则（`08` §6 · 强制）**：
 
-1. 若是最终口径，写入顶层 `PROJECT_PLAN/`；
+1. 若是最终口径，写入顶层 `FAR_LAB_MASTER_PLAN/`；
 2. 若是历史补充，标明 `ARCHIVE`；
 3. 若修改状态，更新 `01_SOURCE_OF_TRUTH_AND_STATUS.md`；
 4. 若修改架构，更新 `02_ARCHITECTURE.md`；
@@ -880,7 +880,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 ## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
 
-> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
 
 ### 与本文档（09_GAP_CLOSURE_LOG）相关的融合缺口
 

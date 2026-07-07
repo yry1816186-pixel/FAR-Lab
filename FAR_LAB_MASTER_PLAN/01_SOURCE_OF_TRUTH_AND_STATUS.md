@@ -34,7 +34,7 @@
 | `<REPOSITORY_ROOT>/repro` | Python 或其他复核实现 |
 | `<REPOSITORY_ROOT>/repro/far_chain_repro` | Python canonical_hash / verify_chain 等确定性复核 |
 | `<REPOSITORY_ROOT>/golden_vectors` | golden vectors（`REPRO_CONTEXT_FIXTURE` 单向量 expectedHex = `96a6372bdf04…af4abf4`，**非 merkle 根**） |
-| `<REPOSITORY_ROOT>/PROJECT_PLAN` | 最终规划和执行口径（P0 文档源，含本文件 + `APPENDIX_A/C/F` 三权威） |
+| `<REPOSITORY_ROOT>/FAR_LAB_MASTER_PLAN` | 最终规划和执行口径（P0 文档源，含本文件 + `APPENDIX_A/C/F` 三权威） |
 | `<REPOSITORY_ROOT>/FINAL_PACKAGE` | 【已归档历史口径】设计/规划/答辩档案，物理档案已退役，备份在 `C:/Users/RichardYuan/FAR-Lab_Backups/` |
 
 ### 1.3 跨平台路径纪律
@@ -49,7 +49,7 @@
 
 | 优先级 | 来源 | 说明 |
 |---|---|---|
-| **P0** | 顶层 `PROJECT_PLAN/`（本文件 + `APPENDIX_A_TYPES.md` + `APPENDIX_C_CANONICAL.md` + `APPENDIX_F_GLOSSARY.md` + 02-10 章正文） | 最终规划和执行口径 |
+| **P0** | 顶层 `FAR_LAB_MASTER_PLAN/`（本文件 + `APPENDIX_A_TYPES.md` + `APPENDIX_C_CANONICAL.md` + `APPENDIX_F_GLOSSARY.md` + 02-10 章正文） | 最终规划和执行口径 |
 | **P1** | 可执行状态命令（`far status --json`）、CI、测试输出 | 实现状态与数量的唯一事实源 |
 | **P2** | 当前代码（`<REPOSITORY_ROOT>/src` 等） | 接口和能力以实际代码为准 |
 | **P3** | 旧 `00`-`86` 与 `_digest`（已归档至 `C:/Users/RichardYuan/FAR-Lab_Backups/`） | 历史来源，不直接覆盖 P0/P1/P2 |
@@ -159,7 +159,7 @@
 | `<GOLDEN_VECTOR_COUNT>` | `goldenVectorCount` | 读 `golden_vectors.json` |
 | `<COVERAGE_LINE>` / `<COVERAGE_BRANCH>` | `coverageLine` / `coverageBranch` | `pnpm coverage` 实跑 |
 | `<SUITE_INTEGRITY_ROOT>` | `suiteIntegrityRoot` | 读取 `benchmark/benchmark_report.json`（由 `runBenchmark` 生成） |
-| `<DOC_COUNT>` | `docCount` | `glob FINAL_PACKAGE/*.md`（历史）或 `PROJECT_PLAN/*.md`（当前） |
+| `<DOC_COUNT>` | `docCount` | `glob FINAL_PACKAGE/*.md`（历史）或 `FAR_LAB_MASTER_PLAN/*.md`（当前） |
 | `<COMMIT_SHA>` | `commitSha` | `git rev-parse HEAD`（若存在） |
 
 ---
@@ -350,7 +350,7 @@ far status --json       # 机器可读 JSON，供文档构建时回填占位符
 | `goldenVectorCount` | 读 `golden_vectors.json` | 替换"8/9/10 向量"漂移 |
 | `coverageLine` / `coverageBranch` | `pnpm coverage` 实跑 | 替换"92.80% / 79.56%"漂移 |
 | `suiteIntegrityRoot` | 读取 `benchmark/benchmark_report.json`（由 `runBenchmark` 生成） | 替换 golden 根声称 |
-| `docCount` | `glob PROJECT_PLAN/*.md`（当前） | 替换"32/39/43 份"漂移 |
+| `docCount` | `glob FAR_LAB_MASTER_PLAN/*.md`（当前） | 替换"32/39/43 份"漂移 |
 | `commitSha` | `git rev-parse HEAD`（若存在） | 替换旧 `07a8005`（红队核实仓库曾有/无 commit 漂移） |
 | `capabilities.*` | 各能力当前代码 + 测试核实 | 替换 §6 能力口径表中的状态枚举 |
 
@@ -537,7 +537,7 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
   run: |
     # 全 PDF/README/pitch/摘要 零裸禁用词
     ! rg -q "物理拦截|物理隔离|物理不可篡改|证明.*科学真理|全自动无人|首个(?!.*据我们所知)|已通过 IETF|全系统形式化" \
-        README.md docs/ PROJECT_PLAN/ --glob '!56_*' --glob '!43_*' --glob '!59_*'
+        README.md docs/ FAR_LAB_MASTER_PLAN/ --glob '!56_*' --glob '!43_*' --glob '!59_*'
 ```
 
 **例外**：本 01 / APPENDIX_F / 07 章自身在"禁用词表 / 订正清单"里引用原措辞是**元层面演示**，不触发门。

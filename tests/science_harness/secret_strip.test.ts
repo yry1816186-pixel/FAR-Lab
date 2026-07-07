@@ -18,8 +18,8 @@
 // 反剧场红线（FUSION-OS-8 + CLAUDE.md §5）：来源不可自填。secret env 不透传给沙箱子进程，
 // 用户脚本无法经 os.environ 读到凭证；dlopen/spawn 被审计 hook 拒绝（确定性科学复算不应加载原生库/派生子进程）。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-8 +
-//            PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-8（secret-strip + dlopen guard 范式）。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-8 +
+//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-8（secret-strip + dlopen guard 范式）。
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

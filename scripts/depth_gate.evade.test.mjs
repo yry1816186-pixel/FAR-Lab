@@ -96,7 +96,7 @@ function makeFixture(prefix) {
     write('tests/foo/t.test.ts', "import { test } from 'node:test';\ntest('x', () => {});\n");
 
     // L2 规避：WIRED_GREEN + 自指伪造 evidence（base=head=depth_gate.ok，非 SHA 格式）
-    write('PROJECT_PLAN/DEPTH_LEDGER.md', [
+    write('FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md', [
       '# DEPTH_LEDGER',
       '',
       '## §C 深度模块接线表',
@@ -141,7 +141,7 @@ function makeFixture(prefix) {
     write('package.json', '{"name":"fixture","version":"0.0.0"}');
     write('tests/foo/t.test.ts', "import { test } from 'node:test';\ntest('real_name', () => {});\n");
     write('scripts/probe.ts', 'export const probePythonAxis = () => 1;\n'); // 非 src caller（R7 放宽后才解析）
-    write('PROJECT_PLAN/DEPTH_LEDGER.md', [
+    write('FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md', [
       '# DEPTH_LEDGER', '', '## §C 深度模块接线表', '',
       '| id | dep | caller | test | red | status | sha |',
       '|----|-----|--------|------|-----|--------|-----|',
@@ -285,7 +285,7 @@ function makeFixture(prefix) {
     write('tests/foo/t.test.ts', "import { test } from 'node:test';\ntest('real_name', () => {});\n");
     // evidence 行用两个不同的 40-hex（L2 只校验格式 + base≠head；closed_by 才是 R6 校验对象）
     const fakeHead = commitA.replace(/^./, (c) => (c === '0' ? '1' : '0'));
-    write('PROJECT_PLAN/DEPTH_LEDGER.md', [
+    write('FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md', [
       '# DEPTH_LEDGER', '', '## §C 深度模块接线表', '',
       '| id | dep | caller | test | red | status | sha |',
       '|----|-----|--------|------|-----|--------|-----|',

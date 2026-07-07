@@ -4,7 +4,7 @@
 # 目的：把「深度功能是否真接到生产路径」从软规则（CLAUDE.md §1/§4）变成 PR-level CI exit 1。
 #   绿套件 = 虚假完成信号——decideFiveValueVerdict/executeFallbackChain 已实现 + 单元测试全绿，
 #   但 src/ 内零 AST CallExpression 生产 caller。本门扫接线状态，当前态（已建未接线）确定 FAIL。
-#   详见 scripts/depth_gate.mjs 头注释 + PROJECT_PLAN/DEPTH_LEDGER.md。
+#   详见 scripts/depth_gate.mjs 头注释 + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md。
 #
 # ⚠️ maintainer 必做（仓库工件无法自证，inherent 缺口）：
 #   GitHub repo → Settings → Branches → Branch protection rules（对应默认分支）
@@ -39,5 +39,5 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: depth_gate (AST CallExpression 接线门 · 失败见 PROJECT_PLAN/DEPTH_LEDGER.md §A)
+      - name: depth_gate (AST CallExpression 接线门 · 失败见 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §A)
         run: node scripts/depth_gate.mjs

@@ -11,7 +11,7 @@
 //   - 缺 python / lightkurve / 网络 → t.skip 或诚实 null（**不当代码 bug，不伪造 hash**）。
 //   - 白名单 host 真取数测试不强断言成功（避免 flaky 网络），只验证「不抛 + 形态合法 + 不伪造」。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C P1-6 + 12 §2.1-§2.2 + 02 C8 RULE-DATA-001。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C P1-6 + 12 §2.1-§2.2 + 02 C8 RULE-DATA-001。
 
 import { spawnSync } from 'node:child_process';
 import { delimiter, resolve } from 'node:path';

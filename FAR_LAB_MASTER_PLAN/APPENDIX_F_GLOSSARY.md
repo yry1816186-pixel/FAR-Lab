@@ -1,6 +1,6 @@
 # 附录 F · 术语表与规范（Glossary & Conventions）
 
-> 作用域：本附录是 `PROJECT_PLAN/` 的**术语与表述规范权威集中处**。
+> 作用域：本附录是 `FAR_LAB_MASTER_PLAN/` 的**术语与表述规范权威集中处**。
 > 权威关系：本附录与 `APPENDIX_A_TYPES.md`（类型权威）、`APPENDIX_C_CANONICAL.md`（canonical 序列化权威）构成"附录三权威"。当术语、字段名、enum 值、路径写法发生冲突时，**类型字段以 A 为准、canonical 字节规则以 C 为准、术语语义与表述口径以本附录（F）为准**。
 > 保留自现有 SSOT：`01_SOURCE_OF_TRUTH_AND_STATUS.md` 的状态标签 taxonomy、`07_RISK_REGISTER_AND_DO_NOT_CLAIM.md` 的禁用词与改写对照、`01` 的路径约定与文档优先级 P0-P3、`08` 的命名收敛裁决（FAR-Chain 为系统名 / 真研 FAR-Lab 为项目集）。本附录增补的是**全量核心术语定义、最终命名表、anti-theater / verdict-critical / independent recomputation / tamper-evident / protocol freeze / scope 等术语的精确语义钉死**。
 > 一句话口径：**FAR-Chain 是 AI4S 科学声明的 claim-level verification layer，不是 AI Scientist；裁决由确定性五值内核产出，LLM 不得作为最终裁决者；篡改是 tamper-evident（可检测）而非 tamper-proof（物理不可改）；任何对外材料中出现裸数字、禁用词、`far-chain/` 路径、第六值 verdict，即视为违反本附录。**
@@ -458,7 +458,7 @@ DEGRADED_SCOPE
   run: |
     # 全 PDF/README/pitch/摘要 零裸禁用词
     ! rg -q "物理拦截|物理隔离|物理不可篡改|证明.*科学真理|全自动无人|首个(?!.*据我们所知)|已通过 IETF|全系统形式化" \
-        README.md docs/ PROJECT_PLAN/ --glob '!56_*' --glob '!43_*' --glob '!59_*'
+        README.md docs/ FAR_LAB_MASTER_PLAN/ --glob '!56_*' --glob '!43_*' --glob '!59_*'
 ```
 
 **例外**：`43`（总纲）/`56`（真相统一）/`59`（W0 审计纲领）/本附录自身在"订正清单 / 禁用词表"里引用原措辞是**元层面演示**，不触发门。
@@ -477,7 +477,7 @@ DEGRADED_SCOPE
 
 所有工程路径以 `<REPOSITORY_ROOT>/` 开头。`<REPOSITORY_ROOT>` 即**工作区根目录**（包含 `src/` `schema/` `frontend/` `tests/` `golden_vectors/` 的目录），**不是** `far-chain/` 子目录。
 
-> 物理档案已退役：`FINAL_PACKAGE/` 是设计/规划/答辩/交接档案，FINAL_PACKAGE 即将被删除（§9 归档声明）。其内容已完整并入 `PROJECT_PLAN/`。物理档案的离线备份位于 `C:/Users/RichardYuan/FAR-Lab_Backups/`。
+> 物理档案已退役：`FINAL_PACKAGE/` 是设计/规划/答辩/交接档案，FINAL_PACKAGE 即将被删除（§9 归档声明）。其内容已完整并入 `FAR_LAB_MASTER_PLAN/`。物理档案的离线备份位于 `C:/Users/RichardYuan/FAR-Lab_Backups/`。
 
 ### 7.2 标准路径表
 
@@ -491,10 +491,10 @@ DEGRADED_SCOPE
 | `<REPOSITORY_ROOT>/repro` | Python 或其他复核实现 |
 | `<REPOSITORY_ROOT>/repro/far_chain_repro` | Python canonical_hash / verify_chain 等确定性复核 |
 | `<REPOSITORY_ROOT>/golden_vectors` | golden vectors |
-| `<REPOSITORY_ROOT>/PROJECT_PLAN` | 最终规划和执行口径（P0 文档源） |
-| `<REPOSITORY_ROOT>/PROJECT_PLAN/APPENDIX_A_TYPES.md` | 类型权威附录（字段名 / enum 字段权威） |
-| `<REPOSITORY_ROOT>/PROJECT_PLAN/APPENDIX_C_CANONICAL.md` | canonical 序列化权威附录（字节规则权威） |
-| `<REPOSITORY_ROOT>/PROJECT_PLAN/APPENDIX_F_GLOSSARY.md` | 本附录（术语语义 / 表述口径权威） |
+| `<REPOSITORY_ROOT>/FAR_LAB_MASTER_PLAN` | 最终规划和执行口径（P0 文档源） |
+| `<REPOSITORY_ROOT>/FAR_LAB_MASTER_PLAN/APPENDIX_A_TYPES.md` | 类型权威附录（字段名 / enum 字段权威） |
+| `<REPOSITORY_ROOT>/FAR_LAB_MASTER_PLAN/APPENDIX_C_CANONICAL.md` | canonical 序列化权威附录（字节规则权威） |
+| `<REPOSITORY_ROOT>/FAR_LAB_MASTER_PLAN/APPENDIX_F_GLOSSARY.md` | 本附录（术语语义 / 表述口径权威） |
 | `<REPOSITORY_ROOT>/FINAL_PACKAGE` | 【已归档历史口径】设计/规划/答辩档案，物理档案已退役，备份在 `C:/Users/RichardYuan/FAR-Lab_Backups/` |
 
 ### 7.3 路径纪律
@@ -523,7 +523,7 @@ migration 必须可逆（up + down），禁 DROP TABLE 无 down，禁破坏 appe
 
 | 优先级 | 来源 | 说明 |
 |---|---|---|
-| **P0** | 顶层 `PROJECT_PLAN/`（含本附录及 APPENDIX_A/C/F 三权威） | 最终规划和执行口径 |
+| **P0** | 顶层 `FAR_LAB_MASTER_PLAN/`（含本附录及 APPENDIX_A/C/F 三权威） | 最终规划和执行口径 |
 | **P1** | 可执行状态命令（`far status --json`）、CI、测试输出 | 实现状态与数量的唯一事实源 |
 | **P2** | 当前代码（`<REPOSITORY_ROOT>/src` 等） | 接口和能力以实际代码为准 |
 | **P3** | 旧 `00`-`86` 与 `_digest`（已归档至 `C:/Users/RichardYuan/FAR-Lab_Backups/`） | 历史来源，不直接覆盖 P0/P1/P2 |
@@ -552,7 +552,7 @@ migration 必须可逆（up + down），禁 DROP TABLE 无 down，禁破坏 appe
 
 **本附录的自包含声明**：
 
-- 本附录所有内容已**完整并入** PROJECT_PLAN（不再依赖 FINAL_PACKAGE 作为有效事实源）；
+- 本附录所有内容已**完整并入** FAR_LAB_MASTER_PLAN（不再依赖 FINAL_PACKAGE 作为有效事实源）；
 - 本附录中引用的 `44`、`56`、`76`、`02_CONSTRAINTS_AND_RED_LINES` 等 FINAL_PACKAGE 编号，仅作**来源溯源**（`08_TRACEABILITY_MATRIX.md` 旧编号 → 新位置映射），**不作为有效依赖**；
 - 任何"详见 FINAL_PACKAGE/X"在本附录中均已被改写为：要么内容完整并入本节/本附录，要么显式标注为"已归档历史口径·备份在 `C:/Users/RichardYuan/FAR-Lab_Backups/`"；
 - 若读者需要查阅 FINAL_PACKAGE 原文做历史溯源，路径是 `C:/Users/RichardYuan/FAR-Lab_Backups/FINAL_PACKAGE/`。

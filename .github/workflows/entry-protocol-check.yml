@@ -66,8 +66,8 @@ jobs:
               fail("single_real_dependency 须含 src/ 路径（被接线的生产 file:line）。实际: " + lines.single_real_dependency);
             }
             // 校验 ledger_item id 在 §C 存在 + 非 WIRED_GREEN（禁对已 closed item 提 PR 凑数）
-            const ledgerPath = "PROJECT_PLAN/DEPTH_LEDGER.md";
-            if (!fs.existsSync(ledgerPath)) fail("PROJECT_PLAN/DEPTH_LEDGER.md 不存在");
+            const ledgerPath = "FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md";
+            if (!fs.existsSync(ledgerPath)) fail("FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md 不存在");
             const text = fs.readFileSync(ledgerPath, "utf8");
             const sectionC = (text.split("## §C")[1] || "");
             const id = lines.ledger_item.replace(/[`*]/g, "");

@@ -1,7 +1,7 @@
 /**
  * computeProofHashV2 TS 自洽测试（fecHash 断言 + normalizeClaim + 纯函数 + 篡改敏感性）。
  *
- * Authority: PROJECT_PLAN/04 §2.5 + APPENDIX_C §2.4（proofHash 5 步伪代码）。
+ * Authority: FAR_LAB_MASTER_PLAN/04 §2.5 + APPENDIX_C §2.4（proofHash 5 步伪代码）。
  */
 
 import { test } from 'node:test';

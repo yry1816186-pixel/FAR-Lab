@@ -1,7 +1,7 @@
 /**
  * false_green_rate —— CI gate 2（APPENDIX_E §6）：false-green-rate=0 不变量。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §6（CI gate 2：false-green-rate·DOD 误报率=0 的对偶——
+ * Authority: FAR_LAB_MASTER_PLAN/APPENDIX_E_ANTI_THEATER.md §6（CI gate 2：false-green-rate·DOD 误报率=0 的对偶——
  *            漏检率=0：任何攻击向量都不得"干净地"封为 CONFIRMED）+ 06_ROADMAP_AND_DOD.md §5.3（DOD）。
  *
  * 不变量定义（gate 2 核心）：

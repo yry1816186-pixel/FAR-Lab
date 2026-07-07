@@ -13,7 +13,7 @@
 // antiTheaterReport(runAntiTheaterLint 整体产出)传入,投影在 buildVerdictKernelInput 内部。类型层保证见
 // src/fec/orchestrator.ts FecAppendClaimArgs 定义(仅 antiTheaterReport?: AntiTheaterReport·无 antiTheaterFindings 字段)。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-1 + PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-1。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-1 + FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-1。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

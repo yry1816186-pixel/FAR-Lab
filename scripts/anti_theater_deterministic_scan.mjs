@@ -2,7 +2,7 @@
 // ci-at anti_theater_deterministic_scan: 确认反剧场检测模块（src/anti_theater）由确定性代码产出，
 // 无 LLM 调用（反 theater F3 + APPENDIX_E §6 grep 门控·镜像 no_llm_final_judge_scan.mjs）。
 //
-// 权威 SSOT: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §6（7 CI 门控·2 grep gate 之一）+
+// 权威 SSOT: FAR_LAB_MASTER_PLAN/APPENDIX_E_ANTI_THEATER.md §6（7 CI 门控·2 grep gate 之一）+
 //            APPENDIX_E §1（runAntiTheaterLint computedBy="deterministic_compiler"）+ 02 F3。
 //
 // 设计（镜像 no_llm_final_judge_scan.mjs）:

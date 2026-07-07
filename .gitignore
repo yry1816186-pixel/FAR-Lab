@@ -46,8 +46,9 @@ docs/source_cards/0/
 /0/
 
 # NODE_COMPILE_CACHE=0 泄漏：env 设字面 '0' → Node 把 V8 编译缓存写到 cwd 下 0/ 目录。
-# 版本戳结构 0/v<ver>-x<arch>-<hash>/ 在任意 cwd 都可能再生——按已知泄漏点 + 通用模式双覆盖。
-PROJECT_PLAN/0/
+# 版本戳结构 0/v<ver>-x<arch>-<hash>/ 在任意 cwd 都可能再生——通用模式 **/0/v.../ 是真正兜底；
+# 下列具体路径是已知高频泄漏点的显式标注（迁移：PROJECT_PLAN/ → FAR_LAB_MASTER_PLAN/）。
+FAR_LAB_MASTER_PLAN/0/
 src/cli/0/
 **/0/v[0-9]*-x[0-9]*/
 

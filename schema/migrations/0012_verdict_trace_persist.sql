@@ -1,7 +1,7 @@
 -- 0012_verdict_trace_persist.sql
 -- verdict_nodes 持久化裁决内核结构化输出（P0-2-EXT）：reasonCodes / ruleTrace / decisiveRuleId / evidenceSufficiency。
 --
--- Authority: PROJECT_PLAN/04_PROOF_ENVELOPE_AND_VERIFIER.md §3.1（proofHash 白名单含 verdictTrace.*）
+-- Authority: FAR_LAB_MASTER_PLAN/04_PROOF_ENVELOPE_AND_VERIFIER.md §3.1（proofHash 白名单含 verdictTrace.*）
 --            + §3.4（verdict 层 verdict-critical：reasonCodes/ruleTrace/decisiveRuleId/evidenceSufficiency →
 --            改变须被察觉）+ CLAUDE.md §4 P0-2-EXT。
 --

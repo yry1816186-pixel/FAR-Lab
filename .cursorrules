@@ -5,7 +5,7 @@ Cursor 应在写代码前阅读仓库的 agent 协议。权威源已移至 `.age
 - `.agent/AGENTS.md` — 跨工具入口
 - `.agent/AGENT_ENTRY_PROTOCOL.md` — 4 步入口协议 + 自检
 - `.agent/AGENT_ANTISKIM_TRIPWIRES.md` — 反 skim 操作手册
-- `PROJECT_PLAN/DEPTH_LEDGER.md` §A/§C — 深度接线账本（机器解析）
+- `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §A/§C — 深度接线账本（机器解析）
 
 机器门 `scripts/depth_gate.mjs`（CI required）与 IDE 无关：任何不带真实深度接线的
 PR 都 exit 1。本地复跑 `node scripts/depth_gate.mjs`。冲突时以

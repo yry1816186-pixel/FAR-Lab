@@ -10,7 +10,7 @@
 // 诚实边界（CLAUDE.md §3）：缺 python = 环境问题 → t.skip（不当代码 bug）。缺 threadpoolctl 不 skip
 // （sandbox 优雅降级，确定性 Python random 不依赖它）。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C P1-6 + 12 §1.2 SR-2/SR-3/SR-5/SR-7。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C P1-6 + 12 §1.2 SR-2/SR-3/SR-5/SR-7。
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

@@ -4,7 +4,7 @@
  * RULE-PE-010 independently_recomputable 的独立路径验证——ProofEnvelope 必须可被一条
  * 不依赖项目 CI 的路径（Python）从原始 claim 重算到 proofHash 匹配。
  *
- * Authority: PROJECT_PLAN/04 §2.4 RULE-PE-010 + APPENDIX_C §1.9（TS/Python 等价）。
+ * Authority: FAR_LAB_MASTER_PLAN/04 §2.4 RULE-PE-010 + APPENDIX_C §1.9（TS/Python 等价）。
  */
 
 import { execFileSync } from 'node:child_process';

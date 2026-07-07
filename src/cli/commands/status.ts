@@ -1,6 +1,6 @@
 // src/cli/commands/status.ts
 // 职责：`far status` 子命令 —— 编排 collectStatusDump + chainHead DB 验证 + testCount spawn + 输出。
-// 设计 SSOT：PROJECT_PLAN/01 §5 + 10 §4（W0 启动最小壳 + phase B testCount + phase C coverage/suiteIntegrity）·运行时 SSOT 以本文件源码 + far status 实测为准。
+// 设计 SSOT：FAR_LAB_MASTER_PLAN/01 §5 + 10 §4（W0 启动最小壳 + phase B testCount + phase C coverage/suiteIntegrity）·运行时 SSOT 以本文件源码 + far status 实测为准。
 //
 // 设计：
 //   - --db <path>：值导入 better-sqlite3（照 tests/ 惯例 `import Database from 'better-sqlite3'`）

@@ -21,7 +21,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 - 核心 P0 + STAT-1 + P1-4 + P1-5a/b/c + P1-6a/b 接线代码已落地（W1-W7 全 PASS：decideFiveValueVerdict 3 生产 caller @ verdict_stage:245/render:37/orchestrator:137 / compileFec 2 caller @ orchestrator:119+kernel:230 / fecV2 必选形参 / FEC-mandatory gate 运行时强制 orchestrator:123-139 / src/statistics 4 真实数学模块经 3 hero pipeline 成生产 caller / 12 GV + verify-golden CLI / venvSandboxAdapter 真起 python 子进程 + fetchOnlineDataset 真起 dataset_fetch.py）。
 - 但 §C 接线行 status 维持 WIRED_RED —— 物证（base-FAIL/head-PASS 双跑）须由 `scripts/depth_evidence.mjs` keystone bot 在 CI 写回，agent 不得手填。前序窗口 9 行自指 evidence `depth_gate.ok → depth_gate.ok` + closed_by 全指向 dca79ce6（纯治理 commit，零 src/ diff）已实测为手填伪造，本轮清除并降级 WIRED_RED。
 - bot 落地前唯一诚实态 = WIRED_RED。P1-5/P1-6 已接线落地（本轮），不再属 backlog；剩余 V2 深度窗口 = 真 OS 级隔离（07_RISK_REGISTER §188 自承做不到）+ maintainer M1-M4（GitHub branch protection / Actions write / CODEOWNERS，超 agent 能力）。
-- **融合衍生 backlog 全量物证**（FUSION-OS-1..14，Open Science 工程范式迁移）：§C 末段 14 行**全 WIRED_GREEN**（keystone bot 受控突变双跑·head=2fcfe04 接线 commit·base=各 cluster 靶向 stub）。迁移边界：只迁 OS 的反剧场/fail-closed/收窄伪造窗口/内容寻址/进程组 kill/AST 结构门工程范式，**绝不迁** OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。详见 `PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
+- **融合衍生 backlog 全量物证**（FUSION-OS-1..14，Open Science 工程范式迁移）：§C 末段 14 行**全 WIRED_GREEN**（keystone bot 受控突变双跑·head=2fcfe04 接线 commit·base=各 cluster 靶向 stub）。迁移边界：只迁 OS 的反剧场/fail-closed/收窄伪造窗口/内容寻址/进程组 kill/AST 结构门工程范式，**绝不迁** OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。详见 `FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
 
 ---
 
@@ -86,7 +86,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 
 ### 融合衍生 backlog（Open Science → FAR-Chain，DESIGN_PROPOSED，非当前 next）
 
-> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。Open Science 经实证为 Claude Code 分支重品牌化的**执行层 agent 工作区**（sanitize-runtime.mjs 长 byte CLAUDE→SCIENC 替换；内部 Anthropic Messages API + universal-llm 翻译网关；science-sonnet-4-6 = claude-*）；FAR-Chain 是**验证层声明级裁决内核**。**层级不同，迁移边界严格**：迁移 OS 的工程范式（反剧场/fail-closed 服务门/收窄伪造窗口/内容寻址 CAS/derivable 标记/进程组 kill/AST 结构门），**绝不迁移** OS 的 LLM-裁决语义——FAR-Chain 红线「LLM 不作最终裁决者，确定性 R0-R9 内核」高于任何融合。6 项收敛点（C-1..C-6：来源不可自填/失败闭环门/LLM-非裁决者/自排除规范哈希/冻结契约工件/从磁盘派生花名册）FAR-Chain 已独立达到，不重复立项。下表 14 行全 NOT_BUILT，属**未来 backlog**，**不抢 §A next_action=KEYSTONE_DEPTH_EVIDENCE_BOT**；接线时升 WIRED_RED，物证仍由 keystone bot CI 双跑写回 WIRED_GREEN。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。Open Science 经实证为 Claude Code 分支重品牌化的**执行层 agent 工作区**（sanitize-runtime.mjs 长 byte CLAUDE→SCIENC 替换；内部 Anthropic Messages API + universal-llm 翻译网关；science-sonnet-4-6 = claude-*）；FAR-Chain 是**验证层声明级裁决内核**。**层级不同，迁移边界严格**：迁移 OS 的工程范式（反剧场/fail-closed 服务门/收窄伪造窗口/内容寻址 CAS/derivable 标记/进程组 kill/AST 结构门），**绝不迁移** OS 的 LLM-裁决语义——FAR-Chain 红线「LLM 不作最终裁决者，确定性 R0-R9 内核」高于任何融合。6 项收敛点（C-1..C-6：来源不可自填/失败闭环门/LLM-非裁决者/自排除规范哈希/冻结契约工件/从磁盘派生花名册）FAR-Chain 已独立达到，不重复立项。下表 14 行全 NOT_BUILT，属**未来 backlog**，**不抢 §A next_action=KEYSTONE_DEPTH_EVIDENCE_BOT**；接线时升 WIRED_RED，物证仍由 keystone bot CI 双跑写回 WIRED_GREEN。
 
 | id | single_real_dependency | proof_caller | proof_test | proof_test_red_commit | status | closed_by_sha | claimed_by_pr |
 |----|------------------------|--------------|------------|-----------------------|--------|---------------|---------------|
@@ -186,12 +186,12 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 **诚实边界（不可省）**：
 
 - 真操作系统级隔离（cgroups / netns / seccomp）属 V2 路线（见
-  `PROJECT_PLAN/07_RISK_REGISTER_AND_DO_NOT_CLAIM.md`）；sandbox 加固为用户态降级，
+  `FAR_LAB_MASTER_PLAN/07_RISK_REGISTER_AND_DO_NOT_CLAIM.md`）；sandbox 加固为用户态降级，
   不宣称运行时强隔离。
 - LLM 不是最终裁决者——五值裁决由确定性 R0–R9 内核给出，这是框架红线。
 - Open Science 工程范式迁移（FUSION-OS-1..14）只迁反剧场 / fail-closed / 内容寻址 /
   进程组 kill / AST 结构门等**工程范式**，不迁其 LLM-裁决语义。设计与迁移边界见
-  `PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
+  `FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
 
 ---
 

@@ -1,7 +1,7 @@
 /**
  * cas/blob_store —— 内容寻址 blob CAS（Content-addressable Storage·FUSION-OS-9）。
  *
- *            + PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-9 + schema/migrations/0015_far_blob_store.sql。
+ *            + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-9 + schema/migrations/0015_far_blob_store.sql。
  *
  * 设计（内容寻址·去重·append-only）：
  *   - hash = sha256(canonical JSON of payload)（复用 evidence_log/hasher.ts hashCanonicalJson·字节稳定）。

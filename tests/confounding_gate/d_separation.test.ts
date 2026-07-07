@@ -1,7 +1,7 @@
 // tests/confounding_gate/d_separation.test.ts
 // 测试 dSeparation（Koller-Friedman Bayes-Ball reachability）。
 //
-// Authority: PROJECT_PLAN/03 §7.5.1 (1)（d_separation 自包含 SSOT）。
+// Authority: FAR_LAB_MASTER_PLAN/03 §7.5.1 (1)（d_separation 自包含 SSOT）。
 //
 // ⚠️ 偏差背景（见 d_separation.ts 头注释·决策 B）：03 §7.5.1 (1) 伪代码的 collider 分支语义与
 // 标准 d-separation 相反。本实现用 Koller-Friedman 标准算法，正确性以 **canonical DAG 数学定义**
