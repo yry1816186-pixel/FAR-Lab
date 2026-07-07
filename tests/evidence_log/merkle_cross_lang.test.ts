@@ -1,7 +1,7 @@
 /**
  * merkle_cross_lang —— Merkle 完整性根 + 包含证明的 TS↔Python 字节相等证明。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/09_repro_determinism.md §4（integrity root·跨语言信任根）。
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/09_repro_determinism.md §4（integrity root·跨语言信任根）。
  *
  * 证明（spawnSync python3 逐位断言）：
  *   1. TS computeMerkleRoot === Python compute_merkle_root（根字节相等·偶/奇叶数均覆盖）

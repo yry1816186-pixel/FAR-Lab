@@ -1,7 +1,7 @@
 /**
  * create_params.test.ts —— buildCreateParams 的 R1 互斥守卫 + N3 反幻觉测试。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §0 N3 + §2.2 R1 + §4.2 buildCreateParams SSOT.
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §0 N3 + §2.2 R1 + §4.2 buildCreateParams SSOT.
  *
  * 测试框架：node:test + node:assert/strict（禁 vitest·06§10 用 vitest 是 spec 示例·项目实际用 node:test）。
  *

@@ -1,7 +1,7 @@
 /**
  * fsm_runner.assertTerminated 单元测试（纯逻辑·不涉及 gateway/DB 实际调用）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §7.1.
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §7.1.
  *
  * 测试覆盖 5 个终止条件分支：
  *   1. feedback_converged — feedbackSignal=null

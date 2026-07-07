@@ -5,7 +5,7 @@
  * 涡度相关法（Eddy Covariance）与遥感驱动的光能利用率模型（如 MODIS MOD17）
  * 之间存在系统性偏差。如何量化并缩小这一偏差？
  *
- * Authority: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
  *
  * 产出：raw input 文本、SourceCard、VerdictNode、reproHash、GraphSubtree、evidence_log 记录。
  * 全程 offline_replay adapter。

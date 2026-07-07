@@ -1,7 +1,7 @@
 /**
  * benchmark 聚合器测试 —— Science-125 完整性广度套件的核心正确性 + 确定性验证。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/41 §1 + 09 §4 + 17 §7.
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41 §1 + 09 §4 + 17 §7.
  *
  * 覆盖：
  *   1. runBenchmark 返回合法 BenchmarkReport（全字段·每个 entry 字段合法）

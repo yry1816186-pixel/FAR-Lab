@@ -1,7 +1,7 @@
 /**
  * agent_attack_cases.test.ts —— M-09 攻击用例 fixtures。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/18 §6（Agent threat-model red-team harness）。
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/18 §6（Agent threat-model red-team harness）。
  *
  * ⚠️ audit [I] Critical 性质澄清——本文件是 **评估器 harness 单元测试**，非集成测试：
  *   - evaluateOverconfidencePressure / evaluatePromptInjection / evaluateToolAbuse 是本文件内

@@ -10,9 +10,9 @@
 // 反假绿：每个断言都基于真实文件/真实重算，无空断言。
 // 诚实边界（ASK-9）：sealedConclusion 绝不等于 CONFIRMED。
 //
-// Authority: FINAL_PACKAGE/15_OPEN_SCIENCE_EXPORT.md §1 +
+// 历史溯源：FINAL_PACKAGE/15_OPEN_SCIENCE_EXPORT.md §1 +
 //            09_PROOF_CARRYING_RESEARCH_OBJECT.md §4 +
-//            17_FINAL_AUDIT.md（拱心石可交付）。
+//            17_FINAL_AUDIT.md（拱心石可交付）——均已归档（备份 FAR-Lab_Backups/）·运行时 SSOT 以本测试源码实测为准。
 // 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
 
 import { test } from 'node:test';

@@ -10,7 +10,7 @@
  * V1 真实工作：computeSandboxRunResult 接受确定性输入，计算 stdoutHash/stderrHash/
  * artifactTreeHash——这些 hash 是 reproHash / ProofEnvelope 的前置锚（SR-3）。
  *
- * 权威 SSOT：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §1.2-§1.3（SR-1..SR-7）。
+ * 历史溯源：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §1.2-§1.3 SR-1..SR-7（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准。
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */
 

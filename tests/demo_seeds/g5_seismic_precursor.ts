@@ -4,7 +4,7 @@
  * 问题简述：震前 ULF/VLF 电磁异常声称可在 7 天窗口内预测 M≥5 地震（precision ≥ 0.80）。
  * 证据：地震前兆预测领域长期存在不可复现问题·无可靠可复现的 metric 证据 → UNTESTED。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
  *
  * verdict 设计：FEC evidences 为空数组 → decideVerdict 第一分支返回 UNTESTED，
  * untestedReason = 'no evidence collected for this claim'。
