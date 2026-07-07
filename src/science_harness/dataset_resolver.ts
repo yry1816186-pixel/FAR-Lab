@@ -12,7 +12,7 @@
  *
  * 诚实铁律（F1/F9）：cached 结果**绝不**升 CONFIRMED；fixture 缺失**绝不**伪造。
  *
- * 权威 SSOT：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §2.2。
+ * 历史溯源：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §2.2（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准。
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */
 

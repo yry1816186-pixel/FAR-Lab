@@ -1,7 +1,7 @@
 /**
  * FallbackChain → degraded_from 端到端桥接集成测试。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/05 §8.2/§9 + 0007_add_degraded_from.sql。
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/05 §8.2/§9 + 0007_add_degraded_from.sql。
  *
  * 目的：证明 FallbackChainResult.degradedFrom → CallAuditData.degradedFrom →
  *       call_records.degraded_from 列 的桥接契约端到端可行（离线，caller 注入 mock）。

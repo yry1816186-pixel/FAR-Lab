@@ -1,7 +1,7 @@
 /**
  * fork_types.test.ts —— M-07 分叉数据结构单元测试。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/18 §4（Forkable replay / counterfactual verdict）。
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/18 §4（Forkable replay / counterfactual verdict）。
  *
  * 覆盖：
  *   - AgentRunFork 创建与验证

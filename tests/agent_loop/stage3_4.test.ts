@@ -1,7 +1,7 @@
 /**
  * stage3_hypothesis + stage4_evidence 单元测试。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2 stage3/4 + §5.3 falsifiability_gate.
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2 stage3/4 + §5.3 falsifiability_gate.
  *
  * 测试覆盖：
  *   - HypothesisSchema zod parse 成功（falsificationMethod 必填：gt+value 或 range+lower/upper）

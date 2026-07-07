@@ -3,7 +3,7 @@
  *
  * 问题简述：为什么行星的轨道不衰减？→ 降级变体「热木星轨道衰减 dP/dt 排名」。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science125 种子→VerdictNode 裁决协议）+
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science125 种子→VerdictNode 裁决协议）+
  *            17_FINAL_AUDIT.md §7（每个 demo seed 要求）。
  *
  * 产出：raw input 文本、SourceCard、VerdictNode、reproHash、GraphSubtree、evidence_log 记录。

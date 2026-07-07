@@ -1,7 +1,7 @@
 // scripts/replay_demo_chain.ts
 // 职责：构造 demo 证明链（C-ASTRO-0001·机器裁决 UNTESTED：legacy 路径不注入统计→R6 不触发）→ 导出完整 .far-proof 包 →
 //       调 recompute_proof_hashes 字节级重算 → 打印摘要。
-// 权威 SSOT：FINAL_PACKAGE/15_OPEN_SCIENCE_EXPORT.md §1（九分量导出）+
+// 历史溯源：FINAL_PACKAGE/15_OPEN_SCIENCE_EXPORT.md §1（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准（九分量导出）+
 //            09_PROOF_CARRYING_RESEARCH_OBJECT.md（ProofEnvelope 密封）+
 //            17_FINAL_AUDIT.md（拱心石可交付）。
 //

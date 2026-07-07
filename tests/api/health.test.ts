@@ -1,7 +1,7 @@
 /**
  * health 路由测试——GET /health + GET /ready（24§5.3 / 17 Epic K-01）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §0.3 / §5.3.
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §0.3 / §5.3.
  *
  * 覆盖：
  *   - GET /health 返回 200 + status='ok' + service='far-chain-api' + ISO timestamp

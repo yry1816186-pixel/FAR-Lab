@@ -1,7 +1,7 @@
 // scripts/recompute_proof_hashes.ts
 // 职责：读取 .far-proof 导出包中的 proof_envelopes.jsonl，对每条信封**独立重算**
 //       proofHash 并与记录值字节比对（"verification not trust" 演示）。
-// 权威 SSOT：FINAL_PACKAGE/09_PROOF_CARRYING_RESEARCH_OBJECT.md §4（proofHash 自排除重算）+
+// 历史溯源：FINAL_PACKAGE/09_PROOF_CARRYING_RESEARCH_OBJECT.md §4（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准（proofHash 自排除重算）+
 //            15_OPEN_SCIENCE_EXPORT.md §1（replay step 3）。
 //
 // 退出码：

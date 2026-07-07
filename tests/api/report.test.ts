@@ -1,7 +1,7 @@
 /**
  * report 路由测试——双端点契约（24§5.3 / 17 Epic K-05a + K-05b）。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5.3 / 17 Epic K-05a/K-05b.
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5.3 / 17 Epic K-05a/K-05b.
  *
  * 端点契约：
  *   - GET /report/:runId      → 200 text/html 审计报告（Epic K-05b·前端 iframe 渲染）

@@ -4,7 +4,7 @@ import type { ProviderProfile, LlmCallCredential } from '../../types.ts';
 
 /**
  * 多模态证据的媒体类型。
- * SSOT: FAR_CHAIN_DEV_SPEC/28 §1
+ * 历史溯源：FAR_CHAIN_DEV_SPEC/28 §1（已归档·commit 66e2975）·运行时 SSOT 以本文件源码实测为准。
  */
 export type MediaKind = 'image' | 'chart' | 'video_frame' | 'diagram' | 'table_render';
 

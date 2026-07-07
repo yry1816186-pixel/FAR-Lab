@@ -1,7 +1,7 @@
 /**
  * Executable Science Harness — 类型层契约（M3 TESS / spec 12）。
  *
- * 权威 SSOT：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §1-§2 +
+ * 历史溯源：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §1-§2（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准 +
  *            11_FALSIFICATION_ENGINE.md §3 (verdict_mapping 5 路径)。
  *
  * 诚实边界（F4 · 02 §4）：

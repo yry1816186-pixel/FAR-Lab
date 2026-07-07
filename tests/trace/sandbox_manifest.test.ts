@@ -1,7 +1,7 @@
 /**
  * sandbox_manifest.test.ts —— M-08 分层沙箱清单单元测试。
  *
- * Authority: FAR_CHAIN_DEV_SPEC/18 §4 (I4: Sandbox manifest + control-plane split)。
+ * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/18 §4 (I4: Sandbox manifest + control-plane split)。
  *
  * 覆盖：
  *   - SandboxManifest 构建（10 工具覆盖）
