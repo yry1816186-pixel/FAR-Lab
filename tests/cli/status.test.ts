@@ -171,8 +171,8 @@ test('toStatusJson: 注入 testCount/coverage 后输出实测 pass 字段', () =
 test('TEST_GLOBS: 与 package.json test script 一致（含 tests/cli 自身 + tests/anti_theater + tests/proof_envelope/v2）', () => {
   assert.ok(TEST_GLOBS.length >= 20, `TEST_GLOBS 应 >= 20 项，实际: ${TEST_GLOBS.length}`);
   assert.ok(
-    TEST_GLOBS.every((g) => g.startsWith('tests/') && g.endsWith('.test.ts')),
-    'TEST_GLOBS 每项须 tests/ 前缀 + .test.ts 后缀',
+    TEST_GLOBS.every((g) => g.startsWith('tests/') && /\.test\.(ts|mjs)$/.test(g)),
+    'TEST_GLOBS 每项须 tests/ 前缀 + .test.ts/.test.mjs 后缀（package.json test script 含 tests/scripts/*.test.mjs）',
   );
   assert.ok(TEST_GLOBS.includes('tests/cli/*.test.ts'), 'TEST_GLOBS 须含 tests/cli（自身测试入口径）');
   assert.ok(

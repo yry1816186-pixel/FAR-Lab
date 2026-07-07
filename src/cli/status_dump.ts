@@ -45,6 +45,7 @@ export const TEST_GLOBS: readonly string[] = [
   'tests/benchmark/*.test.ts',
   'tests/far_proof/*.test.ts',
   'tests/science_harness/*.test.ts',
+  'tests/science_harness/adapters/*.test.ts',
   'tests/confounding_gate/*.test.ts',
   'tests/proof_envelope/*.test.ts',
   'tests/proof_envelope/v2/*.test.ts',
@@ -52,6 +53,7 @@ export const TEST_GLOBS: readonly string[] = [
   'tests/trace/*.test.ts',
   'tests/cli/*.test.ts',
   'tests/anti_theater/*.test.ts',
+  'tests/scripts/*.test.mjs',
 ];
 
 export interface PendingField {

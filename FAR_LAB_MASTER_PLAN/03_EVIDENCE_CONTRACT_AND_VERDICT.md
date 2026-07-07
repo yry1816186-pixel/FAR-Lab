@@ -59,7 +59,7 @@
 | 统计计划（StatisticalPlan 全字段） | `DESIGN_LOCKED` | MVP 仅 static prereg check；sequential alpha-spending `ROADMAP`（W5） |
 | Deterministic Verdict Kernel | `DESIGN_LOCKED` | `decideVerdict()` 当前 `PARTIAL`（已覆盖五值但规则浅，缺完整 rule trace / evidence sufficiency / contradiction 聚合） |
 | Anti-theater 规则集 | `DESIGN_LOCKED` | 20 类攻击目录见 `APPENDIX_E`；19 条 `DESIGN_LOCKED` + 1 条 `ROADMAP`（AT-OVERFIT） |
-| Golden vectors（GV-01..GV-12） | `DESIGN_LOCKED` | 完整 case 目录见 `APPENDIX_B` §2 |
+| Golden vectors（GV-01..GV-14） | `DESIGN_LOCKED` | 完整 case 目录见 `APPENDIX_B` §2（P0 基线 12 + FUSION-OS-13/14 扩展 2） |
 | Formal invariants（TLA+/Dafny/Lean） | `RESEARCH` | 仅文本示例；F10 非 runtime；V2/V3 路线图 |
 
 ---
@@ -1227,7 +1227,7 @@ ProofEnvelope.antiTheaterReport （04 §2）
 
 ## 9. Golden vectors
 
-P0 至少需要 10 个 verdict golden vectors。完整 P0 锁定 12 条（GV-01..GV-12），覆盖矩阵与实现级 case 内容见 **`APPENDIX_B_GOLDEN.md` §2**。本节给出速查表与覆盖矩阵。
+P0 至少需要 10 个 verdict golden vectors。完整 P0 锁定 12 条（GV-01..GV-12）+ FUSION-OS-13/14 扩展 2 条（GV-13 derivation form mismatch / GV-14 identifier fabrication），覆盖矩阵与实现级 case 内容见 **`APPENDIX_B_GOLDEN.md` §2**。本节给出速查表与覆盖矩阵。
 
 ### 9.1 P0 Golden Vector 速查表
 
@@ -1245,6 +1245,8 @@ P0 至少需要 10 个 verdict golden vectors。完整 P0 锁定 12 条（GV-01.
 | GV-10 | tampered proof input | (verifier RED) | R0/verifier | TS/Py/browser | tamperStatus='tampered'；三端必红 |
 | GV-11 | metric swap + LLM override | `UNTESTED` | R3 | TS/Py/browser | metric swap + LLM 非 judge 双红线 |
 | GV-12 | seed cherry-pick | `INCONCLUSIVE` | R8 | TS/Py/browser | seed locked；p_hacking_risk |
+| GV-13 | derivation form mismatch | `INCONCLUSIVE` | R_DERIVATION_FORM_MISMATCH | TS/Py/browser | FUSION-OS-13·agreement≠verification |
+| GV-14 | identifier fabrication | `REFUTED` | R_IDENTIFIER_FABRICATION | TS/Py/browser | FUSION-OS-14·可校验 identifier 无来源→REFUTED |
 
 ### 9.2 原始 10 vector 清单（保留为最小覆盖要求）
 
@@ -1430,7 +1432,7 @@ verdictMapping: { all_pass: CONFIRMED, any_refute: REFUTED, data_missing: UNTEST
 | tamperStatus 取值 | `clean` / `tampered` / `unknown` | `04_PROOF_ENVELOPE_AND_VERIFIER.md` §5 |
 | ConfoundingGate 算法 | d-separation + 后门路径枚举（确定性图算法） | 本文件 §7.5.1（自包含 SSOT）；`FINAL_PACKAGE/36` §3 仅作来源溯源（已退役，备份 `C:/Users/RichardYuan/FAR-Lab_Backups/`） |
 | Anti-theater 攻击目录 | 20 类（AT-FAKE-PASS .. AT-FAKE-DEGRADED） | `APPENDIX_E_ANTI_THEATER.md` §2（权威） |
-| Golden vectors | GV-01..GV-12 完整 case | `APPENDIX_B_GOLDEN.md` §2（权威） |
+| Golden vectors | GV-01..GV-14 完整 case | `APPENDIX_B_GOLDEN.md` §2（权威） |
 
 > **冲突仲裁**：本文件与 `APPENDIX_A_TYPES.md` / `APPENDIX_C_CANONICAL.md` / `APPENDIX_F_GLOSSARY.md` 冲突时，以三个附录为权威（全局规则 10）。
 
