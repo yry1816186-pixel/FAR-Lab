@@ -35,7 +35,13 @@ const scanExt = new Set([
   '.md', '.json', '.sh', '.bash', '.ps1', '.toml', '.env.example',
   '.pem', '.key', '.crt', '.p12', '.pfx', '.txt',
 ]);
+// skip-list: 按设计含合成假密钥的测试夹具文件（验证检测器 exit 1 用·非真实泄露）。
+// 与 zero_tolerance_scan skippedFiles 同模式（scanner self-ref / meta-test）。
+const SKIP_FILES = new Set([
+  'tests/scripts/privacy_scan.test.mjs', // 本扫描器单测：合成 sk-/AKIA/ghp_/private-key 形状验证 exit 1
+]);
 const scanFiles = allFiles.filter((f) => {
+  if (SKIP_FILES.has(f)) return false;
   if (f.endsWith('.lock') || f.endsWith('-lock.json') || f === 'package-lock.json') return false;
   if (f.includes('/node_modules/') || f.includes('/dist/') || f.endsWith('.pyc')) return false;
   const dot = f.lastIndexOf('.');
