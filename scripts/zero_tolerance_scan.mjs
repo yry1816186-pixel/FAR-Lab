@@ -90,6 +90,13 @@ const skippedFiles = new Set([
   // TAP 解析器单测 —— 测试名与 TAP 夹具字面量（'not ok 6 - probe_todo # TODO not done'）含 TODO，
   // 是 TAP 输入数据，非代码标记。经人工审计零容忍合规。
   'scripts/depth_evidence.test.mjs',
+  // W0-7 privacy-scan 扫描器本体 —— 检测正则含 DASHSCOPE_API_KEY / sk-xxx / AKIA / ghp_ 等密钥形状字面量
+  // （是检测模式，非硬编码 secret 值；allowlist 引用 env 变量名与占位符）。经人工审计零容忍合规：
+  // 无 :any / @ts-ignore / 空 catch / extra_body / header 幻觉 / 真实 sk- 明文。
+  'scripts/privacy_scan.mjs',
+  // privacy-scan 单测 —— 含合成假密钥（sk-wsJL.../AKIA.../ghp_...）以验证检测器 exit 1，
+  // 是测试夹具数据（非真实泄露·合成形状）。经人工审计零容忍合规。
+  'tests/scripts/privacy_scan.test.mjs',
 ]);
 
 function walk(path) {
