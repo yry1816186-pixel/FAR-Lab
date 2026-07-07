@@ -1,8 +1,8 @@
 -- 0016_evidence_derivable.sql
 -- FUSION-OS-10: evidence_log 行 derivable 标记 + derivable=1 强制重算验证。
 --
--- Authority: PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-10（Open Science host_call_log.derivable 范式）
---            + PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-10。
+-- Authority: FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-10（Open Science host_call_log.derivable 范式）
+--            + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-10。
 --
 -- 设计（反剧场「系统持有事实重导出」家族·与 F-3 seal 时序 / F-6 provenance 同族）：
 --   derivable INTEGER NOT NULL DEFAULT 0 CHECK (derivable IN (0,1))

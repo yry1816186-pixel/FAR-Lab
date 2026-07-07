@@ -1,7 +1,7 @@
 /**
  * report_proof_mismatch —— CI gate 4（APPENDIX_E §6）：自然语言 verdict 与 structured verdict 不一致检测。
  *
- * Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §2（AT-REPORT-MISMATCH 伪代码·natural_language_verdict_mismatch）+
+ * Authority: FAR_LAB_MASTER_PLAN/APPENDIX_E_ANTI_THEATER.md §2（AT-REPORT-MISMATCH 伪代码·natural_language_verdict_mismatch）+
  *            §6（CI gate 4）+ 04_PROOF_ENVELOPE_AND_VERIFIER.md §2（humanSummary 不进 proofHash·AT-REPORT-MISMATCH
  *            检查其与 structured verdict 强度一致）。
  *

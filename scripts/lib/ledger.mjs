@@ -18,7 +18,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export const LEDGER_REL = ['PROJECT_PLAN', 'DEPTH_LEDGER.md'];
+export const LEDGER_REL = ['FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md'];
 
 // §C 列：id | dep | callerFile:callerLine | proofTest | redCommit | status | closedBy | claimed_by_pr(可选)。
 // group(1)=id（PK，唯一）；callerFile 用 ([^\s|]+) 接受任意路径（R7 收紧：原 src/ 锚点让 P2-1

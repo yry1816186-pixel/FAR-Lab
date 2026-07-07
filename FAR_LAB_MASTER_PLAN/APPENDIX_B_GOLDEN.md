@@ -1,7 +1,7 @@
 # 附录 B · Golden Vector 目录（P0 权威集）
 
 > 本附录是 FAR-Chain **verdict / 验证 golden vector 主题的唯一权威集中处**。
-> 它从 `FINAL_PACKAGE/67_DETERMINISTIC_FIVE_VALUE_VERDICT_ENGINE.md`、`FINAL_PACKAGE/11_FALSIFICATION_ENGINE.md`、`FINAL_PACKAGE/66_FEC_TO_STATISTICAL_VERDICT_CLOSED_LOOP_DESIGN.md` 与现有 `PROJECT_PLAN/03`、`04` 增补深度（**不是推倒重写**），把分散在源文件中的红队案例、failure vector、anti-theater 规则收敛为可执行、可对拍的 P0 vector 集。
+> 它从 `FINAL_PACKAGE/67_DETERMINISTIC_FIVE_VALUE_VERDICT_ENGINE.md`、`FINAL_PACKAGE/11_FALSIFICATION_ENGINE.md`、`FINAL_PACKAGE/66_FEC_TO_STATISTICAL_VERDICT_CLOSED_LOOP_DESIGN.md` 与现有 `FAR_LAB_MASTER_PLAN/03`、`04` 增补深度（**不是推倒重写**），把分散在源文件中的红队案例、failure vector、anti-theater 规则收敛为可执行、可对拍的 P0 vector 集。
 >
 > **路径约定**：所有路径使用 `<REPOSITORY_ROOT>/`（见 `01_SOURCE_OF_TRUTH_AND_STATUS.md` §1）。`far-chain/` 仅作为历史规划路径出现，不作为真实实现根。
 >
@@ -482,7 +482,7 @@ far verify-golden --all --cross-lang
 
 ### 6.1 新增 / 修改 case 的强制步骤
 
-1. **提 RFC**：在 `PROJECT_PLAN/09_GAP_CLOSURE_LOG.md` 记录新增/修改理由、对应红队场景、预期 verdict。
+1. **提 RFC**：在 `FAR_LAB_MASTER_PLAN/09_GAP_CLOSURE_LOG.md` 记录新增/修改理由、对应红队场景、预期 verdict。
 2. **不可改 expectedVerdict 以迎合实现**：若实现输出与 case 预期不符，**修实现，不修 case**（除非 case 本身被证明语义错误，此时须走 §6.2 废止流程）。
 3. **三端同步**：TS / Python / browser runner 同步更新；任一端缺 case 即 CI 红。
 4. **cross-lang 断言**：新增 case 默认进 cross-lang 断言集；若触发已知数值域分叉，须显式标 `known_divergence` 并附 RFC 链接。
@@ -515,8 +515,8 @@ far verify-golden --all --cross-lang
 | `66_*.md` §7 failure vectors（alpha 改 / stopping rule / dataset hash / post-hoc / LLM judge / missing data / multiple tests / failed run omitted） | GV-09 / GV-12 / GV-06 / GV-09 / GV-11 / GV-04 / GV-11 / GV-10 | 同上 |
 | `66_*.md` §9 红队（post-hoc rewrite / p-hacking / optional stopping / cherry-pick / dataset drift / LLM injection / fake degraded scope） | GV-09 / GV-11 / GV-12 / GV-12 / GV-06 / GV-11 / GV-05 | 同上 |
 | `03_EXISTING_ARCHITECTURE.md` §4 golden_vectors 状态（RFC 8785 已知分叉） | §4.4 跨语言 byte-equal 门 | `C:/Users/RichardYuan/FAR-Lab_Backups/FINAL_PACKAGE/03_*.md` |
-| 现有 `PROJECT_PLAN/03_EVIDENCE_CONTRACT_AND_VERDICT.md` §9（10 个 golden vector 速记） | §2 GV-01..GV-12（完整实现级扩展） | —（仍为现行 P0 文档） |
-| 现有 `PROJECT_PLAN/04_PROOF_ENVELOPE_AND_VERIFIER.md` §5 / §7 / §8 | §4.5 verifier 输出契约 / §4.4 browser 边界 / GV-10 diff report | —（仍为现行 P0 文档） |
+| 现有 `FAR_LAB_MASTER_PLAN/03_EVIDENCE_CONTRACT_AND_VERDICT.md` §9（10 个 golden vector 速记） | §2 GV-01..GV-12（完整实现级扩展） | —（仍为现行 P0 文档） |
+| 现有 `FAR_LAB_MASTER_PLAN/04_PROOF_ENVELOPE_AND_VERIFIER.md` §5 / §7 / §8 | §4.5 verifier 输出契约 / §4.4 browser 边界 / GV-10 diff report | —（仍为现行 P0 文档） |
 
 ---
 

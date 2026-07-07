@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // src/cli/far.ts
 // 职责：FAR-Chain CLI 入口（FI-1 · far 命令家族）。
-// 权威 SSOT：PROJECT_PLAN/06 §3.2.3（FI-1 CLI 命令集）+ 01 §5（far status）+ 04 §5（far verify）。
+// 权威 SSOT：FAR_LAB_MASTER_PLAN/06 §3.2.3（FI-1 CLI 命令集）+ 01 §5（far status）+ 04 §5（far verify）。
 //
 // 已实装子命令：`far status`（01 §5）+ `far verify`（04 §5 · FI-9 第三方独立重算）
 // + `far export receipt`（04 §9 Trust Receipt DOC 投影）+ `far export far-proof` + `far bench run`

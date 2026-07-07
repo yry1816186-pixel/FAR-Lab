@@ -45,4 +45,4 @@ pnpm far status       # 或：node packages/cli/bin/far.mjs status
 ## 相关
 
 - 根 CLI 实现：`../../src/cli/far.ts`
-- 设计文档：`../../PROJECT_PLAN/05_AI4S_PRODUCT_DEMO_AND_BENCHMARK.md` §9（命令矩阵）
+- 设计文档：`../../FAR_LAB_MASTER_PLAN/05_AI4S_PRODUCT_DEMO_AND_BENCHMARK.md` §9（命令矩阵）

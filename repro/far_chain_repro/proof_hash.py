@@ -1,6 +1,6 @@
 """ProofEnvelope V2 proofHash 独立重算（RULE-PE-010 independently_recomputable）。
 
-Authority: PROJECT_PLAN/04 §2.5 + APPENDIX_C §1.9 + §2.4。
+Authority: FAR_LAB_MASTER_PLAN/04 §2.5 + APPENDIX_C §1.9 + §2.4。
 
 本模块是 TS computeProofHashV2 的 Python 镜像，用于跨语言 byte-equal 对拍
 （RULE-PE-010：ProofEnvelope 必须可被一条不依赖项目 CI 的路径从原始 claim 重算到 proofHash 匹配）。

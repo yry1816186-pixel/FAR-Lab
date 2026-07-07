@@ -1,8 +1,8 @@
 -- 0015_far_blob_store.sql
 -- FUSION-OS-9: 内容寻址 blob CAS 表（hash PK·evidence/FEC Plan/kernel trace 按 hash 去重）。
 --
--- Authority: PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-9（Open Science content-addressable CAS 范式）
---            + PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-9。
+-- Authority: FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-9（Open Science content-addressable CAS 范式）
+--            + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-9。
 --
 -- 设计（内容寻址·去重·append-only·反剧场）：
 --   hash = sha256(canonical JSON of content)（64-hex·PK·同一内容全局去重·内容寻址 SSOT）。

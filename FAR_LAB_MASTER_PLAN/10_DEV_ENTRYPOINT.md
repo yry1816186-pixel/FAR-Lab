@@ -177,7 +177,7 @@ R2真绿+UQ ──────────────────────�
 检查命令（POSIX，CI/fresh-clone 评委机可跑）：
 
 ```bash
-rg -n "far-chain/" README.md docs PROJECT_PLAN src tests
+rg -n "far-chain/" README.md docs FAR_LAB_MASTER_PLAN src tests
 ```
 
 发现旧路径时，改为 `<REPOSITORY_ROOT>/` 或明确标注为历史路径。命中时须确认它只出现在“禁用/历史/修正”语境里。
@@ -382,11 +382,11 @@ far verify --bundle path/to/.far-proof --explain
 
 ## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
 
-> 来源：`PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `PROJECT_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
 
 ### 与本文档（10_DEV_ENTRYPOINT）相关的融合缺口
 
-- **首批任务延伸·FUSION-OS-1（DESIGN_PROPOSED，最高杠杆，依赖 P0-1 完成）**：当前最大活体缺口 —— `<REPOSITORY_ROOT>/src/anti_theater/lint.ts` 的 20 个反剧场检测器（label-only / seed-cherry / metric-swapping / workflow-digest-mismatch / natural-language-verdict-mismatch 等）仅 `<REPOSITORY_ROOT>/src/cli/commands/verify.ts:412` 离线调用，`<REPOSITORY_ROOT>/src/fec/orchestrator.ts:199` 运行时 verdict 路径硬编码 `antiTheaterFindings:[]`。接线动作：`runAntiTheaterLint(fec, sandbox, statistics)` → `KernelAntiTheaterFinding[]` 注入 `buildVerdictKernelInput`，使 R-anti-theater-fail / seed-cherry / R8-warn 在实时 verdict 生效（Open Science fail-closed 服务门范式：lint 不过则 verdict 不可封 CONFIRMED）。物证须 keystone bot CI 双跑写回 WIRED_GREEN。接线表见 `PROJECT_PLAN/DEPTH_LEDGER.md` §C FUSION-OS-1。
+- **首批任务延伸·FUSION-OS-1（DESIGN_PROPOSED，最高杠杆，依赖 P0-1 完成）**：当前最大活体缺口 —— `<REPOSITORY_ROOT>/src/anti_theater/lint.ts` 的 20 个反剧场检测器（label-only / seed-cherry / metric-swapping / workflow-digest-mismatch / natural-language-verdict-mismatch 等）仅 `<REPOSITORY_ROOT>/src/cli/commands/verify.ts:412` 离线调用，`<REPOSITORY_ROOT>/src/fec/orchestrator.ts:199` 运行时 verdict 路径硬编码 `antiTheaterFindings:[]`。接线动作：`runAntiTheaterLint(fec, sandbox, statistics)` → `KernelAntiTheaterFinding[]` 注入 `buildVerdictKernelInput`，使 R-anti-theater-fail / seed-cherry / R8-warn 在实时 verdict 生效（Open Science fail-closed 服务门范式：lint 不过则 verdict 不可封 CONFIRMED）。物证须 keystone bot CI 双跑写回 WIRED_GREEN。接线表见 `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C FUSION-OS-1。
 
 > 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 `<REPOSITORY_ROOT>/CLAUDE.md` §4 P-FUSION。
 
@@ -444,7 +444,7 @@ far verify --bundle path/to/.far-proof --explain
 ### 6.1 禁用口径扫描
 
 ```bash
-rg -n "证明科学真理|物理不可篡改|完全可复现|全自动科学家|通用 AI4S benchmark|far-chain/" README.md docs PROJECT_PLAN src tests
+rg -n "证明科学真理|物理不可篡改|完全可复现|全自动科学家|通用 AI4S benchmark|far-chain/" README.md docs FAR_LAB_MASTER_PLAN src tests
 ```
 
 如果命中，确认它只出现在“禁用/历史/修正”语境里。
@@ -452,7 +452,7 @@ rg -n "证明科学真理|物理不可篡改|完全可复现|全自动科学家|
 补充禁用口径扫描（表述红线）：
 
 ```bash
-rg -n "区块链|已物理隔离|发现新科学规律|最新|第一|唯一" README.md docs PROJECT_PLAN src tests
+rg -n "区块链|已物理隔离|发现新科学规律|最新|第一|唯一" README.md docs FAR_LAB_MASTER_PLAN src tests
 ```
 
 命中“最新/第一/唯一”时须确认全带“据我们所知”或限定维度（如“最强可靠性层”非绝对宣称），无来源支撑的裸峰值词 = 过度宣称。
@@ -460,19 +460,19 @@ rg -n "区块链|已物理隔离|发现新科学规律|最新|第一|唯一" REA
 ### 6.2 五值 enum 一致性
 
 ```bash
-rg -n "CONFIRMED|REFUTED|INCONCLUSIVE|DEGRADED_SCOPE|UNTESTED" PROJECT_PLAN src tests
+rg -n "CONFIRMED|REFUTED|INCONCLUSIVE|DEGRADED_SCOPE|UNTESTED" FAR_LAB_MASTER_PLAN src tests
 ```
 
 确保 enum 仍是五值，没有新增隐式第六值。如发现旧四值残留（`ACCEPTED/REJECTED/DEGRADED/UNTESTED`）须清理：
 
 ```bash
-rg -n "ACCEPTED|REJECTED" PROJECT_PLAN src tests
+rg -n "ACCEPTED|REJECTED" FAR_LAB_MASTER_PLAN src tests
 ```
 
 ### 6.3 canonicalHash 白名单（C14 已回写为 T3）
 
 ```bash
-rg -n "C14" PROJECT_PLAN APPENDIX_*.md src tests
+rg -n "C14" FAR_LAB_MASTER_PLAN APPENDIX_*.md src tests
 ```
 
 活文档 canonicalHash 白名单语境禁出现 `C14`（白名单四字段为 `T3 = {stageId, cred, payloadKind, prevHash}`）。
@@ -488,7 +488,7 @@ Core 算法层（canonicalHash / verdict_mapping / appendRecord 的哈希与裁�
 ### 6.5 安全（无 secrets）
 
 ```bash
-rg -n "DASHSCOPE_API_KEY=|sk-" README.md docs PROJECT_PLAN src tests frontend
+rg -n "DASHSCOPE_API_KEY=|sk-" README.md docs FAR_LAB_MASTER_PLAN src tests frontend
 rg -n "\.env" .gitignore
 ```
 
@@ -497,7 +497,7 @@ rg -n "\.env" .gitignore
 ### 6.6 CausalModel schema（无 backdoorSet/variableType/edgeType/bidirected）
 
 ```bash
-rg -n "backdoorSet|variableType|edgeType|bidirected" PROJECT_PLAN APPENDIX_*.md src tests
+rg -n "backdoorSet|variableType|edgeType|bidirected" FAR_LAB_MASTER_PLAN APPENDIX_*.md src tests
 ```
 
 CausalModel 已对齐 SSOT：`CausalEdgeKind` 3 值（`direct_cause` / `probable_cause` / `spurious_correlation`）、`node_kind` 4 值（`observed` / `latent` / `intervention` / `outcome`）、`controlledConfounders` + `unmeasuredConfoundersSuspected`。残留字段值仅允许出现在迁移说明注释语境。

@@ -112,7 +112,7 @@ function artifacts(): readonly StageArtifact[] {
 // reasonCodes/ruleTrace/decisiveRuleId 由内核产出且已由 verify_golden.ts 的 golden-vector 路径覆盖
 // （decideFiveValueVerdict 直测·GV-01..GV-12）。stage 不持久化这三字段（verdict_nodes 表无对应列·
 // verdictResultFromKernelOutput:299 仅展平为 untestedReason）—— 把它们接入持久化是独立的 schema 扩展
-// （P0-2-EXT·见 PROJECT_PLAN/DEPTH_LEDGER.md §F），不在本测试范围内假装。
+// （P0-2-EXT·见 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §F），不在本测试范围内假装。
 //
 // 单一真实依赖：src/agent_loop/verdict_stage.ts:245 decideFiveValueVerdict 真实调用 +
 // src/falsifiability/repository.ts:58 recordVerdict 真实写入哈希链。

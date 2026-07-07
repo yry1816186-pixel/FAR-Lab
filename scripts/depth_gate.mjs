@@ -49,7 +49,7 @@ import { execSync, spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tokenize, codeOnlySource } from './lib/code_analysis.mjs';
-import { parseLedgerTable } from './lib/ledger.mjs';
+import { parseLedgerTable, LEDGER_REL } from './lib/ledger.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -422,7 +422,7 @@ function gvCasesHaveSchema(relPath, requiredKeys) {
 function verifyDepthLedger() {
   const ledger = parseLedgerTable(REPO_ROOT);
   if (!ledger.exists) {
-    return { passed: false, reason: 'PROJECT_PLAN/DEPTH_LEDGER.md 不存在——无去窗口化深度状态 SSOT，每窗口重新 skim。须创建（schema 见 §C）' };
+    return { passed: false, reason: 'FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md 不存在——无去窗口化深度状态 SSOT，每窗口重新 skim。须创建（schema 见 §C）' };
   }
   if (ledger.rows.length === 0) {
     return { passed: false, reason: 'DEPTH_LEDGER.md §C 表格未解析出任何行（schema 偏离？）' };
@@ -491,11 +491,11 @@ function verifyDepthLedger() {
 // ---------- 检查原语：WIRED_GREEN evidence 行强制（R7 / §D 抗博弈 #6）----------
 // 设计理由：§C line 41 + §D 抗博弈 #6 承诺「agent 手填 WIRED_GREEN 直接 exit 1」——
 //   WIRED_GREEN 行须紧随 evidence: <base>→<head> 行，由 depth-evidence bot 用 GITHUB_TOKEN 写回
-//   （agent 无该 token + CODEOWNERS 护 PROJECT_PLAN/DEPTH_LEDGER.md）。无 evidence 行 = 手填 = exit 1。
+//   （agent 无该 token + CODEOWNERS 护 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md）。无 evidence 行 = 手填 = exit 1。
 // 红队 #5 实时攻击：agent 手填 `evidence: depth_gate.ok → depth_gate.ok`（base=head 自指 + 非 SHA 格式）
 //   骗过旧宽松正则。门收紧：base≠head + 每侧须为 40-hex SHA 或纯数字 run-ID。
 function verifyWiredGreenEvidence() {
-  const ledgerPath = join(REPO_ROOT, 'PROJECT_PLAN', 'DEPTH_LEDGER.md');
+  const ledgerPath = join(REPO_ROOT, ...LEDGER_REL);
   if (!existsSync(ledgerPath)) return { passed: true, reason: '无 ledger（CHECK-L1 已报）' };
   const text = readFileSync(ledgerPath, 'utf8');
   const sectionC = text.split('## §C')[1] || '';
@@ -730,10 +730,10 @@ if (hardFailures.length > 0) {
   console.error('  W5 → STAT-1: 建 src/statistics/{p_value,effect_size,ci,multiple_testing}.ts（非占位 + 真实数学信号）');
   console.error('  W6 → P1-4: 落盘 golden_vectors/cases/GV-01..GV-12.json（verdict∈五值 + 非空 reasonCodes/evidences）');
   console.error('  W7 → P2-1: 建 tests/real_backends/*.test.ts（真实 spawn/child_process，非字符串自洽）');
-  console.error('  L1 → 修 PROJECT_PLAN/DEPTH_LEDGER.md §C（proof_test 须存在 + closed_by 须真实 sha + status∈枚举）');
+  console.error('  L1 → 修 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C（proof_test 须存在 + closed_by 须真实 sha + status∈枚举）');
   console.error('  L2 → WIRED_GREEN 行须紧随 evidence: <base_sha>→<head_sha>（base≠head + SHA/runID 格式，由 depth-evidence bot 写回，禁手填）');
   console.error('inherent_limits：静态门不证运行时执行/内容真实/RED→GREEN——完整保证须 depth-evidence bot + CODEOWNERS（见文件头）。');
-  console.error('详见 PROJECT_PLAN/DEPTH_LEDGER.md §A (next_action) + §D + .agent/AGENT_ENTRY_PROTOCOL.md + .agent/AGENT_ANTISKIM_TRIPWIRES.md');
+  console.error('详见 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §A (next_action) + §D + .agent/AGENT_ENTRY_PROTOCOL.md + .agent/AGENT_ANTISKIM_TRIPWIRES.md');
   process.exit(1);
 }
 

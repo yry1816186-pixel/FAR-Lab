@@ -158,7 +158,7 @@ pnpm test:demo_seeds
 - **反剧场扫描** `pnpm anti-theater-scan` — 检测器确定性、LLM 不在裁决回路。
 - **零容忍扫描** `pnpm zero-tolerance` — `:any` / 硬编码 secret / 空断言等反模式。
 
-接线状态记录在 `PROJECT_PLAN/DEPTH_LEDGER.md`（机器可读）。贡献流程见
+接线状态记录在 `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md`（机器可读）。贡献流程见
 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ---
@@ -177,7 +177,7 @@ pnpm test:demo_seeds
 - [CONTRIBUTING.md](CONTRIBUTING.md) — 环境搭建、PR 流程、质量门、零容忍规则
 - [CHANGELOG.md](CHANGELOG.md) — 版本变更记录
 - [SECURITY.md](SECURITY.md) — 漏洞报告与密钥策略
-- [PROJECT_PLAN/](PROJECT_PLAN/) — 架构与设计文档
+- [FAR_LAB_MASTER_PLAN/](FAR_LAB_MASTER_PLAN/) — 架构与设计文档
 
 ---
 

@@ -1,7 +1,7 @@
 -- 0009_fec_contracts_v2.sql
 -- FEC V2 契约存储（完整冻结契约 · 03 §1.2 FecContractV2）。
 --
--- Authority: PROJECT_PLAN/03 §1.2（FecContract 16 字段）+ §1.3（JSON Schema）+ 10_DEV_ENTRYPOINT W2-A。
+-- Authority: FAR_LAB_MASTER_PLAN/03 §1.2（FecContract 16 字段）+ §1.3（JSON Schema）+ 10_DEV_ENTRYPOINT W2-A。
 --
 -- 与 V1 falsifiability_contracts（0005）共存：
 --   - V1 是历史预登记（扁平字段：preregistrationHash/alpha/seed/bonferroni/population）。

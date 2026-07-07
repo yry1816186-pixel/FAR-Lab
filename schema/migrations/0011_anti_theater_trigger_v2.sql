@@ -1,7 +1,7 @@
 -- 0011_anti_theater_trigger_v2.sql
 -- ProofEnvelope V2 anti-theater trigger 升级：overallStatus → hasFail/canSealConfirmed（D1 类型统一后）。
 --
--- Authority: PROJECT_PLAN/APPENDIX_E_ANTI_THEATER.md §1（AntiTheaterReport A §7 权威存储类型）+
+-- Authority: FAR_LAB_MASTER_PLAN/APPENDIX_E_ANTI_THEATER.md §1（AntiTheaterReport A §7 权威存储类型）+
 --            APPENDIX_A_TYPES.md §7:1055-1191（findings/hasFail/failCount/warnCount/llmOverrideRejected/
 --            antiTheaterScore?/canSealConfirmed?/verdictConstraint?）+ 04 §2.4 RULE-PE-007
 --            （blocked = hasFail || canSealConfirmed===false，CONFIRMED 时 FAIL）+ task #10 W3.4（D10）。

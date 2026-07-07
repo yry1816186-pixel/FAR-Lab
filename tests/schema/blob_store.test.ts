@@ -10,8 +10,8 @@
 //     无法内容寻址去重，artifact 可静默替换（theater）。
 //   GREEN（接线后）：0015 建表 + append-only trigger；storeBlob 同内容去重 + hash 内容寻址 + 篡改失配检测。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-9 +
-//            PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-9（content-addressable CAS 范式）。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-9 +
+//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-9（content-addressable CAS 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

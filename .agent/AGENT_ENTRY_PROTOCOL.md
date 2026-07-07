@@ -22,9 +22,9 @@
 
 ### 步骤 1 — 读 DEPTH_LEDGER，定位 `next`
 
-读 `PROJECT_PLAN/DEPTH_LEDGER.md` §A（next_action）+ §C（深度模块表）。取 §C 中第一个 `status ≠ WIRED_GREEN` 行的 `id`，记为本次 `next`。`next` 由依赖序拓扑决定，**禁止跳过**（跳过 = 下游建在空中楼阁 = 零进度）。
+读 `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §A（next_action）+ §C（深度模块表）。取 §C 中第一个 `status ≠ WIRED_GREEN` 行的 `id`，记为本次 `next`。`next` 由依赖序拓扑决定，**禁止跳过**（跳过 = 下游建在空中楼阁 = 零进度）。
 
-**不要读 18 个 PROJECT_PLAN 文件**（信息过载 → 你会 skim）。只读 DEPTH_LEDGER.md + AGENT_ANTISKIM_TRIPWIRES.md。
+**不要读 18 个 FAR_LAB_MASTER_PLAN 文件**（信息过载 → 你会 skim）。只读 DEPTH_LEDGER.md + AGENT_ANTISKIM_TRIPWIRES.md。
 
 ### 步骤 2 — 用一句话陈述「单一真实依赖」+「证明测试」，否则 STOP
 
@@ -44,7 +44,7 @@ proof_test: <RED→GREEN 测试文件路径 + 测试名 + 它断言的真实依�
 ### 步骤 3 — 只做 `next` 这一项，不扩散
 
 - 改的每个 file:line 必须与 DEPTH_LEDGER §C 中 `next` 行的 `proof_caller` 相关。
-- 「顺手发现的问题」记到 commit message 或 PROJECT_PLAN，**不顺手改**（最小变更，避免模糊扩散）。
+- 「顺手发现的问题」记到 commit message 或 FAR_LAB_MASTER_PLAN，**不顺手改**（最小变更，避免模糊扩散）。
 - 改完跑**定向**测试（你写的那条 RED→GREEN + 触动到的具体测试），**不要**重跑全量套件找存在感（套件已绿，重跑无信息量；CI 的 depth_gate 才是真门）。
 
 ### 步骤 4 — 写「done」前自检（CI 会机器复核，撒谎被 exit 1）
@@ -82,7 +82,7 @@ proof_test: <RED→GREEN 测试文件路径 + 测试名 + 它断言的真实依�
 | 工件 | 角色 | 强制力来源 |
 |---|---|---|
 | CLAUDE.md §0-§5 | 项目铁律（背景/红线/注释最小化/验证策略） | 文件（Claude 默认读；非 Claude agent 经本文件 + README 横幅引导） |
-| PROJECT_PLAN/DEPTH_LEDGER.md | 深度接线 SSOT（机器解析） | scripts/depth_gate.mjs（CI required）+ 文件（去窗口化状态） |
+| FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md | 深度接线 SSOT（机器解析） | scripts/depth_gate.mjs（CI required）+ 文件（去窗口化状态） |
 | AGENT_ENTRY_PROTOCOL.md（本文件） | 入口协议 + 自检清单 | 文件 + CI depth_gate + 横幅三锚 |
 | AGENT_ANTISKIM_TRIPWIRES.md | 反 skim 操作手册（T0-T8 详释） | 文件 + CI depth_gate 的 WARN 检查 |
 | scripts/zero_tolerance_scan.mjs 等 4 个 | 扫代码反模式（:any / secret / overclaim） | CI（package.json zero-tolerance） |

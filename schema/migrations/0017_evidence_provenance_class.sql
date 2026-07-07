@@ -1,8 +1,8 @@
 -- 0017_evidence_provenance_class.sql
 -- FUSION-OS-6: evidence_log provenance_class tag + system_claim_hash 绑定（LLM 产出 provenance 强制 null + 系统 hash 重算）。
 --
--- Authority: PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-6（Open Science data_vid=None + forged marker 范式）
---            + PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-6 + CLAUDE.md §5「LLM 不作最终裁决者 / 来源不可自填」红线。
+-- Authority: FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-6（Open Science data_vid=None + forged marker 范式）
+--            + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-6 + CLAUDE.md §5「LLM 不作最终裁决者 / 来源不可自填」红线。
 --
 -- 设计（反剧场「来源不可自填」家族·与 F-5 AST 门 / F-10 derivable 同族）：
 --   provenance_class TEXT NOT NULL DEFAULT 'system_derived' CHECK (IN 三值)

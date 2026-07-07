@@ -22,8 +22,8 @@
 //
 // 反剧场红线（FUSION-OS-3 + CLAUDE.md §5）：收窄伪造窗口。seal 后内容变更检出即拒绝，不静默放过。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-3 +
-//            PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-3（sentinel 重导出范式）。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-3 +
+//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-3（sentinel 重导出范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -16,8 +16,8 @@
 // 反剧场红线（FUSION-OS-6 + CLAUDE.md §5）：来源不可自填 / LLM 不作最终裁决者。LLM 产出的 provenance 字段
 // （providerRequestId / isoTimestamp）禁止直通可信 SourceAnchor；系统持有 claimText + canonicalSystemInput 重导出 hash。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C FUSION-OS-6 +
-//            PROJECT_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-6（data_vid=None + forged marker 范式）。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-6 +
+//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-6（data_vid=None + forged marker 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

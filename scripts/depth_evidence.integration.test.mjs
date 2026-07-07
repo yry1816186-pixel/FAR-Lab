@@ -68,8 +68,8 @@ function commit(repo, testAssert, ledgerRow, msg) {
   );
   writeFileSync(join(repo, 'package.json'), '{"name":"x","type":"module"}');
   if (ledgerRow) {
-    mkdirSync(join(repo, 'PROJECT_PLAN'), { recursive: true });
-    writeFileSync(join(repo, 'PROJECT_PLAN', 'DEPTH_LEDGER.md'), ledgerText(ledgerRow), 'utf8');
+    mkdirSync(join(repo, 'FAR_LAB_MASTER_PLAN'), { recursive: true });
+    writeFileSync(join(repo, 'FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md'), ledgerText(ledgerRow), 'utf8');
   }
   git(repo, ['add', '-A']);
   git(repo, ['commit', '-q', '-m', msg]);
@@ -97,7 +97,7 @@ test('integration: base-FAIL + head-PASS → 真写 WIRED_GREEN + evidence（真
     assert.equal(r.status, 0, `bot 应 exit 0（UPGRADE）。stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
     assert.match(r.stdout, /✓ UPGRADE/);
 
-    const ledger = readFileSync(join(repo, 'PROJECT_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
+    const ledger = readFileSync(join(repo, 'FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
     assert.match(ledger, /WIRED_GREEN/);
     assert.match(ledger, new RegExp(`evidence: ${baseSha} → ${headSha}`));
     assert.match(ledger, new RegExp(headSha)); // closed_by = headSha
@@ -121,14 +121,14 @@ test('integration: base-PASS + head-PASS（stale）→ INFO 不写，exit 0，le
   try {
     const baseSha = commit(repo, '1, 1', null, 'base: passing test');
     const headSha = commit(repo, '1, 1', LEDGER_ROW, 'head: passing test + ledger');
-    const before = readFileSync(join(repo, 'PROJECT_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
+    const before = readFileSync(join(repo, 'FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
 
     const r = runBot(repo, baseSha, headSha);
     assert.equal(r.status, 0, `stale 应 exit 0（INFO 不升级）。stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
     assert.match(r.stdout, /○ INFO/);
     assert.match(r.stdout, /aggregate: 0 upgrade/);
 
-    const after = readFileSync(join(repo, 'PROJECT_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
+    const after = readFileSync(join(repo, 'FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
     assert.equal(after, before, 'stale 情形 ledger 须字节级未改');
   } finally {
     rmSync(repo, { recursive: true, force: true });
@@ -140,13 +140,13 @@ test('integration: head 测试仍红（base-FAIL + head-FAIL）→ INFO 不写�
   try {
     const baseSha = commit(repo, '1, 2', null, 'base: failing test');
     const headSha = commit(repo, '1, 3', LEDGER_ROW, 'head: still failing + ledger');
-    const before = readFileSync(join(repo, 'PROJECT_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
+    const before = readFileSync(join(repo, 'FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
 
     const r = runBot(repo, baseSha, headSha);
     assert.equal(r.status, 0, `head 仍红应 exit 0（INFO）。stdout:\n${r.stdout}`);
     assert.match(r.stdout, /○ INFO/);
     assert.match(r.stdout, /aggregate: 0 upgrade/);
-    assert.equal(readFileSync(join(repo, 'PROJECT_PLAN', 'DEPTH_LEDGER.md'), 'utf8'), before);
+    assert.equal(readFileSync(join(repo, 'FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md'), 'utf8'), before);
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
@@ -165,7 +165,7 @@ test('integration: NO_MATCH（账本测试名不存在）→ ERROR fail-closed�
     assert.match(r.stdout, /ERROR/);
     assert.match(r.stdout, /NO_MATCH/);
     // ledger 未被改（仍 WIRED_RED，无 evidence）。
-    const after = readFileSync(join(repo, 'PROJECT_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
+    const after = readFileSync(join(repo, 'FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md'), 'utf8');
     assert.match(after, /WIRED_RED/);
     assert.doesNotMatch(after, /evidence:/);
   } finally {

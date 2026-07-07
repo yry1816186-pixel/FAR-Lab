@@ -28,7 +28,7 @@ test('collectStatusDump: phase A cheap 字段从仓库实测', () => {
     '0011 anti-theater trigger V2 须在 migrationFiles',
   );
 
-  // docCount：PROJECT_PLAN/*.md 实测（01§4.4 当前口径；FINAL_PACKAGE/ 已退役）
+  // docCount：FAR_LAB_MASTER_PLAN/*.md 实测（01§4.4 当前口径；FINAL_PACKAGE/ 已退役）
   assert.ok(dump.docCount > 0, 'docCount 应 > 0');
   assert.ok(dump.numberedDocCount > 0, 'numberedDocCount 应 > 0');
 });
@@ -126,7 +126,7 @@ test('collectStatusDump: coverage 可注入实测（CLI 层 spawn 后传入）',
   }
 });
 
-test('toStatusJson: 输出 PROJECT_PLAN/01 风格机器可读 SSOT，不把 pending 伪装成数字', () => {
+test('toStatusJson: 输出 FAR_LAB_MASTER_PLAN/01 风格机器可读 SSOT，不把 pending 伪装成数字', () => {
   const json = toStatusJson(collectStatusDump(), '2026-07-02T00:00:00.000Z');
 
   assert.strictEqual(json.project, 'FAR-Chain');

@@ -99,7 +99,7 @@ FAR-Chain guards against *theater* — tests that look green but verify nothing.
   is the single source of truth for the five-value verdict
   (CONFIRMED / REFUTED / INCONCLUSIVE / DEGRADED_SCOPE / UNTESTED). The LLM is
   never the final verdict authority.
-- `PROJECT_PLAN/DEPTH_LEDGER.md` is the machine-readable wiring ledger.
+- `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` is the machine-readable wiring ledger.
   `scripts/depth_gate.mjs` parses it — preserve its `§A`/`§C`/`§D` structure.
 - TypeScript in-memory fields use `camelCase`; SQLite physical columns use
   `snake_case`.

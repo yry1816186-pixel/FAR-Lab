@@ -1,7 +1,7 @@
 # 00 项目总述
 
-> 作用域：本章是 `PROJECT_PLAN/` 的项目身份与定位总述。术语语义、命名主名、禁用词、路径约定的权威在 `APPENDIX_F_GLOSSARY.md`；类型字段权威在 `APPENDIX_A_TYPES.md`；canonical 字节规则权威在 `APPENDIX_C_CANONICAL.md`。本章与三者冲突时，改本章，不改附录。
-> 自包含纪律：本章所有内容已完整并入 `PROJECT_PLAN/`。文中引用的 `01_PROJECT_FACTS` / `06_REDEFINED_PROJECT_VISION` / `44_VISION_V2` / `45_COMPETITIVE_TEARDOWN` / `86_GRAND_PRIZE_ARGUMENT` 等 FINAL_PACKAGE 编号仅作来源溯源（`08_TRACEABILITY_MATRIX.md` 旧编号 → 新位置映射），物理档案已退役，离线备份在 `C:/Users/RichardYuan/FAR-Lab_Backups/`。
+> 作用域：本章是 `FAR_LAB_MASTER_PLAN/` 的项目身份与定位总述。术语语义、命名主名、禁用词、路径约定的权威在 `APPENDIX_F_GLOSSARY.md`；类型字段权威在 `APPENDIX_A_TYPES.md`；canonical 字节规则权威在 `APPENDIX_C_CANONICAL.md`。本章与三者冲突时，改本章，不改附录。
+> 自包含纪律：本章所有内容已完整并入 `FAR_LAB_MASTER_PLAN/`。文中引用的 `01_PROJECT_FACTS` / `06_REDEFINED_PROJECT_VISION` / `44_VISION_V2` / `45_COMPETITIVE_TEARDOWN` / `86_GRAND_PRIZE_ARGUMENT` 等 FINAL_PACKAGE 编号仅作来源溯源（`08_TRACEABILITY_MATRIX.md` 旧编号 → 新位置映射），物理档案已退役，离线备份在 `C:/Users/RichardYuan/FAR-Lab_Backups/`。
 > 状态纪律：每个能力描述带一个状态标签（`IMPLEMENTED_VERIFIED` / `IMPLEMENTED_UNVERIFIED` / `PARTIAL` / `DESIGN_LOCKED` / `ROADMAP` / `RESEARCH` / `RETIRED` / `NEEDS_EXTERNAL_VERIFICATION`），与 `01_SOURCE_OF_TRUTH_AND_STATUS.md` §3、`APPENDIX_F_GLOSSARY.md` §5 完全一致。测试数 / 文件数 / CI 通过率 / benchmark 数 / commit / 外部竞品发布时间一律不手填。
 
 ---
@@ -378,7 +378,7 @@ Propose-Critique-Falsify / CORE-Bench / ScienceAgentBench 是 benchmark 视角�
 
 **本章的自包含声明**：
 
-- 本章所有内容已**完整并入** `PROJECT_PLAN`（不再依赖 FINAL_PACKAGE 作为有效事实源）；
+- 本章所有内容已**完整并入** `FAR_LAB_MASTER_PLAN`（不再依赖 FINAL_PACKAGE 作为有效事实源）；
 - 本章中引用的 `01_PROJECT_FACTS` / `06_REDEFINED_PROJECT_VISION` / `44_VISION_V2` / `45_COMPETITIVE_TEARDOWN` / `86_GRAND_PRIZE_ARGUMENT` / `02_CONSTRAINTS_AND_RED_LINES` / `28_FINAL_COMPETITION_ABSTRACT` 等 FINAL_PACKAGE 编号，仅作**来源溯源**（`08_TRACEABILITY_MATRIX.md` 旧编号 → 新位置映射），**不作为有效依赖**；
 - 任何"详见 FINAL_PACKAGE/X"在本章中均已被改写为：要么内容完整并入本章，要么显式标注为"已归档历史口径·备份在 `C:/Users/RichardYuan/FAR-Lab_Backups/`"；
 - 若读者需要查阅 FINAL_PACKAGE 原文做历史溯源，路径是 `C:/Users/RichardYuan/FAR-Lab_Backups/FINAL_PACKAGE/`。

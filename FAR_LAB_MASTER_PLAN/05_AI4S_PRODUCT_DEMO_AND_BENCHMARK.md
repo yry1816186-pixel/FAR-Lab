@@ -826,7 +826,7 @@ $ far ask "Does TIC 268644982 show a transit signal consistent with a planet?"
 | `84_FAR_BENCH_AI4S_BENCHMARK_DESIGN.md` §1-§5 | §5.7 / §5.8 / §5.9 | `C:/Users/RichardYuan/FAR-Lab_Backups/FINAL_PACKAGE/84_*.md` |
 | `85_AI4S_PRODUCT_STORY_AND_DEMO_SCRIPT.md` 全文 | §3 / §10 / §10.1 | `C:/Users/RichardYuan/FAR-Lab_Backups/FINAL_PACKAGE/85_*.md` |
 | `46_FAR_CLI_PRODUCT_SURFACE.md` 全文 | §9（命令矩阵 / 零密钥 / 流式 / 诚实护栏） | `C:/Users/RichardYuan/FAR-Lab_Backups/FINAL_PACKAGE/46_*.md` |
-| 现有 `PROJECT_PLAN/APPENDIX_B_GOLDEN.md` §2（GV-01..GV-12） | §6（引用，权威在附录） | —（仍为现行 P0 文档） |
+| 现有 `FAR_LAB_MASTER_PLAN/APPENDIX_B_GOLDEN.md` §2（GV-01..GV-12） | §6（引用，权威在附录） | —（仍为现行 P0 文档） |
 
 ---
 

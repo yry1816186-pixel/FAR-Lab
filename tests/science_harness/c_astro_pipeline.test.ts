@@ -20,7 +20,7 @@
 // 诚实边界（CLAUDE.md §3）：缺 python/numpy = 环境问题 → t.skip（不当代码 bug）。
 // cached_fixture 是合成 transit LC（baseline_exempt）；真实 TESS 路径在 dataset_real.test.ts 覆盖。
 //
-// Authority: PROJECT_PLAN/DEPTH_LEDGER.md §C P1-5/P1-6 + 03 §7 R0-R9 + 05 §9.4 (C-ASTRO bounded)。
+// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C P1-5/P1-6 + 03 §7 R0-R9 + 05 §9.4 (C-ASTRO bounded)。
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';

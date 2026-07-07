@@ -221,7 +221,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
     }
     process.stderr.write(
       `far ask: profile "${args.profile}" + 真实凭据路径需 reproHashProvider（接 03 calc_bridge）。\n` +
-        '  当前 CLI 仅支持 offline_replay（零密钥·fixture）。真实 profile 路线见 PROJECT_PLAN 06。\n',
+        '  当前 CLI 仅支持 offline_replay（零密钥·fixture）。真实 profile 路线见 FAR_LAB_MASTER_PLAN 06。\n',
     );
     return 2;
   }

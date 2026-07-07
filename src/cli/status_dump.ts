@@ -1,6 +1,6 @@
 // src/cli/status_dump.ts
 // 职责：`far status` 单一 SSOT 数字源收集器（FI-10 · ★★ W0 硬门）。
-// 设计 SSOT：PROJECT_PLAN/01 §5（FarStatusDump schema·禁手填）+ 06 §2（W0 硬门）·运行时 SSOT 以本文件源码 + far status 实测为准。
+// 设计 SSOT：FAR_LAB_MASTER_PLAN/01 §5（FarStatusDump schema·禁手填）+ 06 §2（W0 硬门）·运行时 SSOT 以本文件源码 + far status 实测为准。
 //
 // 设计：
 //   1. 纯文件系统 + git 实测，零手填，零 DB/spawn 依赖（chainHead / testCount 由 CLI 层注入，
@@ -13,7 +13,7 @@
 //      （反幻觉：未实测→不声称已测，诚实标注 pending + reason）。
 //   4. TEST_GLOBS 须与 package.json scripts.test 一致（CI grep 校验，同 coverage_gate.mjs 纪律）。
 //
-// 复用（PROJECT_PLAN/10 §4 W0 启动）：GOLDEN_VECTORS / REPRO_CONTEXT_FIXTURE_EXPECTED_HEX（evidence_log/golden_vectors.ts）。
+// 复用（FAR_LAB_MASTER_PLAN/10 §4 W0 启动）：GOLDEN_VECTORS / REPRO_CONTEXT_FIXTURE_EXPECTED_HEX（evidence_log/golden_vectors.ts）。
 
 import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -346,10 +346,10 @@ function readMigrationFiles(): readonly string[] {
     .sort();
 }
 
-// docCount 来源：glob PROJECT_PLAN/*.md（01§4.4 + §5.3 当前口径；FINAL_PACKAGE/ 已退役见 01§1.2）。
+// docCount 来源：glob FAR_LAB_MASTER_PLAN/*.md（01§4.4 + §5.3 当前口径；FINAL_PACKAGE/ 已退役见 01§1.2）。
 // 与 readMigrationFiles 同模式——读固定 SSOT 目录，缺失=仓库结构破坏（不降级，直接暴露）。
 function readDocFiles(): { total: number; numbered: number } {
-  const files = readdirSync(join(REPO_ROOT, 'PROJECT_PLAN'), { encoding: 'utf8' })
+  const files = readdirSync(join(REPO_ROOT, 'FAR_LAB_MASTER_PLAN'), { encoding: 'utf8' })
     .filter((fileName) => fileName.endsWith('.md'));
   const numbered = files.filter((fileName) => /^\d{2}_/.test(fileName)).length;
   return { total: files.length, numbered };

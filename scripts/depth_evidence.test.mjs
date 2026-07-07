@@ -9,7 +9,7 @@
 // 真实依赖：import 真实 depth_evidence.mjs 导出函数 + 真实 lib/ledger.mjs LEDGER_ROW_RE（R6 同源校验）。
 // 反假绿：断言裁决矩阵每个分支 + 写回前后字节级 diff，无 expect(true)。
 //
-// Authority: scripts/depth_evidence.mjs 康威不变式 + PROJECT_PLAN/DEPTH_LEDGER.md §D inherent_limits (c)(d)。
+// Authority: scripts/depth_evidence.mjs 康威不变式 + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §D inherent_limits (c)(d)。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -208,8 +208,8 @@ test('replaceRowCells: 9-col 行（R10 claimed_by_pr）改 status+closed_by，cl
 test('parseLedgerTable: R10 claimed_by_pr——8 列行 claimedBy=undefined，9 列行 claimedBy=<值>', () => {
   const tmp = mkdtempSync(join(tmpdir(), 'ledger-r10-'));
   try {
-    mkdirSync(join(tmp, 'PROJECT_PLAN'), { recursive: true });
-    const ledgerPath = join(tmp, 'PROJECT_PLAN', 'DEPTH_LEDGER.md');
+    mkdirSync(join(tmp, 'FAR_LAB_MASTER_PLAN'), { recursive: true });
+    const ledgerPath = join(tmp, 'FAR_LAB_MASTER_PLAN', 'DEPTH_LEDGER.md');
     writeFileSync(
       ledgerPath,
       [

@@ -161,10 +161,10 @@ if (!failed) {
 //          src/statistics/ / golden_vectors/cases/ / tests/real_backends/）须真接到生产路径，
 //          非「已建零接线」（BUILT_UNWIRED）或「可选死分支」（WIRED_OPT_IN）。
 //          当前态确定 RED——这是特性不是 bug：ci-all green ⟺ 深度功能已接线。
-//          排障路径不是「修测试让门绿」，是读 PROJECT_PLAN/DEPTH_LEDGER.md §A 取 next_action 做真实接线。
+//          排障路径不是「修测试让门绿」，是读 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §A 取 next_action 做真实接线。
 if (!failed && !run('depth-gate (深度接线 · 见 DEPTH_LEDGER §A)', 'pnpm run depth-gate')) {
   failed = true;
-  console.error('\n→ 这不是测试失败，是深度功能未接生产路径。读 PROJECT_PLAN/DEPTH_LEDGER.md §A (next_action) + .agent/AGENT_ENTRY_PROTOCOL.md');
+  console.error('\n→ 这不是测试失败，是深度功能未接生产路径。读 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §A (next_action) + .agent/AGENT_ENTRY_PROTOCOL.md');
 }
 
 // ====================================================================
