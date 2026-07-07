@@ -8,9 +8,9 @@
 - 英文核心系统：**FAR-Chain**
 - 中文核心系统名：**可证伪科研证据链运行时**
 - 英文副标题：**Proof-Carrying AI Scientist Runtime for Falsifiable Research**
-- 缩写解释推荐：**FAR = Falsification-Anchored Research**
+- 缩写解释（W0 已统一）：**FAR = Falsification-Anchored Research**
 
-说明：当前上传文件已以 FAR-Chain 为最高一致命名；本次不再大改品牌。只把 acronym 解释从普通 “Facilitated/Auditable/Reproducible” 升级为更尖锐的 “Falsification-Anchored Research”。W0 需要统一 glossary，避免双解释混用。
+说明：当前上传文件已以 FAR-Chain 为最高一致命名；本次不再大改品牌。只把 acronym 解释从普通 “Facilitated/Auditable/Reproducible” 升级为更尖锐的 “Falsification-Anchored Research”。W0 已统一对外材料 glossary：FAR acronym（00_PROJECT_BRIEF §1.1 / .pi/project.json description / demo.ts banner）+ 三大支柱对齐 §4（frontend OverviewPage/AboutPage/DemoModePage/AblationPage：可证伪/篡改可检测/可独立复算；旧「可审计/可复现」pillar tagline + 「Falsifiable Auditable Research-Chain」英文名已替换）+ 「防篡改」→「篡改可检测 (tamper-evident)」（§4.2/D2 红线；README/CLAUDE.md/package.json/banner/frontend/master-plan 已替换）。代码注释内残留「防篡改」按 §2 不动（非对外材料，D2 不适用）；「可审计」作 auditability 形容词（工具/git 可审计，非 §4.2 pillar 词）保留。
 
 ## 2. 备选名称比较
 
@@ -25,7 +25,7 @@
 
 ## 3. 一句话定位
 
-**FAR-Chain 让 AI 生成的科研结论携带可审计、可复现、可证伪、可降级的 proof package。**
+**FAR-Chain 让 AI 生成的科研结论携带篡改可检测、可独立复算、可证伪、可降级的 proof package。**
 
 ## 4. 三句话定位
 
@@ -33,7 +33,7 @@ AI Scientist 可以生成假设、代码、图表和论文，但它的科学 cla
 
 ## 5. 评委版定位
 
-这是一个面向国产大模型 AI Scientist 的可信科研证据链系统：Qwen 负责生成候选科研假设与计划，FAR-Chain 负责把它们变成可证伪、可审计、可复现的结构化证据包。它把“AI 科研是否可靠”从口头展示变成第三方机器可验证的 proof package。
+这是一个面向国产大模型 AI Scientist 的可信科研证据链系统：Qwen 负责生成候选科研假设与计划，FAR-Chain 负责把它们变成可证伪、篡改可检测、可独立复算的结构化证据包。它把“AI 科研是否可靠”从口头展示变成第三方机器可验证的 proof package。
 
 ## 6. 开源社区版定位
 

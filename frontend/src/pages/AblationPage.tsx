@@ -103,7 +103,7 @@ const CAPABILITY_DIMENSIONS: readonly CapabilityDim[] = [
   { key: 'structuredChain', label: 'Hash 结构化证据链', description: 'call_records hash 链接·可追溯审计' },
   { key: 'singlePassReasoning', label: '单次推理', description: 'LLM 推理产出结论' },
   { key: 'falsificationSpec', label: '可证伪规格', description: '结构化 预测/指标/阈值·支持证伪判决' },
-  { key: 'reproducibleHash', label: '可复现哈希', description: 'reproHash 设计接 03 calc_bridge·可独立复现' },
+  { key: 'reproducibleHash', label: '可复现哈希', description: 'reproHash 设计接 03 calc_bridge·可独立复算' },
   { key: 'gatedVerdict', label: '门控裁决', description: 'verdict 门 + 降级范围/未测试分支' },
 ];
 
@@ -285,7 +285,7 @@ export default function AblationPage() {
       <header>
         <h1 className="text-3xl font-bold tracking-tight">消融实验</h1>
         <p className="mt-1 text-muted-foreground">
-          对比 FAR-Chain 完整流程与简化基线在可审计性、可复现性、可证伪性上的差异
+          对比 FAR-Chain 完整流程与简化基线在篡改可检测性、可独立复算性、可证伪性上的差异
         </p>
       </header>
 
@@ -576,7 +576,7 @@ export default function AblationPage() {
             FAR-Chain 相对各基线的优势
           </h2>
           <p className="mb-4 text-sm text-muted-foreground">
-            以下对比聚焦可审计性、可复现性、可证伪性三个维度，而非仅比较结论准确度。
+            以下对比聚焦篡改可检测性、可独立复算性、可证伪性三个维度，而非仅比较结论准确度。
           </p>
           <div className="grid gap-4 md:grid-cols-3" data-testid="advantage-cards">
             {/* Auditability */}
@@ -584,7 +584,7 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Eye className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">可审计性</CardTitle>
+                  <CardTitle className="text-lg">篡改可检测性</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -616,12 +616,12 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Repeat className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">可复现性</CardTitle>
+                  <CardTitle className="text-lg">可独立复算性</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  FAR-Chain 的 reproHash 设计接 03 calc_bridge 七分量（生产路径·可独立复现验证）。
+                  FAR-Chain 的 reproHash 设计接 03 calc_bridge 七分量（生产路径·可独立复算验证）。
                   当前 offline demo 用占位 hash（0×64·仅满足链式结构约束·非生产复现锚点）；
                   三基线按方法定义无复现验证机制。
                 </p>

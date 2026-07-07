@@ -17,8 +17,7 @@
 // 出口铁律：参数经 aliyun_qwen adapter（buildCreateParams / COMPETITION_BASE_URL / COMPETITION_MODEL_SNAPSHOT）构建；
 //           smoke 直接用 OpenAI SDK 调百炼端点验证连通（gateway.callLlm 抽象不适用 smoke 的端点连通测试目的）
 
-import { dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import OpenAI from 'openai';
 import {
   COMPETITION_BASE_URL,
@@ -64,7 +63,7 @@ function isChatCompletion(value: unknown): value is ChatCompletionLike {
 const SMOKE_MODELS = [
   { model: COMPETITION_MODEL_SNAPSHOT, label: 'reasoning_snapshot' },
   { model: STRUCTURED_SAFE_MODEL, label: 'structured_safe' },
-  { model: 'qwen3-coder-480b-a35b', label: 'code' },
+  { model: 'qwen3-coder-480b-a35b-instruct', label: 'code' },
   { model: 'qwen3-235b-a22b', label: 'fallback_base' },
 ] as const;
 
@@ -136,9 +135,10 @@ export async function main(): Promise<void> {
 
   // ---- Phase 2: thinking + json_schema 互斥实测 ----
   // 子用例 A: enable_thinking:false + json_schema → 应成功
+  // DashScope 约束：response_format=json_schema 时 prompt 必须含 'json' 字样（否则 400 InvalidParameter·与 OpenAI json_object 同约束）。
   {
     const messages: AliyunQwenChatMessage[] = [
-      { role: 'user', content: 'return {"x":1}' },
+      { role: 'user', content: 'return json {"x":1}' },
     ];
     const schemaDef = {
       type: 'json_schema' as const,
@@ -228,14 +228,8 @@ export async function main(): Promise<void> {
 }
 
 // ---------- CLI entry ----------
-
-const here = dirname(fileURLToPath(import.meta.url));
-const argv1 = process.argv[1];
-const invokedDirectly =
-  argv1 !== undefined &&
-  pathToFileURL(argv1).href ===
-    `file://${here.split(/[\\/]/).join('/')}/competition_qwen_smoke.ts` &&
-  import.meta.url === pathToFileURL(argv1).href;
-if (invokedDirectly) {
+// 直接调用检测：import.meta.url === pathToFileURL(argv[1])。旧版用 `file://${here}/...` 构造比较串，
+// Windows 盘符使构造串为 `file://C:/...`（2 斜杠）而 pathToFileURL 产 `file:///C:/...`（3 斜杠）→ 永不等 → main() 永不执行（静默 no-op·假绿）。canonical 单条件跨平台。
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   void main();
 }

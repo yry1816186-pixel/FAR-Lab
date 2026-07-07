@@ -125,7 +125,9 @@ test('Z3 real Python backend verifies SMT-LIB satisfiability and refutation', as
 });
 
 function findPythonCommand(): string | null {
-  for (const command of ['python3', 'python']) {
+  // Windows: 'python' 优先（WindowsApps python3 是 Store stub / 异装缺包）；Unix: 'python3'。对齐 ensure_py_deps.mjs / smt_backend.ts 约定。
+  const candidates = process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
+  for (const command of candidates) {
     const result = spawnSync(command, ['-c', 'import sys; print(sys.version)'], {
       encoding: 'utf8',
     });

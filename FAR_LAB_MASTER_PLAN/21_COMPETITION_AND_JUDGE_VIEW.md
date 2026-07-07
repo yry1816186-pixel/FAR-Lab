@@ -37,7 +37,7 @@ Core 保持模型中立，比赛演示 profile 使用 Qwen/百炼/DashScope。�
 
 > 给定公开 TESS 光变曲线与文献先验，某候选周期性/flare-like 事件是否被当前数据与预注册检测协议支持，是否存在混杂/伪阳性，能否导出第三方可验证 proof package？
 
-这比“生成一个论文题目”更贴近真实数据、可运行、可审计，也能避免过度科学宣称。
+这比“生成一个论文题目”更贴近真实数据、可运行、篡改可检测，也能避免过度科学宣称。
 
 ## 5. 是否有科研闭环
 
@@ -46,7 +46,7 @@ Core 保持模型中立，比赛演示 profile 使用 Qwen/百炼/DashScope。�
 1. Qwen 生成候选假设/研究计划。
 2. FAR 编译 FEC，冻结数据、指标、阈值、反证条件。
 3. Dataset Resolver 拉取或加载 TESS fixture。
-4. Harness 运行可复现实验或导入已运行结果。
+4. Harness 运行可独立复算实验或导入已运行结果。
 5. Statistical Judge / Causal Assumption Checker / Integrity Firewall 产出结构化检查。
 6. Deterministic Verdict 产出五值结论。
 7. ProofEnvelope 导出 `.far-proof`。
@@ -57,7 +57,7 @@ Core 保持模型中立，比赛演示 profile 使用 Qwen/百炼/DashScope。�
 | 质疑 | 是否成立 | 回应 |
 |---|---|---|
 | 这是不是普通 RAG/多 Agent？ | 不成立 | RAG/多 Agent 产生材料；FAR 的主语是 claim-level FEC、deterministic verdict、proof package 和可反证链。 |
-| 你们是否真的做科学发现？ | 部分成立 | MVP 不宣称发现新科学，而是证明 AI 生成科研 claim 能被可审计验证与降级；真实发现是路线图。 |
+| 你们是否真的做科学发现？ | 部分成立 | MVP 不宣称发现新科学，而是证明 AI 生成科研 claim 能被独立验证与降级；真实发现是路线图。 |
 | 为什么 `CONFIRMED` 不代表真？ | 应主动解释 | 它只表示在冻结 FEC 和当前 evidence 下 bounded support；这比“AI 说对了”更诚实。 |
 | 使用了国产开源大模型吗？ | 需要真实验证 | Competition profile 接入 Qwen/DashScope，真实 API smoke test 标 `NEEDS_API_VALIDATION`。 |
 | Demo 是否只是剧本？ | 风险高 | 用 offline fixture + raw hash + verifier tamper failure + diff report 证明不是纯剧本；真实 MAST 拉取标 `NEEDS_REAL_ENV`。 |
@@ -67,7 +67,7 @@ Core 保持模型中立，比赛演示 profile 使用 Qwen/百炼/DashScope。�
 
 ## 7. 项目一句话定位
 
-**FAR-Chain 不是替 AI 生成更多科研结论，而是让 AI 生成的每个科研结论都携带可审计、可复现、可证伪、可降级的证据包。**
+**FAR-Chain 不是替 AI 生成更多科研结论，而是让 AI 生成的每个科研结论都携带篡改可检测、可独立复算、可证伪、可降级的证据包。**
 
 ## 8. 60 秒答辩开场
 

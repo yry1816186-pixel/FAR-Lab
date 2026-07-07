@@ -72,8 +72,8 @@ test('COMPETITION_MODEL_SNAPSHOT is qwen3.7-max-2026-05-20', () => {
   assert.equal(COMPETITION_MODEL_SNAPSHOT, 'qwen3.7-max-2026-05-20');
 });
 
-test('STRUCTURED_SAFE_MODEL is qwen-max-2025-09-24', () => {
-  assert.equal(STRUCTURED_SAFE_MODEL, 'qwen-max-2025-09-24');
+test('STRUCTURED_SAFE_MODEL is qwen-max', () => {
+  assert.equal(STRUCTURED_SAFE_MODEL, 'qwen-max');
 });
 
 test('snapshot and structured models are distinct', () => {
@@ -128,10 +128,10 @@ test('buildCreateParams rejects non-Qwen model ids', () => {
 });
 
 test('buildCreateParams does not alter model when no routing conditions met', () => {
-  const resolved = buildCreateParams('qwen-max-2025-09-24', MSG, {
+  const resolved = buildCreateParams('qwen-max', MSG, {
     enable_thinking: false,
   });
-  assert.equal(resolved.model, 'qwen-max-2025-09-24');
+  assert.equal(resolved.model, 'qwen-max');
 });
 
 // ---------- extractRequestId ----------
@@ -172,7 +172,7 @@ test('AliyunQwenCreateParams accepts enable_thinking:false with temperature', ()
     enable_thinking: false,
     temperature: 0.3,
   };
-  const resolved = buildCreateParams('qwen-max-2025-09-24', MSG, params);
+  const resolved = buildCreateParams('qwen-max', MSG, params);
   assert.equal(resolved.temperature, 0.3);
   assert.equal(resolved.enable_thinking, false);
 });
@@ -182,7 +182,7 @@ test('AliyunQwenCreateParams accepts max_tokens and top_p', () => {
     max_tokens: 100,
     top_p: 0.9,
   };
-  const resolved = buildCreateParams('qwen-max-2025-09-24', MSG, params);
+  const resolved = buildCreateParams('qwen-max', MSG, params);
   assert.equal(resolved.max_tokens, 100);
   assert.equal(resolved.top_p, 0.9);
 });

@@ -845,6 +845,11 @@ function runExportFarProofFromArgs(args: readonly string[]): number {
     }
   }
 
+  // --demo-chain 自包含 demo 源：未显式 --out 时默认 ./.far-proof/（gitignore 已忽略·禁提交；重跑需 --force）。
+  // --db 严肃路径仍须显式 --out（不默认）。既有目录非空时下方 --force 校验 fail-closed 兜底。
+  if (outputDir === undefined && demoChain) {
+    outputDir = '.far-proof';
+  }
   if (outputDir === undefined || outputDir.length === 0) {
     process.stderr.write('far export far-proof: 必须提供 --out <dir>\n');
     return 2;

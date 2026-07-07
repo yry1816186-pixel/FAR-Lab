@@ -44,7 +44,7 @@ test('buildCreateParams routes structured output to STRUCTURED_SAFE_MODEL', () =
 });
 
 test('buildCreateParams routes thinking calls to the competition snapshot and streams', () => {
-  const params = buildCreateParams('qwen-max-2025-09-24', [{ role: 'user', content: 'think' }], {
+  const params = buildCreateParams('qwen-max', [{ role: 'user', content: 'think' }], {
     enable_thinking: true,
   });
 

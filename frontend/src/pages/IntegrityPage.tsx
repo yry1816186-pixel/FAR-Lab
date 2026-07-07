@@ -906,7 +906,7 @@ export default function IntegrityPage() {
           <h1 className="text-3xl font-bold tracking-tight">完整性信任根</h1>
         </div>
         <p className="mt-1 text-muted-foreground">
-          Integrity · 证据链防篡改的密码学演示 —— Merkle 根 · 实时复证 · 篡改剧场 · 跨语言哈希 · Repro Receipt
+          Integrity · 证据链篡改可检测的密码学演示 —— Merkle 根 · 实时复证 · 篡改剧场 · 跨语言哈希 · Repro Receipt
         </p>
       </header>
 

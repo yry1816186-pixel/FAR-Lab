@@ -15,7 +15,7 @@
 far fec compile --claim examples/fec/sample_fec_contract.json --out examples/fec/sample_compiled.json
 # → far fec compile: FEC-LEGACY-C-ASTRO-0001 → examples/fec/sample_compiled.json (fecHash=f20933daca90…)
 
-# 2. 冻结校验：重算 fecHash 与存储值比对（防篡改·CLAUDE.md §5 RR-1 禁手填 hash）
+# 2. 冻结校验：重算 fecHash 与存储值比对（篡改可检测·CLAUDE.md §5 RR-1 禁手填 hash）
 far fec freeze --fec examples/fec/sample_compiled.json
 # → far fec freeze: PASS (fecHash=f20933daca90…)
 ```

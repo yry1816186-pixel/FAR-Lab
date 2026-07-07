@@ -1,6 +1,6 @@
 # @far-chain/cli
 
-FAR-Chain CLI 包 —— AI4S 科学声明的**声明级验证层**（确定性 R0-R9 内核 · 防篡改 · 反剧场）。
+FAR-Chain CLI 包 —— AI4S 科学声明的**声明级验证层**（确定性 R0-R9 内核 · 篡改可检测 · 反剧场）。
 
 本包是 monorepo workspace（`packages/cli`），入口 `bin/far.mjs` 转发到根 `src/cli/far.ts`
 （node 24 原生 type-stripping 跑 `.ts`，项目无 dist build）。

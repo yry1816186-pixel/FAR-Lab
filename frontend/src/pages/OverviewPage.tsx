@@ -6,8 +6,8 @@ import { ShieldCheck, Eye, Repeat, Terminal, Activity } from 'lucide-react';
 
 const PILLARS = [
   { title: '可证伪', subtitle: 'Falsifiable', description: '每一个科学断言都可以被反驳、降级或标记为未测试。', icon: ShieldCheck },
-  { title: '可审计', subtitle: 'Auditable', description: '每个来源、工具调用、判定与复现产物都有锚点，构成 hash 链接的证据链。', icon: Eye },
-  { title: '可复现', subtitle: 'Reproducible', description: '确定性 hash/重放门暴露漂移而非隐藏它。', icon: Repeat },
+  { title: '篡改可检测', subtitle: 'Tamper-Evident', description: 'append-only hash 链 + Merkle root 让任何篡改可被重算发现（篡改可检测，非物理不可改）。', icon: Eye },
+  { title: '可独立复算', subtitle: 'Independently Re-computable', description: '评委可在自己机器上重算 proof head / verdict trace / 关键 hash，重算失败给出结构化差异。', icon: Repeat },
 ] as const;
 
 const RUN_COMMANDS = [
@@ -108,7 +108,7 @@ export default function OverviewPage() {
     <div className="space-y-8" data-testid="overview-page">
       <header>
         <h1 className="text-3xl font-bold tracking-tight">FAR-Chain</h1>
-        <p className="mt-1 text-muted-foreground">Falsifiable Auditable Research-Chain — AI4S 研究智能体 harness</p>
+        <p className="mt-1 text-muted-foreground">Falsification-Anchored Research Chain — AI4S 研究智能体 harness</p>
       </header>
       <section aria-labelledby="pillars-heading">
         <h2 id="pillars-heading" className="mb-4 text-xl font-semibold">三大支柱</h2>

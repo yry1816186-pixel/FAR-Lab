@@ -1,6 +1,6 @@
 # FAR-Lab
 
-**可证伪 · 可审计 · 可复现的 AI for Science 研究框架**
+**可证伪 · 篡改可检测 · 可独立复算的 AI for Science 研究框架**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 

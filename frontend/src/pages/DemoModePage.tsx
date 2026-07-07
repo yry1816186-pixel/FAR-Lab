@@ -51,7 +51,7 @@ const DEMO_SCENES: readonly DemoScene[] = [
   {
     act: 1,
     title: 'FAR 三大支柱',
-    subtitle: '可证伪 · 可审计 · 可复现',
+    subtitle: '可证伪 · 篡改可检测 · 可独立复算',
     icon: ShieldCheck,
     credibilityPoints: [
       '每个科学断言都附带可证伪规范（FalsificationSpec）：预测值、度量指标、证伪阈值、阈值语义',

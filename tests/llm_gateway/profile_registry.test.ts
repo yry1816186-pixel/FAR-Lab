@@ -48,7 +48,7 @@ test('registerProfile adds a new profile', () => {
       name: 'research_best_available',
       displayName: 'Research Best Available',
       description: 'Auto-select best available model.',
-      defaultModel: 'qwen-max-2025-09-24',
+      defaultModel: 'qwen-max',
       capabilities: ['reasoning', 'structured'],
       requiresApiKey: true,
     },
@@ -56,7 +56,7 @@ test('registerProfile adds a new profile', () => {
   );
 
   assert.deepEqual([...listProfiles()].sort(), ['offline_replay', 'research_best_available']);
-  assert.equal(requireProfile('research_best_available').meta.defaultModel, 'qwen-max-2025-09-24');
+  assert.equal(requireProfile('research_best_available').meta.defaultModel, 'qwen-max');
 });
 
 test('registerProfile throws on duplicate', () => {

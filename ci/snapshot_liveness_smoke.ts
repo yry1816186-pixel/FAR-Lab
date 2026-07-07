@@ -13,8 +13,7 @@
 //   5. 存活 → SNAPSHOT_LIVENESS_SMOKE: OK · exit 0；下线 → FAIL · exit 1
 // 无 :any / @ts-ignore / as unknown as / as 强转
 
-import { dirname } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import {
   COMPETITION_BASE_URL,
   COMPETITION_MODEL_SNAPSHOT,
@@ -91,11 +90,7 @@ export async function main(): Promise<void> {
   console.log('SNAPSHOT_LIVENESS_SMOKE: OK');
 }
 
-const here = dirname(fileURLToPath(import.meta.url));
-const argv1 = process.argv[1];
-const invokedDirectly = argv1 !== undefined
-  && pathToFileURL(argv1).href === `file://${here.split(/[\\/]/).join('/')}/snapshot_liveness_smoke.ts`
-  && import.meta.url === pathToFileURL(argv1).href;
-if (invokedDirectly) {
+// 直接调用检测（canonical·跨平台）：旧版 `file://${here}/...` 构造串在 Windows 盘符下为 `file://C:/...`（2 斜杠）≠ pathToFileURL 的 `file:///C:/...`（3 斜杠）→ main() 永不执行（静默 no-op·假绿）。
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   void main();
 }

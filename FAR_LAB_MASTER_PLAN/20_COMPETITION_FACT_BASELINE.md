@@ -117,7 +117,7 @@ MVP 评测必须先覆盖：schema validation、canonical hash stability、proof
 
 ## 15. 当前最强亮点
 
-1. 从“生成科学”转向“可证伪、可审计、可重放的 AI 科研证据链”。
+1. 从“生成科学”转向“可证伪、篡改可检测、可独立复算的 AI 科研证据链”。
 2. 五值 deterministic verdict 使不确定、失败、降级成为一等公民。
 3. `.far-proof` 把 claim、证据、代码、数据、运行、trace、hash、verdict 打成第三方可查包。
 4. Anti-Theater Harness 直接攻击 AI Scientist 常见伪科研路径。

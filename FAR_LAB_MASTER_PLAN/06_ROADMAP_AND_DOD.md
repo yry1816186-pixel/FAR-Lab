@@ -71,7 +71,7 @@ W0(FI-10 真相统一·质量门) ──不通过则 W1-W5 不启动──► W1
 | 统一仓库根路径为 `<REPOSITORY_ROOT>/` | grep 全仓 `far-chain/` 仅在「已废弃历史」语境命中 | `IMPLEMENTED_VERIFIED`（须 `far status` 复核） |
 | 建立或补齐 `far status --json`（status-dump SSOT，禁手填） | 占位符全文档回填，零裸数字；输出含测试数/migration 数/golden 向量数/coverage | `IMPLEMENTED_VERIFIED`（`src/cli/status_dump.ts` 实测产出 testCount/coverage/migrationCount/goldenVectorCount/suiteIntegrityRoot/gitCommitSha） |
 | 移除公开材料中的手填测试数 | README/PPT/答辩稿零裸 `1038/662/546/1092` 等漂移数字 | `IMPLEMENTED_UNVERIFIED` |
-| 将旧 `Auditable/Reproducible` 主卖点替换为 `Tamper-Evident/Independently Re-computable` | grep 全仓 `Auditable/Reproducible` 仅在「修正/历史」语境命中 | `PARTIAL` |
+| 将旧 `Auditable/Reproducible` 主卖点替换为 `Tamper-Evident/Independently Re-computable` | grep 全仓 `Auditable/Reproducible` 仅在「修正/历史」语境命中 | `IMPLEMENTED_VERIFIED`（README tagline + 00/24/20/21/22/09/25/30/07/08 selling-point 全替换为 篡改可检测/可独立复算；FAR acronym 统一为 Falsification-Anchored Research） |
 | 明确 ProofEnvelope 不是科学真理证书 | PDF/README 含显式「过程可信证据可机器检验，绝非科学结论为真」一句 | `DESIGN_LOCKED` |
 | 给所有 external claim 加 `NEEDS_EXTERNAL_VERIFICATION` 或来源 | 谱系锚点（PCC/FPCC/Adam/AlphaProof）节 `frontier_verified='UNVERIFIED'` 时禁 PDF 引用 | `NEEDS_EXTERNAL_VERIFICATION` |
 | `golden_vectors` 误述订正（`96a6372bdf04…` = 单向量 expectedHex，非 merkle 根） | manifest 标记演进为 `E4_BACKFILLED_96a6372b` | `IMPLEMENTED_VERIFIED` |
