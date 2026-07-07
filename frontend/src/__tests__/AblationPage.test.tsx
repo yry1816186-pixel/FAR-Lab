@@ -402,8 +402,8 @@ describe('AblationPage', () => {
       expect(screen.getByTestId('advantage-cards')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('可审计性')).toBeInTheDocument();
-    expect(screen.getByText('可复现性')).toBeInTheDocument();
+    expect(screen.getByText('篡改可检测性')).toBeInTheDocument();
+    expect(screen.getByText('可独立复算性')).toBeInTheDocument();
     expect(screen.getByText('可证伪性')).toBeInTheDocument();
   });
 

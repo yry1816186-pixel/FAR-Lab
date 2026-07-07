@@ -120,6 +120,8 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
 
 > **当前态**：§C **31 行已升 WIRED_GREEN**（keystone bot 受控突变双跑物证·含全部 P0 + 全部 FUSION-OS-1..14 + CLI/sandbox/schema/probe/sympy）；**3 行维持 WIRED_RED**（P1-2/P1-3 真实 HTTP、P1-6b 网络/lightkurve·均需真实凭据/网络，须 maintainer CI）。运行时正确性由 `far verify-golden --all`（14/14 经真实内核）独立证实。
+>
+> **2026-07-07 maintainer-side 凭据实测**（用户提供 DASHSCOPE_API_KEY + lightkurve 装入 .python-deps）：`DASHSCOPE_API_KEY=sk-xxx FAR_ONLINE=1 node scripts/credential_dual_run.mjs` → **PASS 3 · SKIP 0 · FAIL 0**。P1-3 真实 DashScope HTTP（`qwen_adapter: real DashScope HTTP (line 73)` ~5s 真实 chat.completions 调用·非 mock）、P1-6b 真实 lightkurve spawn（`fetchOnlineDataset` ~16s spawn load-bearing·host 白名单 fail-closed）。附带修复 3 个真实 bug：（1）`competition_qwen_smoke.ts`/`snapshot_liveness_smoke.ts` 的直接调用 guard 在 Windows 盘符下永假（`file://C:/` ≠ `file:///C:/`）→ main() 永不执行 = fresh-clone smoke 12/12 中 2 项静默 no-op 假绿→修为 canonical `import.meta.url === pathToFileURL(argv[1])`；（2）`STRUCTURED_SAFE_MODEL` 旧值 `qwen-max-2025-09-24` 已被 DashScope 下线（404）→ `qwen-max`；smoke model `qwen3-coder-480b-a35b`→`qwen3-coder-480b-a35b-instruct`；（3）`credential_dual_run.mjs` 的 `hasLightkurve()` 未设 PYTHONPATH=.python-deps → 永报 unavailable。修复后 fresh-clone smoke **12/12 PASS（0 skip）**。行 status 仍维持 WIRED_RED：env-gated 测试 base（无凭据）SKIP 非 FAIL，keystone bot 双跑无法 fire（inherent_limit #2）→ WIRED_GREEN 仍须 maintainer 背书或 bot 规则补 env-gated carve-out。
 
 ---
 

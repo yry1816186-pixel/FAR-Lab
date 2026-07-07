@@ -35,13 +35,13 @@ describe('OverviewPage', () => {
     expect(screen.getByRole('heading', { name: 'FAR-Chain', level: 1 })).toBeInTheDocument();
   });
 
-  it('渲染三大支柱（可证伪 / 可审计 / 可复现）', () => {
+  it('渲染三大支柱（可证伪 / 篡改可检测 / 可独立复算）', () => {
     mockHealth(HEALTH_OK);
     renderWithQueryClient(<OverviewPage />);
     const pillars = screen.getByTestId('pillars');
     expect(pillars).toHaveTextContent('可证伪');
-    expect(pillars).toHaveTextContent('可审计');
-    expect(pillars).toHaveTextContent('可复现');
+    expect(pillars).toHaveTextContent('篡改可检测');
+    expect(pillars).toHaveTextContent('可独立复算');
   });
 
   it('渲染运行命令清单', () => {

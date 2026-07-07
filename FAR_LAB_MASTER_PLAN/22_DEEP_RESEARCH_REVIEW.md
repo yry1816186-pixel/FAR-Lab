@@ -64,7 +64,7 @@
 | Lightkurve | 解决：Kepler/TESS light curve analysis | 机制：见官方/论文；抽象为接口或评测约束 | 本项目吸收：转化为模块、schema、trace 或 demo；不照搬其产品边界 | 限制：不能把对方能力说成本项目已具备；真实效果需复验 |
 | NASA ADS API docs | 解决：文献锚点与引用核验 | 机制：见官方/论文；抽象为接口或评测约束 | 本项目吸收：转化为模块、schema、trace 或 demo；不照搬其产品边界 | 限制：不能把对方能力说成本项目已具备；真实效果需复验 |
 
-## 形式化、完整性与防篡改
+## 形式化、完整性与篡改可检测
 
 | 参考 | 解决什么 | 核心机制 | 本项目吸收/差异化 | 不能照搬 |
 | --- | --- | --- | --- | --- |
@@ -95,7 +95,7 @@
 
 ### 9.2 超越
 
-FAR-Chain 的超越点不是比大厂系统更会提出假设，而是在 claim-level 形成 `FEC -> evidence -> verdict -> proof package -> replay` 的可审计链路。它允许第三方推翻 AI claim，这是普通 AI Scientist 演示通常缺失的层。
+FAR-Chain 的超越点不是比大厂系统更会提出假设，而是在 claim-level 形成 `FEC -> evidence -> verdict -> proof package -> replay` 的篡改可检测链路。它允许第三方推翻 AI claim，这是普通 AI Scientist 演示通常缺失的层。
 
 ### 9.3 避免撞车
 

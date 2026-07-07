@@ -1,7 +1,10 @@
 export const COMPETITION_MODEL_SNAPSHOT = 'qwen3.7-max-2026-05-20';
 export const MODEL_SNAPSHOT = COMPETITION_MODEL_SNAPSHOT;
 
-export const STRUCTURED_SAFE_MODEL = 'qwen-max-2025-09-24';
+// 结构化输出安全模型：qwen-max（undated latest）。旧值 qwen-max-2025-09-24 已被 DashScope 下线（2026-07-07 凭据实测 404 The model does not exist）；
+// qwen-max 是同族唯一有效替代（/v1/models 实测），与 COMPETITION_MODEL_SNAPSHOT(qwen3.7-max) 不同（R1 路由矩阵两分支保留）。undated 会随官方升级浮动——这是 qwen-max 系列已无有效 dated snapshot 的客观限制。
+// repro 边界：modelId 不进 canonical hash 白名单 T3（C7·snapshot 切换不破坏既有 proof envelope），仅影响 LLM 路由目标。
+export const STRUCTURED_SAFE_MODEL = 'qwen-max';
 
 /**
  * Competition endpoint（公开端点·非密钥）。默认字面量与 .env.example:17 一致；

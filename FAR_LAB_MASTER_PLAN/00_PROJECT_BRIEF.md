@@ -12,7 +12,7 @@
 
 | 维度 | 口径 |
 |---|---|
-| 系统主名 | `FAR-Chain`（FAR = Facilitated/Auditable/Reproducible） |
+| 系统主名 | `FAR-Chain`（FAR = Falsification-Anchored Research） |
 | 项目集主名 | `真研 FAR-Lab`（中英混排为正式写法，对应英文 `FAR-Lab`） |
 | 系统定位 | AI4S 科学声明的 **claim-level verification layer**（声明级证据验真层） |
 | 项目集定位 | 承载 FAR-Chain 系统及其周边（DomainPack、FAR-Bench、demo、答辩、开源治理）的工程组织 |
@@ -258,7 +258,7 @@ Propose-Critique-Falsify / CORE-Bench / ScienceAgentBench 是 benchmark 视角�
 
 **补救（固化叙事，写进 `28` abstract / 演讲稿）**：
 
-1. **重定义 novelty**：不赌"发现新规律"的科学新颖性，赌"让 AI 科研声明可被机器检验"的**方法新颖性**。在"AI 加剧复现危机"（`28` §3 引用须 PDF 前核原出处）的背景下，"可证伪/可审计/可复现的 AI 科研"本身就是稀缺创新。
+1. **重定义 novelty**：不赌"发现新规律"的科学新颖性，赌"让 AI 科研声明可被机器检验"的**方法新颖性**。在"AI 加剧复现危机"（`28` §3 引用须 PDF 前核原出处）的背景下，"可证伪/篡改可检测/可独立复算的 AI 科研"本身就是稀缺创新。
 2. **ProbeAtlas 作为 novelty 替代出口**：用**确定性方法**测量国产基座（Qwen）的可靠性规律——这是"元科学发现"（用可信方法研究 AI Scientist 本身的可靠性）。**但 p<0.05 必须真实测出**（F8 预登记：N=30 / R=3 / Bonferroni α'=0.0125 / seed=42），不得伪造。
 3. **诚实即加分**：Honesty Wall + DO_NOT_CLAIM + 含 `UNTESTED` 的可信链——在"AI 伪科研"泛滥的背景下，"我们诚实标注哪些没验证"本身就是评委加分项。**含 30% UNTESTED 的可信链 > 100% CONFIRMED 的含伪证链。**
 

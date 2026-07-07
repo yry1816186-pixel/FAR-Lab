@@ -169,7 +169,9 @@ test('secret_stripped_python_side: os.environ cannot read leaked API_KEY（FUSIO
 });
 
 function findPythonCommand(): string | null {
-  for (const command of ['python3', 'python']) {
+  // Windows: 'python' 优先（WindowsApps python3 是 Store stub / 异装缺包）；Unix: 'python3'。对齐 ensure_py_deps.mjs / smt_backend.ts 约定。
+  const candidates = process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
+  for (const command of candidates) {
     const r = spawnSync(command, ['-c', 'import sys; print(sys.version)'], { encoding: 'utf8' });
     if (r.error === undefined && r.status === 0) {
       return command;

@@ -13,7 +13,7 @@
 - **Agent 做什么**：生成候选 claim、编译 FEC、选择数据、规划实验、运行/导入分析、生成反证任务、导出 proof。
 - **证据链**：ClaimNode -> DatasetSnapshot -> CodeArtifact -> RunRecord -> ResultRecord -> StatisticalTestPlan -> VerdictNode。
 - **反证设计**：odd/even transit check、background contamination、randomized period negative control、bootstrap/phase shuffle、data quality flag。
-- **可复现实验**：offline fixture 必须能本地重放；live MAST path 标 `NEEDS_REAL_ENV`。
+- **可独立复算实验**：offline fixture 必须能本地重放；live MAST path 标 `NEEDS_REAL_ENV`。
 - **verdict**：根据证据可能是 `INCONCLUSIVE` 或 `DEGRADED_SCOPE`，不要强行 `CONFIRMED`。
 - **导出**：`.far-proof` + audit.html + verifier command。
 - **UI 关键画面**：claim graph、FEC freeze、raw data hash、verdict reason codes、tamper diff。

@@ -2,11 +2,11 @@
 
 > **来源**：调研优化版 `20_FINAL_EXECUTION_PROMPT_FOR_LOCAL_AGENT`。这是把整个主规划压成一段可直接复制给 Claude Code / OpenHands / 本地 Agent 的总提示词。权威事实源仍是 `01_SOURCE_OF_TRUTH_AND_STATUS`、附录三权威（A/C/F）与 `far status --json`。
 
-你是 FAR-Chain / 真研 FAR-Lab 本地开发 Agent。你的任务不是写营销文案，也不是伪造完成度，而是在现有仓库中把项目按文档逐步打磨成可审计、可验证、可开源、可参赛的 AI4S 可靠性工程。
+你是 FAR-Chain / 真研 FAR-Lab 本地开发 Agent。你的任务不是写营销文案，也不是伪造完成度，而是在现有仓库中把项目按文档逐步打磨成篡改可检测、可验证、可开源、可参赛的 AI4S 可靠性工程。
 
 ## 项目定位
 
-FAR-Chain 是 Proof-Carrying AI Scientist Runtime for Falsifiable Research。它让 AI 生成的科研 claim 携带可审计、可复现、可证伪、可降级的 proof package。核心链路是：`SciIR -> FEC -> evidence binding -> experiment/run/result -> statistical/causal/integrity checks -> deterministic five-value verdict -> ProofEnvelope -> .far-proof -> verifier/replay`。
+FAR-Chain 是 Proof-Carrying AI Scientist Runtime for Falsifiable Research。它让 AI 生成的科研 claim 携带篡改可检测、可独立复算、可证伪、可降级的 proof package。核心链路是：`SciIR -> FEC -> evidence binding -> experiment/run/result -> statistical/causal/integrity checks -> deterministic five-value verdict -> ProofEnvelope -> .far-proof -> verifier/replay`。
 
 ## 事实源
 

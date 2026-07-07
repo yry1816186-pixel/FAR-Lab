@@ -12,6 +12,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { delimiter, resolve } from 'node:path';
 
 const PROOFS = [
   {
@@ -42,9 +43,16 @@ function readKey() {
 }
 
 function hasLightkurve() {
+  // 须镜像测试的 buildPythonPath（repro + .python-deps）：lightkurve 装进 .python-deps（ensure_py_deps 不自动装可选 science 包），
+  // 不设 PYTHONPATH 则系统 python 找不到 → harness 永远报 unavailable → P1-6b 永远 SKIP（即便已正确安装）。对齐 dataset_real.test.ts:buildPythonPath。
+  const prev = process.env.PYTHONPATH;
+  const parts = [resolve('repro'), resolve('.python-deps')];
+  if (prev !== undefined && prev.length > 0) parts.push(prev);
+  const env = { ...process.env, PYTHONPATH: parts.join(delimiter) };
   const r = spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['-c', 'import lightkurve'], {
     encoding: 'utf8',
     stdio: 'ignore',
+    env,
   });
   return r.status === 0;
 }

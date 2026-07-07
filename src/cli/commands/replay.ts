@@ -111,7 +111,7 @@ function renderTimeline(rows: readonly RecordRow[], json: boolean, verify: Chain
     process.stdout.write(`  verify     : ${status}\n`);
   }
   process.stdout.write(
-    '\n  ⚠ honest : 重放展示证据链工程 + 防篡改链接，非重跑原始计算（sandbox_runner 职责）。\n\n',
+    '\n  ⚠ honest : 重放展示证据链工程 + 篡改可检测链接，非重跑原始计算（sandbox_runner 职责）。\n\n',
   );
 }
 

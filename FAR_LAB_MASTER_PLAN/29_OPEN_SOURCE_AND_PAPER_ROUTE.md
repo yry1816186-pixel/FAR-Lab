@@ -54,7 +54,7 @@ Introduction；Threat Model；FAR-Chain Overview；Scientific IR and FEC；Evide
 ## 6. Paper title 备选
 
 - FAR-Chain: Proof-Carrying Research Objects for AI Scientists。
-- Falsification-Anchored Research: Auditable Evidence Chains for Scientific Agents。
+- Falsification-Anchored Research: Tamper-Evident Evidence Chains for Scientific Agents。
 - From AI-Generated Claims to Verifiable Research Objects。
 - A Reliability Runtime for Agentic Scientific Discovery。
 

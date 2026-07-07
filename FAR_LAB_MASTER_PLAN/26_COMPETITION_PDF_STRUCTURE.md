@@ -11,7 +11,7 @@
 | 5 | 系统架构 | 分层架构图 | 工程可信 |
 | 6 | SciIR / FEC | schema 与状态机图 | 可实现 |
 | 7 | 五值 deterministic verdict | 裁决优先级图 | 科学诚实 |
-| 8 | Evidence Ledger / proofHash | Merkle/ledger 图 | 防篡改 |
+| 8 | Evidence Ledger / proofHash | Merkle/ledger 图 | 篡改可检测 |
 | 9 | Anti-Theater Harness | 攻击与防御矩阵 | 反伪科研 |
 | 10 | .far-proof package | 目录结构图 | 第三方可验证 |
 | 11 | Hero Demo：TESS | 光变曲线 + claim graph | AI4S 真实场景 |

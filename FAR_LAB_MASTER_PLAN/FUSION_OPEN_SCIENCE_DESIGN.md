@@ -37,7 +37,7 @@
 
 ### 1.2 FAR-Chain 是什么
 
-FAR-Chain 是 **AI4S 科学声明的声明级验证层**——可独立复算、防篡改、反剧场的验证内核（非测试套件、非 agent 工作区）。裁决由确定性 R0-R9 cascade 纯函数给出，**LLM 永不作最终裁决者**（`verdict_kernel_v2.ts` 类型层零 LLM 输入路径，import 段无任何 LLM 模块）。
+FAR-Chain 是 **AI4S 科学声明的声明级验证层**——可独立复算、篡改可检测、反剧场的验证内核（非测试套件、非 agent 工作区）。裁决由确定性 R0-R9 cascade 纯函数给出，**LLM 永不作最终裁决者**（`verdict_kernel_v2.ts` 类型层零 LLM 输入路径，import 段无任何 LLM 模块）。
 
 ### 1.3 融合的边界
 

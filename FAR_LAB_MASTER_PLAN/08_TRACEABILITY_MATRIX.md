@@ -306,7 +306,7 @@ P0 不再写宏大叙事，要把一个 demo claim 从 hypothesis 到 final rece
 | W0-4 | `07§6.3 C1` | 见本文件 §2.8 第一行 | 见本文件 §2.8 第一行 | Core 中立 overclaim |
 | W0-5 | `src/falsifiability/contracts.ts:13` | 见本文件 §2.8 第二行 | 见本文件 §2.8 第二行 | 注释撒谎 |
 | W0-6 | `53§3` 灵魂时刻⑥ + `44`/`53`"模型可插拔" | 见本文件 §2.8 第三行 | 见本文件 §2.8 第三行 | 灵魂时刻⑥ overclaim |
-| W0-7 | `18§8` Q&A | （11 问无自举条目） | 增补第 12 问："证据链全是 AI 产物，可信性何来？"→"我们不证明 LLM 说的对——我们证明它说了什么之后**不可篡改、可复现、可证伪**；可信性 = reproducibility（字节相等重算）+ falsifiability（可被反例推翻）的联合属性，非 LLM 自评；external anchor gitCommitSha/crossref DOI 是可外部验证的离线锚点" | Z2-BOOTSTRAP |
+| W0-7 | `18§8` Q&A | （11 问无自举条目） | 增补第 12 问："证据链全是 AI 产物，可信性何来？"→"我们不证明 LLM 说的对——我们证明它说了什么之后**不可篡改、可独立复算、可证伪**；可信性 = reproducibility（字节相等重算）+ falsifiability（可被反例推翻）的联合属性，非 LLM 自评；external anchor gitCommitSha/crossref DOI 是可外部验证的离线锚点" | Z2-BOOTSTRAP |
 | 并行 | `48§3.3` | 五类盲区判据（自然语言） | 每类给确定性判定函数签名+阈值常量（如 `data_sensitive`: ≥3 数据子集 run 中 verdict 翻转率 ≥50%），或诚实标注"超出确定性边界→需人工裁决"不纳入自动 typology | NOVELTY-A2 |
 | 并行 | `56§4`/`24§5`"降级走 offline_replay" | "FallbackChain 降级走 offline_replay" | 见本文件 §2.2 最后一行（offline_replay 是 demo profile 非生产兜底） | critic §5 |
 

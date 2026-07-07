@@ -275,7 +275,7 @@ LLM **不得**：
 
 > 任务铁律之一：证据链从 claim 到 evidence 全是 AI 写的，AI 自产自销自证，可信性何来？
 
-**答辩锚**（59 W0-7 / 61 Q2）："我们不证明 LLM 说的对——我们证明它说了什么之后**不可篡改、可复现、可证伪**；可信性 = reproducibility（字节相等重算）+ falsifiability（可被反例推翻）的联合属性，非 LLM 自评；external anchor `gitCommitSha` / crossref DOI 是可外部验证的离线锚点。demo 现场浏览器重算 hash 当众证明'重算≠相信内容'。"
+**答辩锚**（59 W0-7 / 61 Q2）："我们不证明 LLM 说的对——我们证明它说了什么之后**不可篡改、可独立复算、可证伪**；可信性 = reproducibility（字节相等重算）+ falsifiability（可被反例推翻）的联合属性，非 LLM 自评；external anchor `gitCommitSha` / crossref DOI 是可外部验证的离线锚点。demo 现场浏览器重算 hash 当众证明'重算≠相信内容'。"
 
 **AI 验 AI 范式**（61 Q2）："AI 写证明，机器检查证明——这是 PCC（Proof-Carrying Code）范式，**AI 不被信任，proof 被信任**。" AI 形式化的输出仍经 Lean4/Dafny 独立验证（`math_verifier` 路由 `L3_formal`），独立验证器是规则/类型检查器非 LLM。**不可声称"不调 AI"**——AI 介入是诚实的，但 AI 输出不进 verdict 决策路径（F3）。
 

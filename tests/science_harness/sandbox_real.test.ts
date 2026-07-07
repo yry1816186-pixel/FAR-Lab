@@ -162,7 +162,9 @@ test('venv sandbox: SR-4 input.timeoutMs bypass closed — exceeds ceiling throw
 });
 
 function findPythonCommand(): string | null {
-  for (const command of ['python3', 'python']) {
+  // Windows: 'python' 优先（WindowsApps python3 是 Store stub / 异装缺包）；Unix: 'python3'。对齐 ensure_py_deps.mjs / smt_backend.ts 约定。
+  const candidates = process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
+  for (const command of candidates) {
     const r = spawnSync(command, ['-c', 'import sys; print(sys.version)'], { encoding: 'utf8' });
     if (r.error === undefined && r.status === 0) {
       return command;

@@ -16,8 +16,8 @@ import { runVerifyGolden } from './verify_golden.ts';
 
 const BANNER = `
 ╔══════════════════════════════════════════════════════════════════════╗
-║  FAR-Chain · Falsifiability-Aware Reasoning Chain — 一键演示          ║
-║  AI4S 科学声明的声明级验证层（确定性 R0-R9 内核 · 防篡改 · 反剧场）   ║
+║  FAR-Chain · Falsification-Anchored Research Chain — 一键演示        ║
+║  AI4S 科学声明的声明级验证层（确定性 R0-R9 内核·篡改可检测·反剧场）  ║
 ╚══════════════════════════════════════════════════════════════════════╝
 `;
 
@@ -74,8 +74,8 @@ const NEXT_STEPS = `
   下一步
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   · 全栈 Web 仪表盘：pnpm api  +  cd frontend && npm run dev
-  · 导出可独立复算证明包：far export far-proof --demo-chain
-  · 第三方重算验证：far verify --bundle <导出目录>
+  · 导出可独立复算证明包：far export far-proof --demo-chain              （默认输出到 ./.far-proof/，可加 --out <dir> 覆盖）
+  · 第三方重算验证：far verify --bundle .far-proof                       （对上一条导出的目录独立重算）
   · 跑 Science-125 基准：far bench run
   · 深度接线门：node scripts/depth_gate.mjs
 `;
