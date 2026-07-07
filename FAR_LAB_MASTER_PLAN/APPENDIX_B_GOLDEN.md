@@ -26,7 +26,7 @@
 |---|---|---|
 | 五值裁决 enum | `DESIGN_LOCKED` | enum 闭包已锁死，禁新增第六值 |
 | verdict kernel 规则优先级（R0-R9） | `DESIGN_LOCKED` | 来源 `FINAL_PACKAGE/67` §4 |
-| P0 golden vector 集（GV-01..GV-12） | `DESIGN_LOCKED` | 本附录锁定；新增 case 须走 §6 维护流程 |
+| P0 golden vector 集（GV-01..GV-12） | `DESIGN_LOCKED` | 本附录锁定；新增 case 须走 §6 维护流程。GV-13/GV-14 为 FUSION-OS-13/14 扩展（见 §2），同样走本附录 |
 | TS verifier 对拍 | `Pending` | 工程落地状态以 `far status --json` 为准，禁止手填测试数 |
 | Python verifier 对拍 | `Pending` | 同上 |
 | Browser verifier 对拍 | `Pending` | 同上 |
@@ -72,11 +72,11 @@ emit all skipped/warned rules in trace
 
 ---
 
-## 2. P0 Golden Vector 目录（GV-01 .. GV-12）
+## 2. P0 Golden Vector 目录（GV-01 .. GV-14）
 
 每个 case 给出：`caseId`、输入摘要（FEC / 数据 / workflow / 统计结果的关键取值）、`expectedVerdict`、`expectedReasonCodes`、须通过的 verifier（TS / Python / browser）、边界条件。
 
-> **覆盖矩阵**：GV-01 complete support / GV-02 complete refute / GV-03 missing FEC / GV-04 missing dataset / GV-05 narrower population / GV-06 dataset drift / GV-07 underpowered / GV-08 conflicting metrics / GV-09 post-hoc threshold / GV-10 tampered proof input / GV-11 metric swap / GV-12 seed cherry-pick。共 12 条，满足 P0“≥10 条”要求。
+> **覆盖矩阵**：GV-01 complete support / GV-02 complete refute / GV-03 missing FEC / GV-04 missing dataset / GV-05 narrower population / GV-06 dataset drift / GV-07 underpowered / GV-08 conflicting metrics / GV-09 post-hoc threshold / GV-10 tampered proof input / GV-11 metric swap / GV-12 seed cherry-pick / **GV-13 derivation form mismatch（FUSION-OS-13）** / **GV-14 identifier fabrication（FUSION-OS-14）**。共 14 条（P0 基线 12 + FUSION 扩展 2），满足 P0“≥10 条”要求。
 
 > **统一数值约定**：除非 case 显式声明，所有 α 校正后 `adjustedPValue`、effect size、CI 均为 deterministic 浮点比较，容差 `1e-7`（见 §4.1）。所有 hash 为 64 位小写十六进制 sha256。
 
@@ -304,6 +304,38 @@ emit all skipped/warned rules in trace
 | 须通过 verifier | TS / Python / browser |
 | 边界条件 | seed cherry-pick 触发 `integrityFlags += 'p_hacking_risk'`（来源 `FINAL_PACKAGE/11` §4.1 F8 "换 seed = p-hacking"、`03` §8 "seed cherry-picking → INCONCLUSIVE 或 fail"）。`runRegistry`（anti-theater）须记录已知失败 run（seed=42），缺记录则 verifier WARN。若 seed 偏离且无 run registry，升 R3 critical deviation → `UNTESTED`。本 case 设 runRegistry 存在，故降级为 R8 `INCONCLUSIVE`。 |
 
+### GV-13 · derivation form mismatch → INCONCLUSIVE
+
+| 字段 | 取值 |
+|---|---|
+| caseId | `GV-13` |
+| 场景 | derivation form mismatch（literal 被静默换为 derived·数值相等） |
+| FEC | `statisticalPlan.expectedDerivationForm='literal'`（预登记原始测量形态） |
+| dataset | binding 有效 |
+| workflow | seed locked；无 protocol deviation |
+| 统计结果 | `statistics[].derivationForm='derived'`（与预登记 `literal` 不符·p=0.008 supports、effectSize=0.62 数值本身合格） |
+| expectedVerdict | `INCONCLUSIVE` |
+| expectedReasonCodes | `['R_DERIVATION_FORM_MISMATCH']` |
+| decisiveRuleId | `R_DERIVATION_FORM_MISMATCH` |
+| 须通过 verifier | TS / Python / browser |
+| 边界条件 | FUSION-OS-13「Agreement-is-not-verification」反 theater 范式：即便统计数值支持 claim，只要 evidence 的 `derivationForm` 与 FEC 预登记的 `expectedDerivationForm` 不符（literal↔derived↔formula↔auto），内核即降级。防「数值对得上但来源形态被偷换」的静默伪造。零回归 GV-01..12（既有 12 case 无 derivationForm 字段·formMismatch 恒 false·R0-R9 cascade 字节不变）。 |
+
+### GV-14 · identifier fabrication → REFUTED
+
+| 字段 | 取值 |
+|---|---|
+| caseId | `GV-14` |
+| 场景 | identifier fabrication（claim 引用可校验 identifier 但无 harness-verified 来源） |
+| FEC | `claimIdentifiers` 含可校验 identifier（DOI / arXiv / accession / author_year） |
+| dataset | binding 有效 |
+| workflow | 无 protocol deviation |
+| 统计结果 | 统计本身支持（supports） |
+| expectedVerdict | `REFUTED` |
+| expectedReasonCodes | `['UNVERIFIED_IDENTIFIER']` |
+| decisiveRuleId | `R_IDENTIFIER_FABRICATION` |
+| 须通过 verifier | TS / Python / browser |
+| 边界条件 | FUSION-OS-14「fabricated-references EXCEPTION」反 theater 范式：claim 带可校验 identifier（DOI/arXiv/accession/author_year）但无 harness-verified 来源 → `REFUTED`（非 `UNTESTED`·五值优先级 REFUTED>UNTESTED）。插 R5 后 R6 前·三态：not_found=REFUTED / unresolved=UNTESTED / resolved=不触发·unresolved 优先。caller opt-in 接线。零回归 GV-01..13。 |
+
 ---
 
 ## 3. Golden Vector 汇总速查表
@@ -322,6 +354,8 @@ emit all skipped/warned rules in trace
 | GV-10 | tampered proof input | (verifier RED) | R0/verifier | TS/Py/browser | tamperStatus='tampered'；三端必红 |
 | GV-11 | metric swap + LLM override | `UNTESTED` | R3 | TS/Py/browser | metric swap + LLM 非 judge 双红线 |
 | GV-12 | seed cherry-pick | `INCONCLUSIVE` | R8 | TS/Py/browser | seed locked；p_hacking_risk |
+| GV-13 | derivation form mismatch | `INCONCLUSIVE` | R_DERIVATION_FORM_MISMATCH | TS/Py/browser | agreement≠verification；form 偷换降级 |
+| GV-14 | identifier fabrication | `REFUTED` | R_IDENTIFIER_FABRICATION | TS/Py/browser | 可校验 identifier 无来源 → REFUTED（非 UNTESTED） |
 
 ---
 
@@ -524,7 +558,7 @@ far verify-golden --all --cross-lang
 
 | 项 | 口径 |
 |---|---|
-| Golden vector 覆盖度 | P0 锁定 12 条，**不声称**覆盖所有科研场景。新红队发现须走 §6.1 流程补 case。 |
+| Golden vector 覆盖度 | P0 锁定 12 条 + FUSION-OS-13/14 扩展 2 条 = 14 条，**不声称**覆盖所有科研场景。新红队发现须走 §6.1 流程补 case。 |
 | 三端对拍 | 核心算法 byte-equal；数值域边界为已知分叉（RED），**不声称**"所有字段三端完全一致"。 |
 | Browser verifier | 验证 Merkle / chain / proofHash / inclusion proof 的具体范围；**不声称**是"完全不同语言的独立第三方验证生态"。 |
 | Verdict 正确性 | Golden vector 验证的是 **deterministic kernel 在固定输入下输出稳定**，**不声称** verdict 本身是科学真理。 |
