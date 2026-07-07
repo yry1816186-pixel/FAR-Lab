@@ -70,14 +70,14 @@ W0(FI-10 真相统一·质量门) ──不通过则 W1-W5 不启动──► W1
 |---|---|---|
 | 统一仓库根路径为 `<REPOSITORY_ROOT>/` | grep 全仓 `far-chain/` 仅在「已废弃历史」语境命中 | `IMPLEMENTED_VERIFIED`（须 `far status` 复核） |
 | 建立或补齐 `far status --json`（status-dump SSOT，禁手填） | 占位符全文档回填，零裸数字；输出含测试数/migration 数/golden 向量数/coverage | `IMPLEMENTED_VERIFIED`（`src/cli/status_dump.ts` 实测产出 testCount/coverage/migrationCount/goldenVectorCount/suiteIntegrityRoot/gitCommitSha） |
-| 移除公开材料中的手填测试数 | README/PPT/答辩稿零裸 `1038/662/546/1092` 等漂移数字 | `IMPLEMENTED_UNVERIFIED` |
+| 移除公开材料中的手填测试数 | README/PPT/答辩稿零裸 `1038/662/546/1092` 等漂移数字 | `IMPLEMENTED_VERIFIED`（grep README + master-plan 零裸漂移数字，全占位符 `<X_FROM_STATUS_DUMP>`） |
 | 将旧 `Auditable/Reproducible` 主卖点替换为 `Tamper-Evident/Independently Re-computable` | grep 全仓 `Auditable/Reproducible` 仅在「修正/历史」语境命中 | `IMPLEMENTED_VERIFIED`（README tagline + 00/24/20/21/22/09/25/30/07/08 selling-point 全替换为 篡改可检测/可独立复算；FAR acronym 统一为 Falsification-Anchored Research） |
 | 明确 ProofEnvelope 不是科学真理证书 | PDF/README 含显式「过程可信证据可机器检验，绝非科学结论为真」一句 | `DESIGN_LOCKED` |
 | 给所有 external claim 加 `NEEDS_EXTERNAL_VERIFICATION` 或来源 | 谱系锚点（PCC/FPCC/Adam/AlphaProof）节 `frontier_verified='UNVERIFIED'` 时禁 PDF 引用 | `NEEDS_EXTERNAL_VERIFICATION` |
 | `golden_vectors` 误述订正（`96a6372bdf04…` = 单向量 expectedHex，非 merkle 根） | manifest 标记演进为 `E4_BACKFILLED_96a6372b` | `IMPLEMENTED_VERIFIED` |
 | domain 6 值消歧（`SciIRDomain` 领域枚举 ≠ verdict 笔误） | 仅加消歧注，不改五值枚举 | `DESIGN_LOCKED` |
-| 移除无法验证的 commit 引用 | grep 全仓无裸 `07a8005` 等（仓库无对应 commit） | `IMPLEMENTED_UNVERIFIED` |
-| `$null` 残留清理 + privacy-scan CI | privacy-scan CI 生效 | `PARTIAL` |
+| 移除无法验证的 commit 引用 | grep 全仓无裸 `07a8005` 等（仓库无对应 commit） | `IMPLEMENTED_VERIFIED`（仅 4 处残留均为审计溯表/任务规格本身的「此 commit 已移除」元引用，零 live anchor；`af4abf4` 是 golden-vector expectedHex 尾非 commit） |
+| `$null` 残留清理 + privacy-scan CI | privacy-scan CI 生效 | `IMPLEMENTED_VERIFIED`（$null 零残留·`scripts/privacy_scan.mjs` 11 类密钥形状全仓扫描·build-integrity.yml R9-2-16 CI 步·tests/scripts/privacy_scan.test.mjs 4 测实跑；CI Actions-run 待 maintainer） |
 | DO_NOT_CLAIM V2 + 红队风险登记入库 | 与 `07_RISK_REGISTER_AND_DO_NOT_CLAIM.md` 一致 | `DESIGN_LOCKED` |
 
 ### 2.3 DOD（W0 质量硬门）
@@ -107,7 +107,7 @@ W0(FI-10 真相统一·质量门) ──不通过则 W1-W5 不启动──► W1
 |---|---|---|
 | canonical serialization 固化（JCS 对齐，TS `canonicalHash` ≡ Python `canonical_hash`） | 4 字段白名单内（stageId/cred/payloadKind/prevHash）字节相等；数值域 `1e-7` 鸿沟诚实归 RED 待 V3 | `IMPLEMENTED_VERIFIED`（白名单内）/ `PARTIAL`（数值域） |
 | golden vectors 覆盖核心类型 | 含 ≥7 条数值域向量（浮点 / >2^53 大整数 / 科学计数 / NFC 中文 / isoTimestamp 毫秒 / 负零 / 超大负数）；占位哈希用语义哨兵 `PLACEHOLDER_UNVERIFIED_<vectorId>` | `PARTIAL` |
-| evidence log chain 可重算 | `computeChainHead(db)` 遍历 `call_records ORDER BY seq` 逐行重算，末行 hash 即链头 | `IMPLEMENTED_UNVERIFIED` |
+| evidence log chain 可重算 | `verifyChainHead`（src/evidence_log/verifier.ts）遍历 `call_records ORDER BY seq` 逐条重算 hash 逐条校验，末行 hash 即链头 | `IMPLEMENTED_VERIFIED`（verifier.ts 实现·tests/api/integrity + tests/ci/verify_chain_smoke + tests/cli/replay_tamper 实跑） |
 | migration runner 可在 clean checkout 跑通 | `0001-0008`（实测当前已落盘）+ 路线图 `0009-0025`（待 Ask 裁决编号归属，见 §10 CROSS-CUT-003） | `IMPLEMENTED_VERIFIED`（0001-0008）/ `DESIGN_LOCKED`（0009-0025） |
 | TS/Python 对核心 hash 行为对拍 | CI `cross_lang_consistency.test.ts`（TS）启动 Python 子进程跑 `canonical_json.py`，逐 fixture 比对 `expected_ts_hash === expected_py_hash` | `PARTIAL`（数值类已绿） |
 
@@ -118,7 +118,7 @@ W0(FI-10 真相统一·质量门) ──不通过则 W1-W5 不启动──► W1
 | 打开 `arXiv:2602.20214`（Right-to-History）原文核作者/机构/方法 | `UNVERIFIED`，PDF 第 1 页钉死差异化三连（D1 缺位补位 / D2 runtime 非 benchmark / D3 国产基座） | `NEEDS_EXTERNAL_VERIFICATION` |
 | 同构度评估与差异化口径选定 | D1/D2/D3 各有 hedge + 来源 | `NEEDS_EXTERNAL_VERIFICATION` |
 | 谱系锚点（PCC 1996 / FPCC Princeton / Adam 2009 / AlphaProof 2025）查新 | `17` 章 30-checklist novelty/priority 查新前置 | `NEEDS_EXTERNAL_VERIFICATION` |
-| 「首个 / first」全配 hedge 或来源 | grep 全仓裸「首个 / first」必须伴随谱系锚定语句或「据我们所知 / among the first」 | `PARTIAL` |
+| 「首个 / first」全配 hedge 或来源 | grep 全仓裸「首个 / first」必须伴随谱系锚定语句或「据我们所知 / among the first」 | `IMPLEMENTED_VERIFIED`（README+master-plan grep 零裸 novelty overclaim·全 hedge 为「据我们所知/among the first」或 UNVERIFIED_PRIOR_ART） |
 
 #### 3.2.3 CLI 薄壳轨（FI-1 产品化）
 
@@ -195,7 +195,7 @@ far replay <run>                                # 确定性续跑（仅 determin
 | 实现 protocol freeze（`freezeProtocol`） | actor 签名后 `frozenAt` 不可改；改则 `PROTOCOL_DEVIATION_CRITICAL` | `DESIGN_LOCKED` |
 | verdict 输入改为 metric-first | 统计结果按冻结规则映射到五值 | `DESIGN_LOCKED`（实现 `PARTIAL`，见 67 章） |
 | 输出 `VerdictRuleTrace` | 支持/反证/冲突/功效不足均有 deterministic trace | `DESIGN_LOCKED`（实现 `PARTIAL`） |
-| 建立 10 个 verdict golden vectors | 覆盖 5 值 × 边界（缺数据 / scope 缩小 / 反证 / 冲突 / 通过） | `PARTIAL` |
+| 建立 10 个 verdict golden vectors | 覆盖 5 值 × 边界（缺数据 / scope 缩小 / 反证 / 冲突 / 通过） | `IMPLEMENTED_VERIFIED`（14 GV 落盘 golden_vectors/cases/GV-01..14.json·`far verify-golden --all` 14/14 PASS 经真实内核） |
 | LLM evidence label 只能作为辅助，不得直接决定 verdict | verdict 由 deterministic `verdict_mapping` 5 路径产出 | `DESIGN_LOCKED` |
 
 verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路径）：
@@ -249,9 +249,9 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 | 任务 | 验收口径 | 状态 |
 |---|---|---|
-| 建立 10 个 P0 FAR-Bench cases | 覆盖 label-only evidence / post-hoc threshold / dataset drift / metric swap / scope laundering | `PARTIAL` |
+| 建立 10 个 P0 FAR-Bench cases | 覆盖 label-only evidence / post-hoc threshold / dataset drift / metric swap / scope laundering | `IMPLEMENTED_VERIFIED`（20 attackId 超过 10·5 类全覆盖·tests/anti_theater/anti_theater_attack_corpus.test.ts 23 测实跑） |
 | 每个 case 有 expected verdict 或 expected fail | 每个 failure 有 deterministic reason code（`FEC_NOT_COMPILABLE` / `DATASET_BINDING_MISSING` / `MEASUREMENT_FAILED` / `PROTOCOL_DEVIATION_CRITICAL` / `SCOPE_MISMATCH` / `CONTRADICTORY_EVIDENCE` / `PROOF_HASH_MISMATCH` 等） | `DESIGN_LOCKED` |
-| CI 运行 attack corpus | 所有 attack cases 可重复运行 | `PARTIAL` |
+| CI 运行 attack corpus | 所有 attack cases 可重复运行 | `IMPLEMENTED_VERIFIED`（attack_corpus.test.ts + agent_attack_cases.test.ts 在 CI `node --test tests/anti_theater` 实跑·零 flaky） |
 | 生成 benchmark receipt | receipt 进 evidence_log，hash-anchored | `DESIGN_LOCKED` |
 | 确定性 arbiter（纯函数，零 LLM） | `aggregateVerdict` 全 SKIP/弱反驳 → `INCONCLUSIVE` 非 `CONFIRMED`（守 F1 反 theater） | `DESIGN_LOCKED` |
 | `RefutationPayload.attackKind` 三类 | `metric_threshold` / `counterexample_sample` / `citation_failure`（枚举冻结，禁止第四类不经 Ask 扩展） | `DESIGN_LOCKED` |
@@ -310,7 +310,7 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 | 动作 | 展示 | 复用资产 | 状态 |
 |---|---|---|---|
-| 评委终端 `npx far-verify-demo` → 自动跑 `offline_replay` profile 的 C-ASTRO-0001 | 6 阶段 FSM 流式打印，每阶段末尾吐 `stageReceipt` hash；结尾密封 `chainHead` | `runAgentLoop`（fsm_runner）+ `offline_replay` profile（零 key）+ `canonicalHash`（`<REPOSITORY_ROOT>/src/evidence_log/hasher.ts`） | `IMPLEMENTED_UNVERIFIED` |
+| 评委终端 `npx far demo`（roadmap 原名 `far-verify-demo`，实际命令为 `far demo`） → 自动跑 `offline_replay` profile 的 C-ASTRO-0001 | 6 阶段 FSM 流式打印，每阶段末尾吐 `stageReceipt` hash；结尾密封 `chainHead` | `runAgentLoop`（fsm_runner）+ `offline_replay` profile（零 key）+ `canonicalHash`（`<REPOSITORY_ROOT>/src/evidence_log/hasher.ts`） | `IMPLEMENTED_VERIFIED`（`far demo` exit 0·真实 oneSampleZTest p=1.398e-4 → FEC gate → R7 CONFIRMED → ASK-9 密封 INCONCLUSIVE） |
 
 #### 第 2 幕 · 灵魂时刻 ① · 三路字节相等
 

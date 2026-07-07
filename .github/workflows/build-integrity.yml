@@ -304,6 +304,9 @@ jobs:
             exit 1
           fi
           echo "::notice::✅ R9-2-15 通过：未发现 DASHSCOPE_API_KEY 明文"
+      - name: R9-2-16 · privacy-scan 全仓多类密钥形状（W0-7）
+        run: |
+          node scripts/privacy_scan.mjs
 
   # ============================================================
   # DELIVERABLE_MARK · 构建完整性最终标记（全绿则 R9-2 达成）
@@ -323,5 +326,5 @@ jobs:
           echo "  cross_lang: TS === Python byte-equal"
           echo "  merkle_cross_lang: TS Merkle root + inclusion proof === Python byte-equal"
           echo "  anti_theater: 触发器就绪"
-          echo "  security: 零明文 secrets"
+          echo "  security: 零明文 secrets（R9-2-15 DASHSCOPE + R9-2-16 全仓多类密钥形状）"
           echo "========================================="
