@@ -568,7 +568,7 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
 - [ ] domain 6 值消歧注（`SciIRDomain` 领域枚举 6 值，正确，非 verdict 笔误；verdict 5 值 enum 冻结）。
 - [ ] commit 引用移除或 CLI 实测回填。
 - [ ] §8 措辞订正清单全文档落地（CI grep 禁用词门通过）。
-- [ ] `$null` PowerShell 残留清理 + privacy-scan CI 生效。
+- [x] `$null` PowerShell 残留清理 + privacy-scan CI 生效（$null 零残留·scripts/privacy_scan.mjs + build-integrity.yml R9-2-16）。
 - [ ] DO_NOT_CLAIM（APPENDIX_F §6）+ 红队风险登记（本 §9 + 07 章）入库。
 
 ---
