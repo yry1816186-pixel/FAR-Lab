@@ -255,7 +255,7 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 | 生成 benchmark receipt | receipt 进 evidence_log，hash-anchored | `DESIGN_LOCKED` |
 | 确定性 arbiter（纯函数，零 LLM） | `aggregateVerdict` 全 SKIP/弱反驳 → `INCONCLUSIVE` 非 `CONFIRMED`（守 F1 反 theater） | `DESIGN_LOCKED` |
 | `RefutationPayload.attackKind` 三类 | `metric_threshold` / `counterexample_sample` / `citation_failure`（枚举冻结，禁止第四类不经 Ask 扩展） | `DESIGN_LOCKED` |
-| 实时 SSE 流 + ArenaPage + 反驳记分板 | 一个假设被诚实反驳到 `REFUTED`，全链可重放 | `ROADMAP` |
+| 实时 SSE 流 + ArenaPage + 反驳记分板 | 一个假设被诚实反驳到 `REFUTED`，全链可重放 | `PARTIAL`（ArenaPage + 反驳记分板 IMPLEMENTED_VERIFIED：arena_service + GET /arena/demo API + ArenaPage 前端（RobustHero + RefuterScoreboard + HonestyAlert）·detectRefuterAttack 确定性 arbiter·4 测；唯一剩实时 SSE 流式推送——demo 为请求-响应缓存档·非流式） |
 | 离线 persona fixture（demo 兜底） | 明示 `mode=offline_persona_simulation` | `DESIGN_LOCKED` |
 
 ### 5.3 DOD（W3）
