@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-06-29T00:00:00.000Z",
-  "problemCount": 6,
+  "problemCount": 7,
   "entries": [
     {
       "problemId": "A16",
@@ -11,7 +11,7 @@
       "verdict": "CONFIRMED",
       "integrityRoot": "ded47a41e041fad4aa665447d336632ee5d9df7f87d4a8bf91d5a1cae7fee606",
       "leafCount": 7,
-      "reproHash": "6583f5b8adefc35199778c9e38084197ffdbff03502d202c6a072b25ef4fc486",
+      "reproHash": "f97454627f099fc23c2cc491d0d722e8d41685224683549860629cd0deb843b1",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -25,7 +25,7 @@
       "verdict": "INCONCLUSIVE",
       "integrityRoot": "79fd926d012359a6921013dbad290055db763e89f140168a331cc44c7330d45e",
       "leafCount": 7,
-      "reproHash": "50ba8c85d656541c56ab22955a20b62cdc509c39a923314c8a588ac5ff579c12",
+      "reproHash": "30c868871bcdaeb25603c6662708e24c02f26085efb4a6766c2c97dd437ae44a",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -39,7 +39,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "b5d38b915c5dd167136b0b58d38c4c79adf4f4745757c1fbc325722597a57b3d",
       "leafCount": 7,
-      "reproHash": "622d6c81facefdb936819fc7b255b77b784c2df111f838b84d9a8b8644651c4a",
+      "reproHash": "565dc3fe9ef700f46f804b31cd2130f18595fde2675d7cb0bfe85008887dc3bd",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -53,7 +53,7 @@
       "verdict": "DEGRADED_SCOPE",
       "integrityRoot": "ff6ee0b6a5951780caa6429f6bc517df5f294194d7b3db85c5c8b65104449e67",
       "leafCount": 7,
-      "reproHash": "79c17a02bd998def4f3324463f9c2d94700f8ddbd701fd93378048fca79c7b2c",
+      "reproHash": "127be1f1081c1604151f02361e605449455de8fbb4e5c1093775f43d7b8818ba",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -67,7 +67,7 @@
       "verdict": "CONFIRMED",
       "integrityRoot": "7a01b2389c394d943edabd9d0525ec895a93bacfad857e31a7a40d6b4782ce76",
       "leafCount": 7,
-      "reproHash": "c510a9d284e8e374d2164a441a78d967a674d3e4054951ebfb8c2d442b5a84e9",
+      "reproHash": "c80a5824cddc80c1aee49f53d3d5146778b66c4e02db06dfb5fea282ff123ae0",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -81,18 +81,32 @@
       "verdict": "UNTESTED",
       "integrityRoot": "0bfffeb8ccb6904421be118e350a1f708e58a13877836e0b17cdd9d409970056",
       "leafCount": 7,
-      "reproHash": "71acf199eebe74887b88702de61a64f5397ceccb05288cfa69e3c9a8f4ef63b6",
+      "reproHash": "c1ca5a3ec9572da4309eeda0a5112fc2422d474a99770bb2fef02682f4259020",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
       "sourceId": "sc-g5-seismic-precursor-2026"
+    },
+    {
+      "problemId": "P1",
+      "problemTitle": "室温超导（LK-99 复现）",
+      "domain": "物理",
+      "science125Tag": "room-temp-superconductor-lk99",
+      "verdict": "REFUTED",
+      "integrityRoot": "859309a84d213853a5275428bc827cb689318260b1aac5029b95f7284c58e294",
+      "leafCount": 7,
+      "reproHash": "ca8958740d5bd981e48ecaae179a77bcd53ba4fa9455adda3c73e04799d13431",
+      "stagesCompleted": 6,
+      "converged": true,
+      "chainVerified": true,
+      "sourceId": "sc-p1-lk99-replication-2026"
     }
   ],
-  "suiteIntegrityRoot": "88f8c2e933d6a56abed79a3fe87132411dac8ca4099ba9401b52c193d7a3e12e",
-  "totalLeaves": 42,
+  "suiteIntegrityRoot": "c3315ad36ab4ef03b1593ce51d297aaeca3083dba0998229311e3f6067f9b81f",
+  "totalLeaves": 49,
   "verdictDistribution": {
     "CONFIRMED": 2,
-    "REFUTED": 1,
+    "REFUTED": 2,
     "INCONCLUSIVE": 1,
     "DEGRADED_SCOPE": 1,
     "UNTESTED": 1
@@ -102,7 +116,8 @@
     "生物": 1,
     "化学": 1,
     "生态气候": 1,
-    "地学": 1
+    "地学": 1,
+    "物理": 1
   },
   "gitCommitSha": null,
   "honestyNotes": [
