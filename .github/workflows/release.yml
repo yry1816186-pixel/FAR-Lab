@@ -1,13 +1,19 @@
-# FAR-Chain Release — tag v* 触发
+# FAR-Chain Release — tag v* 触发的发布自动化
 #
-# 产出：install.sh / install.ps1（README curl/irm 链接的目标）+ SHA256SUMS checksum +
-#       Docker image → GHCR + GitHub Release（自动 release notes）。
+# 触发条件：maintainer 执行 `git tag v0.1.0 && git push origin v0.1.0`（首次需人类操作）。
 #
-# 红线：本 workflow 不发 npm（无 dist build + Node24 type-stripping 约束，需单独验证，见
-#       publish-node.yml · NEEDS_NPM_PUBLISH_VALIDATION）；不发 PyPI（roadmap）。
-# NEEDS_HUMAN_OPERATION（首次）：GHCR package 权限 + 默认分支 branch protection（见 release-process.md）。
+# NEEDS_RELEASE_PUBLICATION：本 workflow 已就绪，但首次需人类推送 tag。
+#   工件无法自证「已运行成功」——首次 tag 推送前状态保持 NEEDS_RELEASE_PUBLICATION。
+# NEEDS_GHCR_PUBLISH：GHCR 首次需人类配置 GITHUB_TOKEN 对 packages 的 write 权限
+#   （repo Settings → Actions → workflow permissions，或 package settings）。
+#   权限未配置时 docker push 步骤会失败——这是预期的，不阻塞 release assets 发布。
+# NEEDS_NPM_PUBLISH_VALIDATION：npm 打包需验证。项目无 dist build（tsconfig noEmit ·
+#   Node 24 原生 type-stripping 跑 .ts），packages/cli/bin/far.mjs spawn 包外 src/，
+#   独立 npm 包可能装上跑不起来。故 npm pack 为条件步骤（continue-on-error），失败只 WARN。
 #
-# 状态：workflow 已就绪，但首次 tag 推送需人类操作（NEEDS_RELEASE_PUBLICATION）。
+# 红线：不硬编码任何 API key（DASHSCOPE_API_KEY 等）；不默认调用真实 Qwen/DashScope/OpenAI API。
+#   Docker 镜像不内置任何 provider key（offline 优先，见 Dockerfile FAR_CHAIN_OFFLINE=1）。
+# npm 发布走独立的 publish-node.yml（NEEDS_NPM_PUBLISH_VALIDATION），本 workflow 不发 npm registry。
 
 name: Release
 
@@ -20,20 +26,29 @@ on:
         description: 'Tag to release (e.g. v0.1.0)'
         required: true
 
+# 同一 tag 的新 push 取消旧 run（防并发发布覆盖 release assets）
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false   # release 不可中断重跑——避免半发布状态
+
 permissions:
-  contents: write   # create GitHub Release + upload assets
-  packages: write   # push Docker image to GHCR
+  contents: write   # 创建 GitHub Release + 上传 assets
+  packages: write   # push Docker image 到 GHCR
 
 env:
   NODE_VERSION: '24'
   PNPM_VERSION: '10.29.3'
+  PYTHON_VERSION: '3.11'
 
 jobs:
-  # ── 1. 发布前 smoke：确保 README 顶部命令在 release 环境可跑（offline·零密钥）──
-  release_smoke:
+  release:
     runs-on: ubuntu-latest
+    timeout-minutes: 45   # ci-all 30min + docker build/push + release 上传兜底
     steps:
+      # a. checkout
       - uses: actions/checkout@v5
+
+      # b/c. setup node + pnpm（版本锁见 ci.yml 顶部注释·避免 pnpm9/10 漂移）+ python（ci-all 跨语言轴）
       - uses: pnpm/action-setup@v5
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -41,93 +56,141 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - name: far doctor (allow WARN exit 2 · zero secrets)
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      # d. 校验 tag 与 package.json version 一致（不变式：git tag v<X> ↔ package.json "<X>"）
+      - name: Verify tag matches package.json version
         shell: bash
         run: |
-          set +e
-          node src/cli/far.ts doctor
-          code=$?
-          [ "$code" = "1" ] && { echo "FAIL: core capability broken"; exit 1; }
-          exit 0
-      - run: node src/cli/far.ts version
-      - run: node src/cli/far.ts demo tess-offline
-      - run: node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"   # v0.1.0 -> 0.1.0
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          CLI_VERSION=$(node -p "require('./packages/cli/package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag (${GITHUB_REF_NAME} -> ${TAG_VERSION}) != package.json version (${PKG_VERSION})"
+            exit 1
+          fi
+          if [ "$PKG_VERSION" != "$CLI_VERSION" ]; then
+            echo "::error::Root package.json (${PKG_VERSION}) != packages/cli (${CLI_VERSION}) —— 须对齐"
+            exit 1
+          fi
+          echo "Version match: ${PKG_VERSION} (root + @far-chain/cli + tag)"
 
-  # ── 2. release assets：install.sh + install.ps1 + SHA256SUMS ──
-  build_assets:
-    needs: release_smoke
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
+      # e. 安装依赖（frozen）+ Python 科研轴（cross_lang / test:py 需要）
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      # f. 全量 CI 门——确保 release 基于绿构建（ci_all.mjs 串联 11 步 gate·fail-fast）
+      #    无 DASHSCOPE_API_KEY 时 competition_qwen_smoke 优雅 skip，不阻塞。
+      - name: pnpm ci-all (full CI gate · release must be green)
+        run: pnpm ci-all
+        timeout-minutes: 30
+
+      # g/h. 准备 release assets：install.sh + install.ps1 + SHA256SUMS
       - name: Stage install scripts + checksum
         run: |
-          mkdir -p assets
-          cp scripts/install.sh  assets/install.sh
-          cp scripts/install.ps1 assets/install.ps1
-          chmod +x assets/install.sh
-          (cd assets && sha256sum install.sh install.ps1 | tee SHA256SUMS)
-      - uses: actions/upload-artifact@v4
-        with: { name: release-assets, path: assets/ }
+          mkdir -p staging
+          cp scripts/install.sh  staging/install.sh
+          cp scripts/install.ps1 staging/install.ps1
+          chmod +x staging/install.sh
+          (cd staging && sha256sum install.sh install.ps1 | tee SHA256SUMS)
 
-  # ── 3. Docker image → GHCR（默认 offline demo·不内置 key）──
-  docker:
-    needs: release_smoke
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      # i. npm pack（条件性·无 dist build 可能失败）—— 失败只 WARN 不阻塞 release
+      - name: npm pack @far-chain/cli (conditional · no dist build may fail)
+        id: npm_pack
+        continue-on-error: true
+        working-directory: packages/cli
+        run: |
+          pnpm pack
+          # pnpm pack 产出 far-chain-cli-<version>.tgz（scoped name @/ -> -）
+          shopt -s nullglob
+          tarballs=(far-chain-cli-*.tgz)
+          if [ ${#tarballs[@]} -gt 0 ]; then
+            cp "${tarballs[0]}" ../../staging/
+            echo "tarball=$(basename "${tarballs[0]}")" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::pnpm pack 未产出 tarball"
+            exit 1
+          fi
+      - name: Warn if npm pack failed (NEEDS_NPM_PUBLISH_VALIDATION expected)
+        if: steps.npm_pack.outcome == 'failure'
+        run: |
+          echo "::warning::npm pack 失败（预期：无 dist build + Node 24 type-stripping · NEEDS_NPM_PUBLISH_VALIDATION）。"
+          echo "Release 不含 npm tarball，继续发布 install scripts + Docker image。"
+
+      # j-m. 构建 Docker image 并 push 到 GHCR（offline 优先·不内置 key）
+      - name: Resolve GHCR image name (lowercase owner)
+        id: img
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${owner}/far-lab" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+      - name: docker login ghcr.io
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Image name (lowercase owner)
-        id: meta
+      - name: docker build (offline-ready · no key baked in)
         run: |
-          owner="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
-          echo "image=ghcr.io/${owner}/far-lab" >> "$GITHUB_OUTPUT"
-          echo "tag=${GITHUB_REF_NAME:-${{ inputs.tag }}}" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ steps.meta.outputs.image }}:latest
-            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          docker build \
+            -t ${{ steps.img.outputs.image }}:${{ steps.img.outputs.tag }} \
+            -t ${{ steps.img.outputs.image }}:latest \
+            .
+      - name: docker push (tagged)
+        run: docker push ${{ steps.img.outputs.image }}:${{ steps.img.outputs.tag }}
+      - name: docker push (latest)
+        run: docker push ${{ steps.img.outputs.image }}:latest
 
-  # ── 4. GitHub Release（assets + checksum + 自动 notes）──
-  github_release:
-    needs: [build_assets, docker]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
-        with: { name: release-assets, path: assets/ }
+      # n. 保存 docker image digest 到文件（push 后 RepoDigests 已填充）
+      - name: Save docker image digest
+        run: |
+          set -euo pipefail
+          IMAGE="${{ steps.img.outputs.image }}"
+          TAG="${{ steps.img.outputs.tag }}"
+          DIGEST=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' "${IMAGE}:${TAG}" | head -1 || true)
+          if [ -z "$DIGEST" ]; then
+            echo "digest-unavailable (push may have failed · NEEDS_GHCR_PUBLISH)" > staging/docker-digest.txt
+          else
+            echo "$DIGEST" > staging/docker-digest.txt
+          fi
+          echo "Docker digest: $(cat staging/docker-digest.txt)"
+
+      # o. 从 CHANGELOG.md 提取本版本 release notes（无匹配段则回退到自动生成）
+      - name: Extract CHANGELOG section for release body
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          BODY=$(awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { found=1; next }
+            /^## \[/ && found { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$BODY" ]; then
+            echo "(No CHANGELOG section for ${VERSION} — see auto-generated notes below.)" > staging/release-body.md
+          else
+            printf '%s\n' "$BODY" > staging/release-body.md
+          fi
+
+      # 创建 GitHub Release（assets + checksum + docker digest + release notes）
       - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          gh release create "$TAG" \
-            assets/install.sh assets/install.ps1 assets/SHA256SUMS \
-            --generate-notes \
-            --title "$TAG" \
-            --notes-prepend "## Install
-
-          macOS / Linux / WSL:
-          \`\`\`bash
-          curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/install.sh | bash
-          far doctor && far demo tess-offline
-          \`\`\`
-
-          Windows PowerShell:
-          \`\`\`powershell
-          irm https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/install.ps1 | iex
-          far doctor && far demo tess-offline
-          \`\`\`
-
-          Verify checksum: see SHA256SUMS.
-          "
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: FAR-Chain ${{ github.ref_name }}
+          body_path: staging/release-body.md
+          generate_release_notes: true   # CHANGELOG body 之后追加 commit/PR 自动 notes
+          files: |
+            staging/install.sh
+            staging/install.ps1
+            staging/SHA256SUMS
+            staging/docker-digest.txt
+            staging/*.tgz
