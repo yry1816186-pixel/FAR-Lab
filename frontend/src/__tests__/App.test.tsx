@@ -82,11 +82,11 @@ describe('App 路由与导航', () => {
     expect(screen.getByTestId('main-content')).toBeInTheDocument();
   });
 
-  it('渲染 9 个导航项（含完整性信任根与广度榜入口）', () => {
+  it('渲染 10 个导航项（含完整性信任根、广度榜、法庭入口）', () => {
     render(<App />);
     const nav = screen.getByTestId('main-nav');
     const links = within(nav).getAllByRole('link');
-    expect(links).toHaveLength(9);
+    expect(links).toHaveLength(10);
     // 使用 getByRole 验证导航链接存在（"证据链" 等标签在 sm 断点下可见）
     expect(within(nav).getByRole('link', { name: /总览/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /演示/ })).toBeInTheDocument();

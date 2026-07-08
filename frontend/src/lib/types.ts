@@ -374,6 +374,27 @@ export interface BenchmarkReportDto {
 // ---------- API error envelope ----------
 
 /**
+ * 跨模型可靠性证书（GET /api/v1/court/demo）·Authority: src/api/internal/court_service.ts ReliabilityCertificate。
+ */
+export interface CourtModelVerdictDto {
+  readonly model: string;
+  readonly verdict: string | null;
+  readonly decisiveRuleId: string | null;
+  readonly chainHead: string | null;
+  readonly error: string | null;
+}
+
+export interface CourtCertificateDto {
+  readonly certificateId: string;
+  readonly claim: string;
+  readonly modelCount: number;
+  readonly verdicts: readonly CourtModelVerdictDto[];
+  readonly distinctVerdicts: readonly string[];
+  readonly agreement: 'unanimous' | 'majority' | 'split';
+  readonly honestNote: string;
+}
+
+/**
  * Unified API error response (RFC 7807 Problem Details subset, spec 24 §0.6).
  * Authority: src/api/types.ts ApiErrorResponse.
  */

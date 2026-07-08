@@ -9,7 +9,7 @@
 
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Play, Sun, Moon, Trophy } from 'lucide-react';
+import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Play, Sun, Moon, Trophy, Gavel } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/theme/ThemeProvider';
 
@@ -27,6 +27,7 @@ const NAV_ITEMS: ReadonlyArray<{
   { to: '/viz', label: '证据链', icon: Network },
   { to: '/integrity', label: '完整性', icon: ShieldCheck },
   { to: '/leaderboard', label: '广度榜', icon: Trophy },
+  { to: '/court', label: '法庭', icon: Gavel },
   { to: '/honesty', label: '诚信墙', icon: ShieldAlert },
   { to: '/ablation', label: '消融实验', icon: FlaskConical },
   { to: '/report', label: '研究报告', icon: FileText },
