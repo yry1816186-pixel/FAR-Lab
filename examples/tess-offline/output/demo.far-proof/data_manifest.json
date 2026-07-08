@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-06-28T00:00:00.000Z",
+  "files": [
+    "examples\\tess-offline\\output\\demo.far-proof\\proof_envelopes.jsonl",
+    "examples\\tess-offline\\output\\demo.far-proof\\repro_runs.jsonl",
+    "examples\\tess-offline\\output\\demo.far-proof\\call_records.redacted.jsonl",
+    "examples\\tess-offline\\output\\demo.far-proof\\claim_graph.json",
+    "examples\\tess-offline\\output\\demo.far-proof\\otel-trace.jsonl",
+    "examples\\tess-offline\\output\\demo.far-proof\\ro-crate-metadata.json",
+    "examples\\tess-offline\\output\\demo.far-proof\\prov.ttl"
+  ],
+  "totalFiles": 7
+}

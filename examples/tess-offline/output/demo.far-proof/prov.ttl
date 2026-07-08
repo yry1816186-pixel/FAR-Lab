@@ -1,0 +1,10 @@
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:far-chain:run:demo_astro_0001_refuted> a prov:Activity ;
+    prov:startedAtTime "2026-06-28T00:00:00.000Z"^^xsd:dateTime ;
+    prov:generated <urn:far-chain:proof:export> .
+
+<urn:far-chain:proof:export> a prov:Entity ;
+    prov:wasGeneratedBy <urn:far-chain:run:demo_astro_0001_refuted> ;
+    prov:description "FAR-Chain ProofEnvelope export bundle"@en .
