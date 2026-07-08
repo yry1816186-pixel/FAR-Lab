@@ -61,11 +61,12 @@
 
 ### 7. Docker 可运行
 
-- [x] **已验证（配置）** — `Dockerfile` + `docker-compose.yml` + `.dockerignore` 均存在且配置正确：
-  - Dockerfile：`node:24-slim` + pnpm（已优化：移除 build-essential，better-sqlite3 prebuilt；Python 科研轴默认不装以加速 build，见可选层注释），`ENV FAR_CHAIN_OFFLINE=1`（不内置 key），`ENTRYPOINT ["node", "src/cli/far.ts"]`，`CMD ["demo", "tess-offline"]`
+- [x] **已验证（实测）** — `docker build -t far-chain:dev .` 成功（1.35GB image）；`docker run --rm far-chain:dev {version|doctor|demo}` 全通过：
+  - `version`→0.1.0（容器内无 git 显示 ffffffff 占位·预期）／`doctor`→better-sqlite3 可加载✓+offline verify✓+DASHSCOPE WARN（offline 预期）exit 0／`demo tess-offline` exit 0
+  - Dockerfile：`node:24-slim`+pnpm+build-essential+python3（better-sqlite3 node-gyp 兜底：prebuild 网络失败时编译 native），`ENV FAR_CHAIN_OFFLINE=1`（不内置 key），`ENTRYPOINT ["node","src/cli/far.ts"]`，`CMD ["demo","tess-offline"]`
   - docker-compose.yml：`far-demo`（一次性 offline demo）+ `far-api`（长驻 API @ :3000），不默认读宿主 `.env`
   - .dockerignore：排除 node_modules / .git / .far-proof / db / 垃圾文件
-- [ ] **NEEDS_DOCKER_BUILD_VALIDATION** — 本地 Docker Desktop 29.5.2 daemon 已起，但 `docker build` 因 debian mirror + npm registry 网络慢多次超时（800s/500s 未完成）。CI runner（GitHub 网络）会在 release.yml 验证。
+- 本地 `docker build` 历经多次网络超时（debian mirror 慢）最终成功（后台 ~15min：apt build-essential + node-gyp 编译 better-sqlite3）；修复了 d1f1609 误删 build-essential 的 bug（见 commit ac4206b）。
 
 ### 8. CI 真实通过
 
