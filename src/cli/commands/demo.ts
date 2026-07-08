@@ -79,7 +79,20 @@ const NEXT_STEPS = `
   · 跑 Science-125 基准：far bench run
   · 深度接线门：node scripts/depth_gate.mjs
 `;
-export function runDemo(): number {
+const TESS_OFFLINE_NOTE = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  tess-offline 模式：聚焦 TESS（C-ASTRO-0001 脉冲星）offline 裁决演示。
+  完整 demo（含 MMLU hero pipeline · 真实统计驱动 CONFIRMED）：far demo
+  验证持久化 fixture：far verify examples/tess-offline/output/demo.far-proof
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+
+export function runDemo(subcommand: string | undefined = undefined): number {
+  if (subcommand !== undefined && subcommand !== 'tess-offline') {
+    process.stderr.write(`far demo: 未知子命令 '${subcommand}'（当前支持 'tess-offline'，或不带参数跑完整演示）\n`);
+    return 2;
+  }
+  const tessOnly = subcommand === 'tess-offline';
   process.stdout.write(BANNER);
 
   process.stdout.write(PHASE1);
@@ -98,13 +111,17 @@ export function runDemo(): number {
     db.close();
   }
 
-  process.stdout.write(PHASE3);
-  const heroDb = new Database(':memory:');
-  try {
-    const hero = buildHeroAChain(heroDb);
-    process.stdout.write(renderHeroClaim(hero));
-  } finally {
-    heroDb.close();
+  if (tessOnly) {
+    process.stdout.write(TESS_OFFLINE_NOTE);
+  } else {
+    process.stdout.write(PHASE3);
+    const heroDb = new Database(':memory:');
+    try {
+      const hero = buildHeroAChain(heroDb);
+        process.stdout.write(renderHeroClaim(hero));
+    } finally {
+      heroDb.close();
+    }
   }
 
   process.stdout.write(NEXT_STEPS);
