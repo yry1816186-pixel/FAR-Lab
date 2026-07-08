@@ -95,6 +95,8 @@ const skippedFiles = new Set([
   'docs/governance/OPEN_SOURCE_RELEASE_PLAN.md',
   'docs/installation.md',
   'docs/providers/qwen-dashscope.md',
+  // 发布就绪清单 —— far doctor 输出 + 红线验证引用 DASHSCOPE_API_KEY（说明性，非 secret 值）。同 docs 类模式。
+  'docs/governance/RELEASE_READINESS_CHECKLIST.md',
   // TAP 指令解析器 —— 解析 TAP 输出的 `# TODO`/`# SKIP` 指令（标准 TAP 格式）：regex `/\s+#\s*TODO\b/i`
   // 与 status='TODO'/verdict==='TODO' 是 TAP 状态值，非代码 TODO 债务标记（scanner `/TODO|FIXME/` 无法区分 TAP 指令）。
   // 经人工审计零容忍合规：无真实 TODO/FIXME 债务 / 无 :any / @ts-ignore / 空 catch / stub。
