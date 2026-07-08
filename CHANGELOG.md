@@ -5,6 +5,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added (open-source release v0.1.0)
+- `far doctor` / `far version` / `far demo tess-offline` / `far verify <positional>` / `far --help` / `-h` / `-v`.
+- `scripts/install.sh` + `scripts/install.ps1` — user-space installer (zero key, zero big-data, non-root).
+- `Dockerfile` + `docker-compose.yml` + `.dockerignore` — default offline demo / API, no key.
+- `examples/tess-offline/` — persistent self-verifiable demo bundle + tested tamper-detection walkthrough.
+- Bilingual README (`README.md` en + `README.zh-CN.md` zh) with the 16-section open-source structure.
+- `docs/` hierarchy: quickstart / installation / concepts(far-proof, evidence-ledger) / providers(qwen-dashscope) / demos(tess-offline) / governance.
+- `.github/ISSUE_TEMPLATE/*` (bug / feature / reproducibility / docs) + `.github/pull_request_template.md`.
+- `CITATION.cff` + `NEEDS_HUMAN_LICENSE_DECISION.md` (LICENSE is already MIT; changes need human confirmation).
+- `docs/governance/OPEN_SOURCE_AUDIT.md` + `OPEN_SOURCE_RELEASE_PLAN.md` + `release-process.md`.
+
+### Changed (open-source release v0.1.0)
+- Version bumped `0.0.0` → `0.1.0` (root `package.json` aligned with `@far-chain/cli`).
+- Fixed `packages/cli/package.json` `repository.url` (was `earendil-works/far-chain`, now actual `yry1816186-pixel/FAR-Lab`).
+- `far demo` accepts optional `tess-offline` subcommand (focuses TESS, skips MMLU hero Phase 3).
+- `far verify` accepts positional path as `--bundle` alias.
+- `SECURITY.md`: marked archived `FAR_CHAIN_DEV_SPEC/` references; added open-source install/doctor secret-boundary section.
+- `CONTRIBUTING.md`: added `far doctor` to setup + open-source release section.
+
 ### Changed
 - Repository governance cleanup: removed AI process artifacts, consolidated
   the root documentation set, and relocated agent-protocol docs into `.agent/`.

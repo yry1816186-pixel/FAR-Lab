@@ -1,0 +1,42 @@
+name: Documentation
+description: 报告文档问题或改进（README/docs/examples/注释）
+title: "[docs]: "
+labels: ["documentation", "triage"]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: 哪个文档？
+      placeholder: "README.md / docs/installation.md / docs/concepts/far-proof.md / examples/..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 问题类型
+      options:
+        - 命令不可复制 / 已失效
+        - 描述不准确 / 有歧义
+        - 缺失内容
+        - 夸大宣传（违反诚信边界）
+        - 链接失效
+        - 拼写 / 排版
+    validations:
+      required: true
+
+  - type: textarea
+    id: detail
+    attributes:
+      label: 详情
+      description: 当前文档写了什么 / 应该怎么改。引用具体段落。
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: honesty
+    attributes:
+      label: 文档诚信自查
+      options:
+        - label: 我的建议不会引入夸大宣传（如「证明科学真理」「全自动科学家」「物理不可篡改」等禁用词）
+        - label: 若涉及未验证功能，应标注 NEEDS_* 而非写成已完成
