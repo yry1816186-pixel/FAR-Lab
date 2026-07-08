@@ -7,26 +7,23 @@
 # 运行：  docker run --rm far-chain:dev                      # = far demo tess-offline
 #         docker run --rm far-chain:dev doctor               # 容器内环境诊断
 #         docker run --rm far-chain:dev verify examples/tess-offline/output/demo.far-proof
+#
+# 设计：better-sqlite3 用 prebuilt binary（无需 build-essential 编译），far demo / verify 的
+# node 轴不依赖 Python。Python 科研轴（SymPy/Z3 跨语言哈希）默认不装以加速 build——见底部可选层。
 
 FROM node:24-slim
 
-# 构建工具（better-sqlite3 native 编译兜底）+ Python 科研轴（SymPy/Z3）+ git
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 python3-pip python3-venv \
-        build-essential python3-dev \
-        git ca-certificates \
+# git + ca-certificates（better-sqlite3 prebuilt 无需 build-essential / python3-dev）
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
 
 # ── 依赖层（利用 docker layer cache）──
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml pyproject.toml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile
-
-# Python 科研轴（sympy/z3·离线重算跨语言哈希一致性）
-RUN pip install --no-cache-dir --break-system-packages -e .
 
 # ── 源码 ──
 COPY . .
@@ -39,3 +36,10 @@ ENV FAR_CHAIN_OFFLINE=1
 ENTRYPOINT ["node", "src/cli/far.ts"]
 # 默认：offline TESS demo（零密钥）
 CMD ["demo", "tess-offline"]
+
+# ── 可选：Python 科研轴（SymPy/Z3 跨语言哈希一致性）──
+# 默认不装（加速 build；far demo / verify 的 node 轴不依赖它）。
+# 如需跨语言 Python 轴，在上方依赖层后加：
+#   RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip \
+#       && rm -rf /var/lib/apt/lists/* \
+#       && pip install --no-cache-dir --break-system-packages -e .
