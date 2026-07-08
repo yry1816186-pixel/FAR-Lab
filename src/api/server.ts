@@ -31,6 +31,7 @@ import { registerReportRoute } from './routes/report.ts';
 import { registerIntegrityRoutes } from './routes/integrity.ts';
 import { registerBenchmarkRoute } from './routes/benchmark.ts';
 import { registerCourtRoute } from './routes/court.ts';
+import { registerArenaRoute } from './routes/arena.ts';
 import type { AppendRecordOptions } from '../evidence_log/types.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
@@ -129,6 +130,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     // benchmark 端点读预生成 JSON（不依赖运行 db·fresh-clone 跑 generate 脚本即可）
     await registerBenchmarkRoute(v1);
     await registerCourtRoute(v1);
+    await registerArenaRoute(v1);
   }, { prefix: '/api/v1' });
 
   return app;

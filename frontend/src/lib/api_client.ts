@@ -23,6 +23,7 @@ import type {
   ApiErrorResponse,
   BenchmarkReportDto,
   CourtCertificateDto,
+  ArenaResultDto,
   EvidenceChainResponse,
   EvidenceResponse,
   HealthResponse,
@@ -157,6 +158,7 @@ export const queryKeys = {
   reproReceipt: ['integrity', 'receipt'] as const,
   benchmark: ['benchmark'] as const,
   court: ['court'] as const,
+  arena: ['arena'] as const,
 } as const;
 
 // ---------- Probes (bare root, no /api/v1 prefix — spec 24 §0#3) ----------
@@ -332,6 +334,17 @@ export function useBenchmark(
   return useQuery<BenchmarkReportDto, Error>({
     queryKey: queryKeys.benchmark,
     queryFn: () => fetchJson<BenchmarkReportDto>('/api/v1/benchmark'),
+    ...options,
+  });
+}
+
+/** GET /api/v1/arena/demo — 对抗竞技场 demo 结果（offline_replay proponent + 3 refuter）。 */
+export function useArenaDemo(
+  options?: Omit<UseQueryOptions<ArenaResultDto, Error>, 'queryKey' | 'queryFn'>,
+) {
+  return useQuery<ArenaResultDto, Error>({
+    queryKey: queryKeys.arena,
+    queryFn: () => fetchJson<ArenaResultDto>('/api/v1/arena/demo'),
     ...options,
   });
 }
