@@ -27,8 +27,8 @@ import { resolveGitCommitSha } from '../../cli/git_commit_sha.ts';
 /** demo claim（与 far demo 的 C-ASTRO-0001 同源·离线可复现）。 */
 const DEMO_CLAIM = 'C-ASTRO-0001: TIC lightcurve exhibits a transit-like periodic signal (existence claim)';
 
-/** demo 模型（offline_replay 3 模型·展示一致性检测框架）。 */
-const DEMO_MODELS = ['qwen-vl-max', 'qwen-plus', 'qwen-turbo'];
+/** demo 模型标签（offline_replay 按 stageId 路由 fixture·modelId 仅作展示标签；用中性 persona 名更诚实——展示框架非真实模型）。 */
+const DEMO_MODELS = ['court-persona-alpha', 'court-persona-beta', 'court-persona-gamma'];
 
 /** 模块级缓存：首次 runCourtSession 后固定（demo 锚·确定性）。 */
 let cachedCertificate: ReliabilityCertificate | null = null;

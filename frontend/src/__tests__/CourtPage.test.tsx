@@ -19,9 +19,9 @@ const MOCK_CERT: CourtCertificateDto = {
   claim: 'C-ASTRO-0001: TIC lightcurve transit signal',
   modelCount: 3,
   verdicts: [
-    { model: 'qwen-vl-max', verdict: 'CONFIRMED', decisiveRuleId: 'R7_PRIMARY_TEST_CONFIRMS', chainHead: 'a'.repeat(64), error: null },
-    { model: 'qwen-plus', verdict: 'CONFIRMED', decisiveRuleId: 'R7_PRIMARY_TEST_CONFIRMS', chainHead: 'b'.repeat(64), error: null },
-    { model: 'qwen-turbo', verdict: 'CONFIRMED', decisiveRuleId: 'R7_PRIMARY_TEST_CONFIRMS', chainHead: 'c'.repeat(64), error: null },
+    { model: 'court-persona-alpha', verdict: 'CONFIRMED', decisiveRuleId: 'R7_PRIMARY_TEST_CONFIRMS', chainHead: 'a'.repeat(64), error: null },
+    { model: 'court-persona-beta', verdict: 'CONFIRMED', decisiveRuleId: 'R7_PRIMARY_TEST_CONFIRMS', chainHead: 'b'.repeat(64), error: null },
+    { model: 'court-persona-gamma', verdict: 'CONFIRMED', decisiveRuleId: 'R7_PRIMARY_TEST_CONFIRMS', chainHead: 'c'.repeat(64), error: null },
   ],
   distinctVerdicts: ['CONFIRMED'],
   agreement: 'unanimous',
@@ -67,9 +67,9 @@ describe('CourtPage', () => {
     expect(screen.getByText('01KWZTESTCOURTCERT123')).toBeInTheDocument();
 
     // 3 个模型名在裁决表中
-    expect(screen.getByText('qwen-vl-max')).toBeInTheDocument();
-    expect(screen.getByText('qwen-plus')).toBeInTheDocument();
-    expect(screen.getByText('qwen-turbo')).toBeInTheDocument();
+    expect(screen.getByText('court-persona-alpha')).toBeInTheDocument();
+    expect(screen.getByText('court-persona-beta')).toBeInTheDocument();
+    expect(screen.getByText('court-persona-gamma')).toBeInTheDocument();
 
     // 决定性规则（3 模型同规则→多匹配）
     expect(screen.getAllByText('R7_PRIMARY_TEST_CONFIRMS').length).toBe(3);
