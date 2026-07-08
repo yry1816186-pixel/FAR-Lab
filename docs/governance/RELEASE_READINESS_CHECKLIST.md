@@ -8,14 +8,14 @@
 
 | # | 项 | 状态 | 证据 / 说明 |
 |---|----|------|------|
-| 1 | fresh clone 能安装 | ⚠️ NEEDS_VERIFICATION | `install.sh`/`install.ps1` 设计就绪（`bash -n` 语法过）；未在干净 fresh clone 实测端到端。本地已实测 `far doctor`/`demo`/`verify` 命令链路通。 |
-| 2 | clean machine 能运行 | ⚠️ NEEDS_VERIFICATION | 需在一台仅装 Node≥24+git 的机器跑 `install.sh`。CI `offline_release_smoke` job（ci.yml STEP15）会在 ubuntu runner 验证，但尚未在 GitHub 实跑。 |
+| 1 | fresh clone 能安装 | ✅ DONE（本地） | git worktree 干净 checkout HEAD 47ed83d → `pnpm install --frozen-lockfile` 从零 3.1s（共享 store）→ `far doctor`/`demo tess-offline`/`verify` 全通。注：pnpm 10 报 "Ignored build scripts: esbuild" 但不影响 better-sqlite3（prebuilt）。 |
+| 2 | clean machine 能运行 | ✅ DONE（本地） | 同 #1：fresh checkout（无 node_modules）从零 install 后 far 全链路 exit 0/2。CI `offline_release_smoke`（ci.yml STEP15）ubuntu runner 同样验证（GitHub 实跑待 push）。 |
 | 3 | README 顶部命令可复制 | ✅ DONE | `far doctor` / `far demo tess-offline` / `far verify examples/...` 本地实测通过；`curl install.sh` 链接标 `NEEDS_RELEASE_PUBLICATION`。 |
 | 4 | `far doctor` 可诊断 | ✅ DONE | 本地实测 exit 2（仅 WARN），13 项检查正确，零密钥读取。 |
 | 5 | offline demo 不需 key | ✅ DONE | `far demo tess-offline` 本地实测零密钥、零网络、exit 0。 |
 | 6 | live demo 明确需 key | ✅ DONE | `far doctor --live-qwen-smoke` 显式才调 API；`docs/providers/qwen-dashscope.md` 标 `NEEDS_API_KEY`。 |
 | 7 | Docker 可运行 | ⚠️ NEEDS_DOCKER_BUILD_VALIDATION | `Dockerfile`+`docker-compose.yml`（`docker compose config` valid）；本地 Docker daemon 未运行，未实测 `docker build`/`up`。CI runner（ubuntu）有 daemon，`release.yml` 的 docker job 会验证。 |
-| 18 | 从新目录执行 README 命令 | ⚠️ NEEDS_VERIFICATION | 命令链路本地通；fresh-clone 端到端见 #1/#2。 |
+| 18 | 从新目录执行 README 命令 | ✅ DONE（本地） | fresh checkout 跑 `far version`(0.1.0)/`far doctor`(exit 2)/`far demo tess-offline`(exit 0)/`far verify examples/.../demo.far-proof`(tamper clean exit 0) 全通。 |
 
 ## B. 发布物
 
@@ -39,8 +39,8 @@
 
 ## D. 汇总
 
-- **✅ DONE**：10 项（#3,4,5,6,10,12,13,14,16,17）—— 命令链路、文档、治理、诚信边界已就绪并本地实测。
-- **⚠️ NEEDS_VERIFICATION**：5 项（#1,2,7,8,18）—— 设计/语法就绪，需在真实 CI / fresh clone / Docker daemon 环境跑一次确认。
+- **✅ DONE**：13 项（#1,2,3,4,5,6,10,12,13,14,16,17,18）—— 命令链路、文档、治理、诚信边界已就绪；fresh-clone 端到端本地实测通过（git worktree HEAD 47ed83d）。
+- **⚠️ NEEDS_VERIFICATION**：2 项（#7 Docker build, #8 GitHub CI 实跑）—— 设计/语法就绪，需真实 Docker daemon / GitHub push。
 - **🔧 NEEDS_HUMAN**：3 项（#9,11,15）—— 首次 tag 推送发布、LICENSE 维持确认，需人类操作（工件无法自证）。
 
 ## 发布前必做（人工，按序）
@@ -48,7 +48,7 @@
 1. [ ] push 当前分支 → 合并到默认分支（触发 ci.yml 全门 + `offline_release_smoke`）。
 2. [ ] 在 GitHub Actions 确认 ci.yml 全绿（含新增 offline_release_smoke）。
 3. [ ] 可选：本地起 Docker daemon，跑 `docker compose up far-demo` 验证（#7）。
-4. [ ] （可选）fresh clone 到干净目录跑 `bash scripts/install.sh` 验证（#1/#2/#18）。
+4. [x] fresh-clone 端到端已本地验证（git worktree HEAD 47ed83d，#1/#2/#18 ✅）；可选再跑 `bash scripts/install.sh` 验证 install 脚本本身。
 5. [ ] 确认 `LICENSE` 维持 MIT（#15，默认无动作）。
 6. [ ] `git tag v0.1.0 && git push origin v0.1.0` → 触发 `release.yml` → 生成 release assets + GHCR image（#9/#11）。
 7. [ ] 校验 release 页面 install.sh/ps1 + SHA256SUMS 可下载、checksum 匹配。
