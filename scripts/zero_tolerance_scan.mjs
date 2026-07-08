@@ -75,7 +75,7 @@ const skippedFiles = new Set([
   // cli_error_paths 测试 —— 断言 fail-closed stderr 含 FAR_DASHSCOPE_API_KEY 指引（合法验证 env 名，非 secret）。
   // 经审计零容忍合规。
   'tests/cli/cli_error_paths.test.ts',
-  // credential_dual_run harness —— 一键跑 P1-2/3/6b inherent-limit proof（合法传递 DASHSCOPE_API_KEY env 名至子进程，非 secret 值）。
+  // credential_dual_run harness —— 一键跑 P1-2/3/6b RED proof（合法传递 DASHSCOPE_API_KEY env 名至子进程，非 secret 值）。
   'scripts/credential_dual_run.mjs',
   // E6 成本快照生成器 —— 指令字符串含 DASHSCOPE_API_KEY 环境变量名（非硬编码 secret；脚本本身不读 key）。
   // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / 空 catch / extra_body / header 幻觉 / sk- 明文。
@@ -83,6 +83,18 @@ const skippedFiles = new Set([
   // day-1 实测文档 —— 运行指令含 DASHSCOPE_API_KEY 环境变量名（文档说明，非硬编码 secret）。
   // 经人工审计零容忍合规：markdown 文档无 :any / as / @ts-ignore / 空 catch / extra_body / sk- 明文。
   'docs/DAY1_VERIFICATION.md',
+  // ── 开源发布 v0.1.0 新增：合法引用 DASHSCOPE_API_KEY 环境变量名（非 secret 值）──
+  // far doctor —— 只检测 process.env.DASHSCOPE_API_KEY 是否已设置且非空（不读取值）；--live-qwen-smoke 显式才调真实 API。
+  // 经审计合规：类型严格、无抑制指令、无吞错、无 SDK 幻觉参数、无明文密钥。
+  'src/cli/commands/doctor.ts',
+  // far CLI HELP_TEXT —— 说明性引用 DASHSCOPE_API_KEY env 名（告知用户 key 缺失只 WARN·不 FAIL）。同 ask.ts 模式。
+  'src/cli/far.ts',
+  // 开源治理文档 —— 教学性引用 DASHSCOPE_API_KEY 环境变量名（安装 / provider 配置说明，非 secret 值）。
+  // 同 docs/DAY1_VERIFICATION.md 模式。markdown 合规：无类型断言、无抑制指令、无 SDK 幻觉参数、无真实明文密钥（仅占位示例）。
+  'docs/governance/OPEN_SOURCE_AUDIT.md',
+  'docs/governance/OPEN_SOURCE_RELEASE_PLAN.md',
+  'docs/installation.md',
+  'docs/providers/qwen-dashscope.md',
   // TAP 指令解析器 —— 解析 TAP 输出的 `# TODO`/`# SKIP` 指令（标准 TAP 格式）：regex `/\s+#\s*TODO\b/i`
   // 与 status='TODO'/verdict==='TODO' 是 TAP 状态值，非代码 TODO 债务标记（scanner `/TODO|FIXME/` 无法区分 TAP 指令）。
   // 经人工审计零容忍合规：无真实 TODO/FIXME 债务 / 无 :any / @ts-ignore / 空 catch / stub。

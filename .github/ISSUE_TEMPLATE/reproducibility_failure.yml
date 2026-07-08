@@ -1,0 +1,70 @@
+name: Reproducibility failure
+description: 报告可复现性问题（哈希不一致 / verify 失败 / 跨语言漂移）—— FAR-Chain 的核心价值维度
+title: "[repro]: "
+labels: ["reproducibility", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        可复现性是 FAR-Chain 的核心。请贴**实跑**命令 + 输出 + bundle/case 路径。
+        红线：不要手填哈希或数字；粘贴真实输出。
+
+  - type: dropdown
+    id: command
+    attributes:
+      label: 失败的命令
+      options:
+        - far verify --bundle / far verify <path>
+        - far verify-golden
+        - cross_lang_consistency（TS↔Python 哈希）
+        - far fec compile / freeze（fecHash）
+        - far export far-proof
+        - browser verifier
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: path
+    attributes:
+      label: bundle / case / DB 路径
+      placeholder: "examples/tess-offline/output/demo.far-proof 或 golden_vectors/cases/GV-XX.json"
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: 实跑输出（含 status / tamperStatus / recomputation.* / exit code）
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: axis-drift
+    attributes:
+      label: 漂移方向（若涉及跨语言）
+      options:
+        - Node ≠ Python
+        - Node ≠ Browser
+        - Node 自身重算 ≠ 存储
+        - 不涉及跨语言
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: far doctor 输出 + OS/Node/Python 版本 + 是否装了 sympy/z3（pip install -e .）。
+      render: shell
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: honesty
+    attributes:
+      label: 确认
+      options:
+        - label: 这是可复现问题，不是普通 bug（普通 bug 用 Bug report）
+        - label: 我已确认 Python 轴依赖已装（pip install -e .），排除环境缺失导致的 not-run

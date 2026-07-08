@@ -105,12 +105,26 @@ but must NOT expose billing details:
 - `pnpm audit` runs on every CI pipeline.
 - Python dependencies are pinned in `pyproject.toml` with version ranges.
 - Direct dependencies are audited for known CVEs before each release.
-- See `FAR_CHAIN_DEV_SPEC/25_安全合规与运维_SECOPS.md` for full SBOM and
-  dependency audit procedures.
+- Dependency audit / SBOM procedure: see archived `FINAL_PACKAGE/` (FAR_CHAIN_DEV_SPEC/ was archived at commit 66e2975).
 
 ## Model Neutrality & Security
 
 - Core (`src/llm_gateway/`) must never hard-code Qwen, Bailian, or DashScope.
 - Competition adapter (`src/llm_gateway/adapters/aliyun_qwen/`) is the **only**
   location for provider-specific code.
-- See `FAR_CHAIN_DEV_SPEC/16_阿里云参与边界与模型中立策略_ALIYUN_MODEL_NEUTRALITY.md`.
+- Model-neutrality boundary: see archived `FINAL_PACKAGE/` (FAR_CHAIN_DEV_SPEC/16 was archived at commit 66e2975).
+
+---
+
+## Open-Source Install / Doctor Secret Boundary
+
+The new open-source release artifacts (install scripts / `far doctor` / Docker) strictly
+follow the secret rules in this file:
+
+| Artifact | Secret boundary |
+|------|----------|
+| `scripts/install.sh` / `install.ps1` | **never writes** API keys; **never reads** host `.env`; only checks tool presence |
+| `far doctor` | only checks whether `DASHSCOPE_API_KEY` is **set and non-empty**; **never reads its value**; missing → WARN only, never FAIL |
+| `far doctor --live-qwen-smoke` | calls real API only with explicit flag (reuses `ci/competition_qwen_smoke.ts`); no key → FAIL |
+| `Dockerfile` / `docker-compose.yml` | image ships **no** key; real provider only via explicit `docker compose --env-file .env` |
+| `far demo tess-offline` / `far verify` | zero network, zero keys, zero real API |

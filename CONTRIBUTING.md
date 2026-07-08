@@ -17,6 +17,7 @@ git clone https://github.com/yry1816186-pixel/FAR-Lab.git
 cd FAR-Lab
 pnpm install
 node scripts/ensure_py_deps.mjs   # probes the Python axis; reports what is missing
+node src/cli/far.ts doctor        # environment self-diagnosis (no API key needed)
 pnpm test                          # full regression suite
 ```
 
@@ -122,6 +123,19 @@ admin access and cannot be done from a local clone.
    Code Owners* on the branch rule.
 
 Until these are set, the gates are advisory rather than blocking.
+
+## Open-Source Release (v0.1.0)
+
+This repo is being prepared for public open-source release. See:
+
+- `docs/governance/OPEN_SOURCE_AUDIT.md` — read-only baseline audit
+- `docs/governance/OPEN_SOURCE_RELEASE_PLAN.md` — release-form decisions
+- `docs/governance/release-process.md` — tagging / release workflow
+- `docs/installation.md` — user / developer / Docker install
+- Issue templates: `.github/ISSUE_TEMPLATE/` (bug / feature / reproducibility / docs)
+
+Install scripts (`scripts/install.sh` / `install.ps1`) and `far doctor` never read or
+write API keys (see `SECURITY.md` *Open-Source Install / Doctor Secret Boundary*).
 
 ## Need Help
 
