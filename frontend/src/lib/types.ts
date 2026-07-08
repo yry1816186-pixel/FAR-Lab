@@ -395,6 +395,27 @@ export interface CourtCertificateDto {
 }
 
 /**
+ * 对抗竞技场结果（GET /api/v1/arena/demo）·Authority: src/api/internal/arena_service.ts ArenaResult。
+ */
+export interface RefuteAttemptDto {
+  readonly refuter: string;
+  readonly verdict: string | null;
+  readonly attackLanded: boolean;
+  readonly error: string | null;
+}
+
+export interface ArenaResultDto {
+  readonly arenaId: string;
+  readonly hypothesis: string;
+  readonly originalVerdict: string | null;
+  readonly originalRule: string | null;
+  readonly attempts: readonly RefuteAttemptDto[];
+  readonly landedCount: number;
+  readonly robust: boolean;
+  readonly honestNote: string;
+}
+
+/**
  * Unified API error response (RFC 7807 Problem Details subset, spec 24 §0.6).
  * Authority: src/api/types.ts ApiErrorResponse.
  */

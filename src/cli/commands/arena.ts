@@ -8,14 +8,11 @@
 // （展示「稳健」是 fixture 一致的结果，非真实抗攻击）。真实对抗需 --refuters 接真实 provider。
 // 红线：refuter 的 verdict 仍由 R0-R9 确定性内核给出（LLM 非裁决者）；arbiter 是确定性规则，非 LLM 仲裁。
 
-import Database from 'better-sqlite3';
-import { ulid } from 'ulid';
-
-import { createLlmGateway } from '../../llm_gateway/gateway.ts';
-import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
-import { runMigrations } from '../../db/migrator.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
-import { executeAskRun } from './ask.ts';
+import {
+  runArenaSession,
+  type ArenaResult,
+} from '../../api/internal/arena_service.ts';
 
 export interface ArenaArgs {
   readonly hypothesis: string;
@@ -55,77 +52,9 @@ export function parseArenaArgs(argv: readonly string[]): ArenaArgs {
   return { hypothesis, refuters, json };
 }
 
-interface RefuteAttempt {
-  readonly refuter: string;
-  readonly verdict: string | null;
-  readonly attackLanded: boolean;
-  readonly error: string | null;
-}
-
-interface ArenaResult {
-  readonly arenaId: string;
-  readonly hypothesis: string;
-  readonly originalVerdict: string | null;
-  readonly originalRule: string | null;
-  readonly attempts: readonly RefuteAttempt[];
-  readonly landedCount: number;
-  readonly robust: boolean;
-  readonly honestNote: string;
-}
-
-export function detectRefuterAttack(originalVerdict: string | null, refuterVerdict: string | null): boolean {
-  return originalVerdict !== null && refuterVerdict !== null && refuterVerdict !== originalVerdict;
-}
-
-async function runOne(question: string, modelId: string, gitCommitSha: string): Promise<{
-  verdict: string | null;
-  rule: string | null;
-  error: string | null;
-}> {
-  const db = new Database(':memory:');
-  db.pragma('journal_mode = WAL');
-  runMigrations(db);
-  try {
-    const gateway = createLlmGateway([createOfflineReplayAdapter({ modelId })]);
-    const result = await executeAskRun(db, question, 'quick', gitCommitSha, undefined, gateway);
-    const vn = result.loopState.verdictNode;
-    return {
-      verdict: vn === null ? null : vn.verdict,
-      rule: vn === null ? null : vn.verdictTrace.decisiveRuleId,
-      error: result.loopState.error === null ? null : result.loopState.error.message,
-    };
-  } catch (err) {
-    return { verdict: null, rule: null, error: err instanceof Error ? err.message : String(err) };
-  } finally {
-    db.close();
-  }
-}
-
-async function executeArenaSession(args: ArenaArgs, gitCommitSha: string): Promise<ArenaResult> {
-  const orig = await runOne(args.hypothesis, 'arena-proponent', gitCommitSha);
-  const originalVerdict = orig.verdict;
-
-  const attempts: RefuteAttempt[] = [];
-  for (const refuter of args.refuters) {
-    const r = await runOne(`${args.hypothesis} [refute: ${refuter}]`, `arena-refuter-${refuter}`, gitCommitSha);
-    const attackLanded = detectRefuterAttack(originalVerdict, r.verdict);
-    attempts.push({ refuter, verdict: r.verdict, attackLanded, error: r.error });
-  }
-
-  const landedCount = attempts.filter((a) => a.attackLanded).length;
-
-  return {
-    arenaId: ulid(),
-    hypothesis: args.hypothesis,
-    originalVerdict,
-    originalRule: orig.rule,
-    attempts,
-    landedCount,
-    robust: landedCount === 0,
-    honestNote:
-      'offline_replay 下 refuter 回放同一套 fixture，verdict 必然与原始相同 → 无有效攻击；真实对抗需 --refuters 接真实 provider',
-  };
-}
+// detectRefuterAttack + ArenaResult + runArenaSession 已提取至 api/internal/arena_service.ts（CLI + API 共用）。
+export { detectRefuterAttack } from '../../api/internal/arena_service.ts';
+export type { ArenaResult } from '../../api/internal/arena_service.ts';
 
 function renderHuman(res: ArenaResult): void {
   const lines = [
@@ -162,7 +91,7 @@ export async function runArena(argv: readonly string[]): Promise<number> {
     return 2;
   }
 
-  const res = await executeArenaSession(args, resolveGitCommitSha());
+  const res = await runArenaSession(args.hypothesis, args.refuters, resolveGitCommitSha());
 
   if (args.json) {
     process.stdout.write(`${JSON.stringify(res, null, 2)}\n`);
