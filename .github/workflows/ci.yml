@@ -446,3 +446,39 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: snapshot liveness smoke (C8 daily · TS 实现)
         run: pnpm exec tsx ci/snapshot_liveness_smoke.ts
+
+  # ============================================================
+  # STEP 15 · offline_release_smoke（开源发布形态 smoke·验证 README 顶部命令可跑）
+  # 职责：far doctor + far demo tess-offline + far verify examples/.../demo.far-proof
+  # 这是「陌生用户复制 README 第一条命令」的 CI 兜底——发布形态命令必须在 CI 可跑。
+  # needs: install（独立于串行证据链·不阻塞核心门·但自身须绿）。
+  # far doctor 允许 exit 2（仅 WARN·offline 可用）；仅 exit 1（核心损坏）才红。
+  # ============================================================
+  offline_release_smoke:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: far doctor（环境自诊断·零密钥·允许 WARN exit 2）
+        shell: bash
+        run: |
+          set +e
+          node src/cli/far.ts doctor
+          code=$?
+          echo "far doctor exit: $code"
+          if [ "$code" = "1" ]; then echo "FAIL: core capability broken"; exit 1; fi
+          exit 0
+      - name: far version
+        run: node src/cli/far.ts version
+      - name: far demo tess-offline（offline 裁决演示·零凭据）
+        run: node src/cli/far.ts demo tess-offline
+      - name: far verify（持久化 demo.far-proof fixture·第三方独立重算）
+        run: node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof
