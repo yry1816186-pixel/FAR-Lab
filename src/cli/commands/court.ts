@@ -7,14 +7,11 @@
 // 展示的是「多模型法庭框架 + 一致性检测」，真实模型分歧需 --models 接真实 provider（凭据门）。
 // 红线：LLM 不作裁决者——每个模型的 verdict 仍由 R0-R9 确定性内核给出（fixture 只驱动 stage 文本）。
 
-import Database from 'better-sqlite3';
-import { ulid } from 'ulid';
-
-import { createLlmGateway } from '../../llm_gateway/gateway.ts';
-import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
-import { runMigrations } from '../../db/migrator.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
-import { executeAskRun } from './ask.ts';
+import {
+  runCourtSession,
+  type ReliabilityCertificate,
+} from '../../api/internal/court_service.ts';
 
 export interface CourtArgs {
   readonly claim: string;
@@ -54,76 +51,9 @@ export function parseCourtArgs(argv: readonly string[]): CourtArgs {
   return { claim, models, json };
 }
 
-interface ModelVerdict {
-  readonly model: string;
-  readonly verdict: string | null;
-  readonly decisiveRuleId: string | null;
-  readonly chainHead: string | null;
-  readonly error: string | null;
-}
-
-interface ReliabilityCertificate {
-  readonly certificateId: string;
-  readonly claim: string;
-  readonly modelCount: number;
-  readonly verdicts: readonly ModelVerdict[];
-  readonly distinctVerdicts: readonly string[];
-  readonly agreement: 'unanimous' | 'majority' | 'split';
-  readonly honestNote: string;
-}
-
-export function computeAgreement(verdicts: readonly (string | null)[]): 'unanimous' | 'majority' | 'split' {
-  const distinct = new Set(verdicts);
-  if (distinct.size <= 1) return 'unanimous';
-  if (distinct.size === 2) return 'majority';
-  return 'split';
-}
-
-async function executeCourtSession(args: CourtArgs, gitCommitSha: string): Promise<ReliabilityCertificate> {
-  const verdicts: ModelVerdict[] = [];
-  for (const model of args.models) {
-    const db = new Database(':memory:');
-    db.pragma('journal_mode = WAL');
-    runMigrations(db);
-    try {
-      const gateway = createLlmGateway([createOfflineReplayAdapter({ modelId: model })]);
-      const result = await executeAskRun(db, args.claim, 'quick', gitCommitSha, undefined, gateway);
-      const vn = result.loopState.verdictNode;
-      verdicts.push({
-        model,
-        verdict: vn === null ? null : vn.verdict,
-        decisiveRuleId: vn === null ? null : vn.verdictTrace.decisiveRuleId,
-        chainHead: result.reproHash,
-        error: result.loopState.error === null ? null : result.loopState.error.message,
-      });
-    } catch (err) {
-      verdicts.push({
-        model,
-        verdict: null,
-        decisiveRuleId: null,
-        chainHead: null,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      db.close();
-    }
-  }
-
-  const verdictList = verdicts.map((v) => v.verdict);
-  const agreement = computeAgreement(verdictList);
-  const distinctVerdicts = Array.from(new Set(verdictList)).map((v) => v ?? '<null>');
-
-  return {
-    certificateId: ulid(),
-    claim: args.claim,
-    modelCount: args.models.length,
-    verdicts,
-    distinctVerdicts,
-    agreement,
-    honestNote:
-      'offline_replay 下所有模型回放同一套 fixture，verdict 必然一致；真实模型分歧需 --models 接真实 provider（凭据门）',
-  };
-}
+// computeAgreement + ReliabilityCertificate + runCourtSession 已提取至 api/internal/court_service.ts（CLI + API 共用）。
+export { computeAgreement } from '../../api/internal/court_service.ts';
+export type { ReliabilityCertificate } from '../../api/internal/court_service.ts';
 
 function renderHuman(cert: ReliabilityCertificate): void {
   const lines = [
@@ -160,7 +90,7 @@ export async function runCourt(argv: readonly string[]): Promise<number> {
     return 2;
   }
 
-  const cert = await executeCourtSession(args, resolveGitCommitSha());
+  const cert = await runCourtSession(args.claim, args.models, resolveGitCommitSha());
 
   if (args.json) {
     process.stdout.write(`${JSON.stringify(cert, null, 2)}\n`);

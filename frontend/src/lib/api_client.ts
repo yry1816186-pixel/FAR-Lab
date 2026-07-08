@@ -22,6 +22,7 @@ import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@ta
 import type {
   ApiErrorResponse,
   BenchmarkReportDto,
+  CourtCertificateDto,
   EvidenceChainResponse,
   EvidenceResponse,
   HealthResponse,
@@ -155,6 +156,7 @@ export const queryKeys = {
   integrityProof: (seq: number) => ['integrity', 'proof', seq] as const,
   reproReceipt: ['integrity', 'receipt'] as const,
   benchmark: ['benchmark'] as const,
+  court: ['court'] as const,
 } as const;
 
 // ---------- Probes (bare root, no /api/v1 prefix — spec 24 §0#3) ----------
@@ -330,6 +332,17 @@ export function useBenchmark(
   return useQuery<BenchmarkReportDto, Error>({
     queryKey: queryKeys.benchmark,
     queryFn: () => fetchJson<BenchmarkReportDto>('/api/v1/benchmark'),
+    ...options,
+  });
+}
+
+/** GET /api/v1/court/demo — 跨模型可靠性法庭 demo 证书（offline_replay 3 模型）。 */
+export function useCourtDemo(
+  options?: Omit<UseQueryOptions<CourtCertificateDto, Error>, 'queryKey' | 'queryFn'>,
+) {
+  return useQuery<CourtCertificateDto, Error>({
+    queryKey: queryKeys.court,
+    queryFn: () => fetchJson<CourtCertificateDto>('/api/v1/court/demo'),
     ...options,
   });
 }

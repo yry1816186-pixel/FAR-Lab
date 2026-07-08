@@ -13,6 +13,7 @@ import AblationPage from '@/pages/AblationPage';
 import ReportPage from '@/pages/ReportPage';
 import DemoModePage from '@/pages/DemoModePage';
 import AboutPage from '@/pages/AboutPage';
+import CourtPage from '@/pages/CourtPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/viz" element={<VizPage />} />
               <Route path="/integrity" element={<IntegrityPage />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/court" element={<CourtPage />} />
               <Route path="/honesty" element={<HonestyWallPage />} />
               <Route path="/ablation" element={<AblationPage />} />
               <Route path="/report" element={<ReportPage />} />
