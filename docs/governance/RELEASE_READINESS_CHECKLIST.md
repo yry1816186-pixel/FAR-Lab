@@ -113,7 +113,7 @@
 
 ### 17. 所有 NEEDS_* 未被伪装成完成
 
-- [x] **已验证** — README 中 `NEEDS_RELEASE_PUBLICATION` 出现 2 次（lines 19, 26），标注 curl install 链接在 release 发布前不可用。release.yml 顶部注释含 `NEEDS_RELEASE_PUBLICATION` / `NEEDS_GHCR_PUBLISH` / `NEEDS_NPM_PUBLISH_VALIDATION`。Dockerfile 注释含 `NEEDS_DOCKER_BUILD_VALIDATION` / `NEEDS_GHCR_PUBLISH`。无任何 NEEDS_* 被改写为「已完成」。
+- [x] **已验证** — README 中 `NEEDS_RELEASE_PUBLICATION` 出现 2 次（lines 19, 26），标注 curl install 链接在 release 发布前不可用。release.yml 顶部注释含 `NEEDS_RELEASE_PUBLICATION` / `NEEDS_GHCR_PUBLISH`（`NEEDS_NPM_PUBLISH_VALIDATION` 已解决：发布根 far-chain，本地 npm pack + fresh install smoke 验证）。Dockerfile 注释含 `NEEDS_DOCKER_BUILD_VALIDATION`（已验证：docker build+run 全通）/ `NEEDS_GHCR_PUBLISH`。无任何 NEEDS_* 被改写为「已完成」。
 
 ### 18. 从新目录执行 README 命令可成功
 
