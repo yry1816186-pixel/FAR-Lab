@@ -7,13 +7,14 @@
 # NEEDS_GHCR_PUBLISH：GHCR 首次需人类配置 GITHUB_TOKEN 对 packages 的 write 权限
 #   （repo Settings → Actions → workflow permissions，或 package settings）。
 #   权限未配置时 docker push 步骤会失败——这是预期的，不阻塞 release assets 发布。
-# NEEDS_NPM_PUBLISH_VALIDATION：npm 打包需验证。项目无 dist build（tsconfig noEmit ·
-#   Node 24 原生 type-stripping 跑 .ts），packages/cli/bin/far.mjs spawn 包外 src/，
-#   独立 npm 包可能装上跑不起来。故 npm pack 为条件步骤（continue-on-error），失败只 WARN。
+# npm 打包已验证（2026-07-08）：发布根 package (far-chain)，files 含 src/+examples/+schema/+
+#   golden_vectors/+pyproject+脚本，bin: far→src/cli/far.ts（Node 24 type-stripping）。
+#   npm pack + 独立目录 fresh install + far doctor/demo/verify 全 EXIT 0（自包含）。
+#   publish-node.yml 的 validate_packaging 在 CI 重复该 fresh-install smoke。
 #
 # 红线：不硬编码任何 API key（DASHSCOPE_API_KEY 等）；不默认调用真实 Qwen/DashScope/OpenAI API。
 #   Docker 镜像不内置任何 provider key（offline 优先，见 Dockerfile FAR_CHAIN_OFFLINE=1）。
-# npm 发布走独立的 publish-node.yml（NEEDS_NPM_PUBLISH_VALIDATION），本 workflow 不发 npm registry。
+# npm registry 发布走独立的 publish-node.yml（发布根 far-chain），本 workflow 只把 npm tarball 入 release assets。
 
 name: Release
 
@@ -101,28 +102,20 @@ jobs:
           chmod +x staging/install.sh
           (cd staging && sha256sum install.sh install.ps1 | tee SHA256SUMS)
 
-      # i. npm pack（条件性·无 dist build 可能失败）—— 失败只 WARN 不阻塞 release
-      - name: npm pack @far-chain/cli (conditional · no dist build may fail)
+      # i. npm pack 根 package (far-chain) —— 自包含已验证（publish-node.yml fresh-install smoke）
+      - name: npm pack far-chain (root package)
         id: npm_pack
-        continue-on-error: true
-        working-directory: packages/cli
         run: |
-          pnpm pack
-          # pnpm pack 产出 far-chain-cli-<version>.tgz（scoped name @/ -> -）
+          npm pack
           shopt -s nullglob
-          tarballs=(far-chain-cli-*.tgz)
+          tarballs=(far-chain-*.tgz)
           if [ ${#tarballs[@]} -gt 0 ]; then
-            cp "${tarballs[0]}" ../../staging/
+            cp "${tarballs[0]}" staging/
             echo "tarball=$(basename "${tarballs[0]}")" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::pnpm pack 未产出 tarball"
+            echo "::error::npm pack 未产出 far-chain tarball"
             exit 1
           fi
-      - name: Warn if npm pack failed (NEEDS_NPM_PUBLISH_VALIDATION expected)
-        if: steps.npm_pack.outcome == 'failure'
-        run: |
-          echo "::warning::npm pack 失败（预期：无 dist build + Node 24 type-stripping · NEEDS_NPM_PUBLISH_VALIDATION）。"
-          echo "Release 不含 npm tarball，继续发布 install scripts + Docker image。"
 
       # j-m. 构建 Docker image 并 push 到 GHCR（offline 优先·不内置 key）
       - name: Resolve GHCR image name (lowercase owner)

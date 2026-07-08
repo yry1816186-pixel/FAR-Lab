@@ -32,6 +32,13 @@ far doctor
 far demo tess-offline
 ```
 
+**Any OS with npm ≥ 7** (once published to the npm registry):
+```bash
+npm install -g far-chain
+far doctor
+far demo tess-offline
+```
+
 **Right now (developer install, works immediately):**
 ```bash
 git clone https://github.com/yry1816186-pixel/FAR-Lab.git

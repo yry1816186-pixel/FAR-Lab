@@ -38,6 +38,19 @@ far demo tess-offline
 - 安装完跑 `far doctor` 自诊断，打印下一步。
 - 每步 fail-closed（`set -euo pipefail` / `$ErrorActionPreference='Stop'`），失败给明确错误。
 
+## 方式一·备选：npm 全局安装
+
+> `NEEDS_NPM_PUBLISH`：包发布到 npm registry 后生效。发布前用「方式二」。
+> 已本地验证：`npm pack` + 独立目录 fresh install + `far doctor/demo/verify` 全 EXIT 0。
+
+```bash
+npm install -g far-chain
+far doctor
+far demo tess-offline
+```
+
+包内容（根 package `files` 字段）：`src/` + `examples/tess-offline/` + `schema/migrations/` + `golden_vectors/cases/` + `pyproject.toml` + 运行时脚本。`bin: far → src/cli/far.ts`（Node 24 原生 type-stripping，无需 tsc dist build）。独立安装后自包含可用（publish-node.yml 的 validate_packaging 会 fresh-install smoke 验证）。
+
 ## 方式二：开发者安装（git clone）
 
 ```bash
