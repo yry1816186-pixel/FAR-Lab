@@ -14,7 +14,7 @@
 | 4 | `far doctor` 可诊断 | ✅ DONE | 本地实测 exit 2（仅 WARN），13 项检查正确，零密钥读取。 |
 | 5 | offline demo 不需 key | ✅ DONE | `far demo tess-offline` 本地实测零密钥、零网络、exit 0。 |
 | 6 | live demo 明确需 key | ✅ DONE | `far doctor --live-qwen-smoke` 显式才调 API；`docs/providers/qwen-dashscope.md` 标 `NEEDS_API_KEY`。 |
-| 7 | Docker 可运行 | ⚠️ NEEDS_DOCKER_BUILD_VALIDATION | `Dockerfile`+`docker-compose.yml`（`docker compose config` valid）；本地 Docker daemon 未运行，未实测 `docker build`/`up`。CI runner（ubuntu）有 daemon，`release.yml` 的 docker job 会验证。 |
+| 7 | Docker 可运行 | ⚠️ NEEDS_DOCKER_BUILD_VALIDATION | `Dockerfile`（已优化：移除 build-essential，better-sqlite3 prebuilt）+ `docker-compose.yml`（`compose config` valid）；本地 Docker Desktop 29.5.2 daemon 已起，但 `docker build` 因 debian mirror + npm registry 网络慢多次超时（800s/500s 未完成）。CI runner（GitHub 网络）会在 release.yml docker job 验证。 |
 | 18 | 从新目录执行 README 命令 | ✅ DONE（本地） | fresh checkout 跑 `far version`(0.1.0)/`far doctor`(exit 2)/`far demo tess-offline`(exit 0)/`far verify examples/.../demo.far-proof`(tamper clean exit 0) 全通。 |
 
 ## B. 发布物
