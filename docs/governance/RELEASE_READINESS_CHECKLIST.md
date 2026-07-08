@@ -1,7 +1,7 @@
 # FAR-Chain 发布前验收清单（阶段 8）
 
 > 生成时间：2026-07-08 · HEAD `47ed83d9`
-> 性质：逐项验收 `1111` 阶段 8 的 18 个检查点 + CLI 能力 + 红线。
+> 性质：逐项验收开源治理阶段 8 的 18 个检查点 + CLI 能力 + 红线。
 > 原则：每项附证据（命令输出 / 文件路径）；需真实环境/人工的标 `NEEDS_*`，**不伪装为已通过**。
 
 ---
@@ -62,10 +62,10 @@
 ### 7. Docker 可运行
 
 - [x] **已验证（配置）** — `Dockerfile` + `docker-compose.yml` + `.dockerignore` 均存在且配置正确：
-  - Dockerfile：`node:24-slim` + Python + pnpm，`ENV FAR_CHAIN_OFFLINE=1`（不内置 key），`ENTRYPOINT ["node", "src/cli/far.ts"]`，`CMD ["demo", "tess-offline"]`
+  - Dockerfile：`node:24-slim` + pnpm（已优化：移除 build-essential，better-sqlite3 prebuilt；Python 科研轴默认不装以加速 build，见可选层注释），`ENV FAR_CHAIN_OFFLINE=1`（不内置 key），`ENTRYPOINT ["node", "src/cli/far.ts"]`，`CMD ["demo", "tess-offline"]`
   - docker-compose.yml：`far-demo`（一次性 offline demo）+ `far-api`（长驻 API @ :3000），不默认读宿主 `.env`
   - .dockerignore：排除 node_modules / .git / .far-proof / db / 垃圾文件
-- [ ] **NEEDS_DOCKER_BUILD_VALIDATION** — `docker compose up far-demo` 实际构建并运行需 Docker 环境（当前开发机有 Docker 29.5.2，但未实际执行 `docker compose up`）。
+- [ ] **NEEDS_DOCKER_BUILD_VALIDATION** — 本地 Docker Desktop 29.5.2 daemon 已起，但 `docker build` 因 debian mirror + npm registry 网络慢多次超时（800s/500s 未完成）。CI runner（GitHub 网络）会在 release.yml 验证。
 
 ### 8. CI 真实通过
 
