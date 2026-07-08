@@ -33,6 +33,9 @@ env:
   # pnpm 版本须对齐 package.json packageManager SSOT（pnpm@10.29.3）·避免 CI（pnpm9）与 fresh-clone（corepack pnpm10）install 行为漂移
   PNPM_VERSION: '10.29.3'
   NODE_VERSION: '24'
+  # grep -P (PCRE lookbehind (?<!_).../(?!_)) 需 UTF-8 locale，否则 CI 报 "Unmatched [" / "-P supports only unibyte and UTF-8 locales"
+  LC_ALL: C.UTF-8
+  LANG: C.UTF-8
 
 jobs:
   # ============================================================
