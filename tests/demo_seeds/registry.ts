@@ -9,7 +9,7 @@
  * 分层：本文件在 tests/，可 import src/benchmark（tests 依赖 src·方向正确）。
  * DemoSeedResult 结构兼容聚合器的 BenchmarkSeedInput 契约（结构超集·TS 结构类型允许）。
  *
- * 覆盖广度（7 seed · 6 领域 · 全部 5 种 verdict）：
+ * 覆盖广度（8 seed · 7 领域 · 全部 5 种 verdict）：
  *   - A4  天文学  · 行星轨道衰减          → INCONCLUSIVE
  *   - A16 天文学  · 脉冲星制动指数        → CONFIRMED
  *   - B7  生物    · 蛋白质折叠            → REFUTED
@@ -17,6 +17,7 @@
  *   - E2  生态气候· 碳通量                → CONFIRMED
  *   - G5  地学    · 地震前兆              → UNTESTED
  *   - P1  物理    · 室温超导（LK-99）      → REFUTED
+ *   - M2  医学    · 心衰住院（SGLT2 CVOT） → CONFIRMED
  *
  * 诚实定位：领域/问题数是「工程完整性广度」的展示；verdict 由 offline fixture 产出（非真实裁决），
  * 但 verdict 多样性本身即证据——非「全 CONFIRMED」的剧场，而是 supports / refutes / inconclusive /
@@ -30,6 +31,7 @@ import { runC3Seed } from './c3_catalyst_activity.ts';
 import { runE2Seed } from './e2_carbon_flux.ts';
 import { runG5Seed } from './g5_seismic_precursor.ts';
 import { runP1Seed } from './p1_room_temp_superconductor.ts';
+import { runM2Seed } from './m2_sglt2_heart_failure.ts';
 import type { SeedRunner } from '../../src/benchmark/index.ts';
 
 /**
@@ -86,5 +88,12 @@ export const BENCHMARK_SEEDS: readonly SeedRunner[] = [
     domain: '物理',
     science125Tag: 'room-temp-superconductor-lk99',
     run: runP1Seed,
+  },
+  {
+    problemId: 'M2',
+    problemTitle: '心衰住院（SGLT2 抑制剂 CVOT）',
+    domain: '医学',
+    science125Tag: 'sglt2-heart-failure-benefit',
+    run: runM2Seed,
   },
 ];
