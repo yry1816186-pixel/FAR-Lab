@@ -1,191 +1,226 @@
 # FAR-Lab
 
-**可证伪 · 篡改可检测 · 可独立复算的 AI for Science 研究框架**
+**Falsifiable · Tamper-Detectable · Independently Recomputable AI-for-Science framework.**
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+> FAR-Lab is a **claim-level verification layer for AI4S scientific claims**. It does not chase the
+> "fully-automated scientist" narrative. Instead it uses a deterministic verdict kernel and a
+> content-addressed evidence chain to constrain LLM-generated hypotheses inside engineering
+> boundaries that are **falsifiable, recomputable, and traceable**.
+>
+> 🇨🇳 中文文档：[README.zh-CN.md](README.zh-CN.md)
 
-FAR-Lab 是一个面向科学假设生成与验证的研究框架。它不追求"全自动科学家"的叙事，
-而是用确定性的裁决内核与内容寻址的证据链，把 LLM 产出的假设约束在**可证伪、可复算、
-可追溯**的工程边界内。
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A524-green.svg)](https://nodejs.org)
+[![Python](https://img.shields.io/badge/python-%E2%89%A511-blue.svg)](https://www.python.org)
+[![CI](https://github.com/yry1816186-pixel/FAR-Lab/actions/workflows/ci.yml/badge.svg)](https://github.com/yry1816186-pixel/FAR-Lab/actions/workflows/ci.yml)
 
-> 本文档不手填测试数、覆盖率等会随版本漂移的精确指标。运行 `pnpm ci-all` 获取当前权威值。
-
----
-
-## 为什么需要它
-
-大模型生成的科学假设普遍存在三类问题：**不可证伪**（无法被实验否定）、**不可复现**
-（换环境结果漂移）、**不可追溯**（结论与证据脱节）。FAR-Lab 用三条机制闭环这三类问题：
-
-- **可证伪性引擎** — 每个假设必须携带可执行的验证方法，否则不予接纳。
-- **五值裁决内核** — 确定性规则（非 LLM 裁决）给出 CONFIRMED / REFUTED /
-  INCONCLUSIVE / DEGRADED_SCOPE / UNTESTED 五种结论。
-- **内容寻址证据链** — 所有证据、裁决轨迹、FEC 契约按 SHA-256 落库，append-only
-  触发器防止篡改，跨语言（TypeScript / Python / 浏览器）哈希字节一致。
+> Badges point at **real** workflows / facts. CI badge state is whatever GitHub reports live — we do
+> not fabricate a green. Release / PyPI / Docker badges are intentionally absent until those
+> publications exist (`NEEDS_RELEASE_PUBLICATION`).
 
 ---
 
-## 核心能力
+## 30-second install
 
-### 五值裁决系统
+> The one-line installer points at a GitHub Release asset. Until the first release is published
+> (`NEEDS_RELEASE_PUBLICATION`), use the developer install below — the `far` commands are identical.
 
-| 裁决 | 语义 |
-|------|------|
-| `CONFIRMED` | 假设通过全部校验 |
-| `REFUTED` | 证据否定假设 |
-| `INCONCLUSIVE` | 证据不足以判断 |
-| `DEGRADED_SCOPE` | 假设范围收窄但仍成立 |
-| `UNTESTED` | 未提交证据 |
-
-裁决由确定性内核 `src/falsifiability/verdict_kernel_v2.ts` 给出。LLM 不参与最终裁决——
-这是框架的硬约束，由 `pnpm no-llm-judge-scan` 在 CI 中强制。
-
-### 六阶段研究流程
-
-```
-理解 → 整合 → 假设 → 证据 → 计划 → 反馈
+**macOS / Linux / WSL** (once a release exists):
+```bash
+curl -fsSL https://github.com/yry1816186-pixel/FAR-Lab/releases/latest/download/install.sh | bash
+far doctor
+far demo tess-offline
 ```
 
-每阶段有结构化输出 schema 与状态机约束，事件按因果链持久化。
-
-### 可验证的完整性
-
-- 证据哈希链（TS `canonicalHash` ≡ Python `canonical_hash`，字节相等）
-- 套件级 Merkle 聚合根，浏览器侧可用 Web Crypto 独立重算复核
-- 14 条 Golden Vector 用例覆盖五值裁决的全部路径（`golden_vectors/cases/GV-01..14.json`）
-
----
-
-## 技术架构
-
-```
-Frontend (React + Vite, 独立 npm 工作区)
-    ↓ REST API
-Backend (Fastify 5 + TypeScript)
-    ├── agent_loop      六阶段 FSM
-    ├── llm_gateway     模型无关调度层（competition adapter 隔离厂商耦合）
-    ├── evidence_log    append-only 哈希链
-    ├── falsifiability  可证伪性 + 五值裁决内核
-    ├── fec             证据链编排 + 冻结契约
-    └── anti_theater    反"测试假绿"检测器（20 项）
-    ↓
-SQLite（append-only triggers · 内容寻址 CAS）
-```
-
----
-
-## 快速开始
-
-### 环境要求
-
-- Node.js ≥ 24
-- Python 3.11 / 3.12（可选，启用 SymPy / Z3 数学验证轴）
-- pnpm 10.x
-
-### 安装
-
+**Right now (developer install, works immediately):**
 ```bash
 git clone https://github.com/yry1816186-pixel/FAR-Lab.git
 cd FAR-Lab
 pnpm install
-node scripts/ensure_py_deps.mjs   # 探测 Python 验证轴，按需安装
+node src/cli/far.ts doctor            # environment self-diagnosis (no key needed)
+node src/cli/far.ts demo tess-offline # offline demo — needs ZERO credentials
 ```
 
-### 运行测试
+`far doctor` only **WARNs** on a missing API key — it never fails the offline experience and never
+reads a key value.
+
+---
+
+## 2-minute Quickstart
 
 ```bash
-pnpm test            # 主回归套件
-pnpm ci-all          # 完整 CI 流水线（含跨语言、覆盖率、扫描门）
-node scripts/depth_gate.mjs   # 深度接线门（AST caller 校验 + 账本一致性）
-```
+# 1. Verify a pre-generated, self-verifiable proof bundle (offline, no key)
+node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof
+#   → tamperStatus: clean · recomputation.node: pass · exit 0
 
-### 命令行工具
-
-`far` 命令依赖 Node ≥ 24 原生 type-stripping（bin 直接指向 `src/cli/far.ts`）。克隆后任选其一启用：
-
-```bash
-pnpm link --global          # 注册全局 `far`（推荐）
-# 或免安装直接调用：
-node src/cli/far.ts status          # 等价于 `far status`
+# 2. Run the deterministic verdict kernel over 14 golden vectors
 node src/cli/far.ts verify-golden --all
+
+# 3. See tamper detection in action
+cp -r examples/tess-offline/output/demo.far-proof /tmp/tampered
+sed -i 's/UNTESTED/CONFIRMED/' /tmp/tampered/proof_envelopes.jsonl
+node src/cli/far.ts verify /tmp/tampered
+#   → tamperStatus: tampered · recomputation.node: fail · exit 7
 ```
+
+Full CLI reference: `node src/cli/far.ts --help`.
+
+---
+
+## What problem does it solve?
+
+LLM-generated scientific hypotheses suffer three failure modes: **unfalsifiable** (no experiment can
+refute them), **irreproducible** (results drift across environments), and **untraceable** (conclusions
+detached from evidence). FAR-Lab closes all three with:
+
+- **Falsifiability engine** — every accepted claim must carry an executable falsification spec
+  (metric + threshold + comparator). Claims without one are rejected at the gate.
+- **Five-value verdict kernel** — a **deterministic** rule set (R0–R9), **not an LLM**, produces the
+  verdict: `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` / `DEGRADED_SCOPE` / `UNTESTED`.
+- **Content-addressed evidence chain** — all evidence, verdict traces, and FEC contracts are hashed
+  (SHA-256) into an append-only log; cross-language (TypeScript / Python / browser) hashes are
+  byte-identical. Tampering is detectable.
+
+---
+
+## What it is **not**
+
+- ❌ It does **not** prove scientific truths. Demo verdicts come from **offline fixtures**, not real
+  scientific adjudication.
+- ❌ It does **not** use an LLM as the final arbiter. The LLM generates hypotheses; the deterministic
+  R0–R9 kernel decides.
+- ❌ It is **not** a general AI4S benchmark. It is a verification layer.
+- ❌ It does **not** claim physical immutability or full reproducibility — see *Known limits*.
+
+---
+
+## Core concepts
+
+| Concept | Meaning |
+|---------|---------|
+| **Claim** | A falsifiable scientific statement + its falsificationSpec (metric/threshold/comparator) |
+| **Evidence** | A measurement/observation, content-addressed by SHA-256, in an append-only hash chain |
+| **Verdict** | One of 5 values, produced by the deterministic R0–R9 kernel (priority: `DEGRADED_SCOPE > REFUTED > INCONCLUSIVE > CONFIRMED > UNTESTED`) |
+| **ProofEnvelope** | A sealed, hashed verdict artifact (proofHash) that a third party can independently recompute |
+| **`.far-proof`** | A self-verifiable offline bundle (claim graph + redacted chain + proofHash) exportable via `far export far-proof` |
+| **FEC** | Falsifiability Evidence Contract — a frozen, hashed measurement/statistical plan |
+
+Deeper: [docs/concepts/far-proof.md](docs/concepts/far-proof.md) · [docs/concepts/evidence-ledger.md](docs/concepts/evidence-ledger.md)
+
+---
+
+## Offline demo (no API key required)
 
 ```bash
-far status                # 仓库状态与迁移计数
-far verify-golden --all   # 用真实内核裁决跑全部 Golden Vector
-far demo                  # 一键演示（14 GVs + demo chain + 真实统计驱动裁决·无需凭据）
-far fec compile --claim examples/fec/sample_fec_contract.json --out fec.compiled.json
-                          # 编译 FEC 冻结契约（fecHash 重算；示例契约见 examples/fec/）
-far export far-proof --demo-chain --out far-proof-bundle   # 导出可独立复算的证明包
-far verify --bundle far-proof-bundle                      # 第三方独立重算验证导出包
+node src/cli/far.ts demo tess-offline
 ```
 
-### 全栈运行（API + Web 仪表盘）
+Runs entirely offline: 14 golden vectors through the real R0–R9 kernel, then an end-to-end
+TESS claim (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fail-closed sealing. See
+[examples/tess-offline/README.md](examples/tess-offline/README.md) for the persistent bundle and a
+**tested** tamper-detection walkthrough.
+
+---
+
+## Live providers (Qwen / DashScope / Bailian)
+
+> **`NEEDS_API_KEY`** — real inference costs money and never runs by default.
 
 ```bash
-pnpm api                  # 终端 1：启动 REST API @ http://localhost:3000（离线 demo·自动种子裁决数据）
-cd frontend && npm install && npm run dev   # 终端 2：Vite 开发服务器 @ http://localhost:5173
+export DASHSCOPE_API_KEY=sk-...          # never commit this; see SECURITY.md
+node src/cli/far.ts ask "<question>" --profile competition_aliyun_qwen
 ```
 
-前端默认连 `localhost:3000`（可用 `VITE_API_BASE_URL` 覆盖）。API 启动即种子 demo 裁决（C-ASTRO-0001·机器裁决 UNTESTED：legacy 路径不注入统计→R6 不触发；真实统计驱动的 CONFIRMED 经 `far demo` 或 hero pipeline 演示），仪表盘可直接查看证据链与裁决。生产模式：`pnpm api --persist ./far-chain.db --protected`（需 `FAR_JWT_SECRET`）。
-
-前端是 `frontend/` 下的独立工作区（React + Vite + Radix + d3 + reactflow）。
+Core gates and the offline demo run **without** this key. The CI `competition_qwen_smoke` job is a
+conditional gate that gracefully skips when the key is absent. Setup: [docs/providers/qwen-dashscope.md](docs/providers/qwen-dashscope.md)
 
 ---
 
-## Science-125 示例
-
-项目内置覆盖五个领域、五种裁决的基准用例：
-
-| 问题 | 领域 | 裁决 |
-|------|------|------|
-| 脉冲星 P0 | 天文学 | CONFIRMED |
-| 行星轨道衰减 | 天文学 | INCONCLUSIVE |
-| 蛋白质折叠（CASP15） | 生物学 | REFUTED |
-| 催化剂活性（SAC） | 化学 | DEGRADED_SCOPE |
-| 碳通量 | 生态气候 | CONFIRMED |
-| 地震前兆 | 地学 | UNTESTED |
+## Docker
 
 ```bash
-pnpm test:demo_seeds
+docker compose up far-demo      # one-shot offline TESS demo (no key)
+docker compose up far-api       # long-running API server @ http://localhost:3000 (offline)
 ```
 
----
+The default image runs the offline demo / anonymous API and **never** requires a key. To use a real
+provider, pass an explicit env file: `docker compose --env-file .env up far-api`.
 
-## 工程治理
-
-框架用一组机器门把"深度功能是否真接到生产路径"从软规则变成 CI exit code：
-
-- **深度接线门** `scripts/depth_gate.mjs` — AST 校验生产调用方、账本诚实性、统计模块非占位。
-- **反剧场扫描** `pnpm anti-theater-scan` — 检测器确定性、LLM 不在裁决回路。
-- **零容忍扫描** `pnpm zero-tolerance` — `:any` / 硬编码 secret / 空断言等反模式。
-
-接线状态记录在 `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md`（机器可读）。贡献流程见
-[CONTRIBUTING.md](CONTRIBUTING.md)。
+> `NEEDS_DOCKER_BUILD_VALIDATION`: the image is built locally; publish to GHCR is part of the release
+> workflow (`NEEDS_GHCR_PUBLISH`).
 
 ---
 
-## 已知边界
+## Documentation
 
-1. **浮点序列化** — 字符串键哈希完全证明；浮点序列化正迁移至 RFC 8785 JCS 规范化。
-2. **多模态** — 当前支持视觉模态（Qwen-VL）；音频/视频/表格路径在路线图中。
-3. **单机部署** — 基于 SQLite；多节点 PostgreSQL 为未来工作。
-4. **Pre-1.0** — API 与 schema 可能调整。
-
----
-
-## 文档
-
-- [CONTRIBUTING.md](CONTRIBUTING.md) — 环境搭建、PR 流程、质量门、零容忍规则
-- [CHANGELOG.md](CHANGELOG.md) — 版本变更记录
-- [SECURITY.md](SECURITY.md) — 漏洞报告与密钥策略
-- [FAR_LAB_MASTER_PLAN/](FAR_LAB_MASTER_PLAN/) — 架构与设计文档
+- [Quickstart](docs/quickstart.md) · [Installation](docs/installation.md)
+- Concepts: [far-proof](docs/concepts/far-proof.md) · [evidence-ledger](docs/concepts/evidence-ledger.md)
+- Providers: [Qwen / DashScope](docs/providers/qwen-dashscope.md)
+- Demos: [TESS offline](docs/demos/tess-offline.md)
+- Governance: [release process](docs/governance/release-process.md) · [open-source audit](docs/governance/OPEN_SOURCE_AUDIT.md) · [release plan](docs/governance/OPEN_SOURCE_RELEASE_PLAN.md)
+- Architecture & design: [FAR_LAB_MASTER_PLAN/](FAR_LAB_MASTER_PLAN/)
 
 ---
 
-## 许可证
+## Developer guide
 
-MIT License — 详见 [LICENSE](LICENSE)。
+```bash
+pnpm install --frozen-lockfile
+node scripts/ensure_py_deps.mjs   # probe Python axis (skips gracefully if absent)
+pnpm typecheck && pnpm lint
+pnpm ci-all                        # full CI pipeline (cross-lang, coverage, scans)
+```
 
-本项目为 XH-202619 揭榜挂帅挑战杯参赛作品。不代表阿里云、DashScope、NAOC、NADC
-或任何机构的官方立场。
+`make bootstrap` / `make verify` / `make demo` are available on macOS/Linux (Windows: use the pnpm
+commands directly). See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Testing
+
+```bash
+pnpm test            # main regression suite
+pnpm ci-all          # full CI gate (zero-tolerance, anti-theater, depth-gate, cross-lang)
+node scripts/depth_gate.mjs   # depth-wiring gate (AST caller verification + ledger honesty)
+```
+
+The suite is green, but ~25% is tautological (constant assertions / grep-for-missing-word). Green ≠
+deep-feature wiring; that is what `depth_gate.mjs` checks. Real-backend axes (SymPy/Z3/Dafny/Lean)
+skip per environment.
+
+---
+
+## Security & integrity boundaries
+
+- **No LLM as final arbiter** — enforced by `pnpm no-llm-judge-scan` in CI.
+- **No hardcoded raw statistics** — p-values / effect sizes are computed by `src/statistics/`, never
+  literals.
+- **Anti-theater** — 20 detectors catch fake-green tests; enforced by `pnpm anti-theater-scan`.
+- **Secrets never committed** — `.env` is gitignored; see [SECURITY.md](SECURITY.md).
+- Real API / real data / real GPU / competition submission are all explicitly tagged
+  `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` / `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). The repo enforces machine gates (`depth_gate.mjs`,
+`zero_tolerance_scan.mjs`) that turn "is the deep feature really wired" from a soft rule into a CI
+exit code. Read `.agent/AGENT_ENTRY_PROTOCOL.md` before writing code.
+
+---
+
+## Citation & License
+
+If this work is useful, cite it: see [CITATION.cff](CITATION.cff).
+
+**MIT License** — see [LICENSE](LICENSE). This is a competition entry (XH-202619); it does not
+represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any institution.
+
+### Known limits
+
+1. **Float serialization** — string-key hashing is fully proven; float serialization is migrating to
+   RFC 8785 JCS.
+2. **Multimodal** — vision supported (Qwen-VL); audio/video/tabular are on the roadmap.
+3. **Single-node** — SQLite-based; multi-node PostgreSQL is future work.
+4. **Pre-1.0** — API and schema may change.

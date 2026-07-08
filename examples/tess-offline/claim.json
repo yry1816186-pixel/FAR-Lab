@@ -1,0 +1,19 @@
+{
+  "claimId": "C-ASTRO-0001",
+  "title": "TESS-ASTRO adapter macro-F1 benchmark claim (offline demo)",
+  "claimText": "adapter A achieves macro-F1 >= 0.80 on TESS-ASTRO benchmark",
+  "falsificationSpec": {
+    "metric": "macro_f1",
+    "threshold": 0.8,
+    "thresholdSemantics": "gt",
+    "prediction": "adapter A achieves macro-F1 >= 0.80 on TESS-ASTRO benchmark"
+  },
+  "observedMetricValue": 0.62,
+  "machineVerdict": "UNTESTED",
+  "untestedReason": "NO_DECISION_PATH",
+  "sourceAnchor": "tess_astro/adapter_a.py:42 (AdapterA.evaluate@v1)",
+  "honestBoundary": "本 claim 是 offline fixture（非真实科学裁决）。verdict=UNTESTED：legacy demo 路径不注入 StatisticalResult → R6 决策路径不触发 → 内核 fail-closed 给出 UNTESTED 而非 CONFIRMED。展示的是『证据链工程完整性 + 确定性裁决内核 + 防篡改密封』，绝非科学结论为真。",
+  "authoritativeData": "output/demo.far-proof/claim_graph.json (claim+evidence 节点) · proof_envelopes.jsonl (sealed verdict) · 本文件仅为人类可读导航摘要",
+  "verify": "far verify examples/tess-offline/output/demo.far-proof",
+  "needsRealEnv": "真实 TESS live 下载（lightkurve/astroquery）与真实 metric 重算属 P1-6 路线（NEEDS_REAL_ENV），本 demo 不触发任何网络/API。"
+}
