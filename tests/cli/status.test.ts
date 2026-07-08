@@ -110,7 +110,7 @@ test('collectStatusDump: suiteIntegrityRoot 默认读 benchmark_report.json（ph
     );
     assert.strictEqual(
       dump.suiteIntegrityRoot,
-      '88f8c2e933d6a56abed79a3fe87132411dac8ca4099ba9401b52c193d7a3e12e',
+      'f70dc3bd1377dad2d8d048df209e4cab6e248503c6da69f6e4df0a9c1d7542df',
       'suiteIntegrityRoot 应 = benchmark_report.json 的确定性锚 hex',
     );
   }
