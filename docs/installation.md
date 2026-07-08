@@ -95,6 +95,7 @@ cd frontend && npm install && npm run dev      # 终端 2：Vite @ http://localh
 | `far` 命令找不到 | `pnpm link --global`；或直接 `node src/cli/far.ts`；或检查 PATH 含 pnpm 全局 bin |
 | `node src/cli/far.ts` 报 type-stripping 错 | Node < 24；`nvm install 24` 或装 Node ≥ 24 |
 | `pnpm install` 失败 | 删 `node_modules` 重试；确认用 pnpm 10（`corepack enable`） |
+| pnpm 报 "Ignored build scripts: esbuild" | 正常（pnpm 10 默认行为）；不影响 better-sqlite3（prebuilt）与 `far` 命令（fresh-clone 实测验证）。若需 vitest/tsx（dev）：`pnpm approve-builds` |
 | Python 轴 skip | `node scripts/ensure_py_deps.mjs` 看探测输出；`pip install -e .` |
 | better-sqlite3 native 加载失败 | 重装：`pnpm rebuild better-sqlite3`；或确认 Node ≥ 24 匹配 |
 | 任何不确定 | `far doctor` —— 它会逐项告诉你哪里有问题 |
