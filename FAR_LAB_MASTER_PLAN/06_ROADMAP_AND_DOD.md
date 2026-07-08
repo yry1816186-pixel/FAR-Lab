@@ -281,7 +281,7 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 | FI | 满血交付（唯一目标） | 验收口径 | 物理约束 / 诚实边界（保留） | 状态 |
 |---|---|---|---|---|
 | **FI-3 Court**（跨模型可靠性法庭） | 离线 persona 证书 + 真实多模型证书（两档都做） | `agreement_matrix` 结构化计算 verdict kind + evidence 指纹；颁发 `ReliabilityCertificate`；CourtPage 一致性热力图 | 真实多模型须多 key（`NEEDS_HUMAN_OPERATION`） | `DESIGN_LOCKED`（persona 档 `PARTIAL`，真实档 `NEEDS_HUMAN_OPERATION`） |
-| **FI-4 DomainPack** | 5 pack 全绿（TESS LIVE + 4 新 pack：蛋白折叠 / 催化剂 / 碳通量 / 地震前兆） | 每 pack = {dataset_resolver, claim_fixtures, falsification_templates, verdict_thresholds, math_backend_hints}；每 pack 跑通一个 claim 完整链 | verdict_threshold 必须 preregistration 锁（守 F8） | `ROADMAP`（TESS 已 `IMPLEMENTED_VERIFIED`） |
+| **FI-4 DomainPack** | 5 pack 全绿（TESS LIVE + 4 新 pack：蛋白折叠 / 催化剂 / 碳通量 / 地震前兆） | 每 pack = {dataset_resolver, claim_fixtures, falsification_templates, verdict_thresholds, math_backend_hints}；每 pack 跑通一个 claim 完整链 | verdict_threshold 必须 preregistration 锁（守 F8） | `PARTIAL`（TESS LIVE IMPLEMENTED_VERIFIED + 4 新 pack falsification 结构 IMPLEMENTED_VERIFIED：protein/catalyst/carbon/seismic harness · F8 预登记阈值 · verdict_mapping · 8 测·claim_fixtures 复用 demo seed b7/c3/e2/g5；真实 LIVE 数据集 resolver 仍 offline V2） |
 | **FI-5 Bench-125** | 125 题全 fixture + 套件根可验 + Resolution Curve | 复用已落地 `suiteIntegrityRoot` + SuiteVerifier；评委浏览器独立重算 125 题套件根 | Resolution Curve 须过 R5 三审查门（反自我指涉 theater 质量门）；不过门则曲线本身不做（Bench-125 仍满血） | `ROADMAP`（6 seed 已 `IMPLEMENTED_VERIFIED`） |
 | **FI-6 WASM + 流式** | WASM 三向字节相等 + 流式 hash-link + perf 基准 | TS ≡ Python ≡ WASM 三向 golden；canonicalHash µs 级基准进 CI | 若 `1e-7` 鸿沟在 WASM 编译产物重现，诚实降级双语言 + JS（技术约束，非时间妥协） | `ROADMAP` |
 
