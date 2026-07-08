@@ -27,14 +27,26 @@ import { runReplay } from './commands/replay.ts';
 import { runCourt } from './commands/court.ts';
 import { runArena } from './commands/arena.ts';
 import { runInit } from './commands/init.ts';
+import { runDoctor } from './commands/doctor.ts';
+import { runVersion } from './commands/version.ts';
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const command = argv[0];
 
-  if (command === undefined) {
+  if (command === undefined || command === '--help' || command === '-h') {
     process.stdout.write(HELP_TEXT);
-    process.exit(1);
+    process.exit(command === undefined ? 1 : 0);
+  }
+
+  if (command === 'version' || command === '--version' || command === '-v') {
+    process.exit(runVersion());
+  }
+
+  if (command === 'doctor') {
+    const liveQwenSmoke = argv.includes('--live-qwen-smoke');
+    const exitCode = await runDoctor({ liveQwenSmoke });
+    process.exit(exitCode);
   }
 
   if (command === 'status') {
@@ -49,7 +61,7 @@ async function main(): Promise<void> {
   }
 
   if (command === 'demo') {
-    process.exit(runDemo());
+    process.exit(runDemo(argv[1]));
   }
 
   if (command === 'ask') {
@@ -474,6 +486,9 @@ function runVerifyFromArgs(args: readonly string[]): number {
       i += 1;
     } else if (arg.startsWith('--mode=')) {
       mode = arg.slice('--mode='.length);
+    } else if (!arg.startsWith('--') && bundlePath === undefined) {
+      // 位置参数兼容：far verify <path> 等价 far verify --bundle <path>（.far-proof 目录）
+      bundlePath = arg;
     } else {
       process.stderr.write(`far verify: 未知参数 '${arg}'\n`);
       return 2;
@@ -947,7 +962,11 @@ function errorMessage(error: unknown): string {
 const HELP_TEXT = `FAR-Chain CLI（FI-1 · far 命令家族）
 
 用法：
-  far demo                           一键演示（14 Golden Vectors + 端到端 demo claim·offline 无需凭据）
+  far version                        版本号 + git HEAD
+  far doctor [--live-qwen-smoke]     环境自诊断（默认零网络零密钥；DASHSCOPE_API_KEY 缺失只 WARN 不 FAIL）
+                                     --live-qwen-smoke 显式才调真实 API（复用 ci/competition_qwen_smoke.ts·NEEDS_API_VALIDATION）
+  far demo [tess-offline]            一键演示（14 Golden Vectors + 端到端 demo claim·offline 无需凭据）
+                                     tess-offline = 聚焦 TESS（C-ASTRO-0001 脉冲星）offline 裁决
 
   far status [--db <path>] [--json]    生成单一 SSOT 状态报告（FI-10 · 01§5）
     --db <path>   验证 evidence_log DB 链头（verifyChainHead），不提供则 pending
@@ -965,6 +984,7 @@ const HELP_TEXT = `FAR-Chain CLI（FI-1 · far 命令家族）
   far verify [--bundle <path> | --envelope <path> --db <path>] [--mode chain|envelope|full]
              [--json] [--explain]      第三方独立重算验证（FI-9 · 04§5）
     --bundle <path>    .far-proof V1 minimal 离线包目录（full 模式验必需文件 + redacted chain + V1 proofHash）
+    <位置参数>         等价 --bundle（如 far verify examples/tess-offline/output/demo.far-proof）
     --envelope <path>  ProofEnvelopeV2 JSON 文件（envelope/full 模式必需）
     --db <path>        evidence_log DB（chain/full 模式必需·verifyChainHead）
     --mode <m>         chain|envelope|full（默认从 --envelope/--db 推断）
