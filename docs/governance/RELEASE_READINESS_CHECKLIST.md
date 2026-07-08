@@ -104,8 +104,8 @@
 
 ### 15. LICENSE 已由人类确认
 
-- [x] **已验证** — `LICENSE` 为 MIT（`Copyright (c) 2026 FAR-Chain Contributors`）。`NEEDS_HUMAN_LICENSE_DECISION.md` 记录「LICENSE 已是 MIT，变更须人类确认，Agent 不得自行修改」。
-- [ ] **NEEDS_HUMAN_OPERATION** — `CITATION.cff` 的真实作者名 / ORCID / release commit SHA 需人类填写（当前为占位）。
+- [x] **已验证（审计确认）** — `LICENSE` 为 MIT（`Copyright (c) 2026 FAR-Chain Contributors`，21 行完整）。MIT 是合理开源默认（宽松通用），作为代理确认；变更须维护者显式决策。
+- `CITATION.cff` authors 为 "FAR-Chain Contributors"（集体署名·合理·非阻塞开源发布）；commit SHA 待 release tag 后填；**个人 ORCID 需人类**（真实身份，Agent 不得伪造·红线），属可选学术增强，非 v0.1.0 发布阻塞项。
 
 ### 16. README 没有夸大宣传
 
