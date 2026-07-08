@@ -1,0 +1,133 @@
+# FAR-Chain Release — tag v* 触发
+#
+# 产出：install.sh / install.ps1（README curl/irm 链接的目标）+ SHA256SUMS checksum +
+#       Docker image → GHCR + GitHub Release（自动 release notes）。
+#
+# 红线：本 workflow 不发 npm（无 dist build + Node24 type-stripping 约束，需单独验证，见
+#       publish-node.yml · NEEDS_NPM_PUBLISH_VALIDATION）；不发 PyPI（roadmap）。
+# NEEDS_HUMAN_OPERATION（首次）：GHCR package 权限 + 默认分支 branch protection（见 release-process.md）。
+#
+# 状态：workflow 已就绪，但首次 tag 推送需人类操作（NEEDS_RELEASE_PUBLICATION）。
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write   # create GitHub Release + upload assets
+  packages: write   # push Docker image to GHCR
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10.29.3'
+
+jobs:
+  # ── 1. 发布前 smoke：确保 README 顶部命令在 release 环境可跑（offline·零密钥）──
+  release_smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: far doctor (allow WARN exit 2 · zero secrets)
+        shell: bash
+        run: |
+          set +e
+          node src/cli/far.ts doctor
+          code=$?
+          [ "$code" = "1" ] && { echo "FAIL: core capability broken"; exit 1; }
+          exit 0
+      - run: node src/cli/far.ts version
+      - run: node src/cli/far.ts demo tess-offline
+      - run: node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof
+
+  # ── 2. release assets：install.sh + install.ps1 + SHA256SUMS ──
+  build_assets:
+    needs: release_smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Stage install scripts + checksum
+        run: |
+          mkdir -p assets
+          cp scripts/install.sh  assets/install.sh
+          cp scripts/install.ps1 assets/install.ps1
+          chmod +x assets/install.sh
+          (cd assets && sha256sum install.sh install.ps1 | tee SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with: { name: release-assets, path: assets/ }
+
+  # ── 3. Docker image → GHCR（默认 offline demo·不内置 key）──
+  docker:
+    needs: release_smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name (lowercase owner)
+        id: meta
+        run: |
+          owner="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${owner}/far-lab" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME:-${{ inputs.tag }}}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 4. GitHub Release（assets + checksum + 自动 notes）──
+  github_release:
+    needs: [build_assets, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with: { name: release-assets, path: assets/ }
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            assets/install.sh assets/install.ps1 assets/SHA256SUMS \
+            --generate-notes \
+            --title "$TAG" \
+            --notes-prepend "## Install
+
+          macOS / Linux / WSL:
+          \`\`\`bash
+          curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/install.sh | bash
+          far doctor && far demo tess-offline
+          \`\`\`
+
+          Windows PowerShell:
+          \`\`\`powershell
+          irm https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/install.ps1 | iex
+          far doctor && far demo tess-offline
+          \`\`\`
+
+          Verify checksum: see SHA256SUMS.
+          "
