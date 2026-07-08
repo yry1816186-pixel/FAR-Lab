@@ -47,6 +47,14 @@ jobs:
             const fs = require("node:fs");
             const body = process.env.PR_BODY || "";
             const changedFiles = (process.env.CHANGED_FILES || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+            // 豁免机制：PR body 含 `entry_protocol_exempt: <reason>` 显式声明非深度接线 PR
+            //   （governance / docs / CI-only / refactor）→ WARN 跳过 body 检查。
+            //   depth_gate（AST CallExpression 接线门）仍是真接线后盾——豁免 body 检查不豁免 AST 门。
+            const exemptMatch = body.match(/^\s*entry_protocol_exempt\s*:\s*(.+)/im);
+            if (exemptMatch) {
+              console.warn("○ entry_protocol_check EXEMPT: " + exemptMatch[1].trim() + "（非深度接线 PR；depth_gate AST 仍是真接线后盾）");
+              process.exit(0);
+            }
             const lines = { ledger_item: "", single_real_dependency: "" };
             for (const line of body.split(/\r?\n/)) {
               const m1 = line.match(/^\s*ledger_item\s*:\s*(\S+)/i);
