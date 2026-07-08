@@ -127,8 +127,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: npm ci (frozen install via package-lock.json)
         run: npm ci --legacy-peer-deps
-      - name: R9-2-8 · Frontend tsc --noEmit
-        run: npx tsc --noEmit
+      - name: R9-2-8 · Frontend typecheck (tsc -b · handles tsconfig.node composite reference)
+        run: npm run typecheck
       - name: R9-2-9 · Frontend ESLint zero-warnings
         run: npm run lint
       - name: R9-2-10 · Vite production build
