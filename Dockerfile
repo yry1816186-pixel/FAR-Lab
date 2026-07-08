@@ -8,13 +8,16 @@
 #         docker run --rm far-chain:dev doctor               # 容器内环境诊断
 #         docker run --rm far-chain:dev verify examples/tess-offline/output/demo.far-proof
 #
-# 设计：better-sqlite3 用 prebuilt binary（无需 build-essential 编译），far demo / verify 的
-# node 轴不依赖 Python。Python 科研轴（SymPy/Z3 跨语言哈希）默认不装以加速 build——见底部可选层。
+# 设计：better-sqlite3 优先用 prebuilt binary，但保留 build-essential + python3 作为 node-gyp
+# 编译兜底——当 prebuild-install 因网络失败时（如 socket hang up），node-gyp rebuild 仍可编译 native。
+# 移除 build-essential 会破坏该兜底（实测：prebuild 网络失败 → node-gyp 无 Python → install 失败）。
 
 FROM node:24-slim
 
-# git + ca-certificates（better-sqlite3 prebuilt 无需 build-essential / python3-dev）
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+# git + ca-certificates + build-essential + python3（better-sqlite3 native node-gyp 兜底）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git ca-certificates \
+        build-essential python3 python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -38,8 +41,8 @@ ENTRYPOINT ["node", "src/cli/far.ts"]
 CMD ["demo", "tess-offline"]
 
 # ── 可选：Python 科研轴（SymPy/Z3 跨语言哈希一致性）──
-# 默认不装（加速 build；far demo / verify 的 node 轴不依赖它）。
+# 默认不装（far demo / verify 的 node 轴不依赖它；加速 build）。
 # 如需跨语言 Python 轴，在上方依赖层后加：
-#   RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip \
+#   RUN apt-get update && apt-get install -y --no-install-recommends python3-pip \
 #       && rm -rf /var/lib/apt/lists/* \
 #       && pip install --no-cache-dir --break-system-packages -e .
