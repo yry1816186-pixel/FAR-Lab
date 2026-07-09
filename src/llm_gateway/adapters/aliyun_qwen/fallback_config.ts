@@ -31,10 +31,13 @@
  * 注意：digest F-05-17 记录的最小链是 2 元素（qwen3.7-max → qwen3-235b），
  *   spec 24 §5（风险降级 SSOT·更权威）扩展为 3 元素含 qwen-plus 兜底（无 deepseek）。
  *
- * V1 集成边界：引擎（fallback_chain/）已就绪可全测；真实百炼 caller 接线依赖
- *   aliyun_qwen 文本 adapter（待落地）+ DASHSCOPE_API_KEY（competition 条件门）。
- *   chainExhausted → verdict=UNTESTED 的生产 caller 接线属待实现（fallback_degraded_from_bridge.test
- *   已诚实声明 adapter 未编排 executeFallbackChain）。
+ * 生产 caller 接线状态（2026-07 更新）：qwen_adapter.ts:133（文本）+ qwen_vl_adapter.ts:342（VL）
+ *   均已编排 executeFallbackChain：穿透 429/5xx/timeout/network + chainExhausted→RETRY_EXHAUSTED
+ *   (NO_QWEN_FAMILY_AVAILABLE_REASON) + fatalEncountered→BailianHttpError + degradedFrom 进 adapterMeta。
+ *   物证：fallback_real_http.test.ts（本地 proof server·credential-free）+ credential_dual_run.mjs（凭据门）。
+ * stage 级消费现状：adapter chainExhausted→抛 RETRY_EXHAUSTED(NO_QWEN_FAMILY_AVAILABLE_REASON)；
+ *   fsm_runner.runAgentLoop 捕获入 LoopState.error(reason='error'·永不抛·fsm_runner.ts:108)，
+ *   尚未将该 reason 翻译为 verdict=UNTESTED（设计层缺口，非 adapter 层·P1-2 proof_caller=adapter 已闭合）。
  *
  * 零容忍合规。本文件含 qwen 字面量——合规（model-neutral 红线 scope = src/api/，
  *   qwen 字面量在 adapters/aliyun_qwen/ 本就允许）。
