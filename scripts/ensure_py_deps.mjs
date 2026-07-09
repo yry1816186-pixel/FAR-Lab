@@ -1,5 +1,5 @@
 // Ensure Python replay/test dependencies are available without touching system Python.
-// Installs pyproject.toml project.dependencies into .python-deps/ when imports are missing.
+// Installs pyproject.toml project.dependencies into .python-deps/ when imports fail.
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -30,31 +30,19 @@ if (missingBefore.length === 0) {
 
 mkdirSync(pythonDepsDir, { recursive: true });
 const dependencies = readProjectDependencies();
-const install = spawnSync(
-  pythonCmd,
-  [
-    '-m',
-    'pip',
-    'install',
-    '--disable-pip-version-check',
-    '--no-warn-conflicts',
-    '--upgrade',
-    '--target',
-    pythonDepsDir,
-    ...dependencies,
-  ],
-  {
-    cwd: repoRoot,
-    env: process.env,
-    stdio: 'inherit',
-  },
-);
+let install = installDependencies([]);
+if (install.error !== undefined || install.status !== 0) {
+  process.stderr.write(
+    'ensure_py_deps: pip install failed with configured index; retrying via https://pypi.org/simple\n',
+  );
+  install = installDependencies(['--index-url', 'https://pypi.org/simple']);
+}
 
 if (install.error !== undefined || install.status !== 0) {
   const detail = install.error?.message ?? `pip exited with ${install.status ?? 'unknown status'}`;
   process.stderr.write(
     `ensure_py_deps: failed to install Python dependencies into .python-deps (${detail}).\n` +
-      `Run manually: ${pythonCmd} -m pip install --target .python-deps ${dependencies.join(' ')}\n`,
+      `Run manually: ${pythonCmd} -m pip install --upgrade --force-reinstall --target .python-deps ${dependencies.join(' ')}\n`,
   );
   process.exit(1);
 }
@@ -70,9 +58,15 @@ reportOptionalModules(baseEnv);
 function reportOptionalModules(env) {
   // 可选 science 模块探测（非失败）：打印可用/缺失，供 C-ASTRO/Phase 5 skip 决策参考。
   const checkCode = [
-    'import importlib.util, sys',
+    'import importlib, sys',
     `mods = ${JSON.stringify(optionalModules)}`,
-    'avail = [m for m in mods if importlib.util.find_spec(m) is not None]',
+    'avail = []',
+    'for m in mods:',
+    '    try:',
+    '        importlib.import_module(m)',
+    '        avail.append(m)',
+    '    except Exception:',
+    '        pass',
     'print(",".join(avail))',
   ].join('\n');
   const result = spawnSync(pythonCmd, ['-c', checkCode], {
@@ -108,9 +102,14 @@ function buildPythonPath() {
 
 function missingModules(env) {
   const checkCode = [
-    'import importlib.util, sys',
+    'import importlib, sys',
     `mods = ${JSON.stringify(requiredModules)}`,
-    'missing = [m for m in mods if importlib.util.find_spec(m) is None]',
+    'missing = []',
+    'for m in mods:',
+    '    try:',
+    '        importlib.import_module(m)',
+    '    except Exception:',
+    '        missing.append(m)',
     'print("\\n".join(missing))',
     'sys.exit(1 if missing else 0)',
   ].join('\n');
@@ -127,6 +126,30 @@ function missingModules(env) {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+}
+
+function installDependencies(extraPipArgs) {
+  return spawnSync(
+    pythonCmd,
+    [
+      '-m',
+      'pip',
+      'install',
+      '--disable-pip-version-check',
+      '--no-warn-conflicts',
+      ...extraPipArgs,
+      '--upgrade',
+      '--force-reinstall',
+      '--target',
+      pythonDepsDir,
+      ...dependencies,
+    ],
+    {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: 'inherit',
+    },
+  );
 }
 
 function readProjectDependencies() {
