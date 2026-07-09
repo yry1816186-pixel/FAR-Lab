@@ -111,6 +111,8 @@ async function createChatCompletion(
     apiKey,
     baseURL,
     timeout: config.timeoutMs ?? 60_000,
+    // maxRetries:0 — fallback_chain 是唯一重试/降级机制（F11）；与 qwen_adapter.ts:68 + qwen_vl_client.ts:231 同口径。
+    maxRetries: 0,
   });
   return client.chat.completions.create({
     model: request.modelId,
