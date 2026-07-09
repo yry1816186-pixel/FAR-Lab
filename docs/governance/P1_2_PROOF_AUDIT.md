@@ -11,7 +11,7 @@ DEPTH_LEDGER §C P1-2 行 `single_real_dependency = executeFallbackChain 接 loo
 
 ## 实证（worktree 双跑，2026-07-08）
 
-构造受控突变 stub（`evidence/red-wave7-fallback` 分支 @ `c2fffef`，基于 `c0482f5` 移除 `classifySdkTransportError` 调用分支 4 行），在 `f497605`（HEAD，含 _request_id 修复）基础上临时移除同一调用点，隔离观察两类测试：
+构造受控突变基线（`evidence/red-wave7-fallback` 分支 @ `c2fffef`，基于 `c0482f5` 移除 `classifySdkTransportError` 调用分支 4 行），在 `f497605`（HEAD，含 _request_id 修复）基础上临时移除同一调用点，隔离观察两类测试：
 
 | 测试 | 有 classifySdkTransportError | 无 classifySdkTransportError | 结论 |
 |------|------------------------------|------------------------------|------|
@@ -36,5 +36,5 @@ DEPTH_LEDGER §C P1-2 行 `single_real_dependency = executeFallbackChain 接 loo
 
 - 本审计**未**修改 §C 表格（CODEOWNERS 保护）。
 - 本审计**未**手填 WIRED_GREEN（§D CHECK-L2 禁止 agent 手填）。
-- `c2fffef` stub 为本地分支 `evidence/red-wave7-fallback`，未推送（待 §C 校正后由 maintainer 决定推送 / CI 配置）。
+- `c2fffef` 受控突变基线为本地分支 `evidence/red-wave7-fallback`，未推送（待 §C 校正后由 maintainer 决定推送 / CI 配置）。
 - fallback_real_http.test.ts 仍是合法的 **executeFallbackChain 真实 HTTP 集成证明**（real SDK chat.completions + real 429），只是它证明的对象不是 classifySdkTransportError。
