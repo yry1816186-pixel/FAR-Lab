@@ -245,10 +245,13 @@ function verdictForName(parsed, testName) {
 function runProofTest(checkoutDir, testFile, testName) {
   const absTestFile = join(checkoutDir, testFile);
   if (!existsSync(absTestFile)) return { verdict: 'NO_FILE', exitCode: null, tapSample: '' };
-  // 剥离 NODE_TEST_CONTEXT：本 bot 若被另一 `node --test` 进程唤起（如集成测），子 `node --test`
-  // 会继承该 env 进入「test runner child」模式，忽略 --test-reporter=tap 改吐内部流协议 →
+  // 剥离 NODE_TEST*：本 bot 若被另一 `node --test` 进程唤起（如集成测），子 `node --test`
+  // 会继承 test-runner 上下文进入「test runner child」模式，忽略 --test-reporter=tap 改吐内部流协议 →
   // parseTap 抓不到 subtest 名。CI 直调（workflow 非测跑器）无此 env，剥除对 CI 无影响、对本地下兼容。
-  const { NODE_TEST_CONTEXT, ...childEnv } = process.env;
+  const childEnv = { ...process.env };
+  for (const key of Object.keys(childEnv)) {
+    if (key.startsWith('NODE_TEST')) delete childEnv[key];
+  }
   const r = spawnSync(
     'node',
     ['--test', '--test-reporter=tap', testFile],
