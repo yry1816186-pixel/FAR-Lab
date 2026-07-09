@@ -197,6 +197,9 @@ export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<Onl
     });
 
     const stdoutChunks: Buffer[] = [];
+    // stderr 须 drain（否则子进程警告填满 OS pipe buffer ~64KB 后 write 阻塞 → spawn 挂起至 timeout）。
+    // astropy/lightkurve 发大量 warning；捕获同时供失败诊断（02 F1 never-fabricate：fetch 失败有 stderr 可查，非静默 null）。
+    const stderrChunks: Buffer[] = [];
     let settled = false;
     const finish = (r: OnlineFetchResult | null): void => {
       if (settled) return;
@@ -205,6 +208,7 @@ export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<Onl
     };
 
     child.stdout.on('data', (c: Buffer) => stdoutChunks.push(c));
+    child.stderr.on('data', (c: Buffer) => stderrChunks.push(c));
     child.on('error', () => finish(null));
     child.on('close', () => {
       const text = Buffer.concat(stdoutChunks).toString('utf8').trim();
@@ -212,10 +216,16 @@ export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<Onl
       try {
         parsed = JSON.parse(text) as DatasetFetchResponse;
       } catch {
+        if (stderrChunks.length > 0) {
+          console.warn(`fetchOnlineDataset: dataset_fetch.py stderr (parse fail): ${Buffer.concat(stderrChunks).toString('utf8').slice(0, 500)}`);
+        }
         finish(null);
         return;
       }
       if (!parsed.ok || typeof parsed.contentHash !== 'string' || typeof parsed.retrievedAt !== 'string') {
+        if (stderrChunks.length > 0) {
+          console.warn(`fetchOnlineDataset: dataset_fetch.py stderr (ok=false): ${Buffer.concat(stderrChunks).toString('utf8').slice(0, 500)}`);
+        }
         finish(null);
         return;
       }
