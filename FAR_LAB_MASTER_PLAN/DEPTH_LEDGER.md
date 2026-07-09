@@ -62,7 +62,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | STAT-1 | src/statistics/ 真实数学（z-test/Cohen's d/置信区间/Bonferroni·Holm·BH-FDR 多重校正），statistics_math.test.ts GREEN；**3 真实生产 caller 经 P1-5a/b/c**——hero_a_pipeline 调 oneSampleZTest、hero_b_pipeline/c_astro_pipeline 调 twoSampleWelchZTest/adjustPValues（经 fecAppendClaim(statistics?) 注入 V2 kernel 消费真实统计量，不再零 caller） | src/science_harness/hero_a_pipeline.ts:138 | tests/science_harness/hero_a_pipeline.test.ts::hero_a_pipeline: real src/statistics drives R7 CONFIRMED -> ASK-9 INCONCLUSIVE seal (P1-5 Phase 2) | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
-| P1-2 | executeFallbackChain 接 loop_runner / qwen_vl_adapter，真实 429/5xx/timeout 穿透 | src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_adapter.ts:340 | tests/llm_gateway/fallback_real_http.test.ts::real_429穿透_fallback_chain | (待 CI 双跑) | WIRED_RED | — | - |
+| P1-2 | executeFallbackChain 接 loop_runner / qwen_vl_adapter，真实 429/5xx/timeout 穿透 | src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_adapter.ts:340 | tests/llm_gateway/fallback_real_http.test.ts::real_transport_error穿透_fallback_chain | (待 CI 双跑) | WIRED_RED | — | - |
 | P1-4 | 12 条 GV 落盘 golden_vectors/cases/GV-01..GV-12.json（含 input.evidences/expected.verdict/expected.reasonCodes schema）+ far verify-golden 真调 decideFiveValueVerdict（非硬编码旁路） | src/cli/commands/verify_golden.ts:122 | tests/cli/verify_golden_cross_lang.test.ts::node_python_browser_agree_on_GV | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | P2-1 | tests/real_backends/ 真实 spawn SymPy/Z3/Dafny/Lean（非 mock，按环境 skip 但 skip 须显式记录 reason） | tests/real_backends/sympy_real.test.ts:9 | tests/real_backends/sympy_real.test.ts::SymPy real backend verifies and refutes expanded polynomial identities | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
@@ -119,7 +119,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 | FUSION-OS-14 | R-identifier-fabrication: claim 带可校验 identifier(DOI/arXiv/accession/author_year) 无 harness-verified 来源→REFUTED（非 UNTESTED·五值优先级 REFUTED>UNTESTED·Open Science fabricated-references EXCEPTION 范式·插 R5 后 R6 前·三态 not_found=REFUTED/unresolved=UNTESTED/resolved=不触发·unresolved 优先·caller opt-in 接线·GV-14 落盘·零回归 GV-01..13） | src/falsifiability/verdict_kernel_v2.ts:348 | tests/falsifiability/identifier_fabrication.test.ts::doi_with_no_verified_source_refuted | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
 
-> **当前态**：§C **31 行已升 WIRED_GREEN**（keystone bot 受控突变双跑物证·含全部 P0 + 全部 FUSION-OS-1..14 + CLI/sandbox/schema/probe/sympy）；**3 行维持 WIRED_RED**（P1-2 本地真实 HTTP 429 fallback proof 已可无凭据执行；P1-3 真实 DashScope HTTP 需凭据/网络；P1-6b 需 `FAR_ONLINE=1` + lightkurve + 网络，须 maintainer CI 写回物证）。运行时正确性由 `far verify-golden --all`（14/14 经真实内核）独立证实。
+> **当前态**：§C **31 行已升 WIRED_GREEN**（keystone bot 受控突变双跑物证·含全部 P0 + 全部 FUSION-OS-1..14 + CLI/sandbox/schema/probe/sympy）；**3 行维持 WIRED_RED**（P1-2 本地真实 HTTP transport-error + 429 fallback proof 已可无凭据执行；P1-3 真实 DashScope HTTP 需凭据/网络；P1-6b 需 `FAR_ONLINE=1` + lightkurve + 网络，须 maintainer CI 写回物证）。运行时正确性由 `far verify-golden --all`（14/14 经真实内核）独立证实。
 >
 > **2026-07-07 maintainer-side 凭据实测**（用户提供 DASHSCOPE_API_KEY + lightkurve 装入 .python-deps）：`DASHSCOPE_API_KEY=sk-xxx FAR_ONLINE=1 node scripts/credential_dual_run.mjs` → **PASS 3 · SKIP 0 · FAIL 0**。P1-3 真实 DashScope HTTP（`qwen_adapter: real DashScope HTTP (line 73)` ~5s 真实 chat.completions 调用·非 mock）、P1-6b 真实 lightkurve spawn（`fetchOnlineDataset` ~16s spawn load-bearing·host 白名单 fail-closed）。附带修复 3 个真实 bug：（1）`competition_qwen_smoke.ts`/`snapshot_liveness_smoke.ts` 的直接调用 guard 在 Windows 盘符下永假（`file://C:/` ≠ `file:///C:/`）→ main() 永不执行 = fresh-clone smoke 12/12 中 2 项静默 no-op 假绿→修为 canonical `import.meta.url === pathToFileURL(argv[1])`；（2）`STRUCTURED_SAFE_MODEL` 旧值 `qwen-max-2025-09-24` 已被 DashScope 下线（404）→ `qwen-max`；smoke model `qwen3-coder-480b-a35b`→`qwen3-coder-480b-a35b-instruct`；（3）`credential_dual_run.mjs` 的 `hasLightkurve()` 未设 PYTHONPATH=.python-deps → 永报 unavailable。修复后 fresh-clone smoke **12/12 PASS（0 skip）**。行 status 仍维持 WIRED_RED：P1-2 缺 keystone RED→GREEN 写回；P1-3/P1-6b 的外部 proof 在无凭据/无在线条件 base 中会 SKIP 非 FAIL，keystone bot 双跑无法直接 fire（inherent_limit #2）→ WIRED_GREEN 仍须 maintainer 背书或 bot 规则补 env-gated carve-out。
 
@@ -167,7 +167,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 
 ## §F. 状态声明
 
-**当前态**：§C **31 行已升 `WIRED_GREEN`**（全部 P0 P0-1/2a/2b/2c/2d/3/4、STAT-1、P1-1/4/5a/5b/5c/6a、P2-1、P2-2、P3-1、**全部 FUSION-OS-1..14**）；**3 行维持 `WIRED_RED`**（P1-2 本地 OpenAI-compatible server 真实 HTTP 429 fallback proof 已可无凭据执行，但尚无 keystone 双跑写回；P1-3 真实 DashScope HTTP 需凭据/网络；P1-6b fetchOnlineDataset 需 `FAR_ONLINE=1` + lightkurve + 网络）。
+**当前态**：§C **31 行已升 `WIRED_GREEN`**（全部 P0 P0-1/2a/2b/2c/2d/3/4、STAT-1、P1-1/4/5a/5b/5c/6a、P2-1、P2-2、P3-1、**全部 FUSION-OS-1..14**）；**3 行维持 `WIRED_RED`**（P1-2 本地 OpenAI-compatible server 真实 HTTP transport-error + 429 fallback proof 已可无凭据执行，但尚无 keystone 双跑写回；P1-3 真实 DashScope HTTP 需凭据/网络；P1-6b fetchOnlineDataset 需 `FAR_ONLINE=1` + lightkurve + 网络）。
 
 **maintainer 一键产 P1-2/3/6b 物证**：`node scripts/credential_dual_run.mjs` 先执行 P1-2 本地真实 HTTP proof；`DASHSCOPE_API_KEY=sk-xxx node scripts/credential_dual_run.mjs` 追加 P1-3；P1-6b 额外需要 `FAR_ONLINE=1`+lightkurve+网络。PASS 物证由 keystone bot `depth-evidence.yml` 双跑写回 WIRED_GREEN。`scripts/python_axis_probe.mjs`（P3-1）在 `pnpm test` 起跑打印 `Python axis: available|skipped`，明示 axis skip=环境非代码 bug。
 
@@ -180,7 +180,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 - 运行时正确性已由 `far verify-golden --all`（14/14 PASS 经真实内核执行全部 R0-R9 规则）**独立证实**，不依赖 WIRED_GREEN 物证。
 - statistics 行（STAT-1/P1-5a/b/c）的物证证 kernel 依赖路径 load-bearing；src/statistics 的真实数学由 depth_gate CHECK-W5（非占位 + realMathSignal）独立保证。
 
-**为何 3 行停留 WIRED_RED**：P1-2（本地真实 HTTP 429 穿透 fallback chain）已可在无外部凭据环境执行，但仍缺 keystone bot RED→GREEN 写回；P1-3（真实 DashScope HTTP chat.completions）与 P1-6b（fetchOnlineDataset 真起 dataset_fetch.py·需网络+lightkurve）仍依赖外部凭据/网络。须 maintainer CI 按各 proof 的真实前置条件双跑（base FAIL / head PASS）写回。
+**为何 3 行停留 WIRED_RED**：P1-2（本地真实 HTTP transport-error + 429 穿透 fallback chain）已可在无外部凭据环境执行，但仍缺 keystone bot RED→GREEN 写回；P1-3（真实 DashScope HTTP chat.completions）与 P1-6b（fetchOnlineDataset 真起 dataset_fetch.py·需网络+lightkurve）仍依赖外部凭据/网络。须 maintainer CI 按各 proof 的真实前置条件双跑（base FAIL / head PASS）写回。
 
 **变更历史**：逐项接线的工程决策与 file:line 证据见 `git log`（commit message
 含 `single_real_dependency` 声明）与各 proof_test。本账本不重复叙述过程。

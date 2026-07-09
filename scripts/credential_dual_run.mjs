@@ -23,9 +23,9 @@ let lightkurveProbeCache;
 const PROOFS = [
   {
     id: 'P1-2',
-    desc: 'executeFallbackChain 真实 HTTP 429/5xx 穿透（qwen_vl_adapter:340）',
+    desc: 'executeFallbackChain 真实 HTTP transport error 穿透（qwen_vl_adapter:340）',
     test: 'tests/llm_gateway/fallback_real_http.test.ts',
-    proofName: 'real_429穿透_fallback_chain',
+    proofName: 'real_transport_error穿透_fallback_chain',
     prereq: () => true,
     prereqDesc: '本地 OpenAI-compatible proof server',
   },
