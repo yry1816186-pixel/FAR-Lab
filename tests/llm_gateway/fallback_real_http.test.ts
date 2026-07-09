@@ -103,6 +103,16 @@ async function startOpenAiCompatibleServer(): Promise<{
   readonly requests: CapturedHttpRequest[];
   readonly close: () => Promise<void>;
 }> {
+  return startOpenAiCompatibleServerWithPrimaryFailure('http_429');
+}
+
+async function startOpenAiCompatibleServerWithPrimaryFailure(
+  primaryFailure: 'http_429' | 'socket_destroy',
+): Promise<{
+  readonly baseURL: string;
+  readonly requests: CapturedHttpRequest[];
+  readonly close: () => Promise<void>;
+}> {
   const requests: CapturedHttpRequest[] = [];
   const server = createServer(async (req, res) => {
     if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
@@ -129,6 +139,10 @@ async function startOpenAiCompatibleServer(): Promise<{
     });
 
     if (modelId === 'qwen-vl-max') {
+      if (primaryFailure === 'socket_destroy') {
+        req.socket.destroy();
+        return;
+      }
       sendJson(res, 429, {
         error: {
           message: 'quota exhausted by local proof server',
@@ -206,6 +220,56 @@ test('real_429穿透_fallback_chain', async () => {
       result.credential.providerRequestId,
       'local-200',
       'OpenAI SDK surfaces x-request-id as _request_id; VL adapter must preserve that real SDK request id',
+    );
+    assert.equal(result.credential.adapterMeta?.qwenVlModel, 'qwen-vl-plus');
+    assert.equal(result.interpretation, '{"claim":"backup vision ok"}');
+  } finally {
+    await http.close();
+  }
+});
+
+test('real_transport_error穿透_fallback_chain', async () => {
+  const http = await startOpenAiCompatibleServerWithPrimaryFailure('socket_destroy');
+  const adapter = createQwenVlAdapter({
+    apiKey: 'test-key',
+    modelId: 'qwen-vl-max',
+    baseURL: http.baseURL,
+    timeoutMs: 5_000,
+  });
+
+  try {
+    const result = await adapter.interpret({
+      imageBase64: SAMPLE_BASE64_1x1_RED_PNG,
+      mimeType: 'image/png',
+      prompt: '结构化描述这张图',
+    });
+
+    assert.ok(
+      http.requests.some((request) => request.modelId === 'qwen-vl-max'),
+      'primary model must be attempted through real HTTP before the socket-level transport failure',
+    );
+    assert.ok(
+      http.requests.some((request) => request.modelId === 'qwen-vl-plus'),
+      'backup model must be reached after OpenAI SDK APIConnectionError/status=undefined',
+    );
+    assert.ok(
+      http.requests.every((request) => request.method === 'POST' && request.path === '/v1/chat/completions'),
+      'transport-error proof must still use the OpenAI-compatible chat completions HTTP endpoint',
+    );
+    assert.ok(
+      http.requests.every((request) => request.authorization === 'Bearer test-key'),
+      'SDK transport-error path must attach the configured bearer key',
+    );
+    assert.ok(
+      http.requests.every((request) => request.hasImagePart),
+      'transport-error retry/fallback path must preserve the image_url content part',
+    );
+
+    assert.equal(result.credential.modelId, 'qwen-vl-plus');
+    assert.equal(
+      result.credential.providerRequestId,
+      'local-200',
+      'backup success must preserve the real SDK request id after the primary transport error',
     );
     assert.equal(result.credential.adapterMeta?.qwenVlModel, 'qwen-vl-plus');
     assert.equal(result.interpretation, '{"claim":"backup vision ok"}');

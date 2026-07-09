@@ -27,10 +27,8 @@ DEPTH_LEDGER §C P1-2 行 `single_real_dependency = executeFallbackChain 接 loo
 
 ## 建议（maintainer action，§C CODEOWNERS 保护）
 
-1. 将 §C P1-2 行 `proof_test` 由 `fallback_real_http.test.ts::real_429穿透_fallback_chain` 改为 transport-error 单元测试之一：
-   - `tests/llm_gateway/fallback_chain.test.ts::classifier: OpenAI SDK APIConnectionError with status undefined → fallback (network)`，或
-   - `tests/llm_gateway/fallback_chain.test.ts::classifier: OpenAI SDK APIConnectionTimeoutError with status undefined → fallback (timeout)`
-2. 之后 CI keystone bot（`scripts/depth_evidence.mjs`）可用 `--base c2fffef --head c0482f5 --only P1-2` 双跑写回 WIRED_GREEN（base 2 FAIL / head 2 PASS 已本地实证）。
+1. 已补强 §C P1-2 proof_test 为 `tests/llm_gateway/fallback_real_http.test.ts::real_transport_error穿透_fallback_chain`：本地 OpenAI-compatible server 在 primary 请求后直接断开 socket，让 OpenAI SDK 抛 `APIConnectionError`/`status=undefined`，再由真实 fallback chain 进入 backup。
+2. CI keystone bot 仍须用受控突变基线双跑写回 WIRED_GREEN；本审计不手填 §C 完成态。
 
 ## 边界声明
 
