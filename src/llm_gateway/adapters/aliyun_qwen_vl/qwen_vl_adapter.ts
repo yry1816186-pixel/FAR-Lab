@@ -14,8 +14,13 @@ import type {
 } from './types.ts';
 import { QWEN_VL_DEFAULT_MODEL, QWEN_VL_MODELS, isQwenVlModel } from './types.ts';
 import { COMPETITION_BASE_URL } from '../aliyun_qwen/snapshot.ts';
-import { executeFallbackChain } from '../../fallback_chain/index.ts';
-import type { FallbackModelTarget } from '../../fallback_chain/index.ts';
+import {
+  executeFallbackChain,
+  BailianHttpError,
+  type FallbackModelTarget,
+  type FallbackAttempt,
+} from '../../fallback_chain/index.ts';
+import { NO_QWEN_FAMILY_AVAILABLE_REASON } from '../aliyun_qwen/fallback_config.ts';
 
 // ===== Types =====
 
@@ -77,6 +82,17 @@ function qwenVlTargetModel(target: FallbackModelTarget): QwenVlModelId {
     throw new Error(`qwen_vl_adapter: fallback target is not a Qwen-VL model: ${target.modelId}`);
   }
   return target.modelId;
+}
+
+function extractFatalStatus(attempts: readonly FallbackAttempt[]): number | null {
+  for (const a of attempts) {
+    if (a.outcome !== 'fatal' || a.triggerSignal === null) continue;
+    const m = /^http_(\d+)$/.exec(a.triggerSignal);
+    if (m !== null && m[1] !== undefined) {
+      return parseInt(m[1], 10);
+    }
+  }
+  return null;
 }
 
 async function createChatCompletion(
@@ -355,10 +371,46 @@ export function createQwenVlAdapter(config: QwenVlAdapterConfig = {}): ProviderA
 
     if (chainResult.data === null) {
       const reason = chainResult.degradationSummary ?? 'no Qwen-VL fallback target succeeded';
-      throw new Error(`qwen_vl_adapter: vision fallback failed: ${reason}`);
+      if (chainResult.fatalEncountered) {
+        const status = extractFatalStatus(chainResult.attempts) ?? 500;
+        throw new BailianHttpError(
+          status,
+          null,
+          `qwen_vl_adapter: fatal error during fallback chain: ${reason}`,
+        );
+      }
+      if (chainResult.chainExhausted) {
+        // 24 §5：Qwen-VL 家族全不可用 → caller 落 verdict=UNTESTED（绝不切非国产基座·D3 红线）。
+        throw Object.assign(
+          new Error(`qwen_vl_adapter: ${NO_QWEN_FAMILY_AVAILABLE_REASON}: ${reason}`),
+          {
+            code: 'RETRY_EXHAUSTED' as const,
+            reason: NO_QWEN_FAMILY_AVAILABLE_REASON,
+            degradedFrom: chainResult.degradedFrom,
+            attempts: chainResult.attempts,
+          },
+        );
+      }
+      throw new Error(`qwen_vl_adapter: chain returned null data unexpectedly: ${reason}`);
     }
 
-    return chainResult.data;
+    const result = chainResult.data;
+    // 降级留痕进 adapterMeta（degradedFrom=null 表示无降级，属性整体省略——exactOptionalPropertyTypes）
+    if (chainResult.degradedFrom !== null) {
+      return {
+        ...result,
+        credential: {
+          ...result.credential,
+          adapterMeta: {
+            ...result.credential.adapterMeta,
+            degradedFrom: chainResult.degradedFrom,
+            degradationCount: chainResult.degradationCount,
+            degradationSummary: chainResult.degradationSummary,
+          },
+        },
+      };
+    }
+    return result;
   }
 
   return {

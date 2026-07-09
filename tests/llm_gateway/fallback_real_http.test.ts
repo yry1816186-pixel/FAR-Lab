@@ -272,6 +272,11 @@ test('real_transport_error穿透_fallback_chain', async () => {
       'backup success must preserve the real SDK request id after the primary transport error',
     );
     assert.equal(result.credential.adapterMeta?.qwenVlModel, 'qwen-vl-plus');
+    assert.equal(
+      result.credential.adapterMeta?.degradedFrom,
+      'qwen-vl-max',
+      'transport-error fallback must record degradedFrom so downstream audit + verdict see the degradation (P1-2 落 degraded_from)',
+    );
     assert.equal(result.interpretation, '{"claim":"backup vision ok"}');
   } finally {
     await http.close();
