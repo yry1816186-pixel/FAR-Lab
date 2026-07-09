@@ -25,6 +25,7 @@ import {
 import { buildVenvPythonEnv } from '../../src/science_harness/sandbox_runner.ts';
 
 const DATASET_FETCH_PY = resolve('repro/science_harness/dataset_fetch.py');
+const ONLINE_FETCH_PROOF_TIMEOUT_MS = 45_000;
 
 test('fetchOnlineDataset: non-whitelisted host -> null (TS fail-closed gate, no spawn)', async () => {
   const result = await fetchOnlineDataset({
@@ -77,7 +78,7 @@ test('fetchOnlineDataset: whitelisted host honestly returns null-or-result; spaw
   const lightkurveProbe = spawnSync(
     pythonCommand,
     ['-c', 'import lightkurve'],
-    { encoding: 'utf8', env: buildVenvPythonEnv(), timeout: 10_000 },
+    { encoding: 'utf8', env: buildVenvPythonEnv(), timeout: ONLINE_FETCH_PROOF_TIMEOUT_MS },
   );
   if (lightkurveProbe.status !== 0) {
     t.skip(`lightkurve unavailable — real online fetch cannot be verified; cached_fixture is the honest fallback (02 F1)`);
@@ -92,7 +93,7 @@ test('fetchOnlineDataset: whitelisted host honestly returns null-or-result; spaw
       host: 'mast.stsci.edu',
       version: '1.0',
       ticId: 'TIC000000000',
-      timeoutMs: 12_000,
+      timeoutMs: ONLINE_FETCH_PROOF_TIMEOUT_MS,
     });
 
     // 负载不变式：直接 spawn dataset_fetch.py 证明真实子进程执行了（移除 fetchOnlineDataset 的
@@ -105,7 +106,7 @@ test('fetchOnlineDataset: whitelisted host honestly returns null-or-result; spaw
         encoding: 'utf8',
         env: buildVenvPythonEnv(),
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 12_000,
+        timeout: ONLINE_FETCH_PROOF_TIMEOUT_MS,
       },
     );
     assert.equal(direct.status, 0, `dataset_fetch.py must exit 0 with an honest envelope (not crash); stderr=${(direct.stderr ?? '').trim().slice(0, 200)}`);
