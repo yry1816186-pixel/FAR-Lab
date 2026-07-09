@@ -69,6 +69,9 @@ async function createChatCompletion(
     apiKey,
     baseURL,
     timeout: config.timeoutMs ?? 60_000,
+    // maxRetries:0 — fallback_chain 是唯一重试/降级机制（F11：每次降级在 attempts[] 留痕）。
+    // SDK 默认 maxRetries:2 会在链外静默重试同一模型，污染 attempts[] 审计轨迹（不可见的双重重试）。
+    maxRetries: 0,
   });
   return client.chat.completions.create({
     model: request.modelId,

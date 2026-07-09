@@ -228,6 +228,8 @@ export function createQwenVlClient(config: QwenVlClientConfig = {}): QwenVlClien
       apiKey: resolvedApiKey,
       baseURL,
       timeout: timeoutMs,
+      // maxRetries:0 — fallback_chain 是唯一重试/降级机制（F11）；SDK 默认 maxRetries:2 会在链外静默重试，污染 attempts[] 审计。
+      maxRetries: 0,
     });
 
     const completion: OpenAiChatCompletion = await client.chat.completions.create({
