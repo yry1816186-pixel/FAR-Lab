@@ -8,9 +8,10 @@
  *
  * 边界声明（诚实，非幻觉）：
  *   - 本测试证明"桥接契约可行"（降级信息能从 FallbackChain 流到审计列），
- *     不等于生产 competition adapter 已编排 executeFallbackChain。
- *   - 生产编排（competition adapter 实际跑降级链 + 真实 DashScope API 触发降级）
- *     需真实 API 环境，竞赛提交时验证，本测试用 caller 注入离线模拟，绝不伪造真实调用。
+ *     用 caller 注入离线模拟（不调真实 DashScope）。
+ *   - 生产 competition adapter（qwen_adapter.ts:133 / qwen_vl_adapter.ts:342）已编排
+ *     executeFallbackChain 并合并 degradedFrom 进 adapterMeta；真实 DashScope 触发降级
+ *     的端到端物证见 fallback_real_http.test.ts（本地 proof server）+ credential_dual_run.mjs（凭据门）。
  *
  * 零容忍合规：无 any / @ts-ignore / 改期望掩盖实现 / 双重断言。
  */
