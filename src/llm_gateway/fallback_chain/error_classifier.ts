@@ -156,12 +156,8 @@ export function shouldFallback(error: unknown): ShouldFallbackResult {
   if (status !== null) {
     return classifyStatus(status, null);
   }
-  // 5. OpenAI SDK transport errors may carry status=undefined; classify by ctor/cause/code.
-  const sdkTransport = classifySdkTransportError(error);
-  if (sdkTransport !== null) {
-    return sdkTransport;
-  }
-  // 6. 未知 / 配置 / 逻辑错误 → fatal（F11：绝不静默换）
+  // STUB red-wave7-fallback: classifySdkTransportError removed → transport errors fall to fatal (RED).
+  // 5. 未知 / 配置 / 逻辑错误 → fatal（F11：绝不静默换）
   //    NonQwenModelError / ThinkingJsonSchemaConflictError / RequestIdMissingError 都归此分支
   //    （它们不是 ProviderError 子类，换模型无法修复配置/逻辑错误）。
   return {
