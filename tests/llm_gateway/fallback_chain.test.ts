@@ -107,6 +107,36 @@ test('classifier: duck-type error with numeric status → status matrix', () => 
   assert.equal(shouldFallback(err400).fallback, false);
 });
 
+test('classifier: OpenAI SDK APIConnectionError with status undefined → fallback (network)', () => {
+  class APIConnectionError extends Error {
+    constructor() {
+      super('Connection error.');
+      this.name = 'Error';
+      this.cause = new Error(
+        'FetchError: Client network socket disconnected before secure TLS connection was established',
+      );
+    }
+  }
+
+  const r = shouldFallback(new APIConnectionError());
+  assert.equal(r.fallback, true);
+  assert.equal(r.triggerSignal, 'network');
+});
+
+test('classifier: OpenAI SDK APIConnectionTimeoutError with status undefined → fallback (timeout)', () => {
+  class APIConnectionTimeoutError extends Error {
+    constructor() {
+      super('Request timed out.');
+      this.name = 'Error';
+      this.cause = Object.assign(new Error('connect timed out'), { code: 'ETIMEDOUT' });
+    }
+  }
+
+  const r = shouldFallback(new APIConnectionTimeoutError());
+  assert.equal(r.fallback, true);
+  assert.equal(r.triggerSignal, 'timeout');
+});
+
 test('classifier: NonQwenModelError (config error) → fatal', () => {
   const r = shouldFallback(new NonQwenModelError('gpt-4'));
   assert.equal(r.fallback, false);
