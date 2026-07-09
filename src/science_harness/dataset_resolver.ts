@@ -189,59 +189,18 @@ export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<Onl
     timeoutMs,
   };
 
-  return new Promise<OnlineFetchResult | null>((promiseResolve) => {
-    const child = spawn(pythonCmd, [DATASET_FETCH_PY], {
-      env: buildVenvPythonEnv(),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: timeoutMs,
-    });
-
-    const stdoutChunks: Buffer[] = [];
-    // stderr 须 drain（否则子进程警告填满 OS pipe buffer ~64KB 后 write 阻塞 → spawn 挂起至 timeout）。
-    // astropy/lightkurve 发大量 warning；捕获同时供失败诊断（02 F1 never-fabricate：fetch 失败有 stderr 可查，非静默 null）。
-    const stderrChunks: Buffer[] = [];
-    let settled = false;
-    const finish = (r: OnlineFetchResult | null): void => {
-      if (settled) return;
-      settled = true;
-      promiseResolve(r);
-    };
-
-    child.stdout.on('data', (c: Buffer) => stdoutChunks.push(c));
-    child.stderr.on('data', (c: Buffer) => stderrChunks.push(c));
-    child.on('error', () => finish(null));
-    child.on('close', () => {
-      const text = Buffer.concat(stdoutChunks).toString('utf8').trim();
-      let parsed: DatasetFetchResponse;
-      try {
-        parsed = JSON.parse(text) as DatasetFetchResponse;
-      } catch {
-        if (stderrChunks.length > 0) {
-          console.warn(`fetchOnlineDataset: dataset_fetch.py stderr (parse fail): ${Buffer.concat(stderrChunks).toString('utf8').slice(0, 500)}`);
-        }
-        finish(null);
-        return;
-      }
-      if (!parsed.ok || typeof parsed.contentHash !== 'string' || typeof parsed.retrievedAt !== 'string') {
-        if (stderrChunks.length > 0) {
-          console.warn(`fetchOnlineDataset: dataset_fetch.py stderr (ok=false): ${Buffer.concat(stderrChunks).toString('utf8').slice(0, 500)}`);
-        }
-        finish(null);
-        return;
-      }
-      // exactOptionalPropertyTypes：ticId/sector 缺省时不提供 key（条件展开，非 undefined 赋值）。
-      const ref: DatasetRef = {
-        resolver: params.resolver,
-        version: typeof parsed.version === 'string' ? parsed.version : params.version,
-        retrievedAt: parsed.retrievedAt,
-        contentHash: parsed.contentHash,
-        ...(typeof parsed.ticId === 'string' && parsed.ticId.length > 0 ? { ticId: parsed.ticId } : {}),
-        ...(typeof parsed.sector === 'number' ? { sector: parsed.sector } : {}),
-      };
-      finish({ hostWhitelisted: true, ref });
-    });
-
-    child.stdin.write(JSON.stringify(cfg));
-    child.stdin.end();
+  // STUB red-wave-p1-6b: bypass real spawn, return fabricated result with non-sha256 contentHash.
+  // proof test asserts contentHash.match(/^[0-9a-f]{64}$/) → FAILS. head=dcf3394f restores real spawn.
+  void pythonCmd;
+  void timeoutMs;
+  void cfg;
+  return Promise.resolve({
+    hostWhitelisted: true,
+    ref: {
+      resolver: params.resolver,
+      version: params.version,
+      retrievedAt: new Date().toISOString(),
+      contentHash: 'FABRICATED-NOT-REAL-HASH',
+    },
   });
 }
