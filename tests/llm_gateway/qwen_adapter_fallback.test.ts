@@ -13,6 +13,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { once } from 'node:events';
+import type { AddressInfo } from 'node:net';
 import type OpenAI from 'openai';
 
 import { createQwenAdapter } from '../../src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts';
@@ -55,9 +58,155 @@ function makeCompletion(modelId: string, content: string): OpenAI.ChatCompletion
   };
 }
 
+interface CapturedQwenHttpRequest {
+  readonly method: string | undefined;
+  readonly path: string | undefined;
+  readonly authorization: string | undefined;
+  readonly modelId: string | null;
+  readonly roles: readonly string[];
+  readonly temperature: number | null;
+  readonly maxTokens: number | null;
+}
+
+async function readBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function numberField(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === 'number' ? value : null;
+}
+
+function rolesFromPayload(payload: Record<string, unknown>): readonly string[] {
+  if (!Array.isArray(payload.messages)) return [];
+  return payload.messages.flatMap((message) => {
+    const messageRecord = objectRecord(message);
+    return typeof messageRecord?.role === 'string' ? [messageRecord.role] : [];
+  });
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, {
+    'content-type': 'application/json',
+    'x-request-id': `local-${status}`,
+  });
+  res.end(JSON.stringify(body));
+}
+
+function completionBody(modelId: string, content: string): Record<string, unknown> {
+  return {
+    id: `chatcmpl-${modelId}`,
+    request_id: `req-${modelId}`,
+    object: 'chat.completion',
+    created: 0,
+    model: modelId,
+    choices: [
+      {
+        index: 0,
+        finish_reason: 'stop',
+        message: {
+          role: 'assistant',
+          content,
+          refusal: null,
+        },
+        logprobs: null,
+      },
+    ],
+    usage: {
+      prompt_tokens: 5,
+      completion_tokens: 3,
+      total_tokens: 8,
+    },
+  };
+}
+
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((err) => {
+      if (err !== undefined) reject(err);
+      else resolve();
+    });
+  });
+}
+
+async function startOpenAiCompatibleTextServer(): Promise<{
+  readonly baseURL: string;
+  readonly requests: CapturedQwenHttpRequest[];
+  readonly close: () => Promise<void>;
+}> {
+  const requests: CapturedQwenHttpRequest[] = [];
+  const server = createServer(async (req, res) => {
+    if (req.method !== 'POST' || req.url !== '/v1/chat/completions') {
+      sendJson(res, 404, { error: { message: 'not found' } });
+      return;
+    }
+
+    const raw = await readBody(req);
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      sendJson(res, 400, { error: { message: 'invalid json' } });
+      return;
+    }
+
+    const record = objectRecord(payload);
+    const modelId = typeof record?.model === 'string' ? record.model : null;
+    requests.push({
+      method: req.method,
+      path: req.url,
+      authorization: req.headers.authorization,
+      modelId,
+      roles: record === null ? [] : rolesFromPayload(record),
+      temperature: record === null ? null : numberField(record, 'temperature'),
+      maxTokens: record === null ? null : numberField(record, 'max_tokens'),
+    });
+
+    if (modelId !== COMPETITION_PRIMARY_MODEL_ID) {
+      sendJson(res, 400, { error: { message: `unexpected model ${modelId ?? '<missing>'}` } });
+      return;
+    }
+    sendJson(res, 200, completionBody(modelId, 'local-sdk-http-ok'));
+  });
+
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  if (typeof address === 'string' || address === null) {
+    await closeServer(server);
+    throw new Error('test server did not bind to a TCP port');
+  }
+  return {
+    baseURL: `http://127.0.0.1:${(address as AddressInfo).port}/v1`,
+    requests,
+    close: () => closeServer(server),
+  };
+}
+
 // 模拟 openai SDK 原生 429 错误（带 status，duck-type 兼容 error_classifier）。
 function openaiSdkError(status: number, message: string): Error & { status: number } {
   return Object.assign(new Error(message), { status });
+}
+
+class APIConnectionError extends Error {
+  constructor() {
+    super('Connection error.');
+    this.name = 'Error';
+    this.cause = new Error(
+      'FetchError: Client network socket disconnected before secure TLS connection was established',
+    );
+  }
 }
 
 // ===== §1 429 穿透：primary → backup success =====
@@ -89,6 +238,33 @@ test('qwen_adapter: 429 on primary → fallback to backup_1 success (no throw)',
   // 降级留痕：degradedFrom=primary
   assert.equal(response.credential.adapterMeta?.degradedFrom, COMPETITION_PRIMARY_MODEL_ID);
   assert.equal(response.credential.adapterMeta?.degradationCount, 1);
+});
+
+test('qwen_adapter: SDK APIConnectionError on primary → fallback to backup_1 success', async () => {
+  const attempts: string[] = [];
+  const adapter = createQwenAdapter({
+    createChatCompletion: async (request: QwenChatCompletionRequest) => {
+      attempts.push(request.modelId);
+      if (request.modelId === COMPETITION_PRIMARY_MODEL_ID) {
+        throw new APIConnectionError();
+      }
+      return makeCompletion(request.modelId, 'response-after-sdk-network-fallback');
+    },
+  });
+
+  const response = await adapter.call({
+    messages: [{ role: 'user', content: 'hello' }],
+  });
+
+  assert.deepEqual(attempts, [COMPETITION_PRIMARY_MODEL_ID, 'qwen3-235b-a22b']);
+  assert.equal(response.credential.modelId, 'qwen3-235b-a22b');
+  assert.equal(response.content, 'response-after-sdk-network-fallback');
+  assert.equal(response.credential.adapterMeta?.degradedFrom, COMPETITION_PRIMARY_MODEL_ID);
+  const summary = response.credential.adapterMeta?.degradationSummary;
+  if (typeof summary !== 'string') {
+    throw new Error('expected degradationSummary to be present after SDK network fallback');
+  }
+  assert.match(summary, /network/);
 });
 
 // ===== §2 链路耗尽：三档全 429 → RETRY_EXHAUSTED =====
@@ -173,6 +349,46 @@ test('qwen_adapter: primary success → no fallback, no degradedFrom', async () 
   // 无降级 → adapterMeta 不应带 degradedFrom
   assert.equal(response.credential.adapterMeta?.degradedFrom, undefined);
   assert.equal(response.content, 'ok');
+});
+
+test('qwen_adapter: local OpenAI-compatible HTTP exercises SDK path without createChatCompletion', async () => {
+  const http = await startOpenAiCompatibleTextServer();
+  const adapter = createQwenAdapter({
+    apiKey: 'local-test-key',
+    baseURL: http.baseURL,
+    timeoutMs: 5_000,
+  });
+
+  try {
+    const response = await adapter.call({
+      messages: [
+        { role: 'system', content: 'system policy' },
+        { role: 'user', content: 'hello' },
+      ],
+      temperature: 0,
+      maxTokens: 32,
+    });
+
+    assert.equal(http.requests.length, 1, 'primary success must not touch fallback targets');
+    const request = http.requests[0]!;
+    assert.equal(request.method, 'POST');
+    assert.equal(request.path, '/v1/chat/completions');
+    assert.equal(request.authorization, 'Bearer local-test-key');
+    assert.equal(request.modelId, COMPETITION_PRIMARY_MODEL_ID);
+    assert.deepEqual(request.roles, ['system', 'user']);
+    assert.equal(request.temperature, 0);
+    assert.equal(request.maxTokens, 32);
+    assert.equal(response.credential.modelId, COMPETITION_PRIMARY_MODEL_ID);
+    assert.equal(
+      response.credential.providerRequestId,
+      'local-200',
+      'OpenAI SDK surfaces x-request-id as _request_id; adapter must preserve that real SDK request id',
+    );
+    assert.equal(response.credential.adapterMeta?.degradedFrom, undefined);
+    assert.equal(response.content, 'local-sdk-http-ok');
+  } finally {
+    await http.close();
+  }
 });
 
 // ===== §5 真实 SDK 路径选定（无 createChatCompletion 注入）+ fail-closed key 门 =====

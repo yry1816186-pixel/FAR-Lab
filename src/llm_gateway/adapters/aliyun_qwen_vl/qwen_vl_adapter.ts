@@ -129,7 +129,7 @@ function resolveImageUrl(input: MultimodalContentInput): string | null {
 
 /**
  * 从 OpenAI ChatCompletion 对象中提取 request_id。
- * 优先 header（x-request-id），兜底 body（request_id → id）。
+ * 优先 header（x-request-id / SDK 注入的 _request_id），兜底 body（request_id → id）。
  * DashScope 在响应体中附加 request_id 字段（非 OpenAI 标准字段）。
  */
 function pullRequestId(
@@ -145,6 +145,7 @@ function pullRequestId(
   }
   const record = data as Record<string, unknown>;
   return (
+    nonEmptyString(record._request_id) ??
     nonEmptyString(record.request_id) ??
     nonEmptyString(record.id)
   );

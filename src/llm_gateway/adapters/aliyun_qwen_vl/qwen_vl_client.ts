@@ -126,7 +126,7 @@ function nonEmptyString(value: unknown): string | null {
 }
 
 /**
- * 提取 DashScope request_id（header 优先 / body 兜底）。
+ * 提取 DashScope request_id（header / SDK _request_id 优先，body 兜底）。
  * 生产 profile 下缺失时抛错。
  * [已实证·N4 locked] header 名 x-request-id 已由设计锁定。
  */
@@ -147,6 +147,7 @@ function extractDashscopeRequestId(
   }
   const record = data as Record<string, unknown>;
   return (
+    nonEmptyString(record._request_id) ??
     nonEmptyString(record.request_id) ??
     nonEmptyString(record.id)
   );
