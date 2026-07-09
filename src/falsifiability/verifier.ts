@@ -55,10 +55,13 @@ function recomputeVerdictHash(row: VerdictHashRow): string {
 export function verifyVerdictNodes(db: Database.Database): VerdictVerifyResult {
   const rows = db
     .prepare(
+      // 按 rowid（插入序）走链，不按 created_at：recordVerdict 两次快速调用可能落同一毫秒，
+      // created_at 相同时 ULID verdict_id 字典序随机，会打破 prev_hash 链序（曾致 supersede.test.ts flaky）。
+      // rowid 严格单调递增 = recordVerdict 向链 head 追加的链序（系统严格线性，无 fork）。
       `SELECT verdict_id, evidence_id, node_kind, verdict, falsification_spec,
               threshold_spec, source_anchor, verdict_trace_hash, prev_hash, current_hash
        FROM verdict_nodes
-       ORDER BY created_at ASC, verdict_id ASC`,
+       ORDER BY rowid ASC`,
     )
     .all() as VerdictHashRow[];
 
