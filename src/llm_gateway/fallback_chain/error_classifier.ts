@@ -37,6 +37,27 @@ function readNumericStatus(error: unknown): number | null {
   return typeof status === 'number' ? status : null;
 }
 
+function readStringField(error: unknown, field: string): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  if (!(field in error)) return null;
+  const record = error as Record<string, unknown>;
+  const value = record[field];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function constructorName(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const ctor = error.constructor;
+  return typeof ctor === 'function' && typeof ctor.name === 'string' && ctor.name.length > 0
+    ? ctor.name
+    : null;
+}
+
+function readCause(error: unknown): unknown {
+  if (typeof error !== 'object' || error === null) return null;
+  return 'cause' in error ? error.cause : null;
+}
+
 /** 提取错误的人类可读 message（兜底 name/message）。 */
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -70,6 +91,47 @@ function classifyStatus(status: number, requestId: string | null): ShouldFallbac
   };
 }
 
+function classifySdkTransportError(error: unknown): ShouldFallbackResult | null {
+  const cause = readCause(error);
+  const names = [
+    readStringField(error, 'name'),
+    constructorName(error),
+    readStringField(cause, 'name'),
+    constructorName(cause),
+  ].filter((value): value is string => value !== null).join(' ');
+  const code = readStringField(error, 'code') ?? readStringField(cause, 'code');
+  const text = `${names} ${code ?? ''} ${errorMessage(error)} ${cause !== null ? errorMessage(cause) : ''}`;
+
+  const isOpenAiTransport =
+    /\bAPIConnection(?:Timeout)?Error\b/.test(names) ||
+    /\bFetchError\b/.test(names) ||
+    /\bAbortError\b/.test(names);
+  const hasNetworkCode =
+    code !== null && /^(ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT)$/i.test(code);
+
+  if (!isOpenAiTransport && !hasNetworkCode) {
+    return null;
+  }
+  if (/APIConnectionTimeoutError|ETIMEDOUT|UND_ERR_CONNECT_TIMEOUT|timed?\s*out|timeout/i.test(text)) {
+    return {
+      fallback: true,
+      triggerSignal: 'timeout',
+      reason: `SDK transport timeout: ${errorMessage(error)}`,
+    };
+  }
+  if (
+    /APIConnectionError|FetchError|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|fetch failed|socket disconnected|TLS connection|network/i
+      .test(text)
+  ) {
+    return {
+      fallback: true,
+      triggerSignal: 'network',
+      reason: `SDK transport network error: ${errorMessage(error)}`,
+    };
+  }
+  return null;
+}
+
 /**
  * 触发矩阵主入口。判定一个错误是否应触发 fallback。
  *
@@ -94,7 +156,12 @@ export function shouldFallback(error: unknown): ShouldFallbackResult {
   if (status !== null) {
     return classifyStatus(status, null);
   }
-  // 5. 未知 / 配置 / 逻辑错误 → fatal（F11：绝不静默换）
+  // 5. OpenAI SDK transport errors may carry status=undefined; classify by ctor/cause/code.
+  const sdkTransport = classifySdkTransportError(error);
+  if (sdkTransport !== null) {
+    return sdkTransport;
+  }
+  // 6. 未知 / 配置 / 逻辑错误 → fatal（F11：绝不静默换）
   //    NonQwenModelError / ThinkingJsonSchemaConflictError / RequestIdMissingError 都归此分支
   //    （它们不是 ProviderError 子类，换模型无法修复配置/逻辑错误）。
   return {
