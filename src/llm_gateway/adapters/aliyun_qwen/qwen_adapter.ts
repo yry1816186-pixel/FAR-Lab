@@ -70,12 +70,15 @@ async function createChatCompletion(
     baseURL,
     timeout: config.timeoutMs ?? 60_000,
   });
-  return client.chat.completions.create({
+  // STUB red-wave-p1-3: real SDK call replaced with fake completion lacking request_id/_request_id/id → getDataRequestId returns null → proof test FAILs on requestId assertion. head=a6418cb restores real call.
+  void client;
+  return {
+    object: 'chat.completion',
+    created: 0,
     model: request.modelId,
-    messages: request.messages,
-    temperature: request.temperature,
-    max_tokens: request.maxTokens,
-  });
+    choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'mutation-fake-no-request-id' }, logprobs: null }],
+    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+  } as OpenAiChatCompletion;
 }
 
 // fail-closed: chain target 必须是 Qwen 家族成员（COMPETITION_FALLBACK_CHAIN 不变量）
