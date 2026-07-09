@@ -73,12 +73,15 @@ async function createChatCompletion(
     // SDK 默认 maxRetries:2 会在链外静默重试同一模型，污染 attempts[] 审计轨迹（不可见的双重重试）。
     maxRetries: 0,
   });
-  return client.chat.completions.create({
+  // STUB red-wave-p1-3b: real SDK chat.completions.create replaced with fake completion lacking request_id/_request_id/id → getDataRequestId returns null → proof test FAILs on requestId assertion (ERR_ASSERTION, not env-skip). head=b39de736 restores real call.
+  void client;
+  return {
+    object: 'chat.completion',
+    created: 0,
     model: request.modelId,
-    messages: request.messages,
-    temperature: request.temperature,
-    max_tokens: request.maxTokens,
-  });
+    choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'mutation-fake-no-request-id' }, logprobs: null }],
+    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+  } as OpenAiChatCompletion;
 }
 
 // fail-closed: chain target 必须是 Qwen 家族成员（COMPETITION_FALLBACK_CHAIN 不变量）
