@@ -14,13 +14,13 @@
 ## §A. next_action（依赖序 topo，权威，agent 取此字段不要 ad-hoc）
 
 ```
-next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
+next_action = P1-3_DASHSCOPE_CI_EVIDENCE
 ```
 
 理由：
-- 核心 P0 + STAT-1 + P1-4 + P1-5a/b/c + P1-6a/b 接线代码已落地（W1-W7 全 PASS：decideFiveValueVerdict 3 生产 caller @ verdict_stage:245/render:37/orchestrator:137 / compileFec 2 caller @ orchestrator:119+kernel:230 / fecV2 必选形参 / FEC-mandatory gate 运行时强制 orchestrator:123-139 / src/statistics 4 真实数学模块经 3 hero pipeline 成生产 caller / 12 GV + verify-golden CLI / venvSandboxAdapter 真起 python 子进程 + fetchOnlineDataset 真起 dataset_fetch.py）。
-- 但 §C 接线行 status 维持 WIRED_RED —— 物证（base-FAIL/head-PASS 双跑）须由 `scripts/depth_evidence.mjs` keystone bot 在 CI 写回，agent 不得手填。前序窗口 9 行自指 evidence `depth_gate.ok → depth_gate.ok` + closed_by 全指向 dca79ce6（纯治理 commit，零 src/ diff）已实测为手填伪造，本轮清除并降级 WIRED_RED。
-- bot 落地前唯一诚实态 = WIRED_RED。P1-5/P1-6 已接线落地（本轮），不再属 backlog；剩余 V2 深度窗口 = 真 OS 级隔离（07_RISK_REGISTER §188 自承做不到）+ maintainer M1-M4（GitHub branch protection / Actions write / CODEOWNERS，超 agent 能力）。
+- 核心 P0 + STAT-1 + P1-1/2/4/5a/5b/5c/6a/6b + P2/P3 + FUSION-OS-1..14 的接线代码与受控突变双跑物证已落地；§C 当前 **33 行 WIRED_GREEN / 1 行 WIRED_RED**。
+- `scripts/depth_evidence.mjs` 与 `.github/workflows/depth-evidence.yml` 已存在；PR 路径只读 dry-run，maintainer `workflow_dispatch` 路径可带 `DASHSCOPE_API_KEY` 写回 evidence。剩余红项不是“再实现 bot”，而是 **P1-3 真实 DashScope TLS/HTTP head PASS 物证**。
+- P1-3 当前在本 WSL 环境只能证明 base=FAIL、head=SKIP（DashScope TLS/网络不可达），不能诚实升级。下一步须 maintainer 在可达网络中运行 depth-evidence dispatch：base=`ac5663cad827f689a0eb75de977b65fb7427c0f1`，head=`b39de7361188f885bfe2433994dbac63280ac030`，only=`P1-3`，`write_back=true`，且 repo secret `DASHSCOPE_API_KEY` 已配置。
 - **融合衍生 backlog 全量物证**（FUSION-OS-1..14，Open Science 工程范式迁移）：§C 末段 14 行**全 WIRED_GREEN**（keystone bot 受控突变双跑·head=2fcfe04 接线 commit·base=各 cluster 靶向 stub）。迁移边界：只迁 OS 的反剧场/fail-closed/收窄伪造窗口/内容寻址/进程组 kill/AST 结构门工程范式，**绝不迁** OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。详见 `FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
 
 ---
@@ -40,7 +40,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 > **机器解析约定**（depth_gate.mjs 解析本表）：每行格式严格为
 > `| <id> | <single_real_dependency> | <proof_caller_file>:<line> | <proof_test_path>::<test_name> | <proof_test_red_commit> | <status> | <closed_by_sha> | <claimed_by_pr> |`
 > 前 7 列任一缺失或 status 不是 §B 枚举值 → CHECK-L1 失败。第 8 列 `claimed_by_pr` **可选**（R10：向后兼容 8 列旧行；空缺/`-`=未认领，`PR-<n>`=该行被某 PR 认领进行中，防多窗口状态竞争；agent 取下一项前须确认目标行 claimed_by_pr 为空或 `-`）。
-> `closed_by_sha` 仅 status=WIRED_GREEN 时必填；CI 双跑物证（base FAIL/HEAD PASS）由 .github/workflows/depth-evidence.yml 写回本列下方「`evidence: <base_run_id>→<head_run_id>`」行（**禁止 agent 手填 WIRED_GREEN**，见 §D CHECK-L2）。
+> `closed_by_sha` 仅 status=WIRED_GREEN 时必填；双跑物证（base FAIL/HEAD PASS）由 `scripts/depth_evidence.mjs` / `.github/workflows/depth-evidence.yml` 写回本列下方「`evidence: <base_run_id>→<head_run_id>`」行（**禁止 agent 手填 WIRED_GREEN**，见 §D CHECK-L2；本地 bot 物证不等于 GitHub branch protection 防篡改已配置）。
 
 ### 核心接线项（依赖序硬约束，禁止跳过）
 
@@ -70,8 +70,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 | evidence: 712dbc2f43bf6e38272e2f981b7053e87b8918ec → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | P1-1 | far fec compile / far fec freeze CLI 真实调 compileFec + computeFecHash（非 mock，非 stub） | src/cli/commands/fec.ts:89 | tests/cli/fec_compile_freeze.test.ts::runFecCompile drives real compileFec + computeFecHash; runFecFreeze verifies and detects tampering | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
 | evidence: 6ae825f7d2122aff8f45d7e71f47c28711c8d2b0 → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
-| P1-3 | createQwenAdapter 真实调 openai SDK chat.completions.create 穿透 DashScope HTTP | src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts:73 | tests/llm_gateway/qwen_adapter_fallback.test.ts::qwen_adapter: real DashScope HTTP (line 73) — env-gated, no mock | (待 CI 双跑) | WIRED_GREEN | b39de7361188f885bfe2433994dbac63280ac030 | - |
-| evidence: ac5663cad827f689a0eb75de977b65fb7427c0f1 → b39de7361188f885bfe2433994dbac63280ac030 | — | — | — | — | — | — | — |
+| P1-3 | createQwenAdapter 真实调 openai SDK chat.completions.create 穿透 DashScope HTTP | src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts:73 | tests/llm_gateway/qwen_adapter_fallback.test.ts::qwen_adapter: real DashScope HTTP (line 73) — env-gated, no mock | (待 CI 双跑) | WIRED_RED | — | - |
 | P2-2 | 9-state CLI 协议 FSM + computeStageReceipt 真实 sha256 哈希链 | src/cli/stage_receipt.ts:22 | tests/cli/state_machine.test.ts::verifyStageReceiptChain: end-to-end via runFsmAdvance (real CLI entry, real sha256) | (待 CI 双跑) | WIRED_GREEN | 956381a7b9f614855b347d542e1a3e55185f2c1d | - |
 | evidence: 6ae825f7d2122aff8f45d7e71f47c28711c8d2b0 → 956381a7b9f614855b347d542e1a3e55185f2c1d | — | — | — | — | — | — | — |
 | P3-1 | suite 起跑时 probePythonAxis 真实 spawnSync python3 + sympy/z3 import 探针 | scripts/run_py_tests.mjs:83 | tests/scripts/probe_python_axis.test.mjs::probePythonAxis: emits machine-readable first-line contract + honest shape | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
@@ -89,7 +88,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 
 ### 融合衍生 backlog（Open Science → FAR-Chain，DESIGN_PROPOSED，非当前 next）
 
-> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。Open Science 经实证为 Claude Code 分支重品牌化的**执行层 agent 工作区**（sanitize-runtime.mjs 长 byte CLAUDE→SCIENC 替换；内部 Anthropic Messages API + universal-llm 翻译网关；science-sonnet-4-6 = claude-*）；FAR-Chain 是**验证层声明级裁决内核**。**层级不同，迁移边界严格**：迁移 OS 的工程范式（反剧场/fail-closed 服务门/收窄伪造窗口/内容寻址 CAS/derivable 标记/进程组 kill/AST 结构门），**绝不迁移** OS 的 LLM-裁决语义——FAR-Chain 红线「LLM 不作最终裁决者，确定性 R0-R9 内核」高于任何融合。6 项收敛点（C-1..C-6：来源不可自填/失败闭环门/LLM-非裁决者/自排除规范哈希/冻结契约工件/从磁盘派生花名册）FAR-Chain 已独立达到，不重复立项。下表 14 行全 NOT_BUILT，属**未来 backlog**，**不抢 §A next_action=KEYSTONE_DEPTH_EVIDENCE_BOT**；接线时升 WIRED_RED，物证仍由 keystone bot CI 双跑写回 WIRED_GREEN。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。Open Science 经实证为 Claude Code 分支重品牌化的**执行层 agent 工作区**（sanitize-runtime.mjs 长 byte CLAUDE→SCIENC 替换；内部 Anthropic Messages API + universal-llm 翻译网关；science-sonnet-4-6 = claude-*）；FAR-Chain 是**验证层声明级裁决内核**。**层级不同，迁移边界严格**：迁移 OS 的工程范式（反剧场/fail-closed 服务门/收窄伪造窗口/内容寻址 CAS/derivable 标记/进程组 kill/AST 结构门），**绝不迁移** OS 的 LLM-裁决语义——FAR-Chain 红线「LLM 不作最终裁决者，确定性 R0-R9 内核」高于任何融合。6 项收敛点（C-1..C-6：来源不可自填/失败闭环门/LLM-非裁决者/自排除规范哈希/冻结契约工件/从磁盘派生花名册）FAR-Chain 已独立达到，不重复立项。下表 14 行已由受控突变双跑写回 `WIRED_GREEN`；未来新增融合项仍须先升 `WIRED_RED`，再由 keystone bot / maintainer CI 双跑写回 `WIRED_GREEN`。
 
 | id | single_real_dependency | proof_caller | proof_test | proof_test_red_commit | status | closed_by_sha | claimed_by_pr |
 |----|------------------------|--------------|------------|-----------------------|--------|---------------|---------------|
@@ -122,9 +121,9 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 | FUSION-OS-14 | R-identifier-fabrication: claim 带可校验 identifier(DOI/arXiv/accession/author_year) 无 harness-verified 来源→REFUTED（非 UNTESTED·五值优先级 REFUTED>UNTESTED·Open Science fabricated-references EXCEPTION 范式·插 R5 后 R6 前·三态 not_found=REFUTED/unresolved=UNTESTED/resolved=不触发·unresolved 优先·caller opt-in 接线·GV-14 落盘·零回归 GV-01..13） | src/falsifiability/verdict_kernel_v2.ts:348 | tests/falsifiability/identifier_fabrication.test.ts::doi_with_no_verified_source_refuted | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
 | evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
 
-> **当前态**：§C **34 行全 WIRED_GREEN**（keystone bot 受控突变双跑物证·含全部 P0 + 全部 FUSION-OS-1..14 + CLI/sandbox/schema/probe/sympy + **P1-2** VL adapter degradedFrom·head=3bf1011 + **P1-3** 文本 adapter maxRetries:0 + 真实 DashScope HTTP·head=b39de736 + **P1-6b** dataset_resolver stderr-drain + 真实 lightkurve/MAST fetch·head=dcf3394f·WSL 凭据实测 base=96388407 FAIL/head PASS）；**0 行 WIRED_RED**。运行时正确性由 `far verify-golden --all`（14/14 经真实内核）独立证实。
+> **当前态**：§C **33 行 WIRED_GREEN / 1 行 WIRED_RED**。**P1-2** 经 `depth_evidence.mjs --only P1-2 --dry-run` 真双跑验证 base=FAIL/head=PASS（credential-free），evidence 61c0b1d→3bf1011 物证真实，维持 WIRED_GREEN（VL adapter degradedFrom+transport-error fallback）。**P1-6b** 本轮经 `node scripts/depth_evidence.mjs --base 96388407e37c3dfa2cf07494caba119fb6f05c02 --head dcf3394f14428fff7a76e59f09b3ee738ec91137 --only P1-6b` 真双跑验证 base=FAIL/head=PASS，并由 bot 写回 WIRED_GREEN。**P1-3 维持 WIRED_RED**：proof 需真实 DashScope TLS/HTTP。默认进程 env 未加载 key 时 `depth_evidence.mjs --only P1-3 --dry-run` 实测 base=SKIP/head=SKIP；本轮发现 `.env` 含 key 名称（值未打印）并注入后，base=FAIL 但 head 仍因 WSL→DashScope TLS/网络不可达 SKIP（curl `SSL_ERROR_SYSCALL` / Node fetch `socket disconnected before secure TLS connection was established`），仍无法证 head PASS。运行时正确性由 `far verify-golden --all`（14/14 经真实内核）独立证实。
 >
-> **2026-07-07 maintainer-side 凭据实测**（用户提供 DASHSCOPE_API_KEY + lightkurve 装入 .python-deps）：`DASHSCOPE_API_KEY=sk-xxx FAR_ONLINE=1 node scripts/credential_dual_run.mjs` → **PASS 3 · SKIP 0 · FAIL 0**。P1-3 真实 DashScope HTTP（`qwen_adapter: real DashScope HTTP (line 73)` ~5s 真实 chat.completions 调用·非 mock）、P1-6b 真实 lightkurve spawn（`fetchOnlineDataset` ~16s spawn load-bearing·host 白名单 fail-closed）。附带修复 3 个真实 bug：（1）`competition_qwen_smoke.ts`/`snapshot_liveness_smoke.ts` 的直接调用 guard 在 Windows 盘符下永假（`file://C:/` ≠ `file:///C:/`）→ main() 永不执行 = fresh-clone smoke 12/12 中 2 项静默 no-op 假绿→修为 canonical `import.meta.url === pathToFileURL(argv[1])`；（2）`STRUCTURED_SAFE_MODEL` 旧值 `qwen-max-2025-09-24` 已被 DashScope 下线（404）→ `qwen-max`；smoke model `qwen3-coder-480b-a35b`→`qwen3-coder-480b-a35b-instruct`；（3）`credential_dual_run.mjs` 的 `hasLightkurve()` 未设 PYTHONPATH=.python-deps → 永报 unavailable。修复后 fresh-clone smoke **12/12 PASS（0 skip）**。行 status 仍维持 WIRED_RED：P1-2 缺 keystone RED→GREEN 写回；P1-3/P1-6b 的外部 proof 在无凭据/无在线条件 base 中会 SKIP 非 FAIL，keystone bot 双跑无法直接 fire（inherent_limit #2）→ WIRED_GREEN 仍须 maintainer 背书或 bot 规则补 env-gated carve-out。
+> **2026-07-07 maintainer-side 凭据实测**（用户提供 DASHSCOPE_API_KEY + lightkurve 装入 .python-deps）：`DASHSCOPE_API_KEY=sk-xxx FAR_ONLINE=1 node scripts/credential_dual_run.mjs` → **PASS 3 · SKIP 0 · FAIL 0**。P1-3 真实 DashScope HTTP（`qwen_adapter: real DashScope HTTP (line 73)` ~5s 真实 chat.completions 调用·非 mock）、P1-6b 真实 lightkurve spawn（`fetchOnlineDataset` ~16s spawn load-bearing·host 白名单 fail-closed）。附带修复 3 个真实 bug：（1）`competition_qwen_smoke.ts`/`snapshot_liveness_smoke.ts` 的直接调用 guard 在 Windows 盘符下永假（`file://C:/` ≠ `file:///C:/`）→ main() 永不执行 = fresh-clone smoke 12/12 中 2 项静默 no-op 假绿→修为 canonical `import.meta.url === pathToFileURL(argv[1])`；（2）`STRUCTURED_SAFE_MODEL` 旧值 `qwen-max-2025-09-24` 已被 DashScope 下线（404）→ `qwen-max`；smoke model `qwen3-coder-480b-a35b`→`qwen3-coder-480b-a35b-instruct`；（3）`credential_dual_run.mjs` 的 `hasLightkurve()` 未设 PYTHONPATH=.python-deps → 永报 unavailable。修复后 fresh-clone smoke **12/12 PASS（0 skip）**。行 status：**P1-2/P1-6b** 已经 `depth_evidence.mjs --only` 真双跑验证 base=FAIL/head=PASS 并维持 WIRED_GREEN；**P1-3 维持 WIRED_RED**——当前 WSL 到 DashScope TLS/网络不可达，head 仍 SKIP，keystone bot 无法本地升级 → 须 maintainer CI 在可达网络中带 `DASHSCOPE_API_KEY` 双跑或 bot 补 env-gated carve-out。
 
 ---
 
@@ -149,7 +148,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 8. **proof_test 文件须存在（R8）**——§C WIRED_GREEN/RED 行的 proof_test 路径（`::` 前部分）须 existsSync。防账本指向幽灵测试文件。由 **CHECK-L1** 强制。
 9. **closed_by sha 须真实（R9）**——WIRED_GREEN 行 closed_by 须 `git cat-file -t` 返回 `commit`（非 git 目录跳过，不误判桩仓）。防账本编造 sha。由 **CHECK-L1** 强制。
 
-**inherent_limits（诚实声明，不可省）**：静态门能证「符号被生产路径引用」「文件非占位」「账本不指幽灵/不伪造 evidence 格式」，但**不能**证：(a) 运行时真执行到 caller（死分支探测是保守启发式）；(b) caller 传真实数据非预制常量；(c) closed_by sha 真含接线 diff（sha 存在 ≠ sha 接线）；(d) RED→GREEN 双跑物证（须 depth-evidence bot 在 CI 实跑 base/head）。完整保证 = 本静态门 + depth-evidence bot + CODEOWNERS 护本文件 + write-restricted token。bot 未实现前，WIRED_GREEN 可被「正确格式 + 真实 sha + 真实测试文件」组合骗过——故 §C 明确：bot 写回前只允许 WIRED_RED。
+**inherent_limits（诚实声明，不可省）**：静态门能证「符号被生产路径引用」「文件非占位」「账本不指幽灵/不伪造 evidence 格式」，但**不能**证：(a) 运行时真执行到 caller（死分支探测是保守启发式）；(b) caller 传真实数据非预制常量；(c) closed_by sha 真含接线 diff（sha 存在 ≠ sha 接线）；(d) RED→GREEN 双跑物证的防篡改来源（本地 bot 可产真实物证，但完整防护须 maintainer 在 GitHub CI/branch protection/CODEOWNERS/write-restricted token 下重跑）。当前 33 行 WIRED_GREEN 已有本地 `depth_evidence.mjs` 双跑物证；P1-3 保持 WIRED_RED，直到可达 DashScope 网络中的 maintainer dispatch 产出 head PASS。
 
 完整 check 清单（passes/fails/antiGaming）见主输出 §depthGateChecks。
 
@@ -170,11 +169,11 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 
 ## §F. 状态声明
 
-**当前态**：§C **34 行全 `WIRED_GREEN`**（全部 P0 P0-1/2a/2b/2c/2d/3/4、STAT-1、P1-1/2/3/4/5a/5b/5c/6a/6b、P2-1、P2-2、P3-1、**全部 FUSION-OS-1..14**）；**0 行 `WIRED_RED`**。
+**当前态**：§C **33 行 `WIRED_GREEN` / 1 行 `WIRED_RED`**（GREEN：全部 P0、STAT-1、P1-1/2/4/5a/5b/5c/6a/6b、P2-1、P2-2、P3-1、全部 FUSION-OS-1..14；RED：P1-3——DashScope env/network-gated proof，当前 WSL 无法完成真实 TLS/HTTP head PASS，详见下文本轮修正）。
 
 **maintainer 一键产 P1-2/3/6b 物证**：`node scripts/credential_dual_run.mjs` 先执行 P1-2 本地真实 HTTP proof；`DASHSCOPE_API_KEY=sk-xxx node scripts/credential_dual_run.mjs` 追加 P1-3；P1-6b 额外需要 `FAR_ONLINE=1`+lightkurve+网络。PASS 物证由 keystone bot `depth-evidence.yml` 双跑写回 WIRED_GREEN。`scripts/python_axis_probe.mjs`（P3-1）在 `pnpm test` 起跑打印 `Python axis: available|skipped`，明示 axis skip=环境非代码 bug。
 
-31 行的 WIRED_GREEN 由 `scripts/depth_evidence.mjs` keystone bot **本地**双跑物证写回（bot 自身写回，非 agent 手填，符合 §B）。各 cluster 用靶向突变 base + 接线 commit 作 head：base = 受控突变 commit（kernel-stub `f9110351` / FEC-gate-stub `42b08ca4` / 综合集群 stub `6ae825f7` / sandbox+probe stub `70057c5c` / schema-trigger stub `52f87a7d` / sympy-backend stub `712dbc2`，均在 `red-wave*` 分支），head = **接线 commit 本身**（P-cluster/sympy → `956381a`，FUSION/CLI/sandbox → `2fcfe04`）。bot 在真实 git worktree 双跑观察到 base=FAIL / head=PASS；`depth_gate` CHECK-L1 校验 closed_by=接线 commit 的 diff-tree 确实 touch 各行 proof_caller（全通过）。**P1-2 同口径**：base=`61c0b1d`（red-wave-p1-2-vl stub·移除 classifySdkTransportError call）head=`3bf1011`（VL adapter degradedFrom+chainExhausted+fatalEncountered 接线·镜像文本 adapter），proof_test transport-error fallback base FAIL/head PASS。
+33 行的 WIRED_GREEN 由 `scripts/depth_evidence.mjs` keystone bot **本地**双跑物证写回（bot 自身写回，非 agent 手填，符合 §B）。各 cluster 用靶向突变 base + 接线 commit 作 head：base = 受控突变 commit（kernel-stub `f9110351` / FEC-gate-stub `42b08ca4` / 综合集群 stub `6ae825f7` / sandbox+probe stub `70057c5c` / schema-trigger stub `52f87a7d` / sympy-backend stub `712dbc2`，均在 `red-wave*` 分支），head = **接线 commit 本身**（P-cluster/sympy → `956381a`，FUSION/CLI/sandbox → `2fcfe04`）。bot 在真实 git worktree 双跑观察到 base=FAIL / head=PASS；`depth_gate` CHECK-L1 校验 closed_by=接线 commit 的 diff-tree 确实 touch 各行 proof_caller（全通过）。**P1-2 同口径**：base=`61c0b1d`（red-wave-p1-2-vl stub·移除 classifySdkTransportError call）head=`3bf1011`（VL adapter degradedFrom+chainExhausted+fatalEncountered 接线·镜像文本 adapter），proof_test transport-error fallback base FAIL/head PASS。**P1-6b 同口径**：base=`9638840`（red-wave-p1-6b stub·伪造 dataset result）head=`dcf3394`（dataset_resolver stderr-drain 防背压挂起），proof_test 真实 lightkurve/MAST spawn base FAIL/head PASS。
 
 为支持「多 commit 接线需 row 专属 head」，bot 新增 `--only <ids>` 作用域标志（不变量不变：仍须 base-FAIL/head-PASS，仅缩小处理范围使各 cluster 能用接线 commit 作 head 而不被其他 cluster 的 NO_FILE_HEAD fail-closed 阻断）。
 
@@ -183,7 +182,7 @@ next_action = KEYSTONE_DEPTH_EVIDENCE_BOT
 - 运行时正确性已由 `far verify-golden --all`（14/14 PASS 经真实内核执行全部 R0-R9 规则）**独立证实**，不依赖 WIRED_GREEN 物证。
 - statistics 行（STAT-1/P1-5a/b/c）的物证证 kernel 依赖路径 load-bearing；src/statistics 的真实数学由 depth_gate CHECK-W5（非占位 + realMathSignal）独立保证。
 
-**为何 0 行停留 WIRED_RED**：全部 34 行经 keystone bot 双跑写回 WIRED_GREEN。P1-2（本地 HTTP transport-error·head=3bf1011·credential-free）/ P1-3（真实 DashScope HTTP·head=b39de736·凭据门·含 maxRetries:0 修复闭合 SDK 隐式双重重试污染 attempts[] 审计）/ P1-6b（真实 lightkurve/MAST fetch·head=dcf3394f·含 stderr-drain 防背压挂起·WSL 本地双跑）均完成。
+**为何 1 行停留 WIRED_RED（P1-3）**：P1-3 proof 需真实 DashScope TLS/HTTP。默认进程 env 未加载 key 时，`node scripts/depth_evidence.mjs --base ac5663cad827f689a0eb75de977b65fb7427c0f1 --head b39de7361188f885bfe2433994dbac63280ac030 --only P1-3 --dry-run` 报 base=SKIP/head=SKIP；本轮发现 `.env` 含 DashScope key 名称（值未打印），只注入 key 后重跑则 base=FAIL 但 head=SKIP，skip reason 为真实 DashScope 调用 `RETRY_EXHAUSTED`（network），且无密钥连通性探针亦失败：`curl -I https://dashscope.aliyuncs.com/compatible-mode/v1/models` → `SSL_ERROR_SYSCALL`，Node `fetch` → `socket disconnected before secure TLS connection was established`。历史 diff 已核验：base=`ac5663c` 是受控突变（把 `client.chat.completions.create` 换成假 completion），head=`b39de736` 恢复真实 SDK 调用并设置 `maxRetries:0`；`depth_gate` CHECK-L1 亦核验 closed_by touch 到 `src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts`。但当前 WSL 网络无法给出 head PASS，不能把 P1-3 写成 WIRED_GREEN；须 maintainer CI 在可达网络中带凭据双跑或 bot 补 env-gated carve-out。
 
 **变更历史**：逐项接线的工程决策与 file:line 证据见 `git log`（commit message
 含 `single_real_dependency` 声明）与各 proof_test。本账本不重复叙述过程。
