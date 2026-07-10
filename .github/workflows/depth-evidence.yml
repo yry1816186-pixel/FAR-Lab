@@ -12,21 +12,38 @@
 #   2. 把 `depth_evidence` 加入 Branch protection → Require status checks（与 depth_gate 并列）。
 #   3. CODEOWNERS：FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md 由本 bot + maintainer own（防 agent 手改 status）。
 #
-# scripts/depth_evidence.mjs 已实现（base/head 双跑 proof_test → UPGRADE 裁决 → 原子写回 evidence；
-# 集成测 4/4 + 单元测 17/17 + live --dry-run 物证）。本 job 在 pull_request 事件实跑：
-#   - 普通 PR（接线早于 base 合并）→ base PASS + head PASS → INFO → 零写回 exit 0（不阻断）
-#   - 接线 PR（base 缺接线 FAIL + head 接线 PASS）→ UPGRADE → 写回 WIRED_GREEN + evidence
-#   - ERROR（NO_MATCH/UNKNOWN/NO_FILE_HEAD）→ fail-closed exit 1（零写回）
-# workflow_dispatch（无 PR base/head）→ 跳过双跑 exit 0（不阻断），供手动 smoke。
-# depth_gate 已独立阻断未接线 PR；本 job 是把 WIRED_RED→GREEN 物证自动化的收紧层。
+# scripts/depth_evidence.mjs 已实现（base/head 双跑 proof_test → UPGRADE 裁决 → 原子写回 evidence）。
+# 安全边界：
+#   - pull_request 只读 + --dry-run：跑 PR 代码但不给 write token / secrets，防 PR head 脚本窃取写权限。
+  #   - workflow_dispatch 由 maintainer 手动给 base/head/only，只允许默认分支 workflow + write token，可选择写回。
+#   - DashScope secret 只进入 workflow_dispatch；maintainer 须确认 head SHA 可信，因为 proof_test 会执行该 SHA 的代码。
+# depth_gate 已独立阻断未接线 PR；本 workflow 是把 WIRED_RED→GREEN 物证自动化的收紧层。
 name: depth-evidence
 
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      base_sha:
+        description: '40-hex base commit SHA expected to FAIL'
+        required: true
+        type: string
+      head_sha:
+        description: '40-hex head commit SHA expected to PASS'
+        required: true
+        type: string
+      only:
+        description: 'Optional comma-separated §C row ids, e.g. P1-3'
+        required: false
+        type: string
+      write_back:
+        description: 'Write WIRED_GREEN evidence back to DEPTH_LEDGER.md'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
-  contents: write   # 写回 DEPTH_LEDGER.md evidence 行（须 maintainer 在 repo settings 启用 write 权限）
+  contents: read
 
 env:
   NODE_VERSION: '24'
@@ -34,11 +51,15 @@ env:
 
 jobs:
   depth_evidence:
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0   # 双跑须 checkout base SHA，需完整历史
+          persist-credentials: false
       - uses: pnpm/action-setup@v5
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -47,23 +68,52 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: RED→GREEN dual-run evidence (base/head proof_test 双跑 → UPGRADE 写回)
+      - name: RED→GREEN dual-run evidence dry-run (read-only PR)
         env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
-            echo "○ depth_evidence: 非 PR 触发（$GITHUB_EVENT_NAME）——无 base/head SHA，跳过双跑（不阻断）。"
-            exit 0
-          fi
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "○ depth_evidence: PR base/head SHA 为空（fork PR 隐藏 sha / 缺权限）——跳过双跑（不阻断）。"
             exit 0
           fi
-          node scripts/depth_evidence.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
-      - name: Commit back evidence line (若 scripts/depth_evidence.mjs 改了 DEPTH_LEDGER)
-        if: success()
+          node scripts/depth_evidence.mjs --base "$BASE_SHA" --head "$HEAD_SHA" --dry-run
+
+  depth_evidence_dispatch:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 手动写回 DEPTH_LEDGER.md evidence 行
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: RED→GREEN dual-run evidence (maintainer dispatch)
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          ONLY: ${{ inputs.only }}
+          WRITE_BACK: ${{ inputs.write_back }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        run: |
+          args=(--base "$BASE_SHA" --head "$HEAD_SHA")
+          if [ -n "$ONLY" ]; then
+            args+=(--only "$ONLY")
+          fi
+          if [ "$WRITE_BACK" != "true" ]; then
+            args+=(--dry-run)
+          fi
+          node scripts/depth_evidence.mjs "${args[@]}"
+      - name: Commit back evidence line (manual write_back only)
+        if: ${{ success() && inputs.write_back }}
         run: |
           if [ -n "$(git status --porcelain FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md)" ]; then
             git config user.name "github-actions[bot]"
