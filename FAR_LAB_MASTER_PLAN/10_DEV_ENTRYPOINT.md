@@ -371,18 +371,18 @@ far verify --bundle path/to/.far-proof --explain
 
 | 编号 | 实测项 | 能否 LLM 代办 | 状态 |
 |---|---|---|---|
-| E1 | snapshot liveness（GET /v1/models 确认 qwen3.7-max-2026-05-20 存活 + 维护期） | 不能 | `NEEDS_REAL_ENV` |
-| E2 | dashscopeRequestId 字段名（curl -i 抓 header/body 三候选） | 不能 | `NEEDS_REAL_TEST` |
-| E3 | addCycleGuard 钻石拓扑防环（better-sqlite3 :memory:） | 部分 | 待实测 |
-| E4 | golden_vectors 双向回填（TS+Python 对拍） | 命门 | 单向量已回填真实 hex、byte-equal 真绿；剩余数值域边界按 NUMERIC_KNOWN_DIVERGENCE 诚实归 RED，待 RFC 8785 JCS 迁移 |
-| E5 | threadpool_info() CI BLAS 可观测性（ubuntu+numpy 后端） | 部分 | `NEEDS_REAL_ENV` |
-| E6 | competition_qwen_smoke 真实计费 + 控制台截图 | 不能 | `NEEDS_HUMAN_OPERATION`；CI 上若 skipped ≠ passing |
+| E1 | snapshot liveness（GET /v1/models 确认 qwen3.7-max-2026-05-20 存活 + 维护期） | 不能 | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：GET /v1/models 返回 200 + model list 含 `qwen3.7-max-2026-05-20`（created 1783253535）；`snapshot_liveness_smoke.ts` OK） |
+| E2 | dashscopeRequestId 字段名（curl -i 抓 header/body 三候选） | 不能 | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：字段名为 `x-request-id`（非 `dashscope-request-id`/`x-dashscope-request-id`）；body.`id`=`chatcmpl-<同值>`） |
+| E3 | addCycleGuard 钻石拓扑防环（better-sqlite3 :memory:） | 部分 | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：`pnpm test:api` 74/74 PASS·钻石拓扑 better-sqlite3 `:memory:` 防环触发器） |
+| E4 | golden_vectors 双向回填（TS+Python 对拍） | 命门 | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：cross_lang_consistency 7/7 PASS·4 字段白名单字节相等）；剩余数值域边界按 `NUMERIC_KNOWN_DIVERGENCE` 诚实归 RED，待 RFC 8785 JCS 迁移（V3） |
+| E5 | threadpool_info() CI BLAS 可观测性（ubuntu+numpy 后端） | 部分 | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：WSL2 Ubuntu-24.04 + numpy 2.5.1 OpenBLAS(.so) 验证 PASS —— threadpool_info() BEFORE=32 threads, threadpoolctl(1) DURING=1 thread, AFTER=32 restored；SR-7 可观测；Windows 同口径 OpenBLAS(.dll) 24→1→24 PASS） |
+| E6 | competition_qwen_smoke 真实计费 + 控制台截图 | 不能 | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：5/5 OK（reasoning_snapshot/structured_safe/code/fallback_base/thinking+json_schema）+ cost snapshot 归档 request_count=5 total_tokens=760 verdict=OK）；控制台截图仍 `NEEDS_HUMAN_OPERATION`；CI 上若 skipped ≠ passing |
 
 ---
 
 ## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
 
-> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。FUSION-OS-1..14 + 核心 P0-P3 + P1-1..6b 全部由受控突变双跑写回 `WIRED_GREEN`，§C 34/0 全绿，见 DEPTH_LEDGER §A `ALL_GREEN_DEPTH_COMPLETE`。
 
 ### 与本文档（10_DEV_ENTRYPOINT）相关的融合缺口
 
