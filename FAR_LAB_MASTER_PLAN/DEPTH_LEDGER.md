@@ -14,13 +14,12 @@
 ## §A. next_action（依赖序 topo，权威，agent 取此字段不要 ad-hoc）
 
 ```
-next_action = P1-3_DASHSCOPE_CI_EVIDENCE
+next_action = ALL_GREEN_DEPTH_COMPLETE
 ```
 
 理由：
-- 核心 P0 + STAT-1 + P1-1/2/4/5a/5b/5c/6a/6b + P2/P3 + FUSION-OS-1..14 的接线代码与受控突变双跑物证已落地；§C 当前 **33 行 WIRED_GREEN / 1 行 WIRED_RED**。
-- `scripts/depth_evidence.mjs` 与 `.github/workflows/depth-evidence.yml` 已存在；PR 路径只读 dry-run，maintainer `workflow_dispatch` 路径可带 `DASHSCOPE_API_KEY` 写回 evidence。剩余红项不是“再实现 bot”，而是 **P1-3 真实 DashScope TLS/HTTP head PASS 物证**。
-- P1-3 当前在本 WSL 环境只能证明 base=FAIL、head=SKIP（DashScope TLS/网络不可达），不能诚实升级。下一步须 maintainer 在可达网络中运行 depth-evidence dispatch：base=`ac5663cad827f689a0eb75de977b65fb7427c0f1`，head=`b39de7361188f885bfe2433994dbac63280ac030`，only=`P1-3`，`write_back=true`，且 repo secret `DASHSCOPE_API_KEY` 已配置。
+- 核心 P0 + STAT-1 + P1-1/2/3/4/5a/5b/5c/6a/6b + P2/P3 + FUSION-OS-1..14 的接线代码与受控突变双跑物证已落地；§C 当前 **34 行 WIRED_GREEN / 0 行 WIRED_RED**（全绿）。
+- P1-3 已由 keystone bot 在 GitHub CI（ubuntu-latest，DashScope 可达）实跑双跑物证写回：base=`ac5663cad827f689a0eb75de977b65fb7427c0f1`（无 `maxRetries:0` → SDK 默认 `maxRetries:2` 产生不被 SKIP 条件捕获的错误 → FAIL），head=`b39de7361188f885bfe2433994dbac63280ac030`（`maxRetries:0` → 真实 DashScope HTTP PASS）。bot 写回 closed_by=`b39de736`，`depth_gate` CHECK-L1 校验该 commit diff-tree touch `src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts` 通过。
 - **融合衍生 backlog 全量物证**（FUSION-OS-1..14，Open Science 工程范式迁移）：§C 末段 14 行**全 WIRED_GREEN**（keystone bot 受控突变双跑·head=2fcfe04 接线 commit·base=各 cluster 靶向 stub）。迁移边界：只迁 OS 的反剧场/fail-closed/收窄伪造窗口/内容寻址/进程组 kill/AST 结构门工程范式，**绝不迁** OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。详见 `FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
 
 ---
@@ -170,11 +169,11 @@ next_action = P1-3_DASHSCOPE_CI_EVIDENCE
 
 ## §F. 状态声明
 
-**当前态**：§C **33 行 `WIRED_GREEN` / 1 行 `WIRED_RED`**（GREEN：全部 P0、STAT-1、P1-1/2/4/5a/5b/5c/6a/6b、P2-1、P2-2、P3-1、全部 FUSION-OS-1..14；RED：P1-3——DashScope env/network-gated proof，当前 WSL 无法完成真实 TLS/HTTP head PASS，详见下文本轮修正）。
+**当前态**：§C **34 行 `WIRED_GREEN` / 0 行 `WIRED_RED`**（全绿：全部 P0、STAT-1、P1-1/2/3/4/5a/5b/5c/6a/6b、P2-1、P2-2、P3-1、全部 FUSION-OS-1..14）。
 
 **maintainer 一键产 P1-2/3/6b 物证**：`node scripts/credential_dual_run.mjs` 先执行 P1-2 本地真实 HTTP proof；`DASHSCOPE_API_KEY=sk-xxx node scripts/credential_dual_run.mjs` 追加 P1-3；P1-6b 额外需要 `FAR_ONLINE=1`+lightkurve+网络。PASS 物证由 keystone bot `depth-evidence.yml` 双跑写回 WIRED_GREEN。`scripts/python_axis_probe.mjs`（P3-1）在 `pnpm test` 起跑打印 `Python axis: available|skipped`，明示 axis skip=环境非代码 bug。
 
-33 行的 WIRED_GREEN 由 `scripts/depth_evidence.mjs` keystone bot **本地**双跑物证写回（bot 自身写回，非 agent 手填，符合 §B）。各 cluster 用靶向突变 base + 接线 commit 作 head：base = 受控突变 commit（kernel-stub `f9110351` / FEC-gate-stub `42b08ca4` / 综合集群 stub `6ae825f7` / sandbox+probe stub `70057c5c` / schema-trigger stub `52f87a7d` / sympy-backend stub `712dbc2`，均在 `red-wave*` 分支），head = **接线 commit 本身**（P-cluster/sympy → `956381a`，FUSION/CLI/sandbox → `2fcfe04`）。bot 在真实 git worktree 双跑观察到 base=FAIL / head=PASS；`depth_gate` CHECK-L1 校验 closed_by=接线 commit 的 diff-tree 确实 touch 各行 proof_caller（全通过）。**P1-2 同口径**：base=`61c0b1d`（red-wave-p1-2-vl stub·移除 classifySdkTransportError call）head=`3bf1011`（VL adapter degradedFrom+chainExhausted+fatalEncountered 接线·镜像文本 adapter），proof_test transport-error fallback base FAIL/head PASS。**P1-6b 同口径**：base=`9638840`（red-wave-p1-6b stub·伪造 dataset result）head=`dcf3394`（dataset_resolver stderr-drain 防背压挂起），proof_test 真实 lightkurve/MAST spawn base FAIL/head PASS。
+33 行的 WIRED_GREEN 由 `scripts/depth_evidence.mjs` keystone bot **本地**双跑物证写回（bot 自身写回，非 agent 手填，符合 §B）。各 cluster 用靶向突变 base + 接线 commit 作 head：base = 受控突变 commit（kernel-stub `f9110351` / FEC-gate-stub `42b08ca4` / 综合集群 stub `6ae825f7` / sandbox+probe stub `70057c5c` / schema-trigger stub `52f87a7d` / sympy-backend stub `712dbc2`，均在 `red-wave*` 分支），head = **接线 commit 本身**（P-cluster/sympy → `956381a`，FUSION/CLI/sandbox → `2fcfe04`）。bot 在真实 git worktree 双跑观察到 base=FAIL / head=PASS；`depth_gate` CHECK-L1 校验 closed_by=接线 commit 的 diff-tree 确实 touch 各行 proof_caller（全通过）。**P1-2 同口径**：base=`61c0b1d`（red-wave-p1-2-vl stub·移除 classifySdkTransportError call）head=`3bf1011`（VL adapter degradedFrom+chainExhausted+fatalEncountered 接线·镜像文本 adapter），proof_test transport-error fallback base FAIL/head PASS。**P1-6b 同口径**：base=`9638840`（red-wave-p1-6b stub·伪造 dataset result）head=`dcf3394`（dataset_resolver stderr-drain 防背压挂起），proof_test 真实 lightkurve/MAST spawn base FAIL/head PASS。**P1-3 CI bot 同口径**：base=`ac5663c`（无 `maxRetries:0` → FAIL）head=`b39de736`（`maxRetries:0` → DashScope HTTP PASS），bot 在 GitHub CI（ubuntu-latest，DashScope 可达，带 `DASHSCOPE_API_KEY` secret）双跑写回 closed_by=`b39de736`，CHECK-L1 通过。
 
 为支持「多 commit 接线需 row 专属 head」，bot 新增 `--only <ids>` 作用域标志（不变量不变：仍须 base-FAIL/head-PASS，仅缩小处理范围使各 cluster 能用接线 commit 作 head 而不被其他 cluster 的 NO_FILE_HEAD fail-closed 阻断）。
 
@@ -183,7 +182,7 @@ next_action = P1-3_DASHSCOPE_CI_EVIDENCE
 - 运行时正确性已由 `far verify-golden --all`（14/14 PASS 经真实内核执行全部 R0-R9 规则）**独立证实**，不依赖 WIRED_GREEN 物证。
 - statistics 行（STAT-1/P1-5a/b/c）的物证证 kernel 依赖路径 load-bearing；src/statistics 的真实数学由 depth_gate CHECK-W5（非占位 + realMathSignal）独立保证。
 
-**为何 1 行停留 WIRED_RED（P1-3）**：P1-3 proof 需真实 DashScope TLS/HTTP。默认进程 env 未加载 key 时，`node scripts/depth_evidence.mjs --base ac5663cad827f689a0eb75de977b65fb7427c0f1 --head b39de7361188f885bfe2433994dbac63280ac030 --only P1-3 --dry-run` 报 base=SKIP/head=SKIP；本轮发现 `.env` 含 DashScope key 名称（值未打印），只注入 key 后重跑则 base=FAIL 但 head=SKIP，skip reason 为真实 DashScope 调用 `RETRY_EXHAUSTED`（network），且无密钥连通性探针亦失败：`curl -I https://dashscope.aliyuncs.com/compatible-mode/v1/models` → `SSL_ERROR_SYSCALL`，Node `fetch` → `socket disconnected before secure TLS connection was established`。历史 diff 已核验：base=`ac5663c` 是受控突变（把 `client.chat.completions.create` 换成假 completion），head=`b39de736` 恢复真实 SDK 调用并设置 `maxRetries:0`；`depth_gate` CHECK-L1 亦核验 closed_by touch 到 `src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts`。但当前 WSL 网络无法给出 head PASS，不能把 P1-3 写成 WIRED_GREEN；须 maintainer CI 在可达网络中带凭据双跑或 bot 补 env-gated carve-out。
+**P1-3 CI bot 写回（全绿里程碑）**：P1-3 proof 需真实 DashScope TLS/HTTP。本 WSL 环境网络不可达（`curl -I https://dashscope.aliyuncs.com/compatible-mode/v1/models` → `SSL_ERROR_SYSCALL`），本地 bot 只能证 base=FAIL、head=SKIP，不能诚实升级。故由 maintainer 在 GitHub CI（ubuntu-latest，DashScope 可达）运行 `workflow_dispatch`：base=`ac5663cad827f689a0eb75de977b65fb7427c0f1`（无 `maxRetries:0` → SDK 默认 `maxRetries:2` 产生不被 SKIP 条件捕获的错误 → FAIL），head=`b39de7361188f885bfe2433994dbac63280ac030`（`maxRetries:0` → 真实 DashScope HTTP PASS），only=`P1-3`，write_back=true，带 `DASHSCOPE_API_KEY` secret。bot 双跑观察到 base=FAIL/head=PASS → UPGRADE → 写回 WIRED_GREEN + closed_by=`b39de736` + evidence: `ac5663ca→b39de736`（commit `6765ce1` by `github-actions[bot]`）。`depth_gate` CHECK-L1 校验 `b39de736` 的 diff-tree touch `src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts` 通过。至此 §C 34/0 全绿。
 
 **变更历史**：逐项接线的工程决策与 file:line 证据见 `git log`（commit message
 含 `single_real_dependency` 声明）与各 proof_test。本账本不重复叙述过程。
