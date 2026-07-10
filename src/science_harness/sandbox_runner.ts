@@ -209,6 +209,25 @@ const VENV_ENV_ALLOWLIST: ReadonlySet<string> = new Set([
 
 const SECRET_ENV_PATTERN = /(API_KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|PRIVATE_KEY|ACCESS_KEY)/i;
 
+let pythonDepsCompatibleCache: boolean | null = null;
+
+// .python-deps is git-tracked and may contain cross-platform binaries (e.g. Linux .so on Windows).
+// Probe scipy (compiled extension) — if it fails, .python-deps is incompatible and must be skipped
+// in favor of system Python packages, otherwise import chains like lightkurve→scipy break.
+function isPythonDepsCompatible(): boolean {
+  if (pythonDepsCompatibleCache !== null) return pythonDepsCompatibleCache;
+  const pythonDepsDir = resolve('.python-deps');
+  if (!existsSync(pythonDepsDir)) {
+    pythonDepsCompatibleCache = false;
+    return false;
+  }
+  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+  const probeEnv = { ...process.env, PYTHONPATH: [resolve('repro'), pythonDepsDir].join(delimiter) };
+  const r = spawnSync(pythonCmd, ['-c', 'import scipy'], { encoding: 'utf8', env: probeEnv, timeout: 10_000 });
+  pythonDepsCompatibleCache = r.status === 0;
+  return pythonDepsCompatibleCache;
+}
+
 export function buildVenvPythonEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
@@ -220,9 +239,19 @@ export function buildVenvPythonEnv(): NodeJS.ProcessEnv {
     env[key] = value;
   }
   const existing = process.env.PYTHONPATH;
-  const parts = [resolve('repro'), resolve('.python-deps')];
+  const parts = [resolve('repro')];
+  const compatible = isPythonDepsCompatible();
+  if (compatible) {
+    parts.push(resolve('.python-deps'));
+  }
   if (existing !== undefined && existing.length > 0) {
-    parts.push(existing);
+    if (compatible) {
+      parts.push(existing);
+    } else {
+      const pythonDepsAbs = resolve('.python-deps');
+      const filtered = existing.split(delimiter).filter(p => p !== pythonDepsAbs);
+      if (filtered.length > 0) parts.push(filtered.join(delimiter));
+    }
   }
   env.PYTHONPATH = parts.join(delimiter);
   return env;

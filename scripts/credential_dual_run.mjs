@@ -70,20 +70,37 @@ export function buildProofEnv() {
 
 function hasLightkurve() {
   if (lightkurveProbeCache !== undefined) return lightkurveProbeCache;
-  // 须镜像测试的 buildPythonPath（repro + .python-deps）：lightkurve 装进 .python-deps（ensure_py_deps 不自动装可选 science 包），
-  // 不设 PYTHONPATH 则系统 python 找不到 → harness 永远报 unavailable → P1-6b 永远 SKIP（即便已正确安装）。对齐 dataset_real.test.ts:buildPythonPath。
+  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   const prev = process.env.PYTHONPATH;
   const parts = [resolve('repro'), resolve('.python-deps')];
   if (prev !== undefined && prev.length > 0) parts.push(prev);
-  const env = { ...process.env, PYTHONPATH: parts.join(delimiter) };
-  const r = spawnSync(process.platform === 'win32' ? 'python' : 'python3', ['-c', 'import lightkurve'], {
+  const envWithDeps = { ...process.env, PYTHONPATH: parts.join(delimiter) };
+  const r = spawnSync(pythonCmd, ['-c', 'import lightkurve'], {
     encoding: 'utf8',
     stdio: 'ignore',
-    env,
+    env: envWithDeps,
     timeout: LIGHTKURVE_PROBE_TIMEOUT_MS,
   });
-  lightkurveProbeCache = r.status === 0;
+  if (r.status === 0) {
+    lightkurveProbeCache = true;
+    return true;
+  }
+  // .python-deps may have cross-platform binaries (Linux .so on Windows) that break scipy→lightkurve.
+  // Fall back to system packages (repro only, no .python-deps shadowing).
+  const envSysOnly = { ...process.env, PYTHONPATH: [resolve('repro'), prev].filter(Boolean).join(delimiter) };
+  const r2 = spawnSync(pythonCmd, ['-c', 'import lightkurve'], {
+    encoding: 'utf8',
+    stdio: 'ignore',
+    env: envSysOnly,
+    timeout: LIGHTKURVE_PROBE_TIMEOUT_MS,
+  });
+  lightkurveProbeCache = r2.status === 0;
   return lightkurveProbeCache;
+}
+
+function lightkurveStatusForDisplay() {
+  if (process.env.FAR_ONLINE !== '1') return 'not checked (FAR_ONLINE unset)';
+  return hasLightkurve() ? 'available' : 'unavailable';
 }
 
 export function parseTapVerdicts(output) {
@@ -116,7 +133,7 @@ export function main() {
   process.stdout.write('FAR-Chain · RED proof 双跑 harness\n');
   process.stdout.write('═══════════════════════════════════════════════════════\n');
   process.stdout.write(`DASHSCOPE_API_KEY : ${readKey() === null ? '<未设置>' : '已设置'}\n`);
-  process.stdout.write(`lightkurve        : ${hasLightkurve() ? 'available' : 'unavailable'}\n`);
+  process.stdout.write(`lightkurve        : ${lightkurveStatusForDisplay()}\n`);
   process.stdout.write('───────────────────────────────────────────────────────\n\n');
 
   let passCount = 0;
