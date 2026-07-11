@@ -407,7 +407,7 @@ function readVerdict(value: unknown): Verdict | null {
   return (VERDICTS as readonly string[]).includes(value) ? value as Verdict : null;
 }
 
-function buildPythonPath(): string {
+export function buildPythonPath(): string {
   const existingPythonPath = process.env.PYTHONPATH;
   const parts = [resolve('repro'), resolve('.python-deps')];
   if (existingPythonPath !== undefined && existingPythonPath.length > 0) {
