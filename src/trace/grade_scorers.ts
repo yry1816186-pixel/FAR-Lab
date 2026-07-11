@@ -15,10 +15,6 @@
 
 import type { TraceGrade, TraceFailureCode } from './agent_run_event.ts';
 
-// ---------- GraderKind 联合类型 ----------
-
-export type GraderKind = 'deterministic_script' | 'human_checkpoint' | 'external_oracle';
-
 // ---------- 评分输入 ----------
 
 export interface GradeInput {

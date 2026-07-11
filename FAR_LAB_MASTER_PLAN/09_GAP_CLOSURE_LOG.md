@@ -624,7 +624,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 | POPPER (arXiv:2502.09858) 差异化 | `NEEDS_EXTERNAL_VERIFICATION` | PDF 前核原文（POPPER 是 agent 非 benchmark） |
 | PCA (ACSAC2025) 差异化 | `NEEDS_EXTERNAL_VERIFICATION`（`07` Q3） | PDF 前核原文 |
 | MLAgentBench / SCITT / C2PA / Sigstore 同构度 | `NEEDS_EXTERNAL_VERIFICATION`（`59` §10 新增入查新清单） | 逐条核原文，评估与 FAR-Chain 声明级可靠性 + 密码学锚定的真实同构度，**不**断言一票否决 |
-| snapshot `qwen3.7-max-2026-05-20` 竞赛周是否在线 | `NEEDS_EXTERNAL_VERIFICATION`（`07` RK-01） | day-0 实测 GET /v1/models（无 key 不算 graceful skip 通过） |
+| snapshot `qwen3.7-max-2026-05-20` 竞赛周是否在线 | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：GET /v1/models 返回 200 + model list 含 `qwen3.7-max-2026-05-20`·`snapshot_liveness_smoke.ts` OK·`07` RK-01 已同步） | day-0 实测 GET /v1/models（无 key 不算 graceful skip 通过）—— 已执行 2026-07-10 |
 | novelty/priority 查新（proof-carrying 科研闭环优先级） | `NEEDS_EXTERNAL_VERIFICATION`（`07` D10 / D15） | PDF 前做一次查新，无查新前标 `UNVERIFIED_PRIOR_ART` |
 | ProbeAtlas 真实 GPU p<0.05 | `NEEDS_GPU_VALIDATION`（`07` RK-08） | 物理设备约束 |
 
@@ -754,7 +754,7 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 **降级链**（`07` §3.2 RK-01 / FallbackChain · `DESIGN_LOCKED`）：FallbackChain 三档全为真实 qwen 模型（**无 `offline_replay` 兜底档**，见 §10）；cached LLM 响应离线 Demo 兜底；day-0 GET /v1/models 实测复核为准。
 
-**状态**：snapshot 时效 `NEEDS_EXTERNAL_VERIFICATION`（待 E1 竞赛周 day-0 实测）；FallbackChain `DESIGN_LOCKED`。
+**状态**：snapshot 时效 `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：E1 GET /v1/models 返回 200 + `qwen3.7-max-2026-05-20` 在 model list·`snapshot_liveness_smoke.ts` OK·`07` RK-01 已同步 `IMPLEMENTED_VERIFIED`）；FallbackChain `DESIGN_LOCKED`（三档真实 qwen 模型，无 `offline_replay` 兜底档）。
 
 ### 13.5 novelty 维度归属互斥
 
@@ -880,11 +880,11 @@ CLI exit code：`0` = 全链重算匹配（PASS）；`7` = repro 不匹配（FAI
 
 ## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
 
-> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目原为融合 backlog；当前 FUSION-OS-1..14 已由受控突变双跑写回 `WIRED_GREEN`，唯一剩余红项见 DEPTH_LEDGER §A `P1-3_DASHSCOPE_CI_EVIDENCE`。
 
 ### 与本文档（09_GAP_CLOSURE_LOG）相关的融合缺口
 
-- **融合衍生缺漏（DESIGN_PROPOSED·2026-07-05 发现）**：Open Science 工程范式审计发现 14 项可迁移缺口（FUSION-OS-1..14），全 NOT_BUILT，已落入 `DEPTH_LEDGER.md` §C 末段（机器可读接线表）+ `FUSION_OPEN_SCIENCE_DESIGN.md`（设计全文）。
+- **融合衍生缺漏（DESIGN_PROPOSED·2026-07-05 发现 → 当前已接线）**：Open Science 工程范式审计发现 14 项可迁移缺口（FUSION-OS-1..14），现已由受控突变双跑写回 `WIRED_GREEN`，落点仍记录在 `DEPTH_LEDGER.md` §C 末段（机器可读接线表）+ `FUSION_OPEN_SCIENCE_DESIGN.md`（设计全文）。
 - **最高杠杆缺漏**：FUSION-OS-1（反剧场检测器实时接线·当前最大活体缺口 —— 20 个检测器仅 `verify.ts:412` 离线调，`orchestrator.ts:199` 运行时硬编码 `[]`）。
 - **红线级缺漏**：FUSION-OS-11（verdict_nodes.verdict CHECK 约束固化五值 enum·DB 层禁第六值）。
 - **迁移边界**：只迁工程范式，绝不迁 OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。

@@ -5,7 +5,7 @@
  *   - 类型（types.ts）：StageId / PayloadKind / StructuredPayload / StageArtifact /
  *     StageContext / LoopState / AgentLoopError / TerminationCriteria / FeedbackSignal /
  *     ResearchPaperOutput 等
- *   - 映射 SSOT（stage_purpose.ts）：STAGE_TO_PURPOSE_TAG / getPurposeTagForStage
+ *   - 映射 SSOT（stage_purpose.ts）：STAGE_TO_PURPOSE_TAG
  *   - 单阶段骨架（run_stage.ts）：runStage / extractFinishReasonForOfflineReplay /
  *     extractFinishReasonFromOpenAIChatCompletion
  *   - 退避策略（retry_policy.ts）：withRetry / MAX_TOKENS_TABLE / DEFAULT_RETRY_OPTIONS
@@ -17,7 +17,6 @@
 export * from './types.ts';
 export * from './stage_purpose.ts';
 export * from './create_params.ts';
-export * from './schema_gate.ts';
 export * from './run_stage.ts';
 export * from './retry_policy.ts';
 export { runStage1 } from './stages/stage1_understanding.ts';

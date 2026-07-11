@@ -79,24 +79,4 @@ export function listHonestVerdicts(
     .filter((v): v is HonestVerdictNode => v !== null);
 }
 
-/**
- * 按假设 evidenceId 列表查询关联判定节点（GET /verdict/by_hypothesis 用）。
- *
- * 假设 evidenceId 来自 stage3_hypothesis call_record → evidence_log 链。
- * 本函数接受任意 evidenceId 列表，返回所有关联的判定节点。
- */
-export function fetchHonestVerdictsByHypothesisEvidence(
-  db: Database,
-  hypoEvidenceIds: readonly string[],
-): readonly HonestVerdictNode[] {
-  if (hypoEvidenceIds.length === 0) {
-    return [];
-  }
-  const placeholders = hypoEvidenceIds.map(() => '?').join(', ');
-  const rows = db
-    .prepare(`SELECT DISTINCT evidence_id FROM verdict_nodes WHERE evidence_id IN (${placeholders})`)
-    .all(...hypoEvidenceIds) as ReadonlyArray<{ evidence_id: string }>;
-  return rows
-    .map((row) => fetchHonestVerdictByEvidenceId(db, row.evidence_id))
-    .filter((v): v is HonestVerdictNode => v !== null);
-}
+

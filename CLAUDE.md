@@ -106,6 +106,17 @@ FAR-Chain = AI4S 科学声明的**声明级验证层**。核心价值是「可�
 
 > 取序建议：FUSION-OS-1（最高杠杆）→ FUSION-OS-11（红线级）→ FUSION-OS-13/14（内核规则）→ 其余 sandbox/schema 项。**取任何 FUSION-OS-* 前先确认 P0-P3 当前 next_action 已完成或显式让位**（见 `DEPTH_LEDGER.md` §A）。
 
+### P4 — WSL 实战验收与工程治理（已完成）
+
+WSL Linux 真实环境实战验收 + 工程树治理。spec 见 `.trae/specs/wsl-realworld-validation-governance/`。`DEPTH_LEDGER.md` §A `next_action = WSL_REALWORLD_VALIDATED`。
+
+- **P4-1** WSL 环境就绪性探针 + 依赖修复（Node v24.18.0 + lightkurve + venv）✅
+- **P4-2** 深度门 + 全量 CI 真实跑通（depth_gate exit 0 + ci-all + fresh-clone-smoke）✅
+- **P4-3** 真实功能路径端到端实战（14 GV cross-lang + FEC CLI + hero pipeline + api + proof envelope V2 + 凭据双跑）✅
+- **P4-4** 对比试验（baseline 0% vs FAR-Chain 100% 检测率 + 6 类攻击 + 性能基准）✅
+- **P4-5** 查漏补缺（跨平台修复 + typecheck/lint/zero_tolerance exit 0 + 死代码扫描 + CI 门禁 + 同义反复清理 + 文档同步）✅
+- **P4-6** 工程树治理（依赖审计 + 目录治理 + CLI 重构 far.ts 1088→694 行 + 注释最小化 + 死文件清理）✅
+
 ## 5. 不可逾越的项目红线（来自 FAR_LAB_MASTER_PLAN，与全局零容忍叠加）
 
 - 五值裁决枚举**固定**：CONFIRMED / REFUTED / INCONCLUSIVE / DEGRADED_SCOPE / UNTESTED，**禁第六值**，优先级 DEGRADED_SCOPE > REFUTED > INCONCLUSIVE > CONFIRMED > UNTESTED

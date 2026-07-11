@@ -29,6 +29,18 @@ scripts/no_llm_final_judge_scan.mjs                 @yry1816186-pixel
 .github/workflows/depth-gate.yml                @yry1816186-pixel
 .github/workflows/depth-evidence.yml            @yry1816186-pixel
 .github/workflows/entry-protocol-check.yml      @yry1816186-pixel
+# 主 CI / 构建完整性 / 发布 workflow（Phase 4.4 CI gate audit 补全·保持 owner 一致）
+.github/workflows/ci.yml                        @yry1816186-pixel
+.github/workflows/build-integrity.yml           @yry1816186-pixel
+.github/workflows/release.yml                   @yry1816186-pixel
+.github/workflows/publish-node.yml              @yry1816186-pixel
+
+# ── 工程核心配置（防 agent 改 tsconfig 降类型严格度 / 改 package.json 加 ghost dep / 改 pyproject 弱化 Python 轴）──
+package.json                                    @yry1816186-pixel
+packages/cli/package.json                       @yry1816186-pixel
+tsconfig.json                                   @yry1816186-pixel
+pyproject.toml                                  @yry1816186-pixel
+schema/migrations/                              @yry1816186-pixel
 
 # ── 入口协议 + antiskim 红线（防 agent 改 T0-T8 自检 / 放松 tripwire）──
 CLAUDE.md                                       @yry1816186-pixel

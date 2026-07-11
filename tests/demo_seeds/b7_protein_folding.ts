@@ -13,8 +13,6 @@
  * 全程 offline_replay adapter。
  */
 
-import type { Database } from 'better-sqlite3';
-
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';
 import { assemblePaper } from '../../src/agent_loop/paper_assembler.ts';
 import { extractFinishReasonForOfflineReplay } from '../../src/agent_loop/run_stage.ts';
@@ -22,17 +20,13 @@ import { verifyChainHead } from '../../src/evidence_log/verifier.ts';
 import { fecAppendClaim } from '../../src/fec/index.ts';
 import { bridgeLegacyEvidencesToStatistics, makeLegacyCompatFec } from '../../src/falsifiability/index.ts';
 import { getSubtree } from '../../src/api/internal/graph_subtree.ts';
-import type { LoopState, ResearchPaperOutput } from '../../src/agent_loop/types.ts';
 import type { SourceAnchor } from '../../src/evidence_log/types.ts';
 import type {
   EvidenceRecord,
   FalsificationSpec,
   ThresholdSpec,
-  VerdictNode,
 } from '../../src/falsifiability/types.ts';
 import type { SourceCard } from '../../src/audit/source_card.ts';
-import type { GraphSubtree } from '../../src/api/types.ts';
-import type { VerifyResult } from '../../src/evidence_log/types.ts';
 
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';

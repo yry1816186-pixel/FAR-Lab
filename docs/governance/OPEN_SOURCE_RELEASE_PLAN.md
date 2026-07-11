@@ -83,11 +83,11 @@ far demo tess-offline
 
 ## 8. 是否发布 npm
 
-**v0.1.0：发布 `@far-chain/cli`，但标注技术约束。**
+**v0.1.0：发布根 package `far-chain`，但标注 Node 24 技术约束。**
 
-技术难点（审计 §2）：项目无 dist build，`bin` 指向 `.ts`，依赖 Node 24 type-stripping。`packages/cli/bin/far.mjs` 用 `spawn` 调根 `src/cli/far.ts`，**独立 npm 发布需将根 `src/` 一并打包**（`files` 增 `../../src`）或引入 tsc build。
+技术难点（审计 §2）：项目无 dist build，根 `package.json` 的 `bin.far` 指向 `src/cli/far.ts`，依赖 Node 24 type-stripping。发布包必须把 `src/`、`examples/tess-offline/`、`schema/migrations/`、`golden_vectors/cases/`、`pyproject.toml` 与运行时脚本一起打进 tarball。
 
-**v0.1.0 务实选择**：npm 包 `files` 纳入根 `src/` + `repro/`，发布但明确 `engines.node>=24`、`"需 Node 24 原生 type-stripping"`。若打包验证不通过，则降级为「v0.1.0 仅 install.sh，npm 标 roadmap」，绝不发布一个装上跑不起来的包。标注 `NEEDS_NPM_PUBLISH_VALIDATION`。
+**v0.1.0 务实选择**：`.github/workflows/publish-node.yml` 对根包执行 `npm pack` + 独立目录 `npm install --omit=dev` + `far version` smoke，真实发布时强制从 `v*` tag 运行且 tag/root/CLI version 三者一致。发布前仍需配置 `NPM_TOKEN`，标注 `NEEDS_NPM_PUBLISH`。
 
 ---
 
@@ -101,8 +101,8 @@ far demo tess-offline
 
 **是。** `release.yml`（tag `v*` 触发）产出：
 - `install.sh` / `install.ps1`（从仓库 scripts/ 复制到 release assets）
-- `SHA256SUMS` / `SHA256SUMS.sig`（checksum）
-- npm tarball（若 §8 验证通过）
+- `SHA256SUMS`（checksum）
+- npm tarball（根 package `far-chain`，由 publish-node workflow 另行验证/发布）
 - docker image digest 引用
 - 自动生成 release notes（from CHANGELOG + commits）
 

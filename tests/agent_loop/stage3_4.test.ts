@@ -22,7 +22,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 
-import { HypothesisSchema, EvidenceSchema } from '../../src/agent_loop/stages/schemas.ts';
+import { HypothesisSchema } from '../../src/agent_loop/stages/schemas.ts';
 import { runStage3 } from '../../src/agent_loop/stages/stage3_hypothesis.ts';
 import { runStage4 } from '../../src/agent_loop/stages/stage4_evidence.ts';
 import { STAGE_TO_PURPOSE_TAG } from '../../src/agent_loop/stage_purpose.ts';

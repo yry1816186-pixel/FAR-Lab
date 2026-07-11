@@ -29,6 +29,7 @@ import { runArena } from './commands/arena.ts';
 import { runInit } from './commands/init.ts';
 import { runDoctor } from './commands/doctor.ts';
 import { runVersion } from './commands/version.ts';
+import { parseOptions, reportErrors, type OptionSchema } from './parse_options.ts';
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
@@ -145,80 +146,31 @@ function runFecFromArgs(args: readonly string[]): number {
   return 2;
 }
 
+const FEC_COMPILE_SCHEMA: readonly OptionSchema[] = [
+  { name: '--claim', type: 'string', required: true, description: 'FecContractV2 JSON 路径', requiredPlaceholder: 'path' },
+  { name: '--out', type: 'string', required: true, description: '输出 JSON 路径', requiredPlaceholder: 'path' },
+];
+
 function runFecCompileFromArgs(args: readonly string[]): number {
-  let claimPath: string | undefined;
-  let outPath: string | undefined;
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--claim') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far fec compile: --claim 需要一个参数（FecContractV2 JSON 路径）\n');
-        return 2;
-      }
-      claimPath = next;
-      i += 1;
-    } else if (arg.startsWith('--claim=')) {
-      claimPath = arg.slice('--claim='.length);
-    } else if (arg === '--out') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far fec compile: --out 需要一个参数（输出 JSON 路径）\n');
-        return 2;
-      }
-      outPath = next;
-      i += 1;
-    } else if (arg.startsWith('--out=')) {
-      outPath = arg.slice('--out='.length);
-    } else {
-      process.stderr.write(`far fec compile: 未知参数 '${arg}'\n`);
-      return 2;
-    }
-  }
-
-  if (claimPath === undefined) {
-    process.stderr.write('far fec compile: 必须提供 --claim <path>\n');
+  const result = parseOptions(args, FEC_COMPILE_SCHEMA, 'far fec compile');
+  if (reportErrors(result.errors)) {
     return 2;
   }
-  if (outPath === undefined) {
-    process.stderr.write('far fec compile: 必须提供 --out <path>\n');
-    return 2;
-  }
+  const claimPath = result.values['--claim'] as string;
+  const outPath = result.values['--out'] as string;
   return runFecCompile({ claimPath, outPath });
 }
 
+const FEC_FREEZE_SCHEMA: readonly OptionSchema[] = [
+  { name: '--fec', type: 'string', required: true, description: 'compile 输出的 JSON 路径', requiredPlaceholder: 'path' },
+];
+
 function runFecFreezeFromArgs(args: readonly string[]): number {
-  let fecPath: string | undefined;
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--fec') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far fec freeze: --fec 需要一个参数（compile 输出的 JSON 路径）\n');
-        return 2;
-      }
-      fecPath = next;
-      i += 1;
-    } else if (arg.startsWith('--fec=')) {
-      fecPath = arg.slice('--fec='.length);
-    } else {
-      process.stderr.write(`far fec freeze: 未知参数 '${arg}'\n`);
-      return 2;
-    }
-  }
-
-  if (fecPath === undefined) {
-    process.stderr.write('far fec freeze: 必须提供 --fec <path>\n');
+  const result = parseOptions(args, FEC_FREEZE_SCHEMA, 'far fec freeze');
+  if (reportErrors(result.errors)) {
     return 2;
   }
+  const fecPath = result.values['--fec'] as string;
   return runFecFreeze({ fecPath });
 }
 
@@ -231,269 +183,114 @@ function runFsmFromArgs(args: readonly string[]): number {
   return runFsmAdvanceFromArgs(args.slice(1));
 }
 
+const FSM_ADVANCE_SCHEMA: readonly OptionSchema[] = [
+  { name: '--event', type: 'string', required: true, description: 'CliEvent 名', requiredPlaceholder: 'name' },
+  { name: '--input', type: 'string', required: true, description: 'stageOutput JSON 路径', requiredPlaceholder: 'path' },
+  { name: '--state-file', type: 'string', default: './.far/fsm_state.json', description: 'state 文件路径' },
+  { name: '--json', type: 'boolean', description: '机器可读输出（StageReceipt JSON）' },
+];
+
 function runFsmAdvanceFromArgs(args: readonly string[]): number {
-  let event: string | undefined;
-  let inputPath: string | undefined;
-  let stateFile = './.far/fsm_state.json';
-  let json = false;
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--event') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far fsm advance: --event 需要一个参数（CliEvent 名）\n');
-        return 2;
-      }
-      event = next;
-      i += 1;
-    } else if (arg.startsWith('--event=')) {
-      event = arg.slice('--event='.length);
-    } else if (arg === '--input') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far fsm advance: --input 需要一个参数（stageOutput JSON 路径）\n');
-        return 2;
-      }
-      inputPath = next;
-      i += 1;
-    } else if (arg.startsWith('--input=')) {
-      inputPath = arg.slice('--input='.length);
-    } else if (arg === '--state-file') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far fsm advance: --state-file 需要一个参数（state 文件路径）\n');
-        return 2;
-      }
-      stateFile = next;
-      i += 1;
-    } else if (arg.startsWith('--state-file=')) {
-      stateFile = arg.slice('--state-file='.length);
-    } else if (arg === '--json') {
-      json = true;
-    } else {
-      process.stderr.write(`far fsm advance: 未知参数 '${arg}'\n`);
-      return 2;
-    }
-  }
-
-  if (event === undefined) {
-    process.stderr.write('far fsm advance: 必须提供 --event <name>\n');
+  const result = parseOptions(args, FSM_ADVANCE_SCHEMA, 'far fsm advance');
+  if (reportErrors(result.errors)) {
     return 2;
   }
-  if (inputPath === undefined) {
-    process.stderr.write('far fsm advance: 必须提供 --input <path>\n');
-    return 2;
-  }
+  const event = result.values['--event'] as string;
+  const inputPath = result.values['--input'] as string;
+  const stateFile = result.values['--state-file'] as string;
+  const json = result.values['--json'] === true;
 
-  const result = runFsmAdvance({ event, inputPath, stateFile });
-  if (!result.ok) {
-    process.stderr.write(`far fsm advance: ${result.error}\n`);
-    return result.exitCode;
+  const fsmResult = runFsmAdvance({ event, inputPath, stateFile });
+  if (!fsmResult.ok) {
+    process.stderr.write(`far fsm advance: ${fsmResult.error}\n`);
+    return fsmResult.exitCode;
   }
 
   if (json) {
-    process.stdout.write(`${JSON.stringify(result.receipt, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(fsmResult.receipt, null, 2)}\n`);
   } else {
     process.stdout.write(
-      `far fsm advance: ${result.nextState} (receipt=${result.receipt.receipt.slice(0, 12)}…)\n  → ${result.stateFile}\n`,
+      `far fsm advance: ${fsmResult.nextState} (receipt=${fsmResult.receipt.receipt.slice(0, 12)}…)\n  → ${fsmResult.stateFile}\n`,
     );
   }
   return 0;
 }
 
+const VERIFY_GOLDEN_SCHEMA: readonly OptionSchema[] = [
+  { name: '--json', type: 'boolean', description: '输出机器可读汇总' },
+  { name: '--all', type: 'boolean', description: '跑 golden_vectors/cases/GV-01..GV-14.json（默认）' },
+  { name: '--case', type: 'string', description: '仅跑单个 case（如 GV-01）' },
+  { name: '--case-dir', type: 'string', description: '指定 case 目录' },
+  {
+    name: '--backend',
+    type: 'enum',
+    default: 'node',
+    enumValues: ['node', 'python', 'browser'],
+    description: 'node|python|browser',
+  },
+];
+
 function runVerifyGoldenFromArgs(args: readonly string[]): number {
-  let json = false;
-  let all = false;
-  let caseId: string | undefined;
-  let caseDir: string | undefined;
-  let backend: VerifyGoldenBackend = 'node';
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--json') {
-      json = true;
-    } else if (arg === '--all') {
-      all = true;
-    } else if (arg === '--case') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far verify-golden: --case 需要一个 caseId（如 GV-01）\n');
-        return 2;
-      }
-      caseId = next;
-      i += 1;
-    } else if (arg.startsWith('--case=')) {
-      caseId = arg.slice('--case='.length);
-    } else if (arg === '--case-dir') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far verify-golden: --case-dir 需要一个目录路径\n');
-        return 2;
-      }
-      caseDir = next;
-      i += 1;
-    } else if (arg.startsWith('--case-dir=')) {
-      caseDir = arg.slice('--case-dir='.length);
-    } else if (arg === '--backend') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far verify-golden: --backend 需要一个参数（当前支持 node|python|browser）\n');
-        return 2;
-      }
-      const parsed = parseVerifyGoldenBackend(next);
-      if (parsed === null) {
-        process.stderr.write(`far verify-golden: --backend 当前支持 node|python|browser（实际: ${next}）\n`);
-        return 2;
-      }
-      backend = parsed;
-      i += 1;
-    } else if (arg.startsWith('--backend=')) {
-      const value = arg.slice('--backend='.length);
-      const parsed = parseVerifyGoldenBackend(value);
-      if (parsed === null) {
-        process.stderr.write(`far verify-golden: --backend 当前支持 node|python|browser（实际: ${value}）\n`);
-        return 2;
-      }
-      backend = parsed;
-    } else {
-      process.stderr.write(`far verify-golden: 未知参数 '${arg}'\n`);
-      return 2;
-    }
+  const result = parseOptions(args, VERIFY_GOLDEN_SCHEMA, 'far verify-golden');
+  if (reportErrors(result.errors)) {
+    return 2;
   }
-
+  const all = result.values['--all'] === true;
+  const caseId = result.values['--case'] as string | undefined;
   if (all && caseId !== undefined) {
     process.stderr.write('far verify-golden: --all 与 --case 不能同时使用\n');
     return 2;
   }
-
+  const caseDir = result.values['--case-dir'] as string | undefined;
+  const backend = result.values['--backend'] as VerifyGoldenBackend;
   return runVerifyGolden({
-    json,
+    json: result.values['--json'] === true,
     backend,
     ...(caseDir !== undefined ? { caseDir } : {}),
     ...(caseId !== undefined ? { caseIds: [caseId] } : {}),
   });
 }
 
-function parseVerifyGoldenBackend(value: string): VerifyGoldenBackend | null {
-  if (value === 'node' || value === 'python' || value === 'browser') {
-    return value;
-  }
-  return null;
-}
+const STATUS_SCHEMA: readonly OptionSchema[] = [
+  { name: '--json', type: 'boolean', description: '机器可读输出' },
+  { name: '--db', type: 'string', description: 'evidence_log DB 路径' },
+];
 
 function runStatusFromArgs(args: readonly string[]): number {
-  let dbPath: string | undefined;
-  let json = false;
-
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--json') {
-      json = true;
-    } else if (arg === '--db') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far status: --db 需要一个参数（evidence_log DB 路径）\n');
-        return 2;
-      }
-      dbPath = next;
-      i += 1;
-    } else if (arg.startsWith('--db=')) {
-      dbPath = arg.slice('--db='.length);
-    } else {
-      process.stderr.write(`far status: 未知参数 '${arg}'\n`);
-      return 2;
-    }
+  const result = parseOptions(args, STATUS_SCHEMA, 'far status');
+  if (reportErrors(result.errors)) {
+    return 2;
   }
-
+  const dbPath = result.values['--db'] as string | undefined;
+  const json = result.values['--json'] === true;
   return runStatus(dbPath !== undefined ? { dbPath, json } : { json });
 }
 
-function runVerifyFromArgs(args: readonly string[]): number {
-  let bundlePath: string | undefined;
-  let envelopePath: string | undefined;
-  let dbPath: string | undefined;
-  let mode: string | undefined;
-  let json = false;
-  let explain = false;
-  let lintInputPath: string | undefined;
+const VERIFY_SCHEMA: readonly OptionSchema[] = [
+  { name: '--json', type: 'boolean', description: '机器可读 10 字段 schema 输出' },
+  { name: '--explain', type: 'boolean', description: '人类可读模式展开 10 规则 check 表' },
+  { name: '--bundle', type: 'string', positional: true, description: '.far-proof V1 minimal 离线包目录' },
+  { name: '--lint-input', type: 'string', description: 'AntiTheaterLintInput JSON 路径' },
+  { name: '--envelope', type: 'string', description: 'ProofEnvelopeV2 JSON 路径' },
+  { name: '--db', type: 'string', description: 'evidence_log DB 路径' },
+  {
+    name: '--mode',
+    type: 'enum',
+    enumValues: [...VALID_MODES],
+    description: 'chain|envelope|full',
+  },
+];
 
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--json') {
-      json = true;
-    } else if (arg === '--explain') {
-      explain = true;
-    } else if (arg === '--bundle') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far verify: --bundle 需要一个参数（.far-proof 目录路径）\n');
-        return 2;
-      }
-      bundlePath = next;
-      i += 1;
-    } else if (arg.startsWith('--bundle=')) {
-      bundlePath = arg.slice('--bundle='.length);
-    } else if (arg === '--lint-input') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far verify: --lint-input 需要一个参数（AntiTheaterLintInput JSON 路径）\n');
-        return 2;
-      }
-      lintInputPath = next;
-      i += 1;
-    } else if (arg.startsWith('--lint-input=')) {
-      lintInputPath = arg.slice('--lint-input='.length);
-    } else if (arg === '--envelope') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far verify: --envelope 需要一个参数（ProofEnvelopeV2 JSON 路径）\n');
-        return 2;
-      }
-      envelopePath = next;
-      i += 1;
-    } else if (arg.startsWith('--envelope=')) {
-      envelopePath = arg.slice('--envelope='.length);
-    } else if (arg === '--db') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far verify: --db 需要一个参数（evidence_log DB 路径）\n');
-        return 2;
-      }
-      dbPath = next;
-      i += 1;
-    } else if (arg.startsWith('--db=')) {
-      dbPath = arg.slice('--db='.length);
-    } else if (arg === '--mode') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far verify: --mode 需要一个参数（chain|envelope|full）\n');
-        return 2;
-      }
-      mode = next;
-      i += 1;
-    } else if (arg.startsWith('--mode=')) {
-      mode = arg.slice('--mode='.length);
-    } else if (!arg.startsWith('--') && bundlePath === undefined) {
-      // 位置参数兼容：far verify <path> 等价 far verify --bundle <path>（.far-proof 目录）
-      bundlePath = arg;
-    } else {
-      process.stderr.write(`far verify: 未知参数 '${arg}'\n`);
-      return 2;
-    }
+function runVerifyFromArgs(args: readonly string[]): number {
+  const result = parseOptions(args, VERIFY_SCHEMA, 'far verify');
+  if (reportErrors(result.errors)) {
+    return 2;
   }
+  const bundlePath = result.values['--bundle'] as string | undefined;
+  const envelopePath = result.values['--envelope'] as string | undefined;
+  const dbPath = result.values['--db'] as string | undefined;
+  const lintInputPath = result.values['--lint-input'] as string | undefined;
+  let mode = result.values['--mode'] as string | undefined;
 
   // mode 默认推断（D2）：两者→full；仅 --db→chain；否则→envelope（须 --envelope）。
   if (mode === undefined) {
@@ -507,11 +304,7 @@ function runVerifyFromArgs(args: readonly string[]): number {
       mode = 'envelope';
     }
   }
-  if (!VALID_MODES.has(mode)) {
-    process.stderr.write(`far verify: --mode 须为 chain|envelope|full（实际: ${mode}）\n`);
-    return 2;
-  }
-  const verifiedMode: VerifyMode = mode as VerifyMode; // VALID_MODES.has 守卫保证（单层 as 配注释）。
+  const verifiedMode: VerifyMode = mode as VerifyMode; // enum schema 已守卫（单层 as 配注释）。
 
   return runVerify({
     ...(bundlePath !== undefined ? { bundlePath } : {}),
@@ -519,8 +312,8 @@ function runVerifyFromArgs(args: readonly string[]): number {
     ...(dbPath !== undefined ? { dbPath } : {}),
     ...(lintInputPath !== undefined ? { lintInputPath } : {}),
     mode: verifiedMode,
-    json,
-    explain,
+    json: result.values['--json'] === true,
+    explain: result.values['--explain'] === true,
   });
 }
 
@@ -533,93 +326,45 @@ async function runBenchFromArgs(args: readonly string[]): Promise<number> {
   return runBenchRunFromArgs(args.slice(1));
 }
 
-function runBenchRunFromArgs(args: readonly string[]): Promise<number> {
-  let json = false;
-  let outputPath: string | undefined;
-  let generatedAt: string | undefined;
-  let gitCommitSha: string | null | undefined;
-  let domain: string | undefined;
+const BENCH_RUN_SCHEMA: readonly OptionSchema[] = [
+  { name: '--json', type: 'boolean', description: 'stdout 输出完整 BenchmarkReport JSON' },
+  { name: '--out', type: 'string', description: '输出 JSON 路径' },
+  {
+    name: '--generated-at',
+    type: 'string',
+    description: 'ISO 时间戳',
+    validate: (v) => isIsoTimestamp(v) ? null : `须为 ISO UTC 时间戳（实际: ${v}）`,
+  },
+  {
+    name: '--git-commit',
+    type: 'string',
+    description: 'commit sha 或 null',
+    validate: (v) => v.length === 0 ? `不能为空（实际: ${v}）` : null,
+  },
+  {
+    name: '--domain',
+    type: 'string',
+    description: '领域名称',
+    validate: (v) => v.length === 0 ? '需要一个领域名称' : null,
+  },
+];
 
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--json') {
-      json = true;
-    } else if (arg === '--out') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far bench run: --out 需要一个参数（输出 JSON 路径）\n');
-        return Promise.resolve(2);
-      }
-      outputPath = next;
-      i += 1;
-    } else if (arg.startsWith('--out=')) {
-      outputPath = arg.slice('--out='.length);
-    } else if (arg === '--generated-at') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far bench run: --generated-at 需要一个 ISO 时间戳参数\n');
-        return Promise.resolve(2);
-      }
-      if (!isIsoTimestamp(next)) {
-        process.stderr.write(`far bench run: --generated-at 须为 ISO UTC 时间戳（实际: ${next}）\n`);
-        return Promise.resolve(2);
-      }
-      generatedAt = next;
-      i += 1;
-    } else if (arg.startsWith('--generated-at=')) {
-      const value = arg.slice('--generated-at='.length);
-      if (!isIsoTimestamp(value)) {
-        process.stderr.write(`far bench run: --generated-at 须为 ISO UTC 时间戳（实际: ${value}）\n`);
-        return Promise.resolve(2);
-      }
-      generatedAt = value;
-    } else if (arg === '--git-commit') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far bench run: --git-commit 需要一个 commit sha 或 null\n');
-        return Promise.resolve(2);
-      }
-      const parsed = parseGitCommitSha(next);
-      if (parsed === undefined) {
-        process.stderr.write(`far bench run: --git-commit 不能为空（实际: ${next}）\n`);
-        return Promise.resolve(2);
-      }
-      gitCommitSha = parsed;
-      i += 1;
-    } else if (arg.startsWith('--git-commit=')) {
-      const value = arg.slice('--git-commit='.length);
-      const parsed = parseGitCommitSha(value);
-      if (parsed === undefined) {
-        process.stderr.write(`far bench run: --git-commit 不能为空（实际: ${value}）\n`);
-        return Promise.resolve(2);
-      }
-      gitCommitSha = parsed;
-    } else if (arg === '--domain') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far bench run: --domain 需要一个领域名称\n');
-        return Promise.resolve(2);
-      }
-      domain = next;
-      i += 1;
-    } else if (arg.startsWith('--domain=')) {
-      const value = arg.slice('--domain='.length);
-      if (value.length === 0) {
-        process.stderr.write('far bench run: --domain 需要一个领域名称\n');
-        return Promise.resolve(2);
-      }
-      domain = value;
-    } else {
-      process.stderr.write(`far bench run: 未知参数 '${arg}'\n`);
-      return Promise.resolve(2);
-    }
+async function runBenchRunFromArgs(args: readonly string[]): Promise<number> {
+  const result = parseOptions(args, BENCH_RUN_SCHEMA, 'far bench run');
+  if (reportErrors(result.errors)) {
+    return 2;
+  }
+  const outputPath = result.values['--out'] as string | undefined;
+  const generatedAt = result.values['--generated-at'] as string | undefined;
+  const domain = result.values['--domain'] as string | undefined;
+  const rawGitCommit = result.values['--git-commit'] as string | undefined;
+  let gitCommitSha: string | null | undefined = rawGitCommit;
+  if (rawGitCommit === 'null' || rawGitCommit === 'none') {
+    gitCommitSha = null;
   }
 
   return runBenchRun({
-    json,
+    json: result.values['--json'] === true,
     ...(outputPath !== undefined ? { outputPath } : {}),
     ...(generatedAt !== undefined ? { generatedAt } : {}),
     ...(gitCommitSha !== undefined ? { gitCommitSha } : {}),
@@ -639,86 +384,36 @@ function runExportFromArgs(args: readonly string[]): number {
   return 2;
 }
 
-function runExportReceiptFromArgs(args: readonly string[]): number {
-  let bundlePath: string | undefined;
-  let envelopePath: string | undefined;
-  let outputPath: string | undefined;
-  let generatedAt: string | undefined;
-  let format: ReceiptFormat = 'json';
+const EXPORT_RECEIPT_SCHEMA: readonly OptionSchema[] = [
+  { name: '--json', type: 'boolean', description: '快捷 --format json' },
+  { name: '--markdown', type: 'boolean', description: '快捷 --format markdown' },
+  {
+    name: '--format',
+    type: 'string',
+    description: 'json|markdown',
+    validate: (v) => ['json', 'markdown', 'md'].includes(v) ? null : `须为 json|markdown（实际: ${v}）`,
+  },
+  { name: '--bundle', type: 'string', description: '.far-proof 目录路径' },
+  { name: '--envelope', type: 'string', description: 'ProofEnvelopeV2 JSON 路径' },
+  { name: '--out', type: 'string', description: '输出路径' },
+  { name: '--generated-at', type: 'string', description: 'ISO 时间戳' },
+];
 
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--json') {
-      format = 'json';
-    } else if (arg === '--markdown') {
-      format = 'markdown';
-    } else if (arg === '--format') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far export receipt: --format 需要一个参数（json|markdown）\n');
-        return 2;
-      }
-      const parsed = parseReceiptFormat(next);
-      if (parsed === null) {
-        process.stderr.write(`far export receipt: --format 须为 json|markdown（实际: ${next}）\n`);
-        return 2;
-      }
-      format = parsed;
-      i += 1;
-    } else if (arg.startsWith('--format=')) {
-      const parsed = parseReceiptFormat(arg.slice('--format='.length));
-      if (parsed === null) {
-        process.stderr.write(`far export receipt: --format 须为 json|markdown（实际: ${arg.slice('--format='.length)}）\n`);
-        return 2;
-      }
-      format = parsed;
-    } else if (arg === '--bundle') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far export receipt: --bundle 需要一个参数（.far-proof 目录路径）\n');
-        return 2;
-      }
-      bundlePath = next;
-      i += 1;
-    } else if (arg.startsWith('--bundle=')) {
-      bundlePath = arg.slice('--bundle='.length);
-    } else if (arg === '--envelope') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far export receipt: --envelope 需要一个参数（ProofEnvelopeV2 JSON 路径）\n');
-        return 2;
-      }
-      envelopePath = next;
-      i += 1;
-    } else if (arg.startsWith('--envelope=')) {
-      envelopePath = arg.slice('--envelope='.length);
-    } else if (arg === '--out') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far export receipt: --out 需要一个参数（输出路径）\n');
-        return 2;
-      }
-      outputPath = next;
-      i += 1;
-    } else if (arg.startsWith('--out=')) {
-      outputPath = arg.slice('--out='.length);
-    } else if (arg === '--generated-at') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far export receipt: --generated-at 需要一个 ISO 时间戳参数\n');
-        return 2;
-      }
-      generatedAt = next;
-      i += 1;
-    } else if (arg.startsWith('--generated-at=')) {
-      generatedAt = arg.slice('--generated-at='.length);
-    } else {
-      process.stderr.write(`far export receipt: 未知参数 '${arg}'\n`);
-      return 2;
-    }
+function runExportReceiptFromArgs(args: readonly string[]): number {
+  const result = parseOptions(args, EXPORT_RECEIPT_SCHEMA, 'far export receipt');
+  if (reportErrors(result.errors)) {
+    return 2;
+  }
+  const bundlePath = result.values['--bundle'] as string | undefined;
+  const envelopePath = result.values['--envelope'] as string | undefined;
+  const outputPath = result.values['--out'] as string | undefined;
+  const generatedAt = result.values['--generated-at'] as string | undefined;
+  const formatValue = result.values['--format'] as string | undefined;
+  let format: ReceiptFormat = 'json';
+  if (formatValue !== undefined) {
+    format = formatValue === 'md' ? 'markdown' : (formatValue as ReceiptFormat);
+  } else if (result.values['--markdown'] === true) {
+    format = 'markdown';
   }
 
   return runExportReceipt({
@@ -730,138 +425,65 @@ function runExportReceiptFromArgs(args: readonly string[]): number {
   });
 }
 
-function runExportFarProofFromArgs(args: readonly string[]): number {
-  let demoChain = false;
-  let dbPath: string | undefined;
-  let outputDir: string | undefined;
-  let runId: string | undefined;
-  let modelSnapshot: string | undefined;
-  let gitCommitSha: string | undefined;
-  let envHash: string | undefined;
-  let exportedAt: string | undefined;
-  let packageBundle = false;
-  let archivePath: string | undefined;
-  let force = false;
-  let json = false;
+const EXPORT_FAR_PROOF_SCHEMA: readonly OptionSchema[] = [
+  { name: '--demo-chain', type: 'boolean', description: '构造 C-ASTRO-0001 offline demo chain 后导出' },
+  { name: '--json', type: 'boolean', description: '输出 JSON' },
+  { name: '--package', type: 'boolean', description: '生成 verify.sh + integrity.json + .tar.zst 离线包' },
+  { name: '--force', type: 'boolean', description: '覆盖非空输出目录' },
+  { name: '--db', type: 'string', description: 'evidence_log DB 路径' },
+  { name: '--out', type: 'string', description: '输出目录路径' },
+  {
+    name: '--run-id',
+    type: 'string',
+    description: 'run id',
+    validate: (v) => v.length === 0 ? '需要一个非空参数' : null,
+  },
+  {
+    name: '--model-snapshot',
+    type: 'string',
+    description: 'model snapshot',
+    validate: (v) => v.length === 0 ? '需要一个非空参数' : null,
+  },
+  {
+    name: '--git-commit',
+    type: 'string',
+    description: '40-hex SHA',
+    validate: (v) => isGitSha(v) ? null : `须为 40-hex SHA（实际: ${v}）`,
+  },
+  {
+    name: '--env-hash',
+    type: 'string',
+    description: '64-hex 环境指纹',
+    validate: (v) => isHex64(v) ? null : `须为 64-hex（实际: ${v}）`,
+  },
+  { name: '--archive', type: 'string', description: '.tar.zst 输出路径' },
+  {
+    name: '--exported-at',
+    type: 'string',
+    aliases: ['--generated-at'],
+    description: 'ISO UTC 时间戳',
+    validate: (v) => isIsoTimestamp(v) ? null : `须为 ISO UTC 时间戳（实际: ${v}）`,
+  },
+];
 
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === '--demo-chain') {
-      demoChain = true;
-    } else if (arg === '--json') {
-      json = true;
-    } else if (arg === '--package') {
-      packageBundle = true;
-    } else if (arg === '--force') {
-      force = true;
-    } else if (arg === '--db') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far export far-proof: --db 需要一个 evidence_log DB 路径\n');
-        return 2;
-      }
-      dbPath = next;
-      i += 1;
-    } else if (arg.startsWith('--db=')) {
-      dbPath = arg.slice('--db='.length);
-    } else if (arg === '--out') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far export far-proof: --out 需要一个输出目录路径\n');
-        return 2;
-      }
-      outputDir = next;
-      i += 1;
-    } else if (arg.startsWith('--out=')) {
-      outputDir = arg.slice('--out='.length);
-    } else if (arg === '--run-id') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far export far-proof: --run-id 需要一个非空参数\n');
-        return 2;
-      }
-      runId = next;
-      i += 1;
-    } else if (arg.startsWith('--run-id=')) {
-      runId = arg.slice('--run-id='.length);
-    } else if (arg === '--model-snapshot') {
-      const next = args[i + 1];
-      if (next === undefined || next.length === 0) {
-        process.stderr.write('far export far-proof: --model-snapshot 需要一个非空参数\n');
-        return 2;
-      }
-      modelSnapshot = next;
-      i += 1;
-    } else if (arg.startsWith('--model-snapshot=')) {
-      modelSnapshot = arg.slice('--model-snapshot='.length);
-    } else if (arg === '--git-commit') {
-      const next = args[i + 1];
-      if (next === undefined || !isGitSha(next)) {
-        process.stderr.write(`far export far-proof: --git-commit 须为 40-hex SHA（实际: ${next ?? '<missing>'}）\n`);
-        return 2;
-      }
-      gitCommitSha = next;
-      i += 1;
-    } else if (arg.startsWith('--git-commit=')) {
-      const value = arg.slice('--git-commit='.length);
-      if (!isGitSha(value)) {
-        process.stderr.write(`far export far-proof: --git-commit 须为 40-hex SHA（实际: ${value}）\n`);
-        return 2;
-      }
-      gitCommitSha = value;
-    } else if (arg === '--env-hash') {
-      const next = args[i + 1];
-      if (next === undefined || !isHex64(next)) {
-        process.stderr.write(`far export far-proof: --env-hash 须为 64-hex（实际: ${next ?? '<missing>'}）\n`);
-        return 2;
-      }
-      envHash = next;
-      i += 1;
-    } else if (arg.startsWith('--env-hash=')) {
-      const value = arg.slice('--env-hash='.length);
-      if (!isHex64(value)) {
-        process.stderr.write(`far export far-proof: --env-hash 须为 64-hex（实际: ${value}）\n`);
-        return 2;
-      }
-      envHash = value;
-    } else if (arg === '--archive') {
-      const next = args[i + 1];
-      if (next === undefined) {
-        process.stderr.write('far export far-proof: --archive 需要一个 .tar.zst 输出路径\n');
-        return 2;
-      }
-      archivePath = next;
-      packageBundle = true;
-      i += 1;
-    } else if (arg.startsWith('--archive=')) {
-      archivePath = arg.slice('--archive='.length);
-      packageBundle = true;
-    } else if (arg === '--exported-at' || arg === '--generated-at') {
-      const next = args[i + 1];
-      if (next === undefined || !isIsoTimestamp(next)) {
-        process.stderr.write(`far export far-proof: ${arg} 须为 ISO UTC 时间戳（实际: ${next ?? '<missing>'}）\n`);
-        return 2;
-      }
-      exportedAt = next;
-      i += 1;
-    } else if (arg.startsWith('--exported-at=') || arg.startsWith('--generated-at=')) {
-      const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : '';
-      if (!isIsoTimestamp(value)) {
-        process.stderr.write(`far export far-proof: exportedAt 须为 ISO UTC 时间戳（实际: ${value}）\n`);
-        return 2;
-      }
-      exportedAt = value;
-    } else {
-      process.stderr.write(`far export far-proof: 未知参数 '${arg}'\n`);
-      return 2;
-    }
+function runExportFarProofFromArgs(args: readonly string[]): number {
+  const result = parseOptions(args, EXPORT_FAR_PROOF_SCHEMA, 'far export far-proof');
+  if (reportErrors(result.errors)) {
+    return 2;
   }
+  const demoChain = result.values['--demo-chain'] === true;
+  const dbPath = result.values['--db'] as string | undefined;
+  const runId = result.values['--run-id'] as string | undefined;
+  const modelSnapshot = result.values['--model-snapshot'] as string | undefined;
+  const gitCommitSha = result.values['--git-commit'] as string | undefined;
+  const envHash = result.values['--env-hash'] as string | undefined;
+  const archivePath = result.values['--archive'] as string | undefined;
+  const exportedAt = result.values['--exported-at'] as string | undefined;
+  const packageBundle = result.values['--package'] === true || archivePath !== undefined;
 
   // --demo-chain 自包含 demo 源：未显式 --out 时默认 ./.far-proof/（gitignore 已忽略·禁提交；重跑需 --force）。
   // --db 严肃路径仍须显式 --out（不默认）。既有目录非空时下方 --force 校验 fail-closed 兜底。
+  let outputDir = result.values['--out'] as string | undefined;
   if (outputDir === undefined && demoChain) {
     outputDir = '.far-proof';
   }
@@ -879,8 +501,8 @@ function runExportFarProofFromArgs(args: readonly string[]): number {
     source: source.source,
     outputDir,
     packageBundle,
-    force,
-    json,
+    force: result.values['--force'] === true,
+    json: result.values['--json'] === true,
     ...(archivePath !== undefined ? { archivePath } : {}),
     ...(exportedAt !== undefined ? { exportedAt } : {}),
   });
@@ -924,22 +546,6 @@ function buildExportFarProofSource(input: {
       envHash: input.envHash,
     },
   };
-}
-
-function parseReceiptFormat(value: string): ReceiptFormat | null {
-  if (value === 'json') return 'json';
-  if (value === 'markdown' || value === 'md') return 'markdown';
-  return null;
-}
-
-function parseGitCommitSha(value: string): string | null | undefined {
-  if (value === 'null' || value === 'none') {
-    return null;
-  }
-  if (value.length === 0) {
-    return undefined;
-  }
-  return value;
 }
 
 function isIsoTimestamp(value: string): boolean {

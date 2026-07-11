@@ -209,7 +209,4 @@ export const DEFAULT_DEMO_FIXTURES: Readonly<Record<string, string>> = Object.fr
   stage6_feedback: JSON.stringify(feedbackPayload),
 });
 
-/**
- * hero demo 覆盖的全部 stageId（用于校验/文档/测试）。
- */
-export const DEMO_STAGE_IDS: readonly string[] = Object.keys(DEFAULT_DEMO_FIXTURES);
+

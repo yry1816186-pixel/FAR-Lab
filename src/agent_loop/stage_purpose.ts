@@ -26,19 +26,4 @@ export const STAGE_TO_PURPOSE_TAG: Readonly<Record<StageId, PurposeTag>> = {
   stage6_feedback: 'narrative',
 } as const;
 
-/**
- * 取阶段对应的 purpose_tag。
- *
- * 显式 fail（unknown stageId raise）而非静默返回 undefined —— 反 theater 设计
- * （AGENTS §6 第 2 条「禁止 fallback logic that hides broken data」）。
- */
-export function getPurposeTagForStage(stageId: StageId): PurposeTag {
-  const tag = STAGE_TO_PURPOSE_TAG[stageId];
-  if (tag === undefined) {
-    throw new Error(
-      `getPurposeTagForStage: unknown stageId ${String(stageId)}`
-      + '（STAGE_TO_PURPOSE_TAG 未覆盖·检查 06 §2 表一致性）',
-    );
-  }
-  return tag;
-}
+

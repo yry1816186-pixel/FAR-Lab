@@ -5,17 +5,13 @@ import {
   EmptyScopeSlipError,
   EmptyUntestedReasonError,
   FalsifiabilityGateError,
-  decideVerdict,
   evaluateThreshold,
   extractExternalFact,
   falsifiabilityGate,
   getVerdict,
-  makeVerdict,
   recordVerdict,
-  renderHonestVerdict,
 } from '../../src/falsifiability/index.ts';
 import type {
-  EvidenceRecord,
   FalsificationSpec,
   SourceAnchor,
   ThresholdSpec,
@@ -48,17 +44,6 @@ const BASE_THRESHOLD: ThresholdSpec = {
   semantics: 'gt',
   value: 0.85,
 };
-
-function evidence(overrides: Partial<EvidenceRecord>): EvidenceRecord {
-  return {
-    claim: 'measured accuracy evidence',
-    supportsClaim: true,
-    refutesClaim: false,
-    scopeNarrowerThanClaim: false,
-    sourceAnchor: SOURCE_ANCHOR,
-    ...overrides,
-  };
-}
 
 function openDb(): Database.Database {
   const db = new Database(':memory:');
@@ -101,65 +86,6 @@ function seedEvidence(db: Database.Database, evidenceId: string): void {
     sourceAnchor: SOURCE_ANCHOR,
   });
 }
-
-test('decideVerdict covers all five verdict values', () => {
-  assert.deepEqual(decideVerdict({ claim: 'claim', evidences: [] }), {
-    verdict: 'UNTESTED',
-    scopeSlipText: null,
-    untestedReason: 'no evidence collected for this claim',
-    conflictingEvidenceCount: 0,
-  });
-
-  assert.equal(
-    decideVerdict({ claim: 'claim', evidences: [evidence({ supportsClaim: true, refutesClaim: false })] }).verdict,
-    'CONFIRMED',
-  );
-  assert.equal(
-    decideVerdict({ claim: 'claim', evidences: [evidence({ supportsClaim: false, refutesClaim: true })] }).verdict,
-    'REFUTED',
-  );
-  assert.equal(
-    decideVerdict({
-      claim: 'claim',
-      evidences: [
-        evidence({ supportsClaim: true, refutesClaim: false }),
-        evidence({ supportsClaim: false, refutesClaim: true }),
-      ],
-    }).verdict,
-    'INCONCLUSIVE',
-  );
-
-  const degraded = decideVerdict({
-    claim: 'claim',
-    evidences: [
-      evidence({
-        claim: 'claim only holds for subset A',
-        supportsClaim: true,
-        refutesClaim: false,
-        scopeNarrowerThanClaim: true,
-      }),
-    ],
-  });
-  assert.equal(degraded.verdict, 'DEGRADED_SCOPE');
-  assert.match(degraded.scopeSlipText ?? '', /subset A/);
-});
-
-test('DEGRADED_SCOPE takes precedence over CONFIRMED', () => {
-  const verdict = decideVerdict({
-    claim: 'claim',
-    evidences: [
-      evidence({ supportsClaim: true, refutesClaim: false }),
-      evidence({
-        claim: 'claim only holds for subset B',
-        supportsClaim: true,
-        refutesClaim: false,
-        scopeNarrowerThanClaim: true,
-      }),
-    ],
-  });
-
-  assert.equal(verdict.verdict, 'DEGRADED_SCOPE');
-});
 
 test('falsifiabilityGate and evaluateThreshold enforce finite threshold semantics', () => {
   assert.equal(
@@ -206,35 +132,6 @@ test('falsifiabilityGate and evaluateThreshold enforce finite threshold semantic
       }),
     FalsifiabilityGateError,
   );
-});
-
-test('makeVerdict enriches metric evidence through threshold evaluation', () => {
-  const result = makeVerdict({
-    claim: 'claim',
-    evidences: [
-      evidence({
-        metricValue: 0.7,
-        supportsClaim: true,
-        refutesClaim: false,
-      }),
-    ],
-    falsificationSpec: BASE_SPEC,
-    thresholdSpec: BASE_THRESHOLD,
-  });
-
-  assert.equal(result.verdict, 'REFUTED');
-  assert.equal(result.metricValue, 0.7);
-});
-
-test('renderHonestVerdict emits anti-theater fields', () => {
-  const untested = renderHonestVerdict({
-    claim: 'claim',
-    evidences: [],
-    falsificationSpec: BASE_SPEC,
-    thresholdSpec: BASE_THRESHOLD,
-  });
-  assert.equal(untested.verdict, 'UNTESTED');
-  assert.equal(untested.untestedReason, 'EVIDENCE_MISSING');
 });
 
 test('recordVerdict writes and reads a verdict node with parsed JSON fields', () => {

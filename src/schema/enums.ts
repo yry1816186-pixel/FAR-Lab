@@ -70,21 +70,11 @@ export const REPRO_RUN_STATUSES = [
 export type PayloadKind = (typeof PAYLOAD_KINDS)[number];
 export type MainRingPurpose = (typeof MAIN_RING_PURPOSES)[number];
 export type EvalRingPurpose = (typeof EVAL_RING_PURPOSES)[number];
-export type BaselineExemptPurpose = (typeof BASELINE_EXEMPT_PURPOSES)[number];
 export type PurposeTag = (typeof PURPOSE_TAGS)[number];
 export type FinishReason = (typeof FINISH_REASONS)[number];
 export type Verdict = (typeof VERDICTS)[number];
 export type VerdictNodeKind = (typeof VERDICT_NODE_KINDS)[number];
 export type EdgeKind = (typeof EDGE_KINDS)[number];
-export type ReproRunStatus = (typeof REPRO_RUN_STATUSES)[number];
-
-export function isMainRingPurpose(value: string): value is MainRingPurpose {
-  return (MAIN_RING_PURPOSES as readonly string[]).includes(value);
-}
-
-export function isEvalRingPurpose(value: string): value is EvalRingPurpose {
-  return (EVAL_RING_PURPOSES as readonly string[]).includes(value);
-}
 
 // ----- V2 共享 enum（APPENDIX_A_TYPES.md §49-96 DESIGN_LOCKED 权威·多子系统复用）-----
 // 注：science_harness/types.ts 的 ScienceCheckOutcome 字面量与本处 ProofCheckOutcome 一致；

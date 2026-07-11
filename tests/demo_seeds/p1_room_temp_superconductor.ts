@@ -14,8 +14,6 @@
  * 全程 offline_replay adapter。新增物理（凝聚态）域（原 6 seed 无物理）。
  */
 
-import type { Database } from 'better-sqlite3';
-
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';
 import { assemblePaper } from '../../src/agent_loop/paper_assembler.ts';
 import { extractFinishReasonForOfflineReplay } from '../../src/agent_loop/run_stage.ts';

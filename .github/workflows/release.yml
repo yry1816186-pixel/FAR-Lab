@@ -29,7 +29,7 @@ on:
 
 # 同一 tag 的新 push 取消旧 run（防并发发布覆盖 release assets）
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
   cancel-in-progress: false   # release 不可中断重跑——避免半发布状态
 
 permissions:
@@ -40,6 +40,9 @@ env:
   NODE_VERSION: '24'
   PNPM_VERSION: '10.29.3'
   PYTHON_VERSION: '3.11'
+  # tag push 用 github.ref_name；手动 dispatch 必须使用输入 tag。
+  # 旧实现忽略 inputs.tag，导致从默认分支手动发布时拿分支名当版本号，workflow_dispatch 路径必失败。
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
 jobs:
   release:
@@ -50,6 +53,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       # b/c. setup node + pnpm（版本锁见 ci.yml 顶部注释·避免 pnpm9/10 漂移）+ python（ci-all 跨语言轴）
       - uses: pnpm/action-setup@v5
@@ -70,18 +74,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG_VERSION="${GITHUB_REF_NAME#v}"   # v0.1.0 -> 0.1.0
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag must be SemVer-like and start with v (example: v0.1.0). Got: ${RELEASE_TAG}"
+            exit 1
+          fi
+          TAG_VERSION="${RELEASE_TAG#v}"   # v0.1.0 -> 0.1.0
           PKG_VERSION=$(node -p "require('./package.json').version")
           CLI_VERSION=$(node -p "require('./packages/cli/package.json').version")
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "::error::Tag (${GITHUB_REF_NAME} -> ${TAG_VERSION}) != package.json version (${PKG_VERSION})"
+            echo "::error::Tag (${RELEASE_TAG} -> ${TAG_VERSION}) != package.json version (${PKG_VERSION})"
             exit 1
           fi
           if [ "$PKG_VERSION" != "$CLI_VERSION" ]; then
             echo "::error::Root package.json (${PKG_VERSION}) != packages/cli (${CLI_VERSION}) —— 须对齐"
             exit 1
           fi
-          echo "Version match: ${PKG_VERSION} (root + @far-chain/cli + tag)"
+          echo "Version match: ${PKG_VERSION} (root + @far-chain/cli + tag ${RELEASE_TAG})"
 
       # e. 安装依赖（frozen）+ Python 科研轴（cross_lang / test:py 需要）
       - run: pnpm install --frozen-lockfile
@@ -125,7 +133,7 @@ jobs:
         run: |
           owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           echo "image=ghcr.io/${owner}/far-lab" >> "$GITHUB_OUTPUT"
-          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
       - name: docker login ghcr.io
         uses: docker/login-action@v3
         with:
@@ -163,7 +171,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${RELEASE_TAG#v}"
           BODY=$(awk -v v="$VERSION" '
             $0 ~ "^## \\[" v "\\]" { found=1; next }
             /^## \[/ && found { exit }
@@ -179,8 +187,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: FAR-Chain ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: FAR-Chain ${{ env.RELEASE_TAG }}
           body_path: staging/release-body.md
           generate_release_notes: true   # CHANGELOG body 之后追加 commit/PR 自动 notes
           files: |

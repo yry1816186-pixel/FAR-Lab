@@ -1,0 +1,46 @@
+{
+  "attackId": "AT-SEED-CHERRY",
+  "attackClass": "mutation",
+  "description": "Seed cherry-picking: seed 42 failed, seed 137 reported. Anti-theater detector AT-SEED-CHERRY fires with severity=fail. V2 kernel R-anti-theater-fail (verdict_kernel_v2.ts:373) triggers UNTESTED. V1 makeVerdict has no anti-theater input → sees only supporting evidence → CONFIRMED.",
+  "baseCaseId": "GV-01",
+  "claim": "Model M achieves BLS power greater than baseline on dataset D",
+  "falsificationSpec": {
+    "prediction": "Model M achieves BLS power greater than baseline on dataset D",
+    "metric": "bls_power",
+    "falsificationThreshold": 0,
+    "thresholdSemantics": "gt"
+  },
+  "thresholdSpec": {
+    "semantics": "gt",
+    "value": 0
+  },
+  "baselineEvidences": [
+    {
+      "claim": "measured bls_power = 0.62 on dataset D (n=120, seed=137)",
+      "supportsClaim": true,
+      "refutesClaim": false,
+      "scopeNarrowerThanClaim": false,
+      "sourceAnchor": {
+        "gitCommitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "dashscopeRequestId": null,
+        "isoTimestamp": "2026-07-11T00:00:00.000Z",
+        "rawResponseHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ],
+  "kernelOverride": {
+    "antiTheaterFindings": [
+      {
+        "kind": "seed-cherry-picking",
+        "severity": "fail",
+        "details": "seed 42 failed; seed 137 reported (cherry-picked favorable seed)"
+      }
+    ]
+  },
+  "expected": {
+    "baselineVerdict": "CONFIRMED",
+    "farVerdict": "UNTESTED",
+    "farDecisiveRuleId": "ANTI_THEATER_FAIL",
+    "farReasonCodes": ["ANTI_THEATER_FAIL"]
+  }
+}

@@ -24,7 +24,7 @@ test('Dafny real backend verifies simple postcondition theorem', async (t) => {
     'method AddOne(x: int) returns (y: int)',
     '  requires x > 0',
     '  ensures y > -1',
-    '{ y := x }',
+    '{ y := x; }',
   ].join('\n');
   writeFileSync(dfyPath, source, { encoding: 'utf8' });
 
@@ -32,6 +32,10 @@ test('Dafny real backend verifies simple postcondition theorem', async (t) => {
     const result = spawnSync(dafnyCommand, ['verify', dfyPath], { encoding: 'utf8' });
     assert.equal(result.error, undefined, `dafny spawn error: ${result.error}`);
     const combined = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+    if (/Z3 is not found/.test(combined)) {
+      t.skip('Z3 solver not available — dafny verify cannot run without Z3');
+      return;
+    }
     assert.equal(result.status, 0, `dafny verify exited ${result.status}; output: ${combined}`);
     assert.match(combined, /0 errors|no errors|verified|verification successful/i, `expected verification success in: ${combined}`);
   } finally {

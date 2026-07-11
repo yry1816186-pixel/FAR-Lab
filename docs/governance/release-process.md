@@ -30,14 +30,13 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-### 3. Release workflow（`NEEDS_RELEASE_WORKFLOW`）
+### 3. Release workflow（`NEEDS_RELEASE_PUBLICATION`）
 
-`.github/workflows/release.yml`（tag `v*` 触发）产出：
+`.github/workflows/release.yml`（tag `v*` 触发；也可由 maintainer 手动 dispatch 并填同一个已存在 tag）产出：
 
 - `install.sh` / `install.ps1`（从 `scripts/` 复制到 release assets）
-- `SHA256SUMS` + `SHA256SUMS.sig`（checksum）
-- npm tarball（`@far-chain/cli`，**需 `NEEDS_NPM_PUBLISH_VALIDATION`**：无 dist build + Node 24
-  type-stripping 是硬约束，须打包 `src/` 且 `engines.node>=24`；验证不通过则降级为仅 install.sh）
+- `SHA256SUMS`（checksum）
+- npm tarball（根 package `far-chain`；`.github/workflows/publish-node.yml` 会 `npm pack` + 独立目录 fresh install + `far version` 验证自包含）
 - Docker image digest → GHCR（`ghcr.io/yry1816186-pixel/far-lab:<tag>`，`NEEDS_GHCR_PUBLISH`）
 - 自动生成 release notes（from CHANGELOG + commits）
 
@@ -47,7 +46,7 @@ git push origin v0.1.0
 
 - [ ] GitHub repo Settings → Branches → 默认分支 branch protection（CODEOWNERS 要求 review）
 - [ ] GHCR package 权限 + PAT（`packages: write`）
-- [ ] npm publish token（若发布 npm）配置为 secret `NPM_TOKEN`
+- [ ] npm publish token（若发布 npm）配置为 secret `NPM_TOKEN`；真实发布必须从 `v*` tag 运行 `publish-node.yml` 且 tag/root/CLI version 三者一致
 - [ ] 首次 `git tag v0.1.0 && git push origin v0.1.0` 触发 release.yml
 - [ ] 校验 release assets（install.sh/ps1 + checksum）可下载且 checksum 匹配
 - [ ] 校验 `curl ... install.sh | bash` 在 fresh 机器一键跑通 `far demo tess-offline`
@@ -58,7 +57,7 @@ git push origin v0.1.0
 |------|--------|------|
 | GitHub Release assets（install.sh/ps1 + checksum） | ✅ | `NEEDS_RELEASE_PUBLICATION` |
 | GHCR Docker image | ✅ | `NEEDS_GHCR_PUBLISH` |
-| npm `@far-chain/cli` | ⚠️ 带 Node24 约束 | `NEEDS_NPM_PUBLISH_VALIDATION` |
+| npm `far-chain` | ✅ 根包发布，Node24 约束 | `NEEDS_NPM_PUBLISH` |
 | PyPI `far-chain-repro` | ❌ roadmap | `NEEDS_PYPI_PUBLISH` |
 | Homebrew tap | ❌ roadmap | — |
 

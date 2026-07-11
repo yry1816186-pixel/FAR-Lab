@@ -45,15 +45,6 @@ export function sampleStandardDeviation(values: readonly number[]): number {
   return Math.sqrt(sampleVariance(values));
 }
 
-export function summarizeSample(values: readonly number[]): SampleSummary {
-  return {
-    sampleSize: values.length,
-    mean: sampleMean(values),
-    variance: sampleVariance(values),
-    standardDeviation: sampleStandardDeviation(values),
-  };
-}
-
 export function pooledStandardDeviation(
   left: readonly number[],
   right: readonly number[],
@@ -76,16 +67,7 @@ export function cohensDOneSample(sample: readonly number[], nullMean: number): n
   return (sampleMean(sample) - nullMean) / sd;
 }
 
-export function cohensDTwoSample(
-  left: readonly number[],
-  right: readonly number[],
-): number {
-  const pooledSd = pooledStandardDeviation(left, right);
-  if (pooledSd === 0) {
-    throw new Error('cohensDTwoSample: pooled standard deviation must be non-zero');
-  }
-  return (sampleMean(left) - sampleMean(right)) / pooledSd;
-}
+
 
 export function hedgesCorrection(degreesOfFreedom: number): number {
   assertFiniteNumber(degreesOfFreedom, 'degreesOfFreedom');
