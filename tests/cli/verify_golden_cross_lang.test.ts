@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 
 import {
+  buildPythonPath,
   collectVerifyGoldenDump,
   runVerifyGolden,
 } from '../../src/cli/commands/verify_golden.ts';
@@ -53,7 +54,7 @@ test('node_python_browser_agree_on_GV: node backend runs all 14 GV through V2 ke
 test('python backend agrees with node per-case verdicts (P1-4 python axis · skip if env unavailable)', (t) => {
   const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
   // 探针：far_chain_repro 依赖 sympy；缺 sympy / 缺 python = 环境问题（非代码 bug），显式 skip。
-  const probe = spawnSync(pythonCmd, ['-c', 'import sympy'], { encoding: 'utf8' });
+  const probe = spawnSync(pythonCmd, ['-c', 'import sympy'], { encoding: 'utf8', env: { ...process.env, PYTHONPATH: buildPythonPath() } });
   if (probe.error !== undefined || probe.status !== 0) {
     t.skip(`python axis: skipped (sympy unavailable — ${probe.error?.message ?? probe.stderr?.trim() ?? 'non-zero exit'})`);
     return;
