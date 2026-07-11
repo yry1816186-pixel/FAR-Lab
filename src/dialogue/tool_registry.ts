@@ -226,7 +226,7 @@ export const DIALOGUE_TOOL_IDS = [
   'lookup_glossary',
 ] as const;
 
-export type DialogueToolId = (typeof DIALOGUE_TOOL_IDS)[number];
+
 
 // ---------- 工具调用函数 ----------
 

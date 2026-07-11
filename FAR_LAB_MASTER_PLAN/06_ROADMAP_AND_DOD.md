@@ -191,12 +191,12 @@ far replay <run>                                # 确定性续跑（仅 determin
 | 任务 | 验收口径 | 状态 |
 |---|---|---|
 | 定义 `FecContractV2` schema（claim / bindings / statPlan / verdictRule / falsificationSpec） | 字段集合冻结，与 `APPENDIX_A_TYPES.md` FEC 子类型一致 | `DESIGN_LOCKED` |
-| 增加 deterministic validator（`validateFEC`） | 缺 FEC 不能输出 `CONFIRMED` | `DESIGN_LOCKED`（实现 `PARTIAL`） |
-| 实现 protocol freeze（`freezeProtocol`） | actor 签名后 `frozenAt` 不可改；改则 `PROTOCOL_DEVIATION_CRITICAL` | `DESIGN_LOCKED` |
-| verdict 输入改为 metric-first | 统计结果按冻结规则映射到五值 | `DESIGN_LOCKED`（实现 `PARTIAL`，见 67 章） |
-| 输出 `VerdictRuleTrace` | 支持/反证/冲突/功效不足均有 deterministic trace | `DESIGN_LOCKED`（实现 `PARTIAL`） |
-| 建立 10 个 verdict golden vectors | 覆盖 5 值 × 边界（缺数据 / scope 缩小 / 反证 / 冲突 / 通过） | `IMPLEMENTED_VERIFIED`（14 GV 落盘 golden_vectors/cases/GV-01..14.json·`far verify-golden --all` 14/14 PASS 经真实内核） |
-| LLM evidence label 只能作为辅助，不得直接决定 verdict | verdict 由 deterministic `verdict_mapping` 5 路径产出 | `DESIGN_LOCKED` |
+| 增加 deterministic validator（`validateFEC`） | 缺 FEC 不能输出 `CONFIRMED` | `IMPLEMENTED_VERIFIED`（`compileFec` 经 `fecAppendClaim` 进生产 verdict·fecV2 形参必选·DEPTH_LEDGER §C P0-1 WIRED_GREEN） |
+| 实现 protocol freeze（`freezeProtocol`） | actor 签名后 `frozenAt` 不可改；改则 `PROTOCOL_DEVIATION_CRITICAL` | `IMPLEMENTED_VERIFIED`（fecV2 freeze 接线·LLM_FROZEN CI 阻断·P0-1 WIRED_GREEN） |
+| verdict 输入改为 metric-first | 统计结果按冻结规则映射到五值 | `IMPLEMENTED_VERIFIED`（`decideFiveValueVerdict` 替换 4 个生产 caller 的 V1 `makeVerdict`·DEPTH_LEDGER §C P0-2a/b/c/d WIRED_GREEN） |
+| 输出 `VerdictRuleTrace` | 支持/反证/冲突/功效不足均有 deterministic trace | `IMPLEMENTED_VERIFIED`（V2 kernel 输出 reasonCodes/decisiveRuleId/evidenceSufficiency·P0-2 WIRED_GREEN + kernel 消费 compileFec Plan·P0-4 WIRED_GREEN） |
+| 建立 10 个 verdict golden vectors | 覆盖 5 值 × 边界（缺数据 / scope 缩小 / 反证 / 冲突 / 通过） | `IMPLEMENTED_VERIFIED`（14 GV 落盘 golden_vectors/cases/GV-01..14.json·`far verify-golden --all` 14/14 PASS 经真实内核·P1-4 WIRED_GREEN） |
+| LLM evidence label 只能作为辅助，不得直接决定 verdict | verdict 由 deterministic `verdict_mapping` 5 路径产出 | `IMPLEMENTED_VERIFIED`（V2 kernel 消费 `StatisticalResult[]` 非预制布尔·R0-R9 确定性内核裁决·P0-2 WIRED_GREEN） |
 
 verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路径）：
 
@@ -332,12 +332,12 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 | 任务 | 验收口径 | 状态 |
 |---|---|---|
-| 准备 `Your Laptop Is The Verifier` 演示包（含 U 盘离线包） | 评委笔记本无 `DASHSCOPE_API_KEY` 也能跑通三路验真 | `PARTIAL`（核心离线包已 `IMPLEMENTED_VERIFIED`；仍缺非项目成员 fresh-clone 录屏与预编译环境包） |
+| 准备 `Your Laptop Is The Verifier` 演示包（含 U 盘离线包） | 评委笔记本无 `DASHSCOPE_API_KEY` 也能跑通三路验真 | `PARTIAL`（Plan B 离线包 `verify.sh` 验真 PASS 2026-07-10·bundle/chain/proofEnvelope；fresh-clone smoke 12/12 PASS 带 key / 10/12+2SKIP 无 key offline_replay；仍缺非项目成员 fresh-clone 录屏与 Plan C/D 人工演练） |
 | 准备 Trust Receipt 一页 | 自然语言解释是次要的，结构化 JSON 才是主口径 | `IMPLEMENTED_VERIFIED`（`far export receipt` JSON/Markdown；V2 envelope + V1 `.far-proof`，篡改拒发） |
 | 准备风险边界页 | 与 `07_RISK_REGISTER_AND_DO_NOT_CLAIM.md` 一致 | `DESIGN_LOCKED` |
 | 准备 Q&A 防守稿 | 赛道回扣（生成可证伪的假设 vs 生成漂亮的假设） | `PARTIAL` |
 | FI-7 TimeMachine（必做满血） | scrub + fork + deterministic 续跑 + 三跑 byte-equal 录屏（仅 deterministic track，赛道诚实标注：续跑 byte-equal 仅 deterministic track 成立、真实 LLM 轨道不成立） | `ROADMAP` |
-| 六灵魂时刻演练 + 三级降级预案 | 各路径演练含断网（demo-day 现场鲁棒性）；非项目成员 fresh-clone exit 0 | `ROADMAP` |
+| 六灵魂时刻演练 + 三级降级预案 | 各路径演练含断网（demo-day 现场鲁棒性）；非项目成员 fresh-clone exit 0 | `PARTIAL`（Plan B 离线验真 + 断网 offline_replay fresh-clone 10/12+2SKIP 已验证 2026-07-10；Plan C/D 人工演练待用户；非项目成员 fresh-clone 录屏待用户） |
 | 答辩 DO_NOT_CLAIM V2 内化 | 全员禁说清单 | `DESIGN_LOCKED` |
 | 全用户面零裸数字 + 零裸「首个」 | status-dump 回填 + hedge | `PARTIAL` |
 | 答辩前复核外部竞品和论文事实 | Right-to-History / 谱系锚点查新结论落 `NEEDS_EXTERNAL_VERIFICATION` 或 hedge | `NEEDS_EXTERNAL_VERIFICATION` |
@@ -406,16 +406,40 @@ verdict 决策树优先级（`APPENDIX_F_GLOSSARY.md` §3 锁定，禁新增路�
 
 ## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
 
-> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目原为融合 backlog；当前 FUSION-OS-1..14 已由受控突变双跑写回 `WIRED_GREEN`；P1-3 亦已由 maintainer 在 GitHub CI（ubuntu-latest，DashScope 可达，带 `DASHSCOPE_API_KEY` secret）`workflow_dispatch` 双跑写回 `WIRED_GREEN`（closed_by=`b39de736`，base=`ac5663c` FAIL / head=`b39de736` PASS），至此 §C 34/0 全绿（见 DEPTH_LEDGER §A line 21 + §F line 185）。
 
 ### 与本文档（06_ROADMAP_AND_DOD）相关的融合缺口
 
-- **P-FUSION 波次（DESIGN_PROPOSED，W0-W5 之后的独立延伸波次）**：迁移 Open Science 工程范式，14 项 FUSION-OS-1..14 全 NOT_BUILT。**不抢 W0-W5 当前优先级**（W0-W5 是 P0 工程闭环 + keystone bot，见 DEPTH_LEDGER §A next_action=KEYSTONE_DEPTH_EVIDENCE_BOT）。
+- **P-FUSION 波次（历史 DESIGN_PROPOSED → 当前已接线）**：迁移 Open Science 工程范式，14 项 FUSION-OS-1..14 已在 DEPTH_LEDGER §C 维持 `WIRED_GREEN`。P1-3 DashScope 可达网络凭据物证已由 maintainer 在 GitHub CI 双跑写回 `WIRED_GREEN`（§C 34/0 全绿）。深度接线阶段已完成，WSL 实战验收亦已完成（§A `next_action = WSL_REALWORLD_VALIDATED`，见 `.trae/specs/wsl-realworld-validation-governance/`）。
 - **建议取序**：FUSION-OS-1（反剧场实时接线·最高杠杆·闭合当前最大活体缺口）→ FUSION-OS-11（DB CHECK 五值 enum·红线级强制）→ FUSION-OS-13/14（内核 form/identifier 规则）→ FUSION-OS-9/10/12（schema：blob CAS / derivable / supersede）→ FUSION-OS-2/3/4/7/8（sandbox 加固）→ FUSION-OS-5/6（verifier AST 门 + provenance）。
 - **验收门**：每项接线须升 DEPTH_LEDGER §C 对应行至 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN；agent 不得手填。
 - **边界**：真 OS 级网络/cpu/mem 隔离仍 V2（07_RISK_REGISTER §188 自承），P-FUSION 的 sandbox 项是用户态降级，绝不宣称运行时隔离。
 
 > 接线时升 WIRED_RED，物证由 keystone bot CI 双跑写回 WIRED_GREEN（见 DEPTH_LEDGER §D）。取序建议见 CLAUDE.md §4 P-FUSION。
+
+---
+
+## WSL 实战验收与工程治理 DoD（P4 · 已完成）
+
+> 来源：`.trae/specs/wsl-realworld-validation-governance/`。WSL Linux 真实环境实战验收 + 工程树治理，对应 CLAUDE.md §4 P4-1..P4-6。`DEPTH_LEDGER.md` §A `next_action = WSL_REALWORLD_VALIDATED`。
+
+### WSL 实战验收门槛（P4-1..P4-4）
+
+- `node scripts/depth_gate.mjs` exit 0（WSL 真实环境·§C 34/0 全绿校验通过）；
+- `pnpm ci-all` 全 PASS，或 FAIL 项根因为环境/凭据（如 Dafny 工具链缺失）非代码 bug；
+- 14 GV cross-lang 三后端（node / python / browser）verdict 一致（`far verify-golden --all --cross-lang`）；
+- hero pipeline 三条真实跑通（真实统计量 + 真实 venv spawn）：hero_a CONFIRMED→ASK-9 INCONCLUSIVE、hero_b DEGRADED_SCOPE、hero_c DEGRADED_SCOPE；
+- 对比试验报告落盘（`FAR_LAB_MASTER_PLAN/COMPARISON_TRIAL_REPORT.md`）：baseline vs FAR-Chain 检测率对比，FAR-Chain 6/6=100% vs baseline 0/6=0%。
+
+### 工程树治理门槛（P4-5..P4-6）
+
+- 死文件清零（`scripts/0/` 目录 + `*.tsbuildinfo` 不再存在）；
+- 同义反复测试清零（hero_harness 硬编码 metric 测试 / V1 makeVerdict 测试已清理或标注）；
+- CLI 重构完成（`src/cli/far.ts` 重复参数解析模式 100% 消除）；
+- 注释最小化（无散文复述注释·CLAUDE.md §2 判定法通过）；
+- `pnpm typecheck` + `pnpm lint --max-warnings 0` + `node scripts/zero_tolerance_scan.mjs` 三门 exit 0。
+
+> 诚实边界：真操作系统级隔离（cgroups / netns / seccomp）仍属 V2 路线；P4 的 sandbox 加固为用户态降级，不宣称运行时强隔离。LLM 不作最终裁决者——五值裁决由确定性 R0-R9 内核给出。
 
 ---
 

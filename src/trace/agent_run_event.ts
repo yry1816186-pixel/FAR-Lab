@@ -41,24 +41,6 @@ export type AgentRunEventKind = (typeof AGENT_RUN_EVENT_KINDS)[number];
 export type AgentRunEventDecision = (typeof AGENT_RUN_EVENT_DECISIONS)[number];
 export type TraceFailureCode = (typeof TRACE_FAILURE_CODES)[number];
 
-export interface AgentRunEvent {
-  readonly eventId: string;
-  readonly runId: string;
-  readonly parentEventId: string | null;
-  readonly eventKind: AgentRunEventKind;
-  readonly stageId: string | null;
-  readonly actorRole: string;
-  readonly payloadRef: string | null;
-  readonly inputHash: string | null;
-  readonly outputHash: string | null;
-  readonly guardrailName: string | null;
-  readonly decision: AgentRunEventDecision | null;
-  readonly reason: string;
-  readonly prevEventHash: string;
-  readonly currentEventHash: string;
-  readonly isoTimestamp: string;
-}
-
 export interface TraceGrade {
   readonly traceGradeId: string;
   readonly runId: string;

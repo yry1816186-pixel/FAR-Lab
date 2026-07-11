@@ -30,7 +30,6 @@ import {
   appendRecord,
   verifyEvidencePayloadHashes,
   hashCanonicalJson,
-  GENESIS_PREV_HASH,
 } from '../../src/evidence_log/index.ts';
 import type {
   AppendRecordInput,

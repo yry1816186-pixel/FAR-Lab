@@ -158,16 +158,16 @@ L0 任务铁律 / CLAUDE.md 全局铁律（最高，凌驾一切）
 
 | ID | 风险 | 概率[估计] | 影响 | 降级/缓解 | 状态 |
 |---|---|---|---|---|---|
-| RK-01 | Qwen snapshot `qwen3.7-max-2026-05-20` 下线风险（团队 2026-06-27 verified_live·**无百炼官方维护期承诺**·竞赛周 day-0 GET /v1/models 实测复核） | 高 | 高 | FallbackChain（§5）；cached LLM 响应离线 Demo 兜底；day1:verify 强制实测（无 key 不算 graceful skip 通过） | `NEEDS_EXTERNAL_VERIFICATION` |
+| RK-01 | Qwen snapshot `qwen3.7-max-2026-05-20` 下线风险（团队 2026-06-27 verified_live·**无百炼官方维护期承诺**·竞赛周 day-0 GET /v1/models 实测复核） | 高 | 高 | FallbackChain（§5）；cached LLM 响应离线 Demo 兜底；day1:verify 强制实测（无 key 不算 graceful skip 通过） | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：GET /v1/models 返回 200 + `qwen3.7-max-2026-05-20` 在 model list；`snapshot_liveness_smoke.ts` OK） |
 | RK-02 | cross_lang byte-equal 不成立（TS vs Python canonicalHash） | 中 | 极高 | **不可降级**·必须修（白名单/排序/分隔符/NaN/Unicode 对齐）；golden_vectors 防回归；CI R2 block merge | `IMPLEMENTED_VERIFIED`（数值类·边界按 NUMERIC_KNOWN_DIVERGENCE 归 RED 待 V3） |
-| RK-03 | MAST 在线查询失败（TESS 光变曲线） | 中 | 中 | cached fixture（T-W2-01）；verdict 落 `DEGRADED_SCOPE`；标 `baseline_exempt`（F11） | `DESIGN_LOCKED` |
+| RK-03 | MAST 在线查询失败（TESS 光变曲线） | 中 | 中 | cached fixture（T-W2-01）；verdict 落 `DEGRADED_SCOPE`；标 `baseline_exempt`（F11） | `PARTIAL`（day-0 实测 2026-07-10：cached fixture fallback 路径已验证·science_harness c_astro_pipeline R4 DEGRADED_SCOPE 落地；真实 MAST lightkurve spawn 待 Linux 双启动——`.python-deps` 新旧 astropy 7.2.2/8.0.1 + erfa 冲突在 Windows 阻塞 P1-6b） |
 | RK-04 | novelty=0 评分瓶颈（FAR 不产出新发现·传统 novelty 维度=0） | 确定 | 高 | 命门补救：重定义 novelty（让 AI 科研声明可机器检验）+ FI-3 先进性维度出口（59 决策①）+ 诚实护城河 | `DESIGN_LOCKED` |
 | RK-05 | 竞赛日程紧·规范未冻结 | 中 | 极高 | M1-M7 里程碑排序（非裁剪·全部模块必须实现）；诚实报告进度 | `DESIGN_LOCKED` |
 | RK-06 | 评委误解"proof"为数学证明 | 中 | 中 | PDF 边界章节 + Q&A 预案（§6）+ 反复声明"reliability evidence package，非数学证明" | `DESIGN_LOCKED` |
 | RK-07 | sandbox 非物理隔离被质疑 | 中 | 中 | 诚实声明 F4：类型层约束 + CI 审计，**不声称进程级物理隔离** | `IMPLEMENTED_VERIFIED` |
 | RK-08 | GPU 不可得（ProbeAtlas N=30、对抗博弈批量） | 中 | 中 | 代码实现 + 测试脚手架必须完成；真实跑标 `NEEDS_GPU_VALIDATION` | `DESIGN_LOCKED` |
 | RK-09 | dashscope rate limit / quota | 中 | 中 | 限流 + 指数退避 retry 3 次（1s/2s/4s）+ cached 响应；Demo 前预跑缓存关键调用 | `DESIGN_LOCKED` |
-| RK-10 | fresh-clone 环境差异（评委机器跑不出相同 hash） | 低 | 高 | requirements.lock + Python venv 锁定 + repro 七分量（MODEL_SNAPSHOT / CalcSpec / env_hash 全锁） | `DESIGN_LOCKED` |
+| RK-10 | fresh-clone 环境差异（评委机器跑不出相同 hash） | 低 | 高 | requirements.lock + Python venv 锁定 + repro 七分量（MODEL_SNAPSHOT / CalcSpec / env_hash 全锁） | `IMPLEMENTED_VERIFIED`（day-0 实测 2026-07-10：`fresh_clone_smoke` 12/12 PASS 带 key / 10/12+2SKIP 无 key offline_replay；repro 七分量全锁；非项目成员 fresh-clone 录屏仍 `NEEDS_EXTERNAL_VERIFICATION`） |
 | RK-11 | 引用 UNVERIFIED 残留进 PDF | 中 | 中 | PDF 引用前逐条人工核实；标【已核实】或【UNVERIFIED·须核实】；Robin Nature / PaperRepro / SocSci 26xx / CodeEvolve 必须核 | `NEEDS_EXTERNAL_VERIFICATION` |
 | RK-12 | 评委 Demo 现场失败 | 中 | 高 | 降级预案（Plan B/C/D，见 §6.3）；**绝不伪造 CONFIRMED**；"复现失败也是结果"（F9） | `DESIGN_LOCKED` |
 
@@ -575,7 +575,7 @@ FAR-CHAIN 错误码 = 字母前缀 + 4 位数字
 
 ## 融合织入（Open Science 工程范式迁移·DESIGN_PROPOSED·2026-07-05）
 
-> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目全 NOT_BUILT，属未来 backlog，不抢当前 next_action。
+> 来源：`FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md` + `FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md` §C 末段。Open Science = Claude Code 分支重品牌化的执行层 agent 工作区；FAR-Chain = 验证层。迁移边界：只迁工程范式（反剧场 / fail-closed 服务门 / 收窄伪造窗口 / 内容寻址 CAS / derivable 标记 / 进程组 kill / AST 结构门），绝不迁 OS 的 LLM-裁决语义。下述条目原为融合 backlog；当前 FUSION-OS-1..14 已由受控突变双跑写回 `WIRED_GREEN`，唯一剩余红项见 DEPTH_LEDGER §A `P1-3_DASHSCOPE_CI_EVIDENCE`。
 
 ### 与本文档（07_RISK_REGISTER_AND_DO_NOT_CLAIM）相关的融合缺口
 

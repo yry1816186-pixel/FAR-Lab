@@ -201,15 +201,7 @@ export type StructuredPayload =
   | PlanPayload
   | FeedbackPayload;
 
-/** 判别标签字面量集合（用于运行时 narrow + 后续 zod discriminatedUnion）。 */
-export const PAYLOAD_KIND_TAGS = [
-  'understanding',
-  'integration',
-  'hypothesis',
-  'evidence',
-  'plan',
-  'feedback',
-] as const;
+
 
 
 // ---------- §3.4 FeedbackSignal / TerminationCriteria ----------

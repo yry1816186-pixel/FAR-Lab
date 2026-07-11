@@ -35,10 +35,10 @@
 //     (a) 运行时真执行到该 caller（死分支探测是保守启发式，非完备控制流分析）；
 //     (b) caller 传的是真实数据而非预制常量（content-truth 需运行时探针）；
 //     (c) closed_by sha 真做了接线（sha 存在 ≠ sha 含接线 diff）；
-//     (d) RED→GREEN 双跑物证（须 depth-evidence bot 在 CI 实跑 base/head，本门只校验 evidence 行格式）。
+//     (d) RED→GREEN 双跑物证的防篡改来源（本门只校验 evidence 行格式；完整防护须 CI/branch protection）。
 //   完整保证 = 本静态门 + depth-evidence bot（RED→GREEN 双跑）+ CODEOWNERS 护 DEPTH_LEDGER.md
-//     + write-restricted token（agent 无写 evidence 权限）。bot 未实现前，WIRED_GREEN 在本门可被
-//     「正确格式 + 真实 sha + 真实测试文件」骗过——故 §C 明确：bot 写回前只允许 WIRED_RED。
+//     + write-restricted token（agent 无写 evidence 权限）。当前 33 行 WIRED_GREEN 已有本地 bot 双跑物证，
+//     但 GitHub 防篡改闭环仍依赖 maintainer 配置 required status check/CODEOWNERS；P1-3 维持 WIRED_RED。
 //
 // 依赖：node:fs / node:path / node:url / node:child_process 内置 + typescript（devDependency，CI 已安装）。
 // 历史版本曾「零依赖」手写词法状态机（R1），但边界情况易出错且无独立测试；

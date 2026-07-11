@@ -387,7 +387,7 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
   "capabilities": {
     "canonicalHash": "IMPLEMENTED_VERIFIED",
     "fiveValueVerdict": "IMPLEMENTED_VERIFIED",
-    "fecV2": "PARTIAL",
+    "fecV2": "IMPLEMENTED_VERIFIED",
     "proofEnvelopeV2": "PARTIAL",
     "farVerify": "IMPLEMENTED_VERIFIED",
     "farExportReceipt": "IMPLEMENTED_VERIFIED",
@@ -417,7 +417,7 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
 |---|---|---|
 | evidence log chain | `PARTIAL` | 已有实现痕迹（append-only + canonicalHash + chain verifier + Merkle root/proof），需以代码和测试确认闭环；payload/evidence/verdict node 不直接进 chain leaf 是已知闭环缺口 |
 | canonical hash / golden vector | `IMPLEMENTED_VERIFIED` | 属于核心信任根，必须保持最高优先级。四字段白名单 + 数值类已实证 byte-equal；浮点科学计数法（`1e-7` 鸿沟）按 `NUMERIC_KNOWN_DIVERGENCE` 诚实归 RED，待 V3 迁移 RFC 8785 JCS |
-| five-value verdict | `PARTIAL` | 语义已锁定（`VerdictKind` 5 值 enum 冻结，禁止第六值）；工程上需升级为 metric-first deterministic kernel（输出 rule trace + reason codes + evidence sufficiency + statistical uncertainty） |
+| five-value verdict | `IMPLEMENTED_VERIFIED` | 语义已锁定（`VerdictKind` 5 值 enum 冻结，禁止第六值）；metric-first deterministic kernel（`decideFiveValueVerdict`·输出 rule trace + reason codes + evidence sufficiency + statistical uncertainty）已接线进 4 个生产 caller（DEPTH_LEDGER §C P0-2a/b/c/d WIRED_GREEN）+ kernel 消费 compileFec Plan（P0-4 WIRED_GREEN） |
 | ConfoundingGate F6（因果混杂门） | `IMPLEMENTED_VERIFIED`（#12） | `claimType='causal'` 时 verdict kernel 在 R7 CONFIRMED 前调用确定性 d-separation + 后门路径枚举（非 LLM 推理混杂）。`src/confounding_gate/`（Koller-Friedman Bayes-Ball·修正 SSOT §7.5.1 伪代码两处缺陷见 03）+ R-causal 门（`verdict_kernel_v2.ts`·非因果 claim 字节级零回归）+ science_harness hero-B 路径 + CG-1/2/5/6 CI 门（`pnpm run confounding-gate-scan`）。三 claimType hero fixture 全交付（`countDeliveredV1ClaimFixtures()===3`）；claimType 暂为 kernel 输入提示（非哈希保护·封存任务延后） |
 | ProofEnvelope V1 | `PARTIAL` | V1 有 9 rule validator + sealer + proofHash + DB backstop + TS 重算脚本；P0 要升级为 V2 proofHash binding（绑定 SciIR fields + claim graph + cross-language proofHash） |
 | Python verifier | `IMPLEMENTED_VERIFIED` | chain/Merkle verifier + ProofEnvelope V2 proofHash 镜像已实现；`far verify` 会输出 `recomputation.python`，仍不声称完整 verdict trace / 原始证据重跑 |
@@ -441,8 +441,8 @@ CI 在文档构建阶段跑 `far status --json`，把占位符 `<X_FROM_STATUS_D
 | `far arena "<h>" [--refuters]` | `IMPLEMENTED_VERIFIED` | `src/cli/commands/arena.ts`：对抗竞技场（refuter 攻击 + deterministic arbiter verdict 分歧检测·记分板）；offline 下必然 ROBUST |
 | `far init <domain> [--out] [--force]` | `IMPLEMENTED_VERIFIED` | `src/cli/commands/init.ts`：DomainPack 脚手架（config + claim/fec 模板·对齐 FEC contract 结构） |
 | `@far-chain/cli`（`packages/cli`） | `IMPLEMENTED_VERIFIED` | `packages/cli/`：可发布 npm 包（wrapper 转发根 `far.ts`·node 24 type-stripping·monorepo workspace）。独立发布需 build dist 或打包 src |
-| FEC（Falsification Evidence Contract） | `PARTIAL` | V1 = optional contract（`fecAppendClaim` 原子链路 + `registerContract` + 0005 append-only contract 表 + `auditContract`）；V2 = mandatory，绑定 statistical plan + evidence requirements + measurement plan；缺 FEC 时不允许输出 CONFIRMED/REFUTED，只能 UNTESTED 或 fail-closed |
-| anti-theater harness | `PARTIAL` | 现有 anti-theater guard（FAIL+CONFIRMED 被 SQLite trigger ABORT）；P0 至少覆盖 10 个攻击样例（label-only evidence / post-hoc threshold / dataset drift / scope laundering / missing raw artifact / LLM reviewer override / metric swapping / seed cherry-picking / workflow digest mismatch / natural-language verdict mismatch） |
+| FEC（Falsification Evidence Contract） | `IMPLEMENTED_VERIFIED` | V2 mandatory 已接线：`fecV2` 形参必选 + `compileFec` 经 `fecAppendClaim` 进生产 verdict 路径（DEPTH_LEDGER §C P0-1 WIRED_GREEN）；缺/坏 FEC → fail-closed UNTESTED，禁止落 CONFIRMED（P0-3 WIRED_GREEN）；`far fec compile`/`far fec freeze` CLI 真实调 compileFec + computeFecHash（P1-1 WIRED_GREEN）；V1 optional contract 为历史层 |
+| anti-theater harness | `IMPLEMENTED_VERIFIED` | 20 个 attackId 覆盖 10 类攻击样例（label-only / post-hoc threshold / dataset drift / scope laundering / missing raw artifact / LLM reviewer override / metric swapping / seed cherry-pick / workflow digest mismatch / NL verdict mismatch）；反剧场检测器已接实时 verdict 路径（FUSION-OS-1 WIRED_GREEN·`runAntiTheaterLint` → `buildVerdictKernelInput` 单点投影替换硬编码 []）；verifier 加载期 AST 结构门禁顶层 network/IO/LLM call（FUSION-OS-5 WIRED_GREEN） |
 | FAR-Bench | `DESIGN_LOCKED` | 当前按 evaluation protocol / attack corpus 处理（profile_id 永远 `competition_aliyun_qwen`），不宣称泛 benchmark 成熟；P0 升级到 FAR-Bench125（V2）；通用 AI4S benchmark / 排行榜属禁用口径（D6） |
 | Rust / Go / WASM verifier | `ROADMAP` | V2/V3 路线；当前不声称已实现 |
 | external transparency log | `ROADMAP` | V3；当前 ledgerRoot 仅本地 append-only，不说区块链 |

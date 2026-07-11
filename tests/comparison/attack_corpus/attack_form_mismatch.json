@@ -1,0 +1,57 @@
+{
+  "attackId": "AT-FORM-MISMATCH",
+  "attackClass": "mutation",
+  "description": "Derivation form mismatch: FEC expects derivationForm='literal' but statistical result reports 'derived' (values are equal but form differs). V2 kernel R-derivation-form (verdict_kernel_v2.ts:432) triggers INCONCLUSIVE. V1 makeVerdict has no derivation form concept → sees only supporting evidence → CONFIRMED.",
+  "baseCaseId": "GV-01",
+  "claim": "Model M achieves BLS power greater than baseline on dataset D",
+  "falsificationSpec": {
+    "prediction": "Model M achieves BLS power greater than baseline on dataset D",
+    "metric": "bls_power",
+    "falsificationThreshold": 0,
+    "thresholdSemantics": "gt"
+  },
+  "thresholdSpec": {
+    "semantics": "gt",
+    "value": 0
+  },
+  "baselineEvidences": [
+    {
+      "claim": "measured bls_power = 0.62 on dataset D (derived form, values match literal expectation)",
+      "supportsClaim": true,
+      "refutesClaim": false,
+      "scopeNarrowerThanClaim": false,
+      "sourceAnchor": {
+        "gitCommitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "dashscopeRequestId": null,
+        "isoTimestamp": "2026-07-11T00:00:00.000Z",
+        "rawResponseHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ],
+  "kernelOverride": {
+    "fec": {
+      "statisticalPlan": {
+        "expectedDerivationForm": "literal"
+      }
+    },
+    "statistics": [
+      {
+        "testId": "bls_power",
+        "status": "ran",
+        "effectDirection": "supports",
+        "pValue": 0.003,
+        "adjustedPValue": 0.003,
+        "effectSizeObserved": 0.62,
+        "confidenceInterval": [0.21, 0.95],
+        "assumptionDiagnostics": [],
+        "derivationForm": "derived"
+      }
+    ]
+  },
+  "expected": {
+    "baselineVerdict": "CONFIRMED",
+    "farVerdict": "INCONCLUSIVE",
+    "farDecisiveRuleId": "R_DERIVATION_FORM_MISMATCH",
+    "farReasonCodes": ["R_DERIVATION_FORM_MISMATCH"]
+  }
+}

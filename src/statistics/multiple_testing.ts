@@ -37,12 +37,6 @@ export function adjustPValues(
   }
 }
 
-export function rejectAtAlpha(adjusted: readonly AdjustedPValue[]): readonly number[] {
-  return adjusted
-    .filter((item) => item.rejected)
-    .map((item) => item.index);
-}
-
 function holmAdjust(rawPValues: readonly number[], alpha: number): readonly AdjustedPValue[] {
   const sorted = indexed(rawPValues);
   let runningMax = 0;

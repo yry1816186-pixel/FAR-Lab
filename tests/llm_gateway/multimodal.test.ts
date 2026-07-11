@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
@@ -12,12 +11,7 @@ import {
   isQwenVlModel,
 } from '../../src/llm_gateway/adapters/aliyun_qwen_vl/types.ts';
 import type {
-  MediaKind,
   MultimodalContentInput,
-  MultimodalEvidenceCard,
-  MultimodalEvidenceStatus,
-  MultimodalVlmResult,
-  QwenVlModelId,
 } from '../../src/llm_gateway/adapters/aliyun_qwen_vl/types.ts';
 
 import {
@@ -45,10 +39,8 @@ import {
 
 // ===== Imports from core =====
 import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offline_replay/client.ts';
-import { createLlmGateway } from '../../src/llm_gateway/gateway.ts';
 import type {
   ProviderAdapter,
-  LlmCallCredential,
 } from '../../src/llm_gateway/types.ts';
 import { verifyChainHead } from '../../src/evidence_log/index.ts';
 import { runMigrations } from '../../src/db/index.ts';

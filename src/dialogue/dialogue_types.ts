@@ -63,10 +63,6 @@ export function isClarificationQuestionType(value: string): value is Clarificati
   return (CLARIFICATION_QUESTION_TYPES as readonly string[]).includes(value);
 }
 
-// ---------- DialogueMode（对齐 audit/manifest_policy.ts dialogueMode） ----------
-
-export type DialogueMode = 'disabled' | 'enabled';
-
 // ---------- §8 共享值类型（引用 02 §3.6-3.8 物理列·camelCase 内存态） ----------
 
 /** 对应 research_sessions 行（02 §3.6·5 值状态机） */
@@ -136,14 +132,6 @@ export interface ResearchThoughtFramework {
   readonly openIssues: readonly string[];
   readonly linkedDialogueTurnIds: readonly string[];
   readonly synthesizedAt: string;
-}
-
-// ---------- DialogueSession（session + turns + hypotheses 聚合） ----------
-
-export interface DialogueSession {
-  readonly session: ResearchSession;
-  readonly turns: readonly DialogueTurn[];
-  readonly hypotheses: readonly IntentHypothesis[];
 }
 
 // ---------- 澄清决策（39 §5 ClarificationDecision） ----------

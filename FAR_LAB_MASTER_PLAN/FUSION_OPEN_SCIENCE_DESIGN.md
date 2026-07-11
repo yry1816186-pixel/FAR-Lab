@@ -410,7 +410,7 @@ FAR-Chain 是 **AI4S 科学声明的声明级验证层**——可独立复算、
 
 ## 7. 推荐施工序（依赖序，非 ad-hoc）
 
-> 遵守 CLAUDE.md §4「按顺序取下一项，不要 ad-hoc」。FUSION-OS-* 与现有 P0/P1/P2/P3 并列，**不可抢占 next_action=KEYSTONE_DEPTH_EVIDENCE_BOT**（§A 当前态）。
+> 历史施工序如下，保留用于解释 FUSION-OS-1..14 的依赖来源。当前 DEPTH_LEDGER §C 中 FUSION-OS-1..14 已由受控突变双跑写回 `WIRED_GREEN`；§A 当前 next_action 已收敛到 `P1-3_DASHSCOPE_CI_EVIDENCE`。
 
 ### 第一波：反剧场闭合（最高杠杆，无依赖）
 
@@ -438,9 +438,9 @@ FAR-Chain 是 **AI4S 科学声明的声明级验证层**——可独立复算、
 13. **FUSION-OS-5**（verifier AST 结构门）——独立，但配套 verifier registry tiering（L-2 借鉴）。
 14. **FUSION-OS-14**（identifier fabrication REFUTED 规则）——依赖 FUSION-OS-6（harness-verified 来源标记）+ 同步 12 GV（约束 #6）。
 
-### 不可阻塞
+### 当前不可阻塞
 
-- **KEYSTONE_DEPTH_EVIDENCE_BOT**（§A next_action）——所有 §C 行（含 FUSION-OS-*）从 WIRED_RED → WIRED_GREEN 都依赖它接入 CI。这是 FAR-Chain 自证真实接线的最后一公里，**优先级高于所有 FUSION-OS-* 实施**。
+- **P1-3_DASHSCOPE_CI_EVIDENCE**（§A next_action）——FUSION-OS-* 已完成本地 bot 双跑物证；剩余唯一红项是 P1-3，需要 maintainer 在可达 DashScope 网络中带 `DASHSCOPE_API_KEY` 运行 depth-evidence dispatch。
 
 ---
 
@@ -448,7 +448,7 @@ FAR-Chain 是 **AI4S 科学声明的声明级验证层**——可独立复算、
 
 1. **FUSION-OS-1 接线缺口 vs Verify-time-only 分层**：`runAntiTheaterLint` 是否设计上就只打算用于离线 verify（重算+diff），还是原本应该接进 seal 路径？`verdict_kernel_v2.ts:296` 的 antiTheaterFindings fail→UNTESTED 规则存在但实时路径永不喂料——需确认这是接线缺口还是有意的分层设计。（far:sandbox+fec agent open_question）
 2. **V2 sealer 是否已消费 antiTheaterReport**：`proof_envelope/v2/sealer.ts` 与 V1 `sealer.ts` 是否双轨并存？V2 seal 路径是否已接 `runAntiTheaterLint`？若 V2 已接，FUSION-OS-1 落点应改为 V2 路径。（far:sandbox+fec agent open_question）
-3. **keystone bot CI 状态**：`scripts/depth_evidence.mjs` 是否已在 `.github/workflows/depth-evidence.yml` 真实跑通？是否被设为 required status check？这是所有 §C 行 WIRED_RED→GREEN 的前置。（far:plan+schema+gate agent open_question，超 agent 能力，须 maintainer 配置）
+3. **keystone bot CI 状态**：`scripts/depth_evidence.mjs` 与 `.github/workflows/depth-evidence.yml` 已落地；仍需 maintainer 将相关 job 设为 required status check，并在可达 DashScope 网络中对 P1-3 跑带凭据的 dispatch。（far:plan+schema+gate agent open_question，超 agent 能力，须 maintainer 配置）
 4. **OS 加密钥管理**：OS 4 张 `encrypted_*` 凭证表的加密密钥（KEK）存哪？若钥与库同处则 in-DB 加密形同虚设。FUSION-OS-8 secret 剥离不涉及此，但若未来 FAR-Chain 凭证入库须先评估威胁模型。（os:schema agent open_question）
 5. **OS sandbox bind-mount vs FAR-Chain 用户态**：FAR-Chain V2+ 路线是否真的不计划做 OS 级隔离，还是只是 V1 诚实声明？07_RISK_REGISTER §188 未取证原文。FUSION-OS-4 预扫是降级版，须明确 V2+ 是否升级。（far:sandbox+fec agent open_question）
 6. **OS writetrace 术语来源**：`writetrace`/`write_trace`/`sha256`/`provenance` 四个词在 `repo:guanxiaol/open-science` 全部 0 命中（GitHub code search）。OS 实际 provenance 由 harness（9.3MB `science-engine.js` bundle）隐式持有，以 payload 字段喂给 reviewer。若任务方「writetrace」术语源自上游 Claude Code 内核，则与 FAR-Chain 无转移关系。（os:agents+writetrace agent open_question）

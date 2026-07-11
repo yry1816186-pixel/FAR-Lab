@@ -78,3 +78,15 @@ $null
 *.db-wal
 *.db-shm
 examples/fec/sample_compiled.json
+
+# ---------------------------------------------------------------------------
+# 2026-07-11 Phase 5.5 死文件清理增补（DEAD_FILE_CLEANUP.md）
+# ---------------------------------------------------------------------------
+# 运行时状态目录（verifier / replay 产物·禁提交）
+.far/
+# Node 包缓存泄漏点显式标注（已被 node_modules/ 覆盖·此处标注已知高频泄漏）
+node_modules/.cache/
+# Windows native ext 残留（已被 .python-deps/ 覆盖·此处标注 .pyd 编译产物）
+.python-deps/*.pyd
+# replay_demo_chain zstd 归档产物（.far-proof-demo/ 的压缩包·禁提交）
+.far-proof-demo*.tar.zst

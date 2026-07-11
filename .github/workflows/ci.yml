@@ -355,16 +355,22 @@ jobs:
         run: node --test tests/ci/eval_ring_audit.test.ts
 
   # ============================================================
-  # STEP 11 · competition_qwen_smoke（条件门：仅当有 DASHSCOPE_API_KEY 时跑，否则 skip 不 block）
-  # 双 job 模式：secrets 不能直接用于 job 级 if:（actions/runner#520）
+  # STEP 11 · competition_qwen_smoke（条件门：仅可信事件有 DASHSCOPE_API_KEY 时跑，否则 skip 不 block）
+  # 双 job 模式：secrets 不能直接用于 job 级 if:（actions/runner#520）。
+  # 安全边界：pull_request 不读取 secret、不跑真实 DashScope；workflow_dispatch 仅默认分支读取 secret。
+  # 避免 PR head / 手动选择的非默认分支代码拿到凭据。
   # ============================================================
   check_secrets:
     needs: eval_ring_audit
     runs-on: ubuntu-latest
     outputs:
-      has_key: ${{ steps.check.outputs.has_key }}
+      has_key: ${{ steps.check_trusted.outputs.has_key || steps.check_pr.outputs.has_key }}
     steps:
-      - id: check
+      - id: check_pr
+        if: ${{ github.event_name == 'pull_request' }}
+        run: echo "has_key=false" >> "$GITHUB_OUTPUT"
+      - id: check_trusted
+        if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch) }}
         env:
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
         run: |
@@ -376,7 +382,7 @@ jobs:
 
   competition_qwen_smoke:
     needs: check_secrets
-    if: ${{ needs.check_secrets.outputs.has_key == 'true' }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch) && needs.check_secrets.outputs.has_key == 'true' }}
     runs-on: ubuntu-latest
     env:
       DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
@@ -439,12 +445,12 @@ jobs:
 
   # ============================================================
   # STEP 14 · snapshot_liveness_smoke（C8 · 每日 schedule 监控·独立条件门·非串行链）
-  # 触发：仅 schedule / workflow_dispatch；push/PR 不跑（省额度）
+  # 触发：仅 schedule / 默认分支 workflow_dispatch；push/PR/非默认分支手动 run 不跑（省额度 + 防手动选不可信 ref 带 key）
   # 职责：GET /v1/models 校验 COMPETITION_MODEL_SNAPSHOT 在线存活
   # 实现：ci/snapshot_liveness_smoke.ts（本任务 SubTask 8.4；无 key 时 graceful skip）
   # ============================================================
   snapshot_liveness_smoke:
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch) }}
     runs-on: ubuntu-latest
     env:
       DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}

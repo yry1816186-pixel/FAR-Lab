@@ -1,0 +1,53 @@
+{
+  "attackId": "AT-SCOPE-LAUNDER",
+  "attackClass": "mutation",
+  "description": "Scope laundering: evidence covers a subpopulation but claim asserts full population scope. datasetBindings[0].scopeCoverage.relation changed from 'within' to 'partial'. V2 kernel R4 (verdict_kernel_v2.ts:343) triggers DEGRADED_SCOPE. V1 makeVerdict has no scope concept beyond scopeNarrowerThanClaim boolean → if false, CONFIRMED.",
+  "baseCaseId": "GV-01",
+  "claim": "Model M achieves BLS power greater than baseline on dataset D",
+  "falsificationSpec": {
+    "prediction": "Model M achieves BLS power greater than baseline on dataset D",
+    "metric": "bls_power",
+    "falsificationThreshold": 0,
+    "thresholdSemantics": "gt"
+  },
+  "thresholdSpec": {
+    "semantics": "gt",
+    "value": 0
+  },
+  "baselineEvidences": [
+    {
+      "claim": "measured bls_power = 0.62 on subpopulation of dataset D (scope narrower than claim but scopeNarrowerThanClaim=false in V1)",
+      "supportsClaim": true,
+      "refutesClaim": false,
+      "scopeNarrowerThanClaim": false,
+      "sourceAnchor": {
+        "gitCommitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "dashscopeRequestId": null,
+        "isoTimestamp": "2026-07-11T00:00:00.000Z",
+        "rawResponseHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ],
+  "kernelOverride": {
+    "datasetBindings": [
+      {
+        "datasetId": "D-GV",
+        "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceAnchor": {
+          "resolved": true
+        },
+        "scopeCoverage": {
+          "dimension": "population",
+          "value": "adults 18-30 only (subpopulation, not full 18-65)",
+          "relation": "partial"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "baselineVerdict": "CONFIRMED",
+    "farVerdict": "DEGRADED_SCOPE",
+    "farDecisiveRuleId": "R4_SCOPE_MISMATCH_NONCRITICAL",
+    "farReasonCodes": ["R4_SCOPE_MISMATCH_NONCRITICAL"]
+  }
+}

@@ -181,7 +181,7 @@ test('c_astro_pipeline: real venv BLS + real two-sample z-test -> R4 DEGRADED_SC
   }
 });
 
-test('c_astro_pipeline: dataset resolution — online lightkurve attempt degrades to cached_fixture honestly', async (t) => {
+test('c_astro_pipeline: dataset resolution — online lightkurve attempt degrades to cached_fixture honestly', async () => {
   // 不依赖网络/lightkurve：fetchOnlineDataset 对 TIC 的在线尝试要么返回真实 ref（lightkurve+MAST 可用），
   // 要么 null（不可用 → cached_fixture 降级）。两种都合法（02 F1：绝不伪造）。
   const online = await fetchOnlineDataset({

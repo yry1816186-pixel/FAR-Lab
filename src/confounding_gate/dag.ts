@@ -141,17 +141,16 @@ export function assertAcyclic(dag: CausalDag): void {
 
 /** X 的全部祖先（沿 predecessors 反向 BFS·不含 X 自身·sorted）。d_separation Phase1 消费。 */
 export function ancestors(dag: CausalDag, node: string): readonly string[] {
-  return bfsCollect(dag, node, (id) => dag.predecessors(id));
+  return bfsCollect(node, (id) => dag.predecessors(id));
 }
 
 /** X 的全部后代（沿 successors 正向 BFS·不含 X 自身·sorted）。d_separation collider 后代判定消费。 */
 export function descendants(dag: CausalDag, node: string): readonly string[] {
-  return bfsCollect(dag, node, (id) => dag.successors(id));
+  return bfsCollect(node, (id) => dag.successors(id));
 }
 
 /** 通用 BFS 收集（沿 nextFn 方向遍历·去重·sorted·不含起点）。 */
 function bfsCollect(
-  dag: CausalDag,
   start: string,
   nextFn: (id: string) => readonly string[],
 ): readonly string[] {

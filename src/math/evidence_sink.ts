@@ -15,8 +15,7 @@
 
 import type Database from 'better-sqlite3';
 import { canonicalJson } from '../evidence_log/hasher.ts';
-import { appendEvidenceLog } from '../evidence_log/repository.ts';
-import type { EvidenceLogEntry, SourceAnchor } from '../evidence_log/types.ts';
+import type { SourceAnchor } from '../evidence_log/types.ts';
 import type { FormalTarget, MathClaim, MathVerificationRecord } from './math_claim.ts';
 
 // ============================================================
@@ -194,30 +193,4 @@ export interface AppendVerificationEvidenceArgs {
   readonly evidenceId?: string;
 }
 
-/**
- * Append a math verification result to the shared evidence_log. The evidence
- * payload captures the verification outcome, backend fingerprint, and inputHash
- * so the evidence chain is self-describing.
- *
- * Requires a pre-existing call_record (callRecordSeq) for the FK constraint.
- */
-export function appendVerificationEvidence(args: AppendVerificationEvidenceArgs): EvidenceLogEntry {
-  const evidencePayload = {
-    type: 'math_verification',
-    verificationId: args.record.verificationId,
-    claimId: args.record.claimId,
-    backendKind: args.record.backendKind,
-    backendId: args.record.backendId,
-    outcome: args.record.outcome,
-    inputHash: args.record.inputHash,
-    durationMs: args.record.durationMs,
-    compileLog: args.record.compileLog,
-  };
 
-  return appendEvidenceLog(args.db, {
-    callRecordSeq: args.callRecordSeq,
-    evidencePayload,
-    sourceAnchor: args.sourceAnchor,
-    ...(args.evidenceId !== undefined ? { evidenceId: args.evidenceId } : {}),
-  });
-}
