@@ -212,6 +212,31 @@ export function fecAppendClaim(
   return append();
 }
 
+/**
+ * FUSION-OS-1 生产 caller（c_astro_pipeline）构造 AntiTheaterLintInput.verdict 用的初步裁决。
+ *
+ * 与 fecAppendClaim 内最终裁决同源（compileFec → enforceFecMandatoryGate → buildVerdictKernelInput →
+ * decideFiveValueVerdict），唯一差异：antiTheaterReport 强制 undefined → antiTheaterFindings 空
+ * （接线前等价态）。反剧场红线：caller 不得手填 VerdictKernelOutput——须由真实 decideFiveValueVerdict
+ * 产出（T4/T8）。compileFec/fecGate 与 fecAppendClaim 各跑一次（确定性纯函数·冗余仅为解鸡生蛋：
+ * lint 需 preliminary verdict 作输入，而最终 verdict 在 fecAppendClaim 内产）。
+ */
+export function computePreliminaryVerdict(args: FecAppendClaimArgs): VerdictKernelOutput {
+  const compileResult = compileFec({
+    fec: args.fecV2.contract,
+    measurementCutoff: args.fecV2.measurementCutoff ?? null,
+  });
+  const fecGate = enforceFecMandatoryGate(compileResult);
+  assertFecGate(fecGate);
+  const integrityFlags = compileResult.ok
+    ? compileResult.plan.integrityFlags
+    : args.fecV2.contract.integrityFlags;
+  // 强制 antiTheaterFindings 空（接线前等价态）：覆盖 kernel input 字段，避免 exactOptionalPropertyTypes
+  // 下在 args 上 spread antiTheaterReport:undefined 的类型冲突。caller 是否传 report 不影响 preliminary。
+  const kernelInput = buildVerdictKernelInput(args, integrityFlags);
+  return decideFiveValueVerdict({ ...kernelInput, antiTheaterFindings: [] });
+}
+
 function storeVerdictArtifactsInCas(
   db: Database.Database,
   compileResult: CompileFecResult,

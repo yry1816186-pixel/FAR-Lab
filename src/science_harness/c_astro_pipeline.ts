@@ -28,7 +28,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runMigrations } from '../db/migrator.ts';
-import { fecAppendClaim } from '../fec/index.ts';
+import { fecAppendClaim, computePreliminaryVerdict } from '../fec/index.ts';
+import type { FecAppendClaimArgs } from '../fec/index.ts';
 import { GENESIS_PREV_HASH } from '../evidence_log/index.ts';
 import { makeRealStatsFec } from '../falsifiability/index.ts';
 import type {
@@ -54,6 +55,11 @@ import {
 import type { ConfidenceInterval, TwoSampleEffectSize, ZTestResult } from '../statistics/index.ts';
 import { venvSandboxAdapter } from './sandbox_runner.ts';
 import type { SandboxRunResult, SandboxResourceSpec, VenvSandboxAdapter, VenvSandboxInput } from './types.ts';
+import { runAntiTheaterLint } from '../anti_theater/index.ts';
+import type { AntiTheaterReport } from '../anti_theater/index.ts';
+import type { AntiTheaterLintInput } from '../anti_theater/types.ts';
+import type { FecContractV2 } from '../fec/fec_contract.ts';
+import { hashCanonicalJson } from '../evidence_log/hasher.ts';
 
 // ---------------------------------------------------------------------------
 // 确定性常量（claim · 预登记 before unblinding）
@@ -245,6 +251,120 @@ export function buildCAstroStatistics(metricKey: string, bls: BlsMetrics): CAstr
 }
 
 // ---------------------------------------------------------------------------
+// FUSION-OS-1 反剧场接线（生产 caller：真跑 runAntiTheaterLint 注入 fecAppendClaim）
+// ---------------------------------------------------------------------------
+//
+// c_astro_pipeline 是 4 个生产 fecAppendClaim caller 中唯一有诚实构造 AntiTheaterLintInput 数据的
+// （真实 venv sandbox spawn + sandbox.result.artifactTreeHash 真实 sha256）——见 DEPTH_LEDGER §C
+// FUSION-OS-1 降级注记 + CLAUDE.md §4 P-FUSION。本段闭合「类型层投影已接（orchestrator.ts:252）
+// 但 4/4 生产 caller 不传 antiTheaterReport → antiTheaterFindings 运行时恒空 → ANTI_THEATER_FAIL
+// （verdict_kernel_v2.ts:373）不可触发」的 WIRED_OPT_IN 缺口。
+//
+// 诚实构造（反 T4 手填）：frozen 端 hash 从 c_astro 真实 fec 精确计算（GV-D1 自洽模式·误报率=0），
+// rawArtifactHashes 用真实 sandbox artifactTreeHash；缺的 dataset/workflow freeze 记录诚实省略
+// → detect_dataset_drift/detect_workflow_digest 走「无 freeze 基准→skip」退化裁决（不臆断漂移）。
+
+/** AntiTheaterLintInput humanSummary 中性文案（detect_report_mismatch 不触发·不含强度词）。 */
+export const C_ASTRO_ANTI_THEATER_SUMMARY =
+  'C-ASTRO BLS transit search result summary: see structured verdict and sandbox artifacts for the bounded-support conclusion.';
+
+export interface CAstroAntiTheaterInputArgs {
+  readonly fec: FecContractV2;
+  /** computePreliminaryVerdict 产出的初步裁决（anti-theater 前等价态）。 */
+  readonly preliminaryVerdict: VerdictKernelOutput;
+  /** 真实 sandbox 产物 sha256（sandbox.result.artifactTreeHash）→ measurement.rawArtifactHashes。 */
+  readonly sandboxArtifactTreeHash: string;
+  readonly metricKey: string;
+  readonly metricValue: number;
+  readonly frozenAt: string;
+  readonly seed: number;
+  readonly envelopeId: string;
+  readonly humanSummary: string;
+  /**
+   * 测试用攻击注入（诚实代表 cherry-picked run registry）。生产路径不传 → declaredSeeds=[seed]
+   * 与 runRegistry 一致 → detect_seed_cherry HIDDEN_FAILED_RUN 不触发（干净基线）。
+   * 测试传 [seed, <missing>] → 触发 HIDDEN_FAILED_RUN（经真实 detector 证明通道活）。
+   */
+  readonly declaredSeeds?: readonly number[];
+  readonly runRegistrySeeds?: readonly number[];
+}
+
+/**
+ * 从 c_astro 真实数据构造 AntiTheaterLintInput（FUSION-OS-1 生产 caller 的 lint 输入）。
+ *
+ * 反剧场红线：caller 不手填 findings——findings 由 runAntiTheaterLint(detectors) 真实产出，
+ * 经 orchestrator.ts:252 toKernelFindings 单点投影喂 kernel。本函数只构造输入，不产 findings。
+ */
+export function buildCAstroAntiTheaterInput(args: CAstroAntiTheaterInputArgs): AntiTheaterLintInput {
+  const artifactRef = `sha256:${args.sandboxArtifactTreeHash}`;
+  const baseRunId = `castro-run-seed${args.seed}`;
+  const declaredSeeds = args.declaredSeeds ?? [args.seed];
+  const runRegistrySeeds = args.runRegistrySeeds ?? [args.seed];
+  const primaryEvidenceId = args.fec.requiredEvidence[0]?.evidenceId;
+
+  // frozen 端 hash 从真实 fec 精确计算（executed 端由 detector 从同一 fec 重算 → 自洽不触发）。
+  const thresholdHash = hashCanonicalJson({
+    threshold: args.fec.threshold,
+    direction: args.fec.direction,
+    thresholdSemantics: args.fec.threshold.thresholdSemantics,
+  });
+  const primaryMetricHash = hashCanonicalJson({ metric: args.fec.metric });
+  const seedPolicyHash = hashCanonicalJson({ seedPolicy: args.fec.seedPolicy });
+
+  return {
+    fec: args.fec,
+    bindings: [
+      {
+        kind: 'dataset',
+        datasetId: 'castro-lightcurve',
+        contentHash: args.sandboxArtifactTreeHash,
+        schemaHash: args.sandboxArtifactTreeHash,
+        statsFingerprint: '',
+      },
+    ],
+    executionTrace: {
+      measurements: [
+        {
+          ...(primaryEvidenceId !== undefined ? { requirementId: primaryEvidenceId } : {}),
+          role: 'primary',
+          rawArtifactHashes: [artifactRef],
+          runId: baseRunId,
+          splitName: 'hidden',
+          metricKey: args.metricKey,
+          metricValue: args.metricValue,
+        },
+      ],
+      runs: runRegistrySeeds.map((runSeed, index) => ({
+        runId: `${baseRunId}-${index}`,
+        endedAt: args.frozenAt,
+        isInterim: false,
+        earlyStopped: false,
+        seed: runSeed,
+      })),
+    },
+    verdict: args.preliminaryVerdict,
+    envelopeDraft: {
+      envelopeId: args.envelopeId,
+      humanSummary: args.humanSummary,
+      nullResults: [],
+    },
+    preregistrationRecord: {
+      thresholdHash,
+      primaryMetricHash,
+      alpha: args.fec.statisticalPlan.alpha,
+      seedPolicyHash,
+      hypothesisSealedAt: args.frozenAt,
+      toleranceFrozen: true,
+      declaredSeeds,
+    },
+    runRegistry: {
+      runs: runRegistrySeeds.map((runSeed, index) => ({ runId: `${baseRunId}-${index}`, seed: runSeed })),
+      declaredNullResults: [],
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Pipeline B 编排
 // ---------------------------------------------------------------------------
 
@@ -260,6 +380,8 @@ export interface CAstroPipelineResult {
   readonly machineVerdict: Verdict;
   readonly kernelOutput: VerdictKernelOutput;
   readonly fecGate: FecGateDecision;
+  /** FUSION-OS-1：c_astro 生产 caller 真跑 runAntiTheaterLint 产出的报告（anti-theater 实时路径物证）。 */
+  readonly antiTheaterReport: AntiTheaterReport;
   readonly sealed: SealResult;
   readonly sealedConclusion: Verdict;
 }
@@ -324,7 +446,7 @@ export async function buildCAstroChain(
     },
   ];
 
-  const fecResult = fecAppendClaim(db, {
+  const baseFecArgs: FecAppendClaimArgs = {
     callRecord: {
       stageId: 'stage4_evidence',
       cred: {
@@ -379,7 +501,27 @@ export async function buildCAstroChain(
       thresholdValue: C_ASTRO_FALSIFICATION_SPEC.falsificationThreshold,
       compiledAt: C_ASTRO_FROZEN_AT,
     },
-  });
+  };
+
+  // FUSION-OS-1：c_astro 首个生产 caller 真跑 runAntiTheaterLint 注入 fecAppendClaim。
+  // preliminaryVerdict（anti-theater 前等价态·由真实 decideFiveValueVerdict 产出）→ buildCAstroAntiTheaterInput
+  // （真实 fec frozen hash + 真实 sandbox artifactTreeHash）→ runAntiTheaterLint（20 detector 纯函数）
+  // → report → fecAppendClaim(antiTheaterReport) 经 orchestrator.ts:252 toKernelFindings 投影喂 kernel。
+  const preliminaryVerdict = computePreliminaryVerdict(baseFecArgs);
+  const antiTheaterReport = runAntiTheaterLint(
+    buildCAstroAntiTheaterInput({
+      fec,
+      preliminaryVerdict,
+      sandboxArtifactTreeHash: sandbox.result.artifactTreeHash,
+      metricKey: fec.metric.metricKey,
+      metricValue: sandbox.metrics.depth,
+      frozenAt: C_ASTRO_FROZEN_AT,
+      seed: C_ASTRO_SEED,
+      envelopeId: `ENV-${C_ASTRO_CLAIM_ID}`,
+      humanSummary: C_ASTRO_ANTI_THEATER_SUMMARY,
+    }),
+  );
+  const fecResult = fecAppendClaim(db, { ...baseFecArgs, antiTheaterReport });
 
   const { conclusion: sealedConclusion, needsHumanEndorsement } = machineSealableConclusion(
     fecResult.decision.verdict,
@@ -423,6 +565,7 @@ export async function buildCAstroChain(
     machineVerdict: fecResult.decision.verdict,
     kernelOutput: fecResult.kernelOutput,
     fecGate: fecResult.fecGate,
+    antiTheaterReport,
     sealed,
     sealedConclusion,
   };

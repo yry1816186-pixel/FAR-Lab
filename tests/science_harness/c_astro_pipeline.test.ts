@@ -174,6 +174,14 @@ test('c_astro_pipeline: real venv BLS + real two-sample z-test -> R4 DEGRADED_SC
     // cached_fixture 诚实标注：datasetSource + scopeNarrowerThanClaim + baseline_exempt purpose。
     assert.equal(chain.datasetSource, 'cached_fixture');
     assert.equal(chain.claimId, C_ASTRO_CLAIM_ID);
+
+    // ── FUSION-OS-1 生产路径反剧场物证：buildCAstroChain 真跑 runAntiTheaterLint 产 report ──
+    // 互补分工：static CHECK-W8 证 caller 传 antiTheaterReport；本断言证生产 caller 真跑 lint 产 report；
+    // proof_test c_astro_anti_theater_wired.test.ts 证通道活（seed-cherry → ANTI_THEATER_FAIL）。
+    assert.ok(chain.antiTheaterReport !== undefined, 'buildCAstroChain must run runAntiTheaterLint and produce antiTheaterReport (FUSION-OS-1 production caller)');
+    assert.equal(Array.isArray(chain.antiTheaterReport.findings), true, 'antiTheaterReport.findings must be an array (real lint output, not skipped)');
+    assert.equal(chain.antiTheaterReport.llmOverrideRejected, true, 'llmOverrideRejected=true proves report came from real runAntiTheaterLint (deterministic kernel, F3)');
+    assert.equal(typeof chain.antiTheaterReport.antiTheaterScore, 'number', 'antiTheaterScore must be a real computed number (not a stub)');
   } finally {
     db.close();
     restorePythonPath(previous);

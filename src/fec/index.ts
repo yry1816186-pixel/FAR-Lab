@@ -11,7 +11,7 @@
  */
 
 // V1（保留）
-export { fecAppendClaim } from './orchestrator.ts';
+export { fecAppendClaim, computePreliminaryVerdict } from './orchestrator.ts';
 export type { FecAppendClaimArgs, FecAppendClaimResult } from './orchestrator.ts';
 
 // V2 — compiler（03 §2.2 deterministic compiler）
