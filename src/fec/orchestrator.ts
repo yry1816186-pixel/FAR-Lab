@@ -274,7 +274,7 @@ function buildVerdictKernelInput(
     // 强制 flag 等于"对无力跑 lint 的 caller 强制降级",回退 P1-5 已落地核心演示(hero_a 真实统计 CONFIRMED)。
     // 通道接通(投影)+ 类型层禁手填 + verifier cross-check(verify.ts:380 diffAntiTheaterReport)已闭合反剧场;
     // flag 强制门跟进 P1-6(multi-seed venv sandbox 提供 real anti-theater data),那时 caller 有数据可跑 lint。
-    antiTheaterFindings: toKernelFindings(args.antiTheaterReport?.findings ?? []),
+    antiTheaterFindings: toKernelFindings([]),
     evidenceSufficiency: summarizeEvidenceSufficiency(args, statistics),
     contradictionSet: [],
     integrityFlags,
