@@ -45,7 +45,7 @@ export function probePythonAxis(write = (s) => process.stdout.write(s)) {
     } else if (/ModuleNotFoundError.*z3/.test(stderr) || /ImportError.*z3/.test(stderr) || /No module named 'z3'/.test(stderr)) {
       reason = 'z3 import failed';
     } else {
-      reason = `unknown: ${stderr.slice(0, 200)}`;
+      reason = `unknown: ${stderr.slice(0, 200).replace(/[\r\n]+/g, ' ').trim()}`;
     }
     write(`Python axis: skipped (${reason})\n`);
     return { available: false, reason };
