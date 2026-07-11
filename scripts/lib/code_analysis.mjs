@@ -43,27 +43,23 @@ export function tokenize(source) {
   }
   ts.forEachChild(sourceFile, visit);
 
-  // 2. 用 scanner 收集全部注释范围（scanner 是 TS 官方词法器，权威处理 /* */ // ）
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,  // skipTrivia = false → 发射注释 trivia token
-    ts.LanguageVariant.Standard,
-    source,
-  );
-  while (true) {
-    const tokenKind = scanner.scan();
-    if (tokenKind === ts.SyntaxKind.EndOfFileToken) break;
-    if (
-      tokenKind === ts.SyntaxKind.SingleLineCommentTrivia ||
-      tokenKind === ts.SyntaxKind.MultiLineCommentTrivia
-    ) {
-      ranges.push({
-        start: scanner.getTokenStart(),
-        end: scanner.getTokenEnd(),
-        kind: 'comment',
-      });
-    }
-  }
+  // 2. 用 AST 收集全部注释范围（forEachLeading/TrailingCommentRange·经完整 parser）。
+  //    为什么不用 ts.createScanner：scanner 线性扫描在含嵌入式多行字符串 / 复杂模板字面量 / regex
+  //    字面量的文件上会去同步——实测 src/science_harness/c_astro_pipeline.ts 的内嵌 Python 脚本
+  //    字符串（L145-151）致 scanner 在 L205+ 停止发射 MultiLineCommentTrivia，后续块注释被误判为
+  //    code（含 JSDoc 内 `fecAppendClaim(statistics?)`），腐蚀 depth_gate R1 块注释抗博弈保证。
+  //    AST 经 ts.createSourceFile 完整解析，无 scanner 去同步面；注释范围由 parser 权威标注。
+  const fullText = sourceFile.text;
+  const collectComments = (node) => {
+    ts.forEachLeadingCommentRange(fullText, node.getFullStart(), (start, end) => {
+      ranges.push({ start, end, kind: 'comment' });
+    });
+    ts.forEachTrailingCommentRange(fullText, node.end, (start, end) => {
+      ranges.push({ start, end, kind: 'comment' });
+    });
+    ts.forEachChild(node, collectComments);
+  };
+  ts.forEachChild(sourceFile, collectComments);
 
   // 3. 按起始位置排序；同位置时范围大的在前（字符串优先于内部注释）
   ranges.sort((a, b) => a.start - b.start || b.end - a.end);

@@ -417,6 +417,61 @@ function gvCasesHaveSchema(relPath, requiredKeys) {
   return { count: files.length, files: files.map(normalize), badCount: bad.length, bad };
 }
 
+// ---------- 检查原语：fecAppendClaim 生产调用点传 antiTheaterReport（FUSION-OS-1 实时路径门）----------
+// 为什么本门存在（闭合 inherent_limits #b 对 FUSION-OS-1 的具体缺口）：
+//   orchestrator.ts:252 的 toKernelFindings(args.antiTheaterReport?.findings ?? []) 仅类型层投影——
+//   若所有生产 caller 不传 antiTheaterReport，?? [] 恒空 → ANTI_THEATER_FAIL（verdict_kernel_v2.ts:373）
+//   运行时不可触发。runAntiTheaterLint 虽有生产 caller（verify.ts:397），但那是封后离线 envelope 重算，
+//   非实时 verdict 路径——故本门测「fecAppendClaim 调用点传参」而非「runAntiTheaterLint 有 caller」。
+// 抗博弈：codeOnlySource 剥注释/字符串为等长空白（括号深度不变形），按括号深度提取 fecAppendClaim(...)
+//   调用块，块内匹配 \bantiTheaterReport\b。排除定义文件（orchestrator.ts）+ barrel（index.ts）。
+function countFecAppendClaimSitesPassingAntiTheater() {
+  const sites = [];
+  const passing = [];
+  const srcFiles = walk('src').filter((f) => /\.(ts|tsx)$/.test(f)).map(normalize);
+  for (const rel of srcFiles) {
+    if (rel.startsWith('tests/')) continue;
+    if (rel === 'src/fec/orchestrator.ts') continue;
+    if (/(^|[\\/])index\.ts$/.test(rel)) continue;
+    const code = codeOnlySource(readCode(rel));
+    let searchFrom = 0;
+    while (true) {
+      const idx = code.indexOf('fecAppendClaim', searchFrom);
+      if (idx < 0) break;
+      const head = code.slice(Math.max(0, idx - 24), idx);
+      if (/(?:export\s+)?function\s+$/.test(head)) { searchFrom = idx + 1; continue; }
+      const after = code.slice(idx + 'fecAppendClaim'.length);
+      if (!/^\s*\(/.test(after)) { searchFrom = idx + 1; continue; }
+      const openIdx = idx + 'fecAppendClaim'.length + after.indexOf('(');
+      let depth = 0;
+      let endIdx = openIdx;
+      for (let i = openIdx; i < code.length; i++) {
+        if (code[i] === '(') depth++;
+        else if (code[i] === ')') { depth--; if (depth === 0) { endIdx = i; break; } }
+      }
+      const block = code.slice(openIdx, endIdx);
+      const line = code.slice(0, idx).split('\n').length;
+      sites.push({ file: rel, line });
+      // 反「token 在但通道空」规避（inherent_limits #b 的活体：`antiTheaterReport: undefined/null`
+      // 过 token 关但运行时 `?? []` 仍空——与本次降级的原 WIRED_GREEN 同型缺口）。显式 undefined/null
+      // 不计 passing。变量赋值是否运行时为空无法静态判定，运行时充分性由 RED→GREEN E2E
+      // （c_astro 真跑 lint + seed-cherry 攻击经真实路径触发 ANTI_THEATER_FAIL）保证，非本静态门。
+      const tokenPresent = /\bantiTheaterReport\b/.test(block);
+      const explicitEmpty = /antiTheaterReport\b\s*:\s*(?:undefined|null)\b/.test(block);
+      if (tokenPresent && !explicitEmpty) passing.push({ file: rel, line });
+      searchFrom = endIdx + 1;
+    }
+  }
+  return {
+    count: sites.length,
+    passingCount: passing.length,
+    sites,
+    passing,
+    minRequired: 1,
+    passed: passing.length >= 1,
+  };
+}
+
 // ---------- 检查原语：DEPTH_LEDGER §C 解析 + 诚实校验（R6 同口径 + R8/R9） ----------
 // parseLedgerTable 已抽到 scripts/lib/ledger.mjs（R6 单口径：gate 与 depth_evidence bot 共用）。
 function verifyDepthLedger() {
@@ -570,6 +625,13 @@ function hardCheck(name, fn) {
   return r;
 }
 
+// WARN 检查：失败不阻断 exit（记录到 warnings 列表·CI 可见）。用于「通道已接但 caller 传参依赖未来里程碑」类门。
+function warnCheck(name, fn) {
+  const r = fn(); r.name = name;
+  if (!r.passed) warnings.push({ category: name, items: [{ id: name.split(' ')[0], reason: r.reason || JSON.stringify(r) }] });
+  return r;
+}
+
 // CHECK-W1 (HARD): fecV2 形参必选（compileFec 真接线门）
 hardCheck('CHECK-W1 fecV2 形参必选 (P0-1)', () =>
   detectOptionalParam('src/fec/orchestrator.ts', 'fecAppendClaim', 'fecV2'));
@@ -674,6 +736,15 @@ hardCheck('CHECK-W7 tests/real_backends/ 非空 + 真实 spawn 信号 (P2-1)', (
     hollow,
   };
 });
+
+// CHECK-W8 (WARN·P1-6 前降级): ≥1 个 fecAppendClaim 生产调用点传 antiTheaterReport（FUSION-OS-1 实时路径）。
+// R1 决策（tests/fec/anti_theater_wired.test.ts R1 注释）：3/4 生产 caller（含 c_astro 单 seed=42）无诚实构造
+// AntiTheaterLintInput 的数据（seed-cherry 检测需多 run runRegistry·单 seed 无法诚实触发 HIDDEN_FAILED_RUN）。
+// 诚实闭环依赖 P1-6 multi-seed sandbox（CLAUDE.md §4 FUSION-OS-1「flag 强制门移除·P1-6 落地后跟进」）。
+// 通道已接（orchestrator.ts:252 toKernelFindings 投影 + anti_theater_wired.test.ts 真实路径 RED→GREEN 物证）；
+// caller 传参为 P1-6 后置里程碑——P1-6 落地后本门升回 HARD。
+warnCheck('CHECK-W8 fecAppendClaim 生产 caller 传 antiTheaterReport ≥ 1 (FUSION-OS-1·WARN pending P1-6 multi-seed)', () =>
+  countFecAppendClaimSitesPassingAntiTheater());
 
 // CHECK-L1 (HARD): DEPTH_LEDGER §C 存在且合法（含 R8 proof_test 存在 + R9 closed_by sha）
 hardCheck('CHECK-L1 DEPTH_LEDGER §C 存在且合法', () => verifyDepthLedger());
