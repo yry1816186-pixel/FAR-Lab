@@ -19,7 +19,7 @@ next_action = WSL_REALWORLD_VALIDATED
 
 理由：
 - WSL 实战验收已完成（Phase 1-5 全部物证落盘）：depth_gate exit 0 + ci-all 真实跑通 + fresh-clone-smoke + 14 GV cross-lang 三后端全等 + FEC CLI + hero pipeline 真实跑通 + api 9 路由 + proof envelope V2 17/17 + 凭据双跑 P1-2/P1-3/P1-6b。对比试验证明 FAR-Chain 检测率 100% vs baseline 0%（6 类攻击全检出，6 个不同 decisiveRuleId 触发）。工程树治理完成（far.ts 1088→694 行 / 死代码 ~543 行移除 / 9 文件删除 / typecheck+lint+zero_tolerance exit 0）。详见 §F WSL 实战验收物证段落。
-- 核心 P0 + STAT-1 + P1-1/2/3/4/5a/5b/5c/6a/6b + P2/P3 + FUSION-OS-1..14 的接线代码与受控突变双跑物证已落地；§C 当前 **34 行 WIRED_GREEN / 0 行 WIRED_RED**（全绿）。
+- 核心 P0 + STAT-1 + P1-1/2/3/4/5a/5b/5c/6a/6b + P2/P3 + FUSION-OS-1..14 的接线代码与受控突变双跑物证已落地；§C 当前 **33 行 WIRED_GREEN / 0 行 WIRED_RED / 1 行 WIRED_OPT_IN**（FUSION-OS-1 经 2026-07-11 scrutiny 降级：类型层投影通道已接，但实测 4/4 生产 caller 不传 antiTheaterReport → antiTheaterFindings 运行时恒空 → ANTI_THEATER_FAIL 不可触发；详见 §C FUSION-OS-1 行 dep 注记，下一接线目标 = c_astro_pipeline 首个真实 lint caller）。
 - P1-3 已由 keystone bot 在 GitHub CI（ubuntu-latest，DashScope 可达）实跑双跑物证写回：base=`ac5663cad827f689a0eb75de977b65fb7427c0f1`（无 `maxRetries:0` → SDK 默认 `maxRetries:2` 产生不被 SKIP 条件捕获的错误 → FAIL），head=`b39de7361188f885bfe2433994dbac63280ac030`（`maxRetries:0` → 真实 DashScope HTTP PASS）。bot 写回 closed_by=`b39de736`，`depth_gate` CHECK-L1 校验该 commit diff-tree touch `src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts` 通过。
 - **融合衍生 backlog 全量物证**（FUSION-OS-1..14，Open Science 工程范式迁移）：§C 末段 14 行**全 WIRED_GREEN**（keystone bot 受控突变双跑·head=2fcfe04 接线 commit·base=各 cluster 靶向 stub）。迁移边界：只迁 OS 的反剧场/fail-closed/收窄伪造窗口/内容寻址/进程组 kill/AST 结构门工程范式，**绝不迁** OS 的 LLM-裁决语义（FAR-Chain 红线：确定性 R0-R9 内核，LLM 非裁决者）。详见 `FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md`。
 
@@ -93,8 +93,7 @@ next_action = WSL_REALWORLD_VALIDATED
 
 | id | single_real_dependency | proof_caller | proof_test | proof_test_red_commit | status | closed_by_sha | claimed_by_pr |
 |----|------------------------|--------------|------------|-----------------------|--------|---------------|---------------|
-| FUSION-OS-1 | runAntiTheaterLint→caller pre-compute AntiTheaterReport→buildVerdictKernelInput 内 toKernelFindings 单点投影替换 orchestrator.ts:214 + legacy_kernel_adapter.ts:65 硬编码 []，闭合 R-anti-theater-fail 实时路径（Open Science fail-closed 服务门范式·原缺口：20 检测器仅离线 verify.ts:412 调，运行时硬编码 []）；flag 强制门跟进 P1-6（4-caller Explore 实测 3/4 无诚实 lint input 数据） | src/fec/orchestrator.ts:214 | tests/fec/anti_theater_wired.test.ts::green_wired_path_untested_with_anti_theater_fail | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
-| evidence: f9110351d5442c7886ec84b6ee1083afb3f1d9fd → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
+| FUSION-OS-1 | runAntiTheaterLint→caller pre-compute AntiTheaterReport→buildVerdictKernelInput 内 toKernelFindings 单点投影替换 orchestrator.ts:214 + legacy_kernel_adapter.ts:65 硬编码 []，闭合 R-anti-theater-fail 实时路径（Open Science fail-closed 服务门范式·原缺口：20 检测器仅离线 verify.ts:412 调，运行时硬编码 []）；flag 强制门跟进 P1-6（4-caller Explore 实测 3/4 无诚实 lint input 数据）〔2026-07-11 scrutiny 降级 WIRED_GREEN→WIRED_OPT_IN：实测 4/4 生产 caller（demo_chain/hero_a/hero_b/c_astro_pipeline 的 fecAppendClaim 调用）均不传 antiTheaterReport → antiTheaterFindings 运行时恒空 → ANTI_THEATER_FAIL（verdict_kernel_v2.ts:373）不可触发；当前仅类型层投影接线（toKernelFindings·orchestrator.ts:252），runAntiTheaterLint 仍仅 verify.ts 离线调。下一接线目标：c_astro_pipeline 首个真实 runAntiTheaterLint caller 注入 fecAppendClaim〕 | src/fec/orchestrator.ts:214 | tests/fec/anti_theater_wired.test.ts::green_wired_path_untested_with_anti_theater_fail | (待 CI 双跑) | WIRED_OPT_IN | - | - |
 | FUSION-OS-2 | sandbox spawn detached=true 独立进程组 + 超时 process.kill(-pgid) 组播清理，防 numpy/OpenBLAS 子孙成孤儿（Open Science setsid+kill -- -$pgid 范式·proof_caller 行号纠偏见 §F 第二十二轮） | src/science_harness/sandbox_runner.ts:402 | tests/science_harness/sandbox_pgroup_kill.test.ts::timeout_kills_python_grandchildren | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
 | evidence: 70057c5c883a1184ec46f9454f587316365ea7a1 → 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | — | — | — | — | — | — | — |
 | FUSION-OS-3 | packageFarProofBundle seal 承诺点捕获内容快照(snapshotBundleContent path→sha256) + archive 后 detectPostSealStaleness 重算比对(新增/改/删=stale) fail-closed，缩窄 harvest→archive 间 TOCTOU 窗口（Open Science sentinel 重导出在 tar 后范式·**设计纠偏见 §F 第二十三轮**：初版用 mtime 墙钟比对，实测 NTFS mtimeMs 超前 Date.now() 整数刻度致受控文件(integrity.json)误报 stale，改内容哈希比对确定性无时钟依赖） | src/far_proof/offline_package.ts:152 | tests/far_proof/seal_window.test.ts::post_seal_modification_detected_as_stale | (待 CI 双跑) | WIRED_GREEN | 2fcfe04ce6907daaeb12d1ac89e6a48eecb040b3 | - |
@@ -170,7 +169,7 @@ next_action = WSL_REALWORLD_VALIDATED
 
 ## §F. 状态声明
 
-**当前态**：§C **34 行 `WIRED_GREEN` / 0 行 `WIRED_RED`**（全绿：全部 P0、STAT-1、P1-1/2/3/4/5a/5b/5c/6a/6b、P2-1、P2-2、P3-1、全部 FUSION-OS-1..14）。
+**当前态**：§C **33 行 `WIRED_GREEN` / 0 行 `WIRED_RED` / 1 行 `WIRED_OPT_IN`**（FUSION-OS-1 经 2026-07-11 scrutiny 降级——类型层投影通道已接但 4/4 生产 caller 不传 antiTheaterReport，ANTI_THEATER_FAIL 运行时不可触发，详见 §C 该行 dep 注记；其余全部 P0、STAT-1、P1-1/2/3/4/5a/5b/5c/6a/6b、P2-1、P2-2、P3-1、FUSION-OS-2..14 维持 WIRED_GREEN）。
 
 **maintainer 一键产 P1-2/3/6b 物证**：`node scripts/credential_dual_run.mjs` 先执行 P1-2 本地真实 HTTP proof；`DASHSCOPE_API_KEY=sk-xxx node scripts/credential_dual_run.mjs` 追加 P1-3；P1-6b 额外需要 `FAR_ONLINE=1`+lightkurve+网络。PASS 物证由 keystone bot `depth-evidence.yml` 双跑写回 WIRED_GREEN。`scripts/python_axis_probe.mjs`（P3-1）在 `pnpm test` 起跑打印 `Python axis: available|skipped`，明示 axis skip=环境非代码 bug。
 
