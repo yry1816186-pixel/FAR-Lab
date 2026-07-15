@@ -1,0 +1,47 @@
+{
+  "attackId": "AT-IDENTIFIER-FABRICATION",
+  "attackClass": "forgery",
+  "description": "Identifier fabrication: claim cites DOI 10.1/nonexistent but no harness-verified source resolves it. V2 kernel R-identifier-fabrication (verdict_kernel_v2.ts:408) triggers REFUTED. V1 makeVerdict has no identifier verification → sees only supporting evidence → CONFIRMED.",
+  "baseCaseId": "GV-01",
+  "claim": "Model M achieves BLS power greater than baseline on dataset D (cf. DOI 10.1/nonexistent)",
+  "falsificationSpec": {
+    "prediction": "Model M achieves BLS power greater than baseline on dataset D",
+    "metric": "bls_power",
+    "falsificationThreshold": 0,
+    "thresholdSemantics": "gt"
+  },
+  "thresholdSpec": {
+    "semantics": "gt",
+    "value": 0
+  },
+  "baselineEvidences": [
+    {
+      "claim": "measured bls_power = 0.62 on dataset D (n=120, citing DOI 10.1/nonexistent)",
+      "supportsClaim": true,
+      "refutesClaim": false,
+      "scopeNarrowerThanClaim": false,
+      "sourceAnchor": {
+        "gitCommitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "dashscopeRequestId": null,
+        "isoTimestamp": "2026-07-11T00:00:00.000Z",
+        "rawResponseHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ],
+  "kernelOverride": {
+    "identifierClaims": [
+      {
+        "kind": "doi",
+        "value": "10.1/nonexistent",
+        "resolutionStatus": "not_found",
+        "harnessVerifiedSource": false
+      }
+    ]
+  },
+  "expected": {
+    "baselineVerdict": "CONFIRMED",
+    "farVerdict": "REFUTED",
+    "farDecisiveRuleId": "R_IDENTIFIER_FABRICATION",
+    "farReasonCodes": ["UNVERIFIED_IDENTIFIER"]
+  }
+}

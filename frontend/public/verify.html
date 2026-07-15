@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FAR-Chain Verify</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f7f4;
+        --panel: #ffffff;
+        --ink: #1f2933;
+        --muted: #607080;
+        --line: #d9ded8;
+        --accent: #0f766e;
+        --accent-ink: #ffffff;
+        --fail: #b42318;
+        --warn: #a15c07;
+        --pass: #087443;
+        --code-bg: #eef1ef;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 24px 0 32px;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 14px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.15;
+        font-weight: 760;
+      }
+
+      .subtle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 16px;
+        line-height: 1.2;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      input[type="file"] {
+        max-width: 100%;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: #fbfcfb;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 420px;
+        resize: vertical;
+        margin-top: 12px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfb;
+        color: var(--ink);
+        font:
+          13px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+          monospace;
+      }
+
+      button {
+        min-height: 40px;
+        border: 0;
+        border-radius: 8px;
+        padding: 0 14px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 680;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        border: 1px solid var(--line);
+        background: #ffffff;
+        color: var(--ink);
+      }
+
+      button:focus-visible,
+      textarea:focus-visible,
+      input:focus-visible {
+        outline: 3px solid rgba(15, 118, 110, 0.22);
+        outline-offset: 2px;
+      }
+
+      .status {
+        display: grid;
+        gap: 12px;
+      }
+
+      .badge {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        min-height: 30px;
+        border-radius: 999px;
+        padding: 0 12px;
+        font-size: 14px;
+        font-weight: 780;
+        background: var(--code-bg);
+      }
+
+      .badge.pass {
+        background: #dcfce7;
+        color: var(--pass);
+      }
+
+      .badge.fail {
+        background: #fee4e2;
+        color: var(--fail);
+      }
+
+      .badge.warn {
+        background: #fef0c7;
+        color: var(--warn);
+      }
+
+      dl {
+        display: grid;
+        grid-template-columns: 116px minmax(0, 1fr);
+        gap: 8px 10px;
+        margin: 0;
+        font-size: 13px;
+      }
+
+      dt {
+        color: var(--muted);
+      }
+
+      dd {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+
+      pre {
+        margin: 0;
+        max-height: 280px;
+        overflow: auto;
+        border-radius: 8px;
+        background: var(--code-bg);
+        padding: 12px;
+        font:
+          12px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+          monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .drop {
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: #fbfcfb;
+      }
+
+      .drop.over {
+        border-color: var(--accent);
+        background: #eefaf7;
+      }
+
+      @media (max-width: 820px) {
+        main {
+          width: min(100% - 20px, 1120px);
+          padding-top: 14px;
+        }
+
+        header,
+        .grid {
+          display: block;
+        }
+
+        header > :last-child {
+          margin-top: 12px;
+        }
+
+        .grid > * + * {
+          margin-top: 14px;
+        }
+
+        textarea {
+          min-height: 320px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>FAR-Chain Verify</h1>
+          <p class="subtle">ProofEnvelope V2 browser recomputation</p>
+        </div>
+        <div class="row">
+          <button id="verifyButton" type="button">Verify</button>
+          <button id="clearButton" class="secondary" type="button">Clear</button>
+        </div>
+      </header>
+
+      <section class="grid">
+        <div class="panel">
+          <h2>Envelope JSON</h2>
+          <div id="dropZone" class="drop">
+            <div class="row">
+              <input id="fileInput" type="file" accept=".json,application/json" />
+            </div>
+          </div>
+          <textarea id="jsonInput" spellcheck="false" autocomplete="off"></textarea>
+        </div>
+
+        <aside class="panel status">
+          <h2>Result</h2>
+          <div id="statusBadge" class="badge warn">WAITING</div>
+          <dl>
+            <dt>schema</dt>
+            <dd id="schemaValue">-</dd>
+            <dt>tamper</dt>
+            <dd id="tamperValue">-</dd>
+            <dt>stored</dt>
+            <dd id="storedHash">-</dd>
+            <dt>computed</dt>
+            <dd id="computedHash">-</dd>
+            <dt>browser</dt>
+            <dd id="browserAxis">not-run</dd>
+          </dl>
+          <pre id="details">{}</pre>
+        </aside>
+      </section>
+    </main>
+
+    <script id="far-verify-standalone">
+      (function () {
+        "use strict";
+
+        const SCHEMA_VERSION = "far.proof_envelope.v2";
+        const HEX64 = /^[0-9a-f]{64}$/;
+
+        function assertNoNonFiniteNumber(value, path) {
+          if (typeof value === "number") {
+            if (!Number.isFinite(value)) {
+              throw new Error(path + ": NaN and Infinity are not allowed in canonical JSON");
+            }
+            return;
+          }
+          if (Array.isArray(value)) {
+            for (let index = 0; index < value.length; index += 1) {
+              assertNoNonFiniteNumber(value[index], path + "[" + index + "]");
+            }
+            return;
+          }
+          if (value !== null && typeof value === "object") {
+            for (const key of Object.keys(value)) {
+              assertNoNonFiniteNumber(value[key], path + "." + key);
+            }
+          }
+        }
+
+        function canonicalJson(value, path) {
+          assertNoNonFiniteNumber(value, path || "canonicalJson");
+
+          if (value === null) {
+            return "null";
+          }
+          if (typeof value === "string") {
+            return JSON.stringify(value);
+          }
+          if (typeof value === "number") {
+            return JSON.stringify(value);
+          }
+          if (typeof value === "boolean") {
+            return value ? "true" : "false";
+          }
+          if (Array.isArray(value)) {
+            return "[" + value.map((item, index) => canonicalJson(item, (path || "value") + "[" + index + "]")).join(",") + "]";
+          }
+          if (value !== null && typeof value === "object") {
+            const keys = Object.keys(value).sort();
+            const parts = [];
+            for (const key of keys) {
+              const item = value[key];
+              if (item === undefined || typeof item === "function" || typeof item === "symbol") {
+                continue;
+              }
+              parts.push(JSON.stringify(key) + ":" + canonicalJson(item, (path || "value") + "." + key));
+            }
+            return "{" + parts.join(",") + "}";
+          }
+          throw new Error((path || "value") + ": unsupported canonical JSON value");
+        }
+
+        function normalizeWhitespace(text) {
+          if (typeof text !== "string") {
+            throw new Error("claim.naturalLanguage must be a string");
+          }
+          return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/[ \t]+/g, " ").trim();
+        }
+
+        function normalizeClaim(claim) {
+          return Object.assign({}, claim, {
+            naturalLanguage: normalizeWhitespace(claim.naturalLanguage),
+          });
+        }
+
+        function bytesToHex(bytes) {
+          let hex = "";
+          for (const byte of bytes) {
+            hex += byte.toString(16).padStart(2, "0");
+          }
+          return hex;
+        }
+
+        async function sha256HexUtf8(text) {
+          if (!globalThis.crypto || !globalThis.crypto.subtle) {
+            throw new Error("Web Crypto subtle.digest is unavailable in this browser context");
+          }
+          const encoded = new TextEncoder().encode(text);
+          const digest = await globalThis.crypto.subtle.digest("SHA-256", encoded);
+          return bytesToHex(new Uint8Array(digest));
+        }
+
+        async function hashCanonicalJson(value, context) {
+          return sha256HexUtf8(canonicalJson(value, context));
+        }
+
+        function fecHashInput(fec) {
+          return {
+            fecId: fec.fecId,
+            contractVersion: fec.contractVersion,
+            claimId: fec.claimId,
+            measurableImplication: fec.measurableImplication,
+            scope: fec.scope,
+            requiredEvidence: fec.requiredEvidence,
+            datasetRequirements: fec.datasetRequirements,
+            workflowRequirements: fec.workflowRequirements,
+            metric: fec.metric,
+            threshold: fec.threshold,
+            direction: fec.direction,
+            statisticalPlan: fec.statisticalPlan,
+            powerPlan: fec.powerPlan,
+            multipleTestingPlan: fec.multipleTestingPlan,
+            seedPolicy: fec.seedPolicy,
+            deviationPolicy: fec.deviationPolicy,
+            freeze: {
+              actor: fec.freeze.actor,
+              timestamp: fec.freeze.timestamp,
+              environmentPolicy: fec.freeze.environmentPolicy,
+              deviationPolicyHash: fec.freeze.deviationPolicyHash,
+              frozenBy: fec.freeze.frozenBy,
+            },
+          };
+        }
+
+        async function computeFecHash(fec) {
+          return hashCanonicalJson(fecHashInput(fec), "computeFecHash");
+        }
+
+        function proofHashInput(envelope) {
+          return {
+            schemaVersion: envelope.schemaVersion,
+            claim: normalizeClaim(envelope.claim),
+            fecHash: envelope.fecHash,
+            fecSnapshot: envelope.fecSnapshot,
+            protocolFreeze: envelope.protocolFreeze,
+            datasetBindings: envelope.datasetBindings,
+            workflowBindings: envelope.workflowBindings,
+            experimentRuns: envelope.experimentRuns,
+            measurementResults: envelope.measurementResults,
+            statisticalResults: envelope.statisticalResults,
+            verdictTrace: envelope.verdictTrace,
+            antiTheaterReport: envelope.antiTheaterReport,
+            ledgerRoot: envelope.ledgerRoot,
+          };
+        }
+
+        async function computeProofHashV2(envelope) {
+          const recomputedFecHash = await computeFecHash(envelope.fecSnapshot);
+          if (recomputedFecHash !== envelope.fecHash) {
+            throw new Error(
+              "FEC_HASH_MISMATCH: envelope=" + envelope.fecHash + " recomputed=" + recomputedFecHash,
+            );
+          }
+          return hashCanonicalJson(proofHashInput(envelope), "computeProofHashV2");
+        }
+
+        async function verifyProofEnvelopeV2(envelope) {
+          const errors = [];
+          const warnings = [
+            "Browser verifier covers ProofEnvelope V2 proofHash with Web Crypto. It does not verify original raw evidence or external RO-Crate certification.",
+          ];
+          let recomputedProofHash = null;
+
+          if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) {
+            return failure(null, null, ["Envelope root must be a JSON object"], warnings);
+          }
+          if (envelope.schemaVersion !== SCHEMA_VERSION) {
+            errors.push("UNSUPPORTED_SCHEMA_VERSION: " + String(envelope.schemaVersion));
+          }
+          if (typeof envelope.proofHash !== "string" || !HEX64.test(envelope.proofHash)) {
+            errors.push("PROOF_HASH_FORMAT: proofHash must be 64 lowercase hex characters");
+          }
+
+          if (errors.length === 0) {
+            try {
+              recomputedProofHash = await computeProofHashV2(envelope);
+              if (recomputedProofHash !== envelope.proofHash) {
+                errors.push(
+                  "PROOF_HASH_MISMATCH: expected=" +
+                    envelope.proofHash.slice(0, 16) +
+                    " actual=" +
+                    recomputedProofHash.slice(0, 16),
+                );
+              }
+            } catch (error) {
+              errors.push(error instanceof Error ? error.message : String(error));
+            }
+          }
+
+          if (errors.length > 0) {
+            return failure(envelope.proofHash || null, recomputedProofHash, errors, warnings);
+          }
+          return {
+            status: "PASS",
+            schemaVersion: envelope.schemaVersion,
+            proofHash: envelope.proofHash,
+            recomputedProofHash,
+            tamperStatus: "clean",
+            recomputation: { browser: "pass" },
+            errors: [],
+            warnings,
+            verifiedLevels: ["proofEnvelope", "browserProofHash"],
+          };
+        }
+
+        function failure(proofHash, recomputedProofHash, errors, warnings) {
+          return {
+            status: "FAIL",
+            schemaVersion: null,
+            proofHash,
+            recomputedProofHash,
+            tamperStatus: "tampered",
+            recomputation: { browser: "fail" },
+            errors,
+            warnings,
+            verifiedLevels: ["proofEnvelope", "browserProofHash"],
+          };
+        }
+
+        function byId(id) {
+          const element = document.getElementById(id);
+          if (!element) {
+            throw new Error("missing element #" + id);
+          }
+          return element;
+        }
+
+        function setText(id, value) {
+          byId(id).textContent = value;
+        }
+
+        function renderResult(result) {
+          const badge = byId("statusBadge");
+          badge.textContent = result.status;
+          badge.className = "badge " + (result.status === "PASS" ? "pass" : "fail");
+          setText("schemaValue", result.schemaVersion || "-");
+          setText("tamperValue", result.tamperStatus);
+          setText("storedHash", result.proofHash || "-");
+          setText("computedHash", result.recomputedProofHash || "-");
+          setText("browserAxis", result.recomputation.browser);
+          setText("details", JSON.stringify(result, null, 2));
+        }
+
+        function renderError(error) {
+          const result = failure(null, null, [error instanceof Error ? error.message : String(error)], []);
+          renderResult(result);
+        }
+
+        async function verifyFromText(text) {
+          const envelope = JSON.parse(text);
+          return verifyProofEnvelopeV2(envelope);
+        }
+
+        function wireUi() {
+          const input = byId("jsonInput");
+          const fileInput = byId("fileInput");
+          const dropZone = byId("dropZone");
+          byId("verifyButton").addEventListener("click", async () => {
+            try {
+              renderResult(await verifyFromText(input.value));
+            } catch (error) {
+              renderError(error);
+            }
+          });
+          byId("clearButton").addEventListener("click", () => {
+            input.value = "";
+            setText("details", "{}");
+            setText("schemaValue", "-");
+            setText("tamperValue", "-");
+            setText("storedHash", "-");
+            setText("computedHash", "-");
+            setText("browserAxis", "not-run");
+            const badge = byId("statusBadge");
+            badge.textContent = "WAITING";
+            badge.className = "badge warn";
+          });
+          fileInput.addEventListener("change", async () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            input.value = await file.text();
+          });
+          dropZone.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            dropZone.classList.add("over");
+          });
+          dropZone.addEventListener("dragleave", () => {
+            dropZone.classList.remove("over");
+          });
+          dropZone.addEventListener("drop", async (event) => {
+            event.preventDefault();
+            dropZone.classList.remove("over");
+            const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+            if (file) {
+              input.value = await file.text();
+            }
+          });
+        }
+
+        globalThis.FARVerify = {
+          canonicalJson,
+          computeFecHash,
+          computeProofHashV2,
+          normalizeWhitespace,
+          verifyProofEnvelopeV2,
+        };
+
+        if (typeof document !== "undefined") {
+          document.addEventListener("DOMContentLoaded", wireUi);
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "caseId": "GV-03",
+  "status": "DESIGN_LOCKED",
+  "scenario": "missing FEC",
+  "input": {
+    "evidences": [],
+    "kernel": {
+      "fec": null,
+      "datasetBindings": [],
+      "statistics": [],
+      "protocolDeviations": [],
+      "antiTheaterFindings": [],
+      "evidenceSufficiency": {
+        "status": "insufficient",
+        "powerStatus": "unknown"
+      },
+      "contradictionSet": [],
+      "integrityFlags": []
+    }
+  },
+  "expected": {
+    "verdict": "UNTESTED",
+    "decisiveRuleId": "R1_FEC_NOT_COMPILABLE",
+    "reasonCodes": ["R1_FEC_NOT_COMPILABLE"],
+    "untestedReason": "FEC_NOT_READY",
+    "tamperStatus": "clean"
+  }
+}

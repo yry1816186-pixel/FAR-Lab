@@ -1,0 +1,64 @@
+name: Bug report
+description: 报告一个 FAR-Chain 的 bug（非可复现性问题——那个用 Reproducibility failure）
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        诚实优先：贴**实跑**命令输出，不要手填数字。先跑 `far doctor` 收集环境信息。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么？
+      description: 实际行为 + 你预期的行为。
+      placeholder: "运行 `far ...` 后，看到 ...，但预期 ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 最小可复现命令序列。
+      placeholder: "1. far ...\n2. ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: far doctor 输出
+      description: 跑 `far doctor` 贴输出（不会泄露密钥——它只检测存在性）。
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: far version 输出
+      placeholder: "far-chain 0.1.0 · git ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: axis
+    attributes:
+      label: 受影响的轴
+      options:
+        - Node / TS（核心）
+        - Python（科研验证轴）
+        - Browser（Web verifier）
+        - Docker
+        - 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 其他上下文
+    validations:
+      required: false

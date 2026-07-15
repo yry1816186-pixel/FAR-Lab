@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+    groups:
+      typescript:
+        patterns:
+          - "@types/*"
+          - "typescript"
+          - "tsx"
+          - "eslint"
+          - "@typescript-eslint/*"
+      runtime:
+        patterns:
+          - "better-sqlite3"
+    commit-message:
+      prefix: "chore(deps)"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "ci"
+      - "automated"
+    commit-message:
+      prefix: "chore(ci)"

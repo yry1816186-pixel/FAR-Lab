@@ -1,0 +1,94 @@
+# FAR-Chain npm publish — 发布根 package (far-chain)
+#
+# 方案：发布根 package（name: far-chain），files 字段含 src/ + examples/tess-offline/ +
+#   schema/migrations/ + golden_vectors/cases/ + pyproject.toml + 运行时脚本。
+#   bin: far → src/cli/far.ts（Node 24 原生 type-stripping 跑 .ts，无需 tsc dist build）。
+#
+# 已本地验证：npm pack + fresh install（独立目录，无 monorepo）+ far doctor/demo/verify 全 EXIT 0。
+# validate_packaging 在 CI 重复该验证：fresh install + far version 通过才放行发布（不伪造「装上能跑」）。
+#
+# NEEDS_HUMAN_OPERATION：首次发布需配置 secret NPM_TOKEN（npm access token，见 docs/governance/release-process.md）。
+
+name: Publish npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (validate packaging only, no publish)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  validate_packaging:
+    runs-on: ubuntu-latest
+    outputs:
+      self_contained: ${{ steps.check.outputs.self_contained }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Guard real npm publish ref (tag + package version)
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "::error::Real npm publish must run from a v* tag ref. Current ref: ${GITHUB_REF_TYPE}/${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Publish tag must be SemVer-like and start with v (example: v0.1.0). Got: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          tag_version="${GITHUB_REF_NAME#v}"
+          root_version=$(node -p "require('./package.json').version")
+          cli_version=$(node -p "require('./packages/cli/package.json').version")
+          if [ "$tag_version" != "$root_version" ] || [ "$root_version" != "$cli_version" ]; then
+            echo "::error::Version mismatch: tag=${tag_version}, root=${root_version}, cli=${cli_version}"
+            exit 1
+          fi
+      - name: npm pack + verify self-contained + fresh install smoke
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pack
+          tarball=$(ls far-chain-*.tgz | head -1)
+          # 验证包内含自包含运行所需的全部资源
+          for f in package/src/cli/far.ts package/examples/tess-offline package/schema/migrations package/pyproject.toml; do
+            if ! tar -tf "$tarball" | grep -q "^${f}"; then
+              echo "self_contained=false" >> "$GITHUB_OUTPUT"
+              echo "::error::$f 不在 npm tarball —— 包不自包含，发布会装上跑不起来"
+              exit 1
+            fi
+          done
+          # fresh install（独立目录，模拟用户 npm install -g far-chain）+ far version 证明独立可用
+          pkgdir="$(mktemp -d)"
+          tar -xzf "$tarball" -C "$pkgdir"
+          ( cd "$pkgdir/package" && npm install --omit=dev && node src/cli/far.ts version )
+          echo "self_contained=true" >> "$GITHUB_OUTPUT"
+          echo "✓ far-chain npm 包自包含 + fresh install + far version 通过"
+
+  publish:
+    needs: validate_packaging
+    if: ${{ !inputs.dry_run && needs.validate_packaging.outputs.self_contained == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+      - name: npm publish far-chain (root package)
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

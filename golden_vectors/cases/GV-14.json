@@ -1,0 +1,167 @@
+{
+  "caseId": "GV-14",
+  "status": "DESIGN_LOCKED",
+  "scenario": "identifier fabrication (claim cites DOI with no harness-verified source)",
+  "input": {
+    "evidences": [
+      {
+        "evidenceId": "EV-GV-14",
+        "sourceHash": "1414141414141414141414141414141414141414141414141414141414141414",
+        "testIds": ["bls_power"],
+        "status": "ran",
+        "reportedSeed": 42,
+        "frozenSeed": 42
+      }
+    ],
+    "kernel": {
+      "fec": {
+        "fecId": "FEC-GV-14",
+        "contractVersion": "FEC/2.0",
+        "claimId": "C-GV-14",
+        "measurableImplication": "Model M achieves BLS power greater than baseline on dataset D",
+        "scope": {
+          "population": "adults 18-65 all sexes",
+          "timeWindow": "2026-01-01..2026-12-31",
+          "domainConstraint": "benchmark D"
+        },
+        "requiredEvidence": [
+          {
+            "evidenceId": "EV-GV-14",
+            "kind": "statistical",
+            "critical": true,
+            "description": "primary statistical result",
+            "verificationCheckId": "CHECK-GV-14"
+          }
+        ],
+        "datasetRequirements": [
+          {
+            "name": "D-GV",
+            "contentHashAlgorithm": "sha256",
+            "allowSynthetic": false,
+            "schemaFingerprintRequired": true
+          }
+        ],
+        "workflowRequirements": [
+          {
+            "name": "wf-gv",
+            "engine": "script",
+            "requireContainerDigest": true,
+            "requireCommandHash": true,
+            "expectedNetworkPolicy": "off",
+            "requireFixedSeed": true
+          }
+        ],
+        "metric": {
+          "metricKey": "bls_power",
+          "description": "BLS power",
+          "unit": "unitless",
+          "computationRef": "statistics/bls_power",
+          "isDeterministic": false
+        },
+        "threshold": {
+          "value": 0,
+          "unit": "unitless",
+          "thresholdSemantics": "gt",
+          "preregistered": true
+        },
+        "direction": "greater",
+        "statisticalPlan": {
+          "primaryMetric": "bls_power",
+          "nullHypothesis": "effect <= 0",
+          "alternativeHypothesis": "effect > 0",
+          "alpha": 0.0125,
+          "effectDirection": "greater",
+          "confidenceIntervalMethod": "normal_approximation",
+          "multipleTestingCorrection": "bonferroni",
+          "missingDataPolicy": "listwise_deletion",
+          "outlierPolicy": "none",
+          "stoppingRule": "fixed_n"
+        },
+        "powerPlan": {
+          "targetPower": 0.8,
+          "minimumDetectableEffect": 0.2,
+          "sampleSize": 120,
+          "powerMethod": "normal_approximation",
+          "alphaAssumed": 0.0125
+        },
+        "multipleTestingPlan": {
+          "correction": "bonferroni",
+          "familySize": 8,
+          "adjustedAlpha": 0.0125,
+          "preregistered": true
+        },
+        "seedPolicy": {
+          "fixed": true,
+          "seedValue": 42,
+          "allowCherryPick": false
+        },
+        "deviationPolicy": {
+          "criticalCategories": ["alpha_rewrite", "metric_swap", "stopping_violation", "late_exclusion"],
+          "nonCriticalHandling": "degrade",
+          "requireExplicitLog": true
+        },
+        "freeze": {
+          "fecHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "actor": {
+            "actorKind": "deterministic_freezer",
+            "actorId": "gv-freezer"
+          },
+          "timestamp": "2026-01-01T00:00:00Z",
+          "environmentPolicy": "locked-digest",
+          "deviationPolicyHash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "frozenBy": "deterministic_freezer"
+        },
+        "integrityFlags": []
+      },
+      "datasetBindings": [
+        {
+          "datasetId": "D-GV",
+          "contentHash": "1414141414141414141414141414141414141414141414141414141414141414",
+          "sourceAnchor": {
+            "resolved": true
+          },
+          "scopeCoverage": {
+            "dimension": "population",
+            "value": "adults 18-65 all sexes",
+            "relation": "within"
+          }
+        }
+      ],
+      "statistics": [
+        {
+          "testId": "bls_power",
+          "status": "ran",
+          "effectDirection": "supports",
+          "pValue": 0.008,
+          "adjustedPValue": 0.008,
+          "effectSizeObserved": 0.62,
+          "confidenceInterval": [0.21, 0.95],
+          "assumptionDiagnostics": []
+        }
+      ],
+      "protocolDeviations": [],
+      "antiTheaterFindings": [],
+      "evidenceSufficiency": {
+        "status": "sufficient",
+        "powerStatus": "adequate"
+      },
+      "contradictionSet": [],
+      "integrityFlags": [],
+      "identifierClaims": [
+        {
+          "kind": "doi",
+          "value": "10.1/nonexistent",
+          "resolutionStatus": "not_found",
+          "harnessVerifiedSource": false
+        }
+      ]
+    }
+  },
+  "expected": {
+    "verdict": "REFUTED",
+    "decisiveRuleId": "R_IDENTIFIER_FABRICATION",
+    "reasonCodes": ["UNVERIFIED_IDENTIFIER"],
+    "untestedReason": null,
+    "tamperStatus": "clean"
+  }
+}
