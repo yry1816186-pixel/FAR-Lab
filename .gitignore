@@ -1,0 +1,103 @@
+# --- Dependencies ---
+node_modules/
+.python-deps/
+.venv*/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# --- Build & cache ---
+dist/
+coverage/
+*.tsbuildinfo
+.golden_cache/
+.pytest_cache/
+.ruff_cache/
+.benchmarks/
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- IDE & OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- DevOps artifacts ---
+$null
+nul
+
+# --- NODE_COMPILE_CACHE leakage ---
+/0
+/0/
+**/0/v[0-9]*-x[0-9]*/
+
+# --- Project runtime artifacts ---
+.far/
+.far-proof/
+.far-proof-*/
+*.db
+*.db-wal
+*.db-shm
+*.tar.gz
+.privacy-scan-report.txt
+.wf_*.mjs
+
+# --- Agent tooling (local development, not shipped) ---
+.agent/
+.pi/
+.pi.backup-*
+CLAUDE.md
+.cursorrules
+FAR_LAB_MASTER_PLAN/
+dev/
+
+# --- Local development gates (run locally, not in public repo) ---
+scripts/depth_gate.mjs
+scripts/depth_evidence.mjs
+scripts/depth_evidence.test.mjs
+scripts/depth_evidence.integration.test.mjs
+scripts/depth_gate.evade.test.mjs
+scripts/zero_tolerance_scan.mjs
+scripts/anti_theater_deterministic_scan.mjs
+scripts/confounding_gate_deterministic_scan.mjs
+scripts/no_llm_final_judge_scan.mjs
+scripts/coverage_gate.mjs
+scripts/ci_all.mjs
+scripts/lib/ledger.mjs
+scripts/lib/code_analysis.mjs
+.github/workflows/depth-gate.yml
+.github/workflows/depth-evidence.yml
+.github/workflows/entry-protocol-check.yml
+.github/copilot-instructions.md
+tests/ci/zero_tolerance_scan.test.ts
+tests/ci/anti_theater_deterministic_scan.test.ts
+tests/ci/confounding_gate_deterministic_scan.test.ts
+tests/ci/no_llm_final_judge_scan.test.ts
+tests/scripts/code_analysis.test.mjs
+ci/snapshot_liveness_smoke.ts
+
+# --- Local-only docs ---
+docs/governance/OPEN_SOURCE_AUDIT.md
+docs/governance/RELEASE_READINESS_CHECKLIST.md
+docs/governance/P1_2_PROOF_AUDIT.md
+
+# --- Evidence call records (runtime generated) ---
+evidence/dashscope_calls/*.json
+evidence/dashscope_calls/*.log
+evidence/dashscope_calls/*.png
+evidence/dashscope_calls/*.jpg
+evidence/dashscope_calls/*.jpeg
+evidence/dashscope_calls/*.webp
+
+# --- Stale references (historical, prevent re-track) ---
+agent_execution_manifest.yaml
+.agent-governance/
+experiments/
+NEEDS_HUMAN_LICENSE_DECISION.md
+examples/fec/sample_compiled.json

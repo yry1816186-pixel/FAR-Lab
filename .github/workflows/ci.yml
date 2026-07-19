@@ -1,0 +1,436 @@
+# FAR-Chain CI — 12 步串行 gate + competition_qwen_smoke 条件门 + C8 每日 snapshot 存活监控
+# 历史溯源：演化自早期 CI 设计（竞赛内部 spec，未入公开仓库）·运行时 SSOT 以本 workflow + package.json 为准
+# 作用域：对抗 LLM 幻觉的工程化兜底。cross_lang 是 R2 最高优先闸门。
+# 命名约定：job id 一律下划线（不用连字符），因 needs.<job_id>.result 表达式里连字符会被解析为减号
+# Action 版本锁：2026 node24 时代（checkout@v5 / setup-node@v6 / setup-python@v6 / pnpm/action-setup@v5）
+# 命令适配说明（相对早期 CI 设计的偏差·均因既有 package.json/pyproject.toml 实际配置）：
+#   - lint：已配 eslint（eslint.config.js · 零容忍 Z1/Z2/Z3 + argsIgnorePattern '^_'）→ STEP3 跑 `pnpm run lint`
+#   - py_typecheck：pyproject.toml dev 依赖未含 mypy/ruff → 改用 `python -m compileall` 做语法闸门
+#   - test_ts / test_registry：package.json 用 `node --test`（非 vitest）→ 用 `pnpm run test`
+#   - test_py：package.json 用 unittest（非 pytest）→ 用 `pnpm run test:py`
+#   - repro_check：无 Makefile → 用 `pnpm run test:py`
+#   - cross_lang：既有测试位于 tests/evidence_log/cross_lang_consistency.test.ts（非 tests/ci/）→ 直接 node --test 该文件
+#   - migration：spec 23 §1 STEP5 要求 up/down/up 幂等；spec 32 §33 裁定 V1 不交付可运行迁移机
+#                （R-MIG V2 占位红·R2 后置·不假装能跑通）→ forward migrate up [0001-0008] + up 幂等
+#                + append-only trigger 拦截 落 test_ts 全量跑（ci-07·gate 落点见 STEP 5 注释）
+#   - competition_qwen_smoke：ci/competition_qwen_smoke.ts 已实现；无 key 时条件门 skip 不 block
+name: FAR-Chain CI
+
+on:
+  # 默认分支是 feature/initial-project-setup（非 main）——push/PR trigger 必须覆盖它，
+  # 否则针对默认分支的 PR 连主 12 步 CI 都不跑（R2 最高）。main 历史保留，一并覆盖。
+  push:
+    branches: [feature/initial-project-setup, main]
+  pull_request:
+    branches: [feature/initial-project-setup, main]
+  workflow_dispatch:
+
+# 同一 ref 的新 push 取消旧 run（省额度，防并发写入 repro_runs）
+concurrency:
+  # 加 github.event_name：隔离 schedule 触发的 C8 snapshot 监控 run，避免 push 到 main 取消每日定时检查
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # pnpm 版本须对齐 package.json packageManager SSOT（pnpm@10.29.3）·避免 CI（pnpm9）与 fresh-clone（corepack pnpm10）install 行为漂移
+  PNPM_VERSION: '10.29.3'
+  NODE_VERSION: '24'   # CI runner 自身 Node（非项目 TS 编译目标）
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ============================================================
+  # STEP 1 · install（前置脚手架，失败 block 全部）
+  # ============================================================
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - name: Install pnpm deps (frozen)
+        run: pnpm install --frozen-lockfile
+      - name: Install python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: Verify scaffolding exists (ENOENT 早失败)
+        run: |
+          test -f tsconfig.json
+          test -f pyproject.toml
+          test -d src
+          test -d repro
+
+  # ============================================================
+  # FRONTEND GATE · frontend（React+Vite 仪表盘·npm 独立工作区·与后端串行链并行）
+  # frontend/ 有独立 package-lock.json（非 root pnpm workspace 成员）→ 用 npm ci
+  #   - --legacy-peer-deps：eslint@10 与 eslint-plugin-react@7.37 的 peer 元数据过时
+  #     （运行时兼容·本地 pnpm 默认忽略 peer·npm 严格模式需显式 --legacy-peer-deps 复现）
+  #   - typecheck 用 tsc -b（非 --noEmit）：tsconfig.json 项目引用下 --noEmit 触发
+  #     TS6305（引用工程 vite.config.d.ts 产物在 fresh install 缺失·tsc -b 先构建引用工程·与 build 一致）
+  # 职责：typecheck + lint + vitest(123) + vite build 全绿（[J] 前端覆盖率门禁）
+  # ============================================================
+  frontend:
+    needs: install
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci (frozen install via package-lock.json · --legacy-peer-deps 见上注)
+        run: npm ci --legacy-peer-deps
+      - name: typecheck (tsc -b · 项目引用感知)
+        run: npm run typecheck
+      - name: lint (eslint src --ext .ts,.tsx)
+        run: npm run lint
+      - name: test (vitest run · 123 例)
+        run: npm run test
+      - name: build (tsc -b && vite build)
+        run: npm run build
+
+  # ============================================================
+  # STEP 2 · typecheck（零容忍闸门 #1：tsc --noEmit，失败 block 之后全部）
+  # ============================================================
+  typecheck:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: tsc --noEmit (zero-tolerance gate)
+        run: pnpm exec tsc --noEmit
+
+  # ============================================================
+  # STEP 3 · lint（零容忍闸门 #2：eslint src --max-warnings 0 · eslint.config.js 零容忍规则）
+  # ============================================================
+  lint:
+    needs: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: ESLint (zero-tolerance gate #2: eslint src --max-warnings 0)
+        run: pnpm run lint
+
+  # ============================================================
+  # STEP 4 · py_typecheck（零容忍闸门 #3：mypy/ruff 未在 dev 依赖 → compileall 语法闸门）
+  # ============================================================
+  py_typecheck:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: Python 语法闸门 (mypy/ruff 待加入 dev 依赖；暂用 compileall)
+        run: python -m compileall -q repro/
+
+  # ============================================================
+  # STEP 5 · test_ts（node --test TS 单元 + 集成；含 cross_lang 需 python3）
+  # ------------------------------------------------------------
+  # migration gate 落点（ci-07 诚实声明 · spec 23 §1 STEP5 migration vs spec 32 §33）：
+  #   spec 23 §1 STEP5 要求 migration up/down/up 幂等；spec 32 §33 裁定"V1 不交付可运行迁移机
+  #   （R-MIG 占位红·R2 后置·不假装能跑通）"——故 migrate down / up-down-up 完整幂等属 V2。
+  #   V1 实际覆盖（本 step 全量跑，非假绿·非混入式免责）：
+  #     · forward migrate up [0001-0008]：tests/schema/db_migrator.test.ts runMigrations applies [1..8]
+  #     · up 幂等（up→up 不变）：db_migrator.test.ts 'skips already applied versions' → skipped [1..8]
+  #     · contiguous version gap 拦截：db_migrator.test.ts 'rejects version gaps before executing SQL'
+  #     · append-only trigger 拦截（R1/R7·spec 23 STEP6）：tests/evidence_log/append_verify.test.ts
+  #       DROP TRIGGER trg_call_records_no_update + UPDATE 篡改 → verifyChainHead 检测（证明 trigger 存在且拦截）
+  #   migrate down / up-down-up 完整幂等 = V2 R-MIG（spec 32 §33·V1 不交付可运行迁移机）。
+  # ============================================================
+  test_ts:
+    needs: py_typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: node --test (TS unit + integration)
+        run: pnpm run test
+      - name: node --test (agent_loop FSM + N3 反幻觉 + assertTerminated)
+        run: pnpm run test:agent_loop
+
+  # ============================================================
+  # STEP 6 · test_py（unittest，失败 block 之后全部）
+  # ============================================================
+  test_py:
+    needs: test_ts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: Python unittest
+        run: pnpm run test:py
+
+  # ============================================================
+  # STEP 7 · test_registry（scripts/test_registry.ts 未实现 → 全量 TS 测试兜底）
+  # ============================================================
+  test_registry:
+    needs: test_py
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: registry smoke (scripts/test_registry.ts 未实现；跑全量 TS 测试兜底)
+        run: pnpm run test
+
+  # ============================================================
+  # STEP 8 · repro_check（Makefile 无 repro target → test:py 兜底）
+  # ============================================================
+  repro_check:
+    needs: test_registry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: repro check (Makefile 无 repro target；跑 test:py 兜底)
+        run: pnpm run test:py
+
+  # ============================================================
+  # STEP 9 · cross_lang（R2 最高优先闸门：TS canonicalHash === Python canonical_hash byte-equal）
+  # 既有测试位于 tests/evidence_log/cross_lang_consistency.test.ts（非 tests/ci/）
+  # ============================================================
+  cross_lang:
+    needs: repro_check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: cross_lang_consistency (TS canonicalHash === Python canonical_hash, byte-equal)
+        run: node --test tests/evidence_log/cross_lang_consistency.test.ts
+
+  # ============================================================
+  # STEP 10 · competition_qwen_smoke（条件门：仅可信事件有 DASHSCOPE_API_KEY 时跑，否则 skip 不 block）
+  # 双 job 模式：secrets 不能直接用于 job 级 if:（actions/runner#520）。
+  # 安全边界：pull_request 不读取 secret、不跑真实 DashScope；workflow_dispatch 仅默认分支读取 secret。
+  # 避免 PR head / 手动选择的非默认分支代码拿到凭据。
+  # ============================================================
+  check_secrets:
+    needs: cross_lang
+    runs-on: ubuntu-latest
+    outputs:
+      has_key: ${{ steps.check_trusted.outputs.has_key || steps.check_pr.outputs.has_key }}
+    steps:
+      - id: check_pr
+        if: ${{ github.event_name == 'pull_request' }}
+        run: echo "has_key=false" >> "$GITHUB_OUTPUT"
+      - id: check_trusted
+        if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch) }}
+        env:
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        run: |
+          if [ -n "$DASHSCOPE_API_KEY" ]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  competition_qwen_smoke:
+    needs: check_secrets
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch) && needs.check_secrets.outputs.has_key == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      COMPETITION_BASE_URL: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: competition_qwen_smoke (4 模型真实调用 + thinking/json_schema 互斥实测)
+        run: pnpm exec tsx ci/competition_qwen_smoke.ts
+
+  # ============================================================
+  # STEP 12 · verify_chain smoke（evidence_log 启动期链式自验）
+  # competition_qwen_smoke 跑了且过 → verify 跑；被 skip → verify 仍跑；失败 → verify 不跑
+  # ============================================================
+  verify_chain_smoke:
+    needs: competition_qwen_smoke
+    if: ${{ always() && (needs.competition_qwen_smoke.result == 'success' || needs.competition_qwen_smoke.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: verify_chain smoke (启动期 evidence_log 链式自验)
+        run: pnpm exec tsx ci/verify_chain_smoke.ts
+
+  # ============================================================
+  # STEP 13 · merkle_integrity_smoke（整链 Merkle 根 + 包含证明 + 篡改检测·与 verify_chain_smoke 互补）
+  # verify_chain_smoke 证逐条链未断；merkle_integrity_smoke 证整链折叠指纹可信 +
+  #   单条包含证明可独立验证 + 双层篡改防御（append-only trigger + Merkle 数学层）。
+  # ============================================================
+  merkle_integrity_smoke:
+    needs: verify_chain_smoke
+    if: ${{ always() && (needs.verify_chain_smoke.result == 'success' || needs.verify_chain_smoke.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: merkle_integrity smoke (整链 Merkle 根 + inclusion proof + tamper-defense)
+        run: pnpm exec tsx ci/merkle_integrity_smoke.ts
+
+  # ============================================================
+  # STEP 15 · offline_release_smoke（开源发布形态 smoke·验证 README 顶部命令可跑）
+  # 职责：far doctor + far demo tess-offline + far verify examples/.../demo.far-proof
+  # 这是「陌生用户复制 README 第一条命令」的 CI 兜底——发布形态命令必须在 CI 可跑。
+  # needs: install（独立于串行证据链·不阻塞核心门·但自身须绿）。
+  # far doctor 允许 exit 2（仅 WARN·offline 可用）；仅 exit 1（核心损坏）才红。
+  # ============================================================
+  offline_release_smoke:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: far doctor（环境自诊断·零密钥·允许 WARN exit 2）
+        shell: bash
+        run: |
+          set +e
+          node src/cli/far.ts doctor
+          code=$?
+          echo "far doctor exit: $code"
+          if [ "$code" = "1" ]; then echo "FAIL: core capability broken"; exit 1; fi
+          exit 0
+      - name: far version
+        run: node src/cli/far.ts version
+      - name: far demo tess-offline（offline 裁决演示·零凭据）
+        run: node src/cli/far.ts demo tess-offline
+      - name: far verify（持久化 demo.far-proof fixture·第三方独立重算）
+        run: node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof

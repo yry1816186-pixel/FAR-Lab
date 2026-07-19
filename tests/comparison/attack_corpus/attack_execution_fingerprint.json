@@ -1,0 +1,40 @@
+{
+  "attackId": "AT-EXECUTION-FINGERPRINT-MISMATCH",
+  "attackClass": "forgery",
+  "description": "Execution fingerprint mismatch: recomputation resource profile (wall/cpu/peak_rss) diverges >10x from recorded baseline, indicating result is not reproducible. V2 kernel R-execution-fingerprint (verdict_kernel_v2.ts:358) triggers DEGRADED_SCOPE. V1 makeVerdict has no execution fingerprint concept → sees only supporting evidence → CONFIRMED.",
+  "baseCaseId": "GV-01",
+  "claim": "Model M achieves BLS power greater than baseline on dataset D",
+  "falsificationSpec": {
+    "prediction": "Model M achieves BLS power greater than baseline on dataset D",
+    "metric": "bls_power",
+    "falsificationThreshold": 0,
+    "thresholdSemantics": "gt"
+  },
+  "thresholdSpec": {
+    "semantics": "gt",
+    "value": 0
+  },
+  "baselineEvidences": [
+    {
+      "claim": "measured bls_power = 0.62 on dataset D (n=120, resource profile diverges from baseline)",
+      "supportsClaim": true,
+      "refutesClaim": false,
+      "scopeNarrowerThanClaim": false,
+      "sourceAnchor": {
+        "gitCommitSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "dashscopeRequestId": null,
+        "isoTimestamp": "2026-07-11T00:00:00.000Z",
+        "rawResponseHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ],
+  "kernelOverride": {
+    "executionFingerprintMismatch": true
+  },
+  "expected": {
+    "baselineVerdict": "CONFIRMED",
+    "farVerdict": "DEGRADED_SCOPE",
+    "farDecisiveRuleId": "R_EXECUTION_FINGERPRINT_MISMATCH",
+    "farReasonCodes": ["R_EXECUTION_FINGERPRINT_MISMATCH"]
+  }
+}

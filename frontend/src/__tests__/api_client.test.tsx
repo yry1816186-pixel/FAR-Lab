@@ -1,0 +1,323 @@
+import { describe, it, expect, vi } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import {
+  useHealth,
+  useReady,
+  useEvidence,
+  useEvidenceChain,
+  useVerdict,
+  useVerdictByHypothesis,
+  useVerdictList,
+  useReport,
+  useHypothesize,
+  __testables,
+} from '@/lib/api_client';
+import type { HealthResponse, HonestVerdictDto, VerdictNode } from '@/lib/types';
+
+// ---------- 测试包装器 ----------
+
+function createWrapper() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function textResponse(body: string, status = 200): Response {
+  return new Response(body, {
+    status,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
+}
+
+// ---------- Fixtures（后端真实 DTO 形态·字段名 verbatim）----------
+
+const falsificationSpec = {
+  prediction: 'macro_f1 >= 0.8',
+  metric: 'macro_f1',
+  falsificationThreshold: 0.8,
+  thresholdSemantics: 'gt' as const,
+};
+
+const sourceAnchor = {
+  gitCommitSha: 'g'.repeat(40),
+  isoTimestamp: '2026-01-01T00:00:00Z',
+};
+
+/**
+ * HonestVerdictDto — GET /api/v1/verdict/* 形态（verdict route toDto 映射）：
+ * parentNodeId + decision，无 replayProver。
+ */
+function verdictDto(overrides: Record<string, unknown> = {}): HonestVerdictDto {
+  return {
+    verdictId: 'v-001',
+    evidenceId: 'ev-001',
+    parentNodeId: null,
+    nodeKind: 'hypothesis',
+    decision: 'UNTESTED',
+    falsificationSpec,
+    thresholdSpec: null,
+    metricValue: null,
+    conflictingEvidenceCount: 0,
+    scopeSlipText: null,
+    untestedReason: 'no evidence yet',
+    sourceAnchor,
+    prevHash: 'prev-hash',
+    currentHash: 'curr-hash',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  } as HonestVerdictDto;
+}
+
+/**
+ * VerdictNode (raw) — POST /api/v1/hypothesize 形态（executeLoop 直接序列化 LoopState）：
+ * parentVerdictId + verdict + replayProver。
+ */
+function verdictNodeRaw(overrides: Record<string, unknown> = {}): VerdictNode {
+  return {
+    verdictId: 'v-001',
+    evidenceId: 'ev-001',
+    parentVerdictId: null,
+    nodeKind: 'hypothesis',
+    verdict: 'UNTESTED',
+    falsificationSpec,
+    thresholdSpec: null,
+    metricValue: null,
+    conflictingEvidenceCount: 0,
+    scopeSlipText: null,
+    untestedReason: 'no evidence yet',
+    sourceAnchor,
+    replayProver: null,
+    prevHash: 'prev-hash',
+    currentHash: 'curr-hash',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  } as VerdictNode;
+}
+
+const HEAD_HASH = 'a'.repeat(64);
+
+// ---------- 探针（bare root，无 /api/v1 前缀·spec 24 §0#3）----------
+
+describe('api_client probes (bare root)', () => {
+  it('useHealth 以 GET /health 调用 fetch', async () => {
+    const health: HealthResponse = {
+      status: 'ok',
+      service: 'far-chain-api',
+      timestamp: '2026-06-27T00:00:00Z',
+    };
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(health));
+    const { result } = renderHook(() => useHealth(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/health');
+    expect(result.current.data).toEqual(health);
+  });
+
+  it('useReady 以 GET /ready 调用 fetch', async () => {
+    const ready = {
+      status: 'ready',
+      service: 'far-chain-api',
+      checks: { database: 'ok' },
+      timestamp: '2026-06-27T00:00:00Z',
+    };
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(ready));
+    const { result } = renderHook(() => useReady(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/ready');
+    expect(result.current.data?.checks.database).toBe('ok');
+  });
+});
+
+// ---------- App endpoints（/api/v1 前缀·spec 24 §0#2）----------
+
+describe('api_client app endpoints (/api/v1 prefix)', () => {
+  it('useEvidence 以 GET /api/v1/evidence/:id 调用 fetch', async () => {
+    const ev = {
+      evidenceId: 'ev-001',
+      callRecordSeq: 0,
+      stageId: 'stage3_hypothesis',
+      payloadKind: 'hypothesis',
+      evidencePayload: { text: 'demo' },
+      sourceAnchor,
+      createdAt: '2026-01-01T00:00:00Z',
+      // verdictNode 契约字段（audit [G]）：证据条目无关联裁决时为 null
+      verdictNode: null,
+    };
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(ev));
+    const { result } = renderHook(() => useEvidence('ev-001'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/api/v1/evidence/ev-001');
+    expect(result.current.data?.evidenceId).toBe('ev-001');
+    expect(result.current.data?.sourceAnchor).toEqual(sourceAnchor);
+    // [G] 契约对齐：前端 EvidenceResponse.verdictNode 类型安全可访问
+    expect(result.current.data?.verdictNode).toBeNull();
+  });
+
+  it('useEvidenceChain 以 GET /api/v1/evidence/chain/:headHash 调用 fetch', async () => {
+    const chain = {
+      headHash: HEAD_HASH,
+      callRecord: {
+        seq: 0,
+        stageId: 'stage3_hypothesis',
+        payloadKind: 'hypothesis',
+        purposeTag: 'hypothesis',
+        modelId: 'offline-replay',
+        reproHash: 'r'.repeat(64),
+        gitCommitSha: 'g'.repeat(40),
+        isoTimestamp: '2026-01-01T00:00:00Z',
+        finishReason: 'stop',
+        usageTokensTotal: null,
+        prevHash: 'p'.repeat(64),
+        currentHash: HEAD_HASH,
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+      graphSubtree: { rootId: 'node-001', nodes: [], edges: [] },
+    };
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(chain));
+    const { result } = renderHook(() => useEvidenceChain(HEAD_HASH), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
+      `http://localhost:3000/api/v1/evidence/chain/${HEAD_HASH}`,
+    );
+    expect(result.current.data?.callRecord?.currentHash).toBe(HEAD_HASH);
+  });
+
+  it('useVerdict 以 GET /api/v1/verdict/:id 调用 fetch（HonestVerdictDto·decision 字段）', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(verdictDto()));
+    const { result } = renderHook(() => useVerdict('v-001'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/api/v1/verdict/v-001');
+    expect(result.current.data?.verdictId).toBe('v-001');
+    expect(result.current.data?.decision).toBe('UNTESTED');
+    expect(result.current.data?.parentNodeId).toBeNull();
+  });
+
+  it('useVerdictByHypothesis 以 GET /api/v1/verdict/by_hypothesis/:hypoId 调用（单对象·非数组）', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(verdictDto({ verdictId: 'v-002' })));
+    const { result } = renderHook(() => useVerdictByHypothesis('hypo-1'), {
+      wrapper: createWrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
+      'http://localhost:3000/api/v1/verdict/by_hypothesis/hypo-1',
+    );
+    // 后端返回单个 HonestVerdictDto（非数组）——直接消费 verdictId
+    expect(result.current.data?.verdictId).toBe('v-002');
+    expect(result.current.data?.decision).toBe('UNTESTED');
+  });
+
+  it('useVerdictList 以 GET /api/v1/verdict?limit&offset 调用（分页）', async () => {
+    const list = {
+      items: [verdictDto(), verdictDto({ verdictId: 'v-002' })],
+      count: 2,
+      limit: 100,
+      offset: 0,
+    };
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(list));
+    const { result } = renderHook(() => useVerdictList(100, 0), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
+      'http://localhost:3000/api/v1/verdict?limit=100&offset=0',
+    );
+    expect(result.current.data?.items).toHaveLength(2);
+    expect(result.current.data?.count).toBe(2);
+  });
+
+  it('useReport 以 GET /api/v1/report/:runId 调用（HTML 字符串·非 JSON）', async () => {
+    const html = '<!DOCTYPE html><html><body><h1>FAR-Chain Report</h1></body></html>';
+    vi.mocked(fetch).mockResolvedValue(textResponse(html));
+    const { result } = renderHook(() => useReport('run-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/api/v1/report/run-1');
+    expect(result.current.data).toBe(html);
+  });
+
+  it('useHypothesize 以 POST /api/v1/hypothesize 提交（raw honestVerdict 形态·verbatim 消费）', async () => {
+    const hypoResp = {
+      loopState: {
+        runId: 'run-1',
+        iterationsCompleted: 1,
+        terminated: true,
+        terminationReason: 'feedback_converged',
+        artifacts: [],
+        verdictNode: verdictNodeRaw(),
+        error: null,
+      },
+      graphSubtree: {
+        rootId: 'node-001',
+        nodes: [
+          {
+            nodeId: 'node-001',
+            evidenceId: 'ev-001',
+            parentNodeId: null,
+            nodeKind: 'hypothesis',
+            decision: 'UNTESTED',
+            metricValue: null,
+            conflictingEvidenceCount: 0,
+            scopeSlipText: null,
+            untestedReason: null,
+            createdAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+        edges: [],
+      },
+      honestVerdict: verdictNodeRaw({ verdictId: 'v-001', verdict: 'UNTESTED' }),
+      reproHash: 'repro-hash-123',
+    };
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(hypoResp));
+    const { result } = renderHook(() => useHypothesize(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.mutateAsync({ researchInput: '示例研究输入' });
+    });
+    // react-query v5：mutateAsync resolve 后 hook 的 data 状态需一次 re-render 才可见。
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // 校验 POST /api/v1/hypothesize + 请求体（researchInput，无 maxIterations）
+    const callArgs = vi.mocked(fetch).mock.calls[0];
+    expect(callArgs[0]).toBe('http://localhost:3000/api/v1/hypothesize');
+    const init = callArgs[1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ researchInput: '示例研究输入' });
+    // 校验后端字段 verbatim 消费（无 honestyVerdict* aliasing）
+    expect(result.current.data?.reproHash).toBe('repro-hash-123');
+    expect(result.current.data?.honestVerdict?.verdictId).toBe('v-001');
+    expect(result.current.data?.honestVerdict?.verdict).toBe('UNTESTED');
+    expect(result.current.data?.honestVerdict?.parentVerdictId).toBeNull();
+    expect(result.current.data?.loopState.verdictNode?.verdict).toBe('UNTESTED');
+    expect(result.current.data?.graphSubtree.nodes[0]?.nodeId).toBe('node-001');
+  });
+});
+
+// ---------- fetch helpers（__testables）----------
+
+describe('api_client fetch helpers (__testables)', () => {
+  it('API_BASE_URL 默认 http://localhost:3000', () => {
+    expect(__testables.API_BASE_URL).toBe('http://localhost:3000');
+  });
+
+  it('fetchJson 非 2xx 响应抛错（含状态码）', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response('boom', { status: 500, headers: { 'Content-Type': 'text/plain' } }),
+    );
+    await expect(__testables.fetchJson<{ a: number }>('/api/v1/health')).rejects.toThrow(/API 500/);
+  });
+
+  it('fetchText 返回原始文本（HTML body）', async () => {
+    vi.mocked(fetch).mockResolvedValue(textResponse('<html>report</html>'));
+    const out = await __testables.fetchText('/api/v1/report/run-1');
+    expect(out).toBe('<html>report</html>');
+  });
+});
