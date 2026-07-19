@@ -1,0 +1,27 @@
+# FAR-Chain docker-compose
+#
+# 默认 service 全部 offline（无需 API key）：
+#   docker compose up far-demo     # 一次性 offline TESS demo（裁决内核 + 篡改检测演示）
+#   docker compose up far-api      # 长驻 API server @ http://localhost:3000（offline 匿名 demo）
+#
+# 真实 Qwen/百炼推理（可选·NEEDS_API_KEY）：
+#   echo "DASHSCOPE_API_KEY=sk-..." > .env
+#   docker compose --env-file .env up far-api
+# 红线：绝不默认读取宿主 .env；必须显式 --env-file。
+
+services:
+  far-demo:
+    build: .
+    image: far-chain:dev
+    command: ["demo", "tess-offline"]
+    # 一次性 offline demo：14 Golden Vectors + C-ASTRO-0001 TESS 裁决 + 防篡改密封
+
+  far-api:
+    build: .
+    image: far-chain:dev
+    command: ["api", "--host", "0.0.0.0", "--port", "3000"]
+    ports:
+      - "3000:3000"
+    # offline Web Cockpit 后端（匿名 demo·自动种子 C-ASTRO-0001）。
+    # 前端：本地 `cd frontend && npm install && npm run dev` 连 localhost:3000。
+    # 真实 provider：docker compose --env-file .env up far-api（.env 含 DASHSCOPE_API_KEY）

@@ -1,0 +1,178 @@
+# FAR-Chain Release — tag v* 触发的发布自动化
+#
+# 触发条件：maintainer 执行 `git tag v0.1.0 && git push origin v0.1.0`（首次需人类操作）。
+#
+# NEEDS_RELEASE_PUBLICATION：本 workflow 已就绪，但首次需人类推送 tag。
+#   工件无法自证「已运行成功」——首次 tag 推送前状态保持 NEEDS_RELEASE_PUBLICATION。
+# NEEDS_GHCR_PUBLISH：GHCR 首次需人类配置 GITHUB_TOKEN 对 packages 的 write 权限
+#   （repo Settings → Actions → workflow permissions，或 package settings）。
+#   权限未配置时 docker push 步骤会失败——这是预期的，不阻塞 release assets 发布。
+# 红线：不硬编码任何 API key（DASHSCOPE_API_KEY 等）；不默认调用真实 Qwen/DashScope/OpenAI API。
+#   Docker 镜像不内置任何 provider key（offline 优先，见 Dockerfile FAR_CHAIN_OFFLINE=1）。
+# 分发：源码分发（git clone + node src/cli/far.ts）；不发布到 npm registry。
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0)'
+        required: true
+
+# 同一 tag 的新 push 取消旧 run（防并发发布覆盖 release assets）
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+  cancel-in-progress: false   # release 不可中断重跑——避免半发布状态
+
+permissions:
+  contents: write   # 创建 GitHub Release + 上传 assets
+  packages: write   # push Docker image 到 GHCR
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10.29.3'
+  PYTHON_VERSION: '3.11'
+  # tag push 用 github.ref_name；手动 dispatch 必须使用输入 tag。
+  # 旧实现忽略 inputs.tag，导致从默认分支手动发布时拿分支名当版本号，workflow_dispatch 路径必失败。
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45   # 质量门 + docker build/push + release 上传兜底
+    steps:
+      # a. checkout (fetch-depth: 0 — 保留完整历史用于 tag / changelog 校验)
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+
+      # b/c. setup node + pnpm（版本锁见 ci.yml 顶部注释·避免 pnpm9/10 漂移）+ python（跨语言轴）
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      # d. 校验 tag 与 package.json version 一致（不变式：git tag v<X> ↔ package.json "<X>"）
+      - name: Verify tag matches package.json version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag must be SemVer-like and start with v (example: v0.1.0). Got: ${RELEASE_TAG}"
+            exit 1
+          fi
+          TAG_VERSION="${RELEASE_TAG#v}"   # v0.1.0 -> 0.1.0
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag (${RELEASE_TAG} -> ${TAG_VERSION}) != package.json version (${PKG_VERSION})"
+            exit 1
+          fi
+          echo "Version match: ${PKG_VERSION} (root + tag ${RELEASE_TAG})"
+
+      # e. 安装依赖（frozen）+ Python 科研轴（cross_lang / test:py 需要）
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      # f. 全量质量门——确保 release 基于绿构建（typecheck + lint + test + Python 轴 + cross-lang）。
+      #    开发门（depth-gate/zero-tolerance/coverage）不在此公开 release 门（本地 agent 跑）。
+      - name: Full quality gate (typecheck + lint + test + py + cross-lang · release must be green)
+        run: |
+          pnpm typecheck
+          pnpm lint
+          pnpm run test
+          pnpm run test:py
+          node --test tests/evidence_log/cross_lang_consistency.test.ts
+        timeout-minutes: 30
+
+      # g/h. 准备 release assets：install.sh + install.ps1 + SHA256SUMS
+      - name: Stage install scripts + checksum
+        run: |
+          mkdir -p staging
+          cp scripts/install.sh  staging/install.sh
+          cp scripts/install.ps1 staging/install.ps1
+          chmod +x staging/install.sh
+          (cd staging && sha256sum install.sh install.ps1 | tee SHA256SUMS)
+
+      # j-m. 构建 Docker image 并 push 到 GHCR（offline 优先·不内置 key）
+      - name: Resolve GHCR image name (lowercase owner)
+        id: img
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${owner}/far-lab" >> "$GITHUB_OUTPUT"
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+      - name: docker login ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: docker build (offline-ready · no key baked in)
+        run: |
+          docker build \
+            -t ${{ steps.img.outputs.image }}:${{ steps.img.outputs.tag }} \
+            -t ${{ steps.img.outputs.image }}:latest \
+            .
+      - name: docker push (tagged)
+        run: docker push ${{ steps.img.outputs.image }}:${{ steps.img.outputs.tag }}
+      - name: docker push (latest)
+        run: docker push ${{ steps.img.outputs.image }}:latest
+
+      # n. 保存 docker image digest 到文件（push 后 RepoDigests 已填充）
+      - name: Save docker image digest
+        run: |
+          set -euo pipefail
+          IMAGE="${{ steps.img.outputs.image }}"
+          TAG="${{ steps.img.outputs.tag }}"
+          DIGEST=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' "${IMAGE}:${TAG}" | head -1 || true)
+          if [ -z "$DIGEST" ]; then
+            echo "digest-unavailable (push may have failed · NEEDS_GHCR_PUBLISH)" > staging/docker-digest.txt
+          else
+            echo "$DIGEST" > staging/docker-digest.txt
+          fi
+          echo "Docker digest: $(cat staging/docker-digest.txt)"
+
+      # o. 从 CHANGELOG.md 提取本版本 release notes（无匹配段则回退到自动生成）
+      - name: Extract CHANGELOG section for release body
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          BODY=$(awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { found=1; next }
+            /^## \[/ && found { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$BODY" ]; then
+            echo "(No CHANGELOG section for ${VERSION} — see auto-generated notes below.)" > staging/release-body.md
+          else
+            printf '%s\n' "$BODY" > staging/release-body.md
+          fi
+
+      # 创建 GitHub Release（assets + checksum + docker digest + release notes）
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: FAR-Chain ${{ env.RELEASE_TAG }}
+          body_path: staging/release-body.md
+          generate_release_notes: true   # CHANGELOG body 之后追加 commit/PR 自动 notes
+          files: |
+            staging/install.sh
+            staging/install.ps1
+            staging/SHA256SUMS
+            staging/docker-digest.txt

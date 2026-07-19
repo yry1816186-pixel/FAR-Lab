@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-06-29T00:00:00.000Z",
+  "generator": "deterministic_script",
+  "source": "golden_vectors/generate_golden_vectors.ts",
+  "authority": "09 §3 / 23 §2.3 / HANDOFF §3.3",
+  "vectors": [
+    {
+      "label": "simple_hypothesis",
+      "hash": "344ec6a9e54317ff1af8f27794ff4dfdb1ce73b41ea96a8e24babb15871c0e8d"
+    },
+    {
+      "label": "unicode_chinese",
+      "hash": "3611de3b7e5fbe94eefea75ed00f42c512f89b5536dddbe7ef4c0dfb65eae71a"
+    },
+    {
+      "label": "full_fields_integration",
+      "hash": "e23337d1d094878267c214154ad7fdf8ab96ef6ddb80562de6c8401e3ecb1c7a"
+    },
+    {
+      "label": "baseline_exempt_tag",
+      "hash": "4b4360a5e42cf0b18009c18cffb0d381196ba55b13a5c3691d2fba6deb4378d8"
+    },
+    {
+      "label": "N1_float_arith",
+      "hash": "1d8a8e16d9ee625f1fb5ef505413efa212cc020b272ed0f9b3d3d81acf593fde",
+      "note": "IEEE754 浮点算术，TS===Py byte-equal（真绿）"
+    },
+    {
+      "label": "N2_sci_1e21",
+      "hash": "f1ee2b60ee95a3170fdc07a577e5f3514ced26867443d69da265acadead81007",
+      "note": "大科学计数，两边 \"1e+21\" 格式一致（真绿）"
+    },
+    {
+      "label": "N3_int_42",
+      "hash": "4e0730f238f81de137ff27d89ec3bcc3ebadf95107661387df82043c4ec25475",
+      "note": "整数，byte-equal（真绿）"
+    },
+    {
+      "label": "N3b_bigint_gt_2p53",
+      "hash": "66c87d9cb3014e05a11baa97df62282d89d425f22ee15816577c84534e2ef1bb",
+      "note": "JS 值规约 2**53+1→...992，经 stdin 双向 byte-equal（真绿，归 GREEN）"
+    },
+    {
+      "label": "N4_nan_reject",
+      "hash": "REJECTED_AS_EXPECTED",
+      "note": "真 NaN 数值：assertNoNonFiniteNumber 抛 /NaN and Infinity/ → REJECTED_AS_EXPECTED"
+    }
+  ]
+}

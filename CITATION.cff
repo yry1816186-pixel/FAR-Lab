@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use FAR-Lab in your research, please cite it as below."
+title: "FAR-Lab: Falsification-Anchored Research Chain — a claim-level verification layer for AI for Science"
+abstract: >-
+  FAR-Lab constrains LLM-generated scientific hypotheses inside engineering boundaries that are
+  falsifiable, recomputable, and traceable, via a deterministic five-value verdict kernel (R0–R9,
+  no LLM arbiter) and a content-addressed, append-only, cross-language-byte-identical evidence chain
+  with tamper detection.
+authors:
+  - name: "FAR-Chain Contributors"
+    # NEEDS_HUMAN_OPERATION: fill in real author names/ORCID before academic citation use.
+type: software
+version: "0.1.0"
+date-released: "2026-07-08"
+license: MIT
+repository-code: "https://github.com/yry1816186-pixel/FAR-Lab"
+keywords:
+  - ai4s
+  - scientific-reproducibility
+  - falsifiability
+  - verifiable-claims
+  - evidence-chain
+  - deterministic-verdict
+commit: "NEEDS_HUMAN_OPERATION: pin release commit SHA on first release"
