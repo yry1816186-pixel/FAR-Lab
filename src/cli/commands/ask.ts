@@ -34,6 +34,7 @@ export interface AskArgs {
   readonly dbPath: string;
   readonly json: boolean;
   readonly exportDir: string | null;
+  readonly resumePath: string | null;
   readonly profile: string;
 }
 
@@ -43,6 +44,7 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
   let dbPath = ':memory:';
   let json = false;
   let exportDir: string | null = null;
+  let resumePath: string | null = null;
   let profile = 'offline_replay';
 
   for (let i = 0; i < argv.length; i++) {
@@ -64,6 +66,10 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
       json = true;
       continue;
     }
+    if (a === '--resume') {
+      resumePath = argv[++i] ?? '';
+      continue;
+    }
     if (a === '--export') {
       exportDir = argv[++i] ?? '';
       continue;
@@ -82,7 +88,7 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
     }
   }
 
-  return { question, mode, dbPath, json, exportDir, profile };
+  return { question, mode, dbPath, json, exportDir, resumePath, profile };
 }
 
 export interface AskRender {
@@ -141,12 +147,14 @@ export async function executeAskRun(
   gitCommitSha: string,
   onArtifact?: (artifact: StageArtifact) => void,
   gateway?: LlmGateway,
+  resumeStorePath?: string,
 ): Promise<LoopRunnerResult> {
   const result = await executeLoop({
     researchInput: question,
     mode,
     evidenceLogDb: db,
     gitCommitSha,
+    ...(resumeStorePath === undefined ? {} : { resumeStorePath }),
     ...(onArtifact === undefined ? {} : { onArtifact }),
     ...(gateway === undefined ? {} : { gateway }),
   });
@@ -252,7 +260,15 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
   let result: Awaited<ReturnType<typeof executeLoop>> | undefined;
   try {
     const gitCommitSha = resolveGitCommitSha();
-    result = await executeAskRun(db, args.question, args.mode, gitCommitSha);
+    result = await executeAskRun(
+      db,
+      args.question,
+      args.mode,
+      gitCommitSha,
+      undefined,
+      undefined,
+      args.resumePath ?? undefined,
+    );
 
     const render = buildRender(result, args.profile, args.question);
 
