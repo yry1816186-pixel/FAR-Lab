@@ -50,6 +50,8 @@ export interface LoopRunnerArgs {
   readonly profile?: ProviderProfile;
   readonly appendOptions?: AppendRecordOptions;
   readonly termination?: TerminationCriteria;
+  /** IC-06:stage_receipt 恢复存储路径(可选;kill 后从最近有效收据续跑) */
+  readonly resumeStorePath?: string;
   /**
    * reproHash 注入策略（生产路径必须显式提供·接 03 calc_bridge compute_repro_hash）。
    *
@@ -152,6 +154,7 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
     appendOptions,
     evidenceLogDb: args.evidenceLogDb,
     ...(termination === undefined ? {} : { termination }),
+    ...(args.resumeStorePath === undefined ? {} : { resumeStorePath: args.resumeStorePath }),
     ...(args.onArtifact === undefined ? {} : { onArtifact: args.onArtifact }),
   });
 

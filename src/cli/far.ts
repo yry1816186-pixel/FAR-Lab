@@ -842,10 +842,11 @@ USAGE:
     an illegal transition is never silently overwritten: returns PROTOCOL_DEVIATION_CRITICAL, exit 7 (fail-closed).
     exit codes: 0 advanced / 7 protocol deviation / 2 bad args / 1 runtime error
 
-  far ask "<question>" [--mode full|quick] [--json] [--export <dir>]
+  far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--resume <path>]
                                     run the full 6-stage FSM once (runAgentLoop); emits a verdict + evidence chain
     --mode full|quick             full = up to 3 iterations (default) / quick = single pass
     --export <dir>                export a V1 .far-proof self-verifiable bundle to <dir>
+    --resume <path>               stage_receipt store (IC-06): resume from the last valid receipt after kill
     --json                        machine-readable output
     defaults to offline_replay (no keys, fixture replay); real inference needs --profile competition_aliyun_qwen + credentials
     red line: the verdict is produced by the deterministic R0-R9 kernel (the LLM is never the adjudicator).
