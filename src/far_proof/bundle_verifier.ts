@@ -12,6 +12,7 @@ import { canonicalHash } from '../evidence_log/hasher.ts';
 import { rowToCallRecord } from '../evidence_log/repository.ts';
 import { GENESIS_PREV_HASH, type CallRecordHashRow } from '../evidence_log/types.ts';
 import { computeProofHash } from '../proof_envelope/proof_hash.ts';
+import { dispatchRulesetVerifier } from '../proof_envelope/ruleset_version.ts';
 import type { CheckOutcome, ProofCheckResult, ProofEnvelope } from '../proof_envelope/types.ts';
 import type { FalsificationSpec, Verdict } from '../falsifiability/types.ts';
 
@@ -42,6 +43,8 @@ interface RawEnvelopeRow {
   readonly falsification_spec: string;
   readonly source_anchor: string;
   readonly repro_hash: string;
+  /** IC-01 · migration 0019:legacy 包无此列/为 NULL → 按 v1 默认派发 */
+  readonly ruleset_uri?: string | null;
   readonly sealed_by: string;
   readonly sealed_at: string;
   readonly created_at: string;
@@ -176,6 +179,9 @@ export function verifyProofEnvelopeJsonl(jsonlPath: string): {
   const mismatches: ProofEnvelopeMismatch[] = [];
   for (const line of lines) {
     const row = JSON.parse(line) as RawEnvelopeRow;
+    // IC-01 版本派发(ADR-007 H3):无 URI=legacy v1;未知/伪造主版本 fail-closed 抛错(不翻转裁决)。
+    // unknown extra field 不进入 rowToEnvelope/proofHash 输入(MINOR 单调兼容,裁决不翻转)。
+    dispatchRulesetVerifier(row.ruleset_uri ?? null);
     const envelope = rowToEnvelope(row);
     const { proofHash: _stored, ...fieldsForHash } = envelope;
     void _stored;
@@ -281,6 +287,10 @@ function rowToEnvelope(row: RawEnvelopeRow): ProofEnvelope {
     falsificationSpec: JSON.parse(row.falsification_spec) as FalsificationSpec,
     sourceAnchor: JSON.parse(row.source_anchor),
     reproHash: row.repro_hash,
+    // legacy 行 ruleset_uri 缺席/NULL → 字段缺席(exactOptionalPropertyTypes),按 v1 默认派发
+    ...(row.ruleset_uri === null || row.ruleset_uri === undefined
+      ? {}
+      : { rulesetUri: row.ruleset_uri }),
     sealedBy: row.sealed_by,
     sealedAt: row.sealed_at,
     createdAt: row.created_at,

@@ -41,6 +41,8 @@ interface RawEnvelopeRow {
   readonly falsification_spec: string; // JSON 字符串
   readonly source_anchor: string; // JSON 字符串
   readonly repro_hash: string;
+  /** IC-01 · migration 0019:legacy 包无此列 → 字段缺席,按 v1 默认派发(canonical 输入不变) */
+  readonly ruleset_uri?: string | null;
   readonly sealed_by: string;
   readonly sealed_at: string;
   readonly created_at: string;
@@ -79,6 +81,10 @@ function rowToEnvelope(row: RawEnvelopeRow): ProofEnvelope {
     // 但保留完整解析以维持 ProofEnvelope 类型完整。
     sourceAnchor: JSON.parse(row.source_anchor),
     reproHash: row.repro_hash,
+    // IC-01:ruleset_uri 存在时纳入 proofHash canonical 输入;缺席(legacy)时字段缺省,复算与历史一致
+    ...(row.ruleset_uri === null || row.ruleset_uri === undefined
+      ? {}
+      : { rulesetUri: row.ruleset_uri }),
     sealedBy: 'deterministic_sealer',
     sealedAt: row.sealed_at,
     createdAt: row.created_at,
