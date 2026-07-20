@@ -7,9 +7,8 @@
 // 默认离线 demo 模式：jwtSecret=null（匿名·无需凭据）+ in-memory DB + 自动种子 demo 裁决
 // （C-ASTRO-0001 UNTESTED·legacy 路径不注入统计→R6 不触发），前端启动即见真实裁决数据。生产用 --persist/--protected。
 
-import Database from 'better-sqlite3';
 import { startServer } from '../../api/server.ts';
-import { runMigrations } from '../../db/migrator.ts';
+import { openFarDb } from '../../db/open.ts';
 import { buildDemoChain } from '../../far_proof/demo_chain.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 
@@ -63,9 +62,7 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
 
 export async function runApi(argv: readonly string[]): Promise<number> {
   const args = parseApiArgs(argv);
-  const db = new Database(args.dbPath);
-  db.pragma('journal_mode = WAL');
-  runMigrations(db);
+  const db = openFarDb(args.dbPath);
   if (args.seedDemo) {
     buildDemoChain(db);
   }

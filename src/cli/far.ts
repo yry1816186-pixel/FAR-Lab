@@ -55,7 +55,9 @@ async function main(): Promise<void> {
 
   if (command === 'doctor') {
     const liveQwenSmoke = argv.includes('--live-qwen-smoke');
-    const exitCode = await runDoctor({ liveQwenSmoke });
+    const dbIdx = argv.indexOf('--db');
+    const dbPath = dbIdx !== -1 ? argv[dbIdx + 1] : undefined;
+    const exitCode = await runDoctor({ liveQwenSmoke, ...(dbPath !== undefined ? { dbPath } : {}) });
     process.exit(exitCode);
   }
 
@@ -156,6 +158,11 @@ async function main(): Promise<void> {
     const { runLifecycle } = await import('./commands/lifecycle.ts');
     const exitCode = await runLifecycle(argv.slice(1));
     process.exit(exitCode);
+  }
+
+  if (command === 'backup') {
+    const { runBackup } = await import('./commands/backup.ts');
+    process.exit(runBackup(argv.slice(1)));
   }
 
   process.stderr.write(`far: unknown command '${command}'\n\n${HELP_TEXT}`);
@@ -693,9 +700,11 @@ const HELP_TEXT = `FAR-Chain CLI — claim-level verification for AI4S scientifi
 
 USAGE:
   far version                        print version + git HEAD
-  far doctor [--live-qwen-smoke]     environment self-check (no network, no keys by default;
+  far doctor [--live-qwen-smoke] [--db <path>]
+                                     environment self-check (no network, no keys by default;
                                      a missing DASHSCOPE_API_KEY only WARNs, never FAILs)
                                      --live-qwen-smoke   call the real API (needs a valid key)
+                                     --db <path>         full integrity_check + chain verify (fail-closed, IC-03)
   far demo [tess-offline]            one-shot demo (14 Golden Vectors + end-to-end demo claim;
                                      fully offline, no credentials needed)
                                      tess-offline        focus on the TESS (C-ASTRO-0001 pulsar) offline verdict
@@ -737,6 +746,10 @@ USAGE:
                                 record a transition (illegal transitions are rejected, exit 1)
     verify                      verify the target-scoped event hash chain
     exit codes: 0 ok / 1 illegal transition or chain broken / 2 bad args
+
+  far backup --db <path> --out <path> [--force]
+                         safe backup via VACUUM INTO (IC-03; full integrity_check first —
+                         a corrupted DB is never backed up; backup re-checked after write)
 
   far api [--port <n>] [--db <path>|--persist <path>] [--no-seed] [--protected]
           start the REST API server (Fastify; the frontend defaults to localhost:3000)

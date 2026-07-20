@@ -7,11 +7,10 @@
 //
 // 指令：:help / :quit（或 Ctrl-D）/ :fork <后缀>（基于上次 question 重跑）/ :history
 
-import Database from 'better-sqlite3';
 import * as readline from 'node:readline';
 import { stdin, stdout } from 'node:process';
 
-import { runMigrations } from '../../db/migrator.ts';
+import { openFarDb } from '../../db/open.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 import { executeAskRun, buildRender, type AskRender } from './ask.ts';
 
@@ -22,9 +21,7 @@ interface ReplTurn {
 }
 
 async function runOne(question: string, gitCommitSha: string): Promise<AskRender> {
-  const db = new Database(':memory:');
-  db.pragma('journal_mode = WAL');
-  runMigrations(db);
+  const db = openFarDb(':memory:');
   try {
     const result = await executeAskRun(db, question, 'quick', gitCommitSha);
     return buildRender(result, 'offline_replay', question);

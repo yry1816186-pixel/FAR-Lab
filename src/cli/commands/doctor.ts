@@ -16,6 +16,8 @@ import { runVerify } from './verify.ts';
 
 export interface DoctorOptions {
   readonly liveQwenSmoke: boolean;
+  /** IC-03(F-03):可选 DB 完整性检查(integrity_check 全量+链验证;损坏=FAIL fail-closed) */
+  readonly dbPath?: string;
 }
 
 type CheckStatus = 'ok' | 'warn' | 'fail' | 'info';
@@ -235,8 +237,45 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
   }
 }
 
-function checkProviderKey(checks: Check[]): void {
-  const hasKey = Boolean(process.env.DASHSCOPE_API_KEY && process.env.DASHSCOPE_API_KEY.length > 0);
+async function checkDbIntegrity(dbPath: string, checks: Check[]): Promise<void> {
+  // IC-03(F-03):integrity_check 全量 fail-closed(启动级损坏不再静默)
+  try {
+    const { openFarDb, DatabaseIntegrityError } = await import('../../db/open.ts');
+    const { verifyChainHead } = await import('../../evidence_log/verifier.ts');
+    let db;
+    try {
+      db = openFarDb(dbPath, { readonly: true, integrityCheck: 'full' });
+    } catch (error) {
+      if (error instanceof DatabaseIntegrityError) {
+        checks.push({
+          name: `db integrity (${dbPath})`,
+          status: 'fail',
+          detail: `integrity_check FAILED(fail-closed): ${error.message.split('\n')[1]?.trim() ?? error.message}`,
+        });
+        return;
+      }
+      throw error;
+    }
+    try {
+      const chain = verifyChainHead(db);
+      checks.push({
+        name: `db integrity (${dbPath})`,
+        status: 'ok',
+        detail: `integrity_check ok;chain ${chain.ok ? `ok(${chain.verifiedCount})` : `broken@${chain.brokenAtSeq ?? '?'}`}`,
+      });
+    } finally {
+      db.close();
+    }
+  } catch (error) {
+    checks.push({
+      name: `db integrity (${dbPath})`,
+      status: 'fail',
+      detail: `check failed: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
+}
+
+function checkProviderKey(checks: Check[]): void {  const hasKey = Boolean(process.env.DASHSCOPE_API_KEY && process.env.DASHSCOPE_API_KEY.length > 0);
   checks.push({
     name: 'DASHSCOPE_API_KEY',
     status: hasKey ? 'ok' : 'warn',
@@ -284,6 +323,9 @@ export async function runDoctor(opts: DoctorOptions): Promise<number> {
   checkEnv(checks);
   checkProject(root, checks);
   await checkCoreCapability(root, checks);
+  if (opts.dbPath !== undefined) {
+    await checkDbIntegrity(opts.dbPath, checks);
+  }
   checkProviderKey(checks);
   if (opts.liveQwenSmoke) {
     checkLiveQwenSmoke(root, checks);

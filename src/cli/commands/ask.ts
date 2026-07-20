@@ -15,7 +15,7 @@ import { mkdirSync } from 'node:fs';
 import { executeLoop } from '../../api/internal/loop_runner.ts';
 import type { LoopRunnerResult } from '../../api/internal/loop_runner.ts';
 import type { StageArtifact } from '../../agent_loop/types.ts';
-import { runMigrations } from '../../db/migrator.ts';
+import { openFarDb } from '../../db/open.ts';
 import type { LlmGateway } from '../../llm_gateway/gateway.ts';
 import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
 import {
@@ -248,9 +248,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
   if (exportDir !== null) {
     mkdirSync(exportDir, { recursive: true });
   }
-  const db = new Database(rundbPath);
-  db.pragma('journal_mode = WAL');
-  runMigrations(db);
+  const db = openFarDb(rundbPath);
   let result: Awaited<ReturnType<typeof executeLoop>> | undefined;
   try {
     const gitCommitSha = resolveGitCommitSha();

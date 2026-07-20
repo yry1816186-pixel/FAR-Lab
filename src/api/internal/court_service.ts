@@ -7,12 +7,11 @@
 // 展示的是「多模型法庭框架 + 一致性检测」，真实模型分歧须接真实 provider（凭据门）。
 // 红线：LLM 不作裁决者——每个模型的 verdict 仍由 R0-R9 确定性内核给出（fixture 只驱动 stage 文本）。
 
-import Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 
 import { createLlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
-import { runMigrations } from '../../db/migrator.ts';
+import { openFarDb } from '../../db/open.ts';
 import { executeAskRun } from '../../cli/commands/ask.ts';
 
 /** 单模型裁决条目。 */
@@ -57,9 +56,7 @@ export async function runCourtSession(
 ): Promise<ReliabilityCertificate> {
   const verdicts: ModelVerdict[] = [];
   for (const model of models) {
-    const db = new Database(':memory:');
-    db.pragma('journal_mode = WAL');
-    runMigrations(db);
+    const db = openFarDb(':memory:');
     try {
       const gateway = createLlmGateway([createOfflineReplayAdapter({ modelId: model })]);
       const result = await executeAskRun(db, claim, 'quick', gitCommitSha, undefined, gateway);
