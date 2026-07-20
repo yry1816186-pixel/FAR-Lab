@@ -4,6 +4,7 @@
 // 设计: 每条 FF 输出 [PASS]/[FAIL] + 证据行;任一 FAIL → exit 1。允许项必须带架构理由注释（同 zero_tolerance 豁免纪律）。
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const ROOT = process.cwd();
 let failures = 0;
@@ -163,7 +164,15 @@ const importsOf = (f) => [...read(f).matchAll(/^import\s+(?!type)[^'"]*from\s+'(
   check('FF-13', '导出脱敏路径存在且有测试面', hasRedact && hasTest, `exporter 含 redact=${hasRedact} tests/far_proof=${hasTest}`);
 }
 
+// FF-14 JSON Schema 零漂移(IC-12 · ADR-013): schema/json/*.json 与 TS 类型机器生成结果字节一致;
+// 手改生成物或改 TS 类型不重新生成 → DRIFT(exit 1)。生成器: scripts/generate_json_schema.mts
+{
+  const r = spawnSync(process.execPath, ['scripts/generate_json_schema.mts', '--check'], { encoding: 'utf8' });
+  const tail = String(r.stdout ?? '').trim().split('\n').slice(-1)[0] ?? '';
+  check('FF-14', 'JSON Schema 生成物与 TS 类型零漂移', r.status === 0, `generate_json_schema --check exit=${r.status ?? '?'} ${tail}`);
+}
+
 console.log('══ Architecture Fitness Functions (§12.5) ══');
 for (const line of report) console.log(line);
-console.log(failures === 0 ? '\nfitness: PASS (13/13)' : `\nfitness: FAIL (${failures} 项)`);
+console.log(failures === 0 ? '\nfitness: PASS (14/14)' : `\nfitness: FAIL (${failures} 项)`);
 process.exit(failures === 0 ? 0 : 1);
