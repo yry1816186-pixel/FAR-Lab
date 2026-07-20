@@ -55,7 +55,7 @@ test('③ bestOfK=true → 机检红(防择优);schemaVersion=1 → 红(须升�
 
 test('v1 → v2 升级:补字段且 oracleReviewStatus=unreviewed 诚实标注', () => {
   const v2 = JSON.parse(readFileSync(REPORT_PATH, 'utf8')) as Record<string, unknown>;
-  const v1 = { ...v2, schemaVersion: 1 } as unknown as BenchmarkReport;
+  const v1 = JSON.parse(JSON.stringify({ ...v2, schemaVersion: 1 })) as BenchmarkReport;
   const upgraded = upgradeReportV1toV2(v1);
   assert.equal(upgraded.schemaVersion, 2);
   for (const entry of upgraded.entries) {
