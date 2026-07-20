@@ -115,9 +115,9 @@ export function appendRecord(
         `INSERT INTO call_records (
           stage_id, payload_kind, purpose_tag, model_id, dashscope_request_id,
           repro_hash, git_commit_sha, iso_timestamp, request_payload,
-          response_payload, response_payload_hash, degraded_from, finish_reason,
+          response_payload, request_payload_hash, response_payload_hash, degraded_from, finish_reason,
           usage_tokens_total, prev_hash, current_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.stageId,
@@ -130,6 +130,7 @@ export function appendRecord(
         input.cred.isoTimestamp,
         audit.requestPayload,
         audit.responsePayload,
+        audit.requestPayloadHash ?? null,
         audit.responsePayloadHash ?? null,
         audit.degradedFrom ?? null,
         audit.finishReason,
@@ -159,7 +160,7 @@ export function getCallRecordBySeq(db: Database.Database, seq: number): CallReco
     .prepare(
       `SELECT seq, stage_id, payload_kind, purpose_tag, model_id,
               dashscope_request_id, repro_hash, git_commit_sha, iso_timestamp,
-              request_payload, response_payload, response_payload_hash, degraded_from,
+              request_payload, response_payload, request_payload_hash, response_payload_hash, degraded_from,
               finish_reason, usage_tokens_total, prev_hash, current_hash,
               created_at
        FROM call_records

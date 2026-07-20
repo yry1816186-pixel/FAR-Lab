@@ -21,9 +21,9 @@ test('collectStatusDump: phase A cheap 字段从仓库实测', () => {
   // tsFileCount：src/**/*.ts 实测（项目 > 100 个 .ts）
   assert.ok(dump.tsFileCount > 50, `tsFileCount 应 > 50，实际: ${dump.tsFileCount}`);
 
-  // migrationCount：0001-0019 共 19 个（status_dump 从 schema/migrations/*.sql readdir 实测·非硬编码；
+  // migrationCount：0001-0020 共 20 个（status_dump 从 schema/migrations/*.sql readdir 实测·非硬编码；
   // 0019 = ruleset_uri·IC-01 内核版本化 ADR-007；0018 = FUSION-OS-6 evidence provenance DB trigger）。
-  assert.strictEqual(dump.migrationCount, 19);
+  assert.strictEqual(dump.migrationCount, 20);
   assert.ok(dump.migrationFiles.includes('0001_initial.sql'));
   assert.ok(dump.migrationFiles.includes('0008_anti_theater_fail_coverage.sql'));
   assert.ok(

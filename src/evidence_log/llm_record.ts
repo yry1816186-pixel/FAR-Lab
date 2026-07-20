@@ -84,6 +84,8 @@ export function appendLlmResponseRecord(
   const audit: CallAuditData = {
     requestPayload: canonicalJson(requestRecord, 'appendLlmResponseRecord.requestPayload'),
     responsePayload: canonicalJson(responseRecord, 'appendLlmResponseRecord.responsePayload'),
+    // IC-07(F-01 修复):request 侧同样落内容哈希,使 DROP TRIGGER/文件级旁路篡改可检
+    requestPayloadHash: hashCanonicalJson(requestRecord),
     responsePayloadHash: hashCanonicalJson(responseRecord),
     finishReason: args.metadata.finishReason,
     usageTokensTotal: args.response.credential.tokenUsage.totalTokens,

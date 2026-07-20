@@ -8,6 +8,7 @@ import type {
   CallRecordHashRow,
   VerifyResult,
   VerifyEvidencePayloadResult,
+  VerifyCallRecordPayloadResult,
 } from './types.ts';
 
 export function verifyChainHead(db: Database.Database): VerifyResult {
@@ -115,5 +116,70 @@ export function verifyEvidencePayloadHashes(db: Database.Database): VerifyEviden
     ok: tamperedEvidenceIds.length === 0,
     verifiedCount,
     tamperedEvidenceIds,
+  };
+}
+
+interface CallRecordPayloadRow {
+  readonly seq: number;
+  readonly request_payload: string;
+  readonly request_payload_hash: string | null;
+  readonly response_payload: string;
+  readonly response_payload_hash: string | null;
+}
+
+/**
+ * IC-07(F-01 修复 · RT-04):call_records payload 内容寻址重算。
+ *
+ * 反剧场:verifyChainHead 的 canonical 输入只含元数据列,payload 字节不在链上;
+ * append-only trigger 只防行级 UPDATE/DELETE,DROP TRIGGER(DDL)与 DB 文件级编辑可改
+ * request_payload/response_payload 而不触 trigger。本函数重算 hashCanonicalJson(JSON.parse(payload))
+ * 比对写入时落的 request_payload_hash/response_payload_hash,失配 → tampered 并定位 seq。
+ *
+ * 语义(canonicalJson 幂等):hashCanonicalJson(JSON.parse(stored)) === 写入时 hashCanonicalJson(record)。
+ * 老行 hash NULL(0020 前写入)→ legacy-not-covered 计数,不计 tampered(如实标注,不谎报覆盖)。
+ * payload 字节被改致非法 JSON → tampered(不静默吞解析错)。
+ */
+export function verifyCallRecordPayloadHashes(db: Database.Database): VerifyCallRecordPayloadResult {
+  const rows = db
+    .prepare(
+      `SELECT seq, request_payload, request_payload_hash, response_payload, response_payload_hash
+       FROM call_records
+       ORDER BY seq ASC`,
+    )
+    .all() as CallRecordPayloadRow[];
+
+  const tamperedSeqs: number[] = [];
+  let verifiedCount = 0;
+  let legacyCount = 0;
+
+  for (const row of rows) {
+    if (row.request_payload_hash === null || row.response_payload_hash === null) {
+      legacyCount += 1;
+      continue;
+    }
+    let requestOk: boolean;
+    let responseOk: boolean;
+    try {
+      requestOk = hashCanonicalJson(JSON.parse(row.request_payload)) === row.request_payload_hash;
+    } catch {
+      requestOk = false; // 非法 JSON = payload 字节被篡改 → tampered
+    }
+    try {
+      responseOk = hashCanonicalJson(JSON.parse(row.response_payload)) === row.response_payload_hash;
+    } catch {
+      responseOk = false;
+    }
+    if (!requestOk || !responseOk) {
+      tamperedSeqs.push(row.seq);
+      continue;
+    }
+    verifiedCount += 1;
+  }
+
+  return {
+    ok: tamperedSeqs.length === 0,
+    verifiedCount,
+    legacyCount,
+    tamperedSeqs,
   };
 }
