@@ -82,6 +82,10 @@ export function exportFarProof(input: FarProofExportInput): FarProofExportResult
   // 3c. otel-trace.jsonl (call_records 投影 OTel GenAI span·09 §5 V1基本·15 §1)
   filesWritten.push(writeOtelTraceJsonl(db, outputDir, runId));
 
+  // 3d. lifecycle_events.jsonl (IC-05 墓碑化导出:撤回/纠正/supersede 派生记录·可选分量,
+  //     不在 FAR_PROOF_REQUIRED_FILES——老 bundle(0021 前)无此文件仍为合法 V1 包)
+  filesWritten.push(writeLifecycleEventsJsonl(db, outputDir));
+
   // 4. ro-crate-metadata.json
   filesWritten.push(
     writeRoCrateMetadata(outputDir, runId, modelSnapshot, gitCommitSha, envHash, exportedAt, hashVerification),
@@ -178,6 +182,17 @@ function writeClaimGraphJson(db: Database.Database, dir: string): string {
   const edges = db
     .prepare(`SELECT * FROM evidence_edges ORDER BY created_at ASC`)
     .all();
+  // IC-05:撤回/纠正/supersede 状态映射(墓碑化呈现;空表=无生命周期事件)
+  const lifecycleRows = db
+    .prepare(
+      `SELECT target_kind, target_id, to_state FROM lifecycle_events
+       ORDER BY rowid ASC`,
+    )
+    .all() as Array<{ target_kind: string; target_id: string; to_state: string }>;
+  const lifecycleStates: Record<string, string> = {};
+  for (const row of lifecycleRows) {
+    lifecycleStates[`${row.target_kind}:${row.target_id}`] = row.to_state;
+  }
   const graph = {
     format: 'far-chain-claim-graph',
     version: '0.0.0',
@@ -186,9 +201,21 @@ function writeClaimGraphJson(db: Database.Database, dir: string): string {
     edgeCount: edges.length,
     nodes,
     edges,
+    lifecycleStates,
   };
   const filePath = join(dir, 'claim_graph.json');
   writeFileSync(filePath, JSON.stringify(graph, null, 2), 'utf8');
+  return filePath;
+}
+
+/** IC-05:生命周期派生记录导出(撤回标记随包可检) */
+function writeLifecycleEventsJsonl(db: Database.Database, dir: string): string {
+  const rows = db
+    .prepare(`SELECT * FROM lifecycle_events ORDER BY rowid ASC`)
+    .all();
+  const lines = rows.map((row) => JSON.stringify(row)).join('\n');
+  const filePath = join(dir, 'lifecycle_events.jsonl');
+  writeFileSync(filePath, lines.length > 0 ? lines + '\n' : '', 'utf8');
   return filePath;
 }
 

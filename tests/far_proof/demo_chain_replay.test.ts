@@ -39,6 +39,7 @@ const EXPECTED_FILES = [
   'call_records.redacted.jsonl',
   'claim_graph.json',
   'otel-trace.jsonl',
+  'lifecycle_events.jsonl', // IC-05:可选分量(0021 前老包无此文件仍合法)
   'data_manifest.json',
   'README_REPLAY.md',
   'code/MANIFEST.md',
