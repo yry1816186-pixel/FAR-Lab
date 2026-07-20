@@ -26,9 +26,11 @@ import type { Database } from 'better-sqlite3';
 
 import { computeChainMerkleRoot, computeMerkleRoot } from '../evidence_log/merkle_root.ts';
 import { VERDICTS, type Verdict } from '../schema/enums.ts';
+import { CURRENT_RULESET_URI } from '../proof_envelope/ruleset_version.ts';
+import { summarizeTotalCost } from '../llm_gateway/budget.ts';
+import { BENCHMARK_REPORT_SCHEMA_VERSION } from './report_schema.ts';
+import type { BenchmarkEntryV2, BenchmarkReportV2 } from './report_schema.ts';
 import type {
-  BenchmarkEntry,
-  BenchmarkReport,
   DomainDistribution,
   VerdictDistribution,
 } from './types.ts';
@@ -89,7 +91,7 @@ function defaultNow(): string {
 }
 
 /** 统计 verdict 分布（全 5 键恒在·未出现的 verdict 计 0）。 */
-function tallyVerdicts(entries: readonly BenchmarkEntry[]): VerdictDistribution {
+function tallyVerdicts(entries: readonly BenchmarkEntryV2[]): VerdictDistribution {
   const dist = {} as Record<Verdict, number>;
   for (const v of VERDICTS) {
     dist[v] = 0;
@@ -101,7 +103,7 @@ function tallyVerdicts(entries: readonly BenchmarkEntry[]): VerdictDistribution 
 }
 
 /** 统计领域分布（按 domain 字符串分组）。 */
-function tallyDomains(entries: readonly BenchmarkEntry[]): DomainDistribution {
+function tallyDomains(entries: readonly BenchmarkEntryV2[]): DomainDistribution {
   const dist: Record<string, number> = {};
   for (const entry of entries) {
     const prev = dist[entry.domain] ?? 0;
@@ -132,14 +134,16 @@ const HONESTY_NOTES: readonly string[] = [
 export async function runBenchmark(
   seeds: readonly SeedRunner[],
   opts: { readonly now?: () => string; readonly gitCommitSha?: string | null } = {},
-): Promise<BenchmarkReport> {
-  const entries: BenchmarkEntry[] = [];
+): Promise<BenchmarkReportV2> {
+  const executedAt = (opts.now ?? defaultNow)();
+  const entries: BenchmarkEntryV2[] = [];
 
   for (const seed of seeds) {
     // seed 须串行（各自 :memory: db·避免并发干扰·确定性顺序）
     const result = await seed.run();
     try {
       const { root, leafCount } = computeChainMerkleRoot(result.db);
+      const cost = summarizeTotalCost(result.db);
       entries.push({
         problemId: seed.problemId,
         problemTitle: seed.problemTitle,
@@ -153,6 +157,17 @@ export async function runBenchmark(
         converged: result.loopState.terminationReason === 'feedback_converged',
         chainVerified: result.chainVerify.ok,
         sourceId: result.sourceCard.sourceId,
+        // IC-10 披露字段(协议 v2)
+        taskId: seed.problemId,
+        oracleType: 'deterministic_kernel(R0-R9)',
+        oracleReviewStatus: 'unreviewed',
+        traceHash: root,
+        costTokens: cost.tokens,
+        kernelVersion: CURRENT_RULESET_URI,
+        modelVersion: 'offline_replay(fixture)',
+        seed: 'deterministic-fixture',
+        bestOfK: false,
+        executedAt,
       });
     } finally {
       result.db.close();
@@ -167,8 +182,8 @@ export async function runBenchmark(
   const totalLeaves = sorted.reduce((sum, e) => sum + e.leafCount, 0);
 
   return {
-    schemaVersion: 1,
-    generatedAt: (opts.now ?? defaultNow)(),
+    schemaVersion: BENCHMARK_REPORT_SCHEMA_VERSION,
+    generatedAt: executedAt,
     problemCount: sorted.length,
     entries: sorted,
     suiteIntegrityRoot,
@@ -177,5 +192,8 @@ export async function runBenchmark(
     domainDistribution: tallyDomains(sorted),
     gitCommitSha: opts.gitCommitSha ?? null,
     honestyNotes: HONESTY_NOTES,
+    kernelRulesetUri: CURRENT_RULESET_URI,
+    bestOfK: false,
+    executedAt,
   };
 }

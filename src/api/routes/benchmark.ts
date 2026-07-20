@@ -52,7 +52,7 @@ function isReportShape(value: unknown): value is BenchmarkReport {
   const v = value;
   return (
     'schemaVersion' in v &&
-    v.schemaVersion === 1 &&
+    (v.schemaVersion === 1 || v.schemaVersion === 2) &&
     'entries' in v &&
     Array.isArray(v.entries) &&
     'suiteIntegrityRoot' in v &&
