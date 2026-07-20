@@ -36,6 +36,23 @@ export {
   verifyCallRecordPayloadHashes,
 } from './verifier.ts';
 export {
+  LIFECYCLE_STATES,
+  TERMINAL_STATES,
+  LIFECYCLE_TARGET_KINDS,
+  getLifecycleState,
+  listLifecycleEvents,
+  applyLifecycleTransition,
+  verifyLifecycleChain,
+} from './lifecycle.ts';
+export type {
+  LifecycleState,
+  LifecycleTargetKind,
+  LifecycleEvent,
+  LifecycleTransitionInput,
+  LifecycleTransitionResult,
+  LifecycleChainVerifyResult,
+} from './lifecycle.ts';
+export {
   GENESIS_PREV_HASH,
 } from './types.ts';
 export type {

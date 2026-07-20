@@ -152,6 +152,12 @@ async function main(): Promise<void> {
     process.exit(exitCode);
   }
 
+  if (command === 'lifecycle') {
+    const { runLifecycle } = await import('./commands/lifecycle.ts');
+    const exitCode = await runLifecycle(argv.slice(1));
+    process.exit(exitCode);
+  }
+
   process.stderr.write(`far: unknown command '${command}'\n\n${HELP_TEXT}`);
   process.exit(1);
 }
@@ -720,6 +726,15 @@ USAGE:
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
     --json        machine-readable output (used by CI to backfill <X_FROM_STATUS_DUMP> placeholders)
+
+  far lifecycle <sub> --db <path> --target-kind <k> --target-id <id> [options]
+                         retraction/correction/supersession lifecycle (IC-05; tombstone append-only)
+    state                       print current state (active|contested|corrected|retracted|superseded)
+    history [--json]            print the full transition history of the target
+    transition --to <state> --actor <a> --reason <r> [--audit-ref <ref>]
+                                record a transition (illegal transitions are rejected, exit 1)
+    verify                      verify the target-scoped event hash chain
+    exit codes: 0 ok / 1 illegal transition or chain broken / 2 bad args
 
   far api [--port <n>] [--db <path>|--persist <path>] [--no-seed] [--protected]
           start the REST API server (Fastify; the frontend defaults to localhost:3000)
