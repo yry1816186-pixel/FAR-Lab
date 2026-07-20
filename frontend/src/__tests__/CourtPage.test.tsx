@@ -16,6 +16,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
 
 const MOCK_CERT: CourtCertificateDto = {
   certificateId: '01KWZTESTCOURTCERT123',
+  datasetSource: 'replay',
   claim: 'C-ASTRO-0001: TIC lightcurve transit signal',
   modelCount: 3,
   verdicts: [

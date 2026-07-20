@@ -32,6 +32,8 @@ export interface ArenaResult {
   readonly landedCount: number;
   readonly robust: boolean;
   readonly honestNote: string;
+  /** IC-11:数据来源标注(offline_replay=replay;前端只呈现不推断) */
+  readonly datasetSource: 'replay';
 }
 
 /**
@@ -96,6 +98,7 @@ export async function runArenaSession(
     attempts,
     landedCount,
     robust: landedCount === 0,
+    datasetSource: 'replay',
     honestNote:
       'under offline_replay the refuter replays the same fixture, so its verdict necessarily matches the original => no effective attacks; real adversarial testing requires a real provider (credential gate)',
   };

@@ -32,6 +32,8 @@ export interface ReliabilityCertificate {
   readonly distinctVerdicts: readonly string[];
   readonly agreement: 'unanimous' | 'majority' | 'split';
   readonly honestNote: string;
+  /** IC-11:数据来源标注(offline_replay=replay;前端只呈现不推断) */
+  readonly datasetSource: 'replay';
 }
 
 /** 一致性分类：全相同 unanimous / 两种 majority / 三种以上 split。 */
@@ -92,6 +94,7 @@ export async function runCourtSession(
     verdicts,
     distinctVerdicts,
     agreement,
+    datasetSource: 'replay',
     honestNote:
       'under offline_replay all models replay the same fixture, so verdicts are necessarily identical; real model disagreement requires a real provider (credential gate)',
   };

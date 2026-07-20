@@ -23,6 +23,8 @@
  * Both shapes are modeled below as observed; they are NOT interchangeable.
  */
 
+import type { DatasetSourceKind } from './dataset_source.ts';
+
 // ---------- Enums (mirror src/schema/enums.ts) ----------
 
 /** 5 verdict values. Authority: src/schema/enums.ts VERDICTS. */
@@ -392,6 +394,8 @@ export interface CourtCertificateDto {
   readonly distinctVerdicts: readonly string[];
   readonly agreement: 'unanimous' | 'majority' | 'split';
   readonly honestNote: string;
+  /** IC-11:数据来源标注(后端事实;前端只呈现不推断) */
+  readonly datasetSource: DatasetSourceKind;
 }
 
 /**
@@ -413,6 +417,8 @@ export interface ArenaResultDto {
   readonly landedCount: number;
   readonly robust: boolean;
   readonly honestNote: string;
+  /** IC-11:数据来源标注(后端事实;前端只呈现不推断) */
+  readonly datasetSource: DatasetSourceKind;
 }
 
 /**

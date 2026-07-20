@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { VerdictBadge } from '@/components/VerdictBadge';
+import { IntegrityBadge } from '@/components/IntegrityBadge';
 import {
   Table,
   TableBody,
@@ -173,7 +174,7 @@ export default function CourtPage() {
       {/* HonestyAlert */}
       <Alert>
         <ShieldAlert className="h-4 w-4" aria-hidden="true" />
-        <AlertTitle>Honesty statement</AlertTitle>
+        <AlertTitle className="flex items-center gap-2">Honesty statement <IntegrityBadge source={cert.datasetSource} /></AlertTitle>
         <AlertDescription>
           <p>{cert.honestNote}</p>
           <p className="mt-2">
