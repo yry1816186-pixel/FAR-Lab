@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://farlab.dev/schema/json/proof-envelope.schema.json",
+  "title": "FAR-Lab ProofEnvelope",
+  "x-generated-by": "scripts/generate_json_schema.mts(IC-12 · ADR-013 · 机器产物,禁手改)",
+  "x-source": "src/proof_envelope/types.ts#ProofEnvelope",
+  "type": "object",
+  "properties": {
+    "envelopeId": {
+      "type": "string"
+    },
+    "claimId": {
+      "type": "string"
+    },
+    "verdictNodeId": {
+      "type": "string"
+    },
+    "conclusion": {
+      "enum": [
+        "CONFIRMED",
+        "REFUTED",
+        "INCONCLUSIVE",
+        "DEGRADED_SCOPE",
+        "UNTESTED"
+      ]
+    },
+    "proofHash": {
+      "type": "string"
+    },
+    "prevProofHash": {
+      "type": "string"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ruleId": {
+            "enum": [
+              "RULE-PE-001",
+              "RULE-PE-002",
+              "RULE-PE-003",
+              "RULE-PE-004",
+              "RULE-PE-005",
+              "RULE-PE-006",
+              "RULE-PE-007",
+              "RULE-PE-008",
+              "RULE-PE-009"
+            ]
+          },
+          "ruleName": {
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "PASS",
+              "WARN",
+              "FAIL",
+              "SKIP"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ruleId",
+          "ruleName",
+          "outcome",
+          "detail"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "knownFailures": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "falsificationSpec": {
+      "type": "object",
+      "properties": {
+        "prediction": {
+          "type": "string"
+        },
+        "metric": {
+          "type": "string"
+        },
+        "falsificationThreshold": {
+          "type": "number"
+        },
+        "thresholdSemantics": {
+          "enum": [
+            "gt",
+            "lt",
+            "range"
+          ]
+        }
+      },
+      "required": [
+        "prediction",
+        "metric",
+        "falsificationThreshold",
+        "thresholdSemantics"
+      ],
+      "additionalProperties": false
+    },
+    "sourceAnchor": {
+      "type": "object",
+      "properties": {
+        "gitCommitSha": {
+          "type": "string"
+        },
+        "dashscopeRequestId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isoTimestamp": {
+          "type": "string"
+        },
+        "rawResponseHash": {
+          "type": "string"
+        },
+        "codeLocation": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            },
+            "lineNumber": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "filePath",
+            "location"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "gitCommitSha",
+        "dashscopeRequestId",
+        "isoTimestamp",
+        "rawResponseHash"
+      ],
+      "additionalProperties": false
+    },
+    "reproHash": {
+      "type": "string"
+    },
+    "rulesetUri": {
+      "type": "string"
+    },
+    "sealedBy": {
+      "const": "deterministic_sealer"
+    },
+    "sealedAt": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "envelopeId",
+    "claimId",
+    "verdictNodeId",
+    "conclusion",
+    "proofHash",
+    "prevProofHash",
+    "checks",
+    "knownFailures",
+    "falsificationSpec",
+    "sourceAnchor",
+    "reproHash",
+    "sealedBy",
+    "sealedAt",
+    "createdAt"
+  ],
+  "additionalProperties": false
+}

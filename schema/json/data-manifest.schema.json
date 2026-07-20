@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://farlab.dev/schema/json/data-manifest.schema.json",
+  "title": "FAR-Lab .far-proof data_manifest",
+  "x-generated-by": "scripts/generate_json_schema.mts(IC-12 · ADR-013 · 机器产物,禁手改)",
+  "x-source": "src/far_proof/exporter.ts#DataManifest",
+  "type": "object",
+  "properties": {
+    "generatedAt": {
+      "type": "string"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "totalFiles": {
+      "type": "number"
+    },
+    "ruleset": {
+      "type": "object",
+      "properties": {
+        "currentUri": {
+          "type": "string"
+        },
+        "supportedUris": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "legacyDefaultUri": {
+          "type": "string"
+        },
+        "semver": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "currentUri",
+        "supportedUris",
+        "legacyDefaultUri",
+        "semver"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "generatedAt",
+    "files",
+    "totalFiles",
+    "ruleset"
+  ],
+  "additionalProperties": false
+}

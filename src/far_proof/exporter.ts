@@ -355,8 +355,21 @@ function writeProvTtl(dir: string, runId: string, exportedAt: string): string {
   return filePath;
 }
 
+/** .far-proof data_manifest.json 结构(IC-12 schema 生成源;字段变更须重跑 generate_json_schema) */
+export interface DataManifest {
+  readonly generatedAt: string;
+  readonly files: readonly string[];
+  readonly totalFiles: number;
+  readonly ruleset: {
+    readonly currentUri: string;
+    readonly supportedUris: readonly string[];
+    readonly legacyDefaultUri: string;
+    readonly semver: string;
+  };
+}
+
 function writeDataManifest(dir: string, filesWritten: readonly string[], exportedAt: string): string {
-  const manifest = {
+  const manifest: DataManifest = {
     generatedAt: exportedAt,
     files: filesWritten.map((f) => f.replace(dir + '/', '').replace(dir + '\\', '')),
     totalFiles: filesWritten.length,

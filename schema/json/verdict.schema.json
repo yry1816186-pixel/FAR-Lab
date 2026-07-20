@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://farlab.dev/schema/json/verdict.schema.json",
+  "title": "FAR-Lab Five-Value Verdict",
+  "x-generated-by": "scripts/generate_json_schema.mts(IC-12 · ADR-013 · 机器产物,禁手改)",
+  "x-source": "src/schema/enums.ts#VERDICTS",
+  "enum": [
+    "CONFIRMED",
+    "REFUTED",
+    "INCONCLUSIVE",
+    "DEGRADED_SCOPE",
+    "UNTESTED"
+  ]
+}

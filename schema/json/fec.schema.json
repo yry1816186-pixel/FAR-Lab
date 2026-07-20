@@ -1,0 +1,501 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://farlab.dev/schema/json/fec.schema.json",
+  "title": "FAR-Lab Falsification Contract (FEC) V2",
+  "x-generated-by": "scripts/generate_json_schema.mts(IC-12 · ADR-013 · 机器产物,禁手改)",
+  "x-source": "src/fec/fec_contract.ts#FecContractV2",
+  "type": "object",
+  "properties": {
+    "fecId": {
+      "type": "string"
+    },
+    "contractVersion": {
+      "const": "FEC/2.0"
+    },
+    "claimId": {
+      "type": "string"
+    },
+    "measurableImplication": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "population": {
+          "type": "string"
+        },
+        "timeWindow": {
+          "type": "string"
+        },
+        "domainConstraint": {
+          "type": "string"
+        },
+        "boundaryConditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "knownNarrowing": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dimension": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "relation": {
+                "enum": [
+                  "within",
+                  "partial",
+                  "outside"
+                ]
+              }
+            },
+            "required": [
+              "dimension",
+              "value",
+              "relation"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "population",
+        "timeWindow",
+        "domainConstraint"
+      ],
+      "additionalProperties": false
+    },
+    "requiredEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidenceId": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "dataset",
+              "workflow",
+              "measurement",
+              "statistical",
+              "external"
+            ]
+          },
+          "critical": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "verificationCheckId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidenceId",
+          "kind",
+          "critical",
+          "description",
+          "verificationCheckId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "datasetRequirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "contentHashAlgorithm": {
+            "type": "string"
+          },
+          "allowSynthetic": {
+            "type": "boolean"
+          },
+          "requiredLicense": {
+            "type": "string"
+          },
+          "consentOrPrivacyTag": {
+            "type": "string"
+          },
+          "schemaFingerprintRequired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "contentHashAlgorithm",
+          "allowSynthetic",
+          "schemaFingerprintRequired"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "workflowRequirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "engine": {
+            "enum": [
+              "nextflow",
+              "snakemake",
+              "cwl",
+              "notebook",
+              "script",
+              "manual"
+            ]
+          },
+          "requireContainerDigest": {
+            "type": "boolean"
+          },
+          "requireCommandHash": {
+            "type": "boolean"
+          },
+          "expectedNetworkPolicy": {
+            "enum": [
+              "off",
+              "allowlist",
+              "unrestricted-with-warning"
+            ]
+          },
+          "requireFixedSeed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "engine",
+          "requireContainerDigest",
+          "requireCommandHash",
+          "expectedNetworkPolicy",
+          "requireFixedSeed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "metric": {
+      "type": "object",
+      "properties": {
+        "metricKey": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "computationRef": {
+          "type": "string"
+        },
+        "isDeterministic": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "metricKey",
+        "description",
+        "unit",
+        "computationRef",
+        "isDeterministic"
+      ],
+      "additionalProperties": false
+    },
+    "threshold": {
+      "type": "object",
+      "properties": {
+        "semantics": {
+          "enum": [
+            "gt",
+            "lt",
+            "range"
+          ]
+        },
+        "value": {
+          "type": "number"
+        },
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "semantics"
+      ],
+      "additionalProperties": false
+    },
+    "direction": {
+      "enum": [
+        "greater",
+        "less",
+        "equal",
+        "within",
+        "noninferior"
+      ]
+    },
+    "statisticalPlan": {
+      "type": "object",
+      "properties": {
+        "primaryMetric": {
+          "type": "string"
+        },
+        "nullHypothesis": {
+          "type": "string"
+        },
+        "alternativeHypothesis": {
+          "type": "string"
+        },
+        "alpha": {
+          "type": "number"
+        },
+        "effectDirection": {
+          "enum": [
+            "greater",
+            "less",
+            "two_sided"
+          ]
+        },
+        "confidenceIntervalMethod": {
+          "type": "string"
+        },
+        "multipleTestingCorrection": {
+          "enum": [
+            "none",
+            "bonferroni",
+            "holm",
+            "bh_fdr"
+          ]
+        },
+        "missingDataPolicy": {
+          "type": "string"
+        },
+        "outlierPolicy": {
+          "type": "string"
+        },
+        "stoppingRule": {
+          "type": "string"
+        },
+        "scopeLimitation": {
+          "type": "string"
+        },
+        "expectedDerivationForm": {
+          "enum": [
+            "literal",
+            "derived",
+            "formula",
+            "auto"
+          ]
+        }
+      },
+      "required": [
+        "primaryMetric",
+        "nullHypothesis",
+        "alternativeHypothesis",
+        "alpha",
+        "effectDirection",
+        "confidenceIntervalMethod",
+        "multipleTestingCorrection",
+        "missingDataPolicy",
+        "outlierPolicy",
+        "stoppingRule"
+      ],
+      "additionalProperties": false
+    },
+    "powerPlan": {
+      "type": "object",
+      "properties": {
+        "targetPower": {
+          "type": "number"
+        },
+        "minimumDetectableEffect": {
+          "type": "number"
+        },
+        "sampleSize": {
+          "type": "number"
+        },
+        "powerMethod": {
+          "type": "string"
+        },
+        "alphaAssumed": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "targetPower",
+        "minimumDetectableEffect",
+        "sampleSize",
+        "powerMethod",
+        "alphaAssumed"
+      ],
+      "additionalProperties": false
+    },
+    "multipleTestingPlan": {
+      "type": "object",
+      "properties": {
+        "correction": {
+          "enum": [
+            "bonferroni",
+            "holm",
+            "bh_fdr"
+          ]
+        },
+        "familySize": {
+          "type": "number"
+        },
+        "adjustedAlpha": {
+          "type": "number"
+        },
+        "preregistered": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "correction",
+        "familySize",
+        "adjustedAlpha",
+        "preregistered"
+      ],
+      "additionalProperties": false
+    },
+    "seedPolicy": {
+      "type": "object",
+      "properties": {
+        "fixed": {
+          "type": "boolean"
+        },
+        "seedValue": {
+          "type": "number"
+        },
+        "allowCherryPick": {
+          "type": "boolean"
+        },
+        "justification": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fixed",
+        "allowCherryPick"
+      ],
+      "additionalProperties": false
+    },
+    "deviationPolicy": {
+      "type": "object",
+      "properties": {
+        "criticalCategories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "nonCriticalHandling": {
+          "enum": [
+            "tolerate",
+            "degrade",
+            "block"
+          ]
+        },
+        "requireExplicitLog": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "criticalCategories",
+        "nonCriticalHandling",
+        "requireExplicitLog"
+      ],
+      "additionalProperties": false
+    },
+    "freeze": {
+      "type": "object",
+      "properties": {
+        "fecHash": {
+          "type": "string"
+        },
+        "actor": {
+          "type": "object",
+          "properties": {
+            "actorKind": {
+              "enum": [
+                "deterministic_compiler",
+                "deterministic_freezer",
+                "human",
+                "ci_runner"
+              ]
+            },
+            "actorId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "actorKind",
+            "actorId"
+          ],
+          "additionalProperties": false
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "environmentPolicy": {
+          "type": "string"
+        },
+        "deviationPolicyHash": {
+          "type": "string"
+        },
+        "frozenBy": {
+          "const": "deterministic_freezer"
+        }
+      },
+      "required": [
+        "fecHash",
+        "actor",
+        "timestamp",
+        "environmentPolicy",
+        "deviationPolicyHash",
+        "frozenBy"
+      ],
+      "additionalProperties": false
+    },
+    "integrityFlags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "fecId",
+    "contractVersion",
+    "claimId",
+    "measurableImplication",
+    "scope",
+    "requiredEvidence",
+    "datasetRequirements",
+    "workflowRequirements",
+    "metric",
+    "threshold",
+    "direction",
+    "statisticalPlan",
+    "seedPolicy",
+    "deviationPolicy",
+    "freeze",
+    "integrityFlags"
+  ],
+  "additionalProperties": false
+}
