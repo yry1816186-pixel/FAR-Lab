@@ -77,6 +77,11 @@ export interface ChainHeadStatus {
   /** FUSION-OS-10：derivable=1 evidence_payload hash 重算比对（反剧场·DB 文件级篡改检测·与链式 current_hash 正交）。undefined=未验证（无 DB）。 */
   readonly payloadHashOk?: boolean;
   readonly tamperedEvidenceIds?: readonly string[];
+  /** IC-07(F-01 修复)：call_records request/response payload 内容哈希重算比对。undefined=未验证（无 DB）。 */
+  readonly callPayloadHashOk?: boolean;
+  readonly tamperedCallSeqs?: readonly number[];
+  /** IC-07：hash 列 NULL 的老行数（0020 前写入,如实标注 legacy-not-covered,不计 tampered）。 */
+  readonly callPayloadLegacyCount?: number;
 }
 
 export interface StatusDump {

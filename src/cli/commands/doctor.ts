@@ -175,6 +175,64 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
     status: exit === 0 ? 'ok' : 'fail',
     detail: exit === 0 ? `far verify --bundle passed: ${fixture}` : `verify failed exit ${exit} (core capability broken)`,
   });
+
+  // IC-07(F-01 修复)能力自检:payload 内容哈希覆盖 —— 好库 ok + DROP TRIGGER 旁路篡改必检出。
+  try {
+    const { default: Database } = await import('better-sqlite3');
+    const { runMigrations } = await import('../../db/migrator.ts');
+    const { appendRecord, getChainHead, GENESIS_PREV_HASH, hashCanonicalJson } = await import('../../evidence_log/index.ts');
+    const { verifyCallRecordPayloadHashes } = await import('../../evidence_log/verifier.ts');
+    const mem = new Database(':memory:');
+    runMigrations(mem);
+    const reqRec = { probe: 'request' };
+    const resRec = { probe: 'response' };
+    appendRecord(
+      mem,
+      {
+        stageId: 'doctor-probe',
+        cred: {
+          modelId: 'doctor-fixture',
+          dashscopeRequestId: null,
+          reproHash: 'a'.repeat(64),
+          gitCommitSha: 'b'.repeat(40),
+          isoTimestamp: '2026-07-20T00:00:00.000Z',
+        },
+        payloadKind: 'hypothesis',
+        purposeTag: 'hypothesis',
+        prevHash: getChainHead(mem)?.currentHash ?? GENESIS_PREV_HASH,
+      },
+      {
+        requestPayload: JSON.stringify(reqRec),
+        responsePayload: JSON.stringify(resRec),
+        requestPayloadHash: hashCanonicalJson(reqRec),
+        responsePayloadHash: hashCanonicalJson(resRec),
+        finishReason: 'stop',
+        usageTokensTotal: 1,
+      },
+      { providerProfile: 'offline_replay' },
+    );
+    const clean = verifyCallRecordPayloadHashes(mem);
+    // 旁路模拟:DROP TRIGGER 后改 payload 字节(链验证不检,内容哈希必须检)
+    const triggers = mem.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='call_records'`).all() as Array<{ name: string }>;
+    for (const t of triggers) mem.exec(`DROP TRIGGER IF EXISTS "${t.name}"`);
+    mem.prepare(`UPDATE call_records SET request_payload='{"poison":1}' WHERE seq=1`).run();
+    const tampered = verifyCallRecordPayloadHashes(mem);
+    mem.close();
+    const detectOk = clean.ok && clean.verifiedCount === 1 && !tampered.ok && tampered.tamperedSeqs.includes(1);
+    checks.push({
+      name: 'call payload hash coverage (IC-07)',
+      status: detectOk ? 'ok' : 'fail',
+      detail: detectOk
+        ? 'clean verify ok + DROP TRIGGER tamper detected at seq=1'
+        : `unexpected: clean=${JSON.stringify(clean)} tampered=${JSON.stringify(tampered)}`,
+    });
+  } catch (e) {
+    checks.push({
+      name: 'call payload hash coverage (IC-07)',
+      status: 'fail',
+      detail: `self-check failed: ${e instanceof Error ? e.message : String(e)}`,
+    });
+  }
 }
 
 function checkProviderKey(checks: Check[]): void {

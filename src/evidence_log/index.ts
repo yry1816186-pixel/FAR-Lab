@@ -33,6 +33,7 @@ export type {
 export {
   verifyChainHead,
   verifyEvidencePayloadHashes,
+  verifyCallRecordPayloadHashes,
 } from './verifier.ts';
 export {
   GENESIS_PREV_HASH,
@@ -58,5 +59,6 @@ export type {
   SourceAnchor,
   VerifyResult,
   VerifyEvidencePayloadResult,
+  VerifyCallRecordPayloadResult,
   VerifiedCanonicalInput,
 } from './types.ts';

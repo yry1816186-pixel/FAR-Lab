@@ -70,6 +70,12 @@ export interface CallAuditData {
   readonly responsePayload: string;
   readonly finishReason: FinishReason;
   readonly usageTokensTotal: number | null;
+  /**
+   * IC-07(F-01 修复):request payload 内容哈希(sha256 canonical JSON·写入时落)。
+   * verifyCallRecordPayloadHashes 重算比对;老行 NULL = legacy-not-covered(如实标注,不计 tampered)。
+   * 不进 canonical 链输入(避免历史 current_hash 失效;独立内容寻址列,与链正交)。
+   */
+  readonly requestPayloadHash?: string | null;
   readonly responsePayloadHash?: string | null;
   /**
    * 降级来源模型 id（FallbackChain 降级时由调用方注入；非降级为 null/undefined）。
@@ -90,6 +96,8 @@ export interface CallRecordRow {
   readonly iso_timestamp: string;
   readonly request_payload: string;
   readonly response_payload: string;
+  /** IC-07 · migration 0020:老行 NULL = legacy-not-covered */
+  readonly request_payload_hash: string | null;
   readonly response_payload_hash: string | null;
   readonly degraded_from: string | null;
   readonly finish_reason: string;
@@ -158,7 +166,7 @@ export interface AppendEvidenceLogArgs {
 
 export type CallRecordHashRow = Omit<
   CallRecordRow,
-  'request_payload' | 'response_payload' | 'response_payload_hash' | 'finish_reason' | 'usage_tokens_total'
+  'request_payload' | 'response_payload' | 'request_payload_hash' | 'response_payload_hash' | 'finish_reason' | 'usage_tokens_total'
 >;
 
 export interface HashedRecord {
@@ -190,6 +198,19 @@ export interface VerifyEvidencePayloadResult {
   readonly ok: boolean;
   readonly verifiedCount: number;
   readonly tamperedEvidenceIds: readonly string[];
+}
+
+/**
+ * IC-07(F-01 修复):call_records payload 内容寻址重算结果。
+ * ok=false 时 tamperedSeqs 列出 request/response payload 与落库 hash 失配的 seq
+ * (payload 字节被 DROP TRIGGER/文件级旁路篡改的情形)。
+ * legacyCount:hash 列 NULL 的老行(0020 落地前写入)→ 如实标注 legacy-not-covered,不计 tampered。
+ */
+export interface VerifyCallRecordPayloadResult {
+  readonly ok: boolean;
+  readonly verifiedCount: number;
+  readonly legacyCount: number;
+  readonly tamperedSeqs: readonly number[];
 }
 
 export interface AppendRecordOptions {

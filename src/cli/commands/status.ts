@@ -18,7 +18,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { PACKAGE_ROOT } from '../paths.ts';
 
-import { verifyChainHead, verifyEvidencePayloadHashes } from '../../evidence_log/verifier.ts';
+import { verifyChainHead, verifyEvidencePayloadHashes, verifyCallRecordPayloadHashes } from '../../evidence_log/verifier.ts';
 import {
   collectStatusDump,
   TEST_GLOBS,
@@ -145,10 +145,18 @@ function verifyDbChainHead(dbPath: string): ChainHeadStatus {
     db = new Database(dbPath, { readonly: true });
     const result = verifyChainHead(db);
     const payloadHash = verifyEvidencePayloadHashes(db);
+    const callPayload = verifyCallRecordPayloadHashes(db);
     const payloadFields = {
       payloadHashOk: payloadHash.ok,
       ...(payloadHash.tamperedEvidenceIds.length > 0
         ? { tamperedEvidenceIds: payloadHash.tamperedEvidenceIds }
+        : {}),
+      callPayloadHashOk: callPayload.ok,
+      ...(callPayload.tamperedSeqs.length > 0
+        ? { tamperedCallSeqs: callPayload.tamperedSeqs }
+        : {}),
+      ...(callPayload.legacyCount > 0
+        ? { callPayloadLegacyCount: callPayload.legacyCount }
         : {}),
     };
     if (result.ok) {
@@ -235,6 +243,13 @@ function renderChainHead(head: ChainHeadStatus): string {
   // FUSION-OS-10：payload-hash 失配须显式披露（避免 chain ok 但 derivable=1 行被 DB 文件级篡改时「误导性 ok」）。
   if (head.payloadHashOk === false) {
     line += ` · PAYLOAD TAMPERED（${head.tamperedEvidenceIds?.length ?? 0} derivable=1 rows：${head.tamperedEvidenceIds?.join(', ') ?? ''}）`;
+  }
+  // IC-07(F-01 修复)：call_records payload 篡改/老行覆盖度如实披露。
+  if (head.callPayloadHashOk === false) {
+    line += ` · CALL PAYLOAD TAMPERED（seqs：${head.tamperedCallSeqs?.join(', ') ?? ''}）`;
+  }
+  if ((head.callPayloadLegacyCount ?? 0) > 0) {
+    line += ` · call payload legacy-not-covered=${head.callPayloadLegacyCount ?? 0}（0020 前老行,无内容哈希）`;
   }
   return line;
 }
