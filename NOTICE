@@ -1,0 +1,33 @@
+# NOTICE
+
+FAR-Lab 以 MIT License 发布（见根目录 LICENSE）。本文件登记第三方组件与许可状态。
+
+## 当前状态（2026-07-20，S6 裁决 ADR-020）
+
+- 主包（far-chain）：MIT（package.json + LICENSE）
+- 前端（far-chain-frontend）：MIT（2026-07-20 起与根一致；此前误标 Apache-2.0，DEBT-02 已闭环）
+
+## 第三方依赖许可（生产依赖，按 package.json 声明）
+
+| 包 | 许可（按各包声明） | 用途 |
+|---|---|---|
+| fastify 及 @fastify/* 插件 | MIT | HTTP API |
+| better-sqlite3 | MIT | 本地数据库 |
+| openai | Apache-2.0 | LLM SDK（Qwen 兼容端点） |
+| zod / zod-to-json-schema | MIT | Schema |
+| ulid | MIT | 标识符 |
+| fast-json-stable-stringify | MIT | canonical JSON |
+
+前端生产依赖（react/react-dom/react-router-dom/@tanstack/react-query/d3/reactflow/lucide-react/radix-ui 等）：均为 MIT 或 BSD 类许可（按各包声明）。
+
+## 数据与内容
+
+- examples/tess-offline：TESS 公开数据（NASA MAST 公开档案）派生的离线演示夹具。
+- golden_vectors：项目自造金向量，MIT。
+- benchmark/benchmark_report.json：项目内部评测产物，非公共 benchmark 数据。
+
+## 限制声明
+
+- 本清单按各包 package.json 声明汇总，未逐包核验 LICENSE 文件全文；自动化许可证扫描（DEF-15）落地前以此为准。
+- 字体、图标（lucide-react）按各自 ISC/MIT 许可。
+- 若发现许可冲突，请按 SECURITY.md 报告。
