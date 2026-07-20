@@ -48,8 +48,10 @@ import type {
   ReproHashProvider,
   StageArtifact,
   StageContext,
+  StageId,
   TerminationCriteria,
 } from './types.ts';
+import { StageReceiptStore } from './stage_receipt_store.ts';
 import { runStage1 } from './stages/stage1_understanding.ts';
 import { runStage2 } from './stages/stage2_integration.ts';
 import { runStage3 } from './stages/stage3_hypothesis.ts';
@@ -101,6 +103,12 @@ export interface RunAgentLoopArgs {
    * - 显式 profile:超限即停(fail-closed),LoopState.error.code='COST_BUDGET_EXCEEDED'。
    */
   readonly budget?: BudgetProfile | null;
+  /**
+   * IC-06:stage_receipt 恢复存储路径(可选)。
+   * 设置后:每 stage 完成签收据(脱敏)+快照落盘;重启从最近有效收据后续跑(幂等跳过);
+   * 输入变化→收据失效全量重跑;收据链伪造→fail-closed。
+   */
+  readonly resumeStorePath?: string;
   /** 可选：每阶段 artifact 入链后回调（流式输出用·向后兼容·默认不调）。 */
   readonly onArtifact?: (artifact: StageArtifact) => void;
 }
@@ -154,6 +162,24 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
   };
 
   try {
+    // IC-06:resume 存储(可选;伪造收据链 fail-closed;输入变化自动重置)
+    const resumeStore =
+      args.resumeStorePath !== undefined
+        ? StageReceiptStore.open(args.resumeStorePath, args.researchInput)
+        : null;
+    const runStageWithReceipt = async (
+      stageId: StageId,
+      execute: () => Promise<StageArtifact>,
+    ): Promise<StageArtifact> => {
+      const key = `${iteration}:${stageId}`;
+      if (resumeStore !== null && resumeStore.hasSnapshot(key)) {
+        // 幂等重放:不重复 LLM 调用、不重复落库、不重复副作用
+        return resumeStore.snapshot(key);
+      }
+      const artifact = await execute();
+      resumeStore?.record(iteration, stageId, artifact);
+      return artifact;
+    };
     while (true) {
       // G7(IC-04):成本硬预算断路器(超限即停,fail-closed;计量=tokensConsumed/墙钟/循环数)
       if (budgetProfile !== null) {
@@ -166,64 +192,70 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       // 顺序执行六阶段（每轮）
       // 注意：stage1/2/4/5 不消费 feedbackSignal（传 null）；仅 stage3 消费 [6]→[3] 回灌
 
-      const stage1 = await runStage1({
+      const stage1 = await runStageWithReceipt('stage1_understanding', () =>
+        runStage1({
         ...baseCtx,
         iteration,
         prevArtifacts: artifacts,
         feedbackSignal: null,
         tokensConsumed,
-      });
+        }));
       appendArtifact(stage1);
       tokensConsumed += extractTotalTokens(stage1.callResult);
 
-      const stage2 = await runStage2({
+      const stage2 = await runStageWithReceipt('stage2_integration', () =>
+        runStage2({
         ...baseCtx,
         iteration,
         prevArtifacts: artifacts,
         feedbackSignal: null,
         tokensConsumed,
-      });
+        }));
       appendArtifact(stage2);
       tokensConsumed += extractTotalTokens(stage2.callResult);
 
       // stage3：消费 feedbackSignal（[6]→[3] 回灌·首轮为 null）+ falsifiability_gate 硬阻断
-      const stage3 = await runStage3({
+      const stage3 = await runStageWithReceipt('stage3_hypothesis', () =>
+        runStage3({
         ...baseCtx,
         iteration,
         prevArtifacts: artifacts,
         feedbackSignal,
         tokensConsumed,
-      });
+        }));
       appendArtifact(stage3);
       tokensConsumed += extractTotalTokens(stage3.callResult);
 
-      const stage4 = await runStage4({
+      const stage4 = await runStageWithReceipt('stage4_evidence', () =>
+        runStage4({
         ...baseCtx,
         iteration,
         prevArtifacts: artifacts,
         feedbackSignal: null,
         tokensConsumed,
-      });
+        }));
       appendArtifact(stage4);
       tokensConsumed += extractTotalTokens(stage4.callResult);
 
-      const stage5 = await runStage5({
+      const stage5 = await runStageWithReceipt('stage5_plan', () =>
+        runStage5({
         ...baseCtx,
         iteration,
         prevArtifacts: artifacts,
         feedbackSignal: null,
         tokensConsumed,
-      });
+        }));
       appendArtifact(stage5);
       tokensConsumed += extractTotalTokens(stage5.callResult);
 
-      const stage6 = await runStage6({
+      const stage6 = await runStageWithReceipt('stage6_feedback', () =>
+        runStage6({
         ...baseCtx,
         iteration,
         prevArtifacts: artifacts,
         feedbackSignal: null,
         tokensConsumed,
-      });
+        }));
       appendArtifact(stage6);
       tokensConsumed += extractTotalTokens(stage6.callResult);
 
