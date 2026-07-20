@@ -22,6 +22,8 @@ export interface FsmAdvanceOptions {
   readonly event: string;
   readonly inputPath: string;
   readonly stateFile: string;
+  /** G2(IC-02):dry-run 只输出 diff 不落盘(不写 stateFile) */
+  readonly dryRun?: boolean;
 }
 
 export interface FsmStateFile {
@@ -91,6 +93,20 @@ export function runFsmAdvance(options: FsmAdvanceOptions): FsmAdvanceResult {
     prevReceipt: receipt,
     history: [...current.history, stageReceipt],
   };
+  if (options.dryRun === true) {
+    // G2(IC-02):dry-run 输出 diff 不落盘(stateFile 不被触碰)
+    process.stdout.write(
+      `dry-run: ${current.state} → ${result.next}(未写入 ${options.stateFile})\n` +
+        `diff: prevReceipt ${current.prevReceipt.slice(0, 12)}… → ${receipt.slice(0, 12)}… history ${current.history.length} → ${nextState.history.length}\n`,
+    );
+    return {
+      ok: true,
+      exitCode: 0,
+      receipt: stageReceipt,
+      nextState: result.next,
+      stateFile: options.stateFile,
+    };
+  }
   writeStateFile(options.stateFile, nextState);
 
   return {

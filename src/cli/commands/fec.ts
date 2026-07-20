@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { compileFec, computeFecHash } from '../../fec/compiler.ts';
+import { protectedActionGuard } from '../../agent_loop/guards.ts';
 import type {
   CompileFecResult,
   FalsificationPlan,
@@ -118,6 +119,12 @@ export function runFecCompile(options: FecCompileOptions): number {
 }
 
 export function runFecFreeze(options: FecFreezeOptions): number {
+  // G1(IC-02):freeze 为受保护动作;发起方=人类 CLI 显式命令
+  const guard = protectedActionGuard('freeze', 'cli_user');
+  if (!guard.allow) {
+    process.stderr.write(`far fec freeze: ${guard.reason}\n`);
+    return 1;
+  }
   if (!existsSync(options.fecPath)) {
     process.stderr.write(`far fec freeze: fec file not found: ${options.fecPath}\n`);
     return 2;

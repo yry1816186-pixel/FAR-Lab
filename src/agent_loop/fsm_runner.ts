@@ -29,6 +29,7 @@ import type { Database } from 'better-sqlite3';
 
 import type { AppendRecordOptions } from '../evidence_log/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
+import { sanitizeExternalContent } from '../llm_gateway/sanitizer.ts';
 import type {
   LlmResponse,
   ProviderProfile,
@@ -120,11 +121,12 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
   let iteration = 1;
 
   // baseCtx 是循环外不变的 StageContext 部分（循环内部状态字段在每轮重新构造）
+  // G3(IC-02):researchInput 为外部内容,进循环前统一 untrusted 包装+指令剥离(数据≠指令)
   const baseCtx: Omit<StageContext,
     'iteration' | 'prevArtifacts' | 'feedbackSignal' | 'tokensConsumed'
   > = {
     runId: args.runId,
-    researchInput: args.researchInput,
+    researchInput: sanitizeExternalContent(args.researchInput).text,
     gateway: args.gateway,
     profile: args.profile,
     finishReasonExtractor: args.finishReasonExtractor,

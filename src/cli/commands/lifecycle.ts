@@ -12,6 +12,7 @@
 
 import Database from 'better-sqlite3';
 import { runMigrations } from '../../db/migrator.ts';
+import { protectedActionGuard } from '../../agent_loop/guards.ts';
 import {
   applyLifecycleTransition,
   getLifecycleState,
@@ -114,6 +115,12 @@ export async function runLifecycle(argv: readonly string[]): Promise<number> {
       return 0;
     }
     if (parsed.sub === 'transition') {
+      // G1(IC-02):approve 为受保护动作;发起方=人类 CLI 显式命令
+      const guard = protectedActionGuard('approve', 'cli_user');
+      if (!guard.allow) {
+        process.stderr.write(`far lifecycle: ${guard.reason}\n`);
+        return 1;
+      }
       try {
         const result = applyLifecycleTransition(db, {
           targetKind: kind,

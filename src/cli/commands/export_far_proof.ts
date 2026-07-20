@@ -14,6 +14,7 @@ import {
   DEMO_RUN_ID,
 } from '../../far_proof/demo_chain.ts';
 import { exportFarProof, packageFarProofBundle, type FarProofExportResult, type FarProofPackageResult } from '../../far_proof/index.ts';
+import { protectedActionGuard } from '../../agent_loop/guards.ts';
 
 export type ExportFarProofSource =
   | { readonly kind: 'demoChain' }
@@ -55,6 +56,12 @@ export interface ExportFarProofCliResult {
 }
 
 export function runExportFarProof(options: ExportFarProofOptions): number {
+  // G1(IC-02):export 为受保护动作;发起方=人类 CLI 显式命令(LLM 路径不存在,llm_suggestion 必 deny)
+  const guard = protectedActionGuard('export', 'cli_user');
+  if (!guard.allow) {
+    process.stderr.write(`far export far-proof: ${guard.reason}\n`);
+    return 1;
+  }
   const prepared = prepareOutputDir(options.outputDir, options.force);
   if (!prepared.ok) {
     process.stderr.write(`far export far-proof: ${prepared.error}\n`);
