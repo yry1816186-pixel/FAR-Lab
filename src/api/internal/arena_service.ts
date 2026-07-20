@@ -7,12 +7,11 @@
 // （展示「稳健」是 fixture 一致的结果，非真实抗攻击）。真实对抗须接真实 provider（凭据门）。
 // 红线：refuter 的 verdict 仍由 R0-R9 确定性内核给出（LLM 非裁决者）；arbiter 是确定性规则，非 LLM 仲裁。
 
-import Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 
 import { createLlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
-import { runMigrations } from '../../db/migrator.ts';
+import { openFarDb } from '../../db/open.ts';
 import { executeAskRun } from '../../cli/commands/ask.ts';
 
 /** 单次反驳尝试。 */
@@ -48,9 +47,7 @@ async function runOne(
   modelId: string,
   gitCommitSha: string,
 ): Promise<{ verdict: string | null; rule: string | null; error: string | null }> {
-  const db = new Database(':memory:');
-  db.pragma('journal_mode = WAL');
-  runMigrations(db);
+  const db = openFarDb(':memory:');
   try {
     const gateway = createLlmGateway([createOfflineReplayAdapter({ modelId })]);
     const result = await executeAskRun(db, question, 'quick', gitCommitSha, undefined, gateway);

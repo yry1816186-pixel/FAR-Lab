@@ -5,10 +5,9 @@
 // 入链后立即打印（真·实时流，非跑完回放——runAgentLoop.onArtifact 钩子驱动）。
 // 默认 offline_replay profile（零密钥·fixture）；真实推理同 far ask 的 profile 限制。
 
-import Database from 'better-sqlite3';
 
 import type { StageArtifact } from '../../agent_loop/types.ts';
-import { runMigrations } from '../../db/migrator.ts';
+import { openFarDb } from '../../db/open.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 import { executeAskRun } from './ask.ts';
 
@@ -107,9 +106,7 @@ export async function runStream(argv: readonly string[]): Promise<number> {
     process.stdout.write('  ─────────────────────────────────────────────────\n');
   }
 
-  const db = new Database(':memory:');
-  db.pragma('journal_mode = WAL');
-  runMigrations(db);
+  const db = openFarDb(':memory:');
   try {
     const gitCommitSha = resolveGitCommitSha();
     const result = await executeAskRun(db, args.question, args.mode, gitCommitSha, (a) =>

@@ -20,6 +20,7 @@ import { PACKAGE_ROOT } from '../paths.ts';
 
 import { verifyChainHead, verifyEvidencePayloadHashes, verifyCallRecordPayloadHashes } from '../../evidence_log/verifier.ts';
 import { summarizeCostsByStage, summarizeTotalCost } from '../../llm_gateway/budget.ts';
+import { openFarDb } from '../../db/open.ts';
 import {
   collectStatusDump,
   TEST_GLOBS,
@@ -143,7 +144,8 @@ function runCoverage(): CoverageResult {
 function verifyDbChainHead(dbPath: string): ChainHeadStatus {
   let db: Database.Database | undefined;
   try {
-    db = new Database(dbPath, { readonly: true });
+    // IC-03(F-03):status 只读路径同样 quick_check(损坏即 broken 披露,不再静默 ok)
+    db = openFarDb(dbPath, { readonly: true, integrityCheck: 'quick' });
     const result = verifyChainHead(db);
     const payloadHash = verifyEvidencePayloadHashes(db);
     const callPayload = verifyCallRecordPayloadHashes(db);

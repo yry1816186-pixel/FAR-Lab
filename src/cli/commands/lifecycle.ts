@@ -10,8 +10,7 @@
 // 退出码:0 正常 / 1 非法迁移或校验失败 / 2 参数错误。
 // 诚实声明:actor 是签核留痕字符串,CLI 不做身份鉴别(签核权威性属治理面,ADR-004/021)。
 
-import Database from 'better-sqlite3';
-import { runMigrations } from '../../db/migrator.ts';
+import { openFarDb } from '../../db/open.ts';
 import { protectedActionGuard } from '../../agent_loop/guards.ts';
 import {
   applyLifecycleTransition,
@@ -91,8 +90,7 @@ export async function runLifecycle(argv: readonly string[]): Promise<number> {
     process.stderr.write(`far lifecycle: ${parsed.error}\n`);
     return 2;
   }
-  const db = new Database(parsed.dbPath);
-  runMigrations(db); // 幂等:新库建表,老库跳过已应用版本
+  const db = openFarDb(parsed.dbPath); // G5 基线+完整性检查+迁移(幂等)
   try {
     const kind = parsed.targetKind;
     const id = parsed.targetId ?? '';
