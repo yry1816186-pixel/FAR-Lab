@@ -65,6 +65,18 @@ node src/cli/far.ts verify /tmp/tampered
 #   → tamperStatus: tampered · recomputation.node: fail · exit 7
 ```
 
+### Scripted Hero walkthroughs (IC-08, timed + honest-labeled)
+
+```bash
+node scripts/hero_tamper_walkthrough.mjs   # HERO-TAMPER-PLUS: export→verify clean→tamper→verify exit 7 (≤60s)
+node scripts/hero_multiseed.mjs            # HERO-MULTISEED: cherry-pick caught over 5 pre-registered real BLS seeds (≤90s, needs python+numpy)
+```
+
+Both scripts exit non-zero if the narrative breaks (script failure = Hero failure), print an
+honest-status section (what is proven vs NOT proven), and time-box the run. They prove bundle
+integrity + tamper detection + independent recomputation — not scientific truth (fixtures).
+
+
 Full CLI reference: `node src/cli/far.ts --help`.
 
 ---
