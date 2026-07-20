@@ -172,7 +172,16 @@ const importsOf = (f) => [...read(f).matchAll(/^import\s+(?!type)[^'"]*from\s+'(
   check('FF-14', 'JSON Schema 生成物与 TS 类型零漂移', r.status === 0, `generate_json_schema --check exit=${r.status ?? '?'} ${tail}`);
 }
 
+// FF-15 Science-125 报告协议机检(IC-10 · DI-09): benchmark_report.json 披露字段集强制
+// (taskId/oracleType/oracleReviewStatus/traceHash/costTokens/kernelVersion+modelVersion/seed/bestOfK=false/executedAt);
+// 缺任一字段或 bestOfK≠false → 红。机检: scripts/benchmark_report_check.mts
+{
+  const r = spawnSync(process.execPath, ['scripts/benchmark_report_check.mts'], { encoding: 'utf8' });
+  const tail = String(r.stdout ?? r.stderr ?? '').trim().split('\n').slice(-1)[0] ?? '';
+  check('FF-15', 'Science-125 报告披露字段集强制(协议 v2)', r.status === 0, `benchmark_report_check exit=${r.status ?? '?'} ${tail}`);
+}
+
 console.log('══ Architecture Fitness Functions (§12.5) ══');
 for (const line of report) console.log(line);
-console.log(failures === 0 ? '\nfitness: PASS (14/14)' : `\nfitness: FAIL (${failures} 项)`);
+console.log(failures === 0 ? '\nfitness: PASS (15/15)' : `\nfitness: FAIL (${failures} 项)`);
 process.exit(failures === 0 ? 0 : 1);

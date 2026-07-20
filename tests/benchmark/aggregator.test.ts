@@ -25,7 +25,7 @@ import assert from 'node:assert/strict';
 
 import { runBenchmark } from '../../src/benchmark/index.ts';
 import { BENCHMARK_SEEDS } from '../demo_seeds/registry.ts';
-import type { BenchmarkReport } from '../../src/benchmark/types.ts';
+import type { BenchmarkReportV2 } from '../../src/benchmark/report_schema.ts';
 import { VERDICTS } from '../../src/schema/enums.ts';
 import { computeMerkleRoot } from '../../src/evidence_log/merkle_root.ts';
 import { loadReport, __resetBenchmarkCache } from '../../src/api/routes/benchmark.ts';
@@ -38,14 +38,18 @@ const HEX64 = /^[0-9a-f]{64}$/;
 const [report, secondRun] = await Promise.all([
   runBenchmark(BENCHMARK_SEEDS, { now: FIXED_NOW }),
   runBenchmark(BENCHMARK_SEEDS, { now: FIXED_NOW }),
-]) as [BenchmarkReport, BenchmarkReport];
+]) as [BenchmarkReportV2, BenchmarkReportV2];
 
 test('runBenchmark 返回合法 BenchmarkReport（全字段）', () => {
-  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.schemaVersion, 2);
   assert.equal(report.generatedAt, '2026-06-29T00:00:00.000Z');
   assert.equal(report.problemCount, report.entries.length);
   assert.ok(report.entries.length >= 1, 'should have ≥1 problem');
   assert.match(report.suiteIntegrityRoot, HEX64);
+  // IC-10 协议 v2 顶层披露字段
+  assert.equal(report.bestOfK, false);
+  assert.match(report.kernelRulesetUri, /^farlab\.dev\/ruleset\/v\d+$/);
+  assert.equal(report.executedAt, report.generatedAt);
 
   for (const entry of report.entries) {
     assert.ok(entry.problemId.length > 0, 'problemId non-empty');
@@ -59,6 +63,17 @@ test('runBenchmark 返回合法 BenchmarkReport（全字段）', () => {
     assert.equal(entry.chainVerified, true, 'chain verify should pass');
     assert.ok(entry.sourceId.length > 0, 'sourceId non-empty');
     assert.ok(entry.leafCount >= 7, 'leafCount ≥7 (6 loop + 1 FEC)');
+    // IC-10 协议 v2 条目披露字段
+    assert.equal(entry.taskId, entry.problemId);
+    assert.equal(entry.oracleType, 'deterministic_kernel(R0-R9)');
+    assert.equal(entry.oracleReviewStatus, 'unreviewed');
+    assert.equal(entry.traceHash, entry.integrityRoot);
+    assert.ok(typeof entry.costTokens === 'number' && entry.costTokens >= 0, 'costTokens 真实计量');
+    assert.match(entry.kernelVersion, /^farlab\.dev\/ruleset\/v\d+$/);
+    assert.equal(entry.modelVersion, 'offline_replay(fixture)');
+    assert.equal(entry.seed, 'deterministic-fixture');
+    assert.equal(entry.bestOfK, false);
+    assert.equal(entry.executedAt, report.generatedAt);
   }
 });
 

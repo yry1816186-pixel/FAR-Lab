@@ -58,7 +58,7 @@ test('GET /api/v1/benchmark → 200 + 完整报告（报告已生成）', async 
     const response = await app.inject({ method: 'GET', url: '/api/v1/benchmark' });
     assert.equal(response.statusCode, 200);
     const body = response.json() as ReportDto;
-    assert.equal(body.schemaVersion, 1);
+    assert.ok(body.schemaVersion === 1 || body.schemaVersion === 2, `schemaVersion ${body.schemaVersion}(v2=IC-10 协议)`);
     assert.match(body.suiteIntegrityRoot, HEX64);
     assert.ok(body.entries.length >= 1, 'should have ≥1 problem');
     assert.equal(body.problemCount, body.entries.length);

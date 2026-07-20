@@ -8,7 +8,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { runBenchmark, type SeedRunner } from '../../benchmark/index.ts';
-import type { BenchmarkReport } from '../../benchmark/types.ts';
+import type { BenchmarkReportV2 } from '../../benchmark/report_schema.ts';
 
 export interface BenchRunOptions {
   readonly json: boolean;
@@ -67,7 +67,7 @@ async function loadDemoBenchmarkSeeds(): Promise<readonly SeedRunner[]> {
   return module.BENCHMARK_SEEDS;
 }
 
-function renderBenchRunSummary(report: BenchmarkReport, outputPath: string | undefined): string {
+function renderBenchRunSummary(report: BenchmarkReportV2, outputPath: string | undefined): string {
   const lines = [
     'FAR-Bench Demo Run (offline fixture · engineering integrity profile)',
     '════════════════════════════════════════════════════════════',

@@ -20,3 +20,15 @@ export {
   type SeedRunner,
   type BenchmarkSeedInput,
 } from './aggregator.ts';
+
+export {
+  BENCHMARK_REPORT_SCHEMA_VERSION,
+  REPORT_V2_TOP_REQUIRED,
+  REPORT_V2_ENTRY_REQUIRED,
+  checkBenchmarkReportV2,
+  upgradeReportV1toV2,
+  type BenchmarkEntryV2,
+  type BenchmarkReportV2,
+  type OracleReviewStatus,
+  type ReportCheckResult,
+} from './report_schema.ts';
