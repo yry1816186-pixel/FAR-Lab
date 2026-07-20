@@ -30,6 +30,12 @@ import type { Database } from 'better-sqlite3';
 import type { AppendRecordOptions } from '../evidence_log/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import { sanitizeExternalContent } from '../llm_gateway/sanitizer.ts';
+import {
+  DEFAULT_BUDGET_PROFILE,
+  checkBudget,
+  CostBudgetExceeded,
+  type BudgetProfile,
+} from '../llm_gateway/budget.ts';
 import type {
   LlmResponse,
   ProviderProfile,
@@ -88,6 +94,13 @@ export interface RunAgentLoopArgs {
   readonly appendOptions: AppendRecordOptions;
   readonly evidenceLogDb: Database;
   readonly termination?: TerminationCriteria;
+  /**
+   * G7(IC-04):成本硬预算断路器。
+   * - 缺省:DEFAULT_BUDGET_PROFILE(默认开启,宽松兜底);
+   * - 显式 null:关闭(红线决策,须调用方明示);
+   * - 显式 profile:超限即停(fail-closed),LoopState.error.code='COST_BUDGET_EXCEEDED'。
+   */
+  readonly budget?: BudgetProfile | null;
   /** 可选：每阶段 artifact 入链后回调（流式输出用·向后兼容·默认不调）。 */
   readonly onArtifact?: (artifact: StageArtifact) => void;
 }
@@ -110,6 +123,9 @@ export interface RunAgentLoopArgs {
  */
 export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
   const termination: TerminationCriteria = args.termination ?? DEFAULT_TERMINATION;
+  // G7(IC-04):缺省=默认兜底预算(默认开启);显式 null=关闭(红线,调用方明示)
+  const budgetProfile: BudgetProfile | null =
+    args.budget === undefined ? DEFAULT_BUDGET_PROFILE : args.budget;
   const startTime: number = Date.now();
   const artifacts: StageArtifact[] = [];
   const appendArtifact = (a: StageArtifact): void => {
@@ -139,6 +155,14 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
 
   try {
     while (true) {
+      // G7(IC-04):成本硬预算断路器(超限即停,fail-closed;计量=tokensConsumed/墙钟/循环数)
+      if (budgetProfile !== null) {
+        checkBudget(budgetProfile, {
+          tokensConsumed,
+          elapsedMs: Date.now() - startTime,
+          loopsCompleted: iteration - 1,
+        });
+      }
       // 顺序执行六阶段（每轮）
       // 注意：stage1/2/4/5 不消费 feedbackSignal（传 null）；仅 stage3 消费 [6]→[3] 回灌
 
@@ -243,6 +267,23 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       iteration++;
     }
   } catch (err) {
+    // G7(IC-04):成本断路=清晰错误码(不落入通用 error 语义)
+    if (err instanceof CostBudgetExceeded) {
+      return {
+        runId: args.runId,
+        iterationsCompleted: iteration,
+        terminated: true,
+        terminationReason: 'error',
+        artifacts,
+        verdictNode: null,
+        error: {
+          code: 'COST_BUDGET_EXCEEDED',
+          message: err.message,
+          stageId: null,
+          cause: err,
+        },
+      };
+    }
     // 任意阶段抛 AgentLoopError → 终止循环（reason='error'）
     // 错误恢复策略（§7.2 表）部分由 stage 执行器内部实现（retry_policy / stage3 gate）；
     // fsm_runner 层只负责捕获 + 落 LoopState.error。

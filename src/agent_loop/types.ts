@@ -331,6 +331,7 @@ export interface AgentLoopError {
     | 'DASHSCOPE_REQUEST_ID_NULL_FATAL'
     | 'MAX_TOKENS_EXCEEDED'
     | 'MAX_DURATION_EXCEEDED'
+    | 'COST_BUDGET_EXCEEDED'
     | 'STAGE_SCHEMA_INVALID'
     | 'RETRY_EXHAUSTED';
   readonly message: string;

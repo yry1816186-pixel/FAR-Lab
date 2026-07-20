@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { PACKAGE_ROOT } from '../paths.ts';
 
 import { verifyChainHead, verifyEvidencePayloadHashes, verifyCallRecordPayloadHashes } from '../../evidence_log/verifier.ts';
+import { summarizeCostsByStage, summarizeTotalCost } from '../../llm_gateway/budget.ts';
 import {
   collectStatusDump,
   TEST_GLOBS,
@@ -146,6 +147,8 @@ function verifyDbChainHead(dbPath: string): ChainHeadStatus {
     const result = verifyChainHead(db);
     const payloadHash = verifyEvidencePayloadHashes(db);
     const callPayload = verifyCallRecordPayloadHashes(db);
+    const costByStage = summarizeCostsByStage(db);
+    const costTotal = summarizeTotalCost(db);
     const payloadFields = {
       payloadHashOk: payloadHash.ok,
       ...(payloadHash.tamperedEvidenceIds.length > 0
@@ -158,6 +161,8 @@ function verifyDbChainHead(dbPath: string): ChainHeadStatus {
       ...(callPayload.legacyCount > 0
         ? { callPayloadLegacyCount: callPayload.legacyCount }
         : {}),
+      costByStage,
+      costTotalTokens: costTotal.tokens,
     };
     if (result.ok) {
       return { status: 'ok', verifiedCount: result.verifiedCount, ...payloadFields };
@@ -250,6 +255,14 @@ function renderChainHead(head: ChainHeadStatus): string {
   }
   if ((head.callPayloadLegacyCount ?? 0) > 0) {
     line += ` · call payload legacy-not-covered=${head.callPayloadLegacyCount ?? 0}（0020 前老行,无内容哈希）`;
+  }
+  // IC-04(G7):分阶段成本披露(call_records 真实计量,非厂商账单对账)
+  if (head.costByStage !== undefined && head.costByStage.length > 0) {
+    const stageText = head.costByStage
+      .slice(0, 5)
+      .map((s) => `${s.stageId}=${s.tokens}tok/${s.calls}calls`)
+      .join(', ');
+    line += ` · cost: total=${head.costTotalTokens ?? 0}tok [${stageText}${head.costByStage.length > 5 ? ', …' : ''}]`;
   }
   return line;
 }

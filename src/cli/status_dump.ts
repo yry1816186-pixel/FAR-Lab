@@ -82,6 +82,9 @@ export interface ChainHeadStatus {
   readonly tamperedCallSeqs?: readonly number[];
   /** IC-07：hash 列 NULL 的老行数（0020 前写入,如实标注 legacy-not-covered,不计 tampered）。 */
   readonly callPayloadLegacyCount?: number;
+  /** IC-04(G7)：分阶段成本计量(call_records 真实记录);undefined=未验证(无 DB)。 */
+  readonly costByStage?: ReadonlyArray<{ readonly stageId: string; readonly calls: number; readonly tokens: number }>;
+  readonly costTotalTokens?: number;
 }
 
 export interface StatusDump {
