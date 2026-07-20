@@ -9,6 +9,7 @@ import { ulid } from 'ulid';
 import type Database from 'better-sqlite3';
 import { validateProofEnvelope, hasAntiTheaterViolation } from './validator.ts';
 import { computeProofHash } from './proof_hash.ts';
+import { CURRENT_RULESET_URI, assertSealableRulesetUri } from './ruleset_version.ts';
 import type { ProofEnvelope, SealProofEnvelopeInput, ProofCheckResult } from './types.ts';
 
 export interface SealResult {
@@ -58,6 +59,10 @@ export function sealProofEnvelope(
     (c) => c.outcome === 'WARN' || c.outcome === 'FAIL',
   );
 
+  // 1c. 规则集版本盖章(ADR-007 · IC-01):默认当前 URI;显式指定须格式合法且主版本受支持(fail-closed)。
+  const rulesetUri = input.rulesetUri ?? CURRENT_RULESET_URI;
+  assertSealableRulesetUri(rulesetUri);
+
   // 2. 构造 envelope (不含 proofHash)
   const knownFailures: readonly string[] = input.knownFailures ?? [];
 
@@ -72,6 +77,7 @@ export function sealProofEnvelope(
     falsificationSpec: input.falsificationSpec,
     sourceAnchor: input.sourceAnchor,
     reproHash: input.reproHash,
+    rulesetUri,
     sealedBy: 'deterministic_sealer',
     sealedAt: input.sealedAt,
     createdAt: new Date().toISOString(),
@@ -91,8 +97,8 @@ export function sealProofEnvelope(
       envelope_id, claim_id, verdict_node_id, conclusion,
       proof_hash, prev_proof_hash, checks, known_failures,
       falsification_spec, source_anchor, repro_hash,
-      sealed_by, sealed_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ruleset_uri, sealed_by, sealed_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     envelope.envelopeId,
     envelope.claimId,
@@ -105,6 +111,7 @@ export function sealProofEnvelope(
     JSON.stringify(envelope.falsificationSpec),
     JSON.stringify(envelope.sourceAnchor),
     envelope.reproHash,
+    envelope.rulesetUri ?? null,
     envelope.sealedBy,
     envelope.sealedAt,
     envelope.createdAt,
@@ -129,7 +136,7 @@ export function getProofEnvelopesByVerdictNode(
       `SELECT envelope_id, claim_id, verdict_node_id, conclusion,
               proof_hash, prev_proof_hash, checks, known_failures,
               falsification_spec, source_anchor, repro_hash,
-              sealed_by, sealed_at, created_at
+              ruleset_uri, sealed_by, sealed_at, created_at
        FROM proof_envelopes
        WHERE verdict_node_id = ?
        ORDER BY created_at ASC`,
@@ -152,6 +159,10 @@ function rowToProofEnvelope(row: Record<string, unknown>): ProofEnvelope {
     falsificationSpec: JSON.parse(String(row.falsification_spec)),
     sourceAnchor: JSON.parse(String(row.source_anchor)),
     reproHash: String(row.repro_hash),
+    // legacy 行 ruleset_uri 为 NULL → 字段缺席(exactOptionalPropertyTypes),读取侧按 v1 默认派发
+    ...(row.ruleset_uri === null || row.ruleset_uri === undefined
+      ? {}
+      : { rulesetUri: String(row.ruleset_uri) }),
     sealedBy: 'deterministic_sealer',
     sealedAt: String(row.sealed_at),
     createdAt: String(row.created_at),

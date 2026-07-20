@@ -57,6 +57,13 @@ export interface ProofEnvelope {
   readonly falsificationSpec: FalsificationSpec;
   readonly sourceAnchor: SourceAnchor;
   readonly reproHash: string;
+  /**
+   * 规则集版本 URI(ADR-007 · IC-01 · migration 0019)。
+   * 版本化落地前密封的 legacy 信封无此字段(exactOptionalPropertyTypes:读取侧缺省=undefined);
+   * 缺省一律按 farlab.dev/ruleset/v1 派发。存在时纳入 proofHash canonical 输入;
+   * 缺席时 canonical 输入与历史一致(旧证明复算不变)。
+   */
+  readonly rulesetUri?: string;
   readonly sealedBy: 'deterministic_sealer';
   readonly sealedAt: string;
   readonly createdAt: string;
@@ -73,6 +80,8 @@ export interface SealProofEnvelopeInput {
   readonly falsificationSpec: FalsificationSpec;
   readonly sourceAnchor: SourceAnchor;
   readonly reproHash: string;
+  /** 可选:显式指定规则集 URI(默认 CURRENT_RULESET_URI);非法/不支持主版本 seal 时 fail-closed。 */
+  readonly rulesetUri?: string;
   readonly sealedAt: string;
 }
 

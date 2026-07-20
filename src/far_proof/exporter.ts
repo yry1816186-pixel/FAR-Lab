@@ -32,6 +32,7 @@ import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { verifyChainHead } from '../evidence_log/verifier.ts';
 import type { VerifyResult } from '../evidence_log/types.ts';
+import { CURRENT_RULESET_URI, SUPPORTED_RULESET_URIS } from '../proof_envelope/ruleset_version.ts';
 
 export interface FarProofExportInput {
   readonly db: Database.Database;
@@ -289,6 +290,16 @@ function writeRoCrateMetadata(
         name: 'canonicalHash chain verification',
         value: verification.ok ? 'verified' : `broken at seq=${verification.brokenAtSeq ?? '?'}`,
       },
+      {
+        // ADR-007 · IC-01:规则集版本 URI 嵌入 bundle manifest(SemVer:MAJOR 改 URI/MINOR 单调兼容/PATCH 不动语义)
+        '@id': '#ruleset_uri',
+        '@type': 'PropertyValue',
+        name: 'kernel ruleset URI',
+        value: CURRENT_RULESET_URI,
+        description:
+          'Verdict kernel ruleset version (ADR-007). Verifiers dispatch by this URI; ' +
+          'envelopes without ruleset_uri are legacy and dispatch as farlab.dev/ruleset/v1.',
+      },
     ],
   };
   const filePath = join(dir, 'ro-crate-metadata.json');
@@ -322,6 +333,13 @@ function writeDataManifest(dir: string, filesWritten: readonly string[], exporte
     generatedAt: exportedAt,
     files: filesWritten.map((f) => f.replace(dir + '/', '').replace(dir + '\\', '')),
     totalFiles: filesWritten.length,
+    // ADR-007 · IC-01:规则集版本登记(验证器按 URI 派发;无 URI 信封=legacy v1)
+    ruleset: {
+      currentUri: CURRENT_RULESET_URI,
+      supportedUris: [...SUPPORTED_RULESET_URIS],
+      legacyDefaultUri: 'farlab.dev/ruleset/v1',
+      semver: 'MAJOR changes URI / MINOR monotonic backward-compatible / PATCH semantics-neutral',
+    },
   };
   const filePath = join(dir, 'data_manifest.json');
   writeFileSync(filePath, JSON.stringify(manifest, null, 2), 'utf8');

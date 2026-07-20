@@ -1,0 +1,38 @@
+{
+  "suite": "golden_vectors/versioning",
+  "authority": "ADR-007 + IC-01(内核与证明版本化:ruleset_uri SemVer 治理)",
+  "consumer": "tests/proof_envelope/ruleset_versioning.test.ts",
+  "note": "本套件描述版本化场景的判定期望(不含易碎哈希值;哈希由测试实时构造)。GV-01..14 内核金向量不受影响。",
+  "vectors": [
+    {
+      "id": "VV-01",
+      "kind": "sealed_with_v1_uri",
+      "desc": "新密封信封携带 farlab.dev/ruleset/v1;bundle 验证通过",
+      "expect": "verify_pass"
+    },
+    {
+      "id": "VV-02",
+      "kind": "legacy_no_uri",
+      "desc": "legacy 信封(无 ruleset_uri 字段)按 v1 默认派发,复算一致",
+      "expect": "verify_pass_dispatch_v1"
+    },
+    {
+      "id": "VV-03",
+      "kind": "forged_major_v99",
+      "desc": "伪造高版本 URI(farlab.dev/ruleset/v99)→ 验证器 fail-closed 拒绝(不翻转、不静默)",
+      "expect": "verify_fail_ruleset_unsupported"
+    },
+    {
+      "id": "VV-04",
+      "kind": "malformed_uri",
+      "desc": "畸形 URI(非 farlab.dev/ruleset/vN 格式)→ 验证器 fail-closed 拒绝",
+      "expect": "verify_fail_ruleset_malformed"
+    },
+    {
+      "id": "VV-05",
+      "kind": "unknown_extra_field",
+      "desc": "JSONL 行携带未知扩展字段 → 忽略且裁决/哈希不翻转(MINOR 单调兼容)",
+      "expect": "verify_pass_no_flip"
+    }
+  ]
+}
