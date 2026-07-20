@@ -41,7 +41,7 @@ const steps = [
     layer: "观测层(observability)",
     cmd: [FAR, "doctor"],
     expect: 0,
-    note: "环境自检(真实退出码;两条预期 WARN 不阻断:python 3.14 检测器缺陷/DASHSCOPE_API_KEY 未设)",
+    note: "环境自检(真实退出码;两条预期 WARN 不阻断:python 3.14 检测器缺陷/竞赛 API key 未设)",
     acceptExit: [0, 2], // doctor: 2=仅 WARN(见 doctor.ts 退出语义)
   },
   {
