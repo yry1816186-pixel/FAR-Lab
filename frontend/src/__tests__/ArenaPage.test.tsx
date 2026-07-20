@@ -16,6 +16,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
 
 const MOCK_RESULT: ArenaResultDto = {
   arenaId: '01KWZTESTARENARST456',
+  datasetSource: 'replay',
   hypothesis: 'C-ASTRO-0001: TIC lightcurve transit signal',
   originalVerdict: 'CONFIRMED',
   originalRule: 'R7_PRIMARY_TEST_CONFIRMS',
