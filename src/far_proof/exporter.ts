@@ -278,8 +278,13 @@ function writeRoCrateMetadata(
   exportedAt: string,
   verification: VerifyResult,
 ): string {
+  // IC-09:RO-Crate 1.1 兼容映射 —— farlab: 命名空间扩展承载五值/reasonCodes/FEC/生命周期,
+  // 映射损失显式登记(#farlab_mapping_losses);核心可验证性不损失(proofHash 路径不变)。
   const metadata = {
-    '@context': 'https://w3id.org/ro/crate/1.1/context',
+    '@context': [
+      'https://w3id.org/ro/crate/1.1/context',
+      { farlab: 'https://farlab.dev/ns#' },
+    ],
     '@graph': [
       {
         '@id': 'ro-crate-metadata.json',
@@ -288,9 +293,11 @@ function writeRoCrateMetadata(
         name: `FAR-Chain Proof Export: ${runId}`,
         description:
           'Falsifiable, Auditable, Reproducible research evidence package. ' +
+          'farlab: namespace extends RO-Crate 1.1 for verdict/FEC semantics (see #farlab_mapping_losses). ' +
           'NOT validated against third-party RO-Crate/PROV-O validators (V3 roadmap).',
         datePublished: exportedAt,
         version: '0.0.0',
+        'farlab:exportKind': 'far-proof-v1',
       },
       {
         '@id': '#model_snapshot',
@@ -326,6 +333,50 @@ function writeRoCrateMetadata(
         description:
           'Verdict kernel ruleset version (ADR-007). Verifiers dispatch by this URI; ' +
           'envelopes without ruleset_uri are legacy and dispatch as farlab.dev/ruleset/v1.',
+      },
+      {
+        '@id': '#farlab_verdict_semantics',
+        '@type': 'PropertyValue',
+        name: 'farlab:verdictFiveValue',
+        value: 'CONFIRMED|REFUTED|INCONCLUSIVE|DEGRADED_SCOPE|UNTESTED',
+        description:
+          'FAR-Lab five-value verdict enum (R0-R9 deterministic kernel). Namespace extension — ' +
+          'no native RO-Crate/PROV equivalent; third-party tools read it as plain string (loss L-01).',
+      },
+      {
+        '@id': '#farlab_proof_hash_path',
+        '@type': 'PropertyValue',
+        name: 'farlab:proofHash',
+        value: 'proof_envelopes.jsonl → proof_hash (recompute: scripts/recompute_proof_hashes.ts)',
+        description:
+          'Verdict hash chain anchor. Core verifiability is NOT lost in this mapping: ' +
+          'the proofHash path is unchanged and independent of RO-Crate interpretation.',
+      },
+      {
+        '@id': '#farlab_lifecycle_semantics',
+        '@type': 'PropertyValue',
+        name: 'farlab:lifecycleState',
+        value: 'active|contested|corrected|retracted|superseded',
+        description:
+          'IC-05 retraction/correction/supersession lifecycle (see lifecycle_events.jsonl; ' +
+          'terminal states irreversible). Namespace extension (loss L-05).',
+      },
+      {
+        // 映射损失登记(IC-09 oracle ②):每一项=语义损失+处置;被误读为原生语义即违反本登记
+        '@id': '#farlab_mapping_losses',
+        '@type': 'ItemList',
+        name: 'RO-Crate mapping loss registry(映射损失清单)',
+        description:
+          'Semantics that do NOT map natively to RO-Crate 1.1. These are namespace extensions; ' +
+          'reading them as native RO-Crate/PROV semantics is a misreading (counterfactual guard).',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'L-01 五值裁决', description: 'farlab:verdictFiveValue;损失=第三方工具读作自由字符串,无受控枚举/降级语义' },
+          { '@type': 'ListItem', position: 2, name: 'L-02 reasonCodes', description: 'farlab:reasonCodes(R0-R9 规则码,见 verdict trace/claim_graph);损失=无 PROV 等价,机器可读性限于命名空间' },
+          { '@type': 'ListItem', position: 3, name: 'L-03 FEC 预注册合同', description: 'farlab:fecHash(schema/json/fec.schema.json);损失=预注册/HARKing 校验语义不映射' },
+          { '@type': 'ListItem', position: 4, name: 'L-04 裁决哈希链', description: 'farlab:proofHash;损失=append-only/防篡改链语义不映射,但核心可验证性不损失(proofHash 路径不变,bundle verify 不受影响)' },
+          { '@type': 'ListItem', position: 5, name: 'L-05 生命周期状态机', description: 'farlab:lifecycleState;损失=终态不可逆/墓碑化语义不映射' },
+          { '@type': 'ListItem', position: 6, name: 'L-06 anti-theater 检出', description: 'farlab:antiTheaterFindings(见 otel-trace/claim_graph);损失=检出规则语义不映射' },
+        ],
       },
     ],
   };
