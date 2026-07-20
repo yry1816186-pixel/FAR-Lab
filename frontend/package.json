@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "description": "FAR-Chain Web UI — Falsifiable Auditable Research-Chain dashboard",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
