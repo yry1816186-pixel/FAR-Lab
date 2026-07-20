@@ -218,6 +218,7 @@ const FSM_ADVANCE_SCHEMA: readonly OptionSchema[] = [
   { name: '--input', type: 'string', required: true, description: 'path to stageOutput JSON', requiredPlaceholder: 'path' },
   { name: '--state-file', type: 'string', default: './.far/fsm_state.json', description: 'path to state file' },
   { name: '--json', type: 'boolean', description: 'machine-readable output (StageReceipt JSON)' },
+  { name: '--dry-run', type: 'boolean', description: 'G2: print the transition diff without writing the state file' },
 ];
 
 function runFsmAdvanceFromArgs(args: readonly string[]): number {
@@ -229,8 +230,9 @@ function runFsmAdvanceFromArgs(args: readonly string[]): number {
   const inputPath = result.values['--input'] as string;
   const stateFile = result.values['--state-file'] as string;
   const json = result.values['--json'] === true;
+  const dryRun = result.values['--dry-run'] === true;
 
-  const fsmResult = runFsmAdvance({ event, inputPath, stateFile });
+  const fsmResult = runFsmAdvance({ event, inputPath, stateFile, dryRun });
   if (!fsmResult.ok) {
     process.stderr.write(`far fsm advance: ${fsmResult.error}\n`);
     return fsmResult.exitCode;
