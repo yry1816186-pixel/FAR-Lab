@@ -24,7 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { runBenchmark } from '../../src/benchmark/index.ts';
-import { BENCHMARK_SEEDS } from '../demo_seeds/registry.ts';
+import { BENCHMARK_SEEDS } from '../../src/demo_seeds/registry.ts';
 import type { BenchmarkReportV2 } from '../../src/benchmark/report_schema.ts';
 import { VERDICTS } from '../../src/schema/enums.ts';
 import { computeMerkleRoot } from '../../src/evidence_log/merkle_root.ts';

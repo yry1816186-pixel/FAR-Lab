@@ -9,8 +9,9 @@
  *   5. 统计 verdict 分布 + 领域分布。
  *
  * 分层（src 不依赖 tests）：
- *   本模块**不 import tests/demo_seeds**——而是接受 SeedRunner[] 参数（依赖反转）。
- *   seed registry（带 DemoSeedResult 的具体 run 函数）留在 tests/demo_seeds/registry.ts，
+ *   本模块**不 import demo_seeds**——而是接受 SeedRunner[] 参数（依赖反转）。
+ *   seed registry（带 DemoSeedResult 的具体 run 函数）在 src/demo_seeds/registry.ts
+ *   （2026-07-20 对抗修复 V11-06:自 tests/ 迁入 src/,消除生产 CLI→tests 反向依赖），
  *   由 generate 脚本 + 测试组装后传入。DemoSeedResult 结构兼容 BenchmarkSeedInput（结构子集）。
  *
  * 确定性（可作 CI golden 锚）：

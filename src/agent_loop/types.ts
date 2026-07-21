@@ -332,6 +332,7 @@ export interface AgentLoopError {
     | 'MAX_TOKENS_EXCEEDED'
     | 'MAX_DURATION_EXCEEDED'
     | 'COST_BUDGET_EXCEEDED'
+    | 'STAGE_RECEIPT_FORGED'
     | 'STAGE_SCHEMA_INVALID'
     | 'RETRY_EXHAUSTED';
   readonly message: string;

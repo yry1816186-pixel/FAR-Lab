@@ -18,6 +18,7 @@
 // design (Qwen-Math only enters here). All other src/math/ files remain neutral.
 
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
+import { sanitizeExternalContent } from '../llm_gateway/sanitizer.ts';
 import type {
   LlmRequest,
   LlmResponse,
@@ -136,7 +137,8 @@ export class CompetitionMathAutoformalizer implements Autoformalizer {
       ? input.mustBeVerifiedBy.join(', ')
       : '(none specified)';
     return [
-      `Claim (natural language): ${input.naturalLanguage}`,
+      // V06-F9 修复:外部 naturalLanguage 属不可信内容,过 G3 隔离(数据≠指令)
+      `Claim (natural language): ${sanitizeExternalContent(input.naturalLanguage).text}`,
       `Claim kind: ${input.claimKind}`,
       `Target backend: ${backend}`,
       `Must be verified by: ${mustVerify}`,

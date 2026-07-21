@@ -64,12 +64,27 @@ function assertPragmaBaseline(db: Database.Database, dbPath: string): void {
 export function openFarDb(dbPath: string, options: OpenFarDbOptions = {}): Database.Database {
   const readonly = options.readonly === true;
   const checkMode: IntegrityCheckMode = options.integrityCheck ?? 'quick';
-  const db = readonly ? new Database(dbPath, { readonly: true }) : new Database(dbPath);
+  // F-V04-04 修复:写模式打开/PRAGMA 阶段遇头部损坏/截断时同样 fail-closed 并附恢复指引
+  // (此前抛裸 SqliteError,与 readonly 路径的 DatabaseIntegrityError 语义不一致)。
+  let db: Database.Database;
+  try {
+    db = readonly ? new Database(dbPath, { readonly: true }) : new Database(dbPath);
+  } catch (error) {
+    throw new DatabaseIntegrityError(dbPath, `打开失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   if (!readonly) {
-    db.pragma('journal_mode = WAL');
-    db.pragma('synchronous = FULL');
-    db.pragma('foreign_keys = ON');
+    try {
+      db.pragma('journal_mode = WAL');
+      db.pragma('synchronous = FULL');
+      db.pragma('foreign_keys = ON');
+    } catch (error) {
+      db.close();
+      throw new DatabaseIntegrityError(
+        dbPath,
+        `PRAGMA 配置失败(库可能已损坏): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     assertPragmaBaseline(db, dbPath);
   }
 

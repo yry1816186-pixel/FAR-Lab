@@ -10,7 +10,7 @@ import { test } from 'node:test';
 
 import { runBenchRun, selectBenchSeeds } from '../../src/cli/commands/bench.ts';
 import type { BenchmarkReport } from '../../src/benchmark/types.ts';
-import { BENCHMARK_SEEDS } from '../demo_seeds/registry.ts';
+import { BENCHMARK_SEEDS } from '../../src/demo_seeds/registry.ts';
 
 const FIXED_GENERATED_AT = '2026-06-29T00:00:00.000Z';
 const GOLDEN_SUITE_ROOT = 'f70dc3bd1377dad2d8d048df209e4cab6e248503c6da69f6e4df0a9c1d7542df';

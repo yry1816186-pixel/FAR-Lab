@@ -60,9 +60,11 @@ function HealthCard() {
 }
 
 /**
- * Recent verdicts card: pulls real verdicts from GET /api/v1/verdict (not placeholder data).
+ * Recent verdicts card: pulls verdict nodes from GET /api/v1/verdict.
  * Honesty wall: when the backend is unreachable or there are no verdicts yet, show an honest
- * empty state — never render fabricated placeholder records.
+ * empty state — never render fabricated placeholder records. Note: a demo-seeded DB itself
+ * contains fixture verdict records (seed data, not view fabrication) — copy must not claim
+ * "all records produced by live agent loop runs" (F-V09-05).
  */
 function RecentVerdictsCard() {
   const { data, isLoading, isError } = useVerdictList(5, 0);
@@ -71,7 +73,10 @@ function RecentVerdictsCard() {
     <Card data-testid="recent-verdicts">
       <CardHeader>
         <CardTitle className="text-lg">Recent verdicts</CardTitle>
-        <CardDescription>GET /api/v1/verdict — the 5 most recent real verdicts (produced by running the agent loop)</CardDescription>
+        <CardDescription>
+          GET /api/v1/verdict — 本地库最近 5 条裁决节点(确定性内核产出;库经 demo 播种时含 fixture 记录,
+          逐行来源标注待 DTO datasetSource 落地,见 FINDINGS F-V09-05/06)
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
@@ -85,7 +90,8 @@ function RecentVerdictsCard() {
         )}
         {!isLoading && !isError && items.length === 0 && (
           <p className="text-sm text-muted-foreground" data-testid="recent-verdicts-empty">
-            No verdict records yet. After you run the agent loop once (POST /api/v1/hypothesize), real verdicts will appear here — this view never shows placeholder data.
+            No verdict records yet. 运行一次 agent loop(POST /api/v1/hypothesize)后裁决记录会出现在这里;
+            本视图不渲染占位数据(注意:默认 demo 播种的库本身含 fixture 裁决记录,属种子数据而非本视图伪造)。
           </p>
         )}
         {items.length > 0 && (

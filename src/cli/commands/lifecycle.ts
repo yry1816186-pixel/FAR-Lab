@@ -144,7 +144,7 @@ export async function runLifecycle(argv: readonly string[]): Promise<number> {
     process.stdout.write(
       chain.ok
         ? `lifecycle chain ok(${chain.checkedCount} events)\n`
-        : `lifecycle chain BROKEN at event ${chain.brokenAtEventId ?? '?'}\n`,
+        : `lifecycle chain BROKEN at event ${chain.brokenAtEventId ?? '?'}(${chain.violation ?? 'unknown'})\n`,
     );
     return chain.ok ? 0 : 1;
   } finally {

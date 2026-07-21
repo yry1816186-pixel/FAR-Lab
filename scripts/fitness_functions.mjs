@@ -27,7 +27,11 @@ function walk(dir, exts) {
 const srcFiles = walk(join(ROOT, 'src'), ['.ts']);
 const read = (f) => readFileSync(f, 'utf8');
 const rel = (f) => relative(ROOT, f).split('\\').join('/');
-const importsOf = (f) => [...read(f).matchAll(/^import\s+(?!type)[^'"]*from\s+'([^']+)'/gm)].map((m) => m[1]);
+// V11-06 修复:同时识别静态 import 与运行时动态 import()(bench.ts 曾以动态导入逃逸)
+const importsOf = (f) => [
+  ...[...read(f).matchAll(/^import\s+(?!type)[^'"]*from\s+'([^']+)'/gm)].map((m) => m[1]),
+  ...[...read(f).matchAll(/import\(\s*'([^']+)'\s*\)/g)].map((m) => m[1]),
+];
 
 // FF-01 Domain Core 纯净性: 内核与合同层不得 import DB/HTTP/LLM 运行时
 {

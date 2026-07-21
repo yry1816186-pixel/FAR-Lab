@@ -19,6 +19,9 @@ import { join } from 'node:path';
 
 import { sealProofEnvelope } from '../../src/proof_envelope/sealer.ts';
 import { computeProofHash } from '../../src/proof_envelope/proof_hash.ts';
+import { appendRecord, getChainHead } from '../../src/evidence_log/repository.ts';
+import { GENESIS_PREV_HASH } from '../../src/evidence_log/types.ts';
+import { GENESIS_PROOF_HASH } from '../../src/proof_envelope/types.ts';
 import {
   CURRENT_RULESET_URI,
   RULESET_URI_V1,
@@ -55,7 +58,9 @@ function makeInput(overrides: Partial<SealProofEnvelopeInput> = {}): SealProofEn
     claimId: 'claim-vv',
     verdictNodeId: 'vn-vv',
     conclusion: 'REFUTED',
-    prevProofHash: 'a'.repeat(64),
+    // 2026-07-20 对抗修复(F-V09-03):fixture 对齐真实流(ask.ts 恒用 GENESIS_PROOF_HASH);
+    // 非 GENESIS 的非链接 prev 在 bundle 信封链校验下属悬空引用。
+    prevProofHash: GENESIS_PROOF_HASH,
     checks: [],
     falsificationSpec: VALID_SPEC,
     sourceAnchor: VALID_ANCHOR,
@@ -128,6 +133,25 @@ test('VV-01: 新密封信封携带 v1 ruleset_uri,hash 自洽,bundle 验证通�
   assert.equal(result.checked, 1);
   assert.equal(result.mismatches.length, 0);
   // 完整 bundle 导出+验证(manifest 嵌入 ruleset)
+  // 2026-07-20 对抗修复(F-V09-04):full 模式空账本视同破坏;补一条真实 call_record 使链非空。
+  appendRecord(
+    db,
+    {
+      stageId: 'stage1',
+      cred: {
+        modelId: 'fixture',
+        dashscopeRequestId: null,
+        reproHash: 'c'.repeat(64),
+        gitCommitSha: 'b'.repeat(40),
+        isoTimestamp: '2026-06-28T00:00:00.000Z',
+      },
+      payloadKind: 'hypothesis',
+      purposeTag: 'hypothesis',
+      prevHash: getChainHead(db)?.currentHash ?? GENESIS_PREV_HASH,
+    },
+    { requestPayload: '{"q":"vv"}', responsePayload: '{"a":"vv"}', finishReason: 'stop', usageTokensTotal: 1 },
+    { providerProfile: 'offline_replay' },
+  );
   const outDir = mkdtempSync(join(tmpdir(), 'vv-bundle-'));
   exportFarProof({
     db,

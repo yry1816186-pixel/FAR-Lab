@@ -63,7 +63,7 @@ export function selectBenchSeeds(
 async function loadDemoBenchmarkSeeds(): Promise<readonly SeedRunner[]> {
   // Keep ordinary CLI commands light: the test-backed demo seed registry is loaded only
   // when `far bench run` is invoked.
-  const module = await import('../../../tests/demo_seeds/registry.ts');
+  const module = await import('../../demo_seeds/registry.ts');
   return module.BENCHMARK_SEEDS;
 }
 

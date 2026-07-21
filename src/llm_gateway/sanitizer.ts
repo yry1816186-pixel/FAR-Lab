@@ -31,15 +31,20 @@ interface InjectionPattern {
 }
 
 const INJECTION_PATTERNS: readonly InjectionPattern[] = [
-  { id: 'ignore-instructions', re: /ignore\s+(all|any|the)\s+((previous|above|prior|preceding)\s+)?(instructions?|prompts?|rules?)/i },
-  { id: 'role-impersonation', re: /(^|\r?\n)\s*(system|assistant)\s*[:：]/i },
+  // V06-F3 对抗扩充:冠词/指示词变体('ignore all the previous instructions' 曾逃逸)
+  { id: 'ignore-instructions', re: /ignore\s+(all|any|the|these|those)\s+(the\s+)?((previous|above|prior|preceding|aforementioned)\s+)?(instructions?|prompts?|rules?)/i },
+  { id: 'role-impersonation', re: /(^|\r?\n)\s*(system|assistant|user)\s*[:：]/i },
   { id: 'new-identity', re: /you are now|act as|pretend to be|disregard/i },
-  { id: 'zh-injection', re: /忽略(以上|之前|先前|所有).{0,8}(指令|指示|要求)|你现在是/i },
+  // V06-F3 对抗扩充:上述/前述/一切变体 + 无视/别理会句式(曾整体逃逸)
+  { id: 'zh-injection', re: /(忽略|无视|别理会|不要理会)(以上|上述|之前|先前|前述|所有|一切)?.{0,8}(指令|指示|要求|规则)|你现在是/i },
   { id: 'protected-action-demand', re: /(you must|please|now)\s+(seal|delete|freeze|drop|export|approve)\b/i },
   { id: 'base64-blob', re: /[A-Za-z0-9+/]{160,}={0,2}/ },
+  // 登记边界(2026-07-20 对抗轮):法/德/日变体、ChatML 模板、base64url/MIME 折行仍可能逃逸——
+  // sanitizer 为纵深防御而非信任边界(G3 包装+G1 闸门+确定性裁决兜底),残余见 FINDINGS V06-F3。
 ];
 
-const SENTINEL_SPOOF_RE = /UNTRUSTED_EXTERNAL_CONTENT_(BEGIN|END)/g;
+// V06-F4 修复:大小写不敏感(小写/混合伪造曾未转义直达 prompt)
+const SENTINEL_SPOOF_RE = /UNTRUSTED_EXTERNAL_CONTENT_(BEGIN|END)/gi;
 // eslint-disable-next-line no-control-regex -- 有意匹配控制字符(G3 中性化对象)
 const CONTROL_CHARS_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 const ZERO_WIDTH_RE = /[\u200B-\u200F\u202A-\u202E\uFEFF]/g;

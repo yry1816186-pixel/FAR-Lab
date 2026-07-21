@@ -263,6 +263,22 @@ async function checkDbIntegrity(dbPath: string, checks: Check[]): Promise<void> 
         status: 'ok',
         detail: `integrity_check ok;chain ${chain.ok ? `ok(${chain.verifiedCount})` : `broken@${chain.brokenAtSeq ?? '?'}`}`,
       });
+      // F-V04-02 修复:doctor 对实库跑 payload 内容哈希验证(此前只在内存 fixture 自检,
+      // 朴素篡改在 doctor 面报 OK 而 status 面报 TAMPERED,两表面不一致)。
+      const { verifyCallRecordPayloadHashes, verifyEvidencePayloadHashes } = await import(
+        '../../evidence_log/verifier.ts'
+      );
+      const callPayload = verifyCallRecordPayloadHashes(db);
+      const evidencePayload = verifyEvidencePayloadHashes(db);
+      const tampered =
+        callPayload.tamperedSeqs.length > 0 || evidencePayload.tamperedEvidenceIds.length > 0;
+      checks.push({
+        name: `db payload hashes (${dbPath})`,
+        status: tampered ? 'fail' : 'ok',
+        detail: tampered
+          ? `CALL PAYLOAD TAMPERED(seqs:${callPayload.tamperedSeqs.join(',')}) / EVIDENCE PAYLOAD TAMPERED(ids:${evidencePayload.tamperedEvidenceIds.join(',')})`
+          : `payload hashes ok(call=${callPayload.verifiedCount}${callPayload.legacyCount > 0 ? `,legacy-not-covered=${callPayload.legacyCount}` : ''};evidence=${evidencePayload.verifiedCount})`,
+      });
     } finally {
       db.close();
     }
