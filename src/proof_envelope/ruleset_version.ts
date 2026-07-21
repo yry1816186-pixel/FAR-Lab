@@ -58,8 +58,13 @@ export function assertSealableRulesetUri(uri: string): void {
 /**
  * 验证侧派发:返回主版本号。
  * 无 URI → 1(legacy v1);未知/伪造主版本 → fail-closed 抛错(不翻转、不静默)。
+ * V03-F1 修复:含首尾空白的非规范 URI 一律 MALFORMED——canonical 输入保留原始串,
+ * trim 后放行会造成 seal 严/verify 宽不对称(填充形态重算 hash 后可过检)。
  */
 export function dispatchRulesetVerifier(uri: string | null | undefined): number {
+  if (uri !== null && uri !== undefined && uri !== uri.trim()) {
+    throw new Error(`RULESET_VERSION_MALFORMED: '${uri}'(含首尾空白,非规范 URI;fail-closed)`);
+  }
   const resolved = resolveRulesetUri(uri);
   if (parseRulesetMajor(resolved) === null) {
     throw new Error(`RULESET_VERSION_MALFORMED: '${resolved}'(期望 farlab.dev/ruleset/vN)`);

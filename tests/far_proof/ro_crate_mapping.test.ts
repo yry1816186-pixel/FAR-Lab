@@ -24,6 +24,8 @@ interface RoCrateNode {
   readonly name?: string;
   readonly value?: string;
   readonly description?: string;
+  readonly conformsTo?: { readonly '@id'?: string };
+  readonly about?: { readonly '@id'?: string };
   readonly itemListElement?: ReadonlyArray<{ readonly name?: string; readonly description?: string }>;
 }
 
@@ -56,8 +58,14 @@ test('① RO-Crate 结构自检:context/@graph/root/farlab 命名空间', () => 
   assert.match(ctxText, /"farlab"\s*:\s*"https:\/\/farlab\.dev\/ns#"/, '缺 farlab 命名空间');
   assert.ok(Array.isArray(metadata['@graph']) && metadata['@graph'].length > 0, '@graph 非数组');
   const root = metadata['@graph'].find((n) => n['@type'] === 'CreativeWork');
-  assert.ok(root !== undefined, '缺 root CreativeWork');
+  assert.ok(root !== undefined, '缺 descriptor CreativeWork');
   assert.match(root.name ?? '', /FAR-Chain Proof Export/);
+  // F-V09-07:RO-Crate 1.1 必备结构(conformsTo/about/Root Data Entity)
+  assert.deepEqual(root.conformsTo, { '@id': 'https://w3id.org/ro/crate/1.1' }, 'descriptor 缺 conformsTo');
+  assert.deepEqual(root.about, { '@id': './' }, 'descriptor 缺 about → Root Data Entity');
+  const rootData = metadata['@graph'].find((n) => n['@id'] === './');
+  assert.ok(rootData !== undefined, "缺 Root Data Entity(@id='./')");
+  assert.equal(rootData['@type'], 'Dataset');
 });
 
 test('② 映射损失清单文档化且不误读为原生语义', () => {

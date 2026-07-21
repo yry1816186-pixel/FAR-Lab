@@ -138,3 +138,30 @@ Court / arena / ask under `offline_replay` replay the same fixture, so their ver
 identical — they demonstrate the framework, not real model disagreement or real scientific
 adjudication. Real inference needs a real provider (credential gate). See
 [concepts/far-proof.md](concepts/far-proof.md) and [providers/qwen-dashscope.md](providers/qwen-dashscope.md).
+
+## Integrity & lifecycle (IC-01/03/05/06, 2026-07-20)
+
+### `far backup --db <path> --out <path> [--force]`
+Safe backup via SQLite `VACUUM INTO` (never file-level copy). Refuses to back up a corrupted
+database (integrity_check fail-closed), exit 1; healthy backup restores cleanly.
+
+### `far lifecycle <sub> --db <path> --target-kind <k> --target-id <id> [options]`
+Retraction/correction/supersession lifecycle state machine (ADR-021, migration 0021).
+- Subcommands: `state`, `contest`, `retract`, `correct`, `supersede`, `verify`, `events`.
+- Tombstone semantics: transitions are derived records; the original record is never deleted.
+- Illegal transitions (e.g. `retracted → active`) fail closed; every event carries actor+reason+ts
+  and an event-level hash chain (`verify` replays the SSOT state machine: continuity + legal
+  transitions + no events after terminal states).
+
+### `far ask "<question>" --resume <path>`
+Resume a killed agent loop from the stage_receipt store (IC-06, ADR-018): receipts prove stage
+completion (redacted, hash-chained), snapshots skip re-execution; forged receipts/snapshots,
+orphan snapshots, or a receipt lineage that does not match the current DB fail closed with
+`STAGE_RECEIPT_FORGED`.
+
+### Report & schema machine checks (IC-10/IC-12)
+- `node scripts/benchmark_report_check.mts [report]` — Science-125 report protocol v2 (FF-15):
+  disclosure fields, `bestOfK=false`, non-empty/format checks (`problemCount == entries.length`,
+  64-hex hashes).
+- `node scripts/generate_json_schema.mts [--check]` — JSON Schemas are machine-generated from TS
+  types (FF-14); `--check` fails on any drift. Never edit `schema/json/*.json` by hand.

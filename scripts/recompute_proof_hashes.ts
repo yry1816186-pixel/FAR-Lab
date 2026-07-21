@@ -17,6 +17,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { computeProofHash } from '../src/proof_envelope/proof_hash.ts';
+import { dispatchRulesetVerifier } from '../src/proof_envelope/ruleset_version.ts';
 import type {
   ProofEnvelope,
   ProofCheckResult,
@@ -125,6 +126,8 @@ export function recomputeProofHashes(jsonlPath: string): RecomputeResult {
   }> = [];
   for (const [index, line] of lines.entries()) {
     const row = JSON.parse(line) as RawEnvelopeRow;
+    // V03-F2 修复:独立复算路径同样执行版本派发(H3)——伪造主版本不得仅靠本脚本过检
+    dispatchRulesetVerifier(row.ruleset_uri ?? null);
     const envelope = rowToEnvelope(row);
     const { proofHash: _stored, ...fieldsForHash } = envelope;
     void _stored;

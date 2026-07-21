@@ -19,7 +19,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runBenchmark } from '../src/benchmark/index.ts';
-import { BENCHMARK_SEEDS } from '../tests/demo_seeds/registry.ts';
+import { BENCHMARK_SEEDS } from '../src/demo_seeds/registry.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const reportDir = resolve(here, '..', 'benchmark');

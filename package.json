@@ -34,6 +34,7 @@
     "test:agent_loop": "node --test tests/agent_loop/*.test.ts",
     "test:api": "node --test tests/api/*.test.ts",
     "test:ci": "node --test tests/ci/*.test.ts",
+    "coverage": "node scripts/coverage_gate.mjs",
     "test:evidence_log": "node --test tests/evidence_log/*.test.ts",
     "test:falsifiability": "node --test tests/falsifiability/*.test.ts",
     "test:far_proof": "node --test tests/far_proof/*.test.ts",

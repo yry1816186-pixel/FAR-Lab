@@ -25,13 +25,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runA4Seed, A4_RAW_INPUT, A4_SOURCE_CARD } from './a4_planetary_orbit_decay.ts';
-import { runA16Seed, A16_RAW_INPUT, A16_SOURCE_CARD } from './a16_pulsar_p0.ts';
-import { runB7Seed, B7_RAW_INPUT, B7_SOURCE_CARD } from './b7_protein_folding.ts';
-import { runC3Seed, C3_RAW_INPUT, C3_SOURCE_CARD } from './c3_catalyst_activity.ts';
-import { runE2Seed, E2_RAW_INPUT, E2_SOURCE_CARD } from './e2_carbon_flux.ts';
-import { runG5Seed, G5_RAW_INPUT, G5_SOURCE_CARD } from './g5_seismic_precursor.ts';
-import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
+import { runA4Seed, A4_RAW_INPUT, A4_SOURCE_CARD } from '../../src/demo_seeds/a4_planetary_orbit_decay.ts';
+import { runA16Seed, A16_RAW_INPUT, A16_SOURCE_CARD } from '../../src/demo_seeds/a16_pulsar_p0.ts';
+import { runB7Seed, B7_RAW_INPUT, B7_SOURCE_CARD } from '../../src/demo_seeds/b7_protein_folding.ts';
+import { runC3Seed, C3_RAW_INPUT, C3_SOURCE_CARD } from '../../src/demo_seeds/c3_catalyst_activity.ts';
+import { runE2Seed, E2_RAW_INPUT, E2_SOURCE_CARD } from '../../src/demo_seeds/e2_carbon_flux.ts';
+import { runG5Seed, G5_RAW_INPUT, G5_SOURCE_CARD } from '../../src/demo_seeds/g5_seismic_precursor.ts';
+import type { DemoSeedResult } from '../../src/demo_seeds/a4_planetary_orbit_decay.ts';
 
 // ---------- 共享断言 ----------
 

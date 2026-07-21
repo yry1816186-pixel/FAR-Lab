@@ -18,6 +18,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import stableStringify from 'fast-json-stable-stringify';
+import { assertAgentWriteAllowed } from './guards.ts';
 import type { StageArtifact } from './types.ts';
 
 export const RECEIPT_GENESIS_HASH = '0'.repeat(64);
@@ -31,6 +32,12 @@ export interface StageReceipt {
   readonly ts: string;
   readonly prevHash: string;
   readonly receiptHash: string;
+  /** F-V07-03:签收时 DB call_records 行数(血缘绑定;缺席=legacy 收据不强制) */
+  readonly lineageCount?: number;
+  /** F-V07-03:签收时 DB 链头 hash */
+  readonly lineageHead?: string;
+  /** F-V07-05:签收时已耗墙钟 ms(G7 duration 跨 resume 延续) */
+  readonly elapsedMs?: number;
 }
 
 interface StoreFile {
@@ -143,6 +150,13 @@ export class StageReceiptStore {
         throw new StageReceiptForgedError(`快照与收据 outputHash 失配: ${key}(快照被篡改)`);
       }
     }
+    // F-V07-01 修复:反向校验——每个快照键必须有对应收据(孤儿快照注入=伪造证据重放面)
+    const receiptKeys = new Set(parsed.receipts.map((receipt) => `${receipt.iteration}:${receipt.stageId}`));
+    for (const key of Object.keys(parsed.snapshots)) {
+      if (!receiptKeys.has(key)) {
+        throw new StageReceiptForgedError(`孤儿快照(无对应收据): ${key}(快照注入)`);
+      }
+    }
     if (parsed.researchInputHash !== inputHash) {
       // 输入变化 → 收据失效重跑(检测语义;不报错)
       return new StageReceiptStore(path, inputHash, [], {});
@@ -167,8 +181,14 @@ export class StageReceiptStore {
     return this.receipts.length;
   }
 
-  /** 签收+快照落盘(原子写:tmp+rename)。 */
-  record(iteration: number, stageId: string, artifact: StageArtifact): void {
+  /** 签收+快照落盘(原子写:tmp+rename);lineage=签收时 DB 血缘(F-V07-03),elapsedMs=已耗墙钟(F-V07-05)。 */
+  record(
+    iteration: number,
+    stageId: string,
+    artifact: StageArtifact,
+    lineage?: { readonly count: number; readonly head: string | null },
+    elapsedMs?: number,
+  ): void {
     const key = `${iteration}:${stageId}`;
     if (Object.prototype.hasOwnProperty.call(this.snapshots, key)) {
       return; // 重放幂等:已签收不再重复记录
@@ -182,6 +202,8 @@ export class StageReceiptStore {
       outputHash: sha256Hex(canonical(artifact.structured)),
       ts: new Date().toISOString(),
       prevHash,
+      ...(lineage !== undefined ? { lineageCount: lineage.count, lineageHead: lineage.head ?? '' } : {}),
+      ...(elapsedMs !== undefined ? { elapsedMs } : {}),
     };
     const receipt: StageReceipt = { ...core, receiptHash: computeReceiptHash(core) };
     this.receipts = [...this.receipts, receipt];
@@ -189,7 +211,14 @@ export class StageReceiptStore {
     this.persist();
   }
 
+  /** 最近一张收据(无=undefined);血缘/墙钟延续判定用(F-V07-03/F-V07-05)。 */
+  lastReceipt(): StageReceipt | undefined {
+    return this.receipts[this.receipts.length - 1];
+  }
+
   private persist(): void {
+    // G2(IC-02 对抗修复 V06-F2):写路径必须在 AGENT_WRITE_MANIFEST 登记(首个生产接线点)
+    assertAgentWriteAllowed('fs:stage_receipts#stage_receipt_store(resume 收据+快照落盘,IC-06)');
     const file: StoreFile = {
       schemaVersion: 1,
       researchInputHash: this.researchInputHash,

@@ -208,6 +208,15 @@ toolchain is absent.
   literals.
 - **Anti-theater** — 20 detectors catch fake-green tests (tests that pass without exercising real logic).
 - **Secrets never committed** — `.env` is gitignored; see [SECURITY.md](SECURITY.md).
+- **Tamper-evidence scope (2026-07-20 adversarial review)** — naive tampering (content edited without
+  recomputing hashes) and corruption are detected and located; consistent forgery by an attacker who
+  recomputes the public hash algorithm is out of scope for V1 keyless chains (DEF-18).
+- **Lifecycle tombstones** — retractions/corrections are append-only derived records
+  (`far lifecycle`, migration 0021); the bundle verifier replays the event hash chain and the SSOT
+  state machine, so stripped or flipped tombstones in an export are detected.
+- **Crash-safe resume** — `far ask --resume` continues from hash-chained stage receipts with DB
+  lineage binding; forged receipts or a swapped database fail closed.
+- **Offline backup** — `far backup` uses SQLite `VACUUM INTO` and refuses to back up a corrupted DB.
 - Real API / real data / real GPU / competition submission are all explicitly tagged
   `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` / `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`.
 

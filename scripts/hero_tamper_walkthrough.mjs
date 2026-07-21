@@ -71,7 +71,7 @@ rmSync(tmp, { recursive: true, force: true });
 const totalMs = Date.now() - started;
 console.log("");
 console.log("── honest status(诚实边界)──");
-console.log("  证明了: .far-proof 导出包哈希链完整;第三方可离线独立复算;篡改可被 exit 7 检出并结构化指认。");
+console.log("  证明了: .far-proof 导出包哈希链完整(覆盖范围:proof_envelopes 全字段+信封链引用+call_records 白名单字段+lifecycle 事件链;其余分量仅存在性检查,见 FINDINGS F-V09-01);第三方可离线独立复算;覆盖内篡改可被 exit 7 检出并结构化指认。");
 console.log("  不证明: 任何科学真理;demo 数据来自 fixture(legacy demo 链恒 UNTESTED=诚实标注);");
 console.log("          真实统计裁决见 hero 链(z-test)/audit-multiseed;Live LLM 路径=外部合同 IC-14。");
 console.log(`── 计时: ${(totalMs / 1000).toFixed(1)}s / 预算 60s ${totalMs <= BUDGET_MS ? "✓" : "✗ 超时"} ──`);

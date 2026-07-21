@@ -9,11 +9,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { canonicalHash } from '../evidence_log/hasher.ts';
+import { ALLOWED_TRANSITIONS, computeEventHash, type LifecycleState, type LifecycleTargetKind } from '../evidence_log/lifecycle.ts';
 import { rowToCallRecord } from '../evidence_log/repository.ts';
 import { GENESIS_PREV_HASH, type CallRecordHashRow } from '../evidence_log/types.ts';
 import { computeProofHash } from '../proof_envelope/proof_hash.ts';
 import { dispatchRulesetVerifier } from '../proof_envelope/ruleset_version.ts';
-import type { CheckOutcome, ProofCheckResult, ProofEnvelope } from '../proof_envelope/types.ts';
+import { GENESIS_PROOF_HASH, type CheckOutcome, type ProofCheckResult, type ProofEnvelope } from '../proof_envelope/types.ts';
 import type { FalsificationSpec, Verdict } from '../falsifiability/types.ts';
 
 export const FAR_PROOF_REQUIRED_FILES = [
@@ -105,11 +106,14 @@ export function verifyFarProofBundle(
       const proofResult = verifyProofEnvelopeJsonl(join(bundlePath, 'proof_envelopes.jsonl'));
       proofEnvelopeCount = proofResult.checked;
       proofEnvelopeMismatches = proofResult.mismatches;
-      proofEnvelopeOk = proofEnvelopeMismatches.length === 0;
+      proofEnvelopeOk = proofEnvelopeMismatches.length === 0 && proofResult.linkageErrors.length === 0;
       for (const mismatch of proofEnvelopeMismatches) {
         errors.push(
           `PROOF_HASH_MISMATCH: ${mismatch.envelopeId} expected=${mismatch.expected.slice(0, 16)} actual=${mismatch.actual.slice(0, 16)}`,
         );
+      }
+      for (const linkageError of proofResult.linkageErrors) {
+        errors.push(linkageError);
       }
     } catch (error) {
       errors.push(`PROOF_ENVELOPES_UNREADABLE: ${errorMessage(error)}`);
@@ -128,10 +132,28 @@ export function verifyFarProofBundle(
         );
       }
       if (chain.verifiedCount === 0) {
-        warnings.push('CHAIN_EMPTY: call_records.redacted.jsonl contains no records');
+        // F-V09-04 修复:full 模式下空账本视同破坏(删文件=FAIL 而清空=clean 的语义不一致已闭合);
+        // chain 模式保留警告以兼容'仅验链'的显式窄验证(含无 LLM 调用的 legacy 包)。
+        if (mode === 'full') {
+          errors.push('CHAIN_EMPTY: call_records.redacted.jsonl contains no records(full 模式空账本视同破坏)');
+        } else {
+          warnings.push('CHAIN_EMPTY: call_records.redacted.jsonl contains no records');
+        }
       }
     } catch (error) {
       errors.push(`CALL_RECORDS_UNREADABLE: ${errorMessage(error)}`);
+    }
+  }
+
+  // V05-F5/F-V09-02 修复:full 模式下 lifecycle_events.jsonl 事件链独立重算+
+  // 与 claim_graph.lifecycleStates 交叉一致性(撤回墓碑不可无痕抹除/翻转)。
+  if (mode === 'full') {
+    const lifecycleResult = verifyLifecycleEventsJsonl(
+      join(bundlePath, 'lifecycle_events.jsonl'),
+      join(bundlePath, 'claim_graph.json'),
+    );
+    for (const lifecycleError of lifecycleResult.errors) {
+      errors.push(lifecycleError);
     }
   }
 
@@ -170,6 +192,8 @@ function requiredFilesForMode(mode: FarProofBundleVerifyMode): readonly string[]
 export function verifyProofEnvelopeJsonl(jsonlPath: string): {
   readonly checked: number;
   readonly mismatches: readonly ProofEnvelopeMismatch[];
+  /** 链引用悬空(prev_proof_hash 既非 GENESIS 也不指向文件中任何在先信封)——F-V09-03 */
+  readonly linkageErrors: readonly string[];
 } {
   const lines = readJsonlLines(jsonlPath);
   if (lines.length === 0) {
@@ -177,6 +201,8 @@ export function verifyProofEnvelopeJsonl(jsonlPath: string): {
   }
 
   const mismatches: ProofEnvelopeMismatch[] = [];
+  const linkageErrors: string[] = [];
+  const seenProofHashes = new Set<string>();
   for (const line of lines) {
     const row = JSON.parse(line) as RawEnvelopeRow;
     // IC-01 版本派发(ADR-007 H3):无 URI=legacy v1;未知/伪造主版本 fail-closed 抛错(不翻转裁决)。
@@ -193,8 +219,18 @@ export function verifyProofEnvelopeJsonl(jsonlPath: string): {
         actual: recomputed,
       });
     }
+    // F-V09-03 修复:信封间引用完整性。prev_proof_hash 必须是 GENESIS_PROOF_HASH
+    // 或本文件中某个在先信封的 proof_hash;否则即 cherry-pick 删除/乱序/伪造引用。
+    // 登记边界:追加自封印信封(prev 指向真实信封)与删除尾部信封仍不可检——
+    // 信封集合完整性锚定(计数/清单入 data_manifest)属 DESIGN 域,见 FINDINGS F-V09-01。
+    if (envelope.prevProofHash !== GENESIS_PROOF_HASH && !seenProofHashes.has(envelope.prevProofHash)) {
+      linkageErrors.push(
+        `PROOF_CHAIN_DANGLING: ${envelope.envelopeId} prev_proof_hash=${envelope.prevProofHash.slice(0, 16)}… 非 GENESIS 且不指向任何在先信封(删除/乱序/伪造引用)`,
+      );
+    }
+    seenProofHashes.add(envelope.proofHash);
   }
-  return { checked: lines.length, mismatches };
+  return { checked: lines.length, mismatches, linkageErrors };
 }
 
 export function verifyRedactedCallRecordsJsonl(jsonlPath: string): BundleChainResult {
@@ -306,6 +342,134 @@ function emptyChainResult(): BundleChainResult {
     actualHash: null,
     chainHead: null,
   };
+}
+
+interface RawLifecycleRow {
+  readonly event_id: string;
+  readonly target_kind: string;
+  readonly target_id: string;
+  readonly from_state: string;
+  readonly to_state: string;
+  readonly actor: string;
+  readonly reason: string;
+  readonly prev_hash: string;
+  readonly current_hash: string;
+}
+
+export interface LifecycleBundleVerifyResult {
+  readonly ok: boolean;
+  readonly checkedCount: number;
+  readonly errors: readonly string[];
+}
+
+/**
+ * V05-F5/F-V09-02:bundle 内 lifecycle_events.jsonl 独立校验(full 模式)。
+ *   - 文件存在且非空 → 按目标重放:hash 链(prev/current 重算)+ fromState 连续性
+ *     + ALLOWED_TRANSITIONS 迁移表(与 DB 侧 verifyLifecycleChain 同算法);
+ *   - 文件缺失/为空但 claim_graph.lifecycleStates 非空 → LIFECYCLE_STRIPPED(墓碑抹除);
+ *   - 重放导出的各目标终态与 claim_graph.lifecycleStates 不一致 → LIFECYCLE_STATE_MISMATCH;
+ *   - 两侧皆无生命周期记录 → ok(无墓碑可验,legacy 兼容)。
+ * 登记边界:攻击者按公开算法一致重写整条链(keyless hash 固有边界,V05-F7)不可检。
+ */
+export function verifyLifecycleEventsJsonl(
+  lifecyclePath: string,
+  claimGraphPath: string,
+): LifecycleBundleVerifyResult {
+  const errors: string[] = [];
+  let declaredStates: Record<string, string> = {};
+  if (existsSync(claimGraphPath)) {
+    try {
+      const graph = JSON.parse(readFileSync(claimGraphPath, 'utf8')) as { lifecycleStates?: Record<string, string> };
+      declaredStates = graph.lifecycleStates ?? {};
+    } catch (error) {
+      return { ok: false, checkedCount: 0, errors: [`CLAIM_GRAPH_UNREADABLE: ${errorMessage(error)}`] };
+    }
+  }
+  const declaredCount = Object.keys(declaredStates).length;
+
+  if (!existsSync(lifecyclePath)) {
+    if (declaredCount > 0) {
+      errors.push(
+        `LIFECYCLE_STRIPPED: claim_graph.lifecycleStates 声明 ${declaredCount} 个终态目标但 lifecycle_events.jsonl 缺失(墓碑抹除)`,
+      );
+    }
+    return { ok: errors.length === 0, checkedCount: 0, errors };
+  }
+
+  const lines = readFileSync(lifecyclePath, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (lines.length === 0) {
+    if (declaredCount > 0) {
+      errors.push(
+        `LIFECYCLE_STRIPPED: claim_graph.lifecycleStates 声明 ${declaredCount} 个终态目标但 lifecycle_events.jsonl 为空(墓碑抹除)`,
+      );
+    }
+    return { ok: errors.length === 0, checkedCount: 0, errors };
+  }
+
+  const GENESIS_EVENT_HASH = '0'.repeat(64);
+  const perTargetPrev = new Map<string, string>();
+  const perTargetState = new Map<string, LifecycleState>();
+  let checked = 0;
+  for (const line of lines) {
+    let row: RawLifecycleRow;
+    try {
+      row = JSON.parse(line) as RawLifecycleRow;
+    } catch (error) {
+      errors.push(`LIFECYCLE_ROW_UNREADABLE: ${errorMessage(error)}`);
+      continue;
+    }
+    const key = `${row.target_kind}:${row.target_id}`;
+    const expectedPrev = perTargetPrev.get(key) ?? GENESIS_EVENT_HASH;
+    if (row.prev_hash !== expectedPrev) {
+      errors.push(`LIFECYCLE_CHAIN_BROKEN: ${key} event=${row.event_id} prev_hash 链接断裂`);
+      continue;
+    }
+    const recomputed = computeEventHash({
+      targetKind: row.target_kind as LifecycleTargetKind,
+      targetId: row.target_id,
+      fromState: row.from_state as LifecycleState,
+      toState: row.to_state as LifecycleState,
+      actor: row.actor,
+      reason: row.reason,
+      prevHash: row.prev_hash,
+    });
+    if (recomputed !== row.current_hash) {
+      errors.push(`LIFECYCLE_CHAIN_BROKEN: ${key} event=${row.event_id} current_hash 重算不符(事件内容篡改)`);
+      continue;
+    }
+    const expectedState = perTargetState.get(key) ?? 'active';
+    if (row.from_state !== expectedState) {
+      errors.push(
+        `LIFECYCLE_CHAIN_BROKEN: ${key} event=${row.event_id} 状态连续性断裂(expected from=${expectedState}, got ${row.from_state})`,
+      );
+      continue;
+    }
+    const allowed = ALLOWED_TRANSITIONS[row.from_state as LifecycleState];
+    if (allowed === undefined || !allowed.includes(row.to_state as LifecycleState)) {
+      errors.push(
+        `LIFECYCLE_CHAIN_BROKEN: ${key} event=${row.event_id} 非法迁移(${row.from_state} → ${row.to_state})`,
+      );
+      continue;
+    }
+    perTargetPrev.set(key, row.current_hash);
+    perTargetState.set(key, row.to_state as LifecycleState);
+    checked += 1;
+  }
+
+  if (errors.length === 0) {
+    for (const [key, declared] of Object.entries(declaredStates)) {
+      const derived = perTargetState.get(key);
+      if (derived !== declared) {
+        errors.push(
+          `LIFECYCLE_STATE_MISMATCH: ${key} claim_graph 声明 '${declared}' 但事件链重放导出 '${derived ?? '(无事件)'}'`,
+        );
+      }
+    }
+  }
+  return { ok: errors.length === 0, checkedCount: checked, errors };
 }
 
 function errorMessage(error: unknown): string {

@@ -66,6 +66,27 @@ export function checkBudget(profile: BudgetProfile, usage: BudgetUsage): void {
   }
 }
 
+/**
+ * V06-F5 修复:预算配置 fail-closed 校验。
+ * NaN/undefined/非有限/负值=非法(它们会静默关闭对应维度);显式 null=合法关闭(红线,调用方明示)。
+ */
+export function validateBudgetProfile(profile: BudgetProfile): void {
+  const dims: ReadonlyArray<readonly [string, number | null]> = [
+    ['maxTokens', profile.maxTokens],
+    ['maxDurationMs', profile.maxDurationMs],
+    ['maxLoops', profile.maxLoops],
+  ];
+  for (const [name, value] of dims) {
+    if (value === null) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(
+        `budget profile invalid: ${name}=${String(value)}(NaN/undefined/负值会静默关闭该维度;` +
+          '合法关闭须显式 null;G7 fail-closed)',
+      );
+    }
+  }
+}
+
 export interface StageCostRow {
   readonly stageId: string;
   readonly calls: number;

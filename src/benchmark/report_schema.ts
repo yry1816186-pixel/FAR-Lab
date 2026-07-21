@@ -82,6 +82,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * v2 协议机检:缺任一披露字段=红;bestOfK 须为 false;schemaVersion 须为 2。
+ * V-08-F3 修复:补内容校验(对抗"字段存在但内容空洞"合规绕过):
+ *   关键字符串非空;traceHash/suiteIntegrityRoot 须为 64-hex;problemCount 与 entries.length 一致。
  */
 export function checkBenchmarkReportV2(report: unknown): ReportCheckResult {
   const errors: string[] = [];
@@ -99,10 +101,23 @@ export function checkBenchmarkReportV2(report: unknown): ReportCheckResult {
   if (report.bestOfK !== false) {
     errors.push(`bestOfK must be false(防择优披露),got ${String(report.bestOfK)}`);
   }
+  // V-08-F3:顶层关键字段内容校验
+  const nonempty = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+  for (const field of ['generatedAt', 'kernelRulesetUri', 'executedAt', 'suiteIntegrityRoot'] as const) {
+    if (field in report && !nonempty(report[field])) {
+      errors.push(`top-level field ${field} 内容为空(空洞合规阻断)`);
+    }
+  }
+  if (nonempty(report.suiteIntegrityRoot) && !/^[0-9a-f]{64}$/.test(report.suiteIntegrityRoot)) {
+    errors.push(`suiteIntegrityRoot 非 64-hex: ${report.suiteIntegrityRoot.slice(0, 16)}…`);
+  }
   const entries = report.entries;
   if (!Array.isArray(entries)) {
     errors.push('entries is not an array');
   } else {
+    if (typeof report.problemCount === 'number' && report.problemCount !== entries.length) {
+      errors.push(`problemCount=${report.problemCount} 与 entries.length=${entries.length} 不一致`);
+    }
     entries.forEach((entry, index) => {
       if (!isRecord(entry)) {
         errors.push(`entries[${index}] is not an object`);
@@ -118,6 +133,15 @@ export function checkBenchmarkReportV2(report: unknown): ReportCheckResult {
       }
       if (entry.oracleReviewStatus !== 'unreviewed' && entry.oracleReviewStatus !== 'human_reviewed') {
         errors.push(`entries[${index}].oracleReviewStatus 非法: ${String(entry.oracleReviewStatus)}`);
+      }
+      // V-08-F3:条目关键字段内容校验
+      for (const field of ['taskId', 'oracleType', 'kernelVersion', 'modelVersion', 'executedAt'] as const) {
+        if (field in entry && !nonempty(entry[field])) {
+          errors.push(`entries[${index}].${field} 内容为空(空洞合规阻断)`);
+        }
+      }
+      if ('traceHash' in entry && !(typeof entry.traceHash === 'string' && /^[0-9a-f]{64}$/.test(entry.traceHash))) {
+        errors.push(`entries[${index}].traceHash 非 64-hex`);
       }
     });
   }

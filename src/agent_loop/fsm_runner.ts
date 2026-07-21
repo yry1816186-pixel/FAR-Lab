@@ -33,9 +33,11 @@ import { sanitizeExternalContent } from '../llm_gateway/sanitizer.ts';
 import {
   DEFAULT_BUDGET_PROFILE,
   checkBudget,
+  validateBudgetProfile,
   CostBudgetExceeded,
   type BudgetProfile,
 } from '../llm_gateway/budget.ts';
+import { getChainHead } from '../evidence_log/repository.ts';
 import type {
   LlmResponse,
   ProviderProfile,
@@ -51,7 +53,7 @@ import type {
   StageId,
   TerminationCriteria,
 } from './types.ts';
-import { StageReceiptStore } from './stage_receipt_store.ts';
+import { StageReceiptStore, StageReceiptForgedError } from './stage_receipt_store.ts';
 import { runStage1 } from './stages/stage1_understanding.ts';
 import { runStage2 } from './stages/stage2_integration.ts';
 import { runStage3 } from './stages/stage3_hypothesis.ts';
@@ -134,7 +136,13 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
   // G7(IC-04):缺省=默认兜底预算(默认开启);显式 null=关闭(红线,调用方明示)
   const budgetProfile: BudgetProfile | null =
     args.budget === undefined ? DEFAULT_BUDGET_PROFILE : args.budget;
+  // V06-F5 修复:预算配置校验(NaN/undefined/负值=非法,不再静默关闭维度;显式 null 关闭保留)
+  if (budgetProfile !== null) {
+    validateBudgetProfile(budgetProfile);
+  }
   const startTime: number = Date.now();
+  /** F-V07-05:resume 时已被收据覆盖的墙钟(在 open 后校准 startTime) */
+  let resumedElapsedMs = 0;
   const artifacts: StageArtifact[] = [];
   const appendArtifact = (a: StageArtifact): void => {
     artifacts.push(a);
@@ -167,6 +175,30 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       args.resumeStorePath !== undefined
         ? StageReceiptStore.open(args.resumeStorePath, args.researchInput)
         : null;
+    if (resumeStore !== null) {
+      const last = resumeStore.lastReceipt();
+      // F-V07-03 修复:血缘绑定——resume 的 DB 必须包含最后收据签收时的链头
+      // (空心裁决攻击:同存储+全新空 DB → 裁决脱离证据基座;此处 fail-closed)。
+      if (last?.lineageHead !== undefined && last.lineageHead !== '' && last.lineageCount !== undefined) {
+        const row = args.evidenceLogDb
+          .prepare(`SELECT COUNT(*) AS c FROM call_records`)
+          .get() as { c: number };
+        const atSeq = row.c >= last.lineageCount
+          ? (args.evidenceLogDb
+              .prepare(`SELECT current_hash FROM call_records WHERE seq = ?`)
+              .get(last.lineageCount) as { current_hash: string } | undefined)
+          : undefined;
+        if (atSeq === undefined || atSeq.current_hash !== last.lineageHead) {
+          throw new StageReceiptForgedError(
+            `血缘不符:收据签收链头(seq=${last.lineageCount})不在当前 DB 链中(换了 DB 或证据被改写;拒绝空心续跑)`,
+          );
+        }
+      }
+      // F-V07-05 修复:G7 duration 跨 resume 延续(墙钟不清零)
+      if (last?.elapsedMs !== undefined) {
+        resumedElapsedMs = last.elapsedMs;
+      }
+    }
     const runStageWithReceipt = async (
       stageId: StageId,
       execute: () => Promise<StageArtifact>,
@@ -177,7 +209,19 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         return resumeStore.snapshot(key);
       }
       const artifact = await execute();
-      resumeStore?.record(iteration, stageId, artifact);
+      if (resumeStore !== null) {
+        const head = getChainHead(args.evidenceLogDb);
+        const countRow = args.evidenceLogDb
+          .prepare(`SELECT COUNT(*) AS c FROM call_records`)
+          .get() as { c: number };
+        resumeStore.record(
+          iteration,
+          stageId,
+          artifact,
+          { count: countRow.c, head: head?.currentHash ?? null },
+          Date.now() - startTime + resumedElapsedMs,
+        );
+      }
       return artifact;
     };
     while (true) {
@@ -185,7 +229,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       if (budgetProfile !== null) {
         checkBudget(budgetProfile, {
           tokensConsumed,
-          elapsedMs: Date.now() - startTime,
+          elapsedMs: Date.now() - startTime + resumedElapsedMs,
           loopsCompleted: iteration - 1,
         });
       }
@@ -273,6 +317,15 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       };
       const { terminated, reason } = assertTerminated(ctx, feedbackSignal, startTime);
       if (terminated) {
+        // V06-F1 修复:末轮竞态——收敛/终止判定后、裁决产出前复查预算;
+        // 只在轮顶检查会让"恰好末轮超限"逃逸并产出裁决(实测 1 tok 预算跑出 14372 tok 的 CONFIRMED)。
+        if (budgetProfile !== null) {
+          checkBudget(budgetProfile, {
+            tokensConsumed,
+            elapsedMs: Date.now() - startTime + resumedElapsedMs,
+            loopsCompleted: iteration - 1,
+          });
+        }
         // 第 7 阶段（裁决接通）：六阶段收敛后产真实 VerdictNode（落 verdict_nodes·关联 evidence_log）。
         // 非 error 终止（feedback_converged / max_iterations / max_tokens / max_duration）均尝试裁决——
         // 即便未收敛，已产出的 hypothesis+evidence 仍可被裁决（最大化诚实产出）。
@@ -317,6 +370,23 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       };
     }
     // 任意阶段抛 AgentLoopError → 终止循环（reason='error'）
+    if (err instanceof StageReceiptForgedError) {
+      // F-V07-06 修复:收据伪造/血缘不符必须带专属错误码(不再落入 RETRY_EXHAUSTED 兜底)
+      return {
+        runId: args.runId,
+        iterationsCompleted: iteration,
+        terminated: true,
+        terminationReason: 'error',
+        artifacts,
+        verdictNode: null,
+        error: {
+          code: 'STAGE_RECEIPT_FORGED',
+          message: err.message,
+          stageId: null,
+          cause: err,
+        },
+      };
+    }
     // 错误恢复策略（§7.2 表）部分由 stage 执行器内部实现（retry_policy / stage3 gate）；
     // fsm_runner 层只负责捕获 + 落 LoopState.error。
     return {

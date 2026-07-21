@@ -287,8 +287,11 @@ function writeRoCrateMetadata(
     ],
     '@graph': [
       {
+        // F-V09-07 修复:RO-Crate 1.1 描述符必备结构(conformsTo + about 指向 Root Data Entity)
         '@id': 'ro-crate-metadata.json',
         '@type': 'CreativeWork',
+        conformsTo: { '@id': 'https://w3id.org/ro/crate/1.1' },
+        about: { '@id': './' },
         identifier: `far-proof-${runId}`,
         name: `FAR-Chain Proof Export: ${runId}`,
         description:
@@ -298,6 +301,17 @@ function writeRoCrateMetadata(
         datePublished: exportedAt,
         version: '0.0.0',
         'farlab:exportKind': 'far-proof-v1',
+      },
+      {
+        // F-V09-07 修复:Root Data Entity(RO-Crate 1.1 强制;'./' 数据集根)
+        '@id': './',
+        '@type': 'Dataset',
+        name: `FAR-Chain Proof Export: ${runId}`,
+        description:
+          'FAR-Chain .far-proof evidence package root dataset (proof envelopes, call_records chain, ' +
+          'claim graph, lifecycle events, RO-Crate/PROV metadata).',
+        datePublished: exportedAt,
+        license: 'MIT',
       },
       {
         '@id': '#model_snapshot',

@@ -59,6 +59,7 @@ export const AGENT_WRITE_MANIFEST = [
   'db:lifecycle_events#applyLifecycleTransition(生命周期迁移)',
   'fs:export-dir#用户显式 --out 目录(.far-proof 导出)',
   'fs:.far/fsm_state.json#fsm advance(非 dry-run)',
+  'fs:stage_receipts#stage_receipt_store(resume 收据+快照落盘,IC-06)',
 ] as const;
 
 /** 写目标是否在清单内(违规=拒绝)。 */
