@@ -1,0 +1,32 @@
+# FAR-Lab .editorconfig — cross-IDE/agent baseline (advisory; enforced gates are eslint + ruff + tsc)
+# See: https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Python: PEP 8 (4-space); pyproject.toml ruff line-length = 100
+[*.py]
+indent_size = 4
+max_line_length = 100
+
+# Shell scripts: 4-space ( POSIX sh / bash convention used in scripts/*.mjs runners)
+[*.{sh,bash,zsh}]
+indent_size = 4
+
+# Makefiles MUST use tabs (make requirement)
+[Makefile]
+indent_style = tab
+
+# Markdown: preserve trailing two-space hard line breaks
+[*.md]
+trim_trailing_whitespace = false
+
+# YAML often uses 2-space (consistent with default)
+[*.{yaml,yml}]
+indent_size = 2
