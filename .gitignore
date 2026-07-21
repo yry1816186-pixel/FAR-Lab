@@ -101,3 +101,15 @@ agent_execution_manifest.yaml
 experiments/
 NEEDS_HUMAN_LICENSE_DECISION.md
 examples/fec/sample_compiled.json
+
+# --- Workspace preflight (audit artifacts, not shipped) ---
+.far-preflight/
+
+# --- Agent mutable local task state (package manifest: mutable_local_state) ---
+.agent-state/
+
+# --- Local private agent overrides + Pi project caches (merged from .gitignore.agent-config) ---
+CLAUDE.local.md
+.claude/settings.local.json
+.pi/git/
+.pi/npm/
