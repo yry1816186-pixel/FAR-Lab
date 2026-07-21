@@ -1,0 +1,44 @@
+{
+  "name": "FAR-Lab Agent Configuration",
+  "version": "2.0.0",
+  "generated_for": [
+    "Pi coding agent",
+    "Claude Code"
+  ],
+  "canonical_context": "AGENTS.md",
+  "design_contract": "1.md",
+  "design_contract_note": "仓库根 1.md 为全局合同(唯一现行宪章,9762 行);其第二编为 Phase B 设计冻结合同;agent/contracts/DESIGN_PRIME.md 已 SUPERSEDED(头注声明,保留作历史参照)",
+  "architecture": {
+    "always_on": [
+      "AGENTS.md",
+      "CLAUDE.md (Claude only)",
+      ".pi/APPEND_SYSTEM.md (Pi only, 99 行全局版)",
+      ".far-master/ (全局状态 SSOT: STATE.yaml 17 键 + PHASE_GATES.yaml A–H 门登记等 15 项)"
+    ],
+    "on_demand": [
+      ".claude/rules",
+      ".claude/skills",
+      ".claude/agents",
+      "agent/workflows",
+      "agent/policies",
+      ".far-preflight/ (Phase A 细证据,只读)",
+      ".far-design/ (Phase B 控制面,26 项)"
+    ],
+    "mutable_local_state": ".agent-state/"
+  },
+  "machine_gates": {
+    "registry": ".pi/project.json (10 门登记表;pi 不原生执行,靠 bash 直跑 / far-stage 扩展 far_gate_run / prompt 纪律三轨)",
+    "anchor_check": "node scripts/charter_anchor_map.mjs --check (1.md 锚点地图 330 锚点 md5 校验)",
+    "gate_c": "node scripts/gate_c_readiness.mjs (Gate C 实施就绪机检 C1–C5)",
+    "gate_d": "node scripts/gate_d_vertical_slice.mjs (Gate D 垂直切片机检)",
+    "bootstrap": "node scripts/far_design_bootstrap.mjs (Phase B 控制面幂等生成)",
+    "stage_ext_smoke": "node scripts/far_stage_ext_smoke.mjs (far-stage 扩展冒烟)"
+  },
+  "prompts": {
+    "directory": ".pi/prompts/",
+    "count": 25,
+    "note": "全部锚点化:far-phase-a/far-next/far-s0~s10/far-phase-c~h/far-design/resume/status/implement/release/review"
+  },
+  "design_lint": "scripts/design_lint.mjs",
+  "validation": "python scripts/validate_agent_config.py"
+}

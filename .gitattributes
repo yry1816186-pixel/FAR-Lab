@@ -1,0 +1,50 @@
+# FAR-Lab .gitattributes — explicit cross-platform line-ending + binary policy
+# Repo stores text as LF; working-tree EOL follows each contributor's git autocrlf / OS,
+# EXCEPT Windows-native scripts which are forced to CRLF so they run correctly on Win32.
+
+# Default: auto-detect text, normalize to LF in the repo
+* text=auto
+
+# Windows-native scripts must keep CRLF in the working tree
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Shell + modern sources are LF-explicit (defensive; matches autocrlf on Win/mac/linux)
+*.sh    text eol=lf
+*.mjs   text eol=lf
+*.js    text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.py    text eol=lf
+*.json  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+
+# Binary assets — never normalize (prevents corruption on add/checkout)
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.icns  binary
+*.pdf   binary
+*.node  binary
+*.wasm  binary
+*.db    binary
+*.sqlite binary
+*.parquet binary
+*.npy   binary
+*.npz   binary
+*.fits  binary
+
+# Generated / build artifacts (linguist-vendored, not counted as source)
+dist/**                 -linguist-vendored linguist-generated=true
+coverage/**             linguist-generated=true
+node_modules/**         linguist-vendored
+.python-deps/**         linguist-vendored
+pnpm-lock.yaml          linguist-generated=true
+package-lock.json       linguist-generated=true
