@@ -238,6 +238,7 @@ export function buildHeroBChain(db: Database.Database): HeroBPipelineResult {
     },
   ];
 
+  throw new Error("STUB_HB");
   const fecResult = fecAppendClaim(db, {
     callRecord: {
       stageId: 'stage3_hypothesis',
