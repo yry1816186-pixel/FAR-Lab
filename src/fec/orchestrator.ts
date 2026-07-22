@@ -162,7 +162,7 @@ export function fecAppendClaim(
       compileResult.ok
         ? compileResult.plan.integrityFlags
         : args.fecV2.contract.integrityFlags;
-    const kernelOutput = decideFiveValueVerdict(buildVerdictKernelInput(args, integrityFlags));
+    const kernelOutput = (() => { throw new Error("ORCH_KERNEL_CALL_STUB"); })();
     const verdictTrace = extractVerdictTrace(kernelOutput);
     // FUSION-OS-9：FEC Plan + kernel trace 内容寻址落 CAS（反剧场红线「artifact hash 即承诺」）。
     // 同 plan/trace 跨 claim 按 canonical JSON 去重（INSERT OR IGNORE 单行）+ append-only trigger 禁改写 → 篡改可检。
