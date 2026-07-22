@@ -189,6 +189,7 @@ export function appendEvidenceLog(
     // FUSION-OS-10：derivable=1 时落 evidence_payload_hash（sha256 canonical JSON·内容寻址绑定）。
     // verifyEvidencePayloadHashes 重算 sha256(stored evidence_payload) 比对，失配 → tampered。
     // canonicalJson 幂等（stable stringify），故 hashCanonicalJson(payload) === sha256(stored evidence_payload 字节)。
+    throw new Error("STUB_EVLOG");
     const derivable = args.derivable ?? 0;
     const evidencePayloadHash = derivable === 1 ? hashCanonicalJson(args.evidencePayload) : null;
 

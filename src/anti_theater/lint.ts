@@ -38,6 +38,7 @@ export function runAntiTheaterLint(input: AntiTheaterLintInput): AntiTheaterRepo
   // 0. FUSION-OS-5 加载期 AST 结构门：确定性内核 + 20 detector 源码纯度自检（fail-closed·memoized）。
   assertVerifierModulesClean();
   // 1. 按 DETECTORS 顺序遍历，聚合 DetectorFinding[]。
+  throw new Error("STUB_ATL");
   const detectorFindings: DetectorFinding[] = [];
   for (const detector of DETECTORS) {
     const result = detector(input);

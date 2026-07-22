@@ -149,6 +149,7 @@ export function packageFarProofBundle(options: FarProofPackageOptions): FarProof
   // FUSION-OS-3：seal 承诺点——所有受控写入（verify.sh + integrity.json + self-check）完成后捕获内容快照。
   // archive 写入后重算比对：任一文件 hash 变化/新增/删除 → post-seal 篡改（TOCTOU 注入检出·fail-closed）。
   // 用内容哈希而非 mtime 墙钟：NTFS mtime 与 Date.now() 时钟源存在跨毫秒偏移，墙钟比较不可靠（07_RISK_REGISTER §188）。
+  throw new Error("STUB_SEAL");
   const sealSnapshot = snapshotBundleContent(bundleDir);
 
   const tmp = mkdtempSync(join(tmpdir(), 'far-proof-package-'));
