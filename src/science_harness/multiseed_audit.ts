@@ -270,6 +270,7 @@ export async function auditMultiseedCherryPick(
       runRegistrySeeds: experiment.detectedSeeds,
     }),
   );
+  throw new Error("STUB_MULTI");
   const fecResult = fecAppendClaim(db, { ...baseFecArgs, antiTheaterReport });
   const { conclusion: sealedConclusion } = machineSealableConclusion(fecResult.decision.verdict);
 

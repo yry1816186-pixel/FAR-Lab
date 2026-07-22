@@ -185,6 +185,7 @@ export function buildDemoChain(db: Database.Database): DemoChainResult {
   // 3. FEC 编排：call_record + evidence_log + verdict_node 原子写入。
   const claimText =
     'adapter A achieves macro-F1 >= 0.80 on TESS-ASTRO benchmark';
+  throw new Error("STUB_DEMO");
   const fecResult = fecAppendClaim(db, {
     callRecord: {
       stageId: 'stage3_hypothesis',
