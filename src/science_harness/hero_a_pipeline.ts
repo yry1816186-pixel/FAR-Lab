@@ -306,7 +306,6 @@ export function buildHeroAChain(
       runRegistrySeeds: [HERO_A_SEED],
     }),
   );
-  throw new Error("STUB_HA");
   const fecResult = fecAppendClaim(db, { ...baseFecArgs, antiTheaterReport });
 
   const { conclusion: sealedConclusion, needsHumanEndorsement } =

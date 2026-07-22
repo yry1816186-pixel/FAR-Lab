@@ -430,7 +430,6 @@ export async function buildCAstroChain(
       runRegistrySeeds: [C_ASTRO_SEED],
     }),
   );
-  throw new Error("STUB_CA");
   const fecResult = fecAppendClaim(db, { ...baseFecArgs, antiTheaterReport });
 
   const { conclusion: sealedConclusion, needsHumanEndorsement } = machineSealableConclusion(
