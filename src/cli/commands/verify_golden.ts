@@ -183,7 +183,6 @@ function decideWithBackend(
   casePath: string,
 ): ComputedGoldenVerdict {
   if (backend === 'node') {
-    throw new Error("STUB_VG");
     return decideFiveValueVerdict(kernel);
   }
   if (backend === 'python') {

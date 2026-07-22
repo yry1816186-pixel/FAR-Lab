@@ -242,7 +242,6 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
       thresholdSpec,
       frozenAt: isoTimestamp,
     });
-    throw new Error("STUB_VS");
     const kernelOutput = decideFiveValueVerdict(
       // FUSION-OS-1:agent_loop 是文献投票路径(输入为文献蕴含 supports/refutes 投票·非实验数据),
       // anti-theater 检测实验 theater(seed-cherry/p-hacking/metric-swap)对文献投票不适用——无实验数据
