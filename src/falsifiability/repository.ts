@@ -169,7 +169,7 @@ export interface SupersedeVerdictResult {
  * superseded_by 是元数据，不进 old.current_hash 白名单 → old 链完整性不变（verifyVerdictNodes 重算仍匹配）。
  * 事务性：recordVerdict(new) + UPDATE(old.superseded_by) 原子提交；old 不存在 → 抛错（fail-closed）。
  */
-export function supersedeVerdict(db: Database.Database, args: SupersedeVerdictArgs): SupersedeVerdictResult { throw new Error("STUB_SUPER");
+export function supersedeVerdict(db: Database.Database, args: SupersedeVerdictArgs): SupersedeVerdictResult {
   const supersede = db.transaction((): SupersedeVerdictResult => {
     const existing = getVerdict(db, args.oldVerdictId);
     if (existing === null) {
