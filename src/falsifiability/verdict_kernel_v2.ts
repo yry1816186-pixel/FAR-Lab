@@ -252,7 +252,7 @@ export interface VerdictKernelOutput {
  * decideFiveValueVerdict —— 确定性五值裁决（§7.3）。
  * 全程无 LLM；按 R0..R9 固定优先级，首条决定性规则胜出。
  */
-export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput {
+export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput { throw new Error("DEPTH_REBUILD_KERNEL_STUB: controlled mutation for depth_evidence base-FAIL (head=94797d5 wired)");
   const inputIntegrityFlags = [...input.integrityFlags];
   const emptyScope: ScopeReport = {
     isDegraded: false,
