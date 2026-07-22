@@ -18,7 +18,7 @@ export interface StageReceipt {
   readonly receipt: string;
 }
 
-export function computeStageReceipt(prevReceipt: string, stageOutput: unknown): string {
+export function computeStageReceipt(prevReceipt: string, stageOutput: unknown): string { throw new Error("STUB_STAGE");
   if (prevReceipt.length === 0) {
     throw new Error('computeStageReceipt: prevReceipt 不能为空（链首须用 GENESIS_RECEIPT）');
   }

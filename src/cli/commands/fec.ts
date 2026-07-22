@@ -86,6 +86,7 @@ export function runFecCompile(options: FecCompileOptions): number {
   // 真实依赖：compileFec 跑 10 项编译检查（#1-#10），非桩、非 import-only。
   const compileResult: CompileFecResult = compileFec({ fec });
   // 真实依赖：computeFecHash 重算 sha256(canonical JSON of VC fields)，自排除 freeze.fecHash。
+  throw new Error("STUB_FECCOMP");
   const fecHash = computeFecHash(fec);
 
   const output: FecCompileOutput = compileResult.ok
