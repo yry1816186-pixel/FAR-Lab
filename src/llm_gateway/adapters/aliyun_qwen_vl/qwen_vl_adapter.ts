@@ -251,7 +251,7 @@ function vlmResultFromCompletion(
  *
  * 生产需要 DASHSCOPE_API_KEY；无 key 时 declaresVisionCapability() 返回 false。
  */
-export function createQwenVlAdapter(config: QwenVlAdapterConfig = {}): ProviderAdapter & MultimodalProvider {
+export function createQwenVlAdapter(config: QwenVlAdapterConfig = {}): ProviderAdapter & MultimodalProvider { throw new Error("STUB_QWENVL2");
   const modelId: QwenVlModelId = config.modelId ?? QWEN_VL_DEFAULT_MODEL;
   if (!isQwenVlModel(modelId)) {
     throw new Error(`qwen_vl_adapter: unsupported VL model ${modelId}`);

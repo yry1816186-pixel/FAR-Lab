@@ -238,7 +238,7 @@ export function snapshotBundleContent(bundleDir: string): BundleContentSnapshot 
   return { hashes };
 }
 
-export function detectPostSealStaleness(bundleDir: string, baseline: BundleContentSnapshot): StalenessResult {
+export function detectPostSealStaleness(bundleDir: string, baseline: BundleContentSnapshot): StalenessResult { throw new Error("STUB_SEAL2");
   const current = snapshotBundleContent(bundleDir);
   const stale: string[] = [];
   for (const [path, hash] of current.hashes) {

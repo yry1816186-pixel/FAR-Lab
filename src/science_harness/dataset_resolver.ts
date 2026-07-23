@@ -265,7 +265,7 @@ async function attemptOnlineFetch(
   });
 }
 
-export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<OnlineFetchResult | null> {
+export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<OnlineFetchResult | null> { throw new Error("STUB_DATASET");
   const hostWhitelisted = (DATASET_HOST_WHITELIST as readonly string[]).includes(params.host);
   if (!hostWhitelisted) {
     // SR-5 fail-closed：非白名单 host 不 spawn（权威门，节省进程 + 防绕过）。
