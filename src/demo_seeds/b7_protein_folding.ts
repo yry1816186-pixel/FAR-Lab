@@ -88,7 +88,7 @@ const makeIntegrationPayload = () => ({
   citations: [
     {
       evidenceId: 'ev-b7-001',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1038/s41586-021-03819-2',
       title: 'AlphaFold2: Highly Accurate Protein Structure Prediction with Deep Learning',
     },
@@ -100,7 +100,7 @@ const makeIntegrationPayload = () => ({
     },
     {
       evidenceId: 'ev-b7-003',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1093/nar/gkac1080',
       title: 'Protein Data Bank: The Single Global Archive of Macromolecular Structures',
     },
@@ -156,7 +156,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.78,
       source: {
         evidenceId: 'ev-b7-001',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1038/s41586-021-03819-2',
         title: 'AlphaFold2: Highly Accurate Protein Structure Prediction with Deep Learning',
       },
@@ -167,7 +167,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.51,
       source: {
         evidenceId: 'ev-b7-003',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1093/nar/gkac1080',
         title: 'Protein Data Bank: The Single Global Archive of Macromolecular Structures',
       },

@@ -87,13 +87,13 @@ const makeIntegrationPayload = () => ({
   citations: [
     {
       evidenceId: 'ev-p1-001',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1038/s41586-023-06674-2',
       title: 'LK-99 replication: absence of room-temperature superconductivity (Peking U.)',
     },
     {
       evidenceId: 'ev-p1-002',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1038/s41586-023-06473-6',
       title: 'Cu2S impurity phase transition explains the resistivity anomaly in LK-99 (Max Planck)',
     },
@@ -144,7 +144,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.9,
       source: {
         evidenceId: 'ev-p1-002',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1038/s41586-023-06473-6',
         title: 'Cu2S impurity phase transition explains the resistivity anomaly in LK-99',
       },
@@ -155,7 +155,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.85,
       source: {
         evidenceId: 'ev-p1-001',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1038/s41586-023-06674-2',
         title: 'LK-99 replication: absence of room-temperature superconductivity',
       },

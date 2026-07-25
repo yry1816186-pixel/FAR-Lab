@@ -199,8 +199,9 @@ export function verifyEnvelopeV2(envelope: ProofEnvelopeV2): EnvelopeVerifyResul
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // proofHash 独立重算（L4·RULE-PE-010）。verifyProofHashV2 内部已 try/catch fecHash/NaN 断言 → 返回 false。
-  const proofHashOk = verifyProofHashV2(envelope);
+  // proofHash 独立重算（L4·RULE-PE-010）。F-4-005: verifyProofHashV2 返回 result code 区分篡改 vs 格式错误。
+  const proofHashResult = verifyProofHashV2(envelope);
+  const proofHashOk = proofHashResult === 'valid';
 
   // 10 规则（含 RULE-PE-007 verdict↔hasFail、RULE-PE-010 independently_recomputable）。
   // validator 假设 in-process 合法结构；untrusted 反序列化 envelope 深层字段缺失可能抛 TypeError，
@@ -221,7 +222,7 @@ export function verifyEnvelopeV2(envelope: ProofEnvelopeV2): EnvelopeVerifyResul
     }
   }
   if (!proofHashOk) {
-    errors.push('proofHash recomputation mismatch (sealed envelope tampered, or fecHash inconsistent with fecSnapshot)');
+    errors.push(`proofHash recomputation: ${proofHashResult} (sealed envelope tampered, fecHash inconsistent, non-finite number, or malformed structure)`);
   }
 
   // anti-theater 内嵌报告自洽（D4·P0：验内嵌报告一致性，非 20-detector 原始重算·#11b）。
@@ -684,6 +685,40 @@ function verifyDbChain(
 
 // ===== 渲染（人类可读·--explain 展开 10 规则表 + anti-theater 重算 findings）=====
 
+/**
+ * recomputation 醒目汇总行（T-012 · 评委03/08 · 2026-07-24 第 3 轮 CP-10）。
+ *
+ * 评委诉求：python/browser 不是全 pass 时，verify 顶部须有醒目汇总行，防误判「复算全成功」。
+ * 规则：
+ *   - 三轴全 pass → 全绿汇总（无警告）
+ *   - 任一 fail → 显式 PARTIAL_FAILURE 红色醒目
+ *   - 仅 not-run（无 fail）→ PARTIAL_RECOMPUTE 黄色提醒（诚实降级·非失败）
+ */
+function renderRecomputationSummary(recomputation: RecomputationStatus): readonly string[] {
+  const axes: ReadonlyArray<readonly [string, RecomputeAxis]> = [
+    ['node', recomputation.node],
+    ['python', recomputation.python],
+    ['browser', recomputation.browser],
+  ];
+  const passCount = axes.filter(([, s]) => s === 'pass').length;
+  const failCount = axes.filter(([, s]) => s === 'fail').length;
+  const notRunCount = axes.filter(([, s]) => s === 'not-run').length;
+
+  if (failCount > 0) {
+    return [
+      `  ⚠ RECOMPUTE STATUS  : PARTIAL_FAILURE (${passCount} pass / ${failCount} fail / ${notRunCount} not-run) — independent recomputation has failing axes`,
+    ];
+  }
+  if (notRunCount > 0) {
+    return [
+      `  ⚠ RECOMPUTE STATUS  : PARTIAL_RECOMPUTE (${passCount} pass / ${notRunCount} not-run) — some axes not executed; see below for per-axis detail`,
+    ];
+  }
+  return [
+    `  ✓ RECOMPUTE STATUS  : ALL_PASS (3/3 axes) — full independent recomputation`,
+  ];
+}
+
 function renderVerifyHuman(
   dump: VerifyDump,
   envelopeResult: EnvelopeVerifyResult | undefined,
@@ -703,6 +738,7 @@ function renderVerifyHuman(
     `  recomputation.node   : ${dump.recomputation.node}`,
     `  recomputation.python : ${dump.recomputation.python}`,
     `  recomputation.browser: ${dump.recomputation.browser} (Phase 2 / #13 not yet wired)`,
+    ...renderRecomputationSummary(dump.recomputation),
     `  verifiedLevels       : ${dump.verifiedLevels.length > 0 ? dump.verifiedLevels.join(', ') : 'none'}`,
   ];
 

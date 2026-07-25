@@ -9,15 +9,23 @@
  * 分层：本文件在 tests/，可 import src/benchmark（tests 依赖 src·方向正确）。
  * DemoSeedResult 结构兼容聚合器的 BenchmarkSeedInput 契约（结构超集·TS 结构类型允许）。
  *
- * 覆盖广度（8 seed · 7 领域 · 全部 5 种 verdict）：
- *   - A4  天文学  · 行星轨道衰减          → INCONCLUSIVE
- *   - A16 天文学  · 脉冲星制动指数        → CONFIRMED
- *   - B7  生物    · 蛋白质折叠            → REFUTED
- *   - C3  化学    · 催化剂活性            → DEGRADED_SCOPE
- *   - E2  生态气候· 碳通量                → CONFIRMED
- *   - G5  地学    · 地震前兆              → UNTESTED
- *   - P1  物理    · 室温超导（LK-99）      → REFUTED
- *   - M2  医学    · 心衰住院（SGLT2 CVOT） → CONFIRMED
+ * 覆盖广度（16 seed · 15 领域 · 全部 5 种 verdict）：
+ *   - A4  天文学    · 行星轨道衰减          → INCONCLUSIVE
+ *   - A8  理论物理  · 黑洞信息悖论          → CONFIRMED
+ *   - A16 天文学    · 脉冲星制动指数        → CONFIRMED
+ *   - B3  基因组学  · CRISPR 脱靶效应       → INCONCLUSIVE
+ *   - B7  生物      · 蛋白质折叠            → REFUTED
+ *   - C3  化学      · 催化剂活性            → DEGRADED_SCOPE
+ *   - C8  能源化学  · 人造光合作用          → DEGRADED_SCOPE
+ *   - D9  宇宙学    · 暗物质直接探测        → INCONCLUSIVE
+ *   - E2  生态气候  · 碳通量                → CONFIRMED
+ *   - E5  气候科学  · 平衡气候敏感度 ECS    → REFUTED
+ *   - G5  地学      · 地震前兆              → UNTESTED
+ *   - H1  生命起源  · RNA 世界自复制        → INCONCLUSIVE
+ *   - P1  物理      · 室温超导（LK-99）      → REFUTED
+ *   - M2  医学      · 心衰住院（SGLT2 CVOT） → CONFIRMED
+ *   - M7  神经退行  · 阿尔茨海默 Aβ 假说    → DEGRADED_SCOPE
+ *   - N3  神经科学  · 神经退行蛋白聚集      → DEGRADED_SCOPE
  *
  * 诚实定位：领域/问题数是「工程完整性广度」的展示；verdict 由 offline fixture 产出（非真实裁决），
  * 但 verdict 多样性本身即证据——非「全 CONFIRMED」的剧场，而是 supports / refutes / inconclusive /
@@ -25,13 +33,25 @@
  */
 
 import { runA4Seed } from './a4_planetary_orbit_decay.ts';
+import { runA8Seed } from './a8_black_hole_information.ts';
 import { runA16Seed } from './a16_pulsar_p0.ts';
+import { runB3Seed } from './b3_crispr_offtarget.ts';
+import { runB5Seed } from './b5_microbiome_depression.ts';
 import { runB7Seed } from './b7_protein_folding.ts';
 import { runC3Seed } from './c3_catalyst_activity.ts';
+import { runC8Seed } from './c8_artificial_photosynthesis.ts';
+import { runC10Seed } from './c10_nisq_quantum_advantage.ts';
+import { runD9Seed } from './d9_dark_matter_detection.ts';
 import { runE2Seed } from './e2_carbon_flux.ts';
+import { runE5Seed } from './e5_climate_sensitivity.ts';
+import { runE8Seed } from './e8_ocean_acidification_coral.ts';
+import { runG2Seed } from './g2_universal_flu_vaccine.ts';
 import { runG5Seed } from './g5_seismic_precursor.ts';
-import { runP1Seed } from './p1_room_temp_superconductor.ts';
+import { runH1Seed } from './h1_rna_world.ts';
 import { runM2Seed } from './m2_sglt2_heart_failure.ts';
+import { runM7Seed } from './m7_alzheimer_amyloid.ts';
+import { runN3Seed } from './n3_neurodegeneration_aggregation.ts';
+import { runP1Seed } from './p1_room_temp_superconductor.ts';
 import type { SeedRunner } from '../../src/benchmark/index.ts';
 
 /**
@@ -48,11 +68,32 @@ export const BENCHMARK_SEEDS: readonly SeedRunner[] = [
     run: runA4Seed,
   },
   {
+    problemId: 'A8',
+    problemTitle: '黑洞信息悖论（island formula / Page curve）',
+    domain: '理论物理',
+    science125Tag: 'black-hole-information-paradox',
+    run: runA8Seed,
+  },
+  {
     problemId: 'A16',
     problemTitle: '脉冲星制动指数（P0/P1）',
     domain: '天文学',
     science125Tag: 'pulsar-braking-index',
     run: runA16Seed,
+  },
+  {
+    problemId: 'B3',
+    problemTitle: 'CRISPR 脱靶效应（基因组编辑精准性）',
+    domain: '基因组学',
+    science125Tag: 'crispr-offtarget-effects',
+    run: runB3Seed,
+  },
+  {
+    problemId: 'B5',
+    problemTitle: '肠道微生物-脑轴与抑郁症（FMT 疗法）',
+    domain: '微生物组学',
+    science125Tag: 'microbiome-gut-brain-depression',
+    run: runB5Seed,
   },
   {
     problemId: 'B7',
@@ -69,11 +110,53 @@ export const BENCHMARK_SEEDS: readonly SeedRunner[] = [
     run: runC3Seed,
   },
   {
+    problemId: 'C8',
+    problemTitle: '人造光合作用效率（PEC 水分解）',
+    domain: '能源化学',
+    science125Tag: 'artificial-photosynthesis-efficiency',
+    run: runC8Seed,
+  },
+  {
+    problemId: 'C10',
+    problemTitle: 'NISQ 量子优势（Sycamore 经典算法追上）',
+    domain: '量子信息',
+    science125Tag: 'nisq-quantum-advantage',
+    run: runC10Seed,
+  },
+  {
+    problemId: 'D9',
+    problemTitle: '暗物质直接探测（WIMP-核子散射）',
+    domain: '宇宙学',
+    science125Tag: 'dark-matter-direct-detection',
+    run: runD9Seed,
+  },
+  {
     problemId: 'E2',
     problemTitle: '生态系统碳通量（FLUXNET）',
     domain: '生态气候',
     science125Tag: 'ecosystem-carbon-flux',
     run: runE2Seed,
+  },
+  {
+    problemId: 'E5',
+    problemTitle: '平衡气候敏感度（ECS 低敏感证伪）',
+    domain: '气候科学',
+    science125Tag: 'climate-sensitivity-ecs',
+    run: runE5Seed,
+  },
+  {
+    problemId: 'E8',
+    problemTitle: '海洋酸化与珊瑚钙化（pH 下降影响）',
+    domain: '海洋化学',
+    science125Tag: 'ocean-acidification-coral',
+    run: runE8Seed,
+  },
+  {
+    problemId: 'G2',
+    problemTitle: '通用流感疫苗（广谱保护评估）',
+    domain: '免疫学',
+    science125Tag: 'universal-flu-vaccine',
+    run: runG2Seed,
   },
   {
     problemId: 'G5',
@@ -83,11 +166,11 @@ export const BENCHMARK_SEEDS: readonly SeedRunner[] = [
     run: runG5Seed,
   },
   {
-    problemId: 'P1',
-    problemTitle: '室温超导（LK-99 复现）',
-    domain: '物理',
-    science125Tag: 'room-temp-superconductor-lk99',
-    run: runP1Seed,
+    problemId: 'H1',
+    problemTitle: 'RNA 世界假说（ribozyme 自复制）',
+    domain: '生命起源',
+    science125Tag: 'rna-world-self-replication',
+    run: runH1Seed,
   },
   {
     problemId: 'M2',
@@ -95,5 +178,26 @@ export const BENCHMARK_SEEDS: readonly SeedRunner[] = [
     domain: '医学',
     science125Tag: 'sglt2-heart-failure-benefit',
     run: runM2Seed,
+  },
+  {
+    problemId: 'M7',
+    problemTitle: '阿尔茨海默病 Aβ 假说（lecanemab）',
+    domain: '神经退行',
+    science125Tag: 'alzheimer-amyloid-hypothesis',
+    run: runM7Seed,
+  },
+  {
+    problemId: 'N3',
+    problemTitle: '神经退行性疾病蛋白聚集（α-synuclein / PD）',
+    domain: '神经科学',
+    science125Tag: 'neurodegeneration-protein-aggregation',
+    run: runN3Seed,
+  },
+  {
+    problemId: 'P1',
+    problemTitle: '室温超导（LK-99 复现）',
+    domain: '物理',
+    science125Tag: 'room-temp-superconductor-lk99',
+    run: runP1Seed,
   },
 ];

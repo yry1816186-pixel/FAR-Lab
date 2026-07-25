@@ -10,6 +10,25 @@ Honesty: this is a from-scratch numpy BLS (no astropy/lightkurve dependency) so 
 the core numpy install. centroid_offset (M4) is NOT computable from a 1D lightcurve (needs
 2D pixel data) → reported as null; the pipeline marks M4 SKIP (partial_skip -> INCONCLUSIVE).
 Never raises to the caller; failures return {"ok": false, "error": "..."}.
+
+Algorithm deviations from Kovács et al. 2002 (A&A 391, 369) —评委05 F-5-R4-001/002 R4:
+  1. Box-only model (no triangle-fit / Mandel-Agol). Standard BLS+TLS include a triangle
+     model for rounded transits (limb darkening). This implementation fits flat-bottom box
+     only → depth overestimate 10-20% on real limb-darkened transits.
+  2. SR (signal residue) formula uses a Welch-like denominator with GLOBAL flux variance,
+     not the per-bin sigma_in × sqrt(n_in) of Kovács Eq.3. Transit signal leaks into the
+     global variance → SR systematically underestimated → false negative risk on real data.
+  3. No flux normalization before folding. Standard BLS normalizes (subtract mean, divide
+     sigma) before the grid search; this implementation uses raw flux variance.
+  4. No SR → p-value mapping. The pipeline reports depthSNR (dimensionless) but
+     tess_harness M1 threshold unit says 'p-value' — M1 actually consumes a TS-side
+     two-sample z-test p-value, NOT the BLS depthSNR.
+  5. No de-trending / cotrending / systematic-noise removal. Real TESS PDCSAP flux has
+     long-term trends, roll-angle systematics, scattered light — all absent in demo.
+
+These are V2 algorithm-fidelity improvements (DEFERRED ·评委05 F-5-R4-001/002/003).
+Demo verdicts use synthetic box-transit + iid Gaussian noise, which masks these defects.
+For real TESS science, use astropy.timeseries.BoxLeastSquares or transit-least-squares (TLS).
 """
 
 from __future__ import annotations
@@ -130,6 +149,26 @@ def run(
     durations: tuple[float, ...] = (0.08, 0.12, 0.16),
     seed: int | None = None,
 ) -> dict[str, Any]:
+    """Run a Box-fitting Least Squares (BLS) period search over a lightcurve.
+
+    T-017 诚实边界（评委05 F-5-001 · 2026-07-24）：n_periods=120 is a **teaching/demo simplification**.
+    Production TESS BLS pipelines use n_periods >= 2000 (typically 2000-100000) to cover the dense
+    frequency grid required for real transit detection. 120 points is sufficient for the C-ASTRO-0001
+    demo (synthetic single-transit LC with known period in [1.8, 3.0] days) but would miss real
+    TESS transit signals in dense frequency grids. Callers running production TESS must raise
+    n_periods >= 2000 and adjust the Bonferroni alpha accordingly (trial factor = n_periods, not 4).
+
+    Args:
+        lightcurve_path: path to 2-column CSV (time, flux).
+        period_min/period_max: period search range (days).
+        n_periods: number of trial periods in [period_min, period_max]. Demo=120, TESS prod>=2000.
+        n_phases: number of trial phases per period.
+        durations: trial transit durations (days).
+        seed: optional RNG seed for noise injection (observational-uncertainty bootstrap).
+
+    Returns:
+        BLS measurement dict (period, depth, snr, n_points, ...).
+    """
     times, fluxes = read_lightcurve(lightcurve_path)
     # seed-dependent Gaussian noise injection (observational-uncertainty bootstrap):
     # different seeds -> different noise realizations -> genuinely distinct recovered

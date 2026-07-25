@@ -51,7 +51,7 @@ import { buildAntiTheaterPipelineInput } from './anti_theater_input.ts';
 export const SEED_CHERRY_CLAIM_ID = 'C-CHERRY-0001';
 export const SEED_CHERRY_METRIC_KEY = 'transit_depth_significance';
 export const SEED_CHERRY_PIPELINE_CLAIM =
-  'TIC 268644982 shows a transit signal (period ~2.41d, depth ~0.8%) confirmed across 5 pre-registered seeds';
+  'TIC 268644982 shows a transit signal (period ~2.41d, depth ~0.8%) detected across 5 pre-registered seeds';
 
 // cherry-pick fixture：研究者预注册 5 个种子，实际只报告 3 个（隐去 seed 3,4 — 无 transit）。
 // detect_seed_cherry 从 declaredSeeds ⊄ ranSeeds 的差集 {3,4} 诚实 fire HIDDEN_FAILED_RUN。

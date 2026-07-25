@@ -2,6 +2,9 @@
 
 **Falsifiable · Tamper-Detectable · Independently Recomputable AI-for-Science framework.**
 
+> 🎯 **一句话：FAR-Lab 是 AI4S 结论的测谎仪——让 LLM 生成的科学假设，可被任何人独立验证真假。**
+> （[09 Product Thesis](docs/design/09_PRODUCT_THESIS_SCOPE_NON_GOALS_HERO_AND_ADOPTION.md)：LLM 提假设，确定性规则核裁决；验证层是 AI Scientist 走向可信生产的底座）
+
 > FAR-Lab is a **claim-level verification layer for AI4S scientific claims**. It does not chase the
 > "fully-automated scientist" narrative. Instead it uses a deterministic verdict kernel and a
 > content-addressed evidence chain to constrain LLM-generated hypotheses inside engineering
@@ -51,18 +54,30 @@ reads a key value.
 ## 2-minute Quickstart
 
 ```bash
-# 1. Verify a pre-generated, self-verifiable proof bundle (offline, no key)
-node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof
-#   → tamperStatus: clean · recomputation.node: pass · exit 0
+# 1. Run the offline demo through the real R0-R9 kernel (14 golden vectors + end-to-end, no key)
+node src/cli/far.ts demo
+#   → 14/14 golden vectors PASS · end-to-end demo claim sealed · exit 0
+#   (the `tess-offline` sub-mode focuses on C-ASTRO-0001 and may yield UNTESTED; for a full
+#    statistics-driven demo use `far demo` or the hero scripts below)
 
 # 2. Run the deterministic verdict kernel over 14 golden vectors
 node src/cli/far.ts verify-golden --all
 
-# 3. See tamper detection in action
-cp -r examples/tess-offline/output/demo.far-proof /tmp/tampered
+# 3. See tamper detection in action (requires a .far-proof bundle — run step 4 first to export one)
+#    macOS / Linux / WSL (bash):
+mkdir -p /tmp/tampered && cp -r .far-proof /tmp/tampered
 sed -i 's/UNTESTED/CONFIRMED/' /tmp/tampered/proof_envelopes.jsonl
 node src/cli/far.ts verify /tmp/tampered
 #   → tamperStatus: tampered · recomputation.node: fail · exit 7
+#
+#    Windows (PowerShell 7+):
+#   New-Item -ItemType Directory -Force tampered | Out-Null
+#   Copy-Item -Recurse .far-proof tampered
+#   (Get-Content tampered/proof_envelopes.jsonl) -replace 'UNTESTED','CONFIRMED' | Set-Content tampered/proof_envelopes.jsonl
+#   node src/cli/far.ts verify tampered
+
+# 4. Export the proof bundle used by step 3 (and by the hero scripts below)
+node src/cli/far.ts export far-proof --demo-chain --force
 ```
 
 ### Scripted Hero walkthroughs (IC-08, timed + honest-labeled)
@@ -105,6 +120,30 @@ detached from evidence). FAR-Lab closes all three with:
   R0–R9 kernel decides.
 - ❌ It is **not** a general AI4S benchmark. It is a verification layer.
 - ❌ It does **not** claim physical immutability or full reproducibility — see *Known limits*.
+
+---
+
+## How it compares
+
+FAR-Lab occupies a distinct niche — **claim-level falsifiability verification** — that is largely
+**complementary** to (not a replacement for) the established categories below. It can *consume* their
+outputs as evidence and *export* to provenance standards.
+
+| Capability | Experiment trackers<br/>(MLflow / W&B / DVC) | Provenance standards<br/>(W3C PROV-O / RO-Crate) | AI-Scientist generators<br/>(Sakana "AI Scientist" et al.) | **FAR-Lab** |
+|---|:---:|:---:|:---:|:---:|
+| Claim-level **falsifiability** gate (reject unfalsifiable claims) | ✗ | ✗ | partial (LLM-judged) | ✅ **deterministic FEC** |
+| **Deterministic** verdict, no LLM in the decider | ✗ | ✗ | ✗ | ✅ **R0–R9 kernel** |
+| **Anti-theater** detector suite (catch p-hacking / cherry-pick / fixture-as-result) | ✗ | ✗ | ✗ | ✅ **21 detectors** |
+| **Tamper-evident** evidence chain (SHA-256 append-only) | partial (logging) | ✗ (models lineage, no chain) | ✗ | ✅ **+ cross-language byte-identical** |
+| **Independent third-party recompute** of a sealed verdict | ✗ | partial (lineage only) | ✗ | ✅ **ProofEnvelope re-verify** |
+| Role of the LLM | optional logging helper | none | **generator** (writes hypotheses/papers) | **generator only** — never the decider |
+
+**The decisive gap FAR-Lab closes**: in autonomous AI-Scientist systems, the entity that *generates* a
+hypothesis is also the entity that *judges* it. FAR-Lab splits these roles — the LLM proposes, a
+deterministic, content-addressed, anti-theater-protected kernel decides — so a third party can
+independently recompute and falsify the verdict. Experiment trackers and provenance standards are
+necessary infrastructure FAR-Lab builds on (it exports RO-Crate 1.1 + W3C PROV-O), but neither
+produces a falsifiability verdict nor runs anti-theater detection.
 
 ---
 
@@ -162,6 +201,18 @@ provider, pass an explicit env file: `docker compose --env-file .env up far-api`
 
 > `NEEDS_DOCKER_BUILD_VALIDATION`: the image is built locally; publish to GHCR is part of the release
 > workflow (`NEEDS_GHCR_PUBLISH`).
+
+### Platform support matrix (T-010 · 评委03/11)
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Node.js ≥ 24 (macOS / Linux / WSL) | ✅ Fully supported | Required (better-sqlite3 prebuilt binaries + native ESM loaders). |
+| Node.js 22 / 20 | ❌ Not supported | better-sqlite3 ABI mismatch crashes on Node < 24. Use Docker or upgrade. |
+| Windows (PowerShell 7+) | ✅ Supported | All CLI commands work; bash one-liners in Quickstart have PowerShell equivalents inline. |
+| Docker (`docker compose up`) | ✅ Recommended fallback | Bundles correct Node + Python + native deps. Use this if Node version issues arise. |
+
+> If `pnpm install` fails on native modules (better-sqlite3), use `docker compose up far-demo` —
+> the Docker image pins the correct toolchain and bypasses host Node version mismatches.
 
 ---
 
@@ -241,5 +292,31 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
 1. **Float serialization** — string-key hashing is fully proven; float serialization is migrating to
    RFC 8785 JCS.
 2. **Multimodal** — vision supported (Qwen-VL); audio/video/tabular are on the roadmap.
-3. **Single-node** — SQLite-based; multi-node PostgreSQL is future work.
-4. **Pre-1.0** — API and schema may change.
+3. **Single-node** — SQLite-based; multi-node PostgreSQL is future work. Tested throughput is
+   O(10²) rows/sec append + O(10⁴) rows indexed lookups/sec on consumer SSD (single-process).
+   Not suitable for high-concurrency multi-writer production (>100 concurrent writers → use PostgreSQL).
+4. **Pre-1.0** — API and schema may change. We follow early-stage semver: breaking changes bump
+   the minor version (0.x → 0.y) with a deprecation window of at least one minor release.
+5. **Cross-language hashing scope** — string-key hashing is byte-identical across TypeScript/Python
+   (CI-verified); float-key hashing is the V3 RFC 8785 work in item 1; the browser ProofEnvelope
+   verifier is not yet wired (#13).
+6. **TESS demo scientific fidelity** — the offline demo uses a deterministic synthetic light curve
+   (box transit, no limb darkening / contamination) and a coarse BLS grid (120 periods). The
+   Bonferroni α'=0.0125 is a pre-registered fixed threshold (F8), **not** a real TESS frequency-grid
+   trial-factor correction. This is an honest teaching simplification, not a production TESS
+   validation pipeline.
+7. **"CONFIRMED" semantics** — FAR-Lab's `CONFIRMED` verdict means "contract-consistent bounded
+   support", **not** the astronomical term "confirmed exoplanet" (which requires RV mass / TTV).
+   Astronomical candidates produced by the demo should be read as VALIDATED / CANDIDATE.
+8. **Anti-theater runtime wiring** — the 21 anti-theater detectors are fully wired in offline
+   `verify` (bundle re-computation, 20 detectors re-run and compared). Production-path runtime
+   wiring (FUSION-OS-1) is V2, pending real multi-seed data (P1-6).
+9. **Tamper detection scope** — keyless SHA-256 chains detect **naive** tampering (an attacker who
+   does not recompute hashes). Consistent forgery by an attacker who recomputes all public hashes
+   is out of scope for V1 (DEF-18, V-04 PoC). V2 will narrow this window with Ed25519 signatures.
+10. **Deterministic FSM over Bailian Agent** (T-035 · 评委04) — FAR-Lab uses a self-written
+    deterministic FSM (`src/agent_loop/fsm_runner.ts`) instead of Alibaba Cloud Bailian Agent /
+    application orchestration. This is an intentional design choice: the FSM is deterministic and
+    fully traceable (every stage transition is logged to `evidence_log`), whereas Bailian Agent is
+    a black-box orchestration layer that would break reproducibility. Bailian Agent integration is
+    a V2 evaluation item if deterministic-trace compatibility can be preserved.

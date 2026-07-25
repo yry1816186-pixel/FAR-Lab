@@ -52,7 +52,7 @@ function buildIntegrationMessages(ctx: StageContext): readonly LlmMessage[] {
     'Output a JSON object with EXACTLY these fields:',
     '- kind: "integration" (literal string)',
     '- citations: array of { evidenceId, source, doi, title }',
-    '    (source ∈ ["arxiv","ads","s2","tns","gcvs","aavso","gaia","other"]; doi is string|null)',
+    '    (source ∈ ["arxiv","ads","s2","tns","gcvs","aavso","gaia","doi","other"]; doi is string|null)',
     '- knowledgeGraphSummary: string (summary of how the problem maps onto existing knowledge)',
     '- gaps: string[] (identified gaps that the hypothesis must address)',
     '',

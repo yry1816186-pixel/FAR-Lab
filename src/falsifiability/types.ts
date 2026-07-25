@@ -34,6 +34,25 @@ export interface EvidenceRecord {
   readonly refutesClaim: boolean;
   readonly scopeNarrowerThanClaim: boolean;
   readonly sourceAnchor: SourceAnchor;
+  /**
+   * T-003 · Evidence provenance binding（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+   *
+   * 可选字段（V1 向后兼容·demo seed 可缺）：当 metricValue 来自真实 sandbox 执行时，
+   * 此字段须绑定 `sandbox_runner.computeSandboxRunResult` 产出的 `stdoutHash` 或
+   * `artifactTreeHash`（sha256 64-hex）。第三方独立复算时可重算 sandbox 输出 hash 比对，
+   * 证明 metricValue 不是手工注入的 fixture 冒充值。
+   *
+   * 缺失语义：当 FEC 要求 `requireExecutionProvenance: true` 时，primary 证据
+   * （supportsClaim=true 且 refutesClaim=false）缺失此字段 → fail-closed 拒绝裁决
+   * （`assertPrimaryEvidenceProvenanceBound` 抛错 → kernel UNTESTED + EVIDENCE_PROVENANCE_UNBOUND）。
+   *
+   * V1 边界（诚实登记）：
+   *   - 现有 demo seed 均未设置此字段（metricValue 为文献估计值或 fixture 注入值）；
+   *   - 默认 `requireExecutionProvenance: false` → 不强制 → demo seed 不受影响；
+   *   - V2 计划：所有真实研究路径 FEC 强制 `requireExecutionProvenance: true`，
+   *     届时无 provenance hash 的 metricValue 一律 fail-closed。
+   */
+  readonly executionProvenanceHash?: string;
 }
 
 export interface VerdictDecision {

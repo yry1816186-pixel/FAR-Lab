@@ -1,6 +1,19 @@
 /**
  * fsm_runner —— agent_loop 主循环（runAgentLoop + assertTerminated）。
  *
+ * T-016 反馈边状态（2026-07-24 评委逼问第 3 轮·评委04 F-4-004 澄清）：
+ *   ✅ 已有：[6]→[3] 基于 FeedbackSignal 的 hypothesis regen 反馈边
+ *      - stage6_feedback 产 FeedbackSignal（LLM 自评 continueIteration + refinements）
+ *      - 本 runner 把 feedbackSignal 回灌给下一轮 stage3（L262-269/L308/L352）
+ *      - stage3_hypothesis 消费 feedbackSignal.refinements 重新生成假设（stage3_hypothesis.ts:119-128）
+ *      - 回归测试：tests/agent_loop/t016_feedback_edge.test.ts（两轮迭代 + maxIter 兜底）
+ *   ⚠ V2 roadmap：裁决驱动的反馈边（verdict kernel REFUTED/INCONCLUSIVE → hypothesis regen）
+ *      - 当前反馈源是 stage6 LLM 自评，不是 verdict kernel 的裁决结果；
+ *      - 裁决驱动反馈边（verdict_stage 移入循环 + REFUTED 触发 regen）涉及 verdict_stage
+ *        副作用管理（落库时机/VerdictNode 语义/链长变化），是架构改动，V2 roadmap。
+ *      - 评委04 fix_direction 第二选项「诚实标注 V1 线性单 pass，迭代闭环是 V2」——本代码采此选项，
+ *        同时保留已有的 LLM 自评反馈闭环（非完全线性单 pass）。
+ *
  * 适配说明（与 spec §8 的差异·按项目实际 API 优先）：
  *   1. spec §8 入参 `bailianClient: OpenAI` → 本文件入参 `gateway + profile +
  *      finishReasonExtractor + reproHashProvider + gitCommitSha + appendOptions +

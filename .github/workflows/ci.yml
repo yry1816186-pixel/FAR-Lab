@@ -401,7 +401,7 @@ jobs:
 
   # ============================================================
   # STEP 15 · offline_release_smoke（开源发布形态 smoke·验证 README 顶部命令可跑）
-  # 职责：far doctor + far demo tess-offline + far verify examples/.../demo.far-proof
+  # 职责：far doctor + far demo tess-offline + far export far-proof + far verify .far-proof
   # 这是「陌生用户复制 README 第一条命令」的 CI 兜底——发布形态命令必须在 CI 可跑。
   # needs: install（独立于串行证据链·不阻塞核心门·但自身须绿）。
   # far doctor 允许 exit 2（仅 WARN·offline 可用）；仅 exit 1（核心损坏）才红。
@@ -419,7 +419,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: far doctor（环境自诊断·零密钥·允许 WARN exit 2）
+      - name: far doctor（环境自诊·零密钥·允许 WARN exit 2）
         shell: bash
         run: |
           set +e
@@ -432,5 +432,7 @@ jobs:
         run: node src/cli/far.ts version
       - name: far demo tess-offline（offline 裁决演示·零凭据）
         run: node src/cli/far.ts demo tess-offline
-      - name: far verify（持久化 demo.far-proof fixture·第三方独立重算）
-        run: node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof
+      - name: far export far-proof（导出第三方独立重算 bundle）
+        run: node src/cli/far.ts export far-proof --demo-chain --force
+      - name: far verify .far-proof（第三方独立重算）
+        run: node src/cli/far.ts verify .far-proof

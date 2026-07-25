@@ -14,6 +14,17 @@
  * 诚实边界（ASK-9）：mapChecksToVerdict **可**产出 CONFIRMED（机器裁决）；
  * 但上游 ProofEnvelope 密封会按 ASK-9 降级 CONFIRMED→INCONCLUSIVE（见 far_proof/demo_chain）。
  *
+ * T-020 术语边界（评委05 · 2026-07-24）："CONFIRMED" 在本系统是**合同一致性 bounded support** 语义
+ * （R7 触发 = 统计证据 + 契约阈值满足），**非天文学 confirmed exoplanet**（后者需 RV/TTV follow-up +
+ * 人类背书）。ASK-9 降级正是为此：机器不可终审"confirmed planet"——人类须背书。答辩须区分两层。
+ *
+ * T-018 Bonferroni 对象边界（评委05 F-5-002 · C-001 裁决 · 2026-07-24）：M1 的 α'=0.0125 是
+ * **demo 简化层**的 4 检验维度 Bonferroni（M1-M4 × α=0.05 = 0.0125），正确。但**真实 TESS 场景**
+ * 的 BLS 频率网格搜索需按 n_periods trial factor（10³-10⁶ 频率 × α = 极小 α'），不是 4 检验维度。
+ * 本 demo 用 4 维度是教学简化（spec 12 §3.1 登记的 demo 阈值），生产 TESS 管线须按频率网格校正。
+ * C-001 裁决：science_audit "正确" 限定为 demo 简化层；评委05 "对象错" 限定为真实 TESS 层——
+ * 两者都对，是不同层面。本注释明确区分。
+ *
  * evo-03 三 claimType 全交付（22 T-W2-06 + 任务 #12）：
  *   - C-ASTRO-0001 existence（本模块）。
  *   - hero-A-001 quantitative（hero_a_harness.ts·MMLU-physics·设计 INCONCLUSIVE via mixed）。

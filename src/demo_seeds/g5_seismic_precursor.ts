@@ -91,13 +91,13 @@ const makeIntegrationPayload = () => ({
   citations: [
     {
       evidenceId: 'ev-g5-001',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1016/j.pepi.2015.03.002',
       title: 'Critical Review: Statistical Assessment of Earthquake Electromagnetic Precursor Claims',
     },
     {
       evidenceId: 'ev-g5-002',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1002/2014GL061789',
       title: 'Retrospective ULF Anomalies Before the 2011 Tohoku Earthquake: A Re-analysis',
     },
@@ -150,7 +150,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.81,
       source: {
         evidenceId: 'ev-g5-001',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1016/j.pepi.2015.03.002',
         title: 'Critical Review: Statistical Assessment of Earthquake Electromagnetic Precursor Claims',
       },
@@ -161,7 +161,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.59,
       source: {
         evidenceId: 'ev-g5-002',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1002/2014GL061789',
         title: 'Retrospective ULF Anomalies Before the 2011 Tohoku Earthquake: A Re-analysis',
       },

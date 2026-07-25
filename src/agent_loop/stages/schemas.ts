@@ -6,8 +6,9 @@
  *     ExecutableCheck / FeedbackSignal）集中定义，避免 6 个 stage 文件重复。
  *   - 各 stage 的顶层 payload schema（UnderstandingSchema 等）含 `kind: z.literal(...)`
  *     判别标签（R10：判别联合运行时收窄·禁 as 强转）。
- *   - zod schema 仅用于 runStage 内部 `schema.parse(JSON.parse(response.content))`
- *     运行时收窄；不传给 LLM（LlmRequest.responseFormat 是字符串标志·非 schema 对象）。
+ *   - zod schema 双层用途：(a) runStage 内部 `schema.parse(JSON.parse(response.content))`
+ *     运行时收窄；(b) T-013（CP-17）zodToJsonSchema(schema) 转 plain JSON schema 注入
+ *     LlmRequest.jsonSchema → aliyun_qwen adapter 透传为 DashScope response_format。
  *
  * 零容忍合规：无 any 类型注解 / ts-ignore 指令 / 双重断言 / 空 catch 块 / 桩代码返回。
  */
@@ -19,7 +20,7 @@ import { z } from 'zod';
 
 export const CitationAnchorSchema = z.object({
   evidenceId: z.string(),
-  source: z.enum(['arxiv', 'ads', 's2', 'tns', 'gcvs', 'aavso', 'gaia', 'other']),
+  source: z.enum(['arxiv', 'ads', 's2', 'tns', 'gcvs', 'aavso', 'gaia', 'doi', 'other']),
   doi: z.string().nullable(),
   title: z.string(),
 });

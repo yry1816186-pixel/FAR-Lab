@@ -460,6 +460,9 @@
         },
         "frozenBy": {
           "const": "deterministic_freezer"
+        },
+        "gitCommitSha": {
+          "type": "string"
         }
       },
       "required": [
@@ -477,6 +480,15 @@
       "items": {
         "type": "string"
       }
+    },
+    "requireExecutionProvenance": {
+      "type": "boolean"
+    },
+    "requireGitCommitShaBinding": {
+      "type": "boolean"
+    },
+    "requirePowerPlan": {
+      "type": "boolean"
     }
   },
   "required": [

@@ -108,6 +108,30 @@ examples/fec/sample_compiled.json
 # --- Agent mutable local task state (package manifest: mutable_local_state) ---
 .agent-state/
 
+# --- Process artifacts (audit reports, competition materials, presentations) ---
+architecture_audit_report_*.md
+formal_audit_report_*.md
+security_audit_report_*.md
+product_audit_report.md
+science_audit_report.md
+*_audit_report_*.md
+国家级*/
+评审记录/
+FAR-Lab_*.pptx
+FAR-Lab_*.pdf
+_figs/
+scripts/build_report_ppt.py
+scripts/export_pdf.py
+scripts/gen_figs.py
+scripts/gen_figs2.py
+scripts/qa_ppt.py
+scripts/render_ppt.py
+1.md
+3.md
+plan.md
+PI_RUNBOOK.md
+agent-config-manifest.json
+
 # --- Local private agent overrides + Pi project caches (merged from .gitignore.agent-config) ---
 CLAUDE.local.md
 .claude/settings.local.json

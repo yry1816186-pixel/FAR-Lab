@@ -18,7 +18,7 @@ import DemoModePage from '@/pages/DemoModePage';
 describe('DemoModePage', () => {
   function renderPage() {
     return render(
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <DemoModePage />
       </BrowserRouter>,
     );

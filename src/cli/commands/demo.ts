@@ -86,8 +86,14 @@ const NEXT_STEPS = `
 const TESS_OFFLINE_NOTE = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   tess-offline mode: focuses on the TESS (C-ASTRO-0001 pulsar) offline verdict demo.
+  Honesty boundary: this sub-mode yields UNTESTED (NO_DECISION_PATH) by design —
+  the demo seed injects no statistics, so rule R6 cannot fire. It demonstrates
+  FEC orchestration + fail-closed sealing, NOT a scientific verdict.
   Full demo (incl. MMLU hero pipeline · real-statistics-driven CONFIRMED): far demo
-  Verify the persisted fixture: far verify examples/tess-offline/output/demo.far-proof
+
+  Verify the persisted fixture (two-step; T-002 fix · no death loop):
+    1. far export far-proof --demo-chain --out ./tess-offline.far-proof
+    2. far verify --bundle ./tess-offline.far-proof     (exit 0 = clean · exit 7 = tampered/missing)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
 

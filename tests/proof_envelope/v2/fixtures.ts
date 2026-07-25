@@ -47,6 +47,7 @@ export function makeValidEnvelopeV2Core(
       naturalLanguage: 'Model M achieves RMSE <= 0.5 on dataset D',
       domain: 'astronomy',
       scope: 'galaxies with redshift z<0.5',
+      claimType: 'quantitative',
     },
     fecHash,
     fecSnapshot,

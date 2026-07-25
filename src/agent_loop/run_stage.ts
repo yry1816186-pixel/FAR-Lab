@@ -8,10 +8,9 @@
  *      但 finishReason 要等 response 回来才能提取（先有鸡还是先有蛋）。
  *      故拆为两步：先 callLlm 拿 response，再 extract finishReason + 落库。
  *   2. spec §5.1 用 `zodToJsonSchema(schema)` 作为 response_format 传百炼——
- *      项目 LlmRequest.responseFormat 是字符串标志（'json_schema' | 'text'），
- *      不传 schema 对象。zod schema 仅用于 parse response.content（运行时收窄）。
- *      aliyun_qwen adapter 实现 ProviderAdapter 时若需传 schema 给百炼，
- *      由 adapter 内部处理（adapter 维护 schema 注册表或 LlmRequest 扩展·属 adapter 实现细节）。
+ *      T-013（CP-17）已完整接线：本文件用 zodToJsonSchema(stageSchema) 生成 plain JSON schema
+ *      对象注入 LlmRequest.jsonSchema，aliyun_qwen adapter 透传为 DashScope response_format。
+ *      zod schema 仍同时用于 parse response.content（运行时收窄·双层用途）。
  *   3. spec §5.1 用 `parsePayload: (raw) => P`——本文件去掉此参数，zod schema.parse 已做收窄。
  *   4. spec §5.1 直接读 `callResult.data.choices[0].finish_reason`——
  *      项目 LlmResponse.raw 是 unknown（adapter-agnostic），finishReason 由
@@ -28,6 +27,10 @@
  */
 
 import type { z } from 'zod';
+// T-013（CP-17）：zodToJsonSchema 把 stage zod schema 转 plain JSON schema 对象，
+// 注入 LlmRequest.jsonSchema → aliyun_qwen adapter 透传为 DashScope response_format。
+// 仅在 responseFormat='json_schema' 时注入；offline_replay 忽略（fixture 已结构化）。
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 import type {
   LlmMessage,
@@ -110,6 +113,17 @@ export async function runStage<P extends StructuredPayload>(
   // 2. 构造 LlmRequest
   const messages = buildMessages(ctx);
   const maxTokens = MAX_TOKENS_TABLE[stageId];
+  // T-013（CP-17）：stage zod schema → plain JSON schema 注入 LlmRequest.jsonSchema。
+  // name 用 stageId（已是 a-z/_ 形态·符合 OpenAI/DashScope ≤64 字符 a-z/A-Z/0-9/_/- 约束）。
+  // zodToJsonSchema 默认产出 {type:'object', properties:{...}, required:[...]} 形态，
+  // DashScope json_schema 直接消费。
+  const jsonSchema =
+    stageId !== undefined
+      ? {
+          name: stageId,
+          schema: zodToJsonSchema(schema, { name: stageId }) as Record<string, unknown>,
+        }
+      : undefined;
   const request: LlmRequest = {
     messages,
     temperature: 0.2, // spec §10.3 structured 阶段默认低温度（科研可复现）
@@ -117,6 +131,7 @@ export async function runStage<P extends StructuredPayload>(
     responseFormat: 'json_schema', // 六阶段默认 structured（spec §2.2）
     purposeTag,
     stageId, // offline_replay fixture registry 按 stageId 命中（生产 adapter 忽略）
+    ...(jsonSchema !== undefined ? { jsonSchema } : {}),
   };
 
   // 3. withRetry 调 LLM（仅 429/503 退避·其余立即 fatal）

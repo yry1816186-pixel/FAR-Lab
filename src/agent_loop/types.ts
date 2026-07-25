@@ -108,7 +108,7 @@ export interface FalsificationMethod {
  */
 export interface CitationAnchor {
   readonly evidenceId: string;
-  readonly source: 'arxiv' | 'ads' | 's2' | 'tns' | 'gcvs' | 'aavso' | 'gaia' | 'other';
+  readonly source: 'arxiv' | 'ads' | 's2' | 'tns' | 'gcvs' | 'aavso' | 'gaia' | 'doi' | 'other';
   readonly doi: string | null;
   readonly title: string;
 }

@@ -4,7 +4,7 @@
 // 用 TS Compiler API 扫描确定性内核 + detector 源码，禁 forbidden network/IO/LLM call·fail-closed。
 //
 // 真实依赖：scanSourceForForbiddenCalls 调 ts.createSourceFile 真实解析 TS AST（非正则/非桩）；
-// scanDeterministicModules 读真实 verdict_kernel_v2.ts + anti_theater/{lint,constraint,score} + 20 detector 源。
+// scanDeterministicModules 读真实 verdict_kernel_v2.ts + anti_theater/{lint,constraint,score} + 21 detector 源。
 // proof_caller = src/anti_theater/lint.ts runAntiTheaterLint 入口（assertVerifierModulesClean 接线·每次 verdict 路径）。
 // 反假绿：dirty fixture 必抛 + 真实 kernel/detector 模块基线必空（GREEN）。
 //
@@ -73,7 +73,7 @@ test('scanSourceForForbiddenCalls distinguishes import / require / dynamic-impor
 });
 
 test('production_deterministic_modules_pass_gate', () => {
-  // 真实确定性内核模块（verdict_kernel_v2 + anti_theater/{lint,constraint,score} + 20 detector）
+  // 真实确定性内核模块（verdict_kernel_v2 + anti_theater/{lint,constraint,score} + 21 detector）
   // 全部无 forbidden call——证明生产路径加载期门通过（GREEN 基线）。
   const hits = scanDeterministicModules();
   assert.equal(
@@ -84,4 +84,48 @@ test('production_deterministic_modules_pass_gate', () => {
 
   // memoized 生产入口（runAntiTheatorLint 接线）亦不抛。
   assert.doesNotThrow(() => assertVerifierModulesClean());
+});
+
+// ===== F-4-006（评委13 R4）：member-expression 全局 call 捕获（Date.now / Math.random 等） =====
+
+test('F-4-006: Date.now() global call is flagged (member expression)', () => {
+  const dirty = "export function f() { return Date.now(); }";
+  const hits = scanSourceForForbiddenCalls(dirty, 'time.ts');
+  assert.ok(hits.some((h) => h.kind === 'forbidden-global-call' && h.callee === 'Date.now'));
+});
+
+test('F-4-006: Math.random() global call is flagged', () => {
+  const dirty = "export function r() { return Math.random(); }";
+  const hits = scanSourceForForbiddenCalls(dirty, 'rand.ts');
+  assert.ok(hits.some((h) => h.kind === 'forbidden-global-call' && h.callee === 'Math.random'));
+});
+
+test('F-4-006: performance.now() global call is flagged', () => {
+  const dirty = "export function p() { return performance.now(); }";
+  const hits = scanSourceForForbiddenCalls(dirty, 'perf.ts');
+  assert.ok(hits.some((h) => h.kind === 'forbidden-global-call' && h.callee === 'performance.now'));
+});
+
+test('F-4-006: process.hrtime.bigint() global call is flagged', () => {
+  const dirty = "export function h() { return process.hrtime.bigint(); }";
+  const hits = scanSourceForForbiddenCalls(dirty, 'hrtime.ts');
+  assert.ok(hits.some((h) => h.kind === 'forbidden-global-call' && h.callee === 'process.hrtime.bigint'));
+});
+
+test('F-4-006: crypto.getRandomValues() global call is flagged', () => {
+  const dirty = "const arr = new Uint8Array(8); crypto.getRandomValues(arr);";
+  const hits = scanSourceForForbiddenCalls(dirty, 'crypto.ts');
+  assert.ok(hits.some((h) => h.kind === 'forbidden-global-call' && h.callee === 'crypto.getRandomValues'));
+});
+
+test('F-4-006: legitimate Date constructor (new Date) is NOT flagged', () => {
+  const clean = "export function legit() { const d = new Date('2026-01-01'); return d.getFullYear(); }";
+  const hits = scanSourceForForbiddenCalls(clean, 'ok.ts');
+  assert.equal(hits.length, 0);
+});
+
+test('F-4-006: legitimate Math.floor / Math.max are NOT flagged', () => {
+  const clean = "export function ok() { return Math.floor(3.7) + Math.max(1, 2); }";
+  const hits = scanSourceForForbiddenCalls(clean, 'ok2.ts');
+  assert.equal(hits.length, 0);
 });

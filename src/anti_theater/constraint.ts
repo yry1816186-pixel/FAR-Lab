@@ -58,11 +58,16 @@ const REASON_CODE_TO_FORCED: Readonly<Record<string, ForcedVerdict | undefined>>
 };
 
 /**
- * attackId → forcedVerdict 映射（§3.2 SEVERITY_TO_FORCED·20 项·逐字对齐伪代码 958-979）。
+ * attackId → forcedVerdict 映射（§3.2 SEVERITY_TO_FORCED·21 项·逐字对齐伪代码 958-979 + T-003 新增）。
  * undefined = 该 attack 不直接约束 verdict：
  *   - BLOCK 类（AT-FAKE-PASS/JUDGE-OVERRIDE/DATA-HASH-FAKE/WORKFLOW-DIGEST/DEP-FLOAT-DRIFT）由 blockSeal 处理；
  *   - AT-FAKE-DEGRADED 由 reasonCode 映射（REFUTATION_HIDDEN_BY_SCOPE→REFUTED / NULL_RESULT_LAUNDERED 不 force）；
  *   - AT-REPORT-MISMATCH structured wins（report 回退，不降级 verdict）。
+ *
+ * T-003 修复（2026-07-24）：AT-PROVENANCE-UNBOUND → UNTESTED。语义家族与 AT-LABEL-ONLY /
+ * AT-MISSING-RAW 同（证据可信度失败：metricValue 缺执行溯源绑定 = 可能手工注入 fixture 冒充）。
+ * 之前依赖 orchestrator integrityFlag 阻断 CONFIRMED（defense-in-depth 层 2），现 anti-theater 层
+ * 独立权威降级（层 1），两层互补：任一捕获即阻断 CONFIRMED。
  */
 const SEVERITY_TO_FORCED: Readonly<Record<string, ForcedVerdict | undefined>> = {
   'AT-DATA-DRIFT': 'DEGRADED_SCOPE', // 数据漂移 → 范围收窄
@@ -71,6 +76,7 @@ const SEVERITY_TO_FORCED: Readonly<Record<string, ForcedVerdict | undefined>> = 
   'AT-FAKE-PASS': undefined, // BLOCK，由 blockSeal 处理
   'AT-LABEL-ONLY': 'UNTESTED',
   'AT-MISSING-RAW': 'UNTESTED',
+  'AT-PROVENANCE-UNBOUND': 'UNTESTED', // T-003·证据溯源绑定缺失（与 LABEL-ONLY/MISSING-RAW 同语义家族）
   'AT-POSTHOC-THRESHOLD': 'UNTESTED',
   'AT-METRIC-SWAP': 'UNTESTED',
   'AT-HARK': 'UNTESTED',

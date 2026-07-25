@@ -25,7 +25,6 @@ RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
 
 # ── 依赖层（利用 docker layer cache）──
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages ./packages
 RUN pnpm install --frozen-lockfile
 
 # ── 源码 ──

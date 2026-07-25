@@ -1,5 +1,5 @@
 // tests/fixtures/anti_theater/golden_vectors.ts
-// 反剧场 golden vector 夹具：clean base envelope + 20 攻击向量构建器 + spec 表。
+// 反剧场 golden vector 夹具：clean base envelope + 21 攻击向量构建器 + spec 表。
 //
 // Authority: FAR_LAB_MASTER_PLAN/APPENDIX_E_ANTI_THEATER.md §5（AttackCase + §5.2 17 P0 golden vectors 表）+
 //            §6（7 CI gates·5 测试 gate 消费本夹具）+ 06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 /
@@ -8,12 +8,12 @@
 // 设计裁决（GV-D1·夹具形态选择 TS 向量夹具而非 JSON+deep-set）：
 //   - 多数 mutation 需「删除字段」（gv-label-only / gv-missing-raw / gv-fake-pass / gv-seed-cherry
 //     清空数组、gv-data-hash-fake 添加 chunkHashes），JSON+deep-set 无法表达删除语义且类型不安全。
-//   - 故采用类型安全 TS 向量夹具：makeCleanBaseInput() 产通过全部 20 detector 的干净 base，
+//   - 故采用类型安全 TS 向量夹具：makeCleanBaseInput() 产通过全部 21 detector 的干净 base，
 //     每个向量经 cloneMutable 深拷贝后做最小字段 mutation。frozen hash（thresholdHash /
 //     primaryMetricHash / seedPolicyHash）由 base 从 BASE_FEC 精确计算，保证 base 误报率=0；
 //     向量只改 FEC 执行端字段（frozen 端不动）→ hash 自然失配 → detector 命中。
 //
-// 设计裁决（GV-D2·base 通过条件 = 过全部 20 detector）：
+// 设计裁决（GV-D2·base 通过条件 = 过全部 21 detector）：
 //   base 须同时满足每个 detector 的「无发现」条件（误报率=0 基准，见 false_green_rate.test.ts
 //   的 base liveness 断言）。逐条约束记录于 makeCleanBaseInput 注释，便于审计。
 //
@@ -105,7 +105,7 @@ const BASE_FEC: FecContractV2 = {
     metricKey: 'bls_power',
     description: 'Box Least Squares periodogram peak power',
     unit: 'dimensionless',
-    computationRef: 'astropy.timeseries.BoxLeastSquares',
+    computationRef: 'far-lab.numpy-bls.box-only',
     isDeterministic: true,
   },
   threshold: {
@@ -178,7 +178,7 @@ const HASH_WF = 'd4'.repeat(32); // workflow workflowHash
 const HASH_CONTAINER = 'e5'.repeat(32); // workflow containerDigest
 const HASH_ENV = 'f6'.repeat(32); // workflow environmentHash
 
-// ===== BASE_INPUT（干净 AntiTheaterLintInput·过全部 20 detector·GV-D2）=====
+// ===== BASE_INPUT（干净 AntiTheaterLintInput·过全部 21 detector·GV-D2）=====
 
 const BASE_BINDINGS: readonly EvidenceBinding[] = [
   // AT-DATA-DRIFT/AT-DATA-HASH-FAKE 通过条件：contentHash/schemaHash/statsFingerprint === freeze 记录；
@@ -318,7 +318,7 @@ const BASE_INPUT: AntiTheaterLintInput = {
   },
 };
 
-/** 干净 base envelope（过全部 20 detector·误报率=0 基准·每次返回同一只读 const，向量须 cloneMutable 后再 mutate）。 */
+/** 干净 base envelope（过全部 21 detector·误报率=0 基准·每次返回同一只读 const，向量须 cloneMutable 后再 mutate）。 */
 export function makeCleanBaseInput(): AntiTheaterLintInput {
   return BASE_INPUT;
 }
@@ -527,6 +527,28 @@ function gvDepDrift01(): AntiTheaterLintInput {
   return input;
 }
 
+/**
+ * gv-provenance-unbound-01（T-003·2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+ *
+ * 攻击语义：研究者 FEC 显式 opt-in `requireExecutionProvenance=true`（声明 metricValue 必须绑定 sandbox
+ * 执行 hash），但提交的 primary measurement 不携带 executionProvenanceHash → metricValue 可能是手工
+ * 注入的 fixture 冒充真实计算结果（rawArtifactHashes 仅证明产物存在，不证明产物是本次执行产出的）。
+ *
+ * base primary measurement 本就不设 executionProvenanceHash（V1 缺省不强制），故本向量仅需 opt-in
+ * `requireExecutionProvenance=true` 即可触发 AT-PROVENANCE-UNBOUND detector。这构成本攻击的「最小单点
+ * mutation」：clean base（不 opt-in → detector 恒空）↔ attack（opt-in 但 primary 未绑定）→ 命中。
+ *
+ * 与 gv-label-only-01 / gv-missing--01 同语义家族（证据可信度失败 → forced UNTESTED），
+ * 期望 forcedVerdict='UNTESTED' / blockSeal=false（已由 constraint.ts SEVERITY_TO_FORCED 映射 + 临时探针实测回填）。
+ */
+function gvProvenanceUnbound01(): AntiTheaterLintInput {
+  const input = cloneMutable(makeCleanBaseInput());
+  // 研究者声明「primary metricValue 必须绑定 sandbox 执行 hash」（V2 计划·真实研究路径强制）。
+  input.fec.requireExecutionProvenance = true;
+  // base primary measurement 无 executionProvenanceHash → AT-PROVENANCE-UNBOUND 命中（metricValue 可能是 fixture）。
+  return input;
+}
+
 // ===== GoldenVectorSpec 表（corpus/false_green_rate 等 gate 消费）=====
 
 /** 强制 verdict 类型（undefined = anti-theater 不约束 verdict，如 AT-REPORT-MISMATCH structured wins）。 */
@@ -549,12 +571,13 @@ export interface GoldenVectorSpec {
 }
 
 /**
- * GOLDEN_VECTORS：20 向量 = 17 P0（APPENDIX_E §5.2）+ 3 补充（gv-data-hash-fake-01 /
- * gv-optional-stopping-01 / gv-dep-drift-01）。
+ * GOLDEN_VECTORS：21 向量 = 17 P0（APPENDIX_E §5.2）+ 3 补充（gv-data-hash-fake-01 /
+ * gv-optional-stopping-01 / gv-dep-drift-01）+ 1 T-003 修复（gv-provenance-unbound-01）。
  *
  * §5.2 的 17 P0 向量覆盖 16 个 attackId（AT-DATA-DRIFT 由 gv-data-drift-01/02 双向量覆盖），
  * 缺 AT-DATA-HASH-FAKE / AT-OPTIONAL-STOPPING / AT-DEP-FLOAT-DRIFT 3 个 attackId → 补 3 向量。
- * 连同 GV_OVERFIT_01（AT-OVERFIT·ROADMAP 受限）共 ALL_GOLDEN_VECTORS 21 向量，覆盖全部 20 attackId。
+ * T-003 修复（2026-07-24）新增第 21 个 attackId AT-PROVENANCE-UNBOUND → 补 gv-provenance-unbound-01。
+ * 连同 GV_OVERFIT_01（AT-OVERFIT·ROADMAP 受限）共 ALL_GOLDEN_VECTORS 22 向量，覆盖全部 21 attackId。
  */
 export const GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [
   // —— §5.2 17 P0 golden vectors ——
@@ -575,10 +598,12 @@ export const GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [
   { id: 'gv-hark-01', attackId: 'AT-HARK', reasonCode: 'HARKING_REVISION_AFTER_RESULT', build: gvHark01, expectedForcedVerdict: 'UNTESTED', expectedBlockSeal: false },
   { id: 'gv-stopping-rule-01', attackId: 'AT-STOPPING-RULE', reasonCode: 'STOPPING_RULE_VIOLATION', build: gvStoppingRule01, expectedForcedVerdict: 'UNTESTED', expectedBlockSeal: false },
   { id: 'gv-fake-degraded-01', attackId: 'AT-FAKE-DEGRADED', reasonCode: 'REFUTATION_HIDDEN_BY_SCOPE', build: gvFakeDegraded01, expectedForcedVerdict: 'REFUTED', expectedBlockSeal: false },
-  // —— 4 补充向量（补齐 20 attackId 全覆盖：§5.2 17 P0 覆盖 16 attackId·AT-DATA-DRIFT 双向量）——
+  // —— 4 补充向量（补齐 attackId 全覆盖：§5.2 17 P0 覆盖 16 attackId·AT-DATA-DRIFT 双向量 + T-003 1 个）——
   { id: 'gv-data-hash-fake-01', attackId: 'AT-DATA-HASH-FAKE', reasonCode: 'DATASET_HASH_FORGERY', build: gvDataHashFake01, expectedForcedVerdict: 'UNTESTED', expectedBlockSeal: true },
   { id: 'gv-optional-stopping-01', attackId: 'AT-OPTIONAL-STOPPING', reasonCode: 'OPTIONAL_STOPPING_NO_SPENDING', build: gvOptionalStopping01, expectedForcedVerdict: 'INCONCLUSIVE', expectedBlockSeal: false },
   { id: 'gv-dep-drift-01', attackId: 'AT-DEP-FLOAT-DRIFT', reasonCode: 'NUMERIC_TOLERANCE_UNFROZEN', build: gvDepDrift01, expectedForcedVerdict: undefined, expectedBlockSeal: false },
+  // —— gv-provenance-unbound-01（T-003 修复·2026-07-24·补齐第 21 个 attackId）——
+  { id: 'gv-provenance-unbound-01', attackId: 'AT-PROVENANCE-UNBOUND', reasonCode: 'EVIDENCE_PROVENANCE_UNBOUND', build: gvProvenanceUnbound01, expectedForcedVerdict: 'UNTESTED', expectedBlockSeal: false },
   // —— gv-overfit-01：AT-OVERFIT（ROADMAP·D8 受限实现：public-only WARN → DEGRADED_SCOPE）——
   // 注：build 内联（需改 measurement splitName 集合），见下方 GV_OVERFIT_01_BUILD。
 ];
@@ -602,7 +627,7 @@ export const GV_OVERFIT_01: GoldenVectorSpec = {
   expectedBlockSeal: false,
 };
 
-/** 全量 golden vectors（GOLDEN_VECTORS 20 + GV_OVERFIT_01 = 21 向量·覆盖全部 20 attackId）。 */
+/** 全量 golden vectors（GOLDEN_VECTORS 21 + GV_OVERFIT_01 = 22 向量·覆盖全部 21 attackId）。 */
 export const ALL_GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [...GOLDEN_VECTORS, GV_OVERFIT_01];
 
 /**

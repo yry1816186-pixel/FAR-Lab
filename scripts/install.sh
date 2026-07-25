@@ -116,7 +116,8 @@ ${GRN}✓ FAR-Chain 安装完成${RST}  $INSTALL_DIR
     ${CYN}far version${RST}
     ${CYN}far doctor${RST}
     ${CYN}far demo tess-offline${RST}
-    ${CYN}far verify examples/tess-offline/output/demo.far-proof${RST}
+    ${CYN}far export far-proof --demo-chain --force${RST}
+    ${CYN}far verify .far-proof${RST}
 
   真实 Qwen/百炼推理（可选·需 API key）：见 docs/providers/qwen-dashscope.md
   文档：https://github.com/yry1816186-pixel/FAR-Lab#readme
