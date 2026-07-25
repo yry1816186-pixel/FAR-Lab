@@ -17,6 +17,7 @@ Authority: FAR_LAB_MASTER_PLAN/04 §2.5 + APPENDIX_C §1.9 + §2.4。
 import hashlib
 import json
 import re
+import unicodedata
 from typing import Any
 
 __all__ = [
@@ -49,8 +50,10 @@ def canonical_hash(obj: Any) -> str:
 def normalize_whitespace(text: str) -> str:
     """normalizeWhitespace（§2.4 line 257）：\\r\\n→\\n、\\r→\\n、折叠 [ \\t]+→单空格、trim。
 
-    与 TS normalizeWhitespace byte-equal。
+    同时做 Unicode NFC 归一化（评委08 F-4-007·防止 NFC/NFD 等价表示导致跨语言 hash 分裂）。
+    与 TS normalizeWhitespace byte-equal（TS 端 String.prototype.normalize('NFC')）。
     """
+    text = unicodedata.normalize("NFC", text)
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = re.sub(r"[ \t]+", " ", text)
     return text.strip()

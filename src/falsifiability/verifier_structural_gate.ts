@@ -59,10 +59,17 @@ const FORBIDDEN_MODULE_SPECIFIERS: ReadonlySet<string> = new Set([
   'ws', 'socket.io',
 ]);
 
-// 禁全局 call：bare identifier call（无 import 亦可用的全局，如 fetch / WebSocket / child_process 导出的）。
+// 禁全局 call：bare identifier call（无 import 亦可用的全局）。
+// 含非确定性来源（时间/随机）——评委13 F-4-006：deterministic 内核必须无时间/随机源。
 const FORBIDDEN_GLOBAL_CALLS: ReadonlySet<string> = new Set([
   'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource',
   'exec', 'execSync', 'spawn', 'spawnSync', 'fork', 'execFile', 'execFileSync',
+  // 非确定性时间源（破坏"同输入同输出"保证）
+  'Date.now', 'performance', 'performance.now',
+  // 非确定性随机源
+  'Math.random', 'crypto.getRandomValues',
+  // Node.js 高精度时间（非确定性）
+  'process.hrtime', 'process.hrtime.bigint',
 ]);
 
 // 任意路径含 llm_gateway 的 import/require——LLM 网关是裁决禁止依赖。
@@ -75,6 +82,25 @@ function isForbiddenModuleSpecifier(spec: string): boolean {
 function literalText(node: ts.Node): string | null {
   if (node.kind === ts.SyntaxKind.StringLiteral || node.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral) {
     return (node as ts.StringLiteralLike).text;
+  }
+  return null;
+}
+
+/**
+ * 提取 member expression 的完整点分名称（如 Date.now / Math.random / process.hrtime.bigint）。
+ * 仅返回纯 identifier 链（无计算访问·无表达式）·否则 null。
+ * 评委13 F-4-006：用于捕获非确定性时间/随机全局 call（PropertyAccessExpression callee）。
+ */
+function memberExpressionFullName(node: ts.PropertyAccessExpression): string | null {
+  const parts: string[] = [];
+  let current: ts.Node = node;
+  while (ts.isPropertyAccessExpression(current)) {
+    parts.unshift(current.name.text);
+    current = current.expression;
+  }
+  if (ts.isIdentifier(current)) {
+    parts.unshift(current.text);
+    return parts.join('.');
   }
   return null;
 }
@@ -121,6 +147,12 @@ export function scanSourceForForbiddenCalls(source: string, fileName: string): r
         }
       } else if (ts.isIdentifier(callee) && FORBIDDEN_GLOBAL_CALLS.has(callee.text)) {
         hits.push({ fileName, line: lineOf(node), kind: 'forbidden-global-call', callee: callee.text, text: snippet(node) });
+      } else if (ts.isPropertyAccessExpression(callee)) {
+        // 评委13 F-4-006：捕获 member-expression 全局 call（Date.now / Math.random / performance.now / process.hrtime.bigint）。
+        const fullName = memberExpressionFullName(callee);
+        if (fullName !== null && FORBIDDEN_GLOBAL_CALLS.has(fullName)) {
+          hits.push({ fileName, line: lineOf(node), kind: 'forbidden-global-call', callee: fullName, text: snippet(node) });
+        }
       }
     }
     ts.forEachChild(node, visit);

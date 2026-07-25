@@ -80,6 +80,10 @@ export function compileFec(input: CompileFecInput): CompileFecResult {
   checkSeedPolicy(fec, errors);
   checkDeterministicFreezer(fec, errors);
   checkHarkingTimeline(fec, input.measurementCutoff ?? null, errors);
+  // T-008 · 2026-07-24 评委逼问第 1 轮 F-2-005 修复：opt-in 时强制 freeze.gitCommitSha 绑定。
+  checkGitCommitShaBinding(fec, errors);
+  // T-027 · 2026-07-24 评委逼问第 3 轮 F-7-003 修复：opt-in 时强制 powerPlan 合法性。
+  checkPowerPlanRequired(fec, errors);
 
   // 任一 HARD_FAIL → fail-closed（#7 WARN 不计入）。
   const hardFails = errors.filter(isHardFail);
@@ -101,8 +105,25 @@ export function compileFec(input: CompileFecInput): CompileFecResult {
 /**
  * computeFecHash —— sha256(canonical JSON of FEC VC fields)（03 §1.2 [VC] 字段）。
  * freeze.fecHash 应 === computeFecHash(fec)；verifier 重算互验。排除 integrityFlags（derived·非契约内容）。
+ *
+ * T-008 修复（2026-07-24）：freeze.gitCommitSha 作为 [VC] 字段进 hash（与 freeze 其余字段同）。
+ * 缺省（V1）gitCommitSha 缺失 → hash 输入不含此字段（向后兼容·与 T-008 修复前的 hash 一致）；
+ * 显式提供 → hash 输入含此字段（任何篡改 gitCommitSha 都将导致 fecHash 失配）。
  */
 export function computeFecHash(fec: FecContractV2): string {
+  // T-008 · gitCommitSha 缺失时不进 hash 输入（保持 V1 向后兼容·避免破坏现有 demo seed 的 hash）。
+  // 显式提供时（含空字符串）进 hash——空字符串触发 #11 校验失败，但 hash 仍确定性产出。
+  const freezeHashInput: Record<string, unknown> = {
+    actor: fec.freeze.actor,
+    timestamp: fec.freeze.timestamp,
+    environmentPolicy: fec.freeze.environmentPolicy,
+    deviationPolicyHash: fec.freeze.deviationPolicyHash,
+    frozenBy: fec.freeze.frozenBy,
+  };
+  if (fec.freeze.gitCommitSha !== undefined) {
+    freezeHashInput.gitCommitSha = fec.freeze.gitCommitSha;
+  }
+
   const vcFields = {
     fecId: fec.fecId,
     contractVersion: fec.contractVersion,
@@ -122,14 +143,8 @@ export function computeFecHash(fec: FecContractV2): string {
     deviationPolicy: fec.deviationPolicy,
     // freeze.fecHash 是本函数的输出（自引用规避）：hash 输入排除 fecHash 字段本身，
     // 使 caller 可令 freeze.fecHash === computeFecHash(fec) 而不构成循环。
-    // 其余 freeze 字段（actor/timestamp/environmentPolicy/deviationPolicyHash/frozenBy）进 hash。
-    freeze: {
-      actor: fec.freeze.actor,
-      timestamp: fec.freeze.timestamp,
-      environmentPolicy: fec.freeze.environmentPolicy,
-      deviationPolicyHash: fec.freeze.deviationPolicyHash,
-      frozenBy: fec.freeze.frozenBy,
-    },
+    // 其余 freeze 字段（actor/timestamp/environmentPolicy/deviationPolicyHash/frozenBy/gitCommitSha）进 hash。
+    freeze: freezeHashInput,
   };
   return hashCanonicalJson(vcFields);
 }
@@ -154,8 +169,8 @@ export function involvesRandomness(fec: FecContractV2): boolean {
 }
 
 /**
- * mapCompileErrorToSeverity —— reasonCode → severity（03 §2.3 降级规则）。
- * LLM_FROZEN → CI 阻断；MULTIPLE_TESTING_UNCORRECTED → WARN 降级 INCONCLUSIVE；其余 → HARD_FAIL_UNTESTED。
+ * mapCompileErrorToSeverity —— reasonCode → severity（03 §2.3 降级规则 + T-008 修复）。
+ * LLM_FROZEN → CI 阻断；MULTIPLE_TESTING_UNCORRECTED → WARN 降级 INCONCLUSIVE；其余（含 T-008 GIT_COMMIT_SHA_UNBOUND）→ HARD_FAIL_UNTESTED。
  */
 export function mapCompileErrorToSeverity(code: CompileErrorCode): FecCompileSeverity {
   switch (code) {
@@ -164,6 +179,7 @@ export function mapCompileErrorToSeverity(code: CompileErrorCode): FecCompileSev
     case 'MULTIPLE_TESTING_UNCORRECTED':
       return 'WARN_DOWNGRADE_INCONCLUSIVE';
     default:
+      // T-008 · GIT_COMMIT_SHA_UNBOUND 落此分支（HARD_FAIL_UNTESTED · fail-closed UNTESTED）。
       return 'HARD_FAIL_UNTESTED';
   }
 }
@@ -416,6 +432,120 @@ function checkHarkingTimeline(
       severity: mapCompileErrorToSeverity('HARKING_REVISION_AFTER_RESULT'),
       message: `freeze.timestamp="${fec.freeze.timestamp}" 晚于最早 measurement="${measurementCutoff}"（F8 HARKing）`,
       field: 'freeze.timestamp',
+    });
+  }
+}
+
+/**
+ * #11 GIT_COMMIT_SHA_UNBOUND（T-008 · 2026-07-24 评委逼问第 1 轮修复）：
+ *   requireGitCommitShaBinding=true 时，freeze.gitCommitSha 须为合法 40-hex sha1。
+ *
+ * 第三方锚定原理（评审记录/总榜_v1.md T-008）：
+ *   - 原 freeze.timestamp 是自签 ISO-8601 字符串——任何人可任意回填，无法证明"冻结时确实在此时间点"；
+ *   - 绑定 git commit SHA 后，第三方可在 git 历史中验证：
+ *     (a) 该 commit 的 author/committer date 须 ≤ freeze.timestamp（时间一致性）；
+ *     (b) 该 commit 的 tree 须包含冻结时的契约文件（内容一致性）；
+ *     (c) 该 commit 须在 freeze.timestamp 之前已 push 到公开远程（不可回填·公开历史不可变）。
+ *   - 这是 V1 边界（git 锚定），V2 计划追加 OSF 第三方时间戳锚定（D-007）。
+ *
+ * 行为契约：
+ *   - requireGitCommitShaBinding=false/缺省 → 跳过（V1 向后兼容·demo seed 的 freeze.timestamp 仍自签）；
+ *   - requireGitCommitShaBinding=true：
+ *     · freeze.gitCommitSha 缺失/空字符串/非 40-hex → GIT_COMMIT_SHA_UNBOUND（HARD_FAIL_UNTESTED）；
+ *     · 合法 40-hex sha1 → 通过。
+ *
+ * 格式校验（40-hex sha1）：
+ *   - git commit SHA 是 sha1（40 hex 字符），不是 sha256（64 hex）；
+ *   - 大写 hex 视为非法（git rev-parse 输出小写·与 SourceAnchor.gitCommitSha 同规范）；
+ *   - 非 hex 字符（g/h/i 等）视为非法。
+ */
+const GIT_COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
+
+function checkGitCommitShaBinding(fec: FecContractV2, errors: CompileError[]): void {
+  // V1 默认不强制（向后兼容）：requireGitCommitShaBinding 缺省/false → 跳过
+  if (fec.requireGitCommitShaBinding !== true) {
+    return;
+  }
+
+  const sha = fec.freeze.gitCommitSha;
+  if (typeof sha !== 'string' || !GIT_COMMIT_SHA_PATTERN.test(sha)) {
+    errors.push({
+      code: 'GIT_COMMIT_SHA_UNBOUND',
+      severity: mapCompileErrorToSeverity('GIT_COMMIT_SHA_UNBOUND'),
+      message:
+        `freeze.gitCommitSha="${sha ?? '<missing>'}" 须为合法 40-hex sha1（git commit SHA·公开可查）.` +
+        ` requireGitCommitShaBinding=true → fail-closed: 第三方无法在 git 历史中验证 freeze.timestamp ` +
+        `（自签时间戳可任意回填·违反 F8 预注册强度）. Fix: 跑 git rev-parse HEAD 取 40-hex sha1, ` +
+        `填入 freeze.gitCommitSha, 确保 commit date ≤ freeze.timestamp, 然后重新 freeze.`,
+      field: 'freeze.gitCommitSha',
+    });
+  }
+}
+
+/**
+ * #12 POWER_PLAN_REQUIRED（T-027 · 2026-07-24 评委逼问第 3 轮 F-7-003 修复）：
+ *   requirePowerPlan=true 时，powerPlan 须存在且字段合法（sampleSize > 0 + targetPower >= 0.5）。
+ *
+ * 方法学根因（评审记录/总榜_v1.md T-027 + 1轮/评委07_发现.md F-7-003）：
+ *   - 原 `powerPlan?: PowerPlan` 是 optional——FEC 只保证「有 spec」不保证「spec 严格」；
+ *   - 一个垃圾 spec（阈值宽松到永不被证伪）也能过 FEC 门——FEC 的强制力被「宽松 spec」绕过；
+ *   - 复现危机方法学家（评委07）：power analysis 是 claim 严格性的最低门槛——
+ *     无 power analysis 的 quantitative/causal claim 是「不可证伪的伪科学」（p-hacking 温床）。
+ *
+ * 行为契约：
+ *   - requirePowerPlan=false/缺省 → 跳过（V1 向后兼容·demo seed 的 powerPlan optional）；
+ *   - requirePowerPlan=true：
+ *     · powerPlan 缺失 → POWER_PLAN_REQUIRED（HARD_FAIL_UNTESTED · fail-closed UNTESTED）；
+ *     · powerPlan.sampleSize <= 0（含 0/负数/NaN/Infinity）→ POWER_PLAN_REQUIRED；
+ *     · powerPlan.targetPower < 0.5（power 无意义·< 0.5 = 掷硬币）→ POWER_PLAN_REQUIRED；
+ *     · 合法（sampleSize > 0 + targetPower >= 0.5 + 字段完整）→ 通过。
+ *
+ * V1 边界：默认 false（demo seed / hero pipeline 的 powerPlan 多为占位·不强制 opt-in）。
+ * V2 真实研究路径强制 true（科学 claim 无 power analysis = 不可发表）。
+ */
+function checkPowerPlanRequired(fec: FecContractV2, errors: CompileError[]): void {
+  // V1 默认不强制（向后兼容）：requirePowerPlan 缺省/false → 跳过
+  if (fec.requirePowerPlan !== true) {
+    return;
+  }
+
+  const plan = fec.powerPlan;
+  if (plan === undefined) {
+    errors.push({
+      code: 'POWER_PLAN_REQUIRED',
+      severity: mapCompileErrorToSeverity('POWER_PLAN_REQUIRED'),
+      message:
+        'powerPlan 缺失但 requirePowerPlan=true（评委07 F-7-003 方法学修复）.' +
+        ' FEC 须强制 PowerPlan（含 sampleSize + targetPower）——无 power analysis 的 claim' +
+        ' 是「不可证伪的伪科学」（阈值宽松到永不被证伪·p-hacking 温床）.' +
+        ' Fix: 跑 power analysis（如 pwr.t.test）取 sampleSize + targetPower ≥ 0.8, 填入 powerPlan.',
+      field: 'powerPlan',
+    });
+    return;
+  }
+
+  // sampleSize 合法性：须 > 0（0/负数/NaN/Infinity 视为非法·power analysis 无意义）。
+  if (!Number.isFinite(plan.sampleSize) || plan.sampleSize <= 0) {
+    errors.push({
+      code: 'POWER_PLAN_REQUIRED',
+      severity: mapCompileErrorToSeverity('POWER_PLAN_REQUIRED'),
+      message:
+        `powerPlan.sampleSize=${plan.sampleSize} 须为正有限数（power analysis 须基于有效样本量）.` +
+        ` requirePowerPlan=true → fail-closed: 无效 sampleSize 意味着 power analysis 未做.`,
+      field: 'powerPlan.sampleSize',
+    });
+  }
+
+  // targetPower 合法性：须 >= 0.5（< 0.5 = 掷硬币·无检测力意义·power analysis 纯装饰）。
+  // 阈值 0.5 是统计学下限（Cohen 1988 推荐 0.8·0.5 是底线·< 0.5 = 似然比 < 1）。
+  if (!Number.isFinite(plan.targetPower) || plan.targetPower < 0.5) {
+    errors.push({
+      code: 'POWER_PLAN_REQUIRED',
+      severity: mapCompileErrorToSeverity('POWER_PLAN_REQUIRED'),
+      message:
+        `powerPlan.targetPower=${plan.targetPower} 须 >= 0.5（Cohen 1988 推荐 0.8·0.5 是统计学底线·< 0.5 无检测力意义）.` +
+        ` requirePowerPlan=true → fail-closed: targetPower < 0.5 意味着 power analysis 无效.`,
+      field: 'powerPlan.targetPower',
     });
   }
 }

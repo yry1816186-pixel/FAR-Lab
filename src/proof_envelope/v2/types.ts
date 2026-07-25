@@ -21,6 +21,7 @@ import type {
   ProtocolFreeze,
   ScopeCoverage,
 } from '../../fec/fec_contract.ts';
+import type { ClaimType } from '../../confounding_gate/types.ts';
 import type { VerdictKernelOutput } from '../../falsifiability/verdict_kernel_v2.ts';
 // 反剧场类型统一（D1）：AntiTheaterReport 权威定义在 src/anti_theater/types.ts（APPENDIX_A §7）。
 // 本文件 import 供 ProofEnvelopeV2.antiTheaterReport 字段注解用；re-export 见下方原 anti-theater 类型位置。
@@ -50,12 +51,25 @@ export type ProofValidatorRuleV2 = (typeof PROOF_VALIDATOR_RULES_V2)[number];
 
 // ===== 子类型（§2.1 完整证据嵌入·APPENDIX_A §8）=====
 
-/** [VC] claim 快照（naturalLanguage 进 proofHash 前 normalizeWhitespace）。 */
+/**
+ * [VC] claim 快照（naturalLanguage 进 proofHash 前 normalizeWhitespace）。
+ *
+ * claimType（任务 #12 · T-029 · 评委08 F-8-003）：
+ *   原仅存在 kernel 输入层（VerdictKernelInput.claimType），caller 可对同一 claim 传不同 claimType
+ *   改变 R-causal 门裁决，而 ClaimEnvelope hash 不变——第三方独立复算时若 claimType 不同会得不同
+ *   裁决却 hash 一致，破坏「verification not trust」。现 claimType 作为 [VC] 字段进 ClaimEnvelope →
+ *   进 proofHash，篡改 claimType → proofHash 失配 → PROOF_HASH_MISMATCH。
+ *
+ *   类型复用 ClaimType（confounding_gate/types.ts 权威 3 值：existence/quantitative/causal）——
+ *   覆盖 V1 三 claimType 全交付（claim_fixtures.ts V1_CLAIM_FIXTURE_ROADMAP），不平行新建枚举（单一真相源）。
+ */
 export interface ClaimEnvelope {
   readonly id: string;
   readonly naturalLanguage: string;
   readonly domain: string;
   readonly scope: string;
+  /** [VC] claim 类型（R-causal 门消费·任务 #12·T-029）。 */
+  readonly claimType: ClaimType;
 }
 
 /** [VC] 数据集绑定（§3.1·含 contentHash/schemaHash/statsFingerprint/scopeCoverage）。 */

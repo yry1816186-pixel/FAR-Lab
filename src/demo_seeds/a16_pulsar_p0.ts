@@ -90,13 +90,13 @@ const makeIntegrationPayload = () => ({
   citations: [
     {
       evidenceId: 'ev-a16-001',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1093/mnras/stz400',
       title: 'The ATNF Pulsar Catalogue: Status and Braking Index Measurements',
     },
     {
       evidenceId: 'ev-a16-002',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1103/PhysRevD.99.083009',
       title: 'Generalized Braking Law for Pulsar Spin-down: Implications for P₀',
     },
@@ -147,7 +147,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.91,
       source: {
         evidenceId: 'ev-a16-001',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1093/mnras/stz400',
         title: 'The ATNF Pulsar Catalogue: Status and Braking Index Measurements',
       },
@@ -158,7 +158,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.83,
       source: {
         evidenceId: 'ev-a16-002',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1103/PhysRevD.99.083009',
         title: 'Generalized Braking Law for Pulsar Spin-down: Implications for P₀',
       },

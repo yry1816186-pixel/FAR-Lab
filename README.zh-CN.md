@@ -46,18 +46,27 @@ node src/cli/far.ts demo tess-offline # offline demo —— 零凭据
 ## 2 分钟 Quickstart
 
 ```bash
-# 1. 验证一个预生成、可独立复算的证明 bundle（offline·无 key）
-node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof
-#   → tamperStatus: clean · recomputation.node: pass · exit 0
+# 1. 用确定性裁决内核跑 14 条 golden vector（offline·无 key）
+node src/cli/far.ts demo
+#   → 14/14 golden vectors PASS · end-to-end demo claim sealed · exit 0
 
 # 2. 用确定性裁决内核跑 14 条 golden vector
 node src/cli/far.ts verify-golden --all
 
-# 3. 看篡改检测实战
-cp -r examples/tess-offline/output/demo.far-proof /tmp/tampered
+# 3. 导出证明 bundle（步骤 4 篡改演示需要先导出）
+node src/cli/far.ts export far-proof --demo-chain --force
+
+# 4. 看篡改检测实战（macOS / Linux / WSL bash）
+mkdir -p /tmp/tampered && cp -r .far-proof /tmp/tampered
 sed -i 's/UNTESTED/CONFIRMED/' /tmp/tampered/proof_envelopes.jsonl
 node src/cli/far.ts verify /tmp/tampered
 #   → tamperStatus: tampered · recomputation.node: fail · exit 7
+
+#    Windows (PowerShell 7+):
+#   New-Item -ItemType Directory -Force tampered | Out-Null
+#   Copy-Item -Recurse .far-proof tampered
+#   (Get-Content tampered/proof_envelopes.jsonl) -replace 'UNTESTED','CONFIRMED' | Set-Content tampered/proof_envelopes.jsonl
+#   node src/cli/far.ts verify tampered
 ```
 
 完整 CLI 参考：`node src/cli/far.ts --help`。
@@ -109,8 +118,8 @@ node src/cli/far.ts demo tess-offline
 ```
 
 全程 offline：14 条 golden vector 经真实 R0–R9 内核，再跑端到端 TESS 声明（`C-ASTRO-0001`）经
-FEC 编排 → 内核裁决 → fail-closed 密封。持久化 bundle 与**实测过的**篡改检测演示见
-[examples/tess-offline/README.md](examples/tess-offline/README.md)。
+FEC 编排 → 内核裁决 → fail-closed 密封。要验证持久化 bundle，先运行
+`node src/cli/far.ts export far-proof --demo-chain --force` 导出，再用 `far verify .far-proof` 验证。
 
 ---
 
@@ -208,3 +217,5 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
 2. **多模态** —— 当前支持视觉（Qwen-VL）；音频/视频/表格在路线图中。
 3. **单机部署** —— 基于 SQLite；多节点 PostgreSQL 为未来工作。
 4. **Pre-1.0** —— API 与 schema 可能调整。
+5. **复现 vs 复算**（评委07/12 R4）—— FAR-Lab 保证的是**计算可复现性**（recompute：给定相同输入重算同一 verdict），**不是**实验可复现性（reproduce：从原始数据重跑实验）。
+6. **CONFIRMED 语义**（评委05/12 R4）—— FAR-Lab 的 `CONFIRMED` 裁决含义是"合同一致性有界支持"（contract-consistent bounded support），**不是**天文学的"确认系外行星"（后者需要 RV mass / TTV 证据）。demo 产出的天文学候选应读作 VALIDATED / CANDIDATE。

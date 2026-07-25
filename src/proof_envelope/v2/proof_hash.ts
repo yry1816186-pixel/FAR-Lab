@@ -27,10 +27,13 @@ import type { ClaimEnvelope, ProofEnvelopeV2 } from './types.ts';
 
 /**
  * normalizeWhitespace（§2.4 line 257·APPENDIX_C §1.4）：
- * 统一 \r\n→\n、\r→\n、折叠 [ \t]+→单空格、trim。与 Python normalize_whitespace byte-equal。
+ * 统一 \r\n→\n、\r→\n、折叠 [ \t]+→单空格、trim。
+ * 同时做 Unicode NFC 归一化（评委08 F-4-007·防止 NFC/NFD 等价表示导致跨语言 hash 分裂）。
+ * 与 Python normalize_whitespace byte-equal（Python 端 unicodedata.normalize('NFC', text)）。
  */
 export function normalizeWhitespace(text: string): string {
-  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ').trim();
+  const normalized = text.normalize('NFC');
+  return normalized.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ').trim();
 }
 
 /** normalizeClaim（§2.4）：claim.naturalLanguage 规范化（其余字段原样）。 */
@@ -76,14 +79,42 @@ export function computeProofHashV2(envelope: Omit<ProofEnvelopeV2, 'proofHash'>)
 /**
  * verifyProofHashV2 —— 独立重算校验：给定完整 envelope，验证 proofHash 是否正确。
  * 用于 "verification not trust" + RULE-PE-010 independently_recomputable。
+ *
+ * 返回值语义：
+ *   - 'valid'              : proofHash 重算一致（信封完整）
+ *   - 'hash_mismatch'      : 重算成功但 proofHash 不一致（信封被篡改）
+ *   - 'fec_inconsistent'   : fecHash 与 fecSnapshot 不一致（FEC 子信封篡改）
+ *   - 'non_finite_number'  : 信封含 NaN/Infinity（非法数值·篡改或损坏）
+ *   - 'malformed_envelope' : 信封结构损坏（缺字段/类型错·非篡改而是输入错误）
+ *
+ * 旧 boolean API 仍保留（verifyProofHashV2Boolean）用于只关心"是否通过"的调用方。
+ * 新 API 让第三方独立复算时能区分"被篡改"和"输入格式错误"（评委08 F-4-005）。
  */
-export function verifyProofHashV2(envelope: ProofEnvelopeV2): boolean {
+export type ProofHashVerificationResult =
+  | 'valid'
+  | 'hash_mismatch'
+  | 'fec_inconsistent'
+  | 'non_finite_number'
+  | 'malformed_envelope';
+
+export function verifyProofHashV2(envelope: ProofEnvelopeV2): ProofHashVerificationResult {
   const { proofHash, ...rest } = envelope;
   try {
     const recomputed = computeProofHashV2(rest);
-    return recomputed === proofHash;
-  } catch {
-    // fecHash 断言失败或 NaN → proofHash 必不匹配（篡改检测）。
-    return false;
+    return recomputed === proofHash ? 'valid' : 'hash_mismatch';
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('fecHash mismatch')) {
+      return 'fec_inconsistent';
+    }
+    if (message.includes('NaN') || message.includes('Infinity') || message.includes('non-finite')) {
+      return 'non_finite_number';
+    }
+    return 'malformed_envelope';
   }
+}
+
+/** 向后兼容的 boolean 封装（仅 'valid' 为 true）。 */
+export function verifyProofHashV2Boolean(envelope: ProofEnvelopeV2): boolean {
+  return verifyProofHashV2(envelope) === 'valid';
 }

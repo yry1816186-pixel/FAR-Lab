@@ -78,3 +78,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Accessibility: respect the OS-level prefers-reduced-motion setting (WCAG 2.3.3 /
+   vestibular-disorder accommodation). When the user has requested reduced motion,
+   collapse all animations and transitions to near-instant so animate-pulse
+   skeletons, spinners, and RouteEffects scroll do not trigger motion sensitivity. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

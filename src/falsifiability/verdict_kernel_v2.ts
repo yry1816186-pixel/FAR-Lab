@@ -216,7 +216,7 @@ export interface VerdictKernelInput {
   readonly claimType?: ClaimType;
   /** [VC] 证据基础（F6 红线·03 §7.5:961）。'observational_only' + ConfoundingGate FAIL → reasonCodes 追加 F6_CAUSAL_HONESTY。 */
   readonly evidenceBasis?: EvidenceBasis;
-  /** [VC] ConfoundingGate 裁决（caller pre-compute via adjudicateConfounding·镜像 evidenceSufficiency 模式）。claimType='causal' 时由调用方提供；R7 判定前 R-causal 门消费。注：claimType 非哈希保护（kernel 输入提示·任务 #12 范围·ClaimEnvelope 哈希扩展延后）。 */
+  /** [VC] ConfoundingGate 裁决（caller pre-compute via adjudicateConfounding·镜像 evidenceSufficiency 模式）。claimType='causal' 时由调用方提供；R7 判定前 R-causal 门消费。注：claimType 已通过 ClaimEnvelope 进 proofHash（任务 #12 · T-029 评委08 F-8-003 闭环·2026-07-24），caller 偷改 claimType 会致 proofHash 失配 → PROOF_HASH_MISMATCH。 */
   readonly confoundingGateResult?: ConfoundingGateResult;
   /** [VC] identifier 声明（FUSION-OS-14·caller pre-compute via resolveIdentifierClaim）。任一 not_found → R-identifier-fabrication REFUTED；任一 unresolved → UNTESTED（环境故障非伪造·unresolved 优先于 not_found）。optional·缺省零回归。 */
   readonly identifierClaims?: readonly IdentifierClaim[];

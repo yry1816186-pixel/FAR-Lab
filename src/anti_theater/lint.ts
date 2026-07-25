@@ -29,13 +29,13 @@ import { computeAntiTheaterScore, SEAL_BLOCK_SCORE_THRESHOLD } from './score.ts'
 import { assertVerifierModulesClean } from '../falsifiability/verifier_structural_gate.ts';
 
 /**
- * 运行反剧场检测编排（§3·确定性·20 detector 顺序遍历）。
+ * 运行反剧场检测编排（§3·确定性·21 detector 顺序遍历）。
  *
  * @param input AntiTheaterLintInput（7 字段·fec/bindings/executionTrace/verdict/envelopeDraft/preregistrationRecord/runRegistry）。
  * @returns AntiTheaterReport（findings + hasFail/failCount/warnCount/llmOverrideRejected + score/canSealConfirmed/verdictConstraint）。
  */
 export function runAntiTheaterLint(input: AntiTheaterLintInput): AntiTheaterReport {
-  // 0. FUSION-OS-5 加载期 AST 结构门：确定性内核 + 20 detector 源码纯度自检（fail-closed·memoized）。
+  // 0. FUSION-OS-5 加载期 AST 结构门：确定性内核 + 21 detector 源码纯度自检（fail-closed·memoized）。
   assertVerifierModulesClean();
   // 1. 按 DETECTORS 顺序遍历，聚合 DetectorFinding[]。
   const detectorFindings: DetectorFinding[] = [];

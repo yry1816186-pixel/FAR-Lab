@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type {
   LlmCallCredential,
+  LlmJsonSchema,
   LlmRequest,
   LlmResponse,
   ProviderAdapter,
@@ -41,6 +42,12 @@ export interface QwenChatCompletionRequest {
   readonly messages: OpenAiMessageParam[];
   readonly temperature: number;
   readonly maxTokens: number;
+  /**
+   * Structured Output schema（T-013 接线）。非 undefined 时透传为 OpenAI SDK
+   * response_format: { type: 'json_schema', json_schema: {...} }。
+   * DashScope 兼容此形态（compatible-mode/v1）。
+   */
+  readonly jsonSchema?: LlmJsonSchema;
 }
 
 export type QwenChatCompletionCaller = (
@@ -73,11 +80,28 @@ async function createChatCompletion(
     // SDK 默认 maxRetries:2 会在链外静默重试同一模型，污染 attempts[] 审计轨迹（不可见的双重重试）。
     maxRetries: 0,
   });
+  // T-013（评委04 F-4-004 · CP-17）：jsonSchema 非空时透传为 response_format。
+  // 形态与 OpenAI SDK ResponseFormatJSONSchema 一致（DashScope compatible-mode 兼容）。
+  // response_format 仅在 jsonSchema 存在时注入（exactOptionalPropertyTypes：undefined 不赋）。
+  const responseFormatParam: OpenAI.ChatCompletionCreateParams['response_format'] | undefined =
+    request.jsonSchema !== undefined
+      ? {
+          type: 'json_schema',
+          json_schema: {
+            name: request.jsonSchema.name,
+            ...(request.jsonSchema.strict !== undefined
+              ? { strict: request.jsonSchema.strict }
+              : {}),
+            schema: request.jsonSchema.schema,
+          },
+        }
+      : undefined;
   return client.chat.completions.create({
     model: request.modelId,
     messages: request.messages,
     temperature: request.temperature,
     max_tokens: request.maxTokens,
+    ...(responseFormatParam !== undefined ? { response_format: responseFormatParam } : {}),
   });
 }
 
@@ -133,6 +157,21 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
     const temperature = request.temperature ?? 0.3;
     const maxTokens = request.maxTokens ?? 2048;
 
+    // T-013（评委04 F-4-004 · 2026-07-25 第 3 轮 CP-17）·Structured Output 完整接线状态：
+    //   ✅ 接线完成：LlmRequest.jsonSchema（schema 对象）→ createChatCompletion →
+    //      OpenAI SDK response_format:{type:'json_schema', json_schema:{name,schema,strict}}。
+    //      caller（run_stage.ts）用 zodToJsonSchema(stageSchema) 注入 LlmRequest.jsonSchema。
+    //   ✅ R1 互斥已守卫：enable_thinking=true 与 response_format 互斥（agent_loop/create_params.ts
+    //      R1_MUTEX + adapter create_params.ts ThinkingJsonSchemaConflictError 双层）。
+    //   ✅ STRUCTURED_SAFE_MODEL 路由：response_format 存在时 buildCreateParams 切 qwen-max
+    //      （qwen3-thinking 不支持 json_schema · 2026-07-07 凭据实测 404）。
+    //   ⚠ 端到端验证：需真实 Qwen 凭证（DASHSCOPE_API_KEY）触网验证 DashScope 真按 schema 返回。
+    //      本地用 mock caller（断言 response_format 被构造）+ offline_replay（fixture 已结构化）验证透传正确性。
+    //      端到端触网验证是 BLOCKED_EXTERNAL（B-006 相关）。
+    //   Function Calling / tools 接入是 V2（需 DashScope tools API + 真实凭证·DEFERRED）。
+    const capability: 'reasoning' | 'structured' =
+      request.responseFormat === 'json_schema' ? 'structured' : 'reasoning';
+
     const chainResult = await executeFallbackChain(
       COMPETITION_FALLBACK_CHAIN,
       async (target) => {
@@ -142,6 +181,10 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
           messages,
           temperature,
           maxTokens,
+          // T-013：jsonSchema 透传（仅在 responseFormat='json_schema' 时有意义）
+          ...(request.responseFormat === 'json_schema' && request.jsonSchema !== undefined
+            ? { jsonSchema: request.jsonSchema }
+            : {}),
         });
         const requestId = getDataRequestId(completion);
         return {
@@ -205,7 +248,7 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
       providerRequestId: requestId,
       modelId: succeededModelId,
       modelVersion: null,
-      capability: 'reasoning' as const,
+      capability,
       isoTimestamp: new Date().toISOString(),
       tokenUsage: {
         inputTokens: usage?.prompt_tokens ?? 0,

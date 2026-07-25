@@ -93,14 +93,14 @@ const makeIntegrationPayload = () => ({
   citations: [
     {
       evidenceId: 'ev-e2-001',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1016/j.rse.2018.09.012',
       title:
         'Global Evaluation of MODIS GPP Products Against FLUXNET Eddy Covariance Measurements',
     },
     {
       evidenceId: 'ev-e2-002',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1111/gcb.14621',
       title:
         'Water Stress Effects on Light Use Efficiency: A Synthesis of FLUXNET Observations',
@@ -160,7 +160,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.89,
       source: {
         evidenceId: 'ev-e2-001',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1016/j.rse.2018.09.012',
         title:
           'Global Evaluation of MODIS GPP Products Against FLUXNET Eddy Covariance Measurements',
@@ -172,7 +172,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.85,
       source: {
         evidenceId: 'ev-e2-002',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1111/gcb.14621',
         title:
           'Water Stress Effects on Light Use Efficiency: A Synthesis of FLUXNET Observations',

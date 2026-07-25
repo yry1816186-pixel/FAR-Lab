@@ -39,7 +39,9 @@ export {
   normalizeClaim,
   normalizeWhitespace,
   verifyProofHashV2,
+  verifyProofHashV2Boolean,
 } from './proof_hash.ts';
+export type { ProofHashVerificationResult } from './proof_hash.ts';
 
 // validator（validator.ts）
 export {

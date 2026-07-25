@@ -84,19 +84,38 @@ frontend/
     │   ├── alert.tsx
     │   ├── dialog.tsx
     │   └── table.tsx
-    ├── pages/
-    │   ├── OverviewPage.tsx    # 总览（三柱 + 运行命令 + 健康状态）
-    │   ├── VizPage.tsx         # 证据链可视化（stub · 待 D3/React Flow 接入）
-    │   ├── HonestyWallPage.tsx # 诚信墙（stub · 待 5 枚举视觉语言接入）
-    │   ├── AblationPage.tsx    # 消融实验（stub）
-    │   ├── ReportPage.tsx      # 研究报告（stub）
-    │   └── AboutPage.tsx       # 关于
+    ├── pages/                  # 11 个路由页面（均 React.lazy 按需加载，除首页 eager）
+    │   ├── OverviewPage.tsx    # 总览（三柱 + 运行命令 + 后端健康 + 最近裁决）
+    │   ├── DemoModePage.tsx    # 8 幕功能导览
+    │   ├── VizPage.tsx         # 证据链 D3 力导向图（verdict 着色 + 节点侧栏详情）
+    │   ├── IntegrityPage.tsx   # 整链 Merkle 根 + 包含证明 + Repro Receipt
+    │   ├── LeaderboardPage.tsx # Science-125 广度榜
+    │   ├── CourtPage.tsx       # 跨模型可靠性法庭
+    │   ├── ArenaPage.tsx       # 对抗科学竞技场
+    │   ├── HonestyWallPage.tsx # 诚信墙（5 枚举裁决视觉语言）
+    │   ├── AblationPage.tsx    # 消融实验（4 baseline 并行）
+    │   ├── ReportPage.tsx      # 研究报告（沙箱 iframe 渲染）
+    │   └── AboutPage.tsx       # 关于（身份/信任边界/三柱/技术栈/诚实声明）
     └── __tests__/
         ├── utils.test.ts
         ├── App.test.tsx
         ├── OverviewPage.test.tsx
         └── api_client.test.ts
 ```
+
+## 全栈本地联调
+
+前端默认通过绝对 URL（CORS）访问后端 `http://localhost:3000`；也可设 `VITE_API_BASE_URL=` 走 Vite 同源 proxy。
+
+```bash
+# 终端 1：后端（仓库根，offline 模式·自动 seed demo 数据·无需 API key）
+pnpm api                       # 或：node src/cli/far.ts api
+
+# 终端 2：前端
+cd frontend && npm run dev     # http://localhost:5173
+```
+
+后端离线模式自动 seed C-ASTRO-0001 demo 裁决，前端 OverviewPage 的「Backend health」与「Recent verdicts」卡片会显示真实数据。OpenAPI 文档：`http://localhost:3000/documentation/json`。
 
 ## 后端 API 契约（spec 24）
 
@@ -120,10 +139,22 @@ frontend/
   - URL 路径 `/verdict/` 属 API 契约豁免。
 - 零容忍：不含 `: any` / `@ts-ignore` / `as unknown as X` / 空 catch。
 
+## 前端成熟度
+
+- **路由级代码分割**：除首页 OverviewPage（eager）外所有页面 `React.lazy` 按需加载；d3（~280kB）隔离到 vendor-d3 chunk，仅 Viz/Ablation 路由加载。vendor-react / vendor-d3 / vendor-query 独立缓存（见 `vite.config.ts` manualChunks）。
+- **全局错误边界**：`components/ErrorBoundary.tsx` 包裹路由（Suspense 外层），捕获未预期的渲染/lazy-chunk 错误，提供 Try again / Reload 恢复；错误时导航仍可用。
+- **路由级副作用**：`components/RouteEffects.tsx` 切换路由时滚动到顶部 + 更新 `document.title`。
+- **响应式导航**：桌面顶栏横向导航（≥ md）；移动端汉堡抽屉（< md），点击导航后自动关闭。
+- **完整空/错/加载状态**：每个数据页面都有 loading spinner、error alert、empty state 与诚实标注（`IntegrityBadge` datasetSource）。
+- **i18n**：中/英双语（`lib/i18n/zh.ts` + `en.ts`，键值类型强约束）。
+- **离线可用**：后端默认 offline 模式（无外部 LLM），前端零配置即可联调全流程。
+
 ## 限制声明
 
-- `VizPage` / `HonestyWallPage` / `AblationPage` / `ReportPage` 当前为 stub，待 P1 阶段（Task 5-8）接入 D3.js / React Flow / 5 枚举视觉语言 / 报告聚合。
+- 所有页面均已实现（非 stub）：VizPage（D3 力导向图）、HonestyWallPage（5 枚举视觉语言）、AblationPage（4 baseline 并行）、ReportPage（沙箱 iframe）等 11 页均有对应测试覆盖。
 - 前端依赖独立于根项目 `package.json`，不引入 agent 运行时框架（LangGraph / AutoGen / OpenAI Agents SDK 等红线依赖）。
+- `reactflow` 在 `package.json` 中声明但当前无源文件引用（死依赖）；通过 tree-shaking 在 build 中被移除，不影响产物体积。
+- demo 模式裁决来自确定性内核 + fixture 数据，展示框架能力而非真实模型性能（诚实边界，见各页 Honesty 声明）。
 
 ## 许可证
 

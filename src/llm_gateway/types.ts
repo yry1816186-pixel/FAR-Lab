@@ -47,11 +47,33 @@ export interface LlmMessage {
   readonly content: string;
 }
 
+/**
+ * Structured Output schema 对象（DashScope/OpenAI 兼容的 json_schema 形态）。
+ *
+ * 设计：LlmRequest 持 plain JSON schema 对象（非 zod 实例），保持 llm_gateway
+ * adapter-agnostic（不依赖 agent_loop/stages 的 zod schema）。caller（run_stage.ts）
+ * 用 zodToJsonSchema 把 stage zod schema 转为 plain 对象后注入。
+ *
+ * name 约束（OpenAI/DashScope 一致）：a-z/A-Z/0-9/_/-，≤64 字符。
+ */
+export interface LlmJsonSchema {
+  readonly name: string;
+  readonly schema: Record<string, unknown>;
+  readonly strict?: boolean;
+}
+
 export interface LlmRequest {
   readonly messages: readonly LlmMessage[];
   readonly temperature?: number;
   readonly maxTokens?: number;
   readonly responseFormat?: 'text' | 'json_schema';
+  /**
+   * Structured Output schema 对象。仅当 responseFormat='json_schema' 时有效。
+   * adapter（aliyun_qwen）透传为 DashScope/OpenAI response_format.json_schema；
+   * offline_replay 忽略（fixture 已是结构化）。
+   * T-013（评委04 F-4-004 · 2026-07-25 第 3 轮 CP-17）完整接线。
+   */
+  readonly jsonSchema?: LlmJsonSchema;
   readonly purposeTag?: string;
   /**
    * 请求所属阶段标识（agent_loop 执行器注入·如 'stage3_hypothesis'）。

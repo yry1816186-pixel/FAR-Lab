@@ -77,7 +77,7 @@ export {
   applyVerdictConstraint,
 } from './constraint.ts';
 
-// ===== 编排器（§3·runAntiTheaterLint·20 detector 顺序遍历）=====
+// ===== 编排器（§3·runAntiTheaterLint·21 detector 顺序遍历）=====
 export {
   runAntiTheaterLint,
 } from './lint.ts';

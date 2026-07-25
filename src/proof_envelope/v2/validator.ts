@@ -173,8 +173,8 @@ const RULES: ReadonlyArray<ValidatorRuleV2> = [
     ruleId: 'RULE-PE-010',
     ruleName: 'independently_recomputable',
     check(env) {
-      const ok = verifyProofHashV2(env);
-      if (ok) {
+      const result = verifyProofHashV2(env);
+      if (result === 'valid') {
         return {
           outcome: 'PASS',
           detail: 'proofHash independently recomputable (TS self-check pass; Python cross-lang 见 cross_lang.test)',
@@ -182,7 +182,7 @@ const RULES: ReadonlyArray<ValidatorRuleV2> = [
       }
       return {
         outcome: 'FAIL',
-        detail: 'proofHash recomputation mismatch (tampered envelope or fecHash inconsistent with fecSnapshot)',
+        detail: `proofHash verification: ${result} (tampered envelope, fecHash inconsistent, non-finite number, or malformed structure)`,
       };
     },
   },

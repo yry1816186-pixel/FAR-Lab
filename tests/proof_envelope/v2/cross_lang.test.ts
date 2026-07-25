@@ -68,17 +68,17 @@ test('cross-lang byte-equal: full seal path (sealProofEnvelopeV2 → Python 重�
 
 test('cross-lang byte-equal: verifyProofHashV2 (TS) === verify_proof_hash_v2 (Python) — 合法', () => {
   const { envelope } = sealProofEnvelopeV2(makeValidEnvelopeV2Core());
-  assert.equal(verifyProofHashV2(envelope), true);
+  assert.equal(verifyProofHashV2(envelope), 'valid');
   assert.equal(pythonVerifyProofHash(envelope), true);
 });
 
-test('cross-lang byte-equal: tamper verdictTrace → 两端 verify 都 false', () => {
+test('cross-lang byte-equal: tamper verdictTrace → 两端 verify 都 detect failure', () => {
   const { envelope } = sealProofEnvelopeV2(makeValidEnvelopeV2Core());
   const tampered = {
     ...envelope,
     verdictTrace: { ...envelope.verdictTrace, verdict: 'REFUTED' as const },
   };
-  assert.equal(verifyProofHashV2(tampered), false);
+  assert.notEqual(verifyProofHashV2(tampered), 'valid');
   assert.equal(pythonVerifyProofHash(tampered), false);
 });
 

@@ -91,13 +91,13 @@ const makeIntegrationPayload = () => ({
   citations: [
     {
       evidenceId: 'ev-c3-001',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1021/acscatal.0c04525',
       title: 'Open Catalyst 2020 (OC20) Dataset and Large-Scale Benchmarks for Machine Learning in Catalysis',
     },
     {
       evidenceId: 'ev-c3-002',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1038/s41929-021-00673-x',
       title: 'Single-Atom Catalysts for CO2 Reduction: DFT Descriptor Design and ML Screening',
     },
@@ -149,7 +149,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.84,
       source: {
         evidenceId: 'ev-c3-002',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1038/s41929-021-00673-x',
         title: 'Single-Atom Catalysts for CO2 Reduction: DFT Descriptor Design and ML Screening',
       },
@@ -171,7 +171,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.58,
       source: {
         evidenceId: 'ev-c3-001',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1021/acscatal.0c04525',
         title: 'Open Catalyst 2020 (OC20) Dataset and Large-Scale Benchmarks for Machine Learning in Catalysis',
       },

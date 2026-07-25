@@ -78,5 +78,10 @@
     "tsx": "^4.22.4",
     "typescript-eslint": "^8.62.0",
     "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "overrides": {
+      "fast-uri": "^3.1.4"
+    }
   }
 }

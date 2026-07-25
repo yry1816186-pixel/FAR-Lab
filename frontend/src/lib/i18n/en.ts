@@ -22,6 +22,9 @@ export const en: Record<MessageKey, string> = {
   'nav.themeToDark': 'Switch to dark theme',
   'nav.langToEn': 'Switch to English',
   'nav.langToZh': 'Switch to Chinese',
+  'nav.menu': 'Open menu',
+  'nav.closeMenu': 'Close menu',
+  'nav.skipToContent': 'Skip to main content',
 
   // ---- common ----
   'common.unknownError': 'Unknown error',
@@ -71,6 +74,14 @@ export const en: Record<MessageKey, string> = {
   'about.title': 'About FAR-Chain',
   'about.subtitle': 'Falsification-Anchored Research Chain — AI4S research-agent harness',
   'about.tagline': 'Falsifiable · Tamper-Evident · Independently Recomputable',
+  'about.mission': 'FAR-Chain is a falsifiability-anchored harness for AI4S research agents. It does not chat — it answers three questions: how could this claim be refuted, does the evidence support it, and can you recompute the proof yourself?',
+  'about.trustBoundaryTitle': 'Trust boundary',
+  'about.trustBoundaryBody': 'LLMs propose hypotheses; a deterministic rule kernel (R0–R9) decides the verdict. A hash proves integrity only — it never proves scientific truth. The LLM is never the final adjudicator.',
+  'about.pillarsTitle': 'Three pillars',
+  'about.stackTitle': 'Built on',
+  'about.stackBody': 'React + TypeScript + Fastify + SQLite, an append-only hash-chain evidence log, and Merkle integrity proofs — portable .far-proof artifacts a third party can recompute.',
+  'about.honestyTitle': 'Honesty statement',
+  'about.honestyBody': 'This deployment runs in offline replay mode (no external LLM calls). Verdicts come from the deterministic kernel against fixture data — they demonstrate the framework, not real model performance. Real research runs require connecting a provider behind a credential gate.',
 
   // ---- DemoModePage ----
   'demo.title': 'Demo mode',

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '@/App';
 
@@ -109,6 +109,7 @@ describe('App 路由与导航', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('link', { name: /Evidence Chain/ }));
+    await waitFor(() => screen.getByTestId('viz-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('viz-page')).toBeInTheDocument();
   });
 
@@ -116,6 +117,7 @@ describe('App 路由与导航', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('link', { name: /Demo/ }));
+    await waitFor(() => screen.getByTestId('demo-mode-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('demo-mode-page')).toBeInTheDocument();
   });
 
@@ -123,6 +125,7 @@ describe('App 路由与导航', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('link', { name: /Honesty Wall/ }));
+    await waitFor(() => screen.getByTestId('honesty-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('honesty-page')).toBeInTheDocument();
   });
 
@@ -130,6 +133,7 @@ describe('App 路由与导航', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('link', { name: /Integrity/ }));
+    await waitFor(() => screen.getByTestId('integrity-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('integrity-page')).toBeInTheDocument();
   });
 
@@ -137,6 +141,7 @@ describe('App 路由与导航', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('link', { name: /Leaderboard/ }));
+    await waitFor(() => screen.getByTestId('leaderboard-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('leaderboard-page')).toBeInTheDocument();
   });
 
@@ -144,6 +149,7 @@ describe('App 路由与导航', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('link', { name: /About/ }));
+    await waitFor(() => screen.getByTestId('about-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('about-page')).toBeInTheDocument();
   });
 
@@ -159,5 +165,64 @@ describe('App 路由与导航', () => {
     await user.click(toggle);
     // 再次切换回 light
     expect(document.documentElement.classList.contains('dark')).toBe(false);
+  });
+
+  it('移动菜单按钮展开/收起移动导航抽屉', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(screen.queryByTestId('mobile-nav')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('mobile-menu-toggle'));
+    expect(screen.getByTestId('mobile-nav')).toBeInTheDocument();
+    const mobileNav = screen.getByTestId('mobile-nav');
+    expect(within(mobileNav).getAllByRole('link')).toHaveLength(11);
+    await user.click(screen.getByTestId('mobile-menu-toggle'));
+    expect(screen.queryByTestId('mobile-nav')).not.toBeInTheDocument();
+  });
+
+  it('移动抽屉中点击导航后自动关闭', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByTestId('mobile-menu-toggle'));
+    expect(screen.getByTestId('mobile-nav')).toBeInTheDocument();
+    await user.click(within(screen.getByTestId('mobile-nav')).getByRole('link', { name: /Demo/ }));
+    expect(screen.queryByTestId('mobile-nav')).not.toBeInTheDocument();
+    await waitFor(() => screen.getByTestId('demo-mode-page'));
+    expect(screen.getByTestId('demo-mode-page')).toBeInTheDocument();
+  });
+
+  it('按 Escape 键关闭移动抽屉并恢复焦点到 toggle 按钮', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const toggle = screen.getByTestId('mobile-menu-toggle');
+    await user.click(toggle);
+    expect(screen.getByTestId('mobile-nav')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByTestId('mobile-nav')).not.toBeInTheDocument();
+    // a11y: focus restores to the toggle button so the keyboard user isn't stranded
+    expect(toggle).toHaveFocus();
+  });
+
+  it('打开抽屉时焦点自动移入菜单第一个链接', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const toggle = screen.getByTestId('mobile-menu-toggle');
+    await user.click(toggle);
+    const mobileNav = screen.getByTestId('mobile-nav');
+    const firstLink = within(mobileNav).getAllByRole('link')[0];
+    expect(firstLink).toHaveFocus();
+  });
+
+  it('渲染 skip-to-content 链接(键盘用户可跳过 11 项导航)', () => {
+    render(<App />);
+    const skip = screen.getByTestId('skip-to-content');
+    expect(skip).toBeInTheDocument();
+    expect(skip).toHaveAttribute('href', '#main-content');
+  });
+
+  it('主内容区有可聚焦锡点(id=main-content, tabindex=-1)', () => {
+    render(<App />);
+    const main = screen.getByTestId('main-content');
+    expect(main).toHaveAttribute('id', 'main-content');
+    expect(main).toHaveAttribute('tabindex', '-1');
   });
 });

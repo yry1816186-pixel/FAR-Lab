@@ -29,9 +29,12 @@ export type AntiTheaterSeverity = 'INFO' | 'WARN' | 'FAIL' | 'BLOCK';
 // ===== 权威存储类型（APPENDIX_A §7 落地·本文件为唯一运行时定义点）=====
 
 /**
- * 反剧场攻击类别（APPENDIX_A §7 attackKind enum · 20 值）。
+ * 反剧场攻击类别（APPENDIX_A §7 attackKind enum · 21 值）。
  * kebab-case 字面量与 APPENDIX_E §2 attackId（AT-* 前缀）一一对应（见 ATTACK_ID_TO_KIND）。
  * 消费方（verdict kernel / proofHash）一律存本 enum 字面量，不得存 attackId 字符串。
+ *
+ * 注：原 20 值（03 §8 + APPENDIX_E §2 扩展），2026-07-24 T-003 修复新增
+ * `execution-provenance-unbound`（第 21 项）——填补「fixture 冒充真实计算结果」检测空白。
  */
 export type AntiTheaterAttackKind =
   // —— 03 §8 最低强制子集（10 项核心攻击）——
@@ -55,7 +58,9 @@ export type AntiTheaterAttackKind =
   | 'optional-stopping-no-spending'
   | 'dependency-float-drift'
   | 'benchmark-overfit'
-  | 'fake-degraded-scope';
+  | 'fake-degraded-scope'
+  // —— T-003 修复新增（2026-07-24·第 21 项）——
+  | 'execution-provenance-unbound';
 
 /** APPENDIX_E §2 attackId（人类可读 AT-* 前缀）→ APPENDIX_A §7 attackKind（kebab-case 存储字段）映射。 */
 export const ATTACK_ID_TO_KIND: Readonly<Record<string, AntiTheaterAttackKind>> = {
@@ -79,11 +84,13 @@ export const ATTACK_ID_TO_KIND: Readonly<Record<string, AntiTheaterAttackKind>> 
   'AT-DEP-FLOAT-DRIFT': 'dependency-float-drift',
   'AT-OVERFIT': 'benchmark-overfit',
   'AT-FAKE-DEGRADED': 'fake-degraded-scope',
+  // T-003 修复新增（2026-07-24·填补 fixture 冒充检测空白）
+  'AT-PROVENANCE-UNBOUND': 'execution-provenance-unbound',
 };
 
 /**
  * attackKind → attackId 反向查找（Honesty Wall 展示用）。
- * 遍历 ATTACK_ID_TO_KIND（覆盖 20 值全集），未命中即不可达——kind 是闭合 enum。
+ * 遍历 ATTACK_ID_TO_KIND（覆盖 21 值全集），未命中即不可达——kind 是闭合 enum。
  */
 export function attackKindToId(kind: AntiTheaterAttackKind): string {
   for (const [id, k] of Object.entries(ATTACK_ID_TO_KIND)) {
@@ -198,6 +205,20 @@ export interface MeasurementTrace {
   readonly splitName?: string;
   readonly metricKey: string;
   readonly metricValue: number;
+  /**
+   * T-003 · Evidence provenance binding（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+   *
+   * 可选字段：当 FEC 要求 `requireExecutionProvenance: true` 时，primary measurement 须携带
+   * 64-hex sha256（来自 sandbox_runner.stdoutHash/artifactTreeHash），证明 metricValue 是
+   * 本次 sandbox 执行产出的（非手工注入 fixture 冒充）。AT-PROVENANCE-UNBOUND detector 消费。
+   *
+   * 与 rawArtifactHashes 的区别：
+   *   - rawArtifactHashes 证明「有原始产物」（产物存在性）；
+   *   - executionProvenanceHash 证明「产物是这次执行产出的」（执行-产物绑定·防 fixture 冒充）。
+   *
+   * 缺省不强制（向后兼容·V1 demo seed fixture 不设置此字段）。
+   */
+  readonly executionProvenanceHash?: string;
 }
 
 /** 实验运行痕迹（ExecutionTrace.runs 元素·AT-HARK 消费 endedAt/AT-STOPPING-RULE 消费 isInterim/earlyStopped）。 */

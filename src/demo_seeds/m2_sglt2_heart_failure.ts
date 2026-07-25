@@ -86,19 +86,19 @@ const makeIntegrationPayload = () => ({
   citations: [
     {
       evidenceId: 'ev-m2-001',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1056/NEJMoa1504720',
       title: 'Empagliflozin, Cardiovascular Outcomes, and Mortality in T2D (EMPA-REG OUTCOME)',
     },
     {
       evidenceId: 'ev-m2-002',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1056/NEJMoa1611925',
       title: 'Canagliflozin and Cardiovascular and Renal Events in T2D (CANVAS Program)',
     },
     {
       evidenceId: 'ev-m2-003',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1056/NEJMoa1905362',
       title: 'Dapagliflozin and Cardiovascular Outcomes in T2D (DECLARE-TIMI 58)',
     },
@@ -140,7 +140,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.88,
       source: {
         evidenceId: 'ev-m2-001',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1056/NEJMoa1504720',
         title: 'Empagliflozin, Cardiovascular Outcomes, and Mortality in T2D (EMPA-REG OUTCOME)',
       },
@@ -151,7 +151,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.85,
       source: {
         evidenceId: 'ev-m2-002',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1056/NEJMoa1611925',
         title: 'Canagliflozin and Cardiovascular and Renal Events in T2D (CANVAS Program)',
       },
@@ -162,7 +162,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.84,
       source: {
         evidenceId: 'ev-m2-003',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1056/NEJMoa1905362',
         title: 'Dapagliflozin and Cardiovascular Outcomes in T2D (DECLARE-TIMI 58)',
       },

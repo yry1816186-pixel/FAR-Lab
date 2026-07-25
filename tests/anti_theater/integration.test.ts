@@ -185,7 +185,7 @@ test('integration B: runAntiTheaterLint 真实报告注入 antiTheaterReport →
 test('integration C: makeCleanBaseInput 干净报告 → kernel CONFIRMED (R7) + RULE-PE-007 PASS（零误报）', () => {
   const report = runAntiTheaterLint(makeCleanBaseInput());
 
-  // 干净 base 过全部 20 detector → 无 FAIL/WARN（误报率=0·false_green_rate gate 的 liveness 基准）。
+  // 干净 base 过全部 21 detector → 无 FAIL/WARN（误报率=0·false_green_rate gate 的 liveness 基准）。
   assert.equal(report.hasFail, false, '干净 base 须 hasFail=false（过全部 detector·误报率=0）');
   assert.equal(report.canSealConfirmed, true, '干净 base 须 canSealConfirmed=true（score>=70 + 无 blockSeal）');
 

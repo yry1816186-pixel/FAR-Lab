@@ -49,8 +49,12 @@ export const A4_RAW_INPUT = [
 // ---------- SourceCard ----------
 
 export const A4_SOURCE_CARD: SourceCard = {
+  // ⚠ DEMO FICTIONAL REFERENCE (NEEDS_HUMAN_OPERATION): the arXiv ID below was a synthetic
+  // placeholder for this demo seed, NOT a real published paper. Hot-Jupiter orbital decay is a
+  // genuine research field — see Patra et al. 2017 ApJL, Maciejewski et al. 2018, Yee et al. 2020
+  // ApJL (WASP-12b). Replace with a real DOI / arXiv ID before any academic citation.
   sourceId: 'sc-a4-hotjupiter-2026',
-  url: 'https://ui.adsabs.harvard.edu/abs/2026arXiv0612345',
+  url: 'https://example.org/farlab-demo-fictional-ref-a4-hot-jupiter-decay',
   title: 'Hot Jupiter Orbital Decay: A Survey of Transit Timing Variations',
   sourceType: 'paper',
   publisher: 'arXiv / ADS',
@@ -90,7 +94,7 @@ const makeIntegrationPayload = () => ({
   citations: [
     {
       evidenceId: 'ev-a4-001',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.3847/1538-4357/ac8e9a',
       title: 'Tidal Dissipation in Hot Jupiter Systems: A Comprehensive Review',
     },
@@ -102,7 +106,7 @@ const makeIntegrationPayload = () => ({
     },
     {
       evidenceId: 'ev-a4-003',
-      source: 'arxiv' as const,
+      source: 'doi' as const,
       doi: '10.1038/s41586-023-05923-x',
       title: 'Gravitational Wave Background from Short-Period Exoplanets',
     },
@@ -147,7 +151,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.94,
       source: {
         evidenceId: 'ev-a4-001',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.3847/1538-4357/ac8e9a',
         title: 'Tidal Dissipation in Hot Jupiter Systems: A Comprehensive Review',
       },
@@ -169,7 +173,7 @@ const makeEvidencePayload = () => ({
       entailmentScore: 0.55,
       source: {
         evidenceId: 'ev-a4-003',
-        source: 'arxiv' as const,
+        source: 'doi' as const,
         doi: '10.1038/s41586-023-05923-x',
         title: 'Gravitational Wave Background from Short-Period Exoplanets',
       },

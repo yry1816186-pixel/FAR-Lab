@@ -21,6 +21,9 @@ export const zh = {
   'nav.themeToDark': 'Switch to dark theme',
   'nav.langToEn': 'Switch to English',
   'nav.langToZh': '切换到中文',
+  'nav.menu': '打开菜单',
+  'nav.closeMenu': '关闭菜单',
+  'nav.skipToContent': '跳到主内容',
 
   // ---- common ----
   'common.unknownError': '未知错误',
@@ -70,6 +73,14 @@ export const zh = {
   'about.title': '关于 FAR-Chain',
   'about.subtitle': 'Falsification-Anchored Research Chain — AI4S 研究智能体 harness',
   'about.tagline': '可证伪 · 篡改可检测 · 可独立复算',
+  'about.mission': 'FAR-Chain 是面向 AI4S 研究智能体的可证伪锡定 harness。它不对话——它回答三个问题:这条断言如何被推翻、证据是否支持它、以及你能否自己复算证明。',
+  'about.trustBoundaryTitle': '信任边界',
+  'about.trustBoundaryBody': 'LLM 提出假设;确定性规则核(R0–R9)给出裁决。哈希只证明完整性——它从不证明科学真理。LLM 绝非最终裁决者。',
+  'about.pillarsTitle': '三大支柱',
+  'about.stackTitle': '技术栈',
+  'about.stackBody': 'React + TypeScript + Fastify + SQLite、追加式哈希链证据日志、以及 Merkle 完整性证明——第三方可独立复算的 .far-proof 便携制品。',
+  'about.honestyTitle': '诚实声明',
+  'about.honestyBody': '本部署以离线回放模式运行(无外部 LLM 调用)。裁决由确定性内核针对 fixture 数据给出——它们展示的是框架能力,而非真实模型性能。真实研究运行须在凭据门后接入 provider。',
 
   // ---- DemoModePage ----
   'demo.title': '演示模式',

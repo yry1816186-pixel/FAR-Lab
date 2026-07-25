@@ -42,24 +42,42 @@ You will see: ① 14 Golden Vectors adjudicated by the real R0–R9 kernel; ② 
 (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fail-closed sealing. Zero credentials,
 zero network.
 
-## 4. Verify a persisted proof bundle (third-party independent recomputation)
+## 4. Export a proof bundle (needed by step 5 tamper demo)
 
 ```bash
-node src/cli/far.ts verify examples/tess-offline/output/demo.far-proof
+node src/cli/far.ts export far-proof --demo-chain --force
+#   → exports ./.far-proof/ (third-party independently recomputable bundle)
+```
+
+## 5. Verify a persisted proof bundle (third-party independent recomputation)
+
+```bash
+node src/cli/far.ts verify .far-proof
 #   tamperStatus: clean · recomputation.node: pass · exit 0
 ```
 
 `far verify` performs a **third-party independent recomputation** of the bundle: it recomputes the
 proofHash and compares it with the stored value, and verifies hash-chain integrity.
 
-## 5. Watch tamper detection
+## 6. Watch tamper detection
 
+macOS / Linux / WSL (bash):
 ```bash
-cp -r examples/tess-offline/output/demo.far-proof /tmp/tampered
+mkdir -p /tmp/tampered && cp -r .far-proof /tmp/tampered
 sed -i 's/UNTESTED/CONFIRMED/' /tmp/tampered/proof_envelopes.jsonl
 node src/cli/far.ts verify /tmp/tampered
 #   tamperStatus: tampered · recomputation.node: fail · exit 7
 rm -rf /tmp/tampered
+```
+
+Windows (PowerShell 7+):
+```powershell
+New-Item -ItemType Directory -Force tampered | Out-Null
+Copy-Item -Recurse .far-proof tampered
+(Get-Content tampered/proof_envelopes.jsonl) -replace 'UNTESTED','CONFIRMED' | Set-Content tampered/proof_envelopes.jsonl
+node src/cli/far.ts verify tampered
+#   tamperStatus: tampered · recomputation.node: fail · exit 7
+Remove-Item -Recurse -Force tampered
 ```
 
 Any byte change covered by the proofHash → recomputed hash ≠ stored hash → immediately detected as

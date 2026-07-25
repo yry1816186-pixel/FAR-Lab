@@ -5,7 +5,7 @@
 // 单点投影)。经真实 runAntiTheaterLint(golden_vectors seed-cherry 攻击)→ report → fecAppendClaim(antiTheaterReport)
 // → kernel R-anti-theater-fail(verdict_kernel_v2.ts:296)触发 UNTESTED + decisiveRuleId='ANTI_THEATER_FAIL'。
 //
-// 真实依赖链:runAntiTheaterLint(20 detector 纯函数·src/anti_theater/lint.ts:39)
+// 真实依赖链:runAntiTheaterLint(21 detector 纯函数·src/anti_theater/lint.ts:39)
 //   → toKernelFindings(单点投影·adapters/kernel_adapter.ts:58)
 //   → decideFiveValueVerdict(经 fecAppendClaim 真实事务路径·非 FakeBackend·非 mock)。
 //

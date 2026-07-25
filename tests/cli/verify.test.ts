@@ -595,6 +595,55 @@ test('runVerify --bundle: 篡改 sealed_by → exit 7（deterministic sealer 守
   }
 });
 
+// ===== T-001 回归：verify 对缺失/不存在 bundle 路径 fail-closed（exit 7，非 0）=====
+// 评委03 第 1 轮 F-3-001 实测早期版本 exit=0（假阳性）；当前 verifyFarProofBundle 已产
+// MISSING_REQUIRED_FILE errors → status FAIL → exit 7。本测试锁住该行为，防回归。
+test('runVerify --bundle: 不存在的 bundle 路径 → exit 7 + 10 MISSING_REQUIRED_FILE（fail-closed · T-001 回归）', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-verify-missing-bundle-'));
+  try {
+    // 不创建任何文件，直接指向不存在的子目录（镜像 README 早期 examples/tess-offline/output/demo.far-proof 场景）。
+    const ghostBundlePath = join(dir, 'does-not-exist', 'demo.far-proof');
+    const { code, dump } = runVerifyJson({ bundlePath: ghostBundlePath, mode: 'full' });
+
+    assert.equal(code, 7, '缺失 bundle 路径必须 fail-closed exit=7（T-001·禁止假阳性 exit=0）');
+    assert.equal(dump.status, 'FAIL', 'status 须 FAIL（10 MISSING_REQUIRED_FILE errors）');
+    assert.equal(dump.tamperStatus, 'tampered');
+    assert.equal(dump.recomputation.node, 'fail');
+    assert.ok(
+      dump.verifiedLevels.includes('bundle'),
+      'verifiedLevels 须含 bundle（即使全部缺失，bundle 轴已运行）',
+    );
+    assert.equal(
+      dump.errors.filter((e) => e.startsWith('MISSING_REQUIRED_FILE:')).length,
+      10,
+      `full 模式须含 10 条 MISSING_REQUIRED_FILE（全部 required files 缺），实际 errors: ${dump.errors.join(' | ')}`,
+    );
+    assert.ok(
+      dump.errors.some((e) => e.includes('ro-crate-metadata.json')),
+      '须列出具体缺失文件（ro-crate-metadata.json）',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('runVerify --bundle --mode chain: 不存在路径 → exit 7 + MISSING_REQUIRED_FILE call_records.redacted.jsonl', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-verify-missing-chain-'));
+  try {
+    const ghostBundlePath = join(dir, 'ghost');
+    const { code, dump } = runVerifyJson({ bundlePath: ghostBundlePath, mode: 'chain' });
+
+    assert.equal(code, 7, 'chain 模式缺失路径同样 fail-closed');
+    assert.equal(dump.status, 'FAIL');
+    assert.ok(
+      dump.errors.some((e) => e.includes('MISSING_REQUIRED_FILE: call_records.redacted.jsonl')),
+      `chain 模式须缺 call_records.redacted.jsonl: ${dump.errors.join(' | ')}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ===== #11b · diffAntiTheaterReport（重算报告 vs envelope 内嵌报告·深度对比）=====
 
 test('diffAntiTheaterReport: clean↔clean → consistent / 无发散', () => {

@@ -30,7 +30,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Gavel, Loader2, Users, ShieldAlert } from 'lucide-react';
+import { Gavel, Users, ShieldAlert } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const FIVE_VERDICTS = new Set<string>([
   'CONFIRMED',
@@ -61,9 +62,13 @@ export default function CourtPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
-        <span className="text-muted-foreground">Running cross-model court (offline_replay 3 models)…</span>
+      <div className="space-y-8" data-testid="court-loading-skeleton">
+        <header className="space-y-2">
+          <Skeleton className="h-8 w-72" />
+          <Skeleton className="h-4 w-96 max-w-full" />
+        </header>
+        <Skeleton className="h-28 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-lg" />
       </div>
     );
   }

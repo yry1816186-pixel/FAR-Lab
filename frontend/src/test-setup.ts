@@ -42,6 +42,12 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
+// jsdom's window.scrollTo exists but prints a console notice on every call.
+// on every call. Replace it with a silent no-op so RouteEffects' scroll-to-top
+// (and any future scroll call) runs cleanly in the test environment. No test
+// asserts on real scroll offsets today; if one needs to, it can spy/restore.
+window.scrollTo = () => {};
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
