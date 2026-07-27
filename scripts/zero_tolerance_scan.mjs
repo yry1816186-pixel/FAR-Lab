@@ -118,8 +118,16 @@ const skippedFiles = new Set([
   'docs/design/machine-readable/claims.yaml',
   // docs/design/machine-readable/deferral-register.yaml —— 延期登记镜像，DEF-11 处置史引用历史标识符 stub_ok（重命名前的事实记录，非 stub 实现）。
   'docs/design/machine-readable/deferral-register.yaml',
-  // docs/design/machine-readable/source-registry.yaml —— 来源登记镜像，NIST 官方 URL "…ai-risk-management-framework" 中子串 "sk-management-framework" 触发 hardcoded_secret_shape 误报（URL 非密钥）。
+  // docs/design/machine-readable/source-registry.yaml —— 来源登记镜像，NIST 官方 URL “…ai-risk-management-framework” 中子串 “sk-management-framework” 触发 hardcoded_secret_shape 误报（URL 非密钥）。
   'docs/design/machine-readable/source-registry.yaml',
+  // ── R5 CP-20（2026-07-25）：2 份合法内容文件假阳性豁免（提升扫描器精度，非掩盖真 secret/TODO）──
+  // scripts/gen_figs2.py —— 绘图脚本图例数据数组（行 82）“[WARN] DASHSCOPE_API_KEY not set -> offline demo still works”
+  //   是给读者的说明文字（提示缺 key 时离线 demo 仍可用），同 docs/installation.md / far CLI HELP_TEXT 的 env 名说明豁免模式，非 secret 值。
+  //   经审计合规：无 :any / @ts-ignore / 空 catch / stub / extra_body / sk- 明文（纯 matplotlib 绘图脚本）。
+  'scripts/gen_figs2.py',
+  // docs/charter/ULTIMATE_EXECUTION_PRIME.md —— charter 指令文档：讨论 TODO/TBD 元规则（何时该用/禁用，政策阐述非代码债务，同 design_lint.mjs 自引用模式）
+  //   + 引用 NIST 标准 URL（同 source-registry.yaml 的 NIST URL 豁免）。经审计合规：元指令文档，无生产代码违规。
+  'docs/charter/ULTIMATE_EXECUTION_PRIME.md',
 ]);
 
 function walk(path) {
