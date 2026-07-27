@@ -8,7 +8,7 @@
  *
  * 用途：前端用浏览器 Web Crypto（crypto.subtle.digest）独立重算 combine / root，与这里的
  * Node / Python golden 比对——证明「同一算法，浏览器 / Node / Python 三方产出字节相同的哈希」。
- * 这是 FAR-Chain 跨语言确定性承诺的可视化证据（CrossLangHashVerifier 卖点）。
+ * 这是 FAR-Lab 跨语言确定性承诺的可视化证据（CrossLangHashVerifier 卖点）。
  *
  * 这些数值是密码学常量（由输入确定性派生），非魔法数字。勿手改——若改输入请重跑生成脚本
  * 并同步 tests/evidence_log/merkle_cross_lang.test.ts 的回归锚。

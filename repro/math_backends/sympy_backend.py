@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SymPy CAS backend for the FAR-Chain math verification layer (spec 38 §3).
+"""SymPy CAS backend for the FAR-Lab math verification layer (spec 38 §3).
 
 Protocol (stdin → stdout, both JSON):
   Request:  {"mode": "expand"|"simplify"|"parse", "lhs": "...", "rhs": "...", "expr": "..."}

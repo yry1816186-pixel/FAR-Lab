@@ -1,6 +1,6 @@
 # Concept: Determinism (The LLM Is Not the Arbiter)
 
-> FAR-Chain uses LLMs to **generate** hypotheses and evidence, **never** to **decide** the verdict.
+> FAR-Lab uses LLMs to **generate** hypotheses and evidence, **never** to **decide** the verdict.
 > The verdict is produced by a deterministic R0–R9 kernel — pure code, no model call, recomputable to
 > the byte. This is a project red line.
 

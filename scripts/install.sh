@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# FAR-Chain installer (macOS / Linux / WSL · 终端用户向)
+# FAR-Lab installer (macOS / Linux / WSL · 终端用户向)
 #
 # 用法：
 #   curl -fsSL https://github.com/yry1816186-pixel/FAR-Lab/releases/latest/download/install.sh | bash
 #   （Release 发布前 · NEEDS_RELEASE_PUBLICATION：改用 git clone 开发者安装，见 README）
 #
-# 红线：不写 API key、不下载大数据、不启动 GPU/云、不要求 root（装到 ~/.far-chain）。
+# 红线：不写 API key、不下载大数据、不启动 GPU/云、不要求 root（装到 ~/.FAR-Lab）。
 # 失败 fail-closed（set -euo pipefail + 显式 err），每步可诊断。
 # 技术栈：Node ≥24 + pnpm（主）；Python 3.11+（可选科研轴，缺失只 WARN）。
 
 set -euo pipefail
 
-INSTALL_DIR="${FAR_CHAIN_HOME:-$HOME/.far-chain}"
+INSTALL_DIR="${FAR_CHAIN_HOME:-$HOME/.FAR-Lab}"
 REPO_URL="https://github.com/yry1816186-pixel/FAR-Lab.git"
 NODE_MIN_MAJOR=24
 
@@ -60,7 +60,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
   git -C "$INSTALL_DIR" fetch --depth 1 origin 2>/dev/null || warn "fetch 失败（继续用本地版本）"
   git -C "$INSTALL_DIR" reset --hard '@{u}' 2>/dev/null || warn "update 失败（可能有本地改动；cd $INSTALL_DIR && git status 查看）"
 else
-  info "clone FAR-Chain → $INSTALL_DIR"
+  info "clone FAR-Lab → $INSTALL_DIR"
   git clone --depth 1 "$REPO_URL" "$INSTALL_DIR" || err "clone 失败：检查网络 / $REPO_URL"
 fi
 cd "$INSTALL_DIR"
@@ -110,7 +110,7 @@ node "$FAR_TS" doctor || warn "far doctor 报告非全绿（见上方诊断；WA
 # ── 10. 下一步 ──
 cat <<EOF
 
-${GRN}✓ FAR-Chain 安装完成${RST}  $INSTALL_DIR
+${GRN}✓ FAR-Lab 安装完成${RST}  $INSTALL_DIR
 
   下一步（全程 offline·无需 API key）：
     ${CYN}far version${RST}

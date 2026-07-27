@@ -727,7 +727,7 @@ function renderVerifyHuman(
   bundleResult: BundleVerifyResult | undefined = undefined,
 ): string {
   const lines: string[] = [
-    'FAR-Chain Verify (third-party independent recomputation)',
+    'FAR-Lab Verify (third-party independent recomputation)',
     '════════════════════════════════════════════════════════════',
     `  status               : ${dump.status}`,
     `  verdict              : ${dump.verdict ?? 'n/a'}`,

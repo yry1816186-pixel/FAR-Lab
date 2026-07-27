@@ -1,12 +1,12 @@
 name: Reproducibility failure
-description: 报告可复现性问题（哈希不一致 / verify 失败 / 跨语言漂移）—— FAR-Chain 的核心价值维度
+description: 报告可复现性问题（哈希不一致 / verify 失败 / 跨语言漂移）—— FAR-Lab 的核心价值维度
 title: "[repro]: "
 labels: ["reproducibility", "triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        可复现性是 FAR-Chain 的核心。请贴**实跑**命令 + 输出 + bundle/case 路径。
+        可复现性是 FAR-Lab 的核心。请贴**实跑**命令 + 输出 + bundle/case 路径。
         红线：不要手填哈希或数字；粘贴真实输出。
 
   - type: dropdown

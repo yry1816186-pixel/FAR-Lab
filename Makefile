@@ -1,7 +1,7 @@
 .PHONY: bootstrap verify demo typecheck smoke-core test test-py
 
 # =============================================================================
-# FAR-Chain Makefile
+# FAR-Lab Makefile
 # =============================================================================
 # On Windows (PowerShell): run the equivalent pnpm commands directly:
 #   pnpm install               → bootstrap (Node deps only)

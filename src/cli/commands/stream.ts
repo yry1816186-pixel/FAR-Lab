@@ -101,7 +101,7 @@ export async function runStream(argv: readonly string[]): Promise<number> {
   }
 
   if (!args.json) {
-    process.stdout.write('\n  FAR-Chain · far stream (live streaming)\n');
+    process.stdout.write('\n  FAR-Lab · far stream (live streaming)\n');
     process.stdout.write(`  question : ${args.question}\n`);
     process.stdout.write('  ─────────────────────────────────────────────────\n');
   }

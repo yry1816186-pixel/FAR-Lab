@@ -58,7 +58,7 @@ export type { ReliabilityCertificate } from '../../api/internal/court_service.ts
 function renderHuman(cert: ReliabilityCertificate): void {
   const lines = [
     '',
-    '  FAR-Chain · far court (cross-model reliability court)',
+    '  FAR-Lab · far court (cross-model reliability court)',
     '  ─────────────────────────────────────────────────',
     `  claim    : ${cert.claim}`,
     `  models   : ${cert.modelCount}`,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FAR-Chain C-ASTRO BLS transit search (P1-6 / Phase 5).
+"""FAR-Lab C-ASTRO BLS transit search (P1-6 / Phase 5).
 
 Real numpy box-least-squares period search over a 1D lightcurve CSV. Produces measured
 transit metrics (period, depth, depth signal-residue, in/out flux arrays, odd-even symmetry)

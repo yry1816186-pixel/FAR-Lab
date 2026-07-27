@@ -323,7 +323,7 @@ function HeroSuiteRoot({ report }: { readonly report: BenchmarkReportDto }) {
         <CardDescription>
           Each Science-125 problem's evidence chain is first folded into a single-chain Merkle root, then <strong className="text-foreground">folded once more</strong>,
           yielding a single cryptographic fingerprint for the entire benchmark suite — if any problem's chain is tampered with, this root fails immediately.
-          This is FAR-Chain's differentiated moat: single-chain integrity → cross-chain aggregatable auditing.
+          This is FAR-Lab's differentiated moat: single-chain integrity → cross-chain aggregatable auditing.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

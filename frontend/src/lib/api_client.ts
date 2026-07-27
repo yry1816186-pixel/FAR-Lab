@@ -1,5 +1,5 @@
 /**
- * API client — TanStack Query 5 hooks for the FAR-Chain backend (spec 24 API gateway).
+ * API client — TanStack Query 5 hooks for the FAR-Lab backend (spec 24 API gateway).
  *
  * Default base URL: http://localhost:3000 (spec 24). Override via VITE_API_BASE_URL.
  *

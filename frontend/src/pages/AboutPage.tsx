@@ -2,7 +2,7 @@
  * AboutPage — project identity, trust boundary, pillars, stack, honesty.
  *
  * Replaces the former placeholder (title/subtitle/tagline only) with substantive
- * content that reflects FAR-Chain's real identity: a falsifiability-anchored
+ * content that reflects FAR-Lab's real identity: a falsifiability-anchored
  * research-agent harness with a strict LLM-vs-deterministic-kernel trust boundary.
  *
  * Pillars are inlined in English (consistent with nav labels and OverviewPage);

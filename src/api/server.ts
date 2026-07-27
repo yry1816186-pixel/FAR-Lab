@@ -98,8 +98,8 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   await app.register(swagger, {
     swagger: {
       info: {
-        title: 'FAR-Chain API',
-        description: 'FAR-Chain 对外 HTTP API（24§5）',
+        title: 'FAR-Lab API',
+        description: 'FAR-Lab 对外 HTTP API（24§5）',
         version: '2026-06-27',
       },
       consumes: ['application/json'],
@@ -146,8 +146,17 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
 export async function startServer(
   config: ApiServerConfig,
   port = 3000,
-  host = '0.0.0.0',
+  host = '127.0.0.1',
 ): Promise<FastifyInstance> {
+  // F-5-10-005: 非 loopback host + 无 JWT = 匿名暴露计费 LLM 端点（/hypothesize 触发真实百炼费用）→ fail-closed。
+  // 安全默认改为 127.0.0.1；公开部署须显式 --host 0.0.0.0 + --protected/--jwt-secret。
+  const isLoopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
+  if (!isLoopback && config.jwtSecret === null) {
+    throw new Error(
+      `startServer fail-closed: host='${host}' 非 loopback 但 jwtSecret=null（匿名暴露 /hypothesize = 真实 LLM 计费/DoS 面）。` +
+        ` 设 jwtSecret（--protected/--jwt-secret）或绑 loopback（--host 127.0.0.1）。`,
+    );
+  }
   const app = await buildServer(config);
   await app.listen({ port, host });
 

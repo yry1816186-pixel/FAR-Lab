@@ -1,5 +1,5 @@
 name: Bug report
-description: 报告一个 FAR-Chain 的 bug（非可复现性问题——那个用 Reproducibility failure）
+description: 报告一个 FAR-Lab 的 bug（非可复现性问题——那个用 Reproducibility failure）
 title: "[bug]: "
 labels: ["bug", "triage"]
 body:
@@ -39,7 +39,7 @@ body:
     id: version
     attributes:
       label: far version 输出
-      placeholder: "far-chain 0.1.0 · git ..."
+      placeholder: "FAR-Lab 0.1.0 · git ..."
     validations:
       required: true
 

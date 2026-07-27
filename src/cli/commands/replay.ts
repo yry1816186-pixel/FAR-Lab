@@ -102,7 +102,7 @@ function renderTimeline(
     return;
   }
 
-  process.stdout.write('\n  FAR-Chain · far replay (evidence-chain time machine)\n');
+  process.stdout.write('\n  FAR-Lab · far replay (evidence-chain time machine)\n');
   process.stdout.write('  ─────────────────────────────────────────────────\n');
   for (const r of rows) {
     const linked = r.seq === 1 ? 'GENESIS' : `prev=${shortHash(r.prev_hash)}`;

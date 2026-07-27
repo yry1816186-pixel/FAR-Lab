@@ -32,6 +32,8 @@ const DATASET_FETCH_PY = join(PACKAGE_ROOT, 'repro', 'science_harness', 'dataset
 export const DATASET_HOST_WHITELIST = [
   'mast.stsci.edu',
   'heasarc.gsfc.nasa.gov',
+  // F-5-06-003: 发榜方 NADC 镜像（代码层声明支持对接；resolver 当前仅 MAST 通路，NADC 专属 VO 数据 API 对接待 T-024·BLOCKED_EXTERNAL）
+  'nadc.china-vo.org',
 ] as const;
 
 /**

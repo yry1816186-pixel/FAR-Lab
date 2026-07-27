@@ -59,7 +59,7 @@ test('① RO-Crate 结构自检:context/@graph/root/farlab 命名空间', () => 
   assert.ok(Array.isArray(metadata['@graph']) && metadata['@graph'].length > 0, '@graph 非数组');
   const root = metadata['@graph'].find((n) => n['@type'] === 'CreativeWork');
   assert.ok(root !== undefined, '缺 descriptor CreativeWork');
-  assert.match(root.name ?? '', /FAR-Chain Proof Export/);
+  assert.match(root.name ?? '', /FAR-Lab Proof Export/);
   // F-V09-07:RO-Crate 1.1 必备结构(conformsTo/about/Root Data Entity)
   assert.deepEqual(root.conformsTo, { '@id': 'https://w3id.org/ro/crate/1.1' }, 'descriptor 缺 conformsTo');
   assert.deepEqual(root.about, { '@id': './' }, 'descriptor 缺 about → Root Data Entity');

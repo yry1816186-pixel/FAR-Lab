@@ -2,7 +2,7 @@
 //
 // Phase 3 Task 3.1 — baseline 路径构造。
 //
-// 绕过 FAR-Chain 三个核心防御的「裸 LLM 裁决」路径，用于对比试验：
+// 绕过 FAR-Lab 三个核心防御的「裸 LLM 裁决」路径，用于对比试验：
 //   1. 绕过 FEC 强制门：不调用 compileFec + enforceFecMandatoryGate
 //   2. 绕过 V2 kernel：用 V1 makeVerdict（仅 supportsClaim/refutesClaim 布尔计数，无 R0-R9）
 //   3. 绕过 anti-theater：V1 makeVerdict 不接受 antiTheaterReport 参数

@@ -7,10 +7,10 @@ abstract: >-
   no LLM arbiter) and a content-addressed, append-only, cross-language-byte-identical evidence chain
   with tamper detection.
 authors:
-  - name: "FAR-Chain Contributors"
+  - name: "FAR-Lab Contributors"
     # NEEDS_HUMAN_OPERATION: fill in real author names/ORCID before academic citation use.
 type: software
-version: "0.1.0"
+version: "1.0.0"
 date-released: "2026-07-08"
 license: MIT
 repository-code: "https://github.com/yry1816186-pixel/FAR-Lab"

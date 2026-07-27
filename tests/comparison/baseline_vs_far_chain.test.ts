@@ -1,13 +1,13 @@
 // tests/comparison/baseline_vs_far_chain.test.ts
 //
-// Phase 3 Task 3.3 — baseline vs FAR-Chain 对比执行。
+// Phase 3 Task 3.3 — baseline vs FAR-Lab 对比执行。
 //
-// 对 6 条攻击语料分别跑 baseline（V1 makeVerdict）与 FAR-Chain（V2 decideFiveValueVerdict），
-// 捕获 verdict + reasonCodes，验证 FAR-Chain 检测率 >> baseline 检测率。
+// 对 6 条攻击语料分别跑 baseline（V1 makeVerdict）与 FAR-Lab（V2 decideFiveValueVerdict），
+// 捕获 verdict + reasonCodes，验证 FAR-Lab 检测率 >> baseline 检测率。
 //
 // 真实依赖链：
 //   baseline: V1 makeVerdict @ src/falsifiability/verdict.ts:76（真调·非 mock）
-//   FAR-Chain: V2 decideFiveValueVerdict @ src/falsifiability/verdict_kernel_v2.ts:253（真调·非 mock）
+//   FAR-Lab: V2 decideFiveValueVerdict @ src/falsifiability/verdict_kernel_v2.ts:253（真调·非 mock）
 //              内部调 compileFec (line 288) + R0-R9 规则 cascade + anti-theater/protocol/identifier/form/fingerprint 门
 //   生产路径: fecAppendClaim @ src/fec/orchestrator.ts:128（seed-cherry 用例真调·经 DB 事务·compileFec + enforceFecMandatoryGate + decideFiveValueVerdict）
 //
@@ -136,7 +136,7 @@ test(`loaded ${attacks.length} attack corpus files`, () => {
 const comparisonRows: ComparisonRow[] = [];
 
 for (const attack of attacks) {
-  test(`comparison: ${attack.attackId} — baseline ${attack.expected.baselineVerdict} vs FAR-Chain ${attack.expected.farVerdict}`, () => {
+  test(`comparison: ${attack.attackId} — baseline ${attack.expected.baselineVerdict} vs FAR-Lab ${attack.expected.farVerdict}`, () => {
     // --- baseline 路径：V1 makeVerdict（绕过 FEC/V2/anti-theater）---
     const baselineOutput = runBaselineVerdict({
       claim: attack.claim,
@@ -151,13 +151,13 @@ for (const attack of attacks) {
     );
     assert.match(baselineOutput.proofHash, /^[0-9a-f]{64}$/, 'baseline proofHash must be real sha256');
 
-    // --- FAR-Chain 路径：V2 decideFiveValueVerdict（含 compileFec + R0-R9 + anti-theater）---
+    // --- FAR-Lab 路径：V2 decideFiveValueVerdict（含 compileFec + R0-R9 + anti-theater）---
     const kernelInput = buildAttackKernelInput(attack);
     const farOutput = decideFiveValueVerdict(kernelInput);
     assert.equal(
       farOutput.verdict,
       attack.expected.farVerdict,
-      `${attack.attackId} FAR-Chain verdict must be ${attack.expected.farVerdict}`,
+      `${attack.attackId} FAR-Lab verdict must be ${attack.expected.farVerdict}`,
     );
     assert.equal(
       farOutput.decisiveRuleId,
@@ -274,7 +274,7 @@ test('production path: fecAppendClaim processes seed-cherry attack via full FEC 
 
 // ========== 对比结果汇总（所有攻击用例跑完后输出检测率） ==========
 
-test('comparison summary: FAR-Chain detection rate >> baseline detection rate', () => {
+test('comparison summary: FAR-Lab detection rate >> baseline detection rate', () => {
   // 本 test 在 6 条攻击 test 之后跑（node:test 串行执行同文件 test）。
   // 若 comparisonRows 未填满（test 跑序不确定），主动重算。
   if (comparisonRows.length < attacks.length) {
@@ -308,8 +308,8 @@ test('comparison summary: FAR-Chain detection rate >> baseline detection rate', 
   const farRate = (farDetections / comparisonRows.length * 100).toFixed(1);
 
   // 输出对比表（console output 供 COMPARISON_TRIAL_REPORT.md 提取）
-  console.log('\n========== BASELINE vs FAR-CHAIN COMPARISON ==========');
-  console.log('attackId                          | baseline    | FAR-Chain   | decisiveRuleId                    | reasonCodes');
+  console.log('\n========== BASELINE vs FAR-Lab COMPARISON ==========');
+  console.log('attackId                          | baseline    | FAR-Lab   | decisiveRuleId                    | reasonCodes');
   console.log('-'.repeat(160));
   for (const row of comparisonRows) {
     console.log(
@@ -318,18 +318,18 @@ test('comparison summary: FAR-Chain detection rate >> baseline detection rate', 
   }
   console.log('-'.repeat(160));
   console.log(`baseline detection rate: ${baselineDetections}/${comparisonRows.length} (${baselineRate}%)`);
-  console.log(`FAR-Chain detection rate: ${farDetections}/${comparisonRows.length} (${farRate}%)`);
+  console.log(`FAR-Lab detection rate: ${farDetections}/${comparisonRows.length} (${farRate}%)`);
   console.log('=====================================================\n');
 
-  // 核心断言：FAR-Chain 检测率必须 > baseline 检测率
+  // 核心断言：FAR-Lab 检测率必须 > baseline 检测率
   assert.ok(
     farDetections > baselineDetections,
-    `FAR-Chain detection rate (${farDetections}/${comparisonRows.length}) must exceed baseline (${baselineDetections}/${comparisonRows.length})`,
+    `FAR-Lab detection rate (${farDetections}/${comparisonRows.length}) must exceed baseline (${baselineDetections}/${comparisonRows.length})`,
   );
   assert.equal(
     farDetections,
     comparisonRows.length,
-    `FAR-Chain must detect all ${comparisonRows.length} attacks`,
+    `FAR-Lab must detect all ${comparisonRows.length} attacks`,
   );
   assert.equal(
     baselineDetections,

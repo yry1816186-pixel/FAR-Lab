@@ -1,7 +1,7 @@
 [project]
-name = "far-chain-repro"
-version = "0.0.0"
-description = "Python deterministic replay helpers for FAR-Chain."
+name = "far-lab-repro"
+version = "1.0.0"
+description = "Python deterministic replay helpers for FAR-Lab."
 requires-python = ">=3.11"
 # 依赖锁定按 FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §6.2 / §8.2 规范
 # threadpoolctl：R9 BLAS 线程限定 nthread=1（deterministic_blas_ctx 上下文管理器）
@@ -23,6 +23,9 @@ science = ["lightkurve", "astroquery"]
 [tool.pytest.ini_options]
 testpaths = ["repro/tests"]
 
+# Distribution name is far-lab-repro; the importable Python package remains
+# far_chain_repro (stable internal module name; renaming would churn 20+ import sites
+# without functional benefit). find walks repro/ and discovers the package by directory.
 [tool.setuptools.packages.find]
 where = ["repro"]
 

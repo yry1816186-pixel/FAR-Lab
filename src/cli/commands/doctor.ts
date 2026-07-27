@@ -347,7 +347,7 @@ export async function runDoctor(opts: DoctorOptions): Promise<number> {
     checkLiveQwenSmoke(root, checks);
   }
 
-  process.stdout.write('\n  FAR-Chain · far doctor (environment self-check)\n');
+  process.stdout.write('\n  FAR-Lab · far doctor (environment self-check)\n');
   process.stdout.write('  ─────────────────────────────────────────────────\n');
   for (const c of checks) {
     process.stdout.write(`  ${SYMBOL[c.status]} [${c.status.toUpperCase().padEnd(4)}] ${c.name}\n`);

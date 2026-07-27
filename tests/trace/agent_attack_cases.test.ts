@@ -10,7 +10,7 @@
  *     断言评估器对这些模拟输入的判定逻辑正确——它们 **不触达** 真实 src 防御运行时。
  *   - 当前 src 无独立的 HonestyWall / pre_provider_call gate / SourceCard-untrusted 运行时模块
  *     （over_confirmed 仅作 trace 评分 failureCode 存在·见 src/trace/grade_scorers.ts）。
- *   - 即：本文件验证「评估器逻辑正确」，**不**验证「FAR-Chain 真实防御已生效」。
+ *   - 即：本文件验证「评估器逻辑正确」，**不**验证「FAR-Lab 真实防御已生效」。
  *     真实防御的集成测试待对应运行时模块实现后补充——勿据此推断防御已上线（反虚假信心）。
  *
  * 3 个攻击用例：

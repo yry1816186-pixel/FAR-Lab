@@ -127,7 +127,7 @@ test('promptLooksLikeItNeedsVision detects Chinese vision keywords', () => {
 
 test('promptLooksLikeItNeedsVision returns false for pure text prompts', () => {
   assert.equal(promptLooksLikeItNeedsVision('请写一个排序算法'), false);
-  assert.equal(promptLooksLikeItNeedsVision('什么是FAR-Chain'), false);
+  assert.equal(promptLooksLikeItNeedsVision('什么是FAR-Lab'), false);
 });
 
 test('MultimodalGate.decide routes image input to vision', () => {

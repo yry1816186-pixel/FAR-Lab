@@ -1,13 +1,13 @@
 # Concept: Claim
 
 > A **claim** is a falsifiable scientific statement plus an executable **falsificationSpec**. A claim
-> without a falsification spec is rejected at the gate — FAR-Chain never accepts "I observed X" as a
+> without a falsification spec is rejected at the gate — FAR-Lab never accepts "I observed X" as a
 > verdictable scientific claim.
 
 ## What it solves
 
 LLM-generated hypotheses tend to be **unfalsifiable** ("the model understands physics") or
-**unmeasurable** ("performance improved"). FAR-Chain forces every claim to declare, up front, the
+**unmeasurable** ("performance improved"). FAR-Lab forces every claim to declare, up front, the
 exact metric + threshold + comparator that would refute it. If you cannot state what would prove you
 wrong, the claim is not verdictable.
 

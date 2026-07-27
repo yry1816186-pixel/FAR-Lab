@@ -1,11 +1,11 @@
 # Governance
 
-> How decisions are made in the FAR-Chain project. For release operations see
+> How decisions are made in the FAR-Lab project. For release operations see
 > `docs/governance/`.
 
 ## 1. Project vision
 
-FAR-Chain is a claim-level verification layer for AI4S scientific claims — a
+FAR-Lab is a claim-level verification layer for AI4S scientific claims — a
 fourth layer that orthogonally sits across the agent execution stack and
 verifies (not produces) claims. See `README.md`.
 

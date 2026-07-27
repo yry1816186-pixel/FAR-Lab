@@ -98,7 +98,7 @@ function main(): void {
 
     // 6. 摘要（人类可读·诚实声明 demo 边界）。
     console.log('=========================================');
-    console.log('  FAR-Chain Demo Proof Chain — REPLAY OK');
+    console.log('  FAR-Lab Demo Proof Chain — REPLAY OK');
     console.log('=========================================');
     console.log(`  claim:        ${DEMO_CLAIM_ID}`);
     console.log(`  claim text:   ${chain.claimText}`);

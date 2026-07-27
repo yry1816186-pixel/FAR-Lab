@@ -2,7 +2,7 @@
  * AppShell — main application shell with sidebar navigation + top bar + content area.
  *
  * Extracted from App.tsx. Wraps page content with:
- *   - Top navigation bar (FAR-Chain branding + nav links)
+ *   - Top navigation bar (FAR-Lab branding + nav links)
  *   - Theme toggle button
  *   - Language toggle button (zh / en)
  *   - Main content area
@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Play, Sun, Moon, Trophy, Gavel, Swords, Languages, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Play, Sun, Moon, Trophy, Gavel, Swords, Languages, Menu, X, GitCompare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { useI18n, type Locale } from '@/lib/i18n';
@@ -21,13 +21,14 @@ export interface AppShellProps {
 
 const NAV_ITEMS: ReadonlyArray<{
   readonly to: string;
-  readonly labelKey: 'nav.overview' | 'nav.demo' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard' | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation' | 'nav.report' | 'nav.about';
+  readonly labelKey: 'nav.overview' | 'nav.demo' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard' | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation' | 'nav.report' | 'nav.about' | 'nav.versions';
   readonly icon: typeof LayoutDashboard;
 }> = [
   { to: '/', labelKey: 'nav.overview', icon: LayoutDashboard },
   { to: '/demo', labelKey: 'nav.demo', icon: Play },
   { to: '/viz', labelKey: 'nav.viz', icon: Network },
   { to: '/integrity', labelKey: 'nav.integrity', icon: ShieldCheck },
+  { to: '/versions', labelKey: 'nav.versions', icon: GitCompare },
   { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: Trophy },
   { to: '/court', labelKey: 'nav.court', icon: Gavel },
   { to: '/arena', labelKey: 'nav.arena', icon: Swords },

@@ -53,7 +53,7 @@ def main() -> None:
     args = parser.parse_args()
     rows = generate()
     header = [
-        "# FAR-Chain C-ASTRO cached fixture (SYNTHETIC, not real TESS data).",
+        "# FAR-Lab C-ASTRO cached fixture (SYNTHETIC, not real TESS data).",
         f"# Deterministic box-transit: period={PERIOD}d depth={DEPTH} duration={DURATION}d noise_sigma={NOISE_SIGMA} seed={SEED}.",
         "# columns: time_d, flux_normalized, flux_err",
     ]

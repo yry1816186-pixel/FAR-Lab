@@ -1,11 +1,11 @@
 # Changelog
 
-All notable changes to FAR-Chain are documented here.
+All notable changes to FAR-Lab are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [1.0.0] — initial open-source release
 
-FAR-Chain is a **claim-level verification layer for AI-for-Science claims**: it constrains
+FAR-Lab is a **claim-level verification layer for AI-for-Science claims**: it constrains
 LLM-generated hypotheses inside a deterministic, falsifiable, tamper-detectable,
 independently-recomputable boundary. The verdict is produced by a deterministic R0–R9 kernel —
 **never** by an LLM.
@@ -50,15 +50,17 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 
 ### Added — developer & user experience
 
-- `npm install -g far-chain` works end-to-end (esbuild-bundled `dist/far.js`); the no-build source
+- `npm install -g FAR-Lab` works end-to-end (esbuild-bundled `dist/far.js`); the no-build source
   workflow (`node src/cli/far.ts`) is preserved.
 - Bilingual README (`README.md` en + `README.zh-CN.md` zh) and a full English `docs/` hierarchy:
   quickstart, installation, CLI reference, API reference, concept guides (claim / evidence / verdict
   / FEC / anti-theater / determinism / evidence-ledger / far-proof), providers, demos.
 - `scripts/install.sh` + `scripts/install.ps1` — user-space installer (zero key, zero big-data).
 - `Dockerfile` + `docker-compose.yml` — default offline demo / API, no key required.
-- `examples/tess-offline/` — a persistent self-verifiable demo bundle with a tested tamper-detection
-  walkthrough; `examples/fec/` and `examples/statistical-claim/` for FEC and statistical-claim flows.
+- `docs/demos/tess-offline.md` — offline demo walkthrough with a tested tamper-detection guide.
+  > The `examples/` tree (tess-offline bundle, fec, statistical-claim) is documented but not
+  > yet part of the shipped repository; it is a roadmap item. The tested demo path is
+  > `node src/cli/far.ts demo tess-offline` + `far export far-proof` (see README §Offline demo).
 
 ### Changed
 

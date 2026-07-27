@@ -3,7 +3,7 @@
 ## Our Pledge
 
 We as members, contributors, and leaders pledge to make participation in the
-FAR-Chain community a harassment-free experience for everyone, regardless of
+FAR-Lab community a harassment-free experience for everyone, regardless of
 age, body size, visible or invisible disability, ethnicity, sex
 characteristics, gender identity and expression, level of experience,
 education, socio-economic status, nationality, personal appearance, race,
@@ -41,7 +41,7 @@ harmful.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-**security@far-chain.example.com** (see `SECURITY.md`). All complaints will be
+**security@far-lab.example.com** (see `SECURITY.md`). All complaints will be
 reviewed and investigated promptly and fairly.
 
 > `NEEDS_MAINTAINER_ASSIGNMENT`: a dedicated conduct-reporting channel and
@@ -73,7 +73,7 @@ version 2.1, available at
 
 [homepage]: https://www.contributor-covenant.org
 
-## FAR-Chain-specific additions
+## FAR-Lab-specific additions
 
 - **Scientific integrity outranks personal stance**: claims must be
   falsifiable and independently recomputable; counter-evidence must not be

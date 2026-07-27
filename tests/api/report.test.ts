@@ -172,7 +172,7 @@ test('GET /api/v1/report/:runId HTML body contains audit report markers', async 
     assert.equal(response.statusCode, 200);
     const body = response.body;
     // 报告头 + runId 回显 + 裁决统计 + 哈希链段（renderHtml 产出的确定性标记）
-    assert.ok(body.includes('FAR-Chain Research Report'), 'must render report title');
+    assert.ok(body.includes('FAR-Lab Research Report'), 'must render report title');
     assert.ok(body.includes('run-html'), 'must echo runId');
     assert.ok(body.includes('Verdict statistics'), 'must render verdict summary section');
     assert.ok(body.includes('Hash-chain verification'), 'must render hash-chain section');

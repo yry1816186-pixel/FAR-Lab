@@ -1,4 +1,4 @@
-# FAR-Chain Documentation Index
+# FAR-Lab Documentation Index
 
 ## Getting Started
 
@@ -45,3 +45,5 @@
 | [../CHANGELOG.md](../CHANGELOG.md) | Release changelog |
 | [../SUPPORT.md](../SUPPORT.md) | Support channels |
 | [../MAINTAINERS.md](../MAINTAINERS.md) | Maintainer list |
+| [governance/](governance/) | Release operations + open-source plan |
+| [charter/ULTIMATE_EXECUTION_PRIME.md](charter/ULTIMATE_EXECUTION_PRIME.md) | Full lifecycle execution charter (Phase A–H) |

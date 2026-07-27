@@ -1,6 +1,6 @@
-# FAR-Chain Frontend
+# FAR-Lab Frontend
 
-FAR-Chain Web UI — Falsifiable Auditable Research-Chain 仪表盘。
+FAR-Lab Web UI — Falsifiable Auditable Research-Chain 仪表盘。
 
 基于 spec 27（开源治理与社区）§7 前端技术栈：React 18 + Vite 5 + shadcn/ui + Tailwind 3 + D3.js 7 + React Flow 11 + TanStack Query 5。
 
@@ -158,4 +158,4 @@ cd frontend && npm run dev     # http://localhost:5173
 
 ## 许可证
 
-Apache-2.0（与 FAR-Chain 主项目一致）。
+Apache-2.0（与 FAR-Lab 主项目一致）。

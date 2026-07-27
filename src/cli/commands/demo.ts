@@ -1,5 +1,5 @@
 // src/cli/commands/demo.ts
-// far demo —— 一键展示 FAR-Chain 核心能力。
+// far demo —— 一键展示 FAR-Lab 核心能力。
 //
 // 评审 / 新用户一条命令看到系统运转（全程 offline，无需凭据）：
 //   1. 确定性裁决内核 —— 14 Golden Vectors 经真实 R0-R9 kernel
@@ -21,7 +21,7 @@ const bannerLine = (text: string): string => `║  ${text.padEnd(BANNER_WIDTH - 
 
 const BANNER = `
 ╔${'═'.repeat(BANNER_WIDTH)}╗
-${bannerLine('FAR-Chain · Falsification-Anchored Research Chain — one-click demo')}
+${bannerLine('FAR-Lab · Falsification-Anchored Research Chain — one-click demo')}
 ${bannerLine('Claim-level AI4S verification (R0-R9 kernel · tamper-evident · anti-theater)')}
 ╚${'═'.repeat(BANNER_WIDTH)}╝
 `;

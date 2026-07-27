@@ -11,7 +11,7 @@
 
 **DO NOT open public GitHub issues for security vulnerabilities.**
 
-Email: security@far-chain.example.com
+Email: security@far-lab.example.com
 
 Response SLA:
 - Acknowledgement: 48 hours
@@ -59,7 +59,7 @@ docs, CI config, scripts, comments, or commit messages):
 
 1. **Rotate the secret immediately** (regenerate the API key / token).
 2. **Purge from git history** using `git filter-branch` or BFG Repo-Cleaner.
-3. **Notify the security contact** (security@far-chain.example.com).
+3. **Notify the security contact** (security@far-lab.example.com).
 4. Do NOT just add a new commit removing the file — the secret remains in history.
 
 ---
@@ -131,7 +131,7 @@ follow the secret rules in this file:
 
 ## License Integrity
 
-The project license (`LICENSE`) is currently **MIT** (`Copyright (c) 2026 FAR-Chain
+The project license (`LICENSE`) is currently **MIT** (`Copyright (c) 2026 FAR-Lab
 Contributors`). This is an irreversible legal decision:
 
 - **Agents must never modify `LICENSE`** without explicit human confirmation.

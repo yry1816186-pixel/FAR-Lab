@@ -28,7 +28,7 @@ node src/cli/far.ts status     # project status
 ## Security vulnerabilities
 
 **Do not open a public issue.** See `SECURITY.md` for private disclosure
-(`security@far-chain.example.com`).
+(`security@far-lab.example.com`).
 
 ## Response time
 
@@ -37,7 +37,7 @@ committed yet.
 
 ## Out of scope
 
-FAR-Chain does **not**:
+FAR-Lab does **not**:
 
 - prove scientific truth
 - provide physical tamper-proofing guarantees

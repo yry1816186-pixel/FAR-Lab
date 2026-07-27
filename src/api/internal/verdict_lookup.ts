@@ -18,18 +18,21 @@ import { getVerdict } from '../../falsifiability/repository.ts';
 import type { HonestVerdictNode } from '../type_aliases.ts';
 
 /**
- * 按 evidenceId 查询最早的判定节点。
+ * 按 evidenceId 查询当前活跃（superseded_by IS NULL）的最新判定节点。
+ *
+ * FUSION-OS-12：与 getActiveVerdicts（repository.ts:197）语义对齐——只返回未被取代的裁决。
+ * 旧实现 ORDER BY created_at ASC 返回最旧裁决，会把已被 supersede 的旧裁决当“诚实裁决”返回（F-5-10-003 correctness bug）。
  *
  * @param db 数据库实例
  * @param evidenceId 证据 ID
- * @returns 判定节点（无关联记录时返回 null）
+ * @returns 当前活跃判定节点（无活跃记录时返回 null）
  */
 export function fetchHonestVerdictByEvidenceId(
   db: Database,
   evidenceId: string,
 ): HonestVerdictNode | null {
   const row = db
-    .prepare('SELECT verdict_id FROM verdict_nodes WHERE evidence_id = ? ORDER BY created_at ASC LIMIT 1')
+    .prepare('SELECT verdict_id FROM verdict_nodes WHERE evidence_id = ? AND superseded_by IS NULL ORDER BY created_at DESC, verdict_id DESC LIMIT 1')
     .get(evidenceId) as { verdict_id?: string } | undefined;
   if (row === undefined || row.verdict_id === undefined) {
     return null;

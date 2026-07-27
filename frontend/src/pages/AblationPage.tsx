@@ -72,7 +72,7 @@ const BASELINES: readonly BaselineDef[] = [
   },
   {
     key: 'far-chain',
-    label: 'FAR-Chain Full',
+    label: 'FAR-Lab Full',
     description: 'Full 6-stage FSM + evidence chain + falsification gate + reproducibility hash',
     mode: 'full',
     researchInputPrefix: '',
@@ -89,7 +89,7 @@ const BASELINES: readonly BaselineDef[] = [
 //     verdict/iterations 的「数值差异」在 offline 下不存在（真实后端相同）。
 //   - 唯一可在 offline 下真实对比的是**方法定义层面的结构性能力存在性**
 //     （定性 ✓/✗·非编造数值）：每条基线按其方法定义具备或不具备某项能力。
-//   - 此矩阵是 FAR-Chain 真实护城河的可视化锚点（hash 证据链 / 可证伪规格 /
+//   - 此矩阵是 FAR-Lab 真实护城河的可视化锚点（hash 证据链 / 可证伪规格 /
 //     接 calc_bridge 的复现哈希 / 六阶段 FSM / 门控裁决），与 verdict 准确度无关。
 
 interface CapabilityDim {
@@ -113,10 +113,10 @@ const CAPABILITY_DIMENSIONS: readonly CapabilityDim[] = [
  * 依据方法定义（非运行时数值）：
  *   - random：纯随机猜测·不具备任何结构化能力。
  *   - search：仅检索·有证据但不构建 hash 链/不推理/不证伪/不复现/不门控。
- *   - direct-llm：单次 LLM 推理·有结论但无任何 FAR-Chain 结构化机制。
- *   - far-chain：完整六阶段 FSM·全部 6 项结构性能力具备。
+ *   - direct-llm：单次 LLM 推理·有结论但无任何 FAR-Lab 结构化机制。
+ *   - FAR-Lab：完整六阶段 FSM·全部 6 项结构性能力具备。
  *
- * 真实性注记：reproducibleHash 对 far-chain 标 ✓ 指**机制存在**（设计接 calc_bridge）；
+ * 真实性注记：reproducibleHash 对 FAR-Lab 标 ✓ 指**机制存在**（设计接 calc_bridge）；
  *   offline demo 路径用占位 hash（0×64·非生产复现锚点）——生产路径须显式注入 reproHashProvider。
  */
 const BASELINE_CAPABILITIES: Readonly<Record<string, Readonly<Record<string, boolean>>>> = {
@@ -285,7 +285,7 @@ export default function AblationPage() {
       <header>
         <h1 className="text-3xl font-bold tracking-tight">Ablation study</h1>
         <p className="mt-1 text-muted-foreground">
-          Compares the full FAR-Chain pipeline against simplified baselines on tamper-detectability, independent re-computability, and falsifiability
+          Compares the full FAR-Lab pipeline against simplified baselines on tamper-detectability, independent re-computability, and falsifiability
         </p>
       </header>
 
@@ -546,7 +546,7 @@ export default function AblationPage() {
                   <CardTitle className="text-lg">Falsifiability support</CardTitle>
                 </div>
                 <CardDescription>
-                  Whether each baseline emits a structured falsificationSpec (a falsifiable claim) — FAR-Chain's core differentiator
+                  Whether each baseline emits a structured falsificationSpec (a falsifiable claim) — FAR-Lab's core differentiator
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -567,11 +567,11 @@ export default function AblationPage() {
         </section>
       )}
 
-      {/* ---- Summary: FAR-Chain advantages ---- */}
+      {/* ---- Summary: FAR-Lab advantages ---- */}
       {allComplete && hasAnyResult && (
         <section aria-labelledby="summary-heading">
           <h2 id="summary-heading" className="mb-4 text-xl font-semibold">
-            FAR-Chain advantages over the baselines
+            FAR-Lab advantages over the baselines
           </h2>
           <p className="mb-4 text-sm text-muted-foreground">
             The comparison below focuses on tamper-detectability, independent re-computability, and falsifiability — not only on conclusion accuracy.
@@ -587,7 +587,7 @@ export default function AblationPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  FAR-Chain's hash evidence chain spans the full 6-stage FSM (call_records are hash-linked one by one). The three baselines also land call_records via the offline FSM, but by their method definition they do not build a cross-stage structured evidence chain — see the capability matrix above for capability attribution.
+                  FAR-Lab's hash evidence chain spans the full 6-stage FSM (call_records are hash-linked one by one). The three baselines also land call_records via the offline FSM, but by their method definition they do not build a cross-stage structured evidence chain — see the capability matrix above for capability attribution.
                 </p>
                 {farChainResult?.status === 'success' && farChainResult.data !== null && (
                   <div className="rounded bg-muted px-3 py-2">
@@ -617,7 +617,7 @@ export default function AblationPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  FAR-Chain's reproHash is designed to connect to the 03 calc_bridge seven-component hash (production path; independently re-computable). The current offline demo uses a placeholder hash (0×64; satisfies only the chain-structure constraint; not a production reproducibility anchor); the three baselines have no re-computation mechanism by method definition.
+                  FAR-Lab's reproHash is designed to connect to the 03 calc_bridge seven-component hash (production path; independently re-computable). The current offline demo uses a placeholder hash (0×64; satisfies only the chain-structure constraint; not a production reproducibility anchor); the three baselines have no re-computation mechanism by method definition.
                 </p>
                 {farChainResult?.status === 'success' && farChainResult.data !== null && (
                   <div className="rounded bg-muted px-3 py-2">
@@ -652,7 +652,7 @@ export default function AblationPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Every FAR-Chain hypothesis is bound to an explicit falsificationSpec, enabling meaningful falsification verdicts such as REFUTED / DEGRADED_SCOPE. The baselines have no structured falsification standard.
+                  Every FAR-Lab hypothesis is bound to an explicit falsificationSpec, enabling meaningful falsification verdicts such as REFUTED / DEGRADED_SCOPE. The baselines have no structured falsification standard.
                 </p>
                 {farChainResult?.status === 'success' && farChainResult.data !== null && (
                   <div className="rounded bg-muted px-3 py-2">
@@ -699,10 +699,10 @@ function HonestyWallSection() {
           All four baselines go through the <code className="font-mono">offline_replay</code> adapter (model-neutral; no real LLM calls). The fixture matches only by <code className="font-mono">stageId</code> and does not read the research-question text, so the Random / Search / Direct LLM quick baselines produce <strong>the same deterministic loopState</strong>.
         </p>
         <p>
-          The only real runtime difference is that <strong>FAR-Chain uses mode=full</strong> (multi-iteration FSM); the other three use mode=quick (single pass, then terminate). The three baselines showing identical output below is an honest reflection, not a defect.
+          The only real runtime difference is that <strong>FAR-Lab uses mode=full</strong> (multi-iteration FSM); the other three use mode=quick (single pass, then terminate). The three baselines showing identical output below is an honest reflection, not a defect.
         </p>
         <p>
-          FAR-Chain's real moat lies <strong>not in the verdict value</strong> but in structural capabilities (hash evidence chain / falsification spec / calc_bridge-linked reproducibility hash / gated verdict) — see the capability matrix below.
+          FAR-Lab's real moat lies <strong>not in the verdict value</strong> but in structural capabilities (hash evidence chain / falsification spec / calc_bridge-linked reproducibility hash / gated verdict) — see the capability matrix below.
         </p>
         <p>
           Quantifying the capability differences among Random / Search / Direct LLM requires plugging in a real LLM provider (competition_aliyun_qwen), which is beyond the scope of the offline demo.

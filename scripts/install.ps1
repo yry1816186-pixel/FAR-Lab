@@ -1,10 +1,10 @@
-# FAR-Chain installer (Windows PowerShell · 终端用户向)
+# FAR-Lab installer (Windows PowerShell · 终端用户向)
 #
 # 用法：
 #   irm https://github.com/yry1816186-pixel/FAR-Lab/releases/latest/download/install.ps1 | iex
 #   （Release 发布前 · NEEDS_RELEASE_PUBLICATION：改用 git clone 开发者安装，见 README）
 #
-# 红线：不写 API key、不下载大数据、不启动 GPU/云、不要求管理员（装到 %USERPROFILE%\.far-chain）。
+# 红线：不写 API key、不下载大数据、不启动 GPU/云、不要求管理员（装到 %USERPROFILE%\.FAR-Lab）。
 # 失败 fail-closed，每步可诊断。
 # 技术栈：Node ≥24 + pnpm（主）；Python 3.11+（可选科研轴，缺失只 WARN）。
 
@@ -15,7 +15,7 @@ function Ok($m)   { Write-Host "✓ $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "! WARN: $m" -ForegroundColor Yellow }
 function Fail($m) { Write-Host "✗ ERROR: $m" -ForegroundColor Red; exit 1 }
 
-$InstallDir = if ($env:FAR_CHAIN_HOME) { $env:FAR_CHAIN_HOME } else { Join-Path $env:USERPROFILE '.far-chain' }
+$InstallDir = if ($env:FAR_CHAIN_HOME) { $env:FAR_CHAIN_HOME } else { Join-Path $env:USERPROFILE '.FAR-Lab' }
 $RepoUrl    = 'https://github.com/yry1816186-pixel/FAR-Lab.git'
 $NodeMin    = 24
 
@@ -51,7 +51,7 @@ if (Test-Path (Join-Path $InstallDir '.git')) {
   try { git -C $InstallDir fetch --depth 1 origin; git -C $InstallDir reset --hard '@{u}' }
   catch { Warn "update 失败（可能有本地改动；cd $InstallDir; git status）" }
 } else {
-  Info "clone FAR-Chain → $InstallDir"
+  Info "clone FAR-Lab → $InstallDir"
   try { git clone --depth 1 $RepoUrl $InstallDir }
   catch { Fail "clone 失败：检查网络 / $RepoUrl" }
 }
@@ -106,7 +106,7 @@ catch { Warn "far doctor 报告非全绿（见上方诊断；WARN 不阻塞 offl
 
 # ── 9. 下一步 ──
 Write-Host ""
-Ok "FAR-Chain 安装完成  $InstallDir"
+Ok "FAR-Lab 安装完成  $InstallDir"
 Write-Host ""
 Write-Host "  下一步（全程 offline·无需 API key）：" -ForegroundColor White
 Write-Host "    far version" -ForegroundColor Cyan

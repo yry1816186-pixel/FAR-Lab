@@ -1,6 +1,6 @@
 # Installation
 
-FAR-Chain's primary language is TypeScript (Node ≥ 24); the research verification axis uses Python
+FAR-Lab's primary language is TypeScript (Node ≥ 24); the research verification axis uses Python
 3.11+. The frontend is a separate npm workspace.
 
 ## Requirements
@@ -33,7 +33,7 @@ far demo tess-offline
 ```
 
 Script behavior (red lines):
-- Installs into the user directory (`~/.far-chain` / `%USERPROFILE%\.far-chain`); **never requires root / admin**.
+- Installs into the user directory (`~/.FAR-Lab` / `%USERPROFILE%\.FAR-Lab`); **never requires root / admin**.
 - Detects Node ≥ 24 / pnpm / Python / git / Docker and prints clear fix instructions for anything missing.
 - **Writes no API key**, **downloads no large datasets**, **starts no GPU/cloud**.
 - Runs `far doctor` after install and prints the next step.
@@ -92,7 +92,7 @@ cd frontend && npm install && npm run dev      # terminal 2: Vite @ http://local
 ```
 
 The frontend defaults to `localhost:3000` (override with `VITE_API_BASE_URL`). Production mode:
-`pnpm api --persist ./far-chain.db --protected` (needs `FAR_JWT_SECRET`).
+`pnpm api --persist ./FAR-Lab.db --protected` (needs `FAR_JWT_SECRET`).
 
 ## Troubleshooting
 

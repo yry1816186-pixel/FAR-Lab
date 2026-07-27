@@ -1,4 +1,4 @@
-# FAR-Chain docker-compose
+# FAR-Lab docker-compose
 #
 # 默认 service 全部 offline（无需 API key）：
 #   docker compose up far-demo     # 一次性 offline TESS demo（裁决内核 + 篡改检测演示）
@@ -12,13 +12,13 @@
 services:
   far-demo:
     build: .
-    image: far-chain:dev
+    image: far-lab:dev
     command: ["demo", "tess-offline"]
     # 一次性 offline demo：14 Golden Vectors + C-ASTRO-0001 TESS 裁决 + 防篡改密封
 
   far-api:
     build: .
-    image: far-chain:dev
+    image: far-lab:dev
     command: ["api", "--host", "0.0.0.0", "--port", "3000"]
     ports:
       - "3000:3000"

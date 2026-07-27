@@ -238,7 +238,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
   });
 
   it('useReport 以 GET /api/v1/report/:runId 调用（HTML 字符串·非 JSON）', async () => {
-    const html = '<!DOCTYPE html><html><body><h1>FAR-Chain Report</h1></body></html>';
+    const html = '<!DOCTYPE html><html><body><h1>FAR-Lab Report</h1></body></html>';
     vi.mocked(fetch).mockResolvedValue(textResponse(html));
     const { result } = renderHook(() => useReport('run-1'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

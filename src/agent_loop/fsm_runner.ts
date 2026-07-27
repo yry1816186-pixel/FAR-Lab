@@ -126,13 +126,19 @@ export interface RunAgentLoopArgs {
   readonly resumeStorePath?: string;
   /** 可选：每阶段 artifact 入链后回调（流式输出用·向后兼容·默认不调）。 */
   readonly onArtifact?: (artifact: StageArtifact) => void;
+  /**
+   * IC-15 T1'（V2 裁决软建议）：上一次完整 runAgentLoop 调用的 verdict kind。
+   * 可选；缺省 = undefined → stage6 prompt 不注入 verdict hint（字节等同基线·回归兼容）。
+   * 仅传 5 值枚举本身；软建议非硬驱动（不触发自动 regen 循环，防 p-hacking）。
+   */
+  readonly priorVerdictKind?: import('../schema/enums.ts').Verdict;
 }
 
 
 // ---------- runAgentLoop 主循环 ----------
 
 /**
- * runAgentLoop — FAR-Chain 科研循环主入口。
+ * runAgentLoop — FAR-Lab 科研循环主入口。
  *
  * 六阶段确定性 FSM：
  *   [1] understanding → [2] integration → [3] hypothesis (gate) →
@@ -167,6 +173,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
 
   // baseCtx 是循环外不变的 StageContext 部分（循环内部状态字段在每轮重新构造）
   // G3(IC-02):researchInput 为外部内容,进循环前统一 untrusted 包装+指令剥离(数据≠指令)
+  // IC-15 T1':priorVerdictKind 可选透传（undefined 时 stage6 行为字节等同基线）
   const baseCtx: Omit<StageContext,
     'iteration' | 'prevArtifacts' | 'feedbackSignal' | 'tokensConsumed'
   > = {
@@ -180,6 +187,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
     appendOptions: args.appendOptions,
     evidenceLogDb: args.evidenceLogDb,
     termination,
+    ...(args.priorVerdictKind !== undefined ? { priorVerdictKind: args.priorVerdictKind } : {}),
   };
 
   try {

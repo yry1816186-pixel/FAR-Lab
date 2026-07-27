@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FAR-Chain venv sandbox runner (P1-6).
+"""FAR-Lab venv sandbox runner (P1-6).
 
 Protocol (stdin -> stdout, both JSON):
   Request:  {"script": "<python source>", "seed": 42, "networkPolicy": "off",

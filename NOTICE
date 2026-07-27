@@ -4,8 +4,8 @@ FAR-Lab 以 MIT License 发布（见根目录 LICENSE）。本文件登记第三
 
 ## 当前状态（2026-07-20，S6 裁决 ADR-020）
 
-- 主包（far-chain）：MIT（package.json + LICENSE）
-- 前端（far-chain-frontend）：MIT（2026-07-20 起与根一致；此前误标 Apache-2.0，DEBT-02 已闭环）
+- 主包（far-lab）：MIT（package.json + LICENSE）
+- 前端（far-lab-frontend）：MIT（2026-07-20 起与根一致；此前误标 Apache-2.0，DEBT-02 已闭环）
 
 ## 第三方依赖许可（生产依赖，按 package.json 声明）
 
