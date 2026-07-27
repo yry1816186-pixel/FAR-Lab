@@ -118,7 +118,7 @@ export type StatusLabel =
   | 'NEEDS_EXTERNAL_VERIFICATION';
 
 export interface FarStatusJson {
-  readonly project: 'FAR-Chain';
+  readonly project: 'far-chain';
   readonly generatedAt: string;
   readonly commit: {
     readonly sha: string | null;
@@ -211,7 +211,7 @@ export function toStatusJson(dump: StatusDump, generatedAt = new Date().toISOStr
   const commitSha = /^[0-9a-f]{40}$/.test(dump.commitSha) ? dump.commitSha : null;
   const isDirty = readGitDirty();
   return {
-    project: 'FAR-Chain',
+    project: 'far-chain',
     generatedAt,
     commit: {
       sha: commitSha,

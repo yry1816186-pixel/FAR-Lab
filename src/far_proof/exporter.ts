@@ -293,7 +293,7 @@ function writeRoCrateMetadata(
         conformsTo: { '@id': 'https://w3id.org/ro/crate/1.1' },
         about: { '@id': './' },
         identifier: `far-proof-${runId}`,
-        name: `FAR-Chain Proof Export: ${runId}`,
+        name: `FAR-Lab Proof Export: ${runId}`,
         description:
           'Falsifiable, Auditable, Reproducible research evidence package. ' +
           'farlab: namespace extends RO-Crate 1.1 for verdict/FEC semantics (see #farlab_mapping_losses). ' +
@@ -306,9 +306,9 @@ function writeRoCrateMetadata(
         // F-V09-07 修复:Root Data Entity(RO-Crate 1.1 强制;'./' 数据集根)
         '@id': './',
         '@type': 'Dataset',
-        name: `FAR-Chain Proof Export: ${runId}`,
+        name: `FAR-Lab Proof Export: ${runId}`,
         description:
-          'FAR-Chain .far-proof evidence package root dataset (proof envelopes, call_records chain, ' +
+          'FAR-Lab .far-proof evidence package root dataset (proof envelopes, call_records chain, ' +
           'claim graph, lifecycle events, RO-Crate/PROV metadata).',
         datePublished: exportedAt,
         license: 'MIT',
@@ -401,18 +401,18 @@ function writeRoCrateMetadata(
 
 function writeProvTtl(dir: string, runId: string, exportedAt: string): string {
   // 修复：runId 必须在两个引用处都插值（曾因单引号字符串导致 ${runId} 字面量残留·bug）。
-  const activityIri = `<urn:far-chain:run:${runId}>`;
+  const activityIri = `<urn:FAR-Lab:run:${runId}>`;
   const ttl = [
     '@prefix prov: <http://www.w3.org/ns/prov#> .',
     '@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .',
     '',
     `${activityIri} a prov:Activity ;`,
     `    prov:startedAtTime "${exportedAt}"^^xsd:dateTime ;`,
-    '    prov:generated <urn:far-chain:proof:export> .',
+    '    prov:generated <urn:FAR-Lab:proof:export> .',
     '',
-    '<urn:far-chain:proof:export> a prov:Entity ;',
+    '<urn:FAR-Lab:proof:export> a prov:Entity ;',
     `    prov:wasGeneratedBy ${activityIri} ;`,
-    '    prov:description "FAR-Chain ProofEnvelope export bundle"@en .',
+    '    prov:description "FAR-Lab ProofEnvelope export bundle"@en .',
     '',
   ].join('\n');
   const filePath = join(dir, 'prov.ttl');
@@ -485,7 +485,7 @@ function writeReadmeReplay(
   verification: VerifyResult,
 ): string {
   const content = [
-    '# FAR-Chain Proof Export — Replay Instructions',
+    '# FAR-Lab Proof Export — Replay Instructions',
     '',
     `**Run ID**: \`${runId}\``,
     `**Model Snapshot**: \`${modelSnapshot}\``,
@@ -497,7 +497,7 @@ function writeReadmeReplay(
     '',
     '```bash',
     '# 0. Fresh clone + checkout the recorded HEAD (code snapshot lock)',
-    `git clone <repo> && cd far-chain`,
+    `git clone <repo> && cd FAR-Lab`,
     `git checkout ${gitCommitSha}`,
     '',
     '# 1. Install dependencies (frozen — lock files are part of the proof)',
@@ -545,7 +545,7 @@ function writeReadmeReplay(
     '',
     '## Honesty Declaration',
     '',
-    'FAR-Chain produces **reliability evidence packages**, not proofs of scientific truth. ',
+    'FAR-Lab produces **reliability evidence packages**, not proofs of scientific truth. ',
     'Every claim is accompanied by its falsification spec, verdict, audit trail, and ',
     'cryptographic hash chain — so a reviewer can independently verify:',
     '',

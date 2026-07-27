@@ -1,4 +1,4 @@
-<!-- FAR-Chain PR template — 诚实优先：不伪造通过、不删测试、标 NEEDS_* -->
+<!-- FAR-Lab PR template — 诚实优先：不伪造通过、不删测试、标 NEEDS_* -->
 
 ## 这条 PR 做了什么
 

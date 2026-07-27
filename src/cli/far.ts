@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // src/cli/far.ts
-// 职责：FAR-Chain CLI 入口（FI-1 · far 命令家族）。
+// 职责：FAR-Lab CLI 入口（FI-1 · far 命令家族）。
 // CLI 命令集 + far status + far verify。
 //
 // 已实装子命令：`far status`（01 §5）+ `far verify`（04 §5 · FI-9 第三方独立重算）
@@ -693,10 +693,10 @@ function commandHelp(command: string): string {
       break;
     }
   }
-  return 'FAR-Chain CLI — ' + command + '\n\n' + lines.slice(startIdx, endIdx).join('\n').trimEnd();
+  return 'FAR-Lab CLI — ' + command + '\n\n' + lines.slice(startIdx, endIdx).join('\n').trimEnd();
 }
 
-const HELP_TEXT = `FAR-Chain CLI — claim-level verification for AI4S scientific claims
+const HELP_TEXT = `FAR-Lab CLI — claim-level verification for AI4S scientific claims
 
 USAGE:
   far version                        print version + git HEAD
@@ -755,7 +755,7 @@ USAGE:
           start the REST API server (Fastify; the frontend defaults to localhost:3000)
     --port <n>      listen port (default 3000, aligned with frontend api_client.ts; overridable via PORT)
     --db <path>     DB path (default :memory: ephemeral, fresh each start)
-    --persist <p>   persist to a file (e.g. ./far-chain.db; survives restarts)
+    --persist <p>   persist to a file (e.g. ./FAR-Lab.db; survives restarts)
     --no-seed       do not seed the demo verdict (default seeds C-ASTRO-0001 UNTESTED; the legacy seed
                     injects no statistics so rule R6 does not fire; meant for frontend display)
     --protected     enable JWT auth (needs FAR_JWT_SECRET; default offline anonymous demo)

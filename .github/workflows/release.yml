@@ -1,4 +1,4 @@
-# FAR-Chain Release — tag v* 触发的发布自动化
+# FAR-Lab Release — tag v* 触发的发布自动化
 #
 # 触发条件：maintainer 执行 `git tag v0.1.0 && git push origin v0.1.0`（首次需人类操作）。
 #
@@ -168,7 +168,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: FAR-Chain ${{ env.RELEASE_TAG }}
+          name: FAR-Lab ${{ env.RELEASE_TAG }}
           body_path: staging/release-body.md
           generate_release_notes: true   # CHANGELOG body 之后追加 commit/PR 自动 notes
           files: |

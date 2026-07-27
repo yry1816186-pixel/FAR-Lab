@@ -196,7 +196,7 @@ test('runExportReceipt writes Markdown receipt', () => {
 
     assert.equal(exitCode, 0);
     const markdown = readFileSync(outPath, 'utf8');
-    assert.match(markdown, /^# FAR-Chain Trust Receipt/m);
+    assert.match(markdown, /^# FAR-Lab Trust Receipt/m);
     assert.match(markdown, /## Limitations/);
     assert.match(markdown, /proofHash:/);
   } finally {

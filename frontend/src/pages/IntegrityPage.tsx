@@ -599,7 +599,7 @@ function CrossLangHashVerifier() {
           Enter two 64-hex nodes →{' '}
           <strong className="text-foreground">compute combine in real time with browser Web Crypto</strong>{' '}
           = sha256(left + right). Compared against the Node + Python golden, this proves all three produce byte-identical hashes —
-          the visual evidence of FAR-Chain's cross-language determinism.
+          the visual evidence of FAR-Lab's cross-language determinism.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -845,9 +845,9 @@ interface HonestyStatement {
 
 const HONESTY_STATEMENTS: readonly HonestyStatement[] = [
   {
-    title: 'Verdict re-entry not yet implemented',
+    title: 'Verdict prompt-level soft injection implemented; kernel-level hard trigger still V2',
     detail:
-      'Wiring the verdict after 6-stage convergence is done (writes verdict_nodes + evidence_log anchor rows), but the "re-iteration" triggered by DEGRADED_SCOPE / INCONCLUSIVE is not yet wired — the hook is in place but assertTerminated is not connected.',
+      'IC-15 T1\' (2026-07-27): stage6_feedback buildFeedbackMessages now accepts an optional priorVerdictKind and injects it as soft advice via sanitizeExternalContent. The deterministic verdict kernel is NOT moved into the FSM loop — that remains a V2 roadmap item (fsm_runner.ts:10-14). REFUTED does NOT auto-trigger hypothesis regeneration (p-hacking prevention). Use the Versions page (/versions) for side-by-side verdict comparison.',
   },
   {
     title: 'Merkle leaves cover only call_records',

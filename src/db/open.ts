@@ -55,6 +55,11 @@ function assertPragmaBaseline(db: Database.Database, dbPath: string): void {
       throw new Error(`G5 配置基线违反: journal_mode=${String(jm)}(期望 wal) @ ${dbPath}`);
     }
   }
+  // F-5-10-002: 显式固化 busy_timeout（防依赖 better-sqlite3 隐式默认·换库即静默退化）
+  const bt = db.pragma('busy_timeout', { simple: true }) as number;
+  if (bt !== 5000) {
+    throw new Error(`G5 配置基线违反: busy_timeout=${String(bt)}(期望 5000ms) @ ${dbPath}`);
+  }
 }
 
 /**
@@ -78,6 +83,7 @@ export function openFarDb(dbPath: string, options: OpenFarDbOptions = {}): Datab
       db.pragma('journal_mode = WAL');
       db.pragma('synchronous = FULL');
       db.pragma('foreign_keys = ON');
+      db.pragma('busy_timeout = 5000');
     } catch (error) {
       db.close();
       throw new DatabaseIntegrityError(

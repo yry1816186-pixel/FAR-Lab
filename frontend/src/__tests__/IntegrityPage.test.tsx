@@ -149,7 +149,7 @@ describe('IntegrityPage', () => {
   it('HonestyWall：诚实声明条目渲染（已知边界如实标注）', () => {
     renderWithQueryClient(<IntegrityPage />);
     expect(screen.getByTestId('honesty-wall')).toBeInTheDocument();
-    expect(screen.getByTestId('honesty-wall')).toHaveTextContent('Verdict re-entry not yet implemented');
+    expect(screen.getByTestId('honesty-wall')).toHaveTextContent('Verdict prompt-level soft injection implemented');
     expect(screen.getByTestId('honesty-wall')).toHaveTextContent('Known gaps remain in the cross-language numeric domain');
   });
 

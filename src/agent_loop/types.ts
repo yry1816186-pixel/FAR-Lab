@@ -299,6 +299,14 @@ export interface StageContext {
   readonly feedbackSignal: FeedbackSignal | null; // [6]→[3] 回灌（仅 stage3 消费）
   readonly termination: TerminationCriteria;
   readonly tokensConsumed: number; // 累计已耗 token（算力预算闸）
+  /**
+   * IC-15 T1'（V2 裁决软建议）：上一次完整 runAgentLoop 调用产出的 verdict kind。
+   * 可选；缺省（首轮 / 无先验裁决）= undefined → stage6 prompt 不注入 verdict hint。
+   * 遵最小信息原则：仅传 5 值枚举本身，不传 reasonCode/metricValue/threshold
+   * （防 LLM 反推裁决逻辑构造"刚好过"假设·security-auditor C2 缓解）。
+   * 软建议语义：注入时 prompt 明示"仅供参考，你仍独立判断 continueIteration"。
+   */
+  readonly priorVerdictKind?: Verdict;
 }
 
 /**

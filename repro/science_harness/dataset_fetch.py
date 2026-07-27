@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FAR-Chain online dataset fetcher (P1-6).
+"""FAR-Lab online dataset fetcher (P1-6).
 
 Protocol (stdin -> stdout, both JSON):
   Request:  {"resolver": "lightkurve"|"astroquery.mast", "host": "...",
@@ -27,7 +27,7 @@ import sys
 import traceback
 from datetime import datetime, timezone
 
-ALLOWED_HOSTS = {"mast.stsci.edu", "heasarc.gsfc.nasa.gov"}
+ALLOWED_HOSTS = {"mast.stsci.edu", "heasarc.gsfc.nasa.gov", "nadc.china-vo.org"}
 
 
 def emit(result: dict[str, object]) -> None:

@@ -1,5 +1,5 @@
 // src/cli/commands/api.ts
-// far api —— 启动 FAR-Chain REST API server（Fastify）。
+// far api —— 启动 FAR-Lab REST API server（Fastify）。
 //
 // 前端（frontend/）默认连 http://localhost:3000/api/v1（api_client.ts·spec 24）。
 // 本命令让全栈一键可跑：`pnpm api`（或 `far api`）起后端，`cd frontend && npm run dev` 起前端。
@@ -14,6 +14,7 @@ import { resolveGitCommitSha } from '../git_commit_sha.ts';
 
 export interface ApiArgs {
   readonly port: number;
+  readonly host: string;
   readonly dbPath: string;
   readonly seedDemo: boolean;
   readonly jwtSecret: string | null;
@@ -21,6 +22,7 @@ export interface ApiArgs {
 
 export function parseApiArgs(argv: readonly string[]): ApiArgs {
   let port = 3000;
+  let host = '127.0.0.1';
   let dbPath = ':memory:';
   let seedDemo = true;
   let jwtSecret: string | null = null;
@@ -31,12 +33,16 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
       if (Number.isFinite(v) && v > 0) port = v;
       continue;
     }
+    if (a === '--host') {
+      host = argv[++i] ?? host;
+      continue;
+    }
     if (a === '--db') {
       dbPath = argv[++i] ?? dbPath;
       continue;
     }
     if (a === '--persist') {
-      dbPath = argv[++i] ?? './far-chain.db';
+      dbPath = argv[++i] ?? './FAR-Lab.db';
       continue;
     }
     if (a === '--no-seed') {
@@ -57,7 +63,7 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
     const v = parseInt(process.env.PORT, 10);
     if (Number.isFinite(v) && v > 0) port = v;
   }
-  return { port, dbPath, seedDemo, jwtSecret };
+  return { port, host, dbPath, seedDemo, jwtSecret };
 }
 
 export async function runApi(argv: readonly string[]): Promise<number> {
@@ -67,13 +73,13 @@ export async function runApi(argv: readonly string[]): Promise<number> {
     buildDemoChain(db);
   }
   const gitCommitSha = resolveGitCommitSha();
-  const app = await startServer({ db, gitCommitSha, jwtSecret: args.jwtSecret }, args.port);
+  const app = await startServer({ db, gitCommitSha, jwtSecret: args.jwtSecret }, args.port, args.host);
   const base = `http://localhost:${args.port}`;
   const mode = args.jwtSecret === null ? 'offline (anonymous · demo)' : 'protected (jwt)';
   process.stderr.write(
     [
       '',
-      '  FAR-Chain API server',
+      '  FAR-Lab API server',
       '  ─────────────────────────────────────────────────',
       `  mode     : ${mode}`,
       `  database : ${args.dbPath}${args.seedDemo ? '  +  demo seed (C-ASTRO-0001 UNTESTED)' : ''}`,

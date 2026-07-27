@@ -13,7 +13,7 @@ uses an in-memory DB, seeds the demo verdict, and runs **anonymous / offline** (
 ```bash
 far api                                  # anonymous offline demo (in-memory DB)
 far api --port 4000                      # custom port (or set PORT)
-far api --persist ./far-chain.db         # persist across restarts
+far api --persist ./FAR-Lab.db         # persist across restarts
 far api --protected                      # require JWT (needs FAR_JWT_SECRET)
 far api --no-seed                        # do not seed the demo verdict
 ```
@@ -35,7 +35,7 @@ response; the body carries the machine-readable code:
 
 Common codes: `400 VALIDATION_FAILED`, `404 NOT_FOUND`, `409 CHAIN_BROKEN`, `500 INTERNAL`. A live,
 machine-readable OpenAPI document is served at `GET /documentation/json` (16 paths, title
-"FAR-Chain API").
+"FAR-Lab API").
 
 ## Endpoints
 

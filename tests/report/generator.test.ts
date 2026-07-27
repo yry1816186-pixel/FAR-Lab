@@ -399,13 +399,13 @@ test('renderMarkdown produces valid markdown string', () => {
   });
 
   assert.ok(md.length > 0);
-  assert.ok(md.includes('# FAR-Chain Research Report'));
+  assert.ok(md.includes('# FAR-Lab Research Report'));
   assert.ok(md.includes('test-run'));
   assert.ok(md.includes('Executive summary'));
   assert.ok(md.includes('Limitations'));
   assert.ok(md.includes('Verdict statistics'));
   assert.ok(md.includes('Confirmed'));
-  assert.ok(md.includes('FAR-Chain Report Generator'));
+  assert.ok(md.includes('FAR-Lab Report Generator'));
 });
 
 test('renderMarkdown throws on unsupported format', () => {
@@ -483,7 +483,7 @@ test('renderHtml produces valid HTML document', () => {
 
   assert.ok(html.startsWith('<!DOCTYPE html>'));
   assert.ok(html.includes('<html lang="en">'));
-  assert.ok(html.includes('<title>FAR-Chain Report'));
+  assert.ok(html.includes('<title>FAR-Lab Report'));
   assert.ok(html.includes('test-run'));
   assert.ok(html.includes('Confirmed'));
   assert.ok(html.includes('</html>'));

@@ -189,7 +189,7 @@ function verifyDbChainHead(dbPath: string): ChainHeadStatus {
 
 function renderHuman(dump: StatusDump): string {
   const lines: string[] = [
-    'FAR-Chain Status Dump（SSOT · 禁手填 · W0 phase A+B+C）',
+    'FAR-Lab Status Dump（SSOT · 禁手填 · W0 phase A+B+C）',
     '════════════════════════════════════════════════════════════',
     '仓库实测（git + glob，零手填）：',
     `  commitSha            : ${dump.commitSha}`,

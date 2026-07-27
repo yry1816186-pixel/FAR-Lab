@@ -119,7 +119,7 @@ describe('AblationPage', () => {
     expect(screen.getAllByText('Random Baseline').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Search Baseline').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Direct LLM').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('FAR-Chain Full').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('FAR-Lab Full').length).toBeGreaterThanOrEqual(1);
   });
 
   it('enables run button when input is non-empty', async () => {
@@ -171,7 +171,7 @@ describe('AblationPage', () => {
     }
   });
 
-  it('highlights FAR-Chain card with ring style', () => {
+  it('highlights FAR-Lab card with ring style', () => {
     renderWithQueryClient(<AblationPage />);
     const card = screen.getByTestId('baseline-card-far-chain');
     expect(card.className).toContain('ring');
@@ -345,7 +345,7 @@ describe('AblationPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('row-search-error')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('row-far-chain-error')).toBeInTheDocument();
+    expect(screen.getByTestId('row-search-error')).toBeInTheDocument();
     expect(screen.getByTestId('row-search-error')).toHaveTextContent(
       'Request failed',
     );
@@ -542,7 +542,7 @@ describe('AblationPage', () => {
     expect(bars.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('charts show FAR-Chain baseline with distinct color', async () => {
+  it('charts show FAR-Lab baseline with distinct color', async () => {
     const user = userEvent.setup();
     for (const key of BASELINE_KEYS) {
       mockFetchSuccess(makeResponse(`run-${key}`));
@@ -624,7 +624,7 @@ describe('AblationPage', () => {
     }
   });
 
-  it('capability matrix attribution: far-chain all present · random all absent (qualitative truth, not fabricated numbers)', () => {
+  it('capability matrix attribution: FAR-Lab all present · random all absent (qualitative truth, not fabricated numbers)', () => {
     renderWithQueryClient(<AblationPage />);
     const dims = [
       'evidenceRetrieval',

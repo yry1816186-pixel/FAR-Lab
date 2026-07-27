@@ -57,32 +57,13 @@ CLAUDE.md
 FAR_LAB_MASTER_PLAN/
 dev/
 
-# --- Local development gates (run locally, not in public repo) ---
-scripts/depth_gate.mjs
-scripts/depth_evidence.mjs
-scripts/depth_evidence.test.mjs
-scripts/depth_evidence.integration.test.mjs
-scripts/depth_gate.evade.test.mjs
-scripts/zero_tolerance_scan.mjs
-scripts/anti_theater_deterministic_scan.mjs
-scripts/confounding_gate_deterministic_scan.mjs
-scripts/no_llm_final_judge_scan.mjs
-scripts/coverage_gate.mjs
-scripts/ci_all.mjs
-scripts/lib/ledger.mjs
-scripts/lib/code_analysis.mjs
-.github/workflows/depth-gate.yml
-.github/workflows/depth-evidence.yml
-.github/workflows/entry-protocol-check.yml
-.github/copilot-instructions.md
-tests/ci/zero_tolerance_scan.test.ts
-tests/ci/anti_theater_deterministic_scan.test.ts
-tests/ci/confounding_gate_deterministic_scan.test.ts
-tests/ci/no_llm_final_judge_scan.test.ts
-tests/scripts/code_analysis.test.mjs
-ci/snapshot_liveness_smoke.ts
+# --- CI protection scripts & workflows (SHIPPED — these are the repo's binding gates) ---
+# NOTE: depth-gate / depth-evidence / entry-protocol / zero-tolerance / coverage / model-neutrality
+# scanners and their workflows ARE the project's anti-skim, anti-theater, and integrity gates.
+# They MUST be tracked so fresh clones and GitHub Actions can actually enforce them.
+# (Historically these were mislabeled "local-only" — that left the public repo with zero protection.)
 
-# --- Local-only docs ---
+# --- Local-only docs (audit snapshots, not part of the shipped governance surface) ---
 docs/governance/OPEN_SOURCE_AUDIT.md
 docs/governance/RELEASE_READINESS_CHECKLIST.md
 docs/governance/P1_2_PROOF_AUDIT.md
@@ -126,7 +107,8 @@ scripts/gen_figs.py
 scripts/gen_figs2.py
 scripts/qa_ppt.py
 scripts/render_ppt.py
-1.md
+# Charter moved to docs/charter/ULTIMATE_EXECUTION_PRIME.md (now tracked).
+# Legacy process notes below remain local-only:
 3.md
 plan.md
 PI_RUNBOOK.md

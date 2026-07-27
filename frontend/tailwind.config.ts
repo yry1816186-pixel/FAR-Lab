@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss';
 import animate from 'tailwindcss-animate';
 
-// shadcn/ui theme — FAR-Chain brand: deep blue + accent red (spec 27 §4.1)
+// shadcn/ui theme — FAR-Lab brand: deep blue + accent red (spec 27 §4.1)
 const config: Config = {
   darkMode: ['class'],
   content: ['./index.html', './src/**/*.{ts,tsx}'],

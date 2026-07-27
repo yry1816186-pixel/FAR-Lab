@@ -183,7 +183,7 @@ export async function executeAskRun(
 function renderHuman(args: AskArgs, render: AskRender): void {
   const lines = [
     '',
-    '  FAR-Chain · far ask',
+    '  FAR-Lab · far ask',
     '  ─────────────────────────────────────────────────',
     `  question : ${args.question}`,
     `  profile  : ${render.profile}`,

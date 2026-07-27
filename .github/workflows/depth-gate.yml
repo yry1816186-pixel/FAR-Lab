@@ -1,0 +1,50 @@
+# .github/workflows/depth-gate.yml
+# 深度接线门（anti-skim 结构性硬核 · agent 无关 · PR-level 强制）
+#
+# 目的：把「深度功能是否真接到生产路径」从软规则（CLAUDE.md §1/§4）变成 PR-level CI exit 1。
+#   绿套件 = 虚假完成信号——decideFiveValueVerdict/executeFallbackChain 已实现 + 单元测试全绿，
+#   但 src/ 内零 AST CallExpression 生产 caller。本门扫接线状态，当前态（已建未接线）确定 FAIL。
+#   详见 scripts/depth_gate.mjs 头注释 + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md。
+#
+# ⚠️ maintainer 必做（仓库工件无法自证，inherent 缺口）：
+#   GitHub repo → Settings → Branches → Branch protection rules（对应默认分支）
+#   → Require status checks to pass before merging
+#   → 把 `depth_gate` 加入 "Require status checks" list。
+#   未配 branch protection 时，agent 可自合 PR 绕过本门。
+#
+# 依赖 typescript（scripts/lib/code_analysis.mjs AST 解析）→ 需 pnpm install。原「零依赖」注释已过时（code_analysis 引入 typescript 后失效）。
+# job id 用下划线（depth_gate）非连字符：needs.<job_id>.result 表达式里连字符被解析为减号（见 ci.yml:4 约定）。
+# 触发：所有 PR（不限目标分支，覆盖 feature/* 开发流）+ push 默认分支 main + 手动。
+# `pull_request:` 不带 branches 数组 = 对所有分支的 PR 都触发。
+name: depth-gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10.29.3'
+
+jobs:
+  depth_gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # L1 校验 closed_by sha 真实性需完整 git 历史（浅克隆缺历史 sha → 31 illegal 误报）
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: depth_gate (AST CallExpression 接线门 · 失败见 FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §A)
+        run: node scripts/depth_gate.mjs

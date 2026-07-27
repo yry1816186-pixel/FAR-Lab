@@ -1,6 +1,6 @@
 # Quickstart
 
-> Goal: see FAR-Chain's core value in 5 minutes — **deterministic verdict + tamper-detectable**,
+> Goal: see FAR-Lab's core value in 5 minutes — **deterministic verdict + tamper-detectable**,
 > fully offline, zero API keys.
 
 ## Prerequisites

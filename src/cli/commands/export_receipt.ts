@@ -199,7 +199,7 @@ export function buildTrustReceiptFromBundle(
 
 export function renderReceiptMarkdown(receipt: TrustReceipt): string {
   const lines = [
-    '# FAR-Chain Trust Receipt',
+    '# FAR-Lab Trust Receipt',
     '',
     `- Schema: \`${receipt.schemaVersion}\``,
     `- Generated: ${receipt.generatedAt}`,

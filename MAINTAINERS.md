@@ -9,7 +9,7 @@
 | Role | Name | GitHub | Responsibility | Contact |
 |---|---|---|---|---|
 | Lead Maintainer | `NEEDS_MAINTAINER_ASSIGNMENT` | `@yry1816186-pixel` | decisions + merge + release | `NEEDS_CONTACT` |
-| Security Receiver | `NEEDS_MAINTAINER_ASSIGNMENT` | — | security disclosure intake | `security@far-chain.example.com` (see `SECURITY.md`) |
+| Security Receiver | `NEEDS_MAINTAINER_ASSIGNMENT` | — | security disclosure intake | `security@far-lab.example.com` (see `SECURITY.md`) |
 
 > Bus factor is currently 1. A second maintainer and a dedicated security
 > receiver are outstanding (`NEEDS_MAINTAINER_ASSIGNMENT`).

@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `far` CLI is the primary interface to FAR-Chain. Run `far --help` for the live, authoritative
+The `far` CLI is the primary interface to FAR-Lab. Run `far --help` for the live, authoritative
 listing. The CLI runs TypeScript directly via Node 24 native type-stripping (no build step).
 
 Unless noted, every command works **offline with zero credentials**. The deterministic R0–R9 kernel

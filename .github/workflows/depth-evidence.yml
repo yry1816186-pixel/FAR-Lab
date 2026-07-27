@@ -1,0 +1,128 @@
+# .github/workflows/depth-evidence.yml
+# RED→GREEN 双跑物证 bot（.agent/AGENT_ANTISKIM_TRIPWIRES.md T5 机检钩子 · 防 ledger 自我消化 / 伪造 RED→GREEN）
+#
+# 目的：agent 不能手填 DEPTH_LEDGER §C 的 status=WIRED_GREEN——必须由本 job 在 CI 实跑证明：
+#   对每个 status=WIRED_RED 行，checkout base SHA 跑其 proof_test 须 FAIL（非 skip 非 pass），
+#   checkout head SHA 跑同测试须 PASS。双跑通过 → 本 job 用 GITHUB_TOKEN 写回 §C 该行
+#   status=WIRED_GREEN + 紧随的 `evidence: <base_sha>→<head_sha>` 行。
+#
+# ⚠️ maintainer 必做（本 job 默认不会生效，需主动启用）：
+#   1. GitHub repo → Settings → Actions → General → Workflow permissions → 选 "Read and write permissions"
+#      （让 GITHUB_TOKEN 能 push 写回 DEPTH_LEDGER.md）。
+#   2. 把 `depth_evidence` 加入 Branch protection → Require status checks（与 depth_gate 并列）。
+#   3. CODEOWNERS：FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md 由本 bot + maintainer own（防 agent 手改 status）。
+#
+# scripts/depth_evidence.mjs 已实现（base/head 双跑 proof_test → UPGRADE 裁决 → 原子写回 evidence）。
+# 安全边界：
+#   - pull_request 只读 + --dry-run：跑 PR 代码但不给 write token / secrets，防 PR head 脚本窃取写权限。
+  #   - workflow_dispatch 由 maintainer 手动给 base/head/only，只允许默认分支 workflow + write token，可选择写回。
+#   - DashScope secret 只进入 workflow_dispatch；maintainer 须确认 head SHA 可信，因为 proof_test 会执行该 SHA 的代码。
+# depth_gate 已独立阻断未接线 PR；本 workflow 是把 WIRED_RED→GREEN 物证自动化的收紧层。
+name: depth-evidence
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: '40-hex base commit SHA expected to FAIL'
+        required: true
+        type: string
+      head_sha:
+        description: '40-hex head commit SHA expected to PASS'
+        required: true
+        type: string
+      only:
+        description: 'Optional comma-separated §C row ids, e.g. P1-3'
+        required: false
+        type: string
+      write_back:
+        description: 'Write WIRED_GREEN evidence back to DEPTH_LEDGER.md'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10.29.3'
+
+jobs:
+  depth_evidence:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # 双跑须 checkout base SHA，需完整历史
+          persist-credentials: false
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: RED→GREEN dual-run evidence dry-run (read-only PR)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "○ depth_evidence: PR base/head SHA 为空（fork PR 隐藏 sha / 缺权限）——跳过双跑（不阻断）。"
+            exit 0
+          fi
+          node scripts/depth_evidence.mjs --base "$BASE_SHA" --head "$HEAD_SHA" --dry-run
+
+  depth_evidence_dispatch:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name == github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 手动写回 DEPTH_LEDGER.md evidence 行
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Fetch all branches (base SHA may live on red-wave branch — dual-run needs it reachable)
+        run: git fetch origin 'refs/heads/*:refs/remotes/origin/*' --tags
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: RED→GREEN dual-run evidence (maintainer dispatch)
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          ONLY: ${{ inputs.only }}
+          WRITE_BACK: ${{ inputs.write_back }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        run: |
+          args=(--base "$BASE_SHA" --head "$HEAD_SHA")
+          if [ -n "$ONLY" ]; then
+            args+=(--only "$ONLY")
+          fi
+          if [ "$WRITE_BACK" != "true" ]; then
+            args+=(--dry-run)
+          fi
+          node scripts/depth_evidence.mjs "${args[@]}"
+      - name: Commit back evidence line (manual write_back only)
+        if: ${{ success() && inputs.write_back }}
+        run: |
+          if [ -n "$(git status --porcelain FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md
+            git commit -m "chore(depth-evidence): write back WIRED_GREEN evidence (base→head dual-run)"
+            git push
+          else
+            echo "○ 无 WIRED_RED→GREEN 升级，不写回。"
+          fi

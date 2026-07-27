@@ -59,7 +59,7 @@ export async function runRepl(): Promise<number> {
   const history: ReplTurn[] = [];
   let lastQuestion = '';
 
-  process.stdout.write('\n  FAR-Chain · far repl (interactive)\n');
+  process.stdout.write('\n  FAR-Lab · far repl (interactive)\n');
   process.stdout.write('  ─────────────────────────────────────────────────\n');
   process.stdout.write(HELP);
 

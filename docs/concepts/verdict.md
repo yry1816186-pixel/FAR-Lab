@@ -53,7 +53,7 @@ Extended rules (same kernel, same determinism): `R_CAUSAL_CONFOUNDING_FAIL/WARN`
 
 The kernel is pure code with no model call. This makes a verdict **independently recomputable**: a
 third party runs the same rules on the same evidence and gets the same answer — byte-for-byte. An LLM
-verdict is stochastic and opaque; it cannot be recomputed or audited. FAR-Chain uses LLMs to
+verdict is stochastic and opaque; it cannot be recomputed or audited. FAR-Lab uses LLMs to
 **generate** hypotheses and evidence, never to **decide** them. See [determinism.md](determinism.md).
 
 ## Statistics come from `src/statistics/`, never literals

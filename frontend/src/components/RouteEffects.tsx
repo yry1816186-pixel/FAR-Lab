@@ -18,8 +18,8 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const BASE_TITLE = 'FAR-Chain';
-const BASE_TITLE_FULL = 'FAR-Chain · Falsifiable · Auditable · Reproducible';
+const BASE_TITLE = 'FAR-Lab';
+const BASE_TITLE_FULL = 'FAR-Lab · Falsifiable · Auditable · Reproducible';
 
 /** Maps each known route to a short label used in the document title. */
 const ROUTE_TITLES: Readonly<Record<string, string>> = {

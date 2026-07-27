@@ -1,5 +1,5 @@
 {
-  "name": "far-chain",
+  "name": "far-lab",
   "version": "1.0.0",
   "description": "Claim-level verification layer for AI4S scientific claims — falsifiable, tamper-detectable, independently recomputable verdicts via a deterministic R0-R9 kernel (no LLM arbiter).",
   "keywords": [
@@ -22,7 +22,7 @@
   "bugs": {
     "url": "https://github.com/yry1816186-pixel/FAR-Lab/issues"
   },
-  "author": "FAR-Chain Contributors",
+  "author": "FAR-Lab Contributors",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.29.3",

@@ -1,4 +1,4 @@
-# Contributing to FAR-Chain
+# Contributing to FAR-Lab
 
 Thank you for contributing. This guide covers environment setup, the PR
 workflow, and the quality gates every change must pass.
@@ -77,7 +77,7 @@ any PR containing them:
 
 ## Writing Meaningful Tests
 
-FAR-Chain guards against *theater* — tests that look green but verify nothing.
+FAR-Lab guards against *theater* — tests that look green but verify nothing.
 
 - Tests must exercise the **real** code path (real statistics, real subprocess,
   real hash recomputation), not `FakeBackend` fixtures or precomputed metrics.

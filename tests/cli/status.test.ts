@@ -112,7 +112,7 @@ test('collectStatusDump: suiteIntegrityRoot 默认读 benchmark_report.json（ph
     );
     assert.strictEqual(
       dump.suiteIntegrityRoot,
-      '3131e5362f79d201d9059ab1e14b709714717963388e27e69aa1385c83ae804e',
+      '83265409e9395a4738658e069c7ec441a56673d018180a82168647bb1b17f296',
       'suiteIntegrityRoot 应 = benchmark_report.json 的确定性锚 hex',
     );
   }
@@ -131,7 +131,7 @@ test('collectStatusDump: coverage 可注入实测（CLI 层 spawn 后传入）',
 test('toStatusJson: 输出机器可读 SSOT，不把 pending 伪装成数字', () => {
   const json = toStatusJson(collectStatusDump(), '2026-07-02T00:00:00.000Z');
 
-  assert.strictEqual(json.project, 'FAR-Chain');
+  assert.strictEqual(json.project, 'far-chain');
   assert.strictEqual(json.generatedAt, '2026-07-02T00:00:00.000Z');
   assert.strictEqual(json.nodeVersion, process.version);
   assert.strictEqual(json.platform.os, process.platform);

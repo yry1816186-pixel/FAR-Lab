@@ -59,7 +59,7 @@ const DEMO_SCENES: readonly DemoScene[] = [
       'Deterministic replay gate: same input + same model snapshot → same hash; drift is exposed, not hidden',
     ],
     honestyNote:
-      'FAR-Chain does not claim absolute scientific truth. It provides a reliability evidence package, not a proof of truth. A CONFIRMED verdict still requires human scientific review; even if every gate passes, it is merely "re-reviewable", not "proven".',
+      'FAR-Lab does not claim absolute scientific truth. It provides a reliability evidence package, not a proof of truth. A CONFIRMED verdict still requires human scientific review; even if every gate passes, it is merely "re-reviewable", not "proven".',
     relatedPath: '/',
     relatedLabel: 'Overview',
   },
@@ -130,7 +130,7 @@ const DEMO_SCENES: readonly DemoScene[] = [
     subtitle: 'Ablation Study · component-removal comparison',
     icon: FlaskConical,
     credibilityPoints: [
-      'Systematically remove FAR-Chain components and compare output drift, quantifying each component’s information contribution',
+      'Systematically remove FAR-Lab components and compare output drift, quantifying each component’s information contribution',
       'Ablation matrix: removed vs retained × 6 stages, each cell reporting hash diff and verdict change',
       'The ablation results themselves are protected by the hash chain — ablation output is part of the evidence chain',
     ],

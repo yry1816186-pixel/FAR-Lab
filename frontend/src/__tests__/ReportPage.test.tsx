@@ -37,7 +37,7 @@ function errorResponse(status: number, statusText: string): Response {
 
 // ---------- Fixtures ----------
 
-const REPORT_HTML = '<!DOCTYPE html><html><head><title>Test Report</title></head><body><h1>FAR-Chain 研究报告</h1><p>run-001 的结果。</p></body></html>';
+const REPORT_HTML = '<!DOCTYPE html><html><head><title>Test Report</title></head><body><h1>FAR-Lab 研究报告</h1><p>run-001 的结果。</p></body></html>';
 
 const SAMPLE_VERDICT: HonestVerdictDto = {
   verdictId: 'v-run001',

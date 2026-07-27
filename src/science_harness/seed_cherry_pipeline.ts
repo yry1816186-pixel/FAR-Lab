@@ -1,7 +1,7 @@
 /**
  * seed_cherry_pipeline —— cherry-picked adversarial 系外行星 submission 审计（FUSION-OS-1 detector-validation·fixture replay·非 production wiring）。
  *
- * 代表 FAR-Chain 审计一个**已提交的** cherry-picked 声明：研究者预注册 5 个种子 [0,1,2,3,4]，
+ * 代表 FAR-Lab 审计一个**已提交的** cherry-picked 声明：研究者预注册 5 个种子 [0,1,2,3,4]，
  * 实际只报告了 [0,1,2]（隐去 seed 3,4 因其无 transit）。detect_seed_cherry 从真实 runRegistry 差集
  * {3,4} 诚实 fire HIDDEN_FAILED_RUN → anti-theater verdict_kernel_v2.ts:373 → UNTESTED/ANTI_THEATER_FAIL。
  *

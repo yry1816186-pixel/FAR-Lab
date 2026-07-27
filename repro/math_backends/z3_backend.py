@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Z3 SMT backend for FAR-Chain math verification.
+"""Z3 SMT backend for FAR-Lab math verification.
 
 Protocol (stdin -> stdout, both JSON):
   Request:  {"script": "<SMT-LIB assertions>"}

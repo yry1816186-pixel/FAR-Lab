@@ -170,8 +170,8 @@ node src/cli/far.ts demo tess-offline
 
 Runs entirely offline: 14 golden vectors through the real R0–R9 kernel, then an end-to-end
 TESS claim (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fail-closed sealing. See
-[examples/tess-offline/README.md](examples/tess-offline/README.md) for the persistent bundle and a
-**tested** tamper-detection walkthrough.
+[docs/demos/tess-offline.md](docs/demos/tess-offline.md) for the demo walkthrough and a
+**tested** tamper-detection guide.
 
 ---
 

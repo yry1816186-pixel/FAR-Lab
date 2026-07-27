@@ -71,7 +71,7 @@ export interface BenchmarkReport {
    * 套件级聚合完整性根（64-hex）：所有 entry.integrityRoot 作为叶再 Merkle 折叠一次。
    *
    * 整个 benchmark 套件的单个密码学指纹——证明所有问题的证据链**可聚合审计**：
-   * 任一 problem 的链被篡改，suiteIntegrityRoot 立即失效。这是 FAR-Chain 的差异化护城河
+   * 任一 problem 的链被篡改，suiteIntegrityRoot 立即失效。这是 FAR-Lab 的差异化护城河
    * （单链完整性 → 跨链可聚合的套件级信任根）。
    */
   readonly suiteIntegrityRoot: string;

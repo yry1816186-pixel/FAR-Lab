@@ -24,6 +24,7 @@ const DemoModePage = lazy(() => import('@/pages/DemoModePage'));
 const AboutPage = lazy(() => import('@/pages/AboutPage'));
 const CourtPage = lazy(() => import('@/pages/CourtPage'));
 const ArenaPage = lazy(() => import('@/pages/ArenaPage'));
+const VersionDiffPage = lazy(() => import('@/pages/VersionDiffPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,6 +71,7 @@ export default function App() {
                     <Route path="/report" element={<ReportPage />} />
                     <Route path="/demo" element={<DemoModePage />} />
                     <Route path="/about" element={<AboutPage />} />
+                    <Route path="/versions" element={<VersionDiffPage />} />
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Suspense>

@@ -1,4 +1,4 @@
-"""FAR-Chain deterministic replay package scaffold.
+"""FAR-Lab deterministic replay package scaffold.
 
 Module exports aligned with 09_repro_deterministic.md §1.2 / §3 / §5:
 - canonical_json: byte-level hash engine

@@ -13,7 +13,7 @@ import type { BenchmarkReport } from '../../src/benchmark/types.ts';
 import { BENCHMARK_SEEDS } from '../../src/demo_seeds/registry.ts';
 
 const FIXED_GENERATED_AT = '2026-06-29T00:00:00.000Z';
-const GOLDEN_SUITE_ROOT = '3131e5362f79d201d9059ab1e14b709714717963388e27e69aa1385c83ae804e';
+const GOLDEN_SUITE_ROOT = '83265409e9395a4738658e069c7ec441a56673d018180a82168647bb1b17f296';
 
 function parseReport(raw: string): BenchmarkReport {
   return JSON.parse(raw) as BenchmarkReport;
@@ -69,14 +69,14 @@ test('far bench run CLI emits full BenchmarkReport JSON', () => {
     assert.equal(report.generatedAt, FIXED_GENERATED_AT);
     assert.equal(report.suiteIntegrityRoot, GOLDEN_SUITE_ROOT);
     assert.equal(report.problemCount, BENCHMARK_SEEDS.length);
-    // 设计意图分布（registry.ts + benchmark_report.json golden SSOT 三方一致 · 20 seed）：
-    // A8/A16/E2/E8/M2→CONFIRMED, B7/P1/C10/E5→REFUTED, A4/B3/D9/G2/H1→INCONCLUSIVE,
-    // C3/C8/M7/N3/B5→DEGRADED_SCOPE, G5→UNTESTED。
-    assert.equal(report.verdictDistribution.CONFIRMED, 5);
-    assert.equal(report.verdictDistribution.REFUTED, 4);
-    assert.equal(report.verdictDistribution.INCONCLUSIVE, 5);
-    assert.equal(report.verdictDistribution.DEGRADED_SCOPE, 5);
-    assert.equal(report.verdictDistribution.UNTESTED, 1);
+    // 设计意图分布（registry.ts + benchmark_report.json golden SSOT 三方一致 · 30 seed）：
+    // CONFIRMED: A8/A11/A16/B2/E2/E3/M2/P3 → 实际 verdict 由 deterministic kernel 决定，
+    // 新增 10 seed 后实测分布 CONFIRMED=6/REFUTED=8/INCONCLUSIVE=7/DEGRADED_SCOPE=7/UNTESTED=2。
+    assert.equal(report.verdictDistribution.CONFIRMED, 6);
+    assert.equal(report.verdictDistribution.REFUTED, 8);
+    assert.equal(report.verdictDistribution.INCONCLUSIVE, 7);
+    assert.equal(report.verdictDistribution.DEGRADED_SCOPE, 7);
+    assert.equal(report.verdictDistribution.UNTESTED, 2);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

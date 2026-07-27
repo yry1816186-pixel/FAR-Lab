@@ -32,7 +32,7 @@ describe('OverviewPage', () => {
     mockHealth(HEALTH_OK);
     renderWithQueryClient(<OverviewPage />);
     expect(screen.getByTestId('overview-page')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'FAR-Chain', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'FAR-Lab', level: 1 })).toBeInTheDocument();
   });
 
   it('renders the three pillars (Falsifiable / Tamper-Evident / Independently Re-computable)', () => {

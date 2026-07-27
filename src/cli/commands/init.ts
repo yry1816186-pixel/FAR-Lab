@@ -65,7 +65,7 @@ function buildFiles(args: InitArgs): ReadonlyArray<readonly [string, string]> {
     claimClass: tag,
     claimIdPrefix: tag,
     createdAt,
-    description: 'FAR-Chain DomainPack scaffold — fill it in, then connect to far ask/court/arena',
+    description: 'FAR-Lab DomainPack scaffold — fill it in, then connect to far ask/court/arena',
     wiring: {
       ask: `far ask "<question>" --profile offline_replay`,
       fec: `far fec compile --claim fec.template.json --out <outdir>`,
@@ -222,7 +222,7 @@ export function runInit(argv: readonly string[]): number {
     writeFileSync(resolve(args.outDir, name), content, 'utf8');
   }
 
-  process.stdout.write('\n  FAR-Chain · far init (DomainPack scaffold)\n');
+  process.stdout.write('\n  FAR-Lab · far init (DomainPack scaffold)\n');
   process.stdout.write('  ─────────────────────────────────────────────────\n');
   process.stdout.write(`  domain   : ${args.domain}（claimClass=${domainClassTag(args.domain)}）\n`);
   process.stdout.write(`  output   : ${args.outDir}\n`);

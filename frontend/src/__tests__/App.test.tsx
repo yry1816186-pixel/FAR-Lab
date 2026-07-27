@@ -82,11 +82,11 @@ describe('App 路由与导航', () => {
     expect(screen.getByTestId('main-content')).toBeInTheDocument();
   });
 
-  it('渲染 11 个导航项（含完整性信任根、广度榜、法庭、竞技场入口）', () => {
+  it('渲染 12 个导航项（含完整性信任根、广度榜、法庭、竞技场、版本比较入口）', () => {
     render(<App />);
     const nav = screen.getByTestId('main-nav');
     const links = within(nav).getAllByRole('link');
-    expect(links).toHaveLength(11);
+    expect(links).toHaveLength(12);
     // 使用 getByRole 验证导航链接存在（"证据链" 等标签在 sm 断点下可见）
     expect(within(nav).getByRole('link', { name: /Overview/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /Demo/ })).toBeInTheDocument();
@@ -174,7 +174,7 @@ describe('App 路由与导航', () => {
     await user.click(screen.getByTestId('mobile-menu-toggle'));
     expect(screen.getByTestId('mobile-nav')).toBeInTheDocument();
     const mobileNav = screen.getByTestId('mobile-nav');
-    expect(within(mobileNav).getAllByRole('link')).toHaveLength(11);
+    expect(within(mobileNav).getAllByRole('link')).toHaveLength(12);
     await user.click(screen.getByTestId('mobile-menu-toggle'));
     expect(screen.queryByTestId('mobile-nav')).not.toBeInTheDocument();
   });
@@ -212,7 +212,7 @@ describe('App 路由与导航', () => {
     expect(firstLink).toHaveFocus();
   });
 
-  it('渲染 skip-to-content 链接(键盘用户可跳过 11 项导航)', () => {
+  it('渲染 skip-to-content 链接(键盘用户可跳过 12 项导航)', () => {
     render(<App />);
     const skip = screen.getByTestId('skip-to-content');
     expect(skip).toBeInTheDocument();

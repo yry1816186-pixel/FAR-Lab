@@ -59,7 +59,7 @@ export type { ArenaResult } from '../../api/internal/arena_service.ts';
 function renderHuman(res: ArenaResult): void {
   const lines = [
     '',
-    '  FAR-Chain · far arena (adversarial science arena)',
+    '  FAR-Lab · far arena (adversarial science arena)',
     '  ─────────────────────────────────────────────────',
     `  hypothesis : ${res.hypothesis}`,
     `  original   : ${res.originalVerdict ?? '<no verdict>'}${res.originalRule === null ? '' : `(${res.originalRule})`}`,

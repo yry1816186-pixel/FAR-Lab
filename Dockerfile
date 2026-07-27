@@ -1,12 +1,12 @@
-# FAR-Chain Docker image — offline-ready
+# FAR-Lab Docker image — offline-ready
 #
 # 默认跑 offline demo（far demo tess-offline），无需任何 API key。
 # 真实 Qwen/百炼 provider 只能通过 `docker compose --env-file .env up` 显式注入（红线：绝不默认读取）。
 #
-# 构建：  docker build -t far-chain:dev .
-# 运行：  docker run --rm far-chain:dev                      # = far demo tess-offline
-#         docker run --rm far-chain:dev doctor               # 容器内环境诊断
-#         docker run --rm far-chain:dev verify examples/tess-offline/output/demo.far-proof
+# 构建：  docker build -t far-lab:dev .
+# 运行：  docker run --rm far-lab:dev                      # = far demo tess-offline
+#         docker run --rm far-lab:dev doctor               # 容器内环境诊断
+#         docker run --rm far-lab:dev verify .far-proof    # 验证导出的 proof bundle（先跑 export）
 #
 # 设计：better-sqlite3 优先用 prebuilt binary，但保留 build-essential + python3 作为 node-gyp
 # 编译兜底——当 prebuild-install 因网络失败时（如 socket hang up），node-gyp rebuild 仍可编译 native。

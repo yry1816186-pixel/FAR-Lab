@@ -114,7 +114,7 @@ export default function OverviewPage() {
   return (
     <div className="space-y-8" data-testid="overview-page">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">FAR-Chain</h1>
+        <h1 className="text-3xl font-bold tracking-tight">FAR-Lab</h1>
         <p className="mt-1 text-muted-foreground">Falsification-Anchored Research Chain — an AI4S research-agent harness</p>
       </header>
       <section aria-labelledby="pillars-heading">
