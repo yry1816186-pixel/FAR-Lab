@@ -148,15 +148,12 @@ export async function startServer(
   port = 3000,
   host = '127.0.0.1',
 ): Promise<FastifyInstance> {
-  // F-5-10-005: 非 loopback host + 无 JWT = 匿名暴露计费 LLM 端点（/hypothesize 触发真实百炼费用）→ fail-closed。
-  // 安全默认改为 127.0.0.1；公开部署须显式 --host 0.0.0.0 + --protected/--jwt-secret。
-  const isLoopback = host === '127.0.0.1' || host === 'localhost' || host === '::1';
-  if (!isLoopback && config.jwtSecret === null) {
-    throw new Error(
-      `startServer fail-closed: host='${host}' 非 loopback 但 jwtSecret=null（匿名暴露 /hypothesize = 真实 LLM 计费/DoS 面）。` +
-        ` 设 jwtSecret（--protected/--jwt-secret）或绑 loopback（--host 127.0.0.1）。`,
-    );
-  }
+  // FIX-R6-002: 撤销 R5 的 host-inference fail-closed（评委03/11 发现它回归了 README 背书的
+  //   `docker compose up far-api` demo；评委09 发现空 "" secret 仍可绕过）。改 opt-in 鉴权设计：
+  //   - 默认 host=127.0.0.1（安全默认；用户可 --host 0.0.0.0 用于 Docker/公开部署，不再 throw）
+  //   - 匿名（offline）是默认；--protected/--jwt-secret <非空> opt-in 强制 JWT 鉴权
+  //   - 空 secret 由 api.ts FIX-R6-001 拒绝（→null→offline），关闭 "" 伪造 admin 漏洞
+  //   公开匿名部署的 /hypothesize 计费暴露由 --protected 显式 opt-in 鉴权覆盖（单机科研工具默认本地）。
   const app = await buildServer(config);
   await app.listen({ port, host });
 

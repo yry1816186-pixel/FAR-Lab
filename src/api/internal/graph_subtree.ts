@@ -120,7 +120,7 @@ export function getSubtreeByChainHead(db: Database, headHash: string): GraphSubt
   }
 
   const verdictRow = db
-    .prepare('SELECT verdict_id FROM verdict_nodes WHERE evidence_id = ? ORDER BY created_at ASC LIMIT 1')
+    .prepare('SELECT verdict_id FROM verdict_nodes WHERE evidence_id = ? AND superseded_by IS NULL ORDER BY created_at DESC, verdict_id DESC LIMIT 1')
     .get(evidenceRow.evidence_id) as { verdict_id?: string } | undefined;
   if (verdictRow === undefined || verdictRow.verdict_id === undefined) {
     return { rootId: headHash, nodes: [], edges: [] };

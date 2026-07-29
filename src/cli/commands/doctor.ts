@@ -131,11 +131,13 @@ function checkProject(root: string | null, checks: Check[]): void {
     detail: pyDeps ? 'sympy + z3 importable' : 'sympy/z3 missing → run pip install -e . (research axis skips, non-blocking)',
   });
 
-  const examplesOk = existsSync(resolve(root, 'examples/tess-offline'));
+  // FIX-R6-003: 删除 examples/tess-offline 检查（examples/ 已 retire，demo.ts tess-offline 用 :memory: 不持久化；
+  //   该检查必 warn 致 far doctor exit 2·评委13 F-R6-13 答辩现场 1 分钟崩溃）。改为检查真实持久化 bundle。
+  const demoBundleOk = existsSync(resolve(root, '.far-implementation/walking-skeleton/demo.far-proof'));
   checks.push({
-    name: 'examples/tess-offline',
-    status: examplesOk ? 'ok' : 'warn',
-    detail: examplesOk ? 'present' : 'missing (far demo tess-offline can generate persisted artifacts)',
+    name: 'demo.far-proof bundle',
+    status: demoBundleOk ? 'ok' : 'warn',
+    detail: demoBundleOk ? 'present (.far-implementation/walking-skeleton)' : 'missing (run "far demo" to generate)',
   });
 
   const schemaOk = existsSync(resolve(root, 'schema/migrations'));
@@ -162,12 +164,13 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
   if (root === null) {
     return;
   }
-  const fixture = resolve(root, 'examples/tess-offline/output/demo.far-proof');
+  // FIX-R6-003: fixture 路径从已 retire 的 examples/tess-offline 改为真实持久化 bundle。
+  const fixture = resolve(root, '.far-implementation/walking-skeleton/demo.far-proof');
   if (!existsSync(fixture)) {
     checks.push({
       name: 'offline verify (demo fixture)',
       status: 'warn',
-      detail: `fixture not found: ${fixture} (run "far demo tess-offline" to generate it, then re-check)`,
+      detail: `fixture not found: ${fixture} (run "far demo" to generate it, then re-check)`,
     });
     return;
   }

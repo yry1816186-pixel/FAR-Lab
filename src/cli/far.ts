@@ -765,7 +765,7 @@ USAGE:
              [--json] [--explain]      third-party independent re-computation verification
     --bundle <path>      .far-proof V1 minimal offline bundle directory (full mode verifies required
                          files + redacted chain + V1 proofHash)
-    <positional>        equivalent to --bundle (e.g. far verify examples/tess-offline/output/demo.far-proof)
+    <positional>        equivalent to --bundle (e.g. far verify .far-implementation/walking-skeleton/demo.far-proof)
     --envelope <path>   ProofEnvelopeV2 JSON file (required for envelope/full mode)
     --db <path>         evidence_log DB (required for chain/full mode; verifyChainHead)
     --mode <m>          chain|envelope|full (inferred from --envelope/--db by default)
