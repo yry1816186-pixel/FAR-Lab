@@ -47,7 +47,7 @@ import type { EvidenceDirection } from '../schema/enums.ts';
 export const MULTISEED_CLAIM_ID = 'C-MULTISEED-0001';
 export const MULTISEED_METRIC_KEY = 'transit_depth_significance';
 export const MULTISEED_PIPELINE_CLAIM =
-  'TIC 268644982 shows a transit signal confirmed across multiple pre-registered seeds (depthSNR >= detection threshold)';
+  'TIC 268644982 shows a transit signal recovered across multiple pre-registered seeds (depthSNR >= detection threshold)';
 export const MULTISEED_FROZEN_AT = C_ASTRO_FROZEN_AT;
 
 // 研究者预注册的 5 个 seed（全跑）+ 声称的"检测阈值"（depthSNR >= 此值算检测到）。

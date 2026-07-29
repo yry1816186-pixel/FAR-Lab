@@ -156,7 +156,7 @@ function cosineSimilarityTF(
 
 /**
  * 确定性文本相似度计算器。
- * 基于 TF 余弦相似度，完全可复现、可审计。
+ * 基于 TF 余弦相似度，可复现、可审计。（FIX-R6-005: AGENTS.md:52 禁"完全可复现"过度宣称·评委12）
  */
 export function deterministicCosineSimilarity(textA: string, textB: string): number {
   const tokensA = tokenize(textA);

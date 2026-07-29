@@ -50,7 +50,7 @@ export function extractHypothesisEvidenceId(db: Database, loopState: LoopState):
  */
 export function buildSubtreeFromEvidence(db: Database, evidenceId: string): GraphSubtree {
   const row = db
-    .prepare('SELECT verdict_id FROM verdict_nodes WHERE evidence_id = ? ORDER BY created_at ASC LIMIT 1')
+    .prepare('SELECT verdict_id FROM verdict_nodes WHERE evidence_id = ? AND superseded_by IS NULL ORDER BY created_at DESC, verdict_id DESC LIMIT 1')
     .get(evidenceId) as { verdict_id?: string } | undefined;
   if (row === undefined || row.verdict_id === undefined) {
     return { rootId: evidenceId, nodes: [], edges: [] };
