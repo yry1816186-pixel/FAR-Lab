@@ -48,9 +48,13 @@ nul
 .privacy-scan-report.txt
 .wf_*.mjs
 
-# --- Agent tooling (local development, not shipped) ---
+# --- Agent tooling (FAR-Lab pi discipline SHIPPED for fresh-clone cwd-fix) ---
+# .pi/ config (APPEND_SYSTEM/settings/project/extensions/prompts) now tracked so a
+# fresh clone + `cd FAR-Lab && pi` actually loads FAR-Lab discipline + far-guard/far-stage gates.
+# Runtime state + historical gate logs remain local (mutable / potentially stale):
 .agent/
-.pi/
+.pi/state/
+.pi/baseline-logs/
 .pi.backup-*
 CLAUDE.md
 .cursorrules
