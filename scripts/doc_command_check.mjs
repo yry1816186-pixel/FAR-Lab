@@ -69,7 +69,7 @@ function docCommands(readmePath) {
 }
 
 // 步骤 3：占位残留校验（CI backfill 占位须为 <X_FROM_STATUS_DUMP> 合法形式；裸 <foo> 视为残留）
-function placeholderResidue(readmePath) {
+function residualTokenScan(readmePath) {
   if (!existsSync(readmePath)) return [];
   const text = readFileSync(readmePath, 'utf8');
   const residues = [];
@@ -83,7 +83,7 @@ function placeholderResidue(readmePath) {
     if (!/^\$?\s*far\s/.test(raw)) continue;
     // 允许 <X_FROM_STATUS_DUMP>（CI backfill 合法占位）；其余 <lower> 形式视为未填残留
     const bad = raw.match(/<(?![A-Z_]+_FROM_STATUS_DUMP>)[a-z][a-z0-9_-]*>/g);
-    if (bad !== null) residues.push({ line: raw.trim(), placeholders: bad });
+    if (bad !== null) residues.push({ line: raw.trim(), badTokens: bad });
   }
   return residues;
 }
@@ -100,7 +100,7 @@ for (const r of readmes) {
     if (!docAll.has(sub)) docAll.set(sub, []);
     docAll.get(sub).push(...samples);
   }
-  residueAll.push(...placeholderResidue(r).map((x) => ({ ...x, file: r })));
+  residueAll.push(...residualTokenScan(r).map((x) => ({ ...x, file: r })));
 }
 
 const drift = [...docAll.keys()].filter((sub) => !real.has(sub));
@@ -119,7 +119,7 @@ if (drift.length > 0) {
 }
 if (residueAll.length > 0) {
   console.error(`❌ doc_command_check: FAIL — ${residueAll.length} 处文档命令含未填占位 <lower>:`);
-  for (const r of residueAll) console.error(`     [${r.file.split(/[\\/]/).pop()}] ${r.line}  → ${r.placeholders.join(', ')}`);
+  for (const r of residueAll) console.error(`     [${r.file.split(/[\\/]/).pop()}] ${r.line}  → ${r.badTokens.join(', ')}`);
   process.exit(1);
 }
 console.log(`✅ doc_command_check: PASS — ${docAll.size} 文档命令全部存在于 CLI，零占位残留`);
