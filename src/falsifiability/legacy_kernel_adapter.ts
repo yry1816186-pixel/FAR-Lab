@@ -1,5 +1,5 @@
 import type { EffectComparator } from '../schema/enums.ts';
-import type { FecContractV2, ThresholdSpec as FecThresholdSpec } from '../fec/fec_contract.ts';
+import type { FecContractV2, FecThresholdSpec } from '../fec/fec_contract.ts';
 import type {
   ClaimType,
   ConfoundingGateResult,

@@ -14,11 +14,11 @@ test('runMigrations applies 0001_initial and records schema version', () => {
   const db = new Database(':memory:');
   try {
     const result = runMigrations(db);
-    assert.deepEqual(result.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+    assert.deepEqual(result.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
     assert.deepEqual(result.skipped, []);
 
     const rows = getSchemaMetaRows(db);
-    assert.equal(rows.length, 21);
+    assert.equal(rows.length, 22);
     assert.equal(rows[0]?.version, 1);
     assert.equal(rows[0]?.name, '0001_initial');
     assert.equal(rows[1]?.version, 2);
@@ -61,6 +61,8 @@ test('runMigrations applies 0001_initial and records schema version', () => {
     assert.equal(rows[19]?.name, '0020_call_record_payload_hashes');
     assert.equal(rows[20]?.version, 21);
     assert.equal(rows[20]?.name, '0021_lifecycle_events');
+    assert.equal(rows[21]?.version, 22);
+    assert.equal(rows[21]?.name, '0022_narrow_comparator_check');
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -82,7 +84,7 @@ test('runMigrations skips already applied versions', () => {
     runMigrations(db);
     const result = runMigrations(db);
     assert.deepEqual(result.applied, []);
-    assert.deepEqual(result.skipped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+    assert.deepEqual(result.skipped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]);
   } finally {
     db.close();
   }

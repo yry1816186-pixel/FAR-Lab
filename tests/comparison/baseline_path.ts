@@ -28,7 +28,7 @@ import type {
 } from '../../src/falsifiability/types.ts';
 import type {
   FecContractV2,
-  ThresholdSpec as FecThresholdSpec,
+  FecThresholdSpec,
 } from '../../src/fec/fec_contract.ts';
 import type {
   StatisticalResult,

@@ -128,6 +128,12 @@ const importsOf = (f) => [
   check('FF-09', 'PAYLOAD_KINDS 唯一定义源', defs.length === 1 && defs[0] === 'src/schema/enums.ts', defs.join(','));
 }
 
+// FF-16 枚举单一事实源: THRESHOLD_SEMANTICS 仅 src/schema/enums.ts 定义（DEBT-12 收口·防阈值语义多源漂移）
+{
+  const defs = srcFiles.filter((f) => /export const THRESHOLD_SEMANTICS\b/.test(read(f))).map(rel);
+  check('FF-16', 'THRESHOLD_SEMANTICS 唯一定义源', defs.length === 1 && defs[0] === 'src/schema/enums.ts', defs.join(','));
+}
+
 // FF-10 主测试套件覆盖全部测试域: package.json test 含 agent_loop+comparison；frontend 有独立 test
 {
   const pkg = JSON.parse(read('package.json'));
@@ -187,5 +193,5 @@ const importsOf = (f) => [
 
 console.log('══ Architecture Fitness Functions (§12.5) ══');
 for (const line of report) console.log(line);
-console.log(failures === 0 ? '\nfitness: PASS (15/15)' : `\nfitness: FAIL (${failures} 项)`);
+console.log(failures === 0 ? `\nfitness: PASS (${report.length}/${report.length})` : `\nfitness: FAIL (${failures}/${report.length} 项)`);
 process.exit(failures === 0 ? 0 : 1);

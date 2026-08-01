@@ -12,9 +12,13 @@ import {
   hashCanonicalJson,
 } from '../../src/evidence_log/index.ts';
 
+// Windows: 'python' (真实安装); Unix: 'python3'。WindowsApps python3 是 Store stub,
+// 在 coverage 并发下 spawnSync 偶发 status=null。对齐 ensure_py_deps.mjs / smt_backend.ts 约定。
+const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
+
 function pythonCanonicalHash(): string {
   const result = spawnSync(
-    'python3',
+    PYTHON_CMD,
     [
       '-c',
       [
@@ -44,7 +48,7 @@ function runPythonCanonical(obj: Record<string, unknown>, mode: 'hash' | 'str'):
     mode === 'hash'
       ? 'from far_chain_repro.canonical_json import hash_canonical_json; import json,sys; print(hash_canonical_json(json.loads(sys.stdin.read())))'
       : 'from far_chain_repro.canonical_json import canonical_json; import json,sys; print(canonical_json(json.loads(sys.stdin.read())))';
-  const result = spawnSync('python3', ['-c', script], {
+  const result = spawnSync(PYTHON_CMD, ['-c', script], {
     cwd: new URL('../../', import.meta.url),
     encoding: 'utf8',
     input: JSON.stringify(obj),

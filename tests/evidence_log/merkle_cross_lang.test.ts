@@ -30,6 +30,10 @@ import {
 
 const REPRO_ROOT = new URL('../../', import.meta.url);
 
+// Windows: 'python' (真实安装); Unix: 'python3'。WindowsApps python3 是 Store stub,
+// 在 coverage 并发下 spawnSync 偶发 status=null。对齐 ensure_py_deps.mjs / smt_backend.ts 约定。
+const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
+
 /**
  * Golden Merkle 叶集：GOLDEN_VECTORS 链节（跳过 meta_minimal_genesis fixture）的 current_hash。
  * 9 叶（奇数·末叶自复制凑偶·验证 duplicate-last 跨语言一致）。真实 canonical hash·杜绝手抄。
@@ -39,7 +43,7 @@ const GOLDEN_LEAVES: readonly string[] = GOLDEN_VECTORS.slice(1).map(
 );
 
 function spawnPython(script: string, stdin: string, args: readonly string[] = []): string {
-  const result = spawnSync('python3', ['-c', script, ...args], {
+  const result = spawnSync(PYTHON_CMD, ['-c', script, ...args], {
     cwd: REPRO_ROOT,
     encoding: 'utf8',
     input: stdin,

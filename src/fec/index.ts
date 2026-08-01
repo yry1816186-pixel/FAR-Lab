@@ -54,7 +54,7 @@ export type {
   SeedPolicy,
   StatPlanRequiredField,
   StatisticalPlan,
-  ThresholdSpec,
+  FecThresholdSpec,
   VerdictKind,
   VerdictMappingPath,
   WorkflowRequirement,

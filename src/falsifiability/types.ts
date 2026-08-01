@@ -3,6 +3,7 @@ import type {
   ReplayProver,
 } from '../evidence_log/types.ts';
 import type {
+  ThresholdSemantic,
   Verdict,
   VerdictNodeKind,
 } from '../schema/enums.ts';
@@ -11,7 +12,8 @@ import type {
   VerdictRuleTrace,
 } from './verdict_kernel_v2.ts';
 
-export type ThresholdSemantics = 'gt' | 'lt' | 'range';
+// DEBT-12 单源化：派生自 schema/enums.ts THRESHOLD_SEMANTICS（3 值·与 fec_contract/contracts 同源）。
+export type ThresholdSemantics = ThresholdSemantic;
 
 export interface FalsificationSpec {
   readonly prediction: string;

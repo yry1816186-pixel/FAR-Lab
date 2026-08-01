@@ -18,6 +18,7 @@ import type {
   EffectComparator,
   NetworkPolicy,
   ProofCheckOutcome,
+  ThresholdSemantic,
   Verdict,
 } from '../schema/enums.ts';
 
@@ -114,11 +115,14 @@ export interface MetricSpec {
   readonly isDeterministic: boolean;
 }
 
-export interface ThresholdSpec {
+/** FEC 契约层阈值规格（DEBT-11：从 ThresholdSpec 改名为 FecThresholdSpec，消除与 falsifiability/types.ts 同名类型的跨文件覆盖）。 */
+export interface FecThresholdSpec {
   readonly value: number;
   /** 须 === MetricSpec.unit（compiler 校验·否则 THRESHOLD_MISSING）。 */
   readonly unit: string;
-  readonly thresholdSemantics: 'lt' | 'gt' | 'eq' | 'ne' | 'range';
+  // DEBT-12：thresholdSemantics 单源化——派生自 schema/enums.ts THRESHOLD_SEMANTICS（3 值 gt/lt/range）。
+  // eq/ne 死值已移除（精确等值无可证伪语义·Popper；science_check_to_fec.ts 对 '==' fail-closed 拒绝）。
+  readonly thresholdSemantics: ThresholdSemantic;
   readonly rangeUpper?: number;
   readonly preregistered: boolean;
 }
@@ -253,7 +257,7 @@ export interface FecContractV2 {
   /** [VC] primary metric（无 → METRIC_MISSING）。 */
   readonly metric: MetricSpec;
   /** [VC] threshold（无 → THRESHOLD_MISSING）。 */
-  readonly threshold: ThresholdSpec;
+  readonly threshold: FecThresholdSpec;
   /** [VC] effect 与 threshold 比较方向。 */
   readonly direction: EffectComparator;
   /** [VC] 统计计划·全必填字段（缺 → STAT_PLAN_MISSING）。 */
