@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const ROOT = process.cwd();
 const GEN = ["scripts/generate_json_schema.mts"];
@@ -58,4 +59,28 @@ test("③ 生成产物内容与类型语义一致(抽查)", () => {
   const env = JSON.parse(readFileSync(join(ROOT, "schema", "json", "proof-envelope.schema.json"), "utf8"));
   assert.equal(env.properties.sealedBy.const, "deterministic_sealer");
   assert.ok(!env.required.includes("rulesetUri"), "rulesetUri 应为 optional(legacy 兼容)");
+});
+
+test("④ DEBT-11 collision guard: 跨文件同名 interface → ambiguousNames 标记 + assertUnambiguous fail-closed", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "schema-collision-"));
+  try {
+    mkdirSync(join(dir, "src"), { recursive: true });
+    // entry.ts 同时 import a.ts 与 b.ts → 两者均进 program import 闭包；a/b 各声明同名 Foo → 碰撞
+    writeFileSync(join(dir, "src", "entry.ts"),
+      "import './a.ts';\nimport './b.ts';\nexport interface Entry { foo: Foo }\n", "utf8");
+    writeFileSync(join(dir, "src", "a.ts"), "export interface Foo { x: string }\n", "utf8");
+    writeFileSync(join(dir, "src", "b.ts"), "export interface Foo { y: number }\n", "utf8");
+    const mod = await import(pathToFileURL(join(ROOT, "scripts", "generate_json_schema.mts")).href);
+    const index = mod.buildIndex(dir, [
+      { file: "entry.schema.json", title: "t", source: "src/entry.ts#Entry", kind: "interface", name: "Entry" },
+    ]);
+    assert.ok(index.ambiguousNames.has("Foo"), "跨文件同名 Foo 须被 collision-guard 检出进 ambiguousNames");
+    assert.throws(() => mod.assertUnambiguous(index, "Foo"), /ambiguous type reference 'Foo'/,
+      "解析到同名碰撞的类型时须 fail-closed 抛错（禁止静默 last-wins 覆盖）");
+    // 反向：唯一名不抛（防止守卫过敏误伤合法类型）
+    assert.doesNotThrow(() => mod.assertUnambiguous(index, "Entry"),
+      "唯一声明名不应被 collision-guard 误报");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

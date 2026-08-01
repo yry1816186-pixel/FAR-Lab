@@ -218,25 +218,31 @@
     "threshold": {
       "type": "object",
       "properties": {
-        "semantics": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "thresholdSemantics": {
           "enum": [
             "gt",
             "lt",
             "range"
           ]
         },
-        "value": {
+        "rangeUpper": {
           "type": "number"
         },
-        "lower": {
-          "type": "number"
-        },
-        "upper": {
-          "type": "number"
+        "preregistered": {
+          "type": "boolean"
         }
       },
       "required": [
-        "semantics"
+        "value",
+        "unit",
+        "thresholdSemantics",
+        "preregistered"
       ],
       "additionalProperties": false
     },

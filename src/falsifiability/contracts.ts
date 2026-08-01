@@ -18,8 +18,12 @@
 import { ulid } from 'ulid';
 import { hashCanonicalJson } from '../evidence_log/hasher.ts';
 import type Database from 'better-sqlite3';
+import type { ThresholdSemantic } from '../schema/enums.ts';
 
-export type ComparatorKind = 'gt' | 'lt' | 'eq' | 'range';
+// DEBT-12：ComparatorKind 单源化——派生自 schema/enums.ts THRESHOLD_SEMANTICS（与 fec_contract
+// FecThresholdSpec.thresholdSemantics + falsifiability/types.ts ThresholdSemantics 同源·3 值统一）。
+// 'eq' 死值已移除（精确等值无可证伪语义·Popper）；DB CHECK 由 0022 迁移同步收窄。
+export type ComparatorKind = ThresholdSemantic;
 
 export interface FalsifiabilityContract {
   readonly contractId: string;

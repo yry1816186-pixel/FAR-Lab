@@ -28,6 +28,10 @@ const OFFLINE_OPTIONS: AppendRecordOptions = {
   providerProfile: 'offline_replay',
 };
 
+// Windows: 'python' (真实安装); Unix: 'python3'。WindowsApps python3 是 Store stub,
+// 在 coverage 并发下 spawnSync 偶发 status=null。对齐 ensure_py_deps.mjs / smt_backend.ts 约定。
+const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
+
 const SOURCE_ANCHOR: SourceAnchor = {
   gitCommitSha: 'b'.repeat(40),
   dashscopeRequestId: null,
@@ -262,7 +266,7 @@ test('Python verify_chain_head accepts a database written by TS appendRecord', (
       'db.close()',
       'print(f"{result.ok}:{result.verified_count}:{result.broken_at_seq}")',
     ].join('; ');
-    const result = spawnSync('python3', ['-c', script], {
+    const result = spawnSync(PYTHON_CMD, ['-c', script], {
       cwd: new URL('../../', import.meta.url),
       encoding: 'utf8',
       env: {

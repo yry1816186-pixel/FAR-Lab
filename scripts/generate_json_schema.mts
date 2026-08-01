@@ -21,7 +21,8 @@
  * 零容忍合规:无 any / @ts-ignore / 空 catch / 双重断言。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 interface SchemaEntry {
@@ -49,28 +50,59 @@ interface TypeIndex {
   readonly interfaces: Map<string, ts.InterfaceDeclaration>;
   readonly typeAliases: Map<string, ts.TypeNode>;
   readonly constArrays: Map<string, readonly string[]>;
+  // DEBT-11 guard：被 >1 个源文件声明的同名类型集合；生成期解析到此类名字时 fail-closed 抛错，
+  // 防止 buildIndex 的 last-wins 静默覆盖把错误源的形状写进 schema（历史 bug：fec_contract.ts
+  // ThresholdSpec 被 falsifiability/types.ts 同名 ThresholdSpec 覆盖 → fec.schema.json threshold 形状错误）。
+  readonly ambiguousNames: ReadonlySet<string>;
 }
 
-function buildIndex(root: string): TypeIndex {
+/** 记录每个顶层类型名的声明来源文件（DEBT-11 collision-guard 原始数据）。 */
+function recordOrigin(map: Map<string, Set<string>>, name: string, file: string): void {
+  let origins = map.get(name);
+  if (origins === undefined) {
+    origins = new Set<string>();
+    map.set(name, origins);
+  }
+  origins.add(file);
+}
+
+/** 生成期断言：被解析的类型名无跨文件同名冲突，否则 fail-closed（DEBT-11）。 */
+export function assertUnambiguous(index: TypeIndex, name: string): void {
+  if (index.ambiguousNames.has(name)) {
+    throw new Error(
+      `ambiguous type reference '${name}' is declared in multiple source files in the indexed closure — ` +
+        `silent schema-override risk (DEBT-11 guard). Rename one declaration to a unique name, then rerun generate_json_schema.mts.`,
+    );
+  }
+}
+
+export function buildIndex(root: string, entries: readonly SchemaEntry[] = ENTRIES): TypeIndex {
   const interfaces = new Map<string, ts.InterfaceDeclaration>();
   const typeAliases = new Map<string, ts.TypeNode>();
   const constArrays = new Map<string, readonly string[]>();
+  const nameOrigins = new Map<string, Set<string>>();
   // 入口文件 + import 闭包自动纳入 program(避免全 src 扫描)
-  const entryFiles = [...new Set(ENTRIES.map((e) => join(root, e.source.split('#')[0] ?? '')))];
+  const entryFiles = [...new Set(entries.map((e) => join(root, e.source.split('#')[0] ?? '')))];
   const program = ts.createProgram(entryFiles, { allowJs: false, noEmit: true, types: [] });
   for (const sf of program.getSourceFiles()) {
     if (sf.isDeclarationFile) continue;
-    if (!sf.fileName.replace(/\\/g, '/').includes('/src/')) continue;
+    const relFile = sf.fileName.replace(/\\/g, '/');
+    if (!relFile.includes('/src/')) continue;
     const visit = (node: ts.Node): void => {
       if (ts.isInterfaceDeclaration(node)) {
+        recordOrigin(nameOrigins, node.name.text, relFile);
         interfaces.set(node.name.text, node);
       } else if (ts.isTypeAliasDeclaration(node)) {
+        recordOrigin(nameOrigins, node.name.text, relFile);
         typeAliases.set(node.name.text, node.type);
       } else if (ts.isVariableStatement(node)) {
         for (const decl of node.declarationList.declarations) {
           if (ts.isIdentifier(decl.name) && decl.initializer !== undefined) {
             const values = extractConstStringArray(decl.initializer);
-            if (values !== null) constArrays.set(decl.name.text, values);
+            if (values !== null) {
+              recordOrigin(nameOrigins, decl.name.text, relFile);
+              constArrays.set(decl.name.text, values);
+            }
           }
         }
       }
@@ -78,7 +110,11 @@ function buildIndex(root: string): TypeIndex {
     };
     visit(sf);
   }
-  return { interfaces, typeAliases, constArrays };
+  const ambiguousNames = new Set<string>();
+  for (const [name, files] of nameOrigins) {
+    if (files.size > 1) ambiguousNames.add(name);
+  }
+  return { interfaces, typeAliases, constArrays, ambiguousNames };
 }
 
 function extractConstStringArray(init: ts.Expression): readonly string[] | null {
@@ -134,9 +170,15 @@ function convertTypeNode(node: ts.TypeNode, index: TypeIndex, inProgress: Readon
       return { type: 'object', additionalProperties: valueArg === undefined ? true : convertTypeNode(valueArg, index, inProgress) };
     }
     const alias = index.typeAliases.get(name);
-    if (alias !== undefined) return convertTypeNode(alias, index, inProgress);
+    if (alias !== undefined) {
+      assertUnambiguous(index, name);
+      return convertTypeNode(alias, index, inProgress);
+    }
     const iface = index.interfaces.get(name);
-    if (iface !== undefined) return convertInterface(name, iface, index, inProgress);
+    if (iface !== undefined) {
+      assertUnambiguous(index, name);
+      return convertInterface(name, iface, index, inProgress);
+    }
     throw new Error(`unresolvable type reference '${name}'`);
   }
   throw new Error(`unsupported type node kind ${node.kind} — fail-closed,扩展转换器或改类型`);
@@ -264,4 +306,7 @@ function main(): number {
   return 0;
 }
 
-process.exit(main());
+// 仅在直接执行时运行 main（被 import 时不运行，便于单测 buildIndex/assertUnambiguous）。
+if (fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? '')) {
+  process.exit(main());
+}

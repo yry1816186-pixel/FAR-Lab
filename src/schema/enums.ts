@@ -43,6 +43,15 @@ export const VERDICTS = [
   'UNTESTED',
 ] as const;
 
+// DEBT-12：阈值语义单源（3 值）。精确等值 eq/ne 已移除——无可证伪语义（Popper），
+// science_check_to_fec.ts 对 '==' fail-closed 拒绝。fec_contract FecThresholdSpec.thresholdSemantics、
+// falsifiability/types.ts ThresholdSemantics、contracts.ts ComparatorKind 均派生自本常量（FF-16 守单一源）。
+export const THRESHOLD_SEMANTICS = [
+  'gt',
+  'lt',
+  'range',
+] as const;
+
 export const VERDICT_NODE_KINDS = [
   'hypothesis',
   'evidence',
@@ -75,6 +84,7 @@ export type FinishReason = (typeof FINISH_REASONS)[number];
 export type Verdict = (typeof VERDICTS)[number];
 export type VerdictNodeKind = (typeof VERDICT_NODE_KINDS)[number];
 export type EdgeKind = (typeof EDGE_KINDS)[number];
+export type ThresholdSemantic = (typeof THRESHOLD_SEMANTICS)[number];
 
 // ----- V2 共享 enum（APPENDIX_A_TYPES.md §49-96 DESIGN_LOCKED 权威·多子系统复用）-----
 // 注：science_harness/types.ts 的 ScienceCheckOutcome 字面量与本处 ProofCheckOutcome 一致；
