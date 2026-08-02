@@ -30,6 +30,8 @@ export interface BenchmarkEntryV2 extends BenchmarkEntry {
   readonly seed: string | number | null;
   readonly bestOfK: boolean;
   readonly executedAt: string;
+  /** DEF-16 对账:human_reviewed 须锚定真实复核记录(64-hex 引用);unreviewed 须为 null/缺省。防伪造复核状态零成本过机检。 */
+  readonly reviewRecordRef?: string | null;
 }
 
 export interface BenchmarkReportV2 extends Omit<BenchmarkReport, 'schemaVersion' | 'entries'> {
@@ -134,6 +136,18 @@ export function checkBenchmarkReportV2(report: unknown): ReportCheckResult {
       if (entry.oracleReviewStatus !== 'unreviewed' && entry.oracleReviewStatus !== 'human_reviewed') {
         errors.push(`entries[${index}].oracleReviewStatus 非法: ${String(entry.oracleReviewStatus)}`);
       }
+      // DEF-16 对账:human_reviewed 须锚定真实复核记录(64-hex reviewRecordRef);unreviewed 不得携带(防伪造/不一致)
+      if (entry.oracleReviewStatus === 'human_reviewed') {
+        const ref = entry.reviewRecordRef;
+        if (typeof ref !== 'string' || !/^[0-9a-f]{64}$/.test(ref)) {
+          errors.push(`entries[${index}].oracleReviewStatus='human_reviewed' 须有 reviewRecordRef(64-hex 复核记录引用·DEF-16 对账),got ${ref === undefined ? '(missing)' : String(ref).slice(0, 16)}`);
+        }
+      } else if (entry.oracleReviewStatus === 'unreviewed') {
+        const ref = entry.reviewRecordRef;
+        if (ref !== undefined && ref !== null) {
+          errors.push(`entries[${index}].oracleReviewStatus='unreviewed' 不得携带 reviewRecordRef(一致性·DEF-16)`);
+        }
+      }
       // V-08-F3:条目关键字段内容校验
       for (const field of ['taskId', 'oracleType', 'kernelVersion', 'modelVersion', 'executedAt'] as const) {
         if (field in entry && !nonempty(entry[field])) {
@@ -159,6 +173,7 @@ export function upgradeReportV1toV2(report: BenchmarkReport): BenchmarkReportV2 
     taskId: entry.problemId,
     oracleType: 'deterministic_kernel(R0-R9)',
     oracleReviewStatus: 'unreviewed',
+    reviewRecordRef: null,
     traceHash: entry.integrityRoot,
     costTokens: null,
     kernelVersion: CURRENT_RULESET_URI,

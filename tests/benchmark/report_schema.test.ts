@@ -67,3 +67,33 @@ test('v1 → v2 升级:补字段且 oracleReviewStatus=unreviewed 诚实标注',
   const result = checkBenchmarkReportV2(upgraded);
   assert.equal(result.ok, true, `errors: ${result.errors.join('; ')}`);
 });
+
+test('DEF-16 对账:伪造 human_reviewed 无 reviewRecordRef → 机检红(防零成本伪造复核状态)', () => {
+  const report = JSON.parse(readFileSync(REPORT_PATH, 'utf8')) as Record<string, unknown> & { entries: Array<Record<string, unknown>> };
+  // 1. human_reviewed 但无 reviewRecordRef → 须红(伪造阻断)
+  const forged = JSON.parse(JSON.stringify(report)) as { entries: Array<Record<string, unknown>> };
+  forged.entries[0]!.oracleReviewStatus = 'human_reviewed';
+  delete forged.entries[0]!.reviewRecordRef;
+  const forgedResult = checkBenchmarkReportV2(forged);
+  assert.equal(forgedResult.ok, false, 'human_reviewed 无 reviewRecordRef 须被对账拦截');
+  assert.ok(forgedResult.errors.some((e) => e.includes('DEF-16') && e.includes('reviewRecordRef')), `errors: ${forgedResult.errors.join('; ')}`);
+
+  // 2. human_reviewed + 无效(非 64-hex)reviewRecordRef → 须红
+  const invalidRef = JSON.parse(JSON.stringify(report)) as { entries: Array<Record<string, unknown>> };
+  invalidRef.entries[0]!.oracleReviewStatus = 'human_reviewed';
+  invalidRef.entries[0]!.reviewRecordRef = 'not-a-hash';
+  assert.equal(checkBenchmarkReportV2(invalidRef).ok, false, '非 64-hex reviewRecordRef 须被拦');
+
+  // 3. human_reviewed + 合法 64-hex reviewRecordRef → 须过(真实复核主张放行)
+  const valid = JSON.parse(JSON.stringify(report)) as { entries: Array<Record<string, unknown>> };
+  valid.entries[0]!.oracleReviewStatus = 'human_reviewed';
+  valid.entries[0]!.reviewRecordRef = 'a'.repeat(64);
+  const validResult = checkBenchmarkReportV2(valid);
+  assert.equal(validResult.ok, true, `合法 human_reviewed+reviewRecordRef 须过: ${validResult.errors.join('; ')}`);
+
+  // 4. unreviewed + 携带 reviewRecordRef → 须红(不一致)
+  const inconsistent = JSON.parse(JSON.stringify(report)) as { entries: Array<Record<string, unknown>> };
+  inconsistent.entries[0]!.oracleReviewStatus = 'unreviewed';
+  inconsistent.entries[0]!.reviewRecordRef = 'b'.repeat(64);
+  assert.equal(checkBenchmarkReportV2(inconsistent).ok, false, 'unreviewed 携带 reviewRecordRef 须被拦(一致性)');
+});
