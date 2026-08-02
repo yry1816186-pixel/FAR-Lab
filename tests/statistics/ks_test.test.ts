@@ -27,8 +27,13 @@ test('KS: fully separated samples → D=1 (max CDF gap), small asymptotic p', ()
   // [1..5] vs [6..10]: cdf1 reaches 1 while cdf2 still 0 ⇒ D=1
   const r = kolmogorovSmirnovTwoSample([1, 2, 3, 4, 5], [6, 7, 8, 9, 10]);
   assert.equal(r.statistic, 1);
-  // n1=n2=5, en≈1.581, λ≈1.77 ⇒ Q_KS ≈ 2·e^(-2λ²) ≈ 2·e^(-6.27) ≈ 0.0038
-  assert.ok(r.pValue < 0.01, `expected small p for fully-separated samples, got ${r.pValue}`);
+  // n1=n2=5, en=√2.5≈1.5811, λ=(en+0.12+0.11/en)·D≈1.7707
+  // Q_KS(λ)=2·Σ(-1)^{j-1}e^(-2j²λ²)≈2·e^(-6.272)≈0.0037814（独立手算参考值）
+  // 此前仅断言 pValue<0.01（范围检查·捕获不了 qKs 的 2· 因子/指数错误）；现 pin 到精确参考值。
+  assert.ok(
+    Math.abs(r.pValue - 0.0037813540593701) < 1e-6,
+    `expected pValue≈0.0037814 (Q_KS 参考值), got ${r.pValue}`,
+  );
   assert.ok(r.pValue > 0, 'p must be positive');
 });
 
