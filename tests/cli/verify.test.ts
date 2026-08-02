@@ -2,11 +2,14 @@
 // 测试 far verify 的纯收集器（FI-9 · 04§5）。
 // 直接调 verifyEnvelopeV2 / collectVerifyDump / parseProofEnvelopeV2 / verifyChainHeadResult，
 // 不 spawn 子进程（镜像 status.test.ts）。runVerify 端到端用临时文件验 exit code（0/7 契约）+ 空格路径（R5）。
+// #13 起 runVerify 为 async（browser 轴 Web Crypto）——端到端改 spawnSync 子进程隔离 stdout
+// （async mock 窗口会让 node:test reporter 输出插队污染捕获流·竞态）。
 
 import { strict as assert } from 'node:assert';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 
 import Database from 'better-sqlite3';
@@ -35,14 +38,15 @@ import {
   collectVerifyDump,
   diffAntiTheaterReport,
   parseProofEnvelopeV2,
-  runVerify,
   verifyAntiTheaterLint,
   verifyChainHeadResult,
   verifyEnvelopeV2,
   verifyEnvelopeV2WithPython,
+  verifyEnvelopeV2WithBrowser,
   type VerifyDump,
   type VerifyMode,
 } from '../../src/cli/commands/verify.ts';
+import { PACKAGE_ROOT } from '../../src/cli/paths.ts';
 
 // ===== envelope 收集器 =====
 
@@ -113,6 +117,28 @@ test('verifyEnvelopeV2WithPython: 篡改 VC 字段不改 proofHash → Python pr
   assert.ok(
     result.errors.some((e) => /mismatch/.test(e)),
     `Python verifier fail 须含 mismatch，实际: ${result.errors.join(' | ')}`,
+  );
+});
+
+test('verifyEnvelopeV2WithBrowser: 合法 envelope → browser proofHash 重算 pass（#13 接线）', async () => {
+  const result = await verifyEnvelopeV2WithBrowser(sealedEnvelope());
+  assert.equal(result.axis, 'pass', `browser verifier 须 pass，errors=${result.errors.join(' | ')}, warnings=${result.warnings.join(' | ')}`);
+  assert.equal(result.errors.length, 0);
+});
+
+test('verifyEnvelopeV2WithBrowser: 篡改 VC 字段不改 proofHash → browser 重算 fail', async () => {
+  const env = sealedEnvelope();
+  const first = env.statisticalResults[0];
+  assert.ok(first, 'fixture statisticalResults 须非空');
+  const tampered: ProofEnvelopeV2 = {
+    ...env,
+    statisticalResults: [{ ...first, pValue: 0.999 }],
+  };
+  const result = await verifyEnvelopeV2WithBrowser(tampered);
+  assert.equal(result.axis, 'fail');
+  assert.ok(
+    result.errors.some((e: string) => /MISMATCH|mismatch/.test(e)),
+    `browser verifier fail 须含 mismatch，实际: ${result.errors.join(' | ')}`,
   );
 });
 
@@ -421,44 +447,36 @@ test('collectVerifyDump: chain 轴 payloadHashOk=false → status FAIL + tamperS
 
 // ===== runVerify 端到端（exit code 契约 + 空格路径 R5）=====
 
-function runVerifyCapture(options: {
+async function runVerifyCapture(options: {
   readonly bundlePath?: string;
   readonly envelopePath?: string;
   readonly dbPath?: string;
   readonly lintInputPath?: string;
   readonly mode: VerifyMode;
-}): { readonly code: number; readonly stdout: string; readonly stderr: string } {
-  const outChunks: string[] = [];
-  const errChunks: string[] = [];
-  const origOut = process.stdout.write.bind(process.stdout);
-  const origErr = process.stderr.write.bind(process.stderr);
-  // 捕获 stdout + stderr（exit 1/2 的诊断走 stderr）。finally 还原（反回归）。
-  process.stdout.write = ((chunk: unknown): boolean => {
-    outChunks.push(typeof chunk === 'string' ? chunk : String(chunk));
-    return true;
-  }) as typeof process.stdout.write;
-  process.stderr.write = ((chunk: unknown): boolean => {
-    errChunks.push(typeof chunk === 'string' ? chunk : String(chunk));
-    return true;
-  }) as typeof process.stderr.write;
-  let code: number;
-  try {
-    code = runVerify({ ...options, json: true, explain: false });
-  } finally {
-    process.stdout.write = origOut;
-    process.stderr.write = origErr;
-  }
-  return { code, stdout: outChunks.join(''), stderr: errChunks.join('') };
+}): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> {
+  // #13：runVerify 为 async（browser 轴 Web Crypto·async mock 窗口会让 node:test reporter
+  // 输出插队污染捕获流·竞态）→ 改 spawnSync 子进程隔离 stdout（verify_golden.test.ts 既有先例）。
+  const args = ['src/cli/far.ts', 'verify', '--mode', options.mode, '--json'];
+  if (options.bundlePath !== undefined) args.push('--bundle', options.bundlePath);
+  if (options.envelopePath !== undefined) args.push('--envelope', options.envelopePath);
+  if (options.dbPath !== undefined) args.push('--db', options.dbPath);
+  if (options.lintInputPath !== undefined) args.push('--lint-input', options.lintInputPath);
+  const result = spawnSync(process.execPath, args, { encoding: 'utf8', cwd: PACKAGE_ROOT });
+  return {
+    code: result.status ?? 1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
 }
 
-function runVerifyJson(options: {
+async function runVerifyJson(options: {
   readonly bundlePath?: string;
   readonly envelopePath?: string;
   readonly dbPath?: string;
   readonly lintInputPath?: string;
   readonly mode: VerifyMode;
-}): { readonly code: number; readonly dump: VerifyDump; readonly stderr: string } {
-  const { code, stdout, stderr } = runVerifyCapture(options);
+}): Promise<{ readonly code: number; readonly dump: VerifyDump; readonly stderr: string }> {
+  const { code, stdout, stderr } = await runVerifyCapture(options);
   // exit 0/7 恒产 JSON（collectVerifyDump → stdout）；单层 as：runVerify 输出即 VerifyDump（测试上下文）。
   const dump = JSON.parse(stdout) as VerifyDump;
   return { code, dump, stderr };
@@ -488,26 +506,26 @@ function writeDemoBundle(parentDir: string): string {
   }
 }
 
-test('runVerify: 合法 envelope 文件（含空格路径）→ exit 0 + status PASS', () => {
+test('runVerify: 合法 envelope 文件（含空格路径）→ exit 0 + status PASS', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far verify dir-')); // 路径含空格（R5）
   try {
     const envPath = join(dir, 'envelope.json');
     writeFileSync(envPath, JSON.stringify(sealedEnvelope(), null, 2));
 
-    const { code, dump } = runVerifyJson({ envelopePath: envPath, mode: 'envelope' });
+    const { code, dump } = await runVerifyJson({ envelopePath: envPath, mode: 'envelope' });
     assert.equal(code, 0, 'PASS → exit 0');
     assert.equal(dump.status, 'PASS');
     assert.equal(dump.tamperStatus, 'clean');
     assert.equal(dump.recomputation.node, 'pass');
     assert.equal(dump.recomputation.python, 'pass');
-    assert.equal(dump.recomputation.browser, 'not-run');
-    assert.deepEqual(dump.verifiedLevels, ['proofEnvelope', 'pythonProofHash']);
+    assert.equal(dump.recomputation.browser, 'pass', '#13: browser 轴已接线');
+    assert.deepEqual(dump.verifiedLevels, ['proofEnvelope', 'pythonProofHash', 'browserProofHash']);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('runVerify: 篡改 envelope 文件 → exit 7 + status FAIL + tamperStatus tampered', () => {
+test('runVerify: 篡改 envelope 文件 → exit 7 + status FAIL + tamperStatus tampered', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-tampered-'));
   try {
     const env = sealedEnvelope();
@@ -517,7 +535,7 @@ test('runVerify: 篡改 envelope 文件 → exit 7 + status FAIL + tamperStatus 
     const envPath = join(dir, 'tampered.json');
     writeFileSync(envPath, JSON.stringify(tampered, null, 2));
 
-    const { code, dump } = runVerifyJson({ envelopePath: envPath, mode: 'envelope' });
+    const { code, dump } = await runVerifyJson({ envelopePath: envPath, mode: 'envelope' });
     assert.equal(code, 7, 'FAIL → exit 7');
     assert.equal(dump.status, 'FAIL');
     assert.equal(dump.tamperStatus, 'tampered');
@@ -528,11 +546,11 @@ test('runVerify: 篡改 envelope 文件 → exit 7 + status FAIL + tamperStatus 
   }
 });
 
-test('runVerify --bundle: V1 .far-proof 包（含空格路径）→ exit 0 + status WARN（诚实边界）', () => {
+test('runVerify --bundle: V1 .far-proof 包（含空格路径）→ exit 0 + status WARN（诚实边界）', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far verify bundle-'));
   try {
     const bundlePath = writeDemoBundle(dir);
-    const { code, dump } = runVerifyJson({ bundlePath, mode: 'full' });
+    const { code, dump } = await runVerifyJson({ bundlePath, mode: 'full' });
     assert.equal(code, 0, 'WARN → exit 0');
     assert.equal(dump.status, 'WARN');
     assert.equal(dump.tamperStatus, 'clean');
@@ -551,7 +569,7 @@ test('runVerify --bundle: V1 .far-proof 包（含空格路径）→ exit 0 + sta
   }
 });
 
-test('runVerify --bundle: 篡改 proof_envelopes.jsonl → exit 7 + PROOF_HASH_MISMATCH', () => {
+test('runVerify --bundle: 篡改 proof_envelopes.jsonl → exit 7 + PROOF_HASH_MISMATCH', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-bundle-tamper-'));
   try {
     const bundlePath = writeDemoBundle(dir);
@@ -560,7 +578,7 @@ test('runVerify --bundle: 篡改 proof_envelopes.jsonl → exit 7 + PROOF_HASH_M
     row.proof_hash = 'f'.repeat(64);
     writeFileSync(envelopePath, `${JSON.stringify(row)}\n`, 'utf8');
 
-    const { code, dump } = runVerifyJson({ bundlePath, mode: 'full' });
+    const { code, dump } = await runVerifyJson({ bundlePath, mode: 'full' });
     assert.equal(code, 7, 'FAIL → exit 7');
     assert.equal(dump.status, 'FAIL');
     assert.equal(dump.tamperStatus, 'tampered');
@@ -573,7 +591,7 @@ test('runVerify --bundle: 篡改 proof_envelopes.jsonl → exit 7 + PROOF_HASH_M
   }
 });
 
-test('runVerify --bundle: 篡改 sealed_by → exit 7（deterministic sealer 守卫）', () => {
+test('runVerify --bundle: 篡改 sealed_by → exit 7（deterministic sealer 守卫）', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-bundle-sealed-by-'));
   try {
     const bundlePath = writeDemoBundle(dir);
@@ -582,7 +600,7 @@ test('runVerify --bundle: 篡改 sealed_by → exit 7（deterministic sealer 守
     row.sealed_by = 'llm_judge';
     writeFileSync(envelopePath, `${JSON.stringify(row)}\n`, 'utf8');
 
-    const { code, dump } = runVerifyJson({ bundlePath, mode: 'full' });
+    const { code, dump } = await runVerifyJson({ bundlePath, mode: 'full' });
     assert.equal(code, 7, 'FAIL → exit 7');
     assert.equal(dump.status, 'FAIL');
     assert.equal(dump.tamperStatus, 'tampered');
@@ -598,12 +616,12 @@ test('runVerify --bundle: 篡改 sealed_by → exit 7（deterministic sealer 守
 // ===== T-001 回归：verify 对缺失/不存在 bundle 路径 fail-closed（exit 7，非 0）=====
 // 评委03 第 1 轮 F-3-001 实测早期版本 exit=0（假阳性）；当前 verifyFarProofBundle 已产
 // MISSING_REQUIRED_FILE errors → status FAIL → exit 7。本测试锁住该行为，防回归。
-test('runVerify --bundle: 不存在的 bundle 路径 → exit 7 + 10 MISSING_REQUIRED_FILE（fail-closed · T-001 回归）', () => {
+test('runVerify --bundle: 不存在的 bundle 路径 → exit 7 + 10 MISSING_REQUIRED_FILE（fail-closed · T-001 回归）', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-missing-bundle-'));
   try {
     // 不创建任何文件，直接指向不存在的子目录（镜像 README 早期 examples/tess-offline/output/demo.far-proof 场景）。
     const ghostBundlePath = join(dir, 'does-not-exist', 'demo.far-proof');
-    const { code, dump } = runVerifyJson({ bundlePath: ghostBundlePath, mode: 'full' });
+    const { code, dump } = await runVerifyJson({ bundlePath: ghostBundlePath, mode: 'full' });
 
     assert.equal(code, 7, '缺失 bundle 路径必须 fail-closed exit=7（T-001·禁止假阳性 exit=0）');
     assert.equal(dump.status, 'FAIL', 'status 须 FAIL（10 MISSING_REQUIRED_FILE errors）');
@@ -627,11 +645,11 @@ test('runVerify --bundle: 不存在的 bundle 路径 → exit 7 + 10 MISSING_REQ
   }
 });
 
-test('runVerify --bundle --mode chain: 不存在路径 → exit 7 + MISSING_REQUIRED_FILE call_records.redacted.jsonl', () => {
+test('runVerify --bundle --mode chain: 不存在路径 → exit 7 + MISSING_REQUIRED_FILE call_records.redacted.jsonl', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-missing-chain-'));
   try {
     const ghostBundlePath = join(dir, 'ghost');
-    const { code, dump } = runVerifyJson({ bundlePath: ghostBundlePath, mode: 'chain' });
+    const { code, dump } = await runVerifyJson({ bundlePath: ghostBundlePath, mode: 'chain' });
 
     assert.equal(code, 7, 'chain 模式缺失路径同样 fail-closed');
     assert.equal(dump.status, 'FAIL');
@@ -723,14 +741,14 @@ test('verifyAntiTheaterLint: 深层损坏 input（删 fec.threshold·骨架不�
 
 // ===== #11b · runVerify --lint-input 端到端（exit code 契约 + 空格路径 R5）=====
 
-test('runVerify --lint-input: envelope + clean lint-input（含空格路径）→ exit 0 / PASS / verifiedLevels 含 antiTheaterLint', () => {
+test('runVerify --lint-input: envelope + clean lint-input（含空格路径）→ exit 0 / PASS / verifiedLevels 含 antiTheaterLint', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far verify lint-')); // 路径含空格（R5）
   try {
     const envelope = sealedEnvelopeWithCleanReport();
     writeFileSync(join(dir, 'envelope.json'), JSON.stringify(envelope, null, 2));
     writeFileSync(join(dir, 'lint-input.json'), JSON.stringify(makeCleanBaseInput(), null, 2));
 
-    const { code, dump } = runVerifyJson({
+    const { code, dump } = await runVerifyJson({
       envelopePath: join(dir, 'envelope.json'),
       lintInputPath: join(dir, 'lint-input.json'),
       mode: 'envelope',
@@ -744,7 +762,7 @@ test('runVerify --lint-input: envelope + clean lint-input（含空格路径）�
   }
 });
 
-test('runVerify --lint-input: envelope + 攻击 lint-input（gv-posthoc）→ exit 7 / FAIL / errors 含 divergence', () => {
+test('runVerify --lint-input: envelope + 攻击 lint-input（gv-posthoc）→ exit 7 / FAIL / errors 含 divergence', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-lint-mismatch-'));
   try {
     const envelope = sealedEnvelopeWithCleanReport();
@@ -754,7 +772,7 @@ test('runVerify --lint-input: envelope + 攻击 lint-input（gv-posthoc）→ ex
       JSON.stringify(getGoldenVector('gv-posthoc-threshold-01').build(), null, 2),
     );
 
-    const { code, dump } = runVerifyJson({
+    const { code, dump } = await runVerifyJson({
       envelopePath: join(dir, 'envelope.json'),
       lintInputPath: join(dir, 'lint-input.json'),
       mode: 'envelope',
@@ -770,7 +788,7 @@ test('runVerify --lint-input: envelope + 攻击 lint-input（gv-posthoc）→ ex
   }
 });
 
-test('runVerify --lint-input: 骨架非法 lint-input（{bad:1}）→ exit 1 / stderr 含载入失败', () => {
+test('runVerify --lint-input: 骨架非法 lint-input（{bad:1}）→ exit 1 / stderr 含载入失败', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-lint-malformed-'));
   try {
     const envPath = join(dir, 'envelope.json');
@@ -778,7 +796,7 @@ test('runVerify --lint-input: 骨架非法 lint-input（{bad:1}）→ exit 1 / s
     writeFileSync(envPath, JSON.stringify(sealedEnvelopeWithCleanReport(), null, 2));
     writeFileSync(lintPath, JSON.stringify({ bad: 1 }));
 
-    const { code, stderr } = runVerifyCapture({
+    const { code, stderr } = await runVerifyCapture({
       envelopePath: envPath,
       lintInputPath: lintPath,
       mode: 'envelope',
@@ -790,13 +808,13 @@ test('runVerify --lint-input: 骨架非法 lint-input（{bad:1}）→ exit 1 / s
   }
 });
 
-test('runVerify --lint-input: 无 --envelope → exit 2 / stderr 含「须配合 --envelope」', () => {
+test('runVerify --lint-input: 无 --envelope → exit 2 / stderr 含「须配合 --envelope」', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-lint-noenv-'));
   try {
     const lintPath = join(dir, 'lint-input.json');
     writeFileSync(lintPath, JSON.stringify(makeCleanBaseInput(), null, 2));
 
-    const { code, stderr } = runVerifyCapture({ lintInputPath: lintPath, mode: 'envelope' });
+    const { code, stderr } = await runVerifyCapture({ lintInputPath: lintPath, mode: 'envelope' });
     assert.equal(code, 2, 'arg error → exit 2');
     assert.match(stderr, /requires --envelope/);
   } finally {

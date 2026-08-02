@@ -110,7 +110,7 @@ async function main(): Promise<void> {
   }
 
   if (command === 'verify') {
-    const exitCode = runVerifyFromArgs(argv.slice(1));
+    const exitCode = await runVerifyFromArgs(argv.slice(1));
     process.exit(exitCode);
   }
 
@@ -320,7 +320,7 @@ const VERIFY_SCHEMA: readonly OptionSchema[] = [
   },
 ];
 
-function runVerifyFromArgs(args: readonly string[]): number {
+async function runVerifyFromArgs(args: readonly string[]): Promise<number> {
   const result = parseOptions(args, VERIFY_SCHEMA, 'far verify');
   if (reportErrors(result.errors)) {
     return 2;

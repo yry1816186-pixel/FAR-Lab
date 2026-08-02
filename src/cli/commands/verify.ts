@@ -16,6 +16,7 @@ import Database from 'better-sqlite3';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createContext, runInContext } from 'node:vm';
 import { PACKAGE_ROOT } from '../paths.ts';
 
 import { runAntiTheaterLint } from '../../anti_theater/lint.ts';
@@ -36,6 +37,8 @@ const VALID_MODES = new Set<string>(['chain', 'envelope', 'full']);
 const REPO_ROOT = PACKAGE_ROOT;
 const REPRO_PYTHON_DIR = join(PACKAGE_ROOT, 'repro', 'far_chain_repro');
 const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
+/** #13 · browser 轴：offline 浏览器 ProofEnvelope V2 验证器（Web Crypto·独立复算 proofHash）。 */
+const BROWSER_VERIFY_HTML = join(PACKAGE_ROOT, 'frontend', 'public', 'verify.html');
 
 /** far verify 模式（04 §5.1·D2）。VALID_MODES 为运行时校验集合（单一来源）。 */
 export type VerifyMode = 'chain' | 'envelope' | 'full';
@@ -55,7 +58,7 @@ export interface RecomputationStatus {
 }
 
 /** verifier 实际执行的校验层（04 §5.3 verifiedLevels 子集·透明披露）。 */
-export type VerifiedLevel = 'bundle' | 'chain' | 'proofEnvelope' | 'pythonProofHash' | 'antiTheaterLint';
+export type VerifiedLevel = 'bundle' | 'chain' | 'proofEnvelope' | 'pythonProofHash' | 'browserProofHash' | 'antiTheaterLint';
 
 /** far verify 10 字段输出 schema（04 §5.2）。 */
 export interface VerifyDump {
@@ -91,6 +94,92 @@ export interface PythonProofHashRecomputeResult {
   readonly axis: RecomputeAxis;
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
+}
+
+/** Browser ProofEnvelope proofHash 独立重算结果（#13·Web Crypto 轴）。 */
+export interface BrowserProofHashRecomputeResult {
+  readonly axis: RecomputeAxis;
+  readonly errors: readonly string[];
+  readonly warnings: readonly string[];
+}
+
+interface BrowserVerifyEnvelopeSandbox {
+  FARVerify?: {
+    readonly verifyProofEnvelopeV2: (envelope: ProofEnvelopeV2) => Promise<{
+      readonly status: string;
+      readonly recomputation: { readonly browser: RecomputeAxis };
+      readonly errors: readonly string[];
+      readonly warnings: readonly string[];
+    }>;
+  };
+  readonly console: Console;
+  readonly document: { readonly addEventListener: (eventName: string, handler: () => void) => void };
+  readonly crypto: Crypto;
+  readonly TextEncoder: typeof TextEncoder;
+}
+
+let browserVerifierCache: BrowserVerifyEnvelopeSandbox['FARVerify'] | undefined;
+
+/**
+ * loadBrowserEnvelopeVerifier —— 从 frontend/public/verify.html 加载 standalone 浏览器
+ * ProofEnvelope V2 验证器（#13）。vm 沙箱注入 Web Crypto（Node globalThis.crypto.subtle）
+ * 与 TextEncoder——浏览器独立复算路径在 Node 端亦可用（同一算法·跨运行时字节相等）。
+ */
+export function loadBrowserEnvelopeVerifier(): NonNullable<BrowserVerifyEnvelopeSandbox['FARVerify']> {
+  if (browserVerifierCache !== undefined) {
+    return browserVerifierCache;
+  }
+  const html = readFileSync(BROWSER_VERIFY_HTML, 'utf8');
+  const script = html.match(/<script id="far-verify-standalone">([\s\S]*?)<\/script>/)?.[1];
+  if (script === undefined) {
+    throw new Error('browser verifier script #far-verify-standalone not found in verify.html');
+  }
+  if (globalThis.crypto === undefined || globalThis.crypto.subtle === undefined) {
+    throw new Error('Web Crypto subtle.digest is unavailable in this Node runtime');
+  }
+  const sandbox: BrowserVerifyEnvelopeSandbox = {
+    console,
+    document: { addEventListener: () => undefined },
+    crypto: globalThis.crypto,
+    TextEncoder,
+  };
+  createContext(sandbox);
+  runInContext(script, sandbox, { filename: BROWSER_VERIFY_HTML });
+  if (sandbox.FARVerify === undefined) {
+    throw new Error('browser verifier did not expose FARVerify');
+  }
+  browserVerifierCache = sandbox.FARVerify;
+  return sandbox.FARVerify;
+}
+
+/**
+ * verifyEnvelopeV2WithBrowser —— 调 verify.html 内嵌浏览器验证器独立重算 proofHash。
+ * #13 接线：browser 轴不再 not-run——Web Crypto + standalone canonical JSON 独立复算，
+ * 与 node（TS）轴 byte-equal。浏览器不可用（无 crypto.subtle/脚本缺失）→ not-run + warning。
+ */
+export async function verifyEnvelopeV2WithBrowser(
+  envelope: ProofEnvelopeV2,
+): Promise<BrowserProofHashRecomputeResult> {
+  try {
+    const verifier = loadBrowserEnvelopeVerifier();
+    const result = await verifier.verifyProofEnvelopeV2(envelope);
+    if (result.status === 'PASS' && result.recomputation.browser === 'pass') {
+      return { axis: 'pass', errors: [], warnings: [] };
+    }
+    return {
+      axis: 'fail',
+      errors: result.errors.length > 0
+        ? result.errors
+        : ['browser proofHash verifier reported mismatch (status not PASS)'],
+      warnings: [...result.warnings],
+    };
+  } catch (error) {
+    return {
+      axis: 'not-run',
+      errors: [],
+      warnings: [`browser proofHash verifier not-run: ${errorMessage(error)}`],
+    };
+  }
 }
 
 /** chain 校验结果（包 verifyChainHead 链头 + FUSION-OS-10 verifyEvidencePayloadHashes 内容寻址重算）。 */
@@ -426,6 +515,7 @@ export function collectVerifyDump(
   lintResult: LintRecomputeResult | undefined,
   pythonResult: PythonProofHashRecomputeResult | undefined = undefined,
   bundleResult: BundleVerifyResult | undefined = undefined,
+  browserResult: BrowserProofHashRecomputeResult | undefined = undefined,
 ): VerifyDump {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -438,6 +528,7 @@ export function collectVerifyDump(
   let scopeStatus: ScopeStatus = 'n/a';
   let nodeRecompute: RecomputeAxis = 'not-run';
   let pythonRecompute: RecomputeAxis = 'not-run';
+  let browserRecompute: RecomputeAxis = 'not-run';
 
   if (bundleResult !== undefined) {
     verifiedLevels.push('bundle');
@@ -473,6 +564,15 @@ export function collectVerifyDump(
     }
     errors.push(...pythonResult.errors);
     warnings.push(...pythonResult.warnings);
+  }
+
+  if (browserResult !== undefined) {
+    browserRecompute = browserResult.axis;
+    if (browserResult.axis !== 'not-run') {
+      verifiedLevels.push('browserProofHash');
+    }
+    errors.push(...browserResult.errors);
+    warnings.push(...browserResult.warnings);
   }
 
   if (chainResult !== undefined) {
@@ -511,7 +611,7 @@ export function collectVerifyDump(
     ledgerRoot,
     tamperStatus,
     scopeStatus,
-    recomputation: { node: nodeRecompute, python: pythonRecompute, browser: 'not-run' },
+    recomputation: { node: nodeRecompute, python: pythonRecompute, browser: browserRecompute },
     errors,
     warnings,
     verifiedLevels,
@@ -534,7 +634,7 @@ export interface VerifyOptions {
  * runVerify —— IO 编排：载入输入 → 纯收集器 → 渲染 → exit code。
  * @returns 0 PASS / 7 FAIL / 2 arg / 1 runtime（D6）。
  */
-export function runVerify(options: VerifyOptions): number {
+export async function runVerify(options: VerifyOptions): Promise<number> {
   const { mode } = options;
   if (options.bundlePath !== undefined) {
     // DEF-18: 允许 --bundle --db 组合做 DB↔导出锚比对(一致伪造检出);仍禁 envelope/lint-input 组合。
@@ -591,6 +691,7 @@ export function runVerify(options: VerifyOptions): number {
   let envelope: ProofEnvelopeV2 | undefined;
   let envelopeResult: EnvelopeVerifyResult | undefined;
   let pythonResult: PythonProofHashRecomputeResult | undefined;
+  let browserResult: BrowserProofHashRecomputeResult | undefined;
   let chainResult: ChainVerifyResult | undefined;
   let lintResult: LintRecomputeResult | undefined;
 
@@ -607,6 +708,8 @@ export function runVerify(options: VerifyOptions): number {
     envelope = parsed.envelope;
     envelopeResult = verifyEnvelopeV2(envelope);
     pythonResult = verifyEnvelopeV2WithPython(envelope);
+    // #13 · browser 轴：verify.html 内嵌浏览器验证器独立复算（Web Crypto）·与 node 轴 byte-equal。
+    browserResult = await verifyEnvelopeV2WithBrowser(envelope);
   }
 
   if (needDb) {
@@ -638,7 +741,7 @@ export function runVerify(options: VerifyOptions): number {
     lintResult = verifyAntiTheaterLint(envelope, loaded.input);
   }
 
-  const dump = collectVerifyDump(envelopeResult, chainResult, lintResult, pythonResult);
+  const dump = collectVerifyDump(envelopeResult, chainResult, lintResult, pythonResult, undefined, browserResult);
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify(dump, null, 2)}\n`);
@@ -760,7 +863,7 @@ function renderVerifyHuman(
     `  scopeStatus          : ${dump.scopeStatus}`,
     `  recomputation.node   : ${dump.recomputation.node}`,
     `  recomputation.python : ${dump.recomputation.python}`,
-    `  recomputation.browser: ${dump.recomputation.browser} (Phase 2 / #13 not yet wired)`,
+    `  recomputation.browser: ${dump.recomputation.browser} (Web Crypto standalone · #13)`,
     ...renderRecomputationSummary(dump.recomputation),
     `  verifiedLevels       : ${dump.verifiedLevels.length > 0 ? dump.verifiedLevels.join(', ') : 'none'}`,
   ];
@@ -821,7 +924,8 @@ function renderVerifyHuman(
     '    - when --lint-input is provided, the 20 detectors are recomputed independently and compared in depth with the embedded report (#11b · L5);',
     '      when not provided, the raw evidence is not recomputed. the verifier does not check semantic alignment between lint-input and envelope (reviewer judgment).',
     '    - recomputation.python is mirrored by repro/far_chain_repro/proof_hash.py; honestly marked not-run when Python is unavailable.',
-    '    - recomputation.browser is still not-run (Phase 2 / #13 browser ProofEnvelope verifier not yet wired).',
+    '    - recomputation.browser is verified by the standalone browser verifier in frontend/public/verify.html (#13):',
+    '      Web Crypto subtle.digest + independent canonical JSON recompute the ProofEnvelope V2 proofHash (RULE-PE-010).',
     '════════════════════════════════════════════════════════════',
     '',
   );
