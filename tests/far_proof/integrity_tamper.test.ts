@@ -222,3 +222,33 @@ test('DEF-17: 无 integrity.json → verifyFarProofPackageIntegrity 早返 MISSI
     rmSync(tmp + '-2', { recursive: true, force: true });
   }
 });
+
+test('DEF-17: 聚合 integrity 错误 — HASH_MISMATCH(内容篡改) + FILE_COUNT_MISMATCH(文件数变)·此前未测', () => {
+  // 聚合校验与逐文件校验同发(additive)：内容篡改→逐文件 MISMATCH + 聚合 HASH_MISMATCH；
+  // 加/删文件→逐文件 UNEXPECTED/MISSING + 聚合 FILE_COUNT_MISMATCH。此前测仅断言逐文件码。
+  const tmp1 = mkdtempSync(join(tmpdir(), 'far-def17-hash-'));
+  const tmp2 = mkdtempSync(join(tmpdir(), 'far-def17-count-'));
+  try {
+    // 内容篡改 → 聚合 integrityHash(全文件 sha256 派生)变 → INTEGRITY_HASH_MISMATCH
+    const out1 = exportDemoBundle(tmp1);
+    const prov1 = join(out1, 'prov.ttl');
+    writeFileSync(prov1, readFileSync(prov1, 'utf8') + '\n# AGG HASH TAMPER\n', 'utf8');
+    const r1 = verifyFarProofPackageIntegrity(out1);
+    assert.ok(
+      r1.errors.some((e) => e.includes('INTEGRITY_HASH_MISMATCH')),
+      `内容篡改须报聚合 INTEGRITY_HASH_MISMATCH: ${r1.errors.join('; ')}`,
+    );
+
+    // 加文件 → fileCount 变 → INTEGRITY_FILE_COUNT_MISMATCH
+    const out2 = exportDemoBundle(tmp2);
+    writeFileSync(join(out2, 'injected-extra.json'), '{}', 'utf8');
+    const r2 = verifyFarProofPackageIntegrity(out2);
+    assert.ok(
+      r2.errors.some((e) => e.includes('INTEGRITY_FILE_COUNT_MISMATCH')),
+      `加文件须报聚合 INTEGRITY_FILE_COUNT_MISMATCH: ${r2.errors.join('; ')}`,
+    );
+  } finally {
+    rmSync(tmp1, { recursive: true, force: true });
+    rmSync(tmp2, { recursive: true, force: true });
+  }
+});
