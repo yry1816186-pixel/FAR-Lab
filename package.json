@@ -25,6 +25,18 @@
   "author": "FAR-Lab Contributors",
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "far": "./src/cli/far.ts"
+  },
+  "files": [
+    "src",
+    "schema",
+    "scripts",
+    "ci",
+    "repro",
+    "golden_vectors",
+    "frontend/public"
+  ],
   "packageManager": "pnpm@10.29.3",
   "engines": {
     "node": ">=24.0.0"

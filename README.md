@@ -44,7 +44,7 @@ node src/cli/far.ts doctor            # environment self-diagnosis (no key neede
 node src/cli/far.ts demo tess-offline # offline demo — needs ZERO credentials
 ```
 
-> This project is distributed as source (git clone + pnpm install) and is not published to the npm registry. The `far` CLI runs directly via `node src/cli/far.ts`.
+> This project is distributed as source (git clone + pnpm install) and is not published to the npm registry. The `far` CLI runs directly via `node src/cli/far.ts`; after `pnpm install` the `far` bin is also available (or `pnpm exec far` / `npx far-lab`).
 
 `far doctor` only **WARNs** on a missing API key — it never fails the offline experience and never
 reads a key value.

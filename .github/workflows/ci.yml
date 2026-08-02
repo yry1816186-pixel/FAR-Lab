@@ -435,3 +435,41 @@ jobs:
         run: node src/cli/far.ts export far-proof --demo-chain --force
       - name: far verify .far-proof（第三方独立重算）
         run: node src/cli/far.ts verify .far-proof
+
+  # ============================================================
+  # STEP 16 · blocking_gates（设计控制面 + 反剧场 + 覆盖率 + 治理门禁全集）
+  # 职责：把 blocking 扫描器（coverage/zero_tolerance/anti_theater/design_lint/fitness/
+  #       governance_gate）接入 CI——此前仅本地执行。串行链末端依赖，须全绿才可合并。
+  # 说明：scripts/governance_gate.mjs 内部跑 pnpm test 等重门禁，故本 job 不再重复跑 test。
+  # ============================================================
+  blocking_gates:
+    needs: merkle_integrity_smoke
+    if: ${{ always() && (needs.merkle_integrity_smoke.result == 'success' || needs.merkle_integrity_smoke.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      - run: pnpm install --frozen-lockfile
+      - run: python -m pip install --upgrade pip
+      - name: design_lint（设计控制面 SSOT 机检）
+        run: node scripts/design_lint.mjs
+      - name: fitness_functions（架构适应度 16 项）
+        run: node scripts/fitness_functions.mjs
+      - name: zero_tolerance_scan（零容忍禁词扫描）
+        run: node scripts/zero_tolerance_scan.mjs
+      - name: anti_theater_deterministic_scan（反剧场确定性扫描）
+        run: node scripts/anti_theater_deterministic_scan.mjs
+      - name: coverage_gate（行≥85%/分支≥75% 红线）
+        run: node scripts/coverage_gate.mjs
+      - name: governance_gate（GATE_H 治理 SLI 机检·8+1 项）
+        run: node scripts/governance_gate.mjs
