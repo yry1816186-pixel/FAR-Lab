@@ -135,7 +135,7 @@ test('promptLooksLikeItNeedsVision returns false for pure text prompts', () => {
  * text/vision routing and availability — they never invoke interpret(). The
  * throw is a defensive guard against accidental calls and is NOT a fake VLM
  * result (anti-theater: tests must never fabricate a vision answer; a real VLM
- * call needs DASHSCOPE_API_KEY which is absent in CI).
+ * call needs a VLM credential which is absent in CI).
  */
 function makeStubVisionProvider() {
   return {
@@ -143,7 +143,7 @@ function makeStubVisionProvider() {
     declaresVisionCapability: () => false,
     interpret: async () => {
       throw new Error(
-        'makeStubVisionProvider.interpret() is unreachable in gate-routing tests — no DASHSCOPE_API_KEY; never fabricate a VLM answer',
+        'makeStubVisionProvider.interpret() is unreachable in gate-routing tests — no VLM credential in CI; never fabricate a vision answer',
       );
     },
   };
