@@ -213,3 +213,33 @@ test('bundle 文件不可解析 → 对应 *_UNREADABLE 错误（CALL_RECORDS/PR
     db.close();
   }
 });
+
+test('proof envelope checks 字段非数组 → fail-closed throw(parseJsonArrayChecks·防篡改)', () => {
+  // rowToEnvelope(row) 调 parseJsonArrayChecks(row.checks)：JSON.parse 后非数组→抛
+  // 'checks is not a JSON array'(rowToEnvelope 内无 try/catch·从 verify 循环裸传播)。
+  // 此前零测(现有信封测覆盖链接/悬挂,未测 checks 字段形状守卫)。
+  const dir = mkdtempSync(join(tmpdir(), 'bv-checks-'));
+  try {
+    const p = join(dir, 'proof_envelopes.jsonl');
+    const env = makeEnvelopeRow('PE-CHECKS', GENESIS_PROOF_HASH);
+    env.checks = '"not-an-array"'; // checks 是合法 JSON 字符串但 parse 后非数组
+    writeFileSync(p, `${JSON.stringify(env)}\n`, 'utf8');
+    assert.throws(
+      () => verifyProofEnvelopeJsonl(p),
+      /checks is not a JSON array/,
+      '非数组 checks 须 fail-closed 抛错',
+    );
+
+    // checks 数组含非对象元素 → 'checks[N] is not an object'
+    const env2 = makeEnvelopeRow('PE-CHECKS2', GENESIS_PROOF_HASH);
+    env2.checks = '[123]';
+    writeFileSync(p, `${JSON.stringify(env2)}\n`, 'utf8');
+    assert.throws(
+      () => verifyProofEnvelopeJsonl(p),
+      /checks\[0\] is not an object/,
+      '数组内非对象元素须报 checks[N] is not an object',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
