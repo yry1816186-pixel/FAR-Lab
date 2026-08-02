@@ -18,7 +18,7 @@ import { parseApiArgs } from '../../src/cli/commands/api.ts';
 
 test('FIX-R6-002: startServer 非 loopback(0.0.0.0) + jwtSecret=null → 启动成功（opt-in 匿名默认,不再 throw）', async () => {
   const db = openFarDb(':memory:');
-  const port = 49100 + Math.floor(Math.random() * 1000);
+  const port = 0; // OS-assigned ephemeral port — never EACCES on Windows-reserved ranges (49100-50199 可被 Hyper-V/WSL/Docker 预留)
   let app: { close: () => Promise<void> } | null = null;
   try {
     // 匿名（无 jwtSecret）+ 0.0.0.0 须成功启动（恢复 Docker demo 路径·R5 fail-closed 已撤销）
@@ -34,7 +34,7 @@ test('FIX-R6-002: startServer 非 loopback(0.0.0.0) + jwtSecret=null → 启动�
 
 test('startServer: 有 jwtSecret → 启动成功（受保护模式 opt-in）', async () => {
   const db = openFarDb(':memory:');
-  const port = 49200 + Math.floor(Math.random() * 1000);
+  const port = 0; // OS-assigned ephemeral port — never EACCES on Windows-reserved ranges (49100-50199 可被 Hyper-V/WSL/Docker 预留)
   let app: { close: () => Promise<void> } | null = null;
   try {
     app = await startServer(
