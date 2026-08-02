@@ -252,3 +252,32 @@ test('DEF-17: 聚合 integrity 错误 — HASH_MISMATCH(内容篡改) + FILE_COU
     rmSync(tmp2, { recursive: true, force: true });
   }
 });
+
+test('DEF-17: integrity.json 可解析但 schema 非法 → INTEGRITY_UNREADABLE(parseJson schema 守卫)', () => {
+  // parseIntegrity (offline_package.ts:361) 对可解析但结构非法的 integrity.json fail-closed：
+  // 根非对象 / schemaVersion 错 / files 非数组 / files[i] 形状错 / generatedAt-integrityHash 非串。
+  // 这些 throw 被 verifyFarProofPackageIntegrity 的 try/catch 捕为 INTEGRITY_UNREADABLE。
+  // 此前测仅覆盖了不可解析 JSON(语法坏),未覆盖可解析但 schema 坏(语义坏)。
+  const cases = [
+    { label: '根非对象', json: '[1,2,3]' },
+    { label: 'schemaVersion 错', json: JSON.stringify({ schemaVersion: 'evil.v9', files: [], generatedAt: 't', integrityHash: 'h' }) },
+    { label: 'files 非数组', json: JSON.stringify({ schemaVersion: 'far.proof_bundle.integrity.v1', files: 'x', generatedAt: 't', integrityHash: 'h' }) },
+    { label: 'files[0] 非对象', json: JSON.stringify({ schemaVersion: 'far.proof_bundle.integrity.v1', files: [123], generatedAt: 't', integrityHash: 'h' }) },
+    { label: 'generatedAt 非串', json: JSON.stringify({ schemaVersion: 'far.proof_bundle.integrity.v1', files: [], generatedAt: 5, integrityHash: 'h' }) },
+  ];
+  for (const { label, json } of cases) {
+    const tmp = mkdtempSync(join(tmpdir(), `far-def17-schema-${label.replace(/[^a-z0-9]/gi, '')}-`));
+    try {
+      const outputDir = exportDemoBundle(tmp);
+      writeFileSync(join(outputDir, 'integrity.json'), json, 'utf8');
+      const result = verifyFarProofBundle(outputDir, 'full');
+      assert.equal(result.ok, false, `[${label}] schema 非法须导致 verify 红`);
+      assert.ok(
+        result.errors.some((e) => e.includes('INTEGRITY_UNREADABLE')),
+        `[${label}] 须报 INTEGRITY_UNREADABLE: ${result.errors.join('; ')}`,
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+});
