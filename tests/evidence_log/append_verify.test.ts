@@ -104,10 +104,10 @@ function appendWithAuditOverride(db: Database.Database, auditOverride: Partial<C
 
 test('appendRecord validates CallAuditData 输入守卫（4 条·assertAuditData 此前未测）', () => {
   // assertAuditData (repository.ts:281-295) 对 4 个字段 fail-closed throw，此前零测覆盖。
-  const cases = [
+  const cases: Array<{ override: Partial<CallAuditData>; msg: string }> = [
     { override: { requestPayload: '' }, msg: 'requestPayload must be non-empty' },
     { override: { responsePayload: '' }, msg: 'responsePayload must be non-empty' },
-    { override: { finishReason: '' }, msg: 'finishReason must be non-empty' },
+    { override: { finishReason: '' as CallAuditData['finishReason'] }, msg: 'finishReason must be non-empty' },
     { override: { usageTokensTotal: -1 }, msg: 'usageTokensTotal must be a non-negative integer or null' },
     { override: { usageTokensTotal: 1.5 }, msg: 'usageTokensTotal must be a non-negative integer or null' },
   ];
