@@ -34,6 +34,7 @@ export {
   verifyChainHead,
   verifyEvidencePayloadHashes,
   verifyCallRecordPayloadHashes,
+  verifyCallRecordExportAnchor,
 } from './verifier.ts';
 export {
   LIFECYCLE_STATES,

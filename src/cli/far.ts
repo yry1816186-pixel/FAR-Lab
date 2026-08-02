@@ -761,13 +761,15 @@ USAGE:
     --protected     enable JWT auth (needs FAR_JWT_SECRET; default offline anonymous demo)
     example: pnpm api   # backend on localhost:3000; run "cd frontend && npm run dev" for the full stack
 
-  far verify [--bundle <path> | --envelope <path> --db <path>] [--mode chain|envelope|full]
+  far verify [--bundle <path> [--db <path>] | --envelope <path> --db <path>] [--mode chain|envelope|full]
              [--json] [--explain]      third-party independent re-computation verification
     --bundle <path>      .far-proof V1 minimal offline bundle directory (full mode verifies required
-                         files + redacted chain + V1 proofHash)
+                         files + redacted chain + V1 proofHash + integrity.json manifest)
     <positional>        equivalent to --bundle (e.g. far verify .far-implementation/walking-skeleton/demo.far-proof)
     --envelope <path>   ProofEnvelopeV2 JSON file (required for envelope/full mode)
     --db <path>         evidence_log DB (required for chain/full mode; verifyChainHead)
+                        with --bundle: also runs DB↔export anchor comparison (DEF-18 — detects
+                        consistent forgery: DB payload hashes recomputed after export)
     --mode <m>          chain|envelope|full (inferred from --envelope/--db by default)
     --json              machine-readable 10-field schema output
     --explain           human-readable mode: expand the 10-rule check table

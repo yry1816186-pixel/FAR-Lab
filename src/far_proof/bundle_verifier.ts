@@ -8,6 +8,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type Database from 'better-sqlite3';
 import { canonicalHash } from '../evidence_log/hasher.ts';
 import { ALLOWED_TRANSITIONS, computeEventHash, type LifecycleState, type LifecycleTargetKind } from '../evidence_log/lifecycle.ts';
 import { rowToCallRecord } from '../evidence_log/repository.ts';
@@ -17,6 +18,7 @@ import { dispatchRulesetVerifier } from '../proof_envelope/ruleset_version.ts';
 import { GENESIS_PROOF_HASH, type CheckOutcome, type ProofCheckResult, type ProofEnvelope } from '../proof_envelope/types.ts';
 import type { FalsificationSpec, Verdict } from '../falsifiability/types.ts';
 import { verifyFarProofPackageIntegrity, FAR_PROOF_INTEGRITY_FILE } from './offline_package.ts';
+import { verifyCallRecordExportAnchor } from '../evidence_log/verifier.ts';
 
 export const FAR_PROOF_REQUIRED_FILES = [
   'ro-crate-metadata.json',
@@ -91,6 +93,7 @@ export interface BundleVerifyResult {
 export function verifyFarProofBundle(
   bundlePath: string,
   mode: FarProofBundleVerifyMode = 'full',
+  options: { readonly dbAnchor?: Database.Database } = {},
 ): BundleVerifyResult {
   const requiredFiles = requiredFilesForMode(mode);
   const missingFiles = requiredFiles.filter((file) => !existsSync(join(bundlePath, file)));
@@ -167,6 +170,45 @@ export function verifyFarProofBundle(
       for (const integrityError of integrity.errors) {
         errors.push(`INTEGRITY_${integrityError}`);
       }
+    }
+  }
+
+  // DEF-18(F-V04-01 ②):DB↔导出锚比对——当验证者持有证据库(DB)时,把导出中每行的
+  // request/response payload hash 列与 DB 落库值逐 seq 比对。一致伪造(重算 payload + 重算 hash 列)
+  // 使库内自验不可检,但篡改前导出是唯一内容锚:篡改后 DB 的 hash ≠ 篡改前导出的 hash → 检出。
+  // additive——不传 DB(仅验 bundle 自身)不回归,仅失 DB↔导出锚交叉校验。
+  if (options.dbAnchor !== undefined) {
+    const redactedPath = join(bundlePath, 'call_records.redacted.jsonl');
+    if (existsSync(redactedPath)) {
+      try {
+        const exportedRows = readJsonlLines(redactedPath).map((line) => {
+          const parsed = JSON.parse(line) as Record<string, unknown>;
+          return {
+            seq: Number(parsed.seq),
+            request_payload_hash: typeof parsed.request_payload_hash === 'string'
+              ? parsed.request_payload_hash
+              : null,
+            response_payload_hash: typeof parsed.response_payload_hash === 'string'
+              ? parsed.response_payload_hash
+              : null,
+          };
+        });
+        const anchor = verifyCallRecordExportAnchor(options.dbAnchor, exportedRows);
+        if (!anchor.ok) {
+          for (const seq of anchor.tamperedSeqs) {
+            errors.push(
+              `DB_EXPORT_ANCHOR_MISMATCH: seq=${seq} payload hash 与篡改前导出锚不一致(一致伪造检出·DEF-18)`,
+            );
+          }
+          for (const drift of anchor.anchorDrift) {
+            errors.push(`DB_EXPORT_ANCHOR_DRIFT: ${drift}(导出锚行集合与 DB 漂移·DEF-18)`);
+          }
+        }
+      } catch (error) {
+        errors.push(`DB_EXPORT_ANCHOR_UNREADABLE: ${errorMessage(error)}`);
+      }
+    } else {
+      errors.push('DB_EXPORT_ANCHOR_MISSING: 传入 dbAnchor 但 bundle 无 call_records.redacted.jsonl');
     }
   }
 

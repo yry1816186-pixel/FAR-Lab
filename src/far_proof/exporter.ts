@@ -148,12 +148,15 @@ function writeReproRunsJsonl(db: Database.Database, dir: string): string {
 }
 
 function writeCallRecordsRedacted(db: Database.Database, dir: string): string {
-  // 排除 request_payload 和 response_payload (可能含 key)
+  // 排除 request_payload 和 response_payload (可能含 key)；保留 payload 的 sha256 内容哈希列
+  // （DEF-18 F-V04-01 ①：哈希单向不泄露内容，使篡改前导出成为 payload 字节的内容锚——攻击者
+  //  一致重算 hash 列后，DB↔导出锚比对仍可检出：篡改后 DB 的 hash 与篡改前导出的 hash 不一致）。
   // 保留 seq/stage_id/payload_kind/purpose_tag/model_id/repro_hash/prev_hash/current_hash/created_at
   const rows = db
     .prepare(
       `SELECT seq, stage_id, payload_kind, purpose_tag, model_id,
               dashscope_request_id, repro_hash, git_commit_sha, iso_timestamp,
+              request_payload_hash, response_payload_hash,
               finish_reason, usage_tokens_total,
               prev_hash, current_hash, created_at
        FROM call_records ORDER BY seq ASC`,
