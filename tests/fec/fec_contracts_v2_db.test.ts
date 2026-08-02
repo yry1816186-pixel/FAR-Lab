@@ -193,3 +193,42 @@ test('registerFecV2: 重复 fec_id → PRIMARY KEY 冲突', () => {
     db.close();
   }
 });
+
+test('registerFecV2: 应用层 contractVersion 守卫（补 DB CHECK 的第二层防线·line 50）', () => {
+  // DB CHECK 约束已测（上方 'migration 0009: contract_version CHECK'）；本测覆盖应用层 registerFecV2
+  // 在写库前对 contractVersion !== 'FEC/2.0' 的 throw（防御纵深：应用层 + DB 层双关）。
+  const db = openDb();
+  try {
+    assert.throws(
+      () =>
+        registerFecV2(db, {
+          fec: makeValidFec({ contractVersion: 'FEC/1.0' as 'FEC/2.0' }),
+          compiledAt: '2020-01-01T00:00:00Z',
+        }),
+      /contractVersion 须为 'FEC\/2\.0'/,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test('getFecV2ByFecId: contract_json 被篡改/损坏 → rowToStored 检出 throw（读路径纵深防御·line 89-92）', () => {
+  // 防御场景：攻击者绕过应用层写路径，直接向 DB 注入 schema 列合法但 contract_json 内容
+  // 不再是合法 FecContractV2 的行（append-only trigger 只拦 UPDATE/DELETE，不校验 JSON 内容）。
+  // 读路径 rowToStored → isFecContractV2 须检出并 throw（防讀取损坏/篡改数据伪充合法 FEC）。
+  const db = openDb();
+  try {
+    // 直接 INSERT：列约束全满足（contract_version='FEC/2.0'/fec_hash=64hex/compiled_by 正确），
+    // 但 contract_json = 不完整对象（缺大量必填字段→isFecContractV2 返回 false）。
+    db.prepare(
+      `INSERT INTO fec_contracts_v2 (fec_id, claim_id, contract_version, fec_hash, contract_json, compiled_by, compiled_at)
+       VALUES (?, ?, 'FEC/2.0', ?, ?, 'deterministic_compiler', ?)`,
+    ).run('FEC-TAMPER', 'C1', '0'.repeat(64), JSON.stringify({ fecId: 'FEC-TAMPER' }), '2020-01-01');
+    assert.throws(
+      () => getFecV2ByFecId(db, 'FEC-TAMPER'),
+      /不是合法 FecContractV2/,
+    );
+  } finally {
+    db.close();
+  }
+});
