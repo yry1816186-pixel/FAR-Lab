@@ -162,3 +162,26 @@ test('回归基线:无生命周期事件的 demo 包 full verify 仍通过', () 
   assert.equal(result.ok, true, `errors: ${result.errors.join('; ')}`);
   db.close();
 });
+
+test('lifecycle_events.jsonl 含不可解析行 → LIFECYCLE_ROW_UNREADABLE（此前未测错误路径）', () => {
+  // bundle_verifier.verifyLifecycleEventsJsonl 对每行 JSON.parse 包 try/catch：
+  // 不可解析 → push LIFECYCLE_ROW_UNREADABLE + continue（不中断后续行校验）。
+  // 此前测覆盖篡改/抹除/翻转但未覆盖“行本身损坏”这条防御路径。
+  const db = openDb();
+  buildDemoChain(db);
+  applyLifecycleTransition(db, { targetKind: 'claim', targetId: 'C-ASTRO-0001', toState: 'contested', actor: 'a', reason: 'counter' });
+  const outDir = exportDemo(db);
+  const tampered = mkdtempSync(join(tmpdir(), 'bv-lc-unread-'));
+  cpSync(outDir, tampered, { recursive: true });
+  // 追加一行非法 JSON（独占一行·JSONL）→ JSON.parse 抛错
+  const lcPath = join(tampered, 'lifecycle_events.jsonl');
+  const original = readFileSync(lcPath, 'utf8');
+  writeFileSync(lcPath, `${original}{ this is not valid json }}}\n`, 'utf8');
+  const result = verifyFarProofBundle(tampered, 'full');
+  assert.equal(result.ok, false, '不可解析的 lifecycle 行须导致 verify 红');
+  assert.ok(
+    result.errors.some((e) => e.startsWith('LIFECYCLE_ROW_UNREADABLE')),
+    `须报 LIFECYCLE_ROW_UNREADABLE: ${result.errors.join('; ')}`,
+  );
+  db.close();
+});
