@@ -16,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -122,6 +122,30 @@ test('③ 不传 --db(仅验 bundle)→ additive 不回归(clean 仍过)', () =>
   try {
     const result = verifyFarProofBundle(outDir, 'full');
     assert.equal(result.ok, true, `仅验 bundle(无锚)应过: ${result.errors.join('; ')}`);
+  } finally {
+    db.close();
+    rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('④ call_records 导出含不可解析行 + dbAnchor → DB_EXPORT_ANCHOR_UNREADABLE（此前未测 catch）', () => {
+  // bundle_verifier 锚比读路径 readJsonlLines.map(JSON.parse) 包 try/catch：
+  // 任一行不可解析 → DB_EXPORT_ANCHOR_UNREADABLE。此前 0 测覆盖（② 测损坏内容为合法 JSON·未损坏可解析性）。
+  const db = openDb();
+  buildDemoChain(db);
+  backfillPayloadHashes(db);
+  const outDir = exportDb(db);
+  try {
+    const crPath = join(outDir, 'call_records.redacted.jsonl');
+    const lines = readFileSync(crPath, 'utf8').split('\n').filter((l) => l.trim().length > 0);
+    lines[0] = '{ not valid json }}}'; // 替换首行为非法 JSON
+    writeFileSync(crPath, `${lines.join('\n')}\n`, 'utf8');
+    const result = verifyFarProofBundle(outDir, 'full', { dbAnchor: db });
+    assert.equal(result.ok, false, '不可解析行 + dbAnchor 须导致 verify 红');
+    assert.ok(
+      result.errors.some((e) => e.startsWith('DB_EXPORT_ANCHOR_UNREADABLE')),
+      `须报 DB_EXPORT_ANCHOR_UNREADABLE: ${result.errors.join('; ')}`,
+    );
   } finally {
     db.close();
     rmSync(outDir, { recursive: true, force: true });
