@@ -23,7 +23,7 @@ import {
   callAndRecordLlm,
 } from '../../src/evidence_log/llm_record.ts';
 import { verifyChainHead } from '../../src/evidence_log/verifier.ts';
-import type { LlmGateway } from '../../src/llm_gateway/gateway.ts';
+import { createLlmGateway } from '../../src/llm_gateway/gateway.ts';
 import type {
   LlmCallCredential,
   LlmRequest,
@@ -161,13 +161,16 @@ test('④ callAndRecordLlm 编排：callLlm 被调 + 记录落库 + 返回 respo
   try {
     const response = makeResponse(makeCredential());
     let called = 0;
-    const gateway: LlmGateway = {
-      callLlm: async () => {
-        called += 1;
-        return response;
+    // 用真实 createLlmGateway + fake ProviderAdapter（不双重断言·零容忍合规）。
+    const gateway = createLlmGateway([
+      {
+        profile: 'offline_replay',
+        call: async () => {
+          called += 1;
+          return response;
+        },
       },
-      // 仅测试 callAndRecordLlm 编排；其余方法 stub 为不可达（不违反零容忍——接口必有实现）
-    } as unknown as LlmGateway;
+    ]);
 
     const result = await callAndRecordLlm(db, gateway, {
       profile: 'offline_replay',

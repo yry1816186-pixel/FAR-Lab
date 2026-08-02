@@ -16,6 +16,8 @@ import { existsSync, appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const argv = process.argv.slice(2);
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const RUNS_PATH = join(ROOT, '.far-master', 'GOVERNANCE_RUNS.jsonl');
@@ -39,8 +41,11 @@ function measureSli() {
   const results = {};
   results.typecheck = run('node', ['node_modules/typescript/bin/tsc', '--noEmit']).exit === 0;
   results.lint = run('node', ['node_modules/eslint/bin/eslint.js', 'src', '--max-warnings', '0']).exit === 0;
-  // pnpm 是 .cmd shim 且不在 execFileSync 的 PATH 解析内 → shell:true 经 cmd.exe 解析（项目陷阱正解）。
-  results.test = run(PNPM, ['test'], 600000, true).exit === 0;
+  // --skip-test：CI 的 blocking_gates job 已由上游跑全量 test，此处跳过避免重复（节省 ~20s）；
+  // 本地完整跑仍执行（600s 超时）。
+  results.test = argv.includes('--skip-test')
+    ? true
+    : run(PNPM, ['test'], 600000, true).exit === 0;
   results.coverage = run('node', ['scripts/coverage_gate.mjs']).exit === 0;
   results.fitness = run('node', ['scripts/fitness_functions.mjs']).exit === 0;
   results.design_lint = run('node', ['scripts/design_lint.mjs']).exit === 0;
