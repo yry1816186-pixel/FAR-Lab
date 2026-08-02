@@ -130,16 +130,28 @@ test('promptLooksLikeItNeedsVision returns false for pure text prompts', () => {
   assert.equal(promptLooksLikeItNeedsVision('什么是FAR-Lab'), false);
 });
 
-test('MultimodalGate.decide routes image input to vision', () => {
-  const textAdapter = createTextAdapter();
-  // Create a fake vision provider since we cannot actually call Qwen-VL in tests
-  const visionProvider = {
+/**
+ * Shared test double for the vision provider. These gate-routing tests verify
+ * text/vision routing and availability — they never invoke interpret(). The
+ * throw is a defensive guard against accidental calls and is NOT a fake VLM
+ * result (anti-theater: tests must never fabricate a vision answer; a real VLM
+ * call needs DASHSCOPE_API_KEY which is absent in CI).
+ */
+function makeStubVisionProvider() {
+  return {
     profile: 'competition_aliyun_qwen' as const,
-    declaresVisionCapability: () => false, // no DASHSCOPE_API_KEY in test
+    declaresVisionCapability: () => false,
     interpret: async () => {
-      throw new Error('not implemented in test');
+      throw new Error(
+        'makeStubVisionProvider.interpret() is unreachable in gate-routing tests — no DASHSCOPE_API_KEY; never fabricate a VLM answer',
+      );
     },
   };
+}
+
+test('MultimodalGate.decide routes image input to vision', () => {
+  const textAdapter = createTextAdapter();
+  const visionProvider = makeStubVisionProvider();
 
   const gate = createMultimodalGate({ textAdapter, visionProvider });
 
@@ -155,13 +167,7 @@ test('MultimodalGate.decide routes image input to vision', () => {
 
 test('MultimodalGate.decide routes pure text to text_only', () => {
   const textAdapter = createTextAdapter();
-  const visionProvider = {
-    profile: 'competition_aliyun_qwen' as const,
-    declaresVisionCapability: () => false,
-    interpret: async () => {
-      throw new Error('not implemented');
-    },
-  };
+  const visionProvider = makeStubVisionProvider();
 
   const gate = createMultimodalGate({ textAdapter, visionProvider });
 
@@ -174,13 +180,7 @@ test('MultimodalGate.decide routes pure text to text_only', () => {
 
 test('MultimodalGate.isVisionAvailable returns false without API key', () => {
   const textAdapter = createTextAdapter();
-  const visionProvider = {
-    profile: 'competition_aliyun_qwen' as const,
-    declaresVisionCapability: () => false,
-    interpret: async () => {
-      throw new Error('not implemented');
-    },
-  };
+  const visionProvider = makeStubVisionProvider();
 
   const gate = createMultimodalGate({ textAdapter, visionProvider });
   assert.equal(gate.isVisionAvailable(), false);
@@ -188,13 +188,7 @@ test('MultimodalGate.isVisionAvailable returns false without API key', () => {
 
 test('MultimodalGate exposes correct profiles', () => {
   const textAdapter = createTextAdapter();
-  const visionProvider = {
-    profile: 'competition_aliyun_qwen' as const,
-    declaresVisionCapability: () => false,
-    interpret: async () => {
-      throw new Error('not implemented');
-    },
-  };
+  const visionProvider = makeStubVisionProvider();
 
   const gate = createMultimodalGate({ textAdapter, visionProvider });
   assert.equal(gate.textProfile, 'offline_replay');
