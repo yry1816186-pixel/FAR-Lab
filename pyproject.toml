@@ -6,9 +6,10 @@ requires-python = ">=3.11"
 # 依赖锁定按 FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §6.2 / §8.2 规范
 # threadpoolctl：R9 BLAS 线程限定 nthread=1（deterministic_blas_ctx 上下文管理器）
 # numpy：触发 BLAS 加载，threadpool_info() 才能观测 blas 条目（spec §8.2 has_blas fixture）
+#   上限放宽至 <3.0（原 <2.0 过保守）：2026-08-02 实测 numpy 2.5.1 下 113 repro 测试 + 跨语言 canonical_hash byte-equal + TS numpy-dependent 测试全绿；numpy 2.x 与现代生态(astropy/opencv)共存必需
 dependencies = [
     "threadpoolctl>=3.5,<4.0",
-    "numpy>=1.24,<2.0",
+    "numpy>=1.24,<3.0",
     "sympy>=1.13,<2.0",
     "z3-solver>=4.13,<5.0",
 ]
