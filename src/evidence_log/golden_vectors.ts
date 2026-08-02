@@ -202,6 +202,8 @@ export const GOLDEN_VECTORS: ReadonlyArray<{
 //   GREEN = byte-equal（真绿，证明数值域部分可达；含经 stdin 规约后相等的 N1/N3）。
 //   RED   = 真实序列化格式鸿沟（N2b 指数零填充；spec 32 §74 PoC 红→诚实标注数值域部分不可达，V3 RFC 8785 JCS 迁移目标）。
 // canonicalHash 信任根 byte-equal 不受 RED 影响（cred 全 string，数值永不进白名单）。
+// @test-only：以下 NUMERIC_* 仅供 tests/evidence_log/cross_lang_consistency.test.ts 跨语言
+// 数值域对拍使用，不从 evidence_log index 公共 API 导出（非生产路径数据）。
 export const NUMERIC_GREEN_VECTORS: ReadonlyArray<{
   readonly name: string;
   readonly obj: Record<string, unknown>;
