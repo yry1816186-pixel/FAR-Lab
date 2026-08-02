@@ -29,8 +29,8 @@ export default defineConfig({
         // cacheable chunks so they survive app-code deploys and load in parallel.
         // d3 (~280kB) is isolated so it never enters the initial bundle — it only
         // loads when the user navigates to a Viz or Ablation route (React.lazy).
-        // NOTE: reactflow is a declared but UNUSED dependency (no source imports);
-        // it is intentionally omitted here so tree-shaking drops it entirely.
+        // (reactflow was removed as an unused dependency 2026-08-02 — tree-shaking
+        // drops nothing extra since no source imports it.)
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-d3': ['d3'],

@@ -174,7 +174,7 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
     });
     return;
   }
-  const exit = runVerify({ bundlePath: fixture, mode: 'full', json: false, explain: false });
+  const exit = await runVerify({ bundlePath: fixture, mode: 'full', json: false, explain: false });
   checks.push({
     name: 'offline verify (demo fixture)',
     status: exit === 0 ? 'ok' : 'fail',
