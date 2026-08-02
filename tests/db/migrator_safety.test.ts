@@ -9,6 +9,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { runMigrations, getSchemaMetaRows } from '../../src/db/migrator.ts';
 
 test('migrator: DB schema 版本高于代码迁移集 → fail-closed(前向不兼容检测)', () => {
@@ -42,5 +45,29 @@ test('migrator: 已应用迁移被正确跳过 + schema_meta 可读(回归基线
     assert.equal(getSchemaMetaRows(db).length, rowsAfterFirst.length, 'schema_meta 行数不变');
   } finally {
     db.close();
+  }
+});
+
+test('migrator: 迁移版本不连续(断链)→ fail-closed(assertContiguousVersions)', () => {
+  // assertContiguousVersions (migrator.ts:~110) 要求迁移版本 1,2,3,... 连续；
+  // 断链→fail-closed(防迁移集损坏/缺失文件)。此前零测。
+  // 注:readMigrationFiles 的 'invalid/missing migration filename'(L87/91)不可达——
+  // .filter(MIGRATION_FILE_PATTERN.test) 已保证 .match() 必成功,故为死防御码,不测。
+  const tmpDir = mkdtempSync(join(tmpdir(), 'mig-gap-'));
+  try {
+    writeFileSync(join(tmpDir, '0001_a.sql'), '-- v1\n');
+    writeFileSync(join(tmpDir, '0003_c.sql'), '-- v3 (缺 0002)\n');
+    const db = new Database(':memory:');
+    try {
+      assert.throws(
+        () => runMigrations(db, { migrationsDir: tmpDir }),
+        /migration versions must be contiguous, expected 2 but found 3/,
+        '版本断链须 fail-closed',
+      );
+    } finally {
+      db.close();
+    }
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
   }
 });
