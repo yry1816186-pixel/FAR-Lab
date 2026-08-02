@@ -23,8 +23,7 @@ import { parseAntiTheaterLintInput } from '../../anti_theater/schemas.ts';
 import type { AntiTheaterLintInput, AntiTheaterReport } from '../../anti_theater/types.ts';
 import { hashCanonicalJson } from '../../evidence_log/hasher.ts';
 import { verifyChainHead, verifyEvidencePayloadHashes } from '../../evidence_log/verifier.ts';
-import { verifyFarProofBundle, type BundleVerifyResult } from '../../far_proof/bundle_verifier.ts';
-import { verifyProofHashV2 } from '../../proof_envelope/v2/proof_hash.ts';
+import { verifyFarProofBundle, type BundleVerifyResult } from '../../far_proof/bundle_verifier.ts';import { verifyProofHashV2 } from '../../proof_envelope/v2/proof_hash.ts';
 import type { ProofCheckResultV2, ProofEnvelopeV2 } from '../../proof_envelope/v2/types.ts';
 import { summarizeChecksV2, validateProofEnvelopeV2 } from '../../proof_envelope/v2/validator.ts';
 import type { ProofCheckOutcome, Verdict } from '../../schema/enums.ts';
@@ -538,18 +537,42 @@ export interface VerifyOptions {
 export function runVerify(options: VerifyOptions): number {
   const { mode } = options;
   if (options.bundlePath !== undefined) {
-    if (options.envelopePath !== undefined || options.dbPath !== undefined || options.lintInputPath !== undefined) {
-      process.stderr.write('far verify: --bundle cannot be combined with --envelope/--db/--lint-input\n');
+    // DEF-18: 允许 --bundle --db 组合做 DB↔导出锚比对(一致伪造检出);仍禁 envelope/lint-input 组合。
+    if (options.envelopePath !== undefined || options.lintInputPath !== undefined) {
+      process.stderr.write('far verify: --bundle cannot be combined with --envelope/--lint-input\n');
       return 2;
     }
-    const bundleResult = verifyFarProofBundle(options.bundlePath, mode);
-    const dump = collectVerifyDump(undefined, undefined, undefined, undefined, bundleResult);
-    if (options.json) {
-      process.stdout.write(`${JSON.stringify(dump, null, 2)}\n`);
-    } else {
-      process.stdout.write(renderVerifyHuman(dump, undefined, undefined, options.explain, bundleResult));
+    let dbAnchor: Database.Database | undefined;
+    let dbAnchorError: string | null = null;
+    if (options.dbPath !== undefined) {
+      try {
+        dbAnchor = new Database(options.dbPath, { readonly: true });
+      } catch (error) {
+        dbAnchorError = `failed to open DB for anchor comparison: ${errorMessage(error)}`;
+      }
     }
-    return dump.status === 'FAIL' ? 7 : 0;
+    try {
+      const bundleResult = verifyFarProofBundle(
+        options.bundlePath,
+        mode,
+        dbAnchor !== undefined ? { dbAnchor } : {},
+      );
+      const warnings = [...bundleResult.warnings];
+      if (dbAnchorError !== null) {
+        // 锚 DB 打不开 → 如实降级:非 bundle 失败,但锚比对缺失须披露(不静默)。
+        warnings.push(`dbAnchor unavailable: ${dbAnchorError}`);
+      }
+      const augmented = { ...bundleResult, warnings };
+      const dump = collectVerifyDump(undefined, undefined, undefined, undefined, augmented);
+      if (options.json) {
+        process.stdout.write(`${JSON.stringify(dump, null, 2)}\n`);
+      } else {
+        process.stdout.write(renderVerifyHuman(dump, undefined, undefined, options.explain, augmented));
+      }
+      return dump.status === 'FAIL' ? 7 : 0;
+    } finally {
+      dbAnchor?.close();
+    }
   }
 
   // --lint-input 给定时强制载入+校验 envelope（对比基准在内嵌 antiTheaterReport·须先验基准再对比）。
