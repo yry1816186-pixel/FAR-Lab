@@ -87,6 +87,44 @@ function appendFixtureRow(db: Database.Database, index: number): void {
   );
 }
 
+function appendWithAuditOverride(db: Database.Database, auditOverride: Partial<CallAuditData>): void {
+  appendRecord(
+    db,
+    {
+      stageId: 'stage-validate',
+      cred: credential(1),
+      payloadKind: 'hypothesis',
+      purposeTag: 'hypothesis',
+      prevHash: GENESIS_PREV_HASH,
+    },
+    { ...audit(1), ...auditOverride },
+    OFFLINE_OPTIONS,
+  );
+}
+
+test('appendRecord validates CallAuditData 输入守卫（4 条·assertAuditData 此前未测）', () => {
+  // assertAuditData (repository.ts:281-295) 对 4 个字段 fail-closed throw，此前零测覆盖。
+  const cases = [
+    { override: { requestPayload: '' }, msg: 'requestPayload must be non-empty' },
+    { override: { responsePayload: '' }, msg: 'responsePayload must be non-empty' },
+    { override: { finishReason: '' }, msg: 'finishReason must be non-empty' },
+    { override: { usageTokensTotal: -1 }, msg: 'usageTokensTotal must be a non-negative integer or null' },
+    { override: { usageTokensTotal: 1.5 }, msg: 'usageTokensTotal must be a non-negative integer or null' },
+  ];
+  for (const { override, msg } of cases) {
+    const db = openDb();
+    try {
+      assert.throws(
+        () => appendWithAuditOverride(db, override),
+        { message: new RegExp(msg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) },
+        `须报 ${msg}`,
+      );
+    } finally {
+      db.close();
+    }
+  }
+});
+
 test('appendRecord writes a real chained log and verifyChainHead accepts it', () => {
   const db = openDb();
   try {
