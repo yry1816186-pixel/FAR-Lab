@@ -32,6 +32,7 @@ import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { verifyChainHead } from '../evidence_log/verifier.ts';
 import type { VerifyResult } from '../evidence_log/types.ts';
+import { computeFarProofIntegrity, FAR_PROOF_INTEGRITY_FILE } from './offline_package.ts';
 import { CURRENT_RULESET_URI, SUPPORTED_RULESET_URIS } from '../proof_envelope/ruleset_version.ts';
 
 export interface FarProofExportInput {
@@ -104,6 +105,12 @@ export function exportFarProof(input: FarProofExportInput): FarProofExportResult
 
   // 8. code/MANIFEST.md（code/ 目录诚实说明：快照在 HEAD，重放靠 git checkout）
   filesWritten.push(writeCodeManifest(outputDir, gitCommitSha));
+
+  // DEF-17: 全分量 sha256 清单(V-09 静默组闭合)——所有分量写入后生成 integrity.json。
+  // far verify bundle 经 bundle_verifier 机检全分量内容(非仅白名单存在性)。
+  // 自排除 integrity.json 避免自引用;不入 filesWritten(data_manifest 先写·清单本身非披露分量)。
+  const integrityManifest = computeFarProofIntegrity(outputDir, exportedAt);
+  writeFileSync(join(outputDir, FAR_PROOF_INTEGRITY_FILE), `${JSON.stringify(integrityManifest, null, 2)}\n`, 'utf8');
 
   return {
     outputDir,

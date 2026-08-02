@@ -16,6 +16,7 @@ import { computeProofHash } from '../proof_envelope/proof_hash.ts';
 import { dispatchRulesetVerifier } from '../proof_envelope/ruleset_version.ts';
 import { GENESIS_PROOF_HASH, type CheckOutcome, type ProofCheckResult, type ProofEnvelope } from '../proof_envelope/types.ts';
 import type { FalsificationSpec, Verdict } from '../falsifiability/types.ts';
+import { verifyFarProofPackageIntegrity, FAR_PROOF_INTEGRITY_FILE } from './offline_package.ts';
 
 export const FAR_PROOF_REQUIRED_FILES = [
   'ro-crate-metadata.json',
@@ -154,6 +155,18 @@ export function verifyFarProofBundle(
     );
     for (const lifecycleError of lifecycleResult.errors) {
       errors.push(lifecycleError);
+    }
+  }
+
+  // DEF-17: 当 bundle 含 integrity.json 全分量 sha256 清单时,机检全分量内容(非仅白名单存在性)。
+  // 检出 V-09 静默组(ro-crate/prov.ttl/claim_graph/otel/data_manifest/README/code-MANIFEST 内容篡改)。
+  // additive——无清单包(legacy/未导出 integrity.json)不回归,仅失全分量内容校验。
+  if (existsSync(join(bundlePath, FAR_PROOF_INTEGRITY_FILE))) {
+    const integrity = verifyFarProofPackageIntegrity(bundlePath);
+    if (!integrity.ok) {
+      for (const integrityError of integrity.errors) {
+        errors.push(`INTEGRITY_${integrityError}`);
+      }
     }
   }
 
