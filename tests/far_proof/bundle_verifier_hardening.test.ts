@@ -185,3 +185,31 @@ test('lifecycle_events.jsonl 含不可解析行 → LIFECYCLE_ROW_UNREADABLE（�
   );
   db.close();
 });
+
+test('bundle 文件不可解析 → 对应 *_UNREADABLE 错误（CALL_RECORDS/PROOF_ENVELOPES/CLAIM_GRAPH·此前未测 catch 块）', () => {
+  // 三个独立 catch 块此前 0 测覆盖：proof_envelopes.jsonl / call_records.redacted.jsonl /
+  // claim_graph.json 被损坏为非法 JSON 时，各验证函数的 try/catch 须 push 对应 *_UNREADABLE。
+  const cases = [
+    { file: 'proof_envelopes.jsonl', code: 'PROOF_ENVELOPES_UNREADABLE' },
+    { file: 'call_records.redacted.jsonl', code: 'CALL_RECORDS_UNREADABLE' },
+    { file: 'claim_graph.json', code: 'CLAIM_GRAPH_UNREADABLE' },
+  ];
+  const db = openDb();
+  buildDemoChain(db);
+  const base = exportDemo(db);
+  try {
+    for (const { file, code } of cases) {
+      const tampered = mkdtempSync(join(tmpdir(), 'bv-unread-'));
+      cpSync(base, tampered, { recursive: true });
+      writeFileSync(join(tampered, file), '{ this is not valid json }}}', 'utf8');
+      const result = verifyFarProofBundle(tampered, 'full');
+      assert.equal(result.ok, false, `${file} 不可解析须导致 verify 红`);
+      assert.ok(
+        result.errors.some((e) => e.startsWith(code)),
+        `${file} 不可解析须报 ${code}: ${result.errors.join('; ')}`,
+      );
+    }
+  } finally {
+    db.close();
+  }
+});
