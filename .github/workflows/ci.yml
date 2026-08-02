@@ -471,5 +471,5 @@ jobs:
         run: node scripts/anti_theater_deterministic_scan.mjs
       - name: coverage_gate（行≥85%/分支≥75% 红线）
         run: node scripts/coverage_gate.mjs
-      - name: governance_gate（GATE_H 治理 SLI 机检·8+1 项）
-        run: node scripts/governance_gate.mjs
+      - name: governance_gate（GATE_H 治理 SLI 机检·8+1 项·--skip-test 避免重复跑 test）
+        run: node scripts/governance_gate.mjs --skip-test
