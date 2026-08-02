@@ -3,14 +3,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   GOLDEN_VECTORS,
-  NUMERIC_GREEN_VECTORS,
-  NUMERIC_KNOWN_DIVERGENCE,
   REPRO_CONTEXT_FIXTURE,
   REPRO_CONTEXT_FIXTURE_EXPECTED_HEX,
   canonicalHash,
   canonicalJson,
   hashCanonicalJson,
 } from '../../src/evidence_log/index.ts';
+// NUMERIC_* 为 test-only 常量（数值域跨语言对拍专用），不从公共 API 导出——直接引用定义源。
+import {
+  NUMERIC_GREEN_VECTORS,
+  NUMERIC_KNOWN_DIVERGENCE,
+} from '../../src/evidence_log/golden_vectors.ts';
 
 // Windows: 'python' (真实安装); Unix: 'python3'。WindowsApps python3 是 Store stub,
 // 在 coverage 并发下 spawnSync 偶发 status=null。对齐 ensure_py_deps.mjs / smt_backend.ts 约定。

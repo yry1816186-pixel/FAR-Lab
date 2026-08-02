@@ -6,8 +6,6 @@ export {
 } from './hasher.ts';
 export {
   GOLDEN_VECTORS,
-  NUMERIC_GREEN_VECTORS,
-  NUMERIC_KNOWN_DIVERGENCE,
   REPRO_CONTEXT_FIXTURE,
   REPRO_CONTEXT_FIXTURE_EXPECTED_HEX,
 } from './golden_vectors.ts';
