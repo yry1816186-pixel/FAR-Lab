@@ -11,9 +11,12 @@
  *   防止「声称 N 交付 M<N」的过度声称，亦防「偷渡第 4 claimType」。
  *   fixture v1Status 随实现落地翻转（not_implemented → delivered·reason → null）。
  *
- *   注：claimType 措辞 'quantitative' 来自 22 T-W2-06；08 SciIR claimType 9 值枚举
+ *   注：claimType 措辞 'quantitative' 来自 22 T-W2-06·是 ConfoundingGate 粗粒度三值分类轴
+ *   （existence/quantitative/causal·为混淆分析设计），与 08 SciIR 细粒度 9 值科学分类枚举
  *   （causal/correlational/mechanistic/predictive/existence/optimization/methodological/
- *    measurement/reproducibility）未含 'quantitative'（22↔08 待统一·记 TODO·不在本任务 scope）。
+ *    measurement/reproducibility）是**不同轴·非冲突**——'quantitative' 映射 SciIR 的
+ *   {measurement, correlational, predictive, optimization}。详见 src/confounding_gate/types.ts:22-29
+ *   （同名 claimType 为历史命名·ConfoundingGate 专用粗粒度子集·'causal' 触发 F6）。
  *
  * 模型中立。零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */
