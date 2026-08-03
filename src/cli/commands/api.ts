@@ -73,6 +73,18 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
 
 export async function runApi(argv: readonly string[]): Promise<number> {
   const args = parseApiArgs(argv);
+  // SECURITY（深度对抗轮·fail-closed）：非 loopback 绑定且未启用受保护模式（--protected / FAR_JWT_SECRET）
+  // 时拒绝启动。demo 匿名模式（jwtSecret=null）会让任何能访问该端口的请求者匿名写入信任账本
+  // （POST /hypothesize 会 append evidence + 跑 verdict kernel）。loopback 默认安全（仅本机）；
+  // 一旦 --host 0.0.0.0 / 局域网 IP / 公网，必须显式 --protected 配置 JWT，否则攻击者可投毒账本。
+  const isLoopback = args.host === '127.0.0.1' || args.host === 'localhost' || args.host === '::1';
+  if (!isLoopback && args.jwtSecret === null) {
+    throw new Error(
+      `far api: refusing to start in anonymous (demo) mode on non-loopback host "${args.host}". ` +
+        `Anonymous mode allows unauthenticated writes to the trust ledger (POST /hypothesize). ` +
+        `Bind to 127.0.0.1 (default), or set --protected with FAR_JWT_SECRET to require JWT auth.`,
+    );
+  }
   const db = openFarDb(args.dbPath);
   if (args.seedDemo) {
     buildDemoChain(db);

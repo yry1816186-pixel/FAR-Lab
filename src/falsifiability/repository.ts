@@ -134,7 +134,11 @@ export function recordVerdict(db: Database.Database, args: RecordVerdictArgs): V
     return verdict;
   });
 
-  return insert();
+  // IMMEDIATE 事务（CONCURRENCY-1 · APPENDENDIX_C §3.6）：BEGIN IMMEDIATE 获取 RESERVED 写锁，
+  // 使 chainHead 读取 + INSERT 在跨进程并发下也原子（防两条记录接同一 prevHash 的 TOCTOU 分叉）。
+  // 镜像 evidence_log/repository.ts:155 append.immediate() + lifecycle.ts:257 apply.immediate() 的既有修复；
+  // recordVerdict 同属链写入路径，此前漏改（深度对抗轮发现）。
+  return insert.immediate();
 }
 
 export function getVerdict(db: Database.Database, verdictId: string): VerdictNode | null {
@@ -188,7 +192,8 @@ export function supersedeVerdict(db: Database.Database, args: SupersedeVerdictAr
     }
     return { oldVerdict, newVerdict };
   });
-  return supersede();
+  // IMMEDIATE 事务：同 recordVerdict，supersede 内含 recordVerdict 写链头 + UPDATE 旧行，须 RESERVED 锁原子化。
+  return supersede.immediate();
 }
 
 /**
@@ -251,9 +256,13 @@ export function rowToVerdictNode(row: VerdictNodeRow): VerdictNode {
 function getVerdictChainHead(db: Database.Database): VerdictHeadRow | undefined {
   return db
     .prepare(
+      // 按 rowid DESC（插入序逆序）取链头，与 verifyVerdictNodes 的 ORDER BY rowid ASC（verifier.ts:64）对齐。
+      // 旧实现 ORDER BY created_at DESC, verdict_id DESC 在同一毫秒快速调用下脆弱（ULID 字典序随机），
+      // 可能返回非最新行 → 下次 INSERT 接错前驱 → verifyVerdictNodes 报链断（曾致 supersede.test.ts flaky，
+      // verifier 侧已修复但写侧漏改·深度对抗轮发现）。rowid 严格单调递增 = 链写入序。
       `SELECT current_hash
        FROM verdict_nodes
-       ORDER BY created_at DESC, verdict_id DESC
+       ORDER BY rowid DESC
        LIMIT 1`,
     )
     .get() as VerdictHeadRow | undefined;

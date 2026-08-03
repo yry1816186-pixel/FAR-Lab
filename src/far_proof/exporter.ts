@@ -48,6 +48,22 @@ export interface FarProofExportInput {
   readonly exportedAt?: string;
 }
 
+/**
+ * 脱敏厂商请求 ID（深度对抗轮·隐私加固）。
+ *
+ * dashscope_request_id 是 Aliyun Bailian 侧的调用关联标识——可用于查询运营方百炼调用日志，
+ * 从而去匿名化运营方账户。导出到 redacted call_records / OTel spans 时改为确定性摘要：
+ *   sha256('far-redact:' + requestId) 截前 16 hex。
+ * 摘要保留跨调用可关联性（同一 requestId → 同一摘要·审计/调试可用），但不泄露厂商账户信息。
+ * null 保持 null（V1 诚实边界：未记录即如实空）。
+ * 注意：dashscope_request_id 非 hash 链输入（CanonicalInput 4 字段不含它），脱敏不影响链完整性
+ * 与 DEF-18 DB↔导出锚（锚只比 payload_hash）。
+ */
+function redactRequestId(requestId: string | null): string | null {
+  if (requestId === null) return null;
+  return createHash('sha256').update(`far-redact:${requestId}`, 'utf8').digest('hex').slice(0, 16);
+}
+
 export interface FarProofExportResult {
   readonly outputDir: string;
   readonly filesWritten: readonly string[];
@@ -152,6 +168,7 @@ function writeCallRecordsRedacted(db: Database.Database, dir: string): string {
   // （DEF-18 F-V04-01 ①：哈希单向不泄露内容，使篡改前导出成为 payload 字节的内容锚——攻击者
   //  一致重算 hash 列后，DB↔导出锚比对仍可检出：篡改后 DB 的 hash 与篡改前导出的 hash 不一致）。
   // 保留 seq/stage_id/payload_kind/purpose_tag/model_id/repro_hash/prev_hash/current_hash/created_at
+  // 隐私加固（深度对抗轮）：dashscope_request_id 脱敏为确定性摘要（redactRequestId），防厂商账户去匿名化。
   const rows = db
     .prepare(
       `SELECT seq, stage_id, payload_kind, purpose_tag, model_id,
@@ -161,8 +178,12 @@ function writeCallRecordsRedacted(db: Database.Database, dir: string): string {
               prev_hash, current_hash, created_at
        FROM call_records ORDER BY seq ASC`,
     )
-    .all();
-  const lines = rows.map((row) => JSON.stringify(row)).join('\n');
+    .all() as Array<{ dashscope_request_id: string | null } & Record<string, unknown>>;
+  const redactedRows = rows.map((row) => ({
+    ...row,
+    dashscope_request_id: redactRequestId(row.dashscope_request_id),
+  }));
+  const lines = redactedRows.map((row) => JSON.stringify(row)).join('\n');
   const filePath = join(dir, 'call_records.redacted.jsonl');
   writeFileSync(filePath, lines + '\n', 'utf8');
   return filePath;
@@ -259,7 +280,9 @@ function writeOtelTraceJsonl(db: Database.Database, dir: string, runId: string):
       attributes: {
         'gen_ai.system': 'far_chain_gateway',
         'gen_ai.request.model': row.model_id,
-        'gen_ai.response.id': row.dashscope_request_id ?? '',
+        // 隐私加固（深度对抗轮）：厂商请求 ID 脱敏为确定性摘要，不泄露百炼账户关联。
+        // 空（null）保留为空字符串（V1 诚实边界：未记录即如实空）。
+        'gen_ai.response.id': redactRequestId(row.dashscope_request_id) ?? '',
         'gen_ai.response.finish_reason': row.finish_reason ?? '',
         'gen_ai.usage.total_tokens': row.usage_tokens_total ?? 0,
         'far_chain.seq': row.seq,
