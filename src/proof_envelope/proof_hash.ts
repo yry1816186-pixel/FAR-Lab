@@ -23,6 +23,7 @@
 
 import { createHash } from 'node:crypto';
 import stableStringify from 'fast-json-stable-stringify';
+import { compareStringsDeterministic } from '../evidence_log/hasher.ts';
 import type { ProofEnvelope } from './types.ts';
 
 /**
@@ -38,13 +39,15 @@ export function computeProofHash(envelope: Omit<ProofEnvelope, 'proofHash'>): st
   const { checks, knownFailures, ...rest } = envelope;
 
   // 对 checks 数组做确定性序列化: 每个 check 按 (ruleId, outcome) 排序
+  // 用 code-unit 比较（compareStringsDeterministic）而非 localeCompare —— 后者依赖运行时 locale/ICU，
+  // 非 ASCII ruleId 跨平台排序可能不同 → proofHash 漂移（深度对抗轮发现）。
   const sortedChecks = [...checks].sort((a, b) => {
-    const ruleCmp = a.ruleId.localeCompare(b.ruleId);
+    const ruleCmp = compareStringsDeterministic(a.ruleId, b.ruleId);
     if (ruleCmp !== 0) return ruleCmp;
-    return a.outcome.localeCompare(b.outcome);
+    return compareStringsDeterministic(a.outcome, b.outcome);
   });
 
-  const sortedFailures = [...knownFailures].sort();
+  const sortedFailures = [...knownFailures].sort(compareStringsDeterministic);
 
   const canonical = stableStringify({
     ...rest,

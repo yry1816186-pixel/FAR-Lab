@@ -26,6 +26,7 @@
 import type { Database } from 'better-sqlite3';
 
 import { computeChainMerkleRoot, computeMerkleRoot } from '../evidence_log/merkle_root.ts';
+import { compareStringsDeterministic } from '../evidence_log/hasher.ts';
 import { VERDICTS, type Verdict } from '../schema/enums.ts';
 import { CURRENT_RULESET_URI } from '../proof_envelope/ruleset_version.ts';
 import { summarizeTotalCost } from '../llm_gateway/budget.ts';
@@ -176,7 +177,8 @@ export async function runBenchmark(
   }
 
   // 按 problemId 升序（确定性叶序·保证 suiteIntegrityRoot 可复现）
-  const sorted = [...entries].sort((a, b) => a.problemId.localeCompare(b.problemId));
+  // code-unit 序而非 localeCompare —— 后者依赖 locale/ICU，跨平台非 ASCII problemId 排序可能漂移（深度对抗轮发现）
+  const sorted = [...entries].sort((a, b) => compareStringsDeterministic(a.problemId, b.problemId));
 
   // 套件级聚合根：所有 problem 的 integrityRoot 作为叶再 Merkle 折叠
   const suiteIntegrityRoot = computeMerkleRoot(sorted.map((e) => e.integrityRoot));

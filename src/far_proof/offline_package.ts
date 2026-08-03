@@ -22,13 +22,13 @@ import {
   rmSync,
   statSync,
   writeFileSync,
-  type Dirent,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { zstdCompressSync } from 'node:zlib';
 
 import { verifyFarProofBundle } from './bundle_verifier.ts';
+import { compareStringsDeterministic } from '../evidence_log/hasher.ts';
 
 export const FAR_PROOF_INTEGRITY_FILE = 'integrity.json';
 export const FAR_PROOF_VERIFY_SCRIPT = 'verify.sh';
@@ -201,7 +201,7 @@ export function computeFarProofIntegrity(bundleDir: string, generatedAt: string)
         bytes: statSync(absolute).size,
       };
     });
-  const integrityHash = sha256Text(files.map((file) => `${file.path} ${file.sha256}`).sort().join('\n'));
+  const integrityHash = sha256Text(files.map((file) => `${file.path} ${file.sha256}`).sort(compareStringsDeterministic).join('\n'));
   return {
     schemaVersion: 'far.proof_bundle.integrity.v1',
     generatedAt,
@@ -258,12 +258,11 @@ export function detectPostSealStaleness(bundleDir: string, baseline: BundleConte
 }
 
 function visitHash(root: string, dir: string, hashes: Map<string, string>): void {
-  let entries: readonly Dirent[];
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
+  // fail-closed：readdir 失败（权限撤销/并发删除/IO 错误）须抛出，不得静默返回不完整快照。
+  // detectPostSealStaleness 的契约是『seal 后注入/改写/删除文件可被检出（不静默放过）』，
+  // 静默吞错会使快照缺失被篡改目录 → 比对漏报 → 攻击者通过撤销目录读权限绕过 sentinel（深度对抗轮发现）。
+  // 与同文件 listBundleFiles（line 341 无 try/catch·fail-closed）对齐。
+  const entries = readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -338,7 +337,10 @@ export function verifyFarProofPackageIntegrity(bundleDir: string): IntegrityVeri
 function listBundleFiles(root: string): string[] {
   const files: string[] = [];
   function walk(dir: string): void {
-    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+    // code-unit 序（确定性·跨平台一致）——localeCompare 依赖运行时 locale/ICU，非 ASCII 文件名排序可能漂移
+    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+      compareStringsDeterministic(a.name, b.name),
+    );
     for (const entry of entries) {
       const absolute = join(dir, entry.name);
       const rel = relative(root, absolute).split(sep).join('/');
@@ -355,7 +357,7 @@ function listBundleFiles(root: string): string[] {
     }
   }
   walk(root);
-  return files.sort();
+  return files.sort(compareStringsDeterministic);
 }
 
 function parseIntegrity(raw: string): FarProofIntegrityFile {
@@ -427,10 +429,18 @@ function sha256Text(text) {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+// 确定性字符串比较器（UTF-16 code-unit 序）——不依赖 locale/ICU，跨平台一致。
+// localeCompare 在第三方机器上可能因 locale 不同而排序不同 → integrity hash 漂移（深度对抗轮发现）。
+function cmpStr(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
 function listFiles(root) {
   const files = [];
   function walk(dir) {
-    const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+    const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => cmpStr(a.name, b.name));
     for (const entry of entries) {
       const absolute = path.join(dir, entry.name);
       const rel = path.relative(root, absolute).split(path.sep).join('/');
@@ -447,12 +457,12 @@ function listFiles(root) {
     }
   }
   walk(root);
-  return files.sort((a, b) => a.path.localeCompare(b.path));
+  return files.sort((a, b) => cmpStr(a.path, b.path));
 }
 
 const expected = JSON.parse(fs.readFileSync(integrityPath, 'utf8'));
 const actualFiles = listFiles(bundleDir);
-const actualHash = sha256Text(actualFiles.map((file) => \`\${file.path} \${file.sha256}\`).sort().join('\\n'));
+const actualHash = sha256Text(actualFiles.map((file) => \`\${file.path} \${file.sha256}\`).sort(cmpStr).join('\\n'));
 
 if (actualHash !== expected.integrityHash) {
   throw new Error(\`integrityHash mismatch: expected=\${expected.integrityHash} actual=\${actualHash}\`);

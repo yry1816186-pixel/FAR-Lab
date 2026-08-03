@@ -2,6 +2,7 @@ export {
   canonicalJson,
   canonicalHash,
   canonicalHashVerified,
+  compareStringsDeterministic,
   hashCanonicalJson,
 } from './hasher.ts';
 export {

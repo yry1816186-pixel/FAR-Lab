@@ -191,6 +191,30 @@ const importsOf = (f) => [
   check('FF-15', 'Science-125 报告披露字段集强制(协议 v2)', r.status === 0, `benchmark_report_check exit=${r.status ?? '?'} ${tail}`);
 }
 
+// FF-17 proof_envelopes_v2 forward-schema 守卫（DEBT-06 · 深度对抗轮）：
+// V2 表 proof_envelopes_v2 是 forward-schema（migration 0010 建表但零生产写入），V1 表 proof_envelopes
+// 是活跃持久化路径（sealer.ts:96 INSERT）。本守卫强制此决策：src/ 中不得新增 INSERT INTO proof_envelopes_v2
+// （否则 V2 表从 dead-schema 变活跃写路径，须先更新 DEBT-06 裁决 + sealer 接线 + 迁移回归）。
+// 读/验路径（cli/verify.ts + cli/export_receipt.ts import ProofEnvelopeV2/validateProofEnvelopeV2）合法，不在禁列。
+{
+  const bad = [];
+  for (const f of srcFiles) {
+    const text = read(f);
+    // 匹配 INSERT INTO proof_envelopes_v2（容忍空白/换行/反引号）
+    if (/INSERT\s+INTO\s+proof_envelopes_v2/i.test(text)) {
+      bad.push(rel(f));
+    }
+  }
+  check(
+    'FF-17',
+    'proof_envelopes_v2 表零生产写入（DEBT-06 forward-schema 决策守卫）',
+    bad.length === 0,
+    bad.length === 0
+      ? 'src/ 零命中 INSERT INTO proof_envelopes_v2（V1=活跃路径·V2=forward-schema）'
+      : `违规写入 V2 表: ${bad.join(', ')}（须先更新 DEBT-06 裁决）`,
+  );
+}
+
 console.log('══ Architecture Fitness Functions (§12.5) ══');
 for (const line of report) console.log(line);
 console.log(failures === 0 ? `\nfitness: PASS (${report.length}/${report.length})` : `\nfitness: FAIL (${failures}/${report.length} 项)`);

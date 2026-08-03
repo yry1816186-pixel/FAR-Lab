@@ -11,7 +11,15 @@ const roots = [
   'docs',
   'package.json',
   'pyproject.toml',
+  // SECURITY（深度对抗轮）：.env / .env.example 须扫 hardcoded_secret_shape（sk-... 明文密钥）。
+  // .env 被 .gitignore 排除不会进版本库，但本地工作树若含明文密钥会被此门捕获（防 IDE 索引/备份/sync 泄露）。
+  '.env',
+  '.env.example',
 ];
+
+// 环境变量模板文件：DASHSCOPE_API_KEY 字面量合法（env 变量名·非密钥值），仅对这些文件跳过
+// dashscope_env_reference 检查；hardcoded_secret_shape 等其余检查仍全量生效。
+const envTemplateFiles = new Set(['.env', '.env.example']);
 
 const checks = [
   { name: 'ts_any', pattern: /: any\b/ },
@@ -218,6 +226,11 @@ for (const root of roots) {
     for (const [index, rawLine] of lines.entries()) {
       const line = stripLineComment(filePath, rawLine);
       for (const check of checks) {
+        // env 模板文件合法引用 env 变量名（DASHSCOPE_API_KEY）；仅跳过 dashscope_env_reference，
+        // hardcoded_secret_shape 等其余检查仍生效（防明文密钥漏入 .env）。
+        if (check.name === 'dashscope_env_reference' && envTemplateFiles.has(filePath)) {
+          continue;
+        }
         if (check.pattern.test(line)) {
           findings.push(`${filePath}:${index + 1}: ${check.name}: ${rawLine.trim()}`);
         }

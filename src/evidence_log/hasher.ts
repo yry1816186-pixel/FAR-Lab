@@ -38,6 +38,22 @@ export function canonicalJson(value: unknown, context = 'canonicalJson'): string
   return canonical;
 }
 
+/**
+ * 确定性字符串比较器（UTF-16 code-unit order，即 Array#sort 默认序）。
+ *
+ * 用于 hash 输入的排序时，必须用本函数而非 String#localeCompare —— localeCompare 的结果依赖
+ * 运行时 locale 与 ICU 数据版本，非 ASCII 字符在不同机器/Node 构建间排序可能不同 → 相同内容产生
+ * 不同 hash（深度对抗轮发现）。本函数返回 code-unit 序（确定性·跨平台一致·与 Python 默认 bytes 序对齐）。
+ *
+ * 返回值语义同 Array#sort 比较器（负/零/正）。
+ */
+export function compareStringsDeterministic(a: string, b: string): number {
+  // code-unit 比较：直接用 < / > （JS 规范 < 对字符串按 UTF-16 码元逐位比较·确定性·与 locale 无关）。
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
 function assertNoNonFiniteNumber(value: unknown, path: string): void {
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) {

@@ -19,7 +19,7 @@ import { existsSync, readdirSync, readFileSync, statSync, type Dirent, type Stat
 import { delimiter, join, resolve } from 'node:path';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { PACKAGE_ROOT } from '../paths.ts';
-import { hashCanonicalJson } from '../evidence_log/index.ts';
+import { compareStringsDeterministic, hashCanonicalJson } from '../evidence_log/index.ts';
 import type { NetworkPolicy } from '../schema/enums.ts';
 import type { ExecutionFingerprint } from '../falsifiability/verdict_kernel_v2.ts';
 import {
@@ -84,9 +84,10 @@ export function computeArtifactTreeHash(artifacts: readonly ArtifactManifest[]):
   const sorted = [...artifacts]
     .map((a) => ({ path: a.path, contentHash: a.contentHash, bytes: a.bytes }))
     .sort((a, b) => {
-      const pathCmp = a.path.localeCompare(b.path);
+      // code-unit 序（确定性·跨平台）—— localeCompare 依赖 locale/ICU，非 ASCII 路径可能漂移 hash
+      const pathCmp = compareStringsDeterministic(a.path, b.path);
       if (pathCmp !== 0) return pathCmp;
-      return a.contentHash.localeCompare(b.contentHash);
+      return compareStringsDeterministic(a.contentHash, b.contentHash);
     });
   return hashCanonicalJson({ artifacts: sorted });
 }
