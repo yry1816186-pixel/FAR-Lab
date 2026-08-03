@@ -250,7 +250,12 @@ export function fecAppendClaim(
     };
   });
 
-  return append();
+  // IMMEDIATE 事务（CONCURRENCY · 镜像 appendRecord/recordVerdict .immediate() 纪律）：
+  // 本事务体 appendRecord（写 call_records 链）+ appendEvidenceLog。appendRecord 内部的
+  // append.immediate() 在本外层事务内退化为 SAVEPOINT（better-sqlite3 嵌套语义），不获取 RESERVED 锁。
+  // 故锁级由本最外层事务决定：append()=DEFERRED 会使链写在 DEFERRED 下（TOCTOU 窗口），
+  // 须用 append.immediate() 在 BEGIN 即获 RESERVED 锁原子化链写。
+  return append.immediate();
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   sampleMean,
   sampleVariance,
   twoSampleEffectSize,
+  twoSampleWelchZTest,
   wilsonScoreInterval,
   zTestPValue,
 } from '../../src/statistics/index.ts';
@@ -79,4 +80,28 @@ test('multiple-testing corrections preserve original order with monotonic adjust
     bh.map((entry) => entry.rejected),
     [true, true, true],
   );
+});
+
+test('twoSampleWelchZTest: n<2 前置守卫 fail-closed + 清晰定位（哪个样本不足）', () => {
+  // 回归：旧实现对 n<2 会深入 sampleStandardDeviation 抛泛化的 "values must contain at least 2 observations"，
+  // 对 (left, right) 双样本调用者指代不明。修复为函数顶前置守卫，消息含函数名 + 哪个样本。
+  assert.throws(
+    () => twoSampleWelchZTest([1], [1, 2, 3]),
+    /twoSampleWelchZTest: left sample must contain at least 2 observations/,
+    'left n<2 → 清晰消息（含函数名 + left）',
+  );
+  assert.throws(
+    () => twoSampleWelchZTest([1, 2, 3], [1]),
+    /twoSampleWelchZTest: right sample must contain at least 2 observations/,
+    'right n<2 → 清晰消息（含函数名 + right）',
+  );
+  assert.throws(
+    () => twoSampleWelchZTest([], [1, 2]),
+    /twoSampleWelchZTest: left sample must contain at least 2 observations/,
+    'left 空 → 同一前置守卫',
+  );
+  // 正常 n>=2 路径仍工作（回归保护）
+  const ok = twoSampleWelchZTest([1, 2, 3, 4], [2, 3, 4, 5]);
+  assert.ok(Number.isFinite(ok.statistic), 'n>=2 正常路径仍返回有限 z 统计量');
+  assert.ok(ok.pValue >= 0 && ok.pValue <= 1, 'pValue 在 [0,1]');
 });

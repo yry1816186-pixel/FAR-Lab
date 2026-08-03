@@ -82,6 +82,19 @@ export function twoSampleWelchZTest(
   right: readonly number[],
   alternative: AlternativeHypothesis = 'two_sided',
 ): ZTestResult {
+  // 显式前置守卫（fail-closed + 清晰定位）：Welch SE 需要 n>=2 才能算样本方差。
+  // 不前置则 sampleStandardDeviation 会抛泛化的 "values must contain at least 2 observations"，
+  // 对 (left, right) 双样本调用者指代不明（哪个样本不足）。
+  if (left.length < 2) {
+    throw new Error(
+      'twoSampleWelchZTest: left sample must contain at least 2 observations (Welch SE requires n>=2)',
+    );
+  }
+  if (right.length < 2) {
+    throw new Error(
+      'twoSampleWelchZTest: right sample must contain at least 2 observations (Welch SE requires n>=2)',
+    );
+  }
   const leftVariance = sampleStandardDeviation(left) ** 2;
   const rightVariance = sampleStandardDeviation(right) ** 2;
   const standardError = Math.sqrt(leftVariance / left.length + rightVariance / right.length);

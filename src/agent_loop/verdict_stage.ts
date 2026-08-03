@@ -279,5 +279,12 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
     });
   });
 
-  return txn();
+  // IMMEDIATE 事务（CONCURRENCY · 镜像 recordVerdict/append/apply .immediate() 既有纪律）：
+  // 本事务体 appendEvidenceLog + recordVerdict（写 verdict_nodes 链·getVerdictChainHead→INSERT）。
+  // better-sqlite3 嵌套事务用 SAVEPOINT——recordVerdict 内部的 insert.immediate() 在本外层事务内
+  // 退化为 SAVEPOINT，不获取 RESERVED 锁。故锁级由本最外层事务决定：txn()=DEFERRED 会使整个
+  // 链写在 DEFERRED 下（读链头后才获 RESERVED·跨进程 TOCTOU 窗口），须用 txn.immediate() 在
+  // BEGIN 即获 RESERVED 锁，使 chainHead 读 + INSERT 原子化（防两条记录接同一 prevHash 分叉）。
+  // 单进程 better-sqlite3 同步执行下 immediate 不自阻塞；跨进程高争用时 SQLITE_BUSY=fail-closed（期望行为）。
+  return txn.immediate();
 }
