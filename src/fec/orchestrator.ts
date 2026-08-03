@@ -401,6 +401,12 @@ function verdictResultFromKernelOutput(output: VerdictKernelOutput): VerdictResu
         ? output.untestedReason ?? output.reasonCodes.join(', ')
         : null,
     conflictingEvidenceCount: output.statisticalReport.conflicting ? 1 : 0,
+    // 语义说明（防潜伏陷阱·独立对抗轮核实）：此 metricValue 字段在 V2 内核路径下持有
+    // primaryEffectSize（科学管线=c Cohen's d 标准化效应量；桥接路径=经 effectSizeObserved=metricValue 往返后的原值）。
+    // 这不是活跃 bug：裁决决策本身由内核 R0-R9 用 primaryEffectSize vs MDE 完成（两者均效应量·正确），
+    // 真正的阈值比对（evidenceDirectionFromMetric）用原始 evidence.metricValue vs thresholdSpec（原始指标·正确）。
+    // 本字段仅用于显示/审计记录，不回调 evaluateThreshold。未来拆分为 metricValue + effectSizeEstimate 是
+    // 架构改进（需 schema 变更·拭多消费者），但在 V1 范围内此语义已安全。
     metricValue: output.statisticalReport.primaryEffectSize,
   };
 }
