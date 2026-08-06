@@ -130,7 +130,7 @@ export const NETWORK_POLICIES = ['off', 'allowlist', 'unrestricted-with-warning'
 /** Type alias: network policy. */
 export type NetworkPolicy = (typeof NETWORK_POLICIES)[number];
 
-//** Allowed source types for a source card (official_doc, paper, github_repo, dataset, news, benchmark, other). */
+/** Allowed source types for a source card (official_doc, paper, github_repo, dataset, news, benchmark, other). */
 export const SOURCE_CARD_SOURCE_TYPES = [
   'official_doc',
   'paper',

@@ -31,12 +31,14 @@ import {
 // Options + Result
 // ===========================================================================
 
+/** Parsed options for the `far export receipt-v2` command. */
 export interface ExportReceiptV2Options {
   readonly envelopePath?: string;
   readonly outputPath?: string;
   readonly format: 'json' | 'markdown';
 }
 
+/** Result of a receipt-v2 export run: process exit code + rendered output. */
 export interface ExportReceiptV2Result {
   readonly exitCode: number;
   readonly output: string;
