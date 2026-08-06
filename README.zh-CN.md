@@ -190,7 +190,7 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
 
 - **LLM 不作最终裁决者** —— 五值裁决由确定性 R0-R9 内核给出，LLM 绝不裁决。
 - **禁手填裸统计数字** —— p 值 / effect size 由 `src/statistics/` 真实算出，绝非字面量。
-- **反剧场** —— 20 项检测器抓「假绿测试」（看似绿实则未走真实逻辑）。
+- **反剧场** —— 22 项检测器抓「假绿测试」（看似绿实则未走真实逻辑）。
 - **密钥绝不入库** —— `.env` 已 gitignore；见 [SECURITY.md](SECURITY.md)。
 - 真实 API / 真实数据 / 真实 GPU / 比赛提交均显式标注 `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` /
   `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`。

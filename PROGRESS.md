@@ -293,3 +293,18 @@ commit 1 的 pathspec 陷阱洗掉 896 staged D → 改用 git ls-files -i -c �
 **/ _*.py 误伤 3 个 __init__.py → 从 b45cddc^ 恢复 + 规则改 _[a-z]*.py（commit 08ee31d）。
 最终：adversarial tracked=0（保留 3 活文件）、.far-implementation 843K 活状态、功能 staged 47 未动、
 测试基线零回归（2024/2019 pass/0 fail/5 skip）。细节见 CLEANUP_MANIFEST "执行中发现并修复的问题"。
+
+## Checkpoint 8 — 2026-08-07 第二轮增量治理（migrate_clean.sh --apply 完成）
+
+**触发**: 用户发起"深度审计与治理"（蓝图: src/ + tests/unit|integration + scripts/ + assets/ + docs/historical/ + migrate_clean.sh）
+**审计结论**: 蓝图 80% 已由第一轮治理达成（src/ 24 模块化、tests/ 26 子目录、scripts/ 50+、docs/ 295 文件、gitignore 162 行）。强行执行蓝图目录大迁移 = 破坏 2023 测试 import 图 + 616 文件引用链 + 8 处文档引用，判定负收益，本轮零 src 移动。
+
+**执行（--apply）**:
+- C 类回收 ~23MB: 0/ (NODE_COMPILE_CACHE 22MB/2040 文件) + .ruff_cache/ (1MB/70 文件) → .trash_backup/migrated_20260807_012012/
+- untrack 9 个被追踪日志 (.far-release/gates/ ×8 + installer) → 先 mv 再 git rm --cached（Pitfall #10 安全序列）
+- .gitignore 追加 10 条蓝图强制条目 (.trash_backup/ *-agent-*/ *.tmp *.cache + 豁免) + 全局 *.log
+- 归档 project_manifest.txt → docs/audits/PROJECT_MANIFEST_2026-08-07.txt
+
+**交付物**: AUDIT_REPORT.md / migrate_clean.sh (dry-run 默认 + --apply) / CLEANUP_REPORT.txt
+**验证**: typecheck 0 · lint 0 · test 2024 (2019 pass/0 fail/5 skip) 零回归 · demo 核心引擎 OK · 保护断言 63=63 · fixture 完好
+**遗留**: 104 功能变更未提交 (47 staged + 45 mod + 12 untrack, 含 uv.lock/0024 迁移) 待功能会话; .trash_backup 待人工复核

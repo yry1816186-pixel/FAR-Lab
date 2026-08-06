@@ -16,7 +16,7 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 - `far fec compile` / `far fec freeze` — compile a Falsifiability Evidence Contract and freeze its
   tamver hash (`fecHash`). A claim without a compilable FEC can never reach `CONFIRMED`.
 - `far verify [--bundle|--envelope] [--mode] [--explain] [--lint-input]` — third-party independent
-  recomputation of a proof bundle / envelope, including recomputation of the 20 anti-theater detectors.
+  recomputation of a proof bundle / envelope, including recomputation of the 22 anti-theater detectors.
 - `far verify-golden [--all|--case] [--backend node|python|browser]` — recompute the verdict golden
   vectors across three language axes; same input → same verdict in TS, Python, and the browser.
 - `far export far-proof` / `far export receipt` — export a self-verifiable `.far-proof` bundle or a
@@ -39,7 +39,7 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 
 ### Added — anti-theater & integrity
 
-- **20 anti-theater detectors** that block a seal when a "green" result is built on theater
+- **22 anti-theater detectors** that block a seal when a "green" result is built on theater
   (cherry-picked seeds, post-hoc thresholds, scope laundering, metric swap, LLM judge-override, …).
 - **Content-addressed evidence ledger**: append-only SHA-256 hash chain with cross-language
   (TS / Python / browser) byte-identical hashes; tampering breaks the chain and is detected.
@@ -130,7 +130,8 @@ lint 0 / 1581 tests (1574 pass, 0 fail) / far demo exit 0.
   (zero regression when absent).
 
 ### Added — evidence FTS5 search (borrowed from hermes-agent)
-- src/evidence_log/search.ts: nsureFtsIndex / eindexEvidenceFts / searchEvidence /
+- src/evidence_log/search.ts: nsureFtsIndex / 
+eindexEvidenceFts / searchEvidence /
   scapeFtsQuery. Search auxiliary layer — never enters the hash chain.
 
 ### Added — evidence quality grading (borrowed from scientific-agent-skills GRADE/Cochrane RoB)
@@ -141,7 +142,8 @@ lint 0 / 1581 tests (1574 pass, 0 fail) / far demo exit 0.
 ### Added — evidence context compaction (borrowed from opencode session compact)
 - src/agent_loop/compaction.ts: deterministic artifact compression (stage3/4 verdict-critical
   payloads preserved verbatim; narrative fields clipped with hash anchors).
-- unAgentLoop optional compactArtifacts flag (default off → byte-identical).
+- 
+unAgentLoop optional compactArtifacts flag (default off → byte-identical).
 
 ### Added — CLI state revert (borrowed from opencode revert/unrevert)
 - state_machine gains 3 revert edges (STATISTICS→EVIDENCE_GATHERED, VERDICT→STATISTICS,
@@ -152,8 +154,10 @@ lint 0 / 1581 tests (1574 pass, 0 fail) / far demo exit 0.
   auditable exec runs (schedules.json under $FAR_HOME or ~/.far).
 
 ### Added — runtime JSONL session recording (borrowed from pi JSONL session format)
-- src/trace/session_recorder.ts: SessionRecorder / eplaySession / serializeEvent.
-- unAgentLoop optional sessionPath: records run_started / stage_completed ×N / run_completed.
+- src/trace/session_recorder.ts: SessionRecorder / 
+eplaySession / serializeEvent.
+- 
+unAgentLoop optional sessionPath: records run_started / stage_completed ×N / run_completed.
 
 ### Added — math backend fallback chains (borrowed from zeroclaw provider fallback)
 - MathVerifier fallback chains (default: SMT→CAS, Lean4→Dafny; overridable, 

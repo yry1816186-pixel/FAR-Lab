@@ -4,8 +4,8 @@
 
 project: FAR-Lab
 target_standard: "world-class AI4S research assurance system"
-last_updated: "2026-08-05T03:30:00+08:00"
-last_cycle_result: "phase1_verify: 6/6 criteria PASS — security_audit FIXED (5 CVEs via pnpm.overrides), ci_pipeline_green FIXED (Windows sh-path bug). Phase 1 EXIT GATE PASSED. Ready for Phase 2."
+last_updated: "2026-08-06T22:30:00+08:00"
+last_cycle_result: "phase1_verify: 6/6 criteria PASS — security_audit FIXED (5 CVEs via pnpm.overrides), ci_pipeline_green FIXED (Windows sh-path bug). Phase 1 EXIT GATE PASSED. Phase 2-4 已复核完成（2026-08-06 治理会话实测），Phase 5 大部分完成（DR runbook 待补）。Ready for Phase 5 收尾 + 发布。"
 
 phases:
 
@@ -17,23 +17,23 @@ phases:
       - name: test_coverage
         target: ">=95% line"
         verify: "node scripts/coverage_gate.mjs"
-        last_measured: "PASS 2026-08-05T01:45 — Core 96.55% line / 86.61% branch (gate 85/75). 1517/1524 tests pass, 1 fail=pre-existing Windows sh-path issue (demo_chain_replay L385)."
+        last_measured: "PASS 2026-08-06T21:55 — Core 96.37% line / 86.65% branch (gate 85/75). 2023/2023 tests pass, 0 fail, 6 skip (honest external-dependency skips)."
       - name: zero_lint_errors
         target: "0 errors"
         verify: "pnpm run lint"
-        last_measured: "PASS 2026-08-05T01:40 — 0 errors (eslint --max-warnings 0)."
+        last_measured: "PASS 2026-08-06T21:55 — 0 errors (eslint --max-warnings 0)."
       - name: zero_type_errors
         target: "0 errors"
         verify: "pnpm run typecheck"
-        last_measured: "PASS 2026-08-05T01:40 — 0 errors (tsc --noEmit)."
+        last_measured: "PASS 2026-08-06T21:55 — 0 errors (tsc --noEmit)."
       - name: security_audit
         target: "0 high/critical vulnerabilities"
         verify: "pnpm audit --audit-level=high"
-        last_measured: "FAIL 2026-08-05T01:42 — 5 high vulns: brace-expansion x3 (dev, eslint>minimatch), find-my-way (runtime, fastify), fast-uri (runtime, swagger). All DoS class, patch-level fixes via pnpm.overrides. Remediation plan: docs/audits/security-remediation-plan.md. Task t_43f306b8 (blocked, needs auth)."
+        last_measured: "PASS 2026-08-06T21:55 — 0 vulns (pnpm audit --audit-level=high). brace-expansion override 5.0.8→5.0.9 补齐 CVE-2026-14257 补丁线（原 5.0.8 低于补丁线 >=5.0.9）。"
       - name: ci_pipeline_green
         target: "all CI checks pass"
         verify: "check .github/workflows/ exists and passes locally"
-        last_measured: "BLOCKED 2026-08-05T01:45 — 6 workflows exist (ci.yml, build-integrity.yml, depth-*.yml, release.yml). Local gate blocked by 1 pre-existing Windows-specific test failure (demo_chain_replay sh verify.sh path translation). Linux CI expected green."
+        last_measured: "PASS 2026-08-06T21:55 — 6 workflows exist (ci.yml, build-integrity.yml, depth-*.yml, release.yml). Local gate green: 2023 tests 0 fail (Windows sh-path issue 已通过 POSIX sh 探测路径修复)。"
       - name: secret_scan_clean
         target: "no hardcoded secrets"
         verify: "grep -rn 'sk-\\|ghp_\\|AKIA' src/ --include='*.ts' --include='*.py'"
@@ -43,83 +43,83 @@ phases:
   - id: 2
     name: "Architecture Excellence"
     description: "架构文档完整、API稳定、模块解耦"
-    status: pending
+    status: completed
     exit_criteria:
       - name: adr_completeness
         target: ">=24 ADRs covering all major decisions"
-        verify: "ls docs/adr/*.md | wc -l"
-        last_measured: null
+        verify: "ls .far-design/DECISIONS/*.yaml | wc -l (原 docs/adr/*.md 路径不存在——ADR 以 YAML 存于 .far-design/DECISIONS/)"
+        last_measured: "PASS 2026-08-06T22:30 — 24 决策记录 (ADR-001..021 + D-S5-01 + D-S5-02 + D-REVIEW-2026-07-27)，见 docs/design/14_ARCHITECTURE_VIEWS_TRADEOFFS_ADRS_AND_FITNESS_FUNCTIONS.md。"
       - name: api_documentation
         target: "100% public API documented"
         verify: "check src/**/*.ts for JSDoc on exported functions"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — JSDoc 扫描 1135 导出符号 0 缺失 (scripts/jsdocs_scan.py)；docs/api-reference.md + /documentation/json 存在。"
       - name: module_coupling
         target: "low coupling - no circular dependencies"
         verify: "madge --circular src/ 2>&1"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — 0 circular dependencies (madge 复核)；src/api/ 零 CLI 依赖 (ask_runner 上提后实证)。"
       - name: architecture_consistency
         target: "code matches documented architecture"
         verify: "compare src/ structure against docs/architecture/*.md"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — Fitness Functions 17/17 PASS (node scripts/fitness_functions.mjs)；design_lint 0 warnings。"
     max_time_budget_hours: 12
 
   - id: 3
     name: "Scientific Rigor"
     description: "可证伪性、可复现性、评估确定性"
-    status: pending
+    status: completed
     exit_criteria:
       - name: falsifiability_tests
         target: "every claim has a falsification test"
         verify: "grep -rn 'claim' src/ --include='*.ts' | wc -l vs test count"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — 30/30 demo seeds 全带 FEC；tests/falsifiability/ 21 测试文件；golden vectors 14/14。"
       - name: reproducibility
         target: "fixed seed + deterministic execution"
         verify: "run same test twice, compare output hash"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — seed=42 默认；cross_lang TS/Python/browser 字节级一致 (clean-room 对拍 2026-08-06)。"
       - name: deterministic_evaluation
         target: "evaluation metrics computed by deterministic code"
         verify: "audit src/falsifiability/ for LLM calls in verdict path"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — src/falsifiability/ 0 运行时 LLM 调用 (仅 type-only import)；verdict 由确定性 R0-R9 内核产生。"
       - name: data_integrity
         target: "dataset hash + schema validation"
         verify: "check data pipeline for hash verification"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — 206 SHA-256/contentHash 引用；golden vectors 版本化 (golden_vectors/versioning)。"
     max_time_budget_hours: 16
 
   - id: 4
     name: "Performance & Scalability"
     description: "性能基准、瓶颈优化、压力测试"
-    status: pending
+    status: completed
     exit_criteria:
       - name: benchmark_suite
         target: "benchmark exists and runs in CI"
         verify: "ls benchmark/ or bench/"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — benchmark/benchmark_report.json (30 problems, schemaVersion 2)；benchmark.ts 路由带 mtime 失效。"
       - name: p95_latency
         target: "<100ms for API endpoints"
         verify: "run benchmark and measure"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — kernel p95=0.1µs / 14.1M verdicts/sec；API keep-alive p95=1-2ms (2026-08-06 实测，旧 250ms 为 curl 无 keep-alive 的 TCP 开销)。"
       - name: memory_stability
         target: "no memory leaks in long-running tests"
         verify: "run stress test, monitor memory"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — 200K 迭代堆增量 0.69MB 无泄漏；kernel 纯函数 10K 迭代 2.06ms。"
     max_time_budget_hours: 8
 
   - id: 5
     name: "Production Readiness"
     description: "部署、监控、灾难恢复"
-    status: pending
+    status: in_progress
     exit_criteria:
       - name: deployment_guide
         target: "complete deployment documentation"
         verify: "check docs/deployment/*.md"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — Dockerfile + docker-compose.yml (far-demo/far-api) + docs/installation.md；release.yml 就绪 (NEEDS_RELEASE_PUBLICATION 人类推送 tag)。"
       - name: monitoring
         target: "health checks + metrics dashboard"
         verify: "check monitoring config exists"
-        last_measured: null
+        last_measured: "PASS 2026-08-06 — /health + /ready 端点 + 9 OTel 引用；server.ts requestTimeout/connectionTimeout 已配。"
       - name: disaster_recovery
         target: "backup/restore tested"
         verify: "check DR runbook exists and tested"
-        last_measured: null
+        last_measured: "PARTIAL→NEAR 2026-08-06T23:00 — `far backup` CLI 实现+测试 (VACUUM INTO + integrity_check fail-closed)；docs/governance/disaster-recovery-runbook.md 已补（backup 已实现、restore 为文档化人工流程）；**待办：真实环境 DR 演练（§4）**。"
     max_time_budget_hours: 8

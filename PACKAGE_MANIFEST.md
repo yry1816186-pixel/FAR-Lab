@@ -19,10 +19,10 @@
 
 | 路径 | 字节 | 行数 | SHA-256 | 用途 |
 |---|---:|---:|---|---|
-| `FAR-LAB_MASTER_PROMPT_V3.md` | 23,680 | 662 | `0ecb3796292afbf8ea3729b2222469cca41c44253df45da06edebfe40862ea96` | 始终加载的执行内核：指令层级、状态机、权限、上下文、恢复、完成定义。 |
-| `FAR-LAB_MASTER_PROMPT_V3_MONOLITHIC.md` | 245,879 | 9,567 | `d56a407bb03a65c612bbf6666814e6e219dee6f55d7ee7c5f08564552248859b` | 不支持分层加载时使用的单文件兼容版。 |
+| `docs/archive/agent-materials/FAR-LAB_MASTER_PROMPT_V3.md` | 23,680 | 662 | `0ecb3796292afbf8ea3729b2222469cca41c44253df45da06edebfe40862ea96` | 始终加载的执行内核：指令层级、状态机、权限、上下文、恢复、完成定义。 |
+| `docs/archive/agent-materials/FAR-LAB_MASTER_PROMPT_V3_MONOLITHIC.md` | 245,879 | 9,567 | `d56a407bb03a65c612bbf6666814e6e219dee6f55d7ee7c5f08564552248859b` | 不支持分层加载时使用的单文件兼容版。 |
 | `README.md` | 5,240 | 103 | `b75f175e05794cc81e279f87fbe9e3579f1ba9306ea245e7a52a9ddf886a45fe` | 安装、加载、跨代理使用和重要边界。 |
-| `V3_OPTIMIZATION_AUDIT.md` | 26,900 | 493 | `9735bbba72a276330f7d78307631fc274eec08a6496d1132e2f00b18209cc016` | v2 审计、88 项结构性缺口、对标映射和 v3 设计理由。 |
+| `docs/archive/agent-materials/V3_OPTIMIZATION_AUDIT.md` | 26,900 | 493 | `9735bbba72a276330f7d78307631fc274eec08a6496d1132e2f00b18209cc016` | v2 审计、88 项结构性缺口、对标映射和 v3 设计理由。 |
 | `modules/MODULE_MANIFEST.md` | 2,740 | 27 | `b94f52d057844bf915ce213ed8e1cd2ffbd721b39edf590108f60b71c4169646` | 阶段到模块的路由、加载预算和冲突规则。 |
 | `modules/01_EXECUTION_AND_REPOSITORY_FORENSICS.md` | 9,890 | 343 | `886cfd22830fc58bdaa786b1590429bd6582cad534c2edc34e44a398b44f7f91` | 仓库边界、代码地图、历史、配置、取证和成熟度。 |
 | `modules/02_STRATEGY_USERS_PRODUCT_AND_SERVICE.md` | 13,139 | 462 | `32b432a46a99d391e1f327186c6e887209b9f1b3798ad1b8738e598fd8c92706` | 问题、战略、用户、JTBD、服务蓝图、范围和采用。 |
@@ -53,7 +53,7 @@
 - 单文件版包含总控、模块清单、模块 01–10、v2 基线和全部模板；
 - 总控包含模块 10 的强制加载规则；
 - 关键执行概念存在：运行状态、任务图、上下文预算、指令冲突、权限三态、sandbox、子代理合同、MCP/ACP/A2A、重放、压缩、评测和开源治理；
-- `V3_OPTIMIZATION_AUDIT.md` 的缺口 ID 连续按 A–K 分类，共 88 项；
+- `docs/archive/agent-materials/V3_OPTIMIZATION_AUDIT.md` 的缺口 ID 连续按 A–K 分类，共 88 项；
 - 未把提示词设计写成项目实现或领先事实。
 
 ## 使用边界
