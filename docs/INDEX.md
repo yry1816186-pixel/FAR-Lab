@@ -115,6 +115,8 @@ These are point-in-time audit snapshots. For current state, check the live gates
 
 ## Design documentation
 
+> **全景入口**: [design/ULTIMATE_DESIGN.md](design/ULTIMATE_DESIGN.md)（2026-08-05 系统设计圣经——愿景、不可变原则、架构总览）。正式设计文档见下。
+
 33 design documents live in [design/](design/). Reading order:
 
 1. **01 Executive Design Contract** — one-page project overview

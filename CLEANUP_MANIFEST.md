@@ -16,7 +16,7 @@
 
 ---
 
-## 阶段二：迁移脚本（已生成 + dry-run 验证 ✅，--apply 待用户确认 ⏸）
+## 阶段二：迁移脚本（dry-run 验证 ✅ → 已执行 ✅ 2026-08-07）
 
 **产出**: `migrate.sh`（Linux/Mac/git-bash）+ `migrate.ps1`（Windows PowerShell）
 **设计**: 默认 dry-run；`--apply` / `-Apply` 实际执行；冲突自动归档 `docs/archive/migrated_<时间戳>/`，绝不覆盖。
@@ -36,7 +36,10 @@
 | 5 | 追加防御性 .gitignore 规则 | `**/0/v[0-9]*-x*/` `**/__pycache__/` 等 | 防未来污染 |
 | 6 | 生成 `tree.txt` | 重构后结构预览 | — |
 
-**⏸ 待用户确认后执行**: `bash migrate.sh --apply`（或 PowerShell 版）
+**✅ 已执行（2026-08-07）**: `bash migrate.sh --apply` —— 全部 Phase 落地，物理删除 8 项 / D 类 3 组去重 / .gitignore 强化 / tree.txt 生成。执行后 git 操作分 3 个 commit：
+1. `chore(governance): purge adversarial raw evidence + archive legacy agent materials`（896 暂存删除 + 7 归档 rename）
+2. `chore(governance): physical cleanup + dedupe + gitignore hardening + delivery docs`（学习脊柱 14 文件 + D 类去重 + 交付物）
+3. `chore(governance): index ULTIMATE_DESIGN + final docs sync`（INDEX.md 索引 + 本清单 + PROGRESS）
 
 ---
 
@@ -62,21 +65,21 @@
 
 | 风险 | 状态 |
 |---|---|
-| R1: docs/learning/ 100% 未追踪 | ⏸ 待 migrate --apply（Phase 1 自动 `git add`） |
-| R2: 896 暂存删除未落地 | ⏸ 建议在 --apply 前/后 commit（脚本已警告） |
-| R3: C 类物理残留 32.5MB | ⏸ 待 migrate --apply（Phase 2） |
+| R1: docs/learning/ 100% 未追踪 | ✅ 已解决（migrate Phase 1 + commit 2，14 文件入索引） |
+| R2: 896 暂存删除未落地 | ✅ 已解决（commit 1 落地，adversarial/ 已 gitignore 防回库） |
+| R3: C 类物理残留 32.5MB | ✅ 已解决（migrate Phase 2，8 项全删） |
 
 ---
 
-## 执行后检查清单（--apply 完成后）
+## 执行后检查清单（✅ 全部完成 2026-08-07）
 
-- [ ] `git add -A && git commit -m 'chore: governance cleanup (see PROJECT_CLEANLINESS_AUDIT_2026-08-07.md)'`
-- [ ] 确认暂存删除 896 项已落地（`git status --porcelain | grep ^D | wc -l` → 0）
-- [ ] 确认 docs/learning/ 已追踪（`git ls-files docs/learning | wc -l` → 14）
-- [ ] 确认物理清理（`du -sh 0 frontend/0 .pi/state` → 不存在）
-- [ ] 手动: docs/INDEX.md "Design documentation" 小节加 `[ULTIMATE_DESIGN.md](design/ULTIMATE_DESIGN.md)`（Phase 3-G3）
-- [ ] `pnpm run typecheck && pnpm run lint && pnpm test` 全绿（验证无回归）
-- [ ] 复核 tree.txt（Phase 6 产物）
+- [x] `git add -A && git commit`（分 3 个语义 commit 落地，见阶段二）
+- [x] 确认暂存删除 896 项已落地（commit 1，staged D → 0）
+- [x] 确认 docs/learning/ 已追踪（`git ls-files docs/learning | wc -l` → **14**）
+- [x] 确认物理清理（`0/ frontend/0/ .pi/state .pi/baseline-logs __pycache__ .benchmarks .agent-state` → 全部不存在）
+- [x] docs/INDEX.md "Design documentation" 小节已加 `[ULTIMATE_DESIGN.md](design/ULTIMATE_DESIGN.md)` 全景入口
+- [x] `pnpm run typecheck && pnpm run lint && pnpm test` 全绿（typecheck exit 0 / lint exit 0 / **2024 tests: 2019 pass / 0 fail / 5 skip**）
+- [x] tree.txt 已复核（190 行，1,739 文件，排除依赖与已忽略残留）
 
 ---
 
