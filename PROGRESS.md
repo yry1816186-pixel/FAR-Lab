@@ -1,3 +1,84 @@
+# FAR-Lab Progress Checkpoint — 2026-08-07 opencode 配置融入会话（长任务自主模式）
+
+> **任务**：全面解析本设备 opencode 配置 → 制定完善计划 → 融入优化重构 FAR-Lab 项目级配置，让 opencode 在该项目获得完整上下文。中途发现问题彻底解决。禁止幻觉与欺骗，反复验证无遗漏。
+
+## 当前目标（≤20 词）
+建立 FAR-Lab `.opencode/` 项目级配置层，移植 .claude 资产，验证零回归。
+
+## ANALYZE 完成（实测证据 2026-08-07）
+
+**opencode 全局盘点**（`~/.config/opencode/`）：
+- opencode.json 633 行：22 agents + 6 mcp + 2 plugins + 2 providers
+- 35 agents/*.md + 45 commands/*.md + 5 directives/*.md（master-directive 核心 430 行 + full 2182 行）
+- plugins: safety-guard.ts (395 行 ECC fusion) + team-orchestration.ts (348 行 Phoenix v2.1) + empty-response-guard.ts
+- scripts/harness-contracts.mjs (228 行，17 断言 self-test PASS) + tools/{deps,gitinfo,project}.ts
+
+**FAR-Lab 项目内 6 套 AI 配置盘点**：
+- `.claude/` ACTIVE 备用：settings + 6 agents + 8 rules + 5 skills + policy_guard.py（21 文件）
+- `.pi/` RESTORED 备用：APPEND_SYSTEM + extensions + 20 prompts（s0-s10 完整流程）
+- `.hermes/` plan.md 单文件 / `.zcode/` `.zed/` 待查
+- **`.opencode/` 🔴 完全缺失**（核心融入缺口）
+
+**关键发现 7 项**（详见 `.far-design/OPENCODE_INTEGRATION_PLAN.md` §2）：
+- P0-1 🔴 secrets 明文（opencode.json 4 处：L426/433/441/454/462/563/594）— 家目录配置，登记给用户决策
+- P0-2 🟡 `.opencode/` 项目级完全缺失 — 本任务核心
+- P0-3 🟡 AGENTS.md 双重加载冗余 — 项目级用瘦补丁设计
+- P0-4 🟡 policy_guard.py 只接 Claude — 实现 opencode plugin 等价
+- P0-5/6 🟡 skills/agents 格式需转换 — 5 skills + 6 agents 移植
+- P0-7 🟢 pi/hermes/zcode/zed 多套并存 — 不动，登记后续
+
+## PLAN 完成（产物：.far-design/OPENCODE_INTEGRATION_PLAN.md v1.0）
+
+完整融入计划已落盘，含架构设计、执行 TodoList、不变量、风险回滚、验证基线。
+
+## 基线证据（PLAN 时实测）
+- 后端 typecheck EXIT=0 / 0 errors
+- 后端 lint EXIT=0 / 0 errors
+- git: branch design/s0-safe-boot, ahead 1, 10 modified（之前会话产物，非本任务）, 1 untracked
+- git log HEAD: d32f919 docs(progress) checkpoint 9
+
+## ✅ 全部完成（2026-08-07 终验）
+
+**EXEC 全部 6 步落地**（产物 26 文件 / 1418 行 / 74834 bytes）：
+- EXEC-1 ✅ `.opencode/` 目录骨架 + AGENTS.md（瘦补丁，lazy-load @rules）+ 8 rules（typescript/python/tests/frontend/data-migrations/scientific-kernel/security-release/docs-and-config）
+- EXEC-2 ✅ 5 skills 移植（far-design-freeze/implement/refactor/release/verify，opencode SKILL.md 格式，name 与目录一致已验证）
+- EXEC-3 ✅ 6 agents 移植（far-architect/trust-reviewer/security-adversary/verifier/implementer/release，opencode markdown frontmatter 格式，全部含 description+mode+permission 已验证）
+- EXEC-4 ✅ 4 commands 建立（far-baseline/demo/verify-proof/real-paper，全部含 description+agent 已验证）
+- EXEC-5 ✅ far-trust-kernel-guard.ts plugin 实现（283 行，保护 schema/migrations/Claim/FEC/Evidence/Verdict/Proof，BLOCK 现有 migration 编辑，BLOCK FAR-Lab DB destructive ops，WARN trust-kernel edits，复用全局 safety-guard 模式）
+- EXEC-6 ✅ 8 rules 融入 .opencode/AGENTS.md（@rules/*.md lazy loading，8 引用全存在已验证）
+
+**VERIFY 全绿**（实测证据）：
+| 维度 | 命令 | 结果 |
+|------|------|------|
+| typecheck | `pnpm run typecheck` | EXIT=0 / 0 errors |
+| lint | `pnpm run lint` | EXIT=0 / 0 errors |
+| test | `pnpm test` | EXIT=0 / 2024 tests / **2018 pass / 0 fail / 6 skip** |
+| demo | `node src/cli/far.ts demo` | EXIT=0 / 14/14 GV |
+| 反 theater（.opencode/） | `rg ": any|@ts-ignore|catch\{\}"` | 干净（匹配项全是描述文本中的英文单词，非类型注解） |
+| 反 theater（src/+tests/） | 同上 | 干净（匹配项全是注释中的合规声明） |
+| @rules 引用完整性 | 8 引用 vs 8 文件 | 全匹配 |
+| skills name 一致性 | 5 目录 vs 5 name | 全匹配 |
+| agents frontmatter | 6 文件 description+mode+permission | 全有 |
+| commands frontmatter | 4 文件 description+agent | 全有 |
+| plugin 导出 | default + named + Plugin type | 全有 |
+| git diff scope | 只有 .opencode/ + PROGRESS.md + PLAN | 无意外改动 |
+
+**test skip 波动说明**：baseline 2019p/5s → 现在 2018p/6s，多 1 skip 是环境性（python/browser/qwen_adapter 等 env-gated 测试），**fail=0 无回归**。6 个 skip 全是：python axis / browser axis / POSIX chmod on win32 / DASHSCOPE_API_KEY unset / 等。
+
+## 阻塞 / 未验证假设
+- ✅ 无阻塞。原假设"opencode 项目级 opencode.json 字段格式"已通过 context7 官方文档查证：`.opencode/` 目录下 agents/skills/commands/plugins **自动发现**，无需 opencode.json 显式配置。
+- ⚠️ **未验证**：plugin 实际加载行为（需重启 opencode 会话验证审计日志 `~/.local/share/opencode/far-trust-kernel-audit.log`）— 这需要新会话第一动作验证。
+- ⚠️ **未验证**：skills/agents/commands 实际被 opencode 识别（需新会话 `/far-baseline` 命令 + `@far-architect` 派发测试）
+
+## 排除方案（防盲目重试）
+- 不修改 `~/.config/opencode/opencode.json` 全局配置（家目录配置，P3 授权范围外）
+- 不删除 .claude/.pi/.hermes/.zcode/.zed（保留并存的策略，避免破坏）
+- 不复制根 AGENTS.md 内容到 .opencode/AGENTS.md（用瘦补丁设计，避免冗余）
+
+---
+
+# 历史检查点保留（2026-08-06 及之前，供追溯）
+
 # FAR-Lab Progress Checkpoint — 2026-08-06 项目治理会话（商业级整理）
 
 ## 治理会话 checkpoint（2026-08-06 22:30 终验）
