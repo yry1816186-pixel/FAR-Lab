@@ -308,3 +308,37 @@ commit 1 的 pathspec 陷阱洗掉 896 staged D → 改用 git ls-files -i -c �
 **交付物**: AUDIT_REPORT.md / migrate_clean.sh (dry-run 默认 + --apply) / CLEANUP_REPORT.txt
 **验证**: typecheck 0 · lint 0 · test 2024 (2019 pass/0 fail/5 skip) 零回归 · demo 核心引擎 OK · 保护断言 63=63 · fixture 完好
 **遗留**: 104 功能变更未提交 (47 staged + 45 mod + 12 untrack, 含 uv.lock/0024 迁移) 待功能会话; .trash_backup 待人工复核
+
+## Checkpoint 9 — 2026-08-07 v1.1.0 发布 + Bem 真实科学验证
+
+**发布推进（用户"全部授权"后）**:
+- 提交功能组 99 文件 (a12be13) + 治理组 18 文件 (812af1d) → 工作树 0 残留
+- 版本 1.0.0 → 1.1.0 (package.json + frontend)，CHANGELOG [Unreleased] 并入 [1.1.0]
+- 修复 release.yml release-notes 提取缺陷: awk 正则转义 `\[` 在 mawk/gawk 下未定义行为
+  → 改为精确字符串匹配 (index())，本地验证 v1.1.0 提取 89 行 / v1.0.0 回归正常
+- push origin main (94b9145..e1fc6d9 fast-forward 73 commits) + tag v1.1.0 (138f0d2c)
+- Release workflow 31123935937 触发: 版本校验 ✓ install ✓ 质量门 ⚠️ FAILED
+  **根因: GitHub Partial System Outage（runner 卡死 29min → 30min timeout）**
+  本地全门证据: typecheck 0 / lint 0 / 2024 (2019p/0f/5s) / py 121 OK / cross-lang 8/8
+  depth-gate 同因 cancelled（results-receiver 网络错误）。待 GH 恢复后 rerun。
+
+**Bem (2011) 真实科学验证（核心目标 #2）**:
+- far real-paper --paper bem --mode as-published:
+  FAR-Lab 精确重算 t-p=0.006847 (df=99, t=2.51) · Bonferroni adj p=0.0685 (k=10)
+  → ANTI_THEATER_FAIL (AT-PHACK-CORRECTION 捕获多重比较未校正) → verdict UNTESTED
+- --mode corrected: Bonferroni 校正后 p=0.0685 不显著 → R8_INSUFFICIENT_POWER_OR_NULL → INCONCLUSIVE
+- bem_pipeline.test.ts 12/12 pass · 与文献统计一致 (Bem t(99)=2.51 p=.014 one-tailed)
+- 对比: Ritchie/Wiseman 复现失败 t(49) 方向相反已内置 pipeline
+
+**GH Actions major_outage 确认 (02:4x)**: githubstatus API 组件级状态 Actions: major_outage /
+Pages: major_outage · 官方 incident "Workflow runs are still failing or delayed"。
+Release workflow 31123935937 质量门 30min timeout 失败根因 = runner 卡死（17:44:51 最后正常
+测试输出 → 18:14:03 timeout，29min 零输出）· depth-gate 同因 cancelled。
+**自动恢复**: 后台监控 /c/Users/RichardYuan/AppData/Local/Temp/gh_retry_monitor.sh
+（每 2min 查 githubstatus，恢复即 `gh run rerun 31123935937 --failed`）· 最多 2h。
+**本地全门证据（发布前置已完成）**: typecheck 0 / lint 0 / test 2024 (2019p/0f/5s) /
+py 121 OK / cross-lang 8/8 · Bem real-paper 双模式 + bench 30/28域 均验证通过。
+
+**核心目标 #2 补充验证（bench）**: 30 problems / 28 科学域 / 210 leaves /
+verdict {CONFIRMED 6, REFUTED 8, INCONCLUSIVE 7, DEGRADED_SCOPE 7, UNTESTED 2} /
+suiteIntegrityRoot 83265409e9... Merkle 聚合锚定 / 5 条 honesty notes（fixture 边界诚实声明）。
