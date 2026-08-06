@@ -27,12 +27,14 @@ import {
 import type { AssuranceDimensionResult } from '../../v2_domain/shared_schemas.ts';
 import type { AssuranceDimension, ReceiptStanding, PreservationStatus } from '../../v2_domain/contract_enums.ts';
 
+/** Parsed options for the V2 six-dimension verification path (`far verify --v2`). */
 export interface VerifyV2Options {
   readonly envelopePath?: string;
   readonly bundlePath?: string;
   readonly json: boolean;
 }
 
+/** Result of a V2 verification run: process exit code + rendered output. */
 export interface VerifyV2Result {
   readonly exitCode: number;
   readonly output: string;

@@ -9,6 +9,11 @@ import {
   canonicalJson,
   hashCanonicalJson,
 } from '../../src/evidence_log/index.ts';
+// V2 clean-room verifier: from-scratch canonical JSON + sha256 (PS-04).
+import {
+  independentCanonicalJson,
+  independentSha256Hex,
+} from '../../src/v2_domain/independent_verifier.ts';
 // NUMERIC_* 为 test-only 常量（数值域跨语言对拍专用），不从公共 API 导出——直接引用定义源。
 import {
   NUMERIC_GREEN_VECTORS,
@@ -104,6 +109,34 @@ test('numeric green vectors: TS hashCanonicalJson === Python (day-0 PoC byte-equ
     const tsHex = hashCanonicalJson(v.obj);
     const pyHex = runPythonCanonical(v.obj, 'hash');
     assert.equal(tsHex, pyHex, `${v.name}: TS!==Python (expected byte-equal)`);
+  }
+});
+
+test('V2 clean-room independentCanonicalJson === Python canonical_json (no shared canonicalizer)', () => {
+  // PS-04 (world-class parity): the V2 independent verifier re-implements
+  // canonical JSON from Node primitives (NOT the producer's
+  // fast-json-stable-stringify). It must still produce byte-identical
+  // canonical JSON and sha256 to the Python repro axis — this is the
+  // clean-room cross-language consistency proof.
+  const samples: Record<string, unknown>[] = [
+    { a: true, b: [1, 2, { c: 'x', d: null }], c: 3.5 },
+    { z: '中文测试', a: { nested: [1.5, -0, 'x'], flag: false }, empty: {}, arr: [] },
+    // NOTE: 1e-7 (V8 "1e-7") vs 1e-07 (Python) is a KNOWN divergence (N2b,
+    // V3 RFC 8785 JCS target) — excluded here; clean-room parity scope is the
+    // string/object/number-identical domain.
+    { s: 'nested "quotes" \\ backslash \n newline', n: -0, f: 1.25, t: [true, false, null] },
+    { deep: { deeper: { deepest: { value: 42, list: [{ k: 'v' }, []] } } } },
+  ];
+  for (const [i, obj] of samples.entries()) {
+    const tsCanonical = independentCanonicalJson(obj);
+    const tsHex = independentSha256Hex(tsCanonical);
+    const pyHex = runPythonCanonical(obj, 'hash');
+    const pyCanonical = runPythonCanonical(obj, 'str');
+    assert.equal(
+      tsHex,
+      pyHex,
+      `sample[${i}]: clean-room TS sha256 !== Python (expected byte-equal): ${tsCanonical} vs ${pyCanonical}`,
+    );
   }
 });
 
