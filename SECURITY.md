@@ -11,7 +11,15 @@
 
 **DO NOT open public GitHub issues for security vulnerabilities.**
 
-Email: security@far-lab.example.com
+Primary channel — GitHub Private Vulnerability Reporting (operational, no setup needed):
+
+    https://github.com/yry1816186-pixel/FAR-Lab/security/advisories/new
+
+Fallback channel — email:
+
+    security@far-lab.example.com
+    (placeholder — `NEEDS_MAINTAINER_ASSIGNMENT`; until a real address is
+    published in MAINTAINERS.md, prefer the GitHub advisory channel above)
 
 Response SLA:
 - Acknowledgement: 48 hours

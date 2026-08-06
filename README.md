@@ -299,8 +299,9 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
 3. **Single-node** — SQLite-based; multi-node PostgreSQL is future work. Tested throughput is
    O(10²) rows/sec append + O(10⁴) rows indexed lookups/sec on consumer SSD (single-process).
    Not suitable for high-concurrency multi-writer production (>100 concurrent writers → use PostgreSQL).
-4. **Pre-1.0** — API and schema may change. We follow early-stage semver: breaking changes bump
-   the minor version (0.x → 0.y) with a deprecation window of at least one minor release.
+4. **Early-stage 1.x** — API and schema may change within the 1.x line. We follow semver:
+   breaking changes bump the minor version (1.0 → 1.1) with a deprecation window of at least
+   one minor release.
 5. **Cross-language hashing scope** — string-key hashing is byte-identical across TypeScript/Python
    (CI-verified); float-key hashing is the V3 RFC 8785 work in item 1; the browser ProofEnvelope
    verifier is not yet wired (#13).

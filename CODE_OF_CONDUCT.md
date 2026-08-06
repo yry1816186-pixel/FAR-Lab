@@ -40,8 +40,10 @@ harmful.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-**security@far-lab.example.com** (see `SECURITY.md`). All complaints will be
+reported to the community leaders responsible for enforcement via GitHub
+Private Vulnerability Reporting
+(`https://github.com/yry1816186-pixel/FAR-Lab/security/advisories/new`,
+see `SECURITY.md`). All complaints will be
 reviewed and investigated promptly and fairly.
 
 > `NEEDS_MAINTAINER_ASSIGNMENT`: a dedicated conduct-reporting channel and

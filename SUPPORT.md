@@ -28,7 +28,8 @@ node src/cli/far.ts status     # project status
 ## Security vulnerabilities
 
 **Do not open a public issue.** See `SECURITY.md` for private disclosure
-(`security@far-lab.example.com`).
+(GitHub Private Vulnerability Reporting — preferred:
+`https://github.com/yry1816186-pixel/FAR-Lab/security/advisories/new`).
 
 ## Response time
 
