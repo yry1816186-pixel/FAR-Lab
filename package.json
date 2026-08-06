@@ -1,6 +1,6 @@
 {
   "name": "far-lab",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Claim-level verification layer for AI4S scientific claims — falsifiable, tamper-detectable, independently recomputable verdicts via a deterministic R0-R9 kernel (no LLM arbiter).",
   "keywords": [
     "ai4s",
