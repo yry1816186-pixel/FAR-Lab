@@ -10,7 +10,8 @@ is produced by the deterministic R0–R9 kernel; the LLM is not involved.
 
 ```bash
 far demo tess-offline                                       # live demo (14 GV + this claim's verdict)
-far verify examples/tess-offline/output/demo.far-proof     # verify the persisted bundle
+far export far-proof --demo-chain --out ./tess-offline.far-proof   # export the bundle (two-step, T-002)
+far verify ./tess-offline.far-proof                         # verify the persisted bundle (exit 0 = clean)
 ```
 
 ## What you will see
@@ -40,7 +41,8 @@ path is incomplete, it degrades to `UNTESTED` rather than fabricating a `CONFIRM
 ## Tamper detection (reproducible)
 
 ```bash
-cp -r examples/tess-offline/output/demo.far-proof /tmp/tampered
+far export far-proof --demo-chain --out ./tess-offline.far-proof
+cp -r ./tess-offline.far-proof /tmp/tampered
 sed -i 's/UNTESTED/CONFIRMED/' /tmp/tampered/proof_envelopes.jsonl
 far verify /tmp/tampered
 #   status: FAIL · tamperStatus: tampered · recomputation.node: fail · exit 7
@@ -58,4 +60,5 @@ rm -rf /tmp/tampered
 
 ## Details
 
-Full structure and per-file notes: [examples/tess-offline/README.md](../../examples/tess-offline/README.md).
+Bundle structure and per-file notes: [07 证明包教学章](../learning/07_PROOF_BUNDLE.md) 的 7.2 节
+（`.far-proof` 13 个文件逐一说明）。

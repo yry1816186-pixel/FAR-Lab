@@ -49,6 +49,24 @@ nul
 .privacy-scan-report.txt
 .wf_*.mjs
 
+# --- Agent audit scratch (subagent temp scripts) ---
+_audit_*
+
+# --- Runtime artifacts inside governance/evidence dirs (high churn, not source) ---
+.far-implementation/**/*.jsonl
+.far-implementation/**/*.log
+.far-implementation/**/*.ttl
+.far-implementation/**/*.sqlite
+.far-implementation/**/*.sqlite-wal
+.far-implementation/**/*.sqlite-shm
+.far-implementation/**/*.flag
+.far-implementation/**/*.rundb
+.far-implementation/**/*.rundb-wal
+.far-implementation/**/*.rundb-shm
+.far-design/**/*.log
+.far-design/evidence/**/*.jsonl
+.far-master/*.jsonl
+
 # --- Agent tooling (FAR-Lab pi discipline SHIPPED for fresh-clone cwd-fix) ---
 # .pi/ config (APPEND_SYSTEM/settings/project/extensions/prompts) now tracked so a
 # fresh clone + `cd FAR-Lab && pi` actually loads FAR-Lab discipline + far-guard/far-stage gates.
@@ -124,3 +142,20 @@ CLAUDE.local.md
 .claude/settings.local.json
 .pi/git/
 .pi/npm/
+
+# --- 2026-08-07 治理追加：防御未来污染 ---
+# 全局忽略任何 NODE_COMPILE_CACHE 泄漏（不限于根目录）
+**/0/v[0-9]*-x[0-9]*/
+# Python 缓存（全局，含子目录）
+**/__pycache__/
+# 本地会话与代理状态（防止未来新增工具泄漏）
+.agent-state/
+.pi/state/
+.pi/baseline-logs/
+# 对抗过程产物全目录（追踪清理后防止重新入库；REPORT.md 等证据随 git 历史保留）
+.far-implementation/adversarial/
+# 临时脚本与审计残留
+**/_*.py
+**/tmp_*.py
+**/jsdoc_missing_batch*.txt
+

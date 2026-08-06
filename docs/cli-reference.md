@@ -62,7 +62,7 @@ Third-party independent recomputation.
 - `--mode` — `chain` | `envelope` | `full` (inferred from inputs by default).
 - `--json` — machine-readable 10-field schema output.
 - `--explain` — human-readable mode: expand the 10-rule check table.
-- `--lint-input <path>` — independently recompute the 20 anti-theater detectors and compare in depth
+- `--lint-input <path>` — independently recompute the 22 anti-theater detectors and compare in depth
   with the embedded report (requires `--envelope`; any divergence ⇒ FAIL, exit 7).
 - Exit: `0` PASS / `7` FAIL / `2` bad args / `1` runtime.
 
