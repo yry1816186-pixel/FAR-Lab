@@ -79,7 +79,7 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 - `NEEDS_RELEASE_PUBLICATION`: the package is build-ready and `npm install -g` works from a tarball,
   but is not yet published to the npm registry; the GitHub Release is pending.
 
-## [Unreleased] — 2026-08-05 session
+## [1.1.0] — 2026-08-05 · Ecosystem-borrowed upgrade + hero demo + security fixes
 
 ### Fixed
 
@@ -111,7 +111,7 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 - Phase 1 Foundation Hardening: EXIT GATE PASSED (6/6 criteria).
 - Phase 2 Architecture Excellence: Fitness Functions 17/17 PASS, ADRs 24/24.
 
-## [1.1.0] — 2026-08-05 · Ecosystem-borrowed upgrade (9 batches)
+### Ecosystem-borrowed upgrade (9 batches) — details
 
 Learned from 5 world-class open-source projects (opencode / pi / zeroclaw / hermes-agent /
 scientific-agent-skills) and implemented 9 borrowing batches. All gates green: typecheck 0 /
