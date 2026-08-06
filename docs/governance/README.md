@@ -12,6 +12,7 @@ succession) live in the root-level [`GOVERNANCE.md`](../../GOVERNANCE.md).
 |----------|---------|
 | [release-process.md](release-process.md) | Tagging, release workflow, and release-assets checklist |
 | [OPEN_SOURCE_RELEASE_PLAN.md](OPEN_SOURCE_RELEASE_PLAN.md) | Open-source release-form decisions and remaining actions |
+| [disaster-recovery-runbook.md](disaster-recovery-runbook.md) | Backup/restore procedures, DR drill status (Phase 5) |
 
 > **Status note (2026-07-25 governance audit):** the following documents are
 > intentionally gitignored as they contain local audit snapshots rather than

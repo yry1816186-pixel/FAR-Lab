@@ -62,7 +62,7 @@ they agree — the same input yields the same verdict in TS, Python, and the bro
 - ❌ It is **not** "the kernel proves scientific truth". The kernel decides whether the *submitted
   evidence* clears the *declared* bar, deterministically. It does not adjudicate nature.
 - ❌ It is **not** immune to bad input. A fabricated evidence row passes a correct kernel — which is
-  why the content-addressed ledger and the 20 anti-theater detectors exist (see
+  why the content-addressed ledger and the 22 anti-theater detectors exist (see
   [anti-theater.md](anti-theater.md)).
 
 See also: [verdict.md](verdict.md) · [evidence.md](evidence.md) · [anti-theater.md](anti-theater.md)

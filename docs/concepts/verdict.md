@@ -76,7 +76,7 @@ it exercises the real kernel, not a lookup.
 ## Boundaries (honest)
 
 - The kernel is deterministic but its **inputs** can be wrong. A fabricated evidence row will pass the
-  kernel — which is why the content-addressed ledger and the 20 anti-theater detectors exist (see
+  kernel — which is why the content-addressed ledger and the 22 anti-theater detectors exist (see
   [anti-theater.md](anti-theater.md)).
 - `DEGRADED_SCOPE` is an honest narrowing, not a failure: it says "we confirmed X under a strictly
   smaller scope than claimed", not "we failed".
