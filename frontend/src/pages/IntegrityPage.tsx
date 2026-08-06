@@ -37,6 +37,7 @@ import {
   GOLDEN_PROOF_LEAF0,
 } from '@/lib/integrity-golden';
 import type { IntegrityProofDto, IntegrityRootDto, ReproReceipt } from '@/lib/types';
+import { useTimeout } from '@/lib/useTimeout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -252,11 +253,12 @@ function HashRow({
   readonly mono?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const schedule = useTimeout();
   const handleCopy = async () => {
     const ok = await copyToClipboard(value);
     if (ok) {
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      schedule(() => setCopied(false), 1500);
     }
   };
   return (
@@ -751,6 +753,7 @@ function WholeChainRecompute() {
 function ReproReceiptExporter() {
   const { data, isLoading, isError, error } = useReproReceipt();
   const [copied, setCopied] = useState(false);
+  const schedule = useTimeout();
 
   const handleDownload = () => {
     if (data === undefined) return;
@@ -761,7 +764,7 @@ function ReproReceiptExporter() {
     const ok = await copyToClipboard(JSON.stringify(data, null, 2));
     if (ok) {
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      schedule(() => setCopied(false), 1500);
     }
   };
 

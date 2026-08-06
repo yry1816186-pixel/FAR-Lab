@@ -20,7 +20,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PACKAGE_ROOT } from '../../cli/paths.ts';
 
@@ -35,8 +35,9 @@ import type { BenchmarkReport } from '../../benchmark/types.ts';
  */
 const REPORT_PATH = resolve(PACKAGE_ROOT, 'benchmark', 'benchmark_report.json');
 
-/** 模块级缓存：JSON 不可变（generate 才改），首次读后缓存。 */
+/** 模块级缓存：JSON 由 generate 脚本重写 → 以文件 mtime 失效（变更后自动重读·无需重启进程）。 */
 let cachedReport: BenchmarkReport | null = null;
+let cachedMtimeMs = -1;
 
 /**
  * type guard：校验 JSON.parse 产物符合 BenchmarkReport 最小 shape。
@@ -68,7 +69,18 @@ function isReportShape(value: unknown): value is BenchmarkReport {
  * @throws {ApiError 500} 报告 JSON 损坏 / shape 不符
  */
 export function loadReport(reportPath: string = REPORT_PATH): BenchmarkReport {
-  if (cachedReport !== null) {
+  // mtime 失效：文件未变 → 返回缓存；文件已变（generate 重写）→ 重读。
+  // statSync 放最前（文件不存在 → 503，与历史行为一致）。
+  let mtimeMs: number;
+  try {
+    mtimeMs = statSync(reportPath).mtimeMs;
+  } catch (err) {
+    throw serviceUnavailable(
+      'benchmark report not generated; run `pnpm benchmark:generate` then restart the server',
+      { path: reportPath, cause: err instanceof Error ? err.message : String(err) },
+    );
+  }
+  if (cachedReport !== null && mtimeMs === cachedMtimeMs) {
     return cachedReport;
   }
 
@@ -98,6 +110,7 @@ export function loadReport(reportPath: string = REPORT_PATH): BenchmarkReport {
   }
 
   cachedReport = parsed;
+  cachedMtimeMs = mtimeMs;
   return cachedReport;
 }
 
@@ -117,4 +130,5 @@ export async function registerBenchmarkRoute(app: FastifyInstance): Promise<void
  */
 export function __resetBenchmarkCache(): void {
   cachedReport = null;
+  cachedMtimeMs = -1;
 }

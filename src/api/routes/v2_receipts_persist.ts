@@ -114,6 +114,39 @@ export async function registerV2ReceiptPersistRoutes(
 
     const createdAt = new Date().toISOString();
 
+    // 审计 P2-2：数组元素级校验——半损坏的 manifestMembers/contractBindings 元素
+    // 不得直插 DB（member.kind 等访问前先 shape 校验，防 500/脏数据）。
+    if (body.manifestMembers !== undefined) {
+      for (const member of body.manifestMembers) {
+        if (
+          typeof member !== 'object' || member === null ||
+          typeof member.kind !== 'string' ||
+          typeof member.digest !== 'string' ||
+          typeof member.sizeBytes !== 'number' ||
+          !Number.isFinite(member.sizeBytes) || member.sizeBytes < 0
+        ) {
+          return reply.code(400).send({
+            ok: false,
+            error: 'Malformed manifestMembers: each member must be { kind: string, digest: string, sizeBytes: number }',
+          });
+        }
+      }
+    }
+    if (body.contractBindings !== undefined) {
+      for (const binding of body.contractBindings) {
+        if (
+          typeof binding !== 'object' || binding === null ||
+          typeof binding.bindingSetJson !== 'string' ||
+          typeof binding.digest !== 'string'
+        ) {
+          return reply.code(400).send({
+            ok: false,
+            error: 'Malformed contractBindings: each binding must be { bindingSetJson: string, digest: string }',
+          });
+        }
+      }
+    }
+
     // Idempotency: check if a receipt with this proofHash already exists.
     const existing = db
       .prepare('SELECT id FROM v2_receipts WHERE proof_hash = ?')

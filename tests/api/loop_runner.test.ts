@@ -23,6 +23,10 @@ import { STAGE_ORDER } from '../../src/agent_loop/types.ts';
 import type { ReproHashProvider } from '../../src/agent_loop/types.ts';
 import { DEMO_RESEARCH_INPUT } from '../../src/agent_loop/demo_fixtures.ts';
 import { verifyChainHead } from '../../src/evidence_log/verifier.ts';
+import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offline_replay/client.ts';
+import type { LlmGateway } from '../../src/llm_gateway/gateway.ts';
+import type { LlmRequest, LlmResponse } from '../../src/llm_gateway/types.ts';
+import { computeLlmEnvironmentAnchor } from '../../src/llm_gateway/repro_anchor.ts';
 
 /**
  * stageId → 期望的 StructuredPayload.kind（discriminatedUnion 标签）。
@@ -218,6 +222,79 @@ test('executeLoop default offline path runs built-in hero demo to feedback_conve
       .get(verdictNode.evidenceId) as { evidence_payload?: string } | undefined;
     assert.ok(evRow !== undefined, 'CONFIRMED verdict must anchor to an evidence_log row');
     assert.ok((evRow.evidence_payload ?? '').length > 0, 'CONFIRMED evidence_payload must be non-empty');
+  } finally {
+    db.close();
+  }
+});
+
+/**
+ * G3 闭合（2026-08-06）：production profile + modelSnapshot → LLM 调用环境锚 provider。
+ *
+ * 背景：此前 production profile 无 reproHashProvider → REPRO_BRIDGE_NOT_CONFIGURED（CLI 真实
+ * 路径死锁）。闭合后：显式注入 modelSnapshot → resolveReproHashProvider 用环境锚
+ * （computeLlmEnvironmentAnchor·模型快照+活跃模型+node 版本+git sha·真实环境指纹·非占位）。
+ *
+ * 测试用 mock gateway（真实 offline_replay adapter 的 fixture 内容·registeredProfiles 声明
+ * competition_aliyun_qwen）→ 无网络无计费；断言环境锚真实落 call_records.repro_hash。
+ */
+test('G3 闭合：production profile + modelSnapshot → 环境锚落库（非 REPRO_BRIDGE_NOT_CONFIGURED·非占位）', async () => {
+  const db = openDb();
+  // 真实 offline_replay adapter 提供 fixture 内容（按 stageId 路由·hero demo registry）；
+  // registeredProfiles 声明 competition_aliyun_qwen → 环境锚 activeModelIds 含生产 profile 名。
+  // credential.providerProfile 改写为 competition（真实 competition adapter 语义·反 theater
+  // 校验：appendLlmResponseRecord 要求 appendOptions.profile 与 response 凭证 profile 一致）。
+  const adapter = createOfflineReplayAdapter();
+  const gateway: LlmGateway = {
+    register: () => {},
+    callLlm: async (_profile: string, request: LlmRequest): Promise<LlmResponse> => {
+      const response = await adapter.call(request);
+      return {
+        ...response,
+        credential: {
+          ...response.credential,
+          providerProfile: 'competition_aliyun_qwen',
+          providerRequestId: 'mock-request-id-001',
+          // modelId 对齐快照（真实 competition adapter 语义·appendRecord 校验 modelId===snapshot）
+          modelId: modelSnapshot,
+        },
+      };
+    },
+    registeredProfiles: () => ['competition_aliyun_qwen'],
+  };
+  const modelSnapshot = 'qwen3.7-max-2026-05-20';
+  const gitCommitSha = 'a'.repeat(40);
+  const args: LoopRunnerArgs = {
+    researchInput: DEMO_RESEARCH_INPUT,
+    mode: 'quick',
+    profile: 'competition_aliyun_qwen',
+    gateway,
+    modelSnapshot,
+    evidenceLogDb: db,
+    gitCommitSha,
+  };
+  try {
+    // 1. 不再抛 REPRO_BRIDGE_NOT_CONFIGURED（G3 闭合核心断言）
+    const result = await executeLoop(args);
+    assert.ok(result.loopState.terminated, 'competition profile + environment anchor must terminate');
+
+    // 2. 环境锚 = 确定性重算值（同输入同输出·跨层一致）
+    const expectedAnchor = computeLlmEnvironmentAnchor({
+      modelSnapshot,
+      activeModelIds: ['competition_aliyun_qwen'],
+      nodeVersion: process.version,
+      gitCommitSha,
+    });
+    assert.match(expectedAnchor, /^[0-9a-f]{64}$/);
+    assert.notEqual(expectedAnchor, '0'.repeat(64), '环境锚禁占位 hash（G3 红线）');
+
+    // 3. 环境锚真实落 call_records.repro_hash（注入接缝端到端·非 offline 占位）
+    const rows = db
+      .prepare('SELECT repro_hash FROM call_records ORDER BY seq ASC')
+      .all() as { repro_hash: string }[];
+    assert.ok(rows.length > 0, 'loop must produce call_records');
+    for (const row of rows) {
+      assert.equal(row.repro_hash, expectedAnchor, '每个 call_record 的 repro_hash 须 = 环境锚');
+    }
   } finally {
     db.close();
   }

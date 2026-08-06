@@ -9,7 +9,7 @@
  * 分层：本文件在 tests/，可 import src/benchmark（tests 依赖 src·方向正确）。
  * DemoSeedResult 结构兼容聚合器的 BenchmarkSeedInput 契约（结构超集·TS 结构类型允许）。
  *
- * 覆盖广度（16 seed · 15 领域 · 全部 5 种 verdict）：
+ * 覆盖广度（30 seed · 28 领域 · 全部 5 种 verdict）：
  *   - A4  天文学    · 行星轨道衰减          → INCONCLUSIVE
  *   - A8  理论物理  · 黑洞信息悖论          → CONFIRMED
  *   - A16 天文学    · 脉冲星制动指数        → CONFIRMED

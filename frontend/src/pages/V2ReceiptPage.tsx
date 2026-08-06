@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ShieldCheck,
@@ -86,9 +86,14 @@ const API_BASE_URL =
 
 const RECEIPT_LIST_KEY = ['v2', 'receipts', 'list'] as const;
 
-async function fetchReceiptList(limit: number, offset: number): Promise<ReceiptListResponse> {
+async function fetchReceiptList(
+  limit: number,
+  offset: number,
+  signal?: AbortSignal,
+): Promise<ReceiptListResponse> {
   const url = `${API_BASE_URL}/api/v2/receipts?limit=${limit}&offset=${offset}`;
-  const response = await fetch(url);
+  // 审计 P1-5：支持 react-query 取消信号（组件卸载/query 失效时中止 in-flight 请求）。
+  const response = await fetch(url, { signal });
   if (!response.ok) {
     throw new Error(`API returned ${response.status}`);
   }
@@ -108,6 +113,15 @@ export function V2ReceiptPage() {
   const [receipt, setReceipt] = useState<DemoReceipt | null>(null);
   const [verification, setVerification] = useState<VerificationResult | null>(null);
 
+  // 审计 P1-5：卸载时中止 in-flight demo 请求。
+  const demoAbortRef = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      demoAbortRef.current?.abort();
+    },
+    [],
+  );
+
   // --- Upload result state ---
   const [uploadResult, setUploadResult] = useState<VerificationResult | null>(null);
 
@@ -117,8 +131,12 @@ export function V2ReceiptPage() {
   const fetchDemo = useCallback(async () => {
     setDemoLoading(true);
     setDemoError(null);
+    const controller = new AbortController();
+    demoAbortRef.current = controller;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v2/receipts/demo`);
+      const response = await fetch(`${API_BASE_URL}/api/v2/receipts/demo`, {
+        signal: controller.signal,
+      });
       if (!response.ok) {
         throw new Error(`API returned ${response.status}`);
       }
@@ -140,7 +158,7 @@ export function V2ReceiptPage() {
   const listOffset = listPage * PAGE_SIZE;
   const listQuery = useQuery<ReceiptListResponse, Error>({
     queryKey: [...RECEIPT_LIST_KEY, listOffset],
-    queryFn: () => fetchReceiptList(PAGE_SIZE, listOffset),
+    queryFn: ({ signal }) => fetchReceiptList(PAGE_SIZE, listOffset, signal),
   });
 
   // --- Verify mutation (used by ReceiptUploader) ---

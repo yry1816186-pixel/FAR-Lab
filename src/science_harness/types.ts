@@ -99,6 +99,8 @@ export interface SandboxRunResult {
   readonly wallClockMs: number;
   /** 超时标志（SR-4）。 */
   readonly timedOut: boolean;
+  /** 输出超限强制中断（FUSION-OS-10·P1-2 审计修复）。true = stdout+stderr 超过 MAX_OUTPUT_BYTES 被强杀。 */
+  readonly outputLimitExceeded: boolean;
   /** 网络是否被阻（默认 true·SR-5·V1 类型层声明）。 */
   readonly networkBlocked: boolean;
   /** 固定种子（默认 42·SR-2·进 reproHash）。 */
@@ -122,6 +124,8 @@ export interface SandboxExecutionInput {
   readonly artifacts: readonly ArtifactManifest[];
   readonly wallClockMs: number;
   readonly timedOut: boolean;
+  /** FUSION-OS-10：输出超限强制中断（P1-2 审计修复·防失控脚本耗尽宿主内存）。缺省 false。 */
+  readonly outputLimitExceeded?: boolean;
   readonly seed?: number;
   readonly networkBlocked?: boolean;
   /** FUSION-OS-7：用户脚本 CPU 时间毫秒（缺省 0=未测量·V1 类型层 caller 不提供）。 */

@@ -85,7 +85,24 @@ export async function registerVerdictRoutes(
   app: FastifyInstance,
   config: VerdictRouteConfig,
 ): Promise<void> {
-  app.get('/verdict/:id', async (request, reply) => {
+  // 审计 P2-3：params 走 Fastify schema 校验（替代 `as { id: string }` 断言）——
+  // 限定安全字符集 + 长度，防控制字符/异常输入直达 SQL 查询。
+  const idParamSchema = {
+    params: {
+      type: 'object',
+      required: ['id'],
+      properties: { id: { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$' } },
+    },
+  } as const;
+  const hypoIdParamSchema = {
+    params: {
+      type: 'object',
+      required: ['hypoId'],
+      properties: { hypoId: { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9_-]+$' } },
+    },
+  } as const;
+
+  app.get('/verdict/:id', { schema: idParamSchema }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const node = fetchHonestVerdictById(config.db, id);
     if (node === null) {
@@ -94,7 +111,7 @@ export async function registerVerdictRoutes(
     void reply.code(200).send(toHonestVerdictDto(node));
   });
 
-  app.get('/verdict/by_hypothesis/:hypoId', async (request, reply) => {
+  app.get('/verdict/by_hypothesis/:hypoId', { schema: hypoIdParamSchema }, async (request, reply) => {
     const { hypoId } = request.params as { hypoId: string };
     const node = fetchHonestVerdictByEvidenceId(config.db, hypoId);
     if (node === null) {

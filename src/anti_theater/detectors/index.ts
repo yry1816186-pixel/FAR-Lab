@@ -1,5 +1,5 @@
 /**
- * anti_theater detectors barrel + DETECTORS 聚合（APPENDIX_E §3 顺序·21 项）。
+ * anti_theater detectors barrel + DETECTORS 聚合（APPENDIX_E §3 顺序·22 项）。
  *
  * 顺序纪律（§3）：DETECTORS 数组顺序与 APPENDIX_E §3 伪代码逐字对齐——golden vector 对拍与
  * CI corpus test 依赖此顺序产稳定 findings 列表（确定性·F2）。
@@ -7,6 +7,7 @@
  * T-003 修复（2026-07-24）：新增第 21 项 `detect_provenance_unbound`（AT-PROVENANCE-UNBOUND），
  * 追加在数组末尾（不破坏前 20 项 golden vector 顺序对拍）。仅在 `fec.requireExecutionProvenance=true`
  * 时触发，向后兼容 V1 demo seed（不 opt-in → 恒空 finding·零回归）。
+ * 后补：第 22 项 `detect_phack_pcurve`（AT-PHACK-PCURVE）同法追加（2026-08 文档对齐）。
  *
  * 模型中立。零容忍合规。
  */
@@ -39,11 +40,12 @@ import { detect_workflow_digest } from './workflow_digest.ts';
 export type AntiTheaterDetector = (input: AntiTheaterLintInput) => readonly DetectorFinding[];
 
 /**
- * DETECTORS 聚合（APPENDIX_E §3 顺序·21 项）。
+ * DETECTORS 聚合（APPENDIX_E §3 顺序·22 项）。
  * 顺序冻结：lint 编排器按此顺序遍历，findings 列表顺序稳定（确定性·golden vector 对拍）。
  *
  * T-003 修复：第 21 项 `detect_provenance_unbound` 追加在末尾——仅在
  * `fec.requireExecutionProvenance=true` 时触发，V1 向后兼容（不 opt-in → 恒空 finding）。
+ * 第 22 项 `detect_phack_pcurve`（AT-PHACK-PCURVE）同法追加在末尾。
  */
 export const DETECTORS: readonly AntiTheaterDetector[] = [
   detect_fake_pass, // AT-FAKE-PASS

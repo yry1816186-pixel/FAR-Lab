@@ -74,6 +74,48 @@ test('POST /api/v1/hypothesize success returns 200 with full response shape', as
   });
 });
 
+test('POST /api/v1/hypothesize 幂等：同 idempotencyKey 第二次返回 cached 结果（P0-2）', async () => {
+  await withServer(async (app) => {
+    const payload = {
+      researchInput: '幂等测试 claim：某种新材料在低温下的导电性',
+      mode: 'quick',
+      idempotencyKey: 'test-idem-key-0001',
+    };
+    const r1 = await app.inject({ method: 'POST', url: '/api/v1/hypothesize', payload });
+    assert.equal(r1.statusCode, 200);
+    const b1 = r1.json() as { cached?: boolean; reproHash: string };
+    assert.equal(b1.cached, undefined, '首次请求不应命中缓存');
+
+    // 第二次同 key——必须命中幂等缓存（不重跑 LLM、不重复写证据链）。
+    const r2 = await app.inject({ method: 'POST', url: '/api/v1/hypothesize', payload });
+    assert.equal(r2.statusCode, 200);
+    const b2 = r2.json() as { cached?: boolean; reproHash: string; loopState: unknown };
+    assert.equal(b2.cached, true, '第二次必须命中幂等缓存');
+    assert.equal(b2.reproHash, b1.reproHash, '幂等重放必须返回相同结果');
+  });
+});
+
+test('POST /api/v1/hypothesize 幂等：不同 key 独立执行（互不缓存）', async () => {
+  await withServer(async (app) => {
+    const r1 = await app.inject({
+      method: 'POST',
+      url: '/api/v1/hypothesize',
+      payload: { researchInput: '幂等测试 claim A', mode: 'quick', idempotencyKey: 'test-idem-key-A' },
+    });
+    const r2 = await app.inject({
+      method: 'POST',
+      url: '/api/v1/hypothesize',
+      payload: { researchInput: '幂等测试 claim B', mode: 'quick', idempotencyKey: 'test-idem-key-B' },
+    });
+    assert.equal(r1.statusCode, 200);
+    assert.equal(r2.statusCode, 200);
+    const b1 = r1.json() as { cached?: boolean };
+    const b2 = r2.json() as { cached?: boolean };
+    assert.equal(b1.cached, undefined);
+    assert.equal(b2.cached, undefined);
+  });
+});
+
 test('POST /api/v1/hypothesize returns 400 on empty researchInput', async () => {
   await withServer(async (app) => {
     const response = await app.inject({

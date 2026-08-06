@@ -285,12 +285,18 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
     });
     // react-query v5：mutateAsync resolve 后 hook 的 data 状态需一次 re-render 才可见。
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    // 校验 POST /api/v1/hypothesize + 请求体（researchInput，无 maxIterations）
+    // 校验 POST /api/v1/hypothesize + 请求体（researchInput + 审计 P0-2 客户端幂等键）
     const callArgs = vi.mocked(fetch).mock.calls[0];
     expect(callArgs[0]).toBe('http://localhost:3000/api/v1/hypothesize');
     const init = callArgs[1] as RequestInit;
     expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body as string)).toEqual({ researchInput: '示例研究输入' });
+    const sentBody = JSON.parse(init.body as string) as { researchInput: string; idempotencyKey?: string };
+    expect(sentBody.researchInput).toBe('示例研究输入');
+    expect(sentBody.idempotencyKey).toMatch(/^v1-[0-9a-f]{16}$/);
+    // 同输入 → 同幂等键（确定性·防双击重复执行）
+    const keyA = sentBody.idempotencyKey;
+    const keyB = __testables.hypothesizeIdempotencyKey({ researchInput: '示例研究输入' });
+    expect(keyA).toBe(keyB);
     // 校验后端字段 verbatim 消费（无 honestyVerdict* aliasing）
     expect(result.current.data?.reproHash).toBe('repro-hash-123');
     expect(result.current.data?.honestVerdict?.verdictId).toBe('v-001');

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, FileJson, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +35,15 @@ export function ReceiptUploader({ onVerified }: ReceiptUploaderProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 审计 P1-5：卸载时中止 in-flight verify 请求（防 setState-on-unmounted + 拖尾连接占用）。
+  const verifyAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      verifyAbortRef.current?.abort();
+    },
+    [],
+  );
 
   const API_BASE_URL =
     (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:3000';
@@ -80,11 +89,14 @@ export function ReceiptUploader({ onVerified }: ReceiptUploaderProps) {
 
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    verifyAbortRef.current = controller;
     try {
       const response = await fetch(`${API_BASE_URL}/api/v2/receipts/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: trimmed,
+        signal: controller.signal,
       });
       if (!response.ok) {
         const body = await response.text().catch(() => '');

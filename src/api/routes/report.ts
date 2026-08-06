@@ -239,6 +239,7 @@ export async function registerReportRoute(
       terminationReason: 'feedback_converged',
       artifacts,
       verdictNode,
+      intermediateVerdicts: [],
       error: null,
     };
 

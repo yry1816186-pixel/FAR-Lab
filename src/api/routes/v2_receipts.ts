@@ -49,6 +49,21 @@ export async function registerV2ReceiptRoutes(app: FastifyInstance): Promise<voi
       });
     }
 
+    // 审计 P2-2：结构校验——半损坏 envelope 不得产出"看起来有效"的验证结果。
+    // claim / verdictTrace 必须是对象（若存在）；datasetBindings/workflowBindings 必须是数组（若存在）。
+    if (
+      (body.claim !== undefined && (typeof body.claim !== 'object' || body.claim === null)) ||
+      (body.verdictTrace !== undefined && (typeof body.verdictTrace !== 'object' || body.verdictTrace === null)) ||
+      (body.datasetBindings !== undefined && !Array.isArray(body.datasetBindings)) ||
+      (body.workflowBindings !== undefined && !Array.isArray(body.workflowBindings))
+    ) {
+      return reply.code(400).send({
+        ok: false,
+        error:
+          'Malformed envelope: claim/verdictTrace must be objects, manifestMembers/datasetBindings/workflowBindings must be arrays (when present)',
+      });
+    }
+
     // Build a V2DemoReceipt-compatible input from the envelope.
     const claim = body.claim;
     const verdictTrace = body.verdictTrace;

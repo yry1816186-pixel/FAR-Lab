@@ -124,10 +124,12 @@ export async function collectCAstroOnline(options: {
     let chain: CAstroPipelineResult;
     let effectiveSource: DatasetSource;
     let effectiveReason = resolution.reason;
-    if (onlineResolved) {
+    // onlineResolved 定义含 online !== null && lightcurvePath !== undefined——if 条件显式重述
+    // 让 TS 完成类型窄化（零断言·零非空断言）。
+    if (onlineResolved && online !== null && online.lightcurvePath !== undefined) {
       try {
         chain = await buildCAstroChain(db, {
-          lightcurvePath: online!.lightcurvePath!,
+          lightcurvePath: online.lightcurvePath,
           datasetSource: 'online',
           workingDir: work,
           pythonCmd: options.pythonCmd,

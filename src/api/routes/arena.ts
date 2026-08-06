@@ -20,7 +20,8 @@
 import type { FastifyInstance } from 'fastify';
 
 import { internalError } from '../errors/error_handler.ts';
-import { runArenaSession, type ArenaResult } from '../internal/arena_service.ts';
+import { runArenaSession } from '../internal/arena_service.ts';
+import { createAsyncSingletonCache } from '../internal/singleton_cache.ts';
 import { resolveGitCommitSha } from '../../cli/git_commit_sha.ts';
 
 /** demo hypothesis（与 far demo 的 C-ASTRO-0001 同源·离线可复现）。 */
@@ -29,8 +30,13 @@ const DEMO_HYPOTHESIS = 'C-ASTRO-0001: TIC lightcurve exhibits a transit-like pe
 /** demo refuter 标签（中性·对应三类反剧场攻击维度）。 */
 const DEMO_REFUTERS = ['scope-launderer', 'post-hoc-threshold', 'dataset-drift'];
 
-/** 模块级缓存：首次 runArenaSession 后固定（demo 锚·确定性）。 */
-let cachedResult: ArenaResult | null = null;
+/**
+ * 模块级单例缓存：首次 runArenaSession 后固定（demo 锚·确定性）。
+ * promise 单例（非 check-then-act）——并发首击共享同一 in-flight 计算，失败不缓存。
+ */
+const arenaCache = createAsyncSingletonCache(() =>
+  runArenaSession(DEMO_HYPOTHESIS, DEMO_REFUTERS, resolveGitCommitSha()),
+);
 
 /**
  * 注册 arena 路由。
@@ -38,10 +44,8 @@ let cachedResult: ArenaResult | null = null;
 export async function registerArenaRoute(app: FastifyInstance): Promise<void> {
   app.get('/arena/demo', async (_req, reply) => {
     try {
-      if (cachedResult === null) {
-        cachedResult = await runArenaSession(DEMO_HYPOTHESIS, DEMO_REFUTERS, resolveGitCommitSha());
-      }
-      return reply.send(cachedResult);
+      const result = await arenaCache.get();
+      return reply.send(result);
     } catch (err) {
       throw internalError('arena demo session failed', err);
     }

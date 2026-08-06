@@ -108,6 +108,22 @@ test('ensureFtsIndex is idempotent and reindex counts rows', () => {
   assert.equal(n2, 2);
 });
 
+test('searchEvidence 自动同步新写入（FTS 陈旧修复·P0-1）', () => {
+  const db = openDb();
+  appendTwo(db);
+  // 关键：不手动 reindex——写入后直接搜索必须能搜到（懒同步：COUNT 不等 → 自动重建）。
+  const hits = searchEvidence(db, 'primer enzyme');
+  assert.ok(hits.length >= 1, '新写入证据必须可搜索（写入后未手动 reindex）');
+  const first = hits[0];
+  assert.ok(first !== undefined, 'hits[0] must exist');
+  const payload = first.entry.evidencePayload;
+  assert.equal(typeof payload, 'string');
+  assert.match(payload as string, /primer/);
+  // 二次搜索仍一致（同步是幂等的）。
+  const hits2 = searchEvidence(db, 'molecular dynamics');
+  assert.ok(hits2.length >= 1, '第二条证据同样可搜索');
+});
+
 test('searchEvidence full-text matches evidence payload', () => {
   const db = openDb();
   appendTwo(db);

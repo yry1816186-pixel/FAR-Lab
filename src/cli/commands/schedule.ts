@@ -13,6 +13,7 @@
 //   - 存储位置：$FAR_HOME/schedules.json（缺省 ~/.far/schedules.json·JSON 幂等可审计）。
 
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -53,14 +54,39 @@ export function schedulesPath(home: string = process.env.FAR_HOME ?? join(homedi
   return join(home, 'schedules.json');
 }
 
+/** 侧车完整性文件路径（审计 P2-12：schedules.json.sha256）。 */
+export function schedulesHashPath(home?: string): string {
+  return `${schedulesPath(home)}.sha256`;
+}
+
+/** 文件内容 SHA-256（审计 P2-12：防外部篡改注入任意命令执行面）。 */
+function hashScheduleStore(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
 /** 幂等读调度存储（文件不存在 → 空存储）。 */
 export function loadSchedule(home?: string): ScheduleStore {
   const path = schedulesPath(home);
   if (!existsSync(path)) {
     return { entries: [] };
   }
+  const text = readFileSync(path, 'utf8');
+  // 审计 P2-12：侧车 hash 校验——schedules.json 含 exec 命令（任意命令执行面），
+  // 外部篡改 = 注入任意命令。tamper-detect：hash 不符 / 侧车缺失 → fail-closed 拒绝执行。
+  const hashPath = schedulesHashPath(home);
+  if (!existsSync(hashPath)) {
+    throw new Error(
+      `schedule store integrity sidecar missing for ${path}; re-add schedules (far schedule add) to re-seal (tamper-detection: unverifiable = refuse)`,
+    );
+  }
+  const expected = readFileSync(hashPath, 'utf8').trim();
+  if (expected !== hashScheduleStore(text)) {
+    throw new Error(
+      `schedule store integrity check failed for ${path} (tamper detected); re-add schedules (far schedule add) to re-seal`,
+    );
+  }
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    const parsed = JSON.parse(text) as unknown;
     if (typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as ScheduleStore).entries)) {
       throw new Error('schedule store is not a valid { entries: [...] } object');
     }
@@ -70,11 +96,13 @@ export function loadSchedule(home?: string): ScheduleStore {
   }
 }
 
-/** 原子写调度存储（先写临时文件再 rename·防半写）。 */
+/** 原子写调度存储（先写临时文件再 rename·防半写）+ 侧车 hash 密封（审计 P2-12）。 */
 export function saveSchedule(store: ScheduleStore, home?: string): string {
   const path = schedulesPath(home);
   mkdirSync(join(path, '..'), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
+  const text = `${JSON.stringify(store, null, 2)}\n`;
+  writeFileSync(path, text, 'utf8');
+  writeFileSync(`${path}.sha256`, hashScheduleStore(text), 'utf8');
   return path;
 }
 

@@ -9,13 +9,11 @@
 // Exit codes: 0 PASS / 2 arg error / 1 runtime error.
 
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import type { ProofEnvelopeV2 } from '../../proof_envelope/v2/types.ts';
 import {
   buildReceiptManifest,
   verifyReceiptManifest,
   type ReceiptManifest,
-  type ReceiptManifestMember,
 } from '../../v2_domain/receipt_manifest.ts';
 import {
   buildVerificationResult,
@@ -26,6 +24,8 @@ import type { AssuranceDimension, ReceiptStanding, PreservationStatus } from '..
 import {
   buildContractBindingSet,
 } from '../../v2_domain/algorithm_registry.ts';
+import { resolveStandardPolicyId } from '../../v2_domain/policy_registry.ts';
+import { envelopeToManifestMembers } from './envelope_to_manifest_members.ts';
 
 // ===========================================================================
 // Options + Result
@@ -93,9 +93,10 @@ export async function runExportReceiptV2(options: ExportReceiptV2Options): Promi
   const manifestVerification = verifyReceiptManifest(manifest);
 
   // 4. 构建 ContractBindingSet（v0 默认值）
+  // M14 接线：verificationPolicyId 从标准策略注册表 fail-closed 解析（策略 deprecated → 抛错）
   const contractBindingSet = buildContractBindingSet({
     deploymentProfile: 'O_OFFLINE_VERIFIER',
-    verificationPolicyId: 'far.policy.standard-v0.v1',
+    verificationPolicyId: resolveStandardPolicyId(),
     scientificProfile: 'far.scientific.offline-verification.v0',
     disclosureProfile: 'far.disclosure.full.v1',
     canonicalizationAlgorithmId: 'far.canon.jcs-primary.v1',
@@ -150,7 +151,7 @@ export async function runExportReceiptV2(options: ExportReceiptV2Options): Promi
   const result = buildVerificationResult({
     resultId: `vr-v2-${envelope.claim?.id ?? 'unknown'}`,
     receiptId: envelope.claim?.id ?? 'unknown',
-    verificationPolicyId: 'far.policy.standard-v0.v1',
+    verificationPolicyId: resolveStandardPolicyId(),
     evaluatedAt: new Date().toISOString(),
     dimensionResults: dimensions,
     receiptStanding,
@@ -184,40 +185,6 @@ export async function runExportReceiptV2(options: ExportReceiptV2Options): Promi
 // ===========================================================================
 // Helpers
 // ===========================================================================
-
-/**
- * 从 ProofEnvelopeV2 提取 manifest members（与 verify_v2.ts 同逻辑）。
- */
-function envelopeToManifestMembers(envelope: ProofEnvelopeV2): ReceiptManifestMember[] {
-  const members: ReceiptManifestMember[] = [];
-  const digest = (s: string): string => {
-    return createHash('sha256').update(s, 'utf8').digest('hex');
-  };
-
-  if (envelope.claim) {
-    members.push({ kind: 'claim', digest: digest(JSON.stringify(envelope.claim)), sizeBytes: JSON.stringify(envelope.claim).length });
-  }
-  if (envelope.fecSnapshot) {
-    members.push({ kind: 'fecSnapshot', digest: digest(JSON.stringify(envelope.fecSnapshot)), sizeBytes: JSON.stringify(envelope.fecSnapshot).length });
-  }
-  if (envelope.protocolFreeze) {
-    members.push({ kind: 'protocolFreeze', digest: digest(JSON.stringify(envelope.protocolFreeze)), sizeBytes: JSON.stringify(envelope.protocolFreeze).length });
-  }
-  if (envelope.datasetBindings) {
-    members.push({ kind: 'datasetBindings', digest: digest(JSON.stringify(envelope.datasetBindings)), sizeBytes: JSON.stringify(envelope.datasetBindings).length });
-  }
-  if (envelope.workflowBindings) {
-    members.push({ kind: 'workflowBindings', digest: digest(JSON.stringify(envelope.workflowBindings)), sizeBytes: JSON.stringify(envelope.workflowBindings).length });
-  }
-  if (envelope.verdictTrace) {
-    members.push({ kind: 'verdictTrace', digest: digest(JSON.stringify(envelope.verdictTrace)), sizeBytes: JSON.stringify(envelope.verdictTrace).length });
-  }
-  if (envelope.antiTheaterReport) {
-    members.push({ kind: 'antiTheaterReport', digest: digest(JSON.stringify(envelope.antiTheaterReport)), sizeBytes: JSON.stringify(envelope.antiTheaterReport).length });
-  }
-
-  return members;
-}
 
 /**
  * 格式化 V2 收据为 Markdown。

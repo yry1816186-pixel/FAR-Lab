@@ -291,6 +291,26 @@ export interface VerdictKernelOutput {
  * 全程无 LLM；按 R0..R9 固定优先级，首条决定性规则胜出。
  */
 export function decideFiveValueVerdictInternal(input: VerdictKernelInput): VerdictKernelOutput {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // R 规则优先级表（显式化·审计 P0-3）：本函数是顺序决策表，命中即返回——
+  // 优先级由代码顺序隐式表达，此处显式固化，防止未来新增规则时误插优先级。
+  //   1.  R0   SCHEMA_INVALID              (UNTESTED)
+  //   2.  R1   FEC_NOT_COMPILABLE          (UNTESTED)
+  //   3.  R2   NO_VALID_DATASET_BINDING    (UNTESTED)
+  //   4.  R3   CRITICAL_PROTOCOL_DEVIATION (UNTESTED)   [副作用：push harking/p_hacking flags]
+  //   5.  R-EF R_EXECUTION_FINGERPRINT     (DEGRADED_SCOPE) [§FUSION-OS-7：复算资源轮廓发散
+  //           则统计结论不可信·优先级高于 R5+ 统计结论]
+  //   6.  AT   ANTI_THEATER_FAIL           (UNTESTED)   [§7.3 line 852]
+  //   7.  R5   CONTRADICTORY_SIGNIFICANT   (INCONCLUSIVE)
+  //   8.  R-I  R_IDENTIFIER_*              (UNTESTED/REFUTED) [unresolved 优先 not_found]
+  //   9.  R6   PRIMARY_TEST_REFUTES        (REFUTED)
+  //  10.  R-D  R_DERIVATION_FORM_MISMATCH  (INCONCLUSIVE)
+  //  11.  R-C  R_CAUSAL_CONFOUNDING_*      (DEGRADED_SCOPE/INCONCLUSIVE) [在 R7 判定前·r7Pass 参与]
+  //  12.  R7   PRIMARY_TEST_CONFIRMS       (CONFIRMED)
+  //  13.  R8   INSUFFICIENT_POWER_OR_NULL  (INCONCLUSIVE)
+  //  14.  R9   ALL_TESTS_SKIPPED           (UNTESTED)
+  //  15.  —    NO_DECISION_PATH            (UNTESTED)   [兜底]
+  // ─────────────────────────────────────────────────────────────────────────────
   const inputIntegrityFlags = [...input.integrityFlags];
   const emptyScope: ScopeReport = {
     isDegraded: false,

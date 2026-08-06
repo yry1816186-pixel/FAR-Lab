@@ -21,7 +21,8 @@
 import type { FastifyInstance } from 'fastify';
 
 import { internalError } from '../errors/error_handler.ts';
-import { runCourtSession, type ReliabilityCertificate } from '../internal/court_service.ts';
+import { runCourtSession } from '../internal/court_service.ts';
+import { createAsyncSingletonCache } from '../internal/singleton_cache.ts';
 import { resolveGitCommitSha } from '../../cli/git_commit_sha.ts';
 
 /** demo claim（与 far demo 的 C-ASTRO-0001 同源·离线可复现）。 */
@@ -30,8 +31,13 @@ const DEMO_CLAIM = 'C-ASTRO-0001: TIC lightcurve exhibits a transit-like periodi
 /** demo 模型标签（offline_replay 按 stageId 路由 fixture·modelId 仅作展示标签；用中性 persona 名更诚实——展示框架非真实模型）。 */
 const DEMO_MODELS = ['court-persona-alpha', 'court-persona-beta', 'court-persona-gamma'];
 
-/** 模块级缓存：首次 runCourtSession 后固定（demo 锚·确定性）。 */
-let cachedCertificate: ReliabilityCertificate | null = null;
+/**
+ * 模块级单例缓存：首次 runCourtSession 后固定（demo 锚·确定性）。
+ * promise 单例（非 check-then-act）——并发首击共享同一 in-flight 计算，失败不缓存。
+ */
+const courtCache = createAsyncSingletonCache(() =>
+  runCourtSession(DEMO_CLAIM, DEMO_MODELS, resolveGitCommitSha()),
+);
 
 /**
  * court 路由配置。
@@ -49,10 +55,8 @@ export async function registerCourtRoute(
 ): Promise<void> {
   app.get('/court/demo', async (_req, reply) => {
     try {
-      if (cachedCertificate === null) {
-        cachedCertificate = await runCourtSession(DEMO_CLAIM, DEMO_MODELS, resolveGitCommitSha());
-      }
-      return reply.send(cachedCertificate);
+      const certificate = await courtCache.get();
+      return reply.send(certificate);
     } catch (err) {
       throw internalError('court demo session failed', err);
     }

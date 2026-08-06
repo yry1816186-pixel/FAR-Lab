@@ -26,6 +26,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useBenchmark } from '@/lib/api_client';
+import { useTimeout } from '@/lib/useTimeout';
 import { computeMerkleRoot, flipLastHexChar } from '@/lib/merkle';
 import type { BenchmarkEntryDto, BenchmarkReportDto, VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -123,11 +124,12 @@ function CopyHashButton({
   readonly testId: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const schedule = useTimeout();
   const handleCopy = async () => {
     const ok = await copyToClipboard(value);
     if (ok) {
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      schedule(() => setCopied(false), 1500);
     }
   };
   return (

@@ -87,7 +87,10 @@ export async function registerAuthMiddleware(
         userId: decoded.sub,
         role: decoded.role,
       };
-    } catch {
+    } catch (err) {
+      // 审计 P2-9：服务端记录 JWT 验证失败详情（诊断用）——客户端响应保持统一 401
+      // （不泄露 token 内部信息·fail-closed 安全设计不变）。
+      console.warn(`[auth] jwt verify failed: ${err instanceof Error ? err.message : String(err)}`);
       return reply.code(401).type('application/problem+json').send({
         error_code: 'UNAUTHORIZED',
         message: 'invalid or expired JWT',

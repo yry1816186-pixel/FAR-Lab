@@ -6,7 +6,8 @@
  *
  * 机制（零新依赖·确定性·离线·不触网）：
  *   - npm 直依：读 node_modules/<dep>/package.json 的 license/licenses 字段；
- *   - Python 直依：读 .python-deps/<pkg>*.dist-info/METADATA 的 License: 行 + Classifier: License :: 行；
+ *   - Python 直依：读 .venv/Lib/site-packages 或 .python-deps/<pkg>*.dist-info/METADATA 的
+ *     License: 行 + Classifier: License :: 行（.venv 优先，.python-deps 为 fallback）；
  *   - 读不到（依赖未安装）→ 'unverifiable'（warn·非 fail，避免在未 install 环境误报）。
  *
  * 分类：
@@ -87,30 +88,44 @@ function readNpmLicense(dep) {
 
 function readPythonLicense(pkgSpec) {
   // pkgSpec 形如 "numpy>=1.24,<2.0" → 取包名 numpy
-  const pkgName = pkgSpec.split(/[<>=!\[]/)[0].trim().replace(/-/g, '_').toLowerCase();
-  const depsDir = join(ROOT, '.python-deps');
-  if (!existsSync(depsDir)) return null;
-  // 找匹配的 dist-info 目录
-  const distInfo = readdirSync(depsDir).find(
-    (d) => d.toLowerCase().endsWith('.dist-info') && d.toLowerCase().startsWith(pkgName),
-  );
-  if (distInfo === undefined) return null;
-  const metaPath = join(depsDir, distInfo, 'METADATA');
-  if (!existsSync(metaPath)) return null;
-  try {
-    const meta = readFileSync(metaPath, 'utf8');
-    const licLine = meta.split('\n').find((l) => /^License:/i.test(l));
-    const licField = licLine !== undefined ? licLine.replace(/^License:/i, '').trim() : '';
-    // License: 字段常为 "UNKNOWN" 占位；回退读 Classifier: License :: 行
-    const classifiers = meta
-      .split('\n')
-      .filter((l) => /^Classifier: License ::/i.test(l))
-      .map((l) => l.replace(/^Classifier: License ::/i, '').trim());
-    const merged = [licField, ...classifiers].filter((s) => s.length > 0 && s.toUpperCase() !== 'UNKNOWN').join(' | ');
-    return merged.length > 0 ? merged : null;
-  } catch {
-    return null;
+  const pkgName = pkgSpec.split(/[<>=!\\[]/)[0].trim().replace(/-/g, '_').toLowerCase();
+  // 候选探测目录：活跃 .venv 优先（site-packages 为平台标准路径），旧 .python-deps 作 fallback
+  // （2026-08-06 治理：.python-deps 已被 .venv 替代删除，此处支持多候选避免依赖失效）。
+  const candidates = [
+    join(ROOT, '.venv', 'Lib', 'site-packages'),
+    join(ROOT, '.venv', 'lib', `python${process.env.PYTHON_VERSION ?? '3'}.${process.env.PYTHON_MINOR ?? '1'}`.replace(/^python/, ''), 'site-packages'),
+    join(ROOT, '.python-deps'),
+  ];
+  for (const depsDir of candidates) {
+    if (!existsSync(depsDir)) continue;
+    // 找匹配的 dist-info 目录
+    const distInfo = readdirSync(depsDir).find(
+      (d) => d.toLowerCase().endsWith('.dist-info') && d.toLowerCase().startsWith(pkgName),
+    );
+    if (distInfo === undefined) continue;
+    const metaPath = join(depsDir, distInfo, 'METADATA');
+    if (!existsSync(metaPath)) continue;
+    try {
+      const meta = readFileSync(metaPath, 'utf8');
+      const licLine = meta.split('\n').find((l) => /^License:/i.test(l));
+      const licField = licLine !== undefined ? licLine.replace(/^License:/i, '').trim() : '';
+      // PEP 639：numpy 2.5+ 等新包用 License-Expression: 字段（SPDX 表达式），替代旧 License: 行
+      const licExprLine = meta.split('\n').find((l) => /^License-Expression:/i.test(l));
+      const licExprField = licExprLine !== undefined ? licExprLine.replace(/^License-Expression:/i, '').trim() : '';
+      // License: 字段常为 "UNKNOWN" 占位；回退读 Classifier: License :: 行
+      const classifiers = meta
+        .split('\n')
+        .filter((l) => /^Classifier: License ::/i.test(l))
+        .map((l) => l.replace(/^Classifier: License ::/, '').trim());
+      const merged = [licField, licExprField, ...classifiers]
+        .filter((s) => s.length > 0 && s.toUpperCase() !== 'UNKNOWN')
+        .join(' | ');
+      return merged.length > 0 ? merged : null;
+    } catch {
+      return null;
+    }
   }
+  return null;
 }
 
 function collectNpmDeps() {

@@ -7,12 +7,16 @@
  *      - 本 runner 把 feedbackSignal 回灌给下一轮 stage3（L262-269/L308/L352）
  *      - stage3_hypothesis 消费 feedbackSignal.refinements 重新生成假设（stage3_hypothesis.ts:119-128）
  *      - 回归测试：tests/agent_loop/t016_feedback_edge.test.ts（两轮迭代 + maxIter 兜底）
- *   ⚠ V2 roadmap：裁决驱动的反馈边（verdict kernel REFUTED/INCONCLUSIVE → hypothesis regen）
- *      - 当前反馈源是 stage6 LLM 自评，不是 verdict kernel 的裁决结果；
- *      - 裁决驱动反馈边（verdict_stage 移入循环 + REFUTED 触发 regen）涉及 verdict_stage
- *        副作用管理（落库时机/VerdictNode 语义/链长变化），是架构改动，V2 roadmap。
- *      - 评委04 fix_direction 第二选项「诚实标注 V1 线性单 pass，迭代闭环是 V2」——本代码采此选项，
- *        同时保留已有的 LLM 自评反馈闭环（非完全线性单 pass）。
+ *   ✅ 裁决驱动反馈边（V2 roadmap 项·2026-08-06 落地·opt-in RunAgentLoopArgs.verdictDrivenFeedback）：
+ *      - 循环内每轮跑 evaluateIntermediateVerdict（纯计算·无 DB 副作用·不落库）
+ *      - verdict=CONFIRMED → 立即终止（terminationReason='verdict_confirmed'·确定性胜过 LLM 自评）
+ *      - 连续两轮裁决输入指纹相同且非 CONFIRMED → 终止（'verdict_converged'·防 p-hacking 空转）
+ *      - 中间裁决 kind 作为 verdictHint 注入下一轮 stage3（regen 方向软建议·只传 kind 不传细节）
+ *      - 中间裁决序列返回 LoopState.intermediateVerdicts + session JSONL（审计·可复算）
+ *      - 测试：tests/agent_loop/t017_verdict_driven_feedback.test.ts
+ *      - 缺省关闭（undefined=false）→ 行为字节等同基线（LLM 自评反馈边不变·零回归）
+ *   ⚠ 残余说明：verdictHint 是「软建议」注入（LLM 仍独立生成假设）——硬性假设改写（机器改 claim）
+ *      不引入（防机器与 LLM 意见冲突 + 保持假设归 LLM 产出的责任边界）。
  *
  * 适配说明（与 spec §8 的差异·按项目实际 API 优先）：
  *   1. spec §8 入参 `bailianClient: OpenAI` → 本文件入参 `gateway + profile +
@@ -28,12 +32,14 @@
  *      复杂的「FALSIFIABILITY_GATE_BLOCK 降级」策略由 stage3 内部决定是否抛 vs 降级标注，
  *      fsm_runner 只透传。
  *
- * 终止条件（§7.1）：
+ * 终止条件（§7.1 + V2 裁决驱动）：
  *   1. feedback_converged — stage6 产 FeedbackSignal.continueIteration === false
- *   2. max_iterations — iteration > termination.maxIterations
- *   3. max_tokens — tokensConsumed >= termination.maxTokensPerRun（算力预算闸）
- *   4. max_duration — wallClock >= termination.maxDurationMs
- *   5. error — 任意阶段抛 AgentLoopError
+ *   2. verdict_confirmed — verdictDrivenFeedback 开启且中间裁决 = CONFIRMED（确定性立即终止）
+ *   3. verdict_converged — verdictDrivenFeedback 开启且连续两轮裁决输入指纹相同（防 p-hacking 空转）
+ *   4. max_iterations — iteration > termination.maxIterations
+ *   5. max_tokens — tokensConsumed >= termination.maxTokensPerRun（算力预算闸）
+ *   6. max_duration — wallClock >= termination.maxDurationMs
+ *   7. error — 任意阶段抛 AgentLoopError
  *
  * 零容忍合规：无 any 类型注解 / ts-ignore 指令 / 双重断言 / 空 catch 块 / 桩代码返回。
  */
@@ -59,6 +65,7 @@ import type {
   FeedbackPayload,
   FeedbackSignal,
   FinishReasonExtractor,
+  IntermediateVerdict,
   LoopState,
   ReproHashProvider,
   StageArtifact,
@@ -68,6 +75,8 @@ import type {
 } from './types.ts';
 import { StageReceiptStore, StageReceiptForgedError } from './stage_receipt_store.ts';
 import { compactArtifacts } from './compaction.ts';
+import { evaluateIntermediateVerdict } from './verdict_stage.ts';
+import type { Verdict } from '../schema/enums.ts';
 import { SessionRecorder } from '../trace/session_recorder.ts';
 import { createHash } from 'node:crypto';
 import { runStage1 } from './stages/stage1_understanding.ts';
@@ -152,6 +161,14 @@ export interface RunAgentLoopArgs {
    * 与 evidence_log 哈希链正交）。缺省 undefined → 零回归。
    */
   readonly sessionPath?: string;
+  /**
+   * V2 裁决驱动反馈边（T-016 V2 roadmap 项·2026-08-06 落地）：循环内每轮评估中间裁决
+   * （纯计算·无 DB 副作用·不落库），verdict=CONFIRMED 立即终止（确定性胜过 LLM 自评），
+   * 连续两轮裁决输入指纹相同且非 CONFIRMED → verdict_converged 终止（防 p-hacking 空转），
+   * 中间裁决 kind 作为软建议注入下一轮 stage3（regen 方向·只传 kind 不传细节）。
+   * 缺省 undefined=false → 行为字节等同基线（LLM 自评反馈边不变·零回归）。
+   */
+  readonly verdictDrivenFeedback?: boolean;
 }
 
 
@@ -223,6 +240,13 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
   let feedbackSignal: FeedbackSignal | null = null;
   let tokensConsumed = 0;
   let iteration = 1;
+  // V2 裁决驱动反馈边（verdictDrivenFeedback 开启时维护）：
+  //   intermediateVerdicts —— 循环内中间裁决序列（审计·随 LoopState 返回）
+  //   lastInputHash —— 上一轮裁决输入确定性指纹（防 p-hacking 重复输入检测）
+  //   verdictHintForNext —— 本轮中间裁决 kind（注入下一轮 stage3 作 regen 方向软建议）
+  const intermediateVerdicts: IntermediateVerdict[] = [];
+  let lastInputHash: string | null = null;
+  let verdictHintForNext: Verdict | undefined = undefined;
 
   // baseCtx 是循环外不变的 StageContext 部分（循环内部状态字段在每轮重新构造）
   // G3(IC-02):researchInput 为外部内容,进循环前统一 untrusted 包装+指令剥离(数据≠指令)
@@ -336,7 +360,8 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       appendArtifact(stage2);
       tokensConsumed += extractTotalTokens(stage2.callResult);
 
-      // stage3：消费 feedbackSignal（[6]→[3] 回灌·首轮为 null）+ falsifiability_gate 硬阻断
+      // stage3：消费 feedbackSignal（[6]→[3] 回灌·首轮为 null）+ verdictHint（V2 裁决驱动·
+      // 上一轮中间裁决 kind 软建议·regen 方向指导）+ falsifiability_gate 硬阻断
       const stage3 = await runStageWithReceipt('stage3_hypothesis', () =>
         runStage3({
         ...baseCtx,
@@ -344,6 +369,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         prevArtifacts: compactView(),
         feedbackSignal,
         tokensConsumed,
+        ...(verdictHintForNext !== undefined ? { verdictHint: verdictHintForNext } : {}),
         }));
       appendArtifact(stage3);
       tokensConsumed += extractTotalTokens(stage3.callResult);
@@ -385,15 +411,50 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       const feedbackPayload = narrowFeedback(stage6);
       feedbackSignal = feedbackPayload.feedbackSignal;
 
-      // 终止判定（§7.1）
+      // V2 裁决驱动反馈边（opt-in）：循环内中间裁决评估（纯计算·无 DB 副作用）。
+      // 产出顺序：CONFIRMED → 确定性立即终止；重复输入指纹（非 CONFIRMED）→ 防 p-hacking 空转终止；
+      // 其余 → 回退 LLM 自评判定（assertTerminated）。
+      let verdictDriven: { terminated: boolean; reason: LoopState['terminationReason'] } | null = null;
+      if (args.verdictDrivenFeedback === true) {
+        const evaluated = evaluateIntermediateVerdict({
+          artifacts,
+          runId: args.runId,
+          gitCommitSha: args.gitCommitSha,
+        });
+        if (evaluated !== null) {
+          const iv: IntermediateVerdict = {
+            iteration,
+            verdict: evaluated.verdict,
+            decisiveRuleId: evaluated.decisiveRuleId,
+          };
+          intermediateVerdicts.push(iv);
+          verdictHintForNext = evaluated.verdict;
+          if (evaluated.verdict === 'CONFIRMED') {
+            // 确定性裁决确认 → 立即终止（胜过 stage6 LLM 自评 continueIteration=true·
+            // 防 LLM 为多烧配额/构造"刚好过"而继续迭代）。
+            verdictDriven = { terminated: true, reason: 'verdict_confirmed' };
+          } else if (lastInputHash !== null && evaluated.inputHash === lastInputHash) {
+            // 连续两轮裁决输入指纹相同（claim+spec+threshold+证据投票全同）→ regen 无意义·
+            // 终止（防 LLM 无视裁决软建议重复提交同一假设的 p-hacking 空转）。
+            verdictDriven = { terminated: true, reason: 'verdict_converged' };
+          }
+          lastInputHash = evaluated.inputHash;
+        }
+      }
+
+      // 终止判定（§7.1 + V2 裁决驱动）
       const ctx: StageContext = {
         ...baseCtx,
         iteration,
         prevArtifacts: compactView(),
         feedbackSignal,
         tokensConsumed,
+        ...(verdictHintForNext !== undefined ? { verdictHint: verdictHintForNext } : {}),
       };
-      const { terminated, reason } = assertTerminated(ctx, feedbackSignal, startTime);
+      const { terminated, reason } =
+        verdictDriven !== null
+          ? verdictDriven
+          : assertTerminated(ctx, feedbackSignal, startTime);
       if (terminated) {
         // V06-F1 修复:末轮竞态——收敛/终止判定后、裁决产出前复查预算;
         // 只在轮顶检查会让"恰好末轮超限"逃逸并产出裁决(实测 1 tok 预算跑出 14372 tok 的 CONFIRMED)。
@@ -420,6 +481,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           reason,
           verdict: verdictNode?.verdict ?? null,
           artifactCount: artifacts.length,
+          intermediateVerdicts: intermediateVerdicts.map((iv) => `${iv.iteration}:${iv.verdict}`),
         });
         return {
           runId: args.runId,
@@ -428,6 +490,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           terminationReason: reason,
           artifacts,
           verdictNode,
+          intermediateVerdicts,
           error: null,
         };
       }
@@ -453,6 +516,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         terminationReason: 'error',
         artifacts,
         verdictNode: null,
+        intermediateVerdicts,
         error: {
           code: 'COST_BUDGET_EXCEEDED',
           message: err.message,
@@ -471,6 +535,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         terminationReason: 'error',
         artifacts,
         verdictNode: null,
+        intermediateVerdicts,
         error: {
           code: 'STAGE_RECEIPT_FORGED',
           message: err.message,
@@ -488,6 +553,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       terminationReason: 'error',
       artifacts,
       verdictNode: null,
+      intermediateVerdicts,
       error: toAgentLoopError(err),
     };
   }

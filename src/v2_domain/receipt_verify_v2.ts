@@ -29,6 +29,7 @@ import {
   type AssuranceDimensionResult,
 } from './shared_schemas.ts';
 import type { AssuranceDimension, ReceiptStanding, PreservationStatus } from './contract_enums.ts';
+import { resolveStandardPolicyId } from './policy_registry.ts';
 
 // ===========================================================================
 // Demo sample receipt (synthetic, fixture-only — NOT scientific evidence)
@@ -143,10 +144,12 @@ export function runV2ReceiptVerification(input: V2ReceiptVerificationInput): Ver
   };
 
   // 4. Build the complete verification result (always 6 dimensions).
+  // M14 接线：verificationPolicyId 从标准策略注册表 fail-closed 解析（不再硬编码字面量·
+  // 策略 deprecated → 抛 POLICY_DEPRECATED → 本路径 fail-closed）。
   const baseInput = {
     resultId: `vr-${input.receiptId}`,
     receiptId: input.receiptId,
-    verificationPolicyId: 'far.policy.standard-v0.v1',
+    verificationPolicyId: resolveStandardPolicyId(),
     evaluatedAt: new Date().toISOString(),
     dimensionResults: dimensions,
     receiptStanding: input.receiptStanding,
