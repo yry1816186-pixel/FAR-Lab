@@ -155,7 +155,8 @@ CLAUDE.local.md
 # 对抗过程产物全目录（追踪清理后防止重新入库；REPORT.md 等证据随 git 历史保留）
 .far-implementation/adversarial/
 # 临时脚本与审计残留
-**/_*.py
+# 注: 用 _[a-z]* 而非 _* —— __init__.py 等双下划线包文件是有意追踪的活代码，不能忽略
+**/_[a-z]*.py
 **/tmp_*.py
 **/jsdoc_missing_batch*.txt
 
