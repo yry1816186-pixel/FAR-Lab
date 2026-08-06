@@ -286,3 +286,10 @@ M34 DEFERRED（需真实用户）
 - 纯度指数: 20.0% → 88.4%（估算，A 类 8.4MB / 项目内容 9.5MB）
 
 **遗留（非本次治理范围）**: 48 个功能 staged + 11 个功能 untracked（v2_receipts/ask_runner/sandbox 会话成果）保持原样，待功能会话提交。
+
+## Checkpoint 7 补记 — 1625 过程产物全清 + 3 事故修复（2026-08-07 深夜）
+
+commit 1 的 pathspec 陷阱洗掉 896 staged D → 改用 git ls-files -i -c 全量清 1625（commit b45cddc）；
+**/ _*.py 误伤 3 个 __init__.py → 从 b45cddc^ 恢复 + 规则改 _[a-z]*.py（commit 08ee31d）。
+最终：adversarial tracked=0（保留 3 活文件）、.far-implementation 843K 活状态、功能 staged 47 未动、
+测试基线零回归（2024/2019 pass/0 fail/5 skip）。细节见 CLEANUP_MANIFEST "执行中发现并修复的问题"。

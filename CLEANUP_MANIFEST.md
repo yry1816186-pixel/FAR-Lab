@@ -83,6 +83,20 @@
 
 ---
 
+## 执行中发现并修复的问题（诚实记录）
+
+治理执行过程中出现 3 个问题，均已修复并留下经验：
+
+| # | 问题 | 根因 | 修复 | 经验 |
+|---|---|---|---|---|
+| 1 | `git commit -- pathspec` 只提交了 24 个文件，**896 个 staged 删除被"洗掉"**（未入 commit，index 被工作区覆盖还原） | `--only` 模式对 pathspec 匹配的路径会从**工作区**读取内容重新 add；staged 删除的磁盘文件仍在 → 删除意图被还原 | 用 `git ls-files -i -c --exclude-standard` 找出全部"gitignore 覆盖但仍 tracked"的 1625 个文件，物理删除 + `git rm --cached` + pathspec commit（磁盘已无文件 → 删除正确提交，commit b45cddc） | **`git commit -- pathspec` 对 staged 删除有陷阱**：先确认磁盘状态；验证 commit 实际文件数（`git show <commit> --stat`），不能只看 exit code |
+| 2 | gitignore 规则 `**/_*.py` **误伤 3 个 `__init__.py`**（双下划线也匹配），连带删除（b45cddc） | 规则过宽：`_*` 匹配 `__init__.py` | 从 `b45cddc^` 恢复 3 个包文件（1788/764/246 字节，内容零丢失），规则改为 `**/_[a-z]*.py`（commit 08ee31d） | **gitignore 模式必须人工推演边界**：`_*` 这类通配会吞 `__*`；删除前对 `git ls-files -i -c` 清单做活文件排查 |
+| 3 | `git rm` 对 modified 文件拒绝（walking-skeleton .far-proof 内 jsonl），首轮只删 1347/1625 | git 保护机制（丢弃未提交修改需 -f） | 序列改为：物理 `rm -f`（磁盘）→ `git rm --cached`（index）→ pathspec commit | 删除 tracked+modified 文件时，先物理删除再清 index，避免 -f 误伤 |
+
+**净结果**：1625 个过程产物全部清除（0 个活文件误删——3 个 __init__.py 已恢复并验证导入），5 个治理 commit 全部落地，清理前后测试基线完全一致（2024 tests / 2019 pass / 0 fail / 5 skip）。
+
+---
+
 ## 本会话刻意未做的事（边界声明）
 
 1. **未修改任何源码** —— 三阶段全部为审计 + 脚本 + 报告；migrate --apply 待你确认
