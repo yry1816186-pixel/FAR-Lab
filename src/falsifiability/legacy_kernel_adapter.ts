@@ -25,6 +25,11 @@ import type {
   VerdictKernelOutput,
 } from './verdict_kernel_v2.ts';
 
+/**
+ * Arguments for {@link buildLegacyVerdictKernelInput}: the legacy-format
+ * claim and evidence inputs that get adapted into a {@link VerdictKernelInput}
+ * for the V2 deterministic kernel.
+ */
 export interface LegacyVerdictKernelInputArgs {
   readonly claim: string;
   readonly evidences: ReadonlyArray<EvidenceRecord>;
@@ -47,6 +52,13 @@ export interface LegacyVerdictKernelInputArgs {
   readonly antiTheaterReport?: AntiTheaterReport;
 }
 
+/**
+ * Adapts legacy-format claim/evidence inputs into a {@link VerdictKernelInput}
+ * for the V2 deterministic kernel. Bridges the V1 API surface to the V2 kernel.
+ *
+ * @param args - Legacy-format input arguments.
+ * @returns A `VerdictKernelInput` ready for `decideFiveValueVerdict`.
+ */
 export function buildLegacyVerdictKernelInput(
   args: LegacyVerdictKernelInputArgs,
 ): VerdictKernelInput {
@@ -99,6 +111,14 @@ export function bridgeLegacyEvidencesToStatistics(
   );
 }
 
+/**
+ * Constructs a legacy-compatible FEC contract from a falsification spec and
+ * threshold spec, using deterministic defaults for all FEC fields. Used when a
+ * caller needs to invoke the V2 kernel but only has V1-format inputs.
+ *
+ * @param input - Claim ID, falsification spec, threshold spec, and freeze timestamp.
+ * @returns A `FecContractV2` with legacy-compatible defaults.
+ */
 export function makeLegacyCompatFec(input: {
   readonly claimId: string;
   readonly falsificationSpec: FalsificationSpec;
@@ -215,6 +235,11 @@ export interface RealStatsFecInput {
   readonly seedValue: number;
 }
 
+/**
+ * Constructs a FEC contract wired to real statistical computation (not fixtures).
+ * Used when the caller has a real statistical result and needs the FEC to reflect
+ * the actual computation path.
+ */
 export function makeRealStatsFec(input: RealStatsFecInput): FecContractV2 {
   const metricKey = stableMetricKey(input.falsificationSpec.metric);
   const thresholdValue = resolveThresholdValue(input.falsificationSpec, input.thresholdSpec);
@@ -317,6 +342,15 @@ function resolveThresholdValue(spec: FalsificationSpec, thresholdSpec: Threshold
   return thresholdSpec.value ?? spec.falsificationThreshold;
 }
 
+/**
+ * Projects a V2 kernel output ({@link VerdictKernelOutput}) back into a
+ * legacy {@link VerdictResult}, extracting the 5 scalar fields consumed by the
+ * V1 persistence and API layers. Note: structured trace fields go through a
+ * separate projection line (`VerdictTracePersisted`).
+ *
+ * @param output - The V2 kernel output.
+ * @returns A legacy `VerdictResult`.
+ */
 export function verdictResultFromKernelOutput(output: VerdictKernelOutput): VerdictResult {
   return {
     verdict: output.verdict,

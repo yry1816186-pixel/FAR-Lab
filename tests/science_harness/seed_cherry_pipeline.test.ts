@@ -78,8 +78,8 @@ test('seed_cherry_pipeline: real venv BLS + fixture-data cherry-pick -> detect_s
 
     // ── 真实两样本统计（M1：in vs out fluxes · |z|>10 证明真实计算非 stub）──
     assert.ok(
-      statistics.zTest.statistic < -10,
-      `real twoSampleWelchZTest |z|>10 (in<out dip), got ${statistics.zTest.statistic}`,
+      statistics.tTest.statistic < -10,
+      `real twoSampleWelchZTest |z|>10 (in<out dip), got ${statistics.tTest.statistic}`,
     );
     assert.ok(statistics.adjustedPValue <= 0.05, `real adjusted pValue <= alpha, got ${statistics.adjustedPValue}`);
 

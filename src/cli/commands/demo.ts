@@ -97,6 +97,12 @@ const TESS_OFFLINE_NOTE = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
 
+/**
+ * Runs the far demo command: one-shot 6-stage FSM demo with offline replay.
+ *
+ * @param subcommand - Optional demo subcommand (e.g. tess-offline).
+ * @returns Exit code: 0 on success, 1 on failure, 2 on unknown subcommand.
+ */
 export function runDemo(subcommand: string | undefined = undefined): number {
   if (subcommand !== undefined && subcommand !== 'tess-offline') {
     process.stderr.write(`far demo: unknown subcommand '${subcommand}' (supported: 'tess-offline', or run the full demo with no argument)\n`);

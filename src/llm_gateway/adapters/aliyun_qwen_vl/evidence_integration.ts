@@ -67,6 +67,7 @@ export function vlmCredentialToProviderNeutralCredential(
 
 // ===== Evidence card factory =====
 
+/** Input parameters for operations involving create evidence card args. */
 export interface CreateEvidenceCardArgs {
   readonly mediaKind: MediaKind;
   readonly imageBase64?: string;
@@ -142,6 +143,7 @@ function resolveInitialStatus(args: CreateEvidenceCardArgs): MultimodalEvidenceS
 
 // ===== Record VLM call into evidence_log =====
 
+/** Input parameters for operations involving record vlm call args. */
 export interface RecordVlmCallArgs {
   /** VLM 调用结果 */
   readonly result: MultimodalVlmResult;

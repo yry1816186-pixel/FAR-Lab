@@ -42,6 +42,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: G2_RAW_INPUT. */
 export const G2_RAW_INPUT = [
   'Universal influenza vaccine: Seasonal vaccines target the HA head (immunodominant, rapidly mutating),',
   'requiring annual reformulation. Universal vaccine candidates (mRNA-102/101, chimeric HA, stem-only',
@@ -53,6 +54,7 @@ export const G2_RAW_INPUT = [
   'models show partial protection only).',
 ].join(' ');
 
+/** Constant: G2_SOURCE_CARD. */
 export const G2_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-g2-arevalo-mrna-multivalent-2022',
   url: 'https://doi.org/10.1038/s41591-022-01957-2',
@@ -212,6 +214,9 @@ const G2_FALSIFICATION_SPEC: FalsificationSpec = {
 const G2_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 0.6 };
 const G2_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'g2'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2026-06-27T00:00:00.000Z', rawResponseHash: 'g2'.repeat(32) };
 
+/**
+ * run g2 seed.
+ */
 export async function runG2Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [

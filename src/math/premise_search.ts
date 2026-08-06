@@ -9,15 +9,16 @@
 // Model-neutrality: this file references NO model/provider.
 
 import type { MathClaim } from './math_claim.ts';
-
+/** Origin of a premise: from a mathlib library or from locally verified claims. */
 export type PremiseSource = 'mathlib' | 'local_verified_claims';
-
+/** A single premise (theorem/lemma) relevant to a formal proof attempt. */
 export interface Premise {
   readonly name: string;
   readonly statement: string;
   readonly source: PremiseSource;
 }
-
+/** Input for premise search. Contains the query, local claims fallback,
+ * and a mandatory source anchor for auditability. */
 export interface PremiseSearchInput {
   readonly query: string;
   /** Previously-verified claims to search when mathlib is unavailable. */
@@ -27,7 +28,8 @@ export interface PremiseSearchInput {
   /** Mandatory: fingerprint of the search context (git commit, timestamp, etc.). */
   readonly sourceAnchor: string;
 }
-
+/** Result of a premise search: the found premises, their source,
+ * and whether mathlib was available. */
 export interface PremiseSearchResult {
   readonly premises: readonly Premise[];
   readonly source: PremiseSource;

@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import { PACKAGE_ROOT } from '../paths.ts';
 import { runVerify } from './verify.ts';
 
+/** Input parameters for operations involving doctor options. */
 export interface DoctorOptions {
   readonly liveQwenSmoke: boolean;
   /** IC-03(F-03):可选 DB 完整性检查(integrity_check 全量+链验证;损坏=FAIL fail-closed) */
@@ -335,6 +336,13 @@ const SYMBOL: Readonly<Record<CheckStatus, string>> = {
   info: '·',
 };
 
+/**
+ * Runs the far doctor command: environment self-diagnostic checks.
+ *
+ * Validates Node.js version, package structure, git availability, and prerequisites.
+ * @param opts - Doctor options including JSON output flag.
+ * @returns Exit code: 0 all checks pass, 1 any check fails.
+ */
 export async function runDoctor(opts: DoctorOptions): Promise<number> {
   const root = resolveRepoRoot();
   const checks: Check[] = [];

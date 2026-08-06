@@ -31,6 +31,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: E2_RAW_INPUT. */
 export const E2_RAW_INPUT = [
   'Terrestrial ecosystem carbon flux estimation: Eddy Covariance (EC) towers provide',
   'direct measurements of Net Ecosystem Exchange (NEE), but spatial coverage is sparse.',
@@ -45,6 +46,7 @@ export const E2_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: E2_SOURCE_CARD. */
 export const E2_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-e2-carbon-flux-2026',
   url: 'https://fluxnet.org/data/fluxnet2015-dataset/',
@@ -261,6 +263,9 @@ const E2_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- runSeed ----------
 
+/**
+ * run e2 seed.
+ */
 export async function runE2Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 

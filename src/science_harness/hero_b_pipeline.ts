@@ -8,7 +8,7 @@
  *     + evidenceBasis + confoundingGateResult) → decideFiveValueVerdict R-causal 门 → DEGRADED_SCOPE → seal。
  *
  * 单一真实依赖（T8）：
- *   - src/statistics/（twoSampleWelchZTest/twoSampleEffectSize/differenceInMeansConfidenceInterval/adjustPValues）
+ *   - src/statistics/（twoSampleWelchTTest/twoSampleEffectSize/differenceInMeansConfidenceInterval/adjustPValues）
  *   - src/confounding_gate/adjudicate.ts（adjudicateConfounding·d-separation 图算法·非 LLM）
  *
  * F6 因果诚实叙事（真实驱动）：真实统计显著支持（cot 幻觉率显著低于 baseline → 本会 R7 CONFIRMED），
@@ -55,52 +55,56 @@ import {
   differenceInMeansConfidenceInterval,
   sampleMean,
   twoSampleEffectSize,
-  twoSampleWelchZTest,
+  twoSampleWelchTTest,
 } from '../statistics/index.ts';
-import type { ConfidenceInterval, TwoSampleEffectSize, ZTestResult } from '../statistics/index.ts';
+import type { ConfidenceInterval, TwoSampleEffectSize, TTestResult } from '../statistics/index.ts';
 
 // ---------------------------------------------------------------------------
 // 确定性常量（fixture · preregistered before unblinding）
 // ---------------------------------------------------------------------------
-
+/** Hero-B claim identifier (preregistered before unblinding). */
 export const HERO_B_PIPELINE_CLAIM_ID = 'C-COT-B-0002';
-
+/** Hero-B primary metric key: hallucination rate reduction (baseline minus cot). */
 export const HERO_B_METRIC_KEY = 'hallucination_rate_reduction';
-
+/** Hero-B claim: Chain-of-Thought prompting reduces mean LLM hallucination
+ * rate vs baseline (causal claim). */
 export const HERO_B_PIPELINE_CLAIM =
   'Chain-of-Thought prompting reduces mean LLM hallucination rate vs baseline (cot < baseline · causal)';
-
+/** Hero-B falsification spec: reduction must exceed 0 threshold. */
 export const HERO_B_FALSIFICATION_SPEC: FalsificationSpec = {
   prediction: HERO_B_PIPELINE_CLAIM,
   metric: HERO_B_METRIC_KEY,
   falsificationThreshold: 0,
   thresholdSemantics: 'gt',
 };
-
+/** Hero-B threshold spec: greater-than-zero semantics. */
 export const HERO_B_THRESHOLD_SPEC: ThresholdSpec = {
   semantics: 'gt',
   value: 0,
 };
-
+/** Hero-B significance level (5%). */
 export const HERO_B_ALPHA = 0.05;
+/** Hero-B confidence level for interval estimates (95%). */
 export const HERO_B_CONFIDENCE_LEVEL = 0.95;
+/** Hero-B fixed random seed (SR-2, anti-p-hacking). */
 export const HERO_B_SEED = 42;
+/** Hero-B preregistration freeze timestamp (ISO 8601). */
 export const HERO_B_FROZEN_AT = '2026-07-01T00:00:00.000Z';
 
 /**
  * fixture：两组 per-stratum 幻觉率（baseline 无 CoT / cot 有 CoT，各 12 strata，固定 seed=42）。
  * 诚实声明：fixture 数值（非真实沙箱产物）；P1-6 venv 沙箱落地后由真实评测替换。
- * 设计：baseline 均值 ~0.206、cot 均值 ~0.156 → reduction ~0.05；twoSampleWelchZTest(cot, baseline, 'less')
+ * 设计：baseline 均值 ~0.206、cot 均值 ~0.156 → reduction ~0.05；twoSampleWelchTTest(cot, baseline, 'less')
  * 给 z~-4.5 → pValue~3e-6（显著支持「CoT 降低」方向，但不饱和到 0）。
  */
 export const HERO_B_BASELINE_RATES: readonly number[] = [
   0.22, 0.17, 0.24, 0.19, 0.21, 0.18, 0.23, 0.20, 0.16, 0.25, 0.20, 0.22,
 ];
-
+/** Fixture: per-stratum hallucination rates with Chain-of-Thought prompting (12 strata). */
 export const HERO_B_COT_RATES: readonly number[] = [
   0.17, 0.13, 0.19, 0.14, 0.16, 0.12, 0.18, 0.15, 0.11, 0.20, 0.15, 0.17,
 ];
-
+/** Hero-B source anchor: reproducibility fingerprint for the hallucination eval. */
 export const HERO_B_SOURCE_ANCHOR: SourceAnchor = {
   gitCommitSha: 'b'.repeat(40),
   dashscopeRequestId: null,
@@ -116,14 +120,15 @@ export const HERO_B_SOURCE_ANCHOR: SourceAnchor = {
 // ---------------------------------------------------------------------------
 // 真实统计 + 因果裁决
 // ---------------------------------------------------------------------------
-
+/** Real two-sample statistics from Hero-B hallucination rate comparison.
+ * Includes confounding gate result (d-separation adjudication). */
 export interface HeroBStatistics {
   readonly baseline: readonly number[];
   readonly cot: readonly number[];
   readonly baselineMean: number;
   readonly cotMean: number;
   readonly observedReduction: number;
-  readonly zTest: ZTestResult;
+  readonly tTest: TTestResult;
   readonly effectSize: TwoSampleEffectSize;
   readonly confidenceInterval: ConfidenceInterval;
   readonly adjustedPValue: number;
@@ -145,11 +150,11 @@ export function buildHeroBStatistics(metricKey: string): HeroBStatistics {
   const observedReduction = baselineMean - cotMean;
 
   // H1: mean(cot) < mean(baseline)（CoT 降低幻觉率）。显著拒绝 H0 → reduction > 0 = 支持 claim。
-  const zTest = twoSampleWelchZTest(cot, baseline, 'less');
+  const tTest = twoSampleWelchTTest(cot, baseline, 'less');
   const effectSize = twoSampleEffectSize(baseline, cot);
   const confidenceInterval = differenceInMeansConfidenceInterval(baseline, cot, HERO_B_CONFIDENCE_LEVEL);
-  const adjusted = adjustPValues([zTest.pValue], 'bonferroni', HERO_B_ALPHA);
-  const adjustedPValue = adjusted[0]?.adjustedPValue ?? zTest.pValue;
+  const adjusted = adjustPValues([tTest.pValue], 'bonferroni', HERO_B_ALPHA);
+  const adjustedPValue = adjusted[0]?.adjustedPValue ?? tTest.pValue;
 
   const effectDirection: EvidenceDirection = observedReduction > 0 ? 'supports' : 'refutes';
 
@@ -157,7 +162,7 @@ export function buildHeroBStatistics(metricKey: string): HeroBStatistics {
     testId: metricKey,
     status: 'ran',
     effectDirection,
-    pValue: zTest.pValue,
+    pValue: tTest.pValue,
     adjustedPValue,
     effectSizeObserved: effectSize.cohensD,
     confidenceInterval: [confidenceInterval.lower, confidenceInterval.upper],
@@ -176,7 +181,7 @@ export function buildHeroBStatistics(metricKey: string): HeroBStatistics {
     baselineMean,
     cotMean,
     observedReduction,
-    zTest,
+    tTest,
     effectSize,
     confidenceInterval,
     adjustedPValue,
@@ -189,7 +194,7 @@ export function buildHeroBStatistics(metricKey: string): HeroBStatistics {
 // ---------------------------------------------------------------------------
 // Pipeline B 编排
 // ---------------------------------------------------------------------------
-
+/** Complete Hero-B pipeline result: statistics, machine verdict, FEC gate, and sealed proof. */
 export interface HeroBPipelineResult {
   readonly db: Database.Database;
   readonly claimId: string;
@@ -268,7 +273,7 @@ export function buildHeroBChain(db: Database.Database): HeroBPipelineResult {
       baselineMean: statistics.baselineMean,
       cotMean: statistics.cotMean,
       observedReduction: statistics.observedReduction,
-      pValue: statistics.zTest.pValue,
+      pValue: statistics.tTest.pValue,
       adjustedPValue: statistics.adjustedPValue,
     },
     sourceAnchor: HERO_B_SOURCE_ANCHOR,

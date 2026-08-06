@@ -30,6 +30,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: A16_RAW_INPUT. */
 export const A16_RAW_INPUT = [
   'Pulsar braking indices: most radio pulsars are modeled as magnetic dipole radiators',
   'with braking index n = 3. However, measured braking indices for young pulsars',
@@ -44,6 +45,7 @@ export const A16_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: A16_SOURCE_CARD. */
 export const A16_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-a16-pulsar-p0-2026',
   url: 'https://www.atnf.csiro.au/research/pulsar/psrcat/',
@@ -225,6 +227,9 @@ const A16_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- runSeed ----------
 
+/**
+ * run a16 seed.
+ */
 export async function runA16Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 

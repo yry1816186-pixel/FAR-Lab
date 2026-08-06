@@ -18,6 +18,7 @@ import { z } from 'zod';
 
 // ---------- §3.4 共享 sub-schema ----------
 
+/** citation anchor schema constant. */
 export const CitationAnchorSchema = z.object({
   evidenceId: z.string(),
   source: z.enum(['arxiv', 'ads', 's2', 'tns', 'gcvs', 'aavso', 'gaia', 'doi', 'other']),
@@ -25,6 +26,7 @@ export const CitationAnchorSchema = z.object({
   title: z.string(),
 });
 
+/** falsification method schema constant. */
 export const FalsificationMethodSchema = z.object({
   prediction: z.string(),
   metric: z.string(),
@@ -34,6 +36,7 @@ export const FalsificationMethodSchema = z.object({
   upper: z.number().optional(),
 });
 
+/** agent evidence record schema constant. */
 export const AgentEvidenceRecordSchema = z.object({
   evidenceId: z.string(),
   supportsOrRefutes: z.enum(['supports', 'refutes', 'neutral']),
@@ -41,12 +44,14 @@ export const AgentEvidenceRecordSchema = z.object({
   source: CitationAnchorSchema,
 });
 
+/** executable check schema constant. */
 export const ExecutableCheckSchema = z.object({
   ref: z.string(),
   exists: z.boolean(),
   checkedAt: z.string(),
 });
 
+/** feedback signal schema constant. */
 export const FeedbackSignalSchema = z.object({
   continueIteration: z.boolean(),
   iterationNumber: z.number(),
@@ -54,6 +59,7 @@ export const FeedbackSignalSchema = z.object({
   refinements: z.array(z.string()),
 });
 
+/** dialogue context schema constant. */
 export const DialogueContextSchema = z.object({
   frameworkId: z.string(),
   primaryIntent: z.string(),
@@ -63,6 +69,7 @@ export const DialogueContextSchema = z.object({
 
 // ---------- §3.3 各阶段顶层 payload schema（判别联合 variant） ----------
 
+/** understanding schema constant. */
 export const UnderstandingSchema = z.object({
   kind: z.literal('understanding'),
   problemStatement: z.string(),
@@ -72,6 +79,7 @@ export const UnderstandingSchema = z.object({
   dialogueContext: DialogueContextSchema.optional(),
 });
 
+/** integration schema constant. */
 export const IntegrationSchema = z.object({
   kind: z.literal('integration'),
   citations: z.array(CitationAnchorSchema),
@@ -79,6 +87,7 @@ export const IntegrationSchema = z.object({
   gaps: z.array(z.string()),
 });
 
+/** hypothesis schema constant. */
 export const HypothesisSchema = z.object({
   kind: z.literal('hypothesis'),
   claim: z.string(),
@@ -87,12 +96,14 @@ export const HypothesisSchema = z.object({
   scopeSlipText: z.string(),
 });
 
+/** evidence schema constant. */
 export const EvidenceSchema = z.object({
   kind: z.literal('evidence'),
   evidenceRecords: z.array(AgentEvidenceRecordSchema),
   conflictingEvidenceCount: z.number(),
 });
 
+/** plan schema constant. */
 export const PlanSchema = z.object({
   kind: z.literal('plan'),
   datasetChoices: z.array(z.string()),
@@ -101,6 +112,7 @@ export const PlanSchema = z.object({
   executableChecks: z.array(ExecutableCheckSchema),
 });
 
+/** feedback payload schema constant. */
 export const FeedbackPayloadSchema = z.object({
   kind: z.literal('feedback'),
   feedbackSignal: FeedbackSignalSchema,

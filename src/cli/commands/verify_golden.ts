@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { buildPythonPath as sharedBuildPythonPath } from '../python_env.ts';
 
 // backward-compat re-export: tests/cli/verify_golden_cross_lang.test.ts imports buildPythonPath from here.
+/** build python path constant. */
 export const buildPythonPath = sharedBuildPythonPath;
 import { PACKAGE_ROOT } from '../paths.ts';
 import { createContext, runInContext } from 'node:vm';
@@ -22,9 +23,12 @@ const DEFAULT_BROWSER_VERIFY_HTML = join(PACKAGE_ROOT, 'frontend', 'public', 've
 const CASE_ID_PATTERN = /^GV-\d{2}$/;
 const PYTHON_CMD = process.platform === 'win32' ? 'python' : 'python3';
 
+/** Type alias: verify golden status. */
 export type VerifyGoldenStatus = 'PASS' | 'FAIL';
+/** Type alias: verify golden backend. */
 export type VerifyGoldenBackend = 'node' | 'python' | 'browser';
 
+/** Result/output structure for verify golden case result. */
 export interface VerifyGoldenCaseResult {
   readonly caseId: string;
   readonly status: VerifyGoldenStatus;
@@ -38,6 +42,7 @@ export interface VerifyGoldenCaseResult {
   readonly errors: readonly string[];
 }
 
+/** Interface defining verify golden dump. */
 export interface VerifyGoldenDump {
   readonly status: VerifyGoldenStatus;
   readonly backend: VerifyGoldenBackend;
@@ -49,6 +54,7 @@ export interface VerifyGoldenDump {
   readonly errors: readonly string[];
 }
 
+/** Input parameters for operations involving collect verify golden options. */
 export interface CollectVerifyGoldenOptions {
   readonly caseIds?: readonly string[];
   readonly caseDir?: string;
@@ -92,6 +98,9 @@ interface BrowserGoldenSandbox {
 
 let browserVerifierCache: BrowserGoldenVerifier | undefined;
 
+/**
+ * collect verify golden dump.
+ */
 export function collectVerifyGoldenDump(options: CollectVerifyGoldenOptions = {}): VerifyGoldenDump {
   const caseDir = options.caseDir ?? DEFAULT_CASE_DIR;
   const backend = options.backend ?? 'node';
@@ -123,6 +132,9 @@ export function collectVerifyGoldenDump(options: CollectVerifyGoldenOptions = {}
   };
 }
 
+/**
+ * run verify golden.
+ */
 export function runVerifyGolden(options: CollectVerifyGoldenOptions & { readonly json?: boolean } = {}): number {
   const dump = collectVerifyGoldenDump(options);
   if (options.json === true) {
@@ -133,6 +145,9 @@ export function runVerifyGolden(options: CollectVerifyGoldenOptions & { readonly
   return dump.status === 'PASS' ? 0 : 7;
 }
 
+/**
+ * render verify golden text.
+ */
 export function renderVerifyGoldenText(dump: VerifyGoldenDump): string {
   const lines = [
     `far verify-golden: ${dump.status} (${dump.passed}/${dump.total} passed, backend=${dump.backend})`,

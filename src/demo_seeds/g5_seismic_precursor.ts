@@ -34,6 +34,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: G5_RAW_INPUT. */
 export const G5_RAW_INPUT = [
   'Earthquake prediction via pre-seismic electromagnetic precursors: Ultra-Low Frequency (ULF,',
   '0.001–10 Hz) and Very-Low Frequency (VLF) magnetic anomalies have been reported hours to days',
@@ -46,6 +47,7 @@ export const G5_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: G5_SOURCE_CARD. */
 export const G5_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-g5-seismic-precursor-2026',
   url: 'https://doi.org/10.1016/j.pepi.2015.03.002',

@@ -23,7 +23,7 @@ import type {
 } from './math_claim.ts';
 
 const Z3_PYTHON_SCRIPT_PATH = join(PACKAGE_ROOT, 'repro', 'math_backends', 'z3_backend.py');
-
+/** Configuration options for the Z3 SMT backend. */
 export interface Z3SmtBackendOptions {
   readonly z3Command?: string;
   readonly pythonCommand?: string;
@@ -41,7 +41,8 @@ interface Z3PythonResponse {
   readonly rawOutput: string;
   readonly stderr: string;
 }
-
+/** Z3 SMT-LIB backend (spec 38 S3.2). Supports both CLI z3 -in and Python
+ * z3-solver modes. Degrades to outcome='unknown' when Z3 is unavailable. */
 export class Z3SmtBackend implements MathBackend {
   readonly backendKind = 'smt' as const;
   readonly backendId: string;

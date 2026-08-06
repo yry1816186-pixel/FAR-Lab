@@ -17,6 +17,7 @@ import type { AgentRunEventKind } from './agent_run_event.ts';
 
 // ---------- ForkReason：分叉原因 ----------
 
+/** Constant: FORK_REASONS. */
 export const FORK_REASONS = [
   'source_set_changed',
   'threshold_changed',
@@ -26,10 +27,12 @@ export const FORK_REASONS = [
   'human_review',
 ] as const;
 
+/** Type alias: fork reason. */
 export type ForkReason = (typeof FORK_REASONS)[number];
 
 // ---------- AgentRunFork：分叉清单 ----------
 
+/** Interface defining agent run fork. */
 export interface AgentRunFork {
   readonly forkId: string;          // ULID
   readonly baseRunId: string;       // 原 agent_loop 执行 ID
@@ -43,6 +46,7 @@ export interface AgentRunFork {
 
 // ---------- VerdictDelta：裁决差异 ----------
 
+/** Interface defining verdict delta. */
 export interface VerdictDelta {
   readonly baseVerdictId: string;
   readonly forkVerdictId: string;
@@ -55,6 +59,7 @@ export interface VerdictDelta {
 
 // ---------- ReplayBranchMetadata：回放分支元数据 ----------
 
+/** Interface defining replay branch metadata. */
 export interface ReplayBranchMetadata {
   readonly branchId: string;        // ULID
   readonly forkId: string;          // 关联的 fork
@@ -72,6 +77,9 @@ export interface ReplayBranchMetadata {
 
 // ---------- 工厂函数 ----------
 
+/**
+ * create fork.
+ */
 export function createFork(params: {
   readonly forkId: string;
   readonly baseRunId: string;
@@ -110,6 +118,9 @@ export function createFork(params: {
   };
 }
 
+/**
+ * compute verdict delta.
+ */
 export function computeVerdictDelta(params: {
   readonly baseVerdictId: string;
   readonly forkVerdictId: string;
@@ -137,6 +148,9 @@ export function computeVerdictDelta(params: {
   };
 }
 
+/**
+ * create replay branch.
+ */
 export function createReplayBranch(params: {
   readonly branchId: string;
   readonly forkId: string;

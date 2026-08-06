@@ -67,6 +67,7 @@ export const DEMO_MODEL_SNAPSHOT = 'offline-replay-fixture@v1';
 // 环境指纹（envHash）
 // ---------------------------------------------------------------------------
 
+/** Interface defining env descriptor. */
 export interface EnvDescriptor {
   /** schema 最大迁移版本（连续迁移·assertContiguousVersions 保证无间隙）。 */
   readonly schemaVersion: number;
@@ -112,11 +113,13 @@ export const DEMO_FALSIFICATION_SPEC: FalsificationSpec = {
   thresholdSemantics: 'gt',
 };
 
+/** Constant: DEMO_THRESHOLD_SPEC. */
 export const DEMO_THRESHOLD_SPEC: ThresholdSpec = {
   semantics: 'gt',
   value: 0.8,
 };
 
+/** Constant: DEMO_SOURCE_ANCHOR. */
 export const DEMO_SOURCE_ANCHOR: SourceAnchor = {
   gitCommitSha: DEMO_GIT_COMMIT_SHA,
   dashscopeRequestId: null,
@@ -129,6 +132,7 @@ export const DEMO_SOURCE_ANCHOR: SourceAnchor = {
   },
 };
 
+/** Result/output structure for demo chain result. */
 export interface DemoChainResult {
   /** 调用方负责关闭 db（脚本/测试 finally 块）。 */
   readonly db: Database.Database;

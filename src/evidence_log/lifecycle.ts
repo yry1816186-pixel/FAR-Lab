@@ -24,12 +24,17 @@ import { ulid } from 'ulid';
 import { createHash } from 'node:crypto';
 import stableStringify from 'fast-json-stable-stringify';
 
+/** Constant: LIFECYCLE_STATES. */
 export const LIFECYCLE_STATES = ['active', 'contested', 'corrected', 'retracted', 'superseded'] as const;
+/** Type alias: lifecycle state. */
 export type LifecycleState = (typeof LIFECYCLE_STATES)[number];
 
+/** Constant: TERMINAL_STATES. */
 export const TERMINAL_STATES: readonly LifecycleState[] = ['corrected', 'retracted', 'superseded'];
 
+/** Constant: LIFECYCLE_TARGET_KINDS. */
 export const LIFECYCLE_TARGET_KINDS = ['claim', 'verdict_node', 'proof_envelope', 'evidence'] as const;
+/** Type alias: lifecycle target kind. */
 export type LifecycleTargetKind = (typeof LIFECYCLE_TARGET_KINDS)[number];
 
 /** 冻结状态机迁移表(非法迁移=拒绝);bundle 侧事件链重放复用(IC-05 对抗修复) */
@@ -41,6 +46,7 @@ export const ALLOWED_TRANSITIONS: Readonly<Record<LifecycleState, readonly Lifec
   superseded: [],
 };
 
+/** Interface defining lifecycle event. */
 export interface LifecycleEvent {
   readonly eventId: string;
   readonly targetKind: LifecycleTargetKind;
@@ -55,6 +61,7 @@ export interface LifecycleEvent {
   readonly createdAt: string;
 }
 
+/** Input parameters for operations involving lifecycle transition input. */
 export interface LifecycleTransitionInput {
   readonly targetKind: LifecycleTargetKind;
   readonly targetId: string;
@@ -64,6 +71,7 @@ export interface LifecycleTransitionInput {
   readonly auditRef?: string | null;
 }
 
+/** Result/output structure for lifecycle transition result. */
 export interface LifecycleTransitionResult {
   readonly event: LifecycleEvent | null;
   /** true = 目标已在该终态,幂等命中(未重复插入) */
@@ -257,6 +265,7 @@ export function applyLifecycleTransition(
   return apply.immediate();
 }
 
+/** Result/output structure for lifecycle chain verify result. */
 export interface LifecycleChainVerifyResult {
   readonly ok: boolean;
   readonly checkedCount: number;

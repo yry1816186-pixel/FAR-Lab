@@ -11,6 +11,7 @@ import { openFarDb } from '../../db/open.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 import { executeAskRun } from './ask.ts';
 
+/** Input parameters for operations involving stream args. */
 export interface StreamArgs {
   readonly question: string;
   readonly mode: 'full' | 'quick';
@@ -18,6 +19,9 @@ export interface StreamArgs {
   readonly profile: string;
 }
 
+/**
+ * parse stream args.
+ */
 export function parseStreamArgs(argv: readonly string[]): StreamArgs {
   let question = '';
   let mode: 'full' | 'quick' = 'full';
@@ -83,6 +87,9 @@ function renderStageLine(artifact: StageArtifact, json: boolean): void {
   process.stdout.write(`  ◐ ${artifact.stageId.padEnd(22)} ${label.padEnd(4)} · ${tokens} tokens${flag}\n`);
 }
 
+/**
+ * run stream.
+ */
 export async function runStream(argv: readonly string[]): Promise<number> {
   const args = parseStreamArgs(argv);
 

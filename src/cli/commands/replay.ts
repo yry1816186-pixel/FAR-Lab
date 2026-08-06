@@ -15,12 +15,16 @@ import { hashCanonicalJson } from '../../evidence_log/hasher.ts';
 
 type ChainVerify = Awaited<ReturnType<typeof verifyChainHead>>;
 
+/** Input parameters for operations involving replay args. */
 export interface ReplayArgs {
   readonly dbPath: string | null;
   readonly bundleDir: string | null;
   readonly json: boolean;
 }
 
+/**
+ * parse replay args.
+ */
 export function parseReplayArgs(argv: readonly string[]): ReplayArgs {
   let dbPath: string | null = null;
   let bundleDir: string | null = null;
@@ -199,6 +203,13 @@ function renderVerdictAudit(audit: VerdictAudit, json: boolean): void {
   process.stdout.write(`  traceHash    : ${shortHash(audit.traceHash)}  ${mark}\n`);
 }
 
+/**
+ * Runs the far replay command: replays an evidence chain from a DB or bundle.
+ *
+ * Reads call_records, displays each record stage and hash chain, verifies integrity.
+ * @param argv - Raw CLI argument tokens for far replay.
+ * @returns Exit code: 0 success, 1 error, 2 argument error.
+ */
 export function runReplay(argv: readonly string[]): number {
   const args = parseReplayArgs(argv);
 

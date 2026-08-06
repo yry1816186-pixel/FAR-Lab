@@ -9,6 +9,14 @@ import type {
   ThresholdSpec,
 } from './types.ts';
 
+/**
+ * Parses and validates an untrusted JSON value into a {@link FalsificationSpec}.
+ * Fails closed on any missing or invalid field.
+ *
+ * @param value - The untrusted JSON value.
+ * @returns A validated `FalsificationSpec`.
+ * @throws {Error} if any field is missing, wrong type, or non-finite.
+ */
 export function parseFalsificationSpec(value: unknown): FalsificationSpec {
   const record = requireRecord(value, 'FalsificationSpec');
   return {
@@ -22,6 +30,14 @@ export function parseFalsificationSpec(value: unknown): FalsificationSpec {
   };
 }
 
+/**
+ * Parses and validates an untrusted JSON value into a {@link ThresholdSpec}.
+ * Supports single-value and range semantics; validates finite numbers.
+ *
+ * @param value - The untrusted JSON value.
+ * @returns A validated `ThresholdSpec`.
+ * @throws {Error} if any field is missing, wrong type, or non-finite.
+ */
 export function parseThresholdSpec(value: unknown): ThresholdSpec {
   const record = requireRecord(value, 'ThresholdSpec');
   const spec: ThresholdSpec = {
@@ -41,6 +57,13 @@ export function parseThresholdSpec(value: unknown): ThresholdSpec {
   };
 }
 
+/**
+ * Parses and validates an untrusted JSON value into a {@link SourceAnchor}.
+ *
+ * @param value - The untrusted JSON value.
+ * @returns A validated `SourceAnchor`.
+ * @throws {Error} if required fields are missing or wrong type.
+ */
 export function parseSourceAnchor(value: unknown): SourceAnchor {
   const record = requireRecord(value, 'SourceAnchor');
   const dashscopeRequestId = optionalNullableString(record, 'dashscopeRequestId', 'SourceAnchor');
@@ -54,6 +77,14 @@ export function parseSourceAnchor(value: unknown): SourceAnchor {
   };
 }
 
+/**
+ * Parses and validates an untrusted JSON value into a {@link ReplayProver}.
+ * Ensures `messages` is an array and `params` is a record.
+ *
+ * @param value - The untrusted JSON value.
+ * @returns A validated `ReplayProver`.
+ * @throws {Error} if structure is invalid.
+ */
 export function parseReplayProver(value: unknown): ReplayProver {
   const record = requireRecord(value, 'ReplayProver');
   const messages = record.messages;
@@ -71,6 +102,15 @@ export function parseReplayProver(value: unknown): ReplayProver {
   };
 }
 
+/**
+ * Parses a JSON string and returns the result, wrapping parse errors with
+ * the provided context string for better diagnostics.
+ *
+ * @param text - The JSON string to parse.
+ * @param context - A label prepended to error messages for traceability.
+ * @returns The parsed JSON value.
+ * @throws {Error} if `text` is not valid JSON.
+ */
 export function parseJsonObject(text: string, context: string): unknown {
   try {
     return JSON.parse(text) as unknown;

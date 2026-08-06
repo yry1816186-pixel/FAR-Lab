@@ -49,6 +49,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: C8_RAW_INPUT. */
 export const C8_RAW_INPUT = [
   'Artificial photosynthesis efficiency: Photoelectrochemical (PEC) water splitting claims to convert',
   'solar energy to hydrogen fuel at Solar-to-Hydrogen (STH) efficiency exceeding natural photosynthesis',
@@ -62,6 +63,7 @@ export const C8_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: C8_SOURCE_CARD. */
 export const C8_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-c8-luo-perovskite-pec-2019',
   url: 'https://doi.org/10.1038/s41586-019-1532-8',
@@ -277,6 +279,9 @@ const C8_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- runSeed ----------
 
+/**
+ * run c8 seed.
+ */
 export async function runC8Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 

@@ -28,7 +28,9 @@ import { FatalMathError } from './errors.ts';
 // ============================================================
 // §1  MathClaimKind — 12 values (8 symbolic + 4 numerical) — spec §1
 // ============================================================
-
+/** Eight symbolic math claim kinds (spec 38 S1): algebraic_identity,
+ * equation_solution, calculus, inequality, dimensional_consistency,
+ * matrix_identity, statistic_identity, theorem. */
 export const SYMBOLIC_MATH_CLAIM_KINDS = [
   'algebraic_identity',
   'equation_solution',
@@ -39,31 +41,40 @@ export const SYMBOLIC_MATH_CLAIM_KINDS = [
   'statistic_identity',
   'theorem',
 ] as const;
-
+/** Four numerical math claim kinds (spec 38 S1): numerical_reproduction,
+ * statistical_inference, optimization_convergence, validated_numerics. */
 export const NUMERICAL_MATH_CLAIM_KINDS = [
   'numerical_reproduction',
   'statistical_inference',
   'optimization_convergence',
   'validated_numerics',
 ] as const;
-
+/** All 12 math claim kinds (8 symbolic + 4 numerical), authoritative per spec 38 S1. */
 export const MATH_CLAIM_KINDS = [
   ...SYMBOLIC_MATH_CLAIM_KINDS,
   ...NUMERICAL_MATH_CLAIM_KINDS,
 ] as const;
-
+/** Union of the 8 symbolic math claim kind string literals. */
 export type SymbolicMathClaimKind = (typeof SYMBOLIC_MATH_CLAIM_KINDS)[number];
+/** Union of the 4 numerical math claim kind string literals. */
 export type NumericalMathClaimKind = (typeof NUMERICAL_MATH_CLAIM_KINDS)[number];
+/** Union of all 12 math claim kind string literals. */
 export type MathClaimKind = (typeof MATH_CLAIM_KINDS)[number];
-
+/** Type guard: whether a string is one of the 8 symbolic claim kinds.
+ * @param kind String to test.
+ * @returns True if kind is a valid SymbolicMathClaimKind. */
 export function isSymbolicKind(kind: string): kind is SymbolicMathClaimKind {
   return (SYMBOLIC_MATH_CLAIM_KINDS as readonly string[]).includes(kind);
 }
-
+/** Type guard: whether a string is one of the 4 numerical claim kinds.
+ * @param kind String to test.
+ * @returns True if kind is a valid NumericalMathClaimKind. */
 export function isNumericalKind(kind: string): kind is NumericalMathClaimKind {
   return (NUMERICAL_MATH_CLAIM_KINDS as readonly string[]).includes(kind);
 }
-
+/** Type guard: whether a string is a valid MathClaimKind.
+ * @param value String to test.
+ * @returns True if value is one of the 12 known claim kinds. */
 export function isMathClaimKind(value: string): value is MathClaimKind {
   return (MATH_CLAIM_KINDS as readonly string[]).includes(value);
 }
@@ -71,16 +82,18 @@ export function isMathClaimKind(value: string): value is MathClaimKind {
 // ============================================================
 // §2  VerificationLevel — 4 values (L1_cas / L2_smt / L3_formal / L4_human) — spec §1
 // ============================================================
-
+/** Four verification levels (spec 38 S1): L1_cas, L2_smt, L3_formal, L4_human. */
 export const VERIFICATION_LEVELS = [
   'L1_cas',
   'L2_smt',
   'L3_formal',
   'L4_human',
 ] as const;
-
+/** Union of the 4 verification level string literals. */
 export type VerificationLevel = (typeof VERIFICATION_LEVELS)[number];
-
+/** Type guard: whether a string is a valid VerificationLevel.
+ * @param value String to test.
+ * @returns True if value is one of the 4 known levels. */
 export function isVerificationLevel(value: string): value is VerificationLevel {
   return (VERIFICATION_LEVELS as readonly string[]).includes(value);
 }
@@ -89,6 +102,8 @@ export function isVerificationLevel(value: string): value is VerificationLevel {
 // Used by meetsRequiredLevel (partial-order compare) and derivedAchievedLevel
 // (max aggregation over verified symbolic backends). L4_human ranks highest;
 // it is reached only via a HumanCheckpoint-backed verification row.
+/** Rank ordering of verification levels (spec S1.1): L1_cas=1 < L2_smt=2
+ * < L3_formal=3 < L4_human=4. Used by meetsRequiredLevel and derivedAchievedLevel. */
 export const LEVEL_RANK: Readonly<Record<VerificationLevel, number>> = {
   L1_cas: 1,
   L2_smt: 2,
@@ -99,15 +114,17 @@ export const LEVEL_RANK: Readonly<Record<VerificationLevel, number>> = {
 // ============================================================
 // §3  VerificationOutcome — 3 values (verified / refuted / unknown) — spec §1
 // ============================================================
-
+/** Three verification outcomes (spec 38 S1): verified, refuted, unknown. */
 export const VERIFICATION_OUTCOMES = [
   'verified',
   'refuted',
   'unknown',
 ] as const;
-
+/** Union of the 3 verification outcome string literals. */
 export type VerificationOutcome = (typeof VERIFICATION_OUTCOMES)[number];
-
+/** Type guard: whether a string is a valid VerificationOutcome.
+ * @param value String to test.
+ * @returns True if value is verified, refuted, or unknown. */
 export function isVerificationOutcome(value: string): value is VerificationOutcome {
   return (VERIFICATION_OUTCOMES as readonly string[]).includes(value);
 }
@@ -115,7 +132,7 @@ export function isVerificationOutcome(value: string): value is VerificationOutco
 // ============================================================
 // §4  BackendKind — 5 values (cas / smt / lean4 / dafny / numerical) — spec §1.1
 // ============================================================
-
+/** Five backend kinds (spec 38 S1.1): cas, smt, lean4, dafny, numerical. */
 export const BACKEND_KINDS = [
   'cas',
   'smt',
@@ -123,9 +140,11 @@ export const BACKEND_KINDS = [
   'dafny',
   'numerical',
 ] as const;
-
+/** Union of the 5 backend kind string literals. */
 export type BackendKind = (typeof BACKEND_KINDS)[number];
-
+/** Type guard: whether a string is a valid BackendKind.
+ * @param value String to test.
+ * @returns True if value is one of the 5 known backend kinds. */
 export function isBackendKind(value: string): value is BackendKind {
   return (BACKEND_KINDS as readonly string[]).includes(value);
 }
@@ -133,15 +152,20 @@ export function isBackendKind(value: string): value is BackendKind {
 // Symbolic backends (spec §1.1 BACKEND_LEVEL keys): the 4 backends that can
 // return a self-proving 'verified' outcome and therefore contribute to
 // achievedLevel. 'numerical' is excluded — it is non-self-proving (spec §4.5).
+/** Four symbolic backend kinds (spec S1.1): cas, smt, lean4, dafny.
+ * These backends can return self-proving 'verified'.
+ * 'numerical' is excluded (non-self-proving - spec S4.5). */
 export const SYMBOLIC_BACKEND_KINDS = [
   'cas',
   'smt',
   'lean4',
   'dafny',
 ] as const;
-
+/** Union of the 4 symbolic backend kind string literals. */
 export type SymbolicBackendKind = (typeof SYMBOLIC_BACKEND_KINDS)[number];
-
+/** Type guard: whether a backend kind is one of the 4 symbolic backends.
+ * @param kind A BackendKind to test.
+ * @returns True if the backend is cas, smt, lean4, or dafny. */
 export function isSymbolicBackendKind(kind: BackendKind): kind is SymbolicBackendKind {
   return (SYMBOLIC_BACKEND_KINDS as readonly string[]).includes(kind);
 }
@@ -149,6 +173,8 @@ export function isSymbolicBackendKind(kind: BackendKind): kind is SymbolicBacken
 // Maps a symbolic backend kind to the VerificationLevel it satisfies when it
 // returns outcome='verified' (spec §1.1). Only the 4 symbolic backends are
 // keys; 'numerical' has no entry and never contributes to achievedLevel.
+/** Maps each symbolic backend to the verification level it satisfies when
+ * it returns outcome='verified' (spec S1.1). 'numerical' has no entry. */
 export const BACKEND_LEVEL: Readonly<Record<SymbolicBackendKind, VerificationLevel>> = {
   cas: 'L1_cas',
   smt: 'L2_smt',
@@ -162,18 +188,23 @@ export const BACKEND_LEVEL: Readonly<Record<SymbolicBackendKind, VerificationLev
 
 // Formal target language (spec §1 line 73 / §5 line 371). This is the LANGUAGE
 // the `source` is written in, NOT the expression text itself.
+/** Three formal target languages (spec S1 / S5): lean4, dafny, smtlib. */
 export const FORMAL_TARGETS = [
   'lean4',
   'dafny',
   'smtlib',
 ] as const;
-
+/** Union of the 3 formal target language string literals. */
 export type FormalTarget = (typeof FORMAL_TARGETS)[number];
-
+/** Type guard: whether a string is a valid FormalTarget.
+ * @param value String to test.
+ * @returns True if value is lean4, dafny, or smtlib. */
 export function isFormalTarget(value: string): value is FormalTarget {
   return (FORMAL_TARGETS as readonly string[]).includes(value);
 }
-
+/** Machine-checkable formalization of a math claim (spec S1).
+ * target is the formal language; source carries the expression text;
+ * formalizerId identifies which formalizer produced it. */
 export interface FormalExpression {
   /** Formal target language (spec §1). The language `source` is written in. */
   readonly target: FormalTarget;
@@ -193,7 +224,8 @@ export interface FormalExpression {
 // ============================================================
 // §6  MathClaim — structured math claim (spec §1)
 // ============================================================
-
+/** Structured math claim (spec S1). Contains the natural-language claim,
+ * its kind, formalization, required verification level, and linked verdict. */
 export interface MathClaim {
   readonly claimId: string;
   readonly naturalLanguage: string;
@@ -219,7 +251,8 @@ export interface MathClaim {
 // ============================================================
 // §7  MathVerificationRecord — one backend run on one claim — spec §1.1
 // ============================================================
-
+/** One backend verification run on one claim (spec S1.1).
+ * Contains the backend identity, outcome, input hash, and timing. */
 export interface MathVerificationRecord {
   readonly verificationId: string;
   readonly claimId: string;

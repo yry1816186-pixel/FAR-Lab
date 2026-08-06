@@ -47,33 +47,41 @@ import type { VenvSandboxAdapter } from './types.ts';
 import { runAntiTheaterLint } from '../anti_theater/index.ts';
 import type { AntiTheaterReport } from '../anti_theater/index.ts';
 import { buildAntiTheaterPipelineInput } from './anti_theater_input.ts';
-
+/** Seed-cherry audit claim identifier. */
 export const SEED_CHERRY_CLAIM_ID = 'C-CHERRY-0001';
+/** Seed-cherry primary metric key: transit depth significance. */
 export const SEED_CHERRY_METRIC_KEY = 'transit_depth_significance';
+/** Seed-cherry claim: TIC 268644982 shows a transit signal detected
+ * across 5 pre-registered seeds (cherry-picked adversarial submission). */
 export const SEED_CHERRY_PIPELINE_CLAIM =
   'TIC 268644982 shows a transit signal (period ~2.41d, depth ~0.8%) detected across 5 pre-registered seeds';
 
 // cherry-pick fixture：研究者预注册 5 个种子，实际只报告 3 个（隐去 seed 3,4 — 无 transit）。
 // detect_seed_cherry 从 declaredSeeds ⊄ ranSeeds 的差集 {3,4} 诚实 fire HIDDEN_FAILED_RUN。
+/** Primary seed for the seed-cherry fixture (seed 0 of 5 declared). */
 export const SEED_CHERRY_PRIMARY_SEED = 0;
+/** Researcher pre-registered 5 seeds (all declared, cherry-pick hides 3,4). */
 export const SEED_CHERRY_DECLARED_SEEDS: readonly number[] = [0, 1, 2, 3, 4];
+/** Researcher actually reported 3 seeds (cherry-picked: seeds 3,4 hidden). */
 export const SEED_CHERRY_REPORTED_SEEDS: readonly number[] = [0, 1, 2];
-
+/** Seed-cherry falsification spec: transit depth significance > 0. */
 export const SEED_CHERRY_FALSIFICATION_SPEC: FalsificationSpec = {
   prediction: SEED_CHERRY_PIPELINE_CLAIM,
   metric: SEED_CHERRY_METRIC_KEY,
   falsificationThreshold: 0,
   thresholdSemantics: 'gt',
 };
-
+/** Seed-cherry threshold spec: greater-than-zero semantics. */
 export const SEED_CHERRY_THRESHOLD_SPEC: ThresholdSpec = {
   semantics: 'gt',
   value: 0,
 };
-
+/** AntiTheaterLintInput neutral summary text for seed-cherry (no strength words,
+ * detect_report_mismatch does not trigger). */
 export const SEED_CHERRY_ANTI_THEATER_SUMMARY =
   'C-CHERRY BLS transit search result summary: pre-registered 5 seeds; see structured verdict for the audit conclusion.';
-
+/** Complete seed-cherry pipeline result: statistics, machine verdict,
+ * anti-theater report, and sealed proof. */
 export interface SeedCherryPipelineResult {
   readonly db: Database.Database;
   readonly claimId: string;
@@ -86,7 +94,8 @@ export interface SeedCherryPipelineResult {
   readonly sealed: SealResult;
   readonly sealedConclusion: Verdict;
 }
-
+/** Pre-constructed FEC inputs for the seed-cherry chain (decoupled from
+ * DB writes so tests can compare with/without antiTheaterReport). */
 export interface SeedCherryPreparedInputs {
   readonly fec: ReturnType<typeof makeRealStatsFec>;
   readonly statistics: ReturnType<typeof buildCAstroStatistics>;
@@ -179,7 +188,7 @@ export async function prepareSeedCherryChain(options: {
       blsPeriod: sandbox.metrics.period,
       blsDepth: sandbox.metrics.depth,
       blsDepthSNR: sandbox.metrics.depthSNR,
-      pValue: statistics.zTest.pValue,
+      pValue: statistics.tTest.pValue,
       adjustedPValue: statistics.adjustedPValue,
       artifactTreeHash: sandbox.result.artifactTreeHash,
     },

@@ -8,6 +8,15 @@ import type {
   VerdictResult,
 } from './types.ts';
 
+/**
+ * Decides a verdict from a claim and its evidence records using the legacy
+ * simple algorithm (scope-slip → DEGRADED_SCOPE, conflict → INCONCLUSIVE,
+ * all-support → CONFIRMED, all-refute → REFUTED, empty → UNTESTED).
+ *
+ * @param input - The claim text and evidence records.
+ * @returns A {@link VerdictDecision}.
+ * @throws {Error} if claim is empty or evidence state is unreachable.
+ */
 export function decideVerdict(input: {
   readonly claim: string;
   readonly evidences: ReadonlyArray<EvidenceRecord>;
@@ -73,6 +82,13 @@ export function decideVerdict(input: {
   );
 }
 
+/**
+ * Full verdict pipeline: validates the falsification spec via the gate,
+ * enriches evidence with threshold evaluation, then decides the verdict.
+ *
+ * @param input - Claim, evidences, falsification spec, and threshold spec.
+ * @returns A {@link VerdictResult} including the measured metric value.
+ */
 export function makeVerdict(input: {
   readonly claim: string;
   readonly evidences: ReadonlyArray<EvidenceRecord>;

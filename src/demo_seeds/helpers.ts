@@ -20,6 +20,9 @@ import { runMigrations } from '../../src/db/index.ts';
 
 // ---------- DB setup ----------
 
+/**
+ * open db.
+ */
 export function openDb(): Database.Database {
   const db = new Database(':memory:');
   runMigrations(db);
@@ -29,6 +32,9 @@ export function openDb(): Database.Database {
 
 // ---------- fixture LlmResponse ----------
 
+/**
+ * fixture response.
+ */
 export function fixtureResponse(content: string): LlmResponse {
   return {
     credential: {

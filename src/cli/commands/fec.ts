@@ -13,16 +13,19 @@ import type {
   FecContractV2,
 } from '../../fec/fec_contract.ts';
 
+/** Input parameters for operations involving fec compile options. */
 export interface FecCompileOptions {
   readonly claimPath: string;
   readonly outPath: string;
 }
 
+/** Input parameters for operations involving fec freeze options. */
 export interface FecFreezeOptions {
   readonly fecPath: string;
   readonly actorPath?: string;
 }
 
+/** Result/output structure for fec compile success output. */
 export interface FecCompileSuccessOutput {
   readonly ok: true;
   readonly plan: FalsificationPlan;
@@ -30,6 +33,7 @@ export interface FecCompileSuccessOutput {
   readonly fec: FecContractV2;
 }
 
+/** Result/output structure for fec compile failure output. */
 export interface FecCompileFailureOutput {
   readonly ok: false;
   readonly fecHash: string;
@@ -37,6 +41,7 @@ export interface FecCompileFailureOutput {
   readonly errors: readonly string[];
 }
 
+/** Type alias: fec compile output. */
 export type FecCompileOutput = FecCompileSuccessOutput | FecCompileFailureOutput;
 
 interface ParsedFecFile {
@@ -63,6 +68,9 @@ const FEC_CONTRACT_REQUIRED_KEYS = [
   'integrityFlags',
 ] as const;
 
+/**
+ * run fec compile.
+ */
 export function runFecCompile(options: FecCompileOptions): number {
   if (!existsSync(options.claimPath)) {
     process.stderr.write(`far fec compile: claim file not found: ${options.claimPath}\n`);
@@ -118,6 +126,9 @@ export function runFecCompile(options: FecCompileOptions): number {
   return 0;
 }
 
+/**
+ * run fec freeze.
+ */
 export function runFecFreeze(options: FecFreezeOptions): number {
   // G1(IC-02):freeze 为受保护动作;发起方=人类 CLI 显式命令
   const guard = protectedActionGuard('freeze', 'cli_user');

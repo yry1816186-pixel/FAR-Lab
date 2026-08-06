@@ -69,6 +69,7 @@ export const STAGE_ORDER = [
   'stage6_feedback',
 ] as const;
 
+/** Type alias: stage id. */
 export type StageId = (typeof STAGE_ORDER)[number] | 'stage0_dialogue';
 
 
@@ -128,6 +129,7 @@ export interface EvidenceRecord {
   readonly source: CitationAnchor;
 }
 
+/** Interface defining executable check. */
 export interface ExecutableCheck {
   readonly ref: string; // 引用的数据集/方法/排程 URL 或标识
   readonly exists: boolean; // HTTP HEAD/crossmatch 是否命中
@@ -158,6 +160,7 @@ export interface UnderstandingPayload {
   } | undefined;
 }
 
+/** Interface defining integration payload. */
 export interface IntegrationPayload {
   readonly kind: 'integration';
   readonly citations: readonly CitationAnchor[];
@@ -165,6 +168,7 @@ export interface IntegrationPayload {
   readonly gaps: readonly string[];
 }
 
+/** Interface defining hypothesis payload. */
 export interface HypothesisPayload {
   readonly kind: 'hypothesis';
   readonly claim: string;
@@ -173,12 +177,14 @@ export interface HypothesisPayload {
   readonly scopeSlipText: string; // scope-slip 降级声明（反 theater）
 }
 
+/** Interface defining evidence payload. */
 export interface EvidencePayload {
   readonly kind: 'evidence';
   readonly evidenceRecords: readonly EvidenceRecord[];
   readonly conflictingEvidenceCount: number;
 }
 
+/** Interface defining plan payload. */
 export interface PlanPayload {
   readonly kind: 'plan';
   readonly datasetChoices: readonly string[];
@@ -187,12 +193,14 @@ export interface PlanPayload {
   readonly executableChecks: readonly ExecutableCheck[];
 }
 
+/** Interface defining feedback payload. */
 export interface FeedbackPayload {
   readonly kind: 'feedback';
   readonly feedbackSignal: FeedbackSignal;
   readonly iterationSummary: string;
 }
 
+/** Type alias: structured payload. */
 export type StructuredPayload =
   | UnderstandingPayload
   | IntegrationPayload
@@ -328,6 +336,7 @@ export interface LoopState {
   readonly error: AgentLoopError | null;
 }
 
+/** Error type: agent loop error. */
 export interface AgentLoopError {
   readonly code:
     | 'FALSIFIABILITY_GATE_BLOCK'

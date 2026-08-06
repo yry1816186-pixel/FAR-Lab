@@ -21,7 +21,9 @@ import type { FormalTarget, MathClaim, MathVerificationRecord } from './math_cla
 // ============================================================
 // math_claims persistence
 // ============================================================
-
+/** Persist a MathClaim to the math_claims table.
+ * @param db SQLite database connection with the math schema migrated.
+ * @param claim The claim to insert. */
 export function persistMathClaim(db: Database.Database, claim: MathClaim): void {
   const formalizationJson = claim.formalization === null
     ? null
@@ -50,7 +52,10 @@ export function persistMathClaim(db: Database.Database, claim: MathClaim): void 
     claim.createdAt,
   );
 }
-
+/** Retrieve a MathClaim by its ID.
+ * @param db SQLite database connection.
+ * @param claimId The unique claim identifier.
+ * @returns The claim, or null if not found. */
 export function getMathClaim(db: Database.Database, claimId: string): MathClaim | null {
   const row = db
     .prepare(
@@ -112,7 +117,9 @@ function rowToMathClaim(row: MathClaimRow): MathClaim {
 // ============================================================
 // math_verifications persistence
 // ============================================================
-
+/** Persist a MathVerificationRecord to the math_verifications table.
+ * @param db SQLite database connection.
+ * @param record The verification result to insert. */
 export function persistVerification(db: Database.Database, record: MathVerificationRecord): void {
   db.prepare(
     `INSERT INTO math_verifications (
@@ -134,7 +141,10 @@ export function persistVerification(db: Database.Database, record: MathVerificat
     record.verifiedAt,
   );
 }
-
+/** Retrieve all verification records for a claim, ordered by verified_at ascending.
+ * @param db SQLite database connection.
+ * @param claimId The claim whose verifications to fetch.
+ * @returns Array of verification records (may be empty). */
 export function getVerificationsForClaim(db: Database.Database, claimId: string): readonly MathVerificationRecord[] {
   const rows = db
     .prepare(
@@ -183,7 +193,8 @@ function rowToVerification(row: MathVerificationRow): MathVerificationRecord {
 // ============================================================
 // evidence_log append (shared chain)
 // ============================================================
-
+/** Arguments for appending a verification result to the shared evidence_log.
+ * Requires a callRecordSeq FK linking to the LLM-gateway call flow. */
 export interface AppendVerificationEvidenceArgs {
   readonly db: Database.Database;
   readonly record: MathVerificationRecord;

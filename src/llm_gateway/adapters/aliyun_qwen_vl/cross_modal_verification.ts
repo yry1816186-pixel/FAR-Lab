@@ -51,6 +51,7 @@ export interface CrossModalVerifier {
   readonly threshold: number;
 }
 
+/** Input parameters for operations involving cross modal verify args. */
 export interface CrossModalVerifyArgs {
   readonly cardId: string;
   /** 文本模态的来源描述（evidence_id 或 caption） */
@@ -232,6 +233,7 @@ export function createCrossModalVerifier(config: CrossModalVerifierConfig = {}):
 
 // ===== VLM Recheck helpers =====
 
+/** Input parameters for operations involving vlm recheck args. */
 export interface VlmRecheckArgs {
   readonly originalCardId: string;
   readonly originalInterpretation: string;
@@ -239,6 +241,7 @@ export interface VlmRecheckArgs {
   readonly recheckCallRecordSeq: number;
 }
 
+/** Result/output structure for vlm recheck result. */
 export interface VlmRecheckResult {
   readonly consistent: boolean;
   readonly similarity: number;

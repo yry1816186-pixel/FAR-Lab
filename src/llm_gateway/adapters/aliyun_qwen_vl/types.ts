@@ -101,6 +101,7 @@ export interface VlmRecheckArtifact {
  */
 export const CROSS_MODAL_THRESHOLD = 0.6;
 
+/** Type alias: cross check failure code. */
 export type CrossCheckFailureCode = 'multimodal_cross_check_failed';
 
 /**
@@ -155,6 +156,7 @@ export const QWEN_VL_MODELS = [
   'qwen-vl-plus',
 ] as const;
 
+/** Type alias: qwen vl model id. */
 export type QwenVlModelId = (typeof QWEN_VL_MODELS)[number];
 
 /**

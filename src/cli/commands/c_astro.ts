@@ -35,6 +35,7 @@ import type { DatasetRef, DatasetResolution, DatasetResolutionStatus } from '../
 
 const DEFAULT_FIXTURE = join(PACKAGE_ROOT, 'tests', 'fixtures', 'science_harness', 'tic_sample.cache');
 
+/** Input parameters for operations involving c astro online options. */
 export interface CAstroOnlineOptions {
   readonly ticId?: string;
   readonly sector?: number;
@@ -43,6 +44,7 @@ export interface CAstroOnlineOptions {
   readonly json?: boolean;
 }
 
+/** Interface defining c astro online dump. */
 export interface CAstroOnlineDump {
   readonly status: 'resolved_online' | 'degraded_cached' | 'untested';
   readonly claimId: string;
@@ -186,6 +188,9 @@ export async function collectCAstroOnline(options: {
   }
 }
 
+/**
+ * run c astro.
+ */
 export async function runCAstro(options: CAstroOnlineOptions = {}): Promise<number> {
   const lightcurveFixture = options.lightcurvePath ?? DEFAULT_FIXTURE;
   const pythonCommand = options.pythonCmd ?? findPythonCommand();

@@ -32,6 +32,7 @@ import type {
   VerdictTracePersisted,
 } from './types.ts';
 
+/** Raw database row representation of a verdict node, before mapping to {@link VerdictNode}. */
 export interface VerdictNodeRow {
   readonly verdict_id: string;
   readonly evidence_id: string;
@@ -59,6 +60,16 @@ interface VerdictHeadRow {
   readonly current_hash: string;
 }
 
+/**
+ * Persists a verdict node to the database, computing its `currentHash` from all
+ * verdict-critical fields and linking it to the parent via `prevHash`. This is
+ * the sole entry point for writing verdicts — no other path may insert into
+ * `verdict_nodes`.
+ *
+ * @param db - The database handle.
+ * @param args - The verdict fields to persist.
+ * @returns The persisted {@link VerdictNode}.
+ */
 export function recordVerdict(db: Database.Database, args: RecordVerdictArgs): VerdictNode {
   const insert = db.transaction((): VerdictNode => {
     assertRecordVerdictArgs(args);
@@ -141,6 +152,13 @@ export function recordVerdict(db: Database.Database, args: RecordVerdictArgs): V
   return insert.immediate();
 }
 
+/**
+ * Retrieves a verdict node by its ID.
+ *
+ * @param db - The database handle.
+ * @param verdictId - The verdict node ID.
+ * @returns The {@link VerdictNode}, or null if not found.
+ */
 export function getVerdict(db: Database.Database, verdictId: string): VerdictNode | null {
   const row = db
     .prepare(
@@ -157,11 +175,13 @@ export function getVerdict(db: Database.Database, verdictId: string): VerdictNod
   return row === undefined ? null : rowToVerdictNode(row);
 }
 
+/** Arguments for superseding a verdict: the old verdict ID and the new verdict ID that replaces it. */
 export interface SupersedeVerdictArgs {
   readonly oldVerdictId: string;
   readonly newVerdictArgs: RecordVerdictArgs;
 }
 
+/** Result of superseding a verdict: the old node (now marked superseded) and the new active node. */
 export interface SupersedeVerdictResult {
   readonly oldVerdict: VerdictNode;
   readonly newVerdict: VerdictNode;
@@ -215,6 +235,13 @@ export function getActiveVerdicts(db: Database.Database): readonly VerdictNode[]
   return rows.map(rowToVerdictNode);
 }
 
+/**
+ * Maps a raw database row to a {@link VerdictNode}, reconstructing all
+ * verdict-critical fields including the structured trace.
+ *
+ * @param row - The raw database row.
+ * @returns The mapped `VerdictNode`.
+ */
 export function rowToVerdictNode(row: VerdictNodeRow): VerdictNode {
   const verdict = parseVerdict(row.verdict, row.verdict_id);
   const nodeKind = parseVerdictNodeKind(row.node_kind, row.verdict_id);

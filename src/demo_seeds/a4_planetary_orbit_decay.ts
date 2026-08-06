@@ -36,6 +36,7 @@ import { openDb, createSequentialGateway } from './helpers.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: A4_RAW_INPUT. */
 export const A4_RAW_INPUT = [
   'Why don\'t planetary orbits decay? In classical mechanics, two-body orbits are stable,',
   'but general relativity predicts orbital energy loss via gravitational wave emission.',
@@ -48,6 +49,7 @@ export const A4_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: A4_SOURCE_CARD. */
 export const A4_SOURCE_CARD: SourceCard = {
   // ⚠ DEMO FICTIONAL REFERENCE (NEEDS_HUMAN_OPERATION): the arXiv ID below was a synthetic
   // placeholder for this demo seed, NOT a real published paper. Hot-Jupiter orbital decay is a
@@ -248,6 +250,7 @@ const A4_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- DemoSeedResult（每个 seed 的统一产出契约）----------
 
+/** Result/output structure for demo seed result. */
 export interface DemoSeedResult {
   /** 原始输入文本 */
   readonly rawInput: string;

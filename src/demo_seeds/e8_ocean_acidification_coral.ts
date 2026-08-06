@@ -34,6 +34,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: E8_RAW_INPUT. */
 export const E8_RAW_INPUT = [
   'Ocean acidification coral calcification: Atmospheric CO2 rise has reduced surface ocean pH from 8.2 to',
   '8.1 (~30% increase in H+), projected to reach 7.7-7.8 by 2100 under RCP8.5. The claim is that this pH',
@@ -44,6 +45,7 @@ export const E8_RAW_INPUT = [
   'variation (some tolerant species) which does not negate the overall trend.',
 ].join(' ');
 
+/** Constant: E8_SOURCE_CARD. */
 export const E8_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-e8-cornwall-calcification-2021',
   url: 'https://doi.org/10.1038/s41586-021-04155-z',
@@ -113,6 +115,9 @@ const E8_FALSIFICATION_SPEC: FalsificationSpec = { prediction: 'Meta ≥200 stud
 const E8_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 0.3 };
 const E8_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'e8'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2026-06-27T00:00:00.000Z', rawResponseHash: 'e8'.repeat(32) };
 
+/**
+ * run e8 seed.
+ */
 export async function runE8Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [JSON.stringify(makeUnderstandingPayload()), JSON.stringify(makeIntegrationPayload()), JSON.stringify(makeHypothesisPayload()), JSON.stringify(makeEvidencePayload()), JSON.stringify(makePlanPayload()), JSON.stringify(makeFeedbackPayloadConverge())];

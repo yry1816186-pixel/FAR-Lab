@@ -17,6 +17,7 @@ import type { TraceGrade, TraceFailureCode } from './agent_run_event.ts';
 
 // ---------- 评分输入 ----------
 
+/** Input parameters for operations involving grade input. */
 export interface GradeInput {
   readonly traceGradeId: string;
   readonly runId: string;

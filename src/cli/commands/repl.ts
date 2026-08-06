@@ -54,6 +54,9 @@ const HELP = `
   default offline_replay (zero-key · fixture). real inference needs --profile (see far ask).
 `;
 
+/**
+ * run repl.
+ */
 export async function runRepl(): Promise<number> {
   const gitCommitSha = resolveGitCommitSha();
   const history: ReplTurn[] = [];

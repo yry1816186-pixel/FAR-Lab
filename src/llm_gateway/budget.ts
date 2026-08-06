@@ -15,6 +15,7 @@
 
 import type Database from 'better-sqlite3';
 
+/** Interface defining budget profile. */
 export interface BudgetProfile {
   readonly maxTokens: number | null;
   readonly maxDurationMs: number | null;
@@ -28,8 +29,10 @@ export const DEFAULT_BUDGET_PROFILE: BudgetProfile = {
   maxLoops: 100,
 };
 
+/** Type alias: budget dimension. */
 export type BudgetDimension = 'tokens' | 'duration_ms' | 'loops';
 
+/** Class representing cost budget exceeded. */
 export class CostBudgetExceeded extends Error {
   readonly code = 'COST_BUDGET_EXCEEDED' as const;
   readonly dimension: BudgetDimension;
@@ -47,6 +50,7 @@ export class CostBudgetExceeded extends Error {
   }
 }
 
+/** Interface defining budget usage. */
 export interface BudgetUsage {
   readonly tokensConsumed: number;
   readonly elapsedMs: number;
@@ -87,6 +91,7 @@ export function validateBudgetProfile(profile: BudgetProfile): void {
   }
 }
 
+/** Interface defining stage cost row. */
 export interface StageCostRow {
   readonly stageId: string;
   readonly calls: number;

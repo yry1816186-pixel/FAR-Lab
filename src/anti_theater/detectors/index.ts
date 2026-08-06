@@ -26,6 +26,7 @@ import { detect_optional_stopping } from './optional_stopping.ts';
 import { detect_overfit } from './overfit.ts';
 import { detect_phack_alpha } from './phack_alpha.ts';
 import { detect_phack_correction } from './phack_correction.ts';
+import { detect_phack_pcurve } from './phack_pcurve.ts';
 import { detect_posthoc_threshold } from './posthoc_threshold.ts';
 import { detect_provenance_unbound } from './provenance_unbound.ts';
 import { detect_report_mismatch } from './report_mismatch.ts';
@@ -66,6 +67,7 @@ export const DETECTORS: readonly AntiTheaterDetector[] = [
   detect_overfit, // AT-OVERFIT（ROADMAP）
   detect_fake_degraded, // AT-FAKE-DEGRADED
   detect_provenance_unbound, // AT-PROVENANCE-UNBOUND（T-003 修复·2026-07-24）
+  detect_phack_pcurve, // AT-PHACK-PCURVE（p-curve skewness·2026-08-06·填补 p-hacking 分布检测空白）
 ];
 
 // re-export 单个 detector（测试/调试用）

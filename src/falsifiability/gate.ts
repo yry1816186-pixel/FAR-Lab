@@ -4,12 +4,26 @@ import type {
   ThresholdSpec,
 } from './types.ts';
 
+/**
+ * Input to {@link falsifiabilityGate}: the hypothesis text plus the
+ * falsification specification and (for range semantics) a structured threshold.
+ */
 export interface FalsifiabilityGateInput {
   readonly hypothesis: string;
   readonly falsificationSpec: FalsificationSpec;
   readonly thresholdSpec?: ThresholdSpec;
 }
 
+/**
+ * Validates that a hypothesis plus its falsification specification are
+ * well-formed before they enter the verdict pipeline. Rejects empty
+ * hypotheses/predictions/metrics, non-finite thresholds, and incomplete range
+ * threshold specs. Returns the spec unchanged on success (passthrough gate).
+ *
+ * @param input - The hypothesis and falsification spec to validate.
+ * @returns The validated `FalsificationSpec` (unchanged).
+ * @throws {FalsifiabilityGateError} if any field is empty, non-finite, or inconsistent.
+ */
 export function falsifiabilityGate(input: FalsifiabilityGateInput): FalsificationSpec {
   const { prediction, metric, falsificationThreshold, thresholdSemantics } = input.falsificationSpec;
 

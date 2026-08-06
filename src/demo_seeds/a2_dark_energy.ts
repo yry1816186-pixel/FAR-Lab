@@ -35,6 +35,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: A2_RAW_INPUT. */
 export const A2_RAW_INPUT = [
   'The accelerating expansion of the Universe was discovered in 1998 (Riess et al., Perlmutter et al.)',
   'via Type Ia supernovae, earning the 2011 Nobel Prize. The simplest explanation is a Cosmological',
@@ -46,6 +47,7 @@ export const A2_RAW_INPUT = [
   'energy a cosmological constant (w = -1 precisely) or a dynamical field with w ≠ -1?',
 ].join(' ');
 
+/** Constant: A2_SOURCE_CARD. */
 export const A2_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-a2-planck-2018',
   url: 'https://doi.org/10.1051/0004-6361/201833910',
@@ -119,6 +121,9 @@ const A2_FALSIFICATION_SPEC: FalsificationSpec = { prediction: 'w=-1.0±0.05 acr
 const A2_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 0.85 };
 const A2_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'a2'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2026-06-27T00:00:00.000Z', rawResponseHash: 'a2'.repeat(32) };
 
+/**
+ * run a2 seed.
+ */
 export async function runA2Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [JSON.stringify(makeUnderstandingPayload()), JSON.stringify(makeIntegrationPayload()), JSON.stringify(makeHypothesisPayload()), JSON.stringify(makeEvidencePayload()), JSON.stringify(makePlanPayload()), JSON.stringify(makeFeedbackPayloadConverge())];

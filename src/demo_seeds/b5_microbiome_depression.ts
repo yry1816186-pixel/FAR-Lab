@@ -35,6 +35,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: B5_RAW_INPUT. */
 export const B5_RAW_INPUT = [
   'Microbiome-gut-brain axis in depression: The gut microbiome influences brain function via vagus nerve,',
   'short-chain fatty acids (SCFA), tryptophan/serotonin metabolism, and immune signaling. Fecal microbiota',
@@ -45,6 +46,7 @@ export const B5_RAW_INPUT = [
   '(donor variability, engraftment rates).',
 ].join(' ');
 
+/** Constant: B5_SOURCE_CARD. */
 export const B5_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-b5-valles-colomer-2019',
   url: 'https://doi.org/10.1038/s41564-018-0337-x',
@@ -115,6 +117,9 @@ const B5_FALSIFICATION_SPEC: FalsificationSpec = { prediction: '≥3 independent
 const B5_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 0.5 };
 const B5_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'b5'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2026-06-27T00:00:00.000Z', rawResponseHash: 'b5'.repeat(32) };
 
+/**
+ * run b5 seed.
+ */
 export async function runB5Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [JSON.stringify(makeUnderstandingPayload()), JSON.stringify(makeIntegrationPayload()), JSON.stringify(makeHypothesisPayload()), JSON.stringify(makeEvidencePayload()), JSON.stringify(makePlanPayload()), JSON.stringify(makeFeedbackPayloadConverge())];

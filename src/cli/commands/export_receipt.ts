@@ -16,10 +16,14 @@ import {
   type VerifyStatus,
 } from './verify.ts';
 
+/** Type alias: receipt format. */
 export type ReceiptFormat = 'json' | 'markdown';
+/** Type alias: receipt source kind. */
 export type ReceiptSourceKind = 'proofEnvelopeV2' | 'farProofBundleV1';
+/** Type alias: receipt tamper status. */
 export type ReceiptTamperStatus = 'clean' | 'tampered' | 'unknown';
 
+/** Interface defining trust receipt summary. */
 export interface TrustReceiptSummary {
   readonly claimSummary: string;
   readonly verdict: Verdict;
@@ -31,6 +35,7 @@ export interface TrustReceiptSummary {
   readonly requiredNextAction?: string;
 }
 
+/** Interface defining trust receipt. */
 export interface TrustReceipt {
   readonly schemaVersion: 'far.trust_receipt.v1';
   readonly generatedAt: string;
@@ -48,6 +53,7 @@ export interface TrustReceipt {
   };
 }
 
+/** Input parameters for operations involving export receipt options. */
 export interface ExportReceiptOptions {
   readonly bundlePath?: string;
   readonly envelopePath?: string;
@@ -65,6 +71,9 @@ interface BundleEnvelopeProjection {
   readonly knownFailures: readonly string[];
 }
 
+/**
+ * run export receipt.
+ */
 export function runExportReceipt(options: ExportReceiptOptions): number {
   const sourceCount = Number(options.bundlePath !== undefined) + Number(options.envelopePath !== undefined);
   if (sourceCount !== 1) {
@@ -94,6 +103,9 @@ export function runExportReceipt(options: ExportReceiptOptions): number {
   return 0;
 }
 
+/**
+ * build trust receipt from envelope.
+ */
 export function buildTrustReceiptFromEnvelope(
   envelope: ProofEnvelopeV2,
   sourcePath: string,
@@ -145,6 +157,9 @@ export function buildTrustReceiptFromEnvelope(
   };
 }
 
+/**
+ * build trust receipt from bundle.
+ */
 export function buildTrustReceiptFromBundle(
   bundlePath: string,
   generatedAt: string,
@@ -197,6 +212,9 @@ export function buildTrustReceiptFromBundle(
   };
 }
 
+/**
+ * render receipt markdown.
+ */
 export function renderReceiptMarkdown(receipt: TrustReceipt): string {
   const lines = [
     '# FAR-Lab Trust Receipt',

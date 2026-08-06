@@ -29,6 +29,7 @@ import type { AntiTheaterReport } from '../../anti_theater/types.ts';
 
 /** schema 版本（决定 verifier 路径·V2 固定字面量）。 */
 export const PROOF_ENVELOPE_V2_SCHEMA = 'far.proof_envelope.v2' as const;
+/** Type alias: proof envelope v2 schema version. */
 export type ProofEnvelopeV2SchemaVersion = typeof PROOF_ENVELOPE_V2_SCHEMA;
 
 /** CheckOutcome（与 V1 types.ts 一致·9+1 rules 共用）。 */
@@ -47,6 +48,7 @@ export const PROOF_VALIDATOR_RULES_V2 = [
   'RULE-PE-009',
   'RULE-PE-010',
 ] as const;
+/** Type alias: proof validator rule v2. */
 export type ProofValidatorRuleV2 = (typeof PROOF_VALIDATOR_RULES_V2)[number];
 
 // ===== 子类型（§2.1 完整证据嵌入·APPENDIX_A §8）=====
@@ -180,8 +182,10 @@ export const DIFF_REPORT_CODES = [
   'LEDGER_ROOT_MISMATCH',
   'UNSUPPORTED_SCHEMA_VERSION',
 ] as const;
+/** Type alias: diff report code. */
 export type DiffReportCode = (typeof DIFF_REPORT_CODES)[number];
 
+/** Interface defining diff report entry. */
 export interface DiffReportEntry {
   readonly code: DiffReportCode;
   readonly field: string;

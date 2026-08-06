@@ -59,6 +59,7 @@ import {
   assertPrimaryEvidenceProvenanceBound,
 } from '../falsifiability/evidence_provenance.ts';
 
+/** Input parameters for operations involving fec append claim args. */
 export interface FecAppendClaimArgs {
   readonly callRecord: AppendRecordInput;
   readonly callAudit: CallAuditData;
@@ -111,6 +112,7 @@ export interface FecAppendClaimArgs {
   readonly antiTheaterReport?: AntiTheaterReport;
 }
 
+/** fecAppendClaim 返回（callRecord + evidence + decision + kernelOutput + verdictNode + fecGate + casReferences）。 */
 export interface FecAppendClaimResult {
   readonly callRecord: HashedRecord;
   readonly evidence: EvidenceLogEntry;
@@ -128,11 +130,24 @@ export interface FecAppendClaimResult {
   readonly casReferences: CasReferences;
 }
 
+/** FEC Plan + kernel trace 在 CAS 的内容寻址 hash（反剧场「artifact hash 即承诺」·FUSION-OS-9）。 */
 export interface CasReferences {
   readonly fecPlanHash: string | null;
   readonly kernelTraceHash: string;
 }
 
+/**
+ * 编排单条 claim 的 FEC 裁决全流程（IMMEDIATE 事务）。
+ *
+ * 顺序：appendRecord → appendEvidenceLog → registerContract(V1) → compileFec → enforceFecMandatoryGate →
+ * assertFecGate(LLM_FROZEN 阻断) → assertPrimaryEvidenceProvenanceBound → decideFiveValueVerdict →
+ * storeVerdictArtifactsInCas → recordVerdict。
+ *
+ * @param db SQLite 数据库连接（IMMEDIATE 事务级别·原子化链写）
+ * @param args 完整裁决参数（FecAppendClaimArgs）
+ * @returns FecAppendClaimResult（callRecord + evidence + decision + kernelOutput + verdictNode + fecGate + casReferences）
+ * @throws FEC 编译 HARD_FAIL 或 LLM_FROZEN 时抛 Error（事务回滚）
+ */
 export function fecAppendClaim(
   db: Database.Database,
   args: FecAppendClaimArgs,

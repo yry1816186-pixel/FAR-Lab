@@ -1,6 +1,7 @@
 // spec 38 · Math verification layer errors.
 // Mirrors the falsifiability error pattern (src/falsifiability/errors.ts).
-
+/** Base error for the math verification layer. All math-specific errors
+ * extend this class. */
 export class MathVerificationError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);

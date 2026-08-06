@@ -11,7 +11,8 @@ import type { FecContractV2 } from '../fec/fec_contract.ts';
 import type { VerdictKernelOutput } from '../falsifiability/index.ts';
 import type { AntiTheaterLintInput } from '../anti_theater/types.ts';
 import { hashCanonicalJson } from '../evidence_log/hasher.ts';
-
+/** Arguments for building a unified AntiTheaterLintInput from pipeline
+ * constants (shared by hero_a, c_astro, seed_cherry pipelines). */
 export interface AntiTheaterPipelineInputArgs {
   readonly fec: FecContractV2;
   readonly preliminaryVerdict: VerdictKernelOutput;
@@ -27,7 +28,10 @@ export interface AntiTheaterPipelineInputArgs {
   readonly declaredSeeds: readonly number[];
   readonly runRegistrySeeds: readonly number[];
 }
-
+/** Construct a unified AntiTheaterLintInput from pipeline-specific constants.
+ * Enforces anti-theater red lines: declaredSeeds and runRegistrySeeds are REQUIRED.
+ * @param args Pipeline constants and metadata.
+ * @returns A fully-populated AntiTheaterLintInput. */
 export function buildAntiTheaterPipelineInput(args: AntiTheaterPipelineInputArgs): AntiTheaterLintInput {
   const artifactRef = `sha256:${args.artifactHash}`;
   const baseRunId = `${args.runIdPrefix}${args.primarySeed}`;

@@ -16,6 +16,7 @@
 import type Database from 'better-sqlite3';
 import { canonicalJson, hashCanonicalJson } from '../evidence_log/hasher.ts';
 
+/** Interface defining far blob row. */
 export interface FarBlobRow {
   readonly hash: string;
   readonly content: string;

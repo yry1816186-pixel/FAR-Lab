@@ -25,7 +25,8 @@ import type {
   MathClaimKind,
 } from './math_claim.ts';
 import { isNumericalKind, isSymbolicKind } from './math_claim.ts';
-
+/** Input for the autoformalizer: a natural-language math claim plus metadata
+ * describing which backends must verify the resulting formal expression. */
 export interface AutoformalizeInput {
   readonly naturalLanguage: string;
   readonly claimKind: MathClaimKind;
@@ -35,7 +36,8 @@ export interface AutoformalizeInput {
   /** Non-empty list of backends that must verify this formalization. */
   readonly mustBeVerifiedBy: readonly BackendKind[];
 }
-
+/** Contract for converting natural-language math claims into
+ * machine-checkable FormalExpression objects. */
 export interface Autoformalizer {
   readonly formalizerId: string;
   readonly isModelNeutralCore: boolean;

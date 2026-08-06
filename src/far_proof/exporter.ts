@@ -35,6 +35,7 @@ import type { VerifyResult } from '../evidence_log/types.ts';
 import { computeFarProofIntegrity, FAR_PROOF_INTEGRITY_FILE } from './offline_package.ts';
 import { CURRENT_RULESET_URI, SUPPORTED_RULESET_URIS } from '../proof_envelope/ruleset_version.ts';
 
+/** Input parameters for operations involving far proof export input. */
 export interface FarProofExportInput {
   readonly db: Database.Database;
   readonly outputDir: string;
@@ -64,6 +65,7 @@ function redactRequestId(requestId: string | null): string | null {
   return createHash('sha256').update(`far-redact:${requestId}`, 'utf8').digest('hex').slice(0, 16);
 }
 
+/** Result/output structure for far proof export result. */
 export interface FarProofExportResult {
   readonly outputDir: string;
   readonly filesWritten: readonly string[];

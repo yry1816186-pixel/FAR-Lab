@@ -31,7 +31,8 @@ import { CoreNeutralAutoformalizer, backendToFormalTarget } from './autoformaliz
 // ============================================================
 // §1  Constructor options
 // ============================================================
-
+/** Options for constructing a CompetitionMathAutoformalizer.
+ * The competition model snapshot MUST be injected by the caller (red-line #2). */
 export interface CompetitionMathAdapterOptions {
   /** Injected competition model snapshot (e.g. 'qwen3.7-max-2026-05-20').
    * MUST be injected by the caller — never hard-coded (CLAUDE.md red-line #2). */
@@ -74,7 +75,9 @@ const SYSTEM_PROMPT = [
 // ============================================================
 // §3  CompetitionMathAutoformalizer
 // ============================================================
-
+/** Model-backed autoformalizer using a competition Qwen-Math profile.
+ * Wraps the core-neutral rule-based formalizer, falling back on any
+ * gateway or parsing failure (honest degradation). */
 export class CompetitionMathAutoformalizer implements Autoformalizer {
   readonly formalizerId: string;
   readonly isModelNeutralCore = false;
@@ -182,7 +185,10 @@ export class CompetitionMathAutoformalizer implements Autoformalizer {
 // ============================================================
 // §4  Factory
 // ============================================================
-
+/** Factory: create a competition math autoformalizer.
+ * @param options Configuration including the competition model snapshot.
+ * @returns A new CompetitionMathAutoformalizer instance.
+ * @throws Error if competitionModelSnapshot is empty. */
 export function createCompetitionMathAutoformalizer(
   options: CompetitionMathAdapterOptions,
 ): CompetitionMathAutoformalizer {

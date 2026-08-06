@@ -21,8 +21,10 @@ import stableStringify from 'fast-json-stable-stringify';
 import { assertAgentWriteAllowed } from './guards.ts';
 import type { StageArtifact } from './types.ts';
 
+/** Constant: RECEIPT_GENESIS_HASH. */
 export const RECEIPT_GENESIS_HASH = '0'.repeat(64);
 
+/** Interface defining stage receipt. */
 export interface StageReceipt {
   readonly seq: number;
   readonly iteration: number;
@@ -57,6 +59,9 @@ function canonical(value: unknown): string {
   return s;
 }
 
+/**
+ * hash research input.
+ */
 export function hashResearchInput(researchInput: string): string {
   return sha256Hex(canonical(researchInput));
 }
@@ -65,6 +70,7 @@ function computeReceiptHash(core: Omit<StageReceipt, 'receiptHash'>): string {
   return sha256Hex(canonical(core));
 }
 
+/** Class representing stage receipt forged error. */
 export class StageReceiptForgedError extends Error {
   readonly code = 'STAGE_RECEIPT_FORGED' as const;
   constructor(detail: string) {

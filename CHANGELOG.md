@@ -78,3 +78,90 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
   user-space hardening.
 - `NEEDS_RELEASE_PUBLICATION`: the package is build-ready and `npm install -g` works from a tarball,
   but is not yet published to the npm registry; the GitHub Release is pending.
+
+## [Unreleased] — 2026-08-05 session
+
+### Fixed
+
+- **Windows CI test failure**: `demo_chain_replay.test.ts:415` verify.sh MSYS path issue.
+  Root cause: git-bash `sh` reports MSYS-style paths (`/c/tmp/...`) but Windows Node.js
+  needs native paths (`C:\tmp\...`). Fix: `cygpath -w` conversion in verify.sh + defensive
+  `normalizeBundleDir()` in the Node heredoc. (`src/far_proof/offline_package.ts`)
+- **5 high-severity CVEs**: brace-expansion (DoS), find-my-way (HTTP2 DDoS), fast-uri
+  (host confusion). Fixed via `pnpm.overrides` — all were DoS-class transitive deps,
+  none touched the trust kernel. `pnpm audit` now reports zero vulnerabilities.
+
+### Added
+
+- **Hero Demo page** (`/hero` route): 60-second interactive tamper-detection experience
+  for competition judges. Browser-side SHA-256 hash chain, one-click tamper interaction,
+  visual hash diff. (`frontend/src/pages/HeroDemoPage.tsx`)
+- **Judge Quick-Start guide** (`docs/JUDGE_QUICKSTART.md`): 5-minute verification path
+  for competition judges — 60-second demo, 2-minute tamper hero, 5-minute kernel deep dive.
+- **Real-world science integrity cases** (`docs/REAL_WORLD_CASES.md`): maps famous
+  reproducibility failures (Bem 2011, OSC 2015, LK-99, Theranos) to FAR-Lab's 22
+  anti-theater detectors.
+- **API reference** (`docs/API_REFERENCE.md`): all 16 REST endpoints documented with
+  request/response shapes and error format.
+- **Repository navigation guide** (`DOCS_INDEX.md`): organizes 25 root-level documents
+  into clear reading paths for different audiences.
+
+### Changed
+
+- Phase 1 Foundation Hardening: EXIT GATE PASSED (6/6 criteria).
+- Phase 2 Architecture Excellence: Fitness Functions 17/17 PASS, ADRs 24/24.
+
+## [1.1.0] — 2026-08-05 · Ecosystem-borrowed upgrade (9 batches)
+
+Learned from 5 world-class open-source projects (opencode / pi / zeroclaw / hermes-agent /
+scientific-agent-skills) and implemented 9 borrowing batches. All gates green: typecheck 0 /
+lint 0 / 1581 tests (1574 pass, 0 fail) / far demo exit 0.
+
+### Added — supply-chain hardening (borrowed from pi)
+- .npmrc save-exact=true; package.json dependencies + pnpm.overrides exact-pinned.
+- scripts/check-supply-chain.mjs gate (exact pins + lockfile specifier consistency) wired into
+  ci.yml blocking_gates; new weekly .github/workflows/security-audit.yml (pnpm audit --prod +
+  audit signatures).
+
+### Added — statistical trap taxonomy (borrowed from scientific-agent-skills)
+- src/anti_theater/trap_taxonomy.ts: 21-entry taxonomy (category/name/what/cures/realCase) for
+  every anti-theater attack kind + summarizeTraps aggregation.
+- Report layer: optional Statistical Trap Audit section rendering triggered trap categories
+  (zero regression when absent).
+
+### Added — evidence FTS5 search (borrowed from hermes-agent)
+- src/evidence_log/search.ts: nsureFtsIndex / eindexEvidenceFts / searchEvidence /
+  scapeFtsQuery. Search auxiliary layer — never enters the hash chain.
+
+### Added — evidence quality grading (borrowed from scientific-agent-skills GRADE/Cochrane RoB)
+- src/evidence_quality/: gradeEvidenceTier (RCT→1 … expert/unspecified→4) + Cochrane RoB 7-domain
+  assessment + gradeEvidenceQuality. Transparency layer only: VerdictKernelOutput gains optional
+  videnceQualityTier/videnceQualityNote; verdict logic and proofHash unchanged (zero regression).
+
+### Added — evidence context compaction (borrowed from opencode session compact)
+- src/agent_loop/compaction.ts: deterministic artifact compression (stage3/4 verdict-critical
+  payloads preserved verbatim; narrative fields clipped with hash anchors).
+- unAgentLoop optional compactArtifacts flag (default off → byte-identical).
+
+### Added — CLI state revert (borrowed from opencode revert/unrevert)
+- state_machine gains 3 revert edges (STATISTICS→EVIDENCE_GATHERED, VERDICT→STATISTICS,
+  PROOF_SEALED→VERDICT); seal is a commit point — no revert after it (fail-closed).
+
+### Added — scheduled re-verification (borrowed from hermes-agent cron)
+- ar schedule add|list|remove|run: JSON-persisted re-verification jobs with due-date logic and
+  auditable exec runs (schedules.json under $FAR_HOME or ~/.far).
+
+### Added — runtime JSONL session recording (borrowed from pi JSONL session format)
+- src/trace/session_recorder.ts: SessionRecorder / eplaySession / serializeEvent.
+- unAgentLoop optional sessionPath: records run_started / stage_completed ×N / run_completed.
+
+### Added — math backend fallback chains (borrowed from zeroclaw provider fallback)
+- MathVerifier fallback chains (default: SMT→CAS, Lean4→Dafny; overridable, 
+ull disables):
+  unavailable/throwing/honestly-degraded primary backend falls back to alternatives with
+  allback_from:<kind> annotation. Primary conclusion is never overridden.
+
+### Verified
+- Baseline 1517 tests → 1581 (57 new tests across all batches); zero regressions.
+- All borrowed features are optional flags / optional fields / transparency layers — no
+  verdict-kernel or proofHash behavior change without explicit opt-in.

@@ -50,6 +50,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: D9_RAW_INPUT. */
 export const D9_RAW_INPUT = [
   'Dark matter direct detection: The WIMP (Weakly Interacting Massive Particle) hypothesis predicts',
   'that dark matter particles scatter elastically off xenon nuclei in multi-tonne liquid xenon time',
@@ -62,6 +63,7 @@ export const D9_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: D9_SOURCE_CARD. */
 export const D9_SOURCE_CARD: SourceCard = {
   // 真实已发表文献（非 fictional 占位）·XENON Collaboration 2023 PRL
   sourceId: 'sc-d9-xenonnt-2023',

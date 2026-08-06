@@ -58,7 +58,7 @@ test('CI gate 1 · anti-theater attack corpus: each golden vector triggers its t
   }
 });
 
-test('CI gate 1 · corpus 覆盖全部 20 attackId（无 detector 漏覆盖）', () => {
+test('CI gate 1 · corpus 覆盖全部 21 attackId（无 detector 漏覆盖）', () => {
   const coveredAttackIds = new Set(ALL_GOLDEN_VECTORS.map((gv) => gv.attackId));
   const allAttackIds = new Set(Object.keys(ATTACK_ID_TO_KIND));
   const missing = [...allAttackIds].filter((id) => !coveredAttackIds.has(id));

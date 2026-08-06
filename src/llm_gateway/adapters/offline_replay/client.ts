@@ -1,6 +1,7 @@
 import type { LlmRequest, LlmResponse, ProviderAdapter } from '../../types.ts';
 import { DEFAULT_DEMO_FIXTURES } from '../../../agent_loop/demo_fixtures.ts';
 
+/** Input parameters for operations involving offline replay options. */
 export interface OfflineReplayOptions {
   readonly modelId?: string;
   readonly modelVersion?: string | null;
@@ -79,6 +80,9 @@ function resolveFixtureContent(request: LlmRequest, options: OfflineReplayOption
   );
 }
 
+/**
+ * create offline replay adapter.
+ */
 export function createOfflineReplayAdapter(options: OfflineReplayOptions = {}): ProviderAdapter {
   const modelId = options.modelId ?? 'offline-replay-fixture';
   const modelVersion = options.modelVersion ?? null;

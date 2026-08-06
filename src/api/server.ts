@@ -133,6 +133,14 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerArenaRoute(v1);
   }, { prefix: '/api/v1' });
 
+  // V2 API routes — six-dimension receipt verification + persistence.
+  await app.register(async (v2) => {
+    const { registerV2ReceiptRoutes } = await import('./routes/v2_receipts.ts');
+    await registerV2ReceiptRoutes(v2);
+    const { registerV2ReceiptPersistRoutes } = await import('./routes/v2_receipts_persist.ts');
+    await registerV2ReceiptPersistRoutes(v2, config.db);
+  }, { prefix: '/api/v2' });
+
   return app;
 }
 

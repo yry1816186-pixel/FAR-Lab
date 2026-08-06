@@ -55,6 +55,7 @@ import type {
 } from './types.ts';
 import type { EvidenceRecord } from './types.ts';
 
+/** Input parameters for operations involving run verdict stage args. */
 export interface RunVerdictStageArgs {
   readonly db: Database;
   readonly artifacts: readonly StageArtifact[];

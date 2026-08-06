@@ -6,6 +6,7 @@ export const zh = {
   // ---- AppShell / nav (labels stay English in both locales — App.test asserts /Overview/ etc.) ----
   'nav.brand': 'far-chain',
   'nav.overview': 'Overview',
+  'nav.hero': '惊艳演示',
   'nav.demo': 'Demo',
   'nav.viz': 'Evidence Chain',
   'nav.integrity': 'Integrity',
@@ -17,6 +18,8 @@ export const zh = {
   'nav.report': 'Report',
   'nav.about': 'About',
   'nav.versions': '版本比较',
+  'nav.wizard': '验证向导',
+  'nav.v2receipt': 'V2收据验证',
   'nav.aria': 'Main navigation',
   'nav.themeToLight': 'Switch to light theme',
   'nav.themeToDark': 'Switch to dark theme',

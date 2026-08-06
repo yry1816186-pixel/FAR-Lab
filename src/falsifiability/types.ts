@@ -12,9 +12,18 @@ import type {
   VerdictRuleTrace,
 } from './verdict_kernel_v2.ts';
 
-// DEBT-12 单源化：派生自 schema/enums.ts THRESHOLD_SEMANTICS（3 值·与 fec_contract/contracts 同源）。
+/**
+ * How a falsification threshold should be interpreted (single value, range,
+ * or less-than). Single-sourced from `schema/enums.ts THRESHOLD_SEMANTICS`
+ * (DEBT-12) to keep FEC contracts and falsifiability specs aligned.
+ */
 export type ThresholdSemantics = ThresholdSemantic;
 
+/**
+ * A falsifiable scientific prediction: the claim text, the metric to measure,
+ * the threshold value that would falsify it, and how that threshold is
+ * interpreted. This is the input the verdict kernel evaluates.
+ */
 export interface FalsificationSpec {
   readonly prediction: string;
   readonly metric: string;
@@ -22,6 +31,11 @@ export interface FalsificationSpec {
   readonly thresholdSemantics: ThresholdSemantics;
 }
 
+/**
+ * A structured threshold specification supporting three semantics: a single
+ * point value, a lower/upper range, or a range-less semantic. Only the fields
+ * relevant to the chosen `semantics` need to be populated.
+ */
 export interface ThresholdSpec {
   readonly semantics: ThresholdSemantics;
   readonly value?: number;
@@ -29,6 +43,11 @@ export interface ThresholdSpec {
   readonly upper?: number;
 }
 
+/**
+ * A single piece of evidence evaluated against a claim. Records whether the
+ * metric value supports, refutes, or only partially covers the claim's scope,
+ * along with the provenance anchor that binds it to a verifiable source.
+ */
 export interface EvidenceRecord {
   readonly claim: string;
   readonly metricValue?: number;
@@ -57,6 +76,11 @@ export interface EvidenceRecord {
   readonly executionProvenanceHash?: string;
 }
 
+/**
+ * The verdict kernel's decision on a claim: the canonical verdict label plus
+ * mandatory context for non-COMPLETE verdicts (scope-slip text, untested
+ * reason) and the count of conflicting evidence pieces encountered.
+ */
 export interface VerdictDecision {
   readonly verdict: Verdict;
   readonly scopeSlipText: string | null;
@@ -64,6 +88,11 @@ export interface VerdictDecision {
   readonly conflictingEvidenceCount: number;
 }
 
+/**
+ * Extends {@link VerdictDecision} with the measured metric value (or null when
+ * the metric was not computed). This is the top-level verdict result consumed
+ * by the persistence layer and API.
+ */
 export interface VerdictResult extends VerdictDecision {
   readonly metricValue: number | null;
 }
@@ -85,6 +114,12 @@ export interface VerdictTracePersisted {
   readonly evidenceSufficiency: EvidenceSufficiencyReport;
 }
 
+/**
+ * A persisted verdict node in the claim-verdict hash chain. Immutable once
+ * written: the `currentHash` binds all verdict-critical fields and links to
+ * `parentVerdictId` via `prevHash`, so any tampering breaks the chain and is
+ * detected by {@link verifyVerdictNodes}.
+ */
 export interface VerdictNode {
   readonly verdictId: string;
   readonly evidenceId: string;
@@ -111,6 +146,11 @@ export interface VerdictNode {
   readonly updatedAt: string;
 }
 
+/**
+ * Arguments for {@link recordVerdict} — the sole entry point for persisting a
+ * verdict node. All verdict-critical fields must be supplied so the resulting
+ * hash-chain node is complete and tamper-detectable.
+ */
 export interface RecordVerdictArgs {
   readonly evidenceId: string;
   readonly parentVerdictId: string | null;

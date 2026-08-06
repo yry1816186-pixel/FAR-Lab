@@ -9,11 +9,13 @@
  */
 
 export const PROTECTED_ACTIONS = ['freeze', 'approve', 'seal', 'export', 'migrate', 'delete'] as const;
+/** Union of actions that require guard approval before execution. */
 export type ProtectedAction = (typeof PROTECTED_ACTIONS)[number];
 
 /** 发起方:人类通道(cli/api)/确定性代码/LLM 建议/外部内容。后两者永不许可。 */
 export type ActionInitiator = 'cli_user' | 'api_user' | 'deterministic_code' | 'llm_suggestion' | 'external_content';
 
+/** Deterministic allow/deny decision from the protected action guard. */
 export interface GuardDecision {
   readonly allow: boolean;
   readonly reason: string;

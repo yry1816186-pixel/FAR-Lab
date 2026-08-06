@@ -6,8 +6,15 @@
  * arena/court offline_replay 标 replay;前端 IntegrityBadge 消费同一枚举(前端只呈现不推断)。
  */
 export const DATASET_SOURCES = ['online', 'cached_fixture', 'replay', 'fixture'] as const;
+/** Type alias for a dataset source kind. @see DATASET_SOURCES */
 export type DatasetSourceKind = (typeof DATASET_SOURCES)[number];
 
+/**
+ * Type guard: tests whether an unknown value is a valid {@link DatasetSourceKind}.
+ *
+ * @param value - The value to test.
+ * @returns `true` if `value` is one of the four canonical dataset source strings.
+ */
 export function isDatasetSource(value: unknown): value is DatasetSourceKind {
   return typeof value === 'string' && (DATASET_SOURCES as readonly string[]).includes(value);
 }

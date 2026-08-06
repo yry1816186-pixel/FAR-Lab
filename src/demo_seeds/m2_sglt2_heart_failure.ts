@@ -34,6 +34,7 @@ import { openDb, createSequentialGateway } from './helpers.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: M2_RAW_INPUT. */
 export const M2_RAW_INPUT = [
   'SGLT2 inhibitor cardiovascular benefit: Empagliflozin (EMPA-REG OUTCOME), Canagliflozin (CANVAS),',
   'and Dapagliflozin (DECLARE-TIMI 58) collectively claim to reduce heart failure hospitalization in',
@@ -44,6 +45,7 @@ export const M2_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: M2_SOURCE_CARD. */
 export const M2_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-m2-sglt2-cvot-2026',
   url: 'https://doi.org/10.1056/NEJMoa1905362',

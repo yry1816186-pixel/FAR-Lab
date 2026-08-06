@@ -17,9 +17,10 @@ import { computeProofHash } from '../proof_envelope/proof_hash.ts';
 import { dispatchRulesetVerifier } from '../proof_envelope/ruleset_version.ts';
 import { GENESIS_PROOF_HASH, type CheckOutcome, type ProofCheckResult, type ProofEnvelope } from '../proof_envelope/types.ts';
 import type { FalsificationSpec, Verdict } from '../falsifiability/types.ts';
-import { verifyFarProofPackageIntegrity, FAR_PROOF_INTEGRITY_FILE } from './offline_package.ts';
+import { verifyFarProofPackageIntegrity, FAR_PROOF_INTEGRITY_FILE } from './integrity_check.ts';
 import { verifyCallRecordExportAnchor } from '../evidence_log/verifier.ts';
 
+/** V1 .far-proof bundle 所需文件白名单（full 模式必须全部存在）。 */
 export const FAR_PROOF_REQUIRED_FILES = [
   'ro-crate-metadata.json',
   'prov.ttl',
@@ -33,6 +34,7 @@ export const FAR_PROOF_REQUIRED_FILES = [
   'code/MANIFEST.md',
 ] as const;
 
+/** Bundle 验证模式：'chain' 仅验 call_records 哈希链，'envelope' 仅验 proof_envelopes，'full' 全量验证。 */
 export type FarProofBundleVerifyMode = 'chain' | 'envelope' | 'full';
 
 interface RawEnvelopeRow {
@@ -59,12 +61,14 @@ interface RedactedCallRecordRow extends CallRecordHashRow {
   readonly usage_tokens_total?: number | null;
 }
 
+/** 信封 proofHash 重算不匹配详情：信封 ID、存储值与重算值。 */
 export interface ProofEnvelopeMismatch {
   readonly envelopeId: string;
   readonly expected: string;
   readonly actual: string;
 }
 
+/** call_records.redacted.jsonl 哈希链验证结果：是否通过、已验证条数、断裂位置与期望/实际哈希。 */
 export interface BundleChainResult {
   readonly ok: boolean;
   readonly verifiedCount: number;
@@ -74,6 +78,7 @@ export interface BundleChainResult {
   readonly chainHead: string | null;
 }
 
+/** .far-proof bundle 全模式验证结果聚合：必选文件、信封校验、哈希链、生命周期、完整性、DB 锚比对。 */
 export interface BundleVerifyResult {
   readonly ok: boolean;
   readonly bundlePath: string;
@@ -90,6 +95,16 @@ export interface BundleVerifyResult {
   readonly warnings: readonly string[];
 }
 
+/**
+ * 验证 .far-proof bundle 的完整性：必选文件存在性、proof_envelopes proofHash 重算、
+ * call_records 哈希链、lifecycle_events 事件链、integrity.json 全分量 SHA-256 清单、
+ * 可选 DB↔导出锚交叉比对。
+ *
+ * @param bundlePath bundle 根目录路径。
+ * @param mode 验证模式（'chain' | 'envelope' | 'full'，默认 'full'）。
+ * @param options.dbAnchor 可选：持有证据库 DB 时进行 DB↔导出锚交叉校验（DEF-18）。
+ * @returns 聚合验证结果，ok=true 表示所有检查通过。
+ */
 export function verifyFarProofBundle(
   bundlePath: string,
   mode: FarProofBundleVerifyMode = 'full',
@@ -244,6 +259,13 @@ function requiredFilesForMode(mode: FarProofBundleVerifyMode): readonly string[]
   }
 }
 
+/**
+ * 逐行验证 proof_envelopes.jsonl：proofHash 重算 + 信封间 prev_proof_hash 引用完整性。
+ *
+ * @param jsonlPath proof_envelopes.jsonl 文件路径。
+ * @returns checked 行数、不匹配列表、引用悬空错误列表。
+ * @throws 文件为空或不可读时抛出 Error。
+ */
 export function verifyProofEnvelopeJsonl(jsonlPath: string): {
   readonly checked: number;
   readonly mismatches: readonly ProofEnvelopeMismatch[];
@@ -288,6 +310,12 @@ export function verifyProofEnvelopeJsonl(jsonlPath: string): {
   return { checked: lines.length, mismatches, linkageErrors };
 }
 
+/**
+ * 验证 call_records.redacted.jsonl 哈希链：逐行检查 prev_hash 链接与 canonicalHash 重算。
+ *
+ * @param jsonlPath call_records.redacted.jsonl 文件路径。
+ * @returns 链验证结果（ok、已验证条数、断裂位置与哈希）。
+ */
 export function verifyRedactedCallRecordsJsonl(jsonlPath: string): BundleChainResult {
   const lines = readJsonlLines(jsonlPath);
   let expectedPrevHash = GENESIS_PREV_HASH;
@@ -411,6 +439,7 @@ interface RawLifecycleRow {
   readonly current_hash: string;
 }
 
+/** bundle 内 lifecycle_events.jsonl 独立校验结果：是否通过、已检查事件数、错误列表。 */
 export interface LifecycleBundleVerifyResult {
   readonly ok: boolean;
   readonly checkedCount: number;

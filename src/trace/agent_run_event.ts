@@ -1,3 +1,4 @@
+/** Constant: AGENT_RUN_EVENT_KINDS. */
 export const AGENT_RUN_EVENT_KINDS = [
   'run_started',
   'run_completed',
@@ -22,8 +23,10 @@ export const AGENT_RUN_EVENT_KINDS = [
   'clarification_asked',
 ] as const;
 
+/** Constant: AGENT_RUN_EVENT_DECISIONS. */
 export const AGENT_RUN_EVENT_DECISIONS = ['allow', 'ask', 'deny', 'skip', 'record'] as const;
 
+/** Constant: TRACE_FAILURE_CODES. */
 export const TRACE_FAILURE_CODES = [
   'schema_invalid',
   'tool_misroute',
@@ -37,10 +40,14 @@ export const TRACE_FAILURE_CODES = [
   'security_policy_violation',
 ] as const;
 
+/** Type alias: agent run event kind. */
 export type AgentRunEventKind = (typeof AGENT_RUN_EVENT_KINDS)[number];
+/** Type alias: agent run event decision. */
 export type AgentRunEventDecision = (typeof AGENT_RUN_EVENT_DECISIONS)[number];
+/** Type alias: trace failure code. */
 export type TraceFailureCode = (typeof TRACE_FAILURE_CODES)[number];
 
+/** Interface defining trace grade. */
 export interface TraceGrade {
   readonly traceGradeId: string;
   readonly runId: string;

@@ -17,7 +17,8 @@ import type {
   MathBackend,
 } from './math_claim.ts';
 import { InvalidBackendResultError } from './errors.ts';
-
+/** Numerical bound descriptor: a [min, max] range with sample count and
+ * human-readable description. Always present in numerical verification output. */
 export interface NumericalBound {
   readonly min: number;
   readonly max: number;
@@ -29,7 +30,9 @@ interface NumericalTarget {
   readonly bound?: NumericalBound;
   readonly expression?: string;
 }
-
+/** Numerical verification backend (spec 38 S3.5). ALWAYS returns
+ * outcome='unknown' (non-self-proving invariant - spec S4.5).
+ * Pure TypeScript, no external dependencies - always available. */
 export class NumericalBackend implements MathBackend {
   readonly backendKind = 'numerical' as const;
   readonly backendId = 'numerical@v1';

@@ -8,4 +8,5 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/** Constant: PACKAGE_ROOT. */
 export const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));

@@ -229,7 +229,10 @@ function isPythonDepsCompatible(): boolean {
   pythonDepsCompatibleCache = r.status === 0;
   return pythonDepsCompatibleCache;
 }
-
+/** Build a sanitized Python environment for venv subprocess execution.
+ * Strips secret keys (API_KEY/SECRET/TOKEN) and allows only a minimal
+ * env whitelist. Injects PYTHONPATH for repro/ and .python-deps/.
+ * @returns A sanitized environment object for child_process.spawn. */
 export function buildVenvPythonEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
@@ -288,6 +291,9 @@ let venv312PythonCache: string | null | undefined = undefined;
 // 发现 .venv312（Python 3.12·lightkurve 兼容）并验证 lightkurve+astroquery 可 import。
 // 系统 python 3.14 无稳定 lightkurve wheel → P1-6 真在线取数须走此 venv；缺/坏则返回 null，
 // 调用方据 null 走 cached_fixture 降级（02 F1 never-fabricate）。
+/** Resolve the .venv312 Python executable (Python 3.12 with lightkurve).
+ * Probes for the venv and validates lightkurve+astroquery are importable.
+ * @returns Absolute path to the venv Python, or null if unavailable. */
 export function resolveVenvPython(): string | null {
   if (venv312PythonCache !== undefined) return venv312PythonCache;
   const venvDir = resolve('.venv312');
@@ -380,18 +386,24 @@ function walkArtifacts(base: string, dir: string, out: ArtifactManifest[]): void
  * seccomp）。真 OS 级隔离仍是 V2 路线。本层收窄的是「spawn 前显式拒绝已知恶意形状」，非强隔离保证。
  */
 export const PREFLIGHT_DEFAULT_FILE_CAP = 5000;
-
+/** Options for preflight working directory checks (FUSION-OS-4). */
 export interface PreflightOptions {
   readonly fileCap?: number;
 }
-
+/** Result of a preflight working directory scan. Reports whether the
+ * directory is safe for sandbox execution (no .git, no symlinks, file cap). */
 export interface PreflightResult {
   readonly ok: boolean;
   readonly reason: string;
   readonly containerDetected: boolean;
   readonly fileCount: number;
 }
-
+/** Preflight scan a working directory before spawning a venv subprocess.
+ * Rejects .git directories, symlinks (O_NOFOLLOW), and file counts exceeding
+ * the cap (zip-bomb defense). Best-effort, not OS-level isolation.
+ * @param workingDir Directory to scan (empty string = skip).
+ * @param options File count cap override.
+ * @returns Scan result with ok/reason and file count. */
 export function preflightWorkingDir(workingDir: string, options?: PreflightOptions): PreflightResult {
   const containerDetected = detectContainer();
   if (workingDir.length === 0) {

@@ -34,6 +34,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: C3_RAW_INPUT. */
 export const C3_RAW_INPUT = [
   'DFT-computed and ML-augmented catalyst screening: a pipeline combining density functional theory',
   '(DFT) reactivity descriptors with graph neural networks claims to predict catalyst turnover number',
@@ -45,6 +46,7 @@ export const C3_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: C3_SOURCE_CARD. */
 export const C3_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-c3-catalyst-2026',
   url: 'https://opencatalystproject.org/',

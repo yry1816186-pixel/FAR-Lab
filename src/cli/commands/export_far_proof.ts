@@ -16,6 +16,7 @@ import {
 import { exportFarProof, packageFarProofBundle, type FarProofExportResult, type FarProofPackageResult } from '../../far_proof/index.ts';
 import { protectedActionGuard } from '../../agent_loop/guards.ts';
 
+/** Type alias: export far proof source. */
 export type ExportFarProofSource =
   | { readonly kind: 'demoChain' }
   | {
@@ -27,6 +28,7 @@ export type ExportFarProofSource =
       readonly envHash: string;
     };
 
+/** Input parameters for operations involving export far proof options. */
 export interface ExportFarProofOptions {
   readonly source: ExportFarProofSource;
   readonly outputDir: string;
@@ -37,6 +39,7 @@ export interface ExportFarProofOptions {
   readonly json: boolean;
 }
 
+/** Result/output structure for export far proof cli result. */
 export interface ExportFarProofCliResult {
   readonly schemaVersion: 'far.export_far_proof.result.v1';
   readonly source: 'demoChain' | 'db';
@@ -55,6 +58,9 @@ export interface ExportFarProofCliResult {
   readonly limitations: readonly string[];
 }
 
+/**
+ * run export far proof.
+ */
 export function runExportFarProof(options: ExportFarProofOptions): number {
   // G1(IC-02):export 为受保护动作;发起方=人类 CLI 显式命令(LLM 路径不存在,llm_suggestion 必 deny)
   const guard = protectedActionGuard('export', 'cli_user');

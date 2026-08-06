@@ -35,8 +35,8 @@ test('hero_b_pipeline: real two-sample stats + ConfoundingGate FAIL -> R-causal 
 
     // ── 真实两样本统计物证（非常量）──
     assert.ok(
-      statistics.zTest.pValue > 0 && statistics.zTest.pValue < HERO_B_ALPHA,
-      `real twoSampleWelchZTest pValue must be in (0, alpha=${HERO_B_ALPHA}), got ${statistics.zTest.pValue}`,
+      statistics.tTest.pValue > 0 && statistics.tTest.pValue < HERO_B_ALPHA,
+      `real twoSampleWelchZTest pValue must be in (0, alpha=${HERO_B_ALPHA}), got ${statistics.tTest.pValue}`,
     );
     assert.ok(
       statistics.adjustedPValue <= HERO_B_ALPHA,

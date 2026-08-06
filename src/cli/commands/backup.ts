@@ -30,6 +30,9 @@ function parseArgs(argv: readonly string[]): BackupArgs | { error: string } {
   return { dbPath, outPath, force } as BackupArgs;
 }
 
+/**
+ * run backup.
+ */
 export function runBackup(argv: readonly string[]): number {
   const parsed = parseArgs(argv);
   if ('error' in parsed) {

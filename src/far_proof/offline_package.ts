@@ -15,7 +15,6 @@ import { createHash } from 'node:crypto';
 import {
   chmodSync,
   existsSync,
-  lstatSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -28,33 +27,38 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { zstdCompressSync } from 'node:zlib';
 
 import { verifyFarProofBundle } from './bundle_verifier.ts';
-import { compareStringsDeterministic } from '../evidence_log/hasher.ts';
 
-export const FAR_PROOF_INTEGRITY_FILE = 'integrity.json';
+// Re-export integrity-check symbols from the shared module (backward compat)
+export {
+  FAR_PROOF_INTEGRITY_FILE,
+  computeFarProofIntegrity,
+  verifyFarProofPackageIntegrity,
+} from './integrity_check.ts';
+export type {
+  FarProofIntegrityFile,
+  FarProofIntegrityEntry,
+  IntegrityVerificationResult,
+} from './integrity_check.ts';
+
+// Local imports of integrity-check symbols used within this module
+import {
+  FAR_PROOF_INTEGRITY_FILE,
+  computeFarProofIntegrity,
+  sha256File,
+  verifyFarProofPackageIntegrity,
+} from './integrity_check.ts';
+
+/** Constant: FAR_PROOF_VERIFY_SCRIPT. */
 export const FAR_PROOF_VERIFY_SCRIPT = 'verify.sh';
 
-export interface FarProofIntegrityFile {
-  readonly schemaVersion: 'far.proof_bundle.integrity.v1';
-  readonly generatedAt: string;
-  readonly algorithm: 'sha256';
-  readonly excludes: readonly ['integrity.json'];
-  readonly fileCount: number;
-  readonly files: readonly FarProofIntegrityEntry[];
-  readonly integrityHash: string;
-}
-
-export interface FarProofIntegrityEntry {
-  readonly path: string;
-  readonly sha256: string;
-  readonly bytes: number;
-}
-
+/** Input parameters for operations involving far proof package options. */
 export interface FarProofPackageOptions {
   readonly bundleDir: string;
   readonly archivePath?: string;
   readonly generatedAt?: string;
 }
 
+/** Result/output structure for far proof package result. */
 export interface FarProofPackageResult {
   readonly bundleDir: string;
   readonly archivePath: string;
@@ -67,20 +71,13 @@ export interface FarProofPackageResult {
   readonly warnings: readonly string[];
 }
 
-export interface IntegrityVerificationResult {
-  readonly ok: boolean;
-  readonly integrityHash: string | null;
-  readonly expectedHash: string | null;
-  readonly fileCount: number;
-  readonly errors: readonly string[];
-}
-
 // Windows 上 PATH 里的 `tar` 常是 MSYS2/Git Bash 的 GNU tar：它把绝对路径中的盘符 `C:`
 // 当 remote host:device（"Cannot connect to C: resolve failed"），又在 `-C` 反斜杠路径上
 // 被 MSYS2 运行时改坏。两者都让 `far export far-proof` 静默产出空/坏归档。
 // 解法：win32 优先用原生 bsdtar（%SystemRoot%\System32\tar.exe·Win10 1803+ 标配），原生处理
 // 盘符+反斜杠，零 flag；找不到则降级 PATH 的 tar（GNU tar 时加 --force-local 兜盘符 bug）。
 // posix 直接用 PATH 的 tar（Linux CI 的 GNU tar 无此问题）。
+/** Interface defining tar invocation. */
 export interface TarInvocation {
   readonly binary: string;
   readonly extraArgs: readonly string[];
@@ -88,6 +85,9 @@ export interface TarInvocation {
 
 let cachedTar: TarInvocation | undefined;
 
+/**
+ * resolve tar.
+ */
 export function resolveTar(): TarInvocation {
   if (cachedTar !== undefined) {
     return cachedTar;
@@ -116,6 +116,9 @@ export function resolveTar(): TarInvocation {
   return cachedTar;
 }
 
+/**
+ * package far proof bundle.
+ */
 export function packageFarProofBundle(options: FarProofPackageOptions): FarProofPackageResult {
   const bundleDir = resolve(options.bundleDir);
   if (!existsSync(bundleDir) || !statSync(bundleDir).isDirectory()) {
@@ -190,29 +193,6 @@ export function packageFarProofBundle(options: FarProofPackageOptions): FarProof
   };
 }
 
-export function computeFarProofIntegrity(bundleDir: string, generatedAt: string): FarProofIntegrityFile {
-  const files = listBundleFiles(bundleDir)
-    .filter((file) => file !== FAR_PROOF_INTEGRITY_FILE)
-    .map((file) => {
-      const absolute = join(bundleDir, ...file.split('/'));
-      return {
-        path: file,
-        sha256: sha256File(absolute),
-        bytes: statSync(absolute).size,
-      };
-    });
-  const integrityHash = sha256Text(files.map((file) => `${file.path} ${file.sha256}`).sort(compareStringsDeterministic).join('\n'));
-  return {
-    schemaVersion: 'far.proof_bundle.integrity.v1',
-    generatedAt,
-    algorithm: 'sha256',
-    excludes: ['integrity.json'],
-    fileCount: files.length,
-    files,
-    integrityHash,
-  };
-}
-
 /**
  * FUSION-OS-3：post-seal 内容篡改检测（Open Science sentinel 重导出在 tar 后范式）。
  *
@@ -227,17 +207,24 @@ export interface BundleContentSnapshot {
   readonly hashes: ReadonlyMap<string, string>;
 }
 
+/** Result/output structure for staleness result. */
 export interface StalenessResult {
   readonly ok: boolean;
   readonly staleFiles: readonly string[];
 }
 
+/**
+ * snapshot bundle content.
+ */
 export function snapshotBundleContent(bundleDir: string): BundleContentSnapshot {
   const hashes = new Map<string, string>();
   visitHash(resolve(bundleDir), resolve(bundleDir), hashes);
   return { hashes };
 }
 
+/**
+ * detect post seal staleness.
+ */
 export function detectPostSealStaleness(bundleDir: string, baseline: BundleContentSnapshot): StalenessResult {
   const current = snapshotBundleContent(bundleDir);
   const stale: string[] = [];
@@ -268,144 +255,9 @@ function visitHash(root: string, dir: string, hashes: Map<string, string>): void
     if (entry.isDirectory()) {
       visitHash(root, full, hashes);
     } else if (entry.isFile()) {
-      hashes.set(relative(root, full).split(sep).join('/'), sha256File(full));
+      hashes.set(relative(root, full).split(sep).join('/'), createHash('sha256').update(readFileSync(full)).digest('hex'));
     }
   }
-}
-
-export function verifyFarProofPackageIntegrity(bundleDir: string): IntegrityVerificationResult {
-  const errors: string[] = [];
-  const integrityPath = join(bundleDir, FAR_PROOF_INTEGRITY_FILE);
-  if (!existsSync(integrityPath)) {
-    return {
-      ok: false,
-      integrityHash: null,
-      expectedHash: null,
-      fileCount: 0,
-      errors: [`MISSING_INTEGRITY_FILE: ${FAR_PROOF_INTEGRITY_FILE}`],
-    };
-  }
-
-  let expected: FarProofIntegrityFile;
-  try {
-    expected = parseIntegrity(readFileSync(integrityPath, 'utf8'));
-  } catch (error) {
-    return {
-      ok: false,
-      integrityHash: null,
-      expectedHash: null,
-      fileCount: 0,
-      errors: [`INTEGRITY_UNREADABLE: ${errorMessage(error)}`],
-    };
-  }
-
-  const actual = computeFarProofIntegrity(bundleDir, expected.generatedAt);
-  if (actual.integrityHash !== expected.integrityHash) {
-    errors.push(`INTEGRITY_HASH_MISMATCH: expected=${expected.integrityHash} actual=${actual.integrityHash}`);
-  }
-  if (actual.fileCount !== expected.fileCount) {
-    errors.push(`INTEGRITY_FILE_COUNT_MISMATCH: expected=${expected.fileCount} actual=${actual.fileCount}`);
-  }
-
-  const expectedByPath = new Map(expected.files.map((file) => [file.path, file]));
-  const actualByPath = new Map(actual.files.map((file) => [file.path, file]));
-  for (const expectedFile of expected.files) {
-    const actualFile = actualByPath.get(expectedFile.path);
-    if (actualFile === undefined) {
-      errors.push(`INTEGRITY_MISSING_FILE: ${expectedFile.path}`);
-      continue;
-    }
-    if (actualFile.sha256 !== expectedFile.sha256 || actualFile.bytes !== expectedFile.bytes) {
-      errors.push(`INTEGRITY_FILE_MISMATCH: ${expectedFile.path}`);
-    }
-  }
-  for (const actualFile of actual.files) {
-    if (!expectedByPath.has(actualFile.path)) {
-      errors.push(`INTEGRITY_UNEXPECTED_FILE: ${actualFile.path}`);
-    }
-  }
-
-  return {
-    ok: errors.length === 0,
-    integrityHash: actual.integrityHash,
-    expectedHash: expected.integrityHash,
-    fileCount: actual.fileCount,
-    errors,
-  };
-}
-
-function listBundleFiles(root: string): string[] {
-  const files: string[] = [];
-  function walk(dir: string): void {
-    // code-unit 序（确定性·跨平台一致）——localeCompare 依赖运行时 locale/ICU，非 ASCII 文件名排序可能漂移
-    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
-      compareStringsDeterministic(a.name, b.name),
-    );
-    for (const entry of entries) {
-      const absolute = join(dir, entry.name);
-      const rel = relative(root, absolute).split(sep).join('/');
-      if (entry.isDirectory()) {
-        walk(absolute);
-      } else if (entry.isFile()) {
-        files.push(rel);
-      } else if (entry.isSymbolicLink()) {
-        const stat = lstatSync(absolute);
-        throw new Error(`packageFarProofBundle: symlink not allowed in offline bundle: ${rel} (${stat.mode})`);
-      } else {
-        throw new Error(`packageFarProofBundle: unsupported filesystem entry in offline bundle: ${rel}`);
-      }
-    }
-  }
-  walk(root);
-  return files.sort(compareStringsDeterministic);
-}
-
-function parseIntegrity(raw: string): FarProofIntegrityFile {
-  const parsed = JSON.parse(raw) as unknown;
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error('integrity root must be an object');
-  }
-  const record = parsed as Record<string, unknown>;
-  if (record.schemaVersion !== 'far.proof_bundle.integrity.v1') {
-    throw new Error(`unsupported schemaVersion: ${String(record.schemaVersion)}`);
-  }
-  if (!Array.isArray(record.files)) {
-    throw new Error('files must be an array');
-  }
-  const files = record.files.map((entry, index): FarProofIntegrityEntry => {
-    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
-      throw new Error(`files[${index}] must be an object`);
-    }
-    const row = entry as Record<string, unknown>;
-    if (typeof row.path !== 'string' || typeof row.sha256 !== 'string' || typeof row.bytes !== 'number') {
-      throw new Error(`files[${index}] has invalid shape`);
-    }
-    return { path: row.path, sha256: row.sha256, bytes: row.bytes };
-  });
-  if (typeof record.generatedAt !== 'string' || typeof record.integrityHash !== 'string') {
-    throw new Error('generatedAt/integrityHash must be strings');
-  }
-  return {
-    schemaVersion: 'far.proof_bundle.integrity.v1',
-    generatedAt: record.generatedAt,
-    algorithm: 'sha256',
-    excludes: ['integrity.json'],
-    fileCount: typeof record.fileCount === 'number' ? record.fileCount : files.length,
-    files,
-    integrityHash: record.integrityHash,
-  };
-}
-
-function sha256File(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
-}
-
-function sha256Text(text: string): string {
-  return createHash('sha256').update(text, 'utf8').digest('hex');
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 const VERIFY_SH = `#!/usr/bin/env sh
@@ -413,12 +265,32 @@ set -eu
 
 BUNDLE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
+# Cross-platform path normalization: git-bash/MSYS sh reports MSYS-style paths
+# (/c/tmp/...) but Windows Node.js needs native paths (C:\\tmp\\...).
+# Prefer cygpath -w when available; fall back to leaving the path as-is
+# (POSIX systems and WSL pass native paths already).
+if command -v cygpath >/dev/null 2>&1; then
+  BUNDLE_DIR=$(cygpath -w "$BUNDLE_DIR")
+fi
+
 node - "$BUNDLE_DIR" <<'NODE'
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const bundleDir = process.argv[2];
+// Defensive MSYS path normalization (belt-and-suspenders): even without cygpath,
+// normalize /c/tmp/... → C:\\tmp\\... so Windows Node can resolve the bundle.
+function normalizeBundleDir(dir) {
+  if (dir === undefined) return dir;
+  // MSYS root-letter pattern: /c/path or /d/path → C:\\path / D:\\path
+  const msysMatch = dir.match(/^\\/([a-zA-Z])\\/(.*)$/);
+  if (msysMatch && process.platform === 'win32') {
+    return msysMatch[1].toUpperCase() + ':\\\\\\\\' + msysMatch[2].replace(/\\//g, '\\\\\\\\');
+  }
+  return dir;
+}
+
+const bundleDir = normalizeBundleDir(process.argv[2]);
 const integrityPath = path.join(bundleDir, 'integrity.json');
 
 function sha256File(filePath) {

@@ -18,6 +18,7 @@ import {
   transition,
 } from '../state_machine.ts';
 
+/** Input parameters for operations involving fsm advance options. */
 export interface FsmAdvanceOptions {
   readonly event: string;
   readonly inputPath: string;
@@ -26,12 +27,14 @@ export interface FsmAdvanceOptions {
   readonly dryRun?: boolean;
 }
 
+/** Interface defining fsm state file. */
 export interface FsmStateFile {
   readonly state: CliState;
   readonly prevReceipt: string;
   readonly history: readonly StageReceipt[];
 }
 
+/** Interface defining fsm advance success. */
 export interface FsmAdvanceSuccess {
   readonly ok: true;
   readonly exitCode: 0;
@@ -40,14 +43,19 @@ export interface FsmAdvanceSuccess {
   readonly stateFile: string;
 }
 
+/** Interface defining fsm advance failure. */
 export interface FsmAdvanceFailure {
   readonly ok: false;
   readonly exitCode: 1 | 2 | 7;
   readonly error: string;
 }
 
+/** Type alias: fsm advance result. */
 export type FsmAdvanceResult = FsmAdvanceSuccess | FsmAdvanceFailure;
 
+/**
+ * run fsm advance.
+ */
 export function runFsmAdvance(options: FsmAdvanceOptions): FsmAdvanceResult {
   if (!isCliEvent(options.event)) {
     return { ok: false, exitCode: 2, error: `unknown event: ${options.event}` };

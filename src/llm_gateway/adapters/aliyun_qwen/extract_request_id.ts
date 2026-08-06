@@ -11,6 +11,7 @@ export interface HeaderLike {
   get(name: string): string | null;
 }
 
+/** Interface defining response like. */
 export interface ResponseLike {
   readonly headers: HeaderLike;
 }
@@ -23,10 +24,16 @@ function nonEmptyString(value: unknown): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
+/**
+ * extract request id.
+ */
 export function extractRequestId(response: ResponseLike): string | null {
   return nonEmptyString(response.headers.get('x-request-id'));
 }
 
+/**
+ * get data request id.
+ */
 export function getDataRequestId(data: unknown): string | null {
   if (typeof data !== 'object' || data === null) {
     return null;
@@ -40,6 +47,9 @@ export function getDataRequestId(data: unknown): string | null {
   );
 }
 
+/**
+ * extract request id from response or data.
+ */
 export function extractRequestIdFromResponseOrData(
   response: ResponseLike,
   data: unknown,

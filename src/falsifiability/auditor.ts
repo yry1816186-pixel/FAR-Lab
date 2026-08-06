@@ -34,6 +34,7 @@ export const AUDITOR_ENABLED = true as const;
 // 4 审计规则
 // ---------------------------------------------------------------------------
 
+/** The four falsification-sufficiency audit rule IDs (RULE-FS-001 through RULE-FS-003). */
 export const AUDIT_RULES = [
   'RULE-FS-001',
   'RULE-FS-001b',
@@ -41,9 +42,16 @@ export const AUDIT_RULES = [
   'RULE-FS-003',
 ] as const;
 
+/** Type alias for an audit rule ID. @see AUDIT_RULES */
 export type AuditRuleId = (typeof AUDIT_RULES)[number];
+/** Outcome of a single audit rule check: PASS, FAIL, WARN, or SKIP. */
 export type AuditOutcome = 'PASS' | 'FAIL' | 'WARN' | 'SKIP';
 
+/**
+ * A single audit event in the falsification-sufficiency audit hash chain.
+ * Each event is sealed with a `currentHash` that binds all fields plus the
+ * `prevHash`, forming a tamper-detectable chain.
+ */
 export interface AuditEvent {
   readonly eventId: string;
   readonly contractId: string;
@@ -58,6 +66,7 @@ export interface AuditEvent {
   readonly sealedBy: 'deterministic_sealer';
 }
 
+/** Result of auditing a contract: the list of audit events and a summary count per outcome. */
 export interface AuditResult {
   readonly events: readonly AuditEvent[];
   readonly summary: Record<AuditOutcome, number>;

@@ -9,12 +9,16 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+/** Input parameters for operations involving init args. */
 export interface InitArgs {
   readonly domain: string;
   readonly outDir: string;
   readonly force: boolean;
 }
 
+/**
+ * parse init args.
+ */
 export function parseInitArgs(argv: readonly string[]): InitArgs {
   let domain = '';
   let outDir = '';
@@ -198,6 +202,9 @@ The verdict is still produced by the deterministic R0-R9 kernel (the LLM is not 
   ];
 }
 
+/**
+ * run init.
+ */
 export function runInit(argv: readonly string[]): number {
   let args: InitArgs;
   try {

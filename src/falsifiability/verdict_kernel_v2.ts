@@ -28,9 +28,12 @@ import type {
 import { compileFec } from '../fec/compiler.ts';
 import type { ClaimType, ConfoundingGateResult, EvidenceBasis } from '../confounding_gate/types.ts';
 import { confoundingOutcomeVerdictEffect } from '../confounding_gate/adjudicate.ts';
+import { gradeEvidenceQuality } from '../evidence_quality/grader.ts';
+import type { EvidenceTier, RobAssessment, StudyDesign } from '../evidence_quality/types.ts';
 
 // ===== 浮点比较（§7.3 line 892 + APPENDIX_B §4.1·容差 1e-7·三端一致）=====
 
+/** Float comparison tolerance for all verdict-critical numeric comparisons (§7.3 + APPENDIX_B §4.1). Ensures three-platform consistency. */
 export const VERDICT_FLOAT_TOLERANCE = 1e-7;
 
 /** a ≤ b（含等号·容差防边界误判）：a ≤ b + 1e-7 → 视为 a ≤ b。 */
@@ -53,8 +56,14 @@ export interface DatasetBindingSpec {
   readonly scopeCoverage: ScopeCoverage;
 }
 
+/** Status of a single statistical test execution: ran, skipped, or failed. */
 export type TestStatus = 'ran' | 'skipped' | 'failed';
 
+/**
+ * A diagnostic for a statistical assumption check (e.g. normality, distribution drift,
+ * heteroscedasticity). `warn` severity triggers R8 INCONCLUSIVE; `critical` is not used
+ * by the kernel directly but reserved for future expansion.
+ */
 export interface AssumptionDiagnostic {
   readonly kind: string; // 'distribution_drift' | 'normality' | 'heteroscedasticity' | ...
   readonly severity: 'warn' | 'critical';
@@ -126,6 +135,7 @@ export interface ProtocolDeviation {
   readonly details?: string;
 }
 
+/** Severity of a kernel-projected anti-theater finding: `fail` → UNTESTED, `warn` → R8 INCONCLUSIVE, `pass` → no effect. */
 export type KernelAntiTheaterFindingSeverity = 'fail' | 'warn' | 'pass';
 
 /**
@@ -156,6 +166,7 @@ export interface IdentifierClaim {
   readonly harnessVerifiedSource: boolean;
 }
 
+/** How completely the evidence covers the claim's scope: full, partial, or none. */
 export type CoverageRelation = 'full' | 'partial' | 'none';
 
 /** scope 评估报告（§7.4 evaluate_scope 输出·R4/R6/R7 消费）。 */
@@ -167,7 +178,9 @@ export interface ScopeReport {
   readonly hasSameScopeRefutation: boolean;
 }
 
+/** Statistical power status: adequate (meets MDE), underpowered (below MDE), or unknown (no power analysis). */
 export type PowerStatus = 'adequate' | 'underpowered' | 'unknown';
+/** Whether the collected evidence is sufficient to support a verdict: sufficient, insufficient, or unknown. */
 export type EvidenceSufficiencyStatus = 'sufficient' | 'insufficient' | 'unknown';
 
 /** 证据充分性（caller pre-compute·R7/R8 消费 powerStatus）。 */
@@ -176,6 +189,7 @@ export interface EvidenceSufficiencyReport {
   readonly powerStatus: PowerStatus;
 }
 
+/** The effective direction of the aggregated evidence: supports, refutes, neutral, not_applicable, or unknown. */
 export type EffectiveDirection = EvidenceDirection | 'unknown';
 
 /** 统计聚合报告（§7.4 evaluate_statistics 输出·R5/R6/R7/R8 消费）。 */
@@ -195,6 +209,11 @@ export interface StatisticalReport {
 
 // ===== VerdictKernelInput / Output（§7.1 / §7.2）=====
 
+/**
+ * Input to the deterministic verdict kernel ({@link decideFiveValueVerdict}).
+ * All fields are caller pre-computed; the kernel itself is a pure function
+ * that reads no database and mutates nothing.
+ */
 export interface VerdictKernelInput {
   /** [VC] 被裁决的 FEC。null → R0/R1 → UNTESTED。 */
   readonly fec: FecContractV2 | null;
@@ -224,14 +243,28 @@ export interface VerdictKernelInput {
   readonly executionFingerprintMismatch?: boolean;
   /** [VC] 最早 MeasurementResult.collectedAt（ISO-8601·F8 #10 HARKing 纵深）。传入则 R1 内 compileFec 跑 #10——与 orchestrator mandate gate（orchestrator.ts:146）同条件 defense-in-depth，使直调 kernel 且不经 mandate gate 的路径仍能抓 HARKing。缺省 → compileFec 跳过 #10（compiler.ts:409·legacy 文献投票无实测时间线·正确语义）。optional·缺省零回归。 */
   readonly measurementCutoff?: string | null;
+  /** [META] 研究设计（批次 2-D·GRADE 证据层级透明度层）。传入则输出附 evidenceQualityTier/Note（不进 verdict·不进 proofHash·零回归）。 */
+  readonly studyDesign?: StudyDesign;
+  /** [META] Cochrane RoB 7 维评估（批次 2-D·透明度层·缺省维度按 unclear fail-conservative）。 */
+  readonly robAssessments?: readonly RobAssessment[];
 }
 
+/**
+ * Trace entry for a single R0-R9 rule: its ID, whether it triggered,
+ * and optional diagnostic details. Collected into the kernel output's
+ * `ruleTrace` array for full auditability.
+ */
 export interface VerdictRuleTrace {
   readonly ruleId: string;
   readonly triggered: boolean;
   readonly details?: string;
 }
 
+/**
+ * Structured output of the deterministic verdict kernel: the verdict, reason
+ * codes, full R0-R9 rule trace, scope/statistical/evidence-sufficiency reports,
+ * integrity flags, and whether the support is bounded (CONFIRMED ≠ scientific truth).
+ */
 export interface VerdictKernelOutput {
   readonly verdict: VerdictKind;
   readonly reasonCodes: readonly string[];
@@ -244,15 +277,20 @@ export interface VerdictKernelOutput {
   readonly integrityFlags: readonly string[];
   /** CONFIRMED 时 true（bounded support·非科学真理）。 */
   readonly boundedSupport: boolean;
+  /** [META] 证据质量层级（批次 2-D·GRADE·透明度层·不进 verdict 不进 proofHash）。studyDesign 传入时有值。 */
+  readonly evidenceQualityTier?: EvidenceTier;
+  /** [META] 证据质量说明（tier + RoB 聚合·人类可读）。 */
+  readonly evidenceQualityNote?: string;
 }
 
 // ===== 内核入口（§7.3 R0-R9 决策树）=====
 
 /**
- * decideFiveValueVerdict —— 确定性五值裁决（§7.3）。
+ * decideFiveValueVerdictInternal —— 确定性五值裁决核心（§7.3·R0-R9 决策树·与历史字节一致）。
+ * 被公共包装 decideFiveValueVerdict 调用；分离是为了附加证据质量透明度层（批次 2-D·零回归）。
  * 全程无 LLM；按 R0..R9 固定优先级，首条决定性规则胜出。
  */
-export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput {
+export function decideFiveValueVerdictInternal(input: VerdictKernelInput): VerdictKernelOutput {
   const inputIntegrityFlags = [...input.integrityFlags];
   const emptyScope: ScopeReport = {
     isDegraded: false,
@@ -541,6 +579,28 @@ export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernel
     integrityFlags,
     untestedReason: 'NO_DECISION_PATH',
   });
+}
+
+/**
+ * decideFiveValueVerdict —— 确定性五值裁决公共入口（§7.3·R0-R9 决策树）。
+ *
+ * 批次 2-D 增强（零回归）：当调用方提供 input.studyDesign（可选·透明度输入）时，
+ * 输出附带 evidenceQualityTier / evidenceQualityNote（GRADE 证据层级 + Cochrane RoB 聚合）。
+ * 该层**不进 verdict 判定**（R0-R9 逻辑字节不变）也**不进 proofHash**（VC 白名单不变）——
+ * 仅作为透明元数据供 report/audit 消费。未提供 studyDesign → 输出与历史完全一致。
+ */
+export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput {
+  const base = decideFiveValueVerdictInternal(input);
+  if (input.studyDesign === undefined) {
+    return base;
+  }
+  const grade = gradeEvidenceQuality(input.studyDesign, input.robAssessments ?? []);
+  return {
+    ...base,
+    evidenceQualityTier: grade.tier,
+    evidenceQualityNote:
+      `${grade.overall} (tier ${grade.tier} · RoB low ${grade.robLowCount}/7 high ${grade.robHighCount}/7)`,
+  };
 }
 
 // ===== 辅助评估函数（§7.4）=====

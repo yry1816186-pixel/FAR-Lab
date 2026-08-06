@@ -32,8 +32,10 @@ export const PROOF_VALIDATOR_RULES = [
   'RULE-PE-009',
 ] as const;
 
+/** Type alias: proof validator rule. */
 export type ProofValidatorRule = (typeof PROOF_VALIDATOR_RULES)[number];
 
+/** Type alias: check outcome. */
 export type CheckOutcome = 'PASS' | 'WARN' | 'FAIL' | 'SKIP';
 
 /** Single validator check result */
@@ -85,4 +87,5 @@ export interface SealProofEnvelopeInput {
   readonly sealedAt: string;
 }
 
+/** Constant: GENESIS_PROOF_HASH. */
 export const GENESIS_PROOF_HASH = '0'.repeat(64);

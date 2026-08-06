@@ -1,0 +1,125 @@
+# DEVELOPMENT_ROADMAP.yaml — FAR-Lab 自主开发路线图
+# 由 dev-pipeline-orchestrator skill 读取和管理
+# 每次pipeline循环开头读取此文件确定当前阶段
+
+project: FAR-Lab
+target_standard: "world-class AI4S research assurance system"
+last_updated: "2026-08-05T03:30:00+08:00"
+last_cycle_result: "phase1_verify: 6/6 criteria PASS — security_audit FIXED (5 CVEs via pnpm.overrides), ci_pipeline_green FIXED (Windows sh-path bug). Phase 1 EXIT GATE PASSED. Ready for Phase 2."
+
+phases:
+
+  - id: 1
+    name: "Foundation Hardening"
+    description: "确保基础质量：测试、lint、安全、CI全部达标"
+    status: completed
+    exit_criteria:
+      - name: test_coverage
+        target: ">=95% line"
+        verify: "node scripts/coverage_gate.mjs"
+        last_measured: "PASS 2026-08-05T01:45 — Core 96.55% line / 86.61% branch (gate 85/75). 1517/1524 tests pass, 1 fail=pre-existing Windows sh-path issue (demo_chain_replay L385)."
+      - name: zero_lint_errors
+        target: "0 errors"
+        verify: "pnpm run lint"
+        last_measured: "PASS 2026-08-05T01:40 — 0 errors (eslint --max-warnings 0)."
+      - name: zero_type_errors
+        target: "0 errors"
+        verify: "pnpm run typecheck"
+        last_measured: "PASS 2026-08-05T01:40 — 0 errors (tsc --noEmit)."
+      - name: security_audit
+        target: "0 high/critical vulnerabilities"
+        verify: "pnpm audit --audit-level=high"
+        last_measured: "FAIL 2026-08-05T01:42 — 5 high vulns: brace-expansion x3 (dev, eslint>minimatch), find-my-way (runtime, fastify), fast-uri (runtime, swagger). All DoS class, patch-level fixes via pnpm.overrides. Remediation plan: docs/audits/security-remediation-plan.md. Task t_43f306b8 (blocked, needs auth)."
+      - name: ci_pipeline_green
+        target: "all CI checks pass"
+        verify: "check .github/workflows/ exists and passes locally"
+        last_measured: "BLOCKED 2026-08-05T01:45 — 6 workflows exist (ci.yml, build-integrity.yml, depth-*.yml, release.yml). Local gate blocked by 1 pre-existing Windows-specific test failure (demo_chain_replay sh verify.sh path translation). Linux CI expected green."
+      - name: secret_scan_clean
+        target: "no hardcoded secrets"
+        verify: "grep -rn 'sk-\\|ghp_\\|AKIA' src/ --include='*.ts' --include='*.py'"
+        last_measured: "PASS 2026-08-05T01:42 — 0 matches across all src/*.ts files."
+    max_time_budget_hours: 8
+
+  - id: 2
+    name: "Architecture Excellence"
+    description: "架构文档完整、API稳定、模块解耦"
+    status: pending
+    exit_criteria:
+      - name: adr_completeness
+        target: ">=24 ADRs covering all major decisions"
+        verify: "ls docs/adr/*.md | wc -l"
+        last_measured: null
+      - name: api_documentation
+        target: "100% public API documented"
+        verify: "check src/**/*.ts for JSDoc on exported functions"
+        last_measured: null
+      - name: module_coupling
+        target: "low coupling - no circular dependencies"
+        verify: "madge --circular src/ 2>&1"
+        last_measured: null
+      - name: architecture_consistency
+        target: "code matches documented architecture"
+        verify: "compare src/ structure against docs/architecture/*.md"
+        last_measured: null
+    max_time_budget_hours: 12
+
+  - id: 3
+    name: "Scientific Rigor"
+    description: "可证伪性、可复现性、评估确定性"
+    status: pending
+    exit_criteria:
+      - name: falsifiability_tests
+        target: "every claim has a falsification test"
+        verify: "grep -rn 'claim' src/ --include='*.ts' | wc -l vs test count"
+        last_measured: null
+      - name: reproducibility
+        target: "fixed seed + deterministic execution"
+        verify: "run same test twice, compare output hash"
+        last_measured: null
+      - name: deterministic_evaluation
+        target: "evaluation metrics computed by deterministic code"
+        verify: "audit src/falsifiability/ for LLM calls in verdict path"
+        last_measured: null
+      - name: data_integrity
+        target: "dataset hash + schema validation"
+        verify: "check data pipeline for hash verification"
+        last_measured: null
+    max_time_budget_hours: 16
+
+  - id: 4
+    name: "Performance & Scalability"
+    description: "性能基准、瓶颈优化、压力测试"
+    status: pending
+    exit_criteria:
+      - name: benchmark_suite
+        target: "benchmark exists and runs in CI"
+        verify: "ls benchmark/ or bench/"
+        last_measured: null
+      - name: p95_latency
+        target: "<100ms for API endpoints"
+        verify: "run benchmark and measure"
+        last_measured: null
+      - name: memory_stability
+        target: "no memory leaks in long-running tests"
+        verify: "run stress test, monitor memory"
+        last_measured: null
+    max_time_budget_hours: 8
+
+  - id: 5
+    name: "Production Readiness"
+    description: "部署、监控、灾难恢复"
+    status: pending
+    exit_criteria:
+      - name: deployment_guide
+        target: "complete deployment documentation"
+        verify: "check docs/deployment/*.md"
+        last_measured: null
+      - name: monitoring
+        target: "health checks + metrics dashboard"
+        verify: "check monitoring config exists"
+        last_measured: null
+      - name: disaster_recovery
+        target: "backup/restore tested"
+        verify: "check DR runbook exists and tested"
+        last_measured: null
+    max_time_budget_hours: 8

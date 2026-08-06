@@ -36,6 +36,16 @@ export {
   verifyCallRecordExportAnchor,
 } from './verifier.ts';
 export {
+  ensureFtsIndex,
+  reindexEvidenceFts,
+  searchEvidence,
+  escapeFtsQuery,
+} from './search.ts';
+export type {
+  EvidenceSearchOptions,
+  EvidenceSearchResult,
+} from './search.ts';
+export {
   LIFECYCLE_STATES,
   TERMINAL_STATES,
   LIFECYCLE_TARGET_KINDS,

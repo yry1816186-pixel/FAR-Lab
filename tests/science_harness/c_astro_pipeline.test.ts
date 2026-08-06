@@ -100,14 +100,14 @@ test('c_astro_pipeline: real venv BLS + real two-sample z-test -> R4 DEGRADED_SC
     // 合成 transit 信号极强（in≈0.992 vs out≈1.0, σ=0.002, ~30/570 点）→ z-statistic ≈ -21
     // → normalCdf(-21) erf 下溢 → clampProbability → pValue 精确 0。pValue=0 是真实数值结果
     // （stub 会返回圆数）。故用 z 统计量大小证明真实计算，pValue<alpha 证明显著性（R7 门）。
-    assert.equal(statistics.zTest.alternative, 'less', 'H1: mean(inFlux) < mean(outFlux) (transit dip)');
+    assert.equal(statistics.tTest.alternative, 'less', 'H1: mean(inFlux) < mean(outFlux) (transit dip)');
     assert.ok(
-      statistics.zTest.statistic < -10,
-      `real twoSampleWelchZTest statistic must be strongly negative (in<out dip, |z|>10), got ${statistics.zTest.statistic}`,
+      statistics.tTest.statistic < -10,
+      `real twoSampleWelchZTest statistic must be strongly negative (in<out dip, |z|>10), got ${statistics.tTest.statistic}`,
     );
     assert.ok(
-      statistics.zTest.pValue < C_ASTRO_ALPHA,
-      `real z-test pValue must be < alpha (significant; underflows to 0 for strong signal), got ${statistics.zTest.pValue}`,
+      statistics.tTest.pValue < C_ASTRO_ALPHA,
+      `real z-test pValue must be < alpha (significant; underflows to 0 for strong signal), got ${statistics.tTest.pValue}`,
     );
     assert.ok(
       statistics.adjustedPValue <= C_ASTRO_ALPHA,

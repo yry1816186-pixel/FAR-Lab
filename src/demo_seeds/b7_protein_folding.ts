@@ -33,6 +33,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: B7_RAW_INPUT. */
 export const B7_RAW_INPUT = [
   'Protein structure prediction: AlphaFold2 and successor ML methods achieve near-experimental',
   'accuracy on template-based targets, but free-modelling (FM) targets — proteins with no homologous',
@@ -44,6 +45,7 @@ export const B7_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: B7_SOURCE_CARD. */
 export const B7_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-b7-protein-folding-2026',
   url: 'https://predictioncenter.org/casp15/results.cgi',

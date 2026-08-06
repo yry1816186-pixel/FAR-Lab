@@ -15,6 +15,7 @@ import type {
   PurposeTag,
 } from './types.ts';
 
+/** Interface defining llm record metadata. */
 export interface LlmRecordMetadata {
   readonly stageId: string;
   readonly payloadKind: PayloadKind;
@@ -24,6 +25,7 @@ export interface LlmRecordMetadata {
   readonly finishReason: FinishReason;
 }
 
+/** Input parameters for operations involving append llm response args. */
 export interface AppendLlmResponseArgs {
   readonly request: LlmRequest;
   readonly response: LlmResponse;
@@ -31,6 +33,7 @@ export interface AppendLlmResponseArgs {
   readonly appendOptions: AppendRecordOptions;
 }
 
+/** Input parameters for operations involving call and record llm args. */
 export interface CallAndRecordLlmArgs {
   readonly profile: ProviderProfile;
   readonly request: LlmRequest;
@@ -38,11 +41,15 @@ export interface CallAndRecordLlmArgs {
   readonly appendOptions: AppendRecordOptions;
 }
 
+/** Interface defining recorded llm response. */
 export interface RecordedLlmResponse {
   readonly response: LlmResponse;
   readonly record: HashedRecord;
 }
 
+/**
+ * call and record llm.
+ */
 export async function callAndRecordLlm(
   db: import('better-sqlite3').Database,
   gateway: LlmGateway,
@@ -62,6 +69,9 @@ export async function callAndRecordLlm(
   };
 }
 
+/**
+ * append llm response record.
+ */
 export function appendLlmResponseRecord(
   db: import('better-sqlite3').Database,
   args: AppendLlmResponseArgs,

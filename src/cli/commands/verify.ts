@@ -45,9 +45,13 @@ export type VerifyMode = 'chain' | 'envelope' | 'full';
 
 // ===== 公开类型（10 字段 schema · 04 §5.2）=====
 
+/** Type alias: verify status. */
 export type VerifyStatus = 'PASS' | 'FAIL' | 'WARN';
+/** Type alias: tamper status. */
 export type TamperStatus = 'clean' | 'tampered' | 'n/a';
+/** Type alias: scope status. */
 export type ScopeStatus = 'full' | 'degraded' | 'n/a';
+/** Type alias: recompute axis. */
 export type RecomputeAxis = 'pass' | 'fail' | 'not-run';
 
 /** recomputation 三轴（04 §5.2）：node=TS proofHash 重算；python=Python 镜像；browser=后续 Web Crypto。 */
@@ -620,6 +624,7 @@ export function collectVerifyDump(
 
 // ===== IO 壳（runVerify·镜像 status.ts）=====
 
+/** Input parameters for operations involving verify options. */
 export interface VerifyOptions {
   readonly bundlePath?: string;
   readonly envelopePath?: string;

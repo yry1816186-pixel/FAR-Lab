@@ -84,6 +84,9 @@ function parseArgs(argv: readonly string[]): LifecycleArgs | { error: string } {
     json,
   };
 }
+/**
+ * run lifecycle.
+ */
 export async function runLifecycle(argv: readonly string[]): Promise<number> {
   const parsed = parseArgs(argv);
   if ('error' in parsed) {

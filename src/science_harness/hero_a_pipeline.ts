@@ -57,7 +57,7 @@ import { buildAntiTheaterPipelineInput } from './anti_theater_input.ts';
 // ---------------------------------------------------------------------------
 // 确定性常量（fixture · preregistered before unblinding）
 // ---------------------------------------------------------------------------
-
+/** Hero-A claim identifier (preregistered before unblinding). */
 export const HERO_A_PIPELINE_CLAIM_ID = 'C-MMLU-A-0001';
 
 /**
@@ -65,17 +65,17 @@ export const HERO_A_PIPELINE_CLAIM_ID = 'C-MMLU-A-0001';
  * 必须同此值（kernel primary test 匹配：`statistics.filter(s => s.testId === fec.metric.metricKey)`）。
  */
 export const HERO_A_METRIC_KEY = 'mmlu_physics_accuracy';
-
+/** Hero-A claim: model A achieves mean per-run accuracy >= 0.72 on MMLU-physics. */
 export const HERO_A_PIPELINE_CLAIM =
   'model A achieves mean per-run accuracy >= 0.72 on MMLU-physics held-out split';
-
+/** Hero-A falsification spec: accuracy must exceed 0.72 threshold. */
 export const HERO_A_FALSIFICATION_SPEC: FalsificationSpec = {
   prediction: HERO_A_PIPELINE_CLAIM,
   metric: HERO_A_METRIC_KEY,
   falsificationThreshold: 0.72,
   thresholdSemantics: 'gt',
 };
-
+/** Hero-A threshold spec: greater-than semantics at 0.72. */
 export const HERO_A_THRESHOLD_SPEC: ThresholdSpec = {
   semantics: 'gt',
   value: 0.72,
@@ -89,10 +89,13 @@ export const HERO_A_NULL_MEAN = 0.72;
  * 故样本 SD 不影响 pValue——pValue 由样本均值 + 此 preregistered popSD 决定。
  */
 export const HERO_A_POPULATION_SD = 0.04;
-
+/** Hero-A significance level (5%). */
 export const HERO_A_ALPHA = 0.05;
+/** Hero-A confidence level for interval estimates (95%). */
 export const HERO_A_CONFIDENCE_LEVEL = 0.95;
+/** Hero-A fixed random seed (SR-2, anti-p-hacking). */
 export const HERO_A_SEED = 42;
+/** Hero-A preregistration freeze timestamp (ISO 8601). */
 export const HERO_A_FROZEN_AT = '2026-07-01T00:00:00.000Z';
 
 /**
@@ -104,7 +107,7 @@ export const HERO_A_RUN_ACCURACIES: readonly number[] = [
   0.74, 0.76, 0.73, 0.77, 0.75, 0.78, 0.74, 0.76, 0.72, 0.75,
   0.77, 0.76, 0.74, 0.78, 0.75, 0.73, 0.76, 0.77, 0.75, 0.74,
 ];
-
+/** Hero-A source anchor: reproducibility fingerprint for the MMLU evaluation. */
 export const HERO_A_SOURCE_ANCHOR: SourceAnchor = {
   gitCommitSha: 'a'.repeat(40),
   dashscopeRequestId: null,
@@ -120,7 +123,8 @@ export const HERO_A_SOURCE_ANCHOR: SourceAnchor = {
 // ---------------------------------------------------------------------------
 // 真实统计计算（src/statistics/ 生产 caller）
 // ---------------------------------------------------------------------------
-
+/** Real one-sample statistics from Hero-A MMLU-physics accuracy evaluation.
+ * Contains z-test, CI, Cohen's d, adjusted p-value, and FEC StatisticalResult. */
 export interface HeroAStatistics {
   readonly sample: readonly number[];
   readonly observedMean: number;
@@ -176,7 +180,8 @@ export function buildHeroAStatistics(metricKey: string): HeroAStatistics {
 // ---------------------------------------------------------------------------
 // Pipeline B 编排（镜像 demo_chain.ts buildDemoChain shape）
 // ---------------------------------------------------------------------------
-
+/** Complete Hero-A pipeline result: statistics, machine verdict,
+ * anti-theater report, and sealed proof. */
 export interface HeroAPipelineResult {
   /** 调用方负责关闭 db。 */
   readonly db: Database.Database;
@@ -194,6 +199,7 @@ export interface HeroAPipelineResult {
   readonly sealedConclusion: Verdict;
 }
 
+/** Constant: HERO_A_ANTI_THEATER_SUMMARY. */
 export const HERO_A_ANTI_THEATER_SUMMARY =
   'Hero-A MMLU-physics accuracy eval result summary: see structured verdict and preregistered fixture samples for the directional-support conclusion.';
 

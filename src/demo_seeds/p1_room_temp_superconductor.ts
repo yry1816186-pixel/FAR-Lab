@@ -34,6 +34,7 @@ import { openDb, createSequentialGateway } from './helpers.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: P1_RAW_INPUT. */
 export const P1_RAW_INPUT = [
   'Room-temperature ambient-pressure superconductivity: LK-99 (Pb10-xCux(PO4)6O) reportedly exhibits',
   'zero electrical resistance and the Meissner effect at temperatures ≥ 300 K and ambient pressure,',
@@ -45,6 +46,7 @@ export const P1_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: P1_SOURCE_CARD. */
 export const P1_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-p1-lk99-replication-2026',
   url: 'https://doi.org/10.1038/s41586-023-06674-2',

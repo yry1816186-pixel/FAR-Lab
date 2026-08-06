@@ -48,6 +48,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: E5_RAW_INPUT. */
 export const E5_RAW_INPUT = [
   'Equilibrium Climate Sensitivity (ECS) low-sensitivity hypothesis: Some analyses claim ECS is in the',
   '"low sensitivity" range (1.5-2.0 K per CO2 doubling), implying modest climate change impacts. We',
@@ -60,6 +61,7 @@ export const E5_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: E5_SOURCE_CARD. */
 export const E5_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-e5-sherwood-2020-ecs',
   url: 'https://doi.org/10.1029/2019RG000678',
@@ -267,6 +269,9 @@ const E5_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- runSeed ----------
 
+/**
+ * run e5 seed.
+ */
 export async function runE5Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 
