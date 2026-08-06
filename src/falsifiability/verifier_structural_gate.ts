@@ -217,6 +217,8 @@ export function scanDeterministicModules(): readonly ForbiddenCallHit[] {
 
 let checkCompleted = false;
 let cachedError: VerifierStructuralGateError | null = null;
+/** 审计 P2-4：bundle 模式跳过告警已发出标志（一次性·防刷屏）。 */
+let bundleModeWarningEmitted = false;
 
 /**
  * 加载期自检确定性内核全模块源码无 forbidden call——fail-closed。
@@ -236,10 +238,19 @@ export function assertVerifierModulesClean(): void {
   // Bundle mode: the gate AST-scans .ts source, which the published bundle doesn't ship
   // (src/ is dev-only; G1). Source purity was verified before bundling by CI depth_gate;
   // the bundle is the pre-verified artifact. Skip without throwing — the deterministic
-  // kernel (R0-R9) and the 20 detectors still run at verdict time; only this load-time
+  // kernel (R0-R9) and the 22 detectors still run at verdict time; only this load-time
   // source-scan is N/A when there is no source to scan.
   if (!existsSync(join(GATE_DIR, 'verdict_kernel_v2.ts'))) {
     checkCompleted = true;
+    // 审计 P2-4：bundle 模式从"静默跳过"改为"显式告警"——信任转移须可见（不吞不静默）。
+    // 一次性 stderr 告警（进程内仅一次·memoized 后不再打）。
+    if (!bundleModeWarningEmitted) {
+      bundleModeWarningEmitted = true;
+      process.stderr.write(
+        '[far-chain] verifier structural gate: bundle mode (no src/ to AST-scan) — load-time purity check SKIPPED; ' +
+          'trust is delegated to CI depth_gate pre-bundle verification (G1).\n',
+      );
+    }
     return;
   }
   try {

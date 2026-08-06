@@ -38,6 +38,9 @@ const SANDBOX_RUNNER_PY = join(PACKAGE_ROOT, 'repro', 'science_harness', 'sandbo
 /** V1 默认固定种子（SR-2 · F8 反 p-hacking · 进 reproHash）。 */
 export const DEFAULT_SEED = 42;
 
+/** FUSION-OS-10：stdout+stderr 合计输出上限（与 verify_golden 10MB 对齐·防失控脚本耗尽宿主内存）。 */
+export const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
+
 /**
  * V1 唯一 sandbox adapter：类型层确定性 hash 计算（禁声称进程隔离）。
  * V2+ 将替换为真实 venv 子进程执行。
@@ -124,6 +127,7 @@ export function computeSandboxRunResult(
     artifactTreeHash: computeArtifactTreeHash(input.artifacts),
     wallClockMs: input.wallClockMs,
     timedOut: input.timedOut,
+    outputLimitExceeded: input.outputLimitExceeded ?? false,
     networkBlocked,
     seed,
     singleThreaded: true, // SR-7 · nthread=1 单线程确定性
@@ -320,6 +324,8 @@ interface RawVenvResult {
   readonly artifacts: readonly ArtifactManifest[];
   readonly wallClockMs: number;
   readonly timedOut: boolean;
+  /** FUSION-OS-10：输出超限强制中断（P1-2 审计修复）。 */
+  readonly outputLimitExceeded: boolean;
   readonly networkBlocked: boolean;
   readonly cpuMs: number;
   readonly peakRssKb: number;
@@ -565,6 +571,7 @@ export async function spawnVenv(
       artifacts: [],
       wallClockMs: 0,
       timedOut: false,
+      outputLimitExceeded: false,
       networkBlocked: networkPolicy === 'off',
       cpuMs: 0,
       peakRssKb: 0,
@@ -595,6 +602,9 @@ export async function spawnVenv(
     const start = Date.now();
     let timedOut = false;
     let settled = false;
+    // FUSION-OS-10：输出字节计数——stdout+stderr 合计超 MAX_OUTPUT_BYTES → 强杀（防宿主 OOM）。
+    let outputBytes = 0;
+    let outputLimitExceeded = false;
 
     const timer = setTimeout(() => {
       timedOut = true;
@@ -608,8 +618,22 @@ export async function spawnVenv(
       promiseResolve(result);
     };
 
-    child.stdout.on('data', (c: Buffer) => stdoutChunks.push(c));
-    child.stderr.on('data', (c: Buffer) => stderrChunks.push(c));
+    const onOutputChunk = (chunk: Buffer): void => {
+      outputBytes += chunk.length;
+      if (!outputLimitExceeded && outputBytes > MAX_OUTPUT_BYTES) {
+        outputLimitExceeded = true;
+        killProcessGroup(child);
+      }
+    };
+
+    child.stdout.on('data', (c: Buffer) => {
+      onOutputChunk(c);
+      stdoutChunks.push(c);
+    });
+    child.stderr.on('data', (c: Buffer) => {
+      onOutputChunk(c);
+      stderrChunks.push(c);
+    });
 
     child.on('exit', (code: number | null, signal: NodeJS.Signals | null) => {
       if (signal !== null || code === null) timedOut = true;
@@ -624,6 +648,7 @@ export async function spawnVenv(
         artifacts: [],
         wallClockMs: Date.now() - start,
         timedOut: false,
+        outputLimitExceeded: false,
         networkBlocked: networkPolicy === 'off',
         cpuMs: 0,
         peakRssKb: 0,
@@ -636,7 +661,11 @@ export async function spawnVenv(
       const wallClockMs = Date.now() - start;
       const fallbackArtifacts = input.workingDir ? collectArtifacts(input.workingDir) : [];
 
-      if (timedOut) {
+      // FUSION-OS-10：输出超限也是资源中断——与超时同等待遇（fail-closed·结果不可信）。
+      // 跨平台：Windows kill 后 exit code 可能为 1（非 signal），故不能只依赖 exit 事件的 signal 判定。
+      const effectiveTimedOut = timedOut || outputLimitExceeded;
+
+      if (effectiveTimedOut) {
         finish({
           exitCode: 124,
           stdout: stdoutText,
@@ -644,6 +673,7 @@ export async function spawnVenv(
           artifacts: fallbackArtifacts,
           wallClockMs,
           timedOut: true,
+          outputLimitExceeded,
           networkBlocked: networkPolicy === 'off',
           cpuMs: 0,
           peakRssKb: 0,
@@ -667,6 +697,7 @@ export async function spawnVenv(
           artifacts: fallbackArtifacts,
           wallClockMs,
           timedOut: false,
+          outputLimitExceeded: false,
           networkBlocked: networkPolicy === 'off',
           cpuMs: 0,
           peakRssKb: 0,
@@ -681,6 +712,7 @@ export async function spawnVenv(
         artifacts: Array.isArray(parsed.artifacts) ? parsed.artifacts : [],
         wallClockMs: typeof parsed.wallClockMs === 'number' ? parsed.wallClockMs : wallClockMs,
         timedOut: false,
+        outputLimitExceeded: false,
         networkBlocked:
           typeof parsed.networkBlocked === 'boolean' ? parsed.networkBlocked : networkPolicy === 'off',
         cpuMs: typeof parsed.cpuMs === 'number' ? parsed.cpuMs : 0,
@@ -716,6 +748,7 @@ export const venvSandboxAdapter: VenvSandboxAdapter = {
       artifacts: raw.artifacts,
       wallClockMs: raw.wallClockMs,
       timedOut: raw.timedOut,
+      outputLimitExceeded: raw.outputLimitExceeded,
       seed,
       networkBlocked: raw.networkBlocked,
       cpuMs: raw.cpuMs,

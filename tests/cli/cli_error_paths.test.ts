@@ -35,16 +35,38 @@ test('far ask: --profile competition 无凭据 → exit 2 fail-closed（凭据�
   assert.match(r.stderr, /credentials|FAR_DASHSCOPE_API_KEY/);
 });
 
-test('far ask: --profile competition 有凭据 → 构造真实 competition gateway（DIGEST G1 闭合）+ G3 阻塞 exit 2', () => {
-  // G1 闭合证据：生产入口 far ask 调 createCompetitionQwenGateway 构造真实 adapter（先前 bail 不构造）。
-  // gateway 构造可观测（registered profiles 入 stderr）·G3（calc_bridge repro bridge）阻塞 loop 执行·诚实 exit 2。
+test('far ask: --profile competition 有凭据 → 凭据门放行 + 真实调用路径（G3 已闭合·本地拒绝端口离线驱动）', () => {
+  // 2026-08-06 G3 闭合：production profile + 凭据 → 不再 G3 阻塞（环境锚替代七分量桥）。
+  // 真实 HTTP 不可离线测 → 注入 COMPETITION_BASE_URL=127.0.0.1:9（拒绝端口）→ 3 档 fallback
+  // 全部 ECONNREFUSED（毫秒级）→ RETRY_EXHAUSTED → loop error → exit 1（离线确定性）。
+  // 断言核心：凭据门已过（无 credentials 错误）+ 进入真实调用失败路径（非凭据门拒绝）。
   const r = runFar(['ask', 'test', '--profile', 'competition_aliyun_qwen'], {
     FAR_DASHSCOPE_API_KEY: 'sk-test-fake-not-used-no-http-on-construct',
+    COMPETITION_BASE_URL: 'http://127.0.0.1:9',
   });
-  assert.strictEqual(r.status, 2);
-  assert.match(r.stderr, /DIGEST G1/);
-  assert.match(r.stderr, /competition_aliyun_qwen/);
-  assert.match(r.stderr, /calc_bridge|G3/);
+  assert.notStrictEqual(r.status, 2, '凭据门放行后不得以参数错误退出');
+  assert.doesNotMatch(
+    r.stderr,
+    /needs real LLM credentials/,
+    '凭据门不得误拒（变量名对齐回归·2026-08-06）',
+  );
+  assert.doesNotMatch(
+    r.stderr,
+    /reproducibility bridge|DIGEST G3|not yet wired/,
+    'G3 已闭合：不得再报 repro bridge 阻塞',
+  );
+});
+
+test('far ask: --profile competition 仅 DASHSCOPE_API_KEY（.env SSOT 名）→ 凭据门放行（变量名对齐回归）', () => {
+  // 2026-08-06 修复：凭据门此前只读 FAR_DASHSCOPE_API_KEY，忽略 adapter 层 SSOT 变量名
+  // DASHSCOPE_API_KEY——已配置 .env 的用户被误拒。修复后回退读取 → 进入真实调用路径
+  // （本地拒绝端口·离线确定性）。
+  const r = runFar(['ask', 'test', '--profile', 'competition_aliyun_qwen'], {
+    DASHSCOPE_API_KEY: 'sk-test-fake-not-used-no-http-on-construct',
+    COMPETITION_BASE_URL: 'http://127.0.0.1:9',
+  });
+  assert.notStrictEqual(r.status, 2, '凭据门放行后不得以参数错误退出');
+  assert.doesNotMatch(r.stderr, /needs real LLM credentials/, '凭据门不得误拒 DASHSCOPE_API_KEY');
 });
 
 test('far ask: --mode 非法值 → exit 非 0（参数校验）', () => {

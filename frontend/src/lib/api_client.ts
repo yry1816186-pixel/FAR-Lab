@@ -117,29 +117,48 @@ async function throwForStatus(response: Response, url: string): Promise<never> {
   );
 }
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * fetch + 超时中止（审计 P1-5：无 AbortController 时拖尾请求可无限挂起）。
+ * 默认 60s——与后端 LLM 单次调用超时对齐；超时抛 DOMException AbortError（调用方可按需捕获）。
+ */
+const FETCH_TIMEOUT_MS = 60_000;
+
+async function fetchJson<T>(path: string, init?: RequestInit, timeoutMs: number = FETCH_TIMEOUT_MS): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!response.ok) {
-    await throwForStatus(response, url);
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+    });
+    if (!response.ok) {
+      await throwForStatus(response, url);
+    }
+    return (await response.json()) as T;
+  } finally {
+    window.clearTimeout(timer);
   }
-  return (await response.json()) as T;
 }
 
 /** Fetch a non-JSON body (e.g. the GET /report HTML response, Epic K-05b). */
-async function fetchText(path: string, init?: RequestInit): Promise<string> {
+async function fetchText(path: string, init?: RequestInit, timeoutMs: number = FETCH_TIMEOUT_MS): Promise<string> {
   const url = `${API_BASE_URL}${path}`;
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    await throwForStatus(response, url);
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    if (!response.ok) {
+      await throwForStatus(response, url);
+    }
+    return response.text();
+  } finally {
+    window.clearTimeout(timer);
   }
-  return response.text();
 }
 
 // ---------- Query keys ----------
@@ -361,14 +380,32 @@ export function useCourtDemo(
 }
 
 /** POST /api/v1/hypothesize — kick off a research loop. Returns loopState + graph + verdict + reproHash. */
+/**
+ * 审计 P0-2：生成客户端确定性幂等键（同输入 → 同 key → 服务端幂等重放）。
+ * FNV-1a 64-bit——**同步**（异步 crypto.subtle.digest 完成顺序不保证，会打乱并行
+ * mutation 的 fetch 顺序导致 mock/实际响应错位）；跨环境确定性。
+ * 幂等键非安全边界（客户端可自选 key·服务端仅按 key 去重），无需密码学强度。
+ */
+function hypothesizeIdempotencyKey(body: HypothesizeRequest): string {
+  const text = `${body.researchInput}|${body.mode ?? ''}|${body.dialogueMode ?? ''}`;
+  let h = 0xcbf29ce484222325n;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= BigInt(text.charCodeAt(i));
+    h = (h * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return `v1-${h.toString(16).padStart(16, '0')}`;
+}
+
 export function useHypothesize() {
   const queryClient = useQueryClient();
   return useMutation<HypothesizeResponse, Error, HypothesizeRequest>({
-    mutationFn: (body: HypothesizeRequest) =>
-      fetchJson<HypothesizeResponse>('/api/v1/hypothesize', {
+    mutationFn: (body: HypothesizeRequest) => {
+      const idempotencyKey = hypothesizeIdempotencyKey(body);
+      return fetchJson<HypothesizeResponse>('/api/v1/hypothesize', {
         method: 'POST',
-        body: JSON.stringify(body),
-      }),
+        body: JSON.stringify({ ...body, idempotencyKey }),
+      });
+    },
     onSuccess: (data) => {
       // `data.honestVerdict` is the raw VerdictNode shape (parentVerdictId/verdict/replayProver),
       // which is NOT interchangeable with the HonestVerdictDto shape served by GET /verdict/:id
@@ -389,4 +426,5 @@ export const __testables = {
   fetchJson,
   fetchText,
   throwForStatus,
+  hypothesizeIdempotencyKey,
 };

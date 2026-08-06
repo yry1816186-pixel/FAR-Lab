@@ -136,3 +136,32 @@ test('loadReport shape 不符（合法 JSON 缺字段）→ 500 INTERNAL_ERROR',
     __resetBenchmarkCache();
   }
 });
+
+test('loadReport 文件变更后重读（mtime 失效·不返回陈旧缓存）', async () => {
+  __resetBenchmarkCache();
+  const tmp = join(tmpdir(), `far-bench-mtime-${process.pid}.json`);
+  const makeReport = (root: string) => JSON.stringify({
+    schemaVersion: 2,
+    entries: [{ problemId: 'P-1' }],
+    suiteIntegrityRoot: root,
+  });
+  try {
+    writeFileSync(tmp, makeReport('a'.repeat(64)), 'utf8');
+    const first = loadReport(tmp);
+    assert.equal(first.suiteIntegrityRoot, 'a'.repeat(64));
+
+    // 模拟 generate 脚本重写报告：等 20ms 确保 mtime 变化后覆盖。
+    await new Promise((r) => setTimeout(r, 20));
+    writeFileSync(tmp, makeReport('b'.repeat(64)), 'utf8');
+
+    const second = loadReport(tmp);
+    assert.equal(
+      second.suiteIntegrityRoot,
+      'b'.repeat(64),
+      '文件已变更（mtime 前进）时不得返回旧缓存',
+    );
+  } finally {
+    rmSync(tmp, { force: true });
+    __resetBenchmarkCache();
+  }
+});

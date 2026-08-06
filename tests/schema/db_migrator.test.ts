@@ -14,11 +14,11 @@ test('runMigrations applies 0001_initial and records schema version', () => {
   const db = new Database(':memory:');
   try {
     const result = runMigrations(db);
-    assert.deepEqual(result.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]);
+    assert.deepEqual(result.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]);
     assert.deepEqual(result.skipped, []);
 
     const rows = getSchemaMetaRows(db);
-    assert.equal(rows.length, 23);
+    assert.equal(rows.length, 24);
     assert.equal(rows[0]?.version, 1);
     assert.equal(rows[0]?.name, '0001_initial');
     assert.equal(rows[1]?.version, 2);
@@ -65,6 +65,8 @@ test('runMigrations applies 0001_initial and records schema version', () => {
     assert.equal(rows[21]?.name, '0022_narrow_comparator_check');
     assert.equal(rows[22]?.version, 23);
     assert.equal(rows[22]?.name, '0023_v2_receipts');
+    assert.equal(rows[23]?.version, 24);
+    assert.equal(rows[23]?.name, '0024_hypothesize_idempotency');
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -77,6 +79,7 @@ test('runMigrations applies 0001_initial and records schema version', () => {
     assert.ok(tableNames.includes('proof_envelopes_v2'), '0010 须建 proof_envelopes_v2 表');
     assert.ok(tableNames.includes('v2_receipts'), '0023 须建 v2_receipts 表');
     assert.ok(tableNames.includes('v2_manifest_members'), '0023 须建 v2_manifest_members 表');
+    assert.ok(tableNames.includes('hypothesize_idempotency'), '0024 须建 hypothesize_idempotency 表');
   } finally {
     db.close();
   }
@@ -88,7 +91,7 @@ test('runMigrations skips already applied versions', () => {
     runMigrations(db);
     const result = runMigrations(db);
     assert.deepEqual(result.applied, []);
-    assert.deepEqual(result.skipped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]);
+    assert.deepEqual(result.skipped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]);
   } finally {
     db.close();
   }

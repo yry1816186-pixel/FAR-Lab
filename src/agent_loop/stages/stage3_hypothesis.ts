@@ -23,12 +23,14 @@ import type {
   ThresholdSpec,
 } from '../../falsifiability/types.ts';
 import type { LlmMessage } from '../../llm_gateway/types.ts';
+import { sanitizeExternalContent } from '../../llm_gateway/sanitizer.ts';
 import type {
   FalsificationMethod,
   HypothesisPayload,
   StageArtifact,
   StageContext,
 } from '../types.ts';
+import { VERDICT_KIND_TO_HINT } from '../verdict_hints.ts';
 import { runStage } from '../run_stage.ts';
 import { HypothesisSchema } from './schemas.ts';
 import { STAGE_TO_PURPOSE_TAG } from '../stage_purpose.ts';
@@ -124,6 +126,22 @@ function buildHypothesisMessages(ctx: StageContext): readonly LlmMessage[] {
       ctx.feedbackSignal.refinements.length > 0
         ? ctx.feedbackSignal.refinements.map((r, i) => `${i + 1}. ${r}`).join('\n')
         : '(no specific refinements)',
+    );
+  }
+
+  // V2 裁决驱动反馈边：注入上一轮循环内中间裁决 kind 作为软建议（regen 方向指导）。
+  // 遵最小信息原则：仅传 5 值枚举 + 一句抽象修正方向（VERDICT_KIND_TO_HINT），
+  // 禁传 reasonCode/metricValue/threshold（防 LLM 反推裁决逻辑构造"刚好过"假设·security-auditor C2 缓解）。
+  // 缺省（首轮/未开启 verdictDrivenFeedback）= undefined → 不注入，prompt 字节等同基线（回归兼容）。
+  if (ctx.verdictHint !== undefined) {
+    const hint = VERDICT_KIND_TO_HINT[ctx.verdictHint];
+    const sanitized = sanitizeExternalContent(
+      `Previous iteration verdict (deterministic kernel): ${ctx.verdictHint}. ${hint}`,
+    );
+    userParts.push(
+      '',
+      'For reference only — adjust the hypothesis direction if warranted:',
+      sanitized.text,
     );
   }
 

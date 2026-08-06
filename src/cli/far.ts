@@ -849,7 +849,7 @@ USAGE:
     --json              machine-readable 10-field schema output
     --explain           human-readable mode: expand the 10-rule check table
     --lint-input <path> AntiTheaterLintInput JSON (requires --envelope; independently recomputes the
-                        20 detectors and compares them in depth with the embedded report;
+                        22 detectors and compares them in depth with the embedded report;
                         any divergence => status FAIL, exit 7)
     exit codes: 0 PASS / 7 FAIL / 2 bad args / 1 runtime error
 

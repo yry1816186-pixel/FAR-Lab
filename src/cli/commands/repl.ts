@@ -127,7 +127,14 @@ export async function runRepl(): Promise<number> {
 
   return new Promise<number>((resolve) => {
     rl.on('line', (line: string) => {
-      queue = queue.then(() => processLine(line));
+      // 防御：processLine 内部有 try/catch，但 try 之外的意外 throw 会让 queue 变 rejected，
+      // 后续行全部静默跳过。catch 保持链不断（审计 P2-5）。
+      queue = queue
+        .then(() => processLine(line))
+        .catch((err: unknown) => {
+          process.stdout.write(`  ✗ unexpected repl error: ${err instanceof Error ? err.message : String(err)}\n`);
+          rl.prompt();
+        });
     });
     rl.on('close', () => {
       process.stdout.write(`\n  far repl ended (${history.length} runs)\n\n`);

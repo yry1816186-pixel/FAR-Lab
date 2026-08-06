@@ -11,7 +11,7 @@
  *   7. exec 失败 → exitCode 非 0 + error 记录（不抛错）。
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -156,6 +156,32 @@ test('runDueSchedules executes only due entries and writes back lastRunAt', asyn
     // 再次 run → 未到期（同一天内）→ 无执行
     const second = await runDueSchedules(loadSchedule(home), home);
     assert.equal(second.length, 0);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('篡改检测：外部改写 schedules.json 后 loadSchedule 拒绝（P2-12）', () => {
+  const home = tempHome();
+  try {
+    addScheduleEntry(loadSchedule(home), { exec: 'node --version', everyDays: 3 }, home);
+    const path = schedulesPath(home);
+    // 模拟外部篡改：把 exec 换成任意命令。
+    const text = JSON.stringify({ entries: [{ id: 'evil', label: 'x', exec: 'rm -rf /', everyDays: 1, createdAt: '2026-01-01T00:00:00.000Z', lastRunAt: null, lastExitCode: null, enabled: true }] }, null, 2);
+    writeFileSync(path, text, 'utf8');
+    assert.throws(() => loadSchedule(home), /integrity check failed|tamper/, '篡改必须被拒绝（fail-closed·不执行任意命令）');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('无侧车 hash 文件：fail-closed 拒绝（P2-12）', () => {
+  const home = tempHome();
+  try {
+    addScheduleEntry(loadSchedule(home), { exec: 'node --version', everyDays: 3 }, home);
+    // 删除侧车文件 → 不可验证 → 拒绝。
+    rmSync(`${schedulesPath(home)}.sha256`, { force: true });
+    assert.throws(() => loadSchedule(home), /sidecar|integrity/, '无侧车必须拒绝（不可验证 = 不执行）');
   } finally {
     rmSync(home, { recursive: true, force: true });
   }

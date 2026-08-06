@@ -78,6 +78,10 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   const app = Fastify({
     logger: config.logger ?? false,
     bodyLimit: 10 * 1024 * 1024,
+    // 审计 P1-5：请求超时总保险丝——LLM fallback 链最坏路径（60s×3 档 + withRetry 退避）理论 ~720s，
+    // 900s 不误杀慢调用，但封顶防连接无限挂起；空闲连接 60s 回收。
+    requestTimeout: 900_000,
+    connectionTimeout: 60_000,
   });
 
   await app.register(helmet, { contentSecurityPolicy: false });
@@ -167,6 +171,9 @@ export async function startServer(
 
   const shutdown = async (): Promise<void> => {
     await app.close();
+    // WAL checkpoint：显式关闭 DB（better-sqlite3 建议——确保未 checkpoint 的 WAL 数据落盘）。
+    // close() 幂等（已关闭时 no-op）。
+    config.db.close();
     process.exit(0);
   };
   process.on('SIGINT', () => void shutdown());

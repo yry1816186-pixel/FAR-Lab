@@ -9,22 +9,21 @@
 // 「6-stage FSM 端到端跑通 + 证据链完整性 + 确定性裁决内核接线」，绝非「AI 证明科学结论为真」。
 // 红线：LLM 不作最终裁决者——裁决由 R0-R9 确定性内核给出（verdictNode.verdictTrace）。
 
-import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 
+// 审计 P1-1 分层修复：executeAskRun 核心逻辑上提至共享 domain 层
+// （src/api/internal/ask_runner.ts），本文件 import + re-export 保持 CLI 调用面零回归。
+import { executeAskRun } from '../../api/internal/ask_runner.ts';
+export { executeAskRun } from '../../api/internal/ask_runner.ts';
 import { executeLoop } from '../../api/internal/loop_runner.ts';
-import type { LoopRunnerResult } from '../../api/internal/loop_runner.ts';
-import type { StageArtifact } from '../../agent_loop/types.ts';
 import { openFarDb } from '../../db/open.ts';
 import type { LlmGateway } from '../../llm_gateway/gateway.ts';
 import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
+import { COMPETITION_MODEL_SNAPSHOT } from '../../llm_gateway/adapters/aliyun_qwen/snapshot.ts';
 import {
   computeEnvHash,
-  machineSealableConclusion,
   DEMO_MODEL_SNAPSHOT,
 } from '../../far_proof/demo_chain.ts';
-import { sealProofEnvelope } from '../../proof_envelope/index.ts';
-import { GENESIS_PROOF_HASH } from '../../proof_envelope/types.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 import { runExportFarProof } from './export_far_proof.ts';
 
@@ -37,6 +36,8 @@ export interface AskArgs {
   readonly exportDir: string | null;
   readonly resumePath: string | null;
   readonly profile: string;
+  /** V2 裁决驱动反馈边（--verdict-driven·循环内中间裁决驱动终止 + regen 方向软建议）。 */
+  readonly verdictDriven: boolean;
 }
 
 /**
@@ -50,6 +51,7 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
   let exportDir: string | null = null;
   let resumePath: string | null = null;
   let profile = 'offline_replay';
+  let verdictDriven = false;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -82,6 +84,10 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
       profile = argv[++i] ?? profile;
       continue;
     }
+    if (a === '--verdict-driven') {
+      verdictDriven = true;
+      continue;
+    }
     if (a.startsWith('--')) {
       throw new Error(`far ask: unknown argument "${a}"`);
     }
@@ -92,7 +98,7 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
     }
   }
 
-  return { question, mode, dbPath, json, exportDir, resumePath, profile };
+  return { question, mode, dbPath, json, exportDir, resumePath, profile, verdictDriven };
 }
 
 /** Interface defining ask render. */
@@ -110,6 +116,8 @@ export interface AskRender {
   readonly profile: string;
   readonly honestNote: string;
   readonly traceGrade: { readonly score: number; readonly gradedBy: string; readonly failureCodes: readonly string[] };
+  /** 循环内中间裁决序列（verdictDrivenFeedback 开启时·审计显示）。 */
+  readonly intermediateVerdicts: readonly string[];
 }
 
 /**
@@ -134,6 +142,9 @@ export function buildRender(result: Awaited<ReturnType<typeof executeLoop>>, pro
       profile === 'offline_replay'
         ? 'offline_replay fixture driven (not a real scientific verdict) — real inference needs --profile competition_aliyun_qwen + FAR_DASHSCOPE_API_KEY'
         : `profile=${profile}`,
+    intermediateVerdicts: ls.intermediateVerdicts.map(
+      (iv) => `${iv.iteration}:${iv.verdict}`,
+    ),
     traceGrade: {
       score: result.traceGrade.score,
       gradedBy: result.traceGrade.gradedBy,
@@ -143,50 +154,9 @@ export function buildRender(result: Awaited<ReturnType<typeof executeLoop>>, pro
 }
 
 /**
- * executeAskRun —— run 6-stage FSM + ASK-9 降级密封（ask/stream/repl 共享）。
- *
- * runAgentLoop 不密封——sealing 是调用方职责（与 buildDemoChain 同模式）。
- * 密封须在 db 关闭前写 proof_envelopes 表。onArtifact 可选（流式输出）。
+ * executeAskRun —— 已上提至 src/api/internal/ask_runner.ts（审计 P1-1 分层修复），
+ * 本文件顶部 re-export 保持 CLI 调用面零回归。
  */
-export async function executeAskRun(
-  db: Database.Database,
-  question: string,
-  mode: 'full' | 'quick',
-  gitCommitSha: string,
-  onArtifact?: (artifact: StageArtifact) => void,
-  gateway?: LlmGateway,
-  resumeStorePath?: string,
-): Promise<LoopRunnerResult> {
-  const result = await executeLoop({
-    researchInput: question,
-    mode,
-    evidenceLogDb: db,
-    gitCommitSha,
-    ...(resumeStorePath === undefined ? {} : { resumeStorePath }),
-    ...(onArtifact === undefined ? {} : { onArtifact }),
-    ...(gateway === undefined ? {} : { gateway }),
-  });
-
-  if (result.loopState.verdictNode !== null) {
-    const vn = result.loopState.verdictNode;
-    const { conclusion, needsHumanEndorsement } = machineSealableConclusion(vn.verdict);
-    sealProofEnvelope(db, {
-      claimId: result.runId,
-      verdictNodeId: vn.verdictId,
-      conclusion,
-      prevProofHash: GENESIS_PROOF_HASH,
-      checks: [],
-      knownFailures: needsHumanEndorsement
-        ? [`machine verdict was ${vn.verdict} but downgraded to INCONCLUSIVE for sealing (ASK-9: CONFIRMED requires human endorsement)`]
-        : [],
-      falsificationSpec: vn.falsificationSpec,
-      sourceAnchor: vn.sourceAnchor,
-      reproHash: result.reproHash,
-      sealedAt: new Date().toISOString(),
-    });
-  }
-  return result;
-}
 
 function renderHuman(args: AskArgs, render: AskRender): void {
   const lines = [
@@ -204,6 +174,10 @@ function renderHuman(args: AskArgs, render: AskRender): void {
     lines.push(`  rule     : ${render.decisiveRuleId}  (${render.reasonCodes.join(', ')})`);
   } else {
     lines.push('  verdict  : <verdict stage not reached>');
+  }
+  const ls = render.intermediateVerdicts.length > 0 ? render.intermediateVerdicts.join(' → ') : '';
+  if (ls !== '') {
+    lines.push(`  iter verdicts : ${ls}  (deterministic kernel per iteration)`);
   }
   lines.push(`  chain    : ${render.chainHeadHash ?? '<empty chain>'}`);
   if (render.error !== null) {
@@ -225,17 +199,23 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
 
   if (args.question.trim().length === 0) {
     process.stderr.write(
-      'far ask: missing question.\n  usage: far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--profile offline_replay]\n',
+      'far ask: missing question.\n  usage: far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--profile offline_replay] [--verdict-driven]\n',
     );
     return 2;
   }
 
+  // competition 路径的可选注入（G3 闭合后：真实 gateway + 环境锚 modelSnapshot）
+  let competitionGateway: LlmGateway | undefined;
+  let competitionModelSnapshot: string | undefined;
   if (args.profile !== 'offline_replay') {
-    const apiKey = process.env.FAR_DASHSCOPE_API_KEY;
+    // 凭据门：FAR_DASHSCOPE_API_KEY 优先（历史 CLI 变量名）·回退 DASHSCOPE_API_KEY（adapter 层 SSOT 变量名）。
+    // 修复 2026-08-06：此前只读 FAR_DASHSCOPE_API_KEY，而 .env/.env.example 与 qwen_adapter 均用
+    // DASHSCOPE_API_KEY——已配置 .env 的用户会被凭据门误拒（真实 bug·变量名不一致）。
+    const apiKey = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
     if (apiKey === undefined || apiKey === '') {
       process.stderr.write(
         `far ask: profile "${args.profile}" needs real LLM credentials.\n` +
-          '  set FAR_DASHSCOPE_API_KEY=sk-xxx and retry (qwen_adapter real HTTP).\n' +
+          '  set FAR_DASHSCOPE_API_KEY=sk-xxx or DASHSCOPE_API_KEY=sk-xxx (in .env) and retry (qwen_adapter real HTTP).\n' +
           '  default offline_replay needs no credentials (fixture replay).\n',
       );
       return 2;
@@ -248,17 +228,11 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
         'far ask: competition gateway failed to register competition_aliyun_qwen adapter (G1 wiring broken)',
       );
     }
-    // G3（repro bridge / calc_bridge）仍是 CLI loop 执行硬阻塞：calc_bridge.compute_repro_hash 需七分量 ReproContext
-    // （sandbox P1-6 产出·CLI loop 无此上下文）→ executeLoop 会抛 REPRO_BRIDGE_NOT_CONFIGURED。故 loop 暂不可跑；
-    // fallback chain（429/5xx/timeout → degraded_from）由 tests/llm_gateway/*_fallback.test.ts 验证。
-    process.stderr.write(
-      `far ask: profile "${args.profile}" gateway constructed (DIGEST G1 ✓; registered: ${gateway.registeredProfiles().join(', ')}),\n` +
-        '  but the CLI loop requires the reproducibility bridge (calc_bridge · DIGEST G3), which is not yet wired\n' +
-        '  for the CLI loop (blocked on sandbox P1-6: calc_bridge needs the 7-factor ReproContext from a real sandbox run).\n' +
-        '  the fallback chain is verified via tests/llm_gateway/*_fallback.test.ts.\n' +
-        '  use --profile offline_replay for the runnable demo (zero credentials).\n',
-    );
-    return 2;
+    // G3 闭合（2026-08-06）：CLI loop 此前被 repro bridge 硬阻塞——七分量 calc_bridge 是实验路径
+    // 语义（agent_loop 无实验可哈希），现以 LLM 调用环境锚（modelSnapshot+活跃模型+环境版本·repro_anchor.ts）
+    // 作为 cred.reproHash 的真实确定性指纹（非占位非伪造·文档化裁决见 repro_anchor.ts 头注释）。
+    competitionGateway = gateway;
+    competitionModelSnapshot = COMPETITION_MODEL_SNAPSHOT;
   }
 
   // run.db 放 exportDir 旁（避免 force rmSync 冲突 + 不污染产物目录）。
@@ -277,8 +251,10 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
       args.mode,
       gitCommitSha,
       undefined,
-      undefined,
+      competitionGateway,
       args.resumePath ?? undefined,
+      args.verdictDriven || undefined,
+      competitionModelSnapshot,
     );
 
     const render = buildRender(result, args.profile, args.question);

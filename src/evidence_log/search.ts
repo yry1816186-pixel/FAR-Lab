@@ -107,6 +107,14 @@ export function searchEvidence(
     throw new Error('evidence_log.searchEvidence: query must be non-empty');
   }
   ensureFtsIndex(db);
+  // 审计 P0-1：懒同步——FTS 索引与 evidence_log 行数不等（新写入/删除后）→ 自动全量重建。
+  // evidence_log 是 append-only 哈希链（无 UPDATE），COUNT 相等 = 镜像一致；不相等 = 陈旧。
+  // 不阻塞哈希链事务（重建独立事务），写入频率低 → 每次 search 前 COUNT 比较（O(1)）成本可忽略。
+  const logCount = (db.prepare('SELECT COUNT(*) AS c FROM evidence_log').get() as { c: number }).c;
+  const ftsCount = (db.prepare('SELECT COUNT(*) AS c FROM evidence_fts').get() as { c: number }).c;
+  if (logCount !== ftsCount) {
+    reindexEvidenceFts(db);
+  }
   const limit = options.limit ?? DEFAULT_LIMIT;
   if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
     throw new Error('evidence_log.searchEvidence: limit must be an integer in [1, 200]');

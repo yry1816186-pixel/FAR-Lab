@@ -10,6 +10,12 @@
  *   的 evidence_id FK，也满足 recordVerdict 对 CONFIRMED 的 assertConfirmedEvidenceExists 守卫
  *   （Red Line #7：CONFIRMED 必须有非空 evidence_payload）。
  *
+ * V2 裁决驱动反馈边（T-016 V2 roadmap 项·2026-08-06 落地）：
+ *   - computeVerdictDecision：纯计算（无 DB 副作用）——被 runVerdictStage（终局落库）与
+ *     evaluateIntermediateVerdict（循环内中间评估·不落库）共同复用（单一计算权威·DRY）。
+ *   - 中间裁决不落 evidence_log / verdict_nodes（不改变链长·终局 VerdictNode 语义不变），
+ *     仅随 LoopState.intermediateVerdicts 返回 + session JSONL 记录（审计·可复算）。
+ *
  * 类型转换（agent_loop EvidenceRecord → falsifiability EvidenceRecord）：
  *   - supportsOrRefutes='supports' → supportsClaim=true, refutesClaim=false
  *   - supportsOrRefutes='refutes'   → supportsClaim=false, refutesClaim=true
@@ -40,7 +46,10 @@ import type {
   FalsificationSpec,
   ThresholdSpec,
   VerdictNode,
+  VerdictResult,
+  VerdictTracePersisted,
 } from '../falsifiability/index.ts';
+import type { VerdictKernelOutput } from '../falsifiability/index.ts';
 import {
   buildLegacyVerdictKernelInput,
   extractVerdictTrace,
@@ -54,6 +63,7 @@ import type {
   StageArtifact,
 } from './types.ts';
 import type { EvidenceRecord } from './types.ts';
+import type { Verdict } from '../schema/enums.ts';
 
 /** Input parameters for operations involving run verdict stage args. */
 export interface RunVerdictStageArgs {
@@ -163,21 +173,45 @@ function resolveHypothesisCallRecordSeq(db: Database): number | null {
   return head === undefined ? null : head.seq;
 }
 
-// ---------- runVerdictStage 主入口 ----------
+// ---------- 纯计算（无 DB 副作用·runVerdictStage 与 evaluateIntermediateVerdict 共享） ----------
 
 /**
- * 第 7 阶段：裁决接通。六阶段收敛后产真实 VerdictNode。
+ * 纯裁决计算产出（不含任何 DB 写入）。
  *
- * 流程（单事务·原子）：
+ * runVerdictStage 用其中间结果落库；evaluateIntermediateVerdict 只取
+ * verdict / decisiveRuleId / verdictInputHash（循环内中间评估·不落库）。
+ */
+export interface VerdictComputation {
+  readonly hypothesis: HypothesisPayload;
+  readonly evidence: EvidencePayload;
+  readonly spec: FalsificationSpec;
+  readonly thresholdSpec: ThresholdSpec;
+  readonly convertedEvidences: FalsEvidenceRecord[];
+  readonly verdictInputHash: string;
+  readonly sourceAnchor: SourceAnchor;
+  readonly fec: ReturnType<typeof makeLegacyCompatFec>;
+  readonly kernelOutput: VerdictKernelOutput;
+  readonly decision: VerdictResult;
+  readonly verdictTrace: VerdictTracePersisted;
+}
+
+/**
+ * 纯裁决计算（无 DB 副作用·DRY 单一计算权威）。
+ *
+ * 流程（与历史 runVerdictStage 计算部分逐字节对齐·行为不变）：
  *   1. 检索最近 hypothesis + evidence artifact；缺失 → 返回 null。
  *   2. toFalsificationSpecAndThreshold（复用 stage3 单一转换权威）+ resolveThresholdSpec。
  *   3. convertEvidenceRecords（过滤 neutral·投票映射）。
- *   4. 解析 hypothesis call_record seq；空链 → 返回 null。
- *   5. 事务内：appendEvidenceLog（hypothesis 证据行）→ V2 verdict kernel → recordVerdict。
+ *   4. 构造 verdictInputHash（确定性指纹·"绑定裁决了什么"·可复算）+ sourceAnchor。
+ *   5. V2 verdict kernel → VerdictResult + VerdictTracePersisted。
  *
- * @returns VerdictNode（落库读回）；缺前提时返回 null（文档化降级·非错误）
+ * @throws 计算路径真实异常向上传播（禁 fallback 掩盖·fail-closed 与历史 runVerdictStage 一致）
  */
-export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
+export function computeVerdictDecision(args: {
+  readonly artifacts: readonly StageArtifact[];
+  readonly runId: string;
+  readonly gitCommitSha: string;
+}): VerdictComputation | null {
   const hypothesis = findLastHypothesis(args.artifacts);
   const evidence = findLastEvidence(args.artifacts);
   if (hypothesis === undefined || evidence === undefined) {
@@ -188,11 +222,6 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
     hypothesis.falsificationMethod,
   );
   const thresholdSpec = resolveThresholdSpec(spec, rangeThreshold);
-
-  const callRecordSeq = resolveHypothesisCallRecordSeq(args.db);
-  if (callRecordSeq === null) {
-    return null;
-  }
 
   // 先从原始记录算投票摘要（用于 rawResponseHash·打破 sourceAnchor↔converted 的循环依赖）
   const evidenceVotes = evidence.evidenceRecords.map((record) => ({
@@ -213,13 +242,129 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
     dashscopeRequestId: null,
     isoTimestamp,
     rawResponseHash: verdictInputHash,
-    codeLocation: { filePath: 'src/agent_loop/verdict_stage.ts', location: 'runVerdictStage' },
+    codeLocation: { filePath: 'src/agent_loop/verdict_stage.ts', location: 'computeVerdictDecision' },
   };
   const convertedEvidences = convertEvidenceRecords(
     evidence.evidenceRecords,
     hypothesis.claim,
     sourceAnchor,
   );
+
+  const fec = makeLegacyCompatFec({
+    claimId: args.runId,
+    falsificationSpec: spec,
+    thresholdSpec,
+    frozenAt: isoTimestamp,
+  });
+  const kernelOutput = decideFiveValueVerdict(
+    // FUSION-OS-1:agent_loop 是文献投票路径(输入为文献蕴含 supports/refutes 投票·非实验数据),
+    // anti-theater 检测实验 theater(seed-cherry/p-hacking/metric-swap)对文献投票不适用——无实验数据
+    // 无 theater 风险。故 buildLegacyVerdictKernelInput 不加 anti_theater_not_linted flag(见该函数注释)。
+    // CONTRA-005 PATH-A(Round 4 裁决):标 evidenceBasis='observational_only'——文献投票证据非实验产出,
+    // 若声明 claimType='causal' 且 ConfoundingGate FAIL → kernel 追加 F6_CAUSAL_HONESTY reasonCode(诚实降级,
+    // 不新增第六值,保 INV-01)。文献 CONFIRMED 语义保持(非因果声明不受影响)。实验路径的 anti-theater
+    // 强制门在 orchestrator fecAppendClaim。
+    buildLegacyVerdictKernelInput({
+      claim: hypothesis.claim,
+      evidences: convertedEvidences,
+      falsificationSpec: spec,
+      thresholdSpec,
+      fec,
+      evidenceBasis: 'observational_only',
+    }),
+  );
+  const decision = verdictResultFromKernelOutput(kernelOutput);
+  const verdictTrace = extractVerdictTrace(kernelOutput);
+
+  return {
+    hypothesis,
+    evidence,
+    spec,
+    thresholdSpec,
+    convertedEvidences,
+    verdictInputHash,
+    sourceAnchor,
+    fec,
+    kernelOutput,
+    decision,
+    verdictTrace,
+  };
+}
+
+// ---------- 循环内中间裁决评估（无副作用·V2 裁决驱动反馈边） ----------
+
+/**
+ * 中间裁决评估产出（evaluateIntermediateVerdict 的返回形态）。
+ */
+export interface IntermediateVerdictEval {
+  readonly verdict: Verdict;
+  readonly decisiveRuleId: string | null;
+  /** 裁决输入确定性指纹（= 终局 verdictInputHash·与 final 裁决同路径·用于重复输入检测）。 */
+  readonly inputHash: string;
+}
+
+/**
+ * 循环内中间裁决评估（V2 裁决驱动反馈边）。
+ *
+ * 无副作用：不落 evidence_log / verdict_nodes（不改变链长·终局 VerdictNode 语义不变），
+ * 仅返回 { verdict, decisiveRuleId, inputHash } 供 fsm_runner 做裁决驱动终止判定 +
+ * 下一轮 stage3 软建议注入 + LoopState.intermediateVerdicts 审计记录。
+ *
+ * 缺前提（无 hypothesis/evidence）→ 返回 null（本轮不参与裁决驱动判定·回退 LLM 自评）。
+ * 计算路径真实异常向上传播（fail-closed·与 runVerdictStage 一致）。
+ */
+export function evaluateIntermediateVerdict(args: {
+  readonly artifacts: readonly StageArtifact[];
+  readonly runId: string;
+  readonly gitCommitSha: string;
+}): IntermediateVerdictEval | null {
+  const computation = computeVerdictDecision(args);
+  if (computation === null) {
+    return null;
+  }
+  return {
+    verdict: computation.decision.verdict,
+    decisiveRuleId: computation.verdictTrace.decisiveRuleId,
+    inputHash: computation.verdictInputHash,
+  };
+}
+
+// ---------- runVerdictStage 主入口 ----------
+
+/**
+ * 第 7 阶段：裁决接通。六阶段收敛后产真实 VerdictNode。
+ *
+ * 流程（纯计算 computeVerdictDecision + 单事务·原子落库）：
+ *   1. computeVerdictDecision（无 DB 副作用·与循环内中间裁决同路径）。
+ *   2. 解析 hypothesis call_record seq；空链 → 返回 null。
+ *   3. 事务内：appendEvidenceLog（hypothesis 证据行）→ recordVerdict。
+ *
+ * @returns VerdictNode（落库读回）；缺前提时返回 null（文档化降级·非错误）
+ */
+export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
+  const computation = computeVerdictDecision({
+    artifacts: args.artifacts,
+    runId: args.runId,
+    gitCommitSha: args.gitCommitSha,
+  });
+  if (computation === null) {
+    return null;
+  }
+  const {
+    hypothesis,
+    evidence,
+    spec,
+    thresholdSpec,
+    convertedEvidences,
+    sourceAnchor,
+    decision,
+    verdictTrace,
+  } = computation;
+
+  const callRecordSeq = resolveHypothesisCallRecordSeq(args.db);
+  if (callRecordSeq === null) {
+    return null;
+  }
 
   const txn = args.db.transaction((): VerdictNode => {
     const evidenceLogEntry = appendEvidenceLog(args.db, {
@@ -237,31 +382,6 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
       derivable: 1,
     });
 
-    const fec = makeLegacyCompatFec({
-      claimId: args.runId,
-      falsificationSpec: spec,
-      thresholdSpec,
-      frozenAt: isoTimestamp,
-    });
-    const kernelOutput = decideFiveValueVerdict(
-      // FUSION-OS-1:agent_loop 是文献投票路径(输入为文献蕴含 supports/refutes 投票·非实验数据),
-      // anti-theater 检测实验 theater(seed-cherry/p-hacking/metric-swap)对文献投票不适用——无实验数据
-      // 无 theater 风险。故 buildLegacyVerdictKernelInput 不加 anti_theater_not_linted flag(见该函数注释)。
-      // CONTRA-005 PATH-A(Round 4 裁决):标 evidenceBasis='observational_only'——文献投票证据非实验产出,
-      // 若声明 claimType='causal' 且 ConfoundingGate FAIL → kernel 追加 F6_CAUSAL_HONESTY reasonCode(诚实降级,
-      // 不新增第六值,保 INV-01)。文献 CONFIRMED 语义保持(非因果声明不受影响)。实验路径的 anti-theater
-      // 强制门在 orchestrator fecAppendClaim。
-      buildLegacyVerdictKernelInput({
-        claim: hypothesis.claim,
-        evidences: convertedEvidences,
-        falsificationSpec: spec,
-        thresholdSpec,
-        fec,
-        evidenceBasis: 'observational_only',
-      }),
-    );
-    const decision = verdictResultFromKernelOutput(kernelOutput);
-
     return recordVerdict(args.db, {
       evidenceId: evidenceLogEntry.evidenceId,
       parentVerdictId: null,
@@ -275,8 +395,8 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
       untestedReason: decision.untestedReason,
       sourceAnchor,
       replayProver: null,
-      // P0-2-EXT：与 decision 同源 kernelOutput（line 245），落库 trace 供 verdict_nodes 审计 + current_hash 绑定。
-      verdictTrace: extractVerdictTrace(kernelOutput),
+      // P0-2-EXT：与 decision 同源 kernelOutput，落库 trace 供 verdict_nodes 审计 + current_hash 绑定。
+      verdictTrace,
     });
   });
 

@@ -1,7 +1,7 @@
 {
   "name": "far-chain-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "FAR-Lab Web UI — Falsifiable Auditable Research-Chain dashboard",
   "license": "MIT",

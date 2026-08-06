@@ -211,6 +211,8 @@ export interface HypothesizeRequest {
   readonly researchInput: string;
   readonly mode?: 'full' | 'quick';
   readonly dialogueMode?: 'disabled' | 'enabled';
+  /** 审计 P0-2：客户端幂等键（服务端对同 key 重放返回缓存结果·防双击/网络重试重复执行）。 */
+  readonly idempotencyKey?: string;
 }
 
 /** POST /api/v1/hypothesize response. Authority: src/api/types.ts HypothesizeResponse. */

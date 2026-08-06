@@ -9,6 +9,8 @@
  *   - 单阶段骨架（run_stage.ts）：runStage / extractFinishReasonForOfflineReplay /
  *     extractFinishReasonFromOpenAIChatCompletion
  *   - 退避策略（retry_policy.ts）：withRetry / MAX_TOKENS_TABLE / DEFAULT_RETRY_OPTIONS
+ *   - 裁决（verdict_stage.ts）：runVerdictStage / evaluateIntermediateVerdict / computeVerdictDecision
+ *   - 裁决提示共享（verdict_hints.ts）：VERDICT_KIND_TO_HINT
  *   - 六阶段执行器（stages/*）：runStage1 / runStage2 / runStage3 / runStage4 / runStage5 / runStage6
  *   - 主循环（fsm_runner.ts）：runAgentLoop / assertTerminated / DEFAULT_TERMINATION / RunAgentLoopArgs
  *   - 论文组装（paper_assembler.ts）：assemblePaper / ResearchPaperOutput
@@ -19,6 +21,8 @@ export * from './stage_purpose.ts';
 export * from './create_params.ts';
 export * from './run_stage.ts';
 export * from './retry_policy.ts';
+export * from './verdict_stage.ts';
+export * from './verdict_hints.ts';
 export { runStage1 } from './stages/stage1_understanding.ts';
 export { runStage2 } from './stages/stage2_integration.ts';
 export { runStage3 } from './stages/stage3_hypothesis.ts';

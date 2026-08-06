@@ -24,6 +24,7 @@ import type { TraceGrade } from '../../trace/agent_run_event.ts';
 import { extractFinishReasonForOfflineReplay } from '../../agent_loop/run_stage.ts';
 import { createLlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
+import { createLlmEnvironmentAnchorProvider } from '../../llm_gateway/repro_anchor.ts';
 import type { LlmGateway } from '../../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../../llm_gateway/types.ts';
 import type { AppendRecordOptions } from '../../evidence_log/types.ts';
@@ -57,11 +58,26 @@ export interface LoopRunnerArgs {
    *
    * 未提供时的回退（resolveReproHashProvider）：
    *   - offline_replay profile → 确定性占位 hash（测试/demo 语义·非生产数据）
-   *   - 其余 profile（competition 等）→ 抛 REPRO_BRIDGE_NOT_CONFIGURED（禁伪造 hash 进生产 evidence_log）
+   *   - production profile（competition_aliyun_qwen）→ 需 modelSnapshot 显式注入；
+   *     未注入则抛 REPRO_BRIDGE_NOT_CONFIGURED（禁伪造 hash 进生产 evidence_log）
    */
   readonly reproHashProvider?: ReproHashProvider;
+  /**
+   * G3 闭合（2026-08-06）：production profile 的 LLM 调用环境锚分量——
+   * 模型快照（snapshot.ts 常量·由模型特定调用方注入·本文件模型中立禁字面量）。
+   * 注入后 executeLoop 用 createLlmEnvironmentAnchorProvider 构造环境锚 provider
+   * （非占位·确定性环境指纹·详见 repro_anchor.ts 文档化裁决）。
+   * 缺省 undefined → production 路径仍抛 REPRO_BRIDGE_NOT_CONFIGURED（fail-closed）。
+   */
+  readonly modelSnapshot?: string;
   /** 可选：每阶段 artifact 入链后回调（透传 runAgentLoop.onArtifact·流式输出用）。 */
   readonly onArtifact?: (artifact: import('../../agent_loop/types.ts').StageArtifact) => void;
+  /**
+   * V2 裁决驱动反馈边（透传 runAgentLoop.verdictDrivenFeedback·缺省关闭=LLM 自评反馈边）。
+   * 开启后：循环内中间裁决 CONFIRMED 立即终止 / 重复输入指纹防 p-hacking 终止 /
+   * 中间裁决 kind 软建议注入下一轮 stage3 regen。
+   */
+  readonly verdictDrivenFeedback?: boolean;
 }
 
 /**
@@ -99,24 +115,40 @@ const QUICK_TERMINATION: TerminationCriteria = {
 const OFFLINE_REPLAY_REPRO_HASH_PROVIDER: ReproHashProvider = () => '0'.repeat(64);
 
 /**
- * 解析 reproHashProvider 注入策略（offline 占位 vs 生产显式注入）。
+ * 解析 reproHashProvider 注入策略（offline 占位 / 生产环境锚 / fail-fast）。
  *
  *   1. 调用方显式传入 args.reproHashProvider → 信任调用方（生产路径接 calc_bridge）。
  *   2. 未传入 + offline_replay profile → 确定性占位（测试/demo 语义）。
- *   3. 未传入 + 非 offline_replay profile（生产）→ fail-fast（禁无声伪造）。
+ *   3. 未传入 + 非 offline_replay profile（生产）：
+ *      - args.modelSnapshot 已注入 → LLM 调用环境锚 provider（G3 闭合·2026-08-06·
+ *        真实环境指纹·非占位非伪造·见 repro_anchor.ts 文档化裁决）
+ *      - 未注入 modelSnapshot → fail-fast（禁无声伪造·红线不变）
  *
- * @throws {code: 'REPRO_BRIDGE_NOT_CONFIGURED'} 生产 profile 未注入 reproHashProvider
+ * @throws {code: 'REPRO_BRIDGE_NOT_CONFIGURED'} 生产 profile 未注入 reproHashProvider/modelSnapshot
  */
-function resolveReproHashProvider(args: LoopRunnerArgs, profile: ProviderProfile): ReproHashProvider {
+function resolveReproHashProvider(
+  args: LoopRunnerArgs,
+  profile: ProviderProfile,
+  gateway: LlmGateway,
+): ReproHashProvider {
   if (args.reproHashProvider !== undefined) {
     return args.reproHashProvider;
   }
   if (profile === 'offline_replay') {
     return OFFLINE_REPLAY_REPRO_HASH_PROVIDER;
   }
+  if (args.modelSnapshot !== undefined) {
+    // G3 闭合：LLM 调用环境锚（模型快照 + 活跃模型 + node 版本 + git sha·确定性·可审计）
+    return createLlmEnvironmentAnchorProvider({
+      modelSnapshot: args.modelSnapshot,
+      activeModelIds: gateway.registeredProfiles(),
+      nodeVersion: process.version,
+      gitCommitSha: args.gitCommitSha,
+    });
+  }
   throw Object.assign(
     new Error(
-      `executeLoop: profile "${profile}" requires explicit reproHashProvider (offline placeholder forbidden in production evidence_log · connect 03 calc_bridge compute_repro_hash)`,
+      `executeLoop: profile "${profile}" requires explicit reproHashProvider or modelSnapshot (offline placeholder forbidden in production evidence_log · connect 03 calc_bridge compute_repro_hash or inject modelSnapshot for the LLM environment anchor)`,
     ),
     { code: 'REPRO_BRIDGE_NOT_CONFIGURED', profile },
   );
@@ -138,9 +170,18 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
   const mode = args.mode ?? 'full';
   const termination = args.termination ?? (mode === 'quick' ? QUICK_TERMINATION : undefined);
   const profile: ProviderProfile = args.profile ?? 'offline_replay';
-  const appendOptions: AppendRecordOptions = args.appendOptions ?? { providerProfile: profile };
+  // G3 闭合：modelSnapshot 注入时 appendOptions 自动带 competitionModelSnapshot（repository.ts:325
+  // 反 theater 校验——competition 凭证须显式快照·与环境锚同源同值）。
+  const appendOptions: AppendRecordOptions =
+    args.appendOptions ??
+    {
+      providerProfile: profile,
+      ...(args.modelSnapshot !== undefined
+        ? { competitionModelSnapshot: args.modelSnapshot }
+        : {}),
+    };
   const gateway: LlmGateway = args.gateway ?? createLlmGateway([createOfflineReplayAdapter()]);
-  const reproHashProvider = resolveReproHashProvider(args, profile);
+  const reproHashProvider = resolveReproHashProvider(args, profile, gateway);
   const runId = ulid();
 
   const loopState = await runAgentLoop({
@@ -156,6 +197,9 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
     ...(termination === undefined ? {} : { termination }),
     ...(args.resumeStorePath === undefined ? {} : { resumeStorePath: args.resumeStorePath }),
     ...(args.onArtifact === undefined ? {} : { onArtifact: args.onArtifact }),
+    ...(args.verdictDrivenFeedback === undefined
+      ? {}
+      : { verdictDrivenFeedback: args.verdictDrivenFeedback }),
   });
 
   const reproHash = resolveReproHash(args.evidenceLogDb);

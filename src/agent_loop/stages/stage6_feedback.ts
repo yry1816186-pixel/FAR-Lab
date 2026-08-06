@@ -30,11 +30,13 @@ import { runStage } from '../run_stage.ts';
 import { FeedbackPayloadSchema } from './schemas.ts';
 import { STAGE_TO_PURPOSE_TAG } from '../stage_purpose.ts';
 import { sanitizeExternalContent } from '../../llm_gateway/sanitizer.ts';
-import type { Verdict } from '../../schema/enums.ts';
+import { VERDICT_KIND_TO_HINT } from '../verdict_hints.ts';
 
 /**
  * IC-15 T1'（V2 裁决软建议）：把上一次完整 runAgentLoop 的 verdict kind 映射为
  * 抽象修正方向（最小信息原则·security-auditor C2 缓解）。
+ *
+ * 映射定义已提取到共享模块 verdict_hints.ts（单一真相源·stage3 裁决驱动反馈边同用）。
  *
  * 仅传 5 值枚举本身 + 一句抽象修正方向；禁传 reasonCode/metricValue/threshold
  * （防 LLM 反推裁决逻辑构造"刚好过"假设·adversarial hypothesis generation）。
@@ -42,13 +44,6 @@ import type { Verdict } from '../../schema/enums.ts';
  * 软建议语义：注入时 prompt 明示"仅供参考，LLM 仍独立判断 continueIteration"。
  * 非硬驱动：不触发自动 regen 循环，不覆盖 stage6 LLM 自评（防 p-hacking 立意风险）。
  */
-const VERDICT_KIND_TO_HINT: Readonly<Record<Verdict, string>> = {
-  CONFIRMED: 'prior iteration produced CONFIRMED; consider whether the hypothesis is sufficiently refined and whether to converge.',
-  REFUTED: 'prior iteration produced REFUTED; the deterministic kernel found evidence against the claim. Consider whether a substantively different claim direction is warranted.',
-  INCONCLUSIVE: 'prior iteration produced INCONCLUSIVE; evidence is mixed or insufficient. Consider tightening or narrowing the claim scope, or gathering different evidence.',
-  DEGRADED_SCOPE: 'prior iteration produced DEGRADED_SCOPE; evidence is narrower than the claim. Consider narrowing the claim scope or broadening the evidence base.',
-  UNTESTED: 'prior iteration produced UNTESTED; no decision path was reached. Consider refining the falsification contract or the evidence coverage.',
-};
 
 
 /**

@@ -220,6 +220,7 @@ test('sandbox_collects_cpu_and_peak_rss: 真 venv 子进程采集 cpu/peak_rss�
       artifactTreeHash: '',
       wallClockMs: result.wallClockMs,
       timedOut: result.timedOut,
+      outputLimitExceeded: result.outputLimitExceeded ?? false,
       networkBlocked: result.networkBlocked,
       seed: 42,
       singleThreaded: true,

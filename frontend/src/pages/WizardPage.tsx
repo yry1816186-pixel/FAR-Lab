@@ -40,6 +40,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { cn } from '@/lib/utils';
+import { useTimeout } from '@/lib/useTimeout';
 import { useHypothesize } from '@/lib/api_client';
 import type { VerdictValue } from '@/lib/types';
 
@@ -145,6 +146,7 @@ export default function WizardPage(): JSX.Element {
   const [copied, setCopied] = useState(false);
 
   const hypothesize = useHypothesize();
+  const schedule = useTimeout();
 
   const runVerification = useCallback(async () => {
     setResult(null);
@@ -156,11 +158,11 @@ export default function WizardPage(): JSX.Element {
       });
       setResult(data as unknown as HypothesizeResult);
       // auto-advance to verdict step after a brief delay so user sees the pipeline
-      setTimeout(() => setStep(2), 1500);
+      schedule(() => setStep(2), 1500);
     } catch {
       // error is surfaced via hypothesize.error below
     }
-  }, [claim, hypothesize]);
+  }, [claim, hypothesize, schedule]);
 
   const reset = useCallback(() => {
     setStep(0);
@@ -173,9 +175,9 @@ export default function WizardPage(): JSX.Element {
     if (result?.reproHash) {
       void navigator.clipboard.writeText(result.reproHash);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      schedule(() => setCopied(false), 2000);
     }
-  }, [result]);
+  }, [result, schedule]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6" data-testid="wizard-page">

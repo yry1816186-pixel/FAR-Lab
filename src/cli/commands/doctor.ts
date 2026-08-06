@@ -220,7 +220,14 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
     const clean = verifyCallRecordPayloadHashes(mem);
     // 旁路模拟:DROP TRIGGER 后改 payload 字节(链验证不检,内容哈希必须检)
     const triggers = mem.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='call_records'`).all() as Array<{ name: string }>;
-    for (const t of triggers) mem.exec(`DROP TRIGGER IF EXISTS "${t.name}"`);
+    // 审计 P2-1：DROP 语句做标识符白名单校验——即使 sqlite_master 被污染也无注入面（SQLite 无参数化 DDL）。
+    const TRIGGER_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+    for (const t of triggers) {
+      if (!TRIGGER_NAME_RE.test(t.name)) {
+        throw new Error(`doctor: unexpected trigger name ${JSON.stringify(t.name)}`);
+      }
+      mem.exec(`DROP TRIGGER IF EXISTS "${t.name}"`);
+    }
     mem.prepare(`UPDATE call_records SET request_payload='{"poison":1}' WHERE seq=1`).run();
     const tampered = verifyCallRecordPayloadHashes(mem);
     mem.close();

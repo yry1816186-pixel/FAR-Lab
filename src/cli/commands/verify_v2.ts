@@ -12,12 +12,11 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
 import type { ProofEnvelopeV2 } from '../../proof_envelope/v2/types.ts';
+import { verifyProofHashV2 } from '../../proof_envelope/v2/proof_hash.ts';
 import {
   buildReceiptManifest,
   verifyReceiptManifest,
-  type ReceiptManifestMember,
 } from '../../v2_domain/receipt_manifest.ts';
 import { verifyReceiptRoot } from '../../v2_domain/independent_verifier.ts';
 import {
@@ -26,6 +25,8 @@ import {
 } from '../../v2_domain/shared_schemas.ts';
 import type { AssuranceDimensionResult } from '../../v2_domain/shared_schemas.ts';
 import type { AssuranceDimension, ReceiptStanding, PreservationStatus } from '../../v2_domain/contract_enums.ts';
+import { resolveStandardPolicyId } from '../../v2_domain/policy_registry.ts';
+import { envelopeToManifestMembers } from './envelope_to_manifest_members.ts';
 
 /** Parsed options for the V2 six-dimension verification path (`far verify --v2`). */
 export interface VerifyV2Options {
@@ -94,14 +95,16 @@ export async function runVerifyV2(options: VerifyV2Options): Promise<VerifyV2Res
     ? { dimension: 'provenance', outcome: 'PASS', reasonCodes: [], detail: 'manifest present and independently recomputed via clean-room verifier' }
     : { dimension: 'provenance', outcome: 'FAIL', reasonCodes: manifestVerification.isValid ? [] : ['MANDATORY_MEMBER_MISSING'], detail: `manifest or root verification failed: ${manifestVerification.reasonCode}` };
 
-  // integrity: 检查 proofHash 是否存在且格式正确
-  const proofHashValid = typeof envelope.proofHash === 'string' && /^[0-9a-f]{64}$/.test(envelope.proofHash);
+  // integrity: 内容寻址篡改检测——重算 proofHash 并与密封值比对（2026-08-06 修复：
+  // 此前仅查格式 /^[0-9a-f]{64}$/，篡改 claim 后 digest 重算仍"完整"→ 篡改检测失效。
+  // 现接入 verifyProofHashV2（canonical_json(全部 VC 字段 - proofHash) → sha256 重算比对）。
+  const proofHashVerification = verifyProofHashV2(envelope);
   if (!manifestVerification.isValid) {
     dimensions.integrity = { dimension: 'integrity', outcome: 'FAIL', reasonCodes: ['MANDATORY_MEMBER_MISSING'], detail: `manifest incomplete: ${manifestVerification.missingMembers.join(', ')}` };
-  } else if (!proofHashValid) {
-    dimensions.integrity = { dimension: 'integrity', outcome: 'FAIL', reasonCodes: ['PROOF_HASH_MISMATCH'], detail: 'envelope proofHash missing or invalid format' };
+  } else if (proofHashVerification !== 'valid') {
+    dimensions.integrity = { dimension: 'integrity', outcome: 'FAIL', reasonCodes: ['PROOF_HASH_MISMATCH'], detail: `content-addressed proofHash verification failed: ${proofHashVerification}` };
   } else {
-    dimensions.integrity = { dimension: 'integrity', outcome: 'PASS', reasonCodes: [], detail: `proofHash valid (${envelope.proofHash.slice(0, 12)}…); all ${manifestMembers.length} manifest members verified` };
+    dimensions.integrity = { dimension: 'integrity', outcome: 'PASS', reasonCodes: [], detail: `proofHash recomputed and matched (${envelope.proofHash.slice(0, 12)}…); all ${manifestMembers.length} manifest members verified` };
   }
 
   // identity: keyless v0 → NOT_APPLICABLE
@@ -130,7 +133,8 @@ export async function runVerifyV2(options: VerifyV2Options): Promise<VerifyV2Res
   const result = buildVerificationResult({
     resultId: `vr-v2-${envelope.claim?.id ?? 'unknown'}`,
     receiptId: envelope.claim?.id ?? 'unknown',
-    verificationPolicyId: 'far.policy.standard-v0.v1',
+    // M14 接线：从标准策略注册表 fail-closed 解析（策略 deprecated → 抛错·禁静默沿用旧策略）
+    verificationPolicyId: resolveStandardPolicyId(),
     evaluatedAt: new Date().toISOString(),
     dimensionResults: dimensions,
     receiptStanding,
@@ -146,41 +150,6 @@ export async function runVerifyV2(options: VerifyV2Options): Promise<VerifyV2Res
   }
 
   return { exitCode, output: formatVerifyV2Output(result, envelope, manifestVerification, rootVerification) };
-}
-
-/**
- * 从 ProofEnvelopeV2 提取 manifest members。
- */
-function envelopeToManifestMembers(envelope: ProofEnvelopeV2): ReceiptManifestMember[] {
-  const members: ReceiptManifestMember[] = [];
-  const digest = (s: string): string => {
-    return createHash('sha256').update(s, 'utf8').digest('hex');
-  };
-
-  // 映射 envelope 字段到 manifest member kinds
-  if (envelope.claim) {
-    members.push({ kind: 'claim', digest: digest(JSON.stringify(envelope.claim)), sizeBytes: JSON.stringify(envelope.claim).length });
-  }
-  if (envelope.fecSnapshot) {
-    members.push({ kind: 'fecSnapshot', digest: digest(JSON.stringify(envelope.fecSnapshot)), sizeBytes: JSON.stringify(envelope.fecSnapshot).length });
-  }
-  if (envelope.protocolFreeze) {
-    members.push({ kind: 'protocolFreeze', digest: digest(JSON.stringify(envelope.protocolFreeze)), sizeBytes: JSON.stringify(envelope.protocolFreeze).length });
-  }
-  if (envelope.datasetBindings) {
-    members.push({ kind: 'datasetBindings', digest: digest(JSON.stringify(envelope.datasetBindings)), sizeBytes: JSON.stringify(envelope.datasetBindings).length });
-  }
-  if (envelope.workflowBindings) {
-    members.push({ kind: 'workflowBindings', digest: digest(JSON.stringify(envelope.workflowBindings)), sizeBytes: JSON.stringify(envelope.workflowBindings).length });
-  }
-  if (envelope.verdictTrace) {
-    members.push({ kind: 'verdictTrace', digest: digest(JSON.stringify(envelope.verdictTrace)), sizeBytes: JSON.stringify(envelope.verdictTrace).length });
-  }
-  if (envelope.antiTheaterReport) {
-    members.push({ kind: 'antiTheaterReport', digest: digest(JSON.stringify(envelope.antiTheaterReport)), sizeBytes: JSON.stringify(envelope.antiTheaterReport).length });
-  }
-
-  return members;
 }
 
 /**

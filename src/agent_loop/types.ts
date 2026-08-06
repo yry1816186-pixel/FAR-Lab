@@ -315,6 +315,25 @@ export interface StageContext {
    * 软建议语义：注入时 prompt 明示"仅供参考，你仍独立判断 continueIteration"。
    */
   readonly priorVerdictKind?: Verdict;
+  /**
+   * V2 裁决驱动反馈边：上一轮迭代的中间裁决 kind（verdictDrivenFeedback 开启时·循环内）。
+   * 可选；缺省 undefined = 无循环内先验裁决 → stage3 prompt 不注入（字节等同基线·回归兼容）。
+   * 仅供 stage3_hypothesis 消费（regen 方向软建议）；仅传 5 值枚举本身（防 p-hacking）。
+   */
+  readonly verdictHint?: Verdict;
+}
+
+/**
+ * 循环内中间裁决（V2 裁决驱动反馈边·verdictDrivenFeedback 开启时产出）。
+ *
+ * 无副作用：中间裁决是纯计算（不落 evidence_log / verdict_nodes·不改变链长），
+ * 仅随 LoopState 返回 + session JSONL 记录，供审计（输入=当轮 hypothesis+evidence·
+ * 可由 evaluateIntermediateVerdict 复算）。
+ */
+export interface IntermediateVerdict {
+  readonly iteration: number; // 产出该裁决的迭代轮次（从 1 起）
+  readonly verdict: Verdict; // 5 值裁决（R0-R9 确定性内核·非 LLM）
+  readonly decisiveRuleId: string | null; // 裁决决定性规则 ID（审计）
 }
 
 /**
@@ -326,6 +345,8 @@ export interface LoopState {
   readonly terminated: boolean;
   readonly terminationReason:
     | 'feedback_converged'
+    | 'verdict_confirmed' // V2 裁决驱动：中间裁决 CONFIRMED → 确定性立即终止
+    | 'verdict_converged' // V2 裁决驱动：连续两轮裁决输入指纹相同 → 防 p-hacking 空转终止
     | 'max_iterations'
     | 'max_tokens'
     | 'max_duration'
@@ -333,6 +354,8 @@ export interface LoopState {
   readonly artifacts: readonly StageArtifact[]; // 全部阶段产物（按顺序）
   /** verdict 阶段产出的 VerdictNode（若到达 [4] 裁决） */
   readonly verdictNode: VerdictNode | null;
+  /** 循环内中间裁决序列（verdictDrivenFeedback 关闭时恒为空数组·零回归） */
+  readonly intermediateVerdicts: readonly IntermediateVerdict[];
   readonly error: AgentLoopError | null;
 }
 

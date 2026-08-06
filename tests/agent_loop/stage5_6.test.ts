@@ -337,6 +337,7 @@ function buildFullLoopState(): LoopState {
     terminationReason: 'feedback_converged',
     artifacts,
     verdictNode: null,
+    intermediateVerdicts: [],
     error: null,
   };
 }
@@ -393,6 +394,7 @@ test('paperAssembler 降级：缺 hypothesis/understanding → 10 字段全存�
     terminationReason: 'error',
     artifacts: [],
     verdictNode: null,
+    intermediateVerdicts: [],
     error: null,
   };
   const paper = assemblePaper(degradedState);
@@ -414,3 +416,4 @@ test('paperAssembler 降级：缺 hypothesis/understanding → 10 字段全存�
   assert.ok(Array.isArray(paper.references));
   assert.equal(paper.finalVerdict, 'UNTESTED');
 });
+
