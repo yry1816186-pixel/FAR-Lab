@@ -1,8 +1,0 @@
-# Merge these entries into the repository .gitignore after review.
-CLAUDE.local.md
-.claude/settings.local.json
-.agent-state/
-
-# Pi project package caches, if used locally
-.pi/git/
-.pi/npm/
