@@ -160,3 +160,12 @@ CLAUDE.local.md
 **/tmp_*.py
 **/jsdoc_missing_batch*.txt
 
+.trash_backup/
+*-agent-*/
+*.tmp
+*.cache
+!tests/fixtures/**/*.cache
+!tests/fixtures/**/*.log
+!docs/archive/**/*.log
+!docs/audits/**/*.log
+**/评审记录/**/*.log

@@ -197,6 +197,9 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           pip install -e .
+          # 审计 P1-8：science_harness 的 40+ 测试（sandbox/seed_cherry/secret_strip/bls_pipeline/c_astro）
+          # 依赖 numpy/lightkurve——缺装则 t.skip() 静默降级，CI 显示 green 但关键路径未真覆盖。
+          pip install numpy lightkurve
       - name: node --test (TS unit + integration)
         run: pnpm run test
       - name: node --test (agent_loop FSM + N3 反幻觉 + assertTerminated)
