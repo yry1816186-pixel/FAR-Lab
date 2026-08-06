@@ -34,7 +34,9 @@ import {
   validateMathClaim,
 } from './math_claim.ts';
 import type {
+  BackendKind,
   BackendVerifyInput,
+  BackendVerifyResult,
   FormalExpression,
   MathBackend,
   MathClaim,
@@ -46,7 +48,8 @@ import { Z3SmtBackend } from './smt_backend.ts';
 import { Lean4FormalBackend } from './formal_backend.ts';
 import { DafnyBackend } from './dafny_backend.ts';
 import { NumericalBackend } from './numerical_backend.ts';
-
+/** Options for constructing a MathVerifier. Allows injecting custom
+ * backend implementations for testing or alternative configurations. */
 export interface MathVerifierOptions {
   readonly casBackend?: MathBackend;
   readonly smtBackend?: MathBackend;
@@ -54,10 +57,27 @@ export interface MathVerifierOptions {
   readonly formalBackend?: MathBackend;
   readonly dafnyBackend?: MathBackend;
   readonly numericalBackend?: MathBackend;
+  /**
+   * E-fallback（批次 3-I·借鉴 ZeroClaw provider fallback chains）：
+   * 主后端不可用/抛错时的替代后端顺序（按 key 查找已配置后端）。
+   * 缺省 DEFAULT_FALLBACK_CHAINS。null = 关闭该 key 的 fallback。
+   */
+  readonly fallbackChains?: Partial<Record<BackendKind, readonly BackendKind[] | null>>;
 }
 
+/** 默认 fallback 链（确定性·仅同验证等级内跨 engine 兜底）。 */
+export const DEFAULT_FALLBACK_CHAINS: Readonly<Record<BackendKind, readonly BackendKind[]>> = {
+  cas: [],
+  smt: ['cas'], // SMT（Z3）不可用 → CAS（SymPy）兜底
+  lean4: ['dafny'], // Lean4 不可用 → Dafny 兜底（同为形式化验证器）
+  dafny: [],
+  numerical: [],
+};
+/** Routes a MathClaim to the appropriate backend based on claimKind domain
+ * and requiredLevel (spec 38 S4). See module header for routing table. */
 export class MathVerifier {
   private readonly backends: Partial<Record<string, MathBackend>>;
+  private readonly fallbackChains: Readonly<Record<BackendKind, readonly BackendKind[]>>;
 
   constructor(options: MathVerifierOptions = {}) {
     this.backends = {
@@ -67,6 +87,15 @@ export class MathVerifier {
       dafny: options.dafnyBackend ?? new DafnyBackend(),
       numerical: options.numericalBackend ?? new NumericalBackend(),
     };
+    // E-fallback（批次 3-I）：合并默认链 + 用户覆盖（null 显式关闭该 key fallback）
+    const merged: Record<BackendKind, readonly BackendKind[]> = { ...DEFAULT_FALLBACK_CHAINS };
+    for (const key of BACKEND_KINDS) {
+      const override = options.fallbackChains?.[key];
+      if (override !== undefined) {
+        merged[key] = override ?? [];
+      }
+    }
+    this.fallbackChains = merged;
   }
 
   /**
@@ -105,9 +134,93 @@ export class MathVerifier {
     }
 
     const input = this.buildVerifyInput(claim, backend);
-    const result = await backend.verify(input);
+    const result = await this.verifyWithFallback(claim, backend, input);
 
     return this.buildRecord(claim, claim.formalization, result, verifiedAt);
+  }
+
+  /**
+   * E-fallback（批次 3-I·借鉴 ZeroClaw provider fallback chains）：
+   * 主后端不可用（isAvailable=false / verify 抛错 / 诚实降级 backend_disabled）时，
+   * 按 fallbackChains[主 kind] 顺序尝试替代后端（重新 buildVerifyInput 适配）。
+   * 全部替代失败 → 保留主后端结果（含 backend_disabled 诚实降级）或重抛主异常。
+   */
+  private async verifyWithFallback(
+    claim: MathClaim,
+    primary: MathBackend,
+    primaryInput: BackendVerifyInput,
+  ): Promise<BackendVerifyResult> {
+    const chain = this.fallbackChains[primary.backendKind] ?? [];
+
+    // 尝试主后端（isAvailable=false → 诚实降级结果·不抛错——保持原语义）
+    let result: BackendVerifyResult | null = null;
+    let primaryError: unknown = null;
+    if (primary.isAvailable()) {
+      try {
+        result = await primary.verify(primaryInput);
+      } catch (err) {
+        primaryError = err;
+      }
+    } else {
+      result = {
+        backendKind: primary.backendKind,
+        backendId: primary.backendId,
+        outcome: 'unknown',
+        outputArtifact: null,
+        compileLog: 'backend_disabled',
+        durationMs: 0,
+      };
+    }
+
+    // 主后端产出结论（verified/refuted/unknown 非 disabled）→ 直接返回（不 fallback）
+    if (result !== null && !(result.outcome === 'unknown' && result.compileLog === 'backend_disabled')) {
+      return result;
+    }
+
+    // 主后端不可用/抛错/诚实降级 → 尝试 fallback 链
+    const fallback = await this.tryFallbackChain(claim, chain, primary.backendKind);
+    if (fallback !== null) {
+      return fallback;
+    }
+
+    // 无可用 fallback：主后端抛错 → 原样重抛（与历史行为一致）；否则保留 disabled 结果
+    if (primaryError !== null) {
+      throw primaryError;
+    }
+    // result 在此路径非 null：primary 不可用 → 已构造 disabled 结果；primary 可用 →
+    // verify 要么返回非 null 要么抛错（抛错已被 primaryError 捕获并重抛）
+    return result!;
+  }
+
+  /** 沿 fallback 链逐个尝试替代后端；首个成功（非 disabled/非抛错）者返回。 */
+  private async tryFallbackChain(
+    claim: MathClaim,
+    chain: readonly BackendKind[],
+    primaryKind: BackendKind,
+  ): Promise<BackendVerifyResult | null> {
+    for (const altKey of chain) {
+      const alt = this.backends[altKey];
+      if (alt === undefined) {
+        continue; // 替代后端未配置 → 跳过
+      }
+      try {
+        if (!alt.isAvailable()) {
+          continue;
+        }
+        const altInput = this.buildVerifyInput(claim, alt);
+        const altResult = await alt.verify(altInput);
+        if (altResult.outcome === 'unknown' && altResult.compileLog === 'backend_disabled') {
+          continue; // 替代后端也不可用 → 继续链
+        }
+        return {
+          ...altResult,
+          compileLog: `fallback_from:${primaryKind}; ${altResult.compileLog ?? ''}`.trim(),
+        };
+      } catch {
+        continue; // 替代后端抛错 → 尝试下一个
+      }
+    }
+    return null;
   }
 
   private buildRecord(

@@ -54,6 +54,7 @@ import { openDb, createSequentialGateway } from './helpers.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: P3_RAW_INPUT. */
 export const P3_RAW_INPUT = [
   'Arrow of Time and the Thermodynamic Second Law: The macroscopic world exhibits a clear time-asymmetry — ',
   'eggs do not unscramble, heat flows spontaneously from hot to cold, and entropy S increases monotonically ',
@@ -73,6 +74,7 @@ export const P3_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: P3_SOURCE_CARD. */
 export const P3_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-p3-arrow-of-time-zurek-1989',
   url: 'https://doi.org/10.1038/341119a0',

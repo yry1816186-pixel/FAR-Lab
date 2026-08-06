@@ -51,6 +51,9 @@ export interface HonestVerdictDto {
   readonly updatedAt: string;
 }
 
+/**
+ * to honest verdict dto.
+ */
 export function toHonestVerdictDto(node: HonestVerdictNode): HonestVerdictDto {
   return {
     verdictId: node.verdictId,

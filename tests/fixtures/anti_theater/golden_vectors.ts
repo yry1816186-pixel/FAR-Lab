@@ -461,6 +461,27 @@ function gvPhackCorrection01(): AntiTheaterLintInput {
   return input;
 }
 
+/** gv-phack-pcurve-01：primaryAdjustedPValue=0.045 + familySize=5 → P_CURVE_CALIPER_SUSPICIOUS (WARN)。 */
+function gvPhackPcurve01(): AntiTheaterLintInput {
+  const input = cloneMutable(makeCleanBaseInput());
+  // Set primaryAdjustedPValue in the p-hacking danger zone [0.04, 0.05)
+  input.verdict = {
+    ...input.verdict,
+    statisticalReport: {
+      ...input.verdict.statisticalReport,
+      primaryAdjustedPValue: 0.045,
+    },
+  };
+  // Set familySize >= 3 so the detector's minimum threshold is met
+  input.fec.multipleTestingPlan = {
+    correction: 'bonferroni',
+    familySize: 5,
+    adjustedAlpha: 0.01,
+    preregistered: true,
+  };
+  return input;
+}
+
 /** gv-hark-01：hypothesisSealedAt 改晚于 max(runs.endedAt) → HARKING_REVISION_AFTER_RESULT。 */
 function gvHark01(): AntiTheaterLintInput {
   const input = cloneMutable(makeCleanBaseInput());
@@ -571,13 +592,13 @@ export interface GoldenVectorSpec {
 }
 
 /**
- * GOLDEN_VECTORS：21 向量 = 17 P0（APPENDIX_E §5.2）+ 3 补充（gv-data-hash-fake-01 /
+ * GOLDEN_VECTORS：22 向量 = 17 P0（APPENDIX_E §5.2）+ 3 补充（gv-data-hash-fake-01 /
  * gv-optional-stopping-01 / gv-dep-drift-01）+ 1 T-003 修复（gv-provenance-unbound-01）。
  *
  * §5.2 的 17 P0 向量覆盖 16 个 attackId（AT-DATA-DRIFT 由 gv-data-drift-01/02 双向量覆盖），
  * 缺 AT-DATA-HASH-FAKE / AT-OPTIONAL-STOPPING / AT-DEP-FLOAT-DRIFT 3 个 attackId → 补 3 向量。
  * T-003 修复（2026-07-24）新增第 21 个 attackId AT-PROVENANCE-UNBOUND → 补 gv-provenance-unbound-01。
- * 连同 GV_OVERFIT_01（AT-OVERFIT·ROADMAP 受限）共 ALL_GOLDEN_VECTORS 22 向量，覆盖全部 21 attackId。
+ * 连同 GV_OVERFIT_01（AT-OVERFIT·ROADMAP 受限）共 ALL_GOLDEN_VECTORS 22 向量，覆盖全部 22 attackId。
  */
 export const GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [
   // —— §5.2 17 P0 golden vectors ——
@@ -604,6 +625,8 @@ export const GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [
   { id: 'gv-dep-drift-01', attackId: 'AT-DEP-FLOAT-DRIFT', reasonCode: 'NUMERIC_TOLERANCE_UNFROZEN', build: gvDepDrift01, expectedForcedVerdict: undefined, expectedBlockSeal: false },
   // —— gv-provenance-unbound-01（T-003 修复·2026-07-24·补齐第 21 个 attackId）——
   { id: 'gv-provenance-unbound-01', attackId: 'AT-PROVENANCE-UNBOUND', reasonCode: 'EVIDENCE_PROVENANCE_UNBOUND', build: gvProvenanceUnbound01, expectedForcedVerdict: 'UNTESTED', expectedBlockSeal: false },
+  // —— gv-phack-pcurve-01（2026-08-06·补齐第 22 个 attackId·p-curve distributional detection）——
+  { id: 'gv-phack-pcurve-01', attackId: 'AT-PHACK-PCURVE', reasonCode: 'P_CURVE_CALIPER_SUSPICIOUS', build: gvPhackPcurve01, expectedForcedVerdict: 'INCONCLUSIVE', expectedBlockSeal: false },
   // —— gv-overfit-01：AT-OVERFIT（ROADMAP·D8 受限实现：public-only WARN → DEGRADED_SCOPE）——
   // 注：build 内联（需改 measurement splitName 集合），见下方 GV_OVERFIT_01_BUILD。
 ];
@@ -627,7 +650,7 @@ export const GV_OVERFIT_01: GoldenVectorSpec = {
   expectedBlockSeal: false,
 };
 
-/** 全量 golden vectors（GOLDEN_VECTORS 21 + GV_OVERFIT_01 = 22 向量·覆盖全部 21 attackId）。 */
+/** 全量 golden vectors（GOLDEN_VECTORS 22 + GV_OVERFIT_01 = 23 向量·覆盖全部 22 attackId）。 */
 export const ALL_GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [...GOLDEN_VECTORS, GV_OVERFIT_01];
 
 /**

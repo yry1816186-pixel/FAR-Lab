@@ -9,7 +9,7 @@
  * 单一真实依赖（T8）：
  *   - src/science_harness/sandbox_runner.ts:venvSandboxAdapter.executeAsync（真 spawn 子进程）
  *   - repro/science_harness/bls_compute.py:run（numpy BLS 周期搜索·真实测量）
- *   - src/statistics/（twoSampleWelchZTest/twoSampleEffectSize/differenceInMeansConfidenceInterval/adjustPValues）
+ *   - src/statistics/（twoSampleWelchTTest/twoSampleEffectSize/differenceInMeansConfidenceInterval/adjustPValues）
  *
  * 诚实边界：
  *   - 数据集：fetchOnlineDataset(lightkurve) 不可用时落 cached_fixture（合成 transit LC·baseline_exempt）。
@@ -50,9 +50,9 @@ import {
   adjustPValues,
   differenceInMeansConfidenceInterval,
   twoSampleEffectSize,
-  twoSampleWelchZTest,
+  twoSampleWelchTTest,
 } from '../statistics/index.ts';
-import type { ConfidenceInterval, TwoSampleEffectSize, ZTestResult } from '../statistics/index.ts';
+import type { ConfidenceInterval, TwoSampleEffectSize, TTestResult } from '../statistics/index.ts';
 import { venvSandboxAdapter } from './sandbox_runner.ts';
 import type { SandboxRunResult, SandboxResourceSpec, VenvSandboxAdapter, VenvSandboxInput } from './types.ts';
 import { runAntiTheaterLint } from '../anti_theater/index.ts';
@@ -62,31 +62,39 @@ import { buildAntiTheaterPipelineInput } from './anti_theater_input.ts';
 // ---------------------------------------------------------------------------
 // 确定性常量（claim · 预登记 before unblinding）
 // ---------------------------------------------------------------------------
-
+/** C-ASTRO claim identifier (preregistered before unblinding). */
 export const C_ASTRO_CLAIM_ID = 'C-ASTRO-0001';
+/** Primary metric key for C-ASTRO transit depth significance measurement. */
 export const C_ASTRO_METRIC_KEY = 'transit_depth_significance';
+/** TESS Input Catalog ID for the C-ASTRO target star. */
 export const C_ASTRO_TIC_ID = 'TIC 268644982';
+/** TESS sector number for the C-ASTRO observation. */
 export const C_ASTRO_SECTOR = 14;
+/** C-ASTRO pipeline claim text: TIC 268644982 shows a transit signal
+ * consistent with a planet (period ~2.41d, depth ~0.8%). */
 export const C_ASTRO_PIPELINE_CLAIM =
   'TIC 268644982 shows a transit signal consistent with a planet (period ~2.41d, depth ~0.8%)';
-
+/** C-ASTRO falsification specification: transit depth significance must be > 0. */
 export const C_ASTRO_FALSIFICATION_SPEC: FalsificationSpec = {
   prediction: C_ASTRO_PIPELINE_CLAIM,
   metric: C_ASTRO_METRIC_KEY,
   falsificationThreshold: 0,
   thresholdSemantics: 'gt',
 };
-
+/** C-ASTRO threshold specification: greater-than-zero semantics. */
 export const C_ASTRO_THRESHOLD_SPEC: ThresholdSpec = {
   semantics: 'gt',
   value: 0,
 };
-
+/** C-ASTRO significance level alpha (0.05 = 5%). */
 export const C_ASTRO_ALPHA = 0.05;
+/** C-ASTRO confidence level for interval estimates (95%). */
 export const C_ASTRO_CONFIDENCE_LEVEL = 0.95;
+/** C-ASTRO fixed random seed (SR-2, anti-p-hacking). */
 export const C_ASTRO_SEED = 42;
+/** C-ASTRO preregistration freeze timestamp (ISO 8601). */
 export const C_ASTRO_FROZEN_AT = '2026-07-01T00:00:00.000Z';
-
+/** C-ASTRO source anchor: reproducibility fingerprint for the BLS computation. */
 export const C_ASTRO_SOURCE_ANCHOR: SourceAnchor = {
   gitCommitSha: 'd'.repeat(40),
   dashscopeRequestId: null,
@@ -110,7 +118,8 @@ const METRICS_ARTIFACT_NAME = 'bls_metrics.json';
 // ---------------------------------------------------------------------------
 // BLS 测量（sandbox 子进程产物解析）
 // ---------------------------------------------------------------------------
-
+/** BLS (Box-fitting Least Squares) period search output metrics.
+ * Contains transit parameters (period, depth, SNR) and in/out flux arrays. */
 export interface BlsMetrics {
   readonly ok: boolean;
   readonly n_points: number;
@@ -126,7 +135,8 @@ export interface BlsMetrics {
   readonly centroidOffset: number | null;
   readonly error?: string;
 }
-
+/** Result of running BLS computation in a venv sandbox:
+ * the sandbox execution result plus parsed BLS metrics. */
 export interface CAstroSandboxOutput {
   readonly result: SandboxRunResult;
   readonly metrics: BlsMetrics;
@@ -198,10 +208,11 @@ export async function runBlsInSandbox(args: {
 // ---------------------------------------------------------------------------
 // 真实统计（M1：in vs out 两样本 z-test · src/statistics/ 生产 caller）
 // ---------------------------------------------------------------------------
-
+/** Real two-sample statistics from C-ASTRO BLS in/out flux comparison.
+ * Contains z-test, effect size, CI, adjusted p-value, and FEC StatisticalResult. */
 export interface CAstroStatistics {
   readonly bls: BlsMetrics;
-  readonly zTest: ZTestResult;
+  readonly tTest: TTestResult;
   readonly effectSize: TwoSampleEffectSize;
   readonly confidenceInterval: ConfidenceInterval;
   readonly adjustedPValue: number;
@@ -216,15 +227,15 @@ export interface CAstroStatistics {
  */
 export function buildCAstroStatistics(metricKey: string, bls: BlsMetrics): CAstroStatistics {
   // H1: mean(inFlux) < mean(outFlux)（transit dip · in < out）。显著拒绝 H0 → depth>0 = 支持 claim。
-  const zTest = twoSampleWelchZTest(bls.inFluxes, bls.outFluxes, 'less');
+  const tTest = twoSampleWelchTTest(bls.inFluxes, bls.outFluxes, 'less');
   const effectSize = twoSampleEffectSize(bls.outFluxes, bls.inFluxes);
   const confidenceInterval = differenceInMeansConfidenceInterval(
     bls.outFluxes,
     bls.inFluxes,
     C_ASTRO_CONFIDENCE_LEVEL,
   );
-  const adjusted = adjustPValues([zTest.pValue], 'bonferroni', C_ASTRO_ALPHA);
-  const adjustedPValue = adjusted[0]?.adjustedPValue ?? zTest.pValue;
+  const adjusted = adjustPValues([tTest.pValue], 'bonferroni', C_ASTRO_ALPHA);
+  const adjustedPValue = adjusted[0]?.adjustedPValue ?? tTest.pValue;
 
   // BLS depth>0（dip）→ supports claim；depth<=0 → refutes。effectDirection 驱动 kernel supports/refutes 分支。
   const effectDirection: EvidenceDirection = bls.depth > 0 ? 'supports' : 'refutes';
@@ -233,7 +244,7 @@ export function buildCAstroStatistics(metricKey: string, bls: BlsMetrics): CAstr
     testId: metricKey,
     status: 'ran',
     effectDirection,
-    pValue: zTest.pValue,
+    pValue: tTest.pValue,
     adjustedPValue,
     effectSizeObserved: effectSize.cohensD,
     confidenceInterval: [confidenceInterval.lower, confidenceInterval.upper],
@@ -242,7 +253,7 @@ export function buildCAstroStatistics(metricKey: string, bls: BlsMetrics): CAstr
 
   return {
     bls,
-    zTest,
+    tTest,
     effectSize,
     confidenceInterval,
     adjustedPValue,
@@ -273,9 +284,10 @@ export const C_ASTRO_ANTI_THEATER_SUMMARY =
 // ---------------------------------------------------------------------------
 // Pipeline B 编排
 // ---------------------------------------------------------------------------
-
+/** Origin of the lightcurve dataset: online TESS fetch or cached synthetic fixture. */
 export type DatasetSource = 'online' | 'cached_fixture';
-
+/** Complete C-ASTRO pipeline result: sandbox measurement, statistics,
+ * machine verdict, FEC gate decision, anti-theater report, and sealed proof. */
 export interface CAstroPipelineResult {
   readonly db: Database.Database;
   readonly claimId: string;
@@ -386,7 +398,7 @@ export async function buildCAstroChain(
       blsDepth: sandbox.metrics.depth,
       blsDepthSNR: sandbox.metrics.depthSNR,
       oddEvenDiff: sandbox.metrics.oddEvenDiff,
-      pValue: statistics.zTest.pValue,
+      pValue: statistics.tTest.pValue,
       adjustedPValue: statistics.adjustedPValue,
       artifactTreeHash: sandbox.result.artifactTreeHash,
     },

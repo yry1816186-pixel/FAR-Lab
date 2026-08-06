@@ -27,6 +27,7 @@ const REPO_ROOT = PACKAGE_ROOT;
 // 与 package.json scripts.test 保持一致（21 目录后端测试 glob，含 tests/cli 自身 + tests/anti_theater + tests/proof_envelope/v2）。
 // 变更须同步 package.json —— CI grep 校验（同 coverage_gate.mjs TEST_GLOBS 纪律）。
 // CLI 层（commands/status.ts）phase B runTestCount 复用此常量 spawn `node --test --test-reporter=tap`。
+/** Constant: TEST_GLOBS. */
 export const TEST_GLOBS: readonly string[] = [
   'tests/api/*.test.ts',
   'tests/audit/*.test.ts',
@@ -56,12 +57,14 @@ export const TEST_GLOBS: readonly string[] = [
   'tests/scripts/*.test.mjs',
 ];
 
+/** Interface defining pending field. */
 export interface PendingField {
   readonly pending: true;
   readonly phaseB: true;
   readonly reason: string;
 }
 
+/** Result/output structure for test count result. */
 export interface TestCountResult {
   readonly total: number;
   readonly pass: number;
@@ -69,6 +72,7 @@ export interface TestCountResult {
   readonly skipped?: number;
 }
 
+/** Interface defining chain head status. */
 export interface ChainHeadStatus {
   readonly status: 'ok' | 'broken' | 'pending';
   readonly reason?: string;
@@ -87,6 +91,7 @@ export interface ChainHeadStatus {
   readonly costTotalTokens?: number;
 }
 
+/** Interface defining status dump. */
 export interface StatusDump {
   // phase A 实测（cheap · 零手填）
   readonly commitSha: string;
@@ -107,6 +112,7 @@ export interface StatusDump {
   readonly suiteIntegrityRoot: string | PendingField;
 }
 
+/** Type alias: status label. */
 export type StatusLabel =
   | 'IMPLEMENTED_VERIFIED'
   | 'IMPLEMENTED_UNVERIFIED'
@@ -117,6 +123,7 @@ export type StatusLabel =
   | 'RETIRED'
   | 'NEEDS_EXTERNAL_VERIFICATION';
 
+/** Interface defining far status json. */
 export interface FarStatusJson {
   readonly project: 'far-chain';
   readonly generatedAt: string;
@@ -175,6 +182,7 @@ export interface FarStatusJson {
   readonly warnings: readonly string[];
 }
 
+/** Input parameters for operations involving collect status dump options. */
 export interface CollectStatusDumpOptions {
   // chainHead / testCount / coverage 由 CLI 层注入（commands/status.ts）。undefined → pending。
   readonly chainHead?: ChainHeadStatus;
@@ -183,6 +191,9 @@ export interface CollectStatusDumpOptions {
   readonly coverage?: { readonly line: number; readonly branch: number };
 }
 
+/**
+ * collect status dump.
+ */
 export function collectStatusDump(options: CollectStatusDumpOptions = {}): StatusDump {
   const migrations = readMigrationFiles();
   const docCount = readDocFiles();
@@ -207,6 +218,9 @@ export function collectStatusDump(options: CollectStatusDumpOptions = {}): Statu
   };
 }
 
+/**
+ * to status json.
+ */
 export function toStatusJson(dump: StatusDump, generatedAt = new Date().toISOString()): FarStatusJson {
   const commitSha = /^[0-9a-f]{40}$/.test(dump.commitSha) ? dump.commitSha : null;
   const isDirty = readGitDirty();

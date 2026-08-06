@@ -19,6 +19,9 @@ function readRootPackage(): { readonly name: string; readonly version: string } 
   }
 }
 
+/**
+ * run version.
+ */
 export function runVersion(): number {
   const pkg = readRootPackage();
   const resolved = resolveGitCommitSha();

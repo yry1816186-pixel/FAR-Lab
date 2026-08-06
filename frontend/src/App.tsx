@@ -8,12 +8,15 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteEffects } from '@/components/RouteEffects';
 import { I18nProvider } from '@/lib/i18n';
 
-// Route-level code splitting. OverviewPage is the default/landing route and is loaded
-// eagerly so first paint has zero Suspense delay. Every other route is code-split
-// (React.lazy) so heavy dependencies (d3 ~280kB) are isolated to the pages that use
-// them (Viz, Ablation) and never enter the initial bundle. Vendor libs are further
-// split via vite.config.ts manualChunks so they cache independently across deploys.
-import OverviewPage from '@/pages/OverviewPage';
+// Route-level code splitting. HeroDemoPage is the default/landing route — competition
+// judges must see the 60-second tamper-detection "WOW" experience within 3 seconds.
+// It is a self-contained offline page (Web Crypto, no API dependency) so first paint
+// is instant. OverviewPage (the system dashboard) is moved to /overview. Every route
+// is code-split (React.lazy) so heavy dependencies (d3 ~280kB) are isolated to the
+// pages that use them (Viz, Ablation) and never enter the initial bundle. Vendor libs
+// are further split via vite.config.ts manualChunks so they cache independently.
+const HeroDemoPage = lazy(() => import('@/pages/HeroDemoPage'));
+const OverviewPage = lazy(() => import('@/pages/OverviewPage'));
 const VizPage = lazy(() => import('@/pages/VizPage'));
 const IntegrityPage = lazy(() => import('@/pages/IntegrityPage'));
 const LeaderboardPage = lazy(() => import('@/pages/LeaderboardPage'));
@@ -25,6 +28,8 @@ const AboutPage = lazy(() => import('@/pages/AboutPage'));
 const CourtPage = lazy(() => import('@/pages/CourtPage'));
 const ArenaPage = lazy(() => import('@/pages/ArenaPage'));
 const VersionDiffPage = lazy(() => import('@/pages/VersionDiffPage'));
+const WizardPage = lazy(() => import('@/pages/WizardPage'));
+const V2ReceiptPage = lazy(() => import('@/pages/V2ReceiptPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,7 +65,8 @@ export default function App() {
               <ErrorBoundary>
                 <Suspense fallback={<RouteFallback />}>
                   <Routes>
-                    <Route path="/" element={<OverviewPage />} />
+                    <Route path="/" element={<HeroDemoPage />} />
+                    <Route path="/overview" element={<OverviewPage />} />
                     <Route path="/viz" element={<VizPage />} />
                     <Route path="/integrity" element={<IntegrityPage />} />
                     <Route path="/leaderboard" element={<LeaderboardPage />} />
@@ -70,8 +76,11 @@ export default function App() {
                     <Route path="/ablation" element={<AblationPage />} />
                     <Route path="/report" element={<ReportPage />} />
                     <Route path="/demo" element={<DemoModePage />} />
+                    <Route path="/hero" element={<HeroDemoPage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/versions" element={<VersionDiffPage />} />
+                    <Route path="/wizard" element={<WizardPage />} />
+                  <Route path="/v2-receipt" element={<V2ReceiptPage />} />
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Suspense>

@@ -48,6 +48,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: B3_RAW_INPUT. */
 export const B3_RAW_INPUT = [
   'CRISPR-Cas9 off-target effects: Gene therapy claims that CRISPR-Cas9 achieves off-target editing',
   'rate <0.1% (comparable to spontaneous mutation background), enabling safe clinical use. We assess',
@@ -60,6 +61,7 @@ export const B3_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: B3_SOURCE_CARD. */
 export const B3_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-b3-tsai-guide-seq-2015',
   url: 'https://doi.org/10.1038/nbt.3117',
@@ -270,6 +272,9 @@ const B3_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- runSeed ----------
 
+/**
+ * run b3 seed.
+ */
 export async function runB3Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 

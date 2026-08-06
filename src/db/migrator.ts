@@ -6,6 +6,7 @@ import { PACKAGE_ROOT } from '../paths.ts';
 const DEFAULT_MIGRATIONS_DIR = join(PACKAGE_ROOT, 'schema/migrations');
 const MIGRATION_FILE_PATTERN = /^(\d{4})_.+\.sql$/;
 
+/** Interface defining migration file. */
 export interface MigrationFile {
   readonly version: number;
   readonly name: string;
@@ -13,21 +14,27 @@ export interface MigrationFile {
   readonly sql: string;
 }
 
+/** Interface defining schema meta row. */
 export interface SchemaMetaRow {
   readonly version: number;
   readonly name: string;
   readonly applied_at: string;
 }
 
+/** Result/output structure for migration result. */
 export interface MigrationResult {
   readonly applied: readonly number[];
   readonly skipped: readonly number[];
 }
 
+/** Input parameters for operations involving run migrations options. */
 export interface RunMigrationsOptions {
   readonly migrationsDir?: string;
 }
 
+/**
+ * run migrations.
+ */
 export function runMigrations(
   db: Database.Database,
   options: RunMigrationsOptions = {},
@@ -70,6 +77,9 @@ export function runMigrations(
   };
 }
 
+/**
+ * get schema meta rows.
+ */
 export function getSchemaMetaRows(db: Database.Database): readonly SchemaMetaRow[] {
   ensureSchemaMeta(db);
   return db
@@ -77,6 +87,9 @@ export function getSchemaMetaRows(db: Database.Database): readonly SchemaMetaRow
     .all() as SchemaMetaRow[];
 }
 
+/**
+ * read migration files.
+ */
 export function readMigrationFiles(migrationsDir = DEFAULT_MIGRATIONS_DIR): readonly MigrationFile[] {
   return readdirSync(migrationsDir)
     .filter((fileName) => MIGRATION_FILE_PATTERN.test(fileName))

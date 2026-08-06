@@ -4,6 +4,7 @@
 //
 // 设计约束（CLAUDE.md §2 注释最小化）：本文件仅暴露接口与实现，不加散文复述注释。
 
+/** Interface defining option schema. */
 export interface OptionSchema {
   readonly name: string;
   readonly type: 'string' | 'boolean' | 'enum';
@@ -17,11 +18,15 @@ export interface OptionSchema {
   readonly requiredPlaceholder?: string;
 }
 
+/** Result/output structure for parse result. */
 export interface ParseResult {
   readonly values: Readonly<Record<string, string | boolean | undefined>>;
   readonly errors: readonly string[];
 }
 
+/**
+ * parse options.
+ */
 export function parseOptions(
   args: readonly string[],
   schema: readonly OptionSchema[],
@@ -129,6 +134,9 @@ export function parseOptions(
   return { values, errors };
 }
 
+/**
+ * report errors.
+ */
 export function reportErrors(errors: readonly string[]): boolean {
   if (errors.length === 0) {
     return false;

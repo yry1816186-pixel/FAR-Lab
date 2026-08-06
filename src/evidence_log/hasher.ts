@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 import stableStringify from 'fast-json-stable-stringify';
 import type { CanonicalInput, VerifiedCanonicalInput } from './types.ts';
 
+/**
+ * canonical hash.
+ */
 export function canonicalHash(input: CanonicalInput): string {
   if (input.prevHash === undefined || input.prevHash === '') {
     throw new Error('canonicalHash: prevHash is required');
@@ -15,6 +18,9 @@ export function canonicalHash(input: CanonicalInput): string {
   });
 }
 
+/**
+ * canonical hash verified.
+ */
 export function canonicalHashVerified(input: VerifiedCanonicalInput): string {
   assertNoNonFiniteNumber(input, 'CanonicalInput');
   const canonical = stableStringify(input);
@@ -24,11 +30,17 @@ export function canonicalHashVerified(input: VerifiedCanonicalInput): string {
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
+/**
+ * hash canonical json.
+ */
 export function hashCanonicalJson(value: Record<string, unknown>): string {
   const canonical = canonicalJson(value, 'hashCanonicalJson');
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
+/**
+ * canonical json.
+ */
 export function canonicalJson(value: unknown, context = 'canonicalJson'): string {
   assertNoNonFiniteNumber(value, context);
   const canonical = stableStringify(value);

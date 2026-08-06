@@ -39,6 +39,9 @@ export function resolveRulesetUri(uri: string | null | undefined): string {
   return uri.trim();
 }
 
+/**
+ * is supported ruleset uri.
+ */
 export function isSupportedRulesetUri(uri: string): boolean {
   return (SUPPORTED_RULESET_URIS as readonly string[]).includes(uri);
 }

@@ -49,6 +49,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: M7_RAW_INPUT. */
 export const M7_RAW_INPUT = [
   'Alzheimer\'s disease amyloid-β hypothesis: The amyloid cascade hypothesis claims that clearing',
   'cerebral Aβ plaques will CURE Alzheimer\'s disease (restore cognition to baseline). The hypothesis',
@@ -62,6 +63,7 @@ export const M7_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: M7_SOURCE_CARD. */
 export const M7_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-m7-lecanemab-clarity-2023',
   url: 'https://doi.org/10.1056/NEJMoa2212948',
@@ -276,6 +278,9 @@ const M7_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- runSeed ----------
 
+/**
+ * run m7 seed.
+ */
 export async function runM7Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 

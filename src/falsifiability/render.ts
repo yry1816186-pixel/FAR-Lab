@@ -15,6 +15,11 @@ import type {
   Verdict,
 } from './types.ts';
 
+/**
+ * Human-readable rendering of an honest verdict. Unlike {@link VerdictDecision},
+ * the nullable text fields are coerced to empty strings so the output is always
+ * display-ready (no null checks needed at the presentation layer).
+ */
 export interface HonestVerdictRender {
   readonly verdict: Verdict;
   readonly scopeSlipText: string;
@@ -22,6 +27,16 @@ export interface HonestVerdictRender {
   readonly conflictingEvidenceCount: number;
 }
 
+/**
+ * Runs the full verdict kernel on a claim with its evidence and returns a
+ * display-ready verdict render. Enforces honesty invariants: DEGRADED_SCOPE
+ * must have non-empty scope-slip text, UNTESTED must have a non-empty reason.
+ *
+ * @param input - The claim text, evidence records, and falsification/threshold specs.
+ * @returns A {@link HonestVerdictRender} with all fields populated.
+ * @throws {EmptyScopeSlipError} if DEGRADED_SCOPE has empty scope-slip text.
+ * @throws {EmptyUntestedReasonError} if UNTESTED has empty reason text.
+ */
 export function renderHonestVerdict(input: {
   readonly claim: string;
   readonly evidences: ReadonlyArray<EvidenceRecord>;

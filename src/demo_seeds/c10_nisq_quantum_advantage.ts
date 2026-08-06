@@ -38,6 +38,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: C10_RAW_INPUT. */
 export const C10_RAW_INPUT = [
   'NISQ quantum advantage: Google Sycamore (Arute 2019) claimed "quantum supremacy" — a 53-qubit random',
   'circuit sampling task completed in 200 seconds, projected to take 10000 years on classical supercomputers.',
@@ -48,6 +49,7 @@ export const C10_RAW_INPUT = [
   'error correction, limiting useful circuit depth to <100 layers.',
 ].join(' ');
 
+/** Constant: C10_SOURCE_CARD. */
 export const C10_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-c10-arute-sycamore-2019',
   url: 'https://doi.org/10.1038/s41586-019-1666-5',
@@ -157,6 +159,9 @@ const C10_FALSIFICATION_SPEC: FalsificationSpec = {
 const C10_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 10 };
 const C10_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'c1'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2026-06-27T00:00:00.000Z', rawResponseHash: 'c1'.repeat(32) };
 
+/**
+ * run c10 seed.
+ */
 export async function runC10Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [

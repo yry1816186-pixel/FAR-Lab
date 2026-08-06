@@ -7,6 +7,7 @@ export const en: Record<MessageKey, string> = {
   // ---- AppShell / nav ----
   'nav.brand': 'far-chain',
   'nav.overview': 'Overview',
+  'nav.hero': 'Hero Demo',
   'nav.demo': 'Demo',
   'nav.viz': 'Evidence Chain',
   'nav.integrity': 'Integrity',
@@ -18,6 +19,8 @@ export const en: Record<MessageKey, string> = {
   'nav.report': 'Report',
   'nav.about': 'About',
   'nav.versions': 'Versions',
+  'nav.wizard': 'Wizard',
+  'nav.v2receipt': 'V2 Receipt',
   'nav.aria': 'Main navigation',
   'nav.themeToLight': 'Switch to light theme',
   'nav.themeToDark': 'Switch to dark theme',

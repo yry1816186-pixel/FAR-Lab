@@ -14,6 +14,7 @@ import type { LlmGateway } from './gateway.ts';
 import { createQwenAdapter } from './adapters/aliyun_qwen/qwen_adapter.ts';
 import type { QwenChatCompletionCaller } from './adapters/aliyun_qwen/qwen_adapter.ts';
 
+/** Configuration/specification for competition gateway config. */
 export interface CompetitionGatewayConfig {
   readonly apiKey: string;
   readonly timeoutMs?: number;

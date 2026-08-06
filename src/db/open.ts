@@ -15,6 +15,7 @@
 import Database from 'better-sqlite3';
 import { runMigrations } from './migrator.ts';
 
+/** Class representing database integrity error. */
 export class DatabaseIntegrityError extends Error {
   readonly code = 'DB_INTEGRITY_CHECK_FAILED' as const;
   constructor(dbPath: string, detail: string) {
@@ -28,8 +29,10 @@ export class DatabaseIntegrityError extends Error {
   }
 }
 
+/** Type alias: integrity check mode. */
 export type IntegrityCheckMode = 'full' | 'quick' | 'off';
 
+/** Input parameters for operations involving open far db options. */
 export interface OpenFarDbOptions {
   /** 只读打开(status/verify 等只读路径;只读时不写 PRAGMA、不跑迁移) */
   readonly readonly?: boolean;

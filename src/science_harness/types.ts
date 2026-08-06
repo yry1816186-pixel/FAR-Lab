@@ -208,7 +208,8 @@ export interface DatasetRef {
 
 /** 数据集解析结果三态（spec 12 §2.2 决策树）。 */
 export type DatasetResolutionStatus = 'resolved' | 'degraded' | 'untested';
-
+/** Dataset resolution result (spec 12 S2.2 three-valued decision tree).
+ * Tracks status (resolved/degraded/untested), reference, exempt flag, and reason. */
 export interface DatasetResolution {
   readonly status: DatasetResolutionStatus;
   readonly ref: DatasetRef | null;

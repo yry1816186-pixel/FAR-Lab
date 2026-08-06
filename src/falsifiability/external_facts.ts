@@ -7,6 +7,18 @@ import type {
 } from '../evidence_log/types.ts';
 import type { IdentifierClaim } from './verdict_kernel_v2.ts';
 
+/**
+ * Extracts a verifiable {@link SourceAnchor} from an LLM response, binding the
+ * response content + credential + raw payload into a content-addressed hash.
+ * The resulting anchor can be attached to evidence records to prove the metric
+ * value originated from this specific LLM call.
+ *
+ * @param response - The LLM response to extract provenance from.
+ * @param gitCommitSha - The git commit that produced this response (non-empty).
+ * @param codeLocation - Optional source code location for finer-grained attribution.
+ * @returns A {@link SourceAnchor} with `rawResponseHash` binding the response.
+ * @throws {Error} if `gitCommitSha` is empty.
+ */
 export function extractExternalFact(
   response: LlmResponse,
   gitCommitSha: string,
@@ -46,6 +58,17 @@ export const HARNESS_VERIFIED_IDENTIFIERS: ReadonlySet<string> = new Set([
   'author_year:Smith_2024',
 ]);
 
+/**
+ * Resolves an identifier claim (DOI, arXiv ID, accession number, author_year)
+ * against an offline deterministic registry (FUSION-OS-14). Returns a trust
+ * verdict: `resolved` if the registry contains the identifier, `not_found` if
+ * absent, or `unresolved` if the registry itself is unavailable (simulating a
+ * network failure in an offline environment).
+ *
+ * @param claim - The identifier kind and value to resolve.
+ * @param registry - The deterministic identifier set, or `undefined` if unavailable.
+ * @returns An {@link IdentifierClaim} with resolution status filled by the trust root.
+ */
 export function resolveIdentifierClaim(
   claim: { readonly kind: IdentifierClaim['kind']; readonly value: string },
   registry: ReadonlySet<string> | undefined,

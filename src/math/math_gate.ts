@@ -20,12 +20,13 @@ import type {
   MathVerificationRecord,
   VerificationLevel,
 } from './math_claim.ts';
-
+/** Input to the math gate evaluator. */
 export interface MathGateInput {
   readonly claim: MathClaim;
   readonly verifications: readonly MathVerificationRecord[];
 }
-
+/** Result of the math gate evaluation. Indicates whether the claim can be
+ * confirmed given the current math verification state. */
 export interface MathGateResult {
   /** Whether the claim can be confirmed given the math verification state. */
   readonly canConfirm: boolean;

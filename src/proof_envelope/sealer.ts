@@ -12,6 +12,7 @@ import { computeProofHash } from './proof_hash.ts';
 import { CURRENT_RULESET_URI, assertSealableRulesetUri } from './ruleset_version.ts';
 import type { ProofEnvelope, SealProofEnvelopeInput, ProofCheckResult } from './types.ts';
 
+/** Result/output structure for seal result. */
 export interface SealResult {
   readonly envelope: ProofEnvelope;
   readonly checks: readonly ProofCheckResult[];

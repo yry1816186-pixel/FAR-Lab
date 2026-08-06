@@ -24,6 +24,7 @@ import { NO_QWEN_FAMILY_AVAILABLE_REASON } from '../aliyun_qwen/fallback_config.
 
 // ===== Types =====
 
+/** Configuration/specification for qwen vl adapter config. */
 export interface QwenVlAdapterConfig {
   readonly modelId?: QwenVlModelId;
   readonly baseURL?: string;
@@ -36,6 +37,7 @@ type OpenAiChatCompletion = OpenAI.ChatCompletion;
 type OpenAiContentPart = OpenAI.ChatCompletionContentPart;
 type OpenAiMessageParam = OpenAI.ChatCompletionMessageParam;
 
+/** Interface defining qwen vl chat completion request. */
 export interface QwenVlChatCompletionRequest {
   readonly modelId: QwenVlModelId;
   readonly messages: OpenAiMessageParam[];
@@ -43,6 +45,7 @@ export interface QwenVlChatCompletionRequest {
   readonly maxTokens: number;
 }
 
+/** Type alias: qwen vl chat completion caller. */
 export type QwenVlChatCompletionCaller = (
   request: QwenVlChatCompletionRequest,
 ) => Promise<OpenAiChatCompletion>;

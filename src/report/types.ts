@@ -5,6 +5,8 @@
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。
  */
 
+import type { TrapSummary } from '../anti_theater/trap_taxonomy.ts';
+
 /**
  * 报告单段内容。evidenceRefs 指向 evidence_log.evidence_id 列表，
  * 供 HTML/Markdown 模板渲染为可回链锚点。
@@ -33,6 +35,8 @@ export interface ReportData {
   readonly reproHash: string;
   readonly verdictSummary: Readonly<Record<string, number>>;
   readonly sourceAnchorCount: number;
+  /** 统计陷阱审计摘要（批次 1-B·借鉴 scientific-agent-skills 陷阱目录）。调用方注入·可选。 */
+  readonly trapSummary?: TrapSummary;
 }
 
 /**

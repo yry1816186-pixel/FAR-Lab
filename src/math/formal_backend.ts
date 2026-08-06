@@ -21,13 +21,15 @@ import type {
   BackendVerifyResult,
   MathBackend,
 } from './math_claim.ts';
-
+/** Configuration options for the Lean 4 formal verification backend. */
 export interface Lean4FormalBackendOptions {
   readonly leanCommand?: string;
   readonly timeoutMs?: number;
   readonly versionOverride?: string;
 }
-
+/** Lean 4 formal verification backend (spec 38 S3.3).
+ * Spawns the lean compiler on a temp .lean file. Degrades to
+ * outcome='unknown' when the lean binary is not on PATH. */
 export class Lean4FormalBackend implements MathBackend {
   readonly backendKind = 'lean4' as const;
   readonly backendId: string;

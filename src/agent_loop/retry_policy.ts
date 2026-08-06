@@ -39,6 +39,7 @@ export const MAX_TOKENS_TABLE: Readonly<Record<StageId, number>> = {
 
 // ---------- §7.3 withRetry（指数退避·仅瞬态错误） ----------
 
+/** Input parameters for operations involving retry options. */
 export interface RetryOptions {
   /** 额外重试次数（默认 3·总尝试 = 1 + maxRetries） */
   readonly maxRetries: number;
@@ -46,6 +47,7 @@ export interface RetryOptions {
   readonly baseDelayMs: number;
 }
 
+/** Constant: DEFAULT_RETRY_OPTIONS. */
 export const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxRetries: 3,
   baseDelayMs: 1000,

@@ -33,11 +33,15 @@ import {
 
 const REPO_ROOT = PACKAGE_ROOT;
 
+/** Input parameters for operations involving status options. */
 export interface StatusOptions {
   readonly dbPath?: string;
   readonly json: boolean;
 }
 
+/**
+ * run status.
+ */
 export function runStatus(options: StatusOptions, repoRoot: string = REPO_ROOT): number {
   // repoRoot 注入点：测试传无 .git 目录触发 guard；默认 REPO_ROOT 故生产行为不变（installed-package 降级语义见此 guard）。
   if (!existsSync(join(repoRoot, '.git'))) {

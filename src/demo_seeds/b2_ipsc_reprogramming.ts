@@ -35,6 +35,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: B2_RAW_INPUT. */
 export const B2_RAW_INPUT = [
   'Yamanaka 4 factors — OCT4 (Pou5f1), SOX2, KLF4, and c-MYC — delivered via retroviral vectors reprogram',
   'mouse embryonic and adult fibroblasts to induced pluripotent stem cells (iPSCs). iPSCs express pluripotency',
@@ -47,6 +48,7 @@ export const B2_RAW_INPUT = [
   'independent lab replications + clinical trials (RIKEN 2014 eye trial, cardiac patch 2019).',
 ].join(' ');
 
+/** Constant: B2_SOURCE_CARD. */
 export const B2_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-b2-takahashi-yamanaka-2006',
   url: 'https://doi.org/10.1016/j.cell.2006.07.024',
@@ -124,6 +126,9 @@ const B2_FALSIFICATION_SPEC: FalsificationSpec = { prediction: '≥3 independent
 const B2_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 0.95 };
 const B2_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'b2'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2026-06-27T00:00:00.000Z', rawResponseHash: 'b2'.repeat(32) };
 
+/**
+ * run b2 seed.
+ */
 export async function runB2Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [JSON.stringify(makeUnderstandingPayload()), JSON.stringify(makeIntegrationPayload()), JSON.stringify(makeHypothesisPayload()), JSON.stringify(makeEvidencePayload()), JSON.stringify(makePlanPayload()), JSON.stringify(makeFeedbackPayloadConverge())];

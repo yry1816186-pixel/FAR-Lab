@@ -14,8 +14,10 @@
  */
 
 export const UNTRUSTED_BEGIN = '<<UNTRUSTED_EXTERNAL_CONTENT_BEGIN>>';
+/** Constant: UNTRUSTED_END. */
 export const UNTRUSTED_END = '<<UNTRUSTED_EXTERNAL_CONTENT_END>>';
 
+/** Interface defining sanitized external. */
 export interface SanitizedExternal {
   /** 包装后的文本(可安全作为数据嵌入 prompt) */
   readonly text: string;

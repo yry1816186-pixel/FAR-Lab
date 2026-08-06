@@ -14,8 +14,10 @@
 import { CURRENT_RULESET_URI } from '../proof_envelope/ruleset_version.ts';
 import type { BenchmarkEntry, BenchmarkReport } from './types.ts';
 
+/** Constant: BENCHMARK_REPORT_SCHEMA_VERSION. */
 export const BENCHMARK_REPORT_SCHEMA_VERSION = 2 as const;
 
+/** Type alias: oracle review status. */
 export type OracleReviewStatus = 'unreviewed' | 'human_reviewed';
 
 /** v2 条目披露字段(v1 字段全保留+9 披露字段) */
@@ -34,6 +36,7 @@ export interface BenchmarkEntryV2 extends BenchmarkEntry {
   readonly reviewRecordRef?: string | null;
 }
 
+/** Interface defining benchmark report v2. */
 export interface BenchmarkReportV2 extends Omit<BenchmarkReport, 'schemaVersion' | 'entries'> {
   readonly schemaVersion: typeof BENCHMARK_REPORT_SCHEMA_VERSION;
   readonly entries: readonly BenchmarkEntryV2[];
@@ -73,6 +76,7 @@ export const REPORT_V2_ENTRY_REQUIRED = [
   'executedAt',
 ] as const;
 
+/** Result/output structure for report check result. */
 export interface ReportCheckResult {
   readonly ok: boolean;
   readonly errors: readonly string[];

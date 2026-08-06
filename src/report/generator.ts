@@ -13,6 +13,8 @@ import { rowToVerdictNode } from '../falsifiability/repository.ts';
 import type { VerdictNodeRow } from '../falsifiability/repository.ts';
 import type { VerdictNode } from '../falsifiability/types.ts';
 import type { ReportData, ReportSection } from './types.ts';
+import { trapTaxonomyFor } from '../anti_theater/trap_taxonomy.ts';
+import type { TrapSummary } from '../anti_theater/trap_taxonomy.ts';
 
 // ---------------------------------------------------------------------------
 // 数据库行类型（补充·report 模块独有）
@@ -159,9 +161,12 @@ function verdictLabel(verdict: string): string {
 // 主体：从数据库生成 ReportData
 // ---------------------------------------------------------------------------
 
+/** Input parameters for operations involving generate report input. */
 export interface GenerateReportInput {
   readonly db: Database.Database;
   readonly runId: string;
+  /** 统计陷阱审计摘要（批次 1-B·可选·由调用方从 antiTheaterReport.findings 注入）。 */
+  readonly trapSummary?: TrapSummary;
 }
 
 /**
@@ -200,6 +205,7 @@ export function generateReport(input: GenerateReportInput): ReportData {
     edges,
     hashVerification,
     reproHash,
+    input.trapSummary,
   );
 
   const verdictSummary: Record<string, number> = {
@@ -221,6 +227,7 @@ export function generateReport(input: GenerateReportInput): ReportData {
     reproHash,
     verdictSummary,
     sourceAnchorCount: evidenceLog.length,
+    ...(input.trapSummary ? { trapSummary: input.trapSummary } : {}),
   };
 }
 
@@ -236,8 +243,9 @@ function buildSections(
   edges: EvidenceEdgeRow[],
   hashVerification: VerifyResult,
   reproHash: string,
+  trapSummary?: TrapSummary,
 ): ReportSection[] {
-  return [
+  const sections: ReportSection[] = [
     buildSummarySection(runId, verdictNodes, callRecords, reproHash),
     buildStageSummarySection(callRecords, evidenceLog),
     buildVerdictNodesSection(verdictNodes),
@@ -245,6 +253,36 @@ function buildSections(
     buildHashChainSection(callRecords, hashVerification),
     buildLimitationsSection(),
   ];
+  if (trapSummary) {
+    sections.push(buildTrapAuditSection(trapSummary));
+  }
+  return sections;
+}
+
+/**
+ * 统计陷阱审计段（批次 1-B·借鉴 scientific-agent-skills 陷阱目录设计）。
+ * 渲染"本次验证覆盖的陷阱大类 + 触发明细"，使报告不仅给出 verdict 结论，
+ * 还结构化展示"检测了 21 类统计陷阱，触发 N 类警告"的审计表。
+ */
+function buildTrapAuditSection(trapSummary: TrapSummary): ReportSection {
+  const triggeredLines = trapSummary.triggeredKinds.map((kind) => {
+    const t = trapTaxonomyFor(kind);
+    return `- **${t.attackId}**（${t.name}）· 类别 ${t.category} · ${t.what} · 防治：${t.cures.join(' / ')}`;
+  });
+  const body = [
+    `**Findings**: ${trapSummary.totalFindings}`,
+    `**Fail-level**: ${trapSummary.hasFail ? 'YES — verdict degraded (D17 support downgrade)' : 'no'}`,
+    ...(trapSummary.triggeredCategories.length > 0
+      ? [`**Categories triggered (${trapSummary.triggeredCategories.length})**: ${trapSummary.triggeredCategories.join(', ')}`]
+      : []),
+    '',
+    ...(triggeredLines.length > 0 ? ['### Triggered trap details', ...triggeredLines] : ['No statistical traps triggered.']),
+  ];
+  return {
+    title: 'Statistical Trap Audit',
+    body: body.join('\n'),
+    evidenceRefs: [],
+  };
 }
 
 // ---------------------------------------------------------------------------

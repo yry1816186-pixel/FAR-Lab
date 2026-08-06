@@ -218,6 +218,7 @@ provider, pass an explicit env file: `docker compose --env-file .env up far-api`
 
 ## Documentation
 
+- **Competition judges (5-min guide)**: [Judge Quick-Start](docs/JUDGE_QUICKSTART.md)
 - **Getting started**: [Quickstart](docs/quickstart.md) · [Installation](docs/installation.md) · [Full index](docs/INDEX.md)
 - **Concepts**: [Proof bundles](docs/concepts/far-proof.md) · [Evidence ledger](docs/concepts/evidence-ledger.md)
 - **Providers**: [Qwen / DashScope](docs/providers/qwen-dashscope.md)
@@ -268,6 +269,9 @@ toolchain is absent.
 - **Crash-safe resume** — `far ask --resume` continues from hash-chained stage receipts with DB
   lineage binding; forged receipts or a swapped database fail closed.
 - **Offline backup** — `far backup` uses SQLite `VACUUM INTO` and refuses to back up a corrupted DB.
+- **Scheduled re-verification** — `far schedule add --exec "<command>" --every 7` re-verifies claims
+  over time (JSON-persisted under `$FAR_HOME/schedules.json`; due-date logic + auditable exec runs).
+  Your claims get re-verified as new evidence appears — not just once at submission time.
 - Real API / real data / real GPU / competition submission are all explicitly tagged
   `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` / `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`.
 

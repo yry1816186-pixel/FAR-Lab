@@ -38,6 +38,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: E3_RAW_INPUT. */
 export const E3_RAW_INPUT = [
   'Global Carbon Budget: Fossil fuel emissions (9.6±0.5 GtC/yr for 2012-2021) are partitioned into',
   'atmospheric CO2 growth (5.1±0.02 GtC/yr), land carbon sink (3.1±0.6 GtC/yr), and ocean carbon sink',
@@ -49,6 +50,7 @@ export const E3_RAW_INPUT = [
   '(4) Ballantyne et al. 2012 long-term sink growth convergence across independent methods.',
 ].join(' ');
 
+/** Constant: E3_SOURCE_CARD. */
 export const E3_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-e3-friedlingstein-2022',
   url: 'https://doi.org/10.5194/essd-14-4811-2022',
@@ -123,6 +125,9 @@ const E3_FALSIFICATION_SPEC: FalsificationSpec = { prediction: '≥3 independent
 const E3_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'lt', value: 0.5 };
 const E3_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'e3'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2026-06-27T00:00:00.000Z', rawResponseHash: 'e3'.repeat(32) };
 
+/**
+ * run e3 seed.
+ */
 export async function runE3Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [JSON.stringify(makeUnderstandingPayload()), JSON.stringify(makeIntegrationPayload()), JSON.stringify(makeHypothesisPayload()), JSON.stringify(makeEvidencePayload()), JSON.stringify(makePlanPayload()), JSON.stringify(makeFeedbackPayloadConverge())];

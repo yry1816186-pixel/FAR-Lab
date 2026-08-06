@@ -39,6 +39,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: C2_RAW_INPUT. */
 export const C2_RAW_INPUT = [
   'CO2 electroreduction on Cu catalysts: Copper is unique among transition metals in its ability to',
   'reduce CO2 to C2+ products (ethylene, ethanol, acetate) at appreciable Faradaic efficiency.',
@@ -53,6 +54,7 @@ export const C2_RAW_INPUT = [
   'ethylene at <500 mA/cm² with <200h stability, far below the industrial threshold.',
 ].join(' ');
 
+/** Constant: C2_SOURCE_CARD. */
 export const C2_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-c2-hori-1989',
   url: 'https://doi.org/10.1246/bcsj.62.2308',
@@ -130,6 +132,9 @@ const C2_FALSIFICATION_SPEC: FalsificationSpec = { prediction: '≥3 independent
 const C2_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 0.8 };
 const C2_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'c2'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2026-07-27T00:00:00.000Z', rawResponseHash: 'c2'.repeat(32) };
 
+/**
+ * run c2 seed.
+ */
 export async function runC2Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [JSON.stringify(makeUnderstandingPayload()), JSON.stringify(makeIntegrationPayload()), JSON.stringify(makeHypothesisPayload()), JSON.stringify(makeEvidencePayload()), JSON.stringify(makePlanPayload()), JSON.stringify(makeFeedbackPayloadConverge())];

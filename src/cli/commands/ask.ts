@@ -28,6 +28,7 @@ import { GENESIS_PROOF_HASH } from '../../proof_envelope/types.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 import { runExportFarProof } from './export_far_proof.ts';
 
+/** Input parameters for operations involving ask args. */
 export interface AskArgs {
   readonly question: string;
   readonly mode: 'full' | 'quick';
@@ -38,6 +39,9 @@ export interface AskArgs {
   readonly profile: string;
 }
 
+/**
+ * parse ask args.
+ */
 export function parseAskArgs(argv: readonly string[]): AskArgs {
   let question = '';
   let mode: 'full' | 'quick' = 'full';
@@ -91,6 +95,7 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
   return { question, mode, dbPath, json, exportDir, resumePath, profile };
 }
 
+/** Interface defining ask render. */
 export interface AskRender {
   readonly question: string;
   readonly runId: string;
@@ -107,6 +112,9 @@ export interface AskRender {
   readonly traceGrade: { readonly score: number; readonly gradedBy: string; readonly failureCodes: readonly string[] };
 }
 
+/**
+ * build render.
+ */
 export function buildRender(result: Awaited<ReturnType<typeof executeLoop>>, profile: string, question: string): AskRender {
   const ls = result.loopState;
   const vn = ls.verdictNode;
@@ -209,6 +217,9 @@ function renderHuman(args: AskArgs, render: AskRender): void {
   process.stdout.write(lines.join('\n'));
 }
 
+/**
+ * run ask.
+ */
 export async function runAsk(argv: readonly string[]): Promise<number> {
   const args = parseAskArgs(argv);
 

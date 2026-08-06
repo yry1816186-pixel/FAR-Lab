@@ -21,12 +21,14 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
+/** Kinds of calls forbidden in verdict-kernel code paths (e.g. LLM calls, network calls, Math.random). Detected by static analysis. */
 export type ForbiddenCallKind =
   | 'forbidden-import'
   | 'forbidden-require'
   | 'forbidden-dynamic-import'
   | 'forbidden-global-call';
 
+/** A single hit of a forbidden call in the source code, with file, line, and kind. */
 export interface ForbiddenCallHit {
   readonly fileName: string;
   readonly line: number;
@@ -36,6 +38,7 @@ export interface ForbiddenCallHit {
   readonly text: string;
 }
 
+/** Error raised when the structural verification gate detects a forbidden call in a verdict-kernel code path. */
 export class VerifierStructuralGateError extends Error {
   public override readonly name = 'VerifierStructuralGateError';
   readonly hits: readonly ForbiddenCallHit[];

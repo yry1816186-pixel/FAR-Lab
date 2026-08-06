@@ -1,0 +1,37 @@
+# Weekly dependency security audit (borrowed from pi/earendil-works supply-chain
+# hardening: scheduled `npm audit --omit=dev` + signature verification).
+# Runs every Monday 02:00 UTC on main. Failure opens an issue via actionlint-free
+# plain step (no third-party action): a failing step is visible in Actions UI.
+name: Dependency Security Audit
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: '10.29.3'
+  NODE_VERSION: '24'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: pnpm audit --prod (high/critical gate)
+        run: pnpm audit --prod --audit-level=high
+      - name: pnpm audit signatures (registry provenance gate)
+        run: pnpm audit signatures
+      - name: supply-chain gate (exact pins + lockfile consistency)
+        run: node scripts/check-supply-chain.mjs

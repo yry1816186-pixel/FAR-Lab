@@ -11,6 +11,9 @@ import type {
   VerifyCallRecordPayloadResult,
 } from './types.ts';
 
+/**
+ * verify chain head.
+ */
 export function verifyChainHead(db: Database.Database): VerifyResult {
   const rows = db
     .prepare(

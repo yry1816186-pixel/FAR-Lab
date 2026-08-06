@@ -13,14 +13,15 @@ import type {
   MathVerificationRecord,
   VerificationLevel,
 } from './math_claim.ts';
-
+/** Boundary identifier for the math verification honesty wall. */
 export const MATH_VERIFICATION_BOUNDARY = 'math_verification_boundary';
-
+/** Input to the math verification honesty wall renderer. */
 export interface HonestyWallInput {
   readonly claim: MathClaim;
   readonly verifications: readonly MathVerificationRecord[];
 }
-
+/** Rendered output of the math verification honesty wall.
+ * Includes achieved level, gate status, and verification details. */
 export interface HonestyWallRender {
   readonly boundary: typeof MATH_VERIFICATION_BOUNDARY;
   readonly text: string;

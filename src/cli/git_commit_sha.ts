@@ -8,6 +8,9 @@ import { spawnSync } from 'node:child_process';
 import { DEMO_GIT_COMMIT_SHA } from '../far_proof/demo_chain.ts';
 import { PACKAGE_ROOT } from './paths.ts';
 
+/**
+ * resolve git commit sha.
+ */
 export function resolveGitCommitSha(): string {
   // cwd=PACKAGE_ROOT, not the caller's CWD: otherwise an installed `far` run from inside
   // another git repo silently stamps that repo's SHA into session/cert provenance — FUSION-OS C-1 (来源不可自填).

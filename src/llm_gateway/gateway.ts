@@ -5,12 +5,16 @@ import type {
   ProviderProfile,
 } from './types.ts';
 
+/** Interface defining llm gateway. */
 export interface LlmGateway {
   register(adapter: ProviderAdapter): void;
   callLlm(profile: ProviderProfile, request: LlmRequest): Promise<LlmResponse>;
   registeredProfiles(): readonly ProviderProfile[];
 }
 
+/**
+ * create llm gateway.
+ */
 export function createLlmGateway(initialAdapters: readonly ProviderAdapter[] = []): LlmGateway {
   const adapters = new Map<ProviderProfile, ProviderAdapter>();
 

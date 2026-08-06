@@ -64,6 +64,7 @@ export interface FallbackCallerResult<TData> {
   readonly data: TData;
   readonly dashscopeRequestId: string | null;
 }
+/** Type alias: fallback caller. */
 export type FallbackCaller<TData> = (target: FallbackModelTarget) => Promise<FallbackCallerResult<TData>>;
 
 /**

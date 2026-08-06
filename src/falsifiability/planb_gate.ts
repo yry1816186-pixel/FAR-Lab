@@ -12,12 +12,14 @@ import type { VerdictDecision } from './types.ts';
 //   E2  CO2 碳通量       novelty theater   → UNTESTED
 // ---------------------------------------------------------------------------
 
+/** Risk kinds assessed by the Plan-B degradation gate (e.g. scope_degradation, power_loss, assumption_violation). */
 export const PLANB_RISK_KINDS = [
   'A4_GT_NOT_CONSTRUCTIBLE',
   'A16_METHOD_OUT_OF_GUARDRAIL',
   'E2_NOVELTY_THEATER',
 ] as const;
 
+/** Type alias for a Plan-B risk kind. @see PLANB_RISK_KINDS */
 export type PlanBRiskKind = (typeof PLANB_RISK_KINDS)[number];
 
 /** A4 降级文案 — 对齐 ROADMAP §5.2 scope_slip 文案要点 */
@@ -36,6 +38,7 @@ export const E2_UNTESTED_REASON =
 // 类型定义
 // ---------------------------------------------------------------------------
 
+/** Assessment of a single Plan-B risk factor: its kind, severity, and detected evidence. */
 export interface PlanBRiskAssessment {
   /**
    * A4 行星轨道衰减 —— GT 是否可构造？
@@ -54,6 +57,7 @@ export interface PlanBRiskAssessment {
   readonly hasNovelty: boolean;
 }
 
+/** The Plan-B gate's verdict on whether degradation is acceptable or requires escalation. */
 export interface PlanBDegradationVerdict {
   readonly verdict: VerdictDecision['verdict'];
   readonly scopeSlipText: string | null;
@@ -63,6 +67,7 @@ export interface PlanBDegradationVerdict {
   readonly crossRiskFlags: ReadonlyArray<string>;
 }
 
+/** Complete result of the Plan-B risk assessment: all assessments, the aggregate verdict, and recommended actions. */
 export interface PlanBRiskResult {
   /** 是否命中任意 PlanB 风险 */
   readonly triggered: boolean;
@@ -187,6 +192,7 @@ function computeCrossRiskFlags(risks: ReadonlyArray<PlanBRiskKind>): string[] {
 // 集成入口：在 decideVerdict 前应用 PlanB 门
 // ---------------------------------------------------------------------------
 
+/** The final applied decision after Plan-B risk assessment, extending {@link VerdictDecision} with degradation and escalation details. */
 export interface PlanBAppliedDecision extends VerdictDecision {
   readonly planbTriggered: boolean;
   readonly planbRisks: ReadonlyArray<PlanBRiskKind>;

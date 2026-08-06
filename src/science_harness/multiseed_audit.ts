@@ -39,36 +39,44 @@ import {
   adjustPValues,
   differenceInMeansConfidenceInterval,
   twoSampleEffectSize,
-  twoSampleWelchZTest,
+  twoSampleWelchTTest,
 } from '../statistics/index.ts';
 import type { StatisticalResult } from '../falsifiability/index.ts';
 import type { EvidenceDirection } from '../schema/enums.ts';
-
+/** Multi-seed audit claim identifier. */
 export const MULTISEED_CLAIM_ID = 'C-MULTISEED-0001';
+/** Multi-seed audit primary metric key. */
 export const MULTISEED_METRIC_KEY = 'transit_depth_significance';
+/** Multi-seed pipeline claim: TIC 268644982 shows a transit signal recovered
+ * across multiple pre-registered seeds. */
 export const MULTISEED_PIPELINE_CLAIM =
   'TIC 268644982 shows a transit signal recovered across multiple pre-registered seeds (depthSNR >= detection threshold)';
+/** Multi-seed preregistration freeze timestamp (aliased from C-ASTRO). */
 export const MULTISEED_FROZEN_AT = C_ASTRO_FROZEN_AT;
 
 // 研究者预注册的 5 个 seed（全跑）+ 声称的"检测阈值"（depthSNR >= 此值算检测到）。
 // cherry-pick 从数据涌现：只报告 depthSNR >= 阈值的 seed，隐去非检测 seed。
+/** Researcher pre-registered seeds (all must be run). */
 export const MULTISEED_DECLARED_SEEDS: readonly number[] = [0, 1, 2, 3, 4];
+/** BLS depthSNR threshold for seed detection (>= counts as detected). */
 export const MULTISEED_DETECTION_THRESHOLD = 8.5;
-
+/** Multi-seed falsification spec: transit depth significance > 0. */
 export const MULTISEED_FALSIFICATION_SPEC: FalsificationSpec = {
   prediction: MULTISEED_PIPELINE_CLAIM,
   metric: MULTISEED_METRIC_KEY,
   falsificationThreshold: 0,
   thresholdSemantics: 'gt',
 };
+/** Multi-seed threshold spec: greater-than-zero semantics. */
 export const MULTISEED_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 0 };
-
+/** Single seed run in the multi-seed experiment: seed, BLS metrics, and detection flag. */
 export interface MultiseedRun {
   readonly seed: number;
   readonly metrics: BlsMetrics;
   readonly detected: boolean;
 }
-
+/** Complete multi-seed BLS experiment: all runs, detected seed subset,
+ * declared seeds, and detection threshold. */
 export interface MultiseedExperiment {
   /** 每个 seed 的真实 BLS 测量（子进程实算·distinct per seed）。 */
   readonly runs: readonly MultiseedRun[];
@@ -112,7 +120,8 @@ export async function runMultiseedBlsExperiment(options: {
   const detectedSeeds = runs.filter((r) => r.detected).map((r) => r.seed);
   return { runs, detectedSeeds, declaredSeeds: seeds, detectionThreshold: threshold };
 }
-
+/** Result of a multi-seed cherry-pick audit: experiment data, registry hash,
+ * machine verdict, and anti-theater report. */
 export interface MultiseedAuditResult {
   readonly db: Database.Database;
   readonly experiment: MultiseedExperiment;
@@ -148,18 +157,18 @@ export async function auditMultiseedCherryPick(
   // 真实统计：pool reported runs 的 in/out fluxes → 两样本 z-test（real src/statistics）。
   const pooledIn = reportedRuns.flatMap((r) => r.metrics.inFluxes);
   const pooledOut = reportedRuns.flatMap((r) => r.metrics.outFluxes);
-  const zTest = twoSampleWelchZTest(pooledIn, pooledOut, 'less');
+  const tTest = twoSampleWelchTTest(pooledIn, pooledOut, 'less');
   const effectSize = twoSampleEffectSize(pooledOut, pooledIn);
   const ci = differenceInMeansConfidenceInterval(pooledOut, pooledIn, 0.95);
-  const adjusted = adjustPValues([zTest.pValue], 'bonferroni', C_ASTRO_ALPHA);
-  const adjustedPValue = adjusted[0]?.adjustedPValue ?? zTest.pValue;
+  const adjusted = adjustPValues([tTest.pValue], 'bonferroni', C_ASTRO_ALPHA);
+  const adjustedPValue = adjusted[0]?.adjustedPValue ?? tTest.pValue;
   const meanDepth = reportedRuns.reduce((sum, r) => sum + r.metrics.depth, 0) / reportedRuns.length;
   const effectDirection: EvidenceDirection = meanDepth > 0 ? 'supports' : 'refutes';
   const statisticalResult: StatisticalResult = {
     testId: MULTISEED_METRIC_KEY,
     status: 'ran',
     effectDirection,
-    pValue: zTest.pValue,
+    pValue: tTest.pValue,
     adjustedPValue,
     effectSizeObserved: effectSize.cohensD,
     confidenceInterval: [ci.lower, ci.upper],

@@ -23,6 +23,7 @@ import {
 
 // ===== Types =====
 
+/** Configuration/specification for qwen adapter config. */
 export interface QwenAdapterConfig {
   readonly apiKey?: string;
   readonly baseURL?: string;
@@ -37,6 +38,7 @@ export interface QwenAdapterConfig {
 type OpenAiChatCompletion = OpenAI.ChatCompletion;
 type OpenAiMessageParam = OpenAI.ChatCompletionMessageParam;
 
+/** Interface defining qwen chat completion request. */
 export interface QwenChatCompletionRequest {
   readonly modelId: string;
   readonly messages: OpenAiMessageParam[];
@@ -50,6 +52,7 @@ export interface QwenChatCompletionRequest {
   readonly jsonSchema?: LlmJsonSchema;
 }
 
+/** Type alias: qwen chat completion caller. */
 export type QwenChatCompletionCaller = (
   request: QwenChatCompletionRequest,
 ) => Promise<OpenAiChatCompletion>;

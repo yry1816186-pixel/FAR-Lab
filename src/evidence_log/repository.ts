@@ -40,6 +40,9 @@ interface InsertResult {
   readonly lastInsertRowid: number | bigint;
 }
 
+/**
+ * row to call record.
+ */
 export function rowToCallRecord(row: CallRecordHashRow): CanonicalInput {
   const payloadKind = parsePayloadKind(row.payload_kind, row.seq);
   const purposeTag = parsePurposeTag(row.purpose_tag, row.seq);
@@ -62,6 +65,9 @@ export function rowToCallRecord(row: CallRecordHashRow): CanonicalInput {
   };
 }
 
+/**
+ * get chain head.
+ */
 export function getChainHead(db: Database.Database): ChainHead | undefined {
   const row = db
     .prepare(
@@ -82,6 +88,9 @@ export function getChainHead(db: Database.Database): ChainHead | undefined {
   };
 }
 
+/**
+ * append record.
+ */
 export function appendRecord(
   db: Database.Database,
   input: AppendRecordInput,
@@ -155,6 +164,9 @@ export function appendRecord(
   return append.immediate();
 }
 
+/**
+ * get call record by seq.
+ */
 export function getCallRecordBySeq(db: Database.Database, seq: number): CallRecordRow {
   const row = db
     .prepare(
@@ -175,6 +187,9 @@ export function getCallRecordBySeq(db: Database.Database, seq: number): CallReco
   return row;
 }
 
+/**
+ * append evidence log.
+ */
 export function appendEvidenceLog(
   db: Database.Database,
   args: AppendEvidenceLogArgs,
@@ -242,6 +257,9 @@ export function appendEvidenceLog(
   return append();
 }
 
+/**
+ * get evidence log entry.
+ */
 export function getEvidenceLogEntry(db: Database.Database, evidenceId: string): EvidenceLogEntry {
   const row = db
     .prepare(
@@ -261,6 +279,9 @@ export function getEvidenceLogEntry(db: Database.Database, evidenceId: string): 
   return rowToEvidenceLogEntry(row);
 }
 
+/**
+ * row to evidence log entry.
+ */
 export function rowToEvidenceLogEntry(row: EvidenceLogRow): EvidenceLogEntry {
   return {
     evidenceId: row.evidence_id,

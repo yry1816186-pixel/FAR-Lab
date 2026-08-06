@@ -45,7 +45,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // Forward to the console for operator diagnostics. A production deployment would
     // additionally forward this to an error-tracking service; we intentionally do not
     // auto-send telemetry from the browser without explicit user consent.
-    // eslint-disable-next-line no-console
     console.error('[ErrorBoundary] uncaught error:', error, info.componentStack);
   }
 

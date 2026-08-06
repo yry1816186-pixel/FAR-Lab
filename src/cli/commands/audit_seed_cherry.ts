@@ -21,12 +21,14 @@ import {
 
 const DEFAULT_FIXTURE = join(PACKAGE_ROOT, 'tests', 'fixtures', 'science_harness', 'tic_sample.cache');
 
+/** Input parameters for operations involving audit seed cherry options. */
 export interface AuditSeedCherryOptions {
   readonly lightcurvePath?: string;
   readonly pythonCmd?: string;
   readonly json?: boolean;
 }
 
+/** Interface defining audit seed cherry dump. */
 export interface AuditSeedCherryDump {
   readonly status: 'DETECTED' | 'MISSED';
   readonly claimId: string;
@@ -44,6 +46,9 @@ export interface AuditSeedCherryDump {
 }
 
 // collect 不做 env 发现（caller 负责）；仅跑真实链 + 构 dump，供 CLI 包装与物证测试共享。
+/**
+ * collect audit seed cherry.
+ */
 export async function collectAuditSeedCherry(options: {
   readonly lightcurvePath: string;
   readonly pythonCmd: string;
@@ -87,6 +92,9 @@ export async function collectAuditSeedCherry(options: {
   }
 }
 
+/**
+ * run audit seed cherry.
+ */
 export async function runAuditSeedCherry(options: AuditSeedCherryOptions = {}): Promise<number> {
   const lightcurvePath = options.lightcurvePath ?? DEFAULT_FIXTURE;
   const pythonCommand = options.pythonCmd ?? findPythonCommand();

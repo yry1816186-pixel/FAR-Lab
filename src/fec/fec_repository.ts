@@ -27,11 +27,13 @@ interface FecContractV2Row {
   readonly created_at: string;
 }
 
+/** registerFecV2 输入（冻结 FecContractV2 + compiledAt 时间戳）。 */
 export interface RegisterFecV2Input {
   readonly fec: FecContractV2;
   readonly compiledAt: string;
 }
 
+/** DB 存储的 FEC V2 契约（fec + fecHash + compiledAt + locked + createdAt·rowToStored 产出）。 */
 export interface StoredFecContractV2 {
   readonly fec: FecContractV2;
   readonly fecHash: string;
@@ -65,6 +67,9 @@ export function registerFecV2(db: Database.Database, input: RegisterFecV2Input):
   return getFecV2ByFecId(db, fec.fecId);
 }
 
+/**
+ * get fec v2 by fec id.
+ */
 export function getFecV2ByFecId(db: Database.Database, fecId: string): StoredFecContractV2 {
   const row = db
     .prepare(`SELECT * FROM fec_contracts_v2 WHERE fec_id = ?`)
@@ -76,6 +81,9 @@ export function getFecV2ByFecId(db: Database.Database, fecId: string): StoredFec
   return rowToStored(row);
 }
 
+/**
+ * get fec v2 by claim.
+ */
 export function getFecV2ByClaim(db: Database.Database, claimId: string): StoredFecContractV2[] {
   const rows = db
     .prepare(`SELECT * FROM fec_contracts_v2 WHERE claim_id = ? ORDER BY created_at ASC`)

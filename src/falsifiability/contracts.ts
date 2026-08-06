@@ -20,11 +20,24 @@ import { hashCanonicalJson } from '../evidence_log/hasher.ts';
 import type Database from 'better-sqlite3';
 import type { ThresholdSemantic } from '../schema/enums.ts';
 
-// DEBT-12：ComparatorKind 单源化——派生自 schema/enums.ts THRESHOLD_SEMANTICS（与 fec_contract
-// FecThresholdSpec.thresholdSemantics + falsifiability/types.ts ThresholdSemantics 同源·3 值统一）。
-// 'eq' 死值已移除（精确等值无可证伪语义·Popper）；DB CHECK 由 0022 迁移同步收窄。
+/**
+ * How a falsification threshold comparator operates. Single-sourced from
+ * `schema/enums.ts THRESHOLD_SEMANTICS` (DEBT-12) to keep FEC contracts,
+ * `fec_contract.ts FecThresholdSpec`, and `types.ts ThresholdSemantics`
+ * aligned on the same three values. The old `'eq'` comparator was removed
+ * because exact equality has no falsifiable semantics (Popper).
+ */
 export type ComparatorKind = ThresholdSemantic;
 
+/**
+ * An immutable pre-registered falsifiability contract (FEC V1-must).
+ *
+ * Key invariants enforced at registration time:
+ *   - `preregistrationHash` is locked before execution (anti p-hacking, F8)
+ *   - `alpha=0.0125` / `seed=42` / Bonferroni are pre-registered
+ *   - `compiledBy` is always `'deterministic_compiler'` (no LLM, F3)
+ *   - `measurableImplication` is non-empty (F7 FEC triple)
+ */
 export interface FalsifiabilityContract {
   readonly contractId: string;
   readonly claimId: string;
@@ -45,6 +58,11 @@ export interface FalsifiabilityContract {
   readonly createdAt: string;
 }
 
+/**
+ * Input for {@link registerContract}. The caller supplies the claim and its
+ * falsifiable specification; optional fields default to system-wide constants
+ * (`alpha=0.0125`, `seed=42`, `bonferroniApplied=true`, `population='unknown'`).
+ */
 export interface RegisterContractInput {
   readonly claimId: string;
   readonly measurableImplication: string;

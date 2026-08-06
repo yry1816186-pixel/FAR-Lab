@@ -13,6 +13,7 @@ import {
   type ReliabilityCertificate,
 } from '../../api/internal/court_service.ts';
 
+/** Input parameters for operations involving court args. */
 export interface CourtArgs {
   readonly claim: string;
   readonly models: readonly string[];
@@ -21,6 +22,9 @@ export interface CourtArgs {
 
 const DEFAULT_MODELS = ['qwen-vl-max', 'qwen-plus', 'qwen-turbo'];
 
+/**
+ * parse court args.
+ */
 export function parseCourtArgs(argv: readonly string[]): CourtArgs {
   let claim = '';
   let models: readonly string[] = DEFAULT_MODELS;
@@ -80,6 +84,9 @@ function renderHuman(cert: ReliabilityCertificate): void {
   process.stdout.write(lines.join('\n'));
 }
 
+/**
+ * run court.
+ */
 export async function runCourt(argv: readonly string[]): Promise<number> {
   const args = parseCourtArgs(argv);
 

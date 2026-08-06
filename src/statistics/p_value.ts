@@ -8,8 +8,10 @@
 
 import { sampleMean, sampleStandardDeviation } from './effect_size.ts';
 
+/** Type alias: alternative hypothesis. */
 export type AlternativeHypothesis = 'less' | 'greater' | 'two_sided';
 
+/** Result/output structure for z test result. */
 export interface ZTestResult {
   readonly statistic: number;
   readonly pValue: number;
@@ -17,6 +19,9 @@ export interface ZTestResult {
   readonly alternative: AlternativeHypothesis;
 }
 
+/**
+ * erf.
+ */
 export function erf(x: number): number {
   assertFiniteNumber(x, 'x');
   const sign = x < 0 ? -1 : 1;
@@ -32,15 +37,24 @@ export function erf(x: number): number {
   return sign * estimate;
 }
 
+/**
+ * normal cdf.
+ */
 export function normalCdf(x: number): number {
   assertFiniteNumber(x, 'x');
   return 0.5 * (1 + erf(x / Math.SQRT2));
 }
 
+/**
+ * normal survival.
+ */
 export function normalSurvival(x: number): number {
   return 1 - normalCdf(x);
 }
 
+/**
+ * z test p value.
+ */
 export function zTestPValue(
   zScore: number,
   alternative: AlternativeHypothesis,
@@ -56,6 +70,9 @@ export function zTestPValue(
   }
 }
 
+/**
+ * one sample z test.
+ */
 export function oneSampleZTest(
   sample: readonly number[],
   nullMean: number,
@@ -77,6 +94,9 @@ export function oneSampleZTest(
   };
 }
 
+/**
+ * two sample welch z test.
+ */
 export function twoSampleWelchZTest(
   left: readonly number[],
   right: readonly number[],
@@ -110,6 +130,9 @@ export function twoSampleWelchZTest(
   };
 }
 
+/**
+ * normal quantile.
+ */
 export function normalQuantile(probability: number): number {
   assertProbabilityOpen(probability, 'probability');
 

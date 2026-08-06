@@ -22,7 +22,7 @@ import type {
 import type { VerificationOutcome } from './math_claim.ts';
 
 const SYMPY_SCRIPT_PATH = join(PACKAGE_ROOT, 'repro', 'math_backends', 'sympy_backend.py');
-
+/** Configuration options for the SymPy CAS (Computer Algebra System) backend. */
 export interface SymPyCasBackendOptions {
   /** Python executable command. Default 'python'. */
   readonly pythonCommand?: string;

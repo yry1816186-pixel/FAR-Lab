@@ -134,7 +134,8 @@ export function isBaselineExempt(purposeTag: string): boolean {
 // ---------------------------------------------------------------------------
 // V2 在线数据集获取（P1-6 · 真 spawn dataset_fetch.py）
 // ---------------------------------------------------------------------------
-
+/** Parameters for fetching a dataset online via lightkurve or astroquery.mast.
+ * Includes host whitelist enforcement, retry/backoff, and optional LC export. */
 export interface OnlineFetchParams {
   readonly resolver: 'lightkurve' | 'astroquery.mast';
   /** 目标 host（TS 侧白名单权威门——非白名单不 spawn）。 */
@@ -155,7 +156,8 @@ export interface OnlineFetchParams {
    */
   readonly outDir?: string;
 }
-
+/** Result of an online dataset fetch: the resolved dataset reference
+ * plus whether the host was whitelisted. Optional lightcurvePath for BLS. */
 export interface OnlineFetchResult {
   readonly ref: DatasetRef;
   readonly hostWhitelisted: boolean;
@@ -266,7 +268,11 @@ async function attemptOnlineFetch(
     child.stdin.end();
   });
 }
-
+/** Spawn dataset_fetch.py to fetch a dataset online (lightkurve / astroquery.mast).
+ * Returns null on any failure (non-whitelisted host, network, MAST rate-limit).
+ * Caller should fall back to cached_fixture on null (02 F1 never-fabricate).
+ * @param params Fetch configuration including resolver, host, and retry options.
+ * @returns The fetched dataset reference, or null on failure. */
 export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<OnlineFetchResult | null> {
   const hostWhitelisted = (DATASET_HOST_WHITELIST as readonly string[]).includes(params.host);
   if (!hostWhitelisted) {

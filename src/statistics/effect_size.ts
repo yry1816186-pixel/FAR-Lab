@@ -13,6 +13,7 @@ export interface SampleSummary {
   readonly standardDeviation: number;
 }
 
+/** Interface defining two sample effect size. */
 export interface TwoSampleEffectSize {
   readonly differenceInMeans: number;
   readonly pooledStandardDeviation: number;
@@ -21,6 +22,9 @@ export interface TwoSampleEffectSize {
   readonly hedgesCorrection: number;
 }
 
+/**
+ * sample mean.
+ */
 export function sampleMean(values: readonly number[]): number {
   assertFiniteSample(values, 'values', 1);
   let total = 0;
@@ -30,6 +34,9 @@ export function sampleMean(values: readonly number[]): number {
   return total / values.length;
 }
 
+/**
+ * sample variance.
+ */
 export function sampleVariance(values: readonly number[]): number {
   assertFiniteSample(values, 'values', 2);
   const mean = sampleMean(values);
@@ -41,10 +48,16 @@ export function sampleVariance(values: readonly number[]): number {
   return squaredDeviationTotal / (values.length - 1);
 }
 
+/**
+ * sample standard deviation.
+ */
 export function sampleStandardDeviation(values: readonly number[]): number {
   return Math.sqrt(sampleVariance(values));
 }
 
+/**
+ * pooled standard deviation.
+ */
 export function pooledStandardDeviation(
   left: readonly number[],
   right: readonly number[],
@@ -58,6 +71,9 @@ export function pooledStandardDeviation(
   return Math.sqrt(weightedVariance);
 }
 
+/**
+ * cohens d one sample.
+ */
 export function cohensDOneSample(sample: readonly number[], nullMean: number): number {
   assertFiniteNumber(nullMean, 'nullMean');
   const sd = sampleStandardDeviation(sample);
@@ -69,6 +85,9 @@ export function cohensDOneSample(sample: readonly number[], nullMean: number): n
 
 
 
+/**
+ * hedges correction.
+ */
 export function hedgesCorrection(degreesOfFreedom: number): number {
   assertFiniteNumber(degreesOfFreedom, 'degreesOfFreedom');
   if (degreesOfFreedom <= 1) {
@@ -77,6 +96,9 @@ export function hedgesCorrection(degreesOfFreedom: number): number {
   return 1 - 3 / (4 * degreesOfFreedom - 1);
 }
 
+/**
+ * two sample effect size.
+ */
 export function twoSampleEffectSize(
   left: readonly number[],
   right: readonly number[],

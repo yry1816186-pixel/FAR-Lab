@@ -14,6 +14,7 @@ import {
   type ArenaResult,
 } from '../../api/internal/arena_service.ts';
 
+/** Input parameters for operations involving arena args. */
 export interface ArenaArgs {
   readonly hypothesis: string;
   readonly refuters: readonly string[];
@@ -22,6 +23,9 @@ export interface ArenaArgs {
 
 const DEFAULT_REFUTERS = ['scope-launderer', 'post-hoc-threshold', 'dataset-drift'];
 
+/**
+ * parse arena args.
+ */
 export function parseArenaArgs(argv: readonly string[]): ArenaArgs {
   let hypothesis = '';
   let refuters: readonly string[] = DEFAULT_REFUTERS;
@@ -81,6 +85,9 @@ function renderHuman(res: ArenaResult): void {
   process.stdout.write(lines.join('\n'));
 }
 
+/**
+ * run arena.
+ */
 export async function runArena(argv: readonly string[]): Promise<number> {
   const args = parseArenaArgs(argv);
 

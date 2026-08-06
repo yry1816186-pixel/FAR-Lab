@@ -39,6 +39,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: M3_RAW_INPUT. */
 export const M3_RAW_INPUT = [
   'Telomere shortening as the single primary driver of mammalian aging: The Hayflick limit (1961)',
   'established that human diploid fibroblasts have a finite replicative capacity (~50 population doublings).',
@@ -51,6 +52,7 @@ export const M3_RAW_INPUT = [
   'proteostasis loss, mitochondrial dysfunction, and SASP — telomere is one factor among many.',
 ].join(' ');
 
+/** Constant: M3_SOURCE_CARD. */
 export const M3_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-m3-blackburn-telomere-2015',
   url: 'https://doi.org/10.1126/science.aac6506',
@@ -278,6 +280,9 @@ const M3_SOURCE_ANCHOR: SourceAnchor = {
   rawResponseHash: 'm3'.repeat(32),
 };
 
+/**
+ * run m3 seed.
+ */
 export async function runM3Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [

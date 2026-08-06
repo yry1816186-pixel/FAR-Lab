@@ -5,6 +5,7 @@
 import { sampleMean, sampleStandardDeviation } from './effect_size.ts';
 import { normalQuantile } from './p_value.ts';
 
+/** Interface defining confidence interval. */
 export interface ConfidenceInterval {
   readonly estimate: number;
   readonly lower: number;
@@ -13,6 +14,9 @@ export interface ConfidenceInterval {
   readonly standardError: number;
 }
 
+/**
+ * normal approximation interval.
+ */
 export function normalApproximationInterval(
   estimate: number,
   standardError: number,
@@ -33,6 +37,9 @@ export function normalApproximationInterval(
   };
 }
 
+/**
+ * mean confidence interval.
+ */
 export function meanConfidenceInterval(
   sample: readonly number[],
   confidenceLevel = 0.95,
@@ -45,6 +52,9 @@ export function meanConfidenceInterval(
   return normalApproximationInterval(estimate, standardError, confidenceLevel);
 }
 
+/**
+ * difference in means confidence interval.
+ */
 export function differenceInMeansConfidenceInterval(
   left: readonly number[],
   right: readonly number[],
@@ -60,6 +70,9 @@ export function differenceInMeansConfidenceInterval(
   return normalApproximationInterval(estimate, standardError, confidenceLevel);
 }
 
+/**
+ * wilson score interval.
+ */
 export function wilsonScoreInterval(
   successes: number,
   trials: number,

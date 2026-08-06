@@ -50,6 +50,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: H1_RAW_INPUT. */
 export const H1_RAW_INPUT = [
   'RNA world hypothesis self-replication: The RNA world hypothesis posits that early life relied on',
   'RNA molecules that could BOTH store genetic information AND catalyze their own replication (ribozyme',
@@ -62,6 +63,7 @@ export const H1_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: H1_SOURCE_CARD. */
 export const H1_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-h1-johnston-r18-2001',
   url: 'https://doi.org/10.1126/science.1057786',
@@ -277,6 +279,9 @@ const H1_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- runSeed ----------
 
+/**
+ * run h1 seed.
+ */
 export async function runH1Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 

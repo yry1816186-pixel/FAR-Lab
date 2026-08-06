@@ -39,6 +39,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: A11_RAW_INPUT. */
 export const A11_RAW_INPUT = [
   'Supermassive black hole (SMBH) mergers are a natural consequence of hierarchical galaxy assembly.',
   'When two galaxies merge, their central SMBHs form a bound binary that hardens via dynamical friction,',
@@ -54,6 +55,7 @@ export const A11_RAW_INPUT = [
   'gravitational waves across the mass spectrum from stellar-mass to supermassive.',
 ].join(' ');
 
+/** Constant: A11_SOURCE_CARD. */
 export const A11_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-a11-ligo-gw150914-2016',
   url: 'https://doi.org/10.1103/PhysRevLett.116.061102',
@@ -271,6 +273,9 @@ const A11_SOURCE_ANCHOR: SourceAnchor = {
   rawResponseHash: ('a11'.repeat(22)).slice(0, 64),
 };
 
+/**
+ * run a11 seed.
+ */
 export async function runA11Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 

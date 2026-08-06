@@ -4,6 +4,7 @@
 
 export type MultipleTestingCorrection = 'none' | 'bonferroni' | 'holm' | 'bh_fdr';
 
+/** Interface defining adjusted p value. */
 export interface AdjustedPValue {
   readonly index: number;
   readonly rawPValue: number;
@@ -16,6 +17,9 @@ interface IndexedPValue {
   readonly rawPValue: number;
 }
 
+/**
+ * adjust p values.
+ */
 export function adjustPValues(
   rawPValues: readonly number[],
   correction: MultipleTestingCorrection,

@@ -4,7 +4,7 @@
 // CLI 命令集 + far status + far verify。
 //
 // 已实装子命令：`far status`（01 §5）+ `far verify`（04 §5 · FI-9 第三方独立重算）
-// + `far export receipt`（04 §9 Trust Receipt DOC 投影）+ `far export far-proof` + `far bench run`
+// + `far export receipt`（04 §9 Trust Receipt DOC 投影）+ `far export receipt-v2` + `far export far-proof` + `far bench run`
 // + `far verify-golden`（14 GV）+ `far fec compile|freeze` + `far fsm advance`（P2-2）
 // + `far demo`（一键演示）+ `far api`（REST server）+ `far ask`（6-stage FSM）。
 // Node 24 原生 type stripping 跑 .ts（package.json engines node>=24；
@@ -32,6 +32,7 @@ import { runArena } from './commands/arena.ts';
 import { runInit } from './commands/init.ts';
 import { runDoctor } from './commands/doctor.ts';
 import { runVersion } from './commands/version.ts';
+import { runScheduleFromArgs } from './commands/schedule.ts';
 import { parseOptions, reportErrors, type OptionSchema } from './parse_options.ts';
 
 async function main(): Promise<void> {
@@ -73,6 +74,14 @@ async function main(): Promise<void> {
   }
 
   if (command === 'demo') {
+    // `far demo v2` shows the V2 receipt verification path (six assurance dimensions).
+    if (argv[1] === 'v2' || argv[1] === '--v2') {
+      const { runV2ReceiptVerification, formatV2VerificationForDisplay, V2_DEMO_SAMPLE } =
+        await import('../v2_domain/receipt_verify_v2.ts');
+      const result = runV2ReceiptVerification(V2_DEMO_SAMPLE);
+      process.stdout.write(formatV2VerificationForDisplay(result) + '\n');
+      process.exit(0);
+    }
     process.exit(runDemo(argv[1]));
   }
 
@@ -110,6 +119,26 @@ async function main(): Promise<void> {
   }
 
   if (command === 'verify') {
+    // `far verify --v2` routes to the V2 six-dimension verification path.
+    if (argv.includes('--v2')) {
+      const envelopeIdx = argv.indexOf('--envelope');
+      const bundleIdx = argv.indexOf('--bundle');
+      const { runVerifyV2 } = await import('./commands/verify_v2.ts');
+      const opts: { envelopePath?: string; bundlePath?: string; json: boolean } = {
+        json: argv.includes('--json'),
+      };
+      if (envelopeIdx !== -1) {
+        const ep = argv[envelopeIdx + 1];
+        if (ep !== undefined) opts.envelopePath = ep;
+      }
+      if (bundleIdx !== -1) {
+        const bp = argv[bundleIdx + 1];
+        if (bp !== undefined) opts.bundlePath = bp;
+      }
+      const result = await runVerifyV2(opts);
+      process.stdout.write(result.output + '\n');
+      process.exit(result.exitCode);
+    }
     const exitCode = await runVerifyFromArgs(argv.slice(1));
     process.exit(exitCode);
   }
@@ -125,7 +154,7 @@ async function main(): Promise<void> {
   }
 
   if (command === 'export') {
-    const exitCode = runExportFromArgs(argv.slice(1));
+    const exitCode = await runExportFromArgs(argv.slice(1));
     process.exit(exitCode);
   }
 
@@ -163,6 +192,18 @@ async function main(): Promise<void> {
   if (command === 'backup') {
     const { runBackup } = await import('./commands/backup.ts');
     process.exit(runBackup(argv.slice(1)));
+  }
+
+  if (command === 'schedule') {
+    // E-schedule（批次 3-G·借鉴 Hermes cron 无人值守重验证）
+    const exitCode = await runScheduleFromArgs(argv.slice(1));
+    process.exit(exitCode);
+  }
+
+  if (command === 'real-paper') {
+    // real-paper: 真实论文端到端验证（DEEP_AUDIT 缺失项）
+    await import('./commands/real_paper.ts');
+    process.exit(0);
   }
 
   process.stderr.write(`far: unknown command '${command}'\n\n${HELP_TEXT}`);
@@ -411,16 +452,19 @@ async function runBenchRunFromArgs(args: readonly string[]): Promise<number> {
   });
 }
 
-function runExportFromArgs(args: readonly string[]): number {
+function runExportFromArgs(args: readonly string[]): Promise<number> {
   const subcommand = args[0];
   if (subcommand === 'receipt') {
-    return runExportReceiptFromArgs(args.slice(1));
+    return Promise.resolve(runExportReceiptFromArgs(args.slice(1)));
+  }
+  if (subcommand === 'receipt-v2') {
+    return runExportReceiptV2FromArgs(args.slice(1));
   }
   if (subcommand === 'far-proof') {
-    return runExportFarProofFromArgs(args.slice(1));
+    return Promise.resolve(runExportFarProofFromArgs(args.slice(1)));
   }
-  process.stderr.write(`far export: expected 'receipt' or 'far-proof' (got: ${subcommand ?? '<missing>'})\n`);
-  return 2;
+  process.stderr.write(`far export: expected 'receipt', 'receipt-v2', or 'far-proof' (got: ${subcommand ?? '<missing>'})\n`);
+  return Promise.resolve(2);
 }
 
 const EXPORT_RECEIPT_SCHEMA: readonly OptionSchema[] = [
@@ -462,6 +506,37 @@ function runExportReceiptFromArgs(args: readonly string[]): number {
     ...(generatedAt !== undefined ? { generatedAt } : {}),
     format,
   });
+}
+
+const EXPORT_RECEIPT_V2_SCHEMA: readonly OptionSchema[] = [
+  {
+    name: '--format',
+    type: 'string',
+    description: 'json|markdown (default json)',
+    validate: (v) => ['json', 'markdown'].includes(v) ? null : `must be json|markdown (got: ${v})`,
+  },
+  { name: '--envelope', type: 'string', required: true, description: 'path to ProofEnvelopeV2 JSON', requiredPlaceholder: 'path' },
+  { name: '--out', type: 'string', description: 'output path' },
+];
+
+async function runExportReceiptV2FromArgs(args: readonly string[]): Promise<number> {
+  const result = parseOptions(args, EXPORT_RECEIPT_V2_SCHEMA, 'far export receipt-v2');
+  if (reportErrors(result.errors)) {
+    return 2;
+  }
+  const envelopePath = result.values['--envelope'] as string;
+  const outputPath = result.values['--out'] as string | undefined;
+  const formatValue = result.values['--format'] as string | undefined;
+  const format = formatValue === 'markdown' ? 'markdown' : 'json';
+
+  const { runExportReceiptV2 } = await import('./commands/export_receipt_v2.ts');
+  const v2Result = await runExportReceiptV2({
+    envelopePath,
+    ...(outputPath !== undefined ? { outputPath } : {}),
+    format,
+  });
+  process.stdout.write(v2Result.output + '\n');
+  return v2Result.exitCode;
 }
 
 const EXPORT_FAR_PROOF_SCHEMA: readonly OptionSchema[] = [
@@ -798,6 +873,13 @@ USAGE:
     --out <path>         write to a file; omit to print to stdout
     exit codes: 0 success / 7 input validation failed / 2 bad args / 1 runtime error
 
+  far export receipt-v2 --envelope <path> [--format json|markdown] [--out <path>]
+                         V2 Receipt export (manifest + six-dimension verification + ContractBindingSet)
+    --envelope <path>    ProofEnvelopeV2 JSON file
+    --format <fmt>       json|markdown (default json)
+    --out <path>         write to a file; omit to print to stdout
+    exit codes: 0 success / 2 bad args / 1 runtime error
+
   far export far-proof (--demo-chain | --db <path>) --out <dir> [--package] [--archive <path>]
                        [--json] [--force] [--exported-at <iso>]
                          .far-proof V1 self-verifiable evidence bundle
@@ -836,7 +918,8 @@ USAGE:
                                     advance the 9-state CLI protocol FSM and append a stageReceipt hash link
     --event <name>      CliEvent name (ADVANCE_CLAIM_CANDIDATE / ADVANCE_FEC_PROPOSE /
                         ADVANCE_FEC_COMPILE / ADVANCE_EVIDENCE_GATHER / ADVANCE_STATISTICS /
-                        ADVANCE_VERDICT / ADVANCE_PROOF_SEAL / ADVANCE_AUDITABLE / ADVANCE_VERIFIED)
+                        ADVANCE_VERDICT / ADVANCE_PROOF_SEAL / ADVANCE_AUDITABLE / ADVANCE_VERIFIED /
+                        REVERT_EVIDENCE_GATHER / REVERT_STATISTICS / REVERT_VERDICT)
     --input <path>      path to the stageOutput JSON file
     --state-file <path> state file path (default ./.far/fsm_state.json; initialized to INITIAL + GENESIS_RECEIPT if absent)
     --json              machine-readable output (StageReceipt JSON)
@@ -860,6 +943,24 @@ USAGE:
   far court "<claim>" [--models a,b,c]      cross-model reliability court (issues a ReliabilityCertificate)
   far arena "<hypothesis>" [--refuters]     adversarial science arena (refuter attacks + deterministic arbiter scoreboard)
   far init <domain> [--out <dir>] [--force] scaffold a DomainPack (config + claim/fec templates)
+
+  far real-paper [--paper bem] [--mode as-published|corrected]
+    Run a real published paper through the FAR-Lab pipeline (statistics recompute
+    + deterministic verdict kernel + 22 anti-theater fraud detectors + tamper-evident
+    proof seal). Currently supports:
+      bem  — Bem (2011) "Feeling the Future" (replication crisis landmark)
+    Modes:
+      as-published  simulate the paper's actual analysis (exposes methodological flaws)
+      corrected     apply FAR-Lab's proper analysis (Bonferroni correction)
+
+  far schedule <add|list|remove|run>       scheduled re-verification (re-verify claims over time; JSON-persisted)
+    add --exec "<command>" [--every <days>] [--label <text>]
+                          register a periodic re-verification job (--every default 7 days)
+    list                  list all jobs with due status
+    remove <id>           remove a job
+    run                   execute all due jobs now and record lastRunAt/lastExitCode
+    store: $FAR_HOME/schedules.json (default ~/.far/schedules.json); exec via execFile with 5-min timeout.
+    exit codes: 0 ok / 1 error / 2 bad args
 
   All listed commands are implemented. Items below are future work (not missing CLI commands):
   - real multi-model providers (court/arena --models against real LLMs; needs a credential gate)

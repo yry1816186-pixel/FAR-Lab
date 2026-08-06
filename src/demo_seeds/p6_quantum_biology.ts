@@ -59,6 +59,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: P6_RAW_INPUT. */
 export const P6_RAW_INPUT = [
   'Room-temperature quantum coherence in biological function: Three landmark systems claim',
   'quantum effects drive biology — (1) FMO photosynthetic complex excitation energy transfer',
@@ -78,6 +79,7 @@ export const P6_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: P6_SOURCE_CARD. */
 export const P6_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-p6-cao-2020',
   url: 'https://doi.org/10.1126/sciadv.aaz4888',

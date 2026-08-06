@@ -9,8 +9,10 @@ import { hashCanonicalJson } from '../evidence_log/hasher.ts';
 import type { CliState } from './state_machine.ts';
 
 // 与 evidence_log GENESIS_PREV_HASH 同值（'0'.repeat(64)），FSM 链首采用同一 SSOT 口径。
+/** Constant: GENESIS_RECEIPT. */
 export const GENESIS_RECEIPT = '0'.repeat(64);
 
+/** Interface defining stage receipt. */
 export interface StageReceipt {
   readonly stage: CliState;
   readonly prevReceipt: string;
@@ -18,6 +20,9 @@ export interface StageReceipt {
   readonly receipt: string;
 }
 
+/**
+ * compute stage receipt.
+ */
 export function computeStageReceipt(prevReceipt: string, stageOutput: unknown): string {
   if (prevReceipt.length === 0) {
     throw new Error('computeStageReceipt: prevReceipt 不能为空（链首须用 GENESIS_RECEIPT）');
@@ -27,6 +32,9 @@ export function computeStageReceipt(prevReceipt: string, stageOutput: unknown): 
   return createHash('sha256').update(`${prevReceipt}${outputHash}`, 'utf8').digest('hex');
 }
 
+/**
+ * verify stage receipt chain.
+ */
 export function verifyStageReceiptChain(receipts: readonly StageReceipt[]): boolean {
   if (receipts.length === 0) return true;
   let expectedPrev = GENESIS_RECEIPT;

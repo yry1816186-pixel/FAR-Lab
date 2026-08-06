@@ -48,6 +48,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: T1_RAW_INPUT. */
 export const T1_RAW_INPUT = [
   'Consciousness neuroscience: Two dominant theories compete for the neural correlates of consciousness',
   '(NCC). Integrated Information Theory (IIT, Tononi 2004) posits that consciousness IS integrated',
@@ -66,6 +67,7 @@ export const T1_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: T1_SOURCE_CARD. */
 export const T1_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-t1-koch-2016',
   url: 'https://doi.org/10.1038/nrn.2016.22',

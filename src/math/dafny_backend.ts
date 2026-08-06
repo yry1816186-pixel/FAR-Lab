@@ -20,13 +20,15 @@ import type {
   BackendVerifyResult,
   MathBackend,
 } from './math_claim.ts';
-
+/** Configuration options for the Dafny formal verification backend. */
 export interface DafnyBackendOptions {
   readonly dafnyCommand?: string;
   readonly timeoutMs?: number;
   readonly versionOverride?: string;
 }
-
+/** Dafny formal verification backend (spec 38 S3.4).
+ * Spawns the dafny verify CLI on a temp .dfy file. Degrades to
+ * outcome='unknown' when the dafny binary is not on PATH. */
 export class DafnyBackend implements MathBackend {
   readonly backendKind = 'dafny' as const;
   readonly backendId: string;

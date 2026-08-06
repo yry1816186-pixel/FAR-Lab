@@ -1,3 +1,4 @@
+/** Canonical payload kinds for agent-loop messages (hypothesis, experiment, observation, citation, plan, feedback, understanding, integration, meta). */
 export const PAYLOAD_KINDS = [
   'hypothesis',
   'experiment',
@@ -10,6 +11,7 @@ export const PAYLOAD_KINDS = [
   'meta',
 ] as const;
 
+/** Purposes allowed in the main reasoning ring (hypothesis, narrative, viz_select, code_gen, dialogue). */
 export const MAIN_RING_PURPOSES = [
   'hypothesis',
   'narrative',
@@ -18,15 +20,19 @@ export const MAIN_RING_PURPOSES = [
   'dialogue',
 ] as const;
 
+/** Purposes allowed in the evaluation ring (eval, scoring, gt_read). */
 export const EVAL_RING_PURPOSES = ['eval', 'scoring', 'gt_read'] as const;
+/** Purposes that are exempt from baseline comparison (baseline_exempt). */
 export const BASELINE_EXEMPT_PURPOSES = ['baseline_exempt'] as const;
 
+/** Union of all allowed purpose tags (main ring + eval ring + baseline exempt). */
 export const PURPOSE_TAGS = [
   ...MAIN_RING_PURPOSES,
   ...EVAL_RING_PURPOSES,
   ...BASELINE_EXEMPT_PURPOSES,
 ] as const;
 
+/** Reasons an agent-loop stage may finish (stop, length, tool_calls, function_call, content_filter). */
 export const FINISH_REASONS = [
   'stop',
   'length',
@@ -35,6 +41,7 @@ export const FINISH_REASONS = [
   'content_filter',
 ] as const;
 
+/** The five canonical verdict values produced by the deterministic verdict kernel. */
 export const VERDICTS = [
   'CONFIRMED',
   'REFUTED',
@@ -46,12 +53,14 @@ export const VERDICTS = [
 // DEBT-12：阈值语义单源（3 值）。精确等值 eq/ne 已移除——无可证伪语义（Popper），
 // science_check_to_fec.ts 对 '==' fail-closed 拒绝。fec_contract FecThresholdSpec.thresholdSemantics、
 // falsifiability/types.ts ThresholdSemantics、contracts.ts ComparatorKind 均派生自本常量（FF-16 守单一源）。
+/** Single source of truth for threshold comparison semantics (gt, lt, range). The eq/ne values were removed — exact equality has no falsifiable semantics (Popper, DEBT-12). fec_contract FecThresholdSpec.thresholdSemantics, falsifiability/types.ts ThresholdSemantics, and contracts.ts ComparatorKind all derive from this constant (FF-16 single-source guard). */
 export const THRESHOLD_SEMANTICS = [
   'gt',
   'lt',
   'range',
 ] as const;
 
+/** Kinds of nodes in the claim-verdict graph (hypothesis, evidence, method, plan, feedback, root). */
 export const VERDICT_NODE_KINDS = [
   'hypothesis',
   'evidence',
@@ -61,6 +70,7 @@ export const VERDICT_NODE_KINDS = [
   'root',
 ] as const;
 
+/** Kinds of edges in the claim-verdict graph (supports, refutes, derives_from, tests, iterates). */
 export const EDGE_KINDS = [
   'supports',
   'refutes',
@@ -69,6 +79,7 @@ export const EDGE_KINDS = [
   'iterates',
 ] as const;
 
+/** Status values for reproducibility verification runs (success, hash_mismatch, env_drift, aborted). */
 export const REPRO_RUN_STATUSES = [
   'success',
   'hash_mismatch',
@@ -76,14 +87,23 @@ export const REPRO_RUN_STATUSES = [
   'aborted',
 ] as const;
 
+/** Type alias for a canonical payload kind. @see PAYLOAD_KINDS */
 export type PayloadKind = (typeof PAYLOAD_KINDS)[number];
+/** Type alias for a main-ring purpose. @see MAIN_RING_PURPOSES */
 export type MainRingPurpose = (typeof MAIN_RING_PURPOSES)[number];
+/** Type alias for an eval-ring purpose. @see EVAL_RING_PURPOSES */
 export type EvalRingPurpose = (typeof EVAL_RING_PURPOSES)[number];
+/** Type alias for any allowed purpose tag. @see PURPOSE_TAGS */
 export type PurposeTag = (typeof PURPOSE_TAGS)[number];
+/** Type alias for an agent-loop finish reason. @see FINISH_REASONS */
 export type FinishReason = (typeof FINISH_REASONS)[number];
+/** Type alias for a canonical verdict value. @see VERDICTS */
 export type Verdict = (typeof VERDICTS)[number];
+/** Type alias for a claim-verdict graph node kind. @see VERDICT_NODE_KINDS */
 export type VerdictNodeKind = (typeof VERDICT_NODE_KINDS)[number];
+/** Type alias for a claim-verdict graph edge kind. @see EDGE_KINDS */
 export type EdgeKind = (typeof EDGE_KINDS)[number];
+/** Type alias for a threshold comparison semantic. @see THRESHOLD_SEMANTICS */
 export type ThresholdSemantic = (typeof THRESHOLD_SEMANTICS)[number];
 
 // ----- V2 共享 enum（APPENDIX_A_TYPES.md §49-96 DESIGN_LOCKED 权威·多子系统复用）-----
@@ -92,20 +112,25 @@ export type ThresholdSemantic = (typeof THRESHOLD_SEMANTICS)[number];
 
 /** 单个可证伪检验项的判定结果（APPENDIX_A §49-53）。 */
 export const PROOF_CHECK_OUTCOMES = ['PASS', 'FAIL', 'WARN', 'SKIP'] as const;
+/** Type alias: proof check outcome. */
 export type ProofCheckOutcome = (typeof PROOF_CHECK_OUTCOMES)[number];
 
 /** 单条统计/测量结果相对 claim 的方向（APPENDIX_A §63-67）。 */
 export const EVIDENCE_DIRECTIONS = ['supports', 'refutes', 'neutral', 'not_applicable'] as const;
+/** Type alias: evidence direction. */
 export type EvidenceDirection = (typeof EVIDENCE_DIRECTIONS)[number];
 
 /** FEC 声明 effect 与 threshold 的比较关系（APPENDIX_A §78-83·03 FecContract.direction）。 */
 export const EFFECT_COMPARATORS = ['greater', 'less', 'equal', 'within', 'noninferior'] as const;
+/** Type alias: effect comparator. */
 export type EffectComparator = (typeof EFFECT_COMPARATORS)[number];
 
 /** WorkflowBinding 网络策略（APPENDIX_A §93-96·Production 默认 off/allowlist）。 */
 export const NETWORK_POLICIES = ['off', 'allowlist', 'unrestricted-with-warning'] as const;
+/** Type alias: network policy. */
 export type NetworkPolicy = (typeof NETWORK_POLICIES)[number];
 
+//** Allowed source types for a source card (official_doc, paper, github_repo, dataset, news, benchmark, other). */
 export const SOURCE_CARD_SOURCE_TYPES = [
   'official_doc',
   'paper',
@@ -116,10 +141,13 @@ export const SOURCE_CARD_SOURCE_TYPES = [
   'other',
 ] as const;
 
+/** Evidence levels for a source card (primary, secondary, tertiary). */
 export const SOURCE_CARD_EVIDENCE_LEVELS = ['primary', 'secondary', 'tertiary'] as const;
 
+/** Stability classifications for a source card (stable, versioned, time_sensitive). */
 export const SOURCE_CARD_STABILITY = ['stable', 'versioned', 'time_sensitive'] as const;
 
+/** Usage categories for a source card (design_benchmark, api_contract, scientific_evidence, scoring_context). */
 export const SOURCE_CARD_USED_FOR = [
   'design_benchmark',
   'api_contract',
@@ -127,11 +155,20 @@ export const SOURCE_CARD_USED_FOR = [
   'scoring_context',
 ] as const;
 
+/** Type alias for a source card source type. @see SOURCE_CARD_SOURCE_TYPES */
 export type SourceCardSourceType = (typeof SOURCE_CARD_SOURCE_TYPES)[number];
+/** Type alias for a source card evidence level. @see SOURCE_CARD_EVIDENCE_LEVELS */
 export type SourceCardEvidenceLevel = (typeof SOURCE_CARD_EVIDENCE_LEVELS)[number];
+/** Type alias for a source card stability classification. @see SOURCE_CARD_STABILITY */
 export type SourceCardStability = (typeof SOURCE_CARD_STABILITY)[number];
+/** Type alias for a source card usage category. @see SOURCE_CARD_USED_FOR */
 export type SourceCardUsedFor = (typeof SOURCE_CARD_USED_FOR)[number];
 
+/**
+ * A structured "source card" describing a referenced external source: its URL, title,
+ * publisher, evidence level, and stability. Used to annotate evidence provenance
+ * with human-readable source metadata.
+ */
 export interface SourceCard {
   readonly sourceId: string;
   readonly url: string;

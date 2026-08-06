@@ -22,12 +22,14 @@ import {
 
 const DEFAULT_FIXTURE = join(PACKAGE_ROOT, 'tests', 'fixtures', 'science_harness', 'tic_sample.cache');
 
+/** Input parameters for operations involving audit multiseed options. */
 export interface AuditMultiseedOptions {
   readonly lightcurvePath?: string;
   readonly pythonCmd?: string;
   readonly json?: boolean;
 }
 
+/** Interface defining audit multiseed dump. */
 export interface AuditMultiseedDump {
   readonly status: 'DETECTED' | 'MISSED';
   readonly claimId: string;
@@ -44,6 +46,9 @@ export interface AuditMultiseedDump {
   readonly sealedConclusion: string;
 }
 
+/**
+ * collect audit multiseed.
+ */
 export async function collectAuditMultiseed(options: {
   readonly lightcurvePath: string;
   readonly pythonCmd: string;
@@ -86,6 +91,9 @@ export async function collectAuditMultiseed(options: {
   }
 }
 
+/**
+ * run audit multiseed.
+ */
 export async function runAuditMultiseed(options: AuditMultiseedOptions = {}): Promise<number> {
   const lightcurvePath = options.lightcurvePath ?? DEFAULT_FIXTURE;
   const pythonCommand = options.pythonCmd ?? findPythonCommand();

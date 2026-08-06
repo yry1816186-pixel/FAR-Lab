@@ -46,6 +46,7 @@ export const COMPILE_ERROR_CODES = [
   // （power analysis sampleSize > 0），否则"垃圾 spec"（阈值宽松到永不被证伪）也能过 FEC 门。
   'POWER_PLAN_REQUIRED',
 ] as const;
+/** FEC 编译失败原因码（03 §2.1 表·12 项·COMPILE_ERROR_CODES 成员类型）。 */
 export type CompileErrorCode = (typeof COMPILE_ERROR_CODES)[number];
 
 /**
@@ -59,6 +60,7 @@ export const FEC_COMPILE_SEVERITIES = [
   'HARD_FAIL_CI_BLOCK',
   'WARN_DOWNGRADE_INCONCLUSIVE',
 ] as const;
+/** FEC 编译失败严重性级别（03 §2.3 降级规则·FEC_COMPILE_SEVERITIES 成员类型）。 */
 export type FecCompileSeverity = (typeof FEC_COMPILE_SEVERITIES)[number];
 
 /** verdict_mapping 5 路径（03 §7 / APPENDIX_B §1·静态决策表·compiler 产·kernel 消费）。 */
@@ -69,10 +71,12 @@ export const VERDICT_MAPPING_PATHS = [
   'scope_narrow',
   'mixed',
 ] as const;
+/** verdict_mapping 静态决策路径（03 §7 / APPENDIX_B §1·5 路径·compiler 产·kernel 消费）。 */
 export type VerdictMappingPath = (typeof VERDICT_MAPPING_PATHS)[number];
 
 /** scope 有界维度（03 §2.1 #2·三要素非空·否则 SCOPE_UNBOUNDED）。 */
 export const FEC_SCOPE_BOUNDED_DIMENSIONS = ['population', 'timeWindow', 'domainConstraint'] as const;
+/** scope 有界维度名（03 §2.1 #2·population/timeWindow/domainConstraint·三要素非空·否则 SCOPE_UNBOUNDED）。 */
 export type FecScopeBoundedDimension = (typeof FEC_SCOPE_BOUNDED_DIMENSIONS)[number];
 
 /** StatisticalPlan 必填字段（03 §1.3 JSON Schema required·10 项·缺任一 → STAT_PLAN_MISSING）。 */
@@ -88,16 +92,19 @@ export const STAT_PLAN_REQUIRED_FIELDS = [
   'outlierPolicy',
   'stoppingRule',
 ] as const;
+/** StatisticalPlan 必填字段名（03 §1.3 JSON Schema required·10 项·STAT_PLAN_REQUIRED_FIELDS 成员类型）。 */
 export type StatPlanRequiredField = (typeof STAT_PLAN_REQUIRED_FIELDS)[number];
 
 // ===== FEC V2 子类型（逐字对齐 APPENDIX_A §2 + 03 §1.2）=====
 
+/** scope 单维度覆盖声明（dimension/value/relation·描述证据 scope 与 claim scope 的匹配关系）。 */
 export interface ScopeCoverage {
   readonly dimension: string;
   readonly value: string;
   readonly relation: 'within' | 'partial' | 'outside';
 }
 
+/** FEC scope 声明（APPENDIX_A §2·三要素 population/timeWindow/domainConstraint·缺任一 → SCOPE_UNBOUNDED）。 */
 export interface ScopeSpec {
   readonly population: string;
   readonly timeWindow: string;
@@ -106,6 +113,7 @@ export interface ScopeSpec {
   readonly knownNarrowing?: readonly ScopeCoverage[];
 }
 
+/** FEC primary metric 规格（metricKey 禁描述性短语·compiler isDescriptivePhrase 校验·否则 METRIC_MISSING）。 */
 export interface MetricSpec {
   /** 稳定 key，禁描述性短语（compiler isDescriptivePhrase 校验·否则 METRIC_MISSING）。 */
   readonly metricKey: string;
@@ -127,6 +135,7 @@ export interface FecThresholdSpec {
   readonly preregistered: boolean;
 }
 
+/** FEC 统计计划（03 §1.3·10 必填字段·缺任一 → STAT_PLAN_MISSING·全 readonly）。 */
 export interface StatisticalPlan {
   /** 须 === MetricSpec.metricKey（compiler 校验）。 */
   readonly primaryMetric: string;
@@ -145,6 +154,7 @@ export interface StatisticalPlan {
   readonly expectedDerivationForm?: 'literal' | 'derived' | 'formula' | 'auto';
 }
 
+/** FEC power analysis 计划（targetPower/minimumDetectableEffect/sampleSize·T-027 强制 opt-in）。 */
 export interface PowerPlan {
   readonly targetPower: number;
   readonly minimumDetectableEffect: number;
@@ -154,6 +164,7 @@ export interface PowerPlan {
   readonly alphaAssumed: number;
 }
 
+/** FEC 多重检验校正计划（correction/familySize/adjustedAlpha·implication>1 时强制）。 */
 export interface MultipleTestingPlan {
   readonly correction: 'bonferroni' | 'holm' | 'bh_fdr';
   readonly familySize: number;
@@ -161,6 +172,7 @@ export interface MultipleTestingPlan {
   readonly preregistered: boolean;
 }
 
+/** FEC 随机种子策略（涉及随机时 fixed=true+seedValue·否则 PROTOCOL_INCOMPLETE）。 */
 export interface SeedPolicy {
   readonly fixed: boolean;
   /** fixed=true 必填（compiler 校验·涉及随机时）。 */
@@ -169,17 +181,20 @@ export interface SeedPolicy {
   readonly justification?: string;
 }
 
+/** FEC 协议偏离处置策略（criticalCategories + nonCritical handling + 显式日志要求）。 */
 export interface DeviationPolicy {
   readonly criticalCategories: readonly string[];
   readonly nonCriticalHandling: 'tolerate' | 'degrade' | 'block';
   readonly requireExplicitLog: boolean;
 }
 
+/** FEC 操作者引用（actorKind+actorId·标识执行冻结/编译/CI 的角色）。 */
 export interface ActorRef {
   readonly actorKind: 'deterministic_compiler' | 'deterministic_freezer' | 'human' | 'ci_runner';
   readonly actorId: string;
 }
 
+/** FEC 协议冻结快照（fecHash+actor+timestamp+gitCommitSha·F3 要求 frozenBy='deterministic_freezer'）。 */
 export interface ProtocolFreeze {
   /** sha256(canonical JSON of FEC VC fields)——compiler computeFecHash 重算互验。 */
   readonly fecHash: string;
@@ -209,6 +224,7 @@ export interface ProtocolFreeze {
   readonly gitCommitSha?: string;
 }
 
+/** FEC 单条证据要求（evidenceId+kind+critical+verificationCheckId·minItems≥1）。 */
 export interface EvidenceRequirement {
   readonly evidenceId: string;
   readonly kind: 'dataset' | 'workflow' | 'measurement' | 'statistical' | 'external';
@@ -217,6 +233,7 @@ export interface EvidenceRequirement {
   readonly verificationCheckId: string;
 }
 
+/** FEC 数据集要求（name+contentHash+synthetic 策略·被 DatasetBinding 匹配·§3.1）。 */
 export interface DatasetRequirement {
   readonly name: string;
   readonly contentHashAlgorithm: string;
@@ -226,6 +243,7 @@ export interface DatasetRequirement {
   readonly schemaFingerprintRequired: boolean;
 }
 
+/** FEC 工作流要求（engine+container/command hash+network policy·被 WorkflowBinding 匹配·§3.2）。 */
 export interface WorkflowRequirement {
   readonly name: string;
   readonly engine: 'nextflow' | 'snakemake' | 'cwl' | 'notebook' | 'script' | 'manual';
@@ -237,6 +255,7 @@ export interface WorkflowRequirement {
 
 // ===== FecContractV2 顶层（03 §1.2·16 字段·contractVersion='FEC/2.0'）=====
 
+/** FEC V2 顶层契约（03 §1.2·contractVersion='FEC/2.0'·compiler 消费·kernel 执行）。 */
 export interface FecContractV2 {
   /** [VC] FEC 全局唯一 id，如 'FEC-ASTRO-0001'。进 canonicalHash 与 proofHash。 */
   readonly fecId: string;
@@ -344,6 +363,7 @@ export interface FecContractV2 {
 
 // ===== 编译器输入/输出（03 §2.2 伪代码 + 设计 interfaces）=====
 
+/** FEC 编译器输入（fec + 可选 measurementCutoff 用于 HARKING 检查·03 §2.2）。 */
 export interface CompileFecInput {
   readonly fec: FecContractV2;
   /**
@@ -353,6 +373,7 @@ export interface CompileFecInput {
   readonly measurementCutoff?: string | null;
 }
 
+/** FEC 编译错误（code+severity+message+可选 field 路径·03 §2.1）。 */
 export interface CompileError {
   readonly code: CompileErrorCode;
   readonly severity: FecCompileSeverity;
@@ -361,6 +382,7 @@ export interface CompileError {
   readonly field?: string;
 }
 
+/** FEC proof check 描述符（checkId+checkKind+expectedOutcome+verdictMappingPath·04 ProofEnvelope 消费）。 */
 export interface ProofCheckDescriptor {
   readonly checkId: string;
   readonly checkKind: 'falsification_sufficiency' | 'threshold' | 'statistical_plan_lock' | 'seed_policy';
@@ -368,6 +390,7 @@ export interface ProofCheckDescriptor {
   readonly mappedVerdictPath: VerdictMappingPath;
 }
 
+/** FEC 证伪计划（compiler 产物：statLock + verdictMapping + proofChecks + integrityFlags·03 §1.4）。 */
 export interface FalsificationPlan {
   /** 产物 1：stat_lock —— 冻结统计参数 canonicalHash（首里程碑交付·03 §1.4）。 */
   readonly statLock: {

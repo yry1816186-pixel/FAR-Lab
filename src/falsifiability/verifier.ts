@@ -16,6 +16,7 @@ import type Database from 'better-sqlite3';
 import { hashCanonicalJson } from '../evidence_log/hasher.ts';
 import { GENESIS_PREV_HASH } from '../evidence_log/types.ts';
 
+/** Result of verifying a chain of verdict nodes: whether all hashes are valid and which nodes (if any) failed verification. */
 export interface VerdictVerifyResult {
   readonly ok: boolean;
   /** 链断/失配的 verdict_id（ok=true 时为 null）。 */
@@ -52,6 +53,14 @@ function recomputeVerdictHash(row: VerdictHashRow): string {
   });
 }
 
+/**
+ * Verifies the integrity of a sequence of verdict nodes by recomputing each
+ * node's `currentHash` from its verdict-critical fields and checking the
+ * `prevHash` → `currentHash` chain linkage.
+ *
+ * @param nodes - The verdict nodes to verify, in chain order.
+ * @returns A {@link VerdictVerifyResult} indicating pass/fail and any broken nodes.
+ */
 export function verifyVerdictNodes(db: Database.Database): VerdictVerifyResult {
   const rows = db
     .prepare(

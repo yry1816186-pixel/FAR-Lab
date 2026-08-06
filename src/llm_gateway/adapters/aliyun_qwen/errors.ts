@@ -1,3 +1,4 @@
+/** Class representing non qwen model error. */
 export class NonQwenModelError extends Error {
   constructor(modelId: string) {
     super(`competition_aliyun_qwen: non-Qwen model is not allowed: ${modelId}`);
@@ -5,6 +6,7 @@ export class NonQwenModelError extends Error {
   }
 }
 
+/** Class representing thinking json schema conflict error. */
 export class ThinkingJsonSchemaConflictError extends Error {
   constructor() {
     super(
@@ -15,6 +17,7 @@ export class ThinkingJsonSchemaConflictError extends Error {
   }
 }
 
+/** Class representing request id missing error. */
 export class RequestIdMissingError extends Error {
   constructor() {
     super('competition_aliyun_qwen: response is missing a DashScope request id');

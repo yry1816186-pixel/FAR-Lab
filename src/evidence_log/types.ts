@@ -1,8 +1,10 @@
 import type { FinishReason, PayloadKind, PurposeTag } from '../schema/enums.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 
+/** Constant: GENESIS_PREV_HASH. */
 export const GENESIS_PREV_HASH = '0'.repeat(64);
 
+/** Interface defining provider neutral credential. */
 export interface ProviderNeutralCredential {
   readonly modelId: string;
   readonly dashscopeRequestId: string | null;
@@ -11,12 +13,14 @@ export interface ProviderNeutralCredential {
   readonly isoTimestamp: string;
 }
 
+/** Interface defining code location. */
 export interface CodeLocation {
   readonly filePath: string;
   readonly location: string;
   readonly lineNumber?: number;
 }
 
+/** Interface defining source anchor. */
 export interface SourceAnchor {
   readonly gitCommitSha: string;
   readonly dashscopeRequestId: string | null;
@@ -33,6 +37,7 @@ export interface SourceAnchor {
  */
 export type ProvenanceClass = 'system_derived' | 'llm_generated' | 'human';
 
+/** Interface defining replay prover. */
 export interface ReplayProver {
   readonly modelSnapshot: string;
   readonly messages: readonly unknown[];
@@ -41,6 +46,7 @@ export interface ReplayProver {
   readonly expectedResponseHash?: string;
 }
 
+/** Input parameters for operations involving canonical input. */
 export interface CanonicalInput {
   readonly stageId: string;
   readonly cred: ProviderNeutralCredential;
@@ -51,6 +57,7 @@ export interface CanonicalInput {
   readonly currentHash?: string;
 }
 
+/** Type alias: append record input. */
 export type AppendRecordInput = Omit<
   CanonicalInput,
   'prevHash' | 'seq' | 'currentHash'
@@ -58,6 +65,7 @@ export type AppendRecordInput = Omit<
   readonly prevHash?: string;
 };
 
+/** Input parameters for operations involving verified canonical input. */
 export interface VerifiedCanonicalInput {
   readonly stageId: string;
   readonly cred: ProviderNeutralCredential;
@@ -65,6 +73,7 @@ export interface VerifiedCanonicalInput {
   readonly prevHash: string;
 }
 
+/** Interface defining call audit data. */
 export interface CallAuditData {
   readonly requestPayload: string;
   readonly responsePayload: string;
@@ -84,6 +93,7 @@ export interface CallAuditData {
   readonly degradedFrom?: string | null;
 }
 
+/** Interface defining call record row. */
 export interface CallRecordRow {
   readonly seq: number;
   readonly stage_id: string;
@@ -107,6 +117,7 @@ export interface CallRecordRow {
   readonly created_at: string;
 }
 
+/** Interface defining evidence log row. */
 export interface EvidenceLogRow {
   readonly evidence_id: string;
   readonly call_record_seq: number;
@@ -126,6 +137,7 @@ export interface EvidenceLogRow {
   readonly created_at: string;
 }
 
+/** Interface defining evidence log entry. */
 export interface EvidenceLogEntry {
   readonly evidenceId: string;
   readonly callRecordSeq: number;
@@ -140,6 +152,7 @@ export interface EvidenceLogEntry {
   readonly systemClaimHash: string | null;
 }
 
+/** Input parameters for operations involving append evidence log args. */
 export interface AppendEvidenceLogArgs {
   readonly callRecordSeq: number;
   readonly evidencePayload: Record<string, unknown>;
@@ -164,11 +177,13 @@ export interface AppendEvidenceLogArgs {
   readonly systemClaimHash?: string | null;
 }
 
+/** Type alias: call record hash row. */
 export type CallRecordHashRow = Omit<
   CallRecordRow,
   'request_payload' | 'response_payload' | 'request_payload_hash' | 'response_payload_hash' | 'finish_reason' | 'usage_tokens_total'
 >;
 
+/** Interface defining hashed record. */
 export interface HashedRecord {
   readonly seq: number;
   readonly currentHash: string;
@@ -176,11 +191,13 @@ export interface HashedRecord {
   readonly row: CallRecordRow;
 }
 
+/** Interface defining chain head. */
 export interface ChainHead {
   readonly seq: number;
   readonly currentHash: string;
 }
 
+/** Result/output structure for verify result. */
 export interface VerifyResult {
   readonly ok: boolean;
   readonly brokenAtSeq: number | null;
@@ -213,6 +230,7 @@ export interface VerifyCallRecordPayloadResult {
   readonly tamperedSeqs: readonly number[];
 }
 
+/** Input parameters for operations involving append record options. */
 export interface AppendRecordOptions {
   readonly providerProfile: ProviderProfile;
   readonly competitionModelSnapshot?: string;

@@ -12,6 +12,7 @@ import { openFarDb } from '../../db/open.ts';
 import { buildDemoChain } from '../../far_proof/demo_chain.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 
+/** Input parameters for operations involving api args. */
 export interface ApiArgs {
   readonly port: number;
   readonly host: string;
@@ -20,6 +21,9 @@ export interface ApiArgs {
   readonly jwtSecret: string | null;
 }
 
+/**
+ * parse api args.
+ */
 export function parseApiArgs(argv: readonly string[]): ApiArgs {
   let port = 3000;
   let host = '127.0.0.1';
@@ -71,6 +75,9 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
   return { port, host, dbPath, seedDemo, jwtSecret };
 }
 
+/**
+ * run api.
+ */
 export async function runApi(argv: readonly string[]): Promise<number> {
   const args = parseApiArgs(argv);
   // SECURITY（深度对抗轮·fail-closed）：非 loopback 绑定且未启用受保护模式（--protected / FAR_JWT_SECRET）

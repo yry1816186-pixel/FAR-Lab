@@ -1,5 +1,9 @@
 import type { ThresholdSpec } from './types.ts';
 
+/**
+ * Result of evaluating a metric value against a threshold spec: whether the
+ * value supports the claim, refutes it, or neither.
+ */
 export interface ThresholdEvaluation {
   readonly supportsClaim: boolean;
   readonly refutesClaim: boolean;

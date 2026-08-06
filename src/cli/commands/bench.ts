@@ -10,6 +10,7 @@ import { dirname } from 'node:path';
 import { runBenchmark, type SeedRunner } from '../../benchmark/index.ts';
 import type { BenchmarkReportV2 } from '../../benchmark/report_schema.ts';
 
+/** Input parameters for operations involving bench run options. */
 export interface BenchRunOptions {
   readonly json: boolean;
   readonly outputPath?: string;
@@ -18,6 +19,9 @@ export interface BenchRunOptions {
   readonly domain?: string;
 }
 
+/**
+ * run bench run.
+ */
 export async function runBenchRun(options: BenchRunOptions): Promise<number> {
   try {
     const seeds = selectBenchSeeds(await loadDemoBenchmarkSeeds(), options.domain);
@@ -50,6 +54,9 @@ export async function runBenchRun(options: BenchRunOptions): Promise<number> {
   }
 }
 
+/**
+ * select bench seeds.
+ */
 export function selectBenchSeeds(
   seeds: readonly SeedRunner[],
   domain: string | undefined,

@@ -67,6 +67,9 @@ import type {
   TerminationCriteria,
 } from './types.ts';
 import { StageReceiptStore, StageReceiptForgedError } from './stage_receipt_store.ts';
+import { compactArtifacts } from './compaction.ts';
+import { SessionRecorder } from '../trace/session_recorder.ts';
+import { createHash } from 'node:crypto';
 import { runStage1 } from './stages/stage1_understanding.ts';
 import { runStage2 } from './stages/stage2_integration.ts';
 import { runStage3 } from './stages/stage3_hypothesis.ts';
@@ -77,6 +80,11 @@ import { runVerdictStage } from './verdict_stage.ts';
 
 
 // ---------- 默认终止条件 ----------
+
+/** 16-hex 内容锚（session 事件 payload 用·审计可溯源）。 */
+function shortSha(text: string): string {
+  return createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16);
+}
 
 /**
  * 默认终止条件（spec §8 默认值）。
@@ -132,6 +140,18 @@ export interface RunAgentLoopArgs {
    * 仅传 5 值枚举本身；软建议非硬驱动（不触发自动 regen 循环，防 p-hacking）。
    */
   readonly priorVerdictKind?: import('../schema/enums.ts').Verdict;
+  /**
+   * E-compaction（批次 2-E·借鉴 opencode session compact）：iteration ≥ 2 时对注入
+   * stage prompt 的 prevArtifacts 应用上下文压缩（stage3/4 裁决关键产物完整保留·
+   * 叙述字段截断 + hash 锚可溯源）。缺省 false → 字节零回归（与历史行为一致）。
+   */
+  readonly compactArtifacts?: boolean;
+  /**
+   * E-session（批次 3-H·借鉴 pi JSONL session format）：可选 session 录制路径。
+   * 设置后：run_started/stage_completed×N/run_completed 实时追加 JSONL（审计观察层·
+   * 与 evidence_log 哈希链正交）。缺省 undefined → 零回归。
+   */
+  readonly sessionPath?: string;
 }
 
 
@@ -163,9 +183,42 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
   /** F-V07-05:resume 时已被收据覆盖的墙钟(在 open 后校准 startTime) */
   let resumedElapsedMs = 0;
   const artifacts: StageArtifact[] = [];
+  // E-session（批次 3-H·可选）：运行时 JSONL 录制（审计观察层）
+  const session: SessionRecorder | null =
+    args.sessionPath !== undefined ? SessionRecorder.open(args.sessionPath) : null;
+  if (session !== null) {
+    session.record({
+      kind: 'run_started',
+      runId: args.runId,
+      ts: new Date().toISOString(),
+      payload: { researchInputHash: shortSha(args.researchInput) },
+    });
+  }
   const appendArtifact = (a: StageArtifact): void => {
     artifacts.push(a);
+    if (session !== null) {
+      session.record({
+        kind: 'stage_completed',
+        runId: args.runId,
+        stageId: a.stageId,
+        ts: new Date().toISOString(),
+        payload: {
+          payloadKind: a.payloadKind,
+          degraded: a.degraded,
+          contentHash: shortSha(JSON.stringify(a.structured)),
+        },
+      });
+    }
     if (args.onArtifact !== undefined) args.onArtifact(a);
+  };
+  // 终止/出错统一收尾：写 run_completed + close（幂等防重入）
+  let sessionFinalized = false;
+  const finalizeSession = (payload: Record<string, unknown>): void => {
+    if (session !== null && !sessionFinalized) {
+      sessionFinalized = true;
+      session.record({ kind: 'run_completed', runId: args.runId, ts: new Date().toISOString(), payload });
+      session.close();
+    }
   };
   let feedbackSignal: FeedbackSignal | null = null;
   let tokensConsumed = 0;
@@ -246,6 +299,10 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       return artifact;
     };
     while (true) {
+      // E-compaction（批次 2-E·可选）：iteration ≥ 2 时注入 stage 的 prevArtifacts 用压缩视图。
+      // stage3/4 裁决关键产物完整保留；缺省关闭 → 字节零回归。
+      const compactView = (): readonly StageArtifact[] =>
+        args.compactArtifacts === true && iteration >= 2 ? compactArtifacts(artifacts) : artifacts;
       // G7(IC-04):成本硬预算断路器(超限即停,fail-closed;计量=tokensConsumed/墙钟/循环数)
       if (budgetProfile !== null) {
         checkBudget(budgetProfile, {
@@ -261,7 +318,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         runStage1({
         ...baseCtx,
         iteration,
-        prevArtifacts: artifacts,
+        prevArtifacts: compactView(),
         feedbackSignal: null,
         tokensConsumed,
         }));
@@ -272,7 +329,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         runStage2({
         ...baseCtx,
         iteration,
-        prevArtifacts: artifacts,
+        prevArtifacts: compactView(),
         feedbackSignal: null,
         tokensConsumed,
         }));
@@ -284,7 +341,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         runStage3({
         ...baseCtx,
         iteration,
-        prevArtifacts: artifacts,
+        prevArtifacts: compactView(),
         feedbackSignal,
         tokensConsumed,
         }));
@@ -295,7 +352,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         runStage4({
         ...baseCtx,
         iteration,
-        prevArtifacts: artifacts,
+        prevArtifacts: compactView(),
         feedbackSignal: null,
         tokensConsumed,
         }));
@@ -306,7 +363,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         runStage5({
         ...baseCtx,
         iteration,
-        prevArtifacts: artifacts,
+        prevArtifacts: compactView(),
         feedbackSignal: null,
         tokensConsumed,
         }));
@@ -317,7 +374,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         runStage6({
         ...baseCtx,
         iteration,
-        prevArtifacts: artifacts,
+        prevArtifacts: compactView(),
         feedbackSignal: null,
         tokensConsumed,
         }));
@@ -332,7 +389,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       const ctx: StageContext = {
         ...baseCtx,
         iteration,
-        prevArtifacts: artifacts,
+        prevArtifacts: compactView(),
         feedbackSignal,
         tokensConsumed,
       };
@@ -358,6 +415,12 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           gitCommitSha: args.gitCommitSha,
           runId: args.runId,
         });
+        finalizeSession({
+          iterations: iteration,
+          reason,
+          verdict: verdictNode?.verdict ?? null,
+          artifactCount: artifacts.length,
+        });
         return {
           runId: args.runId,
           iterationsCompleted: iteration,
@@ -373,6 +436,14 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       iteration++;
     }
   } catch (err) {
+    // E-session：错误终止也落 run_completed（error 标记·审计完整）
+    finalizeSession({
+      iterations: iteration,
+      reason: 'error',
+      verdict: null,
+      artifactCount: artifacts.length,
+      errorCode: err instanceof Error ? err.name : String(err),
+    });
     // G7(IC-04):成本断路=清晰错误码(不落入通用 error 语义)
     if (err instanceof CostBudgetExceeded) {
       return {

@@ -1,5 +1,6 @@
 import { GENESIS_PREV_HASH, type CanonicalInput } from './types.ts';
 
+/** Constant: REPRO_CONTEXT_FIXTURE. */
 export const REPRO_CONTEXT_FIXTURE: CanonicalInput = {
   stageId: 'stage1_understanding',
   cred: {
@@ -14,9 +15,11 @@ export const REPRO_CONTEXT_FIXTURE: CanonicalInput = {
   prevHash: GENESIS_PREV_HASH,
 };
 
+/** Constant: REPRO_CONTEXT_FIXTURE_EXPECTED_HEX. */
 export const REPRO_CONTEXT_FIXTURE_EXPECTED_HEX =
   '96a6372bdf040677c26700456856ec365b478f9e3bf8824e4b2b9d123af4abf4';
 
+/** Constant: GOLDEN_VECTORS. */
 export const GOLDEN_VECTORS: ReadonlyArray<{
   readonly name: string;
   readonly input: CanonicalInput;
@@ -204,6 +207,7 @@ export const GOLDEN_VECTORS: ReadonlyArray<{
 // canonicalHash 信任根 byte-equal 不受 RED 影响（cred 全 string，数值永不进白名单）。
 // @test-only：以下 NUMERIC_* 仅供 tests/evidence_log/cross_lang_consistency.test.ts 跨语言
 // 数值域对拍使用，不从 evidence_log index 公共 API 导出（非生产路径数据）。
+/** Constant: NUMERIC_GREEN_VECTORS. */
 export const NUMERIC_GREEN_VECTORS: ReadonlyArray<{
   readonly name: string;
   readonly obj: Record<string, unknown>;
@@ -234,6 +238,7 @@ export const NUMERIC_GREEN_VECTORS: ReadonlyArray<{
 // 真实可观测的跨语言序列化格式鸿沟（day-0 PoC RED，证据驱动）。
 // 经 stdin-harness 实测，唯一能跨 JSON 传输保留的差异是【指数表示法格式】（TS 不补零 / Python 补零）。
 // 如实锁定 TS!==Python 作为 V3 RFC 8785 JCS 迁移的回归基线（迁移后此测试需更新为 byte-equal）。禁伪造绿。
+/** Constant: NUMERIC_KNOWN_DIVERGENCE. */
 export const NUMERIC_KNOWN_DIVERGENCE: ReadonlyArray<{
   readonly name: string;
   readonly obj: Record<string, unknown>;

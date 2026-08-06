@@ -97,6 +97,9 @@ export type ProofHashVerificationResult =
   | 'non_finite_number'
   | 'malformed_envelope';
 
+/**
+ * verify proof hash v2.
+ */
 export function verifyProofHashV2(envelope: ProofEnvelopeV2): ProofHashVerificationResult {
   const { proofHash, ...rest } = envelope;
   try {

@@ -40,6 +40,7 @@ export function promptLooksLikeItNeedsVision(prompt: string): boolean {
 
 // ===== Factory =====
 
+/** Configuration/specification for multimodal gate config. */
 export interface MultimodalGateConfig {
   /** 纯文本 adapter（已注册到 LlmGateway 的 text profile） */
   readonly textAdapter: ProviderAdapter;

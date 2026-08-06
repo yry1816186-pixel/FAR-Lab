@@ -52,6 +52,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: N3_RAW_INPUT. */
 export const N3_RAW_INPUT = [
   'Neurodegenerative protein aggregation in Parkinson\'s disease (PD): The dominant hypothesis claims',
   'that α-synuclein (α-syn) aggregation into Lewy bodies is the SOLE driver of dopaminergic neuron',
@@ -66,6 +67,7 @@ export const N3_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: N3_SOURCE_CARD. */
 export const N3_SOURCE_CARD: SourceCard = {
   // 真实已发表文献（非 fictional 占位）·Spillantini et al. 1997 Nature
   sourceId: 'sc-n3-synuclein-lewy-1997',

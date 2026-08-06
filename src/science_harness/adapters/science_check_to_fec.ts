@@ -20,7 +20,8 @@ import type {
   ThresholdSpec,
 } from '../../falsifiability/types.ts';
 import type { ScienceCheck } from '../types.ts';
-
+/** Projection of a ScienceCheck into FEC FalsificationSpec + ThresholdSpec.
+ * Handles the 5-value to 3-value threshold operator mapping (lossy but honest). */
 export interface ScienceCheckFecProjection {
   readonly falsificationSpec: FalsificationSpec;
   readonly thresholdSpec: ThresholdSpec;

@@ -46,6 +46,7 @@ import type { SourceCard } from '../../src/schema/enums.ts';
 import { openDb, createSequentialGateway } from './helpers.ts';
 import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
+/** Constant: H3_RAW_INPUT. */
 export const H3_RAW_INPUT = [
   'Biological homochirality — the exclusive use of L-amino acids and D-sugars by terrestrial life —',
   'is a fundamental unsolved problem in origin-of-life chemistry. Abiotic synthesis produces racemic',
@@ -62,6 +63,7 @@ export const H3_RAW_INPUT = [
   'The field remains at an impasse — multiple plausible hypotheses coexist without a decisive experiment.',
 ].join(' ');
 
+/** Constant: H3_SOURCE_CARD. */
 export const H3_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-h3-meierhenrich-2005',
   url: 'https://doi.org/10.1002/anie.200461359',
@@ -145,6 +147,9 @@ const H3_FALSIFICATION_SPEC: FalsificationSpec = { prediction: '≥3 independent
 const H3_THRESHOLD_SPEC: ThresholdSpec = { semantics: 'gt', value: 2 };
 const H3_SOURCE_ANCHOR: SourceAnchor = { gitCommitSha: 'h3'.repeat(20), dashscopeRequestId: null, isoTimestamp: '2025-07-27T00:00:00.000Z', rawResponseHash: 'h3'.repeat(32) };
 
+/**
+ * run h3 seed.
+ */
 export async function runH3Seed(): Promise<DemoSeedResult> {
   const db = openDb();
   const fixtureContents: readonly string[] = [JSON.stringify(makeUnderstandingPayload()), JSON.stringify(makeIntegrationPayload()), JSON.stringify(makeHypothesisPayload()), JSON.stringify(makeEvidencePayload()), JSON.stringify(makePlanPayload()), JSON.stringify(makeFeedbackPayloadConverge())];

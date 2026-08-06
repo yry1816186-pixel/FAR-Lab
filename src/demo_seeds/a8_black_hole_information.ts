@@ -48,6 +48,7 @@ import type { DemoSeedResult } from './a4_planetary_orbit_decay.ts';
 
 // ---------- raw input text ----------
 
+/** Constant: A8_RAW_INPUT. */
 export const A8_RAW_INPUT = [
   'Black hole information paradox: Hawking (1976) argued that black hole evaporation produces thermal',
   '(mixed-state) radiation, implying information loss and violation of quantum unitarity. We assess whether',
@@ -60,6 +61,7 @@ export const A8_RAW_INPUT = [
 
 // ---------- SourceCard ----------
 
+/** Constant: A8_SOURCE_CARD. */
 export const A8_SOURCE_CARD: SourceCard = {
   sourceId: 'sc-a8-penington-island-2020',
   url: 'https://doi.org/10.1007/JHEP09(2020)002',
@@ -274,6 +276,9 @@ const A8_SOURCE_ANCHOR: SourceAnchor = {
 
 // ---------- runSeed ----------
 
+/**
+ * run a8 seed.
+ */
 export async function runA8Seed(): Promise<DemoSeedResult> {
   const db = openDb();
 

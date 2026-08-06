@@ -1,3 +1,4 @@
+/** Constant: KNOWN_PROVIDER_PROFILES. */
 export const KNOWN_PROVIDER_PROFILES = [
   'competition_aliyun_qwen',
   'research_best_available',
@@ -5,6 +6,7 @@ export const KNOWN_PROVIDER_PROFILES = [
   'offline_replay',
 ] as const;
 
+/** Constant: LLM_CAPABILITIES. */
 export const LLM_CAPABILITIES = [
   'reasoning',
   'structured',
@@ -14,22 +16,28 @@ export const LLM_CAPABILITIES = [
   'rerank',
 ] as const;
 
+/** Type alias: known provider profile. */
 export type KnownProviderProfile = (typeof KNOWN_PROVIDER_PROFILES)[number];
+/** Type alias: provider profile. */
 export type ProviderProfile = KnownProviderProfile | (string & {});
+/** Type alias: llm capability. */
 export type LlmCapability = (typeof LLM_CAPABILITIES)[number];
 
+/** Interface defining token usage. */
 export interface TokenUsage {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly totalTokens: number;
 }
 
+/** Interface defining cost snapshot. */
 export interface CostSnapshot {
   readonly currency: string;
   readonly amount: number;
   readonly source: string;
 }
 
+/** Interface defining llm call credential. */
 export interface LlmCallCredential {
   readonly providerProfile: ProviderProfile;
   readonly providerRequestId: string | null;
@@ -42,6 +50,7 @@ export interface LlmCallCredential {
   readonly adapterMeta?: Record<string, unknown>;
 }
 
+/** Interface defining llm message. */
 export interface LlmMessage {
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
   readonly content: string;
@@ -62,6 +71,7 @@ export interface LlmJsonSchema {
   readonly strict?: boolean;
 }
 
+/** Interface defining llm request. */
 export interface LlmRequest {
   readonly messages: readonly LlmMessage[];
   readonly temperature?: number;
@@ -85,12 +95,14 @@ export interface LlmRequest {
   readonly stageId?: string;
 }
 
+/** Interface defining llm response. */
 export interface LlmResponse {
   readonly credential: LlmCallCredential;
   readonly content: string;
   readonly raw: unknown;
 }
 
+/** Interface defining provider adapter. */
 export interface ProviderAdapter {
   readonly profile: ProviderProfile;
   call(request: LlmRequest): Promise<LlmResponse>;

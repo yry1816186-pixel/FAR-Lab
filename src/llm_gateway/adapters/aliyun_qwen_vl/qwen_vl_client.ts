@@ -19,6 +19,7 @@ type OpenAiContentPart = OpenAI.ChatCompletionContentPart;
 
 // ===== Error types =====
 
+/** Class representing qwen vl image missing error. */
 export class QwenVlImageMissingError extends Error {
   constructor() {
     super('qwen_vl_client: imageRef or imageBase64 is required for vision calls');
@@ -26,6 +27,7 @@ export class QwenVlImageMissingError extends Error {
   }
 }
 
+/** Class representing qwen vl response malformed error. */
 export class QwenVlResponseMalformedError extends Error {
   constructor(reason: string) {
     super(`qwen_vl_client: VLM response is malformed: ${reason}`);
@@ -33,6 +35,7 @@ export class QwenVlResponseMalformedError extends Error {
   }
 }
 
+/** Class representing qwen vl not available error. */
 export class QwenVlNotAvailableError extends Error {
   constructor() {
     super('qwen_vl_client: Qwen-VL is not available (DASHSCOPE_API_KEY missing or offline profile)');
@@ -42,6 +45,7 @@ export class QwenVlNotAvailableError extends Error {
 
 // ===== Client type =====
 
+/** Configuration/specification for qwen vl client config. */
 export interface QwenVlClientConfig {
   readonly modelId?: QwenVlModelId;
   readonly baseURL?: string;
@@ -49,6 +53,7 @@ export interface QwenVlClientConfig {
   readonly timeoutMs?: number;
 }
 
+/** Interface defining qwen vl client. */
 export interface QwenVlClient {
   /** 检查是否配置了有效的 API key */
   isConfigured(): boolean;
