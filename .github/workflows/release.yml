@@ -1,6 +1,6 @@
 # FAR-Lab Release — tag v* 触发的发布自动化
 #
-# 触发条件：maintainer 执行 `git tag v0.1.0 && git push origin v0.1.0`（首次需人类操作）。
+# 触发条件：maintainer 执行 `git tag v1.0.0 && git push origin v1.0.0`（首次需人类操作）。
 #
 # NEEDS_RELEASE_PUBLICATION：本 workflow 已就绪，但首次需人类推送 tag。
 #   工件无法自证「已运行成功」——首次 tag 推送前状态保持 NEEDS_RELEASE_PUBLICATION。
@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v0.1.0)'
+        description: 'Tag to release (e.g. v1.0.0)'
         required: true
 
 # 同一 tag 的新 push 取消旧 run（防并发发布覆盖 release assets）
@@ -70,7 +70,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::Release tag must be SemVer-like and start with v (example: v0.1.0). Got: ${RELEASE_TAG}"
+            echo "::error::Release tag must be SemVer-like and start with v (example: v1.0.0). Got: ${RELEASE_TAG}"
             exit 1
           fi
           TAG_VERSION="${RELEASE_TAG#v}"   # v0.1.0 -> 0.1.0
