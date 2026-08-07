@@ -104,10 +104,17 @@ test('② RT-05-B:备份存在时,删热 WAL 静默尾丢可恢复', async () =>
     src.close();
 
     // 子进程:WAL 写入但不 checkpoint,挂起等 SIGKILL(与 rt05_b 同手法)
+    // CI 韧性(2026-08-07,run 31193099714):子进程脚本落在 OS 临时目录,
+    // 裸 `import 'better-sqlite3'` 从临时目录向上解析 node_modules——CI 的 /tmp 无
+    // node_modules → 子进程启动即崩溃/静默死亡 → 父进程 await stdout 永不 resolve
+    // → 整个测试无限挂起(曾被 --test-timeout=180s 捕获为 cancelled)。
+    // 修复:用 import.meta.resolve() 将父进程已解析的绝对模块 URL 注入子进程脚本
+    // (跨平台、与脚本落盘位置无关);并加 15s fail-fast 守卫,子进程异常即红而非挂。
+    const betterSqlite3Url = import.meta.resolve('better-sqlite3');
     const childScript = join(dir, 'writer.mjs');
     writeFileSync(
       childScript,
-      `import Database from 'better-sqlite3';\n` +
+      `import Database from ${JSON.stringify(betterSqlite3Url)};\n` +
         `const db = new Database(${JSON.stringify(dbPath)});\n` +
         `db.pragma('journal_mode = WAL');\n` +
         `db.prepare("INSERT INTO t VALUES ('uncheckpointed-row')").run();\n` +
@@ -116,11 +123,25 @@ test('② RT-05-B:备份存在时,删热 WAL 静默尾丢可恢复', async () =>
       'utf8',
     );
     const child = spawn(process.execPath, [childScript], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'] });
-    await new Promise<void>((resolve) => {
-      child.stdout.on('data', () => resolve());
+    const written = await new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => resolve(false), 15_000);
+      child.stdout.on('data', () => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+      child.on('error', () => {
+        clearTimeout(timer);
+        resolve(false);
+      });
+      child.on('exit', () => {
+        clearTimeout(timer);
+        resolve(false);
+      });
     });
+    assert.ok(written, 'writer 子进程须在 15s 内写出 WAL——子进程启动失败不得让测试无限挂起');
+    const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
     child.kill('SIGKILL');
-    await new Promise<void>((resolve) => child.on('exit', () => resolve()));
+    await exited;
 
     // 删热 WAL(F-02 攻击面)
     const walPath = `${dbPath}-wal`;
