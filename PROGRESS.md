@@ -2,16 +2,15 @@
 
 > **本会话续跑点（下个会话第一动作读此）**：
 > - **已完成**：
->   - **A2**（commit `cd45a4a`·anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`·效应量-p-CI-方向一致性）
->   - **B2 ✅ 完成**（6 commits·branch coverage **86.76% → 90.00%**·+250 测试·B2 目标达成）
->   - **B3 ✅ 核心完成**（commit `efbd3ab`·API 暴露 decisionTrace + 持久化·**无需 schema migration**——调研发现 verdict_trace_json 是 JSON 全文列·加可选字段自然进全文 + verdict_trace_hash 自动绑定·4 文件 ADDITIVE ONLY + 3 测试零回归）
->   - **A3 核心已完成**（发现：`tests/proof_envelope/v2/cross_lang.test.ts` 7 测试已覆盖 V2 proofHash TS↔Python byte-equal 对拍·RULE-PE-010 已落地）
-> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 23 commits）· 工作树只有 .far-implementation/ pre-existing 残留
-> - **基线**：typecheck 0 / lint 0 / test 2271 (2265p/0f/6s) / demo 14/14 GV / **branch coverage 90.00%**（gate PASS）·line 97.10% / funcs 97.46%
+>   - **A2**（commit `cd45a4a`·anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`）
+>   - **B2 ✅ 完成**（6 commits·branch coverage **86.76% → 90.00%**·+250 测试）
+>   - **B3 ✅ 完整完成**（commit `efbd3ab` 后端·decisionTrace 持久化 + API 暴露·无 schema migration + commit `0f8a9d3` 前端·Honesty Wall Decision Trace 面板·R7 门 7 条件 + metrics 可视化）
+>   - **A3 核心已完成**（V2 proofHash TS↔Python byte-equal 对拍·RULE-PE-010 已落地）
+> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 25 commits）· 工作树只有 .far-implementation/ pre-existing 残留
+> - **基线**：typecheck 0 / lint 0 / test 2271 (2265p/0f/6s) / demo 14/14 GV / branch 90.00% / frontend vitest 24 files 219 tests 全绿
 > - **下一步（按优先级）**：
->   1. **B3 前端展示**（中价值）：竞赛 demo 前端消费 GET /verdict/:id 的 decisionTrace 字段（可视化 r7Gate/metrics）·需读 frontend/ 结构
->   2. **A3 次要增强**（低优先）：.far-proof 包导出 V2 envelope + 更多跨语言 edge case（核心对拍已完成）
->   3. B2 收尾（可选）：hypothesize.ts route handler pending/409/catch 分支（需 Fastify+DB+LLM mock）
+>   1. **A3 次要增强**（低优先·进行中）：V2 proofHash Unicode/NFC edge case 跨语言对拍（cross_lang.test.ts 未测 NFC·L0 已测·V2 层补）
+>   2. **B2 收尾**（可选）：hypothesize.ts route handler pending/409/catch 分支（需 Fastify+DB+LLM mock）
 > - **铁律提醒**：trust kernel 改动 ADDITIVE ONLY（参考 A2 先例）；每个改动独立 commit + 全量验证
 
 ---
