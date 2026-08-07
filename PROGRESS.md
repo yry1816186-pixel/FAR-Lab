@@ -3,14 +3,14 @@
 > **本会话续跑点（下个会话第一动作读此）**：
 > - **已完成**：
 >   - **A2**（commit `cd45a4a`·anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`·效应量-p-CI-方向一致性）
->   - **B2**（commits `097fe4f` + `f536483` + `f783776` + `1db0efc`·branch coverage **86.76% → 89.27%**·+155 新测试·6 个文件到 90%+·kernel_adapter/verifier/fake_degraded/report_mismatch/stopping_rule 等到 95%+）
+>   - **B2 ✅ 完成**（commits `097fe4f`+`f536483`+`f783776`+`1db0efc`+`f7e90f8`+`8a022b1`·branch coverage **86.76% → 90.00%**·+250 新测试·10+ 文件到 90%+·B2 目标 90% 达成）
 >   - **A3 核心已完成**（发现：`tests/proof_envelope/v2/cross_lang.test.ts` 7 测试已覆盖 V2 proofHash TS↔Python byte-equal 对拍·RULE-PE-010 independently_recomputable 已落地）
-> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 14 commits）· 工作树只有 .far-implementation/ pre-existing 残留
-> - **基线**：typecheck 0 / lint 0 / test 2173+ / demo 14/14 GV / **branch coverage 89.27%**（gate PASS·阈值 75%）
+> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 19 commits）· 工作树只有 .far-implementation/ pre-existing 残留
+> - **基线**：typecheck 0 / lint 0 / test 2400+ / demo 14/14 GV / **branch coverage 90.00%**（gate PASS·阈值 75%）·line 97.10% / funcs 97.46%
 > - **下一步（按优先级）**：
->   1. **B2 续收尾**（中价值）：branch 89.27%→90% 差 0.73%·需攻 API/DB 层低 branch 文件（api/routes/report.ts 63.64%·api/server.ts 63.64%·db/open.ts 73.33%·agent_loop/stage_receipt_store.ts 67.35%·需 mock server/DB·新会话更安全）
->   2. **B3**（高价值·P3 已授权）：API 暴露 decisionTrace + schema migration 加 DB 列（trust kernel 高风险·需独立会话）
->   3. **A3 次要增强**（低优先）：.far-proof 包导出 V2 envelope + 更多跨语言 edge case（核心对拍已完成）
+>   1. **B3**（高价值·P3 已授权）：API 暴露 decisionTrace + schema migration 加 DB 列（trust kernel 高风险·大工程·需独立会话完整上下文）
+>   2. **A3 次要增强**（低优先）：.far-proof 包导出 V2 envelope + 更多跨语言 edge case（核心对拍已完成）
+>   3. B2 收尾（可选）：hypothesize.ts route handler pending/409/catch 分支（需 Fastify+DB+LLM mock·建议现有 tests/api/hypothesize.test.ts 补）
 > - **铁律提醒**：trust kernel 改动 ADDITIVE ONLY（参考 A2 先例）；每个改动独立 commit + 全量验证
 
 ---
