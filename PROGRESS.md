@@ -1,4 +1,18 @@
-# FAR-Lab Progress Checkpoint — 2026-08-07 opencode 配置融入会话（长任务自主模式）
+# FAR-Lab Progress Checkpoint — 2026-08-07 改造工程会话（A2 + B2 增量 + A3 调研）
+
+> **本会话续跑点（下个会话第一动作读此）**：
+> - **已完成**：A2（anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`·commit `cd45a4a`）+ B2 增量（branch coverage 86.76%→87.19%·commit `097fe4f`·kernel_adapter/verifier 到 100%）
+> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 9 commits）· 工作树只有 .far-implementation/ pre-existing 残留
+> - **基线**：typecheck 0 / lint 0 / test 2078 (2072p/0f/6s) / demo 14/14 GV / branch coverage 87.19%
+> - **下一步（按优先级）**：
+>   1. **A3**（极高价值·调研已完成）：.far-proof 跨语言强化——V2 Python 镜像 `repro/far_chain_repro/proof_hash.py` 已完整（199 行·compute_proof_hash_v2 + FEC hash + anti-theater 过滤 + NFC），下一步扩 `repro/tests/test_cross_lang_consistency.py` 对拍覆盖 + 端到端 .far-proof 包内嵌 V2 envelope + Python verify
+>   2. **B2 续**（中价值）：branch 87.19%→90% 需攻 `falsifiability/repository.ts`（59.42%·DB 测试复杂）+ `far_proof/offline_package.ts`（59.26%·平台分支）+ `falsifiability/external_facts.ts`（53.33%）
+>   3. **B3**（高价值·P3 需授权·已授权）：API 暴露 decisionTrace + schema migration 加 DB 列（trust kernel 高风险·需独立会话）
+> - **铁律提醒**：trust kernel 改动 ADDITIVE ONLY（参考 A2 先例）；每个改动独立 commit + 全量验证
+
+---
+
+# 历史检查点（opencode 配置融入会话·2026-08-07 早期）
 
 > **任务**：全面解析本设备 opencode 配置 → 制定完善计划 → 融入优化重构 FAR-Lab 项目级配置，让 opencode 在该项目获得完整上下文。中途发现问题彻底解决。禁止幻觉与欺骗，反复验证无遗漏。
 
@@ -61,15 +75,34 @@
 - 无 TODO/FIXME/HACK 集中（匹配项全是注释中的英文单词）
 - **结论：测试质量健康，无假绿证据，无需改造**
 
+**A2 完成**（commit `cd45a4a`）— anti-theater 第 23 检测器「效应量-p-置信区间-方向一致性」：
+- 新增 `AT-EFFECT-P-MISMATCH` / attackKind `effect-p-consistency-mismatch`（闭合 enum 22→23）
+- 三层纯逻辑一致性检测（零误报·不依赖 effectSize 度量语义）：
+  1. `CI_P_INCONSISTENT`：双侧 CI 排除 null ⟺ p < alpha（frequentist Wald 数学恒等）
+  2. `DIRECTION_EFFECT_SIGN_MISMATCH`：effectiveDirection='supports' 但 effectSize 符号与假设方向矛盾
+  3. `DIRECTION_CI_MISMATCH`：effectiveDirection='supports' 但 CI 整体落在假设方向相反区域
+- **关键设计修复**：layer 2/3 加 `effectiveDirection='supports'` 守卫——区分「假设被数据反驳」
+  （refutes·合法科学结果，如 Ritchie 反驳 Bem）与「声称支持但符号矛盾」（supports + 矛盾·伪造）。
+  未加守卫会在 Ritchie 失败复现误报（refutes + 负 effectSize 是合法反驳）。
+- **诚实边界**（cannotProveStatement）：精确 t 分布重算需 V2 类型扩展（StatisticalResult 加
+  testStatistic/sampleSize/testType），当前 input 不暴露故不做——避免基于不可验证的 effectSize
+  语义假设（Cohen's d vs AUC vs 原始 mean difference）误报。当前三层检测任何度量尺度均适用。
+- **ADDITIVE ONLY**（trust kernel §7）：不改裁决逻辑（decideFiveValueVerdictInternal 字节不变），
+  constraint.ts 加 SEVERITY_TO_FORCED 新映射（→UNTESTED·与 AT-LABEL-ONLY 同语义家族）。
+- 25 新测试（3 层全覆盖 + base 零误报 + Ritchie 守卫 + null 字段优雅退化 + 多 finding 同时触发）
+- 1 新 golden vector（gv-effect-p-mismatch-01·CI-p 矛盾向量·corpus 23→24 向量覆盖全部 23 attackId）
+- 验证：typecheck 0 / lint 0 / **test 2058 (2052p/0f/6s·+26 新测试零回归)** / demo 14/14 GV /
+  corpus 24/24 attackId 覆盖 / base 误报率=0 / Ritchie refutes 不误报
+- 数字漂移清理：22→23 detector（18 文件注释同步：src + tests + AGENTS.md §0）
+
 ### 后续路线图（按优先级，供续跑）
 
 | 项 | 类型 | 价值 | 风险 | 工作量 | 状态 |
 |----|------|------|------|--------|------|
-| A2 | 审计+代码 | 极高 | 低 | 中 | 待办 — 22 anti-theater 检测器完备性审计（找遗漏欺诈模式：选择性脱落/图像操纵/数据伪造/Cohen's d 错误等） |
-| A3 | 代码 | 极高 | 中 | 大 | 待办 — .far-proof 跨语言独立可复算强化 |
-| B2 | 代码 | 中 | 低 | 中 | 待办 — branch coverage 83.75% → 90%+ |
-| B3 | 代码 | 高 | 低 | 中 | 待办 — 前端 UX 视觉冲击力（竞赛 demo）+ API 暴露 decisionTrace |
-| C1 | 代码 | 中 | 中 | 小 | 待办 — DEBT-06 V1/V2 proof_envelope 裁决（drop V2 dead schema） |
+| B3 | 代码 | 高 | 高 | 大 | 待办 — 前端 UX 视觉冲击力（竞赛 demo）+ API 暴露 decisionTrace（需 schema migration 加 DB 列·trust kernel 高风险·P3 需授权）|
+| A3 | 代码 | 极高 | 中 | 大 | 待办 — .far-proof 跨语言独立可复算强化（**调研完成**：V2 Python 镜像 `repro/far_chain_repro/proof_hash.py` 199 行已完整·compute_proof_hash_v2 + FEC hash + anti-theater 过滤 + NFC 归一化·下一步扩对拍测试覆盖 + 端到端 .far-proof 包内嵌 V2 envelope）|
+| B2 | 代码 | 中 | 低 | 中 | **进行中** — branch coverage 86.76%→87.19%（commit 097fe4f·+20 测试·kernel_adapter/verifier 到 100%）·repository.ts 59.42% 待攻 |
+| C1 | 代码 | 中 | 中 | 小 | 待办 — DEBT-06 V1/V2 proof_envelope 裁决（drop V2 dead schema·破坏性需确认）|
 | C2 | 审计 | 中 | 中 | 中 | 待办 — 23 模块边界审计 |
 | D1-D3 | 代码 | 中 | 中 | 大 | 待办 — 更多论文/性能基准/LLM 接入 |
 
