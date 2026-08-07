@@ -2,16 +2,16 @@
  * anti_theater trap taxonomy —— 统计陷阱分类法（借鉴 scientific-agent-skills
  * statistical-analysis/statistical-power 的"陷阱目录"设计）。
  *
- * 动机：FAR-Lab 已有 21 个反剧场探测器，但 detect 与 explain 分离——探测器只返回
+ * 动机：FAR-Lab 已有 22 个反剧场探测器，但 detect 与 explain 分离——探测器只返回
  * pass/fail，不产出"这是什么陷阱 + 为什么危险 + 怎么防 + 现实案例"的结构化解释。
- * 本模块为每个 attackKind 提供分类元数据，使报告/演示能输出"本次验证覆盖 21 类
+ * 本模块为每个 attackKind 提供分类元数据，使报告/演示能输出"本次验证覆盖 22 类
  * 统计陷阱，触发 3 类警告"的结构化表格（而非仅 verdict 结论）。
  *
  * 纪律：
  *   - 本文件是纯元数据层（零行为变更）：不触碰任何 detector 逻辑、不进入 proofHash。
  *   - 确定性（F3）：常量表 + 纯函数，无 LLM、无网络。
  *   - realCase 只填有据可查的真实案例（FAR-Lab 反幻觉纪律）；无确凿单一案例标 [n/a]。
- *   - 21 项覆盖全集由 TRAP_TAXONOMY 键集合与 AntiTheaterAttackKind 联合测试对拍（tests/anti_theater/trap_taxonomy.test.ts）。
+ *   - 22 项覆盖全集由 TRAP_TAXONOMY 键集合与 AntiTheaterAttackKind 联合测试对拍（tests/anti_theater/trap_taxonomy.test.ts）。
  */
 
 import type { AntiTheaterAttackKind, AntiTheaterFinding } from './types.ts';
@@ -52,7 +52,7 @@ export interface TrapTaxonomy {
 }
 
 /**
- * 21 项 trap taxonomy 全集（键 = AntiTheaterAttackKind 闭合联合·由测试对拍覆盖完整性）。
+ * 22 项 trap taxonomy 全集（键 = AntiTheaterAttackKind 闭合联合·由测试对拍覆盖完整性）。
  * 覆盖顺序与 DETECTORS 数组（detectors/index.ts）一致。
  */
 export const TRAP_TAXONOMY: Readonly<Record<AntiTheaterAttackKind, TrapTaxonomy>> = {
@@ -254,11 +254,20 @@ export const TRAP_TAXONOMY: Readonly<Record<AntiTheaterAttackKind, TrapTaxonomy>
     cures: ['requireExecutionProvenance opt-in', 'sandbox stdout/artifact hash 绑定', '缺失即 FAIL'],
     realCase: '[n/a]（FAR-Lab T-003 评委逼问修复·防 fixture 冒充）',
   },
+  'effect-p-consistency-mismatch': {
+    attackId: 'AT-EFFECT-P-MISMATCH',
+    kind: 'effect-p-consistency-mismatch',
+    category: 'significance-abuse',
+    name: '统计报告内部不一致（effect/p/CI/direction logical mismatch）',
+    what: '提交的 effectSize / p / 置信区间 / 效应方向四者违反 frequentist 数学恒等关系或符号一致性——如 CI 排除 null 但 p ≥ alpha，或声称 greater 方向但 effectSize 为负。这类数学不可能的组合表明统计报告是手工拼凑或选择性伪造，而非真实统计计算的产物。',
+    cures: ['CI 与 p 必须满足 (1-alpha) 双侧 Wald 恒等关系', 'effectSize 符号须与 effectDirection 一致', 'CI 整体符号须与方向一致·矛盾即 FAIL'],
+    realCase: 'Bogerd et al. (2020) 元分析发现多篇心理学论文的 F/t/p/df 组合在数学上不可能（statcheck 自动检测）',
+  },
 };
 
 /** 陷阱分类覆盖完整性检查（测试对拍用）：返回未覆盖的 kind。 */
 export function uncoveredTrapKinds(): readonly AntiTheaterAttackKind[] {
-  // 枚举联合全集：遍历 ATTACK_ID_TO_KIND 值（21 项）。
+  // 枚举联合全集：遍历 ATTACK_ID_TO_KIND 值（22 项）。
   // 避免 import 运行时对象循环依赖：此处由测试对拍覆盖完整性（tests/anti_theater/trap_taxonomy.test.ts）。
   return Object.values(TRAP_TAXONOMY).map((t) => t.kind);
 }

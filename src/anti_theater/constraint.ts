@@ -58,7 +58,7 @@ const REASON_CODE_TO_FORCED: Readonly<Record<string, ForcedVerdict | undefined>>
 };
 
 /**
- * attackId → forcedVerdict 映射（§3.2 SEVERITY_TO_FORCED·21 项·逐字对齐伪代码 958-979 + T-003 新增）。
+ * attackId → forcedVerdict 映射（§3.2 SEVERITY_TO_FORCED·23 项·逐字对齐伪代码 958-979 + T-003 新增 + A2 新增）。
  * undefined = 该 attack 不直接约束 verdict：
  *   - BLOCK 类（AT-FAKE-PASS/JUDGE-OVERRIDE/DATA-HASH-FAKE/WORKFLOW-DIGEST/DEP-FLOAT-DRIFT）由 blockSeal 处理；
  *   - AT-FAKE-DEGRADED 由 reasonCode 映射（REFUTATION_HIDDEN_BY_SCOPE→REFUTED / NULL_RESULT_LAUNDERED 不 force）；
@@ -91,6 +91,8 @@ const SEVERITY_TO_FORCED: Readonly<Record<string, ForcedVerdict | undefined>> = 
   'AT-WORKFLOW-DIGEST': undefined, // BLOCK
   'AT-DEP-FLOAT-DRIFT': undefined, // BLOCK（部分子项 WARN）
   'AT-REPORT-MISMATCH': undefined, // 不降级（structured wins，report 回退）
+  // A2 新增（2026-08-07·统计报告内部矛盾 = 数据不可信·与 AT-LABEL-ONLY 同语义家族）
+  'AT-EFFECT-P-MISMATCH': 'UNTESTED',
 };
 
 /**

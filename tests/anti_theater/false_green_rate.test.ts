@@ -15,7 +15,7 @@
  *   - report-mismatch：structured verdict 已是 UNTESTED（非 CONFIRMED），canSeal=true 但 hasFail=true →
  *     humanSummary overclaim 被 AT-REPORT-MISMATCH finding 浮现，verdict 不被洗白。
  *
- * 实测（临时探针已删）：21 向量全部满足 `!canSealConfirmed || hasFail`。
+ * 实测（临时探针已删）：24 向量全部满足 `!canSealConfirmed || hasFail`。
  *
  * 模型中立。零容忍合规：无 any / @ts-ignore / 双重断言 / 桩。
  */
@@ -26,9 +26,9 @@ import { runAntiTheaterLint } from '../../src/anti_theater/lint.ts';
 import { SEAL_BLOCK_SCORE_THRESHOLD } from '../../src/anti_theater/score.ts';
 import { ALL_GOLDEN_VECTORS, makeCleanBaseInput } from '../fixtures/anti_theater/golden_vectors.ts';
 
-test('CI gate 2 · base 干净 envelope 是唯一合法干净绿封（过全部 22 detector·误报率=0）', () => {
+test('CI gate 2 · base 干净 envelope 是唯一合法干净绿封（过全部 23 detector·误报率=0）', () => {
   const base = runAntiTheaterLint(makeCleanBaseInput());
-  assert.equal(base.findings.length, 0, 'base 须过全部 22 detector（误报率=0·0 finding）');
+  assert.equal(base.findings.length, 0, 'base 须过全部 23 detector（误报率=0·0 finding）');
   assert.equal(base.antiTheaterScore, 100, 'base 须满分（无任何桶扣分）');
   assert.equal(base.hasFail, false, 'base 须无 FAIL finding');
   assert.equal(base.verdictConstraint?.blockSeal, false, 'base 须无 BLOCK');

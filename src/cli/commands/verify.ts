@@ -4,7 +4,7 @@
 // Modes (inferred from flags when --mode is omitted):
 //   --envelope <path>   verify a ProofEnvelopeV2 JSON (proofHash recompute + 10 rules + embedded anti-theater report)
 //   --db <path>         verify an evidence_log DB chain head
-//   --lint-input <path> recompute the 22 anti-theater detectors independently and diff against the envelope
+//   --lint-input <path> recompute the 23 anti-theater detectors independently and diff against the envelope
 //
 // Pure collectors (verifyEnvelopeV2 / verifyChainHeadResult / checkAntiTheaterReportConsistency /
 // diffAntiTheaterReport / verifyAntiTheaterLint) are separated from IO (runVerify) for direct unit testing.
@@ -926,7 +926,7 @@ function renderVerifyHuman(
     '',
     '  honesty boundary:',
     '    - envelope mode verifies sealed-envelope self-consistency (proofHash recompute + 10 rules + embedded anti-theater report consistency).',
-    '    - when --lint-input is provided, the 22 detectors are recomputed independently and compared in depth with the embedded report (#11b · L5);',
+    '    - when --lint-input is provided, the 23 detectors are recomputed independently and compared in depth with the embedded report (#11b · L5);',
     '      when not provided, the raw evidence is not recomputed. the verifier does not check semantic alignment between lint-input and envelope (reviewer judgment).',
     '    - recomputation.python is mirrored by repro/far_chain_repro/proof_hash.py; honestly marked not-run when Python is unavailable.',
     '    - recomputation.browser is verified by the standalone browser verifier in frontend/public/verify.html (#13):',
