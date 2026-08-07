@@ -1,16 +1,14 @@
 # FAR-Lab Progress Checkpoint — 2026-08-07 改造工程会话（A2 + B2 + A3 调研）
 
 > **本会话续跑点（下个会话第一动作读此）**：
-> - **已完成**：
+> - **已完成（路线图全绿）**：
 >   - **A2**（commit `cd45a4a`·anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`）
->   - **B2 ✅ 完成**（6 commits·branch coverage **86.76% → 90.00%**·+250 测试）
->   - **B3 ✅ 完整完成**（commit `efbd3ab` 后端·decisionTrace 持久化 + API 暴露 + commit `0f8a9d3` 前端·Honesty Wall Decision Trace 面板）
->   - **A3 ✅ 核心 + 次要增强完成**（commit `9bf6f79`·V2 proofHash Unicode/NFC/转义 edge case 跨语言对拍·10 测试）
-> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 26 commits）· 工作树只有 .far-implementation/ pre-existing 残留
-> - **基线**：typecheck 0 / lint 0 / test 2275 (2269p/0f/6s) / demo 14/14 GV / branch 90.00% / frontend vitest 24 files 219 tests 全绿
-> - **下一步（可选·低价值）**：
->   1. **B2 收尾**（可选）：hypothesize.ts route handler pending/409/catch 分支（需 Fastify+DB+LLM mock·复杂·+0.3% branch·价值低）
->   2. 前端其他页面消费 decisionTrace（VizPage/ReportPage·低优先）
+>   - **B2 ✅**（7 commits·branch coverage **86.76% → 90.00%**·+250 测试·+ 收尾 commit `873f6ce` hypothesize pending/409）
+>   - **B3 ✅ 完整**（`efbd3ab` 后端 decisionTrace 持久化 + API + `0f8a9d3` 前端 Honesty Wall Decision Trace 面板）
+>   - **A3 ✅ 完整**（`9bf6f79` V2 proofHash Unicode/NFC/转义跨语言对拍）
+> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 28 commits）· 工作树只有 .far-implementation/ pre-existing 残留
+> - **基线**：typecheck 0 / lint 0 / test 2276 (2270p/0f/6s) / demo 14/14 GV / branch 90.00% / frontend vitest 219 tests 全绿
+> - **剩余可选（低价值·不建议）**：VizPage 节点详情展示 decisionTrace——GraphNodeDto 是有意设计的简化 DTO（无 sourceAnchor/hash·轻量传输）·加 decisionTrace 需后端 GraphSubtree 透传 + 前端改造（跨层·违背 DTO 设计意图）·Honesty Wall 已覆盖决策可解释性
 > - **铁律提醒**：trust kernel 改动 ADDITIVE ONLY（参考 A2 先例）；每个改动独立 commit + 全量验证
 
 ---
