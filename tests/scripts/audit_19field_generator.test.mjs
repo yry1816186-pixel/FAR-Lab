@@ -125,14 +125,14 @@ test("⑨ status 非法 → exit 1（不在枚举）", () => {
 
 test("⑩ 缺多个必填字段 → exit 1 + 列出全部缺失", () => {
   const draft = validDraft();
-  delete draft.trace_id;
   delete draft.actor;
   delete draft.artifacts;
+  delete draft.policy_refs;
   const r = runViaStdin(draft);
   assert.equal(r.status, 1);
-  assert.match(r.stderr, /缺失必填字段: trace_id/);
   assert.match(r.stderr, /缺失必填字段: actor/);
   assert.match(r.stderr, /缺失必填字段: artifacts/);
+  assert.match(r.stderr, /缺失必填字段: policy_refs/);
 });
 
 test("⑪ artifacts 空数组 → exit 1", () => {
