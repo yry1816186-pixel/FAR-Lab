@@ -378,6 +378,10 @@ export function extractVerdictTrace(output: VerdictKernelOutput): VerdictTracePe
     ruleTrace: output.ruleTrace,
     decisiveRuleId: output.decisiveRuleId,
     evidenceSufficiency: output.evidenceSufficiency,
+    // B3：A1 决策路径追踪透传（可选·透明度层·不进裁决判定）。
+    // 新写入时 verdict_trace_json 含 decisionTrace → verdict_trace_hash 自动绑定（信任链增强）；
+    // A1 前写入的旧行无此字段 → 解析时 undefined（零回归·parseVerdictTrace 宽容处理）。
+    ...(output.decisionTrace !== undefined ? { decisionTrace: output.decisionTrace } : {}),
   };
 }
 

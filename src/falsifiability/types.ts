@@ -10,6 +10,7 @@ import type {
 import type {
   EvidenceSufficiencyReport,
   VerdictRuleTrace,
+  DecisionTrace,
 } from './verdict_kernel_v2.ts';
 
 /**
@@ -112,6 +113,19 @@ export interface VerdictTracePersisted {
   readonly ruleTrace: readonly VerdictRuleTrace[];
   readonly decisiveRuleId: string;
   readonly evidenceSufficiency: EvidenceSufficiencyReport;
+  /**
+   * A1 决策路径追踪（B3·可选·透明度层）。
+   *
+   * 与 4 个 verdict-critical 字段不同，decisionTrace 是**事后解释**（firedRuleId / r7Gate /
+   * metrics / totalRulesInTree / cannotProveStatement·verdict_kernel_v2.ts DecisionTrace），
+   * 不参与裁决判定（buildDecisionTrace 不改 R0-R9 逻辑）。可选字段：
+   *   - 新写入：extractVerdictTrace 透传 kernel output.decisionTrace → verdict_trace_json 全文含之
+   *     → verdict_trace_hash 自动绑定（canonical 全文·篡改被 verifyVerdictNodes 捕获·信任链增强）。
+   *   - 旧 DB 行（A1 前写入）：verdict_trace_json 无此字段 → 解析时 undefined（零回归）。
+   *   - 宽容解析（非 fail-closed）：decisionTrace 是透明度元数据非 verdict-critical，形状不校验
+   *     （4 个 critical 字段仍严格校验·parseVerdictTrace）。
+   */
+  readonly decisionTrace?: DecisionTrace;
 }
 
 /**

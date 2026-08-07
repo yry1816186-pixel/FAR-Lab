@@ -49,6 +49,8 @@ export interface HonestVerdictDto {
   readonly currentHash: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+  /** B3：A1 决策路径追踪（透明度层·可选·A1 前旧行无此字段）。 */
+  readonly decisionTrace: unknown;
 }
 
 /**
@@ -72,6 +74,9 @@ export function toHonestVerdictDto(node: HonestVerdictNode): HonestVerdictDto {
     currentHash: node.currentHash,
     createdAt: node.createdAt,
     updatedAt: node.updatedAt,
+    // B3：透传 A1 decisionTrace（node.verdictTrace 来自 getVerdict 解析 verdict_trace_json·
+    // 可选字段·旧行 undefined）。
+    decisionTrace: node.verdictTrace.decisionTrace ?? null,
   };
 }
 
