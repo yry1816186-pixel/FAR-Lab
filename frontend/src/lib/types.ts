@@ -139,6 +139,12 @@ export interface HonestVerdictDto {
   readonly currentHash: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+  /**
+   * A1/B3 决策路径追踪（后端 HonestVerdictDto.decisionTrace·透明度层）。
+   * 形状：{ firedRuleId, r7Gate, metrics, totalRulesInTree, cannotProveStatement }。
+   * 旧库行（B3 前）无此字段 → API 返回 null。前端消费须安全提取（见 EvidenceTimeline）。
+   */
+  readonly decisionTrace: unknown;
 }
 
 /**

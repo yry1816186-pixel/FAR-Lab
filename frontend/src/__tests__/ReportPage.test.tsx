@@ -64,6 +64,7 @@ const SAMPLE_VERDICT: HonestVerdictDto = {
   currentHash: 'curr-hash',
   createdAt: '2026-06-27T00:00:00Z',
   updatedAt: '2026-06-27T00:00:00Z',
+  decisionTrace: null,
 };
 
 const VERDICT_LIST: VerdictListResponse = {

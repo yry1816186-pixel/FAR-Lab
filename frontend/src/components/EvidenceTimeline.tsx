@@ -68,6 +68,107 @@ function truncateHash(hash: string): string {
   return `${hash.slice(0, 8)}...${hash.slice(-6)}`;
 }
 
+// ---------- DecisionTrace（A1/B3 决策路径追踪）安全提取 ----------
+
+/** DecisionTrace 已知字段（从 HonestVerdictDto.decisionTrace: unknown 安全提取·镜像 src/falsifiability/verdict_kernel_v2.ts） */
+interface DecisionTraceSafe {
+  firedRuleId?: string;
+  r7Gate?: {
+    supports?: boolean;
+    primaryAdjustedPValueSignificant?: boolean;
+    effectSizeSufficient?: boolean | null;
+    evidenceSufficient?: boolean;
+    noSameScopeRefutation?: boolean;
+    noIntegrityFlags?: boolean;
+    noWarnAssumption?: boolean;
+    overallPassed?: boolean;
+  } | null;
+  metrics?: {
+    alpha?: number | null;
+    mde?: number | null;
+    primaryAdjustedPValue?: number | null;
+    primaryEffectSize?: number | null;
+    primaryConfidenceInterval?: readonly [number, number] | null;
+    powerStatus?: string;
+    evidenceStatus?: string;
+    effectiveDirection?: string;
+    antiTheaterFailCount?: number;
+    antiTheaterWarnCount?: number;
+    integrityFlags?: readonly string[];
+    totalStatistics?: number;
+    skippedStatistics?: number;
+  };
+  totalRulesInTree?: number;
+  cannotProveStatement?: string;
+}
+
+/** 运行时安全提取 decisionTrace 字段（布尔字段须显式 === true/false 判断·防缺失误判） */
+function extractDecisionTrace(value: unknown): DecisionTraceSafe | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object') return null;
+  const obj = value as Record<string, unknown>;
+  const result: DecisionTraceSafe = {};
+  if (typeof obj.firedRuleId === 'string') result.firedRuleId = obj.firedRuleId;
+
+  if (obj.r7Gate !== null && obj.r7Gate !== undefined && typeof obj.r7Gate === 'object') {
+    const g = obj.r7Gate as Record<string, unknown>;
+    const gate: NonNullable<DecisionTraceSafe['r7Gate']> = {};
+    if (typeof g.supports === 'boolean') gate.supports = g.supports;
+    if (typeof g.primaryAdjustedPValueSignificant === 'boolean') {
+      gate.primaryAdjustedPValueSignificant = g.primaryAdjustedPValueSignificant;
+    }
+    if (g.effectSizeSufficient === null || typeof g.effectSizeSufficient === 'boolean') {
+      gate.effectSizeSufficient = g.effectSizeSufficient as boolean | null;
+    }
+    if (typeof g.evidenceSufficient === 'boolean') gate.evidenceSufficient = g.evidenceSufficient;
+    if (typeof g.noSameScopeRefutation === 'boolean') gate.noSameScopeRefutation = g.noSameScopeRefutation;
+    if (typeof g.noIntegrityFlags === 'boolean') gate.noIntegrityFlags = g.noIntegrityFlags;
+    if (typeof g.noWarnAssumption === 'boolean') gate.noWarnAssumption = g.noWarnAssumption;
+    if (typeof g.overallPassed === 'boolean') gate.overallPassed = g.overallPassed;
+    result.r7Gate = Object.keys(gate).length > 0 ? gate : null;
+  }
+
+  if (obj.metrics !== null && obj.metrics !== undefined && typeof obj.metrics === 'object') {
+    const m = obj.metrics as Record<string, unknown>;
+    const metrics: NonNullable<DecisionTraceSafe['metrics']> = {};
+    if (m.alpha === null || typeof m.alpha === 'number') metrics.alpha = m.alpha as number | null;
+    if (m.mde === null || typeof m.mde === 'number') metrics.mde = m.mde as number | null;
+    if (m.primaryAdjustedPValue === null || typeof m.primaryAdjustedPValue === 'number') {
+      metrics.primaryAdjustedPValue = m.primaryAdjustedPValue as number | null;
+    }
+    if (m.primaryEffectSize === null || typeof m.primaryEffectSize === 'number') {
+      metrics.primaryEffectSize = m.primaryEffectSize as number | null;
+    }
+    if (
+      Array.isArray(m.primaryConfidenceInterval) &&
+      m.primaryConfidenceInterval.length === 2 &&
+      typeof m.primaryConfidenceInterval[0] === 'number' &&
+      typeof m.primaryConfidenceInterval[1] === 'number'
+    ) {
+      metrics.primaryConfidenceInterval = [
+        m.primaryConfidenceInterval[0],
+        m.primaryConfidenceInterval[1],
+      ];
+    }
+    if (typeof m.powerStatus === 'string') metrics.powerStatus = m.powerStatus;
+    if (typeof m.evidenceStatus === 'string') metrics.evidenceStatus = m.evidenceStatus;
+    if (typeof m.effectiveDirection === 'string') metrics.effectiveDirection = m.effectiveDirection;
+    if (typeof m.antiTheaterFailCount === 'number') metrics.antiTheaterFailCount = m.antiTheaterFailCount;
+    if (typeof m.antiTheaterWarnCount === 'number') metrics.antiTheaterWarnCount = m.antiTheaterWarnCount;
+    if (Array.isArray(m.integrityFlags)) {
+      metrics.integrityFlags = m.integrityFlags.filter((f): f is string => typeof f === 'string');
+    }
+    if (typeof m.totalStatistics === 'number') metrics.totalStatistics = m.totalStatistics;
+    if (typeof m.skippedStatistics === 'number') metrics.skippedStatistics = m.skippedStatistics;
+    result.metrics = Object.keys(metrics).length > 0 ? metrics : undefined;
+  }
+
+  if (typeof obj.totalRulesInTree === 'number') result.totalRulesInTree = obj.totalRulesInTree;
+  if (typeof obj.cannotProveStatement === 'string') result.cannotProveStatement = obj.cannotProveStatement;
+
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 // ---------- 子组件 ----------
 
 /** 来源锚点卡片 — 展示证据的外部不可篡改锚点 */
@@ -186,9 +287,194 @@ function HashChainReplay({ prevHash, currentHash }: { prevHash: string; currentH
   );
 }
 
+/** R7 门 7 条件展示配置（英文名 + 中文说明·竞赛 demo 可解释性）。 */
+const R7_GATE_CONDITIONS: readonly {
+  readonly key: keyof NonNullable<DecisionTraceSafe['r7Gate']>;
+  readonly label: string;
+  readonly note: string;
+}[] = [
+  { key: 'supports', label: 'Significant supports evidence', note: 'supports 方向显著统计存在' },
+  { key: 'primaryAdjustedPValueSignificant', label: 'Adjusted p ≤ α', note: '主检验校正后 p 值达标' },
+  { key: 'effectSizeSufficient', label: 'Effect size ≥ MDE', note: '效应量达到最小可检出' },
+  { key: 'evidenceSufficient', label: 'Evidence sufficiency', note: '证据充分性 adequate' },
+  { key: 'noSameScopeRefutation', label: 'No same-scope refutation', note: '无同范围显著反证' },
+  { key: 'noIntegrityFlags', label: 'No integrity flags', note: '无完整性 flag' },
+  { key: 'noWarnAssumption', label: 'No warn assumptions', note: '无统计/反剧场 warn' },
+];
+
+/** 决策路径追踪面板 — 展示 firedRuleId + R7 门 7 条件 + 关键数值（A1/B3 透明度层） */
+function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
+  const gate = trace.r7Gate;
+  const metrics = trace.metrics;
+  return (
+    <div
+      className="rounded-md border bg-muted/30 px-3 py-2.5 space-y-2.5 text-sm"
+      data-testid="decision-trace-panel"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">
+          Decision Trace
+        </h4>
+        {trace.firedRuleId !== undefined && (
+          <code
+            className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary"
+            data-testid="dt-fired-rule"
+          >
+            fired: {trace.firedRuleId}
+          </code>
+        )}
+      </div>
+
+      {/* R7 门 7 条件状态列表 */}
+      {gate !== null && gate !== undefined && (
+        <div className="space-y-1" data-testid="dt-r7-gate">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-muted-foreground">R7 gate</span>
+            {gate.overallPassed === true && (
+              <span className="rounded bg-emerald-100 px-1.5 py-px text-[10px] font-semibold text-emerald-700">
+                ALL PASS
+              </span>
+            )}
+            {gate.overallPassed === false && (
+              <span className="rounded bg-rose-100 px-1.5 py-px text-[10px] font-semibold text-rose-700">
+                BLOCKED
+              </span>
+            )}
+          </div>
+          {R7_GATE_CONDITIONS.map(({ key, label, note }) => {
+            const value = gate[key];
+            const isSkipped = value === null || value === undefined;
+            const passed = value === true;
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between gap-2 rounded bg-background px-2 py-1"
+                data-testid={`dt-r7-${key}`}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span
+                    className={
+                      isSkipped
+                        ? 'text-xs text-muted-foreground/50'
+                        : passed
+                          ? 'text-emerald-600'
+                          : 'text-rose-600'
+                    }
+                    aria-hidden="true"
+                  >
+                    {isSkipped ? '·' : passed ? '✓' : '✗'}
+                  </span>
+                  <span className="text-xs text-foreground truncate" title={note}>
+                    {label}
+                  </span>
+                </div>
+                {!isSkipped && (
+                  <span
+                    className={cn(
+                      'shrink-0 rounded px-1.5 text-[10px] font-semibold',
+                      passed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
+                    )}
+                  >
+                    {passed ? 'PASS' : 'FAIL'}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 关键数值快照 */}
+      {metrics !== undefined && (
+        <div className="space-y-1" data-testid="dt-metrics">
+          <span className="text-xs font-semibold text-muted-foreground">Key metrics</span>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {metrics.alpha !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">alpha</span>
+                <code className="font-mono text-xs">{metrics.alpha === null ? '—' : metrics.alpha}</code>
+              </>
+            )}
+            {metrics.mde !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">MDE</span>
+                <code className="font-mono text-xs">{metrics.mde === null ? '—' : metrics.mde}</code>
+              </>
+            )}
+            {metrics.primaryAdjustedPValue !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">adj. p</span>
+                <code className="font-mono text-xs">
+                  {metrics.primaryAdjustedPValue === null ? '—' : metrics.primaryAdjustedPValue.toPrecision(3)}
+                </code>
+              </>
+            )}
+            {metrics.primaryEffectSize !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">effect size</span>
+                <code className="font-mono text-xs">
+                  {metrics.primaryEffectSize === null ? '—' : metrics.primaryEffectSize.toPrecision(3)}
+                </code>
+              </>
+            )}
+            {metrics.primaryConfidenceInterval !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">95% CI</span>
+                <code className="font-mono text-xs">
+                  {metrics.primaryConfidenceInterval === null
+                    ? '—'
+                    : `[${metrics.primaryConfidenceInterval[0].toPrecision(3)}, ${metrics.primaryConfidenceInterval[1].toPrecision(3)}]`}
+                </code>
+              </>
+            )}
+            {metrics.powerStatus !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">power</span>
+                <code className="font-mono text-xs">{metrics.powerStatus}</code>
+              </>
+            )}
+            {metrics.evidenceStatus !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">evidence</span>
+                <code className="font-mono text-xs">{metrics.evidenceStatus}</code>
+              </>
+            )}
+            {metrics.effectiveDirection !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">direction</span>
+                <code className="font-mono text-xs">{metrics.effectiveDirection}</code>
+              </>
+            )}
+            {metrics.antiTheaterFailCount !== undefined && (
+              <>
+                <span className="text-xs text-muted-foreground">AT fail/warn</span>
+                <code className="font-mono text-xs">
+                  {metrics.antiTheaterFailCount}/{metrics.antiTheaterWarnCount ?? 0}
+                </code>
+              </>
+            )}
+            {metrics.integrityFlags !== undefined && metrics.integrityFlags.length > 0 && (
+              <>
+                <span className="text-xs text-muted-foreground">flags</span>
+                <code className="font-mono text-xs">{metrics.integrityFlags.join(', ')}</code>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 诚实声明（cannot prove） */}
+      {trace.cannotProveStatement !== undefined && (
+        <p className="text-[11px] italic text-muted-foreground" data-testid="dt-cannot-prove">
+          {trace.cannotProveStatement}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** 可证伪规格摘要 */
-function FalsificationSpecSummary({ item }: { item: HonestVerdictDto }) {
-  const semanticsLabel: Record<string, string> = {
+function FalsificationSpecSummary({ item }: { item: HonestVerdictDto }) {  const semanticsLabel: Record<string, string> = {
     gt: '≥',
     lt: '≤',
     range: '∈',
@@ -220,6 +506,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
   const config = VERDICT_CONFIG[item.decision];
   const Icon = config.icon;
   const sourceAnchor = extractSourceAnchor(item.sourceAnchor);
+  const decisionTrace = extractDecisionTrace(item.decisionTrace);
 
   const handleToggle = useCallback(() => {
     onToggle(item.verdictId);
@@ -364,7 +651,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
             </div>
           )}
 
-          {/* 展开区域：SourceCard + 哈希链回放 */}
+          {/* 展开区域：SourceCard + 哈希链回放 + 决策路径追踪 */}
           {isExpanded && (
             <div className="space-y-3 pt-2" data-testid={`expanded-detail-${item.verdictId}`}>
               {sourceAnchor !== null ? (
@@ -375,6 +662,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
                 </div>
               )}
               <HashChainReplay prevHash={item.prevHash} currentHash={item.currentHash} />
+              {decisionTrace !== null && <DecisionTracePanel trace={decisionTrace} />}
             </div>
           )}
         </CardContent>
