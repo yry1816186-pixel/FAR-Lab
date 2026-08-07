@@ -1,13 +1,16 @@
-# FAR-Lab Progress Checkpoint — 2026-08-07 改造工程会话（A2 + B2 增量 + A3 调研）
+# FAR-Lab Progress Checkpoint — 2026-08-07 改造工程会话（A2 + B2 + A3 调研）
 
 > **本会话续跑点（下个会话第一动作读此）**：
-> - **已完成**：A2（anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`·commit `cd45a4a`）+ B2 增量（branch coverage 86.76%→87.19%·commit `097fe4f`·kernel_adapter/verifier 到 100%）
-> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 9 commits）· 工作树只有 .far-implementation/ pre-existing 残留
-> - **基线**：typecheck 0 / lint 0 / test 2078 (2072p/0f/6s) / demo 14/14 GV / branch coverage 87.19%
+> - **已完成**：
+>   - **A2**（commit `cd45a4a`·anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`·效应量-p-CI-方向一致性）
+>   - **B2**（commits `097fe4f` + `f536483` + `f783776` + `1db0efc`·branch coverage **86.76% → 89.27%**·+155 新测试·6 个文件到 90%+·kernel_adapter/verifier/fake_degraded/report_mismatch/stopping_rule 等到 95%+）
+>   - **A3 核心已完成**（发现：`tests/proof_envelope/v2/cross_lang.test.ts` 7 测试已覆盖 V2 proofHash TS↔Python byte-equal 对拍·RULE-PE-010 independently_recomputable 已落地）
+> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 14 commits）· 工作树只有 .far-implementation/ pre-existing 残留
+> - **基线**：typecheck 0 / lint 0 / test 2173+ / demo 14/14 GV / **branch coverage 89.27%**（gate PASS·阈值 75%）
 > - **下一步（按优先级）**：
->   1. **A3**（极高价值·调研已完成）：.far-proof 跨语言强化——V2 Python 镜像 `repro/far_chain_repro/proof_hash.py` 已完整（199 行·compute_proof_hash_v2 + FEC hash + anti-theater 过滤 + NFC），下一步扩 `repro/tests/test_cross_lang_consistency.py` 对拍覆盖 + 端到端 .far-proof 包内嵌 V2 envelope + Python verify
->   2. **B2 续**（中价值）：branch 87.19%→90% 需攻 `falsifiability/repository.ts`（59.42%·DB 测试复杂）+ `far_proof/offline_package.ts`（59.26%·平台分支）+ `falsifiability/external_facts.ts`（53.33%）
->   3. **B3**（高价值·P3 需授权·已授权）：API 暴露 decisionTrace + schema migration 加 DB 列（trust kernel 高风险·需独立会话）
+>   1. **B2 续收尾**（中价值）：branch 89.27%→90% 差 0.73%·需攻 API/DB 层低 branch 文件（api/routes/report.ts 63.64%·api/server.ts 63.64%·db/open.ts 73.33%·agent_loop/stage_receipt_store.ts 67.35%·需 mock server/DB·新会话更安全）
+>   2. **B3**（高价值·P3 已授权）：API 暴露 decisionTrace + schema migration 加 DB 列（trust kernel 高风险·需独立会话）
+>   3. **A3 次要增强**（低优先）：.far-proof 包导出 V2 envelope + 更多跨语言 edge case（核心对拍已完成）
 > - **铁律提醒**：trust kernel 改动 ADDITIVE ONLY（参考 A2 先例）；每个改动独立 commit + 全量验证
 
 ---
