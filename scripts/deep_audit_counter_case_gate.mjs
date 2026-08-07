@@ -59,15 +59,17 @@ function readInput(inputPath) {
   process.exit(1);
 }
 
-// counter-case 节标题模式
+// counter-case 节标题模式（匹配纯标题文本，splitAllSections 已剥离 # 前缀）。
+// 注意：必须以关键词开头且后面只能是「: / ： / 空白」或直接结束——防止「# Red Team Review」
+// 这类主文档标题被误判为空壳 counter-case（H1 无正文内容 → 误报 exit 1）。
 const COUNTER_CASE_HEADERS = [
-  /^#{1,4}\s+counter[- ]?case/i,
-  /^#{1,4}\s+反例/,
-  /^#{1,4}\s+adversarial/i,
-  /^#{1,4}\s+red[- ]?team/i,
-  /^#{1,4}\s+攻击/,
-  /^#{1,4}\s+falsification/i,
-  /^#{1,4}\s+证伪/,
+  /^counter[- ]?case(\s*[:：].*)?$/i,
+  /^反例(\s*[:：].*)?$/,
+  /^adversarial(\s*[:：].*)?$/i,
+  /^red[- ]?team(\s*[:：].*)?$/i,
+  /^攻击(\s*[:：].*)?$/,
+  /^falsification(\s*[:：].*)?$/i,
+  /^证伪(\s*[:：].*)?$/,
 ];
 
 // 证据标记模式（file:line / tests/ 路径 / exit code / pass|fail / 攻击 trace）
@@ -135,8 +137,8 @@ export function validateCounterCase(text) {
   const warnings = [];
   const sections = splitAllSections(text);
 
-  // 找所有 counter-case 节（含子节）
-  const counterCaseSections = sections.filter((s) => isCounterCaseHeader(s.title));
+  // 找所有 counter-case 节（H2-H4，H1 是文档主标题不算）
+  const counterCaseSections = sections.filter((s) => s.level >= 2 && isCounterCaseHeader(s.title));
 
   if (counterCaseSections.length === 0) {
     errors.push('零 counter-case — "全正面审查是戏剧"（AGENT-LIFECYCLE.md §2.5），审查判 FAIL');
