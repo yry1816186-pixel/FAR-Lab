@@ -35,6 +35,7 @@ const EXPECTED_FILES = [
   'ro-crate-metadata.json',
   'prov.ttl',
   'proof_envelopes.jsonl',
+  'proof_envelopes_v2.jsonl', // A3:V2 envelope 可选分量(完整 envelope_json·第三方独立重算 RULE-PE-010)
   'repro_runs.jsonl',
   'call_records.redacted.jsonl',
   'claim_graph.json',

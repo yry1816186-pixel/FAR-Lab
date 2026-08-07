@@ -27,11 +27,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 
+import { runMigrations } from '../../src/db/index.ts';
 import { buildDemoChain, computeEnvHash, DEMO_GIT_COMMIT_SHA, DEMO_RUN_ID } from '../../src/far_proof/demo_chain.ts';
 import { exportFarProof, packageFarProofBundle } from '../../src/far_proof/index.ts';
 import {
@@ -156,3 +157,79 @@ function runExport(tmpDir: string): { readonly outputDir: string } {
     db.close();
   }
 }
+
+// ===== A3：proof_envelopes_v2.jsonl 可选分量 =====
+
+test('A3: exportFarProof 产出 proof_envelopes_v2.jsonl（可选分量·空表写空文件）', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-v2-export-'));
+  try {
+    const { outputDir } = runExport(tmp);
+    // demo_chain 是 V1 链（无 V2 envelope 落库）→ 文件存在但为空（同 lifecycle_events 先例）。
+    const file = join(outputDir, 'proof_envelopes_v2.jsonl');
+    assert.ok(existsSync(file), 'proof_envelopes_v2.jsonl 必须被导出（可选分量）');
+    assert.equal(readFileSync(file, 'utf8').trim(), '', '无 V2 envelope 时导出空文件');
+    // 不在 data_manifest 的 required 语义——但必须出现在 files 清单。
+    const manifest = JSON.parse(readFileSync(join(outputDir, 'data_manifest.json'), 'utf8')) as {
+      files: readonly string[];
+    };
+    assert.ok(
+      manifest.files.some((f) => f.endsWith('proof_envelopes_v2.jsonl')),
+      'data_manifest.files 必须含 proof_envelopes_v2.jsonl',
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('A3: proof_envelopes_v2 有数据 → jsonl 含完整行（envelope_json 全文·可独立重算）', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-v2-data-'));
+  try {
+    const db = new Database(':memory:');
+    try {
+      runMigrations(db);
+      // 手动 INSERT 合法 V2 envelope 行（避开 anti-theater trigger：INCONCLUSIVE + 无 WARN/FAIL）。
+      const envelopeJson = JSON.stringify({
+        schemaVersion: 'far.proof_envelope.v2',
+        envelopeId: 'ENV-V2-001',
+        createdAt: '2026-07-01T00:00:00Z',
+        conclusion: 'INCONCLUSIVE',
+        fecHash: 'a'.repeat(64),
+        ledgerRoot: 'c'.repeat(64),
+      });
+      db.prepare(
+        `INSERT INTO proof_envelopes_v2
+           (envelope_id, claim_id, schema_version, conclusion, fec_hash, proof_hash,
+            ledger_root, envelope_json, sealed_by, sealed_at)
+         VALUES ('ENV-V2-001', 'CLM-001', 'far.proof_envelope.v2', 'INCONCLUSIVE',
+                 ?, ?, ?, ?, 'deterministic_sealer', '2026-07-01T00:00:00Z')`,
+      ).run('a'.repeat(64), 'b'.repeat(64), 'c'.repeat(64), envelopeJson);
+
+      const envHash = computeEnvHash({
+        schemaVersion: 6,
+        nodeVersion: process.version,
+        providerProfile: 'offline_replay',
+      });
+      const outputDir = join(tmp, '.far-proof');
+      exportFarProof({
+        db,
+        outputDir,
+        runId: DEMO_RUN_ID,
+        modelSnapshot: 'offline-replay-fixture@v1',
+        gitCommitSha: DEMO_GIT_COMMIT_SHA,
+        envHash,
+        exportedAt: '2026-06-28T00:00:00.000Z',
+      });
+
+      const content = readFileSync(join(outputDir, 'proof_envelopes_v2.jsonl'), 'utf8');
+      assert.ok(content.includes('"envelope_id":"ENV-V2-001"'), 'jsonl 必须含 V2 行');
+      assert.ok(
+        content.includes('"envelope_json":') && content.includes('ENV-V2-001'),
+        'jsonl 必须含 envelope_json 全文（第三方可独立重算 proofHash·RULE-PE-010）',
+      );
+    } finally {
+      db.close();
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
