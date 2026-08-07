@@ -377,7 +377,17 @@ function parseVerdictTrace(value: unknown, verdictId: string): VerdictTracePersi
     throw new Error(`parseVerdictTrace: decisiveRuleId must be non-empty string at verdict_id=${verdictId}`);
   }
   const evidenceSufficiency = parseEvidenceSufficiency(v.evidenceSufficiency, verdictId);
-  return { reasonCodes, ruleTrace, decisiveRuleId: v.decisiveRuleId, evidenceSufficiency };
+  // B3：decisionTrace 可选·宽容透传（透明度元数据·非 verdict-critical·旧行无则 undefined·零回归）。
+  // 与 4 个 critical 字段不同不深度校验——形状由 DecisionTrace 类型约束，读取方（API/report）自行消费。
+  return {
+    reasonCodes,
+    ruleTrace,
+    decisiveRuleId: v.decisiveRuleId,
+    evidenceSufficiency,
+    ...(v.decisionTrace !== undefined && v.decisionTrace !== null
+      ? { decisionTrace: v.decisionTrace as NonNullable<VerdictTracePersisted['decisionTrace']> }
+      : {}),
+  };
 }
 
 function parseStringArray(raw: unknown, field: string, verdictId: string): readonly string[] {
