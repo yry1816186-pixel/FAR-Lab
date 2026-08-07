@@ -89,6 +89,12 @@ export function exportFarProof(input: FarProofExportInput): FarProofExportResult
   // 1. proof_envelopes.jsonl
   filesWritten.push(writeProofEnvelopesJsonl(db, outputDir));
 
+  // 1b. proof_envelopes_v2.jsonl（A3·2026-08-07：V2 envelope 完整导出·可选分量）
+  // 含 envelope_json（完整 16 字段 canonical envelope）——第三方可用独立实现（repro/far_chain_repro/
+  // proof_hash.py compute_proof_hash_v2）重算 proofHash 做 RULE-PE-010 byte-equal 对拍。
+  // 不在 FAR_PROOF_REQUIRED_FILES（同 lifecycle_events 先例）：老 bundle（0021 前）无此文件仍合法 V1 包。
+  filesWritten.push(writeProofEnvelopesV2Jsonl(db, outputDir));
+
   // 2. repro_runs.jsonl
   filesWritten.push(writeReproRunsJsonl(db, outputDir));
 
@@ -150,6 +156,19 @@ function writeProofEnvelopesJsonl(db: Database.Database, dir: string): string {
   const lines = rows.map((row) => JSON.stringify(row)).join('\n');
   const filePath = join(dir, 'proof_envelopes.jsonl');
   writeFileSync(filePath, lines + '\n', 'utf8');
+  return filePath;
+}
+
+/** A3：proof_envelopes_v2 完整导出（含 envelope_json 全文·可选分量·空表写空文件同 lifecycle_events）。 */
+function writeProofEnvelopesV2Jsonl(db: Database.Database, dir: string): string {
+  const rows = db
+    .prepare(
+      `SELECT * FROM proof_envelopes_v2 ORDER BY created_at ASC`,
+    )
+    .all();
+  const lines = rows.map((row) => JSON.stringify(row)).join('\n');
+  const filePath = join(dir, 'proof_envelopes_v2.jsonl');
+  writeFileSync(filePath, lines.length > 0 ? lines + '\n' : '', 'utf8');
   return filePath;
 }
 
@@ -560,6 +579,7 @@ function writeReadmeReplay(
     '| File | Description |',
     '|------|-------------|',
     '| `proof_envelopes.jsonl` | Sealed proof envelopes (one per claim) |',
+    '| `proof_envelopes_v2.jsonl` | V2 proof envelopes (six-dimension receipts·full envelope_json·independently recomputable via repro/far_chain_repro/proof_hash.py·RULE-PE-010; optional component, absent in pre-0021 bundles) |',
     '| `repro_runs.jsonl` | Reproduction run records |',
     '| `call_records.redacted.jsonl` | Call record chain (API keys redacted) |',
     '| `claim_graph.json` | Evidence DAG subgraph (evidence_edges + verdict_nodes, 09 §5 V1) |',
