@@ -100,7 +100,7 @@
 | 项 | 类型 | 价值 | 风险 | 工作量 | 状态 |
 |----|------|------|------|--------|------|
 | B3 | 代码 | 高 | 高 | 大 | 待办 — 前端 UX 视觉冲击力（竞赛 demo）+ API 暴露 decisionTrace（需 schema migration 加 DB 列·trust kernel 高风险·P3 需授权）|
-| A3 | 代码 | 极高 | 中 | 大 | 待办 — .far-proof 跨语言独立可复算强化（**调研完成**：V2 Python 镜像 `repro/far_chain_repro/proof_hash.py` 199 行已完整·compute_proof_hash_v2 + FEC hash + anti-theater 过滤 + NFC 归一化·下一步扩对拍测试覆盖 + 端到端 .far-proof 包内嵌 V2 envelope）|
+| A3 | 代码 | 极高 | 中 | 大 | **核心已完成**（`tests/proof_envelope/v2/cross_lang.test.ts` 7 测试·TS computeProofHashV2 ↔ Python compute_proof_hash_v2 byte-equal + seal path + tamper detection + variant + antiTheaterReport optional 字段·RULE-PE-010 independently_recomputable 已落地）·次要增强待办（.far-proof 包导出 V2 envelope + 更多 edge case）|
 | B2 | 代码 | 中 | 低 | 中 | **进行中** — branch coverage 86.76%→87.19%（commit 097fe4f·+20 测试·kernel_adapter/verifier 到 100%）·repository.ts 59.42% 待攻 |
 | C1 | 代码 | 中 | 中 | 小 | 待办 — DEBT-06 V1/V2 proof_envelope 裁决（drop V2 dead schema·破坏性需确认）|
 | C2 | 审计 | 中 | 中 | 中 | 待办 — 23 模块边界审计 |
