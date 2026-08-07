@@ -39,6 +39,36 @@
 
 ## ✅ 全部完成（2026-08-07 终验）
 
+**第二轮"全部解决"完成**（用户授权后扩展后续 5 项）：
+
+| 项 | 状态 | 证据 |
+|----|------|------|
+| P0 secrets 迁移 | ✅ | `~/.config/opencode/opencode.json` 7 处明文 → `{env:VAR}`（commit `2406025`）；JSON 解析 OK；0 明文残留 |
+| P0 恢复脚本 | ✅ | `~/.config/opencode/scripts/restore-secrets-to-env.ps1`（2857B，setx 4 个用户级环境变量）|
+| P0 备份忽略 | ✅ | `.gitignore` 追加 `*.bak-secrets-*` 规则，`git check-ignore` 确认备份被忽略 |
+| P3 新增命令 | ✅ | `.opencode/commands/far-bench.md` + `far-export.md`（commit `28f1967`）|
+| P3 pre-commit hook | ✅ | `scripts/far-trust-kernel-precommit.ps1` + `PRECOMMIT_HOOKS.md`；3 场景测试通过（BLOCK/ALLOW/WARN）|
+| P1 plugin 验证 | ✅ | 全局 `@opencode-ai/plugin` 包找到（`~/.config/opencode/node_modules/`），运行时加载可信 |
+| P2 pi 评估 | ✅ 保持现状 | pi 已 RESTORED 2026-08-03（用户授权恢复），不应归档 |
+| P2 skills 评估 | ✅ 保持现状 | `.opencode/skills/`（opencode 原生）+ `.claude/skills/`（Claude 兼容）并存，opencode 优先识别 `.opencode/` |
+
+**用户后续动作（必须）**：
+1. `pwsh C:\Users\RichardYuan\.config\opencode\scripts\restore-secrets-to-env.ps1` — 从备份设置 4 个环境变量
+2. **重启 PowerShell**（setx 在新会话生效）
+3. 验证：`echo $env:GITHUB_PAT` / `$env:ZHIPU_API_KEY` / `$env:DEEPSEEK_API_KEY` / `$env:NUAA_API_KEY`
+4. 启动 opencode，测试 provider/MCP 是否正常
+5. 验证无误后删除备份：`Remove-Item C:\Users\RichardYuan\.config\opencode\opencode.json.bak-secrets-*`
+
+**新会话验证清单**（opencode 重启后）：
+1. 检查 `~/.local/share/opencode/far-trust-kernel-audit.log` 是否有 `session.created`（plugin 加载验证）
+2. 试运行 `/far-baseline`（commands 验证）
+3. 试派发 `@far-architect`（agents 验证）
+4. 检查 `available_skills` 列表是否含 `far-*` 5 个
+
+---
+
+## 第一轮 opencode 配置融入（已完成）
+
 **EXEC 全部 6 步落地**（产物 26 文件 / 1418 行 / 74834 bytes）：
 - EXEC-1 ✅ `.opencode/` 目录骨架 + AGENTS.md（瘦补丁，lazy-load @rules）+ 8 rules（typescript/python/tests/frontend/data-migrations/scientific-kernel/security-release/docs-and-config）
 - EXEC-2 ✅ 5 skills 移植（far-design-freeze/implement/refactor/release/verify，opencode SKILL.md 格式，name 与目录一致已验证）
