@@ -23,6 +23,7 @@ import type {
 } from '../../src/evidence_log/index.ts';
 import { COMPETITION_MODEL_SNAPSHOT } from '../../src/llm_gateway/adapters/aliyun_qwen/index.ts';
 import { runMigrations } from '../../src/db/index.ts';
+import { PYTHON_SPAWN_TIMEOUT_MS, pythonSpawnFailureMessage } from '../_helpers/python.ts';
 
 const OFFLINE_OPTIONS: AppendRecordOptions = {
   providerProfile: 'offline_replay',
@@ -307,13 +308,14 @@ test('Python verify_chain_head accepts a database written by TS appendRecord', (
     const result = spawnSync(PYTHON_CMD, ['-c', script], {
       cwd: new URL('../../', import.meta.url),
       encoding: 'utf8',
+      timeout: PYTHON_SPAWN_TIMEOUT_MS,
       env: {
         ...process.env,
         PYTHONPATH: 'repro',
       },
     });
 
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, 0, pythonSpawnFailureMessage(result));
     assert.equal(result.stdout.trim(), 'True:2:None');
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

@@ -184,6 +184,9 @@ jobs:
   test_ts:
     needs: py_typecheck
     runs-on: ubuntu-latest
+    # CI 韧性（2026-08-07，run 31186354000 曾无 timeout 卡 58min）：job 级 30min 上限自愈。
+    # 配合下方 3 分片 step：任一分片挂 → 该 step 超时红 + tail 日志可见具体挂点，而非整 job 无输出。
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v5
@@ -205,8 +208,37 @@ jobs:
           # 审计 P1-8：science_harness 的 40+ 测试（sandbox/seed_cherry/secret_strip/bls_pipeline/c_astro）
           # 依赖 numpy/lightkurve——缺装则 t.skip() 静默降级，CI 显示 green 但关键路径未真覆盖。
           pip install numpy lightkurve
-      - name: node --test (TS unit + integration)
-        run: pnpm run test
+      - name: ensure native + python deps prelude (package.json test 前置三连)
+        run: node scripts/ensure_native_deps.mjs && node scripts/ensure_py_deps.mjs && node scripts/python_axis_probe.mjs
+      # 分片说明（2026-08-07）：原单步 `pnpm run test`（27 glob 一进程）在 CI 上整体卡死且零输出。
+      # 拆 3 片 → 每片独立进程 + --test-timeout（per-test 180s 兜底）+ pipefail + tail（尾部 8KB
+      # 结果摘要落日志）。glob 全集与 package.json test 脚本完全一致，零丢测试。
+      # shard 1 前置最可疑目录（evidence_log 跨语言 Python spawn 已逐一加 30s spawnSync 超时）。
+      - name: node --test shard 1/3 (api·llm_gateway·schema·evidence_log·falsifiability·fec·math·statistics·golden_vectors)
+        run: |
+          set -o pipefail
+          node --test --test-timeout=180000 \
+            tests/api/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts \
+            tests/evidence_log/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts \
+            tests/math/*.test.ts tests/statistics/*.test.ts tests/golden_vectors/*.test.ts \
+            2>&1 | tail -c 8000
+      - name: node --test shard 2/3 (real_backends·demo_seeds·benchmark·db·far_proof·science_harness·adapters)
+        run: |
+          set -o pipefail
+          node --test --test-timeout=180000 \
+            tests/real_backends/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts \
+            tests/db/*.test.ts tests/far_proof/*.test.ts \
+            tests/science_harness/*.test.ts tests/science_harness/adapters/*.test.ts \
+            2>&1 | tail -c 8000
+      - name: node --test shard 3/3 (confounding_gate·proof_envelope·report·trace·cli·anti_theater·agent_loop·comparison·v2_domain·scripts)
+        run: |
+          set -o pipefail
+          node --test --test-timeout=180000 \
+            tests/confounding_gate/*.test.ts tests/proof_envelope/*.test.ts tests/proof_envelope/v2/*.test.ts \
+            tests/report/*.test.ts tests/trace/*.test.ts tests/cli/*.test.ts tests/anti_theater/*.test.ts \
+            tests/agent_loop/*.test.ts tests/comparison/*.test.ts tests/v2_domain/*.test.ts \
+            tests/scripts/*.test.mjs \
+            2>&1 | tail -c 8000
       - name: node --test (agent_loop FSM + N3 反幻觉 + assertTerminated)
         run: pnpm run test:agent_loop
 

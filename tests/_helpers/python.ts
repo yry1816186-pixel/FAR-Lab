@@ -46,3 +46,23 @@ export function probeNumpy(pythonCommand: string): boolean {
   });
   return r.error === undefined && r.status === 0 && r.stdout.trim().length > 0;
 }
+
+/**
+ * CI 韧性（2026-08-07，run 31186354000 test_ts 卡 58min）：跨语言 Python spawn 必须带上限超时。
+ * 无 timeout 的 spawnSync 一旦 Python 启动/导入被卡，node 主线程被阻塞 → 外层 --test-timeout
+ * 也失效（事件循环冻结）→ 整个 node --test 静默挂起（零输出）。超时后 status=null + error=ETIMEDOUT，
+ * 断言 fail-closed（红而非挂）。默认 30s：单次 canonical/merkle/verify 重算均 < 1s，30s 极充裕。
+ */
+export const PYTHON_SPAWN_TIMEOUT_MS = 30_000;
+
+export function pythonSpawnFailureMessage(result: {
+  status: number | null;
+  stderr: string;
+  stdout?: string;
+  error?: unknown;
+}): string {
+  if (result.error !== undefined) {
+    return `python spawn failed: ${(result.error as Error).message}\nstderr: ${result.stderr}`;
+  }
+  return result.stderr || result.stdout || `python exited with status ${String(result.status)}`;
+}
