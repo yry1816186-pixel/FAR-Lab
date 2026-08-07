@@ -1,14 +1,14 @@
 # FAR-Lab Progress Checkpoint — 2026-08-07 改造工程会话（A2 + B2 + A3 调研）
 
 > **本会话续跑点（下个会话第一动作读此）**：
-> - **已完成（路线图全绿）**：
->   - **A2**（commit `cd45a4a`·anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`）
->   - **B2 ✅**（7 commits·branch coverage **86.76% → 90.00%**·+250 测试·+ 收尾 commit `873f6ce` hypothesize pending/409）
+> - **已完成（路线图 100% 全绿）**：
+>   - **A2**（`cd45a4a`·anti-theater 第 23 检测器 `AT-EFFECT-P-MISMATCH`）
+>   - **B2 ✅**（7 commits·branch coverage **86.76% → 90.00%**·+250 测试·+ hypothesize 409 收尾 `873f6ce`）
 >   - **B3 ✅ 完整**（`efbd3ab` 后端 decisionTrace 持久化 + API + `0f8a9d3` 前端 Honesty Wall Decision Trace 面板）
->   - **A3 ✅ 完整**（`9bf6f79` V2 proofHash Unicode/NFC/转义跨语言对拍）
-> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 28 commits）· 工作树只有 .far-implementation/ pre-existing 残留
-> - **基线**：typecheck 0 / lint 0 / test 2276 (2270p/0f/6s) / demo 14/14 GV / branch 90.00% / frontend vitest 219 tests 全绿
-> - **剩余可选（低价值·不建议）**：VizPage 节点详情展示 decisionTrace——GraphNodeDto 是有意设计的简化 DTO（无 sourceAnchor/hash·轻量传输）·加 decisionTrace 需后端 GraphSubtree 透传 + 前端改造（跨层·违背 DTO 设计意图）·Honesty Wall 已覆盖决策可解释性
+>   - **A3 ✅ 完整**（`9bf6f79` Unicode/NFC/转义对拍 + `cd3ed92` .far-proof 包导出 proof_envelopes_v2.jsonl·第三方独立重算 RULE-PE-010 闭环）
+> - **当前 branch**：`design/s0-safe-boot`（ahead of origin/main 30 commits）· 工作树只有 .far-implementation/ pre-existing 残留
+> - **基线**：typecheck 0 / lint 0 / test 2278 (2272p/0f/6s) / demo 14/14 GV / branch 90.00% / frontend vitest 219 tests 全绿
+> - **剩余可选（低价值·不建议）**：VizPage decisionTrace（GraphNodeDto 有意简化 DTO·跨层）·D1-D3（更多论文/性能基准/LLM 接入·大工程·新方向）
 > - **铁律提醒**：trust kernel 改动 ADDITIVE ONLY（参考 A2 先例）；每个改动独立 commit + 全量验证
 
 ---
