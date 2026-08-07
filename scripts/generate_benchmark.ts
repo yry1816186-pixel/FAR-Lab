@@ -42,10 +42,12 @@ async function main(): Promise<void> {
 
   log(`benchmark report written → ${reportPath}`);
   log(`  problems          : ${report.problemCount}`);
+  log(`  domains           : ${report.domainCount}`);
   log(`  suiteIntegrityRoot: ${report.suiteIntegrityRoot}`);
   log(`  totalLeaves       : ${report.totalLeaves}`);
   log(`  verdictDistribution: ${JSON.stringify(report.verdictDistribution)}`);
   log(`  domainDistribution: ${JSON.stringify(report.domainDistribution)}`);
+  log(`  latencyStats(ms)  : ${JSON.stringify(report.latencyStats)}`);
 }
 
 await main();

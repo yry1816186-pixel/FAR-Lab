@@ -154,6 +154,43 @@ test('domainDistribution 计数与 entries 一致', () => {
   }
 });
 
+test('D2 规模事实：domainCount === domainDistribution 键数（30 problems / 28 domains）', () => {
+  assert.equal(report.domainCount, Object.keys(report.domainDistribution).length);
+  assert.equal(report.problemCount, 30);
+  assert.equal(report.domainCount, 28);
+  assert.ok(
+    report.honestyNotes.some((n) => n.includes('30 problems') && n.includes('28 scientific domains')),
+    'coverageNote 应固化 30 problems / 28 domains 规模事实',
+  );
+});
+
+test('D2 性能基线：每 entry 采集 latencyMs（观测指标·非负数字）', () => {
+  assert.ok(report.entries.length > 0);
+  for (const entry of report.entries) {
+    assert.ok(typeof entry.latencyMs === 'number', `${entry.problemId} latencyMs 应为数字`);
+    assert.ok(Number.isFinite(entry.latencyMs), `${entry.problemId} latencyMs 应有限`);
+    assert.ok(entry.latencyMs >= 0, `${entry.problemId} latencyMs 应非负`);
+  }
+});
+
+test('D2 性能基线：latencyStats p50/p95/max 存在且 p50≤p95≤max（unit=ms）', () => {
+  const stats = report.latencyStats;
+  assert.ok(stats !== null, 'latencyStats 不应为 null（generate 已实测）');
+  assert.ok(stats !== undefined, 'latencyStats 应存在');
+  assert.equal(stats.unit, 'ms');
+  assert.ok(Number.isFinite(stats.p50) && stats.p50 >= 0);
+  assert.ok(Number.isFinite(stats.p95) && stats.p95 >= 0);
+  assert.ok(Number.isFinite(stats.max) && stats.max >= 0);
+  assert.ok(stats.p50 <= stats.p95, 'p50 ≤ p95');
+  assert.ok(stats.p95 <= stats.max, 'p95 ≤ max');
+});
+
+test('D2 性能基线：latency 不进 hash（suiteIntegrityRoot 不因 latency 变化）', () => {
+  // latencyMs 是观测指标——同一 seed 集两次运行 suiteIntegrityRoot 必须字节相同。
+  assert.equal(report.suiteIntegrityRoot, secondRun.suiteIntegrityRoot);
+  assert.equal(report.suiteIntegrityRoot, computeMerkleRoot(report.entries.map((e) => e.integrityRoot)));
+});
+
 test('honestyNotes 含 fixture 诚实声明（非科学排名）', () => {
   assert.ok(report.honestyNotes.length >= 3);
   const joined = report.honestyNotes.join(' ');

@@ -266,7 +266,88 @@ test('getSubtree: node DTO 字段映射正确（camelCase + 全字段）', () =>
     assert.equal(node.conflictingEvidenceCount, 3);
     assert.equal(node.scopeSlipText, 'scope narrowed');
     assert.equal(node.parentNodeId, null);
+    // B3 透明度层：FIXTURE_VERDICT_TRACE 不含 decisionTrace → 宽容降级为 null
+    assert.equal(node.decisionTrace, null);
     assert.ok(node.createdAt.length > 0);
+  } finally {
+    db.close();
+  }
+});
+
+test('getSubtree: decisionTrace 存在时正确映射到 node.decisionTrace（B3 透明度层）', () => {
+  const db = openDb();
+  try {
+    const tracker = new ChainHeadTracker();
+    tracker.appendAndEvidence(db, 'ev-dt-a');
+
+    // 手工构造含 decisionTrace 的 trace（4 个 verdict-critical 字段 + B3 可选字段）
+    const traceWithDecision: VerdictTracePersisted = {
+      reasonCodes: ['R7_SUPPORTED'],
+      ruleTrace: [{ ruleId: 'R7_SUPPORTED', triggered: true }],
+      decisiveRuleId: 'R7_SUPPORTED',
+      evidenceSufficiency: { status: 'sufficient', powerStatus: 'adequate' },
+      decisionTrace: {
+        firedRuleId: 'R7_SUPPORTED',
+        r7Gate: {
+          supports: true,
+          primaryAdjustedPValueSignificant: true,
+          effectSizeSufficient: true,
+          evidenceSufficient: true,
+          noSameScopeRefutation: true,
+          noIntegrityFlags: true,
+          noWarnAssumption: true,
+          overallPassed: true,
+        },
+        metrics: {
+          alpha: 0.05,
+          mde: 0.1,
+          primaryAdjustedPValue: 0.0082,
+          primaryEffectSize: 0.42,
+          primaryConfidenceInterval: [0.2, 0.5],
+          powerStatus: 'adequate',
+          evidenceStatus: 'sufficient',
+          effectiveDirection: 'positive',
+          antiTheaterFailCount: 0,
+          antiTheaterWarnCount: 0,
+          integrityFlags: [],
+          totalStatistics: 4,
+          skippedStatistics: 0,
+        },
+        totalRulesInTree: 18,
+        cannotProveStatement: '决策路径追踪是事后解释，不能证明裁决正确',
+      },
+    };
+    const v = recordVerdict(db, makeVerdictArgs('ev-dt-a', 'CONFIRMED', traceWithDecision));
+
+    const subtree = getSubtree(db, v.verdictId);
+    const node = subtree.nodes[0]!;
+    assert.ok(node.decisionTrace !== null, 'decisionTrace 应透传到 DTO');
+    const dt = node.decisionTrace as Record<string, unknown>;
+    assert.equal(dt.firedRuleId, 'R7_SUPPORTED');
+    assert.equal((dt.metrics as Record<string, unknown>).alpha, 0.05);
+    assert.equal((dt.r7Gate as Record<string, unknown>).overallPassed, true);
+  } finally {
+    db.close();
+  }
+});
+
+test('getSubtree: verdict_trace_json 为非法 JSON 时宽容降级为 null（不阻断图查询）', () => {
+  const db = openDb();
+  try {
+    const tracker = new ChainHeadTracker();
+    tracker.appendAndEvidence(db, 'ev-dt-bad');
+    // verdict_nodes 的 immutable trigger（0012 重建）禁 UPDATE verdict_trace_json →
+    // 用 raw INSERT 注入非法 trace 行（模拟异常/旧数据），验证只读图查询不受影响
+    db.prepare(
+      `INSERT INTO verdict_nodes
+         (verdict_id, evidence_id, node_kind, verdict, falsification_spec,
+          source_anchor, prev_hash, current_hash, verdict_trace_json)
+       VALUES (?, ?, 'evidence', 'CONFIRMED', '{}', 'anchor', 'prev', 'cur', ?)`,
+    ).run('v-dt-bad', 'ev-dt-bad', '{not-valid-json');
+
+    const subtree = getSubtree(db, 'v-dt-bad');
+    assert.equal(subtree.nodes.length, 1, '非法 trace 不应阻断节点返回');
+    assert.equal(subtree.nodes[0]?.decisionTrace, null, '非法 JSON → decisionTrace 为 null');
   } finally {
     db.close();
   }

@@ -20,6 +20,7 @@ import Database from 'better-sqlite3';
 
 import { buildBemChain, type BemAnalysisMode } from '../../science_harness/bem_pipeline.ts';
 import { buildRitchieChain } from '../../science_harness/ritchie_pipeline.ts';
+import { buildOscChain } from '../../science_harness/osc_pipeline.ts';
 
 /** Type alias: paper run result. */
 interface PaperRunResult {
@@ -120,6 +121,106 @@ function runRitchiePaper(): PaperRunResult {
   } finally {
     db.close();
   }
+}
+
+/** Run the OSC (2015) reproducibility pipeline and collect results. */
+function runOscPaper(): PaperRunResult {
+  const db = new Database(':memory:');
+  try {
+    const result = buildOscChain(db);
+    const stats = result.statistics;
+    return {
+      mode: 'aggregate-replication',
+      claimId: result.claimId,
+      claimText: result.claimText,
+      machineVerdict: result.machineVerdict,
+      sealedConclusion: result.sealedConclusion,
+      decisiveRule: result.kernelOutput.decisiveRuleId,
+      reasonCodes: result.kernelOutput.reasonCodes,
+      publishedP: stats.replicationEffectP,
+      farLabExactP: stats.replicationEffectP,
+      farLabP: stats.replicationEffectP,
+      bonferroniP: stats.bhAdjustedPs[0] ?? 0,
+      cohensD: stats.replicationMedianR,
+      survivesCorrection: stats.survivesFdr,
+      antiTheaterFindings: result.antiTheaterReport.findings.length,
+      antiTheaterFindingDetails: result.antiTheaterReport.findings.map(f => ({
+        findingId: f.findingId,
+        attackKind: f.attackKind,
+        outcome: f.outcome,
+        message: f.message,
+      })),
+      fecGateAllowed: result.fecGate.allowed,
+      fecGateReason: result.fecGate.reason,
+      proofHash: result.sealed.envelope.proofHash,
+    };
+  } finally {
+    db.close();
+  }
+}
+
+/** Render OSC result to stdout. */
+function renderOscResult(r: PaperRunResult): string {
+  const SEP = '\u2501'.repeat(70);
+  const lines: string[] = [
+    '',
+    '\u2554' + '\u2550'.repeat(70) + '\u2557',
+    '\u2551  FAR-Lab \u00b7 Real Paper End-to-End \u2014 Reproducibility Crisis        \u2551',
+    '\u2551  Published paper \u2192 FAR-Lab statistics \u2192 kernel verdict \u2192 proof seal  \u2551',
+    '\u255a' + '\u2550'.repeat(70) + '\u255d',
+    '',
+    SEP,
+    '  Paper: Open Science Collaboration (2015).',
+    '         Estimating the reproducibility of psychological science.',
+    '         Science, 349(6251), aac4716. DOI: 10.1126/science.aac4716',
+    SEP,
+    '',
+    `  Claim ID           : ${r.claimId}`,
+    `  Claim              : ${r.claimText}`,
+    `  FEC gate           : allowed=${r.fecGateAllowed} (${r.fecGateReason})`,
+    '',
+    '  \u2500\u2500 97 independent replication studies (100 original) \u2500\u2500',
+    '  Original significant : 97% (97 of 100)',
+    '  Replication signif.  : 36% (36 of 97)',
+    '  Median r original    : 0.403',
+    '  Median r replication : 0.197 (49% of original)',
+    `  FAR-Lab Fisher z p   : ${r.farLabP.toFixed(6)} (one-sided, replication effect > 0)`,
+    `  BH-FDR adjusted p    : ${r.bonferroniP.toFixed(6)} (family = {effect-size z, rate-drop z})`,
+    `  Effect size (r)      : ${r.cohensD.toFixed(4)} (replication median)`,
+    `  Survives FDR         : ${r.survivesCorrection ? 'YES' : 'NO'}`,
+    '',
+    '  \u2500\u2500 Deterministic verdict kernel (R0-R9) \u2500\u2500',
+    `  Machine verdict    : ${r.machineVerdict}`,
+    `  Sealed conclusion  : ${r.sealedConclusion}`,
+    `  Decisive rule      : ${r.decisiveRule}`,
+    `  Reason codes       : ${r.reasonCodes.join(', ')}`,
+    '',
+    '  \u2500\u2500 Anti-theater detectors \u2500\u2500',
+    `  Findings triggered : ${r.antiTheaterFindings}`,
+    '',
+    '  \u2500\u2500 Tamper-evident proof seal \u2500\u2500',
+    `  Proof hash         : ${r.proofHash}`,
+    '',
+    SEP,
+    '  Interpretation',
+    SEP,
+    '  OSC (2015) is the landmark reproducibility-crisis study: 97 independent',
+    '  replication teams re-ran 100 published psychology experiments. Only 36% of',
+    '  replications were significant (vs 97% of originals), and the median effect',
+    '  size halved (r 0.403 -> 0.197).',
+    '',
+    '  FAR-Lab verdict: the replication effect IS statistically nonzero (Fisher z',
+    '  significant, survives BH-FDR), so the evidence supports the claim direction.',
+    '  But it covers only a DEGRADED SCOPE of the claim — effects exist, yet at',
+    '  roughly half magnitude with a collapsed significance rate.',
+    '',
+    '  This is the 4th distinct 5-value verdict in the real-paper suite:',
+    '    Bem as-published = UNTESTED, Bem corrected = INCONCLUSIVE,',
+    '    Ritchie = REFUTED, OSC-2015 = DEGRADED_SCOPE.',
+    SEP,
+    '',
+  ];
+  return lines.join('\n');
 }
 
 /** Render Ritchie result to stdout. */
@@ -274,15 +375,21 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-if (paperArg !== 'bem' && paperArg !== 'ritchie') {
-  process.stderr.write(`Unknown paper: ${paperArg}. Currently supported: bem, ritchie\n`);
+if (paperArg !== 'bem' && paperArg !== 'ritchie' && paperArg !== 'osc') {
+  process.stderr.write(`Unknown paper: ${paperArg}. Currently supported: bem, ritchie, osc\n`);
   process.exit(2);
 }
 
-const result = paperArg === 'bem' ? runBemPaper(modeArg) : runRitchiePaper();
+const result = paperArg === 'bem'
+  ? runBemPaper(modeArg)
+  : paperArg === 'ritchie'
+    ? runRitchiePaper()
+    : runOscPaper();
 
 if (paperArg === 'ritchie') {
   process.stdout.write(renderRitchieResult(result));
+} else if (paperArg === 'osc') {
+  process.stdout.write(renderOscResult(result));
 } else {
   process.stdout.write(renderResult(result));
 }

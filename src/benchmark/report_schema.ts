@@ -3,16 +3,18 @@
  *
  * 披露字段集强制(缺任一=机检红):
  *   taskId / oracleType / oracleReviewStatus / traceHash / costTokens /
- *   kernelVersion+modelVersion / seed / bestOfK(须为 false)/ executedAt。
+ *   kernelVersion+modelVersion / seed / bestOfK(须为 false)/ executedAt /
+ *   latencyMs(D2 观测指标·不进 hash)。
  *
  * schemaVersion 2:v1 报告可经 upgradeReportV1toV2 补字段
- * (oracleReviewStatus='unreviewed' 诚实标注;costTokens=null 诚实标注 v1 未记录)。
+ * (oracleReviewStatus='unreviewed' 诚实标注;costTokens=null 诚实标注 v1 未记录;
+ *  latencyMs=null / latencyStats=null 诚实标注 v1 未采集性能基线)。
  *
  * 零容忍合规:无 any / @ts-ignore / 空 catch / 双重断言。
  */
 
 import { CURRENT_RULESET_URI } from '../proof_envelope/ruleset_version.ts';
-import type { BenchmarkEntry, BenchmarkReport } from './types.ts';
+import type { BenchmarkEntry, BenchmarkReport, LatencyStats } from './types.ts';
 
 /** Constant: BENCHMARK_REPORT_SCHEMA_VERSION. */
 export const BENCHMARK_REPORT_SCHEMA_VERSION = 2 as const;
@@ -20,7 +22,7 @@ export const BENCHMARK_REPORT_SCHEMA_VERSION = 2 as const;
 /** Type alias: oracle review status. */
 export type OracleReviewStatus = 'unreviewed' | 'human_reviewed';
 
-/** v2 条目披露字段(v1 字段全保留+9 披露字段) */
+/** v2 条目披露字段(v1 字段全保留+10 披露字段,含 D2 latencyMs) */
 export interface BenchmarkEntryV2 extends BenchmarkEntry {
   readonly taskId: string;
   readonly oracleType: string;
@@ -32,6 +34,8 @@ export interface BenchmarkEntryV2 extends BenchmarkEntry {
   readonly seed: string | number | null;
   readonly bestOfK: boolean;
   readonly executedAt: string;
+  /** D2 性能基线:单 seed 裁决路径 wall-clock ms(观测指标·不进任何 hash)·v1 upgrade 为 null。 */
+  readonly latencyMs: number | null;
   /** DEF-16 对账:human_reviewed 须锚定真实复核记录(64-hex 引用);unreviewed 须为 null/缺省。防伪造复核状态零成本过机检。 */
   readonly reviewRecordRef?: string | null;
 }
@@ -43,6 +47,10 @@ export interface BenchmarkReportV2 extends Omit<BenchmarkReport, 'schemaVersion'
   readonly kernelRulesetUri: string;
   readonly bestOfK: boolean;
   readonly executedAt: string;
+  /** D2 规模事实:科学域数量(= Object.keys(domainDistribution).length)。 */
+  readonly domainCount: number;
+  /** D2 性能基线:latency 聚合 p50/p95/max(ms·观测指标·不进 hash)·v1 upgrade 为 null。 */
+  readonly latencyStats: LatencyStats | null;
 }
 
 /** 机检必需顶层字段 */
@@ -55,6 +63,8 @@ export const REPORT_V2_TOP_REQUIRED = [
   'totalLeaves',
   'verdictDistribution',
   'domainDistribution',
+  'domainCount',
+  'latencyStats',
   'gitCommitSha',
   'honestyNotes',
   'kernelRulesetUri',
@@ -74,6 +84,7 @@ export const REPORT_V2_ENTRY_REQUIRED = [
   'seed',
   'bestOfK',
   'executedAt',
+  'latencyMs',
 ] as const;
 
 /** Result/output structure for report check result. */
@@ -116,6 +127,28 @@ export function checkBenchmarkReportV2(report: unknown): ReportCheckResult {
   }
   if (nonempty(report.suiteIntegrityRoot) && !/^[0-9a-f]{64}$/.test(report.suiteIntegrityRoot)) {
     errors.push(`suiteIntegrityRoot 非 64-hex: ${report.suiteIntegrityRoot.slice(0, 16)}…`);
+  }
+  // D2 规模事实对账:domainCount 须与 domainDistribution 键数一致(防空洞合规)。
+  if (isRecord(report.domainDistribution) && typeof report.domainCount === 'number') {
+    if (report.domainCount !== Object.keys(report.domainDistribution).length) {
+      errors.push(`domainCount=${report.domainCount} 与 domainDistribution 键数=${Object.keys(report.domainDistribution).length} 不一致`);
+    }
+  }
+  // D2 性能基线对账:latencyStats 若非 null,须含合法 p50/p95/max(ms·观测指标不进 hash)。
+  if (report.latencyStats !== null && report.latencyStats !== undefined) {
+    if (!isRecord(report.latencyStats)) {
+      errors.push('latencyStats 须为对象或 null(诚实标注未采集)');
+    } else {
+      const ls = report.latencyStats;
+      for (const field of ['p50', 'p95', 'max'] as const) {
+        if (typeof ls[field] !== 'number' || !Number.isFinite(ls[field]) || (ls[field] as number) < 0) {
+          errors.push(`latencyStats.${field} 非法(须为有限非负数字): ${String(ls[field])}`);
+        }
+      }
+      if (ls.unit !== 'ms') {
+        errors.push(`latencyStats.unit 非法(须为 'ms'): ${String(ls.unit)}`);
+      }
+    }
   }
   const entries = report.entries;
   if (!Array.isArray(entries)) {
@@ -161,6 +194,12 @@ export function checkBenchmarkReportV2(report: unknown): ReportCheckResult {
       if ('traceHash' in entry && !(typeof entry.traceHash === 'string' && /^[0-9a-f]{64}$/.test(entry.traceHash))) {
         errors.push(`entries[${index}].traceHash 非 64-hex`);
       }
+      // D2 性能基线:latencyMs 若非 null,须为有限非负数字(观测指标·不进 hash)。
+      if ('latencyMs' in entry && entry.latencyMs !== null && entry.latencyMs !== undefined) {
+        if (typeof entry.latencyMs !== 'number' || !Number.isFinite(entry.latencyMs) || entry.latencyMs < 0) {
+          errors.push(`entries[${index}].latencyMs 非法(须为有限非负数字或 null): ${String(entry.latencyMs)}`);
+        }
+      }
     });
   }
   return { ok: errors.length === 0, errors };
@@ -185,7 +224,9 @@ export function upgradeReportV1toV2(report: BenchmarkReport): BenchmarkReportV2 
     seed: 'deterministic-fixture',
     bestOfK: false,
     executedAt: report.generatedAt,
+    latencyMs: null,
   }));
+  const domainCount = Object.keys(report.domainDistribution ?? {}).length;
   return {
     ...report,
     entries,
@@ -193,5 +234,7 @@ export function upgradeReportV1toV2(report: BenchmarkReport): BenchmarkReportV2 
     kernelRulesetUri: CURRENT_RULESET_URI,
     bestOfK: false,
     executedAt: report.generatedAt,
+    domainCount,
+    latencyStats: null,
   };
 }

@@ -64,6 +64,32 @@ replication results. Mean effect size in replications was half the original.
 - ~10% → REFUTED (replication evidence refutes original claim)
 - ~10% → CONFIRMED (would pass all gates — the reproducible minority)
 
+**Implemented (2026-08-07)**: The OSC-2015 aggregate pipeline is now a live,
+deterministic proof chain — `src/science_harness/osc_pipeline.ts` +
+`tests/science_harness/osc_pipeline.test.ts` +
+`repro/real_paper/osc_replication_recompute.py` (independent Python stdlib axis).
+
+**Machine verdict: `DEGRADED_SCOPE`** — the 4th of the 5 verdict values, distinct
+from Bem (`UNTESTED`) and Ritchie (`REFUTED`).
+
+Evidence path that produces it:
+- Replication median effect `r = 0.197` (Fisher z = 0.1996, SE = 1/√94 ≈ 0.1031,
+  z-stat ≈ 1.935, one-sided p ≈ 0.0265) — statistically nonzero, direction **supports**
+  the claim, so R6 (REFUTED) and R7 (CONFIRMED) do not fire.
+- Evidence records `scopeNarrowerThanClaim = true` → `scopeCoverage.relation =
+  'partial'`, plus `distribution_drift` warn in statistical diagnostics →
+  `evaluateScope` marks `isDegraded = true`.
+- R4 fires **before** R6/R7: `decisiveRuleId = R4_SCOPE_MISMATCH_NONCRITICAL`,
+  reason codes `[R4_SCOPE_MISMATCH_NONCRITICAL, DATASET_DRIFT_WARN]`.
+- Sealed proof envelope carries `knownFailures`: effect at ~49% of original
+  magnitude; significance rate collapses 97% → 36%; evidence is published
+  aggregate statistics (not raw trial-level data).
+- Anti-theater lint: 0 findings (summary wording stays honest about the
+  degraded scope — "confirms" would have been rejected).
+
+CLI: `pnpm far real-paper --paper osc` (also reachable via
+`node src/cli/far.ts real-paper --paper osc`).
+
 ---
 
 ## Case 3: LK-99 (2023) — Room-Temperature Superconductor

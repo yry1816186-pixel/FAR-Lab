@@ -46,6 +46,23 @@ export interface BenchmarkEntry {
   readonly sourceId: string;
 }
 
+/**
+ * latency 观测统计（wall-clock ms·仅观测·不参与任何 hash·CI golden 不锚定）。
+ *
+ * D2 性能基线：由 aggregator 以 performance.now() 包裁决路径采集每个 seed 的 latencyMs，
+ * 仅记录为观测指标——绝不进入 evidence chain / integrityRoot / suiteIntegrityRoot 的折叠。
+ */
+export interface LatencyStats {
+  /** p50 延迟（ms·wall-clock）。 */
+  readonly p50: number;
+  /** p95 延迟（ms·wall-clock）。 */
+  readonly p95: number;
+  /** max 延迟（ms·wall-clock）。 */
+  readonly max: number;
+  /** 单位恒为 'ms'（wall-clock 毫秒）。 */
+  readonly unit: 'ms';
+}
+
 /** verdict 分布（key = Verdict 枚举值·value = 计数·全 5 键恒在）。 */
 export type VerdictDistribution = Readonly<Record<Verdict, number>>;
 

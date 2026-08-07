@@ -66,6 +66,42 @@ test('v1 → v2 升级:补字段且 oracleReviewStatus=unreviewed 诚实标注',
   }
   const result = checkBenchmarkReportV2(upgraded);
   assert.equal(result.ok, true, `errors: ${result.errors.join('; ')}`);
+  // D2 诚实标注:v1 未采集性能基线 → latencyMs/latencyStats 均为 null
+  for (const entry of upgraded.entries) {
+    assert.equal(entry.latencyMs, null, 'v1 upgrade 的 latencyMs 须为 null(诚实标注未采集)');
+  }
+  assert.equal(upgraded.latencyStats, null, 'v1 upgrade 的 latencyStats 须为 null(诚实标注未采集)');
+  assert.equal(upgraded.domainCount, Object.keys(upgraded.domainDistribution).length, 'v1 upgrade 的 domainCount 须由 domainDistribution 计算');
+});
+
+test('D2 机检:缺 latencyMs / latencyStats / domainCount → 红;非法 latency → 红', () => {
+  const report = JSON.parse(readFileSync(REPORT_PATH, 'utf8')) as Record<string, unknown> & { entries: Array<Record<string, unknown>> };
+  // 1. 删 entry.latencyMs → 红
+  const noEntryLatency = JSON.parse(JSON.stringify(report)) as { entries: Array<Record<string, unknown>> };
+  delete noEntryLatency.entries[0]!.latencyMs;
+  assert.equal(checkBenchmarkReportV2(noEntryLatency).ok, false, '缺 entry.latencyMs 须红');
+  // 2. 删顶层 latencyStats → 红
+  const noStats = JSON.parse(JSON.stringify(report)) as Record<string, unknown>;
+  delete noStats.latencyStats;
+  assert.equal(checkBenchmarkReportV2(noStats).ok, false, '缺顶层 latencyStats 须红');
+  // 3. 删顶层 domainCount → 红
+  const noDomainCount = JSON.parse(JSON.stringify(report)) as Record<string, unknown>;
+  delete noDomainCount.domainCount;
+  assert.equal(checkBenchmarkReportV2(noDomainCount).ok, false, '缺顶层 domainCount 须红');
+  // 4. domainCount 与 domainDistribution 键数不一致 → 红
+  const badCount = JSON.parse(JSON.stringify(report)) as Record<string, unknown> & { domainCount: number };
+  badCount.domainCount = (badCount.domainCount ?? 0) + 1;
+  assert.equal(checkBenchmarkReportV2(badCount).ok, false, 'domainCount 不一致须红');
+  // 5. latencyStats.unit 非法 → 红
+  const badUnit = JSON.parse(JSON.stringify(report)) as Record<string, unknown> & { latencyStats: Record<string, unknown> };
+  badUnit.latencyStats = { ...badUnit.latencyStats, unit: 's' };
+  assert.equal(checkBenchmarkReportV2(badUnit).ok, false, 'latencyStats.unit != ms 须红');
+  // 6. entry.latencyMs 为负数 → 红
+  const negative = JSON.parse(JSON.stringify(report)) as { entries: Array<Record<string, unknown>> };
+  negative.entries[0]!.latencyMs = -1;
+  assert.equal(checkBenchmarkReportV2(negative).ok, false, 'latencyMs 为负须红');
+  // 7. 正例:现有报告(含全部新字段)过机检
+  assert.equal(checkBenchmarkReportV2(report).ok, true, '现有报告含新字段须过机检');
 });
 
 test('DEF-16 对账:伪造 human_reviewed 无 reviewRecordRef → 机检红(防零成本伪造复核状态)', () => {

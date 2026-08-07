@@ -43,6 +43,7 @@ function makeGraphSubtree(overrides: Partial<GraphSubtree> = {}): GraphSubtree {
         conflictingEvidenceCount: 0,
         scopeSlipText: null,
         untestedReason: null,
+        decisionTrace: null,
         createdAt: '2026-01-01T00:00:00Z',
       },
       {
@@ -55,6 +56,7 @@ function makeGraphSubtree(overrides: Partial<GraphSubtree> = {}): GraphSubtree {
         conflictingEvidenceCount: 1,
         scopeSlipText: null,
         untestedReason: null,
+        decisionTrace: null,
         createdAt: '2026-01-02T00:00:00Z',
       },
       {
@@ -67,6 +69,7 @@ function makeGraphSubtree(overrides: Partial<GraphSubtree> = {}): GraphSubtree {
         conflictingEvidenceCount: 0,
         scopeSlipText: '指标阈值未达成',
         untestedReason: null,
+        decisionTrace: null,
         createdAt: '2026-01-03T00:00:00Z',
       },
     ],
@@ -88,6 +91,43 @@ function makeGraphSubtree(overrides: Partial<GraphSubtree> = {}): GraphSubtree {
         createdAt: '2026-01-03T00:00:00Z',
       },
     ],
+    ...overrides,
+  };
+}
+
+/** 构造带 decisionTrace 的子图（node-ev1 附 B3 决策路径追踪数据） */
+function makeGraphSubtreeWithTrace(overrides: Partial<GraphSubtree> = {}): GraphSubtree {
+  const base = makeGraphSubtree();
+  return {
+    ...base,
+    nodes: base.nodes.map((node) =>
+      node.nodeId === 'node-ev1'
+        ? {
+            ...node,
+            decisionTrace: {
+              firedRuleId: 'R7_SUPPORTED',
+              r7Gate: {
+                supports: true,
+                primaryAdjustedPValueSignificant: true,
+                effectSizeSufficient: true,
+                evidenceSufficient: true,
+                noSameScopeRefutation: true,
+                noIntegrityFlags: true,
+                noWarnAssumption: true,
+                overallPassed: true,
+              },
+              metrics: {
+                alpha: 0.05,
+                mde: 0.1,
+                primaryAdjustedPValue: 0.0082,
+                primaryEffectSize: 0.42,
+              },
+              totalRulesInTree: 18,
+              cannotProveStatement: '该效应量在野外数据集上无法完全排除混杂',
+            },
+          }
+        : node,
+    ),
     ...overrides,
   };
 }
@@ -473,5 +513,57 @@ describe('VizPage', () => {
       expect(sidebar).toHaveTextContent('Confirmed');
       expect(sidebar).toHaveTextContent('0.92');
     });
+  });
+
+  it('节点详情侧栏渲染 decisionTrace 面板（fired rule + R7 门 + 关键指标）', async () => {
+    const user = userEvent.setup();
+    mockChainResponse(makeChainResponse({ graphSubtree: makeGraphSubtreeWithTrace() }));
+    renderWithQueryClient(<VizPage />);
+
+    const input = screen.getByTestId('headhash-input');
+    await user.type(input, HEAD_HASH);
+    await user.click(screen.getByTestId('search-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('force-graph-container')).toBeInTheDocument();
+    });
+
+    const svg = screen.getByTestId('force-graph-svg');
+    const nodeGroups = svg.querySelectorAll('.nodes g');
+    // 点击第二个节点（evidence / CONFIRMED / 附 decisionTrace）
+    fireEvent.click(nodeGroups[1] as SVGGElement);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('decision-trace-panel')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('dt-fired-rule')).toHaveTextContent('fired: R7_SUPPORTED');
+    expect(screen.getByTestId('dt-r7-gate')).toHaveTextContent('R7 gate');
+    expect(screen.getByTestId('dt-metrics')).toHaveTextContent('alpha');
+    expect(screen.getByTestId('dt-cannot-prove')).toHaveTextContent('无法完全排除混杂');
+  });
+
+  it('无 decisionTrace 数据时侧栏优雅降级（不渲染追踪面板）', async () => {
+    const user = userEvent.setup();
+    // 默认 fixture 所有节点 decisionTrace: null
+    mockChainResponse(makeChainResponse());
+    renderWithQueryClient(<VizPage />);
+
+    const input = screen.getByTestId('headhash-input');
+    await user.type(input, HEAD_HASH);
+    await user.click(screen.getByTestId('search-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('force-graph-container')).toBeInTheDocument();
+    });
+
+    const svg = screen.getByTestId('force-graph-svg');
+    const nodeGroups = svg.querySelectorAll('.nodes g');
+    fireEvent.click(nodeGroups[1] as SVGGElement);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('node-detail-sidebar')).toBeInTheDocument();
+    });
+    // 无 decisionTrace → 不渲染面板
+    expect(screen.queryByTestId('decision-trace-panel')).not.toBeInTheDocument();
   });
 });

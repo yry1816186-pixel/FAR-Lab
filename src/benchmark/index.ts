@@ -13,6 +13,7 @@ export type {
   BenchmarkReport,
   VerdictDistribution,
   DomainDistribution,
+  LatencyStats,
 } from './types.ts';
 
 export {
