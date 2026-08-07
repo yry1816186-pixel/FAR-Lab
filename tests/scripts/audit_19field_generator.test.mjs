@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { writeFileSync, readFileSync, unlinkSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
@@ -161,8 +162,10 @@ test("⑬ --help → exit 0 + 显示用法", () => {
 });
 
 test("⑭ --input 文件模式：读文件 + --output 写文件 → exit 0", () => {
-  const inPath = join(ROOT, ".codebuddy", "audit-draft-test.json");
-  const outPath = join(ROOT, ".codebuddy", "audit-out-test.json");
+  // 用系统临时目录（CI fresh checkout 无 .codebuddy/，避免依赖 gitignored 目录）
+  const tmpDir = mkdtempSync(join(tmpdir(), "far-audit-"));
+  const inPath = join(tmpDir, "audit-draft-test.json");
+  const outPath = join(tmpDir, "audit-out-test.json");
   try {
     writeFileSync(inPath, JSON.stringify(validDraft()), "utf8");
     const r = spawnSync(process.execPath, [SCRIPT, "--input", inPath, "--output", outPath], {
@@ -173,8 +176,7 @@ test("⑭ --input 文件模式：读文件 + --output 写文件 → exit 0", () 
     const out = JSON.parse(readFileSync(outPath, "utf8"));
     assert.equal(out.task_id, "A2-anti-theater-detector-23");
   } finally {
-    if (existsSync(inPath)) unlinkSync(inPath);
-    if (existsSync(outPath)) unlinkSync(outPath);
+    rmSync(tmpDir, { recursive: true, force: true });
   }
 });
 

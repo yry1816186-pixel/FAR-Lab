@@ -25,6 +25,7 @@
  *   node scripts/license_audit.mjs --strict     unverifiable 也算 fail（CI 严格模式）
  */
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
 const ROOT = process.cwd();
@@ -89,13 +90,26 @@ function readNpmLicense(dep) {
 function readPythonLicense(pkgSpec) {
   // pkgSpec 形如 "numpy>=1.24,<2.0" → 取包名 numpy
   const pkgName = pkgSpec.split(/[<>=!\\[]/)[0].trim().replace(/-/g, '_').toLowerCase();
-  // 候选探测目录：活跃 .venv 优先（site-packages 为平台标准路径），旧 .python-deps 作 fallback
-  // （2026-08-06 治理：.python-deps 已被 .venv 替代删除，此处支持多候选避免依赖失效）。
+  // 候选探测目录：活跃 .venv 优先（site-packages 为平台标准路径），旧 .python-deps 作 fallback，
+  // 再加系统解释器 site-packages（CI setup-python 无 .venv 时 numpy 等装在系统环境）。
   const candidates = [
     join(ROOT, '.venv', 'Lib', 'site-packages'),
     join(ROOT, '.venv', 'lib', `python${process.env.PYTHON_VERSION ?? '3'}.${process.env.PYTHON_MINOR ?? '1'}`.replace(/^python/, ''), 'site-packages'),
     join(ROOT, '.python-deps'),
   ];
+  // 动态探测当前 python 解释器的 site-packages（离线·确定性；python 不可用时静默跳过）
+  try {
+    const pyCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const probe = spawnSync(pyCmd, ['-c', 'import sysconfig; print(sysconfig.get_paths()["purelib"])'], {
+      encoding: 'utf8',
+      timeout: 15_000,
+      windowsHide: true,
+    });
+    const sysSp = probe.status === 0 && probe.stdout !== null ? probe.stdout.trim() : '';
+    if (sysSp.length > 0 && !candidates.includes(sysSp)) candidates.push(sysSp);
+  } catch {
+    // python 不可用：静默跳过系统 site-packages 探测（回退到 .venv/.python-deps）
+  }
   for (const depsDir of candidates) {
     if (!existsSync(depsDir)) continue;
     // 找匹配的 dist-info 目录
