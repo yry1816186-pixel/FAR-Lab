@@ -281,6 +281,8 @@ export interface VerdictKernelOutput {
   readonly evidenceQualityTier?: EvidenceTier;
   /** [META] 证据质量说明（tier + RoB 聚合·人类可读）。 */
   readonly evidenceQualityNote?: string;
+  /** [META] 决策路径追踪（A1·裁决可解释性·不进 verdict 不进 proofHash·透明度层）。让评委看到 R7 的 8 条件状态 + 关键数值快照。 */
+  readonly decisionTrace?: DecisionTrace;
 }
 
 // ===== 内核入口（§7.3 R0-R9 决策树）=====
@@ -611,8 +613,11 @@ export function decideFiveValueVerdictInternal(input: VerdictKernelInput): Verdi
  */
 export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernelOutput {
   const base = decideFiveValueVerdictInternal(input);
+  // A1（裁决可解释性·批次 3 透明度层）：附加决策路径追踪。
+  // 镜像评估（纯函数·不改裁决逻辑·不进 proofHash）。详见 buildDecisionTrace 文档。
+  const decisionTrace = buildDecisionTrace(input, base);
   if (input.studyDesign === undefined) {
-    return base;
+    return { ...base, decisionTrace };
   }
   const grade = gradeEvidenceQuality(input.studyDesign, input.robAssessments ?? []);
   return {
@@ -620,6 +625,7 @@ export function decideFiveValueVerdict(input: VerdictKernelInput): VerdictKernel
     evidenceQualityTier: grade.tier,
     evidenceQualityNote:
       `${grade.overall} (tier ${grade.tier} · RoB low ${grade.robLowCount}/7 high ${grade.robHighCount}/7)`,
+    decisionTrace,
   };
 }
 
@@ -791,4 +797,176 @@ function renderScopeSlip(impacted: readonly ScopeCoverage[], driftWarn: boolean)
     parts.push('dataset distribution drift');
   }
   return parts.length > 0 ? `scope narrowed: ${parts.join('; ')}` : 'scope narrowed';
+}
+
+// ===== Decision Trace（A1: 裁决可解释性·批次 3 透明度层）=====
+//
+// 设计契约：
+//   - **全程无 LLM**：trace 由确定性镜像评估产出（F3 红线继承）。
+//   - **不进 proofHash**：decisionTrace 是透明度元数据（白名单不变·类似 evidenceQualityTier 先例）。
+//   - **不改裁决逻辑**：buildDecisionTrace 只读取 input + output，不调用 decideFiveValueVerdictInternal。
+//   - **零重复计算**：从 output 读取已计算的 scopeReport/statisticalReport/integrityFlags。
+//
+// 诚实边界（"cannot prove" 声明）：decisionTrace 是事后解释，不能证明裁决正确——
+// 裁决正确性由 R0-R9 确定性逻辑 + 测试套件守护。trace 只提供透明度（让评委看到为何 R7 触发/未触发）。
+
+/** R7 CONFIRMED 门的 7 个条件评估（最复杂规则·最需解释为何 CONFIRMED/未 CONFIRMED）。 */
+export interface R7GateEvaluation {
+  /** statisticalReport.supports（存在显著的 supports 方向统计）。 */
+  readonly supports: boolean;
+  /** primaryAdjustedPValue ≤ α（容差 1e-7·verdictLte）。 */
+  readonly primaryAdjustedPValueSignificant: boolean;
+  /** primaryEffectSize ≥ mde（mde undefined 时为 null·该 gate 被跳过·verdictGte）。 */
+  readonly effectSizeSufficient: boolean | null;
+  /** evidenceSufficiency.status === 'sufficient'。 */
+  readonly evidenceSufficient: boolean;
+  /** !scopeReport.hasSameScopeRefutation（无同 scope 显著反证）。 */
+  readonly noSameScopeRefutation: boolean;
+  /** integrityFlags.length === 0（无完整性 flag·合并后）。 */
+  readonly noIntegrityFlags: boolean;
+  /** !statisticalReport.hasWarnAssumption（无统计 warn + 无 anti-theater warn）。 */
+  readonly noWarnAssumption: boolean;
+  /** 所有 7 条件 PASS（与 decideFiveValueVerdictInternal L503-512 的 r7Pass 一致·测试守护）。 */
+  readonly overallPassed: boolean;
+}
+
+/** 裁决时刻的关键数值快照（供审计/可视化/竞赛 demo）。 */
+export interface DecisionTraceMetrics {
+  readonly alpha: number | null;
+  readonly mde: number | null;
+  readonly primaryAdjustedPValue: number | null;
+  readonly primaryEffectSize: number | null;
+  /** 95% CI [lower, upper]（primary test）。 */
+  readonly primaryConfidenceInterval: readonly [number, number] | null;
+  readonly powerStatus: string;
+  readonly evidenceStatus: string;
+  readonly effectiveDirection: string;
+  readonly antiTheaterFailCount: number;
+  readonly antiTheaterWarnCount: number;
+  /** 合并后的 integrity flags（input + compiledFec·与 output.integrityFlags 一致）。 */
+  readonly integrityFlags: readonly string[];
+  readonly totalStatistics: number;
+  readonly skippedStatistics: number;
+}
+
+/** 决策路径追踪（additive 透明度层·不进 proofHash）。 */
+export interface DecisionTrace {
+  /** 触发的规则 ID（与 VerdictKernelOutput.decisiveRuleId 一致·测试守护一致性）。 */
+  readonly firedRuleId: string;
+  /** R7 门评估（无论是否触发 R7，都记录 7 条件状态·最需解释的规则）。null = fec null/alpha 不可得（R0-R2 场景）。 */
+  readonly r7Gate: R7GateEvaluation | null;
+  /** 裁决时刻数值快照。 */
+  readonly metrics: DecisionTraceMetrics;
+  /** R0-R9 决策树的规则总数（文档化·当前 18 个触发点·见 L300-312 优先级表）。 */
+  readonly totalRulesInTree: number;
+  /** 诚实声明：decisionTrace 是事后解释，不能证明裁决正确。 */
+  readonly cannotProveStatement: string;
+}
+
+/** 镜像 decideFiveValueVerdictInternal L503-512 的 R7 条件评估（纯函数·不改裁决逻辑）。 */
+function evaluateR7Gate(
+  statisticalReport: StatisticalReport,
+  alpha: number,
+  mde: number | undefined,
+  evidenceSufficiency: EvidenceSufficiencyReport,
+  scopeReport: ScopeReport,
+  integrityFlags: readonly string[],
+): R7GateEvaluation {
+  const supports = statisticalReport.supports;
+  const primaryAdjustedPValueSignificant =
+    statisticalReport.primaryAdjustedPValue !== null &&
+    verdictLte(statisticalReport.primaryAdjustedPValue, alpha);
+  const effectSizeSufficient =
+    mde === undefined
+      ? null
+      : statisticalReport.primaryEffectSize !== null &&
+        verdictGte(statisticalReport.primaryEffectSize, mde);
+  const evidenceSufficient = evidenceSufficiency.status === 'sufficient';
+  const noSameScopeRefutation = !scopeReport.hasSameScopeRefutation;
+  const noIntegrityFlags = integrityFlags.length === 0;
+  const noWarnAssumption = !statisticalReport.hasWarnAssumption;
+  const overallPassed =
+    supports &&
+    primaryAdjustedPValueSignificant &&
+    (effectSizeSufficient ?? true) &&
+    evidenceSufficient &&
+    noSameScopeRefutation &&
+    noIntegrityFlags &&
+    noWarnAssumption;
+  return {
+    supports,
+    primaryAdjustedPValueSignificant,
+    effectSizeSufficient,
+    evidenceSufficient,
+    noSameScopeRefutation,
+    noIntegrityFlags,
+    noWarnAssumption,
+    overallPassed,
+  };
+}
+
+/**
+ * 构建决策路径追踪（A1·裁决可解释性）。
+ *
+ * 纯函数（无 IO·无 LLM·确定性）。从 output 读取已计算的 scopeReport/statisticalReport/
+ * integrityFlags（零重复计算），从 input.fec 读取 alpha/mde（仅读取·不编译）。
+ * firedRuleId 取自 output.decisiveRuleId（测试守护一致性）。
+ *
+ * @param input  裁决内核输入（用于读 FEC alpha/mde + statistics 计数）。
+ * @param output 裁决内核输出（用于读已计算的 scope/stat/integrityFlags·避免重复评估）。
+ * @returns DecisionTrace 透明度对象。
+ */
+export function buildDecisionTrace(
+  input: VerdictKernelInput,
+  output: VerdictKernelOutput,
+): DecisionTrace {
+  const { statisticalReport, scopeReport, integrityFlags, decisiveRuleId } = output;
+
+  // alpha/mde 从 input.fec 读取（仅读取字段·不重新编译 FEC）。
+  const alpha = input.fec?.statisticalPlan.alpha ?? null;
+  const mdeRaw = input.fec?.powerPlan?.minimumDetectableEffect;
+  const mde = mdeRaw === undefined ? null : mdeRaw;
+
+  // R7 门评估（alpha 不可得 = R0-R2 场景，R7 不适用 → null）。
+  const r7Gate = alpha !== null
+    ? evaluateR7Gate(
+        statisticalReport,
+        alpha,
+        mdeRaw,
+        input.evidenceSufficiency,
+        scopeReport,
+        integrityFlags,
+      )
+    : null;
+
+  const antiTheaterFailCount = input.antiTheaterFindings.filter((f) => f.severity === 'fail').length;
+  const antiTheaterWarnCount = input.antiTheaterFindings.filter((f) => f.severity === 'warn').length;
+  const totalStatistics = input.statistics.length;
+  const skippedStatistics = input.statistics.filter((s) => s.status === 'skipped').length;
+
+  const metrics: DecisionTraceMetrics = {
+    alpha,
+    mde,
+    primaryAdjustedPValue: statisticalReport.primaryAdjustedPValue,
+    primaryEffectSize: statisticalReport.primaryEffectSize,
+    primaryConfidenceInterval: statisticalReport.primaryConfidenceInterval,
+    powerStatus: input.evidenceSufficiency.powerStatus,
+    evidenceStatus: input.evidenceSufficiency.status,
+    effectiveDirection: statisticalReport.effectiveDirection,
+    antiTheaterFailCount,
+    antiTheaterWarnCount,
+    integrityFlags,
+    totalStatistics,
+    skippedStatistics,
+  };
+
+  return {
+    firedRuleId: decisiveRuleId,
+    r7Gate,
+    metrics,
+    totalRulesInTree: 18,
+    cannotProveStatement:
+      'decisionTrace is a post-hoc explanation for transparency; it cannot prove the verdict is correct. ' +
+      'Verdict correctness is guaranteed by the deterministic R0-R9 logic and the test suite, not by this trace.',
+  };
 }
