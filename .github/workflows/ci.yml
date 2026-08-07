@@ -39,8 +39,10 @@ env:
   NODE_VERSION: '24'   # CI runner 自身 Node（非项目 TS 编译目标）
   PYTHON_VERSION: '3.11'
   # Node ≥24 V8 compile cache 默认写 <cwd>/0/（若 NODE_COMPILE_CACHE 未设或为相对路径）→
-  # 指向 runner.temp 仓库外绝对路径，防止工作树生成 0/（卫生门禁 compile_cache_no_leak 检查）
-  NODE_COMPILE_CACHE: '${{ runner.temp }}/node-compile-cache'
+  # 指向仓库外绝对路径，防止工作树生成 0/（卫生门禁 compile_cache_no_leak 检查）
+  # 注意：顶层 env 仅支持 github/secrets/inputs/vars 上下文，不可用 runner.temp（会导致 workflow 解析失败）；
+  # CI 全 ubuntu runner，/tmp 即仓库外临时目录，语义等价。
+  NODE_COMPILE_CACHE: '/tmp/node-compile-cache'
 
 jobs:
   # ============================================================
