@@ -38,6 +38,9 @@ env:
   PNPM_VERSION: '10.29.3'
   NODE_VERSION: '24'   # CI runner 自身 Node（非项目 TS 编译目标）
   PYTHON_VERSION: '3.11'
+  # Node ≥24 V8 compile cache 默认写 <cwd>/0/（若 NODE_COMPILE_CACHE 未设或为相对路径）→
+  # 指向 runner.temp 仓库外绝对路径，防止工作树生成 0/（卫生门禁 compile_cache_no_leak 检查）
+  NODE_COMPILE_CACHE: '${{ runner.temp }}/node-compile-cache'
 
 jobs:
   # ============================================================
@@ -478,3 +481,5 @@ jobs:
         run: node scripts/coverage_gate.mjs
       - name: governance_gate（GATE_H 治理 SLI 机检·8+1 项·--skip-test 避免重复跑 test）
         run: node scripts/governance_gate.mjs --skip-test
+      - name: repo_hygiene_gate（根目录白名单 / 无垃圾落根 / 运行时产物未跟踪 / 0/ 无泄漏）
+        run: node scripts/repo_hygiene_gate.mjs
