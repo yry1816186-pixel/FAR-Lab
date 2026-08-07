@@ -39,7 +39,31 @@
 
 ## ✅ 全部完成（2026-08-07 终验）
 
-**第二轮"全部解决"完成**（用户授权后扩展后续 5 项）：
+### 第三轮：完美融合重构（用户反馈"生搬硬套"后）
+
+**触发**：用户指出第一轮"最大化覆盖"（26 文件复制）是生搬硬套，要求完美融合。
+**原则**：最小增量 + 最大复用 — `.claude/` 作为三引擎共享 SSOT，`.opencode/` 只放 opencode 独有概念。
+
+**去重执行**（22 文件删除）：
+- 删 `.opencode/AGENTS.md`（86 行）— 与根 AGENTS.md 三重加载
+- 删 `.opencode/README.md`（79 行）— 不再需要
+- 删 `.opencode/skills/` 5 个 — opencode 已自动识别 `.claude/skills/`（context7 官方文档确认 Claude-compatible 路径）
+- 删 `.opencode/rules/` 8 个 — 通过根 AGENTS.md `@.claude/rules/*.md` lazy-load 引用
+- 删 `.opencode/agents/` 6 个 — 用 opencode 全局 agents（architect/code-reviewer/...）+ 根 AGENTS.md FAR-Lab 上下文
+- 删 `.opencode/plugins/far-trust-kernel-guard.ts`（283 行）— 与全局 safety-guard.ts + .claude/hooks/policy_guard.py 互补而非重叠；trust-kernel 保护用 pre-commit hook + AGENTS.md 规则表达
+
+**保留增量**（`.opencode/commands/` 6 个，opencode 独有概念）：
+- far-baseline / far-demo / far-verify-proof / far-real-paper / far-bench / far-export
+
+**融合增强**：
+- 根 `AGENTS.md` 加 §11 "AI engine fusion"：lazy-load `@.claude/rules/*.md`（8 条路径触发）+ opencode 全局 agents 使用指引 + commands 清单 + pre-commit hook 说明
+- `scripts/PRECOMMIT_HOOKS.md` 修正对已删 plugin 的引用
+
+**最终形态**：`.opencode/` 从 26 文件 / 1418 行 → **6 文件 / ~280 行**（只有 commands/）。`.claude/` 作为 opencode+Claude+pi 三引擎共享 SSOT。
+
+---
+
+### 第二轮"全部解决"完成（用户授权后扩展后续 5 项）：
 
 | 项 | 状态 | 证据 |
 |----|------|------|
