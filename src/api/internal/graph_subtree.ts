@@ -34,6 +34,7 @@ interface VerdictNodeRow {
   readonly conflicting_evidence_count: number;
   readonly scope_slip_text: string | null;
   readonly untested_reason: string | null;
+  readonly verdict_trace_json: string;
   readonly created_at: string;
 }
 
@@ -134,7 +135,7 @@ function fetchNode(db: Database, nodeId: string): GraphNodeDto | null {
     .prepare(
       `SELECT verdict_id, evidence_id, parent_verdict_id, node_kind, verdict,
               metric_value, conflicting_evidence_count, scope_slip_text, untested_reason,
-              created_at
+              verdict_trace_json, created_at
        FROM verdict_nodes
        WHERE verdict_id = ?`,
     )
@@ -152,8 +153,37 @@ function fetchNode(db: Database, nodeId: string): GraphNodeDto | null {
     conflictingEvidenceCount: row.conflicting_evidence_count,
     scopeSlipText: row.scope_slip_text,
     untestedReason: row.untested_reason,
+    decisionTrace: parseDecisionTrace(row.verdict_trace_json),
     createdAt: row.created_at,
   };
+}
+
+/**
+ * 从 verdict_trace_json 宽容提取 decisionTrace（B3 透明度元数据·非 verdict-critical）。
+ *
+ * 与 repository.parseVerdictTrace（fail-closed·私有）不同：本函数为只读图查询层，
+ * 对形状不合法的 trace 返回 null 而非抛错——旧行（0012 前的 DEFAULT '{}'）与非法 JSON
+ * 均优雅降级，不阻断证据链图渲染。
+ */
+function parseDecisionTrace(traceJson: string): unknown {
+  if (traceJson === '{}' || traceJson === '') {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(traceJson) as unknown;
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== 'object') {
+    return null;
+  }
+  const obj = parsed as Record<string, unknown>;
+  const trace = obj.decisionTrace;
+  if (trace === undefined || trace === null) {
+    return null;
+  }
+  return trace;
 }
 
 function fetchOutEdges(db: Database, fromNode: string): readonly GraphEdgeDto[] {

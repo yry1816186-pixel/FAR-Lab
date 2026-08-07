@@ -23,6 +23,7 @@
  * 零容忍合规：无 any / ts-ignore / 双重断言 / 空 catch / 桩。db.close 在 finally。
  */
 
+import { performance } from 'node:perf_hooks';
 import type { Database } from 'better-sqlite3';
 
 import { computeChainMerkleRoot, computeMerkleRoot } from '../evidence_log/merkle_root.ts';
@@ -34,6 +35,7 @@ import { BENCHMARK_REPORT_SCHEMA_VERSION } from './report_schema.ts';
 import type { BenchmarkEntryV2, BenchmarkReportV2 } from './report_schema.ts';
 import type {
   DomainDistribution,
+  LatencyStats,
   VerdictDistribution,
 } from './types.ts';
 
@@ -114,6 +116,25 @@ function tallyDomains(entries: readonly BenchmarkEntryV2[]): DomainDistribution 
   return dist;
 }
 
+/**
+ * 统计 latency 分布（D2 性能基线·观测指标·不进任何 hash）。
+ * 取非 null 的 latencyMs 排序后算 p50/p95/max(nearest-rank)；全部 null 时返回 null(诚实标注未采集)。
+ */
+function tallyLatencyStats(entries: readonly BenchmarkEntryV2[]): LatencyStats | null {
+  const values = entries
+    .map((e) => e.latencyMs)
+    .filter((v): v is number => v !== null && v !== undefined && Number.isFinite(v))
+    .sort((a, b) => a - b);
+  if (values.length === 0) {
+    return null;
+  }
+  const percentile = (p: number): number => {
+    const idx = Math.min(values.length - 1, Math.max(0, Math.ceil(p * values.length) - 1));
+    return values[idx] ?? 0;
+  };
+  return { p50: percentile(0.5), p95: percentile(0.95), max: values[values.length - 1] ?? 0, unit: 'ms' };
+}
+
 /** 诚实声明（与 HonestyWall 同源精神·如实标注已知边界）。 */
 const HONESTY_NOTES: readonly string[] = [
   'verdict 由 offline fixture 产出（无真实 LLM 调用·非真实科学裁决）；本榜展示的是证据链的工程完整性广度，非科学结论排名。',
@@ -121,6 +142,8 @@ const HONESTY_NOTES: readonly string[] = [
   '各 problem 的 evidence/hypothesis fixture 是领域特定演示数据；真实科研需接通真实 provider（competition adapter 已就绪·core 模型中立）。',
   '本报告确定性可复现：fresh-clone 跑 generate 脚本得相同 suiteIntegrityRoot（CI golden 锚定）。',
   'reproHash（链头 currentHash）含 ulid verdictId，是 run 实例标识——每次重新生成报告会不同；CI golden 仅锚 suiteIntegrityRoot（由不含 ulid 的 call_records 折叠·确定可复现）。',
+  'D2 性能基线：latencyMs/latencyStats 是 wall-clock 观测指标（性能.now() 包裁决路径），仅记录展示——绝不参与任何 hash（integrityRoot/suiteIntegrityRoot 不受其影响·保持确定性可复现）。',
+  'D2 规模事实：30 problems / 28 domains 已固化（problemCount=30·domainCount=28），超越 V1 "≥20 problems 属 V2 roadmap" 的扩展目标；后续扩展仍须真实领域内容、禁止编造种子。',
 ];
 
 /**
@@ -142,7 +165,10 @@ export async function runBenchmark(
 
   for (const seed of seeds) {
     // seed 须串行（各自 :memory: db·避免并发干扰·确定性顺序）
+    const startedAt = performance.now();
     const result = await seed.run();
+    // D2 性能基线：wall-clock ms（观测指标·仅记录展示·绝不参与任何 hash）
+    const latencyMs = performance.now() - startedAt;
     try {
       const { root, leafCount } = computeChainMerkleRoot(result.db);
       const cost = summarizeTotalCost(result.db);
@@ -170,6 +196,7 @@ export async function runBenchmark(
         seed: 'deterministic-fixture',
         bestOfK: false,
         executedAt,
+        latencyMs,
       });
     } finally {
       result.db.close();
@@ -185,21 +212,22 @@ export async function runBenchmark(
   const totalLeaves = sorted.reduce((sum, e) => sum + e.leafCount, 0);
   const verdictDistribution = tallyVerdicts(sorted);
   const domainDistribution = tallyDomains(sorted);
+  const latencyStats = tallyLatencyStats(sorted);
 
   // T-009 · 维度覆盖论证（2026-07-24 评委逼问第 2 轮→第 3 轮·02 科学性评委 F-2）。
-  // Science-125 原始问题数覆盖率低（8/125），但维度覆盖完整——裁决值全 5 类 exercised +
-  // 科学领域 N 类。这是「维度覆盖 benchmark」的诚实定位，非「125 题穷尽」。
-  // ≥20 题扩展属 V2 roadmap（每题需真实领域内容·禁止编造种子）。
+  // Science-125 原始问题数覆盖率低（30/125），但维度覆盖完整——裁决值全 5 类 exercised +
+  // 科学领域 28 类。这是「维度覆盖 benchmark」的诚实定位，非「125 题穷尽」。
+  // D2(2026-08-07)：30 problems ≥20 已达成（V2 roadmap 扩展目标完成·后续仍须真实领域内容·禁止编造种子）。
   const SCIENCE_125_TOTAL = 125;
   const domainCount = Object.keys(domainDistribution).length;
   const exercisedVerdicts = Object.values(verdictDistribution).filter((c) => c > 0).length;
   const rawCoveragePct = ((sorted.length / SCIENCE_125_TOTAL) * 100).toFixed(1);
   const coverageNote =
-    `T-009 dimension-coverage rationale: raw problem count ${sorted.length}/${SCIENCE_125_TOTAL}=${rawCoveragePct}% (low); ` +
-    `but dimension coverage is complete — ${exercisedVerdicts}/5 verdict values exercised ` +
+    `T-009 dimension-coverage rationale: raw problem count ${sorted.length}/${SCIENCE_125_TOTAL}=${rawCoveragePct}% (30 problems·moderate); ` +
+    `dimension coverage is complete — ${exercisedVerdicts}/5 verdict values exercised ` +
     `(CONFIRMED/REFUTED/INCONCLUSIVE/DEGRADED_SCOPE/UNTESTED all present) across ${domainCount} scientific domains ` +
-    `(${Object.keys(domainDistribution).join(' / ')}). V1 positions this as a dimension-coverage benchmark, ` +
-    `not a 125-problem exhaustive benchmark; expanding to ≥20 problems is V2 roadmap (each needs real domain content, not fabricated seeds).`;
+    `(${Object.keys(domainDistribution).join(' / ')}). D2(2026-08-07) solidified scale fact: 30 problems / ${domainCount} domains ` +
+    `— V1 "≥20 problems is V2 roadmap" target achieved; further expansion still requires real domain content, not fabricated seeds.`;
 
   return {
     schemaVersion: BENCHMARK_REPORT_SCHEMA_VERSION,
@@ -210,6 +238,8 @@ export async function runBenchmark(
     totalLeaves,
     verdictDistribution,
     domainDistribution,
+    domainCount,
+    latencyStats,
     gitCommitSha: opts.gitCommitSha ?? null,
     honestyNotes: [coverageNote, ...HONESTY_NOTES],
     kernelRulesetUri: CURRENT_RULESET_URI,

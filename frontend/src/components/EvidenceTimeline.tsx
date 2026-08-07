@@ -71,7 +71,7 @@ function truncateHash(hash: string): string {
 // ---------- DecisionTrace（A1/B3 决策路径追踪）安全提取 ----------
 
 /** DecisionTrace 已知字段（从 HonestVerdictDto.decisionTrace: unknown 安全提取·镜像 src/falsifiability/verdict_kernel_v2.ts） */
-interface DecisionTraceSafe {
+export interface DecisionTraceSafe {
   firedRuleId?: string;
   r7Gate?: {
     supports?: boolean;
@@ -103,7 +103,7 @@ interface DecisionTraceSafe {
 }
 
 /** 运行时安全提取 decisionTrace 字段（布尔字段须显式 === true/false 判断·防缺失误判） */
-function extractDecisionTrace(value: unknown): DecisionTraceSafe | null {
+export function extractDecisionTrace(value: unknown): DecisionTraceSafe | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== 'object') return null;
   const obj = value as Record<string, unknown>;
@@ -303,7 +303,7 @@ const R7_GATE_CONDITIONS: readonly {
 ];
 
 /** 决策路径追踪面板 — 展示 firedRuleId + R7 门 7 条件 + 关键数值（A1/B3 透明度层） */
-function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
+export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
   const gate = trace.r7Gate;
   const metrics = trace.metrics;
   return (

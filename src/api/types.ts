@@ -33,6 +33,8 @@ export interface GraphNodeDto {
   readonly conflictingEvidenceCount: number;
   readonly scopeSlipText: string | null;
   readonly untestedReason: string | null;
+  /** B3 透明度层：decisionTrace 宽容透传（unknown 形态·与 HonestVerdictDto 一致），无则 null */
+  readonly decisionTrace: unknown | null;
   readonly createdAt: string;
 }
 

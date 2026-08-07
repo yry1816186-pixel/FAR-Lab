@@ -11,7 +11,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "bdf871defaa28346d8f75f3bdfe49c3d4bd560abc5b00e6989658dcb56a69f45",
       "leafCount": 7,
-      "reproHash": "4118af9c811e5ec4de6f3324346825bf24b293b3c690403989872f78e87d5bef",
+      "reproHash": "a1d42b4ebd9665a1a295e8de389eff2227d12ffd64c3dffb5fe9f19aa3da9fa0",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -25,7 +25,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 12.36929999999984
     },
     {
       "problemId": "A16",
@@ -35,7 +36,7 @@
       "verdict": "CONFIRMED",
       "integrityRoot": "ded47a41e041fad4aa665447d336632ee5d9df7f87d4a8bf91d5a1cae7fee606",
       "leafCount": 7,
-      "reproHash": "b5e7faf716ddb3c4897028066eaccb48489e67d81c76995ae4180c6819aad529",
+      "reproHash": "ba3e8193b8e1f42f08c3d125fa5d901f896689e080bf5a76f947a27b72c824ce",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -49,7 +50,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 14.337099999999964
     },
     {
       "problemId": "A2",
@@ -59,7 +61,7 @@
       "verdict": "INCONCLUSIVE",
       "integrityRoot": "c243248adb37904c0ed3b2660a6064499ec24c4bbfa8627e2bb6019baf4e755e",
       "leafCount": 7,
-      "reproHash": "aff8f5cabbc1f9ff74c08f21352f3db5dae67c757afa71d1df250a3dde39ce02",
+      "reproHash": "688501d654f6f37a4b5d0c6dc14483545d59523feea052c99597654ce94e7159",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -73,7 +75,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 26.745200000000068
     },
     {
       "problemId": "A4",
@@ -83,7 +86,7 @@
       "verdict": "INCONCLUSIVE",
       "integrityRoot": "79fd926d012359a6921013dbad290055db763e89f140168a331cc44c7330d45e",
       "leafCount": 7,
-      "reproHash": "798302070550ba5aa34c90ad1ba466674b4526a92436ddc2f53be56045df7491",
+      "reproHash": "aed41011895cfd14699cb0b3ba8c5e9758a7f257aef2692a481b2e23f9ab4054",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -97,7 +100,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 13.17599999999993
     },
     {
       "problemId": "A8",
@@ -107,7 +111,7 @@
       "verdict": "CONFIRMED",
       "integrityRoot": "97b6341fa840e63a2e3ce08d26f174ea405f539f0b45bae8267965de1e2d5c0d",
       "leafCount": 7,
-      "reproHash": "3d23c9551ce40993140e645909505fc1d3bc02062244590c26caca8a6563ca5e",
+      "reproHash": "2c328f904b605b7712ae3c4b342175a648cc31b13c044976e009e59c35087e34",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -121,7 +125,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 12.030199999999923
     },
     {
       "problemId": "B2",
@@ -131,7 +136,7 @@
       "verdict": "INCONCLUSIVE",
       "integrityRoot": "447adb0883f3f9ddecd2bdd0e3bf23a5d8212d55f256ace524be7b9920606cb0",
       "leafCount": 7,
-      "reproHash": "d89cff1adaf707b876a7f1cc4ffb53da9ba32e0be1f2e6e3f1a5981dd4d87892",
+      "reproHash": "2d337704e38911e49522bb01ca5d6bdcbe0ec1e63c7aabd439e1a62b59d3c50f",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -145,7 +150,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.396099999999933
     },
     {
       "problemId": "B3",
@@ -155,7 +161,7 @@
       "verdict": "INCONCLUSIVE",
       "integrityRoot": "c5250b753674f17befa004f9bd4318fcb2965b2277904725dadb0748a42f5152",
       "leafCount": 7,
-      "reproHash": "d98a5864065b5d3a4f48aceed50bd785437b43dff84dc7b000773a6e7747d3c1",
+      "reproHash": "e57037008f90afdb0e107c8400161e84274643ebb7dbd72205a8d8e072a2c7f6",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -169,7 +175,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.783299999999826
     },
     {
       "problemId": "B5",
@@ -179,7 +186,7 @@
       "verdict": "DEGRADED_SCOPE",
       "integrityRoot": "8fea03bf052ce653ac83b2a29397192d2cfdcdf25c61d0453d37ac95ddfb0fcc",
       "leafCount": 7,
-      "reproHash": "2734cdf2850eb5f254a432c4a958beddcb8cf88aa781bd9d84302ee682e819e1",
+      "reproHash": "0171f2b96b129bd95db5a83f2e25768ecddd9d1b9973a45e41ff81ca83fade3d",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -193,7 +200,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 12.333200000000033
     },
     {
       "problemId": "B7",
@@ -203,7 +211,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "b5d38b915c5dd167136b0b58d38c4c79adf4f4745757c1fbc325722597a57b3d",
       "leafCount": 7,
-      "reproHash": "3ff4e09d71c126b592c76f1807224b59ef1ad8464fdc083f5a372587690277c7",
+      "reproHash": "afb4c57f86cd08249693dc434e7f22cacafb6483fada0de4f9d2a8419f426c56",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -217,7 +225,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 12.970299999999952
     },
     {
       "problemId": "C10",
@@ -227,7 +236,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "4604d617ef1b60abe0165713607dcd4aabe91d6656380ee6551caf40722f682d",
       "leafCount": 7,
-      "reproHash": "32a89c2f921e7f38a91cb8faf04ac4e6908a5607ba84dc2cb4acbd75b401d542",
+      "reproHash": "a18e1e898887803474d699be21466678ca4b85d85e998390ac6e718885e53417",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -241,7 +250,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.252199999999903
     },
     {
       "problemId": "C2",
@@ -251,7 +261,7 @@
       "verdict": "DEGRADED_SCOPE",
       "integrityRoot": "61eff78c8d4f95e4af67397aff13c292d7d86318246e08cf973614d18ba8cc61",
       "leafCount": 7,
-      "reproHash": "a9380e062959b020689c8939c226068ae6703c5f1b0b0128df6c615be63a9dc3",
+      "reproHash": "d6a27e9c982608df6949ed76a59dba797f04a2998f360902dda7307a97fe28eb",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -265,7 +275,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 13.899900000000116
     },
     {
       "problemId": "C3",
@@ -275,7 +286,7 @@
       "verdict": "DEGRADED_SCOPE",
       "integrityRoot": "ff6ee0b6a5951780caa6429f6bc517df5f294194d7b3db85c5c8b65104449e67",
       "leafCount": 7,
-      "reproHash": "0156bb7a9524ed0741a7e68dbcf30fc52851267d87f5e61f19b2f38c56b8a85e",
+      "reproHash": "51ccda5cfdad41c0ad89580cac0f8e6608154da08e4631c0fb2558f2c9504433",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -289,7 +300,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 15.622899999999845
     },
     {
       "problemId": "C8",
@@ -299,7 +311,7 @@
       "verdict": "DEGRADED_SCOPE",
       "integrityRoot": "f00c55a4ba188a514064b5cd15226a97dca759488c0785f0be9634768a33e414",
       "leafCount": 7,
-      "reproHash": "b7b7d9c0adb94782a6f46e9babc136bb65e076666324b2433fc8231a399f4b29",
+      "reproHash": "00579c5e77a213d07345b00ffdef0764963ee890baa3856793193305d5e1e8fc",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -313,7 +325,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.631800000000112
     },
     {
       "problemId": "D9",
@@ -323,7 +336,7 @@
       "verdict": "INCONCLUSIVE",
       "integrityRoot": "f23ac512552327171d8b104ec5cf09b797bb77eae86726887df188daa226b51d",
       "leafCount": 7,
-      "reproHash": "f7b1e16ca8f513f65b9131dd98d04b981208823885a45d985cbd8bad67b4b5b4",
+      "reproHash": "be1ed0ea82efa653d0051078489c8a8aa620b132283dbbdffe9b395c042520f2",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -337,7 +350,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.232300000000123
     },
     {
       "problemId": "E2",
@@ -347,7 +361,7 @@
       "verdict": "CONFIRMED",
       "integrityRoot": "7a01b2389c394d943edabd9d0525ec895a93bacfad857e31a7a40d6b4782ce76",
       "leafCount": 7,
-      "reproHash": "bc58b56dc9ef4dd589cb37890417e8a5c0c636aec84495b5ff1cad13621516fd",
+      "reproHash": "8e8095f6a7a32b20c3f4c60a8fd1e86b70f2f8a492afb6a11630e275ba8bfa20",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -361,7 +375,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 10.943700000000035
     },
     {
       "problemId": "E3",
@@ -371,7 +386,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "e4a1df7460846f5a3263678023ad88461cc1fee371a60d9e6f5b88f8ad7a15c8",
       "leafCount": 7,
-      "reproHash": "77ec113980059616ab368a8264067f65e8b8eb5ad0d2714f091bc8845f6c0a2e",
+      "reproHash": "12aa06c15e510ffe9dd4ce7c969dba45627c5ac5c4e4489540824b5ab9e62de7",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -385,7 +400,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 19.150800000000118
     },
     {
       "problemId": "E5",
@@ -395,7 +411,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "983c5b0cc6396b325f96bce7f82cbda14f5d212924e9f35c9694683783ba92ea",
       "leafCount": 7,
-      "reproHash": "e9477f2281c080c0638a797c7ffd1e652224db857bbeb5e5e3f7681558dbb883",
+      "reproHash": "534a5136dc69b760a40541720e7206bdf00ef2a5878f687d0780d2dc7b828590",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -409,7 +425,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.579799999999977
     },
     {
       "problemId": "E8",
@@ -419,7 +436,7 @@
       "verdict": "CONFIRMED",
       "integrityRoot": "db82a60214a87ac0df06c4d1e401b833e3221d17ec610cd7b257e4c044e02bc0",
       "leafCount": 7,
-      "reproHash": "f365b2a99ec59c760abd0fd8b33a44c0164baead3122f7b6a3610ddc7ce29faf",
+      "reproHash": "3d5e8a0c0a0f5098e7bfc288f573620726ba2a809ed1c5de067479037f6d56e7",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -433,7 +450,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 10.827199999999948
     },
     {
       "problemId": "G2",
@@ -443,7 +461,7 @@
       "verdict": "INCONCLUSIVE",
       "integrityRoot": "0b836573ec46b1cf4f87c0435090a46544b88d665dee1753de710fb0447567f8",
       "leafCount": 7,
-      "reproHash": "beb0d19a2847cee06a47cf0b3f5dfa623998b0c445fa3d2dc51e3a40f7632bda",
+      "reproHash": "2fb48a2916adb845dcbd3588b4b404a1a7d865ec00eae1bbfb66859df1be37ef",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -457,7 +475,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.25669999999991
     },
     {
       "problemId": "G5",
@@ -467,7 +486,7 @@
       "verdict": "UNTESTED",
       "integrityRoot": "0bfffeb8ccb6904421be118e350a1f708e58a13877836e0b17cdd9d409970056",
       "leafCount": 7,
-      "reproHash": "9cc8bf07dbbeb5454bf016b1a810cf5707002d71b5275f1c16883a2328f09d49",
+      "reproHash": "f63b2f204a90591c0b847da3083810681f27f39c4dd4964c773e6b6507a39eb0",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -481,7 +500,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 10.394900000000007
     },
     {
       "problemId": "H1",
@@ -491,7 +511,7 @@
       "verdict": "INCONCLUSIVE",
       "integrityRoot": "7e62d277cfce269779ad873b5a24053b2380d9ca33437ec9df63d0cdeb6b469f",
       "leafCount": 7,
-      "reproHash": "cce8e22e9a3b1e47ff7fa578075d959bce335255e0deb5c14d67dffaf9243d06",
+      "reproHash": "7162085a2f9dbc65394aec45b719be53dd8cb24c33eab38d0a7e1a9b648f6832",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -505,7 +525,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 10.89930000000004
     },
     {
       "problemId": "H3",
@@ -515,7 +536,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "96038dbd1d45a3fc8a230f98f04442c3cee104959b1816a6496a068976a9eb7d",
       "leafCount": 7,
-      "reproHash": "5b909c5707cf24d77157576501d690445a586d16976f60928850462442727a27",
+      "reproHash": "62fb3284d5ad5704aafbd0bb2969c7e0b2a1871f52478e4c27c369837fe01978",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -529,7 +550,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 12.33660000000009
     },
     {
       "problemId": "M2",
@@ -539,7 +561,7 @@
       "verdict": "CONFIRMED",
       "integrityRoot": "7c8c6dad46a570d67079d8bbc42e0d1cd098cd2b44f0c8c49e622e6b592d8a6f",
       "leafCount": 7,
-      "reproHash": "8f2938486ad89656dffe437c40b9ab59d398ba8ac07160ef9062d2f5953ccf52",
+      "reproHash": "07c1218c0422459e0ee7c912b67a4c5b0aa09300741d42b6b57d3ff4b9341f0b",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -553,7 +575,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 10.525100000000066
     },
     {
       "problemId": "M3",
@@ -563,7 +586,7 @@
       "verdict": "DEGRADED_SCOPE",
       "integrityRoot": "91ff2dfecbd2b4e595efee91a589b34be5a1e01b09942bd515d24c3d89419c4b",
       "leafCount": 7,
-      "reproHash": "695965832f7cb8b2dcd863a4cb00557340959af96252800952bab5d90414c451",
+      "reproHash": "9e45ea610ccc2437cea4f89dd7a391826c2a6ce7882d37a6faaa84f52dc70f4d",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -577,7 +600,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.460700000000088
     },
     {
       "problemId": "M7",
@@ -587,7 +611,7 @@
       "verdict": "DEGRADED_SCOPE",
       "integrityRoot": "4ac29bee3fef3ada758bf6e8e36c3d57f8c80ab2ca844e890b8b39a088467305",
       "leafCount": 7,
-      "reproHash": "cec47ffb826459453ea9082448f189646d807285ebecc2b3777ca9caa9d66549",
+      "reproHash": "1de82def5a7fb56eaab5c1862aa313558b460ab9023303a719ceb8c1251fa11f",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -601,7 +625,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 12.354299999999967
     },
     {
       "problemId": "N3",
@@ -611,7 +636,7 @@
       "verdict": "DEGRADED_SCOPE",
       "integrityRoot": "d31e4553e0f3ceed9168f9a774979df8ace6701ba1d918866df169aed52165b0",
       "leafCount": 7,
-      "reproHash": "f799e7e6b6130553a366352e56c78bd25f00b6516b6c46c6347f6f1baff3ab6b",
+      "reproHash": "36a6b9ee362f820eece50084687b5b51d91573b78557ee32fe19dab61cbd8393",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -625,7 +650,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 10.275499999999965
     },
     {
       "problemId": "P1",
@@ -635,7 +661,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "859309a84d213853a5275428bc827cb689318260b1aac5029b95f7284c58e294",
       "leafCount": 7,
-      "reproHash": "c2095387e564387a9b2fb361e8f00fdef69c7c557cfb9c7f0d05599b10bd5f65",
+      "reproHash": "96ad00e7eac751f4dfcc3c4f743f837ab59376f45bd79d825b7cbd168e7c5736",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -649,7 +675,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.329099999999926
     },
     {
       "problemId": "P3",
@@ -659,7 +686,7 @@
       "verdict": "CONFIRMED",
       "integrityRoot": "517ec8bcd8178ff96a95464c8c405c4fe274d74a6b1ac157fccd430a1da7e6fa",
       "leafCount": 7,
-      "reproHash": "b358bdd7f9f2bca77d1fba8c7d41e5e3765ade7d8f3b9537362cab193b62c543",
+      "reproHash": "0fd5df2191a3337c2a4dd324f076d80f3c41577638483ae65ed220e424af087c",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -673,7 +700,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.410300000000007
     },
     {
       "problemId": "P6",
@@ -683,7 +711,7 @@
       "verdict": "UNTESTED",
       "integrityRoot": "89afb8dc3d6d9f9652d7829409a64ae1df5496b6a50769358d724fafd12f6afe",
       "leafCount": 7,
-      "reproHash": "502663cb4ba18f4a9f533c9c11cb24dbb4a43ab87809f8801e62a3aea9e8891b",
+      "reproHash": "9404d86d078e9f6526bf47c8b09ad97a7ce22ed83f9e06e3cd67eaccff195aa4",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -697,7 +725,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 10.240199999999959
     },
     {
       "problemId": "T1",
@@ -707,7 +736,7 @@
       "verdict": "REFUTED",
       "integrityRoot": "85312d69a8b179033305bb95c579e7b87796f7468b02f6f05a439c18ea7d591f",
       "leafCount": 7,
-      "reproHash": "aa9775054e3ef340de7ffec5638477958838c6ef8f7934bd414d215d3a3dc532",
+      "reproHash": "0a034989f9323adb4b08b2ee177a31debc7814601f0ef1528897f43effca3304",
       "stagesCompleted": 6,
       "converged": true,
       "chainVerified": true,
@@ -721,7 +750,8 @@
       "modelVersion": "offline_replay(fixture)",
       "seed": "deterministic-fixture",
       "bestOfK": false,
-      "executedAt": "2026-06-29T00:00:00.000Z"
+      "executedAt": "2026-06-29T00:00:00.000Z",
+      "latencyMs": 11.083200000000033
     }
   ],
   "suiteIntegrityRoot": "83265409e9395a4738658e069c7ec441a56673d018180a82168647bb1b17f296",
@@ -763,14 +793,23 @@
     "量子生物学": 1,
     "意识认知神经科学": 1
   },
+  "domainCount": 28,
+  "latencyStats": {
+    "p50": 11.460700000000088,
+    "p95": 19.150800000000118,
+    "max": 26.745200000000068,
+    "unit": "ms"
+  },
   "gitCommitSha": null,
   "honestyNotes": [
-    "T-009 dimension-coverage rationale: raw problem count 30/125=24.0% (low); but dimension coverage is complete — 5/5 verdict values exercised (CONFIRMED/REFUTED/INCONCLUSIVE/DEGRADED_SCOPE/UNTESTED all present) across 28 scientific domains (天体物理 / 天文学 / 宇宙学 / 理论物理 / 干细胞生物学 / 基因组学 / 微生物组学 / 生物 / 量子信息 / 电化学材料 / 化学 / 能源化学 / 生态气候 / 生物地球化学 / 气候科学 / 海洋化学 / 免疫学 / 地学 / 生命起源 / 生命起源化学 / 医学 / 老化医学 / 神经退行 / 神经科学 / 物理 / 热力学 / 量子生物学 / 意识认知神经科学). V1 positions this as a dimension-coverage benchmark, not a 125-problem exhaustive benchmark; expanding to ≥20 problems is V2 roadmap (each needs real domain content, not fabricated seeds).",
+    "T-009 dimension-coverage rationale: raw problem count 30/125=24.0% (30 problems·moderate); dimension coverage is complete — 5/5 verdict values exercised (CONFIRMED/REFUTED/INCONCLUSIVE/DEGRADED_SCOPE/UNTESTED all present) across 28 scientific domains (天体物理 / 天文学 / 宇宙学 / 理论物理 / 干细胞生物学 / 基因组学 / 微生物组学 / 生物 / 量子信息 / 电化学材料 / 化学 / 能源化学 / 生态气候 / 生物地球化学 / 气候科学 / 海洋化学 / 免疫学 / 地学 / 生命起源 / 生命起源化学 / 医学 / 老化医学 / 神经退行 / 神经科学 / 物理 / 热力学 / 量子生物学 / 意识认知神经科学). D2(2026-08-07) solidified scale fact: 30 problems / 28 domains — V1 \"≥20 problems is V2 roadmap\" target achieved; further expansion still requires real domain content, not fabricated seeds.",
     "verdict 由 offline fixture 产出（无真实 LLM 调用·非真实科学裁决）；本榜展示的是证据链的工程完整性广度，非科学结论排名。",
     "suiteIntegrityRoot 由各 problem 的 integrityRoot 再 Merkle 折叠而成，证明跨问题可聚合审计；它不证明科学正确性。",
     "各 problem 的 evidence/hypothesis fixture 是领域特定演示数据；真实科研需接通真实 provider（competition adapter 已就绪·core 模型中立）。",
     "本报告确定性可复现：fresh-clone 跑 generate 脚本得相同 suiteIntegrityRoot（CI golden 锚定）。",
-    "reproHash（链头 currentHash）含 ulid verdictId，是 run 实例标识——每次重新生成报告会不同；CI golden 仅锚 suiteIntegrityRoot（由不含 ulid 的 call_records 折叠·确定可复现）。"
+    "reproHash（链头 currentHash）含 ulid verdictId，是 run 实例标识——每次重新生成报告会不同；CI golden 仅锚 suiteIntegrityRoot（由不含 ulid 的 call_records 折叠·确定可复现）。",
+    "D2 性能基线：latencyMs/latencyStats 是 wall-clock 观测指标（性能.now() 包裁决路径），仅记录展示——绝不参与任何 hash（integrityRoot/suiteIntegrityRoot 不受其影响·保持确定性可复现）。",
+    "D2 规模事实：30 problems / 28 domains 已固化（problemCount=30·domainCount=28），超越 V1 \"≥20 problems 属 V2 roadmap\" 的扩展目标；后续扩展仍须真实领域内容、禁止编造种子。"
   ],
   "kernelRulesetUri": "farlab.dev/ruleset/v1",
   "bestOfK": false,

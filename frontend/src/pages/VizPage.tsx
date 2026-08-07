@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useEvidenceChain } from '@/lib/api_client';
 import type { GraphSubtree, GraphNodeDto } from '@/lib/types';
 import { VERDICT_CONFIG, FALLBACK_VERDICT_COLOR, VerdictBadge } from '@/components/VerdictBadge';
+import { DecisionTracePanel, extractDecisionTrace } from '@/components/EvidenceTimeline';
 import * as d3 from 'd3';
 import { Search, Loader2, AlertTriangle, Network, X } from 'lucide-react';
 
@@ -329,6 +330,8 @@ interface NodeDetailSidebarProps {
 }
 
 function NodeDetailSidebar({ node, onClose }: NodeDetailSidebarProps) {
+  // B3 透明度层：宽容提取 decisionTrace，无数据（null/undefined）则整个面板不渲染
+  const decisionTrace = extractDecisionTrace(node.decisionTrace);
   return (
     <Card className="w-80 shrink-0 self-start" data-testid="node-detail-sidebar">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -357,6 +360,7 @@ function NodeDetailSidebar({ node, onClose }: NodeDetailSidebarProps) {
             <Badge variant="outline">{node.decision}</Badge>
           )}
         </div>
+        {decisionTrace !== null && <DecisionTracePanel trace={decisionTrace} />}
         {node.metricValue !== null && (
           <DetailRow label="Metric" value={String(node.metricValue)} />
         )}

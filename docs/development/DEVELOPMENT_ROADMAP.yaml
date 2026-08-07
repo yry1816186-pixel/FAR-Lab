@@ -4,8 +4,8 @@
 
 project: FAR-Lab
 target_standard: "world-class AI4S research assurance system"
-last_updated: "2026-08-06T22:30:00+08:00"
-last_cycle_result: "phase1_verify: 6/6 criteria PASS — security_audit FIXED (5 CVEs via pnpm.overrides), ci_pipeline_green FIXED (Windows sh-path bug). Phase 1 EXIT GATE PASSED. Phase 2-4 已复核完成（2026-08-06 治理会话实测），Phase 5 大部分完成（DR runbook 待补）。Ready for Phase 5 收尾 + 发布。"
+last_updated: "2026-08-07T00:30:00+08:00"
+last_cycle_result: "D2 benchmark expansion (2026-08-07): latency 性能基线已建立 — benchmark_report.json 新增 latencyMs(每 entry) + latencyStats(p50/p95/max·ms·观测指标不进 hash)；规模事实固化 30 problems / 28 domains(problemCount=30/domainCount=28)；typecheck 0 / lint 0 / benchmark 相关测试全绿；suiteIntegrityRoot 锚定不变(83265409…)。phase1_verify: 6/6 criteria PASS（历史结论保持）。Phase 5 大部分完成（DR runbook 待补）。"
 
 phases:
 
