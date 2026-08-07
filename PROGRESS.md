@@ -39,6 +39,48 @@
 
 ## ✅ 全部完成（2026-08-07 终验）
 
+### 第四轮：FAR-Lab 改造工程启动（用户："现在开始改造 farlab" + "彻底升级优化"）
+
+**方向**：A+B+C+D 全选（核心能力 + 工程质量 + 架构债务 + 新增能力），4 担心全选（科学严谨性 / 可复现性 / 工程质量 / 创新性）。
+
+**A1 完成**（commit `861a85d`）— 裁决内核 R0-R9 可解释性：
+- 新增 `DecisionTrace` / `R7GateEvaluation` / `DecisionTraceMetrics` 类型
+- `buildDecisionTrace(input, output)` 纯函数（从 output 读取，零重复计算）
+- `evaluateR7Gate` 镜像 R7 的 7 条件（supports/pSignificant/effectSize/evidence/noRefutation/noFlags/noWarn）
+- `VerdictKernelOutput.decisionTrace?` additive 字段（不破坏消费者）
+- `decideFiveValueVerdict` 全路径附加 trace
+- **诚实边界**：不改 R0-R9 逻辑（decideFiveValueVerdictInternal 字节不变）+ 不进 proofHash + cannotProveStatement 声明
+- 8 新测试（GV-01/02/03/04 + metrics + invariants + consistency + R8）全绿
+- 验证：typecheck 0 / lint 0 / test 2032(2026p,0f,6s) / demo 14/14 GV / falsifiability 165/165
+
+**B1 审计完成**（无代码改动·结论：健康）— 测试反假绿扫描：
+- 153 测试文件标注 fixture/replay/cached（明确区分 fixture vs live·健康）
+- skip 集中在 science_harness（环境性·需 Python/真实后端·诚实 t.skip）
+- real_backends（sympy/lean/dafny）env-gated：python3/sympy/lean 不可用 → t.skip（非假绿）
+- 无空断言集中（toBeDefined/toBeTruthy/notNull 无 5+ 文件命中）
+- 无 TODO/FIXME/HACK 集中（匹配项全是注释中的英文单词）
+- **结论：测试质量健康，无假绿证据，无需改造**
+
+### 后续路线图（按优先级，供续跑）
+
+| 项 | 类型 | 价值 | 风险 | 工作量 | 状态 |
+|----|------|------|------|--------|------|
+| A2 | 审计+代码 | 极高 | 低 | 中 | 待办 — 22 anti-theater 检测器完备性审计（找遗漏欺诈模式：选择性脱落/图像操纵/数据伪造/Cohen's d 错误等） |
+| A3 | 代码 | 极高 | 中 | 大 | 待办 — .far-proof 跨语言独立可复算强化 |
+| B2 | 代码 | 中 | 低 | 中 | 待办 — branch coverage 83.75% → 90%+ |
+| B3 | 代码 | 高 | 低 | 中 | 待办 — 前端 UX 视觉冲击力（竞赛 demo）+ API 暴露 decisionTrace |
+| C1 | 代码 | 中 | 中 | 小 | 待办 — DEBT-06 V1/V2 proof_envelope 裁决（drop V2 dead schema） |
+| C2 | 审计 | 中 | 中 | 中 | 待办 — 23 模块边界审计 |
+| D1-D3 | 代码 | 中 | 中 | 大 | 待办 — 更多论文/性能基准/LLM 接入 |
+
+**改造工程原则**（从本轮提炼）：
+- trust kernel 改动必须 additive only（A1 先例：decideFiveValueVerdictInternal 字节不变）
+- 每个改造独立 commit + 全量验证（typecheck/lint/test/demo 全绿）
+- 诚实边界声明（cannotProveStatement / "what this cannot prove"）
+- 测试守护（firedRuleId === decisiveRuleId 一致性等）
+
+---
+
 ### 第三轮：完美融合重构（用户反馈"生搬硬套"后）
 
 **触发**：用户指出第一轮"最大化覆盖"（26 文件复制）是生搬硬套，要求完美融合。
