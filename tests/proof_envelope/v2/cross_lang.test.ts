@@ -143,3 +143,59 @@ test('cross-lang byte-equal: antiTheaterReport 含 optional 字段（D9/R1·_fil
   const baseHash = computeProofHashV2(makeValidEnvelopeV2Core());
   assert.notEqual(tsHash, baseHash, 'populated antiTheaterReport 必须改变 proofHash');
 });
+
+// ===== A3 次要增强：V2 proofHash Unicode/NFC edge case（评委08 F-4-007 的 V2 层防线）=====
+
+/** override claim.naturalLanguage（保留其余 claim 字段）。 */
+function withNaturalLanguage(text: string): ReturnType<typeof makeValidEnvelopeV2Core> {
+  const base = makeValidEnvelopeV2Core();
+  return makeValidEnvelopeV2Core({
+    claim: { ...base.claim, naturalLanguage: text },
+  });
+}
+
+test('cross-lang byte-equal: NFC/NFD 等价形式归一化后同 hash（é = e + U+0301）', () => {
+  // NFD（e + combining acute U+0301）与 NFC（é 单字符）是 Unicode 等价表示——normalizeClaim
+  // 的 NFC 归一化必须使两者 hash 相同（否则跨语言/跨平台 hash 分裂·评委08 F-4-007）。
+  const nfd = withNaturalLanguage('cafe\u0301: model achieves RMSE \u2264 0.5');
+  const nfc = withNaturalLanguage('café: model achieves RMSE ≤ 0.5');
+  const tsNfd = computeProofHashV2(nfd);
+  const tsNfc = computeProofHashV2(nfc);
+  assert.equal(tsNfd, tsNfc, 'NFC 归一化后 NFD/NFC 等价形式必须同 hash');
+  const pyNfd = pythonComputeProofHash(nfd);
+  assert.equal(pyNfd, tsNfd, 'Python 端必须与 TS 端 byte-equal（NFD claim）');
+});
+
+test('cross-lang byte-equal: 中文 + 组合字符 claim 双端一致', () => {
+  // 中文 + CJK 兼容字符 + 组合变音符号：两端 canonical_json 必须 byte-equal。
+  const cn = withNaturalLanguage('模型 M 在数据集 D 上达到 RMSE ≤ 0.5（\u4e2d\u6587测试）');
+  const tsHash = computeProofHashV2(cn);
+  const pyHash = pythonComputeProofHash(cn);
+  assert.equal(pyHash, tsHash, '中文 claim 两端必须 byte-equal');
+  assert.match(tsHash, /^[0-9a-f]{64}$/);
+});
+
+test('cross-lang byte-equal: normalizeWhitespace 折叠多空格/tab + CRLF 双端一致', () => {
+  // normalizeWhitespace 语义：\r\n→\n、\r→\n、[ \t]+→单空格、trim（\n 保留·不折叠成空格）。
+  // 场景 A：纯空格/tab 折叠（不含换行）→ 与 clean 文本同 hash。
+  const messySpaces = withNaturalLanguage('  model\tM  achieves  RMSE  ≤ 0.5  ');
+  const clean = withNaturalLanguage('model M achieves RMSE ≤ 0.5');
+  assert.equal(
+    computeProofHashV2(messySpaces),
+    computeProofHashV2(clean),
+    '空格/tab 折叠后须与 clean 文本同 hash（normalizeClaim 生效）',
+  );
+  // 场景 B：CRLF/CR 归一化为 \n——两端 byte-equal（不断言与 clean 相等·\n 保留是设计语义）。
+  const messyCrlf = withNaturalLanguage('model M achieves RMSE\r\n≤ 0.5\r');
+  const tsHash = computeProofHashV2(messyCrlf);
+  const pyHash = pythonComputeProofHash(messyCrlf);
+  assert.equal(pyHash, tsHash, 'CRLF/CR 归一化后两端必须 byte-equal');
+});
+
+test('cross-lang byte-equal: 转义字符（引号/反斜杠/控制符）双端一致', () => {
+  // JSON 转义敏感字符：canonical_json 的转义规则两端必须一致。
+  const escaped = withNaturalLanguage('claim "quoted" with \\ backslash and \u0007 bell');
+  const tsHash = computeProofHashV2(escaped);
+  const pyHash = pythonComputeProofHash(escaped);
+  assert.equal(pyHash, tsHash, '转义字符两端必须 byte-equal');
+});
