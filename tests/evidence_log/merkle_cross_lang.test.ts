@@ -20,6 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GOLDEN_VECTORS } from '../../src/evidence_log/golden_vectors.ts';
+import { PYTHON_SPAWN_TIMEOUT_MS, pythonSpawnFailureMessage } from '../_helpers/python.ts';
 import {
   ZERO_MERKLE_ROOT,
   buildMerkleTree,
@@ -47,9 +48,10 @@ function spawnPython(script: string, stdin: string, args: readonly string[] = []
     cwd: REPRO_ROOT,
     encoding: 'utf8',
     input: stdin,
+    timeout: PYTHON_SPAWN_TIMEOUT_MS,
     env: { ...process.env, PYTHONPATH: 'repro' },
   });
-  assert.equal(result.status, 0, result.stderr || result.stdout || 'python exited non-zero');
+  assert.equal(result.status, 0, pythonSpawnFailureMessage(result));
   return result.stdout.trim();
 }
 

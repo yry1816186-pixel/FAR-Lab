@@ -19,6 +19,7 @@ import {
   NUMERIC_GREEN_VECTORS,
   NUMERIC_KNOWN_DIVERGENCE,
 } from '../../src/evidence_log/golden_vectors.ts';
+import { PYTHON_SPAWN_TIMEOUT_MS, pythonSpawnFailureMessage } from '../_helpers/python.ts';
 
 // Windows: 'python' (真实安装); Unix: 'python3'。WindowsApps python3 是 Store stub,
 // 在 coverage 并发下 spawnSync 偶发 status=null。对齐 ensure_py_deps.mjs / smt_backend.ts 约定。
@@ -38,6 +39,7 @@ function pythonCanonicalHash(): string {
     {
       cwd: new URL('../../', import.meta.url),
       encoding: 'utf8',
+      timeout: PYTHON_SPAWN_TIMEOUT_MS,
       env: {
         ...process.env,
         PYTHONPATH: 'repro',
@@ -45,7 +47,7 @@ function pythonCanonicalHash(): string {
     },
   );
 
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 0, pythonSpawnFailureMessage(result));
   return result.stdout.trim();
 }
 
@@ -60,12 +62,13 @@ function runPythonCanonical(obj: Record<string, unknown>, mode: 'hash' | 'str'):
     cwd: new URL('../../', import.meta.url),
     encoding: 'utf8',
     input: JSON.stringify(obj),
+    timeout: PYTHON_SPAWN_TIMEOUT_MS,
     env: {
       ...process.env,
       PYTHONPATH: 'repro',
     },
   });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.status, 0, pythonSpawnFailureMessage(result));
   return result.stdout.trim();
 }
 

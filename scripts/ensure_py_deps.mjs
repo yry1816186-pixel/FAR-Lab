@@ -84,6 +84,7 @@ function reportOptionalModules(env) {
     cwd: repoRoot,
     env,
     encoding: 'utf8',
+    timeout: 30_000,
   });
   if (result.error !== undefined || result.status !== 0) {
     process.stdout.write(`optional science modules: unavailable (probe failed)\n`);
@@ -128,8 +129,14 @@ function missingModules(env) {
     cwd: repoRoot,
     env,
     encoding: 'utf8',
+    timeout: 30_000,
   });
   if (result.error !== undefined) {
+    if (result.error.code === 'ETIMEDOUT') {
+      // 探测超时 → 按"全部缺失"继续走 install 路径；install 自带 300s 上限，失败仍 graceful skip。
+      process.stderr.write(`ensure_py_deps: import probe timed out after 30s — treating all as missing\n`);
+      return [...requiredModules];
+    }
     process.stderr.write(`ensure_py_deps: failed to spawn ${pythonCmd}: ${result.error.message}\n`);
     process.exit(1);
   }
@@ -140,7 +147,13 @@ function missingModules(env) {
 }
 
 function installDependencies(extraPipArgs) {
-  return spawnSync(
+  // CI 韧性（2026-08-07，run 31186354000）：无 timeout 的 pip spawn 在 CI 上可能整块阻塞。
+  // 300s 上限 + 前后进度行（可观测），超时后返回 status=null → 外层 graceful skip（F-4-102）。
+  const startedAt = Date.now();
+  process.stderr.write(
+    `ensure_py_deps: pip install into .python-deps/ (timeout 300s; index=${extraPipArgs.length > 0 ? extraPipArgs.join(' ') : 'default'})\n`,
+  );
+  const result = spawnSync(
     pythonCmd,
     [
       '-m',
@@ -159,8 +172,15 @@ function installDependencies(extraPipArgs) {
       cwd: repoRoot,
       env: process.env,
       stdio: 'inherit',
+      timeout: 300_000,
     },
   );
+  const elapsedMs = Date.now() - startedAt;
+  const outcome = result.error !== undefined || result.status !== 0 ? 'FAILED' : 'OK';
+  process.stderr.write(
+    `ensure_py_deps: pip install ${outcome} after ${elapsedMs}ms (status=${String(result.status)}; error=${result.error?.message ?? 'none'})\n`,
+  );
+  return result;
 }
 
 function readProjectDependencies() {
@@ -173,6 +193,7 @@ function readProjectDependencies() {
   const result = spawnSync(pythonCmd, ['-c', readCode], {
     cwd: repoRoot,
     encoding: 'utf8',
+    timeout: 30_000,
   });
   if (result.error !== undefined || result.status !== 0) {
     const detail = result.error?.message ?? result.stderr ?? `exit ${result.status ?? '?'}`;

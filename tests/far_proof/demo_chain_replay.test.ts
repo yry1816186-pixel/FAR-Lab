@@ -411,6 +411,8 @@ test('packaged verify.sh runs after .tar.zst extraction (offline verifier path)'
       cwd: process.cwd(),
       env: { ...process.env, FAR_REPO_ROOT: process.cwd() },
       encoding: 'utf8',
+      // CI 韧性（同 cross_lang_consistency 原则）：离线 verify 路径 <10s，60s 上限防 CI 偶发阻塞。
+      timeout: 60_000,
     });
 
     assert.equal(result.status, 0, `verify.sh stderr:\n${result.stderr}\nstdout:\n${result.stdout}`);
