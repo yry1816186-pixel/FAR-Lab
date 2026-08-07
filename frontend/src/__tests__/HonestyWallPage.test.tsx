@@ -53,6 +53,7 @@ function makeVerdict(overrides: Partial<HonestVerdictDto> & { decision: VerdictV
     currentHash: overrides.currentHash ?? 'b'.repeat(64),
     createdAt: overrides.createdAt ?? `2026-01-${String(10 + index).padStart(2, '0')}T00:00:00Z`,
     updatedAt: overrides.updatedAt ?? `2026-01-${String(10 + index).padStart(2, '0')}T00:00:00Z`,
+    decisionTrace: overrides.decisionTrace ?? null,
   } as HonestVerdictDto;
 }
 
@@ -431,6 +432,83 @@ describe('HonestyWallPage', () => {
         expect(hashChain).toHaveTextContent('Genesis hash');
         expect(hashChain).toHaveTextContent('GENESIS');
       });
+    });
+
+    it('B3: decisionTrace panel renders firedRuleId + 7 R7 conditions + metrics + cannotProve', async () => {
+      const user = userEvent.setup();
+      const decisionTrace = {
+        firedRuleId: 'R7_ALL_CHECKS_PASS',
+        r7Gate: {
+          supports: true,
+          primaryAdjustedPValueSignificant: true,
+          effectSizeSufficient: true,
+          evidenceSufficient: true,
+          noSameScopeRefutation: true,
+          noIntegrityFlags: true,
+          noWarnAssumption: false,
+          overallPassed: false,
+        },
+        metrics: {
+          alpha: 0.0125,
+          mde: 0.2,
+          primaryAdjustedPValue: 0.008,
+          primaryEffectSize: 0.35,
+          primaryConfidenceInterval: [0.12, 0.58],
+          powerStatus: 'adequate',
+          evidenceStatus: 'sufficient',
+          effectiveDirection: 'supports',
+          antiTheaterFailCount: 1,
+          antiTheaterWarnCount: 2,
+          integrityFlags: [],
+          totalStatistics: 5,
+          skippedStatistics: 0,
+        },
+        totalRulesInTree: 18,
+        cannotProveStatement: 'decisionTrace is a post-hoc explanation; it cannot prove the verdict is correct.',
+      };
+      const items = [makeVerdict({ decision: 'CONFIRMED', decisionTrace }, 1)];
+      mockVerdictList(items);
+      renderWithQueryClient(<HonestyWallPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('timeline-card-v-001')).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId('timeline-card-v-001'));
+
+      await waitFor(() => {
+        const panel = screen.getByTestId('decision-trace-panel');
+        expect(panel).toBeInTheDocument();
+      });
+      // firedRuleId 徽章
+      expect(screen.getByTestId('dt-fired-rule')).toHaveTextContent('R7_ALL_CHECKS_PASS');
+      // 7 个 R7 条件（6 PASS + 1 FAIL）
+      expect(screen.getByTestId('dt-r7-supports')).toHaveTextContent('PASS');
+      expect(screen.getByTestId('dt-r7-noWarnAssumption')).toHaveTextContent('FAIL');
+      expect(screen.getByTestId('dt-r7-gate')).toHaveTextContent('BLOCKED');
+      // metrics 数值
+      expect(screen.getByTestId('dt-metrics')).toHaveTextContent('0.0125');
+      expect(screen.getByTestId('dt-metrics')).toHaveTextContent('0.008');
+      expect(screen.getByTestId('dt-metrics')).toHaveTextContent('0.35');
+      expect(screen.getByTestId('dt-metrics')).toHaveTextContent('supports');
+      // 诚实声明
+      expect(screen.getByTestId('dt-cannot-prove')).toHaveTextContent('cannot prove');
+    });
+
+    it('B3: decisionTrace null (old rows) → panel not rendered (zero regression)', async () => {
+      const user = userEvent.setup();
+      const items = [makeVerdict({ decision: 'CONFIRMED' }, 1)]; // decisionTrace 默认 null
+      mockVerdictList(items);
+      renderWithQueryClient(<HonestyWallPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('timeline-card-v-001')).toBeInTheDocument();
+      });
+      await user.click(screen.getByTestId('timeline-card-v-001'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('expanded-detail-v-001')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('decision-trace-panel')).toBeNull();
     });
   });
 
