@@ -11,7 +11,7 @@ edited after seeing the result, a scope quietly narrowed to the easy cases. Each
 verdict look `CONFIRMED` while proving nothing. The anti-theater layer inspects the *provenance and
 shape* of the evidence, not just the numbers, and refuses to seal a result built on theater.
 
-## The 22 detectors
+## The 23 detectors
 
 Each detector emits a finding (`PASS` / `WARN` / `FAIL`) over an `AntiTheaterLintInput`. A `FAIL`
 finding with an otherwise-`CONFIRMED` verdict blocks the seal. The detectors (verified in
@@ -44,7 +44,7 @@ finding with an otherwise-`CONFIRMED` verdict blocks the seal. The detectors (ve
 
 ## How a finding affects the verdict
 
-The 22 detectors are run by `runAntiTheaterLint` (`src/anti_theater/lint.ts`). Findings are projected
+The 23 detectors are run by `runAntiTheaterLint` (`src/anti_theater/lint.ts`). Findings are projected
 into the kernel via `toKernelFindings(...)` at `src/fec/orchestrator.ts`. A `FAIL` finding present
 while the verdict would otherwise be `CONFIRMED` triggers `ANTI_THEATER_FAIL` → the verdict is forced
 to `UNTESTED` and the seal is blocked. This is the executable red line "the LLM is not the arbiter"
@@ -60,12 +60,12 @@ be pure local code.
 ## Related commands
 
 ```bash
-far verify --lint-input <path> --envelope <p>   # independently recompute the 22 detectors and
+far verify --lint-input <path> --envelope <p>   # independently recompute the 23 detectors and
                                                  # compare them in depth with the embedded report;
                                                  # any divergence => FAIL, exit 7
 ```
 
-The `--lint-input` path is the strongest independent check: it recomputes all 22 detectors from the
+The `--lint-input` path is the strongest independent check: it recomputes all 23 detectors from the
 raw lint input and asserts they match the report sealed inside the proof envelope — divergence means
 the sealed report was tampered with.
 

@@ -1,7 +1,7 @@
 # FAR-Lab Documentation Index
 
 > **New here? Start here.** This is the single index for FAR-Lab's docs and governance.
-> （本文件是文档与治理的唯一导航源；根目录 `DOCS_INDEX.md` 为薄转发页。）
+> （本文件是文档与治理的唯一导航源；根目录不再保留转发页。）
 
 ## Quick start (for judges / new visitors)
 
@@ -24,7 +24,7 @@
 | [02 系统走查](learning/02_SYSTEM_TOUR.md) | 数据流、25 命令全景、`far demo` 解读 |
 | [03 信任内核](learning/03_TRUST_KERNEL.md) | R0-R9 规则树逐条拆解、golden vectors |
 | [04 统计引擎](learning/04_STATISTICS.md) | z/t 检验、效应量、多重比较校正、功效 |
-| [05 反剧场检测](learning/05_ANTI_THEATER.md) | 22 个检测器逐个拆解、freeze→recompute→compare |
+| [05 反剧场检测](learning/05_ANTI_THEATER.md) | 23 个检测器逐个拆解（以实测为准）、freeze→recompute→compare |
 | [06 证据链](learning/06_EVIDENCE_CHAIN.md) | SHA-256 哈希链、Merkle 根、跨语言一致 |
 | [07 证明包](learning/07_PROOF_BUNDLE.md) | `.far-proof` 导出→验证→篡改检测 |
 | [08 CLI 与 API](learning/08_CLI_AND_API.md) | 25 命令分组、退出码契约、16 REST 端点 |
@@ -49,7 +49,7 @@
 | [concepts/evidence.md](concepts/evidence.md) | What counts as evidence + provenance red lines |
 | [concepts/verdict.md](concepts/verdict.md) | The five-value verdict + the deterministic R0–R9 kernel |
 | [concepts/fec.md](concepts/fec.md) | Falsifiability Evidence Contract (frozen measurement plan) |
-| [concepts/anti-theater.md](concepts/anti-theater.md) | 22 fake-green detectors that block a seal |
+| [concepts/anti-theater.md](concepts/anti-theater.md) | 23 fake-green detectors that block a seal |
 | [concepts/determinism.md](concepts/determinism.md) | Why the LLM is never the verdict arbiter |
 | [concepts/evidence-ledger.md](concepts/evidence-ledger.md) | Append-only content-addressed hash chain (mechanics) |
 | [concepts/far-proof.md](concepts/far-proof.md) | Self-verifiable `.far-proof` proof bundles |
@@ -65,8 +65,8 @@
 
 | Document | Description |
 |----------|-------------|
-| [cli-reference.md](cli-reference.md) | All `far` commands, flags, and exit codes |
-| [api-reference.md](api-reference.md) | REST API endpoints (`far api`) |
+| [reference/cli-reference.md](reference/cli-reference.md) | All `far` commands, flags, and exit codes |
+| [reference/api-reference.md](reference/api-reference.md) | REST API endpoints (`far api`) |
 
 ## Core project documents (root)
 
@@ -74,7 +74,6 @@
 |---|---|---|
 | [../README.md](../README.md) | Project overview + install + quickstart | Everyone |
 | [../README.zh-CN.md](../README.zh-CN.md) | Chinese README | Chinese-speaking visitors |
-| [../GOAL.md](../GOAL.md) | Project priorities ("watermelon vs sesame") | Contributors |
 | [../AGENTS.md](../AGENTS.md) | Agent operating contract (auto-loaded) | AI agents |
 | [../CLAUDE.md](../CLAUDE.md) | Claude Code integration config | AI agents |
 
@@ -86,7 +85,6 @@
 | [../CHANGELOG.md](../CHANGELOG.md) | Version history |
 | [../CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) | Community standards |
 | [../GOVERNANCE.md](../GOVERNANCE.md) | Project governance |
-| [../MAINTAINERS.md](../MAINTAINERS.md) | Maintainer list |
 | [../SECURITY.md](../SECURITY.md) | Security policy + reporting |
 | [../SUPPORT.md](../SUPPORT.md) | Getting help |
 
@@ -94,10 +92,10 @@
 
 | Document | Purpose |
 |---|---|
-| [../COMPETITION_STRATEGY.md](../COMPETITION_STRATEGY.md) | Competition positioning + gap analysis |
-| [../DEVELOPMENT_ROADMAP.yaml](../DEVELOPMENT_ROADMAP.yaml) | Phased development roadmap |
-| [../PROGRESS.md](../PROGRESS.md) | Latest progress checkpoint |
-| [../DEEP_AUDIT.md](../DEEP_AUDIT.md) | Deep audit findings |
+| [charter/COMPETITION_STRATEGY.md](charter/COMPETITION_STRATEGY.md) | Competition positioning + gap analysis |
+| [charter/GOAL.md](charter/GOAL.md) | Project priorities ("watermelon vs sesame") |
+| [development/DEVELOPMENT_ROADMAP.yaml](development/DEVELOPMENT_ROADMAP.yaml) | Phased development roadmap |
+| [development/PROGRESS.md](development/PROGRESS.md) | Latest progress checkpoint |
 
 ## Audit reports (historical, dated snapshots)
 
@@ -133,11 +131,11 @@ See [design/00_INDEX_AND_READING_ORDER.md](design/00_INDEX_AND_READING_ORDER.md)
 | Document | Purpose |
 |---|---|
 | [archive/agent-materials/PI_RUNBOOK.md](archive/agent-materials/PI_RUNBOOK.md) | Pi agent execution runbook (archived) |
-| [../NEW_SESSION_PROMPT.md](../NEW_SESSION_PROMPT.md) | Prompt template for new agent sessions |
 | [archive/agent-materials/plan.md](archive/agent-materials/plan.md) | Pi execution plan (v2, includes v1→v2 adaptation) (archived) |
 | [archive/agent-materials/3.md](archive/agent-materials/3.md) | Historical boot sequence (Step 1-15) (archived) |
 
 > 历史性 agent 运行材料已归档至 `docs/archive/agent-materials/`（保留 git 历史与原始内容）。
+> `docs/archive/` 整体为只读归档：不维护、不更新，导航入口仅本 INDEX。
 
 ## Root-Level Governance Files
 
@@ -149,8 +147,8 @@ See [design/00_INDEX_AND_READING_ORDER.md](design/00_INDEX_AND_READING_ORDER.md)
 | [../CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) | Contributor Covenant |
 | [../CHANGELOG.md](../CHANGELOG.md) | Release changelog |
 | [../SUPPORT.md](../SUPPORT.md) | Support channels |
-| [../MAINTAINERS.md](../MAINTAINERS.md) | Maintainer list |
-| [governance/](governance/) | Release operations + open-source plan |
+| [governance/MAINTAINERS.md](governance/MAINTAINERS.md) | Maintainer list |
+| [governance/](governance/) | Release operations + open-source plan + agent lifecycle (AGENT-LIFECYCLE / AGENT-ORCHESTRATION / AGENT-MEMORY / ROOT-HYGIENE-POLICY) |
 | [charter/ULTIMATE_EXECUTION_PRIME.md](charter/ULTIMATE_EXECUTION_PRIME.md) | Full lifecycle execution charter (Phase A–H) |
 
 ## Live quality gates
@@ -160,6 +158,7 @@ Verify current state at any time:
 ```bash
 pnpm run typecheck   # TypeScript strict mode (0 errors expected)
 pnpm run lint        # ESLint --max-warnings 0 (0 errors expected)
-pnpm test            # 2023 tests (2017 pass / 0 fail / 6 skip)
+pnpm test            # 2278 tests (2272 pass / 0 fail / 6 skip — 以实测为准)
 pnpm audit           # 0 known vulnerabilities
+node scripts/repo_hygiene_gate.mjs   # 仓库卫生门禁（根目录白名单 / 无垃圾落根 / .far-proof 产物未跟踪）
 ```

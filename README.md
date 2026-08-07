@@ -133,7 +133,7 @@ outputs as evidence and *export* to provenance standards.
 |---|:---:|:---:|:---:|:---:|
 | Claim-level **falsifiability** gate (reject unfalsifiable claims) | ✗ | ✗ | partial (LLM-judged) | ✅ **deterministic FEC** |
 | **Deterministic** verdict, no LLM in the decider | ✗ | ✗ | ✗ | ✅ **R0–R9 kernel** |
-| **Anti-theater** detector suite (catch p-hacking / cherry-pick / fixture-as-result) | ✗ | ✗ | ✗ | ✅ **22 detectors** |
+| **Anti-theater** detector suite (catch p-hacking / cherry-pick / fixture-as-result) | ✗ | ✗ | ✗ | ✅ **23 detectors** |
 | **Tamper-evident** evidence chain (SHA-256 append-only) | partial (logging) | ✗ (models lineage, no chain) | ✗ | ✅ **+ cross-language byte-identical** |
 | **Independent third-party recompute** of a sealed verdict | ✗ | partial (lineage only) | ✗ | ✅ **ProofEnvelope re-verify** |
 | Role of the LLM | optional logging helper | none | **generator** (writes hypotheses/papers) | **generator only** — never the decider |
@@ -259,7 +259,7 @@ toolchain is absent.
 - **No LLM as final arbiter** — the five-value verdict is decided by a deterministic R0-R9 kernel; LLMs never cast the final verdict.
 - **No hardcoded raw statistics** — p-values / effect sizes are computed by `src/statistics/`, never
   literals.
-- **Anti-theater** — 22 detectors catch fake-green tests (tests that pass without exercising real logic).
+- **Anti-theater** — 23 detectors catch fake-green tests (tests that pass without exercising real logic).
 - **Secrets never committed** — `.env` is gitignored; see [SECURITY.md](SECURITY.md).
 - **Tamper-evidence scope (2026-07-20 adversarial review)** — naive tampering (content edited without
   recomputing hashes) and corruption are detected and located; consistent forgery by an attacker who
@@ -314,8 +314,8 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
 7. **"CONFIRMED" semantics** — FAR-Lab's `CONFIRMED` verdict means "contract-consistent bounded
    support", **not** the astronomical term "confirmed exoplanet" (which requires RV mass / TTV).
    Astronomical candidates produced by the demo should be read as VALIDATED / CANDIDATE.
-8. **Anti-theater runtime wiring** — the 22 anti-theater detectors are fully wired in offline
-   `verify` (bundle re-computation, 22 detectors re-run and compared). Production-path runtime
+8. **Anti-theater runtime wiring** — the 23 anti-theater detectors are fully wired in offline
+   `verify` (bundle re-computation, 23 detectors re-run and compared). Production-path runtime
    wiring (FUSION-OS-1) is V2, pending real multi-seed data (P1-6).
 9. **Tamper detection scope** — keyless SHA-256 chains detect **naive** tampering (an attacker who
    does not recompute hashes). Consistent forgery by an attacker who recomputes all public hashes
