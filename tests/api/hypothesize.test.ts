@@ -221,3 +221,37 @@ test('POST /api/v1/hypothesize quick mode loopState.terminated === true', async 
     assert.equal(body.loopState.terminated, true);
   });
 });
+
+// ===== B2 收尾：claimIdempotency pending / 409 分支 =====
+
+test('POST /api/v1/hypothesize 幂等：pending 状态 → 409 IDEMPOTENCY_PENDING（并发占位）', async () => {
+  const db = openDb();
+  // 预写 pending 占位记录（模拟并发请求已占位·尚未完成）。
+  db.prepare(
+    `INSERT INTO hypothesize_idempotency (idempotency_key, research_input, mode, dialogue_mode, status)
+     VALUES ('key-pending-001', 'input', 'quick', NULL, 'pending')`,
+  ).run();
+  const app = await buildServer({
+    db,
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    logger: false,
+  });
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/hypothesize',
+      payload: { researchInput: 'input', mode: 'quick', idempotencyKey: 'key-pending-001' },
+    });
+    assert.equal(response.statusCode, 409, 'pending 占位必须 409（防并发同 key 双跑）');
+    const body = response.json() as { error_code: string };
+    assert.equal(body.error_code, 'IDEMPOTENCY_PENDING');
+  } finally {
+    await app.close();
+    db.close();
+  }
+});
+
+// 注：executeLoop 失败清理分支（hypothesize.ts line 141-148）正常路径不可达——
+// runAgentLoop（fsm_runner.ts:501-558）catch 全部错误并转 LoopState.error（不 throw）→
+// executeLoop 恒不 throw → hypothesize catch 分支是防御性代码（runAgentLoop 错误处理已覆盖）。
