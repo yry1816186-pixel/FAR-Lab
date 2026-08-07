@@ -1,5 +1,5 @@
 /**
- * anti_theater detectors barrel + DETECTORS 聚合（APPENDIX_E §3 顺序·22 项）。
+ * anti_theater detectors barrel + DETECTORS 聚合（APPENDIX_E §3 顺序·23 项）。
  *
  * 顺序纪律（§3）：DETECTORS 数组顺序与 APPENDIX_E §3 伪代码逐字对齐——golden vector 对拍与
  * CI corpus test 依赖此顺序产稳定 findings 列表（确定性·F2）。
@@ -8,6 +8,8 @@
  * 追加在数组末尾（不破坏前 20 项 golden vector 顺序对拍）。仅在 `fec.requireExecutionProvenance=true`
  * 时触发，向后兼容 V1 demo seed（不 opt-in → 恒空 finding·零回归）。
  * 后补：第 22 项 `detect_phack_pcurve`（AT-PHACK-PCURVE）同法追加（2026-08 文档对齐）。
+ * A2 新增：第 23 项 `detect_effect_p_consistency`（AT-EFFECT-P-MISMATCH）追加（2026-08-07·填补
+ * 统计报告内部逻辑一致性检测空白·三层纯逻辑检测·零误报）。
  *
  * 模型中立。零容忍合规。
  */
@@ -16,6 +18,7 @@ import type { AntiTheaterLintInput, DetectorFinding } from '../types.ts';
 import { detect_data_hash_fake } from './data_hash_fake.ts';
 import { detect_dataset_drift } from './dataset_drift.ts';
 import { detect_dep_float_drift } from './dep_float_drift.ts';
+import { detect_effect_p_consistency } from './effect_p_consistency.ts';
 import { detect_fake_degraded } from './fake_degraded.ts';
 import { detect_fake_pass } from './fake_pass.ts';
 import { detect_hark } from './hark.ts';
@@ -40,12 +43,14 @@ import { detect_workflow_digest } from './workflow_digest.ts';
 export type AntiTheaterDetector = (input: AntiTheaterLintInput) => readonly DetectorFinding[];
 
 /**
- * DETECTORS 聚合（APPENDIX_E §3 顺序·22 项）。
+ * DETECTORS 聚合（APPENDIX_E §3 顺序·23 项）。
  * 顺序冻结：lint 编排器按此顺序遍历，findings 列表顺序稳定（确定性·golden vector 对拍）。
  *
  * T-003 修复：第 21 项 `detect_provenance_unbound` 追加在末尾——仅在
  * `fec.requireExecutionProvenance=true` 时触发，V1 向后兼容（不 opt-in → 恒空 finding）。
  * 第 22 项 `detect_phack_pcurve`（AT-PHACK-PCURVE）同法追加在末尾。
+ * 第 23 项 `detect_effect_p_consistency`（AT-EFFECT-P-MISMATCH）追加在末尾（2026-08-07·
+ * 统计报告内部一致性·三层纯逻辑检测·零误报）。
  */
 export const DETECTORS: readonly AntiTheaterDetector[] = [
   detect_fake_pass, // AT-FAKE-PASS
@@ -70,6 +75,7 @@ export const DETECTORS: readonly AntiTheaterDetector[] = [
   detect_fake_degraded, // AT-FAKE-DEGRADED
   detect_provenance_unbound, // AT-PROVENANCE-UNBOUND（T-003 修复·2026-07-24）
   detect_phack_pcurve, // AT-PHACK-PCURVE（p-curve skewness·2026-08-06·填补 p-hacking 分布检测空白）
+  detect_effect_p_consistency, // AT-EFFECT-P-MISMATCH（统计报告内部一致性·2026-08-07·A2·填补 effectSize/p/CI/direction 逻辑矛盾检测空白）
 ];
 
 // re-export 单个 detector（测试/调试用）
@@ -77,6 +83,7 @@ export {
   detect_data_hash_fake,
   detect_dataset_drift,
   detect_dep_float_drift,
+  detect_effect_p_consistency,
   detect_fake_degraded,
   detect_fake_pass,
   detect_hark,
@@ -88,6 +95,7 @@ export {
   detect_overfit,
   detect_phack_alpha,
   detect_phack_correction,
+  detect_phack_pcurve,
   detect_posthoc_threshold,
   detect_provenance_unbound,
   detect_report_mismatch,

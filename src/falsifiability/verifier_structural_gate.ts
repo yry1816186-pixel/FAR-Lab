@@ -238,7 +238,7 @@ export function assertVerifierModulesClean(): void {
   // Bundle mode: the gate AST-scans .ts source, which the published bundle doesn't ship
   // (src/ is dev-only; G1). Source purity was verified before bundling by CI depth_gate;
   // the bundle is the pre-verified artifact. Skip without throwing — the deterministic
-  // kernel (R0-R9) and the 22 detectors still run at verdict time; only this load-time
+  // kernel (R0-R9) and the 23 detectors still run at verdict time; only this load-time
   // source-scan is N/A when there is no source to scan.
   if (!existsSync(join(GATE_DIR, 'verdict_kernel_v2.ts'))) {
     checkCompleted = true;

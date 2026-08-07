@@ -8,12 +8,12 @@
 // 设计裁决（GV-D1·夹具形态选择 TS 向量夹具而非 JSON+deep-set）：
 //   - 多数 mutation 需「删除字段」（gv-label-only / gv-missing-raw / gv-fake-pass / gv-seed-cherry
 //     清空数组、gv-data-hash-fake 添加 chunkHashes），JSON+deep-set 无法表达删除语义且类型不安全。
-//   - 故采用类型安全 TS 向量夹具：makeCleanBaseInput() 产通过全部 21 detector 的干净 base，
+//   - 故采用类型安全 TS 向量夹具：makeCleanBaseInput() 产通过全部 23 detector 的干净 base，
 //     每个向量经 cloneMutable 深拷贝后做最小字段 mutation。frozen hash（thresholdHash /
 //     primaryMetricHash / seedPolicyHash）由 base 从 BASE_FEC 精确计算，保证 base 误报率=0；
 //     向量只改 FEC 执行端字段（frozen 端不动）→ hash 自然失配 → detector 命中。
 //
-// 设计裁决（GV-D2·base 通过条件 = 过全部 21 detector）：
+// 设计裁决（GV-D2·base 通过条件 = 过全部 23 detector）：
 //   base 须同时满足每个 detector 的「无发现」条件（误报率=0 基准，见 false_green_rate.test.ts
 //   的 base liveness 断言）。逐条约束记录于 makeCleanBaseInput 注释，便于审计。
 //
@@ -178,7 +178,7 @@ const HASH_WF = 'd4'.repeat(32); // workflow workflowHash
 const HASH_CONTAINER = 'e5'.repeat(32); // workflow containerDigest
 const HASH_ENV = 'f6'.repeat(32); // workflow environmentHash
 
-// ===== BASE_INPUT（干净 AntiTheaterLintInput·过全部 21 detector·GV-D2）=====
+// ===== BASE_INPUT（干净 AntiTheaterLintInput·过全部 23 detector·GV-D2）=====
 
 const BASE_BINDINGS: readonly EvidenceBinding[] = [
   // AT-DATA-DRIFT/AT-DATA-HASH-FAKE 通过条件：contentHash/schemaHash/statsFingerprint === freeze 记录；
@@ -318,7 +318,7 @@ const BASE_INPUT: AntiTheaterLintInput = {
   },
 };
 
-/** 干净 base envelope（过全部 21 detector·误报率=0 基准·每次返回同一只读 const，向量须 cloneMutable 后再 mutate）。 */
+/** 干净 base envelope（过全部 23 detector·误报率=0 基准·每次返回同一只读 const，向量须 cloneMutable 后再 mutate）。 */
 export function makeCleanBaseInput(): AntiTheaterLintInput {
   return BASE_INPUT;
 }
@@ -482,6 +482,37 @@ function gvPhackPcurve01(): AntiTheaterLintInput {
   return input;
 }
 
+/**
+ * gv-effect-p-mismatch-01（A2·2026-08-07·统计报告内部一致性检测）。
+ *
+ * 攻击语义：研究者提交的统计报告中，置信区间与 p 值违反 frequentist 数学恒等关系——
+ * CI=[0.06, 0.24] 排除 null（显著），但报告的 p=0.08 ≥ alpha=0.0125（不显著）。在双侧
+ * Wald 推断下，(1-alpha) CI 排除 null 当且仅当 p < alpha，这是数学恒等关系。违反即表明
+ * CI 或 p 至少有一个是事后拼凑或选择性伪造（如从显著结果中复制 CI，但 p 从不显著子分析中选取）。
+ *
+ * 最小单点 mutation：改 effectDirection='two_sided'（激活 layer 1 CI-p 检测）+ p=0.08（≥ alpha）。
+ * 保持 base CI=[0.06, 0.24]（排除 0）。两层方向检测（L2/L3）因 two-sided 自动 skip，确保
+ * 只触发 layer 1 的 CI_P_INCONSISTENT，命中最严格的数学恒等关系违规。
+ */
+function gvEffectPMismatch01(): AntiTheaterLintInput {
+  const input = cloneMutable(makeCleanBaseInput());
+  // 改 effectDirection 为 two_sided（layer 1 CI-p 恒等关系只在双侧严格成立·单侧由 L3 覆盖）。
+  input.fec.statisticalPlan = {
+    ...input.fec.statisticalPlan,
+    effectDirection: 'two_sided',
+  };
+  // CI 保持 base [0.06, 0.24]（排除 0·显著），但 p 改为 0.08（≥ alpha 0.0125·不显著）。
+  // → CI-p 数学恒等关系违反：CI 显著但 p 不显著 = 数学不可能的统计组合。
+  input.verdict = {
+    ...input.verdict,
+    statisticalReport: {
+      ...input.verdict.statisticalReport,
+      primaryAdjustedPValue: 0.08,
+    },
+  };
+  return input;
+}
+
 /** gv-hark-01：hypothesisSealedAt 改晚于 max(runs.endedAt) → HARKING_REVISION_AFTER_RESULT。 */
 function gvHark01(): AntiTheaterLintInput {
   const input = cloneMutable(makeCleanBaseInput());
@@ -592,13 +623,16 @@ export interface GoldenVectorSpec {
 }
 
 /**
- * GOLDEN_VECTORS：22 向量 = 17 P0（APPENDIX_E §5.2）+ 3 补充（gv-data-hash-fake-01 /
- * gv-optional-stopping-01 / gv-dep-drift-01）+ 1 T-003 修复（gv-provenance-unbound-01）。
+ * GOLDEN_VECTORS：23 向量 = 17 P0（APPENDIX_E §5.2）+ 3 补充（gv-data-hash-fake-01 /
+ * gv-optional-stopping-01 / gv-dep-drift-01）+ 1 T-003 修复（gv-provenance-unbound-01）+
+ * 1 p-curve（gv-phack-pcurve-01）+ 1 A2 一致性（gv-effect-p-mismatch-01）。
  *
  * §5.2 的 17 P0 向量覆盖 16 个 attackId（AT-DATA-DRIFT 由 gv-data-drift-01/02 双向量覆盖），
  * 缺 AT-DATA-HASH-FAKE / AT-OPTIONAL-STOPPING / AT-DEP-FLOAT-DRIFT 3 个 attackId → 补 3 向量。
  * T-003 修复（2026-07-24）新增第 21 个 attackId AT-PROVENANCE-UNBOUND → 补 gv-provenance-unbound-01。
- * 连同 GV_OVERFIT_01（AT-OVERFIT·ROADMAP 受限）共 ALL_GOLDEN_VECTORS 22 向量，覆盖全部 22 attackId。
+ * 第 22 个 attackId AT-PHACK-PCURVE → 补 gv-phack-pcurve-01（2026-08-06）。
+ * 第 23 个 attackId AT-EFFECT-P-MISMATCH → 补 gv-effect-p-mismatch-01（2026-08-07·A2）。
+ * 连同 GV_OVERFIT_01（AT-OVERFIT·ROADMAP 受限）共 ALL_GOLDEN_VECTORS 24 向量，覆盖全部 23 attackId。
  */
 export const GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [
   // —— §5.2 17 P0 golden vectors ——
@@ -627,6 +661,8 @@ export const GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [
   { id: 'gv-provenance-unbound-01', attackId: 'AT-PROVENANCE-UNBOUND', reasonCode: 'EVIDENCE_PROVENANCE_UNBOUND', build: gvProvenanceUnbound01, expectedForcedVerdict: 'UNTESTED', expectedBlockSeal: false },
   // —— gv-phack-pcurve-01（2026-08-06·补齐第 22 个 attackId·p-curve distributional detection）——
   { id: 'gv-phack-pcurve-01', attackId: 'AT-PHACK-PCURVE', reasonCode: 'P_CURVE_CALIPER_SUSPICIOUS', build: gvPhackPcurve01, expectedForcedVerdict: 'INCONCLUSIVE', expectedBlockSeal: false },
+  // —— gv-effect-p-mismatch-01（2026-08-07·A2·补齐第 23 个 attackId·统计报告内部一致性）——
+  { id: 'gv-effect-p-mismatch-01', attackId: 'AT-EFFECT-P-MISMATCH', reasonCode: 'CI_P_INCONSISTENT', build: gvEffectPMismatch01, expectedForcedVerdict: 'UNTESTED', expectedBlockSeal: false },
   // —— gv-overfit-01：AT-OVERFIT（ROADMAP·D8 受限实现：public-only WARN → DEGRADED_SCOPE）——
   // 注：build 内联（需改 measurement splitName 集合），见下方 GV_OVERFIT_01_BUILD。
 ];
@@ -650,7 +686,7 @@ export const GV_OVERFIT_01: GoldenVectorSpec = {
   expectedBlockSeal: false,
 };
 
-/** 全量 golden vectors（GOLDEN_VECTORS 22 + GV_OVERFIT_01 = 23 向量·覆盖全部 22 attackId）。 */
+/** 全量 golden vectors（GOLDEN_VECTORS 23 + GV_OVERFIT_01 = 24 向量·覆盖全部 23 attackId）。 */
 export const ALL_GOLDEN_VECTORS: readonly GoldenVectorSpec[] = [...GOLDEN_VECTORS, GV_OVERFIT_01];
 
 /**

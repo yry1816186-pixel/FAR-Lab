@@ -29,12 +29,14 @@ export type AntiTheaterSeverity = 'INFO' | 'WARN' | 'FAIL' | 'BLOCK';
 // ===== 权威存储类型（APPENDIX_A §7 落地·本文件为唯一运行时定义点）=====
 
 /**
- * 反剧场攻击类别（APPENDIX_A §7 attackKind enum · 21 值）。
+ * 反剧场攻击类别（APPENDIX_A §7 attackKind enum · 22 值）。
  * kebab-case 字面量与 APPENDIX_E §2 attackId（AT-* 前缀）一一对应（见 ATTACK_ID_TO_KIND）。
  * 消费方（verdict kernel / proofHash）一律存本 enum 字面量，不得存 attackId 字符串。
  *
  * 注：原 20 值（03 §8 + APPENDIX_E §2 扩展），2026-07-24 T-003 修复新增
  * `execution-provenance-unbound`（第 21 项）——填补「fixture 冒充真实计算结果」检测空白。
+ * 2026-08-07 A2 新增 `effect-p-consistency-mismatch`（第 23 项）——填补「统计报告内部
+ * effectSize / p / CI / direction 四者逻辑不一致」检测空白（数学不可能的统计组合）。
  */
 export type AntiTheaterAttackKind =
   // —— 03 §8 最低强制子集（10 项核心攻击）——
@@ -61,7 +63,9 @@ export type AntiTheaterAttackKind =
   | 'benchmark-overfit'
   | 'fake-degraded-scope'
   // —— T-003 修复新增（2026-07-24·第 21 项）——
-  | 'execution-provenance-unbound';
+  | 'execution-provenance-unbound'
+  // —— A2 新增（2026-08-07·第 22 项·统计报告内部逻辑一致性）——
+  | 'effect-p-consistency-mismatch';
 
 /** APPENDIX_E §2 attackId（人类可读 AT-* 前缀）→ APPENDIX_A §7 attackKind（kebab-case 存储字段）映射。 */
 export const ATTACK_ID_TO_KIND: Readonly<Record<string, AntiTheaterAttackKind>> = {
@@ -88,11 +92,13 @@ export const ATTACK_ID_TO_KIND: Readonly<Record<string, AntiTheaterAttackKind>> 
   'AT-FAKE-DEGRADED': 'fake-degraded-scope',
   // T-003 修复新增（2026-07-24·填补 fixture 冒充检测空白）
   'AT-PROVENANCE-UNBOUND': 'execution-provenance-unbound',
+  // A2 新增（2026-08-07·填补统计报告内部逻辑一致性检测空白）
+  'AT-EFFECT-P-MISMATCH': 'effect-p-consistency-mismatch',
 };
 
 /**
  * attackKind → attackId 反向查找（Honesty Wall 展示用）。
- * 遍历 ATTACK_ID_TO_KIND（覆盖 21 值全集），未命中即不可达——kind 是闭合 enum。
+ * 遍历 ATTACK_ID_TO_KIND（覆盖 22 值全集），未命中即不可达——kind 是闭合 enum。
  */
 export function attackKindToId(kind: AntiTheaterAttackKind): string {
   for (const [id, k] of Object.entries(ATTACK_ID_TO_KIND)) {
@@ -100,7 +106,7 @@ export function attackKindToId(kind: AntiTheaterAttackKind): string {
       return id;
     }
   }
-  // unreachable：kind 是 20 值闭合 enum，ATTACK_ID_TO_KIND 覆盖全集
+  // unreachable：kind 是 22 值闭合 enum，ATTACK_ID_TO_KIND 覆盖全集
   throw new Error(`attackKindToId: unmapped attackKind '${kind}' (invariant violated)`);
 }
 

@@ -849,7 +849,7 @@ USAGE:
     --json              machine-readable 10-field schema output
     --explain           human-readable mode: expand the 10-rule check table
     --lint-input <path> AntiTheaterLintInput JSON (requires --envelope; independently recomputes the
-                        22 detectors and compares them in depth with the embedded report;
+                        23 detectors and compares them in depth with the embedded report;
                         any divergence => status FAIL, exit 7)
     exit codes: 0 PASS / 7 FAIL / 2 bad args / 1 runtime error
 
@@ -946,7 +946,7 @@ USAGE:
 
   far real-paper [--paper bem] [--mode as-published|corrected]
     Run a real published paper through the FAR-Lab pipeline (statistics recompute
-    + deterministic verdict kernel + 22 anti-theater fraud detectors + tamper-evident
+    + deterministic verdict kernel + 23 anti-theater fraud detectors + tamper-evident
     proof seal). Currently supports:
       bem  — Bem (2011) "Feeling the Future" (replication crisis landmark)
     Modes:

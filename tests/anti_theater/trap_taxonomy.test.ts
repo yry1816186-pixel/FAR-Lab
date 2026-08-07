@@ -3,7 +3,7 @@
  *
  * 覆盖：
  *   1. TRAP_TAXONOMY 键集合与 AntiTheaterAttackKind 闭合联合（经 ATTACK_ID_TO_KIND 值）
- *      全量对拍——21 项无一遗漏、无多余。
+ *      全量对拍——23 项无一遗漏、无多余。
  *   2. 每项 taxonomy 的 attackId 与 ATTACK_ID_TO_KIND 反向映射一致（id ↔ kind 自洽）。
  *   3. trapTaxonomyFor 对已知 kind 返回；未知 kind 抛错（不变量风格与 attackKindToId 一致）。
  *   4. summarizeTraps 聚合正确性：去重/计数/hasFail/空输入。

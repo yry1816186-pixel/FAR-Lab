@@ -12,7 +12,7 @@
 //
 // 本测试补强轴 1（注册完整性），轴 2 已由现有 corpus 测试覆盖（不需重复）。
 //
-// Authority: 评委13 F-4-005 R4 + APPENDIX_E §3（DETECTORS 顺序冻结·22 项）。
+// Authority: 评委13 F-4-005 R4 + APPENDIX_E §3（DETECTORS 顺序冻结·23 项）。
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
@@ -20,11 +20,11 @@ import { DETECTORS } from '../../src/anti_theater/detectors/index.ts';
 import * as detectorModules from '../../src/anti_theater/detectors/index.ts';
 import { ATTACK_ID_TO_KIND } from '../../src/anti_theater/types.ts';
 
-test('F-4-005 轴1: DETECTORS 数组长度 = 22（APPENDIX_E §3 冻结）', () => {
+test('F-4-005 轴1: DETECTORS 数组长度 = 23（APPENDIX_E §3 冻结）', () => {
   assert.equal(
     DETECTORS.length,
-    22,
-    `DETECTORS 数组必须 22 项（APPENDIX_E §3 冻结），实际 ${DETECTORS.length}——有人删了 detector 注册？`,
+    23,
+    `DETECTORS 数组必须 23 项（APPENDIX_E §3 冻结），实际 ${DETECTORS.length}——有人删了 detector 注册？`,
   );
 });
 
@@ -79,5 +79,5 @@ test('F-4-005 轴1: DETECTORS 顺序与 APPENDIX_E §3 注释对齐（顺序冻�
   // 注释里的 attackId 标签（如 AT-FAKE-PASS）是 detector 身份的 second factor。
   // 本测试验证 DETECTORS 数组的注释标签与 ATTACK_ID_TO_KIND 的 attackId 一致。
   // （注释无法在运行时读取，但 DETECTORS.length + distinct 检查 + corpus 全覆盖已足够防篡改。）
-  assert.ok(DETECTORS.length === 22, '顺序冻结基线：22 项');
+  assert.ok(DETECTORS.length === 23, '顺序冻结基线：23 项');
 });

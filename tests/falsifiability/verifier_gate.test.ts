@@ -4,7 +4,7 @@
 // 用 TS Compiler API 扫描确定性内核 + detector 源码，禁 forbidden network/IO/LLM call·fail-closed。
 //
 // 真实依赖：scanSourceForForbiddenCalls 调 ts.createSourceFile 真实解析 TS AST（非正则/非桩）；
-// scanDeterministicModules 读真实 verdict_kernel_v2.ts + anti_theater/{lint,constraint,score} + 21 detector 源。
+// scanDeterministicModules 读真实 verdict_kernel_v2.ts + anti_theater/{lint,constraint,score} + 23 detector 源。
 // proof_caller = src/anti_theater/lint.ts runAntiTheaterLint 入口（assertVerifierModulesClean 接线·每次 verdict 路径）。
 // 反假绿：dirty fixture 必抛 + 真实 kernel/detector 模块基线必空（GREEN）。
 //
@@ -73,7 +73,7 @@ test('scanSourceForForbiddenCalls distinguishes import / require / dynamic-impor
 });
 
 test('production_deterministic_modules_pass_gate', () => {
-  // 真实确定性内核模块（verdict_kernel_v2 + anti_theater/{lint,constraint,score} + 21 detector）
+  // 真实确定性内核模块（verdict_kernel_v2 + anti_theater/{lint,constraint,score} + 23 detector）
   // 全部无 forbidden call——证明生产路径加载期门通过（GREEN 基线）。
   const hits = scanDeterministicModules();
   assert.equal(
