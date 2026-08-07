@@ -63,8 +63,16 @@ _audit_*
 .far-implementation/**/*.rundb
 .far-implementation/**/*.rundb-wal
 .far-implementation/**/*.rundb-shm
+# .far-proof 包与信任收据是可复现运行时产物（far demo/ask/export 每次重写）→ 不跟踪
+.far-implementation/**/*.far-proof/
+.far-implementation/**/*.receipts.json
+# walking-skeleton 运行日志与证据（far demo 重写）
+.far-implementation/walking-skeleton/run_log.txt
+.far-implementation/walking-skeleton/skeleton_evidence.yaml
 .far-design/**/*.log
 .far-design/evidence/**/*.jsonl
+# tess_online 在线采集运行日志（far ask --online 每次运行重写）
+.far-design/evidence/external/tess_online/run_log.txt
 .far-master/*.jsonl
 
 # --- Agent tooling (FAR-Lab pi discipline SHIPPED for fresh-clone cwd-fix) ---
@@ -169,3 +177,12 @@ CLAUDE.local.md
 !docs/archive/**/*.log
 !docs/audits/**/*.log
 **/评审记录/**/*.log
+
+# 根目录覆盖率临时输出（见 docs/ROOT-HYGIENE-POLICY.md）
+coverage_output*.txt
+
+# 临时监控脚本（一次性 GH outage retry monitor）
+scripts/gh_retry_monitor.sh
+
+# 会话工作记忆（daily log + long-term MEMORY.md）——本地记忆不进仓库
+.codebuddy/
