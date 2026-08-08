@@ -20,6 +20,7 @@ export const zh = {
   'nav.versions': '版本比较',
   'nav.wizard': '验证向导',
   'nav.v2receipt': 'V2收据验证',
+  'nav.events': '实时事件流',
   'nav.aria': 'Main navigation',
   'nav.themeToLight': 'Switch to light theme',
   'nav.themeToDark': 'Switch to dark theme',

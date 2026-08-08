@@ -1,0 +1,866 @@
+﻿2026-08-07T15:34:08.7820239Z Current runner version: '2.336.0'
+2026-08-07T15:34:08.7845712Z ##[group]Runner Image Provisioner
+2026-08-07T15:34:08.7846569Z Hosted Compute Agent
+2026-08-07T15:34:08.7847230Z Version: 20260707.563
+2026-08-07T15:34:08.7847907Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+2026-08-07T15:34:08.7848625Z Build Date: 2026-07-07T19:33:50Z
+2026-08-07T15:34:08.7849353Z Worker ID: {a1f9b3c2-beba-4689-b27a-c0b66c658bbd}
+2026-08-07T15:34:08.7850054Z Azure Region: westus
+2026-08-07T15:34:08.7850598Z ##[endgroup]
+2026-08-07T15:34:08.7852115Z ##[group]Operating System
+2026-08-07T15:34:08.7852763Z Ubuntu
+2026-08-07T15:34:08.7853335Z 24.04.4
+2026-08-07T15:34:08.7853861Z LTS
+2026-08-07T15:34:08.7854817Z ##[endgroup]
+2026-08-07T15:34:08.7855493Z ##[group]Runner Image
+2026-08-07T15:34:08.7856101Z Image: ubuntu-24.04
+2026-08-07T15:34:08.7856660Z Version: 20260720.247.2
+2026-08-07T15:34:08.7857977Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260720.247/images/ubuntu/Ubuntu2404-Readme.md
+2026-08-07T15:34:08.7859579Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260720.247
+2026-08-07T15:34:08.7860540Z ##[endgroup]
+2026-08-07T15:34:08.7861611Z ##[group]GITHUB_TOKEN Permissions
+2026-08-07T15:34:08.7863723Z Contents: read
+2026-08-07T15:34:08.7864689Z Metadata: read
+2026-08-07T15:34:08.7865345Z ##[endgroup]
+2026-08-07T15:34:08.7867372Z Secret source: Actions
+2026-08-07T15:34:08.7869011Z Prepare workflow directory
+2026-08-07T15:34:08.8260760Z Prepare all required actions
+2026-08-07T15:34:08.8312725Z Getting action download info
+2026-08-07T15:34:09.2071576Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-08-07T15:34:09.9160941Z Download action repository 'pnpm/action-setup@v5' (SHA:fc06bc1257f339d1d5d8b3a19a8cae5388b55320)
+2026-08-07T15:34:10.3799487Z Download action repository 'actions/setup-node@v6' (SHA:249970729cb0ef3589644e2896645e5dc5ba9c38)
+2026-08-07T15:34:10.8739501Z Download action repository 'actions/setup-python@v6' (SHA:ece7cb06caefa5fff74198d8649806c4678c61a1)
+2026-08-07T15:34:11.0625883Z Complete job name: test_ts
+2026-08-07T15:34:11.1383754Z ##[group]Run actions/checkout@v5
+2026-08-07T15:34:11.1384910Z with:
+2026-08-07T15:34:11.1385225Z   repository: yry1816186-pixel/FAR-Lab
+2026-08-07T15:34:11.1388018Z   token: ***
+2026-08-07T15:34:11.1388285Z   ssh-strict: true
+2026-08-07T15:34:11.1388553Z   ssh-user: git
+2026-08-07T15:34:11.1388827Z   persist-credentials: true
+2026-08-07T15:34:11.1389127Z   clean: true
+2026-08-07T15:34:11.1389399Z   sparse-checkout-cone-mode: true
+2026-08-07T15:34:11.1389722Z   fetch-depth: 1
+2026-08-07T15:34:11.1389983Z   fetch-tags: false
+2026-08-07T15:34:11.1390256Z   show-progress: true
+2026-08-07T15:34:11.1390516Z   lfs: false
+2026-08-07T15:34:11.1390752Z   submodules: false
+2026-08-07T15:34:11.1391019Z   set-safe-directory: true
+2026-08-07T15:34:11.1391327Z   allow-unsafe-pr-checkout: false
+2026-08-07T15:34:11.1391844Z env:
+2026-08-07T15:34:11.1392100Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:34:11.1392397Z   NODE_VERSION: 24
+2026-08-07T15:34:11.1392658Z   PYTHON_VERSION: 3.11
+2026-08-07T15:34:11.1392997Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:34:11.1393345Z ##[endgroup]
+2026-08-07T15:34:11.2432560Z Syncing repository: yry1816186-pixel/FAR-Lab
+2026-08-07T15:34:11.2435011Z ##[group]Getting Git version info
+2026-08-07T15:34:11.2435763Z Working directory is '/home/runner/work/FAR-Lab/FAR-Lab'
+2026-08-07T15:34:11.2436832Z [command]/usr/bin/git version
+2026-08-07T15:34:11.2509869Z git version 2.54.0
+2026-08-07T15:34:11.2531529Z ##[endgroup]
+2026-08-07T15:34:11.2550784Z Temporarily overriding HOME='/home/runner/work/_temp/59038365-9f66-4147-a886-06f6056943dd' before making global git config changes
+2026-08-07T15:34:11.2552949Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-07T15:34:11.2556666Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/FAR-Lab/FAR-Lab
+2026-08-07T15:34:11.2613221Z Deleting the contents of '/home/runner/work/FAR-Lab/FAR-Lab'
+2026-08-07T15:34:11.2619147Z ##[group]Initializing the repository
+2026-08-07T15:34:11.2623683Z [command]/usr/bin/git init /home/runner/work/FAR-Lab/FAR-Lab
+2026-08-07T15:34:11.2739652Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-08-07T15:34:11.2741005Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-08-07T15:34:11.2742038Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-08-07T15:34:11.2742871Z hint: call:
+2026-08-07T15:34:11.2743305Z hint:
+2026-08-07T15:34:11.2744132Z hint: 	git config --global init.defaultBranch <name>
+2026-08-07T15:34:11.2744834Z hint:
+2026-08-07T15:34:11.2745475Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-08-07T15:34:11.2746511Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-08-07T15:34:11.2747049Z hint:
+2026-08-07T15:34:11.2747340Z hint: 	git branch -m <name>
+2026-08-07T15:34:11.2747692Z hint:
+2026-08-07T15:34:11.2748157Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-08-07T15:34:11.2754755Z Initialized empty Git repository in /home/runner/work/FAR-Lab/FAR-Lab/.git/
+2026-08-07T15:34:11.2766767Z [command]/usr/bin/git remote add origin https://github.com/yry1816186-pixel/FAR-Lab
+2026-08-07T15:34:11.2826856Z ##[endgroup]
+2026-08-07T15:34:11.2827783Z ##[group]Disabling automatic garbage collection
+2026-08-07T15:34:11.2831239Z [command]/usr/bin/git config --local gc.auto 0
+2026-08-07T15:34:11.2861023Z ##[endgroup]
+2026-08-07T15:34:11.2861818Z ##[group]Setting up auth
+2026-08-07T15:34:11.2869523Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-07T15:34:11.2906909Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-07T15:34:11.3318485Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-07T15:34:11.3356939Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-07T15:34:11.3576309Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-07T15:34:11.3611369Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-07T15:34:11.3832041Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-08-07T15:34:11.3870565Z ##[endgroup]
+2026-08-07T15:34:11.3871390Z ##[group]Fetching the repository
+2026-08-07T15:34:11.3880225Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3514538937440f50d4b39da0cd9ce350a6490faf:refs/remotes/origin/design/s0-safe-boot
+2026-08-07T15:34:12.5328811Z From https://github.com/yry1816186-pixel/FAR-Lab
+2026-08-07T15:34:12.5330036Z  * [new ref]         3514538937440f50d4b39da0cd9ce350a6490faf -> origin/design/s0-safe-boot
+2026-08-07T15:34:12.5379065Z ##[endgroup]
+2026-08-07T15:34:12.5379820Z ##[group]Determining the checkout info
+2026-08-07T15:34:12.5382358Z ##[endgroup]
+2026-08-07T15:34:12.5392338Z [command]/usr/bin/git sparse-checkout disable
+2026-08-07T15:34:12.5449599Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-08-07T15:34:12.5486448Z ##[group]Checking out the ref
+2026-08-07T15:34:12.5494184Z [command]/usr/bin/git checkout --progress --force -B design/s0-safe-boot refs/remotes/origin/design/s0-safe-boot
+2026-08-07T15:34:12.6592229Z Switched to a new branch 'design/s0-safe-boot'
+2026-08-07T15:34:12.6594371Z branch 'design/s0-safe-boot' set up to track 'origin/design/s0-safe-boot'.
+2026-08-07T15:34:12.6602077Z ##[endgroup]
+2026-08-07T15:34:12.6651433Z [command]/usr/bin/git log -1 --format=%H
+2026-08-07T15:34:12.6677683Z 3514538937440f50d4b39da0cd9ce350a6490faf
+2026-08-07T15:34:12.6976332Z ##[group]Run pnpm/action-setup@v5
+2026-08-07T15:34:12.6976632Z with:
+2026-08-07T15:34:12.6976821Z   version: 10.29.3
+2026-08-07T15:34:12.6977028Z   dest: ~/setup-pnpm
+2026-08-07T15:34:12.6977237Z   run_install: null
+2026-08-07T15:34:12.6977432Z   cache: false
+2026-08-07T15:34:12.6977642Z   cache_dependency_path: pnpm-lock.yaml
+2026-08-07T15:34:12.6977927Z   package_json_file: package.json
+2026-08-07T15:34:12.6978169Z   standalone: false
+2026-08-07T15:34:12.6978360Z env:
+2026-08-07T15:34:12.6978538Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:34:12.6978748Z   NODE_VERSION: 24
+2026-08-07T15:34:12.6978943Z   PYTHON_VERSION: 3.11
+2026-08-07T15:34:12.6979181Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:34:12.6979464Z ##[endgroup]
+2026-08-07T15:34:12.8492233Z ##[group]Running self-installer...
+2026-08-07T15:34:13.2890965Z (node:2191) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-08-07T15:34:13.2892805Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-07T15:34:13.4163716Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-08-07T15:34:13.4255789Z Packages: +1
+2026-08-07T15:34:13.4256344Z +
+2026-08-07T15:34:13.8175666Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-08-07T15:34:13.8443635Z 
+2026-08-07T15:34:13.8444487Z dependencies:
+2026-08-07T15:34:13.8444968Z + pnpm 10.29.3 (11.20.0 is available)
+2026-08-07T15:34:13.8445333Z 
+2026-08-07T15:34:13.8471389Z Done in 789ms
+2026-08-07T15:34:13.8650351Z ##[endgroup]
+2026-08-07T15:34:13.8650857Z Installation Completed!
+2026-08-07T15:34:13.8828379Z ##[group]Run actions/setup-node@v6
+2026-08-07T15:34:13.8828681Z with:
+2026-08-07T15:34:13.8828893Z   node-version: 24
+2026-08-07T15:34:13.8829097Z   cache: pnpm
+2026-08-07T15:34:13.8829310Z   check-latest: false
+2026-08-07T15:34:13.8831912Z   token: ***
+2026-08-07T15:34:13.8832131Z   package-manager-cache: true
+2026-08-07T15:34:13.8832368Z env:
+2026-08-07T15:34:13.8832552Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:34:13.8832771Z   NODE_VERSION: 24
+2026-08-07T15:34:13.8832978Z   PYTHON_VERSION: 3.11
+2026-08-07T15:34:13.8833223Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:34:13.8833560Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-07T15:34:13.8833866Z ##[endgroup]
+2026-08-07T15:34:14.0485125Z Found in cache @ /opt/hostedtoolcache/node/24.18.0/x64
+2026-08-07T15:34:14.0488209Z ##[group]Environment details
+2026-08-07T15:34:16.8672406Z node: v24.18.0
+2026-08-07T15:34:16.8672967Z npm: 11.16.0
+2026-08-07T15:34:16.8674882Z yarn: 1.22.22
+2026-08-07T15:34:16.8676458Z ##[endgroup]
+2026-08-07T15:34:16.8697137Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-08-07T15:34:17.4209948Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-08-07T15:34:17.7147597Z Cache hit for: node-cache-Linux-x64-pnpm-b30e31e7fecdc26d9fa1b5a2c7ded775ac355ba4db12f7e73ad2f1a6489e0d41
+2026-08-07T15:34:18.9945179Z Received 0 of 23875471 (0.0%), 0.0 MBs/sec
+2026-08-07T15:34:19.4262457Z Received 23875471 of 23875471 (100.0%), 15.9 MBs/sec
+2026-08-07T15:34:19.4263372Z Cache Size: ~23 MB (23875471 B)
+2026-08-07T15:34:19.4313190Z [command]/usr/bin/tar -xf /home/runner/work/_temp/31434dc6-f460-481f-8ec5-a8954e0fead5/cache.tzst -P -C /home/runner/work/FAR-Lab/FAR-Lab --use-compress-program unzstd
+2026-08-07T15:34:19.8767961Z Cache restored successfully
+2026-08-07T15:34:19.8787106Z Cache restored from key: node-cache-Linux-x64-pnpm-b30e31e7fecdc26d9fa1b5a2c7ded775ac355ba4db12f7e73ad2f1a6489e0d41
+2026-08-07T15:34:19.8971205Z ##[group]Run actions/setup-python@v6
+2026-08-07T15:34:19.8971503Z with:
+2026-08-07T15:34:19.8971709Z   python-version: 3.11
+2026-08-07T15:34:19.8971931Z   cache: pip
+2026-08-07T15:34:19.8972154Z   cache-dependency-path: pyproject.toml
+2026-08-07T15:34:19.8972621Z   check-latest: false
+2026-08-07T15:34:19.8975513Z   token: ***
+2026-08-07T15:34:19.8975732Z   update-environment: true
+2026-08-07T15:34:19.8975981Z   allow-prereleases: false
+2026-08-07T15:34:19.8976210Z   freethreaded: false
+2026-08-07T15:34:19.8976418Z env:
+2026-08-07T15:34:19.8976607Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:34:19.8976826Z   NODE_VERSION: 24
+2026-08-07T15:34:19.8977028Z   PYTHON_VERSION: 3.11
+2026-08-07T15:34:19.8977278Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:34:19.8977618Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-07T15:34:19.8977924Z ##[endgroup]
+2026-08-07T15:34:20.0391029Z ##[group]Installed versions
+2026-08-07T15:34:20.0523186Z Successfully set up CPython (3.11.15)
+2026-08-07T15:34:20.0524278Z ##[endgroup]
+2026-08-07T15:34:20.0866818Z [command]/opt/hostedtoolcache/Python/3.11.15/x64/bin/pip cache dir
+2026-08-07T15:34:20.7823788Z /home/runner/.cache/pip
+2026-08-07T15:34:21.0590510Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.15-pip-4ac977aa3be076cf0ba3ebb0f4ebbb5836a4d7d98d82206324c80c05e08789f8
+2026-08-07T15:34:22.3639001Z Received 0 of 58714637 (0.0%), 0.0 MBs/sec
+2026-08-07T15:34:23.0383787Z Received 58714637 of 58714637 (100.0%), 33.4 MBs/sec
+2026-08-07T15:34:23.0385578Z Cache Size: ~56 MB (58714637 B)
+2026-08-07T15:34:23.0459960Z [command]/usr/bin/tar -xf /home/runner/work/_temp/1611a047-609a-4074-a304-1dc70326948f/cache.tzst -P -C /home/runner/work/FAR-Lab/FAR-Lab --use-compress-program unzstd
+2026-08-07T15:34:23.1237714Z Cache restored successfully
+2026-08-07T15:34:23.1270979Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.15-pip-4ac977aa3be076cf0ba3ebb0f4ebbb5836a4d7d98d82206324c80c05e08789f8
+2026-08-07T15:34:23.1430110Z ##[group]Run pnpm install --frozen-lockfile
+2026-08-07T15:34:23.1430550Z [36;1mpnpm install --frozen-lockfile[0m
+2026-08-07T15:34:23.1535341Z shell: /usr/bin/bash -e {0}
+2026-08-07T15:34:23.1535680Z env:
+2026-08-07T15:34:23.1535937Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:34:23.1536261Z   NODE_VERSION: 24
+2026-08-07T15:34:23.1536541Z   PYTHON_VERSION: 3.11
+2026-08-07T15:34:23.1536882Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:34:23.1537351Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-07T15:34:23.1537857Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:34:23.1538447Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib/pkgconfig
+2026-08-07T15:34:23.1539018Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:34:23.1539529Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:34:23.1540052Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:34:23.1540599Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib
+2026-08-07T15:34:23.1541033Z ##[endgroup]
+2026-08-07T15:34:23.4789094Z Lockfile is up to date, resolution step is skipped
+2026-08-07T15:34:23.5015923Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-08-07T15:34:23.5504633Z Packages: +243
+2026-08-07T15:34:23.5505527Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-08-07T15:34:23.9038052Z Progress: resolved 243, reused 243, downloaded 0, added 243, done
+2026-08-07T15:34:24.0525788Z 
+2026-08-07T15:34:24.0526478Z dependencies:
+2026-08-07T15:34:24.0527034Z + @fastify/cors 11.2.0
+2026-08-07T15:34:24.0527573Z + @fastify/helmet 13.0.2
+2026-08-07T15:34:24.0528143Z + @fastify/jwt 10.2.0
+2026-08-07T15:34:24.0528691Z + @fastify/rate-limit 10.3.0
+2026-08-07T15:34:24.0529265Z + @fastify/swagger 9.7.0
+2026-08-07T15:34:24.0529821Z + better-sqlite3 12.11.1
+2026-08-07T15:34:24.0530446Z + fast-json-stable-stringify 2.1.0
+2026-08-07T15:34:24.0531078Z + fastify 5.8.5
+2026-08-07T15:34:24.0531518Z + openai 4.104.0
+2026-08-07T15:34:24.0531963Z + typescript 5.9.3
+2026-08-07T15:34:24.0532379Z + ulid 2.4.0
+2026-08-07T15:34:24.0532733Z + zod 3.25.76
+2026-08-07T15:34:24.0533172Z + zod-to-json-schema 3.25.2
+2026-08-07T15:34:24.0533501Z 
+2026-08-07T15:34:24.0534328Z devDependencies:
+2026-08-07T15:34:24.0534824Z + @eslint/js 10.0.1
+2026-08-07T15:34:24.0535426Z + @types/better-sqlite3 7.6.13
+2026-08-07T15:34:24.0535975Z + @types/node 24.13.2
+2026-08-07T15:34:24.0536454Z + eslint 10.6.0
+2026-08-07T15:34:24.0536896Z + tsx 4.22.4
+2026-08-07T15:34:24.0537362Z + typescript-eslint 8.62.0
+2026-08-07T15:34:24.0537683Z 
+2026-08-07T15:34:24.0648030Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-08-07T15:34:24.0649380Z │                                                                              │
+2026-08-07T15:34:24.0650735Z │   Ignored build scripts: esbuild@0.28.1.                                     │
+2026-08-07T15:34:24.0652124Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-08-07T15:34:24.0653404Z │   to run scripts.                                                            │
+2026-08-07T15:34:24.0654855Z │                                                                              │
+2026-08-07T15:34:24.0655849Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-08-07T15:34:24.0707981Z Done in 883ms using pnpm v10.29.3
+2026-08-07T15:34:24.0933113Z ##[group]Run python -m pip install --upgrade pip
+2026-08-07T15:34:24.0933554Z [36;1mpython -m pip install --upgrade pip[0m
+2026-08-07T15:34:24.0933880Z [36;1mpip install -e .[0m
+2026-08-07T15:34:24.0934671Z [36;1m# 审计 P1-8：science_harness 的 40+ 测试（sandbox/seed_cherry/secret_strip/bls_pipeline/c_astro）[0m
+2026-08-07T15:34:24.0935277Z [36;1m# 依赖 numpy/lightkurve——缺装则 t.skip() 静默降级，CI 显示 green 但关键路径未真覆盖。[0m
+2026-08-07T15:34:24.0935706Z [36;1mpip install numpy lightkurve[0m
+2026-08-07T15:34:24.0980248Z shell: /usr/bin/bash -e {0}
+2026-08-07T15:34:24.0980512Z env:
+2026-08-07T15:34:24.0980709Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:34:24.0980940Z   NODE_VERSION: 24
+2026-08-07T15:34:24.0981158Z   PYTHON_VERSION: 3.11
+2026-08-07T15:34:24.0981425Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:34:24.0981809Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-07T15:34:24.0982206Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:34:24.0982678Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib/pkgconfig
+2026-08-07T15:34:24.0983118Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:34:24.0983508Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:34:24.0984173Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:34:24.0984650Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib
+2026-08-07T15:34:24.0984994Z ##[endgroup]
+2026-08-07T15:34:24.6930955Z Requirement already satisfied: pip in /opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/site-packages (26.1.2)
+2026-08-07T15:34:24.7795297Z Collecting pip
+2026-08-07T15:34:24.7816715Z   Using cached pip-26.2.1-py3-none-any.whl.metadata (4.6 kB)
+2026-08-07T15:34:24.7849018Z Using cached pip-26.2.1-py3-none-any.whl (1.8 MB)
+2026-08-07T15:34:24.8276658Z Installing collected packages: pip
+2026-08-07T15:34:24.8278438Z   Attempting uninstall: pip
+2026-08-07T15:34:24.8291921Z     Found existing installation: pip 26.1.2
+2026-08-07T15:34:24.9037282Z     Uninstalling pip-26.1.2:
+2026-08-07T15:34:24.9096152Z       Successfully uninstalled pip-26.1.2
+2026-08-07T15:34:25.7193149Z Successfully installed pip-26.2.1
+2026-08-07T15:34:26.0694659Z Obtaining file:///home/runner/work/FAR-Lab/FAR-Lab
+2026-08-07T15:34:26.0712764Z   Installing build dependencies: started
+2026-08-07T15:34:26.6215921Z   Installing build dependencies: finished with status 'done'
+2026-08-07T15:34:26.6222996Z   Checking if build backend supports build_editable: started
+2026-08-07T15:34:26.9219893Z   Checking if build backend supports build_editable: finished with status 'done'
+2026-08-07T15:34:26.9227828Z   Getting requirements to build editable: started
+2026-08-07T15:34:27.2178823Z   Getting requirements to build editable: finished with status 'done'
+2026-08-07T15:34:27.2188785Z   Preparing editable metadata (pyproject.toml): started
+2026-08-07T15:34:27.3890045Z   Preparing editable metadata (pyproject.toml): finished with status 'done'
+2026-08-07T15:34:27.4467395Z Collecting threadpoolctl<4.0,>=3.5 (from far-lab-repro==1.0.0)
+2026-08-07T15:34:27.4483147Z   Using cached threadpoolctl-3.6.0-py3-none-any.whl.metadata (13 kB)
+2026-08-07T15:34:27.6217748Z Collecting numpy<3.0,>=1.24 (from far-lab-repro==1.0.0)
+2026-08-07T15:34:27.6235327Z   Using cached numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+2026-08-07T15:34:27.6359416Z Collecting sympy<2.0,>=1.13 (from far-lab-repro==1.0.0)
+2026-08-07T15:34:27.6374390Z   Using cached sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+2026-08-07T15:34:27.6589644Z Collecting z3-solver<5.0,>=4.13 (from far-lab-repro==1.0.0)
+2026-08-07T15:34:27.6605236Z   Using cached z3_solver-4.16.0.0-py3-none-manylinux_2_27_x86_64.whl.metadata (602 bytes)
+2026-08-07T15:34:27.6718121Z Collecting mpmath<1.4,>=1.1.0 (from sympy<2.0,>=1.13->far-lab-repro==1.0.0)
+2026-08-07T15:34:27.6732778Z   Using cached mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+2026-08-07T15:34:27.6773618Z Using cached numpy-2.4.6-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.9 MB)
+2026-08-07T15:34:27.6849681Z Using cached sympy-1.14.0-py3-none-any.whl (6.3 MB)
+2026-08-07T15:34:27.6886550Z Using cached mpmath-1.3.0-py3-none-any.whl (536 kB)
+2026-08-07T15:34:27.6903017Z Using cached threadpoolctl-3.6.0-py3-none-any.whl (18 kB)
+2026-08-07T15:34:27.6917780Z Using cached z3_solver-4.16.0.0-py3-none-manylinux_2_27_x86_64.whl (31.7 MB)
+2026-08-07T15:34:27.7672620Z Building wheels for collected packages: far-lab-repro
+2026-08-07T15:34:27.7681263Z   Building editable for far-lab-repro (pyproject.toml): started
+2026-08-07T15:34:27.9550757Z   Building editable for far-lab-repro (pyproject.toml): finished with status 'done'
+2026-08-07T15:34:27.9558231Z   Created wheel for far-lab-repro: filename=far_lab_repro-1.0.0-0.editable-py3-none-any.whl size=3523 sha256=9b9438caaba3d8808da38c6f445074f59c0f5fb1f9aa9f9759f84ff6358997c4
+2026-08-07T15:34:27.9560933Z   Stored in directory: /tmp/pip-ephem-wheel-cache-1xzn22ci/wheels/a0/d6/c2/9a6ff57ed5a951185ca6fb83b088395ac5cc2b6abf817e0c8d
+2026-08-07T15:34:27.9574705Z Successfully built far-lab-repro
+2026-08-07T15:34:27.9895427Z Installing collected packages: z3-solver, mpmath, threadpoolctl, sympy, numpy, far-lab-repro
+2026-08-07T15:34:35.8446895Z 
+2026-08-07T15:34:35.8458393Z Successfully installed far-lab-repro-1.0.0 mpmath-1.3.0 numpy-2.4.6 sympy-1.14.0 threadpoolctl-3.6.0 z3-solver-4.16.0.0
+2026-08-07T15:34:36.1988498Z Requirement already satisfied: numpy in /opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/site-packages (2.4.6)
+2026-08-07T15:34:36.3227070Z Collecting lightkurve
+2026-08-07T15:34:36.3688548Z   Downloading lightkurve-2.6.0-py3-none-any.whl.metadata (6.5 kB)
+2026-08-07T15:34:36.5000673Z Collecting astropy>=5.0 (from lightkurve)
+2026-08-07T15:34:36.5038624Z   Downloading astropy-8.0.1-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (11 kB)
+2026-08-07T15:34:36.5909915Z Collecting astroquery>=0.3.10 (from lightkurve)
+2026-08-07T15:34:36.5947397Z   Downloading astroquery-0.4.11-py3-none-any.whl.metadata (6.5 kB)
+2026-08-07T15:34:36.6098235Z Collecting beautifulsoup4>=4.6.0 (from lightkurve)
+2026-08-07T15:34:36.6130852Z   Downloading beautifulsoup4-4.15.0-py3-none-any.whl.metadata (3.8 kB)
+2026-08-07T15:34:36.6430812Z Collecting bokeh>=2.3.2 (from lightkurve)
+2026-08-07T15:34:36.6471565Z   Downloading bokeh-3.9.2-py3-none-any.whl.metadata (10 kB)
+2026-08-07T15:34:36.7227185Z Collecting fbpca>=1.0 (from lightkurve)
+2026-08-07T15:34:36.7264663Z   Downloading fbpca-1.0.tar.gz (11 kB)
+2026-08-07T15:34:36.7328477Z   Installing build dependencies: started
+2026-08-07T15:34:37.2495440Z   Installing build dependencies: finished with status 'done'
+2026-08-07T15:34:37.2501651Z   Getting requirements to build wheel: started
+2026-08-07T15:34:37.5513727Z   Getting requirements to build wheel: finished with status 'done'
+2026-08-07T15:34:37.5522182Z   Preparing metadata (pyproject.toml): started
+2026-08-07T15:34:37.7067744Z   Preparing metadata (pyproject.toml): finished with status 'done'
+2026-08-07T15:34:37.8196990Z Collecting matplotlib>=3.1 (from lightkurve)
+2026-08-07T15:34:37.8226601Z   Downloading matplotlib-3.11.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (80 kB)
+2026-08-07T15:34:37.8580219Z Collecting memoization>=0.3.1 (from lightkurve)
+2026-08-07T15:34:37.8622360Z   Downloading memoization-0.4.0.tar.gz (41 kB)
+2026-08-07T15:34:37.8804247Z   Installing build dependencies: started
+2026-08-07T15:34:38.3880151Z   Installing build dependencies: finished with status 'done'
+2026-08-07T15:34:38.3885696Z   Getting requirements to build wheel: started
+2026-08-07T15:34:38.7089262Z   Getting requirements to build wheel: finished with status 'done'
+2026-08-07T15:34:38.7097030Z   Preparing metadata (pyproject.toml): started
+2026-08-07T15:34:38.8743332Z   Preparing metadata (pyproject.toml): finished with status 'done'
+2026-08-07T15:34:38.9712840Z Collecting pandas<3.0.0,>=1.3.6 (from lightkurve)
+2026-08-07T15:34:38.9743700Z   Downloading pandas-2.3.3-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (91 kB)
+2026-08-07T15:34:39.0088806Z Collecting patsy>=0.5.0 (from lightkurve)
+2026-08-07T15:34:39.0114937Z   Downloading patsy-1.0.2-py2.py3-none-any.whl.metadata (3.6 kB)
+2026-08-07T15:34:39.0297842Z Collecting requests>=2.22.0 (from lightkurve)
+2026-08-07T15:34:39.0325594Z   Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+2026-08-07T15:34:39.0496871Z Collecting s3fs>=2024.6.1 (from lightkurve)
+2026-08-07T15:34:39.0523795Z   Downloading s3fs-2026.7.0-py3-none-any.whl.metadata (1.2 kB)
+2026-08-07T15:34:39.1350954Z Collecting scikit-learn>=0.24.0 (from lightkurve)
+2026-08-07T15:34:39.1380912Z   Downloading scikit_learn-1.9.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (11 kB)
+2026-08-07T15:34:39.2547124Z Collecting scipy>=1.7 (from lightkurve)
+2026-08-07T15:34:39.2577700Z   Downloading scipy-1.17.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (62 kB)
+2026-08-07T15:34:39.2931255Z Collecting tqdm>=4.25.0 (from lightkurve)
+2026-08-07T15:34:39.2958477Z   Downloading tqdm-4.70.0-py3-none-any.whl.metadata (57 kB)
+2026-08-07T15:34:39.3126550Z Collecting uncertainties>=3.1.4 (from lightkurve)
+2026-08-07T15:34:39.3162889Z   Downloading uncertainties-3.2.3-py3-none-any.whl.metadata (7.0 kB)
+2026-08-07T15:34:39.3350455Z Collecting urllib3>=1.23 (from lightkurve)
+2026-08-07T15:34:39.3380465Z   Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+2026-08-07T15:34:39.3504409Z Collecting python-dateutil>=2.8.2 (from pandas<3.0.0,>=1.3.6->lightkurve)
+2026-08-07T15:34:39.3532722Z   Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+2026-08-07T15:34:39.3833291Z Collecting pytz>=2020.1 (from pandas<3.0.0,>=1.3.6->lightkurve)
+2026-08-07T15:34:39.3860589Z   Downloading pytz-2026.3.post1-py2.py3-none-any.whl.metadata (22 kB)
+2026-08-07T15:34:39.3986172Z Collecting tzdata>=2022.7 (from pandas<3.0.0,>=1.3.6->lightkurve)
+2026-08-07T15:34:39.4017734Z   Downloading tzdata-2026.3-py2.py3-none-any.whl.metadata (1.4 kB)
+2026-08-07T15:34:39.4256709Z Collecting astropy-iers-data>=0.2026.6.22.1.23.34 (from astropy>=5.0->lightkurve)
+2026-08-07T15:34:39.4291902Z   Downloading astropy_iers_data-0.2026.8.3.0.53.6-py3-none-any.whl.metadata (3.4 kB)
+2026-08-07T15:34:39.4431738Z Collecting packaging>=25.0 (from astropy>=5.0->lightkurve)
+2026-08-07T15:34:39.4461651Z   Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+2026-08-07T15:34:39.4708702Z Collecting pyerfa>=2.0.1.3 (from astropy>=5.0->lightkurve)
+2026-08-07T15:34:39.4747778Z   Downloading pyerfa-2.0.1.5-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.7 kB)
+2026-08-07T15:34:39.5063792Z Collecting PyYAML>=6.0.0 (from astropy>=5.0->lightkurve)
+2026-08-07T15:34:39.5093375Z   Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+2026-08-07T15:34:39.5234954Z Collecting html5lib>=0.999 (from astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:39.5267734Z   Downloading html5lib-1.1-py2.py3-none-any.whl.metadata (16 kB)
+2026-08-07T15:34:39.5514307Z Collecting keyring>=15.0 (from astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:39.5541471Z   Downloading keyring-25.7.0-py3-none-any.whl.metadata (21 kB)
+2026-08-07T15:34:39.6324597Z Collecting pyvo>=1.5 (from astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:39.6362557Z   Downloading pyvo-1.9.1-py3-none-any.whl.metadata (4.2 kB)
+2026-08-07T15:34:39.6513137Z Collecting soupsieve>=1.6.1 (from beautifulsoup4>=4.6.0->lightkurve)
+2026-08-07T15:34:39.6542050Z   Downloading soupsieve-2.9.2-py3-none-any.whl.metadata (4.6 kB)
+2026-08-07T15:34:39.6696583Z Collecting typing-extensions>=4.0.0 (from beautifulsoup4>=4.6.0->lightkurve)
+2026-08-07T15:34:39.6722893Z   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-08-07T15:34:39.6859481Z Collecting Jinja2>=2.9 (from bokeh>=2.3.2->lightkurve)
+2026-08-07T15:34:39.6890257Z   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+2026-08-07T15:34:39.7423434Z Collecting contourpy>=1.2 (from bokeh>=2.3.2->lightkurve)
+2026-08-07T15:34:39.7453794Z   Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (5.5 kB)
+2026-08-07T15:34:39.7756216Z Collecting narwhals>=1.13 (from bokeh>=2.3.2->lightkurve)
+2026-08-07T15:34:39.7784979Z   Downloading narwhals-2.24.0-py3-none-any.whl.metadata (15 kB)
+2026-08-07T15:34:39.9438039Z Collecting pillow>=7.1.0 (from bokeh>=2.3.2->lightkurve)
+2026-08-07T15:34:39.9469667Z   Downloading pillow-12.3.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
+2026-08-07T15:34:39.9806366Z Collecting tornado>=6.2 (from bokeh>=2.3.2->lightkurve)
+2026-08-07T15:34:39.9835754Z   Downloading tornado-6.5.8-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (2.8 kB)
+2026-08-07T15:34:39.9990545Z Collecting xyzservices>=2021.09.1 (from bokeh>=2.3.2->lightkurve)
+2026-08-07T15:34:40.0017177Z   Downloading xyzservices-2026.3.0-py3-none-any.whl.metadata (4.1 kB)
+2026-08-07T15:34:40.0164006Z Collecting six>=1.9 (from html5lib>=0.999->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.0193566Z   Downloading six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+2026-08-07T15:34:40.0277662Z Collecting webencodings (from html5lib>=0.999->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.0308478Z   Downloading webencodings-0.5.1-py2.py3-none-any.whl.metadata (2.1 kB)
+2026-08-07T15:34:40.0726632Z Collecting MarkupSafe>=2.0 (from Jinja2>=2.9->bokeh>=2.3.2->lightkurve)
+2026-08-07T15:34:40.0757078Z   Downloading markupsafe-3.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+2026-08-07T15:34:40.0882040Z Collecting SecretStorage>=3.2 (from keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.0910055Z   Downloading secretstorage-3.5.0-py3-none-any.whl.metadata (4.0 kB)
+2026-08-07T15:34:40.1017355Z Collecting jeepney>=0.4.2 (from keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.1044293Z   Downloading jeepney-0.9.0-py3-none-any.whl.metadata (1.2 kB)
+2026-08-07T15:34:40.1264810Z Collecting importlib_metadata>=4.11.4 (from keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.1291366Z   Downloading importlib_metadata-9.0.0-py3-none-any.whl.metadata (4.5 kB)
+2026-08-07T15:34:40.1417398Z Collecting jaraco.classes (from keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.1447852Z   Downloading jaraco.classes-3.4.0-py3-none-any.whl.metadata (2.6 kB)
+2026-08-07T15:34:40.1602356Z Collecting jaraco.functools (from keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.1633414Z   Downloading jaraco_functools-4.6.0-py3-none-any.whl.metadata (2.9 kB)
+2026-08-07T15:34:40.1746932Z Collecting jaraco.context (from keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.1774360Z   Downloading jaraco_context-6.1.2-py3-none-any.whl.metadata (4.2 kB)
+2026-08-07T15:34:40.1924641Z Collecting zipp>=3.20 (from importlib_metadata>=4.11.4->keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:40.1953189Z   Downloading zipp-4.1.0-py3-none-any.whl.metadata (3.6 kB)
+2026-08-07T15:34:40.2074919Z Collecting cycler>=0.10 (from matplotlib>=3.1->lightkurve)
+2026-08-07T15:34:40.2103676Z   Downloading cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+2026-08-07T15:34:40.3312329Z Collecting fonttools>=4.28.2 (from matplotlib>=3.1->lightkurve)
+2026-08-07T15:34:40.3344346Z   Downloading fonttools-4.63.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (118 kB)
+2026-08-07T15:34:40.4178146Z Collecting kiwisolver>=1.3.1 (from matplotlib>=3.1->lightkurve)
+2026-08-07T15:34:40.4207774Z   Downloading kiwisolver-1.5.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (5.1 kB)
+2026-08-07T15:34:40.4437059Z Collecting pyparsing>=3 (from matplotlib>=3.1->lightkurve)
+2026-08-07T15:34:40.4466695Z   Downloading pyparsing-3.3.2-py3-none-any.whl.metadata (5.8 kB)
+2026-08-07T15:34:40.5422993Z Collecting charset_normalizer<4,>=2 (from requests>=2.22.0->lightkurve)
+2026-08-07T15:34:40.5455542Z   Downloading charset_normalizer-3.4.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (41 kB)
+2026-08-07T15:34:40.5613439Z Collecting idna<4,>=2.5 (from requests>=2.22.0->lightkurve)
+2026-08-07T15:34:40.5642730Z   Downloading idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+2026-08-07T15:34:40.5827398Z Collecting certifi>=2023.5.7 (from requests>=2.22.0->lightkurve)
+2026-08-07T15:34:40.5855051Z   Downloading certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+2026-08-07T15:34:40.6149760Z Collecting aiobotocore<4.0.0,>=2.19.0 (from s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:40.6179375Z   Downloading aiobotocore-3.9.0-py3-none-any.whl.metadata (30 kB)
+2026-08-07T15:34:40.6360897Z Collecting fsspec<2026.7.1,>=2026.7.0 (from s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:40.6391570Z   Downloading fsspec-2026.7.0-py3-none-any.whl.metadata (10 kB)
+2026-08-07T15:34:41.1228297Z Collecting aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0 (from s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.1260808Z   Downloading aiohttp-3.14.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+2026-08-07T15:34:41.1409072Z Collecting aioitertools<1.0.0,>=0.5.1 (from aiobotocore<4.0.0,>=2.19.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.1437195Z   Downloading aioitertools-0.13.0-py3-none-any.whl.metadata (3.3 kB)
+2026-08-07T15:34:41.3650231Z Collecting botocore<1.43.57,>=1.43.3 (from aiobotocore<4.0.0,>=2.19.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.3682801Z   Downloading botocore-1.43.56-py3-none-any.whl.metadata (5.6 kB)
+2026-08-07T15:34:41.3796506Z Collecting jmespath<2.0.0,>=0.7.1 (from aiobotocore<4.0.0,>=2.19.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.3824585Z   Downloading jmespath-1.1.0-py3-none-any.whl.metadata (7.6 kB)
+2026-08-07T15:34:41.5745666Z Collecting multidict<7.0.0,>=6.0.0 (from aiobotocore<4.0.0,>=2.19.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.5778246Z   Downloading multidict-6.7.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (5.3 kB)
+2026-08-07T15:34:41.8738411Z Collecting wrapt<3.0.0,>=1.10.10 (from aiobotocore<4.0.0,>=2.19.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.8774780Z   Downloading wrapt-2.3.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (7.4 kB)
+2026-08-07T15:34:41.8928866Z Collecting aiohappyeyeballs>=2.5.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.8959310Z   Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl.metadata (5.9 kB)
+2026-08-07T15:34:41.9076560Z Collecting aiosignal>=1.4.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.9103998Z   Downloading aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+2026-08-07T15:34:41.9231015Z Collecting attrs>=17.3.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.9260880Z   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+2026-08-07T15:34:41.9817402Z Collecting frozenlist>=1.1.1 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:41.9873356Z   Downloading frozenlist-1.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (20 kB)
+2026-08-07T15:34:42.0387516Z Collecting propcache>=0.2.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:42.0421094Z   Downloading propcache-0.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (16 kB)
+2026-08-07T15:34:42.3596413Z Collecting yarl<2.0,>=1.17.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->s3fs>=2024.6.1->lightkurve)
+2026-08-07T15:34:42.3629817Z   Downloading yarl-1.24.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (103 kB)
+2026-08-07T15:34:42.4069882Z Collecting joblib>=1.4.0 (from scikit-learn>=0.24.0->lightkurve)
+2026-08-07T15:34:42.4100359Z   Downloading joblib-1.5.3-py3-none-any.whl.metadata (5.5 kB)
+2026-08-07T15:34:42.4165084Z Requirement already satisfied: threadpoolctl>=3.5.0 in /opt/hostedtoolcache/Python/3.11.15/x64/lib/python3.11/site-packages (from scikit-learn>=0.24.0->lightkurve) (3.6.0)
+2026-08-07T15:34:42.5732897Z Collecting cryptography>=2.0 (from SecretStorage>=3.2->keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:42.5764269Z   Downloading cryptography-50.0.0-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (4.3 kB)
+2026-08-07T15:34:42.6675086Z Collecting cffi>=2.0.0 (from cryptography>=2.0->SecretStorage>=3.2->keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:42.6705388Z   Downloading cffi-2.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+2026-08-07T15:34:42.6844419Z Collecting pycparser (from cffi>=2.0.0->cryptography>=2.0->SecretStorage>=3.2->keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:42.6872897Z   Downloading pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+2026-08-07T15:34:42.7106851Z Collecting more-itertools (from jaraco.classes->keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:42.7134607Z   Downloading more_itertools-11.1.0-py3-none-any.whl.metadata (41 kB)
+2026-08-07T15:34:42.7240494Z Collecting backports.tarfile (from jaraco.context->keyring>=15.0->astroquery>=0.3.10->lightkurve)
+2026-08-07T15:34:42.7272221Z   Downloading backports.tarfile-1.2.0-py3-none-any.whl.metadata (2.0 kB)
+2026-08-07T15:34:42.7396239Z Downloading lightkurve-2.6.0-py3-none-any.whl (261 kB)
+2026-08-07T15:34:42.7466374Z Downloading pandas-2.3.3-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (12.8 MB)
+2026-08-07T15:34:42.8095444Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.8/12.8 MB 210.4 MB/s  0:00:00
+2026-08-07T15:34:42.8137845Z Downloading astropy-8.0.1-cp311-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (10.5 MB)
+2026-08-07T15:34:42.9748109Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.5/10.5 MB 64.2 MB/s  0:00:00
+2026-08-07T15:34:42.9792055Z Downloading astropy_iers_data-0.2026.8.3.0.53.6-py3-none-any.whl (2.0 MB)
+2026-08-07T15:34:42.9873668Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 285.1 MB/s  0:00:00
+2026-08-07T15:34:42.9911037Z Downloading astroquery-0.4.11-py3-none-any.whl (11.1 MB)
+2026-08-07T15:34:43.0735051Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.1/11.1 MB 136.5 MB/s  0:00:00
+2026-08-07T15:34:43.0765799Z Downloading beautifulsoup4-4.15.0-py3-none-any.whl (109 kB)
+2026-08-07T15:34:43.0829115Z Downloading bokeh-3.9.2-py3-none-any.whl (6.4 MB)
+2026-08-07T15:34:43.1259904Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.4/6.4 MB 150.7 MB/s  0:00:00
+2026-08-07T15:34:43.1312222Z Downloading contourpy-1.3.3-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (355 kB)
+2026-08-07T15:34:43.1371517Z Downloading html5lib-1.1-py2.py3-none-any.whl (112 kB)
+2026-08-07T15:34:43.1424042Z Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+2026-08-07T15:34:43.1474871Z Downloading keyring-25.7.0-py3-none-any.whl (39 kB)
+2026-08-07T15:34:43.1528245Z Downloading importlib_metadata-9.0.0-py3-none-any.whl (27 kB)
+2026-08-07T15:34:43.1583622Z Downloading jeepney-0.9.0-py3-none-any.whl (49 kB)
+2026-08-07T15:34:43.1643125Z Downloading markupsafe-3.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+2026-08-07T15:34:43.1700019Z Downloading matplotlib-3.11.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (10.0 MB)
+2026-08-07T15:34:43.2190965Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.0/10.0 MB 214.3 MB/s  0:00:00
+2026-08-07T15:34:43.2220653Z Downloading cycler-0.12.1-py3-none-any.whl (8.3 kB)
+2026-08-07T15:34:43.2275678Z Downloading fonttools-4.63.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.1 MB)
+2026-08-07T15:34:43.2442685Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.1/5.1 MB 330.1 MB/s  0:00:00
+2026-08-07T15:34:43.2475782Z Downloading kiwisolver-1.5.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.4 MB)
+2026-08-07T15:34:43.2567592Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.4/1.4 MB 194.4 MB/s  0:00:00
+2026-08-07T15:34:43.2596501Z Downloading narwhals-2.24.0-py3-none-any.whl (461 kB)
+2026-08-07T15:34:43.2660442Z Downloading packaging-26.3-py3-none-any.whl (129 kB)
+2026-08-07T15:34:43.2749626Z Downloading patsy-1.0.2-py2.py3-none-any.whl (233 kB)
+2026-08-07T15:34:43.2805414Z Downloading pillow-12.3.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (6.9 MB)
+2026-08-07T15:34:43.3045998Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.9/6.9 MB 310.1 MB/s  0:00:00
+2026-08-07T15:34:43.3116788Z Downloading pyerfa-2.0.1.5-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (738 kB)
+2026-08-07T15:34:43.3179740Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 738.7/738.7 kB 113.8 MB/s  0:00:00
+2026-08-07T15:34:43.3208938Z Downloading pyparsing-3.3.2-py3-none-any.whl (122 kB)
+2026-08-07T15:34:43.3264127Z Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+2026-08-07T15:34:43.3320985Z Downloading pytz-2026.3.post1-py2.py3-none-any.whl (508 kB)
+2026-08-07T15:34:43.3400722Z Downloading pyvo-1.9.1-py3-none-any.whl (1.2 MB)
+2026-08-07T15:34:43.3476131Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 169.5 MB/s  0:00:00
+2026-08-07T15:34:43.3508893Z Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (806 kB)
+2026-08-07T15:34:43.3568411Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 806.6/806.6 kB 147.2 MB/s  0:00:00
+2026-08-07T15:34:43.3597811Z Downloading requests-2.34.2-py3-none-any.whl (73 kB)
+2026-08-07T15:34:43.3653360Z Downloading charset_normalizer-3.4.9-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (221 kB)
+2026-08-07T15:34:43.3710002Z Downloading idna-3.18-py3-none-any.whl (65 kB)
+2026-08-07T15:34:43.3761628Z Downloading urllib3-2.7.0-py3-none-any.whl (131 kB)
+2026-08-07T15:34:43.3865305Z Downloading certifi-2026.7.22-py3-none-any.whl (136 kB)
+2026-08-07T15:34:43.3961800Z Downloading s3fs-2026.7.0-py3-none-any.whl (32 kB)
+2026-08-07T15:34:43.4014382Z Downloading aiobotocore-3.9.0-py3-none-any.whl (100 kB)
+2026-08-07T15:34:43.4075209Z Downloading aiohttp-3.14.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.8 MB)
+2026-08-07T15:34:43.4162688Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.8/1.8 MB 232.9 MB/s  0:00:00
+2026-08-07T15:34:43.4194233Z Downloading aioitertools-0.13.0-py3-none-any.whl (24 kB)
+2026-08-07T15:34:43.4245944Z Downloading botocore-1.43.56-py3-none-any.whl (15.4 MB)
+2026-08-07T15:34:43.5061789Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 15.4/15.4 MB 196.5 MB/s  0:00:00
+2026-08-07T15:34:43.5094246Z Downloading fsspec-2026.7.0-py3-none-any.whl (206 kB)
+2026-08-07T15:34:43.5151287Z Downloading jmespath-1.1.0-py3-none-any.whl (20 kB)
+2026-08-07T15:34:43.5206146Z Downloading multidict-6.7.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (246 kB)
+2026-08-07T15:34:43.5266981Z Downloading wrapt-2.3.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (161 kB)
+2026-08-07T15:34:43.5320779Z Downloading yarl-1.24.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (111 kB)
+2026-08-07T15:34:43.5376774Z Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+2026-08-07T15:34:43.5426666Z Downloading aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+2026-08-07T15:34:43.5477924Z Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+2026-08-07T15:34:43.5538224Z Downloading frozenlist-1.8.0-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (231 kB)
+2026-08-07T15:34:43.5598807Z Downloading propcache-0.5.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (58 kB)
+2026-08-07T15:34:43.5652535Z Downloading scikit_learn-1.9.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (9.3 MB)
+2026-08-07T15:34:43.5968128Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 9.3/9.3 MB 309.1 MB/s  0:00:00
+2026-08-07T15:34:43.6000182Z Downloading joblib-1.5.3-py3-none-any.whl (309 kB)
+2026-08-07T15:34:43.6140022Z Downloading scipy-1.17.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (35.3 MB)
+2026-08-07T15:34:43.7328564Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 35.3/35.3 MB 302.3 MB/s  0:00:00
+2026-08-07T15:34:43.7359477Z Downloading secretstorage-3.5.0-py3-none-any.whl (15 kB)
+2026-08-07T15:34:43.7419725Z Downloading cryptography-50.0.0-cp311-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+2026-08-07T15:34:43.7593836Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 302.6 MB/s  0:00:00
+2026-08-07T15:34:43.7625163Z Downloading cffi-2.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (217 kB)
+2026-08-07T15:34:43.7681365Z Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+2026-08-07T15:34:43.7740557Z Downloading soupsieve-2.9.2-py3-none-any.whl (37 kB)
+2026-08-07T15:34:43.7795735Z Downloading tornado-6.5.8-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (450 kB)
+2026-08-07T15:34:43.7861375Z Downloading tqdm-4.70.0-py3-none-any.whl (80 kB)
+2026-08-07T15:34:43.7916429Z Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-08-07T15:34:43.7966726Z Downloading tzdata-2026.3-py2.py3-none-any.whl (348 kB)
+2026-08-07T15:34:43.8027533Z Downloading uncertainties-3.2.3-py3-none-any.whl (60 kB)
+2026-08-07T15:34:43.8088268Z Downloading xyzservices-2026.3.0-py3-none-any.whl (94 kB)
+2026-08-07T15:34:43.8145450Z Downloading zipp-4.1.0-py3-none-any.whl (10 kB)
+2026-08-07T15:34:43.8194894Z Downloading jaraco.classes-3.4.0-py3-none-any.whl (6.8 kB)
+2026-08-07T15:34:43.8398339Z Downloading jaraco_context-6.1.2-py3-none-any.whl (7.9 kB)
+2026-08-07T15:34:43.8457574Z Downloading backports.tarfile-1.2.0-py3-none-any.whl (30 kB)
+2026-08-07T15:34:43.8510006Z Downloading jaraco_functools-4.6.0-py3-none-any.whl (11 kB)
+2026-08-07T15:34:43.8561323Z Downloading more_itertools-11.1.0-py3-none-any.whl (72 kB)
+2026-08-07T15:34:43.8614743Z Downloading pycparser-3.0-py3-none-any.whl (48 kB)
+2026-08-07T15:34:43.8665005Z Downloading webencodings-0.5.1-py2.py3-none-any.whl (11 kB)
+2026-08-07T15:34:44.2522021Z Building wheels for collected packages: fbpca, memoization
+2026-08-07T15:34:44.2530633Z   Building wheel for fbpca (pyproject.toml): started
+2026-08-07T15:34:44.4417874Z   Building wheel for fbpca (pyproject.toml): finished with status 'done'
+2026-08-07T15:34:44.4423728Z   Created wheel for fbpca: filename=fbpca-1.0-py3-none-any.whl size=11427 sha256=9fd5269a9578a8bf561d289798d2cf26abf06406bd5cfcd691e24930c57da84e
+2026-08-07T15:34:44.4426198Z   Stored in directory: /home/runner/.cache/pip/wheels/71/ae/f7/5b7e1e16a133d094431428169e9a8d9f750afe5459f0333c9b
+2026-08-07T15:34:44.4446743Z   Building wheel for memoization (pyproject.toml): started
+2026-08-07T15:34:44.6701871Z   Building wheel for memoization (pyproject.toml): finished with status 'done'
+2026-08-07T15:34:44.6708927Z   Created wheel for memoization: filename=memoization-0.4.0-py3-none-any.whl size=50537 sha256=2851efe562bf01b291f3e509444af82fe67a2289f84de25dece9db24302b498e
+2026-08-07T15:34:44.6711377Z   Stored in directory: /home/runner/.cache/pip/wheels/72/08/6d/529f7ad70429b918b80178256c3adb167607326260884385f7
+2026-08-07T15:34:44.6734520Z Successfully built fbpca memoization
+2026-08-07T15:34:44.8551866Z Installing collected packages: webencodings, pytz, fbpca, zipp, xyzservices, wrapt, urllib3, uncertainties, tzdata, typing-extensions, tqdm, tornado, soupsieve, six, scipy, PyYAML, pyparsing, pyerfa, pycparser, propcache, pillow, patsy, packaging, narwhals, multidict, more-itertools, memoization, MarkupSafe, kiwisolver, joblib, jmespath, jeepney, idna, fsspec, frozenlist, fonttools, cycler, contourpy, charset_normalizer, certifi, backports.tarfile, attrs, astropy-iers-data, aioitertools, aiohappyeyeballs, yarl, scikit-learn, requests, python-dateutil, Jinja2, jaraco.functools, jaraco.context, jaraco.classes, importlib_metadata, html5lib, cffi, beautifulsoup4, astropy, aiosignal, pyvo, pandas, matplotlib, cryptography, botocore, bokeh, aiohttp, SecretStorage, aiobotocore, s3fs, keyring, astroquery, lightkurve
+2026-08-07T15:35:04.8029447Z 
+2026-08-07T15:35:04.8068131Z Successfully installed Jinja2-3.1.6 MarkupSafe-3.0.3 PyYAML-6.0.3 SecretStorage-3.5.0 aiobotocore-3.9.0 aiohappyeyeballs-2.7.1 aiohttp-3.14.3 aioitertools-0.13.0 aiosignal-1.4.0 astropy-8.0.1 astropy-iers-data-0.2026.8.3.0.53.6 astroquery-0.4.11 attrs-26.1.0 backports.tarfile-1.2.0 beautifulsoup4-4.15.0 bokeh-3.9.2 botocore-1.43.56 certifi-2026.7.22 cffi-2.1.1 charset_normalizer-3.4.9 contourpy-1.3.3 cryptography-50.0.0 cycler-0.12.1 fbpca-1.0 fonttools-4.63.0 frozenlist-1.8.0 fsspec-2026.7.0 html5lib-1.1 idna-3.18 importlib_metadata-9.0.0 jaraco.classes-3.4.0 jaraco.context-6.1.2 jaraco.functools-4.6.0 jeepney-0.9.0 jmespath-1.1.0 joblib-1.5.3 keyring-25.7.0 kiwisolver-1.5.0 lightkurve-2.6.0 matplotlib-3.11.1 memoization-0.4.0 more-itertools-11.1.0 multidict-6.7.1 narwhals-2.24.0 packaging-26.3 pandas-2.3.3 patsy-1.0.2 pillow-12.3.0 propcache-0.5.2 pycparser-3.0 pyerfa-2.0.1.5 pyparsing-3.3.2 python-dateutil-2.9.0.post0 pytz-2026.3.post1 pyvo-1.9.1 requests-2.34.2 s3fs-2026.7.0 scikit-learn-1.9.0 scipy-1.17.1 six-1.17.0 soupsieve-2.9.2 tornado-6.5.8 tqdm-4.70.0 typing-extensions-4.16.0 tzdata-2026.3 uncertainties-3.2.3 urllib3-2.7.0 webencodings-0.5.1 wrapt-2.3.0 xyzservices-2026.3.0 yarl-1.24.5 zipp-4.1.0
+2026-08-07T15:35:05.0769085Z ##[group]Run node scripts/ensure_native_deps.mjs && node scripts/ensure_py_deps.mjs && node scripts/python_axis_probe.mjs
+2026-08-07T15:35:05.0770631Z [36;1mnode scripts/ensure_native_deps.mjs && node scripts/ensure_py_deps.mjs && node scripts/python_axis_probe.mjs[0m
+2026-08-07T15:35:05.0836450Z shell: /usr/bin/bash -e {0}
+2026-08-07T15:35:05.0836715Z env:
+2026-08-07T15:35:05.0836919Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:35:05.0837157Z   NODE_VERSION: 24
+2026-08-07T15:35:05.0837375Z   PYTHON_VERSION: 3.11
+2026-08-07T15:35:05.0837832Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:35:05.0838192Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-07T15:35:05.0838600Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:05.0839045Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib/pkgconfig
+2026-08-07T15:35:05.0839484Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:05.0839909Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:05.0840311Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:05.0840717Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib
+2026-08-07T15:35:05.0841051Z ##[endgroup]
+2026-08-07T15:35:09.7738044Z optional science modules: lightkurve,astroquery available
+2026-08-07T15:35:10.1899748Z Python axis: available (python 3.11.15 · sympy/z3/numpy ok)
+2026-08-07T15:35:10.1967853Z ##[group]Run set -o pipefail
+2026-08-07T15:35:10.1968175Z [36;1mset -o pipefail[0m
+2026-08-07T15:35:10.1968463Z [36;1mnode --test --test-timeout=180000 \[0m
+2026-08-07T15:35:10.1968900Z [36;1m  tests/api/*.test.ts tests/llm_gateway/*.test.ts tests/schema/*.test.ts \[0m
+2026-08-07T15:35:10.1969478Z [36;1m  tests/evidence_log/*.test.ts tests/falsifiability/*.test.ts tests/fec/*.test.ts \[0m
+2026-08-07T15:35:10.1970084Z [36;1m  tests/math/*.test.ts tests/statistics/*.test.ts tests/golden_vectors/*.test.ts \[0m
+2026-08-07T15:35:10.1970530Z [36;1m  2>&1 | tail -c 8000[0m
+2026-08-07T15:35:10.2015576Z shell: /usr/bin/bash -e {0}
+2026-08-07T15:35:10.2015843Z env:
+2026-08-07T15:35:10.2016041Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:35:10.2016280Z   NODE_VERSION: 24
+2026-08-07T15:35:10.2016498Z   PYTHON_VERSION: 3.11
+2026-08-07T15:35:10.2016768Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:35:10.2017126Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-07T15:35:10.2017571Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:10.2018018Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib/pkgconfig
+2026-08-07T15:35:10.2018468Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:10.2018866Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:10.2019266Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:10.2019674Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib
+2026-08-07T15:35:10.2020025Z ##[endgroup]
+2026-08-07T15:35:28.5770688Z 零误伤旧行） (19.370501ms)
+2026-08-07T15:35:28.5771506Z ✔ payload_kind CHECK values match TS enum (2.762445ms)
+2026-08-07T15:35:28.5772537Z ✔ purpose_tag CHECK values match the 9-value TS enum (0.443963ms)
+2026-08-07T15:35:28.5773791Z ✔ finish_reason, verdict, edge, and repro status CHECK values match TS enums (0.751581ms)
+2026-08-07T15:35:28.5775480Z ✔ 0003 math_claims.claim_kind CHECK values match TS MATH_CLAIM_KINDS (12 values) (1.989665ms)
+2026-08-07T15:35:28.5777024Z ✔ 0003 math_claims.required_level CHECK values match TS VERIFICATION_LEVELS (4 values) (0.307757ms)
+2026-08-07T15:35:28.5777980Z ✔ 0003 math_claims.expected_outcome CHECK values match TS VERIFICATION_OUTCOMES (3 values) (0.268404ms)
+2026-08-07T15:35:28.5778864Z ✔ 0003 math_verifications.backend_kind CHECK values match TS BACKEND_KINDS (5 values) (0.275116ms)
+2026-08-07T15:35:28.5779729Z ✔ 0003 math_verifications.outcome CHECK values match TS VERIFICATION_OUTCOMES (3 values) (0.328446ms)
+2026-08-07T15:35:28.5780533Z ✔ 0001_initial.sql executes in SQLite memory and creates the five core tables (7.004919ms)
+2026-08-07T15:35:28.5781232Z ✔ core rows can be inserted with valid foreign-key topology (3.160944ms)
+2026-08-07T15:35:28.5781897Z ✔ schema guards reject invalid enum values and append-only updates (3.232948ms)
+2026-08-07T15:35:28.5782970Z ✔ verdict_nodes_insert_sixth_value_rejected_by_trigger: INSERT verdict=SUPER_CONFIRMED → enum guard RAISE 先于列级 CHECK (FUSION-OS-11) (23.517565ms)
+2026-08-07T15:35:28.5784496Z ✔ verdict_nodes_update_sixth_value_rejected_by_trigger: 合法 INCONCLUSIVE 行 UPDATE verdict=SUPER_CONFIRMED → enum guard RAISE (18.920686ms)
+2026-08-07T15:35:28.5786034Z ✔ proof_envelopes_v2_insert_sixth_conclusion_rejected_by_trigger: INSERT conclusion=SUPER_CONFIRMED → enum guard RAISE (19.18351ms)
+2026-08-07T15:35:28.5787226Z ✔ valid_five_values_pass_enum_guard: 五值 INSERT 通过 trigger(不误伤合法裁决·proof_envelopes_v2 全五值 + verdict_nodes CONFIRMED) (22.705037ms)
+2026-08-07T15:35:28.5788079Z ✔ bootstrap: CI brackets the sample mean (lower ≤ estimate ≤ upper) (14.338535ms)
+2026-08-07T15:35:28.5788841Z ✔ bootstrap: CI width shrinks as sample size grows (same underlying distribution) (36.409465ms)
+2026-08-07T15:35:28.5789547Z ✔ bootstrap: determinism — same seed ⇒ identical CI bounds (8.106117ms)
+2026-08-07T15:35:28.5790253Z ✔ bootstrap: different seeds → slightly different bounds (Monte Carlo noise) (5.435449ms)
+2026-08-07T15:35:28.5791189Z ✔ bootstrap: 90% CI is narrower than 99% CI (same sample + seed) (9.421736ms)
+2026-08-07T15:35:28.5791833Z ✔ bootstrap: confidenceLevel is echoed back in result (5.186095ms)
+2026-08-07T15:35:28.5792504Z ✔ bootstrap: defaults applied (iterations=9999, confidenceLevel=0.95) (3.647807ms)
+2026-08-07T15:35:28.5793283Z ✔ bootstrap: 95% CI for moderate sample ≈ analytical normal-approximation CI (±20%) (8.460081ms)
+2026-08-07T15:35:28.5794458Z ✔ bootstrap: symmetric sample → CI roughly symmetric around estimate (2.890405ms)
+2026-08-07T15:35:28.5795101Z ✔ bootstrap: fail-closed on empty sample (1.031816ms)
+2026-08-07T15:35:28.5795717Z ✔ bootstrap: fail-closed on single-element sample (CI meaningless) (0.354686ms)
+2026-08-07T15:35:28.5796347Z ✔ bootstrap: fail-closed on non-finite value (0.314851ms)
+2026-08-07T15:35:28.5796844Z ✔ bootstrap: fail-closed on non-integer seed (0.26109ms)
+2026-08-07T15:35:28.5797485Z ✔ bootstrap: fail-closed on iterations < 2 (need ≥2 points for a percentile) (0.44778ms)
+2026-08-07T15:35:28.5798186Z ✔ bootstrap: fail-closed on confidenceLevel outside (0,1) (0.208712ms)
+2026-08-07T15:35:28.5798793Z ✔ bootstrap: negative-valued sample → CI works correctly (1.381433ms)
+2026-08-07T15:35:28.5799388Z ✔ hedgesCorrection: df<=1 → fail-closed(校正未定义) (2.003922ms)
+2026-08-07T15:35:28.5800048Z ✔ hedgesCorrection: 非有限数(NaN/Infinity)→ assertFiniteNumber fail-closed (0.298029ms)
+2026-08-07T15:35:28.5800714Z ✔ hedgesCorrection: 边界 df=2 合法 + 已知值(公式 J=1-3/(4df-1)) (0.265779ms)
+2026-08-07T15:35:28.5801225Z ✔ hedgesCorrection: 已知值 df=10/100(收敛→1) (0.188754ms)
+2026-08-07T15:35:28.5801766Z ✔ twoSampleEffectSize: 两样本恒定(pooledSd=0)→ fail-closed (0.608553ms)
+2026-08-07T15:35:28.5802374Z ✔ twoSampleEffectSize: 合法两样本 → 返回 cohensD + hedgesG(回归基线) (0.257844ms)
+2026-08-07T15:35:28.5803035Z ✔ KS: identical samples → D=0, pValue=1 (no distributional difference) (2.846854ms)
+2026-08-07T15:35:28.5803721Z ✔ KS: fully separated samples → D=1 (max CDF gap), small asymptotic p (0.52164ms)
+2026-08-07T15:35:28.5804705Z ✔ KS: partial overlap → D=0.4 (hand-computed empirical-CDF gap) (0.263464ms)
+2026-08-07T15:35:28.5805458Z ✔ KS: larger samples — identical-shift gives D = fraction, p decreasing with n (0.290345ms)
+2026-08-07T15:35:28.5806221Z ✔ KS: determinism — same input ⇒ identical output across repeated calls (0.417474ms)
+2026-08-07T15:35:28.5806917Z ✔ KS: ties handled correctly (no D inflation from repeated values) (0.213301ms)
+2026-08-07T15:35:28.5807513Z ✔ KS: single-element samples allowed (D ∈ {0,1}) (0.352422ms)
+2026-08-07T15:35:28.5807978Z ✔ KS: fail-closed on empty sample (2.33867ms)
+2026-08-07T15:35:28.5808501Z ✔ KS: fail-closed on non-finite values (NaN / Infinity) (0.956345ms)
+2026-08-07T15:35:28.5809168Z ✔ KS: statistic always in [0,1], pValue always in [0,1] (boundary integrity) (0.43108ms)
+2026-08-07T15:35:28.5809868Z ✔ permutation: identical samples → observedStatistic=0, pValue=1 (4.240721ms)
+2026-08-07T15:35:28.5810583Z ✔ permutation: identical samples of different sizes → still T_obs=0, p=1 (2.241577ms)
+2026-08-07T15:35:28.5811460Z ✔ permutation: fully separated samples → small p (only 2 of C(6,3)=20 perms reproduce separation) (3.165362ms)
+2026-08-07T15:35:28.5812469Z ✔ permutation: determinism — same seed ⇒ identical extremeCount/pValue (14.213059ms)
+2026-08-07T15:35:28.5813287Z ✔ permutation: different seeds → Monte Carlo noise (extremeCount may differ across seeds) (4.281968ms)
+2026-08-07T15:35:28.5814418Z ✔ permutation: pValue ∈ (0, 1] always (Phipson–Smyth +1 correction guarantees p > 0) (3.259058ms)
+2026-08-07T15:35:28.5815259Z ✔ permutation: Phipson–Smyth +1 — pValue = (extremeCount+1)/(iterations+1) (0.766339ms)
+2026-08-07T15:35:28.5815928Z ✔ permutation: observedStatistic = mean(s1) − mean(s2) (0.301065ms)
+2026-08-07T15:35:28.5816576Z ✔ mulberry32: determinism — same seed ⇒ identical uint32 sequence (0.985941ms)
+2026-08-07T15:35:28.5817146Z ✔ mulberry32: output is uint32 ∈ [0, 2^32) (1.486771ms)
+2026-08-07T15:35:28.5817676Z ✔ mulberry32: different seeds → different sequences (1.037688ms)
+2026-08-07T15:35:28.5818496Z ✔ mulberry32: negative seed coerced to uint32 (same as positive mod 2^32) (0.209323ms)
+2026-08-07T15:35:28.5819105Z ✔ permutation: fail-closed on empty sample (0.747493ms)
+2026-08-07T15:35:28.5819703Z ✔ permutation: fail-closed on non-finite value (NaN/Infinity) (0.555723ms)
+2026-08-07T15:35:28.5820362Z ✔ permutation: fail-closed on non-integer seed (no ambient RNG) (0.347523ms)
+2026-08-07T15:35:28.5820984Z ✔ permutation: fail-closed on non-positive iterations (0.987884ms)
+2026-08-07T15:35:28.5821567Z ✔ permutation: default iterations=9999 when omitted (6.845369ms)
+2026-08-07T15:35:28.5822305Z ✔ permutation: asymmetric sample sizes (n1≠n2) produce valid result (6.119507ms)
+2026-08-07T15:35:28.5823054Z ✔ p-value utilities compute normal-tail probabilities from statistics (1.74735ms)
+2026-08-07T15:35:28.5823789Z ✔ effect-size utilities compute sample variance and standardized effects (0.625294ms)
+2026-08-07T15:35:28.5824727Z ✔ confidence intervals are estimated from sample standard errors (0.57564ms)
+2026-08-07T15:35:28.5825540Z ✔ multiple-testing corrections preserve original order with monotonic adjusted p-values (1.713957ms)
+2026-08-07T15:35:28.5826326Z ✔ twoSampleWelchZTest: n<2 前置守卫 fail-closed + 清晰定位（哪个样本不足） (0.913154ms)
+2026-08-07T15:35:28.5826777Z ▶ t-distribution: logGamma
+2026-08-07T15:35:28.5827195Z   ✔ logGamma(0.5) = ln(sqrt(pi)) = 0.5724 (Stirling) (2.193457ms)
+2026-08-07T15:35:28.5827667Z   ✔ logGamma(1) = 0 and logGamma(2) = 0 (0.16517ms)
+2026-08-07T15:35:28.5828065Z   ✔ logGamma(5) = ln(24) = 3.1781 (0.191189ms)
+2026-08-07T15:35:28.5828486Z ✔ t-distribution: logGamma (3.685278ms)
+2026-08-07T15:35:28.5828859Z ▶ t-distribution: incompleteBeta
+2026-08-07T15:35:28.5829323Z   ✔ incompleteBeta(0.5, a, a) = 0.5 for symmetric params (0.550714ms)
+2026-08-07T15:35:28.5829824Z   ✔ incompleteBeta at boundaries is exact (0.193042ms)
+2026-08-07T15:35:28.5830274Z ✔ t-distribution: incompleteBeta (1.045814ms)
+2026-08-07T15:35:28.5830848Z ▶ t-distribution: studentTCdf against published tables
+2026-08-07T15:35:28.5831424Z   ✔ studentTCdf(1.812, 10) ≈ 0.95 (df=10, one-tailed p=0.05 critical) (0.460805ms)
+2026-08-07T15:35:28.5832015Z   ✔ studentTCdf(2.228, 10) ≈ 0.975 (df=10, one-tailed p=0.025) (0.296727ms)
+2026-08-07T15:35:28.5832746Z   ✔ studentTCdf(2.764, 10) ≈ 0.99 (df=10, one-tailed p=0.01) (0.261822ms)
+2026-08-07T15:35:28.5833282Z   ✔ studentTCdf(0, df) = 0.5 for any df (symmetry) (0.262032ms)
+2026-08-07T15:35:28.5833817Z   ✔ studentTSurvival(t, df) = 1 - studentTCdf(t, df) (0.803659ms)
+2026-08-07T15:35:28.5834677Z ✔ t-distribution: studentTCdf against published tables (2.667758ms)
+2026-08-07T15:35:28.5835226Z ▶ oneSampleTTest: exact vs normal-approximation
+2026-08-07T15:35:28.5835664Z   ✔ large-N t-test converges to z-test (0.861267ms)
+2026-08-07T15:35:28.5836182Z   ✔ small-N t-test p-value > z-test p-value (conservative) (0.341962ms)
+2026-08-07T15:35:28.5836654Z   ✔ degrees of freedom = n - 1 (0.199104ms)
+2026-08-07T15:35:28.5837019Z   ✔ rejects sample with n < 2 (0.420109ms)
+2026-08-07T15:35:28.5837515Z ✔ oneSampleTTest: exact vs normal-approximation (2.112335ms)
+2026-08-07T15:35:28.5837898Z ▶ pairedTTest
+2026-08-07T15:35:28.5838249Z   ✔ matches one-sample t-test on differences (0.277251ms)
+2026-08-07T15:35:28.5838690Z   ✔ rejects unequal-length arrays (0.161744ms)
+2026-08-07T15:35:28.5839050Z ✔ pairedTTest (0.572114ms)
+2026-08-07T15:35:28.5839401Z ▶ twoSampleTTest and twoSampleWelchTTest
+2026-08-07T15:35:28.5839800Z   ✔ two-sample t-test df = n1 + n2 - 2 (0.27698ms)
+2026-08-07T15:35:28.5840265Z   ✔ Welch t-test df is fractional (Satterthwaite) (0.267903ms)
+2026-08-07T15:35:28.5840792Z   ✔ pooled and Welch converge when variances are equal (0.157966ms)
+2026-08-07T15:35:28.5841309Z ✔ twoSampleTTest and twoSampleWelchTTest (0.841449ms)
+2026-08-07T15:35:28.5841651Z ℹ tests 964
+2026-08-07T15:35:28.5841865Z ℹ suites 29
+2026-08-07T15:35:28.5842074Z ℹ pass 963
+2026-08-07T15:35:28.5842278Z ℹ fail 0
+2026-08-07T15:35:28.5842493Z ℹ cancelled 0
+2026-08-07T15:35:28.5842708Z ℹ skipped 1
+2026-08-07T15:35:28.5842912Z ℹ todo 0
+2026-08-07T15:35:28.5843296Z ℹ duration_ms 18316.821766
+2026-08-07T15:35:28.5871910Z ##[group]Run set -o pipefail
+2026-08-07T15:35:28.5872252Z [36;1mset -o pipefail[0m
+2026-08-07T15:35:28.5872545Z [36;1mnode --test --test-timeout=180000 \[0m
+2026-08-07T15:35:28.5873037Z [36;1m  tests/real_backends/*.test.ts tests/demo_seeds/*.test.ts tests/benchmark/*.test.ts \[0m
+2026-08-07T15:35:28.5873558Z [36;1m  tests/db/*.test.ts tests/far_proof/*.test.ts \[0m
+2026-08-07T15:35:28.5874354Z [36;1m  tests/science_harness/*.test.ts tests/science_harness/adapters/*.test.ts \[0m
+2026-08-07T15:35:28.5874807Z [36;1m  2>&1 | tail -c 8000[0m
+2026-08-07T15:35:28.5918972Z shell: /usr/bin/bash -e {0}
+2026-08-07T15:35:28.5919236Z env:
+2026-08-07T15:35:28.5919434Z   PNPM_VERSION: 10.29.3
+2026-08-07T15:35:28.5919664Z   NODE_VERSION: 24
+2026-08-07T15:35:28.5919885Z   PYTHON_VERSION: 3.11
+2026-08-07T15:35:28.5920150Z   NODE_COMPILE_CACHE: /tmp/node-compile-cache
+2026-08-07T15:35:28.5920516Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-08-07T15:35:28.5921062Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:28.5921860Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib/pkgconfig
+2026-08-07T15:35:28.5922709Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:28.5923473Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:28.5924163Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-08-07T15:35:28.5924668Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib
+2026-08-07T15:35:28.5925026Z ##[endgroup]
+2026-08-07T15:38:29.7229392Z sion） (0.238477ms)
+2026-08-07T15:38:29.7230794Z ✔ G5 seismic: 若有前瞻证据（生产 caller 注入）→ 构造有效检验 (0.252253ms)
+2026-08-07T15:38:29.7231721Z ✔ flagExecutionFingerprintMagnitudeMismatch_pure_ratio: 量级差异>10x → true·相似/0 → false（FUSION-OS-7） (1.362747ms)
+2026-08-07T15:38:29.7233833Z ✔ recompute_magnitude_mismatch_flagged: executionFingerprintMismatch → DEGRADED_SCOPE（FUSION-OS-7） (4.782254ms)
+2026-08-07T15:38:29.7236004Z ✔ executionFingerprintMismatch_absent_zero_regression: 无 flag → CONFIRMED（FUSION-OS-7 缺省零回归） (0.480582ms)
+2026-08-07T15:38:29.7238141Z ✔ executionFingerprintMismatch_preempts_refuted: refute + mismatch → DEGRADED_SCOPE（FUSION-OS-7 优先级） (0.514295ms)
+2026-08-07T15:38:29.7239894Z ✔ sandbox_collects_cpu_and_peak_rss: 真 venv 子进程采集 cpu/peak_rss（FUSION-OS-7 真采集·Python-gated） (94.012926ms)
+2026-08-07T15:38:29.7241617Z ✔ hero_a_pipeline: real src/statistics drives R7 CONFIRMED -> ASK-9 INCONCLUSIVE seal (P1-5 Phase 2) (128.711246ms)
+2026-08-07T15:38:29.7242846Z ✔ hero_b_pipeline: real two-sample stats + ConfoundingGate FAIL -> R-causal DEGRADED_SCOPE (single layer) (P1-5 Phase 3) (30.248415ms)
+2026-08-07T15:38:29.7244769Z ✔ multiseed_audit: real per-seed BLS (distinct) + data-emergent cherry-pick -> detect_seed_cherry fires on REAL registry -> ANTI_THEATER_FAIL (9550.843567ms)
+2026-08-07T15:38:29.7246043Z ▶ rToZ / zToR (Fisher transform pure functions)
+2026-08-07T15:38:29.7246465Z   ✔ known values from OSC 2015 (0.86308ms)
+2026-08-07T15:38:29.7246874Z   ✔ round trip zToR(rToZ(r)) === r (0.203883ms)
+2026-08-07T15:38:29.7247254Z   ✔ rejects out-of-range r (0.359494ms)
+2026-08-07T15:38:29.7247739Z ✔ rToZ / zToR (Fisher transform pure functions) (2.490674ms)
+2026-08-07T15:38:29.7248330Z ▶ buildOscStatistics
+2026-08-07T15:38:29.7248773Z   ✔ recomputes published OSC (2015) summary statistics (0.816853ms)
+2026-08-07T15:38:29.7249384Z   ✔ effect direction supports the claim (replication effect > 0) (0.232687ms)
+2026-08-07T15:38:29.7249987Z   ✔ statistical diagnostics flag the distribution drift (0.236854ms)
+2026-08-07T15:38:29.7250646Z ✔ buildOscStatistics (1.581889ms)
+2026-08-07T15:38:29.7251086Z ▶ buildOscChain (end-to-end real paper pipeline)
+2026-08-07T15:38:29.7251615Z   ✔ produces DEGRADED_SCOPE (R4) for the OSC claim (117.328418ms)
+2026-08-07T15:38:29.7252250Z   ✔ sealed conclusion matches the machine verdict (needs endorsement) (18.022402ms)
+2026-08-07T15:38:29.7253060Z   ✔ FEC gate allows the claim with validated statistics (21.684455ms)
+2026-08-07T15:38:29.7254180Z   ✔ anti-theater lint passes on the honest aggregate pipeline (20.594379ms)
+2026-08-07T15:38:29.7254930Z ✔ buildOscChain (end-to-end real paper pipeline) (178.114113ms)
+2026-08-07T15:38:29.7255374Z [venv-sandbox] exitCode=126 stderr:
+2026-08-07T15:38:29.7255767Z preflight: .git not allowed in workingDir (git-flood)
+2026-08-07T15:38:29.7256535Z ✔ git_flood_and_symlink_escape_rejected: preflightWorkingDir 拒绝已知恶意形状（FUSION-OS-4） (4.408534ms)
+2026-08-07T15:38:29.7257488Z ✔ preflight_blocks_spawn_on_git_flood: spawnVenv returns exitCode 126 without spawning（FUSION-OS-4） (24.076104ms)
+2026-08-07T15:38:29.7258211Z ▶ Ritchie (2012) failed replication — statistics recompute
+2026-08-07T15:38:29.7258733Z   ✔ three labs: exact p-values from t-distribution (1.330386ms)
+2026-08-07T15:38:29.7259266Z   ✔ mean direction is refutes (opposite to Bem claim) (0.218821ms)
+2026-08-07T15:38:29.7259796Z   ✔ combined p-value via Fisher method is computed (0.27711ms)
+2026-08-07T15:38:29.7260442Z ✔ Ritchie (2012) failed replication — statistics recompute (5.288375ms)
+2026-08-07T15:38:29.7260976Z ▶ Ritchie (2012) failed replication — verdict kernel
+2026-08-07T15:38:29.7261492Z   ✔ produces REFUTED or INCONCLUSIVE (not CONFIRMED) (118.910588ms)
+2026-08-07T15:38:29.7262095Z   ✔ evidence encodes refutesClaim=true (direction opposite to Bem) (23.972128ms)
+2026-08-07T15:38:29.7262706Z   ✔ no anti-theater findings (clean replication design) (23.057531ms)
+2026-08-07T15:38:29.7263210Z   ✔ FEC gate is allowed (contract compiles) (19.053177ms)
+2026-08-07T15:38:29.7263659Z   ✔ produces tamper-evident proof hash (16.318655ms)
+2026-08-07T15:38:29.7264665Z   ✔ Ritchie claim differs from Bem claim (different paper, same metric) (16.07095ms)
+2026-08-07T15:38:29.7265368Z ✔ Ritchie (2012) failed replication — verdict kernel (218.106366ms)
+2026-08-07T15:38:29.7266074Z ✔ spawnVenv: 输出超过 MAX_OUTPUT_BYTES → 强制中断（timedOut + outputLimitExceeded） (237.7906ms)
+2026-08-07T15:38:29.7266740Z ✔ spawnVenv: 正常小输出不受影响（outputLimitExceeded=false） (73.999503ms)
+2026-08-07T15:38:29.7267431Z ✔ timeout_kills_python_grandchildren: process group kill 杀尽孤孙（FUSION-OS-2） (175.785282ms)
+2026-08-07T15:38:29.7268509Z ✔ spawnVenv_timeout_fires_group_kill: 长 sleep + 短 timeout → timedOut=true（FUSION-OS-2 timer 路径） (1224.633342ms)
+2026-08-07T15:38:29.7269461Z ✔ venv sandbox: real spawn executes deterministic script + computes sha256 hash anchors (P1-6) (81.100019ms)
+2026-08-07T15:38:29.7270350Z ✔ venv sandbox: real spawn captures artifact manifest (sha256 + bytes) from WORKING_DIR (82.57678ms)
+2026-08-07T15:38:29.7270889Z [venv-sandbox] exitCode=1 stderr:
+2026-08-07T15:38:29.7271207Z Traceback (most recent call last):
+2026-08-07T15:38:29.7271774Z   File "/home/runner/work/FAR-Lab/FAR-Lab/repro/science_harness/sandbox_runner.py", line 196, in main
+2026-08-07T15:38:29.7272394Z     exec(compile(script, "<sandbox>", "exec"), namespace)
+2026-08-07T15:38:29.7272784Z   File "<sandbox>", line 1, in <module>
+2026-08-07T15:38:29.7273095Z ValueError: far_sandbox_probe
+2026-08-07T15:38:29.7273280Z 
+2026-08-07T15:38:29.7273773Z ✔ venv sandbox: real spawn captures script exception -> exitCode 1 + non-empty stderr (69.447241ms)
+2026-08-07T15:38:29.7275012Z ✔ venv sandbox: SR-2 seed determinism — same seed -> identical stdoutHash; different seed -> different (173.111424ms)
+2026-08-07T15:38:29.7276004Z ✔ venv sandbox: SR-4 input.timeoutMs bypass closed — exceeds ceiling throws fail-closed (no spawn) (0.936548ms)
+2026-08-07T15:38:29.7276849Z ✔ C-ASTRO-0001 hero demo: M1-M3 PASS + M4 WARN → INCONCLUSIVE (route mixed) (1.780872ms)
+2026-08-07T15:38:29.7277500Z ✔ C-ASTRO-0001 claim text + check ids are stable SSOT (0.997983ms)
+2026-08-07T15:38:29.7278256Z ✔ buildCAstroChecks honors injected thresholds (F8 prereg, no hardcode final values) (0.242926ms)
+2026-08-07T15:38:29.7279117Z ✔ F2 priority 1: scope_narrow integrity flag → DEGRADED_SCOPE (overrides everything) (0.230943ms)
+2026-08-07T15:38:29.7279849Z ✔ F2 priority 2: single FAIL present → REFUTED (route any_refute) (0.314219ms)
+2026-08-07T15:38:29.7280751Z ✔ F2 priority 3: WARN without FAIL → INCONCLUSIVE (0.227667ms)
+2026-08-07T15:38:29.7282078Z ✔ F2 priority 4: [PASS, SKIP] → INCONCLUSIVE (partial_skip · AT-01 · SKIP≠PASS) (0.304221ms)
+2026-08-07T15:38:29.7283639Z ✔ F2 priority 4b: [PASS, PASS, SKIP] → INCONCLUSIVE (partial_skip · 多 PASS 仍被 SKIP 拦) (0.224681ms)
+2026-08-07T15:38:29.7285294Z ✔ F2 priority 5: all PASS (no SKIP) → CONFIRMED (machine route, ASK-9 seals later) (0.326312ms)
+2026-08-07T15:38:29.7286026Z ✔ F2 priority 6: all SKIP / data_missing → UNTESTED (0.42626ms)
+2026-08-07T15:38:29.7286630Z ✔ ROUTE_TO_VERDICT table matches F2 priority routing (0.183364ms)
+2026-08-07T15:38:29.7287237Z ✔ dataset: online + hash match → resolved (exempt=false) (0.270648ms)
+2026-08-07T15:38:29.7287950Z ✔ dataset: contentHash mismatch → degraded (DATA_INTEGRITY_FAIL · 02 C8) (0.183594ms)
+2026-08-07T15:38:29.7288710Z ✔ dataset: non-whitelist host → degraded cached_fixture fallback (SR-5) (0.154971ms)
+2026-08-07T15:38:29.7289547Z ✔ dataset: online unavailable + fixture present → degraded (cached_fixture fallback) (0.175329ms)
+2026-08-07T15:38:29.7290393Z ✔ dataset: online unavailable + NO fixture → untested (never fabricate · 02 F1) (0.141966ms)
+2026-08-07T15:38:29.7291108Z ✔ datasetStatusToIntegrityFlag maps 3 statuses correctly (0.108544ms)
+2026-08-07T15:38:29.7291703Z ✔ DATASET_HOST_WHITELIST contains MAST + HEASARC (0.130355ms)
+2026-08-07T15:38:29.7292365Z ✔ isBaselineExempt: only baseline_exempt channel is exempt (02 C20) (0.12247ms)
+2026-08-07T15:38:29.7293277Z ✔ computeSandboxRunResult enforces SR invariants (seed=42, networkBlocked=true, singleThreaded=true) (1.097399ms)
+2026-08-07T15:38:29.7294439Z ✔ computeSandboxRunResult is deterministic (same input → byte-equal hash) (0.388308ms)
+2026-08-07T15:38:29.7295231Z ✔ computeArtifactTreeHash is order-independent (sort by path+hash) (0.283973ms)
+2026-08-07T15:38:29.7296023Z ✔ computeArtifactTreeHash changes when artifact content changes (sensitivity) (0.289203ms)
+2026-08-07T15:38:29.7296766Z ✔ validateResourceSpec throws on cpu exceeding C19 ceiling (0.68771ms)
+2026-08-07T15:38:29.7297431Z ✔ validateResourceSpec throws on memory exceeding C19 ceiling (0.19737ms)
+2026-08-07T15:38:29.7298316Z ✔ validateResourceSpec throws on timeout exceeding SR-4 ceiling (0.228359ms)
+2026-08-07T15:38:29.7299075Z ✔ typeLayerSandboxAdapter.execute delegates to computeSandboxRunResult (0.242946ms)
+2026-08-07T15:38:29.7299917Z ✔ computeSandboxRunResult honors explicit seed override (SR-2 still reproducible) (0.292018ms)
+2026-08-07T15:38:29.7300777Z ✔ api_key_not_in_sandbox_env: buildVenvPythonEnv 剥离 secret + 白名单过滤（FUSION-OS-8） (2.127823ms)
+2026-08-07T15:38:29.7301637Z ✔ dlopen_rejected_by_audit_hook: ctypes.CDLL in user script → exitCode 126（FUSION-OS-8） (75.581202ms)
+2026-08-07T15:38:29.7302498Z ✔ secret_stripped_python_side: os.environ cannot read leaked API_KEY（FUSION-OS-8） (65.568912ms)
+2026-08-07T15:38:29.7303719Z ✔ seed_cherry_pipeline: real venv BLS + fixture-data cherry-pick -> detect_seed_cherry fires REAL -> ANTI_THEATER_FAIL (FUSION-OS-1 honest closure) (2006.099658ms)
+2026-08-07T15:38:29.7305582Z ✔ seed_cherry_pipeline: load-bearing controlled-mutation — omit antiTheaterReport lets attack reach CONFIRMED (FUSION-OS-1 base/head) (1958.160169ms)
+2026-08-07T15:38:29.7306358Z ℹ tests 234
+2026-08-07T15:38:29.7306572Z ℹ suites 15
+2026-08-07T15:38:29.7306781Z ℹ pass 231
+2026-08-07T15:38:29.7306994Z ℹ fail 0
+2026-08-07T15:38:29.7307202Z ℹ cancelled 1
+2026-08-07T15:38:29.7307419Z ℹ skipped 2
+2026-08-07T15:38:29.7307624Z ℹ todo 0
+2026-08-07T15:38:29.7307869Z ℹ duration_ms 181086.582867
+2026-08-07T15:38:29.7308034Z 
+2026-08-07T15:38:29.7308148Z ✖ failing tests:
+2026-08-07T15:38:29.7308274Z 
+2026-08-07T15:38:29.7308439Z test at tests/db/open.test.ts:96:1
+2026-08-07T15:38:29.7308898Z ✖ ② RT-05-B:备份存在时,删热 WAL 静默尾丢可恢复 (180001.256777ms)
+2026-08-07T15:38:29.7309246Z   'test timed out after 180000ms'
+2026-08-07T15:38:29.7319322Z ##[error]Process completed with exit code 1.
+2026-08-07T15:38:29.7420422Z Post job cleanup.
+2026-08-07T15:38:29.8699407Z Pruning is unnecessary.
+2026-08-07T15:38:29.8878294Z Post job cleanup.
+2026-08-07T15:38:29.9651243Z [command]/usr/bin/git version
+2026-08-07T15:38:29.9691491Z git version 2.54.0
+2026-08-07T15:38:29.9731907Z Temporarily overriding HOME='/home/runner/work/_temp/a9c2e098-ea27-43c9-9280-2f4605aeb9ae' before making global git config changes
+2026-08-07T15:38:29.9733712Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-07T15:38:29.9738217Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/FAR-Lab/FAR-Lab
+2026-08-07T15:38:29.9775862Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-08-07T15:38:29.9809832Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-08-07T15:38:30.0078427Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-07T15:38:30.0101980Z http.https://github.com/.extraheader
+2026-08-07T15:38:30.0116267Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-08-07T15:38:30.0175294Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-08-07T15:38:30.0479377Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-07T15:38:30.0536379Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-08-07T15:38:30.0966532Z Cleaning up orphan processes

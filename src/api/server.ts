@@ -35,6 +35,7 @@ import { registerArenaRoute } from './routes/arena.ts';
 import type { AppendRecordOptions } from '../evidence_log/types.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
+import type { AgentEventBus } from '../agent_loop/events.ts';
 
 /**
  * API server 配置（显式传入·禁 process.env 直读·可测）。
@@ -48,6 +49,8 @@ export interface ApiServerConfig {
   readonly gateway?: LlmGateway;
   readonly profile?: ProviderProfile;
   readonly appendOptions?: AppendRecordOptions;
+  /** P0-4 可选运行时事件总线（注入则注册 /events/stream SSE 端点）。 */
+  readonly eventBus?: AgentEventBus;
   readonly logger?: boolean;
 }
 
@@ -135,6 +138,11 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerBenchmarkRoute(v1);
     await registerCourtRoute(v1);
     await registerArenaRoute(v1);
+    // P0-4 事件流 SSE（可选·注入 eventBus 才注册）
+    if (config.eventBus !== undefined) {
+      const { registerEventsStreamRoute } = await import('./routes/events.ts');
+      registerEventsStreamRoute(v1, { bus: config.eventBus });
+    }
   }, { prefix: '/api/v1' });
 
   // V2 API routes — six-dimension receipt verification + persistence.

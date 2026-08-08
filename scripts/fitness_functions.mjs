@@ -108,10 +108,11 @@ const importsOf = (f) => [
     'src/math/smt_backend.ts', // 外部求解器进程差异
     'src/science_harness/dataset_resolver.ts', // 下载/缓存路径
     'src/science_harness/sandbox_runner.ts', // 子进程沙箱差异
+    'src/hardware/detect.ts', // 硬件探测按平台调用 nvidia-smi/system_profiler 等
   ]);
   const users = srcFiles.filter((f) => read(f).includes('process.platform')).map(rel);
   const unreg = users.filter((u) => !REGISTERED.has(u));
-  check('FF-07', '平台特定逻辑全部登记（9 处在册）', unreg.length === 0, unreg.length ? `未登记: ${unreg.join(',')}` : `${users.length}/9 在册`);
+  check('FF-07', '平台特定逻辑全部登记（10 处在册）', unreg.length === 0, unreg.length ? `未登记: ${unreg.join(',')}` : `${users.length}/10 在册`);
 }
 
 // FF-08 凭据 fail-closed: ask/doctor 只检 env 存在不读值（scanner 豁免名单持续有效）

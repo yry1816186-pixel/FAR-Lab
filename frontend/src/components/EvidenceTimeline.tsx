@@ -70,7 +70,7 @@ function truncateHash(hash: string): string {
 
 // ---------- DecisionTrace（A1/B3 决策路径追踪）安全提取 ----------
 
-/** DecisionTrace 已知字段（从 HonestVerdictDto.decisionTrace: unknown 安全提取·镜像 src/falsifiability/verdict_kernel_v2.ts） */
+/** DecisionTrace 已知字段（从 HonestVerdictDto.decisionTrace: unknown 安全提取·镜像 src/falsifiability 的裁决核源码） */
 export interface DecisionTraceSafe {
   firedRuleId?: string;
   r7Gate?: {

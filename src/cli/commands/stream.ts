@@ -7,6 +7,7 @@
 
 
 import type { StageArtifact } from '../../agent_loop/types.ts';
+import type { AgentLoopEvent } from '../../agent_loop/events.ts';
 import { openFarDb } from '../../db/open.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 import { executeAskRun } from './ask.ts';
@@ -17,6 +18,8 @@ export interface StreamArgs {
   readonly mode: 'full' | 'quick';
   readonly json: boolean;
   readonly profile: string;
+  /** P0-3 事件流显示（run_started/stage_started/stage_completed/...·2026-08-07）。 */
+  readonly events: boolean;
 }
 
 /**
@@ -27,6 +30,7 @@ export function parseStreamArgs(argv: readonly string[]): StreamArgs {
   let mode: 'full' | 'quick' = 'full';
   let json = false;
   let profile = 'offline_replay';
+  let events = false;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -47,6 +51,10 @@ export function parseStreamArgs(argv: readonly string[]): StreamArgs {
       profile = argv[++i] ?? profile;
       continue;
     }
+    if (a === '--events') {
+      events = true;
+      continue;
+    }
     if (a.startsWith('--')) {
       throw new Error(`far stream: unknown argument "${a}"`);
     }
@@ -57,7 +65,7 @@ export function parseStreamArgs(argv: readonly string[]): StreamArgs {
     }
   }
 
-  return { question, mode, json, profile };
+  return { question, mode, json, profile, events };
 }
 
 const STAGE_LABELS: Readonly<Record<string, string>> = {
@@ -68,6 +76,38 @@ const STAGE_LABELS: Readonly<Record<string, string>> = {
   stage5_plan: 'Planning',
   stage6_feedback: 'Feedback',
 };
+
+/** P0-3 事件流渲染（--events）。json 模式输出单行 JSON 事件（管道/SSE 消费友好）。 */
+function renderEventLine(evt: AgentLoopEvent, json: boolean): void {
+  if (json) {
+    process.stdout.write(`${JSON.stringify(evt)}\n`);
+    return;
+  }
+  switch (evt.type) {
+    case 'run_started':
+      process.stdout.write(`  ▶ run started · max ${evt.maxIterations} iter · ${evt.verdictDriven ? 'verdict-driven' : 'feedback'}\n`);
+      break;
+    case 'stage_started': {
+      const label = STAGE_LABELS[evt.stageId] ?? evt.stageId;
+      process.stdout.write(`  ◐ iter ${evt.iteration} · ${evt.stageId} (${label})...\n`);
+      break;
+    }
+    case 'stage_completed': {
+      const flag = evt.degraded ? ' ⚠degraded' : '';
+      process.stdout.write(`  ◑ iter ${evt.iteration} · ${evt.stageId} ✓ · ${evt.payloadKind} · ${evt.tokens} tokens${flag}\n`);
+      break;
+    }
+    case 'iteration_completed':
+      process.stdout.write(`  ↻ iter ${evt.iteration} done · ${evt.tokensConsumed} tokens · verdict=${evt.verdict ?? 'n/a'}\n`);
+      break;
+    case 'run_completed':
+      process.stdout.write(`  ✓ run done · reason=${evt.reason} · ${evt.iterations} iter · verdict=${evt.verdict ?? 'n/a'}\n`);
+      break;
+    case 'run_error':
+      process.stdout.write(`  ✗ run error · code=${evt.code} · ${evt.message}\n`);
+      break;
+  }
+}
 
 function renderStageLine(artifact: StageArtifact, json: boolean): void {
   const tokens = artifact.callResult.credential.tokenUsage.totalTokens;
@@ -95,7 +135,7 @@ export async function runStream(argv: readonly string[]): Promise<number> {
 
   if (args.question.trim().length === 0) {
     process.stderr.write(
-      'far stream: missing question.\n  usage: far stream "<question>" [--mode full|quick] [--json]\n',
+      'far stream: missing question.\n  usage: far stream "<question>" [--mode full|quick] [--json] [--events]\n',
     );
     return 2;
   }
@@ -116,8 +156,13 @@ export async function runStream(argv: readonly string[]): Promise<number> {
   const db = openFarDb(':memory:');
   try {
     const gitCommitSha = resolveGitCommitSha();
-    const result = await executeAskRun(db, args.question, args.mode, gitCommitSha, (a) =>
-      renderStageLine(a, args.json),
+    const result = await executeAskRun(
+      db,
+      args.question,
+      args.mode,
+      gitCommitSha,
+      (a) => renderStageLine(a, args.json),
+      args.events ? (evt) => renderEventLine(evt, args.json) : undefined,
     );
 
     const ls = result.loopState;

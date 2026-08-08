@@ -337,20 +337,25 @@ export interface IntermediateVerdict {
 }
 
 /**
+ * 终止原因判别联合（P0-3 事件流复用·events.ts 引用）。
+ */
+export type TerminationReason =
+  | 'feedback_converged'
+  | 'verdict_confirmed' // V2 裁决驱动：中间裁决 CONFIRMED → 确定性立即终止
+  | 'verdict_converged' // V2 裁决驱动：连续两轮裁决输入指纹相同 → 防 p-hacking 空转终止
+  | 'max_iterations'
+  | 'max_tokens'
+  | 'max_duration'
+  | 'error';
+
+/**
  * runAgentLoop 的最终状态。
  */
 export interface LoopState {
   readonly runId: string;
   readonly iterationsCompleted: number;
   readonly terminated: boolean;
-  readonly terminationReason:
-    | 'feedback_converged'
-    | 'verdict_confirmed' // V2 裁决驱动：中间裁决 CONFIRMED → 确定性立即终止
-    | 'verdict_converged' // V2 裁决驱动：连续两轮裁决输入指纹相同 → 防 p-hacking 空转终止
-    | 'max_iterations'
-    | 'max_tokens'
-    | 'max_duration'
-    | 'error';
+  readonly terminationReason: TerminationReason;
   readonly artifacts: readonly StageArtifact[]; // 全部阶段产物（按顺序）
   /** verdict 阶段产出的 VerdictNode（若到达 [4] 裁决） */
   readonly verdictNode: VerdictNode | null;
@@ -374,6 +379,7 @@ export interface AgentLoopError {
     | 'COST_BUDGET_EXCEEDED'
     | 'STAGE_RECEIPT_FORGED'
     | 'STAGE_SCHEMA_INVALID'
+    | 'EXTENSION_STAGE_FAILED'
     | 'RETRY_EXHAUSTED';
   readonly message: string;
   readonly stageId: StageId | null;

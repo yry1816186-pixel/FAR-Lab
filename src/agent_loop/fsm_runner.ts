@@ -76,6 +76,9 @@ import type {
 import { StageReceiptStore, StageReceiptForgedError } from './stage_receipt_store.ts';
 import { compactArtifacts } from './compaction.ts';
 import { evaluateIntermediateVerdict } from './verdict_stage.ts';
+import type { AgentLoopEvent } from './events.ts';
+import { ExtensionStageError, listStages } from './stage_registry.ts';
+import type { AgentLoopController } from './controller.ts';
 import type { Verdict } from '../schema/enums.ts';
 import { SessionRecorder } from '../trace/session_recorder.ts';
 import { createHash } from 'node:crypto';
@@ -144,6 +147,13 @@ export interface RunAgentLoopArgs {
   /** 可选：每阶段 artifact 入链后回调（流式输出用·向后兼容·默认不调）。 */
   readonly onArtifact?: (artifact: StageArtifact) => void;
   /**
+   * P0-3 运行时事件流（2026-08-07 落地）：订阅 runAgentLoop 生命周期事件
+   * （run_started / stage_started / stage_completed / iteration_completed /
+   * run_completed / run_error）。供 SSE/CLI/前端实时显示。
+   * 缺省 undefined → 零行为（字节等同基线·回归兼容）。
+   */
+  readonly onEvent?: (evt: AgentLoopEvent) => void;
+  /**
    * IC-15 T1'（V2 裁决软建议）：上一次完整 runAgentLoop 调用的 verdict kind。
    * 可选；缺省 = undefined → stage6 prompt 不注入 verdict hint（字节等同基线·回归兼容）。
    * 仅传 5 值枚举本身；软建议非硬驱动（不触发自动 regen 循环，防 p-hacking）。
@@ -169,6 +179,21 @@ export interface RunAgentLoopArgs {
    * 缺省 undefined=false → 行为字节等同基线（LLM 自评反馈边不变·零回归）。
    */
   readonly verdictDrivenFeedback?: boolean;
+  /**
+   * P0-3 人工接管（2026-08-07 落地）：controller.hold() 后，fsm 在下一阶段开始处
+   * 发出 stage_held 事件并异步等待；controller.resume() 发 stage_resumed 后继续。
+   * 供 CLI 交互/前端 UI/测试插入人工检查-干预点。缺省 undefined → 零行为
+   * （未 hold 时 waitIfHeld 同步返回·字节等同基线）。
+   */
+  readonly controller?: AgentLoopController;
+  /**
+   * P0-3 并行扩展阶段（2026-08-07 落地）：主链收敛并产出裁决后，并发执行
+   * stage_registry 中注册的带 executor 的扩展阶段（order>6·Promise.all 并行），
+   * 产物并入 artifacts（复用证据链/收据/事件语义）。扩展失败显式抛
+   * ExtensionStageError → LoopState.error.code='EXTENSION_STAGE_FAILED'
+   * （反剧场 F11·绝不静默吞错）。缺省 undefined=false → 零行为（字节等同基线）。
+   */
+  readonly runParallelExtensionStages?: boolean;
 }
 
 
@@ -211,6 +236,16 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       payload: { researchInputHash: shortSha(args.researchInput) },
     });
   }
+  if (args.onEvent !== undefined) {
+    args.onEvent({
+      type: 'run_started',
+      runId: args.runId,
+      ts: new Date().toISOString(),
+      researchInputHash: shortSha(args.researchInput),
+      maxIterations: termination.maxIterations,
+      verdictDriven: args.verdictDrivenFeedback ?? false,
+    });
+  }
   const appendArtifact = (a: StageArtifact): void => {
     artifacts.push(a);
     if (session !== null) {
@@ -224,6 +259,19 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           degraded: a.degraded,
           contentHash: shortSha(JSON.stringify(a.structured)),
         },
+      });
+    }
+    if (args.onEvent !== undefined) {
+      args.onEvent({
+        type: 'stage_completed',
+        runId: args.runId,
+        iteration,
+        stageId: a.stageId,
+        payloadKind: a.payloadKind,
+        degraded: a.degraded,
+        tokens: tokensConsumed,
+        contentHash: shortSha(JSON.stringify(a.structured)),
+        ts: new Date().toISOString(),
       });
     }
     if (args.onArtifact !== undefined) args.onArtifact(a);
@@ -305,6 +353,37 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       if (resumeStore !== null && resumeStore.hasSnapshot(key)) {
         // 幂等重放:不重复 LLM 调用、不重复落库、不重复副作用
         return resumeStore.snapshot(key);
+      }
+      if (args.onEvent !== undefined) {
+        args.onEvent({
+          type: 'stage_started',
+          runId: args.runId,
+          iteration,
+          stageId,
+          ts: new Date().toISOString(),
+        });
+      }
+      // P0-3 人工接管：hold 后暂停在此处（人工检查/干预点·resume 前不执行本阶段）
+      if (args.controller !== undefined && args.controller.isHeld()) {
+        if (args.onEvent !== undefined) {
+          args.onEvent({
+            type: 'stage_held',
+            runId: args.runId,
+            iteration,
+            stageId,
+            ts: new Date().toISOString(),
+          });
+        }
+        await args.controller.waitIfHeld();
+        if (args.onEvent !== undefined) {
+          args.onEvent({
+            type: 'stage_resumed',
+            runId: args.runId,
+            iteration,
+            stageId,
+            ts: new Date().toISOString(),
+          });
+        }
       }
       const artifact = await execute();
       if (resumeStore !== null) {
@@ -476,6 +555,37 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           gitCommitSha: args.gitCommitSha,
           runId: args.runId,
         });
+        // P0-3 并行扩展阶段：主链收敛并产出裁决后，并发执行注册的扩展 executor
+        // （order>6·独立分支·产物复用证据链/收据/事件语义）。扩展失败显式抛错
+        // （ExtensionStageError）→ 外层 catch → LoopState.error.code='EXTENSION_STAGE_FAILED'
+        // （反剧场 F11·绝不静默吞错）。
+        if (args.runParallelExtensionStages === true) {
+          const extensionStages = listStages().filter(
+            (s) => s.order > 6 && s.executor !== undefined,
+          );
+          if (extensionStages.length > 0) {
+            const extensionResults: StageArtifact[] = await Promise.all(
+              extensionStages.map(async (s) => {
+                const executor = s.executor;
+                if (executor === undefined) {
+                  throw new ExtensionStageError(s.stageId, 'missing executor');
+                }
+                try {
+                  return await executor(ctx);
+                } catch (err) {
+                  // 包装为 ExtensionStageError：任何 executor 失败都是显式错误
+                  // （fail-closed·绝不静默吞错·避免落入 RETRY_EXHAUSTED 兜底）
+                  const message = err instanceof Error ? err.message : String(err);
+                  throw new ExtensionStageError(s.stageId, message);
+                }
+              }),
+            );
+            for (const a of extensionResults) {
+              appendArtifact(a);
+              tokensConsumed += extractTotalTokens(a.callResult);
+            }
+          }
+        }
         finalizeSession({
           iterations: iteration,
           reason,
@@ -483,6 +593,18 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           artifactCount: artifacts.length,
           intermediateVerdicts: intermediateVerdicts.map((iv) => `${iv.iteration}:${iv.verdict}`),
         });
+        if (args.onEvent !== undefined) {
+          args.onEvent({
+            type: 'run_completed',
+            runId: args.runId,
+            reason,
+            iterations: iteration,
+            artifactCount: artifacts.length,
+            verdict: verdictNode?.verdict ?? null,
+            decisiveRuleId: intermediateVerdicts.at(-1)?.decisiveRuleId ?? null,
+            ts: new Date().toISOString(),
+          });
+        }
         return {
           runId: args.runId,
           iterationsCompleted: iteration,
@@ -495,10 +617,34 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         };
       }
 
+      if (args.onEvent !== undefined) {
+        args.onEvent({
+          type: 'iteration_completed',
+          runId: args.runId,
+          iteration,
+          tokensConsumed,
+          continueIteration: true,
+          verdict: intermediateVerdicts.at(-1)?.verdict ?? null,
+          decisiveRuleId: intermediateVerdicts.at(-1)?.decisiveRuleId ?? null,
+          ts: new Date().toISOString(),
+        });
+      }
       // 未终止：iteration++ + 下一轮 stage3 会消费 feedbackSignal（[6]→[3] 回灌）
       iteration++;
     }
   } catch (err) {
+    // P0-3 事件流：错误终止 → run_error 事件（供 SSE/CLI 实时错误显示）
+    if (args.onEvent !== undefined) {
+      args.onEvent({
+        type: 'run_error',
+        runId: args.runId,
+        code: err instanceof Error ? err.name : String(err),
+        message: err instanceof Error ? err.message : String(err),
+        iterations: iteration,
+        artifactCount: artifacts.length,
+        ts: new Date().toISOString(),
+      });
+    }
     // E-session：错误终止也落 run_completed（error 标记·审计完整）
     finalizeSession({
       iterations: iteration,
@@ -540,6 +686,24 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           code: 'STAGE_RECEIPT_FORGED',
           message: err.message,
           stageId: null,
+          cause: err,
+        },
+      };
+    }
+    if (err instanceof ExtensionStageError) {
+      // P0-3 并行扩展阶段失败：显式错误码 + stageId（fail-closed·绝不静默吞错）
+      return {
+        runId: args.runId,
+        iterationsCompleted: iteration,
+        terminated: true,
+        terminationReason: 'error',
+        artifacts,
+        verdictNode: null,
+        intermediateVerdicts,
+        error: {
+          code: 'EXTENSION_STAGE_FAILED',
+          message: err.message,
+          stageId: err.stageId,
           cause: err,
         },
       };
@@ -689,6 +853,7 @@ function isAgentLoopErrorLike(err: unknown): err is import('./types.ts').AgentLo
     'MAX_TOKENS_EXCEEDED',
     'MAX_DURATION_EXCEEDED',
     'STAGE_SCHEMA_INVALID',
+    'EXTENSION_STAGE_FAILED',
     'RETRY_EXHAUSTED',
   ];
   return validCodes.includes(code);

@@ -251,6 +251,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
       args.mode,
       gitCommitSha,
       undefined,
+      undefined,
       competitionGateway,
       args.resumePath ?? undefined,
       args.verdictDriven || undefined,

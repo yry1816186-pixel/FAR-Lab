@@ -21,6 +21,7 @@ export const en: Record<MessageKey, string> = {
   'nav.versions': 'Versions',
   'nav.wizard': 'Wizard',
   'nav.v2receipt': 'V2 Receipt',
+  'nav.events': 'Live Events',
   'nav.aria': 'Main navigation',
   'nav.themeToLight': 'Switch to light theme',
   'nav.themeToDark': 'Switch to dark theme',

@@ -16,6 +16,8 @@
 // FAR-Lab's deterministic kernel + anti-theater detectors, and produces
 // an independently verifiable verdict.
 
+import { pathToFileURL } from 'node:url';
+
 import Database from 'better-sqlite3';
 
 import { buildBemChain, type BemAnalysisMode } from '../../science_harness/bem_pipeline.ts';
@@ -355,41 +357,55 @@ function renderResult(r: PaperRunResult): string {
   return lines.join('\n');
 }
 
-// ---- CLI arg parsing ----
-const args = process.argv.slice(2);
-let paperArg = 'bem';
-let modeArg: BemAnalysisMode = 'as-published';
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--paper' && args[i + 1] !== undefined) {
-    paperArg = args[i + 1] as string;
-    i++;
-  } else if (args[i] === '--mode' && args[i + 1] !== undefined) {
-    const m = args[i + 1];
-    if (m === 'as-published' || m === 'corrected') {
-      modeArg = m;
-    } else {
-      process.stderr.write(`Invalid mode: ${m}. Use 'as-published' or 'corrected'.\n`);
-      process.exit(2);
+// ---- CLI 入口 ----
+
+/**
+ * `far real-paper` 命令入口：解析参数并运行真实论文管线。
+ * 返回进程退出码（0 = 成功；2 = 参数错误）。
+ */
+export function runRealPaperFromArgs(argv: readonly string[]): number {
+  let paperArg = 'bem';
+  let modeArg: BemAnalysisMode = 'as-published';
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--paper' && argv[i + 1] !== undefined) {
+      paperArg = argv[i + 1] as string;
+      i++;
+    } else if (argv[i] === '--mode' && argv[i + 1] !== undefined) {
+      const m = argv[i + 1];
+      if (m === 'as-published' || m === 'corrected') {
+        modeArg = m;
+      } else {
+        process.stderr.write(`Invalid mode: ${m}. Use 'as-published' or 'corrected'.\n`);
+        return 2;
+      }
+      i++;
     }
-    i++;
   }
+
+  if (paperArg !== 'bem' && paperArg !== 'ritchie' && paperArg !== 'osc') {
+    process.stderr.write(`Unknown paper: ${paperArg}. Currently supported: bem, ritchie, osc\n`);
+    return 2;
+  }
+
+  const result = paperArg === 'bem'
+    ? runBemPaper(modeArg)
+    : paperArg === 'ritchie'
+      ? runRitchiePaper()
+      : runOscPaper();
+
+  if (paperArg === 'ritchie') {
+    process.stdout.write(renderRitchieResult(result));
+  } else if (paperArg === 'osc') {
+    process.stdout.write(renderOscResult(result));
+  } else {
+    process.stdout.write(renderResult(result));
+  }
+  return 0;
 }
 
-if (paperArg !== 'bem' && paperArg !== 'ritchie' && paperArg !== 'osc') {
-  process.stderr.write(`Unknown paper: ${paperArg}. Currently supported: bem, ritchie, osc\n`);
-  process.exit(2);
-}
-
-const result = paperArg === 'bem'
-  ? runBemPaper(modeArg)
-  : paperArg === 'ritchie'
-    ? runRitchiePaper()
-    : runOscPaper();
-
-if (paperArg === 'ritchie') {
-  process.stdout.write(renderRitchieResult(result));
-} else if (paperArg === 'osc') {
-  process.stdout.write(renderOscResult(result));
-} else {
-  process.stdout.write(renderResult(result));
+// 直接执行入口：node src/cli/commands/real_paper.ts [--paper bem] [--mode as-published|corrected]
+const isMainModule =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMainModule) {
+  process.exitCode = runRealPaperFromArgs(process.argv.slice(2));
 }

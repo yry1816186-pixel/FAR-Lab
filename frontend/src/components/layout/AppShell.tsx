@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Play, Sun, Moon, Trophy, Gavel, Swords, Languages, Menu, X, GitCompare, Zap, Sparkles, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Play, Sun, Moon, Trophy, Gavel, Swords, Languages, Menu, X, GitCompare, Zap, Sparkles, ScrollText, Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { useI18n, type Locale } from '@/lib/i18n';
@@ -21,7 +21,7 @@ export interface AppShellProps {
 
 const NAV_ITEMS: ReadonlyArray<{
   readonly to: string;
-  readonly labelKey: 'nav.overview' | 'nav.hero' | 'nav.demo' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard' | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation' | 'nav.report' | 'nav.about' | 'nav.versions' | 'nav.wizard' | 'nav.v2receipt';
+  readonly labelKey: 'nav.overview' | 'nav.hero' | 'nav.demo' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard' | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation' | 'nav.report' | 'nav.about' | 'nav.versions' | 'nav.wizard' | 'nav.v2receipt' | 'nav.events';
   readonly icon: typeof LayoutDashboard;
 }> = [
   { to: '/', labelKey: 'nav.hero', icon: Zap },
@@ -38,6 +38,7 @@ const NAV_ITEMS: ReadonlyArray<{
   { to: '/honesty', labelKey: 'nav.honesty', icon: ShieldAlert },
   { to: '/ablation', labelKey: 'nav.ablation', icon: FlaskConical },
   { to: '/report', labelKey: 'nav.report', icon: FileText },
+  { to: '/events', labelKey: 'nav.events', icon: Radio },
   { to: '/about', labelKey: 'nav.about', icon: Info },
 ];
 

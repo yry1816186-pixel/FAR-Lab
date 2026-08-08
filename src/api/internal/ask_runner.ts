@@ -27,6 +27,7 @@ import { GENESIS_PROOF_HASH } from '../../proof_envelope/types.ts';
  * @param mode 'full' | 'quick'（stage 裁剪）。
  * @param gitCommitSha 链头锚定 commit sha。
  * @param onArtifact 可选 artifact 流式回调。
+ * @param onEvent P0-3 可选运行时事件流回调（透传 executeLoop.onEvent·SSE/CLI 实时显示）。
  * @param gateway 可选真实 provider 网关（缺省 offline_replay fixture）。
  * @param resumeStorePath 可选 resume 存储路径。
  * @param verdictDrivenFeedback 可选 V2 裁决驱动反馈边（循环内中间裁决终止/regen 软建议）。
@@ -39,6 +40,7 @@ export async function executeAskRun(
   mode: 'full' | 'quick',
   gitCommitSha: string,
   onArtifact?: (artifact: StageArtifact) => void,
+  onEvent?: (evt: import('../../agent_loop/events.ts').AgentLoopEvent) => void,
   gateway?: LlmGateway,
   resumeStorePath?: string,
   verdictDrivenFeedback?: boolean,
@@ -53,6 +55,7 @@ export async function executeAskRun(
     ...(profile === undefined ? {} : { profile }),
     ...(resumeStorePath === undefined ? {} : { resumeStorePath }),
     ...(onArtifact === undefined ? {} : { onArtifact }),
+    ...(onEvent === undefined ? {} : { onEvent }),
     ...(gateway === undefined ? {} : { gateway }),
     ...(verdictDrivenFeedback === undefined ? {} : { verdictDrivenFeedback }),
     ...(modelSnapshot === undefined ? {} : { modelSnapshot }),

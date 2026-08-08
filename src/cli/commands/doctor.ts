@@ -7,11 +7,18 @@
 //   · --live-qwen-smoke 显式才调真实 API（复用 ci/competition_qwen_smoke.ts，自带无 key graceful skip）。
 // 退出码：0 全绿 / 1 有 FAIL（核心能力损坏）/ 2 仅 WARN（可用但受限）。
 
-import { existsSync } from 'node:fs';
+import { accessSync, constants, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { PACKAGE_ROOT } from '../paths.ts';
+import {
+  PATH_SEP,
+  PACKAGE_ROOT,
+  crossPlatformHomeDir,
+  crossPlatformTmpDir,
+  safeJoin,
+  toPosixPath,
+} from '../paths.ts';
 import { runVerify } from './verify.ts';
 
 /** Input parameters for operations involving doctor options. */
@@ -336,6 +343,53 @@ function checkLiveQwenSmoke(root: string | null, checks: Check[]): void {
   });
 }
 
+function checkCrossPlatform(checks: Check[]): void {
+  // P0-1: 跨平台路径工具自检（Windows/Linux/macOS 上路径语义统一）。
+  checks.push({
+    name: 'path separator',
+    status: 'info',
+    detail: `${JSON.stringify(PATH_SEP)} (${process.platform} · ${process.arch})`,
+  });
+  const posix = toPosixPath('a\\b\\c');
+  checks.push({
+    name: 'path normalization self-check',
+    status: posix === 'a/b/c' ? 'ok' : 'fail',
+    detail: `toPosixPath('a\\\\b\\\\c') → ${posix} (must be 'a/b/c' on every OS)`,
+  });
+  let traversalGuard: boolean;
+  try {
+    safeJoin('root', 'a', 'b');
+    safeJoin('root', '..', 'x');
+    traversalGuard = false; // 未抛错 = 守卫失效
+  } catch {
+    traversalGuard = true;
+  }
+  checks.push({
+    name: 'safeJoin traversal guard',
+    status: traversalGuard ? 'ok' : 'fail',
+    detail: traversalGuard ? 'directory traversal segments rejected (fail-closed)' : 'GUARD BROKEN: .. accepted',
+  });
+  const tmp = crossPlatformTmpDir();
+  let tmpWritable: boolean;
+  try {
+    accessSync(tmp, constants.W_OK);
+    tmpWritable = true;
+  } catch {
+    tmpWritable = false;
+  }
+  checks.push({
+    name: 'temp dir (cross-platform)',
+    status: tmpWritable ? 'ok' : 'warn',
+    detail: `${tmp} ${tmpWritable ? 'writable' : 'NOT writable (set TMPDIR / TEMP)'}`,
+  });
+  const home = crossPlatformHomeDir();
+  checks.push({
+    name: 'home dir (cross-platform)',
+    status: home.length > 0 ? 'ok' : 'warn',
+    detail: home.length > 0 ? home : 'unresolvable via os.homedir()',
+  });
+}
+
 const SYMBOL: Readonly<Record<CheckStatus, string>> = {
   ok: '✓',
   warn: '!',
@@ -355,6 +409,7 @@ export async function runDoctor(opts: DoctorOptions): Promise<number> {
   const checks: Check[] = [];
 
   checkEnv(checks);
+  checkCrossPlatform(checks);
   checkProject(root, checks);
   await checkCoreCapability(root, checks);
   if (opts.dbPath !== undefined) {
