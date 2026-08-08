@@ -90,6 +90,7 @@ export async function runCourtSession(
         'quick',
         gitCommitSha,
         undefined,
+        undefined,
         gateway,
         undefined,
         undefined,

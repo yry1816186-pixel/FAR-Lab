@@ -30,6 +30,7 @@ const ArenaPage = lazy(() => import('@/pages/ArenaPage'));
 const VersionDiffPage = lazy(() => import('@/pages/VersionDiffPage'));
 const WizardPage = lazy(() => import('@/pages/WizardPage'));
 const V2ReceiptPage = lazy(() => import('@/pages/V2ReceiptPage'));
+const EventsPage = lazy(() => import('@/pages/EventsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,7 +81,8 @@ export default function App() {
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/versions" element={<VersionDiffPage />} />
                     <Route path="/wizard" element={<WizardPage />} />
-                  <Route path="/v2-receipt" element={<V2ReceiptPage />} />
+                    <Route path="/v2-receipt" element={<V2ReceiptPage />} />
+                    <Route path="/events" element={<EventsPage />} />
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Suspense>

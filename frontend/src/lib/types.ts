@@ -62,6 +62,105 @@ export type StageId =
   | 'stage5_plan'
   | 'stage6_feedback';
 
+/** Authority: src/schema/enums.ts PAYLOAD_KINDS (9 values). */
+export type PayloadKind =
+  | 'hypothesis'
+  | 'experiment'
+  | 'observation'
+  | 'citation'
+  | 'plan'
+  | 'feedback'
+  | 'understanding'
+  | 'integration'
+  | 'meta';
+
+/** Authority: src/agent_loop/types.ts TerminationReason. */
+export type TerminationReason =
+  | 'feedback_converged'
+  | 'verdict_confirmed'
+  | 'verdict_converged'
+  | 'max_iterations'
+  | 'max_tokens'
+  | 'max_duration'
+  | 'error';
+
+// ---------- Runtime event stream DTO (mirror src/agent_loop/events.ts) ----------
+
+/**
+ * SSE `/api/v1/events/stream` frame payload — verbatim mirror of AgentLoopEvent.
+ * Discriminated union keyed by `type`. All fields pure-data JSON (SSE-transport-safe).
+ */
+export type AgentEventDto =
+  | {
+      readonly type: 'run_started';
+      readonly runId: string;
+      readonly ts: string;
+      readonly researchInputHash: string;
+      readonly maxIterations: number;
+      readonly verdictDriven: boolean;
+    }
+  | {
+      readonly type: 'stage_started';
+      readonly runId: string;
+      readonly iteration: number;
+      readonly stageId: StageId;
+      readonly ts: string;
+    }
+  | {
+      readonly type: 'stage_completed';
+      readonly runId: string;
+      readonly iteration: number;
+      readonly stageId: StageId;
+      readonly payloadKind: PayloadKind;
+      readonly degraded: boolean;
+      readonly tokens: number;
+      readonly contentHash: string;
+      readonly ts: string;
+    }
+  | {
+      readonly type: 'iteration_completed';
+      readonly runId: string;
+      readonly iteration: number;
+      readonly tokensConsumed: number;
+      readonly continueIteration: boolean;
+      readonly verdict: VerdictValue | null;
+      readonly decisiveRuleId: string | null;
+      readonly ts: string;
+    }
+  | {
+      readonly type: 'run_completed';
+      readonly runId: string;
+      readonly reason: TerminationReason;
+      readonly iterations: number;
+      readonly artifactCount: number;
+      readonly verdict: VerdictValue | null;
+      readonly decisiveRuleId: string | null;
+      readonly ts: string;
+    }
+  | {
+      readonly type: 'run_error';
+      readonly runId: string;
+      readonly code: string;
+      readonly message: string;
+      readonly iterations: number;
+      readonly artifactCount: number;
+      readonly ts: string;
+    }
+  | {
+      readonly type: 'stage_held';
+      readonly runId: string;
+      readonly iteration: number;
+      readonly stageId: StageId;
+      readonly ts: string;
+    }
+  | {
+      readonly type: 'stage_resumed';
+      readonly runId: string;
+      readonly iteration: number;
+      readonly stageId: StageId;
+      readonly ts: string;
+    };
+
 // ---------- Shared nested specs (mirror src/falsifiability/types.ts) ----------
 
 export type ThresholdSemantics = 'gt' | 'lt' | 'range';

@@ -3,6 +3,11 @@
 // 职责：FAR-Lab CLI 入口（FI-1 · far 命令家族）。
 // CLI 命令集 + far status + far verify。
 //
+// 分发为表驱动：命令注册表 + 分发器在 src/cli/registry.ts；本文件只做两件事——
+// 1) 提供命令实现（COMMANDS 数组，每个描述符保留原 parseOptions + OptionSchema 解析，
+//    重型/低频命令保持 lazy import，避免冷启动加载无关模块）；
+// 2) 入口 main() 委托 registry.runCli 完成 查表 → -h/--help → run 的分发。
+//
 // 已实装子命令：`far status`（01 §5）+ `far verify`（04 §5 · FI-9 第三方独立重算）
 // + `far export receipt`（04 §9 Trust Receipt DOC 投影）+ `far export receipt-v2` + `far export far-proof` + `far bench run`
 // + `far verify-golden`（14 GV）+ `far fec compile|freeze` + `far fsm advance`（P2-2）
@@ -31,183 +36,212 @@ import { runCourt } from './commands/court.ts';
 import { runArena } from './commands/arena.ts';
 import { runInit } from './commands/init.ts';
 import { runDoctor } from './commands/doctor.ts';
+import { runHardware } from './commands/hardware.ts';
 import { runVersion } from './commands/version.ts';
 import { runScheduleFromArgs } from './commands/schedule.ts';
 import { parseOptions, reportErrors, type OptionSchema } from './parse_options.ts';
+import { runCli, type CliCommand } from './registry.ts';
+
+// ---------------------------------------------------------------------------
+// 命令注册表（声明式）：每个描述符 = name / aliases / description / run。
+// run 收到 argv.slice(1)（已去掉命令名）；返回 number 作为退出码。
+// 重型/低频命令（demo v2 / verify --v2 / export receipt-v2 / lifecycle /
+// backup / real-paper）在 run 内 lazy import，保持 CLI 冷启动轻量。
+// ---------------------------------------------------------------------------
+
+const COMMANDS: readonly CliCommand[] = [
+  {
+    name: 'version',
+    aliases: ['--version', '-v'],
+    description: 'print version + git HEAD',
+    run: () => runVersion(),
+  },
+  {
+    name: 'doctor',
+    description: 'environment self-check (no network, no keys by default)',
+    run: async (args) => {
+      const liveQwenSmoke = args.includes('--live-qwen-smoke');
+      const dbIdx = args.indexOf('--db');
+      const dbPath = dbIdx !== -1 ? args[dbIdx + 1] : undefined;
+      return runDoctor({ liveQwenSmoke, ...(dbPath !== undefined ? { dbPath } : {}) });
+    },
+  },
+  {
+    name: 'hardware',
+    description: 'best-effort runtime compute-backend probe',
+    run: async (args) => runHardware({ json: args.includes('--json') }),
+  },
+  {
+    name: 'status',
+    description: 'emit the single SSOT status report',
+    run: (args) => runStatusFromArgs(args),
+  },
+  {
+    name: 'api',
+    description: 'start the REST API server (Fastify; frontend defaults to localhost:3000)',
+    run: async (args) => {
+      // server 监听中保持进程存活（startServer 注册了 SIGINT/SIGTERM 优雅关停）。
+      // 返回 undefined → runCli 不再调用 process.exit。
+      await runApi(args);
+    },
+  },
+  {
+    name: 'demo',
+    description: 'one-shot demo (14 Golden Vectors + end-to-end demo claim; fully offline)',
+    run: async (args) => {
+      // `far demo v2` shows the V2 receipt verification path (six assurance dimensions).
+      if (args[0] === 'v2' || args[0] === '--v2') {
+        const { runV2ReceiptVerification, formatV2VerificationForDisplay, V2_DEMO_SAMPLE } =
+          await import('../v2_domain/receipt_verify_v2.ts');
+        const result = runV2ReceiptVerification(V2_DEMO_SAMPLE);
+        process.stdout.write(formatV2VerificationForDisplay(result) + '\n');
+        return 0;
+      }
+      return runDemo(args[0]);
+    },
+  },
+  {
+    name: 'ask',
+    description: 'run the full 6-stage FSM once (runAgentLoop); emits a verdict + evidence chain',
+    run: async (args) => runAsk(args),
+  },
+  {
+    name: 'stream',
+    description: 'like ask, but streams each stage live (real streaming, not replay)',
+    run: async (args) => runStream(args),
+  },
+  {
+    name: 'repl',
+    description: 'interactive REPL (ask / :fork <suffix> / :history / :quit)',
+    run: async () => runRepl(),
+  },
+  {
+    name: 'replay',
+    description: 'replay the evidence chain (time machine; hash-chain verify)',
+    run: (args) => runReplay(args),
+  },
+  {
+    name: 'court',
+    description: 'cross-model reliability court (issues a ReliabilityCertificate)',
+    run: async (args) => runCourt(args),
+  },
+  {
+    name: 'arena',
+    description: 'adversarial science arena (refuter attacks + deterministic arbiter scoreboard)',
+    run: async (args) => runArena(args),
+  },
+  {
+    name: 'init',
+    description: 'scaffold a DomainPack (config + claim/fec templates)',
+    run: (args) => runInit(args),
+  },
+  {
+    name: 'verify',
+    description: 'third-party independent re-computation verification',
+    run: async (args) => {
+      // `far verify --v2` routes to the V2 six-dimension verification path.
+      if (args.includes('--v2')) {
+        const envelopeIdx = args.indexOf('--envelope');
+        const bundleIdx = args.indexOf('--bundle');
+        const { runVerifyV2 } = await import('./commands/verify_v2.ts');
+        const opts: { envelopePath?: string; bundlePath?: string; json: boolean } = {
+          json: args.includes('--json'),
+        };
+        if (envelopeIdx !== -1) {
+          const ep = args[envelopeIdx + 1];
+          if (ep !== undefined) opts.envelopePath = ep;
+        }
+        if (bundleIdx !== -1) {
+          const bp = args[bundleIdx + 1];
+          if (bp !== undefined) opts.bundlePath = bp;
+        }
+        const result = await runVerifyV2(opts);
+        process.stdout.write(result.output + '\n');
+        return result.exitCode;
+      }
+      return runVerifyFromArgs(args);
+    },
+  },
+  {
+    name: 'verify-golden',
+    description: 'recompute the verdict golden vectors',
+    run: (args) => runVerifyGoldenFromArgs(args),
+  },
+  {
+    name: 'bench',
+    description: 'FAR-Bench demo profile',
+    run: async (args) => runBenchFromArgs(args),
+  },
+  {
+    name: 'export',
+    description: 'Trust Receipt / .far-proof evidence bundle export',
+    run: (args) => runExportFromArgs(args),
+  },
+  {
+    name: 'fec',
+    description: 'FEC V2 compile + fecHash recompute / freeze cross-check',
+    run: (args) => runFecFromArgs(args),
+  },
+  {
+    name: 'fsm',
+    description: 'advance the 9-state CLI protocol FSM and append a stageReceipt hash link',
+    run: (args) => runFsmFromArgs(args),
+  },
+  {
+    name: 'audit-seed-cherry',
+    description: 'FUSION-OS-1 detector-validation showcase (cherry-pick replay)',
+    run: (args) => runAuditSeedCherryFromArgs(args),
+  },
+  {
+    name: 'audit-multiseed',
+    description: 'FUSION-OS-1 real multi-seed audit (seed-dependent BLS)',
+    run: (args) => runAuditMultiseedFromArgs(args),
+  },
+  {
+    name: 'c-astro',
+    description: 'C-ASTRO-0001 online TESS dataset_resolver production wiring (P1-6)',
+    run: (args) => runCAstroFromArgs(args),
+  },
+  {
+    name: 'lifecycle',
+    description: 'retraction/correction/supersession lifecycle (IC-05; tombstone append-only)',
+    run: async (args) => {
+      const { runLifecycle } = await import('./commands/lifecycle.ts');
+      return runLifecycle(args);
+    },
+  },
+  {
+    name: 'backup',
+    description: 'safe backup via VACUUM INTO (IC-03; full integrity_check first)',
+    run: async (args) => {
+      const { runBackup } = await import('./commands/backup.ts');
+      return runBackup(args);
+    },
+  },
+  {
+    name: 'schedule',
+    description: 'scheduled re-verification (re-verify claims over time; JSON-persisted)',
+    run: (args) => runScheduleFromArgs(args),
+  },
+  {
+    name: 'real-paper',
+    description: 'run a real published paper through the FAR-Lab pipeline',
+    run: async (args) => {
+      // real-paper: 真实论文端到端验证（DEEP_AUDIT 缺失项）
+      const { runRealPaperFromArgs } = await import('./commands/real_paper.ts');
+      return runRealPaperFromArgs(args);
+    },
+  },
+];
 
 async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
-  const command = argv[0];
-
-  if (command === undefined || command === '--help' || command === '-h') {
-    process.stdout.write(HELP_TEXT);
-    process.exit(command === undefined ? 1 : 0);
-  }
-
-  // Per-command help: `far <cmd> --help` / `-h` prints that command's usage section.
-  if (argv.slice(1).some((a) => a === '-h' || a === '--help')) {
-    process.stdout.write(commandHelp(command) + '\n');
-    process.exit(0);
-  }
-
-  if (command === 'version' || command === '--version' || command === '-v') {
-    process.exit(runVersion());
-  }
-
-  if (command === 'doctor') {
-    const liveQwenSmoke = argv.includes('--live-qwen-smoke');
-    const dbIdx = argv.indexOf('--db');
-    const dbPath = dbIdx !== -1 ? argv[dbIdx + 1] : undefined;
-    const exitCode = await runDoctor({ liveQwenSmoke, ...(dbPath !== undefined ? { dbPath } : {}) });
+  const exitCode = await runCli(
+    { commands: COMMANDS, helpText: HELP_TEXT, commandHelp },
+    process.argv.slice(2),
+  );
+  if (exitCode !== undefined) {
     process.exit(exitCode);
   }
-
-  if (command === 'status') {
-    const exitCode = runStatusFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'api') {
-    // server 监听中保持进程存活（startServer 注册了 SIGINT/SIGTERM 优雅关停）。
-    await runApi(argv.slice(1));
-    return;
-  }
-
-  if (command === 'demo') {
-    // `far demo v2` shows the V2 receipt verification path (six assurance dimensions).
-    if (argv[1] === 'v2' || argv[1] === '--v2') {
-      const { runV2ReceiptVerification, formatV2VerificationForDisplay, V2_DEMO_SAMPLE } =
-        await import('../v2_domain/receipt_verify_v2.ts');
-      const result = runV2ReceiptVerification(V2_DEMO_SAMPLE);
-      process.stdout.write(formatV2VerificationForDisplay(result) + '\n');
-      process.exit(0);
-    }
-    process.exit(runDemo(argv[1]));
-  }
-
-  if (command === 'ask') {
-    const exitCode = await runAsk(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'stream') {
-    const exitCode = await runStream(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'repl') {
-    const exitCode = await runRepl();
-    process.exit(exitCode);
-  }
-
-  if (command === 'replay') {
-    process.exit(runReplay(argv.slice(1)));
-  }
-
-  if (command === 'court') {
-    const exitCode = await runCourt(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'arena') {
-    const exitCode = await runArena(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'init') {
-    process.exit(runInit(argv.slice(1)));
-  }
-
-  if (command === 'verify') {
-    // `far verify --v2` routes to the V2 six-dimension verification path.
-    if (argv.includes('--v2')) {
-      const envelopeIdx = argv.indexOf('--envelope');
-      const bundleIdx = argv.indexOf('--bundle');
-      const { runVerifyV2 } = await import('./commands/verify_v2.ts');
-      const opts: { envelopePath?: string; bundlePath?: string; json: boolean } = {
-        json: argv.includes('--json'),
-      };
-      if (envelopeIdx !== -1) {
-        const ep = argv[envelopeIdx + 1];
-        if (ep !== undefined) opts.envelopePath = ep;
-      }
-      if (bundleIdx !== -1) {
-        const bp = argv[bundleIdx + 1];
-        if (bp !== undefined) opts.bundlePath = bp;
-      }
-      const result = await runVerifyV2(opts);
-      process.stdout.write(result.output + '\n');
-      process.exit(result.exitCode);
-    }
-    const exitCode = await runVerifyFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'verify-golden') {
-    const exitCode = runVerifyGoldenFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'bench') {
-    const exitCode = await runBenchFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'export') {
-    const exitCode = await runExportFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'fec') {
-    const exitCode = runFecFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'fsm') {
-    const exitCode = runFsmFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'audit-seed-cherry') {
-    const exitCode = await runAuditSeedCherryFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'audit-multiseed') {
-    const exitCode = await runAuditMultiseedFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'c-astro') {
-    const exitCode = await runCAstroFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'lifecycle') {
-    const { runLifecycle } = await import('./commands/lifecycle.ts');
-    const exitCode = await runLifecycle(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'backup') {
-    const { runBackup } = await import('./commands/backup.ts');
-    process.exit(runBackup(argv.slice(1)));
-  }
-
-  if (command === 'schedule') {
-    // E-schedule（批次 3-G·借鉴 Hermes cron 无人值守重验证）
-    const exitCode = await runScheduleFromArgs(argv.slice(1));
-    process.exit(exitCode);
-  }
-
-  if (command === 'real-paper') {
-    // real-paper: 真实论文端到端验证（DEEP_AUDIT 缺失项）
-    await import('./commands/real_paper.ts');
-    process.exit(0);
-  }
-
-  process.stderr.write(`far: unknown command '${command}'\n\n${HELP_TEXT}`);
-  process.exit(1);
 }
 
 function runFecFromArgs(args: readonly string[]): number {
@@ -780,6 +814,8 @@ USAGE:
                                      a missing DASHSCOPE_API_KEY only WARNs, never FAILs)
                                      --live-qwen-smoke   call the real API (needs a valid key)
                                      --db <path>         full integrity_check + chain verify (fail-closed, IC-03)
+  far hardware [--json]              best-effort runtime compute-backend probe
+                                     (CPU / GPU / WebGPU / WASM; never affects verdict determinism)
   far demo [tess-offline]            one-shot demo (14 Golden Vectors + end-to-end demo claim;
                                      fully offline, no credentials needed)
                                      tess-offline        focus on the TESS (C-ASTRO-0001 pulsar) offline verdict

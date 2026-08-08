@@ -13,10 +13,12 @@
  *   - 裁决提示共享（verdict_hints.ts）：VERDICT_KIND_TO_HINT
  *   - 六阶段执行器（stages/*）：runStage1 / runStage2 / runStage3 / runStage4 / runStage5 / runStage6
  *   - 主循环（fsm_runner.ts）：runAgentLoop / assertTerminated / DEFAULT_TERMINATION / RunAgentLoopArgs
+ *   - 运行时事件流（events.ts）：AgentEventBus / AgentLoopEvent（P0-3 SSE/CLI/前端实时显示）
  *   - 论文组装（paper_assembler.ts）：assemblePaper / ResearchPaperOutput
  */
 
 export * from './types.ts';
+export * from './events.ts';
 export * from './stage_purpose.ts';
 export * from './create_params.ts';
 export * from './run_stage.ts';

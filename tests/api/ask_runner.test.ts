@@ -70,7 +70,7 @@ test('executeAskRun 缺省 offline：6-stage loop 产出裁决 + ASK-9 密封落
 test('executeAskRun 注入 gateway：参数透传 + 密封仍落库', async () => {
   const db = openDb();
   const gateway = defaultGateway();
-  const result = await executeAskRun(db, QUESTION, 'quick', GIT_SHA, undefined, gateway);
+  const result = await executeAskRun(db, QUESTION, 'quick', GIT_SHA, undefined, undefined, gateway);
 
   assert.ok(result.runId.length > 0, '注入网关路径须跑通');
   assert.ok(result.loopState.verdictNode !== null, 'offline fixture 注入网关仍须产出裁决');

@@ -1,0 +1,20 @@
+══ Architecture Fitness Functions (§12.5) ══
+[PASS] FF-01 Domain Core 无 DB/HTTP/LLM 运行时依赖 :: 39 个核心文件零违规 import
+[PASS] FF-02 canonical hash 函数唯一定义源 :: src/evidence_log/hasher.ts
+[PASS] FF-03 decideFiveValueVerdict 定义唯一 :: src/falsifiability/verdict_kernel_v2.ts
+[PASS] FF-04 demo 复用生产路径（demo_chain/pipeline），无旁路 :: demo.ts 仅 import demo_chain/hero 管线/verify_golden/better-sqlite3
+[PASS] FF-05 前端/Agent 不重写裁决 :: frontend 75 文件 + agent_loop 运行时 import 零违规
+[PASS] FF-06 生产代码不 import 测试 :: 零命中
+[FAIL] FF-07 平台特定逻辑全部登记（9 处在册） :: 未登记: src/hardware/detect.ts
+[PASS] FF-08 凭据 fail-closed 豁免登记在册（zero_tolerance skippedFiles） :: ask.ts/doctor.ts 在豁免名单（带审计理由）
+[PASS] FF-09 PAYLOAD_KINDS 唯一定义源 :: src/schema/enums.ts
+[PASS] FF-16 THRESHOLD_SEMANTICS 唯一定义源 :: src/schema/enums.ts
+[PASS] FF-10 主套件覆盖 agent_loop+comparison（DEBT-04）+ frontend 独立套件 :: test 脚本含 agent_loop=true comparison=true frontend_test=有
+[PASS] FF-11 全部 P0 需求有 Oracle :: 121 条需求校验通过
+[PASS] FF-12 五值枚举在内核中完整出现（封闭集合） :: UNTESTED,DEGRADED_SCOPE,INCONCLUSIVE,REFUTED,CONFIRMED
+[PASS] FF-13 导出脱敏路径存在且有测试面 :: exporter 含 redact=true tests/far_proof=true
+[PASS] FF-14 JSON Schema 生成物与 TS 类型零漂移 :: generate_json_schema --check exit=0 schema-drift: OK (4/4)
+[PASS] FF-15 Science-125 报告披露字段集强制(协议 v2) :: benchmark_report_check exit=0 benchmark-report-check: OK — C:\Users\RichardYuan\Desktop\FAR-Lab\benchmark\benchmark_report.json 披露字段齐(协议 v2)
+[PASS] FF-17 proof_envelopes_v2 表零生产写入（DEBT-06 forward-schema 决策守卫） :: src/ 零命中 INSERT INTO proof_envelopes_v2（V1=活跃路径·V2=forward-schema）
+
+fitness: FAIL (1/17 项)

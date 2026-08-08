@@ -3,6 +3,38 @@
 All notable changes to FAR-Lab are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — 1.2.0（比赛前终极升级）
+
+### Added — 跨平台三系统（P0-1）
+- 三平台 CI 矩阵 `.github/workflows/cross-platform.yml`（Windows/macOS/Linux 全量 tests）
+- 跨平台路径工具 `src/paths.ts`：PATH_SEP / toPosixPath / toNativePath / safeJoin（拒 `..` 与绝对路径 fail-closed）/ isSubPath / crossPlatformTmpDir / crossPlatformHomeDir
+- `far doctor` 新增 `checkCrossPlatform()` 5 项运行时自检
+
+### Added — 计算卡适配（P0-2）
+- 硬件探测层 `src/hardware/detect.ts`（GPU/NPU/CUDA/Metal/WASM，尽力而为）
+- OpenAI 兼容统一 LLM 适配器（baseURL 驱动，5 presets：DeepSeek/Zhipu/Ollama/Anthropic/Azure）
+- `far hardware` 命令：运行时硬件与可用加速路径
+
+### Added — 灵活动态 agent 调度（P0-3）
+- Agent 事件总线 + `/api/v1/events/stream` SSE 端点（run/stage/iteration/held/resumed 全事件）
+- 可插拔 stage 注册表 `src/agent_loop/stage_registry.ts`（StageDescriptor.executor 扩展带）
+- 并行扩展阶段：order>6 阶段在 verdict 后 `Promise.all` 并发执行，错误包装 `ExtensionStageError`（`EXTENSION_STAGE_FAILED` 码）
+- 人工接管 `src/agent_loop/controller.ts`：hold/resume/isHeld/waitIfHeld + stage_held/stage_resumed 检查点
+
+### Added — 接口与功能适配（P0-4）
+- 弹性网关 `src/llm_gateway/resilient_gateway.ts`：maxAttempts + fallbackOrder + retryableErrorNames + onFallback（fail-closed 守卫）
+- 速率限制 `src/llm_gateway/rate_limiter.ts`：信号量 FIFO + minIntervalMs 节流
+
+### Added — 前端与图形化 CLI 动态显示（P0-5）
+- CLI 渲染层 `src/cli/render.ts`（spinner/进度条/表格/ANSI，NO_COLOR 规范）
+- 表驱动 CLI 框架 `src/cli/registry.ts`（26 命令声明式注册 + runCli 分发器；run 返回 undefined 不 exit 保 api 长驻命令）
+- `far stream --events` 实时阶段事件流
+- 前端 SSE 实时联动：`useAgentEventStream` hook + `/events` 实时事件流页 + AppShell 导航 + i18n zh/en
+
+### 验证
+- typecheck 0 / lint 0 / tests **2401（2395p/0f/6s）** / frontend **226 tests** / demo 14/14 GV / doc↔CLI 一致性 PASS / 卫生门禁 PASS
+- 修复：real-paper 裸 import bug（`runRealPaperFromArgs` + isMainModule 守卫）、EventsPage VerdictBadge prop 名、前端 act 纪律、App 导航断言
+
 ## [1.0.0] — initial open-source release
 
 FAR-Lab is a **claim-level verification layer for AI-for-Science claims**: it constrains

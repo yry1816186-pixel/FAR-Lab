@@ -18,8 +18,10 @@
  * at tests/dialogue/red_line_grep.test.ts scans src/dialogue/ only).
  */
 
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import type {
+  AgentEventDto,
   ApiErrorResponse,
   BenchmarkReportDto,
   CourtCertificateDto,
@@ -416,6 +418,114 @@ export function useHypothesize() {
       void data;
     },
   });
+}
+
+// ---------- Runtime event stream (SSE · P0-4 /api/v1/events/stream) ----------
+
+/** SSE 连接状态：connecting=连接中/重连中 · live=已连接 · closed=已关闭。 */
+export type EventStreamStatus = 'connecting' | 'live' | 'closed';
+
+/** useAgentEventStream 返回值：状态 + 事件历史 + 最近事件 + 解析错误。 */
+export interface AgentEventStreamState {
+  readonly status: EventStreamStatus;
+  readonly events: readonly AgentEventDto[];
+  readonly lastEvent: AgentEventDto | null;
+  readonly error: string | null;
+}
+
+/** SSE 事件类型列表（与 src/agent_loop/events.ts AgentLoopEvent.type 判别联合对齐）。 */
+const SSE_EVENT_TYPES: readonly string[] = [
+  'run_started',
+  'stage_started',
+  'stage_completed',
+  'iteration_completed',
+  'run_completed',
+  'run_error',
+  'stage_held',
+  'stage_resumed',
+];
+
+/**
+ * 订阅 GET /api/v1/events/stream（SSE·P0-4）。
+ *
+ * - replay=true（默认）：连接后先重放该 run（或全部）历史快照，再实时推送
+ * - runId：仅订阅该 run 的事件
+ * - maxEvents：内存事件上限（防长期运行膨胀）
+ *
+ * EventSource 原生自动重连；error 事件 → status='connecting'（无 server / 掉线）。
+ * 组件卸载时 close() 并终止状态更新（防 setState on unmounted）。
+ */
+export function useAgentEventStream(
+  options?: { readonly runId?: string; readonly replay?: boolean; readonly maxEvents?: number },
+): AgentEventStreamState {
+  const runId = options?.runId ?? undefined;
+  const replay = options?.replay ?? true;
+  const maxEvents = options?.maxEvents ?? 500;
+
+  const [status, setStatus] = useState<EventStreamStatus>('connecting');
+  const [events, setEvents] = useState<readonly AgentEventDto[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (runId !== undefined && runId.length > 0) {
+      params.set('runId', runId);
+    }
+    if (replay) {
+      params.set('replay', 'true');
+    }
+    const query = params.toString();
+    const url = `${API_BASE_URL}/api/v1/events/stream${query.length > 0 ? `?${query}` : ''}`;
+
+    const es = new EventSource(url);
+    let active = true;
+
+    const handleFrame = (evt: MessageEvent<string>): void => {
+      if (!active) {
+        return;
+      }
+      try {
+        const parsed = JSON.parse(evt.data as string) as AgentEventDto;
+        setEvents((prev) => [...prev, parsed].slice(-maxEvents));
+        setStatus('live');
+      } catch {
+        // 非 JSON 帧（如心跳注释行不触发 message；此处仅防御畸形 payload）
+        setError('SSE frame parse failed');
+      }
+    };
+
+    const handleOpen = (): void => {
+      if (active) {
+        setStatus('live');
+        setError(null);
+      }
+    };
+    const handleError = (): void => {
+      // EventSource 自动重连；短暂掉线视为 connecting，不丢已收事件
+      if (active) {
+        setStatus('connecting');
+      }
+    };
+
+    es.addEventListener('open', handleOpen);
+    es.addEventListener('error', handleError);
+    for (const type of SSE_EVENT_TYPES) {
+      es.addEventListener(type, handleFrame);
+    }
+
+    return () => {
+      active = false;
+      es.close();
+      setStatus('closed');
+    };
+  }, [runId, replay, maxEvents]);
+
+  return {
+    status,
+    events,
+    lastEvent: events.length > 0 ? events[events.length - 1] ?? null : null,
+    error,
+  };
 }
 
 // ---------- Exported internals (for unit tests) ----------
