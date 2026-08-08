@@ -23,6 +23,7 @@ coverage/
 # --- IDE & OS ---
 .vscode/
 .zcode/
+.trae/
 .idea/
 *.swp
 *.swo
@@ -51,6 +52,9 @@ nul
 
 # --- Agent audit scratch (subagent temp scripts) ---
 _audit_*
+
+# 根目录测试残留空文件（evt_test.txt 曾误跟踪，2026-08-08 已 git rm --cached；物理文件被 Windows 进程锁占用暂无法删除）
+evt_test.txt
 
 # --- Runtime artifacts inside governance/evidence dirs (high churn, not source) ---
 .far-implementation/**/*.jsonl
