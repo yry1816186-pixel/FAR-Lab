@@ -5,7 +5,8 @@
 #   Windows / macOS / Linux 全部可复现运行。
 # 设计原则：
 #   - 不动 ci.yml（保持竞赛门禁 SSOT 稳定），本文件独立、可随时增删，不参与 needs 串行链。
-#   - NODE_COMPILE_CACHE 在 job 级用 runner.temp（顶层 env 无法引用 runner.temp），
+#   - NODE_COMPILE_CACHE 用 GitHub runner 注入的环境变量 $RUNNER_TEMP（job 级 env 引用
+#     ${{ runner.temp }} 是非法的，会触发 "Unrecognized named-value: 'runner'" 解析失败），
 #     保证 Windows（无 /tmp）不把 V8 compile cache 泄漏进工作树（卫生门禁 compile_cache_no_leak）。
 #   - better-sqlite3@12 提供 win32-x64 / darwin-arm64 / linux prebuilds，frozen install 即可。
 #   - 无 DASHSCOPE_API_KEY 时 offline 路径覆盖核心；真实 LLM smoke 仍由主 ci.yml 条件门负责。
@@ -36,11 +37,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    env:
-      # job 级 env 可引用 runner.temp → 三平台统一的仓库外缓存目录
-      NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
     steps:
       - uses: actions/checkout@v5
+      # NODE_COMPILE_CACHE 指向 runner 临时目录（仓库外），三平台统一的 V8 compile cache
+      - name: Set NODE_COMPILE_CACHE (repo-outside V8 cache)
+        shell: bash
+        run: |
+          echo "NODE_COMPILE_CACHE=$RUNNER_TEMP/node-compile-cache" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v5
         with:
           version: ${{ env.PNPM_VERSION }}
