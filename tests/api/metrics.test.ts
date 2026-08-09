@@ -95,6 +95,16 @@ test('D1-1: GET /metrics returns Prometheus text with business gauges matching D
     const callMatch = /far_lab_call_record_total (\d+)/m.exec(body);
     assert.ok(callMatch !== null);
     assert.equal(Number(callMatch[1]), 1, 'call_record gauge must match DB count (1 seeded row)');
+    // D2-5：降级 gauge 存在且缺省 0（无降级行/无 DEGRADED_SCOPE）。
+    assert.match(body, /far_lab_degradation_total (\d+)/m, 'degradation gauge present');
+    const degMatch = /far_lab_degradation_total (\d+)/m.exec(body);
+    assert.ok(degMatch !== null);
+    assert.equal(Number(degMatch[1]), 0, 'no degraded rows seeded → 0');
+    assert.match(
+      body,
+      /far_lab_degraded_scope_verdict_total (\d+)/m,
+      'DEGRADED_SCOPE gauge present',
+    );
     // 五值 verdict 缺省 0（无 verdict 节点）——诚实零值而非缺行。
     for (const v of ['CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED']) {
       assert.match(
