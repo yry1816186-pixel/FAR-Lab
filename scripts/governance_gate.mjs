@@ -52,13 +52,17 @@ function measureSli() {
   results.zero_tolerance = run('node', ['scripts/zero_tolerance_scan.mjs']).exit === 0;
   results.anti_theater = run('node', ['scripts/anti_theater_deterministic_scan.mjs']).exit === 0;
 
-  // hero 性能：读既有计时日志（诚实：缺失标 UNKNOWN 而非虚构）
-  const perfPaths = [
-    join(ROOT, '.far-implementation/phase_f/perf_hero_tamper.log'),
-    join(ROOT, '.far-implementation/vertical-slice/perf_hero_tamper.log'),
-  ];
-  const heroLog = perfPaths.find((p) => existsSync(p));
-  results.hero_perf = heroLog !== undefined ? true : 'UNKNOWN';
+  // hero 性能（阶段 7 P2-A · B4-G6 接线）：真实 seal 基准实测——不再依赖日志文件存在性
+  // （旧实现恒 UNKNOWN 当日志缺失·观测面死锁）。实测路径 = performance_benchmark.test.ts
+  // 三个门槛（seal<200ms / hash>1000 ops/s / GV cross-lang<30s）→ exit 0 即「实测达标」。
+  // 诚实边界：这是离线本机实测（非生产监控）——部署后第 4 节 SLI 仍须重定义数据源。
+  results.hero_perf =
+    run(
+      'node',
+      ['--test', '--test-timeout=180000', 'tests/comparison/performance_benchmark.test.ts'],
+      240000,
+      true,
+    ).exit === 0;
 
   return results;
 }
