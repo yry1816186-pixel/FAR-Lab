@@ -33,6 +33,7 @@ const CORE_DIRS = [
   'db',
   'schema',
   'api',
+  // P2 TK10：security（src/security 纯 TS：ed25519 签名——信任内核签名完整性）
   // P1-B-2：statistics（src/statistics 纯 TS：p_value/ks_test/effect_size/permutation_test/
   // t_distribution/multiple_testing/bootstrap_ci/ci/index；外部求解器在 src/math/*_backend，
   // 已明确排除，statistics 不涉及）。
