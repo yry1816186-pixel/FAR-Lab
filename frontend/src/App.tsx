@@ -27,6 +27,7 @@ const VersionDiffPage = lazy(() => import('@/pages/VersionDiffPage'));
 const WizardPage = lazy(() => import('@/pages/WizardPage'));
 const V2ReceiptPage = lazy(() => import('@/pages/V2ReceiptPage'));
 const EventsPage = lazy(() => import('@/pages/EventsPage'));
+const AuditTracePage = lazy(() => import('@/pages/AuditTracePage'));
 const PlanningPage = lazy(() => import('@/pages/PlanningPage'));
 
 const queryClient = new QueryClient({
@@ -79,6 +80,7 @@ export default function App() {
                     <Route path="/wizard" element={<WizardPage />} />
                     <Route path="/v2-receipt" element={<V2ReceiptPage />} />
                     <Route path="/events" element={<EventsPage />} />
+                    <Route path="/audit" element={<AuditTracePage />} />
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Suspense>
