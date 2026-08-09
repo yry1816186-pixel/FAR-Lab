@@ -175,6 +175,9 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerVerdictRoutes(v1, { db: config.db });
     await registerReportRoute(v1, { db: config.db });
     await registerIntegrityRoutes(v1, { db: config.db });
+    // 阶段 7 P2（BA3-3）：生命周期事件只读查询（修正通知机制·修正不静默）。
+    const { registerLifecycleRoutes } = await import('./routes/lifecycle.ts');
+    await registerLifecycleRoutes(v1, { db: config.db });
     // benchmark 端点读预生成 JSON（不依赖运行 db·fresh-clone 跑 generate 脚本即可）
     await registerBenchmarkRoute(v1);
     await registerCourtRoute(v1);
