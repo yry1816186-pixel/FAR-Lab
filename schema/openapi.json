@@ -211,6 +211,15 @@
         }
       }
     },
+    "/api/v1/lifecycle/events": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/v1/benchmark": {
       "get": {
         "responses": {
