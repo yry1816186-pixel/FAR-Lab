@@ -10,7 +10,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalJson, hashCanonicalJson } from '../../src/evidence_log/hasher.ts';
+import { canonicalHash, canonicalJson, hashCanonicalJson } from '../../src/evidence_log/hasher.ts';
 
 test('canonicalJson: 顶层 NaN → fail-closed(确定性不变量)', () => {
   assert.throws(
@@ -41,5 +41,29 @@ test('hashCanonicalJson: NaN 输入 → fail-closed(canonicalHash 链守卫一�
     () => hashCanonicalJson({ x: NaN }),
     /NaN and Infinity are not allowed/,
     'hashCanonicalJson 经 canonicalJson,NaN 输入须同样 fail-closed',
+  );
+});
+
+test('canonicalHash: empty-string prevHash is rejected (阶段 7 P1-B-1 mutation 缺口修复)', () => {
+  // mutation_gate 存活位点：`prevHash === undefined || prevHash === ''`（or_to_and 变异后空串被放行）。
+  // 契约：空串 prevHash 必须 fail-closed（空串 prevHash 会伪造链根/断链）。
+  const cred = {
+    modelId: 'offline-replay-fixture',
+    dashscopeRequestId: null,
+    reproHash: 'a'.repeat(64),
+    gitCommitSha: 'b'.repeat(40),
+    isoTimestamp: '2026-06-30T00:00:00.000Z',
+  };
+  assert.throws(
+    () =>
+      canonicalHash({
+        stageId: 'stage3_hypothesis',
+        cred,
+        payloadKind: 'hypothesis',
+        purposeTag: 'hypothesis',
+        prevHash: '',
+      }),
+    /prevHash is required/,
+    'empty-string prevHash must be rejected',
   );
 });
