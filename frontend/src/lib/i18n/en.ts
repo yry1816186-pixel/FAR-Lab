@@ -20,6 +20,7 @@ export const en: Record<MessageKey, string> = {
   'nav.wizard': 'Wizard',
   'nav.v2receipt': 'V2 Receipt',
   'nav.events': 'Live Events',
+  'nav.audit': 'Audit Trace',
   'nav.aria': 'Main navigation',
   'nav.themeToLight': 'Switch to light theme',
   'nav.themeToDark': 'Switch to dark theme',

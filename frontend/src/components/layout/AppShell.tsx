@@ -31,7 +31,7 @@ type NavLabelKey =
   | 'nav.overview' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard'
   | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation'
   | 'nav.report' | 'nav.about' | 'nav.versions' | 'nav.wizard'
-  | 'nav.v2receipt' | 'nav.events' | 'nav.planning';
+  | 'nav.v2receipt' | 'nav.events' | 'nav.planning' | 'nav.audit';
 
 type NavGroupKey =
   | 'nav.group.verify' | 'nav.group.evidence' | 'nav.group.breadth'
@@ -87,6 +87,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
       { to: '/ablation', labelKey: 'nav.ablation', icon: FlaskConical },
       { to: '/report', labelKey: 'nav.report', icon: FileText },
       { to: '/events', labelKey: 'nav.events', icon: Radio },
+      { to: '/audit', labelKey: 'nav.audit', icon: GitCompare },
     ],
   },
   {

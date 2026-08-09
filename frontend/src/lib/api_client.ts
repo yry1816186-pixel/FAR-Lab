@@ -348,6 +348,8 @@ export const queryKeys = {
   benchmark: ['benchmark'] as const,
   court: ['court'] as const,
   arena: ['arena'] as const,
+  lifecycleEvents: (targetKind: string, targetId: string) =>
+    ['lifecycle', 'events', targetKind, targetId] as const,
 } as const;
 
 /** V2 receipts query keys。 */
@@ -594,6 +596,46 @@ export function useCourtDemo(
         await fetchJson<unknown>('/api/v1/court/demo'),
         'GET /court/demo',
       ),
+    ...options,
+  });
+}
+
+/** 生命周期事件响应（BA3-3 · GET /api/v1/lifecycle/events）。 */
+export interface LifecycleEventsResponse {
+  readonly targetKind: string;
+  readonly targetId: string;
+  readonly events: readonly {
+    readonly eventId: string;
+    readonly targetKind: string;
+    readonly targetId: string;
+    readonly fromState: string;
+    readonly toState: string;
+    readonly actor: string;
+    readonly reason: string;
+    readonly prevHash: string;
+    readonly currentHash: string;
+    readonly createdAt: string;
+  }[];
+}
+
+/**
+ * GET /api/v1/lifecycle/events — 生命周期事件（修正通知·BA3-3）。
+ * @param targetId hypothesis/claim id（targetKind 固定 claim——追溯页语义）。
+ */
+export function useLifecycleEvents(
+  targetId: string,
+  options?: Omit<UseQueryOptions<LifecycleEventsResponse, Error>, 'queryKey' | 'queryFn' | 'enabled'>,
+) {
+  return useQuery<LifecycleEventsResponse, Error>({
+    queryKey: queryKeys.lifecycleEvents('claim', targetId),
+    queryFn: async () =>
+      parseV1Response<LifecycleEventsResponse>(
+        await fetchJson<unknown>(
+          `/api/v1/lifecycle/events?targetKind=claim&targetId=${encodeURIComponent(targetId)}`,
+        ),
+        'GET /lifecycle/events',
+      ),
+    enabled: targetId.length > 0,
     ...options,
   });
 }
