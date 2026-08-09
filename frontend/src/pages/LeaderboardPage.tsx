@@ -25,6 +25,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { useT } from '@/lib/i18n';
 import { useBenchmark } from '@/lib/api_client';
 import { useTimeout } from '@/lib/useTimeout';
 import { computeMerkleRoot, flipLastHexChar } from '@/lib/merkle';
@@ -123,6 +124,7 @@ function CopyHashButton({
   readonly label: string;
   readonly testId: string;
 }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const schedule = useTimeout();
   const handleCopy = async () => {
@@ -135,21 +137,13 @@ function CopyHashButton({
   return (
     <Button variant="ghost" size="sm" onClick={handleCopy} aria-label={label} data-testid={testId}>
       <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-      {copied ? 'Copied' : 'Copy'}
+      {copied ? t('common.copied') : t('common.copy')}
     </Button>
   );
 }
 
 // ---------- 浏览器侧套件根独立重算 hook（差异化护城河可视化）----------
 
-/**
- * 浏览器用 Web Crypto 从所有 entries 的单链根独立重算套件根。
- *
- * 与后端 aggregator 的 computeMerkleRoot(sorted.map(e => e.integrityRoot)) 字节相等
- * （同一算法·同一输入·跨语言 SHA-256 契约·merkle.test golden 已证库正确性）。
- * entries 引用稳定（TanStack Query 缓存·data 不变则引用不变）。
- * useEffect 带 cleanup（cancelled flag·防卸载后 setState）。
- */
 function useSuiteRootRecompute(entries: readonly BenchmarkEntryDto[]): {
   readonly root: string | null;
   readonly error: string | null;
@@ -182,18 +176,11 @@ function useSuiteRootRecompute(entries: readonly BenchmarkEntryDto[]): {
 
 // ---------- 2. SuiteVerifier（可验证 leaderboard·浏览器独立验证套件根）----------
 
-/**
- * 浏览器独立重算套件根并比对报告声称的 suiteIntegrityRoot。
- *
- * 这是 leaderboard 区别于普通展示榜的灵魂：用户在浏览器侧用 Web Crypto 从 6 个单链根
- * 重新折叠出套件根，与报告根比对——相等即密码学确认报告未被篡改，无需信任服务端。
- * Tamper Theatre：翻转报告根末位 hex（模拟报告被篡改），浏览器重算根不变 → 立即不匹配。
- */
 function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
+  const t = useT();
   const [tampered, setTampered] = useState(false);
   const { root, error } = useSuiteRootRecompute(report.entries);
 
-  // 篡改时翻转报告根末位 hex（保持 64-hex 合法·仅改一字节）→ 浏览器重算根不变 → 不匹配
   const reportRoot = tampered ? flipLastHexChar(report.suiteIntegrityRoot) : report.suiteIntegrityRoot;
   const matches = root !== null && root === reportRoot;
 
@@ -202,25 +189,23 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
       <CardHeader>
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
-          <CardTitle className="text-xl">Suite-root browser-side verification</CardTitle>
+          <CardTitle className="text-xl">{t('leaderboard.suiteTitle')}</CardTitle>
         </div>
         <CardDescription>
-          The suiteIntegrityRoot above is the suite fingerprint claimed by the backend. <strong className="text-foreground">Your browser now
-          recomputes it independently with Web Crypto</strong>: it re-folds every problem's single-chain root to produce your own suite root. Equal = the report was not tampered with;
-          not equal = the report root is forged. This is a "verifiable leaderboard" — you do not need to trust the server.
+          {t('leaderboard.suiteDesc')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {root === null && error === null && (
           <div className="flex items-center gap-2 text-muted-foreground" data-testid="suite-verifying">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Recomputing the suite root in your browser…
+            {t('leaderboard.verifying')}
           </div>
         )}
         {error !== null && (
           <Alert variant="destructive" data-testid="suite-verify-error">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>Recompute error: {error}</AlertDescription>
+            <AlertDescription>{t('leaderboard.suiteError', { msg: error })}</AlertDescription>
           </Alert>
         )}
         {root !== null && (
@@ -228,9 +213,9 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Browser-recomputed suite root (computeMerkleRoot · {report.entries.length} single-chain roots)
+                  {t('leaderboard.recomputedLabel', { n: report.entries.length })}
                 </span>
-                <CopyHashButton value={root} label="Copy browser-recomputed root" testId="suite-recomputed-root-copy" />
+                <CopyHashButton value={root} label={t('leaderboard.recomputedCopy')} testId="suite-recomputed-root-copy" />
               </div>
               <code
                 className="block break-all rounded bg-muted px-3 py-2 font-mono text-xs"
@@ -251,11 +236,10 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
                   <div className="space-y-1">
                     <div className="font-semibold text-emerald-700 dark:text-emerald-400" data-testid="suite-verify-ok">
-                      ✓ Browser recompute === report suite root
+                      {t('leaderboard.suiteOk')}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Your browser re-folded the same fingerprint from {report.entries.length} single-chain roots — the report's suite integrity is
-                      cryptographically confirmed, with no need to trust the server.
+                      {t('leaderboard.suiteOkDesc', { n: report.entries.length })}
                     </div>
                   </div>
                 </div>
@@ -264,14 +248,14 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
                   <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
                   <div className="space-y-1">
                     <div className="font-semibold text-destructive" data-testid="suite-verify-mismatch">
-                      ✗ Suite root mismatch
+                      {t('leaderboard.suiteMismatch')}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Browser-recomputed root ≠ the suite root claimed by the report — the report may have been tampered with, or the entries are inconsistent with the root.
+                      {t('leaderboard.suiteMismatchDesc')}
                     </div>
                     {tampered && (
                       <Badge variant="destructive" data-testid="suite-tamper-detected">
-                        Tamper detected: the report root's last hex char was changed by one byte; the browser recompute immediately fails
+                        {t('leaderboard.tamperDetected')}
                       </Badge>
                     )}
                   </div>
@@ -281,7 +265,7 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed bg-muted/30 p-3">
               <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
               <span className="text-xs text-muted-foreground">
-                Tamper theatre: simulates an attacker altering the report's suite root (flips the last hex char). The browser-recomputed root stays the same → the mismatch is detected immediately.
+                {t('leaderboard.tamperTheatre')}
               </span>
               {!tampered ? (
                 <Button
@@ -289,9 +273,9 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
                   size="sm"
                   onClick={() => setTampered(true)}
                   data-testid="suite-tamper-btn"
-                  aria-label="Tamper the report suite root"
+                  aria-label={t('leaderboard.tamperAria')}
                 >
-                  Tamper report root
+                  {t('leaderboard.tamperBtn')}
                 </Button>
               ) : (
                 <Button
@@ -299,9 +283,9 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
                   size="sm"
                   onClick={() => setTampered(false)}
                   data-testid="suite-restore-btn"
-                  aria-label="Restore original report suite root"
+                  aria-label={t('leaderboard.restoreAria')}
                 >
-                  Restore original
+                  {t('leaderboard.restoreBtn')}
                 </Button>
               )}
             </div>
@@ -315,24 +299,23 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
 // ---------- 1. HeroSuiteRoot ----------
 
 function HeroSuiteRoot({ report }: { readonly report: BenchmarkReportDto }) {
+  const t = useT();
   return (
     <Card data-testid="hero-suite-root">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Trophy className="h-5 w-5 text-primary" aria-hidden="true" />
-          <CardTitle className="text-xl">Suite-level integrity root</CardTitle>
+          <CardTitle className="text-xl">{t('leaderboard.heroTitle')}</CardTitle>
         </div>
         <CardDescription>
-          Each Science-125 problem's evidence chain is first folded into a single-chain Merkle root, then <strong className="text-foreground">folded once more</strong>,
-          yielding a single cryptographic fingerprint for the entire benchmark suite — if any problem's chain is tampered with, this root fails immediately.
-          This is FAR-Lab's differentiated moat: single-chain integrity → cross-chain aggregatable auditing.
+          {t('leaderboard.heroDesc')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">suiteIntegrityRoot (suite cryptographic fingerprint)</span>
-            <CopyHashButton value={report.suiteIntegrityRoot} label="Copy suite root" testId="suite-integrity-root-copy" />
+            <span className="text-xs font-medium text-muted-foreground">{t('leaderboard.suiteRootLabel')}</span>
+            <CopyHashButton value={report.suiteIntegrityRoot} label={t('leaderboard.suiteRootCopy')} testId="suite-integrity-root-copy" />
           </div>
           <code
             className="block break-all rounded bg-muted px-3 py-2 font-mono text-xs"
@@ -343,19 +326,19 @@ function HeroSuiteRoot({ report }: { readonly report: BenchmarkReportDto }) {
         </div>
         <div className="grid grid-cols-3 gap-3">
           <Stat
-            label="Problems"
+            label={t('leaderboard.problemCount')}
             value={report.problemCount}
             testId="problem-count"
             icon={<Layers className="h-4 w-4" aria-hidden="true" />}
           />
           <Stat
-            label="Total leaves (call_records)"
+            label={t('leaderboard.totalLeaves')}
             value={report.totalLeaves}
             testId="total-leaves"
             icon={<Network className="h-4 w-4" aria-hidden="true" />}
           />
           <Stat
-            label="Domains"
+            label={t('leaderboard.domainCount')}
             value={Object.keys(report.domainDistribution).length}
             testId="domain-count"
             icon={<Globe className="h-4 w-4" aria-hidden="true" />}
@@ -391,17 +374,17 @@ function Stat({
 // ---------- 2. VerdictDistribution ----------
 
 function VerdictDistributionSection({ report }: { readonly report: BenchmarkReportDto }) {
+  const t = useT();
   const total = report.problemCount;
   return (
     <Card data-testid="verdict-distribution">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Hash className="h-5 w-5 text-primary" aria-hidden="true" />
-          <CardTitle className="text-xl">Verdict distribution (real FEC verdicts · not all-pass)</CardTitle>
+          <CardTitle className="text-xl">{t('leaderboard.distTitle')}</CardTitle>
         </div>
         <CardDescription>
-          Falsifiable verdict distribution per problem. The diversity itself is evidence — not an "all-CONFIRMED" theater,
-          but a genuine mix of supports / refutes / inconclusive (honesty note: verdicts are produced by offline fixtures).
+          {t('leaderboard.distDesc')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -416,7 +399,7 @@ function VerdictDistributionSection({ report }: { readonly report: BenchmarkRepo
                   {meta.label}
                 </Badge>
                 <span className="font-mono text-xs text-muted-foreground">
-                  {count} / {total} ({pct}%)
+                  {t('leaderboard.distRatio', { count, total, pct })}
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -437,15 +420,16 @@ function VerdictDistributionSection({ report }: { readonly report: BenchmarkRepo
 // ---------- 3. DomainDistribution ----------
 
 function DomainDistributionSection({ report }: { readonly report: BenchmarkReportDto }) {
+  const t = useT();
   const domains = Object.entries(report.domainDistribution);
   return (
     <Card data-testid="domain-distribution">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Globe className="h-5 w-5 text-primary" aria-hidden="true" />
-          <CardTitle className="text-xl">Domain coverage</CardTitle>
+          <CardTitle className="text-xl">{t('leaderboard.domainTitle')}</CardTitle>
         </div>
-        <CardDescription>Breadth of scientific domains covered by the benchmark suite (general across any AI4S domain).</CardDescription>
+        <CardDescription>{t('leaderboard.domainDesc')}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-2" data-testid="domain-list">
@@ -464,29 +448,29 @@ function DomainDistributionSection({ report }: { readonly report: BenchmarkRepor
 // ---------- 4. ProblemTable ----------
 
 function ProblemTableSection({ report }: { readonly report: BenchmarkReportDto }) {
+  const t = useT();
   return (
     <Card data-testid="problem-table">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Network className="h-5 w-5 text-primary" aria-hidden="true" />
-          <CardTitle className="text-xl">Problem integrity leaderboard</CardTitle>
+          <CardTitle className="text-xl">{t('leaderboard.tableTitle')}</CardTitle>
         </div>
         <CardDescription>
-          Each problem runs a full 6-stage agent loop + FEC orchestration independently, producing an auditable evidence chain.
-          Every field in the table below is computed from a real run (computeChainMerkleRoot / verifyChainHead), not fabricated.
+          {t('leaderboard.tableDesc')}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Problem</TableHead>
-              <TableHead>Domain</TableHead>
-              <TableHead>Verdict</TableHead>
-              <TableHead>Integrity</TableHead>
-              <TableHead>Leaves</TableHead>
-              <TableHead>Single-chain root</TableHead>
-              <TableHead>Run ID</TableHead>
+              <TableHead>{t('leaderboard.col.problem')}</TableHead>
+              <TableHead>{t('leaderboard.col.domain')}</TableHead>
+              <TableHead>{t('leaderboard.col.verdict')}</TableHead>
+              <TableHead>{t('leaderboard.col.integrity')}</TableHead>
+              <TableHead>{t('leaderboard.col.leaves')}</TableHead>
+              <TableHead>{t('leaderboard.col.root')}</TableHead>
+              <TableHead>{t('leaderboard.col.run')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -501,6 +485,7 @@ function ProblemTableSection({ report }: { readonly report: BenchmarkReportDto }
 }
 
 function ProblemRow({ entry }: { readonly entry: BenchmarkEntryDto }) {
+  const t = useT();
   const meta = VERDICT_META[entry.verdict];
   return (
     <TableRow data-testid={`entry-${entry.problemId}`}>
@@ -525,10 +510,10 @@ function ProblemRow({ entry }: { readonly entry: BenchmarkEntryDto }) {
               <XCircle className="h-3.5 w-3.5 text-destructive" aria-hidden="true" />
             )}
             <span className="text-muted-foreground">
-              {entry.chainVerified ? 'Chain verified' : 'Chain failed'} · {entry.stagesCompleted}/6
+              {entry.chainVerified ? t('leaderboard.chainOk') : t('leaderboard.chainFail')} · {entry.stagesCompleted}/6
             </span>
           </span>
-          <span className="text-muted-foreground">{entry.converged ? 'Feedback converged' : 'Not converged'}</span>
+          <span className="text-muted-foreground">{entry.converged ? t('leaderboard.converged') : t('leaderboard.notConverged')}</span>
         </div>
       </TableCell>
       <TableCell>
@@ -544,7 +529,7 @@ function ProblemRow({ entry }: { readonly entry: BenchmarkEntryDto }) {
           </code>
           <CopyHashButton
             value={entry.integrityRoot}
-            label={`Copy ${entry.problemId} single-chain root`}
+            label={t('leaderboard.copyRootAria', { id: entry.problemId })}
             testId={`entry-${entry.problemId}-integrity-copy`}
           />
         </div>
@@ -565,14 +550,15 @@ function ProblemRow({ entry }: { readonly entry: BenchmarkEntryDto }) {
 // ---------- 5. HonestyWall ----------
 
 function HonestyWall({ report }: { readonly report: BenchmarkReportDto }) {
+  const t = useT();
   return (
     <Card data-testid="honesty-wall">
       <CardHeader>
         <div className="flex items-center gap-2">
           <ScrollText className="h-5 w-5 text-amber-600" aria-hidden="true" />
-          <CardTitle className="text-xl">Honesty statement · known boundaries</CardTitle>
+          <CardTitle className="text-xl">{t('leaderboard.honestyTitle')}</CardTitle>
         </div>
-        <CardDescription>All cryptographic metrics on this leaderboard are real and usable, but the following boundaries are noted honestly — no exaggeration, no concealment.</CardDescription>
+        <CardDescription>{t('leaderboard.honestyDesc')}</CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="space-y-3">
@@ -593,6 +579,7 @@ function HonestyWall({ report }: { readonly report: BenchmarkReportDto }) {
 // ---------- 页面主体 ----------
 
 export default function LeaderboardPage() {
+  const t = useT();
   const { data, isLoading, isError, error } = useBenchmark();
 
   return (
@@ -600,26 +587,26 @@ export default function LeaderboardPage() {
       <header>
         <div className="flex items-center gap-2">
           <Trophy className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h1 className="text-3xl font-bold tracking-tight">Integrity breadth leaderboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('leaderboard.title')}</h1>
         </div>
         <p className="mt-1 text-muted-foreground">
-          Science-125 Benchmark · a cross-problem aggregatable integrity suite — suite-level Merkle root · verdict distribution · domain breadth · problem leaderboard
+          {t('leaderboard.subtitle')}
         </p>
       </header>
 
       {isLoading && (
         <div className="flex items-center gap-2 text-muted-foreground" data-testid="benchmark-loading">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          Loading integrity breadth suite report…
+          {t('leaderboard.loading')}
         </div>
       )}
 
       {isError && !isLoading && (
         <Alert variant="destructive" data-testid="benchmark-error">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Failed to load benchmark report</AlertTitle>
+          <AlertTitle>{t('leaderboard.errorTitle')}</AlertTitle>
           <AlertDescription>
-            {error instanceof Error ? error.message : 'Unknown error (the backend may not have run pnpm benchmark:generate yet)'}
+            {error instanceof Error ? error.message : t('leaderboard.errorDesc')}
           </AlertDescription>
         </Alert>
       )}

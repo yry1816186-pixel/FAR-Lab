@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useEvidenceChain } from '@/lib/api_client';
+import { useT } from '@/lib/i18n';
 import type { GraphSubtree, GraphNodeDto } from '@/lib/types';
 import { VERDICT_CONFIG, FALLBACK_VERDICT_COLOR, VerdictBadge } from '@/components/VerdictBadge';
 import { DecisionTracePanel, extractDecisionTrace } from '@/components/EvidenceTimeline';
@@ -105,6 +106,7 @@ interface ForceGraphPanelProps {
 
 /** D3 力导向图 —— 同步 tick(300) 收敛 + 实时 drag 交互，节点颜色按 verdict 映射，tooltip 由 React state 安全渲染。 */
 function ForceGraphPanel({ subtree, onSelectNode }: ForceGraphPanelProps) {
+  const t = useT();
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -197,13 +199,13 @@ function ForceGraphPanel({ subtree, onSelectNode }: ForceGraphPanelProps) {
         const metric = d.metricValue !== null ? d.metricValue.toFixed(4) : '—';
         const conflicts = d.conflictingEvidenceCount;
         return [
-          `Node: ${d.nodeId}`,
-          `Evidence ID: ${d.evidenceId}`,
-          `Type: ${kindLabel}`,
-          `Verdict: ${verdictLabel} (${d.decision})`,
-          `Metric: ${metric}`,
-          `Conflicting evidence: ${conflicts}`,
-          `Created: ${d.createdAt}`,
+          `${t('viz.tooltip.node', { id: d.nodeId })}`,
+          t('viz.tooltip.evidenceId', { id: d.evidenceId }),
+          `${t('viz.ttType')} ${kindLabel}`,
+          `${t('viz.ttVerdict')} ${verdictLabel} (${d.decision})`,
+          t('viz.tooltip.metric', { value: metric }),
+          t('viz.tooltip.conflicts', { n: conflicts }),
+          `${t('viz.tooltip.created', { value: d.createdAt })}`,
         ].join('\n');
       });
 
@@ -279,27 +281,31 @@ function ForceGraphPanel({ subtree, onSelectNode }: ForceGraphPanelProps) {
       simulation.stop();
       svg.selectAll('*').remove();
     };
-  }, [subtree, onSelectNode]);
+  }, [subtree, onSelectNode, t]);
 
   // 工具提示内容（JSX 声明式安全渲染，替代 innerHTML）
   const tooltipContent = hoveredNode !== null ? (
     <div className="space-y-1">
       <div className="font-mono text-xs font-semibold">{hoveredNode.nodeId}</div>
-      <div className="text-xs text-muted-foreground">Evidence ID: {hoveredNode.evidenceId}</div>
+      <div className="text-xs text-muted-foreground">{t('viz.tooltip.evidenceId', { id: hoveredNode.evidenceId })}</div>
       <div className="flex items-center gap-1.5 text-xs">
-        <span className="text-muted-foreground">Type:</span>
+        <span className="text-muted-foreground">{t('viz.ttType')}</span>
         <span>{NODE_KIND_LABEL[hoveredNode.nodeKind] ?? hoveredNode.nodeKind}</span>
       </div>
       <div className="flex items-center gap-1.5 text-xs">
-        <span className="text-muted-foreground">Verdict:</span>
+        <span className="text-muted-foreground">{t('viz.ttVerdict')}</span>
         <span className="font-semibold">
           {VERDICT_CONFIG[hoveredNode.decision as keyof typeof VERDICT_CONFIG]?.label ?? hoveredNode.decision}
         </span>
       </div>
       <div className="text-xs text-muted-foreground">
-        Metric: {hoveredNode.metricValue !== null ? hoveredNode.metricValue.toFixed(4) : '—'}
+        {t('viz.tooltip.metric', {
+          value: hoveredNode.metricValue !== null ? hoveredNode.metricValue.toFixed(4) : '—',
+        })}
       </div>
-      <div className="text-xs text-muted-foreground">Conflicting evidence: {hoveredNode.conflictingEvidenceCount}</div>
+      <div className="text-xs text-muted-foreground">
+        {t('viz.tooltip.conflicts', { n: hoveredNode.conflictingEvidenceCount })}
+      </div>
       <div className="text-xs text-muted-foreground font-mono">{hoveredNode.createdAt.slice(0, 10)}</div>
     </div>
   ) : null;
@@ -330,27 +336,28 @@ interface NodeDetailSidebarProps {
 }
 
 function NodeDetailSidebar({ node, onClose }: NodeDetailSidebarProps) {
+  const t = useT();
   // B3 透明度层：宽容提取 decisionTrace，无数据（null/undefined）则整个面板不渲染
   const decisionTrace = extractDecisionTrace(node.decisionTrace);
   return (
     <Card className="w-80 shrink-0 self-start" data-testid="node-detail-sidebar">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base">Node details</CardTitle>
-        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close sidebar">
+        <CardTitle className="text-base">{t('viz.sidebarTitle')}</CardTitle>
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label={t('viz.closeSidebar')}>
           <X className="h-4 w-4" />
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
-        <DetailRow label="Node ID" value={node.nodeId} mono />
-        <DetailRow label="Evidence ID" value={node.evidenceId} mono />
+        <DetailRow label={t('viz.detail.nodeId')} value={node.nodeId} mono />
+        <DetailRow label={t('viz.detail.evidenceId')} value={node.evidenceId} mono />
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground w-20 shrink-0">Node kind</span>
+          <span className="text-sm text-muted-foreground w-20 shrink-0">{t('viz.detail.nodeKind')}</span>
           <Badge variant={NODE_KIND_BADGE_VARIANT[node.nodeKind] ?? 'outline'}>
             {NODE_KIND_LABEL[node.nodeKind] ?? node.nodeKind}
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground w-20 shrink-0">Verdict</span>
+          <span className="text-sm text-muted-foreground w-20 shrink-0">{t('viz.detail.verdict')}</span>
           {node.decision in VERDICT_CONFIG ? (
             <VerdictBadge
               decision={node.decision as keyof typeof VERDICT_CONFIG}
@@ -362,23 +369,23 @@ function NodeDetailSidebar({ node, onClose }: NodeDetailSidebarProps) {
         </div>
         {decisionTrace !== null && <DecisionTracePanel trace={decisionTrace} />}
         {node.metricValue !== null && (
-          <DetailRow label="Metric" value={String(node.metricValue)} />
+          <DetailRow label={t('viz.detail.metric')} value={String(node.metricValue)} />
         )}
         {node.conflictingEvidenceCount > 0 && (
-          <DetailRow label="Conflicting evidence" value={String(node.conflictingEvidenceCount)} />
+          <DetailRow label={t('viz.detail.conflicts')} value={String(node.conflictingEvidenceCount)} />
         )}
         {node.scopeSlipText !== null && (
-          <DetailRow label="Scope slip" value={node.scopeSlipText} />
+          <DetailRow label={t('viz.detail.scopeSlip')} value={node.scopeSlipText} />
         )}
         {node.untestedReason !== null && (
-          <DetailRow label="Untested reason" value={node.untestedReason} />
+          <DetailRow label={t('viz.detail.untestedReason')} value={node.untestedReason} />
         )}
         {node.parentNodeId !== null && (
-          <DetailRow label="Parent node" value={node.parentNodeId} mono />
+          <DetailRow label={t('viz.detail.parent')} value={node.parentNodeId} mono />
         )}
-        <DetailRow label="sourceAnchor" value={NO_SOURCE_ANCHOR} />
-        <DetailRow label="hash" value={NO_HASH} />
-        <DetailRow label="Created" value={node.createdAt} mono />
+        <DetailRow label={t('viz.detail.sourceAnchor')} value={NO_SOURCE_ANCHOR} />
+        <DetailRow label={t('viz.detail.hash')} value={NO_HASH} />
+        <DetailRow label={t('viz.detail.createdAt')} value={node.createdAt} mono />
       </CardContent>
     </Card>
   );
@@ -416,7 +423,20 @@ function VerdictLegend() {
 
 /** 节点类型图例（辅助参考） */
 function NodeLegend() {
+  const t = useT();
   const entries = Object.entries(NODE_KIND_COLOR_MAP);
+  const kindLabel = (kind: string): string =>
+    kind === 'hypothesis'
+      ? t('viz.nodeKind.hypothesis')
+      : kind === 'evidence'
+        ? t('viz.nodeKind.evidence')
+        : kind === 'method'
+          ? t('viz.nodeKind.method')
+          : kind === 'plan'
+            ? t('viz.nodeKind.plan')
+            : kind === 'feedback'
+              ? t('viz.nodeKind.feedback')
+              : t('viz.nodeKind.root');
   return (
     <div className="flex flex-wrap gap-3" data-testid="node-legend">
       {entries.map(([kind, { fill }]) => (
@@ -426,7 +446,7 @@ function NodeLegend() {
             style={{ backgroundColor: fill }}
             aria-hidden="true"
           />
-          <span className="text-xs text-muted-foreground">{NODE_KIND_LABEL[kind] ?? kind}</span>
+          <span className="text-xs text-muted-foreground">{kindLabel(kind)}</span>
         </div>
       ))}
     </div>
@@ -434,15 +454,16 @@ function NodeLegend() {
 }
 
 function EdgeLegend() {
+  const t = useT();
   return (
     <div className="flex flex-wrap gap-3" data-testid="edge-legend">
       {(
         [
-          ['supports', 'Supports'],
-          ['refutes', 'Refutes'],
-          ['derives_from', 'Derives'],
-          ['tests', 'Tests'],
-          ['iterates', 'Iterates'],
+          ['supports', t('viz.edge.supports')],
+          ['refutes', t('viz.edge.refutes')],
+          ['derives_from', t('viz.edge.derives_from')],
+          ['tests', t('viz.edge.tests')],
+          ['iterates', t('viz.edge.iterates')],
         ] as const
       ).map(([kind, label]) => {
         const style = EDGE_STYLE_MAP[kind] ?? FALLBACK_EDGE_STYLE;
@@ -470,6 +491,7 @@ function EdgeLegend() {
 // ---------- 主页面 ----------
 
 export default function VizPage() {
+  const t = useT();
   const [searchInput, setSearchInput] = useState('');
   const [headHash, setHeadHash] = useState('');
   const [selectedNode, setSelectedNode] = useState<GraphNodeDto | null>(null);
@@ -500,9 +522,9 @@ export default function VizPage() {
     <div className="space-y-6" data-testid="viz-page">
       {/* 页头 */}
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Evidence chain visualization</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t('viz.title')}</h1>
         <p className="mt-1 text-muted-foreground">
-          Enter an evidence-chain head hash (headHash) to browse evidence nodes and edges as a force-directed DAG. Node colors map to the 5-value verdict; hover for details.
+          {t('viz.subtitle')}
         </p>
       </header>
 
@@ -511,7 +533,7 @@ export default function VizPage() {
         <CardContent className="pt-6">
           <div className="flex gap-2" data-testid="search-bar">
             <label htmlFor="headhash-input" className="sr-only">
-              Evidence-chain head hash
+              {t('viz.searchSr')}
             </label>
             <input
               id="headhash-input"
@@ -519,7 +541,7 @@ export default function VizPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Enter headHash (64-hex)"
+              placeholder={t('viz.placeholder')}
               className="flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               data-testid="headhash-input"
             />
@@ -529,7 +551,7 @@ export default function VizPage() {
               ) : (
                 <Search className="h-4 w-4" aria-hidden="true" />
               )}
-              <span>Search</span>
+              <span>{t('viz.searchBtn')}</span>
             </Button>
           </div>
         </CardContent>
@@ -539,9 +561,9 @@ export default function VizPage() {
       {isError && (
         <Alert variant="destructive" data-testid="viz-error">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Failed to fetch evidence chain</AlertTitle>
+          <AlertTitle>{t('viz.errorTitle')}</AlertTitle>
           <AlertDescription>
-            {error instanceof Error ? error.message : 'Unknown error'}
+            {error instanceof Error ? error.message : t('viz.errorTitle')}
           </AlertDescription>
         </Alert>
       )}
@@ -550,9 +572,9 @@ export default function VizPage() {
       {isEmpty && (
         <Alert data-testid="viz-empty">
           <Network className="h-4 w-4" />
-          <AlertTitle>Empty evidence chain</AlertTitle>
+          <AlertTitle>{t('viz.emptyTitle')}</AlertTitle>
           <AlertDescription>
-            The evidence chain for this headHash contains no graph nodes. Possible reasons: the hash does not exist, the chain has not been built yet, or the data has been purged.
+            {t('viz.emptyDesc')}
           </AlertDescription>
         </Alert>
       )}
@@ -561,24 +583,24 @@ export default function VizPage() {
       {subtree !== null && subtree.nodes.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Legend</CardTitle>
-            <CardDescription>Node colors map to the 5-value verdict (primary); node kinds and edge styles provide secondary distinction</CardDescription>
+            <CardTitle className="text-lg">{t('viz.legendTitle')}</CardTitle>
+            <CardDescription>{t('viz.legendDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <span className="text-sm font-medium">Verdict coloring (primary)</span>
+              <span className="text-sm font-medium">{t('viz.verdictLegend')}</span>
               <div className="mt-2">
                 <VerdictLegend />
               </div>
             </div>
             <div>
-              <span className="text-sm font-medium">Node kind (secondary)</span>
+              <span className="text-sm font-medium">{t('viz.nodeLegend')}</span>
               <div className="mt-2">
                 <NodeLegend />
               </div>
             </div>
             <div>
-              <span className="text-sm font-medium">Edge type</span>
+              <span className="text-sm font-medium">{t('viz.edgeLegend')}</span>
               <div className="mt-2">
                 <EdgeLegend />
               </div>
@@ -601,9 +623,9 @@ export default function VizPage() {
       {hasSearched && !isLoading && !isError && subtree === null && (
         <Alert data-testid="viz-no-subtree">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Could not parse evidence-chain graph data</AlertTitle>
+          <AlertTitle>{t('viz.noSubtreeTitle')}</AlertTitle>
           <AlertDescription>
-            The graphSubtree returned by the API does not match the expected shape (missing rootId / nodes / edges). Check that the backend API version matches.
+            {t('viz.noSubtreeDesc')}
           </AlertDescription>
         </Alert>
       )}
@@ -612,9 +634,9 @@ export default function VizPage() {
       {!hasSearched && (
         <div className="flex flex-col items-center justify-center py-20 text-center" data-testid="viz-initial">
           <Network className="h-16 w-16 text-muted-foreground/40" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-semibold">Enter a headHash to start exploring</h2>
+          <h2 className="mt-4 text-lg font-semibold">{t('viz.initialTitle')}</h2>
           <p className="mt-1 text-sm text-muted-foreground max-w-md">
-            The evidence-chain visualization renders support, refutation, derivation, testing, and iteration relationships between evidence nodes as a force-directed DAG. Each node is an auditable verdict record; colors map to the 5-value verdict, and hover reveals evidence details.
+            {t('viz.initialDesc')}
           </p>
         </div>
       )}

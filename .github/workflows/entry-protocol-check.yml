@@ -33,7 +33,7 @@ jobs:
       PR_NUMBER: ${{ github.event.pull_request.number }}
       OWNER_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - name: Validate PR body has ledger_item + single_real_dependency + src path ∈ changed files (R9)
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

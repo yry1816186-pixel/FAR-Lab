@@ -133,7 +133,7 @@ test('GET /api/v1/evidence/:id returns 200 + DTO when evidence exists', async ()
       url: '/api/v1/evidence/ev-test-001',
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       evidenceId: string;
       callRecordSeq: number;
       stageId: string;
@@ -142,7 +142,7 @@ test('GET /api/v1/evidence/:id returns 200 + DTO when evidence exists', async ()
       sourceAnchor: unknown;
       createdAt: string;
       verdictNode: unknown;
-    };
+    } }).data;
     assert.equal(body.evidenceId, 'ev-test-001');
     assert.equal(body.callRecordSeq, record.seq);
     assert.equal(body.stageId, 'stage3_hypothesis');
@@ -211,10 +211,10 @@ test('GET /api/v1/evidence/:id includes verdictNode when verdict exists', async 
       url: '/api/v1/evidence/ev-with-verdict',
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       evidenceId: string;
       verdictNode: { decision: string; evidenceId: string } | null;
-    };
+    } }).data;
     assert.ok(body.verdictNode !== null, 'verdictNode must be present when verdict exists');
     assert.equal(body.verdictNode!.decision, 'CONFIRMED');
     assert.equal(body.verdictNode!.evidenceId, 'ev-with-verdict');
@@ -260,11 +260,11 @@ test('GET /api/v1/evidence/chain/:headHash returns 200 + null callRecord when ha
       url: `/api/v1/evidence/chain/${'0'.repeat(64)}`,
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       headHash: string;
       callRecord: unknown;
       graphSubtree: unknown;
-    };
+    } }).data;
     assert.equal(body.headHash, '0'.repeat(64));
     assert.equal(body.callRecord, null);
   } finally {
@@ -300,11 +300,11 @@ test('GET /api/v1/evidence/chain/:headHash returns 200 + callRecord when hash ex
       url: `/api/v1/evidence/chain/${record.currentHash}`,
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       headHash: string;
       callRecord: { seq: number; stageId: string; currentHash: string } | null;
       graphSubtree: unknown;
-    };
+    } }).data;
     assert.equal(body.headHash, record.currentHash);
     assert.ok(body.callRecord !== null);
     assert.equal(body.callRecord!.seq, record.seq);
@@ -349,7 +349,7 @@ test('EvidenceLogDto uses camelCase field names (24§0 casing rule)', async () =
       url: '/api/v1/evidence/ev-casing-check',
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as Record<string, unknown>;
+    const body = (response.json() as { readonly ok: boolean; readonly data: Record<string, unknown> }).data;
     assert.ok('evidenceId' in body, 'expected camelCase evidenceId');
     assert.ok('callRecordSeq' in body, 'expected camelCase callRecordSeq');
     assert.ok('stageId' in body, 'expected camelCase stageId');

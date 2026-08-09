@@ -68,4 +68,4 @@ far export receipt --bundle <dir> --format markdown          # Trust Receipt pro
   RFC 8785 JCS (see the README known-limits section).
 - `recomputation.python` needs Python + sympy/z3 (`pip install -e .`); `recomputation.browser` is pending.
 
-See also: [evidence-ledger.md](evidence-ledger.md) · [../demos/tess-offline.md](../demos/tess-offline.md)
+See also: [evidence-ledger.md](evidence-ledger.md)

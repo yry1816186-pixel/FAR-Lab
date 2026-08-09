@@ -1,6 +1,6 @@
 # FAR-Lab — Judge Quick-Start Guide (5 minutes)
 
-> **What is FAR-Lab?** FAR-Lab is a *lie-detector for AI-generated scientific claims*.
+> **What is FAR-Lab?** FAR-Lab is an *evidence-verification layer for AI-generated scientific claims*.
 > When an LLM proposes a scientific hypothesis, FAR-Lab uses a **deterministic rule kernel**
 > (no LLM self-judgment) to answer three questions:
 > 1. **Can it be falsified?** (Falsifiability Enforcement Contract — FEC)

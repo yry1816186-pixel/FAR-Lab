@@ -15,9 +15,9 @@ describe('IntegrityBadge (IC-11)', () => {
   it('四个 datasetSource 状态均有可见区分', () => {
     const cases = [
       ['online', 'Live'],
-      ['cached_fixture', 'Cached fixture'],
+      ['cached_fixture', 'Cached reference'],
       ['replay', 'Replay'],
-      ['fixture', 'Fixture'],
+      ['fixture', 'Reference data'],
     ] as const;
     const seen = new Set<string>();
     for (const [source, label] of cases) {
@@ -46,7 +46,7 @@ describe('IntegrityBadge (IC-11)', () => {
   });
 
   it('note 透传呈现', () => {
-    render(<IntegrityBadge source="replay" note="demo only" />);
-    expect(screen.getByTestId('integrity-badge-replay')).toHaveTextContent('demo only');
+    render(<IntegrityBadge source="replay" note="reference note" />);
+    expect(screen.getByTestId('integrity-badge-replay')).toHaveTextContent('reference note');
   });
 });

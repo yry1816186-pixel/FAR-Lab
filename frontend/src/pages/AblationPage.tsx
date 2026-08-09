@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useT } from '@/lib/i18n';
+import type { MessageKey } from '@/lib/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,13 +37,11 @@ import {
 } from '@/components/AblationCharts';
 
 // ============================================================
-// Baseline definitions
+// Baseline definitions (key-only — labels from i18n)
 // ============================================================
 
 interface BaselineDef {
   readonly key: string;
-  readonly label: string;
-  readonly description: string;
   /** POST /api/v1/hypothesize mode parameter */
   readonly mode: 'full' | 'quick';
   /** Prefixed to researchInput to identify the baseline server-side */
@@ -49,76 +49,29 @@ interface BaselineDef {
 }
 
 const BASELINES: readonly BaselineDef[] = [
-  {
-    key: 'random',
-    label: 'Random Baseline',
-    description: 'Random-guess baseline; no search or reasoning capability',
-    mode: 'quick',
-    researchInputPrefix: '[Random Baseline] ',
-  },
-  {
-    key: 'search',
-    label: 'Search Baseline',
-    description: 'Retrieval-only; no LLM reasoning',
-    mode: 'quick',
-    researchInputPrefix: '[Search Baseline] ',
-  },
-  {
-    key: 'direct-llm',
-    label: 'Direct LLM',
-    description: 'Single-pass LLM reasoning; no evidence chain or verification loop',
-    mode: 'quick',
-    researchInputPrefix: '[Direct LLM] ',
-  },
-  {
-    key: 'far-chain',
-    label: 'FAR-Lab Full',
-    description: 'Full 6-stage FSM + evidence chain + falsification gate + reproducibility hash',
-    mode: 'full',
-    researchInputPrefix: '',
-  },
+  { key: 'random', mode: 'quick', researchInputPrefix: '[Random Baseline] ' },
+  { key: 'search', mode: 'quick', researchInputPrefix: '[Search Baseline] ' },
+  { key: 'direct-llm', mode: 'quick', researchInputPrefix: '[Direct LLM] ' },
+  { key: 'far-chain', mode: 'full', researchInputPrefix: '' },
 ];
 
 // ============================================================
 // Capability matrix — 方法定义层面的真实定性能力差异
 // ============================================================
-//
-// 设计理由（反 theater 红线 00§1.4 / 14§3）：
-//   - offline_replay fixture 仅按 stageId 命中·不读取 researchInput 文本，
-//     故 random/search/direct-ll 三条 quick 基线产出相同 loopState——
-//     verdict/iterations 的「数值差异」在 offline 下不存在（真实后端相同）。
-//   - 唯一可在 offline 下真实对比的是**方法定义层面的结构性能力存在性**
-//     （定性 ✓/✗·非编造数值）：每条基线按其方法定义具备或不具备某项能力。
-//   - 此矩阵是 FAR-Lab 真实护城河的可视化锚点（hash 证据链 / 可证伪规格 /
-//     接 calc_bridge 的复现哈希 / 六阶段 FSM / 门控裁决），与 verdict 准确度无关。
 
 interface CapabilityDim {
   readonly key: string;
-  readonly label: string;
-  readonly description: string;
 }
 
 const CAPABILITY_DIMENSIONS: readonly CapabilityDim[] = [
-  { key: 'evidenceRetrieval', label: 'Evidence retrieval', description: 'Retrieves external evidence/literature' },
-  { key: 'structuredChain', label: 'Hash-structured evidence chain', description: 'call_records hash-linked; traceable audit' },
-  { key: 'singlePassReasoning', label: 'Single-pass reasoning', description: 'LLM reasoning produces a conclusion' },
-  { key: 'falsificationSpec', label: 'Falsification spec', description: 'Structured prediction/metric/threshold; supports falsification verdicts' },
-  { key: 'reproducibleHash', label: 'Reproducible hash', description: 'reproHash designed to connect to 03 calc_bridge; independently re-computable' },
-  { key: 'gatedVerdict', label: 'Gated verdict', description: 'verdict gate + degraded-scope/untested branches' },
+  { key: 'evidenceRetrieval' },
+  { key: 'structuredChain' },
+  { key: 'singlePassReasoning' },
+  { key: 'falsificationSpec' },
+  { key: 'reproducibleHash' },
+  { key: 'gatedVerdict' },
 ];
 
-/**
- * BASELINE_CAPABILITIES —— 每条基线在各能力维度上的真实定性归属。
- *
- * 依据方法定义（非运行时数值）：
- *   - random：纯随机猜测·不具备任何结构化能力。
- *   - search：仅检索·有证据但不构建 hash 链/不推理/不证伪/不复现/不门控。
- *   - direct-llm：单次 LLM 推理·有结论但无任何 FAR-Lab 结构化机制。
- *   - FAR-Lab：完整六阶段 FSM·全部 6 项结构性能力具备。
- *
- * 真实性注记：reproducibleHash 对 FAR-Lab 标 ✓ 指**机制存在**（设计接 calc_bridge）；
- *   offline demo 路径用占位 hash（0×64·非生产复现锚点）——生产路径须显式注入 reproHashProvider。
- */
 const BASELINE_CAPABILITIES: Readonly<Record<string, Readonly<Record<string, boolean>>>> = {
   random: {
     evidenceRetrieval: false,
@@ -155,7 +108,61 @@ const BASELINE_CAPABILITIES: Readonly<Record<string, Readonly<Record<string, boo
 };
 
 // ============================================================
-// Verdict visual mapping (matches badge variants + Chinese labels)
+// i18n key lookup helpers (MessageKey-typed for type safety)
+// ============================================================
+
+const BASELINE_LABEL: Record<string, MessageKey> = {
+  random: 'ablation.baseline.random',
+  search: 'ablation.baseline.search',
+  'direct-llm': 'ablation.baseline.direct-llm',
+  'far-chain': 'ablation.baseline.far-chain',
+};
+
+const BASELINE_DESC: Record<string, MessageKey> = {
+  random: 'ablation.baseline.random.desc',
+  search: 'ablation.baseline.search.desc',
+  'direct-llm': 'ablation.baseline.direct-llm.desc',
+  'far-chain': 'ablation.baseline.far-chain.desc',
+};
+
+const CAP_LABEL: Record<string, MessageKey> = {
+  evidenceRetrieval: 'ablation.cap.evidenceRetrieval',
+  structuredChain: 'ablation.cap.structuredChain',
+  singlePassReasoning: 'ablation.cap.singlePassReasoning',
+  falsificationSpec: 'ablation.cap.falsificationSpec',
+  reproducibleHash: 'ablation.cap.reproducibleHash',
+  gatedVerdict: 'ablation.cap.gatedVerdict',
+};
+
+const CAP_DESC: Record<string, MessageKey> = {
+  evidenceRetrieval: 'ablation.cap.evidenceRetrieval.desc',
+  structuredChain: 'ablation.cap.structuredChain.desc',
+  singlePassReasoning: 'ablation.cap.singlePassReasoning.desc',
+  falsificationSpec: 'ablation.cap.falsificationSpec.desc',
+  reproducibleHash: 'ablation.cap.reproducibleHash.desc',
+  gatedVerdict: 'ablation.cap.gatedVerdict.desc',
+};
+
+type TerminationReason = LoopState['terminationReason'];
+
+const TERM_MSG: Record<TerminationReason, MessageKey> = {
+  feedback_converged: 'ablation.term.converged',
+  max_iterations: 'ablation.term.max_iterations',
+  max_tokens: 'ablation.term.max_tokens',
+  max_duration: 'ablation.term.max_duration',
+  error: 'ablation.term.error',
+};
+
+const VERDICT_MSG: Record<VerdictValue, MessageKey> = {
+  CONFIRMED: 'ablation.verdict.CONFIRMED',
+  REFUTED: 'ablation.verdict.REFUTED',
+  INCONCLUSIVE: 'ablation.verdict.INCONCLUSIVE',
+  DEGRADED_SCOPE: 'ablation.verdict.DEGRADED_SCOPE',
+  UNTESTED: 'ablation.verdict.UNTESTED',
+};
+
+// ============================================================
+// Verdict visual mapping (variant only — labels from i18n)
 // ============================================================
 
 const VERDICT_VARIANT: Record<VerdictValue, 'success' | 'destructive' | 'warning' | 'secondary' | 'outline'> = {
@@ -164,14 +171,6 @@ const VERDICT_VARIANT: Record<VerdictValue, 'success' | 'destructive' | 'warning
   INCONCLUSIVE: 'warning',
   DEGRADED_SCOPE: 'secondary',
   UNTESTED: 'outline',
-};
-
-const VERDICT_LABEL: Record<VerdictValue, string> = {
-  CONFIRMED: 'Confirmed',
-  REFUTED: 'Refuted',
-  INCONCLUSIVE: 'Inconclusive',
-  DEGRADED_SCOPE: 'Degraded scope',
-  UNTESTED: 'Untested',
 };
 
 // ============================================================
@@ -199,28 +198,6 @@ function truncateHash(hash: string, len = 12): string {
   return `${hash.slice(0, len)}…`;
 }
 
-type TerminationReason = LoopState['terminationReason'];
-
-function terminationLabel(reason: TerminationReason): string {
-  switch (reason) {
-    case 'feedback_converged':
-      return 'Converged';
-    case 'max_iterations':
-      return 'Max iterations';
-    case 'max_tokens':
-      return 'Token limit';
-    case 'max_duration':
-      return 'Timeout';
-    case 'error':
-      return 'Errored';
-    default: {
-      const _exhaustive: never = reason;
-      void _exhaustive;
-      return reason;
-    }
-  }
-}
-
 function terminationVariant(reason: TerminationReason): 'success' | 'destructive' | 'secondary' {
   if (reason === 'feedback_converged') return 'success';
   if (reason === 'error') return 'destructive';
@@ -232,6 +209,7 @@ function terminationVariant(reason: TerminationReason): 'success' | 'destructive
 // ============================================================
 
 export default function AblationPage() {
+  const t = useT();
   const hypothesize = useHypothesize();
   const [researchInput, setResearchInput] = useState('');
   const [results, setResults] = useState<BaselineResult[]>(createInitialResults);
@@ -283,9 +261,9 @@ export default function AblationPage() {
     <div className="space-y-8" data-testid="ablation-page">
       {/* ---- Header ---- */}
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Ablation study</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t('ablation.title')}</h1>
         <p className="mt-1 text-muted-foreground">
-          Compares the full FAR-Lab pipeline against simplified baselines on tamper-detectability, independent re-computability, and falsifiability
+          {t('ablation.subtitle')}
         </p>
       </header>
 
@@ -294,23 +272,23 @@ export default function AblationPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <FlaskConical className="h-5 w-5" aria-hidden="true" />
-            <CardTitle className="text-lg">Experiment input</CardTitle>
+            <CardTitle className="text-lg">{t('ablation.inputTitle')}</CardTitle>
           </div>
           <CardDescription>
-            Enter a research question to fire hypothesize requests against all 4 baselines in parallel and compare results (via the same offline fixture — the three quick baselines produce identical output; see the honesty boundary below)
+            {t('ablation.inputDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <textarea
               className="w-full min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              placeholder="Enter a research question, e.g.: Is the protective efficacy of the COVID-19 mRNA vaccine in people aged 65+ no less than 80%?"
+              placeholder={t('ablation.placeholder')}
               value={researchInput}
               onChange={(e) => {
                 setResearchInput(e.target.value);
               }}
               disabled={isRunning}
-              aria-label="Research question input"
+              aria-label={t('ablation.inputAria')}
               data-testid="ablation-input"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -325,22 +303,22 @@ export default function AblationPage() {
                 }}
                 disabled={isRunning || !researchInput.trim()}
                 data-testid="ablation-run-button"
-                aria-label="Run ablation study"
+                aria-label={t('ablation.runAria')}
               >
                 {isRunning ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    Running…
+                    {t('ablation.running')}
                   </>
                 ) : (
                   <>
                     <Play className="h-4 w-4" aria-hidden="true" />
-                    Run ablation study
+                    {t('ablation.runBtn')}
                   </>
                 )}
               </Button>
               <span className="text-xs text-muted-foreground">
-                {isRunning ? '4 baselines running in parallel…' : 'Ctrl + Enter to run'}
+                {isRunning ? t('ablation.runHintRunning') : t('ablation.runHintIdle')}
               </span>
             </div>
           </div>
@@ -356,7 +334,7 @@ export default function AblationPage() {
       {/* ---- Baseline result cards ---- */}
       <section aria-labelledby="baseline-results-heading">
         <h2 id="baseline-results-heading" className="mb-4 text-xl font-semibold">
-          Baseline results
+          {t('ablation.resultsHeading')}
         </h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" data-testid="baseline-cards">
           {BASELINES.map((baseline, i) => (
@@ -374,20 +352,20 @@ export default function AblationPage() {
       {hasAnyResult && (
         <section aria-labelledby="comparison-table-heading">
           <h2 id="comparison-table-heading" className="mb-4 text-xl font-semibold">
-            Comparison table
+            {t('ablation.comparisonHeading')}
           </h2>
           <Card data-testid="comparison-table">
             <CardContent className="pt-6">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Baseline</TableHead>
-                    <TableHead>Run ID</TableHead>
-                    <TableHead>Iterations</TableHead>
-                    <TableHead>Termination</TableHead>
-                    <TableHead>Verdict</TableHead>
-                    <TableHead>Metric Value</TableHead>
-                    <TableHead>Repro Hash</TableHead>
+                    <TableHead>{t('ablation.col.baseline')}</TableHead>
+                    <TableHead>{t('ablation.col.runId')}</TableHead>
+                    <TableHead>{t('ablation.col.iterations')}</TableHead>
+                    <TableHead>{t('ablation.col.termination')}</TableHead>
+                    <TableHead>{t('ablation.col.verdict')}</TableHead>
+                    <TableHead>{t('ablation.col.metric')}</TableHead>
+                    <TableHead>{t('ablation.col.reproHash')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -397,10 +375,10 @@ export default function AblationPage() {
                     if (r.status === 'error') {
                       return (
                         <TableRow key={baseline.key} data-testid={`row-${baseline.key}-error`}>
-                          <TableCell className="font-medium">{baseline.label}</TableCell>
+                          <TableCell className="font-medium">{t(BASELINE_LABEL[baseline.key])}</TableCell>
                           <TableCell colSpan={6}>
                             <span className="text-destructive text-sm">
-                              Request failed: {r.error}
+                              {t('ablation.reqFailed', { msg: r.error ?? '' })}
                             </span>
                           </TableCell>
                         </TableRow>
@@ -412,20 +390,20 @@ export default function AblationPage() {
                       d.loopState.verdictNode?.verdict ?? d.honestVerdict?.verdict;
                     return (
                       <TableRow key={baseline.key} data-testid={`row-${baseline.key}`}>
-                        <TableCell className="font-medium">{baseline.label}</TableCell>
+                        <TableCell className="font-medium">{t(BASELINE_LABEL[baseline.key])}</TableCell>
                         <TableCell className="font-mono text-xs">
                           {d.loopState.runId}
                         </TableCell>
                         <TableCell>{d.loopState.iterationsCompleted}</TableCell>
                         <TableCell>
                           <Badge variant={terminationVariant(d.loopState.terminationReason)}>
-                            {terminationLabel(d.loopState.terminationReason)}
+                            {t(TERM_MSG[d.loopState.terminationReason])}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           {verdictValue ? (
                             <Badge variant={VERDICT_VARIANT[verdictValue]}>
-                              {VERDICT_LABEL[verdictValue]}
+                              {t(VERDICT_MSG[verdictValue])}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground text-sm">{'—'}</span>
@@ -456,7 +434,7 @@ export default function AblationPage() {
       {hasAnyResult && (
         <section aria-labelledby="charts-heading">
           <h2 id="charts-heading" className="mb-4 text-xl font-semibold">
-            Visual comparison
+            {t('ablation.chartsHeading')}
           </h2>
           <div className="space-y-6" data-testid="ablation-charts">
             {/* Iteration comparison */}
@@ -464,17 +442,17 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">Iteration count comparison</CardTitle>
+                  <CardTitle className="text-lg">{t('ablation.chart.iterTitle')}</CardTitle>
                 </div>
                 <CardDescription>
-                  Number of iterations each baseline needs to complete the research; reflects search/reasoning efficiency
+                  {t('ablation.chart.iterDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <IterationBarChart
                   data={BASELINES.map((b, i) => ({
                     key: b.key,
-                    label: b.label,
+                    label: t(BASELINE_LABEL[b.key]),
                     response:
                       results[i]?.status === 'success'
                         ? results[i]!.data
@@ -490,17 +468,17 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">Metric value comparison</CardTitle>
+                  <CardTitle className="text-lg">{t('ablation.chart.metricTitle')}</CardTitle>
                 </div>
                 <CardDescription>
-                  metricValue of each baseline's verdict node (only baselines with a metric value are shown)
+                  {t('ablation.chart.metricDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <MetricBarChart
                   data={BASELINES.map((b, i) => ({
                     key: b.key,
-                    label: b.label,
+                    label: t(BASELINE_LABEL[b.key]),
                     response:
                       results[i]?.status === 'success'
                         ? results[i]!.data
@@ -516,18 +494,17 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">Verdict distribution</CardTitle>
+                  <CardTitle className="text-lg">{t('ablation.chart.verdictTitle')}</CardTitle>
                 </div>
                 <CardDescription>
-                  Final verdict type per baseline — CONFIRMED / REFUTED / INCONCLUSIVE /
-                  DEGRADED_SCOPE / UNTESTED
+                  {t('ablation.chart.verdictDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <VerdictDistChart
                   data={BASELINES.map((b, i) => ({
                     key: b.key,
-                    label: b.label,
+                    label: t(BASELINE_LABEL[b.key]),
                     response:
                       results[i]?.status === 'success'
                         ? results[i]!.data
@@ -543,17 +520,17 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">Falsifiability support</CardTitle>
+                  <CardTitle className="text-lg">{t('ablation.chart.falsTitle')}</CardTitle>
                 </div>
                 <CardDescription>
-                  Whether each baseline emits a structured falsificationSpec (a falsifiable claim) — FAR-Lab's core differentiator
+                  {t('ablation.chart.falsDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <FalsifiabilityChart
                   data={BASELINES.map((b, i) => ({
                     key: b.key,
-                    label: b.label,
+                    label: t(BASELINE_LABEL[b.key]),
                     response:
                       results[i]?.status === 'success'
                         ? results[i]!.data
@@ -571,10 +548,10 @@ export default function AblationPage() {
       {allComplete && hasAnyResult && (
         <section aria-labelledby="summary-heading">
           <h2 id="summary-heading" className="mb-4 text-xl font-semibold">
-            FAR-Lab advantages over the baselines
+            {t('ablation.summaryHeading')}
           </h2>
           <p className="mb-4 text-sm text-muted-foreground">
-            The comparison below focuses on tamper-detectability, independent re-computability, and falsifiability — not only on conclusion accuracy.
+            {t('ablation.summaryIntro')}
           </p>
           <div className="grid gap-4 md:grid-cols-3" data-testid="advantage-cards">
             {/* Auditability */}
@@ -582,16 +559,16 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Eye className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">Tamper-detectability</CardTitle>
+                  <CardTitle className="text-lg">{t('ablation.adv.auditTitle')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  FAR-Lab's hash evidence chain spans the full 6-stage FSM (call_records are hash-linked one by one). The three baselines also land call_records via the offline FSM, but by their method definition they do not build a cross-stage structured evidence chain — see the capability matrix above for capability attribution.
+                  {t('ablation.adv.auditBody')}
                 </p>
                 {farChainResult?.status === 'success' && farChainResult.data !== null && (
                   <div className="rounded bg-muted px-3 py-2">
-                    <span className="text-xs text-muted-foreground">Repro Hash: </span>
+                    <span className="text-xs text-muted-foreground">{t('ablation.adv.reproHashLabel')}</span>
                     <code className="text-xs font-mono">
                       {truncateHash(farChainResult.data.reproHash, 16)}
                     </code>
@@ -600,7 +577,7 @@ export default function AblationPage() {
                 <ul className="space-y-1 text-sm text-muted-foreground list-disc list-inside">
                   {otherBaselines.map((b, j) => (
                     <li key={b.key}>
-                      {b.label}: {otherResults[j]?.status === 'success' ? 'no structured evidence chain (see capability matrix)' : '—'}
+                      {t(BASELINE_LABEL[b.key])}: {otherResults[j]?.status === 'success' ? t('ablation.adv.noChain') : '—'}
                     </li>
                   ))}
                 </ul>
@@ -612,16 +589,16 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Repeat className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">Independent re-computability</CardTitle>
+                  <CardTitle className="text-lg">{t('ablation.adv.reproTitle')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  FAR-Lab's reproHash is designed to connect to the 03 calc_bridge seven-component hash (production path; independently re-computable). The current offline demo uses a placeholder hash (0×64; satisfies only the chain-structure constraint; not a production reproducibility anchor); the three baselines have no re-computation mechanism by method definition.
+                  {t('ablation.adv.reproBody')}
                 </p>
                 {farChainResult?.status === 'success' && farChainResult.data !== null && (
                   <div className="rounded bg-muted px-3 py-2">
-                    <span className="text-xs text-muted-foreground">Verdict: </span>
+                    <span className="text-xs text-muted-foreground">{t('ablation.adv.verdictLabel')}</span>
                     <Badge
                       variant={
                         farChainResult.data.honestVerdict?.verdict
@@ -632,9 +609,9 @@ export default function AblationPage() {
                       }
                     >
                       {farChainResult.data.honestVerdict?.verdict
-                        ? VERDICT_LABEL[farChainResult.data.honestVerdict.verdict]
+                        ? t(VERDICT_MSG[farChainResult.data.honestVerdict.verdict])
                         : farChainResult.data.loopState.verdictNode?.verdict
-                          ? VERDICT_LABEL[farChainResult.data.loopState.verdictNode.verdict]
+                          ? t(VERDICT_MSG[farChainResult.data.loopState.verdictNode.verdict])
                           : '—'}
                     </Badge>
                   </div>
@@ -647,20 +624,20 @@ export default function AblationPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">Falsifiability</CardTitle>
+                  <CardTitle className="text-lg">{t('ablation.adv.falsTitle')}</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Every FAR-Lab hypothesis is bound to an explicit falsificationSpec, enabling meaningful falsification verdicts such as REFUTED / DEGRADED_SCOPE. The baselines have no structured falsification standard.
+                  {t('ablation.adv.falsBody')}
                 </p>
                 {farChainResult?.status === 'success' && farChainResult.data !== null && (
                   <div className="rounded bg-muted px-3 py-2">
                     <span className="text-xs text-muted-foreground">
-                      Iterations: {farChainResult.data.loopState.iterationsCompleted}
+                      {t('ablation.adv.iterLabel', { n: farChainResult.data.loopState.iterationsCompleted })}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {' · '}Termination: {terminationLabel(farChainResult.data.loopState.terminationReason)}
+                      {' · '}{t('ablation.adv.termSuffix', { label: t(TERM_MSG[farChainResult.data.loopState.terminationReason]) })}
                     </span>
                   </div>
                 )}
@@ -674,9 +651,9 @@ export default function AblationPage() {
       {allComplete && !hasAnyResult && (
         <Alert variant="destructive" data-testid="ablation-all-error">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>All baselines failed</AlertTitle>
+          <AlertTitle>{t('ablation.allErrorTitle')}</AlertTitle>
           <AlertDescription>
-            Make sure the backend is running (http://localhost:3000) and the /api/v1/hypothesize endpoint is available. Open the browser dev tools to inspect the network errors.
+            {t('ablation.allErrorDesc')}
           </AlertDescription>
         </Alert>
       )}
@@ -690,23 +667,16 @@ export default function AblationPage() {
 
 // ---- Honesty wall (offline 局限诚实声明·反 theater) ----
 function HonestyWallSection() {
+  const t = useT();
   return (
     <Alert data-testid="ablation-honesty-wall" className="border-amber-500/40 bg-amber-500/5">
       <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-      <AlertTitle>Honesty boundary of the offline demo</AlertTitle>
+      <AlertTitle>{t('ablation.honestyTitle')}</AlertTitle>
       <AlertDescription className="space-y-2 text-sm">
-        <p>
-          All four baselines go through the <code className="font-mono">offline_replay</code> adapter (model-neutral; no real LLM calls). The fixture matches only by <code className="font-mono">stageId</code> and does not read the research-question text, so the Random / Search / Direct LLM quick baselines produce <strong>the same deterministic loopState</strong>.
-        </p>
-        <p>
-          The only real runtime difference is that <strong>FAR-Lab uses mode=full</strong> (multi-iteration FSM); the other three use mode=quick (single pass, then terminate). The three baselines showing identical output below is an honest reflection, not a defect.
-        </p>
-        <p>
-          FAR-Lab's real moat lies <strong>not in the verdict value</strong> but in structural capabilities (hash evidence chain / falsification spec / calc_bridge-linked reproducibility hash / gated verdict) — see the capability matrix below.
-        </p>
-        <p>
-          Quantifying the capability differences among Random / Search / Direct LLM requires plugging in a real LLM provider (competition_aliyun_qwen), which is beyond the scope of the offline demo.
-        </p>
+        <p>{t('ablation.honestyP1')}</p>
+        <p>{t('ablation.honestyP2')}</p>
+        <p>{t('ablation.honestyP3')}</p>
+        <p>{t('ablation.honestyP4')}</p>
       </AlertDescription>
     </Alert>
   );
@@ -714,15 +684,16 @@ function HonestyWallSection() {
 
 // ---- Capability matrix (方法定义层面的真实定性能力对比) ----
 function CapabilityMatrixSection() {
+  const t = useT();
   return (
     <section
       aria-labelledby="capability-matrix-heading"
       data-testid="ablation-capability-matrix"
     >
       <h2 id="capability-matrix-heading" className="mb-4 text-xl font-semibold">
-        Capability matrix
+        {t('ablation.matrixHeading')}
         <span className="ml-2 text-sm font-normal text-muted-foreground">
-          (method-definition level; qualitative; not fabricated numbers)
+          {t('ablation.matrixSub')}
         </span>
       </h2>
       <Card>
@@ -730,10 +701,10 @@ function CapabilityMatrixSection() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Capability dimension</TableHead>
+                <TableHead>{t('ablation.matrixColCap')}</TableHead>
                 {BASELINES.map((b) => (
                   <TableHead key={b.key} className="text-center">
-                    {b.label}
+                    {t(BASELINE_LABEL[b.key])}
                   </TableHead>
                 ))}
               </TableRow>
@@ -743,8 +714,8 @@ function CapabilityMatrixSection() {
                 <TableRow key={dim.key}>
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-medium">{dim.label}</span>
-                      <span className="text-xs text-muted-foreground">{dim.description}</span>
+                      <span className="font-medium">{t(CAP_LABEL[dim.key])}</span>
+                      <span className="text-xs text-muted-foreground">{t(CAP_DESC[dim.key])}</span>
                     </div>
                   </TableCell>
                   {BASELINES.map((b) => {
@@ -757,11 +728,11 @@ function CapabilityMatrixSection() {
                       >
                         {has ? (
                           <span className="inline-flex items-center justify-center text-green-600 dark:text-green-400">
-                            <CheckCircle2 className="h-5 w-5" aria-label="Present" />
+                            <CheckCircle2 className="h-5 w-5" aria-label={t('ablation.capYesAria')} />
                           </span>
                         ) : (
                           <span className="inline-flex items-center justify-center text-muted-foreground">
-                            <XCircle className="h-5 w-5" aria-label="Absent" />
+                            <XCircle className="h-5 w-5" aria-label={t('ablation.capNoAria')} />
                           </span>
                         )}
                       </TableCell>
@@ -786,6 +757,7 @@ function BaselineResultCard({
   result: BaselineResult;
   isFarChain: boolean;
 }) {
+  const t = useT();
   return (
     <Card
       data-testid={`baseline-card-${baseline.key}`}
@@ -794,20 +766,20 @@ function BaselineResultCard({
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">{baseline.label}</CardTitle>
+            <CardTitle className="text-base">{t(BASELINE_LABEL[baseline.key])}</CardTitle>
             {isFarChain && (
               <Badge variant="default" className="text-xs">
-                Full
+                {t('ablation.full')}
               </Badge>
             )}
           </div>
         </div>
-        <CardDescription>{baseline.description}</CardDescription>
+        <CardDescription>{t(BASELINE_DESC[baseline.key])}</CardDescription>
       </CardHeader>
       <CardContent>
         {result.status === 'idle' && (
           <p className="text-sm text-muted-foreground" data-testid={`baseline-idle-${baseline.key}`}>
-            Waiting to run…
+            {t('ablation.idle')}
           </p>
         )}
         {result.status === 'loading' && (
@@ -816,13 +788,13 @@ function BaselineResultCard({
             data-testid={`baseline-loading-${baseline.key}`}
           >
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            Running…
+            {t('ablation.loadingBaseline')}
           </div>
         )}
         {result.status === 'error' && (
           <Alert variant="destructive" className="text-xs">
             <AlertTriangle className="h-3 w-3" />
-            <AlertTitle className="text-xs">Run failed</AlertTitle>
+            <AlertTitle className="text-xs">{t('ablation.runFailTitle')}</AlertTitle>
             <AlertDescription className="text-xs">{result.error}</AlertDescription>
           </Alert>
         )}
@@ -832,25 +804,25 @@ function BaselineResultCard({
             data-testid={`baseline-result-${baseline.key}`}
           >
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Run ID</dt>
+              <dt className="text-muted-foreground">{t('ablation.cardRunId')}</dt>
               <dd>
                 <code className="font-mono text-xs">{result.data.loopState.runId}</code>
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Iterations</dt>
+              <dt className="text-muted-foreground">{t('ablation.cardIterations')}</dt>
               <dd>{result.data.loopState.iterationsCompleted}</dd>
             </div>
             <div className="flex justify-between items-center">
-              <dt className="text-muted-foreground">Termination</dt>
+              <dt className="text-muted-foreground">{t('ablation.cardTermination')}</dt>
               <dd>
                 <Badge variant={terminationVariant(result.data.loopState.terminationReason)}>
-                  {terminationLabel(result.data.loopState.terminationReason)}
+                  {t(TERM_MSG[result.data.loopState.terminationReason])}
                 </Badge>
               </dd>
             </div>
             <div className="flex justify-between items-center">
-              <dt className="text-muted-foreground">Verdict</dt>
+              <dt className="text-muted-foreground">{t('ablation.cardVerdict')}</dt>
               <dd>
                 {(() => {
                   const v =
@@ -858,7 +830,7 @@ function BaselineResultCard({
                     result.data.honestVerdict?.verdict;
                   return v ? (
                     <Badge variant={VERDICT_VARIANT[v]}>
-                      {VERDICT_LABEL[v]}
+                      {t(VERDICT_MSG[v])}
                     </Badge>
                   ) : (
                     <span className="text-muted-foreground">{'—'}</span>
@@ -868,7 +840,7 @@ function BaselineResultCard({
             </div>
             {result.data.loopState.verdictNode?.metricValue != null && (
               <div className="flex justify-between">
-                <dt className="text-muted-foreground">Metric</dt>
+                <dt className="text-muted-foreground">{t('ablation.cardMetric')}</dt>
                 <dd>
                   <code className="font-mono text-xs">
                     {result.data.loopState.verdictNode.metricValue.toFixed(4)}
@@ -877,7 +849,7 @@ function BaselineResultCard({
               </div>
             )}
             <div className="flex justify-between">
-              <dt className="text-muted-foreground">Repro Hash</dt>
+              <dt className="text-muted-foreground">{t('ablation.cardReproHash')}</dt>
               <dd>
                 <code
                   className="font-mono text-xs"

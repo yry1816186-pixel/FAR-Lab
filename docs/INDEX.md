@@ -54,12 +54,11 @@
 | [concepts/evidence-ledger.md](concepts/evidence-ledger.md) | Append-only content-addressed hash chain (mechanics) |
 | [concepts/far-proof.md](concepts/far-proof.md) | Self-verifiable `.far-proof` proof bundles |
 
-## Providers & Demos
+## Providers
 
 | Document | Description |
 |----------|-------------|
 | [providers/qwen-dashscope.md](providers/qwen-dashscope.md) | Qwen / DashScope / Bailian live inference |
-| [demos/tess-offline.md](demos/tess-offline.md) | TESS astronomy offline claim demo |
 
 ## Reference
 
@@ -148,7 +147,7 @@ See [design/00_INDEX_AND_READING_ORDER.md](design/00_INDEX_AND_READING_ORDER.md)
 | [../CHANGELOG.md](../CHANGELOG.md) | Release changelog |
 | [../SUPPORT.md](../SUPPORT.md) | Support channels |
 | [governance/MAINTAINERS.md](governance/MAINTAINERS.md) | Maintainer list |
-| [governance/](governance/) | Release operations + open-source plan + agent lifecycle (AGENT-LIFECYCLE / AGENT-ORCHESTRATION / AGENT-MEMORY / ROOT-HYGIENE-POLICY) |
+| [governance/](governance/) | Release operations + open-source plan + agent lifecycle (AGENT-LIFECYCLE / AGENT-ORCHESTRATION / AGENT-MEMORY / OPENCODE-PLANNING / ROOT-HYGIENE-POLICY) |
 | [charter/ULTIMATE_EXECUTION_PRIME.md](charter/ULTIMATE_EXECUTION_PRIME.md) | Full lifecycle execution charter (Phase A–H) |
 
 ## Live quality gates

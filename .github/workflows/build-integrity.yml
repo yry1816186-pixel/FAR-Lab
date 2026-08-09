@@ -44,7 +44,7 @@ jobs:
   audit_constant_source:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       # 门禁 1：src/ 中不得出现 process.env.AUDITOR_ENABLED（必须是编译时常量）
       - name: R9-2-1 · 生产构建 grep 零 process.env.AUDITOR_ENABLED
         run: |
@@ -92,11 +92,11 @@ jobs:
     needs: audit_constant_source
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
@@ -121,8 +121,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -134,7 +134,9 @@ jobs:
       - name: R9-2-9 · Frontend ESLint zero-warnings
         run: npm run lint
       - name: R9-2-10 · Vite production build
-        run: npx vite build
+        # 阶段 7 P1-D-5：统一为 npm run build（= tsc -b && vite build）——与本地 frontend/package.json
+        # 一致（旧实现 npx vite build 跳过 tsc 前置·与本地构建不一致）。
+        run: npm run build
       # 前端构建产物中不得含 process.env.AUDITOR_ENABLED（跨端编译时常量一致性）
       - name: R9-2-11 · grep 前端 dist 中零 process.env.AUDITOR_ENABLED
         run: |
@@ -151,6 +153,42 @@ jobs:
           fi
 
   # ============================================================
+  # REPRODUCIBLE_BUILD · 同 commit 双构建哈希一致（阶段 7 P1-D-2 · F1-03）
+  # 验证：同一 checkout 构建两次 dist，sha256sum 递归对比——任何非确定性源
+  # （构建期时间戳/随机值/路径注入）→ 哈希漂移 → FAIL
+  # ============================================================
+  reproducible_build:
+    needs: build_frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci (frozen install via package-lock.json)
+        run: npm ci --legacy-peer-deps
+      - name: P1-D-2 · Build #1 + record manifest
+        run: |
+          npm run build
+          find dist -type f -exec sha256sum {} \; | sort -k2 | sed 's|  dist/|  |' > /tmp/dist-hash-1.txt
+          echo "files: $(wc -l < /tmp/dist-hash-1.txt)"
+      - name: P1-D-2 · Clean + Build #2 + compare (byte-identical required)
+        run: |
+          rm -rf dist
+          npm run build
+          find dist -type f -exec sha256sum {} \; | sort -k2 | sed 's|  dist/|  |' > /tmp/dist-hash-2.txt
+          if ! diff -u /tmp/dist-hash-1.txt /tmp/dist-hash-2.txt; then
+            echo "::error::P1-D-2 可复现构建失败：同 commit 两次构建产物哈希不一致（存在非确定性源：构建期时间戳/随机值/路径注入）"
+            exit 1
+          fi
+          echo "::notice::✅ P1-D-2 通过：同 commit 双构建产物哈希一致 ($(wc -l < /tmp/dist-hash-1.txt) files)"
+
+  # ============================================================
   # CROSS_LANG · 跨语言哈希一致性（R2 最高优先闸门）
   # 与主 ci.yml 的 cross_lang job 一致——R9-2 独立性兜底
   # ============================================================
@@ -158,15 +196,15 @@ jobs:
     needs: [build_backend, build_frontend]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -187,15 +225,15 @@ jobs:
     needs: cross_lang
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -214,7 +252,7 @@ jobs:
     needs: merkle_cross_lang
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - name: R9-2-13 · anti-theater grep —— proof_envelopes 中 WARN 含 → 封 CONFIRMED 阻断
         run: |
           set -euo pipefail
@@ -259,7 +297,7 @@ jobs:
     needs: anti_theater
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - name: R9-2-14 · 核心路径模型中立 grep（含 golden_vectors.ts + src/anti_theater + src/confounding_gate）
         run: |
           set -euo pipefail
@@ -294,7 +332,7 @@ jobs:
     needs: model_neutrality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - name: R9-2-15 · grep 零 DASHSCOPE_API_KEY 明文（非 .env.example）
         run: |
           hits=$(grep -rPn "DASHSCOPE_API_KEY\s*=\s*['\"]sk-" src/ tests/ || true)
@@ -309,7 +347,7 @@ jobs:
   # DELIVERABLE_MARK · 构建完整性最终标记（全绿则 R9-2 达成）
   # ============================================================
   deliverable_mark:
-    needs: security
+    needs: [security, reproducible_build]
     runs-on: ubuntu-latest
     steps:
       - name: R9-2 · Build Integrity 全绿

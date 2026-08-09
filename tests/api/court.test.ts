@@ -28,7 +28,7 @@ test('GET /court/demo: 返回 ReliabilityCertificate（3 模型 · unanimous · 
   try {
     const res = await app.inject({ method: 'GET', url: '/api/v1/court/demo' });
       assert.equal(res.statusCode, 200);
-      const body = JSON.parse(res.body);
+      const body = JSON.parse(res.body).data;
       // ReliabilityCertificate 最小 shape。
       assert.equal(typeof body.certificateId, 'string');
       assert.match(body.certificateId, /^01/); // ULID 前缀

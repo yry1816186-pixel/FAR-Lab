@@ -544,3 +544,155 @@ export interface ApiErrorResponse {
   };
   readonly detail?: unknown;
 }
+
+// ---------- V2 Receipts API envelope + DTOs (spec doc19 §5) ----------
+//
+// 应然契约(所有 v2_receipts 端点统一信封):
+//   成功 → { ok: true, data: T }
+//   失败 → { ok: false, error: ApiErrorResponse }   (RFC 7807)
+//
+// 前端 api_client.parseV2Response 在边界做信封校验 + zod 运行时 parse
+// (counter-case 2/3:删除平铺回退死代码 + 运行时 zod 校验落地)。
+
+/**
+ * 统一成功/失败响应信封(应然契约·所有 v2_receipts 端点)。
+ * 失败时 error 为 RFC 7807 ApiErrorResponse(过渡期可能是 string,由解码器归一)。
+ */
+export type ApiResponse<T> =
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly error: ApiErrorResponse };
+
+/** V2 收据验证的单一保障维度结果。Authority: src/v2_domain/receipt_verify_v2.ts AssuranceDimensionResult。 */
+export interface V2AssuranceDimensionResult {
+  readonly dimension: string;
+  readonly outcome: 'PASS' | 'FAIL' | 'WARN' | 'SKIP' | 'NOT_APPLICABLE';
+  readonly reasonCodes: readonly string[];
+  readonly detail: string;
+}
+
+/** V2 收据六维验证结果。Authority: src/v2_domain/receipt_verify_v2.ts VerificationResult。 */
+export interface V2VerificationResult {
+  readonly resultVersion: number;
+  readonly resultId: string;
+  readonly receiptId: string;
+  readonly verificationPolicyId: string;
+  readonly evaluatedAt: string;
+  readonly dimensions: Readonly<Record<string, V2AssuranceDimensionResult>>;
+  readonly receiptStanding: string;
+  readonly preservationStatus: string;
+  readonly reviewSummary: string;
+}
+
+/** V2 manifest 成员(fixity digest)。 */
+export interface V2ManifestMember {
+  readonly kind: string;
+  readonly digest: string;
+  readonly sizeBytes: number;
+}
+
+/**
+ * 必填 manifest 成员 kind 列表 —— 镜像 src/v2_domain/receipt_manifest.ts REQUIRED_MANIFEST_MEMBER_KINDS。
+ * counter-case 1:Wizard saveToReceipts 构造完整 11-kind manifest,
+ * 确保复检 processConformance=PASS(后端 verifyReceiptManifest 要求全部 11 kind 在场)。
+ */
+export const REQUIRED_MANIFEST_MEMBER_KINDS = [
+  'claim',
+  'fecSnapshot',
+  'protocolFreeze',
+  'datasetBindings',
+  'workflowBindings',
+  'experimentRuns',
+  'measurementResults',
+  'statisticalResults',
+  'verdictTrace',
+  'antiTheaterReport',
+  'ledgerRoot',
+] as const;
+
+/**
+ * V2 demo 收据形态(GET /api/v2/receipts/demo)。
+ * 注意:demo 端点使用 receiptId/verdictLabel/isFixtureOnly 字段名,
+ * 与持久化端点的 V2StoredReceipt(id/verdict)不同——这是后端契约待统一项
+ * (见 SPRINT1-FRONTEND-REPORT.md 契约差异标注)。
+ */
+export interface V2DemoReceipt {
+  readonly receiptId: string;
+  readonly claimText: string;
+  readonly verdictLabel: string;
+  readonly isFixtureOnly: boolean;
+  readonly manifestMembers: readonly V2ManifestMember[];
+}
+
+/**
+ * V2 持久化收据形态(GET /api/v2/receipts 列表项 + GET /api/v2/receipts/:id)。
+ * Authority: src/api/routes/v2_receipts_persist.ts receiptRowToDto。
+ */
+export interface V2StoredReceipt {
+  readonly id: string;
+  readonly claimId: string;
+  readonly claimText: string;
+  readonly verdict: string;
+  readonly proofHash: string;
+  readonly schemaVersion: string;
+  readonly createdAt: string;
+  readonly receiptStanding: string;
+  readonly preservationStatus: string;
+}
+
+/** GET /api/v2/receipts (list) 的 data。应然契约:limit/offset pagination。 */
+export interface V2ReceiptListResponse {
+  readonly receipts: readonly V2StoredReceipt[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+/** POST /api/v2/receipts/verify 的 data。 */
+export interface V2VerifyEnvelopeResponse {
+  readonly verification: V2VerificationResult;
+  readonly display: string;
+}
+
+/** GET /api/v2/receipts/demo 的 data。 */
+export interface V2DemoReceiptResponse {
+  readonly receipt: V2DemoReceipt;
+  readonly verification: V2VerificationResult;
+}
+
+/** POST /api/v2/receipts (persist) 的 data。 */
+export interface V2PersistReceiptResponse {
+  readonly receiptId: string;
+  readonly idempotent: boolean;
+}
+
+/** POST /api/v2/receipts (persist) 请求体。Authority: src/api/routes/v2_receipts_persist.ts CreateReceiptBody。 */
+export interface V2PersistReceiptRequest {
+  readonly proofHash: string;
+  readonly schemaVersion: string;
+  readonly claimId: string;
+  readonly claimText: string;
+  readonly verdict: string;
+  readonly manifestMembers?: readonly V2ManifestMember[];
+  readonly contractBindings?: readonly { readonly bindingSetJson: string; readonly digest: string }[];
+}
+
+/** GET /api/v2/receipts/:id 的 data。 */
+export interface V2ReceiptDetailResponse {
+  readonly receipt: V2StoredReceipt;
+  readonly manifestMembers: readonly V2ManifestMember[];
+  readonly latestVerification: {
+    readonly id: number;
+    readonly receiptId: string;
+    readonly policyId: string;
+    readonly evaluatedAt: string;
+    readonly result: V2VerificationResult;
+    readonly allPass: boolean;
+  } | null;
+}
+
+/**
+ * GET /api/v2/receipts/:id/verify 的响应。
+ * 应然契约:裸 V2VerificationResult;过渡期后端返回 { ok, verification, display, allPass }。
+ * api_client.useVerifyReceiptById 在边界归一为 V2VerificationResult。
+ */
+export type V2VerifyByIdResponse = V2VerificationResult;

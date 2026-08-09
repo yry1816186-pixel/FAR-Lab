@@ -60,12 +60,12 @@ test('POST /api/v1/hypothesize success returns 200 with full response shape', as
       },
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       loopState: { terminated: boolean };
       graphSubtree: { rootId: string; nodes: readonly unknown[]; edges: readonly unknown[] };
       honestVerdict: unknown;
       reproHash: string;
-    };
+    } }).data;
     assert.equal(typeof body.loopState.terminated, 'boolean');
     assert.equal(typeof body.graphSubtree.rootId, 'string');
     assert.ok(Array.isArray(body.graphSubtree.nodes));
@@ -83,13 +83,13 @@ test('POST /api/v1/hypothesize 幂等：同 idempotencyKey 第二次返回 cache
     };
     const r1 = await app.inject({ method: 'POST', url: '/api/v1/hypothesize', payload });
     assert.equal(r1.statusCode, 200);
-    const b1 = r1.json() as { cached?: boolean; reproHash: string };
+    const b1 = (r1.json() as { readonly ok: boolean; readonly data: { cached?: boolean; reproHash: string } }).data;
     assert.equal(b1.cached, undefined, '首次请求不应命中缓存');
 
     // 第二次同 key——必须命中幂等缓存（不重跑 LLM、不重复写证据链）。
     const r2 = await app.inject({ method: 'POST', url: '/api/v1/hypothesize', payload });
     assert.equal(r2.statusCode, 200);
-    const b2 = r2.json() as { cached?: boolean; reproHash: string; loopState: unknown };
+    const b2 = (r2.json() as { readonly ok: boolean; readonly data: { cached?: boolean; reproHash: string; loopState: unknown } }).data;
     assert.equal(b2.cached, true, '第二次必须命中幂等缓存');
     assert.equal(b2.reproHash, b1.reproHash, '幂等重放必须返回相同结果');
   });
@@ -109,8 +109,8 @@ test('POST /api/v1/hypothesize 幂等：不同 key 独立执行（互不缓存�
     });
     assert.equal(r1.statusCode, 200);
     assert.equal(r2.statusCode, 200);
-    const b1 = r1.json() as { cached?: boolean };
-    const b2 = r2.json() as { cached?: boolean };
+    const b1 = (r1.json() as { readonly ok: boolean; readonly data: { cached?: boolean } }).data;
+    const b2 = (r2.json() as { readonly ok: boolean; readonly data: { cached?: boolean } }).data;
     assert.equal(b1.cached, undefined);
     assert.equal(b2.cached, undefined);
   });
@@ -199,7 +199,7 @@ test('POST /api/v1/hypothesize success reproHash is 64-character hex', async () 
       },
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as { reproHash: string };
+    const body = (response.json() as { readonly ok: boolean; readonly data: { reproHash: string } }).data;
     assert.match(body.reproHash, /^[0-9a-f]{64}$/);
   });
 });
@@ -215,9 +215,9 @@ test('POST /api/v1/hypothesize quick mode loopState.terminated === true', async 
       },
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       loopState: { terminated: boolean; terminationReason?: string };
-    };
+    } }).data;
     assert.equal(body.loopState.terminated, true);
   });
 });

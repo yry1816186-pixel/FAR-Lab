@@ -435,6 +435,12 @@ function buildVerdictNodesSection(verdictNodes: VerdictNode[]): ReportSection {
     if (node.untestedReason !== null && node.untestedReason.length > 0) {
       lines.push(`- **Untested reason**: ${node.untestedReason}`);
     }
+    // 阶段 7 P0-11：GRADE 证据质量标注（透明度层·studyDesign 提供时展示·评委可感知证据层级）。
+    if (node.verdictTrace.evidenceQualityTier !== undefined) {
+      lines.push(
+        `- **Evidence quality**: ${node.verdictTrace.evidenceQualityNote ?? `tier ${node.verdictTrace.evidenceQualityTier}`}`,
+      );
+    }
     lines.push(`- **Evidence ID**: \`${node.evidenceId}\``);
     lines.push(
       `- **Hash chain**: \`${node.prevHash.slice(0, 16)}…\` → \`${node.currentHash.slice(0, 16)}…\``,

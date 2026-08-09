@@ -156,7 +156,6 @@ docker compose up far-api       # 长驻 API server @ http://localhost:3000（of
 - [快速开始](docs/quickstart.md) · [安装](docs/installation.md)
 - 概念：[far-proof](docs/concepts/far-proof.md) · [evidence-ledger](docs/concepts/evidence-ledger.md)
 - Provider：[Qwen / DashScope](docs/providers/qwen-dashscope.md)
-- Demo：[TESS offline](docs/demos/tess-offline.md)
 - 治理：[发布流程](docs/governance/release-process.md) · [发布计划](docs/governance/OPEN_SOURCE_RELEASE_PLAN.md)
 
 ---
@@ -215,7 +214,25 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
 
 1. **浮点序列化** —— 字符串键哈希完全证明；浮点序列化正迁移至 RFC 8785 JCS 规范化。
 2. **多模态** —— 当前支持视觉（Qwen-VL）；音频/视频/表格在路线图中。
-3. **单机部署** —— 基于 SQLite；多节点 PostgreSQL 为未来工作。
-4. **Pre-1.0** —— API 与 schema 可能调整。
-5. **复现 vs 复算**（评委07/12 R4）—— FAR-Lab 保证的是**计算可复现性**（recompute：给定相同输入重算同一 verdict），**不是**实验可复现性（reproduce：从原始数据重跑实验）。
-6. **CONFIRMED 语义**（评委05/12 R4）—— FAR-Lab 的 `CONFIRMED` 裁决含义是"合同一致性有界支持"（contract-consistent bounded support），**不是**天文学的"确认系外行星"（后者需要 RV mass / TTV 证据）。demo 产出的天文学候选应读作 VALIDATED / CANDIDATE。
+3. **单机部署** —— 基于 SQLite；多节点 PostgreSQL 为未来工作。实测吞吐为消费级 SSD 上
+   O(10²) 行/秒追加 + O(10⁴) 行/秒索引查询（单进程）。不适合高并发多写生产环境
+   （>100 并发写入者 → 使用 PostgreSQL）。
+4. **1.x 早期阶段** —— API 与 schema 可能在 1.x 线内调整。遵循 semver：破坏性变更升 minor
+   版本（1.0 → 1.1），并保留至少一个 minor 版本的弃用窗口。
+5. **跨语言哈希范围** —— 字符串键哈希在 TypeScript/Python 间字节一致（CI 验证）；
+   浮点键哈希是第 1 项的 V3 RFC 8785 工作；浏览器端 ProofEnvelope 验证器尚未接线（#13）。
+6. **TESS demo 科学保真度** —— 离线 demo 使用确定性合成光变曲线（box transit，
+   无临边昏暗/污染）与粗粒度 BLS 网格（120 周期）。Bonferroni α'=0.0125 是预登记固定阈值
+   （F8），**不是**真实 TESS 频率网格试验因子校正。这是诚实的教学简化，非生产 TESS 验证管线。
+7. **CONFIRMED 语义** —— FAR-Lab 的 `CONFIRMED` 裁决含义是"合同一致性有界支持"
+   （contract-consistent bounded support），**不是**天文学的"确认系外行星"（后者需要
+   RV mass / TTV 证据）。demo 产出的天文学候选应读作 VALIDATED / CANDIDATE。
+8. **反剧场运行时接线** —— 23 个反剧场检测器已在离线 `verify` 中完整接线（bundle 重算、
+   23 检测器重跑比对）。生产路径运行时接线（FUSION-OS-1）为 V2，等待真实 multi-seed 数据（P1-6）。
+9. **篡改检测范围** —— 无密钥 SHA-256 链检测**朴素**篡改（攻击者不重算哈希）。
+   重算全部公开哈希的一致伪造（consistent forgery）超出 V1 范围（DEF-18，V-04 PoC）。
+   V2 将以 Ed25519 签名收窄此窗口。
+10. **确定性 FSM 而非百炼 Agent**（T-035 · 评委04）—— FAR-Lab 使用自研确定性 FSM
+    （`src/agent_loop/fsm_runner.ts`）而非阿里云百炼 Agent / 应用编排。这是有意设计：
+    FSM 确定性且完全可追溯（每个阶段转换记入 `evidence_log`），而百炼 Agent 是黑盒编排层，
+    会破坏可复现性。百炼 Agent 集成是 V2 评估项（若能保持确定性追踪兼容）。

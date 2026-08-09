@@ -2,7 +2,7 @@
 
 **Falsifiable · Tamper-Detectable · Independently Recomputable AI-for-Science framework.**
 
-> 🎯 **一句话：FAR-Lab 是 AI4S 结论的测谎仪——让 LLM 生成的科学假设，可被任何人独立验证真假。**
+> 🎯 **一句话：FAR-Lab 是 AI4S 结论的证据验证层——让 LLM 生成的科学假设，其证据链与裁决可被任何人独立核验、重算与防篡改检测。**
 > （[09 Product Thesis](docs/design/09_PRODUCT_THESIS_SCOPE_NON_GOALS_HERO_AND_ADOPTION.md)：LLM 提假设，确定性规则核裁决；验证层是 AI Scientist 走向可信生产的底座）
 
 > FAR-Lab is a **claim-level verification layer for AI4S scientific claims**. It does not chase the
@@ -169,9 +169,7 @@ node src/cli/far.ts demo tess-offline
 ```
 
 Runs entirely offline: 14 golden vectors through the real R0–R9 kernel, then an end-to-end
-TESS claim (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fail-closed sealing. See
-[docs/demos/tess-offline.md](docs/demos/tess-offline.md) for the demo walkthrough and a
-**tested** tamper-detection guide.
+TESS claim (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fail-closed sealing.
 
 ---
 
@@ -223,7 +221,6 @@ provider, pass an explicit env file: `docker compose --env-file .env up far-api`
 - **Getting started**: [Quickstart](docs/quickstart.md) · [Installation](docs/installation.md) · [Full index](docs/INDEX.md)
 - **Concepts**: [Proof bundles](docs/concepts/far-proof.md) · [Evidence ledger](docs/concepts/evidence-ledger.md)
 - **Providers**: [Qwen / DashScope](docs/providers/qwen-dashscope.md)
-- **Demos**: [TESS offline](docs/demos/tess-offline.md)
 - **Architecture**: [docs/INDEX.md](docs/INDEX.md)
 
 ---

@@ -81,7 +81,7 @@ function mockVerdictList(items: HonestVerdictDto[]) {
     limit: 100,
     offset: 0,
   };
-  vi.mocked(fetch).mockResolvedValue(jsonResponse(body));
+  vi.mocked(fetch).mockResolvedValue(jsonResponse({ ok: true, data: body }));
 }
 
 // ---------- 测试 ----------

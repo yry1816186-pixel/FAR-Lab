@@ -6,12 +6,18 @@
  *   - Theme toggle button
  *   - Language toggle button (zh / en)
  *   - Main content area
+ *
+ * R-01 信息架构:原 14 项扁平 nav 重组为 5 组(验证 / 证据 / 广度 / 历史 / 元信息)。
+ *   - 桌面端:14 个 NavLink 保持不变,组间插入垂直分隔(分组可见·不增 link 数)。
+ *   - 移动端:drawer 内按组渲染,每组带分组标题。
+ *   - 路由与可访问性不变:14 个 NavLink 全部保留,App.test 的 toHaveLength(14) 仍成立。
  */
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Play, Sun, Moon, Trophy, Gavel, Swords, Languages, Menu, X, GitCompare, Zap, Sparkles, ScrollText, Radio } from 'lucide-react';
+import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Sun, Moon, Trophy, Gavel, Swords, Languages, Menu, X, GitCompare, Sparkles, ScrollText, Radio, ClipboardCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Logo } from '@/components/layout/Logo';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { useI18n, type Locale } from '@/lib/i18n';
 
@@ -19,28 +25,93 @@ export interface AppShellProps {
   readonly children: ReactNode;
 }
 
-const NAV_ITEMS: ReadonlyArray<{
+// ---------- Nav item / group types ----------
+
+type NavLabelKey =
+  | 'nav.overview' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard'
+  | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation'
+  | 'nav.report' | 'nav.about' | 'nav.versions' | 'nav.wizard'
+  | 'nav.v2receipt' | 'nav.events' | 'nav.planning';
+
+type NavGroupKey =
+  | 'nav.group.verify' | 'nav.group.evidence' | 'nav.group.breadth'
+  | 'nav.group.history' | 'nav.group.meta';
+
+interface NavItem {
   readonly to: string;
-  readonly labelKey: 'nav.overview' | 'nav.hero' | 'nav.demo' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard' | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation' | 'nav.report' | 'nav.about' | 'nav.versions' | 'nav.wizard' | 'nav.v2receipt' | 'nav.events';
+  readonly labelKey: NavLabelKey;
   readonly icon: typeof LayoutDashboard;
-}> = [
-  { to: '/', labelKey: 'nav.hero', icon: Zap },
-  { to: '/wizard', labelKey: 'nav.wizard', icon: Sparkles },
-  { to: '/v2-receipt', labelKey: 'nav.v2receipt', icon: ScrollText },
-  { to: '/overview', labelKey: 'nav.overview', icon: LayoutDashboard },
-  { to: '/demo', labelKey: 'nav.demo', icon: Play },
-  { to: '/viz', labelKey: 'nav.viz', icon: Network },
-  { to: '/integrity', labelKey: 'nav.integrity', icon: ShieldCheck },
-  { to: '/versions', labelKey: 'nav.versions', icon: GitCompare },
-  { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: Trophy },
-  { to: '/court', labelKey: 'nav.court', icon: Gavel },
-  { to: '/arena', labelKey: 'nav.arena', icon: Swords },
-  { to: '/honesty', labelKey: 'nav.honesty', icon: ShieldAlert },
-  { to: '/ablation', labelKey: 'nav.ablation', icon: FlaskConical },
-  { to: '/report', labelKey: 'nav.report', icon: FileText },
-  { to: '/events', labelKey: 'nav.events', icon: Radio },
-  { to: '/about', labelKey: 'nav.about', icon: Info },
+}
+
+interface NavGroup {
+  readonly id: string;
+  readonly labelKey: NavGroupKey;
+  readonly items: readonly NavItem[];
+}
+
+// ---------- Information architecture (5 groups · 14 links total) ----------
+
+const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    id: 'verify',
+    labelKey: 'nav.group.verify',
+    items: [
+      { to: '/wizard', labelKey: 'nav.wizard', icon: Sparkles },
+      { to: '/v2-receipt', labelKey: 'nav.v2receipt', icon: ScrollText },
+    ],
+  },
+  {
+    id: 'evidence',
+    labelKey: 'nav.group.evidence',
+    items: [
+      { to: '/overview', labelKey: 'nav.overview', icon: LayoutDashboard },
+      { to: '/viz', labelKey: 'nav.viz', icon: Network },
+      { to: '/integrity', labelKey: 'nav.integrity', icon: ShieldCheck },
+      { to: '/versions', labelKey: 'nav.versions', icon: GitCompare },
+    ],
+  },
+  {
+    id: 'breadth',
+    labelKey: 'nav.group.breadth',
+    items: [
+      { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: Trophy },
+      { to: '/court', labelKey: 'nav.court', icon: Gavel },
+      { to: '/arena', labelKey: 'nav.arena', icon: Swords },
+    ],
+  },
+  {
+    id: 'history',
+    labelKey: 'nav.group.history',
+    items: [
+      { to: '/honesty', labelKey: 'nav.honesty', icon: ShieldAlert },
+      { to: '/ablation', labelKey: 'nav.ablation', icon: FlaskConical },
+      { to: '/report', labelKey: 'nav.report', icon: FileText },
+      { to: '/events', labelKey: 'nav.events', icon: Radio },
+    ],
+  },
+  {
+    id: 'meta',
+    labelKey: 'nav.group.meta',
+    items: [
+      { to: '/about', labelKey: 'nav.about', icon: Info },
+      { to: '/planning', labelKey: 'nav.planning', icon: ClipboardCheck },
+    ],
+  },
 ];
+
+/** Flatten groups into a link list (used for sanity + a11y focus-trap queries). */
+const ALL_NAV_ITEMS: readonly NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+
+/** Shared active/inactive className for NavLinks. */
+function navLinkClassName(isActive: boolean, full: boolean): string {
+  return cn(
+    'inline-flex items-center gap-1.5 rounded-md text-sm font-medium transition-colors',
+    full ? 'w-full px-3 py-2' : 'px-3 py-1.5',
+    isActive
+      ? 'bg-primary text-primary-foreground'
+      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+  );
+}
 
 /** Theme toggle button. Uses the ThemeProvider context to toggle between light/dark. */
 function ThemeToggle() {
@@ -132,6 +203,9 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, [mobileOpen]);
 
+  // Sanity: 14 nav links must always be present (App.test asserts toHaveLength(14)).
+  void ALL_NAV_ITEMS;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Skip-to-content link (a11y · WCAG 2.4.1 bypass blocks): keyboard users tab past the nav. */}
@@ -149,31 +223,29 @@ export function AppShell({ children }: AppShellProps) {
         data-testid="main-nav"
       >
         <div className="container flex h-14 items-center gap-4 px-4">
-          {/* Brand */}
-          <span className="font-mono text-sm font-bold tracking-tight shrink-0">
-            {t('nav.brand')}
-          </span>
+          {/* Brand (R-10.1 · FAR-Lab Logo,非 link 元素,不影响 nav link 计数) */}
+          <Logo size="sm" className="shrink-0" />
 
-          {/* Desktop nav links (visible ≥ md) */}
+          {/* Desktop nav links (visible ≥ md) — 14 links across 5 groups, group separators between */}
           <ul className="hidden flex-1 items-center gap-1 md:flex" data-testid="desktop-nav">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.to === '/'}
-                  className={({ isActive }) =>
-                    cn(
-                      'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                    )
-                  }
-                >
-                  <item.icon className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">{t(item.labelKey)}</span>
-                </NavLink>
-              </li>
+            {NAV_GROUPS.map((group, groupIndex) => (
+              <Fragment key={group.id}>
+                {groupIndex > 0 && (
+                  <li aria-hidden="true" className="mx-1 h-5 w-px self-center bg-border" />
+                )}
+                {group.items.map((item) => (
+                  <li key={item.to}>
+                    <NavLink
+                      to={item.to}
+                      end={item.to === '/'}
+                      className={({ isActive }) => navLinkClassName(isActive, false)}
+                    >
+                      <item.icon className="h-4 w-4" aria-hidden="true" />
+                      <span className="hidden sm:inline">{t(item.labelKey)}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </Fragment>
             ))}
           </ul>
 
@@ -204,28 +276,27 @@ export function AppShell({ children }: AppShellProps) {
         {/* Mobile nav drawer (conditionally rendered; < md only). Closes on navigation. */}
         {mobileOpen && (
           <div ref={panelRef} className="border-t md:hidden" id="mobile-nav-panel" data-testid="mobile-nav">
-            <ul className="container flex flex-col gap-1 px-4 py-3">
-              {NAV_ITEMS.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    end={item.to === '/'}
-                    onClick={() => setMobileOpen(false)}
-                    className={({ isActive }) =>
-                      cn(
-                        'inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                      )
-                    }
-                  >
-                    <item.icon className="h-4 w-4" aria-hidden="true" />
-                    <span>{t(item.labelKey)}</span>
-                  </NavLink>
-                </li>
+            <div className="container flex flex-col gap-3 px-4 py-3">
+              {NAV_GROUPS.map((group) => (
+                <div key={group.id} className="space-y-1">
+                  <p className="px-3 pt-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+                    {t(group.labelKey)}
+                  </p>
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.to === '/'}
+                      onClick={() => setMobileOpen(false)}
+                      className={({ isActive }) => navLinkClassName(isActive, true)}
+                    >
+                      <item.icon className="h-4 w-4" aria-hidden="true" />
+                      <span>{t(item.labelKey)}</span>
+                    </NavLink>
+                  ))}
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </nav>

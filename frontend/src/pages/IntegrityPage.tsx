@@ -23,6 +23,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useIntegrityRoot, useIntegrityProof, useReproReceipt } from '@/lib/api_client';
+import { useT, type MessageKey } from '@/lib/i18n';
 import {
   combineHashes,
   computeMerkleRoot,
@@ -841,54 +842,39 @@ function ReceiptBody({ data }: { readonly data: ReproReceipt }) {
 
 // ---------- 底部诚实声明（Hero Honesty Wall） ----------
 
-interface HonestyStatement {
-  readonly title: string;
-  readonly detail: string;
+interface HonestyStatementDef {
+  readonly titleKey: MessageKey;
+  readonly detailKey: MessageKey;
 }
 
-const HONESTY_STATEMENTS: readonly HonestyStatement[] = [
-  {
-    title: 'Verdict prompt-level soft injection implemented; kernel-level hard trigger still V2',
-    detail:
-      'IC-15 T1\' (2026-07-27): stage6_feedback buildFeedbackMessages now accepts an optional priorVerdictKind and injects it as soft advice via sanitizeExternalContent. The deterministic verdict kernel is NOT moved into the FSM loop — that remains a V2 roadmap item (fsm_runner.ts:10-14). REFUTED does NOT auto-trigger hypothesis regeneration (p-hacking prevention). Use the Versions page (/versions) for side-by-side verdict comparison.',
-  },
-  {
-    title: 'Merkle leaves cover only call_records',
-    detail:
-      'The integrity root is folded from call_records.current_hash; the evidence_log verdict anchor rows are not counted as Merkle leaves (verdicts are derived computations that reuse the existing chain without extending it).',
-  },
-  {
-    title: 'Known gaps remain in the cross-language numeric domain',
-    detail:
-      'This page\'s CrossLang demo covers SHA-256 byte-equality of Merkle combine; however, the N2b exponent zero-padding difference in the canonical-hash numeric domain (TS "1e-7" vs Py "1e-07") remains a known cross-language gap and is a target of the V3 RFC 8785 JCS migration.',
-  },
-  {
-    title: 'All recomputation is local to the browser',
-    detail:
-      'All Merkle recomputation for Live Reproof / CrossLang is done locally in the browser via Web Crypto (crypto.subtle.digest); no proof data is sent to the server. The Repro Receipt generatedAt is a server timestamp; cross-timezone auditing relies on merkleRoot + gitCommitSha.',
-  },
+const HONESTY_STATEMENT_DEFS: readonly HonestyStatementDef[] = [
+  { titleKey: 'integrity.honesty1.title', detailKey: 'integrity.honesty1.detail' },
+  { titleKey: 'integrity.honesty2.title', detailKey: 'integrity.honesty2.detail' },
+  { titleKey: 'integrity.honesty3.title', detailKey: 'integrity.honesty3.detail' },
+  { titleKey: 'integrity.honesty4.title', detailKey: 'integrity.honesty4.detail' },
 ];
 
 function HonestyWall() {
+  const t = useT();
   return (
     <Card data-testid="honesty-wall">
       <CardHeader>
         <div className="flex items-center gap-2">
           <ScrollText className="h-5 w-5 text-amber-600" aria-hidden="true" />
-          <CardTitle className="text-xl">Honesty statement · known boundaries</CardTitle>
+          <CardTitle className="text-xl">{t('integrity.honestyTitle')}</CardTitle>
         </div>
         <CardDescription>
-          All cryptographic primitives on this page are real and usable, but the following boundaries are noted honestly — no exaggeration, no concealment.
+          {t('integrity.honestyDesc')}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="space-y-3">
-          {HONESTY_STATEMENTS.map((stmt) => (
-            <li key={stmt.title} className="flex items-start gap-3 rounded-md border bg-muted/20 p-3">
+          {HONESTY_STATEMENT_DEFS.map((stmt) => (
+            <li key={stmt.titleKey} className="flex items-start gap-3 rounded-md border bg-muted/20 p-3">
               <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
               <div>
-                <div className="text-sm font-semibold">{stmt.title}</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">{stmt.detail}</div>
+                <div className="text-sm font-semibold">{t(stmt.titleKey)}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{t(stmt.detailKey)}</div>
               </div>
             </li>
           ))}
@@ -901,15 +887,16 @@ function HonestyWall() {
 // ---------- 页面主体 ----------
 
 export default function IntegrityPage() {
+  const t = useT();
   return (
     <div className="space-y-6" data-testid="integrity-page">
       <header>
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h1 className="text-3xl font-bold tracking-tight">Integrity trust root</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('integrity.title')}</h1>
         </div>
         <p className="mt-1 text-muted-foreground">
-          Integrity · a cryptographic demo of evidence-chain tamper-detection — Merkle root · live reproof · tamper theatre · cross-language hashing · Repro Receipt
+          {t('integrity.subtitle')}
         </p>
       </header>
 

@@ -15,6 +15,12 @@ INSTALL_DIR="${FAR_CHAIN_HOME:-$HOME/.FAR-Lab}"
 REPO_URL="https://github.com/yry1816186-pixel/FAR-Lab.git"
 NODE_MIN_MAJOR=24
 
+# 发布版本：git clone/update 固定此 tag（杜绝浮动分支）。发布新 release 时更新此常量。
+RELEASE_TAG="v1.1.0"
+# 发布资产校验（见 ── 5b ──）：GitHub Release 附带的 SHA256SUMS 与 sibling 安装脚本。
+SHA256SUMS_URL="https://github.com/yry1816186-pixel/FAR-Lab/releases/download/${RELEASE_TAG}/SHA256SUMS"
+INSTALL_PS1_URL="https://github.com/yry1816186-pixel/FAR-Lab/releases/download/${RELEASE_TAG}/install.ps1"
+
 RED=$'\033[31m'; GRN=$'\033[32m'; YLW=$'\033[33m'; CYN=$'\033[36m'; RST=$'\033[0m'
 [ -t 1 ] || { RED=''; GRN=''; YLW=''; CYN=''; RST=''; }
 
@@ -54,24 +60,53 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 ok "pnpm $(pnpm -v)"
 
-# ── 5. clone / update 仓库 ──
+# ── 5. clone / update 仓库（钉 release tag，杜绝浮动分支）──
 if [ -d "$INSTALL_DIR/.git" ]; then
-  info "已存在 $INSTALL_DIR，拉取最新..."
-  git -C "$INSTALL_DIR" fetch --depth 1 origin 2>/dev/null || warn "fetch 失败（继续用本地版本）"
-  git -C "$INSTALL_DIR" reset --hard '@{u}' 2>/dev/null || warn "update 失败（可能有本地改动；cd $INSTALL_DIR && git status 查看）"
+  info "已存在 $INSTALL_DIR，更新到 $RELEASE_TAG ..."
+  git -C "$INSTALL_DIR" fetch --depth 1 origin tag "$RELEASE_TAG" 2>/dev/null || warn "fetch $RELEASE_TAG 失败（继续用本地版本）"
+  git -C "$INSTALL_DIR" checkout --force "$RELEASE_TAG" 2>/dev/null || warn "checkout $RELEASE_TAG 失败（可能有本地改动；cd $INSTALL_DIR && git status 查看）"
 else
-  info "clone FAR-Lab → $INSTALL_DIR"
-  git clone --depth 1 "$REPO_URL" "$INSTALL_DIR" || err "clone 失败：检查网络 / $REPO_URL"
+  info "clone FAR-Lab@$RELEASE_TAG → $INSTALL_DIR"
+  git clone --branch "$RELEASE_TAG" --depth 1 "$REPO_URL" "$INSTALL_DIR" || err "clone $RELEASE_TAG 失败：检查网络 / $REPO_URL（该 tag 是否已发布？）"
 fi
 cd "$INSTALL_DIR"
 ok "源码就绪 @ $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
 
-# ── 6. Node 依赖（frozen；失败给修复指引）──
+# ── 5b. 发布资产防篡改校验（SHA256SUMS · fail-closed）──
+# 设计说明：本脚本经 `curl … | bash` 分发时 $0 指向 stdin，无法对"正在运行的自己"做
+# 文件哈希自指校验；因此采用等价防篡改方案：下载 GitHub Release 的 SHA256SUMS 资产
+# （HTTPS/TLS），校验其存在性与格式（必须含 scripts/install.sh 与 scripts/install.ps1
+# 条目），并对同批发布的 sibling 资产 install.ps1 做哈希比对——篡改该批次任一安装脚本
+# 必然导致 install.ps1 哈希不匹配 → 中止；另对克隆仓库内的两份安装脚本与清单比对，
+# 覆盖"仓库内容被替换"方向。运行中脚本本体的信任来自分发通道（HTTPS + 本脚本未被篡改
+# 的前提本身即该校验所保护的对象）。任何校验失败一律中止（fail-closed）。
+command -v curl >/dev/null 2>&1 || err "curl 未找到（发布校验需要）。安装: apt-get install curl / brew install curl"
+VERIFY_DIR="$(mktemp -d)" || err "无法创建临时目录"
+trap 'rm -rf "$VERIFY_DIR"' EXIT
+info "下载发布校验资产（SHA256SUMS + install.ps1）…"
+curl -fsSL --max-time 60 "$SHA256SUMS_URL" -o "$VERIFY_DIR/SHA256SUMS" || err "发布校验失败：无法下载 SHA256SUMS（$SHA256SUMS_URL）。检查网络后重试"
+curl -fsSL --max-time 60 "$INSTALL_PS1_URL" -o "$VERIFY_DIR/install.ps1" || err "发布校验失败：无法下载 install.ps1（$INSTALL_PS1_URL）。检查网络后重试"
+grep -Eq '^[0-9a-f]{64}  scripts/install\.(sh|ps1)$' "$VERIFY_DIR/SHA256SUMS" || err "SHA256SUMS 格式异常（缺少 scripts/install.* 条目）——发布资产可疑，已中止"
+sha256_of() {
+  if   command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum   >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+  elif command -v openssl  >/dev/null 2>&1; then openssl dgst -sha256 "$1" | awk '{print $NF}'
+  else err "无 sha256 工具（需 sha256sum / shasum / openssl 之一）"; fi
+}
+EXPECTED_PS1="$(awk '$2=="scripts/install.ps1"{print $1}' "$VERIFY_DIR/SHA256SUMS")"
+ACTUAL_PS1="$(sha256_of "$VERIFY_DIR/install.ps1")"
+[ -n "$EXPECTED_PS1" ] && [ "$EXPECTED_PS1" = "$ACTUAL_PS1" ] || err "发布资产校验失败：install.ps1 哈希不匹配（防篡改检查）——请从官方渠道重新获取安装脚本"
+# 克隆仓库侧：两份安装脚本须与发布清单一致（防仓库内容被替换）
+for _f in scripts/install.sh scripts/install.ps1; do
+  _e="$(awk -v p="$_f" '$2==p{print $1}' "$VERIFY_DIR/SHA256SUMS")"
+  _a="$(sha256_of "$INSTALL_DIR/$_f")"
+  [ -n "$_e" ] && [ "$_e" = "$_a" ] || err "仓库内 $_f 与发布清单 SHA256 不符——源码可能被篡改，已中止"
+done
+ok "发布资产校验通过（SHA256SUMS 存在性 + install.ps1 + 仓库侧 install.*）"
+
+# ── 6. Node 依赖（frozen；失败即 fail-closed，不回退非 frozen）──
 info "pnpm install --frozen-lockfile（Node 依赖·不含大数据）"
-if ! pnpm install --frozen-lockfile; then
-  warn "frozen install 失败，重试非 frozen..."
-  pnpm install || err "pnpm install 失败：删 node_modules 后重试  rm -rf node_modules && pnpm install"
-fi
+pnpm install --frozen-lockfile || err "pnpm install --frozen-lockfile 失败：锁文件过期或依赖变更，请更新 pnpm-lock.yaml 后重试（在仓库根执行 pnpm install 刷新锁文件并提交更新后的 pnpm-lock.yaml）。勿用非 frozen 安装绕过（会破坏可复现构建）。"
 ok "Node 依赖已安装"
 
 # ── 7. Python 科研轴（可选·缺失只 WARN）──

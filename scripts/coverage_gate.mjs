@@ -9,7 +9,7 @@
 // 设计：
 //   - 零新依赖：Node 24 内置 test runner coverage（--experimental-test-coverage +
 //     --test-coverage-lines/branches 阈值 flag，低于阈值 exit 非 0）。
-//   - 仅统计 11 个 Core 目录的覆盖率；llm_gateway/adapters（竞争适配器）、
+//   - 仅统计 13 个 Core 目录的覆盖率；llm_gateway/adapters（竞争适配器）、
 //     math/*_backend（需外部 CAS/Dafny/SMT 求解器，离线不可测）、profiles（离线 replay）
 //     不纳入门禁（与 build-integrity.yml Core 边界一致）。
 //   - test glob 与 package.json `test` 保持一致 + agent_loop（覆盖 src/agent_loop Core 代码）。
@@ -18,8 +18,8 @@
 
 import { spawnSync } from 'node:child_process';
 
-// Core 12 目录(build-integrity.yml SSOT;V11-05 修复:evidence_graph 不存在→confounding_gate,
-// 与 src/ 实际目录对齐)。
+// Core 13 目录(build-integrity.yml SSOT;V11-05 修复:evidence_graph 不存在→confounding_gate,
+// 与 src/ 实际目录对齐;P1-B-2 修复:statistics 纳入——纯 TS 统计内核无外部求解器依赖)。
 const CORE_DIRS = [
   'evidence_log',
   'confounding_gate',
@@ -33,6 +33,10 @@ const CORE_DIRS = [
   'db',
   'schema',
   'api',
+  // P1-B-2：statistics（src/statistics 纯 TS：p_value/ks_test/effect_size/permutation_test/
+  // t_distribution/multiple_testing/bootstrap_ci/ci/index；外部求解器在 src/math/*_backend，
+  // 已明确排除，statistics 不涉及）。
+  'statistics',
 ];
 
 // V11-03 修复:与 package.json `test` glob 逐字对齐(SSOT);删除幽灵目录(audit/evidence_graph/dialogue),

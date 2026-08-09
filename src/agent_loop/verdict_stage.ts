@@ -56,6 +56,12 @@ import {
   makeLegacyCompatFec,
   verdictResultFromKernelOutput,
 } from '../falsifiability/legacy_kernel_adapter.ts';
+import { compileFec } from '../fec/compiler.ts';
+import {
+  assertFecGate,
+  enforceFecMandatoryGate,
+  type FecGateDecision,
+} from '../fec/fec_mandate.ts';
 import { toFalsificationSpecAndThreshold } from './stages/stage3_hypothesis.ts';
 import type {
   EvidencePayload,
@@ -190,6 +196,8 @@ export interface VerdictComputation {
   readonly verdictInputHash: string;
   readonly sourceAnchor: SourceAnchor;
   readonly fec: ReturnType<typeof makeLegacyCompatFec>;
+  /** FEC V2 强制门禁决策（SY5-1 阶段 7 P0-1 接线：镜像 orchestrator.fecAppendClaim）。 */
+  readonly fecGate: FecGateDecision;
   readonly kernelOutput: VerdictKernelOutput;
   readonly decision: VerdictResult;
   readonly verdictTrace: VerdictTracePersisted;
@@ -256,6 +264,16 @@ export function computeVerdictDecision(args: {
     thresholdSpec,
     frozenAt: isoTimestamp,
   });
+  // SY5-1（阶段 7 P0-1）：镜像 orchestrator.fecAppendClaim 的 FEC 强制门
+  // （compileFec → enforceFecMandatoryGate → assertFecGate）。此前本路径直接
+  // decideFiveValueVerdict 跳过强制门（findings SY5-1/TK4-1 三重确认：API/CLI ask
+  // 生产入口「证据链→裁决」可审计性断裂）。
+  // legacy FEC 恒编译通过（compileFec ok=true，探针验证 2026-08-09）→ 正常路径零行为变化；
+  // 防御未来：若构造/编译演化致失败 → fail-closed UNTESTED（与 orchestrator 同语义）；
+  // LLM_FROZEN（ciBlocked）→ assertFecGate throw（CI 阻断·禁静默吞 LLM-as-judge）。
+  const compileResult = compileFec({ fec, measurementCutoff: null });
+  const fecGate = enforceFecMandatoryGate(compileResult);
+  assertFecGate(fecGate);
   const kernelOutput = decideFiveValueVerdict(
     // FUSION-OS-1:agent_loop 是文献投票路径(输入为文献蕴含 supports/refutes 投票·非实验数据),
     // anti-theater 检测实验 theater(seed-cherry/p-hacking/metric-swap)对文献投票不适用——无实验数据
@@ -273,7 +291,19 @@ export function computeVerdictDecision(args: {
       evidenceBasis: 'observational_only',
     }),
   );
-  const decision = verdictResultFromKernelOutput(kernelOutput);
+  const rawDecision = verdictResultFromKernelOutput(kernelOutput);
+  // fail-closed（镜像 orchestrator.ts:214-226）：fecGate.allowed=false 时 decision 覆盖为
+  // UNTESTED（kernel 仍执行·trace 完整·verdict 不越过强制门）。legacy FEC 恒 allowed=true，
+  // 该分支为防御性路径（与 orchestrator 同语义·非死代码——构造演化保护）。
+  const decision: VerdictResult = fecGate.allowed
+    ? rawDecision
+    : {
+        verdict: 'UNTESTED',
+        scopeSlipText: null,
+        untestedReason: fecGate.reason,
+        conflictingEvidenceCount: 0,
+        metricValue: kernelOutput.statisticalReport.primaryEffectSize,
+      };
   const verdictTrace = extractVerdictTrace(kernelOutput);
 
   return {
@@ -285,6 +315,7 @@ export function computeVerdictDecision(args: {
     verdictInputHash,
     sourceAnchor,
     fec,
+    fecGate,
     kernelOutput,
     decision,
     verdictTrace,
@@ -356,6 +387,7 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
     spec,
     thresholdSpec,
     convertedEvidences,
+    verdictInputHash,
     sourceAnchor,
     decision,
     verdictTrace,
@@ -375,6 +407,10 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
         claim: hypothesis.claim,
         evidenceCount: convertedEvidences.length,
         conflictingEvidenceCount: evidence.conflictingEvidenceCount,
+        // SY5-1（阶段 7 P0-1）：canonical 裁决输入锚点——verdictInputHash 绑定
+        // claim + falsificationSpec + thresholdSpec + evidenceVotes，审计者可从证据链
+        // 重放裁决输入（修复前仅落摘要·「证据链→裁决」无法完整重放）。
+        verdictInputHash: verdictInputHash,
       },
       sourceAnchor,
       // FUSION-OS-10：hypothesis_verdict_input 是系统构造的裁决输入摘要（非 raw 外部观测）→ derivable=1

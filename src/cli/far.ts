@@ -20,6 +20,7 @@ import { runExportFarProof, type ExportFarProofSource } from './commands/export_
 import { runExportReceipt, type ReceiptFormat } from './commands/export_receipt.ts';
 import { runFecCompile, runFecFreeze } from './commands/fec.ts';
 import { runFsmAdvance } from './commands/fsm.ts';
+import { runPlanningFromArgs } from './commands/planning.ts';
 import { runStatus } from './commands/status.ts';
 import { runVerify, VALID_MODES, type VerifyMode } from './commands/verify.ts';
 import { runVerifyGolden, type VerifyGoldenBackend } from './commands/verify_golden.ts';
@@ -186,6 +187,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'fsm',
     description: 'advance the 9-state CLI protocol FSM and append a stageReceipt hash link',
     run: (args) => runFsmFromArgs(args),
+  },
+  {
+    name: 'planning',
+    description: 'opencode planning methodology as deterministic gates (plan/spec/risk/state/gate/checkpoint)',
+    run: (args) => runPlanningFromArgs(args),
   },
   {
     name: 'audit-seed-cherry',
@@ -962,6 +968,17 @@ USAGE:
     transition (state_machine) + computeStageReceipt (sha256(prevReceipt + hashCanonicalJson)).
     an illegal transition is never silently overwritten: returns PROTOCOL_DEVIATION_CRITICAL, exit 7 (fail-closed).
     exit codes: 0 advanced / 7 protocol deviation / 2 bad args / 1 runtime error
+
+  far planning plan <file> | spec <file> | risk <signal...> | state <from> <to> [--compress] |
+       gate <file> | checkpoint <file> [--template]
+                                     opencode planning methodology as deterministic gates
+    plan <file>       validate a Plan DAG (dependencies / cycles / per-step verification) → topological order
+    spec <file>       validate a Spec (>=3 verifiable ACs / Delta / trust-kernel additive declaration)
+    risk <signals...> grade P0-P4 (signals: readOnly/docOnly/boundedWrite/touchesTrustKernel/newCliOrApi/crossModule/destructive/irreversible/ambiguous)
+    state <from> <to> stage-machine transition check (ANALYZE→PLAN→EXECUTE→VERIFY→REVIEW→REPORT; --compress allows stage skipping)
+    gate <file>       four-step gate report from {items, results} (DONE / IMPLEMENTED_UNVERIFIED / BLOCKED)
+    checkpoint <file> parse a PROGRESS.md checkpoint (resumption protocol); --template renders the protocol template
+    exit codes: 0 pass / 7 gate fail / 3 IMPLEMENTED_UNVERIFIED / 2 bad args
 
   far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--resume <path>]
                                     run the full 6-stage FSM once (runAgentLoop); emits a verdict + evidence chain

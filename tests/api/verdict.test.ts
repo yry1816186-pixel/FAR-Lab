@@ -151,13 +151,13 @@ test('GET /api/v1/verdict/:id returns 200 + DTO when verdict exists', async () =
       url: `/api/v1/verdict/${verdictId}`,
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       verdictId: string;
       evidenceId: string;
       decision: string;
       nodeKind: string;
       metricValue: number | null;
-    };
+    } }).data;
     assert.equal(body.verdictId, verdictId);
     assert.equal(body.evidenceId, 'ev-verdict-001');
     assert.equal(body.decision, 'CONFIRMED');
@@ -184,7 +184,7 @@ test('GET /api/v1/verdict/:id DTO uses decision field (not verdict·red line com
       url: `/api/v1/verdict/${verdictId}`,
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as Record<string, unknown>;
+    const body = (response.json() as { readonly ok: boolean; readonly data: Record<string, unknown> }).data;
     assert.ok('decision' in body, 'DTO must use decision field (red line compliant)');
     assert.ok(!('verdict' in body), 'DTO must NOT use verdict field (red line)');
   } finally {
@@ -230,7 +230,7 @@ test('GET /api/v1/verdict/by_hypothesis/:hypoId returns 200 when linked verdict 
       url: '/api/v1/verdict/by_hypothesis/ev-hypo-link',
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as { evidenceId: string; decision: string };
+    const body = (response.json() as { readonly ok: boolean; readonly data: { evidenceId: string; decision: string } }).data;
     assert.equal(body.evidenceId, 'ev-hypo-link');
     assert.equal(body.decision, 'CONFIRMED');
   } finally {
@@ -255,12 +255,12 @@ test('GET /api/v1/verdict list returns paginated items', async () => {
       url: '/api/v1/verdict?limit=10&offset=0',
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       items: ReadonlyArray<{ evidenceId: string }>;
       count: number;
       limit: number;
       offset: number;
-    };
+    } }).data;
     assert.equal(body.count, 2);
     assert.equal(body.limit, 10);
     assert.equal(body.offset, 0);
@@ -310,11 +310,11 @@ test('GET /api/v1/verdict?verdict=CONFIRMED filters by verdict value', async () 
       url: '/api/v1/verdict?verdict=CONFIRMED&limit=10&offset=0',
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as {
+    const body = (response.json() as { readonly ok: boolean; readonly data: {
       items: ReadonlyArray<{ decision: string }>;
       count: number;
       verdict: string;
-    };
+    } }).data;
     assert.equal(body.verdict, 'CONFIRMED');
     assert.equal(body.count, 1);
     for (const item of body.items) {

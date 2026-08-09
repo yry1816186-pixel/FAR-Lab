@@ -46,6 +46,17 @@ function stripLineComment(filePath, rawLine) {
   return rawLine;
 }
 
+// stripStringLiterals —— 剥离字符串字面量（单/双引号·含转义），使字符串内的禁词引用
+// （如反剧场分类学 realCase 文本「反 LLM-as-judge 红线·F1」·trap_taxonomy.ts:84）不触发 negative 误报。
+// 修复依据（阶段 7 P0-2a · TK5 findings）：扫描器此前只剥注释不剥字符串——字符串字面量中的
+// "LLM-as-judge" 是文档性引用（非代码违规），被 llm_as_judge 正则误命中 → ci-04 假阳性 FAIL。
+// 威胁模型边界（诚实声明）：不处理模板字面量（`...`）/多行字符串/正则字面量——字符串内引用视为
+// 文档性（真实 LLM-as-judge 违规是代码形态：import/调用/赋值，非字符串说明文本）；若未来需
+// 完整性保证须升级为完整 tokenizer（当前保守剥离已覆盖仓库全部已知误报）。
+function stripStringLiterals(code) {
+  return code.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, '""');
+}
+
 // ── negative check（反 theater 硬门）: 禁 LLM-as-judge 模式 ──
 // negativeRoots 默认 src（生产）；CI04_NEGATIVE_ROOTS env 供元测试用 mkdtemp 隔离，
 // 避免与 zero_tolerance_scan.test.ts 并发注入/删除 src/ 临时文件造成 walk↔readFile 竞态。
@@ -65,7 +76,7 @@ for (const root of negativeRoots) {
     const text = readFileSync(filePath, 'utf8');
     const lines = text.split(/\r?\n/);
     for (const [index, rawLine] of lines.entries()) {
-      const line = stripLineComment(filePath, rawLine);
+      const line = stripStringLiterals(stripLineComment(filePath, rawLine));
       for (const check of llmJudgePatterns) {
         if (check.pattern.test(line)) {
           negativeFindings.push(`${filePath}:${index + 1}: ${check.name}: ${rawLine.trim()}`);

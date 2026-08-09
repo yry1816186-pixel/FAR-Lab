@@ -19,12 +19,11 @@
 裁决永远在服务端的确定性内核里完成——前端只是"读取和展示"。
 这个边界保证了：**UI 美化不影响任何 verdict 的正确性**。
 
-## 9.2 16 条路由（实测 App.tsx）
+## 9.2 14 条路由（实测 App.tsx）
 
 | 路由 | 页面 | 作用 |
 |---|---|---|
-| `/` 与 `/hero` | HeroDemoPage | 默认落地页：60 秒篡改检测演示 |
-| `/overview` | OverviewPage | 系统总览 + 后端健康状态 |
+| `/` 与 `/overview` | OverviewPage | 系统总览 + 后端健康状态（默认落地页） |
 | `/viz` | VizPage | D3 可视化（证据链/关系图） |
 | `/integrity` | IntegrityPage | Merkle 根 + 完整性证明 |
 | `/leaderboard` | LeaderboardPage | benchmark 排行榜 |
@@ -33,7 +32,6 @@
 | `/honesty` | HonestyWallPage | 诚实墙（系统不能做什么） |
 | `/ablation` | AblationPage | 消融实验 |
 | `/report` | ReportPage | 运行报告 |
-| `/demo` | DemoModePage | 演示模式 |
 | `/about` | AboutPage | 关于 |
 | `/versions` | VersionDiffPage | 版本差异 |
 | `/wizard` | WizardPage | 引导式 claim 提交 |

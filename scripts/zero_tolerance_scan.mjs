@@ -47,7 +47,7 @@ const checks = [
   { name: 'ts_any', pattern: /: any\b/ },
   { name: 'unknown_double_assert', pattern: /as unknown as/ },
   { name: 'ts_ignore', pattern: /@ts-ignore|@ts-nocheck/ },
-  { name: 'empty_catch', pattern: /catch\s*(\([^)]*\))?\s*\{\s*\}/ },
+  // empty_catch 由文件级跨行正则统一处理（单行+多行形态·SA9 修复——见主循环下方）
   { name: 'todo_marker', pattern: /TODO|FIXME/ },
   { name: 'stub_or_mock_return', pattern: /stub|mock.*return/ },
   { name: 'unsafe_html', pattern: /innerHTML|dangerouslySetInnerHTML/ },
@@ -60,6 +60,15 @@ const checks = [
   // 编造 header 变体：defaultHeaders.*Enable 是同类幻觉（经 defaultHeaders 注入 thinking 开关）
   { name: 'bailian_default_headers_enable_hallucination', pattern: /defaultHeaders[^\n]*Enable/ },
 ];
+
+// 文件级空 catch 正则（阶段 7 P0-2b · SA9 修复）：单行正则 `catch...{}` 不跨行——
+// 多行形态 `catch (e) {\n}` 漏检。改为剥离注释后的全文跨行匹配（\s* 含换行；
+// 单行形态同样命中·统一单一通道防重复报告）。
+// 语义与历史单行检查一致：**空 catch = catch 体内无任何内容（含注释）**——体内仅注释的
+// catch（如「// best-effort」「// 不可读跳过」）是文档化降级（作者已给出 why），非静默吞错，
+// 不检出；无任何内容的静默 catch 检出。候选区间在原始文本复核（含 // 或 /* 或字符串引号 →
+// 注释/字符串中的 catch 字面量·跳过）。
+const emptyCatchRe = /catch\s*(\([^)]*\))?\s*\{\s*\}/g;
 
 const skippedFiles = new Set([
   'scripts/zero_tolerance_scan.mjs',
@@ -270,6 +279,32 @@ function stripLineComment(filePath, rawLine) {
   return rawLine;
 }
 
+// scanCommentChannel —— 注释通道检测（阶段 7 P0-2b · SA9 Critical 修复）。
+// 背景（findings SA9）：@ts-ignore 指令型注释（`// @ts-ignore`）本身就是注释——stripLineComment
+// 剥离后扫描器永远无法命中（TS 唯一官方指令形态·检出率 <100%）；注释 TODO/FIXME 债务标记同理。
+// 本通道在剥离**前**对原始行特判（块注释形态 `/* @ts-ignore */` 仍由剥离后通道命中）：
+//   - 指令型 `// @ts-ignore` / `// @ts-nocheck` → ts_ignore
+//   - 注释内 TODO/FIXME → todo_marker（债务标记；描述性引用已由 skippedFiles 逐案豁免登记）
+function scanCommentChannel(filePath, index, rawLine, findingsOut) {
+  const trimmed = rawLine.trimStart();
+  // markdown 文档引用 token 字面量是合法表达（政策/历史/示例·同 markdownSkippedChecks 豁免约定）。
+  const isMarkdown = extname(filePath).toLowerCase() === '.md';
+  // 跳过空行 + JSDoc 续行 + 块注释起始/结束（与 stripLineComment 一致）：块注释/JSDoc 内的
+  // @ts/TODO 字面量是文档性引用（如「22 T-W2-06；见模块头 08↔22 TODO」交叉引用），非债务标记。
+  if (trimmed === '' || trimmed.startsWith('*') || trimmed.startsWith('/*') || trimmed.startsWith('*/')) {
+    return;
+  }
+  if (!isMarkdown) {
+    const directive = trimmed.match(/^\/\/\s*@ts-(ignore|nocheck)\b/);
+    if (directive !== null) {
+      findingsOut.push(`${filePath}:${index + 1}: ts_ignore: ${rawLine.trim()}`);
+    }
+  }
+  if (!isMarkdown && /\b(TODO|FIXME)\b/.test(trimmed)) {
+    findingsOut.push(`${filePath}:${index + 1}: todo_marker: ${rawLine.trim()}`);
+  }
+}
+
 const findings = [];
 
 for (const root of roots) {
@@ -279,7 +314,25 @@ for (const root of roots) {
     }
     const text = readFileSync(filePath, 'utf8');
     const lines = text.split(/\r?\n/);
+    // 文件级多行空 catch（SA9 修复）：剥离注释后的全文跨行匹配（统一单行+多行形态）。
+    // markdown 文档引用空 catch 字面量是合法表达（政策/历史表格·同 markdownSkippedChecks 豁免）。
+    if (extname(filePath).toLowerCase() !== '.md') {
+      const strippedText = lines.map((rawLine) => stripLineComment(filePath, rawLine)).join('\n');
+      emptyCatchRe.lastIndex = 0;
+      for (let m = emptyCatchRe.exec(strippedText); m !== null; m = emptyCatchRe.exec(strippedText)) {
+        const lineStart = strippedText.slice(0, m.index).split('\n').length;
+        const lineEnd = lineStart + m[0].split('\n').length - 1;
+        // 原始文本复核：候选区间含注释（// 或 /*）或字符串引号 → 有解释的降级/字面量引用 → 跳过。
+        const origSlice = lines.slice(lineStart - 1, lineEnd).join('\n');
+        if (/\/\/|\/\*|['"]/.test(origSlice)) {
+          continue;
+        }
+        findings.push(`${filePath}:${lineStart}: empty_catch: ${lines[lineStart - 1]?.trim() ?? ''}`);
+      }
+    }
     for (const [index, rawLine] of lines.entries()) {
+      // 注释通道（SA9 修复）：指令型 @ts-ignore/@ts-nocheck 与注释 TODO/FIXME 在剥离前检测。
+      scanCommentChannel(filePath, index, rawLine, findings);
       const line = stripLineComment(filePath, rawLine);
       for (const check of checks) {
         // env 模板文件合法引用 env 变量名（DASHSCOPE_API_KEY）；仅跳过 dashscope_env_reference，
@@ -300,11 +353,6 @@ for (const root of roots) {
   }
 }
 
-if (findings.length > 0) {
-  console.error(findings.join('\n'));
-  process.exit(1);
-}
-
 // ---------- 模型中立专项扫描（src/api/·24§0.1 红线） ----------
 // 设计理由：
 //   - Core 模型中立铁律要求 src/api/ 不出现 Qwen / 百炼 / DashScope 字面量
@@ -312,6 +360,7 @@ if (findings.length > 0) {
 //   - 复用 stripLineComment 剥离注释，避免对文档性注释（如「无 Qwen / 百炼 / DashScope 字面量」）
 //     产生误报；真实代码违规仍会被捕获。
 //   - 与零容忍检查分离：零容忍检查全 src/ 通用；本检查仅扫 src/api/ 子集。
+// 注：各段 findings 在末尾「分段汇总」统一输出 + 退出（阶段 7 P0-2b · 防一处违规短路其余 13 项扫描面）。
 const apiNeutralityPatterns = [
   { name: 'qwen_in_api', pattern: /qwen/i },
   { name: 'bailian_in_api', pattern: /百炼/ },
@@ -335,14 +384,6 @@ for (const filePath of walk('src/api')) {
       }
     }
   }
-}
-
-if (apiNeutralityFindings.length > 0) {
-  console.error(
-    'src/api/ model neutrality violations (Qwen/百炼/DashScope forbidden in core):\n' +
-      apiNeutralityFindings.join('\n'),
-  );
-  process.exit(1);
 }
 
 // ---------- F4 诚实边界专项扫描（science_harness / spec 12 · 02 §4） ----------
@@ -379,14 +420,6 @@ for (const filePath of walk('src')) {
   }
 }
 
-if (f4OverclaimFindings.length > 0) {
-  console.error(
-    'F4 honesty boundary overclaim (V1 must NOT claim process-level isolation; use "resource-bounded & network-restricted venv execution"):\n' +
-      f4OverclaimFindings.join('\n'),
-  );
-  process.exit(1);
-}
-
 // ---------- dialogue 层红线专项扫描（src/dialogue/ · 模型中立层隔离） ----------
 // 设计理由：
 //   - src/dialogue/ 是模型中立层，禁止出现 verdict / qwen / 百炼 / @modelcontextprotocol 字面量
@@ -419,14 +452,6 @@ for (const filePath of walk('src/dialogue')) {
       }
     }
   }
-}
-
-if (dialogueRedLineFindings.length > 0) {
-  console.error(
-    'src/dialogue/ red line violations (verdict/qwen/百炼/@modelcontextprotocol forbidden in dialogue layer):\n' +
-      dialogueRedLineFindings.join('\n'),
-  );
-  process.exit(1);
 }
 
 // ---------- N3 反幻觉专项扫描（百炼 Node SDK 幻觉源 · spec 06 §0 R1 互斥铁律） ----------
@@ -474,11 +499,23 @@ for (const root of n3ScanRoots) {
   }
 }
 
-if (n3Findings.length > 0) {
+// ── 分段汇总（阶段 7 P0-2b · SA9 Critical 修复）──
+// 背景：此前全局段任一命中即 exit(1)，api/dialogue/n3/f4 专项段（13 项扫描面）被短路跳过——
+// 一处违规掩盖其余违规（反剧场「扫描器声称全面但实际部分」缺陷）。现全部 5 段先各自收集，
+// 末尾统一输出分节汇总 + 退出，保证每段独立可观测。
+const allFindings = [
+  ...findings.map((f) => `[zero-tolerance] ${f}`),
+  ...apiNeutralityFindings.map((f) => `[api-neutrality] ${f}`),
+  ...f4OverclaimFindings.map((f) => `[f4-honesty] ${f}`),
+  ...dialogueRedLineFindings.map((f) => `[dialogue-red-line] ${f}`),
+  ...n3Findings.map((f) => `[n3-anti-hallucination] ${f}`),
+];
+
+if (allFindings.length > 0) {
   console.error(
-    'N3 anti-hallucination violations (defaultHeaders/X-DashScope-Enable-Thinking/extra_body forbidden in 百炼 SDK paths):\n' +
-      n3Findings.join('\n'),
+    `zero_tolerance_scan: ${allFindings.length} finding(s) across 5 scan sections:`,
   );
+  console.error(allFindings.join('\n'));
   process.exit(1);
 }
 

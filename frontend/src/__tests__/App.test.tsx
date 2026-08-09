@@ -82,17 +82,17 @@ describe('App 路由与导航', () => {
     expect(screen.getByTestId('main-content')).toBeInTheDocument();
   });
 
-  it('渲染导航项（含完整性信任根、广度榜、法庭、竞技场、版本比较、验证向导入口）', () => {
+  it('渲染导航项（含完整性信任根、广度榜、法庭、竞技场、版本比较、验证向导、规划门禁入口）', () => {
     render(<App />);
     const nav = screen.getByTestId('main-nav');
     const links = within(nav).getAllByRole('link');
-    expect(links).toHaveLength(16);
+    expect(links).toHaveLength(15);
     // 使用 getByRole 验证导航链接存在（"证据链" 等标签在 sm 断点下可见）
     expect(within(nav).getByRole('link', { name: /Overview/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: /^Demo$/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /Integrity/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /Leaderboard/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /About/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /Planning/ })).toBeInTheDocument();
   });
 
   it('渲染主题切换按钮', () => {
@@ -100,16 +100,18 @@ describe('App 路由与导航', () => {
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();
   });
 
-  it('默认路由 / 渲染 HeroDemoPage (competition landing)', async () => {
+  it('默认路由 / 渲染 OverviewPage (系统仪表盘)', async () => {
     render(<App />);
-    await waitFor(() => screen.getByTestId('hero-demo-page')); // wait for lazy chunk
-    expect(screen.getByTestId('hero-demo-page')).toBeInTheDocument();
+    await waitFor(() => screen.getByTestId('overview-page')); // wait for lazy chunk
+    expect(screen.getByTestId('overview-page')).toBeInTheDocument();
   });
 
   it('/overview 渲染 OverviewPage', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('link', { name: /Overview/ }));
+    // R-03: OverviewPage 工作台新增同名快速入口链接,导航点击须限定在 main-nav 内,
+    // 避免 getByRole 因多个同名链接抛 "multiple elements"。
+    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Overview/ }));
     await waitFor(() => screen.getByTestId('overview-page'));
     expect(screen.getByTestId('overview-page')).toBeInTheDocument();
   });
@@ -117,23 +119,15 @@ describe('App 路由与导航', () => {
   it('点击"证据链"导航到 /viz', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('link', { name: /Evidence Chain/ }));
+    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Evidence Chain/ }));
     await waitFor(() => screen.getByTestId('viz-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('viz-page')).toBeInTheDocument();
-  });
-
-  it('点击"演示"导航到 /demo', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole('link', { name: /^Demo$/ }));
-    await waitFor(() => screen.getByTestId('demo-mode-page')); // wait for the lazy-loaded route chunk
-    expect(screen.getByTestId('demo-mode-page')).toBeInTheDocument();
   });
 
   it('点击"诚信墙"导航到 /honesty', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('link', { name: /Honesty Wall/ }));
+    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Honesty Wall/ }));
     await waitFor(() => screen.getByTestId('honesty-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('honesty-page')).toBeInTheDocument();
   });
@@ -141,7 +135,7 @@ describe('App 路由与导航', () => {
   it('点击"完整性"导航到 /integrity', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('link', { name: /Integrity/ }));
+    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Integrity/ }));
     await waitFor(() => screen.getByTestId('integrity-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('integrity-page')).toBeInTheDocument();
   });
@@ -149,7 +143,7 @@ describe('App 路由与导航', () => {
   it('点击"广度榜"导航到 /leaderboard', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('link', { name: /Leaderboard/ }));
+    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Leaderboard/ }));
     await waitFor(() => screen.getByTestId('leaderboard-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('leaderboard-page')).toBeInTheDocument();
   });
@@ -157,7 +151,7 @@ describe('App 路由与导航', () => {
   it('点击"关于"导航到 /about', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('link', { name: /About/ }));
+    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /About/ }));
     await waitFor(() => screen.getByTestId('about-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('about-page')).toBeInTheDocument();
   });
@@ -183,7 +177,7 @@ describe('App 路由与导航', () => {
     await user.click(screen.getByTestId('mobile-menu-toggle'));
     expect(screen.getByTestId('mobile-nav')).toBeInTheDocument();
     const mobileNav = screen.getByTestId('mobile-nav');
-    expect(within(mobileNav).getAllByRole('link')).toHaveLength(16);
+    expect(within(mobileNav).getAllByRole('link')).toHaveLength(14);
     await user.click(screen.getByTestId('mobile-menu-toggle'));
     expect(screen.queryByTestId('mobile-nav')).not.toBeInTheDocument();
   });
@@ -193,10 +187,10 @@ describe('App 路由与导航', () => {
     render(<App />);
     await user.click(screen.getByTestId('mobile-menu-toggle'));
     expect(screen.getByTestId('mobile-nav')).toBeInTheDocument();
-    await user.click(within(screen.getByTestId('mobile-nav')).getByRole('link', { name: /^Demo$/ }));
+    await user.click(within(screen.getByTestId('mobile-nav')).getByRole('link', { name: /Integrity/ }));
     expect(screen.queryByTestId('mobile-nav')).not.toBeInTheDocument();
-    await waitFor(() => screen.getByTestId('demo-mode-page'));
-    expect(screen.getByTestId('demo-mode-page')).toBeInTheDocument();
+    await waitFor(() => screen.getByTestId('integrity-page'));
+    expect(screen.getByTestId('integrity-page')).toBeInTheDocument();
   });
 
   it('按 Escape 键关闭移动抽屉并恢复焦点到 toggle 按钮', async () => {
@@ -221,7 +215,7 @@ describe('App 路由与导航', () => {
     expect(firstLink).toHaveFocus();
   });
 
-  it('渲染 skip-to-content 链接(键盘用户可跳过 12 项导航)', () => {
+  it('渲染 skip-to-content 链接(键盘用户可跳过主导航)', () => {
     render(<App />);
     const skip = screen.getByTestId('skip-to-content');
     expect(skip).toBeInTheDocument();

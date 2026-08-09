@@ -147,6 +147,25 @@ export function errorHandler(
     return;
   }
 
+  // Fastify/ajv schema 验证失败（route schema 的 body/querystring/params 不符）。
+  // error.validation 为 ajv ValidationResult[]（keyword/path/message）。
+  // 转 400 VALIDATION_FAILED + validation issues detail（RFC 7807）——
+  // 不落到 500 INTERNAL_ERROR（避免把客户端输入错误误报为服务端故障）。
+  if (error.validation !== undefined && error.validation.length > 0) {
+    const body: ApiErrorResponse = {
+      error_code: 'VALIDATION_FAILED',
+      message: 'request schema validation failed',
+      source_anchor: {
+        fileId: null,
+        stageId: null,
+        callRecordId: null,
+      },
+      detail: error.validation,
+    };
+    reply.code(400).type('application/problem+json').send(body);
+    return;
+  }
+
   if (error.statusCode === 429) {
     const body: ApiErrorResponse = {
       error_code: 'RATE_LIMITED',

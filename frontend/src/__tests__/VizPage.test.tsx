@@ -156,7 +156,7 @@ function makeChainResponse(overrides: Partial<EvidenceChainResponse> = {}): Evid
 }
 
 function mockChainResponse(body: EvidenceChainResponse) {
-  vi.mocked(fetch).mockResolvedValue(jsonResponse(body));
+  vi.mocked(fetch).mockResolvedValue(jsonResponse({ ok: true, data: body }));
 }
 
 // ---------- 测试 ----------

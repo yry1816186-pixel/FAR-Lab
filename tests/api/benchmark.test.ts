@@ -57,7 +57,7 @@ test('GET /api/v1/benchmark → 200 + 完整报告（报告已生成）', async 
   try {
     const response = await app.inject({ method: 'GET', url: '/api/v1/benchmark' });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as ReportDto;
+    const body = (response.json() as { readonly ok: boolean; readonly data: ReportDto }).data;
     assert.ok(body.schemaVersion === 2, `schemaVersion ${body.schemaVersion}(V10-F-04 对抗修复:钉回 v2;FF-15 保证盘上为 v2)`);
     assert.match(body.suiteIntegrityRoot, HEX64);
     assert.ok(body.entries.length >= 1, 'should have ≥1 problem');
@@ -75,8 +75,8 @@ test('GET /api/v1/benchmark 缓存：两次请求返回相同 suiteIntegrityRoot
     const r2 = await app.inject({ method: 'GET', url: '/api/v1/benchmark' });
     assert.equal(r1.statusCode, 200);
     assert.equal(r2.statusCode, 200);
-    const b1 = r1.json() as ReportDto;
-    const b2 = r2.json() as ReportDto;
+    const b1 = (r1.json() as { readonly ok: boolean; readonly data: ReportDto }).data;
+    const b2 = (r2.json() as { readonly ok: boolean; readonly data: ReportDto }).data;
     assert.equal(b1.suiteIntegrityRoot, b2.suiteIntegrityRoot);
   } finally {
     await app.close();

@@ -103,18 +103,24 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await app.register(jwt, { secret: config.jwtSecret });
   }
   await app.register(swagger, {
-    swagger: {
+    openapi: {
       info: {
         title: 'FAR-Lab API',
-        description: 'FAR-Lab 对外 HTTP API（24§5）',
+        description:
+          'FAR-Lab 对外 HTTP API（24§5）。V2 receipts 端点采用统一信封 { ok: true, data: T } + RFC 7807 错误响应（R-05）。',
         version: '2026-06-27',
       },
-      consumes: ['application/json'],
-      produces: ['application/json', 'application/problem+json', 'text/html'],
+      tags: [
+        { name: 'health', description: 'Liveness + readiness probes' },
+        { name: 'v1', description: 'V1 API (hypothesize / evidence / verdict / report / integrity / benchmark / court / arena)' },
+        { name: 'v2-receipts', description: 'V2 receipt verification + persistence (R-05 unified envelope { ok, data } + RFC 7807 errors)' },
+      ],
     },
   });
-  // @fastify/swagger 9 仅生成 schema 不服务路由（需 swagger-ui 独立包）；手动暴露 OpenAPI JSON 供 API 发现。
+  // @fastify/swagger 9 仅生成 schema 不服务路由（需 swagger-ui 独立包）；手动暴露 OpenAPI 3.0 JSON。
+  // /documentation/json 保留（向后兼容）；/openapi.json 为规范别名（R-15 契约 SSOT 入口 + 前端 mock 生成源）。
   app.get('/documentation/json', { schema: { hide: true } }, () => app.swagger());
+  app.get('/openapi.json', { schema: { hide: true } }, () => app.swagger());
 
   await registerAuthMiddleware(app, { jwtSecret: config.jwtSecret });
 
@@ -123,6 +129,36 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   await registerHealthRoutes(app, { db: config.db });
 
   await app.register(async (v1) => {
+    // R-05 契约统一收尾（P1-3）：v1 成功响应统一 { ok: true, data: T } 信封。
+    // 实现方式：onSend hook 统一包装，路由代码零改动。
+    // 边界（fail-closed，零误包）：
+    //   - statusCode >= 400 不包（RFC 7807 错误信封由 error_handler 产出，禁止二次包装）
+    //   - 非 JSON / SSE（text/event-stream，hijack 流）不包
+    //   - payload 无法解析为对象时不包（防御畸形响应，宁可原样透传）
+    // 前端对应：api_client.ts parseV1Response 在边界解包（single source of truth）。
+    v1.addHook('onSend', async (_request, reply, payload) => {
+      if (reply.statusCode >= 400) {
+        return payload;
+      }
+      const contentType = reply.getHeader('content-type');
+      if (typeof contentType !== 'string' || !contentType.includes('application/json')) {
+        return payload;
+      }
+      if (typeof payload !== 'string' || payload.length === 0) {
+        return payload;
+      }
+      try {
+        const body: unknown = JSON.parse(payload);
+        if (typeof body === 'object' && body !== null && !('ok' in body)) {
+          return JSON.stringify({ ok: true, data: body });
+        }
+        return payload;
+      } catch {
+        // 畸形 JSON 透传（防御性；正常情况下 fastify 序列化不会产生非法 JSON）。
+        return payload;
+      }
+    });
+
     await registerHypothesizeRoute(v1, {
       db: config.db,
       gitCommitSha: config.gitCommitSha,
@@ -138,6 +174,9 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerBenchmarkRoute(v1);
     await registerCourtRoute(v1);
     await registerArenaRoute(v1);
+    // opencode 规划方法论源代码化：确定性门禁引擎 HTTP 层（P0-P4 分级 / Plan/Spec 校验 / 门禁报告）
+    const { registerPlanningRoutes } = await import('./routes/planning.ts');
+    await registerPlanningRoutes(v1);
     // P0-4 事件流 SSE（可选·注入 eventBus 才注册）
     if (config.eventBus !== undefined) {
       const { registerEventsStreamRoute } = await import('./routes/events.ts');

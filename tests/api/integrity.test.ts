@@ -118,7 +118,7 @@ test('GET /api/v1/integrity/root empty db → ZERO_MERKLE_ROOT + null chainHead'
   try {
     const response = await app.inject({ method: 'GET', url: '/api/v1/integrity/root' });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as RootDto;
+    const body = (response.json() as { readonly ok: boolean; readonly data: RootDto }).data;
     assert.equal(body.merkleRoot, '0'.repeat(64), 'empty chain root must be ZERO_MERKLE_ROOT');
     assert.equal(body.leafCount, 0);
     assert.equal(body.chainHeadSeq, null);
@@ -141,7 +141,7 @@ test('GET /api/v1/integrity/root 3 records → 64-hex root + leafCount=3 + chain
   try {
     const response = await app.inject({ method: 'GET', url: '/api/v1/integrity/root' });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as RootDto;
+    const body = (response.json() as { readonly ok: boolean; readonly data: RootDto }).data;
     assert.match(body.merkleRoot, /^[0-9a-f]{64}$/);
     assert.equal(body.leafCount, 3);
     const last = records[records.length - 1];
@@ -218,7 +218,7 @@ test('GET /api/v1/integrity/proof/:seq returns a proof that verifies independent
       url: `/api/v1/integrity/proof/${target.seq}`,
     });
     assert.equal(proofResponse.statusCode, 200);
-    const proof = proofResponse.json() as ProofDto;
+    const proof = (proofResponse.json() as { readonly ok: boolean; readonly data: ProofDto }).data;
     assert.equal(proof.seq, target.seq);
     assert.equal(proof.leaf, target.currentHash);
 
@@ -234,7 +234,7 @@ test('GET /api/v1/integrity/proof/:seq returns a proof that verifies independent
 
     // 跨端点一致：proof.expectedRoot === /integrity/root 的 merkleRoot
     const rootResponse = await app.inject({ method: 'GET', url: '/api/v1/integrity/root' });
-    const root = rootResponse.json() as RootDto;
+    const root = (rootResponse.json() as { readonly ok: boolean; readonly data: RootDto }).data;
     assert.equal(proof.expectedRoot, root.merkleRoot, 'proof root must equal chain root');
   } finally {
     await app.close();
@@ -254,7 +254,7 @@ test('GET /api/v1/integrity/receipt returns schemaVersion=1 + all fields + gitCo
   try {
     const response = await app.inject({ method: 'GET', url: '/api/v1/integrity/receipt' });
     assert.equal(response.statusCode, 200);
-    const receipt = response.json() as {
+    const receipt = (response.json() as { readonly ok: boolean; readonly data: {
       schemaVersion: number;
       merkleRoot: string;
       leafCount: number;
@@ -262,7 +262,7 @@ test('GET /api/v1/integrity/receipt returns schemaVersion=1 + all fields + gitCo
       chainHeadHash: string | null;
       gitCommitSha: string | null;
       generatedAt: string;
-    };
+    } }).data;
     assert.equal(receipt.schemaVersion, 1);
     assert.match(receipt.merkleRoot, /^[0-9a-f]{64}$/);
     assert.equal(receipt.leafCount, 4);
@@ -276,7 +276,7 @@ test('GET /api/v1/integrity/receipt returns schemaVersion=1 + all fields + gitCo
 
     // 跨端点一致：receipt.merkleRoot === root.merkleRoot
     const rootResponse = await app.inject({ method: 'GET', url: '/api/v1/integrity/root' });
-    const root = rootResponse.json() as RootDto;
+    const root = (rootResponse.json() as { readonly ok: boolean; readonly data: RootDto }).data;
     assert.equal(receipt.merkleRoot, root.merkleRoot);
   } finally {
     await app.close();
@@ -307,12 +307,12 @@ test('integrity root is tamper-evident: appending a record changes the root', as
     logger: false,
   });
   try {
-    const before = (await app.inject({ method: 'GET', url: '/api/v1/integrity/root' })).json() as RootDto;
+    const before = ((await app.inject({ method: 'GET', url: '/api/v1/integrity/root' })).json() as { readonly ok: boolean; readonly data: RootDto }).data;
 
     // 追加一条新记录（append-only·模拟 run 继续产出证据）
     appendChain(db, 1);
 
-    const after = (await app.inject({ method: 'GET', url: '/api/v1/integrity/root' })).json() as RootDto;
+    const after = ((await app.inject({ method: 'GET', url: '/api/v1/integrity/root' })).json() as { readonly ok: boolean; readonly data: RootDto }).data;
     assert.notEqual(before.merkleRoot, after.merkleRoot, 'root must change when chain grows');
     assert.equal(after.leafCount, before.leafCount + 1);
   } finally {
