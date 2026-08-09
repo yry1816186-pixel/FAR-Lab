@@ -177,7 +177,7 @@ describe('App 路由与导航', () => {
     await user.click(screen.getByTestId('mobile-menu-toggle'));
     expect(screen.getByTestId('mobile-nav')).toBeInTheDocument();
     const mobileNav = screen.getByTestId('mobile-nav');
-    expect(within(mobileNav).getAllByRole('link')).toHaveLength(14);
+    expect(within(mobileNav).getAllByRole('link')).toHaveLength(15);
     await user.click(screen.getByTestId('mobile-menu-toggle'));
     expect(screen.queryByTestId('mobile-nav')).not.toBeInTheDocument();
   });
