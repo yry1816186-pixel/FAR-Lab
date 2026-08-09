@@ -79,7 +79,9 @@ function resolveCorsOrigin(corsOrigins: readonly string[] | undefined): string[]
  */
 export async function buildServer(config: ApiServerConfig): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: config.logger ?? false,
+    // 阶段 7 P2-A（LP-4）：可观测默认 on——logger 缺省 true（旧默认 false 让观测面静默）。
+    // 测试可显式传 logger:false 保持安静；Fastify 默认不记录请求头/Authorization（无密钥泄漏面）。
+    logger: config.logger ?? true,
     bodyLimit: 10 * 1024 * 1024,
     // 审计 P1-5：请求超时总保险丝——LLM fallback 链最坏路径（60s×3 档 + withRetry 退避）理论 ~720s，
     // 900s 不误杀慢调用，但封顶防连接无限挂起；空闲连接 60s 回收。
