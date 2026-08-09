@@ -27,7 +27,10 @@ import { makeValidEnvelopeV2Core } from '../proof_envelope/v2/fixtures.ts';
 
 const GV_DIR = fileURLToPath(new URL('../../golden_vectors/cases/', import.meta.url));
 
-const SEAL_THRESHOLD_MS = 2000;
+// 阶段 7 P2-A（BY4-G1）收紧：2s → 200ms（实测 ~28ms + 10× 余量）。
+// 原 2s 门槛无法预警真实回归（28ms → 1s 仍假绿）；200ms 允许 CI 抖动但抓住数量级回归。
+// 若 CI 平台波动导致误报（>10×），应复查实现而非放宽门槛（性能预算纪律·报告 7.2 主题 1）。
+const SEAL_THRESHOLD_MS = 200;
 const GV_CROSS_LANG_THRESHOLD_MS = 30000;
 
 function loadAllGoldenVectorKernels(): readonly VerdictKernelInput[] {
