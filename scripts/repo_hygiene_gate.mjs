@@ -23,6 +23,7 @@ const ROOT = join(__dirname, '..');
 const ALLOW_FILES = new Set([
   'README.md', 'README.zh-CN.md', 'LICENSE', 'NOTICE', 'CHANGELOG.md', 'CONTRIBUTING.md',
   'CODE_OF_CONDUCT.md', 'SECURITY.md', 'SUPPORT.md', 'CITATION.cff', 'GOVERNANCE.md',
+  'MAINTAINERS.md',
   'AGENTS.md', 'CLAUDE.md', 'CLAUDE.local.example.md',
   'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'eslint.config.mjs',
   'pyproject.toml', 'uv.lock', '.npmrc', '.env.example', 'Dockerfile', 'docker-compose.yml',
