@@ -27,16 +27,16 @@ function dirname(p) {
 
 test('P0-8: parseTestNumbers extracts tests/pass/fail/skipped from spec output', () => {
   const spec = [
-    'ℹ tests 2589',
+    'ℹ tests 2596',
     'ℹ suites 67',
-    'ℹ pass 2583',
+    'ℹ pass 2590',
     'ℹ fail 0',
     'ℹ cancelled 0',
     'ℹ skipped 6',
     'ℹ todo 0',
   ].join('\n');
   const n = parseTestNumbers(spec);
-  assert.deepEqual(n, { tests: 2589, pass: 2583, fail: 0, skipped: 6 });
+  assert.deepEqual(n, { tests: 2596, pass: 2590, fail: 0, skipped: 6 });
 });
 
 test('P0-8: parseTestNumbers throws on unparseable output', () => {
@@ -45,9 +45,9 @@ test('P0-8: parseTestNumbers throws on unparseable output', () => {
 
 test('P0-8: extractClaimedNumbers reads the AGENTS.md claim pattern', () => {
   const claim = extractClaimedNumbers(
-    '- 331 TS files, 2589 tests passing (2583 pass / 0 fail / 6 skip — SSOT)',
+    '- 331 TS files, 2596 tests passing (2590 pass / 0 fail / 6 skip — SSOT)',
   );
-  assert.deepEqual(claim, { tests: 2589, pass: 2583, fail: 0, skipped: 6 });
+  assert.deepEqual(claim, { tests: 2596, pass: 2590, fail: 0, skipped: 6 });
 });
 
 test('P0-8: end-to-end --check exits 0 when AGENTS.md matches actual numbers', () => {
@@ -55,7 +55,7 @@ test('P0-8: end-to-end --check exits 0 when AGENTS.md matches actual numbers', (
   const specFile = join(here, '_test_numbers_fixture.txt');
   writeFileSync(
     specFile,
-    ['ℹ tests 2589', 'ℹ pass 2583', 'ℹ fail 0', 'ℹ skipped 6'].join('\n'),
+    ['ℹ tests 2596', 'ℹ pass 2590', 'ℹ fail 0', 'ℹ skipped 6'].join('\n'),
     'utf8',
   );
   try {

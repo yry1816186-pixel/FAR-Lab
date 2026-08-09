@@ -14,11 +14,11 @@ test('runMigrations applies 0001_initial and records schema version', () => {
   const db = new Database(':memory:');
   try {
     const result = runMigrations(db);
-    assert.deepEqual(result.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]);
+    assert.deepEqual(result.applied, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
     assert.deepEqual(result.skipped, []);
 
     const rows = getSchemaMetaRows(db);
-    assert.equal(rows.length, 24);
+    assert.equal(rows.length, 25);
     assert.equal(rows[0]?.version, 1);
     assert.equal(rows[0]?.name, '0001_initial');
     assert.equal(rows[1]?.version, 2);
@@ -67,6 +67,8 @@ test('runMigrations applies 0001_initial and records schema version', () => {
     assert.equal(rows[22]?.name, '0023_v2_receipts');
     assert.equal(rows[23]?.version, 24);
     assert.equal(rows[23]?.name, '0024_hypothesize_idempotency');
+    assert.equal(rows[24]?.version, 25);
+    assert.equal(rows[24]?.name, '0025_v2_receipts_owner');
 
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
@@ -80,6 +82,10 @@ test('runMigrations applies 0001_initial and records schema version', () => {
     assert.ok(tableNames.includes('v2_receipts'), '0023 须建 v2_receipts 表');
     assert.ok(tableNames.includes('v2_manifest_members'), '0023 须建 v2_manifest_members 表');
     assert.ok(tableNames.includes('hypothesize_idempotency'), '0024 须建 hypothesize_idempotency 表');
+    const receiptsColumns = (
+      db.prepare('PRAGMA table_info(v2_receipts)').all() as Array<{ name: string }>
+    ).map((c) => c.name);
+    assert.ok(receiptsColumns.includes('owner'), '0025 须加 v2_receipts.owner 列');
   } finally {
     db.close();
   }
@@ -91,7 +97,7 @@ test('runMigrations skips already applied versions', () => {
     runMigrations(db);
     const result = runMigrations(db);
     assert.deepEqual(result.applied, []);
-    assert.deepEqual(result.skipped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]);
+    assert.deepEqual(result.skipped, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
   } finally {
     db.close();
   }

@@ -21,9 +21,10 @@ test('collectStatusDump: phase A cheap 字段从仓库实测', () => {
   // tsFileCount：src/**/*.ts 实测（项目 > 100 个 .ts）
   assert.ok(dump.tsFileCount > 50, `tsFileCount 应 > 50，实际: ${dump.tsFileCount}`);
 
-  // migrationCount：0001-0024 共 24 个（status_dump 从 schema/migrations/*.sql readdir 实测·非硬编码；
-  // 0022 = DEBT-12 comparator CHECK 收窄·移除死值 eq；0023 = V2 receipts 表；0024 = hypothesize 幂等表）。
-  assert.strictEqual(dump.migrationCount, 24);
+  // migrationCount：0001-0025 共 25 个（status_dump 从 schema/migrations/*.sql readdir 实测·非硬编码；
+  // 0022 = DEBT-12 comparator CHECK 收窄·移除死值 eq；0023 = V2 receipts 表；0024 = hypothesize 幂等表；
+  // 0025 = v2_receipts.owner 授权列（LP-5）。
+  assert.strictEqual(dump.migrationCount, 25);
   assert.ok(dump.migrationFiles.includes('0023_v2_receipts.sql'), '0023 V2 receipts 迁移须在 migrationFiles');
   assert.ok(dump.migrationFiles.includes('0022_narrow_comparator_check.sql'), '0022 DEBT-12 收窄迁移须在 migrationFiles');
   assert.ok(dump.migrationFiles.includes('0001_initial.sql'));
