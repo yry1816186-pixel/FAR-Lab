@@ -38,6 +38,8 @@ function collectDbMetrics(config: MetricsRouteConfig): {
   callRecordTotal: number;
   ftsTotal: number;
   verdictByKind: Record<string, number>;
+  degradationTotal: number;
+  degradedScopeVerdictTotal: number;
 } {
   const db = config.db;
   const evidenceLogTotal = (db.prepare('SELECT COUNT(*) AS c FROM evidence_log').get() as {
@@ -46,6 +48,20 @@ function collectDbMetrics(config: MetricsRouteConfig): {
   const callRecordTotal = (db.prepare('SELECT COUNT(*) AS c FROM call_records').get() as {
     c: number;
   }).c;
+  // 阶段 7 P2-A（D2-5）：降级事件 metrics 上报——LLM fallback 链降级（degraded_from 审计列）
+  // + verdict 层 DEGRADED_SCOPE 降级——退化过程可见（findings D2-5：降级无 metrics 通道）。
+  const degradationTotal = (
+    db
+      .prepare('SELECT COUNT(*) AS c FROM call_records WHERE degraded_from IS NOT NULL')
+      .get() as { c: number }
+  ).c;
+  const degradedScopeVerdictTotal = (
+    db
+      .prepare(
+        "SELECT COUNT(*) AS c FROM verdict_nodes WHERE verdict = 'DEGRADED_SCOPE'",
+      )
+      .get() as { c: number }
+  ).c;
   // FTS 表是可选特性（未启用/未创建时缺表）——sqlite_master 存在性检查后 COUNT（无副作用）。
   const ftsTableExists =
     db
@@ -61,7 +77,14 @@ function collectDbMetrics(config: MetricsRouteConfig): {
         .all() as { verdict: string; c: number }[]
     ).map((row) => [row.verdict, row.c]),
   );
-  return { evidenceLogTotal, callRecordTotal, ftsTotal, verdictByKind };
+  return {
+    evidenceLogTotal,
+    callRecordTotal,
+    ftsTotal,
+    verdictByKind,
+    degradationTotal,
+    degradedScopeVerdictTotal,
+  };
 }
 
 /**
@@ -84,7 +107,7 @@ export async function registerMetricsRoutes(
       void reply.code(500).send(`metrics query failed: ${detail}\n`);
       return;
     }
-    const { evidenceLogTotal, callRecordTotal, ftsTotal, verdictByKind } = metrics;
+    const { evidenceLogTotal, callRecordTotal, ftsTotal, verdictByKind, degradationTotal, degradedScopeVerdictTotal } = metrics;
 
     const startMs = config.processStartMs ?? processStartMs;
     const uptimeSec = Math.max(0, (Date.now() - startMs) / 1000);
@@ -114,6 +137,12 @@ export async function registerMetricsRoutes(
       ...['CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED'].map((v) =>
         sample('far_lab_verdict_total', verdictByKind[v] ?? 0, { name: 'verdict', value: v }),
       ),
+      '# HELP far_lab_degradation_total LLM fallback chain degradations (call_records.degraded_from).',
+      '# TYPE far_lab_degradation_total counter',
+      sample('far_lab_degradation_total', degradationTotal),
+      '# HELP far_lab_degraded_scope_verdict_total Verdict nodes degraded to DEGRADED_SCOPE.',
+      '# TYPE far_lab_degraded_scope_verdict_total counter',
+      sample('far_lab_degraded_scope_verdict_total', degradedScopeVerdictTotal),
     ];
     void reply.header('content-type', 'text/plain; version=0.0.4; charset=utf-8');
     return `${lines.join('\n')}\n`;
