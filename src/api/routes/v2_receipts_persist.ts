@@ -25,6 +25,7 @@ import {
   formatV2VerificationForDisplay,
 } from '../../v2_domain/receipt_verify_v2.ts';
 import { notFound } from '../errors/error_handler.ts';
+import { canAccessReceipt, ownerOf, requireRole, WRITABLE_ROLES } from '../auth/require_role.ts';
 import {
   createReceiptRouteSchema,
   listReceiptsRouteSchema,
@@ -88,6 +89,16 @@ export async function registerV2ReceiptPersistRoutes(
   app.post('/receipts', { schema: createReceiptRouteSchema }, async (request, reply) => {
     const body = request.body as CreateReceiptBody;
 
+    // 阶段 7 P2（LP-5 / API5）：功能级授权——受保护模式下 viewer 只读（403 FORBIDDEN）；
+    // offline 匿名模式放行（单机信任·24§3.1 双轨鉴权行为不变）。
+    if (request.principal.role !== 'anonymous' && !requireRole(request.principal, WRITABLE_ROLES)) {
+      return reply.code(403).type('application/problem+json').send({
+        error_code: 'FORBIDDEN',
+        message: 'viewer role is read-only (requireRole: researcher/admin required to create receipts)',
+        source_anchor: { fileId: null, stageId: null, callRecordId: null },
+      });
+    }
+
     const createdAt = new Date().toISOString();
 
     // Idempotency: check if a receipt with this proofHash already exists.
@@ -107,9 +118,14 @@ export async function registerV2ReceiptPersistRoutes(
 
     const receiptId = randomUUID();
 
+    // 阶段 7 P2（LP-5 / API1 BOLA）：owner 落库——受保护模式写 principal.userId；
+    // offline 匿名写 NULL（公开·旧行为不变）。幂等分支不查 owner（proofHash 为内容
+    // 寻址 SHA-256·不可枚举·泄露面≈0）。
+    const owner = ownerOf(request.principal);
+
     const insertReceipt = db.prepare(
-      `INSERT INTO v2_receipts (id, claim_id, claim_text, verdict, proof_hash, schema_version, created_at, receipt_standing, preservation_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 'AVAILABLE')`,
+      `INSERT INTO v2_receipts (id, claim_id, claim_text, verdict, proof_hash, schema_version, created_at, receipt_standing, preservation_status, owner)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 'AVAILABLE', ?)`,
     );
     const insertMember = db.prepare(
       'INSERT OR IGNORE INTO v2_manifest_members (receipt_id, kind, digest, size_bytes) VALUES (?, ?, ?, ?)',
@@ -119,7 +135,7 @@ export async function registerV2ReceiptPersistRoutes(
     );
 
     const tx = db.transaction(() => {
-      insertReceipt.run(receiptId, body.claimId, body.claimText, body.verdict, body.proofHash, body.schemaVersion, createdAt);
+      insertReceipt.run(receiptId, body.claimId, body.claimText, body.verdict, body.proofHash, body.schemaVersion, createdAt, owner);
 
       if (body.manifestMembers !== undefined) {
         for (const member of body.manifestMembers) {
@@ -162,23 +178,36 @@ export async function registerV2ReceiptPersistRoutes(
     const offset = query.offset ?? 0;
     const claimId = query.claimId;
 
+    // 阶段 7 P2（LP-5 / API1 BOLA）：对象级过滤——受保护模式下仅返回
+    // 「自己的 + 公开（owner IS NULL）」receipt；offline 匿名 → 全量（行为不变）。
+    const scopeClause =
+      request.principal.role === 'anonymous' ? '' : 'AND (owner = ? OR owner IS NULL)';
+    const scopeArgs: readonly string[] =
+      request.principal.role === 'anonymous' ? [] : [request.principal.userId];
+
     // claimId 过滤（Wizard 分享链接 ?runId=xxx 定位收据：保存时 claimId = runId）。
     let total: number;
     let rows: readonly ReceiptRow[];
     if (claimId !== undefined) {
       const totalRow = db
-        .prepare('SELECT COUNT(*) AS cnt FROM v2_receipts WHERE claim_id = ?')
-        .get(claimId) as { readonly cnt: number };
+        .prepare(`SELECT COUNT(*) AS cnt FROM v2_receipts WHERE claim_id = ? ${scopeClause}`)
+        .get(claimId, ...scopeArgs) as { readonly cnt: number };
       total = totalRow.cnt;
       rows = db
-        .prepare('SELECT * FROM v2_receipts WHERE claim_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
-        .all(claimId, limit, offset) as readonly ReceiptRow[];
+        .prepare(
+          `SELECT * FROM v2_receipts WHERE claim_id = ? ${scopeClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        )
+        .all(claimId, ...scopeArgs, limit, offset) as readonly ReceiptRow[];
     } else {
-      const totalRow = db.prepare('SELECT COUNT(*) AS cnt FROM v2_receipts').get() as { readonly cnt: number };
+      const totalRow = db
+        .prepare(`SELECT COUNT(*) AS cnt FROM v2_receipts ${scopeClause === '' ? '' : `WHERE ${scopeClause.slice(4)}`}`)
+        .get(...scopeArgs) as { readonly cnt: number };
       total = totalRow.cnt;
       rows = db
-        .prepare('SELECT * FROM v2_receipts ORDER BY created_at DESC LIMIT ? OFFSET ?')
-        .all(limit, offset) as readonly ReceiptRow[];
+        .prepare(
+          `SELECT * FROM v2_receipts ${scopeClause === '' ? '' : `WHERE ${scopeClause.slice(4)}`} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+        )
+        .all(...scopeArgs, limit, offset) as readonly ReceiptRow[];
     }
 
     const receipts = rows.map((row) => receiptRowToDto(row));
@@ -206,6 +235,18 @@ export async function registerV2ReceiptPersistRoutes(
 
     if (row === undefined) {
       throw notFound('Receipt', params.id);
+    }
+
+    // 阶段 7 P2（LP-5 / API1 BOLA）：对象级授权——受保护模式下非本人且非公开 → 403
+    // （水平越权拒绝·不泄露资源存在性之外的信息）。owner 列不在响应契约（ReceiptRow
+    // zod infer 无 owner）——仅服务端授权判定读取。
+    const owner = (row as { readonly owner?: string | null }).owner ?? null;
+    if (request.principal.role !== 'anonymous' && !canAccessReceipt(request.principal, owner)) {
+      return reply.code(403).type('application/problem+json').send({
+        error_code: 'FORBIDDEN',
+        message: 'receipt is not owned by the authenticated principal',
+        source_anchor: { fileId: null, stageId: null, callRecordId: null },
+      });
     }
 
     const members = db
@@ -251,6 +292,16 @@ export async function registerV2ReceiptPersistRoutes(
 
     if (row === undefined) {
       throw notFound('Receipt', params.id);
+    }
+
+    // 阶段 7 P2（LP-5 / API1 BOLA）：对象级授权（与 GET /receipts/:id 同规则）。
+    const owner = (row as { readonly owner?: string | null }).owner ?? null;
+    if (request.principal.role !== 'anonymous' && !canAccessReceipt(request.principal, owner)) {
+      return reply.code(403).type('application/problem+json').send({
+        error_code: 'FORBIDDEN',
+        message: 'receipt is not owned by the authenticated principal',
+        source_anchor: { fileId: null, stageId: null, callRecordId: null },
+      });
     }
 
     const memberRows = db
