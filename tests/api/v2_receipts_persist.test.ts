@@ -1,15 +1,20 @@
 /**
  * v2_receipts_persist.test.ts — V2 receipt persistence CRUD + verification endpoints.
  *
+ * 契约（R-05 统一后）：
+ *   - 成功响应：{ ok: true, data: T }
+ *   - 失败响应：RFC 7807 { error_code, message, source_anchor, detail? }
+ *   - pagination：limit/offset（不再 page/limit）
+ *
  * Tests:
- *   - POST /api/v2/receipts — create receipt → 201 + receiptId
+ *   - POST /api/v2/receipts — create receipt → 201 + { ok, data: { receiptId, idempotent } }
  *   - POST /api/v2/receipts — idempotent: same proofHash → 200 + same receiptId
- *   - GET  /api/v2/receipts — list with pagination → 200 + receipts/total/page/limit
+ *   - GET  /api/v2/receipts — list with pagination → 200 + { ok, data: { receipts, total, limit, offset } }
  *   - GET  /api/v2/receipts/:id — single receipt + manifest + latest verification
  *   - GET  /api/v2/receipts/:id/verify — run V2 six-dimension verification → 200
  *
  * Uses: Fastify inject + better-sqlite3 :memory: + runMigrations.
- * Zero-tolerance: no any / @ts-ignore / double assertions / empty catch / stubs.
+ * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩代码。
  */
 
 import { test, describe } from 'node:test';
@@ -53,7 +58,7 @@ const FIXTURE_RECEIPT = {
 };
 
 describe('POST /api/v2/receipts — create receipt', () => {
-  test('returns 201 with receiptId on create', async () => {
+  test('returns 201 with unified envelope { ok, data: { receiptId, idempotent } }', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -68,17 +73,21 @@ describe('POST /api/v2/receipts — create receipt', () => {
         payload: FIXTURE_RECEIPT,
       });
       assert.equal(res.statusCode, 201);
-      const body = res.json() as { readonly ok: boolean; readonly receiptId: string; readonly idempotent: boolean };
+      const body = res.json() as {
+        readonly ok: boolean;
+        readonly data: { readonly receiptId: string; readonly idempotent: boolean };
+      };
       assert.equal(body.ok, true);
-      assert.ok(body.receiptId.length > 0);
-      assert.equal(body.idempotent, false);
+      assert.ok(body.data !== undefined, 'envelope must contain data');
+      assert.ok(body.data.receiptId.length > 0);
+      assert.equal(body.data.idempotent, false);
     } finally {
       await app.close();
       db.close();
     }
   });
 
-  test('returns 400 when required fields are missing', async () => {
+  test('returns 400 RFC 7807 VALIDATION_FAILED when required fields are missing', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -93,9 +102,17 @@ describe('POST /api/v2/receipts — create receipt', () => {
         payload: { proofHash: 'x' },
       });
       assert.equal(res.statusCode, 400);
-      const body = res.json() as { readonly ok: boolean; readonly error: string };
-      assert.equal(body.ok, false);
-      assert.ok(body.error.includes('Missing required'));
+      assert.match(res.headers['content-type'] ?? '', /application\/problem\+json/);
+      const body = res.json() as {
+        readonly error_code: string;
+        readonly message: string;
+        readonly source_anchor: unknown;
+        readonly detail?: unknown;
+      };
+      assert.equal(body.error_code, 'VALIDATION_FAILED');
+      assert.ok(typeof body.message === 'string' && body.message.length > 0);
+      assert.ok(body.source_anchor !== undefined);
+      assert.ok(body.detail !== undefined, 'validation detail must be present');
     } finally {
       await app.close();
       db.close();
@@ -120,7 +137,7 @@ describe('POST /api/v2/receipts — idempotency', () => {
         payload: FIXTURE_RECEIPT,
       });
       assert.equal(res1.statusCode, 201);
-      const body1 = res1.json() as { readonly receiptId: string };
+      const body1 = res1.json() as { readonly data: { readonly receiptId: string } };
 
       // Second with same proofHash.
       const res2 = await app.inject({
@@ -129,10 +146,13 @@ describe('POST /api/v2/receipts — idempotency', () => {
         payload: FIXTURE_RECEIPT,
       });
       assert.equal(res2.statusCode, 200);
-      const body2 = res2.json() as { readonly ok: boolean; readonly receiptId: string; readonly idempotent: boolean };
+      const body2 = res2.json() as {
+        readonly ok: boolean;
+        readonly data: { readonly receiptId: string; readonly idempotent: boolean };
+      };
       assert.equal(body2.ok, true);
-      assert.equal(body2.receiptId, body1.receiptId);
-      assert.equal(body2.idempotent, true);
+      assert.equal(body2.data.receiptId, body1.data.receiptId);
+      assert.equal(body2.data.idempotent, true);
 
       // Verify only one receipt in DB.
       const count = db.prepare('SELECT COUNT(*) AS cnt FROM v2_receipts').get() as { readonly cnt: number };
@@ -144,8 +164,8 @@ describe('POST /api/v2/receipts — idempotency', () => {
   });
 });
 
-describe('GET /api/v2/receipts — list with pagination', () => {
-  test('returns empty list when no receipts exist', async () => {
+describe('GET /api/v2/receipts — list with limit/offset pagination', () => {
+  test('returns empty list with default limit/offset when no receipts exist', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -161,23 +181,25 @@ describe('GET /api/v2/receipts — list with pagination', () => {
       assert.equal(res.statusCode, 200);
       const body = res.json() as {
         readonly ok: boolean;
-        readonly receipts: readonly unknown[];
-        readonly total: number;
-        readonly page: number;
-        readonly limit: number;
+        readonly data: {
+          readonly receipts: readonly unknown[];
+          readonly total: number;
+          readonly limit: number;
+          readonly offset: number;
+        };
       };
       assert.equal(body.ok, true);
-      assert.equal(body.receipts.length, 0);
-      assert.equal(body.total, 0);
-      assert.equal(body.page, 1);
-      assert.equal(body.limit, 20);
+      assert.equal(body.data.receipts.length, 0);
+      assert.equal(body.data.total, 0);
+      assert.equal(body.data.limit, 20);
+      assert.equal(body.data.offset, 0);
     } finally {
       await app.close();
       db.close();
     }
   });
 
-  test('returns paginated receipts with correct total', async () => {
+  test('returns paginated receipts with correct total + offset semantics', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -199,37 +221,64 @@ describe('GET /api/v2/receipts — list with pagination', () => {
         });
       }
 
+      // Page 1: limit=2, offset=0 → 2 receipts.
       const res = await app.inject({
         method: 'GET',
-        url: '/api/v2/receipts?limit=2&page=1',
+        url: '/api/v2/receipts?limit=2&offset=0',
       });
       assert.equal(res.statusCode, 200);
       const body = res.json() as {
         readonly ok: boolean;
-        readonly receipts: readonly { readonly id: string }[];
-        readonly total: number;
-        readonly page: number;
-        readonly limit: number;
+        readonly data: {
+          readonly receipts: readonly { readonly id: string }[];
+          readonly total: number;
+          readonly limit: number;
+          readonly offset: number;
+        };
       };
       assert.equal(body.ok, true);
-      assert.equal(body.total, 3);
-      assert.equal(body.receipts.length, 2);
-      assert.equal(body.page, 1);
-      assert.equal(body.limit, 2);
+      assert.equal(body.data.total, 3);
+      assert.equal(body.data.receipts.length, 2);
+      assert.equal(body.data.limit, 2);
+      assert.equal(body.data.offset, 0);
 
-      // Page 2.
+      // Page 2: limit=2, offset=2 → 1 receipt.
       const res2 = await app.inject({
         method: 'GET',
-        url: '/api/v2/receipts?limit=2&page=2',
+        url: '/api/v2/receipts?limit=2&offset=2',
       });
       const body2 = res2.json() as {
-        readonly receipts: readonly unknown[];
-        readonly total: number;
-        readonly page: number;
+        readonly data: {
+          readonly receipts: readonly unknown[];
+          readonly total: number;
+          readonly offset: number;
+        };
       };
-      assert.equal(body2.receipts.length, 1);
-      assert.equal(body2.total, 3);
-      assert.equal(body2.page, 2);
+      assert.equal(body2.data.receipts.length, 1);
+      assert.equal(body2.data.total, 3);
+      assert.equal(body2.data.offset, 2);
+    } finally {
+      await app.close();
+      db.close();
+    }
+  });
+
+  test('returns 400 RFC 7807 when limit is out of range (0)', async () => {
+    const db = freshDb();
+    const app = await buildServer({
+      db,
+      gitCommitSha: 'a'.repeat(40),
+      jwtSecret: null,
+      logger: false,
+    });
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v2/receipts?limit=0',
+      });
+      assert.equal(res.statusCode, 400);
+      const body = res.json() as { readonly error_code: string };
+      assert.equal(body.error_code, 'VALIDATION_FAILED');
     } finally {
       await app.close();
       db.close();
@@ -238,7 +287,7 @@ describe('GET /api/v2/receipts — list with pagination', () => {
 });
 
 describe('GET /api/v2/receipts/:id — single receipt detail', () => {
-  test('returns 404 when receipt does not exist', async () => {
+  test('returns 404 RFC 7807 NOT_FOUND when receipt does not exist', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -252,16 +301,22 @@ describe('GET /api/v2/receipts/:id — single receipt detail', () => {
         url: '/api/v2/receipts/nonexistent-id',
       });
       assert.equal(res.statusCode, 404);
-      const body = res.json() as { readonly ok: boolean; readonly error: string };
-      assert.equal(body.ok, false);
-      assert.ok(body.error.includes('not found'));
+      assert.match(res.headers['content-type'] ?? '', /application\/problem\+json/);
+      const body = res.json() as {
+        readonly error_code: string;
+        readonly message: string;
+        readonly source_anchor: unknown;
+      };
+      assert.equal(body.error_code, 'NOT_FOUND');
+      assert.match(body.message, /not found/i);
+      assert.ok(body.source_anchor !== undefined);
     } finally {
       await app.close();
       db.close();
     }
   });
 
-  test('returns receipt with manifest members', async () => {
+  test('returns receipt with manifest members in unified envelope', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -276,8 +331,8 @@ describe('GET /api/v2/receipts/:id — single receipt detail', () => {
         url: '/api/v2/receipts',
         payload: FIXTURE_RECEIPT,
       });
-      const createBody = createRes.json() as { readonly receiptId: string };
-      const receiptId = createBody.receiptId;
+      const createBody = createRes.json() as { readonly data: { readonly receiptId: string } };
+      const receiptId = createBody.data.receiptId;
 
       // Fetch detail.
       const res = await app.inject({
@@ -287,16 +342,18 @@ describe('GET /api/v2/receipts/:id — single receipt detail', () => {
       assert.equal(res.statusCode, 200);
       const body = res.json() as {
         readonly ok: boolean;
-        readonly receipt: { readonly id: string; readonly claimText: string; readonly proofHash: string };
-        readonly manifestMembers: readonly { readonly kind: string; readonly digest: string; readonly sizeBytes: number }[];
-        readonly latestVerification: unknown;
+        readonly data: {
+          readonly receipt: { readonly id: string; readonly claimText: string; readonly proofHash: string };
+          readonly manifestMembers: readonly { readonly kind: string; readonly digest: string; readonly sizeBytes: number }[];
+          readonly latestVerification: unknown;
+        };
       };
       assert.equal(body.ok, true);
-      assert.equal(body.receipt.id, receiptId);
-      assert.equal(body.receipt.claimText, FIXTURE_RECEIPT.claimText);
-      assert.equal(body.receipt.proofHash, FIXTURE_RECEIPT.proofHash);
-      assert.equal(body.manifestMembers.length, 11);
-      assert.equal(body.latestVerification, null);
+      assert.equal(body.data.receipt.id, receiptId);
+      assert.equal(body.data.receipt.claimText, FIXTURE_RECEIPT.claimText);
+      assert.equal(body.data.receipt.proofHash, FIXTURE_RECEIPT.proofHash);
+      assert.equal(body.data.manifestMembers.length, 11);
+      assert.equal(body.data.latestVerification, null);
     } finally {
       await app.close();
       db.close();
@@ -305,7 +362,7 @@ describe('GET /api/v2/receipts/:id — single receipt detail', () => {
 });
 
 describe('GET /api/v2/receipts/:id/verify — V2 six-dimension verification', () => {
-  test('returns 404 when receipt does not exist', async () => {
+  test('returns 404 RFC 7807 NOT_FOUND when receipt does not exist', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -319,15 +376,15 @@ describe('GET /api/v2/receipts/:id/verify — V2 six-dimension verification', ()
         url: '/api/v2/receipts/nonexistent-id/verify',
       });
       assert.equal(res.statusCode, 404);
-      const body = res.json() as { readonly ok: boolean; readonly error: string };
-      assert.equal(body.ok, false);
+      const body = res.json() as { readonly error_code: string };
+      assert.equal(body.error_code, 'NOT_FOUND');
     } finally {
       await app.close();
       db.close();
     }
   });
 
-  test('runs verification and returns 6-dimension result', async () => {
+  test('runs verification and returns 6-dimension result in unified envelope', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -342,7 +399,7 @@ describe('GET /api/v2/receipts/:id/verify — V2 six-dimension verification', ()
         url: '/api/v2/receipts',
         payload: FIXTURE_RECEIPT,
       });
-      const receiptId = (createRes.json() as { readonly receiptId: string }).receiptId;
+      const receiptId = (createRes.json() as { readonly data: { readonly receiptId: string } }).data.receiptId;
 
       // Run verification.
       const res = await app.inject({
@@ -352,26 +409,28 @@ describe('GET /api/v2/receipts/:id/verify — V2 six-dimension verification', ()
       assert.equal(res.statusCode, 200);
       const body = res.json() as {
         readonly ok: boolean;
-        readonly verification: {
-          readonly dimensions: Readonly<Record<string, { readonly dimension: string; readonly outcome: string; readonly detail: string }>>;
-          readonly receiptId: string;
-          readonly verificationPolicyId: string;
+        readonly data: {
+          readonly verification: {
+            readonly dimensions: Readonly<Record<string, { readonly dimension: string; readonly outcome: string; readonly detail: string }>>;
+            readonly receiptId: string;
+            readonly verificationPolicyId: string;
+          };
+          readonly display: string;
+          readonly allPass: boolean;
         };
-        readonly display: string;
-        readonly allPass: boolean;
       };
       assert.equal(body.ok, true);
-      assert.ok(body.display.length > 0);
-      assert.ok(body.verification.receiptId === receiptId);
-      assert.ok(body.verification.verificationPolicyId.length > 0);
+      assert.ok(body.data.display.length > 0);
+      assert.ok(body.data.verification.receiptId === receiptId);
+      assert.ok(body.data.verification.verificationPolicyId.length > 0);
 
       // Must have all 6 dimensions.
-      const dims = Object.keys(body.verification.dimensions);
+      const dims = Object.keys(body.data.verification.dimensions);
       assert.equal(dims.length, 6);
       const expectedDims = ['provenance', 'integrity', 'identity', 'processConformance', 'executionReproduction', 'scientificVerdict'];
       for (const dim of expectedDims) {
         assert.ok(dims.includes(dim), `missing dimension: ${dim}`);
-        const d = body.verification.dimensions[dim];
+        const d = body.data.verification.dimensions[dim];
         assert.ok(d !== undefined, `dimension "${dim}" must exist`);
         assert.ok(d.outcome.length > 0);
       }
@@ -389,7 +448,7 @@ describe('GET /api/v2/receipts/:id/verify — V2 six-dimension verification', ()
     }
   });
 
-  test('verification result appears in GET /receipts/:id', async () => {
+  test('verification result appears in GET /receipts/:id latestVerification', async () => {
     const db = freshDb();
     const app = await buildServer({
       db,
@@ -404,7 +463,7 @@ describe('GET /api/v2/receipts/:id/verify — V2 six-dimension verification', ()
         url: '/api/v2/receipts',
         payload: FIXTURE_RECEIPT,
       });
-      const receiptId = (createRes.json() as { readonly receiptId: string }).receiptId;
+      const receiptId = (createRes.json() as { readonly data: { readonly receiptId: string } }).data.receiptId;
 
       await app.inject({
         method: 'GET',
@@ -417,19 +476,21 @@ describe('GET /api/v2/receipts/:id/verify — V2 six-dimension verification', ()
         url: `/api/v2/receipts/${receiptId}`,
       });
       const detail = detailRes.json() as {
-        readonly latestVerification: {
-          readonly id: number;
-          readonly receiptId: string;
-          readonly policyId: string;
-          readonly evaluatedAt: string;
-          readonly result: { readonly dimensions: Record<string, unknown> };
-          readonly allPass: boolean;
-        } | null;
+        readonly data: {
+          readonly latestVerification: {
+            readonly id: number;
+            readonly receiptId: string;
+            readonly policyId: string;
+            readonly evaluatedAt: string;
+            readonly result: { readonly dimensions: Record<string, unknown> };
+            readonly allPass: boolean;
+          } | null;
+        };
       };
-      assert.ok(detail.latestVerification !== null);
-      assert.equal(detail.latestVerification.receiptId, receiptId);
-      assert.ok(detail.latestVerification.policyId.length > 0);
-      assert.ok(Object.keys(detail.latestVerification.result.dimensions).length === 6);
+      assert.ok(detail.data.latestVerification !== null);
+      assert.equal(detail.data.latestVerification.receiptId, receiptId);
+      assert.ok(detail.data.latestVerification.policyId.length > 0);
+      assert.ok(Object.keys(detail.data.latestVerification.result.dimensions).length === 6);
     } finally {
       await app.close();
       db.close();

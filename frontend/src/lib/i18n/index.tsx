@@ -19,7 +19,10 @@ import { messages, type Locale, type MessageKey } from './messages';
 export type { Locale, MessageKey };
 
 const STORAGE_KEY = 'far-lang';
-const DEFAULT_LOCALE: Locale = 'zh'; // no-provider fallback (direct-render unit tests keep canonical zh)
+// No-provider fallback: matches APP_DEFAULT_LOCALE so direct-render unit tests
+// see the same English strings the real app shows (English-first competition release).
+// Chinese text in tests comes from backend API fixtures, not i18n, so this is safe.
+const DEFAULT_LOCALE: Locale = 'en';
 const APP_DEFAULT_LOCALE: Locale = 'en'; // real-app default — English-first for the international release
 
 export const LOCALES: readonly Locale[] = ['zh', 'en'] as const;
@@ -93,8 +96,8 @@ export function I18nProvider({ children }: { readonly children: ReactNode }) {
 
 /**
  * Returns the active i18n context. Outside an I18nProvider (e.g. direct page
- * renders in unit tests) it returns a zh-bound fallback, so pages render their
- * canonical zh text without each test having to mount a provider.
+ * renders in unit tests) it returns an English-bound fallback, matching the
+ * real app default so tests see the same strings users see.
  */
 export function useI18n(): I18nContextValue {
   return useContext(I18nContext);

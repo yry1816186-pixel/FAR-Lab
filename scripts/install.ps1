@@ -19,6 +19,12 @@ $InstallDir = if ($env:FAR_CHAIN_HOME) { $env:FAR_CHAIN_HOME } else { Join-Path 
 $RepoUrl    = 'https://github.com/yry1816186-pixel/FAR-Lab.git'
 $NodeMin    = 24
 
+# 发布版本：git clone/update 固定此 tag（杜绝浮动分支）。发布新 release 时更新此常量。
+$ReleaseTag = 'v1.1.0'
+# 发布资产校验（见 ── 4b ──）：GitHub Release 附带的 SHA256SUMS 与 sibling 安装脚本。
+$Sha256SumsUrl = "https://github.com/yry1816186-pixel/FAR-Lab/releases/download/$ReleaseTag/SHA256SUMS"
+$InstallShUrl  = "https://github.com/yry1816186-pixel/FAR-Lab/releases/download/$ReleaseTag/install.sh"
+
 # ── 1. git ──
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
   Fail "git 未找到。安装: https://git-scm.com/download/win 或 winget install Git.Git"
@@ -45,26 +51,54 @@ if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
 }
 Ok "pnpm $(pnpm -v)"
 
-# ── 4. clone / update 仓库 ──
+# ── 4. clone / update 仓库（钉 release tag，杜绝浮动分支）──
 if (Test-Path (Join-Path $InstallDir '.git')) {
-  Info "已存在 $InstallDir，拉取最新..."
-  try { git -C $InstallDir fetch --depth 1 origin; git -C $InstallDir reset --hard '@{u}' }
-  catch { Warn "update 失败（可能有本地改动；cd $InstallDir; git status）" }
+  Info "已存在 $InstallDir，更新到 $ReleaseTag ..."
+  try { git -C $InstallDir fetch --depth 1 origin tag $ReleaseTag; git -C $InstallDir checkout --force $ReleaseTag }
+  catch { Warn "update $ReleaseTag 失败（可能有本地改动；cd $InstallDir; git status）" }
 } else {
-  Info "clone FAR-Lab → $InstallDir"
-  try { git clone --depth 1 $RepoUrl $InstallDir }
-  catch { Fail "clone 失败：检查网络 / $RepoUrl" }
+  Info "clone FAR-Lab@$ReleaseTag → $InstallDir"
+  try { git clone --branch $ReleaseTag --depth 1 $RepoUrl $InstallDir }
+  catch { Fail "clone $ReleaseTag 失败：检查网络 / $RepoUrl（该 tag 是否已发布？）" }
 }
 Set-Location $InstallDir
 Ok "源码就绪 @ $(git rev-parse --short HEAD)"
 
-# ── 5. Node 依赖 ──
+# ── 4b. 发布资产防篡改校验（SHA256SUMS · fail-closed）──
+# 设计说明（同 install.sh）：irm | iex 分发时脚本无磁盘文件，无法对"正在运行的自己"做
+# 文件哈希自指校验；改为：下载 GitHub Release 的 SHA256SUMS 资产（HTTPS/TLS），校验其
+# 存在性与格式（必须含 scripts/install.sh 与 scripts/install.ps1 条目），并对同批发布的
+# sibling 资产 install.sh 做哈希比对——篡改该批次任一安装脚本必然导致 install.sh 哈希
+# 不匹配 → 中止。任何校验失败一律中止（fail-closed）。
+$verifyDir = Join-Path $env:TEMP ("far-install-verify-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $verifyDir *> $null
+try {
+  Info "下载发布校验资产（SHA256SUMS + install.sh）…"
+  try { Invoke-WebRequest -Uri $Sha256SumsUrl -OutFile (Join-Path $verifyDir 'SHA256SUMS') -UseBasicParsing -TimeoutSec 60 }
+  catch { Fail "发布校验失败：无法下载 SHA256SUMS（$Sha256SumsUrl）。检查网络后重试" }
+  $sums = Get-Content (Join-Path $verifyDir 'SHA256SUMS') -ErrorAction Stop
+  if (-not ($sums -match '^[0-9a-f]{64}  scripts/install\.(sh|ps1)$')) {
+    Fail "SHA256SUMS 格式异常（缺少 scripts/install.* 条目）——发布资产可疑，已中止"
+  }
+  try { Invoke-WebRequest -Uri $InstallShUrl -OutFile (Join-Path $verifyDir 'install.sh') -UseBasicParsing -TimeoutSec 60 }
+  catch { Fail "发布校验失败：无法下载 install.sh（$InstallShUrl）。检查网络后重试" }
+  $expectedSh = $null
+  foreach ($line in $sums) {
+    if ($line -match '^([0-9a-f]{64})\s+scripts/install\.sh$') { $expectedSh = $Matches[1] }
+  }
+  if (-not $expectedSh) { Fail "SHA256SUMS 中未找到 scripts/install.sh 条目" }
+  $actualSh = (Get-FileHash (Join-Path $verifyDir 'install.sh') -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($expectedSh -ne $actualSh) {
+    Fail "发布资产校验失败：install.sh 哈希不匹配（防篡改检查）——请从官方渠道重新获取安装脚本"
+  }
+  Ok "发布资产校验通过（SHA256SUMS 存在性 + install.sh）"
+}
+finally { Remove-Item -Recurse -Force $verifyDir -ErrorAction SilentlyContinue }
+
+# ── 5. Node 依赖（frozen；失败即 fail-closed，不回退非 frozen）──
 Info "pnpm install --frozen-lockfile（Node 依赖·不含大数据）"
 try { pnpm install --frozen-lockfile }
-catch {
-  Warn "frozen install 失败，重试非 frozen..."
-  try { pnpm install } catch { Fail "pnpm install 失败：删 node_modules 后重试  Remove-Item -Recurse -Force node_modules; pnpm install" }
-}
+catch { Fail "pnpm install --frozen-lockfile 失败：锁文件过期或依赖变更，请更新 pnpm-lock.yaml 后重试（在仓库根执行 pnpm install 刷新锁文件并提交更新后的 pnpm-lock.yaml）。勿用非 frozen 安装绕过（会破坏可复现构建）。" }
 Ok "Node 依赖已安装"
 
 # ── 6. Python 科研轴（可选·缺失只 WARN）──

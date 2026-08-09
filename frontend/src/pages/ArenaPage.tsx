@@ -16,6 +16,7 @@
  */
 
 import { useArenaDemo } from '@/lib/api_client';
+import { useT } from '@/lib/i18n';
 import type { VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -46,6 +47,7 @@ function isVerdictValue(v: string): v is VerdictValue {
 }
 
 export default function ArenaPage() {
+  const t = useT();
   const { data: result, isLoading, isError, error } = useArenaDemo();
 
   if (isLoading) {
@@ -65,13 +67,13 @@ export default function ArenaPage() {
     return (
       <div className="space-y-8">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight">Adversarial Science Arena</h1>
-          <p className="mt-1 text-muted-foreground">Adversarial Science Arena · W3 / FI-2</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('arena.title')}</h1>
+          <p className="mt-1 text-muted-foreground">{t('arena.subtitle')}</p>
         </header>
         <Alert variant="destructive">
-          <AlertTitle>Arena session failed</AlertTitle>
+          <AlertTitle>{t('arena.errorTitle')}</AlertTitle>
           <AlertDescription>
-            {error instanceof Error ? error.message : 'Unknown error'}
+            {error instanceof Error ? error.message : t('arena.noVerdict')}
           </AlertDescription>
         </Alert>
       </div>
@@ -83,10 +85,10 @@ export default function ArenaPage() {
       <header>
         <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
           <Swords className="h-7 w-7" aria-hidden="true" />
-          Adversarial Science Arena
+          {t('arena.title')}
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Adversarial Science Arena · proponent verdict + N refuter rebuttals + deterministic arbiter judges landings
+          {t('arena.subtitle2')}
         </p>
       </header>
 
@@ -99,27 +101,29 @@ export default function ArenaPage() {
             ) : (
               <ShieldAlert className="h-5 w-5" aria-hidden="true" />
             )}
-            Arena verdict
+            {t('arena.verdictTitle')}
           </CardTitle>
-          <CardDescription>hypothesis: {result.hypothesis}</CardDescription>
+          <CardDescription>{t('arena.hypothesis', { h: result.hypothesis })}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4">
           <Badge variant={result.robust ? 'default' : 'destructive'} className="text-base">
-            {result.robust ? 'ROBUST (no effective attack)' : `BREACHED (${result.landedCount} effective attack(s))`}
+            {result.robust
+              ? t('arena.robust')
+              : t('arena.breached', { n: result.landedCount })}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            Original verdict:
+            {t('arena.originalVerdict')}
             {result.originalVerdict !== null && isVerdictValue(result.originalVerdict) ? (
               <VerdictBadge decision={result.originalVerdict} size="sm" />
             ) : (
-              <span className="text-muted-foreground">No verdict</span>
+              <span className="text-muted-foreground">{t('arena.noVerdict')}</span>
             )}
             {result.originalRule !== null && (
               <code className="ml-2 text-xs">{result.originalRule}</code>
             )}
           </span>
           <span className="text-sm text-muted-foreground">
-            arena: <code className="rounded bg-muted px-1.5 py-0.5">{result.arenaId}</code>
+            {t('arena.arenaId')} <code className="rounded bg-muted px-1.5 py-0.5">{result.arenaId}</code>
           </span>
         </CardContent>
       </Card>
@@ -127,18 +131,18 @@ export default function ArenaPage() {
       {/* RefuterScoreboard */}
       <Card>
         <CardHeader>
-          <CardTitle>Refuter scoreboard</CardTitle>
+          <CardTitle>{t('arena.scoreboardTitle')}</CardTitle>
           <CardDescription>
-            Each refuter independently rebuts the hypothesis; the arbiter detects whether the verdict disagrees with the original (landed = effective attack)
+            {t('arena.scoreboardDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Refuter</TableHead>
-                <TableHead>Verdict</TableHead>
-                <TableHead>Attack result</TableHead>
+                <TableHead>{t('arena.col.refuter')}</TableHead>
+                <TableHead>{t('arena.col.verdict')}</TableHead>
+                <TableHead>{t('arena.col.result')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -154,14 +158,14 @@ export default function ArenaPage() {
                     {a.verdict !== null && isVerdictValue(a.verdict) ? (
                       <VerdictBadge decision={a.verdict} size="sm" />
                     ) : (
-                      <Badge variant="destructive">Error</Badge>
+                      <Badge variant="destructive">{t('arena.noVerdict')}</Badge>
                     )}
                   </TableCell>
                   <TableCell>
                     {a.attackLanded ? (
-                      <Badge variant="destructive">✗ LANDED (effective attack)</Badge>
+                      <Badge variant="destructive">{t('arena.landed')}</Badge>
                     ) : (
-                      <Badge variant="secondary">✓ held (withstood)</Badge>
+                      <Badge variant="secondary">{t('arena.held')}</Badge>
                     )}
                   </TableCell>
                 </TableRow>
@@ -174,12 +178,11 @@ export default function ArenaPage() {
       {/* HonestyAlert */}
       <Alert>
         <ShieldAlert className="h-4 w-4" aria-hidden="true" />
-        <AlertTitle className="flex items-center gap-2">Honesty statement <IntegrityBadge source={result.datasetSource} /></AlertTitle>
+        <AlertTitle className="flex items-center gap-2">{t('arena.honestyTitle')} <IntegrityBadge source={result.datasetSource} /></AlertTitle>
         <AlertDescription>
           <p>{result.honestNote}</p>
           <p className="mt-2">
-            <strong>Red line</strong>: the arbiter is a deterministic rule (verdict-disagreement detection), not an LLM adjudicator.
-            Real adversarial testing requires <code className="rounded bg-muted px-1">far arena --refuters</code> to connect a real provider (credential gate).
+            <strong>{t('arena.redLine')}</strong>
           </p>
         </AlertDescription>
       </Alert>

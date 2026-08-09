@@ -14,7 +14,7 @@ export const DATASET_SOURCE_META: Readonly<
   Record<DatasetSourceKind, { label: string; tone: 'live' | 'cached' | 'replay' | 'fixture'; hint: string }>
 > = {
   online: { label: 'Live', tone: 'live', hint: 'real-time online data source' },
-  cached_fixture: { label: 'Cached fixture', tone: 'cached', hint: 'degraded: cached fixture fallback (baseline_exempt)' },
-  replay: { label: 'Replay', tone: 'replay', hint: 'offline replay of recorded fixtures — NOT live inference' },
-  fixture: { label: 'Fixture', tone: 'fixture', hint: 'synthetic fixture data — for demo/regression only' },
+  cached_fixture: { label: 'Cached reference', tone: 'cached', hint: 'degraded: cached reference fallback (baseline_exempt)' },
+  replay: { label: 'Replay', tone: 'replay', hint: 'offline replay of recorded reference data — NOT live inference' },
+  fixture: { label: 'Reference data', tone: 'fixture', hint: 'synthetic reference data — for regression only' },
 };

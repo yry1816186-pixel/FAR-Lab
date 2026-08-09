@@ -1,0 +1,2094 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FAR-Lab API",
+    "description": "FAR-Lab 对外 HTTP API（24§5）。V2 receipts 端点采用统一信封 { ok: true, data: T } + RFC 7807 错误响应（R-05）。",
+    "version": "2026-06-27"
+  },
+  "components": {
+    "schemas": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/hypothesize": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/evidence/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/evidence/chain/{headHash}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "headHash",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/verdict/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/verdict/by_hypothesis/{hypoId}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            "in": "path",
+            "name": "hypoId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/verdict": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/report/{runId}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "runId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/report/{runId}/paper": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "runId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/integrity/root": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/integrity/proof/{seq}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "seq",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/integrity/receipt": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/benchmark": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/court/demo": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/arena/demo": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/planning/risk": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "readOnly": {
+                    "type": "boolean"
+                  },
+                  "docOnly": {
+                    "type": "boolean"
+                  },
+                  "boundedWrite": {
+                    "type": "boolean"
+                  },
+                  "touchesTrustKernel": {
+                    "type": "boolean"
+                  },
+                  "newCliOrApi": {
+                    "type": "boolean"
+                  },
+                  "crossModule": {
+                    "type": "boolean"
+                  },
+                  "destructive": {
+                    "type": "boolean"
+                  },
+                  "irreversible": {
+                    "type": "boolean"
+                  },
+                  "ambiguous": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "readOnly",
+                  "docOnly",
+                  "boundedWrite",
+                  "touchesTrustKernel",
+                  "newCliOrApi",
+                  "crossModule",
+                  "destructive",
+                  "irreversible",
+                  "ambiguous"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "string",
+                          "enum": [
+                            "P0",
+                            "P1",
+                            "P2",
+                            "P3",
+                            "P4"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "reasons"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/planning/plan": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "goal": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "action": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "risk": {
+                          "type": "string",
+                          "enum": [
+                            "P0",
+                            "P1",
+                            "P2",
+                            "P3",
+                            "P4"
+                          ]
+                        },
+                        "tools": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "default": [
+                            "Bash"
+                          ]
+                        },
+                        "dependsOn": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "default": []
+                        },
+                        "verification": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "action",
+                        "risk",
+                        "verification"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  },
+                  "taskClass": {
+                    "type": "string"
+                  },
+                  "lifecycleDepth": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "goal",
+                  "steps"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "violations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "stepId": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "stepId",
+                              "code",
+                              "message"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "executionOrder": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "violations",
+                        "executionOrder"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/planning/spec": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "story": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "delta": {
+                    "type": "object",
+                    "properties": {
+                      "added": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "default": []
+                      },
+                      "modified": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "default": []
+                      },
+                      "removed": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "default": []
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "acceptanceCriteria": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "statement": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "verification": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "statement",
+                        "verification"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  },
+                  "dataFlow": {
+                    "type": "string"
+                  },
+                  "risk": {
+                    "type": "string",
+                    "enum": [
+                      "P0",
+                      "P1",
+                      "P2",
+                      "P3",
+                      "P4"
+                    ]
+                  },
+                  "trustKernel": {
+                    "type": "object",
+                    "properties": {
+                      "additiveOnly": {
+                        "type": "boolean"
+                      },
+                      "cannotProveStatement": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "additiveOnly",
+                      "cannotProveStatement"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "removedJustification": {
+                    "type": "string"
+                  },
+                  "taskId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "story",
+                  "delta",
+                  "acceptanceCriteria",
+                  "risk"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "violations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "message"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "ok",
+                        "violations"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/planning/gate": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "command": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "expected": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "command",
+                        "expected"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "results": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "actual": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pass",
+                            "fail",
+                            "not_run"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "actual",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "items",
+                  "results"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "command": {
+                                "type": "string"
+                              },
+                              "expected": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "command",
+                              "expected"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "results": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "actual": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pass",
+                                  "fail",
+                                  "not_run"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "actual",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "passed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "failed": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "notRun": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "conclusion": {
+                          "type": "string",
+                          "enum": [
+                            "DONE",
+                            "IMPLEMENTED_UNVERIFIED",
+                            "BLOCKED"
+                          ]
+                        },
+                        "rationale": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "results",
+                        "passed",
+                        "failed",
+                        "notRun",
+                        "conclusion",
+                        "rationale"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/receipts/demo": {
+      "get": {
+        "summary": "Demo sample receipt verification",
+        "tags": [
+          "v2-receipts"
+        ],
+        "description": "Returns the demo sample receipt with six-dimension verification ({ ok: true, data: { receipt, verification } }).",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "receipt": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "verification": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "receipt",
+                        "verification"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/receipts/verify": {
+      "post": {
+        "summary": "Verify a ProofEnvelopeV2 (six-dimension result)",
+        "tags": [
+          "v2-receipts"
+        ],
+        "description": "Verify a submitted ProofEnvelopeV2. Returns unified envelope { ok: true, data: { verification, display } }. Validation errors return RFC 7807 { error_code, message, source_anchor, detail? }.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "proofHash": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "envelopeId": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "fecHash": {
+                    "type": "string"
+                  },
+                  "claim": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "fecSnapshot": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "protocolFreeze": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "datasetBindings": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "workflowBindings": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "experimentRuns": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "measurementResults": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "statisticalResults": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "verdictTrace": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "antiTheaterReport": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "ledgerRoot": {
+                    "type": "string"
+                  },
+                  "signatures": {
+                    "type": "array",
+                    "items": {}
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "proofHash"
+                ],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "verification": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "display": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "verification",
+                        "display"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/receipts": {
+      "post": {
+        "summary": "Create a receipt (idempotent by proofHash)",
+        "tags": [
+          "v2-receipts"
+        ],
+        "description": "Create a persisted receipt. Idempotent: same proofHash returns existing receiptId with 200 + idempotent=true. New receipt returns 201 + idempotent=false. Response: { ok: true, data: { receiptId, idempotent } }.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "proofHash": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "schemaVersion": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "claimId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "claimText": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "verdict": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "manifestMembers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "digest": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sizeBytes": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "digest",
+                        "sizeBytes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "contractBindings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "bindingSetJson": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "digest": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "bindingSetJson",
+                        "digest"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "proofHash",
+                  "schemaVersion",
+                  "claimId",
+                  "claimText",
+                  "verdict"
+                ],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "receiptId": {
+                          "type": "string"
+                        },
+                        "idempotent": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "receiptId",
+                        "idempotent"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "receiptId": {
+                          "type": "string"
+                        },
+                        "idempotent": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "receiptId",
+                        "idempotent"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List receipts (limit/offset pagination, optional claimId filter)",
+        "tags": [
+          "v2-receipts"
+        ],
+        "description": "List persisted receipts with limit/offset pagination. Response: { ok: true, data: { receipts, total, limit, offset } }. limit: 1..100 (default 20), offset: >=0 (default 0), claimId: optional exact-match filter (runId of a wizard run).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "in": "query",
+            "name": "offset",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "query",
+            "name": "claimId",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "receipts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "claimId": {
+                                "type": "string"
+                              },
+                              "claimText": {
+                                "type": "string"
+                              },
+                              "verdict": {
+                                "type": "string"
+                              },
+                              "proofHash": {
+                                "type": "string"
+                              },
+                              "schemaVersion": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "receiptStanding": {
+                                "type": "string"
+                              },
+                              "preservationStatus": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "claimId",
+                              "claimText",
+                              "verdict",
+                              "proofHash",
+                              "schemaVersion",
+                              "createdAt",
+                              "receiptStanding",
+                              "preservationStatus"
+                            ],
+                            "additionalProperties": true
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "receipts",
+                        "total",
+                        "limit",
+                        "offset"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/receipts/{id}": {
+      "get": {
+        "summary": "Get receipt detail (manifest members + latest verification)",
+        "tags": [
+          "v2-receipts"
+        ],
+        "description": "Get a single receipt with manifest members and latest persisted verification. Response: { ok: true, data: { receipt, manifestMembers, latestVerification } }. 404 if not found (RFC 7807).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "receipt": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "claimId": {
+                              "type": "string"
+                            },
+                            "claimText": {
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "type": "string"
+                            },
+                            "proofHash": {
+                              "type": "string"
+                            },
+                            "schemaVersion": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "receiptStanding": {
+                              "type": "string"
+                            },
+                            "preservationStatus": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "claimId",
+                            "claimText",
+                            "verdict",
+                            "proofHash",
+                            "schemaVersion",
+                            "createdAt",
+                            "receiptStanding",
+                            "preservationStatus"
+                          ],
+                          "additionalProperties": true
+                        },
+                        "manifestMembers": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "digest": {
+                                "type": "string"
+                              },
+                              "sizeBytes": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "digest",
+                              "sizeBytes"
+                            ],
+                            "additionalProperties": true
+                          }
+                        },
+                        "latestVerification": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "number"
+                                },
+                                "receiptId": {
+                                  "type": "string"
+                                },
+                                "policyId": {
+                                  "type": "string"
+                                },
+                                "evaluatedAt": {
+                                  "type": "string"
+                                },
+                                "result": {
+                                  "type": "object",
+                                  "additionalProperties": {}
+                                },
+                                "allPass": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "receiptId",
+                                "policyId",
+                                "evaluatedAt",
+                                "result",
+                                "allPass"
+                              ],
+                              "additionalProperties": true
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "receipt",
+                        "manifestMembers",
+                        "latestVerification"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/receipts/{id}/verify": {
+      "get": {
+        "summary": "Re-verify a receipt (run + persist six-dimension result)",
+        "tags": [
+          "v2-receipts"
+        ],
+        "description": "Run V2 six-dimension verification on a persisted receipt, persist the result, return it. Response: { ok: true, data: { verification, display, allPass } }. 404 if not found (RFC 7807).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "verification": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "display": {
+                          "type": "string"
+                        },
+                        "allPass": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "verification",
+                        "display",
+                        "allPass"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error_code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "source_anchor": {
+                      "type": "object",
+                      "properties": {
+                        "fileId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "stageId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "callRecordId": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "fileId",
+                        "stageId",
+                        "callRecordId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "detail": {}
+                  },
+                  "required": [
+                    "error_code",
+                    "message",
+                    "source_anchor"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Liveness + readiness probes"
+    },
+    {
+      "name": "v1",
+      "description": "V1 API (hypothesize / evidence / verdict / report / integrity / benchmark / court / arena)"
+    },
+    {
+      "name": "v2-receipts",
+      "description": "V2 receipt verification + persistence (R-05 unified envelope { ok, data } + RFC 7807 errors)"
+    }
+  ]
+}

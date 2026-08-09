@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="FAR-Lab">
+  <!-- FAR-Lab favicon: Verdict Seal mark (optimized for 16px+).
+       seal = brand-600 ink-blue (#2258be), check = white. -->
+  <rect x="3" y="3" width="26" height="26" rx="7" ry="7" fill="#2258be" />
+  <path
+    d="M11 16.4 L14.4 19.8 L21.6 12.5"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="3.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

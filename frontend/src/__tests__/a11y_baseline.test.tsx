@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import OverviewPage from '@/pages/OverviewPage';
 import AboutPage from '@/pages/AboutPage';
 import App from '@/App';
@@ -15,11 +16,16 @@ import App from '@/App';
 // 诚实边界：本层为自动可测子集；完整 WCAG 2.2 AA 合规仍须人工/axe 深度审计（外部）。
 // ============================================================
 
+// R-03 后 OverviewPage 使用 <Link>,需 Router 上下文;MemoryRouter 对无 Link 页面无害。
 function renderWithQueryClient(ui: React.ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
 describe('a11y: 语义结构（WCAG 1.3.1 信息与关系）', () => {

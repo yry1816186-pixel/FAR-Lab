@@ -32,7 +32,6 @@ const ROUTE_TITLES: Readonly<Record<string, string>> = {
   '/honesty': 'Honesty Wall',
   '/ablation': 'Ablation',
   '/report': 'Report',
-  '/demo': 'Demo',
   '/about': 'About',
 };
 

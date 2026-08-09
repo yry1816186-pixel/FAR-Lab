@@ -3,12 +3,18 @@
  *
  * Endpoints:
  *   POST   /receipts             — create a receipt (idempotent by proofHash)
- *   GET    /receipts             — list receipts with pagination
+ *   GET    /receipts             — list receipts with pagination (limit/offset)
  *   GET    /receipts/:id         — get single receipt with manifest members + latest verification
  *   GET    /receipts/:id/verify  — run V2 six-dimension verification, persist result
  *
+ * 契约（R-05 统一）：
+ *   - 成功响应统一信封 { ok: true, data: T }
+ *   - 失败响应统一 RFC 7807（抛 ApiError → error_handler 格式化）
+ *   - pagination 统一 limit/offset（不再 page/limit）
+ *   - 请求体/查询参数/路径参数由 zod schema（fastify/ajv）验证
+ *
  * Authority: doc19 §5 (machine envelope), §8 (API lifecycle).
- * Zero-tolerance: no any / @ts-ignore / double assertions / empty catch / stubs.
+ * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩代码。
  */
 
 import { randomUUID } from 'node:crypto';
@@ -18,41 +24,24 @@ import {
   runV2ReceiptVerification,
   formatV2VerificationForDisplay,
 } from '../../v2_domain/receipt_verify_v2.ts';
+import { notFound } from '../errors/error_handler.ts';
+import {
+  createReceiptRouteSchema,
+  listReceiptsRouteSchema,
+  receiptDetailRouteSchema,
+  reVerifyRouteSchema,
+} from './v2_receipts_schemas.ts';
+import type {
+  CreateReceiptBody,
+  ReceiptRow,
+} from './v2_receipts_schemas.ts';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** Minimal body fields required to create a receipt. */
-interface CreateReceiptBody {
-  readonly proofHash: string;
-  readonly schemaVersion: string;
-  readonly claimId: string;
-  readonly claimText: string;
-  readonly verdict: string;
-  readonly manifestMembers?: readonly {
-    readonly kind: string;
-    readonly digest: string;
-    readonly sizeBytes: number;
-  }[];
-  readonly contractBindings?: readonly {
-    readonly bindingSetJson: string;
-    readonly digest: string;
-  }[];
-}
-
-/** Receipt row from v2_receipts. */
-interface ReceiptRow {
-  readonly id: string;
-  readonly claim_id: string;
-  readonly claim_text: string;
-  readonly verdict: string;
-  readonly proof_hash: string;
-  readonly schema_version: string;
-  readonly created_at: string;
-  readonly receipt_standing: string;
-  readonly preservation_status: string;
-}
+// CreateReceiptBody / ReceiptRow 由 v2_receipts_schemas.ts 的 zod schema 派生
+// （z.infer，SSOT 单一真相源），不再手写重复定义（P1-A-2）。
 
 /** Manifest member row from v2_manifest_members. */
 interface ManifestMemberRow {
@@ -89,63 +78,17 @@ export async function registerV2ReceiptPersistRoutes(
 ): Promise<void> {
   // -----------------------------------------------------------------------
   // POST /receipts — create receipt (idempotent by proofHash)
+  //
+  // 请求体结构校验由 CreateReceiptBodySchema（fastify/ajv）接管：
+  //   - proofHash/schemaVersion/claimId/claimText/verdict 必填 string
+  //   - manifestMembers[].{kind,digest,sizeBytes} 元素级校验
+  //   - contractBindings[].{bindingSetJson,digest} 元素级校验
+  // 验证失败 → error_handler 转 400 VALIDATION_FAILED（RFC 7807）。
   // -----------------------------------------------------------------------
-  app.post('/receipts', async (request, reply) => {
-    const body = request.body as CreateReceiptBody | null;
-    if (body === null || typeof body !== 'object') {
-      return reply.code(400).send({
-        ok: false,
-        error: 'Request body must be a JSON object with proofHash, schemaVersion, claimId, claimText, verdict',
-      });
-    }
-
-    if (
-      typeof body.proofHash !== 'string' ||
-      typeof body.schemaVersion !== 'string' ||
-      typeof body.claimId !== 'string' ||
-      typeof body.claimText !== 'string' ||
-      typeof body.verdict !== 'string'
-    ) {
-      return reply.code(400).send({
-        ok: false,
-        error: 'Missing required fields: proofHash, schemaVersion, claimId, claimText, verdict',
-      });
-    }
+  app.post('/receipts', { schema: createReceiptRouteSchema }, async (request, reply) => {
+    const body = request.body as CreateReceiptBody;
 
     const createdAt = new Date().toISOString();
-
-    // 审计 P2-2：数组元素级校验——半损坏的 manifestMembers/contractBindings 元素
-    // 不得直插 DB（member.kind 等访问前先 shape 校验，防 500/脏数据）。
-    if (body.manifestMembers !== undefined) {
-      for (const member of body.manifestMembers) {
-        if (
-          typeof member !== 'object' || member === null ||
-          typeof member.kind !== 'string' ||
-          typeof member.digest !== 'string' ||
-          typeof member.sizeBytes !== 'number' ||
-          !Number.isFinite(member.sizeBytes) || member.sizeBytes < 0
-        ) {
-          return reply.code(400).send({
-            ok: false,
-            error: 'Malformed manifestMembers: each member must be { kind: string, digest: string, sizeBytes: number }',
-          });
-        }
-      }
-    }
-    if (body.contractBindings !== undefined) {
-      for (const binding of body.contractBindings) {
-        if (
-          typeof binding !== 'object' || binding === null ||
-          typeof binding.bindingSetJson !== 'string' ||
-          typeof binding.digest !== 'string'
-        ) {
-          return reply.code(400).send({
-            ok: false,
-            error: 'Malformed contractBindings: each binding must be { bindingSetJson: string, digest: string }',
-          });
-        }
-      }
-    }
 
     // Idempotency: check if a receipt with this proofHash already exists.
     const existing = db
@@ -155,8 +98,10 @@ export async function registerV2ReceiptPersistRoutes(
     if (existing !== undefined) {
       return reply.code(200).send({
         ok: true,
-        receiptId: existing.id,
-        idempotent: true,
+        data: {
+          receiptId: existing.id,
+          idempotent: true,
+        },
       });
     }
 
@@ -193,50 +138,74 @@ export async function registerV2ReceiptPersistRoutes(
 
     return reply.code(201).send({
       ok: true,
-      receiptId,
-      idempotent: false,
+      data: {
+        receiptId,
+        idempotent: false,
+      },
     });
   });
 
   // -----------------------------------------------------------------------
-  // GET /receipts — list with pagination
+  // GET /receipts — list with pagination (limit/offset)
+  //
+  // 查询参数由 ListReceiptsQuerySchema（fastify/ajv）验证 + coerce + 填充默认值：
+  //   - limit: 1..100，默认 20
+  //   - offset: >=0，默认 0
   // -----------------------------------------------------------------------
-  app.get('/receipts', async (request, reply) => {
-    const query = request.query as { page?: string; limit?: string };
-    const page = Math.max(1, Number.parseInt(query.page ?? '1', 10) || 1);
-    const limit = Math.min(100, Math.max(1, Number.parseInt(query.limit ?? '20', 10) || 20));
-    const offset = (page - 1) * limit;
+  app.get('/receipts', { schema: listReceiptsRouteSchema }, async (request, reply) => {
+    const query = request.query as {
+      readonly limit?: number;
+      readonly offset?: number;
+      readonly claimId?: string;
+    };
+    const limit = query.limit ?? 20;
+    const offset = query.offset ?? 0;
+    const claimId = query.claimId;
 
-    const totalRow = db.prepare('SELECT COUNT(*) AS cnt FROM v2_receipts').get() as { readonly cnt: number };
-    const total = totalRow.cnt;
-
-    const rows = db
-      .prepare('SELECT * FROM v2_receipts ORDER BY created_at DESC LIMIT ? OFFSET ?')
-      .all(limit, offset) as readonly ReceiptRow[];
+    // claimId 过滤（Wizard 分享链接 ?runId=xxx 定位收据：保存时 claimId = runId）。
+    let total: number;
+    let rows: readonly ReceiptRow[];
+    if (claimId !== undefined) {
+      const totalRow = db
+        .prepare('SELECT COUNT(*) AS cnt FROM v2_receipts WHERE claim_id = ?')
+        .get(claimId) as { readonly cnt: number };
+      total = totalRow.cnt;
+      rows = db
+        .prepare('SELECT * FROM v2_receipts WHERE claim_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+        .all(claimId, limit, offset) as readonly ReceiptRow[];
+    } else {
+      const totalRow = db.prepare('SELECT COUNT(*) AS cnt FROM v2_receipts').get() as { readonly cnt: number };
+      total = totalRow.cnt;
+      rows = db
+        .prepare('SELECT * FROM v2_receipts ORDER BY created_at DESC LIMIT ? OFFSET ?')
+        .all(limit, offset) as readonly ReceiptRow[];
+    }
 
     const receipts = rows.map((row) => receiptRowToDto(row));
 
     return reply.code(200).send({
       ok: true,
-      receipts,
-      total,
-      page,
-      limit,
+      data: {
+        receipts,
+        total,
+        limit,
+        offset,
+      },
     });
   });
 
   // -----------------------------------------------------------------------
   // GET /receipts/:id — single receipt with manifest + latest verification
+  //
+  // 路径参数由 ReceiptIdParamsSchema（fastify/ajv）验证（id 非空，长度 <=128）。
+  // 资源不存在 → 抛 notFound（ApiError 404）→ error_handler 转 RFC 7807。
   // -----------------------------------------------------------------------
-  app.get('/receipts/:id', async (request, reply) => {
+  app.get('/receipts/:id', { schema: receiptDetailRouteSchema }, async (request, reply) => {
     const params = request.params as { id: string };
     const row = db.prepare('SELECT * FROM v2_receipts WHERE id = ?').get(params.id) as ReceiptRow | undefined;
 
     if (row === undefined) {
-      return reply.code(404).send({
-        ok: false,
-        error: `Receipt not found: ${params.id}`,
-      });
+      throw notFound('Receipt', params.id);
     }
 
     const members = db
@@ -249,37 +218,39 @@ export async function registerV2ReceiptPersistRoutes(
 
     return reply.code(200).send({
       ok: true,
-      receipt: receiptRowToDto(row),
-      manifestMembers: members.map((m) => ({
-        kind: m.kind,
-        digest: m.digest,
-        sizeBytes: m.size_bytes,
-      })),
-      latestVerification: latestVerification !== undefined
-        ? {
-            id: latestVerification.id,
-            receiptId: latestVerification.receipt_id,
-            policyId: latestVerification.policy_id,
-            evaluatedAt: latestVerification.evaluated_at,
-            result: JSON.parse(latestVerification.result_json),
-            allPass: latestVerification.all_pass === 1,
-          }
-        : null,
+      data: {
+        receipt: receiptRowToDto(row),
+        manifestMembers: members.map((m) => ({
+          kind: m.kind,
+          digest: m.digest,
+          sizeBytes: m.size_bytes,
+        })),
+        latestVerification: latestVerification !== undefined
+          ? {
+              id: latestVerification.id,
+              receiptId: latestVerification.receipt_id,
+              policyId: latestVerification.policy_id,
+              evaluatedAt: latestVerification.evaluated_at,
+              result: JSON.parse(latestVerification.result_json),
+              allPass: latestVerification.all_pass === 1,
+            }
+          : null,
+      },
     });
   });
 
   // -----------------------------------------------------------------------
   // GET /receipts/:id/verify — run V2 six-dimension verification
+  //
+  // 资源不存在 → 抛 notFound（ApiError 404）→ error_handler 转 RFC 7807。
+  // 验证逻辑（runV2ReceiptVerification）与持久化逻辑不动（trust-kernel 边界）。
   // -----------------------------------------------------------------------
-  app.get('/receipts/:id/verify', async (request, reply) => {
+  app.get('/receipts/:id/verify', { schema: reVerifyRouteSchema }, async (request, reply) => {
     const params = request.params as { id: string };
     const row = db.prepare('SELECT * FROM v2_receipts WHERE id = ?').get(params.id) as ReceiptRow | undefined;
 
     if (row === undefined) {
-      return reply.code(404).send({
-        ok: false,
-        error: `Receipt not found: ${params.id}`,
-      });
+      throw notFound('Receipt', params.id);
     }
 
     const memberRows = db
@@ -326,9 +297,11 @@ export async function registerV2ReceiptPersistRoutes(
 
     return reply.code(200).send({
       ok: true,
-      verification: result,
-      display,
-      allPass,
+      data: {
+        verification: result,
+        display,
+        allPass,
+      },
     });
   });
 }

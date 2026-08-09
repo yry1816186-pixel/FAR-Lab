@@ -101,7 +101,7 @@ beforeAll(async () => {
     domainDistribution: { 天文学: 2, 生态气候: 1 },
     gitCommitSha: null,
     honestyNotes: [
-      '本榜 verdict 由 offline fixture 产出（非真实科学裁决）。',
+      '本榜 verdict 由离线参考数据产出（非真实科学裁决）。',
       '展示工程完整性广度，非科学结论排名。',
       'suiteIntegrityRoot 确定可复现（CI golden 锚）。',
     ],
@@ -112,7 +112,7 @@ function mockBenchmarkOk() {
   vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
     const url = input.toString();
     if (url.endsWith('/benchmark')) {
-      return new Response(JSON.stringify(MOCK_REPORT), {
+      return new Response(JSON.stringify({ ok: true, data: MOCK_REPORT }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -190,7 +190,7 @@ describe('LeaderboardPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('honesty-wall')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('honesty-note-0')).toHaveTextContent('fixture');
+    expect(screen.getByTestId('honesty-note-0')).toHaveTextContent('离线参考数据');
     expect(screen.getByTestId('honesty-note-1')).toHaveTextContent('非科学结论排名');
   });
 

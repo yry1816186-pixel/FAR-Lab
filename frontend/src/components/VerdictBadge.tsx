@@ -86,18 +86,23 @@ export const FALLBACK_VERDICT_COLOR: Pick<VerdictVisualConfig, 'fill' | 'stroke'
 
 // ---------- Badge 样式 ----------
 
-/** Badge variant 映射（DEGRADED_SCOPE 使用自定义橙色覆写） */
+/**
+ * Badge variant 映射。
+ * AA 合规:confirmed/refuted/degraded 使用 `*-solid` 深色阶 + 白字(对比度 ≥4.5:1);
+ * inconclusive 为黄底 + 深字(黄+白不达标,故用深字);untested 为 outline 透明底。
+ * vivid `--verdict-*` token 仅用于 icon/border/D3,不用于 badge 文字底,避免饱和色+白字失败。
+ */
 export function verdictBadgeClass(decision: VerdictValue): string {
   const base = 'border-transparent text-white';
   switch (decision) {
     case 'CONFIRMED':
-      return cn(base, 'bg-verdict-confirmed');
+      return cn(base, 'bg-verdict-confirmed-solid');
     case 'REFUTED':
-      return cn(base, 'bg-verdict-refuted');
+      return cn(base, 'bg-verdict-refuted-solid');
     case 'INCONCLUSIVE':
       return cn(base, 'bg-verdict-inconclusive text-verdict-inconclusive-foreground');
     case 'DEGRADED_SCOPE':
-      return cn(base, 'bg-verdict-degraded');
+      return cn(base, 'bg-verdict-degraded-solid');
     case 'UNTESTED':
       return 'text-foreground';
   }

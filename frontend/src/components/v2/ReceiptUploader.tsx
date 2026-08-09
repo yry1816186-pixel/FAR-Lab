@@ -2,51 +2,43 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, FileJson, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useVerifyEnvelope } from '@/lib/api_client';
+import { useT } from '@/lib/i18n';
+import type { V2VerificationResult } from '@/lib/types';
 
 // ---------- Types ----------
 
-export interface AssuranceDimensionResult {
-  dimension: string;
-  outcome: 'PASS' | 'FAIL' | 'WARN' | 'SKIP' | 'NOT_APPLICABLE';
-  reasonCodes: string[];
-  detail: string;
-}
-
-export interface VerificationResult {
-  resultVersion: number;
-  resultId: string;
-  receiptId: string;
-  verificationPolicyId: string;
-  evaluatedAt: string;
-  dimensions: Record<string, AssuranceDimensionResult>;
-  receiptStanding: string;
-  preservationStatus: string;
-  reviewSummary: string;
-}
+/**
+ * 向后兼容别名:V2ReceiptPage 仍 `import { type VerificationResult }`。
+ * SSOT 是 types.ts 的 V2VerificationResult。
+ */
+export type VerificationResult = V2VerificationResult;
 
 interface ReceiptUploaderProps {
-  onVerified: (result: VerificationResult) => void;
+  readonly onVerified: (result: V2VerificationResult) => void;
 }
 
 // ---------- Component ----------
 
 export function ReceiptUploader({ onVerified }: ReceiptUploaderProps) {
+  const t = useT();
   const [jsonText, setJsonText] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // 审计 P1-5：卸载时中止 in-flight verify 请求（防 setState-on-unmounted + 拖尾连接占用）。
-  const verifyAbortRef = useRef<AbortController | null>(null);
+  // 卸载守卫:mutation promise resolve 时若已卸载,跳过 onVerified(setState-on-unmounted)。
+  // fetchJson 内置 60s 超时,无需额外 AbortController;卸载守卫防延迟回调污染已卸载组件。
+  const mountedRef = useRef(true);
+  const verifyEnvelope = useVerifyEnvelope();
 
   useEffect(
-    () => () => {
-      verifyAbortRef.current?.abort();
+    () => {
+      mountedRef.current = true;
+      return () => {
+        mountedRef.current = false;
+      };
     },
     [],
   );
-
-  const API_BASE_URL =
-    (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:3000';
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,17 +51,17 @@ export function ReceiptUploader({ onVerified }: ReceiptUploaderProps) {
         setJsonText(text);
       };
       reader.onerror = () => {
-        setError('Failed to read file');
+        setError(t('receiptUploader.errorReadFile'));
       };
       reader.readAsText(file);
     },
-    [],
+    [t],
   );
 
   const handleVerify = useCallback(async () => {
     const trimmed = jsonText.trim();
     if (trimmed.length === 0) {
-      setError('Paste or upload an envelope JSON first.');
+      setError(t('receiptUploader.errorEmpty'));
       return;
     }
 
@@ -78,45 +70,43 @@ export function ReceiptUploader({ onVerified }: ReceiptUploaderProps) {
     try {
       parsed = JSON.parse(trimmed);
     } catch {
-      setError('Invalid JSON — please check syntax.');
+      setError(t('receiptUploader.errorInvalidJson'));
       return;
     }
 
     if (typeof parsed !== 'object' || parsed === null) {
-      setError('JSON must be an object (envelope).');
+      setError(t('receiptUploader.errorNotObject'));
       return;
     }
 
-    setLoading(true);
     setError(null);
-    const controller = new AbortController();
-    verifyAbortRef.current = controller;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v2/receipts/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: trimmed,
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        const body = await response.text().catch(() => '');
-        throw new Error(`API returned ${response.status}: ${body}`);
+      // 走统一 fetchJson(60s 超时 + ApiError 解析)+ parseV2Response 边界解码
+      // (R-06 · counter-case 2/3):{ ok: true, data: T } 信封校验 + zod 运行时 parse。
+      // zod parse 已保证 data.verification 存在且结构正确;下方防御性检查为 defense-in-depth。
+      const data = await verifyEnvelope.mutateAsync(trimmed);
+      // defense-in-depth:zod parse 理论上已拦截,但保留防御以应对极端契约漂移。
+      if (data.verification === undefined) {
+        throw new Error('Verification response missing `verification` field');
       }
-      const result = (await response.json()) as VerificationResult;
-      onVerified(result);
+      if (mountedRef.current) {
+        onVerified(data.verification);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Verification request failed');
-    } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setError(e instanceof Error ? e.message : t('receiptUploader.errorRequestFailed'));
+      }
     }
-  }, [jsonText, onVerified, API_BASE_URL]);
+  }, [jsonText, onVerified, verifyEnvelope, t]);
+
+  const loading = verifyEnvelope.isPending;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Upload className="w-5 h-5" />
-          Upload Envelope
+          {t('receiptUploader.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -135,17 +125,17 @@ export function ReceiptUploader({ onVerified }: ReceiptUploaderProps) {
             onClick={() => fileInputRef.current?.click()}
           >
             <FileJson className="w-4 h-4" />
-            Choose .json file
+            {t('receiptUploader.chooseFile')}
           </Button>
           <span className="text-xs text-muted-foreground">
-            or paste JSON below
+            {t('receiptUploader.orPaste')}
           </span>
         </div>
 
         {/* Textarea */}
         <textarea
           className="w-full rounded-md border bg-muted/50 p-3 text-sm font-mono resize-y min-h-[120px] focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder='Paste envelope JSON here…'
+          placeholder={t('receiptUploader.placeholder')}
           value={jsonText}
           onChange={(e) => setJsonText(e.target.value)}
           rows={6}
@@ -164,10 +154,10 @@ export function ReceiptUploader({ onVerified }: ReceiptUploaderProps) {
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Verifying…
+              {t('receiptUploader.verifying')}
             </>
           ) : (
-            'Verify Envelope'
+            t('receiptUploader.verify')
           )}
         </Button>
       </CardContent>

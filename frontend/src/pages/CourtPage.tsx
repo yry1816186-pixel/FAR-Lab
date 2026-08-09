@@ -16,6 +16,7 @@
  */
 
 import { useCourtDemo } from '@/lib/api_client';
+import { useT } from '@/lib/i18n';
 import type { VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -41,10 +42,10 @@ const FIVE_VERDICTS = new Set<string>([
   'UNTESTED',
 ]);
 
-const AGREEMENT_LABEL: Record<string, string> = {
-  unanimous: 'Unanimous',
-  majority: 'Majority',
-  split: 'Split',
+const AGREEMENT_LABEL: Record<string, 'court.agreement.unanimous' | 'court.agreement.majority' | 'court.agreement.split'> = {
+  unanimous: 'court.agreement.unanimous',
+  majority: 'court.agreement.majority',
+  split: 'court.agreement.split',
 };
 
 const AGREEMENT_VARIANT: Record<string, 'default' | 'secondary' | 'destructive'> = {
@@ -58,6 +59,7 @@ function isVerdictValue(v: string): v is VerdictValue {
 }
 
 export default function CourtPage() {
+  const t = useT();
   const { data: cert, isLoading, isError, error } = useCourtDemo();
 
   if (isLoading) {
@@ -77,13 +79,13 @@ export default function CourtPage() {
     return (
       <div className="space-y-8">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight">Cross-Model Reliability Court</h1>
-          <p className="mt-1 text-muted-foreground">Cross-Model Reliability Court · FI-3</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('court.title')}</h1>
+          <p className="mt-1 text-muted-foreground">{t('court.subtitle')}</p>
         </header>
         <Alert variant="destructive">
-          <AlertTitle>Court session failed</AlertTitle>
+          <AlertTitle>{t('court.errorTitle')}</AlertTitle>
           <AlertDescription>
-            {error instanceof Error ? error.message : 'Unknown error'}
+            {error instanceof Error ? error.message : t('arena.noVerdict')}
           </AlertDescription>
         </Alert>
       </div>
@@ -95,10 +97,10 @@ export default function CourtPage() {
       <header>
         <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
           <Gavel className="h-7 w-7" aria-hidden="true" />
-          Cross-Model Reliability Court
+          {t('court.title')}
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Cross-Model Reliability Court · run the same claim across multiple models, detect agreement/disagreement, and issue a ReliabilityCertificate
+          {t('court.subtitle2')}
         </p>
       </header>
 
@@ -107,21 +109,24 @@ export default function CourtPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" aria-hidden="true" />
-            Agreement
+            {t('court.agreementTitle')}
           </CardTitle>
           <CardDescription>
-            claim: {cert.claim}
+            {t('court.claim', { claim: cert.claim })}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4">
           <Badge variant={AGREEMENT_VARIANT[cert.agreement] ?? 'default'} className="text-base">
-            {AGREEMENT_LABEL[cert.agreement] ?? cert.agreement}
+            {t(AGREEMENT_LABEL[cert.agreement] ?? 'court.agreement.unanimous')}
           </Badge>
           <span className="text-sm text-muted-foreground">
-            {cert.modelCount} models · distinct verdicts: {cert.distinctVerdicts.join(' / ')}
+            {t('court.models', {
+              n: cert.modelCount,
+              verdicts: cert.distinctVerdicts.join(' / '),
+            })}
           </span>
           <span className="text-sm text-muted-foreground">
-            Certificate: <code className="rounded bg-muted px-1.5 py-0.5">{cert.certificateId}</code>
+            {t('court.certificate')} <code className="rounded bg-muted px-1.5 py-0.5">{cert.certificateId}</code>
           </span>
         </CardContent>
       </Card>
@@ -129,17 +134,17 @@ export default function CourtPage() {
       {/* ModelVerdictTable */}
       <Card>
         <CardHeader>
-          <CardTitle>Per-model verdicts</CardTitle>
-          <CardDescription>Each model independently runs the same claim; the verdict is given by the deterministic R0-R9 kernel (the LLM is not the adjudicator)</CardDescription>
+          <CardTitle>{t('court.tableTitle')}</CardTitle>
+          <CardDescription>{t('court.tableDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Model</TableHead>
-                <TableHead>Verdict</TableHead>
-                <TableHead>Decisive rule</TableHead>
-                <TableHead>Chain head</TableHead>
+                <TableHead>{t('court.col.model')}</TableHead>
+                <TableHead>{t('court.col.verdict')}</TableHead>
+                <TableHead>{t('court.col.rule')}</TableHead>
+                <TableHead>{t('court.col.chainHead')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -150,7 +155,7 @@ export default function CourtPage() {
                     {v.verdict !== null && isVerdictValue(v.verdict) ? (
                       <VerdictBadge decision={v.verdict} size="sm" />
                     ) : (
-                      <Badge variant="destructive">Error</Badge>
+                      <Badge variant="destructive">{t('arena.noVerdict')}</Badge>
                     )}
                   </TableCell>
                   <TableCell>
@@ -179,12 +184,11 @@ export default function CourtPage() {
       {/* HonestyAlert */}
       <Alert>
         <ShieldAlert className="h-4 w-4" aria-hidden="true" />
-        <AlertTitle className="flex items-center gap-2">Honesty statement <IntegrityBadge source={cert.datasetSource} /></AlertTitle>
+        <AlertTitle className="flex items-center gap-2">{t('court.honestyTitle')} <IntegrityBadge source={cert.datasetSource} /></AlertTitle>
         <AlertDescription>
           <p>{cert.honestNote}</p>
           <p className="mt-2">
-            <strong>Red line</strong>: each model's verdict is given by the deterministic R0-R9 kernel; the LLM is not the adjudicator.
-            Real multi-model disagreement requires <code className="rounded bg-muted px-1">far court --models</code> to connect a real provider (credential gate).
+            <strong>{t('court.redLine')}</strong>
           </p>
         </AlertDescription>
       </Alert>

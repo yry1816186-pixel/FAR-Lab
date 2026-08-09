@@ -37,8 +37,24 @@ import type {
   ReadyResponse,
   ReportResponse,
   ReproReceipt,
+  V2DemoReceiptResponse,
+  V2PersistReceiptRequest,
+  V2PersistReceiptResponse,
+  V2ReceiptDetailResponse,
+  V2ReceiptListResponse,
+  V2VerifyByIdResponse,
+  V2VerifyEnvelopeResponse,
   VerdictListResponse,
 } from './types';
+import type { ZodType } from 'zod';
+import {
+  CreateReceiptDataSchema,
+  DemoReceiptDataSchema,
+  ReceiptDetailDataSchema,
+  ReceiptListDataSchema,
+  ReVerifyDataSchema,
+  VerifyEnvelopeDataSchema,
+} from './schemas/v2_receipts';
 
 // ---------- Structured API error ----------
 
@@ -120,13 +136,58 @@ async function throwForStatus(response: Response, url: string): Promise<never> {
 }
 
 /**
+ * 构造 API URL：以 baseUrl 为基准，正确合并其 origin/pathname 前缀与自带 query，
+ * 再追加 path 段与业务 query 参数。
+ *
+ * 解决 `${baseUrl}${path}` 字符串拼接的退化：
+ * 1. baseUrl 含 query（如 `?token=abc`）时，path 会被吞入 query string；
+ * 2. 业务参数需手工拼 `?` 与 `&`，易产生 `??` 或漏 `?`。
+ *
+ * 优先级（从低到高）：baseUrl 自带 query < path 内 query < extraParams。
+ * base 的 pathname 前缀会被保留（去尾斜杠避免双斜杠）。
+ *
+ * @param baseUrl API 基址，可含 pathname 前缀与 query 参数
+ * @param path API 路径，可含 query string（如 `/api/v1/verdict?limit=100`）
+ * @param extraParams 业务参数，优先级最高（覆盖同名参数）
+ */
+function composeApiUrl(
+  baseUrl: string,
+  path: string,
+  extraParams?: Record<string, string>,
+): string {
+  const base = new URL(baseUrl);
+  const basePath = base.pathname.replace(/\/+$/, '');
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  // 拼成完整字符串后整体解析：path 内的 query 会自动分离到 url.searchParams
+  const url = new URL(`${base.origin}${basePath}${normalizedPath}`);
+  // base 自带 query 以"不覆盖"语义合并（path 的同名参数优先于 base）
+  base.searchParams.forEach((value, key) => {
+    if (!url.searchParams.has(key)) {
+      url.searchParams.set(key, value);
+    }
+  });
+  // extraParams 优先级最高
+  if (extraParams) {
+    for (const [key, value] of Object.entries(extraParams)) {
+      url.searchParams.set(key, value);
+    }
+  }
+  return url.href;
+}
+
+/** 构造 API URL：以 API_BASE_URL 为基准。 */
+export function buildApiUrl(path: string, extraParams?: Record<string, string>): string {
+  return composeApiUrl(API_BASE_URL, path, extraParams);
+}
+
+/**
  * fetch + 超时中止（审计 P1-5：无 AbortController 时拖尾请求可无限挂起）。
  * 默认 60s——与后端 LLM 单次调用超时对齐；超时抛 DOMException AbortError（调用方可按需捕获）。
  */
 const FETCH_TIMEOUT_MS = 60_000;
 
 async function fetchJson<T>(path: string, init?: RequestInit, timeoutMs: number = FETCH_TIMEOUT_MS): Promise<T> {
-  const url = `${API_BASE_URL}${path}`;
+  const url = buildApiUrl(path);
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -149,7 +210,7 @@ async function fetchJson<T>(path: string, init?: RequestInit, timeoutMs: number 
 
 /** Fetch a non-JSON body (e.g. the GET /report HTML response, Epic K-05b). */
 async function fetchText(path: string, init?: RequestInit, timeoutMs: number = FETCH_TIMEOUT_MS): Promise<string> {
-  const url = `${API_BASE_URL}${path}`;
+  const url = buildApiUrl(path);
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -161,6 +222,113 @@ async function fetchText(path: string, init?: RequestInit, timeoutMs: number = F
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+/**
+ * V2 receipts 端点边界解码器:校验统一信封 { ok: true, data: T } + zod parse data
+ * (engineering-taste Axis 1 · decode-once-at-boundary · counter-case 2/3)。
+ *
+ * 后端 R-05 已统一所有 v2_receipts 端点为 { ok: true, data: T } 信封 + RFC 7807 错误。
+ * 旧的 unwrapV2Response 平铺回退分支已删除(counter-case 2:死代码清理)——
+ * 后端不再返回 { ok: true, ...fields } 平铺形态,保留回退只会掩盖契约漂移。
+ *
+ * 此函数在边界做运行时 zod parse(counter-case 3),消除"TS <T> 类型断言
+ * 无运行时校验"的 ReceiptUploader bug 模式。parse 失败抛 ApiError
+ * (RESPONSE_SCHEMA_MISMATCH),携带端点名 + zod issue 摘要,便于前端展示
+ * 专业化错误信息(R-07:错误代码 + 文档链接)。
+ *
+ * @param dataSchema  data 字段的 zod schema(来自 schemas/v2_receipts.ts)
+ * @param raw         fetchJson 返回的原始 JSON(unknown)
+ * @param endpoint    端点标识(错误信息用,如 "GET /receipts/demo")
+ * @returns           zod parse 后的 data(类型安全)
+ */
+function parseV2Response<T>(
+  dataSchema: ZodType<T>,
+  raw: unknown,
+  endpoint: string,
+): T {
+  // 1. 信封结构校验
+  if (typeof raw !== 'object' || raw === null) {
+    throw new ApiError(
+      502,
+      `Verification service returned a non-object response from ${endpoint}.`,
+      'RESPONSE_SCHEMA_MISMATCH',
+    );
+  }
+  const obj = raw as Record<string, unknown>;
+
+  // 2. ok 字段校验(必须是字面量 true;失败响应由 throwForStatus 在非 2xx 时处理)
+  if (obj.ok !== true) {
+    throw new ApiError(
+      502,
+      `Verification service response from ${endpoint} is missing the success envelope (ok: true).`,
+      'RESPONSE_SCHEMA_MISMATCH',
+    );
+  }
+
+  // 3. data 字段校验(必须存在且为对象)
+  if (typeof obj.data !== 'object' || obj.data === null) {
+    throw new ApiError(
+      502,
+      `Verification service response from ${endpoint} is missing the data payload.`,
+      'RESPONSE_SCHEMA_MISMATCH',
+    );
+  }
+
+  // 4. zod parse data(运行时契约校验)
+  const result = dataSchema.safeParse(obj.data);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `${i.path.length > 0 ? i.path.join('.') : '(root)'}: ${i.message}`)
+      .join('; ');
+    throw new ApiError(
+      502,
+      `Verification service response from ${endpoint} does not match the expected schema: ${issues}`,
+      'RESPONSE_SCHEMA_MISMATCH',
+      null,
+      { issues: result.error.issues, endpoint },
+    );
+  }
+
+  return result.data;
+}
+
+/**
+ * V1 端点边界解码器（P1-3 契约统一收尾）：解包统一信封 { ok: true, data: T }。
+ *
+ * 后端 server.ts v1 子应用 onSend hook 已统一 v1 成功响应为
+ * { ok: true, data: T }（R-05 收尾；错误响应仍为 RFC 7807，非 2xx 由
+ * throwForStatus 处理）。此函数在边界做信封校验，保持 v2 同构：
+ * 结构非法 → 抛 ApiError（RESPONSE_SCHEMA_MISMATCH），不静默透传。
+ *
+ * @param raw      fetchJson 返回的原始 JSON（应为 { ok: true, data: T }）
+ * @param endpoint 端点标识（错误信息用，如 "GET /evidence/chain/:headHash"）
+ * @returns        信封内的 data
+ */
+function parseV1Response<T>(raw: unknown, endpoint: string): T {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new ApiError(
+      502,
+      `Service returned a non-object response from ${endpoint}.`,
+      'RESPONSE_SCHEMA_MISMATCH',
+    );
+  }
+  const obj = raw as Record<string, unknown>;
+  if (obj.ok !== true) {
+    throw new ApiError(
+      502,
+      `Service response from ${endpoint} is missing the success envelope (ok: true).`,
+      'RESPONSE_SCHEMA_MISMATCH',
+    );
+  }
+  if (obj.data === undefined) {
+    throw new ApiError(
+      502,
+      `Service response from ${endpoint} is missing the data payload.`,
+      'RESPONSE_SCHEMA_MISMATCH',
+    );
+  }
+  return obj.data as T;
 }
 
 // ---------- Query keys ----------
@@ -180,6 +348,14 @@ export const queryKeys = {
   benchmark: ['benchmark'] as const,
   court: ['court'] as const,
   arena: ['arena'] as const,
+} as const;
+
+/** V2 receipts query keys。 */
+export const v2QueryKeys = {
+  demo: ['v2', 'receipts', 'demo'] as const,
+  list: (limit: number, offset: number, claimId?: string) =>
+    ['v2', 'receipts', 'list', limit, offset, claimId ?? 'all'] as const,
+  detail: (receiptId: string) => ['v2', 'receipts', 'detail', receiptId] as const,
 } as const;
 
 // ---------- Probes (bare root, no /api/v1 prefix — spec 24 §0#3) ----------
@@ -217,7 +393,11 @@ export function useEvidence(
 ) {
   return useQuery<EvidenceResponse, Error>({
     queryKey: queryKeys.evidence(evidenceId),
-    queryFn: () => fetchJson<EvidenceResponse>(`/api/v1/evidence/${encodeURIComponent(evidenceId)}`),
+    queryFn: async () =>
+      parseV1Response<EvidenceResponse>(
+        await fetchJson<unknown>(`/api/v1/evidence/${encodeURIComponent(evidenceId)}`),
+        'GET /evidence/:id',
+      ),
     enabled: evidenceId.length > 0,
     ...options,
   });
@@ -230,8 +410,11 @@ export function useEvidenceChain(
 ) {
   return useQuery<EvidenceChainResponse, Error>({
     queryKey: queryKeys.evidenceChain(headHash),
-    queryFn: () =>
-      fetchJson<EvidenceChainResponse>(`/api/v1/evidence/chain/${encodeURIComponent(headHash)}`),
+    queryFn: async () =>
+      parseV1Response<EvidenceChainResponse>(
+        await fetchJson<unknown>(`/api/v1/evidence/chain/${encodeURIComponent(headHash)}`),
+        'GET /evidence/chain/:headHash',
+      ),
     enabled: headHash.length > 0,
     ...options,
   });
@@ -247,8 +430,11 @@ export function useVerdictByHypothesis(
 ) {
   return useQuery<HonestVerdictDto, Error>({
     queryKey: queryKeys.verdictByHypothesis(hypoId),
-    queryFn: () =>
-      fetchJson<HonestVerdictDto>(`/api/v1/verdict/by_hypothesis/${encodeURIComponent(hypoId)}`),
+    queryFn: async () =>
+      parseV1Response<HonestVerdictDto>(
+        await fetchJson<unknown>(`/api/v1/verdict/by_hypothesis/${encodeURIComponent(hypoId)}`),
+        'GET /verdict/by_hypothesis/:hypoId',
+      ),
     enabled: hypoId.length > 0,
     ...options,
   });
@@ -261,7 +447,11 @@ export function useVerdict(
 ) {
   return useQuery<HonestVerdictDto, Error>({
     queryKey: queryKeys.verdict(verdictId),
-    queryFn: () => fetchJson<HonestVerdictDto>(`/api/v1/verdict/${encodeURIComponent(verdictId)}`),
+    queryFn: async () =>
+      parseV1Response<HonestVerdictDto>(
+        await fetchJson<unknown>(`/api/v1/verdict/${encodeURIComponent(verdictId)}`),
+        'GET /verdict/:id',
+      ),
     enabled: verdictId.length > 0,
     ...options,
   });
@@ -275,8 +465,11 @@ export function useVerdictList(
 ) {
   return useQuery<VerdictListResponse, Error>({
     queryKey: queryKeys.verdictList(limit, offset),
-    queryFn: () =>
-      fetchJson<VerdictListResponse>(`/api/v1/verdict?limit=${limit}&offset=${offset}`),
+    queryFn: async () =>
+      parseV1Response<VerdictListResponse>(
+        await fetchJson<unknown>(`/api/v1/verdict?limit=${limit}&offset=${offset}`),
+        'GET /verdict',
+      ),
     ...options,
   });
 }
@@ -308,7 +501,11 @@ export function useIntegrityRoot(
 ) {
   return useQuery<IntegrityRootDto, Error>({
     queryKey: queryKeys.integrityRoot,
-    queryFn: () => fetchJson<IntegrityRootDto>('/api/v1/integrity/root'),
+    queryFn: async () =>
+      parseV1Response<IntegrityRootDto>(
+        await fetchJson<unknown>('/api/v1/integrity/root'),
+        'GET /integrity/root',
+      ),
     ...options,
   });
 }
@@ -324,7 +521,11 @@ export function useIntegrityProof(
 ) {
   return useQuery<IntegrityProofDto, Error>({
     queryKey: queryKeys.integrityProof(seq),
-    queryFn: () => fetchJson<IntegrityProofDto>(`/api/v1/integrity/proof/${seq}`),
+    queryFn: async () =>
+      parseV1Response<IntegrityProofDto>(
+        await fetchJson<unknown>(`/api/v1/integrity/proof/${seq}`),
+        'GET /integrity/proof/:seq',
+      ),
     enabled: Number.isInteger(seq) && seq > 0,
     ...options,
   });
@@ -339,7 +540,11 @@ export function useReproReceipt(
 ) {
   return useQuery<ReproReceipt, Error>({
     queryKey: queryKeys.reproReceipt,
-    queryFn: () => fetchJson<ReproReceipt>('/api/v1/integrity/receipt'),
+    queryFn: async () =>
+      parseV1Response<ReproReceipt>(
+        await fetchJson<unknown>('/api/v1/integrity/receipt'),
+        'GET /integrity/receipt',
+      ),
     ...options,
   });
 }
@@ -354,7 +559,11 @@ export function useBenchmark(
 ) {
   return useQuery<BenchmarkReportDto, Error>({
     queryKey: queryKeys.benchmark,
-    queryFn: () => fetchJson<BenchmarkReportDto>('/api/v1/benchmark'),
+    queryFn: async () =>
+      parseV1Response<BenchmarkReportDto>(
+        await fetchJson<unknown>('/api/v1/benchmark'),
+        'GET /benchmark',
+      ),
     ...options,
   });
 }
@@ -365,7 +574,11 @@ export function useArenaDemo(
 ) {
   return useQuery<ArenaResultDto, Error>({
     queryKey: queryKeys.arena,
-    queryFn: () => fetchJson<ArenaResultDto>('/api/v1/arena/demo'),
+    queryFn: async () =>
+      parseV1Response<ArenaResultDto>(
+        await fetchJson<unknown>('/api/v1/arena/demo'),
+        'GET /arena/demo',
+      ),
     ...options,
   });
 }
@@ -376,7 +589,11 @@ export function useCourtDemo(
 ) {
   return useQuery<CourtCertificateDto, Error>({
     queryKey: queryKeys.court,
-    queryFn: () => fetchJson<CourtCertificateDto>('/api/v1/court/demo'),
+    queryFn: async () =>
+      parseV1Response<CourtCertificateDto>(
+        await fetchJson<unknown>('/api/v1/court/demo'),
+        'GET /court/demo',
+      ),
     ...options,
   });
 }
@@ -401,12 +618,15 @@ function hypothesizeIdempotencyKey(body: HypothesizeRequest): string {
 export function useHypothesize() {
   const queryClient = useQueryClient();
   return useMutation<HypothesizeResponse, Error, HypothesizeRequest>({
-    mutationFn: (body: HypothesizeRequest) => {
+    mutationFn: async (body: HypothesizeRequest) => {
       const idempotencyKey = hypothesizeIdempotencyKey(body);
-      return fetchJson<HypothesizeResponse>('/api/v1/hypothesize', {
-        method: 'POST',
-        body: JSON.stringify({ ...body, idempotencyKey }),
-      });
+      return parseV1Response<HypothesizeResponse>(
+        await fetchJson<unknown>('/api/v1/hypothesize', {
+          method: 'POST',
+          body: JSON.stringify({ ...body, idempotencyKey }),
+        }),
+        'POST /hypothesize',
+      );
     },
     onSuccess: (data) => {
       // `data.honestVerdict` is the raw VerdictNode shape (parentVerdictId/verdict/replayProver),
@@ -416,6 +636,113 @@ export function useHypothesize() {
       // Invalidate verdict list so the honesty wall picks up new verdicts.
       void queryClient.invalidateQueries({ queryKey: ['verdict', 'list'] });
       void data;
+    },
+  });
+}
+
+// ---------- V2 Receipts (spec doc19 §5) ----------
+//
+// 所有 v2_receipts 端点经 parseV2Response 在边界做信封校验 + zod parse
+// (counter-case 2/3:删除平铺回退死代码 + 运行时 zod 校验落地)。
+// 应然契约(后端 R-05 已统一):
+//   GET  /receipts/demo      → { ok: true, data: { receipt, verification } }
+//   GET  /receipts (list)    → { ok: true, data: { receipts, total, limit, offset } }
+//   GET  /receipts/:id       → { ok: true, data: { receipt, manifestMembers, latestVerification } }
+//   POST /receipts/verify    → { ok: true, data: { verification, display } }
+//   POST /receipts           → { ok: true, data: { receiptId, idempotent } }
+//   GET  /receipts/:id/verify → { ok: true, data: { verification, display, allPass } }
+
+/** GET /api/v2/receipts/demo — 示例收据验证结果(示例数据,非用户持久化)。 */
+export function useDemoReceipt(
+  options?: Omit<UseQueryOptions<V2DemoReceiptResponse, Error>, 'queryKey' | 'queryFn'>,
+) {
+  return useQuery<V2DemoReceiptResponse, Error>({
+    queryKey: v2QueryKeys.demo,
+    queryFn: async () => {
+      const raw = await fetchJson<unknown>('/api/v2/receipts/demo');
+      return parseV2Response(DemoReceiptDataSchema, raw, 'GET /receipts/demo');
+    },
+    ...options,
+  });
+}
+
+/** GET /api/v2/receipts — 持久化收据分页列表(用户已保存的 receipts)。claimId 可选过滤(分享链接 runId)。 */
+export function useReceiptList(
+  limit = 20,
+  offset = 0,
+  claimId?: string,
+  options?: Omit<UseQueryOptions<V2ReceiptListResponse, Error>, 'queryKey' | 'queryFn'>,
+) {
+  return useQuery<V2ReceiptListResponse, Error>({
+    queryKey: v2QueryKeys.list(limit, offset, claimId),
+    queryFn: async () => {
+      const qs = claimId !== undefined ? `&claimId=${encodeURIComponent(claimId)}` : '';
+      const raw = await fetchJson<unknown>(`/api/v2/receipts?limit=${limit}&offset=${offset}${qs}`);
+      return parseV2Response(ReceiptListDataSchema, raw, 'GET /receipts');
+    },
+    ...options,
+  });
+}
+
+/** GET /api/v2/receipts/:id — 单收据详情 + manifest + 最新验证。 */
+export function useReceipt(
+  receiptId: string,
+  options?: Omit<UseQueryOptions<V2ReceiptDetailResponse, Error>, 'queryKey' | 'queryFn' | 'enabled'>,
+) {
+  return useQuery<V2ReceiptDetailResponse, Error>({
+    queryKey: v2QueryKeys.detail(receiptId),
+    queryFn: async () => {
+      const raw = await fetchJson<unknown>(`/api/v2/receipts/${encodeURIComponent(receiptId)}`);
+      return parseV2Response(ReceiptDetailDataSchema, raw, 'GET /receipts/:id');
+    },
+    enabled: receiptId.length > 0,
+    ...options,
+  });
+}
+
+/** POST /api/v2/receipts/verify — 验证 envelope,返回六维结果 + display。 */
+export function useVerifyEnvelope() {
+  return useMutation<V2VerifyEnvelopeResponse, Error, string>({
+    mutationFn: async (envelopeJson: string) => {
+      const raw = await fetchJson<unknown>('/api/v2/receipts/verify', {
+        method: 'POST',
+        body: envelopeJson,
+      });
+      return parseV2Response(VerifyEnvelopeDataSchema, raw, 'POST /receipts/verify');
+    },
+  });
+}
+
+/** POST /api/v2/receipts — 持久化收据(幂等 by proofHash)。成功后失效列表缓存。 */
+export function usePersistReceipt() {
+  const queryClient = useQueryClient();
+  return useMutation<V2PersistReceiptResponse, Error, V2PersistReceiptRequest>({
+    mutationFn: async (body: V2PersistReceiptRequest) => {
+      const raw = await fetchJson<unknown>('/api/v2/receipts', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      return parseV2Response(CreateReceiptDataSchema, raw, 'POST /receipts');
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'receipts', 'list'] });
+    },
+  });
+}
+
+/**
+ * GET /api/v2/receipts/:id/verify — UI 内复检(运行六维验证 + 持久化结果)。
+ *
+ * 后端返回 { ok: true, data: { verification, display, allPass } }。
+ * 前端只需要 verification(V2VerifyByIdResponse = V2VerificationResult),
+ * 从 data 中提取 verification 返回。zod parse 确保契约不漂移。
+ */
+export function useVerifyReceiptById() {
+  return useMutation<V2VerifyByIdResponse, Error, string>({
+    mutationFn: async (receiptId: string) => {
+      const raw = await fetchJson<unknown>(`/api/v2/receipts/${encodeURIComponent(receiptId)}/verify`);
+      const data = parseV2Response(ReVerifyDataSchema, raw, 'GET /receipts/:id/verify');
+      return data.verification as V2VerifyByIdResponse;
     },
   });
 }
@@ -467,17 +794,20 @@ export function useAgentEventStream(
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams();
+    // 业务参数通过 extraParams 传入，由 buildApiUrl 统一处理：
+    // ① API_BASE_URL 自带 query（如 token）会被保留合并；
+    // ② API_BASE_URL 的 pathname 前缀会被保留；
+    // ③ `?` 与 `&` 分隔符由 URL 实现管理，避免手工拼接退化。
+    const extraParams: Record<string, string> = {};
     if (runId !== undefined && runId.length > 0) {
-      params.set('runId', runId);
+      extraParams['runId'] = runId;
     }
     if (replay) {
-      params.set('replay', 'true');
+      extraParams['replay'] = 'true';
     }
-    const query = params.toString();
-    const url = `${API_BASE_URL}/api/v1/events/stream${query.length > 0 ? `?${query}` : ''}`;
+    const eventSourceUrl = buildApiUrl('/api/v1/events/stream', extraParams);
 
-    const es = new EventSource(url);
+    const es = new EventSource(eventSourceUrl);
     let active = true;
 
     const handleFrame = (evt: MessageEvent<string>): void => {
@@ -528,11 +858,95 @@ export function useAgentEventStream(
   };
 }
 
+// ---------- Planning gates (opencode planning methodology · /api/v1/planning/*) ----------
+
+export interface PlanningRiskSignals {
+  readonly readOnly: boolean;
+  readonly docOnly: boolean;
+  readonly boundedWrite: boolean;
+  readonly touchesTrustKernel: boolean;
+  readonly newCliOrApi: boolean;
+  readonly crossModule: boolean;
+  readonly destructive: boolean;
+  readonly irreversible: boolean;
+  readonly ambiguous: boolean;
+}
+
+export type PlanningRiskLevel = 'P0' | 'P1' | 'P2' | 'P3' | 'P4';
+
+export interface PlanningRiskResult {
+  readonly level: PlanningRiskLevel;
+  readonly reasons: readonly string[];
+}
+
+export interface PlanningViolation {
+  readonly stepId: string;
+  readonly code: string;
+  readonly message: string;
+}
+
+export interface PlanningPlanResult {
+  readonly ok: boolean;
+  readonly violations: readonly PlanningViolation[];
+  readonly executionOrder: readonly string[];
+}
+
+export interface PlanningSpecResult {
+  readonly ok: boolean;
+  readonly violations: readonly { readonly code: string; readonly message: string }[];
+}
+
+export type GateConclusion = 'DONE' | 'IMPLEMENTED_UNVERIFIED' | 'BLOCKED';
+
+export interface PlanningGateResult {
+  readonly conclusion: GateConclusion;
+  readonly passed: readonly string[];
+  readonly failed: readonly string[];
+  readonly notRun: readonly string[];
+  readonly rationale: string;
+}
+
+/** POST 一个 planning 端点（v1 信封 { ok: true, data } 由 parseV1Response 解包）。 */
+function postPlanning<T>(path: string, body: unknown): Promise<T> {
+  return fetchJson<unknown>(path, { method: 'POST', body: JSON.stringify(body) }).then((raw) =>
+    parseV1Response<T>(raw, `POST ${path}`),
+  );
+}
+
+/** POST /api/v1/planning/risk — P0-P4 确定性风险分级。 */
+export function usePlanningRisk() {
+  return useMutation<PlanningRiskResult, Error, PlanningRiskSignals>({
+    mutationFn: (signals) => postPlanning<PlanningRiskResult>('/api/v1/planning/risk', signals),
+  });
+}
+
+/** POST /api/v1/planning/plan — Plan DAG 校验（环/依赖/可验证 → 拓扑序）。 */
+export function usePlanningPlan() {
+  return useMutation<PlanningPlanResult, Error, unknown>({
+    mutationFn: (plan) => postPlanning<PlanningPlanResult>('/api/v1/planning/plan', plan),
+  });
+}
+
+/** POST /api/v1/planning/spec — Spec 可验证规格校验。 */
+export function usePlanningSpec() {
+  return useMutation<PlanningSpecResult, Error, unknown>({
+    mutationFn: (spec) => postPlanning<PlanningSpecResult>('/api/v1/planning/spec', spec),
+  });
+}
+
+/** POST /api/v1/planning/gate — 四步门函数验证报告。 */
+export function usePlanningGate() {
+  return useMutation<PlanningGateResult, Error, { items: readonly { id: string; name: string; command: string; expected: string }[]; results: Record<string, { status: 'pass' | 'fail' | 'not_run'; actual: string }> }>({
+    mutationFn: (body) => postPlanning<PlanningGateResult>('/api/v1/planning/gate', body),
+  });
+}
+
 // ---------- Exported internals (for unit tests) ----------
 
 export const __testables = {
   API_BASE_URL,
   ApiError,
+  composeApiUrl,
   fetchJson,
   fetchText,
   throwForStatus,

@@ -45,20 +45,20 @@ jobs:
     timeout-minutes: 45   # 质量门 + docker build/push + release 上传兜底
     steps:
       # a. checkout (fetch-depth: 0 — 保留完整历史用于 tag / changelog 校验)
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
 
       # b/c. setup node + pnpm（版本锁见 ci.yml 顶部注释·避免 pnpm9/10 漂移）+ python（跨语言轴）
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -89,6 +89,8 @@ jobs:
 
       # f. 全量质量门——确保 release 基于绿构建（typecheck + lint + test + Python 轴 + cross-lang）。
       #    开发门（depth-gate/zero-tolerance/coverage）不在此公开 release 门（本地 agent 跑）。
+      #    timeout 42min：2026-08-06 v1.1.0 首次 release run 失败根因 = 测试步骤 30min 超时
+      #    （CI 冷环境无 NODE_COMPILE_CACHE·本地 60s 不可比）——预算提升至 job 上限内最大值。
       - name: Full quality gate (typecheck + lint + test + py + cross-lang · release must be green)
         run: |
           pnpm typecheck
@@ -96,7 +98,7 @@ jobs:
           pnpm run test
           pnpm run test:py
           node --test tests/evidence_log/cross_lang_consistency.test.ts
-        timeout-minutes: 30
+        timeout-minutes: 42
 
       # g/h. 准备 release assets：install.sh + install.ps1 + SHA256SUMS
       - name: Stage install scripts + checksum
@@ -115,7 +117,7 @@ jobs:
           echo "image=ghcr.io/${owner}/far-lab" >> "$GITHUB_OUTPUT"
           echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
       - name: docker login ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -165,7 +167,7 @@ jobs:
 
       # 创建 GitHub Release（assets + checksum + docker digest + release notes）
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: FAR-Lab ${{ env.RELEASE_TAG }}

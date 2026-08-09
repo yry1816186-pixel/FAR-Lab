@@ -13,8 +13,11 @@ const badgeVariants = cva(
         destructive:
           'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
         outline: 'text-foreground',
-        success: 'border-transparent bg-emerald-500 text-white hover:bg-emerald-500/80',
-        warning: 'border-transparent bg-amber-500 text-white hover:bg-amber-500/80',
+        // success/warning 接入 verdict solid 深色阶(白字 WCAG AA ≥4.5:1),去硬编码 emerald/amber
+        success:
+          'border-transparent bg-verdict-confirmed-solid text-verdict-confirmed-foreground hover:bg-verdict-confirmed-solid/85',
+        warning:
+          'border-transparent bg-verdict-degraded-solid text-verdict-degraded-foreground hover:bg-verdict-degraded-solid/85',
       },
     },
     defaultVariants: { variant: 'default' },

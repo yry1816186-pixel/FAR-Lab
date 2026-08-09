@@ -84,9 +84,8 @@ frontend/
     │   ├── alert.tsx
     │   ├── dialog.tsx
     │   └── table.tsx
-    ├── pages/                  # 11 个路由页面（均 React.lazy 按需加载，除首页 eager）
+    ├── pages/                  # 10 个路由页面（均 React.lazy 按需加载）
     │   ├── OverviewPage.tsx    # 总览（三柱 + 运行命令 + 后端健康 + 最近裁决）
-    │   ├── DemoModePage.tsx    # 8 幕功能导览
     │   ├── VizPage.tsx         # 证据链 D3 力导向图（verdict 着色 + 节点侧栏详情）
     │   ├── IntegrityPage.tsx   # 整链 Merkle 根 + 包含证明 + Repro Receipt
     │   ├── LeaderboardPage.tsx # Science-125 广度榜

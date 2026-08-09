@@ -28,7 +28,7 @@ test('GET /arena/demo: 返回 ArenaResult（proponent + 3 refuter · robust · o
   try {
     const res = await app.inject({ method: 'GET', url: '/api/v1/arena/demo' });
     assert.equal(res.statusCode, 200);
-    const body = JSON.parse(res.body);
+    const body = JSON.parse(res.body).data;
     assert.match(body.arenaId, /^01/); // ULID
     assert.equal(typeof body.originalVerdict, 'string'); // offline_replay 必有原始裁决
     assert.equal(Array.isArray(body.attempts), true);
@@ -52,7 +52,7 @@ test('GET /arena/demo: 第二次请求命中缓存（同 arenaId）', async () =
   try {
     const res1 = await app.inject({ method: 'GET', url: '/api/v1/arena/demo' });
     const res2 = await app.inject({ method: 'GET', url: '/api/v1/arena/demo' });
-    assert.equal(JSON.parse(res2.body).arenaId, JSON.parse(res1.body).arenaId);
+    assert.equal(JSON.parse(res2.body).data.arenaId, JSON.parse(res1.body).data.arenaId);
   } finally {
     await app.close();
   }

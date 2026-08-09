@@ -387,6 +387,17 @@ function parseVerdictTrace(value: unknown, verdictId: string): VerdictTracePersi
     ...(v.decisionTrace !== undefined && v.decisionTrace !== null
       ? { decisionTrace: v.decisionTrace as NonNullable<VerdictTracePersisted['decisionTrace']> }
       : {}),
+    // 阶段 7 P0-11：GRADE 质量元数据宽容透传（同 decisionTrace 模式·可选·旧行无则 undefined·零回归）。
+    ...(typeof v.evidenceQualityTier === 'number'
+      ? {
+          evidenceQualityTier: v.evidenceQualityTier as NonNullable<
+            VerdictTracePersisted['evidenceQualityTier']
+          >,
+        }
+      : {}),
+    ...(typeof v.evidenceQualityNote === 'string'
+      ? { evidenceQualityNote: v.evidenceQualityNote as NonNullable<VerdictTracePersisted['evidenceQualityNote']> }
+      : {}),
   };
 }
 

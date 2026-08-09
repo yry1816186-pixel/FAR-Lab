@@ -16,53 +16,34 @@ import {
   V2_DEMO_SAMPLE,
 } from '../../v2_domain/receipt_verify_v2.ts';
 import type { ProofEnvelopeV2 } from '../../proof_envelope/v2/types.ts';
+import { verifyRouteSchema, demoRouteSchema } from './v2_receipts_schemas.ts';
 
 /**
  * Register V2 API routes under the given Fastify instance.
  */
 export async function registerV2ReceiptRoutes(app: FastifyInstance): Promise<void> {
   // GET /receipts/demo — return the demo sample receipt with six-dimension verification.
-  app.get('/receipts/demo', async (_request, reply) => {
+  app.get('/receipts/demo', { schema: demoRouteSchema }, async (_request, reply) => {
     const result = runV2ReceiptVerification(V2_DEMO_SAMPLE);
     return reply.code(200).send({
       ok: true,
-      receipt: V2_DEMO_SAMPLE,
-      verification: result,
+      data: {
+        receipt: V2_DEMO_SAMPLE,
+        verification: result,
+      },
     });
   });
 
   // POST /receipts/verify — verify a submitted ProofEnvelopeV2.
-  app.post('/receipts/verify', async (request, reply) => {
-    const body = request.body as ProofEnvelopeV2 | null;
-    if (body === null || typeof body !== 'object') {
-      return reply.code(400).send({
-        ok: false,
-        error: 'Request body must be a ProofEnvelopeV2 JSON object',
-      });
-    }
-
-    // Check minimal envelope shape.
-    if (typeof body.schemaVersion !== 'string' || typeof body.proofHash !== 'string') {
-      return reply.code(400).send({
-        ok: false,
-        error: 'Missing required fields: schemaVersion, proofHash',
-      });
-    }
-
-    // 审计 P2-2：结构校验——半损坏 envelope 不得产出"看起来有效"的验证结果。
-    // claim / verdictTrace 必须是对象（若存在）；datasetBindings/workflowBindings 必须是数组（若存在）。
-    if (
-      (body.claim !== undefined && (typeof body.claim !== 'object' || body.claim === null)) ||
-      (body.verdictTrace !== undefined && (typeof body.verdictTrace !== 'object' || body.verdictTrace === null)) ||
-      (body.datasetBindings !== undefined && !Array.isArray(body.datasetBindings)) ||
-      (body.workflowBindings !== undefined && !Array.isArray(body.workflowBindings))
-    ) {
-      return reply.code(400).send({
-        ok: false,
-        error:
-          'Malformed envelope: claim/verdictTrace must be objects, manifestMembers/datasetBindings/workflowBindings must be arrays (when present)',
-      });
-    }
+  //
+  // 请求体结构校验由 ProofEnvelopeV2RequestSchema（fastify/ajv）接管：
+  //   - schemaVersion / proofHash 必填 string
+  //   - claim / verdictTrace 为对象（若存在）
+  //   - datasetBindings / workflowBindings 等为数组（若存在）
+  // 验证失败 → error_handler 转 400 VALIDATION_FAILED（RFC 7807）。
+  // 原手动 typeof 校验已移除（schema SSOT 接管，避免双套校验漂移）。
+  app.post('/receipts/verify', { schema: verifyRouteSchema }, async (request, reply) => {
+    const body = request.body as ProofEnvelopeV2;
 
     // Build a V2DemoReceipt-compatible input from the envelope.
     const claim = body.claim;
@@ -84,8 +65,10 @@ export async function registerV2ReceiptRoutes(app: FastifyInstance): Promise<voi
 
     return reply.code(200).send({
       ok: true,
-      verification: result,
-      display,
+      data: {
+        verification: result,
+        display,
+      },
     });
   });
 }

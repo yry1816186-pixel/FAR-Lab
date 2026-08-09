@@ -20,7 +20,7 @@ interface AssuranceDimensionCardProps {
   dimension: string;
   outcome: string;
   detail: string;
-  reasonCodes: string[];
+  reasonCodes: readonly string[];
 }
 
 // ---------- Dimension meta ----------

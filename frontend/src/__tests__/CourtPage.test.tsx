@@ -33,7 +33,7 @@ function mockCourtOk() {
   vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
     const url = input.toString();
     if (url.endsWith('/court/demo')) {
-      return new Response(JSON.stringify(MOCK_CERT), {
+      return new Response(JSON.stringify({ ok: true, data: MOCK_CERT }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });

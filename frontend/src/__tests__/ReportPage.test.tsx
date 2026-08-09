@@ -81,7 +81,7 @@ const VERDICT_LIST: VerdictListResponse = {
 function mockDefault() {
   vi.mocked(fetch)
     // first call = useVerdictList → GET /api/v1/verdict
-    .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+    .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
     // second call = useReport → won't be called if activeRunId is empty
     .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
 }
@@ -143,7 +143,7 @@ describe('ReportPage', () => {
   it('输入 runId 并点击查看后显示加载状态', async () => {
     // Prevent fetch from resolving immediately to keep loading state visible.
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockImplementationOnce(
         () => new Promise(() => {
           // never resolves — keeps loading state
@@ -162,7 +162,7 @@ describe('ReportPage', () => {
 
   it('报告 API 返回非 2xx 时展示错误信息', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(errorResponse(404, 'Not Found'));
     const user = userEvent.setup();
     renderWithQueryClient(<ReportPage />);
@@ -178,7 +178,7 @@ describe('ReportPage', () => {
 
   it('成功加载 HTML 报告后渲染 sandboxed iframe', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     const user = userEvent.setup();
     renderWithQueryClient(<ReportPage />);
@@ -197,7 +197,7 @@ describe('ReportPage', () => {
 
   it('报告内容为空字符串时显示空报告提示', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(''));
     const user = userEvent.setup();
     renderWithQueryClient(<ReportPage />);
@@ -213,7 +213,7 @@ describe('ReportPage', () => {
 
   it('查看一个 runId 后将其加入历史列表', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     const user = userEvent.setup();
     renderWithQueryClient(<ReportPage />);
@@ -234,7 +234,7 @@ describe('ReportPage', () => {
 
     // run-A
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     await user.type(input, 'run-A');
     await user.click(screen.getByTestId('report-view-btn'));
@@ -245,7 +245,7 @@ describe('ReportPage', () => {
     // run-B — need to clear input first
     await user.clear(input);
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     await user.type(input, 'run-B');
     await user.click(screen.getByTestId('report-view-btn'));
@@ -261,7 +261,7 @@ describe('ReportPage', () => {
 
   it('重复查看同一个 runId 不重复加入历史', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     const user = userEvent.setup();
     renderWithQueryClient(<ReportPage />);
@@ -293,7 +293,7 @@ describe('ReportPage', () => {
 
   it('查看 runId 后在输入框下方展示快速选择 chip', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     const user = userEvent.setup();
     renderWithQueryClient(<ReportPage />);
@@ -312,7 +312,7 @@ describe('ReportPage', () => {
 
     // View first runId
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     await user.type(input, 'run-A');
     await user.click(screen.getByTestId('report-view-btn'));
@@ -323,7 +323,7 @@ describe('ReportPage', () => {
     // View second runId
     await user.clear(input);
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     await user.type(input, 'run-B');
     await user.click(screen.getByTestId('report-view-btn'));
@@ -333,7 +333,7 @@ describe('ReportPage', () => {
 
     // Click chip for first runId
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     await user.click(screen.getByTestId('report-history-chip-run-A'));
 
@@ -343,7 +343,7 @@ describe('ReportPage', () => {
 
   it('按 Enter 键触发查看', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     const user = userEvent.setup();
     renderWithQueryClient(<ReportPage />);
@@ -358,7 +358,7 @@ describe('ReportPage', () => {
 
   it('判词摘要面板在有判词数据时渲染判词列表', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST }))
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML));
     renderWithQueryClient(<ReportPage />);
     await waitFor(() => {
@@ -380,7 +380,7 @@ describe('ReportPage', () => {
 
   it('历史条目在有匹配判词时展示判词 badge', async () => {
     vi.mocked(fetch)
-      .mockResolvedValueOnce(jsonResponse(VERDICT_LIST)) // useVerdictList
+      .mockResolvedValueOnce(jsonResponse({ ok: true, data: VERDICT_LIST })) // useVerdictList
       .mockResolvedValueOnce(htmlResponse(REPORT_HTML)); // useReport
     const user = userEvent.setup();
     renderWithQueryClient(<ReportPage />);

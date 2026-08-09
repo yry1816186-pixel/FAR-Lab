@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAgentEventStream } from '@/lib/api_client';
+import { useT } from '@/lib/i18n';
 import type { AgentEventDto, StageId, VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -45,9 +46,15 @@ function isVerdictValue(v: string | null | undefined): v is VerdictValue {
 
 /** SSE 连接状态徽章。 */
 function ConnectionBadge({ status }: { readonly status: 'connecting' | 'live' | 'closed' }) {
+  const t = useT();
   const variant =
     status === 'live' ? 'default' : status === 'connecting' ? 'secondary' : 'destructive';
-  const label = status === 'live' ? 'Live' : status === 'connecting' ? 'Connecting' : 'Closed';
+  const label =
+    status === 'live'
+      ? t('events.connLive')
+      : status === 'connecting'
+        ? t('events.connConnecting')
+        : t('events.connClosed');
   return (
     <Badge variant={variant} data-testid={`conn-${status}`}>
       <Radio className="mr-1 h-3 w-3" />
@@ -58,13 +65,14 @@ function ConnectionBadge({ status }: { readonly status: 'connecting' | 'live' | 
 
 /** 单行事件渲染。 */
 function EventRow({ event }: { readonly event: AgentEventDto }) {
+  const t = useT();
   const ts = event.ts.slice(11, 19); // HH:mm:ss
   switch (event.type) {
     case 'run_started':
       return (
         <div className="flex items-center gap-2 border-b border-muted py-1.5 text-sm" data-testid="evt-run_started">
           <span className="w-16 shrink-0 text-muted-foreground">{ts}</span>
-          <Badge variant="outline">run started</Badge>
+          <Badge variant="outline">{t('events.evtRunStarted')}</Badge>
           <span className="font-mono text-xs text-muted-foreground">{event.runId.slice(0, 12)}</span>
           <span className="text-muted-foreground">maxIter={event.maxIterations}</span>
           {event.verdictDriven && <Badge variant="secondary">verdict-driven</Badge>}
@@ -74,7 +82,7 @@ function EventRow({ event }: { readonly event: AgentEventDto }) {
       return (
         <div className="flex items-center gap-2 border-b border-muted py-1.5 text-sm" data-testid="evt-stage_started">
           <span className="w-16 shrink-0 text-muted-foreground">{ts}</span>
-          <Badge variant="outline">stage</Badge>
+          <Badge variant="outline">{t('events.evtStage')}</Badge>
           <span className="font-mono text-xs">it{event.iteration}</span>
           <span>{STAGE_LABEL[event.stageId] ?? event.stageId}</span>
         </div>
@@ -83,7 +91,7 @@ function EventRow({ event }: { readonly event: AgentEventDto }) {
       return (
         <div className="flex items-center gap-2 border-b border-muted py-1.5 text-sm" data-testid="evt-stage_completed">
           <span className="w-16 shrink-0 text-muted-foreground">{ts}</span>
-          <Badge variant="outline">stage done</Badge>
+          <Badge variant="outline">{t('events.evtStageDone')}</Badge>
           <span className="font-mono text-xs">it{event.iteration}</span>
           <span>{STAGE_LABEL[event.stageId] ?? event.stageId}</span>
           <Badge variant="secondary">{event.payloadKind}</Badge>
@@ -95,17 +103,17 @@ function EventRow({ event }: { readonly event: AgentEventDto }) {
       return (
         <div className="flex items-center gap-2 border-b border-muted py-1.5 text-sm" data-testid="evt-iteration_completed">
           <span className="w-16 shrink-0 text-muted-foreground">{ts}</span>
-          <Badge variant="outline">iter done</Badge>
+          <Badge variant="outline">{t('events.evtIterDone')}</Badge>
           <span className="font-mono text-xs">it{event.iteration}</span>
           {isVerdictValue(event.verdict) ? (
             <VerdictBadge decision={event.verdict} />
           ) : (
-            <Badge variant="secondary">no verdict</Badge>
+            <Badge variant="secondary">{t('events.noVerdict')}</Badge>
           )}
           {event.continueIteration ? (
-            <Badge variant="outline">continue</Badge>
+            <Badge variant="outline">{t('events.continue')}</Badge>
           ) : (
-            <Badge variant="outline">stop</Badge>
+            <Badge variant="outline">{t('events.stop')}</Badge>
           )}
           <span className="ml-auto font-mono text-xs text-muted-foreground">tokens={event.tokensConsumed}</span>
         </div>
@@ -114,7 +122,7 @@ function EventRow({ event }: { readonly event: AgentEventDto }) {
       return (
         <div className="flex items-center gap-2 border-b border-muted py-1.5 text-sm" data-testid="evt-run_completed">
           <span className="w-16 shrink-0 text-muted-foreground">{ts}</span>
-          <Badge>run complete</Badge>
+          <Badge>{t('events.evtRunComplete')}</Badge>
           <span className="font-mono text-xs text-muted-foreground">{event.runId.slice(0, 12)}</span>
           <Badge variant="secondary">{event.reason}</Badge>
           {isVerdictValue(event.verdict) ? <VerdictBadge decision={event.verdict} /> : null}
@@ -126,7 +134,7 @@ function EventRow({ event }: { readonly event: AgentEventDto }) {
         <div className="flex items-center gap-2 border-b border-muted py-1.5 text-sm" data-testid="evt-run_error">
           <span className="w-16 shrink-0 text-muted-foreground">{ts}</span>
           <AlertTriangle className="h-4 w-4 text-destructive" />
-          <Badge variant="destructive">run error</Badge>
+          <Badge variant="destructive">{t('events.evtRunError')}</Badge>
           <span className="font-mono text-xs">{event.code}</span>
           <span className="truncate text-muted-foreground">{event.message}</span>
         </div>
@@ -136,7 +144,9 @@ function EventRow({ event }: { readonly event: AgentEventDto }) {
       return (
         <div className="flex items-center gap-2 border-b border-muted py-1.5 text-sm" data-testid={`evt-${event.type}`}>
           <span className="w-16 shrink-0 text-muted-foreground">{ts}</span>
-          <Badge variant="outline">{event.type === 'stage_held' ? 'held' : 'resumed'}</Badge>
+          <Badge variant="outline">
+            {event.type === 'stage_held' ? t('events.evtHeld') : t('events.evtResumed')}
+          </Badge>
           <span className="font-mono text-xs">it{event.iteration}</span>
           <span className="text-muted-foreground">{STAGE_LABEL[event.stageId] ?? event.stageId}</span>
         </div>
@@ -145,6 +155,7 @@ function EventRow({ event }: { readonly event: AgentEventDto }) {
 }
 
 export default function EventsPage() {
+  const t = useT();
   const [runId, setRunId] = useState('');
   const [replay, setReplay] = useState(true);
   const [paused, setPaused] = useState(false);
@@ -163,27 +174,21 @@ export default function EventsPage() {
     <div className="space-y-6">
       <header className="space-y-2">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight">Agent Runtime Event Stream</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('events.title')}</h1>
           <ConnectionBadge status={status} />
         </div>
-        <p className="text-muted-foreground">
-          Live SSE feed from <code className="font-mono text-xs">/api/v1/events/stream</code> — raw
-          agent-loop observation (stages, iterations, verdicts, tokens). Deterministic R0-R9 verdict
-          kernel decides; the LLM never judges.
-        </p>
+        <p className="text-muted-foreground">{t('events.subtitle')}</p>
       </header>
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Filters</CardTitle>
-          <CardDescription>
-            Replays bus history first (when enabled), then streams new events live.
-          </CardDescription>
+          <CardTitle className="text-base">{t('events.filters')}</CardTitle>
+          <CardDescription>{t('events.filtersDesc')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-3">
           <Input
             data-testid="events-runid-input"
-            placeholder="runId (empty = all runs)"
+            placeholder={t('events.runIdPlaceholder')}
             value={runId}
             onChange={(e) => setRunId(e.target.value)}
             className="max-w-64 font-mono text-xs"
@@ -194,7 +199,7 @@ export default function EventsPage() {
             onClick={() => setReplay((v) => !v)}
             data-testid="events-replay-toggle"
           >
-            replay: {replay ? 'on' : 'off'}
+            {t('events.replay', { state: replay ? t('events.replayOn') : t('events.replayOff') })}
           </Button>
           <Button
             variant="outline"
@@ -203,7 +208,7 @@ export default function EventsPage() {
             data-testid="events-pause-toggle"
           >
             {paused ? <Play className="mr-1 h-4 w-4" /> : <Pause className="mr-1 h-4 w-4" />}
-            {paused ? 'resume' : 'pause'} auto-scroll
+            {paused ? t('events.resume') : t('events.pause')}
           </Button>
           <Button
             variant="outline"
@@ -212,17 +217,20 @@ export default function EventsPage() {
             data-testid="events-clear-button"
           >
             <Trash2 className="mr-1 h-4 w-4" />
-            clear
+            {t('events.clear')}
           </Button>
           <span className="ml-auto text-xs text-muted-foreground" data-testid="events-count">
-            {visibleEvents.length} event{visibleEvents.length === 1 ? '' : 's'}
+            {t('events.count', {
+              n: visibleEvents.length,
+              s: visibleEvents.length === 1 ? '' : 's',
+            })}
           </span>
         </CardContent>
       </Card>
 
       {error !== null && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          {error} — connection will auto-reconnect.
+          {error} {t('events.errorReconnect')}
         </div>
       )}
 
@@ -231,8 +239,7 @@ export default function EventsPage() {
           <div ref={scrollRef} className="max-h-[26rem] overflow-y-auto p-3" data-testid="events-stream">
             {visibleEvents.length === 0 ? (
               <p className="px-2 py-6 text-center text-sm text-muted-foreground" data-testid="events-empty">
-                No events yet. Start a run via <code className="font-mono text-xs">far ask</code> or
-                the hypothesize form — the stream will light up live.
+                {t('events.empty')}
               </p>
             ) : (
               visibleEvents.map((evt, i) => <EventRow key={`${evt.runId}-${i}`} event={evt} />)

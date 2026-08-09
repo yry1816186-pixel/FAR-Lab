@@ -66,13 +66,13 @@ function mockIntegrityEndpoints() {
     const url = input.toString();
     const headers = { 'Content-Type': 'application/json' };
     if (url.endsWith('/integrity/root')) {
-      return new Response(JSON.stringify(ROOT_BODY), { status: 200, headers });
+      return new Response(JSON.stringify({ ok: true, data: ROOT_BODY }), { status: 200, headers });
     }
     if (url.includes('/integrity/proof/')) {
-      return new Response(JSON.stringify(PROOF_1), { status: 200, headers });
+      return new Response(JSON.stringify({ ok: true, data: PROOF_1 }), { status: 200, headers });
     }
     if (url.endsWith('/integrity/receipt')) {
-      return new Response(JSON.stringify(RECEIPT_BODY), { status: 200, headers });
+      return new Response(JSON.stringify({ ok: true, data: RECEIPT_BODY }), { status: 200, headers });
     }
     return new Response('', { status: 404 });
   });
@@ -154,10 +154,15 @@ describe('IntegrityPage', () => {
   });
 
   // 放最末：stubGlobal URL 仅本用例生效·不污染前序用例的 fetch stub。
+  // stub 用子类继承 URL 保留构造函数（composeApiUrl 依赖 new URL()），仅替换静态方法。
   it('Repro Receipt：展示 merkleRoot + 下载触发 createObjectURL/revokeObjectURL', async () => {
     const createObjectURL = vi.fn(() => 'blob:fake');
     const revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    class StubURL extends URL {
+      static override createObjectURL = createObjectURL;
+      static override revokeObjectURL = revokeObjectURL;
+    }
+    vi.stubGlobal('URL', StubURL);
     // 拦截 a.click() 避免触发 jsdom 未实现的导航（download 属性下载·生产浏览器正常）。
     const clickSpy = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')

@@ -2,69 +2,132 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+ * FAR-Lab Design Token System (R-09)
+ * ------------------------------------------------------------
+ * 视觉气质:严谨 · 可信 · 科学 · 学术 (Precise · Calm · Evidentiary)
+ * 参考:Apple HIG / Linear / Vercel / Anthropic / DeepMind / arxiv / Nature
+ *
+ * Token 架构:
+ *   - --brand-*      : 品牌主色(ink-blue 11 阶,亮暗共用,不反色)
+ *   - shadcn 语义层   : --background/--foreground/--primary/... 亮暗分别精调
+ *   - --verdict-*     : 5 值裁决色(vivid,用于 icon/border/D3 邻近)
+ *   - --verdict-*-solid: 深色阶(用于 badge bg + 白字,WCAG AA ≥4.5:1)
+ *   - --radius/--ring : 圆角基线 + 聚焦环(品牌蓝)
+ * 所有值为 HSL 三元组(空格分隔,无 hsl() 包裹),经 shadcn `hsl(var(--x))` 消费。
+ * ============================================================ */
+
 @layer base {
   :root {
+    /* ---- Brand scale (ink-blue, 亮暗共用) ---- */
+    --brand-50: 214 60% 97%;
+    --brand-100: 214 64% 94%;
+    --brand-200: 213 70% 88%;
+    --brand-300: 212 73% 80%;
+    --brand-400: 213 72% 67%;
+    --brand-500: 217 71% 53%;
+    --brand-600: 219 70% 44%;
+    --brand-700: 220 67% 36%;
+    --brand-800: 221 64% 28%;
+    --brand-900: 222 60% 22%;
+    --brand-950: 224 65% 14%;
+
+    /* ---- Accent (cyan-teal, 仅 logo 金属感 / 聚焦强调,克制使用) ---- */
+    --accent-brand-400: 190 95% 60%;
+    --accent-brand-500: 192 90% 45%;
+
+    /* ---- Surfaces & text (light · cool slate) ---- */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --popover-foreground: 222 47% 11%;
     --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted-foreground: 215 16.3% 46.9%;
     --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --accent-foreground: 222 47% 11%;
+
+    /* ---- Brand primary (deep ink-blue, 白字 AAA) ---- */
+    --primary: 219 70% 44%;
+    --primary-foreground: 0 0% 100%;
+
+    /* ---- Destructive (error/delete) ---- */
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* ---- Lines & focus ---- */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 217 71% 53%;
+
+    /* ---- Radius baseline (学术偏小圆角) ---- */
     --radius: 0.5rem;
-    /* Verdict status semantic colors (spec 27 §4.1 brand palette) */
+
+    /* ---- Verdict status colors (vivid · icon/border/accent) ---- */
     --verdict-confirmed: 142.1 70.6% 45.3%;
-    --verdict-confirmed-foreground: 210 40% 98%;
+    --verdict-confirmed-solid: 142.1 70.6% 30%;
+    --verdict-confirmed-foreground: 0 0% 100%;
     --verdict-refuted: 0 84.2% 60.2%;
-    --verdict-refuted-foreground: 210 40% 98%;
+    --verdict-refuted-solid: 0 84.2% 40%;
+    --verdict-refuted-foreground: 0 0% 100%;
     --verdict-inconclusive: 47.9 95.8% 53.1%;
     --verdict-inconclusive-foreground: 222.2 84% 4.9%;
     --verdict-degraded: 32.1 94.6% 43.7%;
-    --verdict-degraded-foreground: 210 40% 98%;
+    --verdict-degraded-solid: 32.1 94.6% 32%;
+    --verdict-degraded-foreground: 0 0% 100%;
     --verdict-untested: 215.4 16.3% 46.9%;
     --verdict-untested-foreground: 222.2 84% 4.9%;
   }
+
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* ---- Surfaces & text (dark · 深石板蓝,非纯黑避免刺眼) ---- */
+    --background: 222 47% 5%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 222 44% 8%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 44% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 217 33% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 217 33% 15%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 217 33% 17%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    /* Verdict status semantic colors — dark mode */
+
+    /* ---- Brand primary (ink-blue + 白字,暗底下显眼且 WCAG AA ≥4.5:1) ----
+       注:曾用 brand-500(L53%)+ 深字,对比度仅 3.81 FAIL。改为 brand-600 阶(L45%)+ 白字,
+       对比度 5.79 PASS,且与亮色 primary 同色阶保持品牌一致(counter-case:暗色 a11y 回归)。 */
+    --primary: 217 71% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    /* ---- Destructive ---- */
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* ---- Lines & focus (暗底提亮) ---- */
+    --border: 217 33% 18%;
+    --input: 217 33% 18%;
+    --ring: 217 71% 60%;
+
+    /* ---- Verdict status colors (dark) ----
+       - vivid 变体(--verdict-*):icon/border 用,暗底提亮保可见。
+       - solid 变体(--verdict-*-solid):badge 背景配白字,必须保持暗(WCAG AA ≥4.5:1)。
+         counter-case:曾将 solid 提亮至 L32%/42%,白字对比度跌至 4.35/3.44 FAIL。
+         修正:confirmed-solid→L26%、degraded-solid→L30%,白字对比度 5.69/5.88 PASS。 */
     --verdict-confirmed: 142.1 70.6% 40%;
-    --verdict-confirmed-foreground: 210 40% 98%;
+    --verdict-confirmed-solid: 142.1 70.6% 26%;
+    --verdict-confirmed-foreground: 0 0% 100%;
     --verdict-refuted: 0 72.2% 50.6%;
-    --verdict-refuted-foreground: 210 40% 98%;
+    --verdict-refuted-solid: 0 72.2% 42%;
+    --verdict-refuted-foreground: 0 0% 100%;
     --verdict-inconclusive: 47.9 95.8% 53.1%;
     --verdict-inconclusive-foreground: 222.2 84% 4.9%;
     --verdict-degraded: 32.1 94.6% 50%;
-    --verdict-degraded-foreground: 210 40% 98%;
+    --verdict-degraded-solid: 32.1 94.6% 30%;
+    --verdict-degraded-foreground: 0 0% 100%;
     --verdict-untested: 215.4 16.3% 55%;
     --verdict-untested-foreground: 210 40% 98%;
   }
@@ -75,7 +138,23 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  /* 页面主标题统一使用 display 字族(Geist),其余标题沿用 Inter */
+  h1 {
+    @apply font-display tracking-tight;
+  }
+  /* 品牌色文本选区(克制点缀) */
+  ::selection {
+    background-color: hsl(var(--brand-500) / 0.2);
+  }
+  /* 滚动条(学术克制:细 + 中性色) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
 }
 

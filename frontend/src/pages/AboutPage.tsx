@@ -5,41 +5,50 @@
  * content that reflects FAR-Lab's real identity: a falsifiability-anchored
  * research-agent harness with a strict LLM-vs-deterministic-kernel trust boundary.
  *
- * Pillars are inlined in English (consistent with nav labels and OverviewPage);
- * prose sections (mission / trust / stack / honesty) are i18n-driven (zh + en).
+ * Fully i18n-driven (R-08): all user-visible text resolves through the `t()`
+ * hook; pillar definitions carry only the icon + locale-independent testId
+ * slug + message keys, so zh/en stay in sync via the typed catalogue.
  */
 
-import { useI18n } from '@/lib/i18n';
+import { useT, type MessageKey } from '@/lib/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldCheck, Eye, Repeat, ShieldAlert, Server, Cpu } from 'lucide-react';
 
-const PILLARS = [
+// `slug` is locale-independent so the data-testid stays stable across zh/en
+// (tests assert on the `about-pillar-` prefix only, not the trailing slug).
+const PILLAR_DEFS: readonly {
+  readonly icon: typeof ShieldCheck;
+  readonly slug: string;
+  readonly titleKey: MessageKey;
+  readonly subtitleKey: MessageKey;
+  readonly descKey: MessageKey;
+}[] = [
   {
-    title: 'Falsifiable',
-    subtitle: 'testable claims',
-    description:
-      'Every scientific assertion can be refuted, downgraded, or marked as untested.',
     icon: ShieldCheck,
+    slug: 'falsifiable',
+    titleKey: 'about.pillar1.title',
+    subtitleKey: 'about.pillar1.subtitle',
+    descKey: 'about.pillar1.desc',
   },
   {
-    title: 'Tamper-Evident',
-    subtitle: 'hash-chain verified',
-    description:
-      'An append-only hash chain + Merkle root means any tampering is detectable by recomputation (tamper-detectable, not physically immutable).',
     icon: Eye,
+    slug: 'tamper-evident',
+    titleKey: 'about.pillar2.title',
+    subtitleKey: 'about.pillar2.subtitle',
+    descKey: 'about.pillar2.desc',
   },
   {
-    title: 'Independently Re-computable',
-    subtitle: 'verify it yourself',
-    description:
-      'Reviewers can recompute the proof head / verdict trace on their own machine; a failed recompute yields a structured diff.',
     icon: Repeat,
+    slug: 'recomputable',
+    titleKey: 'about.pillar3.title',
+    subtitleKey: 'about.pillar3.subtitle',
+    descKey: 'about.pillar3.desc',
   },
-] as const;
+];
 
 export default function AboutPage() {
-  const { t } = useI18n();
+  const t = useT();
   return (
     <div className="space-y-10" data-testid="about-page">
       <header className="text-center">
@@ -63,17 +72,17 @@ export default function AboutPage() {
           {t('about.pillarsTitle')}
         </h2>
         <div className="grid gap-4 md:grid-cols-3">
-          {PILLARS.map((p) => (
-            <Card key={p.title} data-testid={`about-pillar-${p.title.toLowerCase()}`}>
+          {PILLAR_DEFS.map((p) => (
+            <Card key={p.slug} data-testid={`about-pillar-${p.slug}`}>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <p.icon className="h-5 w-5" aria-hidden="true" />
-                  <CardTitle className="text-lg">{p.title}</CardTitle>
+                  <CardTitle className="text-lg">{t(p.titleKey)}</CardTitle>
                 </div>
-                <CardDescription>{p.subtitle}</CardDescription>
+                <CardDescription>{t(p.subtitleKey)}</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{p.description}</p>
+                <p className="text-sm text-muted-foreground">{t(p.descKey)}</p>
               </CardContent>
             </Card>
           ))}

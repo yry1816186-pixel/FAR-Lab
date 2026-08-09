@@ -12,7 +12,7 @@
 
 ### 3.1.1 项目定位与阶段
 
-**定位**（`README.md:3-11`）：FAR-Lab 是 AI4S 结论的测谎仪——claim-level verification layer for AI4S scientific claims。核心机制：LLM 提假设，确定性 R0-R9 裁决核（非 LLM）裁决，内容寻址证据链保证可篡改检测，第三方可独立重算。
+**定位**（`README.md:3-11`）：FAR-Lab 是 AI4S 结论的证据验证层——claim-level verification layer for AI4S scientific claims。核心机制：LLM 提假设，确定性 R0-R9 裁决核（非 LLM）裁决，内容寻址证据链保证可篡改检测，第三方可独立重算。
 
 **当前阶段**（`PROGRESS.md:1-12`）：v1.1.0 已发布（`package.json:3`），开发路线图 Phase 1-4 全部 `completed`，Phase 5 `in_progress`（`DEVELOPMENT_ROADMAP.yaml:111`）。当前分支 `design/s0-safe-boot`，ahead of origin/main 30 commits（`PROGRESS.md:9`）。
 

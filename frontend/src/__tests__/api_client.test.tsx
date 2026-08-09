@@ -35,6 +35,11 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/** V1 端点响应（P1-3 契约统一：{ ok: true, data: T } 信封）。 */
+function jsonV1Response(body: unknown, status = 200): Response {
+  return jsonResponse({ ok: true, data: body }, status);
+}
+
 function textResponse(body: string, status = 200): Response {
   return new Response(body, {
     status,
@@ -158,7 +163,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
       // verdictNode 契约字段（audit [G]）：证据条目无关联裁决时为 null
       verdictNode: null,
     };
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(ev));
+    vi.mocked(fetch).mockResolvedValue(jsonV1Response(ev));
     const { result } = renderHook(() => useEvidence('ev-001'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/api/v1/evidence/ev-001');
@@ -188,7 +193,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
       },
       graphSubtree: { rootId: 'node-001', nodes: [], edges: [] },
     };
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(chain));
+    vi.mocked(fetch).mockResolvedValue(jsonV1Response(chain));
     const { result } = renderHook(() => useEvidenceChain(HEAD_HASH), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
@@ -198,7 +203,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
   });
 
   it('useVerdict 以 GET /api/v1/verdict/:id 调用 fetch（HonestVerdictDto·decision 字段）', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(verdictDto()));
+    vi.mocked(fetch).mockResolvedValue(jsonV1Response(verdictDto()));
     const { result } = renderHook(() => useVerdict('v-001'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/api/v1/verdict/v-001');
@@ -208,7 +213,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
   });
 
   it('useVerdictByHypothesis 以 GET /api/v1/verdict/by_hypothesis/:hypoId 调用（单对象·非数组）', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(verdictDto({ verdictId: 'v-002' })));
+    vi.mocked(fetch).mockResolvedValue(jsonV1Response(verdictDto({ verdictId: 'v-002' })));
     const { result } = renderHook(() => useVerdictByHypothesis('hypo-1'), {
       wrapper: createWrapper(),
     });
@@ -228,7 +233,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
       limit: 100,
       offset: 0,
     };
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(list));
+    vi.mocked(fetch).mockResolvedValue(jsonV1Response(list));
     const { result } = renderHook(() => useVerdictList(100, 0), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
@@ -279,7 +284,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
       honestVerdict: verdictNodeRaw({ verdictId: 'v-001', verdict: 'UNTESTED' }),
       reproHash: 'repro-hash-123',
     };
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(hypoResp));
+    vi.mocked(fetch).mockResolvedValue(jsonV1Response(hypoResp));
     const { result } = renderHook(() => useHypothesize(), { wrapper: createWrapper() });
     await act(async () => {
       await result.current.mutateAsync({ researchInput: '示例研究输入' });
@@ -326,5 +331,83 @@ describe('api_client fetch helpers (__testables)', () => {
     vi.mocked(fetch).mockResolvedValue(textResponse('<html>report</html>'));
     const out = await __testables.fetchText('/api/v1/report/run-1');
     expect(out).toBe('<html>report</html>');
+  });
+});
+
+// ---------- composeApiUrl（极端 URL 构造·__testables）----------
+//
+// 验证 API_BASE_URL 含 query 参数 / pathname 前缀 / path 含 query / extraParams 覆盖
+// 等 4 类极端情形。优先级语义：base 自带 query < path 内 query < extraParams。
+
+describe('api_client composeApiUrl (极端 URL 构造)', () => {
+  const compose = __testables.composeApiUrl;
+
+  it('默认 base + 纯 path', () => {
+    expect(compose('http://localhost:3000', '/api/v1/verdict')).toBe(
+      'http://localhost:3000/api/v1/verdict',
+    );
+  });
+
+  it('默认 base + path 含 query（fetchJson verdictList 路径形态）', () => {
+    expect(compose('http://localhost:3000', '/api/v1/verdict?limit=100&offset=0')).toBe(
+      'http://localhost:3000/api/v1/verdict?limit=100&offset=0',
+    );
+  });
+
+  it('base 含 query 参数 → 保留并合并到 path 后', () => {
+    expect(compose('http://localhost:3000?token=abc', '/api/v1/events/stream')).toBe(
+      'http://localhost:3000/api/v1/events/stream?token=abc',
+    );
+  });
+
+  it('base 含 query + path 含 query → 二者合并', () => {
+    expect(compose('http://localhost:3000?token=abc', '/api/v1/verdict?limit=100')).toBe(
+      'http://localhost:3000/api/v1/verdict?limit=100&token=abc',
+    );
+  });
+
+  it('base 含 query + path 含同名 query → path 优先（base 不覆盖）', () => {
+    expect(compose('http://localhost:3000?limit=99', '/api/v1/verdict?limit=100')).toBe(
+      'http://localhost:3000/api/v1/verdict?limit=100',
+    );
+  });
+
+  it('base 含 pathname 前缀 → 前缀保留', () => {
+    expect(compose('http://localhost:3000/v1', '/api/v1/verdict')).toBe(
+      'http://localhost:3000/v1/api/v1/verdict',
+    );
+  });
+
+  it('base 含 pathname 前缀且带尾斜杠 → 不产生双斜杠', () => {
+    expect(compose('http://localhost:3000/v1/', '/api/v1/verdict')).toBe(
+      'http://localhost:3000/v1/api/v1/verdict',
+    );
+  });
+
+  it('extraParams 覆盖 base 与 path 的同名参数（最高优先级）', () => {
+    expect(
+      compose('http://localhost:3000?token=base', '/api/v1/verdict?token=path', { token: 'extra' }),
+    ).toBe('http://localhost:3000/api/v1/verdict?token=extra');
+  });
+
+  it('extraParams 新增参数 + base query 保留（useAgentEventStream 形态）', () => {
+    expect(
+      compose('http://localhost:3000?token=abc', '/api/v1/events/stream', {
+        runId: 'r1',
+        replay: 'true',
+      }),
+    ).toBe('http://localhost:3000/api/v1/events/stream?token=abc&runId=r1&replay=true');
+  });
+
+  it('path 无前导斜杠 → 自动补斜杠', () => {
+    expect(compose('http://localhost:3000', 'api/v1/verdict')).toBe(
+      'http://localhost:3000/api/v1/verdict',
+    );
+  });
+
+  it('extraParams 为空对象 → 与 undefined 等价（不污染 URL）', () => {
+    expect(compose('http://localhost:3000', '/api/v1/verdict', {})).toBe(
+      'http://localhost:3000/api/v1/verdict',
+    );
   });
 });

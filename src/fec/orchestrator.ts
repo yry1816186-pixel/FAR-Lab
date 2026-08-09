@@ -51,6 +51,7 @@ import type {
 import type { AntiTheaterReport } from '../anti_theater/index.ts';
 import { toKernelFindings } from '../anti_theater/index.ts';
 import { recomputeIdentifierClaims } from '../falsifiability/external_facts.ts';
+import type { RobAssessment, StudyDesign } from '../evidence_quality/types.ts';
 // T-003 · Evidence provenance binding（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
 // assertPrimaryEvidenceProvenanceBound 是 fail-closed 前置闸：requireExecutionProvenance=true 时
 // primary 证据缺 executionProvenanceHash → 拒绝裁决（integrityFlag 进 kernel R7 阻断 CONFIRMED）。
@@ -110,6 +111,14 @@ export interface FecAppendClaimArgs {
    * 提供 real anti-theater data),见 buildVerdictKernelInput 注释。
    */
   readonly antiTheaterReport?: AntiTheaterReport;
+  /**
+   * 研究设计（GRADE 证据层级透明度层·阶段 7 P0-11 接线）。提供时 kernel 输出附
+   * evidenceQualityTier/evidenceQualityNote（不进 verdict·不进 proofHash·零回归）；
+   * report/audit 消费。不提供则与历史输出完全一致。
+   */
+  readonly studyDesign?: StudyDesign;
+  /** Cochrane RoB 7 维评估子集（可选·缺省维度按 unclear fail-conservative）。 */
+  readonly robAssessments?: readonly RobAssessment[];
 }
 
 /** fecAppendClaim 返回（callRecord + evidence + decision + kernelOutput + verdictNode + fecGate + casReferences）。 */
@@ -348,6 +357,8 @@ function buildVerdictKernelInput(
     ...(args.identifierClaims !== undefined
       ? { identifierClaims: recomputeIdentifierClaims(args.identifierClaims) }
       : {}),
+    ...(args.studyDesign !== undefined ? { studyDesign: args.studyDesign } : {}),
+    ...(args.robAssessments !== undefined ? { robAssessments: args.robAssessments } : {}),
   };
 }
 

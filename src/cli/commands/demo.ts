@@ -12,6 +12,7 @@
 import Database from 'better-sqlite3';
 import { buildDemoChain, type DemoChainResult } from '../../far_proof/demo_chain.ts';
 import { buildHeroAChain, type HeroAPipelineResult } from '../../science_harness/hero_a_pipeline.ts';
+import { probeEnvironment, retryGoldenOnce } from './demo_probe.ts';
 import { runVerifyGolden } from './verify_golden.ts';
 
 // English prose is roughly twice as wide as the CJK it replaces, so the box banner is
@@ -109,10 +110,21 @@ export function runDemo(subcommand: string | undefined = undefined): number {
     return 2;
   }
   const tessOnly = subcommand === 'tess-offline';
+
+  // 阶段 7 P0-3（S1-69.2 修复）：启动前置环境探测——Node <24 / better-sqlite3 native
+  // 不可用时立即 fail-fast（≤5s 退出非 0 + 可读错误 + Docker 后备指引），杜绝评委面前
+  // 无限挂起（同步阻塞无法被 timer 中断·探测是唯一可靠防线）。
+  const probe = probeEnvironment();
+  if (!probe.ok) {
+    process.stderr.write(`${probe.error}\n`);
+    return 1;
+  }
+
   process.stdout.write(BANNER);
 
   process.stdout.write(PHASE1);
-  const gvExit = runVerifyGolden({ backend: 'node' });
+  // 阶段 7 P0-3（S1-69.3 修复）：GV 失败有界重试 1 次（瞬时波动容错·持续失败仍 exit 7 不掩盖）。
+  const gvExit = retryGoldenOnce(() => runVerifyGolden({ backend: 'node' }));
   if (gvExit !== 0) {
     process.stderr.write(`\nfar demo: golden vector stage failed (exit ${gvExit})\n`);
     return gvExit;

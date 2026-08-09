@@ -200,7 +200,7 @@ test('GET /api/v1/report/:runId/paper returns 200 + application/json ResearchPap
     });
     assert.equal(response.statusCode, 200);
     assert.match(response.headers['content-type'] ?? '', /application\/json/);
-    const body = response.json() as Record<string, unknown>;
+    const body = (response.json() as { readonly ok: boolean; readonly data: Record<string, unknown> }).data;
 
     // ResearchPaperOutput 10 fields
     assert.ok(typeof body.paperTitle === 'string', 'paperTitle must be string');
@@ -250,7 +250,7 @@ test('GET /api/v1/report/:runId/paper finalVerdict is UNTESTED when no verdict n
       url: '/api/v1/report/run-003/paper',
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as { finalVerdict: string };
+    const body = (response.json() as { readonly ok: boolean; readonly data: { finalVerdict: string } }).data;
     assert.equal(body.finalVerdict, 'UNTESTED');
   } finally {
     await app.close();
@@ -275,7 +275,7 @@ test('GET /api/v1/report/:runId/paper paperTitle derived from problemStatement (
       url: '/api/v1/report/run-004/paper',
     });
     assert.equal(response.statusCode, 200);
-    const body = response.json() as { paperTitle: string };
+    const body = (response.json() as { readonly ok: boolean; readonly data: { paperTitle: string } }).data;
     // Title derived deterministically from problemStatement (first 60 chars used in title)
     assert.ok(body.paperTitle.length > 0, 'paperTitle must not be empty');
     assert.ok(body.paperTitle.includes(problemStatement.slice(0, 60)), 'paperTitle must contain problemStatement prefix');

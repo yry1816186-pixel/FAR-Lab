@@ -12,6 +12,7 @@ import type {
   VerdictRuleTrace,
   DecisionTrace,
 } from './verdict_kernel_v2.ts';
+import type { EvidenceTier } from '../evidence_quality/types.ts';
 
 /**
  * How a falsification threshold should be interpreted (single value, range,
@@ -126,6 +127,17 @@ export interface VerdictTracePersisted {
    *     （4 个 critical 字段仍严格校验·parseVerdictTrace）。
    */
   readonly decisionTrace?: DecisionTrace;
+  /**
+   * GRADE 证据质量元数据（批次 2-D·阶段 7 P0-11 接线·可选·透明度层）。
+   *
+   * 与 decisionTrace 同设计：不进 verdict 判定（R0-R9 不变）、不进 proofHash（VC 白名单不变）。
+   * 仅当调用方提供 studyDesign（或chestrator/verdict_stage 透传）时 kernel 产出
+   * evidenceQualityTier/evidenceQualityNote → extractVerdictTrace 条件透传 →
+   * verdict_trace_json 全文含之（verdict_trace_hash 自动绑定·篡改可检）。
+   * 未提供 studyDesign 的行无此字段（零回归·宽容解析同 decisionTrace）。
+   */
+  readonly evidenceQualityTier?: EvidenceTier;
+  readonly evidenceQualityNote?: string;
 }
 
 /**

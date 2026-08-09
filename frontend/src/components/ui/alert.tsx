@@ -11,8 +11,11 @@ const alertVariants = cva(
         default: 'bg-background text-foreground',
         destructive:
           'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
-        warning: 'border-amber-500/50 text-amber-700 dark:text-amber-400 [&>svg]:text-amber-600',
-        info: 'border-blue-500/50 text-blue-700 dark:text-blue-400 [&>svg]:text-blue-600',
+        // warning/info 改为 tinted 模式(色相 border/bg-tint/icon + neutral text),去硬编码 amber/blue,
+        // 文字始终为 foreground 保证 WCAG AA(避免饱和色文字在浅底上对比度不足)。
+        warning:
+          'border-verdict-degraded/40 bg-verdict-degraded/5 text-foreground [&>svg]:text-verdict-degraded',
+        info: 'border-brand-500/40 bg-brand-500/5 text-foreground [&>svg]:text-brand-600 dark:[&>svg]:text-brand-400',
       },
     },
     defaultVariants: { variant: 'default' },

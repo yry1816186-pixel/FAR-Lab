@@ -19,6 +19,7 @@
 
 import { useState, useMemo, type FormEvent } from 'react';
 import { useEvidenceChain } from '@/lib/api_client';
+import { useT } from '@/lib/i18n';
 import type { GraphNodeDto, GraphSubtree, VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -61,6 +62,7 @@ function extractVerdictTimeline(subtree: GraphSubtree): readonly GraphNodeDto[] 
 }
 
 export default function VersionDiffPage() {
+  const t = useT();
   const [hashInput, setHashInput] = useState('');
   const [submittedHash, setSubmittedHash] = useState('');
 
@@ -87,12 +89,10 @@ export default function VersionDiffPage() {
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <GitCompare className="h-7 w-7 text-primary" aria-hidden="true" />
-          <h1 className="text-3xl font-bold tracking-tight">Version Comparison</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('vdiff.title')}</h1>
         </div>
         <p className="text-muted-foreground max-w-3xl">
-          Compare multiple iterations of a research claim and its deterministic verdicts within one
-          evidence chain. Aligned with the competition requirement of "version comparison and human
-          feedback" (CR-03). Input a chain head hash (64-char hex) to load the verdict timeline.
+          {t('vdiff.subtitle')}
         </p>
       </header>
 
@@ -100,11 +100,10 @@ export default function VersionDiffPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5" aria-hidden="true" />
-            Chain Head Hash
+            {t('vdiff.input.title')}
           </CardTitle>
           <CardDescription>
-            Paste a 64-character hex chain head hash (from the Integrity page or any run's
-            <code className="mx-1 rounded bg-muted px-1 text-xs">reproHash</code>).
+            {t('vdiff.input.desc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -113,18 +112,18 @@ export default function VersionDiffPage() {
               type="text"
               value={hashInput}
               onChange={(e) => setHashInput(e.target.value)}
-              placeholder="e.g. a1b2c3... (64 hex chars)"
+              placeholder={t('vdiff.input.placeholder')}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              aria-label="chain head hash input"
+              aria-label={t('vdiff.input.aria')}
               data-testid="version-diff-hash-input"
             />
             <Button type="submit" data-testid="version-diff-submit">
-              Load Timeline
+              {t('vdiff.input.submit')}
             </Button>
           </form>
           {submittedHash.length > 0 && !isValidHash && (
             <p className="mt-2 text-sm text-destructive" data-testid="version-diff-hash-error">
-              Hash must be 64 hexadecimal characters (0-9, a-f).
+              {t('vdiff.input.error')}
             </p>
           )}
         </CardContent>
@@ -133,11 +132,9 @@ export default function VersionDiffPage() {
       {!isValidHash && submittedHash.length === 0 && (
         <Alert data-testid="version-diff-empty-state">
           <Info className="h-4 w-4" aria-hidden="true" />
-          <AlertTitle>No chain loaded</AlertTitle>
+          <AlertTitle>{t('vdiff.empty.title')}</AlertTitle>
           <AlertDescription>
-            Submit a chain head hash above to view its version timeline. The timeline shows each
-            verdict node (root + hypothesis iterations) ordered by creation time, with side-by-side
-            verdict comparisons when multiple versions exist.
+            {t('vdiff.empty.desc')}
           </AlertDescription>
         </Alert>
       )}
@@ -151,7 +148,7 @@ export default function VersionDiffPage() {
 
       {isError && (
         <Alert variant="destructive" data-testid="version-diff-error">
-          <AlertTitle>Failed to load chain</AlertTitle>
+          <AlertTitle>{t('vdiff.error.title')}</AlertTitle>
           <AlertDescription>
             {error instanceof Error ? error.message : 'Unknown error'}
           </AlertDescription>
@@ -161,10 +158,9 @@ export default function VersionDiffPage() {
       {isValidHash && !isLoading && !isError && subtree !== null && timeline.length === 0 && (
         <Alert data-testid="version-diff-no-verdicts">
           <Info className="h-4 w-4" aria-hidden="true" />
-          <AlertTitle>No verdict nodes in this chain</AlertTitle>
+          <AlertTitle>{t('vdiff.noVerdicts.title')}</AlertTitle>
           <AlertDescription>
-            The chain loaded successfully but contains no root or hypothesis verdict nodes. This is
-            expected for chains that converged before reaching the verdict stage.
+            {t('vdiff.noVerdicts.desc')}
           </AlertDescription>
         </Alert>
       )}
@@ -172,7 +168,7 @@ export default function VersionDiffPage() {
       {timeline.length > 0 && (
         <div className="space-y-4" data-testid="version-diff-timeline">
           <h2 className="text-xl font-semibold">
-            Verdict Timeline ({timeline.length} version{timeline.length === 1 ? '' : 's'})
+            {t('vdiff.timeline.title', { n: timeline.length })}
           </h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {timeline.map((node, idx) => {
@@ -188,13 +184,13 @@ export default function VersionDiffPage() {
                 >
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between text-base">
-                      <span>Version {idx + 1}</span>
+                      <span>{t('vdiff.card.version', { n: idx + 1 })}</span>
                       {verdictChanged && (
                         <span
                           className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
                           data-testid={`version-diff-changed-${idx}`}
                         >
-                          verdict changed
+                          {t('vdiff.card.verdictChanged')}
                         </span>
                       )}
                     </CardTitle>
@@ -204,21 +200,21 @@ export default function VersionDiffPage() {
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Verdict:</span>
+                      <span className="text-sm text-muted-foreground">{t('vdiff.card.verdict')}</span>
                       <VerdictBadge decision={verdict} />
                     </div>
                     {node.scopeSlipText !== null && (
                       <p className="text-xs text-muted-foreground">
-                        Scope: {node.scopeSlipText}
+                        {t('vdiff.card.scope')} {node.scopeSlipText}
                       </p>
                     )}
                     {node.untestedReason !== null && (
                       <p className="text-xs text-muted-foreground">
-                        Untested reason: {node.untestedReason}
+                        {t('vdiff.card.untestedReason')} {node.untestedReason}
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Created: {new Date(node.createdAt).toISOString()}
+                      {t('vdiff.card.created')} {new Date(node.createdAt).toISOString()}
                     </p>
                   </CardContent>
                 </Card>
@@ -231,12 +227,7 @@ export default function VersionDiffPage() {
       <Card data-testid="version-diff-honesty">
         <CardContent>
           <p className="text-xs text-muted-foreground">
-            <strong>Honesty boundary:</strong> Per the project's design intent, verdict kernel
-            re-entry within the FSM loop is a V2 roadmap item (fsm_runner.ts:10-14). This page
-            displays versions linked by supersede relationships (migration 0014) — it does not
-            automatically trigger hypothesis regeneration. IC-15 T1' injects prior verdicts as soft
-            advice via stage6 prompt; stage6 LLM retains independent control over
-            continueIteration.
+            {t('vdiff.honesty')}
           </p>
         </CardContent>
       </Card>

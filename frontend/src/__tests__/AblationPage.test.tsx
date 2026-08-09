@@ -68,7 +68,7 @@ function makeResponse(
 
 function mockFetchSuccess(response: HypothesizeResponse) {
   vi.mocked(fetch).mockResolvedValueOnce(
-    new Response(JSON.stringify(response), {
+    new Response(JSON.stringify({ ok: true, data: response }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     }) as Response,

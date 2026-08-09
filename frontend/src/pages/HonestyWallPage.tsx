@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useVerdictList } from '@/lib/api_client';
+import { useT } from '@/lib/i18n';
 import type { HonestVerdictDto, VerdictValue } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,6 +80,7 @@ function SummaryStats({ items }: { items: readonly HonestVerdictDto[] }) {
 // ---------- 页面主体 ----------
 
 export default function HonestyWallPage() {
+  const t = useT();
   const [offset, setOffset] = useState(0);
   const { expandedIds, toggleExpand } = useTimelineExpansion();
 
@@ -107,10 +109,10 @@ export default function HonestyWallPage() {
       <header>
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h1 className="text-3xl font-bold tracking-tight">Honesty Wall</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('honesty.title')}</h1>
         </div>
         <p className="mt-1 text-muted-foreground">
-          HonestyWall · interactive evidence timeline for the 5-value verdict — CONFIRMED · REFUTED · INCONCLUSIVE · DEGRADED_SCOPE · UNTESTED
+          {t('honesty.subtitle')}
         </p>
       </header>
 
@@ -118,7 +120,7 @@ export default function HonestyWallPage() {
       {isLoading && (
         <div className="flex items-center justify-center py-20" data-testid="honesty-loading">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden="true" />
-          <span className="ml-3 text-muted-foreground">Loading verdict data…</span>
+          <span className="ml-3 text-muted-foreground">{t('honesty.loading')}</span>
         </div>
       )}
 
@@ -126,9 +128,9 @@ export default function HonestyWallPage() {
       {isError && !isLoading && (
         <Alert variant="destructive" data-testid="honesty-error">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Data load failed</AlertTitle>
+          <AlertTitle>{t('honesty.errorTitle')}</AlertTitle>
           <AlertDescription>
-            {error instanceof Error ? error.message : 'Unknown error'}
+            {error instanceof Error ? error.message : t('common.unknownError')}
           </AlertDescription>
         </Alert>
       )}
@@ -139,10 +141,10 @@ export default function HonestyWallPage() {
           {/* 汇总统计 */}
           <section aria-labelledby="summary-heading">
             <h2 id="summary-heading" className="mb-3 text-lg font-semibold">
-              Verdict summary
+              {t('honesty.summaryHeading')}
               {totalCount > 0 && (
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({totalCount} total)
+                  {t('honesty.summaryTotal', { n: totalCount })}
                 </span>
               )}
             </h2>
@@ -153,15 +155,15 @@ export default function HonestyWallPage() {
           <section aria-labelledby="timeline-heading">
             <div className="mb-3 flex items-center justify-between">
               <h2 id="timeline-heading" className="text-lg font-semibold">
-                Evidence timeline
+                {t('honesty.timelineHeading')}
                 {items.length > 0 && (
                   <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    page {currentPage + 1}/{totalPages}
+                    {t('honesty.timelinePage', { page: currentPage + 1, total: totalPages })}
                   </span>
                 )}
               </h2>
               {isFetching && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Refreshing" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label={t('honesty.refreshAria')} />
               )}
             </div>
 
@@ -169,7 +171,7 @@ export default function HonestyWallPage() {
               <Card data-testid="honesty-empty">
                 <CardContent className="py-12 text-center text-muted-foreground">
                   <CircleDashed className="mx-auto mb-3 h-8 w-8" aria-hidden="true" />
-                  <p>No experiments run yet — this wall is honestly empty</p>
+                  <p>{t('honesty.empty')}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -183,11 +185,15 @@ export default function HonestyWallPage() {
                 {/* 分页控件 */}
                 <nav
                   className="flex items-center justify-between pt-4"
-                  aria-label="Verdict pagination"
+                  aria-label={t('honesty.paginationAria')}
                   data-testid="pagination"
                 >
                   <span className="text-sm text-muted-foreground">
-                    {items.length} total, showing {offset + 1}–{Math.min(offset + PAGE_SIZE, items.length)}
+                    {t('honesty.range', {
+                      total: items.length,
+                      from: offset + 1,
+                      to: Math.min(offset + PAGE_SIZE, items.length),
+                    })}
                   </span>
                   <div className="flex gap-2">
                     <Button
@@ -195,19 +201,19 @@ export default function HonestyWallPage() {
                       size="sm"
                       onClick={handlePrev}
                       disabled={!hasPrev}
-                      aria-label="Previous page"
+                      aria-label={t('honesty.prevAria')}
                     >
                       <ChevronLeft className="h-4 w-4" />
-                      Previous
+                      {t('honesty.prev')}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleNext}
                       disabled={!hasNext}
-                      aria-label="Next page"
+                      aria-label={t('honesty.nextAria')}
                     >
-                      Next
+                      {t('honesty.next')}
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
