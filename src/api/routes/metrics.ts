@@ -32,6 +32,38 @@ function sample(name: string, value: number, label?: { name: string; value: stri
   return `${name}${labels} ${value}`;
 }
 
+/** DB 业务指标（确定性 COUNT 查询·不触发 LLM·无网络）。 */
+function collectDbMetrics(config: MetricsRouteConfig): {
+  evidenceLogTotal: number;
+  callRecordTotal: number;
+  ftsTotal: number;
+  verdictByKind: Record<string, number>;
+} {
+  const db = config.db;
+  const evidenceLogTotal = (db.prepare('SELECT COUNT(*) AS c FROM evidence_log').get() as {
+    c: number;
+  }).c;
+  const callRecordTotal = (db.prepare('SELECT COUNT(*) AS c FROM call_records').get() as {
+    c: number;
+  }).c;
+  // FTS 表是可选特性（未启用/未创建时缺表）——sqlite_master 存在性检查后 COUNT（无副作用）。
+  const ftsTableExists =
+    db
+      .prepare("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'evidence_fts'")
+      .get() !== undefined;
+  const ftsTotal = ftsTableExists
+    ? (db.prepare('SELECT COUNT(*) AS c FROM evidence_fts').get() as { c: number }).c
+    : 0;
+  const verdictByKind = Object.fromEntries(
+    (
+      db
+        .prepare('SELECT verdict, COUNT(*) AS c FROM verdict_nodes GROUP BY verdict')
+        .all() as { verdict: string; c: number }[]
+    ).map((row) => [row.verdict, row.c]),
+  );
+  return { evidenceLogTotal, callRecordTotal, ftsTotal, verdictByKind };
+}
+
 /**
  * 注册指标路由（GET /metrics）。
  *
@@ -43,41 +75,16 @@ export async function registerMetricsRoutes(
   config: MetricsRouteConfig,
 ): Promise<void> {
   app.get('/metrics', async (_request, reply) => {
-    // 业务指标（确定性 COUNT 查询·不触发 LLM·无网络）。
-    let evidenceLogTotal = 0;
-    let callRecordTotal = 0;
-    let ftsTotal = 0;
-    let verdictByKind: Record<string, number> = {};
+    // 指标查询失败不伪装——返回 500 + 可读错误（可观测面本身必须诚实）。
+    let metrics: ReturnType<typeof collectDbMetrics>;
     try {
-      evidenceLogTotal = (config.db.prepare('SELECT COUNT(*) AS c FROM evidence_log').get() as {
-        c: number;
-      }).c;
-      callRecordTotal = (
-        config.db.prepare('SELECT COUNT(*) AS c FROM call_records').get() as { c: number }
-      ).c;
-      // FTS 表是可选特性（未启用/未创建时缺表）——sqlite_master 存在性检查后 COUNT（无副作用）。
-      const ftsTableExists =
-        config.db
-          .prepare(
-            "SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'evidence_fts'",
-          )
-          .get() !== undefined;
-      ftsTotal = ftsTableExists
-        ? (config.db.prepare('SELECT COUNT(*) AS c FROM evidence_fts').get() as { c: number }).c
-        : 0;
-      verdictByKind = Object.fromEntries(
-        (
-          config.db
-            .prepare('SELECT verdict, COUNT(*) AS c FROM verdict_nodes GROUP BY verdict')
-            .all() as { verdict: string; c: number }[]
-        ).map((row) => [row.verdict, row.c]),
-      );
+      metrics = collectDbMetrics(config);
     } catch (err) {
-      // 指标查询失败不伪装——返回 500 + 可读错误（可观测面本身必须诚实）。
       const detail = err instanceof Error ? err.message : String(err);
       void reply.code(500).send(`metrics query failed: ${detail}\n`);
       return;
     }
+    const { evidenceLogTotal, callRecordTotal, ftsTotal, verdictByKind } = metrics;
 
     const startMs = config.processStartMs ?? processStartMs;
     const uptimeSec = Math.max(0, (Date.now() - startMs) / 1000);
