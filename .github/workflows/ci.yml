@@ -537,6 +537,8 @@ jobs:
         run: node scripts/zero_tolerance_scan.mjs
       - name: anti_theater_deterministic_scan（反剧场确定性扫描）
         run: node scripts/anti_theater_deterministic_scan.mjs
+      - name: doc_command_check（doc↔CLI 一致性·CJ1-G2 文档零漂移）
+        run: node scripts/doc_command_check.mjs
       - name: coverage_gate（行≥85%/分支≥75% 红线）
         run: node scripts/coverage_gate.mjs
       - name: governance_gate（GATE_H 治理 SLI 机检·8+1 项·--skip-test 避免重复跑 test）
