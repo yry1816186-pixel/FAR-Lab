@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -75,6 +75,39 @@ test('P0-8: end-to-end --check exits 0 when AGENTS.md matches actual numbers', (
       `expected exit 0 (AGENTS.md claims synced to actual)\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
     );
   } finally {
+    rmSync(specFile, { force: true });
+  }
+});
+
+test('LP-2: --write rewrites drifted AGENTS.md claim to actual (auto SSOT sync)', () => {
+  // 漂移场景：fixture 声称 1000 而实测 2602——--write 须把 AGENTS.md 回写到实测值。
+  const spec = [
+    'ℹ tests 2602',
+    'ℹ pass 2596',
+    'ℹ fail 0',
+    'ℹ skipped 6',
+    '',
+  ].join('\n');
+  const specFile = join(repoRoot, '.tmp-test-numbers-spec.txt');
+  const agentsPath = join(repoRoot, 'AGENTS.md');
+  writeFileSync(specFile, spec, 'utf8');
+
+  const original = readFileSync(agentsPath, 'utf8');
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [join(repoRoot, 'scripts', 'test_numbers_check.mjs'), '--from-file', specFile, '--write'],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 0, `--write must exit 0\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
+    const updated = readFileSync(agentsPath, 'utf8');
+    const claimed = extractClaimedNumbers(updated);
+    assert.equal(claimed.tests, 2602, 'AGENTS.md must be rewritten to actual tests count');
+    assert.equal(claimed.pass, 2596, 'AGENTS.md pass must be rewritten to actual');
+    assert.equal(claimed.fail, 0, 'AGENTS.md fail must be rewritten to actual');
+    assert.equal(claimed.skipped, 6, 'AGENTS.md skipped must be rewritten to actual');
+  } finally {
+    writeFileSync(agentsPath, original, 'utf8'); // 恢复 AGENTS.md（测试不污染工作树）
     rmSync(specFile, { force: true });
   }
 });
