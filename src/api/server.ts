@@ -24,6 +24,7 @@ import type { Database } from 'better-sqlite3';
 import { registerAuthMiddleware } from './auth/jwt_middleware.ts';
 import { errorHandler } from './errors/error_handler.ts';
 import { registerHealthRoutes } from './routes/health.ts';
+import { registerMetricsRoutes } from './routes/metrics.ts';
 import { registerHypothesizeRoute } from './routes/hypothesize.ts';
 import { registerEvidenceRoutes } from './routes/evidence.ts';
 import { registerVerdictRoutes } from './routes/verdict.ts';
@@ -129,6 +130,8 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   app.setErrorHandler(errorHandler);
 
   await registerHealthRoutes(app, { db: config.db });
+  // 阶段 7 P2-A（D1-1）：/metrics 指标端点（Prometheus 文本格式·裸根探针豁免·观测面第一环）。
+  await registerMetricsRoutes(app, { db: config.db });
 
   await app.register(async (v1) => {
     // R-05 契约统一收尾（P1-3）：v1 成功响应统一 { ok: true, data: T } 信封。
