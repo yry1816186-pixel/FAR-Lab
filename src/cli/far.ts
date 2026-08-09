@@ -40,6 +40,7 @@ import { runDoctor } from './commands/doctor.ts';
 import { runHardware } from './commands/hardware.ts';
 import { runVersion } from './commands/version.ts';
 import { runScheduleFromArgs } from './commands/schedule.ts';
+import { runKeygen, runSign, runVerifySig } from './commands/sign.ts';
 import { parseOptions, reportErrors, type OptionSchema } from './parse_options.ts';
 import { runCli, type CliCommand } from './registry.ts';
 
@@ -135,6 +136,21 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'init',
     description: 'scaffold a DomainPack (config + claim/fec templates)',
     run: (args) => runInit(args),
+  },
+  {
+    name: 'keygen',
+    description: 'generate an Ed25519 key pair (TK10: signer key lifecycle)',
+    run: (args) => runKeygen(args),
+  },
+  {
+    name: 'sign',
+    description: 'sign a file/directory with an Ed25519 private key (deterministic manifest)',
+    run: (args) => runSign(args),
+  },
+  {
+    name: 'verify-sig',
+    description: 'verify an Ed25519 file-manifest signature (independent recompute + hash check)',
+    run: (args) => runVerifySig(args),
   },
   {
     name: 'verify',
