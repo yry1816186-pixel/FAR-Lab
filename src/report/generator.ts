@@ -485,7 +485,7 @@ function buildStageSummarySection(
       lines.push(`- Pseudo tokens (offline_replay char-estimate, not real metering): ${pseudoTokens}`);
     }
     if (cost !== null && cost.priced && cost.totalUsd !== null) {
-      lines.push(`- Estimated cost: \$${cost.totalUsd.toFixed(4)} (${modelId} · ${inputSum} in / ${outputSum} out tokens)`);
+      lines.push(`- Estimated cost: $${cost.totalUsd.toFixed(4)} (${modelId} · ${inputSum} in / ${outputSum} out tokens)`);
     } else if (cost !== null && pricedRecords > 0) {
       lines.push(`- Estimated cost: not priced (${modelId} missing from price table)`);
     }
