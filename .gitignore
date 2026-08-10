@@ -278,3 +278,7 @@ scripts/vertical_slice_cancellation.mjs
 # 运行产物
 # 缓存
 tests/fixtures/science_harness/tic_sample.cache
+# --- 2026-08-10 round 5: 内部设计文档 + 运维治理 ---
+docs/design/
+docs/governance/ROOT-HYGIENE-POLICY.md
+docs/governance/disaster-recovery-runbook.md
