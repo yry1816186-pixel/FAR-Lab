@@ -348,6 +348,30 @@ export const en: Record<MessageKey, string> = {
   'court.honestyTitle': 'Honesty statement',
   'court.redLine': 'Red line: each model’s verdict is given by the deterministic R0-R9 kernel; the LLM is not the arbiter. Real cross-model disagreement requires far court --models against a real provider (credential gate).',
 
+  // ---- CourtPage live form (WS-B.2) ----
+  'court.live.title': 'Run a live court session',
+  'court.live.desc': 'Submit any scientific claim and a list of models. The deterministic R0-R9 kernel judges each model\'s evidence independently.',
+  'court.live.claimLabel': 'Claim',
+  'court.live.claimPlaceholder': 'e.g. Does model A achieve mean accuracy >= 0.72 on benchmark Z?',
+  'court.live.modelsLabel': 'Models (comma-separated labels)',
+  'court.live.run': 'Run live session',
+  'court.live.running': 'Running…',
+
+  // ---- ArenaPage live form (WS-B.2) ----
+  'arena.live.title': 'Run a live arena session',
+  'arena.live.desc': 'Submit any scientific hypothesis and a list of refuter labels. The deterministic arbiter detects whether any refuter breaks the claim.',
+  'arena.live.hypothesisLabel': 'Hypothesis',
+  'arena.live.hypothesisPlaceholder': 'e.g. Does model A achieve mean accuracy >= 0.72 on benchmark Z?',
+  'arena.live.refutersLabel': 'Refuters (comma-separated labels)',
+  'arena.live.run': 'Run live session',
+  'arena.live.running': 'Running…',
+
+  // ---- LLM status banner (WS-B.2 · shared across Wizard / Court / Arena) ----
+  'llm.status.liveTitle': 'Live mode — real inference',
+  'llm.status.liveBody': 'A DASHSCOPE_API_KEY is configured. Your claims are sent to a real language model; the verdict depends on your input.',
+  'llm.status.offlineTitle': 'Offline replay mode',
+  'llm.status.offlineBody': 'No DASHSCOPE_API_KEY configured. Every claim runs against a fixed replay fixture, so the verdict will be the same regardless of input. Set the key in the server environment to enable live inference.',
+
   // ---- ArenaPage ----
   'arena.title': 'Adversarial Science Arena',
   'arena.subtitle': 'Adversarial Science Arena · W3 / FI-2',

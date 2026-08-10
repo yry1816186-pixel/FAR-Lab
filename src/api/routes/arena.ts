@@ -21,7 +21,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import { internalError } from '../errors/error_handler.ts';
+import { ApiError, internalError } from '../errors/error_handler.ts';
 import { runArenaSession } from '../internal/arena_service.ts';
 import { createAsyncSingletonCache } from '../internal/singleton_cache.ts';
 import { resolveGitCommitSha } from '../../cli/git_commit_sha.ts';
@@ -85,18 +85,11 @@ export async function registerArenaRoute(
     // offline 模式（principal 未挂载或 anonymous）全放行（设计·24§3.1 双轨）。
     const role = request.principal?.role ?? 'anonymous';
     if (role !== 'anonymous' && role !== 'researcher' && role !== 'admin') {
-      return reply.status(403).send({
-        error_code: 'FORBIDDEN',
-        message: 'viewer role is read-only (arena: researcher/admin required)',
-      });
+      throw new ApiError({ statusCode: 403, errorCode: 'FORBIDDEN', message: 'viewer role is read-only (arena: researcher/admin required)' });
     }
     const parsed = ArenaLiveRequestSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(400).send({
-        error_code: 'VALIDATION_FAILED',
-        message: 'arena live request body invalid',
-        detail: parsed.error.issues,
-      });
+      throw new ApiError({ statusCode: 400, errorCode: 'VALIDATION_FAILED', message: 'arena live request body invalid', detail: parsed.error.issues });
     }
     try {
       const result = await runArenaSession(
@@ -108,7 +101,7 @@ export async function registerArenaRoute(
           ...(config?.profile === undefined ? {} : { providerProfile: config.profile }),
         },
       );
-      return reply.send(result);
+      void reply.send(result);
     } catch (err) {
       throw internalError('arena live session failed', err);
     }

@@ -1,26 +1,23 @@
 /**
  * CourtPage —— 跨模型可靠性法庭可视化（FI-3）。
  *
- * Authority: src/api/internal/court_service.ts ReliabilityCertificate + GET /api/v1/court/demo。
+ * 端点：GET /api/v1/court/demo（参考 fixture）+ POST /api/v1/court（WS-A.2 live）。
+ * 四组件：LiveSessionForm（WS-B.2）+ AgreementHero + ModelVerdictTable + HonestyAlert。
  *
- * 三组件：
- *   1. AgreementHero — 一致性分类徽章（unanimous / majority / split）+ 模型数 + 证书 ID。
- *   2. ModelVerdictTable — 每个模型的裁决条目（model / verdict / decisiveRuleId / chainHead）。
- *   3. HonestyAlert — 诚实声明（offline_replay 同 fixture→unanimous·真实分歧需凭据门·LLM 非裁决者）。
- *
- * 诚实定位（红线）：
- *   - demo 用 offline_replay（零 key·同 fixture），verdict 必然 unanimous——展示「多模型法庭框架
- *     + 一致性检测 + 证书结构」，非真实模型分歧。
- *   - 每个模型 verdict 仍由 R0-R9 确定性内核给出（LLM 非裁决者）。
- *   - 真实多模型分歧须 far court --models 接真实 provider（凭据门）。
+ * 诚实定位（红线）：demo 用 offline_replay（同 fixture→unanimous）。live 表单：DASHSCOPE_API_KEY
+ * 配置时走真实 provider（datasetSource=real），否则诚实降级 offline replay。每个模型 verdict 由
+ * R0-R9 确定性内核给出（LLM 非裁决者）。
  */
 
-import { useCourtDemo } from '@/lib/api_client';
+import { useState } from 'react';
+import { useCourtDemo, useCourtLive, useLlmStatus } from '@/lib/api_client';
+import type { CourtCertificateDto } from '@/lib/types';
 import { useT } from '@/lib/i18n';
 import type { VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { IntegrityBadge } from '@/components/IntegrityBadge';
 import {
@@ -31,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Gavel, Users, ShieldAlert } from 'lucide-react';
+import { Gavel, Users, ShieldAlert, Zap } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const FIVE_VERDICTS = new Set<string>([
@@ -58,53 +55,11 @@ function isVerdictValue(v: string): v is VerdictValue {
   return FIVE_VERDICTS.has(v);
 }
 
-export default function CourtPage() {
+/** CertificateDisplay — 复用展示组件（demo + live 共用·根据 cert 渲染）。 */
+function CertificateDisplay({ cert }: { readonly cert: CourtCertificateDto }) {
   const t = useT();
-  const { data: cert, isLoading, isError, error } = useCourtDemo();
-
-  if (isLoading) {
-    return (
-      <div className="space-y-8" data-testid="court-loading-skeleton">
-        <header className="space-y-2">
-          <Skeleton className="h-8 w-72" />
-          <Skeleton className="h-4 w-96 max-w-full" />
-        </header>
-        <Skeleton className="h-28 w-full rounded-lg" />
-        <Skeleton className="h-64 w-full rounded-lg" />
-      </div>
-    );
-  }
-
-  if (isError || cert === undefined) {
-    return (
-      <div className="space-y-8">
-        <header>
-          <h1 className="text-3xl font-bold tracking-tight">{t('court.title')}</h1>
-          <p className="mt-1 text-muted-foreground">{t('court.subtitle')}</p>
-        </header>
-        <Alert variant="destructive">
-          <AlertTitle>{t('court.errorTitle')}</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error ? error.message : t('arena.noVerdict')}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
-          <Gavel className="h-7 w-7" aria-hidden="true" />
-          {t('court.title')}
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {t('court.subtitle2')}
-        </p>
-      </header>
-
-      {/* AgreementHero */}
+    <>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -131,7 +86,6 @@ export default function CourtPage() {
         </CardContent>
       </Card>
 
-      {/* ModelVerdictTable */}
       <Card>
         <CardHeader>
           <CardTitle>{t('court.tableTitle')}</CardTitle>
@@ -181,7 +135,6 @@ export default function CourtPage() {
         </CardContent>
       </Card>
 
-      {/* HonestyAlert */}
       <Alert>
         <ShieldAlert className="h-4 w-4" aria-hidden="true" />
         <AlertTitle className="flex items-center gap-2">{t('court.honestyTitle')} <IntegrityBadge source={cert.datasetSource} /></AlertTitle>
@@ -192,6 +145,118 @@ export default function CourtPage() {
           </p>
         </AlertDescription>
       </Alert>
+    </>
+  );
+}
+
+export default function CourtPage() {
+  const t = useT();
+  const { data: demoCert, isLoading, isError, error } = useCourtDemo();
+  const { data: llmStatus } = useLlmStatus();
+  const courtLive = useCourtLive();
+
+  const [liveClaim, setLiveClaim] = useState('');
+  const [liveModels, setLiveModels] = useState('alpha, beta, gamma');
+
+  const isLiveMode = llmStatus?.keyConfigured === true;
+
+  const handleLiveRun = () => {
+    const models = liveModels.split(',').map((m) => m.trim()).filter((m) => m.length > 0);
+    if (liveClaim.trim().length === 0 || models.length === 0) return;
+    void courtLive.mutate({ claim: liveClaim.trim(), models });
+  };
+
+  return (
+    <div className="space-y-8">
+      <header>
+        <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
+          <Gavel className="h-7 w-7" aria-hidden="true" />
+          {t('court.title')}
+        </h1>
+        <p className="mt-1 text-muted-foreground">{t('court.subtitle2')}</p>
+      </header>
+
+      {/* WS-B.2 LLM 状态横幅——诚实展示 live / offline replay */}
+      <Alert data-testid="court-llm-status">
+        <Zap className="h-4 w-4" aria-hidden="true" />
+        <AlertTitle>{isLiveMode ? t('llm.status.liveTitle') : t('llm.status.offlineTitle')}</AlertTitle>
+        <AlertDescription>
+          {isLiveMode ? t('llm.status.liveBody') : t('llm.status.offlineBody')}
+        </AlertDescription>
+      </Alert>
+
+      {/* WS-B.2 Live session form */}
+      <Card data-testid="court-live-form">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gavel className="h-5 w-5" aria-hidden="true" />
+            {t('court.live.title')}
+          </CardTitle>
+          <CardDescription>{t('court.live.desc')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="court-live-claim" className="text-sm font-medium">
+              {t('court.live.claimLabel')}
+            </label>
+            <textarea
+              id="court-live-claim"
+              className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder={t('court.live.claimPlaceholder')}
+              value={liveClaim}
+              onChange={(e) => setLiveClaim(e.target.value)}
+              data-testid="court-live-claim-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="court-live-models" className="text-sm font-medium">
+              {t('court.live.modelsLabel')}
+            </label>
+            <input
+              id="court-live-models"
+              type="text"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={liveModels}
+              onChange={(e) => setLiveModels(e.target.value)}
+              data-testid="court-live-models-input"
+            />
+          </div>
+          <Button onClick={handleLiveRun} disabled={courtLive.isPending || liveClaim.trim().length === 0} data-testid="court-live-run">
+            {courtLive.isPending ? t('court.live.running') : t('court.live.run')}
+          </Button>
+          {courtLive.isError ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                {courtLive.error instanceof Error ? courtLive.error.message : t('arena.noVerdict')}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {courtLive.data ? (
+        <div data-testid="court-live-result">
+          <CertificateDisplay cert={courtLive.data} />
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="space-y-4" data-testid="court-loading-skeleton">
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </div>
+      ) : isError || demoCert === undefined ? (
+        <Alert variant="destructive">
+          <AlertTitle>{t('court.errorTitle')}</AlertTitle>
+          <AlertDescription>
+            {error instanceof Error ? error.message : t('arena.noVerdict')}
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <div data-testid="court-demo-reference">
+          <CertificateDisplay cert={demoCert} />
+        </div>
+      )}
     </div>
   );
 }
