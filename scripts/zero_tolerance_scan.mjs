@@ -307,7 +307,13 @@ function scanCommentChannel(filePath, index, rawLine, findingsOut) {
 
 const findings = [];
 
-for (const root of roots) {
+// CI_ZT_NEGATIVE_ROOTS env 供元测试用 mkdtemp 隔离（对齐 CI04_NEGATIVE_ROOTS 模式：
+// 避免向仓库 tests/ 注入临时坏文件时与其他并发 walk 扫描产生 walk↔readFile 竞态）。
+// 默认 = 生产 roots 全集；env 指定时完全替代（元测试只扫隔离目录）。
+const negativeRootsRaw = process.env.CI_ZT_NEGATIVE_ROOTS;
+const effectiveRoots = negativeRootsRaw !== undefined && negativeRootsRaw !== '' ? negativeRootsRaw.split(';') : roots;
+
+for (const root of effectiveRoots) {
   for (const filePath of walk(root)) {
     if (skippedFiles.has(normalize(filePath))) {
       continue;
@@ -402,7 +408,13 @@ const f4OverclaimPatterns = [
 ];
 
 const f4OverclaimFindings = [];
-for (const filePath of walk('src')) {
+// CI_ZT_F4_ROOTS env 供元测试用 mkdtemp 隔离（对齐 CI04_NEGATIVE_ROOTS 模式：
+// 避免 zero_tolerance_scan.test.ts 注入/删除 src/ 临时文件时与其他 walk src 的
+// 并发扫描（no_llm_final_judge_scan 等）产生 walk↔readFile 竞态）。默认 src（生产）。
+const f4RootsRaw = process.env.CI_ZT_F4_ROOTS;
+const f4Roots = f4RootsRaw !== undefined && f4RootsRaw !== '' ? f4RootsRaw.split(';') : ['src'];
+for (const f4Root of f4Roots) {
+for (const filePath of walk(f4Root)) {
   if (skippedFiles.has(normalize(filePath))) {
     continue;
   }
@@ -418,6 +430,7 @@ for (const filePath of walk('src')) {
       }
     }
   }
+}
 }
 
 // ---------- dialogue 层红线专项扫描（src/dialogue/ · 模型中立层隔离） ----------

@@ -13,6 +13,7 @@ import { rowToVerdictNode } from '../falsifiability/repository.ts';
 import type { VerdictNodeRow } from '../falsifiability/repository.ts';
 import type { VerdictNode } from '../falsifiability/types.ts';
 import type { ReportData, ReportSection } from './types.ts';
+import { estimateUsdCost } from '../llm_gateway/pricing.ts';
 import { trapTaxonomyFor } from '../anti_theater/trap_taxonomy.ts';
 import type { TrapSummary } from '../anti_theater/trap_taxonomy.ts';
 
@@ -47,6 +48,12 @@ interface CallRecordSummaryRow {
    * 由 response_payload 中的 credential.tokenUsage.measured 提取，不依赖 model_id 命名约定。
    */
   readonly measured: number | null;
+  /**
+   * 1128 效率面：response_payload 中 credential.tokenUsage 的输入/输出拆分
+   * （call_records 表仅落库 usage_tokens_total 单值；拆分用于 estimateUsdCost
+   * 精确成本核算）。无法提取 → null（诚实：不编造拆分）。
+   */
+  readonly tokenUsage: { readonly inputTokens: number; readonly outputTokens: number } | null;
 }
 
 /** queryCallRecords 的 SQL 行：额外携带 response_payload 用于提取 measured 标记。 */
@@ -114,8 +121,47 @@ function queryCallRecords(db: Database.Database): CallRecordSummaryRow[] {
     return {
       ...rest,
       measured: extractMeasuredFlag(response_payload),
+      tokenUsage: extractTokenUsage(response_payload),
     };
   });
+}
+
+/**
+ * 从 call_records.response_payload（canonical JSON { content, credential: { tokenUsage, ... }, raw }）
+ * 提取输入/输出 token 拆分（1128 效率面 per-verdict $ 成本核算）。
+ *
+ * 语义：tokenUsage.inputTokens/outputTokens 均为非负 number 才返回拆分；
+ * 缺失/结构不符/非法值 → null（fail-conservative：不编造拆分，成本侧诚实标注不可计价）。
+ * 非法 JSON = payload 字节被篡改 → JSON.parse 异常向上传播（fail-closed，与 extractMeasuredFlag 同语义）。
+ */
+function extractTokenUsage(
+  responsePayload: string,
+): { readonly inputTokens: number; readonly outputTokens: number } | null {
+  const parsed: unknown = JSON.parse(responsePayload);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+  const credential = (parsed as Record<string, unknown>).credential;
+  if (typeof credential !== 'object' || credential === null) {
+    return null;
+  }
+  const tokenUsage = (credential as Record<string, unknown>).tokenUsage;
+  if (typeof tokenUsage !== 'object' || tokenUsage === null) {
+    return null;
+  }
+  const inputTokens = (tokenUsage as Record<string, unknown>).inputTokens;
+  const outputTokens = (tokenUsage as Record<string, unknown>).outputTokens;
+  if (
+    typeof inputTokens !== 'number' ||
+    !Number.isFinite(inputTokens) ||
+    inputTokens < 0 ||
+    typeof outputTokens !== 'number' ||
+    !Number.isFinite(outputTokens) ||
+    outputTokens < 0
+  ) {
+    return null;
+  }
+  return { inputTokens, outputTokens };
 }
 
 /**
@@ -414,12 +460,34 @@ function buildStageSummarySection(
       ...new Set(records.map((r) => r.finish_reason)),
     ].join(', ');
 
+    // 1128 效率面：per-stage 美元成本估算（estimateUsdCost·FOCUS 口径）。
+    // 仅真实计量（measured !== 0）+ 有输入/输出拆分的记录参与；价格缺失 → priced=false。
+    // 伪 token（offline_replay 字符估算）不混入成本（CU4-02 口径混叠消除同源）。
+    let inputSum = 0;
+    let outputSum = 0;
+    let pricedRecords = 0;
+    for (const r of records) {
+      if (r.measured === 0 || r.tokenUsage === null) continue;
+      inputSum += r.tokenUsage.inputTokens;
+      outputSum += r.tokenUsage.outputTokens;
+      pricedRecords += 1;
+    }
+    const modelId = records.find((r) => r.measured !== 0 && r.model_id !== '')?.model_id ?? '';
+    const cost = modelId !== '' && pricedRecords > 0
+      ? estimateUsdCost(modelId, inputSum, outputSum)
+      : null;
+
     lines.push(`### ${stageLabel(stageId)}`);
     lines.push('');
     lines.push(`- Calls: ${records.length}`);
     lines.push(`- Total tokens: ${totalTokens}`);
     if (pseudoTokens > 0) {
       lines.push(`- Pseudo tokens (offline_replay char-estimate, not real metering): ${pseudoTokens}`);
+    }
+    if (cost !== null && cost.priced && cost.totalUsd !== null) {
+      lines.push(`- Estimated cost: \$${cost.totalUsd.toFixed(4)} (${modelId} · ${inputSum} in / ${outputSum} out tokens)`);
+    } else if (cost !== null && pricedRecords > 0) {
+      lines.push(`- Estimated cost: not priced (${modelId} missing from price table)`);
     }
     lines.push(`- Finish reasons: ${finishReasons}`);
     lines.push(`- Evidence entries: ${stageEvidence.length}`);

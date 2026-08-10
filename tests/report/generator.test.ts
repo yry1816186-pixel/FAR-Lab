@@ -356,6 +356,77 @@ test('offline-replay-prefixed model without measured=false is not counted as pse
   db.close();
 });
 
+/** 真实计量 response_payload（tokenUsage 拆分 + measured 缺省 true）。 */
+function realMeteredAuditData(inputTokens: number, outputTokens: number): CallAuditData {
+  return {
+    requestPayload: canonical({ prompt: 'test' }),
+    responsePayload: canonical({
+      content: 'response',
+      credential: {
+        providerProfile: 'competition_aliyun_qwen',
+        tokenUsage: {
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+          // measured 缺省 true（真实计量）
+        },
+      },
+      raw: null,
+    }),
+    finishReason: 'stop',
+    usageTokensTotal: inputTokens + outputTokens,
+  };
+}
+
+test('1128 效率面: per-stage USD cost line rendered from tokenUsage split', () => {
+  const db = openDb();
+  const runId = `run-${ulid()}`;
+
+  // 真实计量 + priced 模型（qwen-plus：input 0.4 / output 1.2 每 M token）
+  seedRecord(db, 'stage3_hypothesis', 'qwen-plus', realMeteredAuditData(1_000_000, 500_000));
+  // 伪 token 记录（measured=false）：不参与成本核算（CU4-02 口径混叠消除）
+  seedRecord(db, 'stage3_hypothesis', 'qwen-plus', pseudoAuditData(999_999_999), 'baseline_exempt');
+
+  const report = generateReport({ db, runId });
+  const stageSection = report.sections.find(
+    (s) => s.title === 'Six-stage output summary',
+  );
+  assert.ok(stageSection !== undefined);
+
+  // 成本 = 1M input × 0.4 + 0.5M output × 1.2 = 0.4 + 0.6 = $1.0000
+  assert.ok(
+    stageSection.body.includes('Estimated cost: $1.0000 (qwen-plus · 1000000 in / 500000 out tokens)'),
+    `expected priced cost line, got:\n${stageSection.body}`,
+  );
+  // 伪 token 不混入成本行（成本仅真实计量记录参与——Cost 行不含伪 token 数）
+  assert.ok(
+    !stageSection.body.includes('Estimated cost: $4.00') && !stageSection.body.includes('Estimated cost: not priced'),
+    'pseudo-token record must not join the cost calculation',
+  );
+
+  db.close();
+});
+
+test('1128 效率面: unpriced model → cost line honest "not priced"', () => {
+  const db = openDb();
+  const runId = `run-${ulid()}`;
+
+  // 真实计量但价格表缺失的模型 → 诚实标注不可计价（fail-conservative）
+  seedRecord(db, 'stage3_hypothesis', 'unknown-model-x', realMeteredAuditData(1000, 500));
+
+  const report = generateReport({ db, runId });
+  const stageSection = report.sections.find(
+    (s) => s.title === 'Six-stage output summary',
+  );
+  assert.ok(stageSection !== undefined);
+  assert.ok(
+    stageSection.body.includes('Estimated cost: not priced (unknown-model-x missing from price table)'),
+    `expected honest not-priced line, got:\n${stageSection.body}`,
+  );
+
+  db.close();
+});
+
 test('generateReport handles DEGRADED_SCOPE verdict', () => {
   const db = openDb();
   const runId = `run-${ulid()}`;
