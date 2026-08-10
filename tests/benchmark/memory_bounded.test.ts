@@ -61,12 +61,13 @@ test('性能 P2: 100 claims 处理堆增长 <5%（有界·无泄漏）', async (
     prev = cur;
   }
 
-  // 趋势判据：末批增量 < 首批增量 × 1.5（无持续加速增长 = 无泄漏信号）
+  // 趋势判据：末批增量 < 首批增量 × 1.5（无持续加速增长 = 无泄漏信号）。
+  // 负增量（GC 回收）视同收敛：仅对正增量判趋势（负数 ×1.5 方向相反会误报，CI 实测首批 -3.61MB）。
   const first = deltas[0] ?? 0;
   const last = deltas[deltas.length - 1] ?? 0;
   const totalGrowthMb = (prev - baseline) / 1024 / 1024;
   assert.ok(
-    last < first * 1.5,
+    last < Math.max(first, 0) * 1.5,
     `堆增量须收敛（非递增）：首批 ${(first / 1024 / 1024).toFixed(2)}MB → 末批 ${(last / 1024 / 1024).toFixed(2)}MB`,
   );
   assert.ok(
