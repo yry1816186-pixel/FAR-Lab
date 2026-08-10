@@ -87,6 +87,15 @@ export async function registerHypothesizeRoute(
   config: HypothesizeRouteConfig,
 ): Promise<void> {
   app.post('/hypothesize', async (request, reply) => {
+    // API1 BOLA 修复（阶段 7 1128 安全面）：受保护模式下（principal 非 anonymous）
+    // 写路由须 researcher+ 角色。offline 模式 anonymous 全放行（设计·24§3.1 双轨）。
+    if (request.principal.role !== 'anonymous' && request.principal.role !== 'researcher' && request.principal.role !== 'admin') {
+      throw new ApiError({
+        statusCode: 403,
+        errorCode: 'FORBIDDEN',
+        message: 'viewer role is read-only (hypothesize: researcher/admin required)',
+      });
+    }
     const parsed = HypothesizeRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       throw new ApiError({
