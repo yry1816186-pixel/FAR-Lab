@@ -348,6 +348,7 @@ export const queryKeys = {
   benchmark: ['benchmark'] as const,
   court: ['court'] as const,
   arena: ['arena'] as const,
+  llmStatus: ['llm-status'] as const,
   lifecycleEvents: (targetKind: string, targetId: string) =>
     ['lifecycle', 'events', targetKind, targetId] as const,
 } as const;
@@ -597,6 +598,72 @@ export function useCourtDemo(
         'GET /court/demo',
       ),
     ...options,
+  });
+}
+
+// ---------- WS-A/B live LLM hooks：让前端能跑真实推理 ----------
+// /llm-status 暴露运行期 LLM profile + keyConfigured（不泄漏 key）。
+// 前端据此显示「live 模式」徽章或「offline replay」诚实横幅——治「每个问题同一裁决」感知。
+// POST /court + POST /arena live：用户提交任意 claim/hypothesis + models/refuters，透传真实 gateway。
+
+/** GET /api/v1/llm-status 响应——运行期 LLM 状态（profile + keyConfigured）。 */
+export interface LlmStatusDto {
+  readonly profile: string;
+  readonly keyConfigured: boolean;
+}
+
+/** POST /api/v1/court 请求体（WS-A.2 live）。 */
+export interface CourtLiveRequest {
+  readonly claim: string;
+  readonly models: readonly string[];
+}
+
+/** POST /api/v1/arena 请求体（WS-A.3 live）。 */
+export interface ArenaLiveRequest {
+  readonly hypothesis: string;
+  readonly refuters: readonly string[];
+}
+
+/** GET /api/v1/llm-status — 运行期 LLM 状态（profile + keyConfigured）。 */
+export function useLlmStatus(
+  options?: Omit<UseQueryOptions<LlmStatusDto, Error>, 'queryKey' | 'queryFn'>,
+) {
+  return useQuery<LlmStatusDto, Error>({
+    queryKey: queryKeys.llmStatus,
+    queryFn: async () =>
+      parseV1Response<LlmStatusDto>(
+        await fetchJson<unknown>('/api/v1/llm-status'),
+        'GET /llm-status',
+      ),
+    ...options,
+  });
+}
+
+/** POST /api/v1/court — live 跨模型法庭（用户提交 claim + models）。 */
+export function useCourtLive() {
+  return useMutation<CourtCertificateDto, Error, CourtLiveRequest>({
+    mutationFn: async (body: CourtLiveRequest) =>
+      parseV1Response<CourtCertificateDto>(
+        await fetchJson<unknown>('/api/v1/court', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+        'POST /court',
+      ),
+  });
+}
+
+/** POST /api/v1/arena — live 对抗竞技场（用户提交 hypothesis + refuters）。 */
+export function useArenaLive() {
+  return useMutation<ArenaResultDto, Error, ArenaLiveRequest>({
+    mutationFn: async (body: ArenaLiveRequest) =>
+      parseV1Response<ArenaResultDto>(
+        await fetchJson<unknown>('/api/v1/arena', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+        'POST /arena',
+      ),
   });
 }
 

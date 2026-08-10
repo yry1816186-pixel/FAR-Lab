@@ -39,6 +39,12 @@ function mockArenaOk() {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    if (url.endsWith('/llm-status')) {
+      return new Response(JSON.stringify({ ok: true, data: { profile: 'offline_replay', keyConfigured: false } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     return new Response('', { status: 404 });
   });
 }
@@ -76,6 +82,19 @@ describe('ArenaPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Arena session failed')).toBeInTheDocument();
+    });
+  });
+
+  it('WS-B.2 渲染 live 表单 + offline replay 状态横幅', async () => {
+    mockArenaOk();
+    renderWithQueryClient(<ArenaPage />);
+
+    expect(screen.getByTestId('arena-live-form')).toBeInTheDocument();
+    expect(screen.getByTestId('arena-live-hypothesis-input')).toBeInTheDocument();
+    expect(screen.getByTestId('arena-live-run')).toBeDisabled();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('arena-llm-status')).toHaveTextContent('Offline replay mode');
     });
   });
 });

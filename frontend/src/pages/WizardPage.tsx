@@ -46,7 +46,7 @@ import { Button } from '@/components/ui/button';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { cn } from '@/lib/utils';
 import { useTimeout } from '@/lib/useTimeout';
-import { useHypothesize, usePersistReceipt } from '@/lib/api_client';
+import { useHypothesize, usePersistReceipt, useLlmStatus } from '@/lib/api_client';
 import { useT, type MessageKey } from '@/lib/i18n';
 import type { VerdictValue, V2ManifestMember } from '@/lib/types';
 import { REQUIRED_MANIFEST_MEMBER_KINDS } from '@/lib/types';
@@ -197,6 +197,7 @@ export default function WizardPage(): JSX.Element {
 
   const hypothesize = useHypothesize();
   const persistReceipt = usePersistReceipt();
+  const { data: llmStatus } = useLlmStatus();
   const schedule = useTimeout();
 
   const runVerification = useCallback(async () => {
@@ -318,6 +319,22 @@ export default function WizardPage(): JSX.Element {
         <p className="text-sm text-muted-foreground">
           {t('wizard.subtitle')}
         </p>
+      </div>
+
+      {/* WS-B.3 LLM 状态横幅——治「每个问题同一裁决」感知：诚实展示 live / offline replay */}
+      <div
+        className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${llmStatus?.keyConfigured === true ? 'border-green-200 bg-green-50 text-green-900 dark:border-green-900 dark:bg-green-950 dark:text-green-100' : 'border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900 dark:bg-yellow-950 dark:text-yellow-100'}`}
+        data-testid="wizard-llm-status"
+      >
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <div>
+          <strong>
+            {llmStatus?.keyConfigured === true ? t('llm.status.liveTitle') : t('llm.status.offlineTitle')}
+          </strong>
+          <p className="mt-0.5">
+            {llmStatus?.keyConfigured === true ? t('llm.status.liveBody') : t('llm.status.offlineBody')}
+          </p>
+        </div>
       </div>
 
       {/* Step indicator */}
