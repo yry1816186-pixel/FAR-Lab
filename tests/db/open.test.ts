@@ -143,10 +143,15 @@ test('② RT-05-B:备份存在时,删热 WAL 静默尾丢可恢复', async () =>
     child.kill('SIGKILL');
     await exited;
 
-    // 删热 WAL(F-02 攻击面)
+    // 删热 WAL(F-02 攻击面)——连同 -shm 一起删（完整文件级破坏模拟）：
+    // macOS 上 -shm 残留会让 SQLite 打开时恢复 WAL 帧索引→尾丢不可观测（2026-08-10 CI 实测）。
     const walPath = `${dbPath}-wal`;
+    const shmPath = `${dbPath}-shm`;
     assert.ok(existsSync(walPath), '热 WAL 应存在');
     rmSync(walPath);
+    if (existsSync(shmPath)) {
+      rmSync(shmPath);
+    }
 
     // 尾丢如实观测:uncheckpointed-row 丢失,checkpointed-row 仍在
     const after = openFarDb(dbPath, { readonly: true, integrityCheck: 'quick' });
