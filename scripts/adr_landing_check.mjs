@@ -84,7 +84,19 @@ function checkAdr(adrId) {
 }
 
 function main() {
-  const adrFiles = readdirSync(DECISIONS_DIR).filter((f) => /^ADR-\d+\.yaml$/.test(f)).sort();
+  // .far-design/ 已 untrack 出公开仓库（2026-08-10 治理清理 AI agent scaffolding）——
+  // CI checkout 无 DECISIONS 目录 → 门禁对象不在仓库内 → 环境声明 skip（exit 0 + 明确输出，非假装通过）。
+  let adrFiles;
+  try {
+    adrFiles = readdirSync(DECISIONS_DIR).filter((f) => /^ADR-\d+\.yaml$/.test(f)).sort();
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      console.log(`adr_landing_check: DECISIONS 目录不存在（${DECISIONS_DIR} 已 untrack 出仓库）——ADR 落地检查环境性跳过`);
+      process.exitCode = 0;
+      return;
+    }
+    throw err;
+  }
   const results = adrFiles.map((f) => checkAdr(f.replace('.yaml', '')));
 
   const landed = results.filter((r) => r.hit).length;
