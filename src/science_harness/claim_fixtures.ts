@@ -25,7 +25,7 @@
 export interface ClaimFixtureRoadmapEntry {
   /** fixture id（22 T-W2-06）。 */
   readonly fixtureId: string;
-  /** claimType 措辞（22 T-W2-06；见模块头 08↔22 TODO）。 */
+  /** claimType 措辞（22 T-W2-06 三 claimType 全交付，见模块头）。 */
   readonly claimType: string;
   /** 科学域。 */
   readonly domain: string;
