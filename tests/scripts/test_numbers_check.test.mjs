@@ -55,7 +55,7 @@ test('P0-8: end-to-end --check exits 0 when AGENTS.md matches actual numbers', (
   const specFile = join(here, '_test_numbers_fixture.txt');
   writeFileSync(
     specFile,
-    ['ℹ tests 2703', 'ℹ pass 2697', 'ℹ fail 0', 'ℹ skipped 6'].join('\n'),
+    ['ℹ tests 2712', 'ℹ pass 2706', 'ℹ fail 0', 'ℹ skipped 6'].join('\n'),
     'utf8',
   );
   try {
