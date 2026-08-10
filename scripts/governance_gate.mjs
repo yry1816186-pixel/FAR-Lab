@@ -32,7 +32,7 @@ function run(cmd, args, timeoutMs = 300000, useShell = false) {
   }
 }
 
-const RED_LINE = new Set(['typecheck', 'lint', 'test', 'coverage', 'fitness', 'design_lint', 'zero_tolerance', 'anti_theater']);
+const RED_LINE = new Set(['typecheck', 'lint', 'test', 'coverage', 'fitness', 'design_lint', 'zero_tolerance', 'anti_theater', 'adr_landing']);
 
 /** Windows 上 pnpm 是 .cmd shim，execFileSync 需显式 .cmd（项目陷阱文档正解）。 */
 const PNPM = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
@@ -52,6 +52,10 @@ function measureSli() {
   results.zero_tolerance = run('node', ['scripts/zero_tolerance_scan.mjs']).exit === 0;
   results.anti_theater = run('node', ['scripts/anti_theater_deterministic_scan.mjs']).exit === 0;
 
+  // ADR 落地率（阶段 7 1125 · P2-C）：21 个 ADR 的 decision 锚点机器核对——
+  // 任何 ADR 决策无代码机制 = 治理红线违规（RED_LINE 含 adr_landing）。
+  results.adr_landing = run('node', ['scripts/adr_landing_check.mjs']).exit === 0;
+
   // hero 性能（阶段 7 P2-A · B4-G6 接线）：真实 seal 基准实测——不再依赖日志文件存在性
   // （旧实现恒 UNKNOWN 当日志缺失·观测面死锁）。实测路径 = performance_benchmark.test.ts
   // 三个门槛（seal<200ms / hash>1000 ops/s / GV cross-lang<30s）→ exit 0 即「实测达标」。
@@ -63,6 +67,11 @@ function measureSli() {
       240000,
       true,
     ).exit === 0;
+
+  // 可观测告警（阶段 7 1124 · P2-B 首步）：/metrics 阈值检查（degraded_scope 占比 /
+  // degradation 增长率 / 端点可达）。非 RED_LINE：无 API 运行时端点不可达是本地
+  // 常态（fail-open 检测、fail-closed 报告）——部署态须重定义数据源与告警通道。
+  results.metrics_alert = run('node', ['scripts/metrics_alert.mjs']).exit === 0;
 
   return results;
 }

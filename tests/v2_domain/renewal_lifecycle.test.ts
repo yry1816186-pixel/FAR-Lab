@@ -47,7 +47,7 @@ test('assertSuiteRenewalTransition: predecessor stopSignDate < renewalDate → n
   assert.doesNotThrow(() => {
     assertSuiteRenewalTransition(
       'far.sig.ed25519-sha256.v1',
-      'far.sig.ed25519-postquantum.v1',
+      'far.sig.ml-dsa-44-sha512.v1',
       '2030-06-01T00:00:00Z',
     );
   });
@@ -58,7 +58,7 @@ test('assertSuiteRenewalTransition: renewalDate <= stopSignDate → throws RENEW
   assert.throws(
     () => assertSuiteRenewalTransition(
       'far.sig.ed25519-sha256.v1',
-      'far.sig.ed25519-postquantum.v1',
+      'far.sig.ml-dsa-44-sha512.v1',
       '2029-12-01T00:00:00Z',
     ),
     { message: /RENEWAL_BEFORE_STOP_SIGN/ },
@@ -70,7 +70,7 @@ test('assertSuiteRenewalTransition: renewalDate exactly stopSignDate → throws 
   assert.throws(
     () => assertSuiteRenewalTransition(
       'far.sig.ed25519-sha256.v1',
-      'far.sig.ed25519-postquantum.v1',
+      'far.sig.ml-dsa-44-sha512.v1',
       '2030-01-01T00:00:00Z',
     ),
     { message: /RENEWAL_BEFORE_STOP_SIGN/ },
@@ -129,4 +129,23 @@ test('isSuiteExpired: atDate >= stopVerifyDate → true', () => {
 
 test('isSuiteExpired: atDate well past stopVerifyDate → true', () => {
   assert.equal(isSuiteExpired(suite(), '2040-01-01T00:00:00Z'), true);
+});
+
+// ---------------------------------------------------------------------------
+// CZ1-01（阶段 7 P1）：PQC 继任 suite 注册回归——successor 链在注册表内闭环
+// ---------------------------------------------------------------------------
+
+test('CZ1-01: ed25519 successor points to a registered ML-DSA suite (PQC renewal path)', () => {
+  const ed25519 = SIGNATURE_ALGORITHM_SUITES.find((s) => s.suiteId === 'far.sig.ed25519-sha256.v1');
+  assert.ok(ed25519, 'ed25519 suite must exist');
+  const successorId = ed25519.renewalPolicy.successorSuiteId;
+  assert.ok(successorId, 'ed25519 must declare a PQC successor');
+  const successor = SIGNATURE_ALGORITHM_SUITES.find((s) => s.suiteId === successorId);
+  assert.ok(successor, `successor "${successorId}" must be registered`);
+  // ML-DSA stopSign 必须晚于 ed25519 stopSign（轮换窗口有效）
+  assert.ok(
+    successor.renewalPolicy.stopSignDate > ed25519.renewalPolicy.stopSignDate,
+    'ML-DSA stopSign must be after ed25519 stopSign (2030 NIST IR 8547 line)',
+  );
+  assert.match(successor.signatureAlgorithm, /FIPS 204/, 'successor must be a FIPS 204 (ML-DSA) suite');
 });

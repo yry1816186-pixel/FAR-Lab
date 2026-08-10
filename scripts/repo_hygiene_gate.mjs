@@ -28,6 +28,7 @@ const ALLOW_FILES = new Set([
   'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'eslint.config.mjs',
   'pyproject.toml', 'uv.lock', '.npmrc', '.env.example', 'Dockerfile', 'docker-compose.yml',
   'Makefile', '.gitignore', '.dockerignore', '.editorconfig', '.gitattributes', '.python-version',
+  '.zenodo.json',
 ]);
 
 /** 根目录目录白名单（前缀匹配，其下内容由各自规范管理）。 */
