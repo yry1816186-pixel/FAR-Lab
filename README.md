@@ -282,6 +282,20 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions must pass
 
 ---
 
+## AI usage disclosure
+
+**Honest statement** (per [JOSS AI Usage Policy 2026](https://joss.readthedocs.io/) / ICMJE / COPE):
+All code in this repository was written by **AI coding agents** (Claude Code AI); the human
+author is responsible for design decisions, requirements, acceptance, and release. The
+deterministic test suite (2693 tests) independently validates behavior. Per-commit human
+line-by-line review is **not yet established** — see
+[docs/concepts/research-integrity.md](docs/concepts/research-integrity.md) §5 for the full
+disclosure + what this project can and cannot prove. At runtime, LLMs (Qwen family) are used
+**only as evidence generators**; the verdict is produced by a deterministic rule kernel
+(R0–R9, no LLM arbiter — enforced by `no_llm_final_judge_scan` in CI).
+
+---
+
 ## Citation & License
 
 If this work is useful, cite it: see [CITATION.cff](CITATION.cff).
