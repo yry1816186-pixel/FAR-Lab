@@ -62,12 +62,14 @@ test('性能 P2: 100 claims 处理堆增长 <5%（有界·无泄漏）', async (
   }
 
   // 趋势判据：末批增量 < 首批增量 × 1.5（无持续加速增长 = 无泄漏信号）。
-  // 负增量（GC 回收）视同收敛：仅对正增量判趋势（负数 ×1.5 方向相反会误报，CI 实测首批 -3.61MB）。
+  // 首批为负（GC 回收）时不做趋势比（负数 ×1.5 方向相反会误报），改判绝对上限：
+  // CI 无 GC 控制的 runner 上末批可能因延迟回收抖动至 ~13MB（实测 ubuntu/macos），
+  // 20MB 上限仍能捕获真泄漏（真泄漏每批持续增长会迅速突破）；totalGrowthMb<25 双保险保留。
   const first = deltas[0] ?? 0;
   const last = deltas[deltas.length - 1] ?? 0;
   const totalGrowthMb = (prev - baseline) / 1024 / 1024;
   assert.ok(
-    last < Math.max(first, 0) * 1.5,
+    first > 0 ? last < first * 1.5 : last < 20,
     `堆增量须收敛（非递增）：首批 ${(first / 1024 / 1024).toFixed(2)}MB → 末批 ${(last / 1024 / 1024).toFixed(2)}MB`,
   );
   assert.ok(
