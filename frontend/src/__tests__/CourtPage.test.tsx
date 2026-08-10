@@ -38,6 +38,12 @@ function mockCourtOk() {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    if (url.endsWith('/llm-status')) {
+      return new Response(JSON.stringify({ ok: true, data: { profile: 'offline_replay', keyConfigured: false } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     return new Response('', { status: 404 });
   });
 }
@@ -85,6 +91,19 @@ describe('CourtPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Court session failed')).toBeInTheDocument();
+    });
+  });
+
+  it('WS-B.2 渲染 live 表单 + offline replay 状态横幅', async () => {
+    mockCourtOk();
+    renderWithQueryClient(<CourtPage />);
+
+    expect(screen.getByTestId('court-live-form')).toBeInTheDocument();
+    expect(screen.getByTestId('court-live-claim-input')).toBeInTheDocument();
+    expect(screen.getByTestId('court-live-run')).toBeDisabled();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('court-llm-status')).toHaveTextContent('Offline replay mode');
     });
   });
 });

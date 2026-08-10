@@ -348,6 +348,30 @@ export const zh = {
   'court.honestyTitle': '诚实声明',
   'court.redLine': '红线：每个模型的 verdict 由 R0-R9 确定性内核给出，LLM 非裁决者。真实多模型分歧须 far court --models 接真实 provider（凭据门）。',
 
+  // ---- CourtPage live form (WS-B.2) ----
+  'court.live.title': '运行实时法庭会话',
+  'court.live.desc': '提交任意科学声明和模型列表。确定性 R0-R9 内核独立评判每个模型的证据。',
+  'court.live.claimLabel': '声明',
+  'court.live.claimPlaceholder': '例如：模型 A 在 benchmark Z 上的平均准确率是否 >= 0.72？',
+  'court.live.modelsLabel': '模型（逗号分隔的标签）',
+  'court.live.run': '运行实时会话',
+  'court.live.running': '运行中…',
+
+  // ---- ArenaPage live form (WS-B.2) ----
+  'arena.live.title': '运行实时竞技场会话',
+  'arena.live.desc': '提交任意科学假设和反驳者标签。确定性仲裁器检测是否有反驳者打破该声明。',
+  'arena.live.hypothesisLabel': '假设',
+  'arena.live.hypothesisPlaceholder': '例如：模型 A 在 benchmark Z 上的平均准确率是否 >= 0.72？',
+  'arena.live.refutersLabel': '反驳者（逗号分隔的标签）',
+  'arena.live.run': '运行实时会话',
+  'arena.live.running': '运行中…',
+
+  // ---- LLM status banner (WS-B.2 · Wizard / Court / Arena 共享) ----
+  'llm.status.liveTitle': '实时模式——真实推理',
+  'llm.status.liveBody': '已配置 DASHSCOPE_API_KEY。您的声明会发送到真实语言模型；裁决取决于您的输入。',
+  'llm.status.offlineTitle': '离线回放模式',
+  'llm.status.offlineBody': '未配置 DASHSCOPE_API_KEY。每个声明都跑固定的回放 fixture，因此无论输入什么裁决都相同。在服务器环境中设置该 key 以启用实时推理。',
+
   // ---- ArenaPage ----
   'arena.title': '对抗科学竞技场',
   'arena.subtitle': 'Adversarial Science Arena · W3 / FI-2',
