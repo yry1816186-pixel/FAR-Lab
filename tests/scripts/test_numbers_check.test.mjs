@@ -45,7 +45,7 @@ test('P0-8: parseTestNumbers throws on unparseable output', () => {
 
 test('P0-8: extractClaimedNumbers reads the AGENTS.md claim pattern', () => {
   const claim = extractClaimedNumbers(
-    '- 331 TS files, 2700 tests passing (2694 pass / 0 fail / 6 skip — SSOT)',
+    '- 331 TS files, 2703 tests passing (2697 pass / 0 fail / 6 skip — SSOT)',
   );
   assert.deepEqual(claim, { tests: 2703, pass: 2697, fail: 0, skipped: 6 });
 });
@@ -55,7 +55,7 @@ test('P0-8: end-to-end --check exits 0 when AGENTS.md matches actual numbers', (
   const specFile = join(here, '_test_numbers_fixture.txt');
   writeFileSync(
     specFile,
-    ['ℹ tests 2712', 'ℹ pass 2706', 'ℹ fail 0', 'ℹ skipped 6'].join('\n'),
+    ['ℹ tests 2700', 'ℹ pass 2694', 'ℹ fail 0', 'ℹ skipped 6'].join('\n'),
     'utf8',
   );
   try {
