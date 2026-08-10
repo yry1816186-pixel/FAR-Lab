@@ -255,3 +255,26 @@ docs/governance/GOVERNANCE_REPORT.md
 docs/design/16_AGENT_RUNTIME_MODELS_TOOLS_CONTEXT_AND_MEMORY.md
 docs/research/competitive-analysis-report.md
 
+
+
+# --- 2026-08-10 round 4: 公开仓库无关文件 ---
+# 竞赛战略/章程
+docs/charter/
+# 品牌/内部风格
+frontend/src/lib/BRAND_VOICE.md
+src/llm_gateway/DIGEST.md
+# GitHub 内部配置(非 CI)
+.github/copilot-instructions.md
+.github/config.yml
+.github/CODEOWNERS
+# AI 工具脚本
+scripts/far_design_bootstrap.mjs
+scripts/validate_agent_config.py
+# 开发工具(precommit 钩子/文档)
+scripts/far-trust-kernel-precommit.ps1
+scripts/PRECOMMIT_HOOKS.md
+# 内部 gate 脚本(无 CI 引用的)
+scripts/vertical_slice_cancellation.mjs
+# 运行产物
+# 缓存
+tests/fixtures/science_harness/tic_sample.cache
