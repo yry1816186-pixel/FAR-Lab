@@ -82,7 +82,9 @@ export async function registerArenaRoute(
   // 无缓存（每请求 hypothesis/refuter 不同）；gateway 缺失时 arena_service 自动降级 offline_replay（诚实）。
   app.post('/arena', async (request, reply) => {
     // API1 BOLA 修复（阶段 7 1128）：受保护模式下 researcher+ 才能触发 arena live（消耗 LLM 额度）。
-    if (request.principal.role !== 'anonymous' && request.principal.role !== 'researcher' && request.principal.role !== 'admin') {
+    // offline 模式（principal 未挂载或 anonymous）全放行（设计·24§3.1 双轨）。
+    const role = request.principal?.role ?? 'anonymous';
+    if (role !== 'anonymous' && role !== 'researcher' && role !== 'admin') {
       return reply.status(403).send({
         error_code: 'FORBIDDEN',
         message: 'viewer role is read-only (arena: researcher/admin required)',
