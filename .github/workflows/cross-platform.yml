@@ -39,6 +39,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       # NODE_COMPILE_CACHE 指向 runner 临时目录（仓库外），三平台统一的 V8 compile cache
       - name: Set NODE_COMPILE_CACHE (repo-outside V8 cache)
         shell: bash
@@ -85,6 +87,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
