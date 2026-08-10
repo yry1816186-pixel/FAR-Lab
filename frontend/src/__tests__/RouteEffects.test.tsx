@@ -13,11 +13,9 @@ import { RouteEffects } from '@/components/RouteEffects';
  *   4. 每次 pathname 变化调用 window.scrollTo(0, 0)
  */
 
-const FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
-
 function renderAt(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]} future={FUTURE}>
+    <MemoryRouter initialEntries={[path]}>
       <RouteEffects />
       <Routes>
         <Route path="*" element={<div>page</div>} />
