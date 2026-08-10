@@ -11,6 +11,7 @@ import { startServer } from '../../api/server.ts';
 import { openFarDb } from '../../db/open.ts';
 import { buildDemoChain } from '../../far_proof/demo_chain.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
+import { resolveRuntimeGateway } from '../../llm_gateway/runtime_gateway.ts';
 
 /** Input parameters for operations involving api args. */
 export interface ApiArgs {
@@ -97,15 +98,25 @@ export async function runApi(argv: readonly string[]): Promise<number> {
     buildDemoChain(db);
   }
   const gitCommitSha = resolveGitCommitSha();
-  const app = await startServer({ db, gitCommitSha, jwtSecret: args.jwtSecret }, args.port, args.host);
+  // WS-A.1：运行期解析真实 LLM 网关（FAR_DASHSCOPE_API_KEY/DASHSCOPE_API_KEY 存在 →
+  // competition_aliyun_qwen 真实推理；否则 null → server 内 offline_replay 诚实降级）。
+  // 模型中立：解析在 llm_gateway 层（本文件无 Qwen/DashScope 字面量）。
+  const runtimeGateway = resolveRuntimeGateway(process.env);
+  const app = await startServer(
+    { db, gitCommitSha, jwtSecret: args.jwtSecret, ...(runtimeGateway === null ? {} : { gateway: runtimeGateway }) },
+    args.port,
+    args.host,
+  );
   const base = `http://localhost:${args.port}`;
   const mode = args.jwtSecret === null ? 'offline (anonymous · demo)' : 'protected (jwt)';
+  const llm = runtimeGateway === null ? 'offline_replay (fixture·zero-key)' : 'competition_aliyun_qwen (real HTTP·billing applies)';
   process.stderr.write(
     [
       '',
       '  FAR-Lab API server',
       '  ─────────────────────────────────────────────────',
       `  mode     : ${mode}`,
+      `  llm      : ${llm}`,
       `  database : ${args.dbPath}${args.seedDemo ? '  +  demo seed (C-ASTRO-0001 UNTESTED)' : ''}`,
       `  commit   : ${gitCommitSha.slice(0, 12)}`,
       '',
