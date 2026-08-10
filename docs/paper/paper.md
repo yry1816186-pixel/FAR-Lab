@@ -89,3 +89,14 @@ substitute for domain-expert review (see docs/concepts/research-integrity.md).
 
 Richard Yuan (design, requirements, acceptance). AI coding agents (Claude Code AI) wrote the
 implementation under human direction — see AI usage disclosure.
+
+# Author contributions (CRediT)
+
+- **Richard Yuan**: Conceptualization, Methodology, Project administration, Supervision, Validation,
+  Writing – review & editing
+- **AI coding agents (Claude Code AI)**: Software, Writing – original draft, Data curation
+  (per JOSS AI Usage Policy 2026 — AI used as implementation assistant; human author
+  responsible for design decisions, requirements, acceptance, release)
+
+Honest note: per-commit human line-by-line review not yet established
+(see research-integrity.md §5).
