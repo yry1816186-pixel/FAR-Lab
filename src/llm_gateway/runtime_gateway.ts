@@ -17,6 +17,12 @@ import { createCompetitionQwenGateway } from './competition_gateway.ts';
 /** 运行期环境（显式传入·禁 process.env 直读·可测）。 */
 export type RuntimeEnv = Readonly<Record<string, string | undefined>>;
 
+/**
+ * 本工厂构造的 provider profile 名（WS-A.1）。
+ * 暴露给 src/api/（模型中立区）import 使用——避免 server.ts 直接写模型字面量（24§0.1）。
+ */
+export const RUNTIME_PROVIDER_PROFILE = 'competition_aliyun_qwen' as const;
+
 /** 支持的 API key 环境变量名（按优先级）。 */
 const API_KEY_ENV_NAMES = ['FAR_DASHSCOPE_API_KEY', 'DASHSCOPE_API_KEY'] as const;
 

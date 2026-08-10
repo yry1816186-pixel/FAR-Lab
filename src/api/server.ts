@@ -33,7 +33,7 @@ import { registerIntegrityRoutes } from './routes/integrity.ts';
 import { registerBenchmarkRoute } from './routes/benchmark.ts';
 import { registerCourtRoute } from './routes/court.ts';
 import { registerArenaRoute } from './routes/arena.ts';
-import { resolveRuntimeGateway } from '../llm_gateway/runtime_gateway.ts';
+import { resolveRuntimeGateway, RUNTIME_PROVIDER_PROFILE } from '../llm_gateway/runtime_gateway.ts';
 import type { AppendRecordOptions } from '../evidence_log/types.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
@@ -84,7 +84,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   // 调用 runtime_gateway（模型中立·字面量只在 llm_gateway/）——server.ts 零 Qwen/DashScope 字面量。
   const resolvedGateway = config.gateway ?? resolveRuntimeGateway(process.env);
   const llmProfile: ProviderProfile | undefined =
-    resolvedGateway === null ? undefined : (config.profile ?? 'competition_aliyun_qwen');
+    resolvedGateway === null ? undefined : (config.profile ?? RUNTIME_PROVIDER_PROFILE);
   const llm = resolvedGateway === null ? undefined : resolvedGateway;
   const keyConfigured = llm !== undefined;
   console.warn(`[far-lab] LLM profile: ${keyConfigured ? String(llmProfile) : 'offline_replay'} (key: ${keyConfigured ? 'configured' : 'absent — running offline replay'})`);
