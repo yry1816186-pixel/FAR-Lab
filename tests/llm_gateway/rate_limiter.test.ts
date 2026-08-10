@@ -110,7 +110,7 @@ test('T-020 节流：minIntervalMs 强制相邻调用最小间隔', async () => 
   inner.register({
     profile: 'p' as ProviderProfile,
     call: async () => {
-      startTimes.push(Date.now());
+      startTimes.push(performance.now());
       return fixtureResponse('p');
     },
   });
@@ -121,10 +121,13 @@ test('T-020 节流：minIntervalMs 强制相邻调用最小间隔', async () => 
   await limited.callLlm('p' as ProviderProfile, makeRequest());
 
   assert.equal(startTimes.length, 3);
+  // 测量容差 1ms：计时点偏移（enforce 内 lastCallAt 记录 vs inner.call 内 startTimes 记录，亚毫秒级 ε）
+  // + 单调时钟浮点精度共同决定 gap ∈ [50-ε, ∞)。语义不变：gap < 49 仍失败（真未节流）。
+  // 另：minIntervalMs 实现用 performance.now()（单调）——不受系统墙钟回拨影响（防 flaky 根因）。
   const gap1 = (startTimes[1] ?? 0) - (startTimes[0] ?? 0);
   const gap2 = (startTimes[2] ?? 0) - (startTimes[1] ?? 0);
-  assert.ok(gap1 >= 50, `gap1=${gap1} 须 ≥50ms`);
-  assert.ok(gap2 >= 50, `gap2=${gap2} 须 ≥50ms`);
+  assert.ok(gap1 >= 49, `gap1=${gap1} 须 ≥50ms（容差 1ms）`);
+  assert.ok(gap2 >= 49, `gap2=${gap2} 须 ≥50ms（容差 1ms）`);
 });
 
 test('T-020 异常路径：调用抛错仍释放并发闸（finally·不泄漏）', async () => {
