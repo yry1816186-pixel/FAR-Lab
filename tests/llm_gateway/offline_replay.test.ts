@@ -128,3 +128,21 @@ test('no stageId and no fixtureResponse throws a clear error (no silent echo fal
     /no stageId and no fixtureResponse provided/,
   );
 });
+
+// ---------------------------------------------------------------------------
+// CU4-02（阶段 7 1127）：offline_replay 伪 token 口径标记（measured=false）
+// ---------------------------------------------------------------------------
+
+test('CU4-02: offline_replay 的 tokenUsage 标记 measured=false（字符伪 token）', async () => {
+  const gateway = createLlmGateway([
+    createOfflineReplayAdapter({
+      fixtureResponse: 'ok', // 全局 fixture（字符串）
+    }),
+  ]);
+  const response = await gateway.callLlm('offline_replay', {
+    stageId: 'stage1',
+    messages: [{ role: 'user', content: 'hello' }],
+  });
+  assert.equal(response.credential.tokenUsage.measured, false, 'offline_replay 必须标记 measured=false');
+  assert.equal(response.credential.tokenUsage.totalTokens, 7, 'hello(5) + ok(2) = 7 字符');
+});

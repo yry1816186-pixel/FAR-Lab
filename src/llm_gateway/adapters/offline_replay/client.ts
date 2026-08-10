@@ -108,6 +108,9 @@ export function createOfflineReplayAdapter(options: OfflineReplayOptions = {}): 
             inputTokens,
             outputTokens,
             totalTokens: inputTokens + outputTokens,
+            // CU4-02（阶段 7 1127）：offline_replay 用字符数估算（伪 token）——
+            // measured=false 标记，禁止混入真实成本依据（usage_tokens_total 消费侧按此区分）。
+            measured: false,
           },
         },
         content,
