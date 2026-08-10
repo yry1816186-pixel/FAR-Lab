@@ -234,3 +234,24 @@ docs/charter/COMPETITION_STRATEGY.md
 # 内部评级 + AI 自动审计产物,公开会让评委判定"自吹自擂 + AI slop"
 docs/audits/
 
+# --- 2026-08-10 round 3: docs/ 内部过程稿/agent jargon 深度清理 ---
+# docs/development/ 内部 sprint 报告 / 交接 / 进度 / skip 记录
+docs/development/AGENTS.md
+docs/development/HANDOFF.md
+docs/development/PROGRESS.md
+docs/development/SKIP_REGISTER.md
+docs/development/SPRINT1-BACKEND-REPORT.md
+docs/development/SPRINT1-FRONTEND-REPORT.md
+docs/development/SPRINT2-BRAND-REPORT.md
+docs/development/ULTIMATE_UPGRADE_PLAN.md
+# docs/governance/ agent 编排内部 jargon + 重复
+docs/governance/AGENT-LIFECYCLE.md
+docs/governance/AGENT-MEMORY.md
+docs/governance/AGENT-ORCHESTRATION.md
+docs/governance/OPENCODE-PLANNING.md
+docs/governance/MAINTAINERS.md
+docs/governance/GOVERNANCE_REPORT.md
+# 散落 agent runtime / 竞品战略
+docs/design/16_AGENT_RUNTIME_MODELS_TOOLS_CONTEXT_AND_MEMORY.md
+docs/research/competitive-analysis-report.md
+
