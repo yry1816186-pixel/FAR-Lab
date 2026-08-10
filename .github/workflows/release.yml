@@ -101,13 +101,16 @@ jobs:
         timeout-minutes: 42
 
       # g/h. 准备 release assets：install.sh + install.ps1 + SHA256SUMS
+      # 契约（DR4-01 修复·2026-08-10）：install.sh 5b 段期望清单含 `scripts/install.*`
+      # 前缀条目（grep/awk 匹配）；故在仓库根对 scripts/ 路径生成哈希，禁止在 staging
+      # 内生成裸路径清单（曾致 v1.2.0 自动发布后安装 fail-closed——Critical）。
       - name: Stage install scripts + checksum
         run: |
           mkdir -p staging
           cp scripts/install.sh  staging/install.sh
           cp scripts/install.ps1 staging/install.ps1
           chmod +x staging/install.sh
-          (cd staging && sha256sum install.sh install.ps1 | tee SHA256SUMS)
+          sha256sum scripts/install.sh scripts/install.ps1 | tee staging/SHA256SUMS
 
       # j-m. 构建 Docker image 并 push 到 GHCR（offline 优先·不内置 key）
       - name: Resolve GHCR image name (lowercase owner)

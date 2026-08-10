@@ -281,3 +281,38 @@ test('DEF-17: integrity.json 可解析但 schema 非法 → INTEGRITY_UNREADABLE
     }
   }
 });
+
+// ---------------------------------------------------------------------------
+// DB1-1（阶段 7 P1）：generatedAt 纳入 integrityHash——时间戳篡改检测回归
+// ---------------------------------------------------------------------------
+
+test('DB1-1: 篡改 generatedAt → INTEGRITY_HASH_MISMATCH（修复前可静默回填）', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-db11-'));
+  try {
+    const outputDir = exportDemoBundle(tmp);
+    const integrityPath = join(outputDir, 'integrity.json');
+    const original = JSON.parse(readFileSync(integrityPath, 'utf8'));
+    // 仅改 generatedAt（时间戳回填攻击：伪装旧导出时间），文件内容不动
+    const tampered = { ...original, generatedAt: '1970-01-01T00:00:00.000Z' };
+    writeFileSync(integrityPath, JSON.stringify(tampered), 'utf8');
+    const result = verifyFarProofBundle(outputDir, 'full');
+    assert.equal(result.ok, false, 'generatedAt 篡改必须导致 verify 红');
+    assert.ok(
+      result.errors.some((e) => e.includes('INTEGRITY_HASH_MISMATCH')),
+      `须报 INTEGRITY_HASH_MISMATCH: ${result.errors.join('; ')}`,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('DB1-1: 未篡改 bundle → verify 仍绿（generatedAt 纳入 hash 不破坏正常路径）', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-db11-ok-'));
+  try {
+    const outputDir = exportDemoBundle(tmp);
+    const result = verifyFarProofBundle(outputDir, 'full');
+    assert.equal(result.ok, true, 'clean bundle 必须通过完整性校验');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});

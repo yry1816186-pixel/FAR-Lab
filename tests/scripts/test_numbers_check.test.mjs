@@ -27,16 +27,16 @@ function dirname(p) {
 
 test('P0-8: parseTestNumbers extracts tests/pass/fail/skipped from spec output', () => {
   const spec = [
-    'ℹ tests 2602',
+    'ℹ tests 2683',
     'ℹ suites 67',
-    'ℹ pass 2596',
+    'ℹ pass 2677',
     'ℹ fail 0',
     'ℹ cancelled 0',
     'ℹ skipped 6',
     'ℹ todo 0',
   ].join('\n');
   const n = parseTestNumbers(spec);
-  assert.deepEqual(n, { tests: 2602, pass: 2596, fail: 0, skipped: 6 });
+  assert.deepEqual(n, { tests: 2683, pass: 2677, fail: 0, skipped: 6 });
 });
 
 test('P0-8: parseTestNumbers throws on unparseable output', () => {
@@ -45,9 +45,9 @@ test('P0-8: parseTestNumbers throws on unparseable output', () => {
 
 test('P0-8: extractClaimedNumbers reads the AGENTS.md claim pattern', () => {
   const claim = extractClaimedNumbers(
-    '- 331 TS files, 2602 tests passing (2596 pass / 0 fail / 6 skip — SSOT)',
+    '- 331 TS files, 2683 tests passing (2677 pass / 0 fail / 6 skip — SSOT)',
   );
-  assert.deepEqual(claim, { tests: 2602, pass: 2596, fail: 0, skipped: 6 });
+  assert.deepEqual(claim, { tests: 2683, pass: 2677, fail: 0, skipped: 6 });
 });
 
 test('P0-8: end-to-end --check exits 0 when AGENTS.md matches actual numbers', () => {
@@ -55,7 +55,7 @@ test('P0-8: end-to-end --check exits 0 when AGENTS.md matches actual numbers', (
   const specFile = join(here, '_test_numbers_fixture.txt');
   writeFileSync(
     specFile,
-    ['ℹ tests 2602', 'ℹ pass 2596', 'ℹ fail 0', 'ℹ skipped 6'].join('\n'),
+    ['ℹ tests 2683', 'ℹ pass 2677', 'ℹ fail 0', 'ℹ skipped 6'].join('\n'),
     'utf8',
   );
   try {
@@ -80,10 +80,10 @@ test('P0-8: end-to-end --check exits 0 when AGENTS.md matches actual numbers', (
 });
 
 test('LP-2: --write rewrites drifted AGENTS.md claim to actual (auto SSOT sync)', () => {
-  // 漂移场景：fixture 声称 1000 而实测 2602——--write 须把 AGENTS.md 回写到实测值。
+  // 漂移场景：fixture 声称 1000 而实测 2683——--write 须把 AGENTS.md 回写到实测值。
   const spec = [
-    'ℹ tests 2602',
-    'ℹ pass 2596',
+    'ℹ tests 2683',
+    'ℹ pass 2677',
     'ℹ fail 0',
     'ℹ skipped 6',
     '',
@@ -102,8 +102,8 @@ test('LP-2: --write rewrites drifted AGENTS.md claim to actual (auto SSOT sync)'
     assert.equal(result.status, 0, `--write must exit 0\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
     const updated = readFileSync(agentsPath, 'utf8');
     const claimed = extractClaimedNumbers(updated);
-    assert.equal(claimed.tests, 2602, 'AGENTS.md must be rewritten to actual tests count');
-    assert.equal(claimed.pass, 2596, 'AGENTS.md pass must be rewritten to actual');
+    assert.equal(claimed.tests, 2683, 'AGENTS.md must be rewritten to actual tests count');
+    assert.equal(claimed.pass, 2677, 'AGENTS.md pass must be rewritten to actual');
     assert.equal(claimed.fail, 0, 'AGENTS.md fail must be rewritten to actual');
     assert.equal(claimed.skipped, 6, 'AGENTS.md skipped must be rewritten to actual');
   } finally {
