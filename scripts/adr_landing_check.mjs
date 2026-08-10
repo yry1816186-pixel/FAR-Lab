@@ -52,8 +52,10 @@ export const ANCHORS = {
 };
 
 function grepRepo(pattern) {
+  // git grep（非系统 rg）：CI Ubuntu runner 默认无 ripgrep——依赖系统 rg 会全 0 误报
+  // （2026-08-10 CI run 实测 0/21）。git 在 checkout 环境必有；grep tracked 内容。
   try {
-    execFileSync('rg', ['-l', '--no-messages', pattern, 'src', 'scripts', 'docs', '.github', 'frontend/src'], {
+    execFileSync('git', ['grep', '-l', '--', pattern, '--', 'src', 'scripts', 'docs', '.github', 'frontend/src'], {
       cwd: process.cwd(),
       stdio: 'pipe',
       encoding: 'utf8',
