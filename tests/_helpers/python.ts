@@ -9,6 +9,13 @@
 import { spawnSync } from 'node:child_process';
 import { delimiter, resolve } from 'node:path';
 
+// 跨平台 Python Unicode 一致性（2026-08-10 CI cross-platform 修复）：
+// CI Windows/macOS runner 的 Python 3.11 默认按区域设置编码（cp1252 等），
+// 与 Node 侧 UTF-8 的 stdin JSON / stdout 解析不一致 → UnicodeEncodeError / 解析错乱。
+// 模块级设置随 ...process.env spread 传播到所有测试的 Python spawn（9+ 文件 import 本模块）。
+process.env.PYTHONUTF8 = '1';
+process.env.PYTHONIOENCODING = 'utf-8';
+
 export function findPythonCommand(): string | null {
   // Windows: 'python' first (WindowsApps python3 is a Store alias / differently-packaged);
   // Unix: 'python3'. Aligns with ensure_py_deps.mjs / smt_backend.ts convention.
