@@ -1,26 +1,23 @@
 /**
  * ArenaPage —— 对抗科学竞技场可视化（W3 / FI-2）。
  *
- * Authority: src/api/internal/arena_service.ts ArenaResult + GET /api/v1/arena/demo。
+ * 端点：GET /api/v1/arena/demo（参考 fixture）+ POST /api/v1/arena（WS-A.3 live）。
+ * 四组件：LiveSessionForm（WS-B.2）+ RobustHero + RefuterScoreboard + HonestyAlert。
  *
- * 三组件：
- *   1. RobustHero — ROBUST/BREACHED 徽章 + 着陆攻击数 + arena ID。
- *   2. RefuterScoreboard — 每个 refuter 的反驳尝试（refuter / verdict / landed?held）。
- *   3. HonestyAlert — 诚实声明（offline_replay 同 fixture→robust·真实对抗需凭据门·arbiter 确定性非 LLM）。
- *
- * 诚实定位（红线）：
- *   - demo 用 offline_replay（零 key·同 fixture），verdict 必然与原始相同 → ROBUST——展示「竞技场框架
- *     + deterministic arbiter + 记分板」，非真实抗攻击能力。
- *   - arbiter 是确定性规则（verdict 分歧检测），非 LLM 仲裁。
- *   - 真实对抗须 far arena --refuters 接真实 provider（凭据门）。
+ * 诚实定位（红线）：demo 用 offline_replay（同 fixture→robust）。live 表单：DASHSCOPE_API_KEY
+ * 配置时走真实 provider（datasetSource=real），否则诚实降级 offline replay。arbiter 是确定性规则
+ * （verdict 分歧检测），非 LLM 仲裁。
  */
 
-import { useArenaDemo } from '@/lib/api_client';
+import { useState } from 'react';
+import { useArenaDemo, useArenaLive, useLlmStatus } from '@/lib/api_client';
+import type { ArenaResultDto } from '@/lib/types';
 import { useT } from '@/lib/i18n';
 import type { VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { IntegrityBadge } from '@/components/IntegrityBadge';
 import {
@@ -31,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Swords, ShieldCheck, ShieldAlert, Swords as SwordIcon } from 'lucide-react';
+import { Swords, ShieldCheck, ShieldAlert, Swords as SwordIcon, Zap } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const FIVE_VERDICTS = new Set<string>([
@@ -46,53 +43,11 @@ function isVerdictValue(v: string): v is VerdictValue {
   return FIVE_VERDICTS.has(v);
 }
 
-export default function ArenaPage() {
+/** ArenaResultDisplay — 复用展示组件（demo + live 共用·根据 result 渲染）。 */
+function ArenaResultDisplay({ result }: { readonly result: ArenaResultDto }) {
   const t = useT();
-  const { data: result, isLoading, isError, error } = useArenaDemo();
-
-  if (isLoading) {
-    return (
-      <div className="space-y-8" data-testid="arena-loading-skeleton">
-        <header className="space-y-2">
-          <Skeleton className="h-8 w-72" />
-          <Skeleton className="h-4 w-96 max-w-full" />
-        </header>
-        <Skeleton className="h-28 w-full rounded-lg" />
-        <Skeleton className="h-64 w-full rounded-lg" />
-      </div>
-    );
-  }
-
-  if (isError || result === undefined) {
-    return (
-      <div className="space-y-8">
-        <header>
-          <h1 className="text-3xl font-bold tracking-tight">{t('arena.title')}</h1>
-          <p className="mt-1 text-muted-foreground">{t('arena.subtitle')}</p>
-        </header>
-        <Alert variant="destructive">
-          <AlertTitle>{t('arena.errorTitle')}</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error ? error.message : t('arena.noVerdict')}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
-          <Swords className="h-7 w-7" aria-hidden="true" />
-          {t('arena.title')}
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          {t('arena.subtitle2')}
-        </p>
-      </header>
-
-      {/* RobustHero */}
+    <>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -107,9 +62,7 @@ export default function ArenaPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4">
           <Badge variant={result.robust ? 'default' : 'destructive'} className="text-base">
-            {result.robust
-              ? t('arena.robust')
-              : t('arena.breached', { n: result.landedCount })}
+            {result.robust ? t('arena.robust') : t('arena.breached', { n: result.landedCount })}
           </Badge>
           <span className="text-sm text-muted-foreground">
             {t('arena.originalVerdict')}
@@ -128,13 +81,10 @@ export default function ArenaPage() {
         </CardContent>
       </Card>
 
-      {/* RefuterScoreboard */}
       <Card>
         <CardHeader>
           <CardTitle>{t('arena.scoreboardTitle')}</CardTitle>
-          <CardDescription>
-            {t('arena.scoreboardDesc')}
-          </CardDescription>
+          <CardDescription>{t('arena.scoreboardDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -175,17 +125,126 @@ export default function ArenaPage() {
         </CardContent>
       </Card>
 
-      {/* HonestyAlert */}
       <Alert>
         <ShieldAlert className="h-4 w-4" aria-hidden="true" />
         <AlertTitle className="flex items-center gap-2">{t('arena.honestyTitle')} <IntegrityBadge source={result.datasetSource} /></AlertTitle>
         <AlertDescription>
           <p>{result.honestNote}</p>
-          <p className="mt-2">
-            <strong>{t('arena.redLine')}</strong>
-          </p>
+          <p className="mt-2"><strong>{t('arena.redLine')}</strong></p>
         </AlertDescription>
       </Alert>
+    </>
+  );
+}
+
+export default function ArenaPage() {
+  const t = useT();
+  const { data: demoResult, isLoading, isError, error } = useArenaDemo();
+  const { data: llmStatus } = useLlmStatus();
+  const arenaLive = useArenaLive();
+
+  const [liveHypothesis, setLiveHypothesis] = useState('');
+  const [liveRefuters, setLiveRefuters] = useState('scope-launderer, post-hoc-threshold, dataset-drift');
+
+  const isLiveMode = llmStatus?.keyConfigured === true;
+
+  const handleLiveRun = () => {
+    const refuters = liveRefuters.split(',').map((r) => r.trim()).filter((r) => r.length > 0);
+    if (liveHypothesis.trim().length === 0 || refuters.length === 0) return;
+    void arenaLive.mutate({ hypothesis: liveHypothesis.trim(), refuters });
+  };
+
+  return (
+    <div className="space-y-8">
+      <header>
+        <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
+          <Swords className="h-7 w-7" aria-hidden="true" />
+          {t('arena.title')}
+        </h1>
+        <p className="mt-1 text-muted-foreground">{t('arena.subtitle2')}</p>
+      </header>
+
+      {/* WS-B.2 LLM 状态横幅 */}
+      <Alert data-testid="arena-llm-status">
+        <Zap className="h-4 w-4" aria-hidden="true" />
+        <AlertTitle>{isLiveMode ? t('llm.status.liveTitle') : t('llm.status.offlineTitle')}</AlertTitle>
+        <AlertDescription>
+          {isLiveMode ? t('llm.status.liveBody') : t('llm.status.offlineBody')}
+        </AlertDescription>
+      </Alert>
+
+      {/* WS-B.2 Live session form */}
+      <Card data-testid="arena-live-form">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Swords className="h-5 w-5" aria-hidden="true" />
+            {t('arena.live.title')}
+          </CardTitle>
+          <CardDescription>{t('arena.live.desc')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="arena-live-hypothesis" className="text-sm font-medium">
+              {t('arena.live.hypothesisLabel')}
+            </label>
+            <textarea
+              id="arena-live-hypothesis"
+              className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder={t('arena.live.hypothesisPlaceholder')}
+              value={liveHypothesis}
+              onChange={(e) => setLiveHypothesis(e.target.value)}
+              data-testid="arena-live-hypothesis-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="arena-live-refuters" className="text-sm font-medium">
+              {t('arena.live.refutersLabel')}
+            </label>
+            <input
+              id="arena-live-refuters"
+              type="text"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={liveRefuters}
+              onChange={(e) => setLiveRefuters(e.target.value)}
+              data-testid="arena-live-refuters-input"
+            />
+          </div>
+          <Button onClick={handleLiveRun} disabled={arenaLive.isPending || liveHypothesis.trim().length === 0} data-testid="arena-live-run">
+            {arenaLive.isPending ? t('arena.live.running') : t('arena.live.run')}
+          </Button>
+          {arenaLive.isError ? (
+            <Alert variant="destructive">
+              <AlertDescription>
+                {arenaLive.error instanceof Error ? arenaLive.error.message : t('arena.noVerdict')}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {arenaLive.data ? (
+        <div data-testid="arena-live-result">
+          <ArenaResultDisplay result={arenaLive.data} />
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="space-y-4" data-testid="arena-loading-skeleton">
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </div>
+      ) : isError || demoResult === undefined ? (
+        <Alert variant="destructive">
+          <AlertTitle>{t('arena.errorTitle')}</AlertTitle>
+          <AlertDescription>
+            {error instanceof Error ? error.message : t('arena.noVerdict')}
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <div data-testid="arena-demo-reference">
+          <ArenaResultDisplay result={demoResult} />
+        </div>
+      )}
     </div>
   );
 }

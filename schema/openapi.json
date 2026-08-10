@@ -238,6 +238,15 @@
         }
       }
     },
+    "/api/v1/court": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/v1/arena/demo": {
       "get": {
         "responses": {
@@ -249,6 +258,15 @@
     },
     "/api/v1/arena": {
       "post": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/v1/llm-status": {
+      "get": {
         "responses": {
           "200": {
             "description": "Default Response"

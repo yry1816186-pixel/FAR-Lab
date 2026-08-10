@@ -33,6 +33,7 @@ import { registerIntegrityRoutes } from './routes/integrity.ts';
 import { registerBenchmarkRoute } from './routes/benchmark.ts';
 import { registerCourtRoute } from './routes/court.ts';
 import { registerArenaRoute } from './routes/arena.ts';
+import { resolveRuntimeGateway, RUNTIME_PROVIDER_PROFILE } from '../llm_gateway/runtime_gateway.ts';
 import type { AppendRecordOptions } from '../evidence_log/types.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
@@ -79,6 +80,14 @@ function resolveCorsOrigin(corsOrigins: readonly string[] | undefined): string[]
  *   8. routes（/health /ready + /api/v1/* 路由）
  */
 export async function buildServer(config: ApiServerConfig): Promise<FastifyInstance> {
+  // WS-A.1 HTTP 层：解析运行期 LLM 网关（显式注入 > env key > offline replay）。
+  // 调用 runtime_gateway（模型中立·字面量只在 llm_gateway/）——server.ts 零 Qwen/DashScope 字面量。
+  const resolvedGateway = config.gateway ?? resolveRuntimeGateway(process.env);
+  const llmProfile: ProviderProfile | undefined =
+    resolvedGateway === null ? undefined : (config.profile ?? RUNTIME_PROVIDER_PROFILE);
+  const llm = resolvedGateway === null ? undefined : resolvedGateway;
+  const keyConfigured = llm !== undefined;
+  console.warn(`[far-lab] LLM profile: ${keyConfigured ? String(llmProfile) : 'offline_replay'} (key: ${keyConfigured ? 'configured' : 'absent — running offline replay'})`);
   const app = Fastify({
     // 阶段 7 P2-A（LP-4）：可观测默认 on——logger 缺省 true（旧默认 false 让观测面静默）。
     // 测试可显式传 logger:false 保持安静；Fastify 默认不记录请求头/Authorization（无密钥泄漏面）。
@@ -167,8 +176,8 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerHypothesizeRoute(v1, {
       db: config.db,
       gitCommitSha: config.gitCommitSha,
-      ...(config.gateway === undefined ? {} : { gateway: config.gateway }),
-      ...(config.profile === undefined ? {} : { profile: config.profile }),
+      ...(llm === undefined ? {} : { gateway: llm }),
+      ...(llmProfile === undefined ? {} : { profile: llmProfile }),
       ...(config.appendOptions === undefined ? {} : { appendOptions: config.appendOptions }),
     });
     await registerEvidenceRoutes(v1, { db: config.db });
@@ -180,8 +189,22 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerLifecycleRoutes(v1, { db: config.db });
     // benchmark 端点读预生成 JSON（不依赖运行 db·fresh-clone 跑 generate 脚本即可）
     await registerBenchmarkRoute(v1);
-    await registerCourtRoute(v1);
-    await registerArenaRoute(v1);
+    // WS-A.1：court / arena 接收 resolved gateway + profile（之前完全无 config→恒 offline replay）。
+    await registerCourtRoute(v1, {
+      gitCommitSha: config.gitCommitSha,
+      ...(llm === undefined ? {} : { gateway: llm }),
+      ...(llmProfile === undefined ? {} : { profile: llmProfile }),
+    });
+    await registerArenaRoute(v1, {
+      gitCommitSha: config.gitCommitSha,
+      ...(llm === undefined ? {} : { gateway: llm }),
+      ...(llmProfile === undefined ? {} : { profile: llmProfile }),
+    });
+    // WS-A.1：/llm-status 暴露运行期 LLM 状态给前端（profile + keyConfigured·不泄漏 key）。
+    v1.get('/llm-status', () => ({
+      profile: keyConfigured ? String(llmProfile) : 'offline_replay',
+      keyConfigured,
+    }));
     // opencode 规划方法论源代码化：确定性门禁引擎 HTTP 层（P0-P4 分级 / Plan/Spec 校验 / 门禁报告）
     const { registerPlanningRoutes } = await import('./routes/planning.ts');
     await registerPlanningRoutes(v1);
