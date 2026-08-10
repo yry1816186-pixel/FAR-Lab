@@ -291,6 +291,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: openapi:check (zod → openapi.json byte-stable)
         run: pnpm run openapi:check
+      - name: json_schema:check (TS types → 4 core JSON Schemas byte-stable · ADR-013)
+        run: node scripts/generate_json_schema.mts --check
       - name: contract test (6 v2-receipts endpoints envelope + RFC7807)
         run: node --test --test-timeout=180000 tests/api/v2_receipts_contract.test.ts
 
