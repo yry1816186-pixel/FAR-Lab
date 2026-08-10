@@ -45,6 +45,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       # 门禁 1：src/ 中不得出现 process.env.AUDITOR_ENABLED（必须是编译时常量）
       - name: R9-2-1 · 生产构建 grep 零 process.env.AUDITOR_ENABLED
         run: |
@@ -93,6 +95,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -122,6 +126,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -165,6 +171,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -197,6 +205,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -226,6 +236,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -253,6 +265,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - name: R9-2-13 · anti-theater grep —— proof_envelopes 中 WARN 含 → 封 CONFIRMED 阻断
         run: |
           set -euo pipefail
@@ -298,6 +312,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - name: R9-2-14 · 核心路径模型中立 grep（含 golden_vectors.ts + src/anti_theater + src/confounding_gate）
         run: |
           set -euo pipefail
@@ -333,6 +349,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - name: R9-2-15 · grep 零 DASHSCOPE_API_KEY 明文（非 .env.example）
         run: |
           hits=$(grep -rPn "DASHSCOPE_API_KEY\s*=\s*['\"]sk-" src/ tests/ || true)

@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
