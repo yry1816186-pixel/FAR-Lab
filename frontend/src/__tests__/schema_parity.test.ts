@@ -36,18 +36,21 @@ type OapiType = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object'
 
 /**
  * 从 zod schema 提取 shape 字段名列表。
- * Zod 3.25: _def.type === 'object' 时 _def.shape 存在。
+ * Zod 3.25: _def.shape 是函数（getter），需调用 shape() 取实际对象；
+ * _def.typeName === 'ZodObject' 标识。.passthrough() 不创建包装层（catchall 字段）。
  */
 function getZodShapeKeys(schema: unknown): string[] {
   const s = schema as Record<string, unknown>;
   const def = s._def as Record<string, unknown> | undefined;
   if (!def) return [];
 
-  if (def.type === 'object') {
-    const shape = def.shape as Record<string, unknown> | undefined;
-    if (shape && typeof shape === 'object') {
-      return Object.keys(shape);
-    }
+  const shapeRaw = def.shape as unknown;
+  // zod 3.25: shape 是函数（getter），调用取实际 shape 对象
+  const shape = (typeof shapeRaw === 'function' ? (shapeRaw as () => Record<string, unknown>)() : shapeRaw) as
+    | Record<string, unknown>
+    | undefined;
+  if (shape && typeof shape === 'object') {
+    return Object.keys(shape);
   }
   return [];
 }
@@ -55,37 +58,42 @@ function getZodShapeKeys(schema: unknown): string[] {
 /**
  * 从 zod schema 提取指定字段的 zod 类型描述。
  * Zod 3.25: field._def.type 是简单字符串（string/number/boolean/array/record/enum/literal/null）。
+ * _def.shape 是函数（getter），需调用取实际对象。
  */
 function getZodFieldType(schema: unknown, field: string): string | undefined {
   const s = schema as Record<string, unknown>;
   const def = s._def as Record<string, unknown> | undefined;
-  if (!def || def.type !== 'object') return undefined;
+  if (!def) return undefined;
 
-  const shape = def.shape as Record<string, unknown> | undefined;
+  const shapeRaw = def.shape as unknown;
+  const shape = (typeof shapeRaw === 'function' ? (shapeRaw as () => Record<string, unknown>)() : shapeRaw) as
+    | Record<string, unknown>
+    | undefined;
   if (!shape) return undefined;
 
   const member = shape[field] as Record<string, unknown> | undefined;
   if (!member) return undefined;
 
   const memberDef = member._def as Record<string, unknown> | undefined;
-  return memberDef?.type as string | undefined;
+  // Zod 3.25: _def.typeName（'ZodString'/'ZodArray'/...），非 _def.type
+  return memberDef?.typeName as string | undefined;
 }
 
 /**
  * zod 类型描述 → OpenAPI JSON Schema 类型映射。
- * Zod 3.25 type 字段值: string/number/boolean/array/record/enum/literal/null
+ * Zod 3.25 typeName 值: ZodString/ZodNumber/ZodBoolean/ZodArray/ZodRecord/ZodObject/ZodEnum/ZodLiteral/ZodNull
  */
 function zodTypeToOapi(zodType: string): OapiType | undefined {
   const map: Record<string, OapiType> = {
-    string: 'string',
-    number: 'number',
-    boolean: 'boolean',
-    array: 'array',
-    record: 'object',
-    object: 'object',
-    enum: 'string',
-    literal: 'string',
-    null: 'null',
+    ZodString: 'string',
+    ZodNumber: 'number',
+    ZodBoolean: 'boolean',
+    ZodArray: 'array',
+    ZodRecord: 'object',
+    ZodObject: 'object',
+    ZodEnum: 'string',
+    ZodLiteral: 'string',
+    ZodNull: 'null',
   };
   return map[zodType];
 }
