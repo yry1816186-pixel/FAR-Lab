@@ -219,7 +219,7 @@ provider, pass an explicit env file: `docker compose --env-file .env up far-api`
 - **学习路径（Learning Path）**: [docs/learning/00_START_HERE.md](docs/learning/00_START_HERE.md) — 从零到扩展者的完整课程（13 章 + 动手练习）
 - **Competition judges (5-min guide)**: [Judge Quick-Start](docs/JUDGE_QUICKSTART.md)
 - **Getting started**: [Quickstart](docs/quickstart.md) · [Installation](docs/installation.md) · [Full index](docs/INDEX.md)
-- **Concepts**: [Proof bundles](docs/concepts/far-proof.md) · [Evidence ledger](docs/concepts/evidence-ledger.md) · [Evidence grading (GRADE)](docs/concepts/evidence-grading.md) · [Research integrity](docs/concepts/research-integrity.md)
+- **Concepts**: [Proof bundles](docs/concepts/far-proof.md) · [Evidence ledger](docs/concepts/evidence-ledger.md) · [Evidence grading (GRADE)](docs/concepts/evidence-grading.md) · [Research integrity](docs/concepts/research-integrity.md) · [Reporting checklist (PRISMA/CONSORT)](docs/concepts/reporting-checklist.md)
 - **Providers**: [Qwen / DashScope](docs/providers/qwen-dashscope.md)
 - **Architecture**: [docs/INDEX.md](docs/INDEX.md)
 
