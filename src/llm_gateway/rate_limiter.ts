@@ -54,14 +54,16 @@ export function createRateLimitedGateway(
 
   async function enforceInterval(): Promise<void> {
     if (minIntervalMs <= 0) return;
-    // 单调时钟（performance.now）：节流间隔不受系统墙钟调整（NTP 回拨）影响，
-    // 否则全量测试/长运行下偶发回拨会使相邻调用间隔断言 gap < minIntervalMs（flaky）。
+    // 单调时钟（performance.now）：节流间隔不受系统墙钟调整（NTP 回拨）影响。
+    // lastCallAt 记录「逻辑目标时刻」（lastCallAt + minIntervalMs 与唤醒时刻取大）：
+    // setTimeout 的浮点延迟在 libuv 中可能截断导致提前唤醒（CI Linux 实测 gap 漂移 <50ms），
+    // 逻辑时间保证下一间隔从目标时刻起算（无漂移累积），配合 Math.ceil 向上取整防截断。
     const now = performance.now();
     const waitMs = lastCallAt + minIntervalMs - now;
     if (waitMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      await new Promise((resolve) => setTimeout(resolve, Math.ceil(waitMs)));
     }
-    lastCallAt = performance.now();
+    lastCallAt = Math.max(lastCallAt + minIntervalMs, performance.now());
   }
 
   return {
