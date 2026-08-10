@@ -43,7 +43,7 @@ const TEST_PATTERNS = [
  * 行为由 tests/far_proof/integrity_tamper.test.ts（32 测试）覆盖。
  * 白名单仅登记「行为已由既有测试覆盖」的提交；新逃逸必须人工复核。
  */
-const ALLOWED_ESCAPES = new Set(['82cafb34']);
+const ALLOWED_ESCAPES = new Set(['']);
 
 function isTrustKernelChange(file) {
   return TRUST_KERNEL_PATTERNS.some((p) => p.test(file));
