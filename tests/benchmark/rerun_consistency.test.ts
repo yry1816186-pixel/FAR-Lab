@@ -29,7 +29,7 @@ test('可复现 P2: runBenchmark 10 次 suiteIntegrityRoot + 全部 verdict 逐�
     roots.add(report.suiteIntegrityRoot);
     // verdict 指纹：全部 entry 的 verdict + integrityRoot + leafCount 序列化
     const fingerprint = JSON.stringify(
-      report.entries.map((e) => ({
+      report.entries.map((e: { verdict: string; integrityRoot: string; leafCount: number }) => ({
         verdict: e.verdict,
         integrityRoot: e.integrityRoot,
         leafCount: e.leafCount,
