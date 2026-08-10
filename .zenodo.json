@@ -1,0 +1,22 @@
+{
+  "$schema": "https://zenodo.org/schemas/deposits/records/legacyrecord.json",
+  "description": "<p>FAR-Lab: Falsification-Anchored Research Chain — a claim-level verification layer for AI for Science. Deterministic five-value verdict kernel (R0-R9, no LLM arbiter), content-addressed append-only evidence chain with tamper detection, and portable .far-proof verification packages.</p><p>JOSS gate 4 (archive DOI) pre-flight file: Zenodo integration declaration. DOI minting requires a Zenodo token (external authorization) — when available, run the GitHub-Zenodo webhook integration (https://docs.github.com/en/repositories/archiving-a-github-repository/referencing-and-citing-content) which auto-mints DOIs for tagged releases.</p>",
+  "access_right": "open",
+  "license": "MIT",
+  "title": "FAR-Lab: Falsification-Anchored Research Chain — a claim-level verification layer for AI for Science",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Richard Yuan",
+      "orcid": ""
+    }
+  ],
+  "keywords": [
+    "ai4s",
+    "scientific-reproducibility",
+    "verification",
+    "falsification",
+    "evidence-chain",
+    "tamper-detection"
+  ]
+}
