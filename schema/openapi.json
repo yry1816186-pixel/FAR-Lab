@@ -247,6 +247,15 @@
         }
       }
     },
+    "/api/v1/arena": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/v1/planning/risk": {
       "post": {
         "requestBody": {
