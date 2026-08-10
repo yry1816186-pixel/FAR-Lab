@@ -357,6 +357,11 @@ function buildStageSummarySection(
       (sum, r) => sum + (r.usage_tokens_total ?? 0),
       0,
     );
+    // CU4-02（阶段 7 1127）：offline_replay 用字符伪 token（measured=false）——
+    // 口径混叠消除：真实计量与伪 token 分开报告，不混入同一成本口径。
+    const pseudoTokens = records
+      .filter((r) => r.model_id.startsWith('offline-replay'))
+      .reduce((sum, r) => sum + (r.usage_tokens_total ?? 0), 0);
     const finishReasons = [
       ...new Set(records.map((r) => r.finish_reason)),
     ].join(', ');
@@ -365,6 +370,9 @@ function buildStageSummarySection(
     lines.push('');
     lines.push(`- Calls: ${records.length}`);
     lines.push(`- Total tokens: ${totalTokens}`);
+    if (pseudoTokens > 0) {
+      lines.push(`- Pseudo tokens (offline_replay char-estimate, not real metering): ${pseudoTokens}`);
+    }
     lines.push(`- Finish reasons: ${finishReasons}`);
     lines.push(`- Evidence entries: ${stageEvidence.length}`);
     lines.push('');
