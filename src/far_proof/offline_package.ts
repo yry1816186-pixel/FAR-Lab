@@ -334,7 +334,9 @@ function listFiles(root) {
 
 const expected = JSON.parse(fs.readFileSync(integrityPath, 'utf8'));
 const actualFiles = listFiles(bundleDir);
-const actualHash = sha256Text(actualFiles.map((file) => \`\${file.path} \${file.sha256}\`).sort(cmpStr).join('\\n'));
+// DB1-1 同步：必须与 computeFarProofIntegrity (src/far_proof/integrity_check.ts) 的聚合口径一致——
+// hashed bytes = generatedAt line + newline + filelist, 而非裸 filelist。否则第三方提取 .far-proof 运行 verify.sh 必失败。
+const actualHash = sha256Text([expected.generatedAt, actualFiles.map((file) => \`\${file.path} \${file.sha256}\`).sort(cmpStr).join('\\n')].join('\\n'));
 
 if (actualHash !== expected.integrityHash) {
   throw new Error(\`integrityHash mismatch: expected=\${expected.integrityHash} actual=\${actualHash}\`);
