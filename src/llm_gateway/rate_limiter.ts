@@ -54,12 +54,14 @@ export function createRateLimitedGateway(
 
   async function enforceInterval(): Promise<void> {
     if (minIntervalMs <= 0) return;
-    const now = Date.now();
+    // 单调时钟（performance.now）：节流间隔不受系统墙钟调整（NTP 回拨）影响，
+    // 否则全量测试/长运行下偶发回拨会使相邻调用间隔断言 gap < minIntervalMs（flaky）。
+    const now = performance.now();
     const waitMs = lastCallAt + minIntervalMs - now;
     if (waitMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
-    lastCallAt = Date.now();
+    lastCallAt = performance.now();
   }
 
   return {
