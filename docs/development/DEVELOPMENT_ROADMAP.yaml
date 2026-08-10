@@ -4,8 +4,8 @@
 
 project: FAR-Lab
 target_standard: "world-class AI4S research assurance system"
-last_updated: "2026-08-07T00:30:00+08:00"
-last_cycle_result: "D2 benchmark expansion (2026-08-07): latency 性能基线已建立 — benchmark_report.json 新增 latencyMs(每 entry) + latencyStats(p50/p95/max·ms·观测指标不进 hash)；规模事实固化 30 problems / 28 domains(problemCount=30/domainCount=28)；typecheck 0 / lint 0 / benchmark 相关测试全绿；suiteIntegrityRoot 锚定不变(83265409…)。phase1_verify: 6/6 criteria PASS（历史结论保持）。Phase 5 大部分完成（DR runbook 待补）。"
+last_updated: "2026-08-10T18:30:00+08:00"
+last_cycle_result: "Release-quality audit (2026-08-10): 全量门禁复验全绿（后端 2703 tests 0 fail / 前端 254 tests / typecheck/lint/build 0 / repo hygiene 4/4 / openapi:check OK / coverage gate PASS 97.69% line）。修复 2 缺陷：① src/report/generator.ts:488 lint no-useless-escape；② 根 pnpm-lock.yaml 陈旧残留（frontend importer 旧条目）清理 → 根 pnpm audit 0 漏洞（此前 8 假警报）。DR 演练完成（本地隔离环境全链路 PASS）。CI security-audit.yml 增强（全量 audit + 前端 npm audit 面）。56 commits push origin/main 完成。"
 
 phases:
 
@@ -29,7 +29,7 @@ phases:
       - name: security_audit
         target: "0 high/critical vulnerabilities"
         verify: "pnpm audit --audit-level=high"
-        last_measured: "PASS 2026-08-06T21:55 — 0 vulns (pnpm audit --audit-level=high). brace-expansion override 5.0.8→5.0.9 补齐 CVE-2026-14257 补丁线（原 5.0.8 低于补丁线 >=5.0.9）。"
+        last_measured: "PASS 2026-08-10 复验 — 根 `pnpm audit` 0 漏洞（lockfile 陈旧残留清理后）+ 前端 `npm audit` 0 漏洞（vite 6.4.3 / vitest 3.2.7 / react-router-dom 7.18.2）。CI security-audit.yml 增强为三面门禁（全量 pnpm audit / prod-only / frontend npm audit）。brace-expansion override 5.0.8→5.0.9 补丁线保持。"
       - name: ci_pipeline_green
         target: "all CI checks pass"
         verify: "check .github/workflows/ exists and passes locally"
@@ -108,7 +108,7 @@ phases:
   - id: 5
     name: "Production Readiness"
     description: "部署、监控、灾难恢复"
-    status: in_progress
+    status: completed
     exit_criteria:
       - name: deployment_guide
         target: "complete deployment documentation"
@@ -121,5 +121,5 @@ phases:
       - name: disaster_recovery
         target: "backup/restore tested"
         verify: "check DR runbook exists and tested"
-        last_measured: "PARTIAL→NEAR 2026-08-06T23:00 — `far backup` CLI 实现+测试 (VACUUM INTO + integrity_check fail-closed)；docs/governance/disaster-recovery-runbook.md 已补（backup 已实现、restore 为文档化人工流程）；**待办：真实环境 DR 演练（§4）**。"
+        last_measured: "DRILLED 2026-08-10 — 本地隔离环境全链路演练 PASS（far ask --db 建 known state → far backup VACUUM INTO + 自检 ok → doctor 完整性 PASS → 模拟丢失 → §3 恢复 → far status 链头 verifiedCount 6/6 · suiteIntegrityRoot 83265409… 前后一致）。记录于 docs/governance/disaster-recovery-runbook.md §4 结果日志。生产部署环境演练留待发布后执行一次（流程相同）。"
     max_time_budget_hours: 8
