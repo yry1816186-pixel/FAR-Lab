@@ -45,7 +45,7 @@ test('P0-8: parseTestNumbers throws on unparseable output', () => {
 
 test('P0-8: extractClaimedNumbers reads the AGENTS.md claim pattern', () => {
   const claim = extractClaimedNumbers(
-    '- 331 TS files, 2703 tests passing (2697 pass / 0 fail / 6 skip — SSOT)',
+    '- 331 TS files, 2700 tests passing (2694 pass / 0 fail / 6 skip — SSOT)',
   );
   assert.deepEqual(claim, { tests: 2703, pass: 2697, fail: 0, skipped: 6 });
 });
