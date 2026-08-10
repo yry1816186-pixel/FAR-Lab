@@ -229,3 +229,8 @@ docs/archive/
 # --- 竞赛战略文件(本地保留,不进公共仓库) ---
 docs/charter/COMPETITION_STRATEGY.md
 
+# --- 2026-08-10 round 2: docs/ 内部过程稿清理 ---
+# docs/audits/ 全是开发期审计快照(BASELINE_DIAGNOSIS_2026-08-05/PHASE3_STUNNING_FACTOR/WORLD_CLASS_FULL_AUDIT 等)
+# 内部评级 + AI 自动审计产物,公开会让评委判定"自吹自擂 + AI slop"
+docs/audits/
+
