@@ -75,6 +75,31 @@ function auditData(): CallAuditData {
   };
 }
 
+/**
+ * 构造 measured=false 的 response_payload（与 appendLlmResponseRecord 落库结构一致：
+ * { content, credential: { tokenUsage: { measured, ... } }, raw }）。
+ */
+function pseudoAuditData(tokens: number): CallAuditData {
+  return {
+    requestPayload: canonical({ prompt: 'test' }),
+    responsePayload: canonical({
+      content: 'replay',
+      credential: {
+        providerProfile: 'offline_replay',
+        tokenUsage: {
+          inputTokens: 0,
+          outputTokens: tokens,
+          totalTokens: tokens,
+          measured: false,
+        },
+      },
+      raw: null,
+    }),
+    finishReason: 'stop',
+    usageTokensTotal: tokens,
+  };
+}
+
 function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
@@ -107,6 +132,28 @@ function seedCallRecord(
       purposeTag,
     },
     auditData(),
+    OFFLINE_OPTIONS,
+  );
+  return result.seq;
+}
+
+/** 写入自定义 model_id + 审计数据的记录（用于验证 measured 标记 vs 命名约定的区分）。 */
+function seedRecord(
+  db: Database.Database,
+  stageId: string,
+  modelId: string,
+  audit: CallAuditData,
+  purposeTag: 'hypothesis' | 'baseline_exempt' = 'hypothesis',
+): number {
+  const result = appendRecord(
+    db,
+    {
+      stageId,
+      cred: { ...credential(1), modelId },
+      payloadKind: 'hypothesis',
+      purposeTag,
+    },
+    audit,
     OFFLINE_OPTIONS,
   );
   return result.seq;
@@ -260,6 +307,51 @@ test('generateReport includes call record and verdict data', () => {
   const graphSection = report.sections.find((s) => s.title === 'Evidence graph topology');
   assert.ok(graphSection !== undefined);
   assert.ok(graphSection.body.includes('0')); // 0 edges
+
+  db.close();
+});
+
+test('pseudo tokens are counted via measured=false flag, not model_id naming', () => {
+  const db = openDb();
+  const runId = `run-${ulid()}`;
+
+  // 伪 token 记录：model_id 不含 offline-replay 前缀（自定义 replay 模型名），measured=false → 应计入
+  seedRecord(db, 'stage3_hypothesis', 'custom-replay-v2', pseudoAuditData(500), 'baseline_exempt');
+  // 真实计量记录：同 stage，response_payload 无 credential（measured 缺失 → 视为真实计量）
+  seedRecord(db, 'stage3_hypothesis', 'real-model-1', auditData());
+
+  const report = generateReport({ db, runId });
+  const stageSection = report.sections.find(
+    (s) => s.title === 'Six-stage output summary',
+  );
+  assert.ok(stageSection !== undefined);
+
+  // total = 500 + 100 = 600；pseudo = 500（按 measured=false 识别，而非 model_id 前缀）
+  assert.ok(stageSection.body.includes('Total tokens: 600'));
+  assert.ok(
+    stageSection.body.includes(
+      'Pseudo tokens (offline_replay char-estimate, not real metering): 500',
+    ),
+  );
+
+  db.close();
+});
+
+test('offline-replay-prefixed model without measured=false is not counted as pseudo', () => {
+  const db = openDb();
+  const runId = `run-${ulid()}`;
+
+  // model_id 以 offline-replay 开头，但 response_payload 无 measured=false 标记 →
+  // 不再按命名约定计入伪 token（与 TokenUsage.measured 缺省 true 一致）
+  seedRecord(db, 'stage3_hypothesis', 'offline-replay-fixture', auditData());
+
+  const report = generateReport({ db, runId });
+  const stageSection = report.sections.find(
+    (s) => s.title === 'Six-stage output summary',
+  );
+  assert.ok(stageSection !== undefined);
+  assert.ok(stageSection.body.includes('Total tokens: 100'));
+  assert.ok(!stageSection.body.includes('Pseudo tokens'));
 
   db.close();
 });

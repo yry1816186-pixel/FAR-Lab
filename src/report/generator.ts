@@ -41,7 +41,18 @@ interface CallRecordSummaryRow {
   readonly prev_hash: string;
   readonly current_hash: string;
   readonly created_at: string;
+  /**
+   * CU4-02（阶段 7 1127）计量来源标记：0 = 伪 token（offline_replay 字符估算，
+   * 非真实计量），1 = 真实 token 计量，null = 无法提取（视为真实计量）。
+   * 由 response_payload 中的 credential.tokenUsage.measured 提取，不依赖 model_id 命名约定。
+   */
+  readonly measured: number | null;
 }
+
+/** queryCallRecords 的 SQL 行：额外携带 response_payload 用于提取 measured 标记。 */
+type CallRecordSqlRow = Omit<CallRecordSummaryRow, 'measured'> & {
+  readonly response_payload: string;
+};
 
 interface EvidenceEdgeRow {
   readonly edge_id: string;
@@ -89,14 +100,50 @@ function queryEvidenceLog(db: Database.Database): EvidenceLogRow[] {
 }
 
 function queryCallRecords(db: Database.Database): CallRecordSummaryRow[] {
-  return db
+  const rows = db
     .prepare(
       `SELECT seq, stage_id, payload_kind, purpose_tag, model_id,
-              finish_reason, usage_tokens_total, prev_hash, current_hash, created_at
+              finish_reason, usage_tokens_total, response_payload, prev_hash, current_hash, created_at
        FROM call_records
        ORDER BY seq ASC`,
     )
-    .all() as CallRecordSummaryRow[];
+    .all() as CallRecordSqlRow[];
+
+  return rows.map((row) => {
+    const { response_payload, ...rest } = row;
+    return {
+      ...rest,
+      measured: extractMeasuredFlag(response_payload),
+    };
+  });
+}
+
+/**
+ * 从 call_records.response_payload（appendLlmResponseRecord 落库的 canonical JSON，
+ * 内容寻址绑定，格式为 { content, credential: { tokenUsage: { measured, ... }, ... }, raw }）
+ * 提取计量来源标记。
+ *
+ * 语义（与 TokenUsage.measured 缺省 true 一致）：显式 false → 0（伪 token）；
+ * 显式 true → 1；缺失/结构不符（如手工构造的记录）→ null（视为真实计量）。
+ * 非法 JSON = payload 字节被篡改 → JSON.parse 异常向上传播（fail-closed，不静默当真实计量）。
+ */
+function extractMeasuredFlag(responsePayload: string): number | null {
+  const parsed: unknown = JSON.parse(responsePayload);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+  const credential = (parsed as Record<string, unknown>).credential;
+  if (typeof credential !== 'object' || credential === null) {
+    return null;
+  }
+  const tokenUsage = (credential as Record<string, unknown>).tokenUsage;
+  if (typeof tokenUsage !== 'object' || tokenUsage === null) {
+    return null;
+  }
+  const measured = (tokenUsage as Record<string, unknown>).measured;
+  if (measured === false) return 0;
+  if (measured === true) return 1;
+  return null;
 }
 
 function queryEdges(db: Database.Database): EvidenceEdgeRow[] {
@@ -358,9 +405,10 @@ function buildStageSummarySection(
       0,
     );
     // CU4-02（阶段 7 1127）：offline_replay 用字符伪 token（measured=false）——
-    // 口径混叠消除：真实计量与伪 token 分开报告，不混入同一成本口径。
+    // 口径混叠消除：按 measured 标记（而非 model_id 命名约定）区分伪 token，
+    // 真实计量与伪 token 分开报告，不混入同一成本口径。
     const pseudoTokens = records
-      .filter((r) => r.model_id.startsWith('offline-replay'))
+      .filter((r) => r.measured === 0)
       .reduce((sum, r) => sum + (r.usage_tokens_total ?? 0), 0);
     const finishReasons = [
       ...new Set(records.map((r) => r.finish_reason)),
