@@ -139,9 +139,12 @@ function runOscPaper(): PaperRunResult {
       sealedConclusion: result.sealedConclusion,
       decisiveRule: result.kernelOutput.decisiveRuleId,
       reasonCodes: result.kernelOutput.reasonCodes,
-      publishedP: stats.replicationEffectP,
-      farLabExactP: stats.replicationEffectP,
-      farLabP: stats.replicationEffectP,
+      // OSC's primary inferential test is the two-proportion z on the
+      // significance-rate collapse (97% -> 36%); the median replication r is
+      // descriptive only (no valid Fisher-z-on-median inference).
+      publishedP: stats.rateDropP,
+      farLabExactP: stats.rateDropP,
+      farLabP: stats.rateDropP,
       bonferroniP: stats.bhAdjustedPs[0] ?? 0,
       cohensD: stats.replicationMedianR,
       survivesCorrection: stats.survivesFdr,

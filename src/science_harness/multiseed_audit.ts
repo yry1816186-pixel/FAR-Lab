@@ -37,7 +37,7 @@ import type { AntiTheaterReport } from '../anti_theater/index.ts';
 import { buildAntiTheaterPipelineInput } from './anti_theater_input.ts';
 import {
   adjustPValues,
-  differenceInMeansConfidenceInterval,
+  differenceInMeansConfidenceIntervalWelch,
   twoSampleEffectSize,
   twoSampleWelchTTest,
 } from '../statistics/index.ts';
@@ -159,7 +159,7 @@ export async function auditMultiseedCherryPick(
   const pooledOut = reportedRuns.flatMap((r) => r.metrics.outFluxes);
   const tTest = twoSampleWelchTTest(pooledIn, pooledOut, 'less');
   const effectSize = twoSampleEffectSize(pooledOut, pooledIn);
-  const ci = differenceInMeansConfidenceInterval(pooledOut, pooledIn, 0.95);
+  const ci = differenceInMeansConfidenceIntervalWelch(pooledOut, pooledIn, 0.95);
   const adjusted = adjustPValues([tTest.pValue], 'bonferroni', C_ASTRO_ALPHA);
   const adjustedPValue = adjusted[0]?.adjustedPValue ?? tTest.pValue;
   const meanDepth = reportedRuns.reduce((sum, r) => sum + r.metrics.depth, 0) / reportedRuns.length;

@@ -18,12 +18,9 @@ export {
 export type {
   OpenAICompatiblePreset,
 } from './adapters/openai_compatible/presets.ts';
-export {
-  createResilientGateway,
-} from './resilient_gateway.ts';
-export type {
-  ResilientGatewayConfig,
-} from './resilient_gateway.ts';
+// rate_limiter is retained (currently no internal consumer) because the upcoming
+// retrieval layer (arXiv/OpenAlex/Crossref) needs exactly this generic
+// semaphore + min-interval throttle (arXiv ≤3 req/s, Crossref polite pool).
 export {
   createRateLimitedGateway,
 } from './rate_limiter.ts';

@@ -40,7 +40,7 @@ finding with an otherwise-`CONFIRMED` verdict blocks the seal. The detectors (ve
 | `AT-REPORT-MISMATCH` | Human-readable summary contradicts the structured verdict |
 | `AT-WORKFLOW-DIGEST` | Reproduction workflow digest mismatch (claimed ≠ run) |
 | `AT-PROVENANCE-UNBOUND` | Result claimed without verifiable data provenance |
-| `AT-PHACK-PCURVE` | p-curve skewness — p-values suspiciously clustered near α |
+| `AT-PHACK-MARGINAL-P` | marginal primary p-value — single adjusted p in [0.04, 0.05) with a large test family (p-hacking risk signal, not a p-curve distribution test) |
 
 ## How a finding affects the verdict
 
