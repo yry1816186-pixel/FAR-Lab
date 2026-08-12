@@ -70,7 +70,7 @@ describe('OpenAlex adapter — hermetic parse against recorded real response', (
   it('documentId is deterministic — same content always hashes to the same id', () => {
     const d = docs[0];
     if (!d) assert.fail('fixture must yield at least one document');
-    const recomputed = computeDocumentId(d.sourceType, d.persistentIdentifier, d.normalizedHash);
+    const recomputed = computeDocumentId(d.sourceType, d.persistentIdentifier);
     assert.equal(recomputed, d.documentId);
     // Re-parsing the identical fixture must yield identical documentIds.
     const reparsed = parseOpenAlexResults(FIXTURE_BODY, QUERY_TEXT, '2099-01-01T00:00:00.000Z', 3);

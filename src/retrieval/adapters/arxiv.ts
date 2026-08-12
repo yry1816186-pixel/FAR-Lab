@@ -116,7 +116,7 @@ export function parseArxivResults(
     });
 
     docs.push({
-      documentId: computeDocumentId('arxiv', persistentIdentifier, normalizedHash),
+      documentId: computeDocumentId('arxiv', persistentIdentifier),
       sourceType: 'arxiv',
       sourceName: 'arXiv',
       persistentIdentifier,

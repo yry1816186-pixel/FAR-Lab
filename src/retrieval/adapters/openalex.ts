@@ -100,7 +100,7 @@ function mapOpenAlexWork(work: OpenAlexWork, rawBody: string, queryText: string,
   });
 
   return {
-    documentId: computeDocumentId('openalex', persistentIdentifier, normalizedHash),
+    documentId: computeDocumentId('openalex', persistentIdentifier),
     sourceType: 'openalex',
     sourceName: 'OpenAlex',
     persistentIdentifier,
