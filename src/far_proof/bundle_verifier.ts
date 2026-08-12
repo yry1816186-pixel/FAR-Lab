@@ -20,6 +20,7 @@ import type { FalsificationSpec, Verdict } from '../falsifiability/types.ts';
 import { verifyFarProofPackageIntegrity, FAR_PROOF_INTEGRITY_FILE } from './integrity_check.ts';
 import { verifyCallRecordExportAnchor } from '../evidence_log/verifier.ts';
 import { verifyBundleSignature, type BundleSignatureResult } from './bundle_signature.ts';
+import { computeEnvFingerprint, compareEnvFingerprint, type EnvFingerprint } from './env_fingerprint.ts';
 
 /** V1 .far-proof bundle 所需文件白名单（full 模式必须全部存在）。 */
 export const FAR_PROOF_REQUIRED_FILES = [
@@ -243,6 +244,31 @@ export function verifyFarProofBundle(
         ? `paths differ: ${signature.mismatchPaths.slice(0, 5).join(', ')}${signature.mismatchPaths.length > 5 ? '…' : ''}`
         : (signature.reason ?? 'cryptographic signature invalid');
     errors.push(`ED25519_SIGNATURE_INVALID: ${evidence}`);
+  }
+
+  // 评委07 Q3 mitigation：运行环境漂移检测（additive·warn，非 fail）。bundle 在环境 A 下导出，
+  // 在环境 B 下复算 → 轻微数值漂移可能。data_manifest.envFingerprint 存在则比对当前环境并披露。
+  // 旧 bundle 无此字段 → 跳过（零回归）。这是 honest disclosure：.far-proof 不锁环境（非 Docker
+  // capsule），漂移只能检测不能消除。
+  const manifestPath = join(bundlePath, 'data_manifest.json');
+  if (existsSync(manifestPath)) {
+    let recordedEnv: EnvFingerprint | undefined;
+    try {
+      recordedEnv = (JSON.parse(readFileSync(manifestPath, 'utf8')) as { readonly envFingerprint?: EnvFingerprint }).envFingerprint;
+    } catch {
+      // data_manifest 整体可读性由 integrity 检查负责；这里仅缺 envFingerprint → 视为旧 bundle 跳过。
+      recordedEnv = undefined;
+    }
+    if (recordedEnv !== undefined) {
+      const cmp = compareEnvFingerprint(recordedEnv, computeEnvFingerprint());
+      if (!cmp.match) {
+        warnings.push(
+          `ENV_DRIFT: bundle was computed under a different runtime environment (${cmp.differences.join('; ')}). `.concat(
+            'Recompute under the recorded environment for bit-exact reproducibility. Disclosure only — .far-proof locks evidence, not the full runtime (unlike a Docker capsule).',
+          ),
+        );
+      }
+    }
   }
 
   return {

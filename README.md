@@ -356,3 +356,11 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
     fully traceable (every stage transition is logged to `evidence_log`), whereas Bailian Agent is
     a black-box orchestration layer that would break reproducibility. Bailian Agent integration is
     a V2 evaluation item if deterministic-trace compatibility can be preserved.
+11. **Reproducibility scope — environment drift** — a `.far-proof` bundle locks the **evidence**
+    (content-addressed hashes, tamper-detectable) but, unlike a Docker capsule, does **not** lock
+    the full runtime environment. To make environment drift **detectable**, each bundle's
+    `data_manifest.json` now carries an `envFingerprint` (node/python version, platform, arch),
+    and `far verify --bundle` emits an `ENV_DRIFT` warning when the verifying environment differs
+    from the recording one. This is disclosure, not a guarantee: same versions can still drift on
+    transitive dependencies, and fully locking the environment (Docker/WholeTale-style) is a V2 item.
+
