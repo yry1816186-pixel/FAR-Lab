@@ -298,7 +298,19 @@ disclosure + what this project can and cannot prove. At runtime, LLMs (Qwen fami
 
 ## Citation & License
 
-If this work is useful, cite it: see [CITATION.cff](CITATION.cff).
+If this work is useful, cite it. The canonical metadata lives in [CITATION.cff](CITATION.cff);
+a ready-to-paste BibTeX entry is provided here for convenience.
+
+```bibtex
+@software{far-lab,
+  author       = {Richard Yuan},
+  title        = {{FAR-Lab: Falsification-Anchored Research Chain---a claim-level verification layer for AI for Science}},
+  year         = {2026},
+  version      = {1.1.0},
+  license      = {MIT},
+  url          = {https://github.com/yry1816186-pixel/FAR-Lab}
+}
+```
 
 **MIT License** — see [LICENSE](LICENSE). This is a competition entry (XH-202619); it does not
 represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any institution.
@@ -327,7 +339,7 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
    Astronomical candidates produced by the demo should be read as VALIDATED / CANDIDATE.
 8. **Anti-theater runtime wiring** — the 23 anti-theater detectors are fully wired in offline
    `verify` (bundle re-computation, 23 detectors re-run and compared). Production-path runtime
-   wiring (FUSION-OS-1) is V2, pending real multi-seed data (P1-6).
+   wiring is a V2 roadmap item, pending real multi-seed data.
 9. **Tamper detection scope** — keyless SHA-256 chains detect **naive** tampering (an attacker who
    does not recompute hashes). Consistent forgery by an attacker who recomputes all public hashes
    is out of scope for V1 (DEF-18, V-04 PoC). V2 will narrow this window with Ed25519 signatures.
