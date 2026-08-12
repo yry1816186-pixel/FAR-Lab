@@ -44,6 +44,49 @@
         "semver"
       ],
       "additionalProperties": false
+    },
+    "envFingerprint": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": "far.proof_bundle.env_fingerprint.v1"
+        },
+        "capturedAt": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "arch": {
+          "type": "string"
+        },
+        "python": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fingerprintHash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "capturedAt",
+        "node",
+        "platform",
+        "arch",
+        "python",
+        "fingerprintHash"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
