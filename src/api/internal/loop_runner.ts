@@ -4,13 +4,13 @@
  * 设计理由（AGENTS §6 关键实现细节）：
  *   - runAgentLoop 签名复杂（gateway + profile + extractors + providers + appendOptions）。
  *   - API 层用 LoopRunnerArgs 简化入参：只需 researchInput + 模式 + DB + 可选 termination。
- *   - 默认 offline_replay 使用 fixture finishReasonExtractor + 占位 reproHashProvider；
- *     非 offline profile 使用真实 OpenAI-compatible response finish_reason 提取，禁止把 live 调用伪装成 fixture stop。
+ *   - 本文件内部组装 RunAgentLoopArgs，注入 offline_replay profile（模型中立·无真实调用）+
+ *     fixture finishReasonExtractor + 占位 reproHashProvider（测试用·生产路径须接 03 calc_bridge）。
  *
  * 模型中立（24§0.1 红线）：
  *   - 本文件不出现 Qwen / 百炼 / DashScope 字面量。
  *   - 默认 profile = 'offline_replay'（Core 模型中立·无真实 LLM 调用）。
- *   - 非 offline profile 的 gateway 由调用方显式注入。
+ *   - 竞赛 profile 由调用方显式传入（competition_aliyun_qwen adapter 在 llm_gateway 层注入）。
  *
  * 零容忍合规：无 any 类型注解 / ts-ignore 指令 / 双重断言 / 空 catch 块 / 桩代码返回。
  */
@@ -21,10 +21,7 @@ import { runAgentLoop } from '../../agent_loop/fsm_runner.ts';
 import type { LoopState, ReproHashProvider, TerminationCriteria } from '../../agent_loop/types.ts';
 import { gradeRunIntegrity } from './run_grade.ts';
 import type { TraceGrade } from '../../trace/agent_run_event.ts';
-import {
-  extractFinishReasonForOfflineReplay,
-  extractFinishReasonFromOpenAIChatCompletion,
-} from '../../agent_loop/run_stage.ts';
+import { extractFinishReasonForOfflineReplay } from '../../agent_loop/run_stage.ts';
 import { createLlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { createLlmEnvironmentAnchorProvider } from '../../llm_gateway/repro_anchor.ts';
@@ -61,13 +58,13 @@ export interface LoopRunnerArgs {
    *
    * 未提供时的回退（resolveReproHashProvider）：
    *   - offline_replay profile → 确定性占位 hash（测试/demo 语义·非生产数据）
-   *   - production profile → 需 modelSnapshot 显式注入；
+   *   - production profile（competition_aliyun_qwen）→ 需 modelSnapshot 显式注入；
    *     未注入则抛 REPRO_BRIDGE_NOT_CONFIGURED（禁伪造 hash 进生产 evidence_log）
    */
   readonly reproHashProvider?: ReproHashProvider;
   /**
    * G3 闭合（2026-08-06）：production profile 的 LLM 调用环境锚分量——
-   * 模型快照（由模型特定调用方注入·本文件模型中立禁字面量）。
+   * 模型快照（snapshot.ts 常量·由模型特定调用方注入·本文件模型中立禁字面量）。
    * 注入后 executeLoop 用 createLlmEnvironmentAnchorProvider 构造环境锚 provider
    * （非占位·确定性环境指纹·详见 repro_anchor.ts 文档化裁决）。
    * 缺省 undefined → production 路径仍抛 REPRO_BRIDGE_NOT_CONFIGURED（fail-closed）。
@@ -116,8 +113,8 @@ const QUICK_TERMINATION: TerminationCriteria = {
  *
  * 红线（types.ts ReproHashProvider 注释第 3 条·03 §10）：
  *   - 此 provider 仅限 offline_replay profile（测试/demo·非生产 evidence_log）。
- *   - 生产 profile 必须显式注入 reproHashProvider 或 modelSnapshot，否则
- *     resolveReproHashProvider 抛 REPRO_BRIDGE_NOT_CONFIGURED。
+ *   - 生产 profile（competition_aliyun_qwen 等）必须显式注入 reproHashProvider（接 03 calc_bridge
+ *     compute_repro_hash·七分量 sha256），否则 resolveReproHashProvider 抛 REPRO_BRIDGE_NOT_CONFIGURED。
  *   - 禁伪造 hash 进生产 evidence_log（红线 #6 CONFIRMED 需真实证据 + 检查点）。
  */
 const OFFLINE_REPLAY_REPRO_HASH_PROVIDER: ReproHashProvider = () => '0'.repeat(64);
@@ -128,8 +125,9 @@ const OFFLINE_REPLAY_REPRO_HASH_PROVIDER: ReproHashProvider = () => '0'.repeat(6
  *   1. 调用方显式传入 args.reproHashProvider → 信任调用方（生产路径接 calc_bridge）。
  *   2. 未传入 + offline_replay profile → 确定性占位（测试/demo 语义）。
  *   3. 未传入 + 非 offline_replay profile（生产）：
- *      - args.modelSnapshot 已注入 → LLM 调用环境锚 provider
- *      - 未注入 modelSnapshot → fail-fast（禁无声伪造）
+ *      - args.modelSnapshot 已注入 → LLM 调用环境锚 provider（G3 闭合·2026-08-06·
+ *        真实环境指纹·非占位非伪造·见 repro_anchor.ts 文档化裁决）
+ *      - 未注入 modelSnapshot → fail-fast（禁无声伪造·红线不变）
  *
  * @throws {code: 'REPRO_BRIDGE_NOT_CONFIGURED'} 生产 profile 未注入 reproHashProvider/modelSnapshot
  */
@@ -145,6 +143,7 @@ function resolveReproHashProvider(
     return OFFLINE_REPLAY_REPRO_HASH_PROVIDER;
   }
   if (args.modelSnapshot !== undefined) {
+    // G3 闭合：LLM 调用环境锚（模型快照 + 活跃模型 + node 版本 + git sha·确定性·可审计）
     return createLlmEnvironmentAnchorProvider({
       modelSnapshot: args.modelSnapshot,
       activeModelIds: gateway.registeredProfiles(),
@@ -176,6 +175,8 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
   const mode = args.mode ?? 'full';
   const termination = args.termination ?? (mode === 'quick' ? QUICK_TERMINATION : undefined);
   const profile: ProviderProfile = args.profile ?? 'offline_replay';
+  // G3 闭合：modelSnapshot 注入时 appendOptions 自动带 competitionModelSnapshot（repository.ts:325
+  // 反 theater 校验——competition 凭证须显式快照·与环境锚同源同值）。
   const appendOptions: AppendRecordOptions =
     args.appendOptions ??
     {
@@ -186,10 +187,6 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
     };
   const gateway: LlmGateway = args.gateway ?? createLlmGateway([createOfflineReplayAdapter()]);
   const reproHashProvider = resolveReproHashProvider(args, profile, gateway);
-  const finishReasonExtractor =
-    profile === 'offline_replay'
-      ? extractFinishReasonForOfflineReplay
-      : extractFinishReasonFromOpenAIChatCompletion;
   const runId = ulid();
 
   const loopState = await runAgentLoop({
@@ -197,7 +194,7 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
     researchInput: args.researchInput,
     gateway,
     profile,
-    finishReasonExtractor,
+    finishReasonExtractor: extractFinishReasonForOfflineReplay,
     reproHashProvider,
     gitCommitSha: args.gitCommitSha,
     appendOptions,
