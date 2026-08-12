@@ -259,7 +259,7 @@ export async function buildSeedCherryAdversarialChain(
 
   const knownFailures = [
     `cherry-picked submission detected: declared ${SEED_CHERRY_DECLARED_SEEDS.length} seeds but runRegistry only logs ${SEED_CHERRY_REPORTED_SEEDS.length} (seeds ${SEED_CHERRY_DECLARED_SEEDS.filter((s) => !SEED_CHERRY_REPORTED_SEEDS.includes(s)).join(',')} hidden)`,
-    'lightcurve is the same synthetic cached_fixture as c_astro; real online TESS multi-seed is the P1-6 V2 productization path',
+    'lightcurve is the same synthetic cached_fixture as c_astro; real online TESS multi-seed is a V2 productization item',
   ];
 
   const sealed = sealProofEnvelope(db, {

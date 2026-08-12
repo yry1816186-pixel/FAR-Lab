@@ -139,7 +139,7 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'keygen',
-    description: 'generate an Ed25519 key pair (TK10: signer key lifecycle)',
+    description: 'generate an Ed25519 key pair (signer key lifecycle)',
     run: (args) => runKeygen(args),
   },
   {
@@ -211,17 +211,17 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'audit-seed-cherry',
-    description: 'FUSION-OS-1 detector-validation showcase (cherry-pick replay)',
+    description: 'anti-theater detector-validation showcase (cherry-pick replay)',
     run: (args) => runAuditSeedCherryFromArgs(args),
   },
   {
     name: 'audit-multiseed',
-    description: 'FUSION-OS-1 real multi-seed audit (seed-dependent BLS)',
+    description: 'real multi-seed audit (seed-dependent BLS)',
     run: (args) => runAuditMultiseedFromArgs(args),
   },
   {
     name: 'c-astro',
-    description: 'C-ASTRO-0001 online TESS dataset_resolver production wiring (P1-6)',
+    description: 'C-ASTRO-0001 online TESS dataset resolver wiring',
     run: (args) => runCAstroFromArgs(args),
   },
   {
@@ -843,23 +843,23 @@ USAGE:
                                      tess-offline        focus on the TESS (C-ASTRO-0001 pulsar) offline verdict
 
   far audit-seed-cherry [--lightcurve <path>] [--python <cmd>] [--json]
-                         FUSION-OS-1 detector-validation showcase: replay a cherry-pick fixture through the
-                         real anti-theater -> verdict path (NOT a production verdict-path wiring; needs P1-6 for that)
+                         anti-theater detector-validation showcase: replay a cherry-pick fixture through the
+                         real anti-theater -> verdict path (NOT a production verdict-path wiring; needs a real run registry for that)
 
   far audit-multiseed [--lightcurve <path>] [--python <cmd>] [--json]
-                        FUSION-OS-1 real multi-seed audit: run seed-dependent BLS across pre-registered
+                        real multi-seed audit: run seed-dependent BLS across pre-registered
                         seeds (noise-injected, distinct per seed); detect_seed_cherry fires on the REAL
-                        computed registry when the researcher hides non-detection seeds. Status RED (local).
+                        computed registry when the researcher hides non-detection seeds. Local fixture only (online TESS multi-seed is a V2 item).
     --lightcurve <path>  lightcurve fixture (default tests/fixtures/science_harness/tic_sample.cache)
     --python <cmd>       python command (default auto-discover python3/python; BLS needs numpy)
     --json               machine-readable output
     needs python+numpy; exits 1 if missing. exit codes: 0 cherry-pick DETECTED / 7 MISSED (regression) / 2 bad args
 
   far c-astro [--tic <id>] [--sector <n>] [--lightcurve <path>] [--python <cmd>] [--json]
-                        C-ASTRO-0001 online TESS dataset_resolver production wiring (P1-6):
+                        C-ASTRO-0001 online TESS dataset resolver wiring:
                         fetchOnlineDataset (lightkurve+MAST, host-whitelisted) -> resolveDataset ->
                         buildCAstroChain. online resolved -> datasetSource=online (real R7); any failure ->
-                        fail-safe cached_fixture (baseline_exempt, DEGRADED_SCOPE). Status RED (single-seed demo).
+                        fail-safe cached_fixture (baseline_exempt, DEGRADED_SCOPE). Single-seed demo (multi-seed is a V2 item).
     --tic <id>           TESS Input Catalog ID (default 268644982)
     --sector <n>         TESS sector (default 14)
     --lightcurve <path>  cached fixture fallback (default tests/fixtures/science_harness/tic_sample.cache)

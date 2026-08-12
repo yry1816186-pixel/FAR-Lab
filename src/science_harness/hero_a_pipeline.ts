@@ -320,10 +320,10 @@ export function buildHeroAChain(
   const knownFailures = needsHumanEndorsement
     ? [
         `machine verdict was CONFIRMED (real R7, adjustedP=${statistics.adjustedPValue.toExponential(3)}) but downgraded to INCONCLUSIVE for sealing (ASK-9: CONFIRMED requires human endorsement)`,
-        'MMLU eval fixture is preregistered synthetic samples; real sandbox measurement is P1-6 V2 roadmap',
+        'MMLU eval fixture is preregistered synthetic samples; real sandbox measurement is a V2 roadmap item',
       ]
     : [
-        'MMLU eval fixture is preregistered synthetic samples; real sandbox measurement is P1-6 V2 roadmap',
+        'MMLU eval fixture is preregistered synthetic samples; real sandbox measurement is a V2 roadmap item',
       ];
 
   const sealed = sealProofEnvelope(db, {
