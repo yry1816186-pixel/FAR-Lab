@@ -32,6 +32,7 @@ import { runAuditMultiseed } from './commands/audit_multiseed.ts';
 import { runCAstro } from './commands/c_astro.ts';
 import { runCAstroLoop } from './commands/c_astro_loop.ts';
 import { runGround } from './commands/ground.ts';
+import { runCheckResource } from './commands/check_resource.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
 import { runReplay } from './commands/replay.ts';
@@ -235,6 +236,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'ground',
     description: 'ground a research question in real literature + counter-evidence (OpenAlex/arXiv/Crossref; --json, --source, --max-per-query)',
     run: async (args) => runGround(args),
+  },
+  {
+    name: 'check-resource',
+    description: 'verify a cited identifier exists at its authoritative source (doi:... | arxiv:... | url:...; --json)',
+    run: async (args) => runCheckResource(args),
   },
   {
     name: 'lifecycle',
@@ -938,6 +944,14 @@ USAGE:
     --no-counter-evidence  disable the adversarial queries (rarely wanted)
     --json              machine-readable GroundedCorpus output
     exits 0 on success; 1 bad args; 2 retrieval failure (fail-closed, never a partial corpus).
+
+  far check-resource <kind>:<value> [--json]
+                        Verify a cited identifier EXISTS at its authoritative source — NOT via an
+                        LLM (directive §20 / forensic K5: closes "exists=true theater"). doi →
+                        Crossref, arxiv → arXiv, url → UNSUPPORTED (safe SSRF URL check is future work).
+    <kind>:<value>      doi:10.1126/science.aac4716 | arxiv:2501.12345 | url:https://...
+    --json              machine-readable ResourceValidation output
+    exits 0 VERIFIED · 7 NOT_FOUND (fabrication signal) · 8 UNAVAILABLE (env failure) · 9 UNSUPPORTED · 1 bad args
 
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
