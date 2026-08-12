@@ -409,6 +409,7 @@ const VERIFY_SCHEMA: readonly OptionSchema[] = [
   { name: '--lint-input', type: 'string', description: 'path to AntiTheaterLintInput JSON' },
   { name: '--envelope', type: 'string', description: 'path to ProofEnvelopeV2 JSON' },
   { name: '--db', type: 'string', description: 'path to evidence_log DB' },
+  { name: '--pubkey', type: 'string', description: 'expected Ed25519 public key PEM (bundle signature attribution; requires --bundle)' },
   {
     name: '--mode',
     type: 'enum',
@@ -426,6 +427,7 @@ async function runVerifyFromArgs(args: readonly string[]): Promise<number> {
   const envelopePath = result.values['--envelope'] as string | undefined;
   const dbPath = result.values['--db'] as string | undefined;
   const lintInputPath = result.values['--lint-input'] as string | undefined;
+  const pubKeyPath = result.values['--pubkey'] as string | undefined;
   let mode = result.values['--mode'] as string | undefined;
 
   // mode 默认推断（D2）：两者→full；仅 --db→chain；否则→envelope（须 --envelope）。
@@ -447,6 +449,7 @@ async function runVerifyFromArgs(args: readonly string[]): Promise<number> {
     ...(envelopePath !== undefined ? { envelopePath } : {}),
     ...(dbPath !== undefined ? { dbPath } : {}),
     ...(lintInputPath !== undefined ? { lintInputPath } : {}),
+    ...(pubKeyPath !== undefined ? { pubKeyPath } : {}),
     mode: verifiedMode,
     json: result.values['--json'] === true,
     explain: result.values['--explain'] === true,

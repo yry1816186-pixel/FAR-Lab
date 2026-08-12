@@ -341,8 +341,12 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
    `verify` (bundle re-computation, 23 detectors re-run and compared). Production-path runtime
    wiring is a V2 roadmap item, pending real multi-seed data.
 9. **Tamper detection scope** — keyless SHA-256 chains detect **naive** tampering (an attacker who
-   does not recompute hashes). Consistent forgery by an attacker who recomputes all public hashes
-   is out of scope for V1 (DEF-18, V-04 PoC). V2 will narrow this window with Ed25519 signatures.
+   does not recompute hashes). An **optional** Ed25519 bundle signature narrows the "consistent
+   forgery" window: `far sign <bundle> --key <sk.pem>` emits a `<bundle>.sig.json` sidecar that
+   `far verify --bundle` checks (add `--pubkey <pk.pem>` for key attribution). A signed bundle
+   whose files are recomputed by an attacker without the private key fails verification. Still out
+   of scope: key identity is an organizational PKI concern, and an attacker holding both the
+   private key and write access can re-sign (DEF-18, V-04).
 10. **Deterministic FSM over Bailian Agent** (T-035 · 评委04) — FAR-Lab uses a self-written
     deterministic FSM (`src/agent_loop/fsm_runner.ts`) instead of Alibaba Cloud Bailian Agent /
     application orchestration. This is an intentional design choice: the FSM is deterministic and
