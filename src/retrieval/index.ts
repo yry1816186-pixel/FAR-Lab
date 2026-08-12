@@ -17,17 +17,30 @@ export * from './hash.ts';
 export * from './http.ts';
 
 export { openalexAdapter, parseOpenAlexResults, buildOpenAlexUrl } from './adapters/openalex.ts';
+export { arxivAdapter, parseArxivResults, buildArxivUrl } from './adapters/arxiv.ts';
+export {
+  crossrefAdapter,
+  parseCrossrefResults,
+  buildCrossrefUrl,
+  resolveCrossrefDoi,
+} from './adapters/crossref.ts';
 
 import type { RetrievedDocument, RetrievalAdapter, RetrievalQuery, RetrievalResult } from './types.ts';
 import { openalexAdapter } from './adapters/openalex.ts';
+import { arxivAdapter } from './adapters/arxiv.ts';
+import { crossrefAdapter } from './adapters/crossref.ts';
 
-/** Select the live adapter for a source. Throws for unknown/ungated sources. */
+/** Select the live adapter for a source. Throws for unknown sources. */
 export function selectLiveAdapter(source: RetrievalQuery['source']): RetrievalAdapter {
   switch (source) {
     case 'openalex':
       return openalexAdapter;
+    case 'arxiv':
+      return arxivAdapter;
+    case 'crossref':
+      return crossrefAdapter;
     default:
-      throw new Error(`retrieval: no live adapter wired yet for source '${source}' (Phase 2)`);
+      throw new Error(`retrieval: no live adapter wired for source '${String(source)}'`);
   }
 }
 

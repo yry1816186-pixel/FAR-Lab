@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TEST-ONLY SYNTHETIC arXiv Atom fixture (directive §38/§48).
+
+  NOT recorded from a live arXiv response — the dev sandbox could not reach
+  export.arxiv.org (verified 2026-08-12: repeated timeouts). This fixture is a
+  faithful, hand-crafted mirror of the real arXiv Atom 1.0 format (entities to
+  unescape, multiple authors, arxiv:doi present/absent, malformed entry to test
+  fail-closed skipping). It exists to unit-test parseArxivResults() hermetically.
+  Real-behavior verification = the env-gated LIVE smoke
+  (FAR_RETRIEVAL_LIVE=1) in arxiv.test.ts, runnable on a network-capable machine.
+-->
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <title>arXiv Query: search_query=all:test</title>
+  <id>http://arxiv.org/api/query?search_query=all:test</id>
+  <entry>
+    <id>http://arxiv.org/abs/2501.12345v2</id>
+    <updated>2025-02-01T00:00:00Z</updated>
+    <published>2025-01-15T00:00:00Z</published>
+    <title>Measurement of the Hubble Constant H0 &amp; implications for &lt;Lambda&gt;CDM</title>
+    <summary>We measure H0 = 73.04 km/s/Mpc. The &quot;tension&quot; with Planck persists.</summary>
+    <author><name>Alice Einstein</name></author>
+    <author><name>Bob Newton</name></author>
+    <link href="http://arxiv.org/abs/2501.12345v2" rel="alternate" type="text/html"/>
+    <arxiv:doi>10.3847/2041-8213/abcd1234</arxiv:doi>
+    <arxiv:primary_category term="astro-ph.CO"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2407.98765v1</id>
+    <updated>2024-07-20T00:00:00Z</updated>
+    <published>2024-07-10T00:00:00Z</published>
+    <title>Replication crisis in psychology: a meta-analysis</title>
+    <summary>No-DOI preprint. We survey 200 replication studies and find shrinkage.</summary>
+    <author><name>Carol Curie</name></author>
+    <link href="http://arxiv.org/abs/2407.98765v1" rel="alternate" type="text/html"/>
+  </entry>
+  <entry>
+    <id>http://example.com/not-an-arxiv-id</id>
+    <title>Malformed entry with no valid arxiv id — must be skipped (fail-closed)</title>
+    <summary>Should never appear in parsed results.</summary>
+  </entry>
+</feed>
