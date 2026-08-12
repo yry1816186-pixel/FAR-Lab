@@ -47,7 +47,7 @@ import type { SourceAnchor } from '../evidence_log/types.ts';
 import { machineSealableConclusion } from '../far_proof/demo_chain.ts';
 import type { EvidenceDirection } from '../schema/enums.ts';
 import {
-  adjustPValues,
+  bonferroniCorrectedPValue,
   differenceInMeansConfidenceInterval,
   twoSampleEffectSize,
   twoSampleWelchTTest,
@@ -123,6 +123,10 @@ const METRICS_ARTIFACT_NAME = 'bls_metrics.json';
 export interface BlsMetrics {
   readonly ok: boolean;
   readonly n_points: number;
+  /** BLS 周期网格搜索的试验周期数（多重检验 trial factor 之一·T-017/评委05）。 */
+  readonly n_periods: number;
+  /** BLS 试验 duration 数（多重检验 trial factor 之二）。Bonferroni trial 数 = n_periods × n_durations。 */
+  readonly n_durations: number;
   readonly period: number;
   readonly duration: number;
   readonly depth: number;
@@ -198,7 +202,13 @@ export async function runBlsInSandbox(args: {
     );
   }
 
-  const metrics = JSON.parse(rawText) as BlsMetrics;
+  const parsed = JSON.parse(rawText) as Partial<BlsMetrics>;
+  // T-017 多重检验：n_periods/n_durations 由 bls_compute 产出；缺省（旧 metrics 文件）回退 demo 网格 120×3。
+  const metrics: BlsMetrics = {
+    ...parsed,
+    n_periods: typeof parsed.n_periods === 'number' ? parsed.n_periods : 120,
+    n_durations: typeof parsed.n_durations === 'number' ? parsed.n_durations : 3,
+  } as BlsMetrics;
   if (!metrics.ok) {
     throw new Error(`c_astro: BLS computation failed in sandbox: ${metrics.error ?? 'unknown'}`);
   }
@@ -234,8 +244,12 @@ export function buildCAstroStatistics(metricKey: string, bls: BlsMetrics): CAstr
     bls.inFluxes,
     C_ASTRO_CONFIDENCE_LEVEL,
   );
-  const adjusted = adjustPValues([tTest.pValue], 'bonferroni', C_ASTRO_ALPHA);
-  const adjustedPValue = adjusted[0]?.adjustedPValue ?? tTest.pValue;
+  // T-017/评委05 多重检验校正（真实 BLS 网格）：M1 的 p 是从 n_periods × n_durations 个
+  // (period,duration) 试验中选出最优者的 p → 须按真实 trial factor 做 Bonferroni（非旧的
+  // adjustPValues([p],'bonferroni') 单元素数组 ×1 no-op，也非 demo 的 4-检验 0.0125）。
+  // 生产 TESS（n_periods≥2000）下此校正会把 adjustedP 显著抬高 → R7 置信诚实降权。
+  const nTrials = bls.n_periods * bls.n_durations;
+  const adjustedPValue = bonferroniCorrectedPValue(tTest.pValue, nTrials);
 
   // BLS depth>0（dip）→ supports claim；depth<=0 → refutes。effectDirection 驱动 kernel supports/refutes 分支。
   const effectDirection: EvidenceDirection = bls.depth > 0 ? 'supports' : 'refutes';
