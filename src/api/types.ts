@@ -77,6 +77,17 @@ export interface HypothesizeResponse {
   readonly honestVerdict: HonestVerdictNode | null;
   readonly reproHash: string;
   readonly traceGrade: TraceGrade;
+  /**
+   * Honest mode label (directive §26 — no mode may masquerade as another).
+   * 'replay' = offline_replay fixtures (the default fresh-clone state, no API
+   * key); 'real' = a live provider gateway was injected. Mirrors court/arena
+   * `datasetSource`. Surfaced so a client can never mistake a replayed fixture
+   * verdict for a live-computed one.
+   */
+  readonly datasetSource: 'replay' | 'real';
+  /** The runtime provider profile that produced this run (e.g. 'offline_replay',
+   * 'competition_aliyun_qwen'). Full transparency beyond the binary label. */
+  readonly providerProfile: string;
 }
 
 /**
