@@ -31,6 +31,7 @@ import { runAuditSeedCherry } from './commands/audit_seed_cherry.ts';
 import { runAuditMultiseed } from './commands/audit_multiseed.ts';
 import { runCAstro } from './commands/c_astro.ts';
 import { runCAstroLoop } from './commands/c_astro_loop.ts';
+import { runGround } from './commands/ground.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
 import { runReplay } from './commands/replay.ts';
@@ -229,6 +230,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'c-astro-loop',
     description: 'C-ASTRO closed-loop experiment iteration (赛道一·B: plan→BLS→verify→refine grid)',
     run: (args) => runCAstroLoopFromArgs(args),
+  },
+  {
+    name: 'ground',
+    description: 'ground a research question in real literature + counter-evidence (OpenAlex/arXiv/Crossref; --json, --source, --max-per-query)',
+    run: async (args) => runGround(args),
   },
   {
     name: 'lifecycle',
@@ -919,6 +925,19 @@ USAGE:
     --json               machine-readable output
     needs python+numpy; exits 1 if missing. exit 0 on run; 2 bad args. Honest: each round is a
     real BLS subprocess; depthSNR may plateau on a saturated signal (real measurement, not a stub).
+
+  far ground "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--no-counter-evidence] [--json]
+                        Ground a research question in REAL literature + adversarial counter-evidence
+                        (赛道一·方向一·A acquisition layer, directive §9/§16). Retrieves supporting docs
+                        + 5 counter-evidence queries (non-replication/null/failure/criticism/alternative),
+                        dedupes into an immutable CorpusSnapshot (snapshotId + tamper-evident rootHash).
+                        A hypothesis should cite documentIds from this corpus; the citation resolver makes
+                        unbound citations deterministically detectable. Network: allowlisted, rate-limited.
+    --source <s>        openalex (default) | arxiv | crossref
+    --max-per-query <n> docs per query, 1..25 (default 5)
+    --no-counter-evidence  disable the adversarial queries (rarely wanted)
+    --json              machine-readable GroundedCorpus output
+    exits 0 on success; 1 bad args; 2 retrieval failure (fail-closed, never a partial corpus).
 
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
