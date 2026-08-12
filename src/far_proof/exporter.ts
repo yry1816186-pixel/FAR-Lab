@@ -33,6 +33,7 @@ import type Database from 'better-sqlite3';
 import { verifyChainHead } from '../evidence_log/verifier.ts';
 import type { VerifyResult } from '../evidence_log/types.ts';
 import { computeFarProofIntegrity, FAR_PROOF_INTEGRITY_FILE } from './offline_package.ts';
+import { computeEnvFingerprint, type EnvFingerprint } from './env_fingerprint.ts';
 import { CURRENT_RULESET_URI, SUPPORTED_RULESET_URIS } from '../proof_envelope/ruleset_version.ts';
 
 /** Input parameters for operations involving far proof export input. */
@@ -485,6 +486,8 @@ export interface DataManifest {
     readonly legacyDefaultUri: string;
     readonly semver: string;
   };
+  /** 运行环境指纹（评委07 Q3 mitigation：让环境漂移可检测）。旧 bundle 无此字段 → 验证器跳过。 */
+  readonly envFingerprint?: EnvFingerprint;
 }
 
 function writeDataManifest(dir: string, filesWritten: readonly string[], exportedAt: string): string {
@@ -499,6 +502,8 @@ function writeDataManifest(dir: string, filesWritten: readonly string[], exporte
       legacyDefaultUri: 'farlab.dev/ruleset/v1',
       semver: 'MAJOR changes URI / MINOR monotonic backward-compatible / PATCH semantics-neutral',
     },
+    // 评委07 Q3 mitigation：捕获导出时运行环境指纹；验证器比对当前环境，漂移即 warn（披露，非 fail）。
+    envFingerprint: computeEnvFingerprint(exportedAt),
   };
   const filePath = join(dir, 'data_manifest.json');
   writeFileSync(filePath, JSON.stringify(manifest, null, 2), 'utf8');
