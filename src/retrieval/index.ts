@@ -15,6 +15,8 @@
 export * from './types.ts';
 export * from './hash.ts';
 export * from './http.ts';
+export * from './corpus.ts';
+export * from './citation_resolver.ts';
 
 export { openalexAdapter, parseOpenAlexResults, buildOpenAlexUrl } from './adapters/openalex.ts';
 export { arxivAdapter, parseArxivResults, buildArxivUrl } from './adapters/arxiv.ts';

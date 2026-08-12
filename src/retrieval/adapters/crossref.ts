@@ -100,7 +100,7 @@ function mapCrossrefWork(work: CrossrefWork, rawBody: string, queryText: string,
   });
 
   return {
-    documentId: computeDocumentId('crossref', doi, normalizedHash),
+    documentId: computeDocumentId('crossref', doi),
     sourceType: 'crossref',
     sourceName: 'Crossref',
     persistentIdentifier: doi,

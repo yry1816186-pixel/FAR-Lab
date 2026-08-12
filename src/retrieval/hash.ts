@@ -48,16 +48,19 @@ export function normalizedDocumentHash(fields: {
 }
 
 /**
- * Deterministic document id: sha256(sourceType | persistentIdentifier |
- * normalizedHash), truncated to 32 hex chars. Same document + same content →
- * same id across runs/platforms (reproducibility anchor for corpus snapshots).
+ * Deterministic document id: sha256(sourceType | persistentIdentifier), 32 hex.
+ * This is the STABLE IDENTITY of a paper (e.g. OpenAlex W-id, arXiv id, DOI) —
+ * it does NOT depend on content, so refetching the same paper (even if the
+ * source updated its metadata) yields the same documentId. Content integrity is
+ * enforced SEPARATELY via normalizedHash + the corpus rootHash (tamper-evident),
+ * keeping "which paper" (documentId/snapshotId) distinct from "what content"
+ * (normalizedHash/rootHash).
  */
 export function computeDocumentId(
   sourceType: DocumentSource,
   persistentIdentifier: string,
-  normalizedHash: string,
 ): string {
-  return rawSha256Hex(`${sourceType}|${persistentIdentifier}|${normalizedHash}`).slice(0, 32);
+  return rawSha256Hex(`${sourceType}|${persistentIdentifier}`).slice(0, 32);
 }
 
 /** Whitespace-normalize a text field (collapse runs, trim). */

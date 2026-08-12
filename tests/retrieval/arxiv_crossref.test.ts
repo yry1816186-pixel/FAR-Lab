@@ -93,7 +93,7 @@ describe('arXiv adapter — hermetic parse against synthetic Atom fixture', () =
   it('documentId is deterministic', () => {
     const d = docs[0];
     if (!d) assert.fail('doc missing');
-    assert.equal(computeDocumentId('arxiv', d.persistentIdentifier, d.normalizedHash), d.documentId);
+    assert.equal(computeDocumentId('arxiv', d.persistentIdentifier), d.documentId);
   });
 
   it('respects maxResults', () => {
