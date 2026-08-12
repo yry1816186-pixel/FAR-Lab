@@ -65,12 +65,20 @@ test('POST /api/v1/hypothesize success returns 200 with full response shape', as
       graphSubtree: { rootId: string; nodes: readonly unknown[]; edges: readonly unknown[] };
       honestVerdict: unknown;
       reproHash: string;
+      datasetSource: 'replay' | 'real';
+      providerProfile: string;
     } }).data;
     assert.equal(typeof body.loopState.terminated, 'boolean');
     assert.equal(typeof body.graphSubtree.rootId, 'string');
     assert.ok(Array.isArray(body.graphSubtree.nodes));
     assert.ok(Array.isArray(body.graphSubtree.edges));
     assert.equal(typeof body.reproHash, 'string');
+    // K2: the response MUST carry an honest mode label (no replay-as-live
+    // masquerade — directive §26). With no gateway injected (test default) it is
+    // 'replay'; the providerProfile string is the exact runtime profile.
+    assert.ok(body.datasetSource === 'replay' || body.datasetSource === 'real');
+    assert.equal(typeof body.providerProfile, 'string');
+    assert.ok(body.providerProfile.length > 0);
   });
 });
 
