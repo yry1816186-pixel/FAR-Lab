@@ -159,7 +159,21 @@ export function buildRender(result: Awaited<ReturnType<typeof executeLoop>>, pro
  */
 
 function renderHuman(args: AskArgs, render: AskRender): void {
-  const lines = [
+  const lines: string[] = [];
+  // B-5（无假 demo）：offline_replay 必须在 verdict 之前、置于输出顶部，不可误读为 live。
+  if (render.profile === 'offline_replay') {
+    lines.push(
+      '',
+      '  ╔═ OFFLINE REPLAY MODE (dev/CI only) ════════════════════════════════╗',
+      '  ║ This run replays a PRE-RECORDED fixture — NOT live LLM inference.  ║',
+      '  ║ The verdict below is workflow display only, NOT a real scientific  ║',
+      '  ║ verdict. For a live verdict:                                       ║',
+      '  ║   far ask "<question>" --profile competition_aliyun_qwen           ║',
+      '  ║   (requires FAR_DASHSCOPE_API_KEY / DASHSCOPE_API_KEY)             ║',
+      '  ╚════════════════════════════════════════════════════════════════════╝',
+    );
+  }
+  lines.push(
     '',
     '  FAR-Lab · far ask',
     '  ─────────────────────────────────────────────────',
@@ -168,7 +182,7 @@ function renderHuman(args: AskArgs, render: AskRender): void {
     `  run      : ${render.runId}  ·  ${render.stageCount} stages  ·  ${render.iterationsCompleted} iter`,
     `  stop     : ${render.terminationReason}`,
     '  ─────────────────────────────────────────────────',
-  ];
+  );
   if (render.verdict !== null) {
     lines.push(`  verdict  : ${render.verdict}`);
     lines.push(`  rule     : ${render.decisiveRuleId}  (${render.reasonCodes.join(', ')})`);
