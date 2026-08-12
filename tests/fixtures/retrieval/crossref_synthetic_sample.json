@@ -1,0 +1,33 @@
+{
+  "_comment": "TEST-ONLY SYNTHETIC Crossref fixture (directive §38/§48). NOT recorded live — dev sandbox could not reach api.crossref.org (verified 2026-08-12). Faithful mirror of real Crossref works-list JSON (JATS-tagged abstract, date-parts, multi-author, one item missing DOI to test fail-closed skip). Real-behavior verification = env-gated LIVE smoke (FAR_RETRIEVAL_LIVE=1) in crossref.test.ts.",
+  "status": "ok",
+  "message-type": "work-list",
+  "message": {
+    "items": [
+      {
+        "DOI": "10.1126/science.aac4716",
+        "title": ["Estimating the reproducibility of psychological science"],
+        "author": [
+          { "given": "Open Science", "family": "Collaboration" }
+        ],
+        "published": { "date-parts": [[2015, 8, 28]] },
+        "abstract": "<jats:p>We conducted <jats:italic>100</jats:italic> replications of published psychology studies.</jats:p>",
+        "URL": "https://doi.org/10.1126/science.aac4716",
+        "license": [{ "URL": "https://creativecommons.org/licenses/by/4.0/" }]
+      },
+      {
+        "DOI": "10.1038/s41586-021-03819-2",
+        "title": ["Highly accurate protein structure prediction with AlphaFold"],
+        "author": [
+          { "given": "John", "family": "Jumper" },
+          { "given": "Richard", "family": "Evans" }
+        ],
+        "publishedOnline": { "date-parts": [[2021]] },
+        "URL": "https://doi.org/10.1038/s41586-021-03819-2"
+      },
+      {
+        "title": ["No-DOI item — must be skipped (fail-closed)"]
+      }
+    ]
+  }
+}
