@@ -59,7 +59,7 @@ test('P0-4: retired lie-detector narrative has zero hits in active docs', () => 
   );
 });
 
-test('P0-4: README Known limits count is aligned between EN and zh-CN (SSOT: 10)', () => {
+test('P0-4: README Known limits count is aligned between EN and zh-CN (SSOT: 11)', () => {
   const en = readFileSync(join(repoRoot, 'README.md'), 'utf8');
   const zh = readFileSync(join(repoRoot, 'README.zh-CN.md'), 'utf8');
   const countItems = (text: string): number => {
@@ -69,5 +69,5 @@ test('P0-4: README Known limits count is aligned between EN and zh-CN (SSOT: 10)
   const enCount = countItems(en.slice(en.indexOf('### Known limits')));
   const zhCount = countItems(zh.slice(zh.indexOf('### 已知边界')));
   assert.equal(zhCount, enCount, `Known limits count must match (en=${enCount}, zh=${zhCount})`);
-  assert.equal(enCount, 10, 'EN Known limits SSOT is 10 items');
+  assert.equal(enCount, 11, 'EN Known limits SSOT is 11 items');
 });
