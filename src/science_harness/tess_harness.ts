@@ -18,12 +18,15 @@
  * （R7 触发 = 统计证据 + 契约阈值满足），**非天文学 confirmed exoplanet**（后者需 RV/TTV follow-up +
  * 人类背书）。ASK-9 降级正是为此：机器不可终审"confirmed planet"——人类须背书。答辩须区分两层。
  *
- * T-018 Bonferroni 对象边界（评委05 F-5-002 · C-001 裁决 · 2026-07-24）：M1 的 α'=0.0125 是
- * **demo 简化层**的 4 检验维度 Bonferroni（M1-M4 × α=0.05 = 0.0125），正确。但**真实 TESS 场景**
- * 的 BLS 频率网格搜索需按 n_periods trial factor（10³-10⁶ 频率 × α = 极小 α'），不是 4 检验维度。
- * 本 demo 用 4 维度是教学简化（spec 12 §3.1 登记的 demo 阈值），生产 TESS 管线须按频率网格校正。
- * C-001 裁决：science_audit "正确" 限定为 demo 简化层；评委05 "对象错" 限定为真实 TESS 层——
- * 两者都对，是不同层面。本注释明确区分。
+ * T-018 Bonferroni 对象边界（评委05 F-5-002 · C-001 裁决 · 2026-07-24 · 已闭合 2026-08-12）：
+ * 多重检验有**两层**，分别在不同位置校正，组合后即真实 TESS 校正：
+ *   (a) M1-M4 四检验维度 Bonferroni → α'=0.05/4=0.0125，**FEC 预登记**（contracts.ts alpha），
+ *       本 harness 的 M1 显示阈值与之同源（0.0125）。这一层是 demo 与生产共用的设计常量。
+ *   (b) BLS 频率网格搜索的 trial factor → n_periods×n_durations 个 (period,duration) 试验，
+ *       在 **buildCAstroStatistics** 经 bonferroniCorrectedPValue(rawP, nTrials) 计入 adjustedPValue
+ *       （旧实现是 adjustPValues([p],'bonferroni') 单元素数组 ×1 的 no-op → 漏了这层 → 已修）。
+ * 两层复合：adjustedP = rawP × nTrials，再 < α'=0.0125 ⟺ rawP < 0.05/(4 × nTrials)。demo 网格
+ * (120×3=360) 下 rawP<3.5e-5；生产 TESS(≥2000×n_dur) 下 rawP<~2e-6——R7 置信按真实网格诚实降权。
  *
  * evo-03 三 claimType 全交付（22 T-W2-06 + 任务 #12）：
  *   - C-ASTRO-0001 existence（本模块）。
