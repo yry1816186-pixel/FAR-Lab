@@ -155,7 +155,7 @@ export function buildRender(result: Awaited<ReturnType<typeof executeLoop>>, pro
 
 /**
  * executeAskRun —— 已上提至 src/api/internal/ask_runner.ts（审计 P1-1 分层修复），
- * 本文件顶部 re-export 保持 CLI 调用面零回归。
+ * 本文件顶部 re-export 保持调用面零回归。
  */
 
 function renderHuman(args: AskArgs, render: AskRender): void {
@@ -213,7 +213,15 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
 
   if (args.question.trim().length === 0) {
     process.stderr.write(
-      'far ask: missing question.\n  usage: far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--profile offline_replay] [--verdict-driven]\n',
+      'far ask: missing question.\n  usage: far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--profile offline_replay|competition_aliyun_qwen] [--verdict-driven]\n',
+    );
+    return 2;
+  }
+
+  if (args.profile !== 'offline_replay' && args.profile !== 'competition_aliyun_qwen') {
+    process.stderr.write(
+      `far ask: unsupported profile "${args.profile}".\n` +
+        '  supported: offline_replay | competition_aliyun_qwen\n',
     );
     return 2;
   }
@@ -222,9 +230,6 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
   let competitionGateway: LlmGateway | undefined;
   let competitionModelSnapshot: string | undefined;
   if (args.profile !== 'offline_replay') {
-    // 凭据门：FAR_DASHSCOPE_API_KEY 优先（历史 CLI 变量名）·回退 DASHSCOPE_API_KEY（adapter 层 SSOT 变量名）。
-    // 修复 2026-08-06：此前只读 FAR_DASHSCOPE_API_KEY，而 .env/.env.example 与 qwen_adapter 均用
-    // DASHSCOPE_API_KEY——已配置 .env 的用户会被凭据门误拒（真实 bug·变量名不一致）。
     const apiKey = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
     if (apiKey === undefined || apiKey === '') {
       process.stderr.write(
@@ -234,17 +239,12 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
       );
       return 2;
     }
-    // DIGEST G1 闭合：生产代码构造真实 competition adapter 网关（先前 bail「CLI supports offline_replay only」
-    // → adapter 从未被生产构造·「Entire system dead in production」）。registeredProfiles 断言使构造可观测（非死代码）。
     const gateway = createCompetitionQwenGateway({ apiKey });
     if (!gateway.registeredProfiles().includes('competition_aliyun_qwen')) {
       throw new Error(
         'far ask: competition gateway failed to register competition_aliyun_qwen adapter (G1 wiring broken)',
       );
     }
-    // G3 闭合（2026-08-06）：CLI loop 此前被 repro bridge 硬阻塞——七分量 calc_bridge 是实验路径
-    // 语义（agent_loop 无实验可哈希），现以 LLM 调用环境锚（modelSnapshot+活跃模型+环境版本·repro_anchor.ts）
-    // 作为 cred.reproHash 的真实确定性指纹（非占位非伪造·文档化裁决见 repro_anchor.ts 头注释）。
     competitionGateway = gateway;
     competitionModelSnapshot = COMPETITION_MODEL_SNAPSHOT;
   }
@@ -270,6 +270,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
       args.resumePath ?? undefined,
       args.verdictDriven || undefined,
       competitionModelSnapshot,
+      args.profile,
     );
 
     const render = buildRender(result, args.profile, args.question);
@@ -283,25 +284,26 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
     db.close();
   }
 
-  // finally 无 catch 吞异常 → try 抛出时不会到达此行；能到这必是 try 正常完成、result 已赋值。
   if (result === undefined) {
     throw new Error('far ask: unreachable — executeAskRun returned without assigning result');
   }
 
-  // db 已关闭，安全导出（force rmSync exportDir 不会撞到打开的句柄）。
+  // db 已关闭，安全导出。live run 必须保留真实 provider/model 元数据，禁止伪装成 offline demo。
   if (exportDir !== null) {
     const gitCommitSha = resolveGitCommitSha();
+    const exportModelSnapshot =
+      args.profile === 'offline_replay' ? DEMO_MODEL_SNAPSHOT : COMPETITION_MODEL_SNAPSHOT;
     const exp = runExportFarProof({
       source: {
         kind: 'db',
         dbPath: rundbPath,
         runId: result.runId,
-        modelSnapshot: DEMO_MODEL_SNAPSHOT,
+        modelSnapshot: exportModelSnapshot,
         gitCommitSha,
         envHash: computeEnvHash({
           schemaVersion: 11,
           nodeVersion: process.version,
-          providerProfile: 'offline_replay',
+          providerProfile: args.profile,
         }),
       },
       outputDir: exportDir,
