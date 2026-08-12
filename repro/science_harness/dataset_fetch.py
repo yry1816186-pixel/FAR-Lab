@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import socket
 import sys
 import traceback
 from datetime import datetime, timezone
@@ -106,6 +107,13 @@ def main() -> None:
         sector = cfg.get("sector", None)
         if not isinstance(sector, int):
             sector = None
+
+        # Fail-fast on network hangs: bound socket operations so an unreachable host raises
+        # socket.timeout (caught below -> honest {ok:false}, exit 0) instead of hanging until
+        # the caller's spawn timeout kills us (which exits non-zero with NO envelope — a crash,
+        # not fail-closed). 30s is generous for a single TESS target yet well under the 45s
+        # caller budget; honesty prefers a bounded honest-null over an indefinite hang.
+        socket.setdefaulttimeout(30.0)
 
         out_path = cfg.get("outPath")
         lightcurve_path: str | None = None
