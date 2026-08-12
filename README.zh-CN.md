@@ -229,9 +229,11 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
    RV mass / TTV 证据）。demo 产出的天文学候选应读作 VALIDATED / CANDIDATE。
 8. **反剧场运行时接线** —— 23 个反剧场检测器已在离线 `verify` 中完整接线（bundle 重算、
    23 检测器重跑比对）。生产路径运行时接线为 V2 路线图项，等待真实 multi-seed 数据。
-9. **篡改检测范围** —— 无密钥 SHA-256 链检测**朴素**篡改（攻击者不重算哈希）。
-   重算全部公开哈希的一致伪造（consistent forgery）超出 V1 范围（DEF-18，V-04 PoC）。
-   V2 将以 Ed25519 签名收窄此窗口。
+9. **篡改检测范围** —— 无密钥 SHA-256 链检测**朴素**篡改（攻击者不重算哈希）。**可选的**
+   Ed25519 bundle 签名收窄"一致伪造"窗口：`far sign <bundle> --key <sk.pem>` 生成
+   `<bundle>.sig.json` sidecar，`far verify --bundle` 自动校验（加 `--pubkey <pk.pem>` 做公钥
+   归属）。攻击者若无私钥却重算被签文件 → 验证失败。仍超出范围：公钥归属是组织 PKI 流程，
+   同时持有私钥+写权限的攻击者可重签（DEF-18，V-04）。
 10. **确定性 FSM 而非百炼 Agent**（T-035 · 评委04）—— FAR-Lab 使用自研确定性 FSM
     （`src/agent_loop/fsm_runner.ts`）而非阿里云百炼 Agent / 应用编排。这是有意设计：
     FSM 确定性且完全可追溯（每个阶段转换记入 `evidence_log`），而百炼 Agent 是黑盒编排层，
