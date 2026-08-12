@@ -9,7 +9,7 @@
  * 单一真实依赖（T8）：
  *   - src/science_harness/sandbox_runner.ts:venvSandboxAdapter.executeAsync（真 spawn 子进程）
  *   - repro/science_harness/bls_compute.py:run（numpy BLS 周期搜索·真实测量）
- *   - src/statistics/（twoSampleWelchTTest/twoSampleEffectSize/differenceInMeansConfidenceInterval/adjustPValues）
+ *   - src/statistics/（twoSampleWelchTTest/twoSampleEffectSize/differenceInMeansConfidenceIntervalWelch/adjustPValues）
  *
  * 诚实边界：
  *   - 数据集：fetchOnlineDataset(lightkurve) 不可用时落 cached_fixture（合成 transit LC·baseline_exempt）。
@@ -48,7 +48,7 @@ import { machineSealableConclusion } from '../far_proof/demo_chain.ts';
 import type { EvidenceDirection } from '../schema/enums.ts';
 import {
   bonferroniCorrectedPValue,
-  differenceInMeansConfidenceInterval,
+  differenceInMeansConfidenceIntervalWelch,
   twoSampleEffectSize,
   twoSampleWelchTTest,
 } from '../statistics/index.ts';
@@ -264,7 +264,7 @@ export function buildCAstroStatistics(metricKey: string, bls: BlsMetrics): CAstr
   // H1: mean(inFlux) < mean(outFlux)（transit dip · in < out）。显著拒绝 H0 → depth>0 = 支持 claim。
   const tTest = twoSampleWelchTTest(bls.inFluxes, bls.outFluxes, 'less');
   const effectSize = twoSampleEffectSize(bls.outFluxes, bls.inFluxes);
-  const confidenceInterval = differenceInMeansConfidenceInterval(
+  const confidenceInterval = differenceInMeansConfidenceIntervalWelch(
     bls.outFluxes,
     bls.inFluxes,
     C_ASTRO_CONFIDENCE_LEVEL,
