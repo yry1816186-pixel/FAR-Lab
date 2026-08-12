@@ -30,6 +30,7 @@ import { runDemo } from './commands/demo.ts';
 import { runAuditSeedCherry } from './commands/audit_seed_cherry.ts';
 import { runAuditMultiseed } from './commands/audit_multiseed.ts';
 import { runCAstro } from './commands/c_astro.ts';
+import { runCAstroLoop } from './commands/c_astro_loop.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
 import { runReplay } from './commands/replay.ts';
@@ -223,6 +224,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'c-astro',
     description: 'C-ASTRO-0001 online TESS dataset resolver wiring',
     run: (args) => runCAstroFromArgs(args),
+  },
+  {
+    name: 'c-astro-loop',
+    description: 'C-ASTRO closed-loop experiment iteration (赛道一·B: plan→BLS→verify→refine grid)',
+    run: (args) => runCAstroLoopFromArgs(args),
   },
   {
     name: 'lifecycle',
@@ -816,6 +822,39 @@ async function runCAstroFromArgs(args: readonly string[]): Promise<number> {
   });
 }
 
+const CASTRO_LOOP_SCHEMA: readonly OptionSchema[] = [
+  { name: '--lightcurve', type: 'string', description: 'lightcurve CSV path (default cached fixture)', requiredPlaceholder: 'path' },
+  { name: '--rounds', type: 'string', description: 'number of closed-loop iterations (default 3)', requiredPlaceholder: 'n' },
+  { name: '--python', type: 'string', description: 'python command (default auto-discover python3/python)', requiredPlaceholder: 'cmd' },
+  { name: '--json', type: 'boolean', description: 'machine-readable output' },
+];
+
+async function runCAstroLoopFromArgs(args: readonly string[]): Promise<number> {
+  const result = parseOptions(args, CASTRO_LOOP_SCHEMA, 'far c-astro-loop');
+  if (reportErrors(result.errors)) {
+    return 2;
+  }
+  const lightcurvePath = result.values['--lightcurve'] as string | undefined;
+  const roundsStr = result.values['--rounds'] as string | undefined;
+  const pythonCmd = result.values['--python'] as string | undefined;
+  const json = result.values['--json'] === true;
+  let rounds: number | undefined;
+  if (roundsStr !== undefined) {
+    const parsed = Number(roundsStr);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      process.stderr.write(`far c-astro-loop: --rounds must be an integer >= 1 (got: ${roundsStr})\n`);
+      return 2;
+    }
+    rounds = parsed;
+  }
+  return runCAstroLoop({
+    ...(lightcurvePath !== undefined ? { lightcurvePath } : {}),
+    ...(rounds !== undefined ? { rounds } : {}),
+    ...(pythonCmd !== undefined ? { pythonCmd } : {}),
+    json,
+  });
+}
+
 function commandHelp(command: string): string {
   const lines = HELP_TEXT.split('\n');
   const startIdx = lines.findIndex((l) => new RegExp('^  far ' + command + '\\b').test(l));
@@ -869,6 +908,17 @@ USAGE:
     --python <cmd>       python command (default auto-discover; BLS needs numpy)
     --json               machine-readable output
     needs python+numpy; exits 1 if missing. exit 0 on pipeline run; 2 bad args
+
+  far c-astro-loop [--lightcurve <path>] [--rounds <n>] [--python <cmd>] [--json]
+                        C-ASTRO closed-loop experiment iteration (赛道一·方向一·B: 接入"仪器"后
+                        据反馈迭代提升). 每轮 = 规划(周期网格) -> BLS(真 numpy) -> 验证 ->
+                        据反馈缩放并加密网格。光变曲线即"仪器"，BLS 即"实验"。
+    --lightcurve <path>  lightcurve CSV (default tests/fixtures/science_harness/tic_sample.cache)
+    --rounds <n>         closed-loop iterations (default 3)
+    --python <cmd>       python command (default auto-discover; BLS needs numpy)
+    --json               machine-readable output
+    needs python+numpy; exits 1 if missing. exit 0 on run; 2 bad args. Honest: each round is a
+    real BLS subprocess; depthSNR may plateau on a saturated signal (real measurement, not a stub).
 
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
