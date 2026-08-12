@@ -157,15 +157,40 @@ export async function runBlsInSandbox(args: {
   readonly adapter?: VenvSandboxAdapter;
   /** 可选 seed：传入则 bls_compute.run 注入 seed-dependent 高斯噪声（真实测量不确定性 bootstrap）。缺省 = 确定性单跑（c_astro 行为）。 */
   readonly blsSeed?: number;
+  /** 可选 BLS 周期网格（缺省 = Python 默认 1.8-3.0d / 120 点）。闭环迭代用它逐轮缩放/加密网格。 */
+  readonly periodMin?: number;
+  readonly periodMax?: number;
+  readonly nPeriods?: number;
 }): Promise<CAstroSandboxOutput> {
   const adapter = args.adapter ?? venvSandboxAdapter;
+  // 闭环网格参数守卫：三者要么全给、要么全不给；periodMin<periodMax、nPeriods>=1。
+  if (
+    (args.periodMin !== undefined || args.periodMax !== undefined || args.nPeriods !== undefined) &&
+    (args.periodMin === undefined || args.periodMax === undefined || args.nPeriods === undefined)
+  ) {
+    throw new Error('runBlsInSandbox: periodMin/periodMax/nPeriods must be provided together');
+  }
+  if (
+    args.periodMin !== undefined &&
+    args.periodMax !== undefined &&
+    args.nPeriods !== undefined &&
+    !(args.periodMin > 0 && args.periodMax > args.periodMin && args.nPeriods >= 1)
+  ) {
+    throw new Error(
+      `runBlsInSandbox: invalid grid (periodMin=${args.periodMin}, periodMax=${args.periodMax}, nPeriods=${args.nPeriods})`,
+    );
+  }
   // sandbox 用户脚本：调 bls_compute.run，把 metrics 写 WORKING_DIR/bls_metrics.json，
   // 打印一行确定性摘要（stdout 锚）。metrics 路径用 WORKING_DIR（sandbox 注入命名空间）。
   const seedArg = args.blsSeed !== undefined ? `, seed=${args.blsSeed}` : '';
+  const gridArg =
+    args.periodMin !== undefined && args.periodMax !== undefined && args.nPeriods !== undefined
+      ? `, period_min=${args.periodMin}, period_max=${args.periodMax}, n_periods=${args.nPeriods}`
+      : '';
   const script =
     'import json, os\n' +
     'from science_harness.bls_compute import run\n' +
-    `__m = run(${JSON.stringify(args.lightcurvePath)}${seedArg})\n` +
+    `__m = run(${JSON.stringify(args.lightcurvePath)}${gridArg}${seedArg})\n` +
     `with open(os.path.join(WORKING_DIR, ${JSON.stringify(METRICS_ARTIFACT_NAME)}), "w") as __f:\n` +
     '    json.dump(__m, __f)\n' +
     'print("period=%.4f depth=%.5f snr=%.2f" % (__m["period"], __m["depth"], __m["depthSNR"]))\n';
