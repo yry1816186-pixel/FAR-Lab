@@ -19,6 +19,7 @@ import { GENESIS_PROOF_HASH, type CheckOutcome, type ProofCheckResult, type Proo
 import type { FalsificationSpec, Verdict } from '../falsifiability/types.ts';
 import { verifyFarProofPackageIntegrity, FAR_PROOF_INTEGRITY_FILE } from './integrity_check.ts';
 import { verifyCallRecordExportAnchor } from '../evidence_log/verifier.ts';
+import { verifyBundleSignature, type BundleSignatureResult } from './bundle_signature.ts';
 
 /** V1 .far-proof bundle 所需文件白名单（full 模式必须全部存在）。 */
 export const FAR_PROOF_REQUIRED_FILES = [
@@ -91,6 +92,8 @@ export interface BundleVerifyResult {
   readonly proofEnvelopeMismatches: readonly ProofEnvelopeMismatch[];
   readonly chainRan: boolean;
   readonly chain: BundleChainResult;
+  /** Ed25519 bundle 签名维度（DEF-18 一致伪造收窄·additive：无 sidecar 则 skipped）。 */
+  readonly signature: BundleSignatureResult;
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
 }
@@ -108,7 +111,7 @@ export interface BundleVerifyResult {
 export function verifyFarProofBundle(
   bundlePath: string,
   mode: FarProofBundleVerifyMode = 'full',
-  options: { readonly dbAnchor?: Database.Database } = {},
+  options: { readonly dbAnchor?: Database.Database; readonly expectedPubKeyPem?: string } = {},
 ): BundleVerifyResult {
   const requiredFiles = requiredFilesForMode(mode);
   const missingFiles = requiredFiles.filter((file) => !existsSync(join(bundlePath, file)));
@@ -228,8 +231,19 @@ export function verifyFarProofBundle(
   }
 
   warnings.push(
-    'Bundle format is V1 minimal self-verifiable export; it is not a third-party RO-Crate/PROV-O certification.',
+    'Bundle format is V1 minimal self-verifiable export; it is not a third-party RO-Crate/PROV certification.',
   );
+
+  // Ed25519 bundle 签名（DEF-18 收窄·additive）：仅当 <bundle>.sig.json sidecar 存在才验签。
+  // sidecar 缺失 → skipped（零回归）；存在且失效 → 进 errors → ok=false → verify FAIL。
+  const signature = verifyBundleSignature(bundlePath, options.expectedPubKeyPem);
+  if (signature.ran && !signature.ok) {
+    const evidence =
+      signature.mismatchPaths !== undefined && signature.mismatchPaths.length > 0
+        ? `paths differ: ${signature.mismatchPaths.slice(0, 5).join(', ')}${signature.mismatchPaths.length > 5 ? '…' : ''}`
+        : (signature.reason ?? 'cryptographic signature invalid');
+    errors.push(`ED25519_SIGNATURE_INVALID: ${evidence}`);
+  }
 
   return {
     ok: errors.length === 0,
@@ -243,6 +257,7 @@ export function verifyFarProofBundle(
     proofEnvelopeMismatches,
     chainRan,
     chain,
+    signature,
     errors,
     warnings,
   };

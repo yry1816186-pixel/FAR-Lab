@@ -630,6 +630,7 @@ export interface VerifyOptions {
   readonly envelopePath?: string;
   readonly dbPath?: string;
   readonly lintInputPath?: string;
+  readonly pubKeyPath?: string;
   readonly mode: VerifyMode;
   readonly json: boolean;
   readonly explain: boolean;
@@ -657,10 +658,19 @@ export async function runVerify(options: VerifyOptions): Promise<number> {
       }
     }
     try {
+      let expectedPubKeyPem: string | undefined;
+      if (options.pubKeyPath !== undefined) {
+        try {
+          expectedPubKeyPem = readFileSync(options.pubKeyPath, 'utf8');
+        } catch (error) {
+          process.stderr.write(`far verify: cannot read --pubkey ${options.pubKeyPath}: ${errorMessage(error)}\n`);
+          return 2;
+        }
+      }
       const bundleResult = verifyFarProofBundle(
         options.bundlePath,
         mode,
-        dbAnchor !== undefined ? { dbAnchor } : {},
+        { ...(dbAnchor !== undefined ? { dbAnchor } : {}), ...(expectedPubKeyPem !== undefined ? { expectedPubKeyPem } : {}) },
       );
       const warnings = [...bundleResult.warnings];
       if (dbAnchorError !== null) {
@@ -889,11 +899,16 @@ function renderVerifyHuman(
       bundleResult.mode === 'chain' || !bundleResult.proofEnvelopeRan
         ? 'not-run'
         : `${bundleResult.proofEnvelopeOk ? 'pass' : 'fail'} (${bundleResult.proofEnvelopeCount} checked)`;
+    const sig = bundleResult.signature;
+    const sigSummary = !sig.ran
+      ? 'skipped (no .sig.json sidecar — DEF-18 consistent-forgery window open)'
+      : `${sig.status}${sig.status === 'pass' ? ` (${sig.fileCount ?? 0} files)` : ''}${sig.reason !== undefined ? ` — ${sig.reason}` : ''}${sig.signer !== undefined ? ` [${sig.signer}]` : ''}`;
     lines.push(
       `  bundle              : ${bundleResult.mode} (${bundleResult.bundlePath})`,
       `  bundle.files        : ${bundleResult.requiredFilesPresent ? 'present' : `missing ${bundleResult.missingFiles.length}`}`,
       `  bundle.chain        : ${chainSummary}`,
       `  bundle.envelopes    : ${envelopeSummary}`,
+      `  bundle.signature    : ${sigSummary}`,
     );
   }
 
