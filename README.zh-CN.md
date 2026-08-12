@@ -228,7 +228,9 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
    （contract-consistent bounded support），**不是**天文学的"确认系外行星"（后者需要
    RV mass / TTV 证据）。demo 产出的天文学候选应读作 VALIDATED / CANDIDATE。
 8. **反剧场运行时接线** —— 23 个反剧场检测器已在离线 `verify` 中完整接线（bundle 重算、
-   23 检测器重跑比对）。生产路径运行时接线为 V2 路线图项，等待真实 multi-seed 数据。
+   23 检测器重跑比对），**并已接入生产裁决路径**：science-harness 流水线真跑 `runAntiTheaterLint`
+   并把 findings 注入 FEC，内核 R4 / ANTI_THEATER_FAIL 规则据此触发。诚实的缺口在数据而非接线
+   —— 多种子 demo 跑在确定性合成光变曲线上；真实在线 TESS 多种子验证是待补的数据项。
 9. **篡改检测范围** —— 无密钥 SHA-256 链检测**朴素**篡改（攻击者不重算哈希）。**可选的**
    Ed25519 bundle 签名收窄"一致伪造"窗口：`far sign <bundle> --key <sk.pem>` 生成
    `<bundle>.sig.json` sidecar，`far verify --bundle` 自动校验（加 `--pubkey <pk.pem>` 做公钥

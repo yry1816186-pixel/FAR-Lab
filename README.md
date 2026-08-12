@@ -338,8 +338,11 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
    support", **not** the astronomical term "confirmed exoplanet" (which requires RV mass / TTV).
    Astronomical candidates produced by the demo should be read as VALIDATED / CANDIDATE.
 8. **Anti-theater runtime wiring** — the 23 anti-theater detectors are fully wired in offline
-   `verify` (bundle re-computation, 23 detectors re-run and compared). Production-path runtime
-   wiring is a V2 roadmap item, pending real multi-seed data.
+   `verify` (bundle re-computation, 23 detectors re-run and compared) **and** in the production
+   verdict path: the science-harness pipelines run `runAntiTheaterLint` and inject the findings
+   into the FEC, and the kernel's R4 / ANTI_THEATER_FAIL rule fires on them. The honest caveat is
+   data, not wiring — the multi-seed demo runs on a deterministic synthetic lightcurve; real
+   online-TESS multi-seed verification is the pending data item.
 9. **Tamper detection scope** — keyless SHA-256 chains detect **naive** tampering (an attacker who
    does not recompute hashes). An **optional** Ed25519 bundle signature narrows the "consistent
    forgery" window: `far sign <bundle> --key <sk.pem>` emits a `<bundle>.sig.json` sidecar that
