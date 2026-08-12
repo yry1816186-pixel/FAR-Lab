@@ -70,7 +70,8 @@ deterministic proof chain — `src/science_harness/osc_pipeline.ts` +
 `repro/real_paper/osc_replication_recompute.py` (independent Python stdlib axis).
 
 **Machine verdict: `DEGRADED_SCOPE`** — the 4th of the 5 verdict values, distinct
-from Bem (`UNTESTED`) and Ritchie (`REFUTED`).
+from Bem (`UNTESTED`) and Ritchie (`INCONCLUSIVE` — three labs failed to replicate;
+combined Fisher p ≈ 0.80 is non-significant, so it is a null result, not a refutation).
 
 Evidence path that produces it:
 - Replication median effect `r = 0.197` (Fisher z = 0.1996, SE = 1/√94 ≈ 0.1031,
