@@ -151,31 +151,7 @@ test('T-020 异常路径：调用抛错仍释放并发闸（finally·不泄漏�
   assert.equal(res.content, 'ok:p');
   assert.equal(calls, 2);
 });
-
-test('T-020 可叠加：resilient + rate-limited 组合（并发安全 + 降级）', async () => {
-  const inner = createLlmGateway();
-  let aCalls = 0;
-  inner.register({
-    profile: 'a' as ProviderProfile,
-    call: async () => {
-      aCalls += 1;
-      const err = new Error('a down');
-      err.name = 'FetchError';
-      throw err;
-    },
-  });
-  inner.register({
-    profile: 'b' as ProviderProfile,
-    call: async () => fixtureResponse('b'),
-  });
-
-  const { createResilientGateway } = await import('../../src/llm_gateway/resilient_gateway.ts');
-  const limited = createRateLimitedGateway(inner, { maxConcurrent: 1 });
-  const resilient = createResilientGateway(limited, {
-    fallbackOrder: ['b' as ProviderProfile],
-  });
-
-  const res = await resilient.callLlm('a' as ProviderProfile, makeRequest());
-  assert.equal(res.content, 'ok:b');
-  assert.equal(aCalls, 1);
-});
+// Note: the former T-020 "resilient + rate-limited composition" test was removed
+// when resilient_gateway.ts was deleted (unused in production; LLM fallback is
+// owned by executeFallbackChain in qwen_adapter). rate_limiter itself is retained
+// because the upcoming retrieval layer reuses it for external-API throttling.
