@@ -44,7 +44,7 @@ Contributor → Committer → Maintainer, by nomination + review by existing
 Maintainers. `NEEDS_MAINTAINER_ASSIGNMENT`: bus factor is currently 1; the
 succession path and a second maintainer are outstanding.
 
-### 6.1 Bus-factor mitigation (阶段 7 P0-10 · CG4-1/BP4-1 修复)
+### 6.1 Bus-factor mitigation
 
 - **现状（诚实声明）**：bus factor = 1（lead maintainer `@yry1816186-pixel`）。
   全部信任内核（verdict kernel / FEC / evidence chain / proof envelope）与发布路径
