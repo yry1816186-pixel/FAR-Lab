@@ -6,7 +6,7 @@
  *   - 本文件走 Pipeline B：fixture 样本 → src/statistics/ 真实计算 → fecAppendClaim(statistics?)
  *     → decideFiveValueVerdict（R5-R8 真实触发）→ machineSealableConclusion → sealProofEnvelope。
  *
- * 单一真实依赖（T8）：src/statistics/（oneSampleZTest/meanConfidenceInterval/cohensDOneSample/adjustPValues）
+ * 单一真实依赖（T8）：src/statistics/（oneSampleZTest/meanConfidenceIntervalT/cohensDOneSample/adjustPValues）
  * —— 本文件是其**首个生产 caller**（STAT-1 BUILT_UNWIRED→WIRED 起点；此前仅 tests/statistics 调用）。
  *
  * 诚实边界（ASK-9）：机器裁决可产 CONFIRMED（真实 R7），但 sealProofEnvelope 禁签 CONFIRMED →
@@ -44,7 +44,7 @@ import type { EvidenceDirection } from '../schema/enums.ts';
 import {
   adjustPValues,
   cohensDOneSample,
-  meanConfidenceInterval,
+  meanConfidenceIntervalT,
   oneSampleZTest,
   sampleMean,
 } from '../statistics/index.ts';
@@ -145,7 +145,7 @@ export function buildHeroAStatistics(metricKey: string): HeroAStatistics {
   const sample = HERO_A_RUN_ACCURACIES;
   const observedMean = sampleMean(sample);
   const zTest = oneSampleZTest(sample, HERO_A_NULL_MEAN, HERO_A_POPULATION_SD, 'greater');
-  const confidenceInterval = meanConfidenceInterval(sample, HERO_A_CONFIDENCE_LEVEL);
+  const confidenceInterval = meanConfidenceIntervalT(sample, HERO_A_CONFIDENCE_LEVEL);
   const cohensD = cohensDOneSample(sample, HERO_A_NULL_MEAN);
   const adjusted = adjustPValues([zTest.pValue], 'bonferroni', HERO_A_ALPHA);
   const adjustedPValue = adjusted[0]?.adjustedPValue ?? zTest.pValue;

@@ -5,16 +5,20 @@
  * z-tests. This is adequate for large samples (N>200) but produces systematically
  * anti-conservative p-values for small samples (N<30), which covers most real
  * psychology / clinical trial / neuroscience papers. This module adds the
- * t-distribution CDF/Survival/inverse so callers can compute exact t-test p-values.
+ * t-distribution CDF/Survival/inverse so callers can compute exact t-test p-values
+ * and t-based confidence intervals.
  *
  * Implementation: regularized incomplete beta function (I_x(a,b)) via continued
- * fraction (Lentz's method), matching Numerical Recipes §6.4. All functions are
- * pure, deterministic, and side-effect free.
+ * fraction (Lentz's method), matching Numerical Recipes §6.4. The quantile
+ * (inverse-CDF) uses Newton's method seeded from the normal approximation.
+ * All functions are pure, deterministic, and side-effect free.
  *
  * References:
  *   - Press et al. (2007). Numerical Recipes 3rd ed., §6.4 (Incomplete Beta).
  *   - Abramowitz & Stegun (1964), §26.7 (Probability Functions).
  */
+
+import { normalQuantile } from './p_value.ts';
 
 /** Maximum iterations for continued fraction expansion. */
 const BETA_ITMAX = 200;
@@ -150,6 +154,107 @@ export function studentTSurvival(t: number, df: number): number {
 export function studentTTwoSidedP(t: number, df: number): number {
   const tt = Math.abs(t);
   return 2 * studentTSurvival(tt, df);
+}
+
+/**
+ * Probability density function of Student's t-distribution.
+ *
+ * f(t; df) = Γ((df+1)/2) / (√(df·π) · Γ(df/2)) · (1 + t²/df)^(-(df+1)/2)
+ *
+ * Computed in log-space then exponentiated for numerical stability with large |t|
+ * or small df. Used as the derivative in studentTQuantile's Newton iteration.
+ */
+export function studentTPdf(t: number, df: number): number {
+  if (!Number.isFinite(t)) {
+    throw new Error(`studentTPdf: t must be finite, got ${t}`);
+  }
+  if (df <= 0) {
+    throw new Error(`studentTPdf: df must be positive, got ${df}`);
+  }
+  const logCoeff = logGamma((df + 1) / 2) - logGamma(df / 2) - 0.5 * Math.log(df * Math.PI);
+  const logBody = -((df + 1) / 2) * Math.log1p((t * t) / df);
+  return Math.exp(logCoeff + logBody);
+}
+
+/**
+ * Maximum |t| the Newton iterate is allowed to reach. Beyond this the t-density
+ * underflows and the CDF is effectively 0 or 1 for any representable df, so the
+ * quantile is indistinguishable from ±∞. Clamping prevents overflow in
+ * `1 + t*t/df` for tiny df (Cauchy tail) while staying below Number.MAX_VALUE.
+ */
+const STUDENT_T_QUANTILE_CLAMP = 1e7;
+
+/**
+ * Quantile (inverse CDF) of Student's t-distribution with df degrees of freedom.
+ * Returns t such that P(T <= t) = p where T ~ t(df).
+ *
+ * Implementation: Newton's method seeded from `normalQuantile(p)` (the exact
+ * asymptotic answer as df → ∞), iterating t_{n+1} = t_n - (F(t_n) − p) / f(t_n)
+ * where F = studentTCdf and f = studentTPdf. For p < 0.5 the symmetry
+ * t_p(df) = −t_{1−p}(df) is used to keep the iterate in the well-conditioned
+ * upper tail. Convergence is quadratic once close.
+ *
+ * Validated against published t-tables to 1e-6 (see tests/statistics/t_quantile.test.ts):
+ *   studentTQuantile(0.975, 2) = 4.30265373
+ *   studentTQuantile(0.975, 10) = 2.22813885
+ *   studentTQuantile(0.95, 100) = 1.66023490
+ *
+ * @param p - target cumulative probability, strictly in (0, 1)
+ * @param df - degrees of freedom, strictly positive (may be fractional for Welch)
+ */
+export function studentTQuantile(p: number, df: number): number {
+  if (!Number.isFinite(p)) {
+    throw new Error(`studentTQuantile: p must be finite, got ${p}`);
+  }
+  if (p <= 0 || p >= 1) {
+    throw new Error(`studentTQuantile: p must be strictly in (0,1), got ${p}`);
+  }
+  if (!Number.isFinite(df)) {
+    throw new Error(`studentTQuantile: df must be finite, got ${df}`);
+  }
+  if (df <= 0) {
+    throw new Error(`studentTQuantile: df must be positive, got ${df}`);
+  }
+  // Median: exact by symmetry of the t-density about 0.
+  if (p === 0.5) {
+    return 0;
+  }
+  // Symmetry t_p(df) = -t_{1-p}(df): solve in the upper tail (p > 0.5) where
+  // normalQuantile gives a positive seed and the CDF/PDF are well-conditioned.
+  if (p < 0.5) {
+    return -studentTQuantile(1 - p, df);
+  }
+
+  let t = normalQuantile(p);
+  // Newton iteration. 100 iterations is far more than enough for double precision
+  // (typically < 10); the cap is a safety net against pathological divergence.
+  for (let i = 0; i < 100; i++) {
+    // Clamp to avoid overflow in (1 + t^2/df) for small df + extreme p.
+    if (t > STUDENT_T_QUANTILE_CLAMP) {
+      t = STUDENT_T_QUANTILE_CLAMP;
+    } else if (t < -STUDENT_T_QUANTILE_CLAMP) {
+      t = -STUDENT_T_QUANTILE_CLAMP;
+    }
+    const cdf = studentTCdf(t, df);
+    const err = cdf - p;
+    const pdf = studentTPdf(t, df);
+    if (!(pdf > 0) || !Number.isFinite(pdf)) {
+      // PDF underflowed: the current iterate is so far in the tail that finer
+      // resolution is below double precision. Accept it.
+      break;
+    }
+    const delta = err / pdf;
+    const next = t - delta;
+    if (!Number.isFinite(next)) {
+      break;
+    }
+    t = next;
+    // Convergence: both the CDF residual and the step must be negligible.
+    if (Math.abs(delta) < 1e-13 && Math.abs(err) < 1e-13) {
+      break;
+    }
+  }
+  return t;
 }
 
 /** Result of a one-sample t-test against a null hypothesis mean. */

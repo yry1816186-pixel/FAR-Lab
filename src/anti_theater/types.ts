@@ -55,7 +55,7 @@ export type AntiTheaterAttackKind =
   | 'dataset-hash-forgery'
   | 'p-hacking-alpha-inflation'
   | 'p-hacking-multiple-testing-uncorrected'
-  | 'p-hacking-p-curve-skew'
+  | 'p-hacking-marginal-p'
   | 'harking-revision-after-result'
   | 'stopping-rule-violation'
   | 'optional-stopping-no-spending'
@@ -83,7 +83,7 @@ export const ATTACK_ID_TO_KIND: Readonly<Record<string, AntiTheaterAttackKind>> 
   'AT-DATA-HASH-FAKE': 'dataset-hash-forgery',
   'AT-PHACK-ALPHA': 'p-hacking-alpha-inflation',
   'AT-PHACK-CORRECTION': 'p-hacking-multiple-testing-uncorrected',
-  'AT-PHACK-PCURVE': 'p-hacking-p-curve-skew',
+  'AT-PHACK-MARGINAL-P': 'p-hacking-marginal-p',
   'AT-HARK': 'harking-revision-after-result',
   'AT-STOPPING-RULE': 'stopping-rule-violation',
   'AT-OPTIONAL-STOPPING': 'optional-stopping-no-spending',

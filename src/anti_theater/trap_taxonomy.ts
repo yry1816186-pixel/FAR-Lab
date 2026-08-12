@@ -182,13 +182,13 @@ export const TRAP_TAXONOMY: Readonly<Record<AntiTheaterAttackKind, TrapTaxonomy>
     cures: ['多重比较校正强制', '未校正即 FAIL', 'preregistration 声明校正策略'],
     realCase: '多重比较问题是统计陷阱教科书条目（scientific-agent-skills statistical-pitfalls 目录）',
   },
-  'p-hacking-p-curve-skew': {
-    attackId: 'AT-PHACK-PCURVE',
-    kind: 'p-hacking-p-curve-skew',
+  'p-hacking-marginal-p': {
+    attackId: 'AT-PHACK-MARGINAL-P',
+    kind: 'p-hacking-marginal-p',
     category: 'significance-abuse',
-    name: 'p-curve 分布异常（p-hacking distributional signature）',
-    what: '显著 p 值聚集在 [0.04, 0.05) 边缘区而非接近 0——这是选择性报告/optional stopping/outcome switching 的分布信号。真实效应的 p-curve 应右偏（近 0 多），p-hacking 的 p-curve 左偏（近阈值多）。',
-    cures: ['p-curve caliper 检测', '报告所有 outcome 不论显著性', 'preregistration + 预注册分析路径'],
+    name: '边缘显著主 p 值 + 大检验族（marginal primary p-value · p-hacking 风险信号）',
+    what: '单个主校正 p 值落在边缘显著区 [0.04, 0.05) 且检验族 familySize≥3——这是选择性报告/optional stopping/outcome switching 的风险信号（非分布检验）。本检测只读单个 primaryAdjustedPValue + familySize，并非 p-curve 分布检验；真正的 p-curve caliper（Simonsohn et al. 2014）需要跨研究的 p 值分布，当前输入不携带。',
+    cures: ['报告所有 outcome 不论显著性', 'preregistration + 预注册分析路径', '多重比较校正（Bonferroni/FDR）', '建议跨研究 p-curve 分布检验作为随访（Simonsohn et al. 2014）'],
     realCase: 'Simonsohn, Simmons & Nelson (2014) P-curve 论文；Bem (2011) 10 实验 p 值分布是经典案例',
   },
   'harking-revision-after-result': {

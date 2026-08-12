@@ -64,34 +64,47 @@ describe('buildOscStatistics', () => {
     assert.equal(s.originalMedianR, OSC_ORIGINAL_MEDIAN_R);
     assert.equal(s.replicationMedianR, OSC_REPLICATION_MEDIAN_R);
 
-    // Fisher z on replication r = 0.197, SE = 1/sqrt(94).
-    assert.ok(Math.abs(s.replicationEffectZ - 0.19961) < 1e-4);
-    assert.ok(Math.abs(s.replicationEffectSe - 0.10314) < 1e-4);
-    assert.ok(Math.abs(s.replicationEffectZStat - 1.935) < 0.02);
-
-    // Replication effect p (one-sided) is significant at alpha=0.05.
-    assert.ok(s.replicationEffectP > 0);
-    assert.ok(s.replicationEffectP < OSC_ALPHA);
-
-    // Rate-drop two-proportion z is decisive (> 8).
-    assert.ok(s.rateDropZ > 8);
-    assert.ok(s.rateDropP < 1e-10);
+    // Primary inferential test: two-proportion z on significance-rate collapse.
+    assert.ok(s.rateDropZ > 8, 'rate-drop z must be decisive (>8)');
+    assert.ok(s.rateDropP > 0 && s.rateDropP < 1e-10, 'rate-drop p tiny but NONZERO (no underflow artifact)');
 
     // Shrinkage ≈ 51%.
     assert.ok(Math.abs(s.effectShrinkage - (1 - 0.197 / 0.403)) < 1e-3);
 
-    // BH-FDR family of 2: primary survives.
-    assert.equal(s.bhAdjustedPs.length, 2);
+    // Single-test BH-FDR family { rate-drop } (the invalid Fisher-z-on-median
+    // test was removed — applying 1/sqrt(N-3) to a median of study-level r is
+    // statistically meaningless).
+    assert.equal(s.bhAdjustedPs.length, 1);
     assert.equal(s.survivesFdr, true);
   });
 
-  test('effect direction supports the claim (replication effect > 0)', () => {
+  test('regression guard: no invalid Fisher-z-on-median inference (K6)', () => {
     const s = buildOscStatistics(OSC_METRIC_KEY);
-    assert.equal(s.effectDirection, 'supports');
+    // The pre-fix bug applied the single-correlation SE 1/sqrt(N-3) to a MEDIAN
+    // of 97 study-level correlations — invalid. These fields must NOT exist.
+    assert.ok(!('replicationEffectSe' in s), 'invalid median SE must be absent');
+    assert.ok(!('replicationEffectZStat' in s), 'invalid median z-stat must be absent');
+    assert.ok(!('replicationEffectP' in s), 'invalid median Fisher-z p must be absent');
+    // The median r is descriptive only — no inferential CI attached (a valid
+    // meta-analytic CI would need per-study sample sizes).
+    assert.equal(s.statisticalResult.confidenceInterval, undefined);
+  });
+
+  test('primary pValue is the rate-drop test (not a fabricated median p)', () => {
+    const s = buildOscStatistics(OSC_METRIC_KEY);
     assert.equal(s.statisticalResult.status, 'ran');
     assert.equal(s.statisticalResult.testId, OSC_METRIC_KEY);
-    assert.ok(s.statisticalResult.pValue !== undefined);
+    assert.ok(s.statisticalResult.pValue !== undefined && s.statisticalResult.pValue > 0);
     assert.ok(s.statisticalResult.pValue < OSC_ALPHA);
+    assert.equal(s.statisticalResult.pValue, s.rateDropP);
+  });
+
+  test('effect direction supports (descriptive: median r nonzero, in claimed direction)', () => {
+    const s = buildOscStatistics(OSC_METRIC_KEY);
+    // 'supports' at the descriptive level (effects reproduce in direction); the
+    // rate collapse + half magnitude are captured by the SCOPE mechanism → R4
+    // DEGRADED_SCOPE. This is NOT 'refutes' (effects exist, just degraded).
+    assert.equal(s.effectDirection, 'supports');
   });
 
   test('statistical diagnostics flag the distribution drift', () => {

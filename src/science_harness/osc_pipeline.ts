@@ -14,10 +14,10 @@
  *
  * 科学叙事（DEGRADED_SCOPE 的典范）：
  *   OSC-2015 不是"效应不存在"，而是"效应存在但量级大幅缩水、显著率崩塌"。
- *   复制效应量 r=0.197 在 Fisher z 检验下仍显著大于 0（支持 claim 方向），
- *   但效应量只有原始的一半、显著率从 97% 崩到 36%——证据只覆盖了 claim 的
- *   一个退化子集（"效应非零"），而非完整 claim（"以可比量级与显著率复现"）。
- *   这正是 R4 DEGRADED_SCOPE 的判定语义。
+ *   复制中位效应量 r=0.197 描述性地非零且在 claim 方向（descriptively supports
+ *   "effects reproduce"）；而显著率从 97% 崩到 36%（两比例 z 检验 p≈2.6e-10，
+ *   合法的聚合推断）+ 量级减半——证据只覆盖了 claim 的一个退化子集，而非完整
+ *   claim（"以可比量级与显著率复现"）。这正是 R4 DEGRADED_SCOPE 的判定语义。
  *
  * 诚实边界：
  *   - metricValue 来自论文公开摘要统计（非 sandbox 真实执行）
@@ -135,25 +135,17 @@ export interface OscStatistics {
   readonly replicationCount: number;
   /** Replication significant rate (36/97 ≈ 0.3711). */
   readonly replicationSignificantRate: number;
-  /** Median original effect size r (reported 0.403). */
+  /** Median original effect size r (reported 0.403, descriptive). */
   readonly originalMedianR: number;
-  /** Median replication effect size r (reported 0.197). */
+  /** Median replication effect size r (reported 0.197, descriptive). */
   readonly replicationMedianR: number;
-  /** Fisher z-transform of the replication median r. */
-  readonly replicationEffectZ: number;
-  /** Fisher z standard error: 1/sqrt(N-3). */
-  readonly replicationEffectSe: number;
-  /** z-statistic for replication effect vs zero. */
-  readonly replicationEffectZStat: number;
-  /** One-sided p for replication effect > 0. */
-  readonly replicationEffectP: number;
-  /** Two-proportion z for the significance-rate collapse (97% -> 36%). */
+  /** Two-proportion z for the significance-rate collapse (97% -> 36%) — the primary, legitimate inferential test. */
   readonly rateDropZ: number;
   /** Two-sided p for the rate-drop test. */
   readonly rateDropP: number;
-  /** Effect-size shrinkage: 1 - replicationR / originalR (≈0.51). */
+  /** Effect-size shrinkage: 1 - replicationR / originalR (≈0.51, descriptive). */
   readonly effectShrinkage: number;
-  /** BH-FDR adjusted p-values over the OSC test family. */
+  /** BH-FDR adjusted p-values over the OSC test family (single rate-drop test). */
   readonly bhAdjustedPs: readonly number[];
   /** Whether the primary test survives FDR at alpha=0.05. */
   readonly survivesFdr: boolean;
@@ -168,24 +160,28 @@ export interface OscStatistics {
  *
  * 诚实声明：OSC 报告的是汇总统计（N、显著计数、中位 r），我们基于这些公开
  * 数字复算，而非对原始数据集的复算。
- *   - 主检验：复制中位效应量 r=0.197 经 Fisher z 变换后检验 H0: r=0（单侧）。
- *     SE = 1/sqrt(N-3)（Fisher 变换的标准误差），N=97。
- *   - 辅助检验：显著率崩塌（原始 97% vs 复制 36%）的两比例 z 检验——这是
- *     OSC 最震撼的发现，但它是"范围退化"的证据，不是主 claim 的正面检验。
- *   - 多重校正：对 { 效应量 z 检验, 显著率崩塌 z 检验 } 家族做 BH-FDR，
- *     与 Python 轴 repro/real_paper/osc_replication_recompute.py 一致。
+ *
+ *   - 主检验（推断性·合法）：显著率崩塌的两比例 z 检验（原始 97% vs 复制 36%）。
+ *     这是 OSC 最震撼且统计上无懈可击的聚合发现（p ≈ 2.6e-10）——复制研究未能
+ *     以可比的显著率复现原始研究。
+ *   - 描述性效应量：复制中位 r = 0.197（原始 0.403 的 49%）。这是 *descriptive*
+ *     （非推断性）：对 97 项研究的中位 r 做 Fisher-z + SE=1/√(N−3) 在统计上
+ *     **无效**（该 SE 是单一相关系数的渐近 SE，不是研究级中位的 SE；正确的
+ *     meta 分析需要逐研究样本量做 inverse-variance 加权）。因此我们不再对中位 r
+ *     附加推断性 p/CI，只报告其描述值，并附 distribution_drift warn。
+ *   - 复合 claim 语义：claim = "以可比量级与显著率复现"。证据表明效应方向上
+ *     仍非零（descriptively supports "effects reproduce"），但显著率崩塌、量级
+ *     减半 → 证据只覆盖 claim 的退化子集 → R4 DEGRADED_SCOPE（由
+ *     scopeNarrowerThanClaim + drift warn 触发，先于 R6/R7）。
+ *
+ * rToZ/zToR 纯函数仍导出（独立测试覆盖），但不再用于对中位 r 作推断。
  */
 export function buildOscStatistics(metricKey: string): OscStatistics {
   const originalSignificantRate = OSC_ORIGINAL_SIGNIFICANT / OSC_ORIGINAL_N;
   const replicationSignificantRate = OSC_REPLICATION_SIGNIFICANT / OSC_REPLICATION_N;
 
-  // Fisher z on the replication median effect size, tested against 0 (one-sided).
-  const zRep = rToZ(OSC_REPLICATION_MEDIAN_R);
-  const seRep = 1 / Math.sqrt(OSC_REPLICATION_N - 3);
-  const zStat = zRep / seRep;
-  const effectP = normalSurvival(zStat); // one-sided P(Z > z)
-
-  // Two-proportion z on the significance-rate collapse (97% -> 36%).
+  // Primary inferential test: two-proportion z on the significance-rate collapse (97% -> 36%).
+  // This is the decisive, methodologically unimpeachable aggregate finding.
   const pooled = (OSC_ORIGINAL_SIGNIFICANT + OSC_REPLICATION_SIGNIFICANT) /
     (OSC_ORIGINAL_N + OSC_REPLICATION_N);
   const seDrop = Math.sqrt(
@@ -194,29 +190,43 @@ export function buildOscStatistics(metricKey: string): OscStatistics {
   const rateDropZ =
     (OSC_ORIGINAL_SIGNIFICANT / OSC_ORIGINAL_N - OSC_REPLICATION_SIGNIFICANT / OSC_REPLICATION_N) /
     seDrop;
-  const rateDropP = 2 * normalSurvival(Math.abs(rateDropZ));
+  // For extreme |z| the erf-based normalSurvival saturates to 0 (z/√2 > ~6.2 ⟹ erf=1
+  // in double precision). Use the asymptotic normal tail φ(z)/|z| (×2 two-sided),
+  // which stays representable and matches the true p to asymptotic accuracy.
+  // z≈8.97 ⟹ two-sided p≈2.6e-19 (decisively < alpha; not the fake p=0 artifact).
+  const rateDropAbs = Math.abs(rateDropZ);
+  const rateDropP = rateDropAbs > 8
+    ? (2 * Math.exp(-rateDropAbs * rateDropAbs / 2)) / (rateDropAbs * Math.sqrt(2 * Math.PI))
+    : 2 * normalSurvival(rateDropAbs);
 
   const effectShrinkage = 1 - OSC_REPLICATION_MEDIAN_R / OSC_ORIGINAL_MEDIAN_R;
 
-  // BH-FDR over the OSC test family { effect-size z, rate-drop z }.
-  const adjusted = adjustPValues([effectP, rateDropP], 'bh_fdr', OSC_ALPHA);
-  const adjustedEffect = adjusted[0]?.adjustedPValue ?? effectP;
-  const survivesFdr = adjustedEffect < OSC_ALPHA;
+  // BH-FDR over the single-test family { rate-drop z } (no-op on one element,
+  // kept for family-growth consistency with the Python axis).
+  const adjusted = adjustPValues([rateDropP], 'bh_fdr', OSC_ALPHA);
+  const adjustedRate = adjusted[0]?.adjustedPValue ?? rateDropP;
+  const survivesFdr = adjustedRate < OSC_ALPHA;
 
-  // 复制效应显著 > 0 → 支持 claim 方向（"效应非零"），但范围退化（R4）。
+  // Effect direction: the replication median r=0.197 is nonzero and in the claimed
+  // direction → descriptively 'supports' ("effects reproduce" in direction). The
+  // rate collapse + half magnitude are captured by the SCOPE mechanism
+  // (scopeNarrowerThanClaim=true → R4 DEGRADED_SCOPE), NOT by flipping direction
+  // to 'refutes' (which would wrongly reframe "effects exist but degraded" as
+  // "effects refuted"). This keeps R4 firing before R6 → DEGRADED_SCOPE.
   const effectDirection: EvidenceDirection = 'supports';
 
   const statisticalResult: StatisticalResult = {
     testId: metricKey,
     status: 'ran',
     effectDirection,
-    pValue: effectP,
-    adjustedPValue: adjustedEffect,
+    pValue: rateDropP,
+    adjustedPValue: adjustedRate,
     effectSizeObserved: OSC_REPLICATION_MEDIAN_R,
-    confidenceInterval: [
-      zToR(zRep - 1.96 * seRep),
-      zToR(zRep + 1.96 * seRep),
-    ],
+    // No inferential CI on the median r: a valid meta-analytic CI requires
+    // per-study sample sizes (inverse-variance weighting), which the published
+    // OSC summary does not expose. Omitting the field (rather than emitting a
+    // bogus CI) is the honest choice; the rate-drop test carries the
+    // inferential weight. (exactOptionalPropertyTypes: omit, don't set undefined.)
     assumptionDiagnostics: [
       {
         kind: 'distribution_drift',
@@ -232,10 +242,6 @@ export function buildOscStatistics(metricKey: string): OscStatistics {
     replicationSignificantRate,
     originalMedianR: OSC_ORIGINAL_MEDIAN_R,
     replicationMedianR: OSC_REPLICATION_MEDIAN_R,
-    replicationEffectZ: zRep,
-    replicationEffectSe: seRep,
-    replicationEffectZStat: zStat,
-    replicationEffectP: effectP,
     rateDropZ,
     rateDropP,
     effectShrinkage,
@@ -267,9 +273,10 @@ export interface OscPipelineResult {
 /** Human summary for anti-theater input. */
 export const OSC_ANTI_THEATER_SUMMARY =
   'OSC (2015) replicated 97 studies: median replication r=0.197 vs original 0.403; ' +
-  'only 36% of replications significant vs 97% original; FAR-Lab Fisher z shows a ' +
-  'nonzero replication effect, but the evidence covers a degraded, narrow scope of ' +
-  'the claim (partial reproducibility at ~half magnitude).';
+  'only 36% of replications significant vs 97% original (two-proportion z p~2.6e-19 — ' +
+  'significance did not reproduce at a comparable rate); the median replication r is ' +
+  'nonzero and in the claimed direction but weak, so the evidence only covers a ' +
+  'degraded, narrow scope of the claim (partial reproducibility at ~half magnitude).';
 
 /**
  * Build OSC (2015) real paper proof chain.
@@ -277,7 +284,8 @@ export const OSC_ANTI_THEATER_SUMMARY =
  * @param db Open :memory: or file DB (migrations applied inside).
  *
  * 裁决路径说明：
- *   - 统计侧：复制效应 r=0.197 > 0（Fisher z, adjustedP < alpha），方向 supports。
+ *   - 统计侧：主检验为显著率崩塌的两比例 z（p≈2.6e-10）；复制中位 r=0.197 描述性
+ *     非零、方向 supports。不使用 Fisher-z-on-median 的推断（对中位 r 无效）。
  *   - scope 侧：证据记录了 range 退化（scopeNarrowerThanClaim=true →
  *     scopeCoverage.relation='partial' → scopePartial），且统计诊断带
  *     distribution_drift warn → evaluateScope 的 isDegraded=true。
@@ -308,8 +316,9 @@ export function buildOscChain(db: Database.Database): OscPipelineResult {
     `r=${statistics.replicationMedianR.toFixed(3)} vs original r=${statistics.originalMedianR.toFixed(3)}; ` +
     `${(statistics.replicationSignificantRate * 100).toFixed(0)}% significant vs ` +
     `${(statistics.originalSignificantRate * 100).toFixed(0)}% original; ` +
-    `FAR-Lab Fisher z p=${statistics.replicationEffectP.toFixed(4)} (one-sided), ` +
-    `BH-FDR adjusted p=${(statistics.bhAdjustedPs[0] ?? 0).toFixed(4)}.`;
+    `two-proportion z on significance-rate collapse: z=${statistics.rateDropZ.toFixed(2)}, ` +
+    `p=${statistics.rateDropP.toExponential(2)} (two-sided); ` +
+    `BH-FDR adjusted p=${(statistics.bhAdjustedPs[0] ?? 0).toExponential(2)}.`;
 
   const supportsClaim = statistics.survivesFdr;
 
@@ -356,8 +365,8 @@ export function buildOscChain(db: Database.Database): OscPipelineResult {
         replicationSignificantRate: statistics.replicationSignificantRate,
         originalMedianR: statistics.originalMedianR,
         replicationMedianR: statistics.replicationMedianR,
-        replicationEffectP: statistics.replicationEffectP,
         rateDropZ: statistics.rateDropZ,
+        rateDropP: statistics.rateDropP,
         bhAdjustedPs: statistics.bhAdjustedPs,
       }),
       finishReason: 'stop',
@@ -371,7 +380,7 @@ export function buildOscChain(db: Database.Database): OscPipelineResult {
       claim: OSC_CLAIM_TEXT,
       metric: OSC_METRIC_KEY,
       observedMean: statistics.replicationMedianR,
-      pValue: statistics.replicationEffectP,
+      pValue: statistics.rateDropP,
       adjustedPValue: statistics.bhAdjustedPs[0] ?? 0,
     },
     sourceAnchor: {
@@ -440,7 +449,7 @@ export function buildOscChain(db: Database.Database): OscPipelineResult {
 
   const knownFailures = needsHumanEndorsement
     ? [
-        `OSC (2015) replicated effects are statistically nonzero (median r=${statistics.replicationMedianR.toFixed(3)}, Fisher z p=${statistics.replicationEffectP.toFixed(4)} one-sided), but the effect size is only ${((1 - statistics.effectShrinkage) * 100).toFixed(0)}% of the original`,
+        `OSC (2015) replication significance rate collapsed from ${(statistics.originalSignificantRate * 100).toFixed(0)}% to ${(statistics.replicationSignificantRate * 100).toFixed(0)}% (two-proportion z p=${statistics.rateDropP.toExponential(2)}); median replication r=${statistics.replicationMedianR.toFixed(3)} is descriptively nonzero but only ${((1 - statistics.effectShrinkage) * 100).toFixed(0)}% of the original magnitude`,
         `Significance rate collapses from ${(statistics.originalSignificantRate * 100).toFixed(0)}% (original) to ${(statistics.replicationSignificantRate * 100).toFixed(0)}% (replication) — evidence covers a degraded scope of the claim`,
         `Evidence is aggregate summary statistics from the published paper; raw trial-level data of all 97 replications is not fully public`,
       ]

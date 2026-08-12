@@ -85,38 +85,3 @@ export type { HeroBMeasuredValues } from './hero_b_harness.ts';
 
 // confounding_integration（F6 因果门与 verdict_mapping 集成 · 任务 #12 决策 E）
 export { decideVerdictWithConfounding } from './confounding_integration.ts';
-
-// DomainPacks（FI-4 多域·4 新 pack：蛋白折叠 / 催化剂 / 碳通量 / 地震前兆）
-// 域无关 evaluateOutcome / mapChecksToVerdict 从 tess_harness 复用；每 pack 仅增 claim + F8 预登记阈值 + buildChecks。
-export {
-  B7_PROTEIN_CLAIM,
-  B7_PROTEIN_CHECK_IDS,
-  B7_PROTEIN_DEFAULT_THRESHOLDS,
-  buildProteinChecks,
-  mapProteinChecksToVerdict,
-} from './protein_harness.ts';
-export type { ProteinMeasuredValues } from './protein_harness.ts';
-export {
-  C3_CATALYST_CLAIM,
-  C3_CATALYST_CHECK_IDS,
-  C3_CATALYST_DEFAULT_THRESHOLDS,
-  buildCatalystChecks,
-  mapCatalystChecksToVerdict,
-} from './catalyst_harness.ts';
-export type { CatalystMeasuredValues } from './catalyst_harness.ts';
-export {
-  E2_CARBON_CLAIM,
-  E2_CARBON_CHECK_IDS,
-  E2_CARBON_DEFAULT_THRESHOLDS,
-  buildCarbonChecks,
-  mapCarbonChecksToVerdict,
-} from './carbon_harness.ts';
-export type { CarbonMeasuredValues } from './carbon_harness.ts';
-export {
-  G5_SEISMIC_CLAIM,
-  G5_SEISMIC_CHECK_IDS,
-  G5_SEISMIC_DEFAULT_THRESHOLDS,
-  buildSeismicChecks,
-  mapSeismicChecksToVerdict,
-} from './seismic_harness.ts';
-export type { SeismicMeasuredValues } from './seismic_harness.ts';

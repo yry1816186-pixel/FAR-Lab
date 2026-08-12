@@ -7,7 +7,7 @@
  * T-003 修复（2026-07-24）：新增第 21 项 `detect_provenance_unbound`（AT-PROVENANCE-UNBOUND），
  * 追加在数组末尾（不破坏前 20 项 golden vector 顺序对拍）。仅在 `fec.requireExecutionProvenance=true`
  * 时触发，向后兼容 V1 demo seed（不 opt-in → 恒空 finding·零回归）。
- * 后补：第 22 项 `detect_phack_pcurve`（AT-PHACK-PCURVE）同法追加（2026-08 文档对齐）。
+ * 后补：第 22 项 `detect_phack_pcurve`（AT-PHACK-MARGINAL-P）同法追加（2026-08 文档对齐）。
  * A2 新增：第 23 项 `detect_effect_p_consistency`（AT-EFFECT-P-MISMATCH）追加（2026-08-07·填补
  * 统计报告内部逻辑一致性检测空白·三层纯逻辑检测·零误报）。
  *
@@ -48,7 +48,7 @@ export type AntiTheaterDetector = (input: AntiTheaterLintInput) => readonly Dete
  *
  * T-003 修复：第 21 项 `detect_provenance_unbound` 追加在末尾——仅在
  * `fec.requireExecutionProvenance=true` 时触发，V1 向后兼容（不 opt-in → 恒空 finding）。
- * 第 22 项 `detect_phack_pcurve`（AT-PHACK-PCURVE）同法追加在末尾。
+ * 第 22 项 `detect_phack_pcurve`（AT-PHACK-MARGINAL-P）同法追加在末尾。
  * 第 23 项 `detect_effect_p_consistency`（AT-EFFECT-P-MISMATCH）追加在末尾（2026-08-07·
  * 统计报告内部一致性·三层纯逻辑检测·零误报）。
  */
@@ -74,7 +74,7 @@ export const DETECTORS: readonly AntiTheaterDetector[] = [
   detect_overfit, // AT-OVERFIT（ROADMAP）
   detect_fake_degraded, // AT-FAKE-DEGRADED
   detect_provenance_unbound, // AT-PROVENANCE-UNBOUND（T-003 修复·2026-07-24）
-  detect_phack_pcurve, // AT-PHACK-PCURVE（p-curve skewness·2026-08-06·填补 p-hacking 分布检测空白）
+  detect_phack_pcurve, // AT-PHACK-MARGINAL-P（marginal primary p·2026-08-06·填补 p-hacking 边缘显著风险信号检测空白）
   detect_effect_p_consistency, // AT-EFFECT-P-MISMATCH（统计报告内部一致性·2026-08-07·A2·填补 effectSize/p/CI/direction 逻辑矛盾检测空白）
 ];
 

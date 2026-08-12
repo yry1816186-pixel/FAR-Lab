@@ -8,7 +8,7 @@
  *     + evidenceBasis + confoundingGateResult) → decideFiveValueVerdict R-causal 门 → DEGRADED_SCOPE → seal。
  *
  * 单一真实依赖（T8）：
- *   - src/statistics/（twoSampleWelchTTest/twoSampleEffectSize/differenceInMeansConfidenceInterval/adjustPValues）
+ *   - src/statistics/（twoSampleWelchTTest/twoSampleEffectSize/differenceInMeansConfidenceIntervalWelch/adjustPValues）
  *   - src/confounding_gate/adjudicate.ts（adjudicateConfounding·d-separation 图算法·非 LLM）
  *
  * F6 因果诚实叙事（真实驱动）：真实统计显著支持（cot 幻觉率显著低于 baseline → 本会 R7 CONFIRMED），
@@ -52,7 +52,7 @@ import {
 } from './hero_b_harness.ts';
 import {
   adjustPValues,
-  differenceInMeansConfidenceInterval,
+  differenceInMeansConfidenceIntervalWelch,
   sampleMean,
   twoSampleEffectSize,
   twoSampleWelchTTest,
@@ -152,7 +152,7 @@ export function buildHeroBStatistics(metricKey: string): HeroBStatistics {
   // H1: mean(cot) < mean(baseline)（CoT 降低幻觉率）。显著拒绝 H0 → reduction > 0 = 支持 claim。
   const tTest = twoSampleWelchTTest(cot, baseline, 'less');
   const effectSize = twoSampleEffectSize(baseline, cot);
-  const confidenceInterval = differenceInMeansConfidenceInterval(baseline, cot, HERO_B_CONFIDENCE_LEVEL);
+  const confidenceInterval = differenceInMeansConfidenceIntervalWelch(baseline, cot, HERO_B_CONFIDENCE_LEVEL);
   const adjusted = adjustPValues([tTest.pValue], 'bonferroni', HERO_B_ALPHA);
   const adjustedPValue = adjusted[0]?.adjustedPValue ?? tTest.pValue;
 

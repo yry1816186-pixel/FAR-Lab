@@ -12,15 +12,23 @@
  *   - 实验3 (French):  N=50, t(49)=0.20, p=.42 one-tailed (null, no effect)
  *
  * Bem 的 H1 方向：受试者能预知未来刺激位置（hit rate > 50%）。
- * Ritchie 三组实验方向与 Bem 完全相反或无效应——这是教科书级的 REFUTED 案例。
+ * Ritchie 三组实验均未在 Bem 方向上达到显著（两组方向相反，一组近零）。
  *
- * 在 FAR-Lab 中，这产出一个 **REFUTED** verdict（效应方向与 claim 相反，统计显著地反驳），
- * 展示了 5 值裁决核中 REFUTED 的正确触发——这是 Bem (INCONCLUSIVE/UNTESTED) 之外的
- * 另一个真实科学场景。
+ * 科学上这是一个 **failed replication**（复制失败），不是 refutation（证伪）：
+ *   - 三组 Fisher 合并 p ≈ 0.80（远非显著）→ 既不支持 Bem 方向，也未显著地反向。
+ *   - Ritchie et al. 本人在论文标题与结论中写的是 "failing the future" / "failed to
+ *     replicate"，而非 "refuted"。把非显著的 null 结果说成 REFUTED 会犯 "absence of
+ *     evidence = evidence of absence" 的错误。
+ *
+ * 因此在 FAR-Lab 中，这产出 **INCONCLUSIVE**（R8_INSUFFICIENT_POWER_OR_NULL）——
+ * 即 5 值裁决中"已检验但证据不足以确认或证伪"的诚实姿态。效应方向标记为 'neutral'
+ * （combined test 非显著），meta-analytic 效应量用每组的 Cohen's d = 2t/√df 汇总，
+ * 附带 k=3 研究级别的真实置信区间（必定宽·诚实反映 n 小）。
  *
  * 诚实边界：
  *   - metricValue 来自论文公开 t 统计量（非原始数据复算）
  *   - 使用精确 Student's t-distribution 复算 p-value（与 Bem pipeline 一致）
+ *   - Cohen's d 与 CI 由公开 t/df 经标准换算导出（Rosenthal 1994），非原始试次数据
  */
 
 import type Database from 'better-sqlite3';
@@ -46,7 +54,7 @@ import type { SealResult } from '../proof_envelope/index.ts';
 import type { SourceAnchor } from '../evidence_log/types.ts';
 import { machineSealableConclusion } from '../far_proof/demo_chain.ts';
 import type { EvidenceDirection } from '../schema/enums.ts';
-import { studentTSurvival } from '../statistics/index.ts';
+import { sampleStandardDeviation, studentTSurvival } from '../statistics/index.ts';
 import { runAntiTheaterLint } from '../anti_theater/index.ts';
 import type { AntiTheaterReport } from '../anti_theater/index.ts';
 import { hashCanonicalJson } from '../evidence_log/hasher.ts';
@@ -84,8 +92,8 @@ export const RITCHIE_FROZEN_AT = '2012-01-01T00:00:00.000Z';
  * Ritchie (2012) Table 1: three independent replication attempts.
  *
  * 诚实提取：这些是论文公开报告的值。
- * 关键：实验1和2的 t 值为负——方向与 Bem 的 H1 相反。
- * 这意味着证据 REFUTES Bem 的 claim（hit rate < 50%, not > 50%）。
+ * 关键：实验1和2的 t 值为负——点估计方向与 Bem 的 H1 相反，但三组均未达显著，
+ * 故这是 failed replication（null result），不是统计意义上的证伪。
  *
  * Source: Ritchie et al. (2012), Results section.
  */
@@ -120,8 +128,12 @@ export interface RitchieStatistics {
   readonly publishedTStats: readonly number[];
   /** FAR-Lab recomputed p-values using exact Student's t-distribution. */
   readonly farLabExactPs: readonly number[];
-  /** Combined p-value via Fisher's method (for meta-analytic REFUTED verdict). */
+  /** Combined p-value via Fisher's method (non-significant ⇒ failed replication). */
   readonly combinedP: number;
+  /** Per-study Cohen's d (= 2t/√df) for each lab. */
+  readonly cohensDPerStudy: readonly number[];
+  /** Fixed-effects mean of the per-study Cohen's d. */
+  readonly pooledCohensD: number;
   /** Mean effect direction across the three labs. */
   readonly meanDirection: EvidenceDirection;
   /** StatisticalResult for FEC kernel consumption. */
@@ -133,31 +145,49 @@ export interface RitchieStatistics {
  *
  * Each of the 3 labs reported a t-statistic for a one-tailed test in Bem's direction
  * (H1: hit rate > 50%). Ritchie's t-values are negative or near-zero, meaning the
- * observed effect was in the OPPOSITE direction or null.
+ * observed effect was in the OPPOSITE direction or null — but none reached
+ * significance, so the honest meta-analytic verdict is "failed replication"
+ * (INCONCLUSIVE), not "refuted."
  *
- * We compute the exact one-tailed p-value for each lab using studentTSurvival,
- * then combine via Fisher's method for a meta-analytic verdict.
+ *   - Per-lab exact one-tailed p via studentTSurvival.
+ *   - Combined p via Fisher's method (non-significant ⇒ null result).
+ *   - Per-study Cohen's d = 2t/√df (Rosenthal 1994); pooled as fixed-effects mean.
+ *   - 95% CI on the pooled d across k=3 studies (meta df = k−1 = 2).
  */
 export function buildRitchieStatistics(metricKey: string): RitchieStatistics {
   const publishedTStats = RITCHIE_EXPERIMENTS.map(e => e.tStat);
 
-  // Exact one-tailed p-value for each lab (H1: hit rate > 50%)
-  // For negative t, studentTSurvival gives p > 0.5 (effect in opposite direction)
+  // Exact one-tailed p-value for each lab in Bem's direction (H1: hit rate > 50%).
+  // For negative t, studentTSurvival returns p > 0.5 (point estimate opposite to Bem).
   const farLabExactPs = RITCHIE_EXPERIMENTS.map(e => studentTSurvival(e.tStat, e.df));
 
-  // Fisher's method for combining p-values: chi² = -2 * Σ ln(p_i)
-  // Under H0, this follows chi²(2k) where k = number of studies
+  // Fisher's method combines the three p-values into one meta-analytic test of
+  // "is there any effect in Bem's direction?". chi² = -2·Σ ln(p_i) ~ chi²(2k) under H0.
+  // All three p's are large ⇒ combined p ≈ 0.80 ⇒ decisively non-significant.
   const fisherStat = -2 * farLabExactPs.reduce((acc, p) => acc + Math.log(p), 0);
-  // For k=3 studies, df=6. We need the upper-tail chi²(6) CDF.
-  // chi²(6) survival at the 0.05 level = 12.59
-  // If fisherStat > 12.59, the combined result is significant at p < 0.05
-  // (in the direction of the test — but since individual p's are > 0.5, this is
-  //  significant in the REVERSE direction = refutation)
   const combinedP = chiSquareSurvival(fisherStat, 2 * farLabExactPs.length);
 
-  // Effect direction: 2 of 3 labs have t < 0 (opposite to claim)
-  const negativeTCount = publishedTStats.filter(t => t < 0).length;
-  const meanDirection: EvidenceDirection = negativeTCount >= 2 ? 'refutes' : 'supports';
+  // Per-study standardized effect size: Cohen's d = 2t/√df
+  // (Rosenthal 1994; Rosnow & Rosenthal 1996 — the standard t→d conversion for a
+  // one-sample/within-subject test on a mean). Unlike averaging t-statistics
+  // (which is meaningless — t scales with √n), averaging d IS a valid
+  // fixed-effects meta-analytic summary of the standardized mean difference.
+  const cohensDPerStudy = RITCHIE_EXPERIMENTS.map(e => (2 * e.tStat) / Math.sqrt(e.df));
+  const pooledCohensD = cohensDPerStudy.reduce((a, b) => a + b, 0) / cohensDPerStudy.length;
+
+  // 95% CI on the pooled d across k=3 studies (meta df = k−1 = 2).
+  // t_{0.975, df=2} = 4.30265273 (exact table value). With only k=3 studies
+  // the interval is necessarily wide; it honestly reflects that a small effect in
+  // either direction cannot be ruled out by these three labs alone.
+  const seD = sampleStandardDeviation(cohensDPerStudy) / Math.sqrt(cohensDPerStudy.length);
+  const tCritDf2 = 4.30265273; // t_{0.975, df=2}
+  const ciLower = pooledCohensD - tCritDf2 * seD;
+  const ciUpper = pooledCohensD + tCritDf2 * seD;
+
+  // Failed replication: the combined test is non-significant, so the honest
+  // direction is 'neutral' — neither supports nor refutes. Ritchie et al. wrote
+  // "failed to replicate," not "refuted."
+  const meanDirection: EvidenceDirection = 'neutral';
 
   const statisticalResult: StatisticalResult = {
     testId: metricKey,
@@ -165,12 +195,20 @@ export function buildRitchieStatistics(metricKey: string): RitchieStatistics {
     effectDirection: meanDirection,
     pValue: combinedP,
     adjustedPValue: combinedP,
-    effectSizeObserved: publishedTStats.reduce((a, b) => a + b, 0) / publishedTStats.length,
-    confidenceInterval: [0, 0],
+    effectSizeObserved: pooledCohensD,
+    confidenceInterval: [ciLower, ciUpper],
     assumptionDiagnostics: [],
   };
 
-  return { publishedTStats, farLabExactPs, combinedP, meanDirection, statisticalResult };
+  return {
+    publishedTStats,
+    farLabExactPs,
+    combinedP,
+    cohensDPerStudy,
+    pooledCohensD,
+    meanDirection,
+    statisticalResult,
+  };
 }
 
 /**
@@ -280,7 +318,8 @@ export const RITCHIE_ANTI_THEATER_SUMMARY =
  * Build Ritchie (2012) real paper proof chain.
  *
  * This pipeline tests the SAME claim as Bem (2011) but with DIFFERENT data (failed replications).
- * The expected verdict is REFUTED — the evidence direction is opposite to the claim.
+ * The expected verdict is INCONCLUSIVE (R8) — three labs failed to replicate, the combined
+ * Fisher p is non-significant, so the evidence neither confirms nor refutes Bem's claim.
  *
  * @param db Open :memory: or file DB.
  */
@@ -303,20 +342,26 @@ export function buildRitchieChain(db: Database.Database): RitchiePipelineResult 
 
   const statistics = buildRitchieStatistics(fec.metric.metricKey);
 
-  // Evidence: 2 of 3 labs refuted, combined p is significant against claim
+  // Evidence: three labs failed to replicate; combined Fisher p is non-significant.
+  const ci = statistics.statisticalResult.confidenceInterval;
+  const ciLo = ci ? ci[0].toFixed(3) : 'n/a';
+  const ciHi = ci ? ci[1].toFixed(3) : 'n/a';
   const evidenceClaim =
     `Ritchie et al. (2012) three labs: t-stats=[${statistics.publishedTStats.map(t => t.toFixed(2)).join(', ')}]; ` +
     `exact p-values=[${statistics.farLabExactPs.map(p => p.toFixed(4)).join(', ')}]; ` +
-    `Fisher combined p=${statistics.combinedP.toFixed(4)}. ` +
-    `Two of three labs show direction OPPOSITE to Bem's claim.`;
+    `Fisher combined p=${statistics.combinedP.toFixed(4)} (non-significant). ` +
+    `Pooled Cohen's d=${statistics.pooledCohensD.toFixed(3)} ` +
+    `(95% CI [${ciLo}, ${ciHi}] crosses zero). ` +
+    `All three labs failed to reproduce Bem's effect (two trended opposite).`;
 
   const evidences: EvidenceRecord[] = [
     {
       claim: evidenceClaim,
-      // Use mean of the three t-stats as metricValue (negative = refutes)
-      metricValue: statistics.publishedTStats.reduce((a, b) => a + b, 0) / 3,
-      supportsClaim: statistics.meanDirection === 'supports',
-      refutesClaim: statistics.meanDirection === 'refutes',
+      // Pooled Cohen's d across the three labs (near zero, slightly against Bem).
+      metricValue: statistics.pooledCohensD,
+      // Failed replication (non-significant combined test) → neutral, not refutes.
+      supportsClaim: false,
+      refutesClaim: false,
       scopeNarrowerThanClaim: false,
       sourceAnchor: RITCHIE_SOURCE_ANCHOR,
     },
@@ -342,6 +387,8 @@ export function buildRitchieChain(db: Database.Database): RitchiePipelineResult 
         tStats: statistics.publishedTStats,
         exactPs: statistics.farLabExactPs,
         combinedP: statistics.combinedP,
+        cohensDPerStudy: statistics.cohensDPerStudy,
+        pooledCohensD: statistics.pooledCohensD,
       }),
       finishReason: 'stop',
       usageTokensTotal: 0,
@@ -351,7 +398,7 @@ export function buildRitchieChain(db: Database.Database): RitchiePipelineResult 
       claimId: RITCHIE_CLAIM_ID,
       claim: RITCHIE_CLAIM_TEXT,
       metric: RITCHIE_METRIC_KEY,
-      observedMean: statistics.publishedTStats.reduce((a, b) => a + b, 0) / 3,
+      observedMean: statistics.pooledCohensD,
       pValue: statistics.combinedP,
       adjustedPValue: statistics.combinedP,
     },
@@ -386,7 +433,7 @@ export function buildRitchieChain(db: Database.Database): RitchiePipelineResult 
       preliminaryVerdict,
       artifactHash,
       metricKey: fec.metric.metricKey,
-      metricValue: statistics.publishedTStats.reduce((a, b) => a + b, 0) / 3,
+      metricValue: statistics.pooledCohensD,
       frozenAt: RITCHIE_FROZEN_AT,
       primarySeed: 42,
       envelopeId: `ENV-${RITCHIE_CLAIM_ID}`,

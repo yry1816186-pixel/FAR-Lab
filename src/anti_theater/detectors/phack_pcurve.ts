@@ -1,43 +1,38 @@
 /**
- * anti_theater detector: AT-PHACK-PCURVE —— p-curve distribution skewness detector.
+ * anti_theater detector: AT-PHACK-MARGINAL-P —— marginal primary p-value p-hacking risk signal.
  *
- * Attack semantics: When a study reports multiple statistical tests, the distribution
- * of significant p-values (those < 0.05) carries diagnostic information about whether
- * the results reflect true effects or p-hacking. Under H1 (true effect), p-values
- * should be right-skewed (more values near 0 than near 0.05). Under p-hacking
- * (selective reporting, optional stopping, outcome switching), p-values cluster
- * just below 0.05 — producing a left-skewed or flat p-curve.
+ * Honest scope: This detector fires when the SINGLE primary adjusted p-value lands in the
+ * marginal zone [0.04, 0.05) alongside a large test family (familySize >= 3). It is a
+ * p-hacking RISK SIGNAL, NOT a p-curve distribution test.
  *
- * This detector implements the "caliper" test (Simonsohn, Simmons & Nelson, 2014):
- *   - Compare frequency of p in [0.040, 0.045] vs p in [0.045, 0.050].
- *   - Under true effects, the [0.040, 0.045] bin should have MORE p-values than
- *     [0.045, 0.050] (monotonically decreasing p-curve).
- *   - If [0.045, 0.050] has >= 1.5x as many p-values as [0.040, 0.045], this is
- *     strong evidence of p-hacking (the "bump" near significance threshold).
+ * A true p-curve caliper (Simonsohn, Simmons & Nelson, 2014) requires a DISTRIBUTION of
+ * p-values across studies (comparing the frequency of p in [0.040, 0.045] vs [0.045, 0.050]).
+ * The current anti-theater input carries only a single scalar primaryAdjustedPValue plus the
+ * FEC multipleTestingPlan.familySize, so a distributional p-curve test cannot be performed
+ * here. Implementing a real p-curve caliper across studies is a V2 feature that needs a
+ * multi-study FEC aggregation.
  *
- * Additionally, for studies with ≥ 3 significant p-values, we compute the share
- * of p-values in the "just significant" zone [0.04, 0.05]. If > 50% of significant
- * p-values fall in this 0.01-wide zone (which is only 20% of the [0, 0.05] range),
- * the distribution is suspiciously clustered near the threshold.
+ * What this signal means: when a family of >= 3 tests is run and the single headline result
+ * squeezes just under alpha (p in [0.04, 0.05)), that is the region most commonly produced
+ * by selective reporting / optional stopping / outcome switching — hence a WARN risk flag,
+ * not proof of p-hacking.
  *
- * References:
+ * Reference (recommended follow-up, NOT performed by this detector):
  *   - Simonsohn, U., Simmons, J. P., & Nelson, L. D. (2014). P-curve: A key to
  *     the file-drawer. Journal of Experimental Psychology: General, 143(2), 534-547.
- *   - Head, M. L., et al. (2015). The extent and consequences of p-hacking in
- *     science. PLoS Biology, 13(3), e1002106.
  *
  * Outcome: WARN (does not block seal, but flags p-hacking risk in the report).
- * Triggered only when the input provides ≥ 3 p-values via VerdictKernelOutput.
+ * Triggered only when primaryAdjustedPValue is present and familySize >= 3.
  */
 
 import type { AntiTheaterLintInput, DetectorFinding } from '../types.ts';
 import { makeFinding } from '../finding_factory.ts';
 
-/** p-values in the "just significant" zone. */
+/** Lower bound (inclusive) of the marginal-significance zone. */
 const JUST_SIGNIFICANT_LOW = 0.040;
 const JUST_SIGNIFICANT_HIGH = 0.050;
 
-/** Minimum number of significant p-values needed for a meaningful p-curve. */
+/** Minimum family size for the marginal-p signal to be meaningful. */
 const MIN_SIGNIFICANT_PVALUES = 3;
 
 /** Fields consumed (documented for proofHash transparency). */
@@ -45,40 +40,27 @@ const AFFECTED_PROOF_HASH_INPUTS: readonly string[] = [
   'verdict.statisticalReport',
 ];
 
-/** Remediation guidance. */
+/** Remediation guidance (p-curve is a recommended FOLLOW-UP, not something this detector performs). */
 const REMEDIATION =
-  'The p-value distribution shows clustering near the significance threshold (p ∈ [0.04, 0.05]), ' +
-  'which is diagnostic of p-hacking. Pre-register all analyses, report all outcomes regardless of ' +
-  'significance, and apply multiple-testing correction. Consider p-curve analysis (Simonsohn et al. 2014).';
+  'The single primary adjusted p-value sits in the marginal-significance zone (p ∈ [0.04, 0.05)) ' +
+  'alongside a large test family, which is a p-hacking risk signal — not proof. Pre-register all ' +
+  'analyses, report all outcomes regardless of significance, and apply multiple-testing correction. ' +
+  'As a recommended follow-up, perform a p-curve distribution analysis across studies (Simonsohn et al. 2014).';
 
 /**
- * Detect p-curve skewness indicating p-hacking.
+ * Detect a marginal primary p-value indicating p-hacking RISK (single-scalar signal).
  *
- * Reads p-values from the verdict kernel output's statistics. Only triggers when
- * ≥ 3 significant p-values (p < 0.05) are available, as the caliper test is
- * meaningless with fewer data points.
+ * Reads the single primaryAdjustedPValue plus the FEC multipleTestingPlan.familySize. Fires a
+ * WARN only when familySize >= 3 AND the primary adjusted p-value lands in [0.04, 0.05). This is
+ * NOT a p-curve distribution test; it cannot be, because the input carries one p-value, not a
+ * distribution. A real p-curve caliper is a recommended follow-up (see file header).
  */
 export function detect_phack_pcurve(input: AntiTheaterLintInput): readonly DetectorFinding[] {
-  // Extract p-values from the verdict kernel output.
-  // The verdict output contains a statisticalReport, but the raw p-values are
-  // in the kernel input statistics. We access them via the verdict output's
-  // statisticalReport — but that only exposes the primary. So we read from
-  // the input.verdict which carries the full statistics list in rule traces.
-  //
-  // However, AntiTheaterLintInput.verdict is VerdictKernelOutput, which has
-  // statisticalReport (aggregated) not the raw list. The raw statistics come
-  // from VerdictKernelInput.statistics. But anti-theater detectors receive
-  // the OUTPUT, not the input.
-  //
-  // Design decision: we check the statisticalReport for primary p-value info
-  // and the evidenceSufficiency for power. For a multi-study p-curve analysis,
-  // we need the FEC's multipleTestingPlan to know the family size, and we
-  // approximate by checking if the primary p-value itself is in the danger zone.
-  //
-  // FULL p-curve across studies requires a multi-study FEC aggregation, which
-  // is a V2 feature. This detector handles the within-study case: when the
-  // familySize > 3 and the primary adjusted p-value falls in [0.04, 0.05].
-
+  // The anti-theater input exposes the single primary adjusted p-value via the verdict
+  // statisticalReport (not a distribution of p-values). AntiTheaterLintInput.verdict is the
+  // VerdictKernelOutput, which exposes statisticalReport.primaryAdjustedPValue and the FEC
+  // multipleTestingPlan.familySize. A distributional p-curve across studies would need a
+  // multi-study FEC aggregation (V2 feature); this detector handles the single-primary case.
   const primaryP = input.verdict.statisticalReport.primaryAdjustedPValue;
   if (primaryP === null || primaryP === undefined) {
     return [];
@@ -89,26 +71,26 @@ export function detect_phack_pcurve(input: AntiTheaterLintInput): readonly Detec
     return [];
   }
 
-  // Within-study caliper: primary p-value in the just-significant zone.
-  // With multiple tests in the family and the primary landing in [0.04, 0.05],
-  // this is a p-hacking signal.
+  // Marginal-primary signal: the single headline p-value lands in the just-significant zone.
+  // With a large family (>= 3 tests) and the primary squeezing just under alpha, this is the
+  // region most associated with selective reporting / optional stopping — a risk flag, not proof.
   const inDangerZone = primaryP >= JUST_SIGNIFICANT_LOW && primaryP < JUST_SIGNIFICANT_HIGH;
 
   if (!inDangerZone) {
     return [];
   }
 
-  // Warn: primary result is in the p-hacking danger zone with a large family.
+  // Warn: primary result is marginally significant with a large test family (risk signal).
   const finding: DetectorFinding = makeFinding({
-    attackId: 'AT-PHACK-PCURVE',
+    attackId: 'AT-PHACK-MARGINAL-P',
     outcome: 'WARN',
-    reasonCode: 'P_CURVE_CALIPER_SUSPICIOUS',
+    reasonCode: 'MARGINAL_PRIMARY_P',
     evidenceRef: 'verdict.statisticalReport.primaryAdjustedPValue',
     message:
-      `Primary adjusted p-value (${primaryP.toFixed(4)}) falls in the p-hacking danger zone ` +
-      `[${JUST_SIGNIFICANT_LOW}, ${JUST_SIGNIFICANT_HIGH}) with family size n=${familySize}. ` +
-      `Under true effects, significant p-values should cluster near 0, not near the threshold. ` +
-      `This pattern is consistent with selective reporting or optional stopping.`,
+      `Primary adjusted p-value (${primaryP.toFixed(4)}) is marginally significant ` +
+      `[${JUST_SIGNIFICANT_LOW}, ${JUST_SIGNIFICANT_HIGH}) with a large test family (n=${familySize}). ` +
+      `A headline result that squeezes just under alpha amid many tests is a p-hacking risk signal ` +
+      `(selective reporting / optional stopping). This is a single-p risk flag, not a p-curve distribution test.`,
     affectedProofHashInputs: AFFECTED_PROOF_HASH_INPUTS,
     remediation: REMEDIATION,
   });
