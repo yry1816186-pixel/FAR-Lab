@@ -123,7 +123,15 @@ export async function registerHypothesizeRoute(
           )
           .get(idemKey) as { response_json: string };
         const cachedBody = JSON.parse(existing.response_json) as HypothesizeResponse;
-        void reply.code(200).send({ ...cachedBody, cached: true });
+        // datasetSource is a property of the running server instance (not the
+        // cached result), so recompute it at serve time — old cached rows from
+        // before this field existed get an honest label too.
+        void reply.code(200).send({
+          ...cachedBody,
+          cached: true,
+          datasetSource: config.gateway === undefined ? 'replay' : 'real',
+          providerProfile: config.profile ?? 'offline_replay',
+        });
         return;
       }
       if (claim === 'pending') {
@@ -174,6 +182,8 @@ export async function registerHypothesizeRoute(
       honestVerdict,
       reproHash,
       traceGrade,
+      datasetSource: config.gateway === undefined ? 'replay' : 'real',
+      providerProfile: config.profile ?? 'offline_replay',
     };
 
     // 幂等记录：规范化（JSON round-trip 保证重放字节一致）后持久化。
