@@ -61,7 +61,7 @@ FAR-Lab 的反剧场层不是"猜"，而是**确定性检测**：每个检测器
 |---|---|---|
 | `AT-PHACK-ALPHA` | α 阈值事后改动 | FEC 冻结的 α vs 实际使用的 α，哈希比对 |
 | `AT-PHACK-CORRECTION` | 多重比较校正被跳过/做假 | 检验次数 m 与校正方法必须匹配 FEC 计划 |
-| `AT-PHACK-PCURVE` | p 值分布异常（p-curve 偏斜） | 对 p 值分布做形状检验——p-hacking 的 p 值聚集在 0.05 边缘 |
+| `AT-PHACK-MARGINAL-P` | 边缘显著主 p 值（marginal primary p） | 单个主校正 p 值落在 [0.04, 0.05) 且 familySize≥3——p-hacking 风险信号（非 p-curve 分布检验；跨研究 p-curve 作为推荐随访） |
 | `AT-OPTIONAL-STOPPING` | 边收集数据边看结果 | 数据收集时间线与检验时间线交叉审计 |
 | `AT-STOPPING-RULE` | 违反预注册停止规则 | 停止时机 vs FEC 声明的 stopping rule |
 | `AT-HARK` | 先看结果再编假设 | FEC 编译时间 vs 最早数据收集时间（measurementCutoff） |

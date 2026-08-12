@@ -1,11 +1,11 @@
 // tests/anti_theater/phack_pcurve.test.ts
-// Unit tests for the AT-PHACK-PCURVE detector (p-curve distributional p-hacking detection).
+// Unit tests for the AT-PHACK-MARGINAL-P detector (marginal primary p-value p-hacking risk signal).
 //
 // Test strategy:
 //   1. Clean input (p not in danger zone) → no finding
 //   2. p in [0.04, 0.05) + familySize >= 3 → WARN finding
 //   3. p < 0.04 (clearly significant) → no finding (true effects cluster near 0)
-//   4. familySize < 3 → no finding (insufficient data for p-curve)
+//   4. familySize < 3 → no finding (insufficient family for the marginal-p signal)
 //   5. primaryAdjustedPValue = null → no finding
 
 import { describe, it } from 'node:test';
@@ -47,7 +47,7 @@ function makeInput(overrides: {
   };
 }
 
-describe('AT-PHACK-PCURVE: p-curve distributional detector', () => {
+describe('AT-PHACK-MARGINAL-P: marginal primary-p detector', () => {
   it('clean input (p well below danger zone) → no finding', () => {
     const input = makeInput({ primaryP: 0.001, familySize: 5 });
     const findings = detect_phack_pcurve(input);
@@ -59,7 +59,7 @@ describe('AT-PHACK-PCURVE: p-curve distributional detector', () => {
     const findings = detect_phack_pcurve(input);
     assert.equal(findings.length, 1);
     assert.equal(findings[0]?.stored.outcome, 'WARN');
-    assert.equal(findings[0]?.stored.attackKind, 'p-hacking-p-curve-skew');
+    assert.equal(findings[0]?.stored.attackKind, 'p-hacking-marginal-p');
   });
 
   it('p = 0.04 (boundary) → WARN finding (inclusive lower bound)', () => {
