@@ -240,3 +240,8 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
     （`src/agent_loop/fsm_runner.ts`）而非阿里云百炼 Agent / 应用编排。这是有意设计：
     FSM 确定性且完全可追溯（每个阶段转换记入 `evidence_log`），而百炼 Agent 是黑盒编排层，
     会破坏可复现性。百炼 Agent 集成是 V2 评估项（若能保持确定性追踪兼容）。
+11. **可复现性范围 —— 运行环境漂移** —— `.far-proof` bundle 锁的是**证据**（内容寻址哈希、
+    篡改可检测），但与 Docker capsule 不同，**不**锁完整运行环境。为让环境漂移**可检测**，
+    每个 bundle 的 `data_manifest.json` 现携带 `envFingerprint`（node/python 版本、平台、架构），
+    `far verify --bundle` 在验证环境与录制环境不一致时发出 `ENV_DRIFT` 警告。这只是披露，非保证：
+    同版本仍可能因传递依赖而漂移，完整环境锁定（Docker/WholeTale 式）是 V2 项。

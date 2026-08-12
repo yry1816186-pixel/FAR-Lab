@@ -30,6 +30,12 @@ test('far ask: 6-stage FSM + verdict + chain（offline quick）', () => {
   assert.match(r.stdout, /chain/);
   assert.match(r.stdout, /R7_PRIMARY_TEST_CONFIRMS/);
   assert.match(r.stdout, /offline_replay fixture/); // 诚实标注
+  // B-5：offline_replay 必须在 verdict 之前、输出顶部以醒目 banner 披露（不可误读为 live）
+  assert.match(r.stdout, /OFFLINE REPLAY MODE \(dev\/CI only\)/);
+  assert.ok(
+    r.stdout.indexOf('OFFLINE REPLAY MODE') < r.stdout.indexOf('verdict'),
+    'offline banner must appear BEFORE the verdict (no fake-demo headline)',
+  );
 });
 
 test('far ask: --json 产出机器可读结构', () => {
