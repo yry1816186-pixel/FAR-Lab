@@ -228,7 +228,7 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
    （contract-consistent bounded support），**不是**天文学的"确认系外行星"（后者需要
    RV mass / TTV 证据）。demo 产出的天文学候选应读作 VALIDATED / CANDIDATE。
 8. **反剧场运行时接线** —— 23 个反剧场检测器已在离线 `verify` 中完整接线（bundle 重算、
-   23 检测器重跑比对）。生产路径运行时接线（FUSION-OS-1）为 V2，等待真实 multi-seed 数据（P1-6）。
+   23 检测器重跑比对）。生产路径运行时接线为 V2 路线图项，等待真实 multi-seed 数据。
 9. **篡改检测范围** —— 无密钥 SHA-256 链检测**朴素**篡改（攻击者不重算哈希）。
    重算全部公开哈希的一致伪造（consistent forgery）超出 V1 范围（DEF-18，V-04 PoC）。
    V2 将以 Ed25519 签名收窄此窗口。

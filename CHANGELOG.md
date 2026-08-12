@@ -3,37 +3,33 @@
 All notable changes to FAR-Lab are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased] — 1.2.0（比赛前终极升级）
+## [Unreleased]
 
-### Added — 跨平台三系统（P0-1）
+### Added — 跨平台支持
 - 三平台 CI 矩阵 `.github/workflows/cross-platform.yml`（Windows/macOS/Linux 全量 tests）
 - 跨平台路径工具 `src/paths.ts`：PATH_SEP / toPosixPath / toNativePath / safeJoin（拒 `..` 与绝对路径 fail-closed）/ isSubPath / crossPlatformTmpDir / crossPlatformHomeDir
 - `far doctor` 新增 `checkCrossPlatform()` 5 项运行时自检
 
-### Added — 计算卡适配（P0-2）
+### Added — 硬件探测与 LLM 适配
 - 硬件探测层 `src/hardware/detect.ts`（GPU/NPU/CUDA/Metal/WASM，尽力而为）
 - OpenAI 兼容统一 LLM 适配器（baseURL 驱动，5 presets：DeepSeek/Zhipu/Ollama/Anthropic/Azure）
 - `far hardware` 命令：运行时硬件与可用加速路径
 
-### Added — 灵活动态 agent 调度（P0-3）
+### Added — agent 调度与事件流
 - Agent 事件总线 + `/api/v1/events/stream` SSE 端点（run/stage/iteration/held/resumed 全事件）
 - 可插拔 stage 注册表 `src/agent_loop/stage_registry.ts`（StageDescriptor.executor 扩展带）
 - 并行扩展阶段：order>6 阶段在 verdict 后 `Promise.all` 并发执行，错误包装 `ExtensionStageError`（`EXTENSION_STAGE_FAILED` 码）
 - 人工接管 `src/agent_loop/controller.ts`：hold/resume/isHeld/waitIfHeld + stage_held/stage_resumed 检查点
 
-### Added — 接口与功能适配（P0-4）
+### Added — 网关韧性与速率限制
 - 弹性网关 `src/llm_gateway/resilient_gateway.ts`：maxAttempts + fallbackOrder + retryableErrorNames + onFallback（fail-closed 守卫）
 - 速率限制 `src/llm_gateway/rate_limiter.ts`：信号量 FIFO + minIntervalMs 节流
 
-### Added — 前端与图形化 CLI 动态显示（P0-5）
+### Added — CLI 渲染层与前端实时联动
 - CLI 渲染层 `src/cli/render.ts`（spinner/进度条/表格/ANSI，NO_COLOR 规范）
 - 表驱动 CLI 框架 `src/cli/registry.ts`（26 命令声明式注册 + runCli 分发器；run 返回 undefined 不 exit 保 api 长驻命令）
 - `far stream --events` 实时阶段事件流
 - 前端 SSE 实时联动：`useAgentEventStream` hook + `/events` 实时事件流页 + AppShell 导航 + i18n zh/en
-
-### 验证
-- typecheck 0 / lint 0 / tests **2401（2395p/0f/6s）** / frontend **226 tests** / demo 14/14 GV / doc↔CLI 一致性 PASS / 卫生门禁 PASS
-- 修复：real-paper 裸 import bug（`runRealPaperFromArgs` + isMainModule 守卫）、EventsPage VerdictBadge prop 名、前端 act 纪律、App 导航断言
 
 ## [1.0.0] — initial open-source release
 
@@ -111,7 +107,7 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 - `NEEDS_RELEASE_PUBLICATION`: the package is build-ready and `npm install -g` works from a tarball,
   but is not yet published to the npm registry; the GitHub Release is pending.
 
-## [1.1.0] — 2026-08-05 · Ecosystem-borrowed upgrade + hero demo + security fixes
+## [1.1.0] — 2026-08-05
 
 ### Fixed
 
@@ -125,9 +121,6 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 
 ### Added
 
-- **Hero Demo page** (`/hero` route): 60-second interactive tamper-detection experience
-  for competition judges. Browser-side SHA-256 hash chain, one-click tamper interaction,
-  visual hash diff. (`frontend/src/pages/HeroDemoPage.tsx`)
 - **Judge Quick-Start guide** (`docs/JUDGE_QUICKSTART.md`): 5-minute verification path
   for competition judges — 60-second demo, 2-minute tamper hero, 5-minute kernel deep dive.
 - **Real-world science integrity cases** (`docs/REAL_WORLD_CASES.md`): maps famous
@@ -138,66 +131,55 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 - **Repository navigation guide** (`DOCS_INDEX.md`): organizes 25 root-level documents
   into clear reading paths for different audiences.
 
-### Changed
+### Added — supply-chain hardening
 
-- Phase 1 Foundation Hardening: EXIT GATE PASSED (6/6 criteria).
-- Phase 2 Architecture Excellence: Fitness Functions 17/17 PASS, ADRs 24/24.
+- `.npmrc` save-exact=true; `package.json` dependencies + `pnpm.overrides` exact-pinned.
+- `scripts/check-supply-chain.mjs` gate (exact pins + lockfile specifier consistency) wired into
+  `ci.yml` blocking_gates; new weekly `.github/workflows/security-audit.yml`
+  (`pnpm audit --prod` + audit signatures).
 
-### Ecosystem-borrowed upgrade (9 batches) — details
+### Added — statistical trap taxonomy
 
-Learned from 5 world-class open-source projects (opencode / pi / zeroclaw / hermes-agent /
-scientific-agent-skills) and implemented 9 borrowing batches. All gates green: typecheck 0 /
-lint 0 / 1581 tests (1574 pass, 0 fail) / far demo exit 0.
-
-### Added — supply-chain hardening (borrowed from pi)
-- .npmrc save-exact=true; package.json dependencies + pnpm.overrides exact-pinned.
-- scripts/check-supply-chain.mjs gate (exact pins + lockfile specifier consistency) wired into
-  ci.yml blocking_gates; new weekly .github/workflows/security-audit.yml (pnpm audit --prod +
-  audit signatures).
-
-### Added — statistical trap taxonomy (borrowed from scientific-agent-skills)
-- src/anti_theater/trap_taxonomy.ts: 21-entry taxonomy (category/name/what/cures/realCase) for
-  every anti-theater attack kind + summarizeTraps aggregation.
+- `src/anti_theater/trap_taxonomy.ts`: 21-entry taxonomy (category/name/what/cures/realCase) for
+  every anti-theater attack kind + `summarizeTraps` aggregation.
 - Report layer: optional Statistical Trap Audit section rendering triggered trap categories
   (zero regression when absent).
 
-### Added — evidence FTS5 search (borrowed from hermes-agent)
-- src/evidence_log/search.ts: nsureFtsIndex / 
-eindexEvidenceFts / searchEvidence /
-  scapeFtsQuery. Search auxiliary layer — never enters the hash chain.
+### Added — evidence FTS5 search
 
-### Added — evidence quality grading (borrowed from scientific-agent-skills GRADE/Cochrane RoB)
-- src/evidence_quality/: gradeEvidenceTier (RCT→1 … expert/unspecified→4) + Cochrane RoB 7-domain
-  assessment + gradeEvidenceQuality. Transparency layer only: VerdictKernelOutput gains optional
-  videnceQualityTier/videnceQualityNote; verdict logic and proofHash unchanged (zero regression).
+- `src/evidence_log/search.ts`: `ensureFtsIndex` / `reindexEvidenceFts` / `searchEvidence` /
+  `escapeFtsQuery`. Search auxiliary layer — never enters the hash chain.
 
-### Added — evidence context compaction (borrowed from opencode session compact)
-- src/agent_loop/compaction.ts: deterministic artifact compression (stage3/4 verdict-critical
+### Added — evidence quality grading
+
+- `src/evidence_quality/`: `gradeEvidenceTier` (RCT→1 … expert/unspecified→4) + Cochrane RoB 7-domain
+  assessment + `gradeEvidenceQuality`. Transparency layer only: `VerdictKernelOutput` gains optional
+  `evidenceQualityTier` / `evidenceQualityNote`; verdict logic and `proofHash` unchanged
+  (zero regression).
+
+### Added — evidence context compaction
+
+- `src/agent_loop/compaction.ts`: deterministic artifact compression (stage3/4 verdict-critical
   payloads preserved verbatim; narrative fields clipped with hash anchors).
-- 
-unAgentLoop optional compactArtifacts flag (default off → byte-identical).
+- `runAgentLoop` optional `compactArtifacts` flag (default off → byte-identical).
 
-### Added — CLI state revert (borrowed from opencode revert/unrevert)
-- state_machine gains 3 revert edges (STATISTICS→EVIDENCE_GATHERED, VERDICT→STATISTICS,
+### Added — CLI state revert
+
+- `state_machine` gains 3 revert edges (STATISTICS→EVIDENCE_GATHERED, VERDICT→STATISTICS,
   PROOF_SEALED→VERDICT); seal is a commit point — no revert after it (fail-closed).
 
-### Added — scheduled re-verification (borrowed from hermes-agent cron)
-- ar schedule add|list|remove|run: JSON-persisted re-verification jobs with due-date logic and
-  auditable exec runs (schedules.json under $FAR_HOME or ~/.far).
+### Added — scheduled re-verification
 
-### Added — runtime JSONL session recording (borrowed from pi JSONL session format)
-- src/trace/session_recorder.ts: SessionRecorder / 
-eplaySession / serializeEvent.
-- 
-unAgentLoop optional sessionPath: records run_started / stage_completed ×N / run_completed.
+- `far schedule add|list|remove|run`: JSON-persisted re-verification jobs with due-date logic and
+  auditable exec runs (`schedules.json` under `$FAR_HOME` or `~/.far`).
 
-### Added — math backend fallback chains (borrowed from zeroclaw provider fallback)
-- MathVerifier fallback chains (default: SMT→CAS, Lean4→Dafny; overridable, 
-ull disables):
-  unavailable/throwing/honestly-degraded primary backend falls back to alternatives with
-  allback_from:<kind> annotation. Primary conclusion is never overridden.
+### Added — runtime JSONL session recording
 
-### Verified
-- Baseline 1517 tests → 1581 (57 new tests across all batches); zero regressions.
-- All borrowed features are optional flags / optional fields / transparency layers — no
-  verdict-kernel or proofHash behavior change without explicit opt-in.
+- `src/trace/session_recorder.ts`: `SessionRecorder` / `replaySession` / `serializeEvent`.
+- `runAgentLoop` optional `sessionPath`: records `run_started` / `stage_completed` ×N / `run_completed`.
+
+### Added — math backend fallback chains
+
+- `MathVerifier` fallback chains (default: SMT→CAS, Lean4→Dafny; overridable, `null` disables):
+  unavailable / throwing / honestly-degraded primary backend falls back to alternatives with
+  `fallback_from:<kind>` annotation. The primary conclusion is never overridden.
