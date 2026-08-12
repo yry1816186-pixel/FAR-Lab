@@ -26,16 +26,21 @@ Published facts used (paper text / supplementary):
   - Median replication effect size r = 0.197 (49% of the original).
 
 Recomputed statistics (honest boundary):
-  - Fisher r-to-z transform for effect-size comparison:
-      z = 0.5 * ln((1 + r) / (1 - r))
-    with standard error SE = 1/sqrt(N - 3).
-  - The r = 0.197 replication effect against H0: r = 0 is tested via the
-    Fisher z transform (one-sample z on the transformed scale).
-  - The 97% -> 36% significance-rate collapse is tested as a two-proportion
-    z-test (original vs replication), which is the decisive aggregate test.
-  - BH-FDR (Benjamini-Hochberg, alpha=0.05) is applied over the family of
-    { effect-size z-test, proportion-significance z-test } exactly as the TS
-    side uses `adjustPValues('bh_fdr')`.
+  - PRIMARY inferential test: the 97% -> 36% significance-rate collapse is
+    tested as a two-proportion z-test (original vs replication). This is the
+    decisive, methodologically unimpeachable aggregate finding (p ~ 2.6e-19).
+  - DESCRIPTIVE only: median replication r = 0.197 (49% of original 0.403).
+    NOTE: applying the Fisher-z transform with SE = 1/sqrt(N-3) to the MEDIAN
+    of 97 study-level correlations is statistically INVALID — that SE is the
+    asymptotic SE of a SINGLE correlation from N paired observations, not of a
+    median across studies. A valid meta-analytic test would require per-study
+    sample sizes for inverse-variance weighting, which the published OSC
+    summary does not expose. We therefore report median r descriptively and
+    attach NO inferential p/CI to it. (Earlier versions of this file computed
+    an invalid Fisher-z-on-median p ~ 0.0265; that has been removed as K6.)
+  - BH-FDR (Benjamini-Hochberg, alpha=0.05) is applied over the single-test
+    family { rate-drop z } (a no-op on one element, kept for family-growth
+    consistency with the TS axis).
 
 Independence & determinism charter:
   - This module imports NO FAR-Lab TypeScript/JavaScript code.
@@ -46,7 +51,7 @@ Independence & determinism charter:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # Published constants (OSC 2015, Science 349, aac4716)
@@ -114,44 +119,45 @@ class OscRecomputeResult:
     originalSignificantRate: float
     replicationCount: int
     replicationSignificantRate: float
-    originalMedianR: float
-    replicationMedianR: float
-    replicationEffectZ: float  # Fisher z-transform of replication r
-    replicationEffectSe: float  # 1/sqrt(N-3)
-    replicationEffectZStat: float  # z / se
-    replicationEffectPOneSided: float
-    replicationEffectPTwoSided: float
-    rateDropZ: float  # two-proportion z (original vs replication)
+    originalMedianR: float  # descriptive
+    replicationMedianR: float  # descriptive
+    rateDropZ: float  # two-proportion z (original vs replication) — PRIMARY test
     rateDropPTwoSided: float
-    effectShrinkage: float  # 1 - (replication r / original r)
-    bhAdjustedPs: list[float]  # BH-FDR over [effect z-test p, rate-drop p]
+    effectShrinkage: float  # 1 - (replication r / original r), descriptive
+    bhAdjustedPs: list[float]  # BH-FDR over [rate-drop p] (single-test family)
     survivesFdr: bool  # any adjusted p < alpha
     recomputeBackend: str  # always 'stdlib-exact'
 
 
 def recompute_osc_statistics() -> OscRecomputeResult:
-    """Recompute OSC-2015 aggregate statistics from published summary stats."""
+    """Recompute OSC-2015 aggregate statistics from published summary stats.
+
+    Primary (inferential) test: two-proportion z on the 97% -> 36%
+    significance-rate collapse. The median replication r=0.197 is reported
+    descriptively only (no Fisher-z-on-median inference — see module docstring).
+    """
     original_rate = OSC_ORIGINAL_SIGNIFICANT / OSC_ORIGINAL_N
     replication_rate = OSC_REPLICATION_SIGNIFICANT / OSC_REPLICATION_N
 
-    # Fisher z on the replication median effect size, tested against 0.
-    z_rep = r_to_z(OSC_REPLICATION_MEDIAN_R)
-    se_rep = 1.0 / math.sqrt(OSC_REPLICATION_N - 3)
-    z_stat = z_rep / se_rep
-    p_one_sided = _normal_survival(z_stat)
-    p_two_sided = 2.0 * _normal_survival(abs(z_stat))
-
-    # Two-proportion z on the significance-rate collapse.
+    # Two-proportion z on the significance-rate collapse (the decisive test).
     rate_z, rate_p = two_proportion_z(
         OSC_ORIGINAL_SIGNIFICANT, OSC_ORIGINAL_N,
         OSC_REPLICATION_SIGNIFICANT, OSC_REPLICATION_N,
     )
 
+    # math.erf saturates for |z|/sqrt(2) > ~6.2, so the two-sided p underflows
+    # to 0 for the extreme rate-drop z (~8.97). Use the asymptotic normal tail
+    # phi(z)/|z| (x2 two-sided) to stay representable (matches the TS axis).
+    # True two-sided p ~ 2.6e-19.
+    if rate_z > 8:
+        rate_p = (2.0 * math.exp(-rate_z * rate_z / 2.0)) / (
+            rate_z * math.sqrt(2.0 * math.pi)
+        )
+
     shrinkage = 1.0 - OSC_REPLICATION_MEDIAN_R / OSC_ORIGINAL_MEDIAN_R
 
-    # BH-FDR over the family { effect-size z-test, rate-drop z-test }.
-    # 与 TS 轴一致：效应量检验用单侧 p（claim 方向为"复制效应 > 0"）。
-    bh = bh_fdr([p_one_sided, rate_p], OSC_ALPHA)
+    # BH-FDR over the single-test family { rate-drop z }.
+    bh = bh_fdr([rate_p], OSC_ALPHA)
     survives = any(p < OSC_ALPHA for p in bh)
 
     return OscRecomputeResult(
@@ -161,11 +167,6 @@ def recompute_osc_statistics() -> OscRecomputeResult:
         replicationSignificantRate=replication_rate,
         originalMedianR=OSC_ORIGINAL_MEDIAN_R,
         replicationMedianR=OSC_REPLICATION_MEDIAN_R,
-        replicationEffectZ=z_rep,
-        replicationEffectSe=se_rep,
-        replicationEffectZStat=z_stat,
-        replicationEffectPOneSided=p_one_sided,
-        replicationEffectPTwoSided=p_two_sided,
         rateDropZ=rate_z,
         rateDropPTwoSided=rate_p,
         effectShrinkage=shrinkage,
@@ -185,20 +186,17 @@ def main() -> None:  # pragma: no cover - CLI entry
           f"({result.replicationCount} studies)")
     print(f"  original median r         : {result.originalMedianR:.4f}")
     print(f"  replication median r      : {result.replicationMedianR:.4f}")
-    print(f"  effect shrinkage          : {result.effectShrinkage:.4f}")
-    print(f"  replication z (Fisher)    : {result.replicationEffectZ:.4f} "
-          f"(SE={result.replicationEffectSe:.4f}, z-stat={result.replicationEffectZStat:.4f})")
-    print(f"  effect p (one/two-sided)  : {result.replicationEffectPOneSided:.6f} / "
-          f"{result.replicationEffectPTwoSided:.6f}")
-    print(f"  rate-drop z / p           : {result.rateDropZ:.4f} / "
+    print(f"  effect shrinkage          : {result.effectShrinkage:.4f} (descriptive)")
+    print(f"  rate-drop z / p (PRIMARY) : {result.rateDropZ:.4f} / "
           f"{result.rateDropPTwoSided:.4e}")
-    print(f"  BH-FDR adjusted p-values  : "
-          f"[{result.bhAdjustedPs[0]:.6f}, {result.bhAdjustedPs[1]:.4e}]")
+    print(f"  BH-FDR adjusted p-values  : [{result.bhAdjustedPs[0]:.4e}]")
     print(f"  survives FDR              : {result.survivesFdr}")
     print()
     print("  Reference (paper): original 97% significant vs replication 36%;")
-    print("  median r 0.403 -> 0.197. The replication effect is statistically")
-    print("  nonzero but its magnitude collapses to ~49% of the original.")
+    print("  median r 0.403 -> 0.197 (descriptive). The significance rate did")
+    print("  NOT reproduce at a comparable level (two-proportion p ~ 2.6e-19);")
+    print("  the median replication r is nonzero but ~49% of the original.")
+    print("  No Fisher-z-on-median inference (invalid SE for a study-level median).")
 
 
 if __name__ == "__main__":  # pragma: no cover
