@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   adjustPValues,
+  bonferroniCorrectedPValue,
   cohensDOneSample,
   meanConfidenceInterval,
   oneSampleZTest,
@@ -80,6 +81,28 @@ test('multiple-testing corrections preserve original order with monotonic adjust
     bh.map((entry) => entry.rejected),
     [true, true, true],
   );
+});
+
+test('bonferroniCorrectedPValue: one statistic selected from nTrials (BLS grid trial factor, T-017/T-018)', () => {
+  // 这是 BLS 周期搜索的校正：best 候选的 p 是从 nTrials 个 (period,duration) 试验中选出 →
+  // 须按真实 trial factor 做 Bonferroni（非 adjustPValues([p],'bonferroni') 的 ×1 no-op）。
+  assertClose(bonferroniCorrectedPValue(0.001, 1), 0.001);
+  assertClose(bonferroniCorrectedPValue(0.001, 360), 0.36); // demo grid 120×3
+  // 生产 TESS 网格（n_periods=2000 × n_durations=3 = 6000 试验）
+  assertClose(bonferroniCorrectedPValue(1e-6, 6000), 0.006);
+  assertClose(bonferroniCorrectedPValue(1e-5, 6000), 0.06);
+  // clamp 到 [0,1]：极大 trial factor 不超过 1
+  assert.equal(bonferroniCorrectedPValue(0.5, 1_000_000), 1);
+  // 复合校正语义：rawP < 0.05/(4×nTrials) ⟺ adjustedP(×nTrials) < 0.0125 (M1-M4 Bonferroni α')
+  const rawP = 1e-6;
+  const nTrials = 6000;
+  assert.ok(bonferroniCorrectedPValue(rawP, nTrials) < 0.0125, 'rawP=1e-6 在生产网格下应通过 α=0.0125');
+  assert.ok(bonferroniCorrectedPValue(1e-4, nTrials) > 0.0125, 'rawP=1e-4 在生产网格下应不通过');
+
+  // 守卫：nTrials<1 / 非法 p → fail-closed
+  assert.throws(() => bonferroniCorrectedPValue(0.01, 0), /nTrials must be >= 1/);
+  assert.throws(() => bonferroniCorrectedPValue(1.5, 10), /p-values in \[0,1\]/);
+  assert.throws(() => bonferroniCorrectedPValue(-0.1, 10), /p-values in \[0,1\]/);
 });
 
 test('twoSampleWelchZTest: n<2 前置守卫 fail-closed + 清晰定位（哪个样本不足）', () => {

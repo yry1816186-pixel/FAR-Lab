@@ -41,6 +41,31 @@ export function adjustPValues(
   }
 }
 
+/**
+ * Bonferroni correction for ONE statistic selected from nTrials independent trials.
+ *
+ * Use case (BLS period search): the BLS scans a grid of nTrials = n_periods × n_durations
+ * (period, duration) cells and reports the best candidate's p-value. That p-value was
+ * selected from nTrials trials, so it must be inflated by the trial factor to control the
+ * family-wise error rate. This is the correction TESS production pipelines require (trial
+ * factor = grid size, NOT 4) — see bls_compute.py T-017 / tess_harness.ts T-018.
+ *
+ * NOTE: this is NOT the same as adjustPValues([p], 'bonferroni'), which multiplies by the
+ * array LENGTH (1 for a single-element array → a no-op). That form is for N simultaneous
+ * tests each with their own p-value; this function is for one SELECTED p-value.
+ *
+ * @param rawPValue the p-value of the selected (best) statistic, in [0, 1].
+ * @param nTrials   number of independent trials the statistic was selected from (>= 1).
+ * @returns Bonferroni-adjusted p-value, clamped to [0, 1] (rawPValue × nTrials).
+ */
+export function bonferroniCorrectedPValue(rawPValue: number, nTrials: number): number {
+  validatePValues([rawPValue]);
+  if (!Number.isFinite(nTrials) || nTrials < 1) {
+    throw new Error(`bonferroniCorrectedPValue: nTrials must be >= 1, got ${nTrials}`);
+  }
+  return Math.min(1, rawPValue * nTrials);
+}
+
 function holmAdjust(rawPValues: readonly number[], alpha: number): readonly AdjustedPValue[] {
   const sorted = indexed(rawPValues);
   let runningMax = 0;

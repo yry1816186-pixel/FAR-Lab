@@ -184,6 +184,11 @@ def run(
     return {
         "ok": True,
         "n_points": int(len(times)),
+        # T-017 多重检验校正（评委05）：暴露真实搜索网格规模，供 TS 侧做 Bonferroni
+        # trial-factor 校正（n_periods × n_durations 个 (period,duration) 独立试验单元）。
+        # demo 网格 120×3=360；生产 TESS ≥2000×n_durations。校正须按真实网格，非 4。
+        "n_periods": int(n_periods),
+        "n_durations": int(len(durations)),
         "period": best["period"],
         "duration": best["duration"],
         "depth": best["depth"],

@@ -33,13 +33,61 @@ import { findPythonCommand, probeNumpy, buildPythonPath, restorePythonPath } fro
 
 import {
   buildCAstroChain,
+  buildCAstroStatistics,
   C_ASTRO_ALPHA,
   C_ASTRO_CLAIM_ID,
   C_ASTRO_METRIC_KEY,
+  type BlsMetrics,
 } from '../../src/science_harness/c_astro_pipeline.ts';
 import { fetchOnlineDataset } from '../../src/science_harness/dataset_resolver.ts';
 
 const CACHED_FIXTURE = resolve('tests/fixtures/science_harness/tic_sample.cache');
+
+/** 构造一个最小确定性 BlsMetrics（in-fluxes 有真实 transit dip，out-fluxes 基线）——纯单元，不需 python。 */
+function makeBlsMetrics(nPeriods: number, nDurations: number): BlsMetrics {
+  // 确定性（非随机）：in-fluxes 系统性低于 out-fluxes → 真实 two-sample 显著 + 稳定可复现。
+  const inFluxes = Array.from({ length: 30 }, (_, i) => 0.992 + (i % 7) * 0.0002);
+  const outFluxes = Array.from({ length: 60 }, (_, i) => 1.0 + (i % 11) * 0.0002);
+  return {
+    ok: true,
+    n_points: 90,
+    n_periods: nPeriods,
+    n_durations: nDurations,
+    period: 2.41,
+    duration: 0.12,
+    depth: 0.008,
+    depthSNR: 9.0,
+    oddEvenDiff: 0.5,
+    oddEvenEvenDepth: 0.008,
+    oddEvenOddDepth: 0.008,
+    inFluxes,
+    outFluxes,
+    centroidOffset: null,
+  };
+}
+
+test('buildCAstroStatistics: adjustedPValue applies real BLS-grid Bonferroni (n_periods × n_durations), not the ×1 no-op (T-017/T-018 fix)', () => {
+  // 同一组 in/out fluxes（同一 rawP），不同 BLS 网格规模 → adjustedP 必须按 nTrials 倍数变化。
+  const demo = buildCAstroStatistics(C_ASTRO_METRIC_KEY, makeBlsMetrics(120, 3));
+  const prod = buildCAstroStatistics(C_ASTRO_METRIC_KEY, makeBlsMetrics(2000, 3));
+  const demoP = demo.statisticalResult.pValue;
+  const prodP = prod.statisticalResult.pValue;
+  assert.ok(demoP !== undefined && prodP !== undefined, 'ran status must produce a raw pValue');
+  assert.equal(demoP, prodP, 'identical fluxes → identical raw p-value');
+  const demoTrials = 120 * 3;
+  const prodTrials = 2000 * 3;
+  // adjustedPValue = rawP × nTrials（真实网格校正，非旧 adjustPValues([p],'bonferroni') 的 ×1）
+  assert.ok(Math.abs(demo.adjustedPValue - demoP * demoTrials) < 1e-9);
+  assert.ok(Math.abs(prod.adjustedPValue - prodP * prodTrials) < 1e-9);
+  // 比例 = trial 比例（6000/360 ≈ 16.67）
+  assert.ok(Math.abs(demo.adjustedPValue / prod.adjustedPValue - demoTrials / prodTrials) < 1e-6);
+  // 关键回归守护：旧实现下 demo.adjustedP == rawP（×1 no-op）；新实现下 = rawP × 360
+  assert.ok(demo.adjustedPValue > demoP, 'grid correction applied (not ×1 no-op)');
+  assert.ok(
+    prod.adjustedPValue > demo.adjustedPValue,
+    '生产网格(6000 trial)比 demo 网格(360)校正更严 — R7 置信按真实网格诚实降权',
+  );
+});
 
 test('c_astro_pipeline: real venv BLS + real two-sample z-test -> R4 DEGRADED_SCOPE (cached_fixture honest scope) -> seal (Phase 5)', async (t) => {
   const pythonCommand = findPythonCommand();
