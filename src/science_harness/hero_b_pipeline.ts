@@ -304,7 +304,7 @@ export function buildHeroBChain(db: Database.Database): HeroBPipelineResult {
 
   const knownFailures = [
     `observational-only causal claim: real two-sample stats supported the association (adjustedP=${statistics.adjustedPValue.toExponential(3)}) but ConfoundingGate FAIL (${statistics.confoundingGate.outcome}, unmeasuredConfounders=[${statistics.confoundingGate.unmeasuredConfounders.join(',')}]) → DEGRADED_SCOPE (F6: correlation != causation)`,
-    'hallucination eval is preregistered synthetic strata; real sandbox measurement is P1-6 V2 roadmap',
+    'hallucination eval is preregistered synthetic strata; real sandbox measurement is a V2 roadmap item',
   ];
 
   const sealed = sealProofEnvelope(db, {

@@ -131,6 +131,6 @@ function renderAuditText(dump: AuditSeedCherryDump): string {
   decisive rule   : ${dump.decisiveRuleId}
   sealed          : ${dump.sealedConclusion}
   honest status   : RED — fixture replay (hardcoded cherry-pick constants); detect_seed_cherry fires on
-                    constants, NOT on a real submission's run registry. Production wiring needs P1-6.
+                    constants, NOT on a real submission's run registry. Production wiring needs a real run registry.
 `;
 }
