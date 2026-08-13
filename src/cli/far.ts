@@ -41,6 +41,7 @@ import {
   runResearchExport,
   runResearchCompare,
   runResearchAnalyze,
+  runResearchEvaluate,
 } from './commands/research.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
@@ -274,17 +275,21 @@ const COMMANDS: readonly CliCommand[] = [
       if (subcommand === 'analyze') {
         return runResearchAnalyze(args.slice(1));
       }
+      if (subcommand === 'evaluate') {
+        return runResearchEvaluate(args.slice(1));
+      }
       if (subcommand === 'start') {
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'inspect', 'verify', 'export', 'compare', 'analyze', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
+        `far research: expected 'start', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
           '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--json] [--out <file>]\n' +
           '         far research inspect <run.json> [--json]\n' +
           '         far research verify <run.json|bundle-dir> [--json]\n' +
           '         far research export <run.json> --out <bundle-dir> [--json]\n' +
           '         far research compare <run.json> [--revision <a> <b>] [--json]\n' +
           '         far research analyze <run.json> [--live] [--out <new.json>] [--json]\n' +
+          '         far research evaluate <run.json> [--json]\n' +
           '         far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile ...]\n',
       );
       return 2;
@@ -1057,6 +1062,12 @@ USAGE:
                          an Observation -> FeedbackSignal -> revision (plan rewritten when
                          triggered). Nulls / small samples / non-significance preserved honestly.
     exits 0 success · 1 experiment/read failure · 2 bad args
+
+  far research evaluate <run.json> [--json]
+                         program-computed evaluation metrics (§14.3) + deterministic recompute.
+                         Metrics come from the frozen run state (never hand-edited); human-rubric
+                         metrics are listed, not auto-scored.
+    exits 0 success · 1 read failure · 2 bad args
 
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
