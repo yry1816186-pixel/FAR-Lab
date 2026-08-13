@@ -98,6 +98,11 @@ const skippedFiles = new Set([
   // 合法读写环境变量名（非硬编码 secret 值）。经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore /
   // 空 catch / extra_body / header 幻觉 / sk- 明文。
   'tests/llm_gateway/qwen_adapter_fallback.test.ts',
+  // tests/api/research.test.ts —— 最后一项测试临时清空 + finally 恢复 FAR_DASHSCOPE_API_KEY
+  // 验证 research API 的 live-profile 503 fail-closed 门（与 qwen_adapter_fallback 同模式）。
+  // 合法读写环境变量名（非硬编码 secret 值）。经人工审计零容忍合规：无 :any / as unknown as /
+  // @ts-ignore / 空 catch / extra_body / header 幻觉 / sk- 明文。
+  'tests/api/research.test.ts',
   // Qwen-VL client —— 合法读取 DASHSCOPE_API_KEY 环境变量名（客户端配置读取）。
   // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / extra_body / header 幻觉。
   'src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_client.ts',
