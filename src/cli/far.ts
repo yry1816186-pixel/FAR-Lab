@@ -1088,6 +1088,9 @@ USAGE:
     --export <dir>                export a V1 .far-proof self-verifiable bundle to <dir>
     --resume <path>               stage_receipt store (IC-06): resume from the last valid receipt after kill
     --json                        machine-readable output
+    --ground                      Phase 4b: FIRST ground the question in real retrieved literature + adversarial
+                                  counter-evidence (§9/§16), attach the corpus snapshot to the result. Default off.
+    --ground-source <s>           openalex (default) | arxiv | crossref (only with --ground)
     defaults to offline_replay (no keys, fixture replay); real inference needs --profile competition_aliyun_qwen + credentials
     red line: the verdict is produced by the deterministic R0-R9 kernel (the LLM is never the adjudicator).
     exit codes: 0 normal termination / 1 loop error / 2 bad args
