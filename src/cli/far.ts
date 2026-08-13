@@ -42,6 +42,7 @@ import {
   runResearchCompare,
   runResearchAnalyze,
   runResearchEvaluate,
+  runResearchBaseline,
 } from './commands/research.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
@@ -278,11 +279,14 @@ const COMMANDS: readonly CliCommand[] = [
       if (subcommand === 'evaluate') {
         return runResearchEvaluate(args.slice(1));
       }
+      if (subcommand === 'baseline') {
+        return runResearchBaseline(args.slice(1));
+      }
       if (subcommand === 'start') {
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
+        `far research: expected 'start', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
           '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--json] [--out <file>]\n' +
           '         far research inspect <run.json> [--json]\n' +
           '         far research verify <run.json|bundle-dir> [--json]\n' +
@@ -290,6 +294,7 @@ const COMMANDS: readonly CliCommand[] = [
           '         far research compare <run.json> [--revision <a> <b>] [--json]\n' +
           '         far research analyze <run.json> [--live] [--out <new.json>] [--json]\n' +
           '         far research evaluate <run.json> [--json]\n' +
+          '         far research baseline "<question>" [--profile ...] [--json]\n' +
           '         far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile ...]\n',
       );
       return 2;
