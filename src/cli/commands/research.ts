@@ -26,6 +26,9 @@ import {
   computeParetoFront,
 } from '../../research/scorecard.ts';
 import { exportResearchBundle, researchBundleSha256 } from '../../research/export_bundle.ts';
+import { runPlanExperiment } from '../../research/experiment.ts';
+import { PACKAGE_ROOT } from '../../paths.ts';
+import type { PsRow, ExoplanetDatasetCard } from '../../research/adapters/exoplanet_dataset.ts';
 import type { ResearchRun } from '../../research/types.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
 import type { RetrievalAdapter } from '../../retrieval/types.ts';
@@ -680,5 +683,193 @@ export async function runResearchFeedback(args: readonly string[]): Promise<numb
       `  affectsHypotheses: ${hypothesisChanges.downgraded.length} · planChanges: ${planChanges.length} · unresolved: ${unresolvedConflicts.length}\n` +
       `  saved: ${outPath}\n`,
   );
+  return 0;
+}
+
+/**
+ * Load the committed REAL archive sample (tests/fixtures/research/
+ * exoplanet_ps_sample.json) as replay rows + a replay dataset card.
+ * The sample is genuine NASA data captured 2026-08-13 (bounded, not exhaustive).
+ */
+function loadExoplanetReplay(): { rows: readonly PsRow[]; card: ExoplanetDatasetCard } {
+  const fixturePath = join(PACKAGE_ROOT, 'tests', 'fixtures', 'research', 'exoplanet_ps_sample.json');
+  const raw = readFileSync(fixturePath, 'utf8');
+  const parsed = JSON.parse(raw) as {
+    source?: string;
+    url?: string;
+    query?: string;
+    capturedAt?: string;
+    license?: string;
+    note?: string;
+    rows?: ReadonlyArray<Record<string, unknown>>;
+  };
+  const rows: PsRow[] = (parsed.rows ?? []).map((r) => ({
+    plName: typeof r.pl_name === 'string' ? r.pl_name : '(unnamed)',
+    radiusEarth: typeof r.pl_rade === 'number' ? r.pl_rade : null,
+    massEarth: typeof r.pl_bmasse === 'number' ? r.pl_bmasse : null,
+    periodDays: typeof r.pl_orbper === 'number' ? r.pl_orbper : null,
+    stellarTeffK: typeof r.st_teff === 'number' ? r.st_teff : null,
+    stellarRadiusRsun: typeof r.st_rad === 'number' ? r.st_rad : null,
+    stellarMassMsun: typeof r.st_mass === 'number' ? r.st_mass : null,
+  }));
+  if (rows.length === 0) {
+    throw new Error(`exoplanet replay fixture is empty or unreadable: ${fixturePath}`);
+  }
+  const card: ExoplanetDatasetCard = {
+    source: parsed.source ?? 'NASA Exoplanet Archive',
+    sourceUrl: parsed.url ?? 'https://exoplanetarchive.ipac.caltech.edu',
+    version: 'PS table (committed real sample)',
+    persistentId: 'nasa-exoplanet-archive:ps',
+    license: parsed.license ?? 'NASA public domain (PD)',
+    downloadedAt: parsed.capturedAt ?? '2026-08-13T00:00:00.000Z',
+    query: parsed.query ?? '(committed sample)',
+    rawChecksum: '(committed-sample)',
+    rowCount: rows.length,
+    fields: ['pl_name', 'pl_rade', 'pl_bmasse', 'pl_orbper', 'st_teff', 'st_rad', 'st_mass'],
+    units: {},
+    missingNotes: [],
+    qualityNotes: [parsed.note ?? 'REAL archive snapshot (bounded, not exhaustive)'],
+    allowedInference: 'Population-level correlation in this snapshot',
+    forbiddenInference: 'No per-system causal claims',
+    reproductionCommand: `replay fixture: ${fixturePath}`,
+    fetchMode: 'RECORDED_REPLAY',
+  };
+  return { rows, card };
+}
+
+/**
+ * Run `far research analyze <run.json> [--live] [--out <new.json>] [--json]`.
+ *
+ * Phase 3 loop: executes the plan's first real analysis step against the NASA
+ * Exoplanet Archive (live TAP fetch with --live; otherwise the committed REAL
+ * sample in RECORDED_REPLAY mode), parses the output into an Observation,
+ * converts it into a FeedbackSignal, and — when the feedback triggers a plan
+ * rewrite — actually redesigns the plan and records an immutable revision.
+ *
+ * Honesty: nulls / small samples / non-significance are preserved in the
+ * observation; a negative result is reported as a negative result.
+ */
+export async function runResearchAnalyze(args: readonly string[]): Promise<number> {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('far research analyze: missing <run.json>.\n  usage: far research analyze <run.json> [--live] [--out <new.json>] [--profile offline_replay|competition_aliyun_qwen] [--json]\n');
+    return 2;
+  }
+  const outIdx = args.indexOf('--out');
+  const outValue = outIdx !== -1 ? args[outIdx + 1] : undefined;
+  const outPath = outValue !== undefined ? outValue : file;
+  const live = args.includes('--live');
+  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : 'offline_replay';
+  const profile = profileArg === 'competition_aliyun_qwen' ? 'competition_aliyun_qwen' : 'offline_replay';
+  const json = args.includes('--json');
+
+  let run: ResearchRun;
+  try {
+    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+  } catch (err) {
+    process.stderr.write(`far research analyze: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+
+  // 1. Execute the plan's first analysis step (live or committed-real replay).
+  let experiment;
+  try {
+    const replay = live ? undefined : loadExoplanetReplay();
+    experiment = await runPlanExperiment({
+      run,
+      ...(replay !== undefined ? { replayRows: replay.rows, replayCard: replay.card } : {}),
+    });
+  } catch (err) {
+    process.stderr.write(
+      `far research analyze: experiment failed (fail-closed): ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return 1;
+  }
+
+  const { observation, feedback, updatedRun } = experiment;
+
+  // 2. Apply the feedback: plan rewrite when triggered (real redesign, not a
+  //    chat-log append); otherwise the feedback is recorded without a rewrite.
+  let newPlan = updatedRun.plan;
+  const planChanges: string[] = [];
+  const unresolvedConflicts: string[] = [];
+  if (feedback.triggers.includes('plan_rewrite')) {
+    const primary = updatedRun.hypotheses.find((h) => h.id === updatedRun.plan.primaryHypothesisId);
+    if (primary === undefined) {
+      unresolvedConflicts.push('plan_rewrite triggered but primary hypothesis not found');
+    } else {
+      const alternatives = updatedRun.hypotheses.filter((h) => h.id !== primary.id);
+      const gateway = profile === 'competition_aliyun_qwen'
+        ? createCompetitionQwenGateway({ apiKey: process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY ?? '' })
+        : createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
+      try {
+        const redesigned = await designResearchPlan(gateway, profile, {
+          question: updatedRun.question,
+          primary,
+          alternatives,
+          corpus: updatedRun.corpus,
+          feedbackText: feedback.text,
+          stageId: 'research_plan_revision',
+        });
+        newPlan = redesigned.plan;
+        planChanges.push(
+          `plan rewritten per analysis feedback: objectives ${updatedRun.plan.objectives.length} → ${newPlan.objectives.length}`,
+        );
+      } catch (err) {
+        unresolvedConflicts.push(`plan_rewrite failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
+  const metricChanges: string[] = feedback.changesScore
+    ? ['score relevance re-evaluated per real-data observation (revision does NOT force improvement)']
+    : [];
+
+  const revision = createRevision({
+    parentRevisionId:
+      updatedRun.revisions.length > 0 ? updatedRun.revisions[updatedRun.revisions.length - 1]!.id : null,
+    number: updatedRun.revisions.length + 1,
+    feedback,
+    changes: {
+      hypothesisChanges: {
+        added: [],
+        removed: [],
+        downgraded: [...feedback.affectsHypothesisIds],
+      },
+      planChanges,
+      metricChanges,
+      unresolvedConflicts,
+    },
+    beforePlan: updatedRun.plan,
+    afterPlan: newPlan,
+  });
+
+  const finalRun: ResearchRun = {
+    ...updatedRun,
+    plan: newPlan,
+    revisions: [...updatedRun.revisions, revision],
+  };
+
+  const dir = dirname(outPath);
+  if (dir !== '.' && dir !== '') {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(outPath, JSON.stringify(finalRun, null, 2) + '\n', 'utf8');
+
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify({ observation, feedback, revisionId: revision.id, saved: outPath }, null, 2)}\n`,
+    );
+  } else {
+    process.stdout.write(
+      `far research analyze: observation collected (${observation.result.status}, n=${observation.result.n}, mode=${observation.mode})\n` +
+        `  result    : ${observation.result.summary}\n` +
+        `  feedback  : ${feedback.text.slice(0, 140)}${feedback.text.length > 140 ? '…' : ''}\n` +
+        `  triggers  : ${feedback.triggers.join(', ')} · changesScore=${feedback.changesScore}\n` +
+        `  revision  : #${revision.number} (${revision.id.slice(0, 8)}…) · planChanges=${planChanges.length} · unresolved=${unresolvedConflicts.length}\n` +
+        `  runMode   : ${finalRun.runMode} (experiment=${finalRun.modes.experimentExecutionMode})\n` +
+        `  saved     : ${outPath}   (compare: far research compare ${outPath})\n`,
+    );
+  }
   return 0;
 }
