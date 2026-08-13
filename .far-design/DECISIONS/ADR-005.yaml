@@ -1,0 +1,31 @@
+# ADR（§12.4）
+adr_id: ADR-005
+title: "架构风格：本地优先模块化单体"
+status: accepted
+context: "架构竞赛 A-G（utility_tournament_complexity.yaml）"
+facts: "现状单体满足核心约束（SPK-C/FF）"
+assumptions: "无多用户/分布式需求"
+forces: "分布能力 vs 复杂度"
+requirements: "DAT-001/ARC-001..007"
+quality_scenarios: "QS-PLT-02"
+options:
+  - "A 最小演进"
+  - "B 重排"
+  - "C 协议优先"
+  - "D CLI 核"
+  - "E Desktop"
+  - "F 服务端"
+  - "G 裁剪"
+simple_baseline: "单体+SQLite"
+decision: "A（现有结构最小演进）+G 部分（孤儿清理）"
+rationale: "复用 100%；零迁移；复杂度最低"
+positive_consequences: "零迁移风险"
+negative_consequences: "命名/局部重叠（DEBT-07 清理）"
+risks:
+  - "结构腐蚀（FF 机检）"
+prototype_evidence: "SPK-C/FF 实跑"
+migration: "无"
+rollback: "重排需 Complexity Credit"
+reopen_triggers:
+  - "结构矛盾出现"
+supersedes: null

@@ -1,0 +1,28 @@
+# ADR（§12.4）
+adr_id: ADR-008
+title: "导出格式 V1.1：九分量+ruleset URI+RO-Crate 兼容面"
+status: accepted
+context: "EVD-006 互操作；ADR-007 落地载体"
+facts: "ro-crate-metadata.json 已存在于九分量（exporter 头）；RO-Crate 1.1 stable（SRC-R1-01）"
+assumptions: "映射损失可接受"
+forces: "互操作红利 vs 映射损失"
+requirements: "EVD-006"
+quality_scenarios: "QS-EVD-02"
+options:
+  - "纯自研"
+  - "RO-Crate 原生"
+  - "自研+兼容映射"
+simple_baseline: "RO-Crate 直用（溯源全 SHOULD）"
+decision: "自研九分量为主体+RO-Crate 兼容元数据映射（损失登记：五值/reasonCodes 无原生表达）"
+rationale: "低成本互操作（CC-09 ACCEPTED）"
+positive_consequences: "生态可读"
+negative_consequences: "双格式认知成本"
+risks:
+  - "RO-Crate 版本漂移"
+prototype_evidence: "SRC-R1-01/02"
+migration: "exporter 增映射文件"
+rollback: "回滚=删映射文件"
+reopen_triggers:
+  - "RO-Crate 1.2"
+  - "映射错误报告"
+supersedes: null

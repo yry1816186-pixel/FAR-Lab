@@ -1,0 +1,16 @@
+# Decision Card（§23.6）
+decision_id: D-S5-01
+question: "10 个概念中收敛哪一个 Thesis 与冻结范围？（U-15 联动）"
+facts: "S1 事实基线（内核/CLI/证据链在产 E3）+ S2 主张账本 + S3 生态尽调（无裁决层重合者）+ S4 官方竞赛事实（可验证假设聚焦）+ SPK-A/B/C 三 Spike 全 SUPPORTED"
+assumptions: "VH-01..04（PROXY_RESEARCH 级）；CR-01 凭证可获；CLM-029 报名有效"
+options: "C-01..C-10（concept_contracts.yaml 全字段）；淘汰 C-03/C-04/C-08/C-10；Pareto C-05/C-07；前沿 C-01/C-02/C-06/C-09"
+simple_baseline: "8 基线 §10.6 统一任务对比：可证伪/离线验证/篡改定位三维全不可达→增量非 UI/自动化"
+evaluation_criteria: "§10.7 九视角盲评+11 硬淘汰项+§10.9 Thesis/Hero 冻结标准"
+prototype_evidence: "SPK-A 三生产路径离线真实运行+诚实降级自标注；SPK-B 第二领域 CONFIRMED/UNTESTED 双中；SPK-C 内核纯函数零副作用"
+decision: "Thesis=三问测谎仪（thesis_hero_freeze.yaml 全字段冻结）；范围=内核+CLI+证据链+导出为冻结核心，agent/API/frontend 为环绕层；Hero 主 HERO-TAMPER-PLUS 备 HERO-MULTISEED"
+why: "竞赛对齐（CR-02/03 官方导向）+简单基线可测增量+已在产证据强度+维护成本可控"
+tradeoffs: "环绕层不冻结=竞赛演示面（前端/API）不做验收硬门；C-05/C-07 资产保留非主方向"
+risks: "VH 全系 PROXY_RESEARCH；U-06/CLM-029 外部依赖；跨平台未证"
+migration: "无（首轮冻结）；环绕层若升级须走 CHANGE_IMPACT"
+rollback: "Thesis 重开触发器见 freeze 单；回滚=S5 文档不删，概念合同保留"
+reopen_trigger: "真实用户研究推翻假设/内核版本化实现矛盾/官方细则冲突/非目标被证核心"

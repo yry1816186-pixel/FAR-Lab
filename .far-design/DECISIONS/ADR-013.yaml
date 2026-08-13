@@ -1,0 +1,27 @@
+# ADR（§12.4）
+adr_id: ADR-013
+title: "Schema 策略：TS 类型 SSOT+JSON Schema 机器生成"
+status: accepted
+context: "平行事实源禁令；zod-to-json-schema 已在依赖"
+facts: "TS 类型为主形态；python 镜像需 conformance 守护"
+assumptions: "生成覆盖可达"
+forces: "单一源 vs 生成成本"
+requirements: "API-001..004"
+quality_scenarios: "QS-API-01"
+options:
+  - "TS SSOT+生成"
+  - "手写双份"
+  - "JSON Schema 为主"
+simple_baseline: "手写双份（禁）"
+decision: "TS 类型 SSOT；JSON Schema 机器生成；SDK 不建（无消费者）"
+rationale: "单一事实源纪律"
+positive_consequences: "漂移可机检"
+negative_consequences: "生成覆盖评估成本"
+risks:
+  - "生成覆盖不全"
+prototype_evidence: "cross_lang 测试"
+migration: "生成管线（实施合同）"
+rollback: "n/a"
+reopen_triggers:
+  - "SDK 消费者出现"
+supersedes: null

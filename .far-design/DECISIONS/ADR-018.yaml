@@ -1,0 +1,27 @@
+# ADR（§12.4）
+adr_id: ADR-018
+title: "恢复语义：stage_receipt 扩展为 checkpoint 原语"
+status: accepted
+context: "ISSUE-LATE-06 恢复未实测；长任务需求"
+facts: "stage_receipt.ts 存在；append-only 账本天然容错"
+assumptions: "收据粒度足够"
+forces: "恢复能力 vs 复杂度"
+requirements: "REL-001..007"
+quality_scenarios: "QS-REL-01"
+options:
+  - "stage_receipt 扩展"
+  - "外部工作流引擎"
+  - "无恢复"
+simple_baseline: "stage_receipt 现状"
+decision: "stage 完成即签收据；恢复=最近有效收据续跑；幂等=收据重放跳过"
+rationale: "最小复杂度满足恢复"
+positive_consequences: "简单可审计"
+negative_consequences: "非通用恢复"
+risks:
+  - "收据覆盖不全"
+prototype_evidence: "设计+实施合同"
+migration: "恢复 Spike（登记）"
+rollback: "n/a"
+reopen_triggers:
+  - "恢复失败证据"
+supersedes: null

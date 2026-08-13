@@ -1,0 +1,27 @@
+# ADR（§12.4）
+adr_id: ADR-002
+title: "第一用户与产品楔子"
+status: accepted
+context: "§10.9 冻结要求明确 Primary User 与 Product Wedge"
+facts: "USER-1..6（PROXY_RESEARCH）；CR-02/03 官方导向"
+assumptions: "评审在乎可验证性（VH-01）"
+forces: "竞赛场景 vs 产品场景"
+requirements: "BUS-002"
+quality_scenarios: "QS-BUS-01"
+options:
+  - "参赛团队优先"
+  - "研究者优先"
+  - "复现者优先"
+simple_baseline: "人工审查（不可扩展）"
+decision: "竞赛第一用户=参赛团队；产品第一用户=AI4S 研究者；楔子=离线自验证证明包+篡改可检"
+rationale: "两方共享同一信任问题（自证/判定）；楔子 60 秒可演示"
+positive_consequences: "两方需求一致化"
+negative_consequences: "真实用户未验证（PROXY_RESEARCH）"
+risks:
+  - "RSK-S5-01"
+prototype_evidence: "SPK-A"
+migration: "无"
+rollback: "重开=用户研究"
+reopen_triggers:
+  - "VH-01/02 被推翻"
+supersedes: null
