@@ -27,3 +27,4 @@ export * from './provenance.ts';
 export * from './researchability_gate.ts';
 export * from './revision.ts';
 export * from './experiment.ts';
+export * from './verification.ts';

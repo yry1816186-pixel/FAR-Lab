@@ -14,17 +14,13 @@ import { dirname, join } from 'node:path';
 import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
-import { createCorpusSnapshot, createReplayAdapter, CitationResolver } from '../../retrieval/index.ts';
-import { runResearch, selectPrimaryHypothesis } from '../../research/orchestrator.ts';
+import { createReplayAdapter } from '../../retrieval/index.ts';
+import { runResearch } from '../../research/orchestrator.ts';
 import { ResearchabilityBlockedError } from '../../research/researchability_gate.ts';
 import { buildFeedbackSignal, createRevision, compareResearchPlans } from '../../research/revision.ts';
 import { designResearchPlan } from '../../research/research_plan.ts';
-import { bindCitations } from '../../research/citation.ts';
-import {
-  buildScorecard,
-  computeDeterministicDimensions,
-  computeParetoFront,
-} from '../../research/scorecard.ts';
+import { verifyResearchRunDeterministic } from '../../research/verification.ts';
+import { computeRunMetrics } from '../../research/evaluation/metrics.ts';
 import { exportResearchBundle, researchBundleSha256 } from '../../research/export_bundle.ts';
 import { runPlanExperiment } from '../../research/experiment.ts';
 import { PACKAGE_ROOT } from '../../paths.ts';
@@ -307,61 +303,11 @@ export function runResearchVerify(args: readonly string[]): number {
     return 1;
   }
 
-  // Re-build the corpus snapshot + resolver from the stored documents.
-  const corpus = createCorpusSnapshot(run.corpus.documents, run.corpus.sourceQueries);
-  if (corpus.rootHash !== run.corpus.rootHash) {
-    process.stdout.write('far research verify: corpus rootHash MISMATCH (tampered corpus)\n');
-    return 7;
-  }
-  const resolver = new CitationResolver(corpus);
-
-  // Re-compute bindings + deterministic dimensions + scorecards.
-  const reScorecards: Record<string, ReturnType<typeof buildScorecard>> = {};
-  for (const h of run.hypotheses) {
-    const binding = bindCitations(h, resolver);
-    const storedBinding = run.bindings[h.id];
-    if (storedBinding === undefined || storedBinding.allBound !== binding.allBound) {
-      process.stdout.write(`far research verify: citation binding MISMATCH for ${h.id}\n`);
-      return 7;
+  const outcome = verifyResearchRunDeterministic(run);
+  if (outcome.status === 'FAIL') {
+    for (const f of outcome.failures) {
+      process.stderr.write(`far research verify: ${f}\n`);
     }
-    const deterministic = computeDeterministicDimensions(h, binding, run.critiques[h.id]);
-    reScorecards[h.id] = buildScorecard(
-      h.id,
-      deterministic,
-      run.scorecards[h.id]?.dimensions.filter((d) => d.source === 'model') ?? [],
-      false,
-      run.scorecards[h.id]?.keyEvidenceToChangeConclusion ?? '',
-    );
-  }
-  const pareto = computeParetoFront(reScorecards);
-  for (const id of Object.keys(reScorecards)) {
-    reScorecards[id] = { ...reScorecards[id]!, paretoOptimal: pareto.has(id) };
-  }
-
-  // Compare deterministic dimensions against stored (model dimensions excluded —
-  // they are LLM output and not independently recomputable).
-  for (const h of run.hypotheses) {
-    const stored = run.scorecards[h.id];
-    const recomputed = reScorecards[h.id];
-    if (stored === undefined || recomputed === undefined) continue;
-    const storedDet = stored.dimensions.filter((d) => d.source === 'deterministic');
-    const recomputedDet = recomputed.dimensions.filter((d) => d.source === 'deterministic');
-    if (JSON.stringify(storedDet) !== JSON.stringify(recomputedDet)) {
-      process.stdout.write(`far research verify: deterministic scorecard MISMATCH for ${h.id}\n`);
-      return 7;
-    }
-    if (stored.paretoOptimal !== recomputed.paretoOptimal) {
-      process.stdout.write(`far research verify: Pareto-front MISMATCH for ${h.id}\n`);
-      return 7;
-    }
-  }
-
-  // Re-derive the primary selection and check it matches the stored plan.
-  const primary = selectPrimaryHypothesis(run.hypotheses, reScorecards);
-  if (primary.id !== run.plan.primaryHypothesisId) {
-    process.stdout.write(
-      `far research verify: primary-hypothesis MISMATCH (recomputed ${primary.id}, stored ${run.plan.primaryHypothesisId})\n`,
-    );
     return 7;
   }
 
@@ -370,8 +316,8 @@ export function runResearchVerify(args: readonly string[]): number {
       JSON.stringify(
         {
           status: 'PASS',
-          verified: ['corpus_rootHash', 'citation_binding', 'deterministic_scorecard', 'pareto_front', 'primary_selection'],
-          notVerifiable: ['model_generation', 'model_critique_dimensions'],
+          verified: [...outcome.verified],
+          notVerifiable: [...outcome.notVerifiable],
         },
         null,
         2,
@@ -380,8 +326,8 @@ export function runResearchVerify(args: readonly string[]): number {
   } else {
     process.stdout.write(
       'far research verify: PASS (deterministic layer recomputed and matches)\n' +
-        '  verified: corpus_rootHash · citation_binding · deterministic_scorecard · pareto_front · primary_selection\n' +
-        '  not independently recomputable (by design): model_generation · model_critique_dimensions\n',
+        `  verified: ${outcome.verified.join(' · ')}\n` +
+        `  not independently recomputable (by design): ${outcome.notVerifiable.join(' · ')}\n`,
     );
   }
   return 0;
@@ -871,5 +817,63 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
         `  saved     : ${outPath}   (compare: far research compare ${outPath})\n`,
     );
   }
+  return 0;
+}
+
+/**
+ * Run `far research evaluate <run.json> [--json]`.
+ *
+ * Program-computed evaluation metrics (§14.3) + deterministic recompute. The
+ * frozen evaluation set (src/research/evaluation/frozen_eval_set.json) maps the
+ * question to its evidence profile; metrics are computed from the frozen run —
+ * never hand-edited. Human-rubric metrics are listed, not faked.
+ */
+export function runResearchEvaluate(args: readonly string[]): number {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('far research evaluate: missing <run.json>.\n  usage: far research evaluate <run.json> [--json]\n');
+    return 2;
+  }
+  const json = args.includes('--json');
+
+  let run: ResearchRun;
+  try {
+    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+  } catch (err) {
+    process.stderr.write(`far research evaluate: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+
+  const outcome = verifyResearchRunDeterministic(run);
+  const report = computeRunMetrics(
+    run,
+    outcome.status,
+    new Date().toISOString(),
+  );
+
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify({ ...report, verification: outcome }, null, 2)}\n`,
+    );
+    return 0;
+  }
+
+  const lines: string[] = [
+    '',
+    '  FAR-Lab · far research evaluate (program-computed metrics, §14.3)',
+    `  run: ${report.runId} · question: ${report.question}`,
+    '  ─────────────────────────────────────────────────────────────────────',
+  ];
+  for (const m of report.metrics) {
+    const v = typeof m.value === 'number' ? m.value.toFixed(3) : String(m.value);
+    lines.push(`  ${m.name.padEnd(34)} ${v}`);
+  }
+  lines.push(
+    `  ${'deterministicRecompute'.padEnd(34)} ${report.deterministicRecompute}`,
+    '  ─────────────────────────────────────────────────────────────────────',
+    `  human-rubric metrics (NOT auto-scored — blind review only): ${report.humanRubricMetrics.join(', ')}`,
+    '',
+  );
+  process.stdout.write(lines.join('\n'));
   return 0;
 }

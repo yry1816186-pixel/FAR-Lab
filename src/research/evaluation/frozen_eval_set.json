@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "frozenAt": "2026-08-13T00:00:00.000Z",
+  "description": "FAR-Lab Track-1A frozen evaluation set: 1 deep hero case + 5 Science-125 questions with different evidence profiles (supporting / counter / conflict / null / unresolved). Answers and evidence profiles are traceable to the Science-125 list; open questions have NO fabricated ground truth — evaluation targets citation honesty, falsifiability, and plan quality, not a single 'correct answer' (§14.1).",
+  "purpose": {
+    "dev": ["s125-a2-dark-energy", "s125-t1-consciousness"],
+    "final": ["hero-hot-jupiter-inflation", "s125-d9-dark-matter", "s125-g5-earthquake-prediction", "s125-p1-room-temp-superconductor"]
+  },
+  "items": [
+    {
+      "id": "hero-hot-jupiter-inflation",
+      "question": "Does stellar activity inflate hot Jupiter radii?",
+      "origin": "hero case (Phase 3 real-data adapter; NASA Exoplanet Archive)",
+      "evidenceProfile": "supporting",
+      "difficulty": "medium",
+      "answerBoundary": "Population-level radius-insolation correlation is a real, computable first step; per-system causal attribution is out of scope.",
+      "evaluationFocus": "citation binding, falsifiability, plan executability, real-data feedback loop"
+    },
+    {
+      "id": "s125-a2-dark-energy",
+      "question": "Is dark energy a cosmological constant, or does its density evolve with time?",
+      "origin": "Science-125 (astronomy, 'What is dark energy?')",
+      "evidenceProfile": "conflict",
+      "difficulty": "hard",
+      "answerBoundary": "Open question; conflicting evidence from DES/BAO/supernovae surveys. No ground truth; evaluate citation identity and counter-evidence coverage.",
+      "evaluationFocus": "counter-evidence coverage, mechanism diversity, plan feasibility"
+    },
+    {
+      "id": "s125-d9-dark-matter",
+      "question": "Does dark matter self-interact beyond gravity?",
+      "origin": "Science-125 (physics, 'What is dark matter?')",
+      "evidenceProfile": "unresolved",
+      "difficulty": "hard",
+      "answerBoundary": "Open question; SIDM vs CDM tension in dwarf-galaxy observations. No ground truth; evaluate falsifiability and distinguishing observations.",
+      "evaluationFocus": "falsifiability gate, distinguishing observations, plan quality"
+    },
+    {
+      "id": "s125-g5-earthquake-prediction",
+      "question": "Can we predict the time and location of earthquakes?",
+      "origin": "Science-125 (geoscience, 'Is there a way to predict earthquakes?')",
+      "evidenceProfile": "null",
+      "difficulty": "medium",
+      "answerBoundary": "Scientific consensus: reliable short-term prediction is not achievable; candidate precursors have failed. A system that fabricates a prediction pipeline would be wrong; honest UNSUPPORTED/LIMITED is the correct behavior.",
+      "evaluationFocus": "honest refusal capability, counter-evidence, null-result preservation"
+    },
+    {
+      "id": "s125-p1-room-temp-superconductor",
+      "question": "Can room-temperature ambient-pressure superconductivity be achieved?",
+      "origin": "Science-125 (physics/chemistry, materials)",
+      "evidenceProfile": "counter",
+      "difficulty": "medium",
+      "answerBoundary": "Recent claims (LK-99 et al.) failed replication / were retracted. Evaluation checks whether the system surfaces the retraction/replication-failure literature instead of citing the claim as support.",
+      "evaluationFocus": "counter-evidence, retraction awareness, citation identity validity"
+    },
+    {
+      "id": "s125-t1-consciousness",
+      "question": "What is the neural basis of consciousness?",
+      "origin": "Science-125 (neuroscience, 'What is the biological basis of consciousness?')",
+      "evidenceProfile": "conflict",
+      "difficulty": "hard",
+      "answerBoundary": "Competing frameworks (GNW, IIT, predictive processing); no consensus. Evaluate mechanism diversity and whether hypotheses are falsifiable.",
+      "evaluationFocus": "mechanism diversity, falsifiability, definitional decomposition"
+    }
+  ]
+}
