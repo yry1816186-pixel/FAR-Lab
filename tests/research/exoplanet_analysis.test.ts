@@ -89,14 +89,14 @@ describe('analyzeRadiusInsolation (honest status semantics)', () => {
     const rows = Array.from({ length: 20 }, (_, i) => row({ plName: `p${i}` }));
     rows.push(row({ plName: 'missing-teff', stellarTeffK: null }));
     rows.push(row({ plName: 'missing-mass', stellarMassMsun: null }));
-    const obs = analyzeRadiusInsolation(rows, { minRadiusEarth: 6, maxPeriodDays: 10, confidenceLevel: 0.95 }, '2026-08-13T00:00:00.000Z');
+    const obs = analyzeRadiusInsolation(rows, { minRadiusEarth: 6, maxPeriodDays: 10, confidenceLevel: 0.95, source: 'default' }, '2026-08-13T00:00:00.000Z');
     assert.equal(obs.status, 'PARTIAL');
     assert.equal(obs.excludedMissing, 2);
     assert.equal(obs.n, 20);
   });
 
   test('small sample → FAILED (never a fake conclusion)', () => {
-    const obs = analyzeRadiusInsolation([row()], { minRadiusEarth: 6, maxPeriodDays: 10, confidenceLevel: 0.95 }, '2026-08-13T00:00:00.000Z');
+    const obs = analyzeRadiusInsolation([row()], { minRadiusEarth: 6, maxPeriodDays: 10, confidenceLevel: 0.95, source: 'default' }, '2026-08-13T00:00:00.000Z');
     assert.equal(obs.status, 'FAILED');
     assert.equal(obs.pearsonR, null);
     assert.match(obs.summary, /insufficient sample/);
@@ -104,10 +104,11 @@ describe('analyzeRadiusInsolation (honest status semantics)', () => {
 
   test('deterministic: same rows → same observation (including inputHash)', () => {
     const rows = Array.from({ length: 15 }, (_, i) => row({ plName: `p${i}`, radiusEarth: 8 + i }));
-    const a = analyzeRadiusInsolation(rows, { minRadiusEarth: 6, maxPeriodDays: 10, confidenceLevel: 0.95 }, 'T');
-    const b = analyzeRadiusInsolation(rows, { minRadiusEarth: 6, maxPeriodDays: 10, confidenceLevel: 0.95 }, 'T');
+    const a = analyzeRadiusInsolation(rows, { minRadiusEarth: 6, maxPeriodDays: 10, confidenceLevel: 0.95, source: 'default' }, 'T');
+    const b = analyzeRadiusInsolation(rows, { minRadiusEarth: 6, maxPeriodDays: 10, confidenceLevel: 0.95, source: 'default' }, 'T');
     assert.equal(a.inputHash, b.inputHash);
     assert.equal(a.pearsonR, b.pearsonR);
     assert.deepEqual(a.confidenceInterval, b.confidenceInterval);
   });
 });
+

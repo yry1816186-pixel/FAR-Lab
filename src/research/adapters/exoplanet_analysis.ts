@@ -33,6 +33,8 @@ export interface RadiusInsolationAnalysisParams {
   readonly maxPeriodDays: number;
   /** Confidence level for the r CI (e.g. 0.95). */
   readonly confidenceLevel: number;
+  /** Where the parameters came from (the frozen plan, or a built-in default). */
+  readonly source: 'plan' | 'default';
 }
 
 /** One analyzed system (insolation + radius, both non-null). */

@@ -5,7 +5,7 @@
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { interpretObservation, runPlanExperiment, type Observation } from '../../src/research/experiment.ts';
+import { extractPlanParameters, interpretObservation, runPlanExperiment, type Observation } from '../../src/research/experiment.ts';
 import { analyzeRadiusInsolation } from '../../src/research/adapters/exoplanet_analysis.ts';
 import type { PsRow, ExoplanetDatasetCard } from '../../src/research/adapters/exoplanet_dataset.ts';
 import type { ResearchRun } from '../../src/research/types.ts';
@@ -19,6 +19,7 @@ function makeObservation(
     minRadiusEarth: minRadius,
     maxPeriodDays: maxPeriod,
     confidenceLevel: 0.95,
+    source: 'default',
   }, '2026-08-13T00:00:00.000Z');
   const card: ExoplanetDatasetCard = {
     source: 'test',
@@ -195,5 +196,59 @@ describe('runPlanExperiment (replay path)', () => {
     // needed: the replay path already covers the aggregate contract.
     // The MIXED case is covered by the live CLI smoke (see PROGRESS.md).
     assert.ok(true);
+  });
+});
+
+describe('extractPlanParameters (plan → adapter inputs)', () => {
+  const plan = (variables: string[] = []): ResearchRun['plan'] => ({
+    objectives: [],
+    primaryHypothesisId: 'h1',
+    alternativeHypothesisIds: [],
+    preregisteredPredictions: [],
+    dataRequirements: [],
+    inclusionExclusionCriteria: [],
+    variables,
+    design: 'd',
+    analysisDag: [],
+    tools: [],
+    statisticalMethods: [],
+    sampleSizeRationale: 's',
+    multiplicityHandling: 'm',
+    missingOutlierStrategy: 'x',
+    stoppingConditions: [],
+    checkpoints: [],
+    budget: 'b',
+    risks: [],
+    reproducibility: [],
+    nextRoundDecisionRules: [],
+    humanApprovalRequired: [],
+  });
+
+  test('plan variables drive the adapter parameters (directive §11.4)', () => {
+    const p = extractPlanParameters(
+      plan([
+        'radius > 8 R_earth (planet radius)',
+        'max_period: 5 days (orbital period)',
+        'confidence_level: 0.90',
+      ]),
+    );
+    assert.equal(p.minRadiusEarth, 8);
+    assert.equal(p.maxPeriodDays, 5);
+    assert.equal(p.confidenceLevel, 0.9);
+    assert.equal(p.source, 'plan');
+  });
+
+  test('silent plan → documented defaults, honestly labeled', () => {
+    const p = extractPlanParameters(plan([]));
+    assert.equal(p.minRadiusEarth, 6);
+    assert.equal(p.maxPeriodDays, 10);
+    assert.equal(p.confidenceLevel, 0.95);
+    assert.equal(p.source, 'default');
+  });
+
+  test('garbage values fall back to defaults (never NaN)', () => {
+    const p = extractPlanParameters(plan(['max_period: banana', 'confidence_level: 99']));
+    assert.equal(p.maxPeriodDays, 10);
+    assert.equal(p.confidenceLevel, 0.95);
   });
 });

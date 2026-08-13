@@ -407,6 +407,7 @@ export const RadiusInsolationObservationZod = z.object({
     minRadiusEarth: z.number(),
     maxPeriodDays: z.number(),
     confidenceLevel: z.number(),
+    source: z.enum(['plan', 'default']),
   }),
   inputHash: z.string(),
   analyzedAt: z.string(),
