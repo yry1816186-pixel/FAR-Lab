@@ -146,6 +146,12 @@ export interface AskRender {
     readonly perQueryCounts: ReadonlyArray<{ readonly query: string; readonly count: number }>;
     readonly fetchMode: 'live' | 'replay';
     readonly groundedAt: string;
+    readonly citationCrossCheck: {
+      readonly citedDoiCount: number;
+      readonly inCorpus: readonly string[];
+      readonly notInCorpus: readonly string[];
+      readonly allInCorpus: boolean;
+    } | null;
   } | null;
 }
 
