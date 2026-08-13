@@ -154,6 +154,37 @@ synthetic fixtures (`runMode=RECORDED_REPLAY`) — this proves the pipeline *wir
 deterministic scoring, Pareto front, plan design), **not** any scientific truth. The deterministic
 verification kernel (`far demo`, `far verify-golden`, `far verify`) runs fully offline with zero key.
 
+### The Track-1A research loop (three-minute walkthrough)
+
+```bash
+# 1. Run the vertical slice (researchability gate → grounding → hypotheses → critique → plan).
+#    Live retrieval works WITHOUT a key (OpenAlex is free); only the model call needs one.
+node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
+
+# 2. Real-data analysis against the NASA Exoplanet Archive (live TAP fetch):
+node src/cli/far.ts research analyze run.json --live
+#   → n=392 hot Jupiters, r=0.587, p<0.001 (association, not causation — honest wording)
+
+# 3. Apply expert feedback → immutable revision → compare the before/after plan:
+node src/cli/far.ts research feedback run.json --file feedback.json
+node src/cli/far.ts research compare run.json
+
+# 4. Program-computed metrics + deterministic recompute:
+node src/cli/far.ts research evaluate run.json
+
+# 5. Export a hash-pinned bundle + third-party verify (tamper → exit 7):
+node src/cli/far.ts research export run.json --out bundle
+node src/cli/far.ts research verify bundle
+
+# 6. The same loop is available as a Web workbench + REST API:
+#    pnpm api  →  http://localhost:3000/research  (or POST /api/v1/research)
+```
+
+The loop is **honest about its modes**: every stage records `modelExecutionMode` /
+`retrievalExecutionMode` / `experimentExecutionMode`; the aggregate `runMode` is `LIVE` only when
+every science-affecting component is live — otherwise `MIXED` / `RECORDED_REPLAY` is shown, never
+disguised as live.
+
 ---
 
 ## How it compares

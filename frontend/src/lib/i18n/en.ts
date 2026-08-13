@@ -797,4 +797,6 @@ export const en: Record<MessageKey, string> = {
   'research.showEvaluate': 'Compute metrics',
   'research.hideEvaluate': 'Hide metrics',
   'research.deterministicRecompute': 'Deterministic recompute',
+  'overview.quick.research.title': 'Research Workbench',
+  'overview.quick.research.desc': 'Question → candidate hypotheses → research plan → feedback revision (Track-1A main flow)',
 };

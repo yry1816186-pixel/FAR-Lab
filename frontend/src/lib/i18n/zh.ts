@@ -794,6 +794,8 @@ export const zh = {
   'research.showEvaluate': '计算指标',
   'research.hideEvaluate': '收起指标',
   'research.deterministicRecompute': '确定性重算',
+  'overview.quick.research.title': '科研工作台',
+  'overview.quick.research.desc': '科学问题 → 候选假设 → 研究计划 → 反馈修订（Track-1A 主流程）',
 } as const;
 
 export type MessageKey = keyof typeof zh;
