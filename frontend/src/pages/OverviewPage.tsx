@@ -11,6 +11,7 @@ import {
   ScrollText,
   Network,
   ShieldCheck,
+  FlaskConical,
   ArrowRight,
   Inbox,
 } from 'lucide-react';
@@ -25,11 +26,12 @@ import type { V2StoredReceipt } from '@/lib/types';
 
 const QUICK_ENTRIES: readonly {
   readonly to: string;
-  readonly titleKey: 'overview.quick.wizard.title' | 'overview.quick.v2receipt.title' | 'overview.quick.viz.title' | 'overview.quick.integrity.title';
-  readonly descKey: 'overview.quick.wizard.desc' | 'overview.quick.v2receipt.desc' | 'overview.quick.viz.desc' | 'overview.quick.integrity.desc';
+  readonly titleKey: 'overview.quick.research.title' | 'overview.quick.wizard.title' | 'overview.quick.v2receipt.title' | 'overview.quick.viz.title' | 'overview.quick.integrity.title';
+  readonly descKey: 'overview.quick.research.desc' | 'overview.quick.wizard.desc' | 'overview.quick.v2receipt.desc' | 'overview.quick.viz.desc' | 'overview.quick.integrity.desc';
   readonly icon: typeof Sparkles;
   readonly testId: string;
 }[] = [
+  { to: '/research', titleKey: 'overview.quick.research.title', descKey: 'overview.quick.research.desc', icon: FlaskConical, testId: 'quick-research' },
   { to: '/wizard', titleKey: 'overview.quick.wizard.title', descKey: 'overview.quick.wizard.desc', icon: Sparkles, testId: 'quick-wizard' },
   { to: '/v2-receipt', titleKey: 'overview.quick.v2receipt.title', descKey: 'overview.quick.v2receipt.desc', icon: ScrollText, testId: 'quick-v2receipt' },
   { to: '/viz', titleKey: 'overview.quick.viz.title', descKey: 'overview.quick.viz.desc', icon: Network, testId: 'quick-viz' },
