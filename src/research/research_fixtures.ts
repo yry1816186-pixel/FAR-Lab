@@ -76,6 +76,55 @@ export const RESEARCH_DEMO_DOCS: readonly RetrievedDocument[] = [DOC_A, DOC_B];
 
 /** The offline_replay fixture registry for the research module (stageId → JSON). */
 export const RESEARCH_DEMO_FIXTURES: Readonly<Record<string, string>> = Object.freeze({
+  research_decompose: JSON.stringify({
+    knownFacts: [
+      'Hot Jupiters show measured radii larger than standard structure models predict',
+      'Stellar activity (starspots, faculae) biases transit-derived parameters',
+    ],
+    unknownVariables: [
+      'The fraction of the radius anomaly attributable to contamination',
+      'The true radius distribution after activity correction',
+    ],
+    keyDefinitions: [
+      'radius anomaly: observed radius minus model radius for a given mass/insolation',
+      'activity index: normalized chromospheric emission proxy (e.g. S_HK)',
+    ],
+    observables: [
+      'transit depth time series',
+      'stellar activity indices',
+      'insolation flux and orbital eccentricity',
+    ],
+    candidateMechanisms: [
+      'unocculted starspot contamination',
+      'tidal heating and internal energy deposition',
+      'correlated (red) photometric noise',
+    ],
+    mainstreamTheories: [
+      'irradiation-driven atmospheric inflation',
+      'tidal dissipation inflation',
+    ],
+    alternativeTheories: [
+      'systematic biases in transit fitting',
+    ],
+    retrievalSubquestions: [
+      'hot Jupiter radius inflation starspot contamination',
+      'hot Jupiter tidal heating radius anomaly',
+      'transit photometry red noise systematic bias',
+    ],
+    confounders: [
+      'activity-inflation correlation confounded by common dependence on stellar type',
+    ],
+    dataRequirements: [
+      'homogeneous transit sample with activity proxies',
+      'multi-band photometry to break degeneracies',
+    ],
+    falsifiabilityConditions: [
+      'inflation persists after spot correction would falsify the artifact hypothesis',
+    ],
+    indistinguishableScenarios: [
+      'tidal inflation and irradiation inflation may be indistinguishable in low-eccentricity samples',
+    ],
+  }),
   research_hypotheses: JSON.stringify({
     hypotheses: [
       {

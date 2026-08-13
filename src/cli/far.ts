@@ -987,12 +987,14 @@ USAGE:
 
   far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>]
                    [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]
-                         Track-1A vertical slice (赛道一·方向一·A): ground the question in real
-                         literature (supporting + counter-evidence) → CorpusSnapshot → generate 3-5
+                         Track-1A vertical slice (赛道一·方向一·A): researchability & safety gate →
+                         ground the question in real literature (supporting + counter-evidence +
+                         decomposition subquestions) → CorpusSnapshot → generate 3-5
                          mechanistically-distinct candidate hypotheses (corpus-injected, citation
                          allowlist) → independent critique → deterministic scorecard + Pareto front →
-                         executable research plan. Citations must bind to the corpus; scoring is
-                         deterministic + independently critiqued (no single model total score).
+                         executable research plan. Every stage records a ProvenanceReceipt (provider
+                         request id / token usage / corpus hashes / git commit); citations must bind
+                         to the corpus; scoring never uses a single model total score.
     --source <s>        openalex (default) | arxiv | crossref
     --max-per-query <n> docs per query, 1..25 (default 5)
     --profile <p>       offline_replay (default; synthetic fixtures, RECORDED_REPLAY) |
@@ -1000,7 +1002,7 @@ USAGE:
     --target <n>        hypothesis count 3..5 (default 3)
     --json              machine-readable ResearchRun output
     --out <file>        save the ResearchRun JSON
-    exits 0 success · 1 pipeline failure · 2 bad args
+    exits 0 success · 1 pipeline failure · 2 bad args · 3 gate refused (UNSUPPORTED — no pipeline ran)
 
   far research inspect <run.json> [--json]
                          print a saved ResearchRun (hypotheses · scorecards · plan · run modes)
