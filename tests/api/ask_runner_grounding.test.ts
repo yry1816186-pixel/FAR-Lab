@@ -79,6 +79,17 @@ test('Phase 4b: WITH --ground → result carries a GroundingReport (corpus + cou
     assert.match(g.corpusSnapshotId, /^[0-9a-f]{64}$/, 'snapshotId is a sha256');
     assert.match(g.corpusRootHash, /^[0-9a-f]{64}$/, 'rootHash is a sha256');
     assert.ok(g.groundedAt.length > 0);
+    // Post-loop citation cross-check (K3 thesis): the loop's cited DOIs are split
+    // into inCorpus (resolve in the grounding corpus) vs notInCorpus (unbound).
+    // null when the loop cited no DOIs (offline_replay fixture may carry none).
+    assert.ok(g.citationCrossCheck === null || typeof g.citationCrossCheck.citedDoiCount === 'number');
+    if (g.citationCrossCheck !== null) {
+      assert.equal(
+        g.citationCrossCheck.inCorpus.length + g.citationCrossCheck.notInCorpus.length,
+        g.citationCrossCheck.citedDoiCount,
+        'every cited DOI is classified in vs not-in corpus',
+      );
+    }
   } finally {
     db.close();
   }
