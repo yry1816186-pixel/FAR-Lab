@@ -51,6 +51,12 @@ export interface DesignPlanOptions {
   readonly corpus: CorpusSnapshot;
   /** Optional feedback to incorporate into the revised plan (revision pass). */
   readonly feedbackText?: string;
+  /**
+   * Override the fixture/stage key (offline_replay registry matches on this).
+   * Revision passes use 'research_plan_revision' so the offline demo shows a
+   * REAL plan diff; live adapters ignore the label.
+   */
+  readonly stageId?: string;
 }
 
 /**
@@ -95,10 +101,16 @@ export async function designResearchPlan(
       : []),
   ].join('\n');
 
-  const { data: body, meta } = await callStructuredJson(gateway, profile, 'research_plan', PlanBodyZod, [
-    { role: 'system', content: system },
-    { role: 'user', content: user },
-  ]);
+  const { data: body, meta } = await callStructuredJson(
+    gateway,
+    profile,
+    opts.stageId ?? 'research_plan',
+    PlanBodyZod,
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  );
 
   return {
     plan: {
