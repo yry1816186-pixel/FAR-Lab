@@ -21,6 +21,7 @@ import { buildFeedbackSignal, compareResearchPlans } from '../../research/revisi
 import { applyFeedbackToRun } from '../../research/application.ts';
 import { verifyResearchRunDeterministic } from '../../research/verification.ts';
 import { computeRunMetrics } from '../../research/evaluation/metrics.ts';
+import { runAllBaselines } from '../../research/evaluation/baseline.ts';
 import { exportResearchBundle, researchBundleSha256 } from '../../research/export_bundle.ts';
 import { runPlanExperiment } from '../../research/experiment.ts';
 import { loadExoplanetReplayRows } from '../../research/adapters/exoplanet_replay.ts';
@@ -724,4 +725,100 @@ export function runResearchEvaluate(args: readonly string[]): number {
   );
   process.stdout.write(lines.join('\n'));
   return 0;
+}
+
+/**
+ * Run `far research baseline "<question>" [--profile ...] [--json]`.
+ *
+ * Four fair baselines (§14.2) with the same model + question: direct answer,
+ * simple RAG, no-deterministic-kernel agent, and the full system. Offline
+ * (offline_replay) each replays its fixture — the report says so. Live needs
+ * the profile API key.
+ */
+export async function runResearchBaseline(args: readonly string[]): Promise<number> {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('far research baseline: missing <question>.\n  usage: far research baseline "<question>" [--profile offline_replay|competition_aliyun_qwen] [--json]\n');
+    return 2;
+  }
+  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : 'offline_replay';
+  const profile = profileArg === 'competition_aliyun_qwen' ? 'competition_aliyun_qwen' : 'offline_replay';
+  const json = args.includes('--json');
+
+  const gateway = profile === 'competition_aliyun_qwen'
+    ? createCompetitionQwenGateway({ apiKey: process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY ?? '' })
+    : createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
+  const replayAdapter = profile === 'competition_aliyun_qwen'
+    ? undefined
+    : createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS);
+
+  let fullRun: ResearchRun | undefined;
+  try {
+    fullRun = await runResearch({
+      question: file,
+      gateway,
+      profile,
+      grounding: {
+        source: 'openalex',
+        maxPerQuery: 5,
+        ...(replayAdapter !== undefined ? { adapter: replayAdapter } : {}),
+      },
+      targetHypothesisCount: 3,
+      sameModelAsGenerator: true,
+    });
+  } catch (err) {
+    if (err instanceof ResearchabilityBlockedError) {
+      process.stderr.write(`far research baseline: gate refused (${err.report.verdict}): ${err.report.reasons.join('; ')}\n`);
+      return 3;
+    }
+    process.stderr.write(`far research baseline: full run failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+
+  try {
+    const entries = await runAllBaselines({
+      question: file,
+      gateway,
+      profile,
+      ...(replayAdapter !== undefined ? { adapter: replayAdapter } : {}),
+      fullRun,
+    });
+
+    if (json) {
+      process.stdout.write(
+        `${JSON.stringify({ question: file, mode: fullRun.runMode, entries }, null, 2)}\n`,
+      );
+      return 0;
+    }
+
+    const lines: string[] = [
+      '',
+      '  FAR-Lab · far research baseline — 4 fair baselines, same model + question (§14.2)',
+      `  question: ${file} · full runMode: ${fullRun.runMode}`,
+      '  ─────────────────────────────────────────────────────────────────────',
+    ];
+    const header = '  kind      | mode             | hyps | corpus | binding | unbound | kernel';
+    lines.push(header);
+    lines.push('  ' + '-'.repeat(header.length - 2));
+    for (const e of entries) {
+      const binding = e.citationBindingRate === null ? 'N/A' : e.citationBindingRate.toFixed(2);
+      const hyps = e.hypothesisCount === null ? 'N/A' : String(e.hypothesisCount);
+      const corpus = e.corpusDocumentCount === null ? 'N/A' : String(e.corpusDocumentCount);
+      const unbound = e.unboundEvidenceCount === null ? 'N/A' : String(e.unboundEvidenceCount);
+      lines.push(
+        `  ${e.kind.padEnd(9)} | ${e.mode.padEnd(16)} | ${hyps.padEnd(4)} | ${corpus.padEnd(6)} | ${binding.padEnd(7)} | ${unbound.padEnd(7)} | ${e.deterministicKernelRan ? 'yes' : 'no'}`,
+      );
+    }
+    lines.push(
+      '  ─────────────────────────────────────────────────────────────────────',
+      '  note: N/A = the variant does not possess that capability (reported honestly,',
+      '        not scored as zero). Live comparison needs --profile competition_aliyun_qwen.',
+      '',
+    );
+    process.stdout.write(lines.join('\n'));
+    return 0;
+  } catch (err) {
+    process.stderr.write(`far research baseline: failed — ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
 }

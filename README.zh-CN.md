@@ -1,10 +1,19 @@
 # FAR-Lab
 
-**可证伪 · 篡改可检测 · 可独立复算的 AI for Science 研究框架**
+**一个证据约束、可证伪、可迭代、可追溯的开源 AI Scientist 科研系统。**
 
-> FAR-Lab 是面向 AI4S 科学声明的**声明级验证层**。它不追求「全自动科学家」叙事，而是用
-> 确定性裁决内核与内容寻址证据链，把 LLM 产出的假设约束在**可证伪、可复算、可追溯**的工程
-> 边界内。
+> 🎯 **一句话：FAR-Lab 是一个证据约束、可证伪、可迭代、可追溯、可复现边界清楚的开源 AI Scientist
+> 研究系统——它从科学问题出发，调用真实文献与数据源生成并比较候选假设，设计可执行研究计划，
+> 吸收人工/文献/工具反馈完成修订，并通过确定性验证内核和内容寻址证据链约束模型幻觉与科研表演。**
+>
+> 产品关系（赛道一·方向一·A：科学假设生成与研究计划设计）：
+> ```text
+> AI Scientist 科研生成、证据整合与研究规划主系统   (far research: 生成候选假设 + 比较 + 研究计划)
+>                          ↓
+> FAR-Lab 确定性可信验证内核                        (R0–R9 裁决 / FEC 可证伪契约 / 内容寻址证据链)
+>                          ↓
+> 可追溯证据、裁决、版本与复现包                    (.far-proof / ProofEnvelope / 第三方独立重算)
+> ```
 >
 > 🇬🇧 English: [README.md](README.md)
 
@@ -73,6 +82,38 @@ node src/cli/far.ts verify /tmp/tampered
 
 ---
 
+## Track-1A 科研主流程（三分钟 walkthrough）
+
+```bash
+# 1. 运行纵向切片（研究可行性门 → 真实文献检索 → 3-5 个候选假设 → 独立批判 → 研究计划）。
+#    检索无需 key（OpenAlex 免费）；只有模型调用需要 key。
+node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
+
+# 2. 真实数据分析（NASA Exoplanet Archive live TAP 抓取）：
+node src/cli/far.ts research analyze run.json --live
+#   → n=392 颗热木星，r=0.587，p<0.001（相关性≠因果——如实表述）
+
+# 3. 专家反馈 → 不可变修订 → 前后计划比较：
+node src/cli/far.ts research feedback run.json --file feedback.json
+node src/cli/far.ts research compare run.json
+
+# 4. 程序化指标 + 确定性重算：
+node src/cli/far.ts research evaluate run.json
+
+# 5. 导出哈希钉住的复现包 + 第三方验证（篡改 → exit 7）：
+node src/cli/far.ts research export run.json --out bundle
+node src/cli/far.ts research verify bundle
+
+# 6. 同样的闭环可通过 Web 工作台 + REST API 使用：
+#    pnpm api  →  http://localhost:3000/research  （或 POST /api/v1/research）
+```
+
+**运行模式诚实标注**：每个阶段记录 `modelExecutionMode` / `retrievalExecutionMode` /
+`experimentExecutionMode`；聚合 `runMode` 仅当所有影响科学的组件均为 live 时才为 `LIVE`，
+否则如实显示 `MIXED` / `RECORDED_REPLAY`，绝不伪装成 live。
+
+---
+
 ## 项目解决什么问题
 
 大模型生成的科学假设普遍存在三类问题：**不可证伪**（无法被实验否定）、**不可复现**
@@ -91,7 +132,8 @@ node src/cli/far.ts verify /tmp/tampered
 
 - ❌ **不**证明科学真理。demo 裁决由 **offline fixture** 产出，非真实科学裁决。
 - ❌ **不**用 LLM 作最终裁决者。LLM 生成假设；确定性 R0–R9 内核裁决。
-- ❌ **不是**通用 AI4S benchmark。它是验证层。
+- ❌ **不是**「全自动科学家」——假设/计划生成器与验证器是分离角色，研究计划的
+  `humanApprovalRequired`（人工批准门）是一等公民。
 - ❌ **不**声称物理不可篡改或完全可复现——见「已知边界」。
 
 ---
@@ -130,6 +172,10 @@ FEC 编排 → 内核裁决 → fail-closed 密封。要验证持久化 bundle�
 ```bash
 export DASHSCOPE_API_KEY=sk-...          # 切勿提交；见 SECURITY.md
 node src/cli/far.ts ask "<question>" --profile competition_aliyun_qwen
+
+# Track-1A 代表性 live 路径：真实 Qwen 生成 + 真实 OpenAlex 检索一次完成
+node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" \
+  --profile competition_aliyun_qwen --source openalex
 ```
 
 核心门与 offline demo **无需**此 key 即可运行。CI 的 `competition_qwen_smoke` 是条件门，无 key
