@@ -1,0 +1,26 @@
+# ADR（§12.4）
+adr_id: ADR-006
+title: "项目结构：维持现状+Fitness Functions 固化"
+status: accepted
+context: "§13 先恢复依赖再移动；现状 18 顶层模块"
+facts: "FACT_MAP 31 条目；Domain Core 无 UI/DB/Provider 依赖（SPK-C）"
+assumptions: "依赖规则可被机检固化"
+forces: "重排收益 vs 风险"
+requirements: "ARC-001..007"
+quality_scenarios: "FF-01..13"
+options:
+  - "A 维持+FF"
+  - "B packages/ 重排"
+simple_baseline: "维持+FF"
+decision: "维持现状；scripts/fitness_functions.mjs 机检依赖规则"
+rationale: "§13.3 不同时多变更；重排无净收益"
+positive_consequences: "零风险"
+negative_consequences: "结构债务靠 FF 监控"
+risks:
+  - "FF 覆盖不全"
+prototype_evidence: "FF 实跑 exit 0"
+migration: "无"
+rollback: "n/a"
+reopen_triggers:
+  - "FF 红"
+supersedes: null
