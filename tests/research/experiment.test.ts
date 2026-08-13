@@ -158,7 +158,19 @@ describe('runPlanExperiment (replay path)', () => {
     modes: { modelExecutionMode: 'RECORDED_REPLAY', retrievalExecutionMode: 'RECORDED_REPLAY', experimentExecutionMode: 'NOT_EXECUTED' },
     runMode: 'RECORDED_REPLAY',
     startedAt: 't',
-    schemaVersion: 2,
+    schemaVersion: 3,
+    citationGate: {
+      boundRate: 1,
+      totalCited: 0,
+      boundCount: 0,
+      unboundEvidenceCount: 0,
+      resolvedViaRetrieval: [],
+      perHypothesis: {},
+      primaryRequiresAllBound: true,
+      primaryAllBound: false,
+      gateVerdict: 'PASS',
+    },
+    falsifiabilityGate: { perHypothesis: {}, allPassed: true },
   };
 
   test('appends an observation, marks experiment mode, keeps aggregate honest', async () => {

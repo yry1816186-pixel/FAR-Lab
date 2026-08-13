@@ -83,7 +83,19 @@ function minimalRun(overrides: Partial<ResearchRun> = {}): ResearchRun {
     },
     runMode: 'RECORDED_REPLAY',
     startedAt: '2026-08-13T00:00:00.000Z',
-    schemaVersion: 2,
+    schemaVersion: 3,
+    citationGate: {
+      boundRate: 1,
+      totalCited: 0,
+      boundCount: 0,
+      unboundEvidenceCount: 0,
+      resolvedViaRetrieval: [],
+      perHypothesis: {},
+      primaryRequiresAllBound: true,
+      primaryAllBound: false,
+      gateVerdict: 'PASS',
+    },
+    falsifiabilityGate: { perHypothesis: {}, allPassed: true },
     ...overrides,
   } satisfies ResearchRun;
 }

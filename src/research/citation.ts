@@ -9,10 +9,13 @@
  */
 
 import type { CitationResolver } from '../retrieval/citation_resolver.ts';
+import { buildEvidenceRelations } from './citation_gate.ts';
 import type { CitationBinding, HypothesisCandidate } from './types.ts';
 
 /**
  * Bind a candidate's supporting + counter-evidence citations to the corpus.
+ * Also derives the claim↔document evidence relations (supports/contradicts,
+ * bound/unbound) — pure set-membership, no LLM, no I/O.
  */
 export function bindCitations(
   candidate: HypothesisCandidate,
@@ -21,7 +24,7 @@ export function bindCitations(
   const supporting = resolver.validate(candidate.supportingCitations);
   const counter = resolver.validate(candidate.counterEvidenceCitations);
   const unbound = [...new Set([...supporting.unbound, ...counter.unbound])];
-  return {
+  const base = {
     supportingIds: [...candidate.supportingCitations],
     counterIds: [...candidate.counterEvidenceCitations],
     boundSupporting: [...supporting.bound],
@@ -29,5 +32,9 @@ export function bindCitations(
     unbound,
     allBound: unbound.length === 0,
     snapshotId: resolver.boundSnapshotId,
+  };
+  return {
+    ...base,
+    relations: buildEvidenceRelations(candidate.id, base),
   };
 }
