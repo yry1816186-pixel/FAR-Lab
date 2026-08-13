@@ -20,7 +20,12 @@ export * from './citation_resolver.ts';
 export * from './counter_evidence.ts';
 export * from './grounding.ts';
 
-export { openalexAdapter, parseOpenAlexResults, buildOpenAlexUrl } from './adapters/openalex.ts';
+export {
+  openalexAdapter,
+  parseOpenAlexResults,
+  buildOpenAlexUrl,
+  sanitizeOpenAlexSearchTerm,
+} from './adapters/openalex.ts';
 export { arxivAdapter, parseArxivResults, buildArxivUrl } from './adapters/arxiv.ts';
 export {
   crossrefAdapter,
