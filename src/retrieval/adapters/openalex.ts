@@ -144,10 +144,23 @@ export function parseOpenAlexResults(
   return docs;
 }
 
+/**
+ * Normalize a retrieval query text for OpenAlex's `search` parameter.
+ *
+ * OpenAlex rejects requests whose search term contains `?` (HTTP 400, verified
+ * against the live API) — a natural-language research question almost always
+ * ends with one. Strip `?` (it carries no retrieval semantics for a free-text
+ * search) and collapse whitespace. The ORIGINAL question text remains the
+ * document's retrievalQuery provenance; this transform only shapes the API call.
+ */
+export function sanitizeOpenAlexSearchTerm(text: string): string {
+  return text.replace(/\?/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 /** Build the OpenAlex request URL for a query. */
 export function buildOpenAlexUrl(query: RetrievalQuery): string {
   const params = new URLSearchParams({
-    search: query.text,
+    search: sanitizeOpenAlexSearchTerm(query.text),
     'per-page': String(Math.min(Math.max(query.maxResults, 1), 25)),
   });
   return `${OPENALEX_BASE}?${params.toString()}${politeMailtoParam()}`;
