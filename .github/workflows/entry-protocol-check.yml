@@ -77,7 +77,7 @@ jobs:
             }
             // 校验 ledger_item id 在 §C 存在 + 非 WIRED_GREEN（禁对已 closed item 提 PR 凑数）
             const ledgerPath = "FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md";
-            if (!fs.existsSync(ledgerPath)) { console.log("DEPTH_LEDGER.md 不存在——生产仓库跳过 ledger_item 校验"); return; }
+            if (!fs.existsSync(ledgerPath)) { console.log("DEPTH_LEDGER.md 不存在——生产仓库跳过 ledger_item 校验"); process.exit(0); }
             const text = fs.readFileSync(ledgerPath, "utf8");
             const sectionC = (text.split("## §C")[1] || "");
             const id = lines.ledger_item.replace(/[`*]/g, "");
