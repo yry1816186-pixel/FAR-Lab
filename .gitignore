@@ -20,6 +20,9 @@ coverage/
 .env.*
 !.env.example
 
+# --- Competition execution prompt (private agent input, not a repo deliverable) ---
+FAR-Lab_Track1A_Agent_Execution_Prompt_Final.md
+
 # --- IDE & OS ---
 .vscode/
 .zcode/

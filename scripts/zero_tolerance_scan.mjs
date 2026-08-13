@@ -104,6 +104,10 @@ const skippedFiles = new Set([
   // far ask CLI —— profile 凭据门：合法引用 FAR_DASHSCOPE_API_KEY 环境变量名（无 key → fail-closed 指引，
   // 非 secret 值）。经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / 空 catch / extra_body / header 幻觉 / sk- 明文。
   'src/cli/commands/ask.ts',
+  // far research CLI —— profile 凭据门：合法引用 FAR_DASHSCOPE_API_KEY 环境变量名（无 key → fail-closed 指引，
+  // 非 secret 值；live 用 competition_aliyun_qwen profile，默认 offline_replay 零 key）。同 ask.ts 模式。
+  // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / 空 catch / sk- 明文（key 仅从 env 传入）。
+  'src/cli/commands/research.ts',
   // runtime_gateway（WS-A.1·2026-08-10）——运行期 LLM 网关解析：合法引用 FAR_DASHSCOPE_API_KEY/
   // DASHSCOPE_API_KEY 环境变量名（读取 env 键名是功能必需；非 secret 值）。经审计零容忍合规：
   // 无 :any / as unknown as / @ts-ignore / 空 catch / sk- 明文（key 仅从 env 传入·测试用 sk-test-not-real 占位）。
