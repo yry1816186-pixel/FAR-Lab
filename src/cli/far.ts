@@ -1074,6 +1074,13 @@ USAGE:
                          metrics are listed, not auto-scored.
     exits 0 success · 1 read failure · 2 bad args
 
+  far research baseline "<question>" [--profile ...] [--json]
+                         four fair baselines (§14.2) with the same model + question: direct answer,
+                         simple RAG, no-deterministic-kernel agent, and the full system. Capability
+                         gaps are reported as N/A (never scored as zero). Live comparison needs the
+                         profile API key.
+    exits 0 success · 3 gate refused · 1 pipeline failure · 2 bad args
+
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
     --json        machine-readable output (used by CI to backfill <X_FROM_STATUS_DUMP> placeholders)
