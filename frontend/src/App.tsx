@@ -29,6 +29,7 @@ const V2ReceiptPage = lazy(() => import('@/pages/V2ReceiptPage'));
 const EventsPage = lazy(() => import('@/pages/EventsPage'));
 const AuditTracePage = lazy(() => import('@/pages/AuditTracePage'));
 const PlanningPage = lazy(() => import('@/pages/PlanningPage'));
+const ResearchWorkbenchPage = lazy(() => import('@/pages/ResearchWorkbenchPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +67,7 @@ export default function App() {
                   <Routes>
                     <Route path="/" element={<OverviewPage />} />
                     <Route path="/overview" element={<OverviewPage />} />
+                    <Route path="/research" element={<ResearchWorkbenchPage />} />
                     <Route path="/viz" element={<VizPage />} />
                     <Route path="/integrity" element={<IntegrityPage />} />
                     <Route path="/leaderboard" element={<LeaderboardPage />} />

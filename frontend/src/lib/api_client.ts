@@ -186,7 +186,7 @@ export function buildApiUrl(path: string, extraParams?: Record<string, string>):
  */
 const FETCH_TIMEOUT_MS = 60_000;
 
-async function fetchJson<T>(path: string, init?: RequestInit, timeoutMs: number = FETCH_TIMEOUT_MS): Promise<T> {
+export async function fetchJson<T>(path: string, init?: RequestInit, timeoutMs: number = FETCH_TIMEOUT_MS): Promise<T> {
   const url = buildApiUrl(path);
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -305,7 +305,7 @@ function parseV2Response<T>(
  * @param endpoint 端点标识（错误信息用，如 "GET /evidence/chain/:headHash"）
  * @returns        信封内的 data
  */
-function parseV1Response<T>(raw: unknown, endpoint: string): T {
+export function parseV1Response<T>(raw: unknown, endpoint: string): T {
   if (typeof raw !== 'object' || raw === null) {
     throw new ApiError(
       502,
