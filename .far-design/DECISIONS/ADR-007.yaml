@@ -1,0 +1,29 @@
+# ADR（§12.4）
+adr_id: ADR-007
+title: "内核与证明版本化（U-17）：H1+H3"
+status: accepted
+context: "历史证明在新内核下的复算语义空白（DI-06）；FEC-007 P0"
+facts: "in-toto Attestation/SLSA 双先例（SRC-R1-05/03）；H2 语义证伪（SRC-R1-07/08/09）"
+assumptions: "多版本验证器维护成本可控"
+forces: "复算语义可信 vs 维护成本"
+requirements: "FEC-007/API-002/003"
+quality_scenarios: "QS-FEC-02"
+options:
+  - "H1 envelope URI"
+  - "H2 内容寻址"
+  - "H3 多版本并存"
+  - "H1+H3"
+simple_baseline: "内核源码 hash 嵌入（吸收为辅助）"
+decision: "H1+H3：envelope 内嵌 ruleset URI（farlab.dev/ruleset/vN，SemVer 治理：MAJOR 改 URI/MINOR 单调后向兼容/PATCH 不动语义）；主版本验证器并存；复算=按声明版本重算；版本 bump 不追溯改写历史；扩展字段单调（忽略不得翻转裁决）"
+rationale: "双重工业先例+空白区自冻结+核心主张必需"
+positive_consequences: "历史证明永久可复算=核心主张长期可信"
+negative_consequences: "多版本维护+URI 治理"
+risks:
+  - "RSK-S5-05"
+prototype_evidence: "DI-04/06 研究"
+migration: "envelope 增字段+bundle manifest；旧包由 v1 验证器处理"
+rollback: "回滚=单版本+声明历史包不可复算（信任降级，禁）"
+reopen_triggers:
+  - "实现矛盾"
+  - "维护成本超阈"
+supersedes: null

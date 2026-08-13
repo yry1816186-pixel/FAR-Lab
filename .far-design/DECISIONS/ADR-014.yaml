@@ -1,0 +1,26 @@
+# ADR（§12.4）
+adr_id: ADR-014
+title: "模块边界与依赖规则（ARC-001..007 机检化）"
+status: accepted
+context: "12.2 冻结失败检查项需可执行"
+facts: "FF-01..13 定义（architecture-fitness-functions.yaml）"
+assumptions: "grep 级机检足够"
+forces: "规则强度 vs 实现成本"
+requirements: "ARC-001..007"
+quality_scenarios: "FF 全绿"
+options:
+  - "文档规则"
+  - "机检规则"
+simple_baseline: "文档规则（§12.5 禁止只写文档）"
+decision: "scripts/fitness_functions.mjs 实跑绿"
+rationale: "§12.5 强制"
+positive_consequences: "腐蚀可监控"
+negative_consequences: "grep 级局限（AST 级未来）"
+risks:
+  - "绕过手法"
+prototype_evidence: "FF 实跑"
+migration: "n/a"
+rollback: "n/a"
+reopen_triggers:
+  - "FF 红"
+supersedes: null

@@ -1,0 +1,28 @@
+# ADR（§12.4）
+adr_id: ADR-003
+title: "核心 Artifact：.far-proof 自验证 bundle"
+status: accepted
+context: "需要可携带、独立可验证的信任载体"
+facts: "CLM-006（export→verify E3）；平台锚反例（SRC-R1-12/13）"
+assumptions: "V1 格式足够表达核心证据"
+forces: "可移植性 vs 表达力 vs 实现成本"
+requirements: "EVD-005"
+quality_scenarios: "QS-EVD-01/02"
+options:
+  - "自研 V1 bundle"
+  - "RO-Crate 直用"
+  - "Sigstore 签名包"
+simple_baseline: "RO-Crate（溯源全 SHOULD=空壳合规）"
+decision: "V1 九分量自验证 bundle 为核心 Artifact；RO-Crate 作兼容映射面（ADR-008）"
+rationale: "离线自验证是信任模型对立面；九分量已实证"
+positive_consequences: "便携+自验证+已在产"
+negative_consequences: "非 RO-Crate 原生认证（自承）；映射损失"
+risks:
+  - "格式演进 V1.1/V2 治理"
+prototype_evidence: "CLM-006/BL-26"
+migration: "V1→V1.1 加 ruleset URI（ADR-007）"
+rollback: "回滚=维持 V1"
+reopen_triggers:
+  - "RO-Crate 1.2 发布"
+  - "redaction 事故"
+supersedes: null

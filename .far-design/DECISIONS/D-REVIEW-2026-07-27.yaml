@@ -1,0 +1,76 @@
+# Decision Record: V1 → V2 (Adversarial Review Outcome)
+decision_id: D-REVIEW-2026-07-27
+type: DESIGN
+scope: "反馈闭环实现路径选择"
+status: DECIDED
+superseded: ""
+date: "2026-07-27"
+authority: "用户指令 + 5 路对抗审查 + synthesizer 合成"
+related_contracts: ["IC-15"]
+related_adrs: ["ADR-015"]
+review_evidence: ".far-design/evidence/s9/adversarial_review_v1_to_v2.md"
+
+# 背景（用块标量避免内联冒号破坏 YAML）
+background: |
+  赛道一·方向1 同时含 A（假设生成）和 B（实验任务规划与反馈迭代）两道题。
+  用户要求评估"同时做 A+B"是否可行。前置分析（基于 Charter + 代码事实 +
+  工程成本）得出结论：A 主线做深 + 把 B 元素作为 A 的真实反馈通道。
+
+  V1 方案提出把 verdict kernel 从循环外移入 FSM 循环，REFUTED/INCONCLUSIVE
+  硬触发 stage3 假设重生成。在 EXECUTE 前用户指令"多子 agent 并发对抗验证优化迭代"。
+
+# 决策
+decision: "驳回 V1，采纳 V2（D1 内核 + A+D 扩展）。"
+
+v2_core: |
+  T1' stage6 prompt 层注入 verdict 软建议（≤6 行，最小信息原则）
+  T2' 前端 VersionDiffPage 实现赛题关键词"版本比较"
+  T3'-T7' 配套端点、测试、TESS 取证、诚实声明同步、验证档
+
+# 否决 V1 的三重独立证据
+reject_reasons:
+
+  - reason_id: "1-赛题事实否决"
+    detail: |
+      competition_facts.yaml:19 关键词是"版本比较 + 人工反馈"，
+      非"自动重生成"。V1 解决的是赛题未要求的问题。
+
+  - reason_id: "2-科学方法论否决（3 路代理共振）"
+    cross_agent_resonance: true
+    sub_points:
+      - "architect C3: REFUTED→regen 是 p-hacking 的结构性版本，CONFIRMED→收敛是 confirmation bias 教科书"
+      - "advisor 风险 1: 评委会读作『刷 verdict 到 CONFIRMED 为止』"
+      - "security C2: verdict 字段回灌 stage3 → LLM 反推裁决逻辑生成『刚好过』假设"
+
+  - reason_id: "3-代码库意图否决"
+    sub_points:
+      - "fsm_runner.ts:10-14 + t016_feedback_edge.test.ts:12-15 明确登记为 V2 roadmap"
+      - "IntegrityPage.tsx:848-850 + .test.tsx:152 硬编码『Verdict re-entry not yet implemented』"
+
+# V2 优势
+v2_advantages:
+  - dimension: "赛题贴合"
+    v1: "未覆盖『版本比较』"
+    v2: "直接命中"
+  - dimension: "p-hacking 风险"
+    v1: "结构性缺陷"
+    v2: "不存在"
+  - dimension: "代码改动"
+    v1: "~200+ 行 + 架构重设计"
+    v2: "~130 行"
+  - dimension: "Critical 数"
+    v1: "7（3 跨代理共振）"
+    v2: "0"
+  - dimension: "既有测试破坏"
+    v1: "IntegrityPage:152"
+    v2: "同步修复"
+  - dimension: "Charter 冲突"
+    v1: "模糊"
+    v2: "无"
+
+# 重开触发
+reopen_triggers:
+  - "V2 实施过程中发现新的 critical 缺陷"
+  - "用户提出赛题解读的权威反驳"
+  - "IC-15 acceptance_oracles 任一不可达"
+  - "评委反馈表明『版本比较』非预期方向"

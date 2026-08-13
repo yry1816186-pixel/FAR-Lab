@@ -1,0 +1,27 @@
+# ADR（§12.4）
+adr_id: ADR-015
+title: "前端定位：环绕层（非冻结验收硬门）"
+status: accepted
+context: "D-S5-04 范围裁决；前端 530kB/159 测试绿/e2e 缺"
+facts: "CLM-019 SUPPORTED_INFERENCE"
+assumptions: "演示合规可由标识组件满足"
+forces: "UX 深度 vs 内核聚焦"
+requirements: "UX-001..005"
+quality_scenarios: "QS-UX-01"
+options:
+  - "前端冻结"
+  - "环绕层"
+  - "砍前端"
+simple_baseline: "CLI 输出"
+decision: "环绕层；补 Offline/Cached/Live/Fixture 标识+诚实边界横幅（演示合规）"
+rationale: "范围诚实+演示合规最低成本"
+positive_consequences: "聚焦"
+negative_consequences: "UX 深度延后"
+risks:
+  - "演示依赖前端"
+prototype_evidence: "frontend_test 159 绿"
+migration: "标识组件（实施合同）"
+rollback: "n/a"
+reopen_triggers:
+  - "前端升核心"
+supersedes: null

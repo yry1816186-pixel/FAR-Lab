@@ -1,0 +1,27 @@
+# ADR（§12.4）
+adr_id: ADR-019
+title: "安全缺口治理：G1/G3/G5/G7 本轮冻结，G2/G4/G6 部分 P2"
+status: accepted
+context: "S3 R3 证据（FP-01..18+G1-G7）；OWASP/NIST 锚点"
+facts: "CurXecute/SQLite 官方/Replit/成本案例=高优先证据"
+assumptions: "本轮带宽可完成四项设计+实施合同"
+forces: "安全覆盖 vs 时间线"
+requirements: "SEC-001..010"
+quality_scenarios: "QS-SEC-01/02"
+options:
+  - "全量冻结"
+  - "优先四项"
+  - "全部 P2"
+simple_baseline: "现状（凭据/脱敏在产）"
+decision: "G1 闸门/G3 隔离/G5 基线/G7 断路器本轮（实施合同 P0）；G2 写权限/G4 来源签名/G6 供应链部分本轮部分 P2"
+rationale: "证据驱动优先级"
+positive_consequences: "高危先堵"
+negative_consequences: "G2/G4/G6 残余风险登记"
+risks:
+  - "延期=攻击面"
+prototype_evidence: "S3 R3 卡"
+migration: "实施合同"
+rollback: "n/a"
+reopen_triggers:
+  - "安全事件"
+supersedes: null
