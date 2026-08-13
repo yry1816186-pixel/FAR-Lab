@@ -226,6 +226,12 @@ scripts/gh_retry_monitor.sh
 .far-design/*
 !.far-design/DECISIONS/
 .far-implementation/
+# 例外：walking-skeleton 的 README.md 是人工文档（脚本不生成·测试断言存在）→ 反忽略。
+!.far-implementation/
+.far-implementation/*
+!.far-implementation/walking-skeleton/
+.far-implementation/walking-skeleton/*
+!.far-implementation/walking-skeleton/README.md
 .far-master/
 .far-release/
 
@@ -263,7 +269,7 @@ docs/development/SPRINT2-BRAND-REPORT.md
 docs/development/ULTIMATE_UPGRADE_PLAN.md
 # docs/governance/ agent 编排内部 jargon + 重复
 docs/governance/AGENT-LIFECYCLE.md
-docs/governance/AGENT-MEMORY.md
+# AGENT-MEMORY.md 例外：adr_count_check.mjs 以它为记忆系统口径锚（§14 记忆系统·CI 断言依赖）。
 docs/governance/AGENT-ORCHESTRATION.md
 docs/governance/OPENCODE-PLANNING.md
 docs/governance/MAINTAINERS.md
