@@ -1,0 +1,480 @@
+// src/cli/commands/research.ts
+// far research start "<question>" — run the Track-1A vertical slice once
+// (ground → generate 3-5 hypotheses → critique → score → plan → ResearchRun).
+//
+// Default offline_replay profile (zero key, synthetic fixtures → RECORDED_REPLAY mode).
+// Live: --profile competition_aliyun_qwen + FAR_DASHSCOPE_API_KEY (real Qwen + real retrieval).
+//
+// Honesty: the offline path proves the pipeline wiring (real citation binding,
+// deterministic scoring, Pareto front, plan design) — NOT any scientific truth.
+// The synthetic demo docs are clearly labeled [SYNTHETIC DEMO].
+
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts';
+import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
+import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
+import { createCorpusSnapshot, createReplayAdapter, CitationResolver } from '../../retrieval/index.ts';
+import { runResearch } from '../../research/orchestrator.ts';
+import { buildFeedbackSignal, createRevision } from '../../research/revision.ts';
+import { designResearchPlan } from '../../research/research_plan.ts';
+import { bindCitations } from '../../research/citation.ts';
+import {
+  buildScorecard,
+  computeDeterministicDimensions,
+  computeParetoFront,
+} from '../../research/scorecard.ts';
+import { selectPrimaryHypothesis } from '../../research/orchestrator.ts';
+import type { ResearchRun } from '../../research/types.ts';
+import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
+import type { RetrievalAdapter } from '../../retrieval/types.ts';
+
+/** Parsed options for the research command. */
+export interface ResearchArgs {
+  readonly question: string;
+  readonly source: 'openalex' | 'arxiv' | 'crossref';
+  readonly maxPerQuery: number;
+  readonly profile: 'offline_replay' | 'competition_aliyun_qwen';
+  readonly target: number;
+  readonly json: boolean;
+  readonly out: string | null;
+}
+
+/** Parse `far research start` args. */
+export function parseResearchArgs(args: readonly string[]): ResearchArgs {
+  let question = '';
+  let source: 'openalex' | 'arxiv' | 'crossref' = 'openalex';
+  let maxPerQuery = 5;
+  let profile: 'offline_replay' | 'competition_aliyun_qwen' = 'offline_replay';
+  let target = 3;
+  let json = false;
+  let out: string | null = null;
+
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === undefined) continue;
+    if (a === '--source') {
+      const v = args[++i];
+      if (v !== 'openalex' && v !== 'arxiv' && v !== 'crossref') {
+        throw new Error(`far research: --source must be openalex|arxiv|crossref (got: ${v ?? '<missing>'})`);
+      }
+      source = v;
+      continue;
+    }
+    if (a === '--max-per-query') {
+      const v = args[++i];
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 1 || n > 25) {
+        throw new Error(`far research: --max-per-query must be 1..25 (got: ${v ?? '<missing>'})`);
+      }
+      maxPerQuery = n;
+      continue;
+    }
+    if (a === '--profile') {
+      const v = args[++i];
+      if (v !== 'offline_replay' && v !== 'competition_aliyun_qwen') {
+        throw new Error(`far research: --profile must be offline_replay|competition_aliyun_qwen (got: ${v ?? '<missing>'})`);
+      }
+      profile = v;
+      continue;
+    }
+    if (a === '--target') {
+      const v = args[++i];
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 3 || n > 5) {
+        throw new Error(`far research: --target must be 3..5 (got: ${v ?? '<missing>'})`);
+      }
+      target = n;
+      continue;
+    }
+    if (a === '--json') {
+      json = true;
+      continue;
+    }
+    if (a === '--out') {
+      out = args[++i] ?? null;
+      continue;
+    }
+    if (a.startsWith('--')) {
+      throw new Error(`far research: unknown argument "${a}"`);
+    }
+    question = question === '' ? a : `${question} ${a}`;
+  }
+  return { question, source, maxPerQuery, profile, target, json, out };
+}
+
+/** Run `far research start`. */
+export async function runResearchStart(args: readonly string[]): Promise<number> {
+  let parsed: ResearchArgs;
+  try {
+    parsed = parseResearchArgs(args);
+  } catch (err) {
+    process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    return 2;
+  }
+
+  if (parsed.question.trim().length === 0) {
+    process.stderr.write(
+      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]\n',
+    );
+    return 2;
+  }
+
+  // Build the gateway + grounding adapter for the chosen profile.
+  let gateway: LlmGateway;
+  let retrievalAdapter: RetrievalAdapter | undefined;
+  if (parsed.profile === 'competition_aliyun_qwen') {
+    const apiKey = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
+    if (apiKey === undefined || apiKey === '') {
+      process.stderr.write(
+        'far research: profile competition_aliyun_qwen needs FAR_DASHSCOPE_API_KEY or DASHSCOPE_API_KEY set.\n  default offline_replay needs no key (synthetic fixtures, RECORDED_REPLAY mode).\n',
+      );
+      return 2;
+    }
+    gateway = createCompetitionQwenGateway({ apiKey });
+    // live retrieval: no injected adapter
+  } else {
+    gateway = createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
+    retrievalAdapter = createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS);
+  }
+
+  let run: ResearchRun;
+  try {
+    run = await runResearch({
+      question: parsed.question,
+      gateway,
+      profile: parsed.profile,
+      grounding: {
+        source: parsed.source,
+        maxPerQuery: parsed.maxPerQuery,
+        ...(retrievalAdapter !== undefined ? { adapter: retrievalAdapter } : {}),
+      },
+      targetHypothesisCount: parsed.target,
+      sameModelAsGenerator: true,
+    });
+  } catch (err) {
+    process.stderr.write(
+      `far research: pipeline failed (${err instanceof Error ? err.message : String(err)})\n`,
+    );
+    return 1;
+  }
+
+  if (parsed.out !== null) {
+    const dir = dirname(parsed.out);
+    if (dir !== '.' && dir !== '') {
+      mkdirSync(dir, { recursive: true });
+    }
+    writeFileSync(parsed.out, JSON.stringify(run, null, 2) + '\n', 'utf8');
+    if (!parsed.json) {
+      process.stderr.write(`  saved    : ${parsed.out} (far research inspect ${parsed.out})\n`);
+    }
+  }
+
+  if (parsed.json) {
+    process.stdout.write(`${JSON.stringify(run, null, 2)}\n`);
+  } else {
+    renderHuman(parsed.profile, run);
+  }
+  return 0;
+}
+
+/** Render a compact human-readable summary. */
+function renderHuman(profile: string, run: ResearchRun): void {
+  const lines: string[] = [];
+  if (profile === 'offline_replay') {
+    lines.push(
+      '',
+      '  ╔═ OFFLINE REPLAY MODE (synthetic fixtures) ═══════════════════════════╗',
+      '  ║ This run replays SYNTHETIC demo fixtures — NOT live science.         ║',
+      '  ║ For a live run: far research start "<q>" --profile competition_aliyun_qwen ║',
+      '  ╚══════════════════════════════════════════════════════════════════════╝',
+    );
+  }
+  lines.push(
+    '',
+    '  FAR-Lab · far research (Track 1A: hypothesis generation + research plan)',
+    '  ─────────────────────────────────────────────────────────────────────',
+    `  question : ${run.question}`,
+    `  run      : ${run.runId}`,
+    `  runMode  : ${run.runMode}  (model=${run.modes.modelExecutionMode} · retrieval=${run.modes.retrievalExecutionMode} · experiment=${run.modes.experimentExecutionMode})`,
+    `  corpus   : ${run.corpus.documentCount} docs · snapshot=${run.corpus.snapshotId.slice(0, 12)}…`,
+    '  ─────────────────────────────────────────────────────────────────────',
+  );
+
+  lines.push('', '  Candidate hypotheses (mechanistically distinct):');
+  for (const h of run.hypotheses) {
+    const binding = run.bindings[h.id];
+    const card = run.scorecards[h.id];
+    const bindingTag = binding?.allBound === true ? 'bound' : `UNBOUND(${binding?.unbound.length ?? '?'})`;
+    const primaryTag = run.plan.primaryHypothesisId === h.id ? ' ← PRIMARY' : '';
+    lines.push(`    · ${h.id.slice(0, 8)}…  ${bindingTag}${primaryTag}`);
+    lines.push(`        ${h.statement.slice(0, 96)}${h.statement.length > 96 ? '…' : ''}`);
+    if (card !== undefined) {
+      const grades = card.dimensions
+        .map((d) => `${d.name.slice(0, 1).toUpperCase()}${d.name.slice(1)}:${d.grade}`)
+        .join(' · ');
+      lines.push(`        ${card.paretoOptimal ? '[Pareto-optimal] ' : ''}${grades}`);
+    }
+  }
+
+  lines.push(
+    '',
+    '  Research plan (primary hypothesis selected deterministically):',
+    `    objectives: ${run.plan.objectives.length} · statisticalMethods: ${run.plan.statisticalMethods.length}`,
+    `    sampleSize: ${run.plan.sampleSizeRationale.slice(0, 80)}${run.plan.sampleSizeRationale.length > 80 ? '…' : ''}`,
+    `    humanApprovalRequired: ${run.plan.humanApprovalRequired.length} step(s)`,
+    '',
+    '  red line: hypotheses are scored deterministically (falsifiability, evidence',
+    '  coverage, counter-evidence) + independently critiqued; the model never emits',
+    '  a single total score. Citations must bind to the grounding corpus.',
+    '',
+  );
+  process.stdout.write(lines.join('\n'));
+}
+
+/** Run `far research inspect <file>` — print a saved ResearchRun. */
+export function runResearchInspect(args: readonly string[]): number {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('far research inspect: missing <file>.\n  usage: far research inspect <run.json> [--json]\n');
+    return 2;
+  }
+  let raw: string;
+  try {
+    raw = readFileSync(file, 'utf8');
+  } catch (err) {
+    process.stderr.write(`far research inspect: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+  const json = args.includes('--json');
+  if (json) {
+    process.stdout.write(raw);
+    return 0;
+  }
+  const run = JSON.parse(raw) as ResearchRun;
+  renderHuman(run.runMode === 'LIVE' ? 'competition_aliyun_qwen' : 'offline_replay', run);
+  return 0;
+}
+
+/**
+ * Run `far research verify <run.json>` — independently re-compute the
+ * DETERMINISTIC parts of a ResearchRun and check they match what was stored.
+ *
+ * This is a third-party verification of the deterministic layer only: citation
+ * binding, deterministic scorecard dimensions, Pareto front, and primary-hypothesis
+ * selection. It does NOT (and must not) claim to reproduce the LLM generation —
+ * external model output is acknowledged as non-reproducible (directive §3.6).
+ */
+export function runResearchVerify(args: readonly string[]): number {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('far research verify: missing <run.json>.\n  usage: far research verify <run.json> [--json]\n');
+    return 2;
+  }
+  let run: ResearchRun;
+  try {
+    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+  } catch (err) {
+    process.stderr.write(`far research verify: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+
+  // Re-build the corpus snapshot + resolver from the stored documents.
+  const corpus = createCorpusSnapshot(run.corpus.documents, run.corpus.sourceQueries);
+  if (corpus.rootHash !== run.corpus.rootHash) {
+    process.stdout.write('far research verify: corpus rootHash MISMATCH (tampered corpus)\n');
+    return 7;
+  }
+  const resolver = new CitationResolver(corpus);
+
+  // Re-compute bindings + deterministic dimensions + scorecards.
+  const reScorecards: Record<string, ReturnType<typeof buildScorecard>> = {};
+  for (const h of run.hypotheses) {
+    const binding = bindCitations(h, resolver);
+    const storedBinding = run.bindings[h.id];
+    if (storedBinding === undefined || storedBinding.allBound !== binding.allBound) {
+      process.stdout.write(`far research verify: citation binding MISMATCH for ${h.id}\n`);
+      return 7;
+    }
+    const deterministic = computeDeterministicDimensions(h, binding, run.critiques[h.id]);
+    reScorecards[h.id] = buildScorecard(
+      h.id,
+      deterministic,
+      run.scorecards[h.id]?.dimensions.filter((d) => d.source === 'model') ?? [],
+      false,
+      run.scorecards[h.id]?.keyEvidenceToChangeConclusion ?? '',
+    );
+  }
+  const pareto = computeParetoFront(reScorecards);
+  for (const id of Object.keys(reScorecards)) {
+    reScorecards[id] = { ...reScorecards[id]!, paretoOptimal: pareto.has(id) };
+  }
+
+  // Compare deterministic dimensions against stored (model dimensions excluded —
+  // they are LLM output and not independently recomputable).
+  for (const h of run.hypotheses) {
+    const stored = run.scorecards[h.id];
+    const recomputed = reScorecards[h.id];
+    if (stored === undefined || recomputed === undefined) continue;
+    const storedDet = stored.dimensions.filter((d) => d.source === 'deterministic');
+    const recomputedDet = recomputed.dimensions.filter((d) => d.source === 'deterministic');
+    if (JSON.stringify(storedDet) !== JSON.stringify(recomputedDet)) {
+      process.stdout.write(`far research verify: deterministic scorecard MISMATCH for ${h.id}\n`);
+      return 7;
+    }
+    if (stored.paretoOptimal !== recomputed.paretoOptimal) {
+      process.stdout.write(`far research verify: Pareto-front MISMATCH for ${h.id}\n`);
+      return 7;
+    }
+  }
+
+  // Re-derive the primary selection and check it matches the stored plan.
+  const primary = selectPrimaryHypothesis(run.hypotheses, reScorecards);
+  if (primary.id !== run.plan.primaryHypothesisId) {
+    process.stdout.write(
+      `far research verify: primary-hypothesis MISMATCH (recomputed ${primary.id}, stored ${run.plan.primaryHypothesisId})\n`,
+    );
+    return 7;
+  }
+
+  const json = args.includes('--json');
+  if (json) {
+    process.stdout.write(
+      JSON.stringify(
+        {
+          status: 'PASS',
+          verified: ['corpus_rootHash', 'citation_binding', 'deterministic_scorecard', 'pareto_front', 'primary_selection'],
+          notVerifiable: ['model_generation', 'model_critique_dimensions'],
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+  } else {
+    process.stdout.write(
+      'far research verify: PASS (deterministic layer recomputed and matches)\n' +
+        '  verified: corpus_rootHash · citation_binding · deterministic_scorecard · pareto_front · primary_selection\n' +
+        '  not independently recomputable (by design): model_generation · model_critique_dimensions\n',
+    );
+  }
+  return 0;
+}
+
+/** Run `far research feedback <run.json> --file feedback.json [--out <new.json>]`. */
+export async function runResearchFeedback(args: readonly string[]): Promise<number> {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('far research feedback: missing <run.json>.\n  usage: far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile offline_replay|competition_aliyun_qwen]\n');
+    return 2;
+  }
+  const feedbackIdx = args.indexOf('--file');
+  const feedbackPath = feedbackIdx !== -1 ? args[feedbackIdx + 1] : undefined;
+  if (feedbackPath === undefined) {
+    process.stderr.write('far research feedback: --file feedback.json is required.\n');
+    return 2;
+  }
+  const outIdx = args.indexOf('--out');
+  const outValue = outIdx !== -1 ? args[outIdx + 1] : undefined;
+  const outPath = outValue !== undefined ? outValue : file;
+  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : 'offline_replay';
+  const profile = profileArg === 'competition_aliyun_qwen' ? 'competition_aliyun_qwen' : 'offline_replay';
+
+  let run: ResearchRun;
+  let feedbackRaw: string;
+  try {
+    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+    feedbackRaw = readFileSync(feedbackPath, 'utf8');
+  } catch (err) {
+    process.stderr.write(`far research feedback: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+
+  const fb = JSON.parse(feedbackRaw) as {
+    source: 'human' | 'literature' | 'tool' | 'analysis';
+    actor: string;
+    text: string;
+    affectsHypothesisIds?: string[];
+    changesScore?: boolean;
+    triggers?: string[];
+  };
+  const feedback = buildFeedbackSignal({
+    source: fb.source,
+    actor: fb.actor,
+    text: fb.text,
+    ...(fb.affectsHypothesisIds !== undefined
+      ? { affectsHypothesisIds: fb.affectsHypothesisIds }
+      : {}),
+    ...(fb.changesScore !== undefined ? { changesScore: fb.changesScore } : {}),
+    ...(fb.triggers !== undefined
+      ? { triggers: fb.triggers as ('new_retrieval' | 'alternative_hypothesis' | 'plan_rewrite' | 'none')[] }
+      : {}),
+  });
+
+  // Determine the concrete changes the feedback causes.
+  const hypothesisChanges = {
+    added: [] as string[],
+    removed: [] as string[],
+    downgraded: [...feedback.affectsHypothesisIds],
+  };
+  const planChanges: string[] = [];
+  const metricChanges: string[] = [];
+  const unresolvedConflicts: string[] = [];
+
+  if (feedback.changesScore) {
+    metricChanges.push('score re-evaluated per feedback (revision does NOT force monotonic improvement)');
+  }
+
+  // If the feedback triggers a plan rewrite, actually re-design the plan with the
+  // feedback injected (a real change, not a chat-log append).
+  let newPlan = run.plan;
+  if (feedback.triggers.includes('plan_rewrite')) {
+    const primary = run.hypotheses.find((h) => h.id === run.plan.primaryHypothesisId);
+    if (primary === undefined) {
+      unresolvedConflicts.push('plan_rewrite requested but primary hypothesis not found in run');
+    } else {
+      const alternatives = run.hypotheses.filter((h) => h.id !== primary.id);
+      const gateway = profile === 'competition_aliyun_qwen'
+        ? createCompetitionQwenGateway({ apiKey: process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY ?? '' })
+        : createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
+      try {
+        newPlan = await designResearchPlan(gateway, profile, {
+          question: run.question,
+          primary,
+          alternatives,
+          corpus: run.corpus,
+          feedbackText: feedback.text,
+        });
+        planChanges.push(
+          `plan rewritten per feedback: objectives ${run.plan.objectives.length} → ${newPlan.objectives.length}`,
+        );
+      } catch (err) {
+        unresolvedConflicts.push(`plan_rewrite failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
+  const revision = createRevision({
+    parentRevisionId: run.revisions.length > 0 ? run.revisions[run.revisions.length - 1]!.id : null,
+    number: run.revisions.length + 1,
+    feedback,
+    changes: { hypothesisChanges, planChanges, metricChanges, unresolvedConflicts },
+  });
+
+  const updated: ResearchRun = {
+    ...run,
+    plan: newPlan,
+    revisions: [...run.revisions, revision],
+  };
+
+  const dir = dirname(outPath);
+  if (dir !== '.' && dir !== '') {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(outPath, JSON.stringify(updated, null, 2) + '\n', 'utf8');
+  process.stdout.write(
+    `far research feedback: revision #${revision.number} (${revision.id.slice(0, 8)}…)\n` +
+      `  affectsHypotheses: ${hypothesisChanges.downgraded.length} · planChanges: ${planChanges.length} · unresolved: ${unresolvedConflicts.length}\n` +
+      `  saved: ${outPath}\n`,
+  );
+  return 0;
+}
