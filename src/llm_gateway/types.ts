@@ -55,6 +55,8 @@ export interface LlmCallCredential {
   readonly tokenUsage: TokenUsage;
   readonly costSnapshot?: CostSnapshot;
   readonly adapterMeta?: Record<string, unknown>;
+  /** Provider-reported finish reason (null = not reported by the provider). */
+  readonly finishReason?: string | null;
 }
 
 /** Interface defining llm message. */
