@@ -38,6 +38,10 @@ export interface AskArgs {
   readonly profile: string;
   /** V2 裁决驱动反馈边（--verdict-driven·循环内中间裁决驱动终止 + regen 方向软建议）。 */
   readonly verdictDriven: boolean;
+  /** Phase 4b grounded mode (--ground): ground the question in real literature + counter-evidence before the loop. */
+  readonly ground: boolean;
+  /** Retrieval source for grounding (--ground-source, default openalex). */
+  readonly groundSource: 'openalex' | 'arxiv' | 'crossref';
 }
 
 /**
@@ -52,6 +56,8 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
   let resumePath: string | null = null;
   let profile = 'offline_replay';
   let verdictDriven = false;
+  let ground = false;
+  let groundSource: 'openalex' | 'arxiv' | 'crossref' = 'openalex';
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -88,6 +94,18 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
       verdictDriven = true;
       continue;
     }
+    if (a === '--ground') {
+      ground = true;
+      continue;
+    }
+    if (a === '--ground-source') {
+      const v = argv[++i];
+      if (v !== 'openalex' && v !== 'arxiv' && v !== 'crossref') {
+        throw new Error(`far ask: --ground-source must be openalex|arxiv|crossref (got: ${v ?? '<missing>'})`);
+      }
+      groundSource = v;
+      continue;
+    }
     if (a.startsWith('--')) {
       throw new Error(`far ask: unknown argument "${a}"`);
     }
@@ -98,7 +116,7 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
     }
   }
 
-  return { question, mode, dbPath, json, exportDir, resumePath, profile, verdictDriven };
+  return { question, mode, dbPath, json, exportDir, resumePath, profile, verdictDriven, ground, groundSource };
 }
 
 /** Interface defining ask render. */
@@ -118,6 +136,17 @@ export interface AskRender {
   readonly traceGrade: { readonly score: number; readonly gradedBy: string; readonly failureCodes: readonly string[] };
   /** 循环内中间裁决序列（verdictDrivenFeedback 开启时·审计显示）。 */
   readonly intermediateVerdicts: readonly string[];
+  /** Grounding report (only when --ground opted in; else null). */
+  readonly grounding: {
+    readonly supportingQuery: string;
+    readonly counterEvidenceStrategies: readonly string[];
+    readonly corpusSnapshotId: string;
+    readonly corpusRootHash: string;
+    readonly documentCount: number;
+    readonly perQueryCounts: ReadonlyArray<{ readonly query: string; readonly count: number }>;
+    readonly fetchMode: 'live' | 'replay';
+    readonly groundedAt: string;
+  } | null;
 }
 
 /**
@@ -150,6 +179,7 @@ export function buildRender(result: Awaited<ReturnType<typeof executeLoop>>, pro
       gradedBy: result.traceGrade.gradedBy,
       failureCodes: result.traceGrade.failureCodes,
     },
+    grounding: result.grounding ?? null,
   };
 }
 
@@ -213,7 +243,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
 
   if (args.question.trim().length === 0) {
     process.stderr.write(
-      'far ask: missing question.\n  usage: far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--profile offline_replay|competition_aliyun_qwen] [--verdict-driven]\n',
+      'far ask: missing question.\n  usage: far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--profile offline_replay|competition_aliyun_qwen] [--verdict-driven] [--ground [--ground-source openalex|arxiv|crossref]]\n',
     );
     return 2;
   }
@@ -271,6 +301,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
       args.verdictDriven || undefined,
       competitionModelSnapshot,
       args.profile,
+      args.ground ? { question: args.question, source: args.groundSource, maxPerQuery: 5 } : undefined,
     );
 
     const render = buildRender(result, args.profile, args.question);

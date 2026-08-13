@@ -29,6 +29,7 @@ import type { LlmGateway } from '../../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../../llm_gateway/types.ts';
 import type { AppendRecordOptions } from '../../evidence_log/types.ts';
 import { ulid } from 'ulid';
+import { groundResearchQuestion, type GroundingOptions } from '../../retrieval/index.ts';
 
 /**
  * LoopRunnerArgs —— API 层调用 runAgentLoop 的简化入参。
@@ -83,6 +84,33 @@ export interface LoopRunnerArgs {
    * 中间裁决 kind 软建议注入下一轮 stage3 regen。
    */
   readonly verdictDrivenFeedback?: boolean;
+  /**
+   * Phase 4b grounded mode (directive §9/§16). When provided, the loop FIRST
+   * grounds the research question in REAL retrieved literature + adversarial
+   * counter-evidence (groundResearchQuestion), and attaches a GroundingReport to
+   * the result. When undefined (default) → behavior is byte-identical (zero
+   * regression for the 200+ existing agent_loop tests). Fail-closed: a grounding
+   * retrieval error rejects the whole run (no partial corpus).
+   */
+  readonly grounding?: GroundingOptions;
+}
+
+/**
+ * GroundingReport —— serializable subset of a GroundedCorpus, attached to
+ * LoopRunnerResult when grounded mode is opted in. Surfaces the corpus identity
+ * (snapshotId = which papers; rootHash = exact content, tamper-evident) so a
+ * downstream consumer (API / CLI / future stage wiring) knows exactly which
+ * evidence set grounded this run.
+ */
+export interface GroundingReport {
+  readonly supportingQuery: string;
+  readonly counterEvidenceStrategies: readonly string[];
+  readonly corpusSnapshotId: string;
+  readonly corpusRootHash: string;
+  readonly documentCount: number;
+  readonly perQueryCounts: ReadonlyArray<{ readonly query: string; readonly count: number }>;
+  readonly fetchMode: 'live' | 'replay';
+  readonly groundedAt: string;
 }
 
 /**
@@ -93,6 +121,8 @@ export interface LoopRunnerResult {
   readonly reproHash: string;
   readonly runId: string;
   readonly traceGrade: TraceGrade;
+  /** Present only when grounded mode (args.grounding) was opted in. */
+  readonly grounding?: GroundingReport;
 }
 
 /**
@@ -189,6 +219,27 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
   const reproHashProvider = resolveReproHashProvider(args, profile, gateway);
   const runId = ulid();
 
+  // Phase 4b grounded mode: when opted in, FIRST ground the research question in
+  // real retrieved literature + counter-evidence. Fail-closed (a retrieval error
+  // rejects the whole run — no partial corpus masquerading as complete). The
+  // corpus snapshot is attached to the result; deep stage-wiring (Qwen proposing
+  // from the corpus, CitationResolver rejecting unbound stage4 citations) builds
+  // on this additive foundation. Default (no grounding) → byte-identical.
+  let groundingReport: GroundingReport | undefined;
+  if (args.grounding !== undefined) {
+    const grounded = await groundResearchQuestion(args.grounding);
+    groundingReport = {
+      supportingQuery: grounded.supportingQuery,
+      counterEvidenceStrategies: grounded.counterEvidenceQueries.map((c) => c.strategy),
+      corpusSnapshotId: grounded.corpus.snapshotId,
+      corpusRootHash: grounded.corpus.rootHash,
+      documentCount: grounded.corpus.documentCount,
+      perQueryCounts: grounded.perQueryCounts,
+      fetchMode: grounded.fetchMode,
+      groundedAt: grounded.groundedAt,
+    };
+  }
+
   const loopState = await runAgentLoop({
     runId,
     researchInput: args.researchInput,
@@ -211,7 +262,7 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
   const reproHash = resolveReproHash(args.evidenceLogDb);
   const traceGrade = gradeRunIntegrity(loopState, args.evidenceLogDb);
 
-  return { loopState, reproHash, runId, traceGrade };
+  return { loopState, reproHash, runId, traceGrade, ...(groundingReport === undefined ? {} : { grounding: groundingReport }) };
 }
 
 /**
