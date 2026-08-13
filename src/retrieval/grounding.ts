@@ -48,6 +48,11 @@ export interface GroundingOptions {
   readonly adapter?: RetrievalAdapter;
   /** Whether to include counter-evidence queries (default true, §16). */
   readonly includeCounterEvidence?: boolean;
+  /**
+   * Extra retrieval queries (e.g. the problem decomposition's retrieval
+   * subquestions, §9.2→§9.3). Each is a bounded additional snapshot query.
+   */
+  readonly extraQueries?: readonly string[];
 }
 
 /** The result of grounding a research question. */
@@ -100,8 +105,20 @@ export async function groundResearchQuestion(opts: GroundingOptions): Promise<Gr
     perQueryCounts.push({ query: cq.text, count: docs.length });
   }
 
+  // 2b. Extra queries (problem-decomposition retrieval subquestions, §9.2→§9.3).
+  const extraQueries = opts.extraQueries ?? [];
+  for (const eq of extraQueries) {
+    const docs = await adapter.retrieve({ text: eq, maxResults: maxPerQuery, source });
+    allDocs.push(...docs);
+    perQueryCounts.push({ query: eq, count: docs.length });
+  }
+
   // 3. Merge + dedupe into an immutable corpus snapshot (sourceQueries provenance).
-  const sourceQueries = [opts.question, ...counterQueries.map((c) => c.text)];
+  const sourceQueries = [
+    opts.question,
+    ...counterQueries.map((c) => c.text),
+    ...extraQueries,
+  ];
   const corpus = createCorpusSnapshot(allDocs, sourceQueries);
   const resolver = new CitationResolver(corpus);
 

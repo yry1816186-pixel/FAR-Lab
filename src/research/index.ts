@@ -23,3 +23,6 @@ export * from './hypothesis_generation.ts';
 export * from './adversarial_review.ts';
 export * from './research_plan.ts';
 export * from './orchestrator.ts';
+export * from './provenance.ts';
+export * from './researchability_gate.ts';
+export * from './revision.ts';
