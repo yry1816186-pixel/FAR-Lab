@@ -9,8 +9,8 @@
 // deterministic scoring, Pareto front, plan design) — NOT any scientific truth.
 // The synthetic demo docs are clearly labeled [SYNTHETIC DEMO].
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
@@ -25,6 +25,7 @@ import {
   computeDeterministicDimensions,
   computeParetoFront,
 } from '../../research/scorecard.ts';
+import { exportResearchBundle, researchBundleSha256 } from '../../research/export_bundle.ts';
 import type { ResearchRun } from '../../research/types.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
 import type { RetrievalAdapter } from '../../retrieval/types.ts';
@@ -281,14 +282,25 @@ export function runResearchInspect(args: readonly string[]): number {
 export function runResearchVerify(args: readonly string[]): number {
   const file = args.find((a) => !a.startsWith('--'));
   if (file === undefined) {
-    process.stderr.write('far research verify: missing <run.json>.\n  usage: far research verify <run.json> [--json]\n');
+    process.stderr.write('far research verify: missing <run.json | bundle-dir>.\n  usage: far research verify <run.json|bundle-dir> [--json]\n');
     return 2;
   }
+  const json = args.includes('--json');
+
+  // Bundle dir: first verify file integrity against the manifest, then verify
+  // the frozen run inside (deterministic recompute + tamper detection).
+  let runPath = file;
+  if (existsSync(join(file, 'manifest.json'))) {
+    const integrity = verifyBundleIntegrity(file);
+    if (integrity !== 0) return integrity;
+    runPath = join(file, 'research-run.json');
+  }
+
   let run: ResearchRun;
   try {
-    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+    run = JSON.parse(readFileSync(runPath, 'utf8')) as ResearchRun;
   } catch (err) {
-    process.stderr.write(`far research verify: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`far research verify: cannot read ${runPath}: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
   }
 
@@ -350,7 +362,6 @@ export function runResearchVerify(args: readonly string[]): number {
     return 7;
   }
 
-  const json = args.includes('--json');
   if (json) {
     process.stdout.write(
       JSON.stringify(
@@ -371,6 +382,88 @@ export function runResearchVerify(args: readonly string[]): number {
     );
   }
   return 0;
+}
+
+/** Verify bundle file integrity against the manifest (tamper detection). */
+function verifyBundleIntegrity(bundleDir: string): number {
+  let manifest: { files?: ReadonlyArray<{ path: string; sha256: string }>; runId?: unknown };
+  try {
+    manifest = JSON.parse(readFileSync(join(bundleDir, 'manifest.json'), 'utf8')) as typeof manifest;
+  } catch (err) {
+    process.stderr.write(`far research verify: cannot read manifest.json: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+  if (!Array.isArray(manifest.files)) {
+    process.stderr.write('far research verify: manifest.json malformed (missing files table)\n');
+    return 1;
+  }
+  let failed = 0;
+  for (const entry of manifest.files) {
+    if (entry.path === 'manifest.json') continue;
+    try {
+      const actual = researchBundleSha256(readFileSync(join(bundleDir, entry.path), 'utf8'));
+      if (actual !== entry.sha256) {
+        process.stderr.write(`far research verify: TAMPERED ${entry.path}\n`);
+        failed += 1;
+      }
+    } catch {
+      process.stderr.write(`far research verify: MISSING ${entry.path}\n`);
+      failed += 1;
+    }
+  }
+  if (failed > 0) {
+    process.stderr.write(`far research verify: bundle integrity FAIL (${failed} file(s) do not match manifest)\n`);
+    return 7;
+  }
+  return 0;
+}
+
+/** Run `far research export <run.json> --out <bundle-dir>`. */
+export function runResearchExport(args: readonly string[]): number {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('far research export: missing <run.json>.\n  usage: far research export <run.json> [--out <bundle-dir>]\n');
+    return 2;
+  }
+  const outIdx = args.indexOf('--out');
+  const outValue = outIdx !== -1 ? args[outIdx + 1] : undefined;
+  if (outValue === undefined) {
+    process.stderr.write('far research export: --out <bundle-dir> is required.\n');
+    return 2;
+  }
+
+  let run: ResearchRun;
+  try {
+    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+  } catch (err) {
+    process.stderr.write(`far research export: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+  if (typeof run.runId !== 'string' || !Array.isArray(run.hypotheses)) {
+    process.stderr.write('far research export: file is not a valid ResearchRun (missing runId/hypotheses)\n');
+    return 1;
+  }
+
+  try {
+    const result = exportResearchBundle(run, outValue);
+    const json = args.includes('--json');
+    if (json) {
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    } else {
+      process.stdout.write(
+        `far research export: bundle written to ${result.bundleDir}\n` +
+          `  run       : ${run.runId} · runMode=${run.runMode} · git=${run.environment.gitCommit?.slice(0, 8) ?? 'n/a'}\n` +
+          `  files     : ${result.filesWritten.join(', ')}\n` +
+          `  manifest  : sha256=${result.manifestHash.slice(0, 16)}…\n` +
+          `  verify    : node ${join(result.bundleDir, 'verify.mjs')}   (integrity, standalone)\n` +
+          `              far research verify ${result.bundleDir}          (deterministic recompute, in-repo)\n`,
+      );
+    }
+    return 0;
+  } catch (err) {
+    process.stderr.write(`far research export: failed — ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
 }
 
 /** Run `far research feedback <run.json> --file feedback.json [--out <new.json>]`. */
