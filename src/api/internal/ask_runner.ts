@@ -13,6 +13,7 @@ import Database from 'better-sqlite3';
 
 import { executeLoop } from './loop_runner.ts';
 import type { LoopRunnerResult } from './loop_runner.ts';
+import type { GroundingOptions } from '../../retrieval/index.ts';
 import type { StageArtifact } from '../../agent_loop/types.ts';
 import type { LlmGateway } from '../../llm_gateway/gateway.ts';
 import { machineSealableConclusion } from '../../far_proof/demo_chain.ts';
@@ -46,6 +47,7 @@ export async function executeAskRun(
   verdictDrivenFeedback?: boolean,
   modelSnapshot?: string,
   profile?: string,
+  grounding?: GroundingOptions,
 ): Promise<LoopRunnerResult> {
   const result = await executeLoop({
     researchInput: question,
@@ -59,6 +61,7 @@ export async function executeAskRun(
     ...(gateway === undefined ? {} : { gateway }),
     ...(verdictDrivenFeedback === undefined ? {} : { verdictDrivenFeedback }),
     ...(modelSnapshot === undefined ? {} : { modelSnapshot }),
+    ...(grounding === undefined ? {} : { grounding }),
   });
 
   if (result.loopState.verdictNode !== null) {
