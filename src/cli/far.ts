@@ -33,7 +33,13 @@ import { runCAstro } from './commands/c_astro.ts';
 import { runCAstroLoop } from './commands/c_astro_loop.ts';
 import { runGround } from './commands/ground.ts';
 import { runCheckResource } from './commands/check_resource.ts';
-import { runResearchInspect, runResearchStart, runResearchFeedback, runResearchVerify } from './commands/research.ts';
+import {
+  runResearchInspect,
+  runResearchStart,
+  runResearchFeedback,
+  runResearchVerify,
+  runResearchExport,
+} from './commands/research.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
 import { runReplay } from './commands/replay.ts';
@@ -257,14 +263,18 @@ const COMMANDS: readonly CliCommand[] = [
       if (subcommand === 'verify') {
         return runResearchVerify(args.slice(1));
       }
+      if (subcommand === 'export') {
+        return runResearchExport(args.slice(1));
+      }
       if (subcommand === 'start') {
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'inspect', 'verify', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
+        `far research: expected 'start', 'inspect', 'verify', 'export', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
           '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--json] [--out <file>]\n' +
           '         far research inspect <run.json> [--json]\n' +
-          '         far research verify <run.json> [--json]\n' +
+          '         far research verify <run.json|bundle-dir> [--json]\n' +
+          '         far research export <run.json> --out <bundle-dir> [--json]\n' +
           '         far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile ...]\n',
       );
       return 2;
@@ -1007,6 +1017,23 @@ USAGE:
   far research inspect <run.json> [--json]
                          print a saved ResearchRun (hypotheses · scorecards · plan · run modes)
     exits 0 success · 1 read/parse failure · 2 bad args
+
+  far research verify <run.json | bundle-dir> [--json]
+                         third-party recompute of the deterministic layer (corpus rootHash ·
+                         citation binding · deterministic scorecard · Pareto front · primary
+                         selection). A bundle-dir is integrity-checked against its manifest first.
+    exits 0 PASS · 7 tamper/mismatch · 1 read/parse failure · 2 bad args
+
+  far research export <run.json> --out <bundle-dir> [--json]
+                         freeze the run into a portable hash-pinned bundle (research-run.json +
+                         manifest.json + standalone verify.mjs + README). LLM text is frozen, not
+                         re-generated; the deterministic layer is independently recomputable.
+    exits 0 success · 1 read/write failure · 2 bad args
+
+  far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile ...]
+                         apply a structured feedback signal → immutable revision (plan_rewrite
+                         triggers a real redesign). Revisions never force monotonic improvement.
+    exits 0 success · 1 failure · 2 bad args
 
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
