@@ -244,7 +244,9 @@ export interface FeedbackSignal {
 
 /**
  * An immutable revision (directive §9.10). Revisions are versioned, comparable,
- * and rollback-referencable: each carries a parent id and a before/after diff.
+ * and rollback-referencable: each carries a parent id, a before/after plan
+ * snapshot (so the diff is recomputable from frozen state, not from prose),
+ * and a before/after diff summary.
  */
 export interface Revision {
   /** Deterministic revision id (hash of parent + content). */
@@ -267,6 +269,10 @@ export interface Revision {
   readonly metricChanges: readonly string[];
   /** Unresolved conflicts left open. */
   readonly unresolvedConflicts: readonly string[];
+  /** Frozen plan BEFORE this revision (null for the first revision). */
+  readonly beforePlan: ResearchPlan | null;
+  /** Frozen plan AFTER this revision (null = not frozen; legacy revisions). */
+  readonly afterPlan: ResearchPlan | null;
   /** ISO timestamp. */
   readonly createdAt: string;
 }
