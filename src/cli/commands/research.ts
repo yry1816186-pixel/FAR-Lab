@@ -17,7 +17,7 @@ import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gate
 import { createCorpusSnapshot, createReplayAdapter, CitationResolver } from '../../retrieval/index.ts';
 import { runResearch, selectPrimaryHypothesis } from '../../research/orchestrator.ts';
 import { ResearchabilityBlockedError } from '../../research/researchability_gate.ts';
-import { buildFeedbackSignal, createRevision } from '../../research/revision.ts';
+import { buildFeedbackSignal, createRevision, compareResearchPlans } from '../../research/revision.ts';
 import { designResearchPlan } from '../../research/research_plan.ts';
 import { bindCitations } from '../../research/citation.ts';
 import {
@@ -384,6 +384,100 @@ export function runResearchVerify(args: readonly string[]): number {
   return 0;
 }
 
+/** Run `far research compare <run.json> [--revision <a> <b>]`. */
+export function runResearchCompare(args: readonly string[]): number {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write('far research compare: missing <run.json>.\n  usage: far research compare <run.json> [--revision <a> <b>] [--json]\n');
+    return 2;
+  }
+
+  let run: ResearchRun;
+  try {
+    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+  } catch (err) {
+    process.stderr.write(`far research compare: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+  if (run.revisions.length === 0) {
+    process.stderr.write('far research compare: the run has no revisions yet (apply feedback first: far research feedback <run.json> --file feedback.json)\n');
+    return 1;
+  }
+
+  // Resolve the two plans to compare: default = first revision's before vs the
+  // latest revision's after. --revision a b overrides (1-based numbers).
+  const revIdx = args.indexOf('--revision');
+  const resolved = ((): {
+    before: ResearchRun['plan'] | null;
+    after: ResearchRun['plan'] | null;
+    label: string;
+  } => {
+    if (revIdx !== -1) {
+      const a = Number(args[revIdx + 1]);
+      const b = Number(args[revIdx + 2]);
+      const revA = run.revisions.find((r) => r.number === a);
+      const revB = run.revisions.find((r) => r.number === b);
+      if (revA === undefined || revB === undefined) {
+        process.stderr.write(`far research compare: revision numbers ${a}/${b} not found (have ${run.revisions.map((r) => r.number).join(',')})\n`);
+        return { before: null, after: null, label: 'error' };
+      }
+      return {
+        before: revA.beforePlan ?? revA.afterPlan,
+        after: revB.afterPlan ?? revB.beforePlan,
+        label: `revision ${a} before vs revision ${b} after`,
+      };
+    }
+    const first = run.revisions[0]!;
+    const last = run.revisions[run.revisions.length - 1]!;
+    return {
+      before: first.beforePlan ?? run.plan,
+      after: last.afterPlan ?? run.plan,
+      label: 'first-before vs latest-after',
+    };
+  })();
+  if (resolved.before === null || resolved.after === null) {
+    return 2;
+  }
+  const { before, after, label } = resolved;
+
+  const diff = compareResearchPlans(before, after);
+  const json = args.includes('--json');
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ label, beforePlanId: before.primaryHypothesisId, afterPlanId: after.primaryHypothesisId, diff }, null, 2)}\n`);
+    return 0;
+  }
+
+  const lines: string[] = [
+    '',
+    `  FAR-Lab · far research compare — ${label}`,
+    `  run: ${run.runId} · revisions: ${run.revisions.length}`,
+    '  ─────────────────────────────────────────────────────────────────────',
+  ];
+  if (diff.identical) {
+    lines.push('  (no plan changes between the two frozen states — recorded honestly)');
+  }
+  if (diff.primaryHypothesisChanged) {
+    lines.push(`  primary hypothesis: ${before.primaryHypothesisId.slice(0, 8)}… → ${after.primaryHypothesisId.slice(0, 8)}…`);
+  }
+  for (const c of diff.stringFieldChanges) {
+    lines.push(`  [${c.field}] "${c.before.slice(0, 60)}…" → "${c.after.slice(0, 60)}…"`);
+  }
+  for (const [field, diffEntry] of Object.entries(diff.arrayFieldChanges)) {
+    lines.push(`  [${field}] +${diffEntry.added.length} added · -${diffEntry.removed.length} removed · =${diffEntry.unchanged.length} unchanged`);
+    for (const item of diffEntry.added.slice(0, 3)) lines.push(`      + ${item}`);
+    for (const item of diffEntry.removed.slice(0, 3)) lines.push(`      - ${item}`);
+  }
+  lines.push(
+    `  unchanged fields: ${diff.unchangedArrayFields.length} array fields (${diff.unchangedArrayFields.join(', ')})`,
+    '',
+    '  note: comparisons never force improvement — a revision may honestly make',
+    '  the plan worse, narrower, or more uncertain.',
+    '',
+  );
+  process.stdout.write(lines.join('\n'));
+  return 0;
+}
+
 /** Verify bundle file integrity against the manifest (tamper detection). */
 function verifyBundleIntegrity(bundleDir: string): number {
   let manifest: { files?: ReadonlyArray<{ path: string; sha256: string }>; runId?: unknown };
@@ -549,6 +643,7 @@ export async function runResearchFeedback(args: readonly string[]): Promise<numb
           alternatives,
           corpus: run.corpus,
           feedbackText: feedback.text,
+          stageId: 'research_plan_revision',
         });
         newPlan = redesigned.plan;
         planChanges.push(
@@ -565,6 +660,8 @@ export async function runResearchFeedback(args: readonly string[]): Promise<numb
     number: run.revisions.length + 1,
     feedback,
     changes: { hypothesisChanges, planChanges, metricChanges, unresolvedConflicts },
+    beforePlan: run.plan,
+    afterPlan: newPlan,
   });
 
   const updated: ResearchRun = {

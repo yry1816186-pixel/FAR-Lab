@@ -222,4 +222,47 @@ export const RESEARCH_DEMO_FIXTURES: Readonly<Record<string, string>> = Object.f
     nextRoundDecisionRules: ['If artifact hypothesis rejected, promote tidal hypothesis'],
     humanApprovalRequired: ['Publication of any real conclusion'],
   }),
+  research_plan_revision: JSON.stringify({
+    objectives: [
+      'Test whether radius inflation persists after starspot correction',
+      'Pre-register a control analysis on activity-corrected vs uncorrected subsamples',
+    ],
+    preregisteredPredictions: [
+      'Inflation residual anti-correlates with activity index',
+      'The control subsample shows no residual inflation after correction',
+    ],
+    dataRequirements: [
+      'Homogeneous transit sample with activity proxies',
+      'Control subsample with independent multi-band photometry',
+    ],
+    inclusionExclusionCriteria: [
+      'Include hot Jupiters with measured activity index; exclude blended systems',
+      'Exclude systems without an independent activity proxy (control analysis)',
+    ],
+    variables: ['radius_ratio (dimensionless)', 'activity_index S_HK (dimensionless)'],
+    design: 'Retrospective cross-sectional study with a pre-registered control subsample; correct for spot contamination, then re-fit radii on both subsamples',
+    analysisDag: [
+      'Select sample',
+      'Split control vs main subsample',
+      'Compute activity proxies',
+      'Fit corrected radii (both subsamples)',
+      'Correlate residual vs activity (main) and test null residual (control)',
+    ],
+    tools: ['Python 3.12', 'numpy', 'scipy'],
+    statisticalMethods: ['Pearson correlation with bootstrap confidence intervals', 'Equivalence test for the control subsample null residual'],
+    sampleSizeRationale: 'Power analysis for r>0.5 at alpha=0.05 requires n>=30 per subsample',
+    multiplicityHandling: 'Two pre-registered tests; Bonferroni alpha=0.025 each',
+    missingOutlierStrategy: 'Listwise deletion; winsorize at 1%',
+    stoppingConditions: [
+      'Stop if n<30 per subsample (under-powered)',
+      'Stop if correlation insignificant and CI excludes 0.5',
+      'Stop if the control subsample shows a significant residual (systematics uncontrolled)',
+    ],
+    checkpoints: ['After sample selection', 'After subsample split', 'After correction'],
+    budget: 'Compute-only; no new observations',
+    risks: ['Activity proxy heterogeneity', 'Control subsample selection bias'],
+    reproducibility: ['Pin software versions; seed all stochastic steps'],
+    nextRoundDecisionRules: ['If artifact hypothesis rejected, promote tidal hypothesis', 'If control residual is significant, trigger instrument-systematic review'],
+    humanApprovalRequired: ['Publication of any real conclusion', 'Release of the control-subsample selection criteria'],
+  }),
 });

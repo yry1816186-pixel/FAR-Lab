@@ -10,7 +10,7 @@
  */
 
 import { rawSha256Hex } from '../retrieval/hash.ts';
-import type { FeedbackSignal, Revision } from './types.ts';
+import type { FeedbackSignal, ResearchPlan, Revision } from './types.ts';
 
 /** Change inputs for building a revision. */
 export interface RevisionChangeInput {
@@ -26,12 +26,16 @@ export interface RevisionChangeInput {
 
 /**
  * Build an immutable Revision (deterministic id = hash(parent + feedback + changes)).
+ * `beforePlan`/`afterPlan` freeze the plans so the diff is recomputable from
+ * stored state (directive §9.10 "不可变、可比较、可回滚引用").
  */
 export function createRevision(input: {
   readonly parentRevisionId: string | null;
   readonly number: number;
   readonly feedback: FeedbackSignal;
   readonly changes: RevisionChangeInput;
+  readonly beforePlan?: ResearchPlan | null;
+  readonly afterPlan?: ResearchPlan;
   readonly createdAt?: string;
 }): Revision {
   const createdAt = input.createdAt ?? new Date().toISOString();
@@ -51,6 +55,8 @@ export function createRevision(input: {
     planChanges: [...input.changes.planChanges],
     metricChanges: [...input.changes.metricChanges],
     unresolvedConflicts: [...input.changes.unresolvedConflicts],
+    beforePlan: input.beforePlan ?? null,
+    afterPlan: input.afterPlan ?? null,
     createdAt,
   };
 }
@@ -79,5 +85,98 @@ export function buildFeedbackSignal(input: {
     changesScore: input.changesScore ?? false,
     triggers: [...(input.triggers ?? ['none'])],
     text: input.text,
+  };
+}
+
+/** One array-field diff (added / removed / unchanged counts + items). */
+export interface ArrayFieldDiff {
+  readonly added: readonly string[];
+  readonly removed: readonly string[];
+  readonly unchanged: readonly string[];
+}
+
+/** A structured, deterministic diff between two research plans. */
+export interface ResearchPlanDiff {
+  /** String fields that changed (name → before/after values). */
+  readonly stringFieldChanges: ReadonlyArray<{
+    readonly field: string;
+    readonly before: string;
+    readonly after: string;
+  }>;
+  /** Array fields with content changes (field → diff). */
+  readonly arrayFieldChanges: Readonly<Record<string, ArrayFieldDiff>>;
+  /** Array fields present in both plans with zero changes. */
+  readonly unchangedArrayFields: readonly string[];
+  /** Primary hypothesis changed? */
+  readonly primaryHypothesisChanged: boolean;
+  /** True iff nothing changed (identical plans). */
+  readonly identical: boolean;
+}
+
+/** Array-valued plan field names (the rest are strings). */
+const PLAN_ARRAY_FIELDS = [
+  'objectives',
+  'preregisteredPredictions',
+  'dataRequirements',
+  'inclusionExclusionCriteria',
+  'variables',
+  'analysisDag',
+  'tools',
+  'statisticalMethods',
+  'stoppingConditions',
+  'checkpoints',
+  'risks',
+  'reproducibility',
+  'nextRoundDecisionRules',
+  'humanApprovalRequired',
+] as const;
+
+const PLAN_STRING_FIELDS = [
+  'design',
+  'sampleSizeRationale',
+  'multiplicityHandling',
+  'missingOutlierStrategy',
+  'budget',
+] as const;
+
+/**
+ * Deterministically diff two research plans (directive §9.10 "版本比较").
+ * Pure: same inputs → same diff. Never requires improvement.
+ */
+export function compareResearchPlans(before: ResearchPlan, after: ResearchPlan): ResearchPlanDiff {
+  const stringFieldChanges: { field: string; before: string; after: string }[] = [];
+  for (const field of PLAN_STRING_FIELDS) {
+    if (before[field] !== after[field]) {
+      stringFieldChanges.push({ field, before: before[field], after: after[field] });
+    }
+  }
+
+  const arrayFieldChanges: Record<string, ArrayFieldDiff> = {};
+  const unchangedArrayFields: string[] = [];
+  for (const field of PLAN_ARRAY_FIELDS) {
+    const b = new Set(before[field]);
+    const a = new Set(after[field]);
+    const added = [...a].filter((v) => !b.has(v));
+    const removed = [...b].filter((v) => !a.has(v));
+    const unchanged = [...b].filter((v) => a.has(v));
+    if (added.length > 0 || removed.length > 0) {
+      arrayFieldChanges[field] = { added, removed, unchanged };
+    } else {
+      unchangedArrayFields.push(field);
+    }
+  }
+
+  const primaryHypothesisChanged = before.primaryHypothesisId !== after.primaryHypothesisId;
+  const identical =
+    stringFieldChanges.length === 0 &&
+    Object.keys(arrayFieldChanges).length === 0 &&
+    !primaryHypothesisChanged;
+
+  return {
+    stringFieldChanges,
+    arrayFieldChanges,
+    unchangedArrayFields,
+    primaryHypothesisChanged,
+    identical,
   };
 }

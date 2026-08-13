@@ -39,6 +39,7 @@ import {
   runResearchFeedback,
   runResearchVerify,
   runResearchExport,
+  runResearchCompare,
 } from './commands/research.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
@@ -266,15 +267,19 @@ const COMMANDS: readonly CliCommand[] = [
       if (subcommand === 'export') {
         return runResearchExport(args.slice(1));
       }
+      if (subcommand === 'compare') {
+        return runResearchCompare(args.slice(1));
+      }
       if (subcommand === 'start') {
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'inspect', 'verify', 'export', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
+        `far research: expected 'start', 'inspect', 'verify', 'export', 'compare', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
           '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--json] [--out <file>]\n' +
           '         far research inspect <run.json> [--json]\n' +
           '         far research verify <run.json|bundle-dir> [--json]\n' +
           '         far research export <run.json> --out <bundle-dir> [--json]\n' +
+          '         far research compare <run.json> [--revision <a> <b>] [--json]\n' +
           '         far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile ...]\n',
       );
       return 2;
@@ -1034,6 +1039,11 @@ USAGE:
                          apply a structured feedback signal → immutable revision (plan_rewrite
                          triggers a real redesign). Revisions never force monotonic improvement.
     exits 0 success · 1 failure · 2 bad args
+
+  far research compare <run.json> [--revision <a> <b>] [--json]
+                         deterministic plan diff between frozen revision states (default: first
+                         revision's before-plan vs latest revision's after-plan).
+    exits 0 success · 1 no revisions / read failure · 2 bad args
 
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
