@@ -33,6 +33,7 @@ import { runCAstro } from './commands/c_astro.ts';
 import { runCAstroLoop } from './commands/c_astro_loop.ts';
 import { runGround } from './commands/ground.ts';
 import { runCheckResource } from './commands/check_resource.ts';
+import { runResearchInspect, runResearchStart, runResearchFeedback, runResearchVerify } from './commands/research.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
 import { runReplay } from './commands/replay.ts';
@@ -243,6 +244,33 @@ const COMMANDS: readonly CliCommand[] = [
     run: async (args) => runCheckResource(args),
   },
   {
+    name: 'research',
+    description: 'Track-1A vertical slice: ground → generate 3-5 hypotheses → critique → score → plan (start|inspect|feedback)',
+    run: async (args) => {
+      const subcommand = args[0];
+      if (subcommand === 'inspect') {
+        return runResearchInspect(args.slice(1));
+      }
+      if (subcommand === 'feedback') {
+        return runResearchFeedback(args.slice(1));
+      }
+      if (subcommand === 'verify') {
+        return runResearchVerify(args.slice(1));
+      }
+      if (subcommand === 'start') {
+        return runResearchStart(args.slice(1));
+      }
+      process.stderr.write(
+        `far research: expected 'start', 'inspect', 'verify', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
+          '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--json] [--out <file>]\n' +
+          '         far research inspect <run.json> [--json]\n' +
+          '         far research verify <run.json> [--json]\n' +
+          '         far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile ...]\n',
+      );
+      return 2;
+    },
+  },
+  {
     name: 'lifecycle',
     description: 'retraction/correction/supersession lifecycle (IC-05; tombstone append-only)',
     run: async (args) => {
@@ -280,7 +308,11 @@ async function main(): Promise<void> {
     process.argv.slice(2),
   );
   if (exitCode !== undefined) {
-    process.exit(exitCode);
+    // Natural exit (exitCode) instead of process.exit(): on Windows, an undici
+    // fetch followed by a force-exit in the same tick races libuv handle teardown
+    // (assertion !(handle->flags & UV_HANDLE_CLOSING), exit 0xC0000409). Letting
+    // the event loop drain gives undici's keep-alive sockets time to close cleanly.
+    process.exitCode = exitCode;
   }
 }
 
@@ -953,6 +985,27 @@ USAGE:
     --json              machine-readable ResourceValidation output
     exits 0 VERIFIED · 7 NOT_FOUND (fabrication signal) · 8 UNAVAILABLE (env failure) · 9 UNSUPPORTED · 1 bad args
 
+  far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>]
+                   [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]
+                         Track-1A vertical slice (赛道一·方向一·A): ground the question in real
+                         literature (supporting + counter-evidence) → CorpusSnapshot → generate 3-5
+                         mechanistically-distinct candidate hypotheses (corpus-injected, citation
+                         allowlist) → independent critique → deterministic scorecard + Pareto front →
+                         executable research plan. Citations must bind to the corpus; scoring is
+                         deterministic + independently critiqued (no single model total score).
+    --source <s>        openalex (default) | arxiv | crossref
+    --max-per-query <n> docs per query, 1..25 (default 5)
+    --profile <p>       offline_replay (default; synthetic fixtures, RECORDED_REPLAY) |
+                        competition_aliyun_qwen (LIVE; needs FAR_DASHSCOPE_API_KEY)
+    --target <n>        hypothesis count 3..5 (default 3)
+    --json              machine-readable ResearchRun output
+    --out <file>        save the ResearchRun JSON
+    exits 0 success · 1 pipeline failure · 2 bad args
+
+  far research inspect <run.json> [--json]
+                         print a saved ResearchRun (hypotheses · scorecards · plan · run modes)
+    exits 0 success · 1 read/parse failure · 2 bad args
+
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
     --json        machine-readable output (used by CI to backfill <X_FROM_STATUS_DUMP> placeholders)
@@ -1130,5 +1183,7 @@ main().catch((error: unknown) => {
   const msg = errorMessage(error);
   // Thrown errors already self-identify as 'far <cmd>: …'; avoid the redundant 'far: failed —' double-prefix.
   process.stderr.write(`${msg.startsWith('far ') ? msg : `far: ${msg}`}\n`);
-  process.exit(1);
+  // Natural exit (see main()): a force-exit right after an undici fetch can crash
+  // on Windows with a libuv assertion; exitCode lets teardown finish cleanly.
+  process.exitCode = 1;
 });

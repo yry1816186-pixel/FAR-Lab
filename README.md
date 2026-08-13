@@ -1,14 +1,25 @@
 # FAR-Lab
 
-**Falsifiable · Tamper-Detectable · Independently Recomputable AI-for-Science framework.**
+**An evidence-constrained, falsifiable, iterable, traceable open-source AI Scientist research system.**
 
-> 🎯 **一句话：FAR-Lab 是 AI4S 结论的证据验证层——让 LLM 生成的科学假设，其证据链与裁决可被任何人独立核验、重算与防篡改检测。**
-> （[09 Product Thesis](docs/design/09_PRODUCT_THESIS_SCOPE_NON_GOALS_HERO_AND_ADOPTION.md)：LLM 提假设，确定性规则核裁决；验证层是 AI Scientist 走向可信生产的底座）
+> 🎯 **一句话：FAR-Lab 是一个证据约束、可证伪、可迭代、可追溯、可复现边界清楚的开源 AI Scientist 研究系统——它从科学问题出发，调用真实文献与数据源生成并比较候选假设，设计可执行研究计划，吸收人工/文献/工具反馈完成修订，并通过确定性验证内核和内容寻址证据链约束模型幻觉与科研表演。**
+>
+> 产品关系（赛道一·方向一·A：科学假设生成与研究计划设计）：
+> ```text
+> AI Scientist 科研生成、证据整合与研究规划主系统   (far research: 生成候选假设 + 比较 + 研究计划)
+>                          ↓
+> FAR-Lab 确定性可信验证内核                        (R0–R9 裁决 / FEC 可证伪契约 / 内容寻址证据链)
+>                          ↓
+> 可追溯证据、裁决、版本与复现包                    (.far-proof / ProofEnvelope / 第三方独立重算)
+> ```
 
-> FAR-Lab is a **claim-level verification layer for AI4S scientific claims**. It does not chase the
-> "fully-automated scientist" narrative. Instead it uses a deterministic verdict kernel and a
-> content-addressed evidence chain to constrain LLM-generated hypotheses inside engineering
-> boundaries that are **falsifiable, recomputable, and traceable**.
+> FAR-Lab is an **open-source AI Scientist research system**: it starts from a scientific question,
+> grounds it in real literature (OpenAlex / arXiv / Crossref, supporting **and** counter-evidence),
+> generates and compares **mechanistically-distinct candidate hypotheses**, designs an **executable
+> research plan**, and routes every claim through a **deterministic verdict kernel** — not an LLM —
+> so the result is falsifiable, tamper-detectable, and independently recomputable. It does not chase
+> the "fully-automated scientist" narrative: **the LLM proposes, the deterministic kernel decides, and
+> a third party can re-verify**.
 >
 > 🇨🇳 中文文档：[README.zh-CN.md](README.zh-CN.md)
 
@@ -118,14 +129,37 @@ detached from evidence). FAR-Lab closes all three with:
   scientific adjudication.
 - ❌ It does **not** use an LLM as the final arbiter. The LLM generates hypotheses; the deterministic
   R0–R9 kernel decides.
-- ❌ It is **not** a general AI4S benchmark. It is a verification layer.
+- ❌ It is **not** a "fully-automated scientist" — the hypothesis/plan generator and the verifier are
+  separate roles, and human approval gates are first-class (see the research plan's
+  `humanApprovalRequired`).
 - ❌ It does **not** claim physical immutability or full reproducibility — see *Known limits*.
+
+---
+
+## Live quickstart (Track 1A: hypothesis generation + research plan)
+
+```bash
+# Ground a question in real literature, generate 3-5 candidate hypotheses,
+# critique them independently, score them, and design an executable plan.
+node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" \
+  --profile competition_aliyun_qwen --source openalex
+```
+
+This is the **representative live path**: real Qwen generation + real OpenAlex retrieval in one run.
+Every stage records its component mode (`modelExecutionMode` / `retrievalExecutionMode`) and the
+aggregate `runMode` (`LIVE` only when all science-affecting components are live).
+
+**Without a key** (`NEEDS_API_KEY`): the same command defaults to `offline_replay` and replays
+synthetic fixtures (`runMode=RECORDED_REPLAY`) — this proves the pipeline *wiring* (citation binding,
+deterministic scoring, Pareto front, plan design), **not** any scientific truth. The deterministic
+verification kernel (`far demo`, `far verify-golden`, `far verify`) runs fully offline with zero key.
 
 ---
 
 ## How it compares
 
-FAR-Lab occupies a distinct niche — **claim-level falsifiability verification** — that is largely
+FAR-Lab is an **AI Scientist research system** (hypothesis generation + research planning) whose
+distinctive trust layer is **claim-level falsifiability verification** — a niche that is largely
 **complementary** to (not a replacement for) the established categories below. It can *consume* their
 outputs as evidence and *export* to provenance standards.
 
