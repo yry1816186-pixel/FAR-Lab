@@ -76,6 +76,42 @@ export const RESEARCH_DEMO_DOCS: readonly RetrievedDocument[] = [DOC_A, DOC_B];
 
 /** The offline_replay fixture registry for the research module (stageId → JSON). */
 export const RESEARCH_DEMO_FIXTURES: Readonly<Record<string, string>> = Object.freeze({
+  baseline_direct: JSON.stringify({
+    bestHypothesis: '[SYNTHETIC] Direct answer: the anomaly is starspot contamination.',
+    mechanism: '[SYNTHETIC] spots bias transit depth.',
+    planSummary: '[SYNTHETIC] compare activity indices with radius residuals.',
+    hypotheses: [{ statement: '[SYNTHETIC] starspot artifact' }],
+  }),
+  baseline_rag: JSON.stringify({
+    bestHypothesis: '[SYNTHETIC] RAG answer: the anomaly is starspot contamination.',
+    mechanism: '[SYNTHETIC] spots bias transit depth.',
+    planSummary: '[SYNTHETIC] re-fit radii after spot correction using retrieved context.',
+    hypotheses: [{ statement: '[SYNTHETIC] starspot artifact (rag)' }],
+  }),
+  baseline_no_kernel: JSON.stringify({
+    hypotheses: [
+      {
+        statement: '[SYNTHETIC] starspot artifact (no kernel)',
+        mechanism: '[SYNTHETIC] spots bias depth',
+        falsificationMethod: { prediction: 'p', metric: 'pearson_r', comparator: 'gt', value: 0.5 },
+        modelTotalScore: 8.5,
+      },
+      {
+        statement: '[SYNTHETIC] tidal heating (no kernel)',
+        mechanism: '[SYNTHETIC] dissipation inflates',
+        falsificationMethod: { prediction: 'p2', metric: 'slope', comparator: 'gt', value: 0 },
+        modelTotalScore: 7.0,
+      },
+      {
+        statement: '[SYNTHETIC] red noise artifact (no kernel)',
+        mechanism: '[SYNTHETIC] correlated noise broadens transit',
+        falsificationMethod: { prediction: 'p3', metric: 'reduction_ratio', comparator: 'lt' },
+        modelTotalScore: 6.2,
+      },
+    ],
+    bestHypothesis: '[SYNTHETIC] starspot artifact (no kernel)',
+    planSummary: '[SYNTHETIC] self-scored winner chosen; no deterministic binding or scoring ran.',
+  }),
   research_decompose: JSON.stringify({
     knownFacts: [
       'Hot Jupiters show measured radii larger than standard structure models predict',
