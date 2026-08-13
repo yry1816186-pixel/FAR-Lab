@@ -20,7 +20,7 @@ import { sanitizeExternalContent } from '../llm_gateway/sanitizer.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import type { FalsificationMethod } from '../agent_loop/types.ts';
-import { callStructuredJson } from './llm.ts';
+import { callStructuredJson, type CallMeta } from './llm.ts';
 import type { HypothesisCandidate } from './types.ts';
 
 /** Options for hypothesis generation. */
@@ -88,12 +88,13 @@ function renderCorpusAllowlist(corpus: CorpusSnapshot): string {
  *
  * The corpus content is injected as untrusted data; the model may cite only the
  * listed documentIds. Candidate ids are computed locally (never model-minted).
+ * Returns the hypotheses plus the provider CallMeta for the stage receipt.
  */
 export async function generateHypotheses(
   gateway: LlmGateway,
   profile: ProviderProfile,
   opts: GenerateHypothesesOptions,
-): Promise<readonly HypothesisCandidate[]> {
+): Promise<{ hypotheses: readonly HypothesisCandidate[]; meta: CallMeta }> {
   const targetCount = opts.targetCount ?? 3;
   const allowlist = renderCorpusAllowlist(opts.corpus);
 
@@ -120,12 +121,18 @@ export async function generateHypotheses(
     allowlist,
   ].join('\n');
 
-  const parsed = await callStructuredJson(gateway, profile, 'research_hypotheses', GenerationZod, [
-    { role: 'system', content: system },
-    { role: 'user', content: user },
-  ]);
+  const { data: parsed, meta } = await callStructuredJson(
+    gateway,
+    profile,
+    'research_hypotheses',
+    GenerationZod,
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  );
 
-  return parsed.hypotheses.map((c) => {
+  const hypotheses = parsed.hypotheses.map((c) => {
     const falsificationMethod: FalsificationMethod = {
       prediction: c.falsificationMethod.prediction,
       metric: c.falsificationMethod.metric,
@@ -156,4 +163,6 @@ export async function generateHypotheses(
       risks: c.risks,
     } satisfies HypothesisCandidate;
   });
+
+  return { hypotheses, meta };
 }

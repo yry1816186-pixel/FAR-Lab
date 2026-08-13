@@ -19,7 +19,7 @@ import type { CorpusSnapshot } from '../retrieval/corpus.ts';
 import { sanitizeExternalContent } from '../llm_gateway/sanitizer.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
-import { callStructuredJson } from './llm.ts';
+import { callStructuredJson, type CallMeta } from './llm.ts';
 import type {
   CritiqueDimension,
   CritiqueReport,
@@ -83,16 +83,21 @@ export interface CritiqueOptions {
 /**
  * Critique one hypothesis independently.
  *
- * Returns the CritiqueReport (findings + model-graded dimensions). The model
- * dimension grades are returned separately from the report so the caller can
- * merge them into the scorecard without coupling critique → scorecard types.
+ * Returns the CritiqueReport (findings + model-graded dimensions) plus the
+ * provider CallMeta for the stage receipt. The model dimension grades are
+ * returned separately from the report so the caller can merge them into the
+ * scorecard without coupling critique → scorecard types.
  */
 export async function critiqueHypothesis(
   gateway: LlmGateway,
   profile: ProviderProfile,
   candidate: HypothesisCandidate,
   opts: CritiqueOptions,
-): Promise<{ report: CritiqueReport; modelDimensions: readonly ScorecardDimension[] }> {
+): Promise<{
+  report: CritiqueReport;
+  modelDimensions: readonly ScorecardDimension[];
+  meta: CallMeta;
+}> {
   const corpusSummary = opts.corpus.documentCount === 0
     ? '(empty corpus)'
     : sanitizeExternalContent(
@@ -129,10 +134,16 @@ export async function critiqueHypothesis(
     corpusSummary,
   ].join('\n');
 
-  const parsed = await callStructuredJson(gateway, profile, 'research_critique', CritiqueZod, [
-    { role: 'system', content: system },
-    { role: 'user', content: user },
-  ]);
+  const { data: parsed, meta } = await callStructuredJson(
+    gateway,
+    profile,
+    'research_critique',
+    CritiqueZod,
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  );
 
   const modelDimensions: ScorecardDimension[] = parsed.modelDimensions.map((d) => ({
     name: d.name,
@@ -152,5 +163,6 @@ export async function critiqueHypothesis(
       sameModelAsGenerator: opts.sameModelAsGenerator,
     },
     modelDimensions,
+    meta,
   };
 }

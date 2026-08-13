@@ -24,6 +24,8 @@
 import type { FalsificationMethod } from '../agent_loop/types.ts';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
 import type { RetrievedDocument } from '../retrieval/types.ts';
+import type { EnvironmentFingerprint, StageReceipt } from './provenance.ts';
+import type { ResearchabilityReport } from './researchability_gate.ts';
 
 /** Per-component execution mode (directive §3.2). */
 export type ComponentMode =
@@ -277,6 +279,8 @@ export interface ResearchRun {
   readonly runId: string;
   /** The scientific question. */
   readonly question: string;
+  /** The researchability gate report (the honest first step of the run). */
+  readonly gateReport: ResearchabilityReport;
   /** The grounding corpus (supporting + counter-evidence). */
   readonly corpus: CorpusSnapshot;
   /** Candidate hypotheses (3-5, mechanistically distinct). */
@@ -291,6 +295,10 @@ export interface ResearchRun {
   readonly plan: ResearchPlan;
   /** Revisions in order (may be empty before feedback). */
   readonly revisions: readonly Revision[];
+  /** Per-stage provenance receipts (directive §3.3). */
+  readonly stageReceipts: readonly StageReceipt[];
+  /** Software-environment fingerprint (git commit / lockfile / node). */
+  readonly environment: EnvironmentFingerprint;
   /** Per-component run modes. */
   readonly modes: {
     readonly modelExecutionMode: ComponentMode;
@@ -306,3 +314,10 @@ export interface ResearchRun {
 }
 
 export { FalsificationMethod };
+export type { EnvironmentFingerprint, StageReceipt } from './provenance.ts';
+export type {
+  ProblemDecomposition,
+  ResearchabilityReport,
+  ResearchabilityVerdict,
+  ResearchScope,
+} from './researchability_gate.ts';

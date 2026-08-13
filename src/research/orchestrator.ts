@@ -3,7 +3,8 @@
  *
  * One command, one application service:
  *   scientific question
- *     → grounding (real retrieval: supporting + counter-evidence)
+ *     → researchability & safety gate (deterministic screening + model decomposition)
+ *     → grounding (real retrieval: supporting + counter-evidence + decomposition subquestions)
  *     → CorpusSnapshot
  *     → generate 3-5 candidate hypotheses (corpus injected, citation allowlist)
  *     → independent critique pass
@@ -11,16 +12,21 @@
  *     → multi-dimensional scorecard + Pareto front (deterministic + model)
  *     → deterministic primary-hypothesis selection
  *     → structured executable research plan
- *     → ResearchRun (with per-component + aggregate run modes)
+ *     → ResearchRun (per-stage ProvenanceReceipts + per-component/aggregate run modes)
  *
  * The verdict kernel / FEC / proof envelope are the trust layer BELOW this
  * slice and are not re-implemented here.
+ *
+ * Fail-closed everywhere: a gate refusal throws ResearchabilityBlockedError;
+ * a retrieval error propagates (a partial corpus would mislead); a structured
+ * output failure propagates (a default payload would mislead).
  */
 
 import { ulid } from 'ulid';
 import { groundResearchQuestion, type GroundedCorpus } from '../retrieval/index.ts';
 import type { RetrievalAdapter, DocumentSource } from '../retrieval/types.ts';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
+import { RETRIEVAL_PARSER_VERSION } from '../retrieval/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import { generateHypotheses } from './hypothesis_generation.ts';
@@ -32,6 +38,20 @@ import {
   computeDeterministicDimensions,
   computeParetoFront,
 } from './scorecard.ts';
+import {
+  assessResearchabilityDeterministic,
+  decomposeResearchQuestion,
+  ResearchabilityBlockedError,
+  type ResearchabilityReport,
+} from './researchability_gate.ts';
+import {
+  buildStageReceipt,
+  captureEnvironmentFingerprint,
+  hashCanonicalJson,
+  type EnvironmentFingerprint,
+  type StageReceipt,
+} from './provenance.ts';
+import type { CallMeta } from './llm.ts';
 import type {
   CitationBinding,
   ComponentMode,
@@ -69,21 +89,87 @@ export interface RunResearchOptions {
   readonly sameModelAsGenerator?: boolean;
   /** Optional run id (default: ULID). */
   readonly runId?: string;
+  /** Injected environment fingerprint (hermetic tests; default = real capture). */
+  readonly environment?: EnvironmentFingerprint;
+  /** Time source (hermetic tests). */
+  readonly now?: () => Date;
 }
+
+/** Maximum decomposition subquestions injected as extra grounding queries. */
+const MAX_DECOMPOSITION_QUERIES = 3;
 
 /**
  * Run the full Track-1A vertical slice and return an immutable ResearchRun.
  *
- * Fail-closed: any retrieval error propagates (a partial corpus would mislead);
- * any structured-output failure propagates (a default payload would mislead).
+ * @throws ResearchabilityBlockedError when the gate refuses the question.
+ * @throws Error on any retrieval / structured-output failure (fail-closed).
  */
 export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun> {
   const runId = opts.runId ?? ulid();
-  const startedAt = new Date().toISOString();
+  const now = opts.now ?? (() => new Date());
+  const startedAt = now().toISOString();
   const targetCount = opts.targetHypothesisCount ?? 3;
   const sameModelAsGenerator = opts.sameModelAsGenerator ?? true;
+  const profile = opts.profile;
+  const receipts: StageReceipt[] = [];
+  let sequence = 0;
+  const nextSeq = (): number => {
+    sequence += 1;
+    return sequence;
+  };
 
-  // 1. Ground the question (supporting + counter-evidence → CorpusSnapshot).
+  // ── 1. Researchability & safety gate (deterministic screening first). ─────
+  const screening = assessResearchabilityDeterministic(opts.question);
+  if (screening.verdict === 'UNSUPPORTED') {
+    throw new ResearchabilityBlockedError({
+      question: opts.question,
+      verdict: 'UNSUPPORTED',
+      reasons: screening.reasons,
+      safetyRisks: screening.safetyRisks,
+      scope: screening.scope,
+      decomposition: null,
+      requiresEthicsGate: screening.requiresEthicsGate,
+      assessedAt: startedAt,
+      schemaVersion: 1,
+    });
+  }
+
+  const decomposition = await decomposeResearchQuestion(
+    opts.gateway,
+    profile,
+    opts.question,
+    screening.scope,
+  );
+  const gateReport: ResearchabilityReport = {
+    question: opts.question,
+    verdict: screening.verdict,
+    reasons: screening.reasons,
+    safetyRisks: screening.safetyRisks,
+    scope: screening.scope,
+    decomposition: decomposition.decomposition,
+    requiresEthicsGate: screening.requiresEthicsGate,
+    assessedAt: startedAt,
+    schemaVersion: 1,
+  };
+  receipts.push(
+    buildStageReceipt({
+      runId,
+      stageId: 'researchability_screening',
+      sequence: nextSeq(),
+      component: 'deterministic',
+      mode: profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE',
+      inputHash: hashCanonicalJson({ question: opts.question }),
+      outputHash: hashCanonicalJson({
+        verdict: screening.verdict,
+        reasons: screening.reasons,
+        safetyRisks: screening.safetyRisks,
+      }),
+      createdAt: startedAt,
+    }),
+  );
+  receipts.push(receiptForModel(runId, 'research_decompose', nextSeq(), profile, decomposition.meta));
+
+  // ── 2. Ground the question (supporting + counter-evidence + decomposition subquestions). ──
   const grounded: GroundedCorpus = await groundResearchQuestion({
     question: opts.question,
     source: opts.grounding?.source ?? 'openalex',
@@ -92,36 +178,60 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     ...(opts.grounding?.includeCounterEvidence !== undefined
       ? { includeCounterEvidence: opts.grounding.includeCounterEvidence }
       : {}),
+    extraQueries: decomposition.decomposition.retrievalSubquestions.slice(
+      0,
+      MAX_DECOMPOSITION_QUERIES,
+    ),
   });
   const corpus: CorpusSnapshot = grounded.corpus;
-
-  // 2. Generate 3-5 candidate hypotheses (corpus-injected, citation allowlist).
-  const hypotheses: readonly HypothesisCandidate[] = await generateHypotheses(
-    opts.gateway,
-    opts.profile,
-    { question: opts.question, corpus, targetCount },
+  receipts.push(
+    buildStageReceipt({
+      runId,
+      stageId: 'grounding',
+      sequence: nextSeq(),
+      component: 'retrieval',
+      mode: grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY',
+      dataSource: opts.grounding?.source ?? 'openalex',
+      corpusSnapshotId: corpus.snapshotId,
+      corpusRootHash: corpus.rootHash,
+      retrievedAt: grounded.groundedAt,
+      parserVersion: RETRIEVAL_PARSER_VERSION,
+      createdAt: grounded.groundedAt,
+    }),
   );
 
-  // 3. Bind citations (deterministic set-membership against the corpus).
+  // ── 3. Generate 3-5 candidate hypotheses (corpus-injected, citation allowlist). ──
+  const generated = await generateHypotheses(opts.gateway, profile, {
+    question: opts.question,
+    corpus,
+    targetCount,
+  });
+  const hypotheses: readonly HypothesisCandidate[] = generated.hypotheses;
+  receipts.push(receiptForModel(runId, 'research_hypotheses', nextSeq(), profile, generated.meta));
+
+  // ── 4. Bind citations (deterministic set-membership against the corpus). ──
   const bindings: Record<string, CitationBinding> = {};
   for (const h of hypotheses) {
     bindings[h.id] = bindCitations(h, grounded.resolver);
   }
 
-  // 4. Independent critique pass (same-model honestly labeled).
+  // ── 5. Independent critique pass (same-model honestly labeled). ──
   const critiques: Record<string, CritiqueReport> = {};
   const modelDimensions: Record<string, ReturnType<typeof computeDeterministicDimensions>> = {};
   for (const h of hypotheses) {
-    const result = await critiqueHypothesis(opts.gateway, opts.profile, h, {
+    const result = await critiqueHypothesis(opts.gateway, profile, h, {
       question: opts.question,
       corpus,
       sameModelAsGenerator,
     });
     critiques[h.id] = result.report;
     modelDimensions[h.id] = result.modelDimensions;
+    receipts.push(
+      receiptForModel(runId, `research_critique:${h.id.slice(0, 8)}`, nextSeq(), profile, result.meta),
+    );
   }
 
-  // 5. Score (deterministic dimensions + model dimensions, merged; Pareto front).
+  // ── 6. Score (deterministic dimensions + model dimensions, merged; Pareto front). ──
   const scorecards: Record<string, HypothesisScorecard> = {};
   for (const h of hypotheses) {
     const binding = bindings[h.id];
@@ -143,22 +253,46 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   for (const id of Object.keys(scorecards)) {
     scorecards[id] = { ...scorecards[id]!, paretoOptimal: pareto.has(id) };
   }
+  receipts.push(
+    buildStageReceipt({
+      runId,
+      stageId: 'scoring',
+      sequence: nextSeq(),
+      component: 'deterministic',
+      mode: profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE',
+      inputHash: hashCanonicalJson({
+        hypotheses: hypotheses.map((h) => ({ id: h.id, falsificationMethod: h.falsificationMethod })),
+        bindings: Object.fromEntries(
+          Object.entries(bindings).map(([id, b]) => [id, { allBound: b.allBound, unbound: b.unbound }]),
+        ),
+      }),
+      outputHash: hashCanonicalJson(
+        Object.fromEntries(
+          Object.entries(scorecards).map(([id, s]) => [id, { paretoOptimal: s.paretoOptimal }]),
+        ),
+      ),
+    }),
+  );
 
-  // 6. Deterministic primary selection (Pareto front + deterministic grades only).
+  // ── 7. Deterministic primary selection (Pareto front + deterministic grades only). ──
   const primary = selectPrimaryHypothesis(hypotheses, scorecards);
   const alternatives = hypotheses.filter((h) => h.id !== primary.id);
 
-  // 7. Design the executable research plan.
-  const plan: ResearchPlan = await designResearchPlan(opts.gateway, opts.profile, {
+  // ── 8. Design the executable research plan. ──
+  const planned = await designResearchPlan(opts.gateway, profile, {
     question: opts.question,
     primary,
     alternatives,
     corpus,
   });
+  const plan: ResearchPlan = planned.plan;
+  receipts.push(receiptForModel(runId, 'research_plan', nextSeq(), profile, planned.meta));
 
-  // 8. Component + aggregate run modes.
+  // ── 9. Environment fingerprint + component/aggregate run modes. ──
+  const environment: EnvironmentFingerprint = opts.environment ?? (await captureEnvironmentFingerprint());
+
   const modelExecutionMode: ComponentMode =
-    opts.profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE';
+    profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE';
   const retrievalExecutionMode: ComponentMode =
     grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY';
   const experimentExecutionMode: ComponentMode = 'NOT_EXECUTED';
@@ -171,6 +305,7 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   return {
     runId,
     question: opts.question,
+    gateReport,
     corpus,
     hypotheses,
     bindings,
@@ -178,11 +313,39 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     scorecards,
     plan,
     revisions: [],
+    stageReceipts: receipts,
+    environment,
     modes,
     runMode: aggregateRunMode(modes),
     startedAt,
-    schemaVersion: 1,
+    schemaVersion: 2,
   };
+}
+
+/** Build a model-stage receipt from a CallMeta (shared shape). */
+function receiptForModel(
+  runId: string,
+  stageId: string,
+  sequence: number,
+  profile: ProviderProfile,
+  meta: CallMeta,
+): StageReceipt {
+  return buildStageReceipt({
+    runId,
+    stageId,
+    sequence,
+    component: 'model',
+    mode: profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE',
+    provider: meta.provider,
+    modelId: meta.modelId,
+    requestId: meta.requestId,
+    modelSnapshot: meta.modelSnapshot,
+    tokenUsage: meta.tokenUsage,
+    latencyMs: meta.latencyMs,
+    retries: meta.attempts - 1,
+    cost: meta.cost,
+    createdAt: meta.isoTimestamp,
+  });
 }
 
 /**

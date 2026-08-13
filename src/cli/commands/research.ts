@@ -15,7 +15,8 @@ import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts'
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
 import { createCorpusSnapshot, createReplayAdapter, CitationResolver } from '../../retrieval/index.ts';
-import { runResearch } from '../../research/orchestrator.ts';
+import { runResearch, selectPrimaryHypothesis } from '../../research/orchestrator.ts';
+import { ResearchabilityBlockedError } from '../../research/researchability_gate.ts';
 import { buildFeedbackSignal, createRevision } from '../../research/revision.ts';
 import { designResearchPlan } from '../../research/research_plan.ts';
 import { bindCitations } from '../../research/citation.ts';
@@ -24,7 +25,6 @@ import {
   computeDeterministicDimensions,
   computeParetoFront,
 } from '../../research/scorecard.ts';
-import { selectPrimaryHypothesis } from '../../research/orchestrator.ts';
 import type { ResearchRun } from '../../research/types.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
 import type { RetrievalAdapter } from '../../retrieval/types.ts';
@@ -153,6 +153,17 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
       sameModelAsGenerator: true,
     });
   } catch (err) {
+    if (err instanceof ResearchabilityBlockedError) {
+      process.stderr.write(
+        `far research: researchability gate REFUSED this question (${err.report.verdict})\n` +
+          `  reasons: ${err.report.reasons.join('; ')}\n` +
+          (err.report.safetyRisks.length > 0
+            ? `  safety: ${err.report.safetyRisks.join('; ')}\n`
+            : '') +
+          '  no research pipeline was run; nothing was fabricated.\n',
+      );
+      return 3;
+    }
     process.stderr.write(
       `far research: pipeline failed (${err instanceof Error ? err.message : String(err)})\n`,
     );
@@ -196,7 +207,9 @@ function renderHuman(profile: string, run: ResearchRun): void {
     '  ─────────────────────────────────────────────────────────────────────',
     `  question : ${run.question}`,
     `  run      : ${run.runId}`,
+    `  gate     : ${run.gateReport.verdict}${run.gateReport.scope.domain !== null ? ` · domain=${run.gateReport.scope.domain}` : ''}${run.gateReport.requiresEthicsGate ? ' · ethics-gate required' : ''}`,
     `  runMode  : ${run.runMode}  (model=${run.modes.modelExecutionMode} · retrieval=${run.modes.retrievalExecutionMode} · experiment=${run.modes.experimentExecutionMode})`,
+    `  receipts : ${run.stageReceipts.length} stage receipts · env git=${run.environment.gitCommit?.slice(0, 8) ?? 'n/a'}${run.environment.gitDirty === true ? ' (dirty)' : ''}`,
     `  corpus   : ${run.corpus.documentCount} docs · snapshot=${run.corpus.snapshotId.slice(0, 12)}…`,
     '  ─────────────────────────────────────────────────────────────────────',
   );
@@ -437,13 +450,14 @@ export async function runResearchFeedback(args: readonly string[]): Promise<numb
         ? createCompetitionQwenGateway({ apiKey: process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY ?? '' })
         : createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
       try {
-        newPlan = await designResearchPlan(gateway, profile, {
+        const redesigned = await designResearchPlan(gateway, profile, {
           question: run.question,
           primary,
           alternatives,
           corpus: run.corpus,
           feedbackText: feedback.text,
         });
+        newPlan = redesigned.plan;
         planChanges.push(
           `plan rewritten per feedback: objectives ${run.plan.objectives.length} → ${newPlan.objectives.length}`,
         );

@@ -13,7 +13,7 @@ import { z } from 'zod';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
-import { callStructuredJson } from './llm.ts';
+import { callStructuredJson, type CallMeta } from './llm.ts';
 import type { HypothesisCandidate, ResearchPlan } from './types.ts';
 
 /** zod schema for the plan body (ids are filled deterministically by caller). */
@@ -55,12 +55,13 @@ export interface DesignPlanOptions {
 
 /**
  * Design the executable research plan for the selected primary hypothesis.
+ * Returns the plan plus the provider CallMeta for the stage receipt.
  */
 export async function designResearchPlan(
   gateway: LlmGateway,
   profile: ProviderProfile,
   opts: DesignPlanOptions,
-): Promise<ResearchPlan> {
+): Promise<{ plan: ResearchPlan; meta: CallMeta }> {
   const alternativesText = opts.alternatives.length === 0
     ? '(no alternatives retained)'
     : opts.alternatives.map((a) => `- ${a.statement}`).join('\n');
@@ -94,32 +95,35 @@ export async function designResearchPlan(
       : []),
   ].join('\n');
 
-  const body = await callStructuredJson(gateway, profile, 'research_plan', PlanBodyZod, [
+  const { data: body, meta } = await callStructuredJson(gateway, profile, 'research_plan', PlanBodyZod, [
     { role: 'system', content: system },
     { role: 'user', content: user },
   ]);
 
   return {
-    objectives: body.objectives,
-    primaryHypothesisId: opts.primary.id,
-    alternativeHypothesisIds: opts.alternatives.map((a) => a.id),
-    preregisteredPredictions: body.preregisteredPredictions,
-    dataRequirements: body.dataRequirements,
-    inclusionExclusionCriteria: body.inclusionExclusionCriteria,
-    variables: body.variables,
-    design: body.design,
-    analysisDag: body.analysisDag,
-    tools: body.tools,
-    statisticalMethods: body.statisticalMethods,
-    sampleSizeRationale: body.sampleSizeRationale,
-    multiplicityHandling: body.multiplicityHandling,
-    missingOutlierStrategy: body.missingOutlierStrategy,
-    stoppingConditions: body.stoppingConditions,
-    checkpoints: body.checkpoints,
-    budget: body.budget,
-    risks: body.risks,
-    reproducibility: body.reproducibility,
-    nextRoundDecisionRules: body.nextRoundDecisionRules,
-    humanApprovalRequired: body.humanApprovalRequired,
+    plan: {
+      objectives: body.objectives,
+      primaryHypothesisId: opts.primary.id,
+      alternativeHypothesisIds: opts.alternatives.map((a) => a.id),
+      preregisteredPredictions: body.preregisteredPredictions,
+      dataRequirements: body.dataRequirements,
+      inclusionExclusionCriteria: body.inclusionExclusionCriteria,
+      variables: body.variables,
+      design: body.design,
+      analysisDag: body.analysisDag,
+      tools: body.tools,
+      statisticalMethods: body.statisticalMethods,
+      sampleSizeRationale: body.sampleSizeRationale,
+      multiplicityHandling: body.multiplicityHandling,
+      missingOutlierStrategy: body.missingOutlierStrategy,
+      stoppingConditions: body.stoppingConditions,
+      checkpoints: body.checkpoints,
+      budget: body.budget,
+      risks: body.risks,
+      reproducibility: body.reproducibility,
+      nextRoundDecisionRules: body.nextRoundDecisionRules,
+      humanApprovalRequired: body.humanApprovalRequired,
+    } satisfies ResearchPlan,
+    meta,
   };
 }
