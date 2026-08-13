@@ -28,14 +28,14 @@ export interface AppShellProps {
 // ---------- Nav item / group types ----------
 
 type NavLabelKey =
-  | 'nav.overview' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard'
+  | 'nav.research' | 'nav.overview' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard'
   | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation'
   | 'nav.report' | 'nav.about' | 'nav.versions' | 'nav.wizard'
   | 'nav.v2receipt' | 'nav.events' | 'nav.planning' | 'nav.audit';
 
 type NavGroupKey =
-  | 'nav.group.verify' | 'nav.group.evidence' | 'nav.group.breadth'
-  | 'nav.group.history' | 'nav.group.meta';
+  | 'nav.group.research' | 'nav.group.verify' | 'nav.group.evidence'
+  | 'nav.group.breadth' | 'nav.group.history' | 'nav.group.meta';
 
 interface NavItem {
   readonly to: string;
@@ -52,6 +52,13 @@ interface NavGroup {
 // ---------- Information architecture (5 groups · 14 links total) ----------
 
 const NAV_GROUPS: readonly NavGroup[] = [
+  {
+    id: 'research',
+    labelKey: 'nav.group.research',
+    items: [
+      { to: '/research', labelKey: 'nav.research', icon: FlaskConical },
+    ],
+  },
   {
     id: 'verify',
     labelKey: 'nav.group.verify',
