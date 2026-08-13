@@ -30,6 +30,7 @@ import type { ProviderProfile } from '../../llm_gateway/types.ts';
 import type { AppendRecordOptions } from '../../evidence_log/types.ts';
 import { ulid } from 'ulid';
 import { groundResearchQuestion, type GroundingOptions } from '../../retrieval/index.ts';
+import type { CorpusSnapshot } from '../../retrieval/corpus.ts';
 
 /**
  * LoopRunnerArgs —— API 层调用 runAgentLoop 的简化入参。
@@ -111,6 +112,19 @@ export interface GroundingReport {
   readonly perQueryCounts: ReadonlyArray<{ readonly query: string; readonly count: number }>;
   readonly fetchMode: 'live' | 'replay';
   readonly groundedAt: string;
+  /**
+   * Post-loop citation cross-check (the K3 thesis, demonstrated at the loop
+   * level): DOIs the loop's stage2 integration cited, split into those that
+   * resolve in the grounding corpus (inCorpus) and those that do not
+   * (notInCorpus — unbound; suggests the run cannot rest on them). null when the
+   * loop cited no DOIs.
+   */
+  readonly citationCrossCheck: {
+    readonly citedDoiCount: number;
+    readonly inCorpus: readonly string[];
+    readonly notInCorpus: readonly string[];
+    readonly allInCorpus: boolean;
+  } | null;
 }
 
 /**
@@ -225,10 +239,17 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
   // corpus snapshot is attached to the result; deep stage-wiring (Qwen proposing
   // from the corpus, CitationResolver rejecting unbound stage4 citations) builds
   // on this additive foundation. Default (no grounding) → byte-identical.
-  let groundingReport: GroundingReport | undefined;
+  // Phase 4b grounded mode: when opted in, FIRST ground the research question in
+  // real retrieved literature + counter-evidence. Fail-closed (a retrieval error
+  // rejects the whole run — no partial corpus). The corpus snapshot is attached
+  // to the result; AFTER the loop we cross-check the loop's cited DOIs against
+  // it (the K3 thesis: citations validated, not trusted). Default → byte-identical.
+  let groundingCorpus: CorpusSnapshot | undefined;
+  let groundingBase: Omit<GroundingReport, 'citationCrossCheck'> | undefined;
   if (args.grounding !== undefined) {
     const grounded = await groundResearchQuestion(args.grounding);
-    groundingReport = {
+    groundingCorpus = grounded.corpus;
+    groundingBase = {
       supportingQuery: grounded.supportingQuery,
       counterEvidenceStrategies: grounded.counterEvidenceQueries.map((c) => c.strategy),
       corpusSnapshotId: grounded.corpus.snapshotId,
@@ -259,10 +280,56 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
       : { verdictDrivenFeedback: args.verdictDrivenFeedback }),
   });
 
+  // Post-loop citation cross-check: do the DOIs the loop's stage2 integration
+  // cited actually resolve in the grounding corpus? (K3 root cause: citations
+  // validated, not trusted. notInCorpus = unbound — cannot ground a verdict.)
+  let citationCrossCheck: GroundingReport['citationCrossCheck'] = null;
+  if (groundingCorpus !== undefined) {
+    const citedDois = extractCitedDoisFromLoop(loopState);
+    if (citedDois.length > 0) {
+      const corpusDois = new Set<string>();
+      for (const doc of groundingCorpus.documents) {
+        if (doc.doi !== null) {
+          corpusDois.add(doc.doi.toLowerCase());
+        }
+      }
+      const inCorpus = citedDois.filter((d) => corpusDois.has(d));
+      const notInCorpus = citedDois.filter((d) => !corpusDois.has(d));
+      citationCrossCheck = {
+        citedDoiCount: citedDois.length,
+        inCorpus,
+        notInCorpus,
+        allInCorpus: notInCorpus.length === 0,
+      };
+    }
+  }
+  const groundingReport: GroundingReport | undefined =
+    groundingBase === undefined ? undefined : { ...groundingBase, citationCrossCheck };
+
   const reproHash = resolveReproHash(args.evidenceLogDb);
   const traceGrade = gradeRunIntegrity(loopState, args.evidenceLogDb);
 
   return { loopState, reproHash, runId, traceGrade, ...(groundingReport === undefined ? {} : { grounding: groundingReport }) };
+}
+
+/**
+ * Extract the de-duplicated, lowercased DOIs the loop's stage2 integration cited
+ * (from loopState.artifacts). Pure, deterministic — no LLM, no DB. Empty array if
+ * the loop cited no DOIs (e.g. offline_replay fixture without DOIs).
+ */
+function extractCitedDoisFromLoop(loopState: LoopState): string[] {
+  const dois = new Set<string>();
+  for (const art of loopState.artifacts) {
+    const p = art.structured;
+    if (p.kind === 'integration') {
+      for (const c of p.citations) {
+        if (c.doi !== null && c.doi.trim().length > 0) {
+          dois.add(c.doi.trim().toLowerCase());
+        }
+      }
+    }
+  }
+  return [...dois];
 }
 
 /**
