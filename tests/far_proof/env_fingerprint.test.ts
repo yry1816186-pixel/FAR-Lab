@@ -40,8 +40,10 @@ test('compareEnvFingerprint: same env → match; drifted node → mismatch with 
 
 test('compareEnvFingerprint: drifted platform + python → both differences reported', () => {
   const current = computeEnvFingerprint();
-  const recorded: typeof current = { ...current, platform: 'linux', python: '2.7.18' };
-  // adjust fingerprintHash to match the recorded mutated env (so it's internally consistent)
+  // 制造真正的 platform 漂移：把 platform 改成与当前不同的值
+  // （ubuntu CI 上 current.platform === 'linux'，改成 'linux' 会无差异——测试意图是漂移被报告）。
+  const driftedPlatform = current.platform === 'linux' ? 'darwin' : 'linux';
+  const recorded: typeof current = { ...current, platform: driftedPlatform, python: '2.7.18' };
   const result = compareEnvFingerprint(recorded, current);
   assert.equal(result.match, false);
   assert.ok(result.differences.some((d) => d.startsWith('platform:')));

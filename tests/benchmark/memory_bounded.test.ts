@@ -69,7 +69,7 @@ test('性能 P2: 100 claims 处理堆增长 <5%（有界·无泄漏）', async (
   const last = deltas[deltas.length - 1] ?? 0;
   const totalGrowthMb = (prev - baseline) / 1024 / 1024;
   assert.ok(
-    first > 0 ? last < first * 1.5 : last < 20,
+    first > 0 ? last < first * 1.5 : last < 20 * 1024 * 1024,
     `堆增量须收敛（非递增）：首批 ${(first / 1024 / 1024).toFixed(2)}MB → 末批 ${(last / 1024 / 1024).toFixed(2)}MB`,
   );
   assert.ok(
