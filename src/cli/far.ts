@@ -40,6 +40,7 @@ import {
   runResearchVerify,
   runResearchExport,
   runResearchCompare,
+  runResearchAnalyze,
 } from './commands/research.ts';
 import { runStream } from './commands/stream.ts';
 import { runRepl } from './commands/repl.ts';
@@ -270,16 +271,20 @@ const COMMANDS: readonly CliCommand[] = [
       if (subcommand === 'compare') {
         return runResearchCompare(args.slice(1));
       }
+      if (subcommand === 'analyze') {
+        return runResearchAnalyze(args.slice(1));
+      }
       if (subcommand === 'start') {
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'inspect', 'verify', 'export', 'compare', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
+        `far research: expected 'start', 'inspect', 'verify', 'export', 'compare', 'analyze', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
           '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--json] [--out <file>]\n' +
           '         far research inspect <run.json> [--json]\n' +
           '         far research verify <run.json|bundle-dir> [--json]\n' +
           '         far research export <run.json> --out <bundle-dir> [--json]\n' +
           '         far research compare <run.json> [--revision <a> <b>] [--json]\n' +
+          '         far research analyze <run.json> [--live] [--out <new.json>] [--json]\n' +
           '         far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile ...]\n',
       );
       return 2;
@@ -1044,6 +1049,14 @@ USAGE:
                          deterministic plan diff between frozen revision states (default: first
                          revision's before-plan vs latest revision's after-plan).
     exits 0 success · 1 no revisions / read failure · 2 bad args
+
+  far research analyze <run.json> [--live] [--out <new.json>] [--json]
+                         Phase 3 loop: execute the plan's first real analysis step against the
+                         NASA Exoplanet Archive (live TAP fetch with --live; otherwise the
+                         committed REAL sample in RECORDED_REPLAY mode) -> parse the output into
+                         an Observation -> FeedbackSignal -> revision (plan rewritten when
+                         triggered). Nulls / small samples / non-significance preserved honestly.
+    exits 0 success · 1 experiment/read failure · 2 bad args
 
   far status [--db <path>] [--json]  emit the single SSOT status report
     --db <path>   verify the evidence_log DB chain head (verifyChainHead); omitted => pending
