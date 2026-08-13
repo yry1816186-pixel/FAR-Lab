@@ -201,7 +201,16 @@ scripts/gh_retry_monitor.sh
 # ============================================================================
 
 # --- AI 工具私人配置（提示词/agent 定义/编辑器绑定） ---
+# 例外：.claude/ 是共享 SSOT 资产（AGENTS.md §11：agents/rules/skills/hooks 供三引擎
+# 共用），且 tests/scripts/policy_guard.test.mjs 断言 hooks/policy_guard.py 存在——
+# CI fresh-clone 必须可复现。反忽略资产目录；settings.local.json 与 __pycache__ 保持忽略。
 .claude/
+!.claude/
+.claude/*
+!.claude/agents/
+!.claude/hooks/
+!.claude/rules/
+!.claude/skills/
 .opencode/
 .pi/
 .zed/
@@ -211,6 +220,11 @@ scripts/gh_retry_monitor.sh
 
 # --- FAR-Lab 内部过程产物（设计稿/实现期/主控/发布期） ---
 .far-design/
+# 例外：决策记录（ADR/D-*）是持久知识资产（AGENTS.md §14 记忆系统·ADR count check 依赖），
+# CI fresh-clone 必须可复现它们 → 反忽略 DECISIONS/。
+!.far-design/
+.far-design/*
+!.far-design/DECISIONS/
 .far-implementation/
 .far-master/
 .far-release/
