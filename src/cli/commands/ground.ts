@@ -29,9 +29,55 @@ export interface GroundOptions {
   readonly json: boolean;
 }
 
-/** Parse `far ground` args. */
+/** Parse `far ground` args (both `--flag value` and `--flag=value` forms). */
 export function parseGroundArgs(args: readonly string[]): GroundOptions | { error: string } {
-  const positional = args.filter((a) => !a.startsWith('--'));
+  const positional: string[] = [];
+  let source: 'openalex' | 'arxiv' | 'crossref' = 'openalex';
+  let maxPerQuery = 5;
+  let includeCounterEvidence = true;
+  let json = false;
+
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i]!;
+    if (a === '--json') {
+      json = true;
+      continue;
+    }
+    if (a === '--no-counter-evidence') {
+      includeCounterEvidence = false;
+      continue;
+    }
+    if (a.startsWith('--source')) {
+      const inline = a.startsWith('--source=') ? a.slice('--source='.length) : args[i + 1];
+      if (inline === undefined || inline.startsWith('--')) {
+        return { error: `far ground: --source needs openalex|arxiv|crossref (got: ${inline ?? '<missing>'})` };
+      }
+      if (inline !== 'openalex' && inline !== 'arxiv' && inline !== 'crossref') {
+        return { error: `far ground: --source must be openalex|arxiv|crossref, got '${inline}'` };
+      }
+      source = inline;
+      if (!a.startsWith('--source=')) i += 1;
+      continue;
+    }
+    if (a.startsWith('--max-per-query')) {
+      const inline = a.startsWith('--max-per-query=') ? a.slice('--max-per-query='.length) : args[i + 1];
+      if (inline === undefined) {
+        return { error: 'far ground: --max-per-query needs an integer in [1,25]' };
+      }
+      const n = Number(inline);
+      if (!Number.isInteger(n) || n < 1 || n > 25) {
+        return { error: `far ground: --max-per-query must be an integer in [1,25], got '${inline}'` };
+      }
+      maxPerQuery = n;
+      if (!a.startsWith('--max-per-query=')) i += 1;
+      continue;
+    }
+    if (a.startsWith('--')) {
+      return { error: `far ground: unknown argument '${a}'` };
+    }
+    positional.push(a);
+  }
+
   if (positional.length === 0) {
     return { error: 'far ground: a research question is required (e.g. far ground "does dark energy exist")' };
   }
@@ -39,28 +85,12 @@ export function parseGroundArgs(args: readonly string[]): GroundOptions | { erro
   if (question.length === 0) {
     return { error: 'far ground: research question must be non-empty' };
   }
-  const sourceArg = args.find((a) => a.startsWith('--source='))?.slice('--source='.length);
-  let source: 'openalex' | 'arxiv' | 'crossref' = 'openalex';
-  if (sourceArg === 'arxiv' || sourceArg === 'crossref' || sourceArg === 'openalex') {
-    source = sourceArg;
-  } else if (sourceArg !== undefined) {
-    return { error: `far ground: --source must be openalex|arxiv|crossref, got '${sourceArg}'` };
-  }
-  const maxArg = args.find((a) => a.startsWith('--max-per-query='))?.slice('--max-per-query='.length);
-  let maxPerQuery = 5;
-  if (maxArg !== undefined) {
-    const n = Number(maxArg);
-    if (!Number.isInteger(n) || n < 1 || n > 25) {
-      return { error: `far ground: --max-per-query must be an integer in [1,25], got '${maxArg}'` };
-    }
-    maxPerQuery = n;
-  }
   return {
     question,
     source,
     maxPerQuery,
-    includeCounterEvidence: !args.includes('--no-counter-evidence'),
-    json: args.includes('--json'),
+    includeCounterEvidence,
+    json,
   };
 }
 

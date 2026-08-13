@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path';
 
 import {
   buildOpenAlexUrl,
+  sanitizeOpenAlexSearchTerm,
   parseOpenAlexResults,
   openalexAdapter,
   createReplayAdapter,
@@ -107,6 +108,25 @@ describe('OpenAlex adapter — URL building + parsing edge cases', () => {
     assert.ok(url.startsWith('https://api.openalex.org/works?'));
     assert.ok(url.includes('search=dark+energy'));
     assert.ok(url.includes('per-page=25'), 'per-page clamped to max 25');
+  });
+
+  it('sanitizeOpenAlexSearchTerm strips ? (OpenAlex rejects it with HTTP 400)', () => {
+    assert.equal(
+      sanitizeOpenAlexSearchTerm('Does light pollution affect insect decline?'),
+      'Does light pollution affect insect decline',
+    );
+    assert.equal(sanitizeOpenAlexSearchTerm('what if  ?  x ?'), 'what if x');
+    assert.equal(sanitizeOpenAlexSearchTerm('no question mark here'), 'no question mark here');
+  });
+
+  it('buildOpenAlexUrl removes ? from the search param (regression: live 400 on natural questions)', () => {
+    const url = buildOpenAlexUrl({
+      text: 'Does light pollution affect insect decline?',
+      maxResults: 3,
+      source: 'openalex',
+    });
+    assert.ok(url.includes('search=Does+light+pollution+affect+insect+decline'), `url=${url}`);
+    assert.ok(!url.includes('%3F'), `'?' must not reach the search param: ${url}`);
   });
 
   it('parseOpenAlexResults throws on non-JSON body (fail-closed, not silent [])', () => {
