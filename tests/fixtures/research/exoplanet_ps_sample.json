@@ -1,0 +1,550 @@
+{
+  "source": "NASA Exoplanet Archive",
+  "url": "https://exoplanetarchive.ipac.caltech.edu",
+  "query": "SELECT TOP 60 pl_name, pl_rade, pl_bmasse, pl_orbper, st_teff, st_rad, st_mass FROM ps WHERE default_flag=1 AND pl_rade > 6 AND pl_orbper < 10 AND st_teff IS NOT NULL ORDER BY pl_orbper ASC",
+  "capturedAt": "2026-08-13T11:25:55.521Z",
+  "license": "NASA public domain (PD)",
+  "note": "REAL archive snapshot for offline tests/replay (bounded, not exhaustive)",
+  "rows": [
+    {
+      "pl_name": "HAT-P-23 b",
+      "pl_rade": 15.334,
+      "pl_bmasse": 664.237,
+      "pl_orbper": 1.212884,
+      "st_teff": 5905,
+      "st_rad": 1.203,
+      "st_mass": 1.13
+    },
+    {
+      "pl_name": "HAT-P-36 b",
+      "pl_rade": 14.313893,
+      "pl_bmasse": 587.413406,
+      "pl_orbper": 1.32734683,
+      "st_teff": 5620,
+      "st_rad": 1.041,
+      "st_mass": 1.03
+    },
+    {
+      "pl_name": "OGLE-TR-113 b",
+      "pl_rade": 12.251,
+      "pl_bmasse": 400.449,
+      "pl_orbper": 1.4324752,
+      "st_teff": 4790,
+      "st_rad": 0.774,
+      "st_mass": 0.779
+    },
+    {
+      "pl_name": "CoRoT-1 b",
+      "pl_rade": 16.7,
+      "pl_bmasse": 327.35,
+      "pl_orbper": 1.5089557,
+      "st_teff": 5950,
+      "st_rad": 1.11,
+      "st_mass": 0.95
+    },
+    {
+      "pl_name": "CoRoT-14 b",
+      "pl_rade": 12.22,
+      "pl_bmasse": 2415.4,
+      "pl_orbper": 1.51214,
+      "st_teff": 6035,
+      "st_rad": 1.21,
+      "st_mass": 1.13
+    },
+    {
+      "pl_name": "CoRoT-2 b",
+      "pl_rade": 16.432,
+      "pl_bmasse": 1102.82,
+      "pl_orbper": 1.7429935,
+      "st_teff": 5625,
+      "st_rad": 0.906,
+      "st_mass": 0.96
+    },
+    {
+      "pl_name": "CoRoT-18 b",
+      "pl_rade": 14.68,
+      "pl_bmasse": 1102.82,
+      "pl_orbper": 1.9000693,
+      "st_teff": 5440,
+      "st_rad": 1,
+      "st_mass": 0.95
+    },
+    {
+      "pl_name": "HAT-P-32 b",
+      "pl_rade": 22.19382,
+      "pl_bmasse": 216.1244,
+      "pl_orbper": 2.1500082,
+      "st_teff": 6001,
+      "st_rad": 1.367,
+      "st_mass": 1.132
+    },
+    {
+      "pl_name": "HD 189733 b",
+      "pl_rade": 12.66617,
+      "pl_bmasse": 359.1479,
+      "pl_orbper": 2.21857567,
+      "st_teff": 5052,
+      "st_rad": 0.75,
+      "st_mass": 0.79
+    },
+    {
+      "pl_name": "OGLE2-TR-L9 b",
+      "pl_rade": 18.046,
+      "pl_bmasse": 1430.175,
+      "pl_orbper": 2.4855335,
+      "st_teff": 6933,
+      "st_rad": 1.53,
+      "st_mass": 1.52
+    },
+    {
+      "pl_name": "HAT-P-5 b",
+      "pl_rade": 13.56289,
+      "pl_bmasse": 311.4734,
+      "pl_orbper": 2.78849,
+      "st_teff": 5960,
+      "st_rad": 1.12,
+      "st_mass": 1.04
+    },
+    {
+      "pl_name": "HAT-P-37 b",
+      "pl_rade": 13.204,
+      "pl_bmasse": 371.528,
+      "pl_orbper": 2.797436,
+      "st_teff": 5500,
+      "st_rad": 0.877,
+      "st_mass": 0.929
+    },
+    {
+      "pl_name": "HAT-P-30 b",
+      "pl_rade": 16.14096,
+      "pl_bmasse": 263.7989,
+      "pl_orbper": 2.8106,
+      "st_teff": 6304,
+      "st_rad": 1.31,
+      "st_mass": 1.55
+    },
+    {
+      "pl_name": "CoRoT-12 b",
+      "pl_rade": 16.14,
+      "pl_bmasse": 291.438,
+      "pl_orbper": 2.828042,
+      "st_teff": 5675,
+      "st_rad": 1.116,
+      "st_mass": 1.078
+    },
+    {
+      "pl_name": "HAT-P-20 b",
+      "pl_rade": 9.718,
+      "pl_bmasse": 2302.899,
+      "pl_orbper": 2.875317,
+      "st_teff": 4595,
+      "st_rad": 0.694,
+      "st_mass": 0.756
+    },
+    {
+      "pl_name": "HD 149026 b",
+      "pl_rade": 8.29466,
+      "pl_bmasse": 120.7754,
+      "pl_orbper": 2.87589,
+      "st_teff": 6179,
+      "st_rad": 1.41,
+      "st_mass": 1.42
+    },
+    {
+      "pl_name": "HAT-P-3 b",
+      "pl_rade": 10.53646,
+      "pl_bmasse": 206.5895,
+      "pl_orbper": 2.8997,
+      "st_teff": 5185,
+      "st_rad": 0.87,
+      "st_mass": 1.06
+    },
+    {
+      "pl_name": "CoRoT-11 b",
+      "pl_rade": 16.03,
+      "pl_bmasse": 740.51,
+      "pl_orbper": 2.99433,
+      "st_teff": 6440,
+      "st_rad": 1.37,
+      "st_mass": 1.27
+    },
+    {
+      "pl_name": "HAT-P-27 b",
+      "pl_rade": 11.43,
+      "pl_bmasse": 197.05,
+      "pl_orbper": 3.039577,
+      "st_teff": 5316,
+      "st_rad": 0.864673,
+      "st_mass": 0.916
+    },
+    {
+      "pl_name": "HAT-P-4 b",
+      "pl_rade": 14.28,
+      "pl_bmasse": 213.255,
+      "pl_orbper": 3.056536,
+      "st_teff": 5860,
+      "st_rad": 1.596,
+      "st_mass": 1.248
+    },
+    {
+      "pl_name": "HAT-P-8 b",
+      "pl_rade": 15.6926,
+      "pl_bmasse": 406.8224,
+      "pl_orbper": 3.07634,
+      "st_teff": 6200,
+      "st_rad": 1.57,
+      "st_mass": 1.27
+    },
+    {
+      "pl_name": "OGLE-TR-10 b",
+      "pl_rade": 14.011,
+      "pl_bmasse": 197.046,
+      "pl_orbper": 3.101278,
+      "st_teff": 5950,
+      "st_rad": 1.17,
+      "st_mass": 1.14
+    },
+    {
+      "pl_name": "HAT-P-22 b",
+      "pl_rade": 12.89035,
+      "pl_bmasse": 785.0401,
+      "pl_orbper": 3.21222,
+      "st_teff": 5302,
+      "st_rad": 1.11,
+      "st_mass": 1.13
+    },
+    {
+      "pl_name": "HAT-P-12 b",
+      "pl_rade": 10.749,
+      "pl_bmasse": 67.059,
+      "pl_orbper": 3.2130598,
+      "st_teff": 4650,
+      "st_rad": 0.701,
+      "st_mass": 0.733
+    },
+    {
+      "pl_name": "Kepler-6 b",
+      "pl_rade": 14.616536,
+      "pl_bmasse": 212.31044,
+      "pl_orbper": 3.2346996,
+      "st_teff": 5647,
+      "st_rad": 1.391,
+      "st_mass": 1.209
+    },
+    {
+      "pl_name": "HAT-P-28 b",
+      "pl_rade": 13.585,
+      "pl_bmasse": 198.953,
+      "pl_orbper": 3.257215,
+      "st_teff": 5680,
+      "st_rad": 1.103,
+      "st_mass": 1.025
+    },
+    {
+      "pl_name": "HAT-P-24 b",
+      "pl_rade": 14.5717,
+      "pl_bmasse": 238.3725,
+      "pl_orbper": 3.35524,
+      "st_teff": 6373,
+      "st_rad": 1.38,
+      "st_mass": 1.37
+    },
+    {
+      "pl_name": "HAT-P-33 b",
+      "pl_rade": 20.73665,
+      "pl_bmasse": 292.4036,
+      "pl_orbper": 3.47447,
+      "st_teff": 6446,
+      "st_rad": 1.79,
+      "st_mass": 1.82
+    },
+    {
+      "pl_name": "Kepler-8 b",
+      "pl_rade": 15.871944,
+      "pl_bmasse": 187.5197,
+      "pl_orbper": 3.5224991,
+      "st_teff": 6213,
+      "st_rad": 1.486,
+      "st_mass": 1.213
+    },
+    {
+      "pl_name": "HD 209458 b",
+      "pl_rade": 15.58051,
+      "pl_bmasse": 232.0159,
+      "pl_orbper": 3.52474859,
+      "st_teff": 6091,
+      "st_rad": 1.19,
+      "st_mass": 1.23
+    },
+    {
+      "pl_name": "CoRoT-23 b",
+      "pl_rade": 11.77,
+      "pl_bmasse": 889.9,
+      "pl_orbper": 3.6313,
+      "st_teff": 5900,
+      "st_rad": 1.61,
+      "st_mass": 1.14
+    },
+    {
+      "pl_name": "HAT-P-35 b",
+      "pl_rade": 14.930388,
+      "pl_bmasse": 335.62848,
+      "pl_orbper": 3.646706,
+      "st_teff": 6096,
+      "st_rad": 1.435,
+      "st_mass": 1.236
+    },
+    {
+      "pl_name": "HAT-P-25 b",
+      "pl_rade": 12.722215,
+      "pl_bmasse": 180.84527,
+      "pl_orbper": 3.65281514,
+      "st_teff": 5519,
+      "st_rad": 0.919,
+      "st_mass": 1.012
+    },
+    {
+      "pl_name": "CoRoT-17 b",
+      "pl_rade": 11.43,
+      "pl_bmasse": 772.29,
+      "pl_orbper": 3.7681,
+      "st_teff": 5740,
+      "st_rad": 1.59,
+      "st_mass": 1.04
+    },
+    {
+      "pl_name": "Kepler-762 b",
+      "pl_rade": 12.68,
+      "pl_bmasse": null,
+      "pl_orbper": 3.770552098,
+      "st_teff": 5944,
+      "st_rad": 1.08,
+      "st_mass": 1.06
+    },
+    {
+      "pl_name": "HAT-P-6 b",
+      "pl_rade": 16.58932,
+      "pl_bmasse": 419.5356,
+      "pl_orbper": 3.85298,
+      "st_teff": 6570,
+      "st_rad": 1.62,
+      "st_mass": 1.79
+    },
+    {
+      "pl_name": "CoRoT-19 b",
+      "pl_rade": 14.46,
+      "pl_bmasse": 352.78,
+      "pl_orbper": 3.89713,
+      "st_teff": 6090,
+      "st_rad": 1.65,
+      "st_mass": 1.21
+    },
+    {
+      "pl_name": "Lupus-TR-3 b",
+      "pl_rade": 9.976,
+      "pl_bmasse": 257.431,
+      "pl_orbper": 3.91405,
+      "st_teff": 5000,
+      "st_rad": 0.82,
+      "st_mass": 0.87
+    },
+    {
+      "pl_name": "HAT-P-9 b",
+      "pl_rade": 15.614137,
+      "pl_bmasse": 238.05467,
+      "pl_orbper": 3.92281072,
+      "st_teff": 6350,
+      "st_rad": 1.338,
+      "st_mass": 1.281
+    },
+    {
+      "pl_name": "HAT-P-19 b",
+      "pl_rade": 11.29865255,
+      "pl_bmasse": 88.03846874,
+      "pl_orbper": 4.00878322,
+      "st_teff": 4962,
+      "st_rad": 0.773,
+      "st_mass": 0.807
+    },
+    {
+      "pl_name": "K2-295 b",
+      "pl_rade": 10.054473,
+      "pl_bmasse": 106.47305,
+      "pl_orbper": 4.024867,
+      "st_teff": 4444,
+      "st_rad": 0.7,
+      "st_mass": 0.74
+    },
+    {
+      "pl_name": "CoRoT-13 b",
+      "pl_rade": 9.92,
+      "pl_bmasse": 415.704,
+      "pl_orbper": 4.03519,
+      "st_teff": 5945,
+      "st_rad": 1.01,
+      "st_mass": 1.09
+    },
+    {
+      "pl_name": "CoRoT-5 b",
+      "pl_rade": 15.558,
+      "pl_bmasse": 148.42,
+      "pl_orbper": 4.0378962,
+      "st_teff": 6100,
+      "st_rad": 1.186,
+      "st_mass": 1
+    },
+    {
+      "pl_name": "HAT-P-21 b",
+      "pl_rade": 12.44199,
+      "pl_bmasse": 1547.8321,
+      "pl_orbper": 4.12448,
+      "st_teff": 5588,
+      "st_rad": 1.21,
+      "st_mass": 1.24
+    },
+    {
+      "pl_name": "HATS-36 b",
+      "pl_rade": 12.92,
+      "pl_bmasse": null,
+      "pl_orbper": 4.175186,
+      "st_teff": 5950,
+      "st_rad": 1.1,
+      "st_mass": 1.1
+    },
+    {
+      "pl_name": "Kepler-491 b",
+      "pl_rade": 8.92,
+      "pl_bmasse": null,
+      "pl_orbper": 4.225384512,
+      "st_teff": 5582,
+      "st_rad": 1.03,
+      "st_mass": 1.04
+    },
+    {
+      "pl_name": "HAT-P-26 b",
+      "pl_rade": 7.06167,
+      "pl_bmasse": 22.2481,
+      "pl_orbper": 4.23452,
+      "st_teff": 5079,
+      "st_rad": 0.87,
+      "st_mass": 1.12
+    },
+    {
+      "pl_name": "CoRoT-3 b",
+      "pl_rade": 11.32,
+      "pl_bmasse": 6883.91,
+      "pl_orbper": 4.2568,
+      "st_teff": 6740,
+      "st_rad": 1.56,
+      "st_mass": 1.37
+    },
+    {
+      "pl_name": "HAT-P-1 b",
+      "pl_rade": 14.784671,
+      "pl_bmasse": 166.86075,
+      "pl_orbper": 4.46529976,
+      "st_teff": 5980,
+      "st_rad": 1.174,
+      "st_mass": 1.151
+    },
+    {
+      "pl_name": "HAT-P-14 b",
+      "pl_rade": 15.91678,
+      "pl_bmasse": 1093.3352,
+      "pl_orbper": 4.62767,
+      "st_teff": 6600,
+      "st_rad": 1.82,
+      "st_mass": 2.65
+    },
+    {
+      "pl_name": "HAT-P-31 b",
+      "pl_rade": 12.21781,
+      "pl_bmasse": 721.4741,
+      "pl_orbper": 5.00542,
+      "st_teff": 6065,
+      "st_rad": 1.39,
+      "st_mass": 1.31
+    },
+    {
+      "pl_name": "HAT-P-34 b",
+      "pl_rade": 13.417173,
+      "pl_bmasse": 1058.3739,
+      "pl_orbper": 5.452654,
+      "st_teff": 6442,
+      "st_rad": 1.53,
+      "st_mass": 1.392
+    },
+    {
+      "pl_name": "HAT-P-18 b",
+      "pl_rade": 11.153,
+      "pl_bmasse": 62.61,
+      "pl_orbper": 5.508023,
+      "st_teff": 4803,
+      "st_rad": 0.749,
+      "st_mass": 0.77
+    },
+    {
+      "pl_name": "HAT-P-29 b",
+      "pl_rade": 13.11453,
+      "pl_bmasse": 279.6904,
+      "pl_orbper": 5.72319,
+      "st_teff": 6087,
+      "st_rad": 1.3,
+      "st_mass": 1.45
+    },
+    {
+      "pl_name": "HD 118203 b",
+      "pl_rade": 12.778238,
+      "pl_bmasse": 680.15279098,
+      "pl_orbper": 6.1349779,
+      "st_teff": 5742,
+      "st_rad": 2.04,
+      "st_mass": 1.27
+    },
+    {
+      "pl_name": "CoRoT-8 b",
+      "pl_rade": 6.39,
+      "pl_bmasse": 69.92,
+      "pl_orbper": 6.21229,
+      "st_teff": 5080,
+      "st_rad": 0.77,
+      "st_mass": 0.88
+    },
+    {
+      "pl_name": "K2-281 b",
+      "pl_rade": 8.18,
+      "pl_bmasse": null,
+      "pl_orbper": 8.687721,
+      "st_teff": 4812,
+      "st_rad": 0.76,
+      "st_mass": 0.82
+    },
+    {
+      "pl_name": "CoRoT-6 b",
+      "pl_rade": 13.068,
+      "pl_bmasse": 940.74,
+      "pl_orbper": 8.886593,
+      "st_teff": 6090,
+      "st_rad": 1.025,
+      "st_mass": 1.05
+    },
+    {
+      "pl_name": "CoRoT-4 b",
+      "pl_rade": 13.34,
+      "pl_bmasse": 228.83,
+      "pl_orbper": 9.20205,
+      "st_teff": 6190,
+      "st_rad": 1.17,
+      "st_mass": 1.16
+    },
+    {
+      "pl_name": "K2-161 b",
+      "pl_rade": 6.11721229,
+      "pl_bmasse": null,
+      "pl_orbper": 9.283188,
+      "st_teff": 4972,
+      "st_rad": 2.568173,
+      "st_mass": 0.986876
+    }
+  ]
+}

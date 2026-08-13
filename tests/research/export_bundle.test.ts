@@ -66,6 +66,7 @@ function minimalRun(overrides: Partial<ResearchRun> = {}): ResearchRun {
       humanApprovalRequired: [],
     },
     revisions: [],
+    observations: [],
     stageReceipts: [],
     environment: {
       gitCommit: 'abc123',

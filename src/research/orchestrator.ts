@@ -313,6 +313,7 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     scorecards,
     plan,
     revisions: [],
+    observations: [],
     stageReceipts: receipts,
     environment,
     modes,

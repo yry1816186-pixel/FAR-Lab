@@ -26,6 +26,7 @@ import type { CorpusSnapshot } from '../retrieval/corpus.ts';
 import type { RetrievedDocument } from '../retrieval/types.ts';
 import type { EnvironmentFingerprint, StageReceipt } from './provenance.ts';
 import type { ResearchabilityReport } from './researchability_gate.ts';
+import type { Observation } from './experiment.ts';
 
 /** Per-component execution mode (directive §3.2). */
 export type ComponentMode =
@@ -301,6 +302,8 @@ export interface ResearchRun {
   readonly plan: ResearchPlan;
   /** Revisions in order (may be empty before feedback). */
   readonly revisions: readonly Revision[];
+  /** Real-data/tool observations collected so far (Phase 3 experiment loop). */
+  readonly observations: readonly Observation[];
   /** Per-stage provenance receipts (directive §3.3). */
   readonly stageReceipts: readonly StageReceipt[];
   /** Software-environment fingerprint (git commit / lockfile / node). */
@@ -327,3 +330,4 @@ export type {
   ResearchabilityVerdict,
   ResearchScope,
 } from './researchability_gate.ts';
+export type { Observation } from './experiment.ts';
