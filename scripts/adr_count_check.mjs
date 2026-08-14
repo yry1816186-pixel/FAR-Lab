@@ -35,11 +35,11 @@ const totalDecisionRecords = readdirSync(decisionsDir).filter(
 const memoryDoc = join(repoRoot, 'docs', 'governance', 'AGENT-MEMORY.md');
 const docText = readFileSync(memoryDoc, 'utf8');
 
-// 合法表述：21 个 ADR-*；合计 24 项；对拍脚本引用（新文档口径）。
+// 合法表述：22 个 ADR-*；合计 25 项；对拍脚本引用（新文档口径）。
 const claimsConsistent =
-  docText.includes(`ADR-*.yaml` + '`（21 个）') ||
-  docText.includes('21 个 ADR-*') ||
-  docText.includes('合计 24 项决策记录') ||
+  docText.includes(`ADR-*.yaml` + '`（22 个）') ||
+  docText.includes('22 个 ADR-*') ||
+  docText.includes('合计 25 项决策记录') ||
   docText.includes('adr_count_check');
 
 if (!claimsConsistent) {

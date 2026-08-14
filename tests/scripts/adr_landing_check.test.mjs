@@ -2,7 +2,7 @@
  * adr_landing_check.mjs 测试（阶段 7 1125 · P2-C）。
  *
  * 覆盖：
- *   1. 脚本对全部 21 个 ADR 输出锚点命中（rate=100%）
+ *   1. 脚本对全部 22 个 ADR 输出锚点命中（rate=100%）
  *   2. 对不存在的锚点会报未命中（脚本有区分能力，非恒真）
  *   3. 退出码语义：全命中 exit 0
  *
@@ -20,10 +20,10 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = join(here, '..', '..');
 const script = join(repoRoot, 'scripts', 'adr_landing_check.mjs');
 
-test('adr_landing_check: 全部 21 ADR 锚点命中（rate=100%）', () => {
+test('adr_landing_check: 全部 22 ADR 锚点命中（rate=100%）', () => {
   const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: 'utf8' });
   assert.equal(result.status, 0, `exit 0 expected\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
-  assert.match(result.stdout, /21\/21/, '必须报告 21/21 命中');
+  assert.match(result.stdout, /22\/22/, '必须报告 22/22 命中');
   assert.match(result.stdout, /rate=100%/, '必须报告 100% 落地率');
 });
 
@@ -33,11 +33,11 @@ test('adr_landing_check: 输出未命中清单格式（存在区分能力）', (
   assert.match(result.stdout, /命中明细/, 'verbose 必须输出命中明细');
 });
 
-test('adr_landing_check: 锚点映射覆盖全部 21 ADR（无遗漏）', async () => {
+test('adr_landing_check: 锚点映射覆盖全部 22 ADR（无遗漏）', async () => {
   const { ANCHORS } = await import(`file:///${script.replace(/\\/g, '/')}`);
-  assert.equal(Object.keys(ANCHORS).length, 21, '必须为全部 21 个 ADR 提供锚点');
+  assert.equal(Object.keys(ANCHORS).length, 22, '必须为全部 22 个 ADR 提供锚点');
   const adrIds = Object.keys(ANCHORS).sort();
-  for (let i = 1; i <= 21; i += 1) {
+  for (let i = 1; i <= 22; i += 1) {
     const id = `ADR-${String(i).padStart(3, '0')}`;
     assert.ok(adrIds.includes(id), `${id} 必须有锚点映射`);
   }
@@ -52,3 +52,4 @@ test('adr_landing_check: 每个 ADR 至少 1 个非空锚点', async () => {
     }
   }
 });
+

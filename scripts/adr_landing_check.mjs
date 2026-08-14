@@ -49,6 +49,7 @@ export const ANCHORS = {
   'ADR-019': ['budget', 'coverage_gate'],
   'ADR-020': ['MIT', 'NOTICE'],
   'ADR-021': ['lifecycle_events'],
+  'ADR-022': ['extractPlanParameters', 'exoplanet'],
 };
 
 function grepRepo(pattern) {
