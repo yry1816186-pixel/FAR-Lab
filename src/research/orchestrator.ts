@@ -4,14 +4,18 @@
  * One command, one application service:
  *   scientific question
  *     → researchability & safety gate (deterministic screening + model decomposition)
- *     → grounding (real retrieval: supporting + counter-evidence + decomposition subquestions)
+ *     → grounding (real retrieval: supporting + counter-evidence + decomposition
+ *       subquestions; optionally ≥2 source families)
  *     → CorpusSnapshot
  *     → generate 3-5 candidate hypotheses (corpus injected, citation allowlist)
+ *     → citation binding (deterministic) + citation gate (unbound citations are
+ *       never effective evidence; DOI re-resolution attempted in live mode)
+ *     → falsifiability gate (kernel gate over every falsification method)
  *     → independent critique pass
- *     → citation binding (deterministic)
  *     → multi-dimensional scorecard + Pareto front (deterministic + model)
- *     → deterministic primary-hypothesis selection
- *     → structured executable research plan
+ *     → deterministic primary-hypothesis selection (fully-bound + falsifiable
+ *       candidates only, when any exist)
+ *     → structured executable research plan (corpus-injected)
  *     → ResearchRun (per-stage ProvenanceReceipts + per-component/aggregate run modes)
  *
  * The verdict kernel / FEC / proof envelope are the trust layer BELOW this
@@ -24,8 +28,10 @@
 
 import { ulid } from 'ulid';
 import { groundResearchQuestion, type GroundedCorpus } from '../retrieval/index.ts';
-import type { RetrievalAdapter, DocumentSource } from '../retrieval/types.ts';
+import { resolveCrossrefDoi } from '../retrieval/adapters/crossref.ts';
+import { createCorpusSnapshot } from '../retrieval/corpus.ts';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
+import type { RetrievedDocument, RetrievalAdapter, DocumentSource } from '../retrieval/types.ts';
 import { RETRIEVAL_PARSER_VERSION } from '../retrieval/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
@@ -33,6 +39,8 @@ import { generateHypotheses } from './hypothesis_generation.ts';
 import { critiqueHypothesis } from './adversarial_review.ts';
 import { designResearchPlan } from './research_plan.ts';
 import { bindCitations } from './citation.ts';
+import { computeCitationGateReport } from './citation_gate.ts';
+import { computeFalsifiabilityGateReport } from './falsifiability_gate.ts';
 import {
   buildScorecard,
   computeDeterministicDimensions,
@@ -45,12 +53,12 @@ import {
   type ResearchabilityReport,
 } from './researchability_gate.ts';
 import {
-  buildStageReceipt,
+  buildProvenanceReceipt,
   captureEnvironmentFingerprint,
-  hashCanonicalJson,
   type EnvironmentFingerprint,
-  type StageReceipt,
+  type ProvenanceReceipt,
 } from './provenance.ts';
+import { hashCanonicalJson } from '../evidence_log/hasher.ts';
 import type { CallMeta } from './llm.ts';
 import type {
   CitationBinding,
@@ -66,6 +74,11 @@ import type {
 /** Grounding options (omitted → live retrieval from OpenAlex). */
 export interface ResearchGroundingOptions {
   readonly source?: DocumentSource;
+  /**
+   * Multiple source families to ground across in one run (directive §9.3).
+   * When set it replaces `source`.
+   */
+  readonly sources?: readonly DocumentSource[];
   readonly maxPerQuery?: number;
   /** Injected replay adapter (offline/test) — marks retrieval as replay. */
   readonly adapter?: RetrievalAdapter;
@@ -98,6 +111,9 @@ export interface RunResearchOptions {
 /** Maximum decomposition subquestions injected as extra grounding queries. */
 const MAX_DECOMPOSITION_QUERIES = 3;
 
+/** A citation id that looks like a DOI (used for authoritative re-resolution). */
+const DOI_PATTERN = /^doi:?\s*10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+$/i;
+
 /**
  * Run the full Track-1A vertical slice and return an immutable ResearchRun.
  *
@@ -111,7 +127,8 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   const targetCount = opts.targetHypothesisCount ?? 3;
   const sameModelAsGenerator = opts.sameModelAsGenerator ?? true;
   const profile = opts.profile;
-  const receipts: StageReceipt[] = [];
+  const liveModel = profile !== 'offline_replay';
+  const receipts: ProvenanceReceipt[] = [];
   let sequence = 0;
   const nextSeq = (): number => {
     sequence += 1;
@@ -152,12 +169,12 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     schemaVersion: 1,
   };
   receipts.push(
-    buildStageReceipt({
+    buildProvenanceReceipt({
       runId,
       stageId: 'researchability_screening',
       sequence: nextSeq(),
       component: 'deterministic',
-      mode: profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE',
+      mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
       inputHash: hashCanonicalJson({ question: opts.question }),
       outputHash: hashCanonicalJson({
         verdict: screening.verdict,
@@ -172,7 +189,9 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   // ── 2. Ground the question (supporting + counter-evidence + decomposition subquestions). ──
   const grounded: GroundedCorpus = await groundResearchQuestion({
     question: opts.question,
-    source: opts.grounding?.source ?? 'openalex',
+    ...(opts.grounding?.sources !== undefined && opts.grounding.sources.length > 0
+      ? { sources: opts.grounding.sources }
+      : { source: opts.grounding?.source ?? 'openalex' }),
     maxPerQuery: opts.grounding?.maxPerQuery ?? 5,
     ...(opts.grounding?.adapter !== undefined ? { adapter: opts.grounding.adapter } : {}),
     ...(opts.grounding?.includeCounterEvidence !== undefined
@@ -183,15 +202,15 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
       MAX_DECOMPOSITION_QUERIES,
     ),
   });
-  const corpus: CorpusSnapshot = grounded.corpus;
+  let corpus: CorpusSnapshot = grounded.corpus;
   receipts.push(
-    buildStageReceipt({
+    buildProvenanceReceipt({
       runId,
       stageId: 'grounding',
       sequence: nextSeq(),
       component: 'retrieval',
       mode: grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY',
-      dataSource: opts.grounding?.source ?? 'openalex',
+      dataSource: grounded.sourcesUsed.join('+'),
       corpusSnapshotId: corpus.snapshotId,
       corpusRootHash: corpus.rootHash,
       retrievedAt: grounded.groundedAt,
@@ -210,12 +229,83 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   receipts.push(receiptForModel(runId, 'research_hypotheses', nextSeq(), profile, generated.meta));
 
   // ── 4. Bind citations (deterministic set-membership against the corpus). ──
-  const bindings: Record<string, CitationBinding> = {};
+  let bindings: Record<string, CitationBinding> = {};
   for (const h of hypotheses) {
     bindings[h.id] = bindCitations(h, grounded.resolver);
   }
 
-  // ── 5. Independent critique pass (same-model honestly labeled). ──
+  // ── 5. Citation gate: unbound citations are never evidence. In live mode,
+  //        attempt authoritative DOI re-resolution before excluding them. ──
+  const resolvedViaRetrieval: string[] = [];
+  if (grounded.fetchMode === 'live') {
+    const unboundIds = new Set(
+      Object.values(bindings).flatMap((b) => [...b.unbound]),
+    );
+    const resolvedDocs: RetrievedDocument[] = [];
+    for (const id of unboundIds) {
+      const normalized = id.toLowerCase().replace(/^doi:/, '').trim();
+      if (!DOI_PATTERN.test(id)) continue;
+      const doc = await resolveCrossrefDoi(normalized);
+      if (doc === null) continue;
+      resolvedDocs.push(doc);
+      resolvedViaRetrieval.push(id);
+    }
+    if (resolvedDocs.length > 0) {
+      // The corpus is content-addressed: adding resolved documents creates a
+      // NEW snapshot (honest — the corpus identity changed) and re-binds.
+      corpus = createCorpusSnapshot(
+        [...corpus.documents, ...resolvedDocs],
+        [...corpus.sourceQueries, 'unbound-citation-doi-resolution'],
+        grounded.groundedAt,
+      );
+      const resolver = new (await import('../retrieval/citation_resolver.ts')).CitationResolver(corpus);
+      const rebind: Record<string, CitationBinding> = {};
+      for (const h of hypotheses) {
+        rebind[h.id] = bindCitations(h, resolver);
+      }
+      bindings = rebind;
+      receipts.push(
+        buildProvenanceReceipt({
+          runId,
+          stageId: 'citation_resolution',
+          sequence: nextSeq(),
+          component: 'retrieval',
+          mode: 'LIVE',
+          dataSource: 'crossref',
+          corpusSnapshotId: corpus.snapshotId,
+          corpusRootHash: corpus.rootHash,
+          retrievedAt: grounded.groundedAt,
+          parserVersion: RETRIEVAL_PARSER_VERSION,
+          inputHash: hashCanonicalJson({ unbound: [...unboundIds] }),
+          outputHash: hashCanonicalJson({ resolved: resolvedViaRetrieval }),
+          createdAt: grounded.groundedAt,
+        }),
+      );
+    }
+  }
+  const citationGate = computeCitationGateReport({
+    bindings,
+    primaryHypothesisId: null, // filled after primary selection
+  });
+
+  // ── 6. Falsifiability gate (kernel gate, deterministic — not the model). ──
+  const falsifiabilityGate = computeFalsifiabilityGateReport(hypotheses);
+  receipts.push(
+    buildProvenanceReceipt({
+      runId,
+      stageId: 'falsifiability_gate',
+      sequence: nextSeq(),
+      component: 'deterministic',
+      mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
+      inputHash: hashCanonicalJson(
+        hypotheses.map((h) => ({ id: h.id, falsificationMethod: h.falsificationMethod })),
+      ),
+      outputHash: hashCanonicalJson(falsifiabilityGate),
+      createdAt: now().toISOString(),
+    }),
+  );
+
+  // ── 7. Independent critique pass (same-model honestly labeled). ──
   const critiques: Record<string, CritiqueReport> = {};
   const modelDimensions: Record<string, ReturnType<typeof computeDeterministicDimensions>> = {};
   for (const h of hypotheses) {
@@ -231,7 +321,7 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     );
   }
 
-  // ── 6. Score (deterministic dimensions + model dimensions, merged; Pareto front). ──
+  // ── 8. Score (deterministic dimensions + model dimensions, merged; Pareto front). ──
   const scorecards: Record<string, HypothesisScorecard> = {};
   for (const h of hypotheses) {
     const binding = bindings[h.id];
@@ -254,12 +344,12 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     scorecards[id] = { ...scorecards[id]!, paretoOptimal: pareto.has(id) };
   }
   receipts.push(
-    buildStageReceipt({
+    buildProvenanceReceipt({
       runId,
       stageId: 'scoring',
       sequence: nextSeq(),
       component: 'deterministic',
-      mode: profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE',
+      mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
       inputHash: hashCanonicalJson({
         hypotheses: hypotheses.map((h) => ({ id: h.id, falsificationMethod: h.falsificationMethod })),
         bindings: Object.fromEntries(
@@ -274,11 +364,26 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     }),
   );
 
-  // ── 7. Deterministic primary selection (Pareto front + deterministic grades only). ──
-  const primary = selectPrimaryHypothesis(hypotheses, scorecards);
+  // ── 9. Deterministic primary selection. Directive §9.5: the primary must be
+  //        fully-bound AND falsifiable when any candidate satisfies both. ──
+  const primaryPool = admissibleHypotheses(hypotheses, bindings, falsifiabilityGate);
+  const primary = selectPrimaryHypothesis(primaryPool, scorecards);
   const alternatives = hypotheses.filter((h) => h.id !== primary.id);
 
-  // ── 8. Design the executable research plan. ──
+  const citationGateReport = {
+    ...citationGate,
+    perHypothesis: { ...citationGate.perHypothesis },
+    primaryAllBound: bindings[primary.id]?.allBound === true,
+    gateVerdict:
+      citationGate.gateVerdict === 'PASS'
+        ? 'PASS'
+        : bindings[primary.id]?.allBound === true
+          ? 'DEGRADED'
+          : 'INCONCLUSIVE',
+    resolvedViaRetrieval,
+  } satisfies ResearchRun['citationGate'];
+
+  // ── 10. Design the executable research plan (corpus-injected). ──
   const planned = await designResearchPlan(opts.gateway, profile, {
     question: opts.question,
     primary,
@@ -288,11 +393,10 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   const plan: ResearchPlan = planned.plan;
   receipts.push(receiptForModel(runId, 'research_plan', nextSeq(), profile, planned.meta));
 
-  // ── 9. Environment fingerprint + component/aggregate run modes. ──
+  // ── 11. Environment fingerprint + component/aggregate run modes. ──
   const environment: EnvironmentFingerprint = opts.environment ?? (await captureEnvironmentFingerprint());
 
-  const modelExecutionMode: ComponentMode =
-    profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE';
+  const modelExecutionMode: ComponentMode = liveModel ? 'LIVE' : 'RECORDED_REPLAY';
   const retrievalExecutionMode: ComponentMode =
     grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY';
   const experimentExecutionMode: ComponentMode = 'NOT_EXECUTED';
@@ -319,7 +423,9 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     modes,
     runMode: aggregateRunMode(modes),
     startedAt,
-    schemaVersion: 2,
+    schemaVersion: 3,
+    citationGate: citationGateReport,
+    falsifiabilityGate,
   };
 }
 
@@ -330,8 +436,8 @@ function receiptForModel(
   sequence: number,
   profile: ProviderProfile,
   meta: CallMeta,
-): StageReceipt {
-  return buildStageReceipt({
+): ProvenanceReceipt {
+  return buildProvenanceReceipt({
     runId,
     stageId,
     sequence,
@@ -344,6 +450,7 @@ function receiptForModel(
     tokenUsage: meta.tokenUsage,
     latencyMs: meta.latencyMs,
     retries: meta.attempts - 1,
+    finishReason: meta.finishReason,
     cost: meta.cost,
     createdAt: meta.isoTimestamp,
   });
@@ -370,6 +477,23 @@ export function aggregateRunMode(modes: {
     return 'RECORDED_REPLAY';
   }
   return 'MIXED';
+}
+
+/**
+ * The candidate pool for primary selection (directive §9.5): fully-bound AND
+ * falsifiable candidates only, when at least one exists. If none qualifies,
+ * the fallback pool is all hypotheses (the gate report then records the
+ * honest degradation). Pure — reused by `far research verify`.
+ */
+export function admissibleHypotheses(
+  hypotheses: readonly HypothesisCandidate[],
+  bindings: Readonly<Record<string, CitationBinding>>,
+  falsifiabilityGate: ResearchRun['falsifiabilityGate'],
+): readonly HypothesisCandidate[] {
+  const admissible = hypotheses.filter(
+    (h) => bindings[h.id]?.allBound === true && falsifiabilityGate.perHypothesis[h.id]?.passed === true,
+  );
+  return admissible.length > 0 ? admissible : [...hypotheses];
 }
 
 /**

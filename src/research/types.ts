@@ -24,7 +24,7 @@
 import type { FalsificationMethod } from '../agent_loop/types.ts';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
 import type { RetrievedDocument } from '../retrieval/types.ts';
-import type { EnvironmentFingerprint, StageReceipt } from './provenance.ts';
+import type { EnvironmentFingerprint, ProvenanceReceipt } from './provenance.ts';
 import type { ResearchabilityReport } from './researchability_gate.ts';
 import type { Observation } from './experiment.ts';
 
@@ -64,6 +64,90 @@ export interface CitationBinding {
   readonly allBound: boolean;
   /** The corpus snapshotId these citations were checked against. */
   readonly snapshotId: string;
+  /**
+   * Claim→document relations derived from the citation lists (directive §9.5
+   * EvidenceRelation): supports for supporting ids, contradicts for counter
+   * ids. Fields the model never extracted (locator/studyType/quality/…) are
+   * honest nulls — nothing is invented.
+   */
+  readonly relations: readonly EvidenceRelation[];
+}
+
+/**
+ * One claim↔document evidence relation (directive §9.5). The relation names
+ * what role the document plays for the claim, plus who extracted/validated it
+ * and whether the binding resolved. Unbound relations carry
+ * validationStatus='unbound' + a failureReason and are NEVER effective
+ * evidence.
+ */
+export interface EvidenceRelation {
+  /** The claim (hypothesis) id. */
+  readonly claimId: string;
+  /** The cited documentId. */
+  readonly documentId: string;
+  /** The role the document plays for the claim. */
+  readonly relation: 'supports' | 'contradicts' | 'contextualizes' | 'methods' | 'insufficient';
+  /** In-document locator (section/figure/table) — null when not extracted. */
+  readonly locator: string | null;
+  /** Whether the document directly measures the claim's variables. */
+  readonly directness: 'direct' | 'indirect' | null;
+  /** Study type (RCT/observational/meta-analysis/…) — null when not extracted. */
+  readonly studyType: string | null;
+  /** Evidence-quality assessment — null when not assessed. */
+  readonly quality: 'high' | 'medium' | 'low' | null;
+  /** Uncertainty notes — null when none recorded. */
+  readonly uncertainty: string | null;
+  /** Who produced the relation. */
+  readonly extractedBy: 'model' | 'deterministic' | 'human';
+  /** Who validated the binding. */
+  readonly validatedBy: 'deterministic-bind' | 'human' | null;
+  /** Whether the documentId resolved in the corpus (bound) or not (unbound). */
+  readonly validationStatus: 'bound' | 'unbound';
+  /** Why it is unbound (null when bound). */
+  readonly failureReason: string | null;
+}
+
+/**
+ * The deterministic citation gate report (directive §9.5): the run-level
+ * accounting of bound vs unbound citations. Accepted claims must be 100%
+ * bound; unbound citations are excluded from effective evidence and named.
+ */
+export interface CitationGateReport {
+  /** bound / total cited (1.0 when nothing was cited). */
+  readonly boundRate: number;
+  /** Total distinct ids cited across all hypotheses. */
+  readonly totalCited: number;
+  /** Distinct cited ids that resolved. */
+  readonly boundCount: number;
+  /** Unbound citations that were excluded from effective evidence. */
+  readonly unboundEvidenceCount: number;
+  /** Unbound ids that were re-resolved via authoritative retrieval. */
+  readonly resolvedViaRetrieval: readonly string[];
+  /** Per-hypothesis binding outcome. */
+  readonly perHypothesis: Readonly<
+    Record<string, { readonly allBound: boolean; readonly unbound: readonly string[] }>
+  >;
+  /** Whether primary-hypothesis selection requires allBound (always true). */
+  readonly primaryRequiresAllBound: boolean;
+  /** Whether the selected primary hypothesis is fully bound. */
+  readonly primaryAllBound: boolean;
+  /** PASS = all bound · DEGRADED = some unbound but primary bound · INCONCLUSIVE = no fully-bound candidate. */
+  readonly gateVerdict: 'PASS' | 'DEGRADED' | 'INCONCLUSIVE';
+}
+
+/**
+ * The deterministic falsifiability gate report (directive §9.6/§9.7): each
+ * candidate's falsification method is validated by the kernel gate (not the
+ * model). A hypothesis whose method fails the gate cannot be selected as
+ * primary.
+ */
+export interface FalsifiabilityGateReport {
+  /** Per-hypothesis gate outcome. */
+  readonly perHypothesis: Readonly<
+    Record<string, { readonly passed: boolean; readonly errors: readonly string[] }>
+  >;
+  /** True iff every candidate passed. */
+  readonly allPassed: boolean;
 }
 
 /**
@@ -305,7 +389,11 @@ export interface ResearchRun {
   /** Real-data/tool observations collected so far (Phase 3 experiment loop). */
   readonly observations: readonly Observation[];
   /** Per-stage provenance receipts (directive §3.3). */
-  readonly stageReceipts: readonly StageReceipt[];
+  readonly stageReceipts: readonly ProvenanceReceipt[];
+  /** The deterministic citation gate report (v3+; recomputed for v2 files). */
+  readonly citationGate: CitationGateReport;
+  /** The deterministic falsifiability gate report (v3+; recomputed for v2 files). */
+  readonly falsifiabilityGate: FalsifiabilityGateReport;
   /** Software-environment fingerprint (git commit / lockfile / node). */
   readonly environment: EnvironmentFingerprint;
   /** Per-component run modes. */
@@ -323,7 +411,7 @@ export interface ResearchRun {
 }
 
 export { FalsificationMethod };
-export type { EnvironmentFingerprint, StageReceipt } from './provenance.ts';
+export type { EnvironmentFingerprint, ProvenanceReceipt } from './provenance.ts';
 export type {
   ProblemDecomposition,
   ResearchabilityReport,
@@ -331,3 +419,4 @@ export type {
   ResearchScope,
 } from './researchability_gate.ts';
 export type { Observation } from './experiment.ts';
+

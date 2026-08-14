@@ -32,9 +32,9 @@ export const zh = {
   // ---- nav group labels (R-01 信息架构分组) ----
   'nav.group.verify': '验证',
   'nav.group.evidence': '证据',
-  'nav.group.breadth': '广度',
   'nav.group.history': '历史',
   'nav.group.meta': '元信息',
+  'nav.group.devtools': '开发与展示工具（fixture/回放数据）',
 
   // ---- PlanningPage（opencode 规划方法论门禁面板）----
   'nav.planning': '规划门禁',

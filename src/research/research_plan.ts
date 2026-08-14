@@ -9,35 +9,27 @@
  * a single total score (directive §9.8).
  */
 
-import { z } from 'zod';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
+import { sanitizeExternalContent } from '../llm_gateway/sanitizer.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import { callStructuredJson, type CallMeta } from './llm.ts';
+import { PlanBodyZod } from './schemas.ts';
 import type { HypothesisCandidate, ResearchPlan } from './types.ts';
 
-/** zod schema for the plan body (ids are filled deterministically by caller). */
-const PlanBodyZod = z.object({
-  objectives: z.array(z.string()),
-  preregisteredPredictions: z.array(z.string()),
-  dataRequirements: z.array(z.string()),
-  inclusionExclusionCriteria: z.array(z.string()),
-  variables: z.array(z.string()),
-  design: z.string(),
-  analysisDag: z.array(z.string()),
-  tools: z.array(z.string()),
-  statisticalMethods: z.array(z.string()),
-  sampleSizeRationale: z.string(),
-  multiplicityHandling: z.string(),
-  missingOutlierStrategy: z.string(),
-  stoppingConditions: z.array(z.string()),
-  checkpoints: z.array(z.string()),
-  budget: z.string(),
-  risks: z.array(z.string()),
-  reproducibility: z.array(z.string()),
-  nextRoundDecisionRules: z.array(z.string()),
-  humanApprovalRequired: z.array(z.string()),
-});
+/** Render the corpus as a citation allowlist for the model context (sanitized). */
+function renderCorpusAllowlist(corpus: CorpusSnapshot): string {
+  if (corpus.documentCount === 0) {
+    return '(the corpus is empty — the plan must not reference any specific paper)';
+  }
+  const lines: string[] = [];
+  for (const doc of corpus.documents) {
+    const abstract = doc.abstract === null ? '(no abstract available)' : doc.abstract;
+    lines.push(`- ${doc.documentId} :: ${doc.title} :: ${abstract}`);
+  }
+  const joined = lines.join('\n');
+  return sanitizeExternalContent(joined).text;
+}
 
 /** Options for plan design. */
 export interface DesignPlanOptions {
@@ -71,6 +63,7 @@ export async function designResearchPlan(
   const alternativesText = opts.alternatives.length === 0
     ? '(no alternatives retained)'
     : opts.alternatives.map((a) => `- ${a.statement}`).join('\n');
+  const allowlist = renderCorpusAllowlist(opts.corpus);
 
   const system = [
     'You are a research-methods planner. Design a CONCRETE, EXECUTABLE research',
@@ -80,6 +73,10 @@ export async function designResearchPlan(
     'success/failure/inconclusive/stopping conditions, intermediate checkpoints,',
     'budget, risks, reproducibility steps, next-round decision rules, and which',
     'steps require human approval.',
+    '',
+    'GROUNDING RULE: the plan may reference ONLY the documents in the untrusted',
+    'corpus data below (by documentId). If the corpus is empty, do not name any',
+    'specific paper. Do NOT invent papers, DOIs, or datasets you cannot see.',
     '',
     'Output JSON only, no markdown fences.',
   ].join('\n');
@@ -95,7 +92,8 @@ export async function designResearchPlan(
     'Alternative hypotheses (kept as fallbacks):',
     alternativesText,
     '',
-    `Grounding corpus document count: ${opts.corpus.documentCount} (titles available to the caller).`,
+    `Grounding corpus (${opts.corpus.documentCount} documents — untrusted data):`,
+    allowlist,
     ...(opts.feedbackText !== undefined && opts.feedbackText.trim().length > 0
       ? ['', 'Reviewer feedback to incorporate into the revised plan:', opts.feedbackText]
       : []),

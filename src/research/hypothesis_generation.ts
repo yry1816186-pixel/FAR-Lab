@@ -13,7 +13,6 @@
  * generation step.
  */
 
-import { z } from 'zod';
 import { rawSha256Hex } from '../retrieval/hash.ts';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
 import { sanitizeExternalContent } from '../llm_gateway/sanitizer.ts';
@@ -21,6 +20,7 @@ import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import type { FalsificationMethod } from '../agent_loop/types.ts';
 import { callStructuredJson, type CallMeta } from './llm.ts';
+import { GenerationZod } from './schemas.ts';
 import type { HypothesisCandidate } from './types.ts';
 
 /** Options for hypothesis generation. */
@@ -32,37 +32,6 @@ export interface GenerateHypothesesOptions {
   /** How many candidates to target (3-5; default 3). */
   readonly targetCount?: number;
 }
-
-/** zod schema for the model's falsification method (mirrors the shared type). */
-const FalsificationMethodZod = z.object({
-  prediction: z.string(),
-  metric: z.string(),
-  comparator: z.enum(['gt', 'lt', 'range']),
-  value: z.number().optional(),
-  lower: z.number().optional(),
-  upper: z.number().optional(),
-});
-
-/** zod schema for one generated hypothesis candidate (no id — computed locally). */
-const CandidateZod = z.object({
-  statement: z.string(),
-  mechanism: z.string(),
-  falsificationMethod: FalsificationMethodZod,
-  supportingCitations: z.array(z.string()),
-  counterEvidenceCitations: z.array(z.string()),
-  relationToExistingTheory: z.string(),
-  alternativeExplanations: z.array(z.string()),
-  observablePredictions: z.array(z.string()),
-  distinguishingObservations: z.array(z.string()),
-  noveltyRelativeToCorpus: z.string(),
-  assumptions: z.array(z.string()),
-  risks: z.array(z.string()),
-});
-
-/** zod schema for the whole generation response. */
-const GenerationZod = z.object({
-  hypotheses: z.array(CandidateZod).min(3).max(5),
-});
 
 /** Compute the deterministic content-addressed id for a candidate. */
 export function computeHypothesisId(statement: string, mechanism: string): string {

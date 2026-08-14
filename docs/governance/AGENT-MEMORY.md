@@ -1,7 +1,7 @@
 # AGENT-MEMORY — FAR-Lab 层级记忆体系操作手册
 
 > **定位**: 这不是一份新记忆库，而是 FAR-Lab **现有记忆资产**的导航与维护规范。
-> FAR-Lab 已有成熟的设计治理体系（`.far-design/` 21 个 ADR-* + 3 个 D-* 决策记录（合计 24 项）+ 盲区登记 + 设计债 + 状态机），
+> FAR-Lab 已有成熟的设计治理体系（`.far-design/` 22 个 ADR-* + 3 个 D-* 决策记录（合计 25 项）+ 盲区登记 + 设计债 + 状态机），
 > 本文档告诉每个 agent：记忆资产在哪、何时读、何时写、怎么维护、怎么晋升——禁止重复造轮子。
 > **权威源**: `AGENTS.md` §10（上下文持久化）+ §3（指令优先级）+ 本文档。
 > **创建**: 2026-08-07（调研见 `RESEARCH-FINDINGS.md` §3.4）
@@ -14,7 +14,7 @@ FAR-Lab 的记忆按**生命周期 + 变更频率**分五型，每型对接一�
 
 | 分型 | 含义 | 现有资产位置 | 变更频率 | agent 权限 |
 |------|------|------------|---------|-----------|
-| **决策记录 (ADR)** | 为什么做这个架构/产品决策 | `.far-design/DECISIONS/ADR-*.yaml`（21 个）+ `D-S5-*.yaml` + `D-REVIEW-*.yaml`（合计 24 项决策记录·计数以 `scripts/adr_count_check.mjs` 实测为准） | 低（决策冻结后稳定）| 读常驻；写需 P3 授权 |
+| **决策记录 (ADR)** | 为什么做这个架构/产品决策 | `.far-design/DECISIONS/ADR-*.yaml`（22 个）+ `D-S5-*.yaml` + `D-REVIEW-*.yaml`（合计 25 项决策记录·计数以 `scripts/adr_count_check.mjs` 实测为准） | 低（决策冻结后稳定）| 读常驻；写需 P3 授权 |
 | **教训记录 (Landmine)** | 已踩过的坑 + 盲区 + 已知缺陷 | `.far-design/BLIND_SPOT_REGISTER.yaml`（11 条）+ `.far-design/DESIGN_DEBT.yaml` + `.far-design/DEFERRAL_REGISTER.yaml` | 中（每次红队/审计追加）| 读常驻；写经审查 |
 | **候选规则** | 观察到但未确认的模式/问题 | `.far-design/QUESTIONS.yaml` + `.far-design/RESEARCH_QUESTIONS.yaml` + `.far-design/ACTIVE_QUESTION.yaml` | 中（观察即登记）| 读按需；写自由 |
 | **会话状态** | 当前任务/阶段/阻塞/续跑点 | `PROGRESS.md`（会话检查点）+ `.far-design/STATE.yaml` + `.far-design/AUTONOMOUS_STATE.md` | 高（每会话更新）| 读会话首；写会话末 |
@@ -63,7 +63,7 @@ supersedes: null             # 取代了哪个旧 ADR
 - **不写 ADR 的情况**：bug 修复、测试补充、文档更新、纯实现细节（这些进 PROGRESS 或 commit message）
 
 ### 2.4 ADR 编号规则
-- 连续编号 `ADR-022`, `ADR-023`...（当前 21 个 + 3 个特殊前缀）
+- 连续编号 `ADR-022`, `ADR-023`...（当前 22 个 + 3 个特殊前缀）
 - forward-only：不回收编号，不重排
 - 特殊前缀：`D-S5-*`（S5 阶段决策）、`D-REVIEW-*`（评审决策）—— 仅用于非连续主题决策
 
@@ -200,9 +200,9 @@ agent 观察到重复模式/可疑行为
 
 ## 9. 现有资产清单（agent 可直接引用）
 
-**决策记录**（`.far-design/DECISIONS/`，21 个 ADR-* + 3 个 D-* = 24 项）:
+**决策记录**（`.far-design/DECISIONS/`，22 个 ADR-* + 3 个 D-* = 25 项）:
 ADR-001..ADR-021（连续）+ D-S5-01.thesis-and-scope + D-S5-02.concept-eliminations + D-REVIEW-2026-07-27
-（计数口径：`ADR-*.yaml` = 21；含 D- 前缀决策记录 = 24。对拍脚本 `scripts/adr_count_check.mjs`）
+（计数口径：`ADR-*.yaml` = 22；含 D- 前缀决策记录 = 25。对拍脚本 `scripts/adr_count_check.mjs`）
 
 **教训/盲区**（`.far-design/`）:
 `BLIND_SPOT_REGISTER.yaml`（BL-1..BL-11）+ `DESIGN_DEBT.yaml` + `DEFERRAL_REGISTER.yaml` + `RISKS.yaml`
@@ -221,3 +221,5 @@ ADR-001..ADR-021（连续）+ D-S5-01.thesis-and-scope + D-S5-02.concept-elimina
 
 **工作记忆**:
 `.codebuddy/memory/MEMORY.md` + `.codebuddy/memory/YYYY-MM-DD.md`
+
+

@@ -57,7 +57,19 @@ function baseRun(overrides: Partial<ResearchRun> = {}): ResearchRun {
     modes: { modelExecutionMode: 'RECORDED_REPLAY', retrievalExecutionMode: 'RECORDED_REPLAY', experimentExecutionMode: 'NOT_EXECUTED' },
     runMode: 'RECORDED_REPLAY',
     startedAt: 't',
-    schemaVersion: 2,
+    schemaVersion: 3,
+    citationGate: {
+      boundRate: 1,
+      totalCited: 0,
+      boundCount: 0,
+      unboundEvidenceCount: 0,
+      resolvedViaRetrieval: [],
+      perHypothesis: {},
+      primaryRequiresAllBound: true,
+      primaryAllBound: false,
+      gateVerdict: 'PASS',
+    },
+    falsifiabilityGate: { perHypothesis: {}, allPassed: true },
     ...overrides,
   } satisfies ResearchRun;
 }
@@ -91,6 +103,7 @@ describe('computeRunMetrics', () => {
           unbound: [],
           allBound: true,
           snapshotId: 's',
+          relations: [],
         },
       },
     });
@@ -130,6 +143,7 @@ describe('computeRunMetrics', () => {
           unbound: ['ghost-id'],
           allBound: false,
           snapshotId: 's',
+          relations: [],
         },
       },
     });
@@ -197,3 +211,4 @@ describe('computeRunMetrics', () => {
     }
   });
 });
+

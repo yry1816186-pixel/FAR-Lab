@@ -33,7 +33,7 @@ export function canonicalHashVerified(input: VerifiedCanonicalInput): string {
 /**
  * hash canonical json.
  */
-export function hashCanonicalJson(value: Record<string, unknown>): string {
+export function hashCanonicalJson(value: unknown): string {
   const canonical = canonicalJson(value, 'hashCanonicalJson');
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }

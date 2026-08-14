@@ -1,5 +1,5 @@
 // tests/research/provenance.test.ts
-// StageReceipt + EnvironmentFingerprint unit tests (directive §3.3):
+// ProvenanceReceipt + EnvironmentFingerprint unit tests (directive §3.3):
 //   - receipts never invent provider fields (null + provenanceStatus='partial')
 //   - deterministic receipts require input/output hashes
 //   - retrieval receipts require corpus identity
@@ -10,11 +10,11 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  buildStageReceipt,
-  hashCanonicalJson,
+  buildProvenanceReceipt,
   hashText,
   modelSnapshotState,
 } from '../../src/research/provenance.ts';
+import { hashCanonicalJson } from '../../src/evidence_log/hasher.ts';
 
 describe('hashCanonicalJson / hashText', () => {
   test('canonical hash is stable across key insertion order', () => {
@@ -41,9 +41,9 @@ describe('modelSnapshotState', () => {
   });
 });
 
-describe('buildStageReceipt', () => {
+describe('buildProvenanceReceipt', () => {
   test('model receipt with no provider id → partial + missingFields named', () => {
-    const r = buildStageReceipt({
+    const r = buildProvenanceReceipt({
       runId: 'run1',
       stageId: 'research_hypotheses',
       sequence: 1,
@@ -64,7 +64,7 @@ describe('buildStageReceipt', () => {
   });
 
   test('model receipt with full provider identity → complete', () => {
-    const r = buildStageReceipt({
+    const r = buildProvenanceReceipt({
       runId: 'run1',
       stageId: 'research_hypotheses',
       sequence: 1,
@@ -85,7 +85,7 @@ describe('buildStageReceipt', () => {
   });
 
   test('retrieval receipt requires corpus identity', () => {
-    const complete = buildStageReceipt({
+    const complete = buildProvenanceReceipt({
       runId: 'run1',
       stageId: 'grounding',
       sequence: 2,
@@ -99,7 +99,7 @@ describe('buildStageReceipt', () => {
     });
     assert.equal(complete.provenanceStatus, 'complete');
 
-    const partial = buildStageReceipt({
+    const partial = buildProvenanceReceipt({
       runId: 'run1',
       stageId: 'grounding',
       sequence: 2,
@@ -117,7 +117,7 @@ describe('buildStageReceipt', () => {
   });
 
   test('deterministic receipt requires input+output hashes', () => {
-    const partial = buildStageReceipt({
+    const partial = buildProvenanceReceipt({
       runId: 'run1',
       stageId: 'scoring',
       sequence: 3,
@@ -131,7 +131,7 @@ describe('buildStageReceipt', () => {
   });
 
   test('sequence + attempt + stageVersion defaults are stable', () => {
-    const r = buildStageReceipt({ runId: 'r', stageId: 's', sequence: 7, component: 'deterministic', mode: 'LIVE', inputHash: 'a', outputHash: 'b' });
+    const r = buildProvenanceReceipt({ runId: 'r', stageId: 's', sequence: 7, component: 'deterministic', mode: 'LIVE', inputHash: 'a', outputHash: 'b' });
     assert.equal(r.stageVersion, 1);
     assert.equal(r.attempt, 1);
     assert.equal(r.sequence, 7);
@@ -146,3 +146,4 @@ describe('captureEnvironmentFingerprint (fail-soft contract)', () => {
     assert.equal(hashText(lock).length, 64);
   });
 });
+

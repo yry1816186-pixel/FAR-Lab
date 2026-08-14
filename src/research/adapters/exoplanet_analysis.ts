@@ -22,7 +22,7 @@
 
 import { normalQuantile } from '../../statistics/p_value.ts';
 import { studentTTwoSidedP } from '../../statistics/t_distribution.ts';
-import { hashCanonicalJson } from '../provenance.ts';
+import { hashCanonicalJson } from '../../evidence_log/hasher.ts';
 import type { PsRow } from './exoplanet_dataset.ts';
 
 /** Parameters of the analysis (derived from the ResearchPlan). */
@@ -33,6 +33,8 @@ export interface RadiusInsolationAnalysisParams {
   readonly maxPeriodDays: number;
   /** Confidence level for the r CI (e.g. 0.95). */
   readonly confidenceLevel: number;
+  /** Where the parameters came from (the frozen plan, or a built-in default). */
+  readonly source: 'plan' | 'default';
 }
 
 /** One analyzed system (insolation + radius, both non-null). */
@@ -206,3 +208,4 @@ export function analyzeRadiusInsolation(
     summary,
   };
 }
+

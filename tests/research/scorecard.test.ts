@@ -50,6 +50,7 @@ function binding(overrides: Partial<CitationBinding> = {}): CitationBinding {
     unbound: [],
     allBound: true,
     snapshotId: 'snap',
+    relations: [],
     ...overrides,
   };
 }
@@ -135,3 +136,4 @@ describe('computeParetoFront (pure)', () => {
     assert.ok(front.has('b'));
   });
 });
+

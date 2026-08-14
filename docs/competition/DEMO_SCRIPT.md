@@ -110,7 +110,7 @@ node src/cli/far.ts research baseline "Does dark matter self-interact?" --profil
 **命令**：
 ```powershell
 pnpm api        # http://localhost:3000/research
-pnpm test       # 2604 (2598p/0f/6s)
+pnpm test       # 2618 (2612p/0f/6s)
 node scripts/zero_tolerance_scan.mjs   # ok
 ```
 **镜头点**：浏览器 /research 页（创建→假设比较表→修订时间线→评估指标）→ 测试数字特写。
@@ -123,3 +123,4 @@ node scripts/zero_tolerance_scan.mjs   # ok
 2. 每个命令的真实输出**不剪辑拼接**（长输出可加速，标注 ×2）。
 3. 片尾 5 秒静态页：仓库地址 + 「提交截止 2026-09-05 · 题目 XH-202619」。
 4. 总时长硬上限 10:00；预算合计 8.5 分钟，留剪辑余量。
+

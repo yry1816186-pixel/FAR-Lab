@@ -109,6 +109,8 @@ const importsOf = (f) => [
     'src/science_harness/dataset_resolver.ts', // 下载/缓存路径
     'src/science_harness/sandbox_runner.ts', // 子进程沙箱差异
     'src/hardware/detect.ts', // 硬件探测按平台调用 nvidia-smi/system_profiler 等
+    'src/far_proof/env_fingerprint.ts', // 环境指纹需记录平台/arch
+    'src/research/provenance.ts', // EnvironmentFingerprint.platform 记录运行平台
   ]);
   const users = srcFiles.filter((f) => read(f).includes('process.platform')).map(rel);
   const unreg = users.filter((u) => !REGISTERED.has(u));
@@ -146,17 +148,25 @@ const importsOf = (f) => [
 }
 
 // FF-11 P0 需求必有 Oracle: REQUIREMENTS.yaml 每条 P0 oracle 非空
+// 激活条件（与 design_lint.mjs 同模式）：.far-design/REQUIREMENTS.yaml 是设计过程产物
+// （.gitignore 222-227 有意不跟踪，§16.1 设计稿不进公开仓库）——fresh-clone/CI 上不存在
+// 时显式 SKIP（非 PASS、非 FAIL、不计数），本地开发机存在时照常校验。
 {
-  const t = read('.far-design/REQUIREMENTS.yaml');
-  const blocks = t.split(/\n  - requirement_id: /).slice(1);
-  const bad = [];
-  for (const b of blocks) {
-    const id = b.split('\n')[0].trim();
-    const isP0 = /priority: P0/.test(b);
-    const oracle = (b.match(/oracle: "(.+)"/) || [])[1];
-    if (isP0 && (!oracle || oracle.length < 4)) bad.push(id);
+  const reqPath = '.far-design/REQUIREMENTS.yaml';
+  if (!existsSync(reqPath)) {
+    report.push('[SKIP] FF-11 全部 P0 需求有 Oracle :: .far-design/REQUIREMENTS.yaml 是设计过程产物（有意不跟踪），fresh-clone 无此输入——按 design_lint 同模式跳过（本地开发机存在时校验）');
+  } else {
+    const t = read(reqPath);
+    const blocks = t.split(/\n  - requirement_id: /).slice(1);
+    const bad = [];
+    for (const b of blocks) {
+      const id = b.split('\n')[0].trim();
+      const isP0 = /priority: P0/.test(b);
+      const oracle = (b.match(/oracle: "(.+)"/) || [])[1];
+      if (isP0 && (!oracle || oracle.length < 4)) bad.push(id);
+    }
+    check('FF-11', '全部 P0 需求有 Oracle', bad.length === 0, bad.length ? `缺 Oracle: ${bad.join(',')}` : `${blocks.length} 条需求校验通过`);
   }
-  check('FF-11', '全部 P0 需求有 Oracle', bad.length === 0, bad.length ? `缺 Oracle: ${bad.join(',')}` : `${blocks.length} 条需求校验通过`);
 }
 
 // FF-12 内核输出五值枚举封闭: verdict_kernel_v2.ts 不出现枚举外 verdict 字面量
