@@ -14,7 +14,7 @@ function makeObservation(
   rows: readonly PsRow[],
   minRadius = 6,
   maxPeriod = 10,
-): Observation {
+): Extract<Observation, { readonly adapter: 'exoplanet-archive-radius-insolation' }> {
   const result = analyzeRadiusInsolation(rows, {
     minRadiusEarth: minRadius,
     maxPeriodDays: maxPeriod,
@@ -81,7 +81,7 @@ describe('interpretObservation', () => {
       radiusEarth: 8 + ((k * 7) % 13) * 0.05,
     }));
     const obs = makeObservation(rows);
-    assert.equal(obs.result.significantAt05, false);
+    assert.equal(obs.adapter === 'exoplanet-archive-radius-insolation' ? obs.result.significantAt05 : null, false);
     const i = interpretObservation(obs);
     assert.deepEqual(i.triggers, ['alternative_hypothesis']);
     assert.equal(i.changesScore, true);
@@ -101,7 +101,7 @@ describe('interpretObservation', () => {
       stellarMassMsun: 1,
     }));
     const obs = makeObservation(rows);
-    assert.equal(obs.result.significantAt05, true);
+    assert.equal(obs.adapter === 'exoplanet-archive-radius-insolation' ? obs.result.significantAt05 : null, true);
     const i = interpretObservation(obs);
     assert.deepEqual(i.triggers, ['none']);
     assert.equal(i.changesScore, false);

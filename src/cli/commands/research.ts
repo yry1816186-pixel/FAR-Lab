@@ -39,7 +39,7 @@ import { verifyResearchRunDeterministic } from '../../research/verification.ts';
 import { computeRunMetrics } from '../../research/evaluation/metrics.ts';
 import { runAllBaselines } from '../../research/evaluation/baseline.ts';
 import { exportResearchBundle, researchBundleSha256 } from '../../research/export_bundle.ts';
-import { runPlanExperiment } from '../../research/experiment.ts';
+import { runPlanExperiment, isLandscapeObservation } from '../../research/experiment.ts';
 import { loadExoplanetReplayRows } from '../../research/adapters/exoplanet_replay.ts';
 import { parseResearchRunJson, FeedbackInputZod } from '../../research/schemas.ts';
 import type { ResearchRun } from '../../research/types.ts';
@@ -1046,10 +1046,18 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
       `${JSON.stringify({ observation, feedback, revisionId: revision.id, saved: outPath }, null, 2)}\n`,
     );
   } else {
+    const headline =
+      isLandscapeObservation(observation)
+        ? `literature-landscape, docs=${observation.result.totalDocuments}, counterShare=${(observation.result.counterEvidenceShare * 100).toFixed(1)}%, mode=${observation.mode}`
+        : `${observation.result.status}, n=${observation.result.n}, mode=${observation.mode}`;
+    const resultLine =
+      isLandscapeObservation(observation)
+        ? `${observation.result.totalDocuments} docs · counter-evidence ${(observation.result.counterEvidenceShare * 100).toFixed(1)}% · fresh≤5y ${(observation.result.freshShare * 100).toFixed(1)}% · median year ${observation.result.medianPublicationYear ?? 'n/a'} · ${observation.result.sourceFamilies.join('+')}`
+        : observation.result.summary;
     process.stdout.write(
-      `far research analyze: observation collected (${observation.result.status}, n=${observation.result.n}, mode=${observation.mode})\n` +
-        `  result    : ${observation.result.summary}\n` +
-        `  feedback  : ${feedback.text.slice(0, 140)}${feedback.text.length > 140 ? '…' : ''}\n` +
+      `far research analyze: observation collected (${headline})\n` +
+        `  result    : ${resultLine}\n` +
+        `  feedback  : ${feedback.text.slice(0, 160)}${feedback.text.length > 160 ? '…' : ''}\n` +
         `  triggers  : ${feedback.triggers.join(', ')} · changesScore=${feedback.changesScore}\n` +
         `  revision  : #${revision.number} (${revision.id.slice(0, 8)}…) · planChanges=${planChanges.length} · unresolved=${unresolvedConflicts.length}\n` +
         `  runMode   : ${finalRun.runMode} (experiment=${finalRun.modes.experimentExecutionMode})\n` +
