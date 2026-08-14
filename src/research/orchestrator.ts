@@ -44,6 +44,11 @@ import { RETRIEVAL_PARSER_VERSION } from '../retrieval/types.ts';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import { generateHypotheses } from './hypothesis_generation.ts';
+import {
+  generateHypothesesMultiStrategy,
+  type FanoutMeta,
+} from '../discovery/generate.ts';
+import type { StrategyId } from '../discovery/types.ts';
 import { critiqueHypothesis } from './adversarial_review.ts';
 import { designResearchPlan } from './research_plan.ts';
 import { bindCitations } from './citation.ts';
@@ -106,6 +111,18 @@ export interface RunResearchOptions {
   readonly grounding?: ResearchGroundingOptions;
   /** Target hypothesis count (3-5, default 3). */
   readonly targetHypothesisCount?: number;
+  /**
+   * Hypothesis-generation strategy (discovery engine, directive §2.1).
+   * 'legacy' = single-shot generateHypotheses (the original path —
+   * @deprecated-transition: b2 flips the default to multi_strategy, b3 removes
+   * the legacy path; Appendix A wiring plan). 'multi_strategy' = the
+   * deterministic fan-out over the registered reasoning strategies.
+   */
+  readonly hypothesisGenerationStrategy?: 'legacy' | 'multi_strategy';
+  /** Explicit strategy subset for multi_strategy (catalog-ordered; default: all registered). */
+  readonly discoveryStrategies?: readonly StrategyId[];
+  /** Receives the fan-out accounting when multi_strategy runs (CLI summary / lifecycle persistence seam). */
+  readonly onFanoutComplete?: (meta: FanoutMeta) => void;
   /** Whether the critique uses the same model as the generator (default true). */
   readonly sameModelAsGenerator?: boolean;
   /** Optional run id (default: ULID). */
@@ -374,6 +391,62 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   // ── 3. Generate 3-5 candidate hypotheses (corpus-injected, citation allowlist). ──
   await driver.run('hypothesis_generation', async () => {
     const corpus = ctx.corpus!;
+    if ((opts.hypothesisGenerationStrategy ?? 'legacy') === 'multi_strategy') {
+      // Discovery fan-out (directive §2.1/§2.2): every applicable strategy
+      // contributes candidates; one receipt per strategy call keeps the
+      // per-strategy provenance; the merge gates are deterministic.
+      const fanout = await generateHypothesesMultiStrategy(opts.gateway, profile, {
+        question: opts.question,
+        corpus,
+        targetCount,
+        ...(opts.discoveryStrategies !== undefined
+          ? { strategyIds: opts.discoveryStrategies }
+          : {}),
+      });
+      ctx.hypotheses = fanout.hypotheses;
+      for (const result of fanout.meta.perStrategy) {
+        if (result.meta !== null) {
+          ctx.receipts.push(
+            receiptForModel(runId, `discovery_${result.strategyId}`, nextSeq(), profile, result.meta),
+          );
+        }
+      }
+      ctx.receipts.push(
+        buildProvenanceReceipt({
+          runId,
+          stageId: 'discovery_fanout',
+          sequence: nextSeq(),
+          component: 'deterministic',
+          mode: profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE',
+          inputHash: hashCanonicalJson({
+            strategies: fanout.meta.strategiesPlanned,
+            question: opts.question,
+            corpusSnapshotId: corpus.snapshotId,
+          }),
+          outputHash: hashCanonicalJson({
+            finalCount: fanout.meta.finalCount,
+            quotaShortfall: fanout.meta.quotaShortfall,
+            exactDuplicatesDropped: fanout.meta.exactDuplicatesDropped,
+            paraphraseFlagged: fanout.meta.paraphraseFlagged,
+            truncated: fanout.meta.truncated,
+            perStrategy: fanout.meta.perStrategy.map((r) => ({
+              strategyId: r.strategyId,
+              contributed: r.candidates.length,
+              error: r.error,
+              skipReason: r.skipReason,
+            })),
+          }),
+          corpusSnapshotId: corpus.snapshotId,
+          corpusRootHash: corpus.rootHash,
+          createdAt: now().toISOString(),
+          errors: fanout.meta.perStrategy
+            .filter((r) => r.error !== null)
+            .map((r) => `${r.strategyId}: ${r.error}`),
+        }),
+      );
+      opts.onFanoutComplete?.(fanout.meta);
+      return;
+    }
     const generated = await generateHypotheses(opts.gateway, profile, {
       question: opts.question,
       corpus,

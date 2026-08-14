@@ -39,7 +39,7 @@ export function computeHypothesisId(statement: string, mechanism: string): strin
 }
 
 /** Render the corpus as a citation allowlist for the model context (sanitized). */
-function renderCorpusAllowlist(corpus: CorpusSnapshot): string {
+export function renderCorpusAllowlist(corpus: CorpusSnapshot): string {
   if (corpus.documentCount === 0) {
     return '(the corpus is empty — you may not cite any document; mark all citation arrays as empty [])';
   }

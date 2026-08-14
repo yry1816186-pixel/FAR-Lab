@@ -75,6 +75,260 @@ export const DOC_B: RetrievedDocument = syntheticDoc(
 export const RESEARCH_DEMO_DOCS: readonly RetrievedDocument[] = [DOC_A, DOC_B];
 
 /** The offline_replay fixture registry for the research module (stageId → JSON). */
+/**
+ * Offline demo fixtures for the discovery strategy fan-out (one candidate per
+ * strategy, distinct topics so the deterministic merge gates stay real:
+ * nothing here is a near-duplicate, so dedup/paraphrase gates do NOT fire on
+ * the demo path — their behavior is pinned by tests/discovery/generate.test.ts).
+ * Synthetic: same rules as the rest of this file — wiring proof, never truth.
+ */
+const DISCOVERY_DEMO_FIXTURES: Readonly<Record<string, string>> = Object.freeze({
+  discovery_induction: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'A single activity-contamination mechanism unifies the radius anomaly across both demo corpus regularities.',
+        mechanism:
+          'REGULARITY_1: radii exceed model predictions at fixed mass [demo-doc-a]; REGULARITY_2: activity proxies correlate with depth residuals [demo-doc-b]; UNIFIED_MECHANISM: unocculted spots bias both observables; EXTRAPOLATION: the bias scales with spot covering fraction.',
+        falsificationMethod: {
+          prediction: 'Radius anomaly vanishes after spot-correction across the sample.',
+          metric: 'residual_rms_ratio',
+          comparator: 'lt',
+          value: 0.5,
+        },
+        supportingCitations: [DOC_A.documentId, DOC_B.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory: 'Unifies contamination-systematics threads of the demo corpus.',
+        alternativeExplanations: ['Physical atmospheric inflation.'],
+        observablePredictions: ['Corrected radii collapse onto structure models.'],
+        distinguishingObservations: ['Multi-band depths disagree before correction only.'],
+        noveltyRelativeToCorpus: 'Combines two corpus regularities into one contamination mechanism.',
+        assumptions: ['Spot covering fractions are recoverable from light curves.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_abduction: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'The minimal explanation for the joint demo phenomena is unocculted spot contamination alone.',
+        mechanism:
+          'PHENOMENON_1: radius excess at fixed mass [demo-doc-a]; PHENOMENON_2: chromatic depth residuals [demo-doc-b]; MINIMAL_SET: a single spot-covering parameter explains both without invoking inflation.',
+        falsificationMethod: {
+          prediction: 'A one-parameter spot model fits both observables better than any two-mechanism model.',
+          metric: 'bic_delta',
+          comparator: 'lt',
+          value: 0,
+        },
+        supportingCitations: [DOC_A.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory: 'Parsimony argument over the demo corpus mechanisms.',
+        alternativeExplanations: ['Two mechanisms coincidentally co-occur.'],
+        observablePredictions: ['Spot covering fraction predicts depth residual sign.'],
+        distinguishingObservations: ['Occulted-spot events directly measure covering fraction.'],
+        noveltyRelativeToCorpus: 'Minimal-set abduction over corpus-reported phenomena.',
+        assumptions: ['Model comparison is fair across mechanism counts.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_analogy: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'Thermal-blanket physics imported from building insulation explains radius anomalies as trapped internal heat.',
+        mechanism:
+          'A high-opacity layer traps internal luminosity exactly as insulation traps heat; radius relaxes outward until cooling balances.',
+        falsificationMethod: {
+          prediction: 'Anomaly size tracks infrared opacity of the inferred layer.',
+          metric: 'opacity_anomaly_slope',
+          comparator: 'gt',
+          value: 0.3,
+        },
+        supportingCitations: [DOC_B.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory:
+          'SOURCE_DOMAIN: building physics; MAPPING: opacity↔insulation R-value, luminosity↔heating power, radius↔envelope thickness; FAILURE_CONDITIONS: breaks when convection dominates over radiative transfer.',
+        alternativeExplanations: ['Tidal heating supplies the extra flux.'],
+        observablePredictions: ['Deeper secondary eclipses for opaque layers.'],
+        distinguishingObservations: ['Day-night contrast isolates transport mode.'],
+        noveltyRelativeToCorpus: 'Distant-domain structural import absent from the demo corpus.',
+        assumptions: ['Radiative equilibrium holds in the layer.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_inversion: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'If irradiation-driven inflation is false, residual radius scatter should be uncorrelated with incident flux.',
+        mechanism:
+          'MAINSTREAM_ASSUMPTION: incident flux inflates radii; IF_FALSE_OBSERVABLE: radius residuals vs flux slope ≈ 0 while activity residuals remain structured.',
+        falsificationMethod: {
+          prediction: 'Radius-vs-flux slope is statistically indistinguishable from zero.',
+          metric: 'flux_slope_pvalue',
+          comparator: 'gt',
+          value: 0.05,
+        },
+        supportingCitations: [],
+        counterEvidenceCitations: [DOC_A.documentId],
+        relationToExistingTheory: 'Direct negation of the corpus-dominant inflation explanation.',
+        alternativeExplanations: ['Flux range too narrow to expose the slope.'],
+        observablePredictions: ['No residual-flux correlation across a wide flux range.'],
+        distinguishingObservations: ['Extended-flux sample separates the two predictions.'],
+        noveltyRelativeToCorpus: 'Tests the corpus mainstream by its negation signature.',
+        assumptions: ['Sample spans a flux range where inflation would show.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_extreme_conditions: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'Below a critical incident flux, the radius anomaly mechanism hands over from inflation to observational artifact.',
+        mechanism:
+          'EXTREME_REGIME: ultra-low incident flux (< 10^6 W/m^2); HANDOVER_PREDICTION: anomaly sign flips as the artifact term dominates the shrinking inflation term.',
+        falsificationMethod: {
+          prediction: 'Anomaly sign flips within the predicted low-flux band.',
+          metric: 'anomaly_sign',
+          comparator: 'range',
+          lower: -0.05,
+          upper: 0.05,
+        },
+        supportingCitations: [DOC_A.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory: 'Extends the corpus inflation relation to its extreme regime.',
+        alternativeExplanations: ['Selection effects produce the flip.'],
+        observablePredictions: ['Transition objects cluster at the critical flux.'],
+        distinguishingObservations: ['Completeness-corrected counts test selection effects.'],
+        noveltyRelativeToCorpus: 'Extrapolates beyond the corpus-observed flux range.',
+        assumptions: ['The two terms are additive.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_constraint_relaxation: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'Relaxing the circular-orbit default reveals eccentricity-driven heating as an anomaly source.',
+        mechanism:
+          'RELAXED_ASSUMPTION: forced e=0 in transit fits; TIGHTENED_ASSUMPTION: (not used — direction: relax); free eccentricity admits tidal dissipation the default fit absorbs into radius.',
+        falsificationMethod: {
+          prediction: 'Allowing eccentricity reduces the radius anomaly budget by a measurable fraction.',
+          metric: 'anomaly_reduction_fraction',
+          comparator: 'gt',
+          value: 0.2,
+        },
+        supportingCitations: [DOC_B.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory: 'Challenges the default-constraint fitting tradition of the corpus.',
+        alternativeExplanations: ['Eccentricity priors bias the reduction.'],
+        observablePredictions: ['Secondary-eclipse timing offsets appear for non-zero e.'],
+        distinguishingObservations: ['RV-independent e estimates cross-check the fits.'],
+        noveltyRelativeToCorpus: 'Methodological-default relaxation absent from the corpus.',
+        assumptions: ['Eccentricity is recoverable from transit data.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_counterfactual: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'Without starspots, the radius anomaly distribution would be marginally anomalous rather than systematic.',
+        mechanism:
+          'COUNTERFACTUAL_VARIABLE: spot covering fraction set to zero; COLLAPSE_CONSEQUENCE: the systematic radius excess collapses to noise, isolating contamination as the load-bearing factor.',
+        falsificationMethod: {
+          prediction: 'Spot-free subsample shows no systematic excess.',
+          metric: 'excess_significance_pvalue',
+          comparator: 'gt',
+          value: 0.05,
+        },
+        supportingCitations: [DOC_A.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory: 'Counterfactual stress-test of the contamination explanation.',
+        alternativeExplanations: ['Spot-free subsample is too small.'],
+        observablePredictions: ['Quiet-star sample radii match models.'],
+        distinguishingObservations: ['Activity-stratified sample sizes decide power.'],
+        noveltyRelativeToCorpus: 'Causal-structure probe via explicit counterfactual.',
+        assumptions: ['Quiet stars are otherwise comparable.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_failure_mining: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'The corpus-admitted lack of multi-band follow-up conceals a chromatic contamination signature worth chasing.',
+        mechanism:
+          'The known unknown — no multi-band depths in the demo corpus — is exactly the observation that would separate spot contamination from physical inflation.',
+        falsificationMethod: {
+          prediction: 'Multi-band depth differences exceed white-light scatter for contaminated targets.',
+          metric: 'chromatic_depth_z',
+          comparator: 'gt',
+          value: 2,
+        },
+        supportingCitations: [DOC_A.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory: 'Operationalizes the corpus limitations section.',
+        alternativeExplanations: ['Instrumental band-pass systematics mimic the signature.'],
+        observablePredictions: ['Spotted targets show band-dependent depths.'],
+        distinguishingObservations: ['Simultaneous multi-band rules out systematics.'],
+        noveltyRelativeToCorpus: 'Seeded directly from the corpus-admitted gap.',
+        assumptions: [
+          'LIMITATION_ORIGIN: demo-doc-a: the corpus admits no multi-band follow-up exists yet.',
+        ],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_contradiction_mining: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'A stellar-metallicity moderator reconciles the corpus-conflicting inflation reports.',
+        mechanism:
+          'CONFLICT_A: inflation reported as significant [demo-doc-a]; CONFLICT_B: null result at comparable sample size [demo-doc-b]; RESOLUTION_MECHANISM: metallicity moderates the inflation response, producing both reports in one process.',
+        falsificationMethod: {
+          prediction: 'Including a metallicity interaction removes the heterogeneity between studies.',
+          metric: 'heterogeneity_i2',
+          comparator: 'lt',
+          value: 25,
+        },
+        supportingCitations: [DOC_A.documentId, DOC_B.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory: 'Reconciles two corpus threads instead of picking one.',
+        alternativeExplanations: ['Publication bias produces the conflict.'],
+        observablePredictions: ['High-metallicity subsample shows the larger effect.'],
+        distinguishingObservations: ['Pre-registered moderator analysis on pooled data.'],
+        noveltyRelativeToCorpus: 'Conflict-resolution mechanism over corpus disagreement.',
+        assumptions: ['Both studies report usable metallicity covariates.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+  discovery_data_driven: JSON.stringify({
+    hypotheses: [
+      {
+        statement: 'A power-law scaling between anomaly size and equilibrium temperature underlies the corpus-reported trends.',
+        mechanism:
+          'EMPIRICAL_PATTERN: reported anomaly grows steeply above ~1500 K [demo-doc-b]; MECHANISM_EXPLANATION: opacity onset near that temperature steepens the thermal-blanket response — a causal story for a correlation, not the correlation itself.',
+        falsificationMethod: {
+          prediction: 'A single power law fits the anomaly-temperature relation within stated scatter.',
+          metric: 'powerlaw_fit_rmse',
+          comparator: 'lt',
+          value: 0.1,
+        },
+        supportingCitations: [DOC_B.documentId],
+        counterEvidenceCitations: [],
+        relationToExistingTheory: 'Gives the corpus empirical trend a causal mechanism.',
+        alternativeExplanations: ['Selection effects shape the apparent law.'],
+        observablePredictions: ['New targets land on the law within scatter.'],
+        distinguishingObservations: ['Out-of-sample prediction contest against a broken trend.'],
+        noveltyRelativeToCorpus: 'Mechanism explanation for a corpus-reported regularity.',
+        assumptions: ['Reported temperatures are on a common scale.'],
+        risks: ['Demo fixture — synthetic content, wiring proof only.'],
+      },
+    ],
+  }),
+});
+
 export const RESEARCH_DEMO_FIXTURES: Readonly<Record<string, string>> = Object.freeze({
   baseline_direct: JSON.stringify({
     bestHypothesis: '[SYNTHETIC] Direct answer: the anomaly is starspot contamination.',
@@ -301,4 +555,5 @@ export const RESEARCH_DEMO_FIXTURES: Readonly<Record<string, string>> = Object.f
     nextRoundDecisionRules: ['If artifact hypothesis rejected, promote tidal hypothesis', 'If control residual is significant, trigger instrument-systematic review'],
     humanApprovalRequired: ['Publication of any real conclusion', 'Release of the control-subsample selection criteria'],
   }),
+  ...DISCOVERY_DEMO_FIXTURES,
 });
