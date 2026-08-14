@@ -2,8 +2,9 @@
 
 ## 赛道一 · 方向 1·A：科学假设生成与研究计划设计
 
-> 题目编号 XH-202619 · 提交截止 2026-09-05 · 本方案对应源码分支 `agent/track-1a`
-> （`github.com/yry1816186-pixel/FAR-Lab`，12 commits，2618 测试零失败）。
+> 题目编号 XH-202619 · 提交截止 2026-09-05 · 本方案对应源码仓库
+> `github.com/yry1816186-pixel/FAR-Lab`（main 分支，**2625 测试 / 2619 通过 / 0 失败**，
+> 2026-08-14 全量实测）。
 
 ---
 
@@ -93,10 +94,14 @@ FAR-Lab 是一个**证据约束、可证伪、可迭代、可追溯**的开源 A
 - 反馈是**类型化信号**（来源：人工/文献/工具/分析；触发器：重检索/换假设/重写计划），
   不是聊天记录追加；修订**不可变、可比较、可回滚引用**（父 id + 冻结 before/after 计划
   快照 + 结构化 diff）。
-- **真实数据分析**：NASA Exoplanet Archive live TAP 抓取 → Kepler-III 辐照度 + Pearson 相关
-  （t 变换双侧 p）+ Fisher-z 置信区间（权威参考：Fisher 1921；对照：Anscombe 四重奏）。实测
+- **真实数据分析**：NASA Exoplanet Archive live TAP 抓取 → 辐照度 + Pearson 相关
+  （t 变换双侧 p）+ Fisher-z 置信区间（权威参考：Fisher 1921；对照：Anscombe 四重奏）。
+  **2026-08-14 live 实测**（runId `01KZZ74P2YEEN0BTBD1V4KK9PD`，mode=LIVE）：
   n=392 颗热木星 r=0.587、p<0.001、95% CI [0.518, 0.649]——与辐照驱动膨胀文献一致；
   表述严格限定为"相关性，非因果"。
+- **人工反馈→修订实测**（同一 runId）：reviewer 要求控制样本（Ca II H&K S-index 匹配
+  入射通量）+ 预注册区分假设的实验 → 修订 #2 真实改写计划（+4 人工批准门、贝叶斯因子
+  决策规则、预注册要求），前后差异可 compare。
 - 观察结果 → 反馈信号 → 修订的真实影响：显著→记录关联；不显著→触发替代假设（**零结果
   如实保留，绝不伪造确认**）；样本不足→触发计划重写（修订可能使计划更保守——如实记录）。
 
@@ -107,10 +112,13 @@ FAR-Lab 是一个**证据约束、可证伪、可迭代、可追溯**的开源 A
 - 每个阶段记录组件模式（`modelExecutionMode`/`retrievalExecutionMode`/`experimentExecutionMode`），
   聚合 `runMode` 仅当所有影响科学的组件均 live 时为 `LIVE`；`MIXED`/`RECORDED_REPLAY` 如实
   展示，绝不伪装 live。
-- 每条运行产出 9+ 条逐阶段 ProvenanceReceipt：provider/模型 id/请求 id/快照状态/提供商
+- 每条运行产出 10 条逐阶段 ProvenanceReceipt：provider/模型 id/请求 id/快照状态/提供商
   报告的 token 用量/成本状态/语料哈希/输入输出哈希/环境指纹（git commit、工作树脏标志、
-  锁文件哈希、Node 版本）。**提供商未提供的字段为 null + provenanceStatus=partial 并列出
-  缺失项——绝不虚构**。
+  锁文件哈希、Node 版本）/重试次数/finish reason。**提供商未提供的字段为 null +
+  provenanceStatus=partial 并列出缺失项——绝不虚构**。
+- **可证伪门实测**（live runId 同上）：Qwen 生成的 3 个假设中 2 个的 falsificationMethod
+  不完整（缺阈值）→ 确定性门如实判 F（`falsifiabilityCompleteness=0.333`），主假设仅从
+  "全绑定 + 可证伪"候选池选出——模型输出被确定性规则约束，而非照单全收。
 
 ---
 
@@ -135,7 +143,10 @@ FAR-Lab 是一个**证据约束、可证伪、可迭代、可追溯**的开源 A
   可证伪性与计划质量。
 - **四类公平基线**（同模型、同问题、同冻结指标）：①Qwen 单次直答 ②Qwen+简单 RAG ③同模型
   同工具但无确定性内核（模型自评分选优）④完整系统。能力缺口报 **N/A**（诚实），绝不记
-  0 分。离线回放已实现对比表；live 对比在 key 就绪后运行。
+  0 分。**2026-08-14 live 实测**（同 key 同问题，全部 mode=LIVE）：
+  direct=6 假设（无语料/无绑定/无内核）；rag=5 假设+14 文档（无绑定验证/无内核）；
+  no_kernel=4 假设（无内核）；**full=3 假设+37 文档语料+binding 1.00+unbound 0+确定性
+  内核 yes**——引用绑定与确定性裁决是完整系统独有的能力，而非参数差异。
 
 ---
 
@@ -152,7 +163,8 @@ FAR-Lab 是一个**证据约束、可证伪、可迭代、可追溯**的开源 A
 
 1. LLM 生成文本不可逐位复现（明确标注为不可复算项，冻结而非重生）。
 2. 相关性分析不构成因果结论；单数据集快照（有界 TOP 400）非穷尽。
-3. 四类基线 live 对比与 live Qwen 冒烟依赖 API key（提交前补充）。
+3. live 依赖 DASHSCOPE_API_KEY；无 key 时系统 fail-closed 提示并显示
+   RECORDED_REPLAY 模式，绝不静默降级伪装 live（CI 冒烟测试无 key 时显式 skip）。
 4. 「全自动科学家」不在目标内：人类批准门是一等公民。
 
 ---
