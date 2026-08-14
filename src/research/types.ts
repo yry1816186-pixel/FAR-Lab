@@ -22,6 +22,7 @@
  */
 
 import type { FalsificationMethod } from '../agent_loop/types.ts';
+import type { StrategyId } from '../discovery/types.ts';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
 import type { RetrievedDocument } from '../retrieval/types.ts';
 import type { EnvironmentFingerprint, ProvenanceReceipt } from './provenance.ts';
@@ -184,6 +185,12 @@ export interface HypothesisCandidate {
   readonly assumptions: readonly string[];
   /** Risks / uncertainties / evidence-coverage gaps. */
   readonly risks: readonly string[];
+  /**
+   * Which discovery strategy produced this candidate (multi-strategy fan-out
+   * only; absent on legacy single-shot candidates). Additive optional field —
+   * persisted runs from before the discovery layer simply lack it.
+   */
+  readonly strategyOrigin?: StrategyId | undefined;
 }
 
 /** Critique dimensions (directive §9.7). */

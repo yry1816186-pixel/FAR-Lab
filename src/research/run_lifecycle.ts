@@ -28,6 +28,8 @@ import { join } from 'node:path';
 import { ulid } from 'ulid';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
+import type { StrategyId } from '../discovery/types.ts';
+import type { FanoutMeta } from '../discovery/generate.ts';
 import {
   runResearch,
   STAGE_LIFECYCLE_STATE,
@@ -62,6 +64,14 @@ export interface RunCheckpoint {
   readonly sources: readonly string[];
   readonly maxPerQuery: number;
   readonly target: number;
+  /**
+   * Hypothesis-generation strategy (discovery engine). Absent on pre-discovery
+   * checkpoints = 'legacy'. Persisted so a crashed multi-strategy run resumes
+   * as multi-strategy (never silently reverts).
+   */
+  readonly hypothesisGenerationStrategy?: 'legacy' | 'multi_strategy';
+  /** Strategy subset for multi_strategy runs (absent = all registered). */
+  readonly discoveryStrategies?: readonly StrategyId[];
   readonly state: ResearchLifecycleState;
   readonly completedStages: readonly ResearchStageId[];
   readonly ctx: Record<string, unknown>;
@@ -257,6 +267,12 @@ export interface ExecuteResearchRunArgs {
   readonly profile: ProviderProfile;
   readonly grounding?: ResearchGroundingOptions;
   readonly targetHypothesisCount?: number;
+  /** Discovery fan-out opt-in (directive §2.1); persisted to the checkpoint for resume-stability. */
+  readonly hypothesisGenerationStrategy?: 'legacy' | 'multi_strategy';
+  /** Strategy subset for multi_strategy runs. */
+  readonly discoveryStrategies?: readonly StrategyId[];
+  /** Receives the fan-out accounting when a multi_strategy run generates hypotheses. */
+  readonly onFanoutComplete?: (meta: FanoutMeta) => void;
   /** Existing run id → resume; omitted → new run (ULID minted). */
   readonly runId?: string;
   readonly store: RunStore;
@@ -310,6 +326,10 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       sources: sourcesOf(args.grounding),
       maxPerQuery: args.grounding?.maxPerQuery ?? 5,
       target: args.targetHypothesisCount ?? 3,
+      ...(args.hypothesisGenerationStrategy !== undefined
+        ? { hypothesisGenerationStrategy: args.hypothesisGenerationStrategy }
+        : {}),
+      ...(args.discoveryStrategies !== undefined ? { discoveryStrategies: args.discoveryStrategies } : {}),
       state: 'CREATED',
       completedStages: [],
       ctx: {},
@@ -418,6 +438,11 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       profile: args.profile,
       grounding,
       targetHypothesisCount: cp.target,
+      // Resume-stability: a persisted strategy mode (or subset) replays on
+      // resume; a pre-discovery checkpoint (absent fields) stays legacy.
+      hypothesisGenerationStrategy: cp.hypothesisGenerationStrategy ?? 'legacy',
+      ...(cp.discoveryStrategies !== undefined ? { discoveryStrategies: cp.discoveryStrategies } : {}),
+      ...(args.onFanoutComplete !== undefined ? { onFanoutComplete: args.onFanoutComplete } : {}),
       runId,
       driver,
       onCtxReady: (ctx) => {

@@ -22,6 +22,7 @@
  */
 
 import { z } from 'zod';
+import { STRATEGY_IDS } from '../discovery/types.ts';
 import { buildEvidenceRelations, computeCitationGateReport } from './citation_gate.ts';
 import { computeFalsifiabilityGateReport } from './falsifiability_gate.ts';
 import type { CitationBinding, ResearchRun } from './types.ts';
@@ -189,6 +190,8 @@ export const HypothesisCandidateZod = z.object({
   noveltyRelativeToCorpus: z.string(),
   assumptions: z.array(z.string()),
   risks: z.array(z.string()),
+  // Discovery-layer attribution (optional: legacy candidates predate the fan-out).
+  strategyOrigin: z.enum(STRATEGY_IDS).optional(),
 });
 
 export const CritiqueReportZod = z.object({
