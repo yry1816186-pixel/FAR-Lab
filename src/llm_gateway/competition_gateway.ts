@@ -24,6 +24,11 @@ export interface CompetitionGatewayConfig {
    * 生产省略 → 真 OpenAI SDK 调 DashScope；测试注入 → 控制 per-target 成败驱动真实 executeFallbackChain（无付费 HTTP）。
    */
   readonly createChatCompletion?: QwenChatCompletionCaller;
+  /**
+   * 内层重试上限 + 退避注入（转发 createQwenAdapter；生产默认，测试注入 instant）。
+   */
+  readonly innerRetryMax?: number;
+  readonly backoff?: (attempt: number, retryAfter: number | null) => Promise<void>;
 }
 
 /**
@@ -41,6 +46,8 @@ export function createCompetitionQwenGateway(config: CompetitionGatewayConfig): 
       ...(config.createChatCompletion !== undefined
         ? { createChatCompletion: config.createChatCompletion }
         : {}),
+      ...(config.innerRetryMax !== undefined ? { innerRetryMax: config.innerRetryMax } : {}),
+      ...(config.backoff !== undefined ? { backoff: config.backoff } : {}),
     }),
   ]);
 }

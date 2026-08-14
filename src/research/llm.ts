@@ -44,6 +44,8 @@ export interface CallMeta {
   readonly latencyMs: number;
   /** Number of repair attempts consumed (1 = first try succeeded). */
   readonly attempts: number;
+  /** Provider-side 429/5xx retries consumed inside the adapter (0 = none). */
+  readonly providerRetries: number;
   /** Provider-reported finish reason (null = provider did not report one). */
   readonly finishReason: string | null;
   /** UTC ISO timestamp of the call. */
@@ -63,6 +65,11 @@ function toCallMeta(
   latencyMs: number,
   attempts: number,
 ): CallMeta {
+  const adapterMeta = credential.adapterMeta;
+  const providerRetries =
+    adapterMeta !== undefined && typeof adapterMeta['providerRetries'] === 'number'
+      ? adapterMeta['providerRetries']
+      : 0;
   return {
     provider: credential.providerProfile,
     modelId: credential.modelId,
@@ -72,6 +79,7 @@ function toCallMeta(
     cost: toReceiptCost(credential.costSnapshot),
     latencyMs,
     attempts,
+    providerRetries,
     finishReason: credential.finishReason ?? null,
     isoTimestamp: credential.isoTimestamp,
   };
@@ -85,6 +93,9 @@ function toCallMeta(
  * @param stageId   fixture/stage key (offline_replay registry matches on this)
  * @param schema    zod schema to validate the parsed output
  * @param messages  system + user messages (external content must be pre-sanitized)
+ * @param maxTokens output-token cap (adapter default 2048 truncates large
+ *                  structured payloads like hypothesis sets — callers pass an
+ *                  explicit budget sized to their stage)
  *
  * @throws on the 2nd consecutive schema/JSON failure (fail-closed)
  */
@@ -94,6 +105,7 @@ export async function callStructuredJson<T>(
   stageId: string,
   schema: z.ZodType<T>,
   messages: readonly LlmMessage[],
+  maxTokens = 4096,
 ): Promise<StructuredCall<T>> {
   const jsonSchema = zodToJsonSchema(schema, { name: stageId }) as Record<string, unknown>;
   let lastError: unknown;
@@ -105,10 +117,19 @@ export async function callStructuredJson<T>(
       responseFormat: 'json_schema',
       jsonSchema: { name: stageId, schema: jsonSchema, strict: true },
       stageId,
+      maxTokens,
     });
     try {
       const parsed: unknown = JSON.parse(response.content);
-      const data = schema.parse(parsed);
+      // Live-evidence repair (2026-08-14, DashScope compatible-mode): on large
+      // inputs the model occasionally returns the JSON object DOUBLE-ENCODED —
+      // the root parses to a string containing the real object. Unwrap once and
+      // re-validate against the schema; the unwrap counts within the attempt
+      // budget (no silent acceptance, no weakened schema).
+      const data =
+        typeof parsed === 'string'
+          ? schema.parse(JSON.parse(parsed))
+          : schema.parse(parsed);
       return {
         data,
         meta: toCallMeta(profile, response.credential, Date.now() - startedAt, attempt),

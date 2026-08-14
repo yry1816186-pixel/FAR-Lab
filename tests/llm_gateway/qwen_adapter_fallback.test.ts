@@ -211,9 +211,10 @@ class APIConnectionError extends Error {
 
 // ===== §1 429 穿透：primary → backup success =====
 
-test('qwen_adapter: 429 on primary → fallback to backup_1 success (no throw)', async () => {
+test('qwen_adapter: 429 on primary → inner retry (3 attempts) → fallback to backup_1 success (no throw)', async () => {
   const attempts: string[] = [];
   const adapter = createQwenAdapter({
+    backoff: async () => {}, // instant — avoid real backoff waits in tests
     createChatCompletion: async (request: QwenChatCompletionRequest) => {
       attempts.push(request.modelId);
       if (request.modelId === COMPETITION_PRIMARY_MODEL_ID) {
@@ -228,16 +229,22 @@ test('qwen_adapter: 429 on primary → fallback to backup_1 success (no throw)',
     messages: [{ role: 'user', content: 'hello' }],
   });
 
-  // 验证 fallback 顺序：先试 primary，429 后切 backup_1
-  assert.equal(attempts.length, 2);
-  assert.equal(attempts[0], COMPETITION_PRIMARY_MODEL_ID);
-  assert.equal(attempts[1], 'qwen3-235b-a22b');
+  // 新契约（2026-08-14 内层重试）：primary 同模型内退避重试 3 次（429 是瞬时
+  // 可恢复错误，不立即降级），耗尽后才切 backup_1。
+  assert.equal(attempts.length, 4);
+  assert.deepEqual(attempts.slice(0, 3), [
+    COMPETITION_PRIMARY_MODEL_ID,
+    COMPETITION_PRIMARY_MODEL_ID,
+    COMPETITION_PRIMARY_MODEL_ID,
+  ]);
+  assert.equal(attempts[3], 'qwen3-235b-a22b');
   // 响应来自 backup_1
   assert.equal(response.credential.modelId, 'qwen3-235b-a22b');
   assert.equal(response.content, 'response-from-backup');
-  // 降级留痕：degradedFrom=primary
+  // 降级留痕：degradedFrom=primary + providerRetries=2（3 次尝试 = 2 次重试）
   assert.equal(response.credential.adapterMeta?.degradedFrom, COMPETITION_PRIMARY_MODEL_ID);
   assert.equal(response.credential.adapterMeta?.degradationCount, 1);
+  assert.equal(response.credential.adapterMeta?.providerRetries, 2);
 });
 
 test('qwen_adapter: SDK APIConnectionError on primary → fallback to backup_1 success', async () => {
@@ -272,6 +279,7 @@ test('qwen_adapter: SDK APIConnectionError on primary → fallback to backup_1 s
 test('qwen_adapter: all targets 429 → chainExhausted → throws RETRY_EXHAUSTED', async () => {
   const attempts: string[] = [];
   const adapter = createQwenAdapter({
+    backoff: async () => {}, // instant — avoid real backoff waits in tests
     createChatCompletion: async (request: QwenChatCompletionRequest) => {
       attempts.push(request.modelId);
       // 使用 BailianRateLimitError（fallback_chain 的 429 typed error）
@@ -292,10 +300,11 @@ test('qwen_adapter: all targets 429 → chainExhausted → throws RETRY_EXHAUSTE
     },
   );
 
-  // 三档全试过（COMPETITION_FALLBACK_CHAIN.length === 3）
-  assert.equal(attempts.length, COMPETITION_FALLBACK_CHAIN.length);
+  // 新契约：三档 × 每档内层重试 3 次尝试（3×3=9），档位顺序保持链序。
+  assert.equal(attempts.length, COMPETITION_FALLBACK_CHAIN.length * 3);
+  const distinct = [...new Set(attempts)];
   assert.deepEqual(
-    attempts,
+    distinct,
     COMPETITION_FALLBACK_CHAIN.map((t) => t.modelId),
   );
 });

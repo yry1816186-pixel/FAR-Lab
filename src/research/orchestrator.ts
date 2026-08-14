@@ -449,7 +449,7 @@ function receiptForModel(
     modelSnapshot: meta.modelSnapshot,
     tokenUsage: meta.tokenUsage,
     latencyMs: meta.latencyMs,
-    retries: meta.attempts - 1,
+    retries: meta.attempts - 1 + meta.providerRetries,
     finishReason: meta.finishReason,
     cost: meta.cost,
     createdAt: meta.isoTimestamp,
