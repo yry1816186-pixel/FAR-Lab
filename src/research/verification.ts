@@ -10,13 +10,15 @@
 
 import { createCorpusSnapshot, CitationResolver } from '../retrieval/index.ts';
 import { bindCitations } from './citation.ts';
+import { computeCitationGateReport } from './citation_gate.ts';
+import { computeFalsifiabilityGateReport } from './falsifiability_gate.ts';
 import {
   buildScorecard,
   computeDeterministicDimensions,
   computeParetoFront,
 } from './scorecard.ts';
-import { selectPrimaryHypothesis } from './orchestrator.ts';
-import type { ResearchRun } from './types.ts';
+import { admissibleHypotheses, selectPrimaryHypothesis } from './orchestrator.ts';
+import type { CitationBinding, ResearchRun } from './types.ts';
 
 /** The outcome of a deterministic recompute. */
 export interface VerificationOutcome {
@@ -39,8 +41,10 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
 
   // 2. Citation binding + deterministic dimensions + scorecards.
   const reScorecards: Record<string, ReturnType<typeof buildScorecard>> = {};
+  const reBindings: Record<string, CitationBinding> = {};
   for (const h of run.hypotheses) {
     const binding = bindCitations(h, resolver);
+    reBindings[h.id] = binding;
     const storedBinding = run.bindings[h.id];
     if (storedBinding === undefined || storedBinding.allBound !== binding.allBound) {
       failures.push(`citation binding MISMATCH for ${h.id}`);
@@ -58,6 +62,7 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
   for (const id of Object.keys(reScorecards)) {
     reScorecards[id] = { ...reScorecards[id]!, paretoOptimal: pareto.has(id) };
   }
+  const recomputedFalsifiability = computeFalsifiabilityGateReport(run.hypotheses);
 
   // 3. Deterministic dimensions + Pareto comparison (model dims excluded).
   for (const h of run.hypotheses) {
@@ -74,16 +79,45 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
     }
   }
 
-  // 4. Primary selection.
-  const primary = selectPrimaryHypothesis(run.hypotheses, reScorecards);
+  // 4. Primary selection (same admissible-pool rule as the orchestrator).
+  const pool = admissibleHypotheses(run.hypotheses, reBindings, recomputedFalsifiability);
+  const primary = selectPrimaryHypothesis(pool, reScorecards);
   if (primary.id !== run.plan.primaryHypothesisId) {
     failures.push(`primary-hypothesis MISMATCH (recomputed ${primary.id}, stored ${run.plan.primaryHypothesisId})`);
+  }
+
+  // 5. Citation gate (recomputed from frozen bindings; resolvedViaRetrieval is
+  //    live-resolution provenance and is not recomputable).
+  const recomputedCitationGate = computeCitationGateReport({
+    bindings: reBindings,
+    primaryHypothesisId: run.plan.primaryHypothesisId,
+  });
+  if (
+    recomputedCitationGate.boundRate !== run.citationGate.boundRate ||
+    recomputedCitationGate.unboundEvidenceCount !== run.citationGate.unboundEvidenceCount ||
+    recomputedCitationGate.gateVerdict !== run.citationGate.gateVerdict ||
+    recomputedCitationGate.primaryAllBound !== run.citationGate.primaryAllBound
+  ) {
+    failures.push('citation gate MISMATCH (stored report does not recompute from the frozen bindings)');
+  }
+
+  // 6. Falsifiability gate (fully recomputable — pure over frozen hypotheses).
+  if (JSON.stringify(recomputedFalsifiability) !== JSON.stringify(run.falsifiabilityGate)) {
+    failures.push('falsifiability gate MISMATCH (stored report does not recompute)');
   }
 
   return {
     status: failures.length === 0 ? 'PASS' : 'FAIL',
     failures,
-    verified: ['corpus_rootHash', 'citation_binding', 'deterministic_scorecard', 'pareto_front', 'primary_selection'],
-    notVerifiable: ['model_generation', 'model_critique_dimensions'],
+    verified: [
+      'corpus_rootHash',
+      'citation_binding',
+      'deterministic_scorecard',
+      'pareto_front',
+      'primary_selection',
+      'citation_gate',
+      'falsifiability_gate',
+    ],
+    notVerifiable: ['model_generation', 'model_critique_dimensions', 'citation_resolution_retrieval'],
   };
 }

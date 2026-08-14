@@ -2,7 +2,7 @@
  * research/provenance — per-stage provenance receipts + environment fingerprint
  * (directive §3.3).
  *
- * Every science-critical stage of a research run records a StageReceipt:
+ * Every science-critical stage of a research run records a ProvenanceReceipt:
  * model stages carry provider identity (model id / request id / snapshot state /
  * provider-reported token usage / cost status); retrieval stages carry corpus
  * identity (snapshotId / rootHash / data source / retrievedAt / parser version);
@@ -54,7 +54,7 @@ export interface ReceiptCost {
  * supply them, and provenanceStatus='partial' lists what is missing. A receipt
  * never fabricates request ids, token usage, or model snapshots.
  */
-export interface StageReceipt {
+export interface ProvenanceReceipt {
   /** The run this stage belongs to. */
   readonly runId: string;
   /** Stage identifier (stable, e.g. 'research_hypotheses'). */
@@ -131,26 +131,7 @@ export interface EnvironmentFingerprint {
   readonly packageVersion: string | null;
 }
 
-/** Recursively sort object keys so serialization is insertion-order independent. */
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value) ?? 'null';
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => stableStringify(v)).join(',')}]`;
-  }
-  const obj = value as Record<string, unknown>;
-  const keys = Object.keys(obj).sort();
-  const parts = keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`);
-  return `{${parts.join(',')}}`;
-}
-
-/** sha256 of a canonical JSON serialization (stable key order). */
-export function hashCanonicalJson(value: unknown): string {
-  return rawSha256Hex(stableStringify(value));
-}
-
-/** sha256 of arbitrary text. */
+/** sha256 of arbitrary text (thin alias over the retrieval hash primitive). */
 export function hashText(text: string): string {
   return rawSha256Hex(text);
 }
@@ -245,7 +226,7 @@ export interface ReceiptInit {
   readonly stageVersion?: number;
   readonly attempt?: number;
   readonly sequence: number;
-  readonly component: StageReceipt['component'];
+  readonly component: ProvenanceReceipt['component'];
   readonly mode: ComponentMode;
   readonly provider?: string | null;
   readonly endpointRegion?: string | null;
@@ -270,11 +251,11 @@ export interface ReceiptInit {
 }
 
 /**
- * Build a StageReceipt, then compute provenanceStatus/missingFields honestly:
+ * Build a ProvenanceReceipt, then compute provenanceStatus/missingFields honestly:
  * a field is "expected" for a component and missing when null; 'partial' names
  * the missing ones. Nothing is filled in by guessing.
  */
-export function buildStageReceipt(init: ReceiptInit): StageReceipt {
+export function buildProvenanceReceipt(init: ReceiptInit): ProvenanceReceipt {
   const base = {
     runId: init.runId,
     stageId: init.stageId,
@@ -303,7 +284,7 @@ export function buildStageReceipt(init: ReceiptInit): StageReceipt {
     promptTemplateHash: init.promptTemplateHash ?? null,
     errors: init.errors ?? [],
     createdAt: init.createdAt ?? new Date().toISOString(),
-  } satisfies Omit<StageReceipt, 'provenanceStatus' | 'missingFields'>;
+  } satisfies Omit<ProvenanceReceipt, 'provenanceStatus' | 'missingFields'>;
 
   const expected: Array<readonly [string, unknown]> =
     base.component === 'model'
@@ -333,3 +314,4 @@ export function buildStageReceipt(init: ReceiptInit): StageReceipt {
     missingFields: missing,
   };
 }
+

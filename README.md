@@ -352,7 +352,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions must pass
 **Honest statement** (per [JOSS AI Usage Policy 2026](https://joss.readthedocs.io/) / ICMJE / COPE):
 All code in this repository was written by **AI coding agents** (Claude Code AI); the human
 author is responsible for design decisions, requirements, acceptance, and release. The
-deterministic test suite (2693 tests) independently validates behavior. Per-commit human
+deterministic test suite (2618 tests) independently validates behavior. Per-commit human
 line-by-line review is **not yet established** — see
 [docs/concepts/research-integrity.md](docs/concepts/research-integrity.md) §5 for the full
 disclosure + what this project can and cannot prove. At runtime, LLMs (Qwen family) are used
@@ -428,4 +428,5 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
     and `far verify --bundle` emits an `ENV_DRIFT` warning when the verifying environment differs
     from the recording one. This is disclosure, not a guarantee: same versions can still drift on
     transitive dependencies, and fully locking the environment (Docker/WholeTale-style) is a V2 item.
+
 

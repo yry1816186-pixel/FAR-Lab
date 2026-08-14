@@ -53,7 +53,7 @@
 | Science-125 问题面向 | ✅ | 冻结评估集 6 项（5 个 Science-125 真实问题 + 1 hero）；demo_seeds 30 个 Science-125 问题 |
 | 多入口（CLI/API/Web）共享同一 application service | ✅ | `applyFeedbackToRun` 单一服务；CLI+API 复用（tests/api/research.test.ts 6 tests） |
 | 权威真实数据集 + Dataset Card | ✅ | NASA Exoplanet Archive TAP（public domain）+ 完整 DatasetCard（来源/版本/license/校验/允许推断边界） |
-| fresh-clone 可复现 | ✅ | 无 key 全链路跑通（offline_replay + 真实样本 replay + live 检索/数据免费）；full suite 2604 |
+| fresh-clone 可复现 | ✅ | 无 key 全链路跑通（offline_replay + 真实样本 replay + live 检索/数据免费）；full suite 2618 |
 
 ## 3. 剩余差距（提交截止前必须完成）
 
@@ -69,3 +69,4 @@
 - [ ] 无伪造绿（所有 badge/数字指向真实 workflow/实测）
 - [ ] demo 视频中的 live 证据标注真实日期与命令输出
 - [ ] 技术方案中的"已验证"全部可回溯到命令输出/测试名
+

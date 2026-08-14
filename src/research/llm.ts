@@ -44,6 +44,8 @@ export interface CallMeta {
   readonly latencyMs: number;
   /** Number of repair attempts consumed (1 = first try succeeded). */
   readonly attempts: number;
+  /** Provider-reported finish reason (null = provider did not report one). */
+  readonly finishReason: string | null;
   /** UTC ISO timestamp of the call. */
   readonly isoTimestamp: string;
 }
@@ -70,6 +72,7 @@ function toCallMeta(
     cost: toReceiptCost(credential.costSnapshot),
     latencyMs,
     attempts,
+    finishReason: credential.finishReason ?? null,
     isoTimestamp: credential.isoTimestamp,
   };
 }

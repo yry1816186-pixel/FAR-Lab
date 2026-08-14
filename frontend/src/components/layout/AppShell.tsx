@@ -35,7 +35,7 @@ type NavLabelKey =
 
 type NavGroupKey =
   | 'nav.group.research' | 'nav.group.verify' | 'nav.group.evidence'
-  | 'nav.group.breadth' | 'nav.group.history' | 'nav.group.meta';
+  | 'nav.group.history' | 'nav.group.meta' | 'nav.group.devtools';
 
 interface NavItem {
   readonly to: string;
@@ -78,20 +78,9 @@ const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
-    id: 'breadth',
-    labelKey: 'nav.group.breadth',
-    items: [
-      { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: Trophy },
-      { to: '/court', labelKey: 'nav.court', icon: Gavel },
-      { to: '/arena', labelKey: 'nav.arena', icon: Swords },
-    ],
-  },
-  {
     id: 'history',
     labelKey: 'nav.group.history',
     items: [
-      { to: '/honesty', labelKey: 'nav.honesty', icon: ShieldAlert },
-      { to: '/ablation', labelKey: 'nav.ablation', icon: FlaskConical },
       { to: '/report', labelKey: 'nav.report', icon: FileText },
       { to: '/events', labelKey: 'nav.events', icon: Radio },
       { to: '/audit', labelKey: 'nav.audit', icon: GitCompare },
@@ -103,6 +92,19 @@ const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { to: '/about', labelKey: 'nav.about', icon: Info },
       { to: '/planning', labelKey: 'nav.planning', icon: ClipboardCheck },
+    ],
+  },
+  {
+    // Track-1A 收敛（协议 §12.5）：展示页降级为"开发与展示工具"——
+    // 真实 API 驱动但数据为 fixture/replay/预生成 benchmark，不属于科研主流程。
+    id: 'devtools',
+    labelKey: 'nav.group.devtools',
+    items: [
+      { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: Trophy },
+      { to: '/court', labelKey: 'nav.court', icon: Gavel },
+      { to: '/arena', labelKey: 'nav.arena', icon: Swords },
+      { to: '/honesty', labelKey: 'nav.honesty', icon: ShieldAlert },
+      { to: '/ablation', labelKey: 'nav.ablation', icon: FlaskConical },
     ],
   },
 ];

@@ -25,14 +25,15 @@ import { runAllBaselines } from '../../research/evaluation/baseline.ts';
 import { exportResearchBundle, researchBundleSha256 } from '../../research/export_bundle.ts';
 import { runPlanExperiment } from '../../research/experiment.ts';
 import { loadExoplanetReplayRows } from '../../research/adapters/exoplanet_replay.ts';
+import { parseResearchRunJson, FeedbackInputZod } from '../../research/schemas.ts';
 import type { ResearchRun } from '../../research/types.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
-import type { RetrievalAdapter } from '../../retrieval/types.ts';
+import type { DocumentSource, RetrievalAdapter } from '../../retrieval/types.ts';
 
 /** Parsed options for the research command. */
 export interface ResearchArgs {
   readonly question: string;
-  readonly source: 'openalex' | 'arxiv' | 'crossref';
+  readonly sources: readonly DocumentSource[];
   readonly maxPerQuery: number;
   readonly profile: 'offline_replay' | 'competition_aliyun_qwen';
   readonly target: number;
@@ -40,10 +41,12 @@ export interface ResearchArgs {
   readonly out: string | null;
 }
 
+const VALID_SOURCES: readonly DocumentSource[] = ['openalex', 'arxiv', 'crossref'];
+
 /** Parse `far research start` args. */
 export function parseResearchArgs(args: readonly string[]): ResearchArgs {
   let question = '';
-  let source: 'openalex' | 'arxiv' | 'crossref' = 'openalex';
+  let sources: readonly DocumentSource[] = ['openalex'];
   let maxPerQuery = 5;
   let profile: 'offline_replay' | 'competition_aliyun_qwen' = 'offline_replay';
   let target = 3;
@@ -55,10 +58,13 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
     if (a === undefined) continue;
     if (a === '--source') {
       const v = args[++i];
-      if (v !== 'openalex' && v !== 'arxiv' && v !== 'crossref') {
-        throw new Error(`far research: --source must be openalex|arxiv|crossref (got: ${v ?? '<missing>'})`);
+      const list = (v ?? '').split(/[+,]/).map((s) => s.trim()).filter((s) => s.length > 0);
+      if (list.length === 0 || list.some((s) => !VALID_SOURCES.includes(s as DocumentSource))) {
+        throw new Error(
+          `far research: --source must be openalex|arxiv|crossref (single or comma/+ separated, got: ${v ?? '<missing>'})`,
+        );
       }
-      source = v;
+      sources = [...new Set(list)] as DocumentSource[];
       continue;
     }
     if (a === '--max-per-query') {
@@ -100,7 +106,7 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
     }
     question = question === '' ? a : `${question} ${a}`;
   }
-  return { question, source, maxPerQuery, profile, target, json, out };
+  return { question, sources, maxPerQuery, profile, target, json, out };
 }
 
 /** Run `far research start`. */
@@ -145,7 +151,9 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
       gateway,
       profile: parsed.profile,
       grounding: {
-        source: parsed.source,
+        ...(parsed.sources.length > 1
+          ? { sources: parsed.sources }
+          : { source: parsed.sources[0] ?? 'openalex' }),
         maxPerQuery: parsed.maxPerQuery,
         ...(retrievalAdapter !== undefined ? { adapter: retrievalAdapter } : {}),
       },
@@ -264,7 +272,7 @@ export function runResearchInspect(args: readonly string[]): number {
     process.stdout.write(raw);
     return 0;
   }
-  const run = JSON.parse(raw) as ResearchRun;
+  const run = parseResearchRunJson(raw);
   renderHuman(run.runMode === 'LIVE' ? 'competition_aliyun_qwen' : 'offline_replay', run);
   return 0;
 }
@@ -297,7 +305,7 @@ export function runResearchVerify(args: readonly string[]): number {
 
   let run: ResearchRun;
   try {
-    run = JSON.parse(readFileSync(runPath, 'utf8')) as ResearchRun;
+    run = parseResearchRunJson(readFileSync(runPath, 'utf8'));
   } catch (err) {
     process.stderr.write(`far research verify: cannot read ${runPath}: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
@@ -343,7 +351,7 @@ export function runResearchCompare(args: readonly string[]): number {
 
   let run: ResearchRun;
   try {
-    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+    run = parseResearchRunJson(readFileSync(file, 'utf8'));
   } catch (err) {
     process.stderr.write(`far research compare: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
@@ -477,7 +485,7 @@ export function runResearchExport(args: readonly string[]): number {
 
   let run: ResearchRun;
   try {
-    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+    run = parseResearchRunJson(readFileSync(file, 'utf8'));
   } catch (err) {
     process.stderr.write(`far research export: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
@@ -509,6 +517,27 @@ export function runResearchExport(args: readonly string[]): number {
   }
 }
 
+/** Parse + validate a user-supplied feedback document (fail-closed). */
+function parseFeedbackJson(raw: string): import('zod').infer<typeof FeedbackInputZod> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`feedback file is not valid JSON: ${err instanceof Error ? err.message : String(err)}`, {
+      cause: err,
+    });
+  }
+  const result = FeedbackInputZod.safeParse(parsed);
+  if (!result.success) {
+    const details = result.error.issues
+      .slice(0, 5)
+      .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('; ');
+    throw new Error(`feedback file is invalid: ${details}`);
+  }
+  return result.data;
+}
+
 /** Run `far research feedback <run.json> --file feedback.json [--out <new.json>]`. */
 export async function runResearchFeedback(args: readonly string[]): Promise<number> {
   const file = args.find((a) => !a.startsWith('--'));
@@ -531,21 +560,14 @@ export async function runResearchFeedback(args: readonly string[]): Promise<numb
   let run: ResearchRun;
   let feedbackRaw: string;
   try {
-    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+    run = parseResearchRunJson(readFileSync(file, 'utf8'));
     feedbackRaw = readFileSync(feedbackPath, 'utf8');
   } catch (err) {
     process.stderr.write(`far research feedback: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
   }
 
-  const fb = JSON.parse(feedbackRaw) as {
-    source: 'human' | 'literature' | 'tool' | 'analysis';
-    actor: string;
-    text: string;
-    affectsHypothesisIds?: string[];
-    changesScore?: boolean;
-    triggers?: string[];
-  };
+  const fb = parseFeedbackJson(feedbackRaw);
   const feedback = buildFeedbackSignal({
     source: fb.source,
     actor: fb.actor,
@@ -554,9 +576,7 @@ export async function runResearchFeedback(args: readonly string[]): Promise<numb
       ? { affectsHypothesisIds: fb.affectsHypothesisIds }
       : {}),
     ...(fb.changesScore !== undefined ? { changesScore: fb.changesScore } : {}),
-    ...(fb.triggers !== undefined
-      ? { triggers: fb.triggers as ('new_retrieval' | 'alternative_hypothesis' | 'plan_rewrite' | 'none')[] }
-      : {}),
+    ...(fb.triggers !== undefined ? { triggers: fb.triggers } : {}),
   });
 
   // Single application service (§12.1): the CLI and the REST API apply feedback
@@ -611,7 +631,7 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
 
   let run: ResearchRun;
   try {
-    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+    run = parseResearchRunJson(readFileSync(file, 'utf8'));
   } catch (err) {
     process.stderr.write(`far research analyze: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
@@ -687,7 +707,7 @@ export function runResearchEvaluate(args: readonly string[]): number {
 
   let run: ResearchRun;
   try {
-    run = JSON.parse(readFileSync(file, 'utf8')) as ResearchRun;
+    run = parseResearchRunJson(readFileSync(file, 'utf8'));
   } catch (err) {
     process.stderr.write(`far research evaluate: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;

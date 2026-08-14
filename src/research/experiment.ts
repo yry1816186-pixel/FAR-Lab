@@ -65,6 +65,46 @@ const DEFAULT_MAX_PERIOD = 10; // days
 const DEFAULT_CONFIDENCE = 0.95;
 
 /**
+ * Extract executable numeric parameters from the frozen ResearchPlan
+ * (directive §11.4: "input parameters come from the current ResearchPlan").
+ *
+ * The plan's `variables` array carries "name: value" dictionary entries
+ * (units in brackets); a deterministic regex extracts the three parameters
+ * the exoplanet adapter consumes. Missing / unparsable → the documented
+ * default, and `source='default'` records that honestly in the observation.
+ */
+export function extractPlanParameters(plan: ResearchRun['plan']): {
+  readonly minRadiusEarth: number;
+  readonly maxPeriodDays: number;
+  readonly confidenceLevel: number;
+  readonly source: 'plan' | 'default';
+} {
+  const text = [...plan.variables, ...plan.dataRequirements].join('\n').toLowerCase();
+  // Separators are bounded to one line ([^0-9\n]) so a value can never bleed
+  // across entries; values must be positive finite numbers.
+  const num = (pattern: RegExp): number | null => {
+    const m = text.match(pattern);
+    if (m === null || m[1] === undefined) return null;
+    const n = Number(m[1]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const minRadiusEarth =
+    num(/\bmin(?:imum)?[\s_-]*radius\b[^0-9\n]{0,20}(\d+(?:\.\d+)?)/) ??
+    num(/\bradius\b[^0-9\n]{0,20}(\d+(?:\.\d+)?)/) ??
+    DEFAULT_MIN_RADIUS;
+  const maxPeriodDays =
+    num(/\bmax(?:imum)?[\s_-]*period\b[^0-9\n]{0,20}(\d+(?:\.\d+)?)/) ??
+    num(/\bperiod\b[^0-9\n]{0,20}(\d+(?:\.\d+)?)/) ??
+    DEFAULT_MAX_PERIOD;
+  const confidenceLevel =
+    num(/\bconfidence[\s_-]*level\b[^0-9\n]{0,20}(0?\.\d+)/) ?? DEFAULT_CONFIDENCE;
+
+  const source: 'plan' | 'default' =
+    /\bradius\b|\bperiod\b|\bconfidence\b/.test(text) ? 'plan' : 'default';
+  return { minRadiusEarth, maxPeriodDays, confidenceLevel, source };
+}
+
+/**
  * Execute the first executable analysis step of the run's plan against the
  * NASA Exoplanet Archive, collect the Observation, and propose the feedback
  * that should drive the next revision.
@@ -75,40 +115,33 @@ export async function runPlanExperiment(opts: RunExperimentOptions): Promise<Exp
   const now = opts.now ?? (() => new Date());
   const producedAt = now().toISOString();
 
-  // 1. Prepare inputs: the plan's hypotheses select the analysis; parameters
-  //    come from plan-level defaults (the plan is the source of the design).
+  // 1. Prepare inputs: the plan's hypotheses select the analysis; the plan's
+  //    variables/dataRequirements supply the executable parameters (extracted
+  //    deterministically; documented defaults only when the plan is silent).
   const primaryId = opts.run.plan.primaryHypothesisId;
-  const rows: readonly PsRow[] =
-    opts.replayRows !== undefined ? opts.replayRows : (await fetchExoplanetPsLive(HOT_JUPITER_QUERY, now)).rows;
-  const card: ExoplanetDatasetCard =
-    opts.replayCard !== undefined
-      ? opts.replayCard
-      : {
-          source: 'NASA Exoplanet Archive',
-          sourceUrl: 'https://exoplanetarchive.ipac.caltech.edu',
-          version: 'PS table (TAP sync snapshot)',
-          persistentId: 'nasa-exoplanet-archive:ps',
-          license: 'NASA public domain (PD)',
-          downloadedAt: producedAt,
-          query: HOT_JUPITER_QUERY,
-          rawChecksum: 'replay:see-fixture',
-          rowCount: rows.length,
-          fields: ['pl_name', 'pl_rade', 'pl_bmasse', 'pl_orbper', 'st_teff', 'st_rad', 'st_mass'],
-          units: {},
-          missingNotes: [],
-          qualityNotes: [],
-          allowedInference: 'Population-level correlation in this snapshot',
-          forbiddenInference: 'No per-system causal claims',
-          reproductionCommand: '(replay fixture)',
-          fetchMode: 'RECORDED_REPLAY',
-        };
-  const mode: ComponentMode = opts.replayRows !== undefined ? 'RECORDED_REPLAY' : 'LIVE';
+  const liveFetch = opts.replayRows === undefined;
+  let rows: readonly PsRow[];
+  let card: ExoplanetDatasetCard;
+  const mode: ComponentMode = liveFetch ? 'LIVE' : 'RECORDED_REPLAY';
+  if (liveFetch) {
+    const fetched = await fetchExoplanetPsLive(HOT_JUPITER_QUERY, now);
+    rows = fetched.rows;
+    card = fetched.card;
+  } else {
+    if (opts.replayRows === undefined || opts.replayCard === undefined) {
+      throw new Error('experiment: replay mode requires replayRows + replayCard');
+    }
+    rows = opts.replayRows;
+    card = opts.replayCard;
+  }
+  const params = extractPlanParameters(opts.run.plan);
 
   // 2. Execute: plan parameters → real statistical computation.
   const result = analyzeRadiusInsolation(rows, {
-    minRadiusEarth: DEFAULT_MIN_RADIUS,
-    maxPeriodDays: DEFAULT_MAX_PERIOD,
-    confidenceLevel: DEFAULT_CONFIDENCE,
+    minRadiusEarth: params.minRadiusEarth,
+    maxPeriodDays: params.maxPeriodDays,
+    confidenceLevel: params.confidenceLevel,
+    source: params.source,
   }, producedAt);
 
   // 3. Collect the Observation (deterministic id over input hash + params).

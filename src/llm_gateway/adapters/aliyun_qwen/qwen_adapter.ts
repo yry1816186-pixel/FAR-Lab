@@ -258,6 +258,9 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
         outputTokens: usage?.completion_tokens ?? 0,
         totalTokens: usage?.total_tokens ?? 0,
       },
+      ...(firstChoice?.finish_reason !== undefined && firstChoice.finish_reason !== null
+        ? { finishReason: firstChoice.finish_reason }
+        : { finishReason: null }),
       ...(adapterMeta !== null ? { adapterMeta } : {}),
     };
 

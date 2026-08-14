@@ -27,6 +27,6 @@ test('P0-6: adr_count_check exits 0 and reports the real count', () => {
     0,
     `expected exit 0\nstdout: ${result.stdout}\nstderr: ${result.stderr}`,
   );
-  assert.match(result.stdout, /ADR-\*\.yaml = 21/, 'script must report the real ADR-* count (21)');
-  assert.match(result.stdout, /total decision records = 24/, 'script must report 24 total records');
+  assert.match(result.stdout, /ADR-\*\.yaml = 22/, 'script must report the real ADR-* count (22)');
+  assert.match(result.stdout, /total decision records = 25/, 'script must report 25 total records');
 });

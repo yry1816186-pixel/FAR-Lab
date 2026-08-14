@@ -112,6 +112,8 @@ export function createOfflineReplayAdapter(options: OfflineReplayOptions = {}): 
             // measured=false 标记，禁止混入真实成本依据（usage_tokens_total 消费侧按此区分）。
             measured: false,
           },
+          // 诚实标注：replay fixture 恒正常结束，finish_reason 由本适配器提供（非 provider）。
+          finishReason: 'stop',
         },
         content,
         raw: {
