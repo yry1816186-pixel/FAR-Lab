@@ -33,9 +33,9 @@ export const en: Record<MessageKey, string> = {
   // ---- nav group labels (R-01 information architecture grouping) ----
   'nav.group.verify': 'Verify',
   'nav.group.evidence': 'Evidence',
-  'nav.group.breadth': 'Breadth',
   'nav.group.history': 'History',
   'nav.group.meta': 'Meta',
+  'nav.group.devtools': 'Dev tools (fixture/replay showcase)',
 
   // ---- PlanningPage (opencode planning methodology as machine gates) ----
   'nav.planning': 'Planning',
