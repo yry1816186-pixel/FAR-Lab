@@ -27,7 +27,7 @@ function pythonComputeProofHash(envelopeWithoutProofHash: unknown): string {
     'import sys, json',
     `sys.path.insert(0, ${JSON.stringify(REPRO_DIR)})`,
     'from proof_hash import compute_proof_hash_v2',
-    'env = json.loads(sys.stdin.read())',
+    'env = json.loads(sys.stdin.buffer.read().decode("utf-8"))',
     'print(compute_proof_hash_v2(env))',
   ].join('\n');
   return execFileSync(PYTHON_CMD, ['-c', pyCode], {
@@ -42,7 +42,7 @@ function pythonVerifyProofHash(envelope: unknown): boolean {
     'import sys, json',
     `sys.path.insert(0, ${JSON.stringify(REPRO_DIR)})`,
     'from proof_hash import verify_proof_hash_v2',
-    'env = json.loads(sys.stdin.read())',
+    'env = json.loads(sys.stdin.buffer.read().decode("utf-8"))',
     'print(verify_proof_hash_v2(env))',
   ].join('\n');
   return execFileSync(PYTHON_CMD, ['-c', pyCode], {

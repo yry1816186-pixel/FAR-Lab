@@ -56,8 +56,8 @@ function pythonCanonicalHash(): string {
 function runPythonCanonical(obj: Record<string, unknown>, mode: 'hash' | 'str'): string {
   const script =
     mode === 'hash'
-      ? 'from far_chain_repro.canonical_json import hash_canonical_json; import json,sys; print(hash_canonical_json(json.loads(sys.stdin.read())))'
-      : 'from far_chain_repro.canonical_json import canonical_json; import json,sys; print(canonical_json(json.loads(sys.stdin.read())))';
+      ? "from far_chain_repro.canonical_json import hash_canonical_json; import json,sys; print(hash_canonical_json(json.loads(sys.stdin.buffer.read().decode('utf-8'))))"
+      : "from far_chain_repro.canonical_json import canonical_json; import json,sys; print(canonical_json(json.loads(sys.stdin.buffer.read().decode('utf-8'))))";
   const result = spawnSync(PYTHON_CMD, ['-c', script], {
     cwd: new URL('../../', import.meta.url),
     encoding: 'utf8',
