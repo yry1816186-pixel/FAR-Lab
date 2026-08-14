@@ -87,9 +87,14 @@ node src/cli/far.ts verify /tmp/tampered
 ```bash
 # 1. 运行纵向切片（研究可行性门 → 真实文献检索 → 3-5 个候选假设 → 独立批判 → 研究计划）。
 #    检索无需 key（OpenAlex 免费）；只有模型调用需要 key。
+#    长任务逐阶段 checkpoint 到 .far/research-runs/<runId>/ —— Ctrl+C 诚实取消
+#    （state=CANCELLED，已完成阶段保留），崩溃/取消后可 resume。
 node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
+node src/cli/far.ts research status <runId>     # 生命周期状态 + 逐阶段进度（8 阶段）
+node src/cli/far.ts research resume <runId>     # 从 checkpoint 续跑已崩溃/已取消的 run
 
-# 2. 真实数据分析（NASA Exoplanet Archive live TAP 抓取）：
+# 2. 真实数据分析（NASA Exoplanet Archive live TAP 抓取）。
+#    领域门控：非系外行星课题会被拒绝，绝不用错误数据集硬算。
 node src/cli/far.ts research analyze run.json --live
 #   → n=392 颗热木星，r=0.587，p<0.001（相关性≠因果——如实表述）
 
@@ -104,8 +109,9 @@ node src/cli/far.ts research evaluate run.json
 node src/cli/far.ts research export run.json --out bundle
 node src/cli/far.ts research verify bundle
 
-# 6. 同样的闭环可通过 Web 工作台 + REST API 使用：
-#    pnpm api  →  http://localhost:3000/research  （或 POST /api/v1/research）
+# 6. 同样的闭环可通过 Web 工作台 + REST API 使用（异步 + SSE）：
+#    pnpm api  →  POST /api/v1/research（202 + runId）· GET /research/<id>/status
+#                 GET /research/<id>/events（SSE 进度）· POST /research/<id>/cancel
 ```
 
 **运行模式诚实标注**：每个阶段记录 `modelExecutionMode` / `retrievalExecutionMode` /
