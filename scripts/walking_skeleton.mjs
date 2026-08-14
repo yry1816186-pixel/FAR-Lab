@@ -60,6 +60,8 @@ const steps = [
       "Walking skeleton probe: adapter A achieves macro-F1 >= 0.80 on TESS-ASTRO",
       "--mode",
       "quick",
+      "--profile",
+      "offline_replay",
       "--export",
       join(WS_DIR, "ask.far-proof"),
     ],

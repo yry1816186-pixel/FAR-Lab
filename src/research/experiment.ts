@@ -20,25 +20,37 @@ import type { PsRow, ExoplanetDatasetCard } from './adapters/exoplanet_dataset.t
 import { fetchExoplanetPsLive, HOT_JUPITER_QUERY } from './adapters/exoplanet_dataset.ts';
 import { analyzeRadiusInsolation, type RadiusInsolationObservation } from './adapters/exoplanet_analysis.ts';
 import { buildFeedbackSignal } from './revision.ts';
+import {
+  analyzeLiteratureLandscape,
+  LANDSCAPE_THRESHOLDS,
+  type LandscapeDatasetCard,
+  type LiteratureLandscapeObservation,
+} from './adapters/literature_landscape.ts';
 import type { ComponentMode, FeedbackSignal, ResearchRun } from './types.ts';
 
-/** A parsed tool/analysis Observation attached to a run (directive §9.10/§11.4). */
-export interface Observation {
-  /** Observation id (hash of the input + analysis, deterministic). */
-  readonly id: string;
-  /** Which adapter produced it. */
-  readonly adapter: 'exoplanet-archive-radius-insolation';
-  /** The hypothesis ids this observation speaks to. */
-  readonly affectsHypothesisIds: readonly string[];
-  /** The structured analysis result. */
-  readonly result: RadiusInsolationObservation;
-  /** The dataset card (provenance of the input data). */
-  readonly datasetCard: ExoplanetDatasetCard;
-  /** Execution mode of the data/analysis component. */
-  readonly mode: ComponentMode;
-  /** ISO timestamp. */
-  readonly producedAt: string;
-}
+/**
+ * A parsed tool/analysis Observation attached to a run (directive §9.10/§11.4).
+ * Discriminated on `adapter` — result and datasetCard correlate with it.
+ */
+export type Observation =
+  | {
+      readonly id: string;
+      readonly adapter: 'exoplanet-archive-radius-insolation';
+      readonly affectsHypothesisIds: readonly string[];
+      readonly result: RadiusInsolationObservation;
+      readonly datasetCard: ExoplanetDatasetCard;
+      readonly mode: ComponentMode;
+      readonly producedAt: string;
+    }
+  | {
+      readonly id: string;
+      readonly adapter: 'literature-landscape';
+      readonly affectsHypothesisIds: readonly string[];
+      readonly result: LiteratureLandscapeObservation;
+      readonly datasetCard: LandscapeDatasetCard;
+      readonly mode: ComponentMode;
+      readonly producedAt: string;
+    };
 
 /** Options for running the experiment. */
 export interface RunExperimentOptions {
@@ -159,69 +171,69 @@ export function extractPlanParameters(plan: ResearchRun['plan']): {
 export async function runPlanExperiment(opts: RunExperimentOptions): Promise<ExperimentResult> {
   const now = opts.now ?? (() => new Date());
   const producedAt = now().toISOString();
+  const primaryId = opts.run.plan.primaryHypothesisId;
 
-  // 0. Domain gate (fail-closed): the only available adapter is the exoplanet
-  //    one; a run outside its domain is REFUSED with a structured error — an
-  //    exoplanet correlation must never be grafted onto a non-exoplanet plan,
-  //    and the absence of a domain adapter is stated, not papered over.
-  if (!isExoplanetApplicable(opts.run)) {
-    const domain = opts.run.gateReport.scope.domain ?? 'unknown';
+  // 0. Adapter routing (fail-closed): the exoplanet adapter serves astro runs;
+  //    every other run gets the domain-general literature-landscape analysis
+  //    over its OWN frozen corpus (text modality — real retrieved documents).
+  //    An EMPTY corpus is refused: no honest analysis exists over zero docs.
+  const useExoplanet = isExoplanetApplicable(opts.run);
+  if (!useExoplanet && opts.run.corpus.documentCount === 0) {
     throw new Error(
-      'experiment: no available ExperimentAdapter matches this run — the only implemented ' +
-        `adapter (exoplanet-archive-radius-insolation) does not apply to domain "${domain}". ` +
-        'No analysis was executed and no observation was fabricated; this run has no real-data ' +
-        'experiment path yet (honest limitation, directive §3.3/§13).',
+      'experiment: no available ExperimentAdapter matches this run — the corpus is empty, so ' +
+        'the literature-landscape analysis has no input and no domain adapter applies. ' +
+        'No analysis was executed and no observation was fabricated (directive §3.3/§13).',
     );
   }
 
-  // 1. Prepare inputs: the plan's hypotheses select the analysis; the plan's
-  //    variables/dataRequirements supply the executable parameters (extracted
-  //    deterministically; documented defaults only when the plan is silent).
-  const primaryId = opts.run.plan.primaryHypothesisId;
-  const liveFetch = opts.replayRows === undefined;
-  let rows: readonly PsRow[];
-  let card: ExoplanetDatasetCard;
-  const mode: ComponentMode = liveFetch ? 'LIVE' : 'RECORDED_REPLAY';
-  if (liveFetch) {
-    const fetched = await fetchExoplanetPsLive(HOT_JUPITER_QUERY, now);
-    rows = fetched.rows;
-    card = fetched.card;
-  } else {
-    if (opts.replayRows === undefined || opts.replayCard === undefined) {
-      throw new Error('experiment: replay mode requires replayRows + replayCard');
+  let observation: Observation;
+  if (useExoplanet) {
+    // 1. Prepare inputs: the plan's variables/dataRequirements supply the
+    //    executable parameters (deterministic; defaults only when the plan
+    //    is silent). 2. Execute: plan parameters → real statistical computation.
+    const liveFetch = opts.replayRows === undefined;
+    let rows: readonly PsRow[];
+    let card: ExoplanetDatasetCard;
+    const mode: ComponentMode = liveFetch ? 'LIVE' : 'RECORDED_REPLAY';
+    if (liveFetch) {
+      const fetched = await fetchExoplanetPsLive(HOT_JUPITER_QUERY, now);
+      rows = fetched.rows;
+      card = fetched.card;
+    } else {
+      if (opts.replayRows === undefined || opts.replayCard === undefined) {
+        throw new Error('experiment: replay mode requires replayRows + replayCard');
+      }
+      rows = opts.replayRows;
+      card = opts.replayCard;
     }
-    rows = opts.replayRows;
-    card = opts.replayCard;
+    const params = extractPlanParameters(opts.run.plan);
+    const result = analyzeRadiusInsolation(rows, {
+      minRadiusEarth: params.minRadiusEarth,
+      maxPeriodDays: params.maxPeriodDays,
+      confidenceLevel: params.confidenceLevel,
+      source: params.source,
+    }, producedAt);
+    observation = {
+      id: `${result.inputHash.slice(0, 16)}`,
+      adapter: 'exoplanet-archive-radius-insolation',
+      affectsHypothesisIds: [primaryId],
+      result,
+      datasetCard: card,
+      mode,
+      producedAt,
+    };
+  } else {
+    observation = runLandscapeExperiment(opts.run, now(), producedAt, primaryId);
   }
-  const params = extractPlanParameters(opts.run.plan);
 
-  // 2. Execute: plan parameters → real statistical computation.
-  const result = analyzeRadiusInsolation(rows, {
-    minRadiusEarth: params.minRadiusEarth,
-    maxPeriodDays: params.maxPeriodDays,
-    confidenceLevel: params.confidenceLevel,
-    source: params.source,
-  }, producedAt);
-
-  // 3. Collect the Observation (deterministic id over input hash + params).
-  const observation: Observation = {
-    id: `${result.inputHash.slice(0, 16)}`,
-    adapter: 'exoplanet-archive-radius-insolation',
-    affectsHypothesisIds: [primaryId],
-    result,
-    datasetCard: card,
-    mode,
-    producedAt,
-  };
-
-  // 4. Propose feedback: the observation's implication for the next round.
+  // 3. Propose feedback: the observation's implication for the next round.
   //    A null/non-significant/failed result is preserved — it may weaken the
   //    primary hypothesis (changesScore=true) or trigger a plan rewrite, but
   //    it is never converted into fake confirmation.
   const implication = interpretObservation(observation);
   const feedback: FeedbackSignal = buildFeedbackSignal({
     source: 'analysis',
-    actor: 'exoplanet-archive-radius-insolation',
+    actor: observation.adapter,
     text: implication.text,
     affectsHypothesisIds: [primaryId],
     changesScore: implication.changesScore,
@@ -234,12 +246,51 @@ export async function runPlanExperiment(opts: RunExperimentOptions): Promise<Exp
     observations: [...opts.run.observations, observation],
     modes: {
       ...opts.run.modes,
-      experimentExecutionMode: mode,
+      experimentExecutionMode: observation.mode,
     },
-    runMode: aggregateWithExperiment(opts.run, mode),
+    runMode: aggregateWithExperiment(opts.run, observation.mode),
   };
 
   return { observation, feedback, updatedRun };
+}
+
+/**
+ * Execute the domain-general literature-landscape analysis over the run's
+ * frozen corpus (deterministic — recomputable by `far research verify`).
+ */
+function runLandscapeExperiment(
+  run: ResearchRun,
+  now: Date,
+  producedAt: string,
+  primaryId: string,
+): Observation {
+  const { result, datasetCard } = analyzeLiteratureLandscape(
+    run.corpus,
+    producedAt,
+    now.getUTCFullYear(),
+  );
+  // Data provenance drives the mode: over a corpus genuinely fetched live this
+  // analysis consumed real-world data; over replay fixtures it is replay
+  // (§3.2 — never labeled stronger than the data it consumed).
+  const mode: ComponentMode =
+    run.modes.retrievalExecutionMode === 'LIVE' ? 'LIVE' : 'RECORDED_REPLAY';
+  return {
+    id: `${result.rootHash.slice(0, 16)}`,
+    adapter: 'literature-landscape',
+    affectsHypothesisIds: [primaryId],
+    result,
+    datasetCard,
+    mode,
+    producedAt,
+  };
+}
+
+
+/** Type guard: the domain-general landscape observation. */
+export function isLandscapeObservation(
+  obs: Observation,
+): obs is Extract<Observation, { readonly adapter: 'literature-landscape' }> {
+  return obs.adapter === 'literature-landscape';
 }
 
 /** What the observation implies for the next round (honest interpretation). */
@@ -248,6 +299,9 @@ export function interpretObservation(obs: Observation): {
   readonly changesScore: boolean;
   readonly triggers: readonly ('new_retrieval' | 'alternative_hypothesis' | 'plan_rewrite' | 'none')[];
 } {
+  if (isLandscapeObservation(obs)) {
+    return interpretLandscape(obs.result);
+  }
   const r = obs.result;
   if (r.status === 'FAILED') {
     return {
@@ -265,6 +319,44 @@ export function interpretObservation(obs: Observation): {
   }
   return {
     text: `real-data analysis: significant positive correlation (n=${r.n}, r=${r.pearsonR?.toFixed(3)}, p=${r.pValue?.toFixed(3)}) — association consistent with irradiation-driven inflation (association, not causation)`,
+    changesScore: false,
+    triggers: ['none'],
+  };
+}
+
+/** Landscape interpretation — proposals only; a healthy landscape proposes nothing. */
+function interpretLandscape(r: LiteratureLandscapeObservation): {
+  readonly text: string;
+  readonly changesScore: boolean;
+  readonly triggers: readonly ('new_retrieval' | 'alternative_hypothesis' | 'plan_rewrite' | 'none')[];
+} {
+  const pct = (x: number): string => `${(x * 100).toFixed(1)}%`;
+  const skew = r.counterEvidenceShare < LANDSCAPE_THRESHOLDS.counterShareFloor;
+  const stale = r.freshShare < LANDSCAPE_THRESHOLDS.freshShareFloor;
+  const parts: string[] = [
+    `literature-landscape: ${r.totalDocuments} grounded documents · counter-evidence share ${pct(r.counterEvidenceShare)} · fresh(≤5y) ${pct(r.freshShare)}` +
+      (r.medianPublicationYear === null ? ' · no dated documents' : ` · median year ${Math.round(r.medianPublicationYear)}`) +
+      ` · ${r.sourceFamilies.length} source famil${r.sourceFamilies.length === 1 ? 'y' : 'ies'}`,
+  ];
+  if (skew) {
+    parts.push(
+      `counter-evidence share is below the ${pct(LANDSCAPE_THRESHOLDS.counterShareFloor)} floor — the evidence base is confirmation-skewed; the plan should add targeted adversarial retrieval (non-replication, null-result, criticism queries) before hypothesis scoring is trusted`,
+    );
+  }
+  if (stale) {
+    parts.push(
+      `only ${pct(r.freshShare)} of documents are from the last ${LANDSCAPE_THRESHOLDS.freshWindowYears} years — for a fast-moving field the plan should require an updated search window`,
+    );
+  }
+  if (skew || stale) {
+    return {
+      text: parts.join(' · '),
+      changesScore: false,
+      triggers: ['new_retrieval', 'plan_rewrite'],
+    };
+  }
+  return {
+    text: parts.join(' · ') + ' — evidence mix is balanced; no change proposed (improvement never forced)',
     changesScore: false,
     triggers: ['none'],
   };
