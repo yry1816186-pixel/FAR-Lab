@@ -26,6 +26,18 @@ export interface DoctorOptions {
   readonly liveQwenSmoke: boolean;
   /** IC-03(F-03):可选 DB 完整性检查(integrity_check 全量+链验证;损坏=FAIL fail-closed) */
   readonly dbPath?: string;
+  /** 2026-08-14 UX reorder:打印完整 far verify 报告(默认只打印一行 VERIFY SUMMARY)。 */
+  readonly fullVerify?: boolean;
+}
+
+/** IC-03 离线重算的紧凑结论(完整报告被捕获,仅 --full-verify 时回显)。 */
+interface VerifySummary {
+  readonly ran: boolean;
+  readonly status: 'PASS' | 'WARN' | 'FAIL' | 'SKIPPED';
+  /** 一行原因(如 PARTIAL_RECOMPUTE);无则空串。 */
+  readonly reason: string;
+  /** 捕获的完整 far verify 人类可读报告(未运行时为空串)。 */
+  readonly fullReport: string;
 }
 
 type CheckStatus = 'ok' | 'warn' | 'fail' | 'info';
@@ -156,7 +168,40 @@ function checkProject(root: string | null, checks: Check[]): void {
   });
 }
 
-async function checkCoreCapability(root: string | null, checks: Check[]): Promise<void> {
+/**
+ * runVerifyCaptured —— 跑 IC-03 离线重算但捕获 stdout(默认不回显完整报告;
+ * 2026-08-14 UX 发现:完整 verify 报告先于环境检查表打印,把环境检查埋没了)。
+ * 单层 as:仅捕获形态的 write shim,finally 中无条件还原,不影响 verify 判定本身。
+ */
+async function runVerifyCaptured(bundlePath: string): Promise<{ readonly exit: number; readonly output: string }> {
+  const chunks: string[] = [];
+  const originalWrite = process.stdout.write;
+  const capturingWrite = ((chunk: unknown): boolean => {
+    chunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk as Uint8Array).toString('utf8'));
+    return true;
+  }) as typeof process.stdout.write;
+  process.stdout.write = capturingWrite;
+  try {
+    const exit = await runVerify({ bundlePath, mode: 'full', json: false, explain: false });
+    return { exit, output: chunks.join('') };
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+}
+
+/** 从捕获的 verify 报告解析紧凑结论(status 行 + RECOMPUTE STATUS 行,确定性文本格式)。 */
+function parseVerifySummary(exit: number, output: string): { readonly status: 'PASS' | 'WARN' | 'FAIL'; readonly reason: string } {
+  const statusMatch = /status\s+:\s+(PASS|WARN|FAIL)/.exec(output);
+  const recomputeMatch = /RECOMPUTE STATUS\s+:\s+([A-Z_]+)/.exec(output);
+  if (exit !== 0) {
+    return { status: 'FAIL', reason: recomputeMatch?.[1] ?? 'exit ' + String(exit) };
+  }
+  const status = statusMatch?.[1] === 'WARN' ? 'WARN' : 'PASS';
+  const reason = recomputeMatch?.[1] !== undefined && recomputeMatch[1] !== 'ALL_PASS' ? recomputeMatch[1] : '';
+  return { status, reason };
+}
+
+async function checkCoreCapability(root: string | null, checks: Check[]): Promise<VerifySummary> {
   try {
     await import('better-sqlite3');
   } catch (e) {
@@ -165,12 +210,12 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
       status: 'fail',
       detail: `better-sqlite3 failed to load: ${e instanceof Error ? e.message : String(e)}`,
     });
-    return;
+    return { ran: false, status: 'SKIPPED', reason: 'better-sqlite3 unavailable (core capability broken)', fullReport: '' };
   }
   checks.push({ name: 'core native module', status: 'ok', detail: 'better-sqlite3 loads' });
 
   if (root === null) {
-    return;
+    return { ran: false, status: 'SKIPPED', reason: 'project root not found', fullReport: '' };
   }
   // FIX-R6-003: fixture 路径从已 retire 的 examples/tess-offline 改为真实持久化 bundle。
   const fixture = resolve(root, '.far-implementation/walking-skeleton/demo.far-proof');
@@ -180,14 +225,16 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
       status: 'warn',
       detail: `fixture not found: ${fixture} (run "far demo" to generate it, then re-check)`,
     });
-    return;
+    return { ran: false, status: 'SKIPPED', reason: `demo fixture missing (run "far demo" to generate)`, fullReport: '' };
   }
-  const exit = await runVerify({ bundlePath: fixture, mode: 'full', json: false, explain: false });
+  const { exit, output } = await runVerifyCaptured(fixture);
   checks.push({
     name: 'offline verify (demo fixture)',
     status: exit === 0 ? 'ok' : 'fail',
     detail: exit === 0 ? `far verify --bundle passed: ${fixture}` : `verify failed exit ${exit} (core capability broken)`,
   });
+  const parsed = parseVerifySummary(exit, output);
+  const verifySummary: VerifySummary = { ran: true, status: parsed.status, reason: parsed.reason, fullReport: output };
 
   // IC-07(F-01 修复)能力自检:payload 内容哈希覆盖 —— 好库 ok + DROP TRIGGER 旁路篡改必检出。
   try {
@@ -253,6 +300,7 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
       detail: `self-check failed: ${e instanceof Error ? e.message : String(e)}`,
     });
   }
+  return verifySummary;
 }
 
 async function checkDbIntegrity(dbPath: string, checks: Check[]): Promise<void> {
@@ -411,7 +459,7 @@ export async function runDoctor(opts: DoctorOptions): Promise<number> {
   checkEnv(checks);
   checkCrossPlatform(checks);
   checkProject(root, checks);
-  await checkCoreCapability(root, checks);
+  const verifySummary = await checkCoreCapability(root, checks);
   if (opts.dbPath !== undefined) {
     await checkDbIntegrity(opts.dbPath, checks);
   }
@@ -420,11 +468,27 @@ export async function runDoctor(opts: DoctorOptions): Promise<number> {
     checkLiveQwenSmoke(root, checks);
   }
 
+  // 2026-08-14 UX reorder: 环境检查表先打印;IC-03 verify 降级为紧凑 VERIFY SUMMARY
+  // (完整报告仅在 --full-verify 下回显)。旧输出把整份 far verify 报告放在最前,埋没了环境检查。
   process.stdout.write('\n  FAR-Lab · far doctor (environment self-check)\n');
   process.stdout.write('  ─────────────────────────────────────────────────\n');
   for (const c of checks) {
     process.stdout.write(`  ${SYMBOL[c.status]} [${c.status.toUpperCase().padEnd(4)}] ${c.name}\n`);
     process.stdout.write(`          ${c.detail}\n`);
+  }
+  process.stdout.write('  ─────────────────────────────────────────────────\n');
+
+  const summarySymbol = SYMBOL[verifySummary.status === 'PASS' ? 'ok' : verifySummary.status === 'FAIL' ? 'fail' : 'warn'];
+  process.stdout.write('  VERIFY SUMMARY (IC-03 · offline recompute of the demo bundle)\n');
+  if (verifySummary.ran) {
+    const reason = verifySummary.reason !== '' ? ` — ${verifySummary.reason}` : '';
+    process.stdout.write(`  ${summarySymbol} verify: ${verifySummary.status}${reason} (run \`far verify\` for the full report)\n`);
+  } else {
+    process.stdout.write(`  ${summarySymbol} verify: ${verifySummary.status} — ${verifySummary.reason}\n`);
+  }
+  if (opts.fullVerify === true && verifySummary.fullReport !== '') {
+    process.stdout.write('\n  --full-verify: full report follows\n');
+    process.stdout.write(verifySummary.fullReport.endsWith('\n') ? verifySummary.fullReport : verifySummary.fullReport + '\n');
   }
   process.stdout.write('  ─────────────────────────────────────────────────\n');
 
