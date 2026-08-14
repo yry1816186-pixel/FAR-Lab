@@ -242,13 +242,16 @@ jobs:
             tests/db/*.test.ts tests/far_proof/*.test.ts \
             tests/science_harness/*.test.ts tests/science_harness/adapters/*.test.ts \
             2>&1 | tail -c 8000
-      - name: node --test shard 3/3 (confounding_gate·proof_envelope·report·trace·cli·anti_theater·agent_loop·comparison·v2_domain·scripts)
+      - name: node --test shard 3/3 (confounding_gate·proof_envelope·report·trace·cli·anti_theater·agent_loop·comparison·v2_domain·research·retrieval·validation·security·planning·discovery·scripts)
         run: |
           set -o pipefail
           node --test --test-timeout=180000 \
             tests/confounding_gate/*.test.ts tests/proof_envelope/*.test.ts tests/proof_envelope/v2/*.test.ts \
             tests/report/*.test.ts tests/trace/*.test.ts tests/cli/*.test.ts tests/anti_theater/*.test.ts \
             tests/agent_loop/*.test.ts tests/comparison/*.test.ts tests/v2_domain/*.test.ts \
+            tests/research/*.test.ts tests/retrieval/*.test.ts tests/validation/*.test.ts \
+            tests/security/*.test.ts tests/planning/*.test.ts \
+            tests/discovery/*.test.ts tests/discovery/strategies/*.test.ts \
             tests/scripts/*.test.mjs \
             2>&1 | tail -c 8000
       - name: node --test (agent_loop FSM + N3 反幻觉 + assertTerminated)
