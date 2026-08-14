@@ -44,6 +44,8 @@ import { loadExoplanetReplayRows } from '../../research/adapters/exoplanet_repla
 import { parseResearchRunJson, FeedbackInputZod } from '../../research/schemas.ts';
 import type { ResearchRun } from '../../research/types.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
+import { parseStrategyIdList, STRATEGY_IDS, type StrategyId } from '../../discovery/types.ts';
+import type { FanoutMeta } from '../../discovery/generate.ts';
 import type { DocumentSource, RetrievalAdapter } from '../../retrieval/types.ts';
 
 /** Parsed options for the research command. */
@@ -53,6 +55,10 @@ export interface ResearchArgs {
   readonly maxPerQuery: number;
   readonly profile: 'auto' | 'offline_replay' | 'competition_aliyun_qwen';
   readonly target: number;
+  /** Opt in to the multi-strategy discovery fan-out (directive §2.1). */
+  readonly multiStrategy: boolean;
+  /** Strategy subset (catalog-ordered; null = all registered). */
+  readonly strategies: readonly StrategyId[] | null;
   readonly json: boolean;
   readonly out: string | null;
 }
@@ -105,6 +111,8 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
   let maxPerQuery = 5;
   let profile: 'auto' | 'offline_replay' | 'competition_aliyun_qwen' = 'auto';
   let target = 3;
+  let multiStrategy = false;
+  let strategies: readonly StrategyId[] | null = null;
   let json = false;
   let out: string | null = null;
 
@@ -148,6 +156,27 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
       target = n;
       continue;
     }
+    if (a === '--multi-strategy') {
+      multiStrategy = true;
+      continue;
+    }
+    if (a === '--strategies') {
+      const v = args[++i];
+      if (v === undefined || v === '') {
+        throw new Error(
+          `far research: --strategies needs a comma-separated list (valid: ${STRATEGY_IDS.join(', ')})`,
+        );
+      }
+      try {
+        strategies = parseStrategyIdList(v);
+      } catch (err) {
+        throw new Error(
+          `far research: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
+        );
+      }
+      continue;
+    }
     if (a === '--json') {
       json = true;
       continue;
@@ -161,7 +190,12 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
     }
     question = question === '' ? a : `${question} ${a}`;
   }
-  return { question, sources, maxPerQuery, profile, target, json, out };
+  if (strategies !== null && !multiStrategy) {
+    throw new Error(
+      'far research: --strategies requires --multi-strategy (the strategy subset only applies to the discovery fan-out)',
+    );
+  }
+  return { question, sources, maxPerQuery, profile, target, multiStrategy, strategies, json, out };
 }
 
 /**
@@ -216,6 +250,27 @@ interface LifecycleRunArgs {
   /** New run (start); mutually exclusive with runId (resume). */
   readonly question?: string;
   readonly runId?: string;
+  /** Discovery fan-out opt-in (start only; resume replays the checkpointed mode). */
+  readonly multiStrategy?: boolean;
+  /** Strategy subset for the fan-out (start only). */
+  readonly strategies?: readonly StrategyId[] | null;
+}
+
+/** One concise stderr summary of the fan-out accounting (honest numbers, never padded). */
+function renderFanoutSummary(meta: FanoutMeta): void {
+  const perStrategy = meta.perStrategy
+    .map((r) => {
+      if (r.error !== null) return `${r.strategyId}: FAILED`;
+      if (r.skipReason !== null) return `${r.strategyId}: skipped`;
+      return `${r.strategyId}: ${r.candidates.length}`;
+    })
+    .join(' · ');
+  process.stderr.write(
+    `discovery fan-out: ${meta.strategiesPlanned.length} strategies → ${meta.finalCount} candidates kept\n` +
+      `  ${perStrategy}\n` +
+      `  dedup: exact ${meta.exactDuplicatesDropped} · paraphrase ${meta.paraphraseFlagged.length} · ` +
+      `truncated ${meta.truncated.length} · quota shortfall ${meta.quotaShortfall}\n`,
+  );
 }
 
 /**
@@ -233,6 +288,9 @@ async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
     profile: args.profile,
     ...(args.grounding !== undefined ? { grounding: args.grounding } : {}),
     targetHypothesisCount: args.target,
+    ...(args.multiStrategy === true ? { hypothesisGenerationStrategy: 'multi_strategy' as const } : {}),
+    ...(args.strategies != null && args.strategies.length > 0 ? { discoveryStrategies: args.strategies } : {}),
+    ...(args.multiStrategy === true ? { onFanoutComplete: renderFanoutSummary } : {}),
     ...(args.runId !== undefined ? { runId: args.runId } : {}),
     store,
   });
@@ -346,7 +404,7 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
 
   if (parsed.question.trim().length === 0) {
     process.stderr.write(
-      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]\n',
+      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--multi-strategy] [--strategies induction,analogy,…] [--json] [--out <file>]\n',
     );
     return 2;
   }
@@ -388,6 +446,8 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
     json: parsed.json,
     out: parsed.out,
     question: parsed.question,
+    ...(parsed.multiStrategy ? { multiStrategy: true } : {}),
+    ...(parsed.strategies !== null ? { strategies: parsed.strategies } : {}),
   });
 }
 
