@@ -51,11 +51,15 @@ far demo tess-offline
 git clone https://github.com/yry1816186-pixel/FAR-Lab.git
 cd FAR-Lab
 pnpm install
-node src/cli/far.ts doctor            # environment self-diagnosis (no key needed)
-node src/cli/far.ts demo tess-offline # offline demo — needs ZERO credentials
+pnpm far doctor            # environment self-diagnosis (no key needed)
+pnpm far demo tess-offline # offline demo — needs ZERO credentials
 ```
 
-> This project is distributed as source (git clone + pnpm install) and is not published to the npm registry. The `far` CLI runs directly via `node src/cli/far.ts`; after `pnpm install` the `far` bin is also available (or `pnpm exec far` / `npx far-lab`).
+> This project is distributed as source (git clone + pnpm install) and is not published to the npm
+> registry. Every command below runs as `pnpm far <cmd>` (the `far` script wraps
+> `node src/cli/far.ts`); without pnpm — e.g. a bare git clone with only Node ≥ 24 — invoke the CLI
+> directly: `node src/cli/far.ts doctor`. After `pnpm install` the `far` bin is also available
+> (or `pnpm exec far` / `npx far-lab`).
 
 `far doctor` only **WARNs** on a missing API key — it never fails the offline experience and never
 reads a key value.
@@ -66,29 +70,29 @@ reads a key value.
 
 ```bash
 # 1. Run the offline demo through the real R0-R9 kernel (14 golden vectors + end-to-end, no key)
-node src/cli/far.ts demo
+pnpm far demo
 #   → 14/14 golden vectors PASS · end-to-end demo claim sealed · exit 0
 #   (the `tess-offline` sub-mode focuses on C-ASTRO-0001 and may yield UNTESTED; for a full
 #    statistics-driven demo use `far demo` or the hero scripts below)
 
 # 2. Run the deterministic verdict kernel over 14 golden vectors
-node src/cli/far.ts verify-golden --all
+pnpm far verify-golden --all
 
 # 3. See tamper detection in action (requires a .far-proof bundle — run step 4 first to export one)
 #    macOS / Linux / WSL (bash):
 mkdir -p /tmp/tampered && cp -r .far-proof /tmp/tampered
 sed -i 's/UNTESTED/CONFIRMED/' /tmp/tampered/proof_envelopes.jsonl
-node src/cli/far.ts verify /tmp/tampered
+pnpm far verify /tmp/tampered
 #   → tamperStatus: tampered · recomputation.node: fail · exit 7
 #
 #    Windows (PowerShell 7+):
 #   New-Item -ItemType Directory -Force tampered | Out-Null
 #   Copy-Item -Recurse .far-proof tampered
 #   (Get-Content tampered/proof_envelopes.jsonl) -replace 'UNTESTED','CONFIRMED' | Set-Content tampered/proof_envelopes.jsonl
-#   node src/cli/far.ts verify tampered
+#   pnpm far verify tampered
 
 # 4. Export the proof bundle used by step 3 (and by the hero scripts below)
-node src/cli/far.ts export far-proof --demo-chain --force
+pnpm far export far-proof --demo-chain --force
 ```
 
 ### Scripted Hero walkthroughs (IC-08, timed + honest-labeled)
@@ -103,7 +107,7 @@ honest-status section (what is proven vs NOT proven), and time-box the run. They
 integrity + tamper detection + independent recomputation — not scientific truth (fixtures).
 
 
-Full CLI reference: `node src/cli/far.ts --help`.
+Full CLI reference: `pnpm far --help` (grouped overview) · per-command usage: `pnpm far <cmd> --help`.
 
 ---
 
@@ -141,49 +145,56 @@ detached from evidence). FAR-Lab closes all three with:
 ```bash
 # Ground a question in real literature, generate 3-5 candidate hypotheses,
 # critique them independently, score them, and design an executable plan.
-node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" \
-  --profile competition_aliyun_qwen --source openalex
+# No --profile needed: the default is `auto` — LIVE (real Qwen + real retrieval)
+# when DASHSCOPE_API_KEY is set.
+pnpm far research start "Does stellar activity inflate hot Jupiter radii?" --source openalex
 ```
 
 This is the **representative live path**: real Qwen generation + real OpenAlex retrieval in one run.
 Every stage records its component mode (`modelExecutionMode` / `retrievalExecutionMode`) and the
 aggregate `runMode` (`LIVE` only when all science-affecting components are live).
 
-**Without a key** (`NEEDS_API_KEY`): the same command defaults to `offline_replay` and replays
-synthetic fixtures (`runMode=RECORDED_REPLAY`) — this proves the pipeline *wiring* (citation binding,
-deterministic scoring, Pareto front, plan design), **not** any scientific truth. The deterministic
-verification kernel (`far demo`, `far verify-golden`, `far verify`) runs fully offline with zero key.
+**Without a key**: `pnpm far research start` **fails closed** (exit 2) with actionable guidance —
+it never fabricates an answer to your question from synthetic fixtures. Two no-key paths:
+`pnpm far ground "<question>"` (real literature retrieval — free, no key), or the explicit
+`pnpm far research start "<q>" --profile offline_replay` wiring demo (`runMode=RECORDED_REPLAY`;
+proves the pipeline plumbing — citation binding, deterministic scoring, Pareto front, plan design —
+**not** any scientific truth). The deterministic verification kernel (`pnpm far demo`,
+`pnpm far verify-golden`, `pnpm far verify`) runs fully offline with zero key.
 
 ### The Track-1A research loop (three-minute walkthrough)
 
 ```bash
 # 1. Run the vertical slice (researchability gate → grounding → hypotheses → critique → plan).
-#    Live retrieval works WITHOUT a key (OpenAlex is free); only the model call needs one.
+#    Live retrieval works WITHOUT a key (OpenAlex is free); the model call needs DASHSCOPE_API_KEY
+#    (profile `auto` = LIVE with a key; without one it fails closed with guidance — see above).
 #    Long runs are checkpointed per stage under .far/research-runs/<runId>/ — Ctrl+C cancels
 #    honestly (state=CANCELLED, finished stages kept) and the run can be resumed.
-node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
-node src/cli/far.ts research status <runId>     # lifecycle state + per-stage progress (8 stages)
-node src/cli/far.ts research resume <runId>     # continue a crashed/cancelled run from its checkpoint
+pnpm far research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
+pnpm far research status <runId>     # lifecycle state + per-stage progress (8 stages)
+pnpm far research resume <runId>     # continue a crashed/cancelled run from its checkpoint
 
 # 2. Real-data analysis against the NASA Exoplanet Archive (live TAP fetch).
 #    Domain-gated: a non-exoplanet run is REFUSED, never analyzed against the wrong dataset.
-node src/cli/far.ts research analyze run.json --live
+pnpm far research analyze run.json --live
 #   → n=392 hot Jupiters, r=0.587, p<0.001 (association, not causation — honest wording)
 
 # 3. Apply expert feedback → immutable revision → compare the before/after plan:
-node src/cli/far.ts research feedback run.json --file feedback.json
-node src/cli/far.ts research compare run.json
+pnpm far research feedback run.json --file feedback.json
+pnpm far research compare run.json
 
 # 4. Program-computed metrics + deterministic recompute:
-node src/cli/far.ts research evaluate run.json
+pnpm far research evaluate run.json
 
 # 5. Export a hash-pinned bundle + third-party verify (tamper → exit 7):
-node src/cli/far.ts research export run.json --out bundle
-node src/cli/far.ts research verify bundle
+pnpm far research export run.json --out bundle
+pnpm far research verify bundle
 
 # 6. The same loop is available as a Web workbench + REST API (async + SSE):
-#    pnpm api  →  POST /api/v1/research (202 + runId) · GET /research/<id>/status
-#                 GET /research/<id>/events (SSE progress) · POST /research/<id>/cancel
+#    pnpm dev   →  API on http://localhost:3000 + Web workbench on http://localhost:5173
+#                  (one command starts both; Ctrl+C stops both)
+#    pnpm api   →  POST /api/v1/research (202 + runId) · GET /research/<id>/status
+#                  GET /research/<id>/events (SSE progress) · POST /research/<id>/cancel
 ```
 
 The loop is **honest about its modes**: every stage records `modelExecutionMode` /
@@ -236,7 +247,7 @@ Deeper: [docs/concepts/far-proof.md](docs/concepts/far-proof.md) · [docs/concep
 ## Offline demo (no API key required)
 
 ```bash
-node src/cli/far.ts demo tess-offline
+pnpm far demo tess-offline
 ```
 
 Runs entirely offline: 14 golden vectors through the real R0–R9 kernel, then an end-to-end
@@ -250,7 +261,7 @@ TESS claim (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fai
 
 ```bash
 export DASHSCOPE_API_KEY=sk-...          # never commit this; see SECURITY.md
-node src/cli/far.ts ask "<question>" --profile competition_aliyun_qwen
+pnpm far ask "<question>" --profile competition_aliyun_qwen
 ```
 
 Core gates and the offline demo run **without** this key. The CI `competition_qwen_smoke` job is a

@@ -40,7 +40,7 @@ test('far research start → status (COMPLETED 8/8) → resume rejected (exit 1)
     // ── start: exit 0, immediate run-started line, per-stage lines, auto-persisted run ──
     const outPath = join(dir, 'run.json');
     const start = runFar(
-      ['research', 'start', 'Does stellar activity inflate hot Jupiter radii?', '--json', '--out', outPath],
+      ['research', 'start', 'Does stellar activity inflate hot Jupiter radii?', '--profile', 'offline_replay', '--json', '--out', outPath],
       env,
     );
     assert.equal(start.status, 0, start.stderr);
@@ -148,7 +148,7 @@ test('far research start with a refused question → exit 3, FAILED(gate_refused
   const runsRoot = join(dir, 'runs');
   const env = { FAR_RESEARCH_RUNS_DIR: runsRoot };
   try {
-    const refused = runFar(['research', 'start', 'write a poem about stars'], env);
+    const refused = runFar(['research', 'start', 'write a poem about stars', '--profile', 'offline_replay'], env);
     assert.equal(refused.status, 3, refused.stderr);
     assert.match(refused.stderr, /researchability gate REFUSED/);
 
@@ -159,6 +159,28 @@ test('far research start with a refused question → exit 3, FAILED(gate_refused
     assert.ok(cp !== null);
     assert.equal(cp.state, 'FAILED');
     assert.equal(cp.errorKind, 'gate_refused');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('no-key default (auto) → exit 2 with actionable guidance, nothing fabricated (2026-08-14 UX fix)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-research-nokey-'));
+  try {
+    const env = {
+      FAR_RESEARCH_RUNS_DIR: join(dir, 'runs'),
+      DASHSCOPE_API_KEY: '',
+      FAR_DASHSCOPE_API_KEY: '',
+    };
+    const r = runFar(['research', 'start', 'How do mRNA vaccines cause myocarditis?'], env);
+    assert.equal(r.status, 2, `expected fail-closed exit 2, got ${r.status}: ${r.stderr}`);
+    assert.ok(r.stderr.includes('no model API key found'), 'states the real cause');
+    assert.ok(r.stderr.includes('bailian.console.aliyun.com'), 'points to where to get a key');
+    assert.ok(r.stderr.includes('far ground'), 'offers the free no-key path');
+    assert.ok(r.stderr.includes('--profile offline_replay'), 'offers the explicit synthetic opt-in');
+    // No checkpoint directory was created — nothing ran, nothing was fabricated.
+    const store = new RunStore(join(dir, 'runs'));
+    assert.deepEqual([...store.listRunIds()], []);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

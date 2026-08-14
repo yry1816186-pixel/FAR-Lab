@@ -11,7 +11,7 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,6 +20,7 @@ import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offli
 import type { LlmRequest, LlmResponse, ProviderAdapter, ProviderProfile } from '../../src/llm_gateway/types.ts';
 import { createReplayAdapter } from '../../src/retrieval/index.ts';
 import {
+  renameWithRetry,
   executeResearchRun,
   RunStore,
   parseCheckpoint,
@@ -305,5 +306,52 @@ describe('run lifecycle (offline replay)', () => {
     const cp = store.loadCheckpoint(runId)!;
     assert.equal(cp.state, 'CANCELLED');
     assert.ok(cp.completedStages.length >= 1, 'finished stage checkpointed before cancel');
+  });
+});
+
+describe('renameWithRetry (Windows EPERM resilience — 2026-08-14 UX finding)', () => {
+  const failingRename = (failTimes: number, code: string) => {
+    let calls = 0;
+    return (_from: string, _to: string): void => {
+      calls += 1;
+      if (calls <= failTimes) {
+        const err = new Error(`synthetic ${code}`) as NodeJS.ErrnoException;
+        err.code = code;
+        throw err;
+      }
+      calls = -100; // succeed only once
+    };
+  };
+
+  it('retries transient EPERM and succeeds once the lock clears', () => {
+    const rename = failingRename(3, 'EPERM');
+    const sleeps: number[] = [];
+    renameWithRetry('a.tmp', 'a.json', rename, (ms) => sleeps.push(ms));
+    assert.deepEqual(sleeps, [20, 40, 80], 'exponential backoff between attempts');
+  });
+
+  it('falls back to an in-place write when the lock never clears', () => {
+    const rename = failingRename(99, 'EPERM');
+    // The fallback path reads `from` and writes `to` — use real temp files.
+    const dir = mkdtempSync(join(tmpdir(), 'far-rename-retry-'));
+    const from = join(dir, 'from.json');
+    const to = join(dir, 'to.json');
+    writeFileSync(from, '{"ok":true}', 'utf8');
+    try {
+      renameWithRetry(from, to, rename, () => {});
+      assert.equal(readFileSync(to, 'utf8'), '{"ok":true}');
+      assert.ok(!existsSync(from), 'tmp cleaned up after fallback');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('throws immediately on non-transient errors (ENOENT)', () => {
+    const rename = ((): void => {
+      const err = new Error('no such file') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+    assert.throws(() => renameWithRetry('a', 'b', rename, () => {}), /no such file/);
   });
 });

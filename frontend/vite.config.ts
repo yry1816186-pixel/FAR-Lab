@@ -47,9 +47,9 @@ export default defineConfig({
   server: {
     port: 5173,
     // All app endpoints live under /api/v1 (spec 24 §0#2); probes /health + /ready
-    // live on the bare root (spec 24 §0#3). The frontend defaults to an absolute
-    // base URL (CORS via @fastify/cors); these proxies apply when VITE_API_BASE_URL
-    // is set to '' for a same-origin dev setup.
+    // live on the bare root (spec 24 §0#3). The API client defaults to a RELATIVE
+    // (same-origin) base, so these proxies carry every request in dev; setting
+    // VITE_API_BASE_URL bypasses them for cross-origin deployments.
     proxy: {
       '/api/v1': 'http://localhost:3000',
       '/health': 'http://localhost:3000',

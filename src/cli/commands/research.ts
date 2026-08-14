@@ -51,7 +51,7 @@ export interface ResearchArgs {
   readonly question: string;
   readonly sources: readonly DocumentSource[];
   readonly maxPerQuery: number;
-  readonly profile: 'offline_replay' | 'competition_aliyun_qwen';
+  readonly profile: 'auto' | 'offline_replay' | 'competition_aliyun_qwen';
   readonly target: number;
   readonly json: boolean;
   readonly out: string | null;
@@ -59,12 +59,51 @@ export interface ResearchArgs {
 
 const VALID_SOURCES: readonly DocumentSource[] = ['openalex', 'arxiv', 'crossref'];
 
+/** The live model API key from the environment (undefined/empty when absent). */
+export function liveApiKey(): string | undefined {
+  const key = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
+  return key !== undefined && key !== '' ? key : undefined;
+}
+
+/** Actionable guidance printed when a live model is required but no key exists. */
+export const NO_KEY_GUIDANCE = [
+  'far research: no model API key found — the research loop needs a live model, and',
+  'answering an arbitrary question from synthetic fixtures would be fabricated science.',
+  '',
+  '  get a key  : https://bailian.console.aliyun.com/  then set DASHSCOPE_API_KEY (or put it in .env)',
+  '  free, now  : far ground "<your question>"                              → real literature, no key needed',
+  '  wiring demo: far research start "<q>" --profile offline_replay          → synthetic fixtures (explicit opt-in)',
+  '',
+].join('\n');
+
+/**
+ * Resolve the `auto` profile default (2026-08-14 UX fix): live when a key
+ * exists, fail closed with guidance otherwise. Explicit profiles pass through
+ * (the caller enforces the key for the live one).
+ */
+export function resolveAutoProfile(
+  profile: 'auto' | 'offline_replay' | 'competition_aliyun_qwen',
+): 'offline_replay' | 'competition_aliyun_qwen' | 'missing-key' {
+  if (profile === 'offline_replay') return 'offline_replay';
+  if (profile === 'competition_aliyun_qwen') {
+    return liveApiKey() !== undefined ? 'competition_aliyun_qwen' : 'missing-key';
+  }
+  return liveApiKey() !== undefined ? 'competition_aliyun_qwen' : 'missing-key';
+}
+
+/** Human label for the execution mode line printed before a run starts. */
+export function modeLine(profile: 'offline_replay' | 'competition_aliyun_qwen'): string {
+  return profile === 'competition_aliyun_qwen'
+    ? 'mode: LIVE — real model (competition_aliyun_qwen) + real literature retrieval'
+    : 'mode: OFFLINE REPLAY — synthetic fixtures: hypotheses will NOT be about your question';
+}
+
 /** Parse `far research start` args. */
 export function parseResearchArgs(args: readonly string[]): ResearchArgs {
   let question = '';
   let sources: readonly DocumentSource[] = ['openalex'];
   let maxPerQuery = 5;
-  let profile: 'offline_replay' | 'competition_aliyun_qwen' = 'offline_replay';
+  let profile: 'auto' | 'offline_replay' | 'competition_aliyun_qwen' = 'auto';
   let target = 3;
   let json = false;
   let out: string | null = null;
@@ -94,8 +133,8 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
     }
     if (a === '--profile') {
       const v = args[++i];
-      if (v !== 'offline_replay' && v !== 'competition_aliyun_qwen') {
-        throw new Error(`far research: --profile must be offline_replay|competition_aliyun_qwen (got: ${v ?? '<missing>'})`);
+      if (v !== 'auto' && v !== 'offline_replay' && v !== 'competition_aliyun_qwen') {
+        throw new Error(`far research: --profile must be auto|offline_replay|competition_aliyun_qwen (got: ${v ?? '<missing>'})`);
       }
       profile = v;
       continue;
@@ -220,6 +259,9 @@ async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
   process.on('SIGINT', onSigint);
 
   try {
+    // The mode line comes FIRST so the user knows what kind of science this is
+    // before any progress (replay fixtures vs live model must never be mistaken).
+    process.stderr.write(`${modeLine(args.profile)}\n`);
     if (runId !== undefined) {
       process.stderr.write(
         `run started: ${runId} (progress checkpoints: ${store.checkpointPath(runId)} · status: far research status ${runId})\n`,
@@ -304,23 +346,27 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
 
   if (parsed.question.trim().length === 0) {
     process.stderr.write(
-      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]\n',
+      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]\n',
     );
     return 2;
   }
 
-  // Build the gateway + grounding adapter for the chosen profile.
+  // Build the gateway + grounding adapter for the chosen profile. Default is
+  // `auto`: live when a key exists; without a key the run FAILS CLOSED with
+  // actionable guidance — replaying synthetic fixtures at an arbitrary user
+  // question answers it with unrelated canned science (2026-08-14 UX finding:
+  // a no-key user asked about mRNA vaccines and got hot-Jupiter hypotheses).
+  // The synthetic path stays available by explicit opt-in.
+  const resolved = resolveAutoProfile(parsed.profile);
+  if (resolved === 'missing-key') {
+    process.stderr.write(NO_KEY_GUIDANCE);
+    return 2;
+  }
+  const profile = resolved;
   let gateway: LlmGateway;
   let retrievalAdapter: RetrievalAdapter | undefined;
-  if (parsed.profile === 'competition_aliyun_qwen') {
-    const apiKey = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
-    if (apiKey === undefined || apiKey === '') {
-      process.stderr.write(
-        'far research: profile competition_aliyun_qwen needs FAR_DASHSCOPE_API_KEY or DASHSCOPE_API_KEY set.\n  default offline_replay needs no key (synthetic fixtures, RECORDED_REPLAY mode).\n',
-      );
-      return 2;
-    }
-    gateway = createCompetitionQwenGateway({ apiKey });
+  if (profile === 'competition_aliyun_qwen') {
+    gateway = createCompetitionQwenGateway({ apiKey: liveApiKey()! });
     // live retrieval: no injected adapter
   } else {
     gateway = createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
@@ -330,7 +376,7 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
   return executeLifecycleRun({
     store: resolveRunStore(),
     gateway,
-    profile: parsed.profile,
+    profile,
     grounding: {
       ...(parsed.sources.length > 1
         ? { sources: parsed.sources }
@@ -854,8 +900,6 @@ export async function runResearchFeedback(args: readonly string[]): Promise<numb
   const outIdx = args.indexOf('--out');
   const outValue = outIdx !== -1 ? args[outIdx + 1] : undefined;
   const outPath = outValue !== undefined ? outValue : file;
-  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : 'offline_replay';
-  const profile = profileArg === 'competition_aliyun_qwen' ? 'competition_aliyun_qwen' : 'offline_replay';
 
   let run: ResearchRun;
   let feedbackRaw: string;
@@ -865,6 +909,21 @@ export async function runResearchFeedback(args: readonly string[]): Promise<numb
   } catch (err) {
     process.stderr.write(`far research feedback: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
+  }
+
+  // Profile: default follows the run's own provenance — a LIVE run's revision
+  // comes from the live model (never silently from replay fixtures); an
+  // explicit --profile overrides.
+  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : undefined;
+  const profile = profileArg === 'competition_aliyun_qwen' || (profileArg === undefined && run.runMode === 'LIVE')
+    ? 'competition_aliyun_qwen'
+    : 'offline_replay';
+  if (profile === 'competition_aliyun_qwen' && liveApiKey() === undefined) {
+    process.stderr.write(
+      'far research feedback: this run is LIVE — revising it needs DASHSCOPE_API_KEY in the environment.\n' +
+        '  (pass --profile offline_replay only for synthetic wiring tests.)\n',
+    );
+    return 2;
   }
 
   const fb = parseFeedbackJson(feedbackRaw);
@@ -925,8 +984,6 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
   const outValue = outIdx !== -1 ? args[outIdx + 1] : undefined;
   const outPath = outValue !== undefined ? outValue : file;
   const live = args.includes('--live');
-  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : 'offline_replay';
-  const profile = profileArg === 'competition_aliyun_qwen' ? 'competition_aliyun_qwen' : 'offline_replay';
   const json = args.includes('--json');
 
   let run: ResearchRun;
@@ -935,6 +992,19 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
   } catch (err) {
     process.stderr.write(`far research analyze: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
+  }
+
+  // Profile: default follows the run's own provenance (LIVE run → live model).
+  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : undefined;
+  const profile = profileArg === 'competition_aliyun_qwen' || (profileArg === undefined && run.runMode === 'LIVE')
+    ? 'competition_aliyun_qwen'
+    : 'offline_replay';
+  if (profile === 'competition_aliyun_qwen' && liveApiKey() === undefined) {
+    process.stderr.write(
+      'far research analyze: this run is LIVE — the revision step needs DASHSCOPE_API_KEY in the environment.\n' +
+        '  (pass --profile offline_replay only for synthetic wiring tests.)\n',
+    );
+    return 2;
   }
 
   // 1. Execute the plan's first analysis step (live or committed-real replay).
@@ -1058,15 +1128,26 @@ export function runResearchEvaluate(args: readonly string[]): number {
 export async function runResearchBaseline(args: readonly string[]): Promise<number> {
   const file = args.find((a) => !a.startsWith('--'));
   if (file === undefined) {
-    process.stderr.write('far research baseline: missing <question>.\n  usage: far research baseline "<question>" [--profile offline_replay|competition_aliyun_qwen] [--json]\n');
+    process.stderr.write('far research baseline: missing <question>.\n  usage: far research baseline "<question>" [--profile auto|offline_replay|competition_aliyun_qwen] [--json]\n');
     return 2;
   }
-  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : 'offline_replay';
-  const profile = profileArg === 'competition_aliyun_qwen' ? 'competition_aliyun_qwen' : 'offline_replay';
+  // Same `auto` default as start: live when a key exists; fail closed with
+  // guidance otherwise (a synthetic-fixture baseline answers nothing real).
+  const profileArg = args.includes('--profile') ? args[args.indexOf('--profile') + 1] : 'auto';
+  const resolved = resolveAutoProfile(
+    profileArg === 'offline_replay' || profileArg === 'competition_aliyun_qwen' || profileArg === 'auto'
+      ? profileArg
+      : 'auto',
+  );
+  if (resolved === 'missing-key') {
+    process.stderr.write(NO_KEY_GUIDANCE);
+    return 2;
+  }
+  const profile = resolved;
   const json = args.includes('--json');
 
   const gateway = profile === 'competition_aliyun_qwen'
-    ? createCompetitionQwenGateway({ apiKey: process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY ?? '' })
+    ? createCompetitionQwenGateway({ apiKey: liveApiKey()! })
     : createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
   const replayAdapter = profile === 'competition_aliyun_qwen'
     ? undefined

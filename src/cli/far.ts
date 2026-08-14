@@ -79,9 +79,14 @@ const COMMANDS: readonly CliCommand[] = [
     description: 'environment self-check (no network, no keys by default)',
     run: async (args) => {
       const liveQwenSmoke = args.includes('--live-qwen-smoke');
+      const fullVerify = args.includes('--full-verify');
       const dbIdx = args.indexOf('--db');
       const dbPath = dbIdx !== -1 ? args[dbIdx + 1] : undefined;
-      return runDoctor({ liveQwenSmoke, ...(dbPath !== undefined ? { dbPath } : {}) });
+      return runDoctor({
+        liveQwenSmoke,
+        fullVerify,
+        ...(dbPath !== undefined ? { dbPath } : {}),
+      });
     },
   },
   {
@@ -939,13 +944,20 @@ async function runCAstroLoopFromArgs(args: readonly string[]): Promise<number> {
   });
 }
 
+// Per-command help (`far <cmd> --help`): slices the detailed usage wall (DETAILED_HELP).
+// 2026-08-14 UX regroup: the default no-arg help (HELP_TEXT) is a compact grouped
+// overview; the full multi-line usage/options/exit-codes stay here per command.
+// Consecutive blocks of the same command (e.g. `far research start` … `far research
+// baseline`, `far export receipt` … `far export far-proof`) are returned together.
 function commandHelp(command: string): string {
-  const lines = HELP_TEXT.split('\n');
-  const startIdx = lines.findIndex((l) => new RegExp('^  far ' + command + '\\b').test(l));
+  const head = command.split(' ')[0] ?? command;
+  const lines = DETAILED_HELP.split('\n');
+  const startIdx = lines.findIndex((l) => new RegExp('^  far ' + head + '\\b').test(l));
   if (startIdx === -1) return HELP_TEXT;
   let endIdx = lines.length;
   for (let i = startIdx + 1; i < lines.length; i += 1) {
-    if (/^ {2}far \S/.test(lines[i] ?? '')) {
+    const m = /^ {2}far ([A-Za-z][\w-]*)/.exec(lines[i] ?? '');
+    if (m !== null && m[1] !== head) {
       endIdx = i;
       break;
     }
@@ -953,14 +965,20 @@ function commandHelp(command: string): string {
   return 'FAR-Lab CLI — ' + command + '\n\n' + lines.slice(startIdx, endIdx).join('\n').trimEnd();
 }
 
-const HELP_TEXT = `FAR-Lab CLI — claim-level verification for AI4S scientific claims
+// DETAILED_HELP — the full per-command usage wall (usage + options + exit codes).
+// Surfaced by `far <cmd> --help`; the default no-arg help is the compact HELP_TEXT below.
+const DETAILED_HELP = `FAR-Lab CLI — claim-level verification for AI4S scientific claims
 
 USAGE:
   far version                        print version + git HEAD
-  far doctor [--live-qwen-smoke] [--db <path>]
+  far doctor [--live-qwen-smoke] [--full-verify] [--db <path>]
                                      environment self-check (no network, no keys by default;
-                                     a missing DASHSCOPE_API_KEY only WARNs, never FAILs)
+                                     a missing DASHSCOPE_API_KEY only WARNs, never FAILs).
+                                     Env checks print FIRST; the offline verify of the demo
+                                     bundle (IC-03) prints as a compact VERIFY SUMMARY line.
                                      --live-qwen-smoke   call the real API (needs a valid key)
+                                     --full-verify       also print the full far verify report
+                                                         (default: summary only)
                                      --db <path>         full integrity_check + chain verify (fail-closed, IC-03)
   far hardware [--json]              best-effort runtime compute-backend probe
                                      (CPU / GPU / WebGPU / WASM; never affects verdict determinism)
@@ -1026,7 +1044,7 @@ USAGE:
     exits 0 VERIFIED · 7 NOT_FOUND (fabrication signal) · 8 UNAVAILABLE (env failure) · 9 UNSUPPORTED · 1 bad args
 
   far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>]
-                   [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]
+                   [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]
                          Track-1A vertical slice (赛道一·方向一·A) under the persistent run
                          lifecycle: researchability & safety gate →
                          ground the question in real literature (supporting + counter-evidence +
@@ -1040,8 +1058,10 @@ USAGE:
                          overrides); one stderr line per stage; first Ctrl+C cancels (exit 130).
     --source <s>        openalex (default) | arxiv | crossref
     --max-per-query <n> docs per query, 1..25 (default 5)
-    --profile <p>       offline_replay (default; synthetic fixtures, RECORDED_REPLAY) |
-                        competition_aliyun_qwen (LIVE; needs FAR_DASHSCOPE_API_KEY)
+    --profile <p>       auto (default; LIVE when DASHSCOPE_API_KEY is set — no flag needed;
+                        without a key the run FAILS CLOSED exit 2 with actionable guidance) |
+                        offline_replay (synthetic fixtures, RECORDED_REPLAY; explicit opt-in) |
+                        competition_aliyun_qwen (LIVE; needs the key)
     --target <n>        hypothesis count 3..5 (default 3)
     --json              machine-readable ResearchRun output
     --out <file>        save the ResearchRun JSON
@@ -1258,6 +1278,14 @@ USAGE:
   far arena "<hypothesis>" [--refuters]     adversarial science arena (refuter attacks + deterministic arbiter scoreboard)
   far init <domain> [--out <dir>] [--force] scaffold a DomainPack (config + claim/fec templates)
 
+  far keygen --out <path>                   generate an Ed25519 key pair (private PKCS8 PEM + .pub.pem)
+  far sign <file-or-dir> --key <private.pem> [--out <sig.json>] [--json]
+                                            sign a deterministic file manifest (Ed25519); signing a
+                                            .far-proof bundle writes <bundle-dir>.sig.json (DEF-18)
+  far verify-sig <file-or-dir> --sig <sig.json> [--pubkey <public.pem>] [--json]
+                                            verify an Ed25519 file-manifest signature (independent
+                                            recompute + hash check; any path drift → FAIL)
+
   far real-paper [--paper bem] [--mode as-published|corrected]
     Run a real published paper through the FAR-Lab pipeline (statistics recompute
     + deterministic verdict kernel + 23 anti-theater fraud detectors + tamper-evident
@@ -1280,6 +1308,82 @@ USAGE:
   - real multi-model providers (court/arena --models against real LLMs; needs a credential gate)
   - formal verifiers (Lean / Dafny / Rust)
   - real OS-level sandbox isolation
+  `;
+
+// HELP_TEXT — compact grouped overview (2026-08-14 UX regroup: the old 300-line wall
+// buried the four real entry commands). One-line descriptions here; full usage,
+// options, and exit codes live in DETAILED_HELP via `far <command> --help`.
+// Every command in COMMANDS appears exactly once in a group (GETTING STARTED
+// intentionally repeats the entry points); scripts/doc_command_check.mjs extracts
+// subcommands from this text, so lines must keep the 2-space "  far <cmd>" shape.
+const HELP_TEXT = `FAR-Lab CLI — claim-level verification for AI4S scientific claims
+
+GETTING STARTED (recommended order)
+  far demo                              see the deterministic kernel verify 14 golden vectors (no key)
+  far ground "<your question>"          real literature retrieval + counter-evidence — free, no key
+  far research start "<your question>"  full research loop (live model when DASHSCOPE_API_KEY is set;
+                                        without a key it fails closed with actionable guidance)
+  far research status <runId>           observe a long run  ·  far research resume <runId>  continue it
+
+RESEARCH LOOP
+  far research <start|status|resume|inspect|verify|export|compare|analyze|evaluate|baseline|feedback>
+                                        ground → hypotheses → critique → deterministic score → plan
+                                        (checkpointed per stage, resumable, Ctrl+C cancels honestly)
+  far ground "<question>"               ground a question in REAL literature + adversarial counter-evidence
+                                        (OpenAlex/arXiv/Crossref; --source, --max-per-query, --json)
+  far check-resource <kind>:<value>     verify a cited identifier exists at its authoritative source
+                                        (doi: | arxiv: | url:; --json)
+  far ask "<question>"                  run the full 6-stage FSM once (verdict + evidence chain)
+  far stream "<question>"               like ask, but streams each stage live (real streaming, not replay)
+  far repl                              interactive REPL (ask / :fork <suffix> / :history / :quit)
+
+VERIFICATION & TRUST
+  far demo [tess-offline]               one-shot demo: 14 golden vectors + end-to-end demo claim (offline)
+  far verify [--bundle|--envelope|--db] third-party independent re-computation verification
+                                        (--v2: V2 six-dimension path; --explain expands the check tables)
+  far verify-golden [--all|--case]      recompute the verdict golden vectors (node/python/browser axes)
+  far fec <compile|freeze>              FEC V2 compile + fecHash recompute / freeze cross-check
+  far replay --db <p> | --bundle <d>    replay the evidence chain (time machine; hash-chain verify)
+  far court "<claim>"                   cross-model reliability court (issues a ReliabilityCertificate)
+  far arena "<hypothesis>"              adversarial science arena (refuter attacks + deterministic arbiter)
+
+EVIDENCE & PROOF
+  far export <receipt|receipt-v2|far-proof>
+                                        Trust Receipt / .far-proof portable evidence bundle export
+  far keygen --out <path>               generate an Ed25519 key pair (signer key lifecycle)
+  far sign <path> --key <sk.pem>        sign a file/directory with an Ed25519 private key (deterministic manifest)
+  far verify-sig <path> --sig <s.json>  verify an Ed25519 file-manifest signature (independent recompute)
+  far backup --db <p> --out <p>         safe backup via VACUUM INTO (full integrity_check first, IC-03)
+  far real-paper [--paper bem]          run a real published paper through the FAR-Lab pipeline
+
+SYSTEM
+  far doctor [--full-verify]            environment self-check (no network, no keys by default;
+                                        env checks first, compact verify summary; --full-verify = full report)
+  far hardware [--json]                 best-effort runtime compute-backend probe (CPU/GPU/WebGPU/WASM)
+  far init <domain>                     scaffold a DomainPack (config + claim/fec templates)
+  far api [--port <n>]                  start the REST API server (Fastify; frontend defaults to :3000)
+  far status [--db <path>]              emit the single SSOT status report
+  far lifecycle <state|history|transition|verify>
+                                        retraction/correction/supersession lifecycle (IC-05; append-only)
+  far planning <plan|spec|risk|state|gate|checkpoint>
+                                        planning methodology as deterministic gates (P0-P4 grading)
+  far schedule <add|list|remove|run>    scheduled re-verification (re-verify claims over time)
+  far fsm advance                       advance the 9-state CLI protocol FSM (stageReceipt hash link)
+  far bench run                         FAR-Bench demo profile
+  far version                           print version + git HEAD
+  far c-astro [--tic <id>] [--sector <n>]
+                                        C-ASTRO-0001 online TESS dataset resolver wiring
+  far c-astro-loop [--rounds <n>]       C-ASTRO closed-loop experiment iteration (plan→BLS→verify→refine)
+  far audit-seed-cherry [--json]        anti-theater detector-validation showcase (cherry-pick replay)
+  far audit-multiseed [--json]          real multi-seed audit (seed-dependent BLS)
+
+MORE
+  far <command> --help                  full usage, options, and exit codes for a single command
+  docs: README quickstart · docs/quickstart.md · docs/INDEX.md
+
+  All listed commands are implemented. Future work (not missing commands): real multi-model
+  providers for court/arena (needs a credential gate) · formal verifiers (Lean/Dafny) ·
+  real OS-level sandbox isolation.
   `;
 
 main().catch((error: unknown) => {
