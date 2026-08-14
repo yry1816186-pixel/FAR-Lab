@@ -28,15 +28,47 @@ import type { CitationBinding, ResearchRun } from './types.ts';
 
 // ── Model-output schemas (shared with the generation modules) ───────────────
 
-/** zod schema for the shared falsification method (mirrors agent_loop type). */
-export const FalsificationMethodZod = z.object({
-  prediction: z.string(),
-  metric: z.string(),
-  comparator: z.enum(['gt', 'lt', 'range']),
-  value: z.number().optional(),
-  lower: z.number().optional(),
-  upper: z.number().optional(),
-});
+/**
+ * zod schema for the shared falsification method (mirrors agent_loop type).
+ *
+ * Threshold coherence is enforced HERE (not only in the falsifiability gate):
+ * `gt`/`lt` require a finite `value` (a live model emitting only lower/upper
+ * for them is rejected at generation time and repaired on retry — 2026-08-14
+ * live-run defect: every live hypothesis failed the gate on this mismatch);
+ * `range` requires finite `lower` < `upper`.
+ */
+export const FalsificationMethodZod = z
+  .object({
+    prediction: z.string(),
+    metric: z.string(),
+    comparator: z.enum(['gt', 'lt', 'range']),
+    value: z.number().optional(),
+    lower: z.number().optional(),
+    upper: z.number().optional(),
+  })
+  .superRefine((m, ctx) => {
+    if (m.comparator === 'gt' || m.comparator === 'lt') {
+      if (m.value === undefined || !Number.isFinite(m.value)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['value'],
+          message: `comparator "${m.comparator}" requires a finite numeric "value" threshold (lower/upper are only valid for comparator "range")`,
+        });
+      }
+      return;
+    }
+    if (
+      m.lower === undefined || m.upper === undefined ||
+      !Number.isFinite(m.lower) || !Number.isFinite(m.upper) ||
+      m.lower >= m.upper
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['lower'],
+        message: 'comparator "range" requires finite numeric "lower" and "upper" with lower < upper',
+      });
+    }
+  });
 
 /** zod schema for one generated hypothesis candidate (no id — computed locally). */
 export const CandidateZod = z.object({

@@ -5,7 +5,7 @@
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractPlanParameters, interpretObservation, runPlanExperiment, type Observation } from '../../src/research/experiment.ts';
+import { extractPlanParameters, interpretObservation, runPlanExperiment, isExoplanetApplicable, type Observation } from '../../src/research/experiment.ts';
 import { analyzeRadiusInsolation } from '../../src/research/adapters/exoplanet_analysis.ts';
 import type { PsRow, ExoplanetDatasetCard } from '../../src/research/adapters/exoplanet_dataset.ts';
 import type { ResearchRun } from '../../src/research/types.ts';
@@ -250,5 +250,112 @@ describe('extractPlanParameters (plan → adapter inputs)', () => {
     const p = extractPlanParameters(plan(['max_period: banana', 'confidence_level: 99']));
     assert.equal(p.maxPeriodDays, 10);
     assert.equal(p.confidenceLevel, 0.95);
+  });
+});
+
+describe('domain gate (fail-closed, directive §3.3/§13 — 2026-08-14 defect D4)', () => {
+  /** Minimal but fully-typed run for the domain gate (no type-assertion bypass). */
+  const domainRun = (domain: string | null, question: string, planVariables: readonly string[]): ResearchRun => ({
+    runId: 'r-d4',
+    question,
+    gateReport: {
+      question,
+      verdict: 'RESEARCHABLE',
+      reasons: [],
+      safetyRisks: [],
+      scope: { domain, domainHints: [], questionLength: question.length },
+      decomposition: null,
+      requiresEthicsGate: false,
+      assessedAt: 't',
+      schemaVersion: 1,
+    },
+    corpus: { snapshotId: 's', rootHash: 'r', documentCount: 0, documents: [], sourceQueries: [], createdAt: 't' },
+    hypotheses: [],
+    bindings: {},
+    critiques: {},
+    scorecards: {},
+    plan: {
+      objectives: [],
+      primaryHypothesisId: 'h1',
+      alternativeHypothesisIds: [],
+      preregisteredPredictions: [],
+      dataRequirements: [],
+      inclusionExclusionCriteria: [],
+      variables: [...planVariables],
+      design: 'd',
+      analysisDag: [],
+      tools: [],
+      statisticalMethods: [],
+      sampleSizeRationale: 's',
+      multiplicityHandling: 'm',
+      missingOutlierStrategy: 'x',
+      stoppingConditions: [],
+      checkpoints: [],
+      budget: 'b',
+      risks: [],
+      reproducibility: [],
+      nextRoundDecisionRules: [],
+      humanApprovalRequired: [],
+    },
+    revisions: [],
+    observations: [],
+    stageReceipts: [],
+    environment: { gitCommit: null, gitDirty: null, nodeVersion: 'v24', platform: 'test', lockfileHash: null, packageVersion: null },
+    modes: { modelExecutionMode: 'RECORDED_REPLAY', retrievalExecutionMode: 'RECORDED_REPLAY', experimentExecutionMode: 'NOT_EXECUTED' },
+    runMode: 'RECORDED_REPLAY',
+    startedAt: 't',
+    schemaVersion: 3,
+    citationGate: {
+      boundRate: 1,
+      totalCited: 0,
+      boundCount: 0,
+      unboundEvidenceCount: 0,
+      resolvedViaRetrieval: [],
+      perHypothesis: {},
+      primaryRequiresAllBound: true,
+      primaryAllBound: false,
+      gateVerdict: 'PASS',
+    },
+    falsifiabilityGate: { perHypothesis: {}, allPassed: true },
+  });
+
+  test('isExoplanetApplicable: astro domain hint → applicable', () => {
+    assert.equal(
+      isExoplanetApplicable(domainRun('astrophysics', 'Does stellar activity correlate with planet radius?', [])),
+      true,
+    );
+  });
+
+  test('isExoplanetApplicable: two keyword hits without domain hint → applicable', () => {
+    assert.equal(
+      isExoplanetApplicable(domainRun(null, 'Do hot Jupiters show radius inflation with insolation?', [])),
+      true,
+    );
+  });
+
+  test('isExoplanetApplicable: non-astro run (diabetes) → REFUSED', () => {
+    assert.equal(
+      isExoplanetApplicable(
+        domainRun(
+          'endocrinology',
+          'Does intermittent fasting reduce insulin resistance in adults with type 2 diabetes?',
+          ['HOMA-IR threshold: 2.5', 'adults with type 2 diabetes'],
+        ),
+      ),
+      false,
+    );
+  });
+
+  test('runPlanExperiment refuses a non-exoplanet run — no observation fabricated', async () => {
+    const run = domainRun(
+      'endocrinology',
+      'Does intermittent fasting reduce insulin resistance in adults with type 2 diabetes?',
+      [],
+    );
+    await assert.rejects(
+      runPlanExperiment({ run }),
+      /no available ExperimentAdapter matches this run/,
+      'the exoplanet adapter must not graft hot-Jupiter data onto a diabetes plan',
+    );
   });
 });
