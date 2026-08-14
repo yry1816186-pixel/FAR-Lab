@@ -47,6 +47,7 @@ import {
   useResearchStatus,
   useStartResearch,
   type ResearchLifecycleEventDto,
+  type ResearchObservationDto,
   type ResearchRunDto,
   type ResearchStatusDto,
 } from '@/lib/research_client';
@@ -58,6 +59,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { FlaskConical, Loader2, PlayCircle, RotateCcw, Scale, XCircle } from 'lucide-react';
+
+/** Type guard: the domain-general landscape observation result. */
+function isLandscapeResult(
+  r: ResearchObservationDto['result'],
+): r is Extract<ResearchObservationDto['result'], { readonly kind: 'literature-landscape' }> {
+  return 'kind' in r && r.kind === 'literature-landscape';
+}
 
 /** 运行模式徽章（状态不依赖颜色——文字 label 显式）。 */
 function RunModeBadge({ run }: { readonly run: ResearchRunDto }) {
@@ -716,8 +724,10 @@ export default function ResearchWorkbenchPage() {
                 <ul className="space-y-2 text-sm" data-testid="observation-list">
                   {run.observations.map((o) => (
                     <li key={o.id} className="rounded border p-2">
-                      <Badge variant="outline">{o.mode}</Badge> {o.result.status} (n={o.result.n}) ·{' '}
-                      {o.result.summary}
+                      <Badge variant="outline">{o.mode}</Badge>{' '}
+                      {isLandscapeResult(o.result)
+                        ? `literature-landscape · ${o.result.totalDocuments} docs · counter-evidence ${(o.result.counterEvidenceShare * 100).toFixed(1)}% · fresh≤5y ${(o.result.freshShare * 100).toFixed(1)}% · median year ${o.result.medianPublicationYear ?? 'n/a'}`
+                        : `${o.result.status} (n=${o.result.n}) · ${o.result.summary}`}
                     </li>
                   ))}
                 </ul>

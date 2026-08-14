@@ -466,15 +466,59 @@ export const ExoplanetDatasetCardZod = z.object({
   fetchMode: z.enum(['LIVE', 'RECORDED_REPLAY']),
 });
 
-export const ObservationZod = z.object({
-  id: z.string(),
-  adapter: z.literal('exoplanet-archive-radius-insolation'),
-  affectsHypothesisIds: z.array(z.string()),
-  result: RadiusInsolationObservationZod,
-  datasetCard: ExoplanetDatasetCardZod,
-  mode: z.enum(['LIVE', 'RECORDED_REPLAY', 'SYNTHETIC_TEST', 'OFFLINE_DEVELOPMENT', 'NOT_EXECUTED']),
+// ── Literature-landscape observation (domain-general adapter) ────────────────
+
+export const LiteratureLandscapeObservationZod = z.object({
+  kind: z.literal('literature-landscape'),
+  snapshotId: z.string(),
+  rootHash: z.string(),
+  totalDocuments: z.number().int().nonnegative(),
+  supportingDocuments: z.number().int().nonnegative(),
+  counterEvidenceDocuments: z.number().int().nonnegative(),
+  counterEvidenceShare: z.number().min(0).max(1),
+  medianPublicationYear: z.number().nullable(),
+  unknownYearDocuments: z.number().int().nonnegative(),
+  freshShare: z.number().min(0).max(1),
+  sourceFamilies: z.array(z.string()),
+  queryCount: z.number().int().nonnegative(),
   producedAt: z.string(),
 });
+
+export const LandscapeDatasetCardZod = z.object({
+  source: z.string(),
+  sourceUrl: z.string(),
+  version: z.string(),
+  persistentId: z.string(),
+  license: z.string(),
+  downloadedAt: z.string(),
+  checksumField: z.string(),
+  checksumValue: z.string(),
+  fields: z.array(z.string()),
+  knownBias: z.string(),
+  allowedInference: z.string(),
+  forbiddenInference: z.string(),
+});
+
+export const ObservationZod = z.discriminatedUnion('adapter', [
+  z.object({
+    id: z.string(),
+    adapter: z.literal('exoplanet-archive-radius-insolation'),
+    affectsHypothesisIds: z.array(z.string()),
+    result: RadiusInsolationObservationZod,
+    datasetCard: ExoplanetDatasetCardZod,
+    mode: z.enum(['LIVE', 'RECORDED_REPLAY', 'SYNTHETIC_TEST', 'OFFLINE_DEVELOPMENT', 'NOT_EXECUTED']),
+    producedAt: z.string(),
+  }),
+  z.object({
+    id: z.string(),
+    adapter: z.literal('literature-landscape'),
+    affectsHypothesisIds: z.array(z.string()),
+    result: LiteratureLandscapeObservationZod,
+    datasetCard: LandscapeDatasetCardZod,
+    mode: z.enum(['LIVE', 'RECORDED_REPLAY', 'SYNTHETIC_TEST', 'OFFLINE_DEVELOPMENT', 'NOT_EXECUTED']),
+    producedAt: z.string(),
+  }),
+]);
 
 // ── The full ResearchRun (schema-versioned, v2 backward-compatible) ──────────
 

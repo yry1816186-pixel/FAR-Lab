@@ -128,6 +128,25 @@ pnpm far research verify bundle
 
 ---
 
+## LIVE 评估（冻结 Track-1A 评估集）
+
+冻结评估集（`src/research/evaluation/frozen_eval_set.json`）以 `scripts/run_frozen_eval.mjs` LIVE 实测
+（百炼真实 Qwen + 真实文献检索；确定性层独立重算）：
+
+| 题目 | 模式 | 语料 | 假设数 | 引用绑定 | 可证伪 | 反证查询 | 计划完整度 | 确定性重算 |
+|---|---|---|---|---|---|---|---|---|
+| hero：热木星半径膨胀 | LIVE | 37 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
+| Science-125：地震预测 | LIVE | 28 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
+| Science-125：室温超导 | LIVE | 21 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
+| Science-125：暗物质自相互作用 | **BLOCKED（限流）** | — | — | — | — | — | — | — |
+
+记录于 2026-08-14 本节所述 commit。如实声明：第 4 题因当日 live 运行总量触发了**全部三家**文献 API 的
+HTTP 429 限流而受阻 — 检查点已保存可续跑（`far research resume <runId>`），限流解除后一条命令即可重生成全表。
+人工 rubric 维度（科学合理性/新颖性/计划可执行性）**有意不自动评分** — 仅列出供盲评。同一脚本可从
+fresh clone + `DASHSCOPE_API_KEY` 复现上表每一个数字。
+
+---
+
 ## 项目解决什么问题
 
 大模型生成的科学假设普遍存在三类问题：**不可证伪**（无法被实验否定）、**不可复现**

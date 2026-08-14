@@ -106,14 +106,23 @@ export interface ResearchObservationDto {
   readonly id: string;
   readonly adapter: string;
   readonly mode: ComponentMode;
-  readonly result: {
-    readonly status: string;
-    readonly n: number;
-    readonly pearsonR: number | null;
-    readonly pValue: number | null;
-    readonly significantAt05: boolean;
-    readonly summary: string;
-  };
+  readonly result:
+    | {
+        readonly status: string;
+        readonly n: number;
+        readonly pearsonR: number | null;
+        readonly pValue: number | null;
+        readonly significantAt05: boolean;
+        readonly summary: string;
+      }
+    | {
+        readonly kind: 'literature-landscape';
+        readonly totalDocuments: number;
+        readonly counterEvidenceShare: number;
+        readonly freshShare: number;
+        readonly medianPublicationYear: number | null;
+        readonly sourceFamilies: readonly string[];
+      };
 }
 
 export interface ResearchRunDto {

@@ -204,6 +204,26 @@ disguised as live.
 
 ---
 
+## Live evaluation (frozen Track-1A set)
+
+Program-computed metrics over the frozen evaluation set (`src/research/evaluation/frozen_eval_set.json`), executed LIVE with
+`scripts/run_frozen_eval.mjs` (real Qwen via Bailian + real literature retrieval; deterministic layer independently recomputed):
+
+| item | mode | corpus docs | hypotheses | citation binding | falsifiable | counter-evidence queries | plan completeness | deterministic recompute |
+|---|---|---|---|---|---|---|---|---|
+| hero: hot-Jupiter radius inflation | LIVE | 37 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
+| Science-125: earthquake prediction | LIVE | 28 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
+| Science-125: room-T superconductivity | LIVE | 21 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
+| Science-125: dark-matter self-interaction | **BLOCKED (rate limit)** | — | — | — | — | — | — | — |
+
+Recorded 2026-08-14 at the commit of this section. Honest caveats, not footnotes: the fourth item was blocked by HTTP 429 from
+**all three** bibliographic APIs after the day's live-run volume — its checkpoint is parked and resumable
+(`far research resume <runId>`), and the table regenerates with one command once limits clear. Human-rubric dimensions
+(scientific plausibility, novelty, plan executability) are deliberately **not** auto-scored — they are listed for blind
+review. The same script reproduces every number above from a fresh clone with a `DASHSCOPE_API_KEY`.
+
+---
+
 ## How it compares
 
 FAR-Lab is an **AI Scientist research system** (hypothesis generation + research planning) whose

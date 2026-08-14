@@ -54,7 +54,7 @@ export function parseAskArgs(argv: readonly string[]): AskArgs {
   let json = false;
   let exportDir: string | null = null;
   let resumePath: string | null = null;
-  let profile = 'offline_replay';
+  let profile = 'auto';
   let verdictDriven = false;
   let ground = false;
   let groundSource: 'openalex' | 'arxiv' | 'crossref' = 'openalex';
@@ -254,28 +254,42 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
     return 2;
   }
 
-  if (args.profile !== 'offline_replay' && args.profile !== 'competition_aliyun_qwen') {
+  if (args.profile !== 'offline_replay' && args.profile !== 'competition_aliyun_qwen' && args.profile !== 'auto') {
     process.stderr.write(
       `far ask: unsupported profile "${args.profile}".\n` +
-        '  supported: offline_replay | competition_aliyun_qwen\n',
+        '  supported: auto | offline_replay | competition_aliyun_qwen\n',
     );
     return 2;
   }
 
+  // `auto` default (2026-08-14, aligned with far research): live when a key
+  // exists; without a key ask FAILS CLOSED with guidance instead of rendering
+  // a fixture verdict for an arbitrary question (the kernel showcase that
+  // genuinely runs offline is `far demo`; `far ground` is the free real-
+  // literature path). Explicit --profile offline_replay opts into fixtures.
+  const apiKey = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
+  const keyPresent = apiKey !== undefined && apiKey !== '';
+  const wantsLive = args.profile === 'competition_aliyun_qwen' || args.profile === 'auto';
+  if (wantsLive && !keyPresent) {
+    process.stderr.write(
+      'far ask: no model API key found — a live verdict needs a live model, and a fixture\n' +
+        'verdict for an arbitrary question would not be a real scientific verdict.\n\n' +
+        '  get a key  : https://bailian.console.aliyun.com/  then set DASHSCOPE_API_KEY (or .env)\n' +
+        '  free, now  : far ground "<your question>"      → real literature retrieval, no key\n' +
+        '  real kernel: far demo                          → deterministic 14/14 golden vectors, no key\n' +
+        '  wiring demo: far ask "<q>" --profile offline_replay                → fixture replay (explicit)\n',
+    );
+    return 2;
+  }
+  const profile: 'offline_replay' | 'competition_aliyun_qwen' =
+    args.profile === 'offline_replay' ? 'offline_replay' : 'competition_aliyun_qwen';
+  const liveNeeded = profile === 'competition_aliyun_qwen';
+
   // competition 路径的可选注入（G3 闭合后：真实 gateway + 环境锚 modelSnapshot）
   let competitionGateway: LlmGateway | undefined;
   let competitionModelSnapshot: string | undefined;
-  if (args.profile !== 'offline_replay') {
-    const apiKey = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
-    if (apiKey === undefined || apiKey === '') {
-      process.stderr.write(
-        `far ask: profile "${args.profile}" needs real LLM credentials.\n` +
-          '  set FAR_DASHSCOPE_API_KEY=sk-xxx or DASHSCOPE_API_KEY=sk-xxx (in .env) and retry (qwen_adapter real HTTP).\n' +
-          '  default offline_replay needs no credentials (fixture replay).\n',
-      );
-      return 2;
-    }
-    const gateway = createCompetitionQwenGateway({ apiKey });
+  if (liveNeeded) {
+    const gateway = createCompetitionQwenGateway({ apiKey: apiKey! });
     if (!gateway.registeredProfiles().includes('competition_aliyun_qwen')) {
       throw new Error(
         'far ask: competition gateway failed to register competition_aliyun_qwen adapter (G1 wiring broken)',
@@ -306,11 +320,11 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
       args.resumePath ?? undefined,
       args.verdictDriven || undefined,
       competitionModelSnapshot,
-      args.profile,
+      profile,
       args.ground ? { question: args.question, source: args.groundSource, maxPerQuery: 5 } : undefined,
     );
 
-    const render = buildRender(result, args.profile, args.question);
+    const render = buildRender(result, profile, args.question);
 
     if (args.json) {
       process.stdout.write(`${JSON.stringify(render, null, 2)}\n`);
@@ -329,7 +343,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
   if (exportDir !== null) {
     const gitCommitSha = resolveGitCommitSha();
     const exportModelSnapshot =
-      args.profile === 'offline_replay' ? DEMO_MODEL_SNAPSHOT : COMPETITION_MODEL_SNAPSHOT;
+      profile === 'offline_replay' ? DEMO_MODEL_SNAPSHOT : COMPETITION_MODEL_SNAPSHOT;
     const exp = runExportFarProof({
       source: {
         kind: 'db',
@@ -340,7 +354,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
         envHash: computeEnvHash({
           schemaVersion: 11,
           nodeVersion: process.version,
-          providerProfile: args.profile,
+          providerProfile: profile,
         }),
       },
       outputDir: exportDir,

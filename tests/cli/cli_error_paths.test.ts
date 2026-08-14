@@ -32,7 +32,19 @@ test('far ask: --profile competition 无凭据 → exit 2 fail-closed（凭据�
     FAR_DASHSCOPE_API_KEY: '',
   });
   assert.strictEqual(r.status, 2);
-  assert.match(r.stderr, /credentials|FAR_DASHSCOPE_API_KEY/);
+  assert.match(r.stderr, /no model API key found/);
+  assert.match(r.stderr, /bailian\.console\.aliyun\.com/);
+  assert.match(r.stderr, /far ground/);
+});
+
+test('far ask: 默认 auto 无凭据 → exit 2 + 可操作指引（不渲染 fixture 裁决·2026-08-14）', () => {
+  const r = runFar(['ask', 'Does X cause Y?'], {
+    FAR_DASHSCOPE_API_KEY: '',
+  });
+  assert.strictEqual(r.status, 2);
+  assert.match(r.stderr, /far demo/);
+  assert.match(r.stderr, /--profile offline_replay/);
+  assert.ok(!r.stdout.includes('verdict'), 'no fixture verdict rendered without explicit opt-in');
 });
 
 test('far ask: --profile competition 有凭据 → 凭据门放行 + 真实调用路径（G3 已闭合·本地拒绝端口离线驱动）', () => {

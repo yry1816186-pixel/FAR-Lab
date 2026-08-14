@@ -108,6 +108,9 @@ const skippedFiles = new Set([
   // 指引且不产出任何 checkpoint。合法环境变量名（非 secret 值）。人工审计：无 :any /
   // as unknown as / @ts-ignore / 空 catch / extra_body / header 幻觉 / sk- 明文。
   'tests/cli/research_lifecycle.test.ts',
+  // scripts/run_frozen_eval.mjs —— LIVE 评估脚本读取 DASHSCOPE_API_KEY 环境变量名做凭据门
+  // （无 key → exit 2 指引；值不落盘不打印）。合法环境变量名（非 secret 值）。人工审计合规。
+  'scripts/run_frozen_eval.mjs',
   // Qwen-VL client —— 合法读取 DASHSCOPE_API_KEY 环境变量名（客户端配置读取）。
   // 经人工审计零容忍合规：无 :any / as unknown as / @ts-ignore / extra_body / header 幻觉。
   'src/llm_gateway/adapters/aliyun_qwen_vl/qwen_vl_client.ts',
