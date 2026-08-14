@@ -16,6 +16,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AgentEventBus, AgentLoopEvent } from '../../agent_loop/events.ts';
+import { sseHeaders } from './sse.ts';
 
 /** SSE 路由配置（显式传入·禁 process.env 直读·可测）。 */
 export interface EventsStreamRouteOptions {
@@ -98,12 +99,7 @@ export function registerEventsStreamRoute(
 
       reply.hijack();
       const raw = reply.raw;
-      raw.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-        'X-Accel-Buffering': 'no',
-      });
+      raw.writeHead(200, sseHeaders(request));
       raw.write(': connected\n\n');
 
       // 重放历史（订阅前快照·避免与实时事件竞态重复）。

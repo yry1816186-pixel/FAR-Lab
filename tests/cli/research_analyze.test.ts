@@ -27,7 +27,7 @@ test('far research analyze: offline run → observation + revision + RECORDED_RE
     const runPath = join(dir, 'run.json');
     // Lifecycle store root isolated per test (start now persists checkpoints).
     const start = runFar(
-      ['research', 'start', 'Does stellar activity inflate hot Jupiter radii?', '--out', runPath],
+      ['research', 'start', 'Does stellar activity inflate hot Jupiter radii?', '--profile', 'offline_replay', '--out', runPath],
       { FAR_RESEARCH_RUNS_DIR: join(dir, 'runs') },
     );
     assert.equal(start.status, 0, start.stderr);

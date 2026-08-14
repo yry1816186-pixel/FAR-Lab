@@ -397,9 +397,20 @@ test('GET /api/v1/research/:runId/events → SSE state snapshot + forwarded even
     const runId = store.listRunIds().find((id) => !known.has(id));
     assert.ok(runId !== undefined, 'checkpoint written synchronously at run start');
 
-    const res = await fetch(`${base}/api/v1/research/${runId}/events`, { signal: AbortSignal.timeout(15_000) });
+    const res = await fetch(`${base}/api/v1/research/${runId}/events`, {
+      signal: AbortSignal.timeout(15_000),
+      headers: { Origin: 'http://localhost:5173' },
+    });
     assert.equal(res.status, 200);
     assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/);
+    // Hijacked SSE responses must still carry CORS headers (2026-08-14 UX
+    // finding: EventSource from the vite dev origin was blocked — live
+    // progress silently degraded to polling on every workbench run).
+    assert.equal(
+      res.headers.get('access-control-allow-origin'),
+      'http://localhost:5173',
+      'SSE echoes the request Origin for cross-origin dev setups',
+    );
     assert.ok(res.body !== null);
 
     const reader = res.body.getReader();

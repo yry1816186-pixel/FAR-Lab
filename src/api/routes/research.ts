@@ -21,6 +21,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { sseHeaders } from './sse.ts';
 
 import { ApiError } from '../errors/error_handler.ts';
 import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts';
@@ -49,7 +50,13 @@ import type { ProviderProfile } from '../../llm_gateway/types.ts';
 /** Create-research request (zod-validated at the boundary). */
 const CreateResearchSchema = z.object({
   question: z.string().min(1).max(2000),
-  profile: z.enum(['offline_replay', RUNTIME_PROVIDER_PROFILE]).default('offline_replay'),
+  /**
+   * `auto` (default): live when an API key exists, otherwise 503 fail-closed
+   * with actionable guidance — the UI/CLI never silently answers an arbitrary
+   * question from synthetic fixtures. Explicit offline_replay stays available
+   * for wiring demos/tests.
+   */
+  profile: z.enum(['auto', 'offline_replay', RUNTIME_PROVIDER_PROFILE]).default('auto'),
   /** Source families to ground across (default ['openalex']). */
   sources: z.array(z.enum(['openalex', 'arxiv', 'crossref'])).min(1).max(3).default(['openalex']),
   /** Legacy single source — merged into `sources` for back-compat. */
@@ -98,12 +105,12 @@ export interface ResearchRunStatusSummary {
 }
 
 /** Build the gateway+adapter pair for a profile (fail-closed on missing key). */
-function buildPipeline(profile: 'offline_replay' | typeof RUNTIME_PROVIDER_PROFILE): {
+function buildPipeline(profile: 'auto' | 'offline_replay' | typeof RUNTIME_PROVIDER_PROFILE): {
   gateway: LlmGateway;
   providerProfile: ProviderProfile;
   replayRetrieval: boolean;
 } {
-  if (profile === RUNTIME_PROVIDER_PROFILE) {
+  if (profile === RUNTIME_PROVIDER_PROFILE || profile === 'auto') {
     // Model-neutral runtime resolution (llm_gateway layer owns the model name;
     // src/api/ never spells it out — 24§0.1 red line).
     const gateway = resolveRuntimeGateway(process.env);
@@ -112,9 +119,15 @@ function buildPipeline(profile: 'offline_replay' | typeof RUNTIME_PROVIDER_PROFI
         statusCode: 503,
         errorCode: 'research_live_profile_unavailable',
         message: `live profile needs an API key in the environment (see far doctor)`,
+        detail: {
+          profile,
+          guidance:
+            'set the live-provider API key in the environment (see far doctor) for live runs; ' +
+            'pass profile=offline_replay explicitly for synthetic-fixture wiring demos',
+        },
       });
     }
-    return { gateway, providerProfile: profile, replayRetrieval: false };
+    return { gateway, providerProfile: RUNTIME_PROVIDER_PROFILE, replayRetrieval: false };
   }
   return {
     gateway: createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]),
@@ -263,12 +276,7 @@ export async function registerResearchRoutes(
 
     reply.hijack();
     const raw = reply.raw;
-    raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
+    raw.writeHead(200, sseHeaders(request));
     const send = (frame: string): void => {
       if (!raw.writableEnded && !raw.destroyed) {
         raw.write(frame);
