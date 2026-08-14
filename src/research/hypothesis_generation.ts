@@ -99,6 +99,9 @@ export async function generateHypotheses(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
+    // 3-5 hypotheses × (mechanism/predictions/citations/…) + corpus allowlist is
+    // the largest structured payload in the slice — 2048 tokens truncates it.
+    8192,
   );
 
   const hypotheses = parsed.hypotheses.map((c) => {

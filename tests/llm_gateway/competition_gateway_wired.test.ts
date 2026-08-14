@@ -64,6 +64,7 @@ test('createCompetitionQwenGateway: 429 on primary → gateway.callLlm drives re
   const attempts: string[] = [];
   const gateway = createCompetitionQwenGateway({
     apiKey: 'test-key',
+    backoff: async () => {}, // instant — avoid real backoff waits in tests
     createChatCompletion: async (request: QwenChatCompletionRequest) => {
       attempts.push(request.modelId);
       if (request.modelId === COMPETITION_PRIMARY_MODEL_ID) {
@@ -78,10 +79,14 @@ test('createCompetitionQwenGateway: 429 on primary → gateway.callLlm drives re
     messages: [{ role: 'user', content: 'hello' }],
   });
 
-  // fallback 顺序：primary 429 后切 backup_1。
-  assert.equal(attempts.length, 2);
-  assert.equal(attempts[0], COMPETITION_PRIMARY_MODEL_ID);
-  assert.equal(attempts[1], 'qwen3-235b-a22b');
+  // 新契约（2026-08-14 内层重试）：primary 同模型 3 次尝试后降级 backup_1。
+  assert.equal(attempts.length, 4);
+  assert.deepEqual(attempts.slice(0, 3), [
+    COMPETITION_PRIMARY_MODEL_ID,
+    COMPETITION_PRIMARY_MODEL_ID,
+    COMPETITION_PRIMARY_MODEL_ID,
+  ]);
+  assert.equal(attempts[3], 'qwen3-235b-a22b');
   // 响应来自 backup_1。
   assert.equal(response.credential.modelId, 'qwen3-235b-a22b');
   assert.equal(response.content, 'response-from-backup');
@@ -93,6 +98,7 @@ test('createCompetitionQwenGateway: 429 on primary → gateway.callLlm drives re
 test('createCompetitionQwenGateway: chain exhausted (三档全 429) → callLlm surfaces RETRY_EXHAUSTED (D3 红线·绝不切非国产基座)', async () => {
   const gateway = createCompetitionQwenGateway({
     apiKey: 'test-key',
+    backoff: async () => {}, // instant — avoid real backoff waits in tests
     createChatCompletion: async () => {
       throw openaiSdkError(429, 'all models rate-limited');
     },

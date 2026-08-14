@@ -108,6 +108,8 @@ export async function designResearchPlan(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
+    // 20+ plan fields (DAG/steps/budgets/…) — needs more headroom than 2048.
+    8192,
   );
 
   return {

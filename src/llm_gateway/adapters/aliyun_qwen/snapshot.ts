@@ -5,6 +5,12 @@ export const MODEL_SNAPSHOT = COMPETITION_MODEL_SNAPSHOT;
 
 // 结构化输出安全模型：qwen-max（undated latest）。旧值 qwen-max-2025-09-24 已被 DashScope 下线（2026-07-07 凭据实测 404 The model does not exist）；
 // qwen-max 是同族唯一有效替代（/v1/models 实测），与 COMPETITION_MODEL_SNAPSHOT(qwen3.7-max) 不同（R1 路由矩阵两分支保留）。undated 会随官方升级浮动——这是 qwen-max 系列已无有效 dated snapshot 的客观限制。
+// ⚠ 2026-08-14 凭据实测修正：对 research_hypotheses 真实 schema（zodToJsonSchema·strict），
+//   qwen3.7-max-2026-05-20 返回合法对象（zodOk=true·6176 chars），qwen-max 反而 zodOk=false（2266 chars）。
+//   生产 research 层结构化调用实际走 COMPETITION_FALLBACK_CHAIN 首位 qwen3.7-max（adapter 链路径未引用
+//   STRUCTURED_SAFE_MODEL 路由；buildCreateParams 的切换仅 smoke/测试路径断言）。
+//   "qwen-max = structured-safe" 的标签未被本次实测支持；保留常量与路由矩阵不动（agent_loop 路径契约），
+//   如实记录：结构化可靠性取决于模型快照行为而非本标签（诚实边界，不伪装）。
 // repro 边界：modelId 不进 canonical hash 白名单 T3（C7·snapshot 切换不破坏既有 proof envelope），仅影响 LLM 路由目标。
 /** Constant: STRUCTURED_SAFE_MODEL. */
 export const STRUCTURED_SAFE_MODEL = 'qwen-max';

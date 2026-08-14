@@ -21,6 +21,48 @@ import {
   type FallbackAttempt,
 } from '../../fallback_chain/index.ts';
 
+// ===== Inner-retry helpers (429/5xx backoff BEFORE chain degradation) =====
+// fallback_chain.ts 的契约：retry = 同模型内瞬时错误退避重试；fallback = 跨模型
+// 切换。caller 必须先内层 retry，耗尽后才让链分类降级。2026-08-14 live 实测：
+// 无内层 retry 时一次 429 即降级到 qwen-plus（不遵循 strict json_schema），
+// 上游 fail-closed。本节按协议 §10（上限/指数退避/抖动/Retry-After）实现。
+
+/** 同模型内层重试上限（3 次尝试 = 2 次退避重试）。 */
+const INNER_RETRY_MAX = 3;
+
+/** 安全读取任意错误对象上的数值 status（duck-type，对齐 error_classifier）。 */
+function readNumericStatus(error: unknown): number | null {
+  if (typeof error !== 'object' || error === null) return null;
+  if (!('status' in error)) return null;
+  const status = error.status;
+  return typeof status === 'number' ? status : null;
+}
+
+/** 从错误上提取 Retry-After 秒数（header 或字段，缺失→null）。 */
+function retryAfterSeconds(error: unknown): number | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const record = error as Record<string, unknown>;
+  const headerValue =
+    typeof record.headers === 'object' && record.headers !== null
+      ? (record.headers as Record<string, unknown>)['retry-after'] ??
+        (record.headers as Record<string, unknown>)['Retry-After']
+      : null;
+  const fieldValue = record['retryAfter'] ?? record['retry_after'];
+  const candidate = headerValue ?? fieldValue;
+  if (typeof candidate === 'string') {
+    const n = Number(candidate);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+  return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
+}
+
+/** 指数退避 + 抖动 + Retry-After 优先（协议 §10）。 */
+async function sleepBackoff(attempt: number, retryAfter: number | null): Promise<void> {
+  const baseMs = retryAfter !== null ? retryAfter * 1000 : 1000 * 2 ** (attempt - 1);
+  const jitterMs = retryAfter !== null ? 0 : Math.floor(Math.random() * 400);
+  await new Promise((resolve) => setTimeout(resolve, baseMs + jitterMs));
+}
+
 // ===== Types =====
 
 /** Configuration/specification for qwen adapter config. */
@@ -33,6 +75,16 @@ export interface QwenAdapterConfig {
    * 生产路径走 openai SDK 真调 DashScope HTTP。
    */
   readonly createChatCompletion?: QwenChatCompletionCaller;
+  /**
+   * 同模型内层重试上限（429/5xx 退避重试；默认 3 次尝试）。测试可注入 1 或
+   * 保持默认以验证契约。
+   */
+  readonly innerRetryMax?: number;
+  /**
+   * 退避注入点（默认 sleepBackoff：指数退避 + 抖动 + Retry-After 优先）。
+   * 测试注入 instant no-op 以避免真实等待。
+   */
+  readonly backoff?: (attempt: number, retryAfter: number | null) => Promise<void>;
 }
 
 type OpenAiChatCompletion = OpenAI.ChatCompletion;
@@ -78,7 +130,10 @@ async function createChatCompletion(
   const client = new OpenAI({
     apiKey,
     baseURL,
-    timeout: config.timeoutMs ?? 60_000,
+    // 180s 默认超时（2026-08-14 live 实测：60s 对 8k-token 结构化生成不够——
+    // qwen3.7-max 大 JSON 生成 >60s 被 SDK 掐断，链误判 timeout 降级到不支持
+    // strict json_schema 的 backup 模型 → 上游 fail-closed。长生成是慢不是坏。）
+    timeout: config.timeoutMs ?? 180_000,
     // maxRetries:0 — fallback_chain 是唯一重试/降级机制（F11：每次降级在 attempts[] 留痕）。
     // SDK 默认 maxRetries:2 会在链外静默重试同一模型，污染 attempts[] 审计轨迹（不可见的双重重试）。
     maxRetries: 0,
@@ -159,6 +214,9 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
     const messages = toOpenAiMessages(request);
     const temperature = request.temperature ?? 0.3;
     const maxTokens = request.maxTokens ?? 2048;
+    let providerRetries = 0;
+    const innerRetryMax = config.innerRetryMax ?? INNER_RETRY_MAX;
+    const backoff = config.backoff ?? sleepBackoff;
 
     // T-013（评委04 F-4-004 · 2026-07-25 第 3 轮 CP-17）·Structured Output 完整接线状态：
     //   ✅ 接线完成：LlmRequest.jsonSchema（schema 对象）→ createChatCompletion →
@@ -179,21 +237,47 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
       COMPETITION_FALLBACK_CHAIN,
       async (target) => {
         const targetModelId = qwenTargetModel(target);
-        const completion = await createChatCompletion(config, baseURL, {
-          modelId: targetModelId,
-          messages,
-          temperature,
-          maxTokens,
-          // T-013：jsonSchema 透传（仅在 responseFormat='json_schema' 时有意义）
-          ...(request.responseFormat === 'json_schema' && request.jsonSchema !== undefined
-            ? { jsonSchema: request.jsonSchema }
-            : {}),
-        });
-        const requestId = getDataRequestId(completion);
-        return {
-          data: completion,
-          dashscopeRequestId: requestId,
-        };
+        // 内层重试（fallback_chain.ts:11 规定的 caller 组合职责·2026-08-14 live 实测接线）：
+        // 429/5xx 是同一模型的瞬时可恢复错误——先在同一模型内退避重试（上限 3 次，
+        // 指数退避 + 抖动 + Retry-After 优先），耗尽后才把错误交还链分类降级。
+        // 依据：2026-08-14 live 实测一次 429 即链降级到 qwen-plus（不遵循 strict
+        // json_schema → 输出形状错误 → 上层 fail-closed）。内层重试避免把瞬时限流
+        // 错判为模型不可用。4xx 立即抛（换模型无用，链按 fatal 处理）。
+        let lastError: unknown = null;
+        for (let attempt = 1; attempt <= innerRetryMax; attempt += 1) {
+          try {
+            const completion = await createChatCompletion(config, baseURL, {
+              modelId: targetModelId,
+              messages,
+              temperature,
+              maxTokens,
+              // T-013：jsonSchema 透传（仅在 responseFormat='json_schema' 时有意义）
+              ...(request.responseFormat === 'json_schema' && request.jsonSchema !== undefined
+                ? { jsonSchema: request.jsonSchema }
+                : {}),
+            });
+            const requestId = getDataRequestId(completion);
+            return {
+              data: completion,
+              dashscopeRequestId: requestId,
+            };
+          } catch (err) {
+            lastError = err;
+            const status = readNumericStatus(err);
+            if (
+              attempt < innerRetryMax &&
+              status !== null &&
+              (status === 429 || (status >= 500 && status < 600))
+            ) {
+              // 跨目标累计内层重试次数（进 adapterMeta.providerRetries → 收据）
+              providerRetries += 1;
+              await backoff(attempt, retryAfterSeconds(err));
+              continue;
+            }
+            throw err;
+          }
+        }
+        throw lastError instanceof Error ? lastError : new Error(String(lastError));
       },
     );
 
@@ -236,13 +320,18 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
     const succeededModelId =
       chainResult.succeededModelId ?? qwenTargetModel(COMPETITION_FALLBACK_CHAIN[0]!);
 
-    // 降级留痕进 adapterMeta（degradedFrom=null 表示无降级，属性整体省略——exactOptionalPropertyTypes）
+    // 降级/内层重试留痕进 adapterMeta（无降级无重试时属性整体省略——exactOptionalPropertyTypes）
     const adapterMeta =
-      chainResult.degradedFrom !== null
+      chainResult.degradedFrom !== null || providerRetries > 0
         ? {
-            degradedFrom: chainResult.degradedFrom,
-            degradationCount: chainResult.degradationCount,
-            degradationSummary: chainResult.degradationSummary,
+            ...(chainResult.degradedFrom !== null
+              ? {
+                  degradedFrom: chainResult.degradedFrom,
+                  degradationCount: chainResult.degradationCount,
+                  degradationSummary: chainResult.degradationSummary,
+                }
+              : {}),
+            ...(providerRetries > 0 ? { providerRetries } : {}),
           }
         : null;
 
@@ -273,3 +362,5 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
 
   return { profile, call };
 }
+
+
