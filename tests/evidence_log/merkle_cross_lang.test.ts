@@ -58,7 +58,7 @@ function spawnPython(script: string, stdin: string, args: readonly string[] = []
 function pythonMerkleRoot(leaves: readonly string[]): string {
   const script =
     'from far_chain_repro.merkle_root import compute_merkle_root; import json,sys; ' +
-    'print(compute_merkle_root(json.loads(sys.stdin.read())))';
+    "print(compute_merkle_root(json.loads(sys.stdin.buffer.read().decode('utf-8'))))";
   return spawnPython(script, JSON.stringify([...leaves]));
 }
 
@@ -72,7 +72,7 @@ interface PythonProofShape {
 function pythonMerkleProof(leaves: readonly string[], index: number): PythonProofShape {
   const script =
     'from far_chain_repro.merkle_root import compute_merkle_inclusion_proof as f; import json,sys; ' +
-    'p=f(json.loads(sys.stdin.read()), int(sys.argv[1])); ' +
+    'p=f(json.loads(sys.stdin.buffer.read().decode(' + "'utf-8'" + ')), int(sys.argv[1])); ' +
     'print(json.dumps({"siblings":p["siblings"],"expectedRoot":p["expectedRoot"],"leaf":p["leaf"],"leafIndex":p["leafIndex"]}))';
   const out = spawnPython(script, JSON.stringify([...leaves]), [String(index)]);
   return JSON.parse(out) as PythonProofShape;
@@ -115,7 +115,7 @@ test('TS and Python inclusion proofs both verify ok (cross-lang soundness)', () 
 
   const pyVerifyScript =
     'from far_chain_repro.merkle_root import compute_merkle_inclusion_proof as f, verify_merkle_inclusion_proof as v; import json,sys; ' +
-    'p=f(json.loads(sys.stdin.read()), int(sys.argv[1])); print(v(p)["ok"])';
+    'p=f(json.loads(sys.stdin.buffer.read().decode(' + "'utf-8'" + ')), int(sys.argv[1])); print(v(p)["ok"])';
   const pyOk = spawnPython(pyVerifyScript, JSON.stringify(leaves), ['4']);
   assert.equal(pyOk, 'True', 'Python proof must verify');
 });
