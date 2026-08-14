@@ -1,8 +1,19 @@
 /**
  * ResearchWorkbenchPage —— Track-1A 科研工作台主流程（§12.5 七项主流程）。
  *
+ * 异步运行生命周期（202 契约）：
+ *   1. 新建研究（question + profile → POST /api/v1/research → 202 {runId, statusUrl, eventsUrl}）
+ *   2. 实时进度面板（状态徽章（文字·非仅颜色）· 阶段清单（completedStages ✓ / remainingStages ○）·
+ *      最新 SSE 事件行 · 已用时 · 取消按钮）
+ *      - SSE 订阅（subscribeResearchEvents）提供实时事件；
+ *      - 状态轮询（useResearchStatus·1.5s）是唯一事实来源——SSE 两次出错即放弃实时事件，
+ *        如实显示 "live events unavailable — polling"（诚实降级·绝不假装实时）；
+ *   3. run_completed → GET /research/:runId 冻结运行 → 完整视图（下方 §12.5 主流程 2-7 全保留）
+ *   4. run_failed → 错误面板（error + errorKind + CLI-only resume 提示）
+ *   5. 用户取消 → CANCELLED 状态 + 如实标注 resume 仅限 CLI
+ *
  * 主流程（全部 API 驱动·无硬编码科研结果）：
- *   1. 新建研究（question + profile → POST /api/v1/research·同步纵向切片）
+ *   1. 新建研究（见上）
  *   2. 运行摘要（gate 裁决 · 聚合+逐组件运行模式横幅 · 收据数 · 语料规模）
  *   3. 候选假设比较（确定性+模型维度评分 · Pareto 标注 · 引用绑定状态）
  *   4. 研究计划（objectives · analysisDag · 统计方法 · 停止条件 · 人工批准门）
@@ -13,26 +24,37 @@
  * 诚实边界：
  *   - offline_replay 模式显式 RECORDED_REPLAY 横幅（不伪装 live）
  *   - live profile 无 key → 后端 503 fail-closed → 错误面板（绝不静默回放）
+ *   - GET 冻结 run 返回 409 research_run_not_completed（刷新时仍在跑）→ 采纳为进行中运行并显示进度
  *   - 空状态 / 加载 / 错误均有处理；状态不依赖颜色（文字+徽章）
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  isTerminalLifecycleEvent,
+  isTerminalRunState,
+  researchKeys,
+  subscribeResearchEvents,
   useAnalyzeResearch,
   useApplyResearchFeedback,
+  useCancelResearch,
   useEvaluateResearch,
   useResearchRun,
+  useResearchStatus,
   useStartResearch,
+  type ResearchLifecycleEventDto,
   type ResearchRunDto,
+  type ResearchStatusDto,
 } from '@/lib/research_client';
+import { ApiError } from '@/lib/api_client';
 import { useT } from '@/lib/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { FlaskConical, Loader2, PlayCircle, RotateCcw, Scale } from 'lucide-react';
+import { FlaskConical, Loader2, PlayCircle, RotateCcw, Scale, XCircle } from 'lucide-react';
 
 /** 运行模式徽章（状态不依赖颜色——文字 label 显式）。 */
 function RunModeBadge({ run }: { readonly run: ResearchRunDto }) {
@@ -150,12 +172,172 @@ function PlanSection({ run }: { readonly run: ResearchRunDto }) {
   );
 }
 
+/** 进行中运行的实时进度面板（202 异步契约 · 状态徽章为文字·非仅颜色）。 */
+function RunProgressPanel({
+  runId,
+  status,
+  statusLoading,
+  statusError,
+  latestEvent,
+  liveDegraded,
+  elapsedSeconds,
+  cancelPending,
+  cancelError,
+  onCancel,
+}: {
+  readonly runId: string;
+  readonly status: ResearchStatusDto | null;
+  readonly statusLoading: boolean;
+  readonly statusError: string | null;
+  readonly latestEvent: ResearchLifecycleEventDto | null;
+  readonly liveDegraded: boolean;
+  readonly elapsedSeconds: number | null;
+  readonly cancelPending: boolean;
+  readonly cancelError: string | null;
+  readonly onCancel: () => void;
+}) {
+  const t = useT();
+  const runState = status?.state ?? null;
+  const isRunning = runState !== null && !isTerminalRunState(runState);
+  const startedAtMs = status !== null ? Date.parse(status.startedAt) : Number.NaN;
+  const elapsed =
+    elapsedSeconds !== null && Number.isFinite(startedAtMs)
+      ? t('research.progress.elapsed', { n: elapsedSeconds })
+      : null;
+
+  return (
+    <Card data-testid="run-progress">
+      <CardHeader>
+        <CardTitle>{t('research.progress.title')}</CardTitle>
+        <CardDescription className="font-mono">{runId}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {/* 当前状态徽章（文字 label）+ 已用时 + 取消按钮 */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-muted-foreground">{t('research.progress.stateLabel')}</span>
+          {runState !== null ? (
+            <Badge
+              variant={
+                runState === 'FAILED' ? 'destructive' : runState === 'COMPLETED' ? 'success' : 'secondary'
+              }
+              data-testid="run-state-badge"
+            >
+              {runState}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground" data-testid="run-state-badge">
+              …
+            </span>
+          )}
+          {isRunning && elapsed !== null && (
+            <span className="text-muted-foreground" data-testid="progress-elapsed">
+              {elapsed}
+            </span>
+          )}
+          {isRunning && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto"
+              onClick={onCancel}
+              disabled={cancelPending}
+              data-testid="cancel-run"
+            >
+              {cancelPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="mr-2 h-4 w-4" />
+              )}
+              {t('research.cancel.button')}
+            </Button>
+          )}
+        </div>
+
+        {/* 阶段清单：completedStages ✓ / remainingStages ○（勾选框符号 + sr-only 文字·非仅颜色） */}
+        {status !== null && (
+          <ul className="grid gap-1 sm:grid-cols-2" data-testid="stage-checklist">
+            {status.completedStages.map((stage) => (
+              <li key={`done-${stage}`} data-testid={`stage-item-${stage}`}>
+                <span aria-hidden="true">✓</span> {stage}{' '}
+                <span className="sr-only">({t('research.progress.stageDone')})</span>
+              </li>
+            ))}
+            {status.remainingStages.map((stage) => (
+              <li key={`todo-${stage}`} className="text-muted-foreground" data-testid={`stage-item-${stage}`}>
+                <span aria-hidden="true">○</span> {stage}{' '}
+                <span className="sr-only">({t('research.progress.stagePending')})</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* 最新 SSE 事件行 */}
+        <div data-testid="latest-event">
+          <span className="text-muted-foreground">{t('research.progress.latestEvent')}: </span>
+          {latestEvent !== null
+            ? `${latestEvent.type}${latestEvent.stageId !== undefined ? ` · ${latestEvent.stageId}` : ''} · #${latestEvent.seq}`
+            : t('research.progress.noEvents')}
+        </div>
+
+        {/* 诚实降级：SSE 两次失败 → 仅轮询 */}
+        {liveDegraded && (
+          <p className="text-xs text-muted-foreground" data-testid="live-degraded">
+            {t('research.progress.degraded')}
+          </p>
+        )}
+
+        {/* 轮询通道自身的错误（如实展示·不静默） */}
+        {statusError !== null && (
+          <p className="text-sm text-destructive" data-testid="status-error">
+            {statusError}
+          </p>
+        )}
+        {status === null && statusLoading && (
+          <p className="text-muted-foreground" data-testid="status-connecting">
+            {t('research.progress.connecting')}
+          </p>
+        )}
+
+        {/* run_failed → 错误面板（error + errorKind + CLI-only resume 提示） */}
+        {runState === 'FAILED' && (
+          <div
+            className="space-y-1 rounded border border-destructive/40 bg-destructive/5 p-3"
+            data-testid="run-failed-panel"
+          >
+            <p className="font-medium text-destructive">{t('research.failed.title')}</p>
+            {status?.error !== null && status?.error !== undefined && <p>{status.error}</p>}
+            <p className="text-xs text-muted-foreground">
+              {t('research.failed.errorKind')}: {status?.errorKind ?? '—'}
+            </p>
+            <p className="text-xs text-muted-foreground">{t('research.failed.retryHint')}</p>
+          </div>
+        )}
+
+        {/* 用户取消 → CANCELLED + resume 仅 CLI 的诚实标注 */}
+        {runState === 'CANCELLED' && (
+          <div className="rounded border p-3" data-testid="run-cancelled-panel">
+            <p className="font-medium">{t('research.cancel.noteTitle')}</p>
+            <p className="text-xs text-muted-foreground">{t('research.cancel.note')}</p>
+          </div>
+        )}
+
+        {cancelError !== null && (
+          <p className="text-sm text-destructive" data-testid="cancel-error">
+            {cancelError}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 /** 工作台主页面。 */
 export default function ResearchWorkbenchPage() {
   const t = useT();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const runId = searchParams.get('runId') ?? '';
+  const runIdParam = searchParams.get('runId') ?? '';
 
   const [question, setQuestion] = useState(
     'Does stellar activity inflate hot Jupiter radii?',
@@ -166,23 +348,118 @@ export default function ResearchWorkbenchPage() {
   const [feedbackText, setFeedbackText] = useState('');
   const [showEvaluate, setShowEvaluate] = useState(false);
 
+  // 本会话通过 202 启动的进行中运行（runId + 事件流地址）。
+  const [startedRun, setStartedRun] = useState<{ readonly runId: string } | null>(null);
+
   const start = useStartResearch();
-  const runQuery = useResearchRun(runId);
-  const feedback = useApplyResearchFeedback(runId);
-  const analyze = useAnalyzeResearch(runId);
-  const evaluate = useEvaluateResearch(showEvaluate ? runId : '');
+  const runQuery = useResearchRun(runIdParam);
+
+  // 分享链接指向仍在跑的运行：GET 冻结 run 返回 409 research_run_not_completed →
+  // 采纳为进行中运行，显示进度面板（轮询直到终态）。
+  const runConflict =
+    runQuery.isError &&
+    runQuery.error instanceof ApiError &&
+    runQuery.error.errorCode === 'research_run_not_completed';
+  const progressRunId = startedRun?.runId ?? (runConflict ? runIdParam : '');
+
+  const statusQuery = useResearchStatus(progressRunId, progressRunId !== '');
+  const cancel = useCancelResearch(progressRunId);
+  const feedback = useApplyResearchFeedback(runIdParam);
+  const analyze = useAnalyzeResearch(runIdParam);
+  const evaluate = useEvaluateResearch(showEvaluate ? runIdParam : '');
 
   const run = runQuery.data;
   const startError = start.isError ? (start.error as Error).message : null;
   const busy = start.isPending || feedback.isPending || analyze.isPending;
 
-  /** 提交创建：成功 → 写入 ?runId= 参数（可分享·刷新保留）。失败 → 错误面板（catch 防 unhandled rejection）。 */
+  const status = statusQuery.data ?? null;
+  const runState = status?.state ?? null;
+  const isRunning = runState !== null && !isTerminalRunState(runState);
+
+  // ---- SSE 实时事件（组件自管订阅；两次出错 → 放弃实时·仅轮询·如实标注） ----
+  const [latestEvent, setLatestEvent] = useState<ResearchLifecycleEventDto | null>(null);
+  const [liveDegraded, setLiveDegraded] = useState(false);
+  useEffect(() => {
+    setLatestEvent(null);
+    setLiveDegraded(false);
+    if (progressRunId === '') {
+      return;
+    }
+    if (typeof EventSource === 'undefined') {
+      // 运行时无原生 EventSource → 直接降级（轮询仍可用）。
+      setLiveDegraded(true);
+      return;
+    }
+    let sseErrors = 0;
+    const unsubscribe = subscribeResearchEvents(
+      progressRunId,
+      (frame) => {
+        if (frame.kind === 'research') {
+          setLatestEvent(frame.event);
+          if (isTerminalLifecycleEvent(frame.event.type)) {
+            // 终态事件 → 立即刷新轮询通道（不等下一个 1.5s 周期）。
+            void queryClient.invalidateQueries({ queryKey: researchKeys.status(frame.event.runId) });
+          }
+        }
+        // 'state' 帧：轮询是唯一事实来源，无需重复应用。
+      },
+      () => {
+        sseErrors += 1;
+        if (sseErrors >= 2) {
+          setLiveDegraded(true);
+          unsubscribe();
+        }
+      },
+    );
+    return unsubscribe;
+  }, [progressRunId, queryClient]);
+
+  // ---- 已用时计时器（仅运行中跳动；由 startedAt 计算·非墙钟起点） ----
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isRunning) {
+      return;
+    }
+    const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
+  const elapsedSeconds =
+    status !== null && status.startedAt !== ''
+      ? Math.max(0, Math.floor((nowTick - Date.parse(status.startedAt)) / 1000))
+      : null;
+
+  // ---- 终态迁移：COMPLETED → 拉取冻结 run；本会话启动的运行导航到 ?runId=（可分享） ----
+  useEffect(() => {
+    if (runState !== 'COMPLETED' || progressRunId === '') {
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: researchKeys.run(progressRunId) });
+    if (startedRun !== null) {
+      setStartedRun(null);
+      navigate(`/research?runId=${encodeURIComponent(progressRunId)}`, { replace: true });
+    }
+  }, [runState, progressRunId, startedRun, navigate, queryClient]);
+
+  /** 提交创建：202 → 记录进行中运行（进度面板接管）。失败 → 错误面板（catch 防 unhandled rejection）。 */
   async function handleStart() {
     try {
-      const created = await start.mutateAsync({ question: question.trim(), profile });
-      navigate(`/research?runId=${encodeURIComponent(created.runId)}`, { replace: true });
+      const accepted = await start.mutateAsync({ question: question.trim(), profile });
+      // 若地址栏还挂着上一个冻结 run，先清掉再进入新一轮进度视图。
+      if (runIdParam !== '') {
+        navigate('/research', { replace: true });
+      }
+      setStartedRun({ runId: accepted.runId });
     } catch {
       // 错误已由 startError 面板展示（isError/error）。
+    }
+  }
+
+  /** 取消进行中运行（终态由轮询通道确认·绝不本地假装取消成功）。 */
+  async function handleCancel() {
+    try {
+      await cancel.mutateAsync();
+    } catch {
+      // 错误已由 cancel-error 行展示。
     }
   }
 
@@ -256,15 +533,31 @@ export default function ResearchWorkbenchPage() {
         </CardContent>
       </Card>
 
-      {/* ── 2. 运行摘要 + 主流程 ── */}
-      {runId !== '' && runQuery.isLoading && (
+      {/* ── 1b. 进行中运行的实时进度面板（202 异步契约）── */}
+      {progressRunId !== '' && (
+        <RunProgressPanel
+          runId={progressRunId}
+          status={status}
+          statusLoading={statusQuery.isLoading}
+          statusError={statusQuery.isError ? (statusQuery.error as Error).message : null}
+          latestEvent={latestEvent}
+          liveDegraded={liveDegraded}
+          elapsedSeconds={elapsedSeconds}
+          cancelPending={cancel.isPending}
+          cancelError={cancel.isError ? `${t('research.cancel.failed')}: ${(cancel.error as Error).message}` : null}
+          onCancel={() => void handleCancel()}
+        />
+      )}
+
+      {/* ── 2. 运行摘要 + 主流程（冻结 run）── */}
+      {runIdParam !== '' && runQuery.isLoading && (
         <Card>
           <CardContent className="py-6 text-sm text-muted-foreground">
-            {t('research.loadingRun')} {runId}
+            {t('research.loadingRun')} {runIdParam}
           </CardContent>
         </Card>
       )}
-      {runId !== '' && runQuery.isError && (
+      {runIdParam !== '' && runQuery.isError && !runConflict && (
         <Card>
           <CardContent className="py-6 text-sm text-destructive" data-testid="run-error">
             {(runQuery.error as Error).message}
