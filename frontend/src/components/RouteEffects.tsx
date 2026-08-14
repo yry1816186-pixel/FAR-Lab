@@ -23,7 +23,8 @@ const BASE_TITLE_FULL = 'FAR-Lab · Falsifiable · Auditable · Reproducible';
 
 /** Maps each known route to a short label used in the document title. */
 const ROUTE_TITLES: Readonly<Record<string, string>> = {
-  '/': 'Overview',
+  '/': 'Research', // research workbench is the default/landing route
+  '/research': 'Research',
   '/viz': 'Evidence Chain',
   '/integrity': 'Integrity',
   '/leaderboard': 'Leaderboard',

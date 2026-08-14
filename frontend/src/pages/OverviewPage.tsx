@@ -155,7 +155,7 @@ export default function OverviewPage() {
         </p>
       </header>
 
-      {/* Primary CTA: start a new verification */}
+      {/* Primary CTA: start research (primary path) + claim verification (secondary tool) */}
       <Card className="border-primary/30 bg-primary/5" data-testid="workbench-cta">
         <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -164,11 +164,18 @@ export default function OverviewPage() {
               {t('overview.ctaDesc')}
             </p>
           </div>
-          <Button asChild size="lg" className="shrink-0">
-            <Link to="/wizard">
-              <Sparkles className="mr-2 h-4 w-4" />{t('overview.ctaBtn')}
-            </Link>
-          </Button>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+            <Button asChild size="lg" data-testid="research-cta">
+              <Link to="/research">
+                <FlaskConical className="mr-2 h-4 w-4" />{t('overview.researchCtaBtn')}
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link to="/wizard">
+                <Sparkles className="mr-2 h-4 w-4" />{t('overview.ctaBtn')}
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

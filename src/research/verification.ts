@@ -80,10 +80,20 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
   }
 
   // 4. Primary selection (same admissible-pool rule as the orchestrator).
+  //    An empty pool means no hypothesis is both fully-bound and falsifiable —
+  //    under the fail-closed contract a stored run may not have a primary at
+  //    all in that state; a selected primary is a contract violation.
   const pool = admissibleHypotheses(run.hypotheses, reBindings, recomputedFalsifiability);
-  const primary = selectPrimaryHypothesis(pool, reScorecards);
-  if (primary.id !== run.plan.primaryHypothesisId) {
-    failures.push(`primary-hypothesis MISMATCH (recomputed ${primary.id}, stored ${run.plan.primaryHypothesisId})`);
+  if (pool.length === 0) {
+    failures.push(
+      'primary selection FORBIDDEN (no hypothesis is both fully citation-bound and falsifiable, ' +
+        'yet a primary was stored — fail-closed contract violated)',
+    );
+  } else {
+    const primary = selectPrimaryHypothesis(pool, reScorecards);
+    if (primary.id !== run.plan.primaryHypothesisId) {
+      failures.push(`primary-hypothesis MISMATCH (recomputed ${primary.id}, stored ${run.plan.primaryHypothesisId})`);
+    }
   }
 
   // 5. Citation gate (recomputed from frozen bindings; resolvedViaRetrieval is

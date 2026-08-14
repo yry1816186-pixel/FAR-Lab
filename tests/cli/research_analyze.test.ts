@@ -11,12 +11,12 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-function runFar(args: readonly string[]): { status: number | null; stdout: string; stderr: string } {
+function runFar(args: readonly string[], extraEnv: Record<string, string> = {}): { status: number | null; stdout: string; stderr: string } {
   const r = spawnSync(process.execPath, ['src/cli/far.ts', ...args], {
     encoding: 'utf8',
     timeout: 120000,
     // offline_replay profile never reads the Qwen key; the parent env has none.
-    env: process.env,
+    env: { ...process.env, ...extraEnv },
   });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
@@ -25,7 +25,11 @@ test('far research analyze: offline run → observation + revision + RECORDED_RE
   const dir = mkdtempSync(join(tmpdir(), 'far-analyze-test-'));
   try {
     const runPath = join(dir, 'run.json');
-    const start = runFar(['research', 'start', 'Does stellar activity inflate hot Jupiter radii?', '--out', runPath]);
+    // Lifecycle store root isolated per test (start now persists checkpoints).
+    const start = runFar(
+      ['research', 'start', 'Does stellar activity inflate hot Jupiter radii?', '--out', runPath],
+      { FAR_RESEARCH_RUNS_DIR: join(dir, 'runs') },
+    );
     assert.equal(start.status, 0, start.stderr);
 
     const analyze = runFar(['research', 'analyze', runPath, '--out', runPath]);

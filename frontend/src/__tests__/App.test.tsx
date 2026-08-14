@@ -95,15 +95,36 @@ describe('App 路由与导航', () => {
     expect(within(nav).getByRole('link', { name: /Planning/ })).toBeInTheDocument();
   });
 
+  it('导航两分组信息架构：Research 主分组在前，工具分组带小号 caption 降级', () => {
+    render(<App />);
+    const nav = screen.getByTestId('main-nav');
+    const links = within(nav).getAllByRole('link');
+    // 主分组（Research）排最前：工作台 · 规划 · 版本比较 · 事件 · 报告。
+    expect(links[0]).toHaveTextContent(/^Research/);
+    const labels = links.map((l) => l.textContent ?? '');
+    expect(labels.indexOf('Report')).toBeLessThan(labels.indexOf('Court'));
+    expect(labels.indexOf('Live Events')).toBeLessThan(labels.indexOf('Overview'));
+    // 次级分组的小号 'tools' caption 存在（视觉降级·不删任何链接）。
+    expect(within(nav).getAllByTestId('nav-tools-caption').length).toBeGreaterThan(0);
+  });
+
   it('渲染主题切换按钮', () => {
     render(<App />);
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();
   });
 
-  it('默认路由 / 渲染 OverviewPage (系统仪表盘)', async () => {
+  it('默认路由 / 渲染科研工作台（research 为唯一主路径）', async () => {
     render(<App />);
-    await waitFor(() => screen.getByTestId('overview-page')); // wait for lazy chunk
-    expect(screen.getByTestId('overview-page')).toBeInTheDocument();
+    await waitFor(() => screen.getByTestId('research-workbench')); // wait for lazy chunk
+    expect(screen.getByTestId('research-workbench')).toBeInTheDocument();
+  });
+
+  it('点击"Research"导航到 /research 工作台', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /^Research$/ }));
+    await waitFor(() => screen.getByTestId('research-workbench')); // wait for the lazy-loaded route chunk
+    expect(screen.getByTestId('research-workbench')).toBeInTheDocument();
   });
 
   it('/overview 渲染 OverviewPage', async () => {

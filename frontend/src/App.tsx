@@ -8,11 +8,13 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteEffects } from '@/components/RouteEffects';
 import { I18nProvider } from '@/lib/i18n';
 
-// Route-level code splitting. OverviewPage is the default/landing route — the system
-// dashboard (health status, recent verdicts, benchmark commands). Every route is
+// Route-level code splitting. The research workbench is the default/landing route —
+// the research workflow (question → run → frozen run) is the unambiguous primary
+// path; the system dashboard stays reachable at /overview. Every route is
 // code-split (React.lazy) so heavy dependencies (d3 ~280kB) are isolated to the
 // pages that use them (Viz, Ablation) and never enter the initial bundle. Vendor libs
 // are further split via vite.config.ts manualChunks so they cache independently.
+const ResearchWorkbenchPage = lazy(() => import('@/pages/ResearchWorkbenchPage'));
 const OverviewPage = lazy(() => import('@/pages/OverviewPage'));
 const VizPage = lazy(() => import('@/pages/VizPage'));
 const IntegrityPage = lazy(() => import('@/pages/IntegrityPage'));
@@ -29,7 +31,6 @@ const V2ReceiptPage = lazy(() => import('@/pages/V2ReceiptPage'));
 const EventsPage = lazy(() => import('@/pages/EventsPage'));
 const AuditTracePage = lazy(() => import('@/pages/AuditTracePage'));
 const PlanningPage = lazy(() => import('@/pages/PlanningPage'));
-const ResearchWorkbenchPage = lazy(() => import('@/pages/ResearchWorkbenchPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,9 +66,9 @@ export default function App() {
               <ErrorBoundary>
                 <Suspense fallback={<RouteFallback />}>
                   <Routes>
-                    <Route path="/" element={<OverviewPage />} />
-                    <Route path="/overview" element={<OverviewPage />} />
+                    <Route path="/" element={<ResearchWorkbenchPage />} />
                     <Route path="/research" element={<ResearchWorkbenchPage />} />
+                    <Route path="/overview" element={<OverviewPage />} />
                     <Route path="/viz" element={<VizPage />} />
                     <Route path="/integrity" element={<IntegrityPage />} />
                     <Route path="/leaderboard" element={<LeaderboardPage />} />

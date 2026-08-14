@@ -35,67 +35,75 @@ function pythonAvailable() {
 }
 
 const hasPython = pythonAvailable();
+// .claude/ 自 2026-08-14 §20 起整目录 untrack 出公共仓库（agent 运营配置）——
+// fresh clone 无此 hook 文件 → 环境性 skip（同 python-unavailable 模式，非假装通过）。
+const hasHook = existsSync(HOOK);
+const skipReason = !hasPython
+  ? "python unavailable"
+  : !hasHook
+    ? "policy_guard.py not present (.claude/ untracked from public repo)"
+    : false;
 
-test("① 安全命令 git status → exit 0", { skip: !hasPython && "python unavailable" }, () => {
+test("① 安全命令 git status → exit 0", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Bash", tool_input: { command: "git status --short" } });
   assert.equal(r.status, 0, `应 exit 0，stderr=${r.stderr}`);
 });
 
-test("② git reset --hard → exit 2 + P4 标注", { skip: !hasPython && "python unavailable" }, () => {
+test("② git reset --hard → exit 2 + P4 标注", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Bash", tool_input: { command: "git reset --hard HEAD~1" } });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\[FAR-Lab policy P4\]/);
   assert.match(r.stderr, /git reset --hard/);
 });
 
-test("③ npm publish → exit 2 + P4（新增检测）", { skip: !hasPython && "python unavailable" }, () => {
+test("③ npm publish → exit 2 + P4（新增检测）", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Bash", tool_input: { command: "npm publish" } });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\[FAR-Lab policy P4\]/);
   assert.match(r.stderr, /npm publish/);
 });
 
-test("④ docker push → exit 2 + P4（新增检测）", { skip: !hasPython && "python unavailable" }, () => {
+test("④ docker push → exit 2 + P4（新增检测）", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Bash", tool_input: { command: "docker push far-lab:latest" } });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\[FAR-Lab policy P4\]/);
   assert.match(r.stderr, /docker push/);
 });
 
-test("⑤ gh pr merge → exit 2 + P4（新增检测）", { skip: !hasPython && "python unavailable" }, () => {
+test("⑤ gh pr merge → exit 2 + P4（新增检测）", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Bash", tool_input: { command: "gh pr merge 123" } });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\[FAR-Lab policy P4\]/);
   assert.match(r.stderr, /gh pr merge/);
 });
 
-test("⑥ git tag v1.0 → exit 2 + P4（新增检测）", { skip: !hasPython && "python unavailable" }, () => {
+test("⑥ git tag v1.0 → exit 2 + P4（新增检测）", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Bash", tool_input: { command: "git tag v1.0.0" } });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\[FAR-Lab policy P4\]/);
   assert.match(r.stderr, /git tag/);
 });
 
-test("⑦ Edit .env → exit 2 + P4", { skip: !hasPython && "python unavailable" }, () => {
+test("⑦ Edit .env → exit 2 + P4", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Edit", tool_input: { file_path: ".env" } });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\[FAR-Lab policy P4\]/);
   assert.match(r.stderr, /protected or sensitive path/);
 });
 
-test("⑧ Edit schema/migrations/*.sql → exit 2 + P3（forward-fix only，新增）", { skip: !hasPython && "python unavailable" }, () => {
+test("⑧ Edit schema/migrations/*.sql → exit 2 + P3（forward-fix only，新增）", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Edit", tool_input: { file_path: "schema/migrations/001_init.sql" } });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\[FAR-Lab policy P3\]/);
   assert.match(r.stderr, /forward-fix only/);
 });
 
-test("⑨ Edit src/foo.ts → exit 0（安全路径）", { skip: !hasPython && "python unavailable" }, () => {
+test("⑨ Edit src/foo.ts → exit 0（安全路径）", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Edit", tool_input: { file_path: "src/foo.ts" } });
   assert.equal(r.status, 0, `应 exit 0，stderr=${r.stderr}`);
 });
 
-test("⑩ 审计日志写入 .far-master/POLICY_AUDIT.jsonl", { skip: !hasPython && "python unavailable" }, () => {
+test("⑩ 审计日志写入 .far-master/POLICY_AUDIT.jsonl", { skip: skipReason }, () => {
   const tmpCwd = mkdtempSync(join(tmpdir(), "far-audit-test-"));
   try {
     const r = spawnSync(PY, [HOOK], {
@@ -118,13 +126,13 @@ test("⑩ 审计日志写入 .far-master/POLICY_AUDIT.jsonl", { skip: !hasPython
   }
 });
 
-test("⑪ git checkout broad (.) → exit 2 + P3（不是 P4）", { skip: !hasPython && "python unavailable" }, () => {
+test("⑪ git checkout broad (.) → exit 2 + P3（不是 P4）", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Bash", tool_input: { command: "git checkout -- ." } });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /\[FAR-Lab policy P3\]/);
 });
 
-test("⑫ 安全命令 pnpm test → exit 0", { skip: !hasPython && "python unavailable" }, () => {
+test("⑫ 安全命令 pnpm test → exit 0", { skip: skipReason }, () => {
   const r = runHook({ tool_name: "Bash", tool_input: { command: "pnpm test" } });
   assert.equal(r.status, 0, `应 exit 0，stderr=${r.stderr}`);
 });

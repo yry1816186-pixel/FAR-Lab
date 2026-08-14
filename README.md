@@ -159,9 +159,14 @@ verification kernel (`far demo`, `far verify-golden`, `far verify`) runs fully o
 ```bash
 # 1. Run the vertical slice (researchability gate → grounding → hypotheses → critique → plan).
 #    Live retrieval works WITHOUT a key (OpenAlex is free); only the model call needs one.
+#    Long runs are checkpointed per stage under .far/research-runs/<runId>/ — Ctrl+C cancels
+#    honestly (state=CANCELLED, finished stages kept) and the run can be resumed.
 node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
+node src/cli/far.ts research status <runId>     # lifecycle state + per-stage progress (8 stages)
+node src/cli/far.ts research resume <runId>     # continue a crashed/cancelled run from its checkpoint
 
-# 2. Real-data analysis against the NASA Exoplanet Archive (live TAP fetch):
+# 2. Real-data analysis against the NASA Exoplanet Archive (live TAP fetch).
+#    Domain-gated: a non-exoplanet run is REFUSED, never analyzed against the wrong dataset.
 node src/cli/far.ts research analyze run.json --live
 #   → n=392 hot Jupiters, r=0.587, p<0.001 (association, not causation — honest wording)
 
@@ -176,8 +181,9 @@ node src/cli/far.ts research evaluate run.json
 node src/cli/far.ts research export run.json --out bundle
 node src/cli/far.ts research verify bundle
 
-# 6. The same loop is available as a Web workbench + REST API:
-#    pnpm api  →  http://localhost:3000/research  (or POST /api/v1/research)
+# 6. The same loop is available as a Web workbench + REST API (async + SSE):
+#    pnpm api  →  POST /api/v1/research (202 + runId) · GET /research/<id>/status
+#                 GET /research/<id>/events (SSE progress) · POST /research/<id>/cancel
 ```
 
 The loop is **honest about its modes**: every stage records `modelExecutionMode` /

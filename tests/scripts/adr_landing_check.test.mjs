@@ -13,6 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,17 +21,28 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = join(here, '..', '..');
 const script = join(repoRoot, 'scripts', 'adr_landing_check.mjs');
 
-test('adr_landing_check: 全部 22 ADR 锚点命中（rate=100%）', () => {
+// .far-design/ 自 2026-08-14 §20 起 untrack 出公共仓库——fresh clone 无 DECISIONS 目录，
+// 脚本对 ENOENT 环境性 skip（exit 0 + skip 输出）。spawn 型断言仅在目录存在时执行；
+// ANCHORS 导入型断言（下方两测）不依赖文件系统，无条件执行。
+const hasDecisions = existsSync(join(repoRoot, '.far-design', 'DECISIONS'));
+
+test('adr_landing_check: 全部 22 ADR 锚点命中（rate=100%）', { skip: !hasDecisions && '.far-design/DECISIONS not present (untracked from public repo)' }, () => {
   const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: 'utf8' });
   assert.equal(result.status, 0, `exit 0 expected\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
   assert.match(result.stdout, /22\/22/, '必须报告 22/22 命中');
   assert.match(result.stdout, /rate=100%/, '必须报告 100% 落地率');
 });
 
-test('adr_landing_check: 输出未命中清单格式（存在区分能力）', () => {
+test('adr_landing_check: 输出未命中清单格式（存在区分能力）', { skip: !hasDecisions && '.far-design/DECISIONS not present (untracked from public repo)' }, () => {
   const result = spawnSync(process.execPath, [script, '--verbose'], { cwd: repoRoot, encoding: 'utf8' });
   assert.equal(result.status, 0, 'verbose 模式也必须 exit 0');
   assert.match(result.stdout, /命中明细/, 'verbose 必须输出命中明细');
+});
+
+test('fresh-clone: script skips gracefully (exit 0 + skip message) when DECISIONS dir absent', { skip: hasDecisions && 'DECISIONS present — skip-path tested only on fresh clones' }, () => {
+  const result = spawnSync(process.execPath, [script], { cwd: repoRoot, encoding: 'utf8' });
+  assert.equal(result.status, 0, `missing-dir must exit 0 (environmental skip)\nstdout: ${result.stdout}\nstderr: ${result.stderr}`);
+  assert.match(result.stdout, /环境性跳过/, 'must print an explicit skip message, not silently pass');
 });
 
 test('adr_landing_check: 锚点映射覆盖全部 22 ADR（无遗漏）', async () => {

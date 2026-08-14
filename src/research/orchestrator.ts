@@ -14,9 +14,16 @@
  *     → independent critique pass
  *     → multi-dimensional scorecard + Pareto front (deterministic + model)
  *     → deterministic primary-hypothesis selection (fully-bound + falsifiable
- *       candidates only, when any exist)
+ *       candidates only; fail-closed when none qualifies)
  *     → structured executable research plan (corpus-injected)
  *     → ResearchRun (per-stage ProvenanceReceipts + per-component/aggregate run modes)
+ *
+ * Stage execution is driver-injected (§8: checkpoint/resume/cancel without
+ * duplicating orchestration): the DEFAULT driver executes stages in order; the
+ * lifecycle driver (run_lifecycle.ts) persists a checkpoint after each stage,
+ * skips completed stages on resume, emits progress events, and honors abort.
+ * Both drivers run the SAME stage functions — one business logic, many
+ * execution modes (§12.1 single application service).
  *
  * The verdict kernel / FEC / proof envelope are the trust layer BELOW this
  * slice and are not re-implemented here.
@@ -30,6 +37,7 @@ import { ulid } from 'ulid';
 import { groundResearchQuestion, type GroundedCorpus } from '../retrieval/index.ts';
 import { resolveCrossrefDoi } from '../retrieval/adapters/crossref.ts';
 import { createCorpusSnapshot } from '../retrieval/corpus.ts';
+import { CitationResolver } from '../retrieval/citation_resolver.ts';
 import type { CorpusSnapshot } from '../retrieval/corpus.ts';
 import type { RetrievedDocument, RetrievalAdapter, DocumentSource } from '../retrieval/types.ts';
 import { RETRIEVAL_PARSER_VERSION } from '../retrieval/types.ts';
@@ -106,13 +114,124 @@ export interface RunResearchOptions {
   readonly environment?: EnvironmentFingerprint;
   /** Time source (hermetic tests). */
   readonly now?: () => Date;
+  /**
+   * Stage execution driver (default: plain sequential execution). The
+   * lifecycle driver adds checkpoint/resume/cancel/events without changing
+   * what any stage computes.
+   */
+  readonly driver?: ResearchStageDriver;
+  /**
+   * Pre-seeded pipeline state (lifecycle resume): hydrated from a checkpoint
+   * by run_lifecycle; completed stages are skipped by the driver. Internal
+   * seam — ordinary callers never pass this.
+   */
+  readonly initialCtx?: ResearchCtx;
+  /** Receives the LIVE ctx reference right after creation (driver checkpointing). */
+  readonly onCtxReady?: (ctx: ResearchCtx) => void;
 }
+
+/**
+ * Stage execution driver. `run` executes one pipeline stage (the stage mutates
+ * the shared ctx); drivers may checkpoint ctx, skip completed stages, emit
+ * events, or abort between stages. Stages always run in order.
+ */
+export interface ResearchStageDriver {
+  run(stageId: ResearchStageId, fn: () => Promise<void>): Promise<void>;
+}
+
+/** Pipeline stage ids, in execution order (checkpoint granularity). */
+export const RESEARCH_STAGE_IDS = [
+  'researchability_gate',
+  'grounding',
+  'hypothesis_generation',
+  'citation_binding',
+  'falsifiability_gate',
+  'critique',
+  'scoring',
+  'plan',
+] as const;
+
+export type ResearchStageId = (typeof RESEARCH_STAGE_IDS)[number];
+
+/**
+ * The serializable pipeline state shared across stages. `grounded.resolver`
+ * (a pure function of the corpus) is rebuilt on hydration, never persisted.
+ */
+export interface ResearchCtx {
+  runId: string;
+  question: string;
+  startedAt: string;
+  receipts: ProvenanceReceipt[];
+  sequence: number;
+  gateReport: ResearchabilityReport | null;
+  /** Retrieval subquestions from decomposition (consumed by grounding). */
+  decompositionSubquestions: readonly string[];
+  /** Grounding outputs; resolver is re-derived from corpus on hydrate. */
+  grounded: {
+    corpus: CorpusSnapshot | null;
+    fetchMode: 'live' | 'replay';
+    sourcesUsed: readonly string[];
+    groundedAt: string;
+    resolver: CitationResolver | null;
+  };
+  hypotheses: readonly HypothesisCandidate[];
+  bindings: Record<string, CitationBinding>;
+  corpus: CorpusSnapshot | null;
+  resolvedViaRetrieval: string[];
+  citationGate: ReturnType<typeof computeCitationGateReport> | null;
+  falsifiabilityGate: ResearchRun['falsifiabilityGate'] | null;
+  critiques: Record<string, CritiqueReport>;
+  modelDimensions: Record<string, ReturnType<typeof computeDeterministicDimensions>>;
+  scorecards: Record<string, HypothesisScorecard>;
+  plan: ResearchPlan | null;
+}
+
+/** Map a pipeline stage to its lifecycle state (directive §16). */
+export const STAGE_LIFECYCLE_STATE: Readonly<Record<ResearchStageId, string>> = {
+  researchability_gate: 'VALIDATING',
+  grounding: 'RETRIEVING',
+  hypothesis_generation: 'GENERATING_HYPOTHESES',
+  citation_binding: 'GENERATING_HYPOTHESES',
+  falsifiability_gate: 'REVIEWING',
+  critique: 'REVIEWING',
+  scoring: 'REVIEWING',
+  plan: 'PLANNING',
+};
 
 /** Maximum decomposition subquestions injected as extra grounding queries. */
 const MAX_DECOMPOSITION_QUERIES = 3;
 
 /** A citation id that looks like a DOI (used for authoritative re-resolution). */
 const DOI_PATTERN = /^doi:?\s*10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+$/i;
+
+/** The default driver: plain sequential execution, no checkpointing. */
+export const identityDriver: ResearchStageDriver = {
+  async run(_stageId, fn) {
+    await fn();
+  },
+};
+
+/** Strip non-serializable ctx members for checkpoint persistence. */
+export function ctxToSerializable(ctx: ResearchCtx): Record<string, unknown> {
+  return {
+    ...ctx,
+    // Append-only arrays are copied: a saved checkpoint must be an immutable
+    // snapshot — a mid-stage push into the live ctx must never leak into a
+    // checkpoint written later (FAILED saves capture the last COMPLETED stage).
+    receipts: [...ctx.receipts],
+    hypotheses: [...ctx.hypotheses],
+    decompositionSubquestions: [...ctx.decompositionSubquestions],
+    resolvedViaRetrieval: [...ctx.resolvedViaRetrieval],
+    grounded: { ...ctx.grounded, resolver: null },
+  };
+}
+
+/** Rebuild the derived resolver after hydrating a ctx from a checkpoint. */
+export function hydrateCtxResolver(ctx: ResearchCtx): void {
+  if (ctx.grounded.corpus !== null && ctx.grounded.resolver === null) {
+    ctx.grounded.resolver = new CitationResolver(ctx.grounded.corpus);
+  }
+}
 
 /**
  * Run the full Track-1A vertical slice and return an immutable ResearchRun.
@@ -121,6 +240,7 @@ const DOI_PATTERN = /^doi:?\s*10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+$/i;
  * @throws Error on any retrieval / structured-output failure (fail-closed).
  */
 export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun> {
+  const driver = opts.driver ?? identityDriver;
   const runId = opts.runId ?? ulid();
   const now = opts.now ?? (() => new Date());
   const startedAt = now().toISOString();
@@ -128,277 +248,351 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   const sameModelAsGenerator = opts.sameModelAsGenerator ?? true;
   const profile = opts.profile;
   const liveModel = profile !== 'offline_replay';
-  const receipts: ProvenanceReceipt[] = [];
-  let sequence = 0;
+
+  const ctx: ResearchCtx = opts.initialCtx !== undefined
+    ? { ...opts.initialCtx, runId, question: opts.question }
+    : {
+        runId,
+        question: opts.question,
+        startedAt,
+        receipts: [],
+        sequence: 0,
+        gateReport: null,
+        decompositionSubquestions: [],
+        grounded: { corpus: null, fetchMode: 'replay', sourcesUsed: [], groundedAt: startedAt, resolver: null },
+        hypotheses: [],
+        bindings: {},
+        corpus: null,
+        resolvedViaRetrieval: [],
+        citationGate: null,
+        falsifiabilityGate: null,
+        critiques: {},
+        modelDimensions: {},
+        scorecards: {},
+        plan: null,
+      };
+  hydrateCtxResolver(ctx);
+  opts.onCtxReady?.(ctx);
   const nextSeq = (): number => {
-    sequence += 1;
-    return sequence;
+    ctx.sequence += 1;
+    return ctx.sequence;
   };
 
   // ── 1. Researchability & safety gate (deterministic screening first). ─────
-  const screening = assessResearchabilityDeterministic(opts.question);
-  if (screening.verdict === 'UNSUPPORTED') {
-    throw new ResearchabilityBlockedError({
+  await driver.run('researchability_gate', async () => {
+    const screening = assessResearchabilityDeterministic(opts.question);
+    if (screening.verdict === 'UNSUPPORTED') {
+      throw new ResearchabilityBlockedError({
+        question: opts.question,
+        verdict: 'UNSUPPORTED',
+        reasons: screening.reasons,
+        safetyRisks: screening.safetyRisks,
+        scope: screening.scope,
+        decomposition: null,
+        requiresEthicsGate: screening.requiresEthicsGate,
+        assessedAt: startedAt,
+        schemaVersion: 1,
+      });
+    }
+
+    const decomposition = await decomposeResearchQuestion(
+      opts.gateway,
+      profile,
+      opts.question,
+      screening.scope,
+    );
+    ctx.gateReport = {
       question: opts.question,
-      verdict: 'UNSUPPORTED',
+      verdict: screening.verdict,
       reasons: screening.reasons,
       safetyRisks: screening.safetyRisks,
       scope: screening.scope,
-      decomposition: null,
+      decomposition: decomposition.decomposition,
       requiresEthicsGate: screening.requiresEthicsGate,
       assessedAt: startedAt,
       schemaVersion: 1,
-    });
-  }
-
-  const decomposition = await decomposeResearchQuestion(
-    opts.gateway,
-    profile,
-    opts.question,
-    screening.scope,
-  );
-  const gateReport: ResearchabilityReport = {
-    question: opts.question,
-    verdict: screening.verdict,
-    reasons: screening.reasons,
-    safetyRisks: screening.safetyRisks,
-    scope: screening.scope,
-    decomposition: decomposition.decomposition,
-    requiresEthicsGate: screening.requiresEthicsGate,
-    assessedAt: startedAt,
-    schemaVersion: 1,
-  };
-  receipts.push(
-    buildProvenanceReceipt({
-      runId,
-      stageId: 'researchability_screening',
-      sequence: nextSeq(),
-      component: 'deterministic',
-      mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
-      inputHash: hashCanonicalJson({ question: opts.question }),
-      outputHash: hashCanonicalJson({
-        verdict: screening.verdict,
-        reasons: screening.reasons,
-        safetyRisks: screening.safetyRisks,
+    };
+    ctx.receipts.push(
+      buildProvenanceReceipt({
+        runId,
+        stageId: 'researchability_screening',
+        sequence: nextSeq(),
+        component: 'deterministic',
+        mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
+        inputHash: hashCanonicalJson({ question: opts.question }),
+        outputHash: hashCanonicalJson({
+          verdict: screening.verdict,
+          reasons: screening.reasons,
+          safetyRisks: screening.safetyRisks,
+        }),
+        createdAt: startedAt,
       }),
-      createdAt: startedAt,
-    }),
-  );
-  receipts.push(receiptForModel(runId, 'research_decompose', nextSeq(), profile, decomposition.meta));
+      receiptForModel(runId, 'research_decompose', nextSeq(), profile, decomposition.meta),
+    );
+    ctx.decompositionSubquestions = decomposition.decomposition.retrievalSubquestions;
+  });
 
   // ── 2. Ground the question (supporting + counter-evidence + decomposition subquestions). ──
-  const grounded: GroundedCorpus = await groundResearchQuestion({
-    question: opts.question,
-    ...(opts.grounding?.sources !== undefined && opts.grounding.sources.length > 0
-      ? { sources: opts.grounding.sources }
-      : { source: opts.grounding?.source ?? 'openalex' }),
-    maxPerQuery: opts.grounding?.maxPerQuery ?? 5,
-    ...(opts.grounding?.adapter !== undefined ? { adapter: opts.grounding.adapter } : {}),
-    ...(opts.grounding?.includeCounterEvidence !== undefined
-      ? { includeCounterEvidence: opts.grounding.includeCounterEvidence }
-      : {}),
-    extraQueries: decomposition.decomposition.retrievalSubquestions.slice(
-      0,
-      MAX_DECOMPOSITION_QUERIES,
-    ),
+  await driver.run('grounding', async () => {
+    const grounded: GroundedCorpus = await groundResearchQuestion({
+      question: opts.question,
+      ...(opts.grounding?.sources !== undefined && opts.grounding.sources.length > 0
+        ? { sources: opts.grounding.sources }
+        : { source: opts.grounding?.source ?? 'openalex' }),
+      maxPerQuery: opts.grounding?.maxPerQuery ?? 5,
+      ...(opts.grounding?.adapter !== undefined ? { adapter: opts.grounding.adapter } : {}),
+      ...(opts.grounding?.includeCounterEvidence !== undefined
+        ? { includeCounterEvidence: opts.grounding.includeCounterEvidence }
+        : {}),
+      extraQueries: (ctx.decompositionSubquestions ?? []).slice(0, MAX_DECOMPOSITION_QUERIES),
+    });
+    ctx.grounded = {
+      corpus: grounded.corpus,
+      fetchMode: grounded.fetchMode,
+      sourcesUsed: grounded.sourcesUsed,
+      groundedAt: grounded.groundedAt,
+      resolver: grounded.resolver,
+    };
+    ctx.corpus = grounded.corpus;
+    ctx.receipts.push(
+      buildProvenanceReceipt({
+        runId,
+        stageId: 'grounding',
+        sequence: nextSeq(),
+        component: 'retrieval',
+        mode: grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY',
+        dataSource: grounded.sourcesUsed.join('+'),
+        corpusSnapshotId: grounded.corpus.snapshotId,
+        corpusRootHash: grounded.corpus.rootHash,
+        retrievedAt: grounded.groundedAt,
+        parserVersion: RETRIEVAL_PARSER_VERSION,
+        createdAt: grounded.groundedAt,
+      }),
+    );
   });
-  let corpus: CorpusSnapshot = grounded.corpus;
-  receipts.push(
-    buildProvenanceReceipt({
-      runId,
-      stageId: 'grounding',
-      sequence: nextSeq(),
-      component: 'retrieval',
-      mode: grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY',
-      dataSource: grounded.sourcesUsed.join('+'),
-      corpusSnapshotId: corpus.snapshotId,
-      corpusRootHash: corpus.rootHash,
-      retrievedAt: grounded.groundedAt,
-      parserVersion: RETRIEVAL_PARSER_VERSION,
-      createdAt: grounded.groundedAt,
-    }),
-  );
 
   // ── 3. Generate 3-5 candidate hypotheses (corpus-injected, citation allowlist). ──
-  const generated = await generateHypotheses(opts.gateway, profile, {
-    question: opts.question,
-    corpus,
-    targetCount,
-  });
-  const hypotheses: readonly HypothesisCandidate[] = generated.hypotheses;
-  receipts.push(receiptForModel(runId, 'research_hypotheses', nextSeq(), profile, generated.meta));
-
-  // ── 4. Bind citations (deterministic set-membership against the corpus). ──
-  let bindings: Record<string, CitationBinding> = {};
-  for (const h of hypotheses) {
-    bindings[h.id] = bindCitations(h, grounded.resolver);
-  }
-
-  // ── 5. Citation gate: unbound citations are never evidence. In live mode,
-  //        attempt authoritative DOI re-resolution before excluding them. ──
-  const resolvedViaRetrieval: string[] = [];
-  if (grounded.fetchMode === 'live') {
-    const unboundIds = new Set(
-      Object.values(bindings).flatMap((b) => [...b.unbound]),
-    );
-    const resolvedDocs: RetrievedDocument[] = [];
-    for (const id of unboundIds) {
-      const normalized = id.toLowerCase().replace(/^doi:/, '').trim();
-      if (!DOI_PATTERN.test(id)) continue;
-      const doc = await resolveCrossrefDoi(normalized);
-      if (doc === null) continue;
-      resolvedDocs.push(doc);
-      resolvedViaRetrieval.push(id);
-    }
-    if (resolvedDocs.length > 0) {
-      // The corpus is content-addressed: adding resolved documents creates a
-      // NEW snapshot (honest — the corpus identity changed) and re-binds.
-      corpus = createCorpusSnapshot(
-        [...corpus.documents, ...resolvedDocs],
-        [...corpus.sourceQueries, 'unbound-citation-doi-resolution'],
-        grounded.groundedAt,
-      );
-      const resolver = new (await import('../retrieval/citation_resolver.ts')).CitationResolver(corpus);
-      const rebind: Record<string, CitationBinding> = {};
-      for (const h of hypotheses) {
-        rebind[h.id] = bindCitations(h, resolver);
-      }
-      bindings = rebind;
-      receipts.push(
-        buildProvenanceReceipt({
-          runId,
-          stageId: 'citation_resolution',
-          sequence: nextSeq(),
-          component: 'retrieval',
-          mode: 'LIVE',
-          dataSource: 'crossref',
-          corpusSnapshotId: corpus.snapshotId,
-          corpusRootHash: corpus.rootHash,
-          retrievedAt: grounded.groundedAt,
-          parserVersion: RETRIEVAL_PARSER_VERSION,
-          inputHash: hashCanonicalJson({ unbound: [...unboundIds] }),
-          outputHash: hashCanonicalJson({ resolved: resolvedViaRetrieval }),
-          createdAt: grounded.groundedAt,
-        }),
-      );
-    }
-  }
-  const citationGate = computeCitationGateReport({
-    bindings,
-    primaryHypothesisId: null, // filled after primary selection
-  });
-
-  // ── 6. Falsifiability gate (kernel gate, deterministic — not the model). ──
-  const falsifiabilityGate = computeFalsifiabilityGateReport(hypotheses);
-  receipts.push(
-    buildProvenanceReceipt({
-      runId,
-      stageId: 'falsifiability_gate',
-      sequence: nextSeq(),
-      component: 'deterministic',
-      mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
-      inputHash: hashCanonicalJson(
-        hypotheses.map((h) => ({ id: h.id, falsificationMethod: h.falsificationMethod })),
-      ),
-      outputHash: hashCanonicalJson(falsifiabilityGate),
-      createdAt: now().toISOString(),
-    }),
-  );
-
-  // ── 7. Independent critique pass (same-model honestly labeled). ──
-  const critiques: Record<string, CritiqueReport> = {};
-  const modelDimensions: Record<string, ReturnType<typeof computeDeterministicDimensions>> = {};
-  for (const h of hypotheses) {
-    const result = await critiqueHypothesis(opts.gateway, profile, h, {
+  await driver.run('hypothesis_generation', async () => {
+    const corpus = ctx.corpus!;
+    const generated = await generateHypotheses(opts.gateway, profile, {
       question: opts.question,
       corpus,
-      sameModelAsGenerator,
+      targetCount,
     });
-    critiques[h.id] = result.report;
-    modelDimensions[h.id] = result.modelDimensions;
-    receipts.push(
-      receiptForModel(runId, `research_critique:${h.id.slice(0, 8)}`, nextSeq(), profile, result.meta),
+    ctx.hypotheses = generated.hypotheses;
+    ctx.receipts.push(
+      receiptForModel(runId, 'research_hypotheses', nextSeq(), profile, generated.meta),
     );
-  }
+  });
 
-  // ── 8. Score (deterministic dimensions + model dimensions, merged; Pareto front). ──
-  const scorecards: Record<string, HypothesisScorecard> = {};
-  for (const h of hypotheses) {
-    const binding = bindings[h.id];
-    if (binding === undefined) continue;
-    const deterministic = computeDeterministicDimensions(h, binding, critiques[h.id]);
-    const merged = buildScorecard(
-      h.id,
-      deterministic,
-      modelDimensions[h.id] ?? [],
-      false, // Pareto updated after all scorecards built
-      critiques[h.id] === undefined
-        ? ''
-        : modelDimensions[h.id]?.find((d) => d.name === 'ExpectedInformationGain')?.rationale ??
-            'no key-evidence hint provided',
+  // ── 4. Citation gate: bind deterministically; in live mode attempt
+  //        authoritative DOI re-resolution before excluding unbound ids. ──
+  await driver.run('citation_binding', async () => {
+    let corpus = ctx.corpus!;
+    const resolver = ctx.grounded.resolver!;
+    let bindings: Record<string, CitationBinding> = {};
+    for (const h of ctx.hypotheses) {
+      bindings[h.id] = bindCitations(h, resolver);
+    }
+
+    const resolvedViaRetrieval: string[] = [];
+    if (ctx.grounded.fetchMode === 'live') {
+      const unboundIds = new Set(
+        Object.values(bindings).flatMap((b) => [...b.unbound]),
+      );
+      const resolvedDocs: RetrievedDocument[] = [];
+      for (const id of unboundIds) {
+        const normalized = id.toLowerCase().replace(/^doi:/, '').trim();
+        if (!DOI_PATTERN.test(id)) continue;
+        const doc = await resolveCrossrefDoi(normalized);
+        if (doc === null) continue;
+        resolvedDocs.push(doc);
+        resolvedViaRetrieval.push(id);
+      }
+      if (resolvedDocs.length > 0) {
+        // The corpus is content-addressed: adding resolved documents creates a
+        // NEW snapshot (honest — the corpus identity changed) and re-binds.
+        corpus = createCorpusSnapshot(
+          [...corpus.documents, ...resolvedDocs],
+          [...corpus.sourceQueries, 'unbound-citation-doi-resolution'],
+          ctx.grounded.groundedAt,
+        );
+        const reResolver = new CitationResolver(corpus);
+        const rebind: Record<string, CitationBinding> = {};
+        for (const h of ctx.hypotheses) {
+          rebind[h.id] = bindCitations(h, reResolver);
+        }
+        bindings = rebind;
+        ctx.receipts.push(
+          buildProvenanceReceipt({
+            runId,
+            stageId: 'citation_resolution',
+            sequence: nextSeq(),
+            component: 'retrieval',
+            mode: 'LIVE',
+            dataSource: 'crossref',
+            corpusSnapshotId: corpus.snapshotId,
+            corpusRootHash: corpus.rootHash,
+            retrievedAt: ctx.grounded.groundedAt,
+            parserVersion: RETRIEVAL_PARSER_VERSION,
+            inputHash: hashCanonicalJson({ unbound: [...unboundIds] }),
+            outputHash: hashCanonicalJson({ resolved: resolvedViaRetrieval }),
+            createdAt: ctx.grounded.groundedAt,
+          }),
+        );
+      }
+    }
+    ctx.corpus = corpus;
+    ctx.grounded.corpus = corpus;
+    ctx.grounded.resolver = new CitationResolver(corpus);
+    ctx.bindings = bindings;
+    ctx.resolvedViaRetrieval = resolvedViaRetrieval;
+    ctx.citationGate = computeCitationGateReport({
+      bindings,
+      primaryHypothesisId: null, // filled after primary selection
+    });
+  });
+
+  // ── 5. Falsifiability gate (kernel gate, deterministic — not the model). ──
+  await driver.run('falsifiability_gate', async () => {
+    ctx.falsifiabilityGate = computeFalsifiabilityGateReport(ctx.hypotheses);
+    ctx.receipts.push(
+      buildProvenanceReceipt({
+        runId,
+        stageId: 'falsifiability_gate',
+        sequence: nextSeq(),
+        component: 'deterministic',
+        mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
+        inputHash: hashCanonicalJson(
+          ctx.hypotheses.map((h) => ({ id: h.id, falsificationMethod: h.falsificationMethod })),
+        ),
+        outputHash: hashCanonicalJson(ctx.falsifiabilityGate),
+        createdAt: now().toISOString(),
+      }),
     );
-    scorecards[h.id] = merged;
-  }
-  const pareto = computeParetoFront(scorecards);
-  for (const id of Object.keys(scorecards)) {
-    scorecards[id] = { ...scorecards[id]!, paretoOptimal: pareto.has(id) };
-  }
-  receipts.push(
-    buildProvenanceReceipt({
-      runId,
-      stageId: 'scoring',
-      sequence: nextSeq(),
-      component: 'deterministic',
-      mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
-      inputHash: hashCanonicalJson({
-        hypotheses: hypotheses.map((h) => ({ id: h.id, falsificationMethod: h.falsificationMethod })),
-        bindings: Object.fromEntries(
-          Object.entries(bindings).map(([id, b]) => [id, { allBound: b.allBound, unbound: b.unbound }]),
+  });
+
+  // ── 6. Independent critique pass (same-model honestly labeled). ──
+  await driver.run('critique', async () => {
+    const critiques: Record<string, CritiqueReport> = {};
+    const modelDimensions: Record<string, ReturnType<typeof computeDeterministicDimensions>> = {};
+    for (const h of ctx.hypotheses) {
+      const result = await critiqueHypothesis(opts.gateway, profile, h, {
+        question: opts.question,
+        corpus: ctx.corpus!,
+        sameModelAsGenerator,
+      });
+      critiques[h.id] = result.report;
+      modelDimensions[h.id] = result.modelDimensions;
+      ctx.receipts.push(
+        receiptForModel(runId, `research_critique:${h.id.slice(0, 8)}`, nextSeq(), profile, result.meta),
+      );
+    }
+    ctx.critiques = critiques;
+    ctx.modelDimensions = modelDimensions;
+  });
+
+  // ── 7. Score (deterministic dimensions + model dimensions, merged; Pareto front). ──
+  await driver.run('scoring', async () => {
+    const scorecards: Record<string, HypothesisScorecard> = {};
+    for (const h of ctx.hypotheses) {
+      const binding = ctx.bindings[h.id];
+      if (binding === undefined) continue;
+      const deterministic = computeDeterministicDimensions(h, binding, ctx.critiques[h.id]);
+      const merged = buildScorecard(
+        h.id,
+        deterministic,
+        ctx.modelDimensions[h.id] ?? [],
+        false, // Pareto updated after all scorecards built
+        ctx.critiques[h.id] === undefined
+          ? ''
+          : ctx.modelDimensions[h.id]?.find((d) => d.name === 'ExpectedInformationGain')?.rationale ??
+              'no key-evidence hint provided',
+      );
+      scorecards[h.id] = merged;
+    }
+    const pareto = computeParetoFront(scorecards);
+    for (const id of Object.keys(scorecards)) {
+      scorecards[id] = { ...scorecards[id]!, paretoOptimal: pareto.has(id) };
+    }
+    ctx.scorecards = scorecards;
+    ctx.receipts.push(
+      buildProvenanceReceipt({
+        runId,
+        stageId: 'scoring',
+        sequence: nextSeq(),
+        component: 'deterministic',
+        mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
+        inputHash: hashCanonicalJson({
+          hypotheses: ctx.hypotheses.map((h) => ({ id: h.id, falsificationMethod: h.falsificationMethod })),
+          bindings: Object.fromEntries(
+            Object.entries(ctx.bindings).map(([id, b]) => [id, { allBound: b.allBound, unbound: b.unbound }]),
+          ),
+        }),
+        outputHash: hashCanonicalJson(
+          Object.fromEntries(
+            Object.entries(scorecards).map(([id, s]) => [id, { paretoOptimal: s.paretoOptimal }]),
+          ),
         ),
       }),
-      outputHash: hashCanonicalJson(
-        Object.fromEntries(
-          Object.entries(scorecards).map(([id, s]) => [id, { paretoOptimal: s.paretoOptimal }]),
-        ),
-      ),
-    }),
-  );
+    );
+  });
 
-  // ── 9. Deterministic primary selection. Directive §9.5: the primary must be
-  //        fully-bound AND falsifiable when any candidate satisfies both. ──
-  const primaryPool = admissibleHypotheses(hypotheses, bindings, falsifiabilityGate);
-  const primary = selectPrimaryHypothesis(primaryPool, scorecards);
-  const alternatives = hypotheses.filter((h) => h.id !== primary.id);
+  // ── 8. Deterministic primary selection. Directive §9.5 + fail-closed: the
+  //        primary MUST be fully-bound AND falsifiable. When no candidate
+  //        qualifies, the run aborts honestly — it never promotes an
+  //        unfalsifiable/unbound hypothesis to primary. ──
+  const primaryPool = admissibleHypotheses(ctx.hypotheses, ctx.bindings, ctx.falsifiabilityGate!);
+  if (primaryPool.length === 0) {
+    const gateFailed = ctx.hypotheses
+      .filter((h) => ctx.falsifiabilityGate!.perHypothesis[h.id]?.passed !== true)
+      .map((h) => h.id)
+      .join(', ');
+    const unbound = ctx.hypotheses
+      .filter((h) => ctx.bindings[h.id]?.allBound !== true)
+      .map((h) => h.id)
+      .join(', ');
+    throw new Error(
+      'research: fail-closed at primary selection — no hypothesis is both fully citation-bound ' +
+        'and falsifiable, so no defensible research plan can be designed. ' +
+        `falsifiability-gate failed: [${gateFailed}] · unbound citations: [${unbound}]. ` +
+        'Re-run with a more specific question, more grounding documents, or a higher --target.',
+    );
+  }
+  const primary = selectPrimaryHypothesis(primaryPool, ctx.scorecards);
+  const alternatives = ctx.hypotheses.filter((h) => h.id !== primary.id);
 
   const citationGateReport = {
-    ...citationGate,
-    perHypothesis: { ...citationGate.perHypothesis },
-    primaryAllBound: bindings[primary.id]?.allBound === true,
+    ...ctx.citationGate!,
+    perHypothesis: { ...ctx.citationGate!.perHypothesis },
+    primaryAllBound: ctx.bindings[primary.id]?.allBound === true,
     gateVerdict:
-      citationGate.gateVerdict === 'PASS'
+      ctx.citationGate!.gateVerdict === 'PASS'
         ? 'PASS'
-        : bindings[primary.id]?.allBound === true
+        : ctx.bindings[primary.id]?.allBound === true
           ? 'DEGRADED'
           : 'INCONCLUSIVE',
-    resolvedViaRetrieval,
+    resolvedViaRetrieval: ctx.resolvedViaRetrieval,
   } satisfies ResearchRun['citationGate'];
 
-  // ── 10. Design the executable research plan (corpus-injected). ──
-  const planned = await designResearchPlan(opts.gateway, profile, {
-    question: opts.question,
-    primary,
-    alternatives,
-    corpus,
+  // ── 9. Design the executable research plan (corpus-injected). ──
+  await driver.run('plan', async () => {
+    const planned = await designResearchPlan(opts.gateway, profile, {
+      question: opts.question,
+      primary,
+      alternatives,
+      corpus: ctx.corpus!,
+    });
+    ctx.plan = planned.plan;
+    ctx.receipts.push(receiptForModel(runId, 'research_plan', nextSeq(), profile, planned.meta));
   });
-  const plan: ResearchPlan = planned.plan;
-  receipts.push(receiptForModel(runId, 'research_plan', nextSeq(), profile, planned.meta));
 
-  // ── 11. Environment fingerprint + component/aggregate run modes. ──
+  // ── 10. Environment fingerprint + component/aggregate run modes. ──
   const environment: EnvironmentFingerprint = opts.environment ?? (await captureEnvironmentFingerprint());
 
   const modelExecutionMode: ComponentMode = liveModel ? 'LIVE' : 'RECORDED_REPLAY';
   const retrievalExecutionMode: ComponentMode =
-    grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY';
+    ctx.grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY';
   const experimentExecutionMode: ComponentMode = 'NOT_EXECUTED';
   const modes = {
     modelExecutionMode,
@@ -409,23 +603,23 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   return {
     runId,
     question: opts.question,
-    gateReport,
-    corpus,
-    hypotheses,
-    bindings,
-    critiques,
-    scorecards,
-    plan,
+    gateReport: ctx.gateReport!,
+    corpus: ctx.corpus!,
+    hypotheses: ctx.hypotheses,
+    bindings: ctx.bindings,
+    critiques: ctx.critiques,
+    scorecards: ctx.scorecards,
+    plan: ctx.plan!,
     revisions: [],
     observations: [],
-    stageReceipts: receipts,
+    stageReceipts: ctx.receipts,
     environment,
     modes,
     runMode: aggregateRunMode(modes),
     startedAt,
     schemaVersion: 3,
     citationGate: citationGateReport,
-    falsifiabilityGate,
+    falsifiabilityGate: ctx.falsifiabilityGate!,
   };
 }
 
@@ -481,19 +675,20 @@ export function aggregateRunMode(modes: {
 
 /**
  * The candidate pool for primary selection (directive §9.5): fully-bound AND
- * falsifiable candidates only, when at least one exists. If none qualifies,
- * the fallback pool is all hypotheses (the gate report then records the
- * honest degradation). Pure — reused by `far research verify`.
+ * falsifiable candidates ONLY — no fallback. When the result is empty the
+ * orchestrator must fail closed (an unfalsifiable or unbound hypothesis can
+ * never become the research plan's primary target; 2026-08-14 live-run
+ * defect: a gate-FAILED hypothesis was selected via the old all-fallback).
+ * Pure — reused by `far research verify`.
  */
 export function admissibleHypotheses(
   hypotheses: readonly HypothesisCandidate[],
   bindings: Readonly<Record<string, CitationBinding>>,
   falsifiabilityGate: ResearchRun['falsifiabilityGate'],
 ): readonly HypothesisCandidate[] {
-  const admissible = hypotheses.filter(
+  return hypotheses.filter(
     (h) => bindings[h.id]?.allBound === true && falsifiabilityGate.perHypothesis[h.id]?.passed === true,
   );
-  return admissible.length > 0 ? admissible : [...hypotheses];
 }
 
 /**

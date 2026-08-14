@@ -7,10 +7,12 @@
  *   - Language toggle button (zh / en)
  *   - Main content area
  *
- * R-01 信息架构:原 14 项扁平 nav 重组为 5 组(验证 / 证据 / 广度 / 历史 / 元信息)。
- *   - 桌面端:14 个 NavLink 保持不变,组间插入垂直分隔(分组可见·不增 link 数)。
- *   - 移动端:drawer 内按组渲染,每组带分组标题。
- *   - 路由与可访问性不变:14 个 NavLink 全部保留,App.test 的 toHaveLength(14) 仍成立。
+ * 信息架构（两分组）:科研主流程为唯一主路径,展示/验证工具降级为次级分组。
+ *   - Research（主分组）:工作台 · 规划 · 版本比较 · 事件流 · 报告——科研工作流的完整闭环。
+ *   - Trust & verification tools（次级分组,带小号 caption 视觉降级）:验证向导 · 收据 ·
+ *     证据链 · 完整性 · 法庭 · 竞技场 · 诚信墙 · 消融 · 广度榜 · 审计 · 仪表盘 · 关于。
+ *   - 路由与可访问性不变:全部 NavLink 保留(数量不变),不删除任何页面;App.test 的
+ *     toHaveLength 断言仍成立。
  */
 
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -31,11 +33,10 @@ type NavLabelKey =
   | 'nav.research' | 'nav.overview' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard'
   | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation'
   | 'nav.report' | 'nav.about' | 'nav.versions' | 'nav.wizard'
-  | 'nav.v2receipt' | 'nav.events' | 'nav.planning' | 'nav.audit';
+  | 'nav.v2receipt' | 'nav.events' | 'nav.planning' | 'nav.audit'
+  | 'nav.toolsCaption';
 
-type NavGroupKey =
-  | 'nav.group.research' | 'nav.group.verify' | 'nav.group.evidence'
-  | 'nav.group.history' | 'nav.group.meta' | 'nav.group.devtools';
+type NavGroupKey = 'nav.group.research' | 'nav.group.tools';
 
 interface NavItem {
   readonly to: string;
@@ -46,65 +47,46 @@ interface NavItem {
 interface NavGroup {
   readonly id: string;
   readonly labelKey: NavGroupKey;
+  /** primary = 科研主流程（第一分组）；tools = 信任与验证工具（次级分组·视觉降级）。 */
+  readonly kind: 'primary' | 'tools';
   readonly items: readonly NavItem[];
 }
 
-// ---------- Information architecture (5 groups · 14 links total) ----------
+// ---------- Information architecture (2 groups · all links preserved) ----------
 
 const NAV_GROUPS: readonly NavGroup[] = [
   {
+    // 科研主流程闭环：工作台（新建/运行/冻结视图）· 规划 · 版本比较（修订）· 事件流 · 报告。
     id: 'research',
     labelKey: 'nav.group.research',
+    kind: 'primary',
     items: [
       { to: '/research', labelKey: 'nav.research', icon: FlaskConical },
+      { to: '/planning', labelKey: 'nav.planning', icon: ClipboardCheck },
+      { to: '/versions', labelKey: 'nav.versions', icon: GitCompare },
+      { to: '/events', labelKey: 'nav.events', icon: Radio },
+      { to: '/report', labelKey: 'nav.report', icon: FileText },
     ],
   },
   {
-    id: 'verify',
-    labelKey: 'nav.group.verify',
-    items: [
-      { to: '/wizard', labelKey: 'nav.wizard', icon: Sparkles },
-      { to: '/v2-receipt', labelKey: 'nav.v2receipt', icon: ScrollText },
-    ],
-  },
-  {
-    id: 'evidence',
-    labelKey: 'nav.group.evidence',
+    // 信任与验证工具（次级分组·小号 caption 视觉降级）：交互验证工具 + 展示页。
+    // 全部保留（本轮不删除任何页面/路由），仅从主路径降级。
+    id: 'tools',
+    labelKey: 'nav.group.tools',
+    kind: 'tools',
     items: [
       { to: '/overview', labelKey: 'nav.overview', icon: LayoutDashboard },
+      { to: '/wizard', labelKey: 'nav.wizard', icon: Sparkles },
+      { to: '/v2-receipt', labelKey: 'nav.v2receipt', icon: ScrollText },
       { to: '/viz', labelKey: 'nav.viz', icon: Network },
       { to: '/integrity', labelKey: 'nav.integrity', icon: ShieldCheck },
-      { to: '/versions', labelKey: 'nav.versions', icon: GitCompare },
-    ],
-  },
-  {
-    id: 'history',
-    labelKey: 'nav.group.history',
-    items: [
-      { to: '/report', labelKey: 'nav.report', icon: FileText },
-      { to: '/events', labelKey: 'nav.events', icon: Radio },
-      { to: '/audit', labelKey: 'nav.audit', icon: GitCompare },
-    ],
-  },
-  {
-    id: 'meta',
-    labelKey: 'nav.group.meta',
-    items: [
-      { to: '/about', labelKey: 'nav.about', icon: Info },
-      { to: '/planning', labelKey: 'nav.planning', icon: ClipboardCheck },
-    ],
-  },
-  {
-    // Track-1A 收敛（协议 §12.5）：展示页降级为"开发与展示工具"——
-    // 真实 API 驱动但数据为 fixture/replay/预生成 benchmark，不属于科研主流程。
-    id: 'devtools',
-    labelKey: 'nav.group.devtools',
-    items: [
-      { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: Trophy },
       { to: '/court', labelKey: 'nav.court', icon: Gavel },
       { to: '/arena', labelKey: 'nav.arena', icon: Swords },
+      { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: Trophy },
       { to: '/honesty', labelKey: 'nav.honesty', icon: ShieldAlert },
       { to: '/ablation', labelKey: 'nav.ablation', icon: FlaskConical },
+      { to: '/audit', labelKey: 'nav.audit', icon: GitCompare },
+      { to: '/about', labelKey: 'nav.about', icon: Info },
     ],
   },
 ];
@@ -213,7 +195,7 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, [mobileOpen]);
 
-  // Sanity: 14 nav links must always be present (App.test asserts toHaveLength(14)).
+  // Sanity: every nav link must stay present (App.test asserts the full count).
   void ALL_NAV_ITEMS;
 
   return (
@@ -236,12 +218,23 @@ export function AppShell({ children }: AppShellProps) {
           {/* Brand (R-10.1 · FAR-Lab Logo,非 link 元素,不影响 nav link 计数) */}
           <Logo size="sm" className="shrink-0" />
 
-          {/* Desktop nav links (visible ≥ md) — 14 links across 5 groups, group separators between */}
+          {/* Desktop nav links (visible ≥ md) — 2 groups: Research (primary) first, then
+              Trust & verification tools demoted behind a small caption + separator. */}
           <ul className="hidden flex-1 items-center gap-1 md:flex" data-testid="desktop-nav">
             {NAV_GROUPS.map((group, groupIndex) => (
               <Fragment key={group.id}>
                 {groupIndex > 0 && (
-                  <li aria-hidden="true" className="mx-1 h-5 w-px self-center bg-border" />
+                  <>
+                    <li aria-hidden="true" className="mx-1 h-5 w-px self-center bg-border" />
+                    {/* 小号 'tools' caption：次级分组视觉降级（宽屏才显示，避免挤压链接） */}
+                    <li
+                      aria-hidden="true"
+                      className="hidden self-center pr-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 xl:list-item"
+                      data-testid="nav-tools-caption"
+                    >
+                      {t('nav.toolsCaption')}
+                    </li>
+                  </>
                 )}
                 {group.items.map((item) => (
                   <li key={item.to}>
