@@ -24,19 +24,21 @@ node src/cli/far.ts doctor
 
 ## 第 1 屏 · 纵向切片（90 秒）
 
-**台词**：「一条命令跑完整切片：研究可行性门 → 真实文献检索（支持+反证）→ 3 个机制
-不同的候选假设 → 独立批判 → 确定性评分 → 可执行研究计划。」
+**台词**：「一条命令跑完整切片：研究可行性门 → 真实文献检索（支持+反证，跨两个独立
+来源族）→ 3 个机制不同的候选假设 → 独立批判 → 确定性评分与可证伪门 → 可执行研究计划。」
 
-**命令**（检索 live·无需 key）：
+**命令**（live Qwen + live 多源检索·需 DASHSCOPE_API_KEY）：
 ```powershell
-node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
+node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" --profile competition_aliyun_qwen --source openalex+crossref --out run.json
 ```
 **镜头点**（逐段停 2 秒）：
-- `gate: RESEARCHABLE · domain=astronomy`
-- `receipts: 9 stage receipts · env git=…`
-- 3 个候选假设卡片（Pareto 标注 + 各维度 grade）
+- `runMode: LIVE (model=LIVE · retrieval=LIVE)` + `receipts: 10 stage receipts`
+- `corpus: 50 docs`（openalex+crossref 合并 + 反证 + 分解子查询）
+- 3 个候选假设卡片（Pareto 标注 + 各维度 grade；可证伪门如实判 2 个 F——模型输出被确定性规则约束的实证）
+- 主假设从"全绑定 + 可证伪"候选池选出（引用绑定率 100%）
 - 研究计划（objectives/statisticalMethods/humanApprovalRequired）
-- 红行提示：评分确定性 + 引用必须绑定语料
+
+> 无 key 时同一命令默认为 offline_replay（合成 fixture + RECORDED_REPLAY 横幅，绝不伪装 live）——录屏可先用无 key 版演练。
 
 ---
 
