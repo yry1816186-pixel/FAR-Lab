@@ -295,3 +295,6 @@ tests/fixtures/science_harness/tic_sample.cache
 docs/design/
 docs/governance/ROOT-HYGIENE-POLICY.md
 docs/governance/disaster-recovery-runbook.md
+
+# --- AI-tooling session artifacts (playwright MCP browser sessions; repo-hygiene gate) ---
+.playwright-mcp/

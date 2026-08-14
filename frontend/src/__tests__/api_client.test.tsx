@@ -129,7 +129,7 @@ describe('api_client probes (bare root)', () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(health));
     const { result } = renderHook(() => useHealth(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/health');
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/health');
     expect(result.current.data).toEqual(health);
   });
 
@@ -143,7 +143,7 @@ describe('api_client probes (bare root)', () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(ready));
     const { result } = renderHook(() => useReady(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/ready');
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/ready');
     expect(result.current.data?.checks.database).toBe('ok');
   });
 });
@@ -166,7 +166,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
     vi.mocked(fetch).mockResolvedValue(jsonV1Response(ev));
     const { result } = renderHook(() => useEvidence('ev-001'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/api/v1/evidence/ev-001');
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/v1/evidence/ev-001');
     expect(result.current.data?.evidenceId).toBe('ev-001');
     expect(result.current.data?.sourceAnchor).toEqual(sourceAnchor);
     // [G] 契约对齐：前端 EvidenceResponse.verdictNode 类型安全可访问
@@ -196,9 +196,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
     vi.mocked(fetch).mockResolvedValue(jsonV1Response(chain));
     const { result } = renderHook(() => useEvidenceChain(HEAD_HASH), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
-      `http://localhost:3000/api/v1/evidence/chain/${HEAD_HASH}`,
-    );
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`/api/v1/evidence/chain/${HEAD_HASH}`);
     expect(result.current.data?.callRecord?.currentHash).toBe(HEAD_HASH);
   });
 
@@ -206,7 +204,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
     vi.mocked(fetch).mockResolvedValue(jsonV1Response(verdictDto()));
     const { result } = renderHook(() => useVerdict('v-001'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/api/v1/verdict/v-001');
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/v1/verdict/v-001');
     expect(result.current.data?.verdictId).toBe('v-001');
     expect(result.current.data?.decision).toBe('UNTESTED');
     expect(result.current.data?.parentNodeId).toBeNull();
@@ -218,9 +216,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
       wrapper: createWrapper(),
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
-      'http://localhost:3000/api/v1/verdict/by_hypothesis/hypo-1',
-    );
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/v1/verdict/by_hypothesis/hypo-1');
     // 后端返回单个 HonestVerdictDto（非数组）——直接消费 verdictId
     expect(result.current.data?.verdictId).toBe('v-002');
     expect(result.current.data?.decision).toBe('UNTESTED');
@@ -236,9 +232,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
     vi.mocked(fetch).mockResolvedValue(jsonV1Response(list));
     const { result } = renderHook(() => useVerdictList(100, 0), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
-      'http://localhost:3000/api/v1/verdict?limit=100&offset=0',
-    );
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/v1/verdict?limit=100&offset=0');
     expect(result.current.data?.items).toHaveLength(2);
     expect(result.current.data?.count).toBe(2);
   });
@@ -248,7 +242,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
     vi.mocked(fetch).mockResolvedValue(textResponse(html));
     const { result } = renderHook(() => useReport('run-1'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('http://localhost:3000/api/v1/report/run-1');
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/v1/report/run-1');
     expect(result.current.data).toBe(html);
   });
 
@@ -293,7 +287,7 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     // 校验 POST /api/v1/hypothesize + 请求体（researchInput + 审计 P0-2 客户端幂等键）
     const callArgs = vi.mocked(fetch).mock.calls[0];
-    expect(callArgs[0]).toBe('http://localhost:3000/api/v1/hypothesize');
+    expect(callArgs[0]).toBe('/api/v1/hypothesize');
     const init = callArgs[1] as RequestInit;
     expect(init.method).toBe('POST');
     const sentBody = JSON.parse(init.body as string) as { researchInput: string; idempotencyKey?: string };
@@ -316,8 +310,25 @@ describe('api_client app endpoints (/api/v1 prefix)', () => {
 // ---------- fetch helpers（__testables）----------
 
 describe('api_client fetch helpers (__testables)', () => {
-  it('API_BASE_URL 默认 http://localhost:3000', () => {
-    expect(__testables.API_BASE_URL).toBe('http://localhost:3000');
+  it('API_BASE_URL 默认为相对基址（same-origin·vite proxy / 反向代理解析）', () => {
+    expect(__testables.API_BASE_URL).toBe('');
+  });
+
+  it('ApiError.guidance() 提取 detail.guidance（503 fail-closed 指引）·缺失/非字符串时为 null', () => {
+    const withGuidance = new __testables.ApiError(
+      503,
+      'live profile needs an API key in the environment (see far doctor)',
+      'research_live_profile_unavailable',
+      null,
+      { profile: 'auto', guidance: 'set DASHSCOPE_API_KEY for live runs' },
+    );
+    expect(withGuidance.guidance()).toBe('set DASHSCOPE_API_KEY for live runs');
+    // detail 缺失
+    expect(new __testables.ApiError(500, 'boom', 'E').guidance()).toBeNull();
+    // detail 存在但 guidance 非字符串
+    expect(
+      new __testables.ApiError(500, 'boom', 'E', null, { guidance: 42 }).guidance(),
+    ).toBeNull();
   });
 
   it('fetchJson 非 2xx 响应抛错（含状态码）', async () => {
@@ -408,6 +419,22 @@ describe('api_client composeApiUrl (极端 URL 构造)', () => {
   it('extraParams 为空对象 → 与 undefined 等价（不污染 URL）', () => {
     expect(compose('http://localhost:3000', '/api/v1/verdict', {})).toBe(
       'http://localhost:3000/api/v1/verdict',
+    );
+  });
+
+  // ---------- same-origin 相对基址（'' · 默认）----------
+
+  it("base 为 ''（默认·same-origin）→ 返回相对 URL", () => {
+    expect(compose('', '/api/v1/verdict')).toBe('/api/v1/verdict');
+  });
+
+  it("base 为 '' + path 无前导斜杠 → 补斜杠后仍为相对 URL", () => {
+    expect(compose('', 'api/v1/verdict')).toBe('/api/v1/verdict');
+  });
+
+  it("base 为 '' + path 含 query + extraParams（SSE 订阅形态）→ query 合并保留", () => {
+    expect(compose('', '/api/v1/events/stream', { runId: 'r1', replay: 'true' })).toBe(
+      '/api/v1/events/stream?runId=r1&replay=true',
     );
   });
 });

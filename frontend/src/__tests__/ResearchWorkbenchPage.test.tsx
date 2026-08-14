@@ -237,11 +237,12 @@ function v1(body: unknown, status = 200): Response {
   return new Response(JSON.stringify({ ok: true, data: body }), { status, headers: HEADERS });
 }
 
-function apiError(status: number, errorCode: string, message: string): Response {
-  return new Response(JSON.stringify({ error_code: errorCode, message, source_anchor: null }), {
-    status,
-    headers: HEADERS,
-  });
+function apiError(status: number, errorCode: string, message: string, detail?: unknown): Response {
+  const body: Record<string, unknown> = { error_code: errorCode, message, source_anchor: null };
+  if (detail !== undefined) {
+    body['detail'] = detail;
+  }
+  return new Response(JSON.stringify(body), { status, headers: HEADERS });
 }
 
 interface ResearchApiOpts {
@@ -251,6 +252,15 @@ interface ResearchApiOpts {
   readonly frozenRun?: ResearchRunDto | null;
   /** POST /research 返回 500（startError 场景）。 */
   readonly startError?: boolean;
+  /** POST /research 返回结构化错误（如 503 research_live_profile_unavailable + detail.guidance）。 */
+  readonly startApiError?: {
+    readonly status: number;
+    readonly errorCode: string;
+    readonly message: string;
+    readonly detail?: unknown;
+  };
+  /** GET /api/v1/llm-status 响应（缺省：无 key → 默认合成模式）。 */
+  readonly llmStatus?: { readonly profile: string; readonly keyConfigured: boolean };
   /** POST feedback 后冻结 run 的下一个形态。 */
   readonly onFeedback?: (run: ResearchRunDto) => ResearchRunDto;
   /** POST analyze 后冻结 run 的下一个形态。 */
@@ -282,9 +292,21 @@ function installResearchApi(opts: ResearchApiOpts = {}): ResearchApiHandle {
   handle.fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
     const method = init?.method ?? 'GET';
-    const base = 'http://localhost:3000/api/v1/research';
+    // 默认相对基址（same-origin）——URL 即路径（dev 由 vite proxy 转发到 :3000）。
+    const base = '/api/v1/research';
 
+    if (url === '/api/v1/llm-status') {
+      return v1(opts.llmStatus ?? { profile: 'competition_aliyun_qwen', keyConfigured: false });
+    }
     if (method === 'POST' && url === base) {
+      if (opts.startApiError !== undefined) {
+        return apiError(
+          opts.startApiError.status,
+          opts.startApiError.errorCode,
+          opts.startApiError.message,
+          opts.startApiError.detail,
+        );
+      }
       if (opts.startError === true) {
         return apiError(500, 'research_pipeline_failed', 'pipeline failed (boom)');
       }
@@ -381,7 +403,12 @@ function wrapper(initialEntries = ['/research']): (props: { children: ReactNode 
   };
 }
 
+/** 问题输入默认为空（不预填示例）——测试先键入问题再点击开始。 */
 async function startRun(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.type(
+    screen.getByLabelText(/scientific question/i),
+    'Does stellar activity inflate hot Jupiter radii?',
+  );
   await user.click(screen.getByRole('button', { name: /start research/i }));
 }
 
@@ -398,13 +425,112 @@ describe('ResearchWorkbenchPage（异步 202 契约）', () => {
     FakeEventSource.last = null;
   });
 
-  it('renders the creation form with an honest offline_replay default', () => {
+  it('renders the creation form: empty question, synthetic default when no API key, caption + status line visible', async () => {
+    installResearchApi({ llmStatus: { profile: 'competition_aliyun_qwen', keyConfigured: false } });
     render(<ResearchWorkbenchPage />, { wrapper: wrapper() });
     expect(screen.getByTestId('research-workbench')).toBeInTheDocument();
     expect(screen.getByLabelText(/scientific question/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /start research/i })).toBeInTheDocument();
-    const radio = screen.getByRole('radio', { name: /offline_replay/ });
-    expect((radio as HTMLInputElement).checked).toBe(true);
+    // 问题输入默认为空（placeholder 保留示例——不预填、不伪装已就绪）。
+    const question = screen.getByLabelText(/scientific question/i) as HTMLInputElement;
+    expect(question.value).toBe('');
+    expect(question).toHaveAttribute(
+      'placeholder',
+      expect.stringContaining('hot Jupiter'),
+    );
+    // 无 key → 默认合成模式，caption 常显（诚实标注假设不对应问题）。
+    const synthetic = screen.getByRole('radio', { name: /synthetic demo/i }) as HTMLInputElement;
+    await waitFor(() => expect(synthetic.checked).toBe(true));
+    expect(screen.getByTestId('profile-option-synthetic')).toHaveTextContent(
+      /will NOT match your question/i,
+    );
+    // live 选项如实标注需要 key（随 llm-status 到达渲染）。
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-option-live')).toHaveTextContent(/needs API key/i),
+    );
+    // 状态行（llm-status 驱动）。
+    await waitFor(() =>
+      expect(screen.getByTestId('backend-status')).toHaveTextContent(
+        /no API key — synthetic mode only/i,
+      ),
+    );
+    // 空问题 → 开始按钮禁用。
+    expect(screen.getByRole('button', { name: /start research/i })).toBeDisabled();
+  });
+
+  it('keyConfigured=true → live is the default (radio auto-checked) and submit sends profile:"auto"', async () => {
+    const api = installResearchApi({
+      llmStatus: { profile: 'competition_aliyun_qwen', keyConfigured: true },
+    });
+    const user = userEvent.setup();
+    render(<ResearchWorkbenchPage />, { wrapper: wrapper() });
+
+    // llm-status 到达后默认翻到 live（用户未显式选择时跟随 key 可用性）。
+    const live = screen.getByRole('radio', { name: /live model/i }) as HTMLInputElement;
+    await waitFor(() => expect(live.checked).toBe(true));
+    expect(screen.getByTestId('profile-option-live')).toHaveTextContent(/ready/i);
+    await waitFor(() =>
+      expect(screen.getByTestId('backend-status')).toHaveTextContent(/live model ready \(qwen\)/i),
+    );
+
+    await startRun(user);
+
+    // 提交体只含 profile:'auto'（绝不发送原始 provider 名——后端 model-neutral 解析）。
+    const startCall = api.fetchMock.mock.calls.find(([input, init]) =>
+      input.toString() === '/api/v1/research' && init?.method === 'POST',
+    );
+    expect(startCall).toBeDefined();
+    const sentBody = JSON.parse(String(startCall?.[1]?.body)) as { question: string; profile: string };
+    expect(sentBody.profile).toBe('auto');
+    expect(sentBody.question).toBe('Does stellar activity inflate hot Jupiter radii?');
+  });
+
+  it('no-key default is synthetic → submit sends profile:"offline_replay"', async () => {
+    const api = installResearchApi({
+      llmStatus: { profile: 'competition_aliyun_qwen', keyConfigured: false },
+    });
+    const user = userEvent.setup();
+    render(<ResearchWorkbenchPage />, { wrapper: wrapper() });
+    await waitFor(() =>
+      expect((screen.getByRole('radio', { name: /synthetic demo/i }) as HTMLInputElement).checked)
+        .toBe(true),
+    );
+
+    await startRun(user);
+
+    const startCall = api.fetchMock.mock.calls.find(([input, init]) =>
+      input.toString() === '/api/v1/research' && init?.method === 'POST',
+    );
+    const sentBody = JSON.parse(String(startCall?.[1]?.body)) as { profile: string };
+    expect(sentBody.profile).toBe('offline_replay');
+  });
+
+  it('live submit without a key → 503 error panel surfaces message AND backend detail.guidance', async () => {
+    installResearchApi({
+      llmStatus: { profile: 'competition_aliyun_qwen', keyConfigured: false },
+      startApiError: {
+        status: 503,
+        errorCode: 'research_live_profile_unavailable',
+        message: 'live profile needs an API key in the environment (see far doctor)',
+        detail: {
+          profile: 'auto',
+          guidance:
+            'set DASHSCOPE_API_KEY (https://bailian.console.aliyun.com/) for live runs; pass profile=offline_replay explicitly for synthetic-fixture wiring demos',
+        },
+      },
+    });
+    const user = userEvent.setup();
+    render(<ResearchWorkbenchPage />, { wrapper: wrapper() });
+
+    // 无 key 仍可显式选择 live（fail-closed 由后端裁决，前端不拦截）。
+    await user.click(screen.getByRole('radio', { name: /live model/i }));
+    await startRun(user);
+
+    // 原始 message 与 detail.guidance 都如实展示（不吞不改）。
+    await screen.findByTestId('start-error');
+    expect(screen.getByTestId('start-error')).toHaveTextContent(/needs an API key/i);
+    const guidance = await screen.findByTestId('start-error-guidance');
+    expect(guidance).toHaveTextContent('set DASHSCOPE_API_KEY');
+    expect(guidance).toHaveTextContent(/offline_replay/);
   });
 
   it('202 start → live progress panel (state badge · stage checklist · elapsed · cancel button)', async () => {
@@ -508,6 +634,26 @@ describe('ResearchWorkbenchPage（异步 202 契约）', () => {
     expect(screen.getByTestId('run-state-badge')).toHaveTextContent('FAILED');
     // 失败后不再显示取消按钮。
     expect(screen.queryByTestId('cancel-run')).not.toBeInTheDocument();
+    // 非 EPERM 错误不出现文件锁提示（提示按错误特征触发·不泛化）。
+    expect(screen.queryByTestId('eperm-hint')).not.toBeInTheDocument();
+  });
+
+  it('run_failed with EPERM+rename → raw error kept + file-lock resume hint appended', async () => {
+    const epermError =
+      "EPERM: operation not permitted, rename 'C:\\.far\\research-runs\\run-async-1\\checkpoint.tmp.json' -> 'C:\\.far\\research-runs\\run-async-1\\checkpoint.json'";
+    installResearchApi({
+      statuses: [statusDto({ state: 'FAILED', error: epermError, errorKind: 'pipeline' })],
+    });
+    const user = userEvent.setup();
+    render(<ResearchWorkbenchPage />, { wrapper: wrapper() });
+
+    await startRun(user);
+    const panel = await screen.findByTestId('run-failed-panel');
+    // 原始错误完整保留在提示之上（诚实原则：提示是补充而非替代）。
+    expect(panel).toHaveTextContent('EPERM: operation not permitted, rename');
+    const hint = await screen.findByTestId('eperm-hint');
+    expect(hint).toHaveTextContent(/file lock \(antivirus\/indexer\)/i);
+    expect(hint).toHaveTextContent(`far research resume ${RUN_ID}`);
   });
 
   it('run_completed → frozen run view renders (mode banner · hypotheses · plan)', async () => {
