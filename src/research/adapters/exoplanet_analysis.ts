@@ -22,7 +22,7 @@
 
 import { normalQuantile } from '../../statistics/p_value.ts';
 import { studentTTwoSidedP } from '../../statistics/t_distribution.ts';
-import { hashCanonicalJson } from '../provenance.ts';
+import { hashCanonicalJson } from '../../evidence_log/hasher.ts';
 import type { PsRow } from './exoplanet_dataset.ts';
 
 /** Parameters of the analysis (derived from the ResearchPlan). */
@@ -208,3 +208,4 @@ export function analyzeRadiusInsolation(
     summary,
   };
 }
+

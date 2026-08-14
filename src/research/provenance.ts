@@ -131,26 +131,7 @@ export interface EnvironmentFingerprint {
   readonly packageVersion: string | null;
 }
 
-/** Recursively sort object keys so serialization is insertion-order independent. */
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value) ?? 'null';
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => stableStringify(v)).join(',')}]`;
-  }
-  const obj = value as Record<string, unknown>;
-  const keys = Object.keys(obj).sort();
-  const parts = keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`);
-  return `{${parts.join(',')}}`;
-}
-
-/** sha256 of a canonical JSON serialization (stable key order). */
-export function hashCanonicalJson(value: unknown): string {
-  return rawSha256Hex(stableStringify(value));
-}
-
-/** sha256 of arbitrary text. */
+/** sha256 of arbitrary text (thin alias over the retrieval hash primitive). */
 export function hashText(text: string): string {
   return rawSha256Hex(text);
 }

@@ -55,10 +55,10 @@ import {
 import {
   buildProvenanceReceipt,
   captureEnvironmentFingerprint,
-  hashCanonicalJson,
   type EnvironmentFingerprint,
   type ProvenanceReceipt,
 } from './provenance.ts';
+import { hashCanonicalJson } from '../evidence_log/hasher.ts';
 import type { CallMeta } from './llm.ts';
 import type {
   CitationBinding,

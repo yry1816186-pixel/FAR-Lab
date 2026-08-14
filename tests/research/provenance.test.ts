@@ -11,10 +11,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   buildProvenanceReceipt,
-  hashCanonicalJson,
   hashText,
   modelSnapshotState,
 } from '../../src/research/provenance.ts';
+import { hashCanonicalJson } from '../../src/evidence_log/hasher.ts';
 
 describe('hashCanonicalJson / hashText', () => {
   test('canonical hash is stable across key insertion order', () => {
