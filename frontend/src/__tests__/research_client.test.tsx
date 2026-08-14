@@ -125,9 +125,22 @@ describe('research_client（异步 202 契约）', () => {
     expect(result.current.data?.runId).toBe(RUN_ID);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [input, init] = fetchMock.mock.calls[0] as [RequestInfo, RequestInit | undefined];
-    expect(input.toString()).toBe('http://localhost:3000/api/v1/research');
+    // 默认相对基址（same-origin）：POST 同源 /api/v1/research（dev 走 vite proxy）。
+    expect(input.toString()).toBe('/api/v1/research');
     expect(init?.method).toBe('POST');
     expect(JSON.parse(String(init?.body))).toEqual({ question: 'q?', profile: 'offline_replay' });
+  });
+
+  it('useStartResearch：profile 只发 auto/offline_replay（auto 为 live 解析·后端契约）', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(v1(ACCEPTED, 202));
+
+    const { result } = renderHook(() => useStartResearch(), { wrapper: wrapper() });
+    await act(async () => {
+      await result.current.mutateAsync({ question: 'q?', profile: 'auto' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const [, init] = fetchMock.mock.calls[0] as [RequestInfo, RequestInit | undefined];
+    expect(JSON.parse(String(init?.body))).toEqual({ question: 'q?', profile: 'auto' });
   });
 
   it('useResearchRuns：GET /research → runs 列表', async () => {
@@ -198,7 +211,7 @@ describe('research_client（异步 202 契约）', () => {
 
     expect(result.current.data).toEqual({ runId: RUN_ID, cancelled: true, state: 'CANCELLED' });
     const [input, init] = fetchMock.mock.calls[0] as [RequestInfo, RequestInit | undefined];
-    expect(input.toString()).toBe(`http://localhost:3000/api/v1/research/${RUN_ID}/cancel`);
+    expect(input.toString()).toBe(`/api/v1/research/${RUN_ID}/cancel`);
     expect(init?.method).toBe('POST');
   });
 
@@ -211,7 +224,7 @@ describe('research_client（异步 202 契约）', () => {
 
       const es = FakeEventSource.instances[FakeEventSource.instances.length - 1];
       expect(es).toBeDefined();
-      expect(es.url).toBe(`http://localhost:3000/api/v1/research/${RUN_ID}/events`);
+      expect(es.url).toBe(`/api/v1/research/${RUN_ID}/events`);
       expect(es.closed).toBe(false);
 
       // 首帧 event: state —— 完整 status payload。

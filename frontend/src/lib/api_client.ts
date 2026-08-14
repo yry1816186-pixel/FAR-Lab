@@ -1,7 +1,13 @@
 /**
  * API client — TanStack Query 5 hooks for the FAR-Lab backend (spec 24 API gateway).
  *
- * Default base URL: http://localhost:3000 (spec 24). Override via VITE_API_BASE_URL.
+ * Base URL resolution (same-origin first):
+ *   1. VITE_API_BASE_URL env override wins — for production deployments that
+ *      serve the API on a different origin (CORS applies).
+ *   2. Otherwise the base is '' (RELATIVE): requests resolve against the page
+ *      origin — the vite dev proxy (vite.config.ts proxies /api/v1 + /health +
+ *      /ready to :3000) in dev, and a reverse proxy in production. Same-origin
+ *      keeps LAN/mobile access working (no hardcoded localhost origin).
  *
  * Path layout (spec 24 §0#2): ALL app endpoints live under the /api/v1/ prefix.
  * Only the liveness + readiness probes (§0#3) live on the bare root (/health, /ready).
@@ -113,12 +119,30 @@ export class ApiError extends Error {
     }
     return null;
   }
+
+  /**
+   * detail.guidance 提取：后端在 fail-closed 错误（如 503 research_live_profile_unavailable）
+   * 的 detail 中附带可操作指引。UI 在原始 message 之外如实展示该指引（不吞不改）；
+   * detail 缺失或 guidance 非字符串时返回 null。
+   */
+  guidance(): string | null {
+    if (typeof this.detail !== 'object' || this.detail === null) {
+      return null;
+    }
+    const value = (this.detail as { guidance?: unknown }).guidance;
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  }
 }
 
 // ---------- Config ----------
 
+/**
+ * '' = same-origin relative base (default): the vite dev proxy / a production
+ * reverse proxy owns API routing. VITE_API_BASE_URL (absolute URL) overrides it
+ * for cross-origin deployments.
+ */
 const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:3000';
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '';
 
 // ---------- Fetch helpers ----------
 
@@ -146,16 +170,24 @@ async function throwForStatus(response: Response, url: string): Promise<never> {
  * 优先级（从低到高）：baseUrl 自带 query < path 内 query < extraParams。
  * base 的 pathname 前缀会被保留（去尾斜杠避免双斜杠）。
  *
- * @param baseUrl API 基址，可含 pathname 前缀与 query 参数
+ * baseUrl 为 ''（默认·same-origin）时：URL 构造需要一个绝对基准，故先挂在占位
+ * origin 上复用同一套合并逻辑，再把占位前缀切掉——返回相对 URL（fetch 与
+ * EventSource 均接受相对 URL，由页面 origin 解析：dev 走 vite proxy，
+ * 生产走反向代理）。
+ *
+ * @param baseUrl API 基址：''（same-origin）或含 pathname 前缀与 query 的绝对 URL
  * @param path API 路径，可含 query string（如 `/api/v1/verdict?limit=100`）
  * @param extraParams 业务参数，优先级最高（覆盖同名参数）
  */
+const SAME_ORIGIN_PLACEHOLDER_ORIGIN = 'http://same-origin.invalid';
+
 function composeApiUrl(
   baseUrl: string,
   path: string,
   extraParams?: Record<string, string>,
 ): string {
-  const base = new URL(baseUrl);
+  const sameOrigin = baseUrl === '';
+  const base = new URL(sameOrigin ? SAME_ORIGIN_PLACEHOLDER_ORIGIN : baseUrl);
   const basePath = base.pathname.replace(/\/+$/, '');
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   // 拼成完整字符串后整体解析：path 内的 query 会自动分离到 url.searchParams
@@ -171,6 +203,10 @@ function composeApiUrl(
     for (const [key, value] of Object.entries(extraParams)) {
       url.searchParams.set(key, value);
     }
+  }
+  if (sameOrigin) {
+    // 切掉占位 origin，保留相对路径 + query（由页面 origin 解析）。
+    return url.href.slice(SAME_ORIGIN_PLACEHOLDER_ORIGIN.length);
   }
   return url.href;
 }

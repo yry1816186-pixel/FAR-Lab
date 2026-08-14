@@ -68,6 +68,8 @@
     "build:check": "pnpm run typecheck && pnpm run lint && pnpm --dir frontend run typecheck && pnpm --dir frontend run lint && pnpm --dir frontend run build",
     "check:supply-chain": "node scripts/check-supply-chain.mjs",
     "api": "node src/cli/far.ts api",
+    "far": "node src/cli/far.ts",
+    "dev": "node scripts/dev.mjs",
     "smoke-core": "pnpm run test && pnpm run test:py",
     "benchmark:generate": "tsx scripts/generate_benchmark.ts",
     "gen:openapi": "node scripts/generate_openapi.mjs",

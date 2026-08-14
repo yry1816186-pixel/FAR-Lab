@@ -44,9 +44,14 @@ far demo tess-offline
 git clone https://github.com/yry1816186-pixel/FAR-Lab.git
 cd FAR-Lab
 pnpm install
-node src/cli/far.ts doctor            # 环境自诊断（无需 key）
-node src/cli/far.ts demo tess-offline # offline demo —— 零凭据
+pnpm far doctor            # 环境自诊断（无需 key）
+pnpm far demo tess-offline # offline demo —— 零凭据
 ```
+
+> 本项目以源码分发（git clone + pnpm install），不发布到 npm registry。下文所有命令均写作
+> `pnpm far <cmd>`（`far` 脚本包装 `node src/cli/far.ts`）；没有 pnpm 时（例如仅有 Node ≥ 24 的
+> 裸 git clone）可直接调用 CLI：`node src/cli/far.ts doctor`。`pnpm install` 之后 `far` bin 亦可用
+> （或 `pnpm exec far` / `npx far-lab`）。
 
 `far doctor` 在缺少 API key 时只 **WARN**，绝不阻塞 offline 体验，也绝不读取 key 的值。
 
@@ -56,29 +61,29 @@ node src/cli/far.ts demo tess-offline # offline demo —— 零凭据
 
 ```bash
 # 1. 用确定性裁决内核跑 14 条 golden vector（offline·无 key）
-node src/cli/far.ts demo
+pnpm far demo
 #   → 14/14 golden vectors PASS · end-to-end demo claim sealed · exit 0
 
 # 2. 用确定性裁决内核跑 14 条 golden vector
-node src/cli/far.ts verify-golden --all
+pnpm far verify-golden --all
 
 # 3. 导出证明 bundle（步骤 4 篡改演示需要先导出）
-node src/cli/far.ts export far-proof --demo-chain --force
+pnpm far export far-proof --demo-chain --force
 
 # 4. 看篡改检测实战（macOS / Linux / WSL bash）
 mkdir -p /tmp/tampered && cp -r .far-proof /tmp/tampered
 sed -i 's/UNTESTED/CONFIRMED/' /tmp/tampered/proof_envelopes.jsonl
-node src/cli/far.ts verify /tmp/tampered
+pnpm far verify /tmp/tampered
 #   → tamperStatus: tampered · recomputation.node: fail · exit 7
 
 #    Windows (PowerShell 7+):
 #   New-Item -ItemType Directory -Force tampered | Out-Null
 #   Copy-Item -Recurse .far-proof tampered
 #   (Get-Content tampered/proof_envelopes.jsonl) -replace 'UNTESTED','CONFIRMED' | Set-Content tampered/proof_envelopes.jsonl
-#   node src/cli/far.ts verify tampered
+#   pnpm far verify tampered
 ```
 
-完整 CLI 参考：`node src/cli/far.ts --help`。
+完整 CLI 参考：`pnpm far --help`（分组总览）· 单命令用法：`pnpm far <cmd> --help`。
 
 ---
 
@@ -86,32 +91,35 @@ node src/cli/far.ts verify /tmp/tampered
 
 ```bash
 # 1. 运行纵向切片（研究可行性门 → 真实文献检索 → 3-5 个候选假设 → 独立批判 → 研究计划）。
-#    检索无需 key（OpenAlex 免费）；只有模型调用需要 key。
+#    检索无需 key（OpenAlex 免费）；模型调用需要 DASHSCOPE_API_KEY
+#    （profile 默认 auto：有 key 即 LIVE；无 key 则 fail-closed 并给出指引——见下）。
 #    长任务逐阶段 checkpoint 到 .far/research-runs/<runId>/ —— Ctrl+C 诚实取消
 #    （state=CANCELLED，已完成阶段保留），崩溃/取消后可 resume。
-node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
-node src/cli/far.ts research status <runId>     # 生命周期状态 + 逐阶段进度（8 阶段）
-node src/cli/far.ts research resume <runId>     # 从 checkpoint 续跑已崩溃/已取消的 run
+pnpm far research start "Does stellar activity inflate hot Jupiter radii?" --out run.json
+pnpm far research status <runId>     # 生命周期状态 + 逐阶段进度（8 阶段）
+pnpm far research resume <runId>     # 从 checkpoint 续跑已崩溃/已取消的 run
 
 # 2. 真实数据分析（NASA Exoplanet Archive live TAP 抓取）。
 #    领域门控：非系外行星课题会被拒绝，绝不用错误数据集硬算。
-node src/cli/far.ts research analyze run.json --live
+pnpm far research analyze run.json --live
 #   → n=392 颗热木星，r=0.587，p<0.001（相关性≠因果——如实表述）
 
 # 3. 专家反馈 → 不可变修订 → 前后计划比较：
-node src/cli/far.ts research feedback run.json --file feedback.json
-node src/cli/far.ts research compare run.json
+pnpm far research feedback run.json --file feedback.json
+pnpm far research compare run.json
 
 # 4. 程序化指标 + 确定性重算：
-node src/cli/far.ts research evaluate run.json
+pnpm far research evaluate run.json
 
 # 5. 导出哈希钉住的复现包 + 第三方验证（篡改 → exit 7）：
-node src/cli/far.ts research export run.json --out bundle
-node src/cli/far.ts research verify bundle
+pnpm far research export run.json --out bundle
+pnpm far research verify bundle
 
 # 6. 同样的闭环可通过 Web 工作台 + REST API 使用（异步 + SSE）：
-#    pnpm api  →  POST /api/v1/research（202 + runId）· GET /research/<id>/status
-#                 GET /research/<id>/events（SSE 进度）· POST /research/<id>/cancel
+#    pnpm dev   →  API @ http://localhost:3000 + Web 工作台 @ http://localhost:5173
+#                  （一条命令同时启动两者；Ctrl+C 同时停止）
+#    pnpm api   →  POST /api/v1/research（202 + runId）· GET /research/<id>/status
+#                  GET /research/<id>/events（SSE 进度）· POST /research/<id>/cancel
 ```
 
 **运行模式诚实标注**：每个阶段记录 `modelExecutionMode` / `retrievalExecutionMode` /
@@ -162,12 +170,12 @@ node src/cli/far.ts research verify bundle
 ## Offline demo（无需 API key）
 
 ```bash
-node src/cli/far.ts demo tess-offline
+pnpm far demo tess-offline
 ```
 
 全程 offline：14 条 golden vector 经真实 R0–R9 内核，再跑端到端 TESS 声明（`C-ASTRO-0001`）经
 FEC 编排 → 内核裁决 → fail-closed 密封。要验证持久化 bundle，先运行
-`node src/cli/far.ts export far-proof --demo-chain --force` 导出，再用 `far verify .far-proof` 验证。
+`pnpm far export far-proof --demo-chain --force` 导出，再用 `far verify .far-proof` 验证。
 
 ---
 
@@ -177,12 +185,19 @@ FEC 编排 → 内核裁决 → fail-closed 密封。要验证持久化 bundle�
 
 ```bash
 export DASHSCOPE_API_KEY=sk-...          # 切勿提交；见 SECURITY.md
-node src/cli/far.ts ask "<question>" --profile competition_aliyun_qwen
+pnpm far ask "<question>" --profile competition_aliyun_qwen
 
 # Track-1A 代表性 live 路径：真实 Qwen 生成 + 真实 OpenAlex 检索一次完成
-node src/cli/far.ts research start "Does stellar activity inflate hot Jupiter radii?" \
-  --profile competition_aliyun_qwen --source openalex
+# 无需 --profile：默认即 auto —— 设了 DASHSCOPE_API_KEY 就是 LIVE
+pnpm far research start "Does stellar activity inflate hot Jupiter radii?" --source openalex
 ```
+
+**没有 key 时**：`pnpm far research start` **fail-closed**（exit 2）并给出可操作指引——绝不用
+合成 fixture 伪造你问题的答案。两条无 key 路径：`pnpm far ground "<question>"`（真实文献检索，
+免费无需 key）；或显式 `pnpm far research start "<q>" --profile offline_replay` 接线演示
+（`runMode=RECORDED_REPLAY`；证明的是管线接线——引用绑定、确定性评分、Pareto 前沿、计划设计——
+**而非**任何科学结论）。确定性验证内核（`pnpm far demo` / `pnpm far verify-golden` /
+`pnpm far verify`）零 key 全程 offline。
 
 核心门与 offline demo **无需**此 key 即可运行。CI 的 `competition_qwen_smoke` 是条件门，无 key
 时 graceful skip。配置：[docs/providers/qwen-dashscope.md](docs/providers/qwen-dashscope.md)

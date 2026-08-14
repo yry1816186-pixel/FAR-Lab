@@ -23,7 +23,7 @@
  *     the ResearchRun + stage receipts + deterministic verify.
  */
 
-import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ulid } from 'ulid';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
@@ -86,6 +86,55 @@ export type ResearchRunEvent =
 /** Default on-disk root for research runs (gitignored via `.far/`). */
 export const DEFAULT_RUNS_ROOT = '.far/research-runs';
 
+/** Error codes Windows intermittently raises when AV/indexers briefly hold a freshly-written file. */
+const TRANSIENT_RENAME_CODES: ReadonlySet<string> = new Set(['EPERM', 'EBUSY', 'EACCES']);
+
+/** Max sync-retry attempts before the in-place fallback (total worst-case wait ≈ 0.6s). */
+const RENAME_RETRIES = 5;
+
+/**
+ * Rename with Windows-resilient retries (2026-08-14 live finding: Defender/
+ * indexers intermittently hold `checkpoint.json`, making rename-over-existing
+ * throw EPERM after ALL stages completed — the run then reported FAILED with
+ * everything done). Backoff doubles per attempt; after the final attempt the
+ * content is written in place (atomicity is lost but correctness is kept —
+ * a torn checkpoint is still structurally validated on load, fail-loud).
+ */
+export function renameWithRetry(
+  from: string,
+  to: string,
+  tryRename: (src: string, dest: string) => void = renameSync,
+  sleep: (ms: number) => void = (ms) => {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  },
+): void {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= RENAME_RETRIES; attempt += 1) {
+    try {
+      tryRename(from, to);
+      return;
+    } catch (err) {
+      lastError = err;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === undefined || !TRANSIENT_RENAME_CODES.has(code)) {
+        throw err; // non-transient (e.g. ENOENT) — retrying cannot help
+      }
+      if (attempt < RENAME_RETRIES) {
+        sleep(20 * 2 ** attempt);
+      }
+    }
+  }
+  // All retries exhausted on a transient lock: write in place as the last
+  // resort, then drop the tmp file (best effort).
+  writeFileSync(to, readFileSync(from, 'utf8'), 'utf8');
+  try {
+    rmSync(from, { force: true });
+  } catch {
+    // tmp cleanup is best-effort; a stale .tmp is harmless and overwritten next save
+  }
+  void lastError;
+}
+
 /** File-backed run store: one directory per run, atomic JSON writes. */
 export class RunStore {
   readonly rootDir: string;
@@ -109,9 +158,8 @@ export class RunStore {
   /** Atomic write (tmp + rename) so a crash mid-write never corrupts state. */
   private writeAtomic(path: string, content: string): void {
     mkdirSync(join(path, '..'), { recursive: true });
-    const tmp = `${path}.tmp`;
-    writeFileSync(tmp, content, 'utf8');
-    renameSync(tmp, path);
+    writeFileSync(`${path}.tmp`, content, 'utf8');
+    renameWithRetry(`${path}.tmp`, path);
   }
 
   saveCheckpoint(cp: RunCheckpoint): void {

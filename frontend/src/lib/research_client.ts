@@ -268,7 +268,15 @@ export type ResearchStreamFrame =
 
 export interface StartResearchRequest {
   readonly question: string;
-  readonly profile: 'offline_replay' | 'competition_aliyun_qwen';
+  /**
+   * Execution profile (backend CreateResearchSchema contract):
+   *   - 'auto': live when the server has an API key, else 503
+   *     research_live_profile_unavailable with detail.guidance (fail-closed).
+   *   - 'offline_replay': synthetic fixtures (wiring demos/tests).
+   * The raw provider profile name is NEVER sent from the UI — 'auto' lets the
+   * backend resolve the live provider model-neutrally.
+   */
+  readonly profile: 'auto' | 'offline_replay';
   readonly sources?: readonly string[];
   readonly maxPerQuery?: number;
   readonly target?: number;

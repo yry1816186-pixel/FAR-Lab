@@ -22,8 +22,11 @@
  *   7. 导出与验证（提示 far research export/verify；evaluate 展示程序化指标）
  *
  * 诚实边界：
+ *   - 执行模式选择器跟随 llm-status（keyConfigured → 默认 Live('auto')，否则默认
+ *     合成 fixtures 且 caption 常显）；提交只发 'auto' | 'offline_replay'
  *   - offline_replay 模式显式 RECORDED_REPLAY 横幅（不伪装 live）
- *   - live profile 无 key → 后端 503 fail-closed → 错误面板（绝不静默回放）
+ *   - live('auto') 无 key → 后端 503 fail-closed → 错误面板（message + detail.guidance
+ *     如实透传，绝不静默回放）
  *   - GET 冻结 run 返回 409 research_run_not_completed（刷新时仍在跑）→ 采纳为进行中运行并显示进度
  *   - 空状态 / 加载 / 错误均有处理；状态不依赖颜色（文字+徽章）
  */
@@ -47,7 +50,7 @@ import {
   type ResearchRunDto,
   type ResearchStatusDto,
 } from '@/lib/research_client';
-import { ApiError } from '@/lib/api_client';
+import { ApiError, useLlmStatus } from '@/lib/api_client';
 import { useT } from '@/lib/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -310,6 +313,13 @@ function RunProgressPanel({
               {t('research.failed.errorKind')}: {status?.errorKind ?? '—'}
             </p>
             <p className="text-xs text-muted-foreground">{t('research.failed.retryHint')}</p>
+            {/* EPERM+rename（文件锁阻塞检查点写入）→ 瞬态失败提示：恢复通常可越过。
+                原始错误保留在上方——提示是补充而非替代（诚实原则）。 */}
+            {isEpermRenameError(status?.error) && (
+              <p className="text-xs text-muted-foreground" data-testid="eperm-hint">
+                {t('research.failed.epermHint', { runId })}
+              </p>
+            )}
           </div>
         )}
 
@@ -332,6 +342,28 @@ function RunProgressPanel({
 }
 
 /** 工作台主页面。 */
+
+/**
+ * EPERM + rename 组合 = 检查点写入被文件锁（杀毒/索引服务）短暂阻塞——
+ * Windows 上常见的瞬态失败，恢复运行通常可越过。用于在 FAILED 面板追加提示。
+ */
+function isEpermRenameError(error: string | null | undefined): boolean {
+  if (typeof error !== 'string') {
+    return false;
+  }
+  const lower = error.toLowerCase();
+  return lower.includes('eperm') && lower.includes('rename');
+}
+
+/** llm-status profile（如 competition_aliyun_qwen）→ 状态行的短标签（qwen）。 */
+function shortProviderLabel(profile: string): string {
+  const parts = profile.split('_');
+  return parts[parts.length - 1] ?? profile;
+}
+
+/** 执行模式选择：'auto'（live·后端按 key 可用性解析）或 'offline_replay'（合成 fixtures）。 */
+export type WorkbenchProfile = 'auto' | 'offline_replay';
+
 export default function ResearchWorkbenchPage() {
   const t = useT();
   const navigate = useNavigate();
@@ -339,14 +371,17 @@ export default function ResearchWorkbenchPage() {
   const [searchParams] = useSearchParams();
   const runIdParam = searchParams.get('runId') ?? '';
 
-  const [question, setQuestion] = useState(
-    'Does stellar activity inflate hot Jupiter radii?',
-  );
-  const [profile, setProfile] = useState<'offline_replay' | 'competition_aliyun_qwen'>(
-    'offline_replay',
-  );
+  // 问题输入默认为空（placeholder 保留示例）——不预填问题，避免“示例即结果”的错觉。
+  const [question, setQuestion] = useState('');
+  // null = 用户尚未显式选择 → 默认值跟随 llm-status 的 keyConfigured（live 优先）。
+  const [profileChoice, setProfileChoice] = useState<WorkbenchProfile | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
   const [showEvaluate, setShowEvaluate] = useState(false);
+
+  // 运行期 LLM 状态（GET /api/v1/llm-status）：keyConfigured 驱动默认执行模式 + 状态行。
+  const llmStatus = useLlmStatus();
+  const keyConfigured = llmStatus.data?.keyConfigured;
+  const profile: WorkbenchProfile = profileChoice ?? (keyConfigured ? 'auto' : 'offline_replay');
 
   // 本会话通过 202 启动的进行中运行（runId + 事件流地址）。
   const [startedRun, setStartedRun] = useState<{ readonly runId: string } | null>(null);
@@ -370,6 +405,10 @@ export default function ResearchWorkbenchPage() {
 
   const run = runQuery.data;
   const startError = start.isError ? (start.error as Error).message : null;
+  // 后端 fail-closed 错误（503 research_live_profile_unavailable）的 detail.guidance
+  // 如实透传展示（message 之外的可操作指引·不吞不改）。
+  const startGuidance =
+    start.isError && start.error instanceof ApiError ? start.error.guidance() : null;
   const busy = start.isPending || feedback.isPending || analyze.isPending;
 
   const status = statusQuery.data ?? null;
@@ -497,38 +536,75 @@ export default function ResearchWorkbenchPage() {
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder={t('research.questionPlaceholder')}
+            data-testid="question-input"
           />
-          <div className="flex items-center gap-4 text-sm">
-            <label className="flex items-center gap-1.5">
+          {/* 执行模式：两项人话选项。提交只发 'auto' | 'offline_replay'（绝不发原始 provider 名）。 */}
+          <div className="space-y-1.5 text-sm">
+            <label className="flex items-start gap-1.5" data-testid="profile-option-live">
               <input
                 type="radio"
                 name="profile"
+                className="mt-1"
+                checked={profile === 'auto'}
+                onChange={() => setProfileChoice('auto')}
+              />
+              <span>
+                {t('research.mode.live')}
+                {keyConfigured === true && (
+                  <span className="ml-1.5 rounded bg-emerald-600/10 px-1.5 py-0.5 text-xs text-emerald-700">
+                    {t('research.mode.liveReady')}
+                  </span>
+                )}
+                {keyConfigured === false && (
+                  <span className="ml-1.5 rounded bg-amber-600/10 px-1.5 py-0.5 text-xs text-amber-700">
+                    {t('research.mode.liveNeedsKey')}
+                  </span>
+                )}
+              </span>
+            </label>
+            <label className="flex items-start gap-1.5" data-testid="profile-option-synthetic">
+              <input
+                type="radio"
+                name="profile"
+                className="mt-1"
                 checked={profile === 'offline_replay'}
-                onChange={() => setProfile('offline_replay')}
+                onChange={() => setProfileChoice('offline_replay')}
               />
-              offline_replay
+              <span>
+                {t('research.mode.synthetic')}
+                <span className="ml-1.5 text-xs text-muted-foreground">
+                  {t('research.mode.syntheticCaption')}
+                </span>
+              </span>
             </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                name="profile"
-                checked={profile === 'competition_aliyun_qwen'}
-                onChange={() => setProfile('competition_aliyun_qwen')}
-              />
-              {t('research.liveProfile')}
-            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <Button onClick={() => void handleStart()} disabled={busy || question.trim() === ''}>
               {start.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
               {t('research.startButton')}
             </Button>
+            {/* 后端模型可用性状态行（llm-status 驱动·默认模式的依据如实可见）。 */}
+            <span className="text-xs text-muted-foreground" data-testid="backend-status">
+              {llmStatus.data !== undefined
+                ? keyConfigured
+                  ? t('research.mode.statusLive', {
+                      profile: shortProviderLabel(llmStatus.data.profile),
+                    })
+                  : t('research.mode.statusSyntheticOnly')
+                : llmStatus.isError
+                  ? t('research.mode.statusUnknown')
+                  : ''}
+            </span>
           </div>
           {startError !== null && (
-            <p className="text-sm text-destructive" data-testid="start-error">
-              {startError}
-            </p>
-          )}
-          {profile === 'competition_aliyun_qwen' && (
-            <p className="text-xs text-muted-foreground">{t('research.liveKeyHint')}</p>
+            <div className="space-y-1" data-testid="start-error">
+              <p className="text-sm text-destructive">{startError}</p>
+              {startGuidance !== null && (
+                <p className="text-xs text-muted-foreground" data-testid="start-error-guidance">
+                  {startGuidance}
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
