@@ -1,6 +1,8 @@
 // src/cli/commands/research.ts
-// far research start "<question>" — run the Track-1A vertical slice once
-// (ground → generate 3-5 hypotheses → critique → score → plan → ResearchRun).
+// far research start "<question>" — run the Track-1A vertical slice under the
+// persistent run lifecycle (ground → generate 3-5 hypotheses → critique → score
+// → plan → ResearchRun), with checkpointed progress, SIGINT cancellation, and
+// `far research status/resume` for observability across process restarts.
 //
 // Default offline_replay profile (zero key, synthetic fixtures → RECORDED_REPLAY mode).
 // Live: --profile competition_aliyun_qwen + FAR_DASHSCOPE_API_KEY (real Qwen + real retrieval).
@@ -15,7 +17,21 @@ import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts'
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
 import { createReplayAdapter } from '../../retrieval/index.ts';
-import { runResearch } from '../../research/orchestrator.ts';
+import {
+  runResearch,
+  STAGE_LIFECYCLE_STATE,
+  RESEARCH_STAGE_IDS,
+  type ResearchGroundingOptions,
+} from '../../research/orchestrator.ts';
+import {
+  RunStore,
+  DEFAULT_RUNS_ROOT,
+  executeResearchRun,
+  addRunEventListener,
+  cancelRun,
+  type ResearchRunEvent,
+  type RunCheckpoint,
+} from '../../research/run_lifecycle.ts';
 import { ResearchabilityBlockedError } from '../../research/researchability_gate.ts';
 import { buildFeedbackSignal, compareResearchPlans } from '../../research/revision.ts';
 import { applyFeedbackToRun } from '../../research/application.ts';
@@ -109,6 +125,173 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
   return { question, sources, maxPerQuery, profile, target, json, out };
 }
 
+/**
+ * Resolve the run store root: `FAR_RESEARCH_RUNS_DIR` when set, otherwise the
+ * default `.far/research-runs`. Read at CALL time (not module load) so tests
+ * can point each process/spawn at its own store root.
+ */
+export function resolveRunStore(env: NodeJS.ProcessEnv = process.env): RunStore {
+  const override = env.FAR_RESEARCH_RUNS_DIR;
+  return new RunStore(override !== undefined && override !== '' ? override : DEFAULT_RUNS_ROOT);
+}
+
+/** Render one lifecycle event as one concise stderr line (no spinner). */
+function renderLifecycleEvent(event: ResearchRunEvent): void {
+  switch (event.type) {
+    case 'run_started':
+      return; // the "run started: …" line is printed by the caller
+    case 'run_resumed':
+      process.stderr.write(`resuming from stage: ${event.fromStage ?? '(start)'}\n`);
+      return;
+    case 'state_changed':
+      process.stderr.write(`state: ${event.from} → ${event.to}\n`);
+      return;
+    case 'stage_started':
+      process.stderr.write(`[${STAGE_LIFECYCLE_STATE[event.stageId]}] ${event.stageId} …\n`);
+      return;
+    case 'stage_completed':
+      process.stderr.write(`[${STAGE_LIFECYCLE_STATE[event.stageId]}] ${event.stageId} … done\n`);
+      return;
+    case 'run_completed':
+      process.stderr.write(`run completed (runMode=${event.runMode})\n`);
+      return;
+    case 'run_failed':
+    case 'run_cancelled':
+      return; // rendered from the checkpoint by the exit paths below
+  }
+}
+
+/** Shared arguments for the CLI lifecycle executor (start and resume). */
+interface LifecycleRunArgs {
+  readonly store: RunStore;
+  readonly gateway: LlmGateway;
+  readonly profile: 'offline_replay' | 'competition_aliyun_qwen';
+  /**
+   * Start: full grounding options (sources/maxPerQuery seed the checkpoint).
+   * Resume: adapter only — the checkpoint already carries sources/maxPerQuery.
+   */
+  readonly grounding?: ResearchGroundingOptions;
+  readonly target: number;
+  readonly json: boolean;
+  readonly out: string | null;
+  /** New run (start); mutually exclusive with runId (resume). */
+  readonly question?: string;
+  readonly runId?: string;
+}
+
+/**
+ * Execute one research run under the lifecycle driver with CLI-grade UX:
+ * immediate `run started` line, one stderr line per event, first-SIGINT
+ * cancellation (second SIGINT = default kill), and exit-code mapping
+ * (0 / 1 pipeline / 3 gate refused / 130 cancelled).
+ */
+async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
+  const { store } = args;
+  const knownBefore = new Set(store.listRunIds());
+  const execution = executeResearchRun({
+    ...(args.question !== undefined ? { question: args.question } : {}),
+    gateway: args.gateway,
+    profile: args.profile,
+    ...(args.grounding !== undefined ? { grounding: args.grounding } : {}),
+    targetHypothesisCount: args.target,
+    ...(args.runId !== undefined ? { runId: args.runId } : {}),
+    store,
+  });
+
+  // The executor persists its first checkpoint synchronously before its first
+  // await, so a NEW run's id is already on disk at this point. (Stage-1
+  // started/changed events fire during that same synchronous prefix — the
+  // "run started" line below is their human rendering.)
+  const runId =
+    args.runId !== undefined ? args.runId : store.listRunIds().find((id) => !knownBefore.has(id));
+  let unsubscribe: (() => void) | null = null;
+  let firstSigint = true;
+  const onSigint = (): void => {
+    if (firstSigint) {
+      firstSigint = false;
+      if (runId !== undefined) cancelRun(runId);
+      process.stderr.write('cancelling at the next stage boundary (second Ctrl+C kills immediately)…\n');
+      return;
+    }
+    // Second Ctrl+C: restore the default handler and re-raise.
+    process.removeListener('SIGINT', onSigint);
+    process.kill(process.pid, 'SIGINT');
+  };
+  process.on('SIGINT', onSigint);
+
+  try {
+    if (runId !== undefined) {
+      process.stderr.write(
+        `run started: ${runId} (progress checkpoints: ${store.checkpointPath(runId)} · status: far research status ${runId})\n`,
+      );
+      unsubscribe = addRunEventListener(runId, renderLifecycleEvent);
+    }
+
+    const run = await execution;
+
+    if (args.out !== null) {
+      const dir = dirname(args.out);
+      if (dir !== '.' && dir !== '') {
+        mkdirSync(dir, { recursive: true });
+      }
+      writeFileSync(args.out, JSON.stringify(run, null, 2) + '\n', 'utf8');
+      if (!args.json) {
+        process.stderr.write(`  saved    : ${args.out} (far research inspect ${args.out})\n`);
+      }
+    }
+    // The lifecycle already persisted the frozen run + checkpoint — say where.
+    if (runId !== undefined) {
+      process.stderr.write(
+        `  run      : ${store.runPath(runId)} (auto-persisted · status: far research status ${runId})\n`,
+      );
+    }
+    if (args.json) {
+      process.stdout.write(`${JSON.stringify(run, null, 2)}\n`);
+    } else {
+      renderHuman(args.profile, run);
+    }
+    return 0;
+  } catch (err) {
+    const cp = runId !== undefined ? safeLoadCheckpoint(store, runId) : null;
+    if (cp !== null && cp.state === 'CANCELLED') {
+      process.stderr.write(`run cancelled — resume with: far research resume ${runId}\n`);
+      return 130;
+    }
+    if (err instanceof ResearchabilityBlockedError) {
+      process.stderr.write(
+        `far research: researchability gate REFUSED this question (${err.report.verdict})\n` +
+          `  reasons: ${err.report.reasons.join('; ')}\n` +
+          (err.report.safetyRisks.length > 0
+            ? `  safety: ${err.report.safetyRisks.join('; ')}\n`
+            : '') +
+          '  no research pipeline was run; nothing was fabricated.\n',
+      );
+      return 3;
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `far research: pipeline failed (state: FAILED · checkpoint: ${runId !== undefined ? store.checkpointPath(runId) : 'n/a'})\n` +
+        `  error: ${message}\n` +
+        (cp !== null && cp.state === 'FAILED' && cp.errorKind !== 'gate_refused' && runId !== undefined
+          ? `  resume with: far research resume ${runId}\n`
+          : ''),
+    );
+    return 1;
+  } finally {
+    process.removeListener('SIGINT', onSigint);
+    if (unsubscribe !== null) unsubscribe();
+  }
+}
+
+/** Load a checkpoint without throwing (corruption → null; status reports it). */
+function safeLoadCheckpoint(store: RunStore, runId: string): RunCheckpoint | null {
+  try {
+    return store.loadCheckpoint(runId);
+  } catch {
+    return null;
+  }
+}
+
 /** Run `far research start`. */
 export async function runResearchStart(args: readonly string[]): Promise<number> {
   let parsed: ResearchArgs;
@@ -144,57 +327,174 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
     retrievalAdapter = createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS);
   }
 
-  let run: ResearchRun;
+  return executeLifecycleRun({
+    store: resolveRunStore(),
+    gateway,
+    profile: parsed.profile,
+    grounding: {
+      ...(parsed.sources.length > 1
+        ? { sources: parsed.sources }
+        : { source: parsed.sources[0] ?? 'openalex' }),
+      maxPerQuery: parsed.maxPerQuery,
+      ...(retrievalAdapter !== undefined ? { adapter: retrievalAdapter } : {}),
+    },
+    target: parsed.target,
+    json: parsed.json,
+    out: parsed.out,
+    question: parsed.question,
+  });
+}
+
+/** Render the stage progress line, e.g. `3/8 [researchability_gate ✓ grounding ✓ …]`. */
+function renderStageProgress(completedStages: readonly string[]): string {
+  const marks = RESEARCH_STAGE_IDS.map((stage) =>
+    completedStages.includes(stage) ? `${stage} ✓` : stage,
+  );
+  return `${completedStages.length}/${RESEARCH_STAGE_IDS.length} [${marks.join(' ')}]`;
+}
+
+/** Run `far research status <runId> [--json]` — print the on-disk checkpoint state. */
+export function runResearchStatus(args: readonly string[]): number {
+  const json = args.includes('--json');
+  const runId = args.find((a) => !a.startsWith('--'));
+  if (runId === undefined) {
+    process.stderr.write('far research status: missing <runId>.\n  usage: far research status <runId> [--json]\n');
+    return 2;
+  }
+  const store = resolveRunStore();
+  let cp: RunCheckpoint | null;
   try {
-    run = await runResearch({
-      question: parsed.question,
-      gateway,
-      profile: parsed.profile,
-      grounding: {
-        ...(parsed.sources.length > 1
-          ? { sources: parsed.sources }
-          : { source: parsed.sources[0] ?? 'openalex' }),
-        maxPerQuery: parsed.maxPerQuery,
-        ...(retrievalAdapter !== undefined ? { adapter: retrievalAdapter } : {}),
-      },
-      targetHypothesisCount: parsed.target,
-      sameModelAsGenerator: true,
-    });
+    cp = store.loadCheckpoint(runId);
   } catch (err) {
-    if (err instanceof ResearchabilityBlockedError) {
-      process.stderr.write(
-        `far research: researchability gate REFUSED this question (${err.report.verdict})\n` +
-          `  reasons: ${err.report.reasons.join('; ')}\n` +
-          (err.report.safetyRisks.length > 0
-            ? `  safety: ${err.report.safetyRisks.join('; ')}\n`
-            : '') +
-          '  no research pipeline was run; nothing was fabricated.\n',
-      );
-      return 3;
-    }
     process.stderr.write(
-      `far research: pipeline failed (${err instanceof Error ? err.message : String(err)})\n`,
+      `far research status: checkpoint for ${runId} is unreadable: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return 1;
+  }
+  if (cp === null) {
+    process.stderr.write(
+      `far research status: no run ${runId} under ${store.rootDir}.\n  (runs are created by: far research start "<question>")\n`,
     );
     return 1;
   }
 
-  if (parsed.out !== null) {
-    const dir = dirname(parsed.out);
-    if (dir !== '.' && dir !== '') {
-      mkdirSync(dir, { recursive: true });
-    }
-    writeFileSync(parsed.out, JSON.stringify(run, null, 2) + '\n', 'utf8');
-    if (!parsed.json) {
-      process.stderr.write(`  saved    : ${parsed.out} (far research inspect ${parsed.out})\n`);
-    }
+  if (json) {
+    process.stdout.write(`${JSON.stringify(cp, null, 2)}\n`);
+    return 0;
   }
 
-  if (parsed.json) {
-    process.stdout.write(`${JSON.stringify(run, null, 2)}\n`);
-  } else {
-    renderHuman(parsed.profile, run);
+  const run = store.loadRun(runId);
+  const lines: string[] = [
+    '',
+    '  FAR-Lab · far research status',
+    '  ─────────────────────────────────────────────────────────────────────',
+    `  runId      : ${cp.runId}`,
+    `  question   : ${cp.question}`,
+    `  state      : ${cp.state}`,
+    `  progress   : ${renderStageProgress(cp.completedStages)}`,
+    `  startedAt  : ${cp.startedAt}`,
+    `  updatedAt  : ${cp.updatedAt}`,
+  ];
+  if (cp.state === 'FAILED' || cp.state === 'CANCELLED') {
+    lines.push(`  error      : ${cp.error ?? '(none recorded)'} (errorKind=${cp.errorKind ?? 'n/a'})`);
   }
+  if (cp.state === 'COMPLETED') {
+    lines.push(
+      `  completedAt: ${cp.completedAt ?? 'n/a'}`,
+      `  runMode    : ${run?.runMode ?? '(run file missing)'}`,
+      `  run file   : ${store.runPath(runId)}`,
+    );
+  }
+  lines.push('  ─────────────────────────────────────────────────────────────────────');
+  if (cp.state === 'COMPLETED') {
+    lines.push(`  next: far research inspect ${store.runPath(runId)} · far research evaluate ${store.runPath(runId)}`);
+  } else {
+    lines.push(`  next: far research resume ${cp.runId} · inspect the checkpoint: ${store.checkpointPath(runId)}`);
+  }
+  lines.push('');
+  process.stdout.write(lines.join('\n'));
   return 0;
+}
+
+/** Run `far research resume <runId> [--profile ...] [--out <file>] [--json]`. */
+export async function runResearchResume(args: readonly string[]): Promise<number> {
+  const runId = args.find((a) => !a.startsWith('--'));
+  if (runId === undefined) {
+    process.stderr.write(
+      'far research resume: missing <runId>.\n  usage: far research resume <runId> [--profile offline_replay|competition_aliyun_qwen] [--out <file>] [--json]\n',
+    );
+    return 2;
+  }
+  const outIdx = args.indexOf('--out');
+  const outValue = outIdx !== -1 ? args[outIdx + 1] : undefined;
+  const json = args.includes('--json');
+
+  const store = resolveRunStore();
+  let cp: RunCheckpoint | null;
+  try {
+    cp = store.loadCheckpoint(runId);
+  } catch (err) {
+    process.stderr.write(
+      `far research resume: checkpoint for ${runId} is unreadable: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return 1;
+  }
+  if (cp === null) {
+    process.stderr.write(
+      `far research resume: no run ${runId} under ${store.rootDir}.\n  (runs are created by: far research start "<question>")\n`,
+    );
+    return 1;
+  }
+  if (cp.state === 'COMPLETED') {
+    process.stderr.write(
+      `far research resume: run ${runId} is already COMPLETED — inspect it: far research inspect ${store.runPath(runId)}\n`,
+    );
+    return 1;
+  }
+
+  // Profile: default = the checkpoint's own profile (resume keeps provenance);
+  // an explicit --profile must match it (mixing replay/live halves mid-run
+  // would produce dishonest mode provenance).
+  const profileIdx = args.indexOf('--profile');
+  const profileArg = profileIdx !== -1 ? args[profileIdx + 1] : undefined;
+  if (profileArg !== undefined && profileArg !== cp.profile) {
+    process.stderr.write(
+      `far research resume: --profile ${profileArg} does not match the checkpoint profile "${cp.profile}" (resume keeps the run's provenance).\n`,
+    );
+    return 2;
+  }
+  const profile: 'offline_replay' | 'competition_aliyun_qwen' =
+    cp.profile === 'offline_replay' ? 'offline_replay' : 'competition_aliyun_qwen';
+
+  let gateway: LlmGateway;
+  let retrievalAdapter: RetrievalAdapter | undefined;
+  if (profile === 'competition_aliyun_qwen') {
+    const apiKey = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
+    if (apiKey === undefined || apiKey === '') {
+      process.stderr.write(
+        'far research: profile competition_aliyun_qwen needs FAR_DASHSCOPE_API_KEY or DASHSCOPE_API_KEY set.\n  default offline_replay needs no key (synthetic fixtures, RECORDED_REPLAY mode).\n',
+      );
+      return 2;
+    }
+    gateway = createCompetitionQwenGateway({ apiKey });
+  } else {
+    gateway = createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
+    // Offline resume: re-inject the replay retrieval adapter (the corpus for
+    // completed stages is reused from the checkpoint; incomplete retrieval
+    // replays the same deterministic fixtures).
+    retrievalAdapter = createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS);
+  }
+
+  return executeLifecycleRun({
+    store,
+    gateway,
+    profile,
+    ...(retrievalAdapter !== undefined ? { grounding: { adapter: retrievalAdapter } } : {}),
+    target: cp.target,
+    json,
+    out: outValue !== undefined ? outValue : null,
+    runId,
+  });
 }
 
 /** Render a compact human-readable summary. */
