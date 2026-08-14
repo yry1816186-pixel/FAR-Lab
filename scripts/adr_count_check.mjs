@@ -25,10 +25,27 @@ function dirname(p) {
 }
 
 const decisionsDir = join(repoRoot, '.far-design', 'DECISIONS');
-const adrFiles = readdirSync(decisionsDir).filter((f) => /^ADR-\d+\.yaml$/.test(f));
+
+// .far-design/ 已 untrack 出公开仓库（2026-08-14 §20 公共仓库清洁化）——
+// fresh clone 无 DECISIONS 目录 → 对拍对象不在仓库内 → 环境声明 skip（exit 0 + 明确输出，
+// 同 adr_landing_check.mjs 的 ENOENT 模式，非假装通过）。
+let dirEntries;
+try {
+  dirEntries = readdirSync(decisionsDir);
+} catch (err) {
+  if (err.code === 'ENOENT') {
+    console.log(
+      `adr_count_check: DECISIONS 目录不存在（${decisionsDir} 已 untrack 出仓库）——ADR 计数对拍环境性跳过`,
+    );
+    process.exit(0);
+  }
+  throw err;
+}
+
+const adrFiles = dirEntries.filter((f) => /^ADR-\d+\.yaml$/.test(f));
 const adrCount = adrFiles.length;
 // D- 前缀决策记录（D-S5-01.thesis-and-scope.yaml 等·带描述后缀）。
-const totalDecisionRecords = readdirSync(decisionsDir).filter(
+const totalDecisionRecords = dirEntries.filter(
   (f) => /^(ADR-\d+|D-S5-[\w.-]+|D-REVIEW-[\w.-]+)\.yaml$/.test(f),
 ).length;
 
