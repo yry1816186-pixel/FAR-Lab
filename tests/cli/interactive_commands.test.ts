@@ -24,7 +24,7 @@ function makeTmpDir(label: string): string {
 }
 
 test('far ask: 6-stage FSM + verdict + chain（offline quick）', () => {
-  const r = runFar(['ask', 'Does the model improve accuracy', '--mode', 'quick']);
+  const r = runFar(['ask', 'Does the model improve accuracy', '--mode', 'quick', '--profile', 'offline_replay']);
   assert.strictEqual(r.status, 0);
   assert.match(r.stdout, /verdict/);
   assert.match(r.stdout, /chain/);
@@ -39,7 +39,7 @@ test('far ask: 6-stage FSM + verdict + chain（offline quick）', () => {
 });
 
 test('far ask: --json 产出机器可读结构', () => {
-  const r = runFar(['ask', 'json mode test', '--mode', 'quick', '--json']);
+  const r = runFar(['ask', 'json mode test', '--mode', 'quick', '--json', '--profile', 'offline_replay']);
   assert.strictEqual(r.status, 0);
   const obj = JSON.parse(r.stdout) as { verdict: string; chainHeadHash: string; runId: string };
   assert.strictEqual(obj.verdict, 'CONFIRMED');
@@ -50,7 +50,7 @@ test('far ask: --json 产出机器可读结构', () => {
 test('far ask --export → far verify 闭环（sealed envelope 可重算验证）', () => {
   const dir = makeTmpDir('ask-export');
   try {
-    const exp = runFar(['ask', 'export closedloop test', '--mode', 'quick', '--export', dir]);
+    const exp = runFar(['ask', 'export closedloop test', '--mode', 'quick', '--export', dir, '--profile', 'offline_replay']);
     assert.strictEqual(exp.status, 0);
     assert.ok(existsSync(join(dir, 'proof_envelopes.jsonl')), 'bundle 须含 sealed envelope');
 
@@ -89,7 +89,7 @@ test('far repl: 交互式多轮 + fork + history', () => {
 test('far replay --bundle: 重放证据链 + hash 链 verify', () => {
   const dir = makeTmpDir('replay');
   try {
-    runFar(['ask', 'replay source question', '--mode', 'quick', '--export', dir]);
+    runFar(['ask', 'replay source question', '--mode', 'quick', '--export', dir, '--profile', 'offline_replay']);
     const r = runFar(['replay', '--bundle', dir]);
     assert.strictEqual(r.status, 0);
     assert.match(r.stdout, /chain head/);
@@ -102,7 +102,7 @@ test('far replay --bundle: 重放证据链 + hash 链 verify', () => {
 test('far replay --db: 从持久化 DB 重放 + verify verified', () => {
   const dir = makeTmpDir('replay-db');
   try {
-    runFar(['ask', 'db replay question', '--mode', 'quick', '--export', dir]);
+    runFar(['ask', 'db replay question', '--mode', 'quick', '--export', dir, '--profile', 'offline_replay']);
     const rundb = join(dir + '.rundb');
     assert.ok(existsSync(rundb), 'ask --export 须产出 .rundb');
     const r = runFar(['replay', '--db', rundb]);
