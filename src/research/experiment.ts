@@ -65,6 +65,51 @@ const DEFAULT_MAX_PERIOD = 10; // days
 const DEFAULT_CONFIDENCE = 0.95;
 
 /**
+ * Applicability terms for the exoplanet adapter: at least TWO distinct term
+ * hits across the run's scientific text (question + hypotheses + plan), or an
+ * exoplanet/astrophysics domain hint, are required. A single loose hit
+ * ("period", "radius") is deliberately NOT enough — a diabetes or NLP plan
+ * must be REFUSED, not analyzed against hot-Jupiter data (2026-08-14 defect:
+ * `far research analyze` grafted an exoplanet correlation onto a diabetes run).
+ */
+const APPLICABILITY_TERMS = [
+  'exoplanet',
+  'transit',
+  'hot jupiter',
+  'planetary radius',
+  'planet radius',
+  'insolation',
+  'light curve',
+  'orbital period',
+  'starspot',
+  'photometric',
+  'radial velocity',
+  'planetary system',
+] as const;
+
+const ASTRO_DOMAIN_HINTS = ['astro', 'exoplanet', 'astronom', 'planetary science', 'stellar'];
+
+/** Does this run fall inside the exoplanet adapter's scientific domain? */
+export function isExoplanetApplicable(run: ResearchRun): boolean {
+  const domain = run.gateReport.scope.domain ?? '';
+  if (ASTRO_DOMAIN_HINTS.some((h) => domain.toLowerCase().includes(h))) {
+    return true;
+  }
+  const text = [
+    run.question,
+    ...run.hypotheses.map((h) => `${h.statement} ${h.mechanism}`),
+    ...run.plan.variables,
+    ...run.plan.dataRequirements,
+  ]
+    .join('\n')
+    .toLowerCase();
+  const hits = new Set(
+    APPLICABILITY_TERMS.filter((term) => text.includes(term)),
+  );
+  return hits.size >= 2;
+}
+
+/**
  * Extract executable numeric parameters from the frozen ResearchPlan
  * (directive §11.4: "input parameters come from the current ResearchPlan").
  *
@@ -114,6 +159,20 @@ export function extractPlanParameters(plan: ResearchRun['plan']): {
 export async function runPlanExperiment(opts: RunExperimentOptions): Promise<ExperimentResult> {
   const now = opts.now ?? (() => new Date());
   const producedAt = now().toISOString();
+
+  // 0. Domain gate (fail-closed): the only available adapter is the exoplanet
+  //    one; a run outside its domain is REFUSED with a structured error — an
+  //    exoplanet correlation must never be grafted onto a non-exoplanet plan,
+  //    and the absence of a domain adapter is stated, not papered over.
+  if (!isExoplanetApplicable(opts.run)) {
+    const domain = opts.run.gateReport.scope.domain ?? 'unknown';
+    throw new Error(
+      'experiment: no available ExperimentAdapter matches this run — the only implemented ' +
+        `adapter (exoplanet-archive-radius-insolation) does not apply to domain "${domain}". ` +
+        'No analysis was executed and no observation was fabricated; this run has no real-data ' +
+        'experiment path yet (honest limitation, directive §3.3/§13).',
+    );
+  }
 
   // 1. Prepare inputs: the plan's hypotheses select the analysis; the plan's
   //    variables/dataRequirements supply the executable parameters (extracted

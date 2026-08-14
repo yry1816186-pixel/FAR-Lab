@@ -29,12 +29,10 @@ export const zh = {
   'nav.closeMenu': '关闭菜单',
   'nav.skipToContent': '跳到主内容',
 
-  // ---- nav group labels (R-01 信息架构分组) ----
-  'nav.group.verify': '验证',
-  'nav.group.evidence': '证据',
-  'nav.group.history': '历史',
-  'nav.group.meta': '元信息',
-  'nav.group.devtools': '开发与展示工具（fixture/回放数据）',
+  // ---- nav group labels（两分组信息架构：科研主路径 + 工具次级分组）----
+  'nav.group.research': '科研',
+  'nav.group.tools': '信任与验证工具',
+  'nav.toolsCaption': '工具',
 
   // ---- PlanningPage（opencode 规划方法论门禁面板）----
   'nav.planning': '规划门禁',
@@ -79,6 +77,7 @@ export const zh = {
   'overview.ctaTitle': '开始新验证',
   'overview.ctaDesc': '从科学问题到防篡改证明仅需 90 秒 —— 由确定性 R0-R9 内核驱动。',
   'overview.ctaBtn': '验证断言',
+  'overview.researchCtaBtn': '开始研究',
   'overview.quickHeading': '快速入口',
   'overview.quick.wizard.title': '验证向导',
   'overview.quick.wizard.desc': '端到端运行断言通过确定性 R0-R9 内核。',
@@ -766,7 +765,6 @@ export const zh = {
   'vdiff.honesty': '诚实边界：根据项目设计意图，FSM 循环内的裁决内核重入是 V2 路线图项。本页展示由 supersede 关系链接的版本，不会自动触发假设再生。IC-15 T1\' 通过 stage6 prompt 注入先前裁决作为软建议；stage6 LLM 保留对 continueIteration 的独立控制。',
   // ---- Track-1A research workbench ----
   'nav.research': '科研工作台',
-  'nav.group.research': '科研',
   'research.title': '科研工作台（赛道一·方向一·A）',
   'research.subtitle': '科学问题 → 真实文献检索 → 候选假设生成与比较 → 可执行研究计划 → 反馈修订 → 真实数据分析 → 导出验证',
   'research.createTitle': '新建研究',
@@ -794,6 +792,23 @@ export const zh = {
   'research.showEvaluate': '计算指标',
   'research.hideEvaluate': '收起指标',
   'research.deterministicRecompute': '确定性重算',
+  // ---- research 异步运行生命周期（202 契约 · 进度面板）----
+  'research.progress.title': '运行进度',
+  'research.progress.stateLabel': '状态',
+  'research.progress.elapsed': '已用时 {n} 秒',
+  'research.progress.connecting': '正在连接运行…',
+  'research.progress.stageDone': '已完成',
+  'research.progress.stagePending': '未开始',
+  'research.progress.latestEvent': '最新事件',
+  'research.progress.noEvents': '—',
+  'research.progress.degraded': '实时事件不可用——已降级为轮询',
+  'research.cancel.button': '取消运行',
+  'research.cancel.failed': '取消请求失败',
+  'research.cancel.noteTitle': '运行已取消',
+  'research.cancel.note': '恢复已取消的运行仅限 CLI（far research resume <runId>）。',
+  'research.failed.title': '运行失败',
+  'research.failed.errorKind': '错误类别',
+  'research.failed.retryHint': '重试仅限 CLI：far research resume <runId> 将从最近保存的检查点继续。',
   'overview.quick.research.title': '科研工作台',
   'overview.quick.research.desc': '科学问题 → 候选假设 → 研究计划 → 反馈修订（Track-1A 主流程）',
 } as const;

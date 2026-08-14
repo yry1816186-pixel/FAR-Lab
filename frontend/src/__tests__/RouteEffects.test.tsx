@@ -39,9 +39,9 @@ describe('RouteEffects', () => {
     expect(document.title).toBe('Integrity · FAR-Lab');
   });
 
-  it('首页 / 设置 Overview 标题', () => {
+  it('首页 /（科研工作台）设置 Research 标题', () => {
     renderAt('/');
-    expect(document.title).toBe('Overview · FAR-Lab');
+    expect(document.title).toBe('Research · FAR-Lab');
   });
 
   it('未知路由回退到完整基础标题', () => {

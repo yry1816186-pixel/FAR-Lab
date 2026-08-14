@@ -112,8 +112,24 @@ export async function callStructuredJson<T>(
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const startedAt = Date.now();
+    // Attempt 2 is a REPAIR: the validation error is fed back to the model so
+    // it can correct the specific violation instead of re-emitting it verbatim
+    // (an identical retry cannot succeed where the first attempt failed).
+    const attemptMessages: readonly LlmMessage[] = attempt === 1
+      ? messages
+      : [
+          ...messages,
+          {
+            role: 'user',
+            content:
+              `Your previous reply failed local schema validation: ${
+                lastError instanceof Error ? lastError.message : String(lastError)
+              }. ` +
+              'Return ONLY the corrected JSON object satisfying the schema — no prose, no markdown fences.',
+          },
+        ];
     const response = await gateway.callLlm(profile, {
-      messages,
+      messages: attemptMessages,
       responseFormat: 'json_schema',
       jsonSchema: { name: stageId, schema: jsonSchema, strict: true },
       stageId,

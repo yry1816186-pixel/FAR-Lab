@@ -48,9 +48,12 @@ describe('OverviewPage', () => {
   it('renders the workbench CTA and quick-entry cards (R-03 workbench)', () => {
     mockHealth(HEALTH_OK);
     renderWithQueryClient(<OverviewPage />);
-    // Primary CTA links into the wizard
+    // Primary CTA starts research (primary path); wizard is the secondary tool
     expect(screen.getByTestId('workbench-cta')).toBeInTheDocument();
+    expect(screen.getByTestId('research-cta')).toHaveTextContent(/Start research/i);
+    expect(screen.getByTestId('research-cta')).toHaveAttribute('href', '/research');
     expect(screen.getByTestId('quick-entries')).toBeInTheDocument();
+    expect(screen.getByTestId('quick-research')).toBeInTheDocument();
     expect(screen.getByTestId('quick-wizard')).toBeInTheDocument();
     expect(screen.getByTestId('quick-v2receipt')).toBeInTheDocument();
     expect(screen.getByTestId('quick-viz')).toBeInTheDocument();

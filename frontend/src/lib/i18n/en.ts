@@ -30,12 +30,10 @@ export const en: Record<MessageKey, string> = {
   'nav.closeMenu': 'Close menu',
   'nav.skipToContent': 'Skip to main content',
 
-  // ---- nav group labels (R-01 information architecture grouping) ----
-  'nav.group.verify': 'Verify',
-  'nav.group.evidence': 'Evidence',
-  'nav.group.history': 'History',
-  'nav.group.meta': 'Meta',
-  'nav.group.devtools': 'Dev tools (fixture/replay showcase)',
+  // ---- nav group labels (two-section IA: research primary, tools secondary) ----
+  'nav.group.research': 'Research',
+  'nav.group.tools': 'Trust & verification tools',
+  'nav.toolsCaption': 'tools',
 
   // ---- PlanningPage (opencode planning methodology as machine gates) ----
   'nav.planning': 'Planning',
@@ -79,6 +77,7 @@ export const en: Record<MessageKey, string> = {
   'overview.ctaTitle': 'Start a new verification',
   'overview.ctaDesc': 'From a scientific question to a tamper-evident proof in 90 seconds — powered by the deterministic R0-R9 kernel.',
   'overview.ctaBtn': 'Verify a claim',
+  'overview.researchCtaBtn': 'Start research',
   'overview.quickHeading': 'Quick entry',
   'overview.quick.wizard.title': 'Verification Wizard',
   'overview.quick.wizard.desc': 'Run a claim through the deterministic R0-R9 kernel end-to-end.',
@@ -769,7 +768,6 @@ export const en: Record<MessageKey, string> = {
   'vdiff.honesty': 'Honesty boundary: Per the project\'s design intent, verdict kernel re-entry within the FSM loop is a V2 roadmap item. This page displays versions linked by supersede relationships (migration 0014) — it does not automatically trigger hypothesis regeneration. IC-15 T1\' injects prior verdicts as soft advice via stage6 prompt; stage6 LLM retains independent control over continueIteration.',
   // ---- Track-1A research workbench ----
   'nav.research': 'Research',
-  'nav.group.research': 'Research',
   'research.title': 'Research Workbench (Track 1 · Direction 1A)',
   'research.subtitle': 'Scientific question → real literature retrieval → candidate hypothesis generation & comparison → executable research plan → feedback revision → real-data analysis → export & verify',
   'research.createTitle': 'New research',
@@ -797,6 +795,23 @@ export const en: Record<MessageKey, string> = {
   'research.showEvaluate': 'Compute metrics',
   'research.hideEvaluate': 'Hide metrics',
   'research.deterministicRecompute': 'Deterministic recompute',
+  // ---- research async run lifecycle (202 contract · progress panel) ----
+  'research.progress.title': 'Run progress',
+  'research.progress.stateLabel': 'State',
+  'research.progress.elapsed': 'elapsed {n}s',
+  'research.progress.connecting': 'Connecting to the run…',
+  'research.progress.stageDone': 'completed',
+  'research.progress.stagePending': 'pending',
+  'research.progress.latestEvent': 'Latest event',
+  'research.progress.noEvents': '—',
+  'research.progress.degraded': 'live events unavailable — polling',
+  'research.cancel.button': 'Cancel run',
+  'research.cancel.failed': 'Cancel request failed',
+  'research.cancel.noteTitle': 'Run cancelled',
+  'research.cancel.note': 'Resuming a cancelled run is CLI-only (far research resume <runId>).',
+  'research.failed.title': 'Run failed',
+  'research.failed.errorKind': 'error kind',
+  'research.failed.retryHint': 'Retry is CLI-only: far research resume <runId> continues from the last saved checkpoint.',
   'overview.quick.research.title': 'Research Workbench',
   'overview.quick.research.desc': 'Question → candidate hypotheses → research plan → feedback revision (Track-1A main flow)',
 };

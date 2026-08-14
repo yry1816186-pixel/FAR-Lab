@@ -36,6 +36,8 @@ import { runCheckResource } from './commands/check_resource.ts';
 import {
   runResearchInspect,
   runResearchStart,
+  runResearchStatus,
+  runResearchResume,
   runResearchFeedback,
   runResearchVerify,
   runResearchExport,
@@ -255,11 +257,17 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'research',
-    description: 'Track-1A vertical slice: ground → generate 3-5 hypotheses → critique → score → plan (start|inspect|feedback)',
+    description: 'Track-1A vertical slice: ground → generate 3-5 hypotheses → critique → score → plan (start|status|resume|inspect)',
     run: async (args) => {
       const subcommand = args[0];
       if (subcommand === 'inspect') {
         return runResearchInspect(args.slice(1));
+      }
+      if (subcommand === 'status') {
+        return runResearchStatus(args.slice(1));
+      }
+      if (subcommand === 'resume') {
+        return runResearchResume(args.slice(1));
       }
       if (subcommand === 'feedback') {
         return runResearchFeedback(args.slice(1));
@@ -286,8 +294,10 @@ const COMMANDS: readonly CliCommand[] = [
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
-          '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--json] [--out <file>]\n' +
+        `far research: expected 'start', 'status', 'resume', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
+          '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]\n' +
+          '         far research status <runId> [--json]\n' +
+          '         far research resume <runId> [--profile ...] [--out <file>] [--json]\n' +
           '         far research inspect <run.json> [--json]\n' +
           '         far research verify <run.json|bundle-dir> [--json]\n' +
           '         far research export <run.json> --out <bundle-dir> [--json]\n' +
@@ -1017,14 +1027,17 @@ USAGE:
 
   far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>]
                    [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]
-                         Track-1A vertical slice (赛道一·方向一·A): researchability & safety gate →
+                         Track-1A vertical slice (赛道一·方向一·A) under the persistent run
+                         lifecycle: researchability & safety gate →
                          ground the question in real literature (supporting + counter-evidence +
                          decomposition subquestions) → CorpusSnapshot → generate 3-5
                          mechanistically-distinct candidate hypotheses (corpus-injected, citation
                          allowlist) → independent critique → deterministic scorecard + Pareto front →
                          executable research plan. Every stage records a ProvenanceReceipt (provider
                          request id / token usage / corpus hashes / git commit); citations must bind
-                         to the corpus; scoring never uses a single model total score.
+                         to the corpus; scoring never uses a single model total score. Progress is
+                         checkpointed under .far/research-runs/<runId>/ (FAR_RESEARCH_RUNS_DIR
+                         overrides); one stderr line per stage; first Ctrl+C cancels (exit 130).
     --source <s>        openalex (default) | arxiv | crossref
     --max-per-query <n> docs per query, 1..25 (default 5)
     --profile <p>       offline_replay (default; synthetic fixtures, RECORDED_REPLAY) |
@@ -1032,7 +1045,22 @@ USAGE:
     --target <n>        hypothesis count 3..5 (default 3)
     --json              machine-readable ResearchRun output
     --out <file>        save the ResearchRun JSON
-    exits 0 success · 1 pipeline failure · 2 bad args · 3 gate refused (UNSUPPORTED — no pipeline ran)
+    exits 0 success · 1 pipeline failure (checkpoint kept; resumable) · 2 bad args · 3 gate refused
+    (UNSUPPORTED — no pipeline ran) · 130 cancelled (first Ctrl+C)
+
+  far research status <runId> [--json]
+                         print the on-disk lifecycle checkpoint: state, stage progress
+                         (n/8 with per-stage ✓), timestamps, error+errorKind when FAILED,
+                         runMode+run file when COMPLETED, and the next-command hint.
+    --json              machine-readable checkpoint object
+    exits 0 success · 1 unknown runId / unreadable checkpoint · 2 bad args
+
+  far research resume <runId> [--profile ...] [--out <file>] [--json]
+                         re-execute a FAILED/CANCELLED run from its checkpoint — completed
+                         stages are NOT repeated (their model calls and frozen corpus are
+                         reused); --profile must match the checkpoint's own profile (a run's
+                         provenance is never mixed mid-flight). COMPLETED runs are rejected.
+    exits 0 success · 1 not resumable / unknown runId · 2 bad args / profile mismatch / missing key
 
   far research inspect <run.json> [--json]
                          print a saved ResearchRun (hypotheses · scorecards · plan · run modes)

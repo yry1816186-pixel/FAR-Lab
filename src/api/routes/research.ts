@@ -1,17 +1,21 @@
 /**
- * research REST routes —— Track-1A 科研纵向切片的 API 面（§12.3 最小真实子集）。
+ * * research REST routes —— Track-1A 科研纵向切片的 API 面（异步生命周期版）。
  *
- * 端点（local-first 单用户内存 registry；同一 application service，§12.1）：
- *   POST /research                   创建运行（同步执行纵向切片·fail-closed）
- *   GET  /research/:runId            获取冻结 ResearchRun
- *   POST /research/:runId/feedback   应用结构化反馈 → 不可变 revision
- *   POST /research/:runId/analyze    真实数据分析（NASA 档案·live 或真实样本 replay）
- *   GET  /research/:runId/evaluate   程序化指标 + 确定性重算
+ * 端点（file-backed RunStore 为主存储；in-memory registry 仅作 write-through 缓存）：
+ *   POST   /research                       202 启动后台运行（progress: status/events 端点）
+ *   GET    /research                       列出全部运行（store.listRunIds + checkpoint）
+ *   GET    /research/:runId/status         checkpoint 摘要（completedStages/remainingStages）
+ *   GET    /research/:runId/events         SSE 实时事件流（state 快照 → research 事件 → 终态关流）
+ *   POST   /research/:runId/cancel         请求取消（运行不在本进程 → cancelled:false）
+ *   GET    /research/:runId                冻结 ResearchRun（未 COMPLETED → 409）
+ *   POST   /research/:runId/feedback       应用结构化反馈 → 不可变 revision（回写 store）
+ *   POST   /research/:runId/analyze        真实数据分析（NASA 档案·live 或真实样本 replay）
+ *   GET    /research/:runId/evaluate       程序化指标 + 确定性重算
  *
  * 诚实边界：
  *   - competition profile 无凭证 → 503 fail-closed（绝不静默降级到 replay）
  *   - offline_replay profile 在响应中显式 runMode=RECORDED_REPLAY
- *   - 长任务 SSE/取消/恢复生命周期 = Phase 4 后续（此处同步执行·明示边界）
+ *   - 后台运行失败已记录进 checkpoint（FAILED + 原因）；POST 的 .catch 只记日志
  *   - 模型中立：无 Qwen/百炼字面量（profile 名来自 env/请求）
  */
 
@@ -23,8 +27,15 @@ import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts'
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { resolveRuntimeGateway, RUNTIME_PROVIDER_PROFILE } from '../../llm_gateway/runtime_gateway.ts';
 import { createReplayAdapter } from '../../retrieval/index.ts';
-import { runResearch } from '../../research/orchestrator.ts';
-import { ResearchabilityBlockedError } from '../../research/researchability_gate.ts';
+import {
+  RunStore,
+  DEFAULT_RUNS_ROOT,
+  executeResearchRun,
+  addRunEventListener,
+  cancelRun,
+  type RunCheckpoint,
+} from '../../research/run_lifecycle.ts';
+import { RESEARCH_STAGE_IDS } from '../../research/orchestrator.ts';
 import { buildFeedbackSignal } from '../../research/revision.ts';
 import { applyFeedbackToRun } from '../../research/application.ts';
 import { runPlanExperiment } from '../../research/experiment.ts';
@@ -39,7 +50,10 @@ import type { ProviderProfile } from '../../llm_gateway/types.ts';
 const CreateResearchSchema = z.object({
   question: z.string().min(1).max(2000),
   profile: z.enum(['offline_replay', RUNTIME_PROVIDER_PROFILE]).default('offline_replay'),
-  source: z.enum(['openalex', 'arxiv', 'crossref']).default('openalex'),
+  /** Source families to ground across (default ['openalex']). */
+  sources: z.array(z.enum(['openalex', 'arxiv', 'crossref'])).min(1).max(3).default(['openalex']),
+  /** Legacy single source — merged into `sources` for back-compat. */
+  source: z.enum(['openalex', 'arxiv', 'crossref']).optional(),
   maxPerQuery: z.number().int().min(1).max(25).default(5),
   target: z.number().int().min(3).max(5).default(3),
 });
@@ -63,6 +77,24 @@ const AnalyzeSchema = z.object({
 export interface ResearchRouteConfig {
   readonly gateway?: LlmGateway;
   readonly profile?: ProviderProfile;
+  /** SSE keepalive ping interval in ms (default 15000; lowered in tests). */
+  readonly eventsPingMs?: number;
+}
+
+/** Checkpoint summary served by GET /:runId/status and the SSE `state` frame. */
+export interface ResearchRunStatusSummary {
+  readonly runId: string;
+  readonly question: string;
+  readonly profile: string;
+  readonly state: string;
+  readonly completedStages: readonly string[];
+  readonly remainingStages: readonly string[];
+  readonly startedAt: string;
+  readonly updatedAt: string;
+  readonly completedAt: string | null;
+  readonly error: string | null;
+  readonly errorKind: string | null;
+  readonly runReady: boolean;
 }
 
 /** Build the gateway+adapter pair for a profile (fail-closed on missing key). */
@@ -91,64 +123,291 @@ function buildPipeline(profile: 'offline_replay' | typeof RUNTIME_PROVIDER_PROFI
   };
 }
 
+/** Terminal lifecycle states (SSE closes after reporting them). */
+function isTerminalState(state: string): boolean {
+  return state === 'COMPLETED' || state === 'FAILED' || state === 'CANCELLED';
+}
+
 export async function registerResearchRoutes(
   app: FastifyInstance,
   _config?: ResearchRouteConfig,
 ): Promise<void> {
-  // Local-first single-user in-memory registry (honest boundary: process-local).
+  // File-backed store is the truth (default .far/research-runs; env override
+  // read once per registration so each server instance is test-pointable).
+  const store = new RunStore(process.env.FAR_RESEARCH_RUNS_DIR ?? DEFAULT_RUNS_ROOT);
+  const pingMs = _config?.eventsPingMs ?? 15_000;
+  // Write-through cache only: lets old tests / concurrent reads resolve runs
+  // without disk round-trips; the store remains the source of truth.
   const registry = new Map<string, ResearchRun>();
 
-  /** POST /research — run the full Track-1A vertical slice once. */
+  /** Load a checkpoint or throw a structured error (404 unknown / 500 corrupt). */
+  const requireCheckpoint = (runId: string): RunCheckpoint => {
+    let cp: RunCheckpoint | null;
+    try {
+      cp = store.loadCheckpoint(runId);
+    } catch (err) {
+      throw new ApiError({
+        statusCode: 500,
+        errorCode: 'research_checkpoint_corrupt',
+        message: `checkpoint for ${runId} is unreadable`,
+        detail: { reason: err instanceof Error ? err.message : String(err) },
+      });
+    }
+    if (cp === null) {
+      throw new ApiError({ statusCode: 404, errorCode: 'research_run_not_found', message: `no research run with id ${runId}` });
+    }
+    return cp;
+  };
+
+  /** Checkpoint → status summary (runReady = frozen run file exists). */
+  const summarize = (cp: RunCheckpoint): ResearchRunStatusSummary => ({
+    runId: cp.runId,
+    question: cp.question,
+    profile: cp.profile,
+    state: cp.state,
+    completedStages: [...cp.completedStages],
+    remainingStages: RESEARCH_STAGE_IDS.filter((s) => !cp.completedStages.includes(s)),
+    startedAt: cp.startedAt,
+    updatedAt: cp.updatedAt,
+    completedAt: cp.completedAt,
+    error: cp.error,
+    errorKind: cp.errorKind,
+    runReady: cp.state === 'COMPLETED' && store.loadRun(cp.runId) !== null,
+  });
+
+  /** POST /research — start one Track-1A run in the background (202 + runId). */
   app.post('/research', async (request, reply) => {
     const body = CreateResearchSchema.parse(request.body);
     const pipeline = buildPipeline(body.profile);
+    const sources = body.source !== undefined
+      ? [...new Set([...body.sources, body.source])]
+      : [...body.sources];
 
-    let run: ResearchRun;
-    try {
-      run = await runResearch({
-        question: body.question,
-        gateway: pipeline.gateway,
-        profile: pipeline.providerProfile,
-        grounding: {
-          source: body.source,
-          maxPerQuery: body.maxPerQuery,
-          ...(pipeline.replayRetrieval
-            ? { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) }
-            : {}),
-        },
-        targetHypothesisCount: body.target,
-        sameModelAsGenerator: true,
+    // Background execution: never awaited here. Failures are recorded in the
+    // checkpoint by executeResearchRun; this .catch only logs (§ brief).
+    const known = new Set(store.listRunIds());
+    void executeResearchRun({
+      question: body.question,
+      gateway: pipeline.gateway,
+      profile: pipeline.providerProfile,
+      grounding: {
+        ...(sources.length > 1 ? { sources } : { source: sources[0] ?? 'openalex' }),
+        maxPerQuery: body.maxPerQuery,
+        ...(pipeline.replayRetrieval
+          ? { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) }
+          : {}),
+      },
+      targetHypothesisCount: body.target,
+      store,
+    })
+      .then((run) => {
+        registry.set(run.runId, run);
+      })
+      .catch((err: unknown) => {
+        request.log.warn(`research run failed (recorded in checkpoint): ${err instanceof Error ? err.message : String(err)}`);
       });
-    } catch (err) {
-      if (err instanceof ResearchabilityBlockedError) {
-        throw new ApiError({ statusCode: 422, errorCode: 'researchability_gate_refused', message: err.message, detail: { verdict: err.report.verdict, reasons: [...err.report.reasons] } });
-      }
-      throw new ApiError({ statusCode: 500, errorCode: 'research_pipeline_failed', message: err instanceof Error ? err.message : String(err) });
-    }
 
-    registry.set(run.runId, run);
-    reply.code(201);
-    return run;
+    // executeResearchRun persists its first checkpoint synchronously before its
+    // first await, so the new run id is on disk by the time we get here.
+    const runId = store.listRunIds().find((id) => !known.has(id));
+    if (runId === undefined) {
+      throw new ApiError({
+        statusCode: 500,
+        errorCode: 'research_run_start_failed',
+        message: 'run did not start (no checkpoint was written)',
+      });
+    }
+    reply.code(202);
+    return {
+      runId,
+      state: 'CREATED',
+      statusUrl: `/api/v1/research/${runId}/status`,
+      eventsUrl: `/api/v1/research/${runId}/events`,
+    };
   });
 
-  /** GET /research/:runId — frozen run (404 when unknown). */
+  /** GET /research — list every run in the store (summary rows). */
+  app.get('/research', async () => {
+    const runs = store.listRunIds().flatMap((runId) => {
+      try {
+        const cp = store.loadCheckpoint(runId);
+        return cp === null
+          ? []
+          : [{
+              runId: cp.runId,
+              question: cp.question,
+              state: cp.state,
+              startedAt: cp.startedAt,
+              updatedAt: cp.updatedAt,
+              error: cp.error,
+            }];
+      } catch {
+        return []; // one corrupt checkpoint must not 500 the whole listing
+      }
+    });
+    return { runs };
+  });
+
+  /** GET /research/:runId/status — checkpoint summary (404 when unknown). */
+  app.get('/research/:runId/status', async (request, reply) => {
+    const { runId } = request.params as { runId: string };
+    const summary = summarize(requireCheckpoint(runId));
+    reply.code(200);
+    return summary;
+  });
+
+  /** GET /research/:runId/events — SSE: state snapshot → live events → close. */
+  app.get('/research/:runId/events', async (request, reply) => {
+    const { runId } = request.params as { runId: string };
+    const cp = requireCheckpoint(runId);
+
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    const send = (frame: string): void => {
+      if (!raw.writableEnded && !raw.destroyed) {
+        raw.write(frame);
+      }
+    };
+
+    // 1. Current state snapshot (lets a late subscriber orient immediately).
+    send(`event: state\ndata: ${JSON.stringify(summarize(cp))}\n\n`);
+
+    // Already terminal → nothing left to forward; close after the snapshot.
+    if (isTerminalState(cp.state)) {
+      raw.end();
+      return;
+    }
+
+    // 2. Forward every lifecycle event; terminal event → send, then close.
+    let unsubscribe: (() => void) | null = null;
+    let heartbeat: NodeJS.Timeout | null = null;
+    let cleaned = false;
+    const cleanup = (): void => {
+      if (cleaned) return;
+      cleaned = true;
+      unsubscribe?.();
+      if (heartbeat !== null) clearInterval(heartbeat);
+      if (!raw.writableEnded && !raw.destroyed) {
+        raw.end();
+      }
+    };
+    unsubscribe = addRunEventListener(runId, (event) => {
+      send(`event: research\ndata: ${JSON.stringify(event)}\n\n`);
+      if (
+        event.type === 'run_completed' ||
+        event.type === 'run_failed' ||
+        event.type === 'run_cancelled'
+      ) {
+        cleanup();
+      }
+    });
+
+    // 3. Keepalive comment line (proxy/LB timeout defense; see events.ts).
+    heartbeat = setInterval(() => {
+      send(': ping\n\n');
+    }, pingMs);
+    heartbeat.unref();
+
+    // Client disconnect → unsubscribe (never leak listeners).
+    raw.on('close', cleanup);
+    raw.on('error', cleanup);
+  });
+
+  /** POST /research/:runId/cancel — request cancellation of an active run. */
+  app.post('/research/:runId/cancel', async (request, reply) => {
+    const { runId } = request.params as { runId: string };
+    const cp = requireCheckpoint(runId);
+    const cancelled = cancelRun(runId);
+    reply.code(200);
+    return { runId, cancelled, state: cp.state };
+  });
+
+  /**
+   * Resolve the gateway for MUTATING a stored run so it matches the run's own
+   * provenance: a LIVE run's revisions must come from the live provider (503
+   * fail-closed when the key is gone), never silently from replay fixtures —
+   * a replay revision inside a LIVE run would be mode confusion (§3.2).
+   */
+  const gatewayForRun = (run: ResearchRun): { gateway: LlmGateway; profile: ProviderProfile } => {
+    if (run.runMode === 'LIVE') {
+      const gateway = resolveRuntimeGateway(process.env);
+      if (gateway === null) {
+        throw new ApiError({
+          statusCode: 503,
+          errorCode: 'research_live_profile_unavailable',
+          message: 'this run is LIVE; mutating it needs an API key in the environment (see far doctor)',
+        });
+      }
+      return { gateway, profile: RUNTIME_PROVIDER_PROFILE };
+    }
+    return {
+      gateway: createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]),
+      profile: 'offline_replay',
+    };
+  };
+
+  /** Load a run file (corrupt → structured 500). */
+  const loadRunFile = (runId: string): ResearchRun | null => {
+    try {
+      return store.loadRun(runId);
+    } catch (err) {
+      throw new ApiError({
+        statusCode: 500,
+        errorCode: 'research_run_corrupt',
+        message: `stored run ${runId} is unreadable`,
+        detail: { reason: err instanceof Error ? err.message : String(err) },
+      });
+    }
+  };
+
+  /** GET /research/:runId — frozen run (409 while not COMPLETED, 404 unknown). */
   app.get('/research/:runId', async (request, reply) => {
     const { runId } = request.params as { runId: string };
-    const run = registry.get(runId);
+    const run = loadRunFile(runId) ?? registry.get(runId) ?? null;
+    if (run !== null) {
+      reply.code(200);
+      return run;
+    }
+    const cp: RunCheckpoint | null = (() => {
+      try {
+        return store.loadCheckpoint(runId);
+      } catch {
+        return null; // corrupt entry → fall through to 404 (loadRunFile reports corruption)
+      }
+    })();
+    if (cp !== null) {
+      throw new ApiError({
+        statusCode: 409,
+        errorCode: 'research_run_not_completed',
+        message: `run ${runId} is ${cp.state} — the frozen ResearchRun is written on COMPLETED`,
+        detail: { state: cp.state },
+      });
+    }
+    throw new ApiError({ statusCode: 404, errorCode: 'research_run_not_found', message: `no research run with id ${runId}` });
+  });
+
+  /**
+   * Resolve a run for the mutation endpoints: store first, in-memory registry
+   * as back-compat fallback (older tests registered runs without a store).
+   */
+  const resolveRun = (runId: string): ResearchRun => {
+    const run = loadRunFile(runId) ?? registry.get(runId);
     if (run === undefined) {
       throw new ApiError({ statusCode: 404, errorCode: 'research_run_not_found', message: `no research run with id ${runId}` });
     }
-    reply.code(200);
     return run;
-  });
+  };
 
   /** POST /research/:runId/feedback — structured feedback → immutable revision. */
   app.post('/research/:runId/feedback', async (request, reply) => {
     const { runId } = request.params as { runId: string };
-    const run = registry.get(runId);
-    if (run === undefined) {
-      throw new ApiError({ statusCode: 404, errorCode: 'research_run_not_found', message: `no research run with id ${runId}` });
-    }
+    const run = resolveRun(runId);
     const body = FeedbackSchema.parse(request.body);
     const feedback = buildFeedbackSignal({
       source: body.source,
@@ -159,14 +418,10 @@ export async function registerResearchRoutes(
       ...(body.triggers !== undefined ? { triggers: body.triggers } : {}),
     });
 
-    const gateway = createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]);
-    const result = await applyFeedbackToRun({
-      run,
-      feedback,
-      gateway,
-      profile: 'offline_replay',
-    });
+    const { gateway, profile } = gatewayForRun(run);
+    const result = await applyFeedbackToRun({ run, feedback, gateway, profile });
     registry.set(runId, result.updated);
+    store.saveRun(runId, result.updated);
     reply.code(200);
     return {
       runId,
@@ -179,10 +434,7 @@ export async function registerResearchRoutes(
   /** POST /research/:runId/analyze — real-data analysis step (Phase 3 loop). */
   app.post('/research/:runId/analyze', async (request, reply) => {
     const { runId } = request.params as { runId: string };
-    const run = registry.get(runId);
-    if (run === undefined) {
-      throw new ApiError({ statusCode: 404, errorCode: 'research_run_not_found', message: `no research run with id ${runId}` });
-    }
+    const run = resolveRun(runId);
     const body = AnalyzeSchema.parse(request.body);
 
     let experiment;
@@ -202,13 +454,15 @@ export async function registerResearchRoutes(
     }
 
     const { updatedRun, observation, feedback } = experiment;
+    const mutationGateway = gatewayForRun(updatedRun);
     const applied = await applyFeedbackToRun({
       run: updatedRun,
       feedback,
-      gateway: createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]),
-      profile: 'offline_replay',
+      gateway: mutationGateway.gateway,
+      profile: mutationGateway.profile,
     });
     registry.set(runId, applied.updated);
+    store.saveRun(runId, applied.updated);
     reply.code(200);
     return {
       runId,
@@ -221,10 +475,7 @@ export async function registerResearchRoutes(
   /** GET /research/:runId/evaluate — program-computed metrics + recompute. */
   app.get('/research/:runId/evaluate', async (request, reply) => {
     const { runId } = request.params as { runId: string };
-    const run = registry.get(runId);
-    if (run === undefined) {
-      throw new ApiError({ statusCode: 404, errorCode: 'research_run_not_found', message: `no research run with id ${runId}` });
-    }
+    const run = resolveRun(runId);
     const outcome = verifyResearchRunDeterministic(run);
     const report = computeRunMetrics(run, outcome.status, new Date().toISOString());
     reply.code(200);
