@@ -14,10 +14,13 @@
 
 /** 研究设计类型（GRADE 证据层级输入轴）。 */
 export type StudyDesign =
+  | 'meta_analysis' // 系统综述/Meta 分析（tier 1·2026-08-16 night-r2 补）
   | 'rct' // 随机对照试验（tier 1）
   | 'quasi_experimental' // 准实验/队列（tier 2）
   | 'observational' // 观察性/病例对照（tier 3）
+  | 'cross_sectional' // 横断面调查（tier 3·2026-08-16 night-r2 补）
   | 'case_report' // 病例报告/案例研究（tier 4）
+  | 'preprint' // 预印本（tier 4·fail-conservative——未经同行评审压过设计词，边界见 grader 注释）
   | 'expert_opinion' // 专家意见（tier 4）
   | 'unspecified'; // 未声明（tier 4·fail-conservative）
 

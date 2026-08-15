@@ -302,6 +302,9 @@ export function computeVerdictDecision(args: {
         scopeSlipText: null,
         untestedReason: fecGate.reason,
         conflictingEvidenceCount: 0,
+        // R10（night-r2 S1 连带字段）：fail-closed UNTESTED 无证据基符号分布可评估 → null。
+        evidenceBaseBias: null,
+        decisiveness: null, // R10 night-r3: additive null (path lacks evidence-vote list)
         metricValue: kernelOutput.statisticalReport.primaryEffectSize,
       };
   const verdictTrace = extractVerdictTrace(kernelOutput);

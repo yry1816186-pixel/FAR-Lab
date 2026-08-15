@@ -24,6 +24,18 @@
  * candidates rely on the model layer (the lexicon is English-first), and
  * REVIEW currently has no human exit — held candidates simply do not proceed.
  * This gate REDUCES dual-use risk; it does not eliminate it.
+ *
+ * Clinical / person-safety layer (directive §2.6 R10, night-r2 S3): Layer 1b
+ * adds deterministic clinical refusals (dosage/prescription generation and
+ * person-harm ingestion requests → CLINICAL_SAFETY_REFUSAL hold, remediation
+ * points to a licensed clinician) and a forced bilingual advisory banner
+ * (`clinicalAdvisory` on the result) for clinical/epidemiology/toxicology/
+ * psych-intervention content that is NOT refused. The banner is a display
+ * disclaimer, never a verdict. Clinical cannot-prove: the screen is a lexical
+ * heuristic — it cannot identify all clinically-actionable content nor
+ * substitute for regulatory review, and the refusal list is deliberately
+ * narrow (dosage/prescription/person-harm) to avoid over-blocking legitimate
+ * research; misses fall through to the model layer or pass unflagged.
  */
 
 import { z } from 'zod';
@@ -32,7 +44,12 @@ import type { ProviderProfile } from '../../llm_gateway/types.ts';
 import { sanitizeExternalContent } from '../../llm_gateway/sanitizer.ts';
 import type { HypothesisCandidate } from '../../research/types.ts';
 import { callStructuredJson } from '../../research/llm.ts';
-import { matchedDualUseRules, type DualUseRule } from './rules.ts';
+import {
+  CLINICAL_ADVISORY_BANNER,
+  matchedClinicalSafetyRules,
+  matchedDualUseRules,
+  type DualUseRule,
+} from './rules.ts';
 
 /** Model-screen response schema (one assessment per candidate INDEX). */
 const SafetyScreenZod = z.object({
@@ -49,7 +66,11 @@ const SafetyScreenZod = z.object({
 });
 
 /** Why a candidate did not proceed. */
-export type SafetyHoldReason = 'DUAL_USE_RULE_MATCH' | 'SAFETY_REVIEW_HELD' | 'SAFETY_SCREEN_FAILED';
+export type SafetyHoldReason =
+  | 'DUAL_USE_RULE_MATCH'
+  | 'CLINICAL_SAFETY_REFUSAL'
+  | 'SAFETY_REVIEW_HELD'
+  | 'SAFETY_SCREEN_FAILED';
 
 /** One non-proceeding candidate with its full audit trail. */
 export interface SafetyHold {
@@ -64,6 +85,14 @@ export interface SafetyHold {
 export interface SafetyScreenResult {
   readonly allowed: readonly HypothesisCandidate[];
   readonly held: readonly SafetyHold[];
+  /**
+   * Forced bilingual health/person-safety disclaimer (directive §2.6 R10):
+   * CLINICAL_ADVISORY_BANNER when ANY screened candidate carried clinical or
+   * person-safety content (advisory vocabulary or a deterministic clinical
+   * refusal); null when the batch is lexically non-clinical. This is a
+   * DISPLAY-LAYER disclaimer, never a verdict — it does not gate anything.
+   */
+  readonly clinicalAdvisory: string | null;
   readonly meta: {
     readonly screened: number;
     readonly blockedCount: number;
@@ -126,10 +155,14 @@ export async function screenCandidatesForDualUse(
 ): Promise<SafetyScreenResult> {
   const held: SafetyHold[] = [];
   const survivors: HypothesisCandidate[] = [];
+  let advisoryRequired = false;
 
   // Layer 1 — deterministic conjunction rules (cannot be overturned later).
+  // Dual-use rules keep priority: a candidate hitting both layers is reported
+  // as DUAL_USE_RULE_MATCH exactly as before (byte-identical legacy behavior).
   for (const candidate of candidates) {
-    const matches: readonly DualUseRule[] = matchedDualUseRules(candidateText(candidate));
+    const text = candidateText(candidate);
+    const matches: readonly DualUseRule[] = matchedDualUseRules(text);
     if (matches.length > 0) {
       held.push({
         candidate,
@@ -140,14 +173,44 @@ export async function screenCandidatesForDualUse(
       });
       continue;
     }
+    // Layer 1b — clinical / person-safety rules (§2.6 R10): deterministic
+    // dosage/prescription/person-harm refusals hold fail-closed; advisory
+    // vocabulary only raises the banner flag (never a hold).
+    const clinical = matchedClinicalSafetyRules(text);
+    const refusals = clinical.filter((r) => r.action === 'refuse');
+    if (refusals.length > 0) {
+      advisoryRequired = true;
+      held.push({
+        candidate,
+        reasonCode: 'CLINICAL_SAFETY_REFUSAL',
+        categories: [...new Set(refusals.map((r) => r.category))],
+        matchedRuleIds: refusals.map((r) => r.id),
+        detail:
+          `clinical safety refusal (fail-closed hold): ${refusals.map((r) => r.id).join(', ')} - ` +
+          'FAR-Lab does not generate dosage, prescription, or person-harm guidance; ' +
+          'consult a licensed clinician for any health decision',
+      });
+      continue;
+    }
+    if (clinical.some((r) => r.action === 'advise')) {
+      advisoryRequired = true;
+    }
     survivors.push(candidate);
   }
+
+  const clinicalAdvisory = advisoryRequired ? CLINICAL_ADVISORY_BANNER : null;
 
   if (survivors.length === 0) {
     return {
       allowed: [],
       held,
-      meta: { screened: candidates.length, blockedCount: held.length, heldCount: 0, modelScreen: 'failed' },
+      clinicalAdvisory,
+      meta: {
+        screened: candidates.length,
+        blockedCount: held.filter((h) => h.reasonCode === 'DUAL_USE_RULE_MATCH').length,
+        heldCount: 0,
+        modelScreen: 'failed',
+      },
     };
   }
 
@@ -181,6 +244,7 @@ export async function screenCandidatesForDualUse(
     return {
       allowed: [],
       held,
+      clinicalAdvisory,
       meta: { screened: candidates.length, blockedCount: 0, heldCount: survivors.length, modelScreen: 'failed' },
     };
   }
@@ -216,6 +280,7 @@ export async function screenCandidatesForDualUse(
   return {
     allowed,
     held,
+    clinicalAdvisory,
     meta: {
       screened: candidates.length,
       blockedCount: held.filter((h) => h.reasonCode === 'DUAL_USE_RULE_MATCH').length,

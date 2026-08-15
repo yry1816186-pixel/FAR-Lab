@@ -308,6 +308,14 @@ never replays pre-baked answers. To enable live inference, pass an explicit env 
 > If `pnpm install` fails on native modules (better-sqlite3), use `docker compose up far-demo` —
 > the Docker image pins the correct toolchain and bypasses host Node version mismatches.
 
+**Windows notes.** The repo enforces LF via `.gitattributes` (byte-level determinism of the
+kernel does not depend on your `core.autocrlf`). Two environment-level tips: (1) if real-time
+antivirus scans lock files during test runs, add the repo directory to the exclusion list —
+FAR-Lab already retries atomic renames on `EPERM`, but exclusions remove the latency; (2) enable
+long-path support (`git config --global core.longpaths true` + the Windows long-path policy) if
+you clone deep under a nested home directory. The Windows CI axis (`windows-latest`) runs the
+full suite on every PR.
+
 ---
 
 ## Documentation
@@ -364,6 +372,18 @@ toolchain is absent.
   Your claims get re-verified as new evidence appears — not just once at submission time.
 - Real API / real data / real GPU usage is explicitly tagged
   `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` / `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`.
+
+---
+
+## Disclaimer
+
+FAR-Lab is a **research tool only**. Its outputs are unvalidated, AI-generated research conjectures —
+**not medical advice** and not clinically validated knowledge. It never produces clinical, dosage, or
+prescription outputs: the deterministic clinical-safety layer (`src/discovery/safety/`) fail-closed
+refuses dosage/prescription/person-harm requests and forces a bilingual "not medical advice" banner
+onto clinical / epidemiology / toxicology / psych-intervention content. That screen is a lexical
+heuristic — it cannot identify all clinically-actionable content and is no substitute for regulatory
+review. **Consult a licensed clinician before any health decision.**
 
 ---
 

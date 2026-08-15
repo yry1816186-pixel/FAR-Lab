@@ -219,6 +219,9 @@ export function applyPlanBGate(
       scopeSlipText: dv.scopeSlipText,
       untestedReason: dv.untestedReason,
       conflictingEvidenceCount: dv.conflictingEvidenceCount,
+      // R10（night-r2 S1 连带字段）：PlanB 风险降级发生在 decideVerdict 之前（证据基
+      // 未被评估）→ 无偏倚注记。非触发路径经下方 `...normalVerdict` 展开自动透传。
+      evidenceBaseBias: null,
       planbTriggered: true,
       planbRisks: result.risks,
       planbCrossRiskFlags: dv.crossRiskFlags,
