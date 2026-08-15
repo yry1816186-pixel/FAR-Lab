@@ -4,8 +4,9 @@
  *
  * Proves: multi_strategy mode runs all 8 stages with per-strategy receipts +
  * a deterministic fan-out receipt; candidates carry strategyOrigin; the
- * deterministic merge gates truncate to targetCount; the legacy default path
- * is untouched (no strategyOrigin, single research_hypotheses receipt).
+ * deterministic merge gates truncate to targetCount. Since the b3 default
+ * flip the bare pipeline IS multi-strategy; the explicit legacy flag keeps
+ * the original single-shot path (zero-regression guard).
  */
 
 import { describe, it } from 'node:test';
@@ -105,8 +106,8 @@ describe('runResearch with hypothesisGenerationStrategy: multi_strategy (full pi
   });
 });
 
-describe('runResearch legacy default (zero-regression guard)', () => {
-  it('without the flag the pipeline is the original single-shot path', async () => {
+describe('hypothesis-generation default (b3 flip: multi-strategy is the default)', () => {
+  it('without the flag the pipeline runs the discovery fan-out', async () => {
     const run = await runResearch({
       question: QUESTION,
       gateway: buildGateway(),
@@ -114,11 +115,36 @@ describe('runResearch legacy default (zero-regression guard)', () => {
       grounding: { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) },
       targetHypothesisCount: 3,
     });
+    assert.ok(run.hypotheses.length >= 1);
+    // Fan-out candidates carry strategy attribution; accounting persisted.
+    assert.ok(run.hypotheses.every((h) => h.strategyOrigin !== undefined));
+    assert.ok(run.stageReceipts.some((r) => r.stageId === 'discovery_fanout'));
+    assert.ok(run.stageReceipts.some((r) => r.stageId === 'discovery_safety_gate'));
+    assert.ok(run.discovery !== null && run.discovery.strategy === 'multi_strategy');
+    assert.ok(run.discovery.fanout !== null);
+  });
+
+  it('explicit legacy flag keeps the original single-shot path (zero-regression guard)', async () => {
+    const run = await runResearch({
+      question: QUESTION,
+      gateway: buildGateway(),
+      profile: 'offline_replay',
+      grounding: { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) },
+      targetHypothesisCount: 3,
+      hypothesisGenerationStrategy: 'legacy',
+    });
     assert.equal(run.hypotheses.length, 3);
     // Legacy candidates carry NO strategy attribution.
     assert.ok(run.hypotheses.every((h) => h.strategyOrigin === undefined));
-    // Exactly the original receipt — no discovery receipts on this path.
+    // Original generation receipt; no fan-out/safety receipts on this path.
+    // (The deterministic tournament is strategy-agnostic and DOES run.)
     assert.ok(run.stageReceipts.some((r) => r.stageId === 'research_hypotheses'));
-    assert.ok(run.stageReceipts.every((r) => !r.stageId.startsWith('discovery_')));
+    assert.deepEqual(
+      run.stageReceipts.filter((r) => r.stageId.startsWith('discovery_')).map((r) => r.stageId),
+      ['discovery_tournament'],
+    );
+    // Legacy runs still record their strategy honestly in the discovery block.
+    assert.ok(run.discovery !== null && run.discovery.strategy === 'legacy');
+    assert.equal(run.discovery.fanout, null);
   });
 });

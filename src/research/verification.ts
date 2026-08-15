@@ -18,6 +18,7 @@ import {
   computeParetoFront,
 } from './scorecard.ts';
 import { admissibleHypotheses, selectPrimaryHypothesis } from './orchestrator.ts';
+import { runHypothesisTournament } from '../discovery/orchestration/tournament.ts';
 import type { CitationBinding, ResearchRun } from './types.ts';
 
 /** The outcome of a deterministic recompute. */
@@ -83,14 +84,22 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
   //    An empty pool means no hypothesis is both fully-bound and falsifiable —
   //    under the fail-closed contract a stored run may not have a primary at
   //    all in that state; a selected primary is a contract violation.
+  //    The deterministic tournament is REPLAYED from the frozen hypothesis
+  //    order + recomputed scorecards (pure — byte-reproducible), so the
+  //    selection rule matches the orchestrator exactly.
   const pool = admissibleHypotheses(run.hypotheses, reBindings, recomputedFalsifiability);
+  const scoredEntries = run.hypotheses
+    .map((candidate, strategyIndex) => ({ candidate, strategyIndex }))
+    .filter((e) => reScorecards[e.candidate.id] !== undefined);
+  const tournament =
+    scoredEntries.length >= 2 ? runHypothesisTournament(scoredEntries, reScorecards) : undefined;
   if (pool.length === 0) {
     failures.push(
       'primary selection FORBIDDEN (no hypothesis is both fully citation-bound and falsifiable, ' +
         'yet a primary was stored — fail-closed contract violated)',
     );
   } else {
-    const primary = selectPrimaryHypothesis(pool, reScorecards);
+    const primary = selectPrimaryHypothesis(pool, reScorecards, tournament);
     if (primary.id !== run.plan.primaryHypothesisId) {
       failures.push(`primary-hypothesis MISMATCH (recomputed ${primary.id}, stored ${run.plan.primaryHypothesisId})`);
     }
@@ -116,6 +125,23 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
     failures.push('falsifiability gate MISMATCH (stored report does not recompute)');
   }
 
+  // 7. Discovery tournament (fully recomputable — pure over the frozen
+  //    hypothesis order + scorecards). A persisted tournament block that does
+  //    not replay byte-for-byte is a tamper/evidence mismatch, fail-closed.
+  if (run.discovery?.tournament != null) {
+    if (tournament === undefined) {
+      failures.push(
+        'discovery tournament MISMATCH (stored tournament but fewer than 2 scored hypotheses recompute)',
+      );
+    } else if (
+      JSON.stringify(tournament.ratings) !== JSON.stringify(run.discovery.tournament.ratings) ||
+      JSON.stringify(tournament.matches) !== JSON.stringify(run.discovery.tournament.matches) ||
+      tournament.meta.degenerate !== run.discovery.tournament.meta.degenerate
+    ) {
+      failures.push('discovery tournament MISMATCH (stored ranking does not replay from frozen scorecards)');
+    }
+  }
+
   return {
     status: failures.length === 0 ? 'PASS' : 'FAIL',
     failures,
@@ -127,6 +153,7 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
       'primary_selection',
       'citation_gate',
       'falsifiability_gate',
+      ...(run.discovery?.tournament != null ? ['discovery_tournament'] : []),
     ],
     notVerifiable: ['model_generation', 'model_critique_dimensions', 'citation_resolution_retrieval'],
   };

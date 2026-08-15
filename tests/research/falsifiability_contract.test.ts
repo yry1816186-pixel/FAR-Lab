@@ -202,6 +202,8 @@ describe('D2 · fail-closed primary selection contract', () => {
         gateway,
         profile: 'offline_replay',
         grounding: { adapter },
+        // The corrupted fixture is the legacy research_hypotheses payload.
+        hypothesisGenerationStrategy: 'legacy',
         targetHypothesisCount: 3,
       }),
       /fail-closed at primary selection/,

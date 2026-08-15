@@ -46,6 +46,12 @@ import type { ResearchRun } from '../../research/types.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
 import { parseStrategyIdList, STRATEGY_IDS, type StrategyId } from '../../discovery/types.ts';
 import type { FanoutMeta } from '../../discovery/generate.ts';
+import {
+  DEFAULT_DISCOVERY_REGISTRY_PATH,
+  readDiscoveryRegistry,
+  verifyDiscoveryRegistryChain,
+  exportDiscoveryRegistry,
+} from '../../discovery/registry.ts';
 import type { DocumentSource, RetrievalAdapter } from '../../retrieval/types.ts';
 
 /** Parsed options for the research command. */
@@ -55,8 +61,12 @@ export interface ResearchArgs {
   readonly maxPerQuery: number;
   readonly profile: 'auto' | 'offline_replay' | 'competition_aliyun_qwen';
   readonly target: number;
-  /** Opt in to the multi-strategy discovery fan-out (directive §2.1). */
-  readonly multiStrategy: boolean;
+  /**
+   * Hypothesis-generation strategy. Default since b3: 'multi_strategy' (the
+   * discovery fan-out, directive §2.1); 'legacy' is the explicit single-shot
+   * opt-out (`--legacy-generation`).
+   */
+  readonly generationStrategy: 'legacy' | 'multi_strategy';
   /** Strategy subset (catalog-ordered; null = all registered). */
   readonly strategies: readonly StrategyId[] | null;
   /** Degrade on source failure instead of failing the grounding closed (§7). */
@@ -113,7 +123,7 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
   let maxPerQuery = 5;
   let profile: 'auto' | 'offline_replay' | 'competition_aliyun_qwen' = 'auto';
   let target = 3;
-  let multiStrategy = false;
+  let generationStrategy: 'legacy' | 'multi_strategy' = 'multi_strategy';
   let strategies: readonly StrategyId[] | null = null;
   let degradeOnSourceFailure = false;
   let json = false;
@@ -160,7 +170,13 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
       continue;
     }
     if (a === '--multi-strategy') {
-      multiStrategy = true;
+      // Default since b3 — accepted for backward compatibility (no-op: the
+      // fan-out is what a bare `far research start` now runs).
+      generationStrategy = 'multi_strategy';
+      continue;
+    }
+    if (a === '--legacy-generation') {
+      generationStrategy = 'legacy';
       continue;
     }
     if (a === '--degrade-on-source-failure') {
@@ -197,9 +213,9 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
     }
     question = question === '' ? a : `${question} ${a}`;
   }
-  if (strategies !== null && !multiStrategy) {
+  if (strategies !== null && generationStrategy === 'legacy') {
     throw new Error(
-      'far research: --strategies requires --multi-strategy (the strategy subset only applies to the discovery fan-out)',
+      'far research: --strategies is incompatible with --legacy-generation (the strategy subset only applies to the discovery fan-out)',
     );
   }
   return {
@@ -208,7 +224,7 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
     maxPerQuery,
     profile,
     target,
-    multiStrategy,
+    generationStrategy,
     strategies,
     degradeOnSourceFailure,
     json,
@@ -268,8 +284,8 @@ interface LifecycleRunArgs {
   /** New run (start); mutually exclusive with runId (resume). */
   readonly question?: string;
   readonly runId?: string;
-  /** Discovery fan-out opt-in (start only; resume replays the checkpointed mode). */
-  readonly multiStrategy?: boolean;
+  /** Hypothesis-generation strategy (start only; resume replays the checkpointed mode). */
+  readonly strategy: 'legacy' | 'multi_strategy';
   /** Strategy subset for the fan-out (start only). */
   readonly strategies?: readonly StrategyId[] | null;
 }
@@ -291,6 +307,36 @@ function renderFanoutSummary(meta: FanoutMeta): void {
   );
 }
 
+/** One concise stderr summary of the deterministic tournament (directive §2.2). */
+function renderTournamentSummary(run: ResearchRun): void {
+  const tournament = run.discovery?.tournament ?? null;
+  if (tournament === null) return;
+  const board = tournament.ratings
+    .map((r) => `#${r.rank} ${r.id.slice(0, 8)} (${r.strategyOrigin ?? 'legacy'}) elo ${r.elo.toFixed(0)} ${r.wins}W/${r.draws}D/${r.losses}L`)
+    .join(' · ');
+  process.stderr.write(
+    `discovery tournament: ${tournament.matches.length} matches${tournament.meta.degenerate ? ' [DEGENERATE: all draws — no ordering information]' : ''}\n` +
+      `  ${board}\n`,
+  );
+}
+
+/** One stderr line on the discovery-registry outcome (from the checkpoint). */
+function renderRegistrationSummary(store: RunStore, runId: string | undefined): void {
+  if (runId === undefined) return;
+  const cp = safeLoadCheckpoint(store, runId);
+  const reg = cp?.discoveryRegistration;
+  if (reg === undefined) return;
+  if (reg.error !== null) {
+    process.stderr.write(`discovery registry: FAILED — ${reg.error}\n`);
+    return;
+  }
+  if (reg.appendedCount > 0 || reg.skippedDuplicates > 0) {
+    process.stderr.write(
+      `discovery registry: ${reg.appendedCount} registered · ${reg.skippedDuplicates} duplicate(s) skipped · ${reg.notRegisteredCount} not qualified (inspect: far research registry)\n`,
+    );
+  }
+}
+
 /**
  * Execute one research run under the lifecycle driver with CLI-grade UX:
  * immediate `run started` line, one stderr line per event, first-SIGINT
@@ -306,9 +352,9 @@ async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
     profile: args.profile,
     ...(args.grounding !== undefined ? { grounding: args.grounding } : {}),
     targetHypothesisCount: args.target,
-    ...(args.multiStrategy === true ? { hypothesisGenerationStrategy: 'multi_strategy' as const } : {}),
+    hypothesisGenerationStrategy: args.strategy,
     ...(args.strategies != null && args.strategies.length > 0 ? { discoveryStrategies: args.strategies } : {}),
-    ...(args.multiStrategy === true ? { onFanoutComplete: renderFanoutSummary } : {}),
+    ...(args.strategy === 'multi_strategy' ? { onFanoutComplete: renderFanoutSummary } : {}),
     ...(args.runId !== undefined ? { runId: args.runId } : {}),
     store,
   });
@@ -363,6 +409,8 @@ async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
         `  run      : ${store.runPath(runId)} (auto-persisted · status: far research status ${runId})\n`,
       );
     }
+    renderTournamentSummary(run);
+    renderRegistrationSummary(store, runId);
     if (args.json) {
       process.stdout.write(`${JSON.stringify(run, null, 2)}\n`);
     } else {
@@ -465,7 +513,7 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
     json: parsed.json,
     out: parsed.out,
     question: parsed.question,
-    ...(parsed.multiStrategy ? { multiStrategy: true } : {}),
+    strategy: parsed.generationStrategy,
     ...(parsed.strategies !== null ? { strategies: parsed.strategies } : {}),
   });
 }
@@ -619,6 +667,8 @@ export async function runResearchResume(args: readonly string[]): Promise<number
     json,
     out: outValue !== undefined ? outValue : null,
     runId,
+    // Resume replays the checkpointed strategy (pre-b3 checkpoints = legacy).
+    strategy: cp.hypothesisGenerationStrategy ?? 'legacy',
   });
 }
 
@@ -1307,6 +1357,107 @@ export async function runResearchBaseline(args: readonly string[]): Promise<numb
     return 0;
   } catch (err) {
     process.stderr.write(`far research baseline: failed — ${err instanceof Error ? err.message : String(err)}\n`);
+    return 1;
+  }
+}
+
+/**
+ * Run `far research registry [--verify] [--export <file>] [--ledger <path>]` —
+ * the Discovery Registry (directive §2.4): list registered conjectures, verify
+ * the hash chain, or write a notarization export.
+ */
+export function runResearchRegistry(args: readonly string[]): number {
+  let verify = false;
+  let exportPath: string | null = null;
+  let ledgerPath: string | undefined;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === '--verify') {
+      verify = true;
+      continue;
+    }
+    if (a === '--export') {
+      exportPath = args[++i] ?? null;
+      if (exportPath === null || exportPath === '') {
+        process.stderr.write('far research registry: --export needs a file path\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--ledger') {
+      ledgerPath = args[++i];
+      if (ledgerPath === undefined || ledgerPath === '') {
+        process.stderr.write('far research registry: --ledger needs a file path\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--json') {
+      continue; // accepted for uniformity; listing is the JSON source anyway
+    }
+    if (a !== undefined && a.startsWith('--')) {
+      process.stderr.write(`far research registry: unknown argument "${a}"\n`);
+      return 2;
+    }
+  }
+  const path = ledgerPath ?? DEFAULT_DISCOVERY_REGISTRY_PATH;
+  try {
+    const records = readDiscoveryRegistry(path);
+    if (verify) {
+      const chain = verifyDiscoveryRegistryChain(records);
+      if (chain.valid) {
+        process.stdout.write(`discovery registry: chain VERIFIED · ${records.length} record(s) · head=${records.length > 0 ? records[records.length - 1]!.recordHash.slice(0, 16) : '(empty)'}\n`);
+      } else {
+        process.stderr.write(
+          `discovery registry: chain BROKEN at record ${chain.firstBrokenIndex} — ${chain.reason}\n`,
+        );
+        return 1;
+      }
+    }
+    if (exportPath !== null) {
+      const exported = exportDiscoveryRegistry(path);
+      const dir = dirname(exportPath);
+      if (dir !== '.' && dir !== '') mkdirSync(dir, { recursive: true });
+      writeFileSync(exportPath, JSON.stringify(exported, null, 2) + '\n', 'utf8');
+      process.stdout.write(
+        `discovery registry: exported ${exported.recordCount} record(s) → ${exportPath} (chainHead=${exported.chainHead.slice(0, 16)}…)\n`,
+      );
+    }
+    if (!verify && exportPath === null) {
+      if (records.length === 0) {
+        process.stdout.write(
+          `discovery registry: empty (no LIVE/MIXED run has registered a CORROBORATED conjecture yet · ledger: ${path})\n` +
+            '  note: registry records prove registration provenance, NOT scientific truth or novelty (directive §2.4).\n',
+        );
+        return 0;
+      }
+      const lines: string[] = [
+        '',
+        '  FAR-Lab · far research registry — Discovery Registry (§2.4)',
+        `  ledger: ${path} · ${records.length} record(s)`,
+        '  ─────────────────────────────────────────────────────────────────────',
+      ];
+      const header = '  registryId        | state            | strategyOrigin | registeredAt';
+      lines.push(header);
+      lines.push('  ' + '-'.repeat(header.length - 2));
+      for (const r of records) {
+        const origin = r.provenance.strategyOrigin ?? 'legacy';
+        lines.push(
+          `  ${r.registryId.padEnd(17)} | ${r.state.padEnd(16)} | ${origin.padEnd(14)} | ${r.registeredAt}`,
+        );
+      }
+      lines.push(
+        '  ─────────────────────────────────────────────────────────────────────',
+        '  records prove registration provenance (when/what/run) — NOT truth or',
+        '  novelty. NOVEL_* additionally requires literature search + human review.',
+        `  verify: far research registry --verify   · notarize: --export <file>`,
+        '',
+      );
+      process.stdout.write(lines.join('\n'));
+    }
+    return 0;
+  } catch (err) {
+    process.stderr.write(`far research registry: failed — ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
   }
 }

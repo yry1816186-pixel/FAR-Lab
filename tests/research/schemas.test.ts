@@ -1,12 +1,14 @@
 /**
  * tests/research/schemas.test.ts — canonical zod schemas for the research domain.
  *
- * Pins three contracts:
+ * Pins four contracts:
  *   1. Round-trip: a live-produced run serializes → parses → validates
  *      (boundary deserialization is fail-closed, not `as`).
  *   2. v2 compatibility: a pre-gate run file upgrades deterministically
- *      (relations + both gates recomputed, schemaVersion → 3).
- *   3. Rejection: malformed runs fail with the offending path named.
+ *      (relations + both gates recomputed, discovery: null, schemaVersion → 4).
+ *   3. v3 compatibility: a pre-discovery run file upgrades with discovery: null
+ *      (absence of accounting ≠ absence of discovery — never fabricated).
+ *   4. Rejection: malformed runs fail with the offending path named.
  */
 
 import { describe, it } from 'node:test';
@@ -87,11 +89,26 @@ function minimalV3Run(): unknown {
 }
 
 describe('parseResearchRunJson', () => {
-  it('accepts a valid v3 run (round-trip through the boundary)', () => {
-    const run = validateResearchRun(minimalV3Run());
+  it('validates a v4 run directly (discovery present)', () => {
+    const v4 = { ...(minimalV3Run() as Record<string, unknown>), discovery: null, schemaVersion: 4 };
+    const run = validateResearchRun(v4);
     assert.equal(run.runId, 'r1');
-    assert.equal(run.schemaVersion, 3);
+    assert.equal(run.schemaVersion, 4);
+    assert.equal(run.discovery, null);
     assert.equal(run.citationGate.gateVerdict, 'PASS');
+  });
+
+  it('rejects a v4-shaped run missing the discovery block (required since v4)', () => {
+    const broken = minimalV3Run() as Record<string, unknown>;
+    broken.schemaVersion = 4;
+    delete broken.discovery;
+    assert.throws(() => validateResearchRun(broken), /discovery/);
+  });
+
+  it('accepts a valid v3 run through the parse boundary (upgraded: discovery null)', () => {
+    const run = parseResearchRunJson(JSON.stringify(minimalV3Run()));
+    assert.equal(run.schemaVersion, 4, 'v3 files upgrade to the current shape');
+    assert.equal(run.discovery, null, 'pre-discovery accounting is null, never fabricated');
   });
 
   it('rejects a malformed run and names the offending path', () => {
@@ -112,7 +129,8 @@ describe('parseResearchRunJson', () => {
     delete v2.falsifiabilityGate;
     v2.schemaVersion = 2;
     const run = parseResearchRunJson(JSON.stringify(v2));
-    assert.equal(run.schemaVersion, 3);
+    assert.equal(run.schemaVersion, 4);
+    assert.equal(run.discovery, null, 'v2 runs predate discovery persistence entirely');
     assert.equal(run.citationGate.boundRate, 1);
     assert.equal(run.falsifiabilityGate.allPassed, true);
   });

@@ -108,6 +108,7 @@ describe('adapter routing + interpretation', () => {
   const baseRun = (corpus: CorpusSnapshot): ResearchRun => ({
       runId: 'r-land',
       question: Q,
+      discovery: null,
       gateReport: {
         question: Q,
         verdict: 'RESEARCHABLE',
