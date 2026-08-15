@@ -29,6 +29,7 @@ import type { BenchmarkReportV2 } from '../../src/benchmark/report_schema.ts';
 import { VERDICTS } from '../../src/schema/enums.ts';
 import { computeMerkleRoot } from '../../src/evidence_log/merkle_root.ts';
 import { loadReport, __resetBenchmarkCache } from '../../src/api/routes/benchmark.ts';
+import { ensureBenchmarkReport } from '../_helpers/benchmark_report.ts';
 
 const FIXED_NOW = (): string => '2026-06-29T00:00:00.000Z';
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -104,9 +105,10 @@ test('reproHash 是 run 实例标识（含 ulid verdictId·跨运行可能不同
   }
 });
 
-test('suiteIntegrityRoot 与 git-tracked benchmark_report.json 一致（CI golden 锚·防回归）', () => {
-  // git-tracked JSON 由 generate 脚本生成，其 suiteIntegrityRoot 是 golden。
+test('suiteIntegrityRoot 与确定性生成物 benchmark_report.json 一致（CI golden 锚·防回归）', () => {
+  // R6 仓库内容政策（2026-08-15）：报告不再 git 跟踪，ensure 先确定性生成（fixed now → golden 锚不变）。
   // 若聚合逻辑 / sort / seed 变更导致 suiteIntegrityRoot 漂移 → 此测试失败 → 提示重新 generate。
+  ensureBenchmarkReport();
   __resetBenchmarkCache();
   const tracked = loadReport();
   assert.equal(

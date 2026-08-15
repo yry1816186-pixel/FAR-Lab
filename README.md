@@ -260,7 +260,7 @@ produces a falsifiability verdict nor runs anti-theater detection.
 | **`.far-proof`** | A self-verifiable offline bundle (claim graph + redacted chain + proofHash) exportable via `far export far-proof` |
 | **FEC** | Falsifiability Evidence Contract — a frozen, hashed measurement/statistical plan |
 
-Deeper: [docs/concepts/far-proof.md](docs/concepts/far-proof.md) · [docs/concepts/evidence-ledger.md](docs/concepts/evidence-ledger.md)
+Deeper: see the concept table above and `far <command> --help` for per-command contracts.
 
 ---
 
@@ -285,7 +285,7 @@ pnpm far ask "<question>" --profile competition_aliyun_qwen
 ```
 
 Core gates and the offline demo run **without** this key. The CI `competition_qwen_smoke` job is a
-conditional gate that gracefully skips when the key is absent. Setup: [docs/providers/qwen-dashscope.md](docs/providers/qwen-dashscope.md)
+conditional gate that gracefully skips when the key is absent. Provider setup: see `.env.example`.
 
 ---
 
@@ -318,12 +318,8 @@ provider, pass an explicit env file: `docker compose --env-file .env up far-api`
 
 ## Documentation
 
-- **学习路径（Learning Path）**: [docs/learning/00_START_HERE.md](docs/learning/00_START_HERE.md) — 从零到扩展者的完整课程（13 章 + 动手练习）
-- **Competition judges (5-min guide)**: [Judge Quick-Start](docs/JUDGE_QUICKSTART.md)
-- **Getting started**: [Quickstart](docs/quickstart.md) · [Installation](docs/installation.md) · [Full index](docs/INDEX.md)
-- **Concepts**: [Proof bundles](docs/concepts/far-proof.md) · [Evidence ledger](docs/concepts/evidence-ledger.md) · [Evidence grading (GRADE)](docs/concepts/evidence-grading.md) · [Research integrity](docs/concepts/research-integrity.md) · [Reporting checklist (PRISMA/CONSORT)](docs/concepts/reporting-checklist.md)
-- **Providers**: [Qwen / DashScope](docs/providers/qwen-dashscope.md)
-- **Architecture**: [docs/INDEX.md](docs/INDEX.md)
+- This README (EN + [zh-CN](README.zh-CN.md)) is the documentation surface: quickstart, installation, architecture, concepts, and the full command reference via `far --help` / `far <command> --help`.
+- Extended internal documentation is intentionally not distributed in the repository (repo carries source + user-facing docs only).
 
 ---
 
@@ -390,9 +386,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions must pass
 All code in this repository was written by **AI coding agents** (Claude Code AI); the human
 author is responsible for design decisions, requirements, acceptance, and release. The
 deterministic test suite (2618 tests) independently validates behavior. Per-commit human
-line-by-line review is **not yet established** — see
-[docs/concepts/research-integrity.md](docs/concepts/research-integrity.md) §5 for the full
-disclosure + what this project can and cannot prove. At runtime, LLMs (Qwen family) are used
+line-by-line review is **not yet established** — see the Known-limits section of this README for
+the full disclosure + what this project can and cannot prove. At runtime, LLMs (Qwen family) are used
 **only as evidence generators**; the verdict is produced by a deterministic rule kernel
 (R0–R9, no LLM arbiter — enforced by `no_llm_final_judge_scan` in CI).
 

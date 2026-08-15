@@ -11,6 +11,10 @@ import { test } from 'node:test';
 
 import { runStatus } from '../../src/cli/commands/status.ts';
 import { collectStatusDump, TEST_GLOBS, toStatusJson } from '../../src/cli/status_dump.ts';
+import { ensureBenchmarkReport } from '../_helpers/benchmark_report.ts';
+
+// R6 仓库内容政策（2026-08-15）：suiteIntegrityRoot 的确定性锚来自生成物报告（不 git 跟踪·按需生成）。
+ensureBenchmarkReport();
 
 test('collectStatusDump: phase A cheap 字段从仓库实测', () => {
   const dump = collectStatusDump();
@@ -34,8 +38,9 @@ test('collectStatusDump: phase A cheap 字段从仓库实测', () => {
     '0011 anti-theater trigger V2 须在 migrationFiles',
   );
 
-  // docCount：docs/**/*.md 实测（纯净仓库口径·docs/ 是用户文档根）
-  assert.ok(dump.docCount > 0, 'docCount 应 > 0');
+  // docCount：docs/**/*.md 实测——R6 仓库内容政策（2026-08-15）后 docs/ 退出仓库：
+  // 本仓库合法态为 0（内部文档移居 .far/docs-local/ 本地）；若未来重建用户文档根则 >0。
+  assert.ok(dump.docCount >= 0, 'docCount 应为非负整数（R6 后 docs/ 不在仓库=0 为合法态）');
 });
 
 test('collectStatusDump: golden 印证 01§4.4（REPRO_CONTEXT_FIXTURE 单向量 hex 非 merkle 根）', () => {
