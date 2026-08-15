@@ -95,6 +95,14 @@ pnpm far verify /tmp/tampered
 pnpm far export far-proof --demo-chain --force
 ```
 
+**Exit-code semantics of `far verify --bundle`** (so scripts read it correctly): `0` = all
+recomputation axes passed; `1` = **partial recompute (WARN)** — the hash chain and tamper check
+are clean but some environment-gated axes (Python / browser Web-Crypto) did not run on this
+machine — this is an honest *not fully recomputed* state, not a verification failure; `7` =
+tampering detected (recomputation mismatched the stored evidence). A `status: WARN` with
+`tamperStatus: clean` therefore means "chain intact, fewer independent re-computers than
+possible" — rerun on a machine with the Python axis installed for the full three-axis result.
+
 The same guarantees the quickstart walks through — bundle integrity, tamper detection (exit 7 on
 edited evidence), and independent recomputation — are asserted end-to-end by the test suite
 (`tests/far_proof/`, `tests/cli/export_far_proof.test.ts`), so a regression in any of them fails
@@ -471,3 +479,9 @@ not represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or 
     transitive dependencies, and fully locking the environment (Docker/WholeTale-style) is a V2 item.
 
 
+12. **Figure/table evidence is out of scope (v1)** — FAR-Lab's evidence pipeline ingests text
+    metadata and abstracts, plus structured experimental observations. It does **not** extract
+    quantitative evidence from paper figures (effect-size curves, spectra, scatter trends).
+    Claims resting primarily on figure-only evidence will show incomplete evidence coverage —
+    by design, honestly — until figure-to-data extraction lands (image-understanding vs
+    vectorized-PDF parsing routes under ADR evaluation, post-competition track).

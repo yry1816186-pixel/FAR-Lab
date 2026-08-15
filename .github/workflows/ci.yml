@@ -558,6 +558,32 @@ jobs:
   #       串行链末端依赖，须全绿才可合并。
   # 
   # ============================================================
+  # STEP 17 · latex_compile（R10 §12 T1：LaTeX 报告在 doc CI 编译通过）
+  # 渲染器产物用真实 TeX 引擎编译验证（pdflatex；booktabs/longtable/hyperref
+  # 在 texlive-latex-recommended 内）。非阻断并行 job——编译红=渲染器语法缺陷。
+  latex_compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends texlive-latex-recommended
+      - name: Render fixture .tex through the real renderer
+        run: node scripts/latex_compile_check.mjs
+      - name: Compile with pdflatex (nonstop; two passes for refs)
+        run: |
+          cd .far/latex
+          pdflatex -interaction=nonstopmode -halt-on-error report-fixture.tex
+          pdflatex -interaction=nonstopmode -halt-on-error report-fixture.tex
+          test -s report-fixture.pdf
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: latex-compiled-report
+          path: .far/latex/report-fixture.pdf
+          if-no-files-found: error
+
   blocking_gates:
     needs: merkle_integrity_smoke
     if: ${{ always() && (needs.merkle_integrity_smoke.result == 'success' || needs.merkle_integrity_smoke.result == 'skipped') }}
