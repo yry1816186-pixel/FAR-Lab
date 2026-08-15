@@ -1,12 +1,12 @@
 /**
  * create_params.test.ts —— buildCreateParams 的 R1 互斥守卫 + N3 反幻觉测试。
  *
- * 历史溯源（已归档）: archived-spec §0 N3 + §2.2 R1 + §4.2 buildCreateParams SSOT.
+ * 历史溯源（已归档）: N3 + §2.2 R1 + §4.2 buildCreateParams SSOT.
  *
  * 测试框架：node:test + node:assert/strict（禁 vitest·06§10 用 vitest 是 spec 示例·项目实际用 node:test）。
  *
  * 模型守卫下沉：R1 模型守卫（modelId 与 enableThinking 路由匹配）由 adapter 负责——
- *   src/llm_gateway/adapters/aliyun_qwen/create_params.ts（assertQwenModel + 路由）+
+ *   src/llm_gateway/adapters/aliyun_qwen/create_params.ts（assertQwenModel + 路由）
  *   tests/llm_gateway/aliyun_qwen_adapter.test.ts + tests/ci/competition_qwen_smoke.test.ts 守护。
  *   本测试只验证 core 的 R1 互斥守卫 + responseFormat 派生 + N3 反幻觉 + enableThinking 顶层字段
  *   （均不依赖模型身份），故 modelId 用 mock 占位符（core 不持任何模型 ID 常量·模型中立红线）。

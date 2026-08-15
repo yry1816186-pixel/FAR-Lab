@@ -3,7 +3,7 @@
 // FUSION-OS-4 端到端 RED→GREEN：spawnVenv 前 preflightWorkingDir 预算预扫（.git-cap /
 // symlink-O_NOFOLLOW / 文件数 cap / container 检测·Open Science gitScanWorker 范式·用户态降级版）。
 //
-// 单一真实依赖（CLAUDE.md §1）：
+// 单一真实依赖：
 //   - 真实 preflightWorkingDir（src/science_harness/sandbox_runner.ts:preflightWorkingDir）
 //     真实 existsSync(.git) + readdirSync({withFileTypes}) + Dirent.isSymbolicLink() lstat 等价遍历
 //     （非 Fake·真实 fs 操作 + 文件数计数 + symlink 形状判定）。
@@ -17,11 +17,10 @@
 //   GREEN（接线后）：preflightWorkingDir 在 spawn 前 .git-cap 拒绝 / symlink O_NOFOLLOW 拒绝 /
 //     文件数 > cap 拒绝；spawnVenv 调用 preflight，fail-closed → exitCode 126 + 不 spawn。
 //
-// 反剧场红线（FUSION-OS-4 + CLAUDE.md §5）：收窄伪造窗口。spawn 前显式拒绝已知恶意形状，
+// 反剧场红线（FUSION-OS-4）：收窄伪造窗口。spawn 前显式拒绝已知恶意形状，
 // 非 OS 级强隔离保证（07_RISK_REGISTER §188·真隔离 V2 路线·诚实声明）。
 //
-// Authority: archived-plan §C FUSION-OS-4 +
-//            archived-plan §4 FUSION-OS-4（gitScanWorker 范式）。
+// Authority: FUSION-OS-4（gitScanWorker 范式）。
 
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';

@@ -1,5 +1,5 @@
 // tests/planning/risk.test.ts
-// opencode /risk 源代码化测试：P0-P4 确定性分级（AGENT-LIFECYCLE §4）。
+// P0-P4 确定性分级。
 // 真实依赖：gradeRisk / isHigherRisk / maxRisk（src/planning/risk.ts，无 mock）。
 
 import { strict as assert } from 'node:assert';

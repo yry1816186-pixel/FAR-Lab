@@ -119,7 +119,7 @@ export const zh = {
   'about.pillar2.desc': '追加式哈希链 + Merkle 根让任何篡改可被重算发现（篡改可检测，非物理不可改）。',
   'about.pillar3.title': '可独立复算',
   'about.pillar3.subtitle': '自行验证',
-  'about.pillar3.desc': '评委可在自己机器上重算证明头 / 裁决轨迹 / 关键哈希，重算失败给出结构化差异。',
+  'about.pillar3.desc': '任何人可在自己机器上重算证明头 / 裁决轨迹 / 关键哈希，重算失败给出结构化差异。',
   'about.stackTitle': '技术栈',
   'about.stackBody': 'React + TypeScript + Fastify + SQLite、追加式哈希链证据日志、以及 Merkle 完整性证明——第三方可独立复算的 .far-proof 便携制品。',
   'about.honestyTitle': '诚实声明',
@@ -763,9 +763,9 @@ export const zh = {
   'vdiff.card.untestedReason': '未测试原因：',
   'vdiff.card.created': '创建：',
   'vdiff.honesty': '诚实边界：根据项目设计意图，FSM 循环内的裁决内核重入是 V2 路线图项。本页展示由 supersede 关系链接的版本，不会自动触发假设再生。IC-15 T1\' 通过 stage6 prompt 注入先前裁决作为软建议；stage6 LLM 保留对 continueIteration 的独立控制。',
-  // ---- Track-1A research workbench ----
+  // ---- research workbench ----
   'nav.research': '科研工作台',
-  'research.title': '科研工作台（赛道一·方向一·A）',
+  'research.title': '科研工作台',
   'research.subtitle': '科学问题 → 真实文献检索 → 候选假设生成与比较 → 可执行研究计划 → 反馈修订 → 真实数据分析 → 导出验证',
   'research.createTitle': '新建研究',
   'research.createHint': '输入科学问题，运行完整纵向切片（研究可行性门 → 文献 grounding → 3-5 个机制不同的候选假设 → 独立批判 → 评分 → 研究计划）',
@@ -818,7 +818,7 @@ export const zh = {
   'research.failed.retryHint': '重试仅限 CLI：far research resume <runId> 将从最近保存的检查点继续。',
   'research.failed.epermHint': '文件锁（杀毒/索引服务）短暂阻塞了检查点写入——恢复运行通常可以成功：far research resume {runId}',
   'overview.quick.research.title': '科研工作台',
-  'overview.quick.research.desc': '科学问题 → 候选假设 → 研究计划 → 反馈修订（Track-1A 主流程）',
+  'overview.quick.research.desc': '科学问题 → 候选假设 → 研究计划 → 反馈修订（科研主流程）',
 } as const;
 
 export type MessageKey = keyof typeof zh;

@@ -1,7 +1,6 @@
 /**
  * error_handler 测试——统一错误响应格式（RFC 7807 子集·24§0.6）。
  *
- * 历史溯源（已归档）: archived-spec网关与接口规范_API_GATEWAY.md §0.6 / §5.
  *
  * 覆盖：
  *   - ApiError 携带 source_anchor（fileId/stageId/callRecordId 三元定位·24 红线）

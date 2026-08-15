@@ -21,7 +21,7 @@
  *      `gitCommitSha` + `appendOptions`。理由：项目实际 LLM 调用入口是
  *      `evidence_log.callAndRecordLlm(db, gateway, args)`（非 spec §5.1 的
  *      `callBailianStructured`·该函数项目未实现）。callAndRecordLlm 需要 LlmGateway +
- *      ProviderProfile + LlmRecordMetadata（含 finishReason/reproHash/gitCommitSha）+
+ *      ProviderProfile + LlmRecordMetadata（含 finishReason/reproHash/gitCommitSha）
  *      AppendRecordOptions。StageContext 持有这些依赖，stage 执行器才能完成
  *      「调 LLM → 提取 finishReason → 构造 metadata → 落 evidence_log」全流程。
  *      offline_replay profile 时 gateway 用 offline_replay adapter（Core 模型中立·无真实 client）。
@@ -390,12 +390,12 @@ export interface AgentLoopError {
 // ---------- §3.6 ResearchPaperOutput（10 字段·确定性映射·禁 LLM-as-judge） ----------
 
 /**
- * 研究论文输出——六阶段全部产物汇总后的比赛要求 10 字段结构。
+ * 研究论文输出——六阶段全部产物汇总后的10 字段结构。
  *
  * 由 paperAssembler 在 runAgentLoop 结束后从 LoopState 聚合而成，
  * 不经 LLM 调用（确定性映射函数·禁 LLM-as-judge）。
  *
- * 字段对齐 OFFICIAL_赛题要求_权威核实.md §3.2 + 赛道一A「生成结果规范」10 字段。
+ * 字段对齐「生成结果规范」10 字段。
  */
 export interface ResearchPaperOutput {
   /** 论文标题（符合学术出版规范） */

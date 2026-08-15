@@ -1,5 +1,5 @@
 /**
- * kernel_evidence_quality.test.ts —— verdict kernel 证据质量透明度层（批次 2-D）。
+ * kernel_evidence_quality.test.ts —— verdict kernel 证据质量透明度层。
  *
  * 覆盖：
  *   1. 未提供 studyDesign → 输出与历史一致（零回归：无 evidenceQuality 字段·verdict 不变）。

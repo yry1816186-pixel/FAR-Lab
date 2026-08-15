@@ -1,7 +1,7 @@
 /**
  * Deterministic two-sample permutation test on the mean difference.
  *
- * Background (T-006/T-044 · 2026-07-24 评委逼问第 3 轮 CP-9): 评委02/07 identified the
+ * Background (T-006/T-044 · 2026-07-24 CP-9): identified the
  * B→A- science-depth gap — `src/statistics/` covered t-test-style p-values, effect sizes,
  * CIs, multiple testing, and (after T-046) KS, but lacked non-parametric resampling methods
  * (permutation/bootstrap). Permutation tests are the gold standard for non-parametric

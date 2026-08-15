@@ -28,7 +28,7 @@ import type { ClaimEnvelope, ProofEnvelopeV2 } from './types.ts';
 /**
  * normalizeWhitespace（§2.4 line 257·APPENDIX_C §1.4）：
  * 统一 \r\n→\n、\r→\n、折叠 [ \t]+→单空格、trim。
- * 同时做 Unicode NFC 归一化（评委08 F-4-007·防止 NFC/NFD 等价表示导致跨语言 hash 分裂）。
+ * 同时做 Unicode NFC 归一化（F-4-007·防止 NFC/NFD 等价表示导致跨语言 hash 分裂）。
  * 与 Python normalize_whitespace byte-equal（Python 端 unicodedata.normalize('NFC', text)）。
  */
 export function normalizeWhitespace(text: string): string {
@@ -88,7 +88,7 @@ export function computeProofHashV2(envelope: Omit<ProofEnvelopeV2, 'proofHash'>)
  *   - 'malformed_envelope' : 信封结构损坏（缺字段/类型错·非篡改而是输入错误）
  *
  * 旧 boolean API 仍保留（verifyProofHashV2Boolean）用于只关心"是否通过"的调用方。
- * 新 API 让第三方独立复算时能区分"被篡改"和"输入格式错误"（评委08 F-4-005）。
+ * 新 API 让第三方独立复算时能区分"被篡改"和"输入格式错误"（F-4-005）。
  */
 export type ProofHashVerificationResult =
   | 'valid'

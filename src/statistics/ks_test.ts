@@ -1,11 +1,11 @@
 /**
  * Deterministic two-sample Kolmogorov–Smirnov (KS) test.
  *
- * Background (T-046 · 2026-07-24 评委逼问第 2 轮→第 3 轮): the a16 pulsar demo seed's plan
+ * Background (T-046 · 2026-07-24 ): the a16 pulsar demo seed's plan
  * lists "Two-sample KS test for P₀ distributions" as a method, but `src/statistics/` had no KS
  * implementation — the plan was not backed by capability. This module provides the real, fully
  * deterministic KS implementation so the plan is genuine. It also widens the statistical surface
- * (permutation/bootstrap/KS) toward closing the B→A- science-depth gap (评委02 T-006/T-044).
+ * (permutation/bootstrap/KS) toward closing the B→A- science-depth gap (T-006/T-044).
  *
  * Algorithm (two-sided two-sample KS — standard, ref: Numerical Recipes §14.3 / Massey 1951):
  *   1. D_{n,m} = sup_x |F̂_1(x) − F̂_2(x)| (empirical-CDF gap, two-sided);

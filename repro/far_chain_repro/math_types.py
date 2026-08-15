@@ -1,15 +1,15 @@
-"""Math verification layer enum mirrors (spec 38 §1 / §1.1).
+"""Math verification layer enum mirrors (§1 / §1.1).
 
 These constants MUST stay byte-equal with the TypeScript enums in
 ``src/math/math_claim.ts`` and the SQL CHECK constraints in
 ``schema/migrations/0003_math_verification.sql``. Cross-language drift
 (TS ↔ SQL) is guarded by ``tests/schema/schema_enum_sync.test.ts``.
 
-Authority: archived-spec数学可验证层_MATH_VERIFICATION.md §1-§4.5.
+Authority: §4.5.
 
 Model-neutrality: this module contains NO provider/model references. It mirrors
 the structural typing of the math verification layer for cross-language hash
-determinism (spec 03 §2.4 canonical_hash byte-equality).
+determinism (§2.4 canonical_hash byte-equality).
 """
 
 from __future__ import annotations

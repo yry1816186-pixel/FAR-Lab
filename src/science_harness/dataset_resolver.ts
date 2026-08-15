@@ -1,5 +1,5 @@
 /**
- * Dataset resolver — 数据集解析决策树（spec 12 §2.1-§2.2）。
+ * Dataset resolver — 数据集解析决策树（§2.1-§2.2）。
  *
  * 三值决策：
  *   lightkurve / astroquery.mast（在线查询·白名单 host）：
@@ -12,7 +12,7 @@
  *
  * 诚实铁律（F1/F9）：cached 结果**绝不**升 CONFIRMED；fixture 缺失**绝不**伪造。
  *
- * 历史溯源：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §2.2（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准。
+ * 历史溯源：（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准。
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */
 
@@ -28,7 +28,7 @@ import { buildVenvPythonEnv, resolveVenvPython } from './sandbox_runner.ts';
 
 const DATASET_FETCH_PY = join(PACKAGE_ROOT, 'repro', 'science_harness', 'dataset_fetch.py');
 
-/** 在线数据集白名单 host（SR-5 · spec 12 §2.2）。 */
+/** 在线数据集白名单 host（SR-5 · §2.2）。 */
 export const DATASET_HOST_WHITELIST = [
   'mast.stsci.edu',
   'heasarc.gsfc.nasa.gov',
@@ -44,7 +44,7 @@ export const DATASET_HOST_WHITELIST = [
  * @param cachedFixture 仓库内置 fixture（在线失败时兜底）。
  *
  * V1 诚实边界：本函数不执行真实网络请求（F4·V1 类型层）。
- * 调用方传入 onlineAttempt 的结果形态，本函数按 spec 12 §2.2 决策树映射为三态。
+ * 调用方传入 onlineAttempt 的结果形态，本函数按 §2.2 决策树映射为三态。
  */
 export function resolveDataset(args: {
   readonly onlineAttempt: { readonly ref: DatasetRef; readonly hostWhitelisted: boolean } | null;
@@ -184,8 +184,8 @@ interface DatasetFetchResponse {
  * 返回 onlineAttempt 形态喂给 resolveDataset；任一失败（非白名单 host / 缺 lightkurve /
  * 网络不可达 / MAST 限流 / JSON 解析失败）→ null，resolveDataset 据此落 cached_fixture。
  *
- * 诚实边界（CLAUDE.md §3）：缺 lightkurve 或网络不可达是**环境问题**，不当代码 bug——
- * 调用方应据返回 null 走 cached_fixture 降级路径（02 F1 never-fabricate）。
+ * 诚实边界：缺 lightkurve 或网络不可达是**环境问题**，不当代码 bug——
+ * 调用方应据返回 null 走 cached_fixture 降级路径（never-fabricate 红线）。
  */
 interface OnlineFetchAttempt {
   readonly result: OnlineFetchResult | null;
@@ -207,7 +207,7 @@ async function attemptOnlineFetch(
 
     const stdoutChunks: Buffer[] = [];
     // stderr 须 drain（否则子进程警告填满 OS pipe buffer ~64KB 后 write 阻塞 → spawn 挂起至 timeout）。
-    // astropy/lightkurve 发大量 warning；捕获同时供失败诊断（02 F1 never-fabricate：fetch 失败有 stderr 可查，非静默 null）。
+    // astropy/lightkurve 发大量 warning；捕获同时供失败诊断（never-fabricate 红线：fetch 失败有 stderr 可查，非静默 null）。
     const stderrChunks: Buffer[] = [];
     let settled = false;
     const finish = (result: OnlineFetchResult | null, permanent: boolean): void => {
@@ -270,7 +270,7 @@ async function attemptOnlineFetch(
 }
 /** Spawn dataset_fetch.py to fetch a dataset online (lightkurve / astroquery.mast).
  * Returns null on any failure (non-whitelisted host, network, MAST rate-limit).
- * Caller should fall back to cached_fixture on null (02 F1 never-fabricate).
+ * Caller should fall back to cached_fixture on null (never-fabricate 红线).
  * @param params Fetch configuration including resolver, host, and retry options.
  * @returns The fetched dataset reference, or null on failure. */
 export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<OnlineFetchResult | null> {
@@ -296,7 +296,7 @@ export async function fetchOnlineDataset(params: OnlineFetchParams): Promise<Onl
   };
 
   // retry/backoff（MAST 限流 / 网络抖动 / 超时为瞬时失败 → 重试；python 缺失 / lightkurve 未装为永久 → 不重试）。
-  // 任一失败最终落 cached_fixture（02 F1 never-fabricate·调用方据 null 降级）。
+  // 任一失败最终落 cached_fixture（never-fabricate 红线·调用方据 null 降级）。
   const maxAttempts = params.maxAttempts ?? 3;
   const backoffMs = params.backoffMs ?? 1000;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {

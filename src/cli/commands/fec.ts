@@ -155,7 +155,7 @@ export function runFecFreeze(options: FecFreezeOptions): number {
     return 2;
   }
 
-  // CLAUDE.md §5 RR-1：禁手填 hash，必须由 computeFecHash 真实重算后与 stored 比对。
+  // RR-1：禁手填 hash，必须由 computeFecHash 真实重算后与 stored 比对。
   const computed = computeFecHash(parsed.value.fec);
   const stored = parsed.value.fecHash;
 

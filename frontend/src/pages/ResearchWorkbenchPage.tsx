@@ -1,5 +1,5 @@
 /**
- * ResearchWorkbenchPage —— Track-1A 科研工作台主流程（§12.5 七项主流程）。
+ * ResearchWorkbenchPage —— 科研工作台主流程（§12.5 七项主流程）。
  *
  * 异步运行生命周期（202 契约）：
  *   1. 新建研究（question + profile → POST /api/v1/research → 202 {runId, statusUrl, eventsUrl}）

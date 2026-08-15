@@ -1,5 +1,5 @@
 /**
- * FallbackChain 测试套件（spec 05 §8.2/§9 + spec 24 §5）。
+ * FallbackChain 测试套件（§8.2/§9 + §5）。
  *
  * 测试策略：caller 注入——确定性 mock 按 modelId 抛特定错误，离线全测：
  *   1. 触发矩阵（error_classifier）：timeout/network/429/5xx → fallback；4xx/config/unknown → fatal
@@ -62,7 +62,7 @@ const CHAIN: readonly FallbackModelTarget[] = [
 ];
 
 // ===========================================================================
-// 1. 触发矩阵（error_classifier · spec 05 §9.2）
+// 1. 触发矩阵（error_classifier · §9.2）
 // ===========================================================================
 
 test('classifier: BailianTimeoutError → fallback (timeout)', () => {
@@ -265,7 +265,7 @@ test('chain: NonQwenModelError on backup → fatal terminates (config error not 
 });
 
 // ===========================================================================
-// 3. D3 红线（spec 24 §5）
+// 3. D3 红线（§5）
 // ===========================================================================
 
 test('engine: success via invalidatesD3 target (last_resort fixture) → invalidatesD3=true (evo-01·引擎机制保留)', async () => {
@@ -326,10 +326,10 @@ test('F11: degradationSummary null when NO swap occurred (honest: no overclaim)'
 });
 
 // ===========================================================================
-// 5. 链配置（COMPETITION_FALLBACK_CHAIN · spec 24 §5）
+// 5. 链配置（COMPETITION_FALLBACK_CHAIN · §5）
 // ===========================================================================
 
-test('COMPETITION_FALLBACK_CHAIN: 3 elements Qwen-only per spec 24 §5 (evo-01)', () => {
+test('COMPETITION_FALLBACK_CHAIN: 3 elements Qwen-only per §5 (evo-01)', () => {
   // evo-01：4 元素含 deepseek → 3 元素 Qwen-only（24 §5 2026-06 删 deepseek·02 §C2）。
   assert.equal(COMPETITION_FALLBACK_CHAIN.length, 3);
   assert.equal(COMPETITION_FALLBACK_CHAIN[0]!.modelId, 'qwen3.7-max-2026-05-20');

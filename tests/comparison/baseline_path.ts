@@ -10,7 +10,7 @@
 // 真实依赖：V1 makeVerdict @ src/falsifiability/verdict.ts:76（真调·非 mock）
 //           proofHash = sha256(canonical JSON of verdict)（node:crypto 真实重算）
 //
-// Authority: CLAUDE.md §1（PROGRESS = 真实依赖端到端接线成功）+ §5 红线（五值枚举固定）。
+// Authority: PROGRESS = 真实依赖端到端接线成功；五值枚举固定。
 
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';

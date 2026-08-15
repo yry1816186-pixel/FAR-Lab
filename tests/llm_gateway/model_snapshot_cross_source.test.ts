@@ -1,7 +1,7 @@
 /**
  * 模型快照跨源 / 跨语言一致性测试（[E] 红线 #2 守护）。
  *
- * Authority: CLAUDE.md Red Line #2（COMPETITION_MODEL_SNAPSHOT 不是 core-wide 常量）/
+ * Authority: COMPETITION_MODEL_SNAPSHOT 不是 core-wide 常量 /
  *            03_确定性规范 §10（repro 七分量·modelId 进 repro_hash）/
  *            00_项目宪法 §8.6（TS/Python 跨语言 canonicalHash byte-equal）。
  *

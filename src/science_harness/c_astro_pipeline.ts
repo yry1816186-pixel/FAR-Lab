@@ -123,7 +123,7 @@ const METRICS_ARTIFACT_NAME = 'bls_metrics.json';
 export interface BlsMetrics {
   readonly ok: boolean;
   readonly n_points: number;
-  /** BLS 周期网格搜索的试验周期数（多重检验 trial factor 之一·T-017/评委05）。 */
+  /** BLS 周期网格搜索的试验周期数（多重检验 trial factor 之一·T-017/）。 */
   readonly n_periods: number;
   /** BLS 试验 duration 数（多重检验 trial factor 之二）。Bonferroni trial 数 = n_periods × n_durations。 */
   readonly n_durations: number;
@@ -269,7 +269,7 @@ export function buildCAstroStatistics(metricKey: string, bls: BlsMetrics): CAstr
     bls.inFluxes,
     C_ASTRO_CONFIDENCE_LEVEL,
   );
-  // T-017/评委05 多重检验校正（真实 BLS 网格）：M1 的 p 是从 n_periods × n_durations 个
+  // T-017 多重检验校正（真实 BLS 网格）：M1 的 p 是从 n_periods × n_durations 个
   // (period,duration) 试验中选出最优者的 p → 须按真实 trial factor 做 Bonferroni（非旧的
   // adjustPValues([p],'bonferroni') 单元素数组 ×1 no-op，也非 demo 的 4-检验 0.0125）。
   // 生产 TESS（n_periods≥2000）下此校正会把 adjustedP 显著抬高 → R7 置信诚实降权。
@@ -307,7 +307,7 @@ export function buildCAstroStatistics(metricKey: string, bls: BlsMetrics): CAstr
 //
 // c_astro_pipeline 是 4 个生产 fecAppendClaim caller 中唯一有诚实构造 AntiTheaterLintInput 数据的
 // （真实 venv sandbox spawn + sandbox.result.artifactTreeHash 真实 sha256）——见 DEPTH_LEDGER §C
-// FUSION-OS-1 降级注记 + CLAUDE.md §4 P-FUSION。本段闭合「类型层投影已接（orchestrator.ts:252）
+// FUSION-OS-1 降级注记。本段闭合「类型层投影已接（orchestrator.ts:252）
 // 但 4/4 生产 caller 不传 antiTheaterReport → antiTheaterFindings 运行时恒空 → ANTI_THEATER_FAIL
 // （verdict_kernel_v2.ts:373）不可触发」的 WIRED_OPT_IN 缺口。
 //

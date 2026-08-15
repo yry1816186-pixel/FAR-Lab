@@ -1,5 +1,5 @@
 /**
- * compaction.test.ts —— agent_loop 上下文压缩（批次 2-E·借鉴 opencode session compact）。
+ * compaction.test.ts —— agent_loop 上下文压缩（session compact 语义）。
  *
  * 覆盖：
  *   1. stage3/stage4 裁决关键产物完整保留（永不压缩）。

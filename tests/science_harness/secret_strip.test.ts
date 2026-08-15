@@ -1,9 +1,9 @@
 // tests/science_harness/secret_strip.test.ts
 //
-// FUSION-OS-8 端到端 RED→GREEN：spawn env secret 白名单剥离（TS 侧 buildVenvPythonEnv）+
+// FUSION-OS-8 端到端 RED→GREEN：spawn env secret 白名单剥离（TS 侧 buildVenvPythonEnv）
 // Python 侧 addaudithook 拒绝 dlopen/spawn（apply_env_hardening 二次 secret 剥离）。
 //
-// 单一真实依赖（CLAUDE.md §1）：
+// 单一真实依赖：
 //   - 真实 buildVenvPythonEnv（src/science_harness/sandbox_runner.ts:159）白名单 + SECRET_ENV_PATTERN 剥离
 //     （非 Fake·真实 process.env 遍历 + 正则匹配 + 白名单过滤）。
 //   - 真实 venvSandboxAdapter.executeAsync（sandbox_runner.ts:388）spawn repro/science_harness/sandbox_runner.py
@@ -15,11 +15,10 @@
 //   GREEN（接线后）：buildVenvPythonEnv 白名单（VENV_ENV_ALLOWLIST）+ SECRET_ENV_PATTERN 剥离；
 //     sandbox_runner.py apply_env_hardening 二次剥离 + addaudithook 拒绝 dlopen/spawn 事件 → sys.exit(126)。
 //
-// 反剧场红线（FUSION-OS-8 + CLAUDE.md §5）：来源不可自填。secret env 不透传给沙箱子进程，
+// 反剧场红线（FUSION-OS-8）：来源不可自填。secret env 不透传给沙箱子进程，
 // 用户脚本无法经 os.environ 读到凭证；dlopen/spawn 被审计 hook 拒绝（确定性科学复算不应加载原生库/派生子进程）。
 //
-// Authority: archived-plan §C FUSION-OS-8 +
-//            archived-plan §4 FUSION-OS-8（secret-strip + dlopen guard 范式）。
+// Authority: FUSION-OS-8（secret-strip + dlopen guard 范式）。
 
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';

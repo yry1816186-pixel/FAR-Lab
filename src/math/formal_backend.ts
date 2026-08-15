@@ -1,9 +1,9 @@
-// spec 38 §3.3 · Formal (Lean 4) backend adapter.
+// §3.3 · Formal (Lean 4) backend adapter.
 // Spawns the `lean` compiler to type-check / elaborate a Lean 4 source file.
 //
 // Lean 4 is almost never available in fresh-clone environments. By design this
 // backend degrades to outcome='unknown' + compileLog='backend_disabled' when
-// the `lean` binary is not on PATH (spec 38 §4.5 honest degradation).
+// the `lean` binary is not on PATH (§4.5 honest degradation).
 //
 // When available, the target string is treated as a Lean 4 source snippet. The
 // backend writes it to a temp .lean file and runs `lean <file>`. A clean exit

@@ -1,5 +1,5 @@
 /**
- * benchmark report ensure-helper —— R6 仓库内容政策适配（业主指令 2026-08-15）。
+ * benchmark report ensure-helper —— 仓库内容政策适配。
  *
  * benchmark/benchmark_report.json 是确定性生成物（scripts/generate_benchmark.ts·
  * fixed now → suiteIntegrityRoot 稳定锚），按政策不再 git 跟踪（.gitignore /benchmark/）。

@@ -258,7 +258,7 @@ function verdictLabel(verdict: string): string {
 export interface GenerateReportInput {
   readonly db: Database.Database;
   readonly runId: string;
-  /** 统计陷阱审计摘要（批次 1-B·可选·由调用方从 antiTheaterReport.findings 注入）。 */
+  /** 统计陷阱审计摘要（可选·由调用方从 antiTheaterReport.findings 注入）。 */
   readonly trapSummary?: TrapSummary;
 }
 
@@ -353,7 +353,7 @@ function buildSections(
 }
 
 /**
- * 统计陷阱审计段（批次 1-B·借鉴 scientific-agent-skills 陷阱目录设计）。
+ * 统计陷阱审计段（统计陷阱目录设计）。
  * 渲染"本次验证覆盖的陷阱大类 + 触发明细"，使报告不仅给出 verdict 结论，
  * 还结构化展示"检测了 21 类统计陷阱，触发 N 类警告"的审计表。
  */
@@ -559,7 +559,7 @@ function buildVerdictNodesSection(verdictNodes: VerdictNode[]): ReportSection {
     if (node.untestedReason !== null && node.untestedReason.length > 0) {
       lines.push(`- **Untested reason**: ${node.untestedReason}`);
     }
-    // P0-11：GRADE 证据质量标注（透明度层·studyDesign 提供时展示·评委可感知证据层级）。
+    // P0-11：GRADE 证据质量标注（透明度层·studyDesign 提供时展示·用户可感知证据层级）。
     if (node.verdictTrace.evidenceQualityTier !== undefined) {
       lines.push(
         `- **Evidence quality**: ${node.verdictTrace.evidenceQualityNote ?? `tier ${node.verdictTrace.evidenceQualityTier}`}`,

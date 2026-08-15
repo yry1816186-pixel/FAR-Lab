@@ -1,5 +1,5 @@
 /**
- * Science Harness 测试套件（M3 TESS / spec 11 §3 + spec 12）。
+ * Science Harness 测试套件（M3 TESS / §3 + spec 12）。
  *
  * 覆盖：
  *   1. C-ASTRO-0001 M1-M4 hero demo（M1-M3 PASS + M4 WARN → INCONCLUSIVE · route mixed）
@@ -42,7 +42,7 @@ import {
 } from '../../src/science_harness/index.ts';
 
 // ---------------------------------------------------------------------------
-// 1. C-ASTRO-0001 hero demo（spec 12 §9 期望落点）
+// 1. C-ASTRO-0001 hero demo（期望落点）
 // ---------------------------------------------------------------------------
 
 test('C-ASTRO-0001 hero demo: M1-M3 PASS + M4 WARN → INCONCLUSIVE (route mixed)', () => {
@@ -174,7 +174,7 @@ test('ROUTE_TO_VERDICT table matches F2 priority routing', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. dataset_resolver 三值决策树（spec 12 §2.2）
+// 3. dataset_resolver 三值决策树（§2.2）
 // ---------------------------------------------------------------------------
 
 const ref: DatasetRef = {

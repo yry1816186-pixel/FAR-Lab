@@ -1,5 +1,5 @@
 /**
- * search.test.ts —— evidence_log FTS5 全文检索（批次 1-C·借鉴 Hermes FTS5 会话召回）。
+ * search.test.ts —— evidence_log FTS5 全文检索（FTS5 会话召回）。
  *
  * 覆盖：
  *   1. ensureFtsIndex 幂等 + reindexEvidenceFts 全量重建计数。

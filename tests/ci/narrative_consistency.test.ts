@@ -2,7 +2,7 @@
  * 叙事一致性守护测试。
  *
  * 背景（findings S2）：README.md:5「测谎仪——可被任何人独立验证真假」与
- * README.md:117-118「does not prove scientific truths」110 行内并存——评委 30 秒可抓矛盾。
+ * README.md:117-118「does not prove scientific truths」110 行内并存——读者 30 秒可抓矛盾。
  * 项目自身已裁定 CLM-002 CONTRADICTED（archived reboot docs:29）但未执行退休。
  * 修复契约（活跃文档，archive/audits 为历史记录豁免）：
  *   1. 「测谎 / lie-detector / 验证真假」叙事零命中（活跃文档）。

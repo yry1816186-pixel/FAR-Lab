@@ -1,7 +1,7 @@
 /**
  * computeProofHashV2 TS 自洽测试（fecHash 断言 + normalizeClaim + 纯函数 + 篡改敏感性）。
  *
- * Authority: archived-plan §2.5 + APPENDIX_C §2.4（proofHash 5 步伪代码）。
+ * Authority: APPENDIX_C §2.4（proofHash 5 步伪代码）。
  */
 
 import { test } from 'node:test';
@@ -91,10 +91,10 @@ test('normalizeClaim 进 proofHash: claim 自然语言空白差异不改变 hash
   assert.equal(computeProofHashV2(base), computeProofHashV2(withExtraSpaces));
 });
 
-// ===== T-029（任务 #12 · 评委08 F-8-003）：claimType 进 ClaimEnvelope hash =====
+// ===== T-029（任务 #12 · F-8-003）：claimType 进 ClaimEnvelope hash =====
 
 test('T-029: 篡改 claimType → proofHash 失配（反 caller 偷改 R-causal 输入）', () => {
-  // 根因（评委08 F-8-003）：原 claimType 仅在 VerdictKernelInput 层，caller 可对同一 claim 传
+  // 根因（F-8-003）：原 claimType 仅在 VerdictKernelInput 层，caller 可对同一 claim 传
   // causal vs quantitative 改变 R-causal 门裁决，而 proofHash 不变 → 第三方独立复算 hash 一致但裁决不同。
   // 修复后 claimType 是 ClaimEnvelope 的 [VC] 字段，进 proofHash，篡改必失配。
   const base = makeValidEnvelopeV2Core(); // claimType: 'quantitative'
@@ -133,7 +133,7 @@ test('T-029: sealProofEnvelopeV2 → verifyProofHashV2 在篡改 claimType 后�
   assert.equal(verifyProofHashV2Boolean(tampered), false, '篡改 claimType 后 verifyProofHashV2Boolean 必须检出');
 });
 
-// ===== F-4-005（评委08 R4）：verifyProofHashV2 空 catch → 区分篡改 vs 格式错误 =====
+// ===== F-4-005（R4）：verifyProofHashV2 空 catch → 区分篡改 vs 格式错误 =====
 
 test('F-4-005: verifyProofHashV2 返回 valid 当信封完整', () => {
   const { envelope } = sealProofEnvelopeV2(makeValidEnvelopeV2Core());
@@ -178,7 +178,7 @@ test('F-4-005: verifyProofHashV2 返回 malformed_envelope/fec_inconsistent 当�
   assert.ok(acceptable.includes(result), `expected malformed/fec_inconsistent, got ${result}`);
 });
 
-// ===== F-4-007（评委08 R4）：Unicode NFC 归一化 =====
+// ===== F-4-007（R4）：Unicode NFC 归一化 =====
 
 test('F-4-007: normalizeWhitespace 做 Unicode NFC 归一化', () => {
   // é 的两种 Unicode 等价表示：precomposed (U+00E9) vs decomposed (e + U+0301)

@@ -1,7 +1,7 @@
 /**
  * benchmark 路由测试 —— GET /api/v1/benchmark 端点 + loadReport 边界。
  *
- * 历史溯源（已归档）: archived-spec §1 + 09 §4 + 24 §5.
+ * 历史溯源（已归档）: 09 §4 + 24 §5.
  *
  * 覆盖：
  *   - GET /api/v1/benchmark → 200 + 完整报告（报告已生成·suiteIntegrityRoot 64-hex）

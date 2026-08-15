@@ -2,7 +2,7 @@
 // ci-cg confounding_gate_deterministic_scan: 确认因果混杂门模块（src/confounding_gate）由确定性图算法产出，
 // 无 LLM 调用（F6 红线 + 03 §7.5.1:1133 CI 验证门 CG-1/CG-2/CG-5/CG-6·镜像 anti_theater_deterministic_scan.mjs）。
 //
-// 权威 SSOT: archived-plan §7.5.1:1133（CG-1/2/5/6 四门）+ §7.5:980（F6 红线）。
+// 权威 SSOT: :1133（CG-1/2/5/6 四门）+ §7.5:980（F6 红线）。
 //
 // 设计（镜像 anti_theater_deterministic_scan.mjs）:
 //   - negative check（F6 硬门·零容忍）: walk src/confounding_gate，stripLineComment 后

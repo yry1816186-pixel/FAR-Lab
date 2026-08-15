@@ -1,6 +1,6 @@
 // tests/far_proof/env_fingerprint.test.ts
 //
-// 环境指纹（评委07 Q3 mitigation）单元测试：计算 + 比对 + 漂移检测。
+// 环境指纹（Q3 mitigation）单元测试：计算 + 比对 + 漂移检测。
 // 纯逻辑（不 IO bundle）——bundle 集成在 exporter/verifier 侧。
 
 import { test } from 'node:test';

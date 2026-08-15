@@ -1,5 +1,5 @@
 /**
- * research/research_fixtures — offline_replay fixtures for the Track-1A slice.
+ * research/research_fixtures — offline_replay fixtures for the research slice.
  *
  * These are SYNTHETIC DEMO fixtures: they let `far research` run end-to-end
  * WITHOUT an API key (offline_replay profile), proving the pipeline wiring

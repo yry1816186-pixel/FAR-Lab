@@ -1,5 +1,5 @@
 // tests/planning/checkpoint.test.ts
-// opencode /context-checkpoint 源代码化测试：PROGRESS.md 检查点协议渲染 + 解析。
+// PROGRESS.md 检查点协议渲染 + 解析。
 // 真实依赖：renderCheckpoint / parseCheckpoint / nextStepFrom（纯函数无 mock）。
 
 import { strict as assert } from 'node:assert';

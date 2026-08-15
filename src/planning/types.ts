@@ -1,7 +1,7 @@
 // src/planning/types.ts
 // 职责：规划门禁方法论源代码化 —— 规划域类型 SSOT（zod schemas + 推导类型）。
 //
-// 融入设计（对应 opencode 全局规划命令 → FAR-Lab 可编程能力）：
+// 融入设计（全局规划命令 → FAR-Lab 可编程能力）：
 //   /plan         → Plan（目标 + DAG 步骤，每步可独立验证）
 //   /spec         → Spec（story + Delta + ≥3 可验证验收标准 + trust-kernel 声明）
 //   /state        → PlanningStage（6 阶段状态机 + 压缩门控）
@@ -17,7 +17,7 @@
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
-// 风险分级 P0-P4（AGENT-LIFECYCLE §4）
+// 风险分级 P0-P4
 // ---------------------------------------------------------------------------
 
 export const RISK_LEVELS = ['P0', 'P1', 'P2', 'P3', 'P4'] as const;
@@ -48,7 +48,7 @@ export interface RiskSignals {
 }
 
 // ---------------------------------------------------------------------------
-// Plan —— opencode /plan：深度规划 DAG
+// Plan —— 深度规划 DAG
 // ---------------------------------------------------------------------------
 
 export const PlanStepSchema = z.object({
@@ -105,7 +105,7 @@ export type PlanViolationCode =
   | 'EMPTY_ACTION';
 
 // ---------------------------------------------------------------------------
-// Spec —— opencode /spec：可验证规格
+// Spec —— 可验证规格
 // ---------------------------------------------------------------------------
 
 export const SpecAcceptanceCriterionSchema = z.object({
@@ -178,7 +178,7 @@ export type SpecViolationCode =
   | 'REMOVED_WITHOUT_JUSTIFICATION';
 
 // ---------------------------------------------------------------------------
-// 状态机 —— opencode /state：ANALYZE → PLAN → EXECUTE → VERIFY → REVIEW → REPORT
+// 状态机 —— ANALYZE → PLAN → EXECUTE → VERIFY → REVIEW → REPORT
 // ---------------------------------------------------------------------------
 
 export const PLANNING_STAGES = [
@@ -205,7 +205,7 @@ export interface StageTransitionResult {
 }
 
 // ---------------------------------------------------------------------------
-// 验证门禁 —— opencode /verify-full：四步门函数（IDENTIFY→RUN→READ→VERIFY）
+// 验证门禁 —— 四步门函数（IDENTIFY→RUN→READ→VERIFY）
 // ---------------------------------------------------------------------------
 
 export const VerificationStatusSchema = z.enum(['pass', 'fail', 'not_run']);
@@ -238,7 +238,7 @@ export type VerificationStatus = z.infer<typeof VerificationStatusSchema>;
 export type VerificationItem = z.infer<typeof VerificationItemSchema>;
 export type VerificationRunResult = z.infer<typeof VerificationRunResultSchema>;
 
-/** 门禁结论（AGENT-LIFECYCLE §5.2 grade）。 */
+/** 门禁结论（grade）。 */
 export type GateConclusion = 'DONE' | 'IMPLEMENTED_UNVERIFIED' | 'BLOCKED';
 
 export interface GateReport {
@@ -253,7 +253,7 @@ export interface GateReport {
 }
 
 // ---------------------------------------------------------------------------
-// Checkpoint —— opencode /context-checkpoint：PROGRESS.md 检查点协议
+// Checkpoint —— PROGRESS.md 检查点协议
 // ---------------------------------------------------------------------------
 
 export const CheckpointSchema = z.object({

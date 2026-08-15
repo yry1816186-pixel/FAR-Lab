@@ -7,10 +7,10 @@
 // 本 builder 仍透传 args.identifierClaims → caller 可自填 resolved 经 verdict_stage/render 绕过 R-identifier
 // REFUTED。修复（shared helper recomputeIdentifierClaims @ external_facts.ts）：两 builder 同源重算，禁漂移。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 buildLegacyVerdictKernelInput → recomputeIdentifierClaims
+// 单一真实依赖：真实 buildLegacyVerdictKernelInput → recomputeIdentifierClaims
 // → decideFiveValueVerdict R-identifier 规则。非 Fake、非直接断言常量、经真实 kernel 端到端。
 //
-// Authority: CLAUDE.md §5（来源不可自填）+ verdict_kernel_v2.ts:397-408 R-identifier 规则。
+// Authority: 来源不可自填；verdict_kernel_v2.ts:397-408 R-identifier 规则。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

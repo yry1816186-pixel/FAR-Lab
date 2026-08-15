@@ -1,15 +1,15 @@
 /**
- * T-016 · [6]→[3] hypothesis regen 反馈边回归测试（2026-07-24 评委逼问第 3 轮）。
+ * T-016 · [6]→[3] hypothesis regen 反馈边回归测试（2026-07-24 ）。
  *
- * 评委04 F-4-004 澄清（grep 漏判修正）：
- *   评委04 当时 grep `REFUTED|hypothesis.*regen` 命中全是 retry_policy，结论「无裁决驱动迭代闭环」。
+ * F-4-004 澄清（grep 漏判修正）：
+ *   当时 grep `REFUTED|hypothesis.*regen` 命中全是 retry_policy，结论「无裁决驱动迭代闭环」。
  *   实际代码有完整的 [6]→[3] 反馈边（基于 FeedbackSignal.continueIteration + refinements）：
  *     - stage6_feedback 产 FeedbackSignal（LLM 自评 continueIteration + refinements）
  *     - fsm_runner 把 feedbackSignal 回灌给下一轮 stage3
  *     - stage3_hypothesis 消费 feedbackSignal.refinements 重新生成假设
  *   本测试验证此反馈边真的 work（iteration=2 时 stage3 收到 iteration=1 的 refinements）。
  *
- * 评委04 深层诉求（裁决驱动反馈边）诚实登记为 V2：
+ * 深层诉求（裁决驱动反馈边）诚实登记为 V2：
  *   当前反馈源是 stage6 LLM 自评，不是 verdict kernel 的 REFUTED/INCONCLUSIVE。
  *   裁决驱动反馈边（verdict_stage 移入循环 + REFUTED 触发 regen）涉及 verdict_stage 副作用管理
  *   （落库时机/VerdictNode 语义/链长变化），是架构改动，V2 roadmap（诚实登记·非本会话范围）。
@@ -21,8 +21,8 @@
  *   4. 第二轮 stage3 的 call_record 含 refinements（验证反馈边真的接通·非 stub）。
  *
  * Authority: T-016 + F-4-004 +
- *            src/agent_loop/fsm_runner.ts（[6]→[3] 回灌·L262-269/L308/L352）+
- *            src/agent_loop/stages/stage3_hypothesis.ts（消费 feedbackSignal·L119-128）+
+ *            src/agent_loop/fsm_runner.ts（[6]→[3] 回灌·L262-269/L308/L352）
+ *            src/agent_loop/stages/stage3_hypothesis.ts（消费 feedbackSignal·L119-128）
  *            src/agent_loop/stages/stage6_feedback.ts（maxIterations 硬收敛·L55-75）。
  *
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩。

@@ -16,7 +16,7 @@
  * 全 scope（scopeNarrowerThanClaim=false）→ R4 不 shadow → anti-theater :373 可达（c_astro cached_fixture 被 R4 shadow）。
  * 模型中立：offline_replay。零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言 / 桩。
  *
- * Authority: archived-plan §C FUSION-OS-1 + CLAUDE.md §4 P-FUSION。
+ * Authority: FUSION-OS-1。
  */
 
 import type Database from 'better-sqlite3';

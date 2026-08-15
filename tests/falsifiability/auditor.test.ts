@@ -1,5 +1,5 @@
 /**
- * FalsificationSufficiencyAuditor 单测 (spec 11 §3.5 + migration 0006).
+ * FalsificationSufficiencyAuditor 单测 (§3.5 + migration 0006).
  *
  * 覆盖背景:auditContract 原为孤立生产代码(全 src 零调用、barrel 未导出、零测试)。
  * §2-M3 修复:barrel 导出 + canonical envelope 哈希(替裸 JSON.stringify + prevHash+payload 字符串拼接)

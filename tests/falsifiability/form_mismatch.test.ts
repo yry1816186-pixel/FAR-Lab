@@ -3,7 +3,7 @@
 // FUSION-OS-13 端到端 RED→GREEN：StatisticalResult.derivationForm 与 FEC statisticalPlan.expectedDerivationForm
 // 不匹配 → R-derivation-form 降级 INCONCLUSIVE（值相等也不信·Open Science Agreement-is-not-verification 范式）。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 decideFiveValueVerdict（verdict_kernel_v2.ts）→ evaluateStatistics 算 formMismatch
+// 单一真实依赖：真实 decideFiveValueVerdict（verdict_kernel_v2.ts）→ evaluateStatistics 算 formMismatch
 // → R-derivation-form 规则（R6 之后、R7 之前）。非 Fake 后端、非硬编码指标。
 //
 // RED→GREEN 论证：
@@ -11,8 +11,7 @@
 //     规则不存在 → 派生形式静默变更（literal 偷换 derived）即使数值相等也判 CONFIRMED（theater）。
 //   GREEN（接线后）：formMismatch=true → R-derivation-form INCONCLUSIVE（GV-13）。
 //
-// Authority: archived-plan §C FUSION-OS-13 +
-//            archived-plan §4 FUSION-OS-13（Agreement-is-not-verification 范式）。
+// Authority: FUSION-OS-13（Agreement-is-not-verification 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

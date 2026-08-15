@@ -1,11 +1,11 @@
 /**
- * aliyun_qwen 文本-only adapter 端到端 fallback 测试（CLAUDE.md §3）。
+ * aliyun_qwen 文本-only adapter 端到端 fallback 测试。
  *
- * 真实依赖：executeFallbackChain 穿透 DashScope HTTP（spec 24 §5 / 05 §8.2）。
+ * 真实依赖：executeFallbackChain 穿透 DashScope HTTP（§5 / 05 §8.2）。
  * 测试在 caller 注入层（createChatCompletion）mock——NOT FakeBackend。
  * executeFallbackChain 本身是真实编排（被测依赖），不 mock。
  *
- * 三条断言（CLAUDE.md §3 端到端 RED→GREEN）：
+ * 三条断言（端到端 RED→GREEN）：
  *   1. 429 穿透：primary 抛 429 → 自动 fallback 到 backup model 并成功
  *   2. 链路耗尽：三档全 429 → adapter.call() 抛 RETRY_EXHAUSTED
  *   3. fatal 错误：400 → adapter.call() 抛 BailianHttpError
@@ -293,7 +293,7 @@ test('qwen_adapter: all targets 429 → chainExhausted → throws RETRY_EXHAUSTE
       assert.ok(err instanceof Error, 'must be Error');
       const code = (err as { code?: unknown }).code;
       assert.equal(code, 'RETRY_EXHAUSTED', 'error.code must be RETRY_EXHAUSTED');
-      // 附带 reason（spec 24 §5 NO_QWEN_FAMILY_AVAILABLE_REASON）
+      // 附带 reason（§5 NO_QWEN_FAMILY_AVAILABLE_REASON）
       const reason = (err as { reason?: unknown }).reason;
       assert.equal(reason, NO_QWEN_FAMILY_AVAILABLE_REASON);
       return true;
@@ -316,7 +316,7 @@ test('qwen_adapter: fatal 400 on primary → throws BailianHttpError (no fallbac
   const adapter = createQwenAdapter({
     createChatCompletion: async (request: QwenChatCompletionRequest) => {
       attempts.push(request.modelId);
-      // 400 = client error → fatal per spec 05 §9.2 trigger matrix
+      // 400 = client error → fatal per §9.2 trigger matrix
       throw new BailianHttpError(400, null, 'bad request');
     },
   });
@@ -438,9 +438,9 @@ test('qwen_adapter: no createChatCompletion injected → real SDK path selected;
 });
 
 // ===== §6 真实 DashScope HTTP（line 73 client.chat.completions.create）— env-gated keystone =====
-// 单一真实依赖：真实 openai SDK → 真实 DashScope HTTPS（spec 24 §5）。这是仓库内**唯一**能证明
+// 单一真实依赖：真实 openai SDK → 真实 DashScope HTTPS（§5）。这是仓库内**唯一**能证明
 // line 73 真执行的测试（§5 证明路径选定 + key 门，但 line 73 在 key 通过后才达）。
-// 诚实边界（CLAUDE.md §3）：无 DASHSCOPE_API_KEY → skip；环境失败（网络/配额/认证/5xx）→ skip 附真实原因；
+// 诚实边界：无 DASHSCOPE_API_KEY → skip；环境失败（网络/配额/认证/5xx）→ skip 附真实原因；
 // 未知错误 → fail（真 bug 守护）。成功 → 强断言真实 DashScope 响应形态。
 
 test('qwen_adapter: real DashScope HTTP (line 73) — env-gated, no mock', async (t) => {

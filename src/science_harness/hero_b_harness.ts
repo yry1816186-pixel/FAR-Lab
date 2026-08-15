@@ -12,7 +12,7 @@
  *   即「相关 ≠ 因果」：观测相关性达标不足以因果 CONFIRMED（F6 因果红线·observational_only 禁 CONFIRMED）。
  *
  *   ⚠ harness 本身**不**调 decideVerdictWithConfounding（分离纯函数·可单测）：
- *   harness 只产 (a) M-checks（buildHeroBChecks）+ (b) CausalModel fixture（HERO_B_CAUSAL_MODEL）+
+ *   harness 只产 (a) M-checks（buildHeroBChecks）+ (b) CausalModel fixture（HERO_B_CAUSAL_MODEL）
  *   (c) exposure/outcome/evidenceBasis 常量；调用方/测试串 mapChecksToVerdict → decideVerdictWithConfounding。
  *
  * HERO_B_CAUSAL_MODEL fixture DAG（§7.5.1:1131 预定义因果 DAG 模版·决策 G）：

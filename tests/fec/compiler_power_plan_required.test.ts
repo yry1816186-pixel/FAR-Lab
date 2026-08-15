@@ -1,6 +1,6 @@
 // tests/fec/compiler_power_plan_required.test.ts
 //
-// T-027 · FEC PowerPlan 强制绑定回归测试（2026-07-24 评委逼问第 3 轮 F-7-003 修复）。
+// T-027 · FEC PowerPlan 强制绑定回归测试（2026-07-24 F-7-003 修复）。
 //
 // T-027 + F-7-003：
 //   "FEC spec 质量无强制审计（powerAnalysisN optional）→ FEC 只保证「有 spec」不保证「spec 严格」"。
@@ -20,7 +20,7 @@
 //   6. orchestrator 集成：opt-in + 缺 powerPlan → fecAppendClaim fail-closed UNTESTED。
 //
 // Authority: T-027 + F-7-003 +
-//            src/fec/compiler.ts（checkPowerPlanRequired · #12）+
+//            src/fec/compiler.ts（checkPowerPlanRequired · #12）
 //            src/fec/fec_contract.ts（FecContractV2.requirePowerPlan）。
 //
 // 模型中立（F3/C1）。零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩。
@@ -81,7 +81,7 @@ test('T-027 compiler: requirePowerPlan=true + powerPlan 缺失 → POWER_PLAN_RE
   const codes = result.errors.map((e) => e.code);
   assert.ok(codes.includes('POWER_PLAN_REQUIRED'), `须报 POWER_PLAN_REQUIRED，实际 codes=${codes.join(',')}`);
   assert.equal(result.failClosedVerdict, 'UNTESTED', 'fail-closed verdict 须为 UNTESTED');
-  // 严重性：HARD_FAIL_UNTESTED（评委07 F-7-003 方法学修复）
+  // 严重性：HARD_FAIL_UNTESTED（F-7-003 方法学修复）
   const ppErr = result.errors.find((e) => e.code === 'POWER_PLAN_REQUIRED')!;
   assert.equal(ppErr.severity, 'HARD_FAIL_UNTESTED');
 });
@@ -203,7 +203,7 @@ test('T-027 compiler: POWER_PLAN_REQUIRED 错误含 field + 修复 hint', () => 
   const ppErr = result.errors.find((e) => e.code === 'POWER_PLAN_REQUIRED')!;
   assert.equal(ppErr.field, 'powerPlan');
   assert.ok(ppErr.message.includes('power analysis'), '错误信息须含修复 hint（跑 power analysis）');
-  assert.ok(ppErr.message.includes('F-7-003'), '错误信息须含评委07 发现编号');
+  assert.ok(ppErr.message.includes('F-7-003'), '错误信息须含发现编号');
 });
 
 // ===== 与其他 opt-in flag 正交（T-003/T-008 同 FEC 不互相干扰）=====

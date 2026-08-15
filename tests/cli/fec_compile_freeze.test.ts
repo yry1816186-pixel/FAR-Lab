@@ -1,5 +1,5 @@
 // tests/cli/fec_compile_freeze.test.ts
-// 端到端测试：`far fec compile` + `far fec freeze`（CLAUDE.md §3「必须」第 5 条）。
+// 端到端测试：`far fec compile` + `far fec freeze`。
 // 真实依赖：compileFec + computeFecHash（非 mock / 非 stub），由 src/fec/compiler.ts 直接驱动。
 
 import { strict as assert } from 'node:assert';

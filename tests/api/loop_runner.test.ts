@@ -1,7 +1,6 @@
 /**
  * loop_runner reproHashProvider 注入策略测试（[C] 红线修复）。
  *
- * 历史溯源（已归档）: archived-spec确定性规范_DETERMINISM.md §10 (repro 七分量) /
  *            17 Epic / agent_loop/types.ts ReproHashProvider 注释第 3 条。
  *
  * 验证 executeLoop 的 fail-fast guard（红线：禁伪造 hash 进生产 evidence_log）：
@@ -119,8 +118,8 @@ test('executeLoop respects explicit reproHashProvider — injected hash lands in
 /**
  * [Task #4 解锁证明] 默认离线路径端到端跑通内置 hero demo。
  *
- * 历史溯源（已归档）: archived-spec §8（runAgentLoop）+
- *            28_FINAL_COMPETITION_ABSTRACT.md §1（Hot Jupiter hero demo）。
+ * 历史溯源（已归档）: （runAgentLoop）
+ *            （Hot Jupiter hero demo）。
  *
  * 证明「无 API key、无 gateway 注入、无任何配置」的默认 executeLoop 调用：
  *   - createOfflineReplayAdapter() 无参 → 内置 DEFAULT_DEMO_FIXTURES registry 兜底

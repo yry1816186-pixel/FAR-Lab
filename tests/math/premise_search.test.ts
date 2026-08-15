@@ -1,4 +1,4 @@
-// spec 38 §6.2 · Premise search tests.
+// §6.2 · Premise search tests.
 // Covers:
 //   - local_verified_claims fallback when mathlib unavailable (fresh-clone default)
 //   - keyword matching against naturalLanguage

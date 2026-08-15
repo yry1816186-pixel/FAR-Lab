@@ -12,7 +12,7 @@
  *   7. 防御守卫：EmptyScopeSlipError / EmptyUntestedReasonError 正确导出
  *   8. range threshold 语义
  *
- * 单一真实依赖（CLAUDE.md §1）：真实 decideFiveValueVerdict kernel。
+ * 单一真实依赖：真实 decideFiveValueVerdict kernel。
  */
 
 import { test } from 'node:test';

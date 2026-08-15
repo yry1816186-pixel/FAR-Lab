@@ -1,6 +1,6 @@
 /**
  * research/falsifiability_gate — the deterministic falsifiability gate for
- * Track-1A hypotheses (directive §9.6 / §9.7 / Phase 2 "可证伪性门").
+ * Research hypotheses（可证伪性门）.
  *
  * Every candidate hypothesis carries a FalsificationMethod (prediction +
  * metric + comparator + threshold). This module maps it to the kernel's

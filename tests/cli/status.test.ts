@@ -13,7 +13,7 @@ import { runStatus } from '../../src/cli/commands/status.ts';
 import { collectStatusDump, TEST_GLOBS, toStatusJson } from '../../src/cli/status_dump.ts';
 import { ensureBenchmarkReport } from '../_helpers/benchmark_report.ts';
 
-// R6 仓库内容政策（2026-08-15）：suiteIntegrityRoot 的确定性锚来自生成物报告（不 git 跟踪·按需生成）。
+// 仓库内容政策：suiteIntegrityRoot 的确定性锚来自生成物报告（不 git 跟踪·按需生成）。
 ensureBenchmarkReport();
 
 test('collectStatusDump: phase A cheap 字段从仓库实测', () => {

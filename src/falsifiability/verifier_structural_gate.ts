@@ -2,7 +2,7 @@
  * verifier 加载期 AST 结构门（FUSION-OS-5）—— TS Compiler API 扫描确定性裁决内核 +
  * anti-theater detector 源码，禁止 forbidden network/IO/LLM call·fail-closed。
  *
- * 反剧场红线（CLAUDE.md §5 + FUSION_OPEN_SCIENCE_DESIGN.md §F-5）：deterministic R0-R9 内核 +
+ * 反剧场红线：deterministic R0-R9 内核 +
  * 20 detector 必须全程无 network/IO/LLM call（F3 deterministic·LLM 不作最终裁决者）。
  * 本门在 runAntiTheaterLint 入口（每次 verdict 路径）加载期自检源码纯度。
  *
@@ -63,7 +63,7 @@ const FORBIDDEN_MODULE_SPECIFIERS: ReadonlySet<string> = new Set([
 ]);
 
 // 禁全局 call：bare identifier call（无 import 亦可用的全局）。
-// 含非确定性来源（时间/随机）——评委13 F-4-006：deterministic 内核必须无时间/随机源。
+// 含非确定性来源（时间/随机）——F-4-006：deterministic 内核必须无时间/随机源。
 const FORBIDDEN_GLOBAL_CALLS: ReadonlySet<string> = new Set([
   'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource',
   'exec', 'execSync', 'spawn', 'spawnSync', 'fork', 'execFile', 'execFileSync',
@@ -92,7 +92,7 @@ function literalText(node: ts.Node): string | null {
 /**
  * 提取 member expression 的完整点分名称（如 Date.now / Math.random / process.hrtime.bigint）。
  * 仅返回纯 identifier 链（无计算访问·无表达式）·否则 null。
- * 评委13 F-4-006：用于捕获非确定性时间/随机全局 call（PropertyAccessExpression callee）。
+ * F-4-006：用于捕获非确定性时间/随机全局 call（PropertyAccessExpression callee）。
  */
 function memberExpressionFullName(node: ts.PropertyAccessExpression): string | null {
   const parts: string[] = [];
@@ -151,7 +151,7 @@ export function scanSourceForForbiddenCalls(source: string, fileName: string): r
       } else if (ts.isIdentifier(callee) && FORBIDDEN_GLOBAL_CALLS.has(callee.text)) {
         hits.push({ fileName, line: lineOf(node), kind: 'forbidden-global-call', callee: callee.text, text: snippet(node) });
       } else if (ts.isPropertyAccessExpression(callee)) {
-        // 评委13 F-4-006：捕获 member-expression 全局 call（Date.now / Math.random / performance.now / process.hrtime.bigint）。
+        // F-4-006：捕获 member-expression 全局 call（Date.now / Math.random / performance.now / process.hrtime.bigint）。
         const fullName = memberExpressionFullName(callee);
         if (fullName !== null && FORBIDDEN_GLOBAL_CALLS.has(fullName)) {
           hits.push({ fileName, line: lineOf(node), kind: 'forbidden-global-call', callee: fullName, text: snippet(node) });

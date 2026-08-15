@@ -14,294 +14,137 @@ coverage/
 .pytest_cache/
 .ruff_cache/
 .benchmarks/
-
-# --- Secrets ---
-.env
-.env.*
-!.env.example
-
-# --- Competition execution prompt (private agent input, not a repo deliverable) ---
-FAR-Lab_Track1A_Agent_Execution_Prompt_Final.md
-/1.md
-/2.md
-
-# --- IDE & OS ---
-.vscode/
-.zcode/
-.trae/
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
-
-# --- DevOps artifacts ---
-$null
-nul
+*.tmp
+*.cache
+!tests/fixtures/**/*.cache
+!tests/fixtures/**/*.log
 
 # --- NODE_COMPILE_CACHE leakage ---
 /0
 /0/
 **/0/v[0-9]*-x[0-9]*/
 
-# --- Project runtime artifacts ---
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Private prompt & agent-instruction files (never tracked) ---
+/1.md
+/2.md
+3.md
+plan.md
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+CLAUDE.local.example.md
+FAR-Lab_Track1A_Agent_Execution_Prompt_Final.md
+PI_RUNBOOK.md
+agent-config-manifest.json
+agent_execution_manifest.yaml
+
+# --- AI tooling local state ---
+.agent/
+.agent-state/
+.agent-governance/
+.claude/
+.opencode/
+.zcode/
+.zed/
+.hermes/
+.trae/
+.pi/
+.pi.backup-*
+.pi/state/
+.pi/baseline-logs/
+.codebuddy/
+.playwright-mcp/
+.cursorrules
+*-agent-*/
+.trash_backup/
+
+# --- Project runtime artifacts (regenerated on every run) ---
 .far/
 .far-proof/
 .far-proof-*/
+.far-design/
+.far-implementation/
+.far-master/
+.far-release/
+.far-preflight/
 *.db
 *.db-wal
 *.db-shm
 *.tar.gz
-.privacy-scan-report.txt
+*.receipts.json
 .wf_*.mjs
-
-# --- Agent audit scratch (subagent temp scripts) ---
 _audit_*
-
-# 根目录测试残留空文件（evt_test.txt 曾误跟踪，2026-08-08 已 git rm --cached；物理文件被 Windows 进程锁占用暂无法删除）
 evt_test.txt
+coverage_output*.txt
 
-# --- Runtime artifacts inside governance/evidence dirs (high churn, not source) ---
-.far-implementation/**/*.jsonl
-.far-implementation/**/*.log
-.far-implementation/**/*.ttl
-.far-implementation/**/*.sqlite
-.far-implementation/**/*.sqlite-wal
-.far-implementation/**/*.sqlite-shm
-.far-implementation/**/*.flag
-.far-implementation/**/*.rundb
-.far-implementation/**/*.rundb-wal
-.far-implementation/**/*.rundb-shm
-# .far-proof 包与信任收据是可复现运行时产物（far demo/ask/export 每次重写）→ 不跟踪
-.far-implementation/**/*.far-proof/
-.far-implementation/**/*.receipts.json
-# walking-skeleton 运行日志与证据（far demo 重写）
-.far-implementation/walking-skeleton/run_log.txt
-.far-implementation/walking-skeleton/skeleton_evidence.yaml
-.far-design/**/*.log
-.far-design/evidence/**/*.jsonl
-# tess_online 在线采集运行日志（far ask --online 每次运行重写）
-.far-design/evidence/external/tess_online/run_log.txt
-.far-master/*.jsonl
-
-# --- Agent tooling (FAR-Lab pi discipline SHIPPED for fresh-clone cwd-fix) ---
-# .pi/ config (APPEND_SYSTEM/settings/project/extensions/prompts) now tracked so a
-# fresh clone + `cd FAR-Lab && pi` actually loads FAR-Lab discipline + far-guard/far-stage gates.
-# Runtime state + historical gate logs remain local (mutable / potentially stale):
-.agent/
-.pi/state/
-.pi/baseline-logs/
-.pi.backup-*
-CLAUDE.md
-.cursorrules
-FAR_LAB_MASTER_PLAN/
-dev/
-
-# --- CI protection scripts & workflows (SHIPPED — these are the repo's binding gates) ---
-# NOTE: depth-gate / depth-evidence / entry-protocol / zero-tolerance / coverage / model-neutrality
-# scanners and their workflows ARE the project's anti-skim, anti-theater, and integrity gates.
-# They MUST be tracked so fresh clones and GitHub Actions can actually enforce them.
-# (Historically these were mislabeled "local-only" — that left the public repo with zero protection.)
-
-# --- Local-only docs (audit snapshots, not part of the shipped governance surface) ---
-docs/governance/OPEN_SOURCE_AUDIT.md
-docs/governance/RELEASE_READINESS_CHECKLIST.md
-docs/governance/P1_2_PROOF_AUDIT.md
-
-# --- Evidence call records (runtime generated) ---
-evidence/dashscope_calls/*.json
-evidence/dashscope_calls/*.log
-evidence/dashscope_calls/*.png
-evidence/dashscope_calls/*.jpg
-evidence/dashscope_calls/*.jpeg
-evidence/dashscope_calls/*.webp
-
-# --- Stale references (historical, prevent re-track) ---
-agent_execution_manifest.yaml
-.agent-governance/
-experiments/
-NEEDS_HUMAN_LICENSE_DECISION.md
-examples/fec/sample_compiled.json
-
-# --- Workspace preflight (audit artifacts, not shipped) ---
-.far-preflight/
-
-# --- Agent mutable local task state (package manifest: mutable_local_state) ---
-.agent-state/
-
-# --- Process artifacts (audit reports, competition materials, presentations) ---
-architecture_audit_report_*.md
-formal_audit_report_*.md
-security_audit_report_*.md
-product_audit_report.md
-science_audit_report.md
-*_audit_report_*.md
-国家级*/
-评审记录/
-FAR-Lab_*.pptx
-FAR-Lab_*.pdf
-_figs/
+# --- Local-only tooling & evidence scripts ---
 scripts/build_report_ppt.py
 scripts/export_pdf.py
 scripts/gen_figs.py
 scripts/gen_figs2.py
 scripts/qa_ppt.py
 scripts/render_ppt.py
-# Charter moved to docs/charter/ULTIMATE_EXECUTION_PRIME.md (now tracked).
-# Legacy process notes below remain local-only:
-3.md
-plan.md
-PI_RUNBOOK.md
-agent-config-manifest.json
-
-# --- Local private agent overrides + Pi project caches (merged from .gitignore.agent-config) ---
-CLAUDE.local.md
-.claude/settings.local.json
-.pi/git/
-.pi/npm/
-
-# --- 2026-08-07 治理追加：防御未来污染 ---
-# 全局忽略任何 NODE_COMPILE_CACHE 泄漏（不限于根目录）
-**/0/v[0-9]*-x[0-9]*/
-# Python 缓存（全局，含子目录）
-**/__pycache__/
-# 本地会话与代理状态（防止未来新增工具泄漏）
-.agent-state/
-.pi/state/
-.pi/baseline-logs/
-# 对抗过程产物全目录（追踪清理后防止重新入库；REPORT.md 等证据随 git 历史保留）
-.far-implementation/adversarial/
-# 临时脚本与审计残留
-# 注: 用 _[a-z]* 而非 _* —— __init__.py 等双下划线包文件是有意追踪的活代码，不能忽略
-**/_[a-z]*.py
-**/tmp_*.py
-**/jsdoc_missing_batch*.txt
-
-.trash_backup/
-*-agent-*/
-*.tmp
-*.cache
-!tests/fixtures/**/*.cache
-!tests/fixtures/**/*.log
-!docs/archive/**/*.log
-!docs/audits/**/*.log
-**/评审记录/**/*.log
-
-# 根目录覆盖率临时输出（见 docs/ROOT-HYGIENE-POLICY.md）
-coverage_output*.txt
-
-# 临时监控脚本（一次性 GH outage retry monitor）
 scripts/gh_retry_monitor.sh
+scripts/far_design_bootstrap.mjs
+scripts/validate_agent_config.py
+scripts/far-trust-kernel-precommit.ps1
+scripts/PRECOMMIT_HOOKS.md
+scripts/vertical_slice_cancellation.mjs
 
-# 会话工作记忆（daily log + long-term MEMORY.md）——本地记忆不进仓库
-.codebuddy/
-
-# ============================================================================
-# 2026-08-10 — 公共仓库清洁化（开源发布前清理）
-# 以下目录/文件本地保留供开发使用,但永远不进公共仓库。
-# 详见: docs/governance/PUBLIC_REPO_CLEANUP_2026-08-10.md（清理记录）
-# ============================================================================
-
-# --- AI 工具私人配置（提示词/agent 定义/编辑器绑定） ---
-# 2026-08-14 §20 公共仓库清洁化：.claude/ 整目录 untrack（agents/rules/skills/hooks 是
-# agent 运营配置，非项目交付物）。policy_guard 测试已改为缺文件环境性 skip。
-.claude/
-.opencode/
-.pi/
-.zed/
-.hermes/
-.trae/
-.zcode/
-
-# --- FAR-Lab 内部过程产物（设计稿/实现期/主控/发布期） ---
-# 2026-08-14 §20 公共仓库清洁化：.far-design/ 整目录 untrack（ADR/决策记录是 agent 过程
-# 文档）。adr_count_check / adr_landing_check 已按缺目录环境性 skip 模式适配。
-.far-design/
-.far-implementation/
-# 例外：walking-skeleton 的 README.md 是人工文档（脚本不生成·测试断言存在）→ 反忽略。
-!.far-implementation/
-.far-implementation/*
-!.far-implementation/walking-skeleton/
-.far-implementation/walking-skeleton/*
-!.far-implementation/walking-skeleton/README.md
-.far-master/
-.far-release/
-
-# --- Agent 编排框架（战略级,绝不公开） ---
+# --- Local working directories & private materials ---
+dev/
 agent/
 modules/
 templates/
+experiments/
+examples/fec/sample_compiled.json
+NEEDS_HUMAN_LICENSE_DECISION.md
+国家级*/
+评审记录/
+**/评审记录/**/*.log
+FAR-Lab_*.pptx
+FAR-Lab_*.pdf
+_figs/
+evidence/dashscope_calls/
+tests/fixtures/science_harness/tic_sample.cache
+architecture_audit_report_*.md
+formal_audit_report_*.md
+security_audit_report_*.md
+product_audit_report.md
+science_audit_report.md
+*_audit_report_*.md
 
-# --- 根级 agent 指令文件 ---
-AGENTS.md
-CLAUDE.md
-CLAUDE.local.example.md
-CLAUDE.local.md
+# --- Local scratch ---
+**/_[a-z]*.py
+**/tmp_*.py
+**/jsdoc_missing_batch*.txt
+$null
+nul
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
 
-# --- docs/archive 整目录(agent 过程稿/旧版 reboot/讲稿) ---
+# --- Repo content policy: docs/, benchmark artifacts, and implementation
+# ledgers are intentionally not distributed with the repository ---
+/docs/
+/benchmark/
 docs/archive/
-
-# --- 竞赛战略文件(本地保留,不进公共仓库) ---
-docs/charter/COMPETITION_STRATEGY.md
-
-# --- 2026-08-10 round 2: docs/ 内部过程稿清理 ---
-# docs/audits/ 全是开发期审计快照(BASELINE_DIAGNOSIS_2026-08-05/PHASE3_STUNNING_FACTOR/WORLD_CLASS_FULL_AUDIT 等)
-# 内部评级 + AI 自动审计产物,公开会让评委判定"自吹自擂 + AI slop"
 docs/audits/
-
-# --- 2026-08-10 round 3: docs/ 内部过程稿/agent jargon 深度清理 ---
-# docs/development/ 内部 sprint 报告 / 交接 / 进度 / skip 记录
-docs/development/AGENTS.md
-docs/development/HANDOFF.md
-docs/development/PROGRESS.md
-docs/development/SKIP_REGISTER.md
-docs/development/SPRINT1-BACKEND-REPORT.md
-docs/development/SPRINT1-FRONTEND-REPORT.md
-docs/development/SPRINT2-BRAND-REPORT.md
-docs/development/ULTIMATE_UPGRADE_PLAN.md
-# docs/governance/ agent 编排内部 jargon + 重复
-docs/governance/AGENT-LIFECYCLE.md
-# AGENT-MEMORY.md 例外：adr_count_check.mjs 以它为记忆系统口径锚（§14 记忆系统·CI 断言依赖）。
-docs/governance/AGENT-ORCHESTRATION.md
-docs/governance/OPENCODE-PLANNING.md
-docs/governance/MAINTAINERS.md
-docs/governance/GOVERNANCE_REPORT.md
-# 散落 agent runtime / 竞品战略
-docs/design/16_AGENT_RUNTIME_MODELS_TOOLS_CONTEXT_AND_MEMORY.md
-docs/research/competitive-analysis-report.md
-
-
-
-# --- 2026-08-10 round 4: 公开仓库无关文件 ---
-# 竞赛战略/章程
 docs/charter/
-# 品牌/内部风格
+docs/design/
+docs/development/
+docs/governance/
+docs/research/
 frontend/src/lib/BRAND_VOICE.md
 src/llm_gateway/DIGEST.md
-# GitHub 内部配置(非 CI)
 .github/copilot-instructions.md
 .github/config.yml
 .github/CODEOWNERS
-# AI 工具脚本
-scripts/far_design_bootstrap.mjs
-scripts/validate_agent_config.py
-# 开发工具(precommit 钩子/文档)
-scripts/far-trust-kernel-precommit.ps1
-scripts/PRECOMMIT_HOOKS.md
-# 内部 gate 脚本(无 CI 引用的)
-scripts/vertical_slice_cancellation.mjs
-# 运行产物
-# 缓存
-tests/fixtures/science_harness/tic_sample.cache
-# --- 2026-08-10 round 5: 内部设计文档 + 运维治理 ---
-docs/design/
-docs/governance/ROOT-HYGIENE-POLICY.md
-docs/governance/disaster-recovery-runbook.md
-
-# --- AI-tooling session artifacts (playwright MCP browser sessions; repo-hygiene gate) ---
-.playwright-mcp/
-
-# R6 repo-content policy (owner directive 2026-08-15): internal docs & generated artifacts stay local
-/docs/
-/benchmark/
-/.far-implementation/

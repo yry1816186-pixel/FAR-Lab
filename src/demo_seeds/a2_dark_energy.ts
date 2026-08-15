@@ -19,7 +19,6 @@
  * verdict 设计：INCONCLUSIVE —— ΛCDM 的 w=-1 在 CMB+SN Ia 约束下成立，但 H0 tension（≥5σ）
  * 暗示可能的新物理学（演化暗能量 / 早期暗能量 / 修正引力），尚无决定性证据推翻或确认。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

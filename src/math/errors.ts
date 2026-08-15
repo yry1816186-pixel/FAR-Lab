@@ -11,7 +11,7 @@ export class MathVerificationError extends Error {
 
 /** Raised when a MathClaim is structurally invalid or when the verifier router
  * detects a cross-domain misroute (e.g. a numerical claim sent to a symbolic
- * backend, or vice versa — spec 38 §4.5 routing isolation). */
+ * backend, or vice versa — §4.5 routing isolation). */
 export class FatalMathError extends MathVerificationError {
   constructor(message: string) {
     super(message);
@@ -20,7 +20,7 @@ export class FatalMathError extends MathVerificationError {
 }
 
 /** Raised when a backend returns a structurally invalid result (e.g. a
- * numerical backend that omits the mandatory bound — spec 38 §4.5). */
+ * numerical backend that omits the mandatory bound — §4.5). */
 export class InvalidBackendResultError extends MathVerificationError {
   constructor(message: string) {
     super(message);

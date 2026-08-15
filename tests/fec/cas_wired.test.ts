@@ -2,7 +2,7 @@
 //
 // FUSION-OS-9 生产 caller 端到端 RED→GREEN：fecAppendClaim 把 FEC Plan + kernel trace 写进 far_blob_store CAS。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 fecAppendClaim 事务（src/fec/orchestrator.ts:fecAppendClaim）经
+// 单一真实依赖：真实 fecAppendClaim 事务（src/fec/orchestrator.ts:fecAppendClaim）经
 // storeVerdictArtifactsInCas 调真实 storeBlob（src/cas/blob_store.ts）→ 真实 INSERT OR IGNORE 落 far_blob_store
 // （0015 migration 建）→ 内容寻址 hash（sha256 canonical JSON）。非 Fake 后端、非硬编码 hash。
 //
@@ -15,8 +15,7 @@
 // 反剧场红线（FUSION-OS-9）：artifact hash 即承诺——CAS 按 canonical JSON 内容寻址，篡改 content → hash 失配 →
 // 查不到。与 verdict_nodes.verdict_trace DB 列（查询用）正交：CAS 是去重 + 内容寻址 SSOT。
 //
-// Authority: archived-plan §C FUSION-OS-9 +
-//            archived-plan §4 FUSION-OS-9（content-addressable CAS 范式）。
+// Authority: FUSION-OS-9（content-addressable CAS 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -2,7 +2,7 @@
  * GRADE 质量层 report 消费测试。
  *
  * 背景：上游 fecAppendClaim 传 studyDesign 后 verdict_trace 携带 evidenceQualityTier/Note，
- * report 的 Verdict nodes 段必须展示质量标注（评委可感知 GRADE 层级）。
+ * report 的 Verdict nodes 段必须展示质量标注（用户可感知 GRADE 层级）。
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩返回。
  */
 

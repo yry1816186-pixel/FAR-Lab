@@ -1,6 +1,6 @@
 """dataclass → dict 序列化辅助测试（09 §1.2 字段顺序保留 + 嵌套递归）。
 
-Authority: archived-spec §1.2 / §8.3.
+Authority: .2 / §8.3.
 """
 
 from __future__ import annotations

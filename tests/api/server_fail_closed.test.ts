@@ -7,7 +7,7 @@
 //
 // R5 的 fail-closed throw 测试已过时（设计变更）；本测试改为验证 opt-in 设计 + 空 secret guard。
 //
-// Authority: 评委03/11(F-R6 回归 demo 路径) + 评委09(F-R6-09-01 空 secret 绕过) + 评委13(答辩 unblock)。
+// Authority: (F-R6 回归 demo 路径) + (F-R6-09-01 空 secret 绕过) + (现场 unblock)。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

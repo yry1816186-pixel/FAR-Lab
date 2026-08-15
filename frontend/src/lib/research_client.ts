@@ -1,5 +1,5 @@
 /**
- * research_client — TanStack Query hooks for the Track-1A research workbench.
+ * research_client — TanStack Query hooks for the research workbench.
  *
  * POST /api/v1/research is ASYNCHRONOUS (202 Accepted): it returns a run handle
  * (runId + statusUrl + eventsUrl), the run lifecycle is observed via

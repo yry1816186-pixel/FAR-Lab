@@ -8,7 +8,7 @@
 // （V2 kernel 真实运行，非硬编码旁路）。proof_caller = verify_golden.ts:122 runVerifyGolden。
 // 反假绿：断言 dump.total===14 + status PASS + per-case decisiveRuleId 非空；python/browser 失败=环境 skip 非代码 bug。
 //
-// Authority: archived-plan §C P1-4 + APPENDIX_B_GOLDEN §2（GV-01..GV-14）+ 04 §5。
+// Authority: P1-4 + APPENDIX_B_GOLDEN §2（GV-01..GV-14）+ 04 §5。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

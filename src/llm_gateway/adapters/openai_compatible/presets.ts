@@ -8,7 +8,7 @@
  *   - 各 profile 的凭证 envVar 未设置时，adapter 仍可创建（用 'not-set' apiKey），
  *     真实调用会失败并显式报错——绝不静默。
  *   - 本地端点（Ollama/vLLM）无需密钥，envVar 留空字符串表示「无需密钥」。
- *   - 竞争 profile（competition_aliyun_qwen）的 Qwen-only fallback 红线（spec 24 §5）
+ *   - 竞争 profile（competition_aliyun_qwen）的 Qwen-only fallback 红线（§5）
  *     不适用于本通用注册表——这里每项是独立可选的通用适配器。
  */
 import { createOpenAICompatibleAdapter } from './index.ts';

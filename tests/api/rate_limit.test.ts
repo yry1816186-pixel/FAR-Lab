@@ -1,7 +1,6 @@
 /**
  * rate_limit 测试——@fastify/rate-limit 限流（24§4）。
  *
- * 历史溯源（已归档）: archived-spec网关与接口规范_API_GATEWAY.md §4.
  *
  * 覆盖：
  *   - 超过 max 请求数后返回 429

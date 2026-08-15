@@ -27,7 +27,6 @@
  * 产出：raw input / SourceCard / 6-stage loop / VerdictNode(INCONCLUSIVE) / reproHash / GraphSubtree。
  * 全程 offline_replay adapter。新增宇宙学/粒子物理域（原 8 seed 无暗物质/粒子物理）。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

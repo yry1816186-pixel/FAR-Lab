@@ -235,7 +235,7 @@ export interface VerdictKernelInput {
   readonly claimType?: ClaimType;
   /** [VC] 证据基础（F6 红线·03 §7.5:961）。'observational_only' + ConfoundingGate FAIL → reasonCodes 追加 F6_CAUSAL_HONESTY。 */
   readonly evidenceBasis?: EvidenceBasis;
-  /** [VC] ConfoundingGate 裁决（caller pre-compute via adjudicateConfounding·镜像 evidenceSufficiency 模式）。claimType='causal' 时由调用方提供；R7 判定前 R-causal 门消费。注：claimType 已通过 ClaimEnvelope 进 proofHash（任务 #12 · T-029 评委08 F-8-003 闭环·2026-07-24），caller 偷改 claimType 会致 proofHash 失配 → PROOF_HASH_MISMATCH。 */
+  /** [VC] ConfoundingGate 裁决（caller pre-compute via adjudicateConfounding·镜像 evidenceSufficiency 模式）。claimType='causal' 时由调用方提供；R7 判定前 R-causal 门消费。注：claimType 已通过 ClaimEnvelope 进 proofHash（任务 #12 · T-029 F-8-003 闭环·2026-07-24），caller 偷改 claimType 会致 proofHash 失配 → PROOF_HASH_MISMATCH。 */
   readonly confoundingGateResult?: ConfoundingGateResult;
   /** [VC] identifier 声明（FUSION-OS-14·caller pre-compute via resolveIdentifierClaim）。任一 not_found → R-identifier-fabrication REFUTED；任一 unresolved → UNTESTED（环境故障非伪造·unresolved 优先于 not_found）。optional·缺省零回归。 */
   readonly identifierClaims?: readonly IdentifierClaim[];
@@ -243,9 +243,9 @@ export interface VerdictKernelInput {
   readonly executionFingerprintMismatch?: boolean;
   /** [VC] 最早 MeasurementResult.collectedAt（ISO-8601·F8 #10 HARKing 纵深）。传入则 R1 内 compileFec 跑 #10——与 orchestrator mandate gate（orchestrator.ts:146）同条件 defense-in-depth，使直调 kernel 且不经 mandate gate 的路径仍能抓 HARKing。缺省 → compileFec 跳过 #10（compiler.ts:409·legacy 文献投票无实测时间线·正确语义）。optional·缺省零回归。 */
   readonly measurementCutoff?: string | null;
-  /** [META] 研究设计（批次 2-D·GRADE 证据层级透明度层）。传入则输出附 evidenceQualityTier/Note（不进 verdict·不进 proofHash·零回归）。 */
+  /** [META] 研究设计（GRADE 证据层级透明度层）。传入则输出附 evidenceQualityTier/Note（不进 verdict·不进 proofHash·零回归）。 */
   readonly studyDesign?: StudyDesign;
-  /** [META] Cochrane RoB 7 维评估（批次 2-D·透明度层·缺省维度按 unclear fail-conservative）。 */
+  /** [META] Cochrane RoB 7 维评估（透明度层·缺省维度按 unclear fail-conservative）。 */
   readonly robAssessments?: readonly RobAssessment[];
 }
 
@@ -277,11 +277,11 @@ export interface VerdictKernelOutput {
   readonly integrityFlags: readonly string[];
   /** CONFIRMED 时 true（bounded support·非科学真理）。 */
   readonly boundedSupport: boolean;
-  /** [META] 证据质量层级（批次 2-D·GRADE·透明度层·不进 verdict 不进 proofHash）。studyDesign 传入时有值。 */
+  /** [META] 证据质量层级（GRADE·透明度层·不进 verdict 不进 proofHash）。studyDesign 传入时有值。 */
   readonly evidenceQualityTier?: EvidenceTier;
   /** [META] 证据质量说明（tier + RoB 聚合·人类可读）。 */
   readonly evidenceQualityNote?: string;
-  /** [META] 决策路径追踪（A1·裁决可解释性·不进 verdict 不进 proofHash·透明度层）。让评委看到 R7 的 8 条件状态 + 关键数值快照。 */
+  /** [META] 决策路径追踪（A1·裁决可解释性·不进 verdict 不进 proofHash·透明度层）。让第三方看到 R7 的 8 条件状态 + 关键数值快照。 */
   readonly decisionTrace?: DecisionTrace;
 }
 
@@ -289,7 +289,7 @@ export interface VerdictKernelOutput {
 
 /**
  * decideFiveValueVerdictInternal —— 确定性五值裁决核心（§7.3·R0-R9 决策树·与历史字节一致）。
- * 被公共包装 decideFiveValueVerdict 调用；分离是为了附加证据质量透明度层（批次 2-D·零回归）。
+ * 被公共包装 decideFiveValueVerdict 调用；分离是为了附加证据质量透明度层（零回归）。
  * 全程无 LLM；按 R0..R9 固定优先级，首条决定性规则胜出。
  */
 export function decideFiveValueVerdictInternal(input: VerdictKernelInput): VerdictKernelOutput {
@@ -606,7 +606,7 @@ export function decideFiveValueVerdictInternal(input: VerdictKernelInput): Verdi
 /**
  * decideFiveValueVerdict —— 确定性五值裁决公共入口（§7.3·R0-R9 决策树）。
  *
- * 批次 2-D 增强（零回归）：当调用方提供 input.studyDesign（可选·透明度输入）时，
+ *  增强（零回归）：当调用方提供 input.studyDesign（可选·透明度输入）时，
  * 输出附带 evidenceQualityTier / evidenceQualityNote（GRADE 证据层级 + Cochrane RoB 聚合）。
  * 该层**不进 verdict 判定**（R0-R9 逻辑字节不变）也**不进 proofHash**（VC 白名单不变）——
  * 仅作为透明元数据供 report/audit 消费。未提供 studyDesign → 输出与历史完全一致。
@@ -808,7 +808,7 @@ function renderScopeSlip(impacted: readonly ScopeCoverage[], driftWarn: boolean)
 //   - **零重复计算**：从 output 读取已计算的 scopeReport/statisticalReport/integrityFlags。
 //
 // 诚实边界（"cannot prove" 声明）：decisionTrace 是事后解释，不能证明裁决正确——
-// 裁决正确性由 R0-R9 确定性逻辑 + 测试套件守护。trace 只提供透明度（让评委看到为何 R7 触发/未触发）。
+// 裁决正确性由 R0-R9 确定性逻辑 + 测试套件守护。trace 只提供透明度（让第三方看到为何 R7 触发/未触发）。
 
 /** R7 CONFIRMED 门的 7 个条件评估（最复杂规则·最需解释为何 CONFIRMED/未 CONFIRMED）。 */
 export interface R7GateEvaluation {
@@ -830,7 +830,7 @@ export interface R7GateEvaluation {
   readonly overallPassed: boolean;
 }
 
-/** 裁决时刻的关键数值快照（供审计/可视化/竞赛 demo）。 */
+/** 裁决时刻的关键数值快照（供审计/可视化/演示）。 */
 export interface DecisionTraceMetrics {
   readonly alpha: number | null;
   readonly mde: number | null;

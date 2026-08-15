@@ -766,7 +766,7 @@ export const en: Record<MessageKey, string> = {
   'vdiff.card.untestedReason': 'Untested reason:',
   'vdiff.card.created': 'Created:',
   'vdiff.honesty': 'Honesty boundary: Per the project\'s design intent, verdict kernel re-entry within the FSM loop is a V2 roadmap item. This page displays versions linked by supersede relationships (migration 0014) — it does not automatically trigger hypothesis regeneration. IC-15 T1\' injects prior verdicts as soft advice via stage6 prompt; stage6 LLM retains independent control over continueIteration.',
-  // ---- Track-1A research workbench ----
+  // ---- research workbench ----
   'nav.research': 'Research',
   'research.title': 'Research Workbench (Track 1 · Direction 1A)',
   'research.subtitle': 'Scientific question → real literature retrieval → candidate hypothesis generation & comparison → executable research plan → feedback revision → real-data analysis → export & verify',
@@ -821,5 +821,5 @@ export const en: Record<MessageKey, string> = {
   'research.failed.retryHint': 'Retry is CLI-only: far research resume <runId> continues from the last saved checkpoint.',
   'research.failed.epermHint': 'A file lock (antivirus/indexer) briefly blocked the checkpoint write — resuming usually succeeds: far research resume {runId}',
   'overview.quick.research.title': 'Research Workbench',
-  'overview.quick.research.desc': 'Question → candidate hypotheses → research plan → feedback revision (Track-1A main flow)',
+  'overview.quick.research.desc': 'Question → candidate hypotheses → research plan → feedback revision (main research flow)',
 };

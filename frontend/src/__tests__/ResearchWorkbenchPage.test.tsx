@@ -1,5 +1,5 @@
 /**
- * ResearchWorkbenchPage.test.tsx —— Track-1A 科研工作台异步流程测试（202 契约）。
+ * ResearchWorkbenchPage.test.tsx —— 科研工作台异步流程测试（202 契约）。
  *
  * 全 API 驱动（mock fetch 按 URL 路由·无网络）：
  *   202 start → 状态轮询（CREATED→…→COMPLETED 序列）→ 实时进度面板

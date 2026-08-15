@@ -1,5 +1,5 @@
 /**
- * trap_audit_section.test.ts —— 报告层统计陷阱审计段（批次 1-B·借鉴 scientific-agent-skills）。
+ * trap_audit_section.test.ts —— 报告层统计陷阱审计段。
  *
  * 验证：
  *   1. 注入 trapSummary → ReportData.trapSummary 透传 + sections 含 'Statistical Trap Audit' 段。

@@ -7,10 +7,10 @@
 //   - src/science_harness/sandbox_runner.ts:spawnVenv（spawn(pythonCmd, [SANDBOX_RUNNER_PY])）
 //   - repro/science_harness/sandbox_runner.py:main（threadpoolctl(1)+seed+exec 用户脚本+emit JSON+scan_artifacts）
 //
-// 诚实边界（CLAUDE.md §3）：缺 python = 环境问题 → t.skip（不当代码 bug）。缺 threadpoolctl 不 skip
+// 诚实边界：缺 python = 环境问题 → t.skip（不当代码 bug）。缺 threadpoolctl 不 skip
 // （sandbox 优雅降级，确定性 Python random 不依赖它）。
 //
-// Authority: archived-plan §C P1-6 + 12 §1.2 SR-2/SR-3/SR-5/SR-7。
+// Authority: P1-6 + 12 §1.2 SR-2/SR-3/SR-5/SR-7。
 
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';

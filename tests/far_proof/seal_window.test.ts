@@ -3,7 +3,7 @@
 // FUSION-OS-3 端到端 RED→GREEN：packageFarProofBundle seal 承诺点捕获内容快照 +
 // archive 后重算比对，缩窄 harvest→archive 间 TOCTOU 窗口（Open Science sentinel 重导出在 tar 后范式）。
 //
-// 单一真实依赖（CLAUDE.md §1）：
+// 单一真实依赖：
 //   - 真实 snapshotBundleContent（src/far_proof/offline_package.ts:snapshotBundleContent）
 //     真实 readdirSync({withFileTypes}) 递归 + sha256File 逐文件哈希（非 Fake·真实 fs + crypto）。
 //   - 真实 detectPostSealStaleness（offline_package.ts:detectPostSealStaleness）重算比对：新增/改/删 = stale。
@@ -20,10 +20,9 @@
 // 设计决策（why 内容哈希非 mtime 墙钟）：NTFS mtime 与 Date.now() 时钟源存在跨毫秒偏移（实测 mtimeMs 常超前
 // 墙钟整数刻度），墙钟比较既误报受控写入（jitter）又漏报 backdated touch。内容比对确定性、无时钟依赖。
 //
-// 反剧场红线（FUSION-OS-3 + CLAUDE.md §5）：收窄伪造窗口。seal 后内容变更检出即拒绝，不静默放过。
+// 反剧场红线（FUSION-OS-3）：收窄伪造窗口。seal 后内容变更检出即拒绝，不静默放过。
 //
-// Authority: archived-plan §C FUSION-OS-3 +
-//            archived-plan §4 FUSION-OS-3（sentinel 重导出范式）。
+// Authority: FUSION-OS-3（sentinel 重导出范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

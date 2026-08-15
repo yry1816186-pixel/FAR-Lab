@@ -214,7 +214,7 @@ export async function runBenchmark(
   const domainDistribution = tallyDomains(sorted);
   const latencyStats = tallyLatencyStats(sorted);
 
-  // T-009 · 维度覆盖论证（2026-07-24 评委逼问第 2 轮→第 3 轮·02 科学性评委 F-2）。
+  // T-009 · 维度覆盖论证（2026-07-24 ·科学性审查 F-2）。
   // Science-125 原始问题数覆盖率低（30/125），但维度覆盖完整——裁决值全 5 类 exercised +
   // 科学领域 28 类。这是「维度覆盖 benchmark」的诚实定位，非「125 题穷尽」。
   // D2(2026-08-07)：30 problems ≥20 已达成（V2 roadmap 扩展目标完成·后续仍须真实领域内容·禁止编造种子）。

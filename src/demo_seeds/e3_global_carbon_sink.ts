@@ -22,7 +22,6 @@
  * 理由：GCP 年报（自 2006 起）+ 多独立方法（大气反演、海洋观测、森林清查）一致性确认
  * 陆地 3.1±0.6 + 海洋 2.6±0.5 GtC/yr（2012-2021），CONFIRMED。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

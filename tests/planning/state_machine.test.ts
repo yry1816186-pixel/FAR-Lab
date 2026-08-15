@@ -1,5 +1,5 @@
 // tests/planning/state_machine.test.ts
-// opencode /state 源代码化测试：规划状态机（AGENTS.md §4.4 + AGENT-LIFECYCLE §1）。
+// 规划状态机。
 // 真实依赖：transitionStage / allowedNextStages / isValidStageChain（纯函数无 mock）。
 
 import { strict as assert } from 'node:assert';

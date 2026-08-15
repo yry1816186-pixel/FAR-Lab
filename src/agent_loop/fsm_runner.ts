@@ -1,7 +1,7 @@
 /**
  * fsm_runner —— agent_loop 主循环（runAgentLoop + assertTerminated）。
  *
- * T-016 反馈边状态（2026-07-24 评委逼问第 3 轮·评委04 F-4-004 澄清）：
+ * T-016 反馈边状态（2026-07-24 ·F-4-004 澄清）：
  *   ✅ 已有：[6]→[3] 基于 FeedbackSignal 的 hypothesis regen 反馈边
  *      - stage6_feedback 产 FeedbackSignal（LLM 自评 continueIteration + refinements）
  *      - 本 runner 把 feedbackSignal 回灌给下一轮 stage3（L262-269/L308/L352）
@@ -160,13 +160,13 @@ export interface RunAgentLoopArgs {
    */
   readonly priorVerdictKind?: import('../schema/enums.ts').Verdict;
   /**
-   * E-compaction（批次 2-E·session-compaction 语义）：iteration ≥ 2 时对注入
+   * E-compaction（session-compaction 语义）：iteration ≥ 2 时对注入
    * stage prompt 的 prevArtifacts 应用上下文压缩（stage3/4 裁决关键产物完整保留·
    * 叙述字段截断 + hash 锚可溯源）。缺省 false → 字节零回归（与历史行为一致）。
    */
   readonly compactArtifacts?: boolean;
   /**
-   * E-session（批次 3-H·借鉴 pi JSONL session format）：可选 session 录制路径。
+   * E-session（JSONL session format）：可选 session 录制路径。
    * 设置后：run_started/stage_completed×N/run_completed 实时追加 JSONL（审计观察层·
    * 与 evidence_log 哈希链正交）。缺省 undefined → 零回归。
    */
@@ -225,7 +225,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
   /** F-V07-05:resume 时已被收据覆盖的墙钟(在 open 后校准 startTime) */
   let resumedElapsedMs = 0;
   const artifacts: StageArtifact[] = [];
-  // E-session（批次 3-H·可选）：运行时 JSONL 录制（审计观察层）
+  // E-session（可选）：运行时 JSONL 录制（审计观察层）
   const session: SessionRecorder | null =
     args.sessionPath !== undefined ? SessionRecorder.open(args.sessionPath) : null;
   if (session !== null) {
@@ -402,7 +402,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       return artifact;
     };
     while (true) {
-      // E-compaction（批次 2-E·可选）：iteration ≥ 2 时注入 stage 的 prevArtifacts 用压缩视图。
+      // E-compaction（可选）：iteration ≥ 2 时注入 stage 的 prevArtifacts 用压缩视图。
       // stage3/4 裁决关键产物完整保留；缺省关闭 → 字节零回归。
       const compactView = (): readonly StageArtifact[] =>
         args.compactArtifacts === true && iteration >= 2 ? compactArtifacts(artifacts) : artifacts;

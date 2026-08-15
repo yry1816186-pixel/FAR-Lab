@@ -1,7 +1,7 @@
 /**
  * Frontend type definitions — verbatim mirror of backend API DTOs (spec 24 API gateway).
  *
- * Alignment authority: spec 24 §5.3 leaves most response bodies UNspecified (only
+ * Alignment authority: §5.3 leaves most response bodies UNspecified (only
  * the probes and a few shapes are named), so the backend implementation is the
  * contract of record for every endpoint. Source-of-truth per type:
  *   - HealthResponse / ReadyResponse        → src/api/routes/health.ts
@@ -13,7 +13,7 @@
  *                                            → src/agent_loop/types.ts + src/falsifiability/types.ts
  *   - enums                                  → src/schema/enums.ts
  *
- * Field names match the backend EXACTLY (camelCase · spec 24 §0 casing rule).
+ * Field names match the backend EXACTLY (camelCase · §0 casing rule).
  * No aliasing, no obfuscation: the frontend consumes backend field names verbatim.
  *
  * Two verdict shapes (the backend serializes one concept two ways):
@@ -531,7 +531,7 @@ export interface ArenaResultDto {
 }
 
 /**
- * Unified API error response (RFC 7807 Problem Details subset, spec 24 §0.6).
+ * Unified API error response (RFC 7807 Problem Details subset, §0.6).
  * Authority: src/api/types.ts ApiErrorResponse.
  */
 export interface ApiErrorResponse {

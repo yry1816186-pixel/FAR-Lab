@@ -4,13 +4,13 @@
 // 接线：fetchOnlineDataset（真 spawn dataset_fetch.py · lightkurve/MAST · host 白名单门）→ resolveDataset
 // （online→cached_fixture 决策树）→ buildCAstroChain（datasetSource 由 resolution 派生）。
 // 在线取数成功 + lightcurvePath → datasetSource='online'（真实 TESS · scope 不缩窄 · 真实 R7）；
-// 任一失败/不可达 → fail-safe 落 cached_fixture（baseline_exempt · DEGRADED_SCOPE · 02 F1 never-fabricate）。
+// 任一失败/不可达 → fail-safe 落 cached_fixture（baseline_exempt · DEGRADED_SCOPE · never-fabricate 红线）。
 //
 // 这是 fetchOnlineDataset / resolveDataset / buildCAstroChain 三组件的首个生产编排调用方
 // （先前三组件均仅由测试驱动·BUILD T7 闭合「组件存在但生产未编排」gap，类比 DIGEST G1）。
 //
 // 诚实边界：在线取数需 lightkurve + MAST 可达（环境门）。缺之 = 环境问题（非代码 bug）→ 诚实降级 cached_fixture。
-// Authority: CLAUDE.md §4 P1-6 + spec 12 §2.1-§2.2 + dataset_resolver.ts。
+// Authority: dataset_resolver.ts。
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';

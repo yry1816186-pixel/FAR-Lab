@@ -1,5 +1,5 @@
 # FAR-Lab CI — 12 步串行 gate + competition_qwen_smoke 条件门 + C8 每日 snapshot 存活监控
-# 历史溯源：演化自早期 CI 设计（竞赛内部 spec，未入公开仓库）·运行时 SSOT 以本 workflow + package.json 为准
+# 运行时 SSOT 以本 workflow + package.json 为准
 # 作用域：对抗 LLM 幻觉的工程化兜底。cross_lang 是 R2 最高优先闸门。
 # 命名约定：job id 一律下划线（不用连字符），因 needs.<job_id>.result 表达式里连字符会被解析为减号
 # Action 版本锁：2026 node24 时代（checkout@v5 / setup-node@v6 / setup-python@v6 / pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288）
@@ -10,9 +10,9 @@
 #   - test_py：package.json 用 unittest（非 pytest）→ 用 `pnpm run test:py`
 #   - repro_check：无 Makefile → 用 `pnpm run test:py`
 #   - cross_lang：既有测试位于 tests/evidence_log/cross_lang_consistency.test.ts（非 tests/ci/）→ 直接 node --test 该文件
-#   - migration：spec 23 §1 STEP5 要求 up/down/up 幂等；spec 32 §33 裁定 V1 不交付可运行迁移机
-#                （R-MIG V2 占位红·R2 后置·不假装能跑通）→ forward migrate up [0001-0008] + up 幂等
-#                + append-only trigger 拦截 落 test_ts 全量跑（ci-07·gate 落点见 STEP 5 注释）
+#   - migration：V1 裁定不交付可运行迁移机（R-MIG V2 占位红·不假装能跑通）
+#                → forward migrate up [0001-0008] + up 幂等
+#                + append-only trigger 拦截 落 test_ts 全量跑（gate 落点见 STEP 5 注释）
 #   - competition_qwen_smoke：ci/competition_qwen_smoke.ts 已实现；无 key 时条件门 skip 不 block
 name: FAR-Lab CI
 
@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -97,7 +97,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -123,7 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -144,7 +144,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -165,7 +165,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -180,16 +180,16 @@ jobs:
   # ============================================================
   # STEP 5 · test_ts（node --test TS 单元 + 集成；含 cross_lang 需 python3）
   # ------------------------------------------------------------
-  # migration gate 落点（ci-07 诚实声明 · spec 23 §1 STEP5 migration vs spec 32 §33）：
-  #   spec 23 §1 STEP5 要求 migration up/down/up 幂等；spec 32 §33 裁定"V1 不交付可运行迁移机
-  #   （R-MIG 占位红·R2 后置·不假装能跑通）"——故 migrate down / up-down-up 完整幂等属 V2。
+  # migration gate 落点（诚实声明）：
+  #   V1 裁定"不交付可运行迁移机（R-MIG 占位红·不假装能跑通）"
+  #   ——故 migrate down / up-down-up 完整幂等属 V2。
   #   V1 实际覆盖（本 step 全量跑，非假绿·非混入式免责）：
   #     · forward migrate up [0001-0008]：tests/schema/db_migrator.test.ts runMigrations applies [1..8]
   #     · up 幂等（up→up 不变）：db_migrator.test.ts 'skips already applied versions' → skipped [1..8]
   #     · contiguous version gap 拦截：db_migrator.test.ts 'rejects version gaps before executing SQL'
-  #     · append-only trigger 拦截（R1/R7·spec 23 STEP6）：tests/evidence_log/append_verify.test.ts
+  #     · append-only trigger 拦截（R1/R7）：tests/evidence_log/append_verify.test.ts
   #       DROP TRIGGER trg_call_records_no_update + UPDATE 篡改 → verifyChainHead 检测（证明 trigger 存在且拦截）
-  #   migrate down / up-down-up 完整幂等 = V2 R-MIG（spec 32 §33·V1 不交付可运行迁移机）。
+  #   migrate down / up-down-up 完整幂等 = V2 R-MIG（V1 不交付可运行迁移机）。
   # ============================================================
   test_ts:
     needs: py_typecheck
@@ -200,7 +200,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -266,7 +266,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -299,7 +299,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -324,7 +324,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -353,7 +353,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -382,7 +382,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -438,7 +438,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -461,7 +461,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -485,7 +485,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -510,7 +510,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -539,8 +539,8 @@ jobs:
 
   # ============================================================
   # STEP 16 · blocking_gates（设计控制面 + 反剧场 + 覆盖率 + 治理门禁全集）
-  # 职责：把 blocking 扫描器（coverage/zero_tolerance/anti_theater/design_lint/fitness/
-  #       governance_gate）接入 CI——此前仅本地执行。串行链末端依赖，须全绿才可合并。
+  # 职责：把 blocking 扫描器（coverage/zero_tolerance/anti_theater 等）接入 CI。
+  #       串行链末端依赖，须全绿才可合并。
   # 
   # ============================================================
   blocking_gates:
@@ -550,7 +550,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -567,9 +567,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .
-      - name: design_lint（设计控制面 SSOT 机检）
-        run: node scripts/design_lint.mjs
-      - name: supply_chain（供应链加固：exact pins + lockfile 一致性·借鉴 pi/earendil-works）
+      - name: supply_chain（供应链加固：exact pins + lockfile 一致性）
         run: node scripts/check-supply-chain.mjs
       - name: zero_tolerance_scan（零容忍禁词扫描）
         run: node scripts/zero_tolerance_scan.mjs

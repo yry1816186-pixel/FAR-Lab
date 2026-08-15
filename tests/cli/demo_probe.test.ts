@@ -2,7 +2,7 @@
  * demo 环境探测与 GV 重试测试。
  *
  * 背景（findings S1）：demo 关键路径零超时保护——better-sqlite3 native 加载异常或
- * Node 版本不符（<24 无原生 type stripping）时进程可能永不 exit（评委面前死等）；
+ * Node 版本不符（<24 无原生 type stripping）时进程可能永不 exit（用户面前死等）；
  * GV 失败即 exit 7 硬终止（后续 PHASE2/3 精彩内容全看不到）。
  * 修复契约：
  *   1. probeEnvironment 对 Node 主版本 <24 → ok=false + 可读错误（含版本指引）。
@@ -40,7 +40,7 @@ test('P0-3: probeEnvironment catches better-sqlite3 load failure with Docker fal
   assert.equal(result.ok, false, 'native module failure must fail the probe');
   assert.ok(
     result.error !== null && /docker|container|Docker/i.test(result.error),
-    'error must carry Docker fallback guidance (S1 评委现场后备)',
+    'error must carry Docker fallback guidance (S1 现场后备)',
   );
 });
 

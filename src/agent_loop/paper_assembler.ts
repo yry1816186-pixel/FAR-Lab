@@ -1,11 +1,11 @@
 /**
- * paperAssembler —— 六阶段产物聚合为比赛 10 字段输出。
+ * paperAssembler —— 六阶段产物聚合为10 字段输出。
  *
  * 定位：runAgentLoop 终止后执行的**确定性映射函数**（不经 LLM·禁 LLM-as-judge）。
  * 把六个阶段产出的 UnderstandingPayload / IntegrationPayload / HypothesisPayload /
  * EvidencePayload / PlanPayload / FeedbackPayload 聚合为 ResearchPaperOutput 10 字段。
  *
- * 直接对齐 OFFICIAL_赛题要求_权威核实.md §3.2 + 赛道一A「生成结果规范」10 字段。
+ * 对齐「生成结果规范」10 字段。
  *
  * 适配说明（与 spec §5.5 差异）：
  *   spec 用 `state.stages.stage1_understanding?.payload` 字典访问——项目 LoopState
@@ -31,7 +31,7 @@ import type { Verdict } from '../schema/enums.ts';
 
 
 /**
- * assemblePaper: 确定性映射——把 LoopState 的六阶段 payload 聚合为比赛 10 字段输出。
+ * assemblePaper: 确定性映射——把 LoopState 的六阶段 payload 聚合为10 字段输出。
  *
  * 禁 LLM-as-judge（纯数据映射·不经 LLM 调用）。
  *

@@ -246,7 +246,7 @@ export function verifyFarProofBundle(
     errors.push(`ED25519_SIGNATURE_INVALID: ${evidence}`);
   }
 
-  // 评委07 Q3 mitigation：运行环境漂移检测（additive·warn，非 fail）。bundle 在环境 A 下导出，
+  // Q3 mitigation：运行环境漂移检测（additive·warn，非 fail）。bundle 在环境 A 下导出，
   // 在环境 B 下复算 → 轻微数值漂移可能。data_manifest.envFingerprint 存在则比对当前环境并披露。
   // 旧 bundle 无此字段 → 跳过（零回归）。这是 honest disclosure：.far-proof 不锁环境（非 Docker
   // capsule），漂移只能检测不能消除。

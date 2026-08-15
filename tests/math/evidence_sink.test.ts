@@ -1,4 +1,4 @@
-// spec 38 §5 · Evidence sink persistence tests.
+// §5 · Evidence sink persistence tests.
 // Loads 0001_initial.sql + 0003_math_verification.sql into an in-memory DB
 // (math 0003 depends on schema_meta table from 0001).
 //

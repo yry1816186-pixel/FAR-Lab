@@ -4,13 +4,13 @@
  * 设计理由（AGENTS §6 关键实现细节）：
  *   - runAgentLoop 签名复杂（gateway + profile + extractors + providers + appendOptions）。
  *   - API 层用 LoopRunnerArgs 简化入参：只需 researchInput + 模式 + DB + 可选 termination。
- *   - 本文件内部组装 RunAgentLoopArgs，注入 offline_replay profile（模型中立·无真实调用）+
+ *   - 本文件内部组装 RunAgentLoopArgs，注入 offline_replay profile（模型中立·无真实调用）
  *     fixture finishReasonExtractor + 占位 reproHashProvider（测试用·生产路径须接 03 calc_bridge）。
  *
  * 模型中立（24§0.1 红线）：
  *   - 本文件不出现 Qwen / 百炼 / DashScope 字面量。
  *   - 默认 profile = 'offline_replay'（Core 模型中立·无真实 LLM 调用）。
- *   - 竞赛 profile 由调用方显式传入（competition_aliyun_qwen adapter 在 llm_gateway 层注入）。
+ *   - competition profile 由调用方显式传入（competition_aliyun_qwen adapter 在 llm_gateway 层注入）。
  *
  * 零容忍合规：无 any 类型注解 / ts-ignore 指令 / 双重断言 / 空 catch 块 / 桩代码返回。
  */

@@ -1,5 +1,5 @@
 /**
- * grader.test.ts —— 证据质量确定性评分（批次 2-D·GRADE/Cochrane RoB 借鉴）。
+ * grader.test.ts —— 证据质量确定性评分（GRADE/Cochrane RoB 借鉴）。
  *
  * 覆盖：
  *   1. gradeEvidenceTier 映射（rct→1 … expert/unspecified→4·fail-conservative）。

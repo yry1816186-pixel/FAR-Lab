@@ -39,10 +39,10 @@ export const COMPILE_ERROR_CODES = [
   'PROTOCOL_INCOMPLETE',
   'LLM_FROZEN',
   'HARKING_REVISION_AFTER_RESULT',
-  // T-008 · 2026-07-24 评委逼问第 1 轮 F-2-005 修复：FEC freeze 须绑定 git commit SHA
+  // T-008 · 2026-07-24 F-2-005 修复：FEC freeze 须绑定 git commit SHA
   // 作为第三方可验证锚定（git 历史公开可查·禁自签时间戳）。
   'GIT_COMMIT_SHA_UNBOUND',
-  // T-027 · 2026-07-24 评委逼问第 3 轮 F-7-003 修复：opt-in 时 FEC 须含合法 PowerPlan
+  // T-027 · 2026-07-24 F-7-003 修复：opt-in 时 FEC 须含合法 PowerPlan
   // （power analysis sampleSize > 0），否则"垃圾 spec"（阈值宽松到永不被证伪）也能过 FEC 门。
   'POWER_PLAN_REQUIRED',
 ] as const;
@@ -215,7 +215,7 @@ export interface ProtocolFreeze {
    *   compiler #11 校验：缺/格式错 → GIT_COMMIT_SHA_UNBOUND → HARD_FAIL_UNTESTED）。
    *
    * 修复背景（T-008）：原 freeze.timestamp 自签无第三方锚定——
-   * 评委可质疑"你冻结时真的在这个时间点吗？还是事后回填的？"。绑定 git commit SHA 后，
+   * 第三方可质疑"你冻结时真的在这个时间点吗？还是事后回填的？"。绑定 git commit SHA 后，
    * 任何人可在 git 历史中验证：该 commit 的 author/committer date 须 ≤ freeze.timestamp，
    * 且该 commit 的 tree 包含冻结时的契约文件（确定性锚定·不可回填）。
    *
@@ -294,7 +294,7 @@ export interface FecContractV2 {
   /** [VC] harking_risk / p_hacking_risk 等·compiler #7 多重检验未校正时追加 p_hacking_risk。 */
   readonly integrityFlags: readonly string[];
   /**
-   * T-003 · Evidence provenance binding 开关（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+   * T-003 · Evidence provenance binding 开关（2026-07-24 F-2-005 修复）。
    *
    * [META] 非编译期 VC 字段（不进 computeFecHash·不进 proofHash）——它是 orchestrator 运行时
    * 调用 `assertPrimaryEvidenceProvenanceBound` 的开关，决定是否对 EvidenceRecord.executionProvenanceHash
@@ -315,7 +315,7 @@ export interface FecContractV2 {
    */
   readonly requireExecutionProvenance?: boolean;
   /**
-   * T-008 · FEC freeze.gitCommitSha 强制绑定开关（2026-07-24 评委逼问第 1 轮 T-008 修复）。
+   * T-008 · FEC freeze.gitCommitSha 强制绑定开关（2026-07-24 T-008 修复）。
    *
    * [META] 非编译期 VC 字段（不进 computeFecHash·不进 proofHash）——它是 compiler 编译期
    * 调用 `checkGitCommitShaBinding` (#11) 的开关，决定是否对 `freeze.gitCommitSha`
@@ -336,17 +336,17 @@ export interface FecContractV2 {
    */
   readonly requireGitCommitShaBinding?: boolean;
   /**
-   * T-027 · FEC PowerPlan 强制开关（2026-07-24 评委逼问第 3 轮 F-7-003 修复）。
+   * T-027 · FEC PowerPlan 强制开关（2026-07-24 F-7-003 修复）。
    *
    * [META] 非编译期 VC 字段（不进 computeFecHash·不进 proofHash）——它是 compiler 编译期
    * 调用 `checkPowerPlanRequired` (#12) 的开关，决定是否对 `powerPlan`（含 sampleSize）强制
    * HARD_FAIL_UNTESTED 校验。
    *
-   * 根因（评委07 F-7-003·T-027）：
+   * 根因（F-7-003·T-027）：
    *   - 原 `powerPlan?: PowerPlan` 是 optional——可不填 = 无强制 power analysis；
    *   - FEC 只保证「有 spec」不保证「spec 严格」。一个垃圾 spec（阈值宽松到永不被证伪）
    *     也能过 FEC 门——FEC 的强制力被「宽松 spec」绕过；
-   *   - 这是方法学漏洞（评委07）：FAR-Lab 宣称「复现危机防线」但允许无 power analysis 的 claim。
+   *   - 这是方法学漏洞：FAR-Lab 宣称「复现危机防线」但允许无 power analysis 的 claim。
    *
    * 行为契约：
    *   - 缺省/false → V1 向后兼容（demo seed 的 powerPlan 仍 optional · 不强制）；

@@ -11,7 +11,7 @@
  *   2. spec §4.2 re-export callBailianStructured/callBailianThinking——项目未实现这两个函数（见 run_stage.ts
  *      适配说明·改用 gateway.callLlm）。本文件不 re-export 这两个函数。
  *   3. spec §4.2 从 aliyun_qwen adapter import 模型常量——按 §12.1「Core 不 import Qwen 常量」+
- *      模型中立红线（CLAUDE.md 红线 1），本文件**零模型 ID 常量**：R1 模型守卫（modelId 与
+ *      模型中立红线，本文件**零模型 ID 常量**：R1 模型守卫（modelId 与
  *      enableThinking 路由匹配）下沉至 adapter（src/llm_gateway/adapters/aliyun_qwen/create_params.ts
  *      assertQwenModel + 路由）·adapter 持模型身份·core 仅保留 R1 互斥守卫（不依赖模型身份）。
  *      modelId 经 CreateParamsInput 透传 + 进 repro_hash（06§2.2）·core 不校验其值。

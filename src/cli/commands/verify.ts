@@ -827,9 +827,9 @@ function verifyDbChain(
 // ===== 渲染（人类可读·--explain 展开 10 规则表 + anti-theater 重算 findings）=====
 
 /**
- * recomputation 醒目汇总行（T-012 · 评委03/08 · 2026-07-24 第 3 轮 CP-10）。
+ * recomputation 醒目汇总行（T-012 · CP-10）。
  *
- * 评委诉求：python/browser 不是全 pass 时，verify 顶部须有醒目汇总行，防误判「复算全成功」。
+ * 诉求：python/browser 不是全 pass 时，verify 顶部须有醒目汇总行，防误判「复算全成功」。
  * 规则：
  *   - 三轴全 pass → 全绿汇总（无警告）
  *   - 任一 fail → 显式 PARTIAL_FAILURE 红色醒目

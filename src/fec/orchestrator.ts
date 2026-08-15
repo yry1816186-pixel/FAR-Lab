@@ -52,7 +52,7 @@ import type { AntiTheaterReport } from '../anti_theater/index.ts';
 import { toKernelFindings } from '../anti_theater/index.ts';
 import { recomputeIdentifierClaims } from '../falsifiability/external_facts.ts';
 import type { RobAssessment, StudyDesign } from '../evidence_quality/types.ts';
-// T-003 · Evidence provenance binding（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+// T-003 · Evidence provenance binding（2026-07-24 F-2-005 修复）。
 // assertPrimaryEvidenceProvenanceBound 是 fail-closed 前置闸：requireExecutionProvenance=true 时
 // primary 证据缺 executionProvenanceHash → 拒绝裁决（integrityFlag 进 kernel R7 阻断 CONFIRMED）。
 import {
@@ -189,7 +189,7 @@ export function fecAppendClaim(
       thresholdSpec: args.thresholdSpec,
     });
 
-    // T-003 · Evidence provenance binding（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+    // T-003 · Evidence provenance binding（2026-07-24 F-2-005 修复）。
     // fail-closed 前置闸：fec.requireExecutionProvenance=true 时，primary 证据
     // （supportsClaim=true 且 refutesClaim=false）必须携带 64-hex executionProvenanceHash
     // （来自 sandbox_runner.stdoutHash/artifactTreeHash）。任一未绑定 → 抛 integrityFlag
@@ -235,7 +235,7 @@ export function fecAppendClaim(
     }
     // T-003 · provenance fail-closed 时显式覆盖 untestedReason：kernel 落 UNTESTED/INCONCLUSIVE
     // 的 reasonCodes 不含 EVIDENCE_PROVENANCE_UNBOUND（kernel 不感知此 flag 语义），故 caller 侧
-    // 显式注入，使 verdict_nodes.untestedReason 直接暴露 root cause（评委审计可读）。
+    // 显式注入，使 verdict_nodes.untestedReason 直接暴露 root cause（审计可读）。
     // 不改 verdict（kernel 已因 integrityFlags.length>0 拒绝 CONFIRMED·fail-closed 已达成）。
     if (!provenanceResult.ok && decision.verdict !== 'CONFIRMED') {
       decision = {

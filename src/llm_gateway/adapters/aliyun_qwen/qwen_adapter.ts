@@ -71,7 +71,7 @@ export interface QwenAdapterConfig {
   readonly baseURL?: string;
   readonly timeoutMs?: number;
   /**
-   * Caller 注入点：测试 mock 此函数即可控制每个 target 的成败（CLAUDE.md §3）。
+   * Caller 注入点：测试 mock 此函数即可控制每个 target 的成败。
    * 生产路径走 openai SDK 真调 DashScope HTTP。
    */
   readonly createChatCompletion?: QwenChatCompletionCaller;
@@ -138,7 +138,7 @@ async function createChatCompletion(
     // SDK 默认 maxRetries:2 会在链外静默重试同一模型，污染 attempts[] 审计轨迹（不可见的双重重试）。
     maxRetries: 0,
   });
-  // T-013（评委04 F-4-004 · CP-17）：jsonSchema 非空时透传为 response_format。
+  // T-013（F-4-004 · CP-17）：jsonSchema 非空时透传为 response_format。
   // 形态与 OpenAI SDK ResponseFormatJSONSchema 一致（DashScope compatible-mode 兼容）。
   // response_format 仅在 jsonSchema 存在时注入（exactOptionalPropertyTypes：undefined 不赋）。
   const responseFormatParam: OpenAI.ChatCompletionCreateParams['response_format'] | undefined =
@@ -198,7 +198,7 @@ function extractFatalStatus(attempts: readonly FallbackAttempt[]): number | null
 /**
  * 创建 competition_aliyun_qwen 文本-only adapter。
  *
- * call() 真编排 executeFallbackChain（spec 24 §5 / 05 §8.2）——穿透 DashScope HTTP：
+ * call() 真编排 executeFallbackChain（§5 / 05 §8.2）——穿透 DashScope HTTP：
  *   - 429/5xx/timeout/network → 自动 fallback 至下一 Qwen target（COMPETITION_FALLBACK_CHAIN）
  *   - 4xx/config → fatal 终止整链，call() 抛 BailianHttpError（绝静默换 F11）
  *   - 链路耗尽（三档全不可用）→ call() 抛 RETRY_EXHAUSTED + NO_QWEN_FAMILY_AVAILABLE_REASON
@@ -218,7 +218,7 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
     const innerRetryMax = config.innerRetryMax ?? INNER_RETRY_MAX;
     const backoff = config.backoff ?? sleepBackoff;
 
-    // T-013（评委04 F-4-004 · 2026-07-25 第 3 轮 CP-17）·Structured Output 完整接线状态：
+    // T-013（F-4-004 · CP-17）·Structured Output 完整接线状态：
     //   ✅ 接线完成：LlmRequest.jsonSchema（schema 对象）→ createChatCompletion →
     //      OpenAI SDK response_format:{type:'json_schema', json_schema:{name,schema,strict}}。
     //      caller（run_stage.ts）用 zodToJsonSchema(stageSchema) 注入 LlmRequest.jsonSchema。
@@ -281,7 +281,7 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
       },
     );
 
-    // F11 / spec 24 §5：链路失败绝不静默返回 null——必须 surface 为 throw。
+    // F11 / §5：链路失败绝不静默返回 null——必须 surface 为 throw。
     if (chainResult.data === null) {
       const summary = chainResult.degradationSummary ?? 'unknown chain failure';
       if (chainResult.fatalEncountered) {
@@ -293,7 +293,7 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
         );
       }
       if (chainResult.chainExhausted) {
-        // spec 24 §5：三档 Qwen 全不可用 → caller 落 verdict=UNTESTED + NO_QWEN_FAMILY_AVAILABLE_REASON
+        // §5：三档 Qwen 全不可用 → caller 落 verdict=UNTESTED + NO_QWEN_FAMILY_AVAILABLE_REASON
         // 绝不切非国产基座（D3 红线）。adapter 层抛 RETRY_EXHAUSTED 供上层 verdict stage 消费。
         throw Object.assign(
           new Error(

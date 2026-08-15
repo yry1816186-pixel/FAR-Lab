@@ -14,7 +14,7 @@ data MUST produce identical numpy array byte values across runs AND across
 platforms (Linux x64 / macOS ARM / Windows x64) provided the same numpy
 version and BLAS backend.
 
-Authority: archived-spec §1-2.
+Authority: -2.
 """
 
 from __future__ import annotations

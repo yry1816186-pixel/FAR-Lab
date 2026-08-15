@@ -2,7 +2,7 @@
  * demo 环境探测。
  *
  * 背景（findings S1）：demo 全同步零超时——better-sqlite3 native 模块加载异常或
- * Node 版本 <24（无原生 type stripping）时，进程可能永不 exit（评委面前死等）。
+ * Node 版本 <24（无原生 type stripping）时，进程可能永不 exit（用户面前死等）。
  * 同步挂起无法被 timer 中断（事件循环阻塞），故主防线 = 启动前置探测 + fail-fast：
  * demo 逻辑跑任何重活前先验证环境，失败立即打印可读错误并返回非 0（≤5s 内退出）。
  *
@@ -40,7 +40,7 @@ export function parseNodeMajor(version: string): number | null {
 /**
  * 环境前置探测：Node 主版本 ≥24（原生 type stripping 要求）+ better-sqlite3 可加载可打开。
  *
- * @returns ProbeResult——ok=false 时 error 含版本指引 / Docker 后备指引（评委现场可执行）。
+ * @returns ProbeResult——ok=false 时 error 含版本指引 / Docker 后备指引（现场可执行）。
  */
 export function probeEnvironment(options: ProbeEnvironmentOptions = {}): ProbeResult {
   const nodeVersion = options.nodeVersion ?? process.version;

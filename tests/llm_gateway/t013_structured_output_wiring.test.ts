@@ -1,5 +1,5 @@
 /**
- * T-013（评委04 F-4-004 · 2026-07-25 第 3 轮 CP-17）Structured Output 完整接线回归测试。
+ * T-013（F-4-004 · CP-17）Structured Output 完整接线回归测试。
  *
  * 验证三层透传链：
  *   1. LlmRequest.jsonSchema（schema 对象）→ QwenChatCompletionRequest.jsonSchema

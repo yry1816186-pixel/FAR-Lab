@@ -1,4 +1,4 @@
-// spec 38 §3.2 · SMT (Z3) backend adapter.
+// §3.2 · SMT (Z3) backend adapter.
 // Spawns the `z3` CLI binary in SMT-LIB v2 mode (stdin → stdout).
 //
 // Protocol: target is a JSON string {"script": "<SMT-LIB assertions>",

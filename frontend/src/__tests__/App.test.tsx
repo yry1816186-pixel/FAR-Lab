@@ -86,7 +86,7 @@ describe('App 路由与导航', () => {
     render(<App />);
     const nav = screen.getByTestId('main-nav');
     const links = within(nav).getAllByRole('link');
-    expect(links).toHaveLength(17); // 14 原有 + research 工作台（Track-1A 主流程）
+    expect(links).toHaveLength(17); // 14 原有 + research 工作台（科研主流程）
     // 使用 getByRole 验证导航链接存在（"证据链" 等标签在 sm 断点下可见）
     expect(within(nav).getByRole('link', { name: /Overview/ })).toBeInTheDocument();
     expect(within(nav).getByRole('link', { name: /Integrity/ })).toBeInTheDocument();

@@ -1,5 +1,5 @@
 // tests/planning/spec.test.ts
-// opencode /spec 源代码化测试：Spec 可验证规格门禁（AGENT-LIFECYCLE §2.2）。
+// Spec 可验证规格门禁。
 // 真实依赖：validateSpec / TRUST_KERNEL_PATHS（src/planning/spec.ts，纯函数无 mock）。
 
 import { strict as assert } from 'node:assert';

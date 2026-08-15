@@ -11,7 +11,7 @@ the core numpy install. centroid_offset (M4) is NOT computable from a 1D lightcu
 2D pixel data) → reported as null; the pipeline marks M4 SKIP (partial_skip -> INCONCLUSIVE).
 Never raises to the caller; failures return {"ok": false, "error": "..."}.
 
-Algorithm deviations from Kovács et al. 2002 (A&A 391, 369) —评委05 F-5-R4-001/002 R4:
+Algorithm deviations from Kovács et al. 2002 (A&A 391, 369) —F-5-R4-001/002 R4:
   1. Box-only model (no triangle-fit / Mandel-Agol). Standard BLS+TLS include a triangle
      model for rounded transits (limb darkening). This implementation fits flat-bottom box
      only → depth overestimate 10-20% on real limb-darkened transits.
@@ -26,7 +26,7 @@ Algorithm deviations from Kovács et al. 2002 (A&A 391, 369) —评委05 F-5-R4-
   5. No de-trending / cotrending / systematic-noise removal. Real TESS PDCSAP flux has
      long-term trends, roll-angle systematics, scattered light — all absent in demo.
 
-These are V2 algorithm-fidelity improvements (DEFERRED ·评委05 F-5-R4-001/002/003).
+These are V2 algorithm-fidelity improvements (DEFERRED ·F-5-R4-001/002/003).
 Demo verdicts use synthetic box-transit + iid Gaussian noise, which masks these defects.
 For real TESS science, use astropy.timeseries.BoxLeastSquares or transit-least-squares (TLS).
 """
@@ -151,7 +151,7 @@ def run(
 ) -> dict[str, Any]:
     """Run a Box-fitting Least Squares (BLS) period search over a lightcurve.
 
-    T-017 诚实边界（评委05 F-5-001 · 2026-07-24）：n_periods=120 is a **teaching/demo simplification**.
+    T-017 诚实边界（F-5-001 · 2026-07-24）：n_periods=120 is a **teaching/demo simplification**.
     Production TESS BLS pipelines use n_periods >= 2000 (typically 2000-100000) to cover the dense
     frequency grid required for real transit detection. 120 points is sufficient for the C-ASTRO-0001
     demo (synthetic single-transit LC with known period in [1.8, 3.0] days) but would miss real
@@ -184,7 +184,7 @@ def run(
     return {
         "ok": True,
         "n_points": int(len(times)),
-        # T-017 多重检验校正（评委05）：暴露真实搜索网格规模，供 TS 侧做 Bonferroni
+        # T-017 多重检验校正：暴露真实搜索网格规模，供 TS 侧做 Bonferroni
         # trial-factor 校正（n_periods × n_durations 个 (period,duration) 独立试验单元）。
         # demo 网格 120×3=360；生产 TESS ≥2000×n_durations。校正须按真实网格，非 4。
         "n_periods": int(n_periods),

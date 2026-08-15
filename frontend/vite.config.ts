@@ -46,8 +46,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // All app endpoints live under /api/v1 (spec 24 §0#2); probes /health + /ready
-    // live on the bare root (spec 24 §0#3). The API client defaults to a RELATIVE
+    // All app endpoints live under /api/v1 (§0#2); probes /health + /ready
+    // live on the bare root (§0#3). The API client defaults to a RELATIVE
     // (same-origin) base, so these proxies carry every request in dev; setting
     // VITE_API_BASE_URL bypasses them for cross-origin deployments.
     proxy: {

@@ -1,7 +1,7 @@
 // tests/cli/audit_seed_cherry.test.ts
 // `far audit-seed-cherry` 物证：FUSION-OS-1 detector-validation showcase 真跑 cherry-pick fixture 回放。
 // collectAuditSeedCherry 经真实 BLS 子进程 + detect_seed_cherry 真实集合差集 → DETECTED（kernel ANTI_THEATER_FAIL）。
-// 缺 python/numpy/fixture = 环境问题 → 跳过（诚实边界·CLAUDE.md §3）。
+// 缺 python/numpy/fixture = 环境问题 → 跳过（诚实边界）。
 
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';

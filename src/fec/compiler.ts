@@ -80,9 +80,9 @@ export function compileFec(input: CompileFecInput): CompileFecResult {
   checkSeedPolicy(fec, errors);
   checkDeterministicFreezer(fec, errors);
   checkHarkingTimeline(fec, input.measurementCutoff ?? null, errors);
-  // T-008 · 2026-07-24 评委逼问第 1 轮 F-2-005 修复：opt-in 时强制 freeze.gitCommitSha 绑定。
+  // T-008 · 2026-07-24 F-2-005 修复：opt-in 时强制 freeze.gitCommitSha 绑定。
   checkGitCommitShaBinding(fec, errors);
-  // T-027 · 2026-07-24 评委逼问第 3 轮 F-7-003 修复：opt-in 时强制 powerPlan 合法性。
+  // T-027 · 2026-07-24 F-7-003 修复：opt-in 时强制 powerPlan 合法性。
   checkPowerPlanRequired(fec, errors);
 
   // 任一 HARD_FAIL → fail-closed（#7 WARN 不计入）。
@@ -437,7 +437,7 @@ function checkHarkingTimeline(
 }
 
 /**
- * #11 GIT_COMMIT_SHA_UNBOUND（T-008 · 2026-07-24 评委逼问第 1 轮修复）：
+ * #11 GIT_COMMIT_SHA_UNBOUND（T-008 · 2026-07-24 修复）：
  *   requireGitCommitShaBinding=true 时，freeze.gitCommitSha 须为合法 40-hex sha1。
  *
  * 第三方锚定原理（T-008）：
@@ -483,13 +483,13 @@ function checkGitCommitShaBinding(fec: FecContractV2, errors: CompileError[]): v
 }
 
 /**
- * #12 POWER_PLAN_REQUIRED（T-027 · 2026-07-24 评委逼问第 3 轮 F-7-003 修复）：
+ * #12 POWER_PLAN_REQUIRED（T-027 · 2026-07-24 F-7-003 修复）：
  *   requirePowerPlan=true 时，powerPlan 须存在且字段合法（sampleSize > 0 + targetPower >= 0.5）。
  *
  * 方法学根因（T-027 + F-7-003）：
  *   - 原 `powerPlan?: PowerPlan` 是 optional——FEC 只保证「有 spec」不保证「spec 严格」；
  *   - 一个垃圾 spec（阈值宽松到永不被证伪）也能过 FEC 门——FEC 的强制力被「宽松 spec」绕过；
- *   - 复现危机方法学家（评委07）：power analysis 是 claim 严格性的最低门槛——
+ *   - 复现危机方法学家：power analysis 是 claim 严格性的最低门槛——
  *     无 power analysis 的 quantitative/causal claim 是「不可证伪的伪科学」（p-hacking 温床）。
  *
  * 行为契约：
@@ -515,7 +515,7 @@ function checkPowerPlanRequired(fec: FecContractV2, errors: CompileError[]): voi
       code: 'POWER_PLAN_REQUIRED',
       severity: mapCompileErrorToSeverity('POWER_PLAN_REQUIRED'),
       message:
-        'powerPlan 缺失但 requirePowerPlan=true（评委07 F-7-003 方法学修复）.' +
+        'powerPlan 缺失但 requirePowerPlan=true（F-7-003 方法学修复）.' +
         ' FEC 须强制 PowerPlan（含 sampleSize + targetPower）——无 power analysis 的 claim' +
         ' 是「不可证伪的伪科学」（阈值宽松到永不被证伪·p-hacking 温床）.' +
         ' Fix: 跑 power analysis（如 pwr.t.test）取 sampleSize + targetPower ≥ 0.8, 填入 powerPlan.',

@@ -112,7 +112,7 @@ export function runDemo(subcommand: string | undefined = undefined): number {
   const tessOnly = subcommand === 'tess-offline';
 
   // P0-3（S1-69.2 修复）：启动前置环境探测——Node <24 / better-sqlite3 native
-  // 不可用时立即 fail-fast（≤5s 退出非 0 + 可读错误 + Docker 后备指引），杜绝评委面前
+  // 不可用时立即 fail-fast（≤5s 退出非 0 + 可读错误 + Docker 后备指引），杜绝用户面前
   // 无限挂起（同步阻塞无法被 timer 中断·探测是唯一可靠防线）。
   const probe = probeEnvironment();
   if (!probe.ok) {

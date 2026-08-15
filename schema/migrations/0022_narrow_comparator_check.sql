@@ -22,7 +22,7 @@
 --   2. 本迁移不进 cross_lang canonical_hash 白名单（不改 hash 列·零回归 14 GV）。
 --   3. 与 0013/0018 同为 DB 层物理守卫加固（defense-in-depth），与应用层正交。
 --
--- Authority: DEBT-12 (DESIGN_DEBT.yaml) + CLAUDE.md §5 可证伪红线 + 02 F8 anti-p-hacking。
+-- Authority: DEBT-12 (DESIGN_DEBT.yaml) 可证伪红线 + F8 anti-p-hacking。
 
 -- 步骤 1：关闭外键（须在事务外）
 PRAGMA foreign_keys = OFF;

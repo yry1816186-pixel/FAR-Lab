@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "frozenAt": "2026-08-13T00:00:00.000Z",
-  "description": "FAR-Lab Track-1A frozen evaluation set: 1 deep hero case + 5 Science-125 questions with different evidence profiles (supporting / counter / conflict / null / unresolved). Answers and evidence profiles are traceable to the Science-125 list; open questions have NO fabricated ground truth — evaluation targets citation honesty, falsifiability, and plan quality, not a single 'correct answer' (§14.1).",
+  "description": "FAR-Lab frozen evaluation set: 1 deep hero case + 5 Science-125 questions with different evidence profiles (supporting / counter / conflict / null / unresolved). Answers and evidence profiles are traceable to the Science-125 list; open questions have NO fabricated ground truth — evaluation targets citation honesty, falsifiability, and plan quality, not a single 'correct answer' (§14.1).",
   "purpose": {
     "dev": ["s125-a2-dark-energy", "s125-t1-consciousness"],
     "final": ["hero-hot-jupiter-inflation", "s125-d9-dark-matter", "s125-g5-earthquake-prediction", "s125-p1-room-temp-superconductor"]

@@ -1,4 +1,4 @@
-// spec 38 §8 · Math gate — extends the falsifiability layer.
+// §8 · Math gate — extends the falsifiability layer.
 // When requireFormalVerification === true, the gate forces the falsifiability
 // 判定 to UNTESTED unless the achieved math verification level >= L3_formal.
 //
@@ -40,7 +40,7 @@ export interface MathGateResult {
 /**
  * Evaluate the math gate for a claim.
  *
- * Rules (spec 38 §8):
+ * Rules (§8):
  * - requireFormalVerification === false → gate OFF. canConfirm = true (backward
  *   compatible; math verification is enrichment, not blocking).
  * - requireFormalVerification === true → gate ON.

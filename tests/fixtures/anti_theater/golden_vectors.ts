@@ -1,7 +1,7 @@
 // tests/fixtures/anti_theater/golden_vectors.ts
 // 反剧场 golden vector 夹具：clean base envelope + 21 攻击向量构建器 + spec 表。
 //
-// Authority: archived-plan §5（AttackCase + §5.2 17 P0 golden vectors 表）+
+// Authority: （AttackCase + §5.2 17 P0 golden vectors 表）
 //            §6（7 CI gates·5 测试 gate 消费本夹具）+ 06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 /
 //            reasonCode / 不用 LLM-as-judge / 误报率=0）。
 //
@@ -580,7 +580,7 @@ function gvDepDrift01(): AntiTheaterLintInput {
 }
 
 /**
- * gv-provenance-unbound-01（T-003·2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+ * gv-provenance-unbound-01（T-003·2026-07-24 F-2-005 修复）。
  *
  * 攻击语义：研究者 FEC 显式 opt-in `requireExecutionProvenance=true`（声明 metricValue 必须绑定 sandbox
  * 执行 hash），但提交的 primary measurement 不携带 executionProvenanceHash → metricValue 可能是手工
@@ -624,7 +624,7 @@ export interface GoldenVectorSpec {
 
 /**
  * GOLDEN_VECTORS：23 向量 = 17 P0（APPENDIX_E §5.2）+ 3 补充（gv-data-hash-fake-01 /
- * gv-optional-stopping-01 / gv-dep-drift-01）+ 1 T-003 修复（gv-provenance-unbound-01）+
+ * gv-optional-stopping-01 / gv-dep-drift-01）+ 1 T-003 修复（gv-provenance-unbound-01）
  * 1 marginal-p（gv-phack-marginal-p-01）+ 1 A2 一致性（gv-effect-p-mismatch-01）。
  *
  * §5.2 的 17 P0 向量覆盖 16 个 attackId（AT-DATA-DRIFT 由 gv-data-drift-01/02 双向量覆盖），

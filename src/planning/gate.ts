@@ -1,8 +1,8 @@
 // src/planning/gate.ts
-// 职责：opencode /verify-full 源代码化 —— 四步门函数报告引擎（确定性纯函数）。
+// 职责：四步门函数报告引擎（确定性纯函数）。
 //
 // 四步门函数：IDENTIFY（识别验证维度）→ RUN（运行命令）→ READ（亲读输出）→ VERIFY（证据落盘）。
-// 纪律（AGENT-LIFECYCLE §5.2 grade + verification-before-completion）：
+// 纪律（grade + verification-before-completion）：
 //   1. 未跑的验证项必须显式标注 not_run —— 绝不默认通过。
 //   2. failed > 0          → BLOCKED（门禁失败，禁止声称完成）
 //   3. not_run > 0         → IMPLEMENTED_UNVERIFIED（实现完成但验证缺失）

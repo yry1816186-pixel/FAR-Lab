@@ -2,7 +2,7 @@
 // 声明式 CLI 参数解析：一次遍历 args，按 schema 解析 --flag value / --flag=value / --flag（boolean），
 // 收集错误，返回结构化结果。无外部依赖（纯 TS）。
 //
-// 设计约束（CLAUDE.md §2 注释最小化）：本文件仅暴露接口与实现，不加散文复述注释。
+// 设计约束：本文件仅暴露接口与实现，不加散文复述注释。
 
 /** Interface defining option schema. */
 export interface OptionSchema {

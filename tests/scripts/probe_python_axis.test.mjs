@@ -6,7 +6,7 @@
 //   ['-c', 'import sympy, z3; print("available")'])。本测试不 mock spawnSync ——
 //   它验证真实探针在当前环境（python 可用或不可用）下都输出**机读友好**的首行契约 + 与返回形态**双向一致**。
 //
-// 诚实边界（CLAUDE.md §3 + 02 F1 never-fabricate）：本测试**不断言** available=true/false
+// 诚实边界：本测试**不断言** available=true/false
 //   （那是环境属性，非代码属性）。它断言的是**契约**：
 //   (a) 探针只写一个 chunk（契约行在任何其他输出之前，无前言噪声污染 CI 日志）
 //   (b) 首行严格匹配 ^Python axis: (available|skipped \(.+\))$ —— CI grep / 人类可读
@@ -14,7 +14,7 @@
 //   (d) available===false ↔ 首行 = 'Python axis: skipped (<reason>)'，reason 非空且**字面**出现在首行
 //   (e) 同环境多次调用确定性（探针不读随机源）
 //
-// Authority: archived-plan §C P3-1 + CLAUDE.md §3（环境失败 ≠ 代码 bug）
+// Authority: 环境失败 ≠ 代码 bug
 //            + scripts/run_py_tests.mjs:16-39 probePythonAxis 实现。
 
 import { test } from 'node:test';

@@ -152,7 +152,7 @@ function checkProject(root: string | null, checks: Check[]): void {
   });
 
   // FIX-R6-003: 删除 examples/tess-offline 检查（examples/ 已 retire，demo.ts tess-offline 用 :memory: 不持久化；
-  //   该检查必 warn 致 far doctor exit 2·评委13 F-R6-13 答辩现场 1 分钟崩溃）。改为检查真实持久化 bundle。
+  //   该检查必 warn 致 far doctor exit 2·F-R6-13 现场 1 分钟崩溃）。改为检查真实持久化 bundle。
   const demoBundleOk = existsSync(resolve(root, '.far-implementation/walking-skeleton/demo.far-proof'));
   checks.push({
     name: 'demo.far-proof bundle',

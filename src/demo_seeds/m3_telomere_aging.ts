@@ -23,7 +23,6 @@
  * 综述强调多机制 + 百岁老人/端粒酶鼠反例）→ DEGRADED_SCOPE（端粒缩短是衰老**部分机制**，
  * 但非**单一首要驱动**）。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';
