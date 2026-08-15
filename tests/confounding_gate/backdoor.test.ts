@@ -1,7 +1,7 @@
 // tests/confounding_gate/backdoor.test.ts
 // 测试 findBackdoorPaths（§7.5.1 (2) DFS 枚举）+ isPathBlocked（路径级 d-separation 阻断）+ blockBackdoorPaths。
 //
-// Authority: archived-plan §7.5.1:1044-1091。
+// Authority: :1044-1091。
 //
 // ⚠️ 偏差背景（见 backdoor.ts 头注释）：SSOT `block_backdoor_paths` 伪代码对每路径调全局 d_separation
 // （恒参 no-op）。本实现用路径级 isPathBlocked（标准定义）。outcome 等价·分桶更精确。

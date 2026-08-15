@@ -13,7 +13,7 @@ Host whitelist enforced via check_host BEFORE any heavy import (so the host-gate
 without lightkurve/astroquery installed). On the whitelisted path, the resolver fetches real
 data, serializes the resulting astropy Table to canonical ECSV bytes, and sha256-hashes them.
 
-Honesty (02 F1 never-fabricate): missing lightkurve/astroquery or any network failure yields
+Honesty (never-fabricate 红线): missing lightkurve/astroquery or any network failure yields
 {"ok": false}; the caller (dataset_resolver.fetchOnlineDataset) maps that to null and falls
 back to cached_fixture. The script never fabricates a content hash.
 """

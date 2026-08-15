@@ -1,7 +1,7 @@
 /**
  * fsm_runner.assertTerminated 单元测试（纯逻辑·不涉及 gateway/DB 实际调用）。
  *
- * 历史溯源（已归档）: archived-spec §7.1.
+ * 历史溯源（已归档）: .1.
  *
  * 测试覆盖 5 个终止条件分支：
  *   1. feedback_converged — feedbackSignal=null

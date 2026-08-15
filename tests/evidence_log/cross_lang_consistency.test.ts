@@ -144,7 +144,7 @@ test('V2 clean-room independentCanonicalJson === Python canonical_json (no share
 });
 
 test('numeric known-divergence: TS !== Python (day-0 PoC red, V3 RFC 8785 JCS target)', () => {
-  // spec 32 §74 day-0 PoC 红→数值域 byte-equal 部分不可达：
+  // §74 day-0 PoC 红→数值域 byte-equal 部分不可达：
   //   N1 浮点整数化（1.0→"1" vs "1.0"）/ N2b 科学计数零填充（1e-7 vs 1e-07）/ N3 >2^53 IEEE754 丢精度。
   // canonicalHash 信任根（T3 白名单 cred 全 string）不碰数值，故信任根 byte-equal 不受影响。
   // 如实锁定 TS!==Python 作为 V3 RFC 8785 JCS 迁移回归基线（迁移后此测试需更新为 byte-equal）。禁伪造绿。

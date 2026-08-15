@@ -5,7 +5,7 @@
  * DashScope compatible-mode 等，全部通过 baseURL + envVar + defaultModel 配置驱动。
  *
  * 设计原则：
- *   1. 独立通用扩展，**不触碰 competition profile**（Qwen-only fallback 链·spec 24 §5）。
+ *   1. 独立通用扩展，**不触碰 competition profile**（Qwen-only fallback 链·§5）。
  *   2. 凭证走环境变量，绝不硬编码密钥。
  *   3. 失败可见：不静默换模型；降级路径在 adapterMeta.usedFallbackModel 显式标注。
  *   4. 确定性铁律：adapter 只做 LLM 调用；裁决确定性由 R0-R9 内核保证，与 LLM 输出无关。

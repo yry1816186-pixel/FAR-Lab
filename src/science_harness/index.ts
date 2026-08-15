@@ -1,7 +1,7 @@
 /**
  * Executable Science Harness 公共出口（M3 TESS / spec 12）。
  *
- * 三职责模块（spec 12 §0 职责分离框图）：
+ * 三职责模块（§0 职责分离框图）：
  *   - sandbox_runner：resource-bounded & network-restricted venv 执行（类型层·F4）+ 确定性 hash
  *   - dataset_resolver：3 值数据集解析决策树（绝不伪造·F1）
  *   - tess_harness：C-ASTRO-0001 M1-M4 检验 + verdict_mapping 5 路径（F2 优先级）

@@ -10,7 +10,7 @@
 //   - src/science_harness/dataset_resolver.ts:resolveDataset（online→cached_fixture 决策树）
 //   - src/science_harness/c_astro_pipeline.ts:buildCAstroChain（datasetSource 派生·真实 R7 或 baseline_exempt）
 //
-// 诚实边界（CLAUDE.md §3 + 02 F1 never-fabricate）：
+// 诚实边界：
 //   - 在线取数需 lightkurve + MAST 可达（环境门）。缺之 → fetchOnlineDataset 返回 null →
 //     resolveDataset degraded cached_fixture → buildCAstroChain(cached_fixture) → DEGRADED_SCOPE。
 //     这是 honest fallback（非假绿）：测试区分「在线成功（env-gated）」与「在线不可达→cached 降级」。

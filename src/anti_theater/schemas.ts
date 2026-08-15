@@ -32,7 +32,7 @@ const BINDING_KINDS = new Set<string>(['dataset', 'workflow']);
  * parseAntiTheaterLintInput —— untrusted JSON → AntiTheaterLintInput 骨架结构校验（决策 A）。
  *
  * 校验：7 顶层字段存在 + 正确 shape（object/array/primitive）+ 一层立即子节点 discriminator
- *      （bindings[].kind / measurements[]/runs[] 元素为对象 + metricValue:number）+
+ *      （bindings[].kind / measurements[]/runs[] 元素为对象 + metricValue:number）
  *       fec.contractVersion === 'FEC/2.0' literal-const。
  * 深层语义（hash 自洽/enum 字面量/fec 子结构）委托 runAntiTheaterLint（verify 收集器 try/catch 安全网）。
  *

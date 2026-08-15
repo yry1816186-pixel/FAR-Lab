@@ -26,11 +26,10 @@
  *     Complete chiral purity induced by nonlinear autocatalysis and recycling"
  *     DOI:10.1103/PhysRevLett.94.065504（研磨 + Ostwald 熟化 → 完全手性纯化·放大机制）
  *
- * verdict 设计：INCONCLUSIVE — 2 supports（外消旋→手性过量机制存在性·多个独立实验证据）+
+ * verdict 设计：INCONCLUSIVE — 2 supports（外消旋→手性过量机制存在性·多个独立实验证据）
  * 2 refutes（机制之间互相竞争·无单一机制可独立复现 ≥3 次·Murchison 过量小且变异性大）→
  * 证据强度不足以判定单一 dominant mechanism。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）。
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

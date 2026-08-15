@@ -6,7 +6,7 @@
 > 研究系统——它从科学问题出发，调用真实文献与数据源生成并比较候选假设，设计可执行研究计划，
 > 吸收人工/文献/工具反馈完成修订，并通过确定性验证内核和内容寻址证据链约束模型幻觉与科研表演。**
 >
-> 产品关系（赛道一·方向一·A：科学假设生成与研究计划设计）：
+> 产品关系（科学假设生成与研究计划设计）：
 > ```text
 > AI Scientist 科研生成、证据整合与研究规划主系统   (far research: 生成候选假设 + 比较 + 研究计划)
 >                          ↓
@@ -87,7 +87,7 @@ pnpm far verify /tmp/tampered
 
 ---
 
-## Track-1A 科研主流程（三分钟 walkthrough）
+## 科研主流程（三分钟 walkthrough）
 
 ```bash
 # 1. 运行纵向切片（研究可行性门 → 真实文献检索 → 3-5 个候选假设 → 独立批判 → 研究计划）。
@@ -128,7 +128,7 @@ pnpm far research verify bundle
 
 ---
 
-## LIVE 评估（冻结 Track-1A 评估集）
+## LIVE 评估（冻结评估集）
 
 冻结评估集（`src/research/evaluation/frozen_eval_set.json`）以 `scripts/run_frozen_eval.mjs` LIVE 实测
 （百炼真实 Qwen + 真实文献检索；确定性层独立重算）：
@@ -206,7 +206,7 @@ FEC 编排 → 内核裁决 → fail-closed 密封。要验证持久化 bundle�
 export DASHSCOPE_API_KEY=sk-...          # 切勿提交；见 SECURITY.md
 pnpm far ask "<question>" --profile competition_aliyun_qwen
 
-# Track-1A 代表性 live 路径：真实 Qwen 生成 + 真实 OpenAlex 检索一次完成
+# 代表性 live 路径：真实 Qwen 生成 + 真实 OpenAlex 检索一次完成
 # 无需 --profile：默认即 auto —— 设了 DASHSCOPE_API_KEY 就是 LIVE
 pnpm far research start "Does stellar activity inflate hot Jupiter radii?" --source openalex
 ```
@@ -273,9 +273,9 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
 
 - **LLM 不作最终裁决者** —— 五值裁决由确定性 R0-R9 内核给出，LLM 绝不裁决。
 - **禁手填裸统计数字** —— p 值 / effect size 由 `src/statistics/` 真实算出，绝非字面量。
-- **反剧场** —— 22 项检测器抓「假绿测试」（看似绿实则未走真实逻辑）。
+- **反剧场** —— 23 项检测器抓「假绿测试」（看似绿实则未走真实逻辑）。
 - **密钥绝不入库** —— `.env` 已 gitignore；见 [SECURITY.md](SECURITY.md)。
-- 真实 API / 真实数据 / 真实 GPU / 比赛提交均显式标注 `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` /
+- 真实 API / 真实数据 / 真实 GPU 用量均显式标注 `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` /
   `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`。
 
 ---
@@ -291,8 +291,7 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
 
 若本工作有用，请引用：见 [CITATION.cff](CITATION.cff)。
 
-**MIT License** —— 见 [LICENSE](LICENSE)。本项目为 XH-202619 揭榜挂帅挑战杯参赛作品，不代表
-阿里云、DashScope、NAOC、NADC 或任何机构的官方立场。
+**MIT License** —— 见 [LICENSE](LICENSE)。本项目为独立开源项目，不代表阿里云、DashScope、NAOC、NADC 或任何机构的官方立场。
 
 ### 已知边界
 
@@ -320,7 +319,7 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
    `<bundle>.sig.json` sidecar，`far verify --bundle` 自动校验（加 `--pubkey <pk.pem>` 做公钥
    归属）。攻击者若无私钥却重算被签文件 → 验证失败。仍超出范围：公钥归属是组织 PKI 流程，
    同时持有私钥+写权限的攻击者可重签（DEF-18，V-04）。
-10. **确定性 FSM 而非百炼 Agent**（T-035 · 评委04）—— FAR-Lab 使用自研确定性 FSM
+10. **确定性 FSM 而非百炼 Agent**（T-035）—— FAR-Lab 使用自研确定性 FSM
     （`src/agent_loop/fsm_runner.ts`）而非阿里云百炼 Agent / 应用编排。这是有意设计：
     FSM 确定性且完全可追溯（每个阶段转换记入 `evidence_log`），而百炼 Agent 是黑盒编排层，
     会破坏可复现性。百炼 Agent 集成是 V2 评估项（若能保持确定性追踪兼容）。

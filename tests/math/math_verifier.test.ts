@@ -4,7 +4,7 @@
 // checkpoint), null formalization rejection, inputHash cross-lang consistency,
 // CAS mode='expand', fresh-clone degradation.
 //
-// Domain isolation (spec 38 §4.5 / §15 T1.4): routing is decided by claimKind,
+// Domain isolation (§4.5 / §15 T1.4): routing is decided by claimKind,
 // NOT requiredLevel — a numerical claim always goes to NumericalBackend
 // regardless of requiredLevel; a symbolic claim is routed by requiredLevel.
 //

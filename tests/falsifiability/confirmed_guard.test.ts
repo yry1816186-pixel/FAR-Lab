@@ -1,9 +1,8 @@
 /**
  * CONFIRMED 判决证据守卫测试（[D] 红线 #7 修复）。
  *
- * 历史溯源（已归档）: archived-spec数据契约 §404 (CONFIRMED=metric≥threshold) /
  *            07_falsifiability_verdict §6.2 (禁未验证 claim 标 CONFIRMED) /
- *            CLAUDE.md Red Line #7 (CONFIRMED 需证据 + checkpoint)。
+ *            CONFIRMED 需证据 + checkpoint。
  *
  * 验证两层守卫（对称 DEGRADED_SCOPE/UNTESTED 范式）：
  *   1. 应用层：recordVerdict 在 CONFIRMED + evidenceId 无对应 evidence_log 记录时

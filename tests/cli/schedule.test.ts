@@ -1,5 +1,5 @@
 /**
- * schedule.test.ts —— 定期重验证调度器（批次 3-G·借鉴 Hermes cron）。
+ * schedule.test.ts —— 定期重验证调度器（cron）。
  *
  * 覆盖：
  *   1. add/list/remove 持久化（临时目录·JSON 往返）。

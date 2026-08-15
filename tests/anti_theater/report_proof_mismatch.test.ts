@@ -1,7 +1,7 @@
 /**
  * report_proof_mismatch —— CI gate 4（APPENDIX_E §6）：自然语言 verdict 与 structured verdict 不一致检测。
  *
- * Authority: archived-plan §2（AT-REPORT-MISMATCH 伪代码·natural_language_verdict_mismatch）+
+ * Authority: （AT-REPORT-MISMATCH 伪代码·natural_language_verdict_mismatch）
  *            §6（CI gate 4）+ 04_PROOF_ENVELOPE_AND_VERIFIER.md §2（humanSummary 不进 proofHash·AT-REPORT-MISMATCH
  *            检查其与 structured verdict 强度一致）。
  *
@@ -11,7 +11,7 @@
  * structured-wins 原则（D16 / 缺口 #10）：
  *   - AT-REPORT-MISMATCH **不强制降级 verdict**（forcedVerdict=undefined）—— structured verdict 是权威，
  *     humanSummary 仅展示。verdict 已是 UNTESTED（honest），不应因报告文案错误再降级。
- *   - 但 mismatch 须被**浮现**：finding 进 antiTheaterReport.hasFail=true（RULE-PE-007 兜底）+
+ *   - 但 mismatch 须被**浮现**：finding 进 antiTheaterReport.hasFail=true（RULE-PE-007 兜底）
  *     reasonCode=REPORT_VERDICT_MISMATCH 披露 + llmOverrideRejected=true（structured 拒绝被 humanSummary 覆盖）。
  *
  * 模型中立。零容忍合规：无 any / @ts-ignore / 双重断言 / 桩。

@@ -3,7 +3,7 @@
 // FUSION-OS-2 端到端 RED→GREEN：spawn detached=true 独立进程组 + 超时 process.kill(-pgid) 组播清理，
 // 防 subprocess.Popen 子孙成孤儿（Open Science setsid+kill -- -$pgid 范式）。
 //
-// 单一真实依赖（CLAUDE.md §1）：
+// 单一真实依赖：
 //   - 真实 killProcessGroup（src/science_harness/sandbox_runner.ts:killProcessGroup）POSIX process.kill(-pgid) /
 //     win taskkill /T —— 非 Fake·真实进程组/tree kill。
 //   - 真实 Python 父进程（Node spawn detached=true 直接起·不经 sandbox_runner.py 故不挂 OS-8 audit hook）
@@ -21,11 +21,10 @@
 //   GREEN（接线后）：detached=true 让 python 父成新进程组 leader（pgid=pid）；killProcessGroup →
 //     process.kill(-pid) 组播 SIGKILL（win taskkill /T 递归）→ 孙进程同组被杀，不成孤儿。
 //
-// 反剧场红线（FUSION-OS-2 + CLAUDE.md §5）：fail-closed 清理。超时不仅杀直接子进程，杀整组——
+// 反剧场红线（FUSION-OS-2）：fail-closed 清理。超时不仅杀直接子进程，杀整组——
 // 防孤孙绕过 sandbox 约束存活。
 //
-// Authority: archived-plan §C FUSION-OS-2 +
-//            archived-plan §4 FUSION-OS-2（setsid+kill -$pgid 范式）。
+// Authority: FUSION-OS-2（setsid+kill -$pgid 范式）。
 
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';

@@ -1,7 +1,7 @@
 /**
  * benchmark 聚合器测试 —— Science-125 完整性广度套件的核心正确性 + 确定性验证。
  *
- * 历史溯源（已归档）: archived-spec §1 + 09 §4 + 17 §7.
+ * 历史溯源（已归档）: 09 §4 + 17 §7.
  *
  * 覆盖：
  *   1. runBenchmark 返回合法 BenchmarkReport（全字段·每个 entry 字段合法）
@@ -106,7 +106,7 @@ test('reproHash 是 run 实例标识（含 ulid verdictId·跨运行可能不同
 });
 
 test('suiteIntegrityRoot 与确定性生成物 benchmark_report.json 一致（CI golden 锚·防回归）', () => {
-  // R6 仓库内容政策（2026-08-15）：报告不再 git 跟踪，ensure 先确定性生成（fixed now → golden 锚不变）。
+  // 仓库内容政策：报告不再 git 跟踪，ensure 先确定性生成（fixed now → golden 锚不变）。
   // 若聚合逻辑 / sort / seed 变更导致 suiteIntegrityRoot 漂移 → 此测试失败 → 提示重新 generate。
   ensureBenchmarkReport();
   __resetBenchmarkCache();

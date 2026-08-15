@@ -1,6 +1,6 @@
 // tests/anti_theater/provenance_unbound.test.ts
 //
-// T-003 · AT-PROVENANCE-UNBOUND detector 回归测试（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+// T-003 · AT-PROVENANCE-UNBOUND detector 回归测试（2026-07-24 F-2-005 修复）。
 //
 // 反剧场最深的洞："系统无法区分真算出来的 metricValue 和编的 metricValue"。
 // rawArtifactHashes 仅证明「有原始产物」（产物存在性），不证明「产物是这次执行产出的」

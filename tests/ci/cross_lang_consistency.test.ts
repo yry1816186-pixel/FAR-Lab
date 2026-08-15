@@ -1,6 +1,6 @@
 // tests/ci/cross_lang_consistency.test.ts
 // 职责：CI R2 最高优先闸门——TS/Python canonicalHash 字节级一致性
-// 历史溯源：10_CI_pipeline.md §9（cross_lang gate）+ 04_evidence_contract.md §2.4（canonicalHash whitelist）（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本测试 + repro/far_chain_repro/ 跨语言源码字节级实测为准
+// 历史溯源：（cross_lang gate）+ 04_evidence_contract.md §2.4（canonicalHash whitelist）·运行时 SSOT 以本测试 + repro/far_chain_repro/ 跨语言源码字节级实测为准
 // 零容忍合规：禁用 any 类型注解、ts-ignore 指令、双重断言、空 catch 块、桩代码返回
 
 import { spawnSync } from 'node:child_process';

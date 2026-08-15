@@ -1,7 +1,7 @@
 /**
  * grade_scorers.test.ts —— M-10 TraceGrade 评分器单元测试。
  *
- * 历史溯源（已归档）: archived-spec §5（Trace grading 与失败分类）。
+ * 历史溯源（已归档）: （Trace grading 与失败分类）。
  *
  * 覆盖：
  *   - deterministicGrade: 7 维度评分、失败码生成、边界 case

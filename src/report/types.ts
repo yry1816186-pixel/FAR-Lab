@@ -35,7 +35,7 @@ export interface ReportData {
   readonly reproHash: string;
   readonly verdictSummary: Readonly<Record<string, number>>;
   readonly sourceAnchorCount: number;
-  /** 统计陷阱审计摘要（批次 1-B·借鉴 scientific-agent-skills 陷阱目录）。调用方注入·可选。 */
+  /** 统计陷阱审计摘要（统计陷阱目录）。调用方注入·可选。 */
   readonly trapSummary?: TrapSummary;
 }
 

@@ -18,7 +18,6 @@
  *
  * verdict 设计：3 条 evidence——全 support（meta-analysis + mesocosm + field 一致确认）→ R7 CONFIRMED。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

@@ -25,7 +25,6 @@
  * verdict 设计：REFUTED —— 阈值 gt 3（≥3 个独立对抗性实验决定性地选出一方）；
  * 实际可用的决定性实验数 ~0-1（Cogitate 2023 未决 + 无其他大规模复制）→ 所有 metricValue < 3。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""SymPy CAS backend for the FAR-Lab math verification layer (spec 38 §3).
+"""SymPy CAS backend for the FAR-Lab math verification layer (§3).
 
 Protocol (stdin → stdout, both JSON):
   Request:  {"mode": "expand"|"simplify"|"parse", "lhs": "...", "rhs": "...", "expr": "..."}
   Response: {"artifact": "...", "log": "...", "outcome": "verified"|"refuted"|"unknown"}
 
-Soundness layer (spec 38 §3.1):
+Soundness layer (§3.1):
   - mode='expand':    expand(lhs) == expand(rhs) → outcome='verified' (SOUND).
                        expand(lhs) != expand(rhs) → outcome='refuted'  (SOUND for the
                        expanded normal form; not a complete refutation in general, but

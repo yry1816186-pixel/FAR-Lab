@@ -184,7 +184,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerVerdictRoutes(v1, { db: config.db });
     await registerReportRoute(v1, { db: config.db });
     await registerIntegrityRoutes(v1, { db: config.db });
-    // Track-1A research vertical slice (hypothesis generation + research plan).
+    // research vertical slice (hypothesis generation + research plan).
     const { registerResearchRoutes } = await import('./routes/research.ts');
     await registerResearchRoutes(v1, {});
     // P2（BA3-3）：生命周期事件只读查询（修正通知机制·修正不静默）。
@@ -241,8 +241,8 @@ export async function startServer(
   port = 3000,
   host = '127.0.0.1',
 ): Promise<FastifyInstance> {
-  // FIX-R6-002: 撤销 R5 的 host-inference fail-closed（评委03/11 发现它回归了 README 背书的
-  //   `docker compose up far-api` demo；评委09 发现空 "" secret 仍可绕过）。改 opt-in 鉴权设计：
+  // FIX-R6-002: 撤销 R5 的 host-inference fail-closed（该改动回归了 README 背书的
+  //   `docker compose up far-api` demo；空 "" secret 仍可绕过）。改 opt-in 鉴权设计：
   //   - 默认 host=127.0.0.1（安全默认；用户可 --host 0.0.0.0 用于 Docker/公开部署，不再 throw）
   //   - 匿名（offline）是默认；--protected/--jwt-secret <非空> opt-in 强制 JWT 鉴权
   //   - 空 secret 由 api.ts FIX-R6-001 拒绝（→null→offline），关闭 "" 伪造 admin 漏洞

@@ -1,6 +1,6 @@
 """merkle_root —— 证据链 Merkle 完整性根 + 包含证明（TS 字节相等对端）。
 
-Authority: archived-spec §4 + 23 §5.2.
+Authority: 23 §5.2.
 Mirror: src/evidence_log/merkle_root.ts（两侧算法逐行对应·duplicate-last-on-odd）。
 
 跨语言字节相等：combine(left,right)=sha256((left+right).encode utf8)。

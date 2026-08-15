@@ -3,12 +3,12 @@
  *
  * 路由（两个产物·content-by-path 分离）：
  *   - GET /report/:runId      → HTML 审计报告（Epic K-05b·Content-Type text/html）
- *   - GET /report/:runId/paper → ResearchPaperOutput JSON（Epic K-05a·竞赛 10 字段）
+ *   - GET /report/:runId/paper → ResearchPaperOutput JSON（Epic K-05a·10 字段）
  *
  * 设计理由（双端点）：
  *   - 前端 ReportPage 用 sandboxed iframe（srcdoc）渲染——需完整 HTML 文档，
  *     由 src/report/ 的 renderHtml 产出（自包含·HTML 转义·模型中立）。
- *   - 竞赛要求 10 字段 ResearchPaperOutput（machine-readable JSON）——由
+ *   - 10 字段 ResearchPaperOutput（machine-readable JSON）——由
  *     assemblePaper 产出（确定性映射·禁 LLM-as-judge）。
  *   - 两产物分离避免「JSON 当 HTML 渲染」的契约断裂（前端 fetchText + iframe
  *     与后端 application/json 不可调和）。
@@ -221,7 +221,7 @@ export async function registerReportRoute(
     reply.code(200).type('text/html; charset=utf-8').send(html);
   });
 
-  // GET /report/:runId/paper → ResearchPaperOutput JSON（Epic K-05a·竞赛 10 字段交付）
+  // GET /report/:runId/paper → ResearchPaperOutput JSON（Epic K-05a·10 字段交付）
   app.get('/report/:runId/paper', async (request, reply) => {
     const { runId } = request.params as { runId: string };
 

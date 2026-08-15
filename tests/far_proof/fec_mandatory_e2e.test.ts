@@ -9,7 +9,7 @@
 // demo_chain 经同一 fecAppendClaim 调用形态间接驱动本路径（P0-3 caller = orchestrator:119）。
 // 反假绿：断言 untestedReason === fecGate.reason 精确区分接线分支，无 expect(true)。
 //
-// Authority: archived-plan §C P0-3 + 03 §2.3 + orchestrator.ts:119-128。
+// Authority: P0-3 + 03 §2.3 + orchestrator.ts:119-128。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

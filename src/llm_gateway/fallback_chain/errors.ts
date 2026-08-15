@@ -1,5 +1,5 @@
 /**
- * FallbackChain 错误层级（spec 05 §9.1 / digest F-05-18）。
+ * FallbackChain 错误层级（§9.1 / digest F-05-18）。
  *
  * 层级：
  *   ProviderError（基类·provider 侧错误总根）
@@ -50,7 +50,7 @@ export class BailianHttpError extends ProviderError {
 
 /**
  * 百炼请求超时（SR-4 / openai client timeout=15000ms 触发）。
- * 触发 fallback（spec 05 §9.2 触发矩阵）。
+ * 触发 fallback（§9.2 触发矩阵）。
  */
 export class BailianTimeoutError extends ProviderError {
   constructor(message?: string) {
@@ -61,7 +61,7 @@ export class BailianTimeoutError extends ProviderError {
 
 /**
  * 百炼网络层错误（DNS 解析失败 / ECONNRESET / socket hang up / 连接拒绝）。
- * 触发 fallback（spec 05 §9.2 触发矩阵）。
+ * 触发 fallback（§9.2 触发矩阵）。
  */
 export class BailianNetworkError extends ProviderError {
   constructor(message?: string) {
@@ -73,7 +73,7 @@ export class BailianNetworkError extends ProviderError {
 /**
  * 百炼限流/配额耗尽（HTTP 429）。
  * 继承 BailianHttpError(429)；额外携带 Retry-After 提示（毫秒，可能为 null）。
- * 触发 fallback（spec 05 §9.2 触发矩阵：429 属可降级信号）。
+ * 触发 fallback（§9.2 触发矩阵：429 属可降级信号）。
  */
 export class BailianRateLimitError extends BailianHttpError {
   readonly retryAfterMs: number | null;

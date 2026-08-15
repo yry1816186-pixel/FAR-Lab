@@ -5,7 +5,7 @@
  *   claim：模型在 MMLU-physics 达 ≥0.72 准确率（ML 域 · measurement nodeKind · claimType=quantitative）。
  *   M1 accuracy / M2 run-variance / M3 contamination。
  *
- * 设计 verdict（spec 10 §4.4:284-288）：M1 PASS + M2/M3 WARN → mapChecksToVerdict route 'mixed' → INCONCLUSIVE。
+ * 设计 verdict（§4.4:284-288）：M1 PASS + M2/M3 WARN → mapChecksToVerdict route 'mixed' → INCONCLUSIVE。
  *
  * RULE-FS-001 不可证伪 rationale（诚实边界）：
  *   定量基准声称（「准确率 ≥ X」）因 (a) 运行间方差 (b) 训练数据污染 难以干净证伪——
@@ -37,7 +37,7 @@ export const HERO_A_CHECK_IDS = ['M1_accuracy', 'M2_run_variance', 'M3_contamina
  * 阈值方向：M1 accuracy 越高越好（>=）；M2 方差越低越好（<）；M3 污染越低越好（<）。
  */
 export const HERO_A_DEFAULT_THRESHOLDS: Record<(typeof HERO_A_CHECK_IDS)[number], ScienceThreshold> = {
-  // M1：accuracy · spec 10 §4.4 称声称阈值 0.72（F8 预登记）。
+  // M1：accuracy · §4.4 称声称阈值 0.72（F8 预登记）。
   M1_accuracy: { op: '>=', value: 0.72, unit: 'accuracy' },
   // M2：run-variance · 跨运行 stddev（V1 注入·禁 hardcode 最终值·待实测）。
   M2_run_variance: { op: '<', value: 0.02, unit: 'stddev' },

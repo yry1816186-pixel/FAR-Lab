@@ -1,8 +1,8 @@
 // src/cli/commands/schedule.ts
-// 职责：far schedule —— 定期重验证调度器（批次 3-G·借鉴 Hermes Agent cron 无人值守调度）。
+// 职责：far schedule —— 定期重验证调度器（cron 无人值守调度）。
 //
 // 动机：FAR-Lab 的验证是一次性的，但科学声明会随时间被新证据推翻（LK-99/冷聚变/复现失败）。
-// schedule 让已验证的 claim 按周期自动重跑验证并记录结果 diff —— 竞赛亮点
+// schedule 让已验证的 claim 按周期自动重跑验证并记录结果 diff —— 核心亮点
 // "scientific re-verification as a service：你的声明会随时间被反复验证"。
 //
 // 设计纪律：

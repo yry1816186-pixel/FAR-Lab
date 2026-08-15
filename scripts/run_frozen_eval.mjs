@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/run_frozen_eval.mjs — run the frozen Track-1A evaluation set LIVE.
+// scripts/run_frozen_eval.mjs — run the frozen evaluation set LIVE.
 //
 // §18.1/§18.3: for each `final` item in src/research/evaluation/frozen_eval_set.json,
 // start a real research run (live model + real retrieval), then compute the

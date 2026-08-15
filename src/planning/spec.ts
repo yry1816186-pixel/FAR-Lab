@@ -1,7 +1,7 @@
 // src/planning/spec.ts
-// 职责：opencode /spec 源代码化 —— Spec 可验证规格门禁引擎（确定性纯函数）。
+// 职责：Spec 可验证规格门禁引擎（确定性纯函数）。
 //
-// 门禁（对应 AGENT-LIFECYCLE §2.2 SPEC 阶段）：
+// 门禁（SPEC 阶段）：
 //   1. story 非空（一句话故事）
 //   2. Delta 至少一个变更声明（ADDED/MODIFIED/REMOVED 任一非空）
 //   3. 验收标准 ≥ 3 条（OpenSpec 法则：≥3 可验证 AC）

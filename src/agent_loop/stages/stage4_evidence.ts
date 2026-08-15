@@ -35,7 +35,7 @@ export async function runStage4(ctx: StageContext): Promise<StageArtifact> {
     ctx,
     'stage4_evidence',
     // payloadKind 落 call_records.payload_kind·必须命中 PAYLOAD_KINDS 9 值之一
-    // spec 06 §2 表：stage4_evidence → 'experiment' 或 'citation'
+    // §2 表：stage4_evidence → 'experiment' 或 'citation'
     // 选 'experiment'：EvidenceRecord 含 entailmentScore（实验度量·非纯文献引用）
     'experiment',
     STAGE_TO_PURPOSE_TAG.stage4_evidence, // 'narrative'（API-1 SSOT）

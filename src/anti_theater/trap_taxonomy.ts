@@ -1,5 +1,5 @@
 /**
- * anti_theater trap taxonomy —— 统计陷阱分类法（借鉴 scientific-agent-skills
+ * anti_theater trap taxonomy —— 统计陷阱分类法（
  * statistical-analysis/statistical-power 的"陷阱目录"设计）。
  *
  * 动机：FAR-Lab 已有 22 个反剧场探测器，但 detect 与 explain 分离——探测器只返回
@@ -180,7 +180,7 @@ export const TRAP_TAXONOMY: Readonly<Record<AntiTheaterAttackKind, TrapTaxonomy>
     name: '多重比较未校正（multiple testing uncorrected）',
     what: '做大量统计检验但未做多重比较校正（Bonferroni/FDR），显著结果实为偶然。',
     cures: ['多重比较校正强制', '未校正即 FAIL', 'preregistration 声明校正策略'],
-    realCase: '多重比较问题是统计陷阱教科书条目（scientific-agent-skills statistical-pitfalls 目录）',
+    realCase: '多重比较问题是统计陷阱教科书条目（统计陷阱目录）',
   },
   'p-hacking-marginal-p': {
     attackId: 'AT-PHACK-MARGINAL-P',
@@ -234,7 +234,7 @@ export const TRAP_TAXONOMY: Readonly<Record<AntiTheaterAttackKind, TrapTaxonomy>
     name: '基准过拟合（benchmark overfit）',
     what: '在 public split 反复调参直至过拟合，声称的泛化能力实为对基准的记忆。',
     cures: ['public/hidden split 分离', 'hidden split 校验', 'public 反复命中即 WARN'],
-    realCase: '[n/a]（通用：竞赛 leaderboard 过拟合）',
+    realCase: '[n/a]（通用：leaderboard 过拟合）',
   },
   'fake-degraded-scope': {
     attackId: 'AT-FAKE-DEGRADED',
@@ -252,7 +252,7 @@ export const TRAP_TAXONOMY: Readonly<Record<AntiTheaterAttackKind, TrapTaxonomy>
     name: '执行-产物绑定缺失（execution provenance unbound）',
     what: '声称的 metricValue 无本次 sandbox 执行的产物 hash 绑定——fixture 冒充真实计算结果。',
     cures: ['requireExecutionProvenance opt-in', 'sandbox stdout/artifact hash 绑定', '缺失即 FAIL'],
-    realCase: '[n/a]（FAR-Lab T-003 评委逼问修复·防 fixture 冒充）',
+    realCase: '[n/a]（FAR-Lab T-003 修复·防 fixture 冒充）',
   },
   'effect-p-consistency-mismatch': {
     attackId: 'AT-EFFECT-P-MISMATCH',

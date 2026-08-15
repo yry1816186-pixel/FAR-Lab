@@ -14,7 +14,7 @@
  *   9. node DTO 字段映射正确
  *  10. edge DTO 字段映射正确
  *
- * 单一真实依赖（CLAUDE.md §1）：真实 better-sqlite3 :memory: DB + appendRecord + appendEvidenceLog + recordVerdict。
+ * 单一真实依赖：真实 better-sqlite3 :memory: DB + appendRecord + appendEvidenceLog + recordVerdict。
  */
 
 import { test } from 'node:test';

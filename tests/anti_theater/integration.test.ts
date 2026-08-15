@@ -4,8 +4,8 @@
  * antiTheaterReport → sealProofEnvelopeV2/RULE-PE-007 三段组合契约（无生产编排器时的组合证明）。
  *
  * Authority: 任务 #10 计划 W3.5b（集成 kernel_adapter + sealer）+ APPENDIX_A_TYPES.md §7.1
- *            （VerdictKernelInput.antiTheaterFindings 消费投影型 KernelAntiTheaterFinding）+
- *            APPENDIX_E_ANTI_THEATER.md §1（runAntiTheaterLint 编排器·D2 双轴纪律）+
+ *            （VerdictKernelInput.antiTheaterFindings 消费投影型 KernelAntiTheaterFinding）
+ *            APPENDIX_E_ANTI_THEATER.md §1（runAntiTheaterLint 编排器·D2 双轴纪律）
  *            04_PROOF_ENVELOPE_AND_VERIFIER.md §2.4 RULE-PE-007（conclusion_matches_anti_theater）。
  *
  * 为什么是集成测试而非生产编排器：

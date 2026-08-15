@@ -614,7 +614,7 @@ test('runVerify --bundle: 篡改 sealed_by → exit 7（deterministic sealer 守
 });
 
 // ===== T-001 回归：verify 对缺失/不存在 bundle 路径 fail-closed（exit 7，非 0）=====
-// 评委03 第 1 轮 F-3-001 实测早期版本 exit=0（假阳性）；当前 verifyFarProofBundle 已产
+// 第 1 轮 F-3-001 实测早期版本 exit=0（假阳性）；当前 verifyFarProofBundle 已产
 // MISSING_REQUIRED_FILE errors → status FAIL → exit 7。本测试锁住该行为，防回归。
 test('runVerify --bundle: 不存在的 bundle 路径 → exit 7 + 10 MISSING_REQUIRED_FILE（fail-closed · T-001 回归）', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'far-verify-missing-bundle-'));

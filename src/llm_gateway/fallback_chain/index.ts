@@ -1,5 +1,5 @@
 /**
- * FallbackChain 公共出口（spec 05 §8.2 / spec 24 §5）。
+ * FallbackChain 公共出口（§8.2 / §5）。
  *
  * 三职责：
  *   - errors：传输错误层级（ProviderError → BailianHttpError/Timeout/Network；RateLimit extends 429）

@@ -96,7 +96,7 @@ export interface CausalModel {
 /**
  * 因果 DAG 运行时表示（buildDag 从 CausalModel.nodes/edges 构造）。
  *
- * 设计：邻接表 + 有向边查询。d_separation 伪代码消费 `dag.neighbors(X)`（无向邻接·union）+
+ * 设计：邻接表 + 有向边查询。d_separation 伪代码消费 `dag.neighbors(X)`（无向邻接·union）
  * `dag.has_edge(X, neighbor)`（正向）/ `dag.has_edge(neighbor, X)`（反向）。
  * 接口方法纯查询（无 mutation·确定性·幂等）。
  */

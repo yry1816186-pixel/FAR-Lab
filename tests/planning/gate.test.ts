@@ -1,5 +1,5 @@
 // tests/planning/gate.test.ts
-// opencode /verify-full 源代码化测试：四步门函数报告（AGENT-LIFECYCLE §5.2 grade）。
+// 四步门函数报告（grade）。
 // 真实依赖：buildGateReport / renderGateReport（src/planning/gate.ts，纯函数无 mock）。
 
 import { strict as assert } from 'node:assert';

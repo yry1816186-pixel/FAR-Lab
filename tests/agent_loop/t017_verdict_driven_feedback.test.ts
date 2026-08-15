@@ -1,7 +1,7 @@
 /**
  * T-017 · V2 裁决驱动反馈边（T-016 V2 roadmap 项落地·2026-08-06）。
  *
- * 背景：评委04 F-4-004 深层诉求「裁决驱动反馈边」——原先反馈源是 stage6 LLM 自评
+ * 背景：F-4-004 深层诉求「裁决驱动反馈边」——原先反馈源是 stage6 LLM 自评
  * （continueIteration），不是 verdict kernel 的 REFUTED/INCONCLUSIVE。本测试验证
  * RunAgentLoopArgs.verdictDrivenFeedback=true 时：
  *
@@ -17,8 +17,8 @@
  *   - refutes 投票 → REFUTED（R6_PRIMARY_TEST_REFUTES）
  *   - neutral/空 → UNTESTED（R2_NO_VALID_DATASET_BINDING）
  *
- * Authority: src/agent_loop/fsm_runner.ts（verdictDrivenFeedback 段）+
- *            src/agent_loop/verdict_stage.ts（evaluateIntermediateVerdict）+
+ * Authority: src/agent_loop/fsm_runner.ts（verdictDrivenFeedback 段）
+ *            src/agent_loop/verdict_stage.ts（evaluateIntermediateVerdict）
  *            src/agent_loop/stages/stage3_hypothesis.ts（verdictHint 消费）。
  *
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩。

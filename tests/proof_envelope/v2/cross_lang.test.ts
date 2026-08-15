@@ -4,7 +4,7 @@
  * RULE-PE-010 independently_recomputable 的独立路径验证——ProofEnvelope 必须可被一条
  * 不依赖项目 CI 的路径（Python）从原始 claim 重算到 proofHash 匹配。
  *
- * Authority: archived-plan §2.4 RULE-PE-010 + APPENDIX_C §1.9（TS/Python 等价）。
+ * Authority: RULE-PE-010 + APPENDIX_C §1.9（TS/Python 等价）。
  */
 
 import { execFileSync } from 'node:child_process';
@@ -144,7 +144,7 @@ test('cross-lang byte-equal: antiTheaterReport 含 optional 字段（D9/R1·_fil
   assert.notEqual(tsHash, baseHash, 'populated antiTheaterReport 必须改变 proofHash');
 });
 
-// ===== A3 次要增强：V2 proofHash Unicode/NFC edge case（评委08 F-4-007 的 V2 层防线）=====
+// ===== A3 次要增强：V2 proofHash Unicode/NFC edge case（F-4-007 的 V2 层防线）=====
 
 /** override claim.naturalLanguage（保留其余 claim 字段）。 */
 function withNaturalLanguage(text: string): ReturnType<typeof makeValidEnvelopeV2Core> {
@@ -156,7 +156,7 @@ function withNaturalLanguage(text: string): ReturnType<typeof makeValidEnvelopeV
 
 test('cross-lang byte-equal: NFC/NFD 等价形式归一化后同 hash（é = e + U+0301）', () => {
   // NFD（e + combining acute U+0301）与 NFC（é 单字符）是 Unicode 等价表示——normalizeClaim
-  // 的 NFC 归一化必须使两者 hash 相同（否则跨语言/跨平台 hash 分裂·评委08 F-4-007）。
+  // 的 NFC 归一化必须使两者 hash 相同（否则跨语言/跨平台 hash 分裂·F-4-007）。
   const nfd = withNaturalLanguage('cafe\u0301: model achieves RMSE \u2264 0.5');
   const nfc = withNaturalLanguage('café: model achieves RMSE ≤ 0.5');
   const tsNfd = computeProofHashV2(nfd);

@@ -59,7 +59,7 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
       continue;
     }
     if (a === '--protected') {
-      // FIX-R6-001: 拒绝空/缺失 secret（"" 会致 HS256 空 key 可伪造 admin JWT·评委09 F-R6-09-01）。
+      // FIX-R6-001: 拒绝空/缺失 secret（"" 会致 HS256 空 key 可伪造 admin JWT·F-R6-09-01）。
       // 非空字符串才启用受保护模式；空/缺失 → null（offline 匿名，由 --protected opt-in 控制）。
       jwtSecret =
         typeof process.env.FAR_JWT_SECRET === 'string' && process.env.FAR_JWT_SECRET.length > 0

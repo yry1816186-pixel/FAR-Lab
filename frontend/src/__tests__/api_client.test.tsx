@@ -117,7 +117,7 @@ function verdictNodeRaw(overrides: Record<string, unknown> = {}): VerdictNode {
 
 const HEAD_HASH = 'a'.repeat(64);
 
-// ---------- 探针（bare root，无 /api/v1 前缀·spec 24 §0#3）----------
+// ---------- 探针（bare root，无 /api/v1 前缀·§0#3）----------
 
 describe('api_client probes (bare root)', () => {
   it('useHealth 以 GET /health 调用 fetch', async () => {
@@ -148,7 +148,7 @@ describe('api_client probes (bare root)', () => {
   });
 });
 
-// ---------- App endpoints（/api/v1 前缀·spec 24 §0#2）----------
+// ---------- App endpoints（/api/v1 前缀·§0#2）----------
 
 describe('api_client app endpoints (/api/v1 prefix)', () => {
   it('useEvidence 以 GET /api/v1/evidence/:id 调用 fetch', async () => {

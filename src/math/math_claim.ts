@@ -1,6 +1,6 @@
 // spec 38 · Math verification layer — type contracts.
 //
-// Enum values are authoritative per spec 38 §1 / §1.1:
+// Enum values are authoritative per §1 / §1.1:
 //   - MathClaimKind: 12 values (8 symbolic + 4 numerical) — spec §1
 //   - VerificationLevel: 4 values (L1_cas / L2_smt / L3_formal / L4_human) — spec §1 (lowercase)
 //   - VerificationOutcome: 3 values (verified / refuted / unknown) — spec §1
@@ -17,7 +17,7 @@
 // Model-neutrality: this file contains NO provider/model references. It is pure
 // structural typing for math claims and verification records.
 //
-// Naming: camelCase for TS in-memory fields (CLAUDE.md red-line #3). The physical
+// Naming: camelCase for TS in-memory fields (naming red-line #3). The physical
 // SQL columns (snake_case) live in schema/migrations/0003_math_verification.sql
 // and are mapped by evidence_sink.ts. `linkedVerdictNodeId` is a compound
 // identifier soft-linking to the falsifiability layer; it does NOT import the
@@ -368,7 +368,7 @@ export function validateMathClaim(claim: MathClaim): void {
     }
     if (isNumericalKind(claim.claimKind)) {
       throw new FatalMathError(
-        `validateMathClaim: numerical kind "${claim.claimKind}" cannot set requireFormalVerification=true (numerical claims are always outcome=unknown — spec 38 §4.5; claim ${claim.claimId})`,
+        `validateMathClaim: numerical kind "${claim.claimKind}" cannot set requireFormalVerification=true (numerical claims are always outcome=unknown — §4.5; claim ${claim.claimId})`,
       );
     }
   }

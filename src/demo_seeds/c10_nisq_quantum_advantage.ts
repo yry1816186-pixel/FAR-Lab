@@ -22,7 +22,6 @@
  * verdict 设计：3 条 evidence——全 refute（经典算法追上 Sycamore + NISQ 噪声限制 + IBM utility 被 ELM 质疑）
  * → metricValue 全部低于「不可超越优势」阈值 → R6 REFUTED。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

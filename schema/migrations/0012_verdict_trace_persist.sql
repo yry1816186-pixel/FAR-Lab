@@ -1,9 +1,9 @@
 -- 0012_verdict_trace_persist.sql
 -- verdict_nodes 持久化裁决内核结构化输出（P0-2-EXT）：reasonCodes / ruleTrace / decisiveRuleId / evidenceSufficiency。
 --
--- Authority: archived-plan §3.1（proofHash 白名单含 verdictTrace.*）
+-- Authority:（proofHash 白名单含 verdictTrace.*）
 --            + §3.4（verdict 层 verdict-critical：reasonCodes/ruleTrace/decisiveRuleId/evidenceSufficiency →
---            改变须被察觉）+ CLAUDE.md §4 P0-2-EXT。
+--            改变须被察觉）+ P0-2-EXT。
 --
 -- 背景（为何加列）：decideFiveValueVerdict（verdict_kernel_v2.ts:176）算出 4 字段后被
 --   verdictResultFromKernelOutput（legacy_kernel_adapter.ts:299）投影丢弃——既不入 verdict_nodes，
@@ -24,7 +24,7 @@
 -- 边界:
 --   1. ADD COLUMN NOT NULL DEFAULT：存量行（如有）取默认 '{}' / ''。fresh test DB 无存量行，不受影响。
 --      注：存量行的 current_hash 是旧白名单算的（不含 verdict_trace_hash）→ verifyVerdictNodes 对其重算
---      会失配。本项目无生产存量 DB（竞赛交付·测试用 fresh DB），可接受；生产 DB 迁移需重插 verdict 链。
+--      会失配。本项目无生产存量 DB（交付以 fresh 测试 DB），可接受；生产 DB 迁移需重插 verdict 链。
 --   2. DROP IF EXISTS + CREATE（幂等·重复应用安全）。
 --   3. 不可变 trigger 扩展两列：否则 UPDATE 这两列不触发 RAISE → 静默篡改（trace_hash 可被换）。
 

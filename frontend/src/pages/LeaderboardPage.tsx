@@ -1,7 +1,7 @@
 /**
  * LeaderboardPage —— Science-125 完整性广度套件的公开 leaderboard（Task #10 惊艳核心）。
  *
- * Authority: spec 41 §1（Science125 种子）+ 09 §4（integrity root）+ 23 §5.2.
+ * Authority: §1（Science125 种子）+ 09 §4（integrity root）+ 23 §5.2.
  *
  * 六大组件（基于后端 GET /api/v1/benchmark 预生成报告）：
  *   1. HeroSuiteRoot        — 套件级聚合 Merkle 根（所有 problem 单链根再折叠·套件密码学指纹）

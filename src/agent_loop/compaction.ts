@@ -1,5 +1,5 @@
 /**
- * agent_loop compaction —— 证据上下文压缩（批次 2-E·session-compaction 语义）。
+ * agent_loop compaction —— 证据上下文压缩（session-compaction 语义）。
  *
  * 动机：runAgentLoop 每轮迭代把全部 prevArtifacts（JSON.stringify 全量）注入下一 stage
  * prompt（stage2_integration.ts:71 `JSON.stringify(stage1, null, 2)`）。iteration ≥ 2 时

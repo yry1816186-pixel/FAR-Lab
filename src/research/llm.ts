@@ -1,5 +1,5 @@
 /**
- * research/llm — shared structured-JSON LLM call helper for the Track-1A layer.
+ * research/llm — shared structured-JSON LLM call helper for the research layer.
  *
  * All model calls in the research module go through callStructuredJson: it
  * issues a structured-output request, JSON-parses, and zod-validates the result

@@ -1,11 +1,10 @@
 /**
  * report 路由测试——双端点契约（24§5.3 / 17 Epic K-05a + K-05b）。
  *
- * 历史溯源（已归档）: archived-spec网关与接口规范_API_GATEWAY.md §5.3 / 17 Epic K-05a/K-05b.
  *
  * 端点契约：
  *   - GET /report/:runId      → 200 text/html 审计报告（Epic K-05b·前端 iframe 渲染）
- *   - GET /report/:runId/paper → 200 application/json ResearchPaperOutput（Epic K-05a·竞赛 10 字段）
+ *   - GET /report/:runId/paper → 200 application/json ResearchPaperOutput（Epic K-05a·10 字段）
  *
  * 覆盖：
  *   - /report/:runId 返回 404 当无 evidence_log 记录

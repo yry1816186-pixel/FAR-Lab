@@ -1,5 +1,5 @@
 /**
- * research — Track-1A "scientific hypothesis generation & research-plan design"
+ * research — "scientific hypothesis generation & research-plan design"
  * vertical slice (directive §6 Phase 2 / §9).
  *
  * Public surface:

@@ -1,5 +1,5 @@
 // src/cli/commands/research.ts
-// far research start "<question>" — run the Track-1A vertical slice under the
+// far research start "<question>" — run the research vertical slice under the
 // persistent run lifecycle (ground → generate 3-5 hypotheses → critique → score
 // → plan → ResearchRun), with checkpointed progress, SIGINT cancellation, and
 // `far research status/resume` for observability across process restarts.
@@ -735,7 +735,7 @@ function renderHuman(profile: string, run: ResearchRun): void {
   }
   lines.push(
     '',
-    '  FAR-Lab · far research (Track 1A: hypothesis generation + research plan)',
+    '  FAR-Lab · far research (hypothesis generation + research plan)',
     '  ─────────────────────────────────────────────────────────────────────',
     `  question : ${run.question}`,
     `  run      : ${run.runId}`,

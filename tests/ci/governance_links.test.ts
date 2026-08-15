@@ -39,7 +39,7 @@ test('P0-5/P0-10: MAINTAINERS.md carries no NEEDS_* placeholder', () => {
 });
 
 test('P0-10: bus-factor mitigation is documented (MAINTAINERS.md succession criteria)', () => {
-  // R6 仓库内容政策（2026-08-15）：GOVERNANCE.md 移出仓库（过程文档）——bus-factor 断言改锚 MAINTAINERS.md。
+  // GOVERNANCE.md 不随仓库分发——bus-factor 断言锚定 MAINTAINERS.md。
   const text = readFileSync(join(repoRoot, 'MAINTAINERS.md'), 'utf8');
   assert.doesNotMatch(text, /NEEDS_/, 'MAINTAINERS.md must not contain placeholders');
   assert.ok(text.trim().length > 0, 'MAINTAINERS.md must document maintainer contact');

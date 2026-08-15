@@ -3,7 +3,7 @@
 // FUSION-OS-12 端到端 RED→GREEN：重评 supersede —— 写新 verdict 行 + UPDATE 旧行 superseded_by 指针 +
 // getActiveVerdicts 过滤被取代行。superseded_by 不进 current_hash 白名单（链完整性不变）。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 recordVerdict 落库（verdict_nodes INSERT + current_hash 链式）→
+// 单一真实依赖：真实 recordVerdict 落库（verdict_nodes INSERT + current_hash 链式）→
 // supersedeVerdict 事务（recordVerdict new + UPDATE old.superseded_by）→ getActiveVerdicts SQL 过滤。
 // 非 Fake 后端、非硬编码指标。
 //
@@ -12,8 +12,7 @@
 //     删旧行（违反 append-only）或改旧行 verdict（违反 terminal-rollback + immutable_fields trigger）。
 //   GREEN（接线后）：重评写新行 + 设指针，旧行 append-only 保留（审计）+ getActiveVerdicts 过滤。
 //
-// Authority: archived-plan §C FUSION-OS-12 +
-//            archived-plan §4 FUSION-OS-12（Open Science memories.superseded_by 范式）。
+// Authority: FUSION-OS-12（Open Science memories.superseded_by 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

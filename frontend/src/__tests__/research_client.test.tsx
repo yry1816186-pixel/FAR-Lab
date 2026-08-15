@@ -1,5 +1,5 @@
 /**
- * research_client.test.tsx —— Track-1A 异步研究客户端（202 契约）单测。
+ * research_client.test.tsx —— 异步研究客户端（202 契约）单测。
  *
  * 覆盖：
  *   - useStartResearch：202 信封 → {runId, statusUrl, eventsUrl}（不含冻结 run）

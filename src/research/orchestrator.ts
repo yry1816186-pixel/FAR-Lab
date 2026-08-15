@@ -1,5 +1,5 @@
 /**
- * research/orchestrator — the Track-1A vertical slice (directive §6 Phase 2).
+ * research/orchestrator — the research vertical slice .
  *
  * One command, one application service:
  *   scientific question
@@ -287,7 +287,7 @@ export function hydrateCtxResolver(ctx: ResearchCtx): void {
 }
 
 /**
- * Run the full Track-1A vertical slice and return an immutable ResearchRun.
+ * Run the full research vertical slice and return an immutable ResearchRun.
  *
  * @throws ResearchabilityBlockedError when the gate refuses the question.
  * @throws Error on any retrieval / structured-output failure (fail-closed).

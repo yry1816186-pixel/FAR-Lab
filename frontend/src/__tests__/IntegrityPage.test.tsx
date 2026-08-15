@@ -1,7 +1,7 @@
 /**
  * IntegrityPage.test —— 完整性信任根交互式演示的组件测试。
  *
- * Authority: Task #7（演示惊艳）+ spec 09 §4 / 23 §5.2（integrity trust root）。
+ * Authority: Task #7（演示惊艳）+ §4 / 23 §5.2（integrity trust root）。
  *
  * 覆盖（mock 3 个 /integrity 端点 + 浏览器 Web Crypto 真算·由 test-setup 注入 Node WebCrypto）：
  *   - Hero 整链根：merkleRoot + leafCount 渲染

@@ -1,5 +1,5 @@
 /**
- * evidence_quality types —— 证据质量评估类型层（批次 2-D·借鉴 scientific-agent-skills
+ * evidence_quality types —— 证据质量评估类型层（
  * scientific-critical-thinking 的 GRADE / Cochrane Risk of Bias 框架）。
  *
  * 设计红线（与 scientific-skills 子代理分析一致）：

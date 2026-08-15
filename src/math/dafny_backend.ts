@@ -1,4 +1,4 @@
-// spec 38 §3.4 · Dafny backend adapter.
+// §3.4 · Dafny backend adapter.
 // Spawns the `dafny` CLI to verify a Dafny source file.
 //
 // Like Lean 4, Dafny is rarely available in fresh-clone environments. This

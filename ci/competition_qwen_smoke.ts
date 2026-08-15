@@ -1,6 +1,6 @@
 // ci/competition_qwen_smoke.ts
 // 职责：CI STEP 11——competition_qwen_smoke 条件门（4 模型真实调用 + thinking/json_schema 互斥实测）
-// 历史溯源：10_CI_pipeline.md §3 / E6 verified smoke test（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本脚本源码 + 实测为准
+// 历史溯源：E6 verified smoke test·运行时 SSOT 以本脚本源码 + 实测为准
 //
 // [须day-1核验·E6·方法:配 DASHSCOPE_API_KEY 真实计费调用]
 // 状态词（02 §7.4）：NEEDS_HUMAN_OPERATION（截图归档）+ NEEDS_REAL_ENV（计费调用）。

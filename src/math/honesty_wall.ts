@@ -1,4 +1,4 @@
-// spec 38 §8 · Honesty wall for the math verification layer.
+// §8 · Honesty wall for the math verification layer.
 // Renders a transparent boundary showing:
 //   - requiredLevel vs achievedLevel
 //   - each verification record with backend fingerprint and outcome

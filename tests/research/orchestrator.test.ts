@@ -1,5 +1,5 @@
 /**
- * tests/research/orchestrator.test.ts — Track-1A vertical slice wiring.
+ * tests/research/orchestrator.test.ts — research vertical slice wiring.
  *
  * Proves the FULL pipeline (ground → generate → critique → score → plan →
  * ResearchRun) runs end-to-end on the OFFLINE (synthetic) path: 3 hypotheses,

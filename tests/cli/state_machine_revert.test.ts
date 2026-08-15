@@ -1,5 +1,5 @@
 /**
- * state_machine_revert.test.ts —— CLI 状态机反向转移（批次 2-F·借鉴 opencode session revert）。
+ * state_machine_revert.test.ts —— CLI 状态机反向转移（session revert）。
  *
  * 覆盖：
  *   1. 三组合法反向边：STATISTICS→EVIDENCE_GATHERED / VERDICT_RENDERED→STATISTICS /

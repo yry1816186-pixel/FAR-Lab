@@ -1,15 +1,15 @@
 /**
- * FallbackChain 类型层契约（spec 05 §8.2 / §9 / spec 24 §5）。
+ * FallbackChain 类型层契约（§8.2 / §9 / §5）。
  *
  * 设计：引擎**模型无关 + 调用方注入**（caller injection）。
  *   - executeFallbackChain 接收 chain（FallbackModelTarget[]）+ caller（注入的调用函数）。
  *   - 生产：caller 包装真实百炼 adapter 调用。
  *   - 测试：caller 是确定性 mock（按 modelId 抛特定错误）——离线可全测触发矩阵/链路遍历。
  *
- * 诚实铁律（F11 · spec 24 §5）：绝不静默换模型。每次 fallback 在 attempts[] 留痕，
+ * 诚实铁律（F11 · §5）：绝不静默换模型。每次 fallback 在 attempts[] 留痕，
  *   degradationSummary 非空——上游 call_records 记 degraded_from + reason + trigger_signal。
  *
- * D3 红线（spec 24 §5·引擎通用机制）：命中 invalidatesD3 target（非国产基座）→ invalidatesD3=true。
+ * D3 红线（§5·引擎通用机制）：命中 invalidatesD3 target（非国产基座）→ invalidatesD3=true。
  *   注：V1 生产 COMPETITION_FALLBACK_CHAIN 已删 deepseek（3 元素 Qwen-only·evo-01·24 §5 2026-06），
  *   本机制保留为防御性——未来若引入非国产基座仍触发诚实声明。
  *
@@ -47,7 +47,7 @@ export interface FallbackAttempt {
 }
 
 /**
- * 触发矩阵判定结果（spec 05 §9.2）。
+ * 触发矩阵判定结果（§9.2）。
  * @param fallback 是否触发降级（true=继续下一个 target；false=致命·终止整链）。
  */
 export interface ShouldFallbackResult {

@@ -1,7 +1,6 @@
 /**
  * demo_seeds 共享 helper —— database 初始化 + gateway 构造 + fixture 工厂。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7 (demo seed 要求).
  *
  * 每个 demo seed 跑完整 6-stage agent loop（offline_replay adapter·不依赖真实 API），
  * 产出：raw input 文本、SourceCard、VerdictNode、reproHash、GraphSubtree、evidence_log 记录。

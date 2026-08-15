@@ -1,4 +1,4 @@
-// spec 38 §6.2 · Premise search (LeanDojo ReProver style).
+// §6.2 · Premise search (LeanDojo ReProver style).
 // Selects relevant premises (theorems/lemmas) for a formal proof attempt.
 //
 // Fresh-clone friendliness: mathlib is almost never available locally. When
@@ -47,7 +47,7 @@ export interface PremiseSearchResult {
  * 2. If mathlib is unavailable → search local_verified_claims by keyword match
  *    against naturalLanguage.
  *
- * The sourceAnchor is ALWAYS included in the result (mandatory per spec 38 §6.2).
+ * The sourceAnchor is ALWAYS included in the result (mandatory per §6.2).
  */
 export function searchPremises(input: PremiseSearchInput): PremiseSearchResult {
   if (input.sourceAnchor.length === 0) {

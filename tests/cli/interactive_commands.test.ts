@@ -1,7 +1,7 @@
 // tests/cli/interactive_commands.test.ts
 // 端到端测试：far ask / stream / replay / court / arena / init（spec §9.2 全命令实装验证）。
 //
-// 真实依赖：每个命令 spawn `src/cli/far.ts` 跑真实 executeLoop（runAgentLoop + ASK-9 密封）+
+// 真实依赖：每个命令 spawn `src/cli/far.ts` 跑真实 executeLoop（runAgentLoop + ASK-9 密封）
 // 离线 fixture 回放。证明「6-stage FSM 端到端 + 证据链工程 + 确定性裁决内核接线」，非桩。
 // 诚实边界：offline_replay fixture 固定 → verdict 固定；本测试验证命令可用性 + 输出形状，非科学裁决。
 

@@ -1,5 +1,5 @@
 /**
- * session_recorder.test.ts —— 运行时 JSONL session 录制/回放（批次 3-H·借鉴 pi JSONL session）。
+ * session_recorder.test.ts —— 运行时 JSONL session 录制/回放（JSONL session）。
  *
  * 覆盖：
  *   1. SessionRecorder 追加录制（seq 递增·close 幂等·closed 后 record 抛错）。

@@ -1,4 +1,4 @@
-// spec 38 §7 + §8 · MathGate and HonestyWall tests.
+// §7 + §8 · MathGate and HonestyWall tests.
 // Covers:
 //   - canConfirmWithMathGate: gate OFF (requireFormalVerification=false) → canConfirm=true
 //   - canConfirmWithMathGate: gate ON + no verifications → canConfirm=false

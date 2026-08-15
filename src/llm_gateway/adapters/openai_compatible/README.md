@@ -15,8 +15,8 @@
 
 ## 设计原则
 
-1. **不触碰 competition profile**：`competition_aliyun_qwen` 的 fallback 链/Qwen-only 红线（spec 24 §5）
-   是竞赛承诺，本 adapter 是**独立的通用扩展**，不参与该链。
+1. **不触碰 competition profile**：`competition_aliyun_qwen` 的 fallback 链/Qwen-only 红线（§5）
+   是产品承诺，本 adapter 是**独立的通用扩展**，不参与该链。
 2. **baseURL + envVar 全配置**：提供商凭证走环境变量，绝不硬编码密钥。
 3. **失败可见**：不静默换模型；降级路径显式记录在 `adapterMeta`。
 4. **确定性铁律**：adapter 只做 LLM 调用；裁决确定性由 R0-R9 内核保证，与 LLM 输出无关。

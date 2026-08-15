@@ -20,7 +20,7 @@ import {
 import type { BenchmarkReport } from '../../src/benchmark/types.ts';
 import { ensureBenchmarkReport, REPORT_PATH } from '../_helpers/benchmark_report.ts';
 
-// R6 仓库内容政策（2026-08-15）：报告为确定性生成物、不 git 跟踪——先确保生成（已存在则零开销）。
+// 仓库内容政策：报告为确定性生成物、不 git 跟踪——先确保生成（已存在则零开销）。
 ensureBenchmarkReport();
 void join;
 

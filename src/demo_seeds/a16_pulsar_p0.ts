@@ -4,7 +4,6 @@
  * 问题简述：脉冲星 P0（初始自转周期）与 Ṗ（周期导数）的异常关系——
  * 某些年轻脉冲星的制动指数 n < 3，暗示非纯磁偶极辐射机制。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
  *
  * 产出：raw input 文本、SourceCard、VerdictNode、reproHash、GraphSubtree、evidence_log 记录。
  * 全程 offline_replay adapter。

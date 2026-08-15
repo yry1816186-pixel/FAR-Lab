@@ -6,7 +6,7 @@
 // 走 R4 的合法 e2e 用例都误判 theater。修复后:仅 verdict='CONFIRMED'+partial 才 FAIL(overclaim),
 // 已降级(DEGRADED_SCOPE/REFUTED/INCONCLUSIVE/UNTESTED)+partial → 放行(honest degrade)。
 //
-// Authority: archived-plan §2 AT-SCOPE-LAUNDER(line 461/464
+// Authority: AT-SCOPE-LAUNDER(line 461/464
 //   expectedVerdict=DEGRADED_SCOPE·设计意图是"把 verdict 推到 DEGRADED_SCOPE",kernel 已降级则目标达成)
 //   + src/anti_theater/detectors/scope_launder.ts(D4 适配裁决 + honest-degrade verdict 二级分流)。
 //

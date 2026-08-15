@@ -1,5 +1,5 @@
 /**
- * evidence_quality grader —— 证据质量确定性评分（批次 2-D·借鉴 GRADE / Cochrane RoB）。
+ * evidence_quality grader —— 证据质量确定性评分（借鉴 GRADE / Cochrane RoB）。
  *
  * 纯函数：gradeEvidenceTier / assessRoB / gradeEvidenceQuality。
  * 不进 verdict（R0-R9 不变）、不进 proofHash（VC 白名单不变）——仅透明度层。

@@ -2,7 +2,7 @@
 //
 // FUSION-OS-9 端到端 RED→GREEN：内容寻址 blob CAS 表（far_blob_store）—— 同内容去重 + 篡改检测 + append-only。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 runMigrations 建 far_blob_store 表（0015）+ trigger → storeBlob 真实落库
+// 单一真实依赖：真实 runMigrations 建 far_blob_store 表（0015）+ trigger → storeBlob 真实落库
 //（INSERT OR IGNORE + sha256 canonical hash）→ CAS 完整性重算比对。非 Fake 后端、非硬编码指标。
 //
 // RED→GREEN 论证：
@@ -10,8 +10,7 @@
 //     无法内容寻址去重，artifact 可静默替换（theater）。
 //   GREEN（接线后）：0015 建表 + append-only trigger；storeBlob 同内容去重 + hash 内容寻址 + 篡改失配检测。
 //
-// Authority: archived-plan §C FUSION-OS-9 +
-//            archived-plan §4 FUSION-OS-9（content-addressable CAS 范式）。
+// Authority: FUSION-OS-9（content-addressable CAS 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

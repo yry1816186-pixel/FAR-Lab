@@ -1,5 +1,5 @@
 /**
- * FallbackChain 触发矩阵分类器（spec 05 §9.2 / digest F-05-17）。
+ * FallbackChain 触发矩阵分类器（§9.2 / digest F-05-17）。
  *
  * 触发矩阵：
  *   触发 fallback（继续下一个 target）：
@@ -66,7 +66,7 @@ function errorMessage(error: unknown): string {
 
 /**
  * 按 HTTP 状态码分类（429 + 5xx → fallback；4xx → fatal；其它 → fatal 保守）。
- * spec 05 §9.2：429/500/502/503 触发；400/401/403/404/422 不触发。
+ * §9.2：429/500/502/503 触发；400/401/403/404/422 不触发。
  * 5xx 全段（500-599）按服务端可恢复处理（含 504 gateway-timeout ≈ timeout）。
  */
 function classifyStatus(status: number, requestId: string | null): ShouldFallbackResult {

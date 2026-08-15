@@ -1,7 +1,7 @@
 /**
  * verdict_stage 测试——裁决接通（agent_loop 第 7 阶段）。
  *
- * 历史溯源（已归档）: archived-spec §8 + 07_falsifiability_verdict.md +
+ * 历史溯源（已归档）: 07_falsifiability_verdict.md +
  *            41_可证伪证据链_FEC.md（hypothesis→VerdictNode 协议）.
  *
  * 覆盖：

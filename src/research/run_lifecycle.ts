@@ -1,5 +1,5 @@
 /**
- * research/run_lifecycle — persistent run lifecycle for the Track-1A slice.
+ * research/run_lifecycle — persistent run lifecycle for the research slice.
  *
  * Directives §14/§16: research runs must be long-task-observable, cancellable,
  * resumable, and survive process restarts. This module wraps runResearch with

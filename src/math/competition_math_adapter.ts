@@ -1,14 +1,14 @@
-// spec 38 §6 · Competition math autoformalizer (Qwen-Math profile).
+// §6 · Competition math autoformalizer (Qwen-Math profile).
 //
 // THIS IS THE ONLY FILE IN src/math/ ALLOWED TO REFERENCE Qwen / 百炼 / the
 // competition profile. The model-neutral core formalizer lives in
 // autoformalizer.ts; this adapter wraps it with a model-backed formalizer for
 // higher-quality formalization, falling back to the rule-based core on any
-// failure (honest degradation — spec 38 §4.5 / AGENTS §6.2).
+// failure (honest degradation — §4.5 / AGENTS §6.2).
 //
 // Red-line safety:
 // - `competitionModelSnapshot` is INJECTED via constructor (NOT hard-coded) —
-//   CLAUDE.md red-line #2 (COMPETITION_MODEL_SNAPSHOT is not a core-wide constant).
+//   model-neutrality red-line (COMPETITION_MODEL_SNAPSHOT is not a core-wide constant).
 // - `formalizerId` embeds the injected snapshot so the evidence trail records
 //   exactly which model version produced each formalization.
 // - When the gateway is absent or the call fails, the result carries
@@ -35,7 +35,7 @@ import { CoreNeutralAutoformalizer, backendToFormalTarget } from './autoformaliz
  * The competition model snapshot MUST be injected by the caller (red-line #2). */
 export interface CompetitionMathAdapterOptions {
   /** Injected competition model snapshot (e.g. 'qwen3.7-max-2026-05-20').
-   * MUST be injected by the caller — never hard-coded (CLAUDE.md red-line #2). */
+   * MUST be injected by the caller — never hard-coded (model-neutrality red-line). */
   readonly competitionModelSnapshot: string;
   /** LLM gateway for calling the competition Qwen-Math model. When undefined,
    * every call degrades to the core-neutral formalizer (fresh-clone friendly). */

@@ -1,9 +1,9 @@
 /**
  * evidence_provenance —— T-003 · Evidence provenance hash binding（fail-closed 校验器）。
  *
- * 评委逼问第 1 轮 F-2-005 / 总榜 T-003 修复：
+ * F-2-005 / T-003 修复：
  *   反剧场最深的洞——"系统无法区分真算出来的 metricValue 和编的 metricValue"。
- *   demo seed 本身就是"手工注入值恰好满足阈值的合法版本"——若评委问"你怎么证明
+ *   demo seed 本身就是"手工注入值恰好满足阈值的合法版本"——若第三方问"你怎么证明
  *   这个 0.71 TM-score 是从 CASP15 真算的而不是手填的"，系统原答不出。
  *
  * 修复机制（V1 边界·诚实登记）：

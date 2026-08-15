@@ -4,7 +4,7 @@
  * 每条规则覆盖 PASS（合法）+ 至少一个 FAIL/WARN（触发条件）路径。
  * RULE-PE-010 跨语言 byte-equal 由 cross_lang.test.ts 独立验证；本文件验证 self-check 路径。
  *
- * Authority: archived-plan §2.4（Validator 规则全表）+ §2.2（V2 字段适配）。
+ * Authority: （Validator 规则全表）+ §2.2（V2 字段适配）。
  */
 
 import { test } from 'node:test';

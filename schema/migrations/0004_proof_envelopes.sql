@@ -1,7 +1,7 @@
 -- 0004_proof_envelopes.sql
 -- ProofEnvelope: sealed evidence packages with proofHash chain.
 --
--- Authority: FINAL_PACKAGE/09_PROOF_CARRYING_RESEARCH_OBJECT.md §1-§4 +
+-- Authority: -§4 +
 --            round8 B1 (proofHash separators + ensure_ascii contract)
 --
 -- 边界:

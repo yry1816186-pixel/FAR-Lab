@@ -2,7 +2,7 @@
 //
 // FUSION-OS-6 端到端 RED→GREEN：LLM 产出 provenance 字段强制 null + 系统 hash 重算绑定 + ProvenanceClass tag。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 appendEvidenceLog（src/evidence_log/repository.ts）fail-closed 门 +
+// 单一真实依赖：真实 appendEvidenceLog（src/evidence_log/repository.ts）fail-closed 门 +
 // 真实 bindProvenance（src/falsifiability/external_facts.ts）调 hashCanonicalJson 系统侧重导出 systemClaimHash。
 // 非 Fake 后端、非硬编码 hash（systemClaimHash 由 hashCanonicalJson 重算）。
 //
@@ -13,11 +13,10 @@
 //     llm_generated 须 systemClaimHash 非空 + sourceAnchor.dashscopeRequestId=null（forged marker 检测）；
 //     bindProvenance 系统侧重导出 systemClaimHash + 强制 anchor.dashscopeRequestId=null（闭合来源不可自填窗口）。
 //
-// 反剧场红线（FUSION-OS-6 + CLAUDE.md §5）：来源不可自填 / LLM 不作最终裁决者。LLM 产出的 provenance 字段
+// 反剧场红线（FUSION-OS-6）：来源不可自填 / LLM 不作最终裁决者。LLM 产出的 provenance 字段
 // （providerRequestId / isoTimestamp）禁止直通可信 SourceAnchor；系统持有 claimText + canonicalSystemInput 重导出 hash。
 //
-// Authority: archived-plan §C FUSION-OS-6 +
-//            archived-plan §4 FUSION-OS-6（data_vid=None + forged marker 范式）。
+// Authority: FUSION-OS-6（data_vid=None + forged marker 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -3,7 +3,7 @@
  *
  * 每个篡改场景触发对应 DiffReportCode；GV-10 tampered proof → verifier RED + diff report 定位篡改字段。
  *
- * Authority: archived-plan §3.4（verdict-critical 字段 diff report）+ APPENDIX_B GV-10。
+ * Authority: （verdict-critical 字段 diff report）+ APPENDIX_B GV-10。
  */
 
 import { test } from 'node:test';

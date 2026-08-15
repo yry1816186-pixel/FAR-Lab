@@ -24,7 +24,7 @@
 - [ ] 我没有删除测试 / 断言来让它通过。
 - [ ] 我没有用 `:any` / `@ts-ignore` / 空 `catch{}` / 占位 return 来糊弄类型或错误。
 - [ ] 我没有把 offline 当 live、把未验证当完成。
-- [ ] 涉及真实 API / 真实数据 / GPU / 比赛提交的，已标 `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` /
+- [ ] 涉及真实 API / 真实数据 / GPU / 真实提交物的，已标 `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` /
       `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`。
 - [ ] 我没有手填裸统计数字（测试数 / 覆盖率 / 通过率），均由命令实时生成。
 

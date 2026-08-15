@@ -12,7 +12,7 @@
  *   8. extractFinishReasonForOfflineReplay: 总是返回 'stop'
  *   9. runStage 正常路径：zod parse 成功 → StageArtifact
  *
- * 单一真实依赖（CLAUDE.md §1）：真实 better-sqlite3 :memory: DB + fake gateway + zod schema。
+ * 单一真实依赖：真实 better-sqlite3 :memory: DB + fake gateway + zod schema。
  */
 
 import { test } from 'node:test';

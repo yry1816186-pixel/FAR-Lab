@@ -1,6 +1,6 @@
 /**
  * tests/research/orchestrator_multi_strategy.test.ts — the discovery fan-out
- * wired into the full Track-1A pipeline (offline end-to-end).
+ * wired into the full research pipeline (offline end-to-end).
  *
  * Proves: multi_strategy mode runs all 8 stages with per-strategy receipts +
  * a deterministic fan-out receipt; candidates carry strategyOrigin; the

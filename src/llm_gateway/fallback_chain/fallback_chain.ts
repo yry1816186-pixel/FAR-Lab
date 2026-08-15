@@ -1,5 +1,5 @@
 /**
- * FallbackChain 执行引擎（spec 05 §8.2 / spec 24 §5）。
+ * FallbackChain 执行引擎（§8.2 / §5）。
  *
  * 职责：遍历降级链，按触发矩阵在每个失败 target 上决定 fallback / fatal，
  * 全程留痕（attempts[] + degradationSummary），绝不静默换模型（F11）。
@@ -97,7 +97,7 @@ export async function executeFallbackChain<TData>(
         reason: null,
         dashscopeRequestId,
       });
-      // 命中非国产基座 → 标失 D3（spec 24 §5）。注：V1 生产 chain 无此 target（deepseek 已删·evo-01），机制保留防御性。
+      // 命中非国产基座 → 标失 D3（§5）。注：V1 生产 chain 无此 target（deepseek 已删·evo-01），机制保留防御性。
       if (target.invalidatesD3 === true) {
         invalidatesD3 = true;
       }

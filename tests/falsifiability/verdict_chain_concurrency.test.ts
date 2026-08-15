@@ -11,7 +11,7 @@
 //      镜像 evidence_log append.immediate() 修复。单进程 better-sqlite3 同步执行无法真测跨进程并发，
 //      但可断言事务标记为 immediate（SQLITE_BUSY 行为差异）+ 链头正确性。
 //
-// Authority: AGENTS.md §7（trust-kernel 高风险域）+ §9（失败路径须测试）+
+// Authority: AGENTS.md §7（trust-kernel 高风险域）+ §9（失败路径须测试）
 //            evidence_log/repository.ts:155 append.immediate() 既有修复范式。
 
 import { test } from 'node:test';

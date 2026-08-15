@@ -7,7 +7,7 @@ export default tseslint.config(
   {
     files: ['src/**/*.ts'],
     rules: {
-      // 零容忍规则（对齐 CLAUDE.md 零容忍表）
+      // 零容忍规则（对齐 零容忍表）
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/ban-ts-comment': [
         'error',

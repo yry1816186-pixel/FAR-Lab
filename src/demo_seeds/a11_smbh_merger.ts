@@ -23,7 +23,6 @@
  * SMBH 并合在纳赫兹引力波背景（NANOGrav 2023 Hellings-Downs 相关性 ~4σ）证据齐备；
  * Kormendy & Ho 2013 综述确认 SMBH-星系共演化（M-sigma 关系 scatter ~0.3 dex）。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

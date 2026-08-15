@@ -1,13 +1,13 @@
 -- 0016_evidence_derivable.sql
 -- FUSION-OS-10: evidence_log 行 derivable 标记 + derivable=1 强制重算验证。
 --
--- Authority: archived-plan §4 FUSION-OS-10（Open Science host_call_log.derivable 范式）
---            + archived-plan §C FUSION-OS-10。
+-- Authority: FUSION-OS-10（Open Science host_call_log.derivable 范式）
+--            + FUSION-OS-10。
 --
 -- 设计（反剧场「系统持有事实重导出」家族·与 F-3 seal 时序 / F-6 provenance 同族）：
 --   derivable INTEGER NOT NULL DEFAULT 0 CHECK (derivable IN (0,1))
 --     - 0 = 不可重算的外部观测（原始终点·字节须原样存档·不重算）
---     - 1 = 可由系统持有的 canonical 输入重算（评审时 verifyEvidencePayloadHashes 重算 hash 比对·
+--     - 1 = 可由系统持有的 canonical 输入重算（验证时 verifyEvidencePayloadHashes 重算 hash 比对·
 --           不信任 workload 自填字节·反剧场）
 --   evidence_payload_hash TEXT（derivable=1 时 = sha256(canonical JSON of evidence_payload)·可空）
 --     - appendEvidenceLog 写入时落 hash；verify 重算 sha256(stored evidence_payload) 比对，失配 → tampered。

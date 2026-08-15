@@ -1,8 +1,8 @@
 /**
- * research/types — Track 1A "scientific hypothesis generation & research-plan
+ * research/types — research "scientific hypothesis generation & research-plan
  * design" domain types (directive §7/§9).
  *
- * FAR-Lab's track-1A surface sits ABOVE the deterministic verdict kernel: given
+ * FAR-Lab's research surface sits ABOVE the deterministic verdict kernel: given
  * a scientific question, it grounds the question in real literature, generates
  * several mechanistically-distinct candidate hypotheses, critiques them
  * independently, scores them on a multi-dimensional scorecard, and designs a
@@ -370,7 +370,7 @@ export interface Revision {
 }
 
 /**
- * The orchestrated result of one Track-1A research run (the vertical slice).
+ * The orchestrated result of one research research run (the vertical slice).
  */
 export interface ResearchRun {
   /** Run id (ULID). */

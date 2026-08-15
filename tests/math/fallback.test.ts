@@ -1,5 +1,5 @@
 /**
- * fallback.test.ts —— math backend fallback 链（批次 3-I·借鉴 ZeroClaw provider fallback）。
+ * fallback.test.ts —— math backend fallback 链（provider fallback）。
  *
  * 覆盖：
  *   1. 主后端 isAvailable=false → fallback 到替代后端（结果带 fallback_from 标注）。
