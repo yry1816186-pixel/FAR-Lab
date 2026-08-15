@@ -116,18 +116,29 @@ test('T-020 节流：minIntervalMs 强制相邻调用最小间隔', async () => 
   });
   const limited = createRateLimitedGateway(inner, { maxConcurrent: 1, minIntervalMs: 50 });
 
+  const t0 = performance.now();
   await limited.callLlm('p' as ProviderProfile, makeRequest());
   await limited.callLlm('p' as ProviderProfile, makeRequest());
   await limited.callLlm('p' as ProviderProfile, makeRequest());
+  const totalElapsed = performance.now() - t0;
 
   assert.equal(startTimes.length, 3);
-  // 测量容差 1ms：计时点偏移（enforce 内 lastCallAt 记录 vs inner.call 内 startTimes 记录，亚毫秒级 ε）
-  // + 单调时钟浮点精度共同决定 gap ∈ [50-ε, ∞)。语义不变：gap < 49 仍失败（真未节流）。
-  // 另：minIntervalMs 实现用 performance.now()（单调）——不受系统墙钟回拨影响（防 flaky 根因）。
+  // 主断言（抗抖动·airtight）：端到端总时长 ≥ 2×间隔−1ms。总时长 = 首次调度延迟 a
+  // （恒正）+ 2×间隔 + 末次调度延迟 δ3（恒正）——各抖动项只加不减，无 CI 负载下的
+  // 相减漂移。真未节流时总时长 ≈ 1-5ms，判别余量 ~95ms。
+  // （2026-08-15 flaky 根治：CI ubuntu 全量并发下逐对 gap 测量三次击穿 1ms 容差——
+  //  gap = 50 + δ2 − δ1，δ 为 enforce→adapter 入口的微任务帧延迟，负载下可 >1ms。）
+  assert.ok(
+    totalElapsed >= 99,
+    `totalElapsed=${totalElapsed.toFixed(2)}ms 须 ≥99ms（3 次调用 × 50ms 节流下限）`,
+  );
+  // 辅断言（逐对·容差 5ms=CI 负载微任务帧抖动的实测上界）：排除"一次长等待+两次
+  // 零间隔"这类总时长合格但相邻性破坏的退化实现。gap < 45 只可能是真未节流
+  // （无节流 gap ≈ 0-5ms）。
   const gap1 = (startTimes[1] ?? 0) - (startTimes[0] ?? 0);
   const gap2 = (startTimes[2] ?? 0) - (startTimes[1] ?? 0);
-  assert.ok(gap1 >= 49, `gap1=${gap1} 须 ≥50ms（容差 1ms）`);
-  assert.ok(gap2 >= 49, `gap2=${gap2} 须 ≥50ms（容差 1ms）`);
+  assert.ok(gap1 >= 45, `gap1=${gap1.toFixed(2)} 须 ≥45ms（50ms−5ms CI 负载容差）`);
+  assert.ok(gap2 >= 45, `gap2=${gap2.toFixed(2)} 须 ≥45ms（50ms−5ms CI 负载容差）`);
 });
 
 test('T-020 异常路径：调用抛错仍释放并发闸（finally·不泄漏）', async () => {

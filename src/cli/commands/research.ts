@@ -59,6 +59,8 @@ export interface ResearchArgs {
   readonly multiStrategy: boolean;
   /** Strategy subset (catalog-ordered; null = all registered). */
   readonly strategies: readonly StrategyId[] | null;
+  /** Degrade on source failure instead of failing the grounding closed (§7). */
+  readonly degradeOnSourceFailure: boolean;
   readonly json: boolean;
   readonly out: string | null;
 }
@@ -113,6 +115,7 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
   let target = 3;
   let multiStrategy = false;
   let strategies: readonly StrategyId[] | null = null;
+  let degradeOnSourceFailure = false;
   let json = false;
   let out: string | null = null;
 
@@ -160,6 +163,10 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
       multiStrategy = true;
       continue;
     }
+    if (a === '--degrade-on-source-failure') {
+      degradeOnSourceFailure = true;
+      continue;
+    }
     if (a === '--strategies') {
       const v = args[++i];
       if (v === undefined || v === '') {
@@ -195,7 +202,18 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
       'far research: --strategies requires --multi-strategy (the strategy subset only applies to the discovery fan-out)',
     );
   }
-  return { question, sources, maxPerQuery, profile, target, multiStrategy, strategies, json, out };
+  return {
+    question,
+    sources,
+    maxPerQuery,
+    profile,
+    target,
+    multiStrategy,
+    strategies,
+    degradeOnSourceFailure,
+    json,
+    out,
+  };
 }
 
 /**
@@ -404,7 +422,7 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
 
   if (parsed.question.trim().length === 0) {
     process.stderr.write(
-      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--multi-strategy] [--strategies induction,analogy,…] [--json] [--out <file>]\n',
+      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--multi-strategy] [--strategies induction,analogy,…] [--degrade-on-source-failure] [--json] [--out <file>]\n',
     );
     return 2;
   }
@@ -441,6 +459,7 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
         : { source: parsed.sources[0] ?? 'openalex' }),
       maxPerQuery: parsed.maxPerQuery,
       ...(retrievalAdapter !== undefined ? { adapter: retrievalAdapter } : {}),
+      ...(parsed.degradeOnSourceFailure ? { onSourceFailure: 'degrade' as const } : {}),
     },
     target: parsed.target,
     json: parsed.json,

@@ -251,7 +251,7 @@ jobs:
             tests/agent_loop/*.test.ts tests/comparison/*.test.ts tests/v2_domain/*.test.ts \
             tests/research/*.test.ts tests/retrieval/*.test.ts tests/validation/*.test.ts \
             tests/security/*.test.ts tests/planning/*.test.ts \
-            tests/discovery/*.test.ts tests/discovery/strategies/*.test.ts \
+            tests/discovery/*.test.ts tests/discovery/strategies/*.test.ts tests/discovery/safety/*.test.ts \
             tests/scripts/*.test.mjs \
             2>&1 | tail -c 8000
       - name: node --test (agent_loop FSM + N3 反幻觉 + assertTerminated)

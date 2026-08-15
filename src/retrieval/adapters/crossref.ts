@@ -19,7 +19,7 @@ import {
   normalizeWhitespace,
   rawSha256Hex,
 } from '../hash.ts';
-import { fetchTextFromAllowlistedHost } from '../http.ts';
+import { fetchTextFromAllowlistedHost, RetrievalHttpError } from '../http.ts';
 import { RETRIEVAL_PARSER_VERSION } from '../types.ts';
 import type { RetrievedDocument, RetrievalAdapter, RetrievalQuery } from '../types.ts';
 
@@ -166,9 +166,16 @@ export async function resolveCrossrefDoi(doi: string): Promise<RetrievedDocument
   let fetched;
   try {
     fetched = await fetchTextFromAllowlistedHost(url, { method: 'GET' });
-  } catch {
-    // 404 → DOI not in Crossref; network error → caller should fail-closed separately.
-    return null;
+  } catch (err) {
+    // NOT_FOUND (404) is a legitimate "DOI does not exist in Crossref" — null.
+    // Any other failure (network/timeout/429/budget) PROPAGATES: swallowing it
+    // here would let callers mistake "could not check" for "checked, absent"
+    // (2026-08-15 fix: the old catch returned null for network errors too,
+    // contradicting the fail-closed doc comment above).
+    if (err instanceof RetrievalHttpError && err.status === 404) {
+      return null;
+    }
+    throw err;
   }
   let parsed: unknown;
   try {
@@ -178,7 +185,7 @@ export async function resolveCrossrefDoi(doi: string): Promise<RetrievedDocument
   }
   const work = (parsed as { message?: CrossrefWork }).message;
   if (!work) return null;
-  return mapCrossrefWork(work, fetched.body, `doi:${normalized}`, new Date().toISOString());
+  return mapCrossrefWork(work, fetched.body, `doi:${normalized}`, fetched.retrievedAt ?? new Date().toISOString());
 }
 
 /** Crossref retrieval adapter (real network fetch via the allowlisted http helper). */
@@ -188,6 +195,12 @@ export const crossrefAdapter: RetrievalAdapter = {
   async retrieve(query: RetrievalQuery): Promise<readonly RetrievedDocument[]> {
     const url = buildCrossrefUrl(query);
     const fetched = await fetchTextFromAllowlistedHost(url, { method: 'GET' });
-    return parseCrossrefResults(fetched.body, query.text, new Date().toISOString(), query.maxResults);
+    const docs = parseCrossrefResults(
+      fetched.body,
+      query.text,
+      fetched.retrievedAt ?? new Date().toISOString(),
+      query.maxResults,
+    );
+    return fetched.cacheHit === true ? docs.map((d) => ({ ...d, retrievedFrom: 'cache' as const })) : docs;
   },
 };

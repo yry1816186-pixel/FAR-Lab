@@ -48,6 +48,7 @@ import {
   generateHypothesesMultiStrategy,
   type FanoutMeta,
 } from '../discovery/generate.ts';
+import { screenCandidatesForDualUse } from '../discovery/safety/dual_use_gate.ts';
 import type { StrategyId } from '../discovery/types.ts';
 import { critiqueHypothesis } from './adversarial_review.ts';
 import { designResearchPlan } from './research_plan.ts';
@@ -97,6 +98,12 @@ export interface ResearchGroundingOptions {
   readonly adapter?: RetrievalAdapter;
   /** Disable counter-evidence queries (rarely wanted). */
   readonly includeCounterEvidence?: boolean;
+  /**
+   * Source-failure policy (directive §7 --degrade-on-source-failure): default
+   * 'reject' (fail-closed grounding); 'degrade' drops failed families with a
+   * failedSources receipt and grounds on the survivors.
+   */
+  readonly onSourceFailure?: 'reject' | 'degrade';
 }
 
 /** Options for one research run. */
@@ -188,6 +195,10 @@ export interface ResearchCtx {
     corpus: CorpusSnapshot | null;
     fetchMode: 'live' | 'replay';
     sourcesUsed: readonly string[];
+    /** Dropped source families (degrade mode only). */
+    failedSources?: ReadonlyArray<{ readonly source: string; readonly error: string }>;
+    /** Documents replayed from the persistent retrieval cache. */
+    cacheHits?: number;
     groundedAt: string;
     resolver: CitationResolver | null;
   };
@@ -362,11 +373,16 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         ? { includeCounterEvidence: opts.grounding.includeCounterEvidence }
         : {}),
       extraQueries: (ctx.decompositionSubquestions ?? []).slice(0, MAX_DECOMPOSITION_QUERIES),
+      ...(opts.grounding?.onSourceFailure !== undefined
+        ? { onSourceFailure: opts.grounding.onSourceFailure }
+        : {}),
     });
     ctx.grounded = {
       corpus: grounded.corpus,
       fetchMode: grounded.fetchMode,
       sourcesUsed: grounded.sourcesUsed,
+      ...(grounded.failedSources !== undefined ? { failedSources: grounded.failedSources } : {}),
+      ...(grounded.cacheHits !== undefined ? { cacheHits: grounded.cacheHits } : {}),
       groundedAt: grounded.groundedAt,
       resolver: grounded.resolver,
     };
@@ -383,6 +399,8 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         corpusRootHash: grounded.corpus.rootHash,
         retrievedAt: grounded.groundedAt,
         parserVersion: RETRIEVAL_PARSER_VERSION,
+        // Degrade mode receipts NAME the dropped families (visible, never silent).
+        errors: (grounded.failedSources ?? []).map((f) => `${f.source}: ${f.error}`),
         createdAt: grounded.groundedAt,
       }),
     );
@@ -445,6 +463,46 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         }),
       );
       opts.onFanoutComplete?.(fanout.meta);
+
+      // Dual-use safety gate (directive §2.6): every fan-out candidate passes
+      // the deterministic+model joint screen BEFORE entering the pipeline.
+      // All-blocked/all-held → fail-closed (never an empty silent pipeline).
+      const safety = await screenCandidatesForDualUse(opts.gateway, profile, fanout.hypotheses);
+      if (safety.allowed.length === 0) {
+        const reasons = safety.held
+          .map((h) => `${h.candidate.id}: ${h.reasonCode}(${h.detail})`)
+          .join('; ');
+        throw new Error(
+          `discovery safety gate: every fan-out candidate was blocked or held — nothing may proceed (${reasons})`,
+        );
+      }
+      ctx.hypotheses = safety.allowed;
+      ctx.receipts.push(
+        buildProvenanceReceipt({
+          runId,
+          stageId: 'discovery_safety_gate',
+          sequence: nextSeq(),
+          component: 'deterministic',
+          mode: profile === 'offline_replay' ? 'RECORDED_REPLAY' : 'LIVE',
+          inputHash: hashCanonicalJson({
+            candidateIds: fanout.hypotheses.map((h) => h.id),
+          }),
+          outputHash: hashCanonicalJson({
+            allowedIds: safety.allowed.map((h) => h.id),
+            held: safety.held.map((h) => ({
+              id: h.candidate.id,
+              reasonCode: h.reasonCode,
+              categories: h.categories,
+              matchedRuleIds: h.matchedRuleIds,
+            })),
+            meta: safety.meta,
+          }),
+          corpusSnapshotId: corpus.snapshotId,
+          corpusRootHash: corpus.rootHash,
+          createdAt: now().toISOString(),
+          errors: safety.held.map((h) => `${h.candidate.id}: ${h.reasonCode}: ${h.detail}`),
+        }),
+      );
       return;
     }
     const generated = await generateHypotheses(opts.gateway, profile, {

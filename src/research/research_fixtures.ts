@@ -476,6 +476,28 @@ export const RESEARCH_DEMO_FIXTURES: Readonly<Record<string, string>> = Object.f
       },
     ],
   }),
+  discovery_safety_screen: JSON.stringify({
+    assessments: [
+      {
+        index: 0,
+        verdict: 'ALLOW',
+        categories: [],
+        reasoning: '[SYNTHETIC] Demo fixture: benign astronomical hypothesis.',
+      },
+      {
+        index: 1,
+        verdict: 'ALLOW',
+        categories: [],
+        reasoning: '[SYNTHETIC] Demo fixture: benign astronomical hypothesis.',
+      },
+      {
+        index: 2,
+        verdict: 'ALLOW',
+        categories: [],
+        reasoning: '[SYNTHETIC] Demo fixture: benign astronomical hypothesis.',
+      },
+    ],
+  }),
   research_critique: JSON.stringify({
     findings: [
       { dimension: 'confounding', finding: 'Activity correction is not independent of the inflation signal', severity: 'minor' },
