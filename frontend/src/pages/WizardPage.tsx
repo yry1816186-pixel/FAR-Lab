@@ -11,8 +11,9 @@
  *   3. Verdict— see the five-value decision + decisive rule + statistical report
  *   4. Proof  — the .far-proof bundle hash + how to independently recompute it
  *
- * This page uses the REAL /api/v1/hypothesize endpoint (no fixtures). The offline
- * demo backend returns a fully structured loopState so this works without API keys.
+ * This page uses the REAL /api/v1/hypothesize endpoint (no fixtures). Without an
+ * API key the server fails closed (503 + guidance) and the wizard disables the run
+ * button instead of replaying pre-baked fixtures.
  */
 
 import { useState, useCallback } from 'react';
@@ -411,7 +412,7 @@ export default function WizardPage(): JSX.Element {
             </div>
             <Button
               onClick={runVerification}
-              disabled={claim.trim().length === 0 || hypothesize.isPending}
+              disabled={claim.trim().length === 0 || hypothesize.isPending || llmStatus?.keyConfigured !== true}
               className="w-full"
               size="lg"
               data-testid="wizard-run"

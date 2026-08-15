@@ -382,8 +382,6 @@ export const queryKeys = {
   integrityProof: (seq: number) => ['integrity', 'proof', seq] as const,
   reproReceipt: ['integrity', 'receipt'] as const,
   benchmark: ['benchmark'] as const,
-  court: ['court'] as const,
-  arena: ['arena'] as const,
   llmStatus: ['llm-status'] as const,
   lifecycleEvents: (targetKind: string, targetId: string) =>
     ['lifecycle', 'events', targetKind, targetId] as const,
@@ -607,36 +605,6 @@ export function useBenchmark(
   });
 }
 
-/** GET /api/v1/arena/demo — 对抗竞技场 demo 结果（offline_replay proponent + 3 refuter）。 */
-export function useArenaDemo(
-  options?: Omit<UseQueryOptions<ArenaResultDto, Error>, 'queryKey' | 'queryFn'>,
-) {
-  return useQuery<ArenaResultDto, Error>({
-    queryKey: queryKeys.arena,
-    queryFn: async () =>
-      parseV1Response<ArenaResultDto>(
-        await fetchJson<unknown>('/api/v1/arena/demo'),
-        'GET /arena/demo',
-      ),
-    ...options,
-  });
-}
-
-/** GET /api/v1/court/demo — 跨模型可靠性法庭 demo 证书（offline_replay 3 模型）。 */
-export function useCourtDemo(
-  options?: Omit<UseQueryOptions<CourtCertificateDto, Error>, 'queryKey' | 'queryFn'>,
-) {
-  return useQuery<CourtCertificateDto, Error>({
-    queryKey: queryKeys.court,
-    queryFn: async () =>
-      parseV1Response<CourtCertificateDto>(
-        await fetchJson<unknown>('/api/v1/court/demo'),
-        'GET /court/demo',
-      ),
-    ...options,
-  });
-}
-
 // ---------- WS-A/B live LLM hooks：让前端能跑真实推理 ----------
 // /llm-status 暴露运行期 LLM profile + keyConfigured（不泄漏 key）。
 // 前端据此显示「live 模式」徽章或「offline replay」诚实横幅——治「每个问题同一裁决」感知。
@@ -644,7 +612,8 @@ export function useCourtDemo(
 
 /** GET /api/v1/llm-status 响应——运行期 LLM 状态（profile + keyConfigured）。 */
 export interface LlmStatusDto {
-  readonly profile: string;
+  /** null = 未配置 key（LLM 依赖端点 fail-closed·无静默回放）。 */
+  readonly profile: string | null;
   readonly keyConfigured: boolean;
 }
 

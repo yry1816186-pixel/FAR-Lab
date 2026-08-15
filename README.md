@@ -288,8 +288,10 @@ docker compose up far-demo      # one-shot offline TESS demo (no key)
 docker compose up far-api       # long-running API server @ http://localhost:3000 (offline)
 ```
 
-The default image runs the offline demo / anonymous API and **never** requires a key. To use a real
-provider, pass an explicit env file: `docker compose --env-file .env up far-api`.
+Without a key the deterministic endpoints (health, benchmark, verdict lookup, v2 receipts, planning)
+are fully real and available, while LLM-dependent endpoints fail closed (503 + guidance) — the server
+never replays pre-baked answers. To enable live inference, pass an explicit env file:
+`docker compose --env-file .env up far-api`.
 
 > `NEEDS_DOCKER_BUILD_VALIDATION`: the image is built locally; publish to GHCR is part of the release
 > workflow (`NEEDS_GHCR_PUBLISH`).

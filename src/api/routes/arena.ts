@@ -2,16 +2,12 @@
  * arena 路由 —— 对抗科学竞技场端点。
  *
  * 端点：
- *   GET  /arena/demo → 对固定 demo hypothesis 跑 proponent + 3 refuter，返回 ArenaResult（缓存）。
- *   POST /arena      → WS-A.3 live：对用户提交的 hypothesis + refuters 跑真实对抗竞技场（无缓存·每请求新跑）。
+ *   POST /arena → WS-A.3 live：对用户提交的 hypothesis + refuters 跑真实对抗竞技场（无缓存·每请求新跑）。
  *
  * 设计：
- *   - GET /arena/demo：首次 runArenaSession 后模块级单例缓存（demo 锚·确定性·快）。
  *   - POST /arena：每请求新跑（hypothesis/refuter 任意·透传 gateway/profile）。
- *
- * 诚实边界（红线）：
- *   - gateway 未注入时 runArenaSession 自动降级 offline_replay——refuter 回放同一 fixture，verdict
- *     必然与原始相同（robust）。路由层据此返回 datasetSource（real / replay），前端诚实展示。
+ *   - 无 LLM 网关（未配置 key）→ 503 fail-closed——绝不静默回放离线 fixture 冒充对抗结果
+ *     （真实对抗须注入真实 gateway·同 research 路由的 no-key 纪律）。
  *   - arbiter 是确定性规则（verdict 分歧检测），非 LLM 仲裁。
  *
  * 模型中立（24§0.1 红线）：无 Qwen / 百炼 / DashScope 字面量（refuter 标签中性）。
@@ -23,24 +19,9 @@ import { z } from 'zod';
 
 import { ApiError, internalError } from '../errors/error_handler.ts';
 import { runArenaSession } from '../internal/arena_service.ts';
-import { createAsyncSingletonCache } from '../internal/singleton_cache.ts';
 import { resolveGitCommitSha } from '../../cli/git_commit_sha.ts';
 import type { ProviderProfile } from '../../llm_gateway/types.ts';
 import type { LlmGateway } from '../../llm_gateway/gateway.ts';
-
-/** demo hypothesis（与 far demo 的 C-ASTRO-0001 同源·离线可复现）。 */
-const DEMO_HYPOTHESIS = 'C-ASTRO-0001: TIC lightcurve exhibits a transit-like periodic signal (existence claim)';
-
-/** demo refuter 标签（中性·对应三类反剧场攻击维度）。 */
-const DEMO_REFUTERS = ['scope-launderer', 'post-hoc-threshold', 'dataset-drift'];
-
-/**
- * 模块级单例缓存：首次 runArenaSession 后固定（demo 锚·确定性）。
- * promise 单例（非 check-then-act）——并发首击共享同一 in-flight 计算，失败不缓存。
- */
-const arenaCache = createAsyncSingletonCache(() =>
-  runArenaSession(DEMO_HYPOTHESIS, DEMO_REFUTERS, resolveGitCommitSha()),
-);
 
 /**
  * arena 路由配置。
@@ -68,18 +49,8 @@ export async function registerArenaRoute(
   app: FastifyInstance,
   config?: ArenaRouteConfig,
 ): Promise<void> {
-  // GET /arena/demo —— 固定 demo hypothesis + 缓存（现状·诚实标注的参考 fixture）。
-  app.get('/arena/demo', async (_req, reply) => {
-    try {
-      const result = await arenaCache.get();
-      return reply.send(result);
-    } catch (err) {
-      throw internalError('arena demo session failed', err);
-    }
-  });
-
   // POST /arena —— WS-A.3 live：用户提交 hypothesis + refuters，透传 gateway 跑真实对抗。
-  // 无缓存（每请求 hypothesis/refuter 不同）；gateway 缺失时 arena_service 自动降级 offline_replay（诚实）。
+  // 无缓存（每请求 hypothesis/refuter 不同）。
   app.post('/arena', async (request, reply) => {
     // API1 BOLA 修复：受保护模式下 researcher+ 才能触发 arena live（消耗 LLM 额度）。
     // offline 模式（principal 未挂载或 anonymous）全放行（设计·24§3.1 双轨）。
@@ -91,13 +62,25 @@ export async function registerArenaRoute(
     if (!parsed.success) {
       throw new ApiError({ statusCode: 400, errorCode: 'VALIDATION_FAILED', message: 'arena live request body invalid', detail: parsed.error.issues });
     }
+    if (config?.gateway === undefined) {
+      throw new ApiError({
+        statusCode: 503,
+        errorCode: 'arena_live_profile_unavailable',
+        message: 'live adversarial sessions need an API key in the environment (see far doctor)',
+        detail: {
+          guidance:
+            'set the live-provider API key in the environment (see far doctor) for real adversarial runs; ' +
+            'replay fixtures exist only for explicit test wiring, never as a served result',
+        },
+      });
+    }
     try {
       const result = await runArenaSession(
         parsed.data.hypothesis,
         parsed.data.refuters,
         config?.gitCommitSha ?? resolveGitCommitSha(),
         {
-          ...(config?.gateway === undefined ? {} : { gateway: config.gateway }),
+          gateway: config.gateway,
           ...(config?.profile === undefined ? {} : { providerProfile: config.profile }),
         },
       );
