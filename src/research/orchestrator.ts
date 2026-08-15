@@ -48,6 +48,12 @@ import {
   generateHypothesesMultiStrategy,
   type FanoutMeta,
 } from '../discovery/generate.ts';
+import {
+  runHypothesisTournament,
+  TOURNAMENT_INITIAL_RATING,
+  TOURNAMENT_K_FACTOR,
+  type TournamentResult,
+} from '../discovery/orchestration/tournament.ts';
 import { screenCandidatesForDualUse } from '../discovery/safety/dual_use_gate.ts';
 import type { StrategyId } from '../discovery/types.ts';
 import { critiqueHypothesis } from './adversarial_review.ts';
@@ -211,6 +217,10 @@ export interface ResearchCtx {
   critiques: Record<string, CritiqueReport>;
   modelDimensions: Record<string, ReturnType<typeof computeDeterministicDimensions>>;
   scorecards: Record<string, HypothesisScorecard>;
+  /** Fan-out accounting (multi-strategy runs; absent on legacy/resumed-pre-b3). */
+  fanoutMeta?: FanoutMeta | null | undefined;
+  /** Deterministic tournament ranking (null when fewer than 2 scored candidates). */
+  tournament?: TournamentResult | null | undefined;
   plan: ResearchPlan | null;
 }
 
@@ -297,6 +307,8 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         critiques: {},
         modelDimensions: {},
         scorecards: {},
+        fanoutMeta: null,
+        tournament: null,
         plan: null,
       };
   hydrateCtxResolver(ctx);
@@ -407,9 +419,12 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   });
 
   // ── 3. Generate 3-5 candidate hypotheses (corpus-injected, citation allowlist). ──
+  // Default since b3: the multi-strategy fan-out (directive §2.1/§2.2). The
+  // legacy single-shot path remains available as an explicit opt-out.
+  const hypothesisGenerationStrategy = opts.hypothesisGenerationStrategy ?? 'multi_strategy';
   await driver.run('hypothesis_generation', async () => {
     const corpus = ctx.corpus!;
-    if ((opts.hypothesisGenerationStrategy ?? 'legacy') === 'multi_strategy') {
+    if (hypothesisGenerationStrategy === 'multi_strategy') {
       // Discovery fan-out (directive §2.1/§2.2): every applicable strategy
       // contributes candidates; one receipt per strategy call keeps the
       // per-strategy provenance; the merge gates are deterministic.
@@ -422,6 +437,7 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
           : {}),
       });
       ctx.hypotheses = fanout.hypotheses;
+      ctx.fanoutMeta = fanout.meta;
       for (const result of fanout.meta.perStrategy) {
         if (result.meta !== null) {
           ctx.receipts.push(
@@ -647,6 +663,54 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
       scorecards[id] = { ...scorecards[id]!, paretoOptimal: pareto.has(id) };
     }
     ctx.scorecards = scorecards;
+
+    // Deterministic tournament (directive §2.2 medium-layer ranker): every
+    // scored candidate plays every other on the deterministic scorecard
+    // dimensions; Elo orders the field. Zero model calls, byte-reproducible;
+    // ranking power only — adjudication stays with the gates/kernel.
+    if (ctx.hypotheses.length >= 2) {
+      const scoredEntries = ctx.hypotheses
+        .map((candidate, strategyIndex) => ({ candidate, strategyIndex }))
+        .filter((e) => scorecards[e.candidate.id] !== undefined);
+      if (scoredEntries.length >= 2) {
+        const tournament = runHypothesisTournament(scoredEntries, scorecards);
+        ctx.tournament = tournament;
+        ctx.receipts.push(
+          buildProvenanceReceipt({
+            runId,
+            stageId: 'discovery_tournament',
+            sequence: nextSeq(),
+            component: 'deterministic',
+            mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
+            inputHash: hashCanonicalJson({
+              entrants: scoredEntries.map((e) => ({
+                id: e.candidate.id,
+                strategyIndex: e.strategyIndex,
+                dimensions: scorecards[e.candidate.id]!.dimensions
+                  .filter((d) => d.source === 'deterministic')
+                  .map((d) => [d.name, d.grade]),
+              })),
+            }),
+            outputHash: hashCanonicalJson({
+              ratings: tournament.ratings.map((r) => ({
+                id: r.id,
+                elo: r.elo,
+                wins: r.wins,
+                draws: r.draws,
+                losses: r.losses,
+                rank: r.rank,
+              })),
+              matches: tournament.matches.map((m) => `${m.aId}|${m.bId}|${m.outcome}`),
+              degenerate: tournament.meta.degenerate,
+            }),
+            createdAt: now().toISOString(),
+            errors: tournament.meta.degenerate
+              ? ['tournament degenerate: every match drew — deterministic dimensions carried no ordering information; ranking fell back to the (wins, id) anchor']
+              : [],
+          }),
+        );
+      }
+    }
     ctx.receipts.push(
       buildProvenanceReceipt({
         runId,
@@ -690,7 +754,11 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         'Re-run with a more specific question, more grounding documents, or a higher --target.',
     );
   }
-  const primary = selectPrimaryHypothesis(primaryPool, ctx.scorecards);
+  const primary = selectPrimaryHypothesis(
+    primaryPool,
+    ctx.scorecards,
+    ctx.tournament ?? undefined,
+  );
   const alternatives = ctx.hypotheses.filter((h) => h.id !== primary.id);
 
   const citationGateReport = {
@@ -740,6 +808,7 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     bindings: ctx.bindings,
     critiques: ctx.critiques,
     scorecards: ctx.scorecards,
+    discovery: buildDiscoveryBlock(hypothesisGenerationStrategy, ctx.fanoutMeta ?? null, ctx.tournament ?? null),
     plan: ctx.plan!,
     revisions: [],
     observations: [],
@@ -748,9 +817,55 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
     modes,
     runMode: aggregateRunMode(modes),
     startedAt,
-    schemaVersion: 3,
+    schemaVersion: 4,
     citationGate: citationGateReport,
     falsifiabilityGate: ctx.falsifiabilityGate!,
+  };
+}
+
+/**
+ * Serialize the discovery accounting onto the run (schema v4). The fan-out
+ * projection DROPS volatile provider metadata (latency/request ids — those
+ * live in stageReceipts); the tournament is persisted verbatim (pure data).
+ */
+function buildDiscoveryBlock(
+  strategy: 'legacy' | 'multi_strategy',
+  fanoutMeta: FanoutMeta | null,
+  tournament: TournamentResult | null,
+): ResearchRun['discovery'] {
+  return {
+    strategy,
+    fanout:
+      fanoutMeta === null
+        ? null
+        : {
+            strategiesPlanned: fanoutMeta.strategiesPlanned,
+            perStrategy: fanoutMeta.perStrategy.map((r) => ({
+              strategyId: r.strategyId,
+              contributed: r.candidates.length,
+              error: r.error,
+              skipReason: r.skipReason,
+            })),
+            exactDuplicatesDropped: fanoutMeta.exactDuplicatesDropped,
+            paraphraseFlagged: fanoutMeta.paraphraseFlagged,
+            truncated: fanoutMeta.truncated,
+            finalCount: fanoutMeta.finalCount,
+            quotaShortfall: fanoutMeta.quotaShortfall,
+          },
+    tournament:
+      tournament === null
+        ? null
+        : {
+            ratings: tournament.ratings,
+            matches: tournament.matches,
+            meta: {
+              rounds: tournament.meta.rounds,
+              initialRating: TOURNAMENT_INITIAL_RATING,
+              kFactor: TOURNAMENT_K_FACTOR,
+              pairingOrder: tournament.meta.pairingOrder,
+              degenerate: tournament.meta.degenerate,
+            },
+          },
   };
 }
 
@@ -830,6 +945,7 @@ export function admissibleHypotheses(
 export function selectPrimaryHypothesis(
   hypotheses: readonly HypothesisCandidate[],
   scorecards: Readonly<Record<string, HypothesisScorecard>>,
+  tournament?: TournamentResult,
 ): HypothesisCandidate {
   const pareto = hypotheses.filter((h) => scorecards[h.id]?.paretoOptimal === true);
   const candidates = pareto.length > 0 ? pareto : [...hypotheses];
@@ -847,7 +963,16 @@ export function selectPrimaryHypothesis(
       .reduce((sum, d) => sum + (gradeValue[d.grade] ?? 0), 0);
   };
 
+  // When a tournament covered every candidate, its (elo, wins, id) ranking is
+  // the primary ordering — Pareto dominance still gates eligibility above.
+  const rank = new Map((tournament?.ratings ?? []).map((r) => [r.id, r.rank]));
+  const tournamentCoversAll = tournament !== undefined && candidates.every((h) => rank.has(h.id));
+
   return [...candidates].sort((a, b) => {
+    if (tournamentCoversAll) {
+      const rankDiff = (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER);
+      if (rankDiff !== 0) return rankDiff;
+    }
     const diff = deterministicTotal(b) - deterministicTotal(a);
     if (diff !== 0) return diff;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;

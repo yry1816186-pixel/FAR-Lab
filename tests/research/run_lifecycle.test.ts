@@ -133,6 +133,10 @@ describe('run lifecycle (offline replay)', () => {
     profile: 'offline_replay' as const,
     grounding: { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) },
     targetHypothesisCount: 3,
+    // These tests exercise lifecycle mechanics (call counts, resume, events);
+    // the single-shot path keeps their 6/4-call contracts stable. The
+    // multi-strategy default has its own coverage (orchestrator + CLI tests).
+    hypothesisGenerationStrategy: 'legacy' as const,
     store,
   });
 

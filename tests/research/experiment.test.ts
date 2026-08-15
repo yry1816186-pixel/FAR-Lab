@@ -113,6 +113,7 @@ describe('runPlanExperiment (replay path)', () => {
   const baseRun: ResearchRun = {
     runId: 'run1',
     question: 'q',
+    discovery: null,
     gateReport: {
       question: 'q',
       verdict: 'RESEARCHABLE',
@@ -258,6 +259,7 @@ describe('domain gate (fail-closed, directive §3.3/§13 — 2026-08-14 defect D
   const domainRun = (domain: string | null, question: string, planVariables: readonly string[]): ResearchRun => ({
     runId: 'r-d4',
     question,
+    discovery: null,
     gateReport: {
       question,
       verdict: 'RESEARCHABLE',

@@ -525,6 +525,80 @@ export const ObservationZod = z.discriminatedUnion('adapter', [
   }),
 ]);
 
+// ── Discovery-layer accounting (schema v4+) ─────────────────────────────────
+
+/** Closed grade alphabet (mirrors ScoreGrade; SSOT for zod boundaries). */
+const SCORE_GRADES = ['A', 'B', 'C', 'D', 'F', 'NOT_APPLICABLE'] as const;
+
+export const FanoutStrategyReceiptZod = z.object({
+  strategyId: z.enum(STRATEGY_IDS),
+  contributed: z.number().int().nonnegative(),
+  error: z.string().nullable(),
+  skipReason: z.string().nullable(),
+});
+
+export const FanoutReceiptZod = z.object({
+  strategiesPlanned: z.array(z.enum(STRATEGY_IDS)),
+  perStrategy: z.array(FanoutStrategyReceiptZod),
+  exactDuplicatesDropped: z.number().int().nonnegative(),
+  paraphraseFlagged: z.array(
+    z.object({
+      keptId: z.string(),
+      droppedId: z.string(),
+      similarity: z.number().min(0).max(1),
+      keptStrategy: z.enum(STRATEGY_IDS),
+      droppedStrategy: z.enum(STRATEGY_IDS),
+    }),
+  ),
+  truncated: z.array(
+    z.object({ id: z.string(), strategyId: z.enum(STRATEGY_IDS) }),
+  ),
+  finalCount: z.number().int().nonnegative(),
+  quotaShortfall: z.number().int().nonnegative(),
+});
+
+export const TournamentReceiptZod = z.object({
+  ratings: z.array(
+    z.object({
+      id: z.string(),
+      strategyOrigin: z.enum(STRATEGY_IDS).nullable(),
+      elo: z.number().finite(),
+      wins: z.number().int().nonnegative(),
+      draws: z.number().int().nonnegative(),
+      losses: z.number().int().nonnegative(),
+      rank: z.number().int().positive(),
+    }),
+  ),
+  matches: z.array(
+    z.object({
+      aId: z.string(),
+      bId: z.string(),
+      outcome: z.enum(['a', 'b', 'draw']),
+      criteria: z.array(
+        z.object({
+          dimension: z.string(),
+          aGrade: z.enum(SCORE_GRADES),
+          bGrade: z.enum(SCORE_GRADES),
+          point: z.enum(['a', 'b', 'none']),
+        }),
+      ),
+    }),
+  ),
+  meta: z.object({
+    rounds: z.number().int().positive(),
+    initialRating: z.number().finite(),
+    kFactor: z.number().finite().positive(),
+    pairingOrder: z.string(),
+    degenerate: z.boolean(),
+  }),
+});
+
+export const DiscoveryBlockZod = z.object({
+  strategy: z.enum(['legacy', 'multi_strategy']),
+  fanout: FanoutReceiptZod.nullable(),
+  tournament: TournamentReceiptZod.nullable(),
+});
+
 // ── The full ResearchRun (schema-versioned, v2 backward-compatible) ──────────
 
 export const ResearchRunZod = z.object({
@@ -541,6 +615,9 @@ export const ResearchRunZod = z.object({
   observations: z.array(ObservationZod),
   stageReceipts: z.array(ProvenanceReceiptZod),
   environment: EnvironmentFingerprintZod,
+  // Discovery accounting (v4+): null = run predates discovery persistence
+  // (schema ≤3) — absence of accounting is NOT absence of discovery.
+  discovery: DiscoveryBlockZod.nullable(),
   modes: z.object({
     modelExecutionMode: z.enum(['LIVE', 'RECORDED_REPLAY', 'SYNTHETIC_TEST', 'OFFLINE_DEVELOPMENT', 'NOT_EXECUTED']),
     retrievalExecutionMode: z.enum(['LIVE', 'RECORDED_REPLAY', 'SYNTHETIC_TEST', 'OFFLINE_DEVELOPMENT', 'NOT_EXECUTED']),
@@ -548,9 +625,9 @@ export const ResearchRunZod = z.object({
   }),
   runMode: z.enum(['LIVE', 'MIXED', 'RECORDED_REPLAY', 'SYNTHETIC_TEST', 'OFFLINE_DEVELOPMENT']),
   startedAt: z.string(),
-  // Known versions 2..3. Bump this max when a v4 shape lands — unknown future
+  // Known versions 2..4. Bump this max when a v5 shape lands — unknown future
   // versions must fail closed rather than be guessed at.
-  schemaVersion: z.number().int().positive().max(3),
+  schemaVersion: z.number().int().positive().max(4),
   citationGate: CitationGateReportZod,
   falsifiabilityGate: FalsifiabilityGateReportZod,
 });
@@ -580,6 +657,12 @@ export function parseResearchRunJson(raw: string): ResearchRun {
     if (record['schemaVersion'] === 2) {
       return upgradeV2Run(record);
     }
+    // v3 → v4: discovery accounting was not persisted before v4. The upgrade
+    // is an explicit materialization of that absence (null ≠ "no discovery
+    // happened" — it means "was not recorded"), never a fabricated block.
+    if (record['schemaVersion'] === 3) {
+      return validateResearchRun({ ...record, discovery: null, schemaVersion: 4 });
+    }
   }
   return validateResearchRun(parsed);
 }
@@ -600,18 +683,19 @@ export function validateResearchRun(value: unknown): ResearchRun {
 /** Pre-v3 binding shape (no derived relations yet). */
 const CitationBindingV2Zod = CitationBindingZod.omit({ relations: true });
 
-/** Pre-v3 run shape (no gates; bindings lack relations). */
+/** Pre-v3 run shape (no gates; bindings lack relations; no discovery accounting). */
 const ResearchRunV2Zod = ResearchRunZod.extend({
   bindings: z.record(z.string(), CitationBindingV2Zod),
-}).omit({ citationGate: true, falsifiabilityGate: true });
+}).omit({ citationGate: true, falsifiabilityGate: true, discovery: true });
 
 type ResearchRunV2 = z.infer<typeof ResearchRunV2Zod>;
 
 /**
- * Upgrade a schemaVersion-2 run to v3: derive the missing evidence relations
- * and recompute both deterministic gates from the frozen bindings/hypotheses.
- * The upgrade is deterministic — a v2 file and the v3 file it would have been
- * produce identical gate values.
+ * Upgrade a schemaVersion-2 run to the current shape: derive the missing
+ * evidence relations and recompute both deterministic gates from the frozen
+ * bindings/hypotheses (deterministic — a v2 file and the file it would have
+ * been produce identical gate values). v2 runs predate discovery persistence
+ * entirely, so the upgraded run carries discovery: null.
  */
 function upgradeV2Run(record: Record<string, unknown>): ResearchRun {
   const v2Result = ResearchRunV2Zod.safeParse(record);
@@ -640,7 +724,8 @@ function upgradeV2Run(record: Record<string, unknown>): ResearchRun {
     bindings,
     citationGate,
     falsifiabilityGate,
-    schemaVersion: 3,
+    discovery: null,
+    schemaVersion: 4,
   });
 }
 

@@ -70,6 +70,7 @@ function baseRun(overrides: Partial<ResearchRun> = {}): ResearchRun {
       gateVerdict: 'PASS',
     },
     falsifiabilityGate: { perHypothesis: {}, allPassed: true },
+    discovery: null,
     ...overrides,
   } satisfies ResearchRun;
 }

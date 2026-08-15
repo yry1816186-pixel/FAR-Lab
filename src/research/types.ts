@@ -389,6 +389,13 @@ export interface ResearchRun {
   readonly critiques: Readonly<Record<string, CritiqueReport>>;
   /** Scorecards per hypothesis. */
   readonly scorecards: Readonly<Record<string, HypothesisScorecard>>;
+  /**
+   * Discovery-layer accounting (schema v4): fan-out merge statistics +
+   * deterministic tournament ranking. null = the run predates discovery
+   * persistence (schema ≤3) — absence of accounting is NOT absence of
+   * discovery; legacy-generation runs carry fanout=null.
+   */
+  readonly discovery: DiscoveryBlock | null;
   /** The structured research plan. */
   readonly plan: ResearchPlan;
   /** Revisions in order (may be empty before feedback). */
@@ -415,6 +422,72 @@ export interface ResearchRun {
   readonly startedAt: string;
   /** Schema version of the ResearchRun shape (for migration). */
   readonly schemaVersion: number;
+}
+
+/** Which hypothesis-generation path a run used. */
+export type HypothesisGenerationStrategy = 'legacy' | 'multi_strategy';
+
+/** Serialized per-strategy fan-out outcome (no volatile provider metadata — that lives in stageReceipts). */
+export interface FanoutStrategyReceipt {
+  readonly strategyId: StrategyId;
+  readonly contributed: number;
+  readonly error: string | null;
+  readonly skipReason: string | null;
+}
+
+/** Schema-v4 projection of the discovery fan-out accounting (directive §2.1/§2.2). */
+export interface FanoutReceipt {
+  readonly strategiesPlanned: readonly StrategyId[];
+  readonly perStrategy: readonly FanoutStrategyReceipt[];
+  readonly exactDuplicatesDropped: number;
+  readonly paraphraseFlagged: readonly {
+    readonly keptId: string;
+    readonly droppedId: string;
+    readonly similarity: number;
+    readonly keptStrategy: StrategyId;
+    readonly droppedStrategy: StrategyId;
+  }[];
+  readonly truncated: readonly { readonly id: string; readonly strategyId: StrategyId }[];
+  readonly finalCount: number;
+  readonly quotaShortfall: number;
+}
+
+/** Schema-v4 projection of the deterministic tournament (directive §2.2 ranking layer). */
+export interface TournamentReceipt {
+  readonly ratings: readonly {
+    readonly id: string;
+    readonly strategyOrigin: StrategyId | null;
+    readonly elo: number;
+    readonly wins: number;
+    readonly draws: number;
+    readonly losses: number;
+    readonly rank: number;
+  }[];
+  readonly matches: readonly {
+    readonly aId: string;
+    readonly bId: string;
+    readonly outcome: 'a' | 'b' | 'draw';
+    readonly criteria: readonly {
+      readonly dimension: string;
+      readonly aGrade: ScoreGrade;
+      readonly bGrade: ScoreGrade;
+      readonly point: 'a' | 'b' | 'none';
+    }[];
+  }[];
+  readonly meta: {
+    readonly rounds: number;
+    readonly initialRating: number;
+    readonly kFactor: number;
+    readonly pairingOrder: string;
+    readonly degenerate: boolean;
+  };
+}
+
+/** Discovery-layer accounting persisted on the run (schema v4+). */
+export interface DiscoveryBlock {
+  readonly strategy: HypothesisGenerationStrategy;
+  readonly fanout: FanoutReceipt | null;
+  readonly tournament: TournamentReceipt | null;
 }
 
 export { FalsificationMethod };
