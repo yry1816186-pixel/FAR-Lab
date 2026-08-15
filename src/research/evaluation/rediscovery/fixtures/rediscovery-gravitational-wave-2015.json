@@ -39,27 +39,50 @@
       "doiStatus": "CONFIRMED",
       "verificationStatus": "VERIFIED_DISCOVERY",
       "unverifiedNote": null,
-      "matchKeywords": ["binary black hole merger", "gravitational wave", "laser interferometry", "direct detection"],
+      "matchKeywords": [
+        "binary black hole merger",
+        "gravitational wave",
+        "laser interferometry",
+        "direct detection"
+      ],
       "synonyms": {
-        "binary black hole merger": ["coalescing black hole pair", "black hole binary inspiral"],
-        "gravitational wave": ["ripples in spacetime"]
+        "binary black hole merger": [
+          "coalescing black hole pair",
+          "black hole binary inspiral"
+        ],
+        "gravitational wave": [
+          "ripples in spacetime"
+        ]
       },
-      "groundingDocPids": ["grav-pre-2014-advligo"]
+      "groundingDocPids": [
+        "grav-pre-2014-advligo"
+      ]
     },
     {
       "id": "gw170817-multimessenger-kilonova",
       "statement": "A binary neutron-star merger is observed in gravitational waves together with an electromagnetic counterpart (kilonova and short gamma-ray burst), founding multi-messenger astrophysics (GW170817, 2017).",
       "publishedAfter": "2017-10-16",
-      "doi": null,
-      "doiStatus": "UNCONFIRMED",
+      "doi": "10.3847/2041-8213/aa91c9",
+      "doiStatus": "CONFIRMED",
       "verificationStatus": "VERIFIED_DISCOVERY",
-      "unverifiedNote": "Multi-paper discovery announced 2017-10-16; the lead multimessenger paper is ApJL 848:L12 but the DOI is not reproduced with high confidence here — verify before citing anywhere.",
-      "matchKeywords": ["binary neutron star merger", "kilonova", "multi messenger"],
+      "unverifiedNote": "[Multi-paper discovery announced 2017-10-16; the lead multimessenger paper is ApJL 848:L12 but the DOI is not reproduced with high confidence here — verify before citing anywhere.] DOI verified online 2026-08-16 via doi.org resolution (10.3847/2041-8213/aa91c9)",
+      "matchKeywords": [
+        "binary neutron star merger",
+        "kilonova",
+        "multi messenger"
+      ],
       "synonyms": {
-        "binary neutron star merger": ["neutron star coalescence"],
-        "kilonova": ["r process glow", "macronova"]
+        "binary neutron star merger": [
+          "neutron star coalescence"
+        ],
+        "kilonova": [
+          "r process glow",
+          "macronova"
+        ]
       },
-      "groundingDocPids": ["grav-pre-2013-sgrb"]
+      "groundingDocPids": [
+        "grav-pre-2013-sgrb"
+      ]
     }
   ],
   "hypotheses": [
@@ -72,15 +95,29 @@
         "comparator": "lt",
         "value": 1
       },
-      "citePids": ["grav-pre-2014-advligo"],
-      "counterCitePids": ["grav-pre-1993-hulse-taylor"],
+      "citePids": [
+        "grav-pre-2014-advligo"
+      ],
+      "counterCitePids": [
+        "grav-pre-1993-hulse-taylor"
+      ],
       "relationToExistingTheory": "Sharpens sensitivity-projection arguments into a ranked prediction of the first source class.",
-      "alternativeExplanations": ["The astrophysical rate of double black-hole mergers is too low for early detection."],
-      "observablePredictions": ["A chirp with tens of solar masses and ringdown consistent with Kerr horizons."],
-      "distinguishingObservations": ["Absence of an electromagnetic counterpart discriminates black-hole from neutron-star mergers."],
+      "alternativeExplanations": [
+        "The astrophysical rate of double black-hole mergers is too low for early detection."
+      ],
+      "observablePredictions": [
+        "A chirp with tens of solar masses and ringdown consistent with Kerr horizons."
+      ],
+      "distinguishingObservations": [
+        "Absence of an electromagnetic counterpart discriminates black-hole from neutron-star mergers."
+      ],
       "noveltyRelativeToCorpus": "Commits to a detection-ordering claim the corpus stops short of making.",
-      "assumptions": ["Matched-filter pipelines control non-Gaussian detector transients."],
-      "risks": ["Uncertain merger-rate priors."]
+      "assumptions": [
+        "Matched-filter pipelines control non-Gaussian detector transients."
+      ],
+      "risks": [
+        "Uncertain merger-rate priors."
+      ]
     },
     {
       "statement": "A coincident short gamma-ray burst association with any first gravitational-wave event would localize an electromagnetic counterpart within its error region.",
@@ -91,15 +128,29 @@
         "comparator": "lt",
         "value": 1
       },
-      "citePids": ["grav-pre-2013-sgrb"],
-      "counterCitePids": ["grav-pre-2010-pta"],
+      "citePids": [
+        "grav-pre-2013-sgrb"
+      ],
+      "counterCitePids": [
+        "grav-pre-2010-pta"
+      ],
       "relationToExistingTheory": "Operationalizes the gamma-ray-burst-merger association into an observing program.",
-      "alternativeExplanations": ["Counterparts are too faint or too slowly evolving for prompt follow-up."],
-      "observablePredictions": ["Sky-localization quality determines counterpart-recovery odds."],
-      "distinguishingObservations": ["Spectroscopic kilonova-like features versus AGN or supernova interlopers."],
+      "alternativeExplanations": [
+        "Counterparts are too faint or too slowly evolving for prompt follow-up."
+      ],
+      "observablePredictions": [
+        "Sky-localization quality determines counterpart-recovery odds."
+      ],
+      "distinguishingObservations": [
+        "Spectroscopic kilonova-like features versus AGN or supernova interlopers."
+      ],
       "noveltyRelativeToCorpus": "Program-level claim rather than a new physical mechanism.",
-      "assumptions": ["Localization regions are small enough for wide-field surveys."],
-      "risks": ["Telescope allocation and weather dominate realization odds."]
+      "assumptions": [
+        "Localization regions are small enough for wide-field surveys."
+      ],
+      "risks": [
+        "Telescope allocation and weather dominate realization odds."
+      ]
     },
     {
       "statement": "Pulsar timing arrays can constrain a stochastic background from cosmic string networks within a decade.",
@@ -110,15 +161,27 @@
         "comparator": "gt",
         "value": 1
       },
-      "citePids": ["grav-pre-2010-pta"],
+      "citePids": [
+        "grav-pre-2010-pta"
+      ],
       "counterCitePids": [],
       "relationToExistingTheory": "Extends pulsar-timing bound-setting into a detection-attempt program.",
-      "alternativeExplanations": ["The string-network tension is below nanohertz observability."],
-      "observablePredictions": ["Quadrupolar correlation grows with array-spanning baselines."],
-      "distinguishingObservations": ["Spectral slope separates string backgrounds from supermassive-binary foregrounds."],
+      "alternativeExplanations": [
+        "The string-network tension is below nanohertz observability."
+      ],
+      "observablePredictions": [
+        "Quadrupolar correlation grows with array-spanning baselines."
+      ],
+      "distinguishingObservations": [
+        "Spectral slope separates string backgrounds from supermassive-binary foregrounds."
+      ],
       "noveltyRelativeToCorpus": "Candidate-source specificity beyond the existing background limits.",
-      "assumptions": ["Array timing precision improves as projected."],
-      "risks": ["Solar-system ephemeris systematics."]
+      "assumptions": [
+        "Array timing precision improves as projected."
+      ],
+      "risks": [
+        "Solar-system ephemeris systematics."
+      ]
     }
   ]
 }

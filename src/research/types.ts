@@ -237,7 +237,8 @@ export type ScorecardDimensionName =
   | 'MethodologicalSoundness'
   | 'ExecutionCost'
   | 'ExpectedInformationGain'
-  | 'Risk';
+  | 'Risk'
+  | 'NoveltyVsResearchMemory';
 
 /** Ordinal grade for a scorecard dimension. */
 export type ScoreGrade = 'A' | 'B' | 'C' | 'D' | 'F' | 'NOT_APPLICABLE';

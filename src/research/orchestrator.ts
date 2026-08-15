@@ -65,6 +65,7 @@ import { computeCitationGateReport } from './citation_gate.ts';
 import { computeFalsifiabilityGateReport } from './falsifiability_gate.ts';
 import {
   buildScorecard,
+  memoryNoveltyDimensionsFor,
   computeDeterministicDimensions,
   computeParetoFront,
 } from './scorecard.ts';
@@ -483,7 +484,7 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         ...(memoryInjection?.summary !== undefined && memoryInjection.summary !== null
           ? { memoryPrior: memoryInjection.summary }
           : {}),
-        ...(memoryInjection !== null ? { knownMemoryHashes: memoryInjection.knownContentHashes } : {}),
+        ...(memoryInjection !== null ? { knownMemoryHashes: memoryInjection.knownContentMarkers } : {}),
       });
       ctx.hypotheses = fanout.hypotheses;
       ctx.fanoutMeta = fanout.meta;
@@ -690,11 +691,21 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
 
   // ── 7. Score (deterministic dimensions + model dimensions, merged; Pareto front). ──
   await driver.run('scoring', async () => {
+    // Cross-run memory-novelty dimensions (§8.3 × §2.5): flags were frozen at
+    // fan-out time (fanout.memoryFlagged, persisted on the run) — scoring and
+    // verification replay share the SAME single-source rule.
+    const memoryFlags = new Map(
+      (ctx.fanoutMeta?.memoryFlagged ?? []).map((f) => [f.id, f.marker]),
+    );
+    const memoryDims = memoryNoveltyDimensionsFor(ctx.hypotheses, memoryFlags);
     const scorecards: Record<string, HypothesisScorecard> = {};
     for (const h of ctx.hypotheses) {
       const binding = ctx.bindings[h.id];
       if (binding === undefined) continue;
-      const deterministic = computeDeterministicDimensions(h, binding, ctx.critiques[h.id]);
+      const deterministic = [
+        ...computeDeterministicDimensions(h, binding, ctx.critiques[h.id]),
+        ...(memoryDims.get(h.id) ?? []),
+      ];
       const merged = buildScorecard(
         h.id,
         deterministic,
