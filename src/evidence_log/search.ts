@@ -55,7 +55,7 @@ export function ensureFtsIndex(db: Database.Database): void {
 
 /**
  * 全量重建 FTS 索引（幂等·DELETE + INSERT SELECT 从 evidence_log 镜像）。
- * 阶段 7 P2-A（B3-G2）规模边界声明：FTS5 虚拟表无唯一约束（INSERT OR IGNORE 无法增量去重），
+ * P2-A（B3-G2）规模边界声明：FTS5 虚拟表无唯一约束（INSERT OR IGNORE 无法增量去重），
  * 增量方案需 NOT IN 过滤（大表退化）或外部游标跟踪（复杂度上升）——当前证据量级（10⁴ 行，
  * 重建 <1s）下全量重建不构成悬崖，懒同步（searchEvidence 的 COUNT 比较）已将重建频率限制为
  * 「写入后首次搜索」。**当 evidence_log > 10⁵ 行时**须升级增量策略（评估 NOT IN 物化或

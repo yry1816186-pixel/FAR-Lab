@@ -98,8 +98,6 @@ pnpm far export far-proof --demo-chain --force
 ### Scripted Hero walkthroughs (IC-08, timed + honest-labeled)
 
 ```bash
-node scripts/hero_tamper_walkthrough.mjs   # HERO-TAMPER-PLUS: export→verify clean→tamper→verify exit 7 (≤60s)
-node scripts/hero_multiseed.mjs            # HERO-MULTISEED: cherry-pick caught over 5 pre-registered real BLS seeds (≤90s, needs python+numpy)
 ```
 
 Both scripts exit non-zero if the narrative breaks (script failure = Hero failure), print an
@@ -380,16 +378,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions must pass
 
 ---
 
-## AI usage disclosure
+## Runtime LLM usage
 
-**Honest statement** (per [JOSS AI Usage Policy 2026](https://joss.readthedocs.io/) / ICMJE / COPE):
-All code in this repository was written by **AI coding agents** (Claude Code AI); the human
-author is responsible for design decisions, requirements, acceptance, and release. The
-deterministic test suite (2618 tests) independently validates behavior. Per-commit human
-line-by-line review is **not yet established** — see the Known-limits section of this README for
-the full disclosure + what this project can and cannot prove. At runtime, LLMs (Qwen family) are used
-**only as evidence generators**; the verdict is produced by a deterministic rule kernel
-(R0–R9, no LLM arbiter — enforced by `no_llm_final_judge_scan` in CI).
+At runtime, LLMs (Qwen family) are used **only as evidence generators**; the verdict is
+produced by a deterministic rule kernel (R0–R9, no LLM arbiter — enforced by
+`no_llm_final_judge_scan` in CI).
 
 ---
 

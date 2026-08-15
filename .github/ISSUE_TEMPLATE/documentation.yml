@@ -7,7 +7,7 @@ body:
     id: location
     attributes:
       label: 哪个文档？
-      placeholder: "README.md / docs/installation.md / docs/concepts/far-proof.md / examples/..."
+      placeholder: "README.md / the relevant `far <command> --help` output / examples/..."
     validations:
       required: true
 

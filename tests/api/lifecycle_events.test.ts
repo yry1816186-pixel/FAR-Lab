@@ -1,5 +1,5 @@
 /**
- * lifecycle 路由测试（阶段 7 P2 · BA3-3 修正通知机制回归载体）。
+ * lifecycle 路由测试。
  *
  * 覆盖：
  *   1. 有事件：查询返回生命周期事件链（active→contested→corrected·含 reason/actor/hash 链）。

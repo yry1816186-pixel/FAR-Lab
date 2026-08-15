@@ -61,7 +61,7 @@ const checks = [
   { name: 'bailian_default_headers_enable_hallucination', pattern: /defaultHeaders[^\n]*Enable/ },
 ];
 
-// 文件级空 catch 正则（阶段 7 P0-2b · SA9 修复）：单行正则 `catch...{}` 不跨行——
+// 文件级空 catch 正则：单行正则 `catch...{}` 不跨行——
 // 多行形态 `catch (e) {\n}` 漏检。改为剥离注释后的全文跨行匹配（\s* 含换行；
 // 单行形态同样命中·统一单一通道防重复报告）。
 // 语义与历史单行检查一致：**空 catch = catch 体内无任何内容（含注释）**——体内仅注释的
@@ -174,7 +174,7 @@ const skippedFiles = new Set([
   'docs/design/20a_PI_VERSION_MANAGEMENT.md',
   // docs/development/AGENTS.md —— 治理散文 "no added stubs" 触发 stub_or_mock_return（反 stub 语义，非 stub 实现）。
   'docs/development/AGENTS.md',
-  // ── S8 收敛（2026-07-20）：3 份 machine-readable 镜像文件（.far-design/ 权威源的只读导出，禁手改） ──
+  // ── S8 收敛（2026-07-20）：3 份 machine-readable 镜像文件（design ledger 权威源的只读导出，禁手改） ──
   // 共同理由：镜像内容=控制面权威登记，合法引用 env 变量名/历史标识符/官方 URL，非 secret 值或 stub 实现。
   // docs/design/machine-readable/claims.yaml —— 主张台账镜像，evidence_refs 引用 DASHSCOPE_API_KEY env 名（doctor/CLI 行为说明，同 docs/installation.md 既有豁免模式）。
   'docs/design/machine-readable/claims.yaml',
@@ -302,7 +302,7 @@ function stripLineComment(filePath, rawLine) {
   return rawLine;
 }
 
-// scanCommentChannel —— 注释通道检测（阶段 7 P0-2b · SA9 Critical 修复）。
+// scanCommentChannel —— 注释通道检测。
 // 背景（findings SA9）：@ts-ignore 指令型注释（`// @ts-ignore`）本身就是注释——stripLineComment
 // 剥离后扫描器永远无法命中（TS 唯一官方指令形态·检出率 <100%）；注释 TODO/FIXME 债务标记同理。
 // 本通道在剥离**前**对原始行特判（块注释形态 `/* @ts-ignore */` 仍由剥离后通道命中）：
@@ -389,7 +389,7 @@ for (const root of effectiveRoots) {
 //   - 复用 stripLineComment 剥离注释，避免对文档性注释（如「无 Qwen / 百炼 / DashScope 字面量」）
 //     产生误报；真实代码违规仍会被捕获。
 //   - 与零容忍检查分离：零容忍检查全 src/ 通用；本检查仅扫 src/api/ 子集。
-// 注：各段 findings 在末尾「分段汇总」统一输出 + 退出（阶段 7 P0-2b · 防一处违规短路其余 13 项扫描面）。
+// 注：各段 findings 在末尾「分段汇总」统一输出 + 退出。
 const apiNeutralityPatterns = [
   { name: 'qwen_in_api', pattern: /qwen/i },
   { name: 'bailian_in_api', pattern: /百炼/ },
@@ -535,7 +535,7 @@ for (const root of n3ScanRoots) {
   }
 }
 
-// ── 分段汇总（阶段 7 P0-2b · SA9 Critical 修复）──
+// ── 分段汇总──
 // 背景：此前全局段任一命中即 exit(1)，api/dialogue/n3/f4 专项段（13 项扫描面）被短路跳过——
 // 一处违规掩盖其余违规（反剧场「扫描器声称全面但实际部分」缺陷）。现全部 5 段先各自收集，
 // 末尾统一输出分节汇总 + 退出，保证每段独立可观测。

@@ -160,7 +160,7 @@ export interface RunAgentLoopArgs {
    */
   readonly priorVerdictKind?: import('../schema/enums.ts').Verdict;
   /**
-   * E-compaction（批次 2-E·借鉴 opencode session compact）：iteration ≥ 2 时对注入
+   * E-compaction（批次 2-E·session-compaction 语义）：iteration ≥ 2 时对注入
    * stage prompt 的 prevArtifacts 应用上下文压缩（stage3/4 裁决关键产物完整保留·
    * 叙述字段截断 + hash 锚可溯源）。缺省 false → 字节零回归（与历史行为一致）。
    */

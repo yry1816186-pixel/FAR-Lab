@@ -1,5 +1,5 @@
 /**
- * rerun_consistency.test.ts — 可复现面 P2（阶段 7 1128）：R0-R9 重跑 10 次全一致。
+ * rerun_consistency.test.ts — 可复现面 P2：R0-R9 重跑 10 次全一致。
  *
  * 依据 12 面「可复现」100 分定义：同 commit 重跑 verdict 全一致 + suiteIntegrityRoot
  * 一致。既有 5/5 重跑测试（W18 SA18）升级为 10 次——固定 now + gitCommitSha 下，

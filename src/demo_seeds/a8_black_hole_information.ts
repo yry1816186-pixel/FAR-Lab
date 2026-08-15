@@ -25,7 +25,7 @@
  * 产出：raw input / SourceCard / 6-stage loop / VerdictNode(CONFIRMED) / reproHash / GraphSubtree。
  * 全程 offline_replay adapter。新增理论物理/量子引力域。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
+ * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

@@ -1,7 +1,7 @@
 // tests/confounding_gate/adjudicate.test.ts
 // 测试 adjudicateConfounding（§7.5.1 (3) 三值 outcome）+ confoundingOutcomeVerdictEffect（§7.5:955-961 共享映射）。
 //
-// Authority: FAR_LAB_MASTER_PLAN/03 §7.5.1:1093-1129 + §7.5:949-961。
+// Authority: archived-plan §7.5.1:1093-1129 + §7.5:949-961。
 //
 // 零容忍合规：无 any / @ts-ignore / 双重断言。
 

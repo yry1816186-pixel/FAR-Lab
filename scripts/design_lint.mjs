@@ -3,13 +3,13 @@
  * design_lint.mjs — FAR-Lab 设计控制面与 SSOT 的机器校验（DESIGN_PRIME §16）。
  *
  * 激活条件（否则 SKIP exit 0，不影响非设计工作）：
- *   .far-design/ 存在，或 docs/design/ 中存在 §15 规范文件，或 docs/design/machine-readable/ 存在。
+ *   design ledger 存在，或 docs/design/ 中存在 §15 规范文件，或 docs/design/machine-readable/ 存在。
  *
  * 校验项（任一失败 exit 1）：
- *   F1 .far-design/**\/*.yaml 与 docs/design/machine-readable/**\/*.yaml 必须可解析且非空
- *   F2 .far-design/STATE.yaml 必须含 §6 全部 22 个必需键，freeze_status 枚举合法
- *   F3 .far-design/CLAIMS.yaml 条目必须含 §3.2 必需字段，status ∈ §3.1/§3.4 词汇
- *   F4 .far-design/DEFERRAL_REGISTER.yaml 条目必须含 §23.18 必需字段
+ *   F1 design ledger**\/*.yaml 与 docs/design/machine-readable/**\/*.yaml 必须可解析且非空
+ *   F2 design ledger 必须含 §6 全部 22 个必需键，freeze_status 枚举合法
+ *   F3 design ledger 条目必须含 §3.2 必需字段，status ∈ §3.1/§3.4 词汇
+ *   F4 design ledger 条目必须含 §23.18 必需字段
  *   F5 控制面与规范文档中禁止未登记的 TODO/TBD/待定/后续补充/尚未考虑 等标记
  *      （同行引用 DEF-n / EXT-n / EA-n / deferral_id / action_id 者豁免）
  *   F6 docs/design/ 的 §15 规范文件必须带完整 §15.1 front-matter 头，status 枚举合法
@@ -63,7 +63,7 @@ const CANONICAL = [
   "21_SECURITY_PRIVACY_THREAT_MODEL_AND_SUPPLY_CHAIN.md",
   "22_EXTENSIBILITY_CONFIGURATION_CUSTOMIZATION_AND_SAFE_EVOLUTION.md",
   "23_TEST_EVALUATION_BENCHMARK_RED_TEAM_AND_EXTERNAL_REPLICATION.md",
-  "24_DEVELOPER_EXPERIENCE_BUILD_RELEASE_AND_ENGINEERING_GOVERNANCE.md",
+  
   "25_OPEN_SOURCE_LICENSE_GOVERNANCE_AND_LONG_TERM_MAINTENANCE.md",
   "26_IMPLEMENTATION_SEQUENCE_RESOURCES_MIGRATION_AND_ROADMAP.md",
   "27_SUSTAINABILITY_ENERGY_AND_COST_BOUNDARIES.md",
@@ -166,7 +166,7 @@ const DOCS = join(ROOT, "docs", "design");
 const MACHINE = join(DOCS, "machine-readable");
 const canonicalPresent = CANONICAL.filter((n) => existsSync(join(DOCS, n)));
 if (!existsSync(CONTROL) && canonicalPresent.length === 0 && !existsSync(MACHINE)) {
-  console.log("design-lint: SKIP (no .far-design/ and no docs/design SSOT present)");
+  console.log("design-lint: SKIP (no design ledger and no docs/design SSOT present)");
   process.exit(0);
 }
 
@@ -185,13 +185,13 @@ const stateFile = join(CONTROL, "STATE.yaml");
 if (existsSync(stateFile) && parsedCache.has(stateFile)) {
   const doc = parsedCache.get(stateFile);
   if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
-    err(".far-design/STATE.yaml: must be a YAML map");
+    err("design ledger: must be a YAML map");
   } else {
     for (const k of STATE_REQUIRED_KEYS) {
-      if (!(k in doc)) err(`.far-design/STATE.yaml: missing required key '${k}' (DESIGN_PRIME §6)`);
+      if (!(k in doc)) err(`design ledger: missing required key '${k}' (DESIGN_PRIME §6)`);
     }
     if (doc.freeze_status !== undefined && !FREEZE_STATUS.has(String(doc.freeze_status))) {
-      err(`.far-design/STATE.yaml: freeze_status '${doc.freeze_status}' not in ${[...FREEZE_STATUS].join("|")}`);
+      err(`design ledger: freeze_status '${doc.freeze_status}' not in ${[...FREEZE_STATUS].join("|")}`);
     }
   }
 }
@@ -201,7 +201,7 @@ const claimsFile = join(CONTROL, "CLAIMS.yaml");
 if (existsSync(claimsFile) && parsedCache.has(claimsFile)) {
   const entries = entriesOf(parsedCache.get(claimsFile), "claims");
   if (!entries) {
-    err(".far-design/CLAIMS.yaml: must be a list, a map of entries, or { claims: [...] }");
+    err("design ledger: must be a list, a map of entries, or { claims: [...] }");
   } else {
     entries.forEach((e, i) => {
       const tag = `CLAIMS[${i}]`;
@@ -222,7 +222,7 @@ const deferralFile = join(CONTROL, "DEFERRAL_REGISTER.yaml");
 if (existsSync(deferralFile) && parsedCache.has(deferralFile)) {
   const entries = entriesOf(parsedCache.get(deferralFile), "deferrals");
   if (!entries) {
-    err(".far-design/DEFERRAL_REGISTER.yaml: must be a list, a map of entries, or { deferrals: [...] }");
+    err("design ledger: must be a list, a map of entries, or { deferrals: [...] }");
   } else {
     entries.forEach((e, i) => {
       const tag = `DEFERRAL[${i}]`;

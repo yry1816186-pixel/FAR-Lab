@@ -128,7 +128,7 @@ export interface VerdictTracePersisted {
    */
   readonly decisionTrace?: DecisionTrace;
   /**
-   * GRADE 证据质量元数据（批次 2-D·阶段 7 P0-11 接线·可选·透明度层）。
+   * GRADE 证据质量元数据（批次 2-D·P0-11 接线·可选·透明度层）。
    *
    * 与 decisionTrace 同设计：不进 verdict 判定（R0-R9 不变）、不进 proofHash（VC 白名单不变）。
    * 仅当调用方提供 studyDesign（或chestrator/verdict_stage 透传）时 kernel 产出

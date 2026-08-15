@@ -1,7 +1,7 @@
 -- 0025_v2_receipts_owner.sql
--- v2_receipts.owner: 属主（JWT subject）审计/授权列（阶段 7 P2 · LP-5 API1 BOLA 修复）。
+-- v2_receipts.owner: 属主（JWT subject）审计/授权列。
 --
--- Authority: 阶段 7 审查 LP-5（findings ZZ-cross-dimensional · API1/API5/API6 同根）。
+-- Authority: 审查 LP-5（findings ZZ-cross-dimensional · API1/API5/API6 同根）。
 --
 -- 设计要点:
 --   1. 可空 owner:旧行/匿名（offline 模式）创建的行 owner 恒为 NULL——公开可读

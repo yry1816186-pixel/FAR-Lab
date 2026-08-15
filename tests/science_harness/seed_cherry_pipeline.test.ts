@@ -21,7 +21,7 @@
 // 诚实边界（CLAUDE.md §3）：缺 python/numpy/fixture = 环境问题 → t.skip。BLS 跑同一 cached_fixture LC
 // （真实 BLS 计算）；真实在线 TESS multi-seed 是 P1-6 V2 产品化路径（本 closure 测 detector 诚实 fire）。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-1 + CLAUDE.md §4 P-FUSION。
+// Authority: archived-plan §C FUSION-OS-1 + CLAUDE.md §4 P-FUSION。
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

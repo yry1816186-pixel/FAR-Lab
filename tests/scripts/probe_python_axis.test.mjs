@@ -14,7 +14,7 @@
 //   (d) available===false ↔ 首行 = 'Python axis: skipped (<reason>)'，reason 非空且**字面**出现在首行
 //   (e) 同环境多次调用确定性（探针不读随机源）
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C P3-1 + CLAUDE.md §3（环境失败 ≠ 代码 bug）
+// Authority: archived-plan §C P3-1 + CLAUDE.md §3（环境失败 ≠ 代码 bug）
 //            + scripts/run_py_tests.mjs:16-39 probePythonAxis 实现。
 
 import { test } from 'node:test';

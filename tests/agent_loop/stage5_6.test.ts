@@ -1,7 +1,7 @@
 /**
  * stage5_plan + stage6_feedback + paper_assembler 单元测试。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2 stage5/6 + §5.5 paper_assembler.
+ * 历史溯源（已归档）: archived-spec §2 stage5/6 + §5.5 paper_assembler.
  *
  * 测试覆盖：
  *   - PlanSchema zod parse 成功（datasetChoices/methodChoices/scheduleOrFeedback/executableChecks）

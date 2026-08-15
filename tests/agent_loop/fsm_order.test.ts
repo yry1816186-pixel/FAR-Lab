@@ -1,7 +1,7 @@
 /**
  * agent_loop FSM 顺序 + STAGE_TO_PURPOSE_TAG 覆盖测试。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2 表 + §3.1 STAGE_ORDER.
+ * 历史溯源（已归档）: archived-spec §2 表 + §3.1 STAGE_ORDER.
  *
  * 测试覆盖：
  *   1. STAGE_ORDER = stage1→stage2→stage3→stage4→stage5→stage6（6 阶段主链·stage0_dialogue 不在主链）

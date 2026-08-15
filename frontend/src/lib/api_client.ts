@@ -1003,7 +1003,7 @@ export function useAgentEventStream(
   };
 }
 
-// ---------- Planning gates (opencode planning methodology · /api/v1/planning/*) ----------
+// ---------- Planning gates (planning-gate methodology · /api/v1/planning/*) ----------
 
 export interface PlanningRiskSignals {
   readonly readOnly: boolean;

@@ -1,5 +1,5 @@
 /**
- * pricing.ts 测试（阶段 7 1127 · CU2-01 价格 SSOT）。
+ * pricing.ts 测试。
  *
  * 覆盖：
  *   1. 已知模型：输入/输出拆分估算 + totalUsd

@@ -13,7 +13,7 @@
 --   为 0013(OS-12=0014 / OS-9=0015 / OS-10=0016 同理)。§C 行不引用文件名,keystone bot 写回看 status +
 --   proof_caller/proof_test。
 --
--- Authority: FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-11 +
+-- Authority: archived-plan §4 FUSION-OS-11 +
 --            CLAUDE.md §5 五值裁决枚举固定(禁第六值·最高红线)。
 
 PRAGMA foreign_keys = ON;

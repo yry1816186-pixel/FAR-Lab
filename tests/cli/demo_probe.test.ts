@@ -1,5 +1,5 @@
 /**
- * demo 环境探测与 GV 重试测试（阶段 7 P0-3 · S1-69.2/69.3 修复）。
+ * demo 环境探测与 GV 重试测试。
  *
  * 背景（findings S1）：demo 关键路径零超时保护——better-sqlite3 native 加载异常或
  * Node 版本不符（<24 无原生 type stripping）时进程可能永不 exit（评委面前死等）；

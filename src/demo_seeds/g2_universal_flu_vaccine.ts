@@ -21,7 +21,7 @@
  * verdict 设计：2 support（mRNA 多价 Phase 1/2 HI 滴度提升 + stem 抗体广谱反应·方向支持）+ 1 refute
  * （H5N1 等高危亚型无临床保护数据·抗体广谱≠保护广谱）→ R5 INCONCLUSIVE。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
+ * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

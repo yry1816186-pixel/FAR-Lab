@@ -1,5 +1,5 @@
 /**
- * runtime_gateway.test.ts —— 运行期 LLM 网关解析（WS-A.1 · 阶段 7 1128 效率/可观测面）。
+ * runtime_gateway.test.ts —— 运行期 LLM 网关解析（WS-A.1 · 1128 效率/可观测面）。
  *
  * 验证 resolveRuntimeGateway：
  *   - key env 存在且非空 → competition_aliyun_qwen 网关（非 null）

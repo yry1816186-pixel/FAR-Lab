@@ -5,7 +5,7 @@ These constants MUST stay byte-equal with the TypeScript enums in
 ``schema/migrations/0003_math_verification.sql``. Cross-language drift
 (TS ↔ SQL) is guarded by ``tests/schema/schema_enum_sync.test.ts``.
 
-Authority: FAR_CHAIN_DEV_SPEC/38_数学可验证层_MATH_VERIFICATION.md §1-§4.5.
+Authority: archived-spec数学可验证层_MATH_VERIFICATION.md §1-§4.5.
 
 Model-neutrality: this module contains NO provider/model references. It mirrors
 the structural typing of the math verification layer for cross-language hash

@@ -1,8 +1,8 @@
 -- 0014_verdict_supersede.sql
 -- FUSION-OS-12: verdict_nodes.superseded_by 自指 FK + 重评写新行设指针 + WHERE superseded_by IS NULL 查当前裁决。
 --
--- Authority: FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-12（Open Science memories.superseded_by 范式）
---            + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-12。
+-- Authority: archived-plan §4 FUSION-OS-12（Open Science memories.superseded_by 范式）
+--            + archived-plan §C FUSION-OS-12。
 --
 -- 为何不重建 trg_verdict_nodes_immutable_fields（设计决策·与 0012 相反）：
 --   supersede 须 UPDATE 旧行 superseded_by = 新 verdict_id。immutable_fields（0001:128-146·0012 重建）

@@ -233,7 +233,7 @@ async function main() {
   // -- 2. .far-master 缺失时的兼容行为 -----------------------------------------
   const masterExistedInitially = fs.existsSync(MASTER_STATE_PATH);
   const designExistedInitially = fs.existsSync(DESIGN_STATE_PATH);
-  console.log(`\n控制面现状: .far-master/STATE.yaml ${masterExistedInitially ? "存在(真实)" : "不存在"} · .far-design/STATE.yaml ${designExistedInitially ? "存在(真实)" : "不存在"}`);
+  console.log(`\n控制面现状: .far-master/STATE.yaml ${masterExistedInitially ? "存在(真实)" : "不存在"} · design ledger ${designExistedInitially ? "存在(真实)" : "不存在"}`);
 
   if (!masterExistedInitially) {
     const { status, notify } = await fireSessionStart(events);

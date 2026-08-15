@@ -1,5 +1,5 @@
 /**
- * sign 命令——Ed25519 文件清单签名（阶段 7 P2 · TK10 签名落地·最小闭环）。
+ * sign 命令——Ed25519 文件清单签名。
  *
  * 用法：
  *   far keygen --out <path>                    生成 Ed25519 密钥对（私钥 PKCS8 PEM + .pub.pem）

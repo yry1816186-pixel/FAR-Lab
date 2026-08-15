@@ -43,7 +43,7 @@ interface CallRecordSummaryRow {
   readonly current_hash: string;
   readonly created_at: string;
   /**
-   * CU4-02（阶段 7 1127）计量来源标记：0 = 伪 token（offline_replay 字符估算，
+   * CU4-02计量来源标记：0 = 伪 token（offline_replay 字符估算，
    * 非真实计量），1 = 真实 token 计量，null = 无法提取（视为真实计量）。
    * 由 response_payload 中的 credential.tokenUsage.measured 提取，不依赖 model_id 命名约定。
    */
@@ -450,7 +450,7 @@ function buildStageSummarySection(
       (sum, r) => sum + (r.usage_tokens_total ?? 0),
       0,
     );
-    // CU4-02（阶段 7 1127）：offline_replay 用字符伪 token（measured=false）——
+    // CU4-02：offline_replay 用字符伪 token（measured=false）——
     // 口径混叠消除：按 measured 标记（而非 model_id 命名约定）区分伪 token，
     // 真实计量与伪 token 分开报告，不混入同一成本口径。
     const pseudoTokens = records
@@ -559,7 +559,7 @@ function buildVerdictNodesSection(verdictNodes: VerdictNode[]): ReportSection {
     if (node.untestedReason !== null && node.untestedReason.length > 0) {
       lines.push(`- **Untested reason**: ${node.untestedReason}`);
     }
-    // 阶段 7 P0-11：GRADE 证据质量标注（透明度层·studyDesign 提供时展示·评委可感知证据层级）。
+    // P0-11：GRADE 证据质量标注（透明度层·studyDesign 提供时展示·评委可感知证据层级）。
     if (node.verdictTrace.evidenceQualityTier !== undefined) {
       lines.push(
         `- **Evidence quality**: ${node.verdictTrace.evidenceQualityNote ?? `tier ${node.verdictTrace.evidenceQualityTier}`}`,

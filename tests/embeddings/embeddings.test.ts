@@ -1,5 +1,5 @@
 // tests/embeddings/embeddings.test.ts
-// 嵌入基础设施（2.md §6.8 补遗规范）契约：
+// 嵌入基础设施（design-spec §6.8 补遗规范）契约：
 //   - config：版本哈希稳定 / 字段变更→哈希变（静默漂移的机械检测）
 //   - stub：确定性黄金向量 / 同文同向量 / 异文几乎必异 / L2 归一 / 批量保序 / 空输入
 //   - cache：命中幂等 / 版本键（configHash 入 key，升级必 miss）/ 损坏=miss /

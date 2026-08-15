@@ -196,7 +196,7 @@ export interface VerdictComputation {
   readonly verdictInputHash: string;
   readonly sourceAnchor: SourceAnchor;
   readonly fec: ReturnType<typeof makeLegacyCompatFec>;
-  /** FEC V2 强制门禁决策（SY5-1 阶段 7 P0-1 接线：镜像 orchestrator.fecAppendClaim）。 */
+  /** FEC V2 强制门禁决策（SY5-1 P0-1 接线：镜像 orchestrator.fecAppendClaim）。 */
   readonly fecGate: FecGateDecision;
   readonly kernelOutput: VerdictKernelOutput;
   readonly decision: VerdictResult;
@@ -264,7 +264,7 @@ export function computeVerdictDecision(args: {
     thresholdSpec,
     frozenAt: isoTimestamp,
   });
-  // SY5-1（阶段 7 P0-1）：镜像 orchestrator.fecAppendClaim 的 FEC 强制门
+  // SY5-1：镜像 orchestrator.fecAppendClaim 的 FEC 强制门
   // （compileFec → enforceFecMandatoryGate → assertFecGate）。此前本路径直接
   // decideFiveValueVerdict 跳过强制门（findings SY5-1/TK4-1 三重确认：API/CLI ask
   // 生产入口「证据链→裁决」可审计性断裂）。
@@ -407,7 +407,7 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
         claim: hypothesis.claim,
         evidenceCount: convertedEvidences.length,
         conflictingEvidenceCount: evidence.conflictingEvidenceCount,
-        // SY5-1（阶段 7 P0-1）：canonical 裁决输入锚点——verdictInputHash 绑定
+        // SY5-1：canonical 裁决输入锚点——verdictInputHash 绑定
         // claim + falsificationSpec + thresholdSpec + evidenceVotes，审计者可从证据链
         // 重放裁决输入（修复前仅落摘要·「证据链→裁决」无法完整重放）。
         verdictInputHash: verdictInputHash,

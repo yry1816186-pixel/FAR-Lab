@@ -1,7 +1,7 @@
 /**
  * verdict 路由测试——GET /verdict/:id + /verdict/by_hypothesis/:hypoId + /verdict（24§5.3）。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5.3.
+ * 历史溯源（已归档）: archived-spec网关与接口规范_API_GATEWAY.md §5.3.
  *
  * 覆盖：
  *   - GET /verdict/:id 返回 404 当记录不存在

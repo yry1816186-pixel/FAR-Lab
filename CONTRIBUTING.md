@@ -112,9 +112,8 @@ Until these are set, the gates are advisory rather than blocking.
 
 This repo is being prepared for public open-source release. See:
 
-- `docs/governance/OPEN_SOURCE_RELEASE_PLAN.md` — release-form decisions
-- `docs/governance/release-process.md` — tagging / release workflow
-- `docs/installation.md` — user / developer / Docker install
+- `governance spec` — release-form decisions
+- `governance spec` — tagging / release workflow
 - Issue templates: `.github/ISSUE_TEMPLATE/` (bug / feature / reproducibility / docs)
 
 Install scripts (`scripts/install.sh` / `install.ps1`) and `far doctor` never read or

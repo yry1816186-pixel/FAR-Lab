@@ -1,5 +1,5 @@
 // tests/discovery/registry.test.ts
-// 发现注册表（2.md §2.4）的契约：
+// 发现注册表（design-spec §2.4）的契约：
 //   - 记录构建：纯函数、registeredAt 注入、内容哈希只覆盖科学内容（包装改动→同哈希）
 //   - 哈希链：创世行 prev='' / 中段篡改 / 尾行篡改 / 乱序全部检出
 //   - append 幂等：同 (contentHash,state) 跳过；同内容新状态追加（状态史保留）

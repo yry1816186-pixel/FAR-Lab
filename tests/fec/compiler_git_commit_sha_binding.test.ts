@@ -2,7 +2,7 @@
 //
 // T-008 · FEC freeze.gitCommitSha 强制绑定回归测试（2026-07-24 评委逼问第 1 轮 T-008 修复）。
 //
-// 评审记录/总榜_v1.md T-008：
+// T-008：
 //   "FEC `frozenAt` 自签无第三方锚定"——原 freeze.timestamp 是自签 ISO-8601 字符串，
 //   任何人可任意回填，无法证明"冻结时确实在此时间点"。
 //
@@ -20,7 +20,7 @@
 //   5. computeFecHash 字段敏感性：gitCommitSha 进 hash（提供时），缺失时不进 hash（V1 兼容）；
 //   6. orchestrator 集成：opt-in + 缺 sha → fecAppendClaim fail-closed UNTESTED。
 //
-// Authority: 评审记录/总榜_v1.md T-008 + 1轮/评委02_发现.md +
+// Authority: T-008 + +
 //            src/fec/compiler.ts:437-481（checkGitCommitShaBinding）+
 //            src/fec/fec_contract.ts:176-203（ProtocolFreeze.gitCommitSha）+
 //            src/fec/fec_contract.ts:285-299（FecContractV2.requireGitCommitShaBinding）。

@@ -11,7 +11,7 @@
 //
 // 真实依赖:runMigrations 真实落地 0013 trigger → INSERT/UPDATE 第六值经 BEFORE trigger RAISE。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-11 + FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-11。
+// Authority: archived-plan §C FUSION-OS-11 + FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-11。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

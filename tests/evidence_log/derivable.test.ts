@@ -17,8 +17,8 @@
 // migration 误删 trigger 可改字节。evidence_payload_hash 是内容寻址绑定，闭合 canonicalHash 4 键不含
 // evidence_payload 的缺口。与链式 current_hash 正交（独立列·不进白名单·零回归 12 GV + cross-lang）。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-10 +
-//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-10（host_call_log.derivable 范式）。
+// Authority: archived-plan §C FUSION-OS-10 +
+//            archived-plan §4 FUSION-OS-10（host_call_log.derivable 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -30,7 +30,7 @@
  * 2 refutes（机制之间互相竞争·无单一机制可独立复现 ≥3 次·Murchison 过量小且变异性大）→
  * 证据强度不足以判定单一 dominant mechanism。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science-125 种子）。
+ * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）。
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

@@ -1,7 +1,7 @@
 /**
  * retry_policy.test.ts —— withRetry 退避策略 + MAX_TOKENS_TABLE 测试。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §7.3（withRetry）+ §7.4（MAX_TOKENS_TABLE）.
+ * 历史溯源（已归档）: archived-spec §7.3（withRetry）+ §7.4（MAX_TOKENS_TABLE）.
  *
  * 测试框架：node:test + node:assert/strict（禁 vitest）。
  *

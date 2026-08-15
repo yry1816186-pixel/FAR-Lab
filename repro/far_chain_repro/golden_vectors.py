@@ -9,7 +9,7 @@ to exercise the full CHECK constraint surface. Additionally, vectors form a vali
 hash chain (each entry's prevHash = previous entry's currentHash) to enable
 chain-integrity regression testing.
 
-Authority: FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §3 + E4 golden trace.
+Authority: archived-spec §3 + E4 golden trace.
 """
 
 from __future__ import annotations

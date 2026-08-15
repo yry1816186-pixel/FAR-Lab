@@ -1,7 +1,7 @@
 // tests/fixtures/anti_theater/golden_vectors.ts
 // 反剧场 golden vector 夹具：clean base envelope + 21 攻击向量构建器 + spec 表。
 //
-// Authority: FAR_LAB_MASTER_PLAN/APPENDIX_E_ANTI_THEATER.md §5（AttackCase + §5.2 17 P0 golden vectors 表）+
+// Authority: archived-plan §5（AttackCase + §5.2 17 P0 golden vectors 表）+
 //            §6（7 CI gates·5 测试 gate 消费本夹具）+ 06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 /
 //            reasonCode / 不用 LLM-as-judge / 误报率=0）。
 //

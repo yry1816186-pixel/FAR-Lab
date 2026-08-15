@@ -234,7 +234,7 @@ export const SIGNATURE_ALGORITHM_SUITES: readonly SignatureAlgorithmSuite[] = Ob
       stopSignDate: '2030-01-01T00:00:00Z',
       stopVerifyDate: '2035-01-01T00:00:00Z',
       downgradeBehavior: 'after stop-verify, historical signatures remain valid with renewal-evidence requirement; no silent downgrade',
-      // CZ1-01（阶段 7 P1）：PQC 继任 suite 注册——NIST IR 8547 迁移线 2030/2035。
+      // CZ1-01：PQC 继任 suite 注册——NIST IR 8547 迁移线 2030/2035。
       // 仅注册声明（平滑轮换路径），不替换现有签名；停止新签后经 renewal 框架轮换。
       successorSuiteId: 'far.sig.ml-dsa-44-sha512.v1',
     },

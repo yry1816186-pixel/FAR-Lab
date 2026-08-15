@@ -4,7 +4,7 @@
  * 问题简述：ML 蛋白质结构预测（AlphaFold2 类）在 CASP15 free-modelling（hard）靶标上的
  * 实际 TM-score 中位数，是否达到声称的 ≥ 0.85？证据显示实际 0.68–0.71 → 预测 REFUTED。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
+ * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
  *
  * verdict 设计：thresholdSpec semantics='gt' value=0.85；所有 evidence metricValue < 0.85
  * → evaluateThreshold 全 refutes → decideVerdict REFUTED（诚实展示 FEC 能正确驳斥过度声称）。

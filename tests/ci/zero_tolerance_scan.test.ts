@@ -103,7 +103,7 @@ test('F4 honesty boundary scan catches process-level isolation overclaim (negati
   }
 });
 
-// ── 阶段 7 P0-2b（SA9 Critical 修复）回归载体 ──
+// ── P0-2b（SA9 Critical 修复）回归载体 ──
 // 背景（findings SA9）：zero_tolerance_scan 对 3 类真实反模式形态漏检——
 //   (1) `// @ts-ignore` 指令型注释（本身是注释→stripLineComment 剥离→永不可命中）
 //   (2) 注释 TODO/FIXME 债务标记（剥离后漏检）

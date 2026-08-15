@@ -15,7 +15,7 @@
 // 诚实边界（doer=grader · §C:49）：DB trigger 物理落地 + 本测试 GREEN 仅证明「trigger 存在且拦截正确」。
 // FUSION-OS-6 §C 升 GREEN 需 CI depth_evidence bot 独立双跑写回，非本会话可跨越。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-6 +
+// Authority: archived-plan §C FUSION-OS-6 +
 //            FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-6 + CLAUDE.md §5「来源不可自填」红线。
 
 import { test } from 'node:test';

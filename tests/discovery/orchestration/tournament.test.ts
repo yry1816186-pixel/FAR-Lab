@@ -1,5 +1,5 @@
 // tests/discovery/orchestration/tournament.test.ts
-// 确定性 Elo 锦标赛（2.md §2.2 中层排序器）的契约：
+// 确定性 Elo 锦标赛（design-spec §2.2 中层排序器）的契约：
 //   - Elo 数学（期望分公式 / K=32 更新 / 平局 0.5）
 //   - 判局规则：逐确定性维度 grade 对比，赢维度多者胜；全平 draw
 //   - 确定性：同输入（任意输入顺序）→ 逐字节相同结果；枚举序 (strategyIndex, id)

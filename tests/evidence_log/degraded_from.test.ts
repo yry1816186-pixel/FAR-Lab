@@ -1,7 +1,7 @@
 // tests/evidence_log/degraded_from.test.ts
 // 职责：验证 FallbackChain 降级来源（degraded_from）落库 + 不破坏 canonical_hash 确定性。
 //
-// 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/05 §8.2/§9 + 0007_add_degraded_from.sql。
+// 历史溯源（已归档）: archived-spec §8.2/§9 + 0007_add_degraded_from.sql。
 //
 // 验证点：
 //   1. appendRecord with audit.degradedFrom → call_records.degraded_from 列正确落库

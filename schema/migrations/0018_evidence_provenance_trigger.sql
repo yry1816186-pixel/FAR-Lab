@@ -17,7 +17,7 @@
 --   2. 旧行 provenance_class=system_derived（0017 缺省）→ WHEN 条件 provenance_class='llm_generated' 不命中·零回填影响。
 --   3. 不进 cross_lang canonical_hash 白名单（不改 evidence_payload / hash 列·零回归 14 GV）。
 --
--- Authority: FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-6 +
+-- Authority: archived-plan §4 FUSION-OS-6 +
 --            CLAUDE.md §5「LLM 不作最终裁决者 / 来源不可自填」红线（落点约束 #9 anti-theater 须 DB trigger 物理兜底）。
 
 PRAGMA foreign_keys = ON;

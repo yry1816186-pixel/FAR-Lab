@@ -111,7 +111,7 @@ export function runDemo(subcommand: string | undefined = undefined): number {
   }
   const tessOnly = subcommand === 'tess-offline';
 
-  // 阶段 7 P0-3（S1-69.2 修复）：启动前置环境探测——Node <24 / better-sqlite3 native
+  // P0-3（S1-69.2 修复）：启动前置环境探测——Node <24 / better-sqlite3 native
   // 不可用时立即 fail-fast（≤5s 退出非 0 + 可读错误 + Docker 后备指引），杜绝评委面前
   // 无限挂起（同步阻塞无法被 timer 中断·探测是唯一可靠防线）。
   const probe = probeEnvironment();
@@ -123,7 +123,7 @@ export function runDemo(subcommand: string | undefined = undefined): number {
   process.stdout.write(BANNER);
 
   process.stdout.write(PHASE1);
-  // 阶段 7 P0-3（S1-69.3 修复）：GV 失败有界重试 1 次（瞬时波动容错·持续失败仍 exit 7 不掩盖）。
+  // P0-3（S1-69.3 修复）：GV 失败有界重试 1 次（瞬时波动容错·持续失败仍 exit 7 不掩盖）。
   const gvExit = retryGoldenOnce(() => runVerifyGolden({ backend: 'node' }));
   if (gvExit !== 0) {
     process.stderr.write(`\nfar demo: golden vector stage failed (exit ${gvExit})\n`);

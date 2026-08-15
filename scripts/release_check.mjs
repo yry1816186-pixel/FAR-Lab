@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * release_check —— tag↔Release 对拍脚本（阶段 7 P0-9 · AT14/BV3-1 修复）。
+ * release_check —— tag↔Release 对拍脚本。
  *
  * 背景（findings BV3-G1）：v1.1.0 tag 存在但 GitHub Release 不存在（假发布）——tag 推送后
  * release.yml 质量门超时失败，Release 从未产出，仓库显示"已发布"实为虚。

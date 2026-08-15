@@ -13,7 +13,7 @@
  * 单一真实依赖（T8）：venvSandboxAdapter.executeAsync 真起 python BLS（per-seed）+
  * detect_seed_cherry 真实集合差集 + src/statistics 真实两样本 z-test。
  *
- * Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-1 + CLAUDE.md §4 P-FUSION。
+ * Authority: archived-plan §C FUSION-OS-1 + CLAUDE.md §4 P-FUSION。
  */
 
 import type Database from 'better-sqlite3';

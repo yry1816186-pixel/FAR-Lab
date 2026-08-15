@@ -89,7 +89,7 @@ export async function registerV2ReceiptPersistRoutes(
   app.post('/receipts', { schema: createReceiptRouteSchema }, async (request, reply) => {
     const body = request.body as CreateReceiptBody;
 
-    // 阶段 7 P2（LP-5 / API5）：功能级授权——受保护模式下 viewer 只读（403 FORBIDDEN）；
+    // P2（LP-5 / API5）：功能级授权——受保护模式下 viewer 只读（403 FORBIDDEN）；
     // offline 匿名模式放行（单机信任·24§3.1 双轨鉴权行为不变）。
     if (request.principal.role !== 'anonymous' && !requireRole(request.principal, WRITABLE_ROLES)) {
       return reply.code(403).type('application/problem+json').send({
@@ -118,7 +118,7 @@ export async function registerV2ReceiptPersistRoutes(
 
     const receiptId = randomUUID();
 
-    // 阶段 7 P2（LP-5 / API1 BOLA）：owner 落库——受保护模式写 principal.userId；
+    // P2（LP-5 / API1 BOLA）：owner 落库——受保护模式写 principal.userId；
     // offline 匿名写 NULL（公开·旧行为不变）。幂等分支不查 owner（proofHash 为内容
     // 寻址 SHA-256·不可枚举·泄露面≈0）。
     const owner = ownerOf(request.principal);
@@ -178,7 +178,7 @@ export async function registerV2ReceiptPersistRoutes(
     const offset = query.offset ?? 0;
     const claimId = query.claimId;
 
-    // 阶段 7 P2（LP-5 / API1 BOLA）：对象级过滤——受保护模式下仅返回
+    // P2（LP-5 / API1 BOLA）：对象级过滤——受保护模式下仅返回
     // 「自己的 + 公开（owner IS NULL）」receipt；offline 匿名 → 全量（行为不变）。
     const scopeClause =
       request.principal.role === 'anonymous' ? '' : 'AND (owner = ? OR owner IS NULL)';
@@ -237,7 +237,7 @@ export async function registerV2ReceiptPersistRoutes(
       throw notFound('Receipt', params.id);
     }
 
-    // 阶段 7 P2（LP-5 / API1 BOLA）：对象级授权——受保护模式下非本人且非公开 → 403
+    // P2（LP-5 / API1 BOLA）：对象级授权——受保护模式下非本人且非公开 → 403
     // （水平越权拒绝·不泄露资源存在性之外的信息）。owner 列不在响应契约（ReceiptRow
     // zod infer 无 owner）——仅服务端授权判定读取。
     const owner = (row as { readonly owner?: string | null }).owner ?? null;
@@ -294,7 +294,7 @@ export async function registerV2ReceiptPersistRoutes(
       throw notFound('Receipt', params.id);
     }
 
-    // 阶段 7 P2（LP-5 / API1 BOLA）：对象级授权（与 GET /receipts/:id 同规则）。
+    // P2（LP-5 / API1 BOLA）：对象级授权（与 GET /receipts/:id 同规则）。
     const owner = (row as { readonly owner?: string | null }).owner ?? null;
     if (request.principal.role !== 'anonymous' && !canAccessReceipt(request.principal, owner)) {
       return reply.code(403).type('application/problem+json').send({

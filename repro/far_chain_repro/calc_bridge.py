@@ -1,6 +1,6 @@
 """七分量确定性 hash 引擎。
 
-Authority: FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §2.
+Authority: archived-spec §2.
 
 七分量 = MODEL_SNAPSHOT + active_model_ids_sorted + CalcSpec + seed + nthread
          + code_hash + env_hash

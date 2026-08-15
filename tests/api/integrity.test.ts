@@ -1,7 +1,7 @@
 /**
  * integrity 路由测试——Merkle 完整性信任根的 HTTP 暴露（09§4 / 24§5.3）。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/09_可复现性规范_REPRO_DETERMINISM.md §4 +
+ * 历史溯源（已归档）: archived-spec可复现性规范_REPRO_DETERMINISM.md §4 +
  *            24_API网关与接口规范_API_GATEWAY.md §5.3.
  *
  * 覆盖：

@@ -1,5 +1,5 @@
 /**
- * pricing.ts — LLM 价格 SSOT（阶段 7 1127 · CU2-01 修复）。
+ * pricing.ts — LLM 价格 SSOT。
  *
  * 目标：消除"无 per-model 价格表"的成本计算盲区（CU2-01 High）。提供：
  *   - MODEL_PRICES：per-$/M token 定价表（输入/输出拆分，FOCUS 口径）
