@@ -48,6 +48,15 @@ export interface CallMeta {
   readonly providerRetries: number;
   /** Provider-reported finish reason (null = provider did not report one). */
   readonly finishReason: string | null;
+  /**
+   * Sampling temperature EXPLICITLY set on the request (null = not set; the
+   * LIVE qwen adapter then applies its documented default 0.3 — see
+   * src/llm_gateway/adapters/aliyun_qwen/qwen_adapter.ts). Recorded for
+   * provenance (directive §2.4), never invented.
+   */
+  readonly temperature: number | null;
+  /** Sampling seed (null = the request layer sets no seed today). */
+  readonly seed: number | null;
   /** UTC ISO timestamp of the call. */
   readonly isoTimestamp: string;
 }
@@ -81,6 +90,10 @@ function toCallMeta(
     attempts,
     providerRetries,
     finishReason: credential.finishReason ?? null,
+    // callStructuredJson sets no sampling params today — record the explicit
+    // truth (null); the effective LIVE default is documented on the field.
+    temperature: null,
+    seed: null,
     isoTimestamp: credential.isoTimestamp,
   };
 }

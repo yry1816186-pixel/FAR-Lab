@@ -433,6 +433,18 @@ export interface FanoutStrategyReceipt {
   readonly contributed: number;
   readonly error: string | null;
   readonly skipReason: string | null;
+  // ── Generation-side provenance (directive §2.4 minimum fields; optional on
+  //    pre-b4 runs = "not recorded then", never fabricated) ──────────────────
+  /** sha256 of the strategy's prompt signature — which prompt version ran. */
+  readonly strategySignatureHash?: string | null | undefined;
+  /** Model id actually invoked (null = skipped/failed/offline fixture). */
+  readonly modelId?: string | null | undefined;
+  /** Gateway/provider identity of the call. */
+  readonly provider?: string | null | undefined;
+  /** Sampling temperature explicitly set (null = not set; qwen default 0.3 — see CallMeta). */
+  readonly temperature?: number | null | undefined;
+  /** Sampling seed (null = not set). */
+  readonly seed?: number | null | undefined;
 }
 
 /** Schema-v4 projection of the discovery fan-out accounting (directive §2.1/§2.2). */

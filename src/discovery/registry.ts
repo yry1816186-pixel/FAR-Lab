@@ -52,6 +52,18 @@ export interface RegistryProvenance {
   readonly counterEvidenceCitations: readonly string[];
   /** sha256 over the run's stage-receipt projection (full receipts live in the run file). */
   readonly receiptsDigest: string;
+  // ── Generation-side minimum provenance (directive §2.4 补遗; optional on
+  //    pre-b4 ledger lines = "not recorded then", never fabricated) ───────────
+  /** sha256 of the strategy's prompt signature — which prompt version produced this conjecture. */
+  readonly strategySignatureHash?: string | null | undefined;
+  /** Model id actually invoked (null = offline fixture / not recorded). */
+  readonly modelId?: string | null | undefined;
+  /** Gateway/provider identity of the generating call. */
+  readonly provider?: string | null | undefined;
+  /** Sampling temperature explicitly set (null = not set; LIVE qwen default 0.3). */
+  readonly temperature?: number | null | undefined;
+  /** Sampling seed (null = not set). */
+  readonly seed?: number | null | undefined;
 }
 
 /** Typed promotion evidence — mirrors ConjecturePromotionEvidence (fail-closed reuse). */
@@ -375,6 +387,11 @@ export function registerRunDiscoveries(
   }
   const registeredAt = (opts.now ?? (() => new Date()))().toISOString();
   const digest = receiptsDigestForRun(run);
+  // §2.4 minimum provenance: match the generating strategy's captured facts
+  // (b4+ runs carry them in the discovery block; legacy/pre-b4 runs = absent).
+  const fanoutByStrategy = new Map(
+    (run.discovery?.fanout?.perStrategy ?? []).map((r) => [r.strategyId, r]),
+  );
   const inputs: RegistryRecordInput[] = [];
   const notRegistered: { id: string; reason: string }[] = [];
 
@@ -414,10 +431,23 @@ export function registerRunDiscoveries(
         corpusSnapshotId: run.corpus.snapshotId,
         corpusRootHash: run.corpus.rootHash,
         modelProfile: run.modes.modelExecutionMode === 'LIVE' ? 'live' : 'mixed',
-        // Citation provenance: the third-party re-resolvable handles (doi → persistent id).
         supportingCitations: (binding?.boundSupporting ?? []).map((d) => d.doi ?? d.persistentIdentifier),
         counterEvidenceCitations: (binding?.boundCounter ?? []).map((d) => d.doi ?? d.persistentIdentifier),
         receiptsDigest: digest,
+        ...(hypothesis.strategyOrigin !== undefined
+          ? (() => {
+              const call = fanoutByStrategy.get(hypothesis.strategyOrigin);
+              return call === undefined
+                ? {}
+                : {
+                    strategySignatureHash: call.strategySignatureHash ?? null,
+                    modelId: call.modelId ?? null,
+                    provider: call.provider ?? null,
+                    temperature: call.temperature ?? null,
+                    seed: call.seed ?? null,
+                  };
+            })()
+          : {}),
       },
       evidence: {
         deterministicCheckRef: `run:${run.runId}/falsifiability_gate+${hypothesis.id}`,
