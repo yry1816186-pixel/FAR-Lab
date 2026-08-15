@@ -378,26 +378,8 @@
         }
       }
     },
-    "/api/v1/court/demo": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
     "/api/v1/court": {
       "post": {
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
-    "/api/v1/arena/demo": {
-      "get": {
         "responses": {
           "200": {
             "description": "Default Response"

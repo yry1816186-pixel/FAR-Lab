@@ -16,13 +16,13 @@ function makeDb(): Database.Database {
   return db;
 }
 
-test('GET /llm-status: 无 gateway → offline_replay + keyConfigured=false', async () => {
+test('GET /llm-status: 无 gateway → profile=null + keyConfigured=false（fail-closed·无静默回放）', async () => {
   const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, logger: false });
   try {
     const res = await app.inject({ method: 'GET', url: '/api/v1/llm-status' });
     assert.equal(res.statusCode, 200);
     const body = JSON.parse(res.body).data;
-    assert.equal(body.profile, 'offline_replay');
+    assert.equal(body.profile, null);
     assert.equal(body.keyConfigured, false);
     assert.equal('apiKey' in body, false);
     assert.equal('key' in body, false);

@@ -1,16 +1,16 @@
 /**
  * CourtPage —— 跨模型可靠性法庭可视化（FI-3）。
  *
- * 端点：GET /api/v1/court/demo（参考 fixture）+ POST /api/v1/court（WS-A.2 live）。
+ * 端点：POST /api/v1/court（WS-A.2 live·真实 provider 跨模型一致性）。
  * 四组件：LiveSessionForm（WS-B.2）+ AgreementHero + ModelVerdictTable + HonestyAlert。
  *
- * 诚实定位（红线）：demo 用 offline_replay（同 fixture→unanimous）。live 表单：DASHSCOPE_API_KEY
- * 配置时走真实 provider（datasetSource=real），否则诚实降级 offline replay。每个模型 verdict 由
+ * 诚实定位（红线）：无预制罐头证书——页面只展示真实跑出来的 session。DASHSCOPE_API_KEY
+ * 未配置时服务端 503 fail-closed，表单同步禁用并给出指引（绝不回放 fixture 冒充跨模型证书）。每个模型 verdict 由
  * R0-R9 确定性内核给出（LLM 非裁决者）。
  */
 
 import { useState } from 'react';
-import { useCourtDemo, useCourtLive, useLlmStatus } from '@/lib/api_client';
+import { useCourtLive, useLlmStatus } from '@/lib/api_client';
 import type { CourtCertificateDto } from '@/lib/types';
 import { useT } from '@/lib/i18n';
 import type { VerdictValue } from '@/lib/types';
@@ -29,7 +29,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Gavel, Users, ShieldAlert, Zap } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 
 const FIVE_VERDICTS = new Set<string>([
   'CONFIRMED',
@@ -151,7 +150,6 @@ function CertificateDisplay({ cert }: { readonly cert: CourtCertificateDto }) {
 
 export default function CourtPage() {
   const t = useT();
-  const { data: demoCert, isLoading, isError, error } = useCourtDemo();
   const { data: llmStatus } = useLlmStatus();
   const courtLive = useCourtLive();
 
@@ -221,9 +219,18 @@ export default function CourtPage() {
               data-testid="court-live-models-input"
             />
           </div>
-          <Button onClick={handleLiveRun} disabled={courtLive.isPending || liveClaim.trim().length === 0} data-testid="court-live-run">
+          <Button
+            onClick={handleLiveRun}
+            disabled={courtLive.isPending || !isLiveMode || liveClaim.trim().length === 0}
+            data-testid="court-live-run"
+          >
             {courtLive.isPending ? t('court.live.running') : t('court.live.run')}
           </Button>
+          {!isLiveMode ? (
+            <p className="text-sm text-muted-foreground" data-testid="court-live-disabled-hint">
+              {t('llm.status.offlineBody')}
+            </p>
+          ) : null}
           {courtLive.isError ? (
             <Alert variant="destructive">
               <AlertDescription>
@@ -240,23 +247,6 @@ export default function CourtPage() {
         </div>
       ) : null}
 
-      {isLoading ? (
-        <div className="space-y-4" data-testid="court-loading-skeleton">
-          <Skeleton className="h-28 w-full rounded-lg" />
-          <Skeleton className="h-64 w-full rounded-lg" />
-        </div>
-      ) : isError || demoCert === undefined ? (
-        <Alert variant="destructive">
-          <AlertTitle>{t('court.errorTitle')}</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error ? error.message : t('arena.noVerdict')}
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <div data-testid="court-demo-reference">
-          <CertificateDisplay cert={demoCert} />
-        </div>
-      )}
     </div>
   );
 }

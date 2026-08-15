@@ -89,6 +89,9 @@ describe('WizardPage', () => {
   it('advances through the pipeline to verdict and proof on successful API call', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
       void input;
       return new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS });
     });
@@ -133,9 +136,12 @@ describe('WizardPage', () => {
 
   it('displays error state on API failure', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockImplementation(async () =>
-      new Response(JSON.stringify({ message: 'Server error' }), { status: 500, headers: HEADERS }),
-    );
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
+      return new Response(JSON.stringify({ message: 'Server error' }), { status: 500, headers: HEADERS });
+    });
     renderWizard();
 
     await user.click(screen.getByTestId('wizard-run'));
@@ -148,9 +154,12 @@ describe('WizardPage', () => {
 
   it('shows start-over button on the proof step that resets to step 0', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockImplementation(async () =>
-      new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS }),
-    );
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
+      return new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS });
+    });
     renderWizard();
 
     await user.click(screen.getByTestId('wizard-run'));
@@ -172,9 +181,12 @@ describe('WizardPage', () => {
 
   it('renders the Next steps card with save/export/share/re-verify actions on the proof step', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockImplementation(async () =>
-      new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS }),
-    );
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
+      return new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS });
+    });
     renderWizard();
 
     await user.click(screen.getByTestId('wizard-run'));
@@ -200,6 +212,9 @@ describe('WizardPage', () => {
     const user = userEvent.setup();
     // Distinguish the persist POST from the hypothesize POST by URL.
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
       const url = String(input);
       if (url.includes('/api/v2/receipts')) {
         return new Response(
@@ -234,6 +249,9 @@ describe('WizardPage', () => {
       manifestMembers?: Array<{ kind: string; digest: string; sizeBytes: number }>;
     } | null = null;
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
       const url = String(input);
       if (url.includes('/api/v2/receipts') && init?.method === 'POST') {
         persistBody = JSON.parse(init.body as string);
@@ -283,9 +301,12 @@ describe('WizardPage', () => {
 
   it('copies the export command and share link to clipboard (R-04 导出/分享)', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockImplementation(async () =>
-      new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS }),
-    );
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
+      return new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS });
+    });
     const writeText = vi.fn();
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText },
@@ -313,9 +334,12 @@ describe('WizardPage', () => {
 
   it('downloads a .far-proof bundle via Blob + browser download (counter-case 5)', async () => {
     const user = userEvent.setup();
-    vi.mocked(fetch).mockImplementation(async () =>
-      new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS }),
-    );
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
+      return new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS });
+    });
     // jsdom 不实现 URL.createObjectURL / anchor.click —— 手工 mock。
     const createObjectURL = vi.fn(() => 'blob:mock-url');
     const revokeObjectURL = vi.fn();

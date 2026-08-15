@@ -25,13 +25,13 @@ const VALID_BODY = {
   models: ['alpha', 'beta'],
 };
 
-test('POST /court: 无 gateway → datasetSource=replay', async () => {
+test('POST /court: 无 gateway → 503 fail-closed（绝不静默回放 fixture）', async () => {
   const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, logger: false });
   try {
     const res = await app.inject({ method: 'POST', url: '/api/v1/court', payload: VALID_BODY });
-    assert.equal(res.statusCode, 200);
-    assert.equal(JSON.parse(res.body).data.datasetSource, 'replay');
-    assert.equal(JSON.parse(res.body).data.modelCount, 2);
+    assert.equal(res.statusCode, 503);
+    const body = JSON.parse(res.body);
+    assert.equal(body.error_code ?? body.code, 'court_live_profile_unavailable');
   } finally { await app.close(); }
 });
 

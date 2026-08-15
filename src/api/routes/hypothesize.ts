@@ -107,6 +107,21 @@ export async function registerHypothesizeRoute(
       });
     }
 
+    // 无 LLM 网关（未配置 key）→ 503 fail-closed：绝不静默回放离线 fixture 冒充
+    // 对任意问题的六阶段科研产出（同 research 路由的 no-key 纪律）。
+    if (config.gateway === undefined) {
+      throw new ApiError({
+        statusCode: 503,
+        errorCode: 'hypothesize_live_profile_unavailable',
+        message: 'live hypothesis runs need an API key in the environment (see far doctor)',
+        detail: {
+          guidance:
+            'set the live-provider API key in the environment (see far doctor) for live runs; ' +
+            'replay fixtures exist only for explicit test wiring (far ask --profile offline_replay), never as a served result',
+        },
+      });
+    }
+
     const idemKey = parsed.data.idempotencyKey;
 
     // 审计 P0-2 幂等路径：已完成的同 key 请求直接返回缓存结果（不重跑 LLM / 不重复写证据链）。
