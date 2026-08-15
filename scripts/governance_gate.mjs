@@ -32,6 +32,23 @@ function run(cmd, args, timeoutMs = 300000, useShell = false) {
   }
 }
 
+/**
+ * Like run(), but on failure the child's captured stdout/stderr is printed —
+ * a swallowed diagnostic is worse than a red gate (2026-08-15: CI reported
+ * `coverage=false` with zero output because stdio was 'ignore').
+ */
+function runLogged(cmd, args, timeoutMs = 300000) {
+  try {
+    execFileSync(cmd, args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'], timeout: timeoutMs });
+    return { exit: 0 };
+  } catch (error) {
+    const e = error;
+    if (e.stdout !== undefined && String(e.stdout).length > 0) process.stdout.write(String(e.stdout));
+    if (e.stderr !== undefined && String(e.stderr).length > 0) process.stderr.write(String(e.stderr));
+    return { exit: typeof e.status === 'number' ? e.status : 1 };
+  }
+}
+
 const RED_LINE = new Set(['typecheck', 'lint', 'test', 'coverage', 'fitness', 'design_lint', 'zero_tolerance', 'anti_theater', 'adr_landing']);
 
 /** Windows 上 pnpm 是 .cmd shim，execFileSync 需显式 .cmd（项目陷阱文档正解）。 */
@@ -46,7 +63,7 @@ function measureSli() {
   results.test = argv.includes('--skip-test')
     ? true
     : run(PNPM, ['test'], 600000, true).exit === 0;
-  results.coverage = run('node', ['scripts/coverage_gate.mjs']).exit === 0;
+  results.coverage = runLogged('node', ['scripts/coverage_gate.mjs']).exit === 0;
   results.fitness = run('node', ['scripts/fitness_functions.mjs']).exit === 0;
   results.design_lint = run('node', ['scripts/design_lint.mjs']).exit === 0;
   results.zero_tolerance = run('node', ['scripts/zero_tolerance_scan.mjs']).exit === 0;

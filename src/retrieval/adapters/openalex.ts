@@ -173,6 +173,12 @@ export const openalexAdapter: RetrievalAdapter = {
   async retrieve(query: RetrievalQuery): Promise<readonly RetrievedDocument[]> {
     const url = buildOpenAlexUrl(query);
     const fetched = await fetchTextFromAllowlistedHost(url, { method: 'GET' });
-    return parseOpenAlexResults(fetched.body, query.text, new Date().toISOString(), query.maxResults);
+    const docs = parseOpenAlexResults(
+      fetched.body,
+      query.text,
+      fetched.retrievedAt ?? new Date().toISOString(),
+      query.maxResults,
+    );
+    return fetched.cacheHit === true ? docs.map((d) => ({ ...d, retrievedFrom: 'cache' as const })) : docs;
   },
 };

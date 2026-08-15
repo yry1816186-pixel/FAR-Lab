@@ -158,6 +158,12 @@ export const arxivAdapter: RetrievalAdapter = {
       method: 'GET',
       headers: { Accept: 'application/atom+xml' },
     });
-    return parseArxivResults(fetched.body, query.text, new Date().toISOString(), query.maxResults);
+    const docs = parseArxivResults(
+      fetched.body,
+      query.text,
+      fetched.retrievedAt ?? new Date().toISOString(),
+      query.maxResults,
+    );
+    return fetched.cacheHit === true ? docs.map((d) => ({ ...d, retrievedFrom: 'cache' as const })) : docs;
   },
 };

@@ -128,6 +128,8 @@ export const RetrievedDocumentZod = z.object({
   authors: z.array(z.string()),
   publicationDate: z.string().nullable(),
   retrievedAt: z.string(),
+  // Persistent-cache replay marker (absent = fresh live fetch).
+  retrievedFrom: z.literal('cache').optional(),
   retrievalQuery: z.string(),
   retrievalMethod: z.string(),
   rawHash: z.string(),
