@@ -83,16 +83,69 @@ export interface AdjudicationCompilation {
 }
 
 /** Direction keywords (ordered; first hit wins; ties are impossible — a text is scanned once per family). */
-const POSITIVE_WORDS = ['positive', 'increases', 'increase', 'higher', 'stronger', 'correlates positively'];
-const NEGATIVE_WORDS = ['negative', 'decreases', 'decrease', 'lower', 'weaker', 'anticorrelates'];
+const POSITIVE_WORDS = ['positive', 'increases', 'increase', 'higher', 'stronger', 'correlates positively', '增加', '升高', '增强', '正相关'];
+const NEGATIVE_WORDS = ['negative', 'decreases', 'decrease', 'lower', 'weaker', 'anticorrelates', '减少', '降低', '减弱', '负相关'];
 
+/**
+ * 否定线索（2.md §8.9 后 R10 T1·claim 语言结构鲁棒性金集的运行时面）：
+ * 词边界匹配（EN——防 "note"/"nothing" 误中 "not"/"no"）+ 中文子串。
+ * 窗口 40 字符（"does not, under any scenario, increase…" 类插入语仍覆盖；
+ * 校准：典型否定-关键词间距 <25 字符，40 = +60% 裕量）。窗口内 ≥2 个线索 =
+ * 双重否定语义不可靠 → fail-closed 返回 null（不猜）。
+ */
+const NEGATION_CUES_EN = /\b(?:not|no|never|without|fails? to|does not|doesn'?t|isn'?t|aren'?t|won'?t|can'?t|cannot)\b/g;
+const NEGATION_CUES_ZH = ['不', '无', '非', '没有', '未'];
+const NEGATION_WINDOW_CHARS = 40;
+
+/**
+ * Negation-aware direction derivation. Each keyword hit is inspected for a
+ * preceding negation cue within the window: a negated hit flips its family.
+ * A negated positive ("does not increase") is a NEGATIVE prediction — the
+ * most classic adjudication failure mode (R10: 否定翻转必须翻转裁决).
+ * Ambiguity (both effective families, or neither, or double negation) → null.
+ */
 function deriveDirection(text: string): PredictionDirection | null {
   const lower = text.toLowerCase();
-  const hasPositive = POSITIVE_WORDS.some((w) => lower.includes(w));
-  const hasNegative = NEGATIVE_WORDS.some((w) => lower.includes(w));
-  if (hasPositive === hasNegative) return null; // none or both → unknown
-  return hasPositive ? 'positive' : 'negative';
+  let effectivePositive = false;
+  let effectiveNegative = false;
+  for (const [words, family] of [
+    [POSITIVE_WORDS, 'positive'],
+    [NEGATIVE_WORDS, 'negative'],
+  ] as const) {
+    for (const word of words) {
+      let idx = lower.indexOf(word);
+      while (idx !== -1) {
+        const window = lower.slice(Math.max(0, idx - NEGATION_WINDOW_CHARS), idx);
+        const enCues = window.match(NEGATION_CUES_EN)?.length ?? 0;
+        const zhCues = NEGATION_CUES_ZH.reduce((n, cue) => n + countOccurrences(window, cue), 0);
+        const cues = enCues + zhCues;
+        if (cues >= 2) return null; // double negation — refuse to guess
+        const negated = cues === 1;
+        if (family === 'positive') {
+          if (negated) effectiveNegative = true;
+          else effectivePositive = true;
+        } else if (negated) effectivePositive = true;
+        else effectiveNegative = true;
+        idx = lower.indexOf(word, idx + word.length);
+      }
+    }
+  }
+  if (effectivePositive === effectiveNegative) return null; // none or both → unknown
+  return effectivePositive ? 'positive' : 'negative';
 }
+
+function countOccurrences(haystack: string, needle: string): number {
+  let n = 0;
+  let i = haystack.indexOf(needle);
+  while (i !== -1) {
+    n += 1;
+    i = haystack.indexOf(needle, i + needle.length);
+  }
+  return n;
+}
+
+/** Test/export surface for the claim-structure golden set (R10 T1). */
+export { deriveDirection as derivePredictionDirectionForTest };
 
 /**
  * Compile the kernel contract from an observation + hypothesis (pure).

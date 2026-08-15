@@ -33,6 +33,9 @@ import { runCAstro } from './commands/c_astro.ts';
 import { runCAstroLoop } from './commands/c_astro_loop.ts';
 import { runGround } from './commands/ground.ts';
 import { runCheckResource } from './commands/check_resource.ts';
+import { runExportCitations, type CitationExportFormat } from './commands/export_citations.ts';
+import { parseJudgePairwiseArgs, runJudgePairwise } from './commands/judge_pairwise.ts';
+import { runRegistryAnchor, renderRegistryAnchorHuman } from './commands/registry_anchor.ts';
 import {
   runResearchInspect,
   runResearchStart,
@@ -300,7 +303,14 @@ const COMMANDS: readonly CliCommand[] = [
         return runResearchBaseline(args.slice(1));
       }
       if (subcommand === 'registry') {
-        return runResearchRegistry(args.slice(1));
+        const registryArgs = args.slice(1);
+        if (registryArgs[0] === 'anchor') {
+          return Promise.resolve(runRegistryAnchorFromArgs(registryArgs.slice(1)));
+        }
+        return runResearchRegistry(registryArgs);
+      }
+      if (subcommand === 'judge') {
+        return runResearchJudgeFromArgs(args.slice(1));
       }
       if (subcommand === 'adjudicate') {
         return runResearchAdjudicate(args.slice(1));
@@ -315,7 +325,7 @@ const COMMANDS: readonly CliCommand[] = [
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'status', 'resume', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', 'feedback', 'registry', 'adjudicate', 'review', or 'memory' (got: ${subcommand ?? '<missing>'})\n` +
+        `far research: expected 'start', 'status', 'resume', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', 'feedback', 'registry', 'adjudicate', 'review', 'memory', or 'judge' (got: ${subcommand ?? '<missing>'})\n` +
           '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]\n' +
           '         far research status <runId> [--json]\n' +
           '         far research resume <runId> [--profile ...] [--out <file>] [--json]\n' +
@@ -328,6 +338,8 @@ const COMMANDS: readonly CliCommand[] = [
           '         far research review <run.json> --hypothesis <id> --to NOVEL_VALIDATED --human-review-ref <ref> [--reviewer <name>] [--ledger <path>] [--json]\n' +
           '         far research review <run.json> --hypothesis <id> --to REDISCOVERY --matching-literature <DOI> [--reviewer <name>] [--ledger <path>] [--json]\n' +
           '         far research registry [--verify | --export <file> | --json] [--ledger <path>]\n' +
+          '         far research registry anchor [--export <cred.json>] [--ledger <path>] [--json]\n' +
+          '         far research judge <runId> [--profile auto|competition_aliyun_qwen] [--json] (LIVE only; fail-closed without key)\n' +
           '         far research memory <status|summary> [--path <file>] [--domain <d>] [--json]\n' +
           '         far research evaluate <run.json> [--json]\n' +
           '         far research baseline "<question>" [--profile ...] [--json]\n' +
@@ -638,8 +650,100 @@ function runExportFromArgs(args: readonly string[]): Promise<number> {
   if (subcommand === 'far-proof') {
     return Promise.resolve(runExportFarProofFromArgs(args.slice(1)));
   }
-  process.stderr.write(`far export: expected 'receipt', 'receipt-v2', or 'far-proof' (got: ${subcommand ?? '<missing>'})\n`);
+  if (subcommand === 'citations') {
+    return Promise.resolve(runExportCitationsFromArgs(args.slice(1)));
+  }
+  process.stderr.write(`far export: expected 'receipt', 'receipt-v2', 'far-proof', or 'citations' (got: ${subcommand ?? '<missing>'})\n`);
   return Promise.resolve(2);
+}
+
+function runRegistryAnchorFromArgs(args: readonly string[]): number {
+  let exportPath: string | undefined;
+  let jsonOut = false;
+  let ledgerPath: string | undefined;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === '--export') {
+      exportPath = args[++i];
+      if (exportPath === undefined || exportPath === '') {
+        process.stderr.write('far research registry anchor: --export needs a file path\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--ledger') {
+      ledgerPath = args[++i];
+      if (ledgerPath === undefined || ledgerPath === '') {
+        process.stderr.write('far research registry anchor: --ledger needs a path\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--json') {
+      jsonOut = true;
+      continue;
+    }
+    if (a !== undefined && a.startsWith('--')) {
+      process.stderr.write(`far research registry anchor: unknown argument "${a}"\n`);
+      return 2;
+    }
+  }
+  try {
+    const outcome = runRegistryAnchor({
+      ...(ledgerPath !== undefined ? { ledgerPath } : {}),
+      ...(exportPath !== undefined ? { exportPath } : {}),
+    });
+    if (jsonOut) {
+      process.stdout.write(`${JSON.stringify(outcome, null, 2)}\n`);
+    } else {
+      process.stdout.write(`${renderRegistryAnchorHuman(outcome)}\n`);
+    }
+    return 0;
+  } catch (error) {
+    process.stderr.write(`far research registry anchor: ${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
+  }
+}
+
+function runResearchJudgeFromArgs(args: readonly string[]): Promise<number> {
+  const parsed = parseJudgePairwiseArgs(args);
+  return runJudgePairwise({ runId: parsed.runId, profile: parsed.profile, json: parsed.json });
+}
+
+function runExportCitationsFromArgs(args: readonly string[]): number {
+  let runId = '';
+  let format: CitationExportFormat = 'bibtex';
+  let output: string | undefined;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === '--format') {
+      const v = args[++i];
+      if (v !== 'bibtex' && v !== 'csl-json') {
+        process.stderr.write(`far export citations: --format must be bibtex|csl-json (got: ${v})\n`);
+        return 2;
+      }
+      format = v;
+      continue;
+    }
+    if (a === '--output' || a === '--out') {
+      output = args[++i];
+      if (output === undefined || output === '') {
+        process.stderr.write('far export citations: --output needs a path (or "-")\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a !== undefined && a.startsWith('--')) {
+      process.stderr.write(`far export citations: unknown argument "${a}"\n`);
+      return 2;
+    }
+    if (runId === '' && a !== undefined) runId = a;
+  }
+  if (runId === '') {
+    process.stderr.write('far export citations: missing runId.\n  usage: far export citations <runId> --format bibtex|csl-json [--output <path>| -]\n');
+    return 2;
+  }
+  return runExportCitations({ runId, format, ...(output !== undefined ? { output } : {}) });
 }
 
 const EXPORT_RECEIPT_SCHEMA: readonly OptionSchema[] = [

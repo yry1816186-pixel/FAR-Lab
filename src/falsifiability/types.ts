@@ -79,6 +79,43 @@ export interface EvidenceRecord {
 }
 
 /**
+ * 发表偏倚感知注记（2.md §8.9 R10 补遗·T0·night-r2 S1）——裁决内核的独占差异位。
+ *
+ * 当收集到的证据基重度偏向支持证据（无反证或反证可忽略）时，decideVerdict 在
+ * VerdictDecision 上附加本注记。检测规则与校准依据见 src/falsifiability/verdict.ts
+ * 模块 docstring（§8.9 数值阈值校准文档义务）。
+ *
+ * CANNOT-PROVE 边界（强制声明）：本注记**不能证明发表偏倚存在**——偏斜的证据基
+ * 完全可能反映真实的科学共识（阴性结果确实少）。它只标记"证据基符号分布失衡"
+ * 这一可观测事实，并据此折减 CONFIRMED 的认识论置信展示；对文献本身不构成
+ * 指控。字段 `note` 必须携带该自声明（带内不可伪造）。
+ *
+ * 折减表示法（设计选择·已文档化）：强度折减（"折减 CONFIRMED 强度"）折叠为本
+ * 对象的 `tempered` 布尔字段，而非 VerdictDecision 上的独立 `confirmedTempered`
+ * 标志——折减只在偏倚存在时才有语义，折叠进偏倚对象避免在每个干净裁决上携带
+ * 无意义的 false 字段。`tempered === true` 当且仅当：偏倚被检出且裁决值为
+ * CONFIRMED。它是认识论注记（epistemic annotation），**不是**裁决降级——5 值
+ * 裁决枚举与裁决值本身永不因此改变（replay 稳定性）。非 CONFIRMED 裁决上检出
+ * 的偏斜仍附加注记（tempered=false·信息性）。
+ */
+export interface EvidenceBaseBias {
+  /** 失衡形态：'no_negative_evidence'=零反证的全支持基；'skewed_base'=反证存在但比值悬殊。 */
+  readonly kind: 'no_negative_evidence' | 'skewed_base';
+  readonly supportCount: number;
+  readonly refuteCount: number;
+  /**
+   * 支持数 / 反证数。no_negative_evidence 时反证为零，按约定以 1 为分母
+   * （ratio = supportCount / 1，数值上等于 supportCount）——只作展示语义，
+   * 不参与判定（判定用整数比较，见 verdict.ts）。
+   */
+  readonly ratio: number;
+  /** 人类可读说明；必须声明本注记是失衡 SIGNAL 而非发表偏倚证明（cannot-prove 入带内）。 */
+  readonly note: string;
+  /** CONFIRMED 强度折减标记（见接口 docstring 的折叠表示法说明）。 */
+  readonly tempered: boolean;
+}
+
+/**
  * The verdict kernel's decision on a claim: the canonical verdict label plus
  * mandatory context for non-COMPLETE verdicts (scope-slip text, untested
  * reason) and the count of conflicting evidence pieces encountered.
@@ -88,6 +125,12 @@ export interface VerdictDecision {
   readonly scopeSlipText: string | null;
   readonly untestedReason: string | null;
   readonly conflictingEvidenceCount: number;
+  /**
+   * 发表偏倚感知注记（R10·additive）：证据基符号分布失衡时非空，否则 null。
+   * UNTESTED（空证据）与 DEGRADED_SCOPE（早退）恒为 null。纯增量字段——旧
+   * 序列化裁决不含此字段即可解析（verdict_nodes 落库走标量列，不哈希本对象）。
+   */
+  readonly evidenceBaseBias: EvidenceBaseBias | null;
 }
 
 /**

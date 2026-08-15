@@ -328,3 +328,11 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
     每个 bundle 的 `data_manifest.json` 现携带 `envFingerprint`（node/python 版本、平台、架构），
     `far verify --bundle` 在验证环境与录制环境不一致时发出 `ENV_DRIFT` 警告。这只是披露，非保证：
     同版本仍可能因传递依赖而漂移，完整环境锁定（Docker/WholeTale 式）是 V2 项。
+
+## 免责声明（Disclaimer）
+
+FAR-Lab 是**纯研究工具**。其输出为未经人体验证的 AI 生成研究猜想——**非医疗建议**、非临床
+验证知识。系统不产出任何临床、剂量或处方内容：确定性临床安全层（`src/discovery/safety/`）
+对剂量/处方/人身伤害类请求 fail-closed 拒答，并对临床/流行病/毒理/心理干预类内容强制附加
+双语"非医疗建议"横幅。该筛选是词法启发式——无法识别全部可临床行动的内容，也不能替代
+监管审查。**任何健康决策前请咨询执业医师。**

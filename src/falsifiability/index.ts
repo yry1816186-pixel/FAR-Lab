@@ -89,6 +89,7 @@ export type {
   BoundProvenance,
 } from './external_facts.ts';
 export type {
+  EvidenceBaseBias,
   EvidenceRecord,
   FalsificationSpec,
   RecordVerdictArgs,
