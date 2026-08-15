@@ -1,5 +1,5 @@
 /**
- * verdict_stage FEC 门接线测试（阶段 7 P0-1 SY5-1 修复）。
+ * verdict_stage FEC 门接线测试。
  *
  * 背景（findings SY5-1 / TK4-1 三重确认）：verdict_stage 生产路径（API/CLI ask）此前跳过
  * compileFec + enforceFecMandatoryGate + assertFecGate（强制门仅在 fec/orchestrator.fecAppendClaim），

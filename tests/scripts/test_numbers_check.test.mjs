@@ -1,5 +1,5 @@
 /**
- * test_numbers_check 脚本测试（阶段 7 P0-8 · AT15/SA13 修复回归载体）。
+ * test_numbers_check 脚本测试。
  *
  * 覆盖：
  *   1. parseTestNumbers 从 node --test spec 输出解析数字。

@@ -19,8 +19,8 @@
 //
 // 反剧场红线（FUSION-OS-7 + CLAUDE.md §5）：per-cell 资源指纹。声明做重算但复算秒级返回 → 不可信 → 降级。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-7 +
-//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-7（per-cell 三元组范式）。
+// Authority: archived-plan §C FUSION-OS-7 +
+//            archived-plan §4 FUSION-OS-7（per-cell 三元组范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

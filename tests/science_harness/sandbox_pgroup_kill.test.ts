@@ -24,8 +24,8 @@
 // 反剧场红线（FUSION-OS-2 + CLAUDE.md §5）：fail-closed 清理。超时不仅杀直接子进程，杀整组——
 // 防孤孙绕过 sandbox 约束存活。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-2 +
-//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-2（setsid+kill -$pgid 范式）。
+// Authority: archived-plan §C FUSION-OS-2 +
+//            archived-plan §4 FUSION-OS-2（setsid+kill -$pgid 范式）。
 
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';

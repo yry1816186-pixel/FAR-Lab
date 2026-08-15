@@ -35,10 +35,10 @@ export const en: Record<MessageKey, string> = {
   'nav.group.tools': 'Trust & verification tools',
   'nav.toolsCaption': 'tools',
 
-  // ---- PlanningPage (opencode planning methodology as machine gates) ----
+  // ---- PlanningPage (planning-gate methodology as machine gates) ----
   'nav.planning': 'Planning',
   'planning.title': 'Planning Gates',
-  'planning.subtitle': 'Deterministic opencode planning methodology as machine gates (no LLM adjudication · zod contract · auditable)',
+  'planning.subtitle': 'Deterministic planning-gate methodology as machine gates (no LLM adjudication · zod contract · auditable)',
   'planning.risk.title': 'Risk Grading',
   'planning.risk.desc': 'Grade P0-P4 from signal booleans (round up on ambiguity; auditable reasons)',
   'planning.risk.run': 'Run grading',

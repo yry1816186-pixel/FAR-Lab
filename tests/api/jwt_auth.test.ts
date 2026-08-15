@@ -1,7 +1,7 @@
 /**
  * jwt_auth.test.ts —— JWT 鉴权中间件 fail-closed 语义测试（24§3.1 双轨鉴权）。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §3 +
+ * 历史溯源（已归档）: archived-spec网关与接口规范_API_GATEWAY.md §3 +
  *            src/api/auth/jwt_middleware.ts（fail-closed 实现）。
  *
  * 覆盖矩阵（对抗式 fail-open 回归守护）：

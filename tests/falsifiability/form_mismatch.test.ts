@@ -11,8 +11,8 @@
 //     规则不存在 → 派生形式静默变更（literal 偷换 derived）即使数值相等也判 CONFIRMED（theater）。
 //   GREEN（接线后）：formMismatch=true → R-derivation-form INCONCLUSIVE（GV-13）。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-13 +
-//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-13（Agreement-is-not-verification 范式）。
+// Authority: archived-plan §C FUSION-OS-13 +
+//            archived-plan §4 FUSION-OS-13（Agreement-is-not-verification 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

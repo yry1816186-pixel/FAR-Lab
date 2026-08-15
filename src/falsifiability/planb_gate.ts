@@ -3,7 +3,7 @@ import type { VerdictDecision } from './types.ts';
 // ---------------------------------------------------------------------------
 // PlanB 三风险裁决门
 //
-// 依据：FAR_CHAIN_DEV_SPEC/12_开发路线图_ROADMAP.md §5.2 三风险降级路径
+// 依据：archived-spec开发路线图_ROADMAP.md §5.2 三风险降级路径
 // 三风险并行判定 + 证据汇总 + 决策记录；命中 ≥1 即 triggered。
 //
 // 风险映射：

@@ -1,5 +1,5 @@
 /**
- * calibration —— 概率预测校准评分（阶段 7 P2-A · N5-E7 校准弃权落地）。
+ * calibration —— 概率预测校准评分。
  *
  * 借鉴 Brier score 与 Expected Calibration Error（ECE）的确定性实现：
  *   - brierScore(p, o) = 1/n Σ(pᵢ − oᵢ)²（0=完美·1=完全反向）

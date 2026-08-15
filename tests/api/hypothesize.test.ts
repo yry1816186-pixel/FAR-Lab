@@ -1,7 +1,7 @@
 /**
  * hypothesize 路由测试——POST /api/v1/hypothesize（24§5 / 17 Epic K-01）。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §5 / 17 Epic K-01.
+ * 历史溯源（已归档）: archived-spec网关与接口规范_API_GATEWAY.md §5 / 17 Epic K-01.
  *
  * 覆盖：
  *   - 成功路径：返回 200 + loopState + graphSubtree + honestVerdict + reproHash

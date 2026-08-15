@@ -19,7 +19,7 @@
  *
  * verdict 设计：1 support（机制 + 动物模型强）+ 2 refute（人类 RCT 矛盾 + FMT 治愈率 <20%）→ DEGRADED_SCOPE。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
+ * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

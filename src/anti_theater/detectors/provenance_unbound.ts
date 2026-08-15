@@ -1,7 +1,7 @@
 /**
  * anti_theater detector AT-PROVENANCE-UNBOUND —— 执行溯源哈希缺失检测器（T-003 修复）。
  *
- * 攻击语义（评委逼问第 1 轮 F-2-005 / 总榜 T-003）：
+ * 攻击语义（F-2-005 / T-003）：
  *   反剧场最深的洞——"系统无法区分真算出来的 metricValue 和编的 metricValue"。
  *   rawArtifactHashes 仅证明「有原始产物」（产物存在性），不证明「产物是这次执行产出的」
  *   （执行-产物绑定）。攻击者可拿别人跑的产物 hash 直接贴到自己手填的 metricValue 上，

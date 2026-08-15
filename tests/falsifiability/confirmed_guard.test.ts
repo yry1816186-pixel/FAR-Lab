@@ -1,7 +1,7 @@
 /**
  * CONFIRMED 判决证据守卫测试（[D] 红线 #7 修复）。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/02_数据契约 §404 (CONFIRMED=metric≥threshold) /
+ * 历史溯源（已归档）: archived-spec数据契约 §404 (CONFIRMED=metric≥threshold) /
  *            07_falsifiability_verdict §6.2 (禁未验证 claim 标 CONFIRMED) /
  *            CLAUDE.md Red Line #7 (CONFIRMED 需证据 + checkpoint)。
  *

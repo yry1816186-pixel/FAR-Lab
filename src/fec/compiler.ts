@@ -440,7 +440,7 @@ function checkHarkingTimeline(
  * #11 GIT_COMMIT_SHA_UNBOUND（T-008 · 2026-07-24 评委逼问第 1 轮修复）：
  *   requireGitCommitShaBinding=true 时，freeze.gitCommitSha 须为合法 40-hex sha1。
  *
- * 第三方锚定原理（评审记录/总榜_v1.md T-008）：
+ * 第三方锚定原理（T-008）：
  *   - 原 freeze.timestamp 是自签 ISO-8601 字符串——任何人可任意回填，无法证明"冻结时确实在此时间点"；
  *   - 绑定 git commit SHA 后，第三方可在 git 历史中验证：
  *     (a) 该 commit 的 author/committer date 须 ≤ freeze.timestamp（时间一致性）；
@@ -486,7 +486,7 @@ function checkGitCommitShaBinding(fec: FecContractV2, errors: CompileError[]): v
  * #12 POWER_PLAN_REQUIRED（T-027 · 2026-07-24 评委逼问第 3 轮 F-7-003 修复）：
  *   requirePowerPlan=true 时，powerPlan 须存在且字段合法（sampleSize > 0 + targetPower >= 0.5）。
  *
- * 方法学根因（评审记录/总榜_v1.md T-027 + 1轮/评委07_发现.md F-7-003）：
+ * 方法学根因（T-027 + F-7-003）：
  *   - 原 `powerPlan?: PowerPlan` 是 optional——FEC 只保证「有 spec」不保证「spec 严格」；
  *   - 一个垃圾 spec（阈值宽松到永不被证伪）也能过 FEC 门——FEC 的强制力被「宽松 spec」绕过；
  *   - 复现危机方法学家（评委07）：power analysis 是 claim 严格性的最低门槛——

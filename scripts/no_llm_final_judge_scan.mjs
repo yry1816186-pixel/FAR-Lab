@@ -48,7 +48,7 @@ function stripLineComment(filePath, rawLine) {
 
 // stripStringLiterals —— 剥离字符串字面量（单/双引号·含转义），使字符串内的禁词引用
 // （如反剧场分类学 realCase 文本「反 LLM-as-judge 红线·F1」·trap_taxonomy.ts:84）不触发 negative 误报。
-// 修复依据（阶段 7 P0-2a · TK5 findings）：扫描器此前只剥注释不剥字符串——字符串字面量中的
+// 修复依据：扫描器此前只剥注释不剥字符串——字符串字面量中的
 // "LLM-as-judge" 是文档性引用（非代码违规），被 llm_as_judge 正则误命中 → ci-04 假阳性 FAIL。
 // 威胁模型边界（诚实声明）：不处理模板字面量（`...`）/多行字符串/正则字面量——字符串内引用视为
 // 文档性（真实 LLM-as-judge 违规是代码形态：import/调用/赋值，非字符串说明文本）；若未来需

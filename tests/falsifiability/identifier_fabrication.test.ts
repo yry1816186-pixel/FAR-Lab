@@ -12,8 +12,8 @@
 //     （doi:10.1/nonexistent 无来源）落 UNTESTED（宽松·theater：伪造引用 == 无法验证）。
 //   GREEN（接线后）：identifierClaims resolutionStatus='not_found' → REFUTED（GV-14）。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-14 +
-//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-14（fabricated-references EXCEPTION）。
+// Authority: archived-plan §C FUSION-OS-14 +
+//            archived-plan §4 FUSION-OS-14（fabricated-references EXCEPTION）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -214,7 +214,7 @@ export interface ProtocolFreeze {
    * - V2 计划：所有真实研究路径 FEC 强制绑定（requireGitCommitShaBinding=true →
    *   compiler #11 校验：缺/格式错 → GIT_COMMIT_SHA_UNBOUND → HARD_FAIL_UNTESTED）。
    *
-   * 修复背景（评审记录/总榜_v1.md T-008）：原 freeze.timestamp 自签无第三方锚定——
+   * 修复背景（T-008）：原 freeze.timestamp 自签无第三方锚定——
    * 评委可质疑"你冻结时真的在这个时间点吗？还是事后回填的？"。绑定 git commit SHA 后，
    * 任何人可在 git 历史中验证：该 commit 的 author/committer date 须 ≤ freeze.timestamp，
    * 且该 commit 的 tree 包含冻结时的契约文件（确定性锚定·不可回填）。
@@ -342,7 +342,7 @@ export interface FecContractV2 {
    * 调用 `checkPowerPlanRequired` (#12) 的开关，决定是否对 `powerPlan`（含 sampleSize）强制
    * HARD_FAIL_UNTESTED 校验。
    *
-   * 根因（评委07 F-7-003·评审记录/总榜_v1.md T-027）：
+   * 根因（评委07 F-7-003·T-027）：
    *   - 原 `powerPlan?: PowerPlan` 是 optional——可不填 = 无强制 power analysis；
    *   - FEC 只保证「有 spec」不保证「spec 严格」。一个垃圾 spec（阈值宽松到永不被证伪）
    *     也能过 FEC 门——FEC 的强制力被「宽松 spec」绕过；

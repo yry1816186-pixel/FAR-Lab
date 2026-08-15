@@ -1,5 +1,5 @@
 /**
- * PlanningPage.test —— opencode 规划方法论门禁面板组件测试。
+ * PlanningPage.test —— 规划门禁方法论门禁面板组件测试。
  *
  * 覆盖（mock 4 个 /api/v1/planning/* 端点 + fetch 按 URL 路由）：
  *   - 4 个门禁卡片渲染（risk/plan/spec/gate 标题）

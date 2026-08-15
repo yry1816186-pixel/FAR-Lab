@@ -1,5 +1,5 @@
 /**
- * AuditTracePage —— 全链路审计追溯可视化（阶段 7 P2 · BW4 Gap-7）。
+ * AuditTracePage —— 全链路审计追溯可视化。
  *
  * 背景（findings BW4 Gap-7）：数据层追溯完整（6 层：call_records → evidence_log →
  * verdict_nodes → proof_envelopes → lifecycle_events → falsification_audit_events），

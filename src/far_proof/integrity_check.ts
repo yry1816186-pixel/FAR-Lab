@@ -56,7 +56,7 @@ export function computeFarProofIntegrity(bundleDir: string, generatedAt: string)
         bytes: statSync(absolute).size,
       };
     });
-  // DB1-1（阶段 7 P1）：generatedAt 纳入 integrityHash——消除"时间戳可回填"质疑面。
+  // DB1-1：generatedAt 纳入 integrityHash——消除"时间戳可回填"质疑面。
   // 篡改 generatedAt（如伪装旧导出时间）将导致 hash 不匹配。verify 侧用
   // expected.generatedAt 重算（对称），跨语言契约（verify.sh 需同步——见 DB1-1 测试）。
   const integrityHash = sha256Text(

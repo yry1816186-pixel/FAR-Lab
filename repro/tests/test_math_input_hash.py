@@ -6,7 +6,7 @@ Cross-language byte-equality (TS↔Python) is verified on the TS side by
 ``canonical_confidence`` normalization (including -0.0, which cannot be passed
 across process boundaries via argv/JSON — both lose the negative zero sign).
 
-Authority: FAR_CHAIN_DEV_SPEC/38 §1 + 03 §2.4 + CLAUDE.md Red Line #5.
+Authority: archived-spec §1 + 03 §2.4 + CLAUDE.md Red Line #5.
 """
 
 from __future__ import annotations

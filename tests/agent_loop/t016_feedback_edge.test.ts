@@ -20,7 +20,7 @@
  *   3. 最终 terminationReason='feedback_converged' + iterationsCompleted=2 + artifacts.length=12（6 stage × 2 轮）；
  *   4. 第二轮 stage3 的 call_record 含 refinements（验证反馈边真的接通·非 stub）。
  *
- * Authority: 评审记录/总榜_v1.md T-016 + 1轮/评委04_发现.md F-4-004 +
+ * Authority: T-016 + F-4-004 +
  *            src/agent_loop/fsm_runner.ts（[6]→[3] 回灌·L262-269/L308/L352）+
  *            src/agent_loop/stages/stage3_hypothesis.ts（消费 feedbackSignal·L119-128）+
  *            src/agent_loop/stages/stage6_feedback.ts（maxIterations 硬收敛·L55-75）。

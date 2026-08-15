@@ -1,5 +1,5 @@
 /**
- * metrics 路由——Prometheus 文本格式指标端点（阶段 7 P2-A · D1-1 修复）。
+ * metrics 路由——Prometheus 文本格式指标端点。
  *
  * 背景（findings D1-1）：观测面被「事件源 → 指标 → 告警」链路的第一环封死——无
  * /metrics 端点。本路由以零新依赖（手写 Prometheus 文本格式）暴露：
@@ -48,7 +48,7 @@ function collectDbMetrics(config: MetricsRouteConfig): {
   const callRecordTotal = (db.prepare('SELECT COUNT(*) AS c FROM call_records').get() as {
     c: number;
   }).c;
-  // 阶段 7 P2-A（D2-5）：降级事件 metrics 上报——LLM fallback 链降级（degraded_from 审计列）
+  // P2-A（D2-5）：降级事件 metrics 上报——LLM fallback 链降级（degraded_from 审计列）
   // + verdict 层 DEGRADED_SCOPE 降级——退化过程可见（findings D2-5：降级无 metrics 通道）。
   const degradationTotal = (
     db

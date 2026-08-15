@@ -85,7 +85,7 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
   / FEC / anti-theater / determinism / evidence-ledger / far-proof), providers, demos.
 - `scripts/install.sh` + `scripts/install.ps1` — user-space installer (zero key, zero big-data).
 - `Dockerfile` + `docker-compose.yml` — default offline demo / API, no key required.
-- `docs/demos/tess-offline.md` — offline demo walkthrough with a tested tamper-detection guide.
+-  — offline demo walkthrough with a tested tamper-detection guide.
   > The `examples/` tree (tess-offline bundle, fec, statistical-claim) is documented but not
   > yet part of the shipped repository; it is a roadmap item. The tested demo path is
   > `node src/cli/far.ts demo tess-offline` + `far export far-proof` (see README §Offline demo).
@@ -121,12 +121,12 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
 
 ### Added
 
-- **Judge Quick-Start guide** (`docs/JUDGE_QUICKSTART.md`): 5-minute verification path
+- **Judge Quick-Start guide** (): 5-minute verification path
   for competition judges — 60-second demo, 2-minute tamper hero, 5-minute kernel deep dive.
-- **Real-world science integrity cases** (`docs/REAL_WORLD_CASES.md`): maps famous
+- **Real-world science integrity cases** (): maps famous
   reproducibility failures (Bem 2011, OSC 2015, LK-99, Theranos) to FAR-Lab's 22
   anti-theater detectors.
-- **API reference** (`docs/API_REFERENCE.md`): all 16 REST endpoints documented with
+- **API reference** (): all 16 REST endpoints documented with
   request/response shapes and error format.
 - **Repository navigation guide** (`DOCS_INDEX.md`): organizes 25 root-level documents
   into clear reading paths for different audiences.

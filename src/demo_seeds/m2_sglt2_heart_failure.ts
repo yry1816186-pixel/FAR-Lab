@@ -4,7 +4,7 @@
  * 问题简述：SGLT2 抑制剂（恩格列净/卡格列净/达格列净）声称降低 T2D 患者 心衰住院 ≥ 25%
  * （HR ≤ 0.75）。证据：EMPA-REG OUTCOME / CANVAS / DECLARE 三大 RCT 一致显示 27-35% 降低 → CONFIRMED。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
+ * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
  *
  * verdict 设计：thresholdSpec semantics='lt' value=0.75（HR·越低越好）；所有 evidence
  * metricValue（HR）≤ 0.75 且 supportsClaim=true → FEC 全 supports → kernel CONFIRMED（R7）。

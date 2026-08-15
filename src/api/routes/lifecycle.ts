@@ -1,5 +1,5 @@
 /**
- * lifecycle 路由——生命周期事件只读查询（阶段 7 P2 · BA3-3 修正通知机制）。
+ * lifecycle 路由——生命周期事件只读查询。
  *
  * 背景（findings BA3-3）：撤回/纠正/supersession 生命周期事件已完整落库（0021
  * lifecycle_events · append-only 哈希链·IC-05），但**无 API 暴露**——相关方无法

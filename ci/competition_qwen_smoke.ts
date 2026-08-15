@@ -5,7 +5,7 @@
 // [须day-1核验·E6·方法:配 DASHSCOPE_API_KEY 真实计费调用]
 // 状态词（02 §7.4）：NEEDS_HUMAN_OPERATION（截图归档）+ NEEDS_REAL_ENV（计费调用）。
 // fail-closed：无 key graceful skip ≠ 通过；CI_GREEN 声明须标注 "E6 skipped 待人工"，否则假绿。
-// 详见 docs/DAY1_VERIFICATION.md §E6。
+// 详见 verification plan §E6。
 // 实现：
 //   1. 读取 DASHSCOPE_API_KEY（无 key 时 graceful skip · exit 0）
 //   2. 经 aliyun_qwen adapter（providerProfile=competition_aliyun_qwen）的 buildCreateParams 构建参数

@@ -283,7 +283,7 @@ test('DEF-17: integrity.json 可解析但 schema 非法 → INTEGRITY_UNREADABLE
 });
 
 // ---------------------------------------------------------------------------
-// DB1-1（阶段 7 P1）：generatedAt 纳入 integrityHash——时间戳篡改检测回归
+// DB1-1：generatedAt 纳入 integrityHash——时间戳篡改检测回归
 // ---------------------------------------------------------------------------
 
 test('DB1-1: 篡改 generatedAt → INTEGRITY_HASH_MISMATCH（修复前可静默回填）', () => {

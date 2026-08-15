@@ -1,7 +1,7 @@
 /**
  * stage1_understanding + stage2_integration 单元测试。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §2 stage1/2 + §5.2 执行器要点.
+ * 历史溯源（已归档）: archived-spec §2 stage1/2 + §5.2 执行器要点.
  *
  * 测试覆盖：
  *   - UnderstandingSchema zod parse 成功/失败（缺 kind / kind 错值 / problemStatement 类型错）

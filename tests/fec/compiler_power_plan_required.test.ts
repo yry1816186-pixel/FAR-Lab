@@ -2,7 +2,7 @@
 //
 // T-027 · FEC PowerPlan 强制绑定回归测试（2026-07-24 评委逼问第 3 轮 F-7-003 修复）。
 //
-// 评审记录/总榜_v1.md T-027 + 1轮/评委07_发现.md F-7-003：
+// T-027 + F-7-003：
 //   "FEC spec 质量无强制审计（powerAnalysisN optional）→ FEC 只保证「有 spec」不保证「spec 严格」"。
 //   一个垃圾 spec（阈值宽松到永不被证伪）也能过 FEC 门——FEC 的强制力被「宽松 spec」绕过。
 //
@@ -19,7 +19,7 @@
 //   5. opt-in + 合法 powerPlan（sampleSize > 0 + targetPower >= 0.5）→ 通过（合法路径不误伤）；
 //   6. orchestrator 集成：opt-in + 缺 powerPlan → fecAppendClaim fail-closed UNTESTED。
 //
-// Authority: 评审记录/总榜_v1.md T-027 + 1轮/评委07_发现.md F-7-003 +
+// Authority: T-027 + F-7-003 +
 //            src/fec/compiler.ts（checkPowerPlanRequired · #12）+
 //            src/fec/fec_contract.ts（FecContractV2.requirePowerPlan）。
 //

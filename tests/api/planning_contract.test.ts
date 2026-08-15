@@ -1,7 +1,7 @@
 /**
  * planning_contract.test.ts — /api/v1/planning 端点契约测试。
  *
- * opencode 规划方法论源代码化 HTTP 层：4 个确定性门禁端点。
+ * 规划门禁方法论源代码化 HTTP 层：4 个确定性门禁端点。
  * 契约 SSOT：src/api/routes/planning_schemas.ts（zod）→ src/planning/* 引擎。
  *
  * 覆盖：

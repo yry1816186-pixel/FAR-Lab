@@ -87,7 +87,7 @@ export async function registerHypothesizeRoute(
   config: HypothesizeRouteConfig,
 ): Promise<void> {
   app.post('/hypothesize', async (request, reply) => {
-    // API1 BOLA 修复（阶段 7 1128 安全面）：受保护模式下（principal 非 anonymous）
+    // API1 BOLA 修复：受保护模式下（principal 非 anonymous）
     // 写路由须 researcher+ 角色。offline 模式（principal 未挂载或 anonymous）全放行（设计·24§3.1 双轨）。
     const role = request.principal?.role ?? 'anonymous';
     if (role !== 'anonymous' && role !== 'researcher' && role !== 'admin') {

@@ -4,7 +4,7 @@
  * 问题简述：LK-99 材料声称在室温（≥ 300 K）常压下零电阻超导（Tc ≥ 300 K）。
  * 证据：独立复现实验（北大、普林斯顿、马克斯·普朗克等）测得电阻非零、无迈斯纳效应 → REFUTED。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
+ * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
  *
  * verdict 设计：thresholdSpec semantics='gt' value=300（Tc K）；所有 evidence metricValue < 300
  * （实测电阻非零·无迈斯纳·复现失败）→ FEC 全 refutes → kernel REFUTED。

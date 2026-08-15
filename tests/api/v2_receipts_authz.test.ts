@@ -1,5 +1,5 @@
 /**
- * v2 receipts 授权层测试（阶段 7 P2 · LP-5 API1 BOLA / API5 功能级授权回归载体）。
+ * v2 receipts 授权层测试。
  *
  * 覆盖：
  *   1. 受保护模式：POST 落 owner（JWT subject）；他人 GET 详情 → 403；列表仅见自己+公开。

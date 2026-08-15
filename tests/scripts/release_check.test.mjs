@@ -1,5 +1,5 @@
 /**
- * release_check 脚本测试（阶段 7 P0-9 · AT14/BV3-1 修复回归载体）。
+ * release_check 脚本测试。
  *
  * 覆盖纯函数（无外部依赖）：
  *   1. listReleaseTags 只返回 v* 发布 tag（排除 depth-* 等内部 tag）。

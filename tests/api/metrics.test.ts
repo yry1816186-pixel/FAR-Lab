@@ -1,5 +1,5 @@
 /**
- * /metrics 端点测试（阶段 7 P2-A · D1-1 修复回归载体）。
+ * /metrics 端点测试。
  *
  * 覆盖：
  *   1. GET /metrics → 200 + text/plain + Prometheus 样本行（uptime/memory/evidence_log/call_record/verdict 五值）。

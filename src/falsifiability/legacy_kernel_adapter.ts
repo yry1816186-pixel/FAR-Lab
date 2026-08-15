@@ -382,7 +382,7 @@ export function extractVerdictTrace(output: VerdictKernelOutput): VerdictTracePe
     // 新写入时 verdict_trace_json 含 decisionTrace → verdict_trace_hash 自动绑定（信任链增强）；
     // A1 前写入的旧行无此字段 → 解析时 undefined（零回归·parseVerdictTrace 宽容处理）。
     ...(output.decisionTrace !== undefined ? { decisionTrace: output.decisionTrace } : {}),
-    // 阶段 7 P0-11：GRADE 证据质量元数据透传（可选·透明度层·不进裁决判定·不进 proofHash）。
+    // P0-11：GRADE 证据质量元数据透传（可选·透明度层·不进裁决判定·不进 proofHash）。
     // 与 decisionTrace 同宽容解析设计：未提供 studyDesign 的行无此字段（零回归）。
     ...(output.evidenceQualityTier !== undefined
       ? {

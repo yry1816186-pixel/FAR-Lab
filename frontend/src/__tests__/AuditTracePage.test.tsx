@@ -1,5 +1,5 @@
 /**
- * AuditTracePage 测试（阶段 7 P2 · BW4 Gap-7 回归载体）。
+ * AuditTracePage 测试。
  *
  * 覆盖：
  *   1. 路由可达：/audit 渲染标题 + 追溯输入框。

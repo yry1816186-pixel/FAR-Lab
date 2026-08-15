@@ -1,5 +1,5 @@
 // src/planning/types.ts
-// 职责：opencode 规划方法论源代码化 —— 规划域类型 SSOT（zod schemas + 推导类型）。
+// 职责：规划门禁方法论源代码化 —— 规划域类型 SSOT（zod schemas + 推导类型）。
 //
 // 融入设计（对应 opencode 全局规划命令 → FAR-Lab 可编程能力）：
 //   /plan         → Plan（目标 + DAG 步骤，每步可独立验证）

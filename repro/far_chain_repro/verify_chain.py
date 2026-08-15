@@ -7,7 +7,7 @@ Two entry points:
 Both recompute canonical_hash for each entry, compare against stored currentHash,
 and verify the prevHash chain forms an unbroken link from GENESIS.
 
-Authority: FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §4 + cross-lang verify.
+Authority: archived-spec §4 + cross-lang verify.
 """
 
 from __future__ import annotations

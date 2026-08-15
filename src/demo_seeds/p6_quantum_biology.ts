@@ -35,7 +35,7 @@
  * （cryptochrome knock-out 实验 2018 给弱支持），(3)无在体单分子实验直接证实
  * 量子效应不可或缺。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/41_可证伪证据链_FEC.md §1（Science-125 种子）+
+ * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science-125 种子）+
  * 17_FINAL_AUDIT.md §7.
  */
 

@@ -296,7 +296,7 @@ describe('packageFarProofBundle error paths', () => {
     writeFileSync(join(bundleDir, 'ro-crate-metadata.json'), '{}');
     writeFileSync(join(bundleDir, 'prov.ttl'), '<http://example.org/>');
     // Missing: proof_envelopes.jsonl, repro_runs.jsonl, call_records.redacted.jsonl,
-    // claim_graph.json, otel-trace.jsonl, data_manifest.json, README_REPLAY.md, code/MANIFEST.md
+    // claim_graph.json, otel-trace.jsonl, data_manifest.json, README_REPLAY.md, manifest
     assert.throws(
       () => packageFarProofBundle({ bundleDir }),
       (err: unknown) => {

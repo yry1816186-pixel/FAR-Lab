@@ -44,7 +44,7 @@ test('hashCanonicalJson: NaN 输入 → fail-closed(canonicalHash 链守卫一�
   );
 });
 
-test('canonicalHash: empty-string prevHash is rejected (阶段 7 P1-B-1 mutation 缺口修复)', () => {
+test('canonicalHash: empty-string prevHash is rejected (P1-B-1 mutation 缺口修复)', () => {
   // mutation_gate 存活位点：`prevHash === undefined || prevHash === ''`（or_to_and 变异后空串被放行）。
   // 契约：空串 prevHash 必须 fail-closed（空串 prevHash 会伪造链根/断链）。
   const cred = {

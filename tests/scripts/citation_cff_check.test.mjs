@@ -1,5 +1,5 @@
 /**
- * CITATION.cff 完整性测试（阶段 7 P0-7 · AC4/RE1/CC1/CD2 修复回归载体）。
+ * CITATION.cff 完整性测试。
  *
  * 背景（findings）：CITATION.cff 曾为 NEEDS_HUMAN_OPERATION 占位 + version 1.0.0 漂移
  * （package.json=1.1.0）+ commit 未锚定。

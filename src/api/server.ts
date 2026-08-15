@@ -89,7 +89,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   const keyConfigured = llm !== undefined;
   console.warn(`[far-lab] LLM profile: ${keyConfigured ? String(llmProfile) : 'offline_replay'} (key: ${keyConfigured ? 'configured' : 'absent — running offline replay'})`);
   const app = Fastify({
-    // 阶段 7 P2-A（LP-4）：可观测默认 on——logger 缺省 true（旧默认 false 让观测面静默）。
+    // P2-A（LP-4）：可观测默认 on——logger 缺省 true（旧默认 false 让观测面静默）。
     // 测试可显式传 logger:false 保持安静；Fastify 默认不记录请求头/Authorization（无密钥泄漏面）。
     logger: config.logger ?? true,
     bodyLimit: 10 * 1024 * 1024,
@@ -139,7 +139,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   app.setErrorHandler(errorHandler);
 
   await registerHealthRoutes(app, { db: config.db });
-  // 阶段 7 P2-A（D1-1）：/metrics 指标端点（Prometheus 文本格式·裸根探针豁免·观测面第一环）。
+  // P2-A（D1-1）：/metrics 指标端点（Prometheus 文本格式·裸根探针豁免·观测面第一环）。
   await registerMetricsRoutes(app, { db: config.db });
 
   await app.register(async (v1) => {
@@ -187,7 +187,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     // Track-1A research vertical slice (hypothesis generation + research plan).
     const { registerResearchRoutes } = await import('./routes/research.ts');
     await registerResearchRoutes(v1, {});
-    // 阶段 7 P2（BA3-3）：生命周期事件只读查询（修正通知机制·修正不静默）。
+    // P2（BA3-3）：生命周期事件只读查询（修正通知机制·修正不静默）。
     const { registerLifecycleRoutes } = await import('./routes/lifecycle.ts');
     await registerLifecycleRoutes(v1, { db: config.db });
     // benchmark 端点读预生成 JSON（不依赖运行 db·fresh-clone 跑 generate 脚本即可）
@@ -208,7 +208,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
       profile: keyConfigured ? String(llmProfile) : 'offline_replay',
       keyConfigured,
     }));
-    // opencode 规划方法论源代码化：确定性门禁引擎 HTTP 层（P0-P4 分级 / Plan/Spec 校验 / 门禁报告）
+    // 规划门禁方法论源代码化：确定性门禁引擎 HTTP 层（P0-P4 分级 / Plan/Spec 校验 / 门禁报告）
     const { registerPlanningRoutes } = await import('./routes/planning.ts');
     await registerPlanningRoutes(v1);
     // P0-4 事件流 SSE（可选·注入 eventBus 才注册）

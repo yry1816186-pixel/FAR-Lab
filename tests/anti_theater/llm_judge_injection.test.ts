@@ -1,7 +1,7 @@
 /**
  * llm_judge_injection —— CI gate 5（APPENDIX_E §6）：LLM-as-final-judge 注入检测 + structured kernel 不被覆盖。
  *
- * Authority: FAR_LAB_MASTER_PLAN/APPENDIX_E_ANTI_THEATER.md §2（AT-JUDGE-OVERRIDE 伪代码·llm-reviewer-override）+
+ * Authority: archived-plan §2（AT-JUDGE-OVERRIDE 伪代码·llm-reviewer-override）+
  *            §6（CI gate 5）+ 03_EVIDENCE_CONTRACT_AND_VERDICT.md §8.2（F3 deterministic kernel·不接受 LLM 裁决）+
  *            F3 模型中立铁律（CI grep gate：src/anti_theater 禁 import openai/dashscope·W3.5 落地）。
  *

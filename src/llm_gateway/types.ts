@@ -29,7 +29,7 @@ export interface TokenUsage {
   readonly outputTokens: number;
   readonly totalTokens: number;
   /**
-   * CU4-02（阶段 7 1127）：计量来源标记——true = 厂商真实 token 计量；
+   * CU4-02：计量来源标记——true = 厂商真实 token 计量；
    * false = 字符伪 token（offline_replay 用字符数估算，非真实 token）。
    * 缺省 true（真实计量）；offline_replay 显式 false。预算/报告侧据此区分
    * 口径（伪 token 不得混入 usage_tokens_total 作为真实成本依据）。

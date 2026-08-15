@@ -1,5 +1,5 @@
 /**
- * GRADE 证据质量层接线测试（阶段 7 P0-11 · CR2-1/2 修复）。
+ * GRADE 证据质量层接线测试。
  *
  * 背景（findings CR2-1/2）：verdict kernel 已支持 studyDesign 可选输入并产出
  * evidenceQualityTier / evidenceQualityNote（透明度层·不进 verdict·不进 proofHash），

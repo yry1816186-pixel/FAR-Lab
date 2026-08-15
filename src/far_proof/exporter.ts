@@ -128,7 +128,7 @@ export function exportFarProof(input: FarProofExportInput): FarProofExportResult
     writeReadmeReplay(outputDir, runId, modelSnapshot, gitCommitSha, envHash, exportedAt, hashVerification),
   );
 
-  // 8. code/MANIFEST.md（code/ 目录诚实说明：快照在 HEAD，重放靠 git checkout）
+  // 8. manifest（code/ 目录诚实说明：快照在 HEAD，重放靠 git checkout）
   filesWritten.push(writeCodeManifest(outputDir, gitCommitSha));
 
   // DEF-17: 全分量 sha256 清单(V-09 静默组闭合)——所有分量写入后生成 integrity.json。

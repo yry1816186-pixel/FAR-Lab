@@ -34,10 +34,10 @@ export const zh = {
   'nav.group.tools': '信任与验证工具',
   'nav.toolsCaption': '工具',
 
-  // ---- PlanningPage（opencode 规划方法论门禁面板）----
+  // ---- PlanningPage（规划门禁方法论门禁面板）----
   'nav.planning': '规划门禁',
   'planning.title': '规划门禁',
-  'planning.subtitle': 'opencode 规划方法论的确定性机器门禁（无 LLM 裁决·zod 契约·可审计）',
+  'planning.subtitle': '规划门禁方法论的确定性机器门禁（无 LLM 裁决·zod 契约·可审计）',
   'planning.risk.title': '风险分级',
   'planning.risk.desc': '按信号布尔集分级 P0-P4（模糊向上取整，命中规则可审计）',
   'planning.risk.run': '运行分级',

@@ -16,7 +16,7 @@
 //   6. 多 primary 部分缺 → 每个 primary 产独立 finding（findingIdSuffix=runId 区分）；
 //   7. 集成 runAntiTheaterLint：base input（不 opt-in）→ 报告 hasFail=false（零回归）。
 //
-// Authority: 评审记录/总榜_v1.md T-003 + 1轮/评委02_发现.md F-2-005 +
+// Authority: T-003 + F-2-005 +
 //            src/anti_theater/detectors/provenance_unbound.ts 行为契约注释。
 
 import { test } from 'node:test';

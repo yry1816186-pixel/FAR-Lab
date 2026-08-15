@@ -1,7 +1,7 @@
 -- 0010_proof_envelopes_v2.sql
 -- ProofEnvelope V2: 完整证据嵌入的封存信封（与 V1 proof_envelopes 共存）。
 --
--- Authority: FAR_LAB_MASTER_PLAN/04 §2.1（V2 目标态）+ APPENDIX_C §2（proofHash 白名单）+
+-- Authority: archived-plan §2.1（V2 目标态）+ APPENDIX_C §2（proofHash 白名单）+
 --            task #9（RULE-PE-010 Ask 层已确认·状态 DESIGN_LOCKED → IMPLEMENTED_VERIFIED）。
 --
 -- 边界:

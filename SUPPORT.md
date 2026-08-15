@@ -3,9 +3,9 @@
 ## Read the docs first
 
 - Entry: `README.md`
-- Quickstart: `docs/quickstart.md` · Installation: `docs/installation.md`
+- Quickstart: `README` · Installation: `README`
 - Concepts: `docs/concepts/` (`far-proof`, `evidence-ledger`)
-- Architecture: `docs/INDEX.md`
+- Architecture: `README`
 - Glossary: `docs/concepts/`
 - Release operations: `docs/governance/`
 
