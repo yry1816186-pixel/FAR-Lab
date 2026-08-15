@@ -16,7 +16,7 @@
 // 复用 golden_vectors + repro context fixture（evidence_log/golden_vectors.ts）。
 
 import { execSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PACKAGE_ROOT } from './paths.ts';
 
@@ -384,9 +384,11 @@ function countVerdictGoldenVectors(): number {
   ).length;
 }
 
-// docCount 来源：glob docs/**/*.md（纯净仓库口径·docs/ 是用户文档根）。
-// 与 readMigrationFiles 同模式——读固定目录，缺失=仓库结构破坏（不降级，直接暴露）。
+// docCount 来源：glob docs/**/*.md（docs/ 是用户文档根）。
+// R6 仓库内容政策（2026-08-15）：docs/ 已退出仓库（内部文档一律 .far/docs-local/ 本地存放）——
+// 目录缺失是政策后的合法状态：返回 0（诚实计数），不再视为仓库结构破坏。
 function readDocFiles(): number {
+  if (!existsSync(join(REPO_ROOT, 'docs'))) return 0;
   return readdirSync(join(REPO_ROOT, 'docs'), { encoding: 'utf8', recursive: true })
     .filter((fileName) => fileName.endsWith('.md')).length;
 }

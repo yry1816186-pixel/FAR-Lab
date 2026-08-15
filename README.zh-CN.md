@@ -182,7 +182,7 @@ fresh clone + `DASHSCOPE_API_KEY` 复现上表每一个数字。
 | **`.far-proof`** | 自验证 offline bundle（claim graph + redacted chain + proofHash），`far export far-proof` 导出 |
 | **FEC** | Falsifiability Evidence Contract——冻结的、带哈希的测量/统计计划 |
 
-深入：[docs/concepts/far-proof.md](docs/concepts/far-proof.md) · [docs/concepts/evidence-ledger.md](docs/concepts/evidence-ledger.md)
+深入：见上方概念表与 `far <command> --help`（每条命令的契约与退出码）。
 
 ---
 
@@ -219,7 +219,7 @@ pnpm far research start "Does stellar activity inflate hot Jupiter radii?" --sou
 `pnpm far verify`）零 key 全程 offline。
 
 核心门与 offline demo **无需**此 key 即可运行。CI 的 `competition_qwen_smoke` 是条件门，无 key
-时 graceful skip。配置：[docs/providers/qwen-dashscope.md](docs/providers/qwen-dashscope.md)
+时 graceful skip。Provider 配置：见 `.env.example`。
 
 ---
 
@@ -239,10 +239,8 @@ docker compose up far-api       # 长驻 API server @ http://localhost:3000（of
 
 ## 文档导航
 
-- [快速开始](docs/quickstart.md) · [安装](docs/installation.md)
-- 概念：[far-proof](docs/concepts/far-proof.md) · [evidence-ledger](docs/concepts/evidence-ledger.md)
-- Provider：[Qwen / DashScope](docs/providers/qwen-dashscope.md)
-- 治理：[发布流程](docs/governance/release-process.md) · [发布计划](docs/governance/OPEN_SOURCE_RELEASE_PLAN.md)
+- 本 README（[English](README.md) + 中文）即文档主面：快速开始、安装、架构、概念与命令参考（`far --help` / `far <command> --help`）。
+- 仓库刻意只分发源码与面向用户的文档，扩展内部文档不入仓。
 
 ---
 

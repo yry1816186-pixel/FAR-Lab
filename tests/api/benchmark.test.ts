@@ -10,7 +10,8 @@
  *   - loadReport 损坏 JSON → 500 INTERNAL_ERROR
  *   - loadReport shape 不符（合法 JSON 缺字段）→ 500 INTERNAL_ERROR
  *
- * 前置：benchmark/benchmark_report.json 已由 pnpm benchmark:generate 生成（CI 先跑 generate）。
+ * 前置：benchmark/benchmark_report.json 为确定性生成物（R6 政策后不 git 跟踪·由
+ * ensureBenchmarkReport 按需生成——固定 now → suiteIntegrityRoot 稳定）。
  *
  * 零容忍合规：无 any / ts-ignore / 双重断言 / 空 catch / 桩返回。
  */
@@ -26,6 +27,9 @@ import { runMigrations } from '../../src/db/index.ts';
 import { buildServer } from '../../src/api/server.ts';
 import { loadReport, __resetBenchmarkCache } from '../../src/api/routes/benchmark.ts';
 import { ApiError } from '../../src/api/errors/error_handler.ts';
+import { ensureBenchmarkReport } from '../_helpers/benchmark_report.ts';
+
+ensureBenchmarkReport();
 
 const HEX64 = /^[0-9a-f]{64}$/;
 

@@ -1383,7 +1383,7 @@ SYSTEM
 
 MORE
   far <command> --help                  full usage, options, and exit codes for a single command
-  docs: README quickstart · docs/quickstart.md · docs/INDEX.md
+  docs: README quickstart · far <command> --help
 
   All listed commands are implemented. Future work (not missing commands): real multi-model
   providers for court/arena (needs a credential gate) · formal verifiers (Lean/Dafny) ·

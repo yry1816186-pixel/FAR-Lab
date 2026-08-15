@@ -197,6 +197,14 @@ const importsOf = (f) => [
 // (taskId/oracleType/oracleReviewStatus/traceHash/costTokens/kernelVersion+modelVersion/seed/bestOfK=false/executedAt);
 // 缺任一字段或 bestOfK≠false → 红。机检: scripts/benchmark_report_check.mts
 {
+  // R6 仓库内容政策（2026-08-15）：报告为确定性生成物、不 git 跟踪——缺失时先确定性生成再机检
+  if (!existsSync(join(ROOT, 'benchmark', 'benchmark_report.json'))) {
+    const g = spawnSync('pnpm', ['benchmark:generate'], { encoding: 'utf8', shell: true });
+    if (g.status !== 0) {
+      check('FF-15', 'Science-125 报告披露字段集强制(协议 v2)', false,
+        `benchmark:generate exit=${g.status ?? '?'} ${String(g.stderr ?? '').trim().slice(0, 200)}`);
+    }
+  }
   const r = spawnSync(process.execPath, ['scripts/benchmark_report_check.mts'], { encoding: 'utf8' });
   const tail = String(r.stdout ?? r.stderr ?? '').trim().split('\n').slice(-1)[0] ?? '';
   check('FF-15', 'Science-125 报告披露字段集强制(协议 v2)', r.status === 0, `benchmark_report_check exit=${r.status ?? '?'} ${tail}`);

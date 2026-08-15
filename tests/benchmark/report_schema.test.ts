@@ -18,8 +18,11 @@ import {
   REPORT_V2_ENTRY_REQUIRED,
 } from '../../src/benchmark/report_schema.ts';
 import type { BenchmarkReport } from '../../src/benchmark/types.ts';
+import { ensureBenchmarkReport, REPORT_PATH } from '../_helpers/benchmark_report.ts';
 
-const REPORT_PATH = join(process.cwd(), 'benchmark', 'benchmark_report.json');
+// R6 仓库内容政策（2026-08-15）：报告为确定性生成物、不 git 跟踪——先确保生成（已存在则零开销）。
+ensureBenchmarkReport();
+void join;
 
 test('① 现有报告(v2)过机检', () => {
   const report = JSON.parse(readFileSync(REPORT_PATH, 'utf8')) as unknown;
