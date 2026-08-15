@@ -370,6 +370,7 @@ export function verdictResultFromKernelOutput(output: VerdictKernelOutput): Verd
     // 观测证据记录）。若未来 V2 输入引入文献证据记录，须先扩展 StatisticalReport
     // 携带证据来源语义，再谈接线（显式登记·不静默伪造 null）。
     evidenceBaseBias: null,
+    decisiveness: null, // R10 night-r3: additive null (path lacks evidence-vote list)
     metricValue: output.statisticalReport.primaryEffectSize,
   };
 }

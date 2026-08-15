@@ -138,8 +138,36 @@ export interface VerdictDecision {
  * the metric was not computed). This is the top-level verdict result consumed
  * by the persistence layer and API.
  */
+/**
+ * 裁决理由层（R10 §8.9 后 T1·night-r3）：逐裁决 leave-one-out 敏感度的反事实标注。
+ *
+ * decisiveEvidence：翻转（supports↔refutes）哪条证据会改变裁决值——自动暴露
+ * "判决悬于单条证据"的脆弱案例；marginToAdjacent：距相邻裁决的最小翻转数
+ * （投票算术推导，O(1)，非暴力重放）。
+ *
+ * CANNOT-PROVE 边界（强制声明）：反事实翻转是**符号算术**的反事实——它假设
+ * 翻转一条证据的符号而不改变其余证据与其真实性权重；它不建模"这条证据本身
+ * 被证伪后其他证据如何联动变化"。UNTESTED（空基）无邻接概念 → null。
+ * DEGRADED_SCOPE 的邻接由 scope 旗标主导（翻转任一 scopeNarrowerThanClaim
+ * 即离开降级）→ margin=1（若存在窄域证据）。
+ */
+export interface VerdictDecisiveness {
+  /** 单条翻转即改变裁决值的证据 claim 文本（升序稳定序；空 = 无单点决定性证据）。 */
+  readonly decisiveEvidenceClaims: readonly string[];
+  /** 距相邻裁决值的最小证据翻转数（≥1；UNTESTED → 无本字段所在的整个对象为 null）。 */
+  readonly marginToAdjacent: number;
+  /** 稳定摘要（人读）：如 "1 of 3 evidence flips changes the verdict"。 */
+  readonly note: string;
+}
+
 export interface VerdictResult extends VerdictDecision {
   readonly metricValue: number | null;
+  /**
+   * 反事实决定性分析（R10 T1·additive）：makeVerdict 路径计算（证据投票路径）；
+   * V2 kernel 投影路径恒 null（统计契约的 leave-one-out 需要 kernel 输入级重算，
+   * 属后续项——语义边界与 evidenceBaseBias 同一登记惯例）。
+   */
+  readonly decisiveness: VerdictDecisiveness | null;
 }
 
 /**

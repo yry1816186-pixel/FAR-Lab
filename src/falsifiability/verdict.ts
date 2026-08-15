@@ -1,11 +1,13 @@
 import { falsifiabilityGate } from './gate.ts';
 import { evaluateThreshold } from './threshold_semantics.ts';
+import type { Verdict } from '../schema/enums.ts';
 import type {
   EvidenceBaseBias,
   EvidenceRecord,
   FalsificationSpec,
   ThresholdSpec,
   VerdictDecision,
+  VerdictDecisiveness,
   VerdictResult,
 } from './types.ts';
 
@@ -213,6 +215,49 @@ export function makeVerdict(input: {
   return {
     ...decision,
     metricValue: firstMetricValue(enrichedEvidences),
+    decisiveness: analyzeVerdictDecisiveness(decision.verdict, enrichedEvidences),
+  };
+}
+
+/**
+ * 反事实决定性分析（R10 §8.9 后 T1·裁决理由层）：翻转哪条证据改变裁决 +
+ * 距相邻裁决的票距。投票算术推导（O(1)），与 decideVerdict 同一语义域——
+ * 不做第二次裁决调用、无状态。导出供审计层直接复用（makeVerdict 已内置）。
+ * cannot-prove 声明见 types.ts VerdictDecisiveness docstring（符号反事实，
+ * 不建模证据间联动）。
+ */
+export function analyzeVerdictDecisiveness(
+  verdict: Verdict,
+  evidences: ReadonlyArray<EvidenceRecord>,
+): VerdictDecisiveness | null {
+  if (evidences.length === 0) return null; // UNTESTED：空基无邻接概念
+  if (verdict === 'DEGRADED_SCOPE') {
+    const narrower = evidences.filter((e) => e.scopeNarrowerThanClaim);
+    if (narrower.length === 0) return null; // 语义不一致防御：降级裁决必有窄域证据
+    return {
+      decisiveEvidenceClaims: narrower.map((e) => e.claim),
+      marginToAdjacent: 1,
+      note: `${narrower.length} scope-narrowing evidence flag(s); clearing any one leaves DEGRADED_SCOPE`,
+    };
+  }
+  const supports = evidences.filter((e) => e.supportsClaim);
+  const refutes = evidences.filter((e) => e.refutesClaim);
+  if (verdict === 'INCONCLUSIVE') {
+    // 冲突态：翻转少数侧全部证据即离开 INCONCLUSIVE——少数侧每条都参与决定
+    const minority = supports.length <= refutes.length ? supports : refutes;
+    return {
+      decisiveEvidenceClaims: minority.map((e) => e.claim),
+      marginToAdjacent: Math.min(supports.length, refutes.length),
+      note: `conflict ${supports.length}:${refutes.length}; flipping all ${minority.length} minority-side evidence resolves the conflict`,
+    };
+  }
+  // 全体一致（CONFIRMED/REFUTED）：翻转任意一条即进入冲突态 → margin 1，
+  // 每条证据都是单点决定性的（N=1 时翻转直达对向裁决，同为 margin 1）——
+  // "判决悬于单条证据"的脆弱性在此显式暴露而非隐藏。
+  return {
+    decisiveEvidenceClaims: evidences.map((e) => e.claim),
+    marginToAdjacent: 1,
+    note: `unanimous ${verdict} on ${evidences.length} evidence; any single flip enters conflict (verdict hangs on each piece)`,
   };
 }
 

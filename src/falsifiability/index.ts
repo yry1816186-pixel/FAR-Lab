@@ -97,6 +97,7 @@ export type {
   SourceAnchor,
   ThresholdSemantics,
   ThresholdSpec,
+  VerdictDecisiveness,
   Verdict,
   VerdictDecision,
   VerdictNode,

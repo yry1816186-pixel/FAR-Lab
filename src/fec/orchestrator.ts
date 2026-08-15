@@ -230,6 +230,7 @@ export function fecAppendClaim(
         conflictingEvidenceCount: 0,
         // R10（night-r2 S1 连带字段）：fail-closed UNTESTED 无证据基符号分布可评估 → null。
         evidenceBaseBias: null,
+        decisiveness: null, // R10 night-r3: additive null (path lacks evidence-vote list)
         metricValue: kernelOutput.statisticalReport.primaryEffectSize,
       };
     } else {
@@ -433,6 +434,7 @@ function verdictResultFromKernelOutput(output: VerdictKernelOutput): VerdictResu
     // 只携带 supports/refutes 布尔（非投票计数），此处无法计算证据基偏斜比值 → 恒 null
     // （检测规则接线在 legacy decideVerdict 路径·见 legacy_kernel_adapter.ts 同名函数注释）。
     evidenceBaseBias: null,
+    decisiveness: null, // R10 night-r3: additive null (path lacks evidence-vote list)
     // 语义说明（防潜伏陷阱·独立对抗轮核实）：此 metricValue 字段在 V2 内核路径下持有
     // primaryEffectSize（科学管线=c Cohen's d 标准化效应量；桥接路径=经 effectSizeObserved=metricValue 往返后的原值）。
     // 这不是活跃 bug：裁决决策本身由内核 R0-R9 用 primaryEffectSize vs MDE 完成（两者均效应量·正确），
