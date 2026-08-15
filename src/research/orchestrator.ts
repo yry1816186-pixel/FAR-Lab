@@ -845,6 +845,13 @@ function buildDiscoveryBlock(
               contributed: r.candidates.length,
               error: r.error,
               skipReason: r.skipReason,
+              // §2.4 minimum provenance fields (b4): prompt-version + model
+              // identity + sampling facts travel with the accounting.
+              strategySignatureHash: r.strategySignatureHash,
+              modelId: r.modelId,
+              provider: r.provider,
+              temperature: r.temperature,
+              seed: r.seed,
             })),
             exactDuplicatesDropped: fanoutMeta.exactDuplicatesDropped,
             paraphraseFlagged: fanoutMeta.paraphraseFlagged,

@@ -30,6 +30,7 @@ import type { FalsificationMethod } from '../agent_loop/types.ts';
 import type { HypothesisCandidate } from '../research/types.ts';
 import { computeHypothesisId, renderCorpusAllowlist } from '../research/hypothesis_generation.ts';
 import { callStructuredJson, type CallMeta } from '../research/llm.ts';
+import { rawSha256Hex } from '../retrieval/hash.ts';
 import { PARAPHRASE_RISK_MARKER, type StrategyId } from './types.ts';
 import {
   buildIdf,
@@ -73,6 +74,17 @@ export interface StrategyCallResult {
   readonly error: string | null;
   /** Honest inapplicability reason when the strategy declined to run. */
   readonly skipReason: string | null;
+  // ── Generation-side provenance (directive §2.4 minimum fields) ────────────
+  /** sha256 of the strategy's prompt signature — WHICH prompt version ran. */
+  readonly strategySignatureHash: string | null;
+  /** Model id actually invoked (null = skipped/failed/offline fixture). */
+  readonly modelId: string | null;
+  /** Gateway/provider identity of the call. */
+  readonly provider: string | null;
+  /** Sampling temperature explicitly set (null = not set; qwen default 0.3 documented in CallMeta). */
+  readonly temperature: number | null;
+  /** Sampling seed (null = not set). */
+  readonly seed: number | null;
 }
 
 /** Deterministic merge accounting for the whole fan-out (audit surface). */
@@ -201,6 +213,11 @@ export async function generateHypothesesMultiStrategy(
         meta: null,
         error: null,
         skipReason: applicability.skipReason ?? 'not applicable',
+        strategySignatureHash: rawSha256Hex(strategy.signature),
+        modelId: null,
+        provider: null,
+        temperature: null,
+        seed: null,
       });
       continue;
     }
@@ -223,6 +240,11 @@ export async function generateHypothesesMultiStrategy(
         meta,
         error: null,
         skipReason: null,
+        strategySignatureHash: rawSha256Hex(strategy.signature),
+        modelId: meta.modelId,
+        provider: meta.provider,
+        temperature: meta.temperature,
+        seed: meta.seed,
       });
     } catch (err) {
       // Fail-soft isolation: one strategy's structured-output failure is
@@ -233,6 +255,11 @@ export async function generateHypothesesMultiStrategy(
         meta: null,
         error: err instanceof Error ? err.message : String(err),
         skipReason: null,
+        strategySignatureHash: rawSha256Hex(strategy.signature),
+        modelId: null,
+        provider: null,
+        temperature: null,
+        seed: null,
       });
     }
   }
