@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "description": "FAR-Lab 性能预算 v1（b6-S2·08-22 发布列车）。门=scripts/perf_budget_check.mjs（超阈 exit 1）。阈值推导=实测 max × 余量倍率（墙钟维度）或实测堆阶梯（堆上限维度），全部可溯源到 rationale 与 last_measured。机器换代/余量失真时用 --update-baseline 显式重置（输出旧→新对照），禁止手改阈值。",
+  "measurement_context": {
+    "baseline_measured_on": "local Windows 11 dev machine, node v24.14.0, 2026-08-15; CI target=ubuntu-latest (GitHub Actions)",
+    "test_wall_source": "GitHub Actions run history, test_ts job step timestamps (gh run view)",
+    "method": "wall=spawnSync 墙钟 N 次取 max × 倍率后向上取整（CLI/demo 100ms 粒度，test_wall 60s 粒度）；heap=--max-old-space-size 阶梯实测 exit code",
+    "cross_machine_caveat": "墙钟跨机器不可比；阈值含 3-5× 余量覆盖 CI runner 差异。首次 CI 运行即校验，连续假红/假绿都须 --update-baseline 重基线并留下 run 证据。"
+  },
+  "budgets": {
+    "cli_cold_start_ms": {
+      "kind": "wall_ms",
+      "threshold_ms": 1000,
+      "command": "node src/cli/far.ts --help",
+      "runs": 3,
+      "rationale": "基线实测（2026-08-15 本地 Win11）4 样本 331.5-368.4ms，max 368.4 × 3 余量 = 1105.2 → 向上取整 1200ms。CLI 冷启动超此量级 = 模块加载面/依赖图退化（竞赛演示第一印象直接受损）。",
+      "last_measured": {
+        "aggregate": "max",
+        "samples_ms": [
+          314,
+          314,
+          311
+        ],
+        "at": "2026-08-15T15:56:23.066Z"
+      }
+    },
+    "demo_wall_ms": {
+      "kind": "wall_ms",
+      "threshold_ms": 1200,
+      "command": "node src/cli/far.ts demo",
+      "runs": 3,
+      "rationale": "基线实测（2026-08-15 本地 Win11）3 样本 438.9-471.5ms 且 stdout 确定性复现（3735 bytes 恒定），max 471.5 × 3 余量 = 1414.5 → 1500ms。核心裁决演示墙钟超此 = 内核路径性能退化。",
+      "last_measured": {
+        "aggregate": "max",
+        "samples_ms": [
+          390,
+          392,
+          393
+        ],
+        "at": "2026-08-15T15:56:23.066Z"
+      }
+    },
+    "demo_heap_cap": {
+      "kind": "heap_success",
+      "cap_mb": 128,
+      "command": "node --max-old-space-size=<cap> src/cli/far.ts demo",
+      "rationale": "堆阶梯实测（2026-08-15 本地 Win11）：cap≥36MB 全部 exit 0（48/64/96/128/160/192/256 均过），cap≤32MB V8 启动即崩（exit 134）。预算取 128MB = 最小可运行值的 3.5×，远低于 Node 默认堆，防内存膨胀退化；门=该 cap 下 demo 必须 exit 0。",
+      "last_measured": {
+        "cap_mb": 128,
+        "exit_code": 0,
+        "at": "2026-08-15T15:56:23.066Z"
+      }
+    },
+    "test_wall_ms": {
+      "kind": "wall_ms",
+      "threshold_ms": 600000,
+      "command": "CI test_ts job: prelude + node --test shard 1-3 + agent_loop（CI 步外测传入 --test-wall-ms）",
+      "runs": 1,
+      "rationale": "CI 实测（GitHub Actions，2026-08-15）：run 31891802369 测试链 117s、run 31891193390 120s（prelude 起 → agent_loop 止）。120s × 5 余量 = 600s，且锚定在 test_ts job 30min timeout 之内——测试链性能退化在此门显式红（附实测值），而非被 timeout 不透明地杀死（历史 run 31186354000 曾无输出挂 58min）。CI 方案弃案：独立轻量 job + skip-suite 子集计时（子集墙钟≠全量墙钟，预算盖不住真实退化；跑全量则套件重复执行）——已弃，采纳复用 test 步骤计时。",
+      "last_measured": null
+    }
+  }
+}

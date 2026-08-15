@@ -99,7 +99,22 @@ export interface FalsificationMethod {
   readonly value?: number | undefined;        // gt/lt 的阈值
   readonly lower?: number | undefined;        // range 下界
   readonly upper?: number | undefined;        // range 上界
+  // b6-S1 结构化可裁决性（加法可选）：旧 run/fixture 无字段照常解析——
+  // "未记录" ≠ "没发生"。新生成路径（discovery 策略 fan-out 的 live 产出）在
+  // zod 层强制给出（AdjudicableFalsificationMethodZod）；KERNEL_ADJUDICATED
+  // 编译门（discovery/adjudication.ts）优先读这两个字段构造 gt/lt 阈值契约，
+  // 字段缺失时回退散文关键词推导（b5 LIVE 实测：散文推不出→诚实拒绝）。
+  readonly direction?: PredictionDirection | undefined;  // 预测方向承诺；'either'=显式无方向承诺（编译门无法构造阈值契约）
+  readonly metricShape?: MetricShape | undefined;        // 预测的度量形状（相关/差值/阈值/比值）
 }
+
+/** 预测方向的结构化枚举（b6-S1）。closed alphabet——不得加值除非迁移裁决。 */
+export const PREDICTION_DIRECTIONS = ['positive', 'negative', 'either'] as const;
+export type PredictionDirection = (typeof PREDICTION_DIRECTIONS)[number];
+
+/** 度量形状的结构化枚举（b6-S1）。编译门当前只认 'correlation'（唯一决断观察族）。 */
+export const METRIC_SHAPES = ['correlation', 'difference', 'threshold', 'ratio'] as const;
+export type MetricShape = (typeof METRIC_SHAPES)[number];
 
 /**
  * CitationAnchor —— 引用文献锚点。

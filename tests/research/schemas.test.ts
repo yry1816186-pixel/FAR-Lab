@@ -18,6 +18,8 @@ import {
   parseResearchRunJson,
   validateResearchRun,
   CitationGateReportZod,
+  FalsificationMethodZod,
+  AdjudicableFalsificationMethodZod,
 } from '../../src/research/schemas.ts';
 import type { ResearchRun } from '../../src/research/types.ts';
 
@@ -141,6 +143,87 @@ describe('CitationGateReportZod', () => {
     const gate = (minimalV3Run() as { citationGate: Record<string, unknown> }).citationGate;
     assert.throws(() => CitationGateReportZod.parse({ ...gate, boundRate: 2 }), /boundRate/);
     assert.throws(() => CitationGateReportZod.parse({ ...gate, gateVerdict: 'MAYBE' }), /gateVerdict/);
+  });
+});
+
+// ── b6-S1: structured adjudicability fields on FalsificationMethod ────────────
+describe('FalsificationMethodZod — structured adjudicability (b6-S1)', () => {
+  const base = { prediction: 'p', metric: 'm', comparator: 'gt', value: 1 };
+
+  it('parses a pre-b6 method with NO adjudicability fields (absent = not recorded)', () => {
+    const out = FalsificationMethodZod.parse(base);
+    assert.equal(out.direction, undefined);
+    assert.equal(out.metricShape, undefined);
+  });
+
+  it('parses and preserves valid structured fields', () => {
+    const out = FalsificationMethodZod.parse({ ...base, direction: 'either', metricShape: 'ratio' });
+    assert.equal(out.direction, 'either');
+    assert.equal(out.metricShape, 'ratio');
+  });
+
+  it('rejects values outside the closed enums (fail-closed)', () => {
+    assert.throws(() => FalsificationMethodZod.parse({ ...base, direction: 'up' }), /direction/);
+    assert.throws(() => FalsificationMethodZod.parse({ ...base, metricShape: 'slope' }), /metricShape/);
+  });
+
+  it('threshold coherence is orthogonal to the new fields (gt without value still rejected)', () => {
+    assert.throws(
+      () => FalsificationMethodZod.parse({ prediction: 'p', metric: 'm', comparator: 'gt', direction: 'positive' }),
+      /value/,
+    );
+  });
+});
+
+describe('AdjudicableFalsificationMethodZod — new-generation contract (b6-S1)', () => {
+  const complete = {
+    prediction: 'p', metric: 'm', comparator: 'gt', value: 1,
+    direction: 'negative', metricShape: 'difference',
+  };
+
+  it('requires direction and metricShape', () => {
+    const { direction: _dropD, ...missingDirection } = complete;
+    void _dropD;
+    const { metricShape: _dropM, ...missingShape } = complete;
+    void _dropM;
+    assert.throws(() => AdjudicableFalsificationMethodZod.parse(missingDirection), /direction/);
+    assert.throws(() => AdjudicableFalsificationMethodZod.parse(missingShape), /metricShape/);
+  });
+
+  it('accepts a complete method and keeps threshold coherence', () => {
+    const out = AdjudicableFalsificationMethodZod.parse(complete);
+    assert.equal(out.direction, 'negative');
+    assert.equal(out.metricShape, 'difference');
+    assert.throws(
+      () => AdjudicableFalsificationMethodZod.parse({ ...complete, comparator: 'range' }),
+      /lower/,
+    );
+  });
+});
+
+describe('ResearchRun boundary round-trip preserves the structured fields (b6-S1)', () => {
+  it('a run whose hypotheses carry direction/metricShape deserializes with them intact', () => {
+    const run = minimalV3Run() as Record<string, unknown>;
+    run.discovery = null;
+    run.schemaVersion = 4;
+    run.hypotheses = [
+      {
+        id: 'h1',
+        statement: 's',
+        mechanism: 'm',
+        falsificationMethod: {
+          prediction: 'p', metric: 'm', comparator: 'lt', value: 0,
+          direction: 'negative', metricShape: 'correlation',
+        },
+        supportingCitations: [], counterEvidenceCitations: [],
+        relationToExistingTheory: 't', alternativeExplanations: [],
+        observablePredictions: [], distinguishingObservations: [],
+        noveltyRelativeToCorpus: 'n', assumptions: [], risks: [],
+      },
+    ];
+    const parsed = validateResearchRun(run);
+    assert.equal(parsed.hypotheses[0]!.falsificationMethod.direction, 'negative');
+    assert.equal(parsed.hypotheses[0]!.falsificationMethod.metricShape, 'correlation');
   });
 });
 

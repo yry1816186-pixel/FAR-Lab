@@ -220,6 +220,8 @@ jobs:
           # 审计 P1-8：science_harness 的 40+ 测试（sandbox/seed_cherry/secret_strip/bls_pipeline/c_astro）
           # 依赖 numpy/lightkurve——缺装则 t.skip() 静默降级，CI 显示 green 但关键路径未真覆盖。
           pip install numpy lightkurve
+      - name: perf_budget timer start (test 墙钟计时原点·b6-S2)
+        run: echo "PERF_TEST_WALL_START_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - name: ensure native + python deps prelude (package.json test 前置三连)
         run: node scripts/ensure_native_deps.mjs && node scripts/ensure_py_deps.mjs && node scripts/python_axis_probe.mjs
       # 分片说明（2026-08-07）：原单步 `pnpm run test`（27 glob 一进程）在 CI 上整体卡死且零输出。
@@ -256,6 +258,19 @@ jobs:
             2>&1 | tail -c 8000
       - name: node --test (agent_loop FSM + N3 反幻觉 + assertTerminated)
         run: pnpm run test:agent_loop
+      # ============================================================
+      # PERF_BUDGET · 性能预算门 v1（b6-S2·08-22 发布列车缺口闭合）
+      # 维度：① CLI 冷启动 ② demo 墙钟 ③ 堆上限下 demo 成功（三者在 job 内实测）
+      #       ④ 本 job 测试链墙钟（上面 timer 原点 → 此处，复用既有 test 步骤计时）。
+      # 方案裁定（弃案已文档化）：弃「独立轻量 job + skip-suite 子集计时」——子集墙钟≠
+      #   全量墙钟，预算盖不住真实退化；跑全量则测试套件 CI 重复执行一遍（时长翻倍）。
+      #   采纳「复用 test 步骤计时」：测的就是真实全量测试链，零重复跑。
+      # 阈值 SSOT=scripts/perf_budget.json（实测 max×倍率·依据与上次实测内嵌）；超阈 →
+      #   exit 1 附实测值。基线实测：CI run 31891802369=117s / 31891193390=120s → 阈值 600s
+      #   （5× 余量，锚定 30min job timeout 之内——退化在此显式红而非被 timeout 不透明杀死）。
+      # ============================================================
+      - name: perf_budget gate (test 墙钟 + CLI 冷启动 + demo 墙钟 + 堆上限)
+        run: node scripts/perf_budget_check.mjs --test-wall-ms "$(( $(date +%s%3N) - PERF_TEST_WALL_START_MS ))"
 
   # ============================================================
   # STEP 6 · test_py（unittest，失败 block 之后全部）

@@ -505,6 +505,8 @@ export interface DiscoveryBlock {
 }
 
 export { FalsificationMethod };
+// b6-S1 结构化可裁决性枚举（SSOT 在 agent_loop/types.ts 的 FalsificationMethod 处）。
+export type { PredictionDirection, MetricShape } from '../agent_loop/types.ts';
 export type { EnvironmentFingerprint, ProvenanceReceipt } from './provenance.ts';
 export type {
   ProblemDecomposition,

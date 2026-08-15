@@ -36,7 +36,13 @@ import type { Observation, ResearchRun, HypothesisCandidate } from '../../src/re
 
 const FIXED_NOW = () => new Date('2026-08-15T12:00:00.000Z');
 
-function candidate(id: string, prediction: string): HypothesisCandidate {
+/** b6-S1 structured adjudicability fields injected into a candidate's falsificationMethod. */
+type StructuredFm = {
+  direction?: 'positive' | 'negative' | 'either';
+  metricShape?: 'correlation' | 'difference' | 'threshold' | 'ratio';
+};
+
+function candidate(id: string, prediction: string, structured: StructuredFm = {}): HypothesisCandidate {
   return {
     id,
     statement: `statement ${id}`,
@@ -46,6 +52,8 @@ function candidate(id: string, prediction: string): HypothesisCandidate {
       metric: 'pearson r',
       comparator: 'gt',
       value: 0,
+      ...(structured.direction !== undefined ? { direction: structured.direction } : {}),
+      ...(structured.metricShape !== undefined ? { metricShape: structured.metricShape } : {}),
     },
     supportingCitations: ['10.1000/demo'],
     counterEvidenceCitations: [],
@@ -180,8 +188,8 @@ function landscapeObservation(): Observation {
   };
 }
 
-function liveRun(prediction: string): ResearchRun {
-  const primary = candidate('h-1', prediction);
+function liveRun(prediction: string, structured: StructuredFm = {}): ResearchRun {
+  const primary = candidate('h-1', prediction, structured);
   return {
     runId: 'run-adj',
     question: 'do hot jupiters inflate with irradiation?',
@@ -546,5 +554,167 @@ describe('runAdjudicationFlow — end-to-end wiring', () => {
     });
     assert.equal(result.decision.status, 'REFUSED');
     assert.equal(result.backflow, null);
+  });
+});
+
+// ── b6-S1: structured adjudicability (direction/metricShape) ──────────────────
+// 优先级契约：结构化字段优先；缺失→散文关键词回退（pre-b6 行为不变）；两通道矛盾
+// → structured_prose_conflict（fail-closed）；显式 'either' → direction_unknown
+// （散文不得推翻显式声明）；非 correlation 形状 → metric_not_covered（不硬凑映射）。
+describe('adjudicateRunObservation — structured adjudicability (b6-S1)', () => {
+  it('structured fields compile with NO prose keywords at all (the b5 deadlock solved)', () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('the coupling ties tidal flux to envelope depth', {
+        direction: 'positive',
+        metricShape: 'correlation',
+      }),
+      observation: exoplanetObservation({ pearsonR: 0.42 }),
+    });
+    assert.equal(out.status, 'COMPILED');
+    assert.equal(out.thresholdSemantics, 'gt');
+    assert.equal(out.evidence!.supportsClaim, true);
+  });
+
+  it('structured negative direction + significant negative r → CONFIRMED (lt honored)', () => {
+    const decision = decideAdjudication(
+      adjudicateRunObservation({
+        run: liveRun('mechanistic prose with no keywords', { direction: 'negative', metricShape: 'correlation' }),
+        observation: exoplanetObservation({ pearsonR: -0.31, significant: true }),
+      }),
+    );
+    assert.equal(decision.status, 'VERDICT');
+    assert.equal(decision.verdict, 'CONFIRMED');
+  });
+
+  it('structured positive direction + significant negative r → REFUTED (declaration is testable)', () => {
+    const decision = decideAdjudication(
+      adjudicateRunObservation({
+        run: liveRun('mechanistic prose with no keywords', { direction: 'positive', metricShape: 'correlation' }),
+        observation: exoplanetObservation({ pearsonR: -0.38, significant: true }),
+      }),
+    );
+    assert.equal(decision.status, 'VERDICT');
+    assert.equal(decision.verdict, 'REFUTED');
+  });
+
+  it("explicit direction='either' → REFUSED direction_unknown even when prose has a direction word", () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('radius increases with insolation', { direction: 'either', metricShape: 'correlation' }),
+      observation: exoplanetObservation(),
+    });
+    assert.equal(out.status, 'REFUSED');
+    assert.equal(out.reason, 'direction_unknown');
+  });
+
+  it('structured direction contradicting derivable prose → REFUSED structured_prose_conflict (positive case)', () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('the association decreases with flux', { direction: 'positive', metricShape: 'correlation' }),
+      observation: exoplanetObservation(),
+    });
+    assert.equal(out.status, 'REFUSED');
+    assert.equal(out.reason, 'structured_prose_conflict');
+  });
+
+  it('structured direction contradicting derivable prose → REFUSED structured_prose_conflict (negative case)', () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('a positive correlation exists', { direction: 'negative', metricShape: 'correlation' }),
+      observation: exoplanetObservation(),
+    });
+    assert.equal(out.status, 'REFUSED');
+    assert.equal(out.reason, 'structured_prose_conflict');
+  });
+
+  it('metricShape=difference while prose claims the correlation family → structured_prose_conflict', () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('the correlation between the pair differs across groups', { direction: 'positive', metricShape: 'difference' }),
+      observation: exoplanetObservation(),
+    });
+    assert.equal(out.status, 'REFUSED');
+    assert.equal(out.reason, 'structured_prose_conflict');
+  });
+
+  it('metricShape=difference with no prose keywords → metric_not_covered (a correlation observation cannot adjudicate it)', () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('the gap between the two groups widens', { direction: 'positive', metricShape: 'difference' }),
+      observation: exoplanetObservation(),
+    });
+    assert.equal(out.status, 'REFUSED');
+    assert.equal(out.reason, 'metric_not_covered');
+  });
+
+  it('metricShape=threshold / ratio → metric_not_covered (not measured by the decisive observation family)', () => {
+    for (const shape of ['threshold', 'ratio'] as const) {
+      const out = adjudicateRunObservation({
+        run: liveRun('mechanistic prose with no keywords', { direction: 'positive', metricShape: shape }),
+        observation: exoplanetObservation(),
+      });
+      assert.equal(out.status, 'REFUSED');
+      assert.equal(out.reason, 'metric_not_covered');
+    }
+  });
+
+  it('fields are independent: direction structured + metricShape via prose fallback compiles', () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('a positive correlation exists', { direction: 'positive' }),
+      observation: exoplanetObservation({ pearsonR: 0.42 }),
+    });
+    assert.equal(out.status, 'COMPILED');
+    assert.equal(out.thresholdSemantics, 'gt');
+  });
+
+  it('fields are independent: metricShape structured + direction via prose fallback compiles', () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('a positive correlation exists', { metricShape: 'correlation' }),
+      observation: exoplanetObservation({ pearsonR: 0.42 }),
+    });
+    assert.equal(out.status, 'COMPILED');
+    assert.equal(out.thresholdSemantics, 'gt');
+  });
+
+  it('structured fields never relax the decisive-observation gate (non-significant still refused)', () => {
+    const out = adjudicateRunObservation({
+      run: liveRun('mechanistic prose with no keywords', { direction: 'positive', metricShape: 'correlation' }),
+      observation: exoplanetObservation({ significant: false, pearsonR: 0.05 }),
+    });
+    assert.equal(out.status, 'REFUSED');
+    assert.equal(out.reason, 'observation_not_decisive');
+  });
+
+  it('tampering the structured direction flips the compiled contract AND breaks the registry match (chain defense)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'far-adjtamper-'));
+    try {
+      // The b5-deadlock shape: prose names the metric family but no direction.
+      const original = liveRun('a correlation exists between radius and insolation');
+      const ledger = join(dir, 'registry.jsonl');
+      registerRunDiscoveries(original, { ledgerPath: ledger, now: FIXED_NOW });
+      assert.equal(
+        adjudicateRunObservation({ run: original, observation: exoplanetObservation() }).reason,
+        'direction_unknown',
+        'pre-b6 prose with no direction word is honestly refused (the b5 LIVE deadlock)',
+      );
+      // Tamper: inject a structured direction the model never declared.
+      const tampered = liveRun('a correlation exists between radius and insolation', {
+        direction: 'negative',
+        metricShape: 'correlation',
+      });
+      // (a) the compile gate itself trusts the (tampered) declaration — it now compiles lt:
+      const compiled = adjudicateRunObservation({ run: tampered, observation: exoplanetObservation({ pearsonR: 0.42 }) });
+      assert.equal(compiled.status, 'COMPILED');
+      assert.equal(compiled.thresholdSemantics, 'lt', 'adjudication is sensitive to the declared direction');
+      // (b) but the registry content-hash chain refuses the tampered hypothesis:
+      const out = recordKernelAdjudication({
+        run: tampered,
+        hypothesisId: 'h-1',
+        observation: exoplanetObservation(),
+        adjudication: { verdict: 'REFUTED', observationId: 'obs-t', adapter: 'exoplanet-archive-radius-insolation', metricValue: -0.2 },
+        ledgerPath: ledger,
+        now: FIXED_NOW,
+      });
+      assert.equal(out.status, 'REFUSED');
+      assert.equal(out.reason, 'not_registered_corroborated');
+      assert.equal(readDiscoveryRegistry(ledger).length, 1, 'no KERNEL_ADJUDICATED line for tampered content');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

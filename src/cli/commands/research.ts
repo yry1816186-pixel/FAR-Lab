@@ -62,6 +62,8 @@ import {
   readDiscoveryRegistry,
   verifyDiscoveryRegistryChain,
   exportDiscoveryRegistry,
+  recordHumanReview,
+  type HumanReviewRefusalReason,
 } from '../../discovery/registry.ts';
 import type { DocumentSource, RetrievalAdapter } from '../../retrieval/types.ts';
 
@@ -1683,6 +1685,8 @@ export function runResearchAdjudicate(args: readonly string[]): number {
       metric_not_covered:
         'the prediction text does not reference the observed correlation metric — the kernel refuses to adjudicate a prediction it cannot measure',
       direction_unknown: 'the prediction states no derivable direction (positive/negative) — the threshold contract is unknown',
+      structured_prose_conflict:
+        'the structured direction/metricShape field contradicts the prediction prose — the kernel never silently picks a channel (fail-closed)',
       no_finite_statistic: 'the observation reports no finite statistic',
     };
     const why = reason !== undefined ? (explanations[reason] ?? reason) : 'unknown';
@@ -1742,6 +1746,219 @@ export function runResearchAdjudicate(args: readonly string[]): number {
         `  memory     : ${result.memoryRefutedBranches > 0 ? `${result.memoryRefutedBranches} branch(es) invalidated (kernel_refuted)` : result.memoryRefutedBranches === -1 ? 'REFUTED but memory store unavailable (registry line stands)' : 'no memory change'}\n` +
         `  history    : ${readAdjudicationLog(file).length} verdict(s) in ${dirname(file)}/adjudications.json\n` +
         '  note       : this adjudicates the falsifiable PREDICTION projection, not the full mechanism (§2.4 cannot-prove).\n',
+    );
+  }
+  return 0;
+}
+
+/**
+ * Run `far research review <run.json> --hypothesis <id> --to NOVEL_VALIDATED --human-review-ref <ref> [--reviewer <name>] [--ledger <path>] [--json]`
+ * (REDISCOVERY variant: `--to REDISCOVERY --matching-literature <DOI/citation>`).
+ *
+ * Human-review entry point for the ladder's top two rungs (§2.4): the tool
+ * RECORDS the review + chains it into the ledger; it never judges the review's
+ * content (human responsibility). The shared ConjectureState machine is the
+ * gate: skip-level promotions are refused with the legal path printed.
+ * Exit codes: 0 appended (or idempotent duplicate) - 2 usage - 3 refused
+ * (typed reason — never a fake promotion) - 1 error.
+ */
+export function runResearchReview(args: readonly string[]): number {
+  // Flag values are consumed positionally during the scan; the run file is the
+  // first UNCONSUMED positional (a `--to NOVEL_VALIDATED` value must never be
+  // mistaken for <run.json>).
+  let hypothesisId: string | undefined;
+  let toState: string | undefined;
+  let humanReviewRef: string | undefined;
+  let matchingLiterature: string | undefined;
+  let reviewer: string | undefined;
+  let ledgerPath: string | undefined;
+  let json = false;
+  const positional: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === '--hypothesis') {
+      hypothesisId = args[++i];
+      if (hypothesisId === undefined || hypothesisId === '') {
+        process.stderr.write('far research review: --hypothesis needs an id\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--to') {
+      toState = args[++i];
+      if (toState === undefined || toState === '') {
+        process.stderr.write('far research review: --to needs a state\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--human-review-ref') {
+      humanReviewRef = args[++i];
+      if (humanReviewRef === undefined || humanReviewRef === '') {
+        process.stderr.write('far research review: --human-review-ref needs a reference\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--matching-literature') {
+      matchingLiterature = args[++i];
+      if (matchingLiterature === undefined || matchingLiterature === '') {
+        process.stderr.write('far research review: --matching-literature needs a DOI or citation pointer\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--reviewer') {
+      reviewer = args[++i];
+      if (reviewer === undefined || reviewer === '') {
+        process.stderr.write('far research review: --reviewer needs a name\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--ledger') {
+      ledgerPath = args[++i];
+      if (ledgerPath === undefined || ledgerPath === '') {
+        process.stderr.write('far research review: --ledger needs a path\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--json') {
+      json = true;
+      continue;
+    }
+    if (a !== undefined && a.startsWith('--')) {
+      process.stderr.write(`far research review: unknown argument "${a}"\n`);
+      return 2;
+    }
+    if (a !== undefined) {
+      positional.push(a);
+    }
+  }
+  const file = positional[0];
+  if (file === undefined) {
+    process.stderr.write(
+      'far research review: missing <run.json>.\n' +
+        '  usage: far research review <run.json> --hypothesis <id> --to NOVEL_VALIDATED --human-review-ref <ref> [--reviewer <name>] [--ledger <path>] [--json]\n' +
+        '         far research review <run.json> --hypothesis <id> --to REDISCOVERY --matching-literature <DOI-or-citation> [--reviewer <name>] [--ledger <path>] [--json]\n',
+    );
+    return 2;
+  }
+  if (hypothesisId === undefined) {
+    process.stderr.write('far research review: --hypothesis <id> is required (explicit target — a review is a human act).\n');
+    return 2;
+  }
+  if (toState === undefined) {
+    process.stderr.write('far research review: --to <state> is required (NOVEL_VALIDATED or REDISCOVERY).\n');
+    return 2;
+  }
+  if (toState !== 'NOVEL_VALIDATED' && toState !== 'REDISCOVERY') {
+    process.stderr.write(
+      `far research review: --to must be NOVEL_VALIDATED (needs --human-review-ref) or REDISCOVERY (needs --matching-literature), got "${toState}"\n`,
+    );
+    return 2;
+  }
+  if (toState === 'NOVEL_VALIDATED' && humanReviewRef === undefined) {
+    process.stderr.write(
+      'far research review: --to NOVEL_VALIDATED requires --human-review-ref <ref> (AI-generated findings never self-certify — §2.4).\n',
+    );
+    return 2;
+  }
+  if (toState === 'REDISCOVERY' && matchingLiterature === undefined) {
+    process.stderr.write(
+      'far research review: --to REDISCOVERY requires --matching-literature <DOI-or-citation> (the matching work must be named).\n',
+    );
+    return 2;
+  }
+
+  let run: ResearchRun;
+  try {
+    run = parseResearchRunJson(readFileSync(file, 'utf8'));
+  } catch (err) {
+    process.stderr.write(
+      `far research review: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return 1;
+  }
+
+  let outcome;
+  try {
+    outcome = recordHumanReview({
+      run,
+      hypothesisId,
+      toState,
+      ...(humanReviewRef !== undefined ? { humanReviewRef } : {}),
+      ...(matchingLiterature !== undefined ? { matchingLiterature } : {}),
+      ...(reviewer !== undefined ? { reviewer } : {}),
+      ...(ledgerPath !== undefined ? { ledgerPath } : {}),
+    });
+  } catch (err) {
+    process.stderr.write(
+      `far research review: failed — ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return 1;
+  }
+
+  const ledger = ledgerPath ?? DEFAULT_DISCOVERY_REGISTRY_PATH;
+  if (outcome.status === 'REFUSED') {
+    const explanations: Record<HumanReviewRefusalReason, string> = {
+      hypothesis_not_in_run: `hypothesis ${hypothesisId} is not in run ${run.runId}`,
+      not_registered:
+        'no registry line for this content — the ladder never promotes unregistered content (run the source run live, or check --ledger path)',
+      illegal_transition: outcome.detail ?? 'illegal ladder transition',
+    };
+    process.stderr.write(
+      `far research review: REFUSED — ${explanations[outcome.reason ?? 'illegal_transition']}\n` +
+        '  (refusal is the honest outcome; no line was appended)\n',
+    );
+    return 3;
+  }
+
+  const chain = verifyDiscoveryRegistryChain(readDiscoveryRegistry(ledger));
+  if (!chain.valid) {
+    process.stderr.write(
+      `far research review: ledger chain BROKEN after append (record ${chain.firstBrokenIndex}: ${chain.reason}) — investigate immediately.\n`,
+    );
+    return 1;
+  }
+
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          hypothesisId,
+          status: outcome.status,
+          fromState: outcome.fromState ?? null,
+          toState,
+          ...(humanReviewRef !== undefined ? { humanReviewRef } : {}),
+          ...(matchingLiterature !== undefined ? { matchingLiterature } : {}),
+          ...(reviewer !== undefined ? { reviewer } : {}),
+          registryId: outcome.appendedRecord?.registryId ?? null,
+          chainValid: chain.valid,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    return 0;
+  }
+
+  const duplicate = outcome.status === 'SKIPPED_DUPLICATE';
+  process.stdout.write(
+    `far research review: ${duplicate ? 'SKIPPED_DUPLICATE (already present — idempotent, no line appended)' : `state_transition ${outcome.fromState} → ${toState} appended (${outcome.appendedRecord?.registryId ?? 'n/a'})`}\n` +
+      `  hypothesis : ${hypothesisId} (run ${run.runId})\n` +
+      `  ledger     : ${ledger} · chain VERIFIED\n` +
+      (humanReviewRef !== undefined ? `  review ref : ${humanReviewRef}${reviewer !== undefined ? ` · reviewer=${reviewer}` : ''}\n` : '') +
+      (matchingLiterature !== undefined ? `  literature : ${matchingLiterature}\n` : '') +
+      '  note       : the tool records the review reference; it does NOT verify the review\'s content (human responsibility — §2.4).\n',
+  );
+  if (toState === 'NOVEL_VALIDATED' && !duplicate) {
+    process.stdout.write(
+      '  disclosure checklist — an EXTERNAL claim of a NOVEL_* finding requires ALL three (missing any one forbids the claim):\n' +
+        '    1. leakage assessment conclusion (contamination / memorization check on record)\n' +
+        '    2. human review record (this line\'s humanReviewRef)\n' +
+        '    3. prominent AI-generated labeling (model / version / prompt-chain provenance)\n',
     );
   }
   return 0;

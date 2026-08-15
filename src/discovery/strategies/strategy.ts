@@ -18,7 +18,7 @@
 import { z } from 'zod';
 import type { LlmMessage } from '../../llm_gateway/types.ts';
 import type { CorpusSnapshot } from '../../retrieval/corpus.ts';
-import { CandidateZod } from '../../research/schemas.ts';
+import { AdjudicableCandidateZod, CandidateZod } from '../../research/schemas.ts';
 import type { StrategyId } from '../types.ts';
 
 /** Input handed to a strategy's message builder. */
@@ -77,10 +77,28 @@ export interface StrategyDefinition {
   readonly instruction: string;
 }
 
-/** Build the per-strategy response schema (same candidate contract as the legacy generator). */
-export function buildStrategySchema(maxPerCall: number) {
+/** Options for the per-strategy response schema (b6-S1 structured adjudicability). */
+export interface StrategySchemaOptions {
+  /**
+   * Require the structured adjudicability fields (`direction` / `metricShape`)
+   * on every falsificationMethod — the NEW-GENERATION contract: a live model
+   * omitting them fails structured validation and enters the existing
+   * two-attempt repair path. Default false keeps the fields OPTIONAL so
+   * pre-b6 recorded replays and legacy fixtures parse byte-stably
+   * ("not recorded" is never "did not happen").
+   */
+  readonly requireAdjudicability?: boolean;
+}
+
+/**
+ * Build the per-strategy response schema (same candidate contract as the
+ * legacy generator; `requireAdjudicability: true` tightens the falsification
+ * method to the b6-S1 structured-adjudicability contract).
+ */
+export function buildStrategySchema(maxPerCall: number, opts: StrategySchemaOptions = {}) {
+  const candidate = opts.requireAdjudicability === true ? AdjudicableCandidateZod : CandidateZod;
   return z.object({
-    hypotheses: z.array(CandidateZod).min(1).max(maxPerCall),
+    hypotheses: z.array(candidate).min(1).max(maxPerCall),
   });
 }
 
@@ -100,6 +118,25 @@ const SHARED_RULES = [
   'Output a JSON object with a single "hypotheses" array. Do NOT wrap in markdown fences.',
 ].join('\n');
 
+/**
+ * b6-S1 structured-adjudicability instruction (strategy path only — appended
+ * AFTER SHARED_RULES so the shared block stays textually aligned with the
+ * legacy generator). Tells the model the two structured contract fields the
+ * new-generation schema requires; the strategy SIGNATURE deliberately does
+ * not change for this (it names the cognitive operation; the contract
+ * version is self-described by the emitted fields — see the b6-S1 ruling).
+ */
+const ADJUDICABILITY_RULES = [
+  'STRUCTURED ADJUDICABILITY (required on every falsificationMethod):',
+  '  - "direction": "positive" | "negative" | "either" — the direction the prediction',
+  '    commits to ("either" = an honest no-direction commitment).',
+  '  - "metricShape": "correlation" | "difference" | "threshold" | "ratio" — the shape',
+  '    of the measurement the prediction is stated in.',
+  'These two fields let the verdict kernel compile your prediction into a threshold',
+  'contract without guessing from prose. A falsificationMethod missing either field',
+  'is invalid and will be rejected.',
+].join('\n');
+
 /** Assemble the full system prompt: strategy identity + epistemic instruction + shared rules. */
 export function buildStrategySystemPrompt(strategy: StrategyDefinition, perCallTarget: number): string {
   return [
@@ -114,6 +151,8 @@ export function buildStrategySystemPrompt(strategy: StrategyDefinition, perCallT
     'MECHANISTICALLY DISTINCT (different causal mechanisms — NOT paraphrases of each other).',
     '',
     SHARED_RULES,
+    '',
+    ADJUDICABILITY_RULES,
   ].join('\n');
 }
 
