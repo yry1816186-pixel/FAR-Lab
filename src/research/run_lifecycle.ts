@@ -72,6 +72,8 @@ export interface RunCheckpoint {
   readonly hypothesisGenerationStrategy?: 'legacy' | 'multi_strategy';
   /** Strategy subset for multi_strategy runs (absent = all registered). */
   readonly discoveryStrategies?: readonly StrategyId[];
+  /** Source-failure policy (absent = 'reject'); persisted for resume-stability. */
+  readonly onSourceFailure?: 'reject' | 'degrade';
   readonly state: ResearchLifecycleState;
   readonly completedStages: readonly ResearchStageId[];
   readonly ctx: Record<string, unknown>;
@@ -330,6 +332,9 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
         ? { hypothesisGenerationStrategy: args.hypothesisGenerationStrategy }
         : {}),
       ...(args.discoveryStrategies !== undefined ? { discoveryStrategies: args.discoveryStrategies } : {}),
+      ...(args.grounding?.onSourceFailure !== undefined
+        ? { onSourceFailure: args.grounding.onSourceFailure }
+        : {}),
       state: 'CREATED',
       completedStages: [],
       ctx: {},
@@ -429,6 +434,7 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
     const grounding: ResearchGroundingOptions = {
       ...sourcePart,
       maxPerQuery: cp.maxPerQuery,
+      ...(cp.onSourceFailure !== undefined ? { onSourceFailure: cp.onSourceFailure } : {}),
       ...(args.grounding?.adapter !== undefined ? { adapter: args.grounding.adapter } : {}),
     };
 

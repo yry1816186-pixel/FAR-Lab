@@ -24,14 +24,21 @@
  *
  * Honesty:
  *   - retrievedAt is the real time of the live fetch (or the fixture's time on
- *     replay) — never fabricated.
- *   - if a retrieval call fails (network/timeout), it FAILS CLOSED: the whole
- *     grounding rejects (the caller must not silently get a partial corpus
- *     masquerading as complete). A per-query soft-fail option is intentionally
- *     NOT provided — partial corpora that omit failed sources would let a
- *     hypothesis look "grounded" while missing the evidence that refutes it.
+ *     replay; or the ORIGINAL fetch time on a persistent-cache hit) — never
+ *     fabricated.
+ *   - DEFAULT: if a retrieval call fails (network/timeout/429-after-retries),
+ *     it FAILS CLOSED: the whole grounding rejects (the caller must not
+ *     silently get a partial corpus masquerading as complete).
+ *   - OPT-IN DEGRADATION (onSourceFailure: 'degrade', directive §7
+ *     --degrade-on-source-failure): a failed source family is DROPPED WITH A
+ *     RECEIPT — failedSources records which source failed and why, the corpus
+ *     honestly shrinks, and a run where EVERY source failed still rejects
+ *     (degradation is visible, never silent, and never total).
  *   - fetchMode: 'live' (real fetch) or 'replay' (injected adapter served
  *     fixtures). Surfaced so a caller never mistakes a replay for a live ground.
+ *   - cacheHits: how many documents were replayed from the persistent
+ *     retrieval cache (each carries retrievedFrom:'cache' + the original
+ *     retrievedAt — snapshot ids stay stable across runs).
  */
 import { createCorpusSnapshot, type CorpusSnapshot } from './corpus.ts';
 import { CitationResolver } from './citation_resolver.ts';
@@ -72,6 +79,14 @@ export interface GroundingOptions {
    * subquestions, §9.2→§9.3). Each is a bounded additional snapshot query.
    */
   readonly extraQueries?: readonly string[];
+  /**
+   * Behavior when a source family fails mid-grounding (directive §7
+   * --degrade-on-source-failure). DEFAULT 'reject': fail closed (the whole
+   * grounding rejects — no partial corpus masquerading as complete).
+   * 'degrade': drop the failed source WITH A RECEIPT (failedSources), keep
+   * grounding on the surviving families; if every family fails, still reject.
+   */
+  readonly onSourceFailure?: 'reject' | 'degrade';
 }
 
 /** The result of grounding a research question. */
@@ -92,6 +107,10 @@ export interface GroundedCorpus {
   }>;
   /** The source families actually used. */
   readonly sourcesUsed: readonly string[];
+  /** Source families that failed and were dropped (degrade mode only; visible, never silent). */
+  readonly failedSources?: ReadonlyArray<{ readonly source: string; readonly error: string }>;
+  /** Documents replayed from the persistent retrieval cache (honest accounting). */
+  readonly cacheHits?: number;
   /** 'live' = real network fetch; 'replay' = injected adapter served fixtures. */
   readonly fetchMode: 'live' | 'replay';
   /** ISO timestamp the grounding was performed. */
@@ -136,16 +155,30 @@ export async function groundResearchQuestion(opts: GroundingOptions): Promise<Gr
   const perQueryCounts: { query: string; source: string; count: number }[] = [];
   const allDocs: RetrievedDocument[] = [];
   let anyReplay = injected !== undefined;
+  const degrade = opts.onSourceFailure === 'degrade';
+  const sourceFailures = new Map<string, string>();
 
-  /** Issue one query against every source family (fail-closed on any error). */
+  /**
+   * Issue one query against every source family. DEFAULT fail-closed on any
+   * error; degrade mode drops the failed family with a receipt and continues
+   * on the survivors (total failure still rejects — see below).
+   */
   const runQuery = async (text: string): Promise<void> => {
     for (const source of sources) {
       const { adapter, fetchMode } = adapterFor(source, injected, opts.adapters);
       if (fetchMode === 'replay') anyReplay = true;
       const query: RetrievalQuery = { text, maxResults: maxPerQuery, source };
-      const docs = await adapter.retrieve(query);
+      const label = `${source}${fetchMode === 'replay' ? ':replay' : ''}`;
+      let docs: readonly RetrievedDocument[];
+      try {
+        docs = await adapter.retrieve(query);
+      } catch (err) {
+        if (!degrade) throw err;
+        sourceFailures.set(label, err instanceof Error ? err.message : String(err));
+        continue;
+      }
       allDocs.push(...docs);
-      perQueryCounts.push({ query: text, source: `${source}${fetchMode === 'replay' ? ':replay' : ''}`, count: docs.length });
+      perQueryCounts.push({ query: text, source: label, count: docs.length });
     }
   };
 
@@ -172,6 +205,18 @@ export async function groundResearchQuestion(opts: GroundingOptions): Promise<Gr
     ...counterQueries.map((c) => c.text),
     ...extraQueries,
   ];
+
+  // Degradation is never TOTAL: a corpus with zero documents cannot ground
+  // anything — if every family failed, reject with the accumulated reasons.
+  if (allDocs.length === 0 && sourceFailures.size > 0) {
+    const reasons = [...sourceFailures.entries()]
+      .map(([source, error]) => `${source}: ${error}`)
+      .join('; ');
+    throw new Error(
+      `grounding degraded but every source family failed — no corpus can be built (${reasons})`,
+    );
+  }
+
   const corpus = createCorpusSnapshot(allDocs, sourceQueries);
   const resolver = new CitationResolver(corpus);
 
@@ -184,6 +229,15 @@ export async function groundResearchQuestion(opts: GroundingOptions): Promise<Gr
     counterEvidenceQueries: counterQueries,
     perQueryCounts,
     sourcesUsed,
+    ...(sourceFailures.size > 0
+      ? {
+          failedSources: [...sourceFailures.entries()].map(([source, error]) => ({
+            source,
+            error,
+          })),
+        }
+      : {}),
+    cacheHits: allDocs.filter((d) => d.retrievedFrom === 'cache').length,
     fetchMode: anyReplay ? 'replay' : 'live',
     groundedAt,
   };

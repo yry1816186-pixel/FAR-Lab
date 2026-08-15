@@ -58,6 +58,12 @@ export interface RetrievedDocument {
   readonly publicationDate: string | null;
   /** ISO timestamp when FAR-Lab retrieved this document. */
   readonly retrievedAt: string;
+  /**
+   * 'cache' when this document was replayed from the persistent retrieval
+   * cache (retrievedAt = the ORIGINAL fetch time; rawHash stable). Absent =
+   * fresh live fetch (additive optional — pre-cache documents simply lack it).
+   */
+  readonly retrievedFrom?: 'cache' | undefined;
   /** The query string that produced this hit. */
   readonly retrievalQuery: string;
   /** Method tag (e.g. "openalex-rest", "arxiv-api-atom", "crossref-rest"). */
