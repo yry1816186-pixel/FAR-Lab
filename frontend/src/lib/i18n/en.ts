@@ -123,7 +123,7 @@ export const en: Record<MessageKey, string> = {
   'about.stackTitle': 'Built on',
   'about.stackBody': 'React + TypeScript + Fastify + SQLite, an append-only hash-chain evidence log, and Merkle integrity proofs — portable .far-proof artifacts a third party can recompute.',
   'about.honestyTitle': 'Honesty statement',
-  'about.honestyBody': 'This deployment runs in offline replay mode (no external LLM calls). Verdicts come from the deterministic kernel against offline reference data — they demonstrate the framework, not real model performance. Real research runs require connecting a provider behind a credential gate.',
+  'about.honestyBody': 'Without a provider key, LLM-dependent actions are disabled (fail-closed) — never silently replaced by pre-baked output. Everything that still runs (deterministic kernel, benchmark, tamper detection, proof verification) is real computation on real code paths. Real research runs require connecting a provider behind a credential gate.',
 
   // ---- HonestyWallPage ----
   'honesty.title': 'Honesty Wall',
@@ -329,7 +329,7 @@ export const en: Record<MessageKey, string> = {
   'court.title': 'Cross-Model Reliability Court',
   'court.subtitle': 'Cross-Model Reliability Court · FI-3',
   'court.subtitle2': 'Cross-Model Reliability Court · run the same claim across models, detect agreement/disagreement, issue a ReliabilityCertificate',
-  'court.loading': 'Running the cross-model court (offline_replay, 3 models)…',
+  'court.loading': 'Running the cross-model court…',
   'court.errorTitle': 'Court session failed',
   'court.agreementTitle': 'Agreement verdict',
   'court.claim': 'claim: {claim}',
@@ -368,14 +368,14 @@ export const en: Record<MessageKey, string> = {
   // ---- LLM status banner (WS-B.2 · shared across Wizard / Court / Arena) ----
   'llm.status.liveTitle': 'Live mode — real inference',
   'llm.status.liveBody': 'A DASHSCOPE_API_KEY is configured. Your claims are sent to a real language model; the verdict depends on your input.',
-  'llm.status.offlineTitle': 'Offline replay mode',
-  'llm.status.offlineBody': 'No DASHSCOPE_API_KEY configured. Every claim runs against a fixed replay fixture, so the verdict will be the same regardless of input. Set the key in the server environment to enable live inference.',
+  'llm.status.offlineTitle': 'Live inference unavailable',
+  'llm.status.offlineBody': 'No DASHSCOPE_API_KEY configured. LLM-dependent actions are disabled (fail-closed) — FAR-Lab never serves pre-baked answers. Set the key in the server environment to enable live inference.',
 
   // ---- ArenaPage ----
   'arena.title': 'Adversarial Science Arena',
   'arena.subtitle': 'Adversarial Science Arena · W3 / FI-2',
   'arena.subtitle2': 'Adversarial Science Arena · proponent verdict + N refuter rebuttals + deterministic arbiter judges landings',
-  'arena.loading': 'Running the adversarial arena (offline_replay proponent + 3 refuters)…',
+  'arena.loading': 'Running the adversarial arena…',
   'arena.errorTitle': 'Arena session failed',
   'arena.verdictTitle': 'Arena verdict',
   'arena.hypothesis': 'hypothesis: {h}',

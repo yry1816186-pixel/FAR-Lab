@@ -13,7 +13,7 @@
       "threshold_ms": 1000,
       "command": "node src/cli/far.ts --help",
       "runs": 3,
-      "rationale": "基线实测（2026-08-15 本地 Win11）4 样本 331.5-368.4ms，max 368.4 × 3 余量 = 1105.2 → 向上取整 1200ms。CLI 冷启动超此量级 = 模块加载面/依赖图退化（竞赛演示第一印象直接受损）。",
+      "rationale": "基线实测（2026-08-15 本地 Win11）4 样本 331.5-368.4ms，max 368.4 × 3 余量 = 1105.2 → 向上取整 1200ms。CLI 冷启动超此量级 = 模块加载面/依赖图退化（演示第一印象直接受损）。",
       "last_measured": {
         "aggregate": "max",
         "samples_ms": [

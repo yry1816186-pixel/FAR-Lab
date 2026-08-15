@@ -21,6 +21,9 @@ import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 
 import { buildServer } from '../../src/api/server.ts';
+// 显式离线回放网关（测试接线 opt-in——服务层默认已 fail-closed，回放仅测试可达）
+import { createLlmGateway } from '../../src/llm_gateway/gateway.ts';
+import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offline_replay/client.ts';
 
 function openDb(): Database.Database {
   const db = new Database(':memory:');
@@ -37,6 +40,8 @@ async function withServer<T>(
     db,
     gitCommitSha: 'a'.repeat(40),
     jwtSecret: null,
+    gateway: createLlmGateway([createOfflineReplayAdapter({ modelId: 'hypothesize-test' })]),
+    profile: 'offline_replay',
     logger: false,
   });
   try {
@@ -242,6 +247,8 @@ test('POST /api/v1/hypothesize 幂等：pending 状态 → 409 IDEMPOTENCY_PENDI
     db,
     gitCommitSha: 'a'.repeat(40),
     jwtSecret: null,
+    gateway: createLlmGateway([createOfflineReplayAdapter({ modelId: 'hypothesize-test' })]),
+    profile: 'offline_replay',
     logger: false,
   });
   try {

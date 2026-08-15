@@ -88,7 +88,7 @@ export async function runApi(argv: readonly string[]): Promise<number> {
   const isLoopback = args.host === '127.0.0.1' || args.host === 'localhost' || args.host === '::1';
   if (!isLoopback && args.jwtSecret === null) {
     throw new Error(
-      `far api: refusing to start in anonymous (demo) mode on non-loopback host "${args.host}". ` +
+      `far api: refusing to start in anonymous (open) mode on non-loopback host "${args.host}". ` +
         `Anonymous mode allows unauthenticated writes to the trust ledger (POST /hypothesize). ` +
         `Bind to 127.0.0.1 (default), or set --protected with FAR_JWT_SECRET to require JWT auth.`,
     );
@@ -99,7 +99,7 @@ export async function runApi(argv: readonly string[]): Promise<number> {
   }
   const gitCommitSha = resolveGitCommitSha();
   // WS-A.1：运行期解析真实 LLM 网关（FAR_DASHSCOPE_API_KEY/DASHSCOPE_API_KEY 存在 →
-  // competition_aliyun_qwen 真实推理；否则 null → server 内 offline_replay 诚实降级）。
+  // competition_aliyun_qwen 真实推理；否则 null → server 内 LLM 端点 503 fail-closed（无静默回放）。
   // 模型中立：解析在 llm_gateway 层（本文件无 Qwen/DashScope 字面量）。
   const runtimeGateway = resolveRuntimeGateway(process.env);
   const app = await startServer(
@@ -108,8 +108,8 @@ export async function runApi(argv: readonly string[]): Promise<number> {
     args.host,
   );
   const base = `http://localhost:${args.port}`;
-  const mode = args.jwtSecret === null ? 'offline (anonymous · demo)' : 'protected (jwt)';
-  const llm = runtimeGateway === null ? 'offline_replay (fixture·zero-key)' : 'competition_aliyun_qwen (real HTTP·billing applies)';
+  const mode = args.jwtSecret === null ? 'open (anonymous)' : 'protected (jwt)';
+  const llm = runtimeGateway === null ? 'not configured (LLM endpoints fail closed 503)' : 'competition_aliyun_qwen (real HTTP·billing applies)';
   process.stderr.write(
     [
       '',

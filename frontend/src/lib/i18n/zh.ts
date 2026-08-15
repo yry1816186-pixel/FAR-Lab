@@ -123,7 +123,7 @@ export const zh = {
   'about.stackTitle': '技术栈',
   'about.stackBody': 'React + TypeScript + Fastify + SQLite、追加式哈希链证据日志、以及 Merkle 完整性证明——第三方可独立复算的 .far-proof 便携制品。',
   'about.honestyTitle': '诚实声明',
-  'about.honestyBody': '本部署以离线回放模式运行(无外部 LLM 调用)。裁决由确定性内核针对离线参考数据给出——它们展示的是框架能力,而非真实模型性能。真实研究运行须在凭据门后接入 provider。',
+  'about.honestyBody': '未配置 provider key 时，依赖 LLM 的操作被禁用（fail-closed）——绝不静默替换为预制输出。仍可运行的一切（确定性内核、基准测试、篡改检测、证明验证）都是真实代码路径上的真实计算。真实科研运行需在凭据门后接入 provider。',
 
   // ---- HonestyWallPage ----
   'honesty.title': '诚信墙',
@@ -329,7 +329,7 @@ export const zh = {
   'court.title': '跨模型可靠性法庭',
   'court.subtitle': 'Cross-Model Reliability Court · FI-3',
   'court.subtitle2': 'Cross-Model Reliability Court · 同一 claim 跑多模型，检测一致/分歧，颁发 ReliabilityCertificate',
-  'court.loading': '正在运行跨模型法庭（offline_replay 3 模型）…',
+  'court.loading': '正在运行跨模型法庭…',
   'court.errorTitle': '法庭会话失败',
   'court.agreementTitle': '一致性裁决',
   'court.claim': 'claim：{claim}',
@@ -368,8 +368,8 @@ export const zh = {
   // ---- LLM status banner (WS-B.2 · Wizard / Court / Arena 共享) ----
   'llm.status.liveTitle': '实时模式——真实推理',
   'llm.status.liveBody': '已配置 DASHSCOPE_API_KEY。您的声明会发送到真实语言模型；裁决取决于您的输入。',
-  'llm.status.offlineTitle': '离线回放模式',
-  'llm.status.offlineBody': '未配置 DASHSCOPE_API_KEY。每个声明都跑固定的回放 fixture，因此无论输入什么裁决都相同。在服务器环境中设置该 key 以启用实时推理。',
+  'llm.status.offlineTitle': '实时推理不可用',
+  'llm.status.offlineBody': '未配置 DASHSCOPE_API_KEY。依赖 LLM 的操作已禁用（fail-closed）——FAR-Lab 绝不输出预制的罐头答案。在服务器环境中设置该 key 以启用实时推理。',
 
   // ---- ArenaPage ----
   'arena.title': '对抗科学竞技场',

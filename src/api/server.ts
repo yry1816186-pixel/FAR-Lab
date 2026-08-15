@@ -87,7 +87,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     resolvedGateway === null ? undefined : (config.profile ?? RUNTIME_PROVIDER_PROFILE);
   const llm = resolvedGateway === null ? undefined : resolvedGateway;
   const keyConfigured = llm !== undefined;
-  console.warn(`[far-lab] LLM profile: ${keyConfigured ? String(llmProfile) : 'offline_replay'} (key: ${keyConfigured ? 'configured' : 'absent — running offline replay'})`);
+  console.warn(`[far-lab] LLM profile: ${keyConfigured ? String(llmProfile) : 'not configured (LLM-dependent endpoints fail closed — deterministic endpoints remain available)'}`);
   const app = Fastify({
     // P2-A（LP-4）：可观测默认 on——logger 缺省 true（旧默认 false 让观测面静默）。
     // 测试可显式传 logger:false 保持安静；Fastify 默认不记录请求头/Authorization（无密钥泄漏面）。
@@ -204,8 +204,9 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
       ...(llmProfile === undefined ? {} : { profile: llmProfile }),
     });
     // WS-A.1：/llm-status 暴露运行期 LLM 状态给前端（profile + keyConfigured·不泄漏 key）。
+    // 无 key 时 profile=null（诚实：LLM 端点 fail-closed，无静默回放兜底）。
     v1.get('/llm-status', () => ({
-      profile: keyConfigured ? String(llmProfile) : 'offline_replay',
+      profile: keyConfigured ? String(llmProfile) : null,
       keyConfigured,
     }));
     // 规划门禁方法论源代码化：确定性门禁引擎 HTTP 层（P0-P4 分级 / Plan/Spec 校验 / 门禁报告）

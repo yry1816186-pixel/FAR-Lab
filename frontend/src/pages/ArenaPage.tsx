@@ -1,16 +1,16 @@
 /**
  * ArenaPage —— 对抗科学竞技场可视化（W3 / FI-2）。
  *
- * 端点：GET /api/v1/arena/demo（参考 fixture）+ POST /api/v1/arena（WS-A.3 live）。
+ * 端点：POST /api/v1/arena（WS-A.3 live·真实 provider 对抗）。
  * 四组件：LiveSessionForm（WS-B.2）+ RobustHero + RefuterScoreboard + HonestyAlert。
  *
- * 诚实定位（红线）：demo 用 offline_replay（同 fixture→robust）。live 表单：DASHSCOPE_API_KEY
- * 配置时走真实 provider（datasetSource=real），否则诚实降级 offline replay。arbiter 是确定性规则
- * （verdict 分歧检测），非 LLM 仲裁。
+ * 诚实定位（红线）：无预制罐头结果——页面只展示真实跑出来的 session。DASHSCOPE_API_KEY
+ * 未配置时服务端 503 fail-closed，表单同步禁用并给出指引（绝不回放 fixture 冒充对抗）。
+ * arbiter 是确定性规则（verdict 分歧检测），非 LLM 仲裁。
  */
 
 import { useState } from 'react';
-import { useArenaDemo, useArenaLive, useLlmStatus } from '@/lib/api_client';
+import { useArenaLive, useLlmStatus } from '@/lib/api_client';
 import type { ArenaResultDto } from '@/lib/types';
 import { useT } from '@/lib/i18n';
 import type { VerdictValue } from '@/lib/types';
@@ -29,7 +29,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Swords, ShieldCheck, ShieldAlert, Swords as SwordIcon, Zap } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 
 const FIVE_VERDICTS = new Set<string>([
   'CONFIRMED',
@@ -139,7 +138,6 @@ function ArenaResultDisplay({ result }: { readonly result: ArenaResultDto }) {
 
 export default function ArenaPage() {
   const t = useT();
-  const { data: demoResult, isLoading, isError, error } = useArenaDemo();
   const { data: llmStatus } = useLlmStatus();
   const arenaLive = useArenaLive();
 
@@ -209,9 +207,18 @@ export default function ArenaPage() {
               data-testid="arena-live-refuters-input"
             />
           </div>
-          <Button onClick={handleLiveRun} disabled={arenaLive.isPending || liveHypothesis.trim().length === 0} data-testid="arena-live-run">
+          <Button
+            onClick={handleLiveRun}
+            disabled={arenaLive.isPending || !isLiveMode || liveHypothesis.trim().length === 0}
+            data-testid="arena-live-run"
+          >
             {arenaLive.isPending ? t('arena.live.running') : t('arena.live.run')}
           </Button>
+          {!isLiveMode ? (
+            <p className="text-sm text-muted-foreground" data-testid="arena-live-disabled-hint">
+              {t('llm.status.offlineBody')}
+            </p>
+          ) : null}
           {arenaLive.isError ? (
             <Alert variant="destructive">
               <AlertDescription>
@@ -227,24 +234,6 @@ export default function ArenaPage() {
           <ArenaResultDisplay result={arenaLive.data} />
         </div>
       ) : null}
-
-      {isLoading ? (
-        <div className="space-y-4" data-testid="arena-loading-skeleton">
-          <Skeleton className="h-28 w-full rounded-lg" />
-          <Skeleton className="h-64 w-full rounded-lg" />
-        </div>
-      ) : isError || demoResult === undefined ? (
-        <Alert variant="destructive">
-          <AlertTitle>{t('arena.errorTitle')}</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error ? error.message : t('arena.noVerdict')}
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <div data-testid="arena-demo-reference">
-          <ArenaResultDisplay result={demoResult} />
-        </div>
-      )}
     </div>
   );
 }

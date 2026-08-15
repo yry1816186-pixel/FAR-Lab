@@ -364,7 +364,8 @@ function isEpermRenameError(error: string | null | undefined): boolean {
 }
 
 /** llm-status profile（如 competition_aliyun_qwen）→ 状态行的短标签（qwen）。 */
-function shortProviderLabel(profile: string): string {
+function shortProviderLabel(profile: string | null): string {
+  if (profile === null) return 'not configured';
   const parts = profile.split('_');
   return parts[parts.length - 1] ?? profile;
 }

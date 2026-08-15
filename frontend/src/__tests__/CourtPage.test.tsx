@@ -1,22 +1,22 @@
 // frontend/src/__tests__/CourtPage.test.tsx
-// 测 CourtPage：mock GET /api/v1/court/demo → 渲染 ReliabilityCertificate（unanimous·3 模型）。
+// 测 CourtPage（live-only）：无 key → 表单禁用 + 指引（无罐头内容）；有 key → 真实 POST 渲染证书。
 
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CourtPage from '@/pages/CourtPage';
 import type { CourtCertificateDto } from '@/lib/types';
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   });
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
 const MOCK_CERT: CourtCertificateDto = {
   certificateId: '01KWZTESTCOURTCERT123',
-  datasetSource: 'replay',
+  datasetSource: 'online',
   claim: 'C-ASTRO-0001: TIC lightcurve transit signal',
   modelCount: 3,
   verdicts: [
@@ -26,42 +26,72 @@ const MOCK_CERT: CourtCertificateDto = {
   ],
   distinctVerdicts: ['CONFIRMED'],
   agreement: 'unanimous',
-  honestNote: 'offline_replay 下所有模型回放同一套 fixture，verdict 必然一致',
+  honestNote: 'real provider cross-model court (real gateway)',
 };
 
-function mockCourtOk() {
-  vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+function mockFetch(opts: { keyConfigured: boolean }) {
+  return vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
-    if (url.endsWith('/court/demo')) {
+    if (url.endsWith('/llm-status')) {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          data: { profile: opts.keyConfigured ? 'competition_aliyun_qwen' : null, keyConfigured: opts.keyConfigured },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    if (url.endsWith('/court') && init?.method === 'POST') {
       return new Response(JSON.stringify({ ok: true, data: MOCK_CERT }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     }
-    if (url.endsWith('/llm-status')) {
-      return new Response(JSON.stringify({ ok: true, data: { profile: 'offline_replay', keyConfigured: false } }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    // 罐头端点已删除——任何对 /court/demo 的请求都必须失败（防回潮）。
+    if (url.endsWith('/court/demo')) {
+      return new Response('', { status: 404 });
     }
     return new Response('', { status: 404 });
   });
 }
 
 describe('CourtPage', () => {
-  beforeAll(() => {
-    // CourtPage 用 Tailwind + lucide；jsdom 不需真实样式。
-  });
-
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('渲染证书标题 + 一致性 + 3 模型裁决表', async () => {
-    mockCourtOk();
+  it('无 key：run 禁用 + 指引在场，且绝不请求已删除的 /court/demo（无罐头内容）', async () => {
+    const fetchMock = mockFetch({ keyConfigured: false });
     renderWithQueryClient(<CourtPage />);
 
-    // 一致性 + 模型数（等待 fetch 解析→success 态）
+    const run = await waitFor(() => screen.getByTestId('court-live-run'));
+    expect(run).toBeDisabled();
+    expect(screen.getByTestId('court-live-disabled-hint')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('court-llm-status')).toHaveTextContent('Live inference unavailable');
+    });
+
+    // 页面不渲染任何预录证书（罐头面清零）。
+    expect(screen.queryByTestId('court-demo-reference')).toBeNull();
+    expect(screen.queryByText('01KWZTESTCOURTCERT123')).toBeNull();
+    for (const call of fetchMock.mock.calls) {
+      expect(call[0].toString().endsWith('/court/demo')).toBe(false);
+    }
+  });
+
+  it('有 key：输入 claim → POST /court → 渲染证书标题 + 一致性 + 3 模型裁决表', async () => {
+    mockFetch({ keyConfigured: true });
+    renderWithQueryClient(<CourtPage />);
+
+    const input = await waitFor(() => screen.getByTestId('court-live-claim-input'));
+    fireEvent.change(input, { target: { value: 'C-ASTRO-0001: TIC lightcurve transit signal' } });
+
+    const run = screen.getByTestId('court-live-run');
+    await waitFor(() => expect(run).toBeEnabled());
+    fireEvent.click(run);
+
+    // 一致性 + 模型数（等待 mutation 解析→success 态）
     await waitFor(() => {
       expect(screen.getByText('Unanimous')).toBeInTheDocument();
     });
@@ -83,27 +113,5 @@ describe('CourtPage', () => {
 
     // 诚实声明
     expect(screen.getByText('Honesty statement')).toBeInTheDocument();
-  });
-
-  it('渲染失败态（fetch 404）', async () => {
-    vi.mocked(fetch).mockImplementation(async () => new Response('', { status: 500 }));
-    renderWithQueryClient(<CourtPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Court session failed')).toBeInTheDocument();
-    });
-  });
-
-  it('WS-B.2 渲染 live 表单 + offline replay 状态横幅', async () => {
-    mockCourtOk();
-    renderWithQueryClient(<CourtPage />);
-
-    expect(screen.getByTestId('court-live-form')).toBeInTheDocument();
-    expect(screen.getByTestId('court-live-claim-input')).toBeInTheDocument();
-    expect(screen.getByTestId('court-live-run')).toBeDisabled();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('court-llm-status')).toHaveTextContent('Offline replay mode');
-    });
   });
 });
