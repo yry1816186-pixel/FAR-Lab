@@ -690,6 +690,28 @@ export interface MemoryInjectionPayload {
   readonly summary: string | null;
   /** Content hashes already explored (branches) or eliminated (negatives). */
   readonly knownContentHashes: ReadonlySet<string>;
+  /**
+   * hash -> full MEMORY_DUPLICATE marker WITH kind (negative:/branch:), so
+   * the fan-out flags frozen on the run carry WHY content is a repeat (b7
+   * scorecard linkage grades F vs C on exactly this prefix).
+   */
+  readonly knownContentMarkers: ReadonlyMap<string, string>;
+}
+
+/** hash -> kind-carrying marker for every known content hash in the store. */
+export function buildMemoryContentMarkers(
+  store: ResearchMemoryStore,
+): ReadonlyMap<string, string> {
+  const markers = new Map<string, string>();
+  for (const n of store.negativeResults) {
+    markers.set(n.contentHash, `MEMORY_DUPLICATE:negative:${n.id}`);
+  }
+  for (const b of store.branchTree) {
+    if (!markers.has(b.contentHash)) {
+      markers.set(b.contentHash, `MEMORY_DUPLICATE:branch:${b.id}`);
+    }
+  }
+  return markers;
 }
 
 /** Build the injection payload from the store (null summary = nothing to inject). */
@@ -710,6 +732,7 @@ export function buildMemoryInjection(
   return {
     summary: emptyStore ? null : buildMemorySummary(store, opts),
     knownContentHashes: known,
+    knownContentMarkers: buildMemoryContentMarkers(store),
   };
 }
 

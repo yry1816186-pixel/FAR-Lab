@@ -65,14 +65,13 @@ describe('rediscovery target registry (brief: >=3 domains, >=2 targets each)', (
         }
       }
     }
-    // The shipped v1 set contains only established discoveries; the two
-    // UNCONFIRMED-DOI targets are the honest bibliographic gaps.
+    // b7-T3 online verification (doi.org resolution, 2026-08-16): the two
+    // formerly-UNCONFIRMED DOIs are now confirmed — the shipped set has ZERO
+    // bibliographic gaps. The MECHANISM stays pinned: any future target with a
+    // null/UNCONFIRMED DOI MUST appear in targetsWithoutConfirmedDoi (so the
+    // gap can never silently hide), and none may linger unflagged.
     assert.deepEqual(unverifiedTargetIds(), []);
-    const noDoi = targetsWithoutConfirmedDoi();
-    assert.deepEqual(
-      noDoi.map((x) => x.id).sort(),
-      ['gw170817-multimessenger-kilonova', 'iron-based-superconductivity'].sort(),
-    );
+    assert.deepEqual(targetsWithoutConfirmedDoi(), []);
   });
 
   it('shipped corpora are holdout-clean: every document is pre-cutoff', () => {

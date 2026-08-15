@@ -35,17 +35,32 @@
       "id": "exoplanet-51peg-radial-velocity",
       "statement": "A Jupiter-mass planet orbits the solar-type star 51 Pegasi, discovered through radial-velocity oscillations (Mayor and Queloz, Nature, 1995).",
       "publishedAfter": "1995-11-23",
-      "doi": "10.1038/378355",
+      "doi": "10.1038/378355a0",
       "doiStatus": "CONFIRMED",
       "verificationStatus": "VERIFIED_DISCOVERY",
       "unverifiedNote": null,
-      "matchKeywords": ["jupiter mass planet", "radial velocity", "sun like star", "planetary companion"],
+      "matchKeywords": [
+        "jupiter mass planet",
+        "radial velocity",
+        "sun like star",
+        "planetary companion"
+      ],
       "synonyms": {
-        "radial velocity": ["doppler shift periodicity", "stellar reflex motion"],
-        "jupiter mass planet": ["massive planetary companion", "gas giant around star"],
-        "planetary companion": ["planet around nearby star"]
+        "radial velocity": [
+          "doppler shift periodicity",
+          "stellar reflex motion"
+        ],
+        "jupiter mass planet": [
+          "massive planetary companion",
+          "gas giant around star"
+        ],
+        "planetary companion": [
+          "planet around nearby star"
+        ]
       },
-      "groundingDocPids": ["cosmo-pre-1988-doppler-limits"]
+      "groundingDocPids": [
+        "cosmo-pre-1988-doppler-limits"
+      ]
     },
     {
       "id": "cosmic-acceleration-snia",
@@ -55,12 +70,23 @@
       "doiStatus": "CONFIRMED",
       "verificationStatus": "VERIFIED_DISCOVERY",
       "unverifiedNote": null,
-      "matchKeywords": ["accelerating expansion", "cosmological constant", "standard candle"],
+      "matchKeywords": [
+        "accelerating expansion",
+        "cosmological constant",
+        "standard candle"
+      ],
       "synonyms": {
-        "standard candle": ["supernova brightness distance", "sn ia luminosity calibration"],
-        "accelerating expansion": ["expansion speeds up over cosmic time"]
+        "standard candle": [
+          "supernova brightness distance",
+          "sn ia luminosity calibration"
+        ],
+        "accelerating expansion": [
+          "expansion speeds up over cosmic time"
+        ]
       },
-      "groundingDocPids": ["cosmo-pre-1992-sn-calibration"]
+      "groundingDocPids": [
+        "cosmo-pre-1992-sn-calibration"
+      ]
     }
   ],
   "hypotheses": [
@@ -73,15 +99,29 @@
         "comparator": "lt",
         "value": 1
       },
-      "citePids": ["cosmo-pre-1988-doppler-limits"],
-      "counterCitePids": ["cosmo-pre-1994-microlensing"],
+      "citePids": [
+        "cosmo-pre-1988-doppler-limits"
+      ],
+      "counterCitePids": [
+        "cosmo-pre-1994-microlensing"
+      ],
       "relationToExistingTheory": "Extends published Doppler upper limits from non-detection into the claimed detection regime.",
-      "alternativeExplanations": ["Coherent stellar activity cycles can mimic periodic Doppler signals."],
-      "observablePredictions": ["Coherent periodicity persists across instruments and observing seasons."],
-      "distinguishingObservations": ["Line-bisector variations should track activity cycles but not planetary companions."],
+      "alternativeExplanations": [
+        "Coherent stellar activity cycles can mimic periodic Doppler signals."
+      ],
+      "observablePredictions": [
+        "Coherent periodicity persists across instruments and observing seasons."
+      ],
+      "distinguishingObservations": [
+        "Line-bisector variations should track activity cycles but not planetary companions."
+      ],
       "noveltyRelativeToCorpus": "Claims the detection threshold for massive companions has already been crossed for nearby stars.",
-      "assumptions": ["Meter-per-second Doppler stability is achievable over years."],
-      "risks": ["Selection effects in historical target lists."]
+      "assumptions": [
+        "Meter-per-second Doppler stability is achievable over years."
+      ],
+      "risks": [
+        "Selection effects in historical target lists."
+      ]
     },
     {
       "statement": "High-redshift Type Ia supernovae can measure the cosmic deceleration parameter when used as standard candles with calibrated light curves.",
@@ -92,15 +132,28 @@
         "comparator": "gt",
         "value": 0.3
       },
-      "citePids": ["cosmo-pre-1992-sn-calibration", "cosmo-pre-1990-deceleration"],
+      "citePids": [
+        "cosmo-pre-1992-sn-calibration",
+        "cosmo-pre-1990-deceleration"
+      ],
       "counterCitePids": [],
       "relationToExistingTheory": "Operationalizes the existing call for higher-redshift standard candles.",
-      "alternativeExplanations": ["Evolution of supernova progenitors with redshift biases the calibration."],
-      "observablePredictions": ["A decisive measurement of the deceleration parameter from z above 0.3 samples."],
-      "distinguishingObservations": ["Multiple independent calibrations should agree on the inferred expansion history."],
+      "alternativeExplanations": [
+        "Evolution of supernova progenitors with redshift biases the calibration."
+      ],
+      "observablePredictions": [
+        "A decisive measurement of the deceleration parameter from z above 0.3 samples."
+      ],
+      "distinguishingObservations": [
+        "Multiple independent calibrations should agree on the inferred expansion history."
+      ],
       "noveltyRelativeToCorpus": "Combines calibration control and depth into a single decisive experiment design.",
-      "assumptions": ["Width-luminosity corrections hold at high redshift."],
-      "risks": ["Sample sizes at high redshift remain small."]
+      "assumptions": [
+        "Width-luminosity corrections hold at high redshift."
+      ],
+      "risks": [
+        "Sample sizes at high redshift remain small."
+      ]
     },
     {
       "statement": "Microlensing optical depth toward the Galactic bulge constrains the compact dark-matter fraction of the halo.",
@@ -109,17 +162,29 @@
         "prediction": "Measured optical depth toward the bulge falls below 1e-7",
         "metric": "optical_depth",
         "comparator": "lt",
-        "value": 1e-7
+        "value": 1e-07
       },
-      "citePids": ["cosmo-pre-1994-microlensing"],
+      "citePids": [
+        "cosmo-pre-1994-microlensing"
+      ],
       "counterCitePids": [],
       "relationToExistingTheory": "Sharpens preliminary microlensing campaign limits into a halo-fraction bound.",
-      "alternativeExplanations": ["Bulge self-lensing dominates the event rate."],
-      "observablePredictions": ["Event-rate spatial distribution tracks halo, not disk, geometry."],
-      "distinguishingObservations": ["Event timescale distribution separates stellar from sub-planetary lenses."],
+      "alternativeExplanations": [
+        "Bulge self-lensing dominates the event rate."
+      ],
+      "observablePredictions": [
+        "Event-rate spatial distribution tracks halo, not disk, geometry."
+      ],
+      "distinguishingObservations": [
+        "Event timescale distribution separates stellar from sub-planetary lenses."
+      ],
       "noveltyRelativeToCorpus": "First halo-fraction inference from campaign statistics in this corpus context.",
-      "assumptions": ["Detection efficiency is well characterized."],
-      "risks": ["Blend events contaminate the statistics."]
+      "assumptions": [
+        "Detection efficiency is well characterized."
+      ],
+      "risks": [
+        "Blend events contaminate the statistics."
+      ]
     }
   ]
 }

@@ -67,9 +67,12 @@ export interface GenerateMultiStrategyOptions {
   /**
    * Content hashes already explored/eliminated in past runs (§2.5 dedup):
    * kept candidates hitting a known hash get a MEMORY_DUPLICATE marker in the
-   * fan-out meta (deterministic exact-hash match — marking only).
+   * fan-out meta (deterministic exact-hash match — marking only). The MAP
+   * form carries the kind (negative:/branch:) so downstream consumers (b7
+   * scorecard linkage) can grade the repeat; a plain Set degrades to a
+   * kindless marker.
    */
-  readonly knownMemoryHashes?: ReadonlySet<string>;
+  readonly knownMemoryHashes?: ReadonlySet<string> | ReadonlyMap<string, string>;
 }
 
 /** One strategy's fan-out outcome (honest accounting: skip, error, or candidates). */
@@ -383,15 +386,21 @@ export async function generateHypothesesMultiStrategy(
     .map((k) => ({ id: k.candidate.id, strategyId: k.candidate.strategyOrigin ?? strategies[k.strategyIndex]!.id }));
 
   // Research-memory dedup guard (§2.5): exact content-hash match against past
-  // runs. b5 scope: MARK ONLY (fan-out meta) — no selection power, declared.
+  // runs. Marking only — no selection power here; the b7 scorecard linkage
+  // grades the repeat downstream from the kind prefix frozen in the marker.
+  const known = opts.knownMemoryHashes;
+  const hasKnown = (hash: string): boolean =>
+    known instanceof Map ? known.has(hash) : known?.has(hash) === true;
+  const markerFor = (hash: string, id: string): string =>
+    known instanceof Map ? (known.get(hash) ?? `MEMORY_DUPLICATE:unknown:${id.slice(0, 12)}`) : `MEMORY_DUPLICATE:unknown:${id.slice(0, 12)}`;
   const memoryFlagged =
-    opts.knownMemoryHashes === undefined
+    known === undefined
       ? undefined
       : finalKept
-          .filter((k) => opts.knownMemoryHashes!.has(hypothesisContentHash(k.candidate)))
+          .filter((k) => hasKnown(hypothesisContentHash(k.candidate)))
           .map((k) => ({
             id: k.candidate.id,
-            marker: `MEMORY_DUPLICATE:${k.candidate.id.slice(0, 12)}`,
+            marker: markerFor(hypothesisContentHash(k.candidate), k.candidate.id),
           }));
 
   return {
