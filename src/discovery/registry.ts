@@ -37,6 +37,10 @@ import { renameWithRetry } from '../research/run_lifecycle.ts';
 import type { HypothesisCandidate, ResearchRun } from '../research/types.ts';
 import { transitionConjectureState, type ConjectureState, type StrategyId } from './types.ts';
 
+// Single implementation moved to the leaf module (content_hash.ts) so the
+// fan-out dedup and research memory can share it without import cycles.
+export { hypothesisContentHash } from './content_hash.ts';
+
 /** Default ledger location (gitignored runtime artifact under `.far/`). */
 export const DEFAULT_DISCOVERY_REGISTRY_PATH = '.far/discovery/registry.jsonl';
 
@@ -71,6 +75,17 @@ export interface RegistryEvidence {
   readonly deterministicCheckRef?: string | undefined;
   readonly matchingLiterature?: string | undefined;
   readonly humanReviewRef?: string | undefined;
+  /**
+   * Present on KERNEL_ADJUDICATED transition lines (b5 backflow): what the
+   * deterministic verdict kernel said, over which observation. Absent on
+   * older lines = "not recorded then" (additive optional field).
+   */
+  readonly adjudication?: {
+    readonly verdict: string;
+    readonly observationId: string;
+    readonly adapter: string;
+    readonly metricValue: number;
+  } | undefined;
 }
 
 export interface DiscoveryRegistryRecord {
@@ -103,13 +118,7 @@ export interface RegistryRecordInput {
 }
 
 /** Compute the scientific-content hash of a hypothesis (stable across packaging edits). */
-export function hypothesisContentHash(candidate: HypothesisCandidate): string {
-  return hashCanonicalJson({
-    statement: candidate.statement,
-    mechanism: candidate.mechanism,
-    falsificationMethod: candidate.falsificationMethod,
-  });
-}
+import { hypothesisContentHash } from './content_hash.ts';
 
 /**
  * Build one registry record (pure). The state transition itself is validated
@@ -373,6 +382,23 @@ export interface RegistrationOutcome {
 }
 
 /**
+ * The CORROBORATED qualification predicate — the SINGLE qualification source
+ * shared by the registry and the research-memory draft tier (one rule, never
+ * two): falsifiability gate passed AND ≥1 bound citation (evidence attached).
+ */
+export function corroboratedQualifies(
+  hypothesis: HypothesisCandidate,
+  run: ResearchRun,
+): boolean {
+  const gateEntry = run.falsifiabilityGate.perHypothesis[hypothesis.id];
+  if (gateEntry?.passed !== true) return false;
+  const binding = run.bindings[hypothesis.id];
+  const boundEvidence =
+    (binding?.boundSupporting.length ?? 0) + (binding?.boundCounter.length ?? 0);
+  return boundEvidence > 0;
+}
+
+/**
  * Run-finalize integration point: register every CORROBORATED-qualified
  * hypothesis of a completed run. Qualification = falsifiability gate passed
  * AND at least one bound citation (evidence attached, not just structured).
@@ -396,19 +422,18 @@ export function registerRunDiscoveries(
   const notRegistered: { id: string; reason: string }[] = [];
 
   for (const hypothesis of run.hypotheses) {
-    const gateEntry = run.falsifiabilityGate.perHypothesis[hypothesis.id];
     const binding = run.bindings[hypothesis.id];
-    const boundEvidence =
-      (binding?.boundSupporting.length ?? 0) + (binding?.boundCounter.length ?? 0);
-    if (gateEntry?.passed !== true) {
+    if (!corroboratedQualifies(hypothesis, run)) {
+      const gateEntry = run.falsifiabilityGate.perHypothesis[hypothesis.id];
       notRegistered.push({
         id: hypothesis.id,
-        reason: gateEntry === undefined ? 'falsifiability gate: no record' : 'falsifiability gate failed',
+        reason:
+          gateEntry === undefined
+            ? 'falsifiability gate: no record'
+            : gateEntry.passed !== true
+              ? 'falsifiability gate failed'
+              : 'no bound citations (CORROBORATED requires evidence)',
       });
-      continue;
-    }
-    if (boundEvidence === 0) {
-      notRegistered.push({ id: hypothesis.id, reason: 'no bound citations (CORROBORATED requires evidence)' });
       continue;
     }
     // Ladder discipline: structured (falsifiable) + evidence → CORROBORATED,

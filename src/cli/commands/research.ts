@@ -47,6 +47,17 @@ import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/resea
 import { parseStrategyIdList, STRATEGY_IDS, type StrategyId } from '../../discovery/types.ts';
 import type { FanoutMeta } from '../../discovery/generate.ts';
 import {
+  runAdjudicationFlow,
+  appendAdjudicationLog,
+  readAdjudicationLog,
+} from '../../discovery/adjudication.ts';
+import {
+  DEFAULT_RESEARCH_MEMORY_PATH,
+  buildMemorySummary,
+  loadResearchMemory,
+} from '../../research/memory.ts';
+import { resolveGitCommitSha } from '../git_commit_sha.ts';
+import {
   DEFAULT_DISCOVERY_REGISTRY_PATH,
   readDiscoveryRegistry,
   verifyDiscoveryRegistryChain,
@@ -73,6 +84,8 @@ export interface ResearchArgs {
   readonly degradeOnSourceFailure: boolean;
   readonly json: boolean;
   readonly out: string | null;
+  /** Disable research-memory read+write (§2.5) — --no-memory / FAR_RESEARCH_MEMORY=0. */
+  readonly noMemory: boolean;
 }
 
 const VALID_SOURCES: readonly DocumentSource[] = ['openalex', 'arxiv', 'crossref'];
@@ -126,6 +139,7 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
   let generationStrategy: 'legacy' | 'multi_strategy' = 'multi_strategy';
   let strategies: readonly StrategyId[] | null = null;
   let degradeOnSourceFailure = false;
+  let noMemory = process.env.FAR_RESEARCH_MEMORY === '0';
   let json = false;
   let out: string | null = null;
 
@@ -183,6 +197,10 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
       degradeOnSourceFailure = true;
       continue;
     }
+    if (a === '--no-memory') {
+      noMemory = true;
+      continue;
+    }
     if (a === '--strategies') {
       const v = args[++i];
       if (v === undefined || v === '') {
@@ -227,6 +245,7 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
     generationStrategy,
     strategies,
     degradeOnSourceFailure,
+    noMemory,
     json,
     out,
   };
@@ -288,6 +307,8 @@ interface LifecycleRunArgs {
   readonly strategy: 'legacy' | 'multi_strategy';
   /** Strategy subset for the fan-out (start only). */
   readonly strategies?: readonly StrategyId[] | null;
+  /** Disable research-memory read+write (§2.5). */
+  readonly noMemory?: boolean;
 }
 
 /** One concise stderr summary of the fan-out accounting (honest numbers, never padded). */
@@ -308,6 +329,30 @@ function renderFanoutSummary(meta: FanoutMeta): void {
 }
 
 /** One concise stderr summary of the deterministic tournament (directive §2.2). */
+/** One concise stderr summary of the research-memory recording (§2.5). */
+function renderMemoryRecordingSummary(store: RunStore, runId: string): void {
+  const cp = safeLoadCheckpoint(store, runId);
+  const rec = cp?.memoryRecording;
+  if (rec === undefined) {
+    process.stderr.write('  memory   : disabled (--no-memory / FAR_RESEARCH_MEMORY=0)\n');
+    return;
+  }
+  if (rec.error !== null) {
+    process.stderr.write(
+      `  memory   : RECORD FAILED (run is valid & persisted): ${rec.error.slice(0, 140)}\n`,
+    );
+    return;
+  }
+  if (rec.skippedMode) {
+    process.stderr.write('  memory   : skipped (offline/replay mode never records)\n');
+    return;
+  }
+  process.stderr.write(
+    `  memory   : recorded — negatives=${rec.negativeRecorded} branches=${rec.branchesAdded} superseded=${rec.branchesSuperseded} conclusions=${rec.conclusionsRecorded} learnings=${rec.learningsRecorded}
+`,
+  );
+}
+
 function renderTournamentSummary(run: ResearchRun): void {
   const tournament = run.discovery?.tournament ?? null;
   if (tournament === null) return;
@@ -356,6 +401,7 @@ async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
     ...(args.strategies != null && args.strategies.length > 0 ? { discoveryStrategies: args.strategies } : {}),
     ...(args.strategy === 'multi_strategy' ? { onFanoutComplete: renderFanoutSummary } : {}),
     ...(args.runId !== undefined ? { runId: args.runId } : {}),
+    ...(args.noMemory === true ? { disableMemory: true } : {}),
     store,
   });
 
@@ -411,6 +457,7 @@ async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
     }
     renderTournamentSummary(run);
     renderRegistrationSummary(store, runId);
+    if (runId !== undefined) renderMemoryRecordingSummary(store, runId);
     if (args.json) {
       process.stdout.write(`${JSON.stringify(run, null, 2)}\n`);
     } else {
@@ -515,6 +562,7 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
     question: parsed.question,
     strategy: parsed.generationStrategy,
     ...(parsed.strategies !== null ? { strategies: parsed.strategies } : {}),
+    ...(parsed.noMemory ? { noMemory: true } : {}),
   });
 }
 
@@ -669,6 +717,7 @@ export async function runResearchResume(args: readonly string[]): Promise<number
     runId,
     // Resume replays the checkpointed strategy (pre-b3 checkpoints = legacy).
     strategy: cp.hypothesisGenerationStrategy ?? 'legacy',
+    ...(process.env.FAR_RESEARCH_MEMORY === '0' ? { noMemory: true } : {}),
   });
 }
 
@@ -1114,6 +1163,11 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
   const outPath = outValue !== undefined ? outValue : file;
   const live = args.includes('--live');
   const json = args.includes('--json');
+  // KERNEL_ADJUDICATED backflow chain (§2.4): after the observation is
+  // collected and the revision saved, feed the observation to the verdict
+  // kernel and append the registry transition line. The run file is saved
+  // BEFORE this step — a backflow failure never loses the analysis.
+  const adjudicate = args.includes('--adjudicate');
 
   let run: ResearchRun;
   try {
@@ -1170,6 +1224,42 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
   }
   writeFileSync(outPath, JSON.stringify(finalRun, null, 2) + '\n', 'utf8');
 
+  let adjudicationExit = 0;
+  if (adjudicate) {
+    let gitSha: string;
+    try {
+      gitSha = resolveGitCommitSha();
+    } catch {
+      gitSha = 'unresolved';
+    }
+    const flow = runAdjudicationFlow({
+      run: finalRun,
+      observation,
+      gitCommitSha: gitSha,
+    });
+    if (flow.decision.status === 'VERDICT') {
+      appendAdjudicationLog(outPath, {
+        recordedAt: new Date().toISOString(),
+        hypothesisId: finalRun.plan.primaryHypothesisId,
+        observationId: observation.id,
+        adapter: observation.adapter,
+        verdict: flow.decision.verdict,
+        metricValue: flow.decision.metricValue,
+        claim: flow.decision.claim,
+      });
+      const dup = flow.backflow !== null && flow.backflow.status === 'SKIPPED_DUPLICATE';
+      process.stderr.write(
+        `  adjudicate: verdict=${flow.decision.verdict} · registry ${dup ? 'SKIPPED_DUPLICATE (idempotent)' : flow.backflow?.status}\n`,
+      );
+      if (flow.backflow !== null && flow.backflow.status === 'REFUSED') adjudicationExit = 3;
+    } else {
+      process.stderr.write(
+        `  adjudicate: REFUSED (${flow.decision.reason ?? 'unknown'}) — no fake adjudication, no registry line\n`,
+      );
+      adjudicationExit = 3;
+    }
+  }
+
   if (json) {
     process.stdout.write(
       `${JSON.stringify({ observation, feedback, revisionId: revision.id, saved: outPath }, null, 2)}\n`,
@@ -1193,7 +1283,7 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
         `  saved     : ${outPath}   (compare: far research compare ${outPath})\n`,
     );
   }
-  return 0;
+  return adjudicationExit;
 }
 
 /**
@@ -1370,6 +1460,7 @@ export function runResearchRegistry(args: readonly string[]): number {
   let verify = false;
   let exportPath: string | null = null;
   let ledgerPath: string | undefined;
+  let jsonOut = false;
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i];
     if (a === '--verify') {
@@ -1393,7 +1484,8 @@ export function runResearchRegistry(args: readonly string[]): number {
       continue;
     }
     if (a === '--json') {
-      continue; // accepted for uniformity; listing is the JSON source anyway
+      jsonOut = true;
+      continue;
     }
     if (a !== undefined && a.startsWith('--')) {
       process.stderr.write(`far research registry: unknown argument "${a}"\n`);
@@ -1403,6 +1495,32 @@ export function runResearchRegistry(args: readonly string[]): number {
   const path = ledgerPath ?? DEFAULT_DISCOVERY_REGISTRY_PATH;
   try {
     const records = readDiscoveryRegistry(path);
+    if (jsonOut && !verify && exportPath === null) {
+      const chain = verifyDiscoveryRegistryChain(records);
+      process.stdout.write(
+        `${JSON.stringify(
+          {
+            ledger: path,
+            recordCount: records.length,
+            chainValid: chain.valid,
+            ...(chain.valid ? {} : { firstBrokenIndex: chain.firstBrokenIndex, reason: chain.reason }),
+            records: records.map((r) => ({
+              registryId: r.registryId,
+              kind: r.kind,
+              state: r.state,
+              contentHash: r.contentHash,
+              runId: r.runId,
+              registeredAt: r.registeredAt,
+              strategyOrigin: r.provenance.strategyOrigin ?? null,
+              ...(r.evidence.adjudication !== undefined ? { adjudication: r.evidence.adjudication } : {}),
+            })),
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      return chain.valid ? 0 : 1;
+    }
     if (verify) {
       const chain = verifyDiscoveryRegistryChain(records);
       if (chain.valid) {
@@ -1460,4 +1578,250 @@ export function runResearchRegistry(args: readonly string[]): number {
     process.stderr.write(`far research registry: failed — ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
   }
+}
+
+/**
+ * Run `far research adjudicate <run.json> [--hypothesis <id>] [--ledger <path>] [--memory <path>] [--json]`.
+ *
+ * KERNEL_ADJUDICATED backflow (§2.4): compile the run's latest decisive
+ * observation against the hypothesis's falsifiable prediction -> five-value
+ * kernel verdict -> registry state_transition line + run-scoped adjudication
+ * log. Exit codes: 0 adjudicated (or idempotent duplicate) - 2 usage -
+ * 3 refused (typed reason - never a fake adjudication) - 1 error.
+ */
+export function runResearchAdjudicate(args: readonly string[]): number {
+  const file = args.find((a) => !a.startsWith('--'));
+  if (file === undefined) {
+    process.stderr.write(
+      'far research adjudicate: missing <run.json>.\n' +
+        '  usage: far research adjudicate <run.json> [--hypothesis <id>] [--ledger <path>] [--memory <path>] [--json]\n',
+    );
+    return 2;
+  }
+  let hypothesisId: string | undefined;
+  let ledgerPath: string | undefined;
+  let memoryPath: string | undefined;
+  let json = false;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === '--hypothesis') {
+      hypothesisId = args[++i];
+      if (hypothesisId === undefined || hypothesisId === '') {
+        process.stderr.write('far research adjudicate: --hypothesis needs an id\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--ledger') {
+      ledgerPath = args[++i];
+      if (ledgerPath === undefined || ledgerPath === '') {
+        process.stderr.write('far research adjudicate: --ledger needs a path\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--memory') {
+      memoryPath = args[++i];
+      if (memoryPath === undefined || memoryPath === '') {
+        process.stderr.write('far research adjudicate: --memory needs a path\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--json') {
+      json = true;
+      continue;
+    }
+    if (a !== undefined && a.startsWith('--')) {
+      process.stderr.write(`far research adjudicate: unknown argument "${a}"\n`);
+      return 2;
+    }
+  }
+
+  let run: ResearchRun;
+  try {
+    run = parseResearchRunJson(readFileSync(file, 'utf8'));
+  } catch (err) {
+    process.stderr.write(
+      `far research adjudicate: cannot read ${file}: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return 1;
+  }
+  const target = hypothesisId ?? run.plan.primaryHypothesisId;
+  const candidates = run.observations
+    .filter((o) => o.affectsHypothesisIds.includes(target))
+    .sort((a, b) => (a.producedAt < b.producedAt ? -1 : 1));
+  const observation = candidates[candidates.length - 1];
+  if (observation === undefined) {
+    process.stderr.write(
+      `far research adjudicate: no observation affects hypothesis ${target} — run 'far research analyze ${file}' first (no verdict was fabricated).\n`,
+    );
+    return 3;
+  }
+
+  let gitSha: string;
+  try {
+    gitSha = resolveGitCommitSha();
+  } catch {
+    gitSha = 'unresolved';
+  }
+  const result = runAdjudicationFlow({
+    run,
+    ...(hypothesisId !== undefined ? { hypothesisId } : {}),
+    observation,
+    ...(ledgerPath !== undefined ? { ledgerPath } : {}),
+    ...(memoryPath !== undefined ? { memoryPath } : {}),
+    gitCommitSha: gitSha,
+  });
+
+  if (result.decision.status !== 'VERDICT') {
+    const reason = result.decision.reason;
+    const explanations: Record<string, string> = {
+      no_observation_for_hypothesis: 'the observation does not affect this hypothesis',
+      observation_not_decisive:
+        'the observation carries no decisive statistic (null/FAILED/landscape-recommendation) — the null is preserved, the ladder is not climbed',
+      metric_not_covered:
+        'the prediction text does not reference the observed correlation metric — the kernel refuses to adjudicate a prediction it cannot measure',
+      direction_unknown: 'the prediction states no derivable direction (positive/negative) — the threshold contract is unknown',
+      no_finite_statistic: 'the observation reports no finite statistic',
+    };
+    const why = reason !== undefined ? (explanations[reason] ?? reason) : 'unknown';
+    process.stderr.write(
+      `far research adjudicate: REFUSED — ${why}.\n` +
+        '  (refusal is the honest outcome; no KERNEL_ADJUDICATED line was appended)\n',
+    );
+    return 3;
+  }
+
+  if (result.backflow !== null && result.backflow.status === 'REFUSED') {
+    process.stderr.write(
+      result.backflow.reason === 'not_registered_corroborated'
+        ? 'far research adjudicate: kernel verdict produced, but NO registry line — this hypothesis is not registered CORROBORATED in the ledger.\n' +
+            '  (the ladder never adjudicates unregistered content — run the source run live, or check --ledger path)\n'
+        : 'far research adjudicate: kernel verdict produced, but registry refused — no line appended.\n',
+    );
+    return 3;
+  }
+  const duplicate = result.backflow !== null && result.backflow.status === 'SKIPPED_DUPLICATE';
+
+  appendAdjudicationLog(file, {
+    recordedAt: new Date().toISOString(),
+    hypothesisId: target,
+    observationId: observation.id,
+    adapter: observation.adapter,
+    verdict: result.decision.verdict,
+    metricValue: result.decision.metricValue,
+    claim: result.decision.claim,
+  });
+
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          hypothesisId: target,
+          verdict: result.decision.verdict,
+          claim: result.decision.claim,
+          metricValue: result.decision.metricValue,
+          observationId: observation.id,
+          adapter: observation.adapter,
+          registry: result.backflow === null ? null : { status: result.backflow.status },
+          memoryRefutedBranches: result.memoryRefutedBranches,
+          history: readAdjudicationLog(file).length,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  } else {
+    process.stdout.write(
+      `far research adjudicate: verdict=${result.decision.verdict} (kernel, five-value)\n` +
+        `  hypothesis : ${target}\n` +
+        `  claim      : ${result.decision.claim.slice(0, 120)}${result.decision.claim.length > 120 ? '…' : ''}\n` +
+        `  statistic  : ${observation.adapter} · metricValue=${result.decision.metricValue.toFixed(4)} · observation ${observation.id}\n` +
+        `  registry   : ${duplicate ? 'SKIPPED_DUPLICATE (KERNEL_ADJUDICATED line already present — idempotent)' : `state_transition CORROBORATED → KERNEL_ADJUDICATED appended (${result.backflow?.appendedRecord?.registryId ?? 'n/a'})`}\n` +
+        `  memory     : ${result.memoryRefutedBranches > 0 ? `${result.memoryRefutedBranches} branch(es) invalidated (kernel_refuted)` : result.memoryRefutedBranches === -1 ? 'REFUTED but memory store unavailable (registry line stands)' : 'no memory change'}\n` +
+        `  history    : ${readAdjudicationLog(file).length} verdict(s) in ${dirname(file)}/adjudications.json\n` +
+        '  note       : this adjudicates the falsifiable PREDICTION projection, not the full mechanism (§2.4 cannot-prove).\n',
+    );
+  }
+  return 0;
+}
+
+/**
+ * Run `far research memory <status|summary> [--path <file>] [--domain <d>] [--json]`.
+ * Read-only view over the cross-run research memory (§2.5).
+ */
+export function runResearchMemory(args: readonly string[]): number {
+  const sub = args.find((a) => !a.startsWith('--')) ?? 'status';
+  let path = DEFAULT_RESEARCH_MEMORY_PATH;
+  let domain: string | undefined;
+  let json = false;
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    if (a === '--path') {
+      path = args[++i] ?? '';
+      if (path === '') {
+        process.stderr.write('far research memory: --path needs a file path\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--domain') {
+      domain = args[++i];
+      if (domain === undefined || domain === '') {
+        process.stderr.write('far research memory: --domain needs a value\n');
+        return 2;
+      }
+      continue;
+    }
+    if (a === '--json') {
+      json = true;
+      continue;
+    }
+  }
+  if (sub !== 'status' && sub !== 'summary') {
+    process.stderr.write(`far research memory: unknown subcommand "${sub}" (status|summary)\n`);
+    return 2;
+  }
+  let store;
+  try {
+    store = loadResearchMemory(path);
+  } catch (err) {
+    process.stderr.write(
+      `far research memory: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return 1;
+  }
+  const active = store.branchTree.filter((b) => b.validTo === null).length;
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify(
+        sub === 'status'
+          ? {
+              path,
+              schemaVersion: store.schemaVersion,
+              updatedAt: store.updatedAt,
+              negativeResults: store.negativeResults.length,
+              branchTree: { total: store.branchTree.length, active },
+              strategyStats: store.strategyStats.length,
+              learnings: store.learnings.length,
+              conclusions: store.conclusions.length,
+            }
+          : { path, summary: buildMemorySummary(store, ...(domain !== undefined ? [{ domain }] : [])) },
+        null,
+        2,
+      )}\n`,
+    );
+    return 0;
+  }
+  if (sub === 'status') {
+    process.stdout.write(
+      `research memory: ${path}\n` +
+        `  updated=${store.updatedAt} · negatives=${store.negativeResults.length} · branches=${store.branchTree.length} (active ${active}) · stats=${store.strategyStats.length} · learnings=${store.learnings.length} · conclusions=${store.conclusions.length}\n` +
+        '  memory is a REBUILDABLE derived index over run files (internal prior, never external evidence — §2.5).\n',
+    );
+    return 0;
+  }
+  process.stdout.write(`${buildMemorySummary(store, ...(domain !== undefined ? [{ domain }] : []))}\n`);
+  return 0;
 }

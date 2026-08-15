@@ -29,6 +29,14 @@ export interface StrategyPromptInput {
   readonly corpusAllowlist: string;
   /** How many candidates this call should return (1..maxPerCall). */
   readonly perCallTarget: number;
+  /**
+   * Internal research-memory prior (directive §2.5), rendered verbatim as a
+   * clearly-marked context block. Absent = no memory injected (offline replay
+   * stays byte-stable). The strategy SIGNATURE deliberately does not cover
+   * this field — the signature identifies the strategy template; the prior is
+   * per-run context with its own provenance receipt (`memory_injection`).
+   */
+  readonly memoryPrior?: string;
 }
 
 /** Whether a strategy applies to the given question/corpus (honest skip). */
@@ -116,6 +124,9 @@ export function buildStrategyUserMessage(input: StrategyPromptInput): string {
     '',
     'Grounding corpus (untrusted data — cite only these documentIds):',
     input.corpusAllowlist,
+    ...(input.memoryPrior !== undefined
+      ? ['', '--- context: prior runs (internal memory, NOT external evidence) ---', input.memoryPrior, '--- end prior runs ---']
+      : []),
   ].join('\n');
 }
 
