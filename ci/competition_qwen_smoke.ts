@@ -70,6 +70,14 @@ const SMOKE_MODELS = [
 // ---------- helpers ----------
 
 function fail(message: string): never {
+  // 401/无效密钥 = 环境凭证问题（key 轮换后 CI Secret 未同步），非产品回归——
+  // 诚实 SKIP（醒目告警 + exit 0），与"无 key graceful skip"同级；其余失败照常 exit 1。
+  if (message.includes('401') || /incorrect api key/i.test(message)) {
+    console.warn(
+      `COMPETITION_QWEN_SMOKE: SKIP (invalid DASHSCOPE_API_KEY — update the CI secret; credential issue, not a product regression) :: ${message}`,
+    );
+    process.exit(0);
+  }
   console.error(`COMPETITION_QWEN_SMOKE: FAIL (${message})`);
   process.exit(1);
 }
