@@ -1,10 +1,12 @@
 // src/cli/commands/doctor.ts
 // far doctor —— 环境自诊断。
 //
-// 红线（OPEN_SOURCE_RELEASE_PLAN §15）：
-//   · 默认零网络、零 API、零密钥读取（只检查 DASHSCOPE_API_KEY 是否**已设置且非空**，不读取其值）。
-//   · provider key 缺失只 WARN，绝不 FAIL（offline demo 不依赖它）。
-//   · --live-qwen-smoke 显式才调真实 API（复用 ci/competition_qwen_smoke.ts，自带无 key graceful skip）。
+// 红线（OPEN_SOURCE_RELEASE_PLAN §15 + night-r4 §11C 凭证健康检查族）：
+//   · 默认零网络、零 API。凭证检查只读 env 值的「形状」（前缀/长度/空白），
+//     回显只给掩码（first4…last2 + 长度；<8 字符全隐藏），绝不输出完整值。
+//   · provider key 缺失/形状错位只 WARN，绝不 FAIL（R9：确定性端点不依赖任何 key）。
+//   · --live-qwen-smoke / --probe-credentials 显式才调真实 API（后者为 1-token 计费 LIVE ping，
+//     仅 DASHSCOPE；无 key 时结构化 skip，绝不伪造探针结果）。
 // 退出码：0 全绿 / 1 有 FAIL（核心能力损坏）/ 2 仅 WARN（可用但受限）。
 
 import { accessSync, constants, existsSync } from 'node:fs';
@@ -28,6 +30,11 @@ export interface DoctorOptions {
   readonly dbPath?: string;
   /** 2026-08-14 UX reorder:打印完整 far verify 报告(默认只打印一行 VERIFY SUMMARY)。 */
   readonly fullVerify?: boolean;
+  /**
+   * night-r4 §11C:显式触发 DASHSCOPE 1-token LIVE ping(真实计费调用;无 key 结构化 skip)。
+   * far.ts 本批未接线该 flag —— runDoctor 以 process.argv 兜底解析,保证 CLI 今日可用。
+   */
+  readonly probeCredentials?: boolean;
 }
 
 /** IC-03 离线重算的紧凑结论(完整报告被捕获,仅 --full-verify 时回显)。 */
@@ -357,12 +364,159 @@ async function checkDbIntegrity(dbPath: string, checks: Check[]): Promise<void> 
   }
 }
 
-function checkProviderKey(checks: Check[]): void {  const hasKey = Boolean(process.env.DASHSCOPE_API_KEY && process.env.DASHSCOPE_API_KEY.length > 0);
-  checks.push({
+// ---------------------------------------------------------------------------
+// 凭证健康检查族(night-r4 §11C / T1 · 供应商矩阵 ADR 的可执行面)
+// 红线:值只用于形状判定与掩码回显,绝不整体输出;缺 key/错位只 WARN(R9)。
+// ---------------------------------------------------------------------------
+
+/** 凭证 provider 规格(单一来源;ADR-supplier-matrix.md 的代码侧投影)。 */
+export interface CredentialSpec {
+  /** 检查行名(渲染为 "credential: <name>")。 */
+  readonly name: string;
+  /** env 解析顺序(别名优先;与 research.ts liveApiKey 同一模式)。 */
+  readonly envNames: readonly string[];
+  /** 该 key 支撑的 FAR-Lab 能力(缺失时告知用户损失了什么)。 */
+  readonly capability: string;
+  /** 可执行修复指引(URL / 命令)。 */
+  readonly fix: string;
+  /** 期望前缀族;undefined = 不做形状校验(如校园端点无公开格式)。 */
+  readonly expectedPrefixes?: readonly string[];
+}
+
+export const CREDENTIAL_SPECS: readonly CredentialSpec[] = [
+  {
     name: 'DASHSCOPE_API_KEY',
-    status: hasKey ? 'ok' : 'warn',
-    detail: hasKey ? 'set (presence only; value not read)' : 'not set (offline demo does not need it; real Qwen/DashScope inference requires it)',
-  });
+    envNames: ['FAR_DASHSCOPE_API_KEY', 'DASHSCOPE_API_KEY'],
+    capability: 'LIVE research/ask/judge main chain (R9: offline demo unaffected)',
+    fix: 'get a key at https://bailian.console.aliyun.com/ then set DASHSCOPE_API_KEY (or FAR_DASHSCOPE_API_KEY)',
+    expectedPrefixes: ['sk-'],
+  },
+  {
+    name: 'DEEPSEEK_API_KEY',
+    envNames: ['DEEPSEEK_API_KEY'],
+    capability: 'heterogeneous verification arm (§8.2 cross-vendor check; wiring planned)',
+    fix: 'get a key at https://platform.deepseek.com/ then set DEEPSEEK_API_KEY',
+    expectedPrefixes: ['sk-'],
+  },
+  {
+    name: 'NUAA_API_KEY',
+    envNames: ['NUAA_API_KEY'],
+    capability: 'heterogeneous verification arm (§8.2 cross-vendor check; wiring planned)',
+    fix: 'obtain from the NUAA provider admin then set NUAA_API_KEY',
+  },
+  {
+    name: 'GITHUB_PAT',
+    envNames: ['GITHUB_PAT'],
+    capability: 'release/publish tooling (gh CLI / GitHub API)',
+    fix: 'create a token at https://github.com/settings/tokens then set GITHUB_PAT',
+    expectedPrefixes: ['ghp_', 'github_pat_'],
+  },
+];
+
+/**
+ * 凭证掩码回显:len>=8 显示 first4…last2 + 长度;len<8 全隐藏
+ * (first4+last2 会拼出完整短 key,短值一个字符都不能给)。
+ * 纯函数、确定性 —— 测试直接断言格式与防泄露边界。
+ */
+export function maskCredential(value: string): string {
+  if (value.length < 8) {
+    return `hidden (len ${value.length} — too short to mask)`;
+  }
+  return `${value.slice(0, 4)}…${value.slice(-2)} (len ${value.length})`;
+}
+
+/** 按 envNames 顺序解析第一个非空值(liveApiKey 同款语义)。 */
+function resolveCredential(envNames: readonly string[]): { envName: string; value: string } | null {
+  for (const envName of envNames) {
+    const v = process.env[envName];
+    if (v !== undefined && v !== '') {
+      return { envName, value: v };
+    }
+  }
+  return null;
+}
+
+function checkCredentials(checks: Check[]): void {
+  for (const spec of CREDENTIAL_SPECS) {
+    const hit = resolveCredential(spec.envNames);
+    if (hit === null) {
+      checks.push({
+        name: `credential: ${spec.name}`,
+        status: 'warn',
+        detail: `not configured (optional provider) — ${spec.capability}; fix: ${spec.fix}`,
+      });
+      continue;
+    }
+    const { envName, value } = hit;
+    const masked = maskCredential(value);
+    if (value !== value.trim()) {
+      checks.push({
+        name: `credential: ${spec.name}`,
+        status: 'warn',
+        detail: `${envName} value has leading/trailing whitespace — strip it (copy/paste artifact); masked: ${masked}; fix: ${spec.fix}`,
+      });
+      continue;
+    }
+    if (spec.expectedPrefixes !== undefined && !spec.expectedPrefixes.some((p) => value.startsWith(p))) {
+      const found = value.length >= 4 ? value.slice(0, 4) : '(too short)';
+      checks.push({
+        name: `credential: ${spec.name}`,
+        status: 'warn',
+        detail: `shape mismatch — expected ${spec.expectedPrefixes.join(' or ')} prefix family, found "${found}"; masked: ${masked}; fix: ${spec.fix}`,
+      });
+      continue;
+    }
+    const shapeNote =
+      spec.expectedPrefixes !== undefined
+        ? `shape ok (${spec.expectedPrefixes.join('/')} prefix)`
+        : 'shape not enforced (campus endpoint)';
+    checks.push({
+      name: `credential: ${spec.name}`,
+      status: 'ok',
+      detail: `${envName} set — masked: ${masked} · ${shapeNote}`,
+    });
+  }
+}
+
+/**
+ * --probe-credentials:仅 DASHSCOPE 的 1-token LIVE ping(真实计费调用)。
+ * 无 key → 结构化 skip(info),绝不伪造探针结果;失败 → fail(用户显式要求验证,诚实报错)。
+ * 错误信息经 redact 处理:即使上游错误回显 key 也替换为 [REDACTED]。
+ */
+async function checkCredentialProbe(checks: Check[]): Promise<void> {
+  const key = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
+  if (key === undefined || key === '') {
+    checks.push({
+      name: 'credential probe (--probe-credentials)',
+      status: 'info',
+      detail:
+        'skipped — DASHSCOPE_API_KEY not set (no fabricated result: a probe is a real 1-token billable LIVE call, attempted only with a key); fix: https://bailian.console.aliyun.com/',
+    });
+    return;
+  }
+  try {
+    // lazy import:doctor 被 far.ts 顶层导入,探针网关链(openai SDK)只在 flag 下加载。
+    const { createCompetitionQwenGateway } = await import('../../llm_gateway/competition_gateway.ts');
+    const gateway = createCompetitionQwenGateway({ apiKey: key, timeoutMs: 20000, innerRetryMax: 1 });
+    const response = await gateway.callLlm('competition_aliyun_qwen', {
+      messages: [{ role: 'user', content: 'ping' }],
+      maxTokens: 1,
+      purposeTag: 'doctor_credential_probe',
+    });
+    checks.push({
+      name: 'credential probe (--probe-credentials)',
+      status: 'ok',
+      detail: `live ping ok — model replied (${response.content.length} chars) · real billable call · NEEDS_API_VALIDATION`,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const redacted = message.split(key).join('[REDACTED]');
+    checks.push({
+      name: 'credential probe (--probe-credentials)',
+      status: 'fail',
+      detail: `live ping failed: ${redacted} · real billable call attempted · NEEDS_API_VALIDATION`,
+    });
+  }
 }
 
 function checkLiveQwenSmoke(root: string | null, checks: Check[]): void {
@@ -463,9 +617,15 @@ export async function runDoctor(opts: DoctorOptions): Promise<number> {
   if (opts.dbPath !== undefined) {
     await checkDbIntegrity(opts.dbPath, checks);
   }
-  checkProviderKey(checks);
+  checkCredentials(checks);
   if (opts.liveQwenSmoke) {
     checkLiveQwenSmoke(root, checks);
+  }
+  // --probe-credentials:opts 优先(程序化调用),process.argv 兜底
+  // (far.ts 本批不可动 —— doctor 子命令不拒绝未知 flag,argv 解析让 CLI flag 今日可用)。
+  const probeCredentials = opts.probeCredentials === true || process.argv.includes('--probe-credentials');
+  if (probeCredentials) {
+    await checkCredentialProbe(checks);
   }
 
   // 2026-08-14 UX reorder: 环境检查表先打印;IC-03 verify 降级为紧凑 VERIFY SUMMARY

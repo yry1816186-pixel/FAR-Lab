@@ -35,6 +35,12 @@ import { runGround } from './commands/ground.ts';
 import { runCheckResource } from './commands/check_resource.ts';
 import { runExportCitations, type CitationExportFormat } from './commands/export_citations.ts';
 import { parseJudgePairwiseArgs, runJudgePairwise } from './commands/judge_pairwise.ts';
+import {
+  parseSnapshotVerifyArgs,
+  runSnapshotVerify,
+  renderSnapshotVerifyHuman,
+  renderSnapshotVerifyJson,
+} from './commands/snapshot_verify.ts';
 import { runRegistryAnchor, renderRegistryAnchorHuman } from './commands/registry_anchor.ts';
 import {
   runResearchInspect,
@@ -83,7 +89,7 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'doctor',
-    description: 'environment self-check (no network, no keys by default)',
+    description: 'environment self-check (no network by default; --probe-credentials adds a real 1-token LIVE ping when a key is set)',
     run: async (args) => {
       const liveQwenSmoke = args.includes('--live-qwen-smoke');
       const fullVerify = args.includes('--full-verify');
@@ -179,6 +185,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'verify-sig',
     description: 'verify an Ed25519 file-manifest signature (independent recompute + hash check)',
     run: (args) => runVerifySig(args),
+  },
+  {
+    name: 'snapshot-verify',
+    description: 'verify a run corpus snapshot has not drifted (recompute snapshotId/rootHash) + snapshot-to-snapshot increment report',
+    run: (args) => runSnapshotVerifyFromArgs(args),
   },
   {
     name: 'verify',
@@ -708,6 +719,23 @@ function runRegistryAnchorFromArgs(args: readonly string[]): number {
 function runResearchJudgeFromArgs(args: readonly string[]): Promise<number> {
   const parsed = parseJudgePairwiseArgs(args);
   return runJudgePairwise({ runId: parsed.runId, profile: parsed.profile, json: parsed.json });
+}
+
+function runSnapshotVerifyFromArgs(args: readonly string[]): number {
+  const parsed = parseSnapshotVerifyArgs(args);
+  if (!parsed.ok) {
+    process.stderr.write(`far snapshot-verify: ${parsed.error}\n`);
+    return 2;
+  }
+  const outcome = runSnapshotVerify({
+    runPaths: parsed.runPaths,
+    ...(parsed.increment !== null ? { increment: parsed.increment } : {}),
+    json: parsed.json,
+  });
+  process.stdout.write(
+    (parsed.json ? renderSnapshotVerifyJson(outcome) : renderSnapshotVerifyHuman(outcome)) + '\n',
+  );
+  return outcome.exitCode;
 }
 
 function runExportCitationsFromArgs(args: readonly string[]): number {
