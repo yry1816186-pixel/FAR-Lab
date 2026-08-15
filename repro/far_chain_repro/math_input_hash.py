@@ -5,9 +5,7 @@ Mirrors TS ``src/math/math_verifier.ts`` ``MathVerifier.computeInputHash`` +
 TS-side comment (math_verifier.ts inputHash docstring) has claimed byte-equality
 with — it was previously missing (audit [F], Red Line #5).
 
-Authority: archived-spec数学可验证层 §1 (FormalExpression) +
-           03_确定性规范 §2.4 (canonical_hash byte-equality) +
-           CLAUDE.md Red Line #5 (TS/Python canonicalHash 必须 byte-equal).
+Authority: canonical_hash byte-equality contract (TS/Python must stay byte-equal).
 
 Model-neutrality: NO provider/model references. Pure hash determinism.
 """

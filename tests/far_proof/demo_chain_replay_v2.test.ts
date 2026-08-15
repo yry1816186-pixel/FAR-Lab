@@ -8,7 +8,7 @@
 // 真实依赖：buildDemoChain → fecAppendClaim → decideFiveValueVerdict（V2 R0-R9 内核，确定性·无 LLM）。
 // 反假绿：断言 kernelOutput.ruleTrace 多条 + decisiveRuleId 命中 R\d + machineVerdict===kernelOutput.verdict。
 //
-// Authority: archived-plan §C P0-2c + 03 §7（R0-R9 决策树）+ orchestrator.ts:117。
+// Authority: P0-2c + 03 §7（R0-R9 决策树）+ orchestrator.ts:117。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

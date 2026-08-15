@@ -214,7 +214,7 @@ export interface MeasurementTrace {
   readonly metricKey: string;
   readonly metricValue: number;
   /**
-   * T-003 · Evidence provenance binding（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+   * T-003 · Evidence provenance binding（2026-07-24 F-2-005 修复）。
    *
    * 可选字段：当 FEC 要求 `requireExecutionProvenance: true` 时，primary measurement 须携带
    * 64-hex sha256（来自 sandbox_runner.stdoutHash/artifactTreeHash），证明 metricValue 是

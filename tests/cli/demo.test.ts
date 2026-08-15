@@ -1,9 +1,9 @@
 // tests/cli/demo.test.ts
 // 测试 far demo 命令的输出契约（T-002 回归）。
 //
-// 第 1 轮评委03 F-3-002 发现：`far demo tess-offline` 的 TESS_OFFLINE_NOTE 指向
+// 第 1 轮F-3-002 发现：`far demo tess-offline` 的 TESS_OFFLINE_NOTE 指向
 // 已删的 `examples/tess-offline/output/demo.far-proof`（commit 2b60d14 删 examples/），
-// 形成死循环——评委照抄必失败。本测试锁住修复：输出不得引用任何不存在的 examples 路径，
+// 形成死循环——用户照抄必失败。本测试锁住修复：输出不得引用任何不存在的 examples 路径，
 // 必须给出可执行的 two-step verify 工作流。
 //
 // 不 spawn 子进程（镜像 verify.test.ts 的 runVerifyCapture 模式）。

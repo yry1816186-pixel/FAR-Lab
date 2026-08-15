@@ -8,7 +8,7 @@
 // 经 fecAppendClaim 真实事务路径，非 FakeBackend、非硬编码 metric 当结论。
 // 反假绿：断言基于真实 compileFec 错误码 + 真实 gate reason，无 expect(true)。
 //
-// Authority: archived-plan §C P0-1 + 03 §2.3（编译失败诚实降级）+ 10 W2-A。
+// Authority: P0-1 + 03 §2.3（编译失败诚实降级）+ 10 W2-A。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

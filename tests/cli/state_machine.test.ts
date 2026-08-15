@@ -1,5 +1,5 @@
 // tests/cli/state_machine.test.ts
-// 端到端测试：9-state CLI 协议 FSM + per-stage stageReceipt 哈希链（CLAUDE.md §3「必须」第 5 条）。
+// 端到端测试：9-state CLI 协议 FSM + per-stage stageReceipt 哈希链。
 // 真实依赖：transition（state_machine）+ computeStageReceipt（sha256 + hashCanonicalJson，非 mock）。
 
 import { strict as assert } from 'node:assert';

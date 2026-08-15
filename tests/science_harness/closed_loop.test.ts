@@ -1,7 +1,7 @@
 // tests/science_harness/closed_loop.test.ts
 //
-// 赛道一·B 核心物证：C-ASTRO 闭环实验迭代（规划→BLS→验证→缩放加密网格→实测提升）。
-// 真实依赖：repro/science_harness/bls_compute.py:run（numpy BLS·逐轮真 spawn）+
+// 核心物证：C-ASTRO 闭环实验迭代（规划→BLS→验证→缩放加密网格→实测提升）。
+// 真实依赖：repro/science_harness/bls_compute.py:run（numpy BLS·逐轮真 spawn）
 // src/science_harness/closed_loop.ts:runClosedLoopAstro（网格策略闭环）。
 //
 // 诚实边界：合成 fixture 上真 BLS 计算（确定性）；真实在线 TESS 运行时待 MAST 数据。
@@ -18,7 +18,7 @@ import { runClosedLoopAstro } from '../../src/science_harness/closed_loop.ts';
 
 const CACHED_FIXTURE = resolve('tests/fixtures/science_harness/tic_sample.cache');
 
-test('c-astro closed loop: real per-round BLS + grid zoom/refine -> narrowed grid, higher resolution (赛道一·B)', async (t) => {
+test('c-astro closed loop: real per-round BLS + grid zoom/refine -> narrowed grid, higher resolution (closed-loop)', async (t) => {
   const pythonCommand = findPythonCommand();
   if (pythonCommand === null || !probeNumpy(pythonCommand)) {
     t.skip('python3/python + numpy not available on PATH');

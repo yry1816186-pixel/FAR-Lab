@@ -2,14 +2,14 @@
 -- Math verification layer (spec 38 · Epic N)
 -- Independent of 0001 five core tables: does not modify call_records / evidence_log /
 -- verdict_nodes / evidence_edges / repro_runs. Two new append-only tables:
---   math_claims        — structured math claim objects (spec 38 §1)
---   math_verifications — per-verification evidence rows (spec 38 §2-§4.5)
+--   math_claims        — structured math claim objects (§1)
+--   math_verifications — per-verification evidence rows (§2-§4.5)
 --
--- Column naming authority (spec 38 §7): expected_outcome / outcome (3-value
+-- Column naming authority (§7): expected_outcome / outcome (3-value
 -- verified/refuted/unknown), deliberately distinct from verdict_nodes.verdict
 -- (5-value CONFIRMED/REFUTED/INCONCLUSIVE/DEGRADED_SCOPE/UNTESTED).
 --
--- achieved_level is NOT a physical column (spec 38 §1.1 方案A): it is derived
+-- achieved_level is NOT a physical column (§1.1 方案A): it is derived
 -- from math_verifications via derivedAchievedLevel(). Keeping it out of
 -- math_claims resolves the append-only UPDATE-trigger contradiction.
 --
@@ -20,7 +20,7 @@ PRAGMA foreign_keys = OFF;
 BEGIN TRANSACTION;
 
 -- ============================================================
--- Step 1: math_claims (structured math claim · spec 38 §1 MathClaim)
+-- Step 1: math_claims (structured math claim · §1 MathClaim)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS math_claims (
   claim_id                     TEXT    PRIMARY KEY,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS math_claims (
       'algebraic_identity', 'equation_solution', 'calculus', 'inequality',
       'dimensional_consistency', 'matrix_identity', 'statistic_identity', 'theorem',
       'numerical_reproduction', 'statistical_inference', 'optimization_convergence', 'validated_numerics'
-    )),                                                       -- MathClaimKind 12 values (8 symbolic + 4 numerical · spec 38 §1)
+    )),                                                       -- MathClaimKind 12 values (8 symbolic + 4 numerical · §1)
   formalization                TEXT,                          -- FormalExpression JSON (nullable)
   required_level               TEXT    NOT NULL
     CHECK (required_level IN ('L1_cas', 'L2_smt', 'L3_formal', 'L4_human')),
@@ -47,7 +47,7 @@ CREATE INDEX IF NOT EXISTS idx_math_claims_required       ON math_claims (requir
 CREATE INDEX IF NOT EXISTS idx_math_claims_linked_verdict ON math_claims (linked_verdict_node_id);
 
 -- ============================================================
--- Step 2: math_verifications (per-verification evidence · spec 38 §2-§4.5)
+-- Step 2: math_verifications (per-verification evidence · §2-§4.5)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS math_verifications (
   verification_id   TEXT    PRIMARY KEY,

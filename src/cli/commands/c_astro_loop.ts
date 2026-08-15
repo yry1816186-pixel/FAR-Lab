@@ -1,7 +1,7 @@
 // src/cli/commands/c_astro_loop.ts
-// `far c-astro-loop` —— 赛道一·方向一·B 闭环实验迭代（规划→BLS→验证→缩放加密网格→实测提升）。
+// `far c-astro-loop` —— 闭环实验迭代（规划→BLS→验证→缩放加密网格→实测提升）。
 //
-// 把 C-ASTRO 从"固定一次分析"升级为 B 赛道要求的闭环科研场景：光变曲线即"仪器"，BLS 即"实验"，
+// 把 C-ASTRO 从"固定一次分析"升级为闭环科研场景：光变曲线即"仪器"，BLS 即"实验"，
 // 周期网格策略即"实验规划"，逐轮据反馈缩放加密。诚实：每轮真 spawn numpy BLS（非常量）；
 // 合成 fixture 上验证，真实在线 TESS 运行时待 MAST 数据。
 
@@ -24,7 +24,7 @@ export interface CAstroLoopOptions {
 
 function renderHuman(rounds: readonly ClosedLoopRoundResult[], finalPeriod: number, narrowedTo: number, monotonic: boolean): string {
   const lines: string[] = [
-    'C-ASTRO closed-loop experiment (赛道一·B: plan -> BLS -> verify -> refine grid -> improve)',
+    'C-ASTRO closed-loop experiment (closed-loop: plan -> BLS -> verify -> refine grid -> improve)',
     '────────────────────────────────────────────────────────────────────────────',
   ];
   for (const r of rounds) {

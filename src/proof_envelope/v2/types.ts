@@ -56,7 +56,7 @@ export type ProofValidatorRuleV2 = (typeof PROOF_VALIDATOR_RULES_V2)[number];
 /**
  * [VC] claim 快照（naturalLanguage 进 proofHash 前 normalizeWhitespace）。
  *
- * claimType（任务 #12 · T-029 · 评委08 F-8-003）：
+ * claimType（任务 #12 · T-029 · F-8-003）：
  *   原仅存在 kernel 输入层（VerdictKernelInput.claimType），caller 可对同一 claim 传不同 claimType
  *   改变 R-causal 门裁决，而 ClaimEnvelope hash 不变——第三方独立复算时若 claimType 不同会得不同
  *   裁决却 hash 一致，破坏「verification not trust」。现 claimType 作为 [VC] 字段进 ClaimEnvelope →

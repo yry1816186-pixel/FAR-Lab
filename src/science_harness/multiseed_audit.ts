@@ -10,10 +10,10 @@
  * 诚实边界：BLS 跑 cached_fixture LC + 本地噪声注入（真实计算·非真实在线 TESS）。
  * 真 online TESS multi-seed 是 P1-6 V2 产品化路径（MAST 此环境不可达）。
  *
- * 单一真实依赖（T8）：venvSandboxAdapter.executeAsync 真起 python BLS（per-seed）+
+ * 单一真实依赖（T8）：venvSandboxAdapter.executeAsync 真起 python BLS（per-seed）
  * detect_seed_cherry 真实集合差集 + src/statistics 真实两样本 z-test。
  *
- * Authority: archived-plan §C FUSION-OS-1 + CLAUDE.md §4 P-FUSION。
+ * Authority: FUSION-OS-1。
  */
 
 import type Database from 'better-sqlite3';

@@ -1,7 +1,7 @@
 // src/planning/plan.ts
-// 职责：opencode /plan 源代码化 —— Plan DAG 校验引擎（确定性纯函数）。
+// 职责：Plan DAG 校验引擎（确定性纯函数）。
 //
-// 门禁（对应 opencode /plan 铁律 + AGENT-LIFECYCLE §2.3）：
+// 门禁铁律：
 //   1. 非空计划（≥1 步）
 //   2. 步骤 id 唯一
 //   3. 每步有动作描述 + 合法风险级

@@ -58,7 +58,7 @@ export interface EvidenceRecord {
   readonly scopeNarrowerThanClaim: boolean;
   readonly sourceAnchor: SourceAnchor;
   /**
-   * T-003 · Evidence provenance binding（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+   * T-003 · Evidence provenance binding（2026-07-24 F-2-005 修复）。
    *
    * 可选字段（V1 向后兼容·demo seed 可缺）：当 metricValue 来自真实 sandbox 执行时，
    * 此字段须绑定 `sandbox_runner.computeSandboxRunResult` 产出的 `stdoutHash` 或
@@ -128,7 +128,7 @@ export interface VerdictTracePersisted {
    */
   readonly decisionTrace?: DecisionTrace;
   /**
-   * GRADE 证据质量元数据（批次 2-D·P0-11 接线·可选·透明度层）。
+   * GRADE 证据质量元数据（P0-11 接线·可选·透明度层）。
    *
    * 与 decisionTrace 同设计：不进 verdict 判定（R0-R9 不变）、不进 proofHash（VC 白名单不变）。
    * 仅当调用方提供 studyDesign（或chestrator/verdict_stage 透传）时 kernel 产出

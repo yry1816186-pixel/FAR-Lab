@@ -15,7 +15,7 @@
 // 反同义反复：断言真实 pValue/cohensD/CI（非常量），verdict 由真实 ConfoundingGate FAIL 驱动
 // （reasonCodes 恰为 R_CAUSAL_CONFOUNDING_FAIL + F6_CAUSAL_HONESTY，无 R7/R8 重复降级）。
 //
-// Authority: archived-plan §C P1-5 + 03 §7.5/§7.5.1（R-causal + F6）+ CLAUDE.md §1。
+// Authority: R-causal + F6。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -4,7 +4,7 @@
 
 > 🎯 **一句话：FAR-Lab 是一个证据约束、可证伪、可迭代、可追溯、可复现边界清楚的开源 AI Scientist 研究系统——它从科学问题出发，调用真实文献与数据源生成并比较候选假设，设计可执行研究计划，吸收人工/文献/工具反馈完成修订，并通过确定性验证内核和内容寻址证据链约束模型幻觉与科研表演。**
 >
-> 产品关系（赛道一·方向一·A：科学假设生成与研究计划设计）：
+> 产品关系（科学假设生成与研究计划设计）：
 > ```text
 > AI Scientist 科研生成、证据整合与研究规划主系统   (far research: 生成候选假设 + 比较 + 研究计划)
 >                          ↓
@@ -73,7 +73,7 @@ reads a key value.
 pnpm far demo
 #   → 14/14 golden vectors PASS · end-to-end demo claim sealed · exit 0
 #   (the `tess-offline` sub-mode focuses on C-ASTRO-0001 and may yield UNTESTED; for a full
-#    statistics-driven demo use `far demo` or the hero scripts below)
+#    statistics-driven demo use `far demo`)
 
 # 2. Run the deterministic verdict kernel over 14 golden vectors
 pnpm far verify-golden --all
@@ -91,19 +91,14 @@ pnpm far verify /tmp/tampered
 #   (Get-Content tampered/proof_envelopes.jsonl) -replace 'UNTESTED','CONFIRMED' | Set-Content tampered/proof_envelopes.jsonl
 #   pnpm far verify tampered
 
-# 4. Export the proof bundle used by step 3 (and by the hero scripts below)
+# 4. Export the proof bundle used by step 3
 pnpm far export far-proof --demo-chain --force
 ```
 
-### Scripted Hero walkthroughs (IC-08, timed + honest-labeled)
-
-```bash
-```
-
-Both scripts exit non-zero if the narrative breaks (script failure = Hero failure), print an
-honest-status section (what is proven vs NOT proven), and time-box the run. They prove bundle
-integrity + tamper detection + independent recomputation — not scientific truth (fixtures).
-
+The same guarantees the quickstart walks through — bundle integrity, tamper detection (exit 7 on
+edited evidence), and independent recomputation — are asserted end-to-end by the test suite
+(`tests/far_proof/`, `tests/cli/export_far_proof.test.ts`), so a regression in any of them fails
+`pnpm test` rather than a scripted walkthrough.
 
 Full CLI reference: `pnpm far --help` (grouped overview) · per-command usage: `pnpm far <cmd> --help`.
 
@@ -138,7 +133,7 @@ detached from evidence). FAR-Lab closes all three with:
 
 ---
 
-## Live quickstart (Track 1A: hypothesis generation + research plan)
+## Live quickstart (hypothesis generation + research plan)
 
 ```bash
 # Ground a question in real literature, generate 3-5 candidate hypotheses,
@@ -160,7 +155,7 @@ proves the pipeline plumbing — citation binding, deterministic scoring, Pareto
 **not** any scientific truth). The deterministic verification kernel (`pnpm far demo`,
 `pnpm far verify-golden`, `pnpm far verify`) runs fully offline with zero key.
 
-### The Track-1A research loop (three-minute walkthrough)
+### The research loop (three-minute walkthrough)
 
 ```bash
 # 1. Run the vertical slice (researchability gate → grounding → hypotheses → critique → plan).
@@ -202,15 +197,14 @@ disguised as live.
 
 ---
 
-## Live evaluation (frozen Track-1A set)
+## Live evaluation (frozen evaluation set)
 
 Program-computed metrics over the frozen evaluation set (`src/research/evaluation/frozen_eval_set.json`), executed LIVE with
 `scripts/run_frozen_eval.mjs` (real Qwen via Bailian + real literature retrieval; deterministic layer independently recomputed):
 
 | item | mode | corpus docs | hypotheses | citation binding | falsifiable | counter-evidence queries | plan completeness | deterministic recompute |
 |---|---|---|---|---|---|---|---|---|
-| hero: hot-Jupiter radius inflation | LIVE | 37 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
-| Science-125: earthquake prediction | LIVE | 28 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
+| hero: hot-Jupiter radius inflation | LIVE | 37 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS || Science-125: earthquake prediction | LIVE | 28 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
 | Science-125: room-T superconductivity | LIVE | 21 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
 | Science-125: dark-matter self-interaction | **BLOCKED (rate limit)** | — | — | — | — | — | — | — |
 
@@ -300,7 +294,7 @@ provider, pass an explicit env file: `docker compose --env-file .env up far-api`
 > `NEEDS_DOCKER_BUILD_VALIDATION`: the image is built locally; publish to GHCR is part of the release
 > workflow (`NEEDS_GHCR_PUBLISH`).
 
-### Platform support matrix (T-010 · 评委03/11)
+### Platform support matrix (T-010)
 
 | Platform | Status | Notes |
 |----------|--------|-------|
@@ -366,7 +360,7 @@ toolchain is absent.
 - **Scheduled re-verification** — `far schedule add --exec "<command>" --every 7` re-verifies claims
   over time (JSON-persisted under `$FAR_HOME/schedules.json`; due-date logic + auditable exec runs).
   Your claims get re-verified as new evidence appears — not just once at submission time.
-- Real API / real data / real GPU / competition submission are all explicitly tagged
+- Real API / real data / real GPU usage is explicitly tagged
   `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` / `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`.
 
 ---
@@ -402,8 +396,8 @@ a ready-to-paste BibTeX entry is provided here for convenience.
 }
 ```
 
-**MIT License** — see [LICENSE](LICENSE). This is a competition entry (XH-202619); it does not
-represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any institution.
+**MIT License** — see [LICENSE](LICENSE). FAR-Lab is an independent open-source project and does
+not represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any institution.
 
 ### Known limits
 
@@ -440,7 +434,7 @@ represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or any 
    whose files are recomputed by an attacker without the private key fails verification. Still out
    of scope: key identity is an organizational PKI concern, and an attacker holding both the
    private key and write access can re-sign (DEF-18, V-04).
-10. **Deterministic FSM over Bailian Agent** (T-035 · 评委04) — FAR-Lab uses a self-written
+10. **Deterministic FSM over Bailian Agent** (T-035) — FAR-Lab uses a self-written
     deterministic FSM (`src/agent_loop/fsm_runner.ts`) instead of Alibaba Cloud Bailian Agent /
     application orchestration. This is an intentional design choice: the FSM is deterministic and
     fully traceable (every stage transition is logged to `evidence_log`), whereas Bailian Agent is

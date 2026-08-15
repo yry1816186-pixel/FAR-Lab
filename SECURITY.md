@@ -95,7 +95,7 @@ committing:
 
 ## Cost Snapshot Archiving
 
-Bailian/DashScope API call cost snapshots are archived for competition evidence
+Bailian/DashScope API call cost snapshots are archived for audit evidence
 but must NOT expose billing details:
 
 - **Location**: `evidence/dashscope_calls/YYYY-MM-DD_cost_snapshot.json`

@@ -1,7 +1,7 @@
 /**
  * Verdict Kernel V2 单测 —— APPENDIX_B_GOLDEN 12 个 P0 golden vectors（GV-01..GV-12）+ 辅助边界 case。
  *
- * 权威：archived-plan §1（R0-R9 优先级 SSOT）+ §2（GV-01..GV-12 详细规范）+
+ * 权威：（R0-R9 优先级 SSOT）+ §2（GV-01..GV-12 详细规范）
  *       §4.1（浮点容差 1e-7）+ 03 §7（VerdictKernelInput/Output）。
  *
  * 覆盖矩阵（APPENDIX_B §2 line 79）：

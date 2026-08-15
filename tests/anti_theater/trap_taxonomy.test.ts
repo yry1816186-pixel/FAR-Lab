@@ -1,5 +1,5 @@
 /**
- * trap_taxonomy.test.ts —— 统计陷阱分类法（批次 1-B·借鉴 scientific-agent-skills）
+ * trap_taxonomy.test.ts —— 统计陷阱分类法
  *
  * 覆盖：
  *   1. TRAP_TAXONOMY 键集合与 AntiTheaterAttackKind 闭合联合（经 ATTACK_ID_TO_KIND 值）

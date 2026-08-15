@@ -1,7 +1,7 @@
 -- 0007_add_degraded_from.sql
 -- call_records.degraded_from: FallbackChain 降级来源模型 id 审计列。
 --
--- Authority: archived-spec §8.2/§9 (FallbackChain) + 24 §5
+-- Authority: .2/§9 (FallbackChain) + 24 §5
 --
 -- 边界:
 --   1. 非破坏性 ADD COLUMN TEXT（NULL 默认）。0001 trg_call_records_no_update/no_delete

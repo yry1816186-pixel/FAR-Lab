@@ -1,15 +1,15 @@
-// spec 38 §4 · Math verifier router.
+// §4 · Math verifier router.
 // Routes a MathClaim to the appropriate backend based on claimKind (domain) +
 // requiredLevel (symbolic strength).
 //
-// Routing table (spec 38 §15 T1.4 / §4.5):
+// Routing table (§15 T1.4 / §4.5):
 //   numerical kind (isNumericalKind)        → NumericalBackend (always unknown + bound)
 //   symbolic kind + L1_cas                   → CasBackend (SymPy, expand=sound)
 //   symbolic kind + L2_smt                   → SmtBackend (Z3)
 //   symbolic kind + L3_formal                → FormalBackend (Lean 4) or DafnyBackend
 //   symbolic kind + L4_human                 → no automatic backend (HumanCheckpoint closes it)
 //
-// Domain isolation (spec 38 §4.5 line 352): the router routes by claimKind domain.
+// Domain isolation (§4.5 line 352): the router routes by claimKind domain.
 // A numerical claim is NEVER sent to a symbolic backend, and vice versa. This is
 // a structural invariant of the router — there is no requiredLevel-based domain
 // inference (an earlier revision incorrectly used requiredLevel=L4 to infer the
@@ -58,7 +58,7 @@ export interface MathVerifierOptions {
   readonly dafnyBackend?: MathBackend;
   readonly numericalBackend?: MathBackend;
   /**
-   * E-fallback（批次 3-I·借鉴 ZeroClaw provider fallback chains）：
+   * E-fallback（provider fallback chains）：
    * 主后端不可用/抛错时的替代后端顺序（按 key 查找已配置后端）。
    * 缺省 DEFAULT_FALLBACK_CHAINS。null = 关闭该 key 的 fallback。
    */
@@ -87,7 +87,7 @@ export class MathVerifier {
       dafny: options.dafnyBackend ?? new DafnyBackend(),
       numerical: options.numericalBackend ?? new NumericalBackend(),
     };
-    // E-fallback（批次 3-I）：合并默认链 + 用户覆盖（null 显式关闭该 key fallback）
+    // E-fallback：合并默认链 + 用户覆盖（null 显式关闭该 key fallback）
     const merged: Record<BackendKind, readonly BackendKind[]> = { ...DEFAULT_FALLBACK_CHAINS };
     for (const key of BACKEND_KINDS) {
       const override = options.fallbackChains?.[key];
@@ -140,7 +140,7 @@ export class MathVerifier {
   }
 
   /**
-   * E-fallback（批次 3-I·借鉴 ZeroClaw provider fallback chains）：
+   * E-fallback（provider fallback chains）：
    * 主后端不可用（isAvailable=false / verify 抛错 / 诚实降级 backend_disabled）时，
    * 按 fallbackChains[主 kind] 顺序尝试替代后端（重新 buildVerifyInput 适配）。
    * 全部替代失败 → 保留主后端结果（含 backend_disabled 诚实降级）或重抛主异常。

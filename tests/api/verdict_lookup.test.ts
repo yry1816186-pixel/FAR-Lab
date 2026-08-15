@@ -7,10 +7,10 @@
 //   → supersede 后返回已被取代的 old verdict（correctness bug·与 getActiveVerdicts 语义不一致）。
 // 新实现（修复）: 加 AND superseded_by IS NULL + ORDER BY created_at DESC → 返回最新活跃裁决。
 //
-// 单一真实依赖（CLAUDE.md §1）: 真实 recordVerdict + supersedeVerdict 落库 →
+// 单一真实依赖: 真实 recordVerdict + supersedeVerdict 落库 →
 // fetchHonestVerdictByEvidenceId SQL 查询。非 Fake 后端、非硬编码指标。
 //
-// Authority: 评委10 F-5-10-003 + src/falsifiability/repository.ts:197 getActiveVerdicts（WHERE superseded_by IS NULL）。
+// Authority: F-5-10-003 + src/falsifiability/repository.ts:197 getActiveVerdicts（WHERE superseded_by IS NULL）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

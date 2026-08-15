@@ -1,8 +1,8 @@
 /**
  * llm_judge_injection —— CI gate 5（APPENDIX_E §6）：LLM-as-final-judge 注入检测 + structured kernel 不被覆盖。
  *
- * Authority: archived-plan §2（AT-JUDGE-OVERRIDE 伪代码·llm-reviewer-override）+
- *            §6（CI gate 5）+ 03_EVIDENCE_CONTRACT_AND_VERDICT.md §8.2（F3 deterministic kernel·不接受 LLM 裁决）+
+ * Authority: （AT-JUDGE-OVERRIDE 伪代码·llm-reviewer-override）
+ *            §6（CI gate 5）+ 03_EVIDENCE_CONTRACT_AND_VERDICT.md §8.2（F3 deterministic kernel·不接受 LLM 裁决）
  *            F3 模型中立铁律（CI grep gate：src/anti_theater 禁 import openai/dashscope·W3.5 落地）。
  *
  * 攻击语义：verdict.integrityFlags 注入 LLM 标记（如 'llm_produced_summary'）→ 暗示 LLM 参与最终裁决，

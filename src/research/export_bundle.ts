@@ -131,7 +131,7 @@ export function exportResearchBundle(
   mkdirSync(outputDir, { recursive: true });
 
   const runJson = `${JSON.stringify(run, null, 2)}\n`;
-  const readme = `# FAR-Lab Research Bundle (Track 1A)
+  const readme = `# FAR-Lab Research Bundle
 
 runId:        ${run.runId}
 question:     ${run.question}

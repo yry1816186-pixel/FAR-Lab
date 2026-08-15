@@ -1,4 +1,4 @@
-# Weekly dependency security audit (borrowed from pi/earendil-works supply-chain
+# Weekly dependency security audit (supply-chain
 # hardening: scheduled `npm audit --omit=dev` + signature verification).
 # Runs every Monday 02:00 UTC on main. Failure opens an issue via actionlint-free
 # plain step (no third-party action): a failing step is visible in Actions UI.
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}

@@ -1,6 +1,6 @@
 """AST 梯度符号扫描器回归测试（R4：FORBIDDEN_PATTERNS 定义顺序 NameError）。
 
-Authority: archived-spec §8.1.
+Authority: .1.
 
 注意：AST 扫描只能识别字面写出的全限定名（如 `torch.autograd.grad(...)`）。
 instance method 形态（如 `loss.backward()` / `opt.step()`）的 dotted_path 是

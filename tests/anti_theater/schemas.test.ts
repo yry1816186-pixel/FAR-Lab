@@ -1,7 +1,7 @@
 // tests/anti_theater/schemas.test.ts
 // 测试 parseAntiTheaterLintInput（#11b · untrusted JSON → AntiTheaterLintInput 骨架校验）。
 //
-// Authority: archived-plan §1（7 字段）+ 04 §5.3（L5 verifier --lint-input）。
+// Authority: （7 字段）+ 04 §5.3（L5 verifier --lint-input）。
 //
 // 策略（镜像 verify.test.ts 的 parseProofEnvelopeV2 测试风格）：
 //   - happy：clean base + gv 攻击向量的 JSON roundtrip 均 ok（结构完整·仅值变）。

@@ -1,5 +1,5 @@
 // tests/api/research.test.ts
-// Track-1A research REST routes（异步生命周期契约·file-backed RunStore 为真相源）:
+// research REST routes（异步生命周期契约·file-backed RunStore 为真相源）:
 //   - POST /research → 202 {runId, state:'CREATED', statusUrl, eventsUrl}（后台执行）
 //   - GET /research → 运行列表；GET /:runId/status → checkpoint 摘要（remainingStages 有序）
 //   - GET /:runId → COMPLETED 后 200 冻结 ResearchRun；未 COMPLETED → 409；未知 → 404

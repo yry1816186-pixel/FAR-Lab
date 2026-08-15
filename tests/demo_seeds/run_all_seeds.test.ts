@@ -1,7 +1,6 @@
 /**
  * 端到端 demo seed 验证测试：验证 3 个 seed（A4 / A16 / E2）全部跑通、产出合法。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science125 种子→VerdictNode 裁决协议）+
  *            17_FINAL_AUDIT.md §7（每个 demo seed 要求）。
  *
  * 验证点（每个 seed）：

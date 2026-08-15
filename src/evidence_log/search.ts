@@ -1,5 +1,5 @@
 /**
- * evidence_log search —— FTS5 全文检索辅助层（批次 1-C·借鉴 Hermes Agent FTS5 会话召回）。
+ * evidence_log search —— FTS5 全文检索辅助层（FTS5 会话召回）。
  *
  * 动机：evidence_log 是 append-only 哈希链（可验证），但无可搜索索引。审计/竞品演示需要
  * "搜索所有 CONFIRMED 相关的引物酶活性声明"这类查询——FTS5 是 SQLite 内置，零额外依赖。

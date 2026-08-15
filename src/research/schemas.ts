@@ -1,5 +1,5 @@
 /**
- * research/schemas — canonical zod schemas for the Track-1A research domain
+ * research/schemas — canonical zod schemas for the research domain
  * (directive §7: one canonical schema per core object, runtime-validated).
  *
  * SSOT discipline: every persisted/deserialized research object must pass

@@ -1,8 +1,8 @@
 /**
  * anti_theater_attack_corpus —— CI gate 1（APPENDIX_E §6）：23 golden vector 参数化命中校验。
  *
- * Authority: archived-plan §5.1（AttackCase）+ §5.2（17 P0 golden vectors 表）+
- *            §6（CI gate 1：attack corpus·每向量须命中目标 detector + 期望 reasonCode/forcedVerdict/blockSeal）+
+ * Authority: （AttackCase）+ §5.2（17 P0 golden vectors 表）
+ *            §6（CI gate 1：attack corpus·每向量须命中目标 detector + 期望 reasonCode/forcedVerdict/blockSeal）
  *            06_ROADMAP_AND_DOD.md §5.3（W3 DOD：攻击可重复 / 误报率=0）。
  *
  * 本 gate 消费 tests/fixtures/anti_theater/golden_vectors.ts 的 ALL_GOLDEN_VECTORS（24 向量·覆盖全部

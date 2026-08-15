@@ -1,7 +1,7 @@
 /**
  * math computeInputHash 跨语言一致性测试（[F] / Red Line #5）。
  *
- * Authority: CLAUDE.md Red Line #5（TS/Python canonicalHash byte-equal）/
+ * Authority: TS/Python canonicalHash byte-equal /
  *            03 §2.4 + 38 §1（FormalExpression inputHash）。
  *
  * 兑现 math_verifier.ts inputHash 注释承诺（audit [F] F-1：原「空头支票」——

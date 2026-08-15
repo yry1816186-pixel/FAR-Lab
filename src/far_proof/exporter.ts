@@ -486,7 +486,7 @@ export interface DataManifest {
     readonly legacyDefaultUri: string;
     readonly semver: string;
   };
-  /** 运行环境指纹（评委07 Q3 mitigation：让环境漂移可检测）。旧 bundle 无此字段 → 验证器跳过。 */
+  /** 运行环境指纹（Q3 mitigation：让环境漂移可检测）。旧 bundle 无此字段 → 验证器跳过。 */
   readonly envFingerprint?: EnvFingerprint;
 }
 
@@ -502,7 +502,7 @@ function writeDataManifest(dir: string, filesWritten: readonly string[], exporte
       legacyDefaultUri: 'farlab.dev/ruleset/v1',
       semver: 'MAJOR changes URI / MINOR monotonic backward-compatible / PATCH semantics-neutral',
     },
-    // 评委07 Q3 mitigation：捕获导出时运行环境指纹；验证器比对当前环境，漂移即 warn（披露，非 fail）。
+    // Q3 mitigation：捕获导出时运行环境指纹；验证器比对当前环境，漂移即 warn（披露，非 fail）。
     envFingerprint: computeEnvFingerprint(exportedAt),
   };
   const filePath = join(dir, 'data_manifest.json');

@@ -1,5 +1,5 @@
 /**
- * * research REST routes —— Track-1A 科研纵向切片的 API 面（异步生命周期版）。
+ * * research REST routes —— 科研纵向切片的 API 面（异步生命周期版）。
  *
  * 端点（file-backed RunStore 为主存储；in-memory registry 仅作 write-through 缓存）：
  *   POST   /research                       202 启动后台运行（progress: status/events 端点）
@@ -188,7 +188,7 @@ export async function registerResearchRoutes(
     runReady: cp.state === 'COMPLETED' && store.loadRun(cp.runId) !== null,
   });
 
-  /** POST /research — start one Track-1A run in the background (202 + runId). */
+  /** POST /research — start one research run in the background (202 + runId). */
   app.post('/research', async (request, reply) => {
     const body = CreateResearchSchema.parse(request.body);
     const pipeline = buildPipeline(body.profile);

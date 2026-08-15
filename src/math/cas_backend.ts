@@ -1,13 +1,13 @@
-// spec 38 §3 · CAS (SymPy) backend adapter.
+// §3 · CAS (SymPy) backend adapter.
 // Spawns `python repro/math_backends/sympy_backend.py` as a subprocess.
 //
-// Soundness layer (spec 38 §3.1):
+// Soundness layer (§3.1):
 //   - mode='expand'  → sound verified/refuted (structural equality of expanded forms)
 //   - mode='simplify' → heuristic; Python returns 'unknown', we preserve it
 //
 // Fresh-clone friendliness: if python or sympy is unavailable, isAvailable()=false
 // and verify() returns outcome='unknown' + compileLog='backend_disabled'. Core
-// gates still pass (honest degradation — spec 38 §4.5).
+// gates still pass (honest degradation — §4.5).
 //
 // Model-neutrality: this file references NO model/provider. It only spawns python.
 

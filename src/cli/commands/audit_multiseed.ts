@@ -7,7 +7,7 @@
 // 与 `far audit-seed-cherry`（fixture 常量 showcase）的区别：本命令的 runRegistry 由真实 BLS 子进程
 // 执行产出（5 真起 python spawn·distinct per seed），非硬编码常量。诚实边界：本地噪声注入（真实计算·
 // 非在线 TESS）；真 online TESS multi-seed 是 P1-6 V2 路径。
-// Authority: CLAUDE.md §4 P-FUSION FUSION-OS-1 + archived-plan §C。
+// Authority: FUSION-OS-1。
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

@@ -11,7 +11,7 @@
 //              内部调 compileFec (line 288) + R0-R9 规则 cascade + anti-theater/protocol/identifier/form/fingerprint 门
 //   生产路径: fecAppendClaim @ src/fec/orchestrator.ts:128（seed-cherry 用例真调·经 DB 事务·compileFec + enforceFecMandatoryGate + decideFiveValueVerdict）
 //
-// Authority: CLAUDE.md §1（PROGRESS = 真实依赖端到端接线成功）+ §5 红线（五值枚举固定）。
+// Authority: PROGRESS = 真实依赖端到端接线成功；五值枚举固定。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

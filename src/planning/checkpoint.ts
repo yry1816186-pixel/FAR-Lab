@@ -1,5 +1,5 @@
 // src/planning/checkpoint.ts
-// 职责：opencode /context-checkpoint 源代码化 —— PROGRESS.md 检查点协议
+// 职责：PROGRESS.md 检查点协议
 // 渲染 + 解析（确定性纯函数）。
 //
 // 协议（AGENTS.md §19.1）：检查点最小内容 = 当前目标 / 已完成（带证据）/

@@ -8,7 +8,7 @@
  * 诚实边界：
  *   - 这是「离线回放 fixture」，非真实 LLM 输出。credential.providerRequestId = null（offline 标记）。
  *   - fixture 形态严格匹配 stages/schemas.ts 的 zod schema（runStage schema.parse 会运行时校验）。
- *   - hero demo 选 Hot Jupiter 轨道衰减（C-ASTRO-0001），与参赛摘要的 hero demo 同源。
+ *   - hero demo 选 Hot Jupiter 轨道衰减（C-ASTRO-0001），与内置 hero demo 同源。
  *
  * 零容忍合规：无 any / ts-ignore / 双重断言 / 空 catch / 桩代码。fixture 是真实结构化科研产物。
  */
@@ -17,7 +17,7 @@
 
 /**
  * Science-125 hero demo 的研究问题原文（用户输入侧）。
- * 与 28 摘要 §1 的 Hot Jupiter 轨道衰减 hero demo 同源。
+ * 与内置 Hot Jupiter 轨道衰减 hero demo 同源。
  */
 export const DEMO_RESEARCH_INPUT =
   'Why do not planetary orbits decay? In classical mechanics two-body orbits are stable, ' +

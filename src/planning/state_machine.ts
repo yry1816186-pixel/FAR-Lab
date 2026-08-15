@@ -1,7 +1,7 @@
 // src/planning/state_machine.ts
-// 职责：opencode /state 源代码化 —— 规划状态机（确定性纯函数）。
+// 职责：规划状态机（确定性纯函数）。
 //
-// 阶段链（AGENTS.md §4.4 + AGENT-LIFECYCLE §1）：
+// 阶段链：
 //   ANALYZE → PLAN → EXECUTE → VERIFY → REVIEW → REPORT
 //
 // 规则：

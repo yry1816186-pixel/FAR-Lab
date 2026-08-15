@@ -1,7 +1,7 @@
 -- 0006_falsification_audit_events.sql
 -- Falsification Sufficiency Auditor: meta-audit events table.
 --
--- Authority: FINAL_PACKAGE/HANDOFF_TO_DEV_AGENT.md §3.5 + round5 §1.5 + round8 B3
+-- Authority: round5 §1.5 + round8 B3
 -- Migration 0025 (per SSOT numbering) → 0006 (contiguous renumber)
 --
 -- 边界:

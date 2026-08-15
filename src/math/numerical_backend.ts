@@ -1,6 +1,6 @@
-// spec 38 §3.5 · Numerical backend.
+// §3.5 · Numerical backend.
 //
-// INVARIANT (spec 38 §4.5): numerical verification is NON-SELF-PROVING. This
+// INVARIANT (§4.5): numerical verification is NON-SELF-PROVING. This
 // backend ALWAYS returns outcome='unknown'. It never claims 'verified' or
 // 'refuted'. A numerical bound is MANDATORY in outputArtifact — omitting it
 // raises InvalidBackendResultError.
@@ -61,7 +61,7 @@ export class NumericalBackend implements MathBackend {
 
     if (target.bound === undefined) {
       throw new InvalidBackendResultError(
-        'NumericalBackend.verify: numerical backend requires a mandatory bound in target.bound (spec 38 §4.5 non-self-proving invariant)',
+        'NumericalBackend.verify: numerical backend requires a mandatory bound in target.bound (§4.5 non-self-proving invariant)',
       );
     }
 

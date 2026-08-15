@@ -1,7 +1,7 @@
 // scripts/no_llm_final_judge_scan.mjs
 // ci-04 no_llm_final_judge_scan: 确认最终裁决由确定性代码产出，无 LLM-as-judge（反 theater F1）。
 //
-// 历史溯源: FINAL_PACKAGE/23_CI_AND_VALIDATION.md §6.6.2（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本脚本源码实测为准（ci-04 · deterministic 标记点）
+// 历史溯源: （已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本脚本源码实测为准（ci-04 · deterministic 标记点）
 //          + 11_FALSIFICATION_ENGINE.md §7.2（migration 0020 verdict_protocols）+ 02 F3
 //          + AT-04 审计裁决（2026-06-29，severity=minor）。
 //

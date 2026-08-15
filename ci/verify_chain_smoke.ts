@@ -1,6 +1,6 @@
 // ci/verify_chain_smoke.ts
 // 职责：启动期 evidence_log 链式自验 smoke（CI STEP 12）
-// 历史溯源：10_CI_pipeline.md §9 / 04_evidence_log.md（FAR_CHAIN_DEV_SPEC/ 已于 commit 66e2975 归档·见 FINAL_PACKAGE/ PDF 层）·运行时 SSOT 以本脚本源码 + 实测为准（verifyChainHead / rowToCallRecord / appendRecord）
+// 历史溯源·运行时 SSOT 以本脚本源码 + 实测为准（verifyChainHead / rowToCallRecord / appendRecord）
 // 实现：
 //   1. 打开 better-sqlite3 :memory: DB
 //   2. runMigrations 执行完整迁移链 0001..0007 建表

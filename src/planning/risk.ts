@@ -1,5 +1,5 @@
 // src/planning/risk.ts
-// 职责：opencode /risk 源代码化 —— P0-P4 确定性风险分级（AGENT-LIFECYCLE §4）。
+// 职责：P0-P4 确定性风险分级。
 //
 // 判定规则（纯函数，无 IO）：
 //   1. 不可逆（irreversible）→ P4（双重授权 + 显式回滚 + 完整生命周期）

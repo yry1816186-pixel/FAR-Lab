@@ -1,6 +1,6 @@
 // tests/fec/orchestrator_provenance_fail_closed.test.ts
 //
-// T-003 · orchestrator 集成回归测试（2026-07-24 评委逼问第 1 轮 F-2-005 修复）。
+// T-003 · orchestrator 集成回归测试（2026-07-24 F-2-005 修复）。
 //
 // 验证 fecAppendClaim 集成 assertPrimaryEvidenceProvenanceBound 的 fail-closed 行为：
 //   - V1 默认（requireExecutionProvenance 缺省）→ 恒通过（向后兼容 demo seed fixture）；
@@ -11,7 +11,7 @@
 // 核心断言：fixture 冒充真实计算结果时，系统 fail-closed 拒绝裁决（不再可能落 CONFIRMED）。
 //
 // Authority: T-003 + F-2-005 +
-//            src/fec/orchestrator.ts:168-221（provenance 校验集成点）+
+//            src/fec/orchestrator.ts:168-221（provenance 校验集成点）
 //            src/falsifiability/evidence_provenance.ts 行为契约注释。
 
 import { test } from 'node:test';
@@ -171,7 +171,7 @@ test('T-003 orchestrator: opt-in + primary 证据缺 executionProvenanceHash →
       `integrityFlags 须含 EVIDENCE_PROVENANCE_UNBOUND·实际: ${result.kernelOutput.integrityFlags.join(', ')}`,
     );
 
-    // 核心断言 3：untestedReason 含 EVIDENCE_PROVENANCE_UNBOUND（评委审计可读）
+    // 核心断言 3：untestedReason 含 EVIDENCE_PROVENANCE_UNBOUND（审计可读）
     assert.ok(
       result.decision.untestedReason !== null,
       'fail-closed 时 untestedReason 须非空',

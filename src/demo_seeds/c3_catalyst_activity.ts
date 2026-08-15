@@ -4,7 +4,6 @@
  * 问题简述：DFT+ML 流水线声称在「所有过渡金属催化剂」上预测转化数（TON）相对误差 ≤ 15%
  * （MAPE ≤ 0.15）。证据仅覆盖单原子催化剂（SAC）子集 → scope 比 claim 窄 → DEGRADED_SCOPE。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1 + 17_FINAL_AUDIT.md §7。
  *
  * verdict 设计：thresholdSpec semantics='lt' value=0.15；FEC evidences 含 1 条
  * scopeNarrowerThanClaim=true（SAC 子集·非全部过渡金属）→ decideVerdict 优先返回 DEGRADED_SCOPE

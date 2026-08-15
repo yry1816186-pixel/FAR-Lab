@@ -3,7 +3,7 @@
 // F-5-10-002 RED→GREEN: openFarDb 写路径显式固化 busy_timeout=5000，
 // 不再依赖 better-sqlite3 隐式默认（换库/升级即静默退化为"立即 BUSY"）。
 //
-// Authority: 评委10 F-5-10-002 + src/db/open.ts assertPragmaBaseline。
+// Authority: F-5-10-002 + src/db/open.ts assertPragmaBaseline。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

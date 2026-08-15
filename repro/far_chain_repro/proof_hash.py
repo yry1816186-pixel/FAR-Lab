@@ -1,6 +1,6 @@
 """ProofEnvelope V2 proofHash 独立重算（RULE-PE-010 independently_recomputable）。
 
-Authority: archived-plan §2.5 + APPENDIX_C §1.9 + §2.4。
+Authority: §2.4。
 
 本模块是 TS computeProofHashV2 的 Python 镜像，用于跨语言 byte-equal 对拍
 （RULE-PE-010：ProofEnvelope 必须可被一条不依赖项目 CI 的路径从原始 claim 重算到 proofHash 匹配）。
@@ -50,7 +50,7 @@ def canonical_hash(obj: Any) -> str:
 def normalize_whitespace(text: str) -> str:
     """normalizeWhitespace（§2.4 line 257）：\\r\\n→\\n、\\r→\\n、折叠 [ \\t]+→单空格、trim。
 
-    同时做 Unicode NFC 归一化（评委08 F-4-007·防止 NFC/NFD 等价表示导致跨语言 hash 分裂）。
+    同时做 Unicode NFC 归一化（F-4-007·防止 NFC/NFD 等价表示导致跨语言 hash 分裂）。
     与 TS normalizeWhitespace byte-equal（TS 端 String.prototype.normalize('NFC')）。
     """
     text = unicodedata.normalize("NFC", text)

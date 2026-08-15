@@ -1,7 +1,7 @@
 /**
  * LeaderboardPage.test —— Science-125 完整性广度榜组件测试。
  *
- * Authority: Task #10（规模扩展·惊艳核心）+ spec 41 §1（Science125 种子）+ 09 §4（integrity root）。
+ * Authority: Task #10（规模扩展·惊艳核心）+ §1（Science125 种子）+ 09 §4（integrity root）。
  *
  * 覆盖（mock GET /api/v1/benchmark 返回 BenchmarkReportDto）：
  *   - 渲染页面容器 + h1 标题

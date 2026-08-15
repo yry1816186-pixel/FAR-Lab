@@ -1,6 +1,6 @@
 """七分量确定性 hash 引擎。
 
-Authority: archived-spec §2.
+Authority: kernel invariants.
 
 七分量 = MODEL_SNAPSHOT + active_model_ids_sorted + CalcSpec + seed + nthread
          + code_hash + env_hash

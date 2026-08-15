@@ -4,7 +4,7 @@
 // 无 harness-verified 来源 → R-identifier-fabrication REFUTED（非 UNTESTED·五值优先级 REFUTED > UNTESTED·
 // Open Science fabricated-references EXCEPTION 范式·反剧场强姿态）。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 decideFiveValueVerdict（verdict_kernel_v2.ts）→ R-identifier-fabrication
+// 单一真实依赖：真实 decideFiveValueVerdict（verdict_kernel_v2.ts）→ R-identifier-fabrication
 // 规则（R5 之后、R6 之前）三态判定。非 Fake 后端、非硬编码指标。
 //
 // RED→GREEN 论证：
@@ -12,8 +12,7 @@
 //     （doi:10.1/nonexistent 无来源）落 UNTESTED（宽松·theater：伪造引用 == 无法验证）。
 //   GREEN（接线后）：identifierClaims resolutionStatus='not_found' → REFUTED（GV-14）。
 //
-// Authority: archived-plan §C FUSION-OS-14 +
-//            archived-plan §4 FUSION-OS-14（fabricated-references EXCEPTION）。
+// Authority: FUSION-OS-14（fabricated-references EXCEPTION）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

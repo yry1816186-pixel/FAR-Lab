@@ -1,5 +1,5 @@
 // tests/planning/plan.test.ts
-// opencode /plan 源代码化测试：Plan DAG 校验门禁（AGENT-LIFECYCLE §2.3）。
+// Plan DAG 校验门禁。
 // 真实依赖：validatePlan / isValidRiskLevel（src/planning/plan.ts，纯函数无 mock）。
 
 import { strict as assert } from 'node:assert';

@@ -3,7 +3,7 @@
  *
  * 背景（findings BW4 Gap-7）：数据层追溯完整（6 层：call_records → evidence_log →
  * verdict_nodes → proof_envelopes → lifecycle_events → falsification_audit_events），
- * 但无可视化追溯 UI——评委需 CLI/SQL 才能追溯。本页提供：
+ * 但无可视化追溯 UI——用户需 CLI/SQL 才能追溯。本页提供：
  *
  *   - 输入：hypothesis ID（claim id）→ 三路真实 API 消费：
  *       ① GET /api/v1/verdict/by_hypothesis/:hypoId   （裁决节点·五值 + currentHash）

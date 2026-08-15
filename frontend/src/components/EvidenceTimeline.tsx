@@ -287,7 +287,7 @@ function HashChainReplay({ prevHash, currentHash }: { prevHash: string; currentH
   );
 }
 
-/** R7 门 7 条件展示配置（英文名 + 中文说明·竞赛 demo 可解释性）。 */
+/** R7 门 7 条件展示配置（英文名 + 中文说明·demo 可解释性）。 */
 const R7_GATE_CONDITIONS: readonly {
   readonly key: keyof NonNullable<DecisionTraceSafe['r7Gate']>;
   readonly label: string;

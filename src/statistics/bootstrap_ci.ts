@@ -1,8 +1,8 @@
 /**
  * Deterministic non-parametric bootstrap confidence interval for the sample mean.
  *
- * Background (T-006/T-044 · 2026-07-24 评委逼问第 3 轮 CP-9): pairs with `permutation_test.ts`
- * to close the non-parametric resampling gap identified by 评委02/07. Bootstrap (Efron 1979)
+ * Background (T-006/T-044 · 2026-07-24 CP-9): pairs with `permutation_test.ts`
+ * to close the non-parametric resampling gap identified by . Bootstrap (Efron 1979)
  * estimates the sampling distribution of a statistic by resampling with replacement —
  * no distributional assumption (unlike the normal-approximation CIs in `ci.ts`).
  *

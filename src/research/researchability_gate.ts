@@ -3,7 +3,7 @@
  * plus problem decomposition (§9.2).
  *
  * The gate runs BEFORE any retrieval or generation. It is the honest first
- * step of the Track-1A slice: a question that is out of scope, unsafe, or not
+ * step of the research slice: a question that is out of scope, unsafe, or not
  * researchable must surface as UNSUPPORTED / LIMITED — never as a fabricated
  * research pipeline (directive §9.1: "系统不得把非天文问题替换成固定 TESS 案例…"
  * — and more generally must not fake success for out-of-capability questions).

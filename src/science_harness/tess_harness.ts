@@ -1,24 +1,24 @@
 /**
- * TESS Harness — C-ASTRO-0001 可证伪检验 + verdict_mapping（spec 11 §3 / spec 12 §3.1 §9）。
+ * TESS Harness — C-ASTRO-0001 可证伪检验 + verdict_mapping（§3 / §3.1 §9）。
  *
- * C-ASTRO-0001（spec 12 §9 / spec 11 §9）：
+ * C-ASTRO-0001（§9 / §9）：
  *   claim：TIC 光变曲线存在 transit-like 周期信号（天文域 · hypothesis nodeKind · claimType=existence）。
  *   M1 BLS 周期搜索 / M2 odd-even depth / M3 transit SNR / M4 duration consistency + centroid vetting。
  *
  * V1 阈值数字 spec 标"待实测 W3 回填"——本模块把阈值作为**注入参数**，禁 hardcode 最终数值。
- * spec §9 期望落点（Hero Demo）：M1-M3 PASS + M4 WARN → verdict=INCONCLUSIVE（route mixed）。
+ * 期望落点（Hero Demo）：M1-M3 PASS + M4 WARN → verdict=INCONCLUSIVE（route mixed）。
  *
- * verdict_mapping 5 路径（spec 11 §3）+ F2 优先级：
+ * verdict_mapping 5 路径（§3）+ F2 优先级：
  *   DEGRADED_SCOPE(1) > REFUTED(2) > INCONCLUSIVE(3) > CONFIRMED(4) > UNTESTED(5)
  *
  * 诚实边界（ASK-9）：mapChecksToVerdict **可**产出 CONFIRMED（机器裁决）；
  * 但上游 ProofEnvelope 密封会按 ASK-9 降级 CONFIRMED→INCONCLUSIVE（见 far_proof/demo_chain）。
  *
- * T-020 术语边界（评委05 · 2026-07-24）："CONFIRMED" 在本系统是**合同一致性 bounded support** 语义
+ * T-020 术语边界（2026-07-24）："CONFIRMED" 在本系统是**合同一致性 bounded support** 语义
  * （R7 触发 = 统计证据 + 契约阈值满足），**非天文学 confirmed exoplanet**（后者需 RV/TTV follow-up +
- * 人类背书）。ASK-9 降级正是为此：机器不可终审"confirmed planet"——人类须背书。答辩须区分两层。
+ * 人类背书）。ASK-9 降级正是为此：机器不可终审"confirmed planet"——人类须背书。须区分两层。
  *
- * T-018 Bonferroni 对象边界（评委05 F-5-002 · C-001 裁决 · 2026-07-24 · 已闭合 2026-08-12）：
+ * T-018 Bonferroni 对象边界（F-5-002 · C-001 裁决 · 2026-07-24 · 已闭合 2026-08-12）：
  * 多重检验有**两层**，分别在不同位置校正，组合后即真实 TESS 校正：
  *   (a) M1-M4 四检验维度 Bonferroni → α'=0.05/4=0.0125，**FEC 预登记**（contracts.ts alpha），
  *       本 harness 的 M1 显示阈值与之同源（0.0125）。这一层是 demo 与生产共用的设计常量。
@@ -47,22 +47,22 @@ import type {
 } from './types.ts';
 import type { Verdict } from '../schema/enums.ts';
 
-/** C-ASTRO-0001 claim 文本（spec 12 §9）。 */
+/** C-ASTRO-0001 claim 文本（§9）。 */
 export const C_ASTRO_0001_CLAIM =
   'TIC lightcurve exhibits a transit-like periodic signal (existence claim · hypothesis node)';
 
-/** C-ASTRO-0001 检验项 id（M1-M4 · spec 12 §3.1）。 */
+/** C-ASTRO-0001 检验项 id（M1-M4 · §3.1）。 */
 export const C_ASTRO_CHECK_IDS = ['M1_bls_power', 'M2_odd_even_depth', 'M3_transit_snr', 'M4_duration_centroid'] as const;
 
-/** M1-M4 默认阈值（spec 11 §1.1 / §9 · V1 注入参数，数字标"待实测"的用占位 + 待回填注释）。 */
+/** M1-M4 默认阈值（§1.1 / §9 · V1 注入参数，数字标"待实测"的用占位 + 待回填注释）。 */
 export const C_ASTRO_DEFAULT_THRESHOLDS: Record<(typeof C_ASTRO_CHECK_IDS)[number], ScienceThreshold> = {
-  // M1：BLS power · Bonferroni 校正 α'=0.0125（F8 预登记·spec 12 §3.1）。
+  // M1：BLS power · Bonferroni 校正 α'=0.0125（F8 预登记·§3.1）。
   M1_bls_power: { op: '<', value: 0.0125, unit: 'p-value' },
-  // M2：odd-even depth diff · spec 11 §1.1 原文 op '<' value 3.0 unit 'sigma'。
+  // M2：odd-even depth diff · §1.1 原文 op '<' value 3.0 unit 'sigma'。
   M2_odd_even_depth: { op: '<', value: 3.0, unit: 'sigma' },
-  // M3：transit SNR · spec 12 §3.1 注脚"脚本设定待实测"（V1 注入·禁 hardcode 最终值）。
+  // M3：transit SNR · §3.1 注脚"脚本设定待实测"（V1 注入·禁 hardcode 最终值）。
   M3_transit_snr: { op: '>=', value: 7.0, unit: 'sigma' },
-  // M4：centroid shift · spec 12 §3.1"待实测"（V1 注入）。
+  // M4：centroid shift · §3.1"待实测"（V1 注入）。
   M4_duration_centroid: { op: '<', value: 1.0, unit: 'pixel' },
 };
 
@@ -169,7 +169,7 @@ export function buildCAstroChecks(
 }
 
 /**
- * verdict_mapping 5 路径决策（spec 11 §3 · F2 优先级）。
+ * verdict_mapping 5 路径决策（§3 · F2 优先级）。
  *
  * 优先级：DEGRADED_SCOPE > REFUTED > INCONCLUSIVE > CONFIRMED > UNTESTED。
  * integrityFlags 来自 dataset_resolver（scope_narrow / data_missing）。
@@ -188,7 +188,7 @@ export function mapChecksToVerdict(
   const hasPass = checks.some((c) => c.outcome === 'PASS');
   // AT-01 修复：hasSkip 显式捕获 SKIP outcome（原 hasFail/hasWarn/hasPass 均不读 SKIP → [PASS,SKIP] 静默升 CONFIRMED）。
   const hasSkip = checks.some((c) => c.outcome === 'SKIP');
-  // all_pass 全量判定（spec 11 §3 all_pass = 全 PASS 无 WARN/FAIL/SKIP）·原 hasPass 存在性判定过宽（AT-01）。
+  // all_pass 全量判定（§3 all_pass = 全 PASS 无 WARN/FAIL/SKIP）·原 hasPass 存在性判定过宽（AT-01）。
   const allPass = checks.length > 0 && checks.every((c) => c.outcome === 'PASS');
 
   // F2 优先级 1：scope_narrow → DEGRADED_SCOPE（baseline_exempt / exploratory / 样本不足）。

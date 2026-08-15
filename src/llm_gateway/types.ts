@@ -90,7 +90,7 @@ export interface LlmRequest {
    * Structured Output schema 对象。仅当 responseFormat='json_schema' 时有效。
    * adapter（aliyun_qwen）透传为 DashScope/OpenAI response_format.json_schema；
    * offline_replay 忽略（fixture 已是结构化）。
-   * T-013（评委04 F-4-004 · 2026-07-25 第 3 轮 CP-17）完整接线。
+   * T-013（F-4-004 · CP-17）完整接线。
    */
   readonly jsonSchema?: LlmJsonSchema;
   readonly purposeTag?: string;

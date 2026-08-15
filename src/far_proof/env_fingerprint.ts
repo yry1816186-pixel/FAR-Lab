@@ -1,8 +1,8 @@
 /**
- * env_fingerprint —— .far-proof 运行环境指纹（评委07 Q3 mitigation）。
+ * env_fingerprint —— .far-proof 运行环境指纹（Q3 mitigation）。
  *
  * 诚实背景：.far-proof 锁证据（内容寻址 hash + 篡改可检测），**但不锁运行环境**——这是相对
- * Docker capsule（锁整个环境）的真实硬伤（评委07 Q3：「Docker capsule 锁整个环境，FAR-Lab 的
+ * Docker capsule（锁整个环境）的真实硬伤（Q3：「Docker capsule 锁整个环境，FAR-Lab 的
  * bundle 只锁证据，运行环境仍可能漂移」）。本模块不做（也不假装做）完整环境锁定——它做的是
  * **让环境漂移可检测**：导出时捕获一个环境指纹写入 bundle，验证时比对当前环境，漂移即披露。
  *

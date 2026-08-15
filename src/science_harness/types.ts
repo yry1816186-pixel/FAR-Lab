@@ -1,7 +1,7 @@
 /**
  * Executable Science Harness — 类型层契约（M3 TESS / spec 12）。
  *
- * 历史溯源：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §1-§2（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准 +
+ * 历史溯源：-§2（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准 +
  *            11_FALSIFICATION_ENGINE.md §3 (verdict_mapping 5 路径)。
  *
  * 诚实边界（F4 · 02 §4）：
@@ -17,7 +17,7 @@
 import type { NetworkPolicy, Verdict } from '../schema/enums.ts';
 
 // ---------------------------------------------------------------------------
-// 资源规格（spec 12 §1.1 · 复用 02/23 ResourceSpec SSOT 三字段）
+// 资源规格（§1.1 · 复用 02/23 ResourceSpec SSOT 三字段）
 // ---------------------------------------------------------------------------
 
 /** CPU 资源限制（02 C19 上限：≤8000 millicores = 8 核）。 */
@@ -31,7 +31,7 @@ export interface MemorySpec {
 }
 
 /**
- * Sandbox 资源规格（spec 12 §1.1）。
+ * Sandbox 资源规格（§1.1）。
  * 复用 02/23 ResourceSpec 的 cpu/memory/timeoutMs 三字段——本模块是 far-chain 内首定义，
  * 因此此 interface 即 SSOT（后续若 02/23 落地 ResourceSpec 须与此对齐，禁分裂）。
  *
@@ -54,7 +54,7 @@ export const RESOURCE_LIMITS = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// 产出制品（spec 12 §1.2）
+// 产出制品（§1.2）
 // ---------------------------------------------------------------------------
 
 /** 单个产出制品（Lightkurve plot / table / CSV 等）。 */
@@ -68,11 +68,11 @@ export interface ArtifactManifest {
 }
 
 // ---------------------------------------------------------------------------
-// SandboxRunResult（spec 12 §1.2 · V1 必须的输出 shape）
+// SandboxRunResult（§1.2 · V1 必须的输出 shape）
 // ---------------------------------------------------------------------------
 
 /**
- * Sandbox 执行结果（spec 12 §1.2）。
+ * Sandbox 执行结果（§1.2）。
  *
  * SR-1..SR-7 红线在 V1 的落地：
  *   - SR-2 固定 seed（默认 42，进 reproHash）
@@ -135,7 +135,7 @@ export interface SandboxExecutionInput {
 }
 
 /**
- * Sandbox adapter 最小契约（spec 12 §0 推断·spec 未明写 interface）。
+ * Sandbox adapter 最小契约（§0 推断·spec 未明写 interface）。
  * V1 唯一实现：TypeLayerSandboxAdapter（确定性 hash 计算·禁声称进程隔离）。
  */
 export interface SandboxAdapter {
@@ -179,7 +179,7 @@ export interface VenvSandboxInput {
  * V2 venv 沙箱适配器契约（P1-6）。
  *
  * 与 V1 `SandboxAdapter.execute`（同步·确定性 hash）共存：`executeAsync` 真起 venv 子进程，
- * `isAvailable` 让调用方对缺失环境诚实 skip（不当代码 bug · CLAUDE.md §3）。
+ * `isAvailable` 让调用方对缺失环境诚实 skip（不当代码 bug）。
  */
 export interface VenvSandboxAdapter {
   readonly adapterId: string;
@@ -189,13 +189,13 @@ export interface VenvSandboxAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// 数据集解析（spec 12 §2.1-§2.2）
+// 数据集解析（§2.1-§2.2）
 // ---------------------------------------------------------------------------
 
-/** 数据集解析策略（spec 12 §2.1 三值）。 */
+/** 数据集解析策略（§2.1 三值）。 */
 export type DatasetResolverKind = 'lightkurve' | 'astroquery.mast' | 'cached_fixture';
 
-/** 数据集引用（spec 12 §2.1）。 */
+/** 数据集引用（§2.1）。 */
 export interface DatasetRef {
   readonly resolver: DatasetResolverKind;
   /** lightkurve/astroquery 版本号（进 reproHash）。 */
@@ -210,7 +210,7 @@ export interface DatasetRef {
   readonly sector?: number;
 }
 
-/** 数据集解析结果三态（spec 12 §2.2 决策树）。 */
+/** 数据集解析结果三态（§2.2 决策树）。 */
 export type DatasetResolutionStatus = 'resolved' | 'degraded' | 'untested';
 /** Dataset resolution result (spec 12 S2.2 three-valued decision tree).
  * Tracks status (resolved/degraded/untested), reference, exempt flag, and reason. */
@@ -228,13 +228,13 @@ export interface DatasetResolution {
 }
 
 // ---------------------------------------------------------------------------
-// 检验项 + verdict_mapping（spec 11 §3 / spec 12 §3.1）
+// 检验项 + verdict_mapping（§3 / §3.1）
 // ---------------------------------------------------------------------------
 
 /** 单个可证伪检验项的判定结果（M1-M4 等）。 */
 export type ScienceCheckOutcome = 'PASS' | 'WARN' | 'FAIL' | 'SKIP';
 
-/** 检验项阈值（spec 11 §1.1 · 注入参数·V1 不 hardcode 数值）。 */
+/** 检验项阈值（§1.1 · 注入参数·V1 不 hardcode 数值）。 */
 export interface ScienceThreshold {
   readonly op: '<' | '<=' | '>' | '>=' | '==';
   readonly value: number;
@@ -253,7 +253,7 @@ export interface ScienceCheck {
 }
 
 /**
- * verdict_mapping 触发路径（spec 11 §3 · 5 verdict · AT-01 修复增 partial_skip 子路径）。
+ * verdict_mapping 触发路径（§3 · 5 verdict · AT-01 修复增 partial_skip 子路径）。
  * verdict 映射见 ROUTE_TO_VERDICT：partial_skip → INCONCLUSIVE
  * （含 PASS 但有 SKIP 未测项 → 未全覆盖 → 禁升 CONFIRMED · 反 theater · SKIP≠PASS）。
  */

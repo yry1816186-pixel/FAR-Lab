@@ -23,7 +23,6 @@
  * verdict 设计：2 support（Hori + Kuhl 证明 Cu 上 C2+ FE 可行）+ 2 refute（De Luna TEA 经济门槛
  *  未达 + Jouny 寿命远不足）→ DEGRADED_SCOPE（实验室可行，工业放大窄于 claim）。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §17（Science-125 种子）+ 17 §7.
  */
 
 import { runAgentLoop, DEFAULT_TERMINATION } from '../../src/agent_loop/fsm_runner.ts';

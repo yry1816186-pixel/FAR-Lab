@@ -15,7 +15,7 @@
 // 反同义反复：断言 pValue/adjustedPValue/CI/effectSize 为 src/statistics/ 实算值（非常量数组、非硬编码），
 // verdict 由真实显著性驱动（R7 decisiveRuleId），非 V1 布尔计数器。
 //
-// Authority: archived-plan §C P1-5 + 03 §7 R0-R9 + CLAUDE.md §1（progress=真实接线非测试变绿）。
+// Authority: R0-R9 + progress=真实接线非测试变绿。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

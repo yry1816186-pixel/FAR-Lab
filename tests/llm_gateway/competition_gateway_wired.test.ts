@@ -1,5 +1,5 @@
 /**
- * competition_gateway 生产接线测试（CLAUDE.md §1 / §3 端到端 RED→GREEN）。
+ * competition_gateway 生产接线测试。
  *
  * 真实依赖：createCompetitionQwenGateway → createLlmGateway → createQwenAdapter → executeFallbackChain。
  * 测试在 createChatCompletion 注入层 mock（per-target 成败）——NOT FakeBackend，executeFallbackChain 本身真实编排。

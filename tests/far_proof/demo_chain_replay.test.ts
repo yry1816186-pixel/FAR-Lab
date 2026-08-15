@@ -10,7 +10,7 @@
 // 反假绿：每个断言都基于真实文件/真实重算，无空断言。
 // 诚实边界（ASK-9）：sealedConclusion 绝不等于 CONFIRMED。
 //
-// 历史溯源：FINAL_PACKAGE/15_OPEN_SCIENCE_EXPORT.md §1 +
+// 历史溯源：
 //            09_PROOF_CARRYING_RESEARCH_OBJECT.md §4 +
 //            17_FINAL_AUDIT.md（拱心石可交付）——均已归档（备份 FAR-Lab_Backups/）·运行时 SSOT 以本测试源码实测为准。
 // 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
@@ -384,7 +384,7 @@ test('verifyFarProofPackageIntegrity detects post-package tamper', () => {
 });
 
 test('packaged verify.sh runs after .tar.zst extraction (offline verifier path)', (t) => {
-  // 诚实边界（CLAUDE.md §3）：verify.sh 是 POSIX 脚本·Windows 缺 sh → spawnSync ENOENT (status===null) → skip。
+  // 诚实边界：verify.sh 是 POSIX 脚本·Windows 缺 sh → spawnSync ENOENT (status===null) → skip。
   // 非代码 bug：同 sandbox_real.test.ts 缺 python 的 skip 模式·CI/Linux 有 sh 跑全断言。不禁断言放行。
   const shProbe = spawnSync('sh', ['-c', 'echo ok'], { encoding: 'utf8' });
   if (shProbe.error !== undefined || shProbe.status === null) {

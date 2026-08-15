@@ -1,8 +1,8 @@
 // tests/anti_theater/detector_integrity.test.ts
 //
-// F-4-005（评委13 R4 补强）：detector 自身反剧场——篡改 detector 为 return [] 时测试能否抓到。
+// F-4-005（R4 补强）：detector 自身反剧场——篡改 detector 为 return [] 时测试能否抓到。
 //
-// 评委13 攻击场景：攻击者把 detect_judge_override 函数体改成 return []，所有 detector 被静默降级。
+// 攻击场景：攻击者把 detect_judge_override 函数体改成 return []，所有 detector 被静默降级。
 // structural gate 只查 import 不查逻辑完整性。
 //
 // 本测试的防线（双轴·D2 纪律）：
@@ -12,7 +12,7 @@
 //
 // 本测试补强轴 1（注册完整性），轴 2 已由现有 corpus 测试覆盖（不需重复）。
 //
-// Authority: 评委13 F-4-005 R4 + APPENDIX_E §3（DETECTORS 顺序冻结·23 项）。
+// Authority: F-4-005 R4 + APPENDIX_E §3（DETECTORS 顺序冻结·23 项）。
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';

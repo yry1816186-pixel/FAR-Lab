@@ -8,7 +8,6 @@ const roots = [
   'scripts',
   'tests',
   'ci',
-  'docs',
   'package.json',
   'pyproject.toml',
   // SECURITY（深度对抗轮）：.env / .env.example 须扫 hardcoded_secret_shape（sk-... 明文密钥）。
@@ -21,9 +20,9 @@ const roots = [
 // dashscope_env_reference 检查；hardcoded_secret_shape 等其余检查仍全量生效。
 const envTemplateFiles = new Set(['.env', '.env.example']);
 
-// ── markdown 文档豁免（2026-08-08 S-大修复·blocking_gates 首次真正跑通）──
+// ── markdown 文档豁免（blocking_gates 首次真正跑通时引入）──
 // 代码级反模式检查对纯文本文档无意义：文档引用禁用 token 字面量是合法表达
-// （政策阐述 / 反剧场成果说明 / 历史评审记录 / 命令帮助文本），与 skippedFiles 中
+// （政策阐述 / 反剧场成果说明 / 历史审计记录 / 命令帮助文本），与 skippedFiles 中
 // 20+ 文档豁免条目（docs/installation.md / docs/design/09 等）的既定约定完全一致。
 // 仅保留 hardcoded_secret_shape：sk- 明文密钥检测对文档有真实安全价值（防文档泄露密钥）。
 // 审计依据：docs/ 全部命中经分类统计均为代码级检查假阳性（ts_ignore 34 / todo_marker 27 /
@@ -130,72 +129,14 @@ const skippedFiles = new Set([
   // cli_error_paths 测试 —— 断言 fail-closed stderr 含 FAR_DASHSCOPE_API_KEY 指引（合法验证 env 名，非 secret）。
   // 经审计零容忍合规。
   'tests/cli/cli_error_paths.test.ts',
-  // ── 开源发布 v0.1.0 新增：合法引用 DASHSCOPE_API_KEY 环境变量名（非 secret 值）──
   // far doctor —— 只检测 process.env.DASHSCOPE_API_KEY 是否已设置且非空（不读取值）；--live-qwen-smoke 显式才调真实 API。
   // 经审计合规：类型严格、无抑制指令、无吞错、无 SDK 幻觉参数、无明文密钥。
   'src/cli/commands/doctor.ts',
   // far CLI HELP_TEXT —— 说明性引用 DASHSCOPE_API_KEY env 名（告知用户 key 缺失只 WARN·不 FAIL）。同 ask.ts 模式。
   'src/cli/far.ts',
-  'docs/installation.md',
-  'docs/providers/qwen-dashscope.md',
   // CLI 参考文档 —— 说明性引用 DASHSCOPE_API_KEY env 名（告知用户 key 缺失只 WARN·不 FAIL）。同 docs/installation.md 模式。
   // markdown 合规：无类型断言、无抑制指令、无 SDK 幻觉参数、无明文密钥。
-  'docs/cli-reference.md',
-  // llm_gateway 摘要文档 —— 审计表格引用 DASHSCOPE_API_KEY env 名（说明 CLI 凭据门行为·非 secret 值）。同 docs 类模式。
-  'src/llm_gateway/DIGEST.md',
-  // TAP 指令解析器 —— 解析 TAP 输出的 `# TODO`/`# SKIP` 指令（标准 TAP 格式）：regex `/\s+#\s*TODO\b/i`
-  // 与 status='TODO'/verdict==='TODO' 是 TAP 状态值，非代码 TODO 债务标记（scanner `/TODO|FIXME/` 无法区分 TAP 指令）。
-  // 经人工审计零容忍合规：无真实 TODO/FIXME 债务 / 无 :any / @ts-ignore / 空 catch / stub。
-  'scripts/depth_evidence.mjs',
-  // TAP 解析器单测 —— 测试名与 TAP 夹具字面量（'not ok 6 - probe_todo # TODO not done'）含 TODO，
-  // 是 TAP 输入数据，非代码标记。经人工审计零容忍合规。
-  'scripts/depth_evidence.test.mjs',
-  // c_astro_pipeline anti-theater 接线测试（FUSION-OS-1 proof_test）—— 反 stub 断言字符串
-  // 'antiTheaterScore must be a real computed number (not a stub)' 含 "stub" 词触发 stub_or_mock_return
-  // 误报（断言意图是验证结果非 stub，反 stub 语义；扫描器 stripLineComment 剥注释但不剥字符串字面量）。
-  // 经人工审计零容忍合规（同仓库其他 skipped 测试文件模式，各项检查均通过）。
   'tests/science_harness/c_astro_pipeline.test.ts',
-  // design-lint 扫描器本体 —— 检测正则含 TODO/TBD/待定/后续补充 等延期标记字面量
-  // （是检测模式，非真实延期债务；同 privacy_scan.mjs 自引用模式）。
-  // 经人工审计零容忍合规：无 :any / @ts-ignore / 空 catch / stub / extra_body / sk- 明文。
-  'scripts/design_lint.mjs',
-  // ── DEF-11 处置（S1, 2026-07-20）：5 份 legacy 设计/治理文档说明性引用禁用 token 字面量 ──
-  // 共同理由：markdown 文档为阐述零容忍政策/测试 Oracle/扫描器设计而引用 token 字面量（同
-  // docs/installation.md 既有豁免模式），非生产代码违规。
-  // 审计依据：本扫描器全量输出显示各文件命中行全部为文档引用/示例行，无其他命中。
-  // 限期：以下为 legacy 文档（docs/design/_LEGACY_MAP.md 映射范围内），S6 文档治理重写后须复核移出本豁免。
-  // docs/design/02_COMPETITION_REQUIREMENTS_TRACE.md —— 测试 Oracle 表引用 DASHSCOPE_API_KEY env 名（grep oracle 说明，非 secret 值）。
-  'docs/design/02_COMPETITION_REQUIREMENTS_TRACE.md',
-  // docs/design/09_SCIENTIFIC_AUTHORITY_AND_TRUST_MODEL.md —— 政策条文引用 :any / as unknown as / @ts-ignore 字面量以阐述禁用规则（引用禁用对象本身）。
-  'docs/design/09_SCIENTIFIC_AUTHORITY_AND_TRUST_MODEL.md',
-  // docs/design/16_OPEN_SOURCE_RELEASE_AND_MAINTENANCE.md —— 发布治理文档引用扫描器 token 名、DASHSCOPE_API_KEY env 名与 extra_body 幻觉参数名（设计理由阐述）。
-  'docs/design/16_OPEN_SOURCE_RELEASE_AND_MAINTENANCE.md',
-  // docs/design/20a_PI_VERSION_MANAGEMENT.md —— markdown 代码块示例含 `: any` 类型注解（文档引述第三方代码片段）。
-  'docs/design/20a_PI_VERSION_MANAGEMENT.md',
-  // docs/development/AGENTS.md —— 治理散文 "no added stubs" 触发 stub_or_mock_return（反 stub 语义，非 stub 实现）。
-  'docs/development/AGENTS.md',
-  // ── S8 收敛（2026-07-20）：3 份 machine-readable 镜像文件（design ledger 权威源的只读导出，禁手改） ──
-  // 共同理由：镜像内容=控制面权威登记，合法引用 env 变量名/历史标识符/官方 URL，非 secret 值或 stub 实现。
-  // docs/design/machine-readable/claims.yaml —— 主张台账镜像，evidence_refs 引用 DASHSCOPE_API_KEY env 名（doctor/CLI 行为说明，同 docs/installation.md 既有豁免模式）。
-  'docs/design/machine-readable/claims.yaml',
-  // docs/design/machine-readable/deferral-register.yaml —— 延期登记镜像，DEF-11 处置史引用历史标识符 stub_ok（重命名前的事实记录，非 stub 实现）。
-  'docs/design/machine-readable/deferral-register.yaml',
-  // docs/design/machine-readable/source-registry.yaml —— 来源登记镜像，NIST 官方 URL “…ai-risk-management-framework” 中子串 “sk-management-framework” 触发 hardcoded_secret_shape 误报（URL 非密钥）。
-  'docs/design/machine-readable/source-registry.yaml',
-  // ── R5 CP-20（2026-07-25）：2 份合法内容文件假阳性豁免（提升扫描器精度，非掩盖真 secret/TODO）──
-  // scripts/gen_figs2.py —— 绘图脚本图例数据数组（行 82）“[WARN] DASHSCOPE_API_KEY not set -> offline demo still works”
-  //   是给读者的说明文字（提示缺 key 时离线 demo 仍可用），同 docs/installation.md / far CLI HELP_TEXT 的 env 名说明豁免模式，非 secret 值。
-  //   经审计合规：无 :any / @ts-ignore / 空 catch / stub / extra_body / sk- 明文（纯 matplotlib 绘图脚本）。
-  'scripts/gen_figs2.py',
-  // docs/charter/ULTIMATE_EXECUTION_PRIME.md —— charter 指令文档：讨论 TODO/TBD 元规则（何时该用/禁用，政策阐述非代码债务，同 design_lint.mjs 自引用模式）
-  //   + 引用 NIST 标准 URL（同 source-registry.yaml 的 NIST URL 豁免）。经审计合规：元指令文档，无生产代码违规。
-  'docs/charter/ULTIMATE_EXECUTION_PRIME.md',
-  // docs/research/RESEARCH-FINDINGS.md —— 调研报告：说明性引用 DASHSCOPE_API_KEY env 名（skip 归因）
-  //   + 反剧场成果总结中引用 `: any`/`@ts-ignore` 禁词字面量（阐述「src/ 零 :any/@ts-ignore」验收标准）。
-  //   同 docs/design/09_SCIENTIFIC_AUTHORITY_AND_TRUST_MODEL.md 豁免模式；stripLineComment 对 .md 不剥注释，
-  //   但本文件命中行经人工审计全部为文档引用（git grep 复核），非真实代码违规。
-  'docs/research/RESEARCH-FINDINGS.md',
-  // ── S-大修复（2026-08-08）：blocking_gates 首次真正跑通后暴露的合法命中，逐一人工审计登记 ──
   // src/cli/commands/arena.ts —— 真实对抗竞技场 CLI：合法读取 FAR_DASHSCOPE_API_KEY/DASHSCOPE_API_KEY
   //   env 变量名（fail-closed 凭据门，同 ask.ts 豁免模式）+ 帮助文本 sk-xxx 占位符示例（非真实密钥，
   //   hardcoded_secret_shape pattern sk-[A-Za-z0-9_-]{20,} 不匹配 sk-xxx）。经审计零容忍合规。
@@ -207,14 +148,6 @@ const skippedFiles = new Set([
   //   TS2352（typecheck 证据），必须经 unknown 桥接——属合法适配器模式（适配层收缩外部 SDK 边界），
   //   非反剧场意义上的绕过类型系统。经审计零容忍合规。
   'src/llm_gateway/adapters/openai_compatible/index.ts',
-  // scripts/audit_19field_generator.mjs —— 19 字段审计生成器：行 73-74 为检测正则 /\bTODO\b/、
-  //   /\bFIXME\b/ 字面量（检测反"借口"协议信号，同 design_lint.mjs 自引用豁免模式）；
-  //   行 275 为错误消息字符串「反"借口"协议：禁 "应该通过"/"should pass"/"TODO"」（政策阐述）。
-  //   经审计零容忍合规：无真实 TODO/FIXME 债务 / 无 :any / @ts-ignore / 空 catch / stub。
-  'scripts/audit_19field_generator.mjs',
-  // tests/evidence_quality/grader.test.ts —— 测试名 'gradeEvidenceQuality tier-3/4: any high or <3 low
-  //   → very_low; else low' 中 `: any` 是分级规则描述（"任意 high 级"），非 TypeScript any 类型注解；
-  //   stripLineComment 不剥字符串字面量导致误报。经审计零容忍合规。
   'tests/evidence_quality/grader.test.ts',
   // tests/llm_gateway/resilient_gateway.test.ts —— 反 stub 断言：行 52 throw new Error(`stub: no behavior
   //   for profile ${profile}`) 是 fail-closed 抛错（无行为时显式失败，反 stub 语义），非 stub/mock 返回实现；
@@ -382,7 +315,7 @@ for (const root of effectiveRoots) {
   }
 }
 
-// ---------- 模型中立专项扫描（src/api/·24§0.1 红线） ----------
+// ---------- 模型中立专项扫描（src/api/ 红线） ----------
 // 设计理由：
 //   - Core 模型中立铁律要求 src/api/ 不出现 Qwen / 百炼 / DashScope 字面量
 //     （这些字面量只允许出现在 llm_gateway/adapters/aliyun_qwen + competition_aliyun_qwen）。
@@ -415,7 +348,7 @@ for (const filePath of walk('src/api')) {
   }
 }
 
-// ---------- F4 诚实边界专项扫描（science_harness / spec 12 · 02 §4） ----------
+// ---------- F4 诚实边界专项扫描（science_harness） ----------
 // 设计理由：
 //   - F4 规定 V1 只做类型层约束（purpose_tag 枚举 + CI 审计断言）。
 //   - 严禁在 V1 代码中声称进程级物理隔离 / strong isolation / tamper-proof / physically isolated——
@@ -461,7 +394,7 @@ for (const filePath of walk(f4Root)) {
 //   - src/dialogue/ 是模型中立层，禁止出现 verdict / qwen / 百炼 / @modelcontextprotocol 字面量
 //     （这些属于裁决内核 / 模型适配层 / MCP 协议层，不应泄漏到 dialogue 层）。
 //   - 合并自 tests/dialogue/red_line_grep.test.ts（P2-3 同义反复测试清理：
-//     原 test 是「grep 缺词」类同义反复，CLAUDE.md §1）。
+//     原 test 是「grep 缺词」类同义反复）。
 //   - 复用 stripLineComment 剥离注释，避免文档性注释误报；真实代码违规仍被捕获。
 //   - 不合并原 test 的「至少 7 个 TS 文件」静态计数断言（同义反复，无扫描价值）。
 const dialogueRedLinePatterns = [

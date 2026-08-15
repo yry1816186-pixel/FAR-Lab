@@ -11,7 +11,7 @@ Closed-loop tampering detection:
 The roundtrip ensures cross-language hash byte-equality: TS canonicalHash
 and Python canonical_hash MUST produce identical hex for the same input.
 
-Authority: archived-spec §3 + cross-lang E4.
+Authority: cross-lang E4.
 """
 
 from __future__ import annotations

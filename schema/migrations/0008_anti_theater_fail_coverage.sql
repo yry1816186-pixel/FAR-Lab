@@ -1,7 +1,7 @@
 -- 0008_anti_theater_fail_coverage.sql
 -- AT-02 审计裁决修复：anti-theater trigger 扩展覆盖 FAIL。
 --
--- Authority: FINAL_PACKAGE/23_CI_AND_VALIDATION.md §5.1（checks 含 WARN/FAIL → verdict 不可 CONFIRMED）
+-- Authority:（checks 含 WARN/FAIL → verdict 不可 CONFIRMED）
 --          + 02_CONSTRAINTS_AND_RED_LINES.md F1 + AT-02 审计裁决（2026-06-29）。
 --
 -- 根因（AT-02）：0004 trg_proof_envelopes_anti_theater 的 WHEN 仅匹配 '%"WARN"%'

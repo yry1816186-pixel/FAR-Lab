@@ -1,9 +1,9 @@
 /**
- * trace session_recorder —— 运行时 JSONL session 录制/回放（批次 3-H·借鉴 pi JSONL session format）。
+ * trace session_recorder —— 运行时 JSONL session 录制/回放（JSONL session format）。
  *
  * 动机：FAR-Lab 已有 22 种 AgentRunEventKind（agent_run_event.ts）与 JSONL 导出（far_proof exporter），
  * 但 agent_loop 主循环（fsm_runner）运行时不产生统一 session 流——审计靠事后导出。
- * 本模块让 run 过程实时落 JSONL session（录、回放、审计一体），借鉴 pi 的
+ * 本模块让 run 过程实时落 JSONL session（录、回放、审计一体）
  * "JSONL session format + SessionManager API" 设计。
  *
  * 设计纪律：

@@ -9,7 +9,7 @@ to exercise the full CHECK constraint surface. Additionally, vectors form a vali
 hash chain (each entry's prevHash = previous entry's currentHash) to enable
 chain-integrity regression testing.
 
-Authority: archived-spec §3 + E4 golden trace.
+Authority: E4 golden trace.
 """
 
 from __future__ import annotations
@@ -201,7 +201,7 @@ GOLDEN_VECTORS: list[dict[str, object]] = [
 CHAIN_VECTORS = GOLDEN_VECTORS[1:]  # hypothesis_genesis through citation_dialogue form a valid chain
 
 
-# ── Numeric canonical boundary vectors (spec 23 §80 / HANDOFF §3.3 / day-0 cross-lang PoC 2026-06-29) ──
+# ── Numeric canonical boundary vectors (§80 / HANDOFF §3.3 / day-0 cross-lang PoC 2026-06-29) ──
 # 走 hash_canonical_json（底层通用 canonical 函数），非 canonical_hash（T3 白名单 cred 全 string 不碰数值）。
 #
 # day-0 cross-lang PoC 方法论：TS 侧通过 spawnSync stdin 把 JSON 传给 Python，两侧分别 hash 比对。

@@ -8,7 +8,7 @@
 // proof_caller = src/anti_theater/lint.ts runAntiTheaterLint 入口（assertVerifierModulesClean 接线·每次 verdict 路径）。
 // 反假绿：dirty fixture 必抛 + 真实 kernel/detector 模块基线必空（GREEN）。
 //
-// Authority: archived-plan §C FUSION-OS-5 + FUSION_OPEN_SCIENCE_DESIGN.md §F-5（kernel.py AST 白名单范式）。
+// Authority: FUSION-OS-5 + FUSION_OPEN_SCIENCE_DESIGN.md §F-5（kernel.py AST 白名单范式）。
 
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
@@ -86,7 +86,7 @@ test('production_deterministic_modules_pass_gate', () => {
   assert.doesNotThrow(() => assertVerifierModulesClean());
 });
 
-// ===== F-4-006（评委13 R4）：member-expression 全局 call 捕获（Date.now / Math.random 等） =====
+// ===== F-4-006（R4）：member-expression 全局 call 捕获（Date.now / Math.random 等） =====
 
 test('F-4-006: Date.now() global call is flagged (member expression)', () => {
   const dirty = "export function f() { return Date.now(); }";

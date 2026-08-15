@@ -1,5 +1,5 @@
 /**
- * Sandbox runner — 类型层执行与确定性 hash 计算（spec 12 §1）。
+ * Sandbox runner — 类型层执行与确定性 hash 计算（§1）。
  *
  * 诚实边界（F4 · 02 §4）：
  *   V1 提供 "resource-bounded & network-restricted venv execution" 的**类型层**实现：
@@ -10,7 +10,7 @@
  * V1 真实工作：computeSandboxRunResult 接受确定性输入，计算 stdoutHash/stderrHash/
  * artifactTreeHash——这些 hash 是 reproHash / ProofEnvelope 的前置锚（SR-3）。
  *
- * 历史溯源：FINAL_PACKAGE/12_EXECUTABLE_SCIENCE_HARNESS.md §1.2-§1.3 SR-1..SR-7（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准。
+ * 历史溯源：-§1.3 SR-1..SR-7（已归档·备份 FAR-Lab_Backups/）·运行时 SSOT 以本文件源码实测为准。
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */
 
@@ -80,7 +80,7 @@ function sha256Hex(text: string): string {
 }
 
 /**
- * 计算产出制品树 hash（SR-3 · spec 12 §1.2）。
+ * 计算产出制品树 hash（SR-3 · §1.2）。
  * artifacts 按 (path, contentHash) 排序后做 canonical_json → sha256（复用 hashCanonicalJson）。
  */
 export function computeArtifactTreeHash(artifacts: readonly ArtifactManifest[]): string {
@@ -154,7 +154,7 @@ export function executionFingerprintFromSandboxResult(result: SandboxRunResult):
 }
 
 /**
- * 由 SandboxRunResult 计算 reproHash 前置指纹（spec 12 §6）。
+ * 由 SandboxRunResult 计算 reproHash 前置指纹（§6）。
  * 复用 hashCanonicalJson 对确定性字段做 canonical hash。
  * 注意：此 hash 喂给上游 reproHash / ProofEnvelope，但不等于 proofHash（proofHash 由 sealer 计算）。
  */
@@ -294,7 +294,7 @@ let venv312PythonCache: string | null | undefined = undefined;
 
 // 发现 .venv312（Python 3.12·lightkurve 兼容）并验证 lightkurve+astroquery 可 import。
 // 系统 python 3.14 无稳定 lightkurve wheel → P1-6 真在线取数须走此 venv；缺/坏则返回 null，
-// 调用方据 null 走 cached_fixture 降级（02 F1 never-fabricate）。
+// 调用方据 null 走 cached_fixture 降级（never-fabricate 红线）。
 /** Resolve the .venv312 Python executable (Python 3.12 with lightkurve).
  * Probes for the venv and validates lightkurve+astroquery are importable.
  * @returns Absolute path to the venv Python, or null if unavailable. */

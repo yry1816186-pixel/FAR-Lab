@@ -29,7 +29,7 @@ export const CLI_EVENTS = [
   'ADVANCE_PROOF_SEAL',
   'ADVANCE_AUDITABLE',
   'ADVANCE_VERIFIED',
-  // E-revert（批次 2-F·借鉴 opencode session revert/unrevert）：
+  // E-revert（session revert/unrevert）：
   // 反向转移仅在 PROOF_SEALED 之前的阶段允许（seal 是提交点·之后不可回退）。
   'REVERT_EVIDENCE_GATHER',
   'REVERT_STATISTICS',
@@ -133,7 +133,7 @@ export function isCliEvent(value: unknown): value is CliEvent {
   return typeof value === 'string' && CLI_EVENT_SET.has(value);
 }
 
-// fail-closed: 非法转移不静默覆写，强制返回 PROTOCOL_DEVIATION_CRITICAL（CLAUDE.md §2 第 3 类）。
+// fail-closed: 非法转移不静默覆写，强制返回 PROTOCOL_DEVIATION_CRITICAL。
 /**
  * transition.
  */

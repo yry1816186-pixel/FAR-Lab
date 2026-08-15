@@ -1,7 +1,7 @@
 /**
  * FallbackChain → degraded_from 端到端桥接集成测试。
  *
- * 历史溯源（已归档）: archived-spec §8.2/§9 + 0007_add_degraded_from.sql。
+ * 历史溯源（已归档）: .2/§9 + 0007_add_degraded_from.sql。
  *
  * 目的：证明 FallbackChainResult.degradedFrom → CallAuditData.degradedFrom →
  *       call_records.degraded_from 列 的桥接契约端到端可行（离线，caller 注入 mock）。
@@ -84,7 +84,7 @@ function requireModelId(value: string | null): string {
 const OFFLINE = { providerProfile: 'offline_replay' as const };
 
 /**
- * 桥接契约（spec 05 §8.2）：调用方拿到 FallbackChainResult 后，用 degradedFrom 构造 CallAuditData。
+ * 桥接契约（§8.2）：调用方拿到 FallbackChainResult 后，用 degradedFrom 构造 CallAuditData。
  * 这是"降级留痕落库"的桥接点——生产 adapter 在此处把 result.degradedFrom 注入 audit。
  */
 function bridgeResultToAudit(

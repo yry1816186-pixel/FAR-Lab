@@ -1,7 +1,6 @@
 /**
  * demo seed registry —— benchmark 聚合器的 seed 元数据 + run 函数清单。
  *
- * 历史溯源（已归档）: archived-spec可证伪证据链_FEC.md §1（Science125 种子）+ 17 §7.
  *
  * 职责：把各 demo seed 的 run 函数与展示元数据（problemId / title / domain / tag）绑定，
  * 供 src/benchmark/aggregator.ts 的 runBenchmark 串行消费。

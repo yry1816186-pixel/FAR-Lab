@@ -7,11 +7,11 @@
 //   - repro/science_harness/dataset_fetch.py:check_host（Python 侧 host 白名单双层防御）
 //   - repro/science_harness/dataset_fetch.py:fetch_lightkurve（lightkurve 真取数 + ECSV sha256）
 //
-// 诚实边界（CLAUDE.md §3 + 02 F1 never-fabricate）：
+// 诚实边界：
 //   - 缺 python / lightkurve / 网络 → t.skip 或诚实 null（**不当代码 bug，不伪造 hash**）。
 //   - 白名单 host 真取数测试不强断言成功（避免 flaky 网络），只验证「不抛 + 形态合法 + 不伪造」。
 //
-// Authority: archived-plan §C P1-6 + 12 §2.1-§2.2 + 02 C8 RULE-DATA-001。
+// Authority: P1-6 + 12 §2.1-§2.2 + 02 C8 RULE-DATA-001。
 
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -76,7 +76,7 @@ test('fetchOnlineDataset: whitelisted host honestly returns null-or-result; spaw
     return;
   }
   // lightkurve 是真实在线取数的硬依赖。缺它 → 跳过（非 assert.ok(true) 假绿）：
-  // 区分「本环境无法验证真实取数」与「接线已验证」（02 F1 never-fabricate）。
+  // 区分「本环境无法验证真实取数」与「接线已验证」（never-fabricate 红线）。
   const lightkurveProbe = spawnSync(
     pythonCommand,
     ['-c', 'import lightkurve'],

@@ -6,7 +6,7 @@ stdin and writes a canonical JSON response to stdout. Scripts MUST:
 
 1. Never crash — always emit valid JSON (outcome='unknown' on any error).
 2. Use ``json.dumps(..., sort_keys=True, separators=(",", ":"), ensure_ascii=False)``
-   for output so cross-language canonical-hash alignment holds (spec 03 §2.4).
+   for output so cross-language canonical-hash alignment holds (§2.4).
 3. Record 'backend_disabled' in the log when the backend dependency is missing.
 
 Scripts are intentionally NOT imported as modules by the TS layer — they are

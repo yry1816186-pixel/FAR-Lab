@@ -385,7 +385,7 @@ function countVerdictGoldenVectors(): number {
 }
 
 // docCount 来源：glob docs/**/*.md（docs/ 是用户文档根）。
-// R6 仓库内容政策（2026-08-15）：docs/ 已退出仓库（内部文档一律 .far/docs-local/ 本地存放）——
+// 仓库内容政策：docs/ 已退出仓库（内部文档一律 .far/docs-local/ 本地存放）——
 // 目录缺失是政策后的合法状态：返回 0（诚实计数），不再视为仓库结构破坏。
 function readDocFiles(): number {
   if (!existsSync(join(REPO_ROOT, 'docs'))) return 0;

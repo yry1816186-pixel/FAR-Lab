@@ -1,7 +1,7 @@
 -- 0005_falsifiability_contracts.sql
 -- Falsifiability Contracts (FEC V1-must): pre-registration of falsifiable claims.
 --
--- Authority: FINAL_PACKAGE/11_FALSIFICATION_ENGINE.md + 21 §1 W1 + 22 §2 T-W1-07
+-- Authority: T-W1-07 (falsifiability contract schema)
 -- Migration 0018 (per SSOT numbering) → 0005 (contiguous renumber)
 --
 -- 边界:

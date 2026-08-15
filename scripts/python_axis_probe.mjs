@@ -2,7 +2,7 @@
 // P3-1：suite 起跑时单条 Python-axis 能力探针，打印清晰状态行。
 //
 // 让 Python axis 的 available|skipped 状态在测试起跑时可见，避免 axis skipped 被误当代码 bug
-// （CLAUDE.md §3「axis skipped = 环境问题，不是你的」）。探针永不阻断 test（始终 exit 0）。
+// 。探针永不阻断 test（始终 exit 0）。
 
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';

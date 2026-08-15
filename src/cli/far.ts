@@ -250,7 +250,7 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'c-astro-loop',
-    description: 'C-ASTRO closed-loop experiment iteration (赛道一·B: plan→BLS→verify→refine grid)',
+    description: 'C-ASTRO closed-loop experiment iteration (closed-loop: plan→BLS→verify→refine grid)',
     run: (args) => runCAstroLoopFromArgs(args),
   },
   {
@@ -265,7 +265,7 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'research',
-    description: 'Track-1A vertical slice: ground → generate 3-5 hypotheses → critique → score → plan (start|status|resume|inspect)',
+    description: 'research vertical slice: ground → generate 3-5 hypotheses → critique → score → plan (start|status|resume|inspect)',
     run: async (args) => {
       const subcommand = args[0];
       if (subcommand === 'inspect') {
@@ -1027,7 +1027,7 @@ USAGE:
     needs python+numpy; exits 1 if missing. exit 0 on pipeline run; 2 bad args
 
   far c-astro-loop [--lightcurve <path>] [--rounds <n>] [--python <cmd>] [--json]
-                        C-ASTRO closed-loop experiment iteration (赛道一·方向一·B: 接入"仪器"后
+                        C-ASTRO closed-loop experiment iteration (closed-loop: 接入"仪器"后
                         据反馈迭代提升). 每轮 = 规划(周期网格) -> BLS(真 numpy) -> 验证 ->
                         据反馈缩放并加密网格。光变曲线即"仪器"，BLS 即"实验"。
     --lightcurve <path>  lightcurve CSV (default tests/fixtures/science_harness/tic_sample.cache)
@@ -1039,7 +1039,7 @@ USAGE:
 
   far ground "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--no-counter-evidence] [--json]
                         Ground a research question in REAL literature + adversarial counter-evidence
-                        (赛道一·方向一·A acquisition layer, directive §9/§16). Retrieves supporting docs
+                        (hypothesis-generation acquisition layer). Retrieves supporting docs
                         + 5 counter-evidence queries (non-replication/null/failure/criticism/alternative),
                         dedupes into an immutable CorpusSnapshot (snapshotId + tamper-evident rootHash).
                         A hypothesis should cite documentIds from this corpus; the citation resolver makes
@@ -1060,7 +1060,7 @@ USAGE:
 
   far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>]
                    [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]
-                         Track-1A vertical slice (赛道一·方向一·A) under the persistent run
+                         research vertical slice under the persistent run
                          lifecycle: researchability & safety gate →
                          ground the question in real literature (supporting + counter-evidence +
                          decomposition subquestions) → CorpusSnapshot → generate 3-5

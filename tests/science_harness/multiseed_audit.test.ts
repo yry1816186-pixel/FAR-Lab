@@ -8,10 +8,10 @@
 // 与 seed_cherry_pipeline（fixture 常量 showcase）的根本区别：本测试的 registry 是 5 次真实
 // BLS spawn 的实算结果（distinct per seed），artifactHash/metricValue 从实算派生。
 //
-// 真实依赖（T8）：venvSandboxAdapter.executeAsync（per-seed 真起 python BLS）+
+// 真实依赖（T8）：venvSandboxAdapter.executeAsync（per-seed 真起 python BLS）
 // detect_seed_cherry 真实集合差集 + src/statistics 真实两样本 z-test。
 //
-// 诚实边界（CLAUDE.md §3）：BLS 跑 cached_fixture LC + 本地噪声注入（真实计算·非在线 TESS）。
+// 诚实边界：BLS 跑 cached_fixture LC + 本地噪声注入（真实计算·非在线 TESS）。
 // 缺 python/numpy/fixture = 环境问题 → 跳过。
 
 import { existsSync } from 'node:fs';

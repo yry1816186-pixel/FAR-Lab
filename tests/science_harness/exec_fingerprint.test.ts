@@ -4,7 +4,7 @@
 // 持久化 → 复算观测三元组与基线比对，任一维度量级差异>10x → R-execution-fingerprint DEGRADED_SCOPE
 // （Open Science per-cell resource 三元组范式·非 bit-exact）。
 //
-// 单一真实依赖（CLAUDE.md §1）：
+// 单一真实依赖：
 //   - 真实 decideFiveValueVerdict（verdict_kernel_v2.ts）→ R-execution-fingerprint 规则（R4 后·anti-theater-fail 前）。
 //   - 真实 flagExecutionFingerprintMagnitudeMismatch（verdict_kernel_v2.ts）纯函数量级比对（max/min>10x）。
 //   - 真实 spawnVenv（sandbox_runner.ts）→ Python time.process_time（CPU·跨平台）+ resource.getrusage（peak_rss·POSIX）
@@ -17,10 +17,9 @@
 //   GREEN（接线后）：caller pre-compute flagExecutionFingerprintMagnitudeMismatch → executionFingerprintMismatch=true
 //     → R-execution-fingerprint DEGRADED_SCOPE（复算不可复现·统计结论不可信）。
 //
-// 反剧场红线（FUSION-OS-7 + CLAUDE.md §5）：per-cell 资源指纹。声明做重算但复算秒级返回 → 不可信 → 降级。
+// 反剧场红线（FUSION-OS-7）：per-cell 资源指纹。声明做重算但复算秒级返回 → 不可信 → 降级。
 //
-// Authority: archived-plan §C FUSION-OS-7 +
-//            archived-plan §4 FUSION-OS-7（per-cell 三元组范式）。
+// Authority: FUSION-OS-7（per-cell 三元组范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,4 +1,4 @@
-// spec 38 §5 · Evidence sink for the math verification layer.
+// §5 · Evidence sink for the math verification layer.
 // Persists MathClaim and MathVerificationRecord to the math_claims /
 // math_verifications tables (0010_math_verification.sql) and appends a
 // corresponding entry to the shared evidence_log (0001_initial.sql).

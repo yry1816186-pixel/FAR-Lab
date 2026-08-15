@@ -1,10 +1,10 @@
 # FAR-Lab Cross-Platform CI — Windows / Linux / macOS 三平台矩阵
 # 目的：用户愿景「完整并且能够适应 win/linux/mac 系统」的工程化兜底。
-#   现有 ci.yml 是 12 步串行 ubuntu-only 竞赛门禁（不可动）——本 workflow 是独立补充矩阵，
+#   现有 ci.yml 是 12 步串行 ubuntu-only 门禁（不可动）——本 workflow 是独立补充矩阵，
 #   在同一仓库证明核心链路（install → typecheck → lint → test → frontend → hygiene）在
 #   Windows / macOS / Linux 全部可复现运行。
 # 设计原则：
-#   - 不动 ci.yml（保持竞赛门禁 SSOT 稳定），本文件独立、可随时增删，不参与 needs 串行链。
+#   - 不动 ci.yml（保持门禁 SSOT 稳定），本文件独立、可随时增删，不参与 needs 串行链。
 #   - NODE_COMPILE_CACHE 用 GitHub runner 注入的环境变量 $RUNNER_TEMP（job 级 env 引用
 #     ${{ runner.temp }} 是非法的，会触发 "Unrecognized named-value: 'runner'" 解析失败），
 #     保证 Windows（无 /tmp）不把 V8 compile cache 泄漏进工作树（卫生门禁 compile_cache_no_leak）。
@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       # NODE_COMPILE_CACHE 指向 runner 临时目录（仓库外），三平台统一的 V8 compile cache
       - name: Set NODE_COMPILE_CACHE (repo-outside V8 cache)
         shell: bash
@@ -88,7 +88,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          fetch-depth: 0   # release_check/no_verify_audit 需 tags + 完整历史
+          fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}

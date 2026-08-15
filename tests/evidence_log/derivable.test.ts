@@ -2,7 +2,7 @@
 //
 // FUSION-OS-10 端到端 RED→GREEN：evidence 行 derivable 标记 + derivable=1 内容寻址 hash 绑定 + verify 重算。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 appendEvidenceLog（src/evidence_log/repository.ts）经 hashCanonicalJson
+// 单一真实依赖：真实 appendEvidenceLog（src/evidence_log/repository.ts）经 hashCanonicalJson
 // 落 evidence_payload_hash → 真实 verifyEvidencePayloadHashes（src/evidence_log/verifier.ts）重算 sha256 比对。
 // 非 Fake 后端、非硬编码 hash（hash 由 hashCanonicalJson 重算互验）。
 //
@@ -17,8 +17,7 @@
 // migration 误删 trigger 可改字节。evidence_payload_hash 是内容寻址绑定，闭合 canonicalHash 4 键不含
 // evidence_payload 的缺口。与链式 current_hash 正交（独立列·不进白名单·零回归 12 GV + cross-lang）。
 //
-// Authority: archived-plan §C FUSION-OS-10 +
-//            archived-plan §4 FUSION-OS-10（host_call_log.derivable 范式）。
+// Authority: FUSION-OS-10（host_call_log.derivable 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

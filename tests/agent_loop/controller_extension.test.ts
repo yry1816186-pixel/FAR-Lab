@@ -9,7 +9,7 @@
  *      产物并入 artifacts（复用证据链语义）；失败显式抛错（fail-closed）。
  *   3. 零回归：缺省不传 → 无 stage_held/stage_resumed 事件、无扩展产物。
  *
- * Authority: src/agent_loop/controller.ts + fsm_runner.ts（controller/扩展段）+
+ * Authority: src/agent_loop/controller.ts + fsm_runner.ts（controller/扩展段）
  *            src/agent_loop/stage_registry.ts（ExtensionStageError）。
  *
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩。

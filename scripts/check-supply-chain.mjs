@@ -1,4 +1,4 @@
-// check-supply-chain.mjs — Supply-chain hardening gate (borrowed from pi/earendil-works)
+// check-supply-chain.mjs — Supply-chain hardening gate
 //
 // Enforces:
 //   1. Every direct dependency (dependencies + devDependencies) in package.json is

@@ -17,7 +17,7 @@
  *
  * 退出码：REVIEW 或 UNKNOWN 任一命中 → exit 1；全 ALLOWED（或仅 unverifiable）→ exit 0。
  *
- * 权威：DEF-15 (DEFERRAL_REGISTER) + AGENTS.md §8 供应链 + SECURITY.md 许可证合规。
+ * 权威：供应链纪律 + SECURITY.md 许可证合规。
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 桩返回。
  *
  * 用法：

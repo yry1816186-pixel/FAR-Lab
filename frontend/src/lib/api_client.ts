@@ -9,16 +9,16 @@
  *      /ready to :3000) in dev, and a reverse proxy in production. Same-origin
  *      keeps LAN/mobile access working (no hardcoded localhost origin).
  *
- * Path layout (spec 24 §0#2): ALL app endpoints live under the /api/v1/ prefix.
+ * Path layout (§0#2): ALL app endpoints live under the /api/v1/ prefix.
  * Only the liveness + readiness probes (§0#3) live on the bare root (/health, /ready).
  *
  * Field contract: the frontend consumes backend field names VERBATIM (camelCase ·
- * spec 24 §0 casing rule). No aliasing, no obfuscation. The backend DTO is the
- * contract of record (spec 24 §5.3 leaves most response bodies unspecified, so the
+ * §0 casing rule). No aliasing, no obfuscation. The backend DTO is the
+ * contract of record (§5.3 leaves most response bodies unspecified, so the
  * implementation defines the shape).
  *
  * NOTE on `verdict` path segments: the URL paths `/verdict/...` are an API contract
- * (spec 24 §5.3). They are URL segments, not source identifiers — exempt from any
+ * (§5.3). They are URL segments, not source identifiers — exempt from any
  * source-level naming convention. Frontend code freely uses `verdict` as a field/
  * type name here because no rule constrains the frontend source (the red-line grep
  * at tests/dialogue/red_line_grep.test.ts scans src/dialogue/ only).
@@ -66,7 +66,7 @@ import {
 
 /**
  * Structured API error carrying backend error details (RFC 7807 Problem Details subset,
- * spec 24 §0.6).
+ * §0.6).
  *
  * Unlike a plain Error, ApiError carries:
  *   - httpStatus: HTTP status code
@@ -397,7 +397,7 @@ export const v2QueryKeys = {
   detail: (receiptId: string) => ['v2', 'receipts', 'detail', receiptId] as const,
 } as const;
 
-// ---------- Probes (bare root, no /api/v1 prefix — spec 24 §0#3) ----------
+// ---------- Probes (bare root, no /api/v1 prefix — §0#3) ----------
 
 /** GET /health — liveness probe. */
 export function useHealth(
@@ -423,7 +423,7 @@ export function useReady(
   });
 }
 
-// ---------- App endpoints (all under /api/v1 — spec 24 §0#2) ----------
+// ---------- App endpoints (all under /api/v1 — §0#2) ----------
 
 /** GET /api/v1/evidence/:id — single evidence-log entry. */
 export function useEvidence(
@@ -529,7 +529,7 @@ export function useReport(
   });
 }
 
-// ---------- Integrity trust-root endpoints (spec 09 §4 / 23 §5.2) ----------
+// ---------- Integrity trust-root endpoints (§4 / 23 §5.2) ----------
 
 /**
  * GET /api/v1/integrity/root — whole-chain Merkle root + chain head locator.

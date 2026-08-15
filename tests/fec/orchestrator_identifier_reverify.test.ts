@@ -8,7 +8,7 @@
 // R-identifier 不触发 → 伪造引用 verdict 通过。identifierClaims 不持久化、verifier 不重算，事后不可查。
 // 修复（orchestrator.ts buildVerdictKernelInput）：caller 只控制 kind+value，harness 重算 resolutionStatus。
 //
-// 单一真实依赖（CLAUDE.md §1）：真实 fecAppendClaim 生产路径 → orchestrator.buildVerdictKernelInput
+// 单一真实依赖：真实 fecAppendClaim 生产路径 → orchestrator.buildVerdictKernelInput
 // → resolveIdentifierClaim（HARNESS_VERIFIED_IDENTIFIERS）→ decideFiveValueVerdict R-identifier 规则。
 // 非 Fake 后端、非硬编码指标、非直接调 kernel（经 fecAppendClaim 端到端）。
 //
@@ -17,8 +17,8 @@
 //     → 落正常 cascade（NO_DECISION_PATH/CONFIRMED）→ 期望 REFUTED FAIL。
 //   GREEN（修复后·重算覆盖）：自填 resolved（value 不在 registry）→ 重算 not_found → R-identifier REFUTED。
 //
-// Authority: CLAUDE.md §5（反 theater 红线：来源不可自填）+
-//            archived-plan §C FUSION-OS-14 dep 注记（caller opt-in → 强化 harness 重算）。
+// Authority: 反 theater 红线（来源不可自填）
+//            FUSION-OS-14 dep 注记（caller opt-in → 强化 harness 重算）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

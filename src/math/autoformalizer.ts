@@ -1,4 +1,4 @@
-// spec 38 §6 · Core-neutral autoformalizer.
+// §6 · Core-neutral autoformalizer.
 // Converts natural-language math claims into machine-checkable FormalExpression
 // objects using RULE-BASED pattern matching (NO LLM calls — model-neutral).
 //
