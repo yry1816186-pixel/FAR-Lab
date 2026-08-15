@@ -30,6 +30,7 @@ import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
 import type { StrategyId } from '../discovery/types.ts';
 import type { FanoutMeta } from '../discovery/generate.ts';
+import { registerRunDiscoveries } from '../discovery/registry.ts';
 import {
   runResearch,
   STAGE_LIFECYCLE_STATE,
@@ -74,6 +75,18 @@ export interface RunCheckpoint {
   readonly discoveryStrategies?: readonly StrategyId[];
   /** Source-failure policy (absent = 'reject'); persisted for resume-stability. */
   readonly onSourceFailure?: 'reject' | 'degrade';
+  /**
+   * Discovery-registry outcome at run completion (LIVE/MIXED runs register
+   * CORROBORATED-qualified hypotheses in the append-only ledger). Null error
+   * = registered (or skipped-by-mode); non-null = the ledger write FAILED —
+   * the run itself is valid and persisted, the failure is surfaced loudly.
+   */
+  readonly discoveryRegistration?: {
+    readonly appendedCount: number;
+    readonly skippedDuplicates: number;
+    readonly notRegisteredCount: number;
+    readonly error: string | null;
+  };
   readonly state: ResearchLifecycleState;
   readonly completedStages: readonly ResearchStageId[];
   readonly ctx: Record<string, unknown>;
@@ -269,12 +282,14 @@ export interface ExecuteResearchRunArgs {
   readonly profile: ProviderProfile;
   readonly grounding?: ResearchGroundingOptions;
   readonly targetHypothesisCount?: number;
-  /** Discovery fan-out opt-in (directive §2.1); persisted to the checkpoint for resume-stability. */
+  /** Discovery fan-out strategy (directive §2.1); persisted to the checkpoint for resume-stability. Default since b3: multi_strategy. */
   readonly hypothesisGenerationStrategy?: 'legacy' | 'multi_strategy';
   /** Strategy subset for multi_strategy runs. */
   readonly discoveryStrategies?: readonly StrategyId[];
   /** Receives the fan-out accounting when a multi_strategy run generates hypotheses. */
   readonly onFanoutComplete?: (meta: FanoutMeta) => void;
+  /** Override the discovery-registry ledger path (tests inject temp dirs). */
+  readonly discoveryRegistryPath?: string;
   /** Existing run id → resume; omitted → new run (ULID minted). */
   readonly runId?: string;
   readonly store: RunStore;
@@ -328,9 +343,9 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       sources: sourcesOf(args.grounding),
       maxPerQuery: args.grounding?.maxPerQuery ?? 5,
       target: args.targetHypothesisCount ?? 3,
-      ...(args.hypothesisGenerationStrategy !== undefined
-        ? { hypothesisGenerationStrategy: args.hypothesisGenerationStrategy }
-        : {}),
+      // Default since b3: multi-strategy fan-out. New checkpoints ALWAYS carry
+      // the field; only pre-b3 checkpoints (absent field) resume as legacy.
+      hypothesisGenerationStrategy: args.hypothesisGenerationStrategy ?? 'multi_strategy',
       ...(args.discoveryStrategies !== undefined ? { discoveryStrategies: args.discoveryStrategies } : {}),
       ...(args.grounding?.onSourceFailure !== undefined
         ? { onSourceFailure: args.grounding.onSourceFailure }
@@ -465,6 +480,34 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       error: null,
       errorKind: null,
     };
+
+    // Discovery Registry (directive §2.4): LIVE/MIXED runs append their
+    // CORROBORATED-qualified hypotheses to the hash-chained ledger. A ledger
+    // failure NEVER discards the completed run — the outcome (with the error)
+    // is persisted on the checkpoint and surfaced by the CLI, loudly.
+    let registration: RunCheckpoint['discoveryRegistration'] = { appendedCount: 0, skippedDuplicates: 0, notRegisteredCount: 0, error: null };
+    try {
+      const outcome = registerRunDiscoveries(run, {
+        ...(args.discoveryRegistryPath !== undefined
+          ? { ledgerPath: args.discoveryRegistryPath }
+          : {}),
+        ...(args.now !== undefined ? { now: args.now } : {}),
+      });
+      registration = {
+        appendedCount: outcome.appended.length,
+        skippedDuplicates: outcome.skippedDuplicates,
+        notRegisteredCount: outcome.notRegistered.length,
+        error: null,
+      };
+    } catch (err) {
+      registration = {
+        appendedCount: 0,
+        skippedDuplicates: 0,
+        notRegisteredCount: 0,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+    cp = { ...cp, discoveryRegistration: registration, updatedAt: now().toISOString() };
     store.saveCheckpoint(cp);
     store.saveRun(runId, run);
     emit({ type: 'run_completed', runId, runMode: run.runMode, at: now().toISOString(), seq: nextSeq() });

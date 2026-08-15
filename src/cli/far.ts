@@ -36,6 +36,7 @@ import { runCheckResource } from './commands/check_resource.ts';
 import {
   runResearchInspect,
   runResearchStart,
+  runResearchRegistry,
   runResearchStatus,
   runResearchResume,
   runResearchFeedback,
@@ -294,6 +295,9 @@ const COMMANDS: readonly CliCommand[] = [
       }
       if (subcommand === 'baseline') {
         return runResearchBaseline(args.slice(1));
+      }
+      if (subcommand === 'registry') {
+        return runResearchRegistry(args.slice(1));
       }
       if (subcommand === 'start') {
         return runResearchStart(args.slice(1));
