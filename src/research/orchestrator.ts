@@ -56,6 +56,8 @@ import {
 } from '../discovery/orchestration/tournament.ts';
 import { screenCandidatesForDualUse } from '../discovery/safety/dual_use_gate.ts';
 import type { StrategyId } from '../discovery/types.ts';
+import type { ResearchMemoryStore } from './memory.ts';
+import { buildMemoryInjection } from './memory.ts';
 import { critiqueHypothesis } from './adversarial_review.ts';
 import { designResearchPlan } from './research_plan.ts';
 import { bindCitations } from './citation.ts';
@@ -136,6 +138,13 @@ export interface RunResearchOptions {
   readonly discoveryStrategies?: readonly StrategyId[];
   /** Receives the fan-out accounting when multi_strategy runs (CLI summary / lifecycle persistence seam). */
   readonly onFanoutComplete?: (meta: FanoutMeta) => void;
+  /**
+   * Research-memory snapshot (§2.5) frozen at run start by the lifecycle: the
+   * domain-aware injection prior + dedup index are derived from it inside the
+   * hypothesis stage (receipted, deterministic). Undefined = no memory path
+   * (offline replay stays byte-stable).
+   */
+  readonly memoryStore?: ResearchMemoryStore;
   /** Whether the critique uses the same model as the generator (default true). */
   readonly sameModelAsGenerator?: boolean;
   /** Optional run id (default: ULID). */
@@ -221,6 +230,12 @@ export interface ResearchCtx {
   fanoutMeta?: FanoutMeta | null | undefined;
   /** Deterministic tournament ranking (null when fewer than 2 scored candidates). */
   tournament?: TournamentResult | null | undefined;
+  /**
+   * Research-memory snapshot frozen at run start (§2.5): the injection prior
+   * and the dedup index are derived from THIS snapshot (never a later state),
+   * so a resumed run replays the same memory inputs. Null = no memory.
+   */
+  memoryStore?: ResearchMemoryStore | null | undefined;
   plan: ResearchPlan | null;
 }
 
@@ -310,6 +325,7 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         fanoutMeta: null,
         tournament: null,
         plan: null,
+        memoryStore: opts.memoryStore ?? null,
       };
   hydrateCtxResolver(ctx);
   opts.onCtxReady?.(ctx);
@@ -425,6 +441,35 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
   await driver.run('hypothesis_generation', async () => {
     const corpus = ctx.corpus!;
     if (hypothesisGenerationStrategy === 'multi_strategy') {
+      // Research-memory injection (§2.5): domain-aware deterministic summary
+      // from the frozen start-snapshot. The prior is CONTEXT, not evidence —
+      // its receipt records exactly what was injected (inputHash over the
+      // summary; verify treats it as an input, like the corpus receipt).
+      const memoryInjection =
+        ctx.memoryStore !== null && ctx.memoryStore !== undefined
+          ? buildMemoryInjection(ctx.memoryStore, {
+              ...(ctx.gateReport?.scope.domain !== undefined && ctx.gateReport.scope.domain !== null
+                ? { domain: ctx.gateReport.scope.domain }
+                : {}),
+            })
+          : null;
+      if (memoryInjection !== null && memoryInjection.summary !== null) {
+        ctx.receipts.push(
+          buildProvenanceReceipt({
+            runId,
+            stageId: 'memory_injection',
+            sequence: nextSeq(),
+            component: 'deterministic',
+            mode: liveModel ? 'LIVE' : 'RECORDED_REPLAY',
+            inputHash: hashCanonicalJson({ summary: memoryInjection.summary }),
+            outputHash: hashCanonicalJson({
+              injected: true,
+              knownContentHashes: memoryInjection.knownContentHashes.size,
+            }),
+            createdAt: now().toISOString(),
+          }),
+        );
+      }
       // Discovery fan-out (directive §2.1/§2.2): every applicable strategy
       // contributes candidates; one receipt per strategy call keeps the
       // per-strategy provenance; the merge gates are deterministic.
@@ -435,6 +480,10 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         ...(opts.discoveryStrategies !== undefined
           ? { strategyIds: opts.discoveryStrategies }
           : {}),
+        ...(memoryInjection?.summary !== undefined && memoryInjection.summary !== null
+          ? { memoryPrior: memoryInjection.summary }
+          : {}),
+        ...(memoryInjection !== null ? { knownMemoryHashes: memoryInjection.knownContentHashes } : {}),
       });
       ctx.hypotheses = fanout.hypotheses;
       ctx.fanoutMeta = fanout.meta;
@@ -858,6 +907,11 @@ function buildDiscoveryBlock(
             truncated: fanoutMeta.truncated,
             finalCount: fanoutMeta.finalCount,
             quotaShortfall: fanoutMeta.quotaShortfall,
+            // §2.5 dedup guard (b5, optional — absent when no memory index
+            // was provided): marked-only, never selection power.
+            ...(fanoutMeta.memoryFlagged !== undefined
+              ? { memoryFlagged: fanoutMeta.memoryFlagged }
+              : {}),
           },
     tournament:
       tournament === null

@@ -462,6 +462,8 @@ export interface FanoutReceipt {
   readonly truncated: readonly { readonly id: string; readonly strategyId: StrategyId }[];
   readonly finalCount: number;
   readonly quotaShortfall: number;
+  /** §2.5 dedup guard (b5, optional): marked-only memory duplicates. */
+  readonly memoryFlagged?: readonly { readonly id: string; readonly marker: string }[] | undefined;
 }
 
 /** Schema-v4 projection of the deterministic tournament (directive §2.2 ranking layer). */
