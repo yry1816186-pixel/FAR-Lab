@@ -31,6 +31,7 @@ import type { ProviderProfile } from '../llm_gateway/types.ts';
 import type { StrategyId } from '../discovery/types.ts';
 import type { FanoutMeta } from '../discovery/generate.ts';
 import { registerRunDiscoveries } from '../discovery/registry.ts';
+import { loadResearchMemory, recordRunToMemory, type ResearchMemoryStore } from './memory.ts';
 import {
   runResearch,
   STAGE_LIFECYCLE_STATE,
@@ -85,6 +86,21 @@ export interface RunCheckpoint {
     readonly appendedCount: number;
     readonly skippedDuplicates: number;
     readonly notRegisteredCount: number;
+    readonly error: string | null;
+  };
+  /**
+   * Research-memory outcome at run completion (directive §2.5). Null error =
+   * recorded (or skipped-by-mode); non-null = the memory write FAILED — the
+   * run itself is valid and persisted, the failure is surfaced loudly. Absent
+   * = memory disabled or not attempted.
+   */
+  readonly memoryRecording?: {
+    readonly skippedMode: boolean;
+    readonly negativeRecorded: number;
+    readonly branchesAdded: number;
+    readonly branchesSuperseded: number;
+    readonly conclusionsRecorded: number;
+    readonly learningsRecorded: number;
     readonly error: string | null;
   };
   readonly state: ResearchLifecycleState;
@@ -290,6 +306,10 @@ export interface ExecuteResearchRunArgs {
   readonly onFanoutComplete?: (meta: FanoutMeta) => void;
   /** Override the discovery-registry ledger path (tests inject temp dirs). */
   readonly discoveryRegistryPath?: string;
+  /** Override the research-memory store path (tests inject temp dirs). */
+  readonly researchMemoryPath?: string;
+  /** Disable research-memory read+write for this run (CLI --no-memory / FAR_RESEARCH_MEMORY=0). */
+  readonly disableMemory?: boolean;
   /** Existing run id → resume; omitted → new run (ULID minted). */
   readonly runId?: string;
   readonly store: RunStore;
@@ -453,6 +473,15 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       ...(args.grounding?.adapter !== undefined ? { adapter: args.grounding.adapter } : {}),
     };
 
+    // Research memory (§2.5): freeze the store snapshot BEFORE the run so the
+    // injection prior and dedup index are stable across resume. Offline replay
+    // never reads memory (fixture byte-stability); a corrupt store is a HARD
+    // error (silently skipping = faked amnesia; repair or archive the file).
+    let memoryStore: ResearchMemoryStore | undefined;
+    if (args.disableMemory !== true && cp.profile !== 'offline_replay') {
+      memoryStore = loadResearchMemory(args.researchMemoryPath);
+    }
+
     const run = await runResearch({
       question: cp.question,
       gateway: args.gateway,
@@ -464,6 +493,7 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       hypothesisGenerationStrategy: cp.hypothesisGenerationStrategy ?? 'legacy',
       ...(cp.discoveryStrategies !== undefined ? { discoveryStrategies: cp.discoveryStrategies } : {}),
       ...(args.onFanoutComplete !== undefined ? { onFanoutComplete: args.onFanoutComplete } : {}),
+      ...(memoryStore !== undefined ? { memoryStore } : {}),
       runId,
       driver,
       onCtxReady: (ctx) => {
@@ -508,6 +538,34 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       };
     }
     cp = { ...cp, discoveryRegistration: registration, updatedAt: now().toISOString() };
+
+    // Research memory (§2.5): record the completed run's negative results,
+    // branches, strategy stats and conclusions. Same failure contract as the
+    // registry — a memory failure NEVER discards the completed run; the error
+    // is persisted on the checkpoint and surfaced loudly.
+    if (args.disableMemory !== true) {
+      let recording: RunCheckpoint['memoryRecording'];
+      try {
+        const outcome = recordRunToMemory(run, {
+          ...(args.researchMemoryPath !== undefined
+            ? { memoryPath: args.researchMemoryPath }
+            : {}),
+          ...(args.now !== undefined ? { now: args.now } : {}),
+        });
+        recording = { ...outcome, error: null };
+      } catch (err) {
+        recording = {
+          skippedMode: false,
+          negativeRecorded: 0,
+          branchesAdded: 0,
+          branchesSuperseded: 0,
+          conclusionsRecorded: 0,
+          learningsRecorded: 0,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+      cp = { ...cp, memoryRecording: recording, updatedAt: now().toISOString() };
+    }
     store.saveCheckpoint(cp);
     store.saveRun(runId, run);
     emit({ type: 'run_completed', runId, runMode: run.runMode, at: now().toISOString(), seq: nextSeq() });

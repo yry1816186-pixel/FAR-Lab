@@ -32,6 +32,7 @@ import { computeHypothesisId, renderCorpusAllowlist } from '../research/hypothes
 import { callStructuredJson, type CallMeta } from '../research/llm.ts';
 import { rawSha256Hex } from '../retrieval/hash.ts';
 import { PARAPHRASE_RISK_MARKER, type StrategyId } from './types.ts';
+import { hypothesisContentHash } from './content_hash.ts';
 import {
   buildIdf,
   paraphraseSimilarity,
@@ -61,6 +62,14 @@ export interface GenerateMultiStrategyOptions {
    * deterministic (scenario #14 of the decision record).
    */
   readonly maxStrategies?: number;
+  /** Internal research-memory prior (§2.5) — rendered as a marked context block; never part of the strategy signature. */
+  readonly memoryPrior?: string;
+  /**
+   * Content hashes already explored/eliminated in past runs (§2.5 dedup):
+   * kept candidates hitting a known hash get a MEMORY_DUPLICATE marker in the
+   * fan-out meta (deterministic exact-hash match — marking only).
+   */
+  readonly knownMemoryHashes?: ReadonlySet<string>;
 }
 
 /** One strategy's fan-out outcome (honest accounting: skip, error, or candidates). */
@@ -109,6 +118,15 @@ export interface FanoutMeta {
   readonly finalCount: number;
   /** max(0, targetCount − finalCount) — reported, never padded. */
   readonly quotaShortfall: number;
+  /**
+   * Candidates whose content-hash already exists in the research memory
+   * (directive §2.5 dedup guard; absent when no memory index was provided).
+   * b5 scope: MARK ONLY — selection/scorecard wiring is a later batch.
+   */
+  readonly memoryFlagged?: readonly {
+    readonly id: string;
+    readonly marker: string;
+  }[];
 }
 
 /** Resolve the effective strategy list: subset → catalog order → budget cap. */
@@ -231,6 +249,7 @@ export async function generateHypothesesMultiStrategy(
           question: opts.question,
           corpusAllowlist: allowlist,
           perCallTarget: strategy.maxPerCall,
+          ...(opts.memoryPrior !== undefined ? { memoryPrior: opts.memoryPrior } : {}),
         }),
         8192,
       );
@@ -350,6 +369,18 @@ export async function generateHypothesesMultiStrategy(
     .slice(targetCount)
     .map((k) => ({ id: k.candidate.id, strategyId: k.candidate.strategyOrigin ?? strategies[k.strategyIndex]!.id }));
 
+  // Research-memory dedup guard (§2.5): exact content-hash match against past
+  // runs. b5 scope: MARK ONLY (fan-out meta) — no selection power, declared.
+  const memoryFlagged =
+    opts.knownMemoryHashes === undefined
+      ? undefined
+      : finalKept
+          .filter((k) => opts.knownMemoryHashes!.has(hypothesisContentHash(k.candidate)))
+          .map((k) => ({
+            id: k.candidate.id,
+            marker: `MEMORY_DUPLICATE:${k.candidate.id.slice(0, 12)}`,
+          }));
+
   return {
     hypotheses: finalKept.map((k) => k.candidate),
     meta: {
@@ -360,6 +391,7 @@ export async function generateHypothesesMultiStrategy(
       truncated,
       finalCount: finalKept.length,
       quotaShortfall: Math.max(0, targetCount - finalKept.length),
+      ...(memoryFlagged !== undefined ? { memoryFlagged } : {}),
     },
   };
 }

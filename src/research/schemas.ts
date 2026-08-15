@@ -562,6 +562,10 @@ export const FanoutReceiptZod = z.object({
   ),
   finalCount: z.number().int().nonnegative(),
   quotaShortfall: z.number().int().nonnegative(),
+  // §2.5 dedup guard (b5, optional — absent on pre-b5 runs).
+  memoryFlagged: z
+    .array(z.object({ id: z.string(), marker: z.string() }))
+    .optional(),
 });
 
 export const TournamentReceiptZod = z.object({

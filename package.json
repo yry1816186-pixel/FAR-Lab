@@ -73,7 +73,8 @@
     "smoke-core": "pnpm run test && pnpm run test:py",
     "benchmark:generate": "tsx scripts/generate_benchmark.ts",
     "gen:openapi": "node scripts/generate_openapi.mjs",
-    "openapi:check": "node scripts/generate_openapi.mjs --check"
+    "openapi:check": "node scripts/generate_openapi.mjs --check",
+    "test:capture": "node scripts/test_capture_run.mjs"
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",

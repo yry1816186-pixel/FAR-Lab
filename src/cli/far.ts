@@ -37,6 +37,8 @@ import {
   runResearchInspect,
   runResearchStart,
   runResearchRegistry,
+  runResearchAdjudicate,
+  runResearchMemory,
   runResearchStatus,
   runResearchResume,
   runResearchFeedback,
@@ -299,11 +301,17 @@ const COMMANDS: readonly CliCommand[] = [
       if (subcommand === 'registry') {
         return runResearchRegistry(args.slice(1));
       }
+      if (subcommand === 'adjudicate') {
+        return runResearchAdjudicate(args.slice(1));
+      }
+      if (subcommand === 'memory') {
+        return runResearchMemory(args.slice(1));
+      }
       if (subcommand === 'start') {
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'status', 'resume', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', or 'feedback' (got: ${subcommand ?? '<missing>'})\n` +
+        `far research: expected 'start', 'status', 'resume', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', 'feedback', 'registry', 'adjudicate', or 'memory' (got: ${subcommand ?? '<missing>'})\n` +
           '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]\n' +
           '         far research status <runId> [--json]\n' +
           '         far research resume <runId> [--profile ...] [--out <file>] [--json]\n' +
@@ -311,7 +319,10 @@ const COMMANDS: readonly CliCommand[] = [
           '         far research verify <run.json|bundle-dir> [--json]\n' +
           '         far research export <run.json> --out <bundle-dir> [--json]\n' +
           '         far research compare <run.json> [--revision <a> <b>] [--json]\n' +
-          '         far research analyze <run.json> [--live] [--out <new.json>] [--json]\n' +
+          '         far research analyze <run.json> [--live] [--adjudicate] [--out <new.json>] [--json]\n' +
+          '         far research adjudicate <run.json> [--hypothesis <id>] [--ledger <path>] [--json]\n' +
+          '         far research registry [--verify | --export <file> | --json] [--ledger <path>]\n' +
+          '         far research memory <status|summary> [--path <file>] [--domain <d>] [--json]\n' +
           '         far research evaluate <run.json> [--json]\n' +
           '         far research baseline "<question>" [--profile ...] [--json]\n' +
           '         far research feedback <run.json> --file feedback.json [--out <new.json>] [--profile ...]\n',
