@@ -3,7 +3,7 @@
  * 独立性：不进 verdict（R0-R9 不变）、不进 proofHash（VC 白名单不变）——透明度层。
  */
 
-export { gradeEvidenceTier, assessRoB, gradeEvidenceQuality, ROB_DOMAINS } from './grader.ts';
+export { gradeEvidenceTier, assessRoB, gradeEvidenceQuality, classifyStudyDesign, ROB_DOMAINS } from './grader.ts';
 export type {
   EvidenceQualityGrade,
   EvidenceQualityLevel,

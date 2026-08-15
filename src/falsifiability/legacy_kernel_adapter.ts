@@ -360,6 +360,17 @@ export function verdictResultFromKernelOutput(output: VerdictKernelOutput): Verd
         ? output.untestedReason ?? output.reasonCodes.join(', ')
         : null,
     conflictingEvidenceCount: output.statisticalReport.conflicting ? 1 : 0,
+    // R10 发表偏倚感知（night-r2 S1 连带字段；night-r2 集成方定性升级）：V2 路径
+    // 恒 null 是**语义边界**而非待办——发表偏倚是"文献证据基"的属性（支持/反证
+    // 检索量与符号比失衡，因阴性结果系统性欠发表）；V2 kernel 的 statistics 是
+    // 确定性实验/统计计算结果（对同一 FEC 契约的多重检验），其全支持=强复现而非
+    // 发表偏倚。把 10:1 规则强行接到内部统计一致性上是概念错配（cargo-cult）。
+    // 检测规则接线在 legacy decideVerdict 证据投票路径（verdict.ts
+    // detectEvidenceBaseBias——b5 KERNEL_ADJUDICATED 回流即走此路径消费文献/
+    // 观测证据记录）。若未来 V2 输入引入文献证据记录，须先扩展 StatisticalReport
+    // 携带证据来源语义，再谈接线（显式登记·不静默伪造 null）。
+    evidenceBaseBias: null,
+    decisiveness: null, // R10 night-r3: additive null (path lacks evidence-vote list)
     metricValue: output.statisticalReport.primaryEffectSize,
   };
 }

@@ -25,6 +25,28 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { rawSha256Hex } from './hash.ts';
 import { safeJoin } from '../paths.ts';
 
+/**
+ * R10 §11C 磁带与缓存存储面脱敏（night-r3）：写入前的密钥形状检测。
+ * 规则族对齐 scripts/zero_tolerance_scan.mjs 的 hardcoded_secret_shape（sk-）并
+ * 扩展常见 token 形状（ghp_/github_pat_/AKIA/PEM 头/Bearer）——保守宽匹配：
+ * 误拒只损失一次缓存（fail-open 到网络），漏检才是安全事故，方向正确。
+ * 纯函数导出供测试与未来磁带写入器复用。
+ */
+const SECRET_SHAPES: ReadonlyArray<{ readonly name: string; readonly re: RegExp }> = [
+  { name: 'sk- key', re: /sk-[A-Za-z0-9_-]{20,}/ },
+  { name: 'github token', re: /gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}/ },
+  { name: 'AWS key id', re: /AKIA[0-9A-Z]{16}/ },
+  { name: 'PEM block', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
+  { name: 'bearer token', re: /Bearer\s+[A-Za-z0-9._-]{30,}/ },
+];
+
+export function detectCachedSecret(text: string): string | null {
+  for (const { name, re } of SECRET_SHAPES) {
+    if (re.test(text)) return name;
+  }
+  return null;
+}
+
 /** Per-host cache TTL (ms) — rationale in the module header. */
 const HOST_TTL_MS: Record<string, number> = {
   'export.arxiv.org': 7 * 24 * 60 * 60 * 1000,
@@ -118,9 +140,19 @@ export class RetrievalCache {
     if (this.disabled) return;
     try {
       mkdirSync(this.rootDir, { recursive: true });
+      const payload = JSON.stringify(envelope);
+      const secret = detectCachedSecret(payload);
+      if (secret !== null) {
+        // R10 §11C 磁带与缓存存储面脱敏：响应/头部若携带密钥形状，
+        // 阻断落盘并告警（伪造含 key 的响应不得成为常驻攻击面）。
+        process.stderr.write(
+          `retrieval cache: REFUSED to store response for ${envelope.host} — secret-shaped content (${secret}) detected; see scripts/zero_tolerance_scan.mjs rule family\n`,
+        );
+        return;
+      }
       const final = this.pathFor(envelope.url);
       const tmp = `${final}.tmp-${process.pid}-${Date.now()}`;
-      writeFileSync(tmp, JSON.stringify(envelope), 'utf8');
+      writeFileSync(tmp, payload, 'utf8');
       renameWithRetry(tmp, final);
     } catch {
       // Disk-full/permission: caching is best-effort; retrieval proceeds live.

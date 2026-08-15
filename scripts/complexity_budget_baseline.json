@@ -1,0 +1,19 @@
+{
+  "entries": [
+    "file:src/agent_loop/fsm_runner.ts",
+    "file:src/cli/commands/research.ts",
+    "file:src/cli/commands/verify.ts",
+    "file:src/cli/far.ts",
+    "file:src/falsifiability/verdict_kernel_v2.ts",
+    "file:src/research/memory.ts",
+    "file:src/research/orchestrator.ts",
+    "fn:src/falsifiability/verdict_kernel_v2.ts:290",
+    "fn:src/fec/fec_repository.ts:110",
+    "fn:src/research/memory.ts:480",
+    "fn:src/research/orchestrator.ts:290",
+    "fn:src/research/provenance.ts:259",
+    "fn:src/science_harness/c_astro_pipeline.ts:164"
+  ],
+  "generatedAt": "2026-08-15T19:20:01.463Z",
+  "note": "BUDGET-DEBT baseline (location keys) — repayment plan territory; new violation locations fail the gate"
+}
