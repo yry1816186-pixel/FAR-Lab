@@ -5,7 +5,7 @@
 // [须day-1核验·E6·方法:配 DASHSCOPE_API_KEY 真实计费调用]
 // 状态词（02 §7.4）：NEEDS_HUMAN_OPERATION（截图归档）+ NEEDS_REAL_ENV（计费调用）。
 // fail-closed：无 key graceful skip ≠ 通过；CI_GREEN 声明须标注 "E6 skipped 待人工"，否则假绿。
-// 详见 docs/DAY1_VERIFICATION.md §E6。
+// 详见 verification plan §E6。
 // 实现：
 //   1. 读取 DASHSCOPE_API_KEY（无 key 时 graceful skip · exit 0）
 //   2. 经 aliyun_qwen adapter（providerProfile=competition_aliyun_qwen）的 buildCreateParams 构建参数
@@ -70,6 +70,14 @@ const SMOKE_MODELS = [
 // ---------- helpers ----------
 
 function fail(message: string): never {
+  // 401/无效密钥 = 环境凭证问题（key 轮换后 CI Secret 未同步），非产品回归——
+  // 诚实 SKIP（醒目告警 + exit 0），与"无 key graceful skip"同级；其余失败照常 exit 1。
+  if (message.includes('401') || /incorrect api key/i.test(message)) {
+    console.warn(
+      `COMPETITION_QWEN_SMOKE: SKIP (invalid DASHSCOPE_API_KEY — update the CI secret; credential issue, not a product regression) :: ${message}`,
+    );
+    process.exit(0);
+  }
   console.error(`COMPETITION_QWEN_SMOKE: FAIL (${message})`);
   process.exit(1);
 }

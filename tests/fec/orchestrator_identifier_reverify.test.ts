@@ -18,7 +18,7 @@
 //   GREEN（修复后·重算覆盖）：自填 resolved（value 不在 registry）→ 重算 not_found → R-identifier REFUTED。
 //
 // Authority: CLAUDE.md §5（反 theater 红线：来源不可自填）+
-//            FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-14 dep 注记（caller opt-in → 强化 harness 重算）。
+//            archived-plan §C FUSION-OS-14 dep 注记（caller opt-in → 强化 harness 重算）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

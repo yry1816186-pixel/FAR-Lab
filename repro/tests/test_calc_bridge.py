@@ -1,6 +1,6 @@
 """七分量确定性 hash 引擎回归测试（R9：threadpool 篡改 → hash 变）。
 
-Authority: FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §8.2.
+Authority: archived-spec §8.2.
 
 R9 核心：threadpool 篡改 → nthread 变 → repro_hash 变 → verify_repro_hash raise。
 

@@ -1,7 +1,7 @@
 /**
  * planning API routes — /api/v1/planning endpoints.
  *
- * opencode 规划方法论源代码化的 HTTP 层：确定性门禁引擎（src/planning/）经 REST 暴露，
+ * 规划门禁方法论源代码化的 HTTP 层：确定性门禁引擎（src/planning/）经 REST 暴露，
  * 供前端规划面板 / 外部工具 / 自动化管线调用。
  *
  * 端点（全部确定性、无 LLM）：

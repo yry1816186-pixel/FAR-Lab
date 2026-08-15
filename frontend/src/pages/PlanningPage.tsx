@@ -1,5 +1,5 @@
 /**
- * PlanningPage —— opencode 规划方法论门禁面板（确定性机器门禁，无 LLM）。
+ * PlanningPage —— 规划门禁方法论门禁面板（确定性机器门禁，无 LLM）。
  *
  * 4 个门禁卡片，对应 /api/v1/planning/* 端点：
  *   - Risk Grading（P0-P4 风险分级 · gradeRisk）

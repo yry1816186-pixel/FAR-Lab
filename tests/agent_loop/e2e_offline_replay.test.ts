@@ -1,7 +1,7 @@
 /**
  * 端到端 runAgentLoop smoke 测试（offline_replay adapter）。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/06_agent_loop.md §8（runAgentLoop）+ Task 10.7。
+ * 历史溯源（已归档）: archived-spec §8（runAgentLoop）+ Task 10.7。
  *
  * 测试覆盖（端到端·六阶段全链路）：
  *   - 用 better-sqlite3 :memory: + runMigrations（完整迁移链 0001..0007）建表

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * publish_to_zenodo.mjs — Zenodo DOI 发布脚本（DX3-01 · 阶段 7 1118 预备）。
+ * publish_to_zenodo.mjs — Zenodo DOI 发布脚本（DX3-01 · 1118 预备）。
  *
  * 用法:
  *   node scripts/publish_to_zenodo.mjs --check    校验 .zenodo.json + token 状态（不发布）

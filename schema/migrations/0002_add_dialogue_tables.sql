@@ -1,7 +1,7 @@
 -- 0002_add_dialogue_tables.sql
 -- 研究对话层三表（research_sessions / dialogue_turns / intent_hypotheses）+ 澄清提问记录表。
 --
--- Authority: FAR_CHAIN_DEV_SPEC/39 §1 接缝 + 02 §3.6-3.8（DDL SSOT·设计冻结）+ 31 §0（增量边界）。
+-- Authority: archived-spec §1 接缝 + 02 §3.6-3.8（DDL SSOT·设计冻结）+ 31 §0（增量边界）。
 --
 -- 边界声明：
 --   1. 不修改 0001_initial.sql 的核心五表。本迁移只新增四张对话层表。

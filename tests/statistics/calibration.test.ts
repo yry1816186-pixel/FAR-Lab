@@ -1,5 +1,5 @@
 /**
- * calibration 评分测试（阶段 7 P2-A · N5-E7 校准弃权落地回归载体）。
+ * calibration 评分测试。
  *
  * 契约：
  *   1. brierScore：1/n Σ(pᵢ - oᵢ)²——完美预测（p=o）→ 0；反向预测 → 1。

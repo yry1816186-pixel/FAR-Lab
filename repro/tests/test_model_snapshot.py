@@ -1,6 +1,6 @@
 """COMPETITION_MODEL_SNAPSHOT 常量 + repro_hash 序列化接缝测试（R15 修复）。
 
-Authority: FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §5 + 00_项目宪法 §8.6.
+Authority: archived-spec §5 + 00_项目宪法 §8.6.
 
 跨语言一致性：本测试覆盖 Python 侧确定性。
 TS↔Python 跨语言 model 字面量一致性由 tests/llm_gateway/model_snapshot_cross_source.test.ts

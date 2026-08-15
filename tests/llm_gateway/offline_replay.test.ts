@@ -130,7 +130,7 @@ test('no stageId and no fixtureResponse throws a clear error (no silent echo fal
 });
 
 // ---------------------------------------------------------------------------
-// CU4-02（阶段 7 1127）：offline_replay 伪 token 口径标记（measured=false）
+// CU4-02：offline_replay 伪 token 口径标记（measured=false）
 // ---------------------------------------------------------------------------
 
 test('CU4-02: offline_replay 的 tokenUsage 标记 measured=false（字符伪 token）', async () => {

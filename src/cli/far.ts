@@ -228,7 +228,7 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'planning',
-    description: 'opencode planning methodology as deterministic gates (plan/spec/risk/state/gate/checkpoint)',
+    description: 'planning-gate methodology as deterministic gates (plan/spec/risk/state/gate/checkpoint)',
     run: (args) => runPlanningFromArgs(args),
   },
   {
@@ -1253,7 +1253,7 @@ USAGE:
 
   far planning plan <file> | spec <file> | risk <signal...> | state <from> <to> [--compress] |
        gate <file> | checkpoint <file> [--template]
-                                     opencode planning methodology as deterministic gates
+                                     planning-gate methodology as deterministic gates
     plan <file>       validate a Plan DAG (dependencies / cycles / per-step verification) → topological order
     spec <file>       validate a Spec (>=3 verifiable ACs / Delta / trust-kernel additive declaration)
     risk <signals...> grade P0-P4 (signals: readOnly/docOnly/boundedWrite/touchesTrustKernel/newCliOrApi/crossModule/destructive/irreversible/ambiguous)

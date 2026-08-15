@@ -2,7 +2,7 @@
 -- lifecycle_events: 撤回/纠正/supersession 生命周期派生记录(IC-05 · PT-8 · ADR-004/012/021)。
 --
 -- Authority: docs/design/machine-readable/state-machines/retraction_lifecycle.yaml(冻结)+
---            .far-design/IMPLEMENTATION_CONTRACTS/IC-05.contract.yaml
+--            design ledger
 --
 -- 设计要点:
 --   1. 墓碑化 append-only:状态迁移以派生记录表达,原记录永不删除(hash 保留)。
@@ -15,7 +15,7 @@
 --      该表 contract_id FK RESTRICT + rule_id CHECK(RULE-FS-001/001b/002/003)
 --      + check_kind='falsification_sufficiency' 均为 falsification 审计专用,
 --      生命周期事件不属于其语义域;审计等价性由本表 append-only+hash 链+触发器提供
---      (见 .far-design/DECISIONS/ADR-021.yaml)。
+--      (见 design ledger)。
 --   5. target 存在性不做 FK(目标跨多表,append-only 审计台账语义;存在性核查在执行层)。
 
 CREATE TABLE IF NOT EXISTS lifecycle_events (

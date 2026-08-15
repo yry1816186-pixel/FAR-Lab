@@ -15,8 +15,8 @@
 // 反剧场红线（FUSION-OS-9）：artifact hash 即承诺——CAS 按 canonical JSON 内容寻址，篡改 content → hash 失配 →
 // 查不到。与 verdict_nodes.verdict_trace DB 列（查询用）正交：CAS 是去重 + 内容寻址 SSOT。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-9 +
-//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-9（content-addressable CAS 范式）。
+// Authority: archived-plan §C FUSION-OS-9 +
+//            archived-plan §4 FUSION-OS-9（content-addressable CAS 范式）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

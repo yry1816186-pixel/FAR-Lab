@@ -1,5 +1,5 @@
 // src/cli/commands/planning.ts
-// 职责：`far planning <subcommand>` —— opencode 规划方法论源代码化的 CLI 入口。
+// 职责：`far planning <subcommand>` —— 规划门禁方法论源代码化的 CLI 入口。
 //
 // 子命令（全部确定性，无 LLM）：
 //   plan <file>       校验 Plan DAG（zod parse + validatePlan）→ 门禁报告 + 拓扑执行序
@@ -69,7 +69,7 @@ export function runPlanningFromArgs(argv: readonly string[]): number {
   }
 }
 
-const USAGE = `far planning — opencode 规划方法论源代码化（确定性门禁引擎）
+const USAGE = `far planning — 规划门禁方法论源代码化（确定性门禁引擎）
 用法:
   far planning plan <file>           校验 Plan DAG → 门禁报告 + 拓扑执行序
   far planning spec <file>           校验 Spec（≥3 可验证 AC / Delta / trust-kernel 声明）

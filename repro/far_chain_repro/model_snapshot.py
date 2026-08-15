@@ -4,7 +4,7 @@ This module mirrors the TS competition adapter constants for cross-language
 hash byte-equality. It is NOT the SSOT — the TS adapter
 (src/llm_gateway/adapters/aliyun_qwen/snapshot.ts) is the primary source.
 
-Authority: FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §5 + 00_项目宪法 §8.6.
+Authority: archived-spec §5 + 00_项目宪法 §8.6.
 """
 
 from __future__ import annotations

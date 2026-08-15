@@ -5,7 +5,7 @@ on import. The scanner covers both ast.Call and ast.Attribute nodes to detect
 gradient-training symbols that would pollute repro_hash by consuming
 random_state.
 
-Authority: FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §3.
+Authority: archived-spec §3.
 """
 
 from __future__ import annotations

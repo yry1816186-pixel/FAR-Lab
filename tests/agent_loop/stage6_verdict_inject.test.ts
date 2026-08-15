@@ -7,7 +7,7 @@
  *   3. hint 经过 sanitizeExternalContent 包装（含 UNTRUSTED_EXTERNAL_CONTENT 标记）
  *   4. hint 仅含 verdict kind + 抽象修正方向，禁传 reasonCode/metricValue/threshold（最小信息原则·反 adversarial hypothesis）
  *
- * 历史溯源：IC-15.contract.yaml + .far-design/evidence/s9/adversarial_review_v1_to_v2.md
+ * 历史溯源：IC-15.contract.yaml + design ledger
  *
  * 零容忍合规：无 any / @ts-ignore / 空 catch / 双重断言。
  */

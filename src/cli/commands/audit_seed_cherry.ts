@@ -5,7 +5,7 @@
 // 诚实框架（非 production verdict-path wiring）：cherry-pick 是 fixture 模块常量（declared 5 / reported 3·
 // 类比 GV-14 测试 fixture），非真实 submission 的 run registry。故本命令是 detector 验证展示，不是把
 // anti-theater 接进处理真实声明的 verdict 路径——后者需 P1-6（真实实验 run registry）。Status RED。
-// Authority: CLAUDE.md §4 P-FUSION FUSION-OS-1 + FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C。
+// Authority: CLAUDE.md §4 P-FUSION FUSION-OS-1 + archived-plan §C。
 
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

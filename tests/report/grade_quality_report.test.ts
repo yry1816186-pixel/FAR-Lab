@@ -1,5 +1,5 @@
 /**
- * GRADE 质量层 report 消费测试（阶段 7 P0-11 · CR2-2 修复）。
+ * GRADE 质量层 report 消费测试。
  *
  * 背景：上游 fecAppendClaim 传 studyDesign 后 verdict_trace 携带 evidenceQualityTier/Note，
  * report 的 Verdict nodes 段必须展示质量标注（评委可感知 GRADE 层级）。

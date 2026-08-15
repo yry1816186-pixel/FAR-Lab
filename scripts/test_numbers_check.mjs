@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * test_numbers_check —— 测试数字 SSOT 对拍脚本（阶段 7 P0-8 · AT15/SA13 修复）。
+ * test_numbers_check —— 测试数字 SSOT 对拍脚本。
  *
  * 背景（findings AT15/SA13）：测试数字 8+ 处散落于文档（AGENTS.md:10 声称 2278 tests，
  * 实测 2474——漂移 196），无单一来源 → 文档-实测必然漂移。

@@ -1,7 +1,7 @@
 -- 0019_ruleset_uri.sql
 -- proof_envelopes.ruleset_uri: 内核规则集版本 URI(ADR-007 H1+H3 · IC-01)。
 --
--- Authority: .far-design/IMPLEMENTATION_CONTRACTS/IC-01.contract.yaml + ADR-007
+-- Authority: design ledger + ADR-007
 --
 -- 边界:
 --   1. 非破坏性 ADD COLUMN TEXT(NULL 默认)。append-only 触发器只禁行级

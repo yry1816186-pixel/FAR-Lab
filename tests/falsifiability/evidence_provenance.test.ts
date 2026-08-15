@@ -11,7 +11,7 @@
 //     · 全部 primary 绑定合法 hash → 通过。
 //   - 错误消息含 claimId 前缀 + 索引列表 + reasonCode 'EVIDENCE_PROVENANCE_UNBOUND'。
 //
-// Authority: 评审记录/总榜_v1.md T-003 + 1轮/评委02_发现.md F-2-005 +
+// Authority: T-003 + F-2-005 +
 //            src/falsifiability/evidence_provenance.ts 行为契约注释。
 
 import { test } from 'node:test';

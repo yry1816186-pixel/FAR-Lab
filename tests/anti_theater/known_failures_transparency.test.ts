@@ -1,7 +1,7 @@
 /**
  * known_failures_transparency —— CI gate 3（APPENDIX_E §6）：已知失败须透明披露。
  *
- * Authority: FAR_LAB_MASTER_PLAN/APPENDIX_E_ANTI_THEATER.md §6（CI gate 3：known-failures transparency·
+ * Authority: archived-plan §6（CI gate 3：known-failures transparency·
  *            含 finding 的 claim 不得静默呈现为 clean CONFIRMED）+ 03_EVIDENCE_CONTRACT_AND_VERDICT.md
  *            §6.1（原则：REFUTED/INCONCLUSIVE 不得被隐藏）+ 04_PROOF_ENVELOPE_AND_VERIFIER.md
  *            RULE-PE-007（CONFIRMED + hasFail → WARN/FAIL·W3.4 validator 兜底）。

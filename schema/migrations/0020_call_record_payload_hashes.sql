@@ -1,7 +1,7 @@
 -- 0020_call_record_payload_hashes.sql
 -- call_records.request_payload_hash: payload 内容哈希覆盖(IC-07 · F-01 修复 · ADR-003)。
 --
--- Authority: .far-design/IMPLEMENTATION_CONTRACTS/IC-07.contract.yaml + RT-04(rt04_tree.log)
+-- Authority: design ledger + RT-04(rt04_tree.log)
 --
 -- 背景(F-01):verifyChainHead 的 canonical 输入只含 8 个元数据列;request_payload/
 --   response_payload 无内容哈希 → DROP TRIGGER 旁路后改 payload 字节不可检(rt04_tree.log:

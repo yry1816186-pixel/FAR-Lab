@@ -4,7 +4,7 @@ Hand-written dicts cannot guarantee field order matches dataclass definition
 order, and nested dataclasses are not recursively expanded, causing hash drift.
 dataclasses.asdict recursively converts to dict with field order preserved.
 
-Authority: FAR_CHAIN_DEV_SPEC/09_repro_deterministic.md §1.2.
+Authority: archived-spec §1.2.
 """
 
 from __future__ import annotations

@@ -112,7 +112,7 @@ export interface FecAppendClaimArgs {
    */
   readonly antiTheaterReport?: AntiTheaterReport;
   /**
-   * 研究设计（GRADE 证据层级透明度层·阶段 7 P0-11 接线）。提供时 kernel 输出附
+   * 研究设计（GRADE 证据层级透明度层·P0-11 接线）。提供时 kernel 输出附
    * evidenceQualityTier/evidenceQualityNote（不进 verdict·不进 proofHash·零回归）；
    * report/audit 消费。不提供则与历史输出完全一致。
    */

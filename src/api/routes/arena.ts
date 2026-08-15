@@ -81,7 +81,7 @@ export async function registerArenaRoute(
   // POST /arena —— WS-A.3 live：用户提交 hypothesis + refuters，透传 gateway 跑真实对抗。
   // 无缓存（每请求 hypothesis/refuter 不同）；gateway 缺失时 arena_service 自动降级 offline_replay（诚实）。
   app.post('/arena', async (request, reply) => {
-    // API1 BOLA 修复（阶段 7 1128）：受保护模式下 researcher+ 才能触发 arena live（消耗 LLM 额度）。
+    // API1 BOLA 修复：受保护模式下 researcher+ 才能触发 arena live（消耗 LLM 额度）。
     // offline 模式（principal 未挂载或 anonymous）全放行（设计·24§3.1 双轨）。
     const role = request.principal?.role ?? 'anonymous';
     if (role !== 'anonymous' && role !== 'researcher' && role !== 'admin') {

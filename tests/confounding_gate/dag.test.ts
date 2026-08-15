@@ -1,7 +1,7 @@
 // tests/confounding_gate/dag.test.ts
 // 测试 buildDag + topologicalSort（CG-2 acyclic fail-closed）+ ancestors/descendants。
 //
-// Authority: FAR_LAB_MASTER_PLAN/03 §7.5.1:1133（CG-2 causalDag 必须无环）+ §7.5.1 (1)（d_separation 消费
+// Authority: archived-plan §7.5.1:1133（CG-2 causalDag 必须无环）+ §7.5.1 (1)（d_separation 消费
 //            dag.neighbors/has_edge/get_ancestors/get_descendants）。
 //
 // 零容忍合规：无 any / @ts-ignore / 双重断言。assert.throws 捕获 CG-2 fail-closed。

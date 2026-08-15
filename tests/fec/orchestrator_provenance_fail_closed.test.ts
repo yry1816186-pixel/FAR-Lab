@@ -10,7 +10,7 @@
 //
 // 核心断言：fixture 冒充真实计算结果时，系统 fail-closed 拒绝裁决（不再可能落 CONFIRMED）。
 //
-// Authority: 评审记录/总榜_v1.md T-003 + 1轮/评委02_发现.md F-2-005 +
+// Authority: T-003 + F-2-005 +
 //            src/fec/orchestrator.ts:168-221（provenance 校验集成点）+
 //            src/falsifiability/evidence_provenance.ts 行为契约注释。
 

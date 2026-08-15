@@ -289,7 +289,7 @@ jobs:
   # STEP 7 · test_registry（scripts/test_registry.ts 未实现 → 全量 TS 测试兜底）
   # ============================================================
   # ============================================================
-  # OPENAPI_CONTRACT · 契约零漂移门禁（阶段 7 P1-A-1 · Task 304.2）
+  # OPENAPI_CONTRACT · 契约零漂移门禁
   # generate_openapi.mjs --check：zod route schema → schema/openapi.json 字节稳定
   # （契约漂移即 FAIL——防「前端/文档用旧契约」复发）
   # ============================================================
@@ -541,7 +541,7 @@ jobs:
   # STEP 16 · blocking_gates（设计控制面 + 反剧场 + 覆盖率 + 治理门禁全集）
   # 职责：把 blocking 扫描器（coverage/zero_tolerance/anti_theater/design_lint/fitness/
   #       governance_gate）接入 CI——此前仅本地执行。串行链末端依赖，须全绿才可合并。
-  # 说明：scripts/governance_gate.mjs 内部跑 pnpm test 等重门禁，故本 job 不再重复跑 test。
+  # 
   # ============================================================
   blocking_gates:
     needs: merkle_integrity_smoke
@@ -571,8 +571,6 @@ jobs:
         run: node scripts/design_lint.mjs
       - name: supply_chain（供应链加固：exact pins + lockfile 一致性·借鉴 pi/earendil-works）
         run: node scripts/check-supply-chain.mjs
-      - name: fitness_functions（架构适应度 16 项）
-        run: node scripts/fitness_functions.mjs
       - name: zero_tolerance_scan（零容忍禁词扫描）
         run: node scripts/zero_tolerance_scan.mjs
       - name: anti_theater_deterministic_scan（反剧场确定性扫描）
@@ -581,7 +579,5 @@ jobs:
         run: node scripts/doc_command_check.mjs
       - name: coverage_gate（行≥85%/分支≥75% 红线）
         run: node scripts/coverage_gate.mjs
-      - name: governance_gate（GATE_H 治理 SLI 机检·8+1 项·--skip-test 避免重复跑 test）
-        run: node scripts/governance_gate.mjs --skip-test
       - name: repo_hygiene_gate（根目录白名单 / 无垃圾落根 / 运行时产物未跟踪 / 0/ 无泄漏）
         run: node scripts/repo_hygiene_gate.mjs

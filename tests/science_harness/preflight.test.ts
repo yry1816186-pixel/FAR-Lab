@@ -20,8 +20,8 @@
 // 反剧场红线（FUSION-OS-4 + CLAUDE.md §5）：收窄伪造窗口。spawn 前显式拒绝已知恶意形状，
 // 非 OS 级强隔离保证（07_RISK_REGISTER §188·真隔离 V2 路线·诚实声明）。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-4 +
-//            FAR_LAB_MASTER_PLAN/FUSION_OPEN_SCIENCE_DESIGN.md §4 FUSION-OS-4（gitScanWorker 范式）。
+// Authority: archived-plan §C FUSION-OS-4 +
+//            archived-plan §4 FUSION-OS-4（gitScanWorker 范式）。
 
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';

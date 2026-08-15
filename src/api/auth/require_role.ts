@@ -1,5 +1,5 @@
 /**
- * require_role —— 功能级授权纯函数层（阶段 7 P2 · LP-5 / API5 修复）。
+ * require_role —— 功能级授权纯函数层。
  *
  * 背景（findings API5）：JWT payload 声明 role（viewer/researcher/admin）但**无任何路由
  * 执行 role 检查**——role 字段为死代码。本模块提供确定性授权判定（纯函数·可测）：

@@ -8,7 +8,7 @@
 // proof_caller = src/anti_theater/lint.ts runAntiTheaterLint 入口（assertVerifierModulesClean 接线·每次 verdict 路径）。
 // 反假绿：dirty fixture 必抛 + 真实 kernel/detector 模块基线必空（GREEN）。
 //
-// Authority: FAR_LAB_MASTER_PLAN/DEPTH_LEDGER.md §C FUSION-OS-5 + FUSION_OPEN_SCIENCE_DESIGN.md §F-5（kernel.py AST 白名单范式）。
+// Authority: archived-plan §C FUSION-OS-5 + FUSION_OPEN_SCIENCE_DESIGN.md §F-5（kernel.py AST 白名单范式）。
 
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';

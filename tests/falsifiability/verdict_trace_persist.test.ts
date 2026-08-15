@@ -12,7 +12,7 @@
 //   GREEN（接线后）：trace 落 verdict_trace_json + verdict_trace_hash 进 current_hash 白名单 →
 //     verifyVerdictNodes 重算 current_hash 捕获任何 trace 篡改（different trace → different hash）。
 //
-// Authority: FAR_LAB_MASTER_PLAN/04 §3.1（proofHash 白名单 verdictTrace.*）+ §3.4（verdict 层 critical）。
+// Authority: archived-plan §3.1（proofHash 白名单 verdictTrace.*）+ §3.4（verdict 层 critical）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

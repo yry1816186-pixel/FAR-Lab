@@ -88,7 +88,7 @@ jobs:
           pip install -e .
 
       # f. 全量质量门——确保 release 基于绿构建（typecheck + lint + test + Python 轴 + cross-lang）。
-      #    开发门（depth-gate/zero-tolerance/coverage）不在此公开 release 门（本地 agent 跑）。
+      #    开发门（zero-tolerance/coverage）不在此公开 release 门（本地 agent 跑）。
       #    timeout 42min：2026-08-06 v1.1.0 首次 release run 失败根因 = 测试步骤 30min 超时
       #    （CI 冷环境无 NODE_COMPILE_CACHE·本地 60s 不可比）——预算提升至 job 上限内最大值。
       - name: Full quality gate (typecheck + lint + test + py + cross-lang · release must be green)
@@ -163,9 +163,9 @@ jobs:
             found { print }
           ' CHANGELOG.md)
           if [ -z "$BODY" ]; then
-            echo "(No CHANGELOG section for ${VERSION} — see auto-generated notes below.)" > staging/release-body.md
+            echo "(No CHANGELOG section for ${VERSION} — see auto-generated notes below.)" > release notes
           else
-            printf '%s\n' "$BODY" > staging/release-body.md
+            printf '%s\n' "$BODY" > release notes
           fi
 
       # 创建 GitHub Release（assets + checksum + docker digest + release notes）
@@ -174,7 +174,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: FAR-Lab ${{ env.RELEASE_TAG }}
-          body_path: staging/release-body.md
+          body_path: release notes
           generate_release_notes: true   # CHANGELOG body 之后追加 commit/PR 自动 notes
           files: |
             staging/install.sh

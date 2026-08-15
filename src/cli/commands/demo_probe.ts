@@ -1,5 +1,5 @@
 /**
- * demo 环境探测（阶段 7 P0-3 · S1-69.2 修复）。
+ * demo 环境探测。
  *
  * 背景（findings S1）：demo 全同步零超时——better-sqlite3 native 模块加载异常或
  * Node 版本 <24（无原生 type stripping）时，进程可能永不 exit（评委面前死等）。
@@ -80,7 +80,7 @@ export function probeEnvironment(options: ProbeEnvironmentOptions = {}): ProbeRe
 }
 
 /**
- * GV 失败有界重试（阶段 7 P0-3 · S1-69.3 修复）。
+ * GV 失败有界重试。
  *
  * 背景：GV 失败即 exit 7 硬终止（后续 PHASE2/3 精彩内容全看不到）——kernel 行为
  * 瞬时波动或 fixture 同步延迟时现场直接死亡。修复：有界重试 1 次（消除瞬时失败；

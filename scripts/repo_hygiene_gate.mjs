@@ -8,7 +8,7 @@
  *   4. NODE_COMPILE_CACHE 无泄漏（根 `0/` 与 `frontend/0/` 物理不存在）
  *
  * 用途：CI `.github/workflows/ci.yml` blocking_gates job 强制 + 本地 `node scripts/repo_hygiene_gate.mjs`。
- * 策略 SSOT：docs/governance/ROOT-HYGIENE-POLICY.md §2（本文件 ALLOWLIST 与之保持同步）。
+ * 策略 SSOT：governance spec §2（本文件 ALLOWLIST 与之保持同步）。
  * 诚实边界：只查根目录（session-artifact 高频落点），不递归子目录内容。
  */
 import { execFileSync } from 'node:child_process';
@@ -19,10 +19,10 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
-/** 根目录文件白名单（精确文件名）。与 docs/governance/ROOT-HYGIENE-POLICY.md §2 同步。 */
+/** 根目录文件白名单（精确文件名）。与 governance spec §2 同步。 */
 const ALLOW_FILES = new Set([
   'README.md', 'README.zh-CN.md', 'LICENSE', 'NOTICE', 'CHANGELOG.md', 'CONTRIBUTING.md',
-  'CODE_OF_CONDUCT.md', 'SECURITY.md', 'SUPPORT.md', 'CITATION.cff', 'GOVERNANCE.md',
+  'CODE_OF_CONDUCT.md', 'SECURITY.md', 'SUPPORT.md', 'CITATION.cff',
   'MAINTAINERS.md',
   'AGENTS.md', 'CLAUDE.md', 'CLAUDE.local.example.md',
   'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'eslint.config.mjs',
@@ -129,7 +129,7 @@ for (const [name, result] of Object.entries(checks)) {
   for (const d of result.details) console.log(`        ${d}`);
 }
 if (!pass) {
-  console.error('\n仓库卫生门禁失败。处理指引（见 docs/governance/ROOT-HYGIENE-POLICY.md）：');
+  console.error('\n仓库卫生门禁失败。处理指引（见 governance spec）：');
   console.error('  - 白名单外根目录文件 → git mv 到 docs/ 子目录 或 删除');
   console.error('  - untracked 垃圾 → 删除或加入 .gitignore');
   console.error('  - 运行时产物被跟踪 → git rm --cached + .gitignore 追加规则');

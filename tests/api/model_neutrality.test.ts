@@ -1,7 +1,7 @@
 /**
  * model_neutrality 测试——src/api/ 模型中立 grep（24§0.1 红线）。
  *
- * 历史溯源（已归档）: FAR_CHAIN_DEV_SPEC/24_API网关与接口规范_API_GATEWAY.md §0.1.
+ * 历史溯源（已归档）: archived-spec网关与接口规范_API_GATEWAY.md §0.1.
  *
  * 覆盖：
  *   - src/api/ 不含 Qwen 字面量（注释剥离后·避免文档性注释误报）

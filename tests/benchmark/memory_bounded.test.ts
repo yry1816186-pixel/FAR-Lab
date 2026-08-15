@@ -1,5 +1,5 @@
 /**
- * memory_bounded.test.ts — 性能面（阶段 7 1128）：100 claims 处理内存有界断言。
+ * memory_bounded.test.ts — 性能面：100 claims 处理内存有界断言。
  *
  * 依据 12 面「性能」100 分定义：批量处理无内存泄漏（100 claims 有界增长）。
  * 方法：
