@@ -39,27 +39,50 @@
       "doiStatus": "CONFIRMED",
       "verificationStatus": "VERIFIED_DISCOVERY",
       "unverifiedNote": null,
-      "matchKeywords": ["graphene", "mechanical exfoliation", "quantum transport", "monolayer carbon"],
+      "matchKeywords": [
+        "graphene",
+        "mechanical exfoliation",
+        "quantum transport",
+        "monolayer carbon"
+      ],
       "synonyms": {
-        "graphene": ["single atomic layer graphite", "two dimensional carbon sheet"],
-        "mechanical exfoliation": ["peeling graphite layers"]
+        "graphene": [
+          "single atomic layer graphite",
+          "two dimensional carbon sheet"
+        ],
+        "mechanical exfoliation": [
+          "peeling graphite layers"
+        ]
       },
-      "groundingDocPids": ["mat-pre-2002-ultrathin-graphite"]
+      "groundingDocPids": [
+        "mat-pre-2002-ultrathin-graphite"
+      ]
     },
     {
       "id": "iron-based-superconductivity",
       "statement": "Fluorine-doped LaFeAsO superconducts at 26 K, opening iron-based superconductivity (Kamihara et al., JACS, 2008).",
       "publishedAfter": "2008-02-23",
-      "doi": null,
-      "doiStatus": "UNCONFIRMED",
+      "doi": "10.1021/ja800073m",
+      "doiStatus": "CONFIRMED",
       "verificationStatus": "VERIFIED_DISCOVERY",
-      "unverifiedNote": "Discovery, venue, and approximate date are established knowledge (JACS 130:3296, 2008, online-first February 2008), but the exact DOI and day-precision date are not reproduced with high confidence here — verify before citing anywhere.",
-      "matchKeywords": ["iron based superconductor", "fluorine doping", "lafeaso"],
+      "unverifiedNote": "[Discovery, venue, and approximate date are established knowledge (JACS 130:3296, 2008, online-first February 2008), but the exact DOI and day-precision date are not reproduced with high confidence here — verify before citing anywhere.] DOI verified online 2026-08-16 via doi.org resolution (10.1021/ja800073m)",
+      "matchKeywords": [
+        "iron based superconductor",
+        "fluorine doping",
+        "lafeaso"
+      ],
       "synonyms": {
-        "iron based superconductor": ["superconductivity in iron compounds", "iron pnictide superconductor"],
-        "fluorine doping": ["fluorine substitution"]
+        "iron based superconductor": [
+          "superconductivity in iron compounds",
+          "iron pnictide superconductor"
+        ],
+        "fluorine doping": [
+          "fluorine substitution"
+        ]
       },
-      "groundingDocPids": ["mat-pre-2000-layered-doping"]
+      "groundingDocPids": [
+        "mat-pre-2000-layered-doping"
+      ]
     }
   ],
   "hypotheses": [
@@ -72,15 +95,29 @@
         "comparator": "lt",
         "value": 100
       },
-      "citePids": ["mat-pre-2002-ultrathin-graphite"],
-      "counterCitePids": ["mat-pre-1999-nanotubes"],
+      "citePids": [
+        "mat-pre-2002-ultrathin-graphite"
+      ],
+      "counterCitePids": [
+        "mat-pre-1999-nanotubes"
+      ],
       "relationToExistingTheory": "Challenges the assumed instability of free-standing two-dimensional crystals at finite temperature.",
-      "alternativeExplanations": ["Monolayers crumple or roll into nanotubes before any measurement is possible."],
-      "observablePredictions": ["Weak-field Hall and Shubnikov-de Haas oscillations persist at room temperature in the monolayer."],
-      "distinguishingObservations": ["Layer-number series of quantized Hall conductance on the same substrate."],
+      "alternativeExplanations": [
+        "Monolayers crumple or roll into nanotubes before any measurement is possible."
+      ],
+      "observablePredictions": [
+        "Weak-field Hall and Shubnikov-de Haas oscillations persist at room temperature in the monolayer."
+      ],
+      "distinguishingObservations": [
+        "Layer-number series of quantized Hall conductance on the same substrate."
+      ],
       "noveltyRelativeToCorpus": "Converts the confinement trend of ultrathin graphite into an explicit isolation and measurement program.",
-      "assumptions": ["Substrate interactions stabilize the monolayer sufficiently for transport measurement."],
-      "risks": ["Visual identification of true monolayers may be impractical."]
+      "assumptions": [
+        "Substrate interactions stabilize the monolayer sufficiently for transport measurement."
+      ],
+      "risks": [
+        "Visual identification of true monolayers may be impractical."
+      ]
     },
     {
       "statement": "Fluorine doping of a layered iron oxyarsenide is predicted to induce superconductivity above 20 K at ambient pressure.",
@@ -91,15 +128,29 @@
         "comparator": "lt",
         "value": 4
       },
-      "citePids": ["mat-pre-2000-layered-doping"],
-      "counterCitePids": ["mat-pre-2002-mgb2"],
+      "citePids": [
+        "mat-pre-2000-layered-doping"
+      ],
+      "counterCitePids": [
+        "mat-pre-2002-mgb2"
+      ],
       "relationToExistingTheory": "Extends the doping-driven crossover principle from cuprate-like oxides to a pnictide host.",
-      "alternativeExplanations": ["The parent magnetic order is robust to carrier injection at achievable doping levels."],
-      "observablePredictions": ["A superconducting dome versus fluorine content peaking near 10 percent substitution."],
-      "distinguishingObservations": ["MuSR or NMR evidence of coexistence or competition between magnetism and superconductivity across the dome."],
+      "alternativeExplanations": [
+        "The parent magnetic order is robust to carrier injection at achievable doping levels."
+      ],
+      "observablePredictions": [
+        "A superconducting dome versus fluorine content peaking near 10 percent substitution."
+      ],
+      "distinguishingObservations": [
+        "MuSR or NMR evidence of coexistence or competition between magnetism and superconductivity across the dome."
+      ],
       "noveltyRelativeToCorpus": "Names a concrete non-cuprate layered candidate family and doping route.",
-      "assumptions": ["Fluorine substitutes on the oxygen site controllably."],
-      "risks": ["Sample synthesis of oxyarsenides is demanding."]
+      "assumptions": [
+        "Fluorine substitutes on the oxygen site controllably."
+      ],
+      "risks": [
+        "Sample synthesis of oxyarsenides is demanding."
+      ]
     },
     {
       "statement": "The 39 K transition of magnesium diboride is fully explained by two-band electron-phonon coupling without exotic pairing.",
@@ -110,15 +161,27 @@
         "comparator": "gt",
         "value": 0.1
       },
-      "citePids": ["mat-pre-2002-mgb2"],
+      "citePids": [
+        "mat-pre-2002-mgb2"
+      ],
       "counterCitePids": [],
       "relationToExistingTheory": "Consolidates the two-gap interpretation of existing MgB2 data.",
-      "alternativeExplanations": ["Strong-coupling anharmonicity dominates the transition."],
-      "observablePredictions": ["Two superconducting gaps resolved in tunneling spectra."],
-      "distinguishingObservations": ["Band-selective scattering experiments separating the two gap scales."],
+      "alternativeExplanations": [
+        "Strong-coupling anharmonicity dominates the transition."
+      ],
+      "observablePredictions": [
+        "Two superconducting gaps resolved in tunneling spectra."
+      ],
+      "distinguishingObservations": [
+        "Band-selective scattering experiments separating the two gap scales."
+      ],
       "noveltyRelativeToCorpus": "Synthesis claim over an already-published two-band analysis.",
-      "assumptions": ["Phonon spectra are accurately known."],
-      "risks": ["Polycrystalline averaging hides band-specific signatures."]
+      "assumptions": [
+        "Phonon spectra are accurately known."
+      ],
+      "risks": [
+        "Polycrystalline averaging hides band-specific signatures."
+      ]
     }
   ]
 }

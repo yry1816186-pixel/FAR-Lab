@@ -204,6 +204,61 @@ function dominates(a: HypothesisScorecard, b: HypothesisScorecard): boolean {
 }
 
 /**
+ * Cross-run memory-novelty dimensions (directive §8.3 × §2.5, b7).
+ *
+ * Rule (single source — the orchestrator at scoring time AND verification at
+ * replay time both call THIS function, never their own copies):
+ *   - NO memory flags in the run  ->  every candidate gets ZERO dimensions
+ *     (pre-b7 runs stay byte-identical on replay; old stored scorecards never
+ *     gain a dimension retroactively).
+ *   - ANY flag present            ->  EVERY candidate gets exactly one
+ *     `NoveltyVsResearchMemory` dimension, symmetric across the field so the
+ *     Pareto front and the pairwise tournament actually compare it (both
+ *     pair dimensions BY NAME — an asymmetric dimension would be silently
+ *     skipped).
+ *
+ * Grades: A = no exact cross-run content match; C = exact match with a still
+ * relevant explored branch (no cross-run novelty); F = re-proposes an
+ * ELIMINATED direction (negative-results ledger hit — the most expensive
+ * repeat). Cannot-prove: this dimension proves LEXICAL-EXACT repetition
+ * (content-hash identity); it does NOT prove semantic novelty (a grade-A
+ * candidate may still paraphrase a known idea — embedding-based detection is
+ * deliberately out of adjudication paths, directive §6.8).
+ */
+export function memoryNoveltyDimensionsFor(
+  candidates: readonly HypothesisCandidate[],
+  memoryFlags: ReadonlyMap<string, string>,
+): ReadonlyMap<string, readonly ScorecardDimension[]> {
+  const out = new Map<string, readonly ScorecardDimension[]>(candidates.map((c) => [c.id, []]));
+  if (memoryFlags.size === 0) return out;
+  for (const candidate of candidates) {
+    const marker = memoryFlags.get(candidate.id);
+    out.set(
+      candidate.id,
+      [
+        {
+          name: 'NoveltyVsResearchMemory',
+          grade:
+            marker === undefined
+              ? 'A'
+              : marker.startsWith('MEMORY_DUPLICATE:negative:')
+                ? 'F'
+                : marker.startsWith('MEMORY_DUPLICATE:branch:')
+                  ? 'C'
+                  : 'A',
+          rationale:
+            marker === undefined
+              ? 'no exact cross-run memory content-hash match (lexical-exact check only — not a semantic-novelty proof)'
+              : `${marker} — exact content match against research memory (${marker.startsWith('MEMORY_DUPLICATE:negative:') ? 'an ELIMINATED direction' : 'an explored branch'})`,
+          source: 'deterministic',
+        },
+      ],
+    );
+  }
+  return out;
+}
+
+/**
  * Build a full HypothesisScorecard from deterministic dimensions + optional
  * model-critique dimensions (merged, never collapsed to a single number).
  */

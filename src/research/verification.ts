@@ -14,6 +14,7 @@ import { computeCitationGateReport } from './citation_gate.ts';
 import { computeFalsifiabilityGateReport } from './falsifiability_gate.ts';
 import {
   buildScorecard,
+  memoryNoveltyDimensionsFor,
   computeDeterministicDimensions,
   computeParetoFront,
 } from './scorecard.ts';
@@ -41,6 +42,12 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
   const resolver = new CitationResolver(corpus);
 
   // 2. Citation binding + deterministic dimensions + scorecards.
+  // Memory-novelty dimensions replay from the FROZEN fan-out flags persisted
+  // on the run (same single-source rule as the orchestrator's scoring stage).
+  const memoryFlags = new Map(
+    (run.discovery?.fanout?.memoryFlagged ?? []).map((f) => [f.id, f.marker]),
+  );
+  const memoryDims = memoryNoveltyDimensionsFor(run.hypotheses, memoryFlags);
   const reScorecards: Record<string, ReturnType<typeof buildScorecard>> = {};
   const reBindings: Record<string, CitationBinding> = {};
   for (const h of run.hypotheses) {
@@ -50,7 +57,10 @@ export function verifyResearchRunDeterministic(run: ResearchRun): VerificationOu
     if (storedBinding === undefined || storedBinding.allBound !== binding.allBound) {
       failures.push(`citation binding MISMATCH for ${h.id}`);
     }
-    const deterministic = computeDeterministicDimensions(h, binding, run.critiques[h.id]);
+    const deterministic = [
+      ...computeDeterministicDimensions(h, binding, run.critiques[h.id]),
+      ...(memoryDims.get(h.id) ?? []),
+    ];
     reScorecards[h.id] = buildScorecard(
       h.id,
       deterministic,

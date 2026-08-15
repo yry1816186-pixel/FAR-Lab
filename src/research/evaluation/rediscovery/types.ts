@@ -118,6 +118,43 @@ export interface TargetMatchResult {
 }
 
 /**
+ * The model's tri-state answer to "have you seen this discovery in your
+ * training data?" (§4.1 contrast probe). Free-text verdicts are forbidden —
+ * the probe accepts ONLY this enum (zod SSOT in probe.ts).
+ */
+export type DirectRecallVerdict = 'known' | 'unsure' | 'not_seen';
+
+/** Whether one probe call produced a validated answer or failed fail-closed. */
+export type DirectRecallCallOutcome = 'answered' | 'call_failed';
+
+/**
+ * One target's direct-recall probe result (the §4.1 "ask the model directly"
+ * contrast arm). `recalled` is the derived boolean kept for backward
+ * compatibility (recalled === recall === 'known'); `recall` is null when the
+ * call failed schema validation twice (fail-closed — never a guessed default).
+ */
+export interface DirectRecallProbeResult {
+  readonly targetId: string;
+  /** Derived boolean (recall === 'known'); kept from the v1 shape. */
+  readonly recalled: boolean;
+  readonly outcome: DirectRecallCallOutcome;
+  /** Tri-state verdict; null when outcome === 'call_failed'. */
+  readonly recall: DirectRecallVerdict | null;
+  /** Model self-reported confidence in [0,1]; null when call_failed. */
+  readonly confidence: number | null;
+  /**
+   * Model-claimed source pointer (paper title / DOI / arXiv id). UNVERIFIED
+   * model claim — never treated as bibliographic truth; null when the model
+   * honestly gave none or the call failed. NEVER fabricated by this code.
+   */
+  readonly sourcePointer: string | null;
+  /** Verbatim failure reason when outcome === 'call_failed'; null otherwise. */
+  readonly error: string | null;
+  /** Provider-reported model id (null = provider did not report one). */
+  readonly modelId: string | null;
+}
+
+/**
  * The leakage-assessment section, MANDATORY on every report (§4.1:
  * "命中≠预言 … 显式披露泄漏风险并做对照").
  */
@@ -129,8 +166,8 @@ export interface LeakageAssessment {
     readonly status: 'NOT_RUN_OFFLINE' | 'LIVE_COMPLETED' | 'BLOCKED';
     /** The probe questions that WOULD be (or were) asked, one per target. */
     readonly probeQuestions: readonly string[];
-    /** Probe outcomes; null until a LIVE probe actually ran (never faked). */
-    readonly results: readonly { readonly targetId: string; readonly recalled: boolean }[] | null;
+    /** Probe outcomes; null until a probe actually ran (never faked). */
+    readonly results: readonly DirectRecallProbeResult[] | null;
   };
   /** Offline replay can never exclude pretraining leakage. */
   readonly pretrainingLeakageRisk: 'CANNOT_BE_EXCLUDED_OFFLINE' | 'PROBED_LIVE';

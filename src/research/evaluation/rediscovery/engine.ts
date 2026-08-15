@@ -36,6 +36,7 @@ import { createReplayAdapter } from '../../../retrieval/index.ts';
 import type { RetrievedDocument } from '../../../retrieval/types.ts';
 import { runResearch } from '../../orchestrator.ts';
 import type { ResearchRun } from '../../types.ts';
+import { buildDirectRecallQuestion } from './probe.ts';
 import {
   FORBIDDEN_SCORE_TERMS,
   LEAKAGE_DISCLAIMER,
@@ -47,6 +48,7 @@ import {
 } from './types.ts';
 import type {
   CorpusCutoffStats,
+  DirectRecallProbeResult,
   LeakageAssessment,
   MatchLevel,
   MetricAggregate,
@@ -374,21 +376,43 @@ export async function replayRediscoverySpec(
   };
 }
 
-/** Build the mandatory leakage section (probe = placeholder until LIVE). */
+/** Build the mandatory leakage section (probe = placeholder until run). */
 export function buildLeakageAssessment(spec: TemporalHoldoutSpec): LeakageAssessment {
   return {
     disclaimer: LEAKAGE_DISCLAIMER,
     directRecallProbe: {
       status: 'NOT_RUN_OFFLINE',
-      probeQuestions: spec.targetDiscoveries.map(
-        (t) =>
-          `DIRECT-RECALL PROBE (needs LIVE): "Do you know of ${t.statement} " ` +
-          `(published after ${spec.cutoffDate})? Answer from memory only.`,
+      probeQuestions: spec.targetDiscoveries.map((t) =>
+        buildDirectRecallQuestion(t, spec.cutoffDate),
       ),
       results: null,
     },
     pretrainingLeakageRisk: 'CANNOT_BE_EXCLUDED_OFFLINE',
   };
+}
+
+/**
+ * Hit/miss-line annotation derived from one probe row (§4.1 honesty rule):
+ * a 'known' answer NEVER clears a hit — it only re-labels the hit's
+ * interpretation as high-leakage-risk. Empty string when no probe row exists
+ * (probe not run) — rows then render exactly as they did pre-probe.
+ */
+function probeAnnotation(matched: boolean, row: DirectRecallProbeResult | undefined): string {
+  if (row === undefined) return '';
+  if (row.outcome === 'call_failed') {
+    return matched ? ' · 泄漏风险：未评估（探针调用失败）' : ' · 探针调用失败';
+  }
+  const recall = row.recall;
+  if (recall === null) return '';
+  if (matched) {
+    if (recall === 'known') return ' · 泄漏风险：高（模型自述见过）';
+    if (recall === 'unsure') return ' · 泄漏风险：未定（模型自述不确定）';
+    return ' · 泄漏风险：低-未清除（模型自述未见过；自述非证明）';
+  }
+  // MISS + known: the model HAS the memory yet the replay did not hit — the
+  // contrast arm of §4.1 (evidence FOR derivation rather than memorization).
+  if (recall === 'known') return ' · 对照：模型自述见过但本回放未命中（支持推导而非记忆）';
+  return '';
 }
 
 // ─── Rendering (guarded against capability-score language) ──────────────────
@@ -406,12 +430,16 @@ export function renderRediscoveryReport(report: RediscoveryReport): string {
     '',
     '## Targets (single run — NOT an aggregate claim)',
   ];
+  const probeRows = new Map(
+    (report.leakageAssessment.directRecallProbe.results ?? []).map((r) => [r.targetId, r]),
+  );
   for (const t of report.targetResults) {
     lines.push(
       `- ${t.targetId}: ${t.matched ? 'HIT' : 'MISS'} (${t.matchLevel}) ` +
         `${t.verificationStatus}${t.doi === null ? ' · doi: (none recorded)' : ` · doi: ${t.doi} [${t.doiStatus}]`}` +
         ` · leadTime: ${t.leadTimeMonths}mo` +
-        (t.matchedKeywords.length > 0 ? ` · evidence: ${t.matchedKeywords.join(' | ')}` : ''),
+        (t.matchedKeywords.length > 0 ? ` · evidence: ${t.matchedKeywords.join(' | ')}` : '') +
+        probeAnnotation(t.matched, probeRows.get(t.targetId)),
     );
   }
   lines.push('');
@@ -422,6 +450,17 @@ export function renderRediscoveryReport(report: RediscoveryReport): string {
   lines.push(`## ${report.leakageAssessment.disclaimer}`);
   lines.push(`direct-recall probe: ${report.leakageAssessment.directRecallProbe.status} ` +
     `(pretraining leakage risk: ${report.leakageAssessment.pretrainingLeakageRisk})`);
+  // Per-target probe evidence — only when a probe actually ran (never faked).
+  for (const r of report.leakageAssessment.directRecallProbe.results ?? []) {
+    if (r.outcome === 'call_failed') {
+      lines.push(`- ${r.targetId}: CALL_FAILED — ${r.error ?? 'unknown error'}`);
+      continue;
+    }
+    lines.push(
+      `- ${r.targetId}: ${r.recall ?? 'n/a'} (confidence ${r.confidence === null ? 'n/a' : r.confidence.toFixed(2)})` +
+        ` · source (model-claimed, unverified): ${r.sourcePointer ?? '(none given)'}`,
+    );
+  }
   const text = lines.join('\n');
   assertNoCapabilityScore(text);
   return text;
