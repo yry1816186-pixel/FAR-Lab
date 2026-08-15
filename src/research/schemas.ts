@@ -535,6 +535,13 @@ export const FanoutStrategyReceiptZod = z.object({
   contributed: z.number().int().nonnegative(),
   error: z.string().nullable(),
   skipReason: z.string().nullable(),
+  // Generation-side provenance (§2.4 minimum fields) — optional: pre-b4 runs
+  // did not record them (absence = not recorded, never fabricated).
+  strategySignatureHash: z.string().nullable().optional(),
+  modelId: z.string().nullable().optional(),
+  provider: z.string().nullable().optional(),
+  temperature: z.number().finite().nullable().optional(),
+  seed: z.number().finite().nullable().optional(),
 });
 
 export const FanoutReceiptZod = z.object({
