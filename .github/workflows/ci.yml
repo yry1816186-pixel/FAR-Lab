@@ -596,6 +596,8 @@ jobs:
         run: node scripts/repo_hygiene_gate.mjs
       - name: fuzz_proof smoke（公开解析面模糊测试·增量档 2k 例；全量 100k 走 pnpm fuzz:proof 本地/夜间）
         run: node scripts/fuzz_proof.mjs --smoke --seed 20260816
+      - name: complexity_budget gate（圈复杂度 ≤15/文件 ≤800 行·新违规阻断·存量债务基线化）
+        run: node scripts/complexity_budget_check.mjs
       - name: Upload fuzz report
         if: always()
         uses: actions/upload-artifact@v4
