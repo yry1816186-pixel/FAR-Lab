@@ -1,0 +1,124 @@
+{
+  "syntheticNotice": "SYNTHETIC REPLAY FIXTURE (wiring proof, not truth): corpus documents and replayed hypotheses are reconstructed pre-cutoff literature context for the offline temporal-holdout framework. They must never be presented as real retrieved literature. Target discoveries below ARE real post-cutoff science (see verificationStatus/doiStatus per target).",
+  "specId": "rediscovery-materials-physics-2003",
+  "domain": "materials_and_condensed_matter",
+  "researchQuestion": "Which low-dimensional carbon systems and doped layered compounds are most likely to yield new stable quantum phases at ambient pressure?",
+  "cutoffDate": "2003-06-30",
+  "corpus": [
+    {
+      "pid": "mat-pre-2002-ultrathin-graphite",
+      "title": "[SYNTHETIC] Electronic properties of ultrathin graphite films: confinement and surface trends",
+      "abstract": "[SYNTHETIC] Thinning graphite to tens of layers shifts the carrier spectrum toward two-dimensional behavior; theoretical arguments suggest a diverging in-plane conductivity as thickness decreases, while free-standing monolayers are widely assumed to be thermodynamically unstable.",
+      "publicationDate": "2002-04-11"
+    },
+    {
+      "pid": "mat-pre-2000-layered-doping",
+      "title": "[SYNTHETIC] Carrier doping in layered transition-metal oxides drives metal-superconductor crossovers",
+      "abstract": "[SYNTHETIC] Substitutive fluorine and oxygen doping of layered square-planar compounds tunes the carrier concentration across magnetic and superconducting ground states; the principle generalizes across layered hosts with two-dimensional conduction planes.",
+      "publicationDate": "2000-09-05"
+    },
+    {
+      "pid": "mat-pre-1999-nanotubes",
+      "title": "[SYNTHETIC] Carbon nanotube ballistic transport and field effects",
+      "abstract": "[SYNTHETIC] Single-walled carbon nanotubes exhibit ballistic transport and gateable carrier density, demonstrating that curved sp2 carbon nanostructures support clean quantum transport at room temperature.",
+      "publicationDate": "1999-10-21"
+    },
+    {
+      "pid": "mat-pre-2002-mgb2",
+      "title": "[SYNTHETIC] Magnesium diboride superconductivity at 39 K: two-gap analysis",
+      "abstract": "[SYNTHETIC] The 39 K transition of MgB2 is analyzed in a two-band electron-phonon framework, showing that conventional phonon pairing survives well above previous intermetallic limits.",
+      "publicationDate": "2002-05-30"
+    }
+  ],
+  "targets": [
+    {
+      "id": "graphene-isolation",
+      "statement": "Stable isolated monolayer graphene is obtained by mechanical exfoliation and shows anomalous room-temperature quantum transport (Novoselov and Geim, Science, 2004).",
+      "publishedAfter": "2004-10-22",
+      "doi": "10.1126/science.1102896",
+      "doiStatus": "CONFIRMED",
+      "verificationStatus": "VERIFIED_DISCOVERY",
+      "unverifiedNote": null,
+      "matchKeywords": ["graphene", "mechanical exfoliation", "quantum transport", "monolayer carbon"],
+      "synonyms": {
+        "graphene": ["single atomic layer graphite", "two dimensional carbon sheet"],
+        "mechanical exfoliation": ["peeling graphite layers"]
+      },
+      "groundingDocPids": ["mat-pre-2002-ultrathin-graphite"]
+    },
+    {
+      "id": "iron-based-superconductivity",
+      "statement": "Fluorine-doped LaFeAsO superconducts at 26 K, opening iron-based superconductivity (Kamihara et al., JACS, 2008).",
+      "publishedAfter": "2008-02-23",
+      "doi": null,
+      "doiStatus": "UNCONFIRMED",
+      "verificationStatus": "VERIFIED_DISCOVERY",
+      "unverifiedNote": "Discovery, venue, and approximate date are established knowledge (JACS 130:3296, 2008, online-first February 2008), but the exact DOI and day-precision date are not reproduced with high confidence here — verify before citing anywhere.",
+      "matchKeywords": ["iron based superconductor", "fluorine doping", "lafeaso"],
+      "synonyms": {
+        "iron based superconductor": ["superconductivity in iron compounds", "iron pnictide superconductor"],
+        "fluorine doping": ["fluorine substitution"]
+      },
+      "groundingDocPids": ["mat-pre-2000-layered-doping"]
+    }
+  ],
+  "hypotheses": [
+    {
+      "statement": "Graphene, a single atomic layer of carbon, can be isolated by mechanical exfoliation of graphite and should show quantum transport corrections at room temperature.",
+      "mechanism": "Micromechanical peeling transfers few-layer flakes onto oxidized silicon, where optical interference and gateable transport reveal the monolayer; the assumed thermodynamic instability of a free monolayer is argued to be a substrate-artifact conclusion, not intrinsic.",
+      "falsificationMethod": {
+        "prediction": "Optically identified monolayer flakes fail gate-dependent transport (mobility below 100 cm2/Vs)",
+        "metric": "mobility_cm2_vs",
+        "comparator": "lt",
+        "value": 100
+      },
+      "citePids": ["mat-pre-2002-ultrathin-graphite"],
+      "counterCitePids": ["mat-pre-1999-nanotubes"],
+      "relationToExistingTheory": "Challenges the assumed instability of free-standing two-dimensional crystals at finite temperature.",
+      "alternativeExplanations": ["Monolayers crumple or roll into nanotubes before any measurement is possible."],
+      "observablePredictions": ["Weak-field Hall and Shubnikov-de Haas oscillations persist at room temperature in the monolayer."],
+      "distinguishingObservations": ["Layer-number series of quantized Hall conductance on the same substrate."],
+      "noveltyRelativeToCorpus": "Converts the confinement trend of ultrathin graphite into an explicit isolation and measurement program.",
+      "assumptions": ["Substrate interactions stabilize the monolayer sufficiently for transport measurement."],
+      "risks": ["Visual identification of true monolayers may be impractical."]
+    },
+    {
+      "statement": "Fluorine doping of a layered iron oxyarsenide is predicted to induce superconductivity above 20 K at ambient pressure.",
+      "mechanism": "Substitutive fluorine on the oxygen site of layered LaFeAsO injects carriers into the iron square-planar sheets, suppressing the magnetic ordering of the parent compound and stabilizing a two-dimensional superconducting state by the same doping principle established in layered transition-metal oxides.",
+      "falsificationMethod": {
+        "prediction": "Resistive measurements of fluorine-doped LaFeAsO show no transition above 4 K",
+        "metric": "onset_temperature_k",
+        "comparator": "lt",
+        "value": 4
+      },
+      "citePids": ["mat-pre-2000-layered-doping"],
+      "counterCitePids": ["mat-pre-2002-mgb2"],
+      "relationToExistingTheory": "Extends the doping-driven crossover principle from cuprate-like oxides to a pnictide host.",
+      "alternativeExplanations": ["The parent magnetic order is robust to carrier injection at achievable doping levels."],
+      "observablePredictions": ["A superconducting dome versus fluorine content peaking near 10 percent substitution."],
+      "distinguishingObservations": ["MuSR or NMR evidence of coexistence or competition between magnetism and superconductivity across the dome."],
+      "noveltyRelativeToCorpus": "Names a concrete non-cuprate layered candidate family and doping route.",
+      "assumptions": ["Fluorine substitutes on the oxygen site controllably."],
+      "risks": ["Sample synthesis of oxyarsenides is demanding."]
+    },
+    {
+      "statement": "The 39 K transition of magnesium diboride is fully explained by two-band electron-phonon coupling without exotic pairing.",
+      "mechanism": "Boron sigma and pi sheets contribute bands with distinct coupling strengths; their interplay raises Tc beyond single-band estimates within conventional BCS theory.",
+      "falsificationMethod": {
+        "prediction": "Isotope-effect exponent deviates from the two-band prediction by more than 0.1",
+        "metric": "isotope_exponent_deviation",
+        "comparator": "gt",
+        "value": 0.1
+      },
+      "citePids": ["mat-pre-2002-mgb2"],
+      "counterCitePids": [],
+      "relationToExistingTheory": "Consolidates the two-gap interpretation of existing MgB2 data.",
+      "alternativeExplanations": ["Strong-coupling anharmonicity dominates the transition."],
+      "observablePredictions": ["Two superconducting gaps resolved in tunneling spectra."],
+      "distinguishingObservations": ["Band-selective scattering experiments separating the two gap scales."],
+      "noveltyRelativeToCorpus": "Synthesis claim over an already-published two-band analysis.",
+      "assumptions": ["Phonon spectra are accurately known."],
+      "risks": ["Polycrystalline averaging hides band-specific signatures."]
+    }
+  ]
+}

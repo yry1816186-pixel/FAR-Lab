@@ -160,6 +160,10 @@ function mapCandidates(
         value?: number;
         lower?: number;
         upper?: number;
+        // b6-S1 structured adjudicability (present on new live generation;
+        // absent on pre-b6 replayed fixtures — passed through verbatim).
+        direction?: 'positive' | 'negative' | 'either';
+        metricShape?: 'correlation' | 'difference' | 'threshold' | 'ratio';
       };
       supportingCitations: string[];
       counterEvidenceCitations: string[];
@@ -178,6 +182,8 @@ function mapCandidates(
       ...(c.falsificationMethod.value !== undefined ? { value: c.falsificationMethod.value } : {}),
       ...(c.falsificationMethod.lower !== undefined ? { lower: c.falsificationMethod.lower } : {}),
       ...(c.falsificationMethod.upper !== undefined ? { upper: c.falsificationMethod.upper } : {}),
+      ...(c.falsificationMethod.direction !== undefined ? { direction: c.falsificationMethod.direction } : {}),
+      ...(c.falsificationMethod.metricShape !== undefined ? { metricShape: c.falsificationMethod.metricShape } : {}),
     };
     out.push({
       id: computeHypothesisId(c.statement, c.mechanism),
@@ -244,7 +250,14 @@ export async function generateHypothesesMultiStrategy(
         gateway,
         profile,
         `discovery_${strategy.id}`,
-        buildStrategySchema(strategy.maxPerCall),
+        // b6-S1: LIVE new generation REQUIRES the structured adjudicability
+        // fields (omission → existing two-attempt repair path, then fail-soft
+        // error). offline_replay keeps them OPTIONAL so pre-b6 recorded
+        // responses replay byte-stably (orchestrator's replay path flows
+        // through here with profile='offline_replay').
+        buildStrategySchema(strategy.maxPerCall, {
+          requireAdjudicability: profile !== 'offline_replay',
+        }),
         buildStrategyMessages(strategy, {
           question: opts.question,
           corpusAllowlist: allowlist,

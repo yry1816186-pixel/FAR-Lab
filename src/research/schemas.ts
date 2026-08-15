@@ -23,6 +23,7 @@
 
 import { z } from 'zod';
 import { STRATEGY_IDS } from '../discovery/types.ts';
+import { METRIC_SHAPES, PREDICTION_DIRECTIONS } from '../agent_loop/types.ts';
 import { buildEvidenceRelations, computeCitationGateReport } from './citation_gate.ts';
 import { computeFalsifiabilityGateReport } from './falsifiability_gate.ts';
 import type { CitationBinding, ResearchRun } from './types.ts';
@@ -37,45 +38,88 @@ import type { CitationBinding, ResearchRun } from './types.ts';
  * for them is rejected at generation time and repaired on retry — 2026-08-14
  * live-run defect: every live hypothesis failed the gate on this mismatch);
  * `range` requires finite `lower` < `upper`.
+ *
+ * b6-S1 structured adjudicability: `direction` / `metricShape` are OPTIONAL
+ * here — pre-b6 runs, recorded replays, and legacy fixtures parse unchanged
+ * ("not recorded" is never "did not happen"). The NEW-GENERATION contract
+ * (discovery strategy fan-out, live profiles) uses the strict variant
+ * `AdjudicableFalsificationMethodZod` below, which REQUIRES both fields.
  */
-export const FalsificationMethodZod = z
-  .object({
-    prediction: z.string(),
-    metric: z.string(),
-    comparator: z.enum(['gt', 'lt', 'range']),
-    value: z.number().optional(),
-    lower: z.number().optional(),
-    upper: z.number().optional(),
-  })
-  .superRefine((m, ctx) => {
-    if (m.comparator === 'gt' || m.comparator === 'lt') {
-      if (m.value === undefined || !Number.isFinite(m.value)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['value'],
-          message: `comparator "${m.comparator}" requires a finite numeric "value" threshold (lower/upper are only valid for comparator "range")`,
-        });
-      }
-      return;
-    }
-    if (
-      m.lower === undefined || m.upper === undefined ||
-      !Number.isFinite(m.lower) || !Number.isFinite(m.upper) ||
-      m.lower >= m.upper
-    ) {
+const FalsificationMethodObjectZod = z.object({
+  prediction: z.string(),
+  metric: z.string(),
+  comparator: z.enum(['gt', 'lt', 'range']),
+  value: z.number().optional(),
+  lower: z.number().optional(),
+  upper: z.number().optional(),
+  direction: z.enum(PREDICTION_DIRECTIONS).optional(),
+  metricShape: z.enum(METRIC_SHAPES).optional(),
+});
+
+/** Shared threshold-coherence refinement (kept identical across variants). */
+function refineThresholdCoherence(
+  m: z.infer<typeof FalsificationMethodObjectZod>,
+  ctx: z.RefinementCtx,
+): void {
+  if (m.comparator === 'gt' || m.comparator === 'lt') {
+    if (m.value === undefined || !Number.isFinite(m.value)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['lower'],
-        message: 'comparator "range" requires finite numeric "lower" and "upper" with lower < upper',
+        path: ['value'],
+        message: `comparator "${m.comparator}" requires a finite numeric "value" threshold (lower/upper are only valid for comparator "range")`,
       });
     }
-  });
+    return;
+  }
+  if (
+    m.lower === undefined || m.upper === undefined ||
+    !Number.isFinite(m.lower) || !Number.isFinite(m.upper) ||
+    m.lower >= m.upper
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['lower'],
+      message: 'comparator "range" requires finite numeric "lower" and "upper" with lower < upper',
+    });
+  }
+}
+
+export const FalsificationMethodZod = FalsificationMethodObjectZod.superRefine(refineThresholdCoherence);
+
+/**
+ * Strict b6-S1 variant: `direction` and `metricShape` are REQUIRED. Used only
+ * by the new-generation path (buildStrategySchema with requireAdjudicability)
+ * — a live model omitting them fails structured validation and enters the
+ * existing two-attempt repair path. Never applied to replayed/legacy data.
+ */
+export const AdjudicableFalsificationMethodZod = FalsificationMethodObjectZod
+  .extend({
+    direction: z.enum(PREDICTION_DIRECTIONS),
+    metricShape: z.enum(METRIC_SHAPES),
+  })
+  .superRefine(refineThresholdCoherence);
 
 /** zod schema for one generated hypothesis candidate (no id — computed locally). */
 export const CandidateZod = z.object({
   statement: z.string(),
   mechanism: z.string(),
   falsificationMethod: FalsificationMethodZod,
+  supportingCitations: z.array(z.string()),
+  counterEvidenceCitations: z.array(z.string()),
+  relationToExistingTheory: z.string(),
+  alternativeExplanations: z.array(z.string()),
+  observablePredictions: z.array(z.string()),
+  distinguishingObservations: z.array(z.string()),
+  noveltyRelativeToCorpus: z.string(),
+  assumptions: z.array(z.string()),
+  risks: z.array(z.string()),
+});
+
+/** Strict b6-S1 candidate variant: adjudicability fields required on falsificationMethod. */
+export const AdjudicableCandidateZod = z.object({
+  statement: z.string(),
+  mechanism: z.string(),
+  falsificationMethod: AdjudicableFalsificationMethodZod,
   supportingCitations: z.array(z.string()),
   counterEvidenceCitations: z.array(z.string()),
   relationToExistingTheory: z.string(),
