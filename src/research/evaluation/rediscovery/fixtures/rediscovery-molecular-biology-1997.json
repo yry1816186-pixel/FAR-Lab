@@ -1,0 +1,124 @@
+{
+  "syntheticNotice": "SYNTHETIC REPLAY FIXTURE (wiring proof, not truth): corpus documents and replayed hypotheses are reconstructed pre-cutoff literature context for the offline temporal-holdout framework. They must never be presented as real retrieved literature. Target discoveries below ARE real post-cutoff science (see verificationStatus/doiStatus per target).",
+  "specId": "rediscovery-molecular-biology-1997",
+  "domain": "molecular_biology",
+  "researchQuestion": "Which RNA-mediated silencing effects and bacterial repeat-associated immune mechanisms could become general sequence-specific genome-targeting tools?",
+  "cutoffDate": "1997-06-30",
+  "corpus": [
+    {
+      "pid": "molbio-pre-1995-antisense-nematode",
+      "title": "[SYNTHETIC] Injected antisense and sense RNA strands both suppress target-gene expression in C. elegans",
+      "abstract": "[SYNTHETIC] Injection of either antisense or sense RNA into C. elegans suppresses corresponding target genes in a concentration-dependent manner; the effect spreads between tissues and persists for a generation, suggesting an amplifying cellular pathway.",
+      "publicationDate": "1995-02-15"
+    },
+    {
+      "pid": "molbio-pre-1993-crispr-repeats",
+      "title": "[SYNTHETIC] Clustered short palindromic repeats in prokaryotic genomes: conserved pattern without assigned function",
+      "abstract": "[SYNTHETIC] Tandem short repeats separated by conserved spacers appear across E. coli and archaeal genomes; adjacent gene families encode conserved predicted nucleases with no experimentally assigned role.",
+      "publicationDate": "1993-11-02"
+    },
+    {
+      "pid": "molbio-pre-1994-zinc-fingers",
+      "title": "[SYNTHETIC] Zinc-finger nucleases direct sequence-specific genome modification in cultured cells",
+      "abstract": "[SYNTHETIC] Fusing engineered zinc-finger DNA-binding domains to a nuclease domain yields double-strand cuts at chosen genomic loci; specificity is limited by finger-domain context effects.",
+      "publicationDate": "1994-09-30"
+    },
+    {
+      "pid": "molbio-pre-1992-transposons",
+      "title": "[SYNTHETIC] Transposon-mediated insertional mutagenesis: coverage, footprinting, and limits",
+      "abstract": "[SYNTHETIC] Transposon mutagenesis saturates bacterial and yeast genomes but leaves footprint mutations and exhibits insertion-site bias that complicates clean genome engineering.",
+      "publicationDate": "1992-07-14"
+    }
+  ],
+  "targets": [
+    {
+      "id": "rna-interference",
+      "statement": "Double-stranded RNA triggers sequence-specific gene silencing (RNA interference) in animals (Fire et al., Nature, 1998).",
+      "publishedAfter": "1998-02-19",
+      "doi": "10.1038/35888",
+      "doiStatus": "CONFIRMED",
+      "verificationStatus": "VERIFIED_DISCOVERY",
+      "unverifiedNote": null,
+      "matchKeywords": ["double stranded rna", "gene silencing", "sequence specific"],
+      "synonyms": {
+        "gene silencing": ["post transcriptional suppression", "target mrna degradation"],
+        "double stranded rna": ["dsrna"]
+      },
+      "groundingDocPids": ["molbio-pre-1995-antisense-nematode"]
+    },
+    {
+      "id": "crispr-cas9-programmable-cleavage",
+      "statement": "Cas9 guided by a single engineered RNA cleaves arbitrary DNA targets, enabling programmable genome editing (Jinek et al., Science, 2012).",
+      "publishedAfter": "2012-08-17",
+      "doi": "10.1126/science.1225829",
+      "doiStatus": "CONFIRMED",
+      "verificationStatus": "VERIFIED_DISCOVERY",
+      "unverifiedNote": null,
+      "matchKeywords": ["programmable genome editing", "cas9", "guide rna"],
+      "synonyms": {
+        "cas9": ["crispr associated nuclease"],
+        "guide rna": ["single engineered rna", "crispr rna"]
+      },
+      "groundingDocPids": ["molbio-pre-1993-crispr-repeats"]
+    }
+  ],
+  "hypotheses": [
+    {
+      "statement": "Double-stranded RNA mediates sequence-specific gene silencing across animal cell lineages.",
+      "mechanism": "dsRNA injected into an animal triggers a cellular pathway that degrades mRNA sharing its sequence; the tissue-to-tissue spread and generational persistence reported for sense-strand suppression are explained by a dsRNA intermediate amplified inside the cell.",
+      "falsificationMethod": {
+        "prediction": "Purified dsRNA injection leaves target mRNA abundance unchanged (fold change above 2 versus buffer control)",
+        "metric": "mrna_fold_change",
+        "comparator": "gt",
+        "value": 2
+      },
+      "citePids": ["molbio-pre-1995-antisense-nematode"],
+      "counterCitePids": [],
+      "relationToExistingTheory": "Unifies the anomalous sense-strand suppression results with classical antisense effects.",
+      "alternativeExplanations": ["Single-strand antisense contamination drives the observed suppression."],
+      "observablePredictions": ["dsRNA is orders of magnitude more potent per molecule than either single strand."],
+      "distinguishingObservations": ["Dose-response separation between purified dsRNA and its denatured strands."],
+      "noveltyRelativeToCorpus": "Names the actual interfering species and generalizes it across lineages.",
+      "assumptions": ["Purified dsRNA can be delivered intact to target tissues."],
+      "risks": ["Sequence-off-target effects at high dose."]
+    },
+    {
+      "statement": "Bacterial repeat-associated nuclease systems could be retooled with a single engineered RNA to cut chosen DNA sequences.",
+      "mechanism": "The conserved nuclease gene family adjacent to the clustered repeats likely acts on foreign DNA guided by repeat-derived transcripts; replacing the spacer-derived segment of that transcript with an engineered sequence would redirect the cut to arbitrary matching genomic sites.",
+      "falsificationMethod": {
+        "prediction": "Reconstituted nuclease plus engineered single RNA fails to cut plasmid targets in vitro (cleaved fraction below 0.05)",
+        "metric": "cleavage_fraction",
+        "comparator": "lt",
+        "value": 0.05
+      },
+      "citePids": ["molbio-pre-1993-crispr-repeats"],
+      "counterCitePids": ["molbio-pre-1994-zinc-fingers"],
+      "relationToExistingTheory": "Repositions an unexplained prokaryotic repeat system as a programmable nuclease chassis.",
+      "alternativeExplanations": ["The repeat system is a DNA-level repair or partitioning mechanism, not RNA-guided cleavage."],
+      "observablePredictions": ["Cleavage maps to sites complementary to the engineered RNA segment."],
+      "distinguishingObservations": ["Mutation of the nuclease catalytic residues abolishes cutting without altering RNA binding."],
+      "noveltyRelativeToCorpus": "First proposal in this corpus context to externalize targeting onto an RNA rather than a protein domain.",
+      "assumptions": ["The nuclease accepts non-native guide segments."],
+      "risks": ["Cellular immunity barriers in eukaryotes."]
+    },
+    {
+      "statement": "Zinc-finger nuclease specificity can be improved by modular assembly of DNA-recognition helices.",
+      "mechanism": "Independent finger modules bind triplet subsites; array assembly from a modular code reduces the context effects that limit current fusion nucleases.",
+      "falsificationMethod": {
+        "prediction": "Modularly assembled arrays exceed a 10 percent off-target cleavage rate at endogenous loci",
+        "metric": "off_target_rate",
+        "comparator": "gt",
+        "value": 0.1
+      },
+      "citePids": ["molbio-pre-1994-zinc-fingers"],
+      "counterCitePids": ["molbio-pre-1992-transposons"],
+      "relationToExistingTheory": "Incremental refinement of the protein-based targeting strategy.",
+      "alternativeExplanations": ["Context-dependent finger pairing defeats modular coding."],
+      "observablePredictions": ["Engineered arrays cut designated loci with predictable rates."],
+      "distinguishingObservations": ["Parallel assembly of the same specificity in two scaffolds."],
+      "noveltyRelativeToCorpus": "Engineering-methods claim within the established zinc-finger paradigm.",
+      "assumptions": ["Triplet recognition is context-free to first order."],
+      "risks": ["Assembly screening cost scales with array length."]
+    }
+  ]
+}

@@ -86,6 +86,16 @@ export interface RegistryEvidence {
     readonly adapter: string;
     readonly metricValue: number;
   } | undefined;
+  /**
+   * Present on human-review transition lines (KERNEL_ADJUDICATED →
+   * NOVEL_VALIDATED / REDISCOVERY): when the review happened and who did it.
+   * Absent on older lines = "not recorded then" (additive optional field —
+   * the reviewedAt/humanReviewRef pair is the disclosure-discipline trail).
+   */
+  readonly review?: {
+    readonly reviewedAt: string;
+    readonly reviewer?: string | undefined;
+  } | undefined;
 }
 
 export interface DiscoveryRegistryRecord {
@@ -488,6 +498,120 @@ export function registerRunDiscoveries(
     skippedDuplicates: result.skippedDuplicates,
     notRegistered,
   };
+}
+
+// ── Human-review promotion (ladder top two rungs) ────────────────────────────
+
+/** Why a human-review promotion was refused (typed — never a stringly error). */
+export type HumanReviewRefusalReason =
+  | 'hypothesis_not_in_run'
+  | 'not_registered'
+  | 'illegal_transition';
+
+/** The human-review promotion outcome (same family as BackflowOutcome). */
+export interface HumanReviewOutcome {
+  readonly status: 'APPENDED' | 'SKIPPED_DUPLICATE' | 'REFUSED';
+  readonly reason?: HumanReviewRefusalReason;
+  /** Verbatim illegal-edge detail from the shared ladder machine (legal path included). */
+  readonly detail?: string;
+  readonly fromState?: ConjectureState;
+  readonly toState?: 'NOVEL_VALIDATED' | 'REDISCOVERY';
+  readonly appendedRecord?: DiscoveryRegistryRecord;
+}
+
+/**
+ * Record ONE human review: promote a ledger-tracked conjecture to
+ * NOVEL_VALIDATED (needs humanReviewRef) or REDISCOVERY (needs
+ * matchingLiterature). The shared ConjectureState machine is THE gate — the
+ * current state is the hypothesis's LAST ledger line, so a CORROBORATED-only
+ * ledger refuses a direct NOVEL jump with the legal path printed (fail-closed,
+ * no skip-level), and terminal states refuse everything.
+ *
+ * The run file supplies the content (contentHash) + provenance only; the
+ * review itself is a human operational act recorded with wall-clock
+ * reviewedAt (notarization semantics, outside the deterministic kernel).
+ *
+ * Cannot-prove: a review line proves a human REFERENCED a review record at
+ * reviewedAt — it does not verify the review's content, the reviewer's
+ * identity, or the conjecture's truth/novelty (disclosure discipline §2.4
+ * still demands leakage assessment + AI-generated labeling externally).
+ */
+export function recordHumanReview(input: {
+  readonly run: ResearchRun;
+  readonly hypothesisId: string;
+  readonly toState: 'NOVEL_VALIDATED' | 'REDISCOVERY';
+  readonly humanReviewRef?: string;
+  readonly matchingLiterature?: string;
+  readonly reviewer?: string;
+  readonly ledgerPath?: string;
+  readonly now?: () => Date;
+}): HumanReviewOutcome {
+  const ledgerPath = input.ledgerPath ?? DEFAULT_DISCOVERY_REGISTRY_PATH;
+  const hypothesis = input.run.hypotheses.find((h) => h.id === input.hypothesisId);
+  if (hypothesis === undefined) {
+    return { status: 'REFUSED', reason: 'hypothesis_not_in_run' };
+  }
+  const contentHash = hypothesisContentHash(hypothesis);
+  const existing = readDiscoveryRegistry(ledgerPath);
+  const history = existing.filter((r) => r.contentHash === contentHash);
+  if (history.length === 0) {
+    // The ladder never promotes unregistered content (§2.4).
+    return { status: 'REFUSED', reason: 'not_registered' };
+  }
+  if (existing.some((r) => r.contentHash === contentHash && r.state === input.toState)) {
+    return { status: 'SKIPPED_DUPLICATE', toState: input.toState };
+  }
+  // The current rung = the LAST line for this content (the ladder history is
+  // append-only; file order is authoritative). The shared machine is the ONLY
+  // gate — no parallel rule set here.
+  const fromState = history[history.length - 1]!.state;
+  const evidence = {
+    ...(input.humanReviewRef !== undefined ? { humanReviewRef: input.humanReviewRef } : {}),
+    ...(input.matchingLiterature !== undefined ? { matchingLiterature: input.matchingLiterature } : {}),
+  };
+  // Validate through the shared machine; on success it echoes `to` back, so
+  // the recorded state below is the requested target itself.
+  try {
+    transitionConjectureState(fromState, input.toState, evidence);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.startsWith('illegal conjecture transition')) {
+      // Skip-level / terminal / demotion — refuse with the legal path verbatim.
+      return { status: 'REFUSED', reason: 'illegal_transition', detail: message, fromState };
+    }
+    // Evidence failures (empty humanReviewRef / matchingLiterature) propagate
+    // loudly — the caller must never be able to launder a promotion through.
+    throw err;
+  }
+  const review = {
+    reviewedAt: (input.now ?? (() => new Date()))().toISOString(),
+    ...(input.reviewer !== undefined && input.reviewer !== '' ? { reviewer: input.reviewer } : {}),
+  };
+  const record = buildDiscoveryRegistryRecord({
+    kind: 'state_transition',
+    sequence: existing.length,
+    contentHash,
+    registeredAt: review.reviewedAt,
+    state: input.toState,
+    question: input.run.question,
+    runId: input.run.runId,
+    provenance: {
+      corpusSnapshotId: input.run.corpus.snapshotId,
+      corpusRootHash: input.run.corpus.rootHash,
+      modelProfile: 'human-review',
+      supportingCitations: [],
+      counterEvidenceCitations: [],
+      receiptsDigest: `human-review:${input.hypothesisId}@${input.run.runId}`,
+    },
+    evidence: { ...evidence, review },
+    prevRecordHash: '',
+  });
+  const append = appendDiscoveryRecords(ledgerPath, [record]);
+  const appendedRecord = append.appended[0];
+  if (appendedRecord === undefined) {
+    return { status: 'SKIPPED_DUPLICATE', toState: input.toState };
+  }
+  return { status: 'APPENDED', fromState, toState: input.toState, appendedRecord };
 }
 
 /** Notarization export: the full ledger + chain head, machine-verifiable. */

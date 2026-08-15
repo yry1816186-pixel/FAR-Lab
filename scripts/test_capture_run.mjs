@@ -27,7 +27,6 @@ const child = spawnSync('pnpm', ['test', ...process.argv.slice(2)], {
   shell: true,
   encoding: 'utf8',
   maxBuffer: 256 * 1024 * 1024,
-  env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
 });
 
 const output = `${child.stdout ?? ''}${child.stderr ?? ''}`;

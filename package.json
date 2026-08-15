@@ -74,6 +74,7 @@
     "benchmark:generate": "tsx scripts/generate_benchmark.ts",
     "gen:openapi": "node scripts/generate_openapi.mjs",
     "openapi:check": "node scripts/generate_openapi.mjs --check",
+    "perf:budget": "node scripts/perf_budget_check.mjs",
     "test:capture": "node scripts/test_capture_run.mjs"
   },
   "dependencies": {

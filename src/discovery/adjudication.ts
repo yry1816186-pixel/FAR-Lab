@@ -13,17 +13,30 @@
  *     with significantAt05=true. Landscape recommendations, FAILED analyses,
  *     and non-significant nulls are REFUSED (exit discipline: a null result is
  *     preserved, never converted into a ladder climb).
- *   - The metric must be COVERED by the prediction text (deterministic
- *     substring proxy — necessary, not sufficient; declared below).
- *   - The prediction's direction must be derivable ('positive/negative',
- *     'increases/decreases', …) — otherwise the threshold contract is unknown.
+ *   - Metric coverage: the prediction's structured `metricShape` field is the
+ *     PRIMARY channel (b6-S1) — 'correlation' is the only shape the decisive
+ *     observation family (Pearson r) measures; difference/threshold/ratio
+ *     predictions are REFUSED metric_not_covered. When the field is absent,
+ *     the prose keyword proxy (correlation/correlate/pearson/association)
+ *     applies as before — necessary, not sufficient; declared below.
+ *   - Direction: the structured `direction` field is the PRIMARY channel;
+ *     'either' is an explicit no-direction commitment (REFUSED
+ *     direction_unknown — prose never overrides an explicit declaration).
+ *     Absent field → prose keyword derivation as before. Structured and prose
+ *     channels CONTRADICTING each other (either one) is REFUSED
+ *     structured_prose_conflict (fail-closed: never silently pick a channel).
  *   - The hypothesis must ALREADY be registered CORROBORATED in the ledger:
  *     the ladder never adjudicates unregistered content.
  *
  * Cannot-prove (must never be hidden): this adjudicates the FALSIFIABLE
  * PREDICTION projection of the hypothesis (its operational content), not the
- * full mechanism, and the metric-coverage check is a textual proxy — a passing
- * check does not prove the observation measures what the author meant.
+ * full mechanism, and the metric-coverage check is a textual/declarative
+ * proxy — a passing check does not prove the observation measures what the
+ * author meant. The structured fields are model-DECLARED and adjudication-
+ * sensitive: tampering a persisted run's `direction` flips the compiled
+ * threshold contract (gt↔lt); the defense is NOT this module but the registry
+ * content-hash chain (a tampered hypothesis no longer matches its registered
+ * CORROBORATED line → not_registered_corroborated) plus run-file provenance.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -53,7 +66,9 @@ export type AdjudicationRefusalReason =
   | 'observation_not_decisive'
   | 'metric_not_covered'
   | 'direction_unknown'
-  | 'no_finite_statistic';
+  | 'no_finite_statistic'
+  /** b6-S1: the structured field and the prose wording contradict (fail-closed). */
+  | 'structured_prose_conflict';
 
 /** The verdict-side result of compiling one observation against one hypothesis. */
 export interface AdjudicationCompilation {
@@ -111,20 +126,52 @@ export function adjudicateRunObservation(input: {
     return { status: 'REFUSED', reason: 'no_finite_statistic' };
   }
   const prediction = hypothesis.falsificationMethod.prediction;
-  // Metric-coverage proxy (necessary, not sufficient — declared in the header):
-  // the prediction must textually reference the correlation statistic family.
   const predictionLower = prediction.toLowerCase();
-  const coversMetric =
+  // Prose metric-coverage proxy (necessary, not sufficient — declared in the
+  // header): the prediction must textually reference the correlation family.
+  const proseCoversMetric =
     predictionLower.includes('correlation') ||
     predictionLower.includes('correlate') ||
     predictionLower.includes('pearson') ||
     predictionLower.includes('association');
-  if (!coversMetric) {
+
+  // ── Metric coverage: structured metricShape FIRST, prose fallback (b6-S1) ──
+  const metricShape = hypothesis.falsificationMethod.metricShape;
+  if (metricShape !== undefined) {
+    if (metricShape !== 'correlation' && proseCoversMetric) {
+      // Structured says a non-correlation shape while the prose claims the
+      // correlation family — the two channels contradict → fail-closed.
+      return { status: 'REFUSED', reason: 'structured_prose_conflict' };
+    }
+    // Only 'correlation' is measured by the decisive observation family
+    // (Pearson r). difference/threshold/ratio predictions are honestly
+    // refused rather than force-mapped onto a correlation statistic.
+    if (metricShape !== 'correlation') {
+      return { status: 'REFUSED', reason: 'metric_not_covered' };
+    }
+  } else if (!proseCoversMetric) {
     return { status: 'REFUSED', reason: 'metric_not_covered' };
   }
-  const direction = deriveDirection(prediction);
-  if (direction === null) {
-    return { status: 'REFUSED', reason: 'direction_unknown' };
+
+  // ── Direction: structured direction FIRST, prose fallback (b6-S1) ──────────
+  const proseDirection = deriveDirection(prediction);
+  const structuredDirection = hypothesis.falsificationMethod.direction;
+  let direction: PredictionDirection;
+  if (structuredDirection !== undefined) {
+    if (structuredDirection === 'either') {
+      // Explicit no-direction commitment: no gt/lt contract is constructible,
+      // and prose keywords must NOT override an explicit declaration.
+      return { status: 'REFUSED', reason: 'direction_unknown' };
+    }
+    if (proseDirection !== null && proseDirection !== structuredDirection) {
+      return { status: 'REFUSED', reason: 'structured_prose_conflict' };
+    }
+    direction = structuredDirection;
+  } else {
+    if (proseDirection === null) {
+      return { status: 'REFUSED', reason: 'direction_unknown' };
+    }
+    direction = proseDirection;
   }
 
   const claim = prediction; // the falsifiable prediction is the operational claim
