@@ -91,16 +91,35 @@ console.log('  阈值: line ≥85% / branch ≥75% (Z16 SSOT)');
 console.log('  Core:', CORE_DIRS.join(', '));
 console.log('═══════════════════════════════════════════');
 
-const result = spawnSync(process.execPath, args, { stdio: 'inherit' });
+// 捕获输出：需要区分「测试失败」与「阈值不达标」两类非零退出（2026-08-16
+// PR #49 事故：memory_bounded 性能测试在覆盖率插桩下 flake → 门禁打出误导性的
+// 「低于阈值」横幅，排障被带偏）。判别：`fail 0` + 非零退出 = 阈值不达标；
+// `fail N>0` = 覆盖率运行内测试失败（可能是插桩下的性能 flake，非覆盖回归）。
+const result = spawnSync(process.execPath, args, {
+  stdio: ['ignore', 'pipe', 'inherit'],
+  maxBuffer: 256 * 1024 * 1024,
+});
+const output = result.stdout ?? '';
+if (output.length > 0) process.stdout.write(output);
 
 const code = result.status ?? 1;
+const failMatch = /ℹ fail (\d+)/.exec(output);
+const failedTests = failMatch !== null ? Number(failMatch[1]) : null;
+
 if (code === 0) {
   console.log('═══════════════════════════════════════════');
   console.log('✅ Z16 COVERAGE GATE: PASS (Core ≥85% line / ≥75% branch)');
   console.log('═══════════════════════════════════════════');
+} else if (failedTests !== null && failedTests > 0) {
+  console.error('═══════════════════════════════════════════');
+  console.error(`❌ Z16 COVERAGE GATE: TESTS FAILED inside the coverage run (${failedTests} failing) —`);
+  console.error('   this is a test failure under instrumentation (perf/memory flake candidates:');
+  console.error('   tests/benchmark/memory_bounded 等), NOT a coverage-threshold regression.');
+  console.error('   Threshold verdict unknown until the failing test passes. Rerun the job first.');
+  console.error('═══════════════════════════════════════════');
 } else {
   console.error('═══════════════════════════════════════════');
-  console.error('❌ Z16 COVERAGE GATE: FAIL (Core 低于阈值)');
+  console.error('❌ Z16 COVERAGE GATE: FAIL (Core 低于阈值 — tests passed, thresholds breached)');
   console.error('═══════════════════════════════════════════');
 }
 process.exit(code);
