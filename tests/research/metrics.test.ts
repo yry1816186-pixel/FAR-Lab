@@ -5,7 +5,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeRunMetrics } from '../../src/research/evaluation/metrics.ts';
-import type { ResearchRun } from '../../src/research/types.ts';
+import type { ResearchRun, ScorecardDimension, ScorecardDimensionName, ScoreGrade } from '../../src/research/types.ts';
+import type { StrategyId } from '../../src/discovery/types.ts';
 
 function baseRun(overrides: Partial<ResearchRun> = {}): ResearchRun {
   return {
@@ -217,7 +218,7 @@ describe('computeRunMetrics', () => {
   //    saturate; these are the rows that can actually adjudicate a primitive. ──
 
   test('scorecardMeanGrade.<dim>: grade-point mean per dimension, NOT_APPLICABLE excluded, sorted names', () => {
-    const dim = (name: string, grade: string) => ({ name, grade, rationale: 'r', source: 'deterministic' as const });
+    const dim = (name: ScorecardDimensionName, grade: ScoreGrade): ScorecardDimension => ({ name, grade, rationale: 'r', source: 'deterministic' });
     const run = baseRun({
       scorecards: {
         h1: { hypothesisId: 'h1', paretoOptimal: true, keyEvidenceToChangeConclusion: '', dimensions: [dim('Testability', 'A'), dim('NoveltyRelativeToCorpus', 'B')] },
@@ -235,7 +236,7 @@ describe('computeRunMetrics', () => {
   });
 
   test('noveltyVsResearchMemoryGrade: surfaced standalone; null when no memory flags (absence is honest)', () => {
-    const dim = (name: string, grade: string) => ({ name, grade, rationale: 'r', source: 'deterministic' as const });
+    const dim = (name: ScorecardDimensionName, grade: ScoreGrade): ScorecardDimension => ({ name, grade, rationale: 'r', source: 'deterministic' });
     const withMemory = computeRunMetrics(baseRun({
       scorecards: { h1: { hypothesisId: 'h1', paretoOptimal: true, keyEvidenceToChangeConclusion: '', dimensions: [dim('NoveltyVsResearchMemory', 'F')] } },
     }), 'PASS', 't');
@@ -268,7 +269,7 @@ describe('computeRunMetrics', () => {
   });
 
   test('strategyOriginDiversity: null on legacy arm (structurally absent), fractional on fan-out', () => {
-    const h = (id: string, origin?: string) => ({
+    const h = (id: string, origin?: StrategyId) => ({
       id, statement: 's', mechanism: 'm',
       falsificationMethod: { prediction: 'p', metric: 'm1', comparator: 'gt' as const, value: 1 },
       supportingCitations: [], counterEvidenceCitations: [],
@@ -286,7 +287,7 @@ describe('computeRunMetrics', () => {
   });
 
   test('paretoFrontSize counts non-dominated scorecards', () => {
-    const dim = (grade: string) => ({ name: 'Testability' as const, grade, rationale: 'r', source: 'deterministic' as const });
+    const dim = (grade: ScoreGrade): ScorecardDimension => ({ name: 'Testability', grade, rationale: 'r', source: 'deterministic' });
     const run = baseRun({
       scorecards: {
         h1: { hypothesisId: 'h1', paretoOptimal: true, keyEvidenceToChangeConclusion: '', dimensions: [dim('A')] },
