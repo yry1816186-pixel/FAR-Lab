@@ -243,6 +243,27 @@ describe('ablation — metric plumbing', () => {
     assert.equal(sameRow.deltaCi95.upper, 0);
   });
 
+  it('single-arm descriptive view: fan-out-only metrics characterize the present arm, labeled not-comparable', () => {
+    const withRuns = arm(5, () => 1).map((o) => ({
+      ...o,
+      metrics: [...o.metrics, { name: 'tournamentEloSpread', value: 105 + o.runIndex }],
+    }));
+    const r = aggregateAblation(pilot(withRuns, arm(5, () => 1)));
+    const row = r.perMetric.find((m) => m.name === 'tournamentEloSpread')!;
+    assert.equal(row.status, 'INSUFFICIENT_N', 'comparison stays suppressed');
+    assert.equal(row.direction, null, 'descriptive rows never get a direction');
+    assert.ok(row.descriptive !== null && row.descriptive !== undefined);
+    assert.equal(row.descriptive.armId, 'with');
+    assert.equal(row.descriptive.n, 5);
+    assert.equal(row.descriptive.mean, (106 + 107 + 108 + 109 + 110) / 5);
+    const text = renderAblation(r);
+    assert.match(text, /desc with: mean=108[.\d]* n=5 .*not comparable/);
+    // A metric absent in BOTH arms stays a plain INSUFFICIENT_N (no descriptive).
+    const none = aggregateAblation(pilot(arm(5, () => 1), arm(5, () => 1)));
+    const absent = none.perMetric.find((m) => m.name === 'tournamentEloSpread');
+    assert.equal(absent, undefined, 'metric absent everywhere is simply not listed');
+  });
+
   it('renderer names both arm configs and the cannot-prove line', () => {
     const r = aggregateAblation(pilot(arm(6, () => 1), arm(6, () => 0.5)));
     const text = renderAblation(r);
