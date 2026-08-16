@@ -5,7 +5,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeRunMetrics } from '../../src/research/evaluation/metrics.ts';
-import type { ResearchRun } from '../../src/research/types.ts';
+import type { ResearchRun, ScorecardDimension, ScorecardDimensionName, ScoreGrade } from '../../src/research/types.ts';
+import type { StrategyId } from '../../src/discovery/types.ts';
 
 function baseRun(overrides: Partial<ResearchRun> = {}): ResearchRun {
   return {
@@ -204,12 +205,97 @@ describe('computeRunMetrics', () => {
     assert.equal(fullC?.value, 1);
   });
 
+
   test('human-rubric metrics are listed, never auto-scored', () => {
     const report = computeRunMetrics(baseRun(), 'PASS', 't');
     assert.ok(report.humanRubricMetrics.length >= 5);
     for (const m of report.metrics) {
       assert.ok(!m.name.toLowerCase().includes('plausibility'), 'model-quality text is not auto-scored');
     }
+  });
+
+  // ── Discriminating metrics (day-r10): the ablation pilot proved gate metrics
+  //    saturate; these are the rows that can actually adjudicate a primitive. ──
+
+  test('scorecardMeanGrade.<dim>: grade-point mean per dimension, NOT_APPLICABLE excluded, sorted names', () => {
+    const dim = (name: ScorecardDimensionName, grade: ScoreGrade): ScorecardDimension => ({ name, grade, rationale: 'r', source: 'deterministic' });
+    const run = baseRun({
+      scorecards: {
+        h1: { hypothesisId: 'h1', paretoOptimal: true, keyEvidenceToChangeConclusion: '', dimensions: [dim('Testability', 'A'), dim('NoveltyRelativeToCorpus', 'B')] },
+        h2: { hypothesisId: 'h2', paretoOptimal: false, keyEvidenceToChangeConclusion: '', dimensions: [dim('Testability', 'F'), dim('NoveltyRelativeToCorpus', 'NOT_APPLICABLE')] },
+      },
+    });
+    const report = computeRunMetrics(run, 'PASS', 't');
+    const testability = report.metrics.find((m) => m.name === 'scorecardMeanGrade.Testability');
+    assert.equal(testability?.value, 2); // (4 + 0) / 2
+    const novelty = report.metrics.find((m) => m.name === 'scorecardMeanGrade.NoveltyRelativeToCorpus');
+    assert.equal(novelty?.value, 3); // NA excluded: 3 / 1
+    // Sorted emission order (deterministic).
+    const dimNames = report.metrics.filter((m) => m.name.startsWith('scorecardMeanGrade.')).map((m) => m.name);
+    assert.deepEqual(dimNames, [...dimNames].sort());
+  });
+
+  test('noveltyVsResearchMemoryGrade: surfaced standalone; null when no memory flags (absence is honest)', () => {
+    const dim = (name: ScorecardDimensionName, grade: ScoreGrade): ScorecardDimension => ({ name, grade, rationale: 'r', source: 'deterministic' });
+    const withMemory = computeRunMetrics(baseRun({
+      scorecards: { h1: { hypothesisId: 'h1', paretoOptimal: true, keyEvidenceToChangeConclusion: '', dimensions: [dim('NoveltyVsResearchMemory', 'F')] } },
+    }), 'PASS', 't');
+    assert.equal(withMemory.metrics.find((m) => m.name === 'noveltyVsResearchMemoryGrade')?.value, 0);
+    const without = computeRunMetrics(baseRun(), 'PASS', 't');
+    assert.equal(without.metrics.find((m) => m.name === 'noveltyVsResearchMemoryGrade')?.value, null);
+  });
+
+  test('falsificationMetricDiversity: 1.0 when every hypothesis tests a different quantity; case-insensitive', () => {
+    const h = (id: string, metric: string) => ({
+      id,
+      statement: 's',
+      mechanism: 'm',
+      falsificationMethod: { prediction: 'p', metric, comparator: 'gt' as const, value: 1 },
+      supportingCitations: [],
+      counterEvidenceCitations: [],
+      relationToExistingTheory: '',
+      alternativeExplanations: [],
+      observablePredictions: [],
+      distinguishingObservations: [],
+      noveltyRelativeToCorpus: '',
+      assumptions: [],
+      risks: [],
+    });
+    const diverse = computeRunMetrics(baseRun({
+      hypotheses: [h('a', 'pearson_r'), h('b', 'effect_size_cohens_d'), h('c', 'Pearson_R')],
+    }), 'PASS', 't');
+    // 'pearson_r' and 'Pearson_R' collapse (case-insensitive) → 2 distinct / 3.
+    assert.equal(diverse.metrics.find((m) => m.name === 'falsificationMetricDiversity')?.value, 2 / 3);
+  });
+
+  test('strategyOriginDiversity: null on legacy arm (structurally absent), fractional on fan-out', () => {
+    const h = (id: string, origin?: StrategyId) => ({
+      id, statement: 's', mechanism: 'm',
+      falsificationMethod: { prediction: 'p', metric: 'm1', comparator: 'gt' as const, value: 1 },
+      supportingCitations: [], counterEvidenceCitations: [],
+      relationToExistingTheory: '', alternativeExplanations: [],
+      observablePredictions: [], distinguishingObservations: [],
+      noveltyRelativeToCorpus: '', assumptions: [], risks: [],
+      ...(origin !== undefined ? { strategyOrigin: origin } : {}),
+    });
+    const legacy = computeRunMetrics(baseRun({ hypotheses: [h('a'), h('b')] }), 'PASS', 't');
+    assert.equal(legacy.metrics.find((m) => m.name === 'strategyOriginDiversity')?.value, null);
+    const fanout = computeRunMetrics(baseRun({
+      hypotheses: [h('a', 'induction'), h('b', 'induction'), h('c', 'analogy')],
+    }), 'PASS', 't');
+    assert.equal(fanout.metrics.find((m) => m.name === 'strategyOriginDiversity')?.value, 2 / 3);
+  });
+
+  test('paretoFrontSize counts non-dominated scorecards', () => {
+    const dim = (grade: ScoreGrade): ScorecardDimension => ({ name: 'Testability', grade, rationale: 'r', source: 'deterministic' });
+    const run = baseRun({
+      scorecards: {
+        h1: { hypothesisId: 'h1', paretoOptimal: true, keyEvidenceToChangeConclusion: '', dimensions: [dim('A')] },
+        h2: { hypothesisId: 'h2', paretoOptimal: false, keyEvidenceToChangeConclusion: '', dimensions: [dim('B')] },
+        h3: { hypothesisId: 'h3', paretoOptimal: true, keyEvidenceToChangeConclusion: '', dimensions: [dim('A')] },
+      },
+    });
+    assert.equal(computeRunMetrics(run, 'PASS', 't').metrics.find((m) => m.name === 'paretoFrontSize')?.value, 2);
   });
 });
 
