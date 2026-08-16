@@ -66,6 +66,12 @@ import {
   type HumanReviewRefusalReason,
 } from '../../discovery/registry.ts';
 import type { DocumentSource, RetrievalAdapter } from '../../retrieval/types.ts';
+import type { CorpusSnapshot } from '../../retrieval/corpus.ts';
+import {
+  DEFAULT_SNAPSHOT_DIR,
+  loadCorpusSnapshotStore,
+  saveCorpusSnapshotStore,
+} from '../../retrieval/snapshot_store.ts';
 
 /** Parsed options for the research command. */
 export interface ResearchArgs {
@@ -88,6 +94,11 @@ export interface ResearchArgs {
   readonly out: string | null;
   /** Disable research-memory read+write (§2.5) — --no-memory / FAR_RESEARCH_MEMORY=0. */
   readonly noMemory: boolean;
+  /**
+   * Pin the run's evidence set to a previously frozen corpus snapshot
+   * (--reuse-snapshot <snapshotId>; explicit opt-in, R9). Null = ground live.
+   */
+  readonly reuseSnapshot: string | null;
 }
 
 const VALID_SOURCES: readonly DocumentSource[] = ['openalex', 'arxiv', 'crossref'];
@@ -142,6 +153,7 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
   let strategies: readonly StrategyId[] | null = null;
   let degradeOnSourceFailure = false;
   let noMemory = process.env.FAR_RESEARCH_MEMORY === '0';
+  let reuseSnapshot: string | null = null;
   let json = false;
   let out: string | null = null;
 
@@ -203,6 +215,16 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
       noMemory = true;
       continue;
     }
+    if (a === '--reuse-snapshot') {
+      const v = args[++i];
+      if (v === undefined || !/^[0-9a-f]{64}$/.test(v)) {
+        throw new Error(
+          'far research: --reuse-snapshot needs a 64-char hex snapshotId (see far research start output or .far/snapshots/)',
+        );
+      }
+      reuseSnapshot = v;
+      continue;
+    }
     if (a === '--strategies') {
       const v = args[++i];
       if (v === undefined || v === '') {
@@ -250,6 +272,7 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
     noMemory,
     json,
     out,
+    reuseSnapshot,
   };
 }
 
@@ -261,6 +284,40 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
 export function resolveRunStore(env: NodeJS.ProcessEnv = process.env): RunStore {
   const override = env.FAR_RESEARCH_RUNS_DIR;
   return new RunStore(override !== undefined && override !== '' ? override : DEFAULT_RUNS_ROOT);
+}
+
+/**
+ * Resolve the snapshot-store dir: `FAR_SNAPSHOT_STORE_DIR` when set, else the
+ * default `.far/snapshots`. Call-time read so tests can point processes at
+ * their own store (mirrors resolveRunStore).
+ */
+export function resolveSnapshotStoreDir(env: NodeJS.ProcessEnv = process.env): string {
+  const override = env.FAR_SNAPSHOT_STORE_DIR;
+  return override !== undefined && override !== '' ? override : DEFAULT_SNAPSHOT_DIR;
+}
+
+/**
+ * Freeze a successful LIVE run's final corpus into the snapshot store
+ * (content-addressed, idempotent). Best-effort by design: a freeze failure
+ * never fails the run — it is a convenience cache for future --reuse-snapshot
+ * pins, so it warns loudly and moves on (the run itself is already persisted).
+ */
+function freezeRunCorpus(run: ResearchRun): void {
+  if (run.corpus.documentCount === 0) return; // nothing meaningful to pin
+  try {
+    const saved = saveCorpusSnapshotStore(run.corpus, resolveSnapshotStoreDir());
+    if (!saved.alreadyExisted) {
+      process.stderr.write(
+        `  frozen   : ${saved.file} (${run.corpus.documentCount} docs — reuse with --reuse-snapshot ${run.corpus.snapshotId})
+`,
+      );
+    }
+  } catch (err) {
+    process.stderr.write(
+      `  frozen   : FAILED to persist corpus snapshot (run is valid & persisted): ${err instanceof Error ? err.message : String(err)}
+`,
+    );
+  }
 }
 
 /** Render one lifecycle event as one concise stderr line (no spinner). */
@@ -441,6 +498,10 @@ async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
 
     const run = await execution;
 
+    // Auto-freeze LIVE corpora: every successful live run grows the pin
+    // inventory future runs can --reuse-snapshot (N>=5 homogeneity mechanism).
+    if (args.profile === 'competition_aliyun_qwen') freezeRunCorpus(run);
+
     if (args.out !== null) {
       const dir = dirname(args.out);
       if (dir !== '.' && dir !== '') {
@@ -519,7 +580,7 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
 
   if (parsed.question.trim().length === 0) {
     process.stderr.write(
-      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--multi-strategy] [--strategies induction,analogy,…] [--degrade-on-source-failure] [--json] [--out <file>]\n',
+      'far research start: missing question.\n  usage: far research start "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--profile auto|offline_replay|competition_aliyun_qwen] [--target 3..5] [--multi-strategy] [--strategies induction,analogy,…] [--degrade-on-source-failure] [--reuse-snapshot <id>] [--json] [--out <file>]\n',
     );
     return 2;
   }
@@ -546,11 +607,34 @@ export async function runResearchStart(args: readonly string[]): Promise<number>
     retrievalAdapter = createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS);
   }
 
+  // Frozen-corpus pin (--reuse-snapshot): resolve and VERIFY the snapshot BEFORE
+  // the run starts — a bad id or tampered file must fail fast, never mid-run.
+  let frozenCorpus: CorpusSnapshot | undefined;
+  if (parsed.reuseSnapshot !== null) {
+    if (retrievalAdapter !== undefined) {
+      process.stderr.write(
+        'far research: --reuse-snapshot pins a LIVE corpus and makes no sense with offline_replay fixtures — drop the flag or use a live profile.\n',
+      );
+      return 2;
+    }
+    try {
+      const loaded = loadCorpusSnapshotStore(parsed.reuseSnapshot, resolveSnapshotStoreDir());
+      frozenCorpus = loaded.snapshot;
+      process.stderr.write(
+        `corpus pinned: frozen snapshot ${frozenCorpus.snapshotId.slice(0, 12)}… (${frozenCorpus.documentCount} docs, integrity-verified, zero retrieval I/O)\n`,
+      );
+    } catch (err) {
+      process.stderr.write(`far research: ${err instanceof Error ? err.message : String(err)}\n`);
+      return 2;
+    }
+  }
+
   return executeLifecycleRun({
     store: resolveRunStore(),
     gateway,
     profile,
     grounding: {
+      ...(frozenCorpus !== undefined ? { frozenCorpus } : {}),
       ...(parsed.sources.length > 1
         ? { sources: parsed.sources }
         : { source: parsed.sources[0] ?? 'openalex' }),

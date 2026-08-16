@@ -24,6 +24,7 @@
  */
 
 import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { loadCorpusSnapshotStore, resolveSnapshotStoreDir } from '../retrieval/snapshot_store.ts';
 import { join } from 'node:path';
 import { ulid } from 'ulid';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
@@ -76,6 +77,13 @@ export interface RunCheckpoint {
   readonly discoveryStrategies?: readonly StrategyId[];
   /** Source-failure policy (absent = 'reject'); persisted for resume-stability. */
   readonly onSourceFailure?: 'reject' | 'degrade';
+  /**
+   * Frozen-corpus pin (night-r8; absent = live grounding). Persisted so a
+   * crashed pinned run resumes on the EXACT same evidence set — the snapshot
+   * is reloaded + re-verified from the store at resume (never silently
+   * re-grounded live mid-run).
+   */
+  readonly frozenSnapshotId?: string;
   /**
    * Discovery-registry outcome at run completion (LIVE/MIXED runs register
    * CORROBORATED-qualified hypotheses in the append-only ledger). Null error
@@ -370,6 +378,9 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       ...(args.grounding?.onSourceFailure !== undefined
         ? { onSourceFailure: args.grounding.onSourceFailure }
         : {}),
+      ...(args.grounding?.frozenCorpus !== undefined
+        ? { frozenSnapshotId: args.grounding.frozenCorpus.snapshotId }
+        : {}),
       state: 'CREATED',
       completedStages: [],
       ctx: {},
@@ -466,9 +477,23 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       cp.sources.length === 1 && cp.sources[0] === 'openalex'
         ? { source: 'openalex' }
         : { sources: cp.sources as NonNullable<ResearchGroundingOptions['sources']> };
+    // Frozen-corpus pin: start passes the corpus directly; a RESUME reloads +
+    // re-verifies it from the snapshot store via the persisted id (absent store
+    // entry → hard error: a pinned run must never silently re-ground live).
+    let frozenCorpusPart: Pick<ResearchGroundingOptions, 'frozenCorpus'> = {};
+    if (args.grounding?.frozenCorpus !== undefined) {
+      frozenCorpusPart = { frozenCorpus: args.grounding.frozenCorpus };
+    } else if (cp.frozenSnapshotId !== undefined) {
+      const reloaded = loadCorpusSnapshotStore(
+        cp.frozenSnapshotId,
+        resolveSnapshotStoreDir(),
+      );
+      frozenCorpusPart = { frozenCorpus: reloaded.snapshot };
+    }
     const grounding: ResearchGroundingOptions = {
       ...sourcePart,
       maxPerQuery: cp.maxPerQuery,
+      ...frozenCorpusPart,
       ...(cp.onSourceFailure !== undefined ? { onSourceFailure: cp.onSourceFailure } : {}),
       ...(args.grounding?.adapter !== undefined ? { adapter: args.grounding.adapter } : {}),
     };
