@@ -57,6 +57,7 @@ import {
   runResearchReview,
   runResearchMemory,
   runResearchStatus,
+  runResearchSnapshots,
   runResearchResume,
   runResearchFeedback,
   runResearchVerify,
@@ -301,6 +302,9 @@ const COMMANDS: readonly CliCommand[] = [
       if (subcommand === 'status') {
         return runResearchStatus(args.slice(1));
       }
+      if (subcommand === 'snapshots') {
+        return Promise.resolve(runResearchSnapshots(args.slice(1)));
+      }
       if (subcommand === 'resume') {
         return runResearchResume(args.slice(1));
       }
@@ -348,9 +352,10 @@ const COMMANDS: readonly CliCommand[] = [
         return runResearchStart(args.slice(1));
       }
       process.stderr.write(
-        `far research: expected 'start', 'status', 'resume', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', 'feedback', 'registry', 'adjudicate', 'review', 'memory', or 'judge' (got: ${subcommand ?? '<missing>'})\n` +
+        `far research: expected 'start', 'status', 'snapshots', 'resume', 'inspect', 'verify', 'export', 'compare', 'analyze', 'evaluate', 'baseline', 'feedback', 'registry', 'adjudicate', 'review', 'memory', or 'judge' (got: ${subcommand ?? '<missing>'})\n` +
           '  usage: far research start "<question>" [--source ...] [--profile offline_replay|competition_aliyun_qwen] [--target 3..5] [--json] [--out <file>]\n' +
           '         far research status <runId> [--json]\n' +
+          '         far research snapshots [--json]\n' +
           '         far research resume <runId> [--profile ...] [--out <file>] [--json]\n' +
           '         far research inspect <run.json> [--json]\n' +
           '         far research verify <run.json|bundle-dir> [--json]\n' +

@@ -68,8 +68,9 @@ import {
 import type { DocumentSource, RetrievalAdapter } from '../../retrieval/types.ts';
 import type { CorpusSnapshot } from '../../retrieval/corpus.ts';
 import {
-  DEFAULT_SNAPSHOT_DIR,
+  listCorpusSnapshotStore,
   loadCorpusSnapshotStore,
+  resolveSnapshotStoreDir,
   saveCorpusSnapshotStore,
 } from '../../retrieval/snapshot_store.ts';
 
@@ -284,16 +285,6 @@ export function parseResearchArgs(args: readonly string[]): ResearchArgs {
 export function resolveRunStore(env: NodeJS.ProcessEnv = process.env): RunStore {
   const override = env.FAR_RESEARCH_RUNS_DIR;
   return new RunStore(override !== undefined && override !== '' ? override : DEFAULT_RUNS_ROOT);
-}
-
-/**
- * Resolve the snapshot-store dir: `FAR_SNAPSHOT_STORE_DIR` when set, else the
- * default `.far/snapshots`. Call-time read so tests can point processes at
- * their own store (mirrors resolveRunStore).
- */
-export function resolveSnapshotStoreDir(env: NodeJS.ProcessEnv = process.env): string {
-  const override = env.FAR_SNAPSHOT_STORE_DIR;
-  return override !== undefined && override !== '' ? override : DEFAULT_SNAPSHOT_DIR;
 }
 
 /**
@@ -2124,5 +2115,41 @@ export function runResearchMemory(args: readonly string[]): number {
     return 0;
   }
   process.stdout.write(`${buildMemorySummary(store, ...(domain !== undefined ? [{ domain }] : []))}\n`);
+  return 0;
+}
+
+/**
+ * Run `far research snapshots [--json]` — inventory of frozen corpus snapshots
+ * (the --reuse-snapshot pin menu). Newest first; corrupt files are skipped by
+ * the lister (loading them is what fails closed).
+ */
+export function runResearchSnapshots(args: readonly string[]): number {
+  const json = args.includes('--json');
+  const dir = resolveSnapshotStoreDir();
+  const entries = listCorpusSnapshotStore(dir);
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify({ dir, count: entries.length, snapshots: entries }, null, 2)}
+`,
+    );
+    return 0;
+  }
+  if (entries.length === 0) {
+    process.stdout.write(
+      `far research snapshots: no frozen snapshots in ${dir} — every successful LIVE run auto-freezes its corpus here.
+`,
+    );
+    return 0;
+  }
+  process.stdout.write(`far research snapshots: ${entries.length} frozen in ${dir} (newest first)
+`);
+  for (const e of entries) {
+    const firstQuery = e.sourceQueries[0] ?? '(no query recorded)';
+    process.stdout.write(
+      `  ${e.snapshotId.slice(0, 12)}… · ${String(e.documentCount).padStart(3)} docs · ${e.createdAt} · ${firstQuery.slice(0, 60)}
+`,
+    );
+  }
+  process.stdout.write('  pin one: far research start "<q>" --profile competition_aliyun_qwen --reuse-snapshot <full-id>\n');
   return 0;
 }
