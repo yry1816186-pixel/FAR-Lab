@@ -149,6 +149,12 @@ function numericValues(runs: readonly FrozenRunObservation[], metric: string): n
  * 两样本非配对 bootstrap：每次迭代两臂独立重采样，delta = mean_a − mean_b 的
  * percentile 95% CI。种子派生走 deriveBootstrapSeed（questionId 位携带
  * primitive 命名空间，保证与 per-arm CI 种子不碰撞且第三方可复算）。
+ *
+ * 修正史（2026-08-16 day-r11 自查实锤）：初版种子推进漏了迭代号 it——所有
+ * 重采样完全相同，CI 退化为单次抽样的点估计（N≥5 报告中 Δmean=0 而
+ * CI=[-0.04,-0.04] 不含 0 的自相矛盾暴露了它）。现版每迭代两臂各取独立
+ * 偏移（it*2 / it*2+1），且同迭代内索引步进混入 i 与样本长度的素数混合，
+ * 保证重采样序列逐迭代变化、两臂不相关。确定性不变（种子+迭代即可复算）。
  */
 function bootstrapDeltaCi(
   withValues: readonly number[],
@@ -156,20 +162,21 @@ function bootstrapDeltaCi(
   seed: number,
   iterations: number,
 ): { lower: number; upper: number } {
-  const resample = (values: readonly number[]): number => {
+  const resample = (values: readonly number[], iterOffset: number): number => {
     let sum = 0;
     for (let i = 0; i < values.length; i += 1) {
-      // 与 bootstrapCi 同族的确定性重采样：种子线性推进，无 Date/Math.random。
-      const idx = Math.floor(rand01(seed + i * 2654435761 + values.length) * values.length);
+      const idx = Math.floor(
+        rand01(seed + iterOffset * 2654435761 + i * 40503 + values.length * 7919) * values.length,
+      );
       sum += values[idx] ?? 0;
     }
     return sum / values.length;
   };
   const deltas: number[] = [];
   for (let it = 0; it < iterations; it += 1) {
-    deltas.push(
-      resample(withValues) - resample(withoutValues),
-    );
+    // 两臂同迭代取不同偏移（it*2 vs it*2+1）——同 n 时避免相关重采样
+    // 低估差的方差。
+    deltas.push(resample(withValues, it * 2) - resample(withoutValues, it * 2 + 1));
   }
   deltas.sort((a, b) => a - b);
   const lo = deltas[Math.floor(0.025 * deltas.length)]!;
