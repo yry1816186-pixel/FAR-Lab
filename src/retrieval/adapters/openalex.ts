@@ -147,14 +147,19 @@ export function parseOpenAlexResults(
 /**
  * Normalize a retrieval query text for OpenAlex's `search` parameter.
  *
- * OpenAlex rejects requests whose search term contains `?` (HTTP 400, verified
- * against the live API) — a natural-language research question almost always
- * ends with one. Strip `?` (it carries no retrieval semantics for a free-text
- * search) and collapse whitespace. The ORIGINAL question text remains the
- * document's retrievalQuery provenance; this transform only shapes the API call.
+ * Live-verified 2026-08-16 (.far/e2e/openalex-400-probe.mjs, per-request
+ * evidence): the search endpoint answers HTTP 400 for `?`, `|`, and `*` —
+ * wildcard/operator characters in the downstream query parser. Everything else
+ * probed passed 200 and was left untouched on purpose: `=` `!` `()` `[]` `{}`
+ * quotes, Greek (ΛCDM/ΩΛ), CJK, superscripts, `@` `^` `:` `;` `#` `%` `$`
+ * `<` `>` `~` `/` `\` and 320+-char plain text all work, and stripping them
+ * would only damage retrieval recall. The three verified triggers carry no
+ * retrieval semantics in a natural-language question, so they are dropped.
+ * The ORIGINAL question text remains the document's retrievalQuery provenance;
+ * this transform only shapes the API call.
  */
 export function sanitizeOpenAlexSearchTerm(text: string): string {
-  return text.replace(/\?/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.replace(/[?|*]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Build the OpenAlex request URL for a query. */

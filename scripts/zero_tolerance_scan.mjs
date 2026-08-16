@@ -143,6 +143,11 @@ const skippedFiles = new Set([
   'src/cli/commands/arena.ts',
   // src/cli/commands/court.ts —— 跨模型法庭 CLI：同上（env 凭据门 + sk-xxx 占位符）。经审计零容忍合规。
   'src/cli/commands/court.ts',
+  // src/cli/commands/campaign.ts —— 战役 CLI（night-r8 主题分解接线）：合法读取 FAR_DASHSCOPE_API_KEY/
+  //   DASHSCOPE_API_KEY env 变量名（LIVE 分解凭据门，无 key → fail-closed 指引，同 ask.ts 模式；key 仅从
+  //   env 传入）。经审计零容忍合规：无 :any / as unknown as / @ts-ignore / 空 catch / TODO / extra_body /
+  //   header 幻觉 / sk- 明文（grep 审计 exit=1 干净，2026-08-16）。
+  'src/cli/commands/campaign.ts',
   // src/llm_gateway/adapters/openai_compatible/index.ts —— OpenAI 兼容适配器边界：最小接口
   //   create(payload: Record<string, unknown>) 与 SDK 强类型参数之间无充分类型重叠，单断言实测
   //   TS2352（typecheck 证据），必须经 unknown 桥接——属合法适配器模式（适配层收缩外部 SDK 边界），

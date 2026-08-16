@@ -20,6 +20,7 @@ import {
   createReplayAdapter,
   parseOpenAlexResults,
 } from '../../src/retrieval/index.ts';
+import { createCorpusSnapshot } from '../../src/retrieval/corpus.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_BODY = readFileSync(join(__dirname, '..', 'fixtures', 'retrieval', 'openalex_osc_query.json'), 'utf8');
@@ -131,5 +132,59 @@ describe('grounding — research-question acquisition orchestration', () => {
     const b = await groundResearchQuestion(opts);
     assert.equal(a.corpus.snapshotId, b.corpus.snapshotId);
     assert.equal(a.corpus.rootHash, b.corpus.rootHash);
+  });
+});
+
+describe('grounding — frozen-corpus replay (explicit opt-in, R9)', () => {
+  // A legitimately-frozen snapshot built through the SSOT (same shape a live
+  // run auto-freezes into .far/snapshots/ and --reuse-snapshot loads back).
+  const frozen = createCorpusSnapshot(FIXTURE_DOCS, ['original live query'], '2026-08-16T00:00:00.000Z');
+
+  it('replays the frozen corpus verbatim with ZERO retrieval I/O', async () => {
+    // A poisoning adapter: if the frozen path touches retrieval at all, this
+    // throws and the test fails — proving the pin makes no network/adaptor call.
+    const poison = {
+      source: 'openalex' as const,
+      sourceName: 'OpenAlex',
+      async retrieve(): Promise<never> { throw new Error('frozen path must not retrieve'); },
+    };
+    const g = await groundResearchQuestion({
+      question: 'any question against the frozen corpus',
+      adapter: poison,
+      frozenCorpus: frozen,
+    });
+    assert.equal(g.fetchMode, 'frozen');
+    assert.deepEqual(g.frozenFrom, { snapshotId: frozen.snapshotId });
+    assert.equal(g.corpus.snapshotId, frozen.snapshotId, 'EXACT pinned corpus (N>=5 homogeneity)');
+    assert.equal(g.corpus.rootHash, frozen.rootHash);
+    assert.deepEqual(g.corpus.documents, frozen.documents);
+    assert.deepEqual(g.perQueryCounts, [], 'no queries issued');
+    assert.deepEqual(g.sourcesUsed, [], 'no sources used');
+    assert.equal(g.counterEvidenceQueries.length, 0);
+    // The resolver still binds against the pinned set (downstream stages work).
+    const first = frozen.documents[0];
+    if (!first) assert.fail('fixture must have docs');
+    const bound = g.resolver.validate([first.documentId]).bound;
+    assert.equal(bound.length, 1);
+    assert.equal(bound[0]!.documentId, first.documentId);
+  });
+
+  it('rejects a tampered frozen corpus at the use site (defense in depth)', async () => {
+    const tampered = {
+      ...frozen,
+      documents: frozen.documents.map((d) => ({ ...d, title: `${d.title} TAMPERED` })),
+    };
+    await assert.rejects(
+      () => groundResearchQuestion({ question: 'q', frozenCorpus: tampered }),
+      /frozen corpus failed integrity verification/,
+    );
+  });
+
+  it('rejects an empty frozen corpus (refusing to ground on nothing)', async () => {
+    const empty = createCorpusSnapshot([], ['q'], '2026-08-16T00:00:00.000Z');
+    await assert.rejects(
+      () => groundResearchQuestion({ question: 'q', frozenCorpus: empty }),
+      /frozen corpus is empty/,
+    );
   });
 });

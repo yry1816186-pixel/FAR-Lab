@@ -110,13 +110,29 @@ describe('OpenAlex adapter — URL building + parsing edge cases', () => {
     assert.ok(url.includes('per-page=25'), 'per-page clamped to max 25');
   });
 
-  it('sanitizeOpenAlexSearchTerm strips ? (OpenAlex rejects it with HTTP 400)', () => {
+  it('sanitizeOpenAlexSearchTerm strips live-verified 400 triggers: ? | *', () => {
     assert.equal(
       sanitizeOpenAlexSearchTerm('Does light pollution affect insect decline?'),
       'Does light pollution affect insect decline',
     );
     assert.equal(sanitizeOpenAlexSearchTerm('what if  ?  x ?'), 'what if x');
     assert.equal(sanitizeOpenAlexSearchTerm('no question mark here'), 'no question mark here');
+    // 2026-08-16 live probe (.far/e2e/openalex-400-probe.mjs): | and * return
+    // HTTP 400 from the works?search= endpoint (wildcard/operator chars).
+    assert.equal(sanitizeOpenAlexSearchTerm('dark energy | constraints'), 'dark energy constraints');
+    assert.equal(sanitizeOpenAlexSearchTerm('dark energy * constraints'), 'dark energy constraints');
+    assert.equal(sanitizeOpenAlexSearchTerm('w(z) = -1? cosm*'), 'w(z) = -1 cosm');
+  });
+
+  it('sanitizeOpenAlexSearchTerm PRESERVES live-verified-safe chars (recall, not theater)', () => {
+    // Same probe: = ! () [] Greek CJK superscripts @ ^ : / all answered 200 —
+    // stripping them would only damage recall with zero 400 protection.
+    const keep = 'Is ΛCDM ΩΛ w(z) = -1! (dark energy) 暗能量 @ ^ : / ± ≈ H₀';
+    assert.equal(sanitizeOpenAlexSearchTerm(keep), keep);
+  });
+
+  it('sanitizeOpenAlexSearchTerm collapses to empty when the query is only triggers (caller-visible degenerate)', () => {
+    assert.equal(sanitizeOpenAlexSearchTerm('?  * | ??*'), '');
   });
 
   it('buildOpenAlexUrl removes ? from the search param (regression: live 400 on natural questions)', () => {

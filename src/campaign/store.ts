@@ -86,6 +86,8 @@ export interface SaveCampaignStartedInput {
   /** 计划问题清单（来自 planner）；顺序即 index 0..n-1。 */
   readonly plannedQuestions: string[];
   readonly budgetTokens: number;
+  /** 问题来源（planner 的 source；进账本——诚实可追溯）。 */
+  readonly questionsSource?: 'explicit' | 'llm';
   /** 注入时钟（测试确定性）；默认真实时刻。 */
   readonly now?: () => Date;
 }
@@ -110,6 +112,7 @@ export function saveCampaignStarted(
       topic: input.topic,
       plannedQuestions: input.plannedQuestions,
       budgetTokens: input.budgetTokens,
+      ...(input.questionsSource !== undefined ? { questionsSource: input.questionsSource } : {}),
     },
     '',
   );

@@ -34,7 +34,7 @@
  */
 
 import { ulid } from 'ulid';
-import { groundResearchQuestion, type GroundedCorpus } from '../retrieval/index.ts';
+import { groundResearchQuestion, type GroundedCorpus, type GroundingOptions } from '../retrieval/index.ts';
 import { resolveCrossrefDoi } from '../retrieval/adapters/crossref.ts';
 import { createCorpusSnapshot } from '../retrieval/corpus.ts';
 import { CitationResolver } from '../retrieval/citation_resolver.ts';
@@ -113,6 +113,11 @@ export interface ResearchGroundingOptions {
    * failedSources receipt and grounds on the survivors.
    */
   readonly onSourceFailure?: 'reject' | 'degrade';
+  /**
+   * Frozen-corpus replay (EXPLICIT opt-in, R9): pin this persisted snapshot as
+   * the run's evidence set — no retrieval I/O. See retrieval/snapshot_store.ts.
+   */
+  readonly frozenCorpus?: CorpusSnapshot;
 }
 
 /** Options for one research run. */
@@ -209,8 +214,10 @@ export interface ResearchCtx {
   /** Grounding outputs; resolver is re-derived from corpus on hydrate. */
   grounded: {
     corpus: CorpusSnapshot | null;
-    fetchMode: 'live' | 'replay';
+    fetchMode: 'live' | 'replay' | 'frozen';
     sourcesUsed: readonly string[];
+    /** Present iff fetchMode 'frozen': the pinned snapshot this run replayed. */
+    frozenFrom?: { readonly snapshotId: string };
     /** Dropped source families (degrade mode only). */
     failedSources?: ReadonlyArray<{ readonly source: string; readonly error: string }>;
     /** Documents replayed from the persistent retrieval cache. */
@@ -391,30 +398,10 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
 
   // ── 2. Ground the question (supporting + counter-evidence + decomposition subquestions). ──
   await driver.run('grounding', async () => {
-    const grounded: GroundedCorpus = await groundResearchQuestion({
-      question: opts.question,
-      ...(opts.grounding?.sources !== undefined && opts.grounding.sources.length > 0
-        ? { sources: opts.grounding.sources }
-        : { source: opts.grounding?.source ?? 'openalex' }),
-      maxPerQuery: opts.grounding?.maxPerQuery ?? 5,
-      ...(opts.grounding?.adapter !== undefined ? { adapter: opts.grounding.adapter } : {}),
-      ...(opts.grounding?.includeCounterEvidence !== undefined
-        ? { includeCounterEvidence: opts.grounding.includeCounterEvidence }
-        : {}),
-      extraQueries: (ctx.decompositionSubquestions ?? []).slice(0, MAX_DECOMPOSITION_QUERIES),
-      ...(opts.grounding?.onSourceFailure !== undefined
-        ? { onSourceFailure: opts.grounding.onSourceFailure }
-        : {}),
-    });
-    ctx.grounded = {
-      corpus: grounded.corpus,
-      fetchMode: grounded.fetchMode,
-      sourcesUsed: grounded.sourcesUsed,
-      ...(grounded.failedSources !== undefined ? { failedSources: grounded.failedSources } : {}),
-      ...(grounded.cacheHits !== undefined ? { cacheHits: grounded.cacheHits } : {}),
-      groundedAt: grounded.groundedAt,
-      resolver: grounded.resolver,
-    };
+    const grounded: GroundedCorpus = await groundResearchQuestion(
+      buildGroundingCallOptions(opts.question, ctx.decompositionSubquestions, opts.grounding),
+    );
+    ctx.grounded = toGroundedCtxFields(grounded);
     ctx.corpus = grounded.corpus;
     ctx.receipts.push(
       buildProvenanceReceipt({
@@ -422,8 +409,8 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
         stageId: 'grounding',
         sequence: nextSeq(),
         component: 'retrieval',
-        mode: grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY',
-        dataSource: grounded.sourcesUsed.join('+'),
+        mode: groundingReceiptMode(grounded),
+        dataSource: groundingDataSource(grounded),
         corpusSnapshotId: grounded.corpus.snapshotId,
         corpusRootHash: grounded.corpus.rootHash,
         retrievedAt: grounded.groundedAt,
@@ -1049,4 +1036,56 @@ export function selectPrimaryHypothesis(
     if (diff !== 0) return diff;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   })[0]!;
+}
+/**
+ * Assemble the grounding-stage call options from run options (pure). Frozen
+ * pin wins outright; otherwise sources/maxPerQuery/adapter/counter-evidence/
+ * degrade policy come from ResearchGroundingOptions with the documented
+ * defaults, plus the bounded decomposition subquestions as extra queries.
+ */
+function buildGroundingCallOptions(
+  question: string,
+  decompositionSubquestions: readonly string[] | undefined,
+  g: ResearchGroundingOptions | undefined,
+): GroundingOptions {
+  return {
+    question,
+    ...(g?.frozenCorpus !== undefined ? { frozenCorpus: g.frozenCorpus } : {}),
+    ...(g?.sources !== undefined && g.sources.length > 0
+      ? { sources: g.sources }
+      : { source: g?.source ?? 'openalex' }),
+    maxPerQuery: g?.maxPerQuery ?? 5,
+    ...(g?.adapter !== undefined ? { adapter: g.adapter } : {}),
+    ...(g?.includeCounterEvidence !== undefined ? { includeCounterEvidence: g.includeCounterEvidence } : {}),
+    extraQueries: (decompositionSubquestions ?? []).slice(0, MAX_DECOMPOSITION_QUERIES),
+    ...(g?.onSourceFailure !== undefined ? { onSourceFailure: g.onSourceFailure } : {}),
+  };
+}
+
+/** Map a GroundedCorpus onto the ctx.grounded shape (optional fields stay honest-absent). */
+function toGroundedCtxFields(
+  grounded: GroundedCorpus,
+): ResearchCtx['grounded'] {
+  return {
+    corpus: grounded.corpus,
+    fetchMode: grounded.fetchMode,
+    sourcesUsed: grounded.sourcesUsed,
+    ...(grounded.frozenFrom !== undefined ? { frozenFrom: grounded.frozenFrom } : {}),
+    ...(grounded.failedSources !== undefined ? { failedSources: grounded.failedSources } : {}),
+    ...(grounded.cacheHits !== undefined ? { cacheHits: grounded.cacheHits } : {}),
+    groundedAt: grounded.groundedAt,
+    resolver: grounded.resolver,
+  };
+}
+
+/** Receipt mode: only a real live fetch is LIVE; replay fixtures and frozen pins are RECORDED_REPLAY. */
+function groundingReceiptMode(grounded: GroundedCorpus): 'LIVE' | 'RECORDED_REPLAY' {
+  return grounded.fetchMode === 'live' ? 'LIVE' : 'RECORDED_REPLAY';
+}
+
+/** Receipt data source: frozen pins name the pinned snapshot; live/replay name the sources. */
+function groundingDataSource(grounded: GroundedCorpus): string {
+  return grounded.frozenFrom !== undefined
+    ? `frozen:${grounded.frozenFrom.snapshotId.slice(0, 12)}`
+    : grounded.sourcesUsed.join('+');
 }

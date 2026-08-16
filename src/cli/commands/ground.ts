@@ -19,6 +19,8 @@
 // Exit codes: 0 success · 1 bad args · 2 retrieval/network failure.
 
 import { groundResearchQuestion, type GroundedCorpus } from '../../retrieval/index.ts';
+import type { CorpusSnapshot } from '../../retrieval/corpus.ts';
+import { loadCorpusSnapshotStore } from '../../retrieval/snapshot_store.ts';
 
 /** Parsed options for the ground command. */
 export interface GroundOptions {
@@ -27,6 +29,8 @@ export interface GroundOptions {
   readonly maxPerQuery: number;
   readonly includeCounterEvidence: boolean;
   readonly json: boolean;
+  /** Pin to a frozen snapshot instead of live retrieval (--reuse-snapshot <id>). */
+  readonly reuseSnapshot: string | null;
 }
 
 /** Parse `far ground` args (both `--flag value` and `--flag=value` forms). */
@@ -36,6 +40,7 @@ export function parseGroundArgs(args: readonly string[]): GroundOptions | { erro
   let maxPerQuery = 5;
   let includeCounterEvidence = true;
   let json = false;
+  let reuseSnapshot: string | null = null;
 
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i]!;
@@ -72,6 +77,15 @@ export function parseGroundArgs(args: readonly string[]): GroundOptions | { erro
       if (!a.startsWith('--max-per-query=')) i += 1;
       continue;
     }
+    if (a.startsWith('--reuse-snapshot')) {
+      const inline = a.startsWith('--reuse-snapshot=') ? a.slice('--reuse-snapshot='.length) : args[i + 1];
+      if (inline === undefined || !/^[0-9a-f]{64}$/.test(inline)) {
+        return { error: 'far ground: --reuse-snapshot needs a 64-char hex snapshotId (.far/snapshots/)' };
+      }
+      reuseSnapshot = inline;
+      if (!a.startsWith('--reuse-snapshot=')) i += 1;
+      continue;
+    }
     if (a.startsWith('--')) {
       return { error: `far ground: unknown argument '${a}'` };
     }
@@ -91,6 +105,7 @@ export function parseGroundArgs(args: readonly string[]): GroundOptions | { erro
     maxPerQuery,
     includeCounterEvidence,
     json,
+    reuseSnapshot,
   };
 }
 
@@ -98,7 +113,15 @@ export function parseGroundArgs(args: readonly string[]): GroundOptions | { erro
 function formatHuman(g: GroundedCorpus): string {
   const lines: string[] = [];
   lines.push(`Grounded corpus for: "${g.supportingQuery}"`);
-  lines.push(`  source         ${g.fetchMode === 'live' ? 'live fetch' : 'replay (injected adapter)'}`);
+  lines.push(
+    `  source         ${
+      g.fetchMode === 'live'
+        ? 'live fetch'
+        : g.fetchMode === 'frozen'
+          ? `frozen snapshot replay (${(g.frozenFrom?.snapshotId ?? g.corpus.snapshotId).slice(0, 12)}…, integrity-verified)`
+          : 'replay (injected adapter)'
+    }`,
+  );
   lines.push(`  groundedAt     ${g.groundedAt}`);
   lines.push(`  documents      ${g.corpus.documentCount} (snapshotId ${g.corpus.snapshotId.slice(0, 12)}… / rootHash ${g.corpus.rootHash.slice(0, 12)}…)`);
   lines.push(`  queries issued:`);
@@ -124,6 +147,16 @@ export async function runGround(args: readonly string[]): Promise<number> {
     process.stderr.write(`${parsed.error}\n`);
     return 1;
   }
+  let frozenCorpus: CorpusSnapshot | undefined;
+  if (parsed.reuseSnapshot !== null) {
+    try {
+      frozenCorpus = loadCorpusSnapshotStore(parsed.reuseSnapshot).snapshot;
+    } catch (err) {
+      process.stderr.write(`far ground: ${err instanceof Error ? err.message : String(err)}
+`);
+      return 2;
+    }
+  }
   let grounded: GroundedCorpus;
   try {
     grounded = await groundResearchQuestion({
@@ -131,6 +164,7 @@ export async function runGround(args: readonly string[]): Promise<number> {
       source: parsed.source,
       maxPerQuery: parsed.maxPerQuery,
       includeCounterEvidence: parsed.includeCounterEvidence,
+      ...(frozenCorpus !== undefined ? { frozenCorpus } : {}),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -36,6 +36,8 @@
  *     (degradation is visible, never silent, and never total).
  *   - fetchMode: 'live' (real fetch) or 'replay' (injected adapter served
  *     fixtures). Surfaced so a caller never mistakes a replay for a live ground.
+ *     'frozen' (explicit opt-in, R9): integrity-verified replay of a persisted
+ *     CorpusSnapshot — zero retrieval I/O; see snapshot_store.ts.
  *   - cacheHits: how many documents were replayed from the persistent
  *     retrieval cache (each carries retrievedFrom:'cache' + the original
  *     retrievedAt — snapshot ids stay stable across runs).
@@ -44,6 +46,7 @@ import { createCorpusSnapshot, type CorpusSnapshot } from './corpus.ts';
 import { CitationResolver } from './citation_resolver.ts';
 import { generateCounterEvidenceQueries, type CounterEvidenceQuery } from './counter_evidence.ts';
 import { selectLiveAdapter } from './index.ts';
+import { verifyCorpusSnapshot } from './snapshot_store.ts';
 import type { DocumentSource, RetrievedDocument, RetrievalAdapter, RetrievalQuery } from './types.ts';
 
 /** Options for grounding a research question. */
@@ -87,6 +90,17 @@ export interface GroundingOptions {
    * grounding on the surviving families; if every family fails, still reject.
    */
   readonly onSourceFailure?: 'reject' | 'degrade';
+  /**
+   * Frozen-corpus replay (EXPLICIT opt-in, R9): ground against this previously
+   * persisted snapshot instead of any retrieval. When set, every other
+   * retrieval option is ignored, NO network I/O happens, and the result
+   * reports fetchMode 'frozen' + frozenFrom. The snapshot is integrity-verified
+   * here as well (defense in depth — loaders verify, and so does the use site):
+   * a tampered or empty frozen corpus rejects. Purpose: pin the EXACT evidence
+   * set across runs (N≥5 homogeneity, orchestration A/B ablations) — see
+   * snapshot_store.ts.
+   */
+  readonly frozenCorpus?: CorpusSnapshot;
 }
 
 /** The result of grounding a research question. */
@@ -112,7 +126,12 @@ export interface GroundedCorpus {
   /** Documents replayed from the persistent retrieval cache (honest accounting). */
   readonly cacheHits?: number;
   /** 'live' = real network fetch; 'replay' = injected adapter served fixtures. */
-  readonly fetchMode: 'live' | 'replay';
+  readonly fetchMode: 'live' | 'replay' | 'frozen';
+  /**
+   * Present iff fetchMode 'frozen': the persisted snapshot this grounding
+   * replayed (explicit opt-in via --reuse-snapshot; no retrieval happened).
+   */
+  readonly frozenFrom?: { readonly snapshotId: string };
   /** ISO timestamp the grounding was performed. */
   readonly groundedAt: string;
 }
@@ -140,6 +159,31 @@ function adapterFor(
  * corpus would be misleading).
  */
 export async function groundResearchQuestion(opts: GroundingOptions): Promise<GroundedCorpus> {
+  // 0. Frozen-corpus replay (explicit opt-in, R9): verify-then-serve, zero I/O.
+  if (opts.frozenCorpus !== undefined) {
+    const frozen = opts.frozenCorpus;
+    const verdict = verifyCorpusSnapshot(frozen);
+    if (!verdict.ok) {
+      throw new Error(
+        `grounding: frozen corpus failed integrity verification — ${verdict.reason} ` +
+          `(refusing to ground on unverified evidence)`,
+      );
+    }
+    if (frozen.documents.length === 0) {
+      throw new Error('grounding: frozen corpus is empty — nothing to reuse (refusing to ground on nothing)');
+    }
+    return {
+      corpus: frozen,
+      resolver: new CitationResolver(frozen),
+      supportingQuery: opts.question,
+      counterEvidenceQueries: [],
+      perQueryCounts: [],
+      sourcesUsed: [],
+      frozenFrom: { snapshotId: frozen.snapshotId },
+      fetchMode: 'frozen',
+      groundedAt: new Date().toISOString(),
+    };
+  }
   const defaultSource: DocumentSource = 'openalex';
   const maxPerQuery = opts.maxPerQuery ?? 5;
   const includeCounter = opts.includeCounterEvidence ?? true;
