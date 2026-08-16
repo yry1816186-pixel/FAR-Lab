@@ -43,6 +43,13 @@ import {
 } from './commands/snapshot_verify.ts';
 import { runRegistryAnchor, renderRegistryAnchorHuman } from './commands/registry_anchor.ts';
 import {
+  runCampaignStart,
+  runCampaignStatus,
+  runCampaignResume,
+  runCampaignReport,
+  runCampaignReplay,
+} from './commands/campaign.ts';
+import {
   runResearchInspect,
   runResearchStart,
   runResearchRegistry,
@@ -277,6 +284,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'check-resource',
     description: 'verify a cited identifier exists at its authoritative source (doi:... | arxiv:... | url:...; --json)',
     run: async (args) => runCheckResource(args),
+  },
+  {
+    name: 'campaign',
+    description: 'multi-question research campaign: hash-chained event ledger, budget guardian, crash-resumable scheduler (start|status|resume|report|replay)',
+    run: async (args) => runCampaignCommand(args),
   },
   {
     name: 'research',
@@ -719,6 +731,18 @@ function runRegistryAnchorFromArgs(args: readonly string[]): number {
 function runResearchJudgeFromArgs(args: readonly string[]): Promise<number> {
   const parsed = parseJudgePairwiseArgs(args);
   return runJudgePairwise({ runId: parsed.runId, profile: parsed.profile, json: parsed.json });
+}
+
+function runCampaignCommand(args: readonly string[]): Promise<number> {
+  const sub = args[0];
+  if (sub === 'start') return runCampaignStart(args.slice(1));
+  if (sub === 'status') return Promise.resolve(runCampaignStatus(args.slice(1)));
+  if (sub === 'resume') return runCampaignResume(args.slice(1));
+  if (sub === 'report') return Promise.resolve(runCampaignReport(args.slice(1)));
+  if (sub === 'replay') return Promise.resolve(runCampaignReplay(args.slice(1)));
+  process.stderr.write(`far campaign: expected 'start', 'status', 'resume', 'report', or 'replay' (got: ${sub ?? '<missing>'})
+`);
+  return Promise.resolve(2);
 }
 
 function runSnapshotVerifyFromArgs(args: readonly string[]): number {
