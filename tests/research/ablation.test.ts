@@ -209,6 +209,40 @@ describe('ablation — metric plumbing', () => {
     assert.equal(flaky.status, 'INSUFFICIENT_N'); // with 臂非空仅 0 < 2
   });
 
+  it('CI is a real distribution, not a degenerate point estimate (day-r11 regression)', () => {
+    // 2026-08-16 bug: the seed advance ignored the iteration index, so every
+    // bootstrap resample was identical and the CI collapsed to one sample's
+    // value (exposed live: deltaMean=0 with CI [-0.04,-0.04] excluding 0).
+    // Regression contract: with noisy arms the CI has positive width, and a
+    // zero-mean-difference pair yields a CI that STRADDLES zero.
+    // Both arms alternate 1/0 (same mean 0.5, real resampling variance).
+    const alternating = Array.from({ length: 6 }, (_, i) =>
+      obs(i + 1, [{ name: 'x', value: i % 2 === 0 ? 1 : 0 }]),
+    );
+    const alternating2 = Array.from({ length: 6 }, (_, i) =>
+      obs(i + 1, [{ name: 'x', value: i % 2 === 0 ? 0 : 1 }]),
+    );
+    const noisy = aggregateAblation(pilot(alternating, alternating2));
+    const row = noisy.perMetric.find((m) => m.name === 'x')!;
+    assert.ok(row.deltaCi95 !== null);
+    assert.ok(
+      row.deltaCi95.upper - row.deltaCi95.lower > 0.05,
+      `CI must have positive width under noise, got [${row.deltaCi95.lower}, ${row.deltaCi95.upper}]`,
+    );
+    // Mean difference is exactly 0 -> the CI must contain 0.
+    assert.ok(
+      row.deltaCi95.lower <= 0 && 0 <= row.deltaCi95.upper,
+      `equal means: CI must straddle 0, got [${row.deltaCi95.lower}, ${row.deltaCi95.upper}]`,
+    );
+    assert.equal(row.direction, 'NO_SIGNAL');
+    // Identical constant arms: degenerate data -> degenerate (but valid) CI at 0.
+    const same = aggregateAblation(pilot(arm(5, () => 0.37), arm(5, () => 0.37)));
+    const sameRow = same.perMetric.find((m) => m.name === 'citationBindingRate')!;
+    assert.ok(sameRow.deltaCi95 !== null);
+    assert.equal(sameRow.deltaCi95.lower, 0);
+    assert.equal(sameRow.deltaCi95.upper, 0);
+  });
+
   it('renderer names both arm configs and the cannot-prove line', () => {
     const r = aggregateAblation(pilot(arm(6, () => 1), arm(6, () => 0.5)));
     const text = renderAblation(r);
