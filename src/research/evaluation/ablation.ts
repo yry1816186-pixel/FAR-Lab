@@ -92,6 +92,17 @@ export interface AblationMetricRow {
   readonly deltaCi95: AblationDeltaCi | null;
   /** 方向只在 REPORTED 且 CI 不跨 0 时非 null。 */
   readonly direction: 'FAVORS_WITH' | 'FAVORS_WITHOUT' | 'NO_SIGNAL' | null;
+  /**
+   * Single-arm descriptive view (day-r11 backlog #2): present when the metric
+   * is structurally ABSENT in one arm (e.g. fan-out-only metrics on the legacy
+   * arm) — the present arm's mean is shown for characterization with an
+   * explicit not-comparable label. Never feeds direction/delta logic.
+   */
+  readonly descriptive?: {
+    readonly armId: 'with' | 'without';
+    readonly mean: number;
+    readonly n: number;
+  } | null;
 }
 
 export interface AblationReport {
@@ -237,6 +248,22 @@ function buildMetricRow(
   },
 ): AblationMetricRow {
   if (withValues.length < 2 || withoutValues.length < 2) {
+    // Single-arm descriptive view: the metric lives in exactly one arm
+    // (structural absence in the other) — characterize it, never compare it.
+    let descriptive: AblationMetricRow['descriptive'] = null;
+    if (withValues.length >= 2 && withoutValues.length === 0) {
+      descriptive = {
+        armId: 'with',
+        mean: withValues.reduce((a, v) => a + v, 0) / withValues.length,
+        n: withValues.length,
+      };
+    } else if (withoutValues.length >= 2 && withValues.length === 0) {
+      descriptive = {
+        armId: 'without',
+        mean: withoutValues.reduce((a, v) => a + v, 0) / withoutValues.length,
+        n: withoutValues.length,
+      };
+    }
     return {
       name,
       status: 'INSUFFICIENT_N',
@@ -247,6 +274,7 @@ function buildMetricRow(
       deltaMean: null,
       deltaCi95: null,
       direction: null,
+      descriptive,
     };
   }
   const withMean = withValues.reduce((s, v) => s + v, 0) / withValues.length;
@@ -277,6 +305,7 @@ function buildMetricRow(
       unit: 'run',
     },
     direction,
+    descriptive: null,
   };
 }
 
@@ -450,7 +479,11 @@ export function renderAblation(report: AblationReport): string {
   lines.push('|---|---|---|---|---|---|');
   for (const m of report.perMetric) {
     if (m.status !== 'REPORTED' && m.withMean === null) {
-      lines.push(`| ${m.name} | — | — | — | — | INSUFFICIENT_N |`);
+      const desc =
+        m.descriptive != null
+          ? `INSUFFICIENT_N (desc ${m.descriptive.armId}: mean=${fmt(m.descriptive.mean)} n=${m.descriptive.n} — structurally absent in the other arm, not comparable)`
+          : 'INSUFFICIENT_N';
+      lines.push(`| ${m.name} | — | — | — | — | ${desc} |`);
       continue;
     }
     lines.push(
