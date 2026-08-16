@@ -18,6 +18,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { planCampaignQuestions } from '../../campaign/planner.ts';
+import { decomposeTopicWithLlm } from '../../campaign/decomposer.ts';
+import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
 import {
   CAMPAIGNS_ROOT,
   loadCampaign,
@@ -97,22 +99,51 @@ export function runCampaignStart(args: readonly string[]): Promise<number> {
   if (topic === '') return Promise.resolve(usage('far campaign start: missing <topic>'));
 
   return (async () => {
-    // LIVE decomposer is a follow-up wiring point (fail-closed today): without
-    // --questions we refuse honestly rather than fabricate sub-questions (R9).
-    if (questionsFlag === undefined) {
+    // 规划：显式 --questions 确定性路径优先；否则 LIVE LLM 分解（无 key
+    // fail-closed——绝不编造兜底问题，R9）。分解元数据只进 stdout/收据面，
+    // 账本记 questionsSource（诚实可追溯），哈希链只承载战役语义。
+    let plannedQuestions: string[];
+    let questionsSource: 'explicit' | 'llm';
+    if (questionsFlag !== undefined) {
+      const planned = await planCampaignQuestions({ topic, questions: questionsFlag.split('|').map((q: string) => q.trim()).filter(Boolean) as string[] });
+      plannedQuestions = [...planned.questions];
+      questionsSource = planned.source;
+    } else {
+      const apiKey = process.env.FAR_DASHSCOPE_API_KEY ?? process.env.DASHSCOPE_API_KEY;
+      if (apiKey === undefined || apiKey === '') {
+        process.stderr.write(
+          'far campaign start: no --questions and no model API key (FAR_DASHSCOPE_API_KEY) — LLM topic decomposition unavailable.\n' +
+          '  either provide explicit questions: far campaign start "<topic>" --questions "q1|q2|q3"\n' +
+          '  or set the key to use LIVE decomposition. Refusing to fabricate questions (R9).\n',
+        );
+        return 2;
+      }
+      const gateway = createCompetitionQwenGateway({ apiKey });
+      if (!gateway.registeredProfiles().includes('competition_aliyun_qwen')) {
+        process.stderr.write('far campaign start: competition gateway failed to register its adapter (G1 wiring broken)\n');
+        return 1;
+      }
+      process.stderr.write('far campaign: decomposing topic with LIVE model (competition_aliyun_qwen)…\n');
+      let decomposed;
+      try {
+        decomposed = await decomposeTopicWithLlm(gateway, 'competition_aliyun_qwen', topic);
+      } catch (err) {
+        process.stderr.write(`far campaign start: topic decomposition FAILED (fail-closed, no fallback fabrication): ${(err as Error).message}\n`);
+        return 2;
+      }
       process.stderr.write(
-        'far campaign start: no --questions provided — LLM topic decomposition is not wired in this build;\n' +
-        '  provide explicit questions: far campaign start "<topic>" --questions "q1|q2|q3" (deterministic, offline-safe)\n',
+        `far campaign: decomposed into ${decomposed.questions.length} questions (model=${decomposed.modelId ?? 'unknown'}, attempts=${decomposed.attempts})\n`,
       );
-      return 2;
+      const planned = await planCampaignQuestions({ topic, decompose: async () => decomposed.questions });
+      plannedQuestions = [...planned.questions];
+      questionsSource = planned.source;
     }
-    const planned = await planCampaignQuestions({ topic, questions: questionsFlag.split('|').map((q: string) => q.trim()).filter(Boolean) as string[] });
     const id = newCampaignId(topic);
     const dir = campaignDir(id);
-    saveCampaignStarted(dir, { topic, plannedQuestions: [...planned.questions], budgetTokens });
+    saveCampaignStarted(dir, { topic, plannedQuestions, budgetTokens, questionsSource });
     const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
     writeFileSync(join(dir, 'head.txt'), head, 'utf8');
-    process.stdout.write(`far campaign: started ${id} (${planned.questions.length} questions, budget ${budgetTokens} tokens, HEAD ${head.slice(0, 8)})\n`);
+    process.stdout.write(`far campaign: started ${id} (${plannedQuestions.length} questions [${questionsSource}], budget ${budgetTokens} tokens, HEAD ${head.slice(0, 8)})\n`);
     const state = await runCampaignLoop({ dir, runQuestion: makeCliRunQuestion(dir) });
     process.stdout.write(
       `far campaign: loop ended — completed=${state.questions.filter((q) => q.status === 'OK').length} ` +
@@ -128,13 +159,15 @@ export function runCampaignStatus(args: readonly string[]): number {
   if (!id) return usage('far campaign status <campaignId>');
   try {
     const { state, events } = loadCampaign(resolveCampaignDir(id));
+    const started = events.find((e) => e.payload.type === 'campaign_started');
+    const qSource = started?.payload.type === 'campaign_started' ? started.payload.questionsSource : undefined;
     const ok = state.questions.filter((q: { status: string }) => q.status === 'OK').length;
     const failed = state.questions.filter((q: { status: string }) => q.status === 'failed').length;
     process.stdout.write(
       [
         `campaign ${state.campaignId}`,
         `  topic      : ${state.topic}`,
-        `  questions  : ${state.questions.length} (ok=${ok} failed=${failed} pending=${state.questions.length - ok - failed})`,
+        `  questions  : ${state.questions.length} (ok=${ok} failed=${failed} pending=${state.questions.length - ok - failed})${qSource !== undefined ? ` [source: ${qSource}]` : ''}`,
         `  tokens     : ${state.cumulativeTokens} / budget ${state.budgetTokens}${state.breakerTripped ? ' [BREAKER TRIPPED]' : ''}`,
         `  status     : ${state.completed ? 'COMPLETED' : 'IN_PROGRESS'} · events=${events.length} · stop=${lastStopReason(events)}`,
       ].join('\n') + '\n',
@@ -243,7 +276,7 @@ export function runCampaignReplay(args: readonly string[]): number {
 }
 
 function usage(message: string): number {
-  process.stderr.write(`${message}\n  usage: far campaign start "<topic>" --questions "q1|q2|..." [--budget-tokens N]\n         far campaign status <id>\n         far campaign resume <id>\n         far campaign report <id> [--format md|latex|json]\n         far campaign replay <id> [--diff <id2>]\n`);
+  process.stderr.write(`${message}\n  usage: far campaign start "<topic>" [--questions "q1|q2|..." — or LIVE decomposition with FAR_DASHSCOPE_API_KEY] [--budget-tokens N]\n         far campaign status <id>\n         far campaign resume <id>\n         far campaign report <id> [--format md|latex|json]\n         far campaign replay <id> [--diff <id2>]\n`);
   return 2;
 }
 

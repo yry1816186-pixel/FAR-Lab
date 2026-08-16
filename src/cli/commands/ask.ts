@@ -144,7 +144,7 @@ export interface AskRender {
     readonly corpusRootHash: string;
     readonly documentCount: number;
     readonly perQueryCounts: ReadonlyArray<{ readonly query: string; readonly count: number }>;
-    readonly fetchMode: 'live' | 'replay';
+    readonly fetchMode: 'live' | 'replay' | 'frozen';
     readonly groundedAt: string;
     readonly citationCrossCheck: {
       readonly citedDoiCount: number;

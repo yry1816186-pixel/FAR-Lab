@@ -110,7 +110,7 @@ export interface GroundingReport {
   readonly corpusRootHash: string;
   readonly documentCount: number;
   readonly perQueryCounts: ReadonlyArray<{ readonly query: string; readonly count: number }>;
-  readonly fetchMode: 'live' | 'replay';
+  readonly fetchMode: 'live' | 'replay' | 'frozen';
   readonly groundedAt: string;
   /**
    * Post-loop citation cross-check (the K3 thesis, demonstrated at the loop

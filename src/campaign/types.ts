@@ -14,7 +14,7 @@
 
 /** 战役事件负载（判别联合：6 种事件覆盖完整生命周期）。 */
 export type CampaignEventPayload =
-  | { readonly type: 'campaign_started'; readonly topic: string; readonly plannedQuestions: readonly string[]; readonly budgetTokens: number }
+  | { readonly type: 'campaign_started'; readonly topic: string; readonly plannedQuestions: readonly string[]; readonly budgetTokens: number; readonly questionsSource?: 'explicit' | 'llm' }
   | { readonly type: 'question_started'; readonly index: number; readonly question: string }
   | { readonly type: 'question_completed'; readonly index: number; readonly question: string; readonly runId: string; readonly tokens: number; readonly status: 'OK' }
   | { readonly type: 'question_failed'; readonly index: number; readonly question: string; readonly errorKind: 'rate_limited' | 'model_output_invalid' | 'unknown'; readonly detail: string }

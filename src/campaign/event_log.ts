@@ -132,6 +132,10 @@ function validateCampaignEventShape(value: unknown, lineIndex: number): Campaign
             errors.push('campaign_started.plannedQuestions must be an array of non-empty strings');
           }
           if (!isCount(p['budgetTokens'])) errors.push('campaign_started.budgetTokens must be a non-negative integer');
+          // Additive (night-r8): optional provenance for where the questions came from.
+          if (p['questionsSource'] !== undefined && p['questionsSource'] !== 'explicit' && p['questionsSource'] !== 'llm') {
+            errors.push("campaign_started.questionsSource must be 'explicit'|'llm' when present");
+          }
           break;
         case 'question_started':
           if (!isCount(p['index'])) errors.push('question_started.index must be a non-negative integer');
