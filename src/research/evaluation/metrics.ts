@@ -10,7 +10,7 @@
  * faked here — they are labeled as human-rubric metrics in the report.
  */
 
-import type { ResearchRun } from '../types.ts';
+import type { HypothesisScorecard, ResearchRun } from '../types.ts';
 import type { ResearchPlan } from '../types.ts';
 
 /** One computed metric value. */
@@ -62,6 +62,48 @@ function falsificationComplete(m: {
   if (m.metric.trim().length === 0) return false;
   if (m.comparator === 'gt' || m.comparator === 'lt') return m.value !== undefined;
   return m.lower !== undefined && m.upper !== undefined;
+}
+
+/** Grade → grade-point mapping for scorecard means (NOT_APPLICABLE excluded). */
+const GRADE_POINTS: Readonly<Record<string, number>> = { A: 4, B: 3, C: 2, D: 1, F: 0 };
+
+/**
+ * Discriminating scorecard metrics (day-r10): the gate metrics saturate on
+ * pinned-corpus questions (2026-08-16 ablation pilot: binding/falsifiability
+ * both 1.0 on BOTH arms), so primitive-value adjudication needs per-dimension
+ * grade means. Deterministic and pure: grade-point mean per dimension name
+ * (A=4…F=0), NOT_APPLICABLE excluded from that dimension's mean, dimensions
+ * emitted in sorted-name order (stable), null when no hypothesis carries a
+ * graded instance of that dimension.
+ */
+function scorecardDimensionMetrics(
+  scorecards: Readonly<Record<string, HypothesisScorecard>>,
+): MetricValue[] {
+  const byDim = new Map<string, { points: number; n: number; na: number }>();
+  for (const sc of Object.values(scorecards)) {
+    for (const dim of sc.dimensions) {
+      const slot = byDim.get(dim.name) ?? { points: 0, n: 0, na: 0 };
+      const gp = GRADE_POINTS[dim.grade];
+      if (gp === undefined) slot.na += 1;
+      else {
+        slot.points += gp;
+        slot.n += 1;
+      }
+      byDim.set(dim.name, slot);
+    }
+  }
+  const out: MetricValue[] = [];
+  for (const name of [...byDim.keys()].sort()) {
+    const { points, n, na } = byDim.get(name)!;
+    out.push({
+      name: `scorecardMeanGrade.${name}`,
+      value: n === 0 ? null : points / n,
+      definition:
+        `mean grade-point of the ${name} scorecard dimension across hypotheses (A=4…F=0; ` +
+        `NOT_APPLICABLE excluded${na > 0 ? `, ${na} NA instance(s) observed` : ''})`,
+    });
+  }
+  return out;
 }
 
 /**
@@ -118,6 +160,13 @@ export function computeRunMetrics(
   const completeReceipts = receipts.filter((r) => r.provenanceStatus === 'complete').length;
   const receiptCompleteness = receipts.length === 0 ? null : completeReceipts / receipts.length;
 
+  // Scorecard dimension means (computed once; the memory-novelty dim is also
+  // surfaced standalone because the ablation layer reads it by name).
+  const scorecardDims = scorecardDimensionMetrics(run.scorecards);
+  const memoryNoveltyDim = scorecardDims.find(
+    (m) => m.name === 'scorecardMeanGrade.NoveltyVsResearchMemory',
+  );
+
   const metrics: MetricValue[] = [
     { name: 'citationBindingRate', value: citationBindingRate, definition: 'bound citations / total cited ids across hypotheses (accepted claims must reach 1.0)' },
     { name: 'unboundEvidenceCount', value: unbound, definition: 'citations that did not resolve in the corpus (must be 0 for accepted claims)' },
@@ -132,6 +181,40 @@ export function computeRunMetrics(
     { name: 'humanApprovalGateCount', value: run.plan.humanApprovalRequired.length, definition: 'plan steps requiring human approval before execution' },
     { name: 'gateVerdictResearchable', value: run.gateReport.verdict === 'RESEARCHABLE', definition: 'whether the researchability gate admitted the question' },
     { name: 'runModeIsLive', value: run.runMode === 'LIVE', definition: 'aggregate run mode (LIVE only when every science-affecting component is live)' },
+    // ── Discriminating metrics (day-r10; the ablation pilot proved gate metrics saturate) ──
+    ...scorecardDims,
+    {
+      name: 'noveltyVsResearchMemoryGrade',
+      value: memoryNoveltyDim === undefined ? null : memoryNoveltyDim.value,
+      definition:
+        'mean grade-point of the cross-run memory-novelty dimension (A=4 novel, C=2 explored-branch dup, F=0 eliminated-direction dup); ' +
+        'null when the run carried no memory flags (memory disabled or no exact match) — absence is honest, never imputed',
+    },
+    {
+      name: 'falsificationMetricDiversity',
+      value:
+        hypotheses.length === 0
+          ? null
+          : new Set(hypotheses.map((h) => h.falsificationMethod.metric.trim().toLowerCase())).size /
+            hypotheses.length,
+      definition:
+        'distinct falsification metrics / hypotheses (1.0 = every hypothesis tests a DIFFERENT measurable quantity; the fan-out diversity signal)',
+    },
+    {
+      name: 'strategyOriginDiversity',
+      value: (() => {
+        const origins = hypotheses.filter((h) => h.strategyOrigin !== undefined);
+        if (origins.length === 0) return null; // legacy single-shot arm: structurally absent
+        return new Set(origins.map((h) => h.strategyOrigin)).size / hypotheses.length;
+      })(),
+      definition:
+        'distinct discovery strategies among hypotheses / hypotheses (null = no hypothesis carries strategyOrigin, i.e. legacy single-shot)',
+    },
+    {
+      name: 'paretoFrontSize',
+      value: Object.values(run.scorecards).filter((sc) => sc.paretoOptimal).length,
+      definition: 'hypotheses on the scorecard Pareto front (non-dominated candidates)',
+    },
   ];
 
   return {
