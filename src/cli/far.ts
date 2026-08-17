@@ -34,6 +34,7 @@ import { runCAstroLoop } from './commands/c_astro_loop.ts';
 import { runGround } from './commands/ground.ts';
 import { runCheckResource } from './commands/check_resource.ts';
 import { runExportCitations, type CitationExportFormat } from './commands/export_citations.ts';
+import { runRubricFromArgs } from './commands/rubric_args.ts';
 import { parseJudgePairwiseArgs, runJudgePairwise } from './commands/judge_pairwise.ts';
 import {
   parseSnapshotVerifyArgs,
@@ -240,6 +241,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'export',
     description: 'Trust Receipt / .far-proof evidence bundle export',
     run: (args) => runExportFromArgs(args),
+  },
+  {
+    name: 'rubric',
+    description: 'blind human-evaluation tool: package de-identified hypotheses, aggregate ratings (kappa/alpha)',
+    run: (args) => Promise.resolve(runRubricFromArgs(args)),
   },
   {
     name: 'fec',
