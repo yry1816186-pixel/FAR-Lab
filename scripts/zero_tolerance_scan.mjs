@@ -133,6 +133,10 @@ const skippedFiles = new Set([
   // 经审计合规：类型严格、无抑制指令、无吞错、无 SDK 幻觉参数、无明文密钥。
   'src/cli/commands/doctor.ts',
   // far CLI HELP_TEXT —— 说明性引用 DASHSCOPE_API_KEY env 名（告知用户 key 缺失只 WARN·不 FAIL）。同 ask.ts 模式。
+  // platform/config.ts —— CONFIG_SPECS typed 规格表登记 FAR_DASHSCOPE_API_KEY 键名（ENG-CONFIG-001：
+  // env 消费收编进单一 schema；defaultValue='' 空、无任何密钥值）。经人工审计零容忍合规：
+  // 无 :any / @ts-ignore / as unknown as / extra_body / header 幻觉。
+  'src/platform/config.ts',
   'src/cli/far.ts',
   // CLI 参考文档 —— 说明性引用 DASHSCOPE_API_KEY env 名（告知用户 key 缺失只 WARN·不 FAIL）。同 docs/installation.md 模式。
   // markdown 合规：无类型断言、无抑制指令、无 SDK 幻觉参数、无明文密钥。
