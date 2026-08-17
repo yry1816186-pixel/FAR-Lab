@@ -206,6 +206,11 @@ const COMMANDS: readonly CliCommand[] = [
     run: async (args) => (await import('./commands/planning.ts')).runPlanningFromArgs(args),
   },
   {
+    name: 'governance',
+    description: 'unknown/assumption registry + reopen propagation ledger (GOV-UNKNOWN/REOPEN-001)',
+    run: async (args) => (await import('./commands/governance.ts')).runGovernanceFromArgs(args),
+  },
+  {
     name: 'audit-seed-cherry',
     description: 'anti-theater detector-validation showcase (cherry-pick replay)',
     run: (args) => runAuditSeedCherryFromArgs(args),
@@ -1438,6 +1443,13 @@ USAGE:
     checkpoint <file> parse a PROGRESS.md checkpoint (resumption protocol); --template renders the protocol template
     exit codes: 0 pass / 7 gate fail / 3 IMPLEMENTED_UNVERIFIED / 2 bad args
 
+  far governance lint|stale|trigger
+    lint [--registry <yaml>] [--known <ids>]   registry integrity gate (zod SSOT + reference edges)
+    stale [--registry <yaml>] [--today <date>] overdue assumptions + degraded conclusions (hit → exit 7)
+    trigger <event-json> [--dry-run]           apply a reopen trigger (9 constitutional triggers);
+                                               converts registry state + appends immutable REOPEN_LOG
+    exit codes: 0 ok / 7 gate fail or illegal transition / 2 usage / 3 registry source missing
+
   far ask "<question>" [--mode full|quick] [--json] [--export <dir>] [--resume <path>]
                                     run the full 6-stage FSM once (runAgentLoop); emits a verdict + evidence chain
     --mode full|quick             full = up to 3 iterations (default) / quick = single pass
@@ -1547,6 +1559,10 @@ SYSTEM
                                         retraction/correction/supersession lifecycle (IC-05; append-only)
   far planning <plan|spec|risk|state|gate|checkpoint>
                                         planning methodology as deterministic gates (P0-P4 grading)
+  far governance <lint|stale|trigger>   unknown/assumption registry + reopen propagation ledger
+                                        (GOV-UNKNOWN/REOPEN-001; lint = integrity gate,
+                                        stale = overdue assumptions + degraded conclusions,
+                                        trigger = apply reopen event, append immutable log)
   far schedule <add|list|remove|run>    scheduled re-verification (re-verify claims over time)
   far fsm advance                       advance the 9-state CLI protocol FSM (stageReceipt hash link)
   far bench run                         FAR-Bench demo profile
