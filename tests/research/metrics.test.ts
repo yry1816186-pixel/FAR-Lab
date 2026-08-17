@@ -300,20 +300,70 @@ describe('computeRunMetrics', () => {
 });
 
 describe('computeRunMetrics — generation-quality telemetry (day-r13, §4.2 R11)', () => {
-  const receipt = (over: Record<string, unknown>) => ({
-    runId: 'r1', stageId: 'st', sequence: 1, component: 'model',
-    mode: 'LIVE', inputHash: 'i', outputHash: 'o', createdAt: 't',
-    ...over,
-  });
-
   test('retry/truncation rates computed from model receipts; non-model receipts ignored', () => {
     const run = baseRun({
       stageReceipts: [
-        receipt({ retries: 0, finishReason: 'stop' }),
-        receipt({ retries: 2, finishReason: 'stop' }),
-        receipt({ retries: 1, finishReason: 'length' }),
-        { runId: 'r1', stageId: 'det', sequence: 4, component: 'deterministic', mode: 'RECORDED_REPLAY', inputHash: 'i', outputHash: 'o', createdAt: 't', retries: 9 },
-      ] as unknown as ResearchRun['stageReceipts'],
+        {
+          runId: 'r1', stageId: 'st', stageVersion: 1, attempt: 1, sequence: 1,
+          component: 'model', mode: 'LIVE',
+          provider: 'dashscope', endpointRegion: 'cn-hangzhou',
+          modelId: 'qwen-max', requestId: 'req-1', modelSnapshot: 'unknown',
+          tokenUsage: { inputTokens: 100, outputTokens: 200, totalTokens: 300, measured: true },
+          latencyMs: 1200, retries: 0, finishReason: 'stop',
+          cost: { amount: 0.003, currency: 'USD', status: 'billed' },
+          inputHash: 'i', outputHash: 'o',
+          corpusSnapshotId: null, corpusRootHash: null,
+          dataSource: null, retrievedAt: null, parserVersion: null,
+          promptTemplateHash: null,
+          errors: [], provenanceStatus: 'complete', missingFields: [],
+          createdAt: 't',
+        },
+        {
+          runId: 'r1', stageId: 'st', stageVersion: 1, attempt: 1, sequence: 2,
+          component: 'model', mode: 'LIVE',
+          provider: 'dashscope', endpointRegion: 'cn-hangzhou',
+          modelId: 'qwen-max', requestId: 'req-2', modelSnapshot: 'unknown',
+          tokenUsage: { inputTokens: 200, outputTokens: 400, totalTokens: 600, measured: true },
+          latencyMs: 2400, retries: 2, finishReason: 'stop',
+          cost: { amount: 0.006, currency: 'USD', status: 'billed' },
+          inputHash: 'i2', outputHash: 'o2',
+          corpusSnapshotId: null, corpusRootHash: null,
+          dataSource: null, retrievedAt: null, parserVersion: null,
+          promptTemplateHash: null,
+          errors: [], provenanceStatus: 'complete', missingFields: [],
+          createdAt: 't',
+        },
+        {
+          runId: 'r1', stageId: 'st', stageVersion: 1, attempt: 1, sequence: 3,
+          component: 'model', mode: 'LIVE',
+          provider: 'dashscope', endpointRegion: 'cn-hangzhou',
+          modelId: 'qwen-max', requestId: 'req-3', modelSnapshot: 'unknown',
+          tokenUsage: { inputTokens: 150, outputTokens: 250, totalTokens: 400, measured: true },
+          latencyMs: 1800, retries: 1, finishReason: 'length',
+          cost: { amount: 0.004, currency: 'USD', status: 'billed' },
+          inputHash: 'i3', outputHash: 'o3',
+          corpusSnapshotId: null, corpusRootHash: null,
+          dataSource: null, retrievedAt: null, parserVersion: null,
+          promptTemplateHash: null,
+          errors: [], provenanceStatus: 'complete', missingFields: [],
+          createdAt: 't',
+        },
+        {
+          runId: 'r1', stageId: 'det', stageVersion: 1, attempt: 1, sequence: 4,
+          component: 'deterministic', mode: 'RECORDED_REPLAY',
+          provider: null, endpointRegion: null,
+          modelId: null, requestId: null, modelSnapshot: 'unknown',
+          tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, measured: true },
+          latencyMs: 0, retries: 9, finishReason: 'stop',
+          cost: { amount: 0, currency: 'USD', status: 'unavailable' },
+          inputHash: 'i', outputHash: 'o',
+          corpusSnapshotId: null, corpusRootHash: null,
+          dataSource: null, retrievedAt: null, parserVersion: null,
+          promptTemplateHash: null,
+          errors: [], provenanceStatus: 'complete', missingFields: [],
+          createdAt: 't',
+        },
+      ],
     });
     const report = computeRunMetrics(run, 'NOT_RUN', 't');
     const rate = report.metrics.find((m) => m.name === 'generationRetryRate')!;
