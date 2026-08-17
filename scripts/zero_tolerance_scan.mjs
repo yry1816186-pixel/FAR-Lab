@@ -71,6 +71,9 @@ const emptyCatchRe = /catch\s*(\([^)]*\))?\s*\{\s*\}/g;
 
 const skippedFiles = new Set([
   'scripts/zero_tolerance_scan.mjs',
+  // diff 级自查门（扫描器家族）：按设计含 TODO/FIXME / : any / as unknown as 等
+  // 反模式字符串作为检测模式（ENG-DIFF-001）。经人工审计无真实逃逸。
+  'scripts/diff_self_check.mjs',
   // ci/snapshot_liveness_smoke.ts 合法读取 process.env.DASHSCOPE_API_KEY（env 变量名，非硬编码 secret）。
   // 跳过以避免 dashscope_env_reference 误报；该文件经人工审计无 :any / @ts-ignore / as unknown as / extra_body / header 幻觉。
   'ci/snapshot_liveness_smoke.ts',
@@ -82,6 +85,9 @@ const skippedFiles = new Set([
   'tests/ci/competition_qwen_smoke.test.ts',
   // 元测试：按设计含反模式字符串（': any' / 'extra_body' / 空 catch）以驱动扫描器；类比扫描器脚本自身跳过。
   'tests/ci/zero_tolerance_scan.test.ts',
+  // 元测试（同上类）：diff_self_check 的正反例按设计含 ': any' / 'as unknown as' 等
+  // 反模式字符串以驱动 diff 级自查门（ENG-DIFF-001）。经人工审计无真实逃逸。
+  'tests/ci/diff_self_check.test.ts',
   // CI 入口脚本 —— 合法读取 DASHSCOPE_API_KEY 环境变量名（用于 graceful skip 条件门判断）。
   // 经人工审计零容忍合规：无 :any / @ts-ignore / as unknown as / extra_body / header 幻觉。
   'scripts/ci_all.mjs',
