@@ -45,7 +45,9 @@ test('store(): a forged response containing a key is REFUSED (negative test — 
 
 test('store(): clean responses still persist (guard did not over-block)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'cache-sec-'));
-  const cache = new RetrievalCache({ rootDir: dir });
+  // fixed clock matching the envelope's storedAt — TTL freshness must not
+  // rot with the wall clock (the 2026-08-16 hardcode made this fail on 08-17)
+  const cache = new RetrievalCache({ rootDir: dir, now: () => Date.parse('2026-08-16T00:30:00.000Z') });
   cache.store(envelope('{"title": "A correlated study"}'));
   const files = readdirSync(dir);
   assert.equal(files.length, 1, 'clean envelope must be stored exactly once');

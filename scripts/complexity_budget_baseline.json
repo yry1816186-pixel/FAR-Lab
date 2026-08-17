@@ -9,7 +9,7 @@
     "file:src/research/orchestrator.ts",
     "fn:src/falsifiability/verdict_kernel_v2.ts:290",
     "fn:src/fec/fec_repository.ts:110",
-    "fn:src/research/memory.ts:480",
+    "fn:src/research/memory.ts:490",
     "fn:src/research/orchestrator.ts:297",
     "fn:src/research/provenance.ts:259",
     "fn:src/science_harness/c_astro_pipeline.ts:164"

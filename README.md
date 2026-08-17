@@ -103,6 +103,7 @@ tampering detected (recomputation mismatched the stored evidence). A `status: WA
 `tamperStatus: clean` therefore means "chain intact, fewer independent re-computers than
 possible" — rerun on a machine with the Python axis installed for the full three-axis result.
 
+
 The same guarantees the quickstart walks through — bundle integrity, tamper detection (exit 7 on
 edited evidence), and independent recomputation — are asserted end-to-end by the test suite
 (`tests/far_proof/`, `tests/cli/export_far_proof.test.ts`), so a regression in any of them fails

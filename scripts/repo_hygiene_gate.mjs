@@ -21,7 +21,7 @@ const ROOT = join(__dirname, '..');
 
 /** 根目录文件白名单（精确文件名）。与 governance spec §2 同步。 */
 const ALLOW_FILES = new Set([
-  'README.md', 'README.zh-CN.md', 'LICENSE', 'NOTICE', 'CHANGELOG.md', 'CONTRIBUTING.md',
+  'README.md', 'README.zh-CN.md', 'LICENSE', 'NOTICE', 'THIRD-PARTY-NOTICES.md', 'CHANGELOG.md', 'CONTRIBUTING.md',
   'CODE_OF_CONDUCT.md', 'SECURITY.md', 'SUPPORT.md', 'CITATION.cff',
   'MAINTAINERS.md',
   'AGENTS.md', 'CLAUDE.md', 'CLAUDE.local.example.md',

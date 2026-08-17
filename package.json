@@ -65,6 +65,8 @@
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "fuzz:proof": "node scripts/fuzz_proof.mjs",
+    "requirements:compile": "node scripts/requirements_compile.mjs",
+    "requirements:check": "node scripts/requirements_compile.mjs --check",
     "build": "pnpm --dir frontend run build",
     "build:check": "pnpm run typecheck && pnpm run lint && pnpm --dir frontend run typecheck && pnpm --dir frontend run lint && pnpm --dir frontend run build",
     "check:supply-chain": "node scripts/check-supply-chain.mjs",
