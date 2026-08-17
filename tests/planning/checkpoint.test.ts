@@ -11,6 +11,7 @@ import {
   renderCheckpoint,
 } from '../../src/planning/checkpoint.ts';
 import type { Checkpoint } from '../../src/planning/types.ts';
+import { CheckpointSchema } from '../../src/planning/types.ts';
 
 function okCheckpoint(overrides: Partial<Checkpoint> = {}): Checkpoint {
   return {
@@ -22,6 +23,10 @@ function okCheckpoint(overrides: Partial<Checkpoint> = {}): Checkpoint {
     blockers: [],
     excludedApproaches: [],
     assumptions: [],
+    valueHypothesis: 'deliver a verifiable planning gate to CLI users',
+    successCriteria: ['cli exits 0 on valid plan'],
+    evidenceGaps: [],
+    unachieved: [],
     ...overrides,
   };
 }
@@ -95,4 +100,37 @@ test('multi-line section content is preserved', () => {
     const lines = (parsed.sections['已完成（带证据：命令输出 / file:line / 测试名）'] ?? '').split('\n');
     assert.equal(lines.length, 3);
   }
+});
+
+
+// ============================================================
+// CORE-VALUE-001 · 价值三元组（batch report 必须回答「为什么值得做」）
+// ============================================================
+
+test('CORE-VALUE-001: 渲染包含价值假设/成功标准/证据缺口/未达成项四节', () => {
+  const text = renderCheckpoint(okCheckpoint({
+    valueHypothesis: 'cut session-resume cost by 50% for the next agent',
+    successCriteria: ['resume test passes', 'checkpoint parse round-trip'],
+    evidenceGaps: ['no multi-session timing measurement yet'],
+    unachieved: [{ item: 'timing benchmark', reason: 'needs second session' }],
+  }));
+  assert.match(text, /cut session-resume cost by 50%/);
+  assert.match(text, /resume test passes/);
+  assert.match(text, /no multi-session timing measurement yet/);
+  assert.match(text, /timing benchmark/);
+  assert.match(text, /needs second session/);
+});
+
+test('CORE-VALUE-001 fail-closed: 缺 valueHypothesis 的 checkpoint 被 schema 拒绝', () => {
+  const broken = okCheckpoint();
+  delete (broken as { valueHypothesis?: string }).valueHypothesis;
+  const parsed = CheckpointSchema.safeParse(broken);
+  assert.equal(parsed.success, false, 'batch without a value hypothesis must not pass the gate');
+});
+
+test('CORE-VALUE-001: unachieved 项缺 reason 被拒（未达成必须交代原因）', () => {
+  const parsed = CheckpointSchema.safeParse(
+    okCheckpoint({ unachieved: [{ item: 'x' } as unknown as { item: string; reason: string }] }),
+  );
+  assert.equal(parsed.success, false);
 });
