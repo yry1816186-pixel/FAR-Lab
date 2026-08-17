@@ -272,6 +272,69 @@ test('GV-08: conflicting metrics (multi-implication 互斥) → INCONCLUSIVE (R5
   assert.equal(out.decisiveRuleId, 'R5_CONTRADICTORY_SIGNIFICANT_EVIDENCE');
 });
 
+// ---------------------------------------------------------------------------
+// EVID-CONTRADICTION-001 · 均值掩盖锁（GV-13/GV-14）——冲突不得被多数票/均值稀释
+// ---------------------------------------------------------------------------
+
+test('GV-13: 10 supports + 1 refute（均显著）→ 仍 INCONCLUSIVE（多数票不得覆盖冲突）', () => {
+  // 均值口径下净效应 +0.42 会被解读为支持；布尔冲突检测使多数票无效。
+  const statistics = [
+    {
+      testId: 'refuting-outlier',
+      status: 'ran',
+      effectDirection: 'refutes',
+      pValue: 0.01,
+      adjustedPValue: 0.01,
+      effectSizeObserved: -0.4,
+      confidenceInterval: [-0.7, -0.1],
+      assumptionDiagnostics: [],
+    },
+    ...Array.from({ length: 10 }, (_, i) => ({
+      testId: `supporting-${i}`,
+      status: 'ran',
+      effectDirection: 'supports',
+      pValue: 0.01,
+      adjustedPValue: 0.01,
+      effectSizeObserved: 0.46,
+      confidenceInterval: [0.2, 0.7],
+      assumptionDiagnostics: [],
+    })),
+  ];
+  const out = decideFiveValueVerdict(baseKernelInput({ statistics }));
+  assert.equal(out.verdict, 'INCONCLUSIVE', '1 条显著反证必须阻断 CONFIRMED——不得被 10:1 多数票均值掩盖');
+  assert.equal(out.decisiveRuleId, 'R5_CONTRADICTORY_SIGNIFICANT_EVIDENCE');
+});
+
+test('GV-14: 相反效应量 (+0.8 / -0.7) 双双显著 → conflicting（均值≈0.05 不得产生干净结论）', () => {
+  const input = baseKernelInput({
+    statistics: [
+      {
+        testId: 'plus-arm',
+        status: 'ran',
+        effectDirection: 'supports',
+        pValue: 0.001,
+        adjustedPValue: 0.001,
+        effectSizeObserved: 0.8,
+        confidenceInterval: [0.5, 1.1],
+        assumptionDiagnostics: [],
+      },
+      {
+        testId: 'minus-arm',
+        status: 'ran',
+        effectDirection: 'refutes',
+        pValue: 0.002,
+        adjustedPValue: 0.002,
+        effectSizeObserved: -0.7,
+        confidenceInterval: [-1.0, -0.4],
+        assumptionDiagnostics: [],
+      },
+    ],
+  });
+  const out = decideFiveValueVerdict(input);
+  assert.equal(out.verdict, 'INCONCLUSIVE', '符号相反的双臂不得经均值抵消产生 CONFIRMED/REFUTED');
+  assert.equal(out.decisiveRuleId, 'R5_CONTRADICTORY_SIGNIFICANT_EVIDENCE');
+});
+
 test('GV-09: post-hoc threshold (alpha_rewrite critical) → UNTESTED (R3 + ALPHA_REWRITE_DETECTED)', () => {
   const input = baseKernelInput({
     protocolDeviations: [{ kind: 'alpha_rewrite', severity: 'critical', detectedAt: 'post-result' }],
