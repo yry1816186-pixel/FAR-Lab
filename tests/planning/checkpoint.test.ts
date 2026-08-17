@@ -130,7 +130,7 @@ test('CORE-VALUE-001 fail-closed: 缺 valueHypothesis 的 checkpoint 被 schema 
 
 test('CORE-VALUE-001: unachieved 项缺 reason 被拒（未达成必须交代原因）', () => {
   const parsed = CheckpointSchema.safeParse(
-    okCheckpoint({ unachieved: [{ item: 'x' } as unknown as { item: string; reason: string }] }),
+    okCheckpoint({ unachieved: JSON.parse('{"item":"x"}') as { item: string; reason: string }[] }),
   );
   assert.equal(parsed.success, false);
 });
