@@ -11,6 +11,7 @@ import { verifyChainHead } from '../evidence_log/verifier.ts';
 import type { ReportClaimCategory } from '../schema/enums.ts';
 import type { LimitationItem } from './types.ts';
 import { buildClaimLimitations } from './limitations.ts';
+
 export { buildClaimLimitations, claimLimitationCoverage } from './limitations.ts';
 import { REPORT_CLAIM_CATEGORIES } from '../schema/enums.ts';
 import type { VerifyResult } from '../evidence_log/types.ts';
