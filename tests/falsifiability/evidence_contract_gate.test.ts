@@ -103,10 +103,14 @@ test('gate: 合同存在但内容违规（hash 篡改/自填来源）→ fail-cl
 });
 
 test('gate: 合同形状损坏（多余字段裁掉后过不了 zod）→ fail-closed', () => {
+  // JSON 边界单次 cast 注入损坏形状（unknown 双重 cast 为零容忍禁用模式）
   const broken = { ...makeContract() } as Record<string, unknown>;
   delete broken.retraction;
+  const recordWithBroken = JSON.parse(
+    JSON.stringify({ ...makeRecord(), evidenceContract: broken }),
+  ) as EvidenceRecord;
   const result = assertPrimaryEvidenceContractBound(
-    [makeRecord({ evidenceContract: broken as unknown as EvidenceContractV1 })],
+    [recordWithBroken],
     { requireFullEvidenceContract: true },
   );
   assert.equal(result.ok, false);
