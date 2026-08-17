@@ -13,7 +13,8 @@
 // 退出码：0 = 通过 / 7 = 门禁失败 / 3 = IMPLEMENTED_UNVERIFIED / 2 = 用法或文件错误
 // （7 与 fec compile / verify 的 fail 语义一致；3 对应 grade 的中间态）
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 import { buildGateReport, renderGateReport } from '../../planning/gate.ts';
 import { parseCheckpoint, renderCheckpoint, nextStepFrom } from '../../planning/checkpoint.ts';
@@ -23,6 +24,15 @@ import {
   matchClosureToContract,
   validateBatchContract,
 } from '../../planning/batch_contract.ts';
+import {
+  BaselineEntrySchema,
+  StartupReceiptSchema,
+  assembleStartupReceipt,
+  diffStartupState,
+  parseGatesSnapshot,
+  verifyStartupReceipt,
+} from '../../planning/startup_receipt.ts';
+import type { BaselineEntry } from '../../planning/startup_receipt.ts';
 import {
   CheckpointSchema,
   PlanSchema,
@@ -64,6 +74,8 @@ export function runPlanningFromArgs(argv: readonly string[]): number {
       return runSpecCheck(argv.slice(1), json);
     case 'batch':
       return runBatchCheck(argv.slice(1), json);
+    case 'startup':
+      return runStartup(argv.slice(1), json);
     case 'risk':
       return runRisk(argv.slice(1), json);
     case 'state':
@@ -83,6 +95,7 @@ const USAGE = `far planning — 规划门禁方法论源代码化（确定性门
   far planning plan <file>           校验 Plan DAG → 门禁报告 + 拓扑执行序
   far planning spec <file>           校验 Spec（≥3 可验证 AC / Delta / trust-kernel 声明）
   far planning batch <file>          校验 batch contract（§4.2 十二字段）；--closure <file> 收尾对拍
+  far planning startup --baseline <f> 生成启动 receipt（CORE-START-001：资产哈希+baseline+状态差异）
   far planning risk <signal>...      风险分级 P0-P4（信号: ${RISK_SIGNAL_NAMES.join('/')}）
   far planning state <from> <to>     状态机转移校验（--compress 允许压缩模式）
   far planning gate <file>           验证门禁报告（四步门函数，not_run 显式标注）
@@ -262,6 +275,114 @@ function runBatchCheck(args: readonly string[], json: boolean): number {
     `far planning batch: CLOSURE MATCH PASS — acceptance ${s.acceptancePassed}/${s.acceptanceTotal}, outcomes ${Object.entries(s.outcomesByKind).map(([k, n]) => `${k}=${n}`).join(' ')}, files written ${s.filesWritten}, unknowns resolved ${s.unknownsResolved}\n`,
   );
   return 0;
+}
+
+
+// ---------------------------------------------------------------------------
+// startup 子命令（CORE-START-001：启动 receipt）
+// ---------------------------------------------------------------------------
+
+const RECEIPT_PATH = '.far/state/startup_receipt.json';
+
+function gitOutput(args: readonly string[]): string {
+  const r = spawnSync('git', args, { encoding: 'utf8', timeout: 15000 });
+  return r.status === 0 ? (r.stdout ?? '').trim() : '';
+}
+
+function runStartup(args: readonly string[], json: boolean): number {
+  const baselineFlag = args.indexOf('--baseline');
+  const baselineFile = baselineFlag === -1 ? undefined : args[baselineFlag + 1];
+  if (baselineFile === undefined || baselineFile.startsWith('--')) {
+    process.stderr.write('far planning startup: --baseline <file> required (JSON array of {name, command, exitCode, summary} — 实跑结果转录，本命令不代跑)\n');
+    return 2;
+  }
+  const rawBaseline = readJsonOrExit(baselineFile, 'startup');
+  if (rawBaseline === undefined) return 2;
+  if (!Array.isArray(rawBaseline)) {
+    process.stderr.write('far planning startup: baseline file must be a JSON array\n');
+    return 2;
+  }
+  const baseline: BaselineEntry[] = [];
+  for (const entry of rawBaseline) {
+    const parsed = BaselineEntrySchema.safeParse(entry);
+    if (!parsed.success) {
+      process.stderr.write(`far planning startup: invalid baseline entry — ${zodSummary(parsed.error)}\n`);
+      return 2;
+    }
+    baseline.push(parsed.data);
+  }
+
+  const gatesText = existsSync('.far/requirements/GATES.yaml')
+    ? readFileSync('.far/requirements/GATES.yaml', 'utf8')
+    : '';
+  if (gatesText === '') {
+    process.stderr.write('far planning startup: GATES.yaml missing or empty — run requirements:compile first (fail-closed)\n');
+    return 7;
+  }
+
+  let assembled;
+  try {
+    assembled = assembleStartupReceipt({
+      baseline,
+      gitState: {
+        branch: gitOutput(['rev-parse', '--abbrev-ref', 'HEAD']) || '(unknown)',
+        head: gitOutput(['rev-parse', 'HEAD']) || '(unknown)',
+        dirtyCount: gitOutput(['status', '--porcelain']).split('\n').filter((l) => l.trim().length > 0).length,
+      },
+      gatesYamlText: gatesText,
+      plannedBatch: {
+        objective: '见 checkpoint 与会话任务',
+        requirementId: assembledTopNotPassing(gatesText) ?? 'CORE-START-001',
+      },
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    process.stderr.write(`far planning startup: assemble failed — ${error instanceof Error ? error.message : String(error)}
+`);
+    return 7;
+  }
+
+  // 状态差异（与上次持久化 receipt 对比）
+  let diff: ReturnType<typeof diffStartupState> = [];
+  if (existsSync(RECEIPT_PATH)) {
+    try {
+      const prev = StartupReceiptSchema.parse(JSON.parse(readFileSync(RECEIPT_PATH, 'utf8')));
+      diff = diffStartupState(prev, assembled.receipt);
+    } catch {
+      process.stderr.write('far planning startup: previous receipt unreadable — diff skipped (recorded)\n');
+    }
+  }
+
+  const verdict = verifyStartupReceipt(assembled.receipt);
+  if (args.includes('--write')) {
+    writeFileSync(RECEIPT_PATH, `${JSON.stringify(assembled.receipt, null, 2)}
+`);
+  }
+
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ receipt: assembled.receipt, warnings: assembled.warnings, diff, ok: verdict.ok, problems: verdict.problems })}
+`);
+  } else {
+    process.stdout.write(
+      `far planning startup: receipt assembled — branch ${assembled.receipt.gitState.branch}@${assembled.receipt.gitState.head.slice(0, 7)} dirty=${assembled.receipt.gitState.dirtyCount}, T0 ${assembled.receipt.gatesSnapshot.t0Pass}/${assembled.receipt.gatesSnapshot.t0Total}, top gap ${(assembled.receipt.gatesSnapshot.topNotPassing ?? '(none)')}, baseline ${assembled.receipt.baseline.length} entr(ies), assets ${assembled.receipt.readAssets.filter((a) => a.exists).length}/${assembled.receipt.readAssets.length} present
+`,
+    );
+    for (const w of assembled.warnings) process.stdout.write(`  [warn] ${w}
+`);
+    for (const d of diff) process.stdout.write(`  [diff] ${d.field}: ${d.before} → ${d.after}
+`);
+    for (const p of verdict.problems) process.stdout.write(`  [problem] ${p}
+`);
+  }
+  return verdict.ok ? 0 : 7;
+}
+
+function assembledTopNotPassing(gatesText: string): string | null {
+  try {
+    return parseGatesSnapshot(gatesText).topNotPassing;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
