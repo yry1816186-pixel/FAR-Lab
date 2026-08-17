@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { VerdictBadge } from '@/components/VerdictBadge';
+import { describeVerdictUncertainty, renderUncertaintyNote } from '@/lib/uncertainty';
 import { Radio, Pause, Play, Trash2, AlertTriangle } from 'lucide-react';
 
 const STAGE_LABEL: Record<StageId, string> = {
@@ -125,7 +126,16 @@ function EventRow({ event }: { readonly event: AgentEventDto }) {
           <Badge>{t('events.evtRunComplete')}</Badge>
           <span className="font-mono text-xs text-muted-foreground">{event.runId.slice(0, 12)}</span>
           <Badge variant="secondary">{event.reason}</Badge>
-          {isVerdictValue(event.verdict) ? <VerdictBadge decision={event.verdict} /> : null}
+          {isVerdictValue(event.verdict) ? (
+            <VerdictBadge
+              decision={event.verdict}
+              uncertaintyNote={
+                describeVerdictUncertainty(event.verdict) !== null
+                  ? renderUncertaintyNote(describeVerdictUncertainty(event.verdict)!)
+                  : undefined
+              }
+            />
+          ) : null}
           <span className="ml-auto font-mono text-xs text-muted-foreground">iter={event.iterations} artifacts={event.artifactCount}</span>
         </div>
       );

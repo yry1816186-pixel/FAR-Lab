@@ -114,10 +114,15 @@ export interface VerdictBadgeProps {
   readonly decision: VerdictValue;
   /** 尺寸变体：sm 用于紧凑布局，md 用于标准卡片（默认 md） */
   readonly size?: 'sm' | 'md';
+  /**
+   * 不确定性披露（UX-UNCERTAINTY-001·opt-in）：非决定性裁决的「已知道/还不知道/如何减少」
+   * 一行文本。内容必须来自 renderUncertaintyNote（同源防脱钩），紧凑布局（sm）不传。
+   */
+  readonly uncertaintyNote?: string;
 }
 
 /** 5 值裁决 Badge — 颜色 + 图标 + 中文标签 */
-export function VerdictBadge({ decision, size = 'md' }: VerdictBadgeProps) {
+export function VerdictBadge({ decision, size = 'md', uncertaintyNote }: VerdictBadgeProps) {
   const config = VERDICT_CONFIG[decision];
   const Icon = config.icon;
   const isSm = size === 'sm';
@@ -129,6 +134,15 @@ export function VerdictBadge({ decision, size = 'md' }: VerdictBadgeProps) {
     >
       <Icon className={cn(isSm ? 'h-3 w-3' : 'h-3.5 w-3.5')} aria-hidden="true" />
       <span>{config.label}</span>
+      {uncertaintyNote !== undefined && (
+        <span
+          data-testid="verdict-uncertainty-note"
+          className="font-normal opacity-80"
+          aria-label={`uncertainty: ${uncertaintyNote}`}
+        >
+          {uncertaintyNote}
+        </span>
+      )}
     </Badge>
   );
 }
