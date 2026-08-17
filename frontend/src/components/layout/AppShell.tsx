@@ -265,13 +265,6 @@ export function AppShell({ children }: AppShellProps) {
     };
   }, [toolsOpen]);
 
-  // Route change closes whichever panel is open (link clicks inside the panel
-  // rely on this too) and keeps at most one panel open at a time.
-  useEffect(() => {
-    setToolsOpen(false);
-    setMobileOpen(false);
-  }, [location.pathname]);
-
   // The Tools disclosure must light up when the current route lives inside the
   // tools group — otherwise 12 routes would lose their "you are here" signal.
   const toolsActive = TOOLS_ITEMS.some(
@@ -382,6 +375,7 @@ export function AppShell({ children }: AppShellProps) {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  onClick={() => setToolsOpen(false)}
                   className={({ isActive }) => navLinkClassName(isActive, true)}
                 >
                   <item.icon className="h-4 w-4" aria-hidden="true" />
@@ -405,6 +399,7 @@ export function AppShell({ children }: AppShellProps) {
                     <NavLink
                       key={item.to}
                       to={item.to}
+                      onClick={() => setMobileOpen(false)}
                       className={({ isActive }) => navLinkClassName(isActive, true)}
                     >
                       <item.icon className="h-4 w-4" aria-hidden="true" />
