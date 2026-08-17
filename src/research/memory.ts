@@ -88,6 +88,13 @@ export interface NegativeResultEntry {
   readonly reasonDetail: string;
   /** Pointers to the evidence of elimination (run file / gate report refs). */
   readonly evidencePointers: readonly string[];
+  /**
+   * The eliminated hypothesis's statement (day-r13): near-duplicate screening
+   * needs the DIRECTION text, not just its hash. Optional — pre-day-r13
+   * entries lack it and skip near-dup screening (exact-hash still applies);
+   * every new record sets it.
+   */
+  readonly statement?: string;
 }
 
 /** A node of the explored-branch tree (bitemporal: supersede, never delete). */
@@ -354,6 +361,7 @@ export function recordRunToMemory(
               { gateErrors: gateEntry?.errors.length ?? 0, candidates: run.hypotheses.length },
             ),
             evidencePointers: [runPointer, 'falsifiabilityGate.perHypothesis'],
+            statement: hypothesis.statement,
           });
         }
         continue;
@@ -376,6 +384,7 @@ export function recordRunToMemory(
               boundCounter: counterCount,
             }),
             evidencePointers: [runPointer, 'bindings'],
+            statement: hypothesis.statement,
           });
         }
         continue;
@@ -696,6 +705,14 @@ export interface MemoryInjectionPayload {
    * scorecard linkage grades F vs C on exactly this prefix).
    */
   readonly knownContentMarkers: ReadonlyMap<string, string>;
+  /**
+   * Statement references for near-duplicate screening (day-r13): exact-hash
+   * identity catches only byte-identical content — a regenerated paraphrase
+   * of an explored/eliminated direction slips through. These statements let
+   * the fan-out run the deterministic lexical near-dup check (marker family
+   * MEMORY_NEAR_DUP:*, marking only — never selection power, same as exact).
+   */
+  readonly knownStatements: ReadonlyArray<{ marker: string; statement: string }>;
 }
 
 /** hash -> kind-carrying marker for every known content hash in the store. */
@@ -733,7 +750,32 @@ export function buildMemoryInjection(
     summary: emptyStore ? null : buildMemorySummary(store, opts),
     knownContentHashes: known,
     knownContentMarkers: buildMemoryContentMarkers(store),
+    knownStatements: buildMemoryStatementReferences(store),
   };
+}
+
+/**
+ * Statement references for near-dup screening: negatives first (the more
+ * expensive repeat), then ACTIVE branches only (validTo = null — superseded
+ * branches are history, a new hit against them is lineage continuation, not
+ * a repeat). Pre-day-r13 negatives without a statement are skipped (exact-
+ * hash screening still covers them). Order is deterministic (input order).
+ */
+export function buildMemoryStatementReferences(
+  store: ResearchMemoryStore,
+): ReadonlyArray<{ marker: string; statement: string }> {
+  const refs: { marker: string; statement: string }[] = [];
+  for (const n of store.negativeResults) {
+    if (typeof n.statement === 'string' && n.statement.length > 0) {
+      refs.push({ marker: `MEMORY_DUPLICATE:negative:${n.id}`, statement: n.statement });
+    }
+  }
+  for (const b of store.branchTree) {
+    if (b.validTo === null) {
+      refs.push({ marker: `MEMORY_DUPLICATE:branch:${b.id}`, statement: b.statement });
+    }
+  }
+  return refs;
 }
 
 // ── Dedup screening (exact content-hash; marking only, never selection power) ─
