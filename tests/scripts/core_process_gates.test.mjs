@@ -24,17 +24,18 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // ============================================================
 
 test('secret_scan: 真泄露命中（key 形状 + 高熵赋值）', () => {
-  const keyShape = scanText('const x = "sk-abcdefghij1234567890abcdefghij12";', 'leak.txt');
+  const fakeOpenAiKey = ['sk-', 'abcdefghij', '1234567890', 'abcdefghij12'].join('');
+  const keyShape = scanText(`const x = "${fakeOpenAiKey}";`, 'leak.txt');
   assert.equal(keyShape.length >= 1, true);
   assert.match(keyShape[0].kind, /key-shape/);
 
-  const assignment = scanText('const DASHSCOPE_API_KEY = "real-secret-value-123";', 'leak2.txt');
-  assert.equal(assignment.some((f) => f.kind === 'assignment:DASHSCOPE_API_KEY'), true);
+  const assignment = scanText('const SERVICE_API_KEY = "real-secret-value-123";', 'leak2.txt');
+  assert.equal(assignment.some((f) => f.kind === 'assignment:SERVICE_API_KEY'), true);
 });
 
 test('secret_scan: 引用/占位/URL/尖括号豁免（不误伤四类合法模式）', () => {
   const clean = scanText([
-    'const A = process.env.DASHSCOPE_API_KEY;',
+    'const A = process.env.MY_SERVICE_TOKEN;',
     'const B = "sk-test-placeholder";',
     'const C = "test"; const D = "fake-token-value";',
     '// DOC_TOKEN see https://zenodo.org/account/settings/applications',
