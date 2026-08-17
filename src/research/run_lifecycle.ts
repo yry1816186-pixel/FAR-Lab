@@ -55,6 +55,13 @@ import {
   type ResearchStageId,
 } from './orchestrator.ts';
 import { ResearchabilityBlockedError } from './researchability_gate.ts';
+import { parseCheckpoint } from './checkpoint_schema.ts';
+export { parseCheckpoint } from './checkpoint_schema.ts';
+export {
+  CHECKPOINT_SCHEMA_VERSION,
+  CHECKPOINT_MIGRATIONS,
+  migrateCheckpointPayload,
+} from './checkpoint_schema.ts';
 import type { ResearchRun } from './types.ts';
 import {
   RESEARCH_RUN_ID_PATTERN,
@@ -339,35 +346,6 @@ export class RunStore {
 }
 
 /** Parse + structurally validate a checkpoint file (fail loud on corruption). */
-export function parseCheckpoint(raw: string): RunCheckpoint {
-  const parsed: unknown = JSON.parse(raw);
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('checkpoint.json is not an object');
-  }
-  const cp = parsed as Record<string, unknown>;
-  const stageIds = RESEARCH_STAGE_IDS as readonly string[];
-  if (
-    typeof cp.runId !== 'string' ||
-    typeof cp.question !== 'string' ||
-    typeof cp.profile !== 'string' ||
-    typeof cp.state !== 'string' ||
-    !Array.isArray(cp.completedStages) ||
-    cp.completedStages.some((s) => !stageIds.includes(s as string)) ||
-    typeof cp.ctx !== 'object' || cp.ctx === null
-  ) {
-    throw new Error('checkpoint.json is structurally invalid (state/completedStages/ctx)');
-  }
-  try {
-    assertValidResearchRunId(cp.runId);
-  } catch {
-    throw new Error('checkpoint.json has an invalid research run id');
-  }
-  // Intentional conversion: the critical fields are structurally validated
-  // above; TS itself recommends the explicit `unknown` boundary for this
-  // (single assertion, never the banned `as unknown as` chain).
-  const validated: unknown = cp;
-  return validated as RunCheckpoint;
-}
 
 /** In-process cancellation registry (one controller per active run). */
 const activeControllers = new Map<string, AbortController>();
