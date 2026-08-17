@@ -155,6 +155,7 @@ export type ThreadLimitReason =
   | 'threadpoolctl_setup_failed'
   | 'threadpoolctl_verification_failed'
   | 'threadpool_limit_not_one'
+  | 'threadpool_introspection_gap'
   | 'manifest_missing_thread_limit_attestation'
   | 'execution_not_started'
   | 'execution_interrupted'
