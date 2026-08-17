@@ -618,6 +618,8 @@ jobs:
         run: node scripts/no_llm_final_judge_scan.mjs
       - name: mutation_gate smoke（信任内核抽样变异·fec compiler 20 位点·存活率 <10% 门·ENG-TEST-001）
         run: node scripts/mutation_gate.mjs src/fec/compiler.ts tests/fec/fec_mandatory_gate.test.ts --limit 20
+      - name: claim_lint（公开声明→收据绑定扫描·CORE-REALITY-001/CORE-CLAIM-001）
+        run: node scripts/claim_lint.mjs
       - name: doc_command_check（doc↔CLI 一致性·CJ1-G2 文档零漂移）
         run: node scripts/doc_command_check.mjs
       - name: coverage_gate（行≥85%/分支≥75% 红线）

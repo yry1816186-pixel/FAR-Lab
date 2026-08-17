@@ -1,0 +1,45 @@
+# FCS — Frozen Comparison Set（CORE-CLAIM-001 / EVAL-FCS-001）
+# 冻结对标集：任何「领先/世界级/最快」类公开声明的唯一合法参照物。
+# 诚实边界（limitations 详列）：v1 比较器全部为内部前版本/消融基线——外部第三方系统对标尚未冻结；
+# 在外部比较器入集前，本项目不得发布任何相对外部系统的领先声明。
+
+id: milestone-competition-2026
+frozenAt: "2026-08-17T00:00:00Z"
+purpose: 竞赛里程碑期间所有公开比较声明的冻结参照集（同条件、可复算、含失败项）
+dimensions:
+  - verdict-correctness-on-frozen-benchmark
+  - reproducibility-third-party-recompute
+  - evidence-chain-integrity-tamper-detection
+  - honesty-under-no-key-and-rate-limit
+  - marginal-cost-per-run
+comparators:
+  - name: far-lab-single-pass-direct
+    versionOrCommit: "edb0b3d"
+    date: "2026-08-17"
+    rationale: 消融基线——无扇出单轮直答（对照组主干）。
+    configuration: "src/research/evaluation/baseline.ts variant=direct"
+  - name: far-lab-rag-only
+    versionOrCommit: "edb0b3d"
+    date: "2026-08-17"
+    rationale: 消融基线——仅检索无内核裁决。
+    configuration: "src/research/evaluation/baseline.ts variant=rag"
+  - name: far-lab-no-kernel
+    versionOrCommit: "edb0b3d"
+    date: "2026-08-17"
+    rationale: 消融基线——完整管线但去确定性内核（裁决价值归因）。
+    configuration: "src/research/evaluation/baseline.ts variant=no_kernel"
+  - name: far-lab-v1-predecessor
+    versionOrCommit: "98ef985 (main @ PR #42)"
+    date: "2026-08-16"
+    rationale: 内部前版本链条——回归性对照（tests/comparison/baseline_vs_far_chain.test.ts）。
+    configuration: "V1 deterministic chain + attack corpus"
+method: 同题/同冻结语料快照/同 gateway 与 profile/同指标族（N>=5 bootstrap CI，MIXED_RUN_MODE 拒聚合）；消融协议见 src/research/evaluation/ablation.ts 与 .far/eval/ablation/（hero/a2/d9 三题 REPORTED 报告）。
+hardwareAndEnvironment:
+  os: "windows-latest (dev) / ubuntu+macos (CI cross-platform)"
+  node: "24.x (engines 锁定)"
+  models: "Qwen (DashScope/Bailian) LIVE；无 key 场景 fail-closed 503"
+fairnessReview: 内部基线同代码同语料同指标（公平性由 frozen_multirun/ablation 协议机检）；外部系统比较因配置与语料不可等同冻结，尚未纳入——不得据此发布外部领先声明。
+limitations:
+  - 无外部第三方系统比较器（外部对标未冻结——所有对外比较声明限于内部基线族）
+  - 成本数字以 RMB 计价的换算单价为 ASSUMED（券额对账后更新）
+  - 三题消融样本（hero/a2/d9）不足以支持跨领域普遍结论（题间异质性已实证）
