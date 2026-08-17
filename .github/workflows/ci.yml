@@ -624,6 +624,8 @@ jobs:
         run: node scripts/claim_lint.mjs
       - name: secret_scan（代码库 secret 泄露扫描·CORE-SECRETS-001）
         run: node scripts/secret_scan.mjs --root . --fail-on-hit
+      - name: novelty_wording_lint（新颖性声明分级绑定·CORE-NOVELTY-001）
+        run: node scripts/novelty_wording_lint.mjs
       - name: doc_command_check（doc↔CLI 一致性·CJ1-G2 文档零漂移）
         run: node scripts/doc_command_check.mjs
       - name: coverage_gate（行≥85%/分支≥75% 红线）

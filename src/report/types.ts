@@ -6,6 +6,7 @@
  */
 
 import type { TrapSummary } from '../anti_theater/trap_taxonomy.ts';
+import type { ReportClaimCategory } from '../schema/enums.ts';
 
 /**
  * 报告单段内容。evidenceRefs 指向 evidence_log.evidence_id 列表，
@@ -15,6 +16,12 @@ export interface ReportSection {
   readonly title: string;
   readonly body: string;
   readonly evidenceRefs: readonly string[];
+  /**
+   * CORE-REPORT-001 · 声明分类（必填）：FACT=已验证结构化记录 / INFERENCE=聚合推断 /
+   * UNCOMPLETED=边界与未完成声明。构建器漏分类 = 类型错误（编译期 fail-closed）；
+   * 运行期由 assertEverySectionCategorized 二次校验（防绕过构造器直接拼对象）。
+   */
+  readonly category: ReportClaimCategory;
 }
 
 /**
@@ -49,3 +56,6 @@ export interface ReportRenderOptions {
   readonly format: 'html' | 'markdown';
   readonly includeEvidenceLinks: boolean;
 }
+
+/** 未分类段落体（builder 产物）；分类由 buildSections 中央挂接（CORE-REPORT-001 单点映射）。 */
+export type SectionBody = Omit<ReportSection, 'category'>;

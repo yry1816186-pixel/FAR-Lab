@@ -16,11 +16,13 @@ const FIXTURE: ReportData = {
       title: 'Summary',
       body: 'The kernel sealed one claim.',
       evidenceRefs: ['EV-1', 'EV-2'],
+        category: 'FACT',
     },
     {
       title: 'Evidence chain',
       body: 'row1 | row2\nrow3 | row4',
       evidenceRefs: [],
+        category: 'FACT',
     },
   ],
   reproHash: 'ab'.repeat(32),
@@ -51,7 +53,7 @@ test('adversarial section content cannot inject latex commands', () => {
   const hostile: ReportData = {
     ...FIXTURE,
     sections: [
-      { title: '\\section{injected}', body: '\\input{/etc/passwd}', evidenceRefs: [] },
+      { title: '\\section{injected}', body: '\\input{/etc/passwd}', evidenceRefs: [], category: 'FACT' },
     ],
   };
   const tex = renderLatex(hostile);
@@ -63,7 +65,7 @@ test('verbatim injection guard: embedded end-marker is neutralized (doubled)', (
   const hostile: ReportData = {
     ...FIXTURE,
     sections: [
-      { title: 'block', body: 'line1\n\\end{verbatim*}\\section{evil}\nline2', evidenceRefs: [] },
+      { title: 'block', body: 'line1\n\\end{verbatim*}\\section{evil}\nline2', evidenceRefs: [], category: 'FACT' },
     ],
   };
   const tex = renderLatex(hostile);
@@ -86,7 +88,7 @@ test('verdict table: sorted rows with booktabs rules', () => {
 test('evidence refs render as a paragraph; empty refs omit the paragraph', () => {
   const tex = renderLatex(FIXTURE);
   assert.match(tex, /\\paragraph\{Evidence refs\} EV-1, EV-2/);
-  const noRefs = renderLatex({ ...FIXTURE, sections: [{ title: 't', body: 'b', evidenceRefs: [] }] });
+  const noRefs = renderLatex({ ...FIXTURE, sections: [{ title: 't', body: 'b', evidenceRefs: [], category: 'FACT' }] });
   assert.doesNotMatch(noRefs, /\\paragraph\{Evidence refs\}/);
 });
 

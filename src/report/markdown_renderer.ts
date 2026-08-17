@@ -105,7 +105,8 @@ export function renderMarkdown(
   // ---- 各段落 ----
   for (const section of data.sections) {
     lines.push(horizontalRule());
-    lines.push(`## ${section.title}`);
+    // CORE-REPORT-001：声明分类随标题渲染（事实/推断/未完成在成品报告可见可数）
+    lines.push(`## ${section.title} [${section.category}]`);
     lines.push('');
 
     // Evidence refs
@@ -165,7 +166,7 @@ export function renderHtml(
 
       return `
     <section>
-      <h2>${escapeHtml(section.title)}</h2>
+      <h2>${escapeHtml(section.title)} <span class="claim-category" data-category="${section.category}">[${section.category}]</span></h2>
       <div>${bodyHtml}</div>
     </section>`;
     })
