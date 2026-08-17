@@ -10,6 +10,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -76,6 +77,13 @@ const I18nContext = createContext<I18nContextValue>(FALLBACK_VALUE);
 
 export function I18nProvider({ children }: { readonly children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
+
+  // Mirror the active locale to <html lang> so screen readers switch
+  // pronunciation engines (WCAG 3.1.1). Without this, a zh UI is read
+  // with an English voice (or vice versa).
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);

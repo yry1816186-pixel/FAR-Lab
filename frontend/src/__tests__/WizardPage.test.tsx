@@ -332,7 +332,7 @@ describe('WizardPage', () => {
     expect(writeText.mock.calls.at(-1)?.[0]).toContain('/v2-receipt?runId=');
   });
 
-  it('downloads a .far-proof bundle via Blob + browser download (counter-case 5)', async () => {
+  it('downloads a minimal summary via Blob + browser download — filename/schema/content must NOT masquerade as a .far-proof bundle (P0 honesty)', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       if (input.toString().endsWith('/llm-status')) {
@@ -340,8 +340,12 @@ describe('WizardPage', () => {
       }
       return new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS });
     });
-    // jsdom 不实现 URL.createObjectURL / anchor.click —— 手工 mock。
-    const createObjectURL = vi.fn(() => 'blob:mock-url');
+    // jsdom 不实现 URL.createObjectURL / anchor.click —— 手工 mock,并捕获 Blob 以检验内容。
+    let capturedBlob: Blob | null = null;
+    const createObjectURL = vi.fn((blob: Blob) => {
+      capturedBlob = blob;
+      return 'blob:mock-url';
+    });
     const revokeObjectURL = vi.fn();
     Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true });
     Object.defineProperty(URL, 'revokeObjectURL', { value: revokeObjectURL, configurable: true });
@@ -357,10 +361,14 @@ describe('WizardPage', () => {
     await user.click(screen.getByText(/See proof/i));
     await waitFor(() => expect(screen.getByTestId('wizard-step-proof')).toBeInTheDocument());
 
+    // 按钮文案自证边界:明示"非 .far-proof bundle"。
+    const downloadBtn = screen.getByTestId('wizard-download-summary');
+    expect(downloadBtn).toHaveTextContent(/not a \.far-proof bundle/i);
+
     // Click download → triggers Blob + anchor click
-    await user.click(screen.getByTestId('wizard-download-proof'));
+    await user.click(downloadBtn);
     await waitFor(() => {
-      expect(screen.getByTestId('wizard-download-proof')).toHaveTextContent(/downloaded/i);
+      expect(screen.getByTestId('wizard-download-summary')).toHaveTextContent(/downloaded/i);
     });
 
     // Blob URL was created and revoked
@@ -368,11 +376,50 @@ describe('WizardPage', () => {
     expect(revokeObjectURL).toHaveBeenCalledTimes(1);
     // Anchor was clicked (browser download triggered)
     expect(clickSpy).toHaveBeenCalledTimes(1);
-    // Download filename contains runId prefix.
+    // 诚实化断言(P0 修复):文件名/内容均不得冒充 .far-proof bundle。
     // mockImplementation(() => {}) types instances as void → cast through unknown.
     const anchor = clickSpy.mock.instances[0] as unknown as HTMLAnchorElement;
-    expect(anchor.download).toContain('far-proof-');
+    expect(anchor.download).toContain('far-wizard-summary-');
+    expect(anchor.download).not.toContain('far-proof-');
+    // jsdom Blob 与 undici Response 不互认,用 FileReader 读取文本。
+    const blobText = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(capturedBlob as Blob);
+    });
+    const summary = JSON.parse(blobText);
+    expect(summary.schemaVersion).toBe('far-wizard-summary.v1');
+    expect(summary.schemaVersion).not.toBe('far-proof.v1');
+    // manifest 派生摘要显式标注 DERIVED
+    expect(String(summary.manifestDigests)).toMatch(/^DERIVED/);
+    expect(summary.note).toContain('NOT a .far-proof bundle');
 
     clickSpy.mockRestore();
+  }, 15000);
+
+  it('step4 展示的 CLI 导出命令使用完整 runId（不截断,照抄可执行）', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      if (input.toString().endsWith('/llm-status')) {
+        return new Response(JSON.stringify({ ok: true, data: { profile: 'competition_aliyun_qwen', keyConfigured: true } }), { status: 200, headers: HEADERS });
+      }
+      return new Response(JSON.stringify({ ok: true, data: SUCCESSFUL_RESPONSE }), { status: 200, headers: HEADERS });
+    });
+
+    renderWizard();
+    await user.click(screen.getByTestId('wizard-run'));
+    await waitFor(
+      () => expect(screen.getByTestId('wizard-step-verdict')).toBeInTheDocument(),
+      { timeout: 4000 },
+    );
+    await user.click(screen.getByText(/See proof/i));
+    await waitFor(() => expect(screen.getByTestId('wizard-step-proof')).toBeInTheDocument());
+
+    const pre = document.querySelector('pre')?.textContent ?? '';
+    const cmd = pre.split('\n').find((l) => l.includes('far export far-proof')) ?? '';
+    // 与复制按钮同源:完整 runId,无 slice 截断
+    const runIdInPre = cmd.replace(/^.*--run-id\s+/, '').trim();
+    expect(runIdInPre.length).toBeGreaterThan(16);
+    expect(cmd.endsWith(runIdInPre)).toBe(true);
   }, 15000);
 });

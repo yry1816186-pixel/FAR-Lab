@@ -1,10 +1,10 @@
 import { Suspense, lazy } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { AppShell } from '@/components/layout/AppShell';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { RouteErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteEffects } from '@/components/RouteEffects';
 import { I18nProvider } from '@/lib/i18n';
 
@@ -63,10 +63,13 @@ export default function App() {
           <BrowserRouter>
             <RouteEffects />
             <AppShell>
-              <ErrorBoundary>
+              <RouteErrorBoundary>
                 <Suspense fallback={<RouteFallback />}>
                   <Routes>
-                    <Route path="/" element={<ResearchWorkbenchPage />} />
+                    {/* '/' redirects to the canonical /research so the workbench
+                        NavLink shows its active state on landing and deep links,
+                        history and shares have a single canonical URL. */}
+                    <Route path="/" element={<Navigate to="/research" replace />} />
                     <Route path="/research" element={<ResearchWorkbenchPage />} />
                     <Route path="/overview" element={<OverviewPage />} />
                     <Route path="/viz" element={<VizPage />} />
@@ -87,7 +90,7 @@ export default function App() {
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Suspense>
-              </ErrorBoundary>
+              </RouteErrorBoundary>
             </AppShell>
           </BrowserRouter>
         </ThemeProvider>

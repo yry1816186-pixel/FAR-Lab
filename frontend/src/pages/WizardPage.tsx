@@ -278,14 +278,16 @@ export default function WizardPage(): JSX.Element {
     schedule(() => setCopiedShare(false), 2000);
   }, [result, schedule]);
 
-  // counter-case 5: UI 内导出 .far-proof —— 前端 Blob 构造 + 浏览器下载(方案 A)。
-  // 构造最小化 .far-proof JSON 包裹(含 runId / proofHash / claim / verdict / manifest),
-  // 用户可直接下载分享,无需 CLI。完整证据链 bundle 仍需 `far export far-proof` CLI。
-  const downloadFarProof = useCallback(async () => {
+  // counter-case 5: UI 内导出最小摘要 —— 前端 Blob 构造 + 浏览器下载(方案 A)。
+  // 诚实边界(2026-08-18 审计 P0 修复):这不是 `far export far-proof` 产出的
+  // .far-proof bundle,不能通过 `far verify --bundle` 验证——文件名/schemaVersion/
+  // 按钮文案均不得暗示等价。manifestMembers 为 reproHash 派生摘要,非组件内容
+  // digest,产物内显式标注 DERIVED。
+  const downloadSummaryJson = useCallback(async () => {
     if (!result) return;
     const manifestMembers = await buildManifestMembers(result.reproHash);
-    const bundle = {
-      schemaVersion: 'far-proof.v1',
+    const summary = {
+      schemaVersion: 'far-wizard-summary.v1',
       exportedAt: new Date().toISOString(),
       runId: result.loopState.runId,
       proofHash: result.reproHash,
@@ -294,13 +296,14 @@ export default function WizardPage(): JSX.Element {
       falsificationSpec: result.honestVerdict?.falsificationSpec ?? null,
       metricValue: result.honestVerdict?.metricValue ?? null,
       manifestMembers,
-      note: 'Minimal proof bundle exported from FAR-Lab UI. For full evidence chain, use: far export far-proof --run-id ' + result.loopState.runId,
+      manifestDigests: 'DERIVED: sha-256(proofHash + ":" + kind) — NOT component content digests',
+      note: 'Minimal summary exported from FAR-Lab UI — this is NOT a .far-proof bundle and will not pass `far verify --bundle`. For the full evidence chain, use: far export far-proof --run-id ' + result.loopState.runId,
     };
-    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(summary, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `far-proof-${result.loopState.runId.slice(0, 16)}.json`;
+    a.download = `far-wizard-summary-${result.loopState.runId.slice(0, 16)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -570,7 +573,7 @@ export default function WizardPage(): JSX.Element {
                 <CheckCircle2 className="h-4 w-4" />{t('wizard.step4.howToVerify')}
               </p>
               <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 text-xs"><code>{`# Export the proof bundle
-far export far-proof --run-id ${result.loopState.runId.slice(0, 16)}
+far export far-proof --run-id ${result.loopState.runId}
 
 # Anyone can recompute (no API keys needed)
 far verify --bundle .far-proof`}</code></pre>
@@ -583,16 +586,17 @@ far verify --bundle .far-proof`}</code></pre>
               <p className="text-xs text-muted-foreground">
                 {t('wizard.step4.nextStepsDesc')}
               </p>
-              {/* counter-case 5: UI 内导出 .far-proof —— 直接下载,无需 CLI */}
+              {/* counter-case 5: UI 内导出最小摘要 —— 直接下载,无需 CLI。
+                  诚实边界:非 .far-proof bundle,文案与文件名不得冒充(见 downloadSummaryJson)。 */}
               <Button
-                onClick={downloadFarProof}
+                onClick={downloadSummaryJson}
                 disabled={!result}
-                data-testid="wizard-download-proof"
+                data-testid="wizard-download-summary"
                 className="w-full"
                 size="sm"
               >
                 {downloadedProof ? <Check className="mr-2 h-4 w-4 text-green-600" /> : <Download className="mr-2 h-4 w-4" />}
-                {downloadedProof ? t('wizard.step4.proofDownloaded') : t('wizard.step4.downloadProof')}
+                {downloadedProof ? t('wizard.step4.summaryDownloaded') : t('wizard.step4.downloadSummary')}
               </Button>
               <div className="grid gap-2 sm:grid-cols-2">
                 <Button
