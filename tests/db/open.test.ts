@@ -112,6 +112,10 @@ test('② RT-05-B:备份存在时,删热 WAL 静默尾丢可恢复', async () =>
     // (跨平台、与脚本落盘位置无关);并加 15s fail-fast 守卫,子进程异常即红而非挂。
     const betterSqlite3Url = import.meta.resolve('better-sqlite3');
     const childScript = join(dir, 'writer.mjs');
+    // 挂起机制用永续 interval 而非一次性 setTimeout：一次性 timer 在 CI 高负载下可能在
+    // 父进程 kill 之前触发 → 事件循环排空 → node 干净退出 → better-sqlite3 连接关闭时
+    // checkpoint → uncheckpointed-row 落进主库 → 尾丢断言假红（2026-08-18 三平台 flake
+    // 实测 2 次）。永续 interval 不会被排空，子进程只能被 SIGKILL 终止（无干净退出路径）。
     writeFileSync(
       childScript,
       `import Database from ${JSON.stringify(betterSqlite3Url)};\n` +
@@ -119,7 +123,7 @@ test('② RT-05-B:备份存在时,删热 WAL 静默尾丢可恢复', async () =>
         `db.pragma('journal_mode = WAL');\n` +
         `db.prepare("INSERT INTO t VALUES ('uncheckpointed-row')").run();\n` +
         `console.log('written');\n` +
-        `setTimeout(() => {}, 30000);\n`,
+        `setInterval(() => {}, 1 << 30);\n`,
       'utf8',
     );
     const child = spawn(process.execPath, [childScript], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'] });
@@ -148,10 +152,19 @@ test('② RT-05-B:备份存在时,删热 WAL 静默尾丢可恢复', async () =>
     const walPath = `${dbPath}-wal`;
     const shmPath = `${dbPath}-shm`;
     assert.ok(existsSync(walPath), '热 WAL 应存在');
+    // 前置自证：WAL 帧里确实还挂着未 checkpoint 的行（帧 payload 不压缩，字节可检）。
+    // 若此步红 = 子进程生命周期已破（帧提前 checkpoint/未落盘）——把混沌失败变成可定位失败。
+    const walBytes = readFileSync(walPath);
+    assert.ok(walBytes.length > 0, '热 WAL 非空（未 checkpoint 帧在场）');
+    assert.ok(
+      walBytes.includes('uncheckpointed-row'),
+      '热 WAL 须含 uncheckpointed-row 帧（否则子进程在 kill 前已被 checkpoint——前置条件破坏）',
+    );
     rmSync(walPath);
     if (existsSync(shmPath)) {
       rmSync(shmPath);
     }
+    assert.ok(!existsSync(walPath), 'WAL 删除后不得残留');
 
     // 尾丢如实观测:uncheckpointed-row 丢失,checkpointed-row 仍在
     const after = openFarDb(dbPath, { readonly: true, integrityCheck: 'quick' });
