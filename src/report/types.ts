@@ -22,6 +22,21 @@ export interface ReportSection {
    * 运行期由 assertEverySectionCategorized 二次校验（防绕过构造器直接拼对象）。
    */
   readonly category: ReportClaimCategory;
+  /**
+   * CORE-LIMITS-001 · 逐结论限制项（可选——仅结论性段落携带）：
+   * 每个重要结论必须说明「本结论不能证明什么」。全局边界仍在 Limitations 段 body。
+   */
+  readonly limitations?: readonly LimitationItem[];
+}
+
+/** 单条结论的限制声明：该结论不能证明什么 + 为什么。 */
+export interface LimitationItem {
+  /** 结论标识（verdictId）。 */
+  readonly claimId: string;
+  /** 本结论不能证明的事（具体，不泛化）。 */
+  readonly cannotProve: string;
+  /** 为什么不能证明（范围/证据/统计边界）。 */
+  readonly reason: string;
 }
 
 /**
