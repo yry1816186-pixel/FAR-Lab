@@ -198,8 +198,10 @@ test('CORE-START-001 e2e fail-closed: 缺 --baseline → 2；GATES 缺失（fres
   try {
     const baselineFile = join(dir, 'baseline.json');
     writeFileSync(baselineFile, JSON.stringify(goodBaseline()));
-    // 本 worktree（REPO_ROOT）有 startup 代码但无 gitignored .far/requirements/GATES.yaml → fail-closed 7
-    const r = runStartupCli(REPO_ROOT, ['--baseline', baselineFile]);
+    // CLI 以 cwd 相对路径解析 .far/requirements/GATES.yaml → 用无 GATES 的临时目录
+    // 断言 fail-closed 7。此前用 REPO_ROOT 当 cwd 是机器状态依赖:任何带 .far 宪法层
+    // 的开发机都会读到真 GATES → exit 0 → 测试红(CI 新检出碰巧掩盖)。
+    const r = runStartupCli(dir, ['--baseline', baselineFile]);
     assert.equal(r.status, 7);
     assert.match(r.stderr, /GATES\.yaml missing/);
   } finally {
