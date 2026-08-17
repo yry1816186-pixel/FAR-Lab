@@ -33,7 +33,7 @@ export const en: Record<MessageKey, string> = {
   // ---- nav group labels (two-section IA: research primary, tools secondary) ----
   'nav.group.research': 'Research',
   'nav.group.tools': 'Trust & verification tools',
-  'nav.toolsCaption': 'tools',
+  'nav.toolsButton': 'Tools',
 
   // ---- PlanningPage (planning-gate methodology as machine gates) ----
   'nav.planning': 'Planning',
@@ -470,7 +470,7 @@ export const en: Record<MessageKey, string> = {
   'ablation.chart.iterDesc': 'Number of iterations each baseline needs to complete the research; reflects search/reasoning efficiency',
   'ablation.chart.metricTitle': 'Metric value comparison',
   'ablation.chart.metricDesc': 'Comparison of each baseline’s verdict-node metricValue (only baselines with a metric value are shown)',
-  'ablation.chart.verdictTitle': 'Verdict distribution',
+  'ablation.chart.verdictTitle': 'Final verdict comparison',
   'ablation.chart.verdictDesc': 'Comparison of each baseline’s final verdict type — CONFIRMED / REFUTED / INCONCLUSIVE / DEGRADED_SCOPE / UNTESTED',
   'ablation.chart.falsTitle': 'Falsifiability support',
   'ablation.chart.falsDesc': 'Whether each baseline outputs a structured falsificationSpec (a falsifiable assertion) — FAR-Lab’s core differentiator',
@@ -612,8 +612,8 @@ export const en: Record<MessageKey, string> = {
   'wizard.step4.howToVerify': 'How to independently verify',
   'wizard.step4.nextSteps': 'Next steps',
   'wizard.step4.nextStepsDesc': 'The verdict is sealed — now take it further: persist it for later review, export a portable proof, share the link, or re-verify independently.',
-  'wizard.step4.downloadProof': 'Download .far-proof bundle',
-  'wizard.step4.proofDownloaded': 'Proof bundle downloaded',
+  'wizard.step4.downloadSummary': 'Download minimal summary (not a .far-proof bundle)',
+  'wizard.step4.summaryDownloaded': 'Summary downloaded',
   'wizard.step4.saveReceipt': 'Save to receipts',
   'wizard.step4.savedReceipt': 'Saved to receipts',
   'wizard.step4.copyExport': 'Copy export command',
@@ -622,7 +622,7 @@ export const en: Record<MessageKey, string> = {
   'wizard.step4.linkCopied': 'Link copied',
   'wizard.step4.reverify': 'Re-verify in Receipt page',
   'wizard.step4.savedReceiptId': 'Saved. Receipt ID:',
-  'wizard.step4.savedReceiptDesc': '— open the Receipt page to run independent six-dimension verification.',
+  'wizard.step4.savedReceiptDesc': '— manifest digests are DERIVED from reproHash (not component content digests). Open the Receipt page to run independent six-dimension verification.',
   'wizard.step4.saveFailed': 'Save failed:',
   'wizard.step4.saveFailedSuffix': '. You can still export or share.',
   'wizard.step4.back': 'Back',
