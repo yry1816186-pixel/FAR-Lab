@@ -64,6 +64,48 @@ function falsificationComplete(m: {
   return m.lower !== undefined && m.upper !== undefined;
 }
 
+/** Grade → grade-point mapping for scorecard means (NOT_APPLICABLE excluded). */
+const GRADE_POINTS: Readonly<Record<string, number>> = { A: 4, B: 3, C: 2, D: 1, F: 0 };
+
+/**
+ * Discriminating scorecard metrics (day-r10): the gate metrics saturate on
+ * pinned-corpus questions (2026-08-16 ablation pilot: binding/falsifiability
+ * both 1.0 on BOTH arms), so primitive-value adjudication needs per-dimension
+ * grade means. Deterministic and pure: grade-point mean per dimension name
+ * (A=4…F=0), NOT_APPLICABLE excluded from that dimension's mean, dimensions
+ * emitted in sorted-name order (stable), null when no hypothesis carries a
+ * graded instance of that dimension.
+ */
+function scorecardDimensionMetrics(
+  scorecards: Readonly<Record<string, HypothesisScorecard>>,
+): MetricValue[] {
+  const byDim = new Map<string, { points: number; n: number; na: number }>();
+  for (const sc of Object.values(scorecards)) {
+    for (const dim of sc.dimensions) {
+      const slot = byDim.get(dim.name) ?? { points: 0, n: 0, na: 0 };
+      const gp = GRADE_POINTS[dim.grade];
+      if (gp === undefined) slot.na += 1;
+      else {
+        slot.points += gp;
+        slot.n += 1;
+      }
+      byDim.set(dim.name, slot);
+    }
+  }
+  const out: MetricValue[] = [];
+  for (const name of [...byDim.keys()].sort()) {
+    const { points, n, na } = byDim.get(name)!;
+    out.push({
+      name: `scorecardMeanGrade.${name}`,
+      value: n === 0 ? null : points / n,
+      definition:
+        `mean grade-point of the ${name} scorecard dimension across hypotheses (A=4…F=0; ` +
+        `NOT_APPLICABLE excluded${na > 0 ? `, ${na} NA instance(s) observed` : ''})`,
+    });
+  }
+  return out;
+}
+
 /**
  * Grade → grade-point mapping for scorecard means (NOT_APPLICABLE excluded).
  *
