@@ -273,6 +273,24 @@ export const CheckpointSchema = z.object({
   excludedApproaches: z.array(z.string()).default([]),
   /** 未验证的假设。 */
   assumptions: z.array(z.string()).default([]),
+  /**
+   * CORE-VALUE-001 · 价值三元组（batch report 必须回答「为什么值得做」）。
+   * valueHypothesis：预期交付什么价值给谁（一句话，可被后续证据证实/证伪）。
+   * successCriteria：怎么算达成（可验收判据，收尾时逐条对账）。
+   * evidenceGaps：宣布达成还缺什么证据（诚实缺口清单）。
+   * unachieved：未达成项（item + 未达成原因——收尾未覆盖 goal 的部分必须显式交代）。
+   */
+  valueHypothesis: z.string().min(1),
+  successCriteria: z.array(z.string().min(1)).default([]),
+  evidenceGaps: z.array(z.string().min(1)).default([]),
+  unachieved: z
+    .array(
+      z.object({
+        item: z.string().min(1),
+        reason: z.string().min(1),
+      }),
+    )
+    .default([]),
 });
 
 export type Checkpoint = z.infer<typeof CheckpointSchema>;
