@@ -150,7 +150,14 @@ test('venv sandbox: a script that re-expands a real numerical pool invalidates t
     );
     assert.equal(result.exitCode, 78, `verified nthread!=1 must invalidate an otherwise successful run — receipt: ${receipt}`);
     assert.equal(result.singleThreaded, false, receipt);
-    assert.equal(result.threadLimitReason, 'threadpool_limit_not_one', receipt);
+    // 两种失效理由都使 SR-7 回执无效：
+    //   threadpool_limit_not_one     —— 池可见且 ≠1（Linux/Windows 路径）
+    //   threadpool_introspection_gap —— 平台枚举不到池（macOS 实测），空真防护 fail-closed
+    assert.ok(
+      result.threadLimitReason === 'threadpool_limit_not_one' ||
+        result.threadLimitReason === 'threadpool_introspection_gap',
+      `expected an invalidating threadLimitReason — receipt: ${receipt}`,
+    );
   } finally {
     restorePythonPath(previous);
   }
