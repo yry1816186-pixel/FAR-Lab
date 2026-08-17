@@ -312,9 +312,11 @@ test('E2E Demo C: fresh-clone — Lean4 unavailable → outcome=unknown → gate
     requireFormalVerification: true,
   }, formalization);
 
-  // Lean4 backend unavailable — simulates fresh-clone with no Lean installed.
+  // Both formal backends unavailable — simulates a fresh clone with neither
+  // Lean4 nor Dafny installed, independent of tools present on the test host.
   const fakeLean = new FakeBackend('lean4', 'verified', false);
-  const verifier = new MathVerifier({ formalBackend: fakeLean });
+  const fakeDafny = new FakeBackend('dafny', 'verified', false);
+  const verifier = new MathVerifier({ formalBackend: fakeLean, dafnyBackend: fakeDafny });
   const record = await verifier.verify(claim);
 
   // N-16: Honest degradation — outcome='unknown' + compileLog='backend_disabled'.

@@ -310,10 +310,10 @@ function doc(doi: string) {
 }
 
 /** Minimal valid v4 run (adapts the adjudication test fixture) with N hypotheses. */
-function fixtureRun(hypothesisIds: readonly string[]): ResearchRun {
+function fixtureRun(runId: string, hypothesisIds: readonly string[]): ResearchRun {
   const primaryId = hypothesisIds[0]!;
   return {
-    runId: 'run-judge-fixture',
+    runId,
     question: 'which mechanisms inflate hot jupiters?',
     gateReport: {
       question: 'q?',
@@ -418,7 +418,7 @@ describe('runJudgePairwise (CLI, injected judge — no network)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'far-judge-nokey-'));
     try {
       const store = new RunStore(join(dir, 'runs'));
-      store.saveRun('run-x', fixtureRun(['h-1', 'h-2', 'h-3']));
+      store.saveRun('run-x', fixtureRun('run-x', ['h-1', 'h-2', 'h-3']));
       const { cap, stdout, stderr } = sinks();
       const code = await runJudgePairwise({ runId: 'run-x', store, apiKey: '', stdout, stderr });
       assert.equal(code, 2);
@@ -448,7 +448,7 @@ describe('runJudgePairwise (CLI, injected judge — no network)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'far-judge-single-'));
     try {
       const store = new RunStore(join(dir, 'runs'));
-      store.saveRun('run-single', fixtureRun(['h-only']));
+      store.saveRun('run-single', fixtureRun('run-single', ['h-only']));
       const { cap, stdout, stderr } = sinks();
       const code = await runJudgePairwise({ runId: 'run-single', store, apiKey: '', stdout, stderr });
       assert.equal(code, 1);
@@ -470,7 +470,7 @@ describe('runJudgePairwise (CLI, injected judge — no network)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'far-judge-consistent-'));
     try {
       const store = new RunStore(join(dir, 'runs'));
-      store.saveRun('run-c', fixtureRun(['h-1', 'h-2', 'h-3']));
+      store.saveRun('run-c', fixtureRun('run-c', ['h-1', 'h-2', 'h-3']));
       const calls: { pair: JudgePair; direction: string; prompts: { userPrompt: string } }[] = [];
       const { cap, stdout, stderr } = sinks();
       const code = await runJudgePairwise({
@@ -505,7 +505,7 @@ describe('runJudgePairwise (CLI, injected judge — no network)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'far-judge-biased-'));
     try {
       const store = new RunStore(join(dir, 'runs'));
-      store.saveRun('run-b', fixtureRun(['h-1', 'h-2', 'h-3']));
+      store.saveRun('run-b', fixtureRun('run-b', ['h-1', 'h-2', 'h-3']));
       const { cap, stdout, stderr } = sinks();
       // always picks the FIRST-PRESENTED id → every pair flips with direction
       const biased = async ({ pair, direction }: { pair: JudgePair; direction: 'ab' | 'ba' }) => ({
@@ -544,7 +544,7 @@ describe('runJudgePairwise (CLI, injected judge — no network)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'far-judge-bogus-'));
     try {
       const store = new RunStore(join(dir, 'runs'));
-      store.saveRun('run-r', fixtureRun(['h-1', 'h-2']));
+      store.saveRun('run-r', fixtureRun('run-r', ['h-1', 'h-2']));
       const { cap, stdout, stderr } = sinks();
       const bogus = async () => ({ winnerId: 'h-bogus', tokenUsage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 } });
       const code = await runJudgePairwise({ runId: 'run-r', store, stdout, stderr, judge: bogus });
@@ -561,7 +561,7 @@ describe('runJudgePairwise (CLI, injected judge — no network)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'far-judge-throwing-'));
     try {
       const store = new RunStore(join(dir, 'runs'));
-      store.saveRun('run-t', fixtureRun(['h-1', 'h-2']));
+      store.saveRun('run-t', fixtureRun('run-t', ['h-1', 'h-2']));
       const { cap, stdout, stderr } = sinks();
       const failing = async () => {
         throw new Error('rate limit exhausted');

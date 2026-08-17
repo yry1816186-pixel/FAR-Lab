@@ -4,7 +4,7 @@
  * 设计原则：
  *   - offline 模式 skip：无 JWT_SECRET 环境变量时返回 anonymous 主体（不阻断·24§3.1 双轨鉴权）。
  *   - 有 JWT_SECRET 时：验证 Bearer Token，解码后挂载到 request.principal。
- *   - 三探针（/health /ready /metrics）不经过此中间件（24§0.3 鉴权豁免）。
+ *   - 三探针（GET /health /ready /metrics）由此中间件精确豁免并挂载 anonymous（24§0.3）。
  *   - 不引入 LLM-as-judge / 外部 agent runtime（24§0.7 红线）。
  *
  * 模型中立（24§0.1 红线）：无 Qwen / 百炼 / DashScope 字面量。
@@ -44,9 +44,10 @@ const ANONYMOUS_PRINCIPAL: AuthPrincipal = {
  *
  * 行为：
  *   - jwtSecret === null：所有请求挂载 anonymous 主体（offline 模式·24§3.1·不阻断）。
+ *   - jwtSecret !== null 且 GET 精确命中 /health /ready /metrics：挂载 anonymous 主体并豁免 JWT。
  *   - jwtSecret !== null（受保护模式）：缺 Authorization 头 / 非 Bearer 前缀 / 空 token / 无效签名
  *     一律返回 401（fail-closed·禁挂 anonymous 静默放行）。仅签名有效时挂载 principal。
- *     （三探针 /health /ready /metrics 路径在 server.ts 中豁免注册本中间件。）
+ *     豁免比较原始 path 的精确值（忽略 query）且限 GET；近似/嵌套路径仍 fail-closed。
  *
  * @param app Fastify 实例
  * @param config 鉴权配置
@@ -58,6 +59,11 @@ export async function registerAuthMiddleware(
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     // jwtSecret === null（offline 模式·24§3.1）：所有请求挂载 anonymous 主体·不阻断
     if (config.jwtSecret === null) {
+      request.principal = ANONYMOUS_PRINCIPAL;
+      return;
+    }
+
+    if (isAnonymousProbeRequest(request)) {
       request.principal = ANONYMOUS_PRINCIPAL;
       return;
     }
@@ -102,6 +108,21 @@ export async function registerAuthMiddleware(
       });
     }
   });
+}
+
+const ANONYMOUS_PROBE_PATHS: ReadonlySet<string> = new Set(['/health', '/ready', '/metrics']);
+
+/**
+ * 只豁免三个实际 GET probe。request.url 保留 query string，故比较前先截去 `?`
+ * 之后的部分。不做前缀、尾斜杠或 URL decode 宽松化，避免业务/相似路径误命中。
+ */
+function isAnonymousProbeRequest(request: FastifyRequest): boolean {
+  if (request.method !== 'GET') {
+    return false;
+  }
+  const queryIndex = request.url.indexOf('?');
+  const path = queryIndex === -1 ? request.url : request.url.slice(0, queryIndex);
+  return ANONYMOUS_PROBE_PATHS.has(path);
 }
 
 interface JwtPayloadShape {

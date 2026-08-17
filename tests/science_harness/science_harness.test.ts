@@ -283,17 +283,54 @@ const execInput: SandboxExecutionInput = {
   timedOut: false,
 };
 
-test('computeSandboxRunResult enforces SR invariants (seed=42, networkBlocked=true, singleThreaded=true)', () => {
+test('computeSandboxRunResult defaults unattested SR-7 to false instead of fabricating single-thread execution', () => {
   const result = computeSandboxRunResult(execInput, spec);
   assert.equal(result.exitCode, 0);
   assert.equal(result.seed, DEFAULT_SEED);
   assert.equal(result.networkBlocked, true);
-  assert.equal(result.singleThreaded, true);
+  assert.equal(result.singleThreaded, false);
+  assert.equal(result.threadLimitReason, 'not_attested');
   assert.equal(result.timedOut, false);
   // hash 字段为 64 hex。
   assert.match(result.stdoutHash, /^[0-9a-f]{64}$/);
   assert.match(result.stderrHash, /^[0-9a-f]{64}$/);
   assert.match(result.artifactTreeHash, /^[0-9a-f]{64}$/);
+});
+
+test('computeSandboxRunResult preserves a valid SR-7 execution attestation and rejects a contradictory one', () => {
+  const attested = computeSandboxRunResult(
+    {
+      ...execInput,
+      singleThreaded: true,
+      threadLimitReason: 'threadpoolctl_applied_no_supported_pools',
+    },
+    spec,
+  );
+  assert.equal(attested.singleThreaded, true);
+  assert.equal(attested.threadLimitReason, 'threadpoolctl_applied_no_supported_pools');
+
+  const contradictory = computeSandboxRunResult(
+    { ...execInput, singleThreaded: true, threadLimitReason: 'threadpoolctl_unavailable' },
+    spec,
+  );
+  assert.equal(contradictory.singleThreaded, false);
+  assert.equal(contradictory.threadLimitReason, 'manifest_missing_thread_limit_attestation');
+});
+
+test('computeSandboxReproFingerprint binds the SR-7 reason, not only its boolean claim', () => {
+  const result = computeSandboxRunResult(
+    {
+      ...execInput,
+      singleThreaded: true,
+      threadLimitReason: 'threadpoolctl_applied_no_supported_pools',
+    },
+    spec,
+  );
+  assert.notEqual(
+    computeSandboxReproFingerprint(result),
+    computeSandboxReproFingerprint({ ...result, threadLimitReason: 'threadpoolctl_verified' }),
+    'changing the provenance reason must invalidate the fingerprint',
+  );
 });
 
 test('computeSandboxRunResult is deterministic (same input → byte-equal hash)', () => {

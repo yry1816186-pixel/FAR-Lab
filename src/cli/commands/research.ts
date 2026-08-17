@@ -13,6 +13,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { createTwoPhaseSigintHandler } from '../two_phase_sigint.ts';
 import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { createCompetitionQwenGateway } from '../../llm_gateway/competition_gateway.ts';
@@ -26,9 +27,9 @@ import {
 import {
   RunStore,
   DEFAULT_RUNS_ROOT,
+  InvalidResearchRunIdError,
   executeResearchRun,
   addRunEventListener,
-  cancelRun,
   type ResearchRunEvent,
   type RunCheckpoint,
 } from '../../research/run_lifecycle.ts';
@@ -440,54 +441,44 @@ function renderRegistrationSummary(store: RunStore, runId: string | undefined): 
  */
 async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
   const { store } = args;
-  const knownBefore = new Set(store.listRunIds());
-  const execution = executeResearchRun({
-    ...(args.question !== undefined ? { question: args.question } : {}),
-    gateway: args.gateway,
-    profile: args.profile,
-    ...(args.grounding !== undefined ? { grounding: args.grounding } : {}),
-    targetHypothesisCount: args.target,
-    hypothesisGenerationStrategy: args.strategy,
-    ...(args.strategies != null && args.strategies.length > 0 ? { discoveryStrategies: args.strategies } : {}),
-    ...(args.strategy === 'multi_strategy' ? { onFanoutComplete: renderFanoutSummary } : {}),
-    ...(args.runId !== undefined ? { runId: args.runId } : {}),
-    ...(args.noMemory === true ? { disableMemory: true } : {}),
-    store,
+  let runId = args.runId;
+  const subscription: { unsubscribe: (() => void) | null } = { unsubscribe: null };
+  const cancellation = new AbortController();
+  // Install the handler before starting any work. The external signal is the
+  // cancellation authority; runId discovery is no longer part of correctness.
+  const onSigint = createTwoPhaseSigintHandler({
+    cancelRun: () => cancellation.abort(),
+    notify: (message) => process.stderr.write(`${message}\n`),
+    killSelf: () => process.kill(process.pid, 'SIGINT'),
+    removeListener: (fn) => process.removeListener('SIGINT', fn),
   });
-
-  // The executor persists its first checkpoint synchronously before its first
-  // await, so a NEW run's id is already on disk at this point. (Stage-1
-  // started/changed events fire during that same synchronous prefix — the
-  // "run started" line below is their human rendering.)
-  const runId =
-    args.runId !== undefined ? args.runId : store.listRunIds().find((id) => !knownBefore.has(id));
-  let unsubscribe: (() => void) | null = null;
-  let firstSigint = true;
-  const onSigint = (): void => {
-    if (firstSigint) {
-      firstSigint = false;
-      if (runId !== undefined) cancelRun(runId);
-      process.stderr.write('cancelling at the next stage boundary (second Ctrl+C kills immediately)…\n');
-      return;
-    }
-    // Second Ctrl+C: restore the default handler and re-raise.
-    process.removeListener('SIGINT', onSigint);
-    process.kill(process.pid, 'SIGINT');
-  };
   process.on('SIGINT', onSigint);
 
   try {
     // The mode line comes FIRST so the user knows what kind of science this is
     // before any progress (replay fixtures vs live model must never be mistaken).
     process.stderr.write(`${modeLine(args.profile)}\n`);
-    if (runId !== undefined) {
-      process.stderr.write(
-        `run started: ${runId} (progress checkpoints: ${store.checkpointPath(runId)} · status: far research status ${runId})\n`,
-      );
-      unsubscribe = addRunEventListener(runId, renderLifecycleEvent);
-    }
-
-    const run = await execution;
+    const run = await executeResearchRun({
+      ...(args.question !== undefined ? { question: args.question } : {}),
+      gateway: args.gateway,
+      profile: args.profile,
+      ...(args.grounding !== undefined ? { grounding: args.grounding } : {}),
+      targetHypothesisCount: args.target,
+      hypothesisGenerationStrategy: args.strategy,
+      ...(args.strategies != null && args.strategies.length > 0 ? { discoveryStrategies: args.strategies } : {}),
+      ...(args.strategy === 'multi_strategy' ? { onFanoutComplete: renderFanoutSummary } : {}),
+      ...(args.runId !== undefined ? { runId: args.runId } : {}),
+      ...(args.noMemory === true ? { disableMemory: true } : {}),
+      store,
+      signal: cancellation.signal,
+      onRunPrepared: (preparedRunId) => {
+        runId = preparedRunId;
+        process.stderr.write(
+          `run started: ${preparedRunId} (progress checkpoints: ${store.checkpointPath(preparedRunId)} · status: far research status ${preparedRunId})\n`,
+        );
+        subscription.unsubscribe = addRunEventListener(preparedRunId, renderLifecycleEvent);
+      },
+    });
 
     // Auto-freeze LIVE corpora: every successful live run grows the pin
     // inventory future runs can --reuse-snapshot (N>=5 homogeneity mechanism).
@@ -546,7 +537,7 @@ async function executeLifecycleRun(args: LifecycleRunArgs): Promise<number> {
     return 1;
   } finally {
     process.removeListener('SIGINT', onSigint);
-    if (unsubscribe !== null) unsubscribe();
+    subscription.unsubscribe?.();
   }
 }
 
@@ -664,6 +655,10 @@ export function runResearchStatus(args: readonly string[]): number {
   try {
     cp = store.loadCheckpoint(runId);
   } catch (err) {
+    if (err instanceof InvalidResearchRunIdError) {
+      process.stderr.write(`far research status: ${err.message}.\n`);
+      return 2;
+    }
     process.stderr.write(
       `far research status: checkpoint for ${runId} is unreadable: ${err instanceof Error ? err.message : String(err)}\n`,
     );
@@ -732,6 +727,10 @@ export async function runResearchResume(args: readonly string[]): Promise<number
   try {
     cp = store.loadCheckpoint(runId);
   } catch (err) {
+    if (err instanceof InvalidResearchRunIdError) {
+      process.stderr.write(`far research resume: ${err.message}.\n`);
+      return 2;
+    }
     process.stderr.write(
       `far research resume: checkpoint for ${runId} is unreadable: ${err instanceof Error ? err.message : String(err)}\n`,
     );

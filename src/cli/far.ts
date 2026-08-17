@@ -5,7 +5,7 @@
 //
 // 分发为表驱动：命令注册表 + 分发器在 src/cli/registry.ts；本文件只做两件事——
 // 1) 提供命令实现（COMMANDS 数组，每个描述符保留原 parseOptions + OptionSchema 解析，
-//    重型/低频命令保持 lazy import，避免冷启动加载无关模块）；
+//    所有命令实现均按分派 lazy import，避免 --help/错误路径冷启动加载无关模块）；
 // 2) 入口 main() 委托 registry.runCli 完成 查表 → -h/--help → run 的分发。
 //
 // 已实装子命令：`far status`（01 §5）+ `far verify`（04 §5 · FI-9 第三方独立重算）
@@ -15,78 +15,19 @@
 // Node 24 原生 type stripping 跑 .ts（package.json engines node>=24；
 // tsconfig noEmit，不构建 dist；bin 直接指向本文件）。
 
-import { runBenchRun } from './commands/bench.ts';
-import { runExportFarProof, type ExportFarProofSource } from './commands/export_far_proof.ts';
-import { runExportReceipt, type ReceiptFormat } from './commands/export_receipt.ts';
-import { runFecCompile, runFecFreeze } from './commands/fec.ts';
-import { runFsmAdvance } from './commands/fsm.ts';
-import { runPlanningFromArgs } from './commands/planning.ts';
-import { runStatus } from './commands/status.ts';
-import { runVerify, VALID_MODES, type VerifyMode } from './commands/verify.ts';
-import { runVerifyGolden, type VerifyGoldenBackend } from './commands/verify_golden.ts';
-import { runApi } from './commands/api.ts';
-import { runAsk } from './commands/ask.ts';
-import { runDemo } from './commands/demo.ts';
-import { runAuditSeedCherry } from './commands/audit_seed_cherry.ts';
-import { runAuditMultiseed } from './commands/audit_multiseed.ts';
-import { runCAstro } from './commands/c_astro.ts';
-import { runCAstroLoop } from './commands/c_astro_loop.ts';
-import { runGround } from './commands/ground.ts';
-import { runCheckResource } from './commands/check_resource.ts';
-import { runExportCitations, type CitationExportFormat } from './commands/export_citations.ts';
-import { runRubricFromArgs } from './commands/rubric_args.ts';
-import { parseJudgePairwiseArgs, runJudgePairwise } from './commands/judge_pairwise.ts';
-import {
-  parseSnapshotVerifyArgs,
-  runSnapshotVerify,
-  renderSnapshotVerifyHuman,
-  renderSnapshotVerifyJson,
-} from './commands/snapshot_verify.ts';
-import { runRegistryAnchor, renderRegistryAnchorHuman } from './commands/registry_anchor.ts';
-import {
-  runCampaignStart,
-  runCampaignStatus,
-  runCampaignResume,
-  runCampaignReport,
-  runCampaignReplay,
-} from './commands/campaign.ts';
-import {
-  runResearchInspect,
-  runResearchStart,
-  runResearchRegistry,
-  runResearchAdjudicate,
-  runResearchReview,
-  runResearchMemory,
-  runResearchStatus,
-  runResearchSnapshots,
-  runResearchResume,
-  runResearchFeedback,
-  runResearchVerify,
-  runResearchExport,
-  runResearchCompare,
-  runResearchAnalyze,
-  runResearchEvaluate,
-  runResearchBaseline,
-} from './commands/research.ts';
-import { runStream } from './commands/stream.ts';
-import { runRepl } from './commands/repl.ts';
-import { runReplay } from './commands/replay.ts';
-import { runCourt } from './commands/court.ts';
-import { runArena } from './commands/arena.ts';
-import { runInit } from './commands/init.ts';
-import { runDoctor } from './commands/doctor.ts';
-import { runHardware } from './commands/hardware.ts';
-import { runVersion } from './commands/version.ts';
-import { runScheduleFromArgs } from './commands/schedule.ts';
-import { runKeygen, runSign, runVerifySig } from './commands/sign.ts';
+import type { ExportFarProofSource } from './commands/export_far_proof.ts';
+import type { ReceiptFormat } from './commands/export_receipt.ts';
+import type { VerifyMode } from './commands/verify.ts';
+import type { VerifyGoldenBackend } from './commands/verify_golden.ts';
+import type { CitationExportFormat } from './commands/export_citations.ts';
 import { parseOptions, reportErrors, type OptionSchema } from './parse_options.ts';
 import { runCli, type CliCommand } from './registry.ts';
 
 // ---------------------------------------------------------------------------
 // 命令注册表（声明式）：每个描述符 = name / aliases / description / run。
 // run 收到 argv.slice(1)（已去掉命令名）；返回 number 作为退出码。
-// 重型/低频命令（demo v2 / verify --v2 / export receipt-v2 / lifecycle /
-// backup / real-paper）在 run 内 lazy import，保持 CLI 冷启动轻量。
+// 命令实现在 run 或子命令 helper 内 lazy import；入口的静态运行时依赖仅保留
+// parse_options + registry，使 --help/未知命令不评估任何命令实现。
 // ---------------------------------------------------------------------------
 
 const COMMANDS: readonly CliCommand[] = [
@@ -94,12 +35,13 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'version',
     aliases: ['--version', '-v'],
     description: 'print version + git HEAD',
-    run: () => runVersion(),
+    run: async () => (await import('./commands/version.ts')).runVersion(),
   },
   {
     name: 'doctor',
     description: 'environment self-check (no network by default; --probe-credentials adds a real 1-token LIVE ping when a key is set)',
     run: async (args) => {
+      const { runDoctor } = await import('./commands/doctor.ts');
       const liveQwenSmoke = args.includes('--live-qwen-smoke');
       const fullVerify = args.includes('--full-verify');
       const dbIdx = args.indexOf('--db');
@@ -114,7 +56,7 @@ const COMMANDS: readonly CliCommand[] = [
   {
     name: 'hardware',
     description: 'best-effort runtime compute-backend probe',
-    run: async (args) => runHardware({ json: args.includes('--json') }),
+    run: async (args) => (await import('./commands/hardware.ts')).runHardware({ json: args.includes('--json') }),
   },
   {
     name: 'status',
@@ -125,6 +67,7 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'api',
     description: 'start the REST API server (Fastify; frontend defaults to localhost:3000)',
     run: async (args) => {
+      const { runApi } = await import('./commands/api.ts');
       // server 监听中保持进程存活（startServer 注册了 SIGINT/SIGTERM 优雅关停）。
       // 返回 undefined → runCli 不再调用 process.exit。
       await runApi(args);
@@ -142,58 +85,58 @@ const COMMANDS: readonly CliCommand[] = [
         process.stdout.write(formatV2VerificationForDisplay(result) + '\n');
         return 0;
       }
-      return runDemo(args[0]);
+      return (await import('./commands/demo.ts')).runDemo(args[0]);
     },
   },
   {
     name: 'ask',
     description: 'run the full 6-stage FSM once (runAgentLoop); emits a verdict + evidence chain',
-    run: async (args) => runAsk(args),
+    run: async (args) => (await import('./commands/ask.ts')).runAsk(args),
   },
   {
     name: 'stream',
     description: 'like ask, but streams each stage live (real streaming, not replay)',
-    run: async (args) => runStream(args),
+    run: async (args) => (await import('./commands/stream.ts')).runStream(args),
   },
   {
     name: 'repl',
     description: 'interactive REPL (ask / :fork <suffix> / :history / :quit)',
-    run: async () => runRepl(),
+    run: async () => (await import('./commands/repl.ts')).runRepl(),
   },
   {
     name: 'replay',
     description: 'replay the evidence chain (time machine; hash-chain verify)',
-    run: (args) => runReplay(args),
+    run: async (args) => (await import('./commands/replay.ts')).runReplay(args),
   },
   {
     name: 'court',
     description: 'cross-model reliability court (issues a ReliabilityCertificate)',
-    run: async (args) => runCourt(args),
+    run: async (args) => (await import('./commands/court.ts')).runCourt(args),
   },
   {
     name: 'arena',
     description: 'adversarial science arena (refuter attacks + deterministic arbiter scoreboard)',
-    run: async (args) => runArena(args),
+    run: async (args) => (await import('./commands/arena.ts')).runArena(args),
   },
   {
     name: 'init',
     description: 'scaffold a DomainPack (config + claim/fec templates)',
-    run: (args) => runInit(args),
+    run: async (args) => (await import('./commands/init.ts')).runInit(args),
   },
   {
     name: 'keygen',
     description: 'generate an Ed25519 key pair (signer key lifecycle)',
-    run: (args) => runKeygen(args),
+    run: async (args) => (await import('./commands/sign.ts')).runKeygen(args),
   },
   {
     name: 'sign',
     description: 'sign a file/directory with an Ed25519 private key (deterministic manifest)',
-    run: (args) => runSign(args),
+    run: async (args) => (await import('./commands/sign.ts')).runSign(args),
   },
   {
     name: 'verify-sig',
     description: 'verify an Ed25519 file-manifest signature (independent recompute + hash check)',
-    run: (args) => runVerifySig(args),
+    run: async (args) => (await import('./commands/sign.ts')).runVerifySig(args),
   },
   {
     name: 'snapshot-verify',
@@ -245,7 +188,7 @@ const COMMANDS: readonly CliCommand[] = [
   {
     name: 'rubric',
     description: 'blind human-evaluation tool: package de-identified hypotheses, aggregate ratings (kappa/alpha)',
-    run: (args) => Promise.resolve(runRubricFromArgs(args)),
+    run: async (args) => (await import('./commands/rubric_args.ts')).runRubricFromArgs(args),
   },
   {
     name: 'fec',
@@ -260,7 +203,7 @@ const COMMANDS: readonly CliCommand[] = [
   {
     name: 'planning',
     description: 'planning-gate methodology as deterministic gates (plan/spec/risk/state/gate/checkpoint)',
-    run: (args) => runPlanningFromArgs(args),
+    run: async (args) => (await import('./commands/planning.ts')).runPlanningFromArgs(args),
   },
   {
     name: 'audit-seed-cherry',
@@ -285,12 +228,12 @@ const COMMANDS: readonly CliCommand[] = [
   {
     name: 'ground',
     description: 'ground a research question in real literature + counter-evidence (OpenAlex/arXiv/Crossref; --json, --source, --max-per-query)',
-    run: async (args) => runGround(args),
+    run: async (args) => (await import('./commands/ground.ts')).runGround(args),
   },
   {
     name: 'check-resource',
     description: 'verify a cited identifier exists at its authoritative source (doi:... | arxiv:... | url:...; --json)',
-    run: async (args) => runCheckResource(args),
+    run: async (args) => (await import('./commands/check_resource.ts')).runCheckResource(args),
   },
   {
     name: 'campaign',
@@ -302,6 +245,30 @@ const COMMANDS: readonly CliCommand[] = [
     description: 'research vertical slice: ground → generate 3-5 hypotheses → critique → score → plan (start|status|resume|inspect)',
     run: async (args) => {
       const subcommand = args[0];
+      if (subcommand === 'registry' && args[1] === 'anchor') {
+        return runRegistryAnchorFromArgs(args.slice(2));
+      }
+      if (subcommand === 'judge') {
+        return runResearchJudgeFromArgs(args.slice(1));
+      }
+      const {
+        runResearchInspect,
+        runResearchStart,
+        runResearchRegistry,
+        runResearchAdjudicate,
+        runResearchReview,
+        runResearchMemory,
+        runResearchStatus,
+        runResearchSnapshots,
+        runResearchResume,
+        runResearchFeedback,
+        runResearchVerify,
+        runResearchExport,
+        runResearchCompare,
+        runResearchAnalyze,
+        runResearchEvaluate,
+        runResearchBaseline,
+      } = await import('./commands/research.ts');
       if (subcommand === 'inspect') {
         return runResearchInspect(args.slice(1));
       }
@@ -336,14 +303,7 @@ const COMMANDS: readonly CliCommand[] = [
         return runResearchBaseline(args.slice(1));
       }
       if (subcommand === 'registry') {
-        const registryArgs = args.slice(1);
-        if (registryArgs[0] === 'anchor') {
-          return Promise.resolve(runRegistryAnchorFromArgs(registryArgs.slice(1)));
-        }
-        return runResearchRegistry(registryArgs);
-      }
-      if (subcommand === 'judge') {
-        return runResearchJudgeFromArgs(args.slice(1));
+        return runResearchRegistry(args.slice(1));
       }
       if (subcommand === 'adjudicate') {
         return runResearchAdjudicate(args.slice(1));
@@ -401,7 +361,7 @@ const COMMANDS: readonly CliCommand[] = [
   {
     name: 'schedule',
     description: 'scheduled re-verification (re-verify claims over time; JSON-persisted)',
-    run: (args) => runScheduleFromArgs(args),
+    run: async (args) => (await import('./commands/schedule.ts')).runScheduleFromArgs(args),
   },
   {
     name: 'real-paper',
@@ -428,7 +388,7 @@ async function main(): Promise<void> {
   }
 }
 
-function runFecFromArgs(args: readonly string[]): number {
+async function runFecFromArgs(args: readonly string[]): Promise<number> {
   const subcommand = args[0];
   if (subcommand === 'compile') {
     return runFecCompileFromArgs(args.slice(1));
@@ -447,13 +407,14 @@ const FEC_COMPILE_SCHEMA: readonly OptionSchema[] = [
   { name: '--out', type: 'string', required: true, description: 'output JSON path', requiredPlaceholder: 'path' },
 ];
 
-function runFecCompileFromArgs(args: readonly string[]): number {
+async function runFecCompileFromArgs(args: readonly string[]): Promise<number> {
   const result = parseOptions(args, FEC_COMPILE_SCHEMA, 'far fec compile');
   if (reportErrors(result.errors)) {
     return 2;
   }
   const claimPath = result.values['--claim'] as string;
   const outPath = result.values['--out'] as string;
+  const { runFecCompile } = await import('./commands/fec.ts');
   return runFecCompile({ claimPath, outPath });
 }
 
@@ -461,16 +422,17 @@ const FEC_FREEZE_SCHEMA: readonly OptionSchema[] = [
   { name: '--fec', type: 'string', required: true, description: 'path to the JSON produced by `far fec compile`', requiredPlaceholder: 'path' },
 ];
 
-function runFecFreezeFromArgs(args: readonly string[]): number {
+async function runFecFreezeFromArgs(args: readonly string[]): Promise<number> {
   const result = parseOptions(args, FEC_FREEZE_SCHEMA, 'far fec freeze');
   if (reportErrors(result.errors)) {
     return 2;
   }
   const fecPath = result.values['--fec'] as string;
+  const { runFecFreeze } = await import('./commands/fec.ts');
   return runFecFreeze({ fecPath });
 }
 
-function runFsmFromArgs(args: readonly string[]): number {
+async function runFsmFromArgs(args: readonly string[]): Promise<number> {
   const subcommand = args[0];
   if (subcommand !== 'advance') {
     process.stderr.write(`far fsm: only 'advance' is supported (got: ${subcommand ?? '<missing>'})\n`);
@@ -487,7 +449,7 @@ const FSM_ADVANCE_SCHEMA: readonly OptionSchema[] = [
   { name: '--dry-run', type: 'boolean', description: 'G2: print the transition diff without writing the state file' },
 ];
 
-function runFsmAdvanceFromArgs(args: readonly string[]): number {
+async function runFsmAdvanceFromArgs(args: readonly string[]): Promise<number> {
   const result = parseOptions(args, FSM_ADVANCE_SCHEMA, 'far fsm advance');
   if (reportErrors(result.errors)) {
     return 2;
@@ -498,6 +460,7 @@ function runFsmAdvanceFromArgs(args: readonly string[]): number {
   const json = result.values['--json'] === true;
   const dryRun = result.values['--dry-run'] === true;
 
+  const { runFsmAdvance } = await import('./commands/fsm.ts');
   const fsmResult = runFsmAdvance({ event, inputPath, stateFile, dryRun });
   if (!fsmResult.ok) {
     process.stderr.write(`far fsm advance: ${fsmResult.error}\n`);
@@ -528,7 +491,7 @@ const VERIFY_GOLDEN_SCHEMA: readonly OptionSchema[] = [
   },
 ];
 
-function runVerifyGoldenFromArgs(args: readonly string[]): number {
+async function runVerifyGoldenFromArgs(args: readonly string[]): Promise<number> {
   const result = parseOptions(args, VERIFY_GOLDEN_SCHEMA, 'far verify-golden');
   if (reportErrors(result.errors)) {
     return 2;
@@ -541,6 +504,7 @@ function runVerifyGoldenFromArgs(args: readonly string[]): number {
   }
   const caseDir = result.values['--case-dir'] as string | undefined;
   const backend = result.values['--backend'] as VerifyGoldenBackend;
+  const { runVerifyGolden } = await import('./commands/verify_golden.ts');
   return runVerifyGolden({
     json: result.values['--json'] === true,
     backend,
@@ -554,17 +518,19 @@ const STATUS_SCHEMA: readonly OptionSchema[] = [
   { name: '--db', type: 'string', description: 'path to evidence_log DB' },
 ];
 
-function runStatusFromArgs(args: readonly string[]): number {
+async function runStatusFromArgs(args: readonly string[]): Promise<number> {
   const result = parseOptions(args, STATUS_SCHEMA, 'far status');
   if (reportErrors(result.errors)) {
     return 2;
   }
   const dbPath = result.values['--db'] as string | undefined;
   const json = result.values['--json'] === true;
+  const { runStatus } = await import('./commands/status.ts');
   return runStatus(dbPath !== undefined ? { dbPath, json } : { json });
 }
 
-const VERIFY_SCHEMA: readonly OptionSchema[] = [
+function verifySchema(validModes: ReadonlySet<string>): readonly OptionSchema[] {
+  return [
   { name: '--json', type: 'boolean', description: 'machine-readable 10-field schema output' },
   { name: '--explain', type: 'boolean', description: 'human-readable mode: expand the 10-rule check table' },
   { name: '--bundle', type: 'string', positional: true, description: 'path to a .far-proof V1 minimal offline bundle directory' },
@@ -575,13 +541,15 @@ const VERIFY_SCHEMA: readonly OptionSchema[] = [
   {
     name: '--mode',
     type: 'enum',
-    enumValues: [...VALID_MODES],
+    enumValues: [...validModes],
     description: 'chain|envelope|full',
   },
-];
+  ];
+}
 
 async function runVerifyFromArgs(args: readonly string[]): Promise<number> {
-  const result = parseOptions(args, VERIFY_SCHEMA, 'far verify');
+  const { runVerify, VALID_MODES } = await import('./commands/verify.ts');
+  const result = parseOptions(args, verifySchema(VALID_MODES), 'far verify');
   if (reportErrors(result.errors)) {
     return 2;
   }
@@ -664,6 +632,7 @@ async function runBenchRunFromArgs(args: readonly string[]): Promise<number> {
     gitCommitSha = null;
   }
 
+  const { runBenchRun } = await import('./commands/bench.ts');
   return runBenchRun({
     json: result.values['--json'] === true,
     ...(outputPath !== undefined ? { outputPath } : {}),
@@ -676,22 +645,22 @@ async function runBenchRunFromArgs(args: readonly string[]): Promise<number> {
 function runExportFromArgs(args: readonly string[]): Promise<number> {
   const subcommand = args[0];
   if (subcommand === 'receipt') {
-    return Promise.resolve(runExportReceiptFromArgs(args.slice(1)));
+    return runExportReceiptFromArgs(args.slice(1));
   }
   if (subcommand === 'receipt-v2') {
     return runExportReceiptV2FromArgs(args.slice(1));
   }
   if (subcommand === 'far-proof') {
-    return Promise.resolve(runExportFarProofFromArgs(args.slice(1)));
+    return runExportFarProofFromArgs(args.slice(1));
   }
   if (subcommand === 'citations') {
-    return Promise.resolve(runExportCitationsFromArgs(args.slice(1)));
+    return runExportCitationsFromArgs(args.slice(1));
   }
   process.stderr.write(`far export: expected 'receipt', 'receipt-v2', 'far-proof', or 'citations' (got: ${subcommand ?? '<missing>'})\n`);
   return Promise.resolve(2);
 }
 
-function runRegistryAnchorFromArgs(args: readonly string[]): number {
+async function runRegistryAnchorFromArgs(args: readonly string[]): Promise<number> {
   let exportPath: string | undefined;
   let jsonOut = false;
   let ledgerPath: string | undefined;
@@ -723,6 +692,7 @@ function runRegistryAnchorFromArgs(args: readonly string[]): number {
     }
   }
   try {
+    const { runRegistryAnchor, renderRegistryAnchorHuman } = await import('./commands/registry_anchor.ts');
     const outcome = runRegistryAnchor({
       ...(ledgerPath !== undefined ? { ledgerPath } : {}),
       ...(exportPath !== undefined ? { exportPath } : {}),
@@ -739,24 +709,38 @@ function runRegistryAnchorFromArgs(args: readonly string[]): number {
   }
 }
 
-function runResearchJudgeFromArgs(args: readonly string[]): Promise<number> {
+async function runResearchJudgeFromArgs(args: readonly string[]): Promise<number> {
+  const { parseJudgePairwiseArgs, runJudgePairwise } = await import('./commands/judge_pairwise.ts');
   const parsed = parseJudgePairwiseArgs(args);
   return runJudgePairwise({ runId: parsed.runId, profile: parsed.profile, json: parsed.json });
 }
 
-function runCampaignCommand(args: readonly string[]): Promise<number> {
+async function runCampaignCommand(args: readonly string[]): Promise<number> {
   const sub = args[0];
+  const {
+    runCampaignStart,
+    runCampaignStatus,
+    runCampaignResume,
+    runCampaignReport,
+    runCampaignReplay,
+  } = await import('./commands/campaign.ts');
   if (sub === 'start') return runCampaignStart(args.slice(1));
-  if (sub === 'status') return Promise.resolve(runCampaignStatus(args.slice(1)));
+  if (sub === 'status') return runCampaignStatus(args.slice(1));
   if (sub === 'resume') return runCampaignResume(args.slice(1));
-  if (sub === 'report') return Promise.resolve(runCampaignReport(args.slice(1)));
-  if (sub === 'replay') return Promise.resolve(runCampaignReplay(args.slice(1)));
+  if (sub === 'report') return runCampaignReport(args.slice(1));
+  if (sub === 'replay') return runCampaignReplay(args.slice(1));
   process.stderr.write(`far campaign: expected 'start', 'status', 'resume', 'report', or 'replay' (got: ${sub ?? '<missing>'})
 `);
-  return Promise.resolve(2);
+  return 2;
 }
 
-function runSnapshotVerifyFromArgs(args: readonly string[]): number {
+async function runSnapshotVerifyFromArgs(args: readonly string[]): Promise<number> {
+  const {
+    parseSnapshotVerifyArgs,
+    runSnapshotVerify,
+    renderSnapshotVerifyHuman,
+    renderSnapshotVerifyJson,
+  } = await import('./commands/snapshot_verify.ts');
   const parsed = parseSnapshotVerifyArgs(args);
   if (!parsed.ok) {
     process.stderr.write(`far snapshot-verify: ${parsed.error}\n`);
@@ -774,7 +758,7 @@ function runSnapshotVerifyFromArgs(args: readonly string[]): number {
 }
 
 
-function runExportCitationsFromArgs(args: readonly string[]): number {
+async function runExportCitationsFromArgs(args: readonly string[]): Promise<number> {
   let runId = '';
   let format: CitationExportFormat = 'bibtex';
   let output: string | undefined;
@@ -807,6 +791,7 @@ function runExportCitationsFromArgs(args: readonly string[]): number {
     process.stderr.write('far export citations: missing runId.\n  usage: far export citations <runId> --format bibtex|csl-json [--output <path>| -]\n');
     return 2;
   }
+  const { runExportCitations } = await import('./commands/export_citations.ts');
   return runExportCitations({ runId, format, ...(output !== undefined ? { output } : {}) });
 }
 
@@ -825,7 +810,7 @@ const EXPORT_RECEIPT_SCHEMA: readonly OptionSchema[] = [
   { name: '--generated-at', type: 'string', description: 'ISO timestamp' },
 ];
 
-function runExportReceiptFromArgs(args: readonly string[]): number {
+async function runExportReceiptFromArgs(args: readonly string[]): Promise<number> {
   const result = parseOptions(args, EXPORT_RECEIPT_SCHEMA, 'far export receipt');
   if (reportErrors(result.errors)) {
     return 2;
@@ -842,6 +827,7 @@ function runExportReceiptFromArgs(args: readonly string[]): number {
     format = 'markdown';
   }
 
+  const { runExportReceipt } = await import('./commands/export_receipt.ts');
   return runExportReceipt({
     ...(bundlePath !== undefined ? { bundlePath } : {}),
     ...(envelopePath !== undefined ? { envelopePath } : {}),
@@ -923,7 +909,7 @@ const EXPORT_FAR_PROOF_SCHEMA: readonly OptionSchema[] = [
   },
 ];
 
-function runExportFarProofFromArgs(args: readonly string[]): number {
+async function runExportFarProofFromArgs(args: readonly string[]): Promise<number> {
   const result = parseOptions(args, EXPORT_FAR_PROOF_SCHEMA, 'far export far-proof');
   if (reportErrors(result.errors)) {
     return 2;
@@ -954,6 +940,7 @@ function runExportFarProofFromArgs(args: readonly string[]): number {
     return 2;
   }
 
+  const { runExportFarProof } = await import('./commands/export_far_proof.ts');
   return runExportFarProof({
     source: source.source,
     outputDir,
@@ -1036,6 +1023,7 @@ async function runAuditSeedCherryFromArgs(args: readonly string[]): Promise<numb
   const lightcurvePath = result.values['--lightcurve'] as string | undefined;
   const pythonCmd = result.values['--python'] as string | undefined;
   const json = result.values['--json'] === true;
+  const { runAuditSeedCherry } = await import('./commands/audit_seed_cherry.ts');
   return runAuditSeedCherry({
     ...(lightcurvePath !== undefined ? { lightcurvePath } : {}),
     ...(pythonCmd !== undefined ? { pythonCmd } : {}),
@@ -1057,6 +1045,7 @@ async function runAuditMultiseedFromArgs(args: readonly string[]): Promise<numbe
   const lightcurvePath = result.values['--lightcurve'] as string | undefined;
   const pythonCmd = result.values['--python'] as string | undefined;
   const json = result.values['--json'] === true;
+  const { runAuditMultiseed } = await import('./commands/audit_multiseed.ts');
   return runAuditMultiseed({
     ...(lightcurvePath !== undefined ? { lightcurvePath } : {}),
     ...(pythonCmd !== undefined ? { pythonCmd } : {}),
@@ -1091,6 +1080,7 @@ async function runCAstroFromArgs(args: readonly string[]): Promise<number> {
     }
     sector = parsed;
   }
+  const { runCAstro } = await import('./commands/c_astro.ts');
   return runCAstro({
     ...(ticId !== undefined ? { ticId } : {}),
     ...(sector !== undefined ? { sector } : {}),
@@ -1125,6 +1115,7 @@ async function runCAstroLoopFromArgs(args: readonly string[]): Promise<number> {
     }
     rounds = parsed;
   }
+  const { runCAstroLoop } = await import('./commands/c_astro_loop.ts');
   return runCAstroLoop({
     ...(lightcurvePath !== undefined ? { lightcurvePath } : {}),
     ...(rounds !== undefined ? { rounds } : {}),

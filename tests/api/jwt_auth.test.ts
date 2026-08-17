@@ -12,7 +12,8 @@
  *     · 无效签名 token → 401
  *     · 有效签名 token → 挂载 principal（userId/role）
  *
- * 测试用独立 Fastify 实例 + registerAuthMiddleware（不依赖 db/routes），聚焦鉴权语义。
+ * 单元层用独立 Fastify 实例聚焦鉴权语义；集成层用真实 buildServer
+ * 验证 probe 边界与业务路由未受豁免影响。
  *
  * 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch / 桩返回。JSON.parse 返回值用结构断言收窄。
  */
@@ -22,8 +23,11 @@ import assert from 'node:assert/strict';
 
 import Fastify, { type FastifyInstance } from 'fastify';
 import jwt from '@fastify/jwt';
+import Database from 'better-sqlite3';
 
 import { registerAuthMiddleware } from '../../src/api/auth/jwt_middleware.ts';
+import { buildServer } from '../../src/api/server.ts';
+import { runMigrations } from '../../src/db/index.ts';
 
 const PROTECTED_SECRET = 'test-jwt-secret-do-not-use-in-prod';
 
@@ -47,6 +51,13 @@ function parseBody(res: { body: string }): Record<string, unknown> {
   const parsed: unknown = JSON.parse(res.body);
   assert.ok(parsed !== null && typeof parsed === 'object', '响应体非对象');
   return parsed as Record<string, unknown>;
+}
+
+function openDb(): Database.Database {
+  const db = new Database(':memory:');
+  runMigrations(db);
+  db.pragma('foreign_keys = ON');
+  return db;
 }
 
 test('offline 模式（jwtSecret=null）无 Authorization 头 → 匿名放行 200', async () => {
@@ -133,5 +144,70 @@ test('受保护模式有效签名 token → 挂载 principal（userId/role）', 
     assert.equal(principal.role, 'researcher');
   } finally {
     await app.close();
+  }
+});
+
+test('真实 buildServer：受保护模式业务路由继续 fail-closed，有效 token 可通过', async () => {
+  const db = openDb();
+  const app = await buildServer({
+    db,
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: PROTECTED_SECRET,
+    logger: false,
+  });
+  try {
+    const missing = await app.inject({ method: 'GET', url: '/api/v1/llm-status' });
+    assert.equal(missing.statusCode, 401);
+    assert.equal(parseBody(missing).error_code, 'UNAUTHORIZED');
+
+    const invalidToken = 'invalid.jwt.token-canary';
+    const invalid = await app.inject({
+      method: 'GET',
+      url: '/api/v1/llm-status',
+      headers: { authorization: `Bearer ${invalidToken}` },
+    });
+    assert.equal(invalid.statusCode, 401);
+    assert.equal(parseBody(invalid).message, 'invalid or expired JWT');
+    assert.equal(invalid.body.includes(invalidToken), false, 'error response must not echo token');
+
+    const validToken = app.jwt.sign({ sub: 'researcher-002', role: 'researcher' });
+    const valid = await app.inject({
+      method: 'GET',
+      url: '/api/v1/llm-status',
+      headers: { authorization: `Bearer ${validToken}` },
+    });
+    assert.equal(valid.statusCode, 200);
+  } finally {
+    await app.close();
+    db.close();
+  }
+});
+
+test('真实 buildServer：近似、嵌套或错误方法不得命中 probe 匿名豁免', async () => {
+  const db = openDb();
+  const app = await buildServer({
+    db,
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: PROTECTED_SECRET,
+    logger: false,
+  });
+  try {
+    const nonProbeRequests = [
+      { method: 'GET' as const, url: '/healthz' },
+      { method: 'GET' as const, url: '/health/' },
+      { method: 'GET' as const, url: '/ready/status' },
+      { method: 'GET' as const, url: '/metrics/internal' },
+      { method: 'GET' as const, url: '/api/v1/health' },
+      { method: 'POST' as const, url: '/health' },
+    ];
+
+    for (const request of nonProbeRequests) {
+      const response = await app.inject(request);
+      assert.equal(response.statusCode, 401, `${request.method} ${request.url} must require JWT`);
+      assert.equal(parseBody(response).error_code, 'UNAUTHORIZED');
+    }
+  } finally {
+    await app.close();
+    db.close();
   }
 });

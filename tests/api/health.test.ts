@@ -25,6 +25,8 @@ function openDb(): Database.Database {
   return db;
 }
 
+const PROTECTED_SECRET = 'test-jwt-secret-do-not-use-in-prod';
+
 test('GET /health returns 200 with status=ok', async () => {
   const db = openDb();
   const app = await buildServer({
@@ -124,5 +126,41 @@ test('GET /ready returns 503 + status=not_ready when DB fails', async () => {
     assert.equal(body.checks.database, 'fail');
   } finally {
     await app.close();
+  }
+});
+
+test('protected mode keeps exact /health and /ready probes anonymous, including query strings', async () => {
+  const db = openDb();
+  const app = await buildServer({
+    db,
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: PROTECTED_SECRET,
+    logger: false,
+  });
+  const observedPrincipals = new Map<string, { userId: string; role: string }>();
+  app.addHook('preHandler', async (request) => {
+    observedPrincipals.set(request.url, request.principal);
+  });
+  try {
+    const validToken = app.jwt.sign({ sub: 'probe-caller', role: 'admin' });
+    const health = await app.inject({
+      method: 'GET',
+      url: '/health?source=orchestrator',
+      headers: { authorization: `Bearer ${validToken}` },
+    });
+    const ready = await app.inject({ method: 'GET', url: '/ready?verbose=1' });
+    assert.equal(health.statusCode, 200);
+    assert.equal(ready.statusCode, 200);
+    assert.deepEqual(observedPrincipals.get('/health?source=orchestrator'), {
+      userId: 'anonymous',
+      role: 'anonymous',
+    });
+    assert.deepEqual(observedPrincipals.get('/ready?verbose=1'), {
+      userId: 'anonymous',
+      role: 'anonymous',
+    });
+  } finally {
+    await app.close();
+    db.close();
   }
 });

@@ -26,6 +26,14 @@ import {
 } from '../../evidence_log/merkle_root.ts';
 import { getChainHead } from '../../evidence_log/repository.ts';
 import { badRequest, notFound } from '../errors/error_handler.ts';
+import {
+  IntegrityProofRouteSchema,
+  IntegrityRootRouteSchema,
+  ReproReceiptRouteSchema,
+  type IntegrityProofDto,
+  type IntegrityRootDto,
+  type ReproReceipt,
+} from './integrity_schemas.ts';
 
 /**
  * integrity 路由配置。
@@ -39,43 +47,6 @@ export interface IntegrityRouteConfig {
  *
  * chainHeadHash 即 reproHash（链头 current_hash）——run 的主信任锚。
  */
-export interface IntegrityRootDto {
-  readonly merkleRoot: string;
-  readonly leafCount: number;
-  readonly chainHeadSeq: number | null;
-  readonly chainHeadHash: string | null;
-}
-
-/**
- * /integrity/proof/:seq 响应 DTO：单条证据的 Merkle 包含证明。
- *
- * 审计方持有此证明 + run 的 merkleRoot 即可独立验证（无需下载全部 call_records）。
- */
-export interface IntegrityProofDto {
-  readonly seq: number;
-  readonly leafIndex: number;
-  readonly leaf: string;
-  readonly siblings: readonly string[];
-  readonly expectedRoot: string;
-  readonly leafCount: number;
-}
-
-/**
- * Repro Receipt：可移植的整链信任根快照（schemaVersion 锁定契约演进）。
- *
- * 用途：钉入研究产物 / CI artifact / 论文附录——任一方持有 receipt + 可重算的 Merkle 根
- * 即可验证「该 run 的证据链未被篡改·且与我手中的一致」。
- */
-export interface ReproReceipt {
-  readonly schemaVersion: 1;
-  readonly merkleRoot: string;
-  readonly leafCount: number;
-  readonly chainHeadSeq: number | null;
-  readonly chainHeadHash: string | null;
-  readonly gitCommitSha: string | null;
-  readonly generatedAt: string;
-}
-
 /**
  * 构建 Repro Receipt（可测·now 注入避免时间不确定性）。
  *
@@ -130,26 +101,38 @@ export async function registerIntegrityRoutes(
   config: IntegrityRouteConfig,
 ): Promise<void> {
   // GET /integrity/root → 整链 Merkle 根 + 链头定位
-  app.get('/integrity/root', async (_request, reply) => {
+  app.get('/integrity/root', { schema: IntegrityRootRouteSchema }, async (_request, reply) => {
     const { root, leafCount } = computeChainMerkleRoot(config.db);
     const head = getChainHead(config.db);
 
-    const body: IntegrityRootDto = {
-      merkleRoot: root,
-      leafCount,
-      chainHeadSeq: head?.seq ?? null,
-      chainHeadHash: head?.currentHash ?? null,
-    };
+    let body: IntegrityRootDto;
+    if (leafCount === 0) {
+      if (head !== undefined) throw new Error('integrity root is empty but chain head exists');
+      body = {
+        merkleRoot: root,
+        leafCount: 0,
+        chainHeadSeq: null,
+        chainHeadHash: null,
+      };
+    } else {
+      if (head === undefined) throw new Error('integrity root is non-empty but chain head is missing');
+      body = {
+        merkleRoot: root,
+        leafCount,
+        chainHeadSeq: head.seq,
+        chainHeadHash: head.currentHash,
+      };
+    }
 
     void reply.code(200).send(body);
   });
 
   // GET /integrity/proof/:seq → 单条证据的 Merkle 包含证明
-  app.get('/integrity/proof/:seq', async (request, reply) => {
+  app.get('/integrity/proof/:seq', { schema: IntegrityProofRouteSchema }, async (request, reply) => {
     const { seq: seqRaw } = request.params as { seq: string };
-    const seq = Number.parseInt(seqRaw, 10);
-    if (!Number.isInteger(seq) || seq < 1) {
-      throw badRequest('seq must be a positive integer', { seq: seqRaw });
+    const seq = Number(seqRaw);
+    if (!/^[1-9][0-9]*$/.test(seqRaw) || !Number.isSafeInteger(seq)) {
+      throw badRequest('seq must be a canonical positive safe integer', { seq: seqRaw });
     }
 
     let computed: { readonly proof: MerkleInclusionProof; readonly leafIndex: number };
@@ -167,7 +150,7 @@ export async function registerIntegrityRoutes(
       seq,
       leafIndex,
       leaf: proof.leaf,
-      siblings: proof.siblings,
+      siblings: [...proof.siblings],
       expectedRoot: proof.expectedRoot,
       leafCount: proof.leafCount,
     };
@@ -176,7 +159,7 @@ export async function registerIntegrityRoutes(
   });
 
   // GET /integrity/receipt → Repro Receipt（可移植整链信任根）
-  app.get('/integrity/receipt', async (_request, reply) => {
+  app.get('/integrity/receipt', { schema: ReproReceiptRouteSchema }, async (_request, reply) => {
     const receipt = buildReproReceipt(config.db);
     void reply.code(200).send(receipt);
   });

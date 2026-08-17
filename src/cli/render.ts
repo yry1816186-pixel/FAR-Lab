@@ -25,7 +25,9 @@ const ANSI_CODES: Record<AnsiColor, string> = {
 };
 
 /** 是否应该启用 ANSI（TTY + 平台支持 + 显式开关）。 */
-export function ansiEnabled(opts: { force?: boolean; disable?: boolean; stream?: NodeJS.WriteStream } = {}): boolean {
+export function ansiEnabled(
+  opts: { force?: boolean; disable?: boolean; stream?: { readonly isTTY?: boolean } } = {},
+): boolean {
   // NO_COLOR 规范（https://no-color.org）优先级最高——显式关闭优先于 force。
   if (process.env.NO_COLOR !== undefined && process.env.NO_COLOR !== '') return false;
   if (opts.disable === true) return false;

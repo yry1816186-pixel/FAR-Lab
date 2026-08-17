@@ -5,7 +5,7 @@
  * 契约 SSOT：src/api/routes/planning_schemas.ts（zod）→ src/planning/* 引擎。
  *
  * 覆盖：
- *   - 4 端点成功响应符合统一信封 { ok: true, data: T }（v1 onSend hook）
+ *   - 4 端点成功响应符合统一信封 { ok: true, data: T }（handler + v1 preSerialization）
  *   - 业务门禁失败（plan/spec 校验违规）→ HTTP 200 + data.ok=false（门禁语义在 data 内，非 HTTP 错误）
  *   - ajv 请求体校验失败 → 400 VALIDATION_FAILED（RFC 7807）
  *   - OpenAPI 3.0 schema 含 /api/v1/planning/* 4 paths
