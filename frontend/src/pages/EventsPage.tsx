@@ -17,8 +17,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAgentEventStream } from '@/lib/api_client';
+import { isVerdictValue } from '@/lib/verdict';
 import { useT } from '@/lib/i18n';
-import type { AgentEventDto, StageId, VerdictValue } from '@/lib/types';
+import type { AgentEventDto, StageId } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,14 +37,6 @@ const STAGE_LABEL: Record<StageId, string> = {
   stage5_plan: 'Plan',
   stage6_feedback: 'Feedback',
 };
-
-function isVerdictValue(v: string | null | undefined): v is VerdictValue {
-  return (
-    v !== null &&
-    v !== undefined &&
-    ['CONFIRMED', 'REFUTED', 'INCONCLUSIVE', 'DEGRADED_SCOPE', 'UNTESTED'].includes(v)
-  );
-}
 
 /** SSE 连接状态徽章。 */
 function ConnectionBadge({ status }: { readonly status: 'connecting' | 'live' | 'closed' }) {

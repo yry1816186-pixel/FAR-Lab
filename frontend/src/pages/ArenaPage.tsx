@@ -11,9 +11,9 @@
 
 import { useState } from 'react';
 import { useArenaLive, useLlmStatus } from '@/lib/api_client';
+import { isVerdictValue } from '@/lib/verdict';
 import type { ArenaResultDto } from '@/lib/types';
 import { useT } from '@/lib/i18n';
-import type { VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -30,17 +30,6 @@ import {
 } from '@/components/ui/table';
 import { Swords, ShieldCheck, ShieldAlert, Swords as SwordIcon, Zap } from 'lucide-react';
 
-const FIVE_VERDICTS = new Set<string>([
-  'CONFIRMED',
-  'REFUTED',
-  'INCONCLUSIVE',
-  'DEGRADED_SCOPE',
-  'UNTESTED',
-]);
-
-function isVerdictValue(v: string): v is VerdictValue {
-  return FIVE_VERDICTS.has(v);
-}
 
 /** ArenaResultDisplay — 复用展示组件（demo + live 共用·根据 result 渲染）。 */
 function ArenaResultDisplay({ result }: { readonly result: ArenaResultDto }) {

@@ -25,6 +25,8 @@ import {
 } from '@/lib/api_client';
 import type { HonestVerdictDto, EvidenceChainResponse } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { VerdictBadge } from '@/components/VerdictBadge';
+import { isVerdictValue } from '@/lib/verdict';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -34,13 +36,6 @@ interface TraceInput {
   readonly token: number;
 }
 
-const VERDICT_COLORS: Record<string, string> = {
-  CONFIRMED: 'bg-emerald-100 text-emerald-800',
-  REFUTED: 'bg-rose-100 text-rose-800',
-  INCONCLUSIVE: 'bg-amber-100 text-amber-800',
-  DEGRADED_SCOPE: 'bg-orange-100 text-orange-800',
-  UNTESTED: 'bg-slate-200 text-slate-700',
-};
 
 export default function AuditTracePage() {
   const [input, setInput] = useState<TraceInput>({ hypothesisId: '', token: 0 });
@@ -155,7 +150,9 @@ function VerdictCard({ verdict }: { verdict: HonestVerdictDto }) {
       <CardContent className="space-y-2">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">decision:</span>
-          <Badge className={VERDICT_COLORS[verdict.decision] ?? ''}>{verdict.decision}</Badge>
+          {isVerdictValue(verdict.decision)
+            ? <VerdictBadge decision={verdict.decision} size="sm" />
+            : <Badge>{verdict.decision}</Badge>}
         </div>
         {verdict.nodeKind !== undefined && (
           <p className="text-sm text-muted-foreground">nodeKind: {verdict.nodeKind}</p>

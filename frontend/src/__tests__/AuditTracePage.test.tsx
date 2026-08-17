@@ -138,7 +138,10 @@ describe('AuditTracePage — BW4 Gap-7 全链路追溯', () => {
 
     // 三路 API 全部命中。
     await screen.findByText('Verdict Node');
-    expect(screen.getByText('CONFIRMED')).toBeInTheDocument();
+    // 裁决经 VerdictBadge 渲染(SSOT 组件):人类可读标签 + data-testid 语义锚
+    const badge = screen.getByTestId('verdict-badge-confirmed');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('Confirmed');
     expect(await screen.findAllByText('Evidence Chain')).toHaveLength(2); // badge + card title
     await screen.findByText(/Lifecycle Events/);
     // 生命周期修正通知可见（BA3-3）。
