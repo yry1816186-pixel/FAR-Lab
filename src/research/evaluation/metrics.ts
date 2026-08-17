@@ -64,7 +64,17 @@ function falsificationComplete(m: {
   return m.lower !== undefined && m.upper !== undefined;
 }
 
-/** Grade → grade-point mapping for scorecard means (NOT_APPLICABLE excluded). */
+/**
+ * Grade → grade-point mapping for scorecard means (NOT_APPLICABLE excluded).
+ *
+ * DISPLAY CONVENTION, NOT MEASUREMENT THEORY (day-r10 backlog #2): A=4…F=0 is
+ * an ordinal letter scale flattened to equal 1-point steps for aggregation
+ * readability. It is NOT a claim that adjacent grades are equidistant in
+ * scientific quality. Cross-arm comparisons under the SAME grading pipeline
+ * are valid (the mapping is monotone); absolute grade-point values must not
+ * be read as ratio-scale quality. Consumers needing the letters can recover
+ * them from the run's scorecards.
+ */
 const GRADE_POINTS: Readonly<Record<string, number>> = { A: 4, B: 3, C: 2, D: 1, F: 0 };
 
 /**
