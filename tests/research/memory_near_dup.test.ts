@@ -191,10 +191,20 @@ describe('fan-out near-duplicate flagging (end-to-end through runResearch)', () 
 
 describe('memoryNoveltyDimensionsFor — near-dup grade mapping', () => {
   const cand = (id: string): HypothesisCandidate => ({
-    id, statement: 's', mechanism: 'm', predictions: [], evidenceRefs: [],
-    falsificationMethod: { kind: 'statistical_test', description: 'd' },
-    limitations: [], strategyOrigin: 'inversion', domain: 'astronomy',
-  } as unknown as HypothesisCandidate);
+    id,
+    statement: 's',
+    mechanism: 'm',
+    falsificationMethod: { prediction: 'p', metric: 'macro_f1', comparator: 'gt', value: 0.8 },
+    supportingCitations: [],
+    counterEvidenceCitations: [],
+    relationToExistingTheory: 'r',
+    alternativeExplanations: [],
+    observablePredictions: [],
+    distinguishingObservations: [],
+    noveltyRelativeToCorpus: 'n',
+    assumptions: [],
+    risks: [],
+  });
 
   it('MEMORY_NEAR_DUP:negative grades F with paraphrase rationale; branch grades C', () => {
     const out = memoryNoveltyDimensionsFor(
