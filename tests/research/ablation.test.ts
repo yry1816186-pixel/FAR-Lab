@@ -271,5 +271,15 @@ describe('ablation — metric plumbing', () => {
     assert.match(text, /arm without:.*--legacy-generation single-shot/);
     assert.match(text, /cannot-prove: this comparison does not establish causal attribution/);
     assert.match(text, /marginal cost \(with − without\)/);
+    // day-r13: environment notes render verbatim; absent → no environment line.
+    assert.ok(!text.includes('environment:'));
+    const noted = aggregateAblation({
+      ...pilot(arm(6, () => 1), arm(6, () => 0.5)),
+      environmentNotes: ['10-way concurrent launch — wall-clock confounded by concurrency'],
+    });
+    const notedText = renderAblation(noted);
+    assert.match(notedText, /environment: 10-way concurrent launch — wall-clock confounded by concurrency/);
+    // Notes are display-only: every statistic is unchanged by their presence.
+    assert.equal(noted.marginalCost.deltaTokensMean, r.marginalCost.deltaTokensMean);
   });
 });

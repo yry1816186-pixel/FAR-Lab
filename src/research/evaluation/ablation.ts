@@ -54,6 +54,13 @@ export interface AblationInput {
   readonly seed?: number;
   readonly iterations?: number;
   readonly generatedAt?: string;
+  /**
+   * Environment provenance notes (day-r13): verbatim footer lines in the
+   * rendered report — e.g. the concurrency of the launch (10-way concurrent
+   * launch inflates wall-clock vs a quieter host, so cross-question wall-clock
+   * comparability is confounded). Notes never feed any statistic.
+   */
+  readonly environmentNotes?: readonly string[];
 }
 
 // ─── 输出 ────────────────────────────────────────────────────────────────────
@@ -130,6 +137,8 @@ export interface AblationReport {
   readonly perMetric: readonly AblationMetricRow[];
   readonly evidenceGrade: 'STATISTICAL_SIGNAL' | 'DIRECTIONAL_ONLY';
   readonly powerCaveat: string;
+  /** Verbatim environment provenance notes (see AblationInput.environmentNotes). */
+  readonly environmentNotes: readonly string[];
 }
 
 // ─── 内部 ────────────────────────────────────────────────────────────────────
@@ -425,6 +434,7 @@ export function aggregateAblation(input: AblationInput): AblationReport {
     perMetric,
     evidenceGrade: status === 'REPORTED' ? 'STATISTICAL_SIGNAL' : 'DIRECTIONAL_ONLY',
     powerCaveat: FROZEN_POWER_CAVEAT,
+    environmentNotes: input.environmentNotes ?? [],
   };
 }
 
@@ -494,6 +504,10 @@ export function renderAblation(report: AblationReport): string {
   }
   lines.push('');
   lines.push(`power caveat: ${report.powerCaveat}`);
+  if (report.environmentNotes.length > 0) {
+    lines.push('');
+    for (const note of report.environmentNotes) lines.push(`environment: ${note}`);
+  }
   lines.push('cannot-prove: this comparison does not establish causal attribution to the primitive (model/prompt/retrieval drift remain confounds); directions describe CI position only.');
   return lines.join('\n');
 }

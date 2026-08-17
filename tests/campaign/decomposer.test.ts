@@ -124,6 +124,9 @@ describe('decomposeTopicWithLlm — end-to-end (offline fixture gateway)', () =>
     assert.ok(result.questions[0]!.startsWith('Does dark energy cluster'));
     assert.equal(result.modelId !== null, true, 'meta carries the model id');
     assert.equal(result.attempts, 1);
+    // day-r13: the cost sidecar contract — tokenUsage rides along (null only
+    // when the provider genuinely reported nothing, never silently dropped).
+    assert.ok(result.tokenUsage === null || typeof result.tokenUsage.totalTokens === 'number');
   });
 
   it('FAILS CLOSED when hygiene collapses the set below 2 questions', async () => {
