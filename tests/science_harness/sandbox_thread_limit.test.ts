@@ -146,7 +146,7 @@ test('venv sandbox: a script that re-expands a real numerical pool invalidates t
       RESOURCES,
     );
     const receipt = JSON.stringify(
-      { exitCode: result.exitCode, singleThreaded: result.singleThreaded, threadLimitReason: result.threadLimitReason, stderr: result.stderr },
+      { exitCode: result.exitCode, singleThreaded: result.singleThreaded, threadLimitReason: result.threadLimitReason, stderrHash: result.stderrHash },
     );
     assert.equal(result.exitCode, 78, `verified nthread!=1 must invalidate an otherwise successful run — receipt: ${receipt}`);
     assert.equal(result.singleThreaded, false, receipt);
