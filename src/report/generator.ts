@@ -8,11 +8,13 @@
 
 import type Database from 'better-sqlite3';
 import { verifyChainHead } from '../evidence_log/verifier.ts';
+import type { ReportClaimCategory } from '../schema/enums.ts';
+import { REPORT_CLAIM_CATEGORIES } from '../schema/enums.ts';
 import type { VerifyResult } from '../evidence_log/types.ts';
 import { rowToVerdictNode } from '../falsifiability/repository.ts';
 import type { VerdictNodeRow } from '../falsifiability/repository.ts';
 import type { VerdictNode } from '../falsifiability/types.ts';
-import type { ReportData, ReportSection } from './types.ts';
+import type { ReportData, ReportSection , SectionBody } from './types.ts';
 import { estimateUsdCost } from '../llm_gateway/pricing.ts';
 import { trapTaxonomyFor } from '../anti_theater/trap_taxonomy.ts';
 import type { TrapSummary } from '../anti_theater/trap_taxonomy.ts';
@@ -300,6 +302,8 @@ export function generateReport(input: GenerateReportInput): ReportData {
     reproHash,
     input.trapSummary,
   );
+  // CORE-REPORT-001 运行期 fail-closed：分类缺失/非法的段落不得进入成品报告
+  assertEverySectionCategorized(sections);
 
   const verdictSummary: Record<string, number> = {
     CONFIRMED: 0,
@@ -328,6 +332,21 @@ export function generateReport(input: GenerateReportInput): ReportData {
 // 报告段落构建
 // ---------------------------------------------------------------------------
 
+
+/** CORE-REPORT-001：给 builder 产物挂声明分类（中央单点）。 */
+function categorize(body: SectionBody, category: ReportClaimCategory): ReportSection {
+  return { ...body, category };
+}
+
+/** 运行期 fail-closed：任何段落缺合法分类 → 抛错（防绕过 buildSections 直接拼 ReportData）。 */
+export function assertEverySectionCategorized(sections: readonly ReportSection[]): void {
+  for (const section of sections) {
+    if (!REPORT_CLAIM_CATEGORIES.includes(section.category)) {
+      throw new Error(`report section '${section.title}' lacks a valid claim category (CORE-REPORT-001)`);
+    }
+  }
+}
+
 function buildSections(
   runId: string,
   verdictNodes: VerdictNode[],
@@ -338,18 +357,24 @@ function buildSections(
   reproHash: string,
   trapSummary?: TrapSummary,
 ): ReportSection[] {
-  const sections: ReportSection[] = [
-    buildSummarySection(runId, verdictNodes, callRecords, reproHash),
-    buildStageSummarySection(callRecords, evidenceLog),
-    buildVerdictNodesSection(verdictNodes),
-    buildEvidenceGraphSection(verdictNodes, edges),
-    buildHashChainSection(callRecords, hashVerification),
-    buildLimitationsSection(),
+  // CORE-REPORT-001 中央分类映射：事实=已验证结构化记录（裁决/图/链/阶段账目）；
+  // 推断=聚合与审计判断（摘要/陷阱审计）；未完成=边界声明（limitations）。
+  // Hash 链断裂时该段降为 UNCOMPLETED（验证未完成——诚实优先）。
+  const categorized: ReportSection[] = [
+    categorize(buildSummarySection(runId, verdictNodes, callRecords, reproHash), 'INFERENCE'),
+    categorize(buildStageSummarySection(callRecords, evidenceLog), 'FACT'),
+    categorize(buildVerdictNodesSection(verdictNodes), 'FACT'),
+    categorize(buildEvidenceGraphSection(verdictNodes, edges), 'FACT'),
+    categorize(
+      buildHashChainSection(callRecords, hashVerification),
+      hashVerification.ok ? 'FACT' : 'UNCOMPLETED',
+    ),
+    categorize(buildLimitationsSection(), 'UNCOMPLETED'),
   ];
   if (trapSummary) {
-    sections.push(buildTrapAuditSection(trapSummary));
+    categorized.push(categorize(buildTrapAuditSection(trapSummary), 'INFERENCE'));
   }
-  return sections;
+  return categorized;
 }
 
 /**
@@ -357,7 +382,7 @@ function buildSections(
  * 渲染"本次验证覆盖的陷阱大类 + 触发明细"，使报告不仅给出 verdict 结论，
  * 还结构化展示"检测了 21 类统计陷阱，触发 N 类警告"的审计表。
  */
-function buildTrapAuditSection(trapSummary: TrapSummary): ReportSection {
+function buildTrapAuditSection(trapSummary: TrapSummary): SectionBody {
   const triggeredLines = trapSummary.triggeredKinds.map((kind) => {
     const t = trapTaxonomyFor(kind);
     return `- **${t.attackId}**（${t.name}）· 类别 ${t.category} · ${t.what} · 防治：${t.cures.join(' / ')}`;
@@ -387,7 +412,7 @@ function buildSummarySection(
   verdictNodes: VerdictNode[],
   callRecords: CallRecordSummaryRow[],
   reproHash: string,
-): ReportSection {
+): SectionBody {
   const totalVerdicts = verdictNodes.length;
   const confirmedCount = verdictNodes.filter((n) => n.verdict === 'CONFIRMED').length;
   const refutedCount = verdictNodes.filter((n) => n.verdict === 'REFUTED').length;
@@ -417,7 +442,7 @@ function buildSummarySection(
 function buildStageSummarySection(
   callRecords: CallRecordSummaryRow[],
   evidenceLog: EvidenceLogRow[],
-): ReportSection {
+): SectionBody {
   if (callRecords.length === 0) {
     return {
       title: 'Six-stage output summary',
@@ -505,7 +530,7 @@ function buildStageSummarySection(
 // §3 裁决节点
 // ---------------------------------------------------------------------------
 
-function buildVerdictNodesSection(verdictNodes: VerdictNode[]): ReportSection {
+function buildVerdictNodesSection(verdictNodes: VerdictNode[]): SectionBody {
   if (verdictNodes.length === 0) {
     return {
       title: 'Verdict nodes',
@@ -587,7 +612,7 @@ function buildVerdictNodesSection(verdictNodes: VerdictNode[]): ReportSection {
 function buildEvidenceGraphSection(
   verdictNodes: VerdictNode[],
   edges: EvidenceEdgeRow[],
-): ReportSection {
+): SectionBody {
   const nodeIds = new Set(verdictNodes.map((n) => n.verdictId));
   const evidenceRefs: string[] = [];
 
@@ -667,7 +692,7 @@ function buildEvidenceGraphSection(
 function buildHashChainSection(
   callRecords: CallRecordSummaryRow[],
   verification: VerifyResult,
-): ReportSection {
+): SectionBody {
   if (callRecords.length === 0) {
     return {
       title: 'Hash-chain verification',
@@ -736,7 +761,7 @@ function buildHashChainSection(
 // §6 限制声明
 // ---------------------------------------------------------------------------
 
-function buildLimitationsSection(): ReportSection {
+function buildLimitationsSection(): SectionBody {
   const body = [
     'This report is auto-generated by the FAR-Lab report generator and follows these principles:',
     '',

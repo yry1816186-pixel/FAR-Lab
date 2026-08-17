@@ -534,11 +534,13 @@ function emptyReportData(overrides: Partial<ReportData> = {}): ReportData {
         title: 'Executive summary',
         body: 'test summary body',
         evidenceRefs: [],
+        category: 'FACT',
       },
       {
         title: 'Limitations',
         body: 'test limitations body',
         evidenceRefs: [],
+        category: 'FACT',
       },
     ],
     reproHash: '',
@@ -587,6 +589,7 @@ test('renderMarkdown includes evidence links when enabled', () => {
         title: 'Test section',
         body: 'some body',
         evidenceRefs: ['ev-001', 'ev-002'],
+        category: 'FACT',
       },
     ],
   });
@@ -607,6 +610,7 @@ test('renderMarkdown excludes evidence links when disabled', () => {
         title: 'Test section',
         body: 'some body',
         evidenceRefs: ['ev-001'],
+        category: 'FACT',
       },
     ],
   });
@@ -659,6 +663,7 @@ test('renderHtml escapes HTML special characters', () => {
         title: 'XSS <script>alert(1)</script>',
         body: 'content & more',
         evidenceRefs: [],
+        category: 'FACT',
       },
     ],
   });
