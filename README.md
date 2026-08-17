@@ -396,6 +396,18 @@ review. **Consult a licensed clinician before any health decision.**
 
 ---
 
+## Responsible use
+
+FAR-Lab accelerates falsifiable research exploration; it does not remove scientist or operator responsibility.
+
+- **Human accountability** — every verdict is protocol-bounded: `CONFIRMED` means "within the stated protocol, inputs, and thresholds", never scientific truth. Publication, clinical, policy, and safety decisions remain human responsibilities.
+- **Dual-use screening** — high-risk domains (clinical, bio/chem safety, human subjects) pass deterministic fail-closed gates (`src/discovery/safety/`); refused categories are answered with refusal, not with the requested content.
+- **No fabrication** — claims without sufficient evidence surface as `UNTESTED` / `INCONCLUSIVE` rather than confident answers; negative results are first-class records, never hidden.
+- **Traceability when sharing** — every shareable result can be exported as a content-addressed `.far-proof` bundle that third parties independently recompute; cite the bundle when sharing conclusions.
+- **Reporting** — security or misuse concerns: [SECURITY.md](SECURITY.md).
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions must pass
