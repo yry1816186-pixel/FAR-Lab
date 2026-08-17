@@ -190,3 +190,22 @@ export interface SourceCard {
  */
 export const REPORT_CLAIM_CATEGORIES = ['FACT', 'INFERENCE', 'UNCOMPLETED'] as const;
 export type ReportClaimCategory = (typeof REPORT_CLAIM_CATEGORIES)[number];
+
+/**
+ * CORE-EPISTEMIC-001 · 关键判断认知类型标签（宪法 §科学输出 九值字母表）。
+ * 与 REPORT_CLAIM_CATEGORIES 正交：报告段落分类是「完成度」维度（FACT/INFERENCE/UNCOMPLETED），
+ * 本表是「认知来源」维度——同一句判断两者兼备（例：INFERENCE 段落里的 HYPOTHESIS 判断）。
+ * 约束（宪法原文）：UNKNOWN 不得在后续步骤无证据消失；置信度必须与证据质量/校准状态匹配。
+ */
+export const EPISTEMIC_TAGS = [
+  'FACT',
+  'OBSERVATION',
+  'EVIDENCE',
+  'ASSUMPTION',
+  'HYPOTHESIS',
+  'INFERENCE',
+  'UNKNOWN',
+  'RISK',
+  'DECISION',
+] as const;
+export type EpistemicTag = (typeof EPISTEMIC_TAGS)[number];
