@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useHealth, useReceiptList } from '@/lib/api_client';
+import { VERDICT_BADGE_VARIANT, isVerdictValue } from '@/lib/verdict';
 import { useT } from '@/lib/i18n';
 import {
   Activity,
@@ -38,9 +39,6 @@ const QUICK_ENTRIES: readonly {
   { to: '/integrity', titleKey: 'overview.quick.integrity.title', descKey: 'overview.quick.integrity.desc', icon: ShieldCheck, testId: 'quick-integrity' },
 ];
 
-const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
-  CONFIRMED: 'success', REFUTED: 'destructive', INCONCLUSIVE: 'warning', DEGRADED_SCOPE: 'secondary', UNTESTED: 'outline',
-};
 
 function HealthCard() {
   const t = useT();
@@ -133,7 +131,7 @@ function RecentReceiptsCard() {
               <li key={r.id} className="flex items-center justify-between rounded border p-2">
                 <span className="font-mono text-xs truncate max-w-[140px]">{r.id}</span>
                 <span className="flex-1 truncate px-3 text-sm">{r.claimText}</span>
-                <Badge variant={STATUS_VARIANT[r.verdict] ?? 'outline'}>{r.verdict}</Badge>
+                <Badge variant={VERDICT_BADGE_VARIANT[isVerdictValue(r.verdict) ? r.verdict : 'UNTESTED']}>{r.verdict}</Badge>
               </li>
             ))}
           </ul>

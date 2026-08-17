@@ -4,19 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useReport, useVerdictList } from '@/lib/api_client';
+import { VERDICT_BADGE_VARIANT, isVerdictValue } from '@/lib/verdict';
 import { useT } from '@/lib/i18n';
 import type { HonestVerdictDto } from '@/lib/types';
 import { FileText, AlertCircle, Loader2, Clock, Search, History } from 'lucide-react';
 
 // ---------- Constants ----------
 
-const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
-  CONFIRMED: 'success',
-  REFUTED: 'destructive',
-  INCONCLUSIVE: 'warning',
-  DEGRADED_SCOPE: 'secondary',
-  UNTESTED: 'outline',
-};
 
 interface ReportHistoryEntry {
   runId: string;
@@ -306,7 +300,7 @@ export default function ReportPage() {
                         {relatedVerdict !== null && (
                           <Badge
                             variant={
-                              STATUS_VARIANT[relatedVerdict.decision] ?? 'outline'
+                              VERDICT_BADGE_VARIANT[isVerdictValue(relatedVerdict.decision) ? relatedVerdict.decision : 'UNTESTED']
                             }
                             data-testid={`report-verdict-badge-${h.runId}`}
                           >
@@ -363,7 +357,7 @@ export default function ReportPage() {
                     <div className="flex items-center justify-between gap-2">
                       <code className="font-mono text-xs">{v.verdictId}</code>
                       <Badge
-                        variant={STATUS_VARIANT[v.decision] ?? 'outline'}
+                        variant={VERDICT_BADGE_VARIANT[isVerdictValue(v.decision) ? v.decision : 'UNTESTED']}
                       >
                         {v.decision}
                       </Badge>

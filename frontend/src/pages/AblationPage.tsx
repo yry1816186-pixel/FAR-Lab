@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useT } from '@/lib/i18n';
+import { VERDICT_BADGE_VARIANT } from '@/lib/verdict';
 import type { MessageKey } from '@/lib/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -165,13 +166,6 @@ const VERDICT_MSG: Record<VerdictValue, MessageKey> = {
 // Verdict visual mapping (variant only — labels from i18n)
 // ============================================================
 
-const VERDICT_VARIANT: Record<VerdictValue, 'success' | 'destructive' | 'warning' | 'secondary' | 'outline'> = {
-  CONFIRMED: 'success',
-  REFUTED: 'destructive',
-  INCONCLUSIVE: 'warning',
-  DEGRADED_SCOPE: 'secondary',
-  UNTESTED: 'outline',
-};
 
 // ============================================================
 // Per-baseline result state
@@ -402,7 +396,7 @@ export default function AblationPage() {
                         </TableCell>
                         <TableCell>
                           {verdictValue ? (
-                            <Badge variant={VERDICT_VARIANT[verdictValue]}>
+                            <Badge variant={VERDICT_BADGE_VARIANT[verdictValue]}>
                               {t(VERDICT_MSG[verdictValue])}
                             </Badge>
                           ) : (
@@ -602,9 +596,9 @@ export default function AblationPage() {
                     <Badge
                       variant={
                         farChainResult.data.honestVerdict?.verdict
-                          ? VERDICT_VARIANT[farChainResult.data.honestVerdict.verdict]
+                          ? VERDICT_BADGE_VARIANT[farChainResult.data.honestVerdict.verdict]
                           : farChainResult.data.loopState.verdictNode?.verdict
-                            ? VERDICT_VARIANT[farChainResult.data.loopState.verdictNode.verdict]
+                            ? VERDICT_BADGE_VARIANT[farChainResult.data.loopState.verdictNode.verdict]
                             : 'outline'
                       }
                     >
@@ -829,7 +823,7 @@ function BaselineResultCard({
                     result.data.loopState.verdictNode?.verdict ??
                     result.data.honestVerdict?.verdict;
                   return v ? (
-                    <Badge variant={VERDICT_VARIANT[v]}>
+                    <Badge variant={VERDICT_BADGE_VARIANT[v]}>
                       {t(VERDICT_MSG[v])}
                     </Badge>
                   ) : (
