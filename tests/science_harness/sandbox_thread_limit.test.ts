@@ -161,13 +161,17 @@ test('venv sandbox red team: thread verifier does not make the dlopen audit set 
   const previous = process.env.PYTHONPATH;
   process.env.PYTHONPATH = buildPythonPath(previous);
   try {
+    // PEP 578 fires 'ctypes.dlopen' before any load attempt, so a slash-containing
+    // nonexistent path is the cross-platform / cross-Python-version trigger:
+    // CDLL(None) TypeErrors in pure-Python ctypes on Python >= 3.12 before the audit
+    // event ever fires (observed: 3.12.10 win32 → exit 1, not 126).
     const result = await venvSandboxAdapter.executeAsync(
       {
         script: [
           'import __main__',
           'import ctypes',
           '__main__._AUDIT_REJECT_EVENTS = frozenset()',
-          'ctypes.CDLL(None)',
+          "ctypes.CDLL('/sandbox/redteam/fake-dlopen-probe.so')",
         ].join('\n'),
         pythonCmd: pythonCommand,
       },
