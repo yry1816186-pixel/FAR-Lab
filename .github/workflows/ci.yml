@@ -612,6 +612,11 @@ jobs:
         run: node scripts/check-supply-chain.mjs
       - name: zero_tolerance_scan（零容忍禁词扫描）
         run: node scripts/zero_tolerance_scan.mjs
+      - name: diff_self_check（diff 级自查：逃逸注入/断言削弱/语义漂移——ENG-DIFF-001）
+        run: |
+          git fetch origin main --depth=1
+          git diff origin/main...HEAD > "$RUNNER_TEMP/pr.diff" || echo "" > "$RUNNER_TEMP/pr.diff"
+          node scripts/diff_self_check.mjs --diff-file "$RUNNER_TEMP/pr.diff"
       - name: anti_theater_deterministic_scan（反剧场确定性扫描）
         run: node scripts/anti_theater_deterministic_scan.mjs
       - name: no_llm_final_judge_scan（LLM 终审权禁令扫描——CORE-TRUST-001 主防线 CI 强制）
