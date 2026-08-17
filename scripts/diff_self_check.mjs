@@ -25,6 +25,16 @@ import { readFileSync } from 'node:fs';
 
 const JUSTIFICATION_RE = /(理由|rationale|REASON\s*:|because|依据|justification|iii-exempt)/i;
 
+// 扫描器家族豁免（与 zero_tolerance_scan.mjs skippedFiles 同纪律）：这些文件按设计
+// 携带反模式字符串作为检测模式/驱动样本——对它们做 diff 级逃逸检测是自指误报
+// （本门在真实 PR 上的首次运行即实证：抓到的全是元文件的模式字符串）。
+const SCANNER_FAMILY = new Set([
+  'scripts/zero_tolerance_scan.mjs',
+  'scripts/diff_self_check.mjs',
+  'tests/ci/zero_tolerance_scan.test.ts',
+  'tests/ci/diff_self_check.test.ts',
+]);
+
 const ESCAPE_PATTERNS = [
   { id: 'ESCAPE', re: /:\s*any\b/, msg: ': any 注入' },
   { id: 'ESCAPE', re: /@ts-ignore/, msg: '@ts-ignore 注入' },
@@ -122,6 +132,7 @@ const srcChanged = [];
 const testChanged = [];
 
 for (const file of files) {
+  if (SCANNER_FAMILY.has(file.path)) continue;
   const isTest = /(^|\/)(tests?\/|_test\.|\.test\.|\.spec\.)/.test(file.path) || /\.test\.tsx?$/.test(file.path);
   if (file.path.startsWith('src/')) srcChanged.push(file.path);
   if (isTest) testChanged.push(file.path);
