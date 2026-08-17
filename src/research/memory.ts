@@ -486,6 +486,7 @@ export function recordRunToMemory(
 
     // Strategy utility statistics (aggregate counters over per-run facts).
     const stats = prev.strategyStats.map((s) => ({ ...s }));
+    // complexity-exempt: rote field-level stat incrementer — splitting hurts readability (day-r13 telemetry)
     const bump = (
       strategy: StrategyId,
       patch: Partial<Omit<StrategyDomainStat, 'strategy' | 'domain'>>,
