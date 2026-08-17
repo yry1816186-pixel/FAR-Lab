@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -110,7 +110,12 @@ ${fakeHash}  EXTRA_FILE.md
   } finally { rmSync(smuggled, { recursive: true, force: true }); }
 });
 
-test('manifest: 真实宪法目录 --check 实跑 PASS', () => {
+test('manifest: 真实宪法目录 --check 实跑 PASS（CI 无私有 .far 层 → skip-if-absent）', (t) => {
+  const manifestPath = join(REPO, '.far', 'constitution', 'MANIFEST.sha256');
+  if (!existsSync(manifestPath)) {
+    t.skip('constitution layer is machine-local (gitignored) — verified on dev machines, absent on CI');
+    return;
+  }
   const out = execFileSync('node', [join(REPO, 'scripts', 'constitution_manifest.mjs'), '--check'], { encoding: 'utf8' });
   assert.match(out, /PASS — 3 file\(s\) verified/);
 });
