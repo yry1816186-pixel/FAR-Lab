@@ -32,8 +32,16 @@ test('ansiEnabled: false when NO_COLOR set', () => {
 });
 
 test('ansiEnabled: force overrides non-TTY', () => {
-  // 即使没有真实 TTY，force:true 也启用（测试与管道场景）。
-  assert.equal(ansiEnabled({ force: true }), true);
+  // The host may intentionally export NO_COLOR. Isolate that higher-priority
+  // policy so this test exercises force vs non-TTY rather than ambient state.
+  const previous = process.env.NO_COLOR;
+  delete process.env.NO_COLOR;
+  try {
+    assert.equal(ansiEnabled({ force: true }), true);
+  } finally {
+    if (previous === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = previous;
+  }
 });
 
 test('renderProgressBar clamps to [0,1]', () => {

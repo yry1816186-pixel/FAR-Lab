@@ -18,6 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { snapshotBundleContent } from '../../src/far_proof/offline_package.ts';
@@ -62,23 +63,62 @@ test('snapshotBundleContent_empty_dir: 空目录 → 空快照（非错误）', 
   }
 });
 
-// 注：权限撤销（chmod 000）测试在 Windows 上不可靠（NTFS ACL ≠ POSIX mode bits），
-// 故用 ENOENT 路径验证 fail-closed 语义。POSIX 平台的 chmod 000 场景由 CI 覆盖。
-// 本测试跳过 chmod 路径以保持跨平台确定性（不引入 platform-skip 的 flaky）。
+// Windows 的 NTFS ACL 不等价于 POSIX mode bits，故只跳过 Windows 轴。POSIX 轴不能盲信
+// os.tmpdir()：WSL 可继承 Windows TEMP 并把临时目录落到 /mnt/c DrvFS，那里 chmod 显示
+// 000 但未必实际拒绝读取。因此此用例显式用 POSIX 原生 /tmp，且在子进程中调真实
+// snapshotBundleContent；若 runner 是 root，子进程降权到 nobody，避免 root 绕过 DAC 造成假红。
 test('snapshotBundleContent_unreadable_subdir_unix: POSIX 不可读子目录 → 抛错（skip on win32）', {
   skip: process.platform === 'win32' ? 'POSIX chmod 测试·Windows NTFS ACL 语义不同' : undefined,
-}, () => {
-  const tmp = mkdtempSync(join(tmpdir(), 'far-stale-perm-'));
+}, (t) => {
+  const identity = unprivilegedChildIdentity();
+  if (identity === null) {
+    t.skip('POSIX root runner cannot resolve an unprivileged nobody uid/gid');
+    return;
+  }
+
+  const tmp = mkdtempSync(join('/tmp', 'far-stale-perm-'));
   try {
     mkdirSync(join(tmp, 'locked'));
     writeFileSync(join(tmp, 'locked', 'secret.json'), '{}');
+    // mkdtemp 缺省 0700；降权子进程需要能穿过根目录，但不能读 locked。
+    chmodSync(tmp, 0o755);
     chmodSync(join(tmp, 'locked'), 0o000); // 撤销所有权限
     try {
-      assert.throws(
-        () => snapshotBundleContent(tmp),
-        /EACCES|permission/i,
-        '不可读子目录须抛 EACCES（fail-closed），不静默跳过其内容',
+      const moduleUrl = new URL('../../src/far_proof/offline_package.ts', import.meta.url).href;
+      const childSource = `
+        const { snapshotBundleContent } = await import(${JSON.stringify(moduleUrl)});
+        const dropUid = ${identity?.uid ?? 'null'};
+        const dropGid = ${identity?.gid ?? 'null'};
+        if (dropUid !== null && dropGid !== null) {
+          process.setgroups([]);
+          process.setgid(dropGid);
+          process.setuid(dropUid);
+        }
+        try {
+          snapshotBundleContent(process.argv[1]);
+          process.stderr.write('snapshot unexpectedly succeeded');
+          process.exitCode = 3;
+        } catch (error) {
+          const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+          if (code === 'EACCES' || code === 'EPERM') {
+            process.stdout.write(code + ':' + String(process.getuid?.() ?? 'unknown'));
+          } else {
+            process.stderr.write(error instanceof Error ? error.stack ?? error.message : String(error));
+            process.exitCode = 4;
+          }
+        }
+      `;
+      const child = spawnSync(
+        process.execPath,
+        ['--input-type=module', '--eval', childSource, tmp],
+        { encoding: 'utf8' },
       );
+      assert.equal(
+        child.status,
+        0,
+        `不可读子目录须 fail-closed（status=${String(child.status)}; stdout=${child.stdout}; stderr=${child.stderr}; error=${child.error?.message ?? 'none'}）`,
+      );
+      assert.match(child.stdout, /EACCES|EPERM/, '子进程须观测到真实权限拒绝');
     } finally {
       chmodSync(join(tmp, 'locked'), 0o755); // 恢复以便清理
     }
@@ -86,3 +126,25 @@ test('snapshotBundleContent_unreadable_subdir_unix: POSIX 不可读子目录 →
     rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+/**
+ * Non-root runners already exercise DAC honestly. Root runners must drop to the
+ * platform's `nobody` account; returning null means this POSIX capability is not
+ * available and the test reports an explicit axis skip instead of a false pass.
+ */
+function unprivilegedChildIdentity(): { readonly uid: number; readonly gid: number } | undefined | null {
+  if (process.getuid?.() !== 0) return undefined;
+  const uid = resolveIdentityNumber(['-u', 'nobody']);
+  const gid = resolveIdentityNumber(['-g', 'nobody']);
+  if (uid === null || gid === null || uid === 0) return null;
+  return { uid, gid };
+}
+
+function resolveIdentityNumber(args: readonly string[]): number | null {
+  const result = spawnSync('id', args, { encoding: 'utf8' });
+  if (result.status !== 0) return null;
+  const parsed = Number(result.stdout.trim());
+  if (!Number.isInteger(parsed)) return null;
+  // Darwin may render nobody as -2 while spawn uid/gid uses unsigned uid_t.
+  return parsed < 0 ? 2 ** 32 + parsed : parsed;
+}

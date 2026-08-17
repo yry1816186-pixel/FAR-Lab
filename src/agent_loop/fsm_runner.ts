@@ -167,7 +167,7 @@ export interface RunAgentLoopArgs {
   readonly compactArtifacts?: boolean;
   /**
    * E-session（JSONL session format）：可选 session 录制路径。
-   * 设置后：run_started/stage_completed×N/run_completed 实时追加 JSONL（审计观察层·
+   * 设置后：run_started/(stage_started→stage_completed)×N/run_completed 实时追加 JSONL（审计观察层·
    * 与 evidence_log 哈希链正交）。缺省 undefined → 零回归。
    */
   readonly sessionPath?: string;
@@ -255,6 +255,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
         stageId: a.stageId,
         ts: new Date().toISOString(),
         payload: {
+          iteration,
           payloadKind: a.payloadKind,
           degraded: a.degraded,
           contentHash: shortSha(JSON.stringify(a.structured)),
@@ -352,7 +353,26 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
       const key = `${iteration}:${stageId}`;
       if (resumeStore !== null && resumeStore.hasSnapshot(key)) {
         // 幂等重放:不重复 LLM 调用、不重复落库、不重复副作用
+        if (session !== null) {
+          session.record({
+            kind: 'stage_started',
+            runId: args.runId,
+            stageId,
+            ts: new Date().toISOString(),
+            payload: { iteration, replayedFromReceipt: true },
+          });
+        }
         return resumeStore.snapshot(key);
+      }
+      const stageStartedAt = new Date().toISOString();
+      if (session !== null) {
+        session.record({
+          kind: 'stage_started',
+          runId: args.runId,
+          stageId,
+          ts: stageStartedAt,
+          payload: { iteration },
+        });
       }
       if (args.onEvent !== undefined) {
         args.onEvent({
@@ -360,7 +380,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           runId: args.runId,
           iteration,
           stageId,
-          ts: new Date().toISOString(),
+          ts: stageStartedAt,
         });
       }
       // P0-3 人工接管：hold 后暂停在此处（人工检查/干预点·resume 前不执行本阶段）
@@ -569,6 +589,15 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
                 const executor = s.executor;
                 if (executor === undefined) {
                   throw new ExtensionStageError(s.stageId, 'missing executor');
+                }
+                if (session !== null) {
+                  session.record({
+                    kind: 'stage_started',
+                    runId: args.runId,
+                    stageId: s.stageId,
+                    ts: new Date().toISOString(),
+                    payload: { iteration, extension: true },
+                  });
                 }
                 try {
                   return await executor(ctx);

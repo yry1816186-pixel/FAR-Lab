@@ -19,6 +19,9 @@ import { runMigrations } from '../../src/db/index.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { runAgentLoop } from '../../src/agent_loop/fsm_runner.ts';
 import { extractFinishReasonForOfflineReplay } from '../../src/agent_loop/run_stage.ts';
@@ -32,6 +35,7 @@ import type { AgentLoopEvent } from '../../src/agent_loop/events.ts';
 import type { StageArtifact, StageId } from '../../src/agent_loop/types.ts';
 import type { LlmGateway } from '../../src/llm_gateway/gateway.ts';
 import type { LlmResponse } from '../../src/llm_gateway/types.ts';
+import { replaySession } from '../../src/trace/session_recorder.ts';
 
 
 // ---------- helpers（镜像 t016/t017 模式）----------
@@ -257,6 +261,7 @@ test('T-018 集成：controller.hold 在阶段开始处暂停并发出 stage_hel
 
 test('T-018 并行扩展：主链收敛后并发执行 order>6 扩展 executor，产物并入 artifacts', async () => {
   const db = openDb();
+  const dir = mkdtempSync(join(tmpdir(), 't018-extension-session-'));
   try {
     resetStageRegistry();
     let executorCalls = 0;
@@ -287,6 +292,7 @@ test('T-018 并行扩展：主链收敛后并发执行 order>6 扩展 executor�
       evidenceLogDb: db,
       termination: { maxIterations: 1, maxTokensPerRun: 50000, maxDurationMs: 10 * 60 * 1000 },
       runParallelExtensionStages: true,
+      sessionPath: join(dir, 'session.jsonl'),
     });
 
     assert.equal(executorCalls, 1, '扩展 executor 须执行一次');
@@ -297,9 +303,17 @@ test('T-018 并行扩展：主链收敛后并发执行 order>6 扩展 executor�
     assert.equal(audit.degraded, false);
     // 主链裁决不受扩展影响（扩展在主链收敛后运行）
     assert.equal(state.verdictNode?.verdict, 'CONFIRMED');
+    const sessionEvents = replaySession(join(dir, 'session.jsonl')).events;
+    const auditStarts = sessionEvents.filter((event) => event.kind === 'stage_started' && event.stageId === 'stage7_audit');
+    const auditCompletions = sessionEvents.filter((event) => event.kind === 'stage_completed' && event.stageId === 'stage7_audit');
+    assert.equal(auditStarts.length, 1, '扩展阶段只能有一个 start');
+    assert.equal(auditCompletions.length, 1, '成功扩展阶段只能有一个 completion');
+    assert.equal(auditStarts[0]!.payload?.iteration, auditCompletions[0]!.payload?.iteration);
+    assert.equal(auditStarts[0]!.payload?.extension, true);
   } finally {
     resetStageRegistry();
     db.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

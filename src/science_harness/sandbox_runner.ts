@@ -25,10 +25,12 @@ import type { ExecutionFingerprint } from '../falsifiability/verdict_kernel_v2.t
 import {
   RESOURCE_LIMITS,
   type ArtifactManifest,
+  type RawVenvResult,
   type SandboxAdapter,
   type SandboxExecutionInput,
   type SandboxResourceSpec,
   type SandboxRunResult,
+  type ThreadLimitReason,
   type VenvSandboxAdapter,
   type VenvSandboxInput,
 } from './types.ts';
@@ -99,8 +101,8 @@ export function computeArtifactTreeHash(artifacts: readonly ArtifactManifest[]):
  * 计算 SandboxRunResult（V1 类型层核心）。
  *
  * 输入为确定性产物（exitCode/stdout/stderr/artifacts）；本函数计算所有 hash 字段
- * 并强制 V1 不变量：seed 默认 42（SR-2）、networkBlocked 默认 true（SR-5·类型层声明）、
- * singleThreaded=true（SR-7）。
+ * 并强制 V1 不变量：seed 默认 42（SR-2）、networkBlocked 默认 true（SR-5·类型层声明）。
+ * SR-7 必须由真实执行层显式回传；缺省是 false/not_attested，不得由 hash-only 层猜测。
  *
  * 注意：本函数不 spawn 子进程、不执行真实网络封禁（F4·V1 类型层）。
  * 它只对调用方提供的确定性输入计算 hash 锚——这是 reproHash 的前置条件。
@@ -113,6 +115,9 @@ export function computeSandboxRunResult(
 
   const seed = input.seed ?? DEFAULT_SEED;
   const networkBlocked = input.networkBlocked ?? true;
+  const threadAttestation = input.singleThreaded === undefined && input.threadLimitReason === undefined
+    ? { singleThreaded: false, reason: 'not_attested' as const }
+    : parseThreadLimitAttestation(input);
   // FUSION-OS-7：cpu/peak_rss 透传（缺省 0=未测量）。非负有限守卫——防 Python 侧异常负值/NaN 污染指纹。
   const cpuMs = sanitizeResourceMetric(input.cpuMs);
   const peakRssKb = sanitizeResourceMetric(input.peakRssKb);
@@ -130,7 +135,8 @@ export function computeSandboxRunResult(
     outputLimitExceeded: input.outputLimitExceeded ?? false,
     networkBlocked,
     seed,
-    singleThreaded: true, // SR-7 · nthread=1 单线程确定性
+    singleThreaded: threadAttestation.singleThreaded,
+    threadLimitReason: threadAttestation.reason,
     cpuMs,
     peakRssKb,
   };
@@ -166,6 +172,7 @@ export function computeSandboxReproFingerprint(result: SandboxRunResult): string
     artifactTreeHash: result.artifactTreeHash,
     seed: result.seed,
     singleThreaded: result.singleThreaded,
+    threadLimitReason: result.threadLimitReason,
     networkBlocked: result.networkBlocked,
   });
 }
@@ -317,20 +324,6 @@ export function resolveVenvPython(): string | null {
   return venv312PythonCache;
 }
 
-interface RawVenvResult {
-  readonly exitCode: number;
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly artifacts: readonly ArtifactManifest[];
-  readonly wallClockMs: number;
-  readonly timedOut: boolean;
-  /** FUSION-OS-10：输出超限强制中断（P1-2 审计修复）。 */
-  readonly outputLimitExceeded: boolean;
-  readonly networkBlocked: boolean;
-  readonly cpuMs: number;
-  readonly peakRssKb: number;
-}
-
 interface PythonSandboxManifest {
   readonly exitCode?: number;
   readonly stdout?: string;
@@ -338,8 +331,33 @@ interface PythonSandboxManifest {
   readonly artifacts?: readonly ArtifactManifest[];
   readonly wallClockMs?: number;
   readonly networkBlocked?: boolean;
+  readonly singleThreaded?: boolean;
+  readonly threadLimitReason?: string;
   readonly cpuMs?: number;
   readonly peakRssKb?: number;
+}
+
+/** 校验跨语言不受信 manifest 的 bool/reason 配对；矛盾/未知值 fail-closed。 */
+function parseThreadLimitAttestation(
+  manifest: PythonSandboxManifest,
+): { readonly singleThreaded: boolean; readonly reason: ThreadLimitReason } {
+  const reason = manifest.threadLimitReason;
+  switch (reason) {
+    case 'threadpoolctl_verified':
+    case 'threadpoolctl_applied_no_supported_pools':
+      if (manifest.singleThreaded === true) return { singleThreaded: true, reason };
+      break;
+    case 'threadpoolctl_unavailable':
+    case 'threadpoolctl_setup_failed':
+    case 'threadpoolctl_verification_failed':
+    case 'threadpool_limit_not_one':
+    case 'execution_not_started':
+    case 'execution_interrupted':
+    case 'not_attested':
+      if (manifest.singleThreaded === false) return { singleThreaded: false, reason };
+      break;
+  }
+  return { singleThreaded: false, reason: 'manifest_missing_thread_limit_attestation' };
 }
 
 /**
@@ -573,6 +591,8 @@ export async function spawnVenv(
       timedOut: false,
       outputLimitExceeded: false,
       networkBlocked: networkPolicy === 'off',
+      singleThreaded: false,
+      threadLimitReason: 'execution_not_started',
       cpuMs: 0,
       peakRssKb: 0,
     });
@@ -650,6 +670,8 @@ export async function spawnVenv(
         timedOut: false,
         outputLimitExceeded: false,
         networkBlocked: networkPolicy === 'off',
+        singleThreaded: false,
+        threadLimitReason: 'execution_not_started',
         cpuMs: 0,
         peakRssKb: 0,
       });
@@ -675,6 +697,8 @@ export async function spawnVenv(
           timedOut: true,
           outputLimitExceeded,
           networkBlocked: networkPolicy === 'off',
+          singleThreaded: false,
+          threadLimitReason: 'execution_interrupted',
           cpuMs: 0,
           peakRssKb: 0,
         });
@@ -699,22 +723,34 @@ export async function spawnVenv(
           timedOut: false,
           outputLimitExceeded: false,
           networkBlocked: networkPolicy === 'off',
+          singleThreaded: false,
+          threadLimitReason: 'manifest_missing_thread_limit_attestation',
           cpuMs: 0,
           peakRssKb: 0,
         });
         return;
       }
 
+      const attestation = parseThreadLimitAttestation(parsed);
+      const parsedExitCode = typeof parsed.exitCode === 'number' ? parsed.exitCode : (code ?? 1);
+      const attestationError = parsedExitCode === 0 && !attestation.singleThreaded
+        ? `thread_limit_attestation_failed: ${attestation.reason}`
+        : '';
+      const parsedStderr = typeof parsed.stderr === 'string' ? parsed.stderr : stderrText;
       finish({
-        exitCode: typeof parsed.exitCode === 'number' ? parsed.exitCode : (code ?? 1),
+        exitCode: attestationError.length > 0 ? 78 : parsedExitCode,
         stdout: typeof parsed.stdout === 'string' ? parsed.stdout : '',
-        stderr: typeof parsed.stderr === 'string' ? parsed.stderr : stderrText,
+        stderr: attestationError.length > 0
+          ? `${parsedStderr}${parsedStderr.length > 0 && !parsedStderr.endsWith('\n') ? '\n' : ''}${attestationError}`
+          : parsedStderr,
         artifacts: Array.isArray(parsed.artifacts) ? parsed.artifacts : [],
         wallClockMs: typeof parsed.wallClockMs === 'number' ? parsed.wallClockMs : wallClockMs,
         timedOut: false,
         outputLimitExceeded: false,
         networkBlocked:
           typeof parsed.networkBlocked === 'boolean' ? parsed.networkBlocked : networkPolicy === 'off',
+        singleThreaded: attestation.singleThreaded,
+        threadLimitReason: attestation.reason,
         cpuMs: typeof parsed.cpuMs === 'number' ? parsed.cpuMs : 0,
         peakRssKb: typeof parsed.peakRssKb === 'number' ? parsed.peakRssKb : 0,
       });
@@ -751,6 +787,8 @@ export const venvSandboxAdapter: VenvSandboxAdapter = {
       outputLimitExceeded: raw.outputLimitExceeded,
       seed,
       networkBlocked: raw.networkBlocked,
+      singleThreaded: raw.singleThreaded,
+      threadLimitReason: raw.threadLimitReason,
       cpuMs: raw.cpuMs,
       peakRssKb: raw.peakRssKb,
     };

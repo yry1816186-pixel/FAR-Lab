@@ -1,0 +1,150 @@
+# TEST_RISK_MAP — executable test-design × risk evidence (ENG-TEST-001).
+# Every asset has an explicit kind so an arbitrary existing file cannot pose as
+# test evidence. scripts/test_risk_map_check.mjs validates paths, exact CI jobs
+# or run lines, the Constitution taxonomy, and zero unresolved gaps.
+
+schemaVersion: "1"
+riskClasses:
+  - class: unit
+    risk: Unit-level logic branch errors
+    assets:
+      - kind: test
+        locator: tests/fec/fec_mandatory_gate.test.ts
+      - kind: test
+        locator: tests/statistics/
+
+  - class: contract
+    risk: Public schema, API, or persistence contract drift
+    assets:
+      - kind: test
+        locator: tests/api/v2_receipts_contract.test.ts
+      - kind: ci_job
+        locator: openapi_contract
+      - kind: test
+        locator: tests/schema/db_migrator.test.ts
+      - kind: script
+        locator: scripts/test_risk_map_check.mjs
+      - kind: test
+        locator: tests/scripts/test_risk_map_check.test.mjs
+      - kind: ci_run
+        locator: pnpm run test:risk-map
+
+  - class: property-based
+    risk: Invariants fail for generated valid input combinations
+    assets:
+      - kind: test
+        locator: tests/evidence_log/property_based_invariants.test.ts
+
+  - class: metamorphic
+    risk: Output relations change under semantics-preserving input transformations
+    assets:
+      - kind: test
+        locator: tests/statistics/metamorphic_invariants.test.ts
+
+  - class: differential
+    risk: Independent implementations diverge on the same canonical input
+    assets:
+      - kind: test
+        locator: tests/evidence_log/cross_lang_consistency.test.ts
+      - kind: test
+        locator: tests/evidence_log/merkle_cross_lang.test.ts
+      - kind: corpus
+        locator: repro/far_chain_repro/
+
+  - class: mutation
+    risk: Tests pass after meaningful production logic is altered
+    assets:
+      - kind: script
+        locator: scripts/mutation_gate.mjs
+      - kind: ci_run
+        locator: node scripts/mutation_gate.mjs src/fec/compiler.ts tests/fec/fec_mandatory_gate.test.ts --limit 20
+      - kind: test
+        locator: tests/fec/fec_mandatory_gate.test.ts
+
+  - class: fuzz
+    risk: Public parsers crash, hang, or exhaust resources on malformed input
+    assets:
+      - kind: script
+        locator: scripts/fuzz_proof.mjs
+      - kind: ci_run
+        locator: node scripts/fuzz_proof.mjs --smoke --seed 20260816
+
+  - class: integration
+    risk: Correct modules fail when assembled across state and persistence boundaries
+    assets:
+      - kind: test
+        locator: tests/far_proof/demo_chain_replay_v2.test.ts
+      - kind: test
+        locator: tests/campaign/core.test.ts
+
+  - class: e2e
+    risk: The user-visible product chain breaks despite lower-level tests
+    assets:
+      - kind: ci_run
+        locator: node src/cli/far.ts demo tess-offline
+      - kind: test
+        locator: tests/science_harness/bem_pipeline.test.ts
+
+  - class: visual-a11y
+    risk: Scientific UI or assistive-technology behavior regresses
+    assets:
+      - kind: test
+        locator: frontend/src/__tests__/a11y_baseline.test.tsx
+      - kind: test
+        locator: frontend/src/__tests__/HonestyWallPage.test.tsx
+
+  - class: fault-injection
+    risk: Retry, recovery, cancellation, or degraded paths fail under injected faults
+    assets:
+      - kind: test
+        locator: tests/retrieval/http_hardening.test.ts
+      - kind: test
+        locator: tests/campaign/scheduler.test.ts
+      - kind: test
+        locator: tests/agent_loop/recovery_chaos.test.ts
+
+  - class: regression
+    risk: A previously fixed defect or frozen semantic vector returns
+    assets:
+      - kind: corpus
+        locator: golden_vectors/cases/
+      - kind: test
+        locator: tests/golden_vectors/verdict_oracle_cases.test.ts
+      - kind: test
+        locator: tests/cli/verify_golden_cross_lang.test.ts
+
+  - class: positive
+    risk: Valid supported inputs fail to reach their protocol-defined behavior
+    assets:
+      - kind: test
+        locator: tests/golden_vectors/verdict_oracle_cases.test.ts
+      - kind: test
+        locator: tests/far_proof/demo_chain_replay_v2.test.ts
+
+  - class: negative
+    risk: Invalid or unsupported input is silently accepted
+    assets:
+      - kind: test
+        locator: tests/discovery/claim_negation_golden.test.ts
+      - kind: test
+        locator: tests/far_proof/bundle_verifier_hardening.test.ts
+      - kind: test
+        locator: tests/evidence_log/canonical_json_guard.test.ts
+
+  - class: boundary
+    risk: Threshold, numeric, size, or version boundary behavior is wrong
+    assets:
+      - kind: test
+        locator: tests/falsifiability/threshold_boundary.test.ts
+      - kind: test
+        locator: tests/statistics/p_value_boundaries.test.ts
+
+  - class: tamper
+    risk: Modified, reordered, or forged evidence is not detected
+    assets:
+      - kind: test
+        locator: tests/far_proof/integrity_tamper.test.ts
+      - kind: test
+        locator: tests/cli/replay_tamper.test.ts
+      - kind: test
+        locator: tests/evidence_log/lifecycle_hardening.test.ts

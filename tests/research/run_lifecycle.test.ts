@@ -11,7 +11,16 @@
 
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,12 +29,14 @@ import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offli
 import type { LlmRequest, LlmResponse, ProviderAdapter, ProviderProfile } from '../../src/llm_gateway/types.ts';
 import { createReplayAdapter } from '../../src/retrieval/index.ts';
 import {
+  assertValidResearchRunId,
   renameWithRetry,
   executeResearchRun,
   RunStore,
   parseCheckpoint,
   cancelRun,
   addRunEventListener,
+  type RunCheckpoint,
   type ResearchRunEvent,
 } from '../../src/research/run_lifecycle.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../src/research/research_fixtures.ts';
@@ -112,6 +123,30 @@ class DelayedGateway implements LlmGateway {
   }
 }
 
+/** A real pipeline failure racing an abort must not be relabelled CANCELLED. */
+class AbortThenFailGateway implements LlmGateway {
+  private readonly inner: LlmGateway;
+  private readonly controller: AbortController;
+
+  constructor(inner: LlmGateway, controller: AbortController) {
+    this.inner = inner;
+    this.controller = controller;
+  }
+
+  register(adapter: ProviderAdapter): void {
+    this.inner.register(adapter);
+  }
+
+  registeredProfiles(): readonly ProviderProfile[] {
+    return this.inner.registeredProfiles();
+  }
+
+  async callLlm(_profile: ProviderProfile, _request: LlmRequest): Promise<LlmResponse> {
+    this.controller.abort();
+    throw new Error('provider failed while cancellation raced');
+  }
+}
+
 describe('run lifecycle (offline replay)', () => {
   let storeRoot: string;
   let store: RunStore;
@@ -153,29 +188,24 @@ describe('run lifecycle (offline replay)', () => {
   });
 
   it('emits run_started → stage events → run_completed with monotonic seq', async () => {
-    // Delayed calls give the poll time to attach the listener at CREATED
-    // state (the initial checkpoint is persisted before stage 1 runs).
-    const delayed = new DelayedGateway(baseGateway, 25);
-    const cpPromise = new Promise<string>((resolve) => {
-      const timer = setInterval(() => {
-        const ids = store.listRunIds();
-        if (ids.length > 0) {
-          clearInterval(timer);
-          resolve(ids[0]!);
-        }
-      }, 2);
-    });
-
-    const execution = executeResearchRun({
-      ...offlineArgs(delayed, 'Does stellar activity inflate hot Jupiter radii?'),
-    });
-    const runId = await cpPromise;
     const collected: ResearchRunEvent[] = [];
-    const unsubscribe = addRunEventListener(runId, (e) => collected.push(e));
-    await execution;
-    unsubscribe();
+    let preparedRunId: string | undefined;
+    let preparedState: string | undefined;
+    const subscription: { unsubscribe: (() => void) | null } = { unsubscribe: null };
+    const run = await executeResearchRun({
+      ...offlineArgs(baseGateway, 'Does stellar activity inflate hot Jupiter radii?'),
+      onRunPrepared: (runId) => {
+        preparedRunId = runId;
+        preparedState = store.loadCheckpoint(runId)?.state;
+        subscription.unsubscribe = addRunEventListener(runId, (event) => collected.push(event));
+      },
+    });
+    subscription.unsubscribe?.();
 
     const types = collected.map((e) => e.type);
+    assert.equal(preparedRunId, run.runId, 'prepared callback exposes the executor-owned id');
+    assert.equal(preparedState, 'CREATED', 'initial checkpoint is durable before the callback');
+    assert.equal(types[0], 'run_started', 'subscription is installed before the first event');
     assert.ok(types.includes('stage_completed'), 'stage events observed');
     assert.equal(types[types.length - 1], 'run_completed');
     const seqs = collected.map((e) => e.seq);
@@ -288,6 +318,121 @@ describe('run lifecycle (offline replay)', () => {
     assert.throws(() => parseCheckpoint('null'), /not an object/);
   });
 
+  it('RunStore rejects traversal-shaped ids and cross-bound storage records', () => {
+    for (const invalid of [
+      '',
+      '.',
+      '..',
+      '../outside',
+      '..\\outside',
+      '/absolute',
+      'nested/run',
+      'encoded%2Fslash',
+      `x${'a'.repeat(128)}`,
+    ]) {
+      assert.throws(
+        () => store.runDir(invalid),
+        /research run id must be 1\.\.128 ASCII/,
+        invalid,
+      );
+      assert.throws(() => store.loadCheckpoint(invalid), /research run id must/);
+    }
+
+    assert.doesNotThrow(() => assertValidResearchRunId('01M0459R7V71SZTRKMFPEPDYWQ'));
+    assert.doesNotThrow(() => assertValidResearchRunId('rediscovery-cosmology-1994-r0'));
+
+    const checkpoint = {
+      runId: 'bound-a',
+      question: 'Does the storage binding hold?',
+      profile: 'offline_replay',
+      sources: ['openalex'],
+      maxPerQuery: 5,
+      target: 3,
+      state: 'CREATED',
+      completedStages: [],
+      ctx: {},
+      startedAt: '2026-08-17T00:00:00.000Z',
+      updatedAt: '2026-08-17T00:00:00.000Z',
+      error: null,
+      errorKind: null,
+      completedAt: null,
+    } satisfies RunCheckpoint;
+    store.saveCheckpoint(checkpoint);
+    const mismatchedPath = store.checkpointPath('bound-b');
+    store.saveCheckpoint({ ...checkpoint, runId: 'bound-b' });
+    writeFileSync(mismatchedPath, `${JSON.stringify(checkpoint)}\n`, 'utf8');
+    assert.throws(
+      () => store.loadCheckpoint('bound-b'),
+      /runId does not match its storage directory/,
+    );
+  });
+
+  it('RunStore rejects linked run directories and linked storage files', {
+    skip: process.platform === 'win32' ? 'symlink creation needs elevated privileges on Windows' : undefined,
+  }, () => {
+    const outside = mkdtempSync(join(tmpdir(), 'far-research-outside-'));
+    const at = '2026-08-17T00:00:00.000Z';
+    const checkpoint = {
+      runId: 'alias',
+      question: 'OUTSIDE_SENTINEL',
+      profile: 'offline_replay',
+      sources: ['openalex'],
+      maxPerQuery: 5,
+      target: 3,
+      state: 'CREATED',
+      completedStages: [],
+      ctx: {},
+      startedAt: at,
+      updatedAt: at,
+      error: null,
+      errorKind: null,
+      completedAt: null,
+    } satisfies RunCheckpoint;
+    try {
+      writeFileSync(join(outside, 'checkpoint.json'), JSON.stringify(checkpoint), 'utf8');
+      mkdirSync(storeRoot, { recursive: true });
+      symlinkSync(outside, join(storeRoot, 'alias'), 'dir');
+      assert.throws(() => store.loadCheckpoint('alias'), /real directory, not a link/);
+      assert.throws(() => store.runDir('alias'), /real directory, not a link/);
+
+      const fileCheckpoint = { ...checkpoint, runId: 'linked-file' };
+      store.saveCheckpoint(fileCheckpoint);
+      const checkpointPath = store.checkpointPath('linked-file');
+      rmSync(checkpointPath);
+      symlinkSync(join(outside, 'checkpoint.json'), checkpointPath, 'file');
+      assert.throws(() => store.loadCheckpoint('linked-file'), /regular file, not a link/);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('RunStore rejects portable case-fold aliases and leaves no fixed tmp file', () => {
+    const at = '2026-08-17T00:00:00.000Z';
+    const checkpoint = {
+      runId: 'CaseRun',
+      question: 'portable identity',
+      profile: 'offline_replay',
+      sources: ['openalex'],
+      maxPerQuery: 5,
+      target: 3,
+      state: 'CREATED',
+      completedStages: [],
+      ctx: {},
+      startedAt: at,
+      updatedAt: at,
+      error: null,
+      errorKind: null,
+      completedAt: null,
+    } satisfies RunCheckpoint;
+    store.saveCheckpoint(checkpoint);
+    assert.throws(
+      () => store.saveCheckpoint({ ...checkpoint, runId: 'caserun' }),
+      /case-fold collision/,
+    );
+    assert.ok(store.listRunIds().includes('CaseRun'));
+    assert.equal(readdirSync(store.runDir('CaseRun')).some((name) => name.endsWith('.tmp')), false);
+  });
+
   it('cancelRun aborts an active run at the next stage boundary', async () => {
     const slowGateway = new DelayedGateway(baseGateway, 40);
     const execution = executeResearchRun({
@@ -310,6 +455,76 @@ describe('run lifecycle (offline replay)', () => {
     const cp = store.loadCheckpoint(runId)!;
     assert.equal(cp.state, 'CANCELLED');
     assert.ok(cp.completedStages.length >= 1, 'finished stage checkpointed before cancel');
+  });
+
+  it('a real provider failure racing an abort remains FAILED with its root cause', async () => {
+    const controller = new AbortController();
+    let preparedRunId: string | undefined;
+    await assert.rejects(
+      executeResearchRun({
+        ...offlineArgs(
+          new AbortThenFailGateway(baseGateway, controller),
+          'Does stellar activity inflate hot Jupiter radii?',
+        ),
+        signal: controller.signal,
+        onRunPrepared: (runId) => {
+          preparedRunId = runId;
+        },
+      }),
+      /provider failed while cancellation raced/,
+    );
+    assert.ok(preparedRunId !== undefined);
+    const checkpoint = store.loadCheckpoint(preparedRunId);
+    assert.ok(checkpoint !== null);
+    assert.equal(checkpoint.state, 'FAILED');
+    assert.equal(checkpoint.errorKind, 'pipeline');
+    assert.equal(checkpoint.error, 'provider failed while cancellation raced');
+  });
+
+  it('cancellation accepted at the final durable boundary stays CANCELLED and resumes without repeated stages', async () => {
+    let preparedRunId: string | undefined;
+    let cancelAccepted = false;
+    const subscription: { unsubscribe: (() => void) | null } = { unsubscribe: null };
+
+    const execution = executeResearchRun({
+      ...offlineArgs(baseGateway, 'Does stellar activity inflate hot Jupiter radii?'),
+      onRunPrepared: (runId) => {
+        preparedRunId = runId;
+        subscription.unsubscribe = addRunEventListener(runId, (event) => {
+          if (event.type === 'stage_completed' && event.stageId === 'plan') {
+            cancelAccepted = cancelRun(runId);
+          }
+        });
+      },
+    });
+
+    try {
+      await assert.rejects(execution, /aborted/i);
+    } finally {
+      subscription.unsubscribe?.();
+    }
+    assert.ok(preparedRunId !== undefined, 'executor must expose its authoritative run id');
+    assert.equal(cancelAccepted, true, 'final-boundary cancellation reached the active controller');
+
+    const cancelled = store.loadCheckpoint(preparedRunId);
+    assert.ok(cancelled !== null);
+    assert.equal(cancelled.state, 'CANCELLED');
+    assert.equal(cancelled.errorKind, 'aborted');
+    assert.equal(cancelled.completedStages.length, 8, 'final stage is durable before cancellation');
+    assert.equal(cancelled.completedStages.at(-1), 'plan');
+    assert.ok(!existsSync(store.runPath(preparedRunId)), 'cancelled execution must not publish a completed run');
+
+    const resumeGateway = new CountingGateway(baseGateway);
+    const resumed = await executeResearchRun({
+      gateway: resumeGateway,
+      profile: 'offline_replay',
+      grounding: { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) },
+      runId: preparedRunId,
+      store,
+    });
+    assert.equal(resumeGateway.calls, 0, 'resume reuses all eight durable stages');
+    assert.equal(verifyResearchRunDeterministic(resumed).status, 'PASS');
+    assert.equal(store.loadCheckpoint(preparedRunId)?.state, 'COMPLETED');
   });
 });
 

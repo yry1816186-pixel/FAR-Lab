@@ -23,6 +23,7 @@ import type {
 } from '../../src/evidence_log/index.ts';
 
 const OFFLINE: AppendRecordOptions = { providerProfile: 'offline_replay' };
+const PROTECTED_SECRET = 'test-jwt-secret-do-not-use-in-prod';
 
 function openDb(): Database.Database {
   const db = new Database(':memory:');
@@ -129,5 +130,34 @@ test('D1-1: metrics query failure returns 500 (honest observability, no masking)
     assert.match(res.body, /metrics query failed/, 'error body must be readable');
   } finally {
     await app.close();
+  }
+});
+
+test('protected mode keeps exact /metrics probe anonymous when a query string is present', async () => {
+  const db = openDb();
+  const app = await buildServer({
+    db,
+    gitCommitSha: 'b'.repeat(40),
+    jwtSecret: PROTECTED_SECRET,
+    logger: false,
+  });
+  let observedPrincipal: { userId: string; role: string } | undefined;
+  app.addHook('preHandler', async (request) => {
+    if (request.url === '/metrics?format=prometheus') {
+      observedPrincipal = request.principal;
+    }
+  });
+  try {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/metrics?format=prometheus',
+      headers: { authorization: 'Bearer invalid.jwt.probe-canary' },
+    });
+    assert.equal(response.statusCode, 200);
+    assert.match(response.body, /^# HELP far_lab_evidence_log_total/m);
+    assert.deepEqual(observedPrincipal, { userId: 'anonymous', role: 'anonymous' });
+  } finally {
+    await app.close();
+    db.close();
   }
 });

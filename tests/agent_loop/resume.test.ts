@@ -22,6 +22,7 @@ import type { LlmGateway } from '../../src/llm_gateway/gateway.ts';
 import type { LlmRequest, LlmResponse, ProviderProfile } from '../../src/llm_gateway/types.ts';
 import { runMigrations } from '../../src/db/migrator.ts';
 import { StageReceiptStore, StageReceiptForgedError, verifyReceiptChain } from '../../src/agent_loop/stage_receipt_store.ts';
+import { replaySession } from '../../src/trace/session_recorder.ts';
 
 const INPUT = 'resume oracle probe';
 
@@ -46,7 +47,13 @@ function countingGateway(counter: { calls: number }, failAtCall?: number): LlmGa
   };
 }
 
-async function runLoop(db: Database.Database, storePath: string, gateway: LlmGateway, researchInput: string = INPUT) {
+async function runLoop(
+  db: Database.Database,
+  storePath: string,
+  gateway: LlmGateway,
+  researchInput: string = INPUT,
+  sessionPath?: string,
+) {
   return runAgentLoop({
     runId: `resume-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     researchInput,
@@ -59,6 +66,7 @@ async function runLoop(db: Database.Database, storePath: string, gateway: LlmGat
     evidenceLogDb: db,
     termination: DEFAULT_TERMINATION,
     resumeStorePath: storePath,
+    ...(sessionPath !== undefined ? { sessionPath } : {}),
   });
 }
 
@@ -76,7 +84,8 @@ test('① stage4 后 kill → 重启从 stage5 续跑,stage1-4 不重复', async
     assert.equal(store.receiptCount(), 4, 'stage1-4 收据已签收');
 
     const resumeCounter = { calls: 0 };
-    const second = await runLoop(db, storePath, countingGateway(resumeCounter));
+    const resumeSessionPath = join(dir, 'resume-session.jsonl');
+    const second = await runLoop(db, storePath, countingGateway(resumeCounter), INPUT, resumeSessionPath);
     assert.equal(second.error, null);
     assert.ok(second.verdictNode !== null, '续跑应产出裁决');
     assert.equal(resumeCounter.calls, 2, `stage1-4 不得重复 LLM 调用(应只跑 stage5+stage6,实际 ${resumeCounter.calls})`);
@@ -86,6 +95,13 @@ test('① stage4 后 kill → 重启从 stage5 续跑,stage1-4 不重复', async
     assert.equal(rows.n, 6, `call_records 应为 6(无重复),实际 ${rows.n}`);
     // 快照产物与前序一致(artifacts 完整 6 阶段)
     assert.equal(second.artifacts.length, 6);
+    const resumeEvents = replaySession(resumeSessionPath).events;
+    const starts = resumeEvents.filter((event) => event.kind === 'stage_started');
+    const completions = resumeEvents.filter((event) => event.kind === 'stage_completed');
+    const correlationKey = (event: (typeof resumeEvents)[number]) =>
+      `${String(event.payload?.iteration)}:${event.stageId}`;
+    assert.deepEqual(starts.map(correlationKey), completions.map(correlationKey), '恢复分支不得产生孤儿 stage start');
+    assert.equal(starts.filter((event) => event.payload?.replayedFromReceipt === true).length, 4, 'stage1-4 恢复快照必须显式标 replayed');
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

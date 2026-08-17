@@ -7,8 +7,8 @@
 //   - resume of COMPLETED → exit 1（already COMPLETED）；unknown runId → exit 1；缺参 → exit 2
 //   - gate-refused question → exit 3（no pipeline ran）
 
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -22,6 +22,12 @@ interface FarResult {
   readonly stderr: string;
 }
 
+interface SignalledFarResult extends FarResult {
+  readonly signal: NodeJS.Signals | null;
+  readonly signalSent: boolean;
+  readonly signalAccepted: boolean;
+}
+
 function runFar(args: readonly string[], extraEnv: Record<string, string>): FarResult {
   const r = spawnSync(process.execPath, ['src/cli/far.ts', ...args], {
     encoding: 'utf8',
@@ -30,6 +36,51 @@ function runFar(args: readonly string[], extraEnv: Record<string, string>): FarR
     env: { ...process.env, ...extraEnv },
   });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+}
+
+/** Spawn a real CLI process and deliver the first SIGINT after its run id is durable. */
+function runFarWithFirstSigint(
+  args: readonly string[],
+  extraEnv: Record<string, string>,
+): Promise<SignalledFarResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['src/cli/far.ts', ...args], {
+      env: { ...process.env, ...extraEnv },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let signalSent = false;
+    let signalAccepted = false;
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, 120_000);
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+      if (!signalSent && stderr.includes('run started:')) {
+        signalSent = true;
+        signalAccepted = child.kill('SIGINT');
+      }
+    });
+    child.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.once('close', (status, signal) => {
+      clearTimeout(timeout);
+      if (timedOut) {
+        reject(new Error(`SIGINT CLI probe timed out\nstdout: ${stdout}\nstderr: ${stderr}`));
+        return;
+      }
+      resolve({ status, signal, stdout, stderr, signalSent, signalAccepted });
+    });
+  });
 }
 
 test('far research start → status (COMPLETED 8/8) → resume rejected (exit 1)', () => {
@@ -79,6 +130,45 @@ test('far research start → status (COMPLETED 8/8) → resume rejected (exit 1)
     const resume = runFar(['research', 'resume', runId], env);
     assert.equal(resume.status, 1);
     assert.match(resume.stderr, /already COMPLETED/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('far research start: first real SIGINT → exit 130 + durable CANCELLED checkpoint', {
+  skip: process.platform === 'win32' ? 'Windows does not deliver POSIX SIGINT to child processes' : undefined,
+}, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-research-sigint-'));
+  const runsRoot = join(dir, 'runs');
+  try {
+    const result = await runFarWithFirstSigint(
+      [
+        'research',
+        'start',
+        'Does stellar activity inflate hot Jupiter radii?',
+        '--profile',
+        'offline_replay',
+      ],
+      { FAR_RESEARCH_RUNS_DIR: runsRoot, FAR_RESEARCH_MEMORY: '0' },
+    );
+    assert.equal(result.signalSent, true, `run never exposed a durable id\nstderr: ${result.stderr}`);
+    assert.equal(result.signalAccepted, true, 'OS accepted delivery of the first SIGINT');
+    assert.equal(result.signal, null, 'first SIGINT is graceful, not an OS-level hard kill');
+    assert.equal(result.status, 130, result.stderr);
+    assert.match(result.stderr, /cancelling at the next stage boundary/);
+    assert.match(result.stderr, /run cancelled — resume with:/);
+    assert.doesNotMatch(result.stderr, /run completed/);
+
+    const store = new RunStore(runsRoot);
+    const runIds = store.listRunIds();
+    assert.equal(runIds.length, 1, 'the signalled process owns exactly one authoritative run id');
+    const runId = runIds[0];
+    assert.ok(runId !== undefined);
+    const checkpoint = store.loadCheckpoint(runId);
+    assert.ok(checkpoint !== null);
+    assert.equal(checkpoint.state, 'CANCELLED');
+    assert.equal(checkpoint.errorKind, 'aborted');
+    assert.ok(!existsSync(store.runPath(runId)), 'cancelled CLI must not publish a completed run');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -134,6 +224,13 @@ test('far research status/resume: unknown runId → exit 1; missing arg → exit
     const unknownResume = runFar(['research', 'resume', 'no-such-run'], env);
     assert.equal(unknownResume.status, 1);
     assert.match(unknownResume.stderr, /no run no-such-run/);
+
+    for (const command of ['status', 'resume']) {
+      const traversal = runFar(['research', command, '../outside'], env);
+      assert.equal(traversal.status, 2);
+      assert.match(traversal.stderr, /research run id must be 1\.\.128 ASCII/);
+      assert.doesNotMatch(traversal.stdout + traversal.stderr, /OUTSIDE_SENTINEL/);
+    }
 
     const noArgResume = runFar(['research', 'resume'], env);
     assert.equal(noArgResume.status, 2);

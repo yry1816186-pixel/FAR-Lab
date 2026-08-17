@@ -10,7 +10,8 @@
  *   POST /api/v1/planning/spec    — Spec 可验证规格校验（validateSpec）
  *   POST /api/v1/planning/gate    — 四步门函数验证报告（buildGateReport）
  *
- * 契约：v1 onSend hook 统一包装 { ok: true, data: T }；ajv 校验失败 → 400 VALIDATION_FAILED（RFC 7807）。
+ * 契约：handler 显式返回 { ok: true, data: T }；v1 preSerialization hook 识别后不双包；
+ * ajv 校验失败 → 400 VALIDATION_FAILED（RFC 7807）。
  */
 
 import type { FastifyInstance } from 'fastify';

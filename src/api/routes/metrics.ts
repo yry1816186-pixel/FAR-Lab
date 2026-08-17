@@ -26,6 +26,26 @@ export interface MetricsRouteConfig {
   readonly processStartMs?: number;
 }
 
+const PROMETHEUS_TEXT_RESPONSE = {
+  type: 'string',
+  description: 'Prometheus text exposition format 0.0.4',
+} as const;
+
+const METRICS_RESPONSE_SCHEMAS = {
+  200: {
+    description: 'Current process and FAR-Lab database gauges',
+    content: {
+      'text/plain': { schema: PROMETHEUS_TEXT_RESPONSE },
+    },
+  },
+  500: {
+    description: 'Metrics collection failed; plain-text diagnostic without fabricated samples',
+    content: {
+      'text/plain': { schema: { type: 'string' } },
+    },
+  },
+} as const;
+
 /** Prometheus 文本格式单样本行。 */
 function sample(name: string, value: number, label?: { name: string; value: string }): string {
   const labels = label === undefined ? '' : `{${label.name}="${label.value}"}`;
@@ -97,7 +117,7 @@ export async function registerMetricsRoutes(
   app: FastifyInstance,
   config: MetricsRouteConfig,
 ): Promise<void> {
-  app.get('/metrics', async (_request, reply) => {
+  app.get('/metrics', { schema: { response: METRICS_RESPONSE_SCHEMAS } }, async (_request, reply) => {
     // 指标查询失败不伪装——返回 500 + 可读错误（可观测面本身必须诚实）。
     let metrics: ReturnType<typeof collectDbMetrics>;
     try {
