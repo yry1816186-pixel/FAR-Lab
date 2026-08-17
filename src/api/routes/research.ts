@@ -31,9 +31,11 @@ import { createReplayAdapter } from '../../retrieval/index.ts';
 import {
   RunStore,
   DEFAULT_RUNS_ROOT,
+  assertValidResearchRunId,
   executeResearchRun,
   addRunEventListener,
   cancelRun,
+  type ExecuteResearchRunArgs,
   type RunCheckpoint,
 } from '../../research/run_lifecycle.ts';
 import { RESEARCH_STAGE_IDS } from '../../research/orchestrator.ts';
@@ -86,6 +88,10 @@ export interface ResearchRouteConfig {
   readonly profile?: ProviderProfile;
   /** SSE keepalive ping interval in ms (default 15000; lowered in tests). */
   readonly eventsPingMs?: number;
+  /** File-backed lifecycle store override for embedders and failure-injection tests. */
+  readonly store?: RunStore;
+  /** Lifecycle executor override for deterministic concurrency/failure tests. */
+  readonly executeRun?: (args: ExecuteResearchRunArgs) => Promise<ResearchRun>;
 }
 
 /** Checkpoint summary served by GET /:runId/status and the SSE `state` frame. */
@@ -143,18 +149,33 @@ function isTerminalState(state: string): boolean {
 
 export async function registerResearchRoutes(
   app: FastifyInstance,
-  _config?: ResearchRouteConfig,
+  config?: ResearchRouteConfig,
 ): Promise<void> {
   // File-backed store is the truth (default .far/research-runs; env override
   // read once per registration so each server instance is test-pointable).
-  const store = new RunStore(process.env.FAR_RESEARCH_RUNS_DIR ?? DEFAULT_RUNS_ROOT);
-  const pingMs = _config?.eventsPingMs ?? 15_000;
+  const store = config?.store ?? new RunStore(process.env.FAR_RESEARCH_RUNS_DIR ?? DEFAULT_RUNS_ROOT);
+  const executeRun = config?.executeRun ?? executeResearchRun;
+  const pingMs = config?.eventsPingMs ?? 15_000;
   // Write-through cache only: lets old tests / concurrent reads resolve runs
   // without disk round-trips; the store remains the source of truth.
   const registry = new Map<string, ResearchRun>();
 
+  /** Treat an unsafe path identifier as invalid client input, never store corruption. */
+  const requireValidRunId = (runId: string): void => {
+    try {
+      assertValidResearchRunId(runId);
+    } catch {
+      throw new ApiError({
+        statusCode: 400,
+        errorCode: 'invalid_research_run_id',
+        message: 'research run id has an invalid format',
+      });
+    }
+  };
+
   /** Load a checkpoint or throw a structured error (404 unknown / 500 corrupt). */
   const requireCheckpoint = (runId: string): RunCheckpoint => {
+    requireValidRunId(runId);
     let cp: RunCheckpoint | null;
     try {
       cp = store.loadCheckpoint(runId);
@@ -196,38 +217,85 @@ export async function registerResearchRoutes(
       ? [...new Set([...body.sources, body.source])]
       : [...body.sources];
 
-    // Background execution: never awaited here. Failures are recorded in the
-    // checkpoint by executeResearchRun; this .catch only logs (§ brief).
-    const known = new Set(store.listRunIds());
-    void executeResearchRun({
-      question: body.question,
-      gateway: pipeline.gateway,
-      profile: pipeline.providerProfile,
-      grounding: {
-        ...(sources.length > 1 ? { sources } : { source: sources[0] ?? 'openalex' }),
-        maxPerQuery: body.maxPerQuery,
-        ...(pipeline.replayRetrieval
-          ? { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) }
-          : {}),
-      },
-      targetHypothesisCount: body.target,
-      store,
-    })
-      .then((run) => {
-        registry.set(run.runId, run);
-      })
-      .catch((err: unknown) => {
-        request.log.warn(`research run failed (recorded in checkpoint): ${err instanceof Error ? err.message : String(err)}`);
-      });
+    // A per-request preparation handshake owns the returned id. Directory-set
+    // inference is ambiguous when another worker/request creates a checkpoint
+    // in the same store between observations. The real executor invokes this
+    // callback synchronously after its first durable checkpoint; the Promise
+    // fallback also makes pre-preparation rejection explicit and handled.
+    const preparation: { runId?: string; settled: boolean } = { settled: false };
+    let resolvePrepared!: (runId: string) => void;
+    let rejectPrepared!: (reason: unknown) => void;
+    const prepared = new Promise<string>((resolve, reject) => {
+      resolvePrepared = resolve;
+      rejectPrepared = reject;
+    });
+    const rejectPreparation = (err: unknown): void => {
+      if (!preparation.settled) {
+        preparation.settled = true;
+        rejectPrepared(err);
+      }
+    };
+    const logExecutionFailure = (err: unknown): void => {
+      rejectPreparation(err);
+      request.log.warn(`research run failed (recorded in checkpoint): ${err instanceof Error ? err.message : String(err)}`);
+    };
 
-    // executeResearchRun persists its first checkpoint synchronously before its
-    // first await, so the new run id is on disk by the time we get here.
-    const runId = store.listRunIds().find((id) => !known.has(id));
-    if (runId === undefined) {
+    try {
+      const execution = executeRun({
+        question: body.question,
+        gateway: pipeline.gateway,
+        profile: pipeline.providerProfile,
+        grounding: {
+          ...(sources.length > 1 ? { sources } : { source: sources[0] ?? 'openalex' }),
+          maxPerQuery: body.maxPerQuery,
+          ...(pipeline.replayRetrieval
+            ? { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) }
+            : {}),
+        },
+        targetHypothesisCount: body.target,
+        store,
+        onRunPrepared: (runId) => {
+          if (preparation.settled) return;
+          preparation.runId = runId;
+          preparation.settled = true;
+          resolvePrepared(runId);
+        },
+      });
+      // Attach the rejection observer in the same turn as executor invocation:
+      // even an already-rejected async function cannot become unhandled.
+      void execution
+        .then((run) => {
+          if (!preparation.settled) {
+            rejectPreparation(new Error('research executor resolved before reporting its prepared run id'));
+          }
+          registry.set(run.runId, run);
+        })
+        .catch(logExecutionFailure);
+    } catch (err) {
+      // The production executor is async (so throws become rejections), but an
+      // injected/alternate executor may still throw before returning a Promise.
+      logExecutionFailure(err);
+    }
+
+    let runId: string;
+    try {
+      // No await/microtask hop on the production fast path: the callback is
+      // synchronous and the response retains the existing immediate-202 timing.
+      runId = preparation.runId ?? await prepared;
+      assertValidResearchRunId(runId);
+      const checkpoint = store.loadCheckpoint(runId);
+      if (checkpoint === null) {
+        throw new Error('prepared run id has no durable checkpoint');
+      }
+      if (checkpoint.question !== body.question || checkpoint.profile !== pipeline.providerProfile) {
+        throw new Error('prepared run checkpoint does not belong to this request');
+      }
+    } catch (err) {
       throw new ApiError({
         statusCode: 500,
         errorCode: 'research_run_start_failed',
-        message: 'run did not start (no checkpoint was written)',
+        message: 'run did not start with a valid request-owned checkpoint',
+        cause: err,
       });
     }
     reply.code(202);
@@ -362,6 +430,7 @@ export async function registerResearchRoutes(
 
   /** Load a run file (corrupt → structured 500). */
   const loadRunFile = (runId: string): ResearchRun | null => {
+    requireValidRunId(runId);
     try {
       return store.loadRun(runId);
     } catch (err) {

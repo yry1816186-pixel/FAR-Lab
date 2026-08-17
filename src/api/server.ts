@@ -67,6 +67,36 @@ function resolveCorsOrigin(corsOrigins: readonly string[] | undefined): string[]
 }
 
 /**
+ * Wire contract for GET /api/v1/llm-status.
+ *
+ * The schema describes the final V1 success envelope because the V1
+ * preSerialization hook wraps route payloads before Fastify selects and runs
+ * its response serializer.
+ */
+const LLM_STATUS_RESPONSE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['ok', 'data'],
+  properties: {
+    ok: { type: 'boolean', enum: [true] },
+    data: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['profile', 'keyConfigured'],
+      properties: {
+        profile: { type: 'string', nullable: true },
+        keyConfigured: { type: 'boolean' },
+      },
+    },
+  },
+} as const;
+
+/** Return true only for the explicit V1 success-envelope shape. */
+function isV1SuccessEnvelope(payload: object): boolean {
+  return 'ok' in payload && payload.ok === true && 'data' in payload;
+}
+
+/**
  * 构建 Fastify 实例（不启动监听·用于测试）。
  *
  * 插件注册顺序（24§1.3）：
@@ -144,33 +174,23 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
 
   await app.register(async (v1) => {
     // R-05 契约统一收尾（P1-3）：v1 成功响应统一 { ok: true, data: T } 信封。
-    // 实现方式：onSend hook 统一包装，路由代码零改动。
+    // 实现方式：preSerialization hook 在 Fastify response schema 序列化前统一包装。
+    // 这使 schema 描述真实 wire envelope，且不会让 bare handler payload 先被 envelope
+    // serializer 裁空或因缺少 required:ok/data 而失败。
     // 边界（fail-closed，零误包）：
     //   - statusCode >= 400 不包（RFC 7807 错误信封由 error_handler 产出，禁止二次包装）
-    //   - 非 JSON / SSE（text/event-stream，hijack 流）不包
-    //   - payload 无法解析为对象时不包（防御畸形响应，宁可原样透传）
+    //   - 已手工包装的 { ok: true, data: T } 不双包
+    //   - Fastify 不对 string / Buffer / stream / null 调用 preSerialization，因此
+    //     HTML、纯文本、SSE/hijack 和流式响应保持原样
     // 前端对应：api_client.ts parseV1Response 在边界解包（single source of truth）。
-    v1.addHook('onSend', async (_request, reply, payload) => {
+    v1.addHook('preSerialization', async (_request, reply, payload) => {
       if (reply.statusCode >= 400) {
         return payload;
       }
-      const contentType = reply.getHeader('content-type');
-      if (typeof contentType !== 'string' || !contentType.includes('application/json')) {
+      if (typeof payload !== 'object' || payload === null || isV1SuccessEnvelope(payload)) {
         return payload;
       }
-      if (typeof payload !== 'string' || payload.length === 0) {
-        return payload;
-      }
-      try {
-        const body: unknown = JSON.parse(payload);
-        if (typeof body === 'object' && body !== null && !('ok' in body)) {
-          return JSON.stringify({ ok: true, data: body });
-        }
-        return payload;
-      } catch {
-        // 畸形 JSON 透传（防御性；正常情况下 fastify 序列化不会产生非法 JSON）。
-        return payload;
-      }
+      return { ok: true, data: payload };
     });
 
     await registerHypothesizeRoute(v1, {
@@ -205,10 +225,14 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     });
     // WS-A.1：/llm-status 暴露运行期 LLM 状态给前端（profile + keyConfigured·不泄漏 key）。
     // 无 key 时 profile=null（诚实：LLM 端点 fail-closed，无静默回放兜底）。
-    v1.get('/llm-status', () => ({
-      profile: keyConfigured ? String(llmProfile) : null,
-      keyConfigured,
-    }));
+    v1.get(
+      '/llm-status',
+      { schema: { response: { 200: LLM_STATUS_RESPONSE_SCHEMA } } },
+      () => ({
+        profile: keyConfigured ? String(llmProfile) : null,
+        keyConfigured,
+      }),
+    );
     // 规划门禁方法论源代码化：确定性门禁引擎 HTTP 层（P0-P4 分级 / Plan/Spec 校验 / 门禁报告）
     const { registerPlanningRoutes } = await import('./routes/planning.ts');
     await registerPlanningRoutes(v1);

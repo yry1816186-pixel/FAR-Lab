@@ -14,6 +14,7 @@
  */
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { AGENT_RUN_EVENT_KINDS } from './agent_run_event.ts';
 import type { AgentRunEventKind } from './agent_run_event.ts';
@@ -69,40 +70,172 @@ export function serializeEvent(event: Omit<SessionEvent, 'seq'> & { seq?: number
   return JSON.stringify(base);
 }
 
+const PRIVATE_KEY_BLOCK_PATTERN = /-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----[\s\S]*?-----END \1-----/gi;
+const PRIVATE_KEY_REMAINDER_PATTERN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*/gi;
+const SECRET_VALUE_PATTERN = /sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|\bBearer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/gi;
+const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const INTERNATIONAL_PHONE_PATTERN = /\+\d(?:[\d .()-]{5,}\d)/g;
+const SECRET_KEY_SUFFIX_PATTERN = /(?:token|secret|password|passphrase|apikey|authorization|credential|privatekey|accesskey|cookie|sessionid)(?:value|header)?s?$/;
+const PII_KEY_PATTERN = /(?:email|e_mail|phone|mobile|address|full_?name|first_?name|last_?name|ssn|social_security_number)s?$/i;
+const REDACTED = '[REDACTED]';
+const REDACTED_PII = '[REDACTED_PII]';
+
+function redactText(value: string): string {
+  return value
+    .replace(PRIVATE_KEY_BLOCK_PATTERN, REDACTED)
+    .replace(PRIVATE_KEY_REMAINDER_PATTERN, REDACTED)
+    .replace(SECRET_VALUE_PATTERN, REDACTED)
+    .replace(EMAIL_PATTERN, REDACTED_PII)
+    .replace(INTERNATIONAL_PHONE_PATTERN, REDACTED_PII);
+}
+
+function isSecretKey(key: string): boolean {
+  const normalized = key.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  return normalized === 'auth'
+    || normalized === 'authheader'
+    || normalized === 'oauth'
+    || normalized === 'bearer'
+    || SECRET_KEY_SUFFIX_PATTERN.test(normalized);
+}
+
+/** 脱敏顶层关联标识：不泄露原值，但保留同值间的稳定关联。 */
+function redactIdentifier(value: string): string {
+  if (redactText(value) === value) return value;
+  const digest = createHash('sha256').update('far-session-redacted-id\0').update(value).digest('hex').slice(0, 16);
+  return `redacted-${digest}`;
+}
+
+/** 深度脱敏：secret 形状值与敏感键名的值替换为 [REDACTED]（录制路径统一执行——文件永不落密）。 */
+export function redactPayload(value: unknown): unknown {
+  if (typeof value === 'string') {
+    // 只用 replace（内部从 0 扫描且重置 lastIndex）；避免全局正则 .test() 的 lastIndex 状态陷阱。
+    return redactText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactPayload(item));
+  }
+  if (typeof value === 'object' && value !== null) {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      const safeKey = redactText(key);
+      if (isSecretKey(key)) {
+        out[safeKey] = REDACTED;
+      } else if (PII_KEY_PATTERN.test(key)) {
+        out[safeKey] = REDACTED_PII;
+      } else {
+        out[safeKey] = redactPayload(item);
+      }
+    }
+    return out;
+  }
+  return value;
+}
+
+export interface SessionRecorderOptions {
+  /** 显式关闭（优先于环境变量与采样）。关闭态：不建目录、不落盘、record no-op。 */
+  readonly enabled?: boolean;
+  /** 确定性采样率 (0,1]，默认 1（全量）。按 runId 整体判定，避免孤儿生命周期事件。 */
+  readonly samplingRate?: number;
+}
+
+function assertEventContract(event: Omit<SessionEvent, 'seq'>): void {
+  if (event.runId.trim().length === 0) {
+    throw new Error('session_recorder: runId must be non-empty');
+  }
+  if (!event.ts.endsWith('Z') || Number.isNaN(Date.parse(event.ts))) {
+    throw new Error(`session_recorder: ts must be a valid UTC timestamp, got '${redactText(event.ts)}'`);
+  }
+  const stageEvent = event.kind === 'stage_started' || event.kind === 'stage_completed';
+  if (stageEvent && (event.stageId === undefined || event.stageId.trim().length === 0)) {
+    throw new Error(`session_recorder: ${event.kind} requires a non-empty stageId`);
+  }
+}
+
+function lastSequence(path: string): number {
+  if (!existsSync(path)) return 0;
+  let maximum = 0;
+  for (const event of replaySession(path).events) {
+    if (Number.isSafeInteger(event.seq) && event.seq >= 1) {
+      maximum = Math.max(maximum, event.seq);
+    }
+  }
+  return maximum;
+}
+
 /**
  * 运行时 Session 录制器（追加式 JSONL）。
  * open(path) → record(event) × N → close()。
+ * 可观测性三旋钮（ENG-OBS-001）：FAR_SESSION_RECORD=off / opts.enabled=false → 完全关闭；
+ * opts.samplingRate ∈ (0,1) → 确定性抽样；录制路径统一 secret 脱敏。
  */
 export class SessionRecorder {
   private readonly path: string;
+  private readonly enabled: boolean;
+  private readonly samplingRate: number;
   private seq: number;
+  private events: number;
   private bytes: number;
   private closed: boolean;
 
-  private constructor(path: string) {
+  private constructor(path: string, enabled: boolean, samplingRate: number, initialSeq: number) {
     this.path = path;
-    this.seq = 0;
+    this.enabled = enabled;
+    this.samplingRate = samplingRate;
+    this.seq = initialSeq;
+    this.events = 0;
     this.bytes = 0;
     this.closed = false;
   }
 
   /** 打开录制器（目录自动创建；已有文件继续追加——多 run 可共用 session 文件）。 */
-  static open(path: string): SessionRecorder {
+  static open(path: string, options: SessionRecorderOptions = {}): SessionRecorder {
+    const enabled = options.enabled ?? process.env.FAR_SESSION_RECORD !== 'off';
+    if (!enabled) {
+      return new SessionRecorder(path, false, 1, 0);
+    }
+    const rate = options.samplingRate ?? 1;
+    if (!(rate > 0 && rate <= 1)) {
+      throw new Error(`session_recorder: samplingRate must be in (0,1], got ${rate}`);
+    }
     mkdirSync(dirname(path), { recursive: true });
-    return new SessionRecorder(path);
+    return new SessionRecorder(path, true, rate, lastSequence(path));
   }
 
-  /** 追加一条事件（kind 校验；已关闭 → 抛错）。返回事件序号。 */
+  /** 采样判定（确定性）：同一 runId 的全部事件共享决策。 */
+  private sampled(runId: string): boolean {
+    if (this.samplingRate >= 1) return true;
+    const prefix = createHash('sha256').update(`run|${runId}`).digest().readUInt32BE(0);
+    return prefix / 0x1_0000_0000 < this.samplingRate;
+  }
+
+  /** 追加一条事件（kind 校验；已关闭 → 抛错；关闭态/被采样掉 → no-op）。返回写入的事件序号（未写入 = 0）。 */
   record(event: Omit<SessionEvent, 'seq'>): number {
     if (this.closed) {
       throw new Error('session_recorder: recorder is closed');
     }
+    if (!this.enabled) {
+      return 0;
+    }
     assertEventKind(event.kind);
-    this.seq += 1;
-    const line = `${serializeEvent({ ...event, seq: this.seq })}\n`;
+    assertEventContract(event);
+    if (!this.sampled(event.runId)) {
+      return 0;
+    }
+    const nextSeq = this.seq + 1;
+    const payload = event.payload === undefined ? undefined : (redactPayload(event.payload) as Record<string, unknown>);
+    const line = `${serializeEvent({
+      seq: nextSeq,
+      ts: event.ts,
+      kind: event.kind,
+      runId: redactIdentifier(event.runId),
+      ...(event.stageId !== undefined ? { stageId: redactIdentifier(event.stageId) } : {}),
+      ...(payload !== undefined ? { payload } : {}),
+    })}\n`;
     appendFileSync(this.path, line, 'utf8');
+    this.seq = nextSeq;
+    this.events += 1;
     this.bytes += Buffer.byteLength(line, 'utf8');
-    return this.seq;
+    return nextSeq;
   }
 
   /** 关闭录制器（幂等）。 */
@@ -112,7 +245,7 @@ export class SessionRecorder {
 
   /** 统计（未关闭也可查）。 */
   stats(): SessionStats {
-    return { events: this.seq, bytes: this.bytes };
+    return { events: this.events, bytes: this.bytes };
   }
 }
 

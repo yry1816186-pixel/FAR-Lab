@@ -55,6 +55,7 @@
     "test:llm_gateway": "node --test tests/llm_gateway/*.test.ts",
     "test:math": "node --test tests/math/*.test.ts",
     "test:statistics": "node --test tests/statistics/*.test.ts",
+    "test:risk-map": "node scripts/test_risk_map_check.mjs",
     "test:golden_vectors": "node --test tests/golden_vectors/*.test.ts",
     "test:real_backends": "node --test tests/real_backends/*.test.ts",
     "test:py": "node scripts/ensure_py_deps.mjs && node scripts/run_py_tests.mjs",

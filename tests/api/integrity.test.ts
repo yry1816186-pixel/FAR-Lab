@@ -32,6 +32,12 @@ import type {
 } from '../../src/evidence_log/index.ts';
 import { verifyMerkleInclusionProof } from '../../src/evidence_log/merkle_root.ts';
 import { buildReproReceipt } from '../../src/api/routes/integrity.ts';
+import {
+  IntegrityProofEnvelopeSchema,
+  IntegrityRootEnvelopeSchema,
+  ReproReceiptDataSchema,
+  ReproReceiptEnvelopeSchema,
+} from '../../src/api/routes/integrity_schemas.ts';
 
 const OFFLINE_OPTIONS: AppendRecordOptions = {
   providerProfile: 'offline_replay',
@@ -117,6 +123,7 @@ test('GET /api/v1/integrity/root empty db → ZERO_MERKLE_ROOT + null chainHead'
   try {
     const response = await app.inject({ method: 'GET', url: '/api/v1/integrity/root' });
     assert.equal(response.statusCode, 200);
+    assert.equal(IntegrityRootEnvelopeSchema.safeParse(response.json()).success, true);
     const body = (response.json() as { readonly ok: boolean; readonly data: RootDto }).data;
     assert.equal(body.merkleRoot, '0'.repeat(64), 'empty chain root must be ZERO_MERKLE_ROOT');
     assert.equal(body.leafCount, 0);
@@ -163,7 +170,16 @@ test('GET /api/v1/integrity/proof/:seq rejects non-positive-integer seq with 400
     logger: false,
   });
   try {
-    for (const badSeq of ['0', '-1', 'abc']) {
+    for (const badSeq of [
+      '0',
+      '-1',
+      'abc',
+      '1abc',
+      '1.5',
+      '1e2',
+      '01',
+      '9007199254740993',
+    ]) {
       const response = await app.inject({
         method: 'GET',
         url: `/api/v1/integrity/proof/${badSeq}`,
@@ -171,6 +187,8 @@ test('GET /api/v1/integrity/proof/:seq rejects non-positive-integer seq with 400
       assert.equal(response.statusCode, 400, `seq=${badSeq} must be 400`);
       const body = response.json() as { error_code: string };
       assert.equal(body.error_code, 'BAD_REQUEST');
+      assert.match(response.headers['content-type'] ?? '', /^application\/problem\+json/);
+      assert.equal('ok' in body, false, 'problem response must not be success-wrapped');
     }
   } finally {
     await app.close();
@@ -218,6 +236,7 @@ test('GET /api/v1/integrity/proof/:seq returns a proof that verifies independent
     });
     assert.equal(proofResponse.statusCode, 200);
     const proof = (proofResponse.json() as { readonly ok: boolean; readonly data: ProofDto }).data;
+    assert.equal(IntegrityProofEnvelopeSchema.safeParse(proofResponse.json()).success, true);
     assert.equal(proof.seq, target.seq);
     assert.equal(proof.leaf, target.currentHash);
 
@@ -253,6 +272,7 @@ test('GET /api/v1/integrity/receipt returns schemaVersion=1 + all fields + gitCo
   try {
     const response = await app.inject({ method: 'GET', url: '/api/v1/integrity/receipt' });
     assert.equal(response.statusCode, 200);
+    assert.equal(ReproReceiptEnvelopeSchema.safeParse(response.json()).success, true);
     const receipt = (response.json() as { readonly ok: boolean; readonly data: {
       schemaVersion: number;
       merkleRoot: string;
@@ -281,6 +301,43 @@ test('GET /api/v1/integrity/receipt returns schemaVersion=1 + all fields + gitCo
     await app.close();
     db.close();
   }
+});
+
+test('integrity response schemas reject malformed hashes, missing proof fields, and receipt drift', () => {
+  assert.equal(IntegrityProofEnvelopeSchema.safeParse({
+    ok: true,
+    data: {
+      seq: 1,
+      leafIndex: 0,
+      leaf: 'a'.repeat(63),
+      siblings: [],
+      expectedRoot: 'b'.repeat(64),
+      leafCount: 1,
+    },
+  }).success, false);
+  assert.equal(IntegrityProofEnvelopeSchema.safeParse({
+    ok: true,
+    data: {
+      seq: 1,
+      leafIndex: 0,
+      leaf: 'a'.repeat(64),
+      siblings: [],
+      leafCount: 1,
+    },
+  }).success, false);
+
+  const receipt = {
+    schemaVersion: 1,
+    merkleRoot: '0'.repeat(64),
+    leafCount: 0,
+    chainHeadSeq: null,
+    chainHeadHash: null,
+    gitCommitSha: null,
+    generatedAt: '2026-08-17T00:00:00.000Z',
+  } as const;
+  assert.equal(ReproReceiptDataSchema.safeParse(receipt).success, true);
+  assert.equal(ReproReceiptDataSchema.safeParse({ ...receipt, schemaVersion: 2 }).success, false);
+  assert.equal(ReproReceiptDataSchema.safeParse({ ...receipt, generatedAt: 'not-a-date' }).success, false);
 });
 
 test('buildReproReceipt honors injected now (deterministic generatedAt·no time nondeterminism)', () => {

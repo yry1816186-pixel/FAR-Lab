@@ -6,7 +6,7 @@
  *   2. replaySession 回放（行序保持·损坏行跳过计数·空行忽略）。
  *   3. 未知 kind 校验抛错。
  *   4. serializeEvent 可选字段（stageId/payload 条件展开）。
- *   5. fsm_runner 集成：传 sessionPath → run 后 JSONL 含 run_started/stage_completed/run_completed。
+ *   5. fsm_runner 集成：传 sessionPath → run 后 JSONL 含成对 stage_started/stage_completed。
  *   6. 零回归：不传 sessionPath → 六阶段照常产出（session 可选字段不影响既有路径）。
  */
 
@@ -207,7 +207,7 @@ test('defaultSessionPath nests under sessions dir', () => {
   assert.ok(p.endsWith('run-abc.jsonl'), `path should end with run-abc.jsonl: ${p}`);
 });
 
-test('fsm_runner integration: sessionPath produces run_started/stage_completed/run_completed', async () => {
+test('fsm_runner integration: sessionPath produces paired stage lifecycle events', async () => {
   const dir = tempDir();
   try {
     const sessionPath = join(dir, 'run.jsonl');
@@ -221,6 +221,13 @@ test('fsm_runner integration: sessionPath produces run_started/stage_completed/r
     assert.equal(kinds[kinds.length - 1], 'run_completed', 'last event is run_completed');
     const stageEvents = kinds.filter((k) => k === 'stage_completed');
     assert.ok(stageEvents.length >= 3, `expected >=3 stage_completed, got ${stageEvents.length}`);
+    const stageStarts = replay.events.filter((event) => event.kind === 'stage_started');
+    const stageCompletions = replay.events.filter((event) => event.kind === 'stage_completed');
+    assert.deepEqual(
+      stageStarts.map((event) => `${String(event.payload?.iteration)}:${event.stageId}`),
+      stageCompletions.map((event) => `${String(event.payload?.iteration)}:${event.stageId}`),
+      'production session must preserve stage_started/stage_completed correlation',
+    );
     const completed = replay.events[kinds.length - 1]!;
     assert.equal(completed.payload?.iterations, 1);
     assert.equal(replay.skippedLines, 0);

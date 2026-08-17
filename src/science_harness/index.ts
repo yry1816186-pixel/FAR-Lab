@@ -17,6 +17,7 @@ export type {
   SandboxResourceSpec,
   ArtifactManifest,
   SandboxRunResult,
+  ThreadLimitReason,
   SandboxExecutionInput,
   SandboxAdapter,
   DatasetResolverKind,

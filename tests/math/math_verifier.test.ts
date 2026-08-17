@@ -240,11 +240,13 @@ test('verify returns unknown when CAS backend unavailable (fresh-clone degradati
 
 test('verify returns unknown when Lean4 backend unavailable (fresh-clone degradation)', async () => {
   const formalBackend = new FakeBackend('lean4', 'verified', false);
-  const verifier = new MathVerifier({ formalBackend });
+  const dafnyBackend = new FakeBackend('dafny', 'verified', false);
+  const verifier = new MathVerifier({ formalBackend, dafnyBackend });
   const claim = makeClaim({ claimKind: 'algebraic_identity', requiredLevel: 'L3_formal' });
   const record = await verifier.verify(claim);
   assert.equal(record.outcome, 'unknown');
   assert.equal(record.compileLog, 'backend_disabled');
+  assert.equal(dafnyBackend.callCount, 0, 'unavailable fallback is never invoked');
 });
 
 // ============================================================

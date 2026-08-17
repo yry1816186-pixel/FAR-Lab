@@ -21,6 +21,39 @@ export interface HealthRouteConfig {
   readonly db: Database;
 }
 
+const HEALTH_RESPONSE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['status', 'service', 'timestamp'],
+  properties: {
+    status: { type: 'string', enum: ['ok'] },
+    service: { type: 'string', enum: ['far-chain-api'] },
+    timestamp: { type: 'string', description: 'UTC ISO-8601 observation time' },
+  },
+} as const;
+
+function readyResponseSchema(status: 'ready' | 'not_ready', database: 'ok' | 'fail') {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['status', 'service', 'checks', 'timestamp'],
+    properties: {
+      status: { type: 'string', enum: [status] },
+      service: { type: 'string', enum: ['far-chain-api'] },
+      checks: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['database'],
+        properties: { database: { type: 'string', enum: [database] } },
+      },
+      timestamp: { type: 'string', description: 'UTC ISO-8601 observation time' },
+    },
+  } as const;
+}
+
+const READY_RESPONSE_SCHEMA = readyResponseSchema('ready', 'ok');
+const NOT_READY_RESPONSE_SCHEMA = readyResponseSchema('not_ready', 'fail');
+
 /**
  * 注册健康检查路由（/health + /ready）。
  *
@@ -30,7 +63,7 @@ export async function registerHealthRoutes(
   app: FastifyInstance,
   config: HealthRouteConfig,
 ): Promise<void> {
-  app.get('/health', async () => {
+  app.get('/health', { schema: { response: { 200: HEALTH_RESPONSE_SCHEMA } } }, async () => {
     const body: HealthResponse = {
       status: 'ok',
       service: 'far-chain-api',
@@ -39,7 +72,14 @@ export async function registerHealthRoutes(
     return body;
   });
 
-  app.get('/ready', async (_request, reply) => {
+  app.get('/ready', {
+    schema: {
+      response: {
+        200: READY_RESPONSE_SCHEMA,
+        503: NOT_READY_RESPONSE_SCHEMA,
+      },
+    },
+  }, async (_request, reply) => {
     let dbOk: 'ok' | 'fail' = 'ok';
     try {
       config.db.prepare('SELECT 1 AS one').get();

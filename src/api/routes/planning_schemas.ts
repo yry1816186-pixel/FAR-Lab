@@ -5,7 +5,8 @@
  *   - zod schema 是契约唯一真相源：路由层验证、OpenAPI 生成、契约测试均从此派生。
  *   - 业务 schema（Plan/Spec/VerificationReport/Checkpoint）来自 src/planning/types.ts（单一真相源，
  *     不重复定义）；本文件只定义 API 视图层：RiskSignals 请求 + 响应视图。
- *   - 统一成功信封 { ok: true, data: T }（v1 onSend hook 自动包装）+ 失败 RFC 7807（error_handler）。
+ *   - 统一成功信封 { ok: true, data: T }（handler 显式返回，v1 preSerialization 不双包）
+ *     + 失败 RFC 7807（error_handler）。
  *   - 响应 schema 使用 .passthrough() 防止 fast-json-stringify 丢弃 data 内额外字段。
  *
  * 端点清单：
@@ -118,7 +119,7 @@ export const GateReportResponseSchema = z
 // ===========================================================================
 //
 // 注意：planning 路由的 handler **手动返回统一信封** { ok: true, data: T }
-// （与 v2_receipts 同模式，src/api/routes/v2_receipts.ts）。原因：v1 onSend hook
+// （与 v2_receipts 同模式，src/api/routes/v2_receipts.ts）。原因：v1 preSerialization hook
 // 用 `!('ok' in body)` 判断是否已包装——plan/spec 门禁结果本身含 ok 键（{ok,
 // violations, ...}），若返回裸对象会被 hook 误判为"已包装"而跳过信封包装。
 // 手动包信封 + response schema 带信封（ok 字段），序列化与 wire 形态一致。

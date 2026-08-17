@@ -65,6 +65,24 @@ test('permutation: determinism — same seed ⇒ identical extremeCount/pValue',
   assert.equal(r1.observedStatistic, r2.observedStatistic);
 });
 
+test('permutation: frozen end-to-end shuffle reference vector', () => {
+  // Locks the private unbiased bounded-index mapping without widening the public API.
+  assert.deepEqual(
+    permutationTestMeanDifference(
+      [0.5, 2, 7, 11],
+      [1, 3.5, 4],
+      { seed: 20260817, iterations: 37 },
+    ),
+    {
+      observedStatistic: 2.2916666666666665,
+      pValue: 21 / 38,
+      iterations: 37,
+      extremeCount: 20,
+      seed: 20260817,
+    },
+  );
+});
+
 test('permutation: different seeds → Monte Carlo noise (extremeCount may differ across seeds)', () => {
   // Different seeds should produce *similar but not necessarily identical* extremeCounts
   // (Monte Carlo variance of order sqrt(iterations)). We assert that at least the outputs
@@ -113,6 +131,150 @@ test('permutation: observedStatistic = mean(s1) − mean(s2)', () => {
   });
   // mean([1,2,3,4]) = 2.5; mean([10,20,30,40]) = 25; T_obs = 2.5 − 25 = −22.5
   assert.ok(Math.abs(r.observedStatistic - (-22.5)) < 1e-12);
+});
+
+test('permutation: observedStatistic correctly rounds the exact supplied-double mean difference', () => {
+  const maximum = Number.MAX_VALUE;
+  const result = permutationTestMeanDifference(
+    [maximum, maximum, -maximum],
+    [maximum, 0, 1],
+    { seed: 0, iterations: 1 },
+  );
+
+  // Treating the supplied doubles as exact dyadic rationals gives
+  // (MAX + MAX - MAX) / 3 - (MAX + 0 + 1) / 3 = -1/3.
+  // A floating accumulation path instead loses the unit and can report either
+  // zero or a huge spurious residual depending on row order.
+  assert.equal(result.observedStatistic, -1 / 3);
+});
+
+test('permutation: a representably smaller near-boundary statistic is not widened into a tie', () => {
+  // seed=14 puts [10, 8.999999999] in the first group for the sole permutation.
+  // Its |T_k| is 4.9999999995, strictly below |T_obs|=5.0000000005 by 1e-9.
+  // The exact dyadic implementation must retain strict >= semantics rather than
+  // hiding a real ordering behind an arbitrary scale-wide epsilon.
+  const result = permutationTestMeanDifference([10, 9], [8.999999999, 0], {
+    seed: 14,
+    iterations: 1,
+  });
+  assert.equal(result.extremeCount, 0);
+  assert.equal(result.pValue, 0.5);
+});
+
+test('permutation: exact-double comparison does not promote ULP-near integer statistics to ties', () => {
+  // Independent Python Fraction(float.as_integer_ratio()) oracle with the frozen
+  // canonical unbiased shuffle stream gives 27 extreme draws. The former
+  // raw-input ULP band widened genuinely smaller statistics into ties.
+  const result = permutationTestMeanDifference(
+    [9999999999999924, 9999999999999986, 9999999999999968, 9999999999999914],
+    [10000000000000088, 10000000000000082, 9999999999999968, 9999999999999940],
+    { seed: 2654435761, iterations: 100 },
+  );
+  assert.equal(result.extremeCount, 27);
+  assert.equal(result.pValue, 28 / 101);
+});
+
+test('permutation: finite opposite-sign extremes remain valid under exact dyadic arithmetic', () => {
+  const maximum = Number.MAX_VALUE;
+  const result = permutationTestMeanDifference(
+    [maximum, maximum],
+    [maximum, -maximum],
+    { seed: 9, iterations: 20 },
+  );
+  assert.equal(result.observedStatistic, maximum);
+  assert.equal(Number.isNaN(result.pValue), false);
+  assert.equal(result.pValue, 1);
+});
+
+test('permutation: unrepresentable observed mean difference fails closed with rescaling guidance', () => {
+  const maximum = Number.MAX_VALUE;
+  assert.throws(
+    () => permutationTestMeanDifference(
+      [maximum, maximum],
+      [-maximum, -maximum],
+      { seed: 1, iterations: 1 },
+    ),
+    (error: unknown) => error instanceof RangeError
+      && /mean difference exceeds the finite IEEE-754 range; rescale inputs/.test(error.message),
+  );
+});
+
+test('permutation: exact rounding at the finite-overflow boundary is fail-closed only at infinity', () => {
+  const maximum = Number.MAX_VALUE;
+  const belowHalfUlp = 2 ** 969;
+  const halfUlp = 2 ** 970;
+
+  // MAX + 2^969 is one quarter of the conceptual overflow ULP above MAX and
+  // therefore rounds back to the largest finite binary64 value.
+  assert.equal(
+    permutationTestMeanDifference([maximum], [-belowHalfUlp], { seed: 0, iterations: 1 })
+      .observedStatistic,
+    maximum,
+  );
+  // MAX + 2^970 is exactly the overflow midpoint. MAX's significand is odd,
+  // so ties-to-even selects infinity; the public finite-result contract rejects it.
+  assert.throws(
+    () => permutationTestMeanDifference([maximum], [-halfUlp], { seed: 0, iterations: 1 }),
+    (error: unknown) => error instanceof RangeError
+      && /mean difference exceeds the finite IEEE-754 range; rescale inputs/.test(error.message),
+  );
+});
+
+test('permutation: unrepresentable permuted statistic fails closed instead of emitting a plausible p-value', () => {
+  const maximum = Number.MAX_VALUE;
+  assert.throws(
+    () => permutationTestMeanDifference(
+      [maximum, -maximum],
+      [maximum, -maximum],
+      { seed: 0, iterations: 1 },
+    ),
+    (error: unknown) => error instanceof RangeError
+      && /mean difference exceeds the finite IEEE-754 range; rescale inputs/.test(error.message),
+  );
+});
+
+test('permutation: zero is canonicalized to +0 and representable subnormals remain finite', () => {
+  const zero = permutationTestMeanDifference([-0], [0], { seed: 4, iterations: 5 });
+  assert.equal(zero.observedStatistic, 0);
+  assert.equal(Object.is(zero.observedStatistic, -0), false);
+
+  const tiny = Number.MIN_VALUE;
+  const subnormal = permutationTestMeanDifference(
+    [4 * tiny, 8 * tiny],
+    [0, 4 * tiny],
+    { seed: 4, iterations: 1 },
+  );
+  assert.equal(subnormal.observedStatistic, 4 * tiny);
+  assert.equal(subnormal.extremeCount, 0, 'a zero permuted statistic remains strictly smaller');
+  assert.equal(subnormal.pValue, 0.5);
+
+  const halfwayToTiny = permutationTestMeanDifference([tiny, 0], [0], {
+    seed: 0,
+    iterations: 1,
+  });
+  assert.equal(halfwayToTiny.observedStatistic, 0, 'halfway underflow ties to even zero');
+  assert.equal(Object.is(halfwayToTiny.observedStatistic, -0), false);
+
+  const aboveHalfway = permutationTestMeanDifference([tiny, tiny, 0], [0], {
+    seed: 0,
+    iterations: 1,
+  });
+  assert.equal(aboveHalfway.observedStatistic, tiny, 'two-thirds of a subnormal ULP rounds up');
+});
+
+test('permutation: normal halfway means use ties-to-even rounding', () => {
+  const nextAfterOne = 1 + Number.EPSILON;
+  const halfway = permutationTestMeanDifference([1, nextAfterOne], [0], {
+    seed: 0,
+    iterations: 1,
+  });
+  assert.equal(halfway.observedStatistic, 1);
+
+  const aboveHalfway = permutationTestMeanDifference([1, nextAfterOne, nextAfterOne], [0], {
+    seed: 0,
+    iterations: 1,
+  });
+  assert.equal(aboveHalfway.observedStatistic, nextAfterOne);
 });
 
 // ===== mulberry32 RNG determinism =====

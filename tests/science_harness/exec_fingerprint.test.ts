@@ -223,6 +223,7 @@ test('sandbox_collects_cpu_and_peak_rss: 真 venv 子进程采集 cpu/peak_rss�
       networkBlocked: result.networkBlocked,
       seed: 42,
       singleThreaded: true,
+      threadLimitReason: 'threadpoolctl_verified',
       cpuMs: result.cpuMs,
       peakRssKb: result.peakRssKb,
     });

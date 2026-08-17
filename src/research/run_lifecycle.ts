@@ -23,9 +23,19 @@
  *     the ResearchRun + stage receipts + deterministic verify.
  */
 
-import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import type { Dirent } from 'node:fs';
 import { loadCorpusSnapshotStore, resolveSnapshotStoreDir } from '../retrieval/snapshot_store.ts';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { ulid } from 'ulid';
 import type { LlmGateway } from '../llm_gateway/gateway.ts';
 import type { ProviderProfile } from '../llm_gateway/types.ts';
@@ -46,6 +56,17 @@ import {
 } from './orchestrator.ts';
 import { ResearchabilityBlockedError } from './researchability_gate.ts';
 import type { ResearchRun } from './types.ts';
+import {
+  RESEARCH_RUN_ID_PATTERN,
+  assertValidResearchRunId,
+  renameWithRetry,
+} from './run_store_security.ts';
+
+export {
+  InvalidResearchRunIdError,
+  assertValidResearchRunId,
+  renameWithRetry,
+} from './run_store_security.ts';
 
 /** Lifecycle states (directive §16, hypothesis/plan subset). */
 export type ResearchLifecycleState =
@@ -135,54 +156,8 @@ export type ResearchRunEvent =
 /** Default on-disk root for research runs (gitignored via `.far/`). */
 export const DEFAULT_RUNS_ROOT = '.far/research-runs';
 
-/** Error codes Windows intermittently raises when AV/indexers briefly hold a freshly-written file. */
-const TRANSIENT_RENAME_CODES: ReadonlySet<string> = new Set(['EPERM', 'EBUSY', 'EACCES']);
-
-/** Max sync-retry attempts before the in-place fallback (total worst-case wait ≈ 0.6s). */
-const RENAME_RETRIES = 5;
-
-/**
- * Rename with Windows-resilient retries (2026-08-14 live finding: Defender/
- * indexers intermittently hold `checkpoint.json`, making rename-over-existing
- * throw EPERM after ALL stages completed — the run then reported FAILED with
- * everything done). Backoff doubles per attempt; after the final attempt the
- * content is written in place (atomicity is lost but correctness is kept —
- * a torn checkpoint is still structurally validated on load, fail-loud).
- */
-export function renameWithRetry(
-  from: string,
-  to: string,
-  tryRename: (src: string, dest: string) => void = renameSync,
-  sleep: (ms: number) => void = (ms) => {
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-  },
-): void {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= RENAME_RETRIES; attempt += 1) {
-    try {
-      tryRename(from, to);
-      return;
-    } catch (err) {
-      lastError = err;
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code === undefined || !TRANSIENT_RENAME_CODES.has(code)) {
-        throw err; // non-transient (e.g. ENOENT) — retrying cannot help
-      }
-      if (attempt < RENAME_RETRIES) {
-        sleep(20 * 2 ** attempt);
-      }
-    }
-  }
-  // All retries exhausted on a transient lock: write in place as the last
-  // resort, then drop the tmp file (best effort).
-  writeFileSync(to, readFileSync(from, 'utf8'), 'utf8');
-  try {
-    rmSync(from, { force: true });
-  } catch {
-    // tmp cleanup is best-effort; a stale .tmp is harmless and overwritten next save
-  }
-  void lastError;
-}
+/** Process-local suffix prevents concurrent atomic writers sharing one tmp path. */
+let atomicWriteSequence = 0;
 
 /** File-backed run store: one directory per run, atomic JSON writes. */
 export class RunStore {
@@ -192,8 +167,88 @@ export class RunStore {
     this.rootDir = rootDir;
   }
 
+  /** Windows-portable comparison for filesystem identities. */
+  private comparablePath(path: string): string {
+    return process.platform === 'win32' ? path.toLowerCase() : path;
+  }
+
+  /**
+   * Find the exact directory entry and reject case-fold aliases. Enforcing this
+   * on every platform prevents a store created on Linux from becoming
+   * ambiguous or overwriting a different run when moved to Windows.
+   */
+  private findExactRunEntry(runId: string): Dirent | null {
+    if (!existsSync(this.rootDir)) return null;
+    const folded = runId.toLowerCase();
+    const aliases = readdirSync(this.rootDir, { withFileTypes: true })
+      .filter((entry) => entry.name.toLowerCase() === folded);
+    if (aliases.length > 1 || (aliases.length === 1 && aliases[0]!.name !== runId)) {
+      throw new Error('research run id has a case-fold collision in the store');
+    }
+    return aliases[0] ?? null;
+  }
+
+  /** Reject symlink/junction run directories and require their canonical direct-child path. */
+  private assertRunDirectorySafe(runId: string, directory: string): void {
+    const metadata = lstatSync(directory);
+    if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+      throw new Error('research run storage entry must be a real directory, not a link or file');
+    }
+    const canonicalRoot = realpathSync(this.rootDir);
+    const canonicalDirectory = realpathSync(directory);
+    const expectedDirectory = resolve(canonicalRoot, runId);
+    if (this.comparablePath(canonicalDirectory) !== this.comparablePath(expectedDirectory)) {
+      throw new Error('research run storage directory escapes its configured root');
+    }
+  }
+
+  /** Return an existing safe run directory, or null without creating storage. */
+  private existingRunDir(runId: string): string | null {
+    assertValidResearchRunId(runId);
+    const entry = this.findExactRunEntry(runId);
+    if (entry === null) return null;
+    const directory = join(this.rootDir, entry.name);
+    this.assertRunDirectorySafe(runId, directory);
+    return directory;
+  }
+
+  /** Atomically claim a direct child directory, then re-check its canonical identity. */
+  private ensureRunDir(runId: string): string {
+    assertValidResearchRunId(runId);
+    mkdirSync(this.rootDir, { recursive: true });
+    let entry = this.findExactRunEntry(runId);
+    const directory = join(this.rootDir, runId);
+    if (entry === null) {
+      try {
+        mkdirSync(directory);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+      }
+      // Re-scan after mkdir/EEXIST: a concurrent case-fold alias must fail,
+      // and an exact entry must be validated rather than assumed to be ours.
+      entry = this.findExactRunEntry(runId);
+    }
+    if (entry === null) {
+      throw new Error('research run storage directory could not be created');
+    }
+    this.assertRunDirectorySafe(runId, directory);
+    return directory;
+  }
+
+  /** Reject file symlinks and non-files before a read or overwrite. */
+  private assertSafeFileIfPresent(path: string): boolean {
+    if (!existsSync(path)) return false;
+    const metadata = lstatSync(path);
+    if (metadata.isSymbolicLink() || !metadata.isFile()) {
+      throw new Error('research run storage file must be a regular file, not a link or directory');
+    }
+    return true;
+  }
+
   runDir(runId: string): string {
-    return join(this.rootDir, runId);
+    assertValidResearchRunId(runId);
+    const existing = this.existingRunDir(runId);
+    return existing ?? join(this.rootDir, runId);
   }
 
   checkpointPath(runId: string): string {
@@ -206,36 +261,79 @@ export class RunStore {
 
   /** Atomic write (tmp + rename) so a crash mid-write never corrupts state. */
   private writeAtomic(path: string, content: string): void {
-    mkdirSync(join(path, '..'), { recursive: true });
-    writeFileSync(`${path}.tmp`, content, 'utf8');
-    renameWithRetry(`${path}.tmp`, path);
+    this.assertSafeFileIfPresent(path);
+    atomicWriteSequence += 1;
+    const temporaryPath = `${path}.${process.pid}.${atomicWriteSequence}.tmp`;
+    try {
+      writeFileSync(temporaryPath, content, { encoding: 'utf8', flag: 'wx' });
+      this.assertSafeFileIfPresent(temporaryPath);
+      renameWithRetry(temporaryPath, path);
+    } finally {
+      if (existsSync(temporaryPath)) rmSync(temporaryPath, { force: true });
+    }
   }
 
   saveCheckpoint(cp: RunCheckpoint): void {
-    this.writeAtomic(this.checkpointPath(cp.runId), `${JSON.stringify(cp, null, 2)}\n`);
+    const directory = this.ensureRunDir(cp.runId);
+    this.writeAtomic(join(directory, 'checkpoint.json'), `${JSON.stringify(cp, null, 2)}\n`);
   }
 
   loadCheckpoint(runId: string): RunCheckpoint | null {
-    const path = this.checkpointPath(runId);
-    if (!existsSync(path)) return null;
-    return parseCheckpoint(readFileSync(path, 'utf8'));
+    const directory = this.existingRunDir(runId);
+    if (directory === null) return null;
+    const path = join(directory, 'checkpoint.json');
+    if (!this.assertSafeFileIfPresent(path)) return null;
+    const checkpoint = parseCheckpoint(readFileSync(path, 'utf8'));
+    if (checkpoint.runId !== runId) {
+      throw new Error('checkpoint.json runId does not match its storage directory');
+    }
+    return checkpoint;
   }
 
   saveRun(runId: string, run: ResearchRun): void {
-    this.writeAtomic(this.runPath(runId), `${JSON.stringify(run, null, 2)}\n`);
+    if (run.runId !== runId) {
+      throw new Error('ResearchRun runId does not match its storage directory');
+    }
+    const directory = this.ensureRunDir(runId);
+    this.writeAtomic(join(directory, 'research-run.json'), `${JSON.stringify(run, null, 2)}\n`);
   }
 
   loadRun(runId: string): ResearchRun | null {
-    const path = this.runPath(runId);
-    if (!existsSync(path)) return null;
-    return JSON.parse(readFileSync(path, 'utf8')) as ResearchRun;
+    const directory = this.existingRunDir(runId);
+    if (directory === null) return null;
+    const path = join(directory, 'research-run.json');
+    if (!this.assertSafeFileIfPresent(path)) return null;
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    if (
+      typeof parsed !== 'object'
+      || parsed === null
+      || !('runId' in parsed)
+      || parsed.runId !== runId
+    ) {
+      throw new Error('research-run.json runId does not match its storage directory');
+    }
+    return parsed as ResearchRun;
   }
 
   listRunIds(): readonly string[] {
     if (!existsSync(this.rootDir)) return [];
-    return readdirSync(this.rootDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && existsSync(this.checkpointPath(e.name)))
-      .map((e) => e.name)
+    const names = readdirSync(this.rootDir, { withFileTypes: true })
+      .filter((entry) => RESEARCH_RUN_ID_PATTERN.test(entry.name))
+      .map((entry) => entry.name);
+    const caseFolded = new Set<string>();
+    for (const name of names) {
+      const folded = name.toLowerCase();
+      if (caseFolded.has(folded)) {
+        throw new Error('research run ids have a case-fold collision in the store');
+      }
+      caseFolded.add(folded);
+    }
+    return names
+      .filter((name) => {
+        const directory = this.existingRunDir(name);
+        if (directory === null) return false;
+        return this.assertSafeFileIfPresent(join(directory, 'checkpoint.json'));
+      })
       .sort();
   }
 }
@@ -258,6 +356,11 @@ export function parseCheckpoint(raw: string): RunCheckpoint {
     typeof cp.ctx !== 'object' || cp.ctx === null
   ) {
     throw new Error('checkpoint.json is structurally invalid (state/completedStages/ctx)');
+  }
+  try {
+    assertValidResearchRunId(cp.runId);
+  } catch {
+    throw new Error('checkpoint.json has an invalid research run id');
   }
   // Intentional conversion: the critical fields are structurally validated
   // above; TS itself recommends the explicit `unknown` boundary for this
@@ -320,6 +423,12 @@ export interface ExecuteResearchRunArgs {
   readonly disableMemory?: boolean;
   /** Existing run id → resume; omitted → new run (ULID minted). */
   readonly runId?: string;
+  /**
+   * Called exactly once after the initial checkpoint is durable and before the
+   * first lifecycle event.  CLI/API adapters use this authoritative id instead
+   * of racing the run directory to discover which checkpoint was just created.
+   */
+  readonly onRunPrepared?: (runId: string) => void;
   readonly store: RunStore;
   readonly signal?: AbortSignal;
   readonly now?: () => Date;
@@ -451,6 +560,16 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       };
       store.saveCheckpoint(cp);
       emit({ type: 'stage_completed', runId, stageId, at: now().toISOString(), seq: nextSeq() });
+
+      // A stage body may resolve through an entirely synchronous replay chain.
+      // Yield once so an OS SIGINT queued during that work can reach the CLI's
+      // AbortController, then observe cancellation at this *durable* boundary.
+      // Checking after save preserves resume semantics: completed work is never
+      // repeated, including when cancellation lands after the final `plan` stage.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      if (controller.signal.aborted) {
+        throw new AbortedRunError();
+      }
     },
   };
 
@@ -462,6 +581,7 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
     // Persist the initial state immediately: `far research status` and event
     // subscribers must see a CREATED/loaded checkpoint before stage 1 finishes.
     store.saveCheckpoint(cp);
+    args.onRunPrepared?.(runId);
     if (cp.completedStages.length === 0 && cp.state === 'CREATED') {
       emit({ type: 'run_started', runId, question: cp.question, at: now().toISOString(), seq: nextSeq() });
     } else {
@@ -526,6 +646,14 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
       },
       ...(initialCtx !== undefined ? { initialCtx } : {}),
     });
+
+    // Covers an all-stages-complete resume and the narrow interval after the
+    // final stage boundary.  No registry/memory side effect may run after an
+    // accepted cancellation request.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    if (controller.signal.aborted) {
+      throw new AbortedRunError();
+    }
 
     cp = {
       ...cp,
@@ -596,7 +724,11 @@ export async function executeResearchRun(args: ExecuteResearchRunArgs): Promise<
     emit({ type: 'run_completed', runId, runMode: run.runMode, at: now().toISOString(), seq: nextSeq() });
     return run;
   } catch (err) {
-    if (err instanceof AbortedRunError || controller.signal.aborted) {
+    // Cancellation is a classification of the error that crossed a durable
+    // boundary, not merely of concurrent signal state. A provider/callback may
+    // fail at the same moment a user aborts; masking that real failure as
+    // CANCELLED would destroy the resumable checkpoint's root-cause evidence.
+    if (err instanceof AbortedRunError) {
       cp = {
         ...cp,
         state: 'CANCELLED',

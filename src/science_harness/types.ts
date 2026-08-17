@@ -105,8 +105,15 @@ export interface SandboxRunResult {
   readonly networkBlocked: boolean;
   /** 固定种子（默认 42·SR-2·进 reproHash）。 */
   readonly seed: number;
-  /** 单线程标志（SR-7·nthread=1）。 */
+  /**
+   * 受 threadpoolctl 支持的数值线程池是否已限制为 1（SR-7）。
+   * 这不是“整个 Python 进程绝对没有其他线程”的证明。
+   */
   readonly singleThreaded: boolean;
+  /**
+   * singleThreaded 的可审计事实来源。字符串使用稳定机器枚举，并进入 repro fingerprint。
+   */
+  readonly threadLimitReason: ThreadLimitReason;
   /** FUSION-OS-7：用户脚本 CPU 时间毫秒（Python time.process_time·跨平台·非墙钟）。0=未测量。不进 reproHash（非确定性）。 */
   readonly cpuMs: number;
   /** FUSION-OS-7：峰值驻留集 KB（POSIX resource.getrusage·Windows 降级 0）。0=未测量。不进 reproHash。 */
@@ -128,10 +135,45 @@ export interface SandboxExecutionInput {
   readonly outputLimitExceeded?: boolean;
   readonly seed?: number;
   readonly networkBlocked?: boolean;
+  /**
+   * 由真实执行层回传的 SR-7 证据。缺省为 false/not_attested，禁止 hash-only
+   * 路径凭空宣称已施加单线程限制。
+   */
+  readonly singleThreaded?: boolean;
+  readonly threadLimitReason?: ThreadLimitReason;
   /** FUSION-OS-7：用户脚本 CPU 时间毫秒（缺省 0=未测量·V1 类型层 caller 不提供）。 */
   readonly cpuMs?: number;
   /** FUSION-OS-7：峰值驻留集 KB（缺省 0=未测量）。 */
   readonly peakRssKb?: number;
+}
+
+/** SR-7 数值线程限制回执的稳定失败/成功分类。 */
+export type ThreadLimitReason =
+  | 'threadpoolctl_verified'
+  | 'threadpoolctl_applied_no_supported_pools'
+  | 'threadpoolctl_unavailable'
+  | 'threadpoolctl_setup_failed'
+  | 'threadpoolctl_verification_failed'
+  | 'threadpool_limit_not_one'
+  | 'manifest_missing_thread_limit_attestation'
+  | 'execution_not_started'
+  | 'execution_interrupted'
+  | 'not_attested';
+
+/** Python 子进程 JSON wire 解析后、hash 计算前的内部执行结果。 */
+export interface RawVenvResult {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly artifacts: readonly ArtifactManifest[];
+  readonly wallClockMs: number;
+  readonly timedOut: boolean;
+  readonly outputLimitExceeded: boolean;
+  readonly networkBlocked: boolean;
+  readonly singleThreaded: boolean;
+  readonly threadLimitReason: ThreadLimitReason;
+  readonly cpuMs: number;
+  readonly peakRssKb: number;
 }
 
 /**

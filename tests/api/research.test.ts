@@ -12,13 +12,14 @@
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import Fastify from 'fastify';
 
 import { buildServer } from '../../src/api/server.ts';
+import { errorHandler } from '../../src/api/errors/error_handler.ts';
 import { runMigrations } from '../../src/db/index.ts';
 import { registerResearchRoutes } from '../../src/api/routes/research.ts';
 import { RunStore, executeResearchRun, type RunCheckpoint } from '../../src/research/run_lifecycle.ts';
@@ -27,6 +28,7 @@ import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offli
 import type { LlmRequest, LlmResponse, ProviderAdapter, ProviderProfile } from '../../src/llm_gateway/types.ts';
 import { createReplayAdapter } from '../../src/retrieval/index.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../src/research/research_fixtures.ts';
+import type { ResearchRun } from '../../src/research/types.ts';
 
 // Per-process store root (read once per route registration — set before makeApp).
 const storeRoot = mkdtempSync(join(tmpdir(), 'far-research-api-'));
@@ -58,6 +60,26 @@ interface StatusRow {
   readonly runReady: boolean;
   readonly error: string | null;
   readonly errorKind: string | null;
+}
+
+function makeCreatedCheckpoint(runId: string, question: string): RunCheckpoint {
+  const at = new Date().toISOString();
+  return {
+    runId,
+    question,
+    profile: 'offline_replay',
+    sources: ['openalex'],
+    maxPerQuery: 5,
+    target: 3,
+    state: 'CREATED',
+    completedStages: [],
+    ctx: {},
+    startedAt: at,
+    updatedAt: at,
+    error: null,
+    errorKind: null,
+    completedAt: null,
+  };
 }
 
 /** Poll GET /:runId/status until the run reaches one of `states` (fail on timeout). */
@@ -141,6 +163,161 @@ test('POST /api/v1/research → 202 CREATED + runId; COMPLETED run retrievable w
   }
 });
 
+test('concurrent POST preparations return the callback-owned runId despite reverse interleaving and directory order', async () => {
+  const isolatedRoot = mkdtempSync(join(tmpdir(), 'far-research-api-interleaved-'));
+  const store = new RunStore(isolatedRoot);
+  const app = Fastify({ logger: false });
+  const firstQuestion = 'Does intervention alpha change endpoint one?';
+  const secondQuestion = 'Does intervention beta change endpoint two?';
+  const firstRunId = 'far-z-owned-by-first-request';
+  const secondRunId = 'far-a-owned-by-second-request';
+  const runIdByQuestion = new Map([
+    [firstQuestion, firstRunId],
+    [secondQuestion, secondRunId],
+  ]);
+  interface PendingExecution {
+    readonly args: Parameters<typeof executeResearchRun>[0];
+    readonly reject: (reason: unknown) => void;
+    settled: boolean;
+  }
+  const pending: PendingExecution[] = [];
+  const unhandled: unknown[] = [];
+  const recordUnhandled = (reason: unknown): void => {
+    unhandled.push(reason);
+  };
+  process.on('unhandledRejection', recordUnhandled);
+
+  // Deliberately hold request 1 at preparation. Request 2 then persists and
+  // reports first, followed by request 1, while both executions remain in
+  // flight. A shared directory-set difference has no request ownership here.
+  const executeInterleaved: typeof executeResearchRun = (args) =>
+    new Promise<ResearchRun>((_resolve, reject) => {
+      pending.push({ args, reject, settled: false });
+      if (pending.length !== 2) return;
+      const first = pending[0];
+      const second = pending[1];
+      assert.ok(first !== undefined && second !== undefined);
+      for (const entry of [second, first]) {
+        const question = entry.args.question;
+        assert.ok(question !== undefined);
+        const runId = runIdByQuestion.get(question);
+        assert.ok(runId !== undefined);
+        entry.args.store.saveCheckpoint(makeCreatedCheckpoint(runId, question));
+        entry.args.onRunPrepared?.(runId);
+      }
+    });
+
+  const rejectPending = (entry: PendingExecution, message: string): void => {
+    if (entry.settled) return;
+    entry.settled = true;
+    entry.reject(new Error(message));
+  };
+
+  try {
+    await registerResearchRoutes(app, { store, executeRun: executeInterleaved });
+    const firstResponsePromise = app.inject({
+      method: 'POST',
+      url: '/research',
+      payload: { question: firstQuestion, profile: 'offline_replay' },
+    });
+    const secondResponsePromise = app.inject({
+      method: 'POST',
+      url: '/research',
+      payload: { question: secondQuestion, profile: 'offline_replay' },
+    });
+    const [firstResponse, secondResponse] = await Promise.all([firstResponsePromise, secondResponsePromise]);
+
+    assert.equal(firstResponse.statusCode, 202);
+    assert.equal(secondResponse.statusCode, 202);
+    const firstCreated = firstResponse.json() as { runId: string; state: string };
+    const secondCreated = secondResponse.json() as { runId: string; state: string };
+    assert.deepEqual(firstCreated, { runId: firstRunId, state: 'CREATED', statusUrl: `/api/v1/research/${firstRunId}/status`, eventsUrl: `/api/v1/research/${firstRunId}/events` });
+    assert.deepEqual(secondCreated, { runId: secondRunId, state: 'CREATED', statusUrl: `/api/v1/research/${secondRunId}/status`, eventsUrl: `/api/v1/research/${secondRunId}/events` });
+    assert.deepEqual(store.listRunIds(), [secondRunId, firstRunId], 'lexicographic directory order is the reverse of request order');
+    assert.equal(store.loadCheckpoint(firstRunId)?.question, firstQuestion);
+    assert.equal(store.loadCheckpoint(secondRunId)?.question, secondQuestion);
+
+    // Settle in reverse request order after both 202 responses. The route's
+    // same-turn rejection observers must consume both background failures.
+    const first = pending[0];
+    const second = pending[1];
+    assert.ok(first !== undefined && second !== undefined);
+    rejectPending(second, 'controlled second execution shutdown');
+    rejectPending(first, 'controlled first execution shutdown');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    for (const entry of pending) {
+      rejectPending(entry, 'test cleanup');
+    }
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    process.off('unhandledRejection', recordUnhandled);
+    await app.close();
+    rmSync(isolatedRoot, { recursive: true, force: true });
+  }
+});
+
+test('preparation failures and unbound callback ids return structured 500 without unhandled rejection', async () => {
+  const rejectedExecutor: typeof executeResearchRun = async () => {
+    throw new Error('controlled rejected preparation');
+  };
+  const throwingExecutor: typeof executeResearchRun = () => {
+    throw new Error('controlled synchronous preparation throw');
+  };
+  const invalidIdExecutor: typeof executeResearchRun = (args) => {
+    args.onRunPrepared?.('../outside');
+    return new Promise<ResearchRun>(() => {});
+  };
+  const missingCheckpointExecutor: typeof executeResearchRun = (args) => {
+    args.onRunPrepared?.('ghost-run');
+    return new Promise<ResearchRun>(() => {});
+  };
+  const wrongOwnerExecutor: typeof executeResearchRun = (args) => {
+    args.store.saveCheckpoint(makeCreatedCheckpoint('other-run', 'A different request'));
+    args.onRunPrepared?.('other-run');
+    return new Promise<ResearchRun>(() => {});
+  };
+  const cases: ReadonlyArray<{ readonly name: string; readonly executeRun: typeof executeResearchRun }> = [
+    { name: 'rejected Promise', executeRun: rejectedExecutor },
+    { name: 'synchronous throw', executeRun: throwingExecutor },
+    { name: 'invalid callback id', executeRun: invalidIdExecutor },
+    { name: 'callback without checkpoint', executeRun: missingCheckpointExecutor },
+    { name: 'callback bound to another request', executeRun: wrongOwnerExecutor },
+  ];
+  const unhandled: unknown[] = [];
+  const recordUnhandled = (reason: unknown): void => {
+    unhandled.push(reason);
+  };
+  process.on('unhandledRejection', recordUnhandled);
+  try {
+    for (const failureCase of cases) {
+      const isolatedRoot = mkdtempSync(join(tmpdir(), 'far-research-api-start-failure-'));
+      const app = Fastify({ logger: false });
+      app.setErrorHandler(errorHandler);
+      try {
+        await registerResearchRoutes(app, {
+          store: new RunStore(isolatedRoot),
+          executeRun: failureCase.executeRun,
+        });
+        const response = await app.inject({
+          method: 'POST',
+          url: '/research',
+          payload: { question: 'Does a controlled preparation failure stay handled?', profile: 'offline_replay' },
+        });
+        assert.equal(response.statusCode, 500, failureCase.name);
+        assert.equal((response.json() as { error_code: string }).error_code, 'research_run_start_failed', failureCase.name);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      } finally {
+        await app.close();
+        rmSync(isolatedRoot, { recursive: true, force: true });
+      }
+    }
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off('unhandledRejection', recordUnhandled);
+  }
+});
+
 test('GET /api/v1/research → run list rows; status 404 unknown; frozen-run 404 unknown id', async () => {
   const app = await makeApp();
   try {
@@ -172,6 +349,40 @@ test('GET /api/v1/research → run list rows; status 404 unknown; frozen-run 404
     }
   } finally {
     await app.close();
+  }
+});
+
+test('encoded path traversal runId is rejected before any sibling checkpoint can be read', async () => {
+  const parent = mkdtempSync(join(tmpdir(), 'far-research-api-boundary-'));
+  const runsRoot = join(parent, 'runs');
+  const outsideDir = join(parent, 'outside');
+  mkdirSync(outsideDir, { recursive: true });
+  writeFileSync(
+    join(outsideDir, 'checkpoint.json'),
+    `${JSON.stringify(makeCreatedCheckpoint('../outside', 'OUTSIDE_SENTINEL'))}\n`,
+    'utf8',
+  );
+  const app = Fastify({ logger: false });
+  try {
+    app.setErrorHandler(errorHandler);
+    await registerResearchRoutes(app, { store: new RunStore(runsRoot) });
+
+    for (const probe of [
+      { method: 'GET' as const, url: '/research/%2e%2e%2foutside/status' },
+      { method: 'GET' as const, url: '/research/%2e%2e%2foutside' },
+      { method: 'POST' as const, url: '/research/%2e%2e%2foutside/feedback', payload: {
+        source: 'human', actor: 'red-team', text: 'must not reach outside storage',
+      } },
+    ]) {
+      const response = await app.inject(probe);
+      assert.equal(response.statusCode, 400, `${probe.method} ${probe.url}: ${response.body}`);
+      const body = response.json() as { error_code: string; message: string };
+      assert.equal(body.error_code, 'invalid_research_run_id');
+      assert.doesNotMatch(response.body, /OUTSIDE_SENTINEL/);
+    }
+  } finally {
+    await app.close();
+    rmSync(parent, { recursive: true, force: true });
   }
 });
 
@@ -385,7 +596,7 @@ test('GET /api/v1/research/:runId/events → SSE state snapshot + forwarded even
       createLlmGateway([createOfflineReplayAdapter({ fixtures: RESEARCH_DEMO_FIXTURES })]),
       60,
     );
-    const known = new Set(store.listRunIds());
+    const preparation: { runId?: string } = {};
     const execution = executeResearchRun({
       question: 'Does stellar activity inflate hot Jupiter radii?',
       gateway,
@@ -393,9 +604,12 @@ test('GET /api/v1/research/:runId/events → SSE state snapshot + forwarded even
       grounding: { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) },
       targetHypothesisCount: 3,
       store,
+      onRunPrepared: (runId) => {
+        preparation.runId = runId;
+      },
     });
-    const runId = store.listRunIds().find((id) => !known.has(id));
-    assert.ok(runId !== undefined, 'checkpoint written synchronously at run start');
+    const runId = preparation.runId;
+    assert.ok(runId !== undefined, 'executor reports its id after the initial checkpoint is durable');
 
     const res = await fetch(`${base}/api/v1/research/${runId}/events`, {
       signal: AbortSignal.timeout(15_000),

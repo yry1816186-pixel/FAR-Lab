@@ -7,8 +7,8 @@
 //   - src/science_harness/sandbox_runner.ts:spawnVenv（spawn(pythonCmd, [SANDBOX_RUNNER_PY])）
 //   - repro/science_harness/sandbox_runner.py:main（threadpoolctl(1)+seed+exec 用户脚本+emit JSON+scan_artifacts）
 //
-// 诚实边界：缺 python = 环境问题 → t.skip（不当代码 bug）。缺 threadpoolctl 不 skip
-// （sandbox 优雅降级，确定性 Python random 不依赖它）。
+// 诚实边界：缺 python = 环境问题 → t.skip（不当代码 bug）。threadpoolctl 是 SR-7
+// 执行前置条件；缺失/失效时必须非零退出且 singleThreaded=false，不得继续脚本。
 //
 // Authority: P1-6 + 12 §1.2 SR-2/SR-3/SR-5/SR-7。
 
@@ -47,6 +47,11 @@ test('venv sandbox: real spawn executes deterministic script + computes sha256 h
     assert.equal(result.seed, 42, 'SR-2 seed must flow into result');
     assert.equal(result.networkBlocked, true, 'default networkPolicy=off -> networkBlocked=true (SR-5)');
     assert.equal(result.singleThreaded, true, 'SR-7 nthread=1');
+    assert.ok(
+      result.threadLimitReason === 'threadpoolctl_verified'
+        || result.threadLimitReason === 'threadpoolctl_applied_no_supported_pools',
+      `SR-7 must carry a successful threadpoolctl receipt, got ${result.threadLimitReason}`,
+    );
     assert.equal(result.timedOut, false);
     assert.match(result.stdoutHash, /^[0-9a-f]{64}$/, 'stdoutHash must be real sha256');
     assert.match(result.stderrHash, /^[0-9a-f]{64}$/, 'stderrHash must be real sha256');
