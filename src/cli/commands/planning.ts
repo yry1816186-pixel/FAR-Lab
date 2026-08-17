@@ -281,6 +281,10 @@ function runCheckpoint(args: readonly string[], json: boolean): number {
       blockers: [],
       excludedApproaches: [],
       assumptions: [],
+      valueHypothesis: '示例：预期交付什么价值给谁（可被后续证据证实/证伪）',
+      successCriteria: ['示例：怎么算达成（可验收判据）'],
+      evidenceGaps: [],
+      unachieved: [],
     });
     if (json) {
       process.stdout.write(`${JSON.stringify(cp)}\n`);
