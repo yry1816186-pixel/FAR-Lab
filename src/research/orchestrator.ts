@@ -472,6 +472,7 @@ export async function runResearch(opts: RunResearchOptions): Promise<ResearchRun
           ? { memoryPrior: memoryInjection.summary }
           : {}),
         ...(memoryInjection !== null ? { knownMemoryHashes: memoryInjection.knownContentMarkers } : {}),
+        ...(memoryInjection !== null ? { knownMemoryReferences: memoryInjection.knownStatements } : {}),
       });
       ctx.hypotheses = fanout.hypotheses;
       ctx.fanoutMeta = fanout.meta;

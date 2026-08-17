@@ -76,6 +76,29 @@ export interface FarProofExportResult {
 /**
  * 导出 .far-proof/ 完整证据包。
  */
+/**
+ * Third-party metadata attribution (compliance audit 2026-08-17 §5.1).
+ * Constant text — every .far-proof bundle carries it; the verifier renders it
+ * at recompute time so the notice travels with the Produced Work (ODC-BY 4.3).
+ */
+export const SOURCES_ATTRIBUTION_TEXT = [
+  'This bundle contains bibliographic metadata and abstracts retrieved from',
+  'OpenAlex (openalex.org), Crossref (crossref.org), and arXiv (arxiv.org).',
+  "OpenAlex data: CC0 per OpenAlex's license statement (attribution given",
+  'voluntarily; if ODC-BY terms apply to any portion, this notice satisfies',
+  'ODC-BY 4.3 — opendatacommons.org/licenses/by/1-0/). Crossref metadata reused',
+  'per api.crossref.org terms; abstracts are included only where the source',
+  'record carries a permissive license. arXiv descriptive metadata incl.',
+  'abstracts: CC0 1.0 (info.arxiv.org/help/api/tou.html). No full texts are',
+  'redistributed.',
+].join('\n');
+
+function writeSourcesAttribution(outputDir: string): string {
+  const filePath = join(outputDir, 'SOURCES-ATTRIBUTION.txt');
+  writeFileSync(filePath, `${SOURCES_ATTRIBUTION_TEXT}\n`, 'utf8');
+  return filePath;
+}
+
 export function exportFarProof(input: FarProofExportInput): FarProofExportResult {
   const { db, outputDir, runId, modelSnapshot, gitCommitSha, envHash } = input;
   const exportedAt = input.exportedAt ?? new Date().toISOString();
@@ -130,6 +153,10 @@ export function exportFarProof(input: FarProofExportInput): FarProofExportResult
 
   // 8. manifest（code/ 目录诚实说明：快照在 HEAD，重放靠 git checkout）
   filesWritten.push(writeCodeManifest(outputDir, gitCommitSha));
+
+  // 8b. SOURCES-ATTRIBUTION.txt（day-r13 合规审计 §5.1/C2：ODC-BY 4.3 归属
+  // 义务随 Produced Work 分发——在 integrity 计算前写入，纳入防篡改清单）。
+  filesWritten.push(writeSourcesAttribution(outputDir));
 
   // DEF-17: 全分量 sha256 清单(V-09 静默组闭合)——所有分量写入后生成 integrity.json。
   // far verify bundle 经 bundle_verifier 机检全分量内容(非仅白名单存在性)。

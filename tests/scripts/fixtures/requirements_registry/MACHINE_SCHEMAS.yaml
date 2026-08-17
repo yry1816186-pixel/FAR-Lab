@@ -1,0 +1,4 @@
+# fixture machine schemas — pattern identical to the deployed constitution package
+schemaVersion: "1"
+normativeSource:
+  requirementBlockPattern: '^### \[REQ:(?<id>[A-Z0-9-]+)\]\[(?<tier>T0|T1|T2|T3)\]\[owner:(?<owner>[^\]]+)\]\[scope:(?<scope>[^\]]+)\] (?<title>.+)$'

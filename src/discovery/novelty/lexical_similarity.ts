@@ -143,6 +143,17 @@ export function paraphraseSimilarity(
 export const PARAPHRASE_THRESHOLD = 0.85;
 
 /**
+ * Research-memory near-duplicate threshold (day-r13). Lower than the
+ * paraphrase DROP threshold because a memory flag is marking-only (grade C/F
+ * on the scorecard, no selection power, no candidate dropped) — false marks
+ * are cheap and visible in the rationale, while the paraphrase gate kills a
+ * candidate outright and must stay conservative. Calibration: ±0.05 moves
+ * borderline regenerated paraphrases between flagged/unflagged; pinned by
+ * boundary tests in tests/research/memory_near_dup.test.ts.
+ */
+export const MEMORY_NEAR_DUP_THRESHOLD = 0.8;
+
+/**
  * Nearest-neighbor distance of a text to a reference corpus (directive §8.3):
  * 1 − max cosine similarity. 1.0 = shares nothing with the corpus; near 0 =
  * near-duplicate of some corpus document. Empty corpus → 1 (maximally novel

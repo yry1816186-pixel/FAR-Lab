@@ -66,6 +66,8 @@ export interface DecomposeTopicResult {
   readonly modelId: string | null;
   readonly attempts: number;
   readonly latencyMs: number;
+  /** Provider-reported token usage (day-r13: 24h campaign full-cost accounting needs the decomposition call counted too; null = unavailable). */
+  readonly tokenUsage: { readonly inputTokens: number; readonly outputTokens: number; readonly totalTokens: number } | null;
 }
 
 const DECOMPOSE_SYSTEM_PROMPT = [
@@ -114,5 +116,17 @@ export async function decomposeTopicWithLlm(
         '(duplicates/too-short/overlong dropped) — a campaign needs ≥2, refusing to fabricate more',
     );
   }
-  return { questions, modelId: meta.modelId, attempts: meta.attempts, latencyMs: meta.latencyMs };
+  return {
+    questions,
+    modelId: meta.modelId,
+    attempts: meta.attempts,
+    latencyMs: meta.latencyMs,
+    tokenUsage: meta.tokenUsage === null
+      ? null
+      : {
+          inputTokens: meta.tokenUsage.inputTokens,
+          outputTokens: meta.tokenUsage.outputTokens,
+          totalTokens: meta.tokenUsage.totalTokens,
+        },
+  };
 }

@@ -220,10 +220,14 @@ function dominates(a: HypothesisScorecard, b: HypothesisScorecard): boolean {
  * Grades: A = no exact cross-run content match; C = exact match with a still
  * relevant explored branch (no cross-run novelty); F = re-proposes an
  * ELIMINATED direction (negative-results ledger hit — the most expensive
- * repeat). Cannot-prove: this dimension proves LEXICAL-EXACT repetition
- * (content-hash identity); it does NOT prove semantic novelty (a grade-A
- * candidate may still paraphrase a known idea — embedding-based detection is
- * deliberately out of adjudication paths, directive §6.8).
+ * repeat). The MEMORY_NEAR_DUP family (day-r13) grades identically by kind:
+ * a lexical near-duplicate of an eliminated direction is still an F, of an
+ * active branch still a C — the rationale distinguishes paraphrase-with-
+ * similarity from exact identity. Cannot-prove: this dimension proves
+ * LEXICAL repetition (content-hash identity or surface-similarity ≥ 0.80);
+ * it does NOT prove semantic novelty (a grade-A candidate may still
+ * paraphrase a known idea below the lexical threshold — embedding-based
+ * detection is deliberately out of adjudication paths, directive §6.8).
  */
 export function memoryNoveltyDimensionsFor(
   candidates: readonly HypothesisCandidate[],
@@ -233,23 +237,25 @@ export function memoryNoveltyDimensionsFor(
   if (memoryFlags.size === 0) return out;
   for (const candidate of candidates) {
     const marker = memoryFlags.get(candidate.id);
+    const isNegative =
+      marker !== undefined &&
+      (marker.startsWith('MEMORY_DUPLICATE:negative:') || marker.startsWith('MEMORY_NEAR_DUP:negative:'));
+    const isBranch =
+      marker !== undefined &&
+      (marker.startsWith('MEMORY_DUPLICATE:branch:') || marker.startsWith('MEMORY_NEAR_DUP:branch:'));
+    const nearDup = marker !== undefined && marker.startsWith('MEMORY_NEAR_DUP:');
     out.set(
       candidate.id,
       [
         {
           name: 'NoveltyVsResearchMemory',
-          grade:
-            marker === undefined
-              ? 'A'
-              : marker.startsWith('MEMORY_DUPLICATE:negative:')
-                ? 'F'
-                : marker.startsWith('MEMORY_DUPLICATE:branch:')
-                  ? 'C'
-                  : 'A',
+          grade: isNegative ? 'F' : isBranch ? 'C' : 'A',
           rationale:
             marker === undefined
               ? 'no exact cross-run memory content-hash match (lexical-exact check only — not a semantic-novelty proof)'
-              : `${marker} — exact content match against research memory (${marker.startsWith('MEMORY_DUPLICATE:negative:') ? 'an ELIMINATED direction' : 'an explored branch'})`,
+              : nearDup
+                ? `${marker} — lexical near-duplicate of research memory content (${isNegative ? 'an ELIMINATED direction' : 'an explored branch'}; surface similarity ≥ 0.80, not exact identity)`
+                : `${marker} — exact content match against research memory (${isNegative ? 'an ELIMINATED direction' : 'an explored branch'})`,
           source: 'deterministic',
         },
       ],

@@ -104,6 +104,13 @@ export function runCampaignStart(args: readonly string[]): Promise<number> {
     // 账本记 questionsSource（诚实可追溯），哈希链只承载战役语义。
     let plannedQuestions: string[];
     let questionsSource: 'explicit' | 'llm';
+    let decomposeCost: {
+      stageId: string;
+      modelId: string | null;
+      attempts: number;
+      latencyMs: number;
+      tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number } | null;
+    } | null = null;
     if (questionsFlag !== undefined) {
       const planned = await planCampaignQuestions({ topic, questions: questionsFlag.split('|').map((q: string) => q.trim()).filter(Boolean) as string[] });
       plannedQuestions = [...planned.questions];
@@ -137,10 +144,28 @@ export function runCampaignStart(args: readonly string[]): Promise<number> {
       const planned = await planCampaignQuestions({ topic, decompose: async () => decomposed.questions });
       plannedQuestions = [...planned.questions];
       questionsSource = planned.source;
+      decomposeCost = {
+        stageId: 'campaign_topic_decomposition',
+        modelId: decomposed.modelId,
+        attempts: decomposed.attempts,
+        latencyMs: decomposed.latencyMs,
+        tokenUsage: decomposed.tokenUsage,
+      };
     }
     const id = newCampaignId(topic);
     const dir = campaignDir(id);
     saveCampaignStarted(dir, { topic, plannedQuestions, budgetTokens, questionsSource });
+    // day-r13: decomposition cost sidecar — the planning LLM call is real
+    // spend; the 24h campaign's full-cost accounting must be able to see it.
+    // Sidecar, NOT a ledger event: questionsSource stays the only additive
+    // hash-chain field (old ledgers replay byte-identical).
+    if (decomposeCost !== null) {
+      writeFileSync(
+        join(dir, 'decomposition-cost.json'),
+        `${JSON.stringify({ ...decomposeCost, questionsSource, recordedAt: new Date().toISOString() }, null, 2)}\n`,
+        'utf8',
+      );
+    }
     const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
     writeFileSync(join(dir, 'head.txt'), head, 'utf8');
     process.stdout.write(`far campaign: started ${id} (${plannedQuestions.length} questions [${questionsSource}], budget ${budgetTokens} tokens, HEAD ${head.slice(0, 8)})\n`);
