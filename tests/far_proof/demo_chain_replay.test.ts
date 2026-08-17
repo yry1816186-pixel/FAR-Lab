@@ -43,8 +43,9 @@ const EXPECTED_FILES = [
   'lifecycle_events.jsonl', // IC-05:可选分量(0021 前老包无此文件仍合法)
   'data_manifest.json',
   'README_REPLAY.md',
-  'code/MANIFEST.md',
-] as const;
+	  'code/MANIFEST.md',
+	  'SOURCES-ATTRIBUTION.txt', // C2: ODC-BY / CC0 third-party attribution (compliance §5.6)
+	] as const;
 
 interface RunExportOutput {
   readonly result: ReturnType<typeof exportFarProof>;
