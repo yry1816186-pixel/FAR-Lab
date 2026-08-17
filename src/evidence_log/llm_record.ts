@@ -1,4 +1,4 @@
-import type { LlmGateway } from '../llm_gateway/gateway.ts';
+import type { LlmGateway } from '../llm_gateway/types.ts';
 import type {
   LlmRequest,
   LlmResponse,

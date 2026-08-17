@@ -116,3 +116,13 @@ export interface ProviderAdapter {
   readonly profile: ProviderProfile;
   call(request: LlmRequest): Promise<LlmResponse>;
 }
+
+/**
+ * Interface defining llm gateway (CORE-ARCH-001: kernel layers type-depend on this
+ * contract in types.ts — never on the implementation in gateway.ts).
+ */
+export interface LlmGateway {
+  register(adapter: ProviderAdapter): void;
+  callLlm(profile: ProviderProfile, request: LlmRequest): Promise<LlmResponse>;
+  registeredProfiles(): readonly ProviderProfile[];
+}
