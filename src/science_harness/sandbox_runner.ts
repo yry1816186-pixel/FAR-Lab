@@ -324,7 +324,7 @@ export function resolveVenvPython(): string | null {
   return venv312PythonCache;
 }
 
-interface PythonSandboxManifest {
+export interface PythonSandboxManifest {
   readonly exitCode?: number;
   readonly stdout?: string;
   readonly stderr?: string;
@@ -338,7 +338,7 @@ interface PythonSandboxManifest {
 }
 
 /** 校验跨语言不受信 manifest 的 bool/reason 配对；矛盾/未知值 fail-closed。 */
-function parseThreadLimitAttestation(
+export function parseThreadLimitAttestation(
   manifest: PythonSandboxManifest,
 ): { readonly singleThreaded: boolean; readonly reason: ThreadLimitReason } {
   const reason = manifest.threadLimitReason;
@@ -351,6 +351,7 @@ function parseThreadLimitAttestation(
     case 'threadpoolctl_setup_failed':
     case 'threadpoolctl_verification_failed':
     case 'threadpool_limit_not_one':
+    case 'threadpool_introspection_gap':
     case 'execution_not_started':
     case 'execution_interrupted':
     case 'not_attested':

@@ -136,6 +136,17 @@ _THREAD_LIMIT_ENV_VARS = (
     "NUMEXPR_NUM_THREADS",
 )
 
+# 沙箱脚本 import 了其中任一模块却枚举不到线程池 → 平台 introspection 缺口（空真防护）。
+_THREADPOOL_CAPABLE_MODULES = (
+    "numpy",
+    "numpy.core._multiarray_umath",
+    "scipy",
+    "sklearn",
+    "numexpr",
+    "torch",
+    "xgboost",
+)
+
 
 def _prepare_thread_limit():
     """Apply SR-7 before user imports and return (context, info function, error reason).
@@ -189,7 +200,17 @@ def _install_user_audit_hook(threadpool_info):
 
 
 def _verify_thread_limit(trusted_threadpool_probe):
-    """Verify every threadpoolctl-visible pool reports exactly one worker."""
+    """Verify every threadpoolctl-visible pool reports exactly one worker.
+
+    Vacuous-attestation guard: a script that imported a threadpool-capable
+    library (numpy/scipy/...) must produce at least one visible pool. Zero
+    pools there means platform introspection failed (observed: macOS CI,
+    threadpoolctl 0 pools with numpy loaded) — attesting singleThreaded
+    anyway would be evidence-free (anti-fake-green), so fail closed with
+    'threadpool_introspection_gap'. Cannot-prove note: on such platforms
+    BLAS-importing scripts can never receive a singleThreaded receipt;
+    they honestly fail with 78 instead.
+    """
     try:
         pools = trusted_threadpool_probe()
     except BaseException:  # includes audit/SystemExit; convert to an honest failed receipt.
@@ -197,6 +218,8 @@ def _verify_thread_limit(trusted_threadpool_probe):
     if not isinstance(pools, list):
         return False, "threadpoolctl_verification_failed"
     if len(pools) == 0:
+        if any(name in sys.modules for name in _THREADPOOL_CAPABLE_MODULES):
+            return False, "threadpool_introspection_gap"
         return True, "threadpoolctl_applied_no_supported_pools"
     for pool in pools:
         if not isinstance(pool, dict):
