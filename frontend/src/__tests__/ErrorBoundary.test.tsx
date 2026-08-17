@@ -71,4 +71,44 @@ describe('ErrorBoundary', () => {
     expect(screen.getByTestId('healthy-child')).toBeInTheDocument();
     expect(screen.queryByTestId('error-boundary-fallback')).not.toBeInTheDocument();
   });
+
+  it('resetOn 变化（路由切换）清除错误并渲染新子树——单页崩溃不再冻结全部路由（审计 P0-4）', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    shouldThrow = true;
+    const { rerender } = render(
+      <ErrorBoundary resetOn="/crashed-page">
+        <ThrowingChild />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByTestId('error-boundary-fallback')).toBeInTheDocument();
+
+    // 用户点击顶栏导航离开崩溃页：pathname 变化,子树换成健康页。
+    shouldThrow = false;
+    rerender(
+      <ErrorBoundary resetOn="/healthy-page">
+        <ThrowingChild />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByTestId('healthy-child')).toBeInTheDocument();
+    expect(screen.queryByTestId('error-boundary-fallback')).not.toBeInTheDocument();
+  });
+
+  it('resetOn 不变时不重置（同路由内错误持续显示,不闪烁）', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    shouldThrow = true;
+    const { rerender } = render(
+      <ErrorBoundary resetOn="/same">
+        <ThrowingChild />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByTestId('error-boundary-fallback')).toBeInTheDocument();
+    shouldThrow = false;
+    rerender(
+      <ErrorBoundary resetOn="/same">
+        <ThrowingChild />
+      </ErrorBoundary>,
+    );
+    // 路由未变:错误保持——需要显式 Try again,不会自动消失。
+    expect(screen.getByTestId('error-boundary-fallback')).toBeInTheDocument();
+  });
 });

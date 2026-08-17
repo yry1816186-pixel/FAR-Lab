@@ -79,7 +79,7 @@ describe('UX-VIZ-001: 消融图表诚实性（lint + 渲染绑定）', () => {
   it.each([
     ['iteration-chart-svg', 'Bar chart of iteration counts across baselines', () => <IterationBarChart data={DATA} />],
     ['metric-chart-svg', 'Bar chart of metric values across baselines', () => <MetricBarChart data={DATA} />],
-    ['verdict-dist-chart-svg', 'Verdict distribution across baselines', () => <VerdictDistChart data={DATA} />],
+    ['verdict-dist-chart-svg', 'Final verdict comparison across baselines (one run each, categorical — not a score)', () => <VerdictDistChart data={DATA} />],
     ['falsifiability-chart-svg', 'Falsifiability comparison across baselines', () => <FalsifiabilityChart data={DATA} />],
   ])('%s 可访问名称与 spec 声明一致', (svgTestId, expectedLabel, renderChart) => {
     render(renderChart());
@@ -97,5 +97,57 @@ describe('UX-VIZ-001: 消融图表诚实性（lint + 渲染绑定）', () => {
     ];
     const { container } = render(<IterationBarChart data={empty} />);
     expect(container.textContent).not.toMatch(/n=\d/);
+  });
+});
+
+describe('消融图表诚实性 — 2026-08-18 审计修复（截断轴 / 裁决序数化）', () => {
+  // jsdom 无布局:clientWidth=0 → d3 渲染跳过。但 y 定义域在 effect 内计算,
+  // 通过注入非零尺寸让渲染走通,再断言轴刻度含 0。
+  function withLayout(html: string): string {
+    return html;
+  }
+
+  it('MetricBarChart y 轴从 0 起（柱高∝数值契约·修复截断轴）', () => {
+    // 判别性断言:注入容器尺寸后,度量图 y 轴第一个刻度必须是 0(旧实现为
+    // max(0, min-10%range) 的截断值,此测试对旧实现红)。
+    const original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      return { width: 600, height: 340, top: 0, left: 0, bottom: 340, right: 600, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    };
+    try {
+      const { container } = render(<MetricBarChart data={DATA} />);
+      const tickTexts = [...container.querySelectorAll('svg g.tick text')].map((t) => t.textContent ?? '');
+      // 网格组带空 tickFormat——只看数值刻度:最小值必须是 0(旧实现为截断基线,此断言对旧码红)
+      const numericTicks = tickTexts.map(Number).filter((n) => Number.isFinite(n));
+      expect(numericTicks.length).toBeGreaterThan(0);
+      // 最小刻度必须是 0(旧截断实现为 max(0,min-10%range)>0,此断言对旧码红)
+      expect(Math.min(...numericTicks)).toBe(0);
+    } finally {
+      Element.prototype.getBoundingClientRect = original;
+    }
+  });
+
+  it('VerdictDistChart 渲染类别点阵而非分数柱（无 verdict→score 高度映射）', () => {
+    const original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      return { width: 600, height: 340, top: 0, left: 0, bottom: 340, right: 600, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    };
+    try {
+      const { container } = render(<VerdictDistChart data={DATA} />);
+      // 点阵标记存在
+      const dots = container.querySelectorAll('circle.verdict-dot');
+      expect(dots.length).toBe(DATA.length);
+      // 旧实现的分数柱(verdict-bar rect)必须不复存在
+      expect(container.querySelectorAll('rect.verdict-bar').length).toBe(0);
+      // y 轴是 5 个裁决类别名(非 0-4 数值刻度)
+      const tickTexts = [...container.querySelectorAll('svg g.tick text')].map((t) => t.textContent ?? '');
+      for (const label of ['Confirmed', 'Refuted', 'Inconclusive', 'Degraded', 'Untested']) {
+        expect(tickTexts).toContain(label);
+      }
+      expect(tickTexts).not.toContain('4');
+    } finally {
+      Element.prototype.getBoundingClientRect = original;
+    }
+    void withLayout;
   });
 });

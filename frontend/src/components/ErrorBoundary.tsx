@@ -21,11 +21,19 @@
  */
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AlertTriangle, RotateCcw, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ErrorBoundaryProps {
   readonly children: ReactNode;
+  /**
+   * When this value changes, a caught error is cleared and the subtree remounts.
+   * Bound to the route pathname by RouteErrorBoundary so navigating away from a
+   * crashed page recovers the app WITHOUT a manual "Try again" — React does not
+   * reset boundary state when children change.
+   */
+  readonly resetOn?: string | number;
 }
 
 interface ErrorBoundaryState {
@@ -46,6 +54,19 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // additionally forward this to an error-tracking service; we intentionally do not
     // auto-send telemetry from the browser without explicit user consent.
     console.error('[ErrorBoundary] uncaught error:', error, info.componentStack);
+  }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps): void {
+    // Route recovery: navigating away from a crashed page must clear the error.
+    // Without this, one page's render crash freezes EVERY route behind the same
+    // fallback until the user clicks "Try again" manually.
+    if (
+      this.props.resetOn !== undefined &&
+      prevProps.resetOn !== this.props.resetOn &&
+      this.state.error !== null
+    ) {
+      this.setState((prev) => ({ error: null, resetKey: prev.resetKey + 1 }));
+    }
   }
 
   private readonly handleReset = (): void => {
@@ -100,4 +121,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       </div>
     );
   }
+}
+
+/**
+ * ErrorBoundary bound to the current route: any navigation (pathname change)
+ * clears a caught error, so the rest of the app stays usable after one page
+ * crashes. Must be rendered inside <BrowserRouter>.
+ */
+export function RouteErrorBoundary({ children }: { readonly children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetOn={pathname}>{children}</ErrorBoundary>;
 }

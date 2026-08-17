@@ -9,6 +9,14 @@ import App from '@/App';
  */
 describe('App 路由与导航', () => {
   beforeEach(() => {
+    // BrowserRouter 从 window.location 初始化,而 jsdom 的 location 跨测试持久——
+    // 上一测试 pushState 导航后,本测试会从残留路径挂载。显式归位到 '/',把
+    // "每测试起始路由为 /" 这一隐含契约变成明契约。
+    window.history.replaceState({}, '', '/');
+    // 同理:localStorage 的语言/主题偏好跨测试持久(切换语言的测试会把 zh 留给
+    // 后续测试,导致英文名查询失败)。归位到 en。
+    window.localStorage.removeItem('far-lang');
+    document.documentElement.lang = 'en';
     // 按 URL 路由 mock：/health（OverviewPage）+ 3 个 /integrity 端点（IntegrityPage）。
     // 后端契约：IntegrityRootDto.chainHeadHash 为 string|null，不可缺字段（缺字段→undefined→slice 崩溃）。
     // proof 用单叶树（siblings:[]·leaf===expectedRoot）使浏览器 verifyInclusionProof 返回 ok=true。
@@ -82,30 +90,50 @@ describe('App 路由与导航', () => {
     expect(screen.getByTestId('main-content')).toBeInTheDocument();
   });
 
-  it('渲染导航项（含完整性信任根、广度榜、法庭、竞技场、版本比较、验证向导、规划门禁入口）', () => {
+  it('桌面导航 IA：科研主流程 5 链接常驻单行，工具 12 链接折叠进 Tools 面板', async () => {
+    const user = userEvent.setup();
     render(<App />);
-    const nav = screen.getByTestId('main-nav');
-    const links = within(nav).getAllByRole('link');
-    expect(links).toHaveLength(17); // 14 原有 + research 工作台（科研主流程）
-    // 使用 getByRole 验证导航链接存在（"证据链" 等标签在 sm 断点下可见）
-    expect(within(nav).getByRole('link', { name: /Overview/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: /Integrity/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: /Leaderboard/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: /About/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('link', { name: /Planning/ })).toBeInTheDocument();
+    // 主分组常驻：工作台 · 规划 · 版本比较 · 事件 · 报告（单行容纳,不产生全局横向滚动）。
+    const primary = within(screen.getByTestId('desktop-nav')).getAllByRole('link');
+    expect(primary).toHaveLength(5);
+    expect(primary[0]).toHaveTextContent(/^Research/);
+    expect(within(screen.getByTestId('desktop-nav')).getByRole('link', { name: /Planning/ })).toBeInTheDocument();
+    // 工具组折叠：面板初始关闭,Tools 按钮披露 12 个次级路由（17 个 NavLink 全保留）。
+    expect(screen.queryByTestId('tools-nav-panel')).not.toBeInTheDocument();
+    const toolsToggle = screen.getByTestId('tools-toggle');
+    expect(toolsToggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toolsToggle);
+    const panel = screen.getByTestId('tools-nav-panel');
+    expect(within(panel).getAllByRole('link')).toHaveLength(12);
+    expect(within(panel).getByRole('link', { name: /Overview/ })).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: /Integrity/ })).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: /Leaderboard/ })).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: /About/ })).toBeInTheDocument();
+    expect(within(panel).getByText(/Trust & verification tools/)).toBeInTheDocument();
   });
 
-  it('导航两分组信息架构：Research 主分组在前，工具分组带小号 caption 降级', () => {
+  it('Tools 面板 a11y：Escape 关闭并归还焦点到 Tools 按钮', async () => {
+    const user = userEvent.setup();
     render(<App />);
-    const nav = screen.getByTestId('main-nav');
-    const links = within(nav).getAllByRole('link');
-    // 主分组（Research）排最前：工作台 · 规划 · 版本比较 · 事件 · 报告。
-    expect(links[0]).toHaveTextContent(/^Research/);
-    const labels = links.map((l) => l.textContent ?? '');
-    expect(labels.indexOf('Report')).toBeLessThan(labels.indexOf('Court'));
-    expect(labels.indexOf('Live Events')).toBeLessThan(labels.indexOf('Overview'));
-    // 次级分组的小号 'tools' caption 存在（视觉降级·不删任何链接）。
-    expect(within(nav).getAllByTestId('nav-tools-caption').length).toBeGreaterThan(0);
+    const toolsToggle = screen.getByTestId('tools-toggle');
+    await user.click(toolsToggle);
+    const panel = screen.getByTestId('tools-nav-panel');
+    expect(toolsToggle).toHaveAttribute('aria-expanded', 'true');
+    // 打开后焦点进入面板首链接（与移动抽屉同契约）
+    expect(within(panel).getAllByRole('link')[0]).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByTestId('tools-nav-panel')).not.toBeInTheDocument();
+    expect(toolsToggle).toHaveFocus();
+  });
+
+  it('Tools 按钮在工具组路由激活时携带 aria-current（"you are here" 信号）', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByTestId('tools-toggle'));
+    await user.click(within(screen.getByTestId('tools-nav-panel')).getByRole('link', { name: /Integrity/ }));
+    await waitFor(() => screen.getByTestId('integrity-page'));
+    const toolsToggle = screen.getByTestId('tools-toggle');
+    expect(toolsToggle).toHaveAttribute('aria-current', 'page');
   });
 
   it('渲染主题切换按钮', () => {
@@ -119,6 +147,37 @@ describe('App 路由与导航', () => {
     expect(screen.getByTestId('research-workbench')).toBeInTheDocument();
   });
 
+  it('/ 重定向到规范 URL /research 且导航高亮 Research（单一 canonical·审计 F3/F19）', async () => {
+    render(<App />);
+    await waitFor(() => screen.getByTestId('research-workbench'));
+    expect(window.location.pathname).toBe('/research');
+    const researchLink = within(screen.getByTestId('desktop-nav')).getByRole('link', { name: /^Research/ });
+    expect(researchLink).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('客户端导航后焦点移入 #main-content（换页锚点·审计 F8）', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => screen.getByTestId('research-workbench'));
+    expect(screen.getByTestId('main-content')).not.toHaveFocus();
+    await user.click(within(screen.getByTestId('desktop-nav')).getByRole('link', { name: /^Planning/ }));
+    await waitFor(() => expect(screen.getByTestId('main-content')).toHaveFocus());
+  });
+
+  it('中文界面 <html lang> 同步为 zh（审计 F7）', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByTestId('language-toggle'));
+    expect(document.documentElement.lang).toBe('zh');
+    // zh 字典补全后导航不再混语（此前 Report/Overview 等 10 项回退英文）
+    await user.click(screen.getByTestId('tools-toggle'));
+    const panel = screen.getByTestId('tools-nav-panel');
+    expect(within(panel).getByRole('link', { name: /仪表盘/ })).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: /完整性/ })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(document.documentElement.lang).toBe('zh');
+  });
+
   it('点击"Research"导航到 /research 工作台', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -127,12 +186,17 @@ describe('App 路由与导航', () => {
     expect(screen.getByTestId('research-workbench')).toBeInTheDocument();
   });
 
+  /** 打开 Tools 面板并返回其容器（工具组 12 链接的查询范围）。 */
+  async function openToolsPanel(user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> {
+    await user.click(screen.getByTestId('tools-toggle'));
+    return screen.getByTestId('tools-nav-panel');
+  }
+
   it('/overview 渲染 OverviewPage', async () => {
     const user = userEvent.setup();
     render(<App />);
-    // R-03: OverviewPage 工作台新增同名快速入口链接,导航点击须限定在 main-nav 内,
-    // 避免 getByRole 因多个同名链接抛 "multiple elements"。
-    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Overview/ }));
+    const panel = await openToolsPanel(user);
+    await user.click(within(panel).getByRole('link', { name: /Overview/ }));
     await waitFor(() => screen.getByTestId('overview-page'));
     expect(screen.getByTestId('overview-page')).toBeInTheDocument();
   });
@@ -140,7 +204,8 @@ describe('App 路由与导航', () => {
   it('点击"证据链"导航到 /viz', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Evidence Chain/ }));
+    const panel = await openToolsPanel(user);
+    await user.click(within(panel).getByRole('link', { name: /Evidence Chain/ }));
     await waitFor(() => screen.getByTestId('viz-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('viz-page')).toBeInTheDocument();
   });
@@ -148,7 +213,8 @@ describe('App 路由与导航', () => {
   it('点击"诚信墙"导航到 /honesty', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Honesty Wall/ }));
+    const panel = await openToolsPanel(user);
+    await user.click(within(panel).getByRole('link', { name: /Honesty Wall/ }));
     await waitFor(() => screen.getByTestId('honesty-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('honesty-page')).toBeInTheDocument();
   });
@@ -156,7 +222,8 @@ describe('App 路由与导航', () => {
   it('点击"完整性"导航到 /integrity', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Integrity/ }));
+    const panel = await openToolsPanel(user);
+    await user.click(within(panel).getByRole('link', { name: /Integrity/ }));
     await waitFor(() => screen.getByTestId('integrity-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('integrity-page')).toBeInTheDocument();
   });
@@ -164,7 +231,8 @@ describe('App 路由与导航', () => {
   it('点击"广度榜"导航到 /leaderboard', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /Leaderboard/ }));
+    const panel = await openToolsPanel(user);
+    await user.click(within(panel).getByRole('link', { name: /Leaderboard/ }));
     await waitFor(() => screen.getByTestId('leaderboard-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('leaderboard-page')).toBeInTheDocument();
   });
@@ -172,7 +240,8 @@ describe('App 路由与导航', () => {
   it('点击"关于"导航到 /about', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(within(screen.getByTestId('main-nav')).getByRole('link', { name: /About/ }));
+    const panel = await openToolsPanel(user);
+    await user.click(within(panel).getByRole('link', { name: /About/ }));
     await waitFor(() => screen.getByTestId('about-page')); // wait for the lazy-loaded route chunk
     expect(screen.getByTestId('about-page')).toBeInTheDocument();
   });
