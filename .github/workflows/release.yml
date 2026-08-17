@@ -112,6 +112,17 @@ jobs:
           chmod +x staging/install.sh
           sha256sum scripts/install.sh scripts/install.ps1 | tee staging/SHA256SUMS
 
+      # g2. 供应链证据三件：license 审计（strict）+ SBOM + 发布件 SHA256SUMS
+      #     （REL-SUPPLY-001 / CORE-PUBLIC-001 接线——发布工件层证据链补全；签名/attestation 仍为登记缺口）
+      - name: Supply-chain evidence (license audit + SBOM + release checksums)
+        run: |
+          node scripts/license_audit.mjs --strict
+          node scripts/generate_sbom.mjs
+          node scripts/verify_release_checksums.mjs --write
+          node scripts/verify_release_checksums.mjs --check
+          cp .far-release/sbom.json staging/sbom.json
+          cp .far-release/SHA256SUMS.txt staging/SHA256SUMS-release.txt
+
       # j-m. 构建 Docker image 并 push 到 GHCR（offline 优先·不内置 key）
       - name: Resolve GHCR image name (lowercase owner)
         id: img
@@ -180,4 +191,6 @@ jobs:
             staging/install.sh
             staging/install.ps1
             staging/SHA256SUMS
+            staging/SHA256SUMS-release.txt
+            staging/sbom.json
             staging/docker-digest.txt
