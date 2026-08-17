@@ -766,7 +766,6 @@ function runSnapshotVerifyFromArgs(args: readonly string[]): number {
   );
   return outcome.exitCode;
 }
-
 function runExportCitationsFromArgs(args: readonly string[]): number {
   let runId = '';
   let format: CitationExportFormat = 'bibtex';
