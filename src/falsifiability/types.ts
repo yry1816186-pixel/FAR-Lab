@@ -19,6 +19,8 @@ import type { EvidenceTier } from '../evidence_quality/types.ts';
  * or less-than). Single-sourced from `schema/enums.ts THRESHOLD_SEMANTICS`
  * (DEBT-12) to keep FEC contracts and falsifiability specs aligned.
  */
+import type { EvidenceContractV1 } from '../evidence_quality/evidence_contract.ts';
+
 export type ThresholdSemantics = ThresholdSemantic;
 
 /**
@@ -76,6 +78,18 @@ export interface EvidenceRecord {
    *     届时无 provenance hash 的 metricValue 一律 fail-closed。
    */
   readonly executionProvenanceHash?: string;
+  /**
+   * EVID-RECORD-001 · 16 字段证据合同（2026-08-17 落地·V1 可选）。
+   *
+   * 表达「证据与声明的支持关系」而不只存引用：源快照/定位符/提取命题/四值关系
+   * （含 QUALIFIES）/直接性/独立性/研究设计/人群语境/效应与不确定性/偏倚风险/
+   * 撤稿状态/提取方法/提取者身份/置信度/许可边界/内容哈希。
+   *
+   * 消费：FEC 可选 requireFullEvidenceContract: true → assertPrimaryEvidenceContractBound
+   * fail-closed（evidence_contract_gate.ts·镜像 T-003 模式）。
+   * V1 边界（诚实登记）：默认不强制（demo seed 不受影响）；V2 真实研究路径全开。
+   */
+  readonly evidenceContract?: EvidenceContractV1;
 }
 
 /**

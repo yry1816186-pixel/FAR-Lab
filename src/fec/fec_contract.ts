@@ -315,6 +315,17 @@ export interface FecContractV2 {
    */
   readonly requireExecutionProvenance?: boolean;
   /**
+   * EVID-RECORD-001 · 16 字段证据合同开关（2026-08-17·T-003 同模式镜像）。
+   *
+   * [META] 非编译期 VC 字段（不进 computeFecHash·不进 proofHash）。true 时 orchestrator
+   * 在裁决前跑 assertPrimaryEvidenceContractBound：primary 证据缺 evidenceContract 或
+   * 合同违规（hash 篡改/来源自填/撤稿仍支持）→ 追加 EVIDENCE_CONTRACT_INCOMPLETE
+   * integrityFlag → kernel R7 阻断 CONFIRMED（fail-closed UNTESTED）。
+   * V1 默认 undefined=false：无任何路径 opt-in（休眠能力·向后兼容全部 demo seed）。
+   * V2 真实研究路径接入后将强制 opt-in（届时无完整合同的证据不进聚合）。
+   */
+  readonly requireFullEvidenceContract?: boolean;
+  /**
    * T-008 · FEC freeze.gitCommitSha 强制绑定开关（2026-07-24 T-008 修复）。
    *
    * [META] 非编译期 VC 字段（不进 computeFecHash·不进 proofHash）——它是 compiler 编译期
