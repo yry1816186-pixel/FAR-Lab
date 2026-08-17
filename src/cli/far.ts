@@ -1557,8 +1557,9 @@ SYSTEM
   far status [--db <path>]              emit the single SSOT status report
   far lifecycle <state|history|transition|verify>
                                         retraction/correction/supersession lifecycle (IC-05; append-only)
-  far planning <plan|spec|risk|state|gate|checkpoint>
-                                        planning methodology as deterministic gates (P0-P4 grading)
+  far planning <plan|spec|batch|risk|state|gate|checkpoint>
+                                        planning methodology as deterministic gates (P0-P4 grading;
+                                        batch = CORE-BATCH-001 contract + closure-evidence-match)
   far governance <lint|stale|trigger>   unknown/assumption registry + reopen propagation ledger
                                         (GOV-UNKNOWN/REOPEN-001; lint = integrity gate,
                                         stale = overdue assumptions + degraded conclusions,
