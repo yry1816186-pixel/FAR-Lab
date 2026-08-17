@@ -4,6 +4,7 @@
 // 子命令（全部确定性，无 LLM）：
 //   plan <file>       校验 Plan DAG（zod parse + validatePlan）→ 门禁报告 + 拓扑执行序
 //   spec <file>       校验 Spec（zod parse + validateSpec）→ 门禁报告
+//   batch <file>      校验 batch contract（CORE-BATCH-001 十二字段）；--closure <file> 收尾对拍
 //   risk <signals...> 风险分级 P0-P4（gradeRisk，可审计 reasons）
 //   state <from> <to> 规划状态机转移校验（--compress 允许压缩模式）
 //   gate <file>       验证门禁报告（四步门函数；结论 DONE/IMPLEMENTED_UNVERIFIED/BLOCKED）
@@ -16,17 +17,23 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import { buildGateReport, renderGateReport } from '../../planning/gate.ts';
 import { parseCheckpoint, renderCheckpoint, nextStepFrom } from '../../planning/checkpoint.ts';
-import { validatePlan } from '../../planning/plan.ts';
-import { gradeRisk } from '../../planning/risk.ts';
-import type { RiskSignals } from '../../planning/types.ts';
-import { transitionStage } from '../../planning/state_machine.ts';
-import { validateSpec } from '../../planning/spec.ts';
+import {
+  BatchClosureSchema,
+  BatchContractSchema,
+  matchClosureToContract,
+  validateBatchContract,
+} from '../../planning/batch_contract.ts';
 import {
   CheckpointSchema,
   PlanSchema,
   SpecSchema,
   VerificationReportSchema,
 } from '../../planning/types.ts';
+import { gradeRisk } from '../../planning/risk.ts';
+import type { RiskSignals } from '../../planning/types.ts';
+import { validatePlan } from '../../planning/plan.ts';
+import { transitionStage } from '../../planning/state_machine.ts';
+import { validateSpec } from '../../planning/spec.ts';
 
 const RISK_SIGNAL_NAMES = [
   'readOnly',
@@ -55,6 +62,8 @@ export function runPlanningFromArgs(argv: readonly string[]): number {
       return runPlanCheck(argv.slice(1), json);
     case 'spec':
       return runSpecCheck(argv.slice(1), json);
+    case 'batch':
+      return runBatchCheck(argv.slice(1), json);
     case 'risk':
       return runRisk(argv.slice(1), json);
     case 'state':
@@ -73,6 +82,7 @@ const USAGE = `far planning — 规划门禁方法论源代码化（确定性门
 用法:
   far planning plan <file>           校验 Plan DAG → 门禁报告 + 拓扑执行序
   far planning spec <file>           校验 Spec（≥3 可验证 AC / Delta / trust-kernel 声明）
+  far planning batch <file>          校验 batch contract（§4.2 十二字段）；--closure <file> 收尾对拍
   far planning risk <signal>...      风险分级 P0-P4（信号: ${RISK_SIGNAL_NAMES.join('/')}）
   far planning state <from> <to>     状态机转移校验（--compress 允许压缩模式）
   far planning gate <file>           验证门禁报告（四步门函数，not_run 显式标注）
@@ -165,6 +175,93 @@ function summarizeDelta(added: readonly string[], modified: readonly string[], r
   if (modified.length > 0) parts.push(`~${modified.length}`);
   if (removed.length > 0) parts.push(`-${removed.length}`);
   return parts.length === 0 ? 'empty' : parts.join('/');
+}
+
+// ---------------------------------------------------------------------------
+// batch 子命令（CORE-BATCH-001：batch contract + 可选收尾对拍）
+// ---------------------------------------------------------------------------
+
+function runBatchCheck(args: readonly string[], json: boolean): number {
+  const closureFlag = args.indexOf('--closure');
+  const contractFile = closureFlag === -1 ? args[0] : args.slice(0, closureFlag)[0];
+  const closureFile = closureFlag === -1 ? undefined : args[closureFlag + 1];
+  if (contractFile === undefined) {
+    process.stderr.write('far planning batch: missing <contract-file>\n');
+    return 2;
+  }
+  if (closureFlag !== -1 && (closureFile === undefined || closureFile.startsWith('--'))) {
+    process.stderr.write('far planning batch: --closure requires <closure-file>\n');
+    return 2;
+  }
+
+  const rawContract = readJsonOrExit(contractFile, 'batch');
+  if (rawContract === undefined) return 2;
+  const parsedContract = BatchContractSchema.safeParse(rawContract);
+  if (!parsedContract.success) {
+    const msg = zodSummary(parsedContract.error);
+    if (json) {
+      process.stdout.write(`${JSON.stringify({ subcommand: 'batch', gate: 'FAIL', violations: [{ code: 'SCHEMA', message: msg }] })}\n`);
+    } else {
+      process.stderr.write(`far planning batch: invalid contract structure — ${msg}\n`);
+    }
+    return 7;
+  }
+
+  const validation = validateBatchContract(parsedContract.data);
+  if (!validation.ok) {
+    if (json) {
+      process.stdout.write(`${JSON.stringify({ subcommand: 'batch', gate: 'FAIL', violations: validation.violations })}\n`);
+    } else {
+      process.stderr.write('far planning batch: BATCH CONTRACT GATE FAILED (exit 7)\n');
+      for (const v of validation.violations) {
+        process.stderr.write(`  [${v.code}] ${v.message}\n`);
+      }
+    }
+    return 7;
+  }
+
+  // 无 --closure：合同本身通过即出口（开批门禁）
+  if (closureFile === undefined) {
+    const summary = `batch '${parsedContract.data.batchId}' — ${parsedContract.data.requirementIds.join('/')} risk ${parsedContract.data.risk}, ${parsedContract.data.acceptanceCommands.length} acceptance command(s), write set ${parsedContract.data.allowedWriteSet.length} entr(ies)`;
+    if (json) {
+      process.stdout.write(`${JSON.stringify({ subcommand: 'batch', gate: 'PASS', summary })}\n`);
+    } else {
+      process.stdout.write(`far planning batch: CONTRACT PASS — ${summary}\n`);
+    }
+    return 0;
+  }
+
+  // 有 --closure：收尾对拍（closure-evidence-match）
+  const rawClosure = readJsonOrExit(closureFile, 'batch');
+  if (rawClosure === undefined) return 2;
+  const parsedClosure = BatchClosureSchema.safeParse(rawClosure);
+  if (!parsedClosure.success) {
+    const msg = zodSummary(parsedClosure.error);
+    if (json) {
+      process.stdout.write(`${JSON.stringify({ subcommand: 'batch', match: 'FAIL', violations: [{ code: 'SCHEMA', message: msg }] })}\n`);
+    } else {
+      process.stderr.write(`far planning batch: invalid closure structure — ${msg}\n`);
+    }
+    return 7;
+  }
+
+  const match = matchClosureToContract(parsedContract.data, parsedClosure.data);
+  if (json) {
+    process.stdout.write(`${JSON.stringify({ subcommand: 'batch', match: match.ok ? 'PASS' : 'FAIL', violations: match.violations, summary: match.summary })}\n`);
+    return match.ok ? 0 : 7;
+  }
+  if (!match.ok) {
+    process.stderr.write('far planning batch: CLOSURE MATCH FAILED (exit 7)\n');
+    for (const v of match.violations) {
+      process.stderr.write(`  [${v.code}] ${v.message}\n`);
+    }
+    return 7;
+  }
+  const s = match.summary;
+  process.stdout.write(
+    `far planning batch: CLOSURE MATCH PASS — acceptance ${s.acceptancePassed}/${s.acceptanceTotal}, outcomes ${Object.entries(s.outcomesByKind).map(([k, n]) => `${k}=${n}`).join(' ')}, files written ${s.filesWritten}, unknowns resolved ${s.unknownsResolved}\n`,
+  );
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
