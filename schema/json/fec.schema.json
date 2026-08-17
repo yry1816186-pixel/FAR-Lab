@@ -490,6 +490,9 @@
     "requireExecutionProvenance": {
       "type": "boolean"
     },
+    "requireFullEvidenceContract": {
+      "type": "boolean"
+    },
     "requireGitCommitShaBinding": {
       "type": "boolean"
     },
