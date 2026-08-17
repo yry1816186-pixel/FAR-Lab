@@ -31,6 +31,25 @@ export function renderCheckpoint(cp: Checkpoint): string {
   if (cp.assumptions.length > 0) {
     lines.push('', `## 未验证的假设`, ...bullet(cp.assumptions));
   }
+  // CORE-VALUE-001 · 价值三元组（batch report 必答「为什么值得做」）
+  lines.push(
+    '',
+    `## 价值假设（预期交付什么价值给谁·可被后续证据证实/证伪）`,
+    cp.valueHypothesis,
+  );
+  if (cp.successCriteria.length > 0) {
+    lines.push('', `## 成功标准（怎么算达成·收尾逐条对账）`, ...bullet(cp.successCriteria));
+  }
+  if (cp.evidenceGaps.length > 0) {
+    lines.push('', `## 证据缺口（宣布达成还缺什么证据）`, ...bullet(cp.evidenceGaps));
+  }
+  if (cp.unachieved.length > 0) {
+    lines.push(
+      '',
+      `## 未达成项（收尾未覆盖 goal 的部分必须显式交代）`,
+      ...cp.unachieved.map((u) => `- ${u.item} — 原因：${u.reason}`),
+    );
+  }
   lines.push('', `## 下一步（具体可执行的下一动作，不是抽象计划）`, cp.nextStep, '');
   return lines.join('\n');
 }

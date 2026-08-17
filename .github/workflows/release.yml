@@ -114,6 +114,8 @@ jobs:
 
       # g2. 供应链证据三件：license 审计（strict）+ SBOM + 发布件 SHA256SUMS
       #     （REL-SUPPLY-001 / CORE-PUBLIC-001 接线——发布工件层证据链补全；签名/attestation 仍为登记缺口）
+      - name: Sensitive info scan (pre-release gate · CORE-SECRETS-001/CORE-PUBLIC-001)
+        run: node scripts/secret_scan.mjs --root . --fail-on-hit
       - name: Supply-chain evidence (license audit + SBOM + release checksums)
         run: |
           node scripts/license_audit.mjs --strict

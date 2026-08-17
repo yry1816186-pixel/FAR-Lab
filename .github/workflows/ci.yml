@@ -622,6 +622,8 @@ jobs:
         run: pnpm run test:risk-map
       - name: claim_lint（公开声明→收据绑定扫描·CORE-REALITY-001/CORE-CLAIM-001）
         run: node scripts/claim_lint.mjs
+      - name: secret_scan（代码库 secret 泄露扫描·CORE-SECRETS-001）
+        run: node scripts/secret_scan.mjs --root . --fail-on-hit
       - name: doc_command_check（doc↔CLI 一致性·CJ1-G2 文档零漂移）
         run: node scripts/doc_command_check.mjs
       - name: coverage_gate（行≥85%/分支≥75% 红线）

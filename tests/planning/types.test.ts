@@ -55,12 +55,13 @@ test('SpecSchema requires story and risk', () => {
   assert.equal(SpecSchema.safeParse({ ...base, risk: 'P9' }).success, false);
 });
 
-test('CheckpointSchema defaults empty arrays', () => {
+test('CheckpointSchema defaults empty arrays（CORE-VALUE-001：valueHypothesis 必填）', () => {
   const r = CheckpointSchema.safeParse({
     taskId: 't',
     goal: 'g',
     state: 's',
     nextStep: 'n',
+    valueHypothesis: 'v',
   });
   assert.equal(r.success, true);
   if (r.success) {
