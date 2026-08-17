@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decideFiveValueVerdict } from '../../src/falsifiability/verdict_kernel_v2.ts';
-import type { VerdictKernelInput } from '../../src/falsifiability/verdict_kernel_v2.ts';
+import type { StatisticalResult, VerdictKernelInput } from '../../src/falsifiability/verdict_kernel_v2.ts';
 import { baseMetric, baseStatPlan, makeValidFec } from '../fec/fixtures.ts';
 import type { FecContractV2 } from '../../src/fec/fec_contract.ts';
 import type { ConfoundingGateResult } from '../../src/confounding_gate/types.ts';
@@ -278,7 +278,7 @@ test('GV-08: conflicting metrics (multi-implication 互斥) → INCONCLUSIVE (R5
 
 test('GV-13: 10 supports + 1 refute（均显著）→ 仍 INCONCLUSIVE（多数票不得覆盖冲突）', () => {
   // 均值口径下净效应 +0.42 会被解读为支持；布尔冲突检测使多数票无效。
-  const statistics = [
+  const statistics: readonly StatisticalResult[] = [
     {
       testId: 'refuting-outlier',
       status: 'ran',
@@ -289,14 +289,14 @@ test('GV-13: 10 supports + 1 refute（均显著）→ 仍 INCONCLUSIVE（多数�
       confidenceInterval: [-0.7, -0.1],
       assumptionDiagnostics: [],
     },
-    ...Array.from({ length: 10 }, (_, i) => ({
+    ...Array.from({ length: 10 }, (_, i): StatisticalResult => ({
       testId: `supporting-${i}`,
       status: 'ran',
       effectDirection: 'supports',
       pValue: 0.01,
       adjustedPValue: 0.01,
       effectSizeObserved: 0.46,
-      confidenceInterval: [0.2, 0.7],
+      confidenceInterval: [0.2, 0.7] as const,
       assumptionDiagnostics: [],
     })),
   ];
