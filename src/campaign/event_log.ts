@@ -205,12 +205,27 @@ export function readCampaignEvents(dir: string): CampaignEvent[] {
 }
 
 /**
+ * 写入故障注入缝（CAMPAIGN-CHECKPOINT-001 磁盘满测试用）：默认真 fs；测试注入
+ * 抛 ENOSPC（含「先写一半再抛」的最坏情形）以确定性验证 fail-closed 与恢复。
+ * 缺省行为与本函数历史行为逐字节一致（无行为变更，纯可测性缝）。
+ */
+export interface CampaignWriteIo {
+  writeFileSync(path: string, data: string): void;
+}
+
+const REAL_WRITE_IO: CampaignWriteIo = {
+  writeFileSync: (path, data) => {
+    writeFileSync(path, data, 'utf8');
+  },
+};
+
+/**
  * 追加一条事件到台账（append-only）。Fail-closed 前置校验：
  *   - 既有链必须验证通过（拒绝向被篡改的台账追加）；
  *   - 新事件的 prevEventHash 必须链到当前链头（空台账要求创世 prev=''）。
  * seq 是调用方持有的排序元数据，链完整性由哈希链保证（不在此强制连续）。
  */
-export function appendCampaignEvent(dir: string, event: CampaignEvent): void {
+export function appendCampaignEvent(dir: string, event: CampaignEvent, io: CampaignWriteIo = REAL_WRITE_IO): void {
   const existing = readCampaignEvents(dir);
   const chain = verifyCampaignEventChain(existing);
   if (!chain.valid) {
@@ -230,10 +245,9 @@ export function appendCampaignEvent(dir: string, event: CampaignEvent): void {
   const path = campaignEventsPath(dir);
   mkdirSync(dirname(path), { recursive: true });
   const line = `${JSON.stringify(event)}\n`;
-  writeFileSync(
+  io.writeFileSync(
     path,
     existsSync(path) ? readFileSync(path, 'utf8').replace(/\n*$/, '\n') + line : line,
-    'utf8',
   );
 }
 
