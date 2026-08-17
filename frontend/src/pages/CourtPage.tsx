@@ -11,9 +11,9 @@
 
 import { useState } from 'react';
 import { useCourtLive, useLlmStatus } from '@/lib/api_client';
+import { isVerdictValue } from '@/lib/verdict';
 import type { CourtCertificateDto } from '@/lib/types';
 import { useT } from '@/lib/i18n';
-import type { VerdictValue } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -30,13 +30,6 @@ import {
 } from '@/components/ui/table';
 import { Gavel, Users, ShieldAlert, Zap } from 'lucide-react';
 
-const FIVE_VERDICTS = new Set<string>([
-  'CONFIRMED',
-  'REFUTED',
-  'INCONCLUSIVE',
-  'DEGRADED_SCOPE',
-  'UNTESTED',
-]);
 
 const AGREEMENT_LABEL: Record<string, 'court.agreement.unanimous' | 'court.agreement.majority' | 'court.agreement.split'> = {
   unanimous: 'court.agreement.unanimous',
@@ -49,10 +42,6 @@ const AGREEMENT_VARIANT: Record<string, 'default' | 'secondary' | 'destructive'>
   majority: 'secondary',
   split: 'destructive',
 };
-
-function isVerdictValue(v: string): v is VerdictValue {
-  return FIVE_VERDICTS.has(v);
-}
 
 /** CertificateDisplay — 复用展示组件（demo + live 共用·根据 cert 渲染）。 */
 function CertificateDisplay({ cert }: { readonly cert: CourtCertificateDto }) {

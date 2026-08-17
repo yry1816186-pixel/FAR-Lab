@@ -26,6 +26,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useT } from '@/lib/i18n';
+import { VERDICT_BADGE_VARIANT, VERDICT_VALUES, type VerdictBadgeVariant } from '@/lib/verdict';
 import { useBenchmark } from '@/lib/api_client';
 import { useTimeout } from '@/lib/useTimeout';
 import { computeMerkleRoot, flipLastHexChar } from '@/lib/merkle';
@@ -61,26 +62,12 @@ import { cn } from '@/lib/utils';
 
 // ---------- verdict → badge 映射 ----------
 
-type BadgeVariant = 'success' | 'destructive' | 'secondary' | 'warning' | 'outline';
 
-const VERDICT_META: Readonly<Record<VerdictValue, { readonly variant: BadgeVariant; readonly label: string }>> = {
-  CONFIRMED: { variant: 'success', label: 'CONFIRMED' },
-  REFUTED: { variant: 'destructive', label: 'REFUTED' },
-  INCONCLUSIVE: { variant: 'secondary', label: 'INCONCLUSIVE' },
-  DEGRADED_SCOPE: { variant: 'warning', label: 'DEGRADED_SCOPE' },
-  UNTESTED: { variant: 'outline', label: 'UNTESTED' },
-};
 
-const VERDICT_ORDER: readonly VerdictValue[] = [
-  'CONFIRMED',
-  'REFUTED',
-  'INCONCLUSIVE',
-  'DEGRADED_SCOPE',
-  'UNTESTED',
-];
+const VERDICT_ORDER: readonly VerdictValue[] = VERDICT_VALUES;
 
 /** 占比条颜色（Tailwind 调色板类·与 badge.tsx 同源·非硬编码 hex）。 */
-function barColor(variant: BadgeVariant): string {
+function barColor(variant: VerdictBadgeVariant): string {
   switch (variant) {
     case 'success':
       return 'bg-emerald-500';
@@ -391,12 +378,11 @@ function VerdictDistributionSection({ report }: { readonly report: BenchmarkRepo
         {VERDICT_ORDER.map((v) => {
           const count = report.verdictDistribution[v] ?? 0;
           const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-          const meta = VERDICT_META[v];
-          return (
+                    return (
             <div key={v} className="space-y-1.5" data-testid={`verdict-row-${v}`}>
               <div className="flex items-center justify-between text-sm">
-                <Badge variant={meta.variant} data-testid={`verdict-badge-${v}`}>
-                  {meta.label}
+                <Badge variant={VERDICT_BADGE_VARIANT[v]} data-testid={`verdict-badge-${v}`}>
+                  {v}
                 </Badge>
                 <span className="font-mono text-xs text-muted-foreground">
                   {t('leaderboard.distRatio', { count, total, pct })}
@@ -404,7 +390,7 @@ function VerdictDistributionSection({ report }: { readonly report: BenchmarkRepo
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className={cn('h-full rounded-full', barColor(meta.variant))}
+                  className={cn('h-full rounded-full', barColor(VERDICT_BADGE_VARIANT[v]))}
                   style={{ width: `${pct}%` }}
                   data-testid={`verdict-bar-${v}`}
                 />
@@ -486,8 +472,7 @@ function ProblemTableSection({ report }: { readonly report: BenchmarkReportDto }
 
 function ProblemRow({ entry }: { readonly entry: BenchmarkEntryDto }) {
   const t = useT();
-  const meta = VERDICT_META[entry.verdict];
-  return (
+    return (
     <TableRow data-testid={`entry-${entry.problemId}`}>
       <TableCell>
         <div className="font-mono text-xs font-semibold">{entry.problemId}</div>
@@ -497,8 +482,8 @@ function ProblemRow({ entry }: { readonly entry: BenchmarkEntryDto }) {
         <Badge variant="outline">{entry.domain}</Badge>
       </TableCell>
       <TableCell>
-        <Badge variant={meta.variant} data-testid={`entry-${entry.problemId}-verdict`}>
-          {meta.label}
+        <Badge variant={VERDICT_BADGE_VARIANT[entry.verdict]} data-testid={`entry-${entry.problemId}-verdict`}>
+          {entry.verdict}
         </Badge>
       </TableCell>
       <TableCell>

@@ -13,6 +13,8 @@ import {
   Link2,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { VerdictBadge } from '@/components/VerdictBadge';
+import { isVerdictValue } from '@/lib/verdict';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -155,7 +157,9 @@ export function V2ReceiptPage() {
                 <div>
                   <span className="text-muted-foreground">{t('v2.verdict')}</span>
                   <div>
-                    <Badge variant="outline">{sharedReceipt.verdict}</Badge>
+                    {isVerdictValue(sharedReceipt.verdict)
+                      ? <VerdictBadge decision={sharedReceipt.verdict} size="sm" />
+                      : <Badge variant="outline">{sharedReceipt.verdict}</Badge>}
                   </div>
                 </div>
                 <div className="col-span-2">
@@ -286,7 +290,9 @@ export function V2ReceiptPage() {
               <div>
                 <span className="text-muted-foreground">{t('v2.verdict')}</span>
                 <div>
-                  <Badge variant="outline">{receipt.verdictLabel}</Badge>
+                  {isVerdictValue(receipt.verdictLabel)
+                    ? <VerdictBadge decision={receipt.verdictLabel} size="sm" />
+                    : <Badge variant="outline">{receipt.verdictLabel}</Badge>}
                 </div>
               </div>
               <div className="col-span-2">
@@ -449,7 +455,9 @@ export function V2ReceiptPage() {
                         {item.claimText}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{item.verdict}</Badge>
+                        {isVerdictValue(item.verdict)
+                          ? <VerdictBadge decision={item.verdict} size="sm" />
+                          : <Badge variant="outline">{item.verdict}</Badge>}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {item.createdAt}

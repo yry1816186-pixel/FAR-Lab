@@ -19,8 +19,9 @@
 
 import { useState, useMemo, type FormEvent } from 'react';
 import { useEvidenceChain } from '@/lib/api_client';
+import { isVerdictValue } from '@/lib/verdict';
 import { useT } from '@/lib/i18n';
-import type { GraphNodeDto, GraphSubtree, VerdictValue } from '@/lib/types';
+import type { GraphNodeDto, GraphSubtree } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -28,17 +29,6 @@ import { VerdictBadge } from '@/components/VerdictBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GitCompare, Search, Info } from 'lucide-react';
 
-const FIVE_VERDICTS = new Set<string>([
-  'CONFIRMED',
-  'REFUTED',
-  'INCONCLUSIVE',
-  'DEGRADED_SCOPE',
-  'UNTESTED',
-]);
-
-function isVerdictValue(v: string): v is VerdictValue {
-  return FIVE_VERDICTS.has(v);
-}
 
 /** 把 graphSubtree（API 返回为 unknown）安全收窄为 GraphSubtree。 */
 function narrowSubtree(raw: unknown): GraphSubtree | null {
