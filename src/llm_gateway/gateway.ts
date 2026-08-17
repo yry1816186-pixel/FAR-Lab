@@ -4,13 +4,12 @@ import type {
   ProviderAdapter,
   ProviderProfile,
 } from './types.ts';
+import type { LlmGateway } from './types.ts';
 
-/** Interface defining llm gateway. */
-export interface LlmGateway {
-  register(adapter: ProviderAdapter): void;
-  callLlm(profile: ProviderProfile, request: LlmRequest): Promise<LlmResponse>;
-  registeredProfiles(): readonly ProviderProfile[];
-}
+// CORE-ARCH-001: interface lives in types.ts (contract file); re-exported here for
+// existing import sites — new kernel-side imports must target types.ts.
+export type { LlmGateway };
+
 
 /**
  * create llm gateway.
