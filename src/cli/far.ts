@@ -34,6 +34,7 @@ import { runCAstroLoop } from './commands/c_astro_loop.ts';
 import { runGround } from './commands/ground.ts';
 import { runCheckResource } from './commands/check_resource.ts';
 import { runExportCitations, type CitationExportFormat } from './commands/export_citations.ts';
+import { runRubricFromArgs } from './commands/rubric_args.ts';
 import { parseJudgePairwiseArgs, runJudgePairwise } from './commands/judge_pairwise.ts';
 import {
   parseSnapshotVerifyArgs,
@@ -240,6 +241,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'export',
     description: 'Trust Receipt / .far-proof evidence bundle export',
     run: (args) => runExportFromArgs(args),
+  },
+  {
+    name: 'rubric',
+    description: 'blind human-evaluation tool: package de-identified hypotheses, aggregate ratings (kappa/alpha)',
+    run: (args) => Promise.resolve(runRubricFromArgs(args)),
   },
   {
     name: 'fec',
@@ -1557,6 +1563,14 @@ SYSTEM
   far c-astro-loop [--rounds <n>]       C-ASTRO closed-loop experiment iteration (plan→BLS→verify→refine)
   far audit-seed-cherry [--json]        anti-theater detector-validation showcase (cherry-pick replay)
   far audit-multiseed [--json]          real multi-seed audit (seed-dependent BLS)
+
+CAMPAIGN & EVALUATION
+  far campaign <start|status|resume|report|replay>
+                                        multi-day research campaigns (hash-chained ledger, budget
+                                        guard, crash-resumable scheduler, md/latex/json reports)
+  far research judge <runId>            LIVE pairwise position-bias check for the tournament judge
+  far rubric <package|aggregate>        blind human evaluation: de-identified hypothesis packs,
+                                        CSV ratings aggregation (Cohen's kappa + Krippendorff's alpha)
 
 MORE
   far <command> --help                  full usage, options, and exit codes for a single command

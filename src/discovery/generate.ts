@@ -37,6 +37,7 @@ import {
   buildIdf,
   paraphraseSimilarity,
   PARAPHRASE_THRESHOLD,
+  MEMORY_NEAR_DUP_THRESHOLD,
 } from './novelty/lexical_similarity.ts';
 import { STRATEGY_REGISTRY } from './strategies/index.ts';
 import {
@@ -73,6 +74,15 @@ export interface GenerateMultiStrategyOptions {
    * kindless marker.
    */
   readonly knownMemoryHashes?: ReadonlySet<string> | ReadonlyMap<string, string>;
+  /**
+   * Past-run statement references for near-duplicate screening (day-r13):
+   * candidates with NO exact hash hit but lexical similarity ≥
+   * MEMORY_NEAR_DUP_THRESHOLD against a reference get a MEMORY_NEAR_DUP:*
+   * marker (kind inherited from the reference). Marking only — same no-
+   * selection-power contract as the exact-hash guard. Absent = near-dup
+   * screen off (pre-day-r13 callers stay byte-identical).
+   */
+  readonly knownMemoryReferences?: readonly { marker: string; statement: string }[];
 }
 
 /** One strategy's fan-out outcome (honest accounting: skip, error, or candidates). */
@@ -393,15 +403,37 @@ export async function generateHypothesesMultiStrategy(
     known instanceof Map ? known.has(hash) : known?.has(hash) === true;
   const markerFor = (hash: string, id: string): string =>
     known instanceof Map ? (known.get(hash) ?? `MEMORY_DUPLICATE:unknown:${id.slice(0, 12)}`) : `MEMORY_DUPLICATE:unknown:${id.slice(0, 12)}`;
+  const references = opts.knownMemoryReferences;
   const memoryFlagged =
-    known === undefined
+    known === undefined && references === undefined
       ? undefined
-      : finalKept
-          .filter((k) => hasKnown(hypothesisContentHash(k.candidate)))
-          .map((k) => ({
-            id: k.candidate.id,
-            marker: markerFor(hypothesisContentHash(k.candidate), k.candidate.id),
-          }));
+      : finalKept.flatMap((k) => {
+          const hash = hypothesisContentHash(k.candidate);
+          if (hasKnown(hash)) {
+            return [{ id: k.candidate.id, marker: markerFor(hash, k.candidate.id) }];
+          }
+          if (references === undefined || references.length === 0) return [];
+          // Near-duplicate screen (day-r13): paraphrase of an explored/eliminated
+          // direction. Best (max-similarity) reference wins; ties break to the
+          // earlier reference (negatives before branches — deterministic).
+          let best: { marker: string; similarity: number } | null = null;
+          for (const ref of references) {
+            const sim = paraphraseSimilarity(k.candidate.statement, ref.statement);
+            if (sim >= MEMORY_NEAR_DUP_THRESHOLD && (best === null || sim > best.similarity)) {
+              best = { marker: ref.marker, similarity: sim };
+            }
+          }
+          if (best === null) return [];
+          // MEMORY_NEAR_DUP keeps the kind prefix (negative:/branch:) so the
+          // scorecard grades it exactly like the exact-hash family; sim=… makes
+          // the flag self-auditing on the frozen run (no recompute needed).
+          return [
+            {
+              id: k.candidate.id,
+              marker: `${best.marker.replace(/^MEMORY_DUPLICATE:/, 'MEMORY_NEAR_DUP:')}:sim${best.similarity.toFixed(4)}`,
+            },
+          ];
+        });
 
   return {
     hypotheses: finalKept.map((k) => k.candidate),

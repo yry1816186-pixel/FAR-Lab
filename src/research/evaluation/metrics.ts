@@ -277,6 +277,35 @@ export function computeRunMetrics(
       value: Object.values(run.scorecards).filter((sc) => sc.paretoOptimal).length,
       definition: 'hypotheses on the scorecard Pareto front (non-dominated candidates)',
     },
+    // ── Generation-quality telemetry (§4.2 补遗 R11, day-r13): the LLM layer's
+    // "test pass rate" — computed straight from stageReceipts (retries carry
+    // schema-repair + provider retries; finishReason=length marks truncation).
+    ...(() => {
+      const modelReceipts = run.stageReceipts.filter((r) => r.component === 'model');
+      if (modelReceipts.length === 0) return [];
+      const retried = modelReceipts.filter((r) => (r.retries ?? 0) > 0).length;
+      const truncated = modelReceipts.filter((r) => r.finishReason === 'length').length;
+      const totalRetries = modelReceipts.reduce((n, r) => n + (r.retries ?? 0), 0);
+      return [
+        {
+          name: 'generationRetryRate',
+          value: retried / modelReceipts.length,
+          definition:
+            'model calls that needed ≥1 retry (schema-repair or provider) / model calls — the LLM layer\'s failure/rework rate (§4.2 R11)',
+        },
+        {
+          name: 'generationTruncationRate',
+          value: truncated / modelReceipts.length,
+          definition:
+            'model calls whose finishReason=length (output cut at the token cap) / model calls — silent truncation corrupts structured output downstream',
+        },
+        {
+          name: 'generationRetryCount',
+          value: totalRetries,
+          definition: 'total retries across model calls (absolute rework volume)',
+        },
+      ];
+    })(),
   ];
 
   return {

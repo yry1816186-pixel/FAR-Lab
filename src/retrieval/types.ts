@@ -78,6 +78,14 @@ export interface RetrievedDocument {
   readonly abstract: string | null;
   /** License string if stated by the source, null otherwise. */
   readonly licenseMetadata: string | null;
+  /**
+   * Present when an abstract existed at the source but was WITHHELD by our
+   * compliance gate (day-r13: Crossref records without a permissive record-
+   * level license — see COMPLIANCE-data-redistribution.md §5.2). Distinguishes
+   * "we chose not to ship it" from "the source had none". Provenance
+   * annotation only — deliberately NOT part of normalizedDocumentHash.
+   */
+  readonly abstractWithheldReason?: 'crossref_record_license_not_permissive' | undefined;
 }
 
 /** A retrieval request. */

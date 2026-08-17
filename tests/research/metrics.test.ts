@@ -299,3 +299,34 @@ describe('computeRunMetrics', () => {
   });
 });
 
+describe('computeRunMetrics — generation-quality telemetry (day-r13, §4.2 R11)', () => {
+  const receipt = (over: Record<string, unknown>) => ({
+    runId: 'r1', stageId: 'st', sequence: 1, component: 'model',
+    mode: 'LIVE', inputHash: 'i', outputHash: 'o', createdAt: 't',
+    ...over,
+  });
+
+  test('retry/truncation rates computed from model receipts; non-model receipts ignored', () => {
+    const run = baseRun({
+      stageReceipts: [
+        receipt({ retries: 0, finishReason: 'stop' }),
+        receipt({ retries: 2, finishReason: 'stop' }),
+        receipt({ retries: 1, finishReason: 'length' }),
+        { runId: 'r1', stageId: 'det', sequence: 4, component: 'deterministic', mode: 'RECORDED_REPLAY', inputHash: 'i', outputHash: 'o', createdAt: 't', retries: 9 },
+      ] as unknown as ResearchRun['stageReceipts'],
+    });
+    const report = computeRunMetrics(run, 'NOT_RUN', 't');
+    const rate = report.metrics.find((m) => m.name === 'generationRetryRate')!;
+    const trunc = report.metrics.find((m) => m.name === 'generationTruncationRate')!;
+    const count = report.metrics.find((m) => m.name === 'generationRetryCount')!;
+    assert.equal(rate.value, 2 / 3, 'two of three model calls needed retries');
+    assert.equal(trunc.value, 1 / 3, 'one of three truncated at the token cap');
+    assert.equal(count.value, 3, 'absolute rework volume 2+1');
+  });
+
+  test('zero model receipts -> telemetry rows absent (never divide by zero)', () => {
+    const report = computeRunMetrics(baseRun(), 'NOT_RUN', 't');
+    assert.equal(report.metrics.find((m) => m.name === 'generationRetryRate'), undefined);
+    assert.equal(report.metrics.find((m) => m.name === 'generationTruncationRate'), undefined);
+  });
+});

@@ -86,6 +86,8 @@ export interface BundleVerifyResult {
   readonly bundlePath: string;
   readonly mode: FarProofBundleVerifyMode;
   readonly requiredFilesPresent: boolean;
+  /** day-r13 compliance: SOURCES-ATTRIBUTION.txt present (absence = warning, not error). */
+  readonly attributionPresent: boolean;
   readonly missingFiles: readonly string[];
   readonly proofEnvelopeRan: boolean;
   readonly proofEnvelopeOk: boolean;
@@ -118,6 +120,7 @@ export function verifyFarProofBundle(
   const missingFiles = requiredFiles.filter((file) => !existsSync(join(bundlePath, file)));
   const errors: string[] = missingFiles.map((file) => `MISSING_REQUIRED_FILE: ${file}`);
   const warnings: string[] = [];
+  let attributionPresent = false; // day-r13 §5.7: reported, never load-bearing for ok
 
   let proofEnvelopeCount = 0;
   let proofEnvelopeRan = false;
@@ -271,11 +274,23 @@ export function verifyFarProofBundle(
     }
   }
 
+  // day-r13 compliance duty (audit §5.7): the attribution notice must be
+  // VISIBLE at recompute time — presence is reported, absence warned (old
+  // pre-day-r13 bundles stay valid; the warning nudges re-export).
+  if (existsSync(join(bundlePath, 'SOURCES-ATTRIBUTION.txt'))) {
+    attributionPresent = true;
+  } else {
+    warnings.push(
+      'SOURCES_ATTRIBUTION: bundle predates the 2026-08-17 redistribution audit — re-export to attach the third-party metadata attribution notice.',
+    );
+  }
+
   return {
     ok: errors.length === 0,
     bundlePath,
     mode,
     requiredFilesPresent: missingFiles.length === 0,
+    attributionPresent,
     missingFiles,
     proofEnvelopeRan,
     proofEnvelopeOk,

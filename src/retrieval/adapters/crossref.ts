@@ -72,6 +72,25 @@ function normalizeDoi(doi: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed.toLowerCase() : null;
 }
 
+/**
+ * Permissive abstract-license allowlist (compliance audit §5.2, 2026-08-17 —
+ * .far/docs-local/COMPLIANCE-data-redistribution.md R1): CC0 / CC-BY / CC-BY-SA
+ * and the Open Data Commons PDM/BY families. NC/ND/unspecified licenses and
+ * absent license signals all FAIL this check — an abstract ships only when the
+ * record itself carries a permissive grant ("Some abstracts contained in the
+ * metadata may be subject to copyright by publishers or authors", Crossref
+ * REST API docs, fetched 2026-08-17).
+ */
+const PERMISSIVE_ABSTRACT_LICENSE =
+  /^https?:\/\/(creativecommons\.org\/(publicdomain\/zero(\/[0-9.]+)?|licenses\/(by-sa|by)(?![-a-z0-9])(\/[0-9.]+)?)\/?|opendatacommons\.org\/licenses\/(pdm|by)\/?)/i;
+
+/** True when ANY license entry on the record grants permissive reuse. */
+function abstractAllowedByLicense(work: CrossrefWork): boolean {
+  return (work.license ?? []).some(
+    (l) => typeof l.URL === 'string' && PERMISSIVE_ABSTRACT_LICENSE.test(l.URL),
+  );
+}
+
 /** Map one Crossref work to a RetrievedDocument. */
 function mapCrossrefWork(work: CrossrefWork, rawBody: string, queryText: string, retrievedAt: string): RetrievedDocument | null {
   const doi = normalizeDoi(work.DOI);
@@ -83,7 +102,15 @@ function mapCrossrefWork(work: CrossrefWork, rawBody: string, queryText: string,
     .map((a) => normalizeWhitespace(`${a.given ?? ''} ${a.family ?? ''}`.trim()))
     .filter((name) => name.length > 0);
   const publicationDate = crossrefDate(work);
-  const abstract = cleanCrossrefAbstract(work.abstract);
+  let abstract = cleanCrossrefAbstract(work.abstract);
+  // Compliance gate (§5.2): the abstract ships only under a permissive
+  // record-level license. Withholding is annotated on the document —
+  // "not shipped" must stay distinguishable from "source had none".
+  let abstractWithheldReason: RetrievedDocument['abstractWithheldReason'] = undefined;
+  if (abstract !== null && !abstractAllowedByLicense(work)) {
+    abstract = null;
+    abstractWithheldReason = 'crossref_record_license_not_permissive';
+  }
   const canonicalUrl = work.URL ?? `https://doi.org/${doi}`;
   const license = work.license?.[0]?.URL ?? null;
 
@@ -117,6 +144,7 @@ function mapCrossrefWork(work: CrossrefWork, rawBody: string, queryText: string,
     parserVersion: RETRIEVAL_PARSER_VERSION,
     abstract,
     licenseMetadata: license,
+    ...(abstractWithheldReason !== undefined ? { abstractWithheldReason } : {}),
   };
 }
 
