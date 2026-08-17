@@ -145,9 +145,12 @@ test('venv sandbox: a script that re-expands a real numerical pool invalidates t
       { script, pythonCmd: pythonCommand },
       RESOURCES,
     );
-    assert.equal(result.exitCode, 78, 'verified nthread!=1 must invalidate an otherwise successful run');
-    assert.equal(result.singleThreaded, false);
-    assert.equal(result.threadLimitReason, 'threadpool_limit_not_one');
+    const receipt = JSON.stringify(
+      { exitCode: result.exitCode, singleThreaded: result.singleThreaded, threadLimitReason: result.threadLimitReason, stderr: result.stderr },
+    );
+    assert.equal(result.exitCode, 78, `verified nthread!=1 must invalidate an otherwise successful run — receipt: ${receipt}`);
+    assert.equal(result.singleThreaded, false, receipt);
+    assert.equal(result.threadLimitReason, 'threadpool_limit_not_one', receipt);
   } finally {
     restorePythonPath(previous);
   }
