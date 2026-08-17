@@ -15,6 +15,8 @@
  */
 
 import { useRef, useEffect } from 'react';
+
+import { renderHonestyCaption, type ChartHonestySpec, type ChartStatisticalSpec } from '@/lib/vizHonesty';
 import * as d3 from 'd3';
 import type { HypothesizeResponse, VerdictValue } from '@/lib/types';
 
@@ -54,7 +56,7 @@ const VERDICT_LABELS: Record<VerdictValue, string> = {
 // 共享类型
 // ---------------------------------------------------------------------------
 
-interface BaselineData {
+export interface BaselineData {
   readonly key: string;
   readonly label: string;
   readonly response: HypothesizeResponse | null;
@@ -76,6 +78,58 @@ function hasValidResponse(d: BaselineData): d is ValidBaseline {
 function baselineColor(key: string): string {
   return BASELINE_COLORS[key] ?? FALLBACK_COLOR;
 }
+
+// ---------------------------------------------------------------------------
+// UX-VIZ-001 诚实层：单次运行的统计事实 + 统一披露字幕。
+// 消融页每条基线真实只跑 1 次（n=1）——CI 不可计算必须说出口，不冒充重复测量。
+// ---------------------------------------------------------------------------
+
+function singleRunStat(metricKind: ChartStatisticalSpec['metricKind']): ChartStatisticalSpec {
+  return {
+    runsPerSubject: 1,
+    nRendered: true,
+    ci: null,
+    ciRendered: false,
+    noCiReason: 'single run per baseline: CI not computable from n=1',
+    metricKind,
+  };
+}
+
+function HonestyCaption({ stat, testId }: { stat: ChartStatisticalSpec; testId: string }) {
+  return (
+    <p data-testid={testId} className="px-3 pb-2 pt-1 text-xs text-muted-foreground">
+      {renderHonestyCaption(stat)}
+    </p>
+  );
+}
+
+/** 四图的诚实性 spec——与各组件真实渲染绑定（aria-label 原文一致；字幕渲染 n/CI 披露）。 */
+export const ABLATION_CHART_HONESTY_SPECS: readonly ChartHonestySpec[] = [
+  {
+    id: 'ablation/iterations',
+    comparative: true,
+    statistical: singleRunStat('count'),
+    a11y: { roleImg: true, ariaLabel: 'Bar chart of iteration counts across baselines', nonColorChannel: true },
+  },
+  {
+    id: 'ablation/metric',
+    comparative: true,
+    statistical: singleRunStat('mean'),
+    a11y: { roleImg: true, ariaLabel: 'Bar chart of metric values across baselines', nonColorChannel: true },
+  },
+  {
+    id: 'ablation/verdict-dist',
+    comparative: true,
+    statistical: singleRunStat('ordinal'),
+    a11y: { roleImg: true, ariaLabel: 'Verdict distribution across baselines', nonColorChannel: true },
+  },
+  {
+    id: 'ablation/falsifiability',
+    comparative: true,
+    statistical: singleRunStat('ordinal'),
+    a11y: { roleImg: true, ariaLabel: 'Falsifiability comparison across baselines', nonColorChannel: true },
+  },
+];
 
 // ---------------------------------------------------------------------------
 // 柱状图：迭代次数对比
@@ -205,6 +259,7 @@ export function IterationBarChart({ data }: IterationChartProps) {
       data-testid="iteration-chart-container"
     >
       <svg ref={svgRef} className="w-full h-full" data-testid="iteration-chart-svg" />
+      {data.some(hasValidResponse) && <HonestyCaption stat={singleRunStat('count')} testId="iteration-honesty-caption" />}
     </div>
   );
 }
@@ -354,6 +409,7 @@ export function MetricBarChart({ data }: MetricChartProps) {
       data-testid="metric-chart-container"
     >
       <svg ref={svgRef} className="w-full h-full" data-testid="metric-chart-svg" />
+      {data.some(hasValidResponse) && <HonestyCaption stat={singleRunStat('mean')} testId="metric-honesty-caption" />}
     </div>
   );
 }
@@ -519,6 +575,7 @@ export function VerdictDistChart({ data }: VerdictDistChartProps) {
       data-testid="verdict-dist-chart-container"
     >
       <svg ref={svgRef} className="w-full h-full" data-testid="verdict-dist-chart-svg" />
+      {data.some(hasValidResponse) && <HonestyCaption stat={singleRunStat('ordinal')} testId="verdict-honesty-caption" />}
     </div>
   );
 }
@@ -663,6 +720,7 @@ export function FalsifiabilityChart({ data }: FalsifiabilityChartProps) {
       data-testid="falsifiability-chart-container"
     >
       <svg ref={svgRef} className="w-full h-full" data-testid="falsifiability-chart-svg" />
+      {data.some(hasValidResponse) && <HonestyCaption stat={singleRunStat('ordinal')} testId="falsifiability-honesty-caption" />}
     </div>
   );
 }
