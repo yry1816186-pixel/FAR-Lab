@@ -183,3 +183,10 @@ export interface SourceCard {
   readonly verifiedFactId?: string;
   readonly notes?: string;
 }
+
+/**
+ * CORE-REPORT-001 · 报告段落声明分类：报告必须区分事实、推断和未完成。
+ * FACT=已验证的结构化记录；INFERENCE=由记录推出的聚合/审计判断；UNCOMPLETED=边界/未完成声明。
+ */
+export const REPORT_CLAIM_CATEGORIES = ['FACT', 'INFERENCE', 'UNCOMPLETED'] as const;
+export type ReportClaimCategory = (typeof REPORT_CLAIM_CATEGORIES)[number];
