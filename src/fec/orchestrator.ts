@@ -59,6 +59,11 @@ import {
   EVIDENCE_PROVENANCE_UNBOUND_REASON_CODE,
   assertPrimaryEvidenceProvenanceBound,
 } from '../falsifiability/evidence_provenance.ts';
+// EVID-RECORD-001 · 16 字段证据合同闸（T-003 模式镜像·fail-closed 前置）。
+import {
+  assertPrimaryEvidenceContractBound,
+  EVIDENCE_CONTRACT_INCOMPLETE_REASON_CODE,
+} from '../falsifiability/evidence_contract_gate.ts';
 
 /** Input parameters for operations involving fec append claim args. */
 export interface FecAppendClaimArgs {
@@ -202,15 +207,25 @@ export function fecAppendClaim(
       claimId: args.fecV2.contract.claimId,
     });
 
+    // EVIDENCE_CONTRACT_INCOMPLETE：FEC requireFullEvidenceContract=true 时 primary 证据
+    // 缺完整 16 字段合同/合同违规 → 追加 flag（kernel R7 阻断 CONFIRMED·fail-closed UNTESTED）。
+    const contractGateResult = assertPrimaryEvidenceContractBound(args.evidences, {
+      requireFullEvidenceContract: args.fecV2.contract.requireFullEvidenceContract ?? false,
+      claimId: args.fecV2.contract.claimId,
+    });
+
     const integrityFlags =
       compileResult.ok
         ? compileResult.plan.integrityFlags
         : args.fecV2.contract.integrityFlags;
     // provenance 未绑定 → 追加 EVIDENCE_PROVENANCE_UNBOUND flag（kernel R7 阻断 CONFIRMED，
     // R8 不直接触发 → 落 R9/NO_DECISION_PATH UNTESTED·fail-closed 语义）。
-    const integrityFlagsWithProvenance = provenanceResult.ok
+    let integrityFlagsWithProvenance = provenanceResult.ok
       ? integrityFlags
       : [...integrityFlags, EVIDENCE_PROVENANCE_UNBOUND_REASON_CODE];
+    if (!contractGateResult.ok) {
+      integrityFlagsWithProvenance = [...integrityFlagsWithProvenance, EVIDENCE_CONTRACT_INCOMPLETE_REASON_CODE];
+    }
     const kernelOutput = decideFiveValueVerdict(
       buildVerdictKernelInput(args, integrityFlagsWithProvenance),
     );
