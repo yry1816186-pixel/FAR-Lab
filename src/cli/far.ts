@@ -1565,6 +1565,14 @@ SYSTEM
   far audit-seed-cherry [--json]        anti-theater detector-validation showcase (cherry-pick replay)
   far audit-multiseed [--json]          real multi-seed audit (seed-dependent BLS)
 
+CAMPAIGN & EVALUATION
+  far campaign <start|status|resume|report|replay>
+                                        multi-day research campaigns (hash-chained ledger, budget
+                                        guard, crash-resumable scheduler, md/latex/json reports)
+  far research judge <runId>            LIVE pairwise position-bias check for the tournament judge
+  far rubric <package|aggregate>        blind human evaluation: de-identified hypothesis packs,
+                                        CSV ratings aggregation (Cohen's kappa + Krippendorff's alpha)
+
 MORE
   far <command> --help                  full usage, options, and exit codes for a single command
   docs: README quickstart · far <command> --help
