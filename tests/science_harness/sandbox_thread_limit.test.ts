@@ -145,9 +145,19 @@ test('venv sandbox: a script that re-expands a real numerical pool invalidates t
       { script, pythonCmd: pythonCommand },
       RESOURCES,
     );
-    assert.equal(result.exitCode, 78, 'verified nthread!=1 must invalidate an otherwise successful run');
-    assert.equal(result.singleThreaded, false);
-    assert.equal(result.threadLimitReason, 'threadpool_limit_not_one');
+    const receipt = JSON.stringify(
+      { exitCode: result.exitCode, singleThreaded: result.singleThreaded, threadLimitReason: result.threadLimitReason, stderrHash: result.stderrHash },
+    );
+    assert.equal(result.exitCode, 78, `verified nthread!=1 must invalidate an otherwise successful run — receipt: ${receipt}`);
+    assert.equal(result.singleThreaded, false, receipt);
+    // 两种失效理由都使 SR-7 回执无效：
+    //   threadpool_limit_not_one     —— 池可见且 ≠1（Linux/Windows 路径）
+    //   threadpool_introspection_gap —— 平台枚举不到池（macOS 实测），空真防护 fail-closed
+    assert.ok(
+      result.threadLimitReason === 'threadpool_limit_not_one' ||
+        result.threadLimitReason === 'threadpool_introspection_gap',
+      `expected an invalidating threadLimitReason — receipt: ${receipt}`,
+    );
   } finally {
     restorePythonPath(previous);
   }
@@ -161,13 +171,17 @@ test('venv sandbox red team: thread verifier does not make the dlopen audit set 
   const previous = process.env.PYTHONPATH;
   process.env.PYTHONPATH = buildPythonPath(previous);
   try {
+    // PEP 578 fires 'ctypes.dlopen' before any load attempt, so a slash-containing
+    // nonexistent path is the cross-platform / cross-Python-version trigger:
+    // CDLL(None) TypeErrors in pure-Python ctypes on Python >= 3.12 before the audit
+    // event ever fires (observed: 3.12.10 win32 → exit 1, not 126).
     const result = await venvSandboxAdapter.executeAsync(
       {
         script: [
           'import __main__',
           'import ctypes',
           '__main__._AUDIT_REJECT_EVENTS = frozenset()',
-          'ctypes.CDLL(None)',
+          "ctypes.CDLL('/sandbox/redteam/fake-dlopen-probe.so')",
         ].join('\n'),
         pythonCmd: pythonCommand,
       },
