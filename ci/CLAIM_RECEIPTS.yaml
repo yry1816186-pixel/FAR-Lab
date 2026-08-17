@@ -1,0 +1,41 @@
+# CLAIM_RECEIPTS — 公开声明 → 证据收据绑定清单（CORE-REALITY-001 / CORE-CLAIM-001）
+# 执法：scripts/claim_lint.mjs（CI 步）— 声明面上的完成/性能/最高级声明必须在此绑定收据。
+# 维护契约：变更声明与更新收据同一 PR（lint 的 R2 规则拦截陈旧收据）；evidence 命令必须可复算。
+# 范围（v1）：README 双语（当前状态声明面）。CHANGELOG 为版本时点历史记录，豁免并文档化于 claim_lint.mjs 头注。
+
+surfaces:
+  - README.md
+  - README.zh-CN.md
+
+receipts:
+  - id: AT-DETECTORS-23-EN
+    file: README.md
+    pattern: "23 detectors"
+    summary: "反剧场检测器套件规模声明（3 处：能力矩阵/正文/verify 流程）"
+    superlative: false
+    fcsRef: null
+    lastVerifiedAt: "2026-08-17"
+    evidence:
+      - "node -e \"console.log(require('fs').readdirSync('src/anti_theater/detectors').filter(f=>f.endsWith('.ts')&&f!=='index.ts').length)\" → 23"
+      - "tests/anti_theater/（16 文件·含 attack_corpus/false_green_rate/report_proof_mismatch）"
+      - "ci.yml blocking_gates（每 push 强制）"
+  - id: AT-DETECTORS-23-ZH
+    file: README.zh-CN.md
+    pattern: "23 检测器"
+    summary: "反剧场检测器套件规模声明（中文面·生产裁决路径接入）"
+    superlative: false
+    fcsRef: null
+    lastVerifiedAt: "2026-08-17"
+    evidence:
+      - "node -e \"console.log(require('fs').readdirSync('src/anti_theater/detectors').filter(f=>f.endsWith('.ts')&&f!=='index.ts').length)\" → 23"
+      - "src/anti_theater/lint.ts runAntiTheaterLint（science-harness 生产路径）"
+  - id: BENCH-Q4-RATELIMIT-ZH
+    file: README.zh-CN.md
+    pattern: "第 4 题"
+    summary: "基准第 4 题当日 LIVE 限流事件记录（历史事实陈述·自锚定 commit）"
+    superlative: false
+    fcsRef: null
+    lastVerifiedAt: "2026-08-17"
+    evidence:
+      - "README.zh-CN.md 同节所引 commit（2026-08-14 事件记录·d7a9455 前后 runId 台账）"
+      - "docs/development/PROGRESS.md 2026-08-14 前后批次（gitignored 运行台账层）"
