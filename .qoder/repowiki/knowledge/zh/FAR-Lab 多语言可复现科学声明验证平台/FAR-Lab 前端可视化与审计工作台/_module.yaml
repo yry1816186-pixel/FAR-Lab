@@ -1,9 +1,0 @@
-schema_version: 1
-module_path: frontend
-title: FAR-Lab 前端可视化与审计工作台
-scope:
-    - frontend/
-source_files: []
-depends_on: []
-related_to:
-    - path: ci
