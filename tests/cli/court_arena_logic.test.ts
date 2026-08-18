@@ -25,7 +25,7 @@ test('computeAgreement: three or more complete verdict values are split', () => 
   );
 });
 
-test('computeAgreement: any missing verdict makes agreement inconclusive', () => {
+test('computeAgreement: a missing verdict makes agreement inconclusive', () => {
   assert.strictEqual(computeAgreement(['CONFIRMED', null]), 'inconclusive');
   assert.strictEqual(computeAgreement([null, null]), 'inconclusive');
   assert.strictEqual(computeAgreement([]), 'inconclusive');

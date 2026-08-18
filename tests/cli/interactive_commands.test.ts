@@ -9,15 +9,17 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import assert from 'node:assert';
 
+import { RUNTIME_API_KEY_ENV_NAMES } from '../../src/llm_gateway/runtime_gateway.ts';
+
 function runFar(args: readonly string[]): SpawnSyncReturns<string> {
+  const env = { ...process.env };
+  for (const name of RUNTIME_API_KEY_ENV_NAMES) {
+    delete env[name];
+  }
   return spawnSync(process.execPath, ['src/cli/far.ts', ...args], {
     encoding: 'utf8',
     timeout: 120000,
-    env: {
-      ...process.env,
-      FAR_DASHSCOPE_API_KEY: '',
-      DASHSCOPE_API_KEY: '',
-    },
+    env,
   });
 }
 

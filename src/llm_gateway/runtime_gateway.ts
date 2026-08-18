@@ -20,7 +20,7 @@ export const RUNTIME_PROVIDER_PROFILE = 'competition_aliyun_qwen' as const;
 export const RUNTIME_MODEL_SNAPSHOT = COMPETITION_MODEL_SNAPSHOT;
 
 /** Supported API-key environment variables, in priority order. */
-const API_KEY_ENV_NAMES = ['FAR_DASHSCOPE_API_KEY', 'DASHSCOPE_API_KEY'] as const;
+export const RUNTIME_API_KEY_ENV_NAMES = ['FAR_DASHSCOPE_API_KEY', 'DASHSCOPE_API_KEY'] as const;
 
 /**
  * Resolve the built-in live gateway.
@@ -30,7 +30,7 @@ const API_KEY_ENV_NAMES = ['FAR_DASHSCOPE_API_KEY', 'DASHSCOPE_API_KEY'] as cons
  * - no replay or synthetic fallback is constructed here.
  */
 export function resolveRuntimeGateway(env: RuntimeEnv): LlmGateway | null {
-  const apiKey = API_KEY_ENV_NAMES.map((name) => env[name]).find(
+  const apiKey = RUNTIME_API_KEY_ENV_NAMES.map((name) => env[name]).find(
     (value): value is string => typeof value === 'string' && value.length > 0,
   );
   if (apiKey === undefined) {
