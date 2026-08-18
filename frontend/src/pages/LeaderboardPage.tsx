@@ -70,11 +70,11 @@ const VERDICT_ORDER: readonly VerdictValue[] = VERDICT_VALUES;
 function barColor(variant: VerdictBadgeVariant): string {
   switch (variant) {
     case 'success':
-      return 'bg-emerald-500';
+      return 'bg-success/100';
     case 'destructive':
       return 'bg-destructive';
     case 'warning':
-      return 'bg-amber-500';
+      return 'bg-warning/100';
     case 'secondary':
       return 'bg-secondary-foreground';
     case 'outline':
@@ -214,15 +214,15 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
             <div
               className={cn(
                 'rounded-md border p-4',
-                matches ? 'border-emerald-500 bg-emerald-500/5' : 'border-destructive bg-destructive/5',
+                matches ? 'border-success/40 bg-success/100/5' : 'border-destructive bg-destructive/5',
               )}
               data-testid="suite-verify-result"
             >
               {matches ? (
                 <div className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
                   <div className="space-y-1">
-                    <div className="font-semibold text-emerald-700 dark:text-emerald-400" data-testid="suite-verify-ok">
+                    <div className="font-semibold text-success" data-testid="suite-verify-ok">
                       {t('leaderboard.suiteOk')}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -250,7 +250,7 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed bg-muted/30 p-3">
-              <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
+              <AlertTriangle className="h-4 w-4 text-warning" aria-hidden="true" />
               <span className="text-xs text-muted-foreground">
                 {t('leaderboard.tamperTheatre')}
               </span>
@@ -490,7 +490,7 @@ function ProblemRow({ entry }: { readonly entry: BenchmarkEntryDto }) {
         <div className="flex flex-col gap-1 text-xs">
           <span className="flex items-center gap-1">
             {entry.chainVerified ? (
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-success" aria-hidden="true" />
             ) : (
               <XCircle className="h-3.5 w-3.5 text-destructive" aria-hidden="true" />
             )}
@@ -540,7 +540,7 @@ function HonestyWall({ report }: { readonly report: BenchmarkReportDto }) {
     <Card data-testid="honesty-wall">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <ScrollText className="h-5 w-5 text-amber-600" aria-hidden="true" />
+          <ScrollText className="h-5 w-5 text-warning" aria-hidden="true" />
           <CardTitle className="text-xl">{t('leaderboard.honestyTitle')}</CardTitle>
         </div>
         <CardDescription>{t('leaderboard.honestyDesc')}</CardDescription>
@@ -549,7 +549,7 @@ function HonestyWall({ report }: { readonly report: BenchmarkReportDto }) {
         <ul className="space-y-3">
           {report.honestyNotes.map((note, idx) => (
             <li key={idx} className="flex items-start gap-3 rounded-md border bg-muted/20 p-3">
-              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
               <span className="text-xs text-muted-foreground" data-testid={`honesty-note-${idx}`}>
                 {note}
               </span>
