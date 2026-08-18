@@ -53,32 +53,32 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'db', budgetFiles: 4 },
   { module: 'delegation', budgetFiles: 1 },
   { module: 'demo_seeds', budgetFiles: 32 },
-  { module: 'discovery', budgetFiles: 24 },
-  { module: 'evaluation', budgetFiles: 8 },
-  { module: 'evidence', budgetFiles: 2 },
+  { module: 'discovery', budgetFiles: 24 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
+  { module: 'evaluation', budgetFiles: 8 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
+  { module: 'evidence', budgetFiles: 2 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'evidence_log', budgetFiles: 10 },
   { module: 'evidence_quality', budgetFiles: 5 },
   { module: 'falsifiability', budgetFiles: 19 },
-  { module: 'far_proof', budgetFiles: 9 },
+  { module: 'far_proof', budgetFiles: 9 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'fec', budgetFiles: 6 },
-  { module: 'gates', budgetFiles: 7 },
+  { module: 'gates', budgetFiles: 7 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'governance', budgetFiles: 9 },
   { module: 'hardware', budgetFiles: 1 },
   { module: 'llm_gateway', budgetFiles: 29 },
-  { module: 'math', budgetFiles: 16 },
+  { module: 'math', budgetFiles: 16 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'planning', budgetFiles: 9 },
   { module: 'platform', budgetFiles: 5 },
   { module: 'proof_envelope', budgetFiles: 12 },
   { module: 'release', budgetFiles: 5 },
   { module: 'report', budgetFiles: 8 },
   { module: 'research', budgetFiles: 39 },
-  { module: 'retrieval', budgetFiles: 17 },
+  { module: 'retrieval', budgetFiles: 17 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'safety', budgetFiles: 1 },
   { module: 'schema', budgetFiles: 3 },
-  { module: 'science', budgetFiles: 3 },
-  { module: 'science_harness', budgetFiles: 22 },
+  { module: 'science', budgetFiles: 3 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
+  { module: 'science_harness', budgetFiles: 22 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'security', budgetFiles: 6 },
-  { module: 'statistics', budgetFiles: 11 },
+  { module: 'statistics', budgetFiles: 11 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'trace', budgetFiles: 3 },
   { module: 'v2_domain', budgetFiles: 7 },
   { module: 'validation', budgetFiles: 1 },
