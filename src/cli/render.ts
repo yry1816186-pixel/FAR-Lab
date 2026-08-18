@@ -109,6 +109,31 @@ export function renderProgressBar(progress: number, width = 20, enabled = true):
   return `${colored} ${pct}`;
 }
 
+/** Wide (2-cell) code point ranges: CJK, Hangul, Kana compat, fullwidth forms, emoji pictographs.
+ * Data-driven table (behavior-identical to the previous boolean chain, split for complexity budget).
+ */
+const WIDE_CODEPOINT_RANGES: readonly (readonly [number, number])[] = [
+  [0x1100, 0x115f],
+  [0x2329, 0x232a],
+  [0x2e80, 0xa4cf],
+  [0xac00, 0xd7a3],
+  [0xf900, 0xfaff],
+  [0xfe10, 0xfe19],
+  [0xfe30, 0xfe6f],
+  [0xff00, 0xff60],
+  [0xffe0, 0xffe6],
+  [0x1f300, 0x1faff],
+  [0x20000, 0x3fffd],
+];
+
+/** Narrow exceptions inside the wide blocks (U+303F IDEOGRAPHIC HALFWORD FILL SPACE etc.). */
+const NARROW_CODEPOINT_EXCEPTIONS: ReadonlySet<number> = new Set([0x303f]);
+
+function isWideCodePoint(code: number): boolean {
+  if (code < 0x1100 || NARROW_CODEPOINT_EXCEPTIONS.has(code)) return false;
+  return WIDE_CODEPOINT_RANGES.some(([lo, hi]) => code >= lo && code <= hi);
+}
+
 /** Return terminal display width, not UTF-16 code-unit length.
  * CJK/full-width glyphs occupy two terminal cells; combining marks occupy zero.
  * This intentionally stays dependency-free so CLI bootstrap remains reliable.
@@ -116,22 +141,8 @@ export function renderProgressBar(progress: number, width = 20, enabled = true):
 export function displayWidth(value: string): number {
   let width = 0;
   for (const char of Array.from(value)) {
-    const code = char.codePointAt(0) ?? 0;
     if (/\p{Mark}/u.test(char)) continue;
-    const wide =
-      code >= 0x1100 &&
-      (code <= 0x115f ||
-        code === 0x2329 || code === 0x232a ||
-        (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
-        (code >= 0xac00 && code <= 0xd7a3) ||
-        (code >= 0xf900 && code <= 0xfaff) ||
-        (code >= 0xfe10 && code <= 0xfe19) ||
-        (code >= 0xfe30 && code <= 0xfe6f) ||
-        (code >= 0xff00 && code <= 0xff60) ||
-        (code >= 0xffe0 && code <= 0xffe6) ||
-        (code >= 0x1f300 && code <= 0x1faff) ||
-        (code >= 0x20000 && code <= 0x3fffd));
-    width += wide ? 2 : 1;
+    width += isWideCodePoint(char.codePointAt(0) ?? 0) ? 2 : 1;
   }
   return width;
 }
