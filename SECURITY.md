@@ -19,7 +19,7 @@ Fallback channel — email:
 
     security@far-lab.example.com
     (placeholder — `NEEDS_MAINTAINER_ASSIGNMENT`; until a real address is
-    published in governance spec, prefer the GitHub advisory channel above)
+    published in MAINTAINERS.md (governance spec), prefer the GitHub advisory channel above)
 
 Response SLA:
 - Acknowledgement: 48 hours
