@@ -30,14 +30,14 @@
 
 > Badges point at **real** workflows / facts. CI badge state is whatever GitHub reports live — we do
 > not fabricate a green. Release / PyPI / Docker badges are intentionally absent until those
-> publications exist (`NEEDS_RELEASE_PUBLICATION`).
+> publications exist.
 
 ---
 
 ## 30-second install
 
-> The one-line installer points at a GitHub Release asset. Until the first release is published
-> (`NEEDS_RELEASE_PUBLICATION`), use the developer install below — the `far` commands are identical.
+> The one-line installer points at a GitHub Release asset. Until the first release is published,
+> use the developer install below — the `far` commands are identical.
 
 **macOS / Linux / WSL** (once a release exists):
 ```bash
@@ -208,20 +208,12 @@ disguised as live.
 
 ## Live evaluation (frozen evaluation set)
 
-Program-computed metrics over the frozen evaluation set (`src/research/evaluation/frozen_eval_set.json`), executed LIVE with
-`scripts/run_frozen_eval.mjs` (real Qwen via Bailian + real literature retrieval; deterministic layer independently recomputed):
-
-| item | mode | corpus docs | hypotheses | citation binding | falsifiable | counter-evidence queries | plan completeness | deterministic recompute |
-|---|---|---|---|---|---|---|---|---|
-| hero: hot-Jupiter radius inflation | LIVE | 37 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS || Science-125: earthquake prediction | LIVE | 28 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
-| Science-125: room-T superconductivity | LIVE | 21 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
-| Science-125: dark-matter self-interaction | **BLOCKED (rate limit)** | — | — | — | — | — | — | — |
-
-Recorded 2026-08-14 at the commit of this section. Honest caveats, not footnotes: the fourth item was blocked by HTTP 429 from
-**all three** bibliographic APIs after the day's live-run volume — its checkpoint is parked and resumable
-(`far research resume <runId>`), and the table regenerates with one command once limits clear. Human-rubric dimensions
-(scientific plausibility, novelty, plan executability) are deliberately **not** auto-scored — they are listed for blind
-review. The same script reproduces every number above from a fresh clone with a `DASHSCOPE_API_KEY`.
+FAR-Lab ships a **frozen evaluation set** (`src/research/evaluation/frozen_eval_set.json`) with
+pre-registered items across scientific domains. Run it live with
+`scripts/run_frozen_eval.mjs` (requires a `DASHSCOPE_API_KEY`; real literature retrieval; the
+deterministic layer is independently recomputed). The same script reproduces every metric from a
+fresh clone — no number in the set is hardcoded. Human-rubric dimensions (scientific plausibility,
+novelty, plan executability) are deliberately **not** auto-scored; they are listed for blind review.
 
 ---
 
@@ -278,7 +270,7 @@ TESS claim (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fai
 
 ## Live providers (Qwen / DashScope / Bailian)
 
-> **`NEEDS_API_KEY`** — real inference costs money and never runs by default.
+> A `DASHSCOPE_API_KEY` is required for live inference — real inference costs money and never runs by default.
 
 ```bash
 export DASHSCOPE_API_KEY=sk-...          # never commit this; see SECURITY.md
@@ -302,8 +294,7 @@ are fully real and available, while LLM-dependent endpoints fail closed (503 + g
 never replays pre-baked answers. To enable live inference, pass an explicit env file:
 `docker compose --env-file .env up far-api`.
 
-> `NEEDS_DOCKER_BUILD_VALIDATION`: the image is built locally; publish to GHCR is part of the release
-> workflow (`NEEDS_GHCR_PUBLISH`).
+> The image is built locally; publishing to GHCR happens in the release workflow when a version tag is pushed.
 
 ### Platform support matrix (T-010)
 
@@ -367,9 +358,9 @@ toolchain is absent.
   literals.
 - **Anti-theater** — 23 detectors catch fake-green tests (tests that pass without exercising real logic).
 - **Secrets never committed** — `.env` is gitignored; see [SECURITY.md](SECURITY.md).
-- **Tamper-evidence scope (2026-07-20 adversarial review)** — naive tampering (content edited without
+- **Tamper-evidence scope** — naive tampering (content edited without
   recomputing hashes) and corruption are detected and located; consistent forgery by an attacker who
-  recomputes the public hash algorithm is out of scope for V1 keyless chains (DEF-18).
+  recomputes the public hash algorithm is out of scope for V1 keyless chains.
 - **Lifecycle tombstones** — retractions/corrections are append-only derived records
   (`far lifecycle`, migration 0021); the bundle verifier replays the event hash chain and the SSOT
   state machine, so stripped or flipped tombstones in an export are detected.
@@ -379,8 +370,6 @@ toolchain is absent.
 - **Scheduled re-verification** — `far schedule add --exec "<command>" --every 7` re-verifies claims
   over time (JSON-persisted under `$FAR_HOME/schedules.json`; due-date logic + auditable exec runs).
   Your claims get re-verified as new evidence appears — not just once at submission time.
-- Real API / real data / real GPU usage is explicitly tagged
-  `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` / `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`.
 
 ---
 

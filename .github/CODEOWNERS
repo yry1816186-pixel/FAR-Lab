@@ -1,5 +1,5 @@
 # FAR-Lab CODEOWNERS — OSS-FOUNDATION-001（开源基础完整性）
 # 默认 owner：仓库维护者对所有路径的 PR 审查负责。
 # 信任内核路径（src/falsifiability / src/evidence_log / src/far_proof / golden_vectors）
-# 的变更按 AGENTS.md §7 走高风险审查协议；CODEOWNERS 是其 GitHub 侧落点。
+# 的变更按 CONTRIBUTING.md "Architecture Authority" 的高风险协议走；CODEOWNERS 是其 GitHub 侧落点。
 * @yry1816186-pixel

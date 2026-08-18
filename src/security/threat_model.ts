@@ -286,7 +286,7 @@ export const THREAT_SURFACES: readonly ThreatSurface[] = [
     ],
     mitigations: [
       { asset: 'SECURITY.md', note: '密钥红线 + DashScope 截图脱敏规则 + 成本快照禁字段清单（入仓库前检查单）' },
-      { asset: 'scripts/repo_hygiene_gate.mjs', note: '仓库卫生门——运行时产物/敏感文件位置强制' },
+      { asset: 'scripts/repo_hygiene_gate.mjs', note: '仓库内容门禁（A–I 9 项递归：tracked 内容政策强制）' },
       { asset: 'src/platform/errors.ts', note: 'redactErrorMessage——错误信息脱敏后才可呈现' },
     ],
     residualRisk: '脱敏基于已知模式——未知形状的敏感串（新供应商响应格式）不在模式覆盖内。',

@@ -18,7 +18,7 @@
  *   R4 收据 evidence 非空且 lastVerifiedAt 存在。
  *
  * 范围边界（v1 诚实声明）：CHANGELOG 历史条目描述其版本时点事实，不属当前状态声明面；
- * 运行时生成的报告由各自生成器与 gate 约束（tests/report、benchmark_report_check）。
+ * 运行时生成的报告由各自生成器与 gate 约束（tests/report）。
  *
  * 用法：node scripts/claim_lint.mjs [--root <repo>] [--manifest <path>]
  * 退出码：0 全部绑定；1 存在无收据声明/陈旧收据/结构违规；2 参数错误。

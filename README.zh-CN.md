@@ -23,14 +23,13 @@
 [![CI](https://github.com/yry1816186-pixel/FAR-Lab/actions/workflows/ci.yml/badge.svg)](https://github.com/yry1816186-pixel/FAR-Lab/actions/workflows/ci.yml)
 
 > Badge 指向**真实** workflow / 事实。CI badge 状态由 GitHub 实时报告，**不伪造**绿。Release /
-> PyPI / Docker badge 在相应发布物存在前故意缺失（`NEEDS_RELEASE_PUBLICATION`）。
+> PyPI / Docker badge 在相应发布物存在前故意缺失。
 
 ---
 
 ## 30 秒安装
 
-> 一键安装脚本指向 GitHub Release asset。首次 release 发布前（`NEEDS_RELEASE_PUBLICATION`），用下方
-> 开发者安装——`far` 命令完全一致。
+> 一键安装脚本指向 GitHub Release asset。首次 release 发布前，用下方开发者安装——`far` 命令完全一致。
 
 **macOS / Linux / WSL**（release 发布后）：
 ```bash
@@ -130,20 +129,10 @@ pnpm far research verify bundle
 
 ## LIVE 评估（冻结评估集）
 
-冻结评估集（`src/research/evaluation/frozen_eval_set.json`）以 `scripts/run_frozen_eval.mjs` LIVE 实测
-（百炼真实 Qwen + 真实文献检索；确定性层独立重算）：
-
-| 题目 | 模式 | 语料 | 假设数 | 引用绑定 | 可证伪 | 反证查询 | 计划完整度 | 确定性重算 |
-|---|---|---|---|---|---|---|---|---|
-| hero：热木星半径膨胀 | LIVE | 37 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
-| Science-125：地震预测 | LIVE | 28 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
-| Science-125：室温超导 | LIVE | 21 | 3 | 1.00 | 1.00 | 8 | 1.00 | PASS |
-| Science-125：暗物质自相互作用 | **BLOCKED（限流）** | — | — | — | — | — | — | — |
-
-记录于 2026-08-14 本节所述 commit。如实声明：第 4 题因当日 live 运行总量触发了**全部三家**文献 API 的
-HTTP 429 限流而受阻 — 检查点已保存可续跑（`far research resume <runId>`），限流解除后一条命令即可重生成全表。
-人工 rubric 维度（科学合理性/新颖性/计划可执行性）**有意不自动评分** — 仅列出供盲评。同一脚本可从
-fresh clone + `DASHSCOPE_API_KEY` 复现上表每一个数字。
+FAR-Lab 自带**冻结评估集**（`src/research/evaluation/frozen_eval_set.json`），含跨科学领域的
+预登记题目。用 `scripts/run_frozen_eval.mjs` 实跑（需 `DASHSCOPE_API_KEY`；真实文献检索；
+确定性层独立重算）。同一脚本可从 fresh clone 复现全部指标——集合中没有任何数字是硬编码的。
+人工 rubric 维度（科学合理性/新颖性/计划可执行性）**有意不自动评分**——仅列出供盲评。
 
 ---
 
@@ -200,7 +189,7 @@ FEC 编排 → 内核裁决 → fail-closed 密封。要验证持久化 bundle�
 
 ## Live provider（Qwen / DashScope / 百炼）
 
-> **`NEEDS_API_KEY`** —— 真实推理计费，默认绝不运行。
+> **`DASHSCOPE_API_KEY`** —— 真实推理计费，默认绝不运行。
 
 ```bash
 export DASHSCOPE_API_KEY=sk-...          # 切勿提交；见 SECURITY.md
@@ -233,7 +222,7 @@ docker compose up far-api       # 长驻 API server @ http://localhost:3000（of
 默认镜像跑 offline demo / 匿名 API，**绝不**要求 key。要用真实 provider，显式传 env 文件：
 `docker compose --env-file .env up far-api`。
 
-> `NEEDS_DOCKER_BUILD_VALIDATION`：镜像本地构建；发布到 GHCR 属 release workflow（`NEEDS_GHCR_PUBLISH`）。
+> 镜像本地构建；发布到 GHCR 在 release workflow 推送版本 tag 时进行。
 
 ---
 
@@ -275,8 +264,6 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
 - **禁手填裸统计数字** —— p 值 / effect size 由 `src/statistics/` 真实算出，绝非字面量。
 - **反剧场** —— 23 项检测器抓「假绿测试」（看似绿实则未走真实逻辑）。
 - **密钥绝不入库** —— `.env` 已 gitignore；见 [SECURITY.md](SECURITY.md)。
-- 真实 API / 真实数据 / 真实 GPU 用量均显式标注 `NEEDS_API_VALIDATION` / `NEEDS_REAL_ENV` /
-  `NEEDS_GPU_VALIDATION` / `NEEDS_HUMAN_OPERATION`。
 
 ---
 
