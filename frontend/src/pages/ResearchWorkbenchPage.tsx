@@ -79,16 +79,17 @@ function RunModeBadge({ run }: { readonly run: ResearchRunDto }) {
 
 /** 候选假设比较表（§12.5 主流程 4）。 */
 function HypothesisTable({ run }: { readonly run: ResearchRunDto }) {
+  const t = useT();
   return (
     <div className="overflow-x-auto" data-testid="hypothesis-table">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left">
-            <th className="py-2 pr-3 font-medium">Hypothesis</th>
-            <th className="py-2 pr-3 font-medium">Deterministic grades</th>
-            <th className="py-2 pr-3 font-medium">Model grades</th>
-            <th className="py-2 pr-3 font-medium">Citations</th>
-            <th className="py-2 font-medium">Status</th>
+            <th className="py-2 pr-3 font-medium">{t('research.hypothesis')}</th>
+            <th className="py-2 pr-3 font-medium">{t('research.deterministicGrades')}</th>
+            <th className="py-2 pr-3 font-medium">{t('research.modelGrades')}</th>
+            <th className="py-2 pr-3 font-medium">{t('research.citations')}</th>
+            <th className="py-2 font-medium">{t('research.status')}</th>
           </tr>
         </thead>
         <tbody>
@@ -119,14 +120,14 @@ function HypothesisTable({ run }: { readonly run: ResearchRunDto }) {
                   ))}
                 </td>
                 <td className="py-2 pr-3 text-xs">
-                  <div>supporting: {h.supportingCitations.length}</div>
-                  <div>counter: {h.counterEvidenceCitations.length}</div>
+                  <div>{t('research.supporting')}: {h.supportingCitations.length}</div>
+                  <div>{t('research.counter')}: {h.counterEvidenceCitations.length}</div>
                   {binding !== undefined && !binding.allBound && (
-                    <div className="text-destructive">unbound: {binding.unbound.length}</div>
+                    <div className="text-destructive">{t('research.unbound')}: {binding.unbound.length}</div>
                   )}
                 </td>
                 <td className="py-2 text-xs">
-                  {isPrimary && <Badge data-testid="primary-badge">PRIMARY</Badge>}
+                  {isPrimary && <Badge data-testid="primary-badge">{t('research.primary')}</Badge>}
                   {card?.paretoOptimal === true && (
                     <Badge variant="outline" className="ml-1">
                       Pareto
@@ -144,19 +145,20 @@ function HypothesisTable({ run }: { readonly run: ResearchRunDto }) {
 
 /** 研究计划渲染（§12.5 主流程 5）。 */
 function PlanSection({ run }: { readonly run: ResearchRunDto }) {
+  const t = useT();
   const p = run.plan;
   return (
     <div className="space-y-3 text-sm" data-testid="plan-section">
       <div>
-        <span className="font-medium">Objectives: </span>
+        <span className="font-medium">{t('research.objectives')}: </span>
         {p.objectives.join('; ')}
       </div>
       <div>
-        <span className="font-medium">Design: </span>
+        <span className="font-medium">{t('research.design')}: </span>
         {p.design}
       </div>
       <div>
-        <span className="font-medium">Analysis DAG: </span>
+        <span className="font-medium">{t('research.analysisDag')}: </span>
         {p.analysisDag.length > 0 ? (
           <ol className="ml-5 list-decimal">
             {p.analysisDag.map((step) => (
@@ -164,20 +166,20 @@ function PlanSection({ run }: { readonly run: ResearchRunDto }) {
             ))}
           </ol>
         ) : (
-          '(none)'
+          `(${t('research.none')})`
         )}
       </div>
       <div>
-        <span className="font-medium">Statistical methods: </span>
-        {p.statisticalMethods.join('; ') || '(none)'}
+        <span className="font-medium">{t('research.statisticalMethods')}: </span>
+        {p.statisticalMethods.join('; ') || `(${t('research.none')})`}
       </div>
       <div>
-        <span className="font-medium">Stopping conditions: </span>
-        {p.stoppingConditions.join('; ') || '(none)'}
+        <span className="font-medium">{t('research.stoppingConditions')}: </span>
+        {p.stoppingConditions.join('; ') || `(${t('research.none')})`}
       </div>
       <div>
-        <span className="font-medium">Human approval required: </span>
-        {p.humanApprovalRequired.join('; ') || '(none)'}
+        <span className="font-medium">{t('research.humanApprovalRequired')}: </span>
+        {p.humanApprovalRequired.join('; ') || `(${t('research.none')})`}
       </div>
     </div>
   );
