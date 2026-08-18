@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "far.proof_bundle.conformance_vectors.v1.schema.json",
+  "title": "FAR-Lab verifier conformance vectors (PROOF-VERIFY-001)",
+  "description": "Language-independent public schema for the cross-implementation conformance vector set shared by every .far-proof verifier implementation (CLI, library, browser/WASM). The vectors JSON (conformance_vectors.json) carries the data; this schema is the normative contract. Any implementation must accept every valid instance of this schema and produce the expectedOutcome for each vector.",
+  "type": "object",
+  "required": ["formatVersion", "generated", "vectors"],
+  "additionalProperties": false,
+  "properties": {
+    "formatVersion": { "const": 1 },
+    "generated": { "type": "string", "minLength": 10 },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/conformanceVector" }
+    }
+  },
+  "definitions": {
+    "conformanceVector": {
+      "type": "object",
+      "required": ["vectorId", "kind", "inputRef", "expectedOutcome", "derivedFrom"],
+      "additionalProperties": false,
+      "properties": {
+        "vectorId": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["valid", "tampered", "malformed", "missing_artifact"] },
+        "inputRef": { "$ref": "#/definitions/inputRef" },
+        "expectedOutcome": { "$ref": "#/definitions/expectedOutcome" },
+        "derivedFrom": { "type": "string", "minLength": 1 }
+      }
+    },
+    "inputRef": {
+      "type": "object",
+      "required": ["base"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "const": "far-proof-demo-chain@v1" },
+        "mutate": { "$ref": "#/definitions/mutation" }
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "required": ["target", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "target": { "type": "string", "minLength": 1 },
+        "action": { "enum": ["none", "append", "overwrite", "truncate", "delete", "corrupt-hash"] },
+        "content": { "type": "string" }
+      }
+    },
+    "expectedOutcome": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["status"],
+          "additionalProperties": false,
+          "properties": { "status": { "const": "PASS" } }
+        },
+        {
+          "type": "object",
+          "required": ["status", "errorCode"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "const": "FAIL" },
+            "errorCode": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    }
+  }
+}
