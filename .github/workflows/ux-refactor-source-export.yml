@@ -1,0 +1,40 @@
+name: UX Refactor Source Export
+
+on:
+  push:
+    branches:
+      - ux-refactor/2026-08-18
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export_source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Build complete tracked-source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/FAR-Lab-refactor-source
+          git ls-files -z | while IFS= read -r -d '' path; do
+            mkdir -p "/tmp/FAR-Lab-refactor-source/$(dirname "$path")"
+            cp -a -- "$path" "/tmp/FAR-Lab-refactor-source/$path"
+          done
+          printf '%s\n' "$(git rev-parse HEAD)" > /tmp/FAR-Lab-refactor-source/.SOURCE_HEAD
+          (cd /tmp && zip -qr FAR-Lab-refactor-source.zip FAR-Lab-refactor-source)
+      - name: Upload tracked-source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: FAR-Lab-refactor-source
+          path: /tmp/FAR-Lab-refactor-source.zip
+          if-no-files-found: error
+          retention-days: 1
