@@ -62,6 +62,17 @@ agent_execution_manifest.yaml
 .cursorrules
 *-agent-*/
 .trash_backup/
+/.qoder/
+
+# --- Generated repository-analysis outputs (never product source) ---
+/DESIGN_SYSTEM.md
+/HUMAN_SURFACE_INVENTORY.md
+/LOCAL_REPLACE_PROMPT.md
+/PROJECT_FILE_MANIFEST.txt
+/REFACTOR_MANIFEST.md
+/UI_DEBT_REPORT.md
+/VALIDATION_REPORT.md
+/VALIDATION_RUN_ID.txt
 
 # --- Project runtime artifacts (regenerated on every run) ---
 .far/
