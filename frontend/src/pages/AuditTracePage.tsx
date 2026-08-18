@@ -65,7 +65,7 @@ export default function AuditTracePage() {
       <PageHeader
         title={t('audit.title')}
         description={t('audit.subtitle')}
-        icon={GitCompare}
+        icon={<GitCompare className="h-7 w-7 text-primary" />}
       />
 
       <Card>
