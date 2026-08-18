@@ -2,7 +2,7 @@
 # Baseline main: a6647be68c8012246ffb57de8752649657a847f2
 # Format: sha256  bytes  path
 # PROJECT_FILE_MANIFEST.txt itself is intentionally omitted from its own hash rows.
-29680171acb639068cb3dc50c149795fef5c3802989ad40f5910a3a0682daab7          12  .assistant-run-id
+76cdf8774ca0a127ef1b9f91a267b6cc5eb11660768c331c626e7655268ae7ad          12  .assistant-run-id
 fa55310e8d8da1668e82f26cffa54d9fb7490b5a3c605c0e83da5fa2fd345fb2         254  .dockerignore
 ee3e7ec0945a67776d0627938ea102de1991b8534d76eb684a37e8e116a36a1e         772  .editorconfig
 4e5660ca1cf76b901051f4302c12e3808f8acafa5d6f6c74621e929274aeec87        1646  .env.example
@@ -163,13 +163,13 @@ c3c0a3164ffc7c17568d74bc81fefc79305b000571dcc4160c336881f818040a        5600  LO
 56c383443cd3121505c8edfd0be631af771abeff82babf1d1892e6bf7e3c79c4        1476  NOTICE
 8604acf4f7ea64f19805ec8eb8c5bd1d7f9fbf80739c8160426f01959f9c56d1       28612  README.md
 ad84c5130738dd7775d020f7c4139b5aca4275356349ad1c3ff441b70681cd56       19335  README.zh-CN.md
-cc095da74ca3727085d8dd3d9d161cd26a65cf93080c2dec4a4d10a39321fafa        2660  REFACTOR_MANIFEST.md
+8342eec6d08c8fa92a9a2749a6c82b114b666f9a46d6963b841778b3cfc8b821        2660  REFACTOR_MANIFEST.md
 7f812387d8086077e98bbec58c3fdb70d60d6a1e53a5f47eeba3f0d56c8ef962        5810  SECURITY.md
 83d6a4e0b10345b3346037d9e4b20266a5583362dc4647dca6a56dd33b6c9e13        1398  SUPPORT.md
 7f1eb27e99e73a722aa81d4faf13538a735dea89cb3017e67d3e8a8d5d6296f7        2114  THIRD-PARTY-NOTICES.md
 48f52c75c5ab480d4a2c0ee7cb054c926f3368d57f6c671cbc2eb2506f903890        4646  UI_DEBT_REPORT.md
-4f69fe21c38b1424156dff63a314596a2d9f423837d52c812a15077ee6a474a7        1133  VALIDATION_REPORT.md
-42f8e61e9082e3df6f83269144b1936af480bfd6228ec857a40aff16e7ecf553          12  VALIDATION_RUN_ID.txt
+36476e2907a56967fbcd253bb0d21f9d50964627b59f9766d50bd29ec6cb8e23        1133  VALIDATION_REPORT.md
+f8410d5a2dd04d6fb4b083ebf7b5aebff73c3078a53b8e1896d28f7b6fc4d211          12  VALIDATION_RUN_ID.txt
 bfd097971f1b0ab82dd02809f56073cb8ed1999b345d1214b42f42df63f8f81f        2096  ci/CLAIM_RECEIPTS.yaml
 e88e16304035861a671f858a24574d3f9627d09c6393df7e40abd343487922c2        2769  ci/FCS-milestone-competition-2026.yaml
 0ade68281336aa77bd9fd300f23ed813bf381dc772c17b4d056bbebdf15a584d        5091  ci/TEST_RISK_MAP.yaml
@@ -397,7 +397,7 @@ b5c55ecb7c7d26412944c4979af5410dadc809e6a2ae49b30cba9f36da290d0f         730  sc
 7125702bfb119df16ab207eff0dcb82a7aba000b48d64e0d8a1e91a2c223209d        5483  scripts/doc_command_check.mjs
 96b473798d7910e87a791f5b37fcd195306543007ef17fc828eaf57309fa01af        2167  scripts/ensure_native_deps.mjs
 45e7045dfa9ad69e5e16359951a46f919ac4c2b4a151ff03d91783d8137c8e3e        8022  scripts/ensure_py_deps.mjs
-1ed317820d56d3a34e601b0545add51a13cd3bde21ad31121d3a59ba4c1032bf        6785  scripts/finalize_human_surfaces.mjs
+d971d7629572a480a1fb04fdcf11977a54b007b8bff4ff77c57c1f103637cd20        6680  scripts/finalize_human_surfaces.mjs
 4b23f111a5ba6e5ccb4d86cb36801f8e119bdbdc6a574373b33eefc9f34ceee1       13273  scripts/fuzz_proof.mjs
 576f45027bb96d053acf9b916da0d1d517f2ad52932d5d4e9c2227a571cedbb1        2363  scripts/generate_benchmark.ts
 fbfa21839dc80d8aa1f24f4612ec59cf657193aed6390810a4de888a2c04b2d6       14282  scripts/generate_json_schema.mts
