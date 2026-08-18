@@ -1,0 +1,37 @@
+schema_version: 1
+module_path: ""
+title: FAR-Lab 多语言可复现科学声明验证平台
+scope:
+    - CONTRIBUTING.md
+    - SECURITY.md
+    - SUPPORT.md
+    - MAINTAINERS.md
+    - THIRD-PARTY-NOTICES.md
+    - CITATION.cff
+    - .zenodo.json
+    - Dockerfile
+    - docker-compose.yml
+    - Makefile
+    - package.json
+    - pnpm-workspace.yaml
+    - pyproject.toml
+    - uv.lock
+    - tsconfig.json
+    - .gitignore
+    - .editorconfig
+    - .npmrc
+    - .dockerignore
+    - .env.example
+    - .gitattributes
+    - .python-version
+    - CHANGELOG.md
+    - CODE_OF_CONDUCT.md
+    - LICENSE
+    - NOTICE
+    - README.md
+    - README.zh-CN.md
+    - eslint.config.mjs
+    - pnpm-lock.yaml
+source_files: []
+depends_on: []
+related_to: []

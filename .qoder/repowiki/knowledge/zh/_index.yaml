@@ -1,0 +1,127 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: main
+nodes_managed: true
+exported_at: "2026-08-18T03:14:46Z"
+modules:
+    "":
+        dir_name: FAR-Lab 多语言可复现科学声明验证平台
+        title: FAR-Lab 多语言可复现科学声明验证平台
+        scope:
+            - CONTRIBUTING.md
+            - SECURITY.md
+            - SUPPORT.md
+            - MAINTAINERS.md
+            - THIRD-PARTY-NOTICES.md
+            - CITATION.cff
+            - .zenodo.json
+            - Dockerfile
+            - docker-compose.yml
+            - Makefile
+            - package.json
+            - pnpm-workspace.yaml
+            - pyproject.toml
+            - uv.lock
+            - tsconfig.json
+            - .gitignore
+            - .editorconfig
+            - .npmrc
+            - .dockerignore
+            - .env.example
+            - .gitattributes
+            - .python-version
+            - CHANGELOG.md
+            - CODE_OF_CONDUCT.md
+            - LICENSE
+            - NOTICE
+            - README.md
+            - README.zh-CN.md
+            - eslint.config.mjs
+            - pnpm-lock.yaml
+        source_files: []
+        children:
+            - ci
+            - frontend
+            - golden_vectors
+            - repro
+            - schema_dir
+            - scripts
+            - tests
+        depends_on: []
+        related_to: []
+    ci:
+        dir_name: CI 门控与证据声明清单
+        title: CI 门控与证据声明清单
+        scope:
+            - ci/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: frontend
+            - path: scripts
+    frontend:
+        dir_name: FAR-Lab 前端可视化与审计工作台
+        title: FAR-Lab 前端可视化与审计工作台
+        scope:
+            - frontend/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: ci
+    golden_vectors:
+        dir_name: 裁决内核金向量与版本化测试套件
+        title: 裁决内核金向量与版本化测试套件
+        scope:
+            - golden_vectors/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: repro
+            - path: tests
+    repro:
+        dir_name: FAR-Lab 确定性科学复算与验证工具集
+        title: FAR-Lab 确定性科学复算与验证工具集
+        scope:
+            - repro/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: golden_vectors
+    schema_dir:
+        dir_name: FAR-Lab 数据契约与迁移定义
+        title: FAR-Lab 数据契约与迁移定义
+        scope:
+            - schema/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: scripts
+            - path: tests
+    scripts:
+        dir_name: FAR-Lab 仓库质量门禁与构建脚本集
+        title: FAR-Lab 仓库质量门禁与构建脚本集
+        scope:
+            - scripts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: ci
+            - path: schema_dir
+    tests:
+        dir_name: FAR-Lab 全量测试套件
+        title: FAR-Lab 全量测试套件
+        scope:
+            - tests/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: golden_vectors
+            - path: schema_dir
