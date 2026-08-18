@@ -5,11 +5,13 @@
  * 职责（宪法 T0 逐项）：
  *   - VERIFIER_CONTRACT：公开 verifier 的 5 条行为保证（离线可运行 / 无模型凭证 /
  *     无网络出口 / 无遥测 / verdict 只能来自 verifier 执行结果），每条绑定机器验证手段。
- *   - conformance vectors（src/far_proof/conformance_vectors.json）：从 golden proof
- *     corpus（demo_chain 导出 bundle）生成的跨实现共享测试向量——valid→PASS、
- *     tampered→具体失败码、malformed→解析错误、missing artifact→缺失错误。字段：
- *     vectorId / kind / inputRef / expectedOutcome。任何实现（CLI、library、浏览器）
- *     都必须对同一向量集产出同一结果。
+ *   - conformance vectors（src/far_proof/conformance_vectors.json + 同名
+ *     .schema.json 公开规范）：从 golden proof corpus（demo_chain 导出 bundle）生成的
+ *     跨实现共享测试向量——valid→PASS、tampered→具体失败码、malformed→解析错误、
+ *     missing artifact→缺失错误。字段：vectorId / kind / inputRef / expectedOutcome。
+ *     任何实现（CLI、library、浏览器）都必须对同一向量集产出同一结果；向量文件的
+ *     规范 SSOT 是 conformance_vectors.schema.json（draft-07，语言无关公开工件），
+ *     加载即按 schema 校验（draft-07 子集校验器内置，零新依赖）。
  *   - verifyConformance(runner)：注入任意 verify 函数跑全套向量（CLI 与 library 两
  *     runner 各自实证——cross-implementation conformance）。
  *   - withNetworkDenied(fn)：测试助手——stub globalThis.fetch 抛错，证明 fn 执行期间
@@ -134,27 +136,167 @@ export interface ConformanceVectorFile {
   readonly vectors: readonly ConformanceVector[];
 }
 
-/** 加载 conformance vectors（模块同目录 JSON；跨实现共享的单一文件）。 */
+/** 加载 conformance vectors（模块同目录 JSON；跨实现共享的单一文件）。
+ *  加载即按公开 JSON Schema（conformance_vectors.schema.json · draft-07）校验——
+ *  schema 是规范 SSOT，任何实现共享同一公开工件。 */
 export function loadConformanceVectors(): ConformanceVectorFile {
-  const raw = JSON.parse(
-    readFileSync(fileURLToPath(new URL('./conformance_vectors.json', import.meta.url)), 'utf8'),
-  ) as ConformanceVectorFile;
-  if (raw.formatVersion !== 1 || !Array.isArray(raw.vectors) || raw.vectors.length === 0) {
-    throw new Error('conformance_vectors.json: malformed (formatVersion must be 1 with a non-empty vectors array)');
+  return loadConformanceVectorsFile(
+    fileURLToPath(new URL('./conformance_vectors.json', import.meta.url)),
+  );
+}
+
+/** 按路径加载 + schema 校验（可注入坏文件做负向测试——schema 契约可证伪）。 */
+export function loadConformanceVectorsFile(path: string): ConformanceVectorFile {
+  const raw: unknown = JSON.parse(readFileSync(path, 'utf8'));
+  const violations = validateConformanceVectorsDoc(raw);
+  if (violations.length > 0) {
+    const detail = violations.map((e) => `${e.path}: ${e.message}`).join('; ');
+    throw new Error(`conformance vectors at ${path} violate the public schema (${detail})`);
   }
-  for (const v of raw.vectors) {
-    if (
-      typeof v.vectorId !== 'string'
-      || typeof v.kind !== 'string'
-      || typeof v.inputRef !== 'object'
-      || v.inputRef === null
-      || typeof v.expectedOutcome !== 'object'
-      || v.expectedOutcome === null
-    ) {
-      throw new Error(`conformance_vectors.json: vector ${String(v.vectorId)} violates the shared schema`);
+  return raw as ConformanceVectorFile; // 单次受控断言：上方 schema 校验已证形状
+}
+
+// ---------------------------------------------------------------------------
+// 公开 schema 校验（draft-07 子集 · schema 驱动 · 零新依赖）
+// 支持关键字：type/enum/const/minLength/minItems/required/properties/
+// additionalProperties/items/$ref(#/definitions/…)/oneOf——覆盖本 schema 全部用法。
+// ---------------------------------------------------------------------------
+
+export interface SchemaViolation {
+  readonly path: string;
+  readonly message: string;
+}
+
+type JsonSchemaNode = Readonly<Record<string, unknown>>;
+
+/** 各 JSON 类型的运行时判定（integer 按 JSON Schema 语义：无小数部分的 number）。 */
+const TYPE_PREDICATES: Readonly<Record<string, (v: unknown) => boolean>> = Object.freeze({
+  string: (v): boolean => typeof v === 'string',
+  number: (v): boolean => typeof v === 'number' && Number.isFinite(v),
+  integer: (v): boolean => typeof v === 'number' && Number.isInteger(v),
+  boolean: (v): boolean => typeof v === 'boolean',
+  object: (v): boolean => typeof v === 'object' && v !== null && !Array.isArray(v),
+  array: (v): boolean => Array.isArray(v),
+  null: (v): boolean => v === null,
+});
+
+/** 解析 $ref '#/definitions/<name>'（本 schema 仅用文档内引用）。 */
+function resolveRef(ref: string, root: JsonSchemaNode): JsonSchemaNode | null {
+  if (!ref.startsWith('#/')) return null;
+  let node: unknown = root;
+  for (const seg of ref.slice(2).split('/')) {
+    if (typeof node !== 'object' || node === null) return null;
+    node = (node as JsonSchemaNode)[seg];
+  }
+  return typeof node === 'object' && node !== null ? (node as JsonSchemaNode) : null;
+}
+
+function validateScalarKeywords(schema: JsonSchemaNode, value: unknown, path: string, errors: SchemaViolation[]): void {
+  const type = schema['type'];
+  if (typeof type === 'string') {
+    const predicate = TYPE_PREDICATES[type];
+    if (predicate !== undefined && !predicate(value)) {
+      errors.push({ path, message: `expected type '${type}', got ${JSON.stringify(typeof value)}` });
     }
   }
-  return raw;
+  const expected = schema['const'];
+  if (expected !== undefined && JSON.stringify(value) !== JSON.stringify(expected)) {
+    errors.push({ path, message: `expected const ${JSON.stringify(expected)}, got ${JSON.stringify(value)}` });
+  }
+  const enumValues = schema['enum'];
+  if (Array.isArray(enumValues) && !enumValues.some((e) => JSON.stringify(e) === JSON.stringify(value))) {
+    errors.push({ path, message: `value ${JSON.stringify(value)} not in enum [${enumValues.map((e) => JSON.stringify(e)).join(', ')}]` });
+  }
+  if (typeof value === 'string' && typeof schema['minLength'] === 'number' && value.length < schema['minLength']) {
+    errors.push({ path, message: `string shorter than minLength ${String(schema['minLength'])}` });
+  }
+  if (Array.isArray(value) && typeof schema['minItems'] === 'number' && value.length < schema['minItems']) {
+    errors.push({ path, message: `array shorter than minItems ${String(schema['minItems'])}` });
+  }
+}
+
+function validateObjectKeywords(
+  schema: JsonSchemaNode,
+  value: Record<string, unknown>,
+  root: JsonSchemaNode,
+  path: string,
+  errors: SchemaViolation[],
+): void {
+  const required = schema['required'];
+  if (Array.isArray(required)) {
+    for (const key of required) {
+      if (typeof key === 'string' && !(key in value)) {
+        errors.push({ path, message: `missing required property '${key}'` });
+      }
+    }
+  }
+  const properties = schema['properties'];
+  if (typeof properties === 'object' && properties !== null) {
+    for (const [key, subSchema] of Object.entries(properties as JsonSchemaNode)) {
+      if (key in value && typeof subSchema === 'object' && subSchema !== null) {
+        validateSchemaNode(subSchema as JsonSchemaNode, value[key], root, `${path}.${key}`, errors);
+      }
+    }
+  }
+  if (schema['additionalProperties'] === false) {
+    const known = new Set(Object.keys(properties instanceof Object ? (properties as JsonSchemaNode) : {}));
+    for (const key of Object.keys(value)) {
+      if (!known.has(key)) {
+        errors.push({ path: `${path}.${key}`, message: 'additional property not allowed by schema' });
+      }
+    }
+  }
+}
+
+function validateSchemaNode(schema: JsonSchemaNode, value: unknown, root: JsonSchemaNode, path: string, errors: SchemaViolation[]): void {
+  const ref = schema['$ref'];
+  if (typeof ref === 'string') {
+    const target = resolveRef(ref, root);
+    if (target === null) {
+      errors.push({ path, message: `unresolvable $ref ${ref}` });
+      return;
+    }
+    validateSchemaNode(target, value, root, path, errors);
+    return;
+  }
+  validateScalarKeywords(schema, value, path, errors);
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    validateObjectKeywords(schema, value as Record<string, unknown>, root, path, errors);
+  }
+  const items = schema['items'];
+  if (Array.isArray(value) && typeof items === 'object' && items !== null) {
+    for (let i = 0; i < value.length; i += 1) {
+      validateSchemaNode(items as JsonSchemaNode, value[i], root, `${path}[${i}]`, errors);
+    }
+  }
+  const oneOf = schema['oneOf'];
+  if (Array.isArray(oneOf)) {
+    validateOneOf(oneOf, value, root, path, errors);
+  }
+}
+
+function validateOneOf(branches: readonly unknown[], value: unknown, root: JsonSchemaNode, path: string, errors: SchemaViolation[]): void {
+  const branchErrors: string[] = [];
+  let matchCount = 0;
+  for (const branch of branches) {
+    if (typeof branch !== 'object' || branch === null) continue;
+    const probe: SchemaViolation[] = [];
+    validateSchemaNode(branch as JsonSchemaNode, value, root, path, probe);
+    if (probe.length === 0) matchCount += 1;
+    branchErrors.push(probe.map((e) => `${e.path}: ${e.message}`).join(' | '));
+  }
+  if (matchCount !== 1) {
+    errors.push({ path, message: `oneOf: expected exactly 1 matching branch, got ${matchCount} (branches: ${branchErrors.join(' || ')})` });
+  }
+}
+
+/** 按公开 schema 校验任意文档（schema 文件本身即规范 SSOT——加载即校验）。 */
+export function validateConformanceVectorsDoc(doc: unknown): readonly SchemaViolation[] {
+  const schemaPath = fileURLToPath(new URL('./conformance_vectors.schema.json', import.meta.url));
+  const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as JsonSchemaNode;
+  const errors: SchemaViolation[] = [];
+  validateSchemaNode(schema, doc, schema, '$', errors);
+  return errors;
 }
 
 // ---------------------------------------------------------------------------

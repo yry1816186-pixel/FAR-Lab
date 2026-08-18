@@ -31,6 +31,8 @@ import { verifyFarProofBundle } from '../../src/far_proof/bundle_verifier.ts';
 import {
   VERIFIER_CONTRACT,
   loadConformanceVectors,
+  loadConformanceVectorsFile,
+  validateConformanceVectorsDoc,
   verifyConformance,
   makeCliVerifierRunner,
   withNetworkDenied,
@@ -42,6 +44,7 @@ import {
   applyConformanceMutation,
   type ConformanceRunner,
 } from '../../src/far_proof/verifier_contract.ts';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -110,6 +113,84 @@ test('conformance vectors: ≥10 条、4 类全覆盖、共享 schema 字段齐�
       assert.ok(v.expectedOutcome.errorCode.length > 3, `${v.vectorId} FAIL 向量须带具体失败码`);
     }
     assert.match(v.derivedFrom, /empirical/);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 公开 JSON Schema（draft-07）——规范工件 + schema 驱动校验真实接线
+// ---------------------------------------------------------------------------
+
+test('公开 schema 工件: draft-07 声明 + 顶层 required 覆盖 formatVersion/vectors', () => {
+  const schema = JSON.parse(
+    readFileSync(
+      fileURLToPath(new URL('../../src/far_proof/conformance_vectors.schema.json', import.meta.url)),
+      'utf8',
+    ),
+  ) as { readonly $schema: string; readonly required: readonly string[]; readonly properties: Record<string, unknown> };
+  assert.match(schema.$schema, /draft-07/);
+  assert.deepEqual([...schema.required].sort(), ['formatVersion', 'generated', 'vectors']);
+  assert.ok(Object.keys(schema.properties).length >= 3);
+  // expectedOutcome 的 oneOf 两分支：PASS 无 errorCode / FAIL 必带 errorCode
+  const outcome = JSON.stringify(schema);
+  assert.match(outcome, /"const":\s*"PASS"/);
+  assert.match(outcome, /"const":\s*"FAIL"/);
+});
+
+test('schema 校验真实接线: 出厂 vectors 文档 0 违规（loadConformanceVectors 加载即校验）', () => {
+  const doc = loadConformanceVectors(); // 内部走 validateConformanceVectorsDoc——坏文档会抛
+  assert.equal(doc.formatVersion, 1);
+  assert.equal(validateConformanceVectorsDoc(doc).length, 0, '出厂文档必须对公开 schema 0 违规');
+});
+
+test('schema 校验负向: 篡改向量文档必须被 schema 校验拒绝（契约可证伪）', () => {
+  const rawJson = readFileSync(
+    fileURLToPath(new URL('../../src/far_proof/conformance_vectors.json', import.meta.url)),
+    'utf8',
+  );
+  interface MutableDoc {
+    formatVersion: unknown;
+    vectors: { [key: string]: unknown }[];
+    [key: string]: unknown;
+  }
+  const cases: readonly { readonly name: string; readonly mutate: (d: MutableDoc) => void; readonly expect: RegExp }[] = [
+    { name: '缺 derivedFrom', mutate: (d) => { delete d.vectors[0]!.derivedFrom; }, expect: /missing required property 'derivedFrom'/ },
+    { name: 'kind 非法', mutate: (d) => { d.vectors[0]!.kind = 'bogus'; }, expect: /not in enum/ },
+    { name: 'FAIL 缺 errorCode', mutate: (d) => { d.vectors[0]!.expectedOutcome = { status: 'FAIL' }; }, expect: /oneOf/ },
+    { name: 'mutate.action 非法', mutate: (d) => { d.vectors[0]!.inputRef = { base: 'far-proof-demo-chain@v1', mutate: { target: 'x', action: 'nuke' } }; }, expect: /not in enum/ },
+    { name: '未知顶层键', mutate: (d) => { d.extraKey = 1; }, expect: /additional property/ },
+    { name: 'formatVersion 漂移', mutate: (d) => { d.formatVersion = 2; }, expect: /expected const 1, got 2/ },
+  ];
+  for (const c of cases) {
+    const doc = JSON.parse(rawJson) as MutableDoc;
+    c.mutate(doc);
+    const violations = validateConformanceVectorsDoc(doc);
+    assert.ok(violations.length > 0, `${c.name}: 必须产生违规`);
+    assert.match(
+      violations.map((v) => `${v.path}: ${v.message}`).join('; '),
+      c.expect,
+      `${c.name}: 违规信息须指路（got: ${violations.map((v) => v.message).join('; ')}）`,
+    );
+  }
+});
+
+test('loadConformanceVectorsFile 负向: 坏 JSON 文件按 schema 拒绝（端到端）', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-vc-schema-'));
+  try {
+    const rawJson = readFileSync(
+      fileURLToPath(new URL('../../src/far_proof/conformance_vectors.json', import.meta.url)),
+      'utf8',
+    );
+    const bad = JSON.parse(rawJson) as { vectors: { [key: string]: unknown }[] };
+    delete bad.vectors[0]!.vectorId;
+    const badPath = join(tmp, 'bad_vectors.json');
+    writeFileSync(badPath, JSON.stringify(bad), 'utf8');
+    assert.throws(
+      () => loadConformanceVectorsFile(badPath),
+      /violate the public schema.*vectorId/,
+      '坏文件必须被加载路径拒绝（schema 是加载时契约，不是摆设）',
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
   }
 });
 
