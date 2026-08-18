@@ -492,7 +492,7 @@ function ProofVerification({ proofDto }: { readonly proofDto: IntegrityProofDto 
       <div
         className={cn(
           'rounded-md border p-4',
-          verifyState.status === 'verified' && verifyState.ok && 'border-success/40 bg-success/100/5',
+          verifyState.status === 'verified' && verifyState.ok && 'border-success/40 bg-success/5',
           verifyState.status === 'verified' && !verifyState.ok && 'border-destructive bg-destructive/5',
         )}
         data-testid="verify-result"
@@ -659,7 +659,7 @@ function CrossLangHashVerifier() {
               <div
                 className={cn(
                   'flex items-center gap-2 rounded-md border p-3',
-                  matchesGolden ? 'border-success/40 bg-success/100/5' : 'border-destructive bg-destructive/5',
+                  matchesGolden ? 'border-success/40 bg-success/5' : 'border-destructive bg-destructive/5',
                 )}
                 data-testid="golden-compare"
               >

@@ -647,7 +647,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
               data-testid={`untested-reason-${item.verdictId}`}
             >
               <span className="font-semibold text-muted-foreground">Untested reason:</span>
-              <span className="text-gray-600 ml-1">{item.untestedReason}</span>
+              <span className="text-muted-foreground ml-1">{item.untestedReason}</span>
             </div>
           )}
 
