@@ -9,11 +9,11 @@
 import { DATASET_SOURCE_META, isDatasetSource, type DatasetSourceKind } from '../lib/dataset_source.ts';
 
 const TONE_CLASSES: Readonly<Record<'live' | 'cached' | 'replay' | 'fixture' | 'unknown', string>> = {
-  live: 'border-emerald-700/40 bg-emerald-50 text-emerald-900',
-  cached: 'border-amber-700/40 bg-amber-50 text-amber-900',
-  replay: 'border-slate-500/40 bg-slate-100 text-slate-800',
+  live: 'border-success/40 bg-success/10 text-success',
+  cached: 'border-warning/40 bg-warning/10 text-warning',
+  replay: 'border-border bg-muted text-muted-foreground',
   fixture: 'border-stone-400/50 bg-stone-100 text-stone-700',
-  unknown: 'border-red-700/50 bg-red-50 text-red-900',
+  unknown: 'border-destructive/50 bg-destructive/5 text-destructive',
 };
 
 export interface IntegrityBadgeProps {

@@ -139,7 +139,7 @@ export function V2ReceiptPage() {
             </div>
           )}
           {sharedListQuery.isError && (
-            <p className="text-sm text-red-400 flex items-center gap-2">
+            <p className="text-sm text-destructive flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
               {t('v2.sharedLoadFailed')}
             </p>
@@ -189,7 +189,7 @@ export function V2ReceiptPage() {
                   {t('v2.sharedReVerify')}
                 </Button>
                 {reVerifyMutation.isError && (
-                  <span className="text-sm text-red-400">{t('v2.sharedReVerifyFailed')}</span>
+                  <span className="text-sm text-destructive">{t('v2.sharedReVerifyFailed')}</span>
                 )}
               </div>
 
@@ -200,7 +200,7 @@ export function V2ReceiptPage() {
                 </div>
               )}
               {sharedDetailQuery.isError && (
-                <p className="text-sm text-red-400 flex items-center gap-2">
+                <p className="text-sm text-destructive flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
                   {t('v2.sharedDetailFailed')}
                 </p>
@@ -257,9 +257,9 @@ export function V2ReceiptPage() {
 
   // --- Reference receipt section (non-blocking: error shows card but page still renders) ---
   const demoSection = demoQuery.isError ? (
-    <Card className="border-red-500/30 bg-red-500/5">
+    <Card className="border-destructive/30 bg-destructive/5">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-red-400">
+        <CardTitle className="flex items-center gap-2 text-destructive">
           <ShieldAlert className="w-5 h-5" />
           {t('v2.refReceiptUnavailable')}
         </CardTitle>
@@ -423,7 +423,7 @@ export function V2ReceiptPage() {
         )}
 
         {listQuery.isError && (
-          <div className="flex items-center gap-2 text-sm text-red-400 py-4">
+          <div className="flex items-center gap-2 text-sm text-destructive py-4">
             <AlertTriangle className="w-4 h-4" />
             <span>{t('v2.listLoadFailed')} {listQuery.error?.message ?? 'Unknown error'}</span>
           </div>
