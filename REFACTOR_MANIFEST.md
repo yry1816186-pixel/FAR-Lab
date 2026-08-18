@@ -4,43 +4,41 @@
 
 - Repository: `yry1816186-pixel/FAR-Lab`
 - Original target branch: `main`
-- Original synchronized commit: `1e2c8b3c7c8706292f890138e88948ab7dcb80a3`
+- Original commit SHA: `a6647be68c8012246ffb57de8752649657a847f2`
 - Work branch: `ux-refactor/2026-08-18`
-- Implementation commit: `b1c7ee95850ea3c43161c1e4d38810393bc9b5dd`
-- Final packaging/validation commit: _populated after final validation cleanup_
+- Validated source SHA before report finalization: `4f2cb984d28e8aa4b5210394351366c1ee935e99`
 
-## Architectural changes
+## Architectural and product changes
 
-1. Extracted browser information architecture into `frontend/src/components/layout/navigation.ts` as a route-label-icon-search SSOT.
-2. Added `CommandCenter.tsx`, a keyboard-first navigation command center constrained to existing real routes.
-3. Extended the design-token layer with semantic operational colors and CSS-level motion tokens; migrated product TSX away from raw Tailwind palette colors.
-4. Strengthened shared responsive PageHeader and dense Table primitives.
-5. Corrected CLI terminal table measurement for CJK/full-width/combining Unicode behavior without adding a dependency.
-6. Strengthened generated HTML report semantics, responsive behavior and print output without modifying deterministic report facts.
-7. Added repository-level Human Surface, UI debt, design-system, validation, replacement and file-manifest deliverables.
+1. Preserved the existing route/navigation SSOT and research-first information architecture rather than creating a competing design system.
+2. Added a focused human-surface i18n catalogue merged into the existing message system; migrated remaining Audit/Evidence/Research system labels.
+3. Corrected Audit Trace capability mismatch: claim IDs now call verdict/lifecycle APIs while only real 64-hex chain heads call the evidence-chain endpoint.
+4. Retained semantic operational/verdict color tokens, responsive dense-data primitives, reduced-motion behavior, command center, CLI Unicode display-width handling, and semantic generated reports.
+5. Validation runs the repository build/type/lint/tests/performance/contracts plus real Chromium responsive/theme/keyboard/axe checks.
 
-## Scientific/security integrity
+## Scientific and security integrity
 
-Not changed:
-
-- deterministic verdict computation;
-- evidence/provenance hashing;
-- proof verification rules;
-- falsifiability/science gates;
-- authorization/security boundaries;
-- persistence success criteria;
-- API scientific schemas.
+No deterministic verdict rule, evidence hash rule, proof verification rule, falsifiability gate, authorization boundary, or persistence success criterion was intentionally changed by this finalization.
 
 ## Dependencies
 
-No runtime or development dependency was added for the refactor. Existing React/Radix/Tailwind/Testing Library infrastructure is reused.
+No runtime dependency was added. Playwright and axe-core are installed ephemerally only inside the validation workflow.
 
 ## Migrations
 
-No database/schema migration is required by this Human Experience Layer refactor.
+No database/schema migration is introduced by this Human Experience Layer finalization.
+
+## File changes from original main
+
+- `M	.github/workflows/ux-refactor-source-export.yml`
+- `M	UI_DEBT_REPORT.md`
+- `A	frontend/src/lib/i18n/human_surfaces.ts`
+- `M	frontend/src/lib/i18n/messages.ts`
+- `M	frontend/src/pages/AuditTracePage.tsx`
+- `A	scripts/finalize_human_surfaces.mjs`
 
 ## Known limitations
 
-- Several domain-heavy pages/components remain large and can be decomposed further without changing UX behavior; the cross-cutting refactor deliberately avoids speculative rewrites of scientific domain logic.
-- Some domain-specific literal strings remain outside the i18n catalogue; global/system additions in this change are localized.
-- The repository does not commit a heavyweight browser E2E framework. Final browser screenshots are generated ephemerally during validation.
+- Automated accessibility testing cannot prove screen-reader announcement quality or every assistive-technology/browser combination; semantic/keyboard checks and axe complement, not replace, manual AT testing.
+- CI lab performance is not production field telemetry.
+- The current backend does not expose a reliable hypothesis-ID → evidence-chain headHash mapping; Audit Trace explicitly communicates this rather than fabricating a cross-link.
