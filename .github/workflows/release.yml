@@ -45,7 +45,7 @@ jobs:
     timeout-minutes: 45   # 质量门 + docker build/push + release 上传兜底
     steps:
       # a. checkout (fetch-depth: 0 — 保留完整历史用于 tag / changelog 校验)
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}

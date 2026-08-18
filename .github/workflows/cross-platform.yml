@@ -38,7 +38,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       # NODE_COMPILE_CACHE 指向 runner 临时目录（仓库外），三平台统一的 V8 compile cache
@@ -86,7 +86,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38

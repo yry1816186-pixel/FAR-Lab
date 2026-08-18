@@ -43,7 +43,7 @@ jobs:
   audit_constant_source:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       # 门禁 1：src/ 中不得出现 process.env.AUDITOR_ENABLED（必须是编译时常量）
@@ -93,7 +93,7 @@ jobs:
     needs: audit_constant_source
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -133,7 +133,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
@@ -178,7 +178,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
@@ -212,7 +212,7 @@ jobs:
     needs: [build_backend, build_frontend]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -243,7 +243,7 @@ jobs:
     needs: cross_lang
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -272,7 +272,7 @@ jobs:
     needs: merkle_cross_lang
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - name: R9-2-13 · anti-theater grep —— proof_envelopes 中 WARN 含 → 封 CONFIRMED 阻断
@@ -319,7 +319,7 @@ jobs:
     needs: anti_theater
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - name: R9-2-14 · 核心路径模型中立 grep（含 golden_vectors.ts + src/anti_theater + src/confounding_gate）
@@ -356,7 +356,7 @@ jobs:
     needs: model_neutrality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - name: R9-2-15 · grep 零 DASHSCOPE_API_KEY 明文（非 .env.example）

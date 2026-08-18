@@ -51,7 +51,7 @@ jobs:
   install:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -87,7 +87,7 @@ jobs:
   repo_hygiene:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: repo hygiene gate (tracked content policy · A-I 9 gates)
         run: node scripts/repo_hygiene_gate.mjs
 
@@ -107,7 +107,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
@@ -133,7 +133,7 @@ jobs:
     needs: install
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -154,7 +154,7 @@ jobs:
     needs: typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -175,7 +175,7 @@ jobs:
     needs: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -210,7 +210,7 @@ jobs:
     # 配合下方 3 分片 step：任一分片挂 → 该 step 超时红 + tail 日志可见具体挂点，而非整 job 无输出。
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -291,7 +291,7 @@ jobs:
     needs: test_ts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -324,7 +324,7 @@ jobs:
     needs: install
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -349,7 +349,7 @@ jobs:
     needs: test_py
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -378,7 +378,7 @@ jobs:
     needs: test_registry
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -407,7 +407,7 @@ jobs:
     needs: repro_check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -463,7 +463,7 @@ jobs:
       DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
       COMPETITION_BASE_URL: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -486,7 +486,7 @@ jobs:
     if: ${{ always() && (needs.competition_qwen_smoke.result == 'success' || needs.competition_qwen_smoke.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -510,7 +510,7 @@ jobs:
     if: ${{ always() && (needs.verify_chain_smoke.result == 'success' || needs.verify_chain_smoke.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -535,7 +535,7 @@ jobs:
     needs: install
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
@@ -576,7 +576,7 @@ jobs:
   latex_compile:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 24
@@ -601,7 +601,7 @@ jobs:
     if: ${{ always() && (needs.merkle_integrity_smoke.result == 'success' || needs.merkle_integrity_smoke.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0   # release_check 需 tags + 完整历史
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
