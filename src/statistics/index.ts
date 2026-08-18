@@ -6,3 +6,4 @@ export * from './multiple_testing.ts';
 export * from './ks_test.ts';
 export * from './permutation_test.ts';
 export * from './bootstrap_ci.ts';
+export * from './numerics.ts';
