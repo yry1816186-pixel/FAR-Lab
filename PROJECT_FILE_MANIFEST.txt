@@ -161,13 +161,13 @@ c3c0a3164ffc7c17568d74bc81fefc79305b000571dcc4160c336881f818040a        5600  LO
 56c383443cd3121505c8edfd0be631af771abeff82babf1d1892e6bf7e3c79c4        1476  NOTICE
 8604acf4f7ea64f19805ec8eb8c5bd1d7f9fbf80739c8160426f01959f9c56d1       28612  README.md
 ad84c5130738dd7775d020f7c4139b5aca4275356349ad1c3ff441b70681cd56       19335  README.zh-CN.md
-df81be3fc7b029161ca92b3b20ceefb63be56042feaec956e2705fc87469a8ce        2698  REFACTOR_MANIFEST.md
+fff47ad951a3038b0561b15d9d3db51e63cfb0838fc17d52520bd4209ec3913a        2912  REFACTOR_MANIFEST.md
 7f812387d8086077e98bbec58c3fdb70d60d6a1e53a5f47eeba3f0d56c8ef962        5810  SECURITY.md
 83d6a4e0b10345b3346037d9e4b20266a5583362dc4647dca6a56dd33b6c9e13        1398  SUPPORT.md
 7f1eb27e99e73a722aa81d4faf13538a735dea89cb3017e67d3e8a8d5d6296f7        2114  THIRD-PARTY-NOTICES.md
 bc2757772f6841461b8daf4e7571d6e61e6caa61cded0143ac6235ba128f0d8e        5870  UI_DEBT_REPORT.md
-c2d437aff6223a92193912fe89d47f1a4da9d8697a6d397950d322208e0e0e3d        1701  VALIDATION_REPORT.md
-3ed5fe03cb742a4571ec1dfea45b2434003f1d19c3e8ff1c9c4e352c53691887          12  VALIDATION_RUN_ID.txt
+f16a7462947078df1f123d553340b67f41176f43f79af4fa2065a716d32c699b        1702  VALIDATION_REPORT.md
+f74f58e2e06da09203f2e0adfd5fe4284f4711def047ec73b17639b416a45bb0          12  VALIDATION_RUN_ID.txt
 bfd097971f1b0ab82dd02809f56073cb8ed1999b345d1214b42f42df63f8f81f        2096  ci/CLAIM_RECEIPTS.yaml
 e88e16304035861a671f858a24574d3f9627d09c6393df7e40abd343487922c2        2769  ci/FCS-milestone-competition-2026.yaml
 0ade68281336aa77bd9fd300f23ed813bf381dc772c17b4d056bbebdf15a584d        5091  ci/TEST_RISK_MAP.yaml
@@ -196,7 +196,7 @@ dddace25ee5d56783a8ebc15131247a8ec19d573bae8960edb7406da5de5f08c        4547  fr
 afe370e74946a2f1de48ce083012cf889d4b90bea9301c2d25c271d4efea94eb        4970  frontend/src/__tests__/CourtPage.test.tsx
 45f5532006816492fb15eda815b0e08c24058aa2d733bd7e56b437d488d4827a        4172  frontend/src/__tests__/ErrorBoundary.test.tsx
 60d9e4ca8b0b22439865f026bd93287c16fa4e1c8732b443752ca392f2e7cbf7        4004  frontend/src/__tests__/EventsPage.test.tsx
-910a05f8037d2569489f0a532050c33e514933f403c3c71081ce1c0b684de6a9       22160  frontend/src/__tests__/HonestyWallPage.test.tsx
+31c68c508cb4abbe8e8bc907a48634f6ae4c7dacad80601bc55dcd4d19943820       22160  frontend/src/__tests__/HonestyWallPage.test.tsx
 2dfde226a8561e5cfe5d850065abe952be9bf2047201697ba1212dc09d2224b0        1970  frontend/src/__tests__/IntegrityBadge.test.tsx
 be6d31475849852ecb55dc78e8a63b542765d7999644a3622add3b9e3fa44462        7607  frontend/src/__tests__/IntegrityPage.test.tsx
 2f89ee08a0c2ad8b2da09e057f67b4dfc8cab0dca04f6270fde8424faa8ede4b       10211  frontend/src/__tests__/LeaderboardPage.test.tsx
@@ -208,7 +208,7 @@ ad880f7dbb6cacab8aff0015b40bd63bcb66ea977d604b116c572f951aaed151        6602  fr
 9edf46c05ae78adba0998a02a9322ef39d71c6572699465cdebf1c47f64e8dfc         849  frontend/src/__tests__/Skeleton.test.tsx
 382aa02cd09122174f804feb31b960487c7ef92b3d60e3e96fb8f9da00079b30       19319  frontend/src/__tests__/V2ReceiptPage.test.tsx
 8162f9cafc71e6c8b3f81003c3674d61a296c9c82e94e60ec95e7f4dde1674e1        6456  frontend/src/__tests__/VersionDiffPage.test.tsx
-80a90f0500351d03e329dd451d2f2d638bf3d6101c4914ab24445168f2cd5da2       19610  frontend/src/__tests__/VizPage.test.tsx
+2b96c17783f6907c835f92058335ed9ec143dc824b0a8a549dc9e01fdf312b2c       19615  frontend/src/__tests__/VizPage.test.tsx
 c8c209ec4eca64f1e95cedec9089fe471e25bde534aef17fc76652ffc7849597       19292  frontend/src/__tests__/WizardPage.test.tsx
 093e1a23a87c5cd0b964c1a29266ff8d565d6a9e73327e96317bc387e56d8953        3546  frontend/src/__tests__/a11y_baseline.test.tsx
 27b258057d167123a01b438ae6bbc591c5c3ad4161015770ed48179c1f222ca0        7061  frontend/src/__tests__/ablationHonesty.test.tsx
@@ -246,7 +246,7 @@ a65e8028757e179d85140ba0f558de5c798319003d8b15699b31cdd2dcf99730        1763  fr
 f1d88b30d895c0a70b6f897809ab1b92eabb2925b99c74bf8dcca040d1ae409f        2826  frontend/src/components/ui/table.tsx
 1bba4274737ed6abf702880ef02dbd56fe830ee2de39de332a54061cb0937a7d        3401  frontend/src/components/v2/AssuranceDimensionCard.tsx
 b2ca18fa68268f9b7043b0adde831f391a1291ad40c4211a0b49a4baa4d72be5        5460  frontend/src/components/v2/ReceiptUploader.tsx
-860697a6f4f1f16f8b9bf832ca1cf6db7c61e6aec6dc61455ac54058da662ed5       10645  frontend/src/index.css
+25f72688663f281fa98307bc0eef75e748d885f1eba2674b5b1c1a122ca1f99b       10535  frontend/src/index.css
 b0b48b7d30bbbffd0f026a1e2c43589dc7ba1c9260dddf46fb56875d1773bc1e       38799  frontend/src/lib/api_client.ts
 3873a60690257ece625680e3651dab8d042601e8e25d246ec9fd6c550a81f266        5461  frontend/src/lib/chartColors.ts
 b6c8205f227a50763be148cf78a929b9b5fad24ab92780145b45b7602dba7b7e        1192  frontend/src/lib/dataset_source.ts
@@ -279,7 +279,7 @@ a3725a0bd1849c4e4dc4bcc4740e61d0b55d9c773e4171c48d22b28ea04ccc8c       22224  fr
 b3cd07a290bf00aade8075fa6ff2d7b0c42311f5bbc87f373f47321c67b826f7        9257  frontend/src/pages/PlanningPage.tsx
 48f0aeb216b680e6b27671a4aba9ba1e8753c6adef84980dc56ae283c2887107       13965  frontend/src/pages/ReportPage.tsx
 1f630394c28f58937ee6ef562ca191f6eca31759e0ec500f6aa4d55c68e7444d       35309  frontend/src/pages/ResearchWorkbenchPage.tsx
-71cc52e955c7a5429f7c04e54e6d1183b95b5b038a77b370098fbfae6fdaefb4       21498  frontend/src/pages/V2ReceiptPage.tsx
+9c9534a1bfc829908445e0b055eb6e6e1f558e37f9cf23fe1f5a1c50df78648c       22036  frontend/src/pages/V2ReceiptPage.tsx
 50e1d1fa809e834edcd996351e8fe18446eed292729629344eb2590942780317        9343  frontend/src/pages/VersionDiffPage.tsx
 4e2bc717cc3abe2153458d420c88bf45645057106f076e228e3d97777b7cb64c       24509  frontend/src/pages/VizPage.tsx
 431c528dfdfba3739c373381445cc0374bf213615f0d760f4ed24a1347ecd307       31404  frontend/src/pages/WizardPage.tsx
@@ -741,7 +741,7 @@ b728f8ed7b0948bd54515a7606d51945fc244bdb97a287f1e18370586de07ff1       30165  sr
 a48ce0acb381a2ab7fe200e9aa24b0e0b9f9aecc4e5f691eb0d82789c2799b29        9875  src/gates/world_score.ts
 22102a8d4c7b35d33adaead326d9235900a28e75c89d2e64edb1b23f8b1a66da        4396  src/governance/adr_schema.ts
 93b69ab3ea0e90a8c389b4152515ac1c4deea18a3d0247fc46f4db8b07bac128       12913  src/governance/borrow_registry.ts
-776349bf4954772f8cd49517fc6a26fccdb59e609e51cc575077fa3edf239f8a        9080  src/governance/complexity_ledger.ts
+c0a78865e468a29190087ac4ba56a8893de97ff3746834fdf06d3a6a9f5fa8a3        9124  src/governance/complexity_ledger.ts
 98c31e707dbd94b2171011a2e8cfb441cb6ee3352deff46a9ec43a42a6857d63        7196  src/governance/dogfood_ledger.ts
 6939a0d78f2c9dc3b3ca67fccaedf7153de660561406dd2f2670ddb41824cafd        8030  src/governance/info_gain.ts
 33728759342eaf4792479c960e1cb06e4ce70a80a27371645230b789af9cddea        8961  src/governance/omission_ledger.ts
