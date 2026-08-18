@@ -492,7 +492,7 @@ function ProofVerification({ proofDto }: { readonly proofDto: IntegrityProofDto 
       <div
         className={cn(
           'rounded-md border p-4',
-          verifyState.status === 'verified' && verifyState.ok && 'border-emerald-500 bg-emerald-500/5',
+          verifyState.status === 'verified' && verifyState.ok && 'border-success/40 bg-success/100/5',
           verifyState.status === 'verified' && !verifyState.ok && 'border-destructive bg-destructive/5',
         )}
         data-testid="verify-result"
@@ -505,9 +505,9 @@ function ProofVerification({ proofDto }: { readonly proofDto: IntegrityProofDto 
         )}
         {verifyState.status === 'verified' && verifyState.ok && (
           <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
             <div className="space-y-1">
-              <div className="font-semibold text-emerald-700 dark:text-emerald-400">
+              <div className="font-semibold text-success">
                 ✓ Inclusion proof verified
               </div>
               <div className="text-xs text-muted-foreground">
@@ -543,7 +543,7 @@ function ProofVerification({ proofDto }: { readonly proofDto: IntegrityProofDto 
 
       {/* Tamper Theatre 控制 */}
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed bg-muted/30 p-3">
-        <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
+        <AlertTriangle className="h-4 w-4 text-warning" aria-hidden="true" />
         <span className="text-xs text-muted-foreground">
           Tamper theatre: simulates an attacker altering this evidence's hash (flips the last hex char).
         </span>
@@ -659,18 +659,18 @@ function CrossLangHashVerifier() {
               <div
                 className={cn(
                   'flex items-center gap-2 rounded-md border p-3',
-                  matchesGolden ? 'border-emerald-500 bg-emerald-500/5' : 'border-destructive bg-destructive/5',
+                  matchesGolden ? 'border-success/40 bg-success/100/5' : 'border-destructive bg-destructive/5',
                 )}
                 data-testid="golden-compare"
               >
                 {matchesGolden ? (
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden="true" />
                 ) : (
                   <XCircle className="h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
                 )}
                 <div className="text-sm">
                   {matchesGolden ? (
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                    <span className="font-semibold text-success">
                       ✓ Byte-equal to the Node + Python golden (cross-language consistency confirmed)
                     </span>
                   ) : (
@@ -860,7 +860,7 @@ function HonestyWall() {
     <Card data-testid="honesty-wall">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <ScrollText className="h-5 w-5 text-amber-600" aria-hidden="true" />
+          <ScrollText className="h-5 w-5 text-warning" aria-hidden="true" />
           <CardTitle className="text-xl">{t('integrity.honestyTitle')}</CardTitle>
         </div>
         <CardDescription>
@@ -871,7 +871,7 @@ function HonestyWall() {
         <ul className="space-y-3">
           {HONESTY_STATEMENT_DEFS.map((stmt) => (
             <li key={stmt.titleKey} className="flex items-start gap-3 rounded-md border bg-muted/20 p-3">
-              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+              <Lock className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
               <div>
                 <div className="text-sm font-semibold">{t(stmt.titleKey)}</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">{t(stmt.detailKey)}</div>

@@ -136,6 +136,20 @@ describe('App 路由与导航', () => {
     expect(toolsToggle).toHaveAttribute('aria-current', 'page');
   });
 
+  it('Cmd/Ctrl+K 快速导航只暴露真实路由并支持键盘打开', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.keyboard('{Control>}k{/Control}');
+    const dialog = screen.getByRole('dialog', { name: /Go to/i });
+    expect(dialog).toBeInTheDocument();
+    const search = within(dialog).getByPlaceholderText(/Search pages and tools/i);
+    await user.type(search, 'integrity');
+    expect(within(dialog).getByRole('option', { name: /Integrity/ })).toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    await waitFor(() => screen.getByTestId('integrity-page'));
+    expect(window.location.pathname).toBe('/integrity');
+  });
+
   it('渲染主题切换按钮', () => {
     render(<App />);
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();

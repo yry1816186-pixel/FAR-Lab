@@ -143,7 +143,7 @@ export function ReceiptUploader({ onVerified }: ReceiptUploaderProps) {
 
         {/* Error display */}
         {error !== null && (
-          <div className="flex items-start gap-2 text-sm text-red-400">
+          <div className="flex items-start gap-2 text-sm text-destructive">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
