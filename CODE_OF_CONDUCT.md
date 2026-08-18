@@ -46,10 +46,8 @@ Private Vulnerability Reporting
 see `SECURITY.md`). All complaints will be
 reviewed and investigated promptly and fairly.
 
-> `NEEDS_MAINTAINER_ASSIGNMENT`: a dedicated conduct-reporting channel and
-> response SLA will be published once maintainers are confirmed. Until then,
-> reports are handled best-effort by the lead maintainer
-> (`@yry1816186-pixel`).
+Reports are handled best-effort by the lead maintainer
+(`@yry1816186-pixel`), who also reviews all security-related reports.
 
 Community leaders are obligated to respect the privacy and security of the
 reporter of any incident.

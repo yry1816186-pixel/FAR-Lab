@@ -1,3 +1,12 @@
+# ============================================================
+# FAR-Lab .gitignore — 本地允许存在、但绝不成为 tracked source 的内容
+#
+# 机器侧一致性（单一规则源）：scripts/repo_hygiene_gate.mjs 递归扫描 git index，
+# 禁止本文件忽略的路径类型以 tracked 形式出现。本文件与 gate 语义必须一致：
+# 凡此处被忽略的路径，gate 同样拒绝 tracked；gate 允许的 tracked 路径，此处不得忽略。
+# 任何一侧改动必须同步另一侧 + CI 验证。
+# ============================================================
+
 # --- Dependencies ---
 node_modules/
 .python-deps/
@@ -23,30 +32,24 @@ coverage/
 /0
 /0/
 **/0/v[0-9]*-x[0-9]*/
+frontend/0/
 
 # --- Secrets ---
 .env
 .env.*
 !.env.example
 
-# --- Private prompt & agent-instruction files (never tracked) ---
-/1.md
-/2.md
-3.md
-plan.md
+# --- AI tooling & agent local state（本地编码工具配置不进入公开仓库）---
 AGENTS.md
 CLAUDE.md
 CLAUDE.local.md
 CLAUDE.local.example.md
+*.local.md
 FAR-Lab_Track1A_Agent_Execution_Prompt_Final.md
 PI_RUNBOOK.md
 agent-config-manifest.json
 agent_execution_manifest.yaml
-
-# --- AI tooling local state ---
-.agent/
-.agent-state/
-.agent-governance/
+.qoder/
 .claude/
 .opencode/
 .zcode/
@@ -54,27 +57,63 @@ agent_execution_manifest.yaml
 .hermes/
 .trae/
 .pi/
-.pi.backup-*
+.pi.backup-*/
 .pi/state/
 .pi/baseline-logs/
 .codebuddy/
-.playwright-mcp/
+.cursor/
 .cursorrules
+.windsurf/
+.agent/
+.agent-state/
+.agent-governance/
+.playwright-mcp/
 *-agent-*/
 .trash_backup/
-/.qoder/
 
-# --- Generated repository-analysis outputs (never product source) ---
+# --- Generated repository-analysis outputs（一次性审计/报告产物，永远不 tracked）---
 /DESIGN_SYSTEM.md
 /HUMAN_SURFACE_INVENTORY.md
 /LOCAL_REPLACE_PROMPT.md
+/LOCAL_REPLACE_PROMPT.txt
 /PROJECT_FILE_MANIFEST.txt
+/PROJECT_FILE_MANIFEST.md
 /REFACTOR_MANIFEST.md
 /UI_DEBT_REPORT.md
 /VALIDATION_REPORT.md
 /VALIDATION_RUN_ID.txt
+/FINAL_REPORT.md
+/AGENT_SUMMARY.md
+/CLEANUP_SUMMARY.md
+/REPOSITORY_AUDIT.md
+/GOVERNANCE_PLAN.md
+architecture_audit_report_*.md
+formal_audit_report_*.md
+security_audit_report_*.md
+product_audit_report.md
+science_audit_report.md
+*_audit_report_*.md
 
-# --- Project runtime artifacts (regenerated on every run) ---
+# --- Local working directories & private materials ---
+dev/
+agent/
+modules/
+templates/
+experiments/
+docs/
+/benchmark/
+examples/fec/sample_compiled.json
+NEEDS_HUMAN_LICENSE_DECISION.md
+国家级*/
+评审记录/
+**/评审记录/**/*.log
+FAR-Lab_*.pptx
+FAR-Lab_*.pdf
+_figs/
+evidence/dashscope_calls/
+tests/fixtures/science_harness/tic_sample.cache
+
+# --- Runtime artifacts（far demo/ask/export 每次运行重新生成）---
 .far/
 .far-proof/
 .far-proof-*/
@@ -92,6 +131,11 @@ agent_execution_manifest.yaml
 _audit_*
 evt_test.txt
 coverage_output*.txt
+run_log.txt
+skeleton_evidence.yaml
+.rundb
+.rundb-wal
+.rundb-shm
 
 # --- Local-only tooling & evidence scripts ---
 scripts/build_report_ppt.py
@@ -107,30 +151,11 @@ scripts/far-trust-kernel-precommit.ps1
 scripts/PRECOMMIT_HOOKS.md
 scripts/vertical_slice_cancellation.mjs
 
-# --- Local working directories & private materials ---
-dev/
-agent/
-modules/
-templates/
-experiments/
-examples/fec/sample_compiled.json
-NEEDS_HUMAN_LICENSE_DECISION.md
-国家级*/
-评审记录/
-**/评审记录/**/*.log
-FAR-Lab_*.pptx
-FAR-Lab_*.pdf
-_figs/
-evidence/dashscope_calls/
-tests/fixtures/science_harness/tic_sample.cache
-architecture_audit_report_*.md
-formal_audit_report_*.md
-security_audit_report_*.md
-product_audit_report.md
-science_audit_report.md
-*_audit_report_*.md
-
-# --- Local scratch ---
+# --- Local scratch & OS ---
+/1.md
+/2.md
+3.md
+plan.md
 **/_[a-z]*.py
 **/tmp_*.py
 **/jsdoc_missing_batch*.txt
@@ -143,17 +168,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# --- Repo content policy: docs/, benchmark artifacts, and implementation
-# ledgers are intentionally not distributed with the repository ---
-/docs/
-/benchmark/
-docs/archive/
-docs/audits/
-docs/charter/
-docs/design/
-docs/development/
-docs/governance/
-docs/research/
+# --- Repo content policy: docs/benchmark 与实现台账不随源码分发（gate Gate C 同源禁止 tracked）---
 frontend/src/lib/BRAND_VOICE.md
 src/llm_gateway/DIGEST.md
 .github/copilot-instructions.md

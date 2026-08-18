@@ -4,10 +4,8 @@
 
 - Entry: `README.md`
 - Quickstart: `README` · Installation: `README`
-- Concepts: `docs/concepts/` (`far-proof`, `evidence-ledger`)
 - Architecture: `README`
-- Glossary: `docs/concepts/`
-- Release operations: `docs/governance/`
+- Concepts & glossary: `README` (core concept table) + `far <command> --help`
 
 ## Self-diagnosis
 
@@ -19,11 +17,10 @@ node src/cli/far.ts status     # project status
 ## Where to ask
 
 - **Usage questions / architecture discussion**: GitHub Discussions
-  (`NEEDS_MAINTAINER_ASSIGNMENT` to enable)
 - **Bugs**: GitHub Issue (`.github/ISSUE_TEMPLATE/bug_report.yml`)
 - **Feature requests**: GitHub Issue (`.github/ISSUE_TEMPLATE/feature_request.yml`)
 - **Reproducibility failure** (a verdict you cannot reproduce): GitHub Issue
-  (`.github/ISSUE_TEMPLATE/` — reproducibility is a first-class concern)
+  (`.github/ISSUE_TEMPLATE/reproducibility_failure.yml` — reproducibility is a first-class concern)
 
 ## Security vulnerabilities
 
@@ -33,8 +30,7 @@ node src/cli/far.ts status     # project status
 
 ## Response time
 
-`NEEDS_MAINTAINER_ASSIGNMENT` — best-effort, single-maintainer project, no SLA
-committed yet.
+Best-effort, single-maintainer project, no SLA committed yet. See `MAINTAINERS.md`.
 
 ## Out of scope
 

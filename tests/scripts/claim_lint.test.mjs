@@ -108,7 +108,10 @@ test('real repo: README surfaces fully bound and CLI exits 0', () => {
     fcsFiles: { 'ci/FCS-milestone-competition-2026.yaml': true },
   });
   assert.equal(result.ok, true, JSON.stringify(result.findings, null, 2));
-  assert.ok(result.stats.claimOccurrences >= 5, 'README 双语声明面应有 >=5 个声明出现处被检测');
+  // 阈值=4（2026-08-18 治理修剪：README 移除 LIVE snapshot 表后，unit 直连模式
+  // （数字+单位词）命中从 5 降至 4——"14 golden vectors"/"42 CLI commands" 因中间词
+  // 不属直连不计。断言意图=声明面非空洞，机制验证由 ok=true + 下方 CLI PASS 承担。
+  assert.ok(result.stats.claimOccurrences >= 4, 'README 双语声明面应有 >=4 个声明出现处被检测');
 
   const stdout = execFileSync('node', [join(repoRoot, 'scripts', 'claim_lint.mjs')], { cwd: repoRoot, encoding: 'utf8' });
   assert.match(stdout, /claim_lint: PASS/);

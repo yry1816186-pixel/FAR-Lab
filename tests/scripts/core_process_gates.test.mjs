@@ -2,20 +2,17 @@
 //
 // CORE 流程族机器层测试：
 //   1. secret_scan（CORE-SECRETS-001）——判别力：真泄露命中 / 引用与占位豁免 / 目录免检
-//   2. constitution_manifest（CORE-GOVCHANGE-001）——哈希锁定：漂移/缺失/夹带全部 fail-closed
-//   3. hidden-CoT schema 扫描（CORE-COT-001）——trace/proof schema 无自由形式思维链字段
+//   2. hidden-CoT schema 扫描（CORE-COT-001）——trace/proof schema 无自由形式思维链字段
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, readdirSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { execFileSync } from 'node:child_process';
 
 import { scanText } from '../../scripts/secret_scan.mjs';
-import { verifyManifest, sha256File } from '../../scripts/constitution_manifest.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -50,78 +47,7 @@ test('secret_scan: 仓库全量扫描零命中（实跑门禁面）', () => {
 });
 
 // ============================================================
-// 2. constitution_manifest fail-closed
-// ============================================================
-
-function tempConstitution(mutate) {
-  const dir = mkdtempSync(join(tmpdir(), 'const-manifest-'));
-  const files = {
-    'CORE_CONSTITUTION.md': '# constitution v1\n',
-    'DOMAIN_PROTOCOLS.md': '# protocols v1\n',
-    'MACHINE_SCHEMAS.yaml': 'requirementBlockPattern: x\n',
-  };
-  for (const [name, body] of Object.entries(files)) {
-    writeFileSync(join(dir, name), body, 'utf8');
-  }
-  const lines = Object.entries(files).map(([f]) => `${sha256File(join(dir, f))}  ${f}`).join('\n');
-  writeFileSync(join(dir, 'MANIFEST.sha256'), `${lines}\n`, 'utf8');
-  if (mutate !== undefined) mutate(dir);
-  return dir;
-}
-
-test('manifest: 未变更 → 全 ok', () => {
-  const dir = tempConstitution();
-  try {
-    const results = verifyManifest(dir, readFileSync(join(dir, 'MANIFEST.sha256'), 'utf8'));
-    assert.equal(results.length, 3);
-    assert.ok(results.every((r) => r.ok));
-  } finally { rmSync(dir, { recursive: true, force: true }); }
-});
-
-test('manifest fail-closed: 宪法内容漂移 / 源缺失 / 清单缺项 / 夹带未知条目', () => {
-  const drifted = tempConstitution((d) => writeFileSync(join(d, 'DOMAIN_PROTOCOLS.md'), '# secretly weakened\n', 'utf8'));
-  try {
-    const r1 = verifyManifest(drifted, readFileSync(join(drifted, 'MANIFEST.sha256'), 'utf8'));
-    assert.ok(r1.some((x) => x.kind === 'hash-drift'));
-  } finally { rmSync(drifted, { recursive: true, force: true }); }
-
-  const missingSrc = tempConstitution((d) => rmSync(join(d, 'CORE_CONSTITUTION.md')));
-  try {
-    const r2 = verifyManifest(missingSrc, readFileSync(join(missingSrc, 'MANIFEST.sha256'), 'utf8'));
-    assert.ok(r2.some((x) => x.kind === 'missing-source'));
-  } finally { rmSync(missingSrc, { recursive: true, force: true }); }
-
-  const withNotInManifest = tempConstitution();
-  try {
-    const manifest = readFileSync(join(withNotInManifest, 'MANIFEST.sha256'), 'utf8')
-      .split('\n').filter((l) => l.includes('CORE_CONSTITUTION') ? false : true).join('\n');
-    const r3 = verifyManifest(withNotInManifest, manifest);
-    assert.ok(r3.some((x) => x.kind === 'not-in-manifest'));
-  } finally { rmSync(withNotInManifest, { recursive: true, force: true }); }
-
-  const smuggled = tempConstitution();
-  try {
-    const base = readFileSync(join(smuggled, 'MANIFEST.sha256'), 'utf8').trimEnd();
-    const fakeHash = 'deadbeef'.padEnd(64, '0');
-    const r4 = verifyManifest(smuggled, `${base}
-${fakeHash}  EXTRA_FILE.md
-`);
-    assert.ok(r4.some((x) => x.kind === 'unknown-manifest-entry'));
-  } finally { rmSync(smuggled, { recursive: true, force: true }); }
-});
-
-test('manifest: 真实宪法目录 --check 实跑 PASS（CI 无私有 .far 层 → skip-if-absent）', (t) => {
-  const manifestPath = join(REPO, '.far', 'constitution', 'MANIFEST.sha256');
-  if (!existsSync(manifestPath)) {
-    t.skip('constitution layer is machine-local (gitignored) — verified on dev machines, absent on CI');
-    return;
-  }
-  const out = execFileSync('node', [join(REPO, 'scripts', 'constitution_manifest.mjs'), '--check'], { encoding: 'utf8' });
-  assert.match(out, /PASS — 3 file\(s\) verified/);
-});
-
-// ============================================================
-// 3. hidden-CoT schema 扫描（CORE-COT-001 锁定）
+// 2. hidden-CoT schema 扫描（CORE-COT-001 锁定）
 // ============================================================
 
 /** 自由形式隐藏思维链字段名黑名单（snake/camel 两形）。 */

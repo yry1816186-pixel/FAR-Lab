@@ -10,7 +10,7 @@
 | Role | Holder | Authority |
 |------|--------|-----------|
 | Lead Maintainer | `@yry1816186-pixel` | merge / release / final decision |
-| Trust-kernel reviewers | Lead Maintainer (acting) | `src/falsifiability` `src/evidence_log` `src/far_proof` `src/canonical` `src/fec` 高风险审查（AGENTS.md §7 协议的 GitHub 侧落点，CODEOWNERS 强制） |
+| Trust-kernel reviewers | Lead Maintainer (acting) | `src/falsifiability` `src/evidence_log` `src/far_proof` `src/canonical` `src/fec` 高风险审查（`CONTRIBUTING.md` "Architecture Authority" 信任内核协议的 GitHub 侧落点，CODEOWNERS 强制） |
 | Security response | Lead Maintainer | 私密披露分诊（`SECURITY.md` SLA） |
 
 新增维护者：连续 5 个被合并的高质量 PR + 对信任内核边界的评审记录 → 由 Lead

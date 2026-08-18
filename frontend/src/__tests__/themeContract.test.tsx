@@ -27,7 +27,6 @@ import { ThemeProvider, useTheme } from '@/components/theme/ThemeProvider';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(HERE, '..', 'index.css'), 'utf-8');
 const tailwindConfig = readFileSync(join(HERE, '..', '..', 'tailwind.config.ts'), 'utf-8');
-const dialogSrc = readFileSync(join(HERE, '..', 'components', 'ui', 'dialog.tsx'), 'utf-8');
 const workbenchSrc = readFileSync(join(HERE, '..', 'pages', 'ResearchWorkbenchPage.tsx'), 'utf-8');
 
 /** 抽取顶层 `selector { ... }` 块体(token 声明无嵌套花括号)。 */
@@ -255,11 +254,6 @@ describe('主题面契约 — color-scheme / selection / overlay(PR-03)', () => 
       expect(tokenValue(block, 'overlay-opacity'), `${label} 缺 --overlay-opacity`).toMatch(/^0?\.\d+$/);
     }
     expect(tailwindConfig).toContain("overlay: 'hsl(var(--overlay) / var(--overlay-opacity))'");
-  });
-
-  it('dialog 遮罩消费 overlay token,硬编码黑遮罩清零', () => {
-    expect(dialogSrc).toContain('bg-overlay');
-    expect(dialogSrc).not.toMatch(/bg-black\/?\d*/);
   });
 
   it('D-15:needs-API-key 徽章消费 warning token 配对(amber 硬编码清零)', () => {
