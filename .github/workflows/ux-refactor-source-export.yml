@@ -38,3 +38,85 @@ jobs:
           path: /tmp/FAR-Lab-refactor-source.zip
           if-no-files-found: error
           retention-days: 1
+
+  browser_qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
+        with:
+          version: 10.29.3
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: 24
+      - name: Install dependencies and Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          (cd frontend && npm ci --legacy-peer-deps)
+          mkdir -p /tmp/far-visual-qa/output
+          cd /tmp/far-visual-qa
+          npm init -y >/dev/null
+          npm install playwright@1.55.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+      - name: Start FAR-Lab
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup pnpm run dev >/tmp/far-dev.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:5173/ >/dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/far-dev.log
+          exit 1
+      - name: Inspect responsive/theme/keyboard behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >/tmp/far-visual-qa/qa.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          const base='http://127.0.0.1:5173', out='/tmp/far-visual-qa/output';
+          const browser=await chromium.launch({headless:true});
+          const cases=[
+            ['research-desktop-light','/research',1440,900,'light'],['research-desktop-dark','/research',1440,900,'dark'],
+            ['research-tablet-light','/research',820,1180,'light'],['research-tablet-dark','/research',820,1180,'dark'],
+            ['research-mobile-light','/research',390,844,'light'],['research-mobile-dark','/research',390,844,'dark'],
+            ['integrity-desktop-light','/integrity',1440,900,'light'],['integrity-desktop-dark','/integrity',1440,900,'dark'],
+            ['report-tablet-dark','/report',820,1180,'dark'],['audit-mobile-light','/audit',390,844,'light'],['overview-wide-light','/overview',1920,1080,'light']
+          ];
+          const results=[];
+          for(const [name,path,width,height,theme] of cases){
+            const c=await browser.newContext({viewport:{width,height}});
+            await c.addInitScript(v=>localStorage.setItem('far-chain-theme',v),theme);
+            const p=await c.newPage(); const started=Date.now();
+            await p.goto(base+path,{waitUntil:'domcontentloaded',timeout:30000}); await p.waitForTimeout(700);
+            const m=await p.evaluate(()=>({viewportWidth:document.documentElement.clientWidth,documentWidth:document.documentElement.scrollWidth,htmlDark:document.documentElement.classList.contains('dark')}));
+            if(await p.locator('main').count()===0) throw new Error(`${name}: missing main`);
+            if(await p.locator('h1').count()===0) throw new Error(`${name}: missing h1`);
+            if(m.documentWidth>m.viewportWidth+1) throw new Error(`${name}: global overflow ${m.documentWidth}>${m.viewportWidth}`);
+            if((theme==='dark')!==m.htmlDark) throw new Error(`${name}: theme mismatch`);
+            await p.screenshot({path:`${out}/${name}.png`,fullPage:true});
+            results.push({name,path,width,height,theme,elapsedMs:Date.now()-started,...m}); await c.close();
+          }
+          const c=await browser.newContext({viewport:{width:1440,height:900}}),p=await c.newPage();
+          await p.goto(base+'/research',{waitUntil:'domcontentloaded'}); await p.keyboard.press('Control+K');
+          await p.getByRole('dialog').waitFor({state:'visible'}); const input=p.locator('#command-center-search');
+          if(!(await input.evaluate(el=>el===document.activeElement))) throw new Error('command search focus');
+          await input.fill('integrity'); await p.keyboard.press('Enter'); await p.waitForURL('**/integrity');
+          results.push({name:'command-center-keyboard',passed:true,finalUrl:p.url()}); await c.close(); await browser.close();
+          fs.writeFileSync(`${out}/results.json`,JSON.stringify(results,null,2)+'\n');
+          EOF
+          node /tmp/far-visual-qa/qa.mjs
+          cp /tmp/far-dev.log /tmp/far-visual-qa/output/dev.log
+      - name: Upload browser QA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: FAR-Lab-visual-qa
+          path: /tmp/far-visual-qa/output
+          if-no-files-found: error
+          retention-days: 3
