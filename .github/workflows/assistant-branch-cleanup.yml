@@ -1,0 +1,31 @@
+name: Assistant branch cleanup
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  delete-merged-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Delete obsolete merged branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          for branch in \
+            'feat/t1-gov-core' \
+            'fix/integration-sweep' \
+            'ux-refactor/2026-08-18'
+          do
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              git push origin --delete "$branch"
+            else
+              echo "already absent: $branch"
+            fi
+          done
