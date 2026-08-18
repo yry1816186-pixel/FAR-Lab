@@ -195,3 +195,35 @@ test('non-finite values cannot be silently normalized into a tape', () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('Date, Map, Set, and class instances cannot define tape identity implicitly', () => {
+  class CustomPayload {
+    readonly content = 'answer';
+  }
+
+  const nonPlainValues: readonly unknown[] = [
+    new Date('2026-08-18T08:00:00.000Z'),
+    new Map([['content', 'answer']]),
+    new Set(['answer']),
+    new CustomPayload(),
+  ];
+
+  for (const value of nonPlainValues) {
+    const root = mkdtempSync(join(tmpdir(), 'far-tape-integrity-'));
+    try {
+      assert.throws(
+        () =>
+          recordTapeCall(root, {
+            stageId: 'stage1_understanding',
+            profile: 'competition_aliyun_qwen',
+            request: { q: 'x' },
+            response: value,
+            codeVersion: CODE_VERSION,
+          }),
+        /only plain objects and arrays are allowed/,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
