@@ -72,9 +72,12 @@ test('REL-BUILD-001 diff: IDENTICAL / 输入变更三向 / 仅环境漂移 → E
   assert.deepEqual([...removedDiff.removedInputs], ['zzz-new.ts']);
 
   // 仅环境漂移（CI vs 本地 node 版本不同）→ 输入全同 → EXPLAINED_ENV_DRIFT
+  // platform 漂移值相对 base 构造：任何宿主平台上 a!==b 恒成立（ubuntu 上硬编码
+  // 'linux' 会与本机 platform 相同，漂移不可见——环境依赖用例的移植性陷阱）。
+  const driftedPlatform = base.env.platform === 'linux' ? 'win32' : 'linux';
   const envDrifted: BuildManifest = {
     ...base,
-    env: { ...base.env, nodeVersion: 'v99.0.0', platform: 'linux' },
+    env: { ...base.env, nodeVersion: 'v99.0.0', platform: driftedPlatform },
   };
   const envDiff = compareBuildManifests(base, envDrifted);
   assert.equal(envDiff.status, 'EXPLAINED_ENV_DRIFT');
