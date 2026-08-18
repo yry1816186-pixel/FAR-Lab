@@ -1,0 +1,470 @@
+{
+  "formatVersion": 1,
+  "generated": "2026-08-17",
+  "generator": "one-off script over src/statistics/numerics.ts (actual outputs, frozen; see module header)",
+  "note": "expectedHex = big-endian IEEE754 bit pattern (distinguishes -0); cross-platform reference vectors for KERNEL-NUMERIC-001",
+  "count": 44,
+  "vectors": [
+    {
+      "vectorId": "dsum-001",
+      "kind": "deterministicSum",
+      "input": [
+        1,
+        2,
+        3
+      ],
+      "expected": 6,
+      "expectedHex": "0x4018000000000000"
+    },
+    {
+      "vectorId": "dsum-002",
+      "kind": "deterministicSum",
+      "input": [
+        0.1,
+        0.2,
+        0.3
+      ],
+      "expected": 0.6,
+      "expectedHex": "0x3fe3333333333333"
+    },
+    {
+      "vectorId": "dsum-003",
+      "kind": "deterministicSum",
+      "input": [
+        10000000000000000,
+        1,
+        -10000000000000000
+      ],
+      "expected": 1,
+      "expectedHex": "0x3ff0000000000000"
+    },
+    {
+      "vectorId": "dsum-004",
+      "kind": "deterministicSum",
+      "input": [
+        1,
+        -10000000000000000,
+        10000000000000000
+      ],
+      "expected": 1,
+      "expectedHex": "0x3ff0000000000000"
+    },
+    {
+      "vectorId": "dsum-005",
+      "kind": "deterministicSum",
+      "input": [
+        5e-324,
+        5e-324
+      ],
+      "expected": 1e-323,
+      "expectedHex": "0x0000000000000002"
+    },
+    {
+      "vectorId": "dsum-006",
+      "kind": "deterministicSum",
+      "input": [
+        "-0"
+      ],
+      "expected": 0,
+      "expectedHex": "0x0000000000000000"
+    },
+    {
+      "vectorId": "dsum-007",
+      "kind": "deterministicSum",
+      "input": [
+        "-0",
+        0
+      ],
+      "expected": 0,
+      "expectedHex": "0x0000000000000000"
+    },
+    {
+      "vectorId": "dsum-008",
+      "kind": "deterministicSum",
+      "input": [
+        1.7976931348623157e+308,
+        8.988465674311579e+307,
+        -1.7976931348623157e+308
+      ],
+      "expected": 8.988465674311579e+307,
+      "expectedHex": "0x7fdfffffffffffff"
+    },
+    {
+      "vectorId": "dsum-009",
+      "kind": "deterministicSum",
+      "input": [
+        1,
+        -1,
+        1,
+        -1,
+        1
+      ],
+      "expected": 1,
+      "expectedHex": "0x3ff0000000000000"
+    },
+    {
+      "vectorId": "dsum-010",
+      "kind": "deterministicSum",
+      "input": [
+        1e-300,
+        1e+300,
+        1e-300
+      ],
+      "expected": 1e+300,
+      "expectedHex": "0x7e37e43c8800759c"
+    },
+    {
+      "vectorId": "dsum-011",
+      "kind": "deterministicSum",
+      "input": [
+        3.141592653589793,
+        2.718281828459045
+      ],
+      "expected": 5.859874482048838,
+      "expectedHex": "0x40177082efac4240"
+    },
+    {
+      "vectorId": "dsum-012",
+      "kind": "deterministicSum",
+      "input": [
+        1e-320,
+        1e-320,
+        1e-320,
+        1
+      ],
+      "expected": 1,
+      "expectedHex": "0x3ff0000000000000"
+    },
+    {
+      "vectorId": "dmean-013",
+      "kind": "deterministicMean",
+      "input": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expected": 2.5,
+      "expectedHex": "0x4004000000000000"
+    },
+    {
+      "vectorId": "dmean-014",
+      "kind": "deterministicMean",
+      "input": [
+        0.1,
+        0.2,
+        0.3
+      ],
+      "expected": 0.19999999999999998,
+      "expectedHex": "0x3fc9999999999999"
+    },
+    {
+      "vectorId": "dmean-015",
+      "kind": "deterministicMean",
+      "input": [
+        10000000000000000,
+        1,
+        -10000000000000000,
+        3
+      ],
+      "expected": 1,
+      "expectedHex": "0x3ff0000000000000"
+    },
+    {
+      "vectorId": "dmean-016",
+      "kind": "deterministicMean",
+      "input": [
+        "-0",
+        0,
+        0
+      ],
+      "expected": 0,
+      "expectedHex": "0x0000000000000000"
+    },
+    {
+      "vectorId": "dmean-017",
+      "kind": "deterministicMean",
+      "input": [
+        5,
+        10,
+        15,
+        20,
+        25
+      ],
+      "expected": 15,
+      "expectedHex": "0x402e000000000000"
+    },
+    {
+      "vectorId": "dmean-018",
+      "kind": "deterministicMean",
+      "input": [
+        1e-323,
+        1e-323
+      ],
+      "expected": 1e-323,
+      "expectedHex": "0x0000000000000002"
+    },
+    {
+      "vectorId": "dmean-019",
+      "kind": "deterministicMean",
+      "input": [
+        42
+      ],
+      "expected": 42,
+      "expectedHex": "0x4045000000000000"
+    },
+    {
+      "vectorId": "nsum-020",
+      "kind": "neumaierSum",
+      "input": [
+        10000000000000000,
+        1,
+        -10000000000000000
+      ],
+      "expected": 1,
+      "expectedHex": "0x3ff0000000000000"
+    },
+    {
+      "vectorId": "nsum-021",
+      "kind": "neumaierSum",
+      "input": [
+        0.1,
+        0.2,
+        0.3
+      ],
+      "expected": 0.6,
+      "expectedHex": "0x3fe3333333333333"
+    },
+    {
+      "vectorId": "nsum-022",
+      "kind": "neumaierSum",
+      "input": [],
+      "expected": 0,
+      "expectedHex": "0x0000000000000000"
+    },
+    {
+      "vectorId": "nsum-023",
+      "kind": "neumaierSum",
+      "input": [
+        42
+      ],
+      "expected": 42,
+      "expectedHex": "0x4045000000000000"
+    },
+    {
+      "vectorId": "nsum-024",
+      "kind": "neumaierSum",
+      "input": [
+        1,
+        2.5,
+        -3.75,
+        1.25
+      ],
+      "expected": 1,
+      "expectedHex": "0x3ff0000000000000"
+    },
+    {
+      "vectorId": "ksum-025",
+      "kind": "kahanSum",
+      "input": [
+        10000000000000000,
+        1,
+        -10000000000000000
+      ],
+      "expected": 0,
+      "expectedHex": "0x0000000000000000"
+    },
+    {
+      "vectorId": "ksum-026",
+      "kind": "kahanSum",
+      "input": [
+        0.1,
+        0.2,
+        0.3
+      ],
+      "expected": 0.6,
+      "expectedHex": "0x3fe3333333333333"
+    },
+    {
+      "vectorId": "ksum-027",
+      "kind": "kahanSum",
+      "input": [
+        1,
+        2.5,
+        -3.75,
+        1.25
+      ],
+      "expected": 1,
+      "expectedHex": "0x3ff0000000000000"
+    },
+    {
+      "vectorId": "cmp-028",
+      "kind": "tolerantCompare",
+      "input": [
+        1,
+        1.0000000000001
+      ],
+      "expected": 0
+    },
+    {
+      "vectorId": "cmp-029",
+      "kind": "tolerantCompare",
+      "input": [
+        1,
+        1.001
+      ],
+      "expected": -1
+    },
+    {
+      "vectorId": "cmp-030",
+      "kind": "tolerantCompare",
+      "input": [
+        1.001,
+        1
+      ],
+      "expected": 1
+    },
+    {
+      "vectorId": "cmp-031",
+      "kind": "tolerantCompare",
+      "input": [
+        0.30000000000000004,
+        0.3
+      ],
+      "expected": 0
+    },
+    {
+      "vectorId": "cmp-032",
+      "kind": "tolerantCompare",
+      "input": [
+        0,
+        0
+      ],
+      "expected": 0
+    },
+    {
+      "vectorId": "cmp-033",
+      "kind": "tolerantCompare",
+      "input": [
+        1e-300,
+        1e-302
+      ],
+      "expected": 1
+    },
+    {
+      "vectorId": "cmp-034",
+      "kind": "tolerantCompare",
+      "input": [
+        5e-324,
+        1e-323
+      ],
+      "expected": -1
+    },
+    {
+      "vectorId": "cmp-035",
+      "kind": "tolerantCompare",
+      "input": [
+        1,
+        1.0000000000001
+      ],
+      "relTolerance": 1e-14,
+      "expected": -1
+    },
+    {
+      "vectorId": "rdiff-036",
+      "kind": "relDiff",
+      "input": [
+        1,
+        1.0000000000001
+      ],
+      "expected": 9.99200722162541e-14,
+      "expectedHex": "0x3d3c1ffffffffce9"
+    },
+    {
+      "vectorId": "rdiff-037",
+      "kind": "relDiff",
+      "input": [
+        0,
+        0
+      ],
+      "expected": 0,
+      "expectedHex": "0x0000000000000000"
+    },
+    {
+      "vectorId": "rdiff-038",
+      "kind": "relDiff",
+      "input": [
+        100,
+        100.000000000001
+      ],
+      "expected": 9.947598300641304e-15,
+      "expectedHex": "0x3d06666666666628"
+    },
+    {
+      "vectorId": "cls-039",
+      "kind": "classifyNumericEdge",
+      "input": "-0",
+      "expected": {
+        "kind": "zero",
+        "sign": "-",
+        "extreme": false,
+        "kernelSafe": true
+      }
+    },
+    {
+      "vectorId": "cls-040",
+      "kind": "classifyNumericEdge",
+      "input": 5e-324,
+      "expected": {
+        "kind": "subnormal",
+        "sign": "+",
+        "extreme": false,
+        "kernelSafe": true
+      }
+    },
+    {
+      "vectorId": "cls-041",
+      "kind": "classifyNumericEdge",
+      "input": 1e+308,
+      "expected": {
+        "kind": "normal",
+        "sign": "+",
+        "extreme": true,
+        "kernelSafe": true
+      }
+    },
+    {
+      "vectorId": "cls-042",
+      "kind": "classifyNumericEdge",
+      "input": "NaN",
+      "expected": {
+        "kind": "nan",
+        "sign": null,
+        "extreme": false,
+        "kernelSafe": false
+      }
+    },
+    {
+      "vectorId": "cls-043",
+      "kind": "classifyNumericEdge",
+      "input": "+Infinity",
+      "expected": {
+        "kind": "infinite",
+        "sign": "+",
+        "extreme": true,
+        "kernelSafe": false
+      }
+    },
+    {
+      "vectorId": "cls-044",
+      "kind": "classifyNumericEdge",
+      "input": 1.5,
+      "expected": {
+        "kind": "normal",
+        "sign": "+",
+        "extreme": false,
+        "kernelSafe": true
+      }
+    }
+  ]
+}

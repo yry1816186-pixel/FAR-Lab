@@ -1,0 +1,165 @@
+{
+  "formatVersion": 1,
+  "generated": "2026-08-17",
+  "vectors": [
+    {
+      "vectorId": "conf-valid-clean",
+      "kind": "valid",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1"
+      },
+      "expectedOutcome": {
+        "status": "PASS"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-tampered-prov-ttl",
+      "kind": "tampered",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "prov.ttl",
+          "action": "append",
+          "content": "# CONFORMANCE_TAMPER\n"
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "INTEGRITY_FILE_MISMATCH"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-tampered-claim-graph",
+      "kind": "tampered",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "claim_graph.json",
+          "action": "append",
+          "content": " "
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "INTEGRITY_FILE_MISMATCH"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-tampered-ro-crate",
+      "kind": "tampered",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "ro-crate-metadata.json",
+          "action": "append",
+          "content": " "
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "INTEGRITY_FILE_MISMATCH"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-tampered-integrity-hash",
+      "kind": "tampered",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "integrity.json",
+          "action": "corrupt-hash"
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "INTEGRITY_HASH_MISMATCH"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-malformed-proof-envelopes",
+      "kind": "malformed",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "proof_envelopes.jsonl",
+          "action": "truncate"
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "PROOF_ENVELOPES_UNREADABLE"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-malformed-call-records",
+      "kind": "malformed",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "call_records.redacted.jsonl",
+          "action": "overwrite",
+          "content": "not-json{"
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "CALL_RECORDS_UNREADABLE"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-missing-readme",
+      "kind": "missing_artifact",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "README_REPLAY.md",
+          "action": "delete"
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "MISSING_REQUIRED_FILE"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-missing-data-manifest",
+      "kind": "missing_artifact",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "data_manifest.json",
+          "action": "delete"
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "MISSING_REQUIRED_FILE"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    },
+    {
+      "vectorId": "conf-missing-proof-envelopes",
+      "kind": "missing_artifact",
+      "inputRef": {
+        "base": "far-proof-demo-chain@v1",
+        "mutate": {
+          "target": "proof_envelopes.jsonl",
+          "action": "delete"
+        }
+      },
+      "expectedOutcome": {
+        "status": "FAIL",
+        "errorCode": "MISSING_REQUIRED_FILE"
+      },
+      "derivedFrom": "empirical: verifyFarProofBundle(dir, full) actual outcome, frozen at generation (2026-08-17)"
+    }
+  ]
+}

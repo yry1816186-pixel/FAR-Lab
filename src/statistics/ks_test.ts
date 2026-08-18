@@ -22,6 +22,10 @@
  * exactness for n,m < 8 — callers should treat small-sample p-values as approximate. No LLM.
  */
 
+// KERNEL-NUMERIC-001: series truncation tolerance centralized in numerics.ts (value unchanged:
+// 1e-12 → CENTRAL_TOLERANCE.SERIES_TRUNCATION_REL — bit-identical, golden vectors unaffected).
+import { CENTRAL_TOLERANCE } from './numerics.ts';
+
 /** Two-sample KS test result. */
 export interface KsTestResult {
   /** KS two-sided statistic D_{n,m} = sup_x |F̂_1(x) − F̂_2(x)| ∈ [0, 1]. */
@@ -128,7 +132,7 @@ function qKs(lambda: number): number {
     const term = sign * Math.exp(exponent);
     sum += term;
     sign = -sign;
-    if (Math.abs(term) <= 1e-12 * Math.abs(sum)) {
+    if (Math.abs(term) <= CENTRAL_TOLERANCE.SERIES_TRUNCATION_REL * Math.abs(sum)) {
       break;
     }
   }

@@ -19,11 +19,14 @@
  */
 
 import { normalQuantile } from './p_value.ts';
+// KERNEL-NUMERIC-001: convergence tolerances centralized in numerics.ts (values unchanged:
+// 3.0e-12 → T_BETA_CONVERGENCE, 1e-13 → T_NEWTON_CONVERGENCE — bit-identical, golden vectors unaffected).
+import { CENTRAL_TOLERANCE } from './numerics.ts';
 
 /** Maximum iterations for continued fraction expansion. */
 const BETA_ITMAX = 200;
-/** Convergence threshold for continued fraction. */
-const BETA_EPS = 3.0e-12;
+/** Convergence threshold for continued fraction (CENTRAL_TOLERANCE.T_BETA_CONVERGENCE). */
+const BETA_EPS = CENTRAL_TOLERANCE.T_BETA_CONVERGENCE;
 /** Numerical floor for values treated as zero. */
 const TINY = 1.0e-300;
 
@@ -250,7 +253,7 @@ export function studentTQuantile(p: number, df: number): number {
     }
     t = next;
     // Convergence: both the CDF residual and the step must be negligible.
-    if (Math.abs(delta) < 1e-13 && Math.abs(err) < 1e-13) {
+    if (Math.abs(delta) < CENTRAL_TOLERANCE.T_NEWTON_CONVERGENCE && Math.abs(err) < CENTRAL_TOLERANCE.T_NEWTON_CONVERGENCE) {
       break;
     }
   }
