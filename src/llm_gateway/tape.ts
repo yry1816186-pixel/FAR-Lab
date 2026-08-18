@@ -185,6 +185,12 @@ function assertCanonicalJsonValue(
       }
       return;
     }
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new Error(
+        `${path}: only plain objects and arrays are allowed in Model Tape JSON`,
+      );
+    }
     for (const [key, item] of Object.entries(value)) {
       assertCanonicalJsonValue(item, `${path}.${key}`, ancestors);
     }
