@@ -663,7 +663,7 @@ export default function AblationPage() {
 function HonestyWallSection() {
   const t = useT();
   return (
-    <Alert data-testid="ablation-honesty-wall" className="border-warning/40 bg-warning/100/5">
+    <Alert data-testid="ablation-honesty-wall" className="border-warning/40 bg-warning/5">
       <ShieldAlert className="h-4 w-4 text-warning" aria-hidden="true" />
       <AlertTitle>{t('ablation.honestyTitle')}</AlertTitle>
       <AlertDescription className="space-y-2 text-sm">

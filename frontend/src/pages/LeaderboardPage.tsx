@@ -70,11 +70,11 @@ const VERDICT_ORDER: readonly VerdictValue[] = VERDICT_VALUES;
 function barColor(variant: VerdictBadgeVariant): string {
   switch (variant) {
     case 'success':
-      return 'bg-success/100';
+      return 'bg-success';
     case 'destructive':
       return 'bg-destructive';
     case 'warning':
-      return 'bg-warning/100';
+      return 'bg-warning';
     case 'secondary':
       return 'bg-secondary-foreground';
     case 'outline':
@@ -214,7 +214,7 @@ function SuiteVerifier({ report }: { readonly report: BenchmarkReportDto }) {
             <div
               className={cn(
                 'rounded-md border p-4',
-                matches ? 'border-success/40 bg-success/100/5' : 'border-destructive bg-destructive/5',
+                matches ? 'border-success/40 bg-success/5' : 'border-destructive bg-destructive/5',
               )}
               data-testid="suite-verify-result"
             >
