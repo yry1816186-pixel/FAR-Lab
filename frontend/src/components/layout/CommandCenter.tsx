@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Command, Search, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -31,7 +31,7 @@ export function CommandCenter() {
   }, [query, t]);
 
   useEffect(() => {
-    function onGlobalKeyDown(event: KeyboardEvent): void {
+    function onGlobalKeyDown(event: globalThis.KeyboardEvent): void {
       if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k') {
         event.preventDefault();
         setOpen((value) => !value);
@@ -58,7 +58,7 @@ export function CommandCenter() {
     navigate(path);
   }
 
-  function onDialogKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+  function onDialogKeyDown(event: ReactKeyboardEvent<HTMLDivElement>): void {
     if (event.key === 'Tab') {
       const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
         'input, button:not([disabled]), [tabindex]:not([tabindex="-1"])',
