@@ -331,12 +331,12 @@ export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-semibold text-muted-foreground">R7 gate</span>
             {gate.overallPassed === true && (
-              <span className="rounded bg-emerald-100 px-1.5 py-px text-[10px] font-semibold text-emerald-700">
+              <span className="rounded bg-success/10 px-1.5 py-px text-[10px] font-semibold text-success">
                 ALL PASS
               </span>
             )}
             {gate.overallPassed === false && (
-              <span className="rounded bg-rose-100 px-1.5 py-px text-[10px] font-semibold text-rose-700">
+              <span className="rounded bg-destructive/10 px-1.5 py-px text-[10px] font-semibold text-destructive">
                 BLOCKED
               </span>
             )}
@@ -357,8 +357,8 @@ export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
                       isSkipped
                         ? 'text-xs text-muted-foreground/50'
                         : passed
-                          ? 'text-emerald-600'
-                          : 'text-rose-600'
+                          ? 'text-success'
+                          : 'text-destructive'
                     }
                     aria-hidden="true"
                   >
@@ -372,7 +372,7 @@ export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
                   <span
                     className={cn(
                       'shrink-0 rounded px-1.5 text-[10px] font-semibold',
-                      passed ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700',
+                      passed ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive',
                     )}
                   >
                     {passed ? 'PASS' : 'FAIL'}
@@ -632,21 +632,21 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
           {/* DEGRADED_SCOPE 高亮 */}
           {item.decision === 'DEGRADED_SCOPE' && item.scopeSlipText !== null && (
             <div
-              className="rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-sm"
+              className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
               data-testid={`scope-slip-${item.verdictId}`}
             >
-              <span className="font-semibold text-orange-800">Scope degradation note:</span>
-              <span className="text-orange-700 ml-1">{item.scopeSlipText}</span>
+              <span className="font-semibold text-warning">Scope degradation note:</span>
+              <span className="text-warning ml-1">{item.scopeSlipText}</span>
             </div>
           )}
 
           {/* UNTESTED 高亮 */}
           {item.decision === 'UNTESTED' && item.untestedReason !== null && (
             <div
-              className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm"
+              className="rounded-md border border-border bg-muted px-3 py-2 text-sm"
               data-testid={`untested-reason-${item.verdictId}`}
             >
-              <span className="font-semibold text-gray-700">Untested reason:</span>
+              <span className="font-semibold text-muted-foreground">Untested reason:</span>
               <span className="text-gray-600 ml-1">{item.untestedReason}</span>
             </div>
           )}

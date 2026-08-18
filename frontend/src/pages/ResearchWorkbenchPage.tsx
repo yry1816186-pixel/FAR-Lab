@@ -560,7 +560,7 @@ export default function ResearchWorkbenchPage() {
               <span>
                 {t('research.mode.live')}
                 {keyConfigured === true && (
-                  <span className="ml-1.5 rounded bg-emerald-600/10 px-1.5 py-0.5 text-xs text-emerald-700">
+                  <span className="ml-1.5 rounded bg-success/10 px-1.5 py-0.5 text-xs text-success">
                     {t('research.mode.liveReady')}
                   </span>
                 )}

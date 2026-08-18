@@ -327,7 +327,7 @@ export default function WizardPage(): JSX.Element {
 
       {/* WS-B.3 LLM 状态横幅——治「每个问题同一裁决」感知：诚实展示 live / offline replay */}
       <div
-        className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${llmStatus?.keyConfigured === true ? 'border-green-200 bg-green-50 text-green-900 dark:border-green-900 dark:bg-green-950 dark:text-green-100' : 'border-yellow-200 bg-yellow-50 text-yellow-900 dark:border-yellow-900 dark:bg-yellow-950 dark:text-yellow-100'}`}
+        className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${llmStatus?.keyConfigured === true ? 'border-success/40 bg-success/10 text-success' : 'border-warning/40 bg-warning/10 text-warning'}`}
         data-testid="wizard-llm-status"
       >
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -520,8 +520,8 @@ export default function WizardPage(): JSX.Element {
                   </div>
                 )}
                 {result.honestVerdict.untestedReason && (
-                  <div className="flex items-start gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-600" />
+                  <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/100/5 p-3">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                     <p className="text-sm">
                       <span className="font-medium">{t('wizard.step3.honestDowngrade')}</span> {result.honestVerdict.untestedReason}
                     </p>
@@ -554,7 +554,7 @@ export default function WizardPage(): JSX.Element {
               <div className="flex items-center gap-2">
                 <code className="flex-1 truncate rounded bg-muted px-2 py-1.5 text-xs" data-testid="wizard-repro-hash">{result.reproHash}</code>
                 <Button variant="outline" size="icon" onClick={copyReproHash} data-testid="wizard-copy-hash">
-                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                  {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
@@ -568,8 +568,8 @@ export default function WizardPage(): JSX.Element {
                 <p className="mt-1 text-sm">{t('wizard.step4.deterministicDesc')}</p>
               </div>
             </div>
-            <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3 text-sm">
-              <p className="flex items-center gap-2 font-medium text-blue-700 dark:text-blue-400">
+            <div className="rounded-lg border border-info/30 bg-info/5 p-3 text-sm">
+              <p className="flex items-center gap-2 font-medium text-info dark:text-info">
                 <CheckCircle2 className="h-4 w-4" />{t('wizard.step4.howToVerify')}
               </p>
               <pre className="mt-2 overflow-x-auto rounded bg-muted p-2 text-xs"><code>{`# Export the proof bundle
@@ -595,7 +595,7 @@ far verify --bundle .far-proof`}</code></pre>
                 className="w-full"
                 size="sm"
               >
-                {downloadedProof ? <Check className="mr-2 h-4 w-4 text-green-600" /> : <Download className="mr-2 h-4 w-4" />}
+                {downloadedProof ? <Check className="mr-2 h-4 w-4 text-success" /> : <Download className="mr-2 h-4 w-4" />}
                 {downloadedProof ? t('wizard.step4.summaryDownloaded') : t('wizard.step4.downloadSummary')}
               </Button>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -610,11 +610,11 @@ far verify --bundle .far-proof`}</code></pre>
                   {savedReceiptId !== null ? t('wizard.step4.savedReceipt') : t('wizard.step4.saveReceipt')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={copyExportCommand} data-testid="wizard-copy-export">
-                  {copiedExport ? <Check className="mr-2 h-4 w-4 text-green-600" /> : <Download className="mr-2 h-4 w-4" />}
+                  {copiedExport ? <Check className="mr-2 h-4 w-4 text-success" /> : <Download className="mr-2 h-4 w-4" />}
                   {copiedExport ? t('wizard.step4.commandCopied') : t('wizard.step4.copyExport')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={copyShareLink} data-testid="wizard-copy-share">
-                  {copiedShare ? <Check className="mr-2 h-4 w-4 text-green-600" /> : <Share2 className="mr-2 h-4 w-4" />}
+                  {copiedShare ? <Check className="mr-2 h-4 w-4 text-success" /> : <Share2 className="mr-2 h-4 w-4" />}
                   {copiedShare ? t('wizard.step4.linkCopied') : t('wizard.step4.copyShare')}
                 </Button>
                 <Button asChild variant="outline" size="sm" data-testid="wizard-reverify-link">
@@ -629,7 +629,7 @@ far verify --bundle .far-proof`}</code></pre>
                 </p>
               )}
               {persistReceipt.isError && (
-                <p className="text-xs text-red-600">
+                <p className="text-xs text-destructive">
                   {t('wizard.step4.saveFailed')} {persistReceipt.error?.message ?? t('wizard.error.unknown')}{t('wizard.step4.saveFailedSuffix')}
                 </p>
               )}
@@ -644,10 +644,10 @@ far verify --bundle .far-proof`}</code></pre>
 
       {/* Error display */}
       {hypothesize.isError && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 p-4" data-testid="wizard-error">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+        <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4" data-testid="wizard-error">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-700 dark:text-red-400">{t('wizard.error.title')}</p>
+            <p className="text-sm font-medium text-destructive">{t('wizard.error.title')}</p>
             <p className="mt-1 text-xs text-muted-foreground">{hypothesize.error?.message ?? t('wizard.error.unknown')}</p>
             <Button variant="outline" size="sm" onClick={reset} className="mt-2">{t('wizard.error.tryAgain')}</Button>
           </div>

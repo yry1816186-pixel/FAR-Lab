@@ -68,6 +68,21 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 217 71% 53%;
 
+    /* ---- Human-state semantics (never the only carrier of meaning) ---- */
+    --info: 217 71% 45%;
+    --success: 142 70% 32%;
+    --warning: 32 95% 34%;
+    --evidence: 266 55% 45%;
+    --provenance: 190 70% 32%;
+
+    /* ---- Motion tokens ---- */
+    --motion-instant: 0ms;
+    --motion-fast: 120ms;
+    --motion-normal: 200ms;
+    --motion-complex: 320ms;
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-emphasized: cubic-bezier(0.2, 0, 0, 1.2);
+
     /* ---- Radius baseline (学术偏小圆角) ---- */
     --radius: 0.5rem;
 
@@ -142,6 +157,11 @@
     --border: 217 33% 18%;
     --input: 217 33% 18%;
     --ring: 217 71% 60%;
+    --info: 213 94% 68%;
+    --success: 142 70% 52%;
+    --warning: 38 92% 58%;
+    --evidence: 266 80% 72%;
+    --provenance: 188 75% 55%;
 
     /* ---- Semantic status colors (dark) ----
        vivid 阶暗底提亮保可见(与 verdict confirmed/inconclusive 暗调同策略);

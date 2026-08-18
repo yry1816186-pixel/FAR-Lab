@@ -53,6 +53,11 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        info: 'hsl(var(--info))',
+        success: 'hsl(var(--success))',
+        warning: 'hsl(var(--warning))',
+        evidence: 'hsl(var(--evidence))',
+        provenance: 'hsl(var(--provenance))',
 
         // ---- Overlay(PR-03 主题契约):Dialog/AlertDialog 遮罩,不再硬编码 black/80 ----
         overlay: 'hsl(var(--overlay) / var(--overlay-opacity))',
@@ -160,8 +165,10 @@ const config: Config = {
       },
       // ---- 动效时长(fast/normal/slow/very-slow 语义别名) ----
       transitionDuration: {
-        fast: '150ms',
-        normal: '250ms',
+        instant: 'var(--motion-instant)',
+        fast: 'var(--motion-fast)',
+        normal: 'var(--motion-normal)',
+        complex: 'var(--motion-complex)',
         slow: '400ms',
         'very-slow': '600ms',
       },

@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import { RouteErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteEffects } from '@/components/RouteEffects';
-import { I18nProvider } from '@/lib/i18n';
+import { I18nProvider, useI18n } from '@/lib/i18n';
 
 // Route-level code splitting. The research workbench is the default/landing route —
 // the research workflow (question → run → frozen run) is the unambiguous primary
@@ -100,10 +100,12 @@ export default function App() {
 }
 
 function NotFoundPage() {
+  const { t } = useI18n();
   return (
-    <div className="py-20 text-center" data-testid="not-found-page">
-      <h1 className="text-2xl font-bold">404</h1>
-      <p className="mt-2 text-muted-foreground">Page not found</p>
+    <div className="mx-auto max-w-lg py-20 text-center" data-testid="not-found-page">
+      <p className="font-mono text-sm font-semibold text-primary">404</p>
+      <h1 className="mt-2 text-2xl font-bold">{t('notFound.title')}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">{t('notFound.description')}</p>
     </div>
   );
 }
