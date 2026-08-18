@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           echo "NODE_COMPILE_CACHE=$RUNNER_TEMP/node-compile-cache" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
