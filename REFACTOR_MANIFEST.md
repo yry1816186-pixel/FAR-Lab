@@ -6,7 +6,7 @@
 - Original target branch: `main`
 - Original commit SHA: `a6647be68c8012246ffb57de8752649657a847f2`
 - Work branch: `ux-refactor/2026-08-18`
-- Validated source SHA before report finalization: `6403dd7ed474bf50ea400c55f9e0fbf53794e192`
+- Validated source SHA before report finalization: `1f4f840cfca72467f72897adfeca95c79a7505a8`
 
 ## Architectural and product changes
 
@@ -30,6 +30,8 @@ No database/schema migration is introduced by this Human Experience Layer finali
 
 ## File changes from original main
 
+- `A	.assistant-run-id`
+- `A	.github/workflows/assistant-run-marker.yml`
 - `M	.github/workflows/ux-refactor-source-export.yml`
 - `M	HUMAN_SURFACE_INVENTORY.md`
 - `A	PROJECT_FILE_MANIFEST.txt`

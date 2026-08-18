@@ -2,6 +2,7 @@
 # Baseline main: a6647be68c8012246ffb57de8752649657a847f2
 # Format: sha256  bytes  path
 # PROJECT_FILE_MANIFEST.txt itself is intentionally omitted from its own hash rows.
+1b41d7a142d3f44633cd9951e51aeee2bc59f4d1096d4e593da44d04296d33c1          12  .assistant-run-id
 fa55310e8d8da1668e82f26cffa54d9fb7490b5a3c605c0e83da5fa2fd345fb2         254  .dockerignore
 ee3e7ec0945a67776d0627938ea102de1991b8534d76eb684a37e8e116a36a1e         772  .editorconfig
 4e5660ca1cf76b901051f4302c12e3808f8acafa5d6f6c74621e929274aeec87        1646  .env.example
@@ -13,6 +14,7 @@ c7d20d1bd075ca704801ae923a49e6e3327fc527ba3fc1de34b7b211a3278f6b        1387  .g
 261c952d274865accddc07e26c91a8fe30ef072b3cc44d572d9cd32039be2af2        2059  .github/ISSUE_TEMPLATE/reproducibility_failure.yml
 3e70e79ee5dff99c07fe059e43e818612bf4da25c98f5f79c24296234f163280         912  .github/dependabot.yml
 9f95c5fa48afa68410fa2c83586ccbbf8a3956263b357c391b1a954fd1973e91        1138  .github/pull_request_template.md
+ca86fa01c44680e7a85c5b944de09c379ae91d9ae91bf3514eda94b3cd168705         806  .github/workflows/assistant-run-marker.yml
 1afd4f86fb5cc280c62e20fe35c352519bb6ca1f972219c50921b2875382e4a2       19635  .github/workflows/build-integrity.yml
 3ed98785466dab6cd6014e9e504a47a315e99dd0514dc3f529de422de4a4c21b       34140  .github/workflows/ci.yml
 29edce9493acbe85c998ffd9abe431e566da12e4332c58d5204c84a3a0ef4455        4179  .github/workflows/cross-platform.yml
@@ -161,13 +163,13 @@ c3c0a3164ffc7c17568d74bc81fefc79305b000571dcc4160c336881f818040a        5600  LO
 56c383443cd3121505c8edfd0be631af771abeff82babf1d1892e6bf7e3c79c4        1476  NOTICE
 8604acf4f7ea64f19805ec8eb8c5bd1d7f9fbf80739c8160426f01959f9c56d1       28612  README.md
 ad84c5130738dd7775d020f7c4139b5aca4275356349ad1c3ff441b70681cd56       19335  README.zh-CN.md
-ff812ce2912846740a0754cac090a5921e6ae8514235353ed95e9925dad2965b        2534  REFACTOR_MANIFEST.md
+4519ea4706784b7a2281ac3b39c57bea06ddf58d4f1e587d1a8b411f8f345cac        2607  REFACTOR_MANIFEST.md
 7f812387d8086077e98bbec58c3fdb70d60d6a1e53a5f47eeba3f0d56c8ef962        5810  SECURITY.md
 83d6a4e0b10345b3346037d9e4b20266a5583362dc4647dca6a56dd33b6c9e13        1398  SUPPORT.md
 7f1eb27e99e73a722aa81d4faf13538a735dea89cb3017e67d3e8a8d5d6296f7        2114  THIRD-PARTY-NOTICES.md
 48f52c75c5ab480d4a2c0ee7cb054c926f3368d57f6c671cbc2eb2506f903890        4646  UI_DEBT_REPORT.md
-0f9b5eb3097e4021eb9f0d85e605eec3205eb073af346ecc9e312127a5d85a24        1133  VALIDATION_REPORT.md
-39e39615b899d05a878f5ac9c7b8d8112fdcda6d671accb87aa13917ce93259f          12  VALIDATION_RUN_ID.txt
+40c17fc6944c1a6fda08abf089790892f5016d748ec83aece44c48dc042a378a        1133  VALIDATION_REPORT.md
+339f9b4be0468cc568f4463d97ed675ce5b2ee2f23cc3f99c07afe1646c48214          12  VALIDATION_RUN_ID.txt
 bfd097971f1b0ab82dd02809f56073cb8ed1999b345d1214b42f42df63f8f81f        2096  ci/CLAIM_RECEIPTS.yaml
 e88e16304035861a671f858a24574d3f9627d09c6393df7e40abd343487922c2        2769  ci/FCS-milestone-competition-2026.yaml
 0ade68281336aa77bd9fd300f23ed813bf381dc772c17b4d056bbebdf15a584d        5091  ci/TEST_RISK_MAP.yaml
