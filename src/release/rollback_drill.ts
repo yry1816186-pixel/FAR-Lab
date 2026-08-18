@@ -27,7 +27,7 @@
 //   - 不可逆迁移（forward-only）没有 down migration——本模块的「回滚」语义 = 恢复
 //     到备份快照 + 重放前向迁移，不是 schema 降级。
 //
-// 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。模型中立。
+// 零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。模型中立。
 
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

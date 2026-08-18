@@ -20,7 +20,7 @@
 //   - LEGAL_UNKNOWNS 的 OPEN 状态意味着「不确定」——仅元数据模式是保守缓解，
 //     不是权利确认；关闭未知项需要人工确权（本模块不自动关闭）。
 //
-// 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。模型中立。
+// 零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。模型中立。
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

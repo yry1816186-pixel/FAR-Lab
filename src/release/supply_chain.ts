@@ -31,7 +31,7 @@
 //   - 撤销名单是本地 registry 文件——不提供全局在线撤销查询（离线验证语境下的
 //     显式边界：撤销的时效性 = 名单分发时效性）。
 //
-// 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。模型中立。
+// 零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。模型中立。
 
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';

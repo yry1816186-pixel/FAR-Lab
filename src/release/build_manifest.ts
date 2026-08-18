@@ -25,7 +25,7 @@
 //     依赖编译，超出本模块边界）；
 //   - SHA-256 抗碰撞性是密码学假设，本模块不做二次独立哈希复核。
 //
-// 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。模型中立。
+// 零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。模型中立。
 
 import { createHash } from 'node:crypto';
 import {

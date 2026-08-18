@@ -26,7 +26,7 @@
 //   - CLI 命令名提取依赖 far.ts 的声明缩进约定（4 空格 `name:`）——约定变化会
 //     被 sync 检出为「全部命令消失」fail（保守失败方向，不静默放行）。
 //
-// 零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。模型中立。
+// 零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。模型中立。
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
