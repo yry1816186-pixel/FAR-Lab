@@ -25,7 +25,7 @@
  *     下新增 websocket 子目录）不会触发 fail；
  *   - highRiskPathTests 只验证文件存在，不验证测试在跑、不验证测试断言强度。
  *
- * 模型中立。零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。
+ * 模型中立。零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。
  */
 
 import { existsSync, readdirSync } from 'node:fs';

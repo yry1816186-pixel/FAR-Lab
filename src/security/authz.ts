@@ -25,7 +25,7 @@
  *     有内存写权限的攻击者整体重写（无外部锚定）；
  *   - 时间戳来自调用方注入（grantedAt 参数），本模块不验证其与真实墙钟一致。
  *
- * 模型中立。零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。
+ * 模型中立。零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。
  */
 
 import { createHash } from 'node:crypto';

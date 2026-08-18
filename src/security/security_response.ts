@@ -21,7 +21,7 @@
  *   - 公告模板不验证 CVE 编号真实性（CVE 分配是外部机构流程）；
  *   - 演练时间线由调用方注入——本模块不验证其与真实墙钟一致。
  *
- * 模型中立。零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。
+ * 模型中立。零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。
  */
 
 import { existsSync, readFileSync } from 'node:fs';

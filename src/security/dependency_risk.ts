@@ -29,7 +29,7 @@
  *   - import 扫描只覆盖 src 树全部 .ts/.tsx 文件的静态字面量 import——动态拼接的
  *     require 字符串模板检测不到。
  *
- * 零新依赖。模型中立。零容忍合规：无 any / @ts-ignore / 双重断言 / 空 catch。
+ * 零新依赖。模型中立。零容忍合规：无 any 类型注解、ts 抑制指令、双重断言、空 catch。
  */
 
 import { createHash } from 'node:crypto';
