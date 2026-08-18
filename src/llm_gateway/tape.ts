@@ -91,12 +91,12 @@ export class CorruptTapeError extends Error {
   }
 }
 
-/** An existing content address is immutable and may not be overwritten. */
+/** An existing content address contains different recorded evidence. */
 export class TapeAlreadyExistsError extends Error {
   readonly path: string;
 
   constructor(path: string) {
-    super(`tape already exists at '${path}' - recorded evidence is immutable`);
+    super(`tape already exists at '${path}' with different recorded evidence`);
     this.name = 'TapeAlreadyExistsError';
     this.path = path;
   }
@@ -360,10 +360,18 @@ export function recordTapeCall(root: string, input: RecordTapeInput): RecordTape
       flag: 'wx',
     });
   } catch (error: unknown) {
-    if (hasErrorCode(error, 'EEXIST')) {
-      throw new TapeAlreadyExistsError(path);
+    if (!hasErrorCode(error, 'EEXIST')) {
+      throw error;
     }
-    throw error;
+    const existing = loadTapeEntry(root, input.stageId, input.profile, input.request);
+    if (
+      existing !== null &&
+      existing.responseHash === entry.responseHash &&
+      existing.codeVersion === entry.codeVersion
+    ) {
+      return { ok: true, entry: existing, path };
+    }
+    throw new TapeAlreadyExistsError(path);
   }
   return { ok: true, entry, path };
 }
