@@ -80,6 +80,18 @@ jobs:
           test -d repro
 
   # ============================================================
+  # REPO_HYGIENE · tracked 内容门禁（A–I 9 项递归扫描 · 零依赖零 install）
+  # 置于最前：FINAL_REPORT.md / AGENT_SUMMARY.md 等过程文件一进 index 立即红，
+  # 不等重型测试跑完才发现。SSOT = scripts/repo_hygiene_gate.mjs（与 .gitignore 同源）。
+  # ============================================================
+  repo_hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: repo hygiene gate (tracked content policy · A-I 9 gates)
+        run: node scripts/repo_hygiene_gate.mjs
+
+  # ============================================================
   # FRONTEND GATE · frontend（React+Vite 仪表盘·npm 独立工作区·与后端串行链并行）
   # frontend/ 有独立 package-lock.json（非 root pnpm workspace 成员）→ 用 npm ci
   #   - --legacy-peer-deps：eslint@10 与 eslint-plugin-react@7.37 的 peer 元数据过时
@@ -635,7 +647,7 @@ jobs:
         run: node scripts/doc_command_check.mjs
       - name: coverage_gate（行≥85%/分支≥75% 红线）
         run: node scripts/coverage_gate.mjs
-      - name: repo_hygiene_gate（根目录白名单 / 无垃圾落根 / 运行时产物未跟踪 / 0/ 无泄漏）
+      - name: repo_hygiene_gate（tracked 内容门禁 A–I · 递归扫描 git index）
         run: node scripts/repo_hygiene_gate.mjs
       - name: fuzz_proof smoke（公开解析面模糊测试·增量档 2k 例；全量 100k 走 pnpm fuzz:proof 本地/夜间）
         run: node scripts/fuzz_proof.mjs --smoke --seed 20260816

@@ -71,8 +71,8 @@ export const CONCURRENCY_INVENTORY: readonly ConcurrencyInventoryEntry[] = [
   },
   {
     item: 'idempotency-keys', maturity: 'implemented',
-    authority: 'src/agent_loop/stage_receipt_store.ts（inputHash 幂等跳过）+ campaign/dag.ts idempotentSkip',
-    testFace: ['tests/agent_loop/stage_registry.test.ts', 'tests/campaign/dag.test.ts'],
+    authority: 'src/agent_loop/stage_receipt_store.ts（inputHash 幂等跳过）',
+    testFace: ['tests/agent_loop/stage_registry.test.ts'],
     note: 'exactly-once 收据跳过 + at-least-once 不承诺跳过（语义显式）',
   },
   {
@@ -83,8 +83,8 @@ export const CONCURRENCY_INVENTORY: readonly ConcurrencyInventoryEntry[] = [
   },
   {
     item: 'retry-semantics', maturity: 'implemented',
-    authority: 'src/agent_loop/retry_policy.ts（429 退避）+ campaign/scheduler.ts（崩溃恰重试一次）+ campaign/dag.ts（maxRetries 余量）',
-    testFace: ['tests/campaign/scheduler.test.ts', 'tests/campaign/dag.test.ts'],
+    authority: 'src/agent_loop/retry_policy.ts（429 退避）+ campaign/scheduler.ts（崩溃恰重试一次）',
+    testFace: ['tests/campaign/scheduler.test.ts'],
     note: '限流退避/崩溃单次重试/重试余量耗尽退出',
   },
   {

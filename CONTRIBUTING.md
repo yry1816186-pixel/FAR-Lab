@@ -54,6 +54,7 @@ All gates must pass on a clean clone before you start.
 | Agent loop | `pnpm test:agent_loop` | 6-stage FSM + anti-hallucination |
 | Python axis | `pnpm run test:py` | SymPy / Z3 verification (skips if absent) |
 | Cross-lang | `node --test tests/evidence_log/cross_lang_consistency.test.ts` | TS canonicalHash === Python byte-equal |
+| Repository hygiene | `pnpm repo:hygiene` | Tracked 内容政策（A–I 9 项递归门禁：Markdown allowlist / 禁过程文件与生成产物 / 禁 dangling 引用） |
 
 ## Zero-Tolerance Rules
 
@@ -90,6 +91,38 @@ FAR-Lab guards against *theater* — tests that look green but verify nothing.
   (CONFIRMED / REFUTED / INCONCLUSIVE / DEGRADED_SCOPE / UNTESTED).
 - TypeScript in-memory fields use `camelCase`; SQLite physical columns use `snake_case`.
 
+### Trust-kernel review protocol
+
+Changes touching the deterministic verification kernel — Claim, FEC, Evidence,
+Verdict, ProofEnvelope, provenance, or signatures — are high-risk. They must
+include: deterministic behavior, canonical handling, negative/boundary/tamper
+tests, and a statement of what the mechanism cannot prove. These paths are
+enforced on GitHub via `.github/CODEOWNERS` (see `MAINTAINERS.md`).
+
+## Repository Content Policy
+
+The Git tree is the canonical definition of FAR-Lab **source code** — not an
+agent workspace, report archive, or scratchpad. Any file entering git must
+justify being tracked. `.gitignore` expresses what may exist locally; the
+hygiene gate (`pnpm repo:hygiene`, enforced in CI) rejects tracked content
+that has no source-tree role. The gate and `.gitignore` are one policy — they
+never contradict each other.
+
+- **Markdown is default-deny.** Only the explicit `MD_ALLOWLIST` in
+  `scripts/repo_hygiene_gate.mjs` may be tracked. One-off reports, summaries,
+  plans, progress logs, audits, and handoff notes never belong in the repository.
+- **Process artifacts are rejected recursively** — reports, manifests,
+  validation dumps, backups, generated evaluation output, screenshots, and
+  PPT/PDF presentations are not source (gates C/E/F/G).
+- **No local AI-tool state** — `.claude/`, `.opencode/`, `.zcode/` and similar
+  tool directories stay local-only and ignored (gate C).
+- **Root stays minimal** — only approved files and the source directories in
+  the gate's root allowlist (gate B).
+- **Adding an exception** requires the narrowest per-file rule (never a
+  directory wildcard) plus an explanation in the same PR. Ask: *would a fresh
+  clone's user, contributor, CI, build, test, release, or runtime materially
+  lose something if this file disappeared?* If no — it should not be tracked.
+
 ## Repository Configuration (maintainer)
 
 These GitHub settings make the quality gates binding. They require repository
@@ -108,13 +141,12 @@ admin access and cannot be done from a local clone.
 
 Until these are set, the gates are advisory rather than blocking.
 
-## Open-Source Release (v1.0.0)
+## Open-Source Release
 
-This repo is being prepared for public open-source release. See:
-
-- `governance spec` — release-form decisions
-- `governance spec` — tagging / release workflow
-- Issue templates: `.github/ISSUE_TEMPLATE/` (bug / feature / reproducibility / docs)
+Releases are tagged `v*` on `main` and published by the release workflow
+(`.github/workflows/release.yml`): changelog extraction, supply-chain evidence
+(SBOM + release checksums), and Docker images. Issue templates:
+`.github/ISSUE_TEMPLATE/` (bug / feature / reproducibility / docs).
 
 Install scripts (`scripts/install.sh` / `install.ps1`) and `far doctor` never read or
 write API keys (see `SECURITY.md` *Open-Source Install / Doctor Secret Boundary*).
