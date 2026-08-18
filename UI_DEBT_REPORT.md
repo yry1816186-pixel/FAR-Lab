@@ -7,6 +7,7 @@ Severity: P0 blocks correctness/trust; P1 materially harms core workflow/accessi
 
 | Severity | Surface | Debt observed | Resolution | Status |
 |---|---|---|---|---|
+| P1 | V2 Receipt | Production `/v2-receipt` fetched a built-in demo/reference receipt, blocked the whole workspace on that fixture request, and rendered fixture verification as first-class page content | Removed `useDemoReceipt` from the production page. Persisted receipts, shared `runId` lookup, uploaded-envelope verification, manifest/latest verification and re-verification are now the only production result paths. Tests explicitly assert that `/api/v2/receipts/demo` is never requested by the page | Resolved in source; complete current-main validation pending |
 | P1 | Audit Trace / API affordance | Audit Trace passed a hypothesis/claim ID directly to `/api/v1/evidence/chain/:headHash`, although that endpoint requires an actual chain-head hash; the UI therefore implied a provenance relation the backend did not expose | Split identifier routing by real capability: claim/hypothesis IDs only query verdict + lifecycle; only a 64-hex chain head queries evidence chain. The UI explicitly explains that no reliable hypothesis→headHash mapping exists and never guesses one | Resolved |
 | P1 | Audit Trace tests | Existing test asserted `/evidence/chain/hypo-1`, locking the incorrect capability mismatch in as expected behavior | Replaced that assertion with endpoint-boundary regression tests for claim IDs, real chain hashes, and honest empty results; no test was skipped or weakened | Resolved |
 | P1 | Global navigation | Route IA lived inside a 400+ line AppShell, making route labels/search/title consumers prone to drift | Extracted `navigation.ts` SSOT; AppShell and document-title mapping consume it | Resolved |
@@ -22,13 +23,24 @@ Severity: P0 blocks correctness/trust; P1 materially harms core workflow/accessi
 | P2 | Human-surface documentation | No repository-root inventory proving browser/CLI/export coverage | Added `HUMAN_SURFACE_INVENTORY.md` | Resolved |
 | P2 | Design system documentation | Tokens existed in code but no consolidated product-facing rules artifact | Added `DESIGN_SYSTEM.md` | Resolved |
 | P2 | Large components | Several domain-heavy pages/components remain 500–900+ lines (`IntegrityPage`, `AblationPage`, `ResearchWorkbenchPage`, `EvidenceTimeline`) | Cross-cutting IA/styles/state conventions were moved into shared primitives/SSOTs without mechanically fragmenting scientific logic. Further domain decomposition remains a maintainability opportunity, not a user-facing correctness blocker | Partially resolved |
-| P2 | Browser regression infrastructure | Repository has Testing Library/Vitest but no committed Playwright/Cypress runtime dependency | Delivery validation runs Chromium + axe-core ephemerally in GitHub Actions across all routes, themes, responsive widths, and keyboard paths. A persistent screenshot-diff framework is intentionally not added as a runtime dependency | Resolved for delivery; persistent visual diff remains optional |
+| P2 | Browser regression infrastructure | Repository has Testing Library/Vitest but no committed Playwright/Cypress runtime dependency | Delivery validation used Chromium + axe-core ephemerally across routes/themes/responsive widths/keyboard paths; temporary delivery workflows were removed after use rather than kept as product infrastructure | Delivery evidence exists; complete current-main rerun pending |
 | P3 | Generated report theme | HTML report intentionally renders as a printable light document rather than mirroring app dark mode | Explicit `color-scheme: light` and print-first behavior retained | Intentional |
 
 ## Fake UI audit
 
-The product is evaluated against a strict three-state rule: an affordance must be genuinely wired, explicitly unavailable with a reason, or removed. No new fake data, fake progress, inert navigation, unsupported mutation action, or fabricated evidence relation is introduced. The Audit Trace correction is the concrete example from this pass: the previous hypothesis-ID→chain-head implication was removed because the backend cannot prove that mapping.
+The product is evaluated against a strict three-state rule: an affordance must be genuinely wired, explicitly unavailable with a reason, or removed. No new fake data, fake progress, inert navigation, unsupported mutation action, or fabricated evidence relation is introduced.
+
+Two concrete corrections define the final truth boundary:
+
+1. Audit Trace no longer infers a hypothesis-ID → evidence-chain-head relation the backend cannot prove.
+2. V2 Receipt no longer uses the built-in demo/reference endpoint as production content, loading state, verification result, provenance evidence, or success signal.
+
+Reference fixtures and deterministic vectors remain legitimate in tests/offline validation tooling; they are not presented as formal production research results by the Web Receipt workspace.
 
 ## Scientific integrity guardrail
 
-No change was made to deterministic verdict rules, evidence hashing, proof verification, scientific gate semantics, security boundaries, authorization policy, or persistence success criteria. This refactor is confined to presentation, navigation, rendering, API-affordance correctness, terminal display behavior, accessibility, localization, and validation infrastructure.
+No change was made to deterministic verdict rules, evidence hashing, proof verification, scientific gate semantics, security boundaries, authorization policy, or persistence success criteria. This refactor is confined to presentation, navigation, rendering, API-affordance correctness, terminal display behavior, accessibility, localization, production/fixture separation, and validation infrastructure.
+
+## Remaining validation debt
+
+The last complete hosted matrix predates the final Receipt source closure and contained exactly one frontend test failure plus one root governance failure. Both underlying source defects have been corrected; the governance fix has a targeted 5/5 post-fix test pass. The complete current-main frontend/root/browser matrix has not been rerun, so this report does not mark overall validation as resolved. See `VALIDATION_REPORT.md` for exact evidence.
