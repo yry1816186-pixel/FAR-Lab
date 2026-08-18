@@ -1,6 +1,6 @@
 # FAR-Lab UI / Human Experience Debt Report
 
-Baseline: `main@1e2c8b3c7c8706292f890138e88948ab7dcb80a3`  
+Baseline: `main@a6647be68c8012246ffb57de8752649657a847f2`  
 Audit date: 2026-08-18
 
 Severity: P0 blocks correctness/trust; P1 materially harms core workflow/accessibility; P2 consistency/efficiency; P3 polish/maintenance.
