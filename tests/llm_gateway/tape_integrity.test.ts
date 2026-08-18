@@ -145,11 +145,33 @@ test('stage identifiers cannot escape the tape root', () => {
   }
 });
 
-test('recorded tape content addresses are immutable', () => {
+test('identical recording retries are idempotent', () => {
+  const root = mkdtempSync(join(tmpdir(), 'far-tape-integrity-'));
+  try {
+    const first = recordOne(root);
+    const retried = recordOne(root);
+    assert.equal(retried.path, first.path);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a different response cannot overwrite an existing content address', () => {
   const root = mkdtempSync(join(tmpdir(), 'far-tape-integrity-'));
   try {
     recordOne(root);
-    assert.throws(() => recordOne(root), TapeAlreadyExistsError);
+    assert.throws(
+      () =>
+        recordTapeCall(root, {
+          stageId: 'stage1_understanding',
+          profile: 'competition_aliyun_qwen',
+          request: { messages: [{ role: 'user', content: 'question' }] },
+          response: { content: 'different answer', providerRequestId: 'req-2' },
+          codeVersion: CODE_VERSION,
+          recordedAt: '2026-08-18T08:01:00.000Z',
+        }),
+      TapeAlreadyExistsError,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
