@@ -34,7 +34,6 @@
 //   reorder            → tests/platform/concurrency_consistency.test.ts（真链交换）
 //   duplicate          → 同上（campaign 双起防重——真原语；appendEvent 重复 payload
 //                        是合法重试记录非 duplicate）
-//   compensation-failure → tests/campaign/dag.test.ts（重试余量耗尽退出）
 
 export const CONSISTENCY_ENTITIES = [
   { entity: 'verdict', sot: 'db:verdict_nodes', writer: 'fec/kernel 经 recordVerdict（写清单在册）' },
