@@ -39,7 +39,7 @@ export interface ModuleBudget {
  * → checkComplexityLedger fail——扩预算必须在 git diff 里显式可见并带理由。
  */
 export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
-{ module: 'agent_loop', budgetFiles: 26 },
+  { module: 'agent_loop', budgetFiles: 26 },
   { module: 'anti_theater', budgetFiles: 35 },
   { module: 'api', budgetFiles: 34 },
   { module: 'architecture', budgetFiles: 1 },
@@ -55,6 +55,7 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'demo_seeds', budgetFiles: 32 },
   { module: 'discovery', budgetFiles: 23 },
   { module: 'evaluation', budgetFiles: 2 },
+  { module: 'evidence', budgetFiles: 2 },
   { module: 'evidence_log', budgetFiles: 10 },
   { module: 'evidence_quality', budgetFiles: 5 },
   { module: 'falsifiability', budgetFiles: 19 },
