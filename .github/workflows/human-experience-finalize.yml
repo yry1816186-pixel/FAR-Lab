@@ -1,0 +1,612 @@
+name: Human Experience Finalize
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/human-experience-finalize.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: human-experience-finalize
+  cancel-in-progress: false
+
+env:
+  PNPM_VERSION: '10.29.3'
+  NODE_VERSION: '24'
+  PYTHON_VERSION: '3.11'
+  NODE_COMPILE_CACHE: '/tmp/node-compile-cache'
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Remove fixture-led production UX and normalize CLI entry guidance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def segment(text: str, start: str, end: str, replacement: str) -> str:
+              a = text.index(start)
+              b = text.index(end, a)
+              return text[:a] + replacement + text[b:]
+
+          page_path = Path('frontend/src/pages/V2ReceiptPage.tsx')
+          page = page_path.read_text()
+          page = page.replace('  ShieldAlert,\n', '')
+          page = page.replace('  useDemoReceipt,\n', '')
+          page = page.replace(
+              'import type { V2DemoReceipt, V2StoredReceipt, V2AssuranceDimensionResult } from \'@/lib/types\';',
+              'import type { V2StoredReceipt, V2AssuranceDimensionResult } from \'@/lib/types\';',
+          )
+          page = segment(
+              page,
+              '// ---------- Dimension rendering order (demo section) ----------',
+              'const PAGE_SIZE = 20;',
+              '',
+          )
+          page = segment(
+              page,
+              '  // --- Reference receipt (built-in example verification) ---',
+              '  // --- Upload result state ---',
+              '',
+          )
+          page = segment(
+              page,
+              '  // --- Full page loading (reference receipt only; list loads independently) ---',
+              '  // --- Shared-link receipt section',
+              '',
+          )
+          page = segment(
+              page,
+              '  // --- Reference receipt section (non-blocking: error shows card but page still renders) ---',
+              '  // --- Upload verification result ---',
+              '',
+          )
+          page = page.replace(
+              '      {/* Reference Receipt Section */}\n      {demoSection}\n\n',
+              '',
+          )
+          page = segment(
+              page,
+              '      {/* Review Summary */}',
+              '    </div>\n  );',
+              '',
+          )
+          page = page.replace(
+              '// demo 端点与持久化端点收据形态不同(后端契约待统一项,见 SPRINT1-FRONTEND-REPORT.md):\n//   - V2DemoReceipt       : receiptId / verdictLabel / isFixtureOnly  (GET /receipts/demo)\n//   - V2StoredReceipt     : id / verdict / receiptStanding / ...      (GET /receipts 列表项)\n// 前端按应然契约消费(types.ts 为 SSOT),边界由 api_client.parseV2Response 做\n// { ok: true, data: T } 信封校验 + zod 运行时 parse(counter-case 2/3)。',
+              '// Production receipt surfaces consume persisted receipt contracts only.\n// API responses are decoded at the api_client boundary with the existing zod SSOT;\n// fixture/demo receipt endpoints are intentionally not part of the production page data flow.',
+          )
+          for forbidden in ('useDemoReceipt', 'demoQuery', 'demoSection', 'DIMENSION_ORDER'):
+              if forbidden in page:
+                  raise SystemExit(f'V2ReceiptPage still contains production fixture dependency: {forbidden}')
+          page_path.write_text(page)
+
+          test_path = Path('frontend/src/__tests__/V2ReceiptPage.test.tsx')
+          test = test_path.read_text()
+          first = "  it('渲染页面标题与保障范围(R-07: Honesty Boundary → Assurance Scope)'"
+          second = "  it('demo 段："
+          test = segment(
+              test,
+              first,
+              second,
+              """  it('渲染页面标题与保障范围，并且真实工作区不被 fixture 请求阻塞', async () => {
+    renderWithQueryClient(<V2ReceiptPage />);
+    expect(screen.getByText('V2 Receipt Verification')).toBeInTheDocument();
+    expect(screen.getByText('Assurance Scope')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Paste envelope JSON here…')).toBeInTheDocument();
+    expect(await screen.findByText('rcpt-1')).toBeInTheDocument();
+  });
+
+""",
+          )
+          test = segment(
+              test,
+              "  it('demo 段：",
+              "  it('收据列表：条目渲染 + 总数'",
+              """  it('正式页面不读取 legacy demo receipt endpoint，只渲染持久化收据', async () => {
+    renderWithQueryClient(<V2ReceiptPage />);
+    expect(await screen.findByText('rcpt-1')).toBeInTheDocument();
+    expect(screen.getByText('First claim')).toBeInTheDocument();
+    expect(screen.queryByText('rcpt-demo-001')).not.toBeInTheDocument();
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => input.toString());
+    expect(urls.some((url) => url.includes('/api/v2/receipts/demo'))).toBe(false);
+  });
+
+  it('上传 envelope 后渲染真实 verification payload 的六个保障维度', async () => {
+    renderWithQueryClient(<V2ReceiptPage />);
+    await screen.findByText('rcpt-1');
+    const textarea = screen.getByPlaceholderText('Paste envelope JSON here…') as HTMLTextAreaElement;
+    fireEvent.change(textarea, {
+      target: { value: JSON.stringify({ schemaVersion: 'far.envelope.v2', proofHash: 'a'.repeat(64) }) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify Envelope' }));
+    expect(await screen.findByText('vr-upload-1')).toBeInTheDocument();
+    for (const label of ['Provenance', 'Integrity', 'Identity', 'Process Conformance', 'Execution Reproduction', 'Scientific Verdict']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+  }, 15000);
+
+""",
+          )
+          test = segment(
+              test,
+              "  it('demo 错误：",
+              "  it('上传验证：ReceiptUploader",
+              """  it('legacy demo endpoint 即使不可用也不会影响正式收据工作区', async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.includes('/api/v2/receipts/demo')) {
+        return new Response('legacy fixture unavailable', { status: 500 });
+      }
+      if (url.includes('/api/v2/receipts?limit=')) {
+        return new Response(JSON.stringify({ ok: true, data: LIST_BODY }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response('', { status: 404 });
+    });
+    renderWithQueryClient(<V2ReceiptPage />);
+    expect(await screen.findByText('rcpt-1')).toBeInTheDocument();
+    expect(screen.getByText('Stored Receipts')).toBeInTheDocument();
+    expect(screen.getByText('Assurance Scope')).toBeInTheDocument();
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => input.toString());
+    expect(urls.some((url) => url.includes('/api/v2/receipts/demo'))).toBe(false);
+  });
+
+""",
+          )
+          test = test.replace("await screen.findByText('rcpt-demo-001');", "await screen.findByText('rcpt-1');")
+          test = test.replace("await screen.findByText('rcpt-demo-001'); // 等 demo 加载完成", "await screen.findByText('rcpt-1');")
+          test_path.write_text(test)
+
+          cli_path = Path('src/cli/far.ts')
+          cli = cli_path.read_text()
+          replacements = {
+              '+ `far demo`（一键演示）': '+ `far demo`（确定性离线自检；不代表生产研究结果）',
+              "description: 'one-shot demo (14 Golden Vectors + end-to-end demo claim; fully offline)'": "description: 'deterministic offline self-test (14 Golden Vectors + reference claim; never presented as a production research result)'",
+              "description: 'FAR-Bench demo profile'": "description: 'FAR-Bench deterministic evaluation profile'",
+              '  far demo [tess-offline]            one-shot demo (14 Golden Vectors + end-to-end demo claim;\n                                     fully offline, no credentials needed)': '  far demo [tess-offline]            deterministic offline self-test (14 Golden Vectors + reference claim;\n                                     never a production research result; no credentials needed)',
+              '  far demo                              see the deterministic kernel verify 14 golden vectors (no key)': '  far doctor [--full-verify]            check runtime, integrity prerequisites, and verification readiness',
+              '  far demo [tess-offline]               one-shot demo: 14 golden vectors + end-to-end demo claim (offline)': '  far demo [tess-offline]               deterministic self-test: golden vectors + offline reference claim; not a production result',
+              '  far bench run                         FAR-Bench demo profile': '  far bench run                         FAR-Bench deterministic evaluation profile',
+              '                        C-ASTRO-0001 online TESS dataset resolver wiring:\n': '                        C-ASTRO-0001 online TESS dataset resolver wiring:\n',
+              '                        fail-safe cached_fixture (baseline_exempt, DEGRADED_SCOPE). Single-seed demo (multi-seed is a V2 item).': '                        fail-safe cached_fixture (baseline_exempt, DEGRADED_SCOPE). Single-seed reference run (multi-seed is a V2 item).',
+          }
+          for old, new in replacements.items():
+              if old not in cli and old not in ('                        C-ASTRO-0001 online TESS dataset resolver wiring:\n',):
+                  raise SystemExit(f'CLI expected text not found: {old[:80]}')
+              cli = cli.replace(old, new)
+          cli_path.write_text(cli)
+
+          print('Applied production UX closure patches.')
+          PY
+          git diff --check
+          git diff -- frontend/src/pages/V2ReceiptPage.tsx frontend/src/__tests__/V2ReceiptPage.test.tsx src/cli/far.ts
+
+      - name: Install locked dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          (cd frontend && npm ci --legacy-peer-deps)
+          python -m pip install --upgrade pip
+          pip install -e .
+          mkdir -p /tmp/far-validation/logs /tmp/far-visual-qa/output
+          cd /tmp/far-visual-qa
+          npm init -y >/dev/null
+          npm install playwright@1.55.0 axe-core@4.10.2 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+
+      - name: Run complete command validation matrix
+        shell: bash
+        run: |
+          set +e
+          : > /tmp/far-validation/commands.tsv
+          failed=0
+          run_check() {
+            label="$1"
+            command="$2"
+            start=$(date +%s)
+            bash -lc "$command" >"/tmp/far-validation/logs/${label}.log" 2>&1
+            rc=$?
+            end=$(date +%s)
+            duration=$((end-start))
+            printf '%s\t%s\t%s\t%s\n' "$label" "$rc" "$duration" "$command" >> /tmp/far-validation/commands.tsv
+            echo "===== ${label} (exit ${rc}, ${duration}s) ====="
+            tail -n 80 "/tmp/far-validation/logs/${label}.log"
+            if [ "$rc" -ne 0 ]; then failed=1; fi
+          }
+          run_check diff_check 'git diff --check'
+          run_check build_check 'pnpm run build:check'
+          run_check frontend_vitest 'npm --prefix frontend run test'
+          run_check root_tests 'pnpm run test'
+          run_check python_tests 'pnpm run test:py'
+          run_check ux_gate_tests 'node --test tests/gates/*.test.ts tests/cli/*.test.ts'
+          run_check performance_budget 'pnpm run perf:budget'
+          run_check openapi_contract 'pnpm run openapi:check'
+          run_check supply_chain 'pnpm run check:supply-chain'
+          run_check cli_help 'node src/cli/far.ts --help'
+          run_check cli_no_color 'env NO_COLOR=1 node src/cli/far.ts --help'
+          run_check cli_research_help 'node src/cli/far.ts research --help'
+          run_check cli_verify_help 'node src/cli/far.ts verify --help'
+          run_check cli_export_help 'node src/cli/far.ts export --help'
+          echo "$failed" > /tmp/far-validation/command_failed
+          exit 0
+
+      - name: Record production bundle measurements
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import gzip, json
+          from pathlib import Path
+          root = Path('frontend/dist')
+          rows = []
+          for p in sorted(root.rglob('*')):
+              if p.is_file():
+                  data = p.read_bytes()
+                  rows.append({
+                      'path': p.as_posix(),
+                      'bytes': len(data),
+                      'gzipBytes': len(gzip.compress(data, compresslevel=9)),
+                  })
+          summary = {
+              'label': 'Lab Measurement — production Vite build artifacts',
+              'files': rows,
+              'totalBytes': sum(r['bytes'] for r in rows),
+              'totalGzipBytes': sum(r['gzipBytes'] for r in rows),
+              'jsBytes': sum(r['bytes'] for r in rows if r['path'].endswith('.js')),
+              'jsGzipBytes': sum(r['gzipBytes'] for r in rows if r['path'].endswith('.js')),
+              'cssBytes': sum(r['bytes'] for r in rows if r['path'].endswith('.css')),
+              'cssGzipBytes': sum(r['gzipBytes'] for r in rows if r['path'].endswith('.css')),
+          }
+          Path('/tmp/far-validation/bundle_metrics.json').write_text(json.dumps(summary, indent=2) + '\n')
+          print(json.dumps({k:v for k,v in summary.items() if k != 'files'}, indent=2))
+          PY
+
+      - name: Start application for browser QA
+        shell: bash
+        run: |
+          set +e
+          nohup pnpm run dev >/tmp/far-dev.log 2>&1 &
+          ok=0
+          for i in $(seq 1 90); do
+            if curl -fsS http://localhost:5173/ >/dev/null 2>&1; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" -eq 0 ]; then
+            cat /tmp/far-dev.log
+            echo 1 > /tmp/far-validation/browser_start_failed
+          else
+            echo 0 > /tmp/far-validation/browser_start_failed
+          fi
+          exit 0
+
+      - name: Run responsive, theme, i18n, keyboard and WCAG browser QA
+        shell: bash
+        working-directory: /tmp/far-visual-qa
+        run: |
+          set +e
+          if [ "$(cat /tmp/far-validation/browser_start_failed)" != "0" ]; then
+            echo 1 > /tmp/far-validation/browser_failed
+            exit 0
+          fi
+          cat > qa.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import { createRequire } from 'node:module';
+          import fs from 'node:fs';
+          const require = createRequire(import.meta.url);
+          const axePath = require.resolve('axe-core/axe.min.js');
+          const base = 'http://localhost:5173';
+          const out = '/tmp/far-visual-qa/output';
+          const routes = ['/research','/planning','/versions','/events','/report','/overview','/wizard','/v2-receipt','/viz','/integrity','/court','/arena','/leaderboard','/honesty','/ablation','/audit','/about'];
+          const keyRoutes = ['/research','/v2-receipt','/integrity','/audit','/report','/viz'];
+          const cases = routes.map((path) => ({ name:`desktop-light-${path.slice(1)}`, path, width:1440, height:900, theme:'light', locale:'en' }));
+          for (const path of keyRoutes) {
+            cases.push({ name:`desktop-dark-${path.slice(1)}`, path, width:1440, height:900, theme:'dark', locale:'en' });
+            cases.push({ name:`tablet-light-${path.slice(1)}`, path, width:820, height:1180, theme:'light', locale:'en' });
+            cases.push({ name:`tablet-dark-${path.slice(1)}`, path, width:820, height:1180, theme:'dark', locale:'zh' });
+            cases.push({ name:`mobile-light-${path.slice(1)}`, path, width:390, height:844, theme:'light', locale:'en' });
+            cases.push({ name:`mobile-dark-${path.slice(1)}`, path, width:390, height:844, theme:'dark', locale:'zh' });
+          }
+          for (const path of ['/research','/v2-receipt','/audit']) {
+            cases.push({ name:`narrow-320-${path.slice(1)}`, path, width:320, height:800, theme:'light', locale:'zh' });
+          }
+          cases.push({ name:'overview-wide', path:'/overview', width:1920, height:1080, theme:'light', locale:'en' });
+
+          const browser = await chromium.launch({ headless: true });
+          const results = [];
+          let failures = 0;
+          let violationGroups = 0;
+          for (const c of cases) {
+            const context = await browser.newContext({ viewport: { width:c.width, height:c.height } });
+            await context.addInitScript(({theme, locale}) => {
+              localStorage.setItem('far-chain-theme', theme);
+              localStorage.setItem('far-lang', locale);
+            }, {theme:c.theme, locale:c.locale});
+            const page = await context.newPage();
+            const started = Date.now();
+            const entry = { ...c, violations: [], errors: [] };
+            try {
+              await page.goto(base + c.path, { waitUntil:'domcontentloaded', timeout:30000 });
+              await page.locator('[data-testid="main-content"]').waitFor({ state:'attached', timeout:15000 });
+              await page.waitForTimeout(350);
+              const metrics = await page.evaluate(() => ({
+                viewportWidth: document.documentElement.clientWidth,
+                documentWidth: document.documentElement.scrollWidth,
+                htmlDark: document.documentElement.classList.contains('dark'),
+                lang: document.documentElement.lang,
+                title: document.title,
+                navigation: (() => {
+                  const n = performance.getEntriesByType('navigation')[0];
+                  return n ? { domContentLoaded: Math.round(n.domContentLoadedEventEnd), load: Math.round(n.loadEventEnd) } : null;
+                })(),
+              }));
+              Object.assign(entry, metrics);
+              if (await page.locator('main').count() !== 1) throw new Error('expected exactly one main landmark');
+              if (await page.locator('h1').count() < 1) throw new Error('missing h1');
+              if (metrics.documentWidth > metrics.viewportWidth + 1) throw new Error(`global overflow ${metrics.documentWidth}>${metrics.viewportWidth}`);
+              if ((c.theme === 'dark') !== metrics.htmlDark) throw new Error('theme mismatch');
+              if (metrics.lang !== c.locale) throw new Error(`locale mismatch ${metrics.lang} != ${c.locale}`);
+              await page.addScriptTag({ path: axePath });
+              const axe = await page.evaluate(async () => await globalThis.axe.run(document, {
+                runOnly: { type:'tag', values:['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa'] },
+              }));
+              entry.violations = axe.violations.map((v) => ({ id:v.id, impact:v.impact, help:v.help, nodes:v.nodes.length }));
+              violationGroups += entry.violations.length;
+              if (entry.violations.length > 0) failures += 1;
+              await page.screenshot({ path:`${out}/${c.name}.png`, fullPage:true });
+            } catch (error) {
+              failures += 1;
+              entry.errors.push(error instanceof Error ? error.message : String(error));
+            }
+            entry.elapsedMs = Date.now() - started;
+            results.push(entry);
+            await context.close();
+          }
+
+          async function interaction(name, fn) {
+            try {
+              const result = await fn();
+              results.push({ name, passed:true, ...result });
+            } catch (error) {
+              failures += 1;
+              results.push({ name, passed:false, error:error instanceof Error ? error.message : String(error) });
+            }
+          }
+
+          await interaction('command-center-keyboard', async () => {
+            const context = await browser.newContext({ viewport:{ width:1440, height:900 } });
+            const page = await context.newPage();
+            await page.goto(base + '/research', { waitUntil:'domcontentloaded' });
+            const trigger = page.getByTestId('command-center-trigger');
+            await trigger.waitFor({ state:'visible', timeout:15000 });
+            await page.keyboard.press('Control+K');
+            await page.getByRole('dialog').waitFor({ state:'visible', timeout:5000 });
+            const input = page.locator('#command-center-search');
+            if (!(await input.evaluate((el) => el === document.activeElement))) throw new Error('command center search did not receive focus');
+            await input.fill('integrity');
+            await page.keyboard.press('ArrowDown');
+            await page.keyboard.press('ArrowUp');
+            await page.keyboard.press('Enter');
+            await page.waitForURL('**/integrity', { timeout:5000 });
+            const finalUrl = page.url();
+            await context.close();
+            return { finalUrl };
+          });
+
+          await interaction('command-center-escape-focus-restore', async () => {
+            const context = await browser.newContext({ viewport:{ width:1440, height:900 } });
+            const page = await context.newPage();
+            await page.goto(base + '/research', { waitUntil:'domcontentloaded' });
+            const trigger = page.getByTestId('command-center-trigger');
+            await trigger.waitFor({ state:'visible', timeout:15000 });
+            await trigger.focus();
+            await trigger.press('Enter');
+            await page.getByRole('dialog').waitFor({ state:'visible' });
+            await page.keyboard.press('Escape');
+            if (!(await trigger.evaluate((el) => el === document.activeElement))) throw new Error('command center did not restore focus');
+            await context.close();
+            return {};
+          });
+
+          await interaction('mobile-menu-keyboard', async () => {
+            const context = await browser.newContext({ viewport:{ width:390, height:844 } });
+            const page = await context.newPage();
+            await page.goto(base + '/research', { waitUntil:'domcontentloaded' });
+            const toggle = page.getByTestId('mobile-menu-toggle');
+            await toggle.waitFor({ state:'visible', timeout:15000 });
+            await toggle.focus();
+            await toggle.press('Enter');
+            await page.getByTestId('mobile-nav').waitFor({ state:'visible' });
+            await page.keyboard.press('Escape');
+            if (!(await toggle.evaluate((el) => el === document.activeElement))) throw new Error('mobile navigation did not restore focus');
+            await context.close();
+            return {};
+          });
+
+          await browser.close();
+          fs.copyFileSync('/tmp/far-dev.log', `${out}/dev.log`);
+          fs.writeFileSync(`${out}/results.json`, JSON.stringify({ failures, violationGroups, caseCount:cases.length, results }, null, 2) + '\n');
+          console.log(JSON.stringify({ failures, violationGroups, caseCount:cases.length }, null, 2));
+          process.exit(failures === 0 && violationGroups === 0 ? 0 : 2);
+          EOF
+          node qa.mjs
+          rc=$?
+          echo "$rc" > /tmp/far-validation/browser_failed
+          exit 0
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: FAR-Lab-human-experience-final-validation
+          path: |
+            /tmp/far-validation
+            /tmp/far-visual-qa/output
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Require every validation surface to pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          command_failed=$(cat /tmp/far-validation/command_failed)
+          browser_failed=$(cat /tmp/far-validation/browser_failed)
+          if [ "$command_failed" != "0" ] || [ "$browser_failed" != "0" ]; then
+            echo "Final validation failed: command_failed=$command_failed browser_failed=$browser_failed" >&2
+            exit 1
+          fi
+
+      - name: Update final product documentation and remove temporary workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, re, subprocess
+
+          source_sha = subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()
+          rows = []
+          for line in Path('/tmp/far-validation/commands.tsv').read_text().splitlines():
+              label, rc, duration, command = line.split('\t', 3)
+              rows.append((label, int(rc), int(duration), command))
+          browser = json.loads(Path('/tmp/far-visual-qa/output/results.json').read_text())
+          bundle = json.loads(Path('/tmp/far-validation/bundle_metrics.json').read_text())
+
+          def extract_node_counts(path):
+              text = Path(path).read_text(errors='replace')
+              vals = {}
+              for key in ('tests','pass','fail','skipped'):
+                  m = re.search(rf'^# {key} (\d+)', text, re.M)
+                  if m: vals[key] = int(m.group(1))
+              return vals
+
+          root_counts = extract_node_counts('/tmp/far-validation/logs/root_tests.log')
+          gate_counts = extract_node_counts('/tmp/far-validation/logs/ux_gate_tests.log')
+          vitest = Path('/tmp/far-validation/logs/frontend_vitest.log').read_text(errors='replace')
+          vitest_files = re.search(r'Test Files\s+(\d+) passed', vitest)
+          vitest_tests = re.search(r'Tests\s+(\d+) passed', vitest)
+          py = Path('/tmp/far-validation/logs/python_tests.log').read_text(errors='replace')
+          py_count = re.search(r'(\d+) passed', py)
+          perf_tail = '\n'.join(Path('/tmp/far-validation/logs/performance_budget.log').read_text(errors='replace').splitlines()[-30:])
+
+          lines = [
+              '# FAR-Lab Final Validation Report', '',
+              f'Validation source commit: `{source_sha}`',
+              'Date: 2026-08-18',
+              '',
+              'This report records commands actually executed on the final Human Experience Layer source. PASS is written only for exit code 0.',
+              '', '## Command matrix', '',
+              '| Command | Result | Duration |', '|---|---:|---:|',
+          ]
+          for _, rc, duration, command in rows:
+              safe = command.replace('|','\\|')
+              lines.append(f'| `{safe}` | {"PASS" if rc == 0 else "FAIL"} (exit {rc}) | {duration}s |')
+          lines += ['', '## Relevant counts', '']
+          if vitest_files: lines.append(f'- Frontend Vitest: {vitest_files.group(1)} test files passed.')
+          if vitest_tests: lines.append(f'- Frontend Vitest: {vitest_tests.group(1)} tests passed.')
+          if root_counts: lines.append('- Root Node tests: ' + ', '.join(f'{k}={v}' for k,v in root_counts.items()) + '.')
+          if py_count: lines.append(f'- Python tests: {py_count.group(1)} passed.')
+          if gate_counts: lines.append('- Explicit UX/CLI gate tests: ' + ', '.join(f'{k}={v}' for k,v in gate_counts.items()) + '.')
+          lines += [
+              '', '## Browser QA', '',
+              f'- Chromium cases: {browser["caseCount"]} route/viewport/theme/locale cases plus 3 keyboard interaction flows.',
+              f'- WCAG-tagged axe violation groups: {browser["violationGroups"]}.',
+              f'- Browser QA failures: {browser["failures"]}.',
+              '- All 17 product routes were checked at 1440x900 light/en.',
+              '- Research, V2 Receipt, Integrity, Audit, Report, and Visualization were additionally checked at desktop dark, tablet light, tablet dark/zh, mobile light, and mobile dark/zh.',
+              '- Research, V2 Receipt, and Audit were also checked at 320px width; Overview was checked at 1920x1080.',
+              '- Keyboard checks covered Cmd/Ctrl+K open/search/arrow/enter, Escape focus restoration, and mobile drawer Escape focus restoration.',
+              '', '## Accessibility', '',
+              '- Automated baseline: axe-core WCAG 2 A/AA, 2.1 A/AA and 2.2 AA tags on every browser case.',
+              '- Structural gates: exactly one main landmark, at least one h1, html lang matches selected locale, no global horizontal overflow, and requested theme is actually applied.',
+              '- Accessibility result: PASS when the violation/failure counts above are zero; no exception list or suppressed axe rule is used.',
+              '', '## Performance', '',
+              '- Measurement class: Lab Measurement. No field Core Web Vitals are claimed.',
+              f'- Production build total: {bundle["totalBytes"]} bytes raw / {bundle["totalGzipBytes"]} bytes gzip.',
+              f'- JavaScript: {bundle["jsBytes"]} bytes raw / {bundle["jsGzipBytes"]} bytes gzip.',
+              f'- CSS: {bundle["cssBytes"]} bytes raw / {bundle["cssGzipBytes"]} bytes gzip.',
+              '- Existing `pnpm run perf:budget` gate passed. Tail of its real output:', '', '```text', perf_tail, '```',
+              '', '## Known failures', '',
+              '- None in this final validation run. Earlier 2026-08-18 failures are superseded by this report rather than relabeled as passes.',
+          ]
+          Path('VALIDATION_REPORT.md').write_text('\n'.join(lines) + '\n')
+
+          appendices = {
+              'UI_DEBT_REPORT.md': '''\n## 2026-08-18 production closure\n\n- **Resolved — fixture-led Receipt UI:** `/v2-receipt` no longer calls or renders the built-in demo/reference receipt. Real persisted receipts, shared run receipts, uploaded envelopes, real verification responses, and explicit unavailable/error states are the only production data paths.\n- **Resolved — fixture query blocking:** the production Receipt workspace no longer early-returns on a demo endpoint request; uploader/list/shared receipt capabilities remain usable independently.\n- **Resolved — validation truth:** the stale failed validation report was replaced only after a fresh full command matrix plus browser/axe run passed.\n- **Resolved — temporary delivery infrastructure:** the two `ux-refactor-*` workflows and the one-shot finalizer are removed in the final commit.\n''',
+              'HUMAN_SURFACE_INVENTORY.md': '''\n## 2026-08-18 final surface closure\n\nThe inventory was revalidated against the final route SSOT and CLI registry. `/v2-receipt` is a production Receipt/Verification workspace backed only by persisted receipt APIs, shared run IDs, uploaded envelopes, and returned verification payloads; the legacy fixture endpoint is not consumed by that page. The CLI `far demo` command remains only as an explicitly labeled deterministic offline self-test and is not a recommended production workflow. No desktop wrapper exists, so none was invented.\n''',
+              'DESIGN_SYSTEM.md': '''\n## Production-surface truth rule\n\nDesign primitives must never upgrade scientific state. `unknown`, `unavailable`, `partial`, `failed`, and `inconclusive` retain distinct semantic text/icons and cannot be collapsed to success by color. Fixtures and reference vectors may exist in tests or explicit deterministic self-test tooling, but production Web surfaces must not use them as data sources, loading gates, progress, provenance, or success evidence. Responsive and theme acceptance is validated at the shell/document level for overflow, landmarks, locale, focus flows, and WCAG-tagged axe checks.\n''',
+              'REFACTOR_MANIFEST.md': '''\n## Final production closure — 2026-08-18\n\n- Removed the built-in V2 demo/reference receipt from the production Receipt data flow and its page-level loading dependency.\n- Preserved and strengthened real Receipt workflows: shared run deep-link lookup, persisted receipt list/pagination, envelope verification, six-dimension verification results, manifest details, and re-verification.\n- Reworked the same Receipt tests rather than deleting them: they now assert that the production page does not request the legacy demo endpoint and verify the six dimensions from the real verification response path.\n- Reframed CLI `far demo` as an optional deterministic offline self-test and moved runtime readiness (`far doctor`) to the first getting-started action; research/ground remain the production workflow.\n- Re-ran build/typecheck/lint, frontend/root/Python tests, contracts, performance budget, supply-chain gate, CLI help/NO_COLOR, and Chromium+axe responsive/theme/i18n/keyboard QA.\n- Removed all temporary UX delivery workflows after successful validation.\n''',
+          }
+          for name, appendix in appendices.items():
+              p = Path(name)
+              text = p.read_text() if p.exists() else f'# {name}\n'
+              marker = appendix.strip().splitlines()[0]
+              if marker not in text:
+                  p.write_text(text.rstrip() + '\n' + appendix)
+
+          for wf in [
+              Path('.github/workflows/ux-refactor-source-export.yml'),
+              Path('.github/workflows/ux-refactor-visual-qa.yml'),
+              Path('.github/workflows/human-experience-finalize.yml'),
+          ]:
+              if wf.exists(): wf.unlink()
+
+          tracked = subprocess.check_output(['git','ls-files'], text=True).splitlines()
+          live = sorted(path for path in tracked if Path(path).exists() and path != 'PROJECT_FILE_MANIFEST.txt')
+          live.append('PROJECT_FILE_MANIFEST.txt')
+          Path('PROJECT_FILE_MANIFEST.txt').write_text('\n'.join(sorted(live)) + '\n')
+          PY
+          git diff --check
+          if grep -RniE '(text|bg|border|ring)-(red|green|amber|yellow|blue|gray|slate)-[0-9]+' frontend/src --include='*.tsx' --exclude='*.test.tsx'; then
+            echo 'Direct palette utility remains in production TSX.' >&2
+            exit 1
+          fi
+          if grep -nE 'useDemoReceipt|demoQuery|demoSection' frontend/src/pages/V2ReceiptPage.tsx; then
+            echo 'Fixture-led production receipt dependency remains.' >&2
+            exit 1
+          fi
+
+      - name: Commit validated product to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git status --short
+          git commit -m 'refactor(hx): close production human experience layer'
+          git push origin HEAD:main
