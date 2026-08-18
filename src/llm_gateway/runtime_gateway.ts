@@ -1,37 +1,33 @@
 // src/llm_gateway/runtime_gateway.ts
-// 运行期 LLM 网关解析（WS-A.1 让真实推理可达——API server 路径闭合）。
+// Runtime LLM context resolution for the HTTP server.
 //
-// 背景：CLI 命令（far ask/arena/court）已支持 --profile competition_aliyun_qwen + 凭据门，
-// 但 `far api`（REST server）从不构造真实网关——POST /hypothesize 即使用户设了
-// FAR_DASHSCOPE_API_KEY 也跑 offline_replay（「Entire system dead in production」在 API 面依旧成立）。
-//
-// 模型中立红线（24§0.1）：src/api/ 禁 Qwen/DashScope 字面量。本文件位于 llm_gateway/
-// （C10 纪律：模型字面量允许在 adapter/gateway 层）——api.ts/server.ts 只 import
-// resolveRuntimeGateway 抽象，无任何模型字面量泄漏。
-//
-// 诚实边界：key 不存在时返回 null（调用方走 offline_replay 确定性 fixture），绝不假装 live。
+// The API layer imports only the model-neutral exported context constants. Model
+// names and provider-specific environment variables remain inside llm_gateway/.
+// No-key environments return null: LLM-dependent endpoints must fail closed and
+// must never substitute an offline fixture.
 
 import type { LlmGateway } from './gateway.ts';
 import { createCompetitionQwenGateway } from './competition_gateway.ts';
+import { COMPETITION_MODEL_SNAPSHOT } from './adapters/aliyun_qwen/snapshot.ts';
 
-/** 运行期环境（显式传入·禁 process.env 直读·可测）。 */
+/** Runtime environment (explicitly supplied for deterministic tests). */
 export type RuntimeEnv = Readonly<Record<string, string | undefined>>;
 
-/**
- * 本工厂构造的 provider profile 名（WS-A.1）。
- * 暴露给 src/api/（模型中立区）import 使用——避免 server.ts 直接写模型字面量（24§0.1）。
- */
+/** Provider profile created by the built-in runtime resolver. */
 export const RUNTIME_PROVIDER_PROFILE = 'competition_aliyun_qwen' as const;
 
-/** 支持的 API key 环境变量名（按优先级）。 */
+/** Immutable model snapshot paired with the built-in runtime profile. */
+export const RUNTIME_MODEL_SNAPSHOT = COMPETITION_MODEL_SNAPSHOT;
+
+/** Supported API-key environment variables, in priority order. */
 const API_KEY_ENV_NAMES = ['FAR_DASHSCOPE_API_KEY', 'DASHSCOPE_API_KEY'] as const;
 
 /**
- * 从运行期环境解析 LLM 网关：
- *   - 任一 API key env 存在且非空 → competition_aliyun_qwen 网关（真实 HTTP·计费）
- *   - 否则 → null（调用方降级 offline_replay·确定性 fixture）
+ * Resolve the built-in live gateway.
  *
- * fail-conservative：key 为空串视为缺失（不构造会 401 的网关）。
+ * - a non-empty key creates the real competition gateway;
+ * - no key returns null;
+ * - no replay or synthetic fallback is constructed here.
  */
 export function resolveRuntimeGateway(env: RuntimeEnv): LlmGateway | null {
   const apiKey = API_KEY_ENV_NAMES.map((name) => env[name]).find(

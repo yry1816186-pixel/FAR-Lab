@@ -1,22 +1,18 @@
 // src/api/internal/arena_service.ts
-// 对抗科学竞技场核心服务（CLI far arena + API /arena 共用）。
+// Adversarial scientific arena shared by CLI and API.
 //
-// 一个 hypothesis 由确定性内核裁决（原始 verdict），N 个 refuter 各自尝试反驳，
-// deterministic arbiter（detectRefuterAttack）判定每个 refuter 是否「着陆」（verdict 与原始分歧 = 有效攻击）。
-// 诚实边界：offline_replay 下 refuter 回放同一套 fixture，verdict 必然与原始相同 → 无有效攻击
-// （展示「稳健」是 fixture 一致的结果，非真实抗攻击）。真实对抗须注入真实 gateway
-// （凭据门 + G3 环境锚·2026-08-06 闭合）——options.gateway/modelSnapshot 提供时走真实 provider。
-// 红线：refuter 的 verdict 仍由 R0-R9 确定性内核给出（LLM 非裁决者）；arbiter 是确定性规则，非 LLM 仲裁。
+// Every run requires an explicitly configured live model gateway, provider
+// profile, and model snapshot. There is no offline fixture fallback. The
+// deterministic arbiter compares kernel verdicts and never claims robustness
+// when a required execution failed.
 
 import { ulid } from 'ulid';
 
-import { createLlmGateway } from '../../llm_gateway/gateway.ts';
-import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { openFarDb } from '../../db/open.ts';
 import { executeAskRun } from './ask_runner.ts';
 import type { LlmGateway } from '../../llm_gateway/gateway.ts';
+import type { ProviderProfile } from '../../llm_gateway/types.ts';
 
-/** 单次反驳尝试。 */
 export interface RefuteAttempt {
   readonly refuter: string;
   readonly verdict: string | null;
@@ -24,58 +20,54 @@ export interface RefuteAttempt {
   readonly error: string | null;
 }
 
-/**
- * 竞技场会话选项（2026-08-06·G3 闭合后真实对抗接线）。
- *
- * 缺省（全 undefined）→ offline_replay fixture 回放（零凭据·展示框架）。
- * gateway+modelSnapshot 提供 → 真实 provider 对抗（凭据门由 CLI/API 调用方执行·
- * 环境锚由 loop_runner 按 modelSnapshot 自动构造·repro_anchor.ts）。
- */
 export interface ArenaSessionOptions {
-  /** 真实 provider 网关（由调用方凭据门后构造·CLI 层注入·本文件禁模型字面量）。 */
-  readonly gateway?: LlmGateway;
-  /** 模型快照（G3 环境锚分量·competition 必需·snapshot.ts 常量）。 */
-  readonly modelSnapshot?: string;
-  /** 真实 provider profile 名（executeLoop profile 路由·如 'competition_aliyun_qwen'·CLI 层注入）。 */
-  readonly providerProfile?: string;
-  /** 真实 provider 标签（honestNote 展示·如 'competition_aliyun_qwen'）。 */
+  readonly gateway: LlmGateway;
+  readonly modelSnapshot: string;
+  readonly providerProfile: ProviderProfile;
   readonly providerLabel?: string;
 }
 
-/** 竞技场会话结果。 */
 export interface ArenaResult {
   readonly arenaId: string;
   readonly hypothesis: string;
   readonly originalVerdict: string | null;
   readonly originalRule: string | null;
+  readonly originalError: string | null;
   readonly attempts: readonly RefuteAttempt[];
   readonly landedCount: number;
   readonly robust: boolean;
+  readonly assessment: 'ROBUST' | 'BREACHED' | 'INCONCLUSIVE';
   readonly honestNote: string;
-  /** IC-11:数据来源标注(replay=fixture 回放·real=真实 provider;前端只呈现不推断) */
-  readonly datasetSource: 'replay' | 'real';
+  readonly datasetSource: 'real';
 }
 
-/**
- * deterministic arbiter：refuter verdict 与原始分歧 → 有效攻击（landed）。
- * 任一为 null（无裁决/错误）→ fail-safe 不算 landed（禁误判攻击成功）。
- */
-export function detectRefuterAttack(originalVerdict: string | null, refuterVerdict: string | null): boolean {
+export function detectRefuterAttack(
+  originalVerdict: string | null,
+  refuterVerdict: string | null,
+): boolean {
   return originalVerdict !== null && refuterVerdict !== null && refuterVerdict !== originalVerdict;
+}
+
+function assertSessionOptions(options: ArenaSessionOptions): void {
+  const profile = String(options.providerProfile).trim();
+  if (options.modelSnapshot.trim().length === 0) {
+    throw new Error('arena: modelSnapshot must be non-empty');
+  }
+  if (profile.length === 0) {
+    throw new Error('arena: providerProfile must be non-empty');
+  }
+  if (profile === 'offline_replay') {
+    throw new Error('arena: offline_replay is test-only and cannot produce a served assessment');
+  }
 }
 
 async function runOne(
   question: string,
-  modelId: string,
   gitCommitSha: string,
-  gateway?: LlmGateway,
-  modelSnapshot?: string,
-  providerProfile?: string,
+  options: ArenaSessionOptions,
 ): Promise<{ verdict: string | null; rule: string | null; error: string | null }> {
   const db = openFarDb(':memory:');
   try {
-    const resolvedGateway =
-      gateway ?? createLlmGateway([createOfflineReplayAdapter({ modelId })]);
     const result = await executeAskRun(
       db,
       question,
@@ -83,79 +75,85 @@ async function runOne(
       gitCommitSha,
       undefined,
       undefined,
-      resolvedGateway,
+      options.gateway,
       undefined,
       undefined,
-      modelSnapshot,
-      // 模型中立红线（24§0.1）：本文件禁 Qwen 字面量——providerProfile 由 CLI 调用方经
-      // options 注入；缺省 offline_replay（fixture 回放）。
-      gateway === undefined ? 'offline_replay' : providerProfile,
+      options.modelSnapshot,
+      options.providerProfile,
     );
-    const vn = result.loopState.verdictNode;
+    const node = result.loopState.verdictNode;
     return {
-      verdict: vn === null ? null : vn.verdict,
-      rule: vn === null ? null : vn.verdictTrace.decisiveRuleId,
+      verdict: node === null ? null : node.verdict,
+      rule: node === null ? null : node.verdictTrace.decisiveRuleId,
       error: result.loopState.error === null ? null : result.loopState.error.message,
     };
-  } catch (err) {
-    return { verdict: null, rule: null, error: err instanceof Error ? err.message : String(err) };
+  } catch (error: unknown) {
+    return {
+      verdict: null,
+      rule: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
   } finally {
     db.close();
   }
 }
 
-/**
- * 运行对抗竞技场会话：proponent 裁决原始 verdict + N refuter 反驳 + arbiter 判定着陆。
- *
- * @param hypothesis 待检验的科学假设。
- * @param refuters refuter 标签列表。
- * @param gitCommitSha 链头锚定 commit sha。
- * @param options 真实 provider 选项（2026-08-06·缺省 offline_replay 回放）。
- */
 export async function runArenaSession(
   hypothesis: string,
   refuters: readonly string[],
   gitCommitSha: string,
-  options: ArenaSessionOptions = {},
+  options: ArenaSessionOptions,
 ): Promise<ArenaResult> {
-  const orig = await runOne(
-    hypothesis,
-    'arena-proponent',
-    gitCommitSha,
-    options.gateway,
-    options.modelSnapshot,
-    options.providerProfile,
-  );
-  const originalVerdict = orig.verdict;
+  if (hypothesis.trim().length === 0) {
+    throw new Error('arena: hypothesis must be non-empty');
+  }
+  if (refuters.length === 0 || refuters.some((refuter) => refuter.trim().length === 0)) {
+    throw new Error('arena: at least one non-empty refuter is required');
+  }
+  assertSessionOptions(options);
 
+  const original = await runOne(hypothesis, gitCommitSha, options);
   const attempts: RefuteAttempt[] = [];
   for (const refuter of refuters) {
-    const r = await runOne(
-      `${hypothesis} [refute: ${refuter}]`,
-      `arena-refuter-${refuter}`,
+    const result = await runOne(
+      `${hypothesis} [adversarial review objective: ${refuter}]`,
       gitCommitSha,
-      options.gateway,
-      options.modelSnapshot,
-      options.providerProfile,
+      options,
     );
-    const attackLanded = detectRefuterAttack(originalVerdict, r.verdict);
-    attempts.push({ refuter, verdict: r.verdict, attackLanded, error: r.error });
+    attempts.push({
+      refuter,
+      verdict: result.verdict,
+      attackLanded: detectRefuterAttack(original.verdict, result.verdict),
+      error: result.error,
+    });
   }
 
-  const landedCount = attempts.filter((a) => a.attackLanded).length;
+  const landedCount = attempts.filter((attempt) => attempt.attackLanded).length;
+  const complete =
+    original.error === null &&
+    original.verdict !== null &&
+    attempts.every((attempt) => attempt.error === null && attempt.verdict !== null);
+  const assessment: ArenaResult['assessment'] = !complete
+    ? 'INCONCLUSIVE'
+    : landedCount > 0
+      ? 'BREACHED'
+      : 'ROBUST';
 
   return {
     arenaId: ulid(),
     hypothesis,
-    originalVerdict,
-    originalRule: orig.rule,
+    originalVerdict: original.verdict,
+    originalRule: original.rule,
+    originalError: original.error,
     attempts,
     landedCount,
-    robust: landedCount === 0,
-    datasetSource: options.gateway === undefined ? 'replay' : 'real',
+    robust: assessment === 'ROBUST',
+    assessment,
+    datasetSource: 'real',
     honestNote:
-      options.gateway === undefined
-        ? 'under offline_replay the refuter replays the same fixture, so its verdict necessarily matches the original => no effective attacks; real adversarial testing requires a real provider (credential gate)'
-        : `real provider adversarial arena (${options.providerLabel ?? 'real gateway'}) — refuter verdicts are computed by the deterministic R0-R9 kernel over real LLM evidence (credential-gated, billing applies)`,
+      assessment === 'INCONCLUSIVE'
+        ? 'The adversarial assessment is INCONCLUSIVE because at least one required live execution or kernel verdict failed. Missing results are not counted as defenses.'
+        : `Live provider adversarial session (${options.providerLabel ?? String(options.providerProfile)}). ` +
+          'ROBUST means only that none of the configured adversarial objectives changed the deterministic kernel verdict in this session; it is not universal robustness or scientific truth.',
   };
 }
