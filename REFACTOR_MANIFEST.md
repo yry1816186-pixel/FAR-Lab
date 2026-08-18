@@ -6,7 +6,8 @@
 - Original target branch: `main`
 - Original synchronized commit: `1e2c8b3c7c8706292f890138e88948ab7dcb80a3`
 - Work branch: `ux-refactor/2026-08-18`
-- Final commit: _populated after final validation commit_
+- Implementation commit: `b1c7ee95850ea3c43161c1e4d38810393bc9b5dd`
+- Final packaging/validation commit: _populated after final validation cleanup_
 
 ## Architectural changes
 
