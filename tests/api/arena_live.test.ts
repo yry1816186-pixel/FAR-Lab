@@ -1,13 +1,13 @@
-// tests/api/arena_live.test.ts
-// WS-A.3 契约测试：POST /arena（live）端点。无真实 DashScope HTTP。
-
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+
 import { runMigrations } from '../../src/db/index.ts';
 import { buildServer } from '../../src/api/server.ts';
-import { createLlmGateway } from '../../src/llm_gateway/gateway.ts';
-import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offline_replay/client.ts';
+import {
+  createLiveFixtureGateway,
+  TEST_MODEL_SNAPSHOT,
+} from './live_fixture_gateway.ts';
 
 function makeDb(): Database.Database {
   const db = new Database(':memory:');
@@ -16,39 +16,84 @@ function makeDb(): Database.Database {
   return db;
 }
 
-function buildTestGateway() {
-  return createLlmGateway([createOfflineReplayAdapter({ modelId: 'arena-test-model' })]);
-}
-
 const VALID_BODY = {
   hypothesis: 'Does model A achieve mean accuracy >= 0.72 on benchmark Z?',
   refuters: ['scope-launderer', 'post-hoc-threshold'],
 };
 
-test('POST /arena: 无 gateway → 503 fail-closed（绝不静默回放 fixture）', async () => {
-  const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, logger: false });
+test('POST /arena without a gateway returns REQUIRES_CONFIGURATION', async () => {
+  const app = await buildServer({
+    db: makeDb(),
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    logger: false,
+  });
   try {
-    const res = await app.inject({ method: 'POST', url: '/api/v1/arena', payload: VALID_BODY });
-    assert.equal(res.statusCode, 503);
-    const body = JSON.parse(res.body);
+    const response = await app.inject({ method: 'POST', url: '/api/v1/arena', payload: VALID_BODY });
+    assert.equal(response.statusCode, 503);
+    const body = JSON.parse(response.body);
     assert.equal(body.error_code ?? body.code, 'arena_live_profile_unavailable');
-  } finally { await app.close(); }
+    assert.equal(body.detail?.status, 'REQUIRES_CONFIGURATION');
+  } finally {
+    await app.close();
+  }
 });
 
-test('POST /arena: 注入 gateway → datasetSource=real', async () => {
-  const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, gateway: buildTestGateway(), profile: 'competition_aliyun_qwen', logger: false });
+test('POST /arena requires the immutable model snapshot as part of the live context', async () => {
+  const app = await buildServer({
+    db: makeDb(),
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    gateway: createLiveFixtureGateway('arena-model'),
+    profile: 'competition_aliyun_qwen',
+    logger: false,
+  });
   try {
-    const res = await app.inject({ method: 'POST', url: '/api/v1/arena', payload: VALID_BODY });
-    assert.equal(res.statusCode, 200);
-    assert.equal(JSON.parse(res.body).data.datasetSource, 'real');
-  } finally { await app.close(); }
+    const response = await app.inject({ method: 'POST', url: '/api/v1/arena', payload: VALID_BODY });
+    assert.equal(response.statusCode, 503);
+    assert.match(response.body, /modelSnapshot/);
+  } finally {
+    await app.close();
+  }
 });
 
-test('POST /arena: 无 hypothesis → 400', async () => {
-  const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, logger: false });
+test('POST /arena with a complete execution context returns a real-source assessment', async () => {
+  const app = await buildServer({
+    db: makeDb(),
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    gateway: createLiveFixtureGateway('arena-model'),
+    profile: 'competition_aliyun_qwen',
+    modelSnapshot: TEST_MODEL_SNAPSHOT,
+    logger: false,
+  });
   try {
-    const res = await app.inject({ method: 'POST', url: '/api/v1/arena', payload: { hypothesis: '', refuters: ['x'] } });
-    assert.equal(res.statusCode, 400);
-    assert.equal(JSON.parse(res.body).error_code, 'VALIDATION_FAILED');
-  } finally { await app.close(); }
+    const response = await app.inject({ method: 'POST', url: '/api/v1/arena', payload: VALID_BODY });
+    assert.equal(response.statusCode, 200);
+    const data = JSON.parse(response.body).data;
+    assert.equal(data.datasetSource, 'real');
+    assert.ok(data.assessment === 'ROBUST' || data.assessment === 'BREACHED');
+  } finally {
+    await app.close();
+  }
+});
+
+test('POST /arena rejects an empty hypothesis', async () => {
+  const app = await buildServer({
+    db: makeDb(),
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    logger: false,
+  });
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/arena',
+      payload: { hypothesis: '', refuters: ['x'] },
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(JSON.parse(response.body).error_code, 'VALIDATION_FAILED');
+  } finally {
+    await app.close();
+  }
 });

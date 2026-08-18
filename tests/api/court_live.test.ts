@@ -1,13 +1,14 @@
-// tests/api/court_live.test.ts
-// WS-A.2 契约测试：POST /court（live）端点。无真实 DashScope HTTP。
-
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+
 import { runMigrations } from '../../src/db/index.ts';
 import { buildServer } from '../../src/api/server.ts';
-import { createLlmGateway } from '../../src/llm_gateway/gateway.ts';
-import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offline_replay/client.ts';
+import type { CourtModelTarget } from '../../src/api/internal/court_service.ts';
+import {
+  createLiveFixtureGateway,
+  TEST_MODEL_SNAPSHOT,
+} from './live_fixture_gateway.ts';
 
 function makeDb(): Database.Database {
   const db = new Database(':memory:');
@@ -16,47 +17,104 @@ function makeDb(): Database.Database {
   return db;
 }
 
-function buildTestGateway() {
-  return createLlmGateway([createOfflineReplayAdapter({ modelId: 'court-test-model' })]);
+function target(id: string, independenceKey: string): CourtModelTarget {
+  return {
+    id,
+    gateway: createLiveFixtureGateway(id),
+    providerProfile: 'competition_aliyun_qwen',
+    modelSnapshot: TEST_MODEL_SNAPSHOT,
+    allowedModelIds: [id],
+    independenceKey,
+  };
 }
 
 const VALID_BODY = {
   claim: 'Does model A achieve mean accuracy >= 0.72 on benchmark Z?',
-  models: ['alpha', 'beta'],
+  models: ['model-a', 'model-b'],
 };
 
-test('POST /court: 无 gateway → 503 fail-closed（绝不静默回放 fixture）', async () => {
-  const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, logger: false });
+test('POST /court without an independent target catalog returns NOT_SUPPORTED', async () => {
+  const app = await buildServer({
+    db: makeDb(),
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    logger: false,
+  });
   try {
-    const res = await app.inject({ method: 'POST', url: '/api/v1/court', payload: VALID_BODY });
-    assert.equal(res.statusCode, 503);
-    const body = JSON.parse(res.body);
-    assert.equal(body.error_code ?? body.code, 'court_live_profile_unavailable');
-  } finally { await app.close(); }
+    const response = await app.inject({ method: 'POST', url: '/api/v1/court', payload: VALID_BODY });
+    assert.equal(response.statusCode, 501);
+    const body = JSON.parse(response.body);
+    assert.equal(body.error_code, 'NOT_SUPPORTED');
+    assert.equal(body.detail?.status, 'NOT_SUPPORTED');
+  } finally {
+    await app.close();
+  }
 });
 
-test('POST /court: 注入 gateway → datasetSource=real（透传生效）', async () => {
-  const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, gateway: buildTestGateway(), profile: 'competition_aliyun_qwen', logger: false });
+test('POST /court with two independent targets returns a real-source certificate', async () => {
+  const app = await buildServer({
+    db: makeDb(),
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    courtModelTargets: [
+      target('model-a', 'provider-account-a'),
+      target('model-b', 'provider-account-b'),
+    ],
+    logger: false,
+  });
   try {
-    const res = await app.inject({ method: 'POST', url: '/api/v1/court', payload: VALID_BODY });
-    assert.equal(res.statusCode, 200);
-    assert.equal(JSON.parse(res.body).data.datasetSource, 'real');
-  } finally { await app.close(); }
+    const response = await app.inject({ method: 'POST', url: '/api/v1/court', payload: VALID_BODY });
+    assert.equal(response.statusCode, 200);
+    const data = JSON.parse(response.body).data;
+    assert.equal(data.datasetSource, 'real');
+    assert.equal(data.modelCount, 2);
+    assert.equal(data.agreement, 'unanimous');
+  } finally {
+    await app.close();
+  }
 });
 
-test('POST /court: 无 claim → 400 VALIDATION_FAILED', async () => {
-  const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, logger: false });
+test('POST /court rejects a missing claim', async () => {
+  const app = await buildServer({
+    db: makeDb(),
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    logger: false,
+  });
   try {
-    const res = await app.inject({ method: 'POST', url: '/api/v1/court', payload: { claim: '', models: ['alpha'] } });
-    assert.equal(res.statusCode, 400);
-    assert.equal(JSON.parse(res.body).error_code, 'VALIDATION_FAILED');
-  } finally { await app.close(); }
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/court',
+      payload: { claim: '', models: ['model-a', 'model-b'] },
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(JSON.parse(response.body).error_code, 'VALIDATION_FAILED');
+  } finally {
+    await app.close();
+  }
 });
 
-test('POST /court: models 超过 6 个 → 400', async () => {
-  const app = await buildServer({ db: makeDb(), gitCommitSha: 'a'.repeat(40), jwtSecret: null, logger: false });
+test('POST /court requires two to six model targets', async () => {
+  const app = await buildServer({
+    db: makeDb(),
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    logger: false,
+  });
   try {
-    const res = await app.inject({ method: 'POST', url: '/api/v1/court', payload: { claim: 'test', models: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] } });
-    assert.equal(res.statusCode, 400);
-  } finally { await app.close(); }
+    const tooFew = await app.inject({
+      method: 'POST',
+      url: '/api/v1/court',
+      payload: { claim: 'test', models: ['a'] },
+    });
+    const tooMany = await app.inject({
+      method: 'POST',
+      url: '/api/v1/court',
+      payload: { claim: 'test', models: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] },
+    });
+    assert.equal(tooFew.statusCode, 400);
+    assert.equal(tooMany.statusCode, 400);
+  } finally {
+    await app.close();
+  }
 });

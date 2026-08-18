@@ -1,89 +1,200 @@
 // src/api/internal/court_service.ts
-// 跨模型可靠性法庭核心服务（CLI far court + API /court 共用）。
+// Cross-model reliability court shared by API integrations.
 //
-// 同一 claim 跑多个模型（每个独立 modelId 的 offline_replay adapter），收集各自的机器裁决，
-// 结构化检测一致/分歧，颁发 ReliabilityCertificate。
-// 诚实边界：offline_replay 下所有模型回放同一套 fixture（按 stageId），verdict 必然相同——
-// 展示的是「多模型法庭框架 + 一致性检测」，真实模型分歧须接真实 provider（凭据门 +
-// G3 环境锚·2026-08-06 闭合）——options.gateway/modelSnapshot 提供时走真实 provider。
-// 红线：LLM 不作裁决者——每个模型的 verdict 仍由 R0-R9 确定性内核给出（fixture 只驱动 stage 文本）。
+// A court session is valid only when every requested model resolves to an
+// explicitly configured live execution target and the selected targets declare
+// distinct independence keys. Re-running one gateway under different labels is
+// not cross-model evidence and is rejected before execution.
 
 import { ulid } from 'ulid';
 
-import { createLlmGateway } from '../../llm_gateway/gateway.ts';
-import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { openFarDb } from '../../db/open.ts';
 import { executeAskRun } from './ask_runner.ts';
 import type { LlmGateway } from '../../llm_gateway/gateway.ts';
+import type { ProviderProfile } from '../../llm_gateway/types.ts';
 
-/** 单模型裁决条目。 */
+export interface CourtModelTarget {
+  readonly id: string;
+  readonly gateway: LlmGateway;
+  readonly providerProfile: ProviderProfile;
+  readonly modelSnapshot: string;
+  readonly allowedModelIds: readonly string[];
+  readonly independenceKey: string;
+  readonly providerLabel?: string;
+}
+
+export interface CourtSessionOptions {
+  readonly targets: readonly CourtModelTarget[];
+}
+
 export interface ModelVerdict {
   readonly model: string;
   readonly verdict: string | null;
   readonly decisiveRuleId: string | null;
   readonly chainHead: string | null;
   readonly error: string | null;
+  readonly observedModelIds: readonly string[];
+  readonly independenceKey: string;
 }
 
-/** 跨模型可靠性证书。 */
 export interface ReliabilityCertificate {
   readonly certificateId: string;
   readonly claim: string;
   readonly modelCount: number;
   readonly verdicts: readonly ModelVerdict[];
   readonly distinctVerdicts: readonly string[];
-  readonly agreement: 'unanimous' | 'majority' | 'split';
+  readonly agreement: 'unanimous' | 'majority' | 'split' | 'inconclusive';
   readonly honestNote: string;
-  /** IC-11:数据来源标注(replay=fixture 回放·real=真实 provider;前端只呈现不推断) */
-  readonly datasetSource: 'replay' | 'real';
+  readonly datasetSource: 'real';
 }
 
-/** 一致性分类：全相同 unanimous / 两种 majority / 三种以上 split。 */
-export function computeAgreement(verdicts: readonly (string | null)[]): 'unanimous' | 'majority' | 'split' {
+export type CourtConfigurationErrorCode =
+  | 'COURT_TARGETS_NOT_CONFIGURED'
+  | 'COURT_TARGET_NOT_FOUND'
+  | 'COURT_TARGETS_NOT_INDEPENDENT'
+  | 'COURT_TARGET_INVALID';
+
+export class CourtConfigurationError extends Error {
+  readonly code: CourtConfigurationErrorCode;
+  readonly detail: Readonly<Record<string, unknown>>;
+
+  constructor(
+    code: CourtConfigurationErrorCode,
+    message: string,
+    detail: Readonly<Record<string, unknown>> = {},
+  ) {
+    super(message);
+    this.name = 'CourtConfigurationError';
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
+export function computeAgreement(
+  verdicts: readonly (string | null)[],
+): ReliabilityCertificate['agreement'] {
+  if (verdicts.length === 0 || verdicts.some((verdict) => verdict === null)) {
+    return 'inconclusive';
+  }
   const distinct = new Set(verdicts);
   if (distinct.size <= 1) return 'unanimous';
   if (distinct.size === 2) return 'majority';
   return 'split';
 }
 
-/**
- * 法庭会话选项（2026-08-06·G3 闭合后真实模型分歧接线）。
- *
- * 缺省（全 undefined）→ offline_replay fixture 回放（零凭据·展示框架）。
- * gateway+modelSnapshot 提供 → 真实 provider 多模型分歧（凭据门由 CLI/API 调用方执行·
- * 环境锚由 loop_runner 按 modelSnapshot 自动构造·repro_anchor.ts）。
- */
-export interface CourtSessionOptions {
-  /** 真实 provider 网关（由调用方凭据门后构造·CLI 层注入·本文件禁模型字面量）。 */
-  readonly gateway?: LlmGateway;
-  /** 模型快照（G3 环境锚分量·competition 必需·snapshot.ts 常量）。 */
-  readonly modelSnapshot?: string;
-  /** 真实 provider profile 名（executeLoop profile 路由·CLI 层注入）。 */
-  readonly providerProfile?: string;
-  /** 真实 provider 标签（honestNote 展示·如 'competition_aliyun_qwen'）。 */
-  readonly providerLabel?: string;
+function validateTarget(target: CourtModelTarget): void {
+  const profile = String(target.providerProfile).trim();
+  if (
+    target.id.trim().length === 0 ||
+    target.modelSnapshot.trim().length === 0 ||
+    target.independenceKey.trim().length === 0 ||
+    profile.length === 0 ||
+    profile === 'offline_replay' ||
+    target.allowedModelIds.length === 0 ||
+    target.allowedModelIds.some((modelId) => modelId.trim().length === 0)
+  ) {
+    throw new CourtConfigurationError(
+      'COURT_TARGET_INVALID',
+      `court target '${target.id || '<empty>'}' is incomplete or not live`,
+      { targetId: target.id, providerProfile: profile },
+    );
+  }
 }
 
-/**
- * 运行跨模型法庭会话：对同一 claim 跑多个模型，收集裁决，颁发证书。
- *
- * @param claim 待裁决的科学声明文本。
- * @param models 模型 id 列表（offline_replay 时每个独立 modelId 的 adapter）。
- * @param gitCommitSha 链头锚定的 commit sha。
- * @param options 真实 provider 选项（2026-08-06·缺省 offline_replay 回放）。
- */
+function resolveTargets(
+  requestedModels: readonly string[],
+  options: CourtSessionOptions,
+): readonly CourtModelTarget[] {
+  if (requestedModels.length < 2) {
+    throw new CourtConfigurationError(
+      'COURT_TARGETS_NOT_CONFIGURED',
+      'cross-model court requires at least two requested model targets',
+      { requestedModels },
+    );
+  }
+  if (new Set(requestedModels).size !== requestedModels.length) {
+    throw new CourtConfigurationError(
+      'COURT_TARGET_INVALID',
+      'cross-model court model ids must be unique',
+      { requestedModels },
+    );
+  }
+
+  const byId = new Map<string, CourtModelTarget>();
+  for (const target of options.targets) {
+    validateTarget(target);
+    if (byId.has(target.id)) {
+      throw new CourtConfigurationError(
+        'COURT_TARGET_INVALID',
+        `duplicate court target id '${target.id}'`,
+        { targetId: target.id },
+      );
+    }
+    byId.set(target.id, target);
+  }
+
+  const missing = requestedModels.filter((model) => !byId.has(model));
+  if (missing.length > 0) {
+    throw new CourtConfigurationError(
+      'COURT_TARGET_NOT_FOUND',
+      `requested court targets are not configured: ${missing.join(', ')}`,
+      { requestedModels, availableModels: [...byId.keys()], missing },
+    );
+  }
+
+  const resolved: CourtModelTarget[] = [];
+  for (const model of requestedModels) {
+    const target = byId.get(model);
+    if (target === undefined) {
+      throw new CourtConfigurationError(
+        'COURT_TARGET_NOT_FOUND',
+        `court target '${model}' was not resolved`,
+        { requestedModels },
+      );
+    }
+    resolved.push(target);
+  }
+
+  const independenceKeys = resolved.map((target) => target.independenceKey);
+  if (new Set(independenceKeys).size !== independenceKeys.length) {
+    throw new CourtConfigurationError(
+      'COURT_TARGETS_NOT_INDEPENDENT',
+      'requested court targets share an independence key; relabelling one execution path is not cross-model evidence',
+      { requestedModels, independenceKeys },
+    );
+  }
+  return resolved;
+}
+
+function observedExecutionIdentity(
+  artifacts: Awaited<ReturnType<typeof executeAskRun>>['loopState']['artifacts'],
+): {
+  readonly modelIds: readonly string[];
+  readonly providerProfiles: readonly string[];
+} {
+  return {
+    modelIds: [...new Set(artifacts.map((artifact) => artifact.callResult.credential.modelId))].sort(),
+    providerProfiles: [
+      ...new Set(artifacts.map((artifact) => String(artifact.callResult.credential.providerProfile))),
+    ].sort(),
+  };
+}
+
 export async function runCourtSession(
   claim: string,
   models: readonly string[],
   gitCommitSha: string,
-  options: CourtSessionOptions = {},
+  options: CourtSessionOptions,
 ): Promise<ReliabilityCertificate> {
+  if (claim.trim().length === 0) {
+    throw new CourtConfigurationError('COURT_TARGET_INVALID', 'court claim must be non-empty');
+  }
+  const targets = resolveTargets(models, options);
   const verdicts: ModelVerdict[] = [];
-  for (const model of models) {
+
+  for (const target of targets) {
     const db = openFarDb(':memory:');
     try {
-      const gateway =
-        options.gateway ?? createLlmGateway([createOfflineReplayAdapter({ modelId: model })]);
       const result = await executeAskRun(
         db,
         claim,
@@ -91,49 +202,65 @@ export async function runCourtSession(
         gitCommitSha,
         undefined,
         undefined,
-        gateway,
+        target.gateway,
         undefined,
         undefined,
-        options.modelSnapshot,
-        options.gateway === undefined ? 'offline_replay' : options.providerProfile, // 模型中立红线：providerProfile 由 CLI 层注入·本文件禁 Qwen 字面量
+        target.modelSnapshot,
+        target.providerProfile,
       );
-      const vn = result.loopState.verdictNode;
+      const identity = observedExecutionIdentity(result.loopState.artifacts);
+      const unexpectedModels = identity.modelIds.filter(
+        (modelId) => !target.allowedModelIds.includes(modelId),
+      );
+      const unexpectedProfiles = identity.providerProfiles.filter(
+        (profile) => profile !== String(target.providerProfile),
+      );
+      const identityError =
+        identity.modelIds.length === 0
+          ? 'no model execution identity was recorded'
+          : unexpectedModels.length > 0 || unexpectedProfiles.length > 0
+            ? `execution identity mismatch: models=[${unexpectedModels.join(', ')}], profiles=[${unexpectedProfiles.join(', ')}]`
+            : null;
+      const node = result.loopState.verdictNode;
+      const loopError = result.loopState.error === null ? null : result.loopState.error.message;
+      const error = identityError ?? loopError;
       verdicts.push({
-        model,
-        verdict: vn === null ? null : vn.verdict,
-        decisiveRuleId: vn === null ? null : vn.verdictTrace.decisiveRuleId,
-        chainHead: result.reproHash,
-        error: result.loopState.error === null ? null : result.loopState.error.message,
+        model: target.id,
+        verdict: error === null && node !== null ? node.verdict : null,
+        decisiveRuleId: error === null && node !== null ? node.verdictTrace.decisiveRuleId : null,
+        chainHead: error === null ? result.reproHash : null,
+        error,
+        observedModelIds: identity.modelIds,
+        independenceKey: target.independenceKey,
       });
-    } catch (err) {
+    } catch (error: unknown) {
       verdicts.push({
-        model,
+        model: target.id,
         verdict: null,
         decisiveRuleId: null,
         chainHead: null,
-        error: err instanceof Error ? err.message : String(err),
+        error: error instanceof Error ? error.message : String(error),
+        observedModelIds: [],
+        independenceKey: target.independenceKey,
       });
     } finally {
       db.close();
     }
   }
 
-  const verdictList = verdicts.map((v) => v.verdict);
+  const verdictList = verdicts.map((verdict) => verdict.verdict);
   const agreement = computeAgreement(verdictList);
-  const distinctVerdicts = Array.from(new Set(verdictList)).map((v) => v ?? '<null>');
-
   return {
     certificateId: ulid(),
     claim,
-    modelCount: models.length,
+    modelCount: targets.length,
     verdicts,
-    distinctVerdicts,
+    distinctVerdicts: [...new Set(verdictList.map((verdict) => verdict ?? '<null>'))],
     agreement,
-    datasetSource: options.gateway === undefined ? 'replay' : 'real',
+    datasetSource: 'real',
     honestNote:
-      options.gateway === undefined
-        ? 'under offline_replay all models replay the same fixture, so verdicts are necessarily identical; real model disagreement requires a real provider (credential gate)'
-        : `real provider cross-model court (${options.providerLabel ?? 'real gateway'}) — each model verdict is computed by the deterministic R0-R9 kernel over real LLM evidence (credential-gated, billing applies)`,
+      agreement === 'inconclusive'
+        ? 'Cross-model agreement is INCONCLUSIVE because at least one configured target failed execution, identity verification, or kernel adjudication. Missing results are not agreement.'
+        : 'Each result came from a separately configured live target with a distinct independence key and an observed model identity inside its declared allowlist. Agreement is still not proof that the scientific claim is true.',
   };
 }
-

@@ -1,9 +1,6 @@
-// tests/cli/interactive_commands.test.ts
-// 端到端测试：far ask / stream / replay / court / arena / init（spec §9.2 全命令实装验证）。
-//
-// 真实依赖：每个命令 spawn `src/cli/far.ts` 跑真实 executeLoop（runAgentLoop + ASK-9 密封）
-// 离线 fixture 回放。证明「6-stage FSM 端到端 + 证据链工程 + 确定性裁决内核接线」，非桩。
-// 诚实边界：offline_replay fixture 固定 → verdict 固定；本测试验证命令可用性 + 输出形状，非科学裁决。
+// End-to-end CLI tests for interactive and workflow commands.
+// Offline ask/replay cases are explicit engineering fixtures. Arena and court
+// tests assert the new production truth boundary: no canned assessment.
 
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -16,6 +13,11 @@ function runFar(args: readonly string[]): SpawnSyncReturns<string> {
   return spawnSync(process.execPath, ['src/cli/far.ts', ...args], {
     encoding: 'utf8',
     timeout: 120000,
+    env: {
+      ...process.env,
+      FAR_DASHSCOPE_API_KEY: '',
+      DASHSCOPE_API_KEY: '',
+    },
   });
 }
 
@@ -23,133 +25,170 @@ function makeTmpDir(label: string): string {
   return mkdtempSync(join(tmpdir(), `far-${label}-`));
 }
 
-test('far ask: 6-stage FSM + verdict + chain（offline quick）', () => {
-  const r = runFar(['ask', 'Does the model improve accuracy', '--mode', 'quick', '--profile', 'offline_replay']);
-  assert.strictEqual(r.status, 0);
-  assert.match(r.stdout, /verdict/);
-  assert.match(r.stdout, /chain/);
-  assert.match(r.stdout, /R7_PRIMARY_TEST_CONFIRMS/);
-  assert.match(r.stdout, /offline_replay fixture/); // 诚实标注
-  // B-5：offline_replay 必须在 verdict 之前、输出顶部以醒目 banner 披露（不可误读为 live）
-  assert.match(r.stdout, /OFFLINE REPLAY MODE \(dev\/CI only\)/);
-  assert.ok(
-    r.stdout.indexOf('OFFLINE REPLAY MODE') < r.stdout.indexOf('verdict'),
-    'offline banner must appear BEFORE the verdict (no fake-demo headline)',
-  );
+test('far ask: explicit offline engineering replay runs the six-stage wiring', () => {
+  const result = runFar([
+    'ask',
+    'Does the model improve accuracy',
+    '--mode',
+    'quick',
+    '--profile',
+    'offline_replay',
+  ]);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /verdict/);
+  assert.match(result.stdout, /chain/);
+  assert.match(result.stdout, /R7_PRIMARY_TEST_CONFIRMS/);
+  assert.match(result.stdout, /offline_replay fixture/);
+  assert.match(result.stdout, /OFFLINE REPLAY MODE \(dev\/CI only\)/);
+  assert.ok(result.stdout.indexOf('OFFLINE REPLAY MODE') < result.stdout.indexOf('verdict'));
 });
 
-test('far ask: --json 产出机器可读结构', () => {
-  const r = runFar(['ask', 'json mode test', '--mode', 'quick', '--json', '--profile', 'offline_replay']);
-  assert.strictEqual(r.status, 0);
-  const obj = JSON.parse(r.stdout) as { verdict: string; chainHeadHash: string; runId: string };
-  assert.strictEqual(obj.verdict, 'CONFIRMED');
-  assert.ok(/^[0-9a-f]{64}$/.test(obj.chainHeadHash));
-  assert.ok(obj.runId.length > 0);
+test('far ask: --json emits a machine-readable explicit replay result', () => {
+  const result = runFar([
+    'ask',
+    'json mode test',
+    '--mode',
+    'quick',
+    '--json',
+    '--profile',
+    'offline_replay',
+  ]);
+  assert.strictEqual(result.status, 0);
+  const object = JSON.parse(result.stdout) as {
+    verdict: string;
+    chainHeadHash: string;
+    runId: string;
+  };
+  assert.strictEqual(object.verdict, 'CONFIRMED');
+  assert.ok(/^[0-9a-f]{64}$/.test(object.chainHeadHash));
+  assert.ok(object.runId.length > 0);
 });
 
-test('far ask --export → far verify 闭环（sealed envelope 可重算验证）', () => {
-  const dir = makeTmpDir('ask-export');
+test('far ask --export closes through far verify', () => {
+  const directory = makeTmpDir('ask-export');
   try {
-    const exp = runFar(['ask', 'export closedloop test', '--mode', 'quick', '--export', dir, '--profile', 'offline_replay']);
-    assert.strictEqual(exp.status, 0);
-    assert.ok(existsSync(join(dir, 'proof_envelopes.jsonl')), 'bundle 须含 sealed envelope');
+    const exported = runFar([
+      'ask',
+      'export closedloop test',
+      '--mode',
+      'quick',
+      '--export',
+      directory,
+      '--profile',
+      'offline_replay',
+    ]);
+    assert.strictEqual(exported.status, 0);
+    assert.ok(existsSync(join(directory, 'proof_envelopes.jsonl')));
 
-    const verify = runFar(['verify', '--bundle', dir]);
-    assert.ok(verify.status === 0 || verify.status === undefined);
-    assert.match(verify.stdout, /clean/); // tamperStatus clean
+    const verified = runFar(['verify', '--bundle', directory]);
+    assert.ok(verified.status === 0 || verified.status === undefined);
+    assert.match(verified.stdout, /clean/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
-test('far stream: 实时流式打印每阶段（onArtifact 回调·真流非回放）', () => {
-  const r = runFar(['stream', 'streaming test question', '--mode', 'quick']);
-  assert.strictEqual(r.status, 0);
-  assert.match(r.stdout, /stage1_understanding/);
-  assert.match(r.stdout, /stage6_feedback/);
-  assert.match(r.stdout, /verdict/);
+test('far stream prints each stage', () => {
+  const result = runFar(['stream', 'streaming test question', '--mode', 'quick']);
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /stage1_understanding/);
+  assert.match(result.stdout, /stage6_feedback/);
+  assert.match(result.stdout, /verdict/);
 });
 
-test('far repl: 交互式多轮 + fork + history', () => {
-  const r = spawnSync(
-    process.execPath,
-    ['src/cli/far.ts', 'repl'],
-    {
-      input: 'first question\n:fork refined\n:history\n:quit\n',
-      encoding: 'utf8',
-      timeout: 120000,
-    },
-  );
-  assert.strictEqual(r.status, 0);
-  assert.match(r.stdout, /feedback_converged/);
-  assert.match(r.stdout, /first question refined/); // fork 拼接
-  assert.match(r.stdout, /history|verdict=CONFIRMED/i);
+test('far repl supports multi-turn, fork, and history', () => {
+  const result = spawnSync(process.execPath, ['src/cli/far.ts', 'repl'], {
+    input: 'first question\n:fork refined\n:history\n:quit\n',
+    encoding: 'utf8',
+    timeout: 120000,
+  });
+  assert.strictEqual(result.status, 0);
+  assert.match(result.stdout, /feedback_converged/);
+  assert.match(result.stdout, /first question refined/);
+  assert.match(result.stdout, /history|verdict=CONFIRMED/i);
 });
 
-test('far replay --bundle: 重放证据链 + hash 链 verify', () => {
-  const dir = makeTmpDir('replay');
+test('far replay --bundle verifies the exported evidence chain', () => {
+  const directory = makeTmpDir('replay');
   try {
-    runFar(['ask', 'replay source question', '--mode', 'quick', '--export', dir, '--profile', 'offline_replay']);
-    const r = runFar(['replay', '--bundle', dir]);
-    assert.strictEqual(r.status, 0);
-    assert.match(r.stdout, /chain head/);
-    assert.match(r.stdout, /stage1_understanding/);
+    runFar([
+      'ask',
+      'replay source question',
+      '--mode',
+      'quick',
+      '--export',
+      directory,
+      '--profile',
+      'offline_replay',
+    ]);
+    const result = runFar(['replay', '--bundle', directory]);
+    assert.strictEqual(result.status, 0);
+    assert.match(result.stdout, /chain head/);
+    assert.match(result.stdout, /stage1_understanding/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
-test('far replay --db: 从持久化 DB 重放 + verify verified', () => {
-  const dir = makeTmpDir('replay-db');
+test('far replay --db verifies a persisted evidence chain', () => {
+  const directory = makeTmpDir('replay-db');
   try {
-    runFar(['ask', 'db replay question', '--mode', 'quick', '--export', dir, '--profile', 'offline_replay']);
-    const rundb = join(dir + '.rundb');
-    assert.ok(existsSync(rundb), 'ask --export 须产出 .rundb');
-    const r = runFar(['replay', '--db', rundb]);
-    assert.strictEqual(r.status, 0);
-    assert.match(r.stdout, /verified \(hash chain self-consistent\)/);
+    runFar([
+      'ask',
+      'db replay question',
+      '--mode',
+      'quick',
+      '--export',
+      directory,
+      '--profile',
+      'offline_replay',
+    ]);
+    const runDatabase = `${directory}.rundb`;
+    assert.ok(existsSync(runDatabase));
+    const result = runFar(['replay', '--db', runDatabase]);
+    assert.strictEqual(result.status, 0);
+    assert.match(result.stdout, /verified \(hash chain self-consistent\)/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true });
     try {
-      rmSync(dir + '.rundb', { force: true });
+      rmSync(`${directory}.rundb`, { force: true });
     } catch {
-      // ignore
+      // Cleanup is best-effort after the primary assertions.
     }
   }
 });
 
-test('far court: 多模型法庭 + ReliabilityCertificate（offline 一致）', () => {
-  const r = runFar(['court', 'court test claim', '--models', 'alpha,beta']);
-  assert.strictEqual(r.status, 0);
-  assert.match(r.stdout, /agreement : unanimous/);
-  assert.match(r.stdout, /alpha.*CONFIRMED/);
-  assert.match(r.stdout, /beta.*CONFIRMED/);
-  assert.match(r.stdout, /under offline_replay all models replay the same fixture/);
+test('far court returns NOT_SUPPORTED instead of a fabricated cross-model certificate', () => {
+  const result = runFar(['court', 'court test claim', '--models', 'alpha,beta']);
+  assert.strictEqual(result.status, 3);
+  assert.match(result.stderr, /NOT_SUPPORTED/);
+  assert.match(result.stderr, /independently configured model targets/);
+  assert.doesNotMatch(result.stdout, /unanimous/);
 });
 
-test('far arena: 对抗竞技场 + deterministic arbiter（offline ROBUST）', () => {
-  const r = runFar(['arena', 'arena test hypothesis', '--refuters', 'attacker1,attacker2']);
-  assert.strictEqual(r.status, 0);
-  assert.match(r.stdout, /original.*CONFIRMED/);
-  assert.match(r.stdout, /ROBUST|BREACHED/);
-  assert.match(r.stdout, /arbiter is a deterministic rule/);
+test('far arena without a live key returns REQUIRES_CONFIGURATION and no robustness result', () => {
+  const result = runFar(['arena', 'arena test hypothesis', '--refuters', 'attacker1,attacker2']);
+  assert.strictEqual(result.status, 2);
+  assert.match(result.stderr, /REQUIRES_CONFIGURATION/);
+  assert.match(result.stderr, /offline fixtures are test-only/);
+  assert.doesNotMatch(result.stdout, /ROBUST|BREACHED/);
 });
 
-test('far init: DomainPack 脚手架生成（4 文件 + claimClass）', () => {
-  const dir = makeTmpDir('init');
+test('far init generates a four-file DomainPack scaffold', () => {
+  const directory = makeTmpDir('init');
   try {
-    const r = runFar(['init', 'testdomain', '--out', dir, '--force']);
-    assert.strictEqual(r.status, 0);
-    assert.ok(existsSync(join(dir, 'domain.config.json')));
-    assert.ok(existsSync(join(dir, 'claim.template.json')));
-    assert.ok(existsSync(join(dir, 'fec.template.json')));
-    assert.ok(existsSync(join(dir, 'README.md')));
+    const result = runFar(['init', 'testdomain', '--out', directory, '--force']);
+    assert.strictEqual(result.status, 0);
+    assert.ok(existsSync(join(directory, 'domain.config.json')));
+    assert.ok(existsSync(join(directory, 'claim.template.json')));
+    assert.ok(existsSync(join(directory, 'fec.template.json')));
+    assert.ok(existsSync(join(directory, 'README.md')));
     const config = JSON.parse(
-      readFileSync(join(dir, 'domain.config.json'), 'utf8'),
+      readFileSync(join(directory, 'domain.config.json'), 'utf8'),
     ) as { claimClass: string; name: string };
     assert.strictEqual(config.claimClass, 'TESTDOMAIN');
     assert.strictEqual(config.name, 'testdomain');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true });
   }
 });
