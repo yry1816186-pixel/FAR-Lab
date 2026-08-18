@@ -10,9 +10,31 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  semantic_cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ux-refactor/2026-08-18
+      - name: Correct semantic-class migration edge cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(frontend/src/components/v2/AssuranceDimensionCard.tsx frontend/src/components/EvidenceTimeline.tsx frontend/src/pages/LeaderboardPage.tsx frontend/src/pages/IntegrityPage.tsx frontend/src/pages/AblationPage.tsx frontend/src/pages/WizardPage.tsx)
+          perl -0pi -e 's/bg-success\/100\/10/bg-success\/10/g; s/bg-warning\/100\/10/bg-warning\/10/g; s/bg-muted0\/10/bg-muted\/50/g; s/bg-muted0\/5/bg-muted\/30/g; s/text-gray-400/text-muted-foreground/g; s/text-gray-500/text-muted-foreground/g; s/text-gray-600/text-muted-foreground/g; s/bg-success\/100\/5/bg-success\/5/g; s/bg-warning\/100\/5/bg-warning\/5/g; s/bg-success\/100/bg-success/g; s/bg-warning\/100/bg-warning/g' "${files[@]}"
+          if grep -RniE '(100/|muted0|success/100|warning/100|info/100|destructive/100|evidence/100|provenance/100)' frontend/src --include='*.ts' --include='*.tsx'; then exit 1; fi
+          if grep -RniE '(text|bg|border|ring)-(red|green|amber|yellow|blue|gray|slate)-[0-9]+' frontend/src --include='*.tsx' --exclude='*.test.tsx'; then exit 1; fi
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "${files[@]}"
+          git commit -m 'fix(ux): correct semantic color migration edge cases'
+          git push origin HEAD:ux-refactor/2026-08-18
+
   export_source:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -51,6 +73,12 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 24
+      - name: Apply pending semantic QA fix to checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(frontend/src/components/v2/AssuranceDimensionCard.tsx frontend/src/components/EvidenceTimeline.tsx frontend/src/pages/LeaderboardPage.tsx frontend/src/pages/IntegrityPage.tsx frontend/src/pages/AblationPage.tsx frontend/src/pages/WizardPage.tsx)
+          perl -0pi -e 's/bg-success\/100\/10/bg-success\/10/g; s/bg-warning\/100\/10/bg-warning\/10/g; s/bg-muted0\/10/bg-muted\/50/g; s/bg-muted0\/5/bg-muted\/30/g; s/text-gray-400/text-muted-foreground/g; s/text-gray-500/text-muted-foreground/g; s/text-gray-600/text-muted-foreground/g; s/bg-success\/100\/5/bg-success\/5/g; s/bg-warning\/100\/5/bg-warning\/5/g; s/bg-success\/100/bg-success/g; s/bg-warning\/100/bg-warning/g' "${files[@]}"
       - name: Install dependencies and Chromium
         shell: bash
         run: |
@@ -67,8 +95,8 @@ jobs:
         run: |
           set -euo pipefail
           nohup pnpm run dev >/tmp/far-dev.log 2>&1 &
-          for i in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:5173/ >/dev/null 2>&1; then exit 0; fi
+          for i in $(seq 1 45); do
+            if curl -fsS http://localhost:5173/ >/dev/null 2>&1; then exit 0; fi
             sleep 1
           done
           cat /tmp/far-dev.log
@@ -80,7 +108,7 @@ jobs:
           cat >/tmp/far-visual-qa/qa.mjs <<'EOF'
           import { chromium } from 'playwright';
           import fs from 'node:fs';
-          const base='http://127.0.0.1:5173', out='/tmp/far-visual-qa/output';
+          const base='http://localhost:5173', out='/tmp/far-visual-qa/output';
           const browser=await chromium.launch({headless:true});
           const cases=[
             ['research-desktop-light','/research',1440,900,'light'],['research-desktop-dark','/research',1440,900,'dark'],
