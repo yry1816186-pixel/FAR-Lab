@@ -50,16 +50,24 @@ export async function registerArenaRoute(
       });
     }
 
-    const profile = config?.profile === undefined ? null : String(config.profile);
+    const gateway = config?.gateway;
+    const providerProfile = config?.profile;
+    const modelSnapshot = config?.modelSnapshot;
+    const profile = providerProfile === undefined ? null : String(providerProfile);
     const missingConfiguration = [
-      config?.gateway === undefined ? 'gateway' : null,
+      gateway === undefined ? 'gateway' : null,
       profile === null || profile.trim().length === 0 ? 'profile' : null,
       profile === 'offline_replay' ? 'liveProfile' : null,
-      config?.modelSnapshot === undefined || config.modelSnapshot.trim().length === 0
+      modelSnapshot === undefined || modelSnapshot.trim().length === 0
         ? 'modelSnapshot'
         : null,
     ].filter((item): item is string => item !== null);
-    if (missingConfiguration.length > 0) {
+    if (
+      missingConfiguration.length > 0 ||
+      gateway === undefined ||
+      providerProfile === undefined ||
+      modelSnapshot === undefined
+    ) {
       throw new ApiError({
         statusCode: 503,
         errorCode: 'arena_live_profile_unavailable',
@@ -79,9 +87,9 @@ export async function registerArenaRoute(
         parsed.data.refuters,
         config?.gitCommitSha ?? resolveGitCommitSha(),
         {
-          gateway: config.gateway,
-          providerProfile: config.profile,
-          modelSnapshot: config.modelSnapshot,
+          gateway,
+          providerProfile,
+          modelSnapshot,
           providerLabel: profile ?? undefined,
         },
       );

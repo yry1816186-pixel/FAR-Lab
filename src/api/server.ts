@@ -123,13 +123,13 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
       info: {
         title: 'FAR-Lab API',
         description:
-          'FAR-Lab public HTTP API. V2 receipt endpoints use { ok: true, data: T } success envelopes and RFC 7807 errors.',
+          'FAR-Lab 对外 HTTP API（24§5）。V2 receipts 端点采用统一信封 { ok: true, data: T } + RFC 7807 错误响应（R-05）。',
         version: '2026-06-27',
       },
       tags: [
-        { name: 'health', description: 'Liveness and readiness probes' },
-        { name: 'v1', description: 'V1 scientific workflow API' },
-        { name: 'v2-receipts', description: 'V2 receipt verification and persistence' },
+        { name: 'health', description: 'Liveness + readiness probes' },
+        { name: 'v1', description: 'V1 API (hypothesize / evidence / verdict / report / integrity / benchmark / court / arena)' },
+        { name: 'v2-receipts', description: 'V2 receipt verification + persistence (R-05 unified envelope { ok, data } + RFC 7807 errors)' },
       ],
     },
   });
