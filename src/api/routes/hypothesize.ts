@@ -24,6 +24,7 @@ import { fetchHonestVerdictByEvidenceId } from '../internal/verdict_lookup.ts';
 import { extractHypothesisEvidenceId, buildSubtreeFromEvidence } from '../internal/hypothesis_helpers.ts';
 import { ApiError } from '../errors/error_handler.ts';
 import type { GraphSubtree, HypothesizeResponse } from '../types.ts';
+import type { AgentEventBus } from '../../agent_loop/events.ts';
 
 /**
  * hypothesize 路由配置。
@@ -34,6 +35,11 @@ export interface HypothesizeRouteConfig {
   readonly gateway?: LlmGateway;
   readonly profile?: ProviderProfile;
   readonly appendOptions?: AppendRecordOptions;
+  /**
+   * P0-4 运行时事件流：注入则本路由把 loop 事件发布到总线（/events/stream
+   * SSE 订阅者实时可见）。未注入零行为变化（onEvent 透传是 ADDITIVE ONLY）。
+   */
+  readonly eventBus?: AgentEventBus;
 }
 
 const HypothesizeRequestSchema = z.object({
@@ -170,6 +176,7 @@ export async function registerHypothesizeRoute(
         ...(config.gateway === undefined ? {} : { gateway: config.gateway }),
         ...(config.profile === undefined ? {} : { profile: config.profile }),
         ...(config.appendOptions === undefined ? {} : { appendOptions: config.appendOptions }),
+        ...(config.eventBus === undefined ? {} : { onEvent: (evt) => config.eventBus?.emit(evt) }),
       });
     } catch (err) {
       // 失败不残留 pending 占位——删除记录让重试可重新执行。

@@ -12,6 +12,7 @@ import { openFarDb } from '../../db/open.ts';
 import { buildDemoChain } from '../../far_proof/demo_chain.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
 import { resolveRuntimeGateway } from '../../llm_gateway/runtime_gateway.ts';
+import { AgentEventBus } from '../../agent_loop/events.ts';
 
 /** Input parameters for operations involving api args. */
 export interface ApiArgs {
@@ -102,8 +103,12 @@ export async function runApi(argv: readonly string[]): Promise<number> {
   // competition_aliyun_qwen 真实推理；否则 null → server 内 LLM 端点 503 fail-closed（无静默回放）。
   // 模型中立：解析在 llm_gateway 层（本文件无 Qwen/DashScope 字面量）。
   const runtimeGateway = resolveRuntimeGateway(process.env);
+  // P0-4 事件流：默认注入 AgentEventBus → /api/v1/events/stream 注册且 hypothesize
+  // 运行事件实时推送（此前 far api 不注入 → Events 页在标准全栈部署下永远
+  // connecting + console 每 3s 刷 404）。
+  const eventBus = new AgentEventBus();
   const app = await startServer(
-    { db, gitCommitSha, jwtSecret: args.jwtSecret, ...(runtimeGateway === null ? {} : { gateway: runtimeGateway }) },
+    { db, gitCommitSha, jwtSecret: args.jwtSecret, eventBus, ...(runtimeGateway === null ? {} : { gateway: runtimeGateway }) },
     args.port,
     args.host,
   );
