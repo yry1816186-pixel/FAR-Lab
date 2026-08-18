@@ -95,7 +95,41 @@ const EVENT_TYPES = new Set([
   'question_failed',
   'budget_breaker_tripped',
   'campaign_completed',
+  // SCI-HITL-001 additive：人类输入审计事件（随主台账链，不改调度投影）。
+  'prior_injected',
+  'annotation',
+  'resource_veto',
+  'revision_requested',
+  'campaign_paused',
+  'campaign_resumed',
+  'risk_accepted',
+  'human_event_reverted',
 ]);
+/** SCI-HITL-001 事件子集（结构校验走表驱动的 validateHumanLoopEventShape）。 */
+const HUMAN_LOOP_EVENT_TYPES = new Set([
+  'prior_injected',
+  'annotation',
+  'resource_veto',
+  'revision_requested',
+  'campaign_paused',
+  'campaign_resumed',
+  'risk_accepted',
+  'human_event_reverted',
+]);
+/**
+ * HITL 事件的必填非空字符串字段表（表驱动——append-only 校验面，新增
+ * 事件类型在这里加一行，不增加 switch 复杂度预算）。
+ */
+const HITL_REQUIRED_STRING_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  prior_injected: ['priorId', 'actor', 'statement'],
+  annotation: ['targetId', 'actor', 'note'],
+  resource_veto: ['actor', 'resource', 'reason'],
+  revision_requested: ['targetId', 'actor', 'note'],
+  campaign_paused: ['actor', 'reason'],
+  campaign_resumed: ['actor', 'reason'],
+  risk_accepted: ['actor', 'riskDescription', 'acknowledgement'],
+  human_event_reverted: ['actor', 'reason'],
+};
 const ERROR_KINDS = new Set(['rate_limited', 'model_output_invalid', 'unknown']);
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
@@ -105,6 +139,24 @@ function isNonEmptyString(v: unknown): v is string {
 
 function isCount(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v) && v >= 0;
+}
+
+/**
+ * HITL 事件结构校验（SCI-HITL-001；表驱动 + 两条类型特例）：
+ *   prior_injected.kind 铁律（恒 'context'）；
+ *   human_event_reverted.revertedSeq 必须是正整数（引用被回滚台账 seq）。
+ */
+function validateHumanLoopEventShape(p: Record<string, unknown>, errors: string[]): void {
+  const type = String(p['type']);
+  for (const field of HITL_REQUIRED_STRING_FIELDS[type] ?? []) {
+    if (!isNonEmptyString(p[field])) errors.push(`${type}.${field} must be a non-empty string`);
+  }
+  if (type === 'prior_injected' && p['kind'] !== 'context') {
+    errors.push("prior_injected.kind must be 'context' (layering rule: human priors are never evidence)");
+  }
+  if (type === 'human_event_reverted' && (!isCount(p['revertedSeq']) || (p['revertedSeq'] as number) < 1)) {
+    errors.push('human_event_reverted.revertedSeq must be a positive integer (references the reverted ledger seq)');
+  }
 }
 
 /** 结构校验（读盘后、进状态机前；镜像 registry 的 parseRecordLine 卫生）。 */
@@ -124,6 +176,9 @@ function validateCampaignEventShape(value: unknown, lineIndex: number): Campaign
     const p = payload as Record<string, unknown>;
     if (typeof p['type'] !== 'string' || !EVENT_TYPES.has(p['type'])) {
       errors.push(`payload.type must be one of ${[...EVENT_TYPES].join('|')}`);
+    } else if (HUMAN_LOOP_EVENT_TYPES.has(p['type'])) {
+      // SCI-HITL-001：人类输入事件走表驱动校验（复杂度预算独立于调度事件 switch）。
+      validateHumanLoopEventShape(p, errors);
     } else {
       switch (p['type']) {
         case 'campaign_started':
@@ -335,6 +390,20 @@ function foldCampaignEvent(state: CampaignState, payload: CampaignEventPayload):
       }
       return { ...state, completed: true };
     }
+    // ── SCI-HITL-001：人类输入事件原样折叠（审计层不投影调度状态）──────────
+    // 分层铁律的机器面：HITL 事件在主台账上可审计（哈希链覆盖），但
+    // deriveCampaignState 的调度/科学投影对它们恒不变——人类批准/先验/驳回
+    // 不得自动改写机器裁决状态（SCI-HITL-001）。人类循环状态（paused 等）
+    // 由 campaign/human_loop.ts 的 deriveHumanLoopState 独立投影。
+    case 'prior_injected':
+    case 'annotation':
+    case 'resource_veto':
+    case 'revision_requested':
+    case 'campaign_paused':
+    case 'campaign_resumed':
+    case 'risk_accepted':
+    case 'human_event_reverted':
+      return state;
   }
 }
 

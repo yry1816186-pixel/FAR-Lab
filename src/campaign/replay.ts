@@ -67,10 +67,10 @@ export const TIMELINE_END = '(timeline end)';
 // ---------------------------------------------------------------------------
 
 /**
- * 事件单行摘要（表现层·确定性）：对 6 种契约事件给人读的格式化。
- * payload 是封闭判别联合（读盘经结构校验），switch 穷尽——漏 case 在
- * 编译期暴露（default 分支的 never 赋值）。摘要只服务时间线可读性与 diff，
- * 不参与链校验或状态折叠。
+ * 事件单行摘要（表现层·确定性）：对契约事件（6 种调度 + 8 种 HITL 审计，
+ * SCI-HITL-001 additive）给人读的格式化。payload 是封闭判别联合（读盘经
+ * 结构校验），switch 穷尽——漏 case 在编译期暴露（default 分支的 never
+ * 赋值）。摘要只服务时间线可读性与 diff，不参与链校验或状态折叠。
  */
 export function summarizeCampaignEvent(event: CampaignEvent): string {
   const payload = event.payload;
@@ -87,6 +87,24 @@ export function summarizeCampaignEvent(event: CampaignEvent): string {
       return `breaker tripped at ${payload.cumulativeTokens} tokens (${payload.remainingQuestions} questions remaining)`;
     case 'campaign_completed':
       return `campaign completed: ${payload.completedCount} OK / ${payload.failedCount} failed / ${payload.totalTokens} tokens`;
+    // ── SCI-HITL-001 additive：人类输入审计事件的重放摘要（只服务时间线
+    //    可读性，与调度投影/状态折叠无关——分层铁律同 deriveCampaignState）──
+    case 'prior_injected':
+      return `human prior '${payload.priorId}' injected by ${payload.actor} (kind=${payload.kind})`;
+    case 'annotation':
+      return `annotation on ${payload.targetId} by ${payload.actor}: ${payload.note}`;
+    case 'resource_veto':
+      return `resource veto by ${payload.actor} on '${payload.resource}': ${payload.reason}`;
+    case 'revision_requested':
+      return `revision requested on ${payload.targetId} by ${payload.actor}: ${payload.note}`;
+    case 'campaign_paused':
+      return `campaign paused by ${payload.actor}: ${payload.reason}`;
+    case 'campaign_resumed':
+      return `campaign resumed by ${payload.actor}: ${payload.reason}`;
+    case 'risk_accepted':
+      return `risk accepted by ${payload.actor}: ${payload.riskDescription} (${payload.acknowledgement})`;
+    case 'human_event_reverted':
+      return `event seq ${payload.revertedSeq} reverted by ${payload.actor}: ${payload.reason} (audit trail preserved)`;
     default: {
       const unreachable: never = payload; // 穷尽性护栏：漏 case 编译期报错
       return String(unreachable);
