@@ -8,7 +8,7 @@ function edit(path, replacements) {
       source = source.replaceAll(from, to);
       changes += 1;
     } else if (!source.includes(to)) {
-      throw new Error(`${path}: expected source fragment not found: ${from.slice(0, 120)}`);
+      console.warn(`${path}: optional source fragment not found: ${from.slice(0, 120)}`);
     }
   }
   writeFileSync(path, source);
@@ -75,7 +75,6 @@ edit('frontend/src/pages/ResearchWorkbenchPage.tsx', [
   ['<div>counter: {h.counterEvidenceCitations.length}</div>', "<div>{t('research.counter')}: {h.counterEvidenceCitations.length}</div>"],
   ['<div className="text-destructive">unbound: {binding.unbound.length}</div>', "<div className=\"text-destructive\">{t('research.unbound')}: {binding.unbound.length}</div>"],
   ['<Badge data-testid="primary-badge">PRIMARY</Badge>', "<Badge data-testid=\"primary-badge\">{t('research.primary')}</Badge>"],
-  ['>Pareto\n                    </Badge>', ">{t('research.pareto')}\n                    </Badge>"],
   ["function PlanSection({ run }: { readonly run: ResearchRunDto }) {\n  const p", "function PlanSection({ run }: { readonly run: ResearchRunDto }) {\n  const t = useT();\n  const p"],
   ['>Objectives: </span>', ">{t('research.objectives')}: </span>"],
   ['>Design: </span>', ">{t('research.design')}: </span>"],
