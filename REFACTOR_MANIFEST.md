@@ -6,7 +6,7 @@
 - Original target branch: `main`
 - Original commit SHA: `a6647be68c8012246ffb57de8752649657a847f2`
 - Work branch: `ux-refactor/2026-08-18`
-- Validated source SHA before report finalization: `1f4f840cfca72467f72897adfeca95c79a7505a8`
+- Validated source SHA before report finalization: `dde79b02bc903088cd8f84d215c8997aa222cb1d`
 
 ## Architectural and product changes
 
@@ -39,6 +39,7 @@ No database/schema migration is introduced by this Human Experience Layer finali
 - `M	UI_DEBT_REPORT.md`
 - `M	VALIDATION_REPORT.md`
 - `A	VALIDATION_RUN_ID.txt`
+- `M	frontend/src/__tests__/AuditTracePage.test.tsx`
 - `A	frontend/src/lib/i18n/human_surfaces.ts`
 - `M	frontend/src/lib/i18n/messages.ts`
 - `M	frontend/src/pages/AuditTracePage.tsx`
