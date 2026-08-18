@@ -90,7 +90,7 @@ export async function registerArenaRoute(
           gateway,
           providerProfile,
           modelSnapshot,
-          providerLabel: profile ?? undefined,
+          providerLabel: String(providerProfile),
         },
       );
       void reply.send(result);
