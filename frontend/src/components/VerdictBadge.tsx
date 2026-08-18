@@ -2,13 +2,18 @@
  * VerdictBadge — 5 值裁决共享视觉组件。
  *
  * 提供裁决配置（图标/颜色/标签）和可复用 Badge，供 HonestyWallPage、VizPage、
- * EvidenceTimeline 等页面统一引用。颜色值使用 HSL 函数记法（Design Token 派生），
- * 禁止硬编码 #RRGGBB。
+ * EvidenceTimeline 等页面统一引用。D3 填充/描边色经 lib/chartColors 单一出口
+ * 消费 `--verdict-*` token（暗色主题自适应，D-02 销账），禁止硬编码 hsl/#RRGGBB。
  */
 
 import type { VerdictValue } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import {
+  verdictChartFill,
+  verdictChartStroke,
+  FALLBACK_VERDICT_CHART_COLOR,
+} from '@/lib/chartColors';
 import {
   CheckCircle2,
   XCircle,
@@ -34,55 +39,77 @@ export interface VerdictVisualConfig {
   readonly stroke: string;
 }
 
-/** 5 种裁决的视觉差异化配置（SSOT） */
+/**
+ * 5 种裁决的视觉差异化配置（SSOT）。
+ * fill/stroke 为惰性 getter：D3 渲染时经 chartColors 读当前主题 token，
+ * 暗色翻转后重绘即取新值（若在模块加载期求值会锁死初始主题）。
+ */
 export const VERDICT_CONFIG: Record<VerdictValue, VerdictVisualConfig> = {
   CONFIRMED: {
     label: 'Confirmed',
     icon: CheckCircle2,
     cardClassName: 'border-l-4 border-l-verdict-confirmed',
     iconClassName: 'text-verdict-confirmed',
-    fill: 'hsl(142.1, 70.6%, 45.3%)',
-    stroke: 'hsl(142.1, 70.6%, 32%)',
+    get fill() {
+      return verdictChartFill('CONFIRMED');
+    },
+    get stroke() {
+      return verdictChartStroke('CONFIRMED');
+    },
   },
   REFUTED: {
     label: 'Refuted',
     icon: XCircle,
     cardClassName: 'border-l-4 border-l-verdict-refuted',
     iconClassName: 'text-verdict-refuted',
-    fill: 'hsl(0, 84.2%, 60.2%)',
-    stroke: 'hsl(0, 84.2%, 45%)',
+    get fill() {
+      return verdictChartFill('REFUTED');
+    },
+    get stroke() {
+      return verdictChartStroke('REFUTED');
+    },
   },
   INCONCLUSIVE: {
     label: 'Inconclusive',
     icon: HelpCircle,
     cardClassName: 'border-l-4 border-l-verdict-inconclusive',
     iconClassName: 'text-verdict-inconclusive',
-    fill: 'hsl(47.9, 95.8%, 53.1%)',
-    stroke: 'hsl(47.9, 95.8%, 40%)',
+    get fill() {
+      return verdictChartFill('INCONCLUSIVE');
+    },
+    get stroke() {
+      return verdictChartStroke('INCONCLUSIVE');
+    },
   },
   DEGRADED_SCOPE: {
     label: 'Degraded scope',
     icon: AlertTriangle,
     cardClassName: 'border-l-4 border-l-verdict-degraded',
     iconClassName: 'text-verdict-degraded',
-    fill: 'hsl(32.1, 94.6%, 43.7%)',
-    stroke: 'hsl(32.1, 94.6%, 33%)',
+    get fill() {
+      return verdictChartFill('DEGRADED_SCOPE');
+    },
+    get stroke() {
+      return verdictChartStroke('DEGRADED_SCOPE');
+    },
   },
   UNTESTED: {
     label: 'Untested',
     icon: CircleDashed,
     cardClassName: 'border-dashed border-verdict-untested',
     iconClassName: 'text-verdict-untested',
-    fill: 'hsl(215.4, 16.3%, 46.9%)',
-    stroke: 'hsl(215.4, 16.3%, 35%)',
+    get fill() {
+      return verdictChartFill('UNTESTED');
+    },
+    get stroke() {
+      return verdictChartStroke('UNTESTED');
+    },
   },
 };
 
-/** D3 回退颜色（未知 verdict 值时使用） */
-export const FALLBACK_VERDICT_COLOR: Pick<VerdictVisualConfig, 'fill' | 'stroke'> = {
-  fill: 'hsl(215.4, 16.3%, 70%)',
-  stroke: 'hsl(215.4, 16.3%, 55%)',
-};
+/** D3 回退颜色（未知 verdict 值时使用，经 chartColors 单一出口） */
+export const FALLBACK_VERDICT_COLOR: Pick<VerdictVisualConfig, 'fill' | 'stroke'> =
+  FALLBACK_VERDICT_CHART_COLOR;
 
 // ---------- Badge 样式 ----------
 

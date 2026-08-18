@@ -565,7 +565,9 @@ export default function ResearchWorkbenchPage() {
                   </span>
                 )}
                 {keyConfigured === false && (
-                  <span className="ml-1.5 rounded bg-amber-600/10 px-1.5 py-0.5 text-xs text-amber-700">
+                  <span className="ml-1.5 rounded bg-warning px-1.5 py-0.5 text-xs font-medium text-warning-foreground">
+                    {/* D-15 销账(PR-03):原琥珀原始调色板文本色在暗底对比 3.6:1 < AA。
+                        改 warning token 配对(亮黄底+深藏青字),亮暗双主题均 ≥13:1。 */}
                     {t('research.mode.liveNeedsKey')}
                   </span>
                 )}

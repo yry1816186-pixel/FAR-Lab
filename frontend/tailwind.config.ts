@@ -54,6 +54,9 @@ const config: Config = {
           foreground: 'hsl(var(--card-foreground))',
         },
 
+        // ---- Overlay(PR-03 主题契约):Dialog/AlertDialog 遮罩,不再硬编码 black/80 ----
+        overlay: 'hsl(var(--overlay) / var(--overlay-opacity))',
+
         // ---- Brand 主色(ink-blue 11 阶,亮暗共用) ----
         brand: {
           50: 'hsl(var(--brand-50))',
@@ -91,6 +94,18 @@ const config: Config = {
           untested: 'hsl(var(--verdict-untested))',
           'untested-foreground': 'hsl(var(--verdict-untested-foreground))',
         },
+
+        // ---- 语义状态色(success/warning · D-04 token 供给,亮暗主题化) ----
+        // warning 不设 solid 变体(黄底+白字不达 AA,配 warning-foreground 深字)。
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          solid: 'hsl(var(--success-solid))',
+          foreground: 'hsl(var(--success-foreground))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
       },
 
       // ---- 字体族 ----
@@ -102,6 +117,8 @@ const config: Config = {
 
       // ---- 字号阶(1.25 modular scale 基底) ----
       fontSize: {
+        // 2xs:微标/徽章内文本(11px),收敛 text-[10px]/text-[11px] 任意值(D-04 供给)
+        '2xs': ['0.6875rem', { lineHeight: '1.4' }],
         // display:hero/页面主标题(responsive clamp)
         display: ['clamp(2rem, 5vw, 3.5rem)', { lineHeight: '1.1', fontWeight: '700', letterSpacing: '-0.02em' }],
         h1: ['1.875rem', { lineHeight: '1.2', fontWeight: '600', letterSpacing: '-0.015em' }],

@@ -6,7 +6,8 @@
  *   - 指标值对比柱状图
  *   - 裁决分布堆叠图
  *
- * 颜色使用 HSL 函数记法（Design Token 派生），不硬编码 #RRGGBB。
+ * 颜色统一经 lib/chartColors 单一出口（消费 --verdict-* / --border /
+ * --muted-foreground token，暗色自适应，D-03 销账），本文件不再自写 hsl。
  * 所有图表在 useEffect 中通过同步 D3 tick 渲染，无 rAF 依赖，便于测试。
  *
  * 类型安全（零容忍#4）：filter 后 d3 回调内不使用 `d.response!` 非空断言——
@@ -19,58 +20,18 @@ import { useRef, useEffect } from 'react';
 import { renderHonestyCaption, type ChartHonestySpec, type ChartStatisticalSpec } from '@/lib/vizHonesty';
 import * as d3 from 'd3';
 import type { HypothesizeResponse, VerdictValue } from '@/lib/types';
+import {
+  baselineChartColor,
+  verdictChartFill,
+  chartGridColor,
+  chartTextColor,
+  CHART_NEUTRAL_FILL,
+} from '@/lib/chartColors';
 
 // ---------------------------------------------------------------------------
-// 颜色色板（HSL 函数记法）
+// 取色：全部经 lib/chartColors 单一出口（主题感知 + token 消费，暗色自适应）。
+// 已知边界：图表不监听主题切换——主题翻转后需数据变化或重挂载才重绘（backlog）。
 // ---------------------------------------------------------------------------
-
-const BASELINE_COLORS: Record<string, string> = {
-  random: 'hsl(0, 72%, 58%)',
-  search: 'hsl(32, 95%, 44%)',
-  'direct-llm': 'hsl(262, 83%, 58%)',
-  'far-chain': 'hsl(217, 91%, 60%)',
-};
-
-const FALLBACK_COLOR = 'hsl(215, 16%, 60%)';
-
-/**
- * 主题感知取色：渲染时从 CSS 变量读取语义 token（--border / --muted-foreground /
- * --verdict-*），暗色主题下轴文字/网格自动取暗色阶（此前静态浅色常量在暗色卡片
- * 上对比度崩溃）。读不到（jsdom/极老浏览器）回退到原浅色值。
- * 已知边界：图表不监听主题切换——主题翻转后需数据变化或重挂载才重绘（backlog）。
- */
-function cssHsl(varName: string, fallback: string): string {
-  if (typeof window === 'undefined') return fallback;
-  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-  return value.length > 0 ? `hsl(${value})` : fallback;
-}
-
-const VERDICT_TOKEN: Record<VerdictValue, string> = {
-  CONFIRMED: '--verdict-confirmed',
-  REFUTED: '--verdict-refuted',
-  INCONCLUSIVE: '--verdict-inconclusive',
-  DEGRADED_SCOPE: '--verdict-degraded',
-  UNTESTED: '--verdict-untested',
-};
-
-function verdictChartColor(v: VerdictValue): string {
-  const fallback: Record<VerdictValue, string> = {
-    CONFIRMED: 'hsl(142, 71%, 45%)',
-    REFUTED: 'hsl(0, 84%, 60%)',
-    INCONCLUSIVE: 'hsl(48, 96%, 53%)',
-    DEGRADED_SCOPE: 'hsl(32, 95%, 44%)',
-    UNTESTED: 'hsl(215, 16%, 70%)',
-  };
-  return cssHsl(VERDICT_TOKEN[v], fallback[v]);
-}
-
-function gridColor(): string {
-  return cssHsl('--border', 'hsl(215, 16%, 85%)');
-}
-
-function textColor(): string {
-  return cssHsl('--muted-foreground', 'hsl(215, 16%, 30%)');
-}
 
 const VERDICT_LABELS: Record<VerdictValue, string> = {
   CONFIRMED: 'Confirmed',
@@ -101,10 +62,6 @@ type ValidBaseline = BaselineData & { readonly response: HypothesizeResponse };
 /** 类型谓词：收窄 BaselineData → ValidBaseline（替代各处 `d.response!` 断言）。 */
 function hasValidResponse(d: BaselineData): d is ValidBaseline {
   return d.response !== null && !d.isError;
-}
-
-function baselineColor(key: string): string {
-  return BASELINE_COLORS[key] ?? FALLBACK_COLOR;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,14 +180,14 @@ export function IterationBarChart({ data }: IterationChartProps) {
           .tickFormat(() => ''),
       )
       .selectAll('line')
-      .attr('stroke', gridColor())
+      .attr('stroke', chartGridColor())
       .attr('stroke-dasharray', '4,4');
 
     // Y 轴
     g.append('g')
       .call(d3.axisLeft(yScale).ticks(5))
       .selectAll('text')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 12);
 
     // X 轴
@@ -238,7 +195,7 @@ export function IterationBarChart({ data }: IterationChartProps) {
       .attr('transform', `translate(0,${innerH})`)
       .call(d3.axisBottom(xScale))
       .selectAll('text')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 11)
       .attr('text-anchor', 'end')
       .attr('dx', '-0.5em')
@@ -258,7 +215,7 @@ export function IterationBarChart({ data }: IterationChartProps) {
         'height',
         (d) => innerH - yScale(d.response.loopState.iterationsCompleted),
       )
-      .attr('fill', (d) => baselineColor(d.key))
+      .attr('fill', (d) => baselineChartColor(d.key))
       .attr('rx', 3);
 
     // 数值标签
@@ -270,7 +227,7 @@ export function IterationBarChart({ data }: IterationChartProps) {
       .attr('x', (d) => (xScale(d.label) ?? 0) + xScale.bandwidth() / 2)
       .attr('y', (d) => yScale(d.response.loopState.iterationsCompleted) - 6)
       .attr('text-anchor', 'middle')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 13)
       .attr('font-weight', '600')
       .text((d) => String(d.response.loopState.iterationsCompleted));
@@ -377,14 +334,14 @@ export function MetricBarChart({ data }: MetricChartProps) {
           .tickFormat(() => ''),
       )
       .selectAll('line')
-      .attr('stroke', gridColor())
+      .attr('stroke', chartGridColor())
       .attr('stroke-dasharray', '4,4');
 
     // Y 轴
     g.append('g')
       .call(d3.axisLeft(yScale).ticks(5))
       .selectAll('text')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 12);
 
     // X 轴
@@ -392,7 +349,7 @@ export function MetricBarChart({ data }: MetricChartProps) {
       .attr('transform', `translate(0,${innerH})`)
       .call(d3.axisBottom(xScale))
       .selectAll('text')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 11)
       .attr('text-anchor', 'end')
       .attr('dx', '-0.5em')
@@ -409,7 +366,7 @@ export function MetricBarChart({ data }: MetricChartProps) {
       .attr('y', (d) => yScale(d.metricValue))
       .attr('width', xScale.bandwidth())
       .attr('height', (d) => innerH - yScale(d.metricValue))
-      .attr('fill', (d) => baselineColor(d.key))
+      .attr('fill', (d) => baselineChartColor(d.key))
       .attr('rx', 3);
 
     // 数值标签
@@ -421,7 +378,7 @@ export function MetricBarChart({ data }: MetricChartProps) {
       .attr('x', (d) => (xScale(d.label) ?? 0) + xScale.bandwidth() / 2)
       .attr('y', (d) => yScale(d.metricValue) - 6)
       .attr('text-anchor', 'middle')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 12)
       .attr('font-weight', '600')
       .text((d) => d.metricValue.toFixed(4));
@@ -515,7 +472,7 @@ export function VerdictDistChart({ data }: VerdictDistChartProps) {
     g.append('g')
       .call(yAxis)
       .selectAll('text')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 11);
 
     // X axis
@@ -523,7 +480,7 @@ export function VerdictDistChart({ data }: VerdictDistChartProps) {
       .attr('transform', `translate(0,${innerH})`)
       .call(d3.axisBottom(xScale))
       .selectAll('text')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 11)
       .attr('text-anchor', 'end')
       .attr('dx', '-0.5em')
@@ -541,7 +498,7 @@ export function VerdictDistChart({ data }: VerdictDistChartProps) {
       .attr('x2', innerW)
       .attr('y1', (v) => yScale(v) ?? 0)
       .attr('y2', (v) => yScale(v) ?? 0)
-      .attr('stroke', gridColor())
+      .attr('stroke', chartGridColor())
       .attr('stroke-dasharray', '4,4');
 
     // One dot per baseline at (baseline, its verdict row)
@@ -556,8 +513,8 @@ export function VerdictDistChart({ data }: VerdictDistChartProps) {
         return (yScale(v) ?? 0) + yScale.bandwidth() / 2;
       })
       .attr('r', 9)
-      .attr('fill', (d) => verdictChartColor(getVerdictFromResponse(d.response)))
-      .attr('stroke', textColor())
+      .attr('fill', (d) => verdictChartFill(getVerdictFromResponse(d.response)))
+      .attr('stroke', chartTextColor())
       .attr('stroke-width', 1);
 
     // Verdict text beside each dot — color-independent channel (WCAG 1.4.1)
@@ -572,7 +529,7 @@ export function VerdictDistChart({ data }: VerdictDistChartProps) {
         return (yScale(v) ?? 0) + yScale.bandwidth() / 2 + 4;
       })
       .attr('text-anchor', 'start')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 11)
       .attr('font-weight', '600')
       .text((d) => VERDICT_LABELS[getVerdictFromResponse(d.response)] ?? '');
@@ -653,7 +610,7 @@ export function FalsifiabilityChart({ data }: FalsifiabilityChartProps) {
           .tickFormat((d) => (d === 0 ? 'No' : 'Yes')),
       )
       .selectAll('text')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 12);
 
     // X axis
@@ -661,7 +618,7 @@ export function FalsifiabilityChart({ data }: FalsifiabilityChartProps) {
       .attr('transform', `translate(0,${innerH})`)
       .call(d3.axisBottom(xScale))
       .selectAll('text')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 11)
       .attr('text-anchor', 'end')
       .attr('dx', '-0.5em')
@@ -679,7 +636,7 @@ export function FalsifiabilityChart({ data }: FalsifiabilityChartProps) {
           .tickFormat(() => ''),
       )
       .selectAll('line')
-      .attr('stroke', gridColor())
+      .attr('stroke', chartGridColor())
       .attr('stroke-dasharray', '4,4');
 
     // Bars: 1 = has falsificationSpec, 0 = doesn't
@@ -696,8 +653,8 @@ export function FalsifiabilityChart({ data }: FalsifiabilityChartProps) {
       )
       .attr('fill', (d) =>
         hasFalsificationSpec(d.response)
-          ? 'hsl(142, 71%, 45%)'
-          : 'hsl(215, 16%, 70%)',
+          ? verdictChartFill('CONFIRMED')
+          : CHART_NEUTRAL_FILL,
       )
       .attr('rx', 3);
 
@@ -715,7 +672,7 @@ export function FalsifiabilityChart({ data }: FalsifiabilityChartProps) {
         yScale(hasFalsificationSpec(d.response) ? 0.95 : 0.05) - 8,
       )
       .attr('text-anchor', 'middle')
-      .attr('fill', textColor())
+      .attr('fill', chartTextColor())
       .attr('font-size', 12)
       .attr('font-weight', '600')
       .text((d) =>
