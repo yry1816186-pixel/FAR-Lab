@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { AppShell } from '@/components/layout/AppShell';
 import { RouteErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteEffects } from '@/components/RouteEffects';
-import { I18nProvider, useI18n } from '@/lib/i18n';
+import { I18nProvider, useI18n, useT } from '@/lib/i18n';
 
 // Route-level code splitting. The research workbench is the default/landing route —
 // the research workflow (question → run → frozen run) is the unambiguous primary
@@ -44,12 +44,13 @@ const queryClient = new QueryClient({
 
 /** Suspense fallback shown while a lazy-loaded route chunk downloads on first navigation. */
 function RouteFallback() {
+  const t = useT();
   return (
     <div className="flex items-center justify-center py-24" data-testid="route-fallback">
       <div
         className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-primary"
         role="status"
-        aria-label="Loading page"
+        aria-label={t('app.loadingPage')}
       />
     </div>
   );
