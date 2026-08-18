@@ -103,7 +103,7 @@
     "@types/node": "24.13.2",
     "eslint": "10.6.0",
     "tsx": "4.22.4",
-    "typescript-eslint": "8.62.0",
+    "typescript-eslint": "8.67.0",
     "yaml": "2.9.0"
   },
   "pnpm": {
