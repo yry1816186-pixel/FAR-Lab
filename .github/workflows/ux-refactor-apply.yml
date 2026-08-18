@@ -1,0 +1,36 @@
+name: UX Refactor Atomic Apply
+
+on:
+  push:
+    branches:
+      - ux-refactor/2026-08-18
+    paths:
+      - .ux-refactor/READY
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ux-refactor/2026-08-18
+          fetch-depth: 0
+      - name: Verify and apply atomic refactor patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .ux-refactor/chunk-* > /tmp/ux.patch.gz.b64
+          base64 -d /tmp/ux.patch.gz.b64 | gunzip > /tmp/ux.patch
+          git apply --check /tmp/ux.patch
+          git apply /tmp/ux.patch
+          rm -rf .ux-refactor
+          rm -f .github/workflows/ux-refactor-apply.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor(ux): unify FAR-Lab human experience layer'
+          git push origin HEAD:ux-refactor/2026-08-18
