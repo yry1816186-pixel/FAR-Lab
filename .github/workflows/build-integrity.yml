@@ -1,5 +1,4 @@
 # R9-2 · Build Integrity — 双构建 + 双 grep 断言（编译时常量闸门）
-# 权威 SSOT：HANDOFF_TO_DEV_AGENT.md §3.5, round8 A6, round9 B6
 #
 # 核心断言：
 #   生产构建 grep 零 process.env.AUDITOR_ENABLED（编译时常量，非运行时环境变量）

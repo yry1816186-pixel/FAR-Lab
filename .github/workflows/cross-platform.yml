@@ -73,7 +73,7 @@ jobs:
         run: pnpm run test
       - name: test:agent_loop (FSM + N3 anti-hallucination)
         run: pnpm run test:agent_loop
-      - name: repo hygiene gate (root allowlist / no junk / 0/ leak)
+      - name: repo hygiene gate (tracked content policy · A-I 9 gates)
         run: node scripts/repo_hygiene_gate.mjs
 
   frontend-matrix:
