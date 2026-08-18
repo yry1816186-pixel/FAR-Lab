@@ -58,7 +58,7 @@ const OUTCOME_META: Record<
   PASS: {
     icon: CheckCircle2,
     color: 'text-success',
-    bg: 'bg-success/100/10 border-success/40',
+    bg: 'bg-success/10 border-success/40',
     label: 'PASS',
   },
   FAIL: {
@@ -70,19 +70,19 @@ const OUTCOME_META: Record<
   WARN: {
     icon: AlertTriangle,
     color: 'text-warning',
-    bg: 'bg-warning/100/10 border-warning/40',
+    bg: 'bg-warning/10 border-warning/40',
     label: 'WARN',
   },
   SKIP: {
     icon: MinusCircle,
-    color: 'text-gray-400',
-    bg: 'bg-muted0/10 border-border/30',
+    color: 'text-muted-foreground',
+    bg: 'bg-muted/50 border-border/30',
     label: 'SKIP',
   },
   NOT_APPLICABLE: {
     icon: MinusCircle,
-    color: 'text-gray-500',
-    bg: 'bg-muted0/5 border-border/20',
+    color: 'text-muted-foreground',
+    bg: 'bg-muted/30 border-border/20',
     label: 'N/A',
   },
 };
@@ -108,7 +108,7 @@ export function AssuranceDimensionCard({
         outcomeMeta.bg,
       )}
     >
-      <Icon className={cn('w-5 h-5 mt-0.5 shrink-0', meta?.color ?? 'text-gray-400')} />
+      <Icon className={cn('w-5 h-5 mt-0.5 shrink-0', meta?.color ?? 'text-muted-foreground')} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="font-medium text-sm">{meta?.label ?? dimension}</span>
