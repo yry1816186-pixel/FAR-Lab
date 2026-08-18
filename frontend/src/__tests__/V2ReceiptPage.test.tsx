@@ -149,7 +149,9 @@ describe('V2ReceiptPage — production receipt workspace', () => {
     }));
 
     renderPage();
-    expect(await screen.findByText('Failed to load receipt list')).toBeInTheDocument();
+    const errorAlert = await screen.findByRole('alert');
+    expect(errorAlert).toHaveTextContent('Failed to load receipt list:');
+    expect(errorAlert).toHaveTextContent('service unavailable');
     expect(screen.getByPlaceholderText('Paste envelope JSON here…')).toBeInTheDocument();
     expect(screen.getByText('Assurance Scope')).toBeInTheDocument();
   });
