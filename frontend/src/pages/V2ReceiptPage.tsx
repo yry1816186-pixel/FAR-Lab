@@ -109,8 +109,18 @@ export function V2ReceiptPage() {
   // --- Full page loading (reference receipt only; list loads independently) ---
   if (demoQuery.isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="container max-w-5xl mx-auto py-8 px-4 space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <ScrollText className="w-8 h-8 text-primary" aria-hidden="true" />
+            {t('v2.title')}
+          </h1>
+          <p className="text-muted-foreground">{t('v2.subtitle')}</p>
+        </div>
+        <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-live="polite">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" aria-hidden="true" />
+          <span className="sr-only">{t('app.loadingPage')}</span>
+        </div>
       </div>
     );
   }

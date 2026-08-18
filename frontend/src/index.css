@@ -70,8 +70,6 @@
 
     /* ---- Human-state semantics (never the only carrier of meaning) ---- */
     --info: 217 71% 45%;
-    --success: 142 70% 32%;
-    --warning: 32 95% 34%;
     --evidence: 266 55% 45%;
     --provenance: 190 70% 32%;
 
@@ -158,8 +156,6 @@
     --input: 217 33% 18%;
     --ring: 217 71% 60%;
     --info: 213 94% 68%;
-    --success: 142 70% 52%;
-    --warning: 38 92% 58%;
     --evidence: 266 80% 72%;
     --provenance: 188 75% 55%;
 
