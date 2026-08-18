@@ -127,6 +127,38 @@ pnpm far research verify bundle
 
 ---
 
+## Web 工作台
+
+`pnpm dev` 同时启动 API（:3000）与 Web 工作台（:5173）；`Ctrl+C` 同时停止两者。
+工作台围绕科学对象组织，而不是聊天气泡：
+
+- **研究任务**（`/missions`）——任务级闭环：运行中展示状态轮询 + SSE 生命周期事件流；
+  完成后提供七个视图（总览 / 假设 / 接地 / 计划 / 执行 / 评估 / 溯源）。未完成的任务只显示
+  实时状态——绝不展示编造的冻结结果。
+- **断言检验**（`/assay`）——对单条断言运行 R0–R9 判定内核，或开启跨模型**法庭** / 对抗
+  **竞技场**。法庭与竞技场仅实时可用：未配置 `DASHSCOPE_API_KEY` 时界面预先如实说明，后端
+  以 503 + 处理指引拒绝——绝不回放预制裁决。
+- **验证**（`/verify`）——粘贴或上传 `.far-proof` 证明包，执行六维验证；可按 proofHash 幂等
+  保存收据并稍后复检（`/receipts/<id>`）。
+- **证据**（`/evidence`）——裁决台账、按哈希的证据/链查询，以及整链 Merkle 信任根与可移植
+  快照（可钉入论文附录或 CI）。
+- **基准**（`/benchmark`）——预生成的 Science-125 报告，诚实声明原文展示（离线夹具产出，
+  如实标注——非真实科学裁决）。
+
+每个界面如实渲染聚合 `runMode`；裁决同时携带机器规范令牌与本地化释义；loading / empty /
+error / unavailable 均为一等状态——API 不可达时显示带机器错误码的真实错误，绝不展示编造的
+仪表盘。
+
+工作台源码在 `frontend/`（React 18 + Vite；默认中文，英文次之）：`cd frontend && npm ci`，
+然后 `npm run dev` / `npm run build` / `npm run test`。
+
+单进程模式：`pnpm build` 产出 `frontend/dist` 后，直接 `pnpm api` 即由 API 托管工作台——
+`http://localhost:3000/` 就是完整应用（含 SPA 深链），无需 dev server 或反向代理。
+`--web-root <dir>` 覆盖产物位置，`--no-web` 关闭托管；dist 不存在时 API 保持纯 API 形态并在启动时
+如实说明——绝不服务伪造的外壳页面。
+
+---
+
 ## LIVE 评估（冻结评估集）
 
 FAR-Lab 自带**冻结评估集**（`src/research/evaluation/frozen_eval_set.json`），含跨科学领域的

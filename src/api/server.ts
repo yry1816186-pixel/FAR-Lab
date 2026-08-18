@@ -50,6 +50,13 @@ export interface ApiServerConfig {
   readonly appendOptions?: AppendRecordOptions;
   readonly eventBus?: AgentEventBus;
   readonly logger?: boolean;
+  /**
+   * Static web hosting root (the built `frontend/dist`). Default: auto-detected
+   * `<repo>/frontend/dist`; mounted only when index.html truly exists there —
+   * otherwise the server keeps its API-only 404 behavior (never a fake web shell).
+   * Pass `false` to explicitly disable hosting even when a dist exists.
+   */
+  readonly webRoot?: string | false;
 }
 
 function resolveCorsOrigin(corsOrigins: readonly string[] | undefined): string[] | boolean {
@@ -206,6 +213,14 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     const { registerV2ReceiptPersistRoutes } = await import('./routes/v2_receipts_persist.ts');
     await registerV2ReceiptPersistRoutes(v2, config.db);
   }, { prefix: '/api/v2' });
+
+  // Static web hosting (single-process product mode): mounted last, strictly as
+  // the not-found fallback — every registered route above keeps precedence.
+  if (config.webRoot !== false) {
+    const { registerStaticWeb, defaultWebDistRoot } = await import('./static_web.ts');
+    const mount = registerStaticWeb(app, config.webRoot ?? defaultWebDistRoot());
+    console.warn(`[far-lab] web: ${mount.mounted ? `${mount.reason} — ${mount.distRoot}` : `API-only (${mount.reason})`}`);
+  }
 
   return app;
 }

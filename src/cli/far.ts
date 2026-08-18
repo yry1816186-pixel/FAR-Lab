@@ -1332,6 +1332,7 @@ USAGE:
                          a corrupted DB is never backed up; backup re-checked after write)
 
   far api [--port <n>] [--db <path>|--persist <path>] [--no-seed] [--protected]
+          [--web-root <dir>] [--no-web]
           start the REST API server (Fastify; the frontend defaults to localhost:3000)
     --port <n>      listen port (default 3000, aligned with frontend api_client.ts; overridable via PORT)
     --db <path>     DB path (default :memory: ephemeral, fresh each start)
@@ -1339,7 +1340,11 @@ USAGE:
     --no-seed       do not seed the demo verdict (default seeds C-ASTRO-0001 UNTESTED; the legacy seed
                     injects no statistics so rule R6 does not fire; meant for frontend display)
     --protected     enable JWT auth (needs FAR_JWT_SECRET; default offline anonymous demo)
+    --web-root <d>  serve a built web bundle from <d> (default <repo>/frontend/dist when present)
+    --no-web        API-only mode even when a built dist exists (default: serve dist when present —
+                    single-process product mode; without a dist the server stays API-only and says so)
     example: pnpm api   # backend on localhost:3000; run "cd frontend && npm run dev" for the full stack
+             pnpm build && pnpm api   # single process: API + workbench both on localhost:3000
 
   far verify [--bundle <path> [--db <path>] | --envelope <path> --db <path>] [--mode chain|envelope|full]
              [--json] [--explain]      third-party independent re-computation verification

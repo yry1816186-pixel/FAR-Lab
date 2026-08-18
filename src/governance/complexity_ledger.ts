@@ -41,7 +41,7 @@ export interface ModuleBudget {
 export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
 { module: 'agent_loop', budgetFiles: 26 },
   { module: 'anti_theater', budgetFiles: 35 },
-  { module: 'api', budgetFiles: 34 },
+  { module: 'api', budgetFiles: 35 },  // 依据: Open-World R1 复杂度租金——static_web.ts 单进程产品形态(API 直托 frontend/dist),真实文件数对账,非阈值放松
   { module: 'architecture', budgetFiles: 1 },
   { module: 'audit', budgetFiles: 1 },
   { module: 'benchmark', budgetFiles: 4 },

@@ -1,50 +1,32 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="FAR-Lab — the deterministic trust layer for AI-generated scientific claims. Falsifiable · Auditable · Reproducible."
-    />
-    <!-- Brand color: browser UI / mobile address bar (ink-blue brand-600)。
-         下方预绘脚本会把首个 theme-color 改写为应用内解析的主题色（media 版
-         只能跟随 OS,无视用户的应用内覆盖）。 -->
-    <meta name="theme-color" content="#2258be" />
-    <meta name="theme-color" content="#0a0e1a" media="(prefers-color-scheme: dark)" />
-    <title>FAR-Lab · Falsifiable · Auditable · Reproducible</title>
-
-    <!-- 暗色预绘（审计批次 4·FOUC 修复）：同步阻塞脚本在首帧前解析主题并预置
-         .dark class。此前 .dark 由 ThemeProvider 在 React mount 后才加——存了
-         dark 的用户每次冷启动先白屏一帧再翻黑。与 ThemeProvider 同源判定：
-         localStorage['far-chain-theme'] → prefers-color-scheme 回退。 -->
+    <meta name="description" content="FAR-Lab — falsifiable, auditable research missions with deterministic verdicts and tamper-detectable evidence chains." />
+    <meta name="theme-color" content="#fafaf8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>FAR-Lab</title>
     <script>
-      ;(function () {
-        var dark = false;
+      // Pre-paint theme resolution (avoids a light/dark flash on load).
+      // Key 'far-theme': 'dark' | 'light' | absent (follow prefers-color-scheme).
+      (function () {
         try {
-          var stored = localStorage.getItem('far-chain-theme');
-          dark =
+          var stored = window.localStorage.getItem('far-theme');
+          var dark =
             stored === 'dark' ||
-            (stored !== 'light' &&
+            (stored === null &&
               window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) {
+            document.documentElement.classList.add('dark');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#101113');
+          }
         } catch (e) {
-          dark = false; // localStorage 不可用（隐私模式）→ 亮色回退
+          /* storage unavailable: fall back to the light default */
         }
-        if (dark) document.documentElement.classList.add('dark');
-        var meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', dark ? '#0a0e1a' : '#2258be');
       })();
     </script>
-
-    <!-- Brand typography (R-10.3): Geist (display) + Inter (body) + JetBrains Mono (code/hash).
-         display=swap → 离线/慢网时优雅回退到 system-ui,不阻塞渲染。 -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body>
     <div id="root"></div>

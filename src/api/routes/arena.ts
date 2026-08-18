@@ -26,6 +26,50 @@ const ArenaLiveRequestSchema = z.object({
   refuters: z.array(z.string().min(1).max(64)).min(1).max(6),
 });
 
+interface LiveExecutionContext {
+  readonly gateway: LlmGateway;
+  readonly providerProfile: ProviderProfile;
+  readonly modelSnapshot: string;
+}
+
+/**
+ * Fail-closed live context gate: arena never substitutes replay fixtures, so a
+ * missing/replay-shaped execution context is a 503 with actionable guidance.
+ */
+function requireLiveExecutionContext(config: ArenaRouteConfig | undefined): LiveExecutionContext {
+  const gateway = config?.gateway;
+  const providerProfile = config?.profile;
+  const modelSnapshot = config?.modelSnapshot;
+  const profile = providerProfile === undefined ? null : String(providerProfile);
+  const missingConfiguration = [
+    gateway === undefined ? 'gateway' : null,
+    profile === null || profile.trim().length === 0 ? 'profile' : null,
+    profile === 'offline_replay' ? 'liveProfile' : null,
+    modelSnapshot === undefined || modelSnapshot.trim().length === 0
+      ? 'modelSnapshot'
+      : null,
+  ].filter((item): item is string => item !== null);
+  if (
+    missingConfiguration.length > 0 ||
+    gateway === undefined ||
+    providerProfile === undefined ||
+    modelSnapshot === undefined
+  ) {
+    throw new ApiError({
+      statusCode: 503,
+      errorCode: 'arena_live_profile_unavailable',
+      message: 'live adversarial sessions require a complete non-replay model execution context',
+      detail: {
+        status: 'REQUIRES_CONFIGURATION',
+        missingConfiguration,
+        guidance:
+          'configure a live provider gateway, exact provider profile, and immutable model snapshot; offline_replay is test-only and is never served as an arena result',
+      },
+    });
+  }
+  return { gateway, providerProfile, modelSnapshot };
+}
+
 export async function registerArenaRoute(
   app: FastifyInstance,
   config?: ArenaRouteConfig,
@@ -50,36 +94,7 @@ export async function registerArenaRoute(
       });
     }
 
-    const gateway = config?.gateway;
-    const providerProfile = config?.profile;
-    const modelSnapshot = config?.modelSnapshot;
-    const profile = providerProfile === undefined ? null : String(providerProfile);
-    const missingConfiguration = [
-      gateway === undefined ? 'gateway' : null,
-      profile === null || profile.trim().length === 0 ? 'profile' : null,
-      profile === 'offline_replay' ? 'liveProfile' : null,
-      modelSnapshot === undefined || modelSnapshot.trim().length === 0
-        ? 'modelSnapshot'
-        : null,
-    ].filter((item): item is string => item !== null);
-    if (
-      missingConfiguration.length > 0 ||
-      gateway === undefined ||
-      providerProfile === undefined ||
-      modelSnapshot === undefined
-    ) {
-      throw new ApiError({
-        statusCode: 503,
-        errorCode: 'arena_live_profile_unavailable',
-        message: 'live adversarial sessions require a complete non-replay model execution context',
-        detail: {
-          status: 'REQUIRES_CONFIGURATION',
-          missingConfiguration,
-          guidance:
-            'configure a live provider gateway, exact provider profile, and immutable model snapshot; offline_replay is test-only and is never served as an arena result',
-        },
-      });
-    }
+    const liveContext = requireLiveExecutionContext(config);
 
     try {
       const result = await runArenaSession(
@@ -87,10 +102,10 @@ export async function registerArenaRoute(
         parsed.data.refuters,
         config?.gitCommitSha ?? resolveGitCommitSha(),
         {
-          gateway,
-          providerProfile,
-          modelSnapshot,
-          providerLabel: String(providerProfile),
+          gateway: liveContext.gateway,
+          providerProfile: liveContext.providerProfile,
+          modelSnapshot: liveContext.modelSnapshot,
+          providerLabel: String(liveContext.providerProfile),
         },
       );
       void reply.send(result);

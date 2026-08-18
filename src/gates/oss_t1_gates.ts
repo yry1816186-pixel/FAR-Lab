@@ -337,7 +337,7 @@ export const PUBLICATION_INVENTORY: readonly PublicationEntry[] = [
   { asset: 'src/benchmark/report_schema.ts', visibility: 'public', assetClass: 'benchmark-protocol' },
   { asset: 'ci/CLAIM_RECEIPTS.yaml', visibility: 'public', assetClass: 'release-gates' },
   { asset: 'scripts/release_check.mjs', visibility: 'public', assetClass: 'release-gates' },
-  { asset: 'frontend/src/pages/HonestyWallPage.tsx', visibility: 'public', assetClass: 'negative-results' },
+  { asset: 'frontend/src/features/evidence/EvidencePage.tsx', visibility: 'public', assetClass: 'negative-results' },
   { asset: 'CHANGELOG.md', visibility: 'public', assetClass: 'roadmap-deprecation' },
   { asset: 'CITATION.cff', visibility: 'public', assetClass: 'reproducibility-metadata' },
   { asset: '.zenodo.json', visibility: 'public', assetClass: 'reproducibility-metadata' },

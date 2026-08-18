@@ -169,7 +169,6 @@ Thumbs.db
 .idea/
 
 # --- Repo content policy: docs/benchmark 与实现台账不随源码分发（gate Gate C 同源禁止 tracked）---
-frontend/src/lib/BRAND_VOICE.md
 src/llm_gateway/DIGEST.md
 .github/copilot-instructions.md
 .github/config.yml

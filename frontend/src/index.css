@@ -2,258 +2,133 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============================================================
- * FAR-Lab Design Token System (R-09)
- * ------------------------------------------------------------
- * 视觉气质:严谨 · 可信 · 科学 · 学术 (Precise · Calm · Evidentiary)
- * 参考:Apple HIG / Linear / Vercel / Anthropic / DeepMind / arxiv / Nature
+/*
+ * FAR-Lab design tokens.
  *
- * Token 架构:
- *   - --brand-*      : 品牌主色(ink-blue 11 阶,亮暗共用,不反色)
- *   - shadcn 语义层   : --background/--foreground/--primary/... 亮暗分别精调
- *   - --verdict-*     : 5 值裁决色(vivid,用于 icon/border/D3 邻近)
- *   - --verdict-*-solid: 深色阶(用于 badge bg + 白字,WCAG AA ≥4.5:1)
- *   - --success/--warning: 语义状态色(D-04 token 供给,供页面替换原始调色板类名)
- *   - --focus-ring    : 全局 :focus-visible 焦点环(D-05 基线)
- *   - --radius/--ring : 圆角基线 + 聚焦环(品牌蓝)
- * 所有值为 HSL 三元组(空格分隔,无 hsl() 包裹),经 shadcn `hsl(var(--x))` 消费。
- * ============================================================ */
+ * Product character: scientific instrument × research workspace × precision
+ * engineering tool. Restraint first — no gradients, no glow, no glass. Color
+ * encodes semantics only; layout solves complexity through hierarchy,
+ * grouping, and spacing rather than card stacking.
+ */
 
-@layer base {
-  :root {
-    /* ---- 主题契约(PR-03):原生控件/滚动条/自动填充跟随亮色主题 ---- */
-    color-scheme: light;
+:root {
+  /* Surfaces & ink */
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f3f2ef;
+  --border: #e3e1da;
+  --border-strong: #c9c6bd;
+  --ink: #1c1b18;
+  --ink-2: #57544c;
+  --ink-3: #8a867c;
 
-    /* ---- Brand scale (ink-blue, 亮暗共用) ---- */
-    --brand-50: 214 60% 97%;
-    --brand-100: 214 64% 94%;
-    --brand-200: 213 70% 88%;
-    --brand-300: 212 73% 80%;
-    --brand-400: 213 72% 67%;
-    --brand-500: 217 71% 53%;
-    --brand-600: 219 70% 44%;
-    --brand-700: 220 67% 36%;
-    --brand-800: 221 64% 28%;
-    --brand-900: 222 60% 22%;
-    --brand-950: 224 65% 14%;
+  /* Interactive accent (instrument blue) — interactive affordance only */
+  --accent: #1a4fd6;
+  --accent-ink: #ffffff;
 
-    /* ---- Accent (cyan-teal, 仅 logo 金属感 / 聚焦强调,克制使用) ---- */
-    --accent-brand-400: 190 95% 60%;
-    --accent-brand-500: 192 90% 45%;
+  /* Generic state */
+  --ok: #0e7a4c;
+  --danger: #b23232;
+  --warn: #96690d;
+  --info: #1a4fd6;
 
-    /* ---- Surfaces & text (light · cool slate) ---- */
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222 47% 11%;
+  /* Verdict semantics (canonical 5-value machine verdict) */
+  --v-confirmed: #0e7a4c;
+  --v-refuted: #b23232;
+  --v-inconclusive: #96690d;
+  --v-degraded: #6556c4;
+  --v-untested: #6e6b64;
 
-    /* ---- Brand primary (deep ink-blue, 白字 AAA) ---- */
-    --primary: 219 70% 44%;
-    --primary-foreground: 0 0% 100%;
+  color-scheme: light;
+}
 
-    /* ---- Destructive (error/delete) ---- */
-    --destructive: 0 72% 48%;
-    --destructive-foreground: 0 0% 100%;
+.dark {
+  --bg: #101113;
+  --surface: #16171a;
+  --surface-2: #1d1f23;
+  --border: #2a2c31;
+  --border-strong: #3d4046;
+  --ink: #e9e7e2;
+  --ink-2: #b3b0a7;
+  --ink-3: #7d7a72;
 
-    /* ---- Lines & focus ---- */
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 217 71% 53%;
+  --accent: #7aa2ff;
+  --accent-ink: #0d1526;
 
-    /* ---- Human-state semantics (never the only carrier of meaning) ---- */
-    --info: 217 71% 45%;
-    --evidence: 266 55% 45%;
-    --provenance: 190 70% 32%;
+  --ok: #3fb97f;
+  --danger: #e06c6c;
+  --warn: #d9a83f;
+  --info: #7aa2ff;
 
-    /* ---- Motion tokens ---- */
-    --motion-instant: 0ms;
-    --motion-fast: 120ms;
-    --motion-normal: 200ms;
-    --motion-complex: 320ms;
-    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-    --ease-emphasized: cubic-bezier(0.2, 0, 0, 1.2);
+  --v-confirmed: #3fb97f;
+  --v-refuted: #e06c6c;
+  --v-inconclusive: #d9a83f;
+  --v-degraded: #a394f0;
+  --v-untested: #8f8c85;
 
-    /* ---- Radius baseline (学术偏小圆角) ---- */
-    --radius: 0.5rem;
-
-    /* ---- Semantic status colors (success/warning · D-04 token 供给) ----
-       沿用 verdict 色阶同族校准:success 与 confirmed 同族绿,warning 与
-       inconclusive 同族黄(黄+白字不达 AA,故只配深色前景,不设 solid 变体)。
-       供后续页面 PR 替换 red- / emerald- 等原始调色板类名,不重算既有 verdict 色值。 */
-    --success: 142.1 70.6% 45.3%;
-    --success-solid: 142.1 70.6% 30%;
-    --success-foreground: 0 0% 100%;
-    --warning: 47.9 95.8% 53.1%;
-    --warning-foreground: 222.2 84% 4.9%;
-
-    /* ---- Focus ring (D-05 全局 :focus-visible 基线) ----
-       与 --ring 同色族保持品牌一致;offset 走 token 便于后续微调。 */
-    --focus-ring: 217 71% 53%;
-    --focus-ring-offset: 2px;
-
-    /* ---- 主题面契约(PR-03):选区与 overlay 遮罩 token 化 ----
-       selection:品牌蓝淡染 + 继承深色字(浅染底不翻白字,克制)。
-       overlay:Dialog/AlertDialog 遮罩色(深墨蓝,消费时带透明度和 --overlay-opacity)。 */
-    --selection: 217 71% 53%;
-    --selection-alpha: 0.18;
-    --overlay: 224 71% 4%;
-    --overlay-opacity: 0.8;
-
-    /* ---- Verdict status colors (vivid · icon/border/accent) ---- */
-    --verdict-confirmed: 142.1 70.6% 45.3%;
-    --verdict-confirmed-solid: 142.1 70.6% 30%;
-    --verdict-confirmed-foreground: 0 0% 100%;
-    --verdict-refuted: 0 84.2% 60.2%;
-    --verdict-refuted-solid: 0 84.2% 40%;
-    --verdict-refuted-foreground: 0 0% 100%;
-    --verdict-inconclusive: 47.9 95.8% 53.1%;
-    --verdict-inconclusive-foreground: 222.2 84% 4.9%;
-    --verdict-degraded: 32.1 94.6% 43.7%;
-    --verdict-degraded-solid: 32.1 94.6% 32%;
-    --verdict-degraded-foreground: 0 0% 100%;
-    --verdict-untested: 215.4 16.3% 46.9%;
-    --verdict-untested-foreground: 222.2 84% 4.9%;
-  }
-
-  .dark {
-    /* ---- 主题契约(PR-03):原生控件/滚动条/自动填充跟随暗色主题 ---- */
-    color-scheme: dark;
-
-    /* ---- Surfaces & text (dark · 深石板蓝,非纯黑避免刺眼) ---- */
-    --background: 222 47% 5%;
-    --foreground: 210 40% 98%;
-    --card: 222 44% 8%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 44% 8%;
-    --popover-foreground: 210 40% 98%;
-    --secondary: 217 33% 15%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 15%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-
-    /* ---- Brand primary (ink-blue + 白字,暗底下显眼且 WCAG AA ≥4.5:1) ----
-       注:曾用 brand-500(L53%)+ 深字,对比度仅 3.81 FAIL。改为 brand-600 阶(L45%)+ 白字,
-       对比度 5.79 PASS,且与亮色 primary 同色阶保持品牌一致(counter-case:暗色 a11y 回归)。 */
-    --primary: 217 71% 45%;
-    --primary-foreground: 0 0% 100%;
-
-    /* ---- Destructive ---- */
-    --destructive: 0 63% 45%;
-    --destructive-foreground: 0 0% 100%;
-
-    /* ---- Lines & focus (暗底提亮) ---- */
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 217 71% 60%;
-    --info: 213 94% 68%;
-    --evidence: 266 80% 72%;
-    --provenance: 188 75% 55%;
-
-    /* ---- Semantic status colors (dark) ----
-       vivid 阶暗底提亮保可见(与 verdict confirmed/inconclusive 暗调同策略);
-       success-solid 保持深(白字 AA ≥4.5:1,同 confirmed-solid L26% 校准)。 */
-    --success: 142.1 70.6% 40%;
-    --success-solid: 142.1 70.6% 26%;
-    --success-foreground: 0 0% 100%;
-    --warning: 47.9 95.8% 53.1%;
-    --warning-foreground: 222.2 84% 4.9%;
-
-    /* ---- Focus ring (dark · 暗底提亮,同 --ring 策略) ---- */
-    --focus-ring: 217 71% 60%;
-    --focus-ring-offset: 2px;
-
-    /* ---- 主题面契约(PR-03 · dark) ----
-       selection:暗底提亮品牌蓝 + 加深染透明度,配亮字保可读。
-       overlay:遮罩略降不透明度(暗底本就深,避免压成纯黑洞)。 */
-    --selection: 216 90% 64%;
-    --selection-alpha: 0.32;
-    --selection-foreground: 210 40% 98%;
-    --overlay: 224 71% 4%;
-    --overlay-opacity: 0.72;
-
-    /* ---- Verdict status colors (dark) ----
-       - vivid 变体(--verdict-*):icon/border 用,暗底提亮保可见。
-       - solid 变体(--verdict-*-solid):badge 背景配白字,必须保持暗(WCAG AA ≥4.5:1)。
-         counter-case:曾将 solid 提亮至 L32%/42%,白字对比度跌至 4.35/3.44 FAIL。
-         修正:confirmed-solid→L26%、degraded-solid→L30%,白字对比度 5.69/5.88 PASS。 */
-    --verdict-confirmed: 142.1 70.6% 40%;
-    --verdict-confirmed-solid: 142.1 70.6% 26%;
-    --verdict-confirmed-foreground: 0 0% 100%;
-    --verdict-refuted: 0 72.2% 50.6%;
-    --verdict-refuted-solid: 0 72.2% 42%;
-    --verdict-refuted-foreground: 0 0% 100%;
-    --verdict-inconclusive: 47.9 95.8% 53.1%;
-    --verdict-inconclusive-foreground: 222.2 84% 4.9%;
-    --verdict-degraded: 32.1 94.6% 50%;
-    --verdict-degraded-solid: 32.1 94.6% 30%;
-    --verdict-degraded-foreground: 0 0% 100%;
-    --verdict-untested: 215.4 16.3% 55%;
-    --verdict-untested-foreground: 210 40% 98%;
-  }
+  color-scheme: dark;
 }
 
 @layer base {
-  * {
-    @apply border-border;
+  html {
+    @apply bg-bg text-ink antialiased;
+    font-feature-settings: 'tnum' 1, 'cv05' 1;
   }
+
   body {
-    @apply bg-background text-foreground font-sans;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
+    @apply font-sans text-[0.875rem] leading-relaxed;
   }
-  /* 页面主标题统一使用 display 字族(Geist),其余标题沿用 Inter */
-  h1 {
-    @apply font-display tracking-tight;
-  }
-  /* 文本选区(PR-03 主题契约):亮暗各一套 token(原仅亮色单调淡染)。
-     亮色:品牌蓝淡染 + 继承深色字;暗色:提亮蓝加深染 + 亮字。 */
-  ::selection {
-    background-color: hsl(var(--selection) / var(--selection-alpha));
-    color: var(--selection-foreground, inherit);
-  }
-  /* 全局键盘焦点基线(D-05 · WCAG 2.4.7 Focus Visible):
-     此前全仓无 :focus-visible 规则,nav 链接与 shell 按钮仅 hover 样式,
-     程序化聚焦实测 outline-style:none——键盘用户丢失位置。
-     环色/offset 消费 token(亮暗自适应)。不与 Button 原语产生双重环:
-     Button 已声明 focus-visible:outline-none + box-shadow ring(ring-ring,
-     offset-2),utility 特异性高于本 base 规则,原语自身环生效、本规则让位。 */
+
+  /* Visible focus everywhere interactive elements allow it (WCAG 2.4.7). */
   :focus-visible {
-    outline: 2px solid hsl(var(--focus-ring));
-    outline-offset: var(--focus-ring-offset);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
-  /* 滚动条(学术克制:细 + 中性色,muted-foreground token 亮暗自适应) */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
   }
-  /* WebKit 滚动条同 token 映射(克制:不加圆角/悬停等装饰)。 */
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+
+  code,
+  kbd,
+  pre,
+  samp {
+    @apply font-mono;
   }
-  ::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.3);
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
+
+  /* Long hashes / ids must wrap without breaking layout. */
+  .hash-wrap {
+    word-break: break-all;
   }
 }
 
-/* Accessibility: respect the OS-level prefers-reduced-motion setting (WCAG 2.3.3 /
-   vestibular-disorder accommodation). When the user has requested reduced motion,
-   collapse all animations and transitions to near-instant so animate-pulse
-   skeletons, spinners, and RouteEffects scroll do not trigger motion sensitivity. */
+@layer components {
+  /* Micro section label — the primary grouping device of the workspace. */
+  .label-micro {
+    @apply font-sans text-micro font-semibold uppercase text-ink3;
+  }
+
+  /* Skip-to-content link: visually hidden until focused (WCAG 2.4.1). */
+  .skip-link {
+    @apply sr-only;
+  }
+  .skip-link:focus-visible {
+    @apply not-sr-only fixed left-4 top-4 z-50 rounded border border-borderStrong bg-surface px-3 py-2 text-sm font-medium text-ink shadow-md;
+  }
+}
+
+@keyframes far-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.far-spinner {
+  animation: far-spin 0.9s linear infinite;
+}
+
+/* Reduced motion: kill animation/transition/smooth scroll globally. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -262,5 +137,8 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .far-spinner {
+    animation: none;
   }
 }

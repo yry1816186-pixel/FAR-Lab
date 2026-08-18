@@ -4,10 +4,7 @@ import Database from 'better-sqlite3';
 
 import { runMigrations } from '../../src/db/index.ts';
 import { buildServer } from '../../src/api/server.ts';
-import {
-  createLiveFixtureGateway,
-  TEST_MODEL_SNAPSHOT,
-} from './live_fixture_gateway.ts';
+import { createLiveFixtureGateway } from './live_fixture_gateway.ts';
 
 function makeDb(): Database.Database {
   const db = new Database(':memory:');
@@ -64,7 +61,7 @@ test('POST /arena with a complete execution context returns a real-source assess
     jwtSecret: null,
     gateway: createLiveFixtureGateway('arena-model'),
     profile: 'competition_aliyun_qwen',
-    modelSnapshot: TEST_MODEL_SNAPSHOT,
+    modelSnapshot: 'arena-model',
     logger: false,
   });
   try {

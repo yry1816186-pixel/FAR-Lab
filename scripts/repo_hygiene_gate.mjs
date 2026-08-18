@@ -75,7 +75,7 @@ const MD_ALLOWLIST = new Set([
   // GitHub community
   '.github/pull_request_template.md',
   // 独立工作区 / 子模块局部文档（解释代码不可见的长期契约）
-  'frontend/README.md', 'frontend/DESIGN_SYSTEM.md',
+  'frontend/README.md',
   'golden_vectors/versioning/README.md',
   'schema/json/README.md', 'schema/migrations/README.md',
   'src/llm_gateway/adapters/openai_compatible/README.md',

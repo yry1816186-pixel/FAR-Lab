@@ -75,16 +75,29 @@ prefixOutput(api, 'api');
 // Prefer spawning vite's bin directly (no npm/pnpm shell wrapper → no orphan
 // process trees on Windows kill). Fall back to `pnpm --dir frontend run dev`
 // when the local vite bin is absent (e.g. exotic installs).
+//
+// Host/port forwarding: preview hosts (and humans) pass `-- --port N --host H`
+// or set PORT/HOST env; forward both to the vite child so the web surface
+// listens where the caller expects. The API child keeps :3000 (vite proxy
+// targets it) and receives no forwarded args.
+const forwardedArgs = process.argv.slice(2);
+const hasArg = (name) => forwardedArgs.some((a) => a === name || a.startsWith(`${name}=`));
+if (!hasArg('--port') && /^\d+$/.test(process.env.PORT ?? '')) {
+  forwardedArgs.push('--port', process.env.PORT);
+}
+if (!hasArg('--host') && typeof process.env.HOST === 'string' && process.env.HOST.length > 0) {
+  forwardedArgs.push('--host', process.env.HOST);
+}
 const viteBin = join(ROOT, 'frontend', 'node_modules', 'vite', 'bin', 'vite.js');
 let web;
 if (existsSync(viteBin)) {
-  web = spawn(process.execPath, [viteBin], {
+  web = spawn(process.execPath, [viteBin, ...forwardedArgs], {
     cwd: join(ROOT, 'frontend'),
     env: process.env,
     stdio: ['inherit', 'pipe', 'pipe'],
   });
 } else {
-  web = spawn('pnpm', ['--dir', join(ROOT, 'frontend'), 'run', 'dev'], {
+  web = spawn('pnpm', ['--dir', join(ROOT, 'frontend'), 'run', 'dev', '--', ...forwardedArgs], {
     cwd: ROOT,
     env: process.env,
     stdio: ['inherit', 'pipe', 'pipe'],
@@ -104,6 +117,9 @@ let finishing = false;
 console.log('FAR-Lab dev — full-stack development session');
 console.log(`  API : ${API_URL}  (node src/cli/far.ts api)`);
 console.log(`  Web : ${WEB_URL}  (vite)`);
+if (forwardedArgs.length > 0) {
+  console.log(`  Web args forwarded to vite: ${forwardedArgs.join(' ')}`);
+}
 console.log('  Ctrl+C stops both.');
 if (Object.keys(dotenvOverrides).length > 0) {
   console.log(`  .env: loaded ${Object.keys(dotenvOverrides).length} key(s) into the API env (values never printed).`);

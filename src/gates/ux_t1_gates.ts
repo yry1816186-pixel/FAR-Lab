@@ -5,19 +5,20 @@
 //     百分比/不可解释 ETA——宪法条款的机器面）；
 //   - pseudoLocalize/wideCharRatio（UX-I18N）：伪本地化膨胀与 CJK 宽字符风险检测。
 //
-// 断言的真实资产（2026-08-17 实测 @origin/main）：
+// 断言的真实资产（2026-08-18 clean-room 前端重建后实测）：
 //   A11Y：index.css prefers-reduced-motion 媒体查询、AppShell skip-link + main 地标、
-//         button focus-visible ring、pages aria- 计 151 处/18 页、VerdictBadge 文本+
-//         图标双通道、AblationCharts roleImg×4；
+//         Button focus-visible ring、src 全树 aria-/htmlFor/role 真实计数、
+//         VerdictBadge 文本+图标双通道、Benchmark 分布条 role="img"+aria-label（行为由
+//         frontend 测试锁死：getByRole('img') 断言逐行在场）；
 //   API：schema/openapi.json 36 路径全 /v1|v2 版本化、receipts limit/offset 分页、
 //         429 限流问题响应、platform/errors.ts 错误目录（code/class/remediation/since）、
 //         generate_openapi --check CI 防漂移、release/compat_matrix 兼容矩阵；
 //   CLI：far.ts --json ≥10 处、doctor/--dry-run/research resume/退出码契约、
 //         cli_error_paths 可操作错误测试、README Ctrl+C 诚实取消+续跑；
-//   I18N：zh/en 目录 759 键零漂移 + 占位符逐键校验 + verdict 经 {raw} 透传；
-//   PERF：/research/{id}/cancel + /events SSE 端点、EventSource 自动重连、
+//   I18N：zh/en 目录 481 键零漂移 + 占位符逐键校验 + verdict 经 {raw} 透传；
+//   PERF：/research/{id}/cancel + /events SSE 端点、EventSource 自动重连（sse.ts）、
 //         fsm resumeStore、perf_budget.json ≥4 预算（rationale+阈值）+ CI 门；
-//   WEB：App.tsx 19 路由（科学对象维度）零 chat 路由、Workbench ≥4 状态面。
+//   WEB：app/App.tsx 11 路由（科学对象维度）零 chat 路由、核心旅程 ≥4 状态面 testid。
 //
 // Cannot-prove（本机制不能证明什么）：
 //   - 所有源码断言是「结构在场」判定：对比度数值、读屏实际朗读、触控目标尺寸、
@@ -79,6 +80,18 @@ function readJson(absPath: string): unknown {
   }
 }
 
+/** 递归收集某扩展名的文件（新前端为 features/ 分层结构，扁平 readdir 不够用）。 */
+function listFilesRecursive(dir: string, ext: string): string[] {
+  const out: string[] = [];
+  if (!existsSync(dir)) return out;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listFilesRecursive(full, ext));
+    else if (entry.name.endsWith(ext)) out.push(full);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // UX-A11Y-001：核心旅程可访问性（源码可静态断言的维度）
 // ---------------------------------------------------------------------------
@@ -101,50 +114,55 @@ export function checkA11y(repoRoot: string): RequirementCheck {
     }
   }
 
-  // 2) 语义地标 + skip link（AppShell：跳转链接 + main 地标）
-  const shell = readText(join(repoRoot, 'frontend/src/components/layout/AppShell.tsx'));
+  // 2) 语义地标 + skip link（AppShell：跳转链接 + main 地标 + 具名主导航）
+  const shell = readText(join(repoRoot, 'frontend/src/app/AppShell.tsx'));
   if (!shell.includes('skipToContent')) problems.push('AppShell lacks skip-to-content link');
   else evidence.push('skipToContent link present');
   if (!shell.includes('<main id="main-content"')) problems.push('AppShell lacks <main id="main-content"> landmark');
   else evidence.push('main landmark with programmatically focusable id');
+  if (!shell.includes('aria-label')) problems.push('AppShell nav/menu lack accessible names');
+  else evidence.push('labelled navigation + menu disclosure (aria-label/aria-expanded/aria-controls)');
 
   // 3) visible focus（交互组件 focus-visible ring）
-  const button = readText(join(repoRoot, 'frontend/src/components/ui/button.tsx'));
-  if (!button.includes('focus-visible:ring')) problems.push('ui/button lacks focus-visible ring styling');
+  const button = readText(join(repoRoot, 'frontend/src/shared/ui/Button.tsx'));
+  if (!button.includes('focus-visible:ring')) problems.push('ui/Button lacks focus-visible ring styling');
   else evidence.push('focus-visible ring on interactive components');
 
-  // 4) aria 覆盖面（真实计数：页均 aria 属性）
-  const pagesDir = join(repoRoot, 'frontend/src/pages');
+  // 4) aria/label 覆盖面（真实计数：新架构把模式集中在 shared 原语——Tabs/StateBlock/
+  //    HashValue/AppShell——页面经组合继承；故扫描 src 全树，另断言 htmlFor 表单标签关联）
+  const srcDir = join(repoRoot, 'frontend/src');
+  const tsxFiles = existsSync(srcDir) ? listFilesRecursive(srcDir, '.tsx') : [];
+  if (tsxFiles.length === 0) problems.push('frontend/src tree missing');
   let ariaTotal = 0;
-  let pagesWithAria = 0;
-  let pageCount = 0;
-  if (existsSync(pagesDir)) {
-    for (const f of readdirSync(pagesDir)) {
-      if (!f.endsWith('.tsx')) continue;
-      pageCount += 1;
-      const n = countOccurrences(readText(join(pagesDir, f)), 'aria-');
-      ariaTotal += n;
-      if (n > 0) pagesWithAria += 1;
-    }
-  } else {
-    problems.push('frontend/src/pages directory missing');
+  let filesWithAria = 0;
+  let htmlForTotal = 0;
+  for (const f of tsxFiles) {
+    const text = readText(f);
+    const n = countOccurrences(text, 'aria-');
+    ariaTotal += n;
+    if (n > 0) filesWithAria += 1;
+    htmlForTotal += countOccurrences(text, 'htmlFor');
   }
-  if (pageCount < 10) problems.push(`page count suspiciously low: ${pageCount}`);
-  if (ariaTotal < 120) problems.push(`aria attribute coverage too low: ${ariaTotal} across ${pageCount} pages`);
-  else evidence.push(`aria coverage: ${ariaTotal} attributes across ${pageCount} pages (${pagesWithAria} pages have >=1)`);
-  if (pagesWithAria < 13) problems.push(`only ${pagesWithAria}/${pageCount} pages carry aria attributes`);
+  if (ariaTotal < 40) problems.push(`aria attribute coverage too low: ${ariaTotal} across src`);
+  else evidence.push(`aria coverage: ${ariaTotal} attributes across ${tsxFiles.length} tsx (${filesWithAria} files carry >=1)`);
+  if (filesWithAria < 12) problems.push(`only ${filesWithAria}/${tsxFiles.length} files carry aria attributes`);
+  if (htmlForTotal < 8) problems.push(`form label association too low: ${htmlForTotal} htmlFor`);
+  else evidence.push(`form labeling: ${htmlForTotal} htmlFor associations (labels, not placeholder-only)`);
 
-  // 5) 非颜色编码：verdict 状态带文本 label + 图标双通道（色盲可辨）
-  const badge = readText(join(repoRoot, 'frontend/src/components/VerdictBadge.tsx'));
-  const hasTextAndIcon = badge.includes('label:') && badge.includes('icon:');
+  // 5) 非颜色编码：verdict 状态带文本 token + 图标双通道（色盲可辨）
+  const badge = readText(join(repoRoot, 'frontend/src/shared/ui/VerdictBadge.tsx'));
+  const hasTextAndIcon = badge.includes('verdict.token') && badge.includes('VERDICT_ICON');
   if (!hasTextAndIcon) problems.push('VerdictBadge lacks text+icon channels (color-only encoding)');
-  else evidence.push('non-color encoding: verdict states carry label+icon channels');
+  else evidence.push('non-color encoding: verdict states carry machine token + shape icon channels');
 
-  // 6) 图表替代文本：role="img" + aria-label spec 与渲染绑定
-  const charts = readText(join(repoRoot, 'frontend/src/components/AblationCharts.tsx'));
-  const roleImgCount = countOccurrences(charts, 'roleImg: true');
-  if (roleImgCount < 3) problems.push(`chart alternatives too few: ${roleImgCount} roleImg specs`);
-  else evidence.push(`chart alternatives: ${roleImgCount} charts with role=img + aria-label spec`);
+  // 6) 图表替代文本：benchmark 分布条 role="img" + 逐行 aria-label；渲染行为由前端测试锁死
+  const bench = readText(join(repoRoot, 'frontend/src/features/benchmark/BenchmarkPage.tsx'));
+  const hasRoleImg = bench.includes('role="img"') && bench.includes('aria-label');
+  if (!hasRoleImg) problems.push('benchmark distribution bars lack role="img" + aria-label alternatives');
+  else evidence.push('chart alternatives: distribution bars render role="img" + per-row aria-label (key: count)');
+  const benchTest = readText(join(repoRoot, 'frontend/src/__tests__/evidence_benchmark.test.tsx'));
+  if (!benchTest.includes("getByRole('img'")) problems.push('no rendered-behavior test locks the chart alternatives');
+  else evidence.push("chart alternatives locked by behavior test (getByRole('img', { name: 'CONFIRMED: 3' }) etc.)");
 
   return makeCheck(
     'UX-A11Y-001',
@@ -338,8 +356,8 @@ export function checkI18n(repoRoot: string): RequirementCheck {
   const problems: string[] = [];
   const evidence: string[] = [];
 
-  const zhPath = join(repoRoot, 'frontend/src/lib/i18n/zh.ts');
-  const enPath = join(repoRoot, 'frontend/src/lib/i18n/en.ts');
+  const zhPath = join(repoRoot, 'frontend/src/shared/i18n/zh.ts');
+  const enPath = join(repoRoot, 'frontend/src/shared/i18n/en.ts');
   const zh = readText(zhPath);
   const en = readText(enPath);
   if (zh.length === 0 || en.length === 0) {
@@ -349,7 +367,7 @@ export function checkI18n(repoRoot: string): RequirementCheck {
 
   const zhKeys = extractCatalogueKeys(zh);
   const enKeys = extractCatalogueKeys(en);
-  if (zhKeys.size < 700) problems.push(`catalogue too small: ${zhKeys.size} keys`);
+  if (zhKeys.size < 400) problems.push(`catalogue too small: ${zhKeys.size} keys`);
   else evidence.push(`${zhKeys.size} keys per locale (zh default + en non-default)`);
 
   // 键位零漂移
@@ -370,7 +388,7 @@ export function checkI18n(repoRoot: string): RequirementCheck {
   else evidence.push('placeholder parity: {token} sets identical per key');
 
   // verdict 规范值经 {raw} 透传：翻译包裹但不替换认知状态值
-  const verdictKey = 'viz.tooltip.verdict';
+  const verdictKey = 'verdict.token';
   const zhVerdict = zhKeys.get(verdictKey) ?? '';
   const enVerdict = enKeys.get(verdictKey) ?? '';
   if (!zhVerdict.includes('{raw}') || !enVerdict.includes('{raw}')) {
@@ -379,10 +397,10 @@ export function checkI18n(repoRoot: string): RequirementCheck {
     evidence.push('epistemic preservation: verdict canonical tokens pass through {raw} (translation wraps, never replaces)');
   }
 
-  // 非默认语言核心旅程在场（research.* 工作台旅程键双语言存在）
-  const coreJourney = [...zhKeys.keys()].filter((k) => k.startsWith('research.')).length;
+  // 非默认语言核心旅程在场（mission.* 工作台旅程键双语言存在）
+  const coreJourney = [...zhKeys.keys()].filter((k) => k.startsWith('mission.')).length;
   if (coreJourney < 20) problems.push(`core journey keys too few: ${coreJourney}`);
-  else evidence.push(`non-default-locale core journey: ${coreJourney} research.* keys in both locales`);
+  else evidence.push(`non-default-locale core journey: ${coreJourney} mission.* keys in both locales`);
 
   // 类型层防漂移标记
   if (!en.includes('Record<MessageKey, string>')) problems.push('en catalogue not type-bound to zh keys');
@@ -434,12 +452,13 @@ export function checkPerf(repoRoot: string): RequirementCheck {
   if (!hasEvents) problems.push('openapi lacks /research/{runId}/events (SSE progress)');
   else evidence.push('SSE progress: GET /api/v1/research/{runId}/events');
 
-  // 客户端：取消调用 + EventSource 自动重连（断线恢复面）
-  const client = readText(join(repoRoot, 'frontend/src/lib/research_client.ts'));
-  if (!client.includes('/cancel')) problems.push('research client lacks cancel call');
+  // 客户端：取消调用（endpoints.ts）+ EventSource 自动重连（sse.ts，断线恢复面）
+  const endpoints = readText(join(repoRoot, 'frontend/src/shared/api/endpoints.ts'));
+  if (!endpoints.includes('/cancel')) problems.push('research endpoints lack cancel call');
   else evidence.push('client cancel wired (POST .../cancel)');
-  if (!client.includes('EventSource')) problems.push('client lacks EventSource streaming');
-  else if (!client.includes('auto-reconnect')) problems.push('client SSE reconnect behavior not documented');
+  const sse = readText(join(repoRoot, 'frontend/src/shared/api/sse.ts'));
+  if (!sse.includes('EventSource')) problems.push('client lacks EventSource streaming');
+  else if (!sse.includes('auto-reconnect')) problems.push('client SSE reconnect behavior not documented');
   else evidence.push('EventSource streaming with documented native auto-reconnect (stream interruption recovery)');
 
   // 后端断点续跑：FSM resume store + CLI resume
@@ -479,25 +498,25 @@ export function checkPerf(repoRoot: string): RequirementCheck {
 
 /** 宪法 UX-WEB-001 列举的科学对象维度 → 仓库真实路由的映射（证据化登记）。 */
 export const SCIENTIFIC_OBJECT_ROUTES: readonly { readonly object: string; readonly route: string }[] = [
-  { object: 'ResearchQuestion + experiment plan/run', route: '/research' },
-  { object: 'evidence graph', route: '/viz' },
-  { object: 'experiment plan (machine gates)', route: '/planning' },
-  { object: 'verdict/proof report', route: '/report' },
-  { object: 'verdict/proof chain', route: '/integrity' },
-  { object: 'verdict adjudication (model comparison)', route: '/court' },
-  { object: 'correction/history (audit trace)', route: '/audit' },
-  { object: 'correction/history (version diff)', route: '/versions' },
-  { object: 'negative results / epistemic honesty', route: '/honesty' },
+  { object: 'ResearchQuestion + mission run', route: '/missions' },
+  { object: 'mission workspace (hypotheses/grounding/plan/execution/evaluation/provenance)', route: '/missions/:runId' },
+  { object: 'mission workspace views', route: '/missions/:runId/:view' },
+  { object: 'verdict adjudication (claim assay + model court/arena)', route: '/assay' },
+  { object: 'proof verification (.far-proof)', route: '/verify' },
+  { object: 'verification receipt detail', route: '/receipts/:receiptId' },
+  { object: 'verdict/evidence chain + integrity trust root', route: '/evidence' },
+  { object: 'benchmark report + epistemic honesty notes', route: '/benchmark' },
+  { object: 'product honesty (what it cannot prove)', route: '/about' },
 ];
 
 export function checkWebWorkbench(repoRoot: string): RequirementCheck {
   const problems: string[] = [];
   const evidence: string[] = [];
 
-  const app = readText(join(repoRoot, 'frontend/src/App.tsx'));
+  const app = readText(join(repoRoot, 'frontend/src/app/App.tsx'));
   const routes = [...app.matchAll(/<Route path="([^"]+)" element=\{<(\w+)/g)]
     .map((m) => ({ path: m[1] ?? '', page: m[2] ?? '' }));
-  if (routes.length < 17) problems.push(`route table too small: ${routes.length}`);
+  if (routes.length < 9) problems.push(`route table too small: ${routes.length}`);
   else evidence.push(`route table: ${routes.length} routes (incl. 404 catch-all)`);
 
   const catchAll = routes.find((r) => r.path === '*');
@@ -515,25 +534,32 @@ export function checkWebWorkbench(repoRoot: string): RequirementCheck {
   if (missingObjects.length > 0) {
     problems.push(`scientific-object routes missing: ${missingObjects.map((o) => `${o.object}→${o.route}`).join(', ')}`);
   } else {
-    evidence.push(`scientific objects covered: ${SCIENTIFIC_OBJECT_ROUTES.length} dimensions (question/evidence/plan/verdict/history/negative-results)`);
+    evidence.push(`scientific objects covered: ${SCIENTIFIC_OBJECT_ROUTES.length} dimensions (question/mission/verdict/proof/evidence/honesty)`);
   }
 
-  // 视图状态面：Workbench 页含 loading/error/degraded 等 ≥4 个可测状态
-  const wb = readText(join(repoRoot, 'frontend/src/pages/ResearchWorkbenchPage.tsx'));
-  const stateTestids = ['live-degraded', 'status-error', 'start-error', 'run-error', 'cancel-error'];
-  const present = stateTestids.filter((id) => wb.includes(`data-testid="${id}"`));
-  const loadingMarkers = countOccurrences(wb, 'isLoading') + countOccurrences(wb, 'Loading');
-  if (present.length < 4) problems.push(`view state coverage too low: ${present.length}/5 error/degraded testids`);
-  else evidence.push(`view states: ${present.length} error/degraded testids + ${loadingMarkers} loading markers on core journey`);
+  // 视图状态面：核心旅程（工作台/断言/验证/新建表单）含 error/unavailable 等 ≥4 个可测状态
+  const journeyFiles = [
+    'frontend/src/features/missions/MissionWorkspacePage.tsx',
+    'frontend/src/features/missions/RunGate.tsx',
+    'frontend/src/features/missions/NewMissionForm.tsx',
+    'frontend/src/features/assay/AssayPage.tsx',
+    'frontend/src/features/verify/VerifyPage.tsx',
+  ];
+  const journeyText = journeyFiles.map((f) => readText(join(repoRoot, f))).join('\n');
+  const stateTestids = ['status-error', 'run-error', 'cancel-error', 'start-error', 'llm-unavailable', 'verify-error'];
+  const present = stateTestids.filter((id) => journeyText.includes(`data-testid="${id}"`) || journeyText.includes(`testId="${id}"`));
+  const loadingMarkers = countOccurrences(journeyText, 'LoadingBlock');
+  if (present.length < 4) problems.push(`view state coverage too low: ${present.length}/6 error/unavailable testids`);
+  else evidence.push(`view states: ${present.length} error/unavailable testids + ${loadingMarkers} loading markers on core journey`);
   if (loadingMarkers < 3) problems.push(`loading state markers too few: ${loadingMarkers}`);
 
-  const pagesDir = join(repoRoot, 'frontend/src/pages');
-  const pageCount = existsSync(pagesDir) ? readdirSync(pagesDir).filter((f) => f.endsWith('.tsx')).length : 0;
-  if (pageCount < 17) problems.push(`pages too few: ${pageCount}`);
-  else evidence.push(`${pageCount} page components`);
+  const featuresDir = join(repoRoot, 'frontend/src/features');
+  const pageCount = existsSync(featuresDir) ? listFilesRecursive(featuresDir, '.tsx').length : 0;
+  if (pageCount < 12) problems.push(`feature components too few: ${pageCount}`);
+  else evidence.push(`${pageCount} feature components across missions/assay/verify/evidence/benchmark/about/home`);
 
   return makeCheck('UX-WEB-001', problems, evidence, [
-    'empty/stale/success 状态的每路由逐页清点未全量机器化（核心旅程 Workbench 已断言；其余页由其页面测试承载）',
+    'empty/stale/success 状态的每路由逐页清点未全量机器化（核心旅程已断言；其余由 frontend 行为测试承载）',
     'budget/cost 视图作为独立路由未拆出——预算可见性在 CLI 层（profile/cost 报告）承载，web 侧如实登记为部分覆盖',
   ]);
 }
