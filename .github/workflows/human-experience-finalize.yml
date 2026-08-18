@@ -1,0 +1,195 @@
+name: Human Experience Finalize
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/human-experience-finalize.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: human-experience-finalize
+  cancel-in-progress: false
+
+jobs:
+  focused-closure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Record observable heartbeat
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          printf '# Human Experience Finalize Status\n\nState: RUNNING\nSource: `%s`\nStarted: %s\n' "$(git rev-parse HEAD)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > HUMAN_EXPERIENCE_FINALIZE_STATUS.md
+          git add HUMAN_EXPERIENCE_FINALIZE_STATUS.md
+          git commit -m 'chore: record human experience validation heartbeat'
+          git push origin HEAD:main
+
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
+        with:
+          version: '10.29.3'
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Apply production receipt and CLI closure
+        id: patch
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def cut(text: str, start: str, end: str, replacement: str = '') -> str:
+              a = text.index(start)
+              b = text.index(end, a)
+              return text[:a] + replacement + text[b:]
+
+          p = Path('frontend/src/pages/V2ReceiptPage.tsx')
+          s = p.read_text()
+          s = s.replace('  ShieldAlert,\n', '')
+          s = s.replace('  useDemoReceipt,\n', '')
+          s = s.replace("import type { V2DemoReceipt, V2StoredReceipt, V2AssuranceDimensionResult } from '@/lib/types';", "import type { V2StoredReceipt, V2AssuranceDimensionResult } from '@/lib/types';")
+          s = cut(s, '// ---------- Dimension rendering order (demo section) ----------', 'const PAGE_SIZE = 20;')
+          s = cut(s, '  // --- Reference receipt (built-in example verification) ---', '  // --- Upload result state ---')
+          s = cut(s, '  // --- Full page loading (reference receipt only; list loads independently) ---', '  // --- Shared-link receipt section')
+          s = cut(s, '  // --- Reference receipt section (non-blocking: error shows card but page still renders) ---', '  // --- Upload verification result ---')
+          s = s.replace('      {/* Reference Receipt Section */}\n      {demoSection}\n\n', '')
+          s = cut(s, '      {/* Review Summary */}', '    </div>\n  );')
+          old_comment = "// demo 端点与持久化端点收据形态不同(后端契约待统一项,见 SPRINT1-FRONTEND-REPORT.md):\n//   - V2DemoReceipt       : receiptId / verdictLabel / isFixtureOnly  (GET /receipts/demo)\n//   - V2StoredReceipt     : id / verdict / receiptStanding / ...      (GET /receipts 列表项)\n// 前端按应然契约消费(types.ts 为 SSOT),边界由 api_client.parseV2Response 做\n// { ok: true, data: T } 信封校验 + zod 运行时 parse(counter-case 2/3)。"
+          new_comment = "// Production receipt surfaces consume persisted receipt contracts only.\n// API responses are decoded at the api_client boundary with the existing zod SSOT;\n// fixture/demo receipt endpoints are intentionally not part of the production page data flow."
+          if old_comment in s:
+              s = s.replace(old_comment, new_comment)
+          for token in ('useDemoReceipt', 'demoQuery', 'demoSection', 'DIMENSION_ORDER', 'V2DemoReceipt'):
+              if token in s:
+                  raise RuntimeError(f'production receipt page still contains {token}')
+          p.write_text(s)
+
+          p = Path('frontend/src/__tests__/V2ReceiptPage.test.tsx')
+          s = p.read_text()
+          s = cut(
+              s,
+              "  it('渲染页面标题与保障范围(R-07: Honesty Boundary → Assurance Scope)'",
+              "  it('demo 段：",
+              """  it('渲染正式收据工作区，不被 fixture 请求阻塞', async () => {
+    renderWithQueryClient(<V2ReceiptPage />);
+    expect(screen.getByText('V2 Receipt Verification')).toBeInTheDocument();
+    expect(screen.getByText('Assurance Scope')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Paste envelope JSON here…')).toBeInTheDocument();
+    expect(await screen.findByText('rcpt-1')).toBeInTheDocument();
+  });
+
+""",
+          )
+          s = cut(
+              s,
+              "  it('demo 段：",
+              "  it('收据列表：条目渲染 + 总数'",
+              """  it('正式页面不请求 legacy demo receipt endpoint', async () => {
+    renderWithQueryClient(<V2ReceiptPage />);
+    expect(await screen.findByText('rcpt-1')).toBeInTheDocument();
+    expect(screen.queryByText('rcpt-demo-001')).not.toBeInTheDocument();
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => input.toString());
+    expect(urls.some((url) => url.includes('/api/v2/receipts/demo'))).toBe(false);
+  });
+
+  it('上传 envelope 后渲染 verification payload 的六个保障维度', async () => {
+    renderWithQueryClient(<V2ReceiptPage />);
+    await screen.findByText('rcpt-1');
+    const textarea = screen.getByPlaceholderText('Paste envelope JSON here…') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: JSON.stringify({ schemaVersion: 'far.envelope.v2', proofHash: 'a'.repeat(64) }) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify Envelope' }));
+    expect(await screen.findByText('vr-upload-1')).toBeInTheDocument();
+    for (const label of ['Provenance', 'Integrity', 'Identity', 'Process Conformance', 'Execution Reproduction', 'Scientific Verdict']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+  }, 15000);
+
+""",
+          )
+          s = cut(
+              s,
+              "  it('demo 错误：",
+              "  it('上传验证：ReceiptUploader",
+              """  it('legacy demo endpoint 不可用也不影响正式工作区', async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.includes('/api/v2/receipts/demo')) return new Response('legacy fixture unavailable', { status: 500 });
+      if (url.includes('/api/v2/receipts?limit=')) return new Response(JSON.stringify({ ok: true, data: LIST_BODY }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response('', { status: 404 });
+    });
+    renderWithQueryClient(<V2ReceiptPage />);
+    expect(await screen.findByText('rcpt-1')).toBeInTheDocument();
+    expect(screen.getByText('Stored Receipts')).toBeInTheDocument();
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => input.toString());
+    expect(urls.some((url) => url.includes('/api/v2/receipts/demo'))).toBe(false);
+  });
+
+""",
+          )
+          s = s.replace("await screen.findByText('rcpt-demo-001'); // 等 demo 加载完成", "await screen.findByText('rcpt-1');")
+          s = s.replace("await screen.findByText('rcpt-demo-001');", "await screen.findByText('rcpt-1');")
+          p.write_text(s)
+
+          p = Path('src/cli/far.ts')
+          s = p.read_text()
+          pairs = [
+            ('+ `far demo`（一键演示）', '+ `far demo`（确定性离线自检；不代表生产研究结果）'),
+            ("description: 'one-shot demo (14 Golden Vectors + end-to-end demo claim; fully offline)'", "description: 'deterministic offline self-test (14 Golden Vectors + reference claim; never a production research result)'"),
+            ("description: 'FAR-Bench demo profile'", "description: 'FAR-Bench deterministic evaluation profile'"),
+            ('  far demo                              see the deterministic kernel verify 14 golden vectors (no key)', '  far doctor [--full-verify]            check runtime, integrity prerequisites, and verification readiness'),
+            ('  far demo [tess-offline]               one-shot demo: 14 golden vectors + end-to-end demo claim (offline)', '  far demo [tess-offline]               deterministic self-test: golden vectors + offline reference claim; not a production result'),
+            ('  far bench run                         FAR-Bench demo profile', '  far bench run                         FAR-Bench deterministic evaluation profile'),
+            ('                        fail-safe cached_fixture (baseline_exempt, DEGRADED_SCOPE). Single-seed demo (multi-seed is a V2 item).', '                        fail-safe cached_fixture (baseline_exempt, DEGRADED_SCOPE). Single-seed reference run (multi-seed is a V2 item).'),
+          ]
+          for old, new in pairs:
+              if old not in s:
+                  raise RuntimeError(f'expected CLI text missing: {old}')
+              s = s.replace(old, new)
+          p.write_text(s)
+          PY
+          git diff --check
+
+      - name: Install frontend and run focused validation
+        id: validate
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm ci --legacy-peer-deps
+          npm run typecheck
+          npm run lint
+          npm run test -- src/__tests__/V2ReceiptPage.test.tsx
+
+      - name: Persist focused result
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if [ '${{ steps.patch.outcome }}' = 'success' ] && [ '${{ steps.validate.outcome }}' = 'success' ]; then
+            rm -f HUMAN_EXPERIENCE_FINALIZE_STATUS.md
+            git add -A
+            git commit -m 'refactor(hx): remove fixture-led receipt UX'
+            git push origin HEAD:main
+          else
+            git reset --hard HEAD
+            printf '# Human Experience Finalize Status\n\nState: FOCUSED_VALIDATION_FAILED\nPatch step: `%s`\nValidation step: `%s`\nFinished: %s\n' '${{ steps.patch.outcome }}' '${{ steps.validate.outcome }}' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > HUMAN_EXPERIENCE_FINALIZE_STATUS.md
+            git add HUMAN_EXPERIENCE_FINALIZE_STATUS.md
+            git commit -m 'chore: record human experience validation failure'
+            git push origin HEAD:main
+            exit 1
+          fi
