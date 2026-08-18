@@ -663,8 +663,8 @@ export default function AblationPage() {
 function HonestyWallSection() {
   const t = useT();
   return (
-    <Alert data-testid="ablation-honesty-wall" className="border-amber-500/40 bg-amber-500/5">
-      <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+    <Alert data-testid="ablation-honesty-wall" className="border-warning/40 bg-warning/100/5">
+      <ShieldAlert className="h-4 w-4 text-warning" aria-hidden="true" />
       <AlertTitle>{t('ablation.honestyTitle')}</AlertTitle>
       <AlertDescription className="space-y-2 text-sm">
         <p>{t('ablation.honestyP1')}</p>
@@ -721,7 +721,7 @@ function CapabilityMatrixSection() {
                         data-testid={`cap-${dim.key}-${b.key}`}
                       >
                         {has ? (
-                          <span className="inline-flex items-center justify-center text-green-600 dark:text-green-400">
+                          <span className="inline-flex items-center justify-center text-success">
                             <CheckCircle2 className="h-5 w-5" aria-label={t('ablation.capYesAria')} />
                           </span>
                         ) : (

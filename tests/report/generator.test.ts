@@ -653,6 +653,10 @@ test('renderHtml produces valid HTML document', () => {
   assert.ok(html.includes('<title>FAR-Lab Report'));
   assert.ok(html.includes('test-run'));
   assert.ok(html.includes('Confirmed'));
+  assert.ok(html.includes('<main>'));
+  assert.ok(html.includes('<caption>Counts by deterministic verdict state</caption>'));
+  assert.ok(html.includes('<th scope="col">Verdict</th>'));
+  assert.ok(html.includes('@media print'));
   assert.ok(html.includes('</html>'));
 });
 

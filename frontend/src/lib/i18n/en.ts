@@ -34,6 +34,16 @@ export const en: Record<MessageKey, string> = {
   'nav.group.research': 'Research',
   'nav.group.tools': 'Trust & verification tools',
   'nav.toolsButton': 'Tools',
+  'nav.commandCenter': 'Go to…',
+  'nav.commandPlaceholder': 'Search pages and tools…',
+  'nav.closeCommandCenter': 'Close command center',
+  'nav.commandResults': 'Navigation results',
+  'nav.commandEmpty': 'No matching destination',
+  'nav.commandMove': 'move',
+  'nav.commandOpen': 'open',
+  'nav.commandClose': 'close',
+  'notFound.title': 'Page not found',
+  'notFound.description': 'This route does not exist in FAR-Lab.',
 
   // ---- PlanningPage (planning-gate methodology as machine gates) ----
   'nav.planning': 'Planning',
