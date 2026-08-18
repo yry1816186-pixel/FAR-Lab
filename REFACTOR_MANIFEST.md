@@ -6,7 +6,7 @@
 - Original target branch: `main`
 - Original commit SHA: `a6647be68c8012246ffb57de8752649657a847f2`
 - Work branch: `ux-refactor/2026-08-18`
-- Validated source SHA before report finalization: `c78c58f9adfabcbe483b0bd7e0148b0505d41179`
+- Validated source SHA before report finalization: `ce619bac684a73e8d140f2ed071b019d44733c95`
 
 ## Architectural and product changes
 
@@ -44,6 +44,7 @@ No database/schema migration is introduced by this Human Experience Layer finali
 - `M	frontend/src/lib/i18n/messages.ts`
 - `M	frontend/src/pages/AuditTracePage.tsx`
 - `M	frontend/src/pages/ResearchWorkbenchPage.tsx`
+- `M	src/cli/render.ts`
 
 ## Known limitations
 
