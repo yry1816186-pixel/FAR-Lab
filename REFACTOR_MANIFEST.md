@@ -6,7 +6,7 @@
 - Original target branch: `main`
 - Original commit SHA: `a6647be68c8012246ffb57de8752649657a847f2`
 - Work branch: `ux-refactor/2026-08-18`
-- Validated source SHA before report finalization: `dde79b02bc903088cd8f84d215c8997aa222cb1d`
+- Validated source SHA before report finalization: `3a86f9b027c27e33dad46e98d06689b11fbc1453`
 
 ## Architectural and product changes
 
