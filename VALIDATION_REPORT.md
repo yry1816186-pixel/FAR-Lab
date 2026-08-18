@@ -3,17 +3,17 @@
 Validation date: 2026-08-18
 Original target: `main@a6647be68c8012246ffb57de8752649657a847f2`
 Work branch: `ux-refactor/2026-08-18`
-GitHub Actions run id: `32105374534`
+GitHub Actions run id: `32105386054`
 
 ## Actual command validation
 
 | Check | Command | Exit | Duration | Result |
 |---|---|---:|---:|---|
-| `build_check` | `pnpm run build:check` | 0 | 38s | **PASS** |
-| `frontend_vitest` | `npm --prefix frontend run test` | 1 | 26s | **FAIL** |
-| `root_tests` | `pnpm run test` | 1 | 113s | **FAIL** |
+| `build_check` | `pnpm run build:check` | 0 | 40s | **PASS** |
+| `frontend_vitest` | `npm --prefix frontend run test` | 1 | 27s | **FAIL** |
+| `root_tests` | `pnpm run test` | 1 | 119s | **FAIL** |
 | `python_tests` | `pnpm run test:py` | 0 | 1s | **PASS** |
-| `ux_gate_tests` | `node --test tests/gates/*.test.ts tests/cli/*.test.ts` | 0 | 21s | **PASS** |
+| `ux_gate_tests` | `node --test tests/gates/*.test.ts tests/cli/*.test.ts` | 0 | 22s | **PASS** |
 | `performance_budget` | `pnpm run perf:budget` | 0 | 2s | **PASS** |
 | `openapi_contract` | `pnpm run openapi:check` | 0 | 1s | **PASS** |
 | `cli_help` | `node src/cli/far.ts --help` | 0 | 0s | **PASS** |
