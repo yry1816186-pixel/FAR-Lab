@@ -1,85 +1,148 @@
-name: UX Refactor Source Export
+name: UX Refactor Final Validation and Package
 
 on:
   push:
     branches:
       - ux-refactor/2026-08-18
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
   contents: write
 
-jobs:
-  semantic_cleanup:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: ux-refactor/2026-08-18
-      - name: Correct semantic-class migration edge cases
-        shell: bash
-        run: |
-          set -euo pipefail
-          files=(frontend/src/components/v2/AssuranceDimensionCard.tsx frontend/src/components/EvidenceTimeline.tsx frontend/src/pages/LeaderboardPage.tsx frontend/src/pages/IntegrityPage.tsx frontend/src/pages/AblationPage.tsx frontend/src/pages/WizardPage.tsx)
-          perl -0pi -e 's/bg-success\/100\/10/bg-success\/10/g; s/bg-warning\/100\/10/bg-warning\/10/g; s/bg-muted0\/10/bg-muted\/50/g; s/bg-muted0\/5/bg-muted\/30/g; s/text-gray-400/text-muted-foreground/g; s/text-gray-500/text-muted-foreground/g; s/text-gray-600/text-muted-foreground/g; s/bg-success\/100\/5/bg-success\/5/g; s/bg-warning\/100\/5/bg-warning\/5/g; s/bg-success\/100/bg-success/g; s/bg-warning\/100/bg-warning/g' "${files[@]}"
-          if grep -RniE '(100/|muted0|success/100|warning/100|info/100|destructive/100|evidence/100|provenance/100)' frontend/src --include='*.ts' --include='*.tsx'; then exit 1; fi
-          if grep -RniE '(text|bg|border|ring)-(red|green|amber|yellow|blue|gray|slate)-[0-9]+' frontend/src --include='*.tsx' --exclude='*.test.tsx'; then exit 1; fi
-          if git diff --quiet; then exit 0; fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "${files[@]}"
-          git commit -m 'fix(ux): correct semantic color migration edge cases'
-          git push origin HEAD:ux-refactor/2026-08-18
+env:
+  PNPM_VERSION: '10.29.3'
+  NODE_VERSION: '24'
+  PYTHON_VERSION: '3.11'
+  NODE_COMPILE_CACHE: '/tmp/node-compile-cache'
+  BASE_SHA: 'a6647be68c8012246ffb57de8752649657a847f2'
 
-  export_source:
+jobs:
+  finalize_source:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
+          ref: ux-refactor/2026-08-18
           fetch-depth: 0
-      - name: Build complete tracked-source snapshot
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Apply final human-surface migration
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/FAR-Lab-refactor-source
-          git ls-files -z | while IFS= read -r -d '' path; do
-            mkdir -p "/tmp/FAR-Lab-refactor-source/$(dirname "$path")"
-            cp -a -- "$path" "/tmp/FAR-Lab-refactor-source/$path"
-          done
-          printf '%s\n' "$(git rev-parse HEAD)" > /tmp/FAR-Lab-refactor-source/.SOURCE_HEAD
-          (cd /tmp && zip -qr FAR-Lab-refactor-source.zip FAR-Lab-refactor-source)
-      - name: Upload tracked-source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: FAR-Lab-refactor-source
-          path: /tmp/FAR-Lab-refactor-source.zip
-          if-no-files-found: error
-          retention-days: 1
+          if test -f scripts/finalize_human_surfaces.mjs; then
+            node scripts/finalize_human_surfaces.mjs
+            rm scripts/finalize_human_surfaces.mjs
+          fi
+          if grep -RniE '(100/|muted0|success/100|warning/100|info/100|destructive/100|evidence/100|provenance/100)' frontend/src --include='*.ts' --include='*.tsx'; then
+            echo 'Invalid semantic token form remains.' >&2
+            exit 1
+          fi
+          if grep -RniE '(text|bg|border|ring)-(red|green|amber|yellow|blue|gray|slate)-[0-9]+' frontend/src --include='*.tsx' --exclude='*.test.tsx'; then
+            echo 'Direct palette utility remains in product TSX.' >&2
+            exit 1
+          fi
+      - name: Commit finalized source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor(ux): finalize human-facing surfaces'
+          git push origin HEAD:ux-refactor/2026-08-18
 
-  browser_qa:
+  validate:
+    needs: finalize_source
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ux-refactor/2026-08-18
+          fetch-depth: 0
       - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
         with:
-          version: 10.29.3
+          version: ${{ env.PNPM_VERSION }}
           run_install: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
-          node-version: 24
-      - name: Apply pending semantic QA fix to checkout
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install locked project dependencies
         shell: bash
         run: |
           set -euo pipefail
-          files=(frontend/src/components/v2/AssuranceDimensionCard.tsx frontend/src/components/EvidenceTimeline.tsx frontend/src/pages/LeaderboardPage.tsx frontend/src/pages/IntegrityPage.tsx frontend/src/pages/AblationPage.tsx frontend/src/pages/WizardPage.tsx)
-          perl -0pi -e 's/bg-success\/100\/10/bg-success\/10/g; s/bg-warning\/100\/10/bg-warning\/10/g; s/bg-muted0\/10/bg-muted\/50/g; s/bg-muted0\/5/bg-muted\/30/g; s/text-gray-400/text-muted-foreground/g; s/text-gray-500/text-muted-foreground/g; s/text-gray-600/text-muted-foreground/g; s/bg-success\/100\/5/bg-success\/5/g; s/bg-warning\/100\/5/bg-warning\/5/g; s/bg-success\/100/bg-success/g; s/bg-warning\/100/bg-warning/g' "${files[@]}"
-      - name: Install dependencies and Chromium
+          pnpm install --frozen-lockfile
+          (cd frontend && npm ci --legacy-peer-deps)
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: Run complete validation matrix
+        id: checks
+        shell: bash
+        run: |
+          set +e
+          mkdir -p /tmp/far-validation/logs
+          : > /tmp/far-validation/commands.tsv
+          failed=0
+          run_check() {
+            label="$1"
+            command="$2"
+            start=$(date +%s)
+            bash -lc "$command" >"/tmp/far-validation/logs/${label}.log" 2>&1
+            rc=$?
+            end=$(date +%s)
+            duration=$((end-start))
+            printf '%s\t%s\t%s\t%s\n' "$label" "$rc" "$duration" "$command" >> /tmp/far-validation/commands.tsv
+            echo "===== ${label} (exit ${rc}, ${duration}s) ====="
+            tail -n 120 "/tmp/far-validation/logs/${label}.log"
+            if [ "$rc" -ne 0 ]; then failed=1; fi
+          }
+          run_check build_check 'pnpm run build:check'
+          run_check frontend_vitest 'npm --prefix frontend run test'
+          run_check root_tests 'pnpm run test'
+          run_check python_tests 'pnpm run test:py'
+          run_check ux_gate_tests 'node --test tests/gates/*.test.ts tests/cli/*.test.ts'
+          run_check performance_budget 'pnpm run perf:budget'
+          run_check openapi_contract 'pnpm run openapi:check'
+          run_check cli_help 'node src/cli/far.ts --help'
+          run_check cli_no_color 'env NO_COLOR=1 node src/cli/far.ts --help'
+          echo "failed=${failed}" >> "$GITHUB_OUTPUT"
+          exit "$failed"
+      - name: Upload command evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FAR-Lab-command-validation
+          path: /tmp/far-validation
+          if-no-files-found: error
+          retention-days: 7
+
+  browser_qa:
+    needs: finalize_source
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ux-refactor/2026-08-18
+          fetch-depth: 0
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install app and ephemeral browser QA runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -88,63 +151,283 @@ jobs:
           mkdir -p /tmp/far-visual-qa/output
           cd /tmp/far-visual-qa
           npm init -y >/dev/null
-          npm install playwright@1.55.0 >/dev/null
+          npm install playwright@1.55.0 axe-core@4.10.2 >/dev/null
           npx playwright install --with-deps chromium >/dev/null
       - name: Start FAR-Lab
         shell: bash
         run: |
           set -euo pipefail
           nohup pnpm run dev >/tmp/far-dev.log 2>&1 &
-          for i in $(seq 1 45); do
+          for i in $(seq 1 60); do
             if curl -fsS http://localhost:5173/ >/dev/null 2>&1; then exit 0; fi
             sleep 1
           done
           cat /tmp/far-dev.log
           exit 1
-      - name: Inspect responsive/theme/keyboard behavior
+      - name: Run responsive theme keyboard and WCAG checks
+        shell: bash
+        working-directory: /tmp/far-visual-qa
+        run: |
+          set -euo pipefail
+          cat >qa.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          import { createRequire } from 'node:module';
+          import fs from 'node:fs';
+          const require = createRequire(import.meta.url);
+          const axePath = require.resolve('axe-core/axe.min.js');
+          const base = 'http://localhost:5173';
+          const out = '/tmp/far-visual-qa/output';
+          const routes = ['/research','/planning','/versions','/events','/report','/overview','/wizard','/v2-receipt','/viz','/integrity','/court','/arena','/leaderboard','/honesty','/ablation','/audit','/about'];
+          const cases = routes.map((path) => [`desktop-${path.slice(1)}`, path, 1440, 900, 'light']);
+          cases.push(
+            ['research-dark','/research',1440,900,'dark'],
+            ['research-tablet','/research',820,1180,'light'],
+            ['research-mobile','/research',390,844,'light'],
+            ['research-mobile-dark','/research',390,844,'dark'],
+            ['integrity-dark','/integrity',1440,900,'dark'],
+            ['report-tablet-dark','/report',820,1180,'dark'],
+            ['audit-mobile','/audit',390,844,'light'],
+            ['overview-wide','/overview',1920,1080,'light']
+          );
+          const browser = await chromium.launch({ headless: true });
+          const results = [];
+          let violations = 0;
+          for (const [name,path,width,height,theme] of cases) {
+            const context = await browser.newContext({ viewport: { width, height } });
+            await context.addInitScript((value) => localStorage.setItem('far-chain-theme', value), theme);
+            const page = await context.newPage();
+            const started = Date.now();
+            await page.goto(base + path, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.waitForTimeout(600);
+            const metrics = await page.evaluate(() => ({
+              viewportWidth: document.documentElement.clientWidth,
+              documentWidth: document.documentElement.scrollWidth,
+              htmlDark: document.documentElement.classList.contains('dark'),
+              title: document.title,
+            }));
+            if (await page.locator('main').count() !== 1) throw new Error(`${name}: expected one main landmark`);
+            if (await page.locator('h1').count() < 1) throw new Error(`${name}: missing h1`);
+            if (metrics.documentWidth > metrics.viewportWidth + 1) throw new Error(`${name}: global overflow ${metrics.documentWidth}>${metrics.viewportWidth}`);
+            if ((theme === 'dark') !== metrics.htmlDark) throw new Error(`${name}: theme mismatch`);
+            await page.addScriptTag({ path: axePath });
+            const axe = await page.evaluate(async () => await globalThis.axe.run(document, {
+              runOnly: { type: 'tag', values: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa'] },
+            }));
+            const routeViolations = axe.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.length }));
+            violations += routeViolations.length;
+            await page.screenshot({ path: `${out}/${name}.png`, fullPage: true });
+            results.push({ name, path, width, height, theme, elapsedMs: Date.now() - started, ...metrics, violations: routeViolations });
+            await context.close();
+          }
+
+          const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+          const page = await context.newPage();
+          await page.goto(base + '/research', { waitUntil: 'domcontentloaded' });
+          await page.keyboard.press('Control+K');
+          await page.getByRole('dialog').waitFor({ state: 'visible' });
+          const input = page.locator('#command-center-search');
+          if (!(await input.evaluate((el) => el === document.activeElement))) throw new Error('command center search did not receive focus');
+          await input.fill('integrity');
+          await page.keyboard.press('Enter');
+          await page.waitForURL('**/integrity');
+          results.push({ name: 'command-center-keyboard', passed: true, finalUrl: page.url() });
+          await context.close();
+
+          const mobile = await browser.newContext({ viewport: { width: 390, height: 844 } });
+          const mobilePage = await mobile.newPage();
+          await mobilePage.goto(base + '/research', { waitUntil: 'domcontentloaded' });
+          const toggle = mobilePage.getByTestId('mobile-menu-toggle');
+          await toggle.focus();
+          await toggle.press('Enter');
+          await mobilePage.getByTestId('mobile-nav').waitFor({ state: 'visible' });
+          await mobilePage.keyboard.press('Escape');
+          if (!(await toggle.evaluate((el) => el === document.activeElement))) throw new Error('mobile navigation did not restore focus');
+          results.push({ name: 'mobile-menu-keyboard', passed: true });
+          await mobile.close();
+
+          await browser.close();
+          fs.writeFileSync(`${out}/results.json`, JSON.stringify({ violations, results }, null, 2) + '\n');
+          fs.copyFileSync('/tmp/far-dev.log', `${out}/dev.log`);
+          if (violations > 0) {
+            console.error(`axe reported ${violations} WCAG-tagged violation groups`);
+            process.exit(2);
+          }
+          EOF
+          node qa.mjs
+      - name: Upload browser QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FAR-Lab-browser-qa
+          path: /tmp/far-visual-qa/output
+          if-no-files-found: warn
+          retention-days: 7
+
+  package:
+    if: always()
+    needs: [finalize_source, validate, browser_qa]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ux-refactor/2026-08-18
+          fetch-depth: 0
+      - name: Download validation evidence
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: /tmp/far-evidence
+      - name: Finalize reports and manifest
+        shell: bash
+        env:
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+          BROWSER_RESULT: ${{ needs.browser_qa.result }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$RUN_ID" > VALIDATION_RUN_ID.txt
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, os, subprocess, json, csv
+
+          base = os.environ['BASE_SHA']
+          validate_result = os.environ.get('VALIDATE_RESULT', 'unknown')
+          browser_result = os.environ.get('BROWSER_RESULT', 'unknown')
+          run_id = os.environ.get('RUN_ID', '')
+
+          inventory = Path('HUMAN_SURFACE_INVENTORY.md')
+          if inventory.exists():
+              text = inventory.read_text()
+              import re
+              text = re.sub(r'Baseline commit: `[^`]+`', f'Baseline commit: `{base}`', text, count=1)
+              inventory.write_text(text)
+
+          commands = []
+          command_file = Path('/tmp/far-evidence/FAR-Lab-command-validation/commands.tsv')
+          if command_file.exists():
+              with command_file.open() as fh:
+                  for row in csv.reader(fh, delimiter='\t'):
+                      if len(row) >= 4:
+                          commands.append(row[:4])
+
+          browser_json = Path('/tmp/far-evidence/FAR-Lab-browser-qa/results.json')
+          browser_data = None
+          if browser_json.exists():
+              browser_data = json.loads(browser_json.read_text())
+
+          report = [
+              '# FAR-Lab Refactor Validation Report', '',
+              'Validation date: 2026-08-18',
+              f'Original target: `main@{base}`',
+              'Work branch: `ux-refactor/2026-08-18`',
+              f'GitHub Actions run id: `{run_id}`', '',
+              '## Actual command validation', '',
+              '| Check | Command | Exit | Duration | Result |',
+              '|---|---|---:|---:|---|',
+          ]
+          if commands:
+              for label, rc, duration, command in commands:
+                  status = 'PASS' if rc == '0' else 'FAIL'
+                  report.append(f'| `{label}` | `{command}` | {rc} | {duration}s | **{status}** |')
+          else:
+              report.append('| command evidence | unavailable | — | — | **BLOCKED / missing artifact** |')
+          report += ['', f'Validation job result: **{validate_result.upper()}**.', '']
+
+          report += ['## Browser / accessibility / responsive QA', '']
+          if browser_data is not None:
+              cases = browser_data.get('results', [])
+              axe = browser_data.get('violations', 0)
+              report.append(f'- Browser job result: **{browser_result.upper()}**.')
+              report.append(f'- Chromium cases executed: **{len(cases)}** (17 desktop routes plus responsive/theme/keyboard cases).')
+              report.append(f'- WCAG 2.x A/AA tagged axe violation groups: **{axe}**.')
+              report.append('- Automated checks assert one main landmark, at least one h1, no global viewport overflow, theme application, Cmd/Ctrl+K focus/navigation, and mobile-menu Escape/focus restoration.')
+              report.append('- Screenshots were captured for every visual case and retained as GitHub Actions evidence.')
+          else:
+              report.append(f'- Browser job result: **{browser_result.upper()}**; browser evidence artifact was unavailable to the packaging job.')
+          report += ['', '## Performance', '',
+              '- `pnpm run perf:budget` is recorded above as the repository lab performance gate.',
+              '- This is a lab/CI measurement. No claim is made that CI timing equals production field Core Web Vitals.', '',
+              '## Environment limitations', '',
+              '- The ChatGPT container could not resolve github.com and had no project dependency installation, so direct local clone/build was unavailable.',
+              '- To avoid reporting unexecuted checks as success, build/test/browser evidence above comes from the GitHub-hosted runner using the repository lockfiles and declared Node/Python toolchain.',
+          ]
+          Path('VALIDATION_REPORT.md').write_text('\n'.join(report) + '\n')
+
+          diff = subprocess.run(['git','diff','--name-status',f'{base}...HEAD'], check=True, text=True, capture_output=True).stdout.strip().splitlines()
+          manifest = [
+              '# FAR-Lab Human Experience Refactor Manifest', '',
+              '## Baseline', '',
+              '- Repository: `yry1816186-pixel/FAR-Lab`',
+              '- Original target branch: `main`',
+              f'- Original commit SHA: `{base}`',
+              '- Work branch: `ux-refactor/2026-08-18`',
+              f'- Validated source SHA before report finalization: `{subprocess.check_output(["git","rev-parse","HEAD"], text=True).strip()}`',
+              '', '## Architectural and product changes', '',
+              '1. Preserved the existing route/navigation SSOT and research-first information architecture rather than creating a competing design system.',
+              '2. Added a focused human-surface i18n catalogue merged into the existing message system; migrated remaining Audit/Evidence/Research system labels.',
+              '3. Corrected Audit Trace capability mismatch: claim IDs now call verdict/lifecycle APIs while only real 64-hex chain heads call the evidence-chain endpoint.',
+              '4. Retained semantic operational/verdict color tokens, responsive dense-data primitives, reduced-motion behavior, command center, CLI Unicode display-width handling, and semantic generated reports.',
+              '5. Validation runs the repository build/type/lint/tests/performance/contracts plus real Chromium responsive/theme/keyboard/axe checks.',
+              '', '## Scientific and security integrity', '',
+              'No deterministic verdict rule, evidence hash rule, proof verification rule, falsifiability gate, authorization boundary, or persistence success criterion was intentionally changed by this finalization.',
+              '', '## Dependencies', '',
+              'No runtime dependency was added. Playwright and axe-core are installed ephemerally only inside the validation workflow.',
+              '', '## Migrations', '',
+              'No database/schema migration is introduced by this Human Experience Layer finalization.',
+              '', '## File changes from original main', '',
+          ]
+          manifest.extend([f'- `{line}`' for line in diff] or ['- No file changes detected.'])
+          manifest += ['', '## Known limitations', '',
+              '- Automated accessibility testing cannot prove screen-reader announcement quality or every assistive-technology/browser combination; semantic/keyboard checks and axe complement, not replace, manual AT testing.',
+              '- CI lab performance is not production field telemetry.',
+              '- The current backend does not expose a reliable hypothesis-ID → evidence-chain headHash mapping; Audit Trace explicitly communicates this rather than fabricating a cross-link.',
+          ]
+          Path('REFACTOR_MANIFEST.md').write_text('\n'.join(manifest) + '\n')
+
+          tracked = subprocess.run(['git','ls-files','-z'], check=True, capture_output=True).stdout.split(b'\0')
+          tracked = [p.decode() for p in tracked if p]
+          rows = ['# FAR-Lab complete tracked project file manifest', f'# Baseline main: {base}', '# Format: sha256  bytes  path', '# PROJECT_FILE_MANIFEST.txt itself is intentionally omitted from its own hash rows.']
+          for p in sorted(tracked):
+              if p == 'PROJECT_FILE_MANIFEST.txt':
+                  continue
+              path = Path(p)
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              rows.append(f'{hashlib.sha256(data).hexdigest()}  {len(data):>10}  {p}')
+          Path('PROJECT_FILE_MANIFEST.txt').write_text('\n'.join(rows) + '\n')
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add HUMAN_SURFACE_INVENTORY.md VALIDATION_REPORT.md REFACTOR_MANIFEST.md PROJECT_FILE_MANIFEST.txt VALIDATION_RUN_ID.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'docs(ux): finalize validation and project manifests'
+            git push origin HEAD:ux-refactor/2026-08-18
+          fi
+      - name: Build complete project snapshot
         shell: bash
         run: |
           set -euo pipefail
-          cat >/tmp/far-visual-qa/qa.mjs <<'EOF'
-          import { chromium } from 'playwright';
-          import fs from 'node:fs';
-          const base='http://localhost:5173', out='/tmp/far-visual-qa/output';
-          const browser=await chromium.launch({headless:true});
-          const cases=[
-            ['research-desktop-light','/research',1440,900,'light'],['research-desktop-dark','/research',1440,900,'dark'],
-            ['research-tablet-light','/research',820,1180,'light'],['research-tablet-dark','/research',820,1180,'dark'],
-            ['research-mobile-light','/research',390,844,'light'],['research-mobile-dark','/research',390,844,'dark'],
-            ['integrity-desktop-light','/integrity',1440,900,'light'],['integrity-desktop-dark','/integrity',1440,900,'dark'],
-            ['report-tablet-dark','/report',820,1180,'dark'],['audit-mobile-light','/audit',390,844,'light'],['overview-wide-light','/overview',1920,1080,'light']
-          ];
-          const results=[];
-          for(const [name,path,width,height,theme] of cases){
-            const c=await browser.newContext({viewport:{width,height}});
-            await c.addInitScript(v=>localStorage.setItem('far-chain-theme',v),theme);
-            const p=await c.newPage(); const started=Date.now();
-            await p.goto(base+path,{waitUntil:'domcontentloaded',timeout:30000}); await p.waitForTimeout(700);
-            const m=await p.evaluate(()=>({viewportWidth:document.documentElement.clientWidth,documentWidth:document.documentElement.scrollWidth,htmlDark:document.documentElement.classList.contains('dark')}));
-            if(await p.locator('main').count()===0) throw new Error(`${name}: missing main`);
-            if(await p.locator('h1').count()===0) throw new Error(`${name}: missing h1`);
-            if(m.documentWidth>m.viewportWidth+1) throw new Error(`${name}: global overflow ${m.documentWidth}>${m.viewportWidth}`);
-            if((theme==='dark')!==m.htmlDark) throw new Error(`${name}: theme mismatch`);
-            await p.screenshot({path:`${out}/${name}.png`,fullPage:true});
-            results.push({name,path,width,height,theme,elapsedMs:Date.now()-started,...m}); await c.close();
-          }
-          const c=await browser.newContext({viewport:{width:1440,height:900}}),p=await c.newPage();
-          await p.goto(base+'/research',{waitUntil:'domcontentloaded'}); await p.keyboard.press('Control+K');
-          await p.getByRole('dialog').waitFor({state:'visible'}); const input=p.locator('#command-center-search');
-          if(!(await input.evaluate(el=>el===document.activeElement))) throw new Error('command search focus');
-          await input.fill('integrity'); await p.keyboard.press('Enter'); await p.waitForURL('**/integrity');
-          results.push({name:'command-center-keyboard',passed:true,finalUrl:p.url()}); await c.close(); await browser.close();
-          fs.writeFileSync(`${out}/results.json`,JSON.stringify(results,null,2)+'\n');
-          EOF
-          node /tmp/far-visual-qa/qa.mjs
-          cp /tmp/far-dev.log /tmp/far-visual-qa/output/dev.log
-      - name: Upload browser QA evidence
+          rm -rf /tmp/FAR-Lab-refactored /tmp/FAR-Lab-refactored.zip
+          mkdir -p /tmp/FAR-Lab-refactored
+          git ls-files -z | while IFS= read -r -d '' path; do
+            case "$path" in
+              .git/*|node_modules/*|frontend/node_modules/*|dist/*|frontend/dist/*|*.env|.env) continue ;;
+            esac
+            mkdir -p "/tmp/FAR-Lab-refactored/$(dirname "$path")"
+            cp -a -- "$path" "/tmp/FAR-Lab-refactored/$path"
+          done
+          printf '%s\n' "$(git rev-parse HEAD)" > /tmp/FAR-Lab-refactored/.SOURCE_HEAD
+          (cd /tmp && zip -9qr FAR-Lab-refactored.zip FAR-Lab-refactored)
+          sha256sum /tmp/FAR-Lab-refactored.zip | tee /tmp/FAR-Lab-refactored.zip.sha256
+      - name: Upload final complete snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: FAR-Lab-visual-qa
-          path: /tmp/far-visual-qa/output
+          name: FAR-Lab-refactored-package
+          path: |
+            /tmp/FAR-Lab-refactored.zip
+            /tmp/FAR-Lab-refactored.zip.sha256
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 7
