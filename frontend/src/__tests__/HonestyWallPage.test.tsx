@@ -357,13 +357,13 @@ describe('HonestyWallPage', () => {
 
       // SourceCard 内容
       const sourceCard = screen.getByTestId('source-card');
-      expect(sourceCard).toHaveTextContent('Source Anchor');
+      expect(sourceCard).toHaveTextContent('Source anchor');
       expect(sourceCard).toHaveTextContent('2026-06-27T00:00:00Z');
       expect(sourceCard).toHaveTextContent('req-12345');
 
       // 哈希链回放
       const hashChain = screen.getByTestId('hash-chain-replay');
-      expect(hashChain).toHaveTextContent('Hash Chain Replay');
+      expect(hashChain).toHaveTextContent('Hash chain replay');
     });
 
     it('clicking again collapses the expanded detail', async () => {

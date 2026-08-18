@@ -1,22 +1,15 @@
 /**
- * AuditTracePage —— 全链路审计追溯可视化。
+ * AuditTracePage — honest cross-layer provenance lookup.
  *
- * 背景（findings BW4 Gap-7）：数据层追溯完整（6 层：call_records → evidence_log →
- * verdict_nodes → proof_envelopes → lifecycle_events → falsification_audit_events），
- * 但无可视化追溯 UI——用户需 CLI/SQL 才能追溯。本页提供：
+ * Backend capability boundary:
+ * - hypothesis/claim ID → verdict + lifecycle APIs
+ * - 64-hex chain head   → evidence-chain API
  *
- *   - 输入：hypothesis ID（claim id）→ 三路真实 API 消费：
- *       ① GET /api/v1/verdict/by_hypothesis/:hypoId   （裁决节点·五值 + currentHash）
- *       ② GET /api/v1/evidence/chain/:headHash        （证据链·call_record + 哈希链）
- *       ③ GET /api/v1/lifecycle/events?targetKind=claim&targetId=:hypoId（生命周期·修正通知）
- *   - 血缘流程可视化：Hypothesis → Evidence Chain → Verdict → Lifecycle（链式卡片）
- *   - 诚实边界：无数据 → 明确「未找到」提示（非 404 伪装）；全部真实 API 消费（无假 demo）
- *
- * 零容忍合规：无 any / ts-ignore / 双重断言 / 空 catch / innerHTML / 桩。useEffect 带 cleanup。
- * 无障碍：输入框 aria-label；错误 Alert 可读。
+ * The backend does not currently expose a reliable hypothesis → chain-head mapping,
+ * so this surface never passes a claim ID to the chain endpoint or fabricates a link.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   useVerdictByHypothesis,
   useEvidenceChain,
@@ -24,109 +17,139 @@ import {
   type LifecycleEventsResponse,
 } from '@/lib/api_client';
 import type { HonestVerdictDto, EvidenceChainResponse } from '@/lib/types';
+import { useT } from '@/lib/i18n';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { VerdictBadge } from '@/components/VerdictBadge';
 import { isVerdictValue } from '@/lib/verdict';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { GitCompare, Search } from 'lucide-react';
 
-interface TraceInput {
-  readonly hypothesisId: string;
-  readonly token: number;
-}
-
+const CHAIN_HEAD_PATTERN = /^[0-9a-f]{64}$/i;
 
 export default function AuditTracePage() {
-  const [input, setInput] = useState<TraceInput>({ hypothesisId: '', token: 0 });
+  const t = useT();
   const [draft, setDraft] = useState('');
-
-  const verdict = useVerdictByHypothesis(input.hypothesisId);
-  const chain = useEvidenceChain(input.hypothesisId);
-  const lifecycle = useLifecycleEvents(input.hypothesisId);
-
+  const [submitted, setSubmitted] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const isChainLookup = CHAIN_HEAD_PATTERN.test(submitted);
+  const claimId = submitted.length > 0 && !isChainLookup ? submitted : '';
+  const chainHead = isChainLookup ? submitted.toLowerCase() : '';
+
+  const verdict = useVerdictByHypothesis(claimId);
+  const chain = useEvidenceChain(chainHead);
+  const lifecycle = useLifecycleEvents(claimId);
+
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const hasTrace =
-    input.hypothesisId.length > 0 &&
-    input.token > 0 &&
-    (verdict.data !== undefined || chain.data !== undefined || lifecycle.data !== undefined);
+  const isLoading = verdict.isLoading || chain.isLoading || lifecycle.isLoading;
+  const lookupError = verdict.error ?? chain.error ?? lifecycle.error;
+  const hasClaimTrace = verdict.data !== undefined || (lifecycle.data?.events.length ?? 0) > 0;
+  const hasChainTrace = chain.data !== undefined;
+  const hasTrace = isChainLookup ? hasChainTrace : hasClaimTrace;
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    setSubmitted(draft.trim());
+  }
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Audit Trace — 全链路追溯</h1>
-        <p className="text-muted-foreground">
-          Input a hypothesis / claim ID to trace its evidence chain, verdict node and lifecycle events
-          (data layer is complete; this page is the BW4 Gap-7 visualization).
-        </p>
-      </header>
+    <div className="space-y-6" data-testid="audit-trace-page">
+      <PageHeader
+        title={t('audit.title')}
+        description={t('audit.subtitle')}
+        icon={<GitCompare className="h-7 w-7 text-primary" />}
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle>追溯入口</CardTitle>
-          <CardDescription>六层数据链（call_records → evidence_log → verdict_nodes → proof_envelopes → lifecycle_events → falsification_audit_events）</CardDescription>
+          <CardTitle>{t('audit.entryTitle')}</CardTitle>
+          <CardDescription>{t('audit.entryDescription')}</CardDescription>
         </CardHeader>
-        <CardContent className="flex gap-2">
-          <input
-            ref={inputRef}
-            aria-label="hypothesis ID to trace"
-            className="flex-1 rounded-md border px-3 py-2"
-            placeholder="hypothesis id / claim id（如 stage1_hypothesis 或 run id）"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && draft.trim().length > 0) {
-                setInput({ hypothesisId: draft.trim(), token: Date.now() });
-              }
-            }}
-          />
-          <Button
-            aria-label="run trace"
-            disabled={draft.trim().length === 0}
-            onClick={() => setInput({ hypothesisId: draft.trim(), token: Date.now() })}
-          >
-            追溯
-          </Button>
+        <CardContent>
+          <form className="flex flex-col gap-2 sm:flex-row" onSubmit={handleSubmit}>
+            <Input
+              ref={inputRef}
+              aria-label={t('audit.inputAria')}
+              placeholder={t('audit.placeholder')}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              className="font-mono"
+              autoComplete="off"
+            />
+            <Button type="submit" disabled={draft.trim().length === 0} className="shrink-0">
+              <Search className="mr-2 h-4 w-4" aria-hidden="true" />
+              {t('audit.run')}
+            </Button>
+          </form>
+          {submitted.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline">
+                {isChainLookup ? t('audit.lookupChain') : t('audit.lookupClaim')}
+              </Badge>
+              <code className="break-all">{submitted}</code>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {verdict.error !== null && (
-        <Alert>
-          <AlertTitle>追溯失败</AlertTitle>
-          <AlertDescription>{verdict.error.message}</AlertDescription>
+      {submitted.length > 0 && !isChainLookup && (
+        <Alert data-testid="audit-chain-capability-note">
+          <AlertTitle>{t('audit.evidenceChain')}</AlertTitle>
+          <AlertDescription>{t('audit.chainNeedsHash')}</AlertDescription>
         </Alert>
       )}
 
-      {input.hypothesisId.length > 0 && input.token > 0 && !hasTrace && verdict.error === null && (
-        <Alert>
-          <AlertTitle>未找到追溯数据</AlertTitle>
-          <AlertDescription>
-            No trace found for &quot;{input.hypothesisId}&quot; — no verdict node, evidence chain or
-            lifecycle events reference this ID (honest empty result, not a fabricated demo).
-          </AlertDescription>
+      {isLoading && (
+        <div className="space-y-3" role="status" aria-label={t('audit.loading')} data-testid="audit-loading">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-28 w-full" />
+          <span className="sr-only">{t('audit.loading')}</span>
+        </div>
+      )}
+
+      {lookupError !== null && (
+        <Alert variant="destructive" data-testid="audit-error">
+          <AlertTitle>{t('audit.failureTitle')}</AlertTitle>
+          <AlertDescription>{lookupError.message}</AlertDescription>
+        </Alert>
+      )}
+
+      {submitted.length > 0 && !isLoading && lookupError === null && !hasTrace && (
+        <Alert data-testid="audit-empty">
+          <AlertTitle>{t('audit.emptyTitle')}</AlertTitle>
+          <AlertDescription>{t('audit.emptyDescription', { id: submitted })}</AlertDescription>
         </Alert>
       )}
 
       {hasTrace && (
         <div className="space-y-4">
-          {/* 血缘主链：Hypothesis → Evidence → Verdict → Lifecycle */}
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant="outline">{input.hypothesisId}</Badge>
-            <span aria-hidden>→</span>
-            <Badge variant="secondary">{chain.data !== undefined ? 'Evidence Chain' : '—'}</Badge>
-            <span aria-hidden>→</span>
-            <Badge variant="secondary">{verdict.data !== undefined ? 'Verdict' : '—'}</Badge>
-            <span aria-hidden>→</span>
-            <Badge variant="secondary">
-              {lifecycle.data !== undefined && lifecycle.data.events.length > 0
-                ? `Lifecycle (${lifecycle.data.events.length})`
-                : 'Lifecycle (none)'}
+          <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label={t('audit.title')}>
+            <Badge variant="outline" className="max-w-full font-mono">
+              <span className="truncate">{submitted}</span>
             </Badge>
-          </div>
+            <span aria-hidden="true">→</span>
+            {isChainLookup ? (
+              <Badge variant="secondary">{t('audit.evidenceChain')}</Badge>
+            ) : (
+              <>
+                <Badge variant="secondary">
+                  {verdict.data !== undefined ? t('audit.verdict') : `${t('audit.verdict')} (${t('audit.none')})`}
+                </Badge>
+                <span aria-hidden="true">→</span>
+                <Badge variant="secondary">
+                  {t('audit.lifecycle')} ({lifecycle.data?.events.length ?? 0})
+                </Badge>
+              </>
+            )}
+          </nav>
 
           {verdict.data !== undefined && <VerdictCard verdict={verdict.data} />}
           {chain.data !== undefined && <ChainCard chain={chain.data} />}
@@ -139,103 +162,126 @@ export default function AuditTracePage() {
   );
 }
 
-/** Verdict 节点卡片（HonestVerdictDto：decision + currentHash + untestedReason）。 */
-function VerdictCard({ verdict }: { verdict: HonestVerdictDto }) {
+function VerdictCard({ verdict }: { readonly verdict: HonestVerdictDto }) {
+  const t = useT();
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Verdict Node</CardTitle>
-        <CardDescription>确定性内核五值裁决 + currentHash（哈希链篡改可检）</CardDescription>
+        <CardTitle>{t('audit.verdictTitle')}</CardTitle>
+        <CardDescription>{t('audit.verdictDescription')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">decision:</span>
-          {isVerdictValue(verdict.decision)
-            ? <VerdictBadge decision={verdict.decision} size="sm" />
-            : <Badge>{verdict.decision}</Badge>}
+          <span className="text-sm text-muted-foreground">{t('audit.decision')}:</span>
+          {isVerdictValue(verdict.decision) ? (
+            <VerdictBadge decision={verdict.decision} size="sm" />
+          ) : (
+            <Badge>{verdict.decision}</Badge>
+          )}
         </div>
         {verdict.nodeKind !== undefined && (
-          <p className="text-sm text-muted-foreground">nodeKind: {verdict.nodeKind}</p>
+          <MetadataRow label={t('audit.nodeKind')} value={verdict.nodeKind} />
         )}
         {verdict.untestedReason !== null && verdict.untestedReason.length > 0 && (
-          <p className="text-sm">untestedReason: {verdict.untestedReason}</p>
+          <MetadataRow label={t('audit.untestedReason')} value={verdict.untestedReason} />
         )}
         {verdict.scopeSlipText !== null && verdict.scopeSlipText.length > 0 && (
-          <p className="text-sm">scopeSlip: {verdict.scopeSlipText}</p>
+          <MetadataRow label={t('audit.scopeSlip')} value={verdict.scopeSlipText} />
         )}
-        <p className="break-all font-mono text-xs">
-          currentHash: {verdict.currentHash}
-        </p>
+        <div className="rounded-md border bg-muted/30 p-2">
+          <div className="text-xs font-medium text-muted-foreground">{t('audit.currentHash')}</div>
+          <code className="mt-1 block break-all font-mono text-xs">{verdict.currentHash}</code>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-/** 证据链卡片（call_record + 哈希链）。 */
-function ChainCard({ chain }: { chain: EvidenceChainResponse }) {
+function MetadataRow({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <p className="text-sm">
+      <span className="text-muted-foreground">{label}: </span>
+      <span>{value}</span>
+    </p>
+  );
+}
+
+function ChainCard({ chain }: { readonly chain: EvidenceChainResponse }) {
+  const t = useT();
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Evidence Chain</CardTitle>
-        <CardDescription>哈希链头 + call_record（模型/时间戳/prev→current hash）</CardDescription>
+        <CardTitle>{t('audit.chainTitle')}</CardTitle>
+        <CardDescription>{t('audit.chainDescription')}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
         {chain.callRecord === null ? (
-          <p className="text-sm text-muted-foreground">No call record at chain head (honest empty).</p>
+          <p className="text-sm text-muted-foreground">{t('audit.noCallRecord')}</p>
         ) : (
-          <div className="rounded-md border p-2 text-sm">
+          <div className="rounded-md border p-3 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">#{chain.callRecord.seq}</Badge>
               <span>{chain.callRecord.stageId}</span>
               <span className="text-muted-foreground">{chain.callRecord.payloadKind}</span>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              model: {chain.callRecord.modelId} · finish: {chain.callRecord.finishReason} ·{' '}
-              {chain.callRecord.isoTimestamp}
-            </p>
-            <p className="mt-1 break-all font-mono text-xs">
-              prev: {chain.callRecord.prevHash.slice(0, 24)}… → curr: {chain.callRecord.currentHash.slice(0, 24)}…
-            </p>
+            <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
+              <dt className="text-muted-foreground">{t('audit.model')}</dt>
+              <dd className="break-all font-mono">{chain.callRecord.modelId}</dd>
+              <dt className="text-muted-foreground">{t('audit.finish')}</dt>
+              <dd>{chain.callRecord.finishReason}</dd>
+              <dt className="text-muted-foreground">ISO</dt>
+              <dd className="font-mono">{chain.callRecord.isoTimestamp}</dd>
+            </dl>
+            <div className="mt-3 grid gap-2 lg:grid-cols-2">
+              <HashField label={t('audit.prev')} value={chain.callRecord.prevHash} />
+              <HashField label={t('audit.curr')} value={chain.callRecord.currentHash} />
+            </div>
           </div>
         )}
-        <p className="break-all font-mono text-xs text-muted-foreground">
-          headHash: {chain.headHash}
-        </p>
+        <HashField label={t('audit.headHash')} value={chain.headHash} />
       </CardContent>
     </Card>
   );
 }
 
-/** 生命周期事件卡片（BA3-3 修正通知）。 */
-function LifecycleCard({ lifecycle }: { lifecycle: LifecycleEventsResponse }) {
+function HashField({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border bg-muted/30 p-2">
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <code className="mt-1 block break-all font-mono text-xs">{value}</code>
+    </div>
+  );
+}
+
+function LifecycleCard({ lifecycle }: { readonly lifecycle: LifecycleEventsResponse }) {
+  const t = useT();
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Lifecycle Events（修正通知）</CardTitle>
-        <CardDescription>撤回 / 纠正 / supersession——修正不静默（BA3-3）</CardDescription>
+        <CardTitle>{t('audit.lifecycleTitle')}</CardTitle>
+        <CardDescription>{t('audit.lifecycleDescription')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        {lifecycle.events.map((ev) => (
-          <div key={ev.eventId} className="rounded-md border p-2 text-sm">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{ev.fromState}</Badge>
-              <span aria-hidden>→</span>
+        {lifecycle.events.map((event) => (
+          <article key={event.eventId} className="rounded-md border p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">{event.fromState}</Badge>
+              <span aria-hidden="true">→</span>
               <Badge
-                variant={
-                  ev.toState === 'corrected' || ev.toState === 'retracted'
-                    ? 'destructive'
-                    : 'secondary'
-                }
+                variant={event.toState === 'corrected' || event.toState === 'retracted' ? 'destructive' : 'secondary'}
               >
-                {ev.toState}
+                {event.toState}
               </Badge>
-              <span className="text-muted-foreground">by {ev.actor}</span>
+              <span className="text-muted-foreground">
+                {t('audit.by')}: {event.actor}
+              </span>
             </div>
-            <p className="mt-1">{ev.reason}</p>
-            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">
-              {ev.createdAt} · {ev.currentHash.slice(0, 16)}…
-            </p>
-          </div>
+            <p className="mt-2">{event.reason}</p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
+              <time dateTime={event.createdAt}>{event.createdAt}</time>
+              <span className="break-all">{event.currentHash}</span>
+            </div>
+          </article>
         ))}
       </CardContent>
     </Card>

@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { VERDICT_CONFIG, VerdictBadge } from './VerdictBadge';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 import {
   ChevronDown,
   ChevronUp,
@@ -173,33 +174,34 @@ export function extractDecisionTrace(value: unknown): DecisionTraceSafe | null {
 
 /** 来源锚点卡片 — 展示证据的外部不可篡改锚点 */
 function SourceCard({ sourceAnchor }: { sourceAnchor: SourceAnchorSafe }) {
+  const t = useT();
   return (
     <div
       className="rounded-md border bg-muted/30 px-3 py-2.5 space-y-2 text-sm"
       data-testid="source-card"
     >
       <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">
-        Source Anchor
+        {t('ev.sourceTitle')}
       </h4>
       <div className="grid grid-cols-1 gap-1.5">
         {sourceAnchor.gitCommitSha !== undefined && (
           <div className="flex items-center gap-1.5">
             <GitCommitHorizontal className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="text-muted-foreground text-xs">Commit:</span>
+            <span className="text-muted-foreground text-xs">{t('ev.commit')}</span>
             <code className="font-mono text-xs text-foreground">{sourceAnchor.gitCommitSha.slice(0, 8)}</code>
           </div>
         )}
         {sourceAnchor.isoTimestamp !== undefined && (
           <div className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="text-muted-foreground text-xs">Time:</span>
+            <span className="text-muted-foreground text-xs">{t('ev.time')}</span>
             <code className="font-mono text-xs text-foreground">{sourceAnchor.isoTimestamp}</code>
           </div>
         )}
         {sourceAnchor.dashscopeRequestId !== undefined && sourceAnchor.dashscopeRequestId !== null && (
           <div className="flex items-center gap-1.5">
             <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="text-muted-foreground text-xs">Request ID:</span>
+            <span className="text-muted-foreground text-xs">{t('ev.requestId')}</span>
             <code className="font-mono text-xs text-foreground truncate max-w-[200px]">
               {sourceAnchor.dashscopeRequestId}
             </code>
@@ -208,21 +210,21 @@ function SourceCard({ sourceAnchor }: { sourceAnchor: SourceAnchorSafe }) {
         {sourceAnchor.dashscopeRequestId === null && (
           <div className="flex items-center gap-1.5">
             <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="text-muted-foreground text-xs">Request ID:</span>
-            <span className="text-xs text-verdict-inconclusive font-medium">credentials missing (null)</span>
+            <span className="text-muted-foreground text-xs">{t('ev.requestId')}</span>
+            <span className="text-xs text-verdict-inconclusive font-medium">{t('ev.credentialMissing')}</span>
           </div>
         )}
         {sourceAnchor.rawResponseHash !== undefined && (
           <div className="flex items-center gap-1.5">
             <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="text-muted-foreground text-xs">Response hash:</span>
+            <span className="text-muted-foreground text-xs">{t('ev.responseHash')}</span>
             <code className="font-mono text-xs text-foreground">{truncateHash(sourceAnchor.rawResponseHash)}</code>
           </div>
         )}
         {sourceAnchor.doiOrArxivId !== undefined && (
           <div className="flex items-center gap-1.5">
             <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="text-muted-foreground text-xs">DOI/arXiv:</span>
+            <span className="text-muted-foreground text-xs">{t('ev.doi')}</span>
             <code className="font-mono text-xs text-foreground">{sourceAnchor.doiOrArxivId}</code>
           </div>
         )}
@@ -230,7 +232,7 @@ function SourceCard({ sourceAnchor }: { sourceAnchor: SourceAnchorSafe }) {
           sourceAnchor.codeLocation.filePath !== undefined && (
             <div className="flex items-center gap-1.5">
               <FileCode className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="text-muted-foreground text-xs">Code:</span>
+              <span className="text-muted-foreground text-xs">{t('ev.code')}</span>
               <code className="font-mono text-xs text-foreground">
                 {sourceAnchor.codeLocation.filePath}
                 {sourceAnchor.codeLocation.location !== undefined
@@ -246,6 +248,7 @@ function SourceCard({ sourceAnchor }: { sourceAnchor: SourceAnchorSafe }) {
 
 /** 哈希链回放 — 展示 prevHash → currentHash 链式完整性 */
 function HashChainReplay({ prevHash, currentHash }: { prevHash: string; currentHash: string }) {
+  const t = useT();
   const isGenesis = prevHash === '0'.repeat(64);
   return (
     <div
@@ -253,16 +256,16 @@ function HashChainReplay({ prevHash, currentHash }: { prevHash: string; currentH
       data-testid="hash-chain-replay"
     >
       <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">
-        Hash Chain Replay
+        {t('ev.chainTitle')}
       </h4>
       <div className="flex flex-col items-center gap-1">
         {/* prevHash */}
         <div className="w-full rounded bg-background px-2 py-1 border">
           <span className="text-xs text-muted-foreground">
-            {isGenesis ? 'Genesis hash' : 'Previous hash (prevHash)'}
+            {isGenesis ? t('ev.genesis') : t('ev.prevHash')}
           </span>
           <code className="block font-mono text-xs text-foreground break-all">
-            {isGenesis ? '0×64 (GENESIS)' : truncateHash(prevHash)}
+            {isGenesis ? t('ev.genesisValue') : truncateHash(prevHash)}
           </code>
         </div>
         {/* 链式连接箭头 */}
@@ -272,7 +275,7 @@ function HashChainReplay({ prevHash, currentHash }: { prevHash: string; currentH
         </div>
         {/* currentHash */}
         <div className="w-full rounded bg-background px-2 py-1 border border-primary/30">
-          <span className="text-xs text-muted-foreground">Current hash (currentHash)</span>
+          <span className="text-xs text-muted-foreground">{t('ev.currentHash')}</span>
           <code className="block font-mono text-xs text-primary font-semibold break-all">
             {truncateHash(currentHash)}
           </code>
@@ -280,7 +283,7 @@ function HashChainReplay({ prevHash, currentHash }: { prevHash: string; currentH
       </div>
       {!isGenesis && (
         <p className="text-[11px] text-muted-foreground text-center">
-          Verification: sha256(prevHash ‖ payload) = currentHash. Chain integrity guarantees the evidence was not tampered with.
+          {t('ev.chainVerify')}
         </p>
       )}
     </div>
@@ -304,6 +307,7 @@ const R7_GATE_CONDITIONS: readonly {
 
 /** 决策路径追踪面板 — 展示 firedRuleId + R7 门 7 条件 + 关键数值（A1/B3 透明度层） */
 export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
+  const t = useT();
   const gate = trace.r7Gate;
   const metrics = trace.metrics;
   return (
@@ -313,14 +317,14 @@ export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
     >
       <div className="flex items-center justify-between gap-2">
         <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">
-          Decision Trace
+          {t('evidence.decisionTrace')}
         </h4>
         {trace.firedRuleId !== undefined && (
           <code
             className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary"
             data-testid="dt-fired-rule"
           >
-            fired: {trace.firedRuleId}
+            {t('evidence.firedRule', { id: trace.firedRuleId })}
           </code>
         )}
       </div>
@@ -329,15 +333,15 @@ export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
       {gate !== null && gate !== undefined && (
         <div className="space-y-1" data-testid="dt-r7-gate">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">R7 gate</span>
+            <span className="text-xs font-semibold text-muted-foreground">{t('evidence.r7Gate')}</span>
             {gate.overallPassed === true && (
               <span className="rounded bg-success/10 px-1.5 py-px text-[10px] font-semibold text-success">
-                ALL PASS
+                {t('evidence.allPass')}
               </span>
             )}
             {gate.overallPassed === false && (
               <span className="rounded bg-destructive/10 px-1.5 py-px text-[10px] font-semibold text-destructive">
-                BLOCKED
+                {t('evidence.blocked')}
               </span>
             )}
           </div>
@@ -375,7 +379,7 @@ export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
                       passed ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive',
                     )}
                   >
-                    {passed ? 'PASS' : 'FAIL'}
+                    {passed ? t('evidence.pass') : t('evidence.fail')}
                   </span>
                 )}
               </div>
@@ -387,7 +391,7 @@ export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
       {/* 关键数值快照 */}
       {metrics !== undefined && (
         <div className="space-y-1" data-testid="dt-metrics">
-          <span className="text-xs font-semibold text-muted-foreground">Key metrics</span>
+          <span className="text-xs font-semibold text-muted-foreground">{t('evidence.keyMetrics')}</span>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {metrics.alpha !== undefined && (
               <>
@@ -474,14 +478,16 @@ export function DecisionTracePanel({ trace }: { trace: DecisionTraceSafe }) {
 }
 
 /** 可证伪规格摘要 */
-function FalsificationSpecSummary({ item }: { item: HonestVerdictDto }) {  const semanticsLabel: Record<string, string> = {
+function FalsificationSpecSummary({ item }: { item: HonestVerdictDto }) {
+  const t = useT();
+  const semanticsLabel: Record<string, string> = {
     gt: '≥',
     lt: '≤',
     range: '∈',
   };
   return (
     <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
-      <span className="text-muted-foreground">Falsifiable claim:</span>
+      <span className="text-muted-foreground">{t('ev.falsAssertion')}</span>
       <span className="font-medium text-foreground">{item.falsificationSpec.prediction}</span>
       <span className="text-muted-foreground">
         {' '}
@@ -503,6 +509,7 @@ interface TimelineEntryProps {
 }
 
 function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
+  const t = useT();
   const config = VERDICT_CONFIG[item.decision];
   const Icon = config.icon;
   const sourceAnchor = extractSourceAnchor(item.sourceAnchor);
@@ -553,7 +560,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
         role="button"
         tabIndex={0}
         aria-expanded={isExpanded}
-        aria-label={`Verdict ${item.verdictId} - ${config.label}`}
+        aria-label={t('ev.entryAria', { id: item.verdictId, label: config.label })}
       >
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
@@ -569,7 +576,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6"
-                aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                aria-label={isExpanded ? t('ev.collapseAria') : t('ev.expandAria')}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleToggle();
@@ -588,18 +595,18 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
         {/* 折叠元信息（始终可见） */}
         <CardContent className="space-y-2">
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <span className="text-muted-foreground">Node type</span>
+            <span className="text-muted-foreground">{t('ev.nodeKind')}</span>
             <span className="font-mono text-foreground">{item.nodeKind}</span>
 
-            <span className="text-muted-foreground">Metric value</span>
+            <span className="text-muted-foreground">{t('ev.metricValue')}</span>
             <span className="font-mono text-foreground">
               {item.metricValue !== null ? item.metricValue.toFixed(4) : '—'}
             </span>
 
-            <span className="text-muted-foreground">Conflicting evidence</span>
+            <span className="text-muted-foreground">{t('ev.conflicts')}</span>
             <span className="font-mono text-foreground">{item.conflictingEvidenceCount}</span>
 
-            <span className="text-muted-foreground">Created at</span>
+            <span className="text-muted-foreground">{t('ev.createdAt')}</span>
             <span className="font-mono text-xs text-foreground">{item.createdAt}</span>
           </div>
 
@@ -622,7 +629,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
           )}
           {sourceAnchor === null && (
             <div className="text-xs text-muted-foreground/60 italic" data-testid={`source-anchor-empty-${item.verdictId}`}>
-              No parseable source anchor
+              {t('ev.sourceEmpty')}
             </div>
           )}
 
@@ -635,7 +642,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
               className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
               data-testid={`scope-slip-${item.verdictId}`}
             >
-              <span className="font-semibold text-warning">Scope degradation note:</span>
+              <span className="font-semibold text-warning">{t('evidence.scopeDegradation')}</span>
               <span className="text-warning ml-1">{item.scopeSlipText}</span>
             </div>
           )}
@@ -646,7 +653,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
               className="rounded-md border border-border bg-muted px-3 py-2 text-sm"
               data-testid={`untested-reason-${item.verdictId}`}
             >
-              <span className="font-semibold text-muted-foreground">Untested reason:</span>
+              <span className="font-semibold text-muted-foreground">{t('ev.untestedLabel')}</span>
               <span className="text-muted-foreground ml-1">{item.untestedReason}</span>
             </div>
           )}
@@ -658,7 +665,7 @@ function TimelineEntry({ item, isExpanded, onToggle }: TimelineEntryProps) {
                 <SourceCard sourceAnchor={sourceAnchor} />
               ) : (
                 <div className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-                  sourceAnchor data unavailable
+                  {t('ev.sourceUnavailable')}
                 </div>
               )}
               <HashChainReplay prevHash={item.prevHash} currentHash={item.currentHash} />
@@ -681,6 +688,7 @@ export interface EvidenceTimelineProps {
 
 /** 交互式证据时间线 */
 export function EvidenceTimeline({ items, expandedIds, onToggleExpand }: EvidenceTimelineProps) {
+  const t = useT();
   if (items.length === 0) {
     return (
       <div
@@ -688,7 +696,7 @@ export function EvidenceTimeline({ items, expandedIds, onToggleExpand }: Evidenc
         data-testid="timeline-empty"
       >
         <Hash className="h-10 w-10 mb-3 text-muted-foreground/40" aria-hidden="true" />
-        <p>No timeline entries yet</p>
+        <p>{t('ev.empty')}</p>
       </div>
     );
   }
@@ -712,7 +720,7 @@ export function EvidenceTimeline({ items, expandedIds, onToggleExpand }: Evidenc
             data-testid="timeline-end-marker"
           />
         </div>
-        <span className="text-xs text-muted-foreground">End of evidence chain</span>
+        <span className="text-xs text-muted-foreground">{t('ev.chainEnd')}</span>
       </div>
     </div>
   );

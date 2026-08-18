@@ -536,7 +536,7 @@ describe('VizPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('decision-trace-panel')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('dt-fired-rule')).toHaveTextContent('fired: R7_SUPPORTED');
+    expect(screen.getByTestId('dt-fired-rule')).toHaveTextContent('Fired rule: R7_SUPPORTED');
     expect(screen.getByTestId('dt-r7-gate')).toHaveTextContent('R7 gate');
     expect(screen.getByTestId('dt-metrics')).toHaveTextContent('alpha');
     expect(screen.getByTestId('dt-cannot-prove')).toHaveTextContent('无法完全排除混杂');

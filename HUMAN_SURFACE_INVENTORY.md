@@ -1,7 +1,7 @@
 # FAR-Lab Human Surface Inventory
 
 Baseline branch: `main`  
-Baseline commit: `1e2c8b3c7c8706292f890138e88948ab7dcb80a3`  
+Baseline commit: `a6647be68c8012246ffb57de8752649657a847f2`  
 Inventory date: 2026-08-18
 
 This inventory treats the Human Experience Layer as every surface a person can see, read, operate, wait on, interpret, export, or consume. It is intentionally broader than `frontend/`.
