@@ -6,7 +6,7 @@
 - Original target branch: `main`
 - Original commit SHA: `a6647be68c8012246ffb57de8752649657a847f2`
 - Work branch: `ux-refactor/2026-08-18`
-- Validated source SHA before report finalization: `3a86f9b027c27e33dad46e98d06689b11fbc1453`
+- Validated source SHA before report finalization: `d171b5675bad62b2e76328e0ff5c607b4c3e025d`
 
 ## Architectural and product changes
 
@@ -30,8 +30,6 @@ No database/schema migration is introduced by this Human Experience Layer finali
 
 ## File changes from original main
 
-- `A	.assistant-run-id`
-- `A	.github/workflows/assistant-run-marker.yml`
 - `M	.github/workflows/ux-refactor-source-export.yml`
 - `M	HUMAN_SURFACE_INVENTORY.md`
 - `A	PROJECT_FILE_MANIFEST.txt`
@@ -39,11 +37,13 @@ No database/schema migration is introduced by this Human Experience Layer finali
 - `M	UI_DEBT_REPORT.md`
 - `M	VALIDATION_REPORT.md`
 - `A	VALIDATION_RUN_ID.txt`
+- `M	frontend/src/App.tsx`
 - `M	frontend/src/__tests__/AuditTracePage.test.tsx`
+- `M	frontend/src/components/EvidenceTimeline.tsx`
 - `A	frontend/src/lib/i18n/human_surfaces.ts`
 - `M	frontend/src/lib/i18n/messages.ts`
 - `M	frontend/src/pages/AuditTracePage.tsx`
-- `A	scripts/finalize_human_surfaces.mjs`
+- `M	frontend/src/pages/ResearchWorkbenchPage.tsx`
 
 ## Known limitations
 
