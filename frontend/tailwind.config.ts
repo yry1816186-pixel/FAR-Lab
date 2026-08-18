@@ -54,6 +54,9 @@ const config: Config = {
           foreground: 'hsl(var(--card-foreground))',
         },
 
+        // ---- Overlay(PR-03 主题契约):Dialog/AlertDialog 遮罩,不再硬编码 black/80 ----
+        overlay: 'hsl(var(--overlay) / var(--overlay-opacity))',
+
         // ---- Brand 主色(ink-blue 11 阶,亮暗共用) ----
         brand: {
           50: 'hsl(var(--brand-50))',

@@ -21,6 +21,9 @@
 
 @layer base {
   :root {
+    /* ---- 主题契约(PR-03):原生控件/滚动条/自动填充跟随亮色主题 ---- */
+    color-scheme: light;
+
     /* ---- Brand scale (ink-blue, 亮暗共用) ---- */
     --brand-50: 214 60% 97%;
     --brand-100: 214 64% 94%;
@@ -83,6 +86,14 @@
     --focus-ring: 217 71% 53%;
     --focus-ring-offset: 2px;
 
+    /* ---- 主题面契约(PR-03):选区与 overlay 遮罩 token 化 ----
+       selection:品牌蓝淡染 + 继承深色字(浅染底不翻白字,克制)。
+       overlay:Dialog/AlertDialog 遮罩色(深墨蓝,消费时带透明度和 --overlay-opacity)。 */
+    --selection: 217 71% 53%;
+    --selection-alpha: 0.18;
+    --overlay: 224 71% 4%;
+    --overlay-opacity: 0.8;
+
     /* ---- Verdict status colors (vivid · icon/border/accent) ---- */
     --verdict-confirmed: 142.1 70.6% 45.3%;
     --verdict-confirmed-solid: 142.1 70.6% 30%;
@@ -100,6 +111,9 @@
   }
 
   .dark {
+    /* ---- 主题契约(PR-03):原生控件/滚动条/自动填充跟随暗色主题 ---- */
+    color-scheme: dark;
+
     /* ---- Surfaces & text (dark · 深石板蓝,非纯黑避免刺眼) ---- */
     --background: 222 47% 5%;
     --foreground: 210 40% 98%;
@@ -142,6 +156,15 @@
     --focus-ring: 217 71% 60%;
     --focus-ring-offset: 2px;
 
+    /* ---- 主题面契约(PR-03 · dark) ----
+       selection:暗底提亮品牌蓝 + 加深染透明度,配亮字保可读。
+       overlay:遮罩略降不透明度(暗底本就深,避免压成纯黑洞)。 */
+    --selection: 216 90% 64%;
+    --selection-alpha: 0.32;
+    --selection-foreground: 210 40% 98%;
+    --overlay: 224 71% 4%;
+    --overlay-opacity: 0.72;
+
     /* ---- Verdict status colors (dark) ----
        - vivid 变体(--verdict-*):icon/border 用,暗底提亮保可见。
        - solid 变体(--verdict-*-solid):badge 背景配白字,必须保持暗(WCAG AA ≥4.5:1)。
@@ -177,9 +200,11 @@
   h1 {
     @apply font-display tracking-tight;
   }
-  /* 品牌色文本选区(克制点缀) */
+  /* 文本选区(PR-03 主题契约):亮暗各一套 token(原仅亮色单调淡染)。
+     亮色:品牌蓝淡染 + 继承深色字;暗色:提亮蓝加深染 + 亮字。 */
   ::selection {
-    background-color: hsl(var(--brand-500) / 0.2);
+    background-color: hsl(var(--selection) / var(--selection-alpha));
+    color: var(--selection-foreground, inherit);
   }
   /* 全局键盘焦点基线(D-05 · WCAG 2.4.7 Focus Visible):
      此前全仓无 :focus-visible 规则,nav 链接与 shell 按钮仅 hover 样式,
@@ -191,10 +216,21 @@
     outline: 2px solid hsl(var(--focus-ring));
     outline-offset: var(--focus-ring-offset);
   }
-  /* 滚动条(学术克制:细 + 中性色) */
+  /* 滚动条(学术克制:细 + 中性色,muted-foreground token 亮暗自适应) */
   * {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+  /* WebKit 滚动条同 token 映射(克制:不加圆角/悬停等装饰)。 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
