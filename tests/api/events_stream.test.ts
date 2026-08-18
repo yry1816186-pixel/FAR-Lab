@@ -106,7 +106,12 @@ async function collectSse(
   return seen;
 }
 
+import { createLlmGateway } from '../../src/llm_gateway/gateway.ts';
+import { createOfflineReplayAdapter } from '../../src/llm_gateway/adapters/offline_replay/client.ts';
+
 test('P0-4: /events/stream 经真实 TCP/HTTP 栈返回 200 + text/event-stream', async () => {
+
+
   const bus = new AgentEventBus();
   const { base, close } = await startServerWithBus(bus);
   try {
@@ -218,5 +223,61 @@ test('P0-4: 未注入 eventBus → /events/stream 不注册（404·off-by-defaul
     assert.equal(res.status, 404, '无 eventBus 时 SSE 端点不得暴露（默认关闭）');
   } finally {
     await close();
+  }
+});
+
+// ---------- P0-4 生产者接线（2026-08-18 审计批次 3）----------
+
+test('P0-4 接线: hypothesize 运行事件经 bus 到达 /events/stream（replay 可见完整 run 序列）', async () => {
+  // 判别性:此前 far api 不注入 bus 且 hypothesize 不发布事件——本测试红。
+  // 修复后:POST /hypothesize(offline replay 网关·确定性真 loop) → bus 收到
+  // run_started..run_completed → SSE replay=true 重放该 runId 全部帧。
+  const bus = new AgentEventBus();
+  const db = openDb();
+  const app = await buildServer({
+    db,
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    logger: false,
+    eventBus: bus,
+    gateway: createLlmGateway([createOfflineReplayAdapter({ modelId: 'events-wiring-test' })]),
+    profile: 'offline_replay',
+  });
+  await app.listen({ port: 0, host: '127.0.0.1' });
+  const address = app.server.address();
+  if (address === null || typeof address === 'string') {
+    await app.close();
+    db.close();
+    throw new Error('events_stream wiring: expected TCP address');
+  }
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const res = await fetch(`${base}/api/v1/hypothesize`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ researchInput: 'test question for event stream wiring' }),
+    });
+    const bodyText = await res.text();
+    assert.equal(res.status, 200, `hypothesize 须成功: ${bodyText}`);
+    const payload = JSON.parse(bodyText) as { data?: { loopState?: { runId?: string } } };
+    const runId = payload.data?.loopState?.runId;
+    assert.ok(typeof runId === 'string' && runId.length > 0, '响应须含 runId');
+
+    const lines = await collectSse(`${base}/api/v1/events/stream?replay=true`, {
+      until: (ls) => ls.some((l) => l.startsWith('data:') && l.includes('"run_completed"') && l.includes(runId)),
+      timeoutMs: 8000,
+    });
+    const frames = lines.filter((l) => l.startsWith('data:'));
+    assert.ok(
+      frames.some((f) => f.includes('"run_started"') && f.includes(runId)),
+      'replay 须含本 run 的 run_started 帧',
+    );
+    assert.ok(
+      frames.some((f) => f.includes('"run_completed"') && f.includes(runId)),
+      'replay 须含本 run 的 run_completed 帧',
+    );
+  } finally {
+    await app.close();
+    db.close();
   }
 });
