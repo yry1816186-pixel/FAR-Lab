@@ -1,98 +1,300 @@
 // src/llm_gateway/tape.ts
-// 职责：CAMPAIGN-REPLAY-001 第 2 层 —— Model Tape（LIVE 调用录制 → .far/tapes/ → 确定性回放）。
+// Model Tape: record real LIVE model calls and replay them deterministically.
 //
-// 五层重放中的分工：Retrieval VCR（retrieval/cache.ts，既有）、**Model Tape（本模块）**、
-// Orchestration Decision Log（agent_loop/decision_log.ts，本批）、Campaign Replay
-// （campaign/replay.ts，既有）、Kernel deterministic replay（far_proof，既有）。
+// Integrity contract:
+//   - recording is content-addressed by the exact canonical request;
+//   - canonical request, response, and complete entry hashes are verified on every read;
+//   - missing, corrupt, and version-drifted tapes fail closed;
+//   - replay is always labelled RECORDED_REPLAY and never masquerades as LIVE.
 //
-// 诚实契约：
-//   - Tape 只录制真实 LIVE 调用（entry.mode='LIVE' 是录制事实标记，不是回放标记）；
-//     回放产物一律标 mode='RECORDED_REPLAY'——replay 永不冒充 LIVE（宪法红线，
-//     与 authenticity-ironlaw R9 同源）。
-//   - 写入前脱敏门：复用 retrieval/cache.ts 预留的 detectCachedSecret 密钥形状检测
-//     （注释明言「供未来磁带写入器复用」）——检出即拒写（fail-closed，宁可损失一盘
-//     tape 不落盘密钥）。
-//   - 缺失 tape / 版本漂移 / 部分覆盖都是显式错误与显式报告，绝不静默降级。
-//
-// Cannot-prove：tape 证明「录制内容逐字节回放一致」；不证明录制之外系统其他分量
-// （检索/内核）同时可重放——那是各层各自的重放面，聚合声明见 replay report。
+// This integrity layer detects accidental corruption and edits whose hashes were not
+// deliberately recomputed. It does not authenticate the external provider or protect
+// against a writer who can rewrite the tape and all hashes; those require a signed
+// provider receipt or another independent verification channel.
 
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import stableStringify from 'fast-json-stable-stringify';
 import { z } from 'zod';
 
 import { detectCachedSecret } from '../retrieval/cache.ts';
 
-/** Tape 存储根（gitignored 运行时产物区）。 */
+/** Tape storage root (runtime artifact; gitignored). */
 export const TAPE_ROOT = '.far/tapes';
 
-export const TAPE_SCHEMA_VERSION = 1;
+/** Version 2 adds response and whole-entry integrity hashes. */
+export const TAPE_SCHEMA_VERSION = 2;
 
-/** 回放模式标签（与 research/schemas.ts 五值执行模式对齐——此处只用到两值）。 */
+/** Replay mode labels shared with the research execution model. */
 export type ReplayMode = 'LIVE' | 'RECORDED_REPLAY';
 
-export const TapeEntrySchema = z.object({
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+const SAFE_STAGE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+const TapeEntryBodySchema = z.object({
   schemaVersion: z.literal(TAPE_SCHEMA_VERSION),
-  /** 内容寻址键 = sha256(profile + canonical request)。 */
-  requestHash: z.string().length(64),
-  stageId: z.string().min(1),
+  /** Content-address key = sha256(profile + canonical request). */
+  requestHash: z.string().regex(SHA256_HEX),
+  /** sha256 of responseJson bytes. */
+  responseHash: z.string().regex(SHA256_HEX),
+  stageId: z.string().regex(SAFE_STAGE_ID),
   profile: z.string().min(1),
-  /** 录制时的请求载荷（脱敏门后原样保存）。 */
+  /** Canonical request captured after the secret scan. */
   requestJson: z.string().min(1),
-  /** 录制时的响应载荷。 */
+  /** Canonical response captured after the secret scan. */
   responseJson: z.string().min(1),
-  /** 录制来源事实：只有真实 LIVE 调用可入 tape。 */
+  /** Recording fact: only a real LIVE call may be written. */
   mode: z.literal('LIVE'),
-  recordedAt: z.string().min(1),
-  /** 录制时构建版本（版本漂移检测锚点）。 */
+  recordedAt: z.string().datetime({ offset: true }),
+  /** Build/version that produced the live response. */
   codeVersion: z.string().min(1),
-  /** 脱敏检查结论（passed=false 的 tape 不存在——门在写入前）。 */
-  secretScan: z.object({ passed: z.literal(true), detector: z.string().nullable() }),
-});
+  /** A failed scan is never written. */
+  secretScan: z.object({ passed: z.literal(true), detector: z.null() }).strict(),
+}).strict();
+
+export const TapeEntrySchema = TapeEntryBodySchema.extend({
+  /** sha256 of the canonical entry body (all fields except entryHash). */
+  entryHash: z.string().regex(SHA256_HEX),
+}).strict();
 
 export type TapeEntry = z.infer<typeof TapeEntrySchema>;
+type TapeEntryBody = z.infer<typeof TapeEntryBodySchema>;
 
-/** tape 缺失（fail-closed：缺失 tape 的回放请求不得静默落到网络或空响应）。 */
+/** Missing tape: replay never falls through to network, fixtures, or an empty response. */
 export class MissingTapeError extends Error {
   readonly stageId: string;
   readonly requestHash: string;
+
   constructor(stageId: string, requestHash: string) {
-    super(`missing tape for stage '${stageId}' (requestHash ${requestHash.slice(0, 12)}…) — no tape, no replay (fail-closed)`);
+    super(
+      `missing tape for stage '${stageId}' (requestHash ${requestHash.slice(0, 12)}...) ` +
+        '- no tape, no replay (fail-closed)',
+    );
     this.name = 'MissingTapeError';
     this.stageId = stageId;
     this.requestHash = requestHash;
   }
 }
 
-/** tape 版本漂移（录制时构建 ≠ 当前构建——回放结果对当前构建不具代表性，须显式决策）。 */
+/** A tape file exists but is malformed or has failed an integrity check. */
+export class CorruptTapeError extends Error {
+  readonly path: string;
+  readonly reason: string;
+
+  constructor(path: string, reason: string) {
+    super(`corrupt tape '${path}': ${reason} - replay blocked (fail-closed)`);
+    this.name = 'CorruptTapeError';
+    this.path = path;
+    this.reason = reason;
+  }
+}
+
+/** An existing content address is immutable and may not be overwritten. */
+export class TapeAlreadyExistsError extends Error {
+  readonly path: string;
+
+  constructor(path: string) {
+    super(`tape already exists at '${path}' - recorded evidence is immutable`);
+    this.name = 'TapeAlreadyExistsError';
+    this.path = path;
+  }
+}
+
+/** Existing tape uses a schema that this runtime cannot verify. */
+export class UnsupportedTapeSchemaError extends Error {
+  readonly path: string;
+  readonly foundVersion: unknown;
+  readonly supportedVersion: number;
+
+  constructor(path: string, foundVersion: unknown) {
+    super(
+      `unsupported tape schema in '${path}': found ${String(foundVersion)}, ` +
+        `requires ${TAPE_SCHEMA_VERSION} - replay blocked`,
+    );
+    this.name = 'UnsupportedTapeSchemaError';
+    this.path = path;
+    this.foundVersion = foundVersion;
+    this.supportedVersion = TAPE_SCHEMA_VERSION;
+  }
+}
+
+/** Tape version drift: the current build must explicitly decide whether to proceed. */
 export class TapeVersionDriftError extends Error {
   readonly recorded: string;
   readonly current: string;
+
   constructor(recorded: string, current: string) {
-    super(`tape version drift: recorded under '${recorded}' but current build is '${current}' — replay invalid without explicit decision`);
+    super(
+      `tape version drift: recorded under '${recorded}' but current build is '${current}' ` +
+        '- replay invalid without explicit decision',
+    );
     this.name = 'TapeVersionDriftError';
     this.recorded = recorded;
     this.current = current;
   }
 }
 
-/** 请求 → 内容寻址哈希（canonical：键排序稳定序列化）。 */
-export function tapeRequestHash(profile: string, request: unknown): string {
-  return createHash('sha256').update(stableStringify({ profile, request })).digest('hex');
+function canonicalJson(value: unknown, context: string): string {
+  assertCanonicalJsonValue(value, context);
+  const canonical = stableStringify(value);
+  if (canonical === undefined) {
+    throw new Error(`${context}: value is not canonical-JSON serializable`);
+  }
+  return canonical;
 }
 
-/** 确定性序列化（键排序——同请求同哈希，与 fast-json-stable-stringify 同语义的自实现）。 */
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  const keys = Object.keys(value as Record<string, unknown>).sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(',')}}`;
+function sha256Text(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function assertCanonicalJsonValue(
+  value: unknown,
+  path: string,
+  ancestors: WeakSet<object> = new WeakSet<object>(),
+): void {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+    return;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`${path}: NaN and Infinity are not allowed in Model Tape JSON`);
+    }
+    return;
+  }
+  if (
+    value === undefined ||
+    typeof value === 'bigint' ||
+    typeof value === 'function' ||
+    typeof value === 'symbol'
+  ) {
+    throw new Error(`${path}: ${typeof value} is not allowed in Model Tape JSON`);
+  }
+  if (typeof value !== 'object') {
+    throw new Error(`${path}: unsupported value in Model Tape JSON`);
+  }
+  if (ancestors.has(value)) {
+    throw new Error(`${path}: cyclic objects are not allowed in Model Tape JSON`);
+  }
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      for (const [index, item] of value.entries()) {
+        assertCanonicalJsonValue(item, `${path}[${index}]`, ancestors);
+      }
+      return;
+    }
+    for (const [key, item] of Object.entries(value)) {
+      assertCanonicalJsonValue(item, `${path}.${key}`, ancestors);
+    }
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+function assertTapeRoot(root: string): void {
+  if (root.trim().length === 0) {
+    throw new Error('Model Tape root must be non-empty');
+  }
+}
+
+function assertProfile(profile: string): void {
+  if (profile.trim().length === 0) {
+    throw new Error('Model Tape profile must be non-empty');
+  }
+}
+
+function hasErrorCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === code
+  );
+}
+
+/** Exact request -> content address. */
+export function tapeRequestHash(profile: string, request: unknown): string {
+  assertProfile(profile);
+  return sha256Text(canonicalJson({ profile, request }, 'tapeRequestHash'));
+}
+
+function tapeEntryHash(body: TapeEntryBody): string {
+  return sha256Text(canonicalJson(body, 'tapeEntryHash'));
+}
+
+function assertSafeStageId(stageId: string): void {
+  if (!SAFE_STAGE_ID.test(stageId)) {
+    throw new Error(
+      `invalid tape stageId '${stageId}': expected ${SAFE_STAGE_ID.source} (path separators forbidden)`,
+    );
+  }
 }
 
 function tapePath(root: string, stageId: string, requestHash: string): string {
+  assertTapeRoot(root);
+  assertSafeStageId(stageId);
+  if (!SHA256_HEX.test(requestHash)) {
+    throw new Error('invalid tape requestHash: expected lowercase sha256 hex');
+  }
   return join(root, `${stageId}-${requestHash}.json`);
+}
+
+function entryBody(entry: TapeEntry): TapeEntryBody {
+  return {
+    schemaVersion: entry.schemaVersion,
+    requestHash: entry.requestHash,
+    responseHash: entry.responseHash,
+    stageId: entry.stageId,
+    profile: entry.profile,
+    requestJson: entry.requestJson,
+    responseJson: entry.responseJson,
+    mode: entry.mode,
+    recordedAt: entry.recordedAt,
+    codeVersion: entry.codeVersion,
+    secretScan: entry.secretScan,
+  };
+}
+
+function verifyTapeEntry(entry: TapeEntry, path: string): TapeEntry {
+  let request: unknown;
+  try {
+    request = JSON.parse(entry.requestJson) as unknown;
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new CorruptTapeError(path, `requestJson is invalid JSON (${reason})`);
+  }
+  if (canonicalJson(request, 'verifyTapeEntry.request') !== entry.requestJson) {
+    throw new CorruptTapeError(path, 'requestJson is not canonical JSON');
+  }
+
+  const expectedRequestHash = tapeRequestHash(entry.profile, request);
+  if (entry.requestHash !== expectedRequestHash) {
+    throw new CorruptTapeError(path, 'requestHash does not match profile + requestJson');
+  }
+
+  const expectedResponseHash = sha256Text(entry.responseJson);
+  if (entry.responseHash !== expectedResponseHash) {
+    throw new CorruptTapeError(path, 'responseHash does not match responseJson');
+  }
+  let response: unknown;
+  try {
+    response = JSON.parse(entry.responseJson) as unknown;
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new CorruptTapeError(path, `responseJson is invalid JSON (${reason})`);
+  }
+  if (canonicalJson(response, 'verifyTapeEntry.response') !== entry.responseJson) {
+    throw new CorruptTapeError(path, 'responseJson is not canonical JSON');
+  }
+
+  const expectedEntryHash = tapeEntryHash(entryBody(entry));
+  if (entry.entryHash !== expectedEntryHash) {
+    throw new CorruptTapeError(path, 'entryHash does not match canonical tape metadata');
+  }
+
+  return entry;
 }
 
 export interface RecordTapeInput {
@@ -109,21 +311,36 @@ export type RecordTapeResult =
   | { readonly ok: false; readonly reason: 'secret-detected'; readonly detector: string };
 
 /**
- * 录制一次 LIVE 调用到 tape（写入前脱敏门：request/response 任一检出密钥形状即拒写）。
- * 调用方必须只在真实 LIVE 调用后调用本函数（mode='LIVE' 是事实声明）。
+ * Record one real LIVE call. The caller must invoke this only after a successful live call.
+ * Request and response are canonicalized and scanned before any bytes are written.
  */
 export function recordTapeCall(root: string, input: RecordTapeInput): RecordTapeResult {
-  const requestJson = stableStringify(input.request);
-  const responseJson = stableStringify(input.response);
-  for (const [label, text] of [['request', requestJson], ['response', responseJson]] as const) {
+  assertTapeRoot(root);
+  assertSafeStageId(input.stageId);
+  assertProfile(input.profile);
+  if (input.profile === 'offline_replay') {
+    throw new Error('recordTapeCall: offline_replay is not a LIVE provider profile');
+  }
+  if (input.codeVersion.trim().length === 0) {
+    throw new Error('recordTapeCall: codeVersion must be non-empty');
+  }
+  const requestJson = canonicalJson(input.request, 'recordTapeCall.request');
+  const responseJson = canonicalJson(input.response, 'recordTapeCall.response');
+
+  for (const [label, text] of [
+    ['request', requestJson],
+    ['response', responseJson],
+  ] as const) {
     const detector = detectCachedSecret(text);
     if (detector !== null) {
       return { ok: false, reason: 'secret-detected', detector: `${label}:${detector}` };
     }
   }
-  const entry = TapeEntrySchema.parse({
+
+  const body = TapeEntryBodySchema.parse({
     schemaVersion: TAPE_SCHEMA_VERSION,
     requestHash: tapeRequestHash(input.profile, input.request),
+    responseHash: sha256Text(responseJson),
     stageId: input.stageId,
     profile: input.profile,
     requestJson,
@@ -133,18 +350,59 @@ export function recordTapeCall(root: string, input: RecordTapeInput): RecordTape
     codeVersion: input.codeVersion,
     secretScan: { passed: true, detector: null },
   });
+  const entry = TapeEntrySchema.parse({ ...body, entryHash: tapeEntryHash(body) });
+
   mkdirSync(root, { recursive: true });
   const path = tapePath(root, entry.stageId, entry.requestHash);
-  writeFileSync(path, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
+  try {
+    writeFileSync(path, `${JSON.stringify(entry, null, 2)}\n`, {
+      encoding: 'utf8',
+      flag: 'wx',
+    });
+  } catch (error: unknown) {
+    if (hasErrorCode(error, 'EEXIST')) {
+      throw new TapeAlreadyExistsError(path);
+    }
+    throw error;
+  }
   return { ok: true, entry, path };
 }
 
-export function loadTapeEntry(root: string, stageId: string, profile: string, request: unknown): TapeEntry | null {
-  const hash = tapeRequestHash(profile, request);
-  const path = tapePath(root, stageId, hash);
+/**
+ * Load and verify a tape. Missing returns null; malformed/tampered/unsupported files throw.
+ */
+export function loadTapeEntry(
+  root: string,
+  stageId: string,
+  profile: string,
+  request: unknown,
+): TapeEntry | null {
+  const requestHash = tapeRequestHash(profile, request);
+  const path = tapePath(root, stageId, requestHash);
   if (!existsSync(path)) return null;
-  const parsed = TapeEntrySchema.safeParse(JSON.parse(readFileSync(path, 'utf8')));
-  return parsed.success ? parsed.data : null;
+
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+  } catch (error: unknown) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new CorruptTapeError(path, `file is not valid JSON (${reason})`);
+  }
+
+  if (
+    typeof decoded === 'object' &&
+    decoded !== null &&
+    'schemaVersion' in decoded &&
+    decoded.schemaVersion !== TAPE_SCHEMA_VERSION
+  ) {
+    throw new UnsupportedTapeSchemaError(path, decoded.schemaVersion);
+  }
+
+  const parsed = TapeEntrySchema.safeParse(decoded);
+  if (!parsed.success) {
+    throw new CorruptTapeError(path, parsed.error.issues.map((issue) => issue.message).join('; '));
+  }
+  return verifyTapeEntry(parsed.data, path);
 }
 
 export interface ReplayedCall<T> {
@@ -154,8 +412,7 @@ export interface ReplayedCall<T> {
 }
 
 /**
- * 从 tape 回放（逐字节一致）：缺失 → MissingTapeError；版本漂移 → TapeVersionDriftError
- * （除非 allowDrift=true 显式放行并记录在返回值）。回放 mode 恒为 RECORDED_REPLAY。
+ * Replay the exact canonical recorded response. Missing, corrupt, and version-drifted tapes fail closed.
  */
 export function replayFromTape<T>(
   root: string,
@@ -174,7 +431,7 @@ export function replayFromTape<T>(
   }
   return {
     response: JSON.parse(entry.responseJson) as T,
-    mode: 'RECORDED_REPLAY', // 回放永不冒充 LIVE（宪法红线）
+    mode: 'RECORDED_REPLAY',
     tapeEntry: entry,
   };
 }
@@ -186,16 +443,19 @@ export interface PartialReplayReport {
   readonly partial: boolean;
 }
 
-/** 部分覆盖报告：哪些 stage 有 tape、哪些缺——部分 replay 必须显式可见，不许静默缩水。 */
+/** Report exact replay coverage; corruption propagates instead of being counted as missing. */
 export function partialReplayReport(
   root: string,
   requested: readonly { stageId: string; profile: string; request: unknown }[],
 ): PartialReplayReport {
   const covered: string[] = [];
   const missing: string[] = [];
-  for (const r of requested) {
-    if (loadTapeEntry(root, r.stageId, r.profile, r.request) !== null) covered.push(r.stageId);
-    else missing.push(r.stageId);
+  for (const item of requested) {
+    if (loadTapeEntry(root, item.stageId, item.profile, item.request) !== null) {
+      covered.push(item.stageId);
+    } else {
+      missing.push(item.stageId);
+    }
   }
   return { requested, covered, missing, partial: missing.length > 0 && covered.length > 0 };
 }
