@@ -199,6 +199,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
       ...(llm === undefined ? {} : { gateway: llm }),
       ...(llmProfile === undefined ? {} : { profile: llmProfile }),
       ...(config.appendOptions === undefined ? {} : { appendOptions: config.appendOptions }),
+      ...(config.eventBus === undefined ? {} : { eventBus: config.eventBus }),
     });
     await registerEvidenceRoutes(v1, { db: config.db });
     await registerVerdictRoutes(v1, { db: config.db });
