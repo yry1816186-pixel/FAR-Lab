@@ -6,6 +6,7 @@ import {
   ansiEnabled,
   badge,
   colorize,
+  displayWidth,
   renderProgressBar,
   renderTable,
   rule,
@@ -90,4 +91,12 @@ test('rule produces fixed-width separator', () => {
 test('SPINNER_FRAMES has at least 4 distinct frames', () => {
   assert.ok(SPINNER_FRAMES.length >= 4);
   assert.equal(new Set(SPINNER_FRAMES).size, SPINNER_FRAMES.length);
+});
+
+test('renderTable aligns CJK/full-width terminal cells', () => {
+  const out = renderTable(['状态', 'ID'], [['通过', 'a'], ['WARN', 'b']], false);
+  const lines = out.split('\n');
+  assert.equal(displayWidth(lines[1] ?? ''), displayWidth(lines[3] ?? ''));
+  assert.equal(displayWidth(lines[3] ?? ''), displayWidth(lines[4] ?? ''));
+  assert.notEqual(lines[1]?.length, lines[4]?.length, 'test must exercise wide-glyph cell width');
 });

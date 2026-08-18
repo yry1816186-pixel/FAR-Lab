@@ -29,8 +29,8 @@ const DIMENSION_META: Record<
   string,
   { icon: typeof ShieldCheck; label: string; color: string }
 > = {
-  provenance: { icon: Fingerprint, label: 'Provenance', color: 'text-blue-400' },
-  integrity: { icon: ShieldCheck, label: 'Integrity', color: 'text-green-400' },
+  provenance: { icon: Fingerprint, label: 'Provenance', color: 'text-info' },
+  integrity: { icon: ShieldCheck, label: 'Integrity', color: 'text-success' },
   identity: { icon: Eye, label: 'Identity', color: 'text-purple-400' },
   processConformance: {
     icon: Repeat,
@@ -40,12 +40,12 @@ const DIMENSION_META: Record<
   executionReproduction: {
     icon: Hash,
     label: 'Execution Reproduction',
-    color: 'text-orange-400',
+    color: 'text-warning',
   },
   scientificVerdict: {
     icon: FlaskConical,
     label: 'Scientific Verdict',
-    color: 'text-yellow-400',
+    color: 'text-warning',
   },
 };
 
@@ -57,32 +57,32 @@ const OUTCOME_META: Record<
 > = {
   PASS: {
     icon: CheckCircle2,
-    color: 'text-green-400',
-    bg: 'bg-green-500/10 border-green-500/30',
+    color: 'text-success',
+    bg: 'bg-success/100/10 border-success/40',
     label: 'PASS',
   },
   FAIL: {
     icon: XCircle,
-    color: 'text-red-400',
-    bg: 'bg-red-500/10 border-red-500/30',
+    color: 'text-destructive',
+    bg: 'bg-destructive/10 border-destructive/30',
     label: 'FAIL',
   },
   WARN: {
     icon: AlertTriangle,
-    color: 'text-yellow-400',
-    bg: 'bg-yellow-500/10 border-yellow-500/30',
+    color: 'text-warning',
+    bg: 'bg-warning/100/10 border-warning/40',
     label: 'WARN',
   },
   SKIP: {
     icon: MinusCircle,
     color: 'text-gray-400',
-    bg: 'bg-gray-500/10 border-gray-500/30',
+    bg: 'bg-muted0/10 border-border/30',
     label: 'SKIP',
   },
   NOT_APPLICABLE: {
     icon: MinusCircle,
     color: 'text-gray-500',
-    bg: 'bg-gray-500/5 border-gray-500/20',
+    bg: 'bg-muted0/5 border-border/20',
     label: 'N/A',
   },
 };

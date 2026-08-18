@@ -15,95 +15,19 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Network, ShieldAlert, ShieldCheck, FlaskConical, FileText, Info, Sun, Moon, Trophy, Gavel, Swords, Languages, Menu, X, GitCompare, Sparkles, ScrollText, Radio, ClipboardCheck, ChevronDown } from 'lucide-react';
+import { Sun, Moon, Languages, Menu, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/layout/Logo';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { useI18n, type Locale } from '@/lib/i18n';
+import { CommandCenter } from '@/components/layout/CommandCenter';
+import { NAV_GROUPS, PRIMARY_ITEMS, TOOLS_ITEMS } from '@/components/layout/navigation';
+
+export { NAV_TITLE_BY_PATH } from '@/components/layout/navigation';
 
 export interface AppShellProps {
   readonly children: ReactNode;
 }
-
-// ---------- Nav item / group types ----------
-
-type NavLabelKey =
-  | 'nav.research' | 'nav.overview' | 'nav.viz' | 'nav.integrity' | 'nav.leaderboard'
-  | 'nav.court' | 'nav.arena' | 'nav.honesty' | 'nav.ablation'
-  | 'nav.report' | 'nav.about' | 'nav.versions' | 'nav.wizard'
-  | 'nav.v2receipt' | 'nav.events' | 'nav.planning' | 'nav.audit';
-
-type NavGroupKey = 'nav.group.research' | 'nav.group.tools';
-
-interface NavItem {
-  readonly to: string;
-  readonly labelKey: NavLabelKey;
-  readonly icon: typeof LayoutDashboard;
-}
-
-interface NavGroup {
-  readonly id: string;
-  readonly labelKey: NavGroupKey;
-  /** primary = 科研主流程（常驻单行）；tools = 信任与验证工具（折叠进 Tools 面板）。 */
-  readonly kind: 'primary' | 'tools';
-  readonly items: readonly NavItem[];
-}
-
-// ---------- Information architecture (2 groups · all links preserved) ----------
-
-const NAV_GROUPS: readonly NavGroup[] = [
-  {
-    // 科研主流程闭环：工作台（新建/运行/冻结视图）· 规划 · 版本比较（修订）· 事件流 · 报告。
-    id: 'research',
-    labelKey: 'nav.group.research',
-    kind: 'primary',
-    items: [
-      { to: '/research', labelKey: 'nav.research', icon: FlaskConical },
-      { to: '/planning', labelKey: 'nav.planning', icon: ClipboardCheck },
-      { to: '/versions', labelKey: 'nav.versions', icon: GitCompare },
-      { to: '/events', labelKey: 'nav.events', icon: Radio },
-      { to: '/report', labelKey: 'nav.report', icon: FileText },
-    ],
-  },
-  {
-    // 信任与验证工具（次级·Tools 面板折叠）：交互验证工具 + 展示页。
-    // 全部保留（不删除任何页面/路由），仅从主路径降级。
-    id: 'tools',
-    labelKey: 'nav.group.tools',
-    kind: 'tools',
-    items: [
-      { to: '/overview', labelKey: 'nav.overview', icon: LayoutDashboard },
-      { to: '/wizard', labelKey: 'nav.wizard', icon: Sparkles },
-      { to: '/v2-receipt', labelKey: 'nav.v2receipt', icon: ScrollText },
-      { to: '/viz', labelKey: 'nav.viz', icon: Network },
-      { to: '/integrity', labelKey: 'nav.integrity', icon: ShieldCheck },
-      { to: '/court', labelKey: 'nav.court', icon: Gavel },
-      { to: '/arena', labelKey: 'nav.arena', icon: Swords },
-      { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: Trophy },
-      { to: '/honesty', labelKey: 'nav.honesty', icon: ShieldAlert },
-      { to: '/ablation', labelKey: 'nav.ablation', icon: FlaskConical },
-      { to: '/audit', labelKey: 'nav.audit', icon: GitCompare },
-      { to: '/about', labelKey: 'nav.about', icon: Info },
-    ],
-  },
-];
-
-const PRIMARY_ITEMS: readonly NavItem[] = NAV_GROUPS[0].items;
-const TOOLS_ITEMS: readonly NavItem[] = NAV_GROUPS[1].items;
-
-/**
- * Single source of route → nav label key. RouteEffects derives document titles
- * from this map so the tab/history title can never drift from the information
- * architecture (no second hand-maintained route→title table).
- */
-export const NAV_TITLE_BY_PATH: Readonly<Record<string, NavLabelKey>> = {
-  // '/' redirects to /research, but the title must be correct even on the
-  // pre-redirect frame.
-  '/': 'nav.research',
-  ...Object.fromEntries(
-    NAV_GROUPS.flatMap((group) => group.items.map((item) => [item.to, item.labelKey] as const)),
-  ),
-};
 
 /** Shared active/inactive className for NavLinks. */
 function navLinkClassName(isActive: boolean, full: boolean): string {
@@ -139,14 +63,14 @@ function ThemeToggle() {
 
 /** Language toggle button (zh ⇄ en). */
 function LanguageToggle() {
-  const { locale, setLocale } = useI18n();
+  const { locale, setLocale, t } = useI18n();
   const next: Locale = locale === 'zh' ? 'en' : 'zh';
   return (
     <button
       type="button"
       onClick={() => setLocale(next)}
       className="inline-flex items-center justify-center gap-1 rounded-md p-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-      aria-label={locale === 'zh' ? 'Switch to English' : '切换到中文'}
+      aria-label={locale === 'zh' ? t('nav.langToEn') : t('nav.langToZh')}
       data-testid="language-toggle"
     >
       <Languages className="h-4 w-4" aria-hidden="true" />
@@ -287,7 +211,7 @@ export function AppShell({ children }: AppShellProps) {
         aria-label={t('nav.aria')}
         data-testid="main-nav"
       >
-        <div className="container flex h-14 min-w-0 items-center gap-4 px-4">
+        <div className="container flex h-14 min-w-0 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
           {/* Brand (R-10.1 · FAR-Lab Logo,非 link 元素,不影响 nav link 计数) */}
           <Logo size="sm" className="shrink-0" />
 
@@ -335,6 +259,7 @@ export function AppShell({ children }: AppShellProps) {
 
           {/* Toggles + mobile menu button */}
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            <CommandCenter />
             <LanguageToggle />
             <ThemeToggle />
             {/* Mobile menu toggle (visible only < md) */}
@@ -414,7 +339,7 @@ export function AppShell({ children }: AppShellProps) {
       </nav>
 
       {/* Main content */}
-      <main id="main-content" tabIndex={-1} className="container py-6" data-testid="main-content">
+      <main id="main-content" tabIndex={-1} className="container min-w-0 px-4 py-5 sm:px-6 sm:py-6 lg:px-8" data-testid="main-content">
         {children}
       </main>
     </div>

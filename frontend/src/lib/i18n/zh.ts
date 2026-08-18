@@ -33,6 +33,16 @@ export const zh = {
   'nav.group.research': '科研',
   'nav.group.tools': '信任与验证工具',
   'nav.toolsButton': '工具',
+  'nav.commandCenter': '快速导航…',
+  'nav.commandPlaceholder': '搜索页面与工具…',
+  'nav.closeCommandCenter': '关闭快速导航',
+  'nav.commandResults': '导航结果',
+  'nav.commandEmpty': '没有匹配的目标',
+  'nav.commandMove': '移动',
+  'nav.commandOpen': '打开',
+  'nav.commandClose': '关闭',
+  'notFound.title': '页面不存在',
+  'notFound.description': 'FAR-Lab 中不存在这个路由。',
 
   // ---- PlanningPage（规划门禁方法论门禁面板）----
   'nav.planning': '规划门禁',

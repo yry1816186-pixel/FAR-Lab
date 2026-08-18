@@ -109,6 +109,37 @@ export function renderProgressBar(progress: number, width = 20, enabled = true):
   return `${colored} ${pct}`;
 }
 
+/** Return terminal display width, not UTF-16 code-unit length.
+ * CJK/full-width glyphs occupy two terminal cells; combining marks occupy zero.
+ * This intentionally stays dependency-free so CLI bootstrap remains reliable.
+ */
+export function displayWidth(value: string): number {
+  let width = 0;
+  for (const char of Array.from(value)) {
+    const code = char.codePointAt(0) ?? 0;
+    if (/\p{Mark}/u.test(char)) continue;
+    const wide =
+      code >= 0x1100 &&
+      (code <= 0x115f ||
+        code === 0x2329 || code === 0x232a ||
+        (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
+        (code >= 0xac00 && code <= 0xd7a3) ||
+        (code >= 0xf900 && code <= 0xfaff) ||
+        (code >= 0xfe10 && code <= 0xfe19) ||
+        (code >= 0xfe30 && code <= 0xfe6f) ||
+        (code >= 0xff00 && code <= 0xff60) ||
+        (code >= 0xffe0 && code <= 0xffe6) ||
+        (code >= 0x1f300 && code <= 0x1faff) ||
+        (code >= 0x20000 && code <= 0x3fffd));
+    width += wide ? 2 : 1;
+  }
+  return width;
+}
+
+function padDisplay(value: string, width: number): string {
+  return value + ' '.repeat(Math.max(0, width - displayWidth(value)));
+}
+
 /**
  * 渲染简单的对齐表格（markdown 风格分隔，跨平台）。
  * @param headers - 列头
@@ -120,10 +151,10 @@ export function renderTable(headers: readonly string[], rows: readonly (readonly
 
   const colWidths = headers.map((_, col) => {
     const headerCell = headers[col] ?? '';
-    let max = headerCell.length;
+    let max = displayWidth(headerCell);
     for (const row of rows) {
       const cell = row[col];
-      const len = cell === null || cell === undefined ? 0 : String(cell).length;
+      const len = cell === null || cell === undefined ? 0 : displayWidth(String(cell));
       if (len > max) max = len;
     }
     return max;
@@ -132,7 +163,7 @@ export function renderTable(headers: readonly string[], rows: readonly (readonly
   const fmtCell = (cell: string | number | null, width: number): string => {
     const s = cell === null ? '' : String(cell);
     const w = width < 0 ? 0 : width;
-    return s.padEnd(w);
+    return padDisplay(s, w);
   };
 
   const sep = `+-${colWidths.map((w) => '-'.repeat(w)).join('-+-')}-+`;

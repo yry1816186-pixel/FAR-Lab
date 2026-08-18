@@ -27,7 +27,7 @@ export interface PageHeaderProps {
 export function PageHeader({ title, description, actions, icon, 'data-testid': testId }: PageHeaderProps) {
   return (
     <header data-testid={testId}>
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-2 min-w-0">
           {icon !== undefined && (
             <span className="shrink-0" aria-hidden="true">
@@ -35,14 +35,14 @@ export function PageHeader({ title, description, actions, icon, 'data-testid': t
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight truncate">{title}</h1>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
             {description !== undefined && description.length > 0 && (
               <p className="mt-1 text-muted-foreground">{description}</p>
             )}
           </div>
         </div>
         {actions !== undefined && (
-          <div className="flex items-center gap-2 shrink-0">{actions}</div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">{actions}</div>
         )}
       </div>
     </header>
