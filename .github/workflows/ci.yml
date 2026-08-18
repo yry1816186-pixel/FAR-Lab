@@ -589,7 +589,7 @@ jobs:
           pdflatex -interaction=nonstopmode -halt-on-error report-fixture.tex
           pdflatex -interaction=nonstopmode -halt-on-error report-fixture.tex
           test -s report-fixture.pdf
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: latex-compiled-report
@@ -655,7 +655,7 @@ jobs:
         run: node scripts/complexity_budget_check.mjs
       - name: Upload fuzz report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-proof-report
           path: .far/fuzz/fuzz-proof-report.*
