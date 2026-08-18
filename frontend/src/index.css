@@ -13,6 +13,8 @@
  *   - shadcn 语义层   : --background/--foreground/--primary/... 亮暗分别精调
  *   - --verdict-*     : 5 值裁决色(vivid,用于 icon/border/D3 邻近)
  *   - --verdict-*-solid: 深色阶(用于 badge bg + 白字,WCAG AA ≥4.5:1)
+ *   - --success/--warning: 语义状态色(D-04 token 供给,供页面替换原始调色板类名)
+ *   - --focus-ring    : 全局 :focus-visible 焦点环(D-05 基线)
  *   - --radius/--ring : 圆角基线 + 聚焦环(品牌蓝)
  * 所有值为 HSL 三元组(空格分隔,无 hsl() 包裹),经 shadcn `hsl(var(--x))` 消费。
  * ============================================================ */
@@ -66,6 +68,21 @@
     /* ---- Radius baseline (学术偏小圆角) ---- */
     --radius: 0.5rem;
 
+    /* ---- Semantic status colors (success/warning · D-04 token 供给) ----
+       沿用 verdict 色阶同族校准:success 与 confirmed 同族绿,warning 与
+       inconclusive 同族黄(黄+白字不达 AA,故只配深色前景,不设 solid 变体)。
+       供后续页面 PR 替换 red- / emerald- 等原始调色板类名,不重算既有 verdict 色值。 */
+    --success: 142.1 70.6% 45.3%;
+    --success-solid: 142.1 70.6% 30%;
+    --success-foreground: 0 0% 100%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 222.2 84% 4.9%;
+
+    /* ---- Focus ring (D-05 全局 :focus-visible 基线) ----
+       与 --ring 同色族保持品牌一致;offset 走 token 便于后续微调。 */
+    --focus-ring: 217 71% 53%;
+    --focus-ring-offset: 2px;
+
     /* ---- Verdict status colors (vivid · icon/border/accent) ---- */
     --verdict-confirmed: 142.1 70.6% 45.3%;
     --verdict-confirmed-solid: 142.1 70.6% 30%;
@@ -112,6 +129,19 @@
     --input: 217 33% 18%;
     --ring: 217 71% 60%;
 
+    /* ---- Semantic status colors (dark) ----
+       vivid 阶暗底提亮保可见(与 verdict confirmed/inconclusive 暗调同策略);
+       success-solid 保持深(白字 AA ≥4.5:1,同 confirmed-solid L26% 校准)。 */
+    --success: 142.1 70.6% 40%;
+    --success-solid: 142.1 70.6% 26%;
+    --success-foreground: 0 0% 100%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 222.2 84% 4.9%;
+
+    /* ---- Focus ring (dark · 暗底提亮,同 --ring 策略) ---- */
+    --focus-ring: 217 71% 60%;
+    --focus-ring-offset: 2px;
+
     /* ---- Verdict status colors (dark) ----
        - vivid 变体(--verdict-*):icon/border 用,暗底提亮保可见。
        - solid 变体(--verdict-*-solid):badge 背景配白字,必须保持暗(WCAG AA ≥4.5:1)。
@@ -150,6 +180,16 @@
   /* 品牌色文本选区(克制点缀) */
   ::selection {
     background-color: hsl(var(--brand-500) / 0.2);
+  }
+  /* 全局键盘焦点基线(D-05 · WCAG 2.4.7 Focus Visible):
+     此前全仓无 :focus-visible 规则,nav 链接与 shell 按钮仅 hover 样式,
+     程序化聚焦实测 outline-style:none——键盘用户丢失位置。
+     环色/offset 消费 token(亮暗自适应)。不与 Button 原语产生双重环:
+     Button 已声明 focus-visible:outline-none + box-shadow ring(ring-ring,
+     offset-2),utility 特异性高于本 base 规则,原语自身环生效、本规则让位。 */
+  :focus-visible {
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: var(--focus-ring-offset);
   }
   /* 滚动条(学术克制:细 + 中性色) */
   * {
