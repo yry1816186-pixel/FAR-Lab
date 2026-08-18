@@ -6,7 +6,7 @@
 - Original target branch: `main`
 - Original commit SHA: `a6647be68c8012246ffb57de8752649657a847f2`
 - Work branch: `ux-refactor/2026-08-18`
-- Validated source SHA before report finalization: `4f2cb984d28e8aa4b5210394351366c1ee935e99`
+- Validated source SHA before report finalization: `6403dd7ed474bf50ea400c55f9e0fbf53794e192`
 
 ## Architectural and product changes
 
@@ -31,7 +31,12 @@ No database/schema migration is introduced by this Human Experience Layer finali
 ## File changes from original main
 
 - `M	.github/workflows/ux-refactor-source-export.yml`
+- `M	HUMAN_SURFACE_INVENTORY.md`
+- `A	PROJECT_FILE_MANIFEST.txt`
+- `M	REFACTOR_MANIFEST.md`
 - `M	UI_DEBT_REPORT.md`
+- `M	VALIDATION_REPORT.md`
+- `A	VALIDATION_RUN_ID.txt`
 - `A	frontend/src/lib/i18n/human_surfaces.ts`
 - `M	frontend/src/lib/i18n/messages.ts`
 - `M	frontend/src/pages/AuditTracePage.tsx`
