@@ -5,10 +5,7 @@ import Database from 'better-sqlite3';
 import { runMigrations } from '../../src/db/index.ts';
 import { buildServer } from '../../src/api/server.ts';
 import type { CourtModelTarget } from '../../src/api/internal/court_service.ts';
-import {
-  createLiveFixtureGateway,
-  TEST_MODEL_SNAPSHOT,
-} from './live_fixture_gateway.ts';
+import { createLiveFixtureGateway } from './live_fixture_gateway.ts';
 
 function makeDb(): Database.Database {
   const db = new Database(':memory:');
@@ -17,12 +14,15 @@ function makeDb(): Database.Database {
   return db;
 }
 
+// Strict-contract alignment: observed model identity (credential.modelId = target
+// id) must equal the pinned per-target snapshot, mirroring the production primary
+// path where modelId === COMPETITION_MODEL_SNAPSHOT.
 function target(id: string, independenceKey: string): CourtModelTarget {
   return {
     id,
     gateway: createLiveFixtureGateway(id),
     providerProfile: 'competition_aliyun_qwen',
-    modelSnapshot: TEST_MODEL_SNAPSHOT,
+    modelSnapshot: id,
     allowedModelIds: [id],
     independenceKey,
   };

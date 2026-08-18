@@ -1,15 +1,16 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+
+import App from './app/App.tsx';
 import './index.css';
 
-const rootEl = document.getElementById('root');
-if (rootEl === null) {
-  throw new Error('main.tsx: root element #root not found in index.html');
+const rootElement = document.getElementById('root');
+if (rootElement === null) {
+  throw new Error('missing #root mount point');
 }
 
-ReactDOM.createRoot(rootEl).render(
-  <React.StrictMode>
+createRoot(rootElement).render(
+  <StrictMode>
     <App />
-  </React.StrictMode>,
+  </StrictMode>,
 );

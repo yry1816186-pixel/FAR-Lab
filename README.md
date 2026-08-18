@@ -206,6 +206,40 @@ disguised as live.
 
 ---
 
+## Web workbench
+
+`pnpm dev` starts the API (:3000) and the web workbench (:5173) together; `Ctrl+C` stops both.
+The workbench is organized around scientific objects, not chat bubbles:
+
+- **Missions** (`/missions`) — a research mission end to end: status polling + SSE lifecycle events
+  while running, seven views once completed (overview / hypotheses / grounding / plan / execution /
+  evaluation / provenance). A run that is not finished shows its live state — never a fabricated
+  result.
+- **Assay** (`/assay`) — run the R0–R9 kernel over a single claim, or open the cross-model **court**
+  / adversarial **arena**. Court and arena are live-only: without `DASHSCOPE_API_KEY` the UI states
+  the requirement up front and the backend answers 503 with guidance — it never replays a canned
+  verdict.
+- **Verify** (`/verify`) — paste or upload a `.far-proof` envelope for six-dimension verification;
+  persist receipts idempotently (by proofHash) and re-verify them later (`/receipts/<id>`).
+- **Evidence** (`/evidence`) — the verdict ledger, evidence/chain lookup by hash, and the
+  whole-chain Merkle trust root with a portable snapshot you can pin into a paper appendix or CI.
+- **Benchmark** (`/benchmark`) — the pre-generated Science-125 report with its honesty notes shown
+  verbatim (offline fixture output, labeled as such — not real scientific adjudication).
+
+Every surface renders the aggregate `runMode` verbatim, verdicts carry their canonical machine
+token plus a localized gloss, and loading / empty / error / unavailable are first-class states —
+an unreachable API shows the error with its machine code, never a fabricated dashboard.
+
+The workbench source lives in `frontend/` (React 18 + Vite; zh-CN default, English secondary):
+`cd frontend && npm ci`, then `npm run dev` / `npm run build` / `npm run test`.
+
+Single-process mode: once `pnpm build` has produced `frontend/dist`, plain `pnpm api` serves the
+workbench itself — `http://localhost:3000/` is the app (SPA deep links included), no dev server or
+reverse proxy needed. `--web-root <dir>` overrides the dist location, `--no-web` disables hosting;
+when no built dist exists the API stays API-only and says so at startup (it never serves a fake shell).
+
+---
+
 ## Live evaluation (frozen evaluation set)
 
 FAR-Lab ships a **frozen evaluation set** (`src/research/evaluation/frozen_eval_set.json`) with

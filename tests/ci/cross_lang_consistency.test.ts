@@ -12,6 +12,7 @@ import {
   canonicalHash,
   hashCanonicalJson,
 } from '../../src/evidence_log/index.ts';
+import { buildPythonPath } from '../_helpers/python.ts';
 
 const farChainRoot = new URL('../../', import.meta.url);
 
@@ -25,7 +26,9 @@ function spawnPython(script: string, args: readonly string[] = []): string {
     encoding: 'utf8',
     env: {
       ...process.env,
-      PYTHONPATH: 'repro',
+      // 必须含 .python-deps/（ensure_py_deps 安装位）——硬编码 'repro' 会在
+      // 系统 Python 无 threadpoolctl 的机器上 ModuleNotFoundError（2026-08-18 实测）。
+      PYTHONPATH: buildPythonPath(process.env.PYTHONPATH),
     },
   });
   assert.equal(result.status, 0, result.stderr);

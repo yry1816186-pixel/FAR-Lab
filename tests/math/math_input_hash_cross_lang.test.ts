@@ -28,6 +28,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { MathVerifier, canonicalConfidence } from '../../src/math/math_verifier.ts';
+import { buildPythonPath } from '../_helpers/python.ts';
 import type { FormalExpression } from '../../src/math/math_claim.ts';
 
 const farChainRoot = new URL('../../', import.meta.url);
@@ -60,7 +61,7 @@ function pythonComputeInputHash(c: CrossLangCase): string {
       encoding: 'utf8',
       env: {
         ...process.env,
-        PYTHONPATH: 'repro',
+        PYTHONPATH: buildPythonPath(process.env.PYTHONPATH),
       },
     },
   );

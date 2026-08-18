@@ -1,8 +1,10 @@
 // src/cli/commands/api.ts
 // far api —— 启动 FAR-Lab REST API server（Fastify）。
 //
-// 前端（frontend/）默认连 http://localhost:3000/api/v1（api_client.ts·spec 24）。
+// 前端（frontend/）经 vite dev proxy 以 same-origin 方式连本服务（shared/api/endpoints.ts）。
 // 本命令让全栈一键可跑：`pnpm api`（或 `far api`）起后端，`cd frontend && npm run dev` 起前端。
+// 单进程产品形态：`pnpm build` 产出 frontend/dist 后，`pnpm api` 直接托管之
+// （/ 与 SPA 深链由 dist 提供；--web-root <dir> 覆盖，--no-web 关闭；dist 缺失时如实 API-only）。
 //
 // 默认离线 demo 模式：jwtSecret=null（匿名·无需凭据）+ in-memory DB + 自动种子 demo 裁决
 // （C-ASTRO-0001 UNTESTED·legacy 路径不注入统计→R6 不触发），前端启动即见真实裁决数据。生产用 --persist/--protected。
@@ -21,6 +23,8 @@ export interface ApiArgs {
   readonly dbPath: string;
   readonly seedDemo: boolean;
   readonly jwtSecret: string | null;
+  /** Static web root override (`--web-root`), or false to disable hosting (`--no-web`). */
+  readonly web?: string | false;
 }
 
 /**
@@ -32,6 +36,7 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
   let dbPath = ':memory:';
   let seedDemo = true;
   let jwtSecret: string | null = null;
+  let web: string | false | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--port') {
@@ -68,13 +73,23 @@ export function parseApiArgs(argv: readonly string[]): ApiArgs {
           : null;
       continue;
     }
+    if (a === '--web-root') {
+      // 显式静态根（自托管前端构建产物）；目录无 index.html 时如实回退 API-only。
+      web = argv[++i] ?? web;
+      continue;
+    }
+    if (a === '--no-web') {
+      // 显式关闭静态托管（纯 API 部署形态）。
+      web = false;
+      continue;
+    }
     throw new Error(`far api: unknown argument "${a}"`);
   }
   if (process.env.PORT !== undefined) {
     const v = parseInt(process.env.PORT, 10);
     if (Number.isFinite(v) && v > 0) port = v;
   }
-  return { port, host, dbPath, seedDemo, jwtSecret };
+  return { port, host, dbPath, seedDemo, jwtSecret, ...(web === undefined ? {} : { web }) };
 }
 
 /**
@@ -108,7 +123,14 @@ export async function runApi(argv: readonly string[]): Promise<number> {
   // connecting + console 每 3s 刷 404）。
   const eventBus = new AgentEventBus();
   const app = await startServer(
-    { db, gitCommitSha, jwtSecret: args.jwtSecret, eventBus, ...(runtimeGateway === null ? {} : { gateway: runtimeGateway }) },
+    {
+      db,
+      gitCommitSha,
+      jwtSecret: args.jwtSecret,
+      eventBus,
+      ...(runtimeGateway === null ? {} : { gateway: runtimeGateway }),
+      ...(args.web === undefined ? {} : { webRoot: args.web }),
+    },
     args.port,
     args.host,
   );
@@ -130,7 +152,7 @@ export async function runApi(argv: readonly string[]): Promise<number> {
       `    openapi        ${base}/documentation/json`,
       `    api v1 root    ${base}/api/v1/verdict`,
       '',
-      '  frontend connects here (frontend/src/lib/api_client.ts → localhost:3000).',
+      '  frontend connects here (frontend/src/shared/api/endpoints.ts → same-origin /api).',
       '  press Ctrl+C to stop.',
       '',
     ].join('\n'),

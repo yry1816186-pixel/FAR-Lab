@@ -7,19 +7,21 @@ import {
   runCourtSession,
   type CourtModelTarget,
 } from '../../src/api/internal/court_service.ts';
-import {
-  createLiveFixtureGateway,
-  TEST_MODEL_SNAPSHOT,
-} from './live_fixture_gateway.ts';
+import { createLiveFixtureGateway } from './live_fixture_gateway.ts';
 
 const GIT_SHA = 'a'.repeat(40);
 
+// Strict-contract alignment: the competition evidence gate requires the observed
+// model identity (credential.modelId) to equal the pinned snapshot, exactly like
+// the production primary path (modelId === COMPETITION_MODEL_SNAPSHOT). The
+// fixture gateway reports modelId = target id, so the per-target snapshot is the
+// same value — snapshot pinning and identity allowlisting stay coherent.
 function target(id: string, independenceKey: string): CourtModelTarget {
   return {
     id,
     gateway: createLiveFixtureGateway(id),
     providerProfile: 'competition_aliyun_qwen',
-    modelSnapshot: TEST_MODEL_SNAPSHOT,
+    modelSnapshot: id,
     allowedModelIds: [id],
     independenceKey,
     providerLabel: `test:${id}`,
@@ -33,7 +35,7 @@ test('arena requires a complete execution context and reports a live assessment'
     GIT_SHA,
     {
       gateway: createLiveFixtureGateway('arena-model'),
-      modelSnapshot: TEST_MODEL_SNAPSHOT,
+      modelSnapshot: 'arena-model',
       providerProfile: 'competition_aliyun_qwen',
       providerLabel: 'test-live-fixture',
     },
@@ -59,7 +61,7 @@ test('arena never reports ROBUST when a required execution fails', async () => {
     GIT_SHA,
     {
       gateway: failingGateway,
-      modelSnapshot: TEST_MODEL_SNAPSHOT,
+      modelSnapshot: 'unreachable-snapshot',
       providerProfile: 'competition_aliyun_qwen',
     },
   );

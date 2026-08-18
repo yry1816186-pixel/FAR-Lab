@@ -3,7 +3,7 @@
 // （CONTEXT/EXTERNAL/PROMPTREG/SCENARIO/STOP 的机器层）。
 //
 // 存量衔接：三门条件映射既有资产（recovery chaos/injection/secret scan/audit chains/
-// discovery 阶梯/statistics/evidence 三件套/novelty lint/vizHonesty/uncertainty 页/…）。
+// discovery 阶梯/statistics/evidence 三件套/novelty lint/benchmark 分布条/StateBlock 诚实态/…）。
 // GOV 五项：EXTERNAL 的 external_facts.ts 已有 recompute 语义——补 freshness 门；
 // CONTEXT = batch contract 的 Context Pack 面（批 12 已立 12 字段）——补最小充分校验；
 // PROMPTREG = 行为配置变更登记与回归门；SCENARIO = 九类场景台账 schema+状态判定；
@@ -57,11 +57,11 @@ export function scienceGate(repoRoot: string): SimpleGateReport {
 
 export function uxGate(repoRoot: string): SimpleGateReport {
   return runSimpleGate(repoRoot, 'UX', [
-    { claim: '科学图表诚实（vizHonesty 6 规则+四图绑定）', path: 'frontend/src/lib/vizHonesty.ts' },
-    { claim: 'uncertainty 可见（五类分类学+措辞 review）', path: 'frontend/src/lib/uncertainty.ts' },
+    { claim: '科学图表诚实（分布条 role=img+逐行文本标签，无色-only 编码）', path: 'frontend/src/features/benchmark/BenchmarkPage.tsx', mustContain: ['role="img"'] },
+    { claim: '诚实状态面（loading/empty/error/unavailable 一等状态，error 带机器码+guidance）', path: 'frontend/src/shared/ui/StateBlock.tsx', mustContain: ['role="alert"'] },
     { claim: 'mode 可见（五值 runMode 贯穿）', path: 'src/research/schemas.ts', mustContain: ['RECORDED_REPLAY'] },
     { claim: 'error/empty/degraded 状态（fail-closed 错误面在测）', path: 'tests/cli/cli_error_paths.test.ts' },
-    { claim: '无假 UI（Wizard 信任剧场修复批 #70）', path: 'frontend/src/pages/WizardPage.tsx' },
+    { claim: '无假 UI（示例收据诚实标注为夹具 + 验证失败如实暴露）', path: 'frontend/src/features/verify/VerifyPage.tsx', mustContain: ['verify.demoNote'] },
     { claim: '错误分类可操作（八类+remediation）', path: 'src/platform/errors.ts', mustContain: ['remediation'] },
   ]);
 }

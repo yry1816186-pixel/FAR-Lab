@@ -89,9 +89,9 @@ riskClasses:
     risk: Scientific UI or assistive-technology behavior regresses
     assets:
       - kind: test
-        locator: frontend/src/__tests__/a11y_baseline.test.tsx
+        locator: frontend/src/__tests__/tabs_shell_a11y.test.tsx
       - kind: test
-        locator: frontend/src/__tests__/HonestyWallPage.test.tsx
+        locator: frontend/src/__tests__/verdict_badge.test.tsx
 
   - class: fault-injection
     risk: Retry, recovery, cancellation, or degraded paths fail under injected faults
