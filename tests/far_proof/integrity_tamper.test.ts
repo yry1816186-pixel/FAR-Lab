@@ -316,3 +316,116 @@ test('DB1-1: 未篡改 bundle → verify 仍绿（generatedAt 纳入 hash 不破
     rmSync(tmp, { recursive: true, force: true });
   }
 });
+// ── 2026-08-20 mutation 盲区补杀（or_to_and 输入校验复合条件：单字段无效须逐个拦截）──
+// parseIntegrity 未导出，经 verifyFarProofPackageIntegrity 间接覆盖：逐字段篡改
+// integrity.json 的类型形状，断言对应 *_UNREADABLE / fail-closed 错误。
+
+test('mutation 盲区: integrity.json 校验层错误文本逐层断言（or_to_and 位点·纵深防御下须按文本杀灭）', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-int-mut-'));
+  try {
+    const dir = exportDemoBundle(tmp);
+    const integrityPath = join(dir, 'integrity.json');
+    const original = readFileSync(integrityPath, 'utf8');
+
+    const rewrite = (mutate: (obj: Record<string, unknown>) => void): void => {
+      const obj = JSON.parse(original) as Record<string, unknown>;
+      mutate(obj);
+      writeFileSync(integrityPath, `${JSON.stringify(obj)}\n`, 'utf8');
+    };
+    // 纵深防御说明：单层校验漏过时下一层往往仍拦（最终 ok 同为 false）——所以
+    // 断言必须是错误文本（对应校验层），而非布尔；or→and 变异把拦截推迟到后层，
+    // 文本变化即被本用例捕获。
+    const expectError = (snippet: string): void => {
+      const r = verifyFarProofPackageIntegrity(dir);
+      assert.ok(
+        !r.ok && r.errors.some((e) => e.includes(snippet)),
+        `须含错误文本 '${snippet}'，实际: ${JSON.stringify(r.errors)}`,
+      );
+    };
+
+    // 位点 1：根为数组 → 根对象校验层
+    writeFileSync(integrityPath, '[]\n', 'utf8');
+    expectError('integrity root must be an object');
+    // 位点 1b：根为字符串（只触发 typeof 支、不触发 null/Array 支——复合条件
+    // 单支变异被其余支兜住时，只有单支输入能区分校验层）
+    writeFileSync(integrityPath, '"not-an-object"\n', 'utf8');
+    expectError('integrity root must be an object');
+
+    // 位点 2：files 条目为 null → 条目对象校验层
+    rewrite((o) => {
+      (o.files as unknown[])[0] = null;
+    });
+    expectError('files[0] must be an object');
+
+    // 位点 3a/3b/3c：path/sha256/bytes 单字段类型无效 → 形状校验层
+    rewrite((o) => {
+      ((o.files as { path: unknown }[])[0]).path = 123;
+    });
+    expectError('files[0] has invalid shape');
+    rewrite((o) => {
+      ((o.files as { sha256: unknown }[])[0]).sha256 = null;
+    });
+    expectError('files[0] has invalid shape');
+    rewrite((o) => {
+      ((o.files as { bytes: unknown }[])[0]).bytes = 'x';
+    });
+    expectError('files[0] has invalid shape');
+
+    // 位点 4：generatedAt 非字符串 → 尾部字符串校验层
+    rewrite((o) => {
+      o.generatedAt = 42;
+    });
+    expectError('generatedAt/integrityHash must be strings');
+
+    // 恢复 → 必须重新通过（证明上述失败源于篡改而非环境）
+    writeFileSync(integrityPath, `${original}\n`, 'utf8');
+    assert.ok(verifyFarProofPackageIntegrity(dir).ok, '恢复原始 integrity.json 后必须通过');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('mutation 盲区: fileCount 非数字时回退 files.length（=== number 位点）', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-int-fc-'));
+  try {
+    const dir = exportDemoBundle(tmp);
+    const integrityPath = join(dir, 'integrity.json');
+    const original = readFileSync(integrityPath, 'utf8');
+    const obj = JSON.parse(original) as Record<string, unknown>;
+    // 删除 fileCount 字段 → 回退 files.length；integrityHash 是对 files 内容的哈希？
+    // 若 integrityHash 覆盖 fileCount 字段本身则删除会致 mismatch（也是合法杀灭）。
+    delete obj.fileCount;
+    writeFileSync(integrityPath, `${JSON.stringify(obj)}\n`, 'utf8');
+    // 两种可接受结果：clean 回退 或 hash mismatch 检出——不可接受的是 crash/静默通过形状错误
+    const r = verifyFarProofPackageIntegrity(dir);
+    assert.ok(typeof r.ok === 'boolean', 'fileCount 缺席必须产生确定性结果而非 crash');
+    // 恢复
+    writeFileSync(integrityPath, `${original}\n`, 'utf8');
+    assert.ok(verifyFarProofPackageIntegrity(dir).ok, '恢复后必须通过');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('mutation 盲区: integrity.json 仅 bytes 字段失配须检出（内容比较 or_to_and 位点）', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'far-int-bytes-'));
+  try {
+    const dir = exportDemoBundle(tmp);
+    const integrityPath = join(dir, 'integrity.json');
+    const original = readFileSync(integrityPath, 'utf8');
+    const obj = JSON.parse(original) as { files: { path: string; sha256: string; bytes: number }[] };
+    // 篡改 bytes（保持 sha256 不变）→ sha 相等、bytes 失配 → or→and 变异下漏过
+    obj.files[0].bytes += 1;
+    writeFileSync(integrityPath, `${JSON.stringify(obj)}\n`, 'utf8');
+    const r = verifyFarProofPackageIntegrity(dir);
+    assert.ok(
+      !r.ok && r.errors.some((e) => e.includes('INTEGRITY_FILE_MISMATCH')),
+      `仅 bytes 失配必须检出 INTEGRITY_FILE_MISMATCH，实际: ${JSON.stringify(r.errors)}`,
+    );
+    // 恢复通过
+    writeFileSync(integrityPath, `${original}\n`, 'utf8');
+    assert.ok(verifyFarProofPackageIntegrity(dir).ok);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});

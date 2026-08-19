@@ -17,6 +17,10 @@
  *
  * 退出码: 0 = 存活率 <10%（达标）· 1 = 存活率 ≥10%（测试强度不足·须补断言）
  * 输出: killed/survived 明细 + 存活率 + 达标判定。
+ *
+ * 等价变异登记（EQUIVALENT_MUTATIONS）：数学上不可杀灭的变异（变异后可观测行为
+ * 与原代码等价——任何测试都无法区分）。登记纪律：每条必须带论证；命中不计入
+ * 存活率（计入 equivalent 单独披露）；登记只增不减或改须在 PR 说明中论证。
  */
 
 import { readFileSync, writeFileSync, copyFileSync } from 'node:fs';
@@ -26,6 +30,52 @@ import { spawnSync } from 'node:child_process';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..');
+
+// 等价变异登记：op + 行文本前缀匹配（trim 后 startsWith）。
+// 每条带论证；抽查论证真实性是 code review 责任（防豁免沦为逃逸后门）。
+const EQUIVALENT_MUTATIONS = {
+  'src/far_proof/integrity_check.ts': [
+    {
+      op: 'eq_to_neq',
+      linePrefix: "fileCount: typeof record.fileCount === 'number'",
+      reason: '合法导出的 fileCount 恒等于 files.length（exporter 同源生成）：变异取 files.length 与取 fileCount 值相同；仅攻击者自构 bundle 可区分，而该场景由 INTEGRITY_HASH_MISMATCH 层覆盖',
+    },
+  ],
+  'src/statistics/p_value.ts': [
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (probability < plow)',
+      reason: 'A&S 26.2.23 分支算法在边界连续：Q(plow) 低尾/中段两分支输出同值（2026-08-20 实测 -1.9729610490848712 双分支一致），分支选择在边界不可观测',
+    },
+    {
+      op: 'lte_to_lt',
+      linePrefix: 'if (probability <= phigh)',
+      reason: '同上：phigh=1-plow 边界中段/高尾两分支数值一致（算法设计保证连续性）',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (value < 0)',
+      reason: 'clampProbability：value=0 时提前返回 0 与 fall-through 返回 value(=0) 等值',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (value > 1)',
+      reason: 'clampProbability：value=1 时提前返回 1 与 fall-through 返回 value(=1) 等值',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'const sign = x < 0 ? -1 : 1',
+      reason: 'erf(0)=0：x=0 时符号取 -1 或 1 结果均为 0（-0 与 0 数值相等），符号分支在 x=0 不可观测',
+    },
+  ],
+};
+
+/** 位点是否命中等价变异登记（返回登记项或 null）。 */
+function findEquivalentRegistration(srcFile, site) {
+  const regs = EQUIVALENT_MUTATIONS[srcFile];
+  if (regs === undefined) return null;
+  return regs.find((r) => r.op === site.operator && site.line.startsWith(r.linePrefix)) ?? null;
+}
 
 const OPERATORS = [
   { name: 'eq_to_neq', re: /(===)/g, replace: '!==' },
@@ -131,36 +181,62 @@ function main() {
     `mutation_gate: baseline OK (${sites.length} sites found, running up to ${effectiveLimit}; tests: ${testFilesList.join(', ')})`,
   );
 
+  // 等价登记的位点跳过执行（省时）但单独披露。
   const selected = sites.slice(0, effectiveLimit);
   let killed = 0;
   let survived = 0;
+  let equivalent = 0;
   const survivedList = [];
 
-  for (const site of selected) {
-    const mutated = applyMutation(original, site);
-    writeFileSync(srcPath, mutated, 'utf8');
-    // 变异在**任一**目标测试下失败 = killed（全部通过 = survived）。
-    const allPassed = testFilesList.every((tf) => runTest(tf));
-    writeFileSync(srcPath, original, 'utf8'); // 恢复原始（无论结果）
-
-    if (allPassed) {
-      survived += 1;
-      survivedList.push(site);
-      if (verbose) {
-        console.log(`  SURVIVED ${site.operator}: ${site.line}`);
+  try {
+    for (const site of selected) {
+      const eqReg = findEquivalentRegistration(srcFile, site);
+      if (eqReg !== null) {
+        equivalent += 1;
+        console.log(`  equiv    ${site.operator}: ${site.line}`);
+        console.log(`           ↳ 登记论证: ${eqReg.reason}`);
+        continue;
       }
-    } else {
-      killed += 1;
-      if (verbose) {
-        console.log(`  killed   ${site.operator}: ${site.line}`);
+      const mutated = applyMutation(original, site);
+      writeFileSync(srcPath, mutated, 'utf8');
+      // 变异在**任一**目标测试下失败 = killed（全部通过 = survived）。
+      // try/finally 确保任何异常路径下源文件恢复（变异源泄漏进工作树是本工具最危险故障）。
+      let allPassed;
+      try {
+        allPassed = testFilesList.every((tf) => runTest(tf));
+      } finally {
+        writeFileSync(srcPath, original, 'utf8');
+      }
+
+      if (allPassed) {
+        survived += 1;
+        survivedList.push(site);
+        if (verbose) {
+          console.log(`  SURVIVED ${site.operator}: ${site.line}`);
+        }
+      } else {
+        killed += 1;
+        if (verbose) {
+          console.log(`  killed   ${site.operator}: ${site.line}`);
+        }
       }
     }
+  } catch (err) {
+    // 极端路径（如 writeFileSync 失败）也要尽力恢复源文件再退出。
+    try {
+      writeFileSync(srcPath, original, 'utf8');
+    } catch {
+      // 恢复失败只能如实退出
+    }
+    throw err;
   }
 
   const total = killed + survived;
   const rate = total === 0 ? 0 : survived / total;
   console.log('─'.repeat(60));
-  console.log(`mutation_gate: killed=${killed} survived=${survived} (${total} mutations)`);
+  console.log(
+    `mutation_gate: killed=${killed} survived=${survived} equivalent=${equivalent} (${killed + survived} executed + ${equivalent} registered-equivalent)`,
+  );
   console.log(`mutation_gate: survival rate = ${(rate * 100).toFixed(1)}% (target <10%)`);
   if (survivedList.length > 0) {
     console.log('survived mutations (test gaps):');

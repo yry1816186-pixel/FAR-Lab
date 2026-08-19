@@ -105,3 +105,14 @@ test('normalCdf / normalSurvival 对称性 + 有限性', () => {
   assert.ok(Math.abs(normalCdf(1.96) + normalSurvival(1.96) - 1) < 1e-9);
   assert.throws(() => normalCdf(Number.NaN), /x: expected a finite number/);
 });
+
+test('twoSampleWelchZTest: 恰好 n=2 的合法双样本必须成功（min-n 守卫边界·mutation 位点）', () => {
+  // mutation_gate 存活位点：`left.length < 2` / `right.length < 2` 的 lt_to_lte 变异——
+  // 变异后 n=2 的合法样本被错误拒绝。契约：n>=2 即合法（Welch SE 可算）。
+  const r = twoSampleWelchZTest([1, 2], [2, 3]);
+  assert.ok(Number.isFinite(r.statistic), 'n=2 双样本必须成功（变异下会抛错）');
+  assert.ok(r.pValue > 0 && r.pValue < 1, 'p 值在 (0,1)');
+  // 单侧恰好 n=2 同理
+  const rOne = twoSampleWelchZTest([1.5, 2.5], [10, 11], 'greater');
+  assert.ok(Number.isFinite(rOne.statistic), 'n=2 单侧必须成功');
+});
