@@ -13,7 +13,7 @@ import { startServer } from '../../api/server.ts';
 import { openFarDb } from '../../db/open.ts';
 import { buildDemoChain } from '../../far_proof/demo_chain.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
-import { resolveRuntimeGateway } from '../../llm_gateway/runtime_gateway.ts';
+import { resolveRuntimeGateway, RUNTIME_MODEL_SNAPSHOT } from '../../llm_gateway/runtime_gateway.ts';
 import { AgentEventBus } from '../../agent_loop/events.ts';
 
 /** Input parameters for operations involving api args. */
@@ -128,7 +128,10 @@ export async function runApi(argv: readonly string[]): Promise<number> {
       gitCommitSha,
       jwtSecret: args.jwtSecret,
       eventBus,
-      ...(runtimeGateway === null ? {} : { gateway: runtimeGateway }),
+      // gateway 由本命令经 env 解析 → 同时给出环境模型快照（否则 server 把显式
+      // gateway 误判为"外部注入"而丢弃 RUNTIME_MODEL_SNAPSHOT → hypothesize
+      // 生产路径 REPRO_BRIDGE_NOT_CONFIGURED 裸 500——2026-08-19 根因实证）。
+      ...(runtimeGateway === null ? {} : { gateway: runtimeGateway, modelSnapshot: RUNTIME_MODEL_SNAPSHOT }),
       ...(args.web === undefined ? {} : { webRoot: args.web }),
     },
     args.port,

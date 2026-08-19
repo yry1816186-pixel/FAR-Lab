@@ -205,6 +205,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
       gitCommitSha: config.gitCommitSha,
       ...(llm === undefined ? {} : { gateway: llm }),
       ...(llmProfile === undefined ? {} : { profile: llmProfile }),
+      ...(llmModelSnapshot === undefined ? {} : { modelSnapshot: llmModelSnapshot }),
       ...(config.appendOptions === undefined ? {} : { appendOptions: config.appendOptions }),
       ...(config.eventBus === undefined ? {} : { eventBus: config.eventBus }),
     });

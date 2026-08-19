@@ -12,6 +12,7 @@
  */
 
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
+import { BailianHttpError, ProviderError } from '../../llm_gateway/fallback_chain/errors.ts';
 import type { ApiErrorResponse } from '../types.ts';
 
 /**
@@ -129,6 +130,22 @@ export function errorHandler(
       ...(error.detail === undefined ? {} : { detail: error.detail }),
     };
     reply.code(error.statusCode).type('application/problem+json').send(body);
+    return;
+  }
+
+  // Provider 传输层失败（HTTP 4xx/5xx、超时、网络）→ 503 fail-closed + 可行动指引——
+  // 不得扁平化成裸 500「internal server error」（裸 500 不给用户下一步；曾实测
+  // arrearage 账户输出无信息 500）。模型中立：不带 provider 名/密钥形状。
+  if (error instanceof ProviderError) {
+    const status = error instanceof BailianHttpError ? error.status : null;
+    const body: ApiErrorResponse = {
+      error_code: 'LLM_PROVIDER_FAILED',
+      message:
+        `live model provider request failed${status !== null ? ` (HTTP ${status})` : ''}. ` +
+        'Check the configured API key and account status (quota/balance), or run with an offline profile. No verdict was fabricated.',
+      source_anchor: { fileId: null, stageId: null, callRecordId: null },
+    };
+    reply.code(503).type('application/problem+json').send(body);
     return;
   }
 

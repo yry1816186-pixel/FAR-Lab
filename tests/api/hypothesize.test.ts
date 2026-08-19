@@ -272,13 +272,15 @@ test('POST /api/v1/hypothesize 幂等：pending 状态 → 409 IDEMPOTENCY_PENDI
 
 
 // ---------------------------------------------------------------------------
-// Provider 失败 → 503 fail-closed 映射（裸 500 修复的判别锁）
-// 缺陷背景：arrearage 等 provider 传输层失败曾被扁平化为无信息的
-// "internal server error"（HTTP 500）——用户拿不到下一步。修复后：
-// ProviderError → 503 LLM_PROVIDER_FAILED + 可行动指引 + 模型中立（不带 provider 名）。
+// Provider 失败两态契约（2026-08-19 根因链：modelSnapshot 转发缺口→裸 500 → 修复后
+// 真实行为显形=loop 内捕捉记 LoopState.error，不抛路由）。
+// ① loop 路径：200 + loopState.error 如实（terminated:error·无裁决·无信封·消息保留
+//    ——运行失败但请求成功，零伪造）；
+// ② 逃逸路径：全局 error_handler 把 ProviderError → 503 LLM_PROVIDER_FAILED
+//    （unit 锁，防未来路由绕过 loop 直接抛时退化为裸 500）。
 // ---------------------------------------------------------------------------
 
-test('POST /api/v1/hypothesize: provider HTTP 失败 → 503 + 指引，不裸 500 不泄密', async () => {
+test('POST /api/v1/hypothesize: provider HTTP 失败 → 200 + loopState.error 如实零伪造', async () => {
   const db = openDb();
   const { BailianHttpError } = await import('../../src/llm_gateway/fallback_chain/errors.ts');
   const { createLlmGateway } = await import('../../src/llm_gateway/gateway.ts');
@@ -311,15 +313,61 @@ test('POST /api/v1/hypothesize: provider HTTP 失败 → 503 + 指引，不裸 5
         idempotencyKey: 'provider-fail-test-0001',
       },
     });
-    assert.equal(response.statusCode, 503, `provider 失败必须 fail-closed 503，不得裸 500: ${response.body}`);
-    const body = response.json() as { error_code: string; message: string };
-    assert.equal(body.error_code, 'LLM_PROVIDER_FAILED');
-    assert.ok(body.message.includes('offline'), '必须给可行动下一步（offline profile 指引）');
-    assert.ok(body.message.includes('HTTP 400'), 'HTTP 状态应保留（诊断价值）');
-    // 模型中立红线：不得携带 provider 品牌字面量/密钥形状
-    assert.ok(!/dashscope|bailian|qwen|sk-/i.test(body.message), `消息泄漏 provider 信息: ${body.message}`);
+    assert.equal(response.statusCode, 200, `loop 内 provider 失败应落 LoopState.error: ${response.body.slice(0, 200)}`);
+    const body = response.json() as {
+      data: {
+        loopState: { terminated: boolean; terminationReason: string; error: { code: string; message: string } | null };
+        honestVerdict: unknown;
+        proofEnvelopeV2Status: string;
+      };
+    };
+    assert.equal(body.data.loopState.terminated, true);
+    assert.equal(body.data.loopState.terminationReason, 'error');
+    assert.ok(body.data.loopState.error !== null, 'error 必须如实记录');
+    assert.ok(body.data.loopState.error.message.includes('Arrearage'), 'provider 真实原因应保留（可行动性）');
+    assert.equal(body.data.honestVerdict, null, '失败运行不得伪造裁决');
+    assert.equal(body.data.proofEnvelopeV2Status, 'skipped', '失败运行不得伪造信封');
   } finally {
     await app.close();
     db.close();
   }
+});
+
+test('error_handler: ProviderError 逃逸 → 503 LLM_PROVIDER_FAILED（unit 锁）', async () => {
+  const { errorHandler } = await import('../../src/api/errors/error_handler.ts');
+  const { BailianHttpError, BailianTimeoutError } = await import('../../src/llm_gateway/fallback_chain/errors.ts');
+
+  function capture() {
+    const out = { code: 0, body: '' };
+    const reply = {
+      code(c: number) {
+        out.code = c;
+        return this;
+      },
+      type() {
+        return this;
+      },
+      send(b: unknown) {
+        out.body = JSON.stringify(b);
+        return this;
+      },
+    };
+    return { out, reply };
+  }
+
+  const a = capture();
+  errorHandler(
+    new BailianHttpError(400, null, 'http_400 Arrearage') as never,
+    {} as never,
+    a.reply as never,
+  );
+  assert.equal(a.out.code, 503, 'provider HTTP 失败必须 503 不得 500');
+  const bodyA = JSON.parse(a.out.body) as { error_code: string; message: string };
+  assert.equal(bodyA.error_code, 'LLM_PROVIDER_FAILED');
+  assert.ok(bodyA.message.includes('offline'), '必须给 offline 下一步指引');
+  assert.ok(!/dashscope|bailian|qwen|sk-/i.test(bodyA.message), `模型中立红线: ${bodyA.message}`);
+
+  const b = capture();
+  errorHandler(new BailianTimeoutError('timed out') as never, {} as never, b.reply as never);
+  assert.equal(b.out.code, 503, 'provider 超时同样 503');
 });
