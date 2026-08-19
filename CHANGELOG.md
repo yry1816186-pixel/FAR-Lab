@@ -5,6 +5,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — RFC 8785 JCS canonicalization (V3 complete)
+- 信任内核全部哈希路径统一到 RFC 8785 JSON Canonicalization Scheme：vendored `canonicalize@4.0.0`（`src/vendor/`，与 npm tarball 逐字节一致，Apache-2.0 随源分发）；迁移 7 处 `fast-json-stable-stringify` 使用点（evidence_log hasher/lifecycle、agent_loop 收据、proof_envelope v1/v2、research 桥、llm_gateway tape）。差分实测：纯 JSON 域输出与旧序列化器逐字节一致（哈希中性迁移，旧 `.far-proof` 包继续可验证）
+- Python 轴：核心依赖新增 `rfc8785`；修复错误导入名（`serialize`→`dumps`，原先被 except ImportError 静默吞掉导致永远走非规范 fallback）；int→float ES6 域规约（RFC 8785 §3.2.2.3），不可精确表示的整数 fail-closed；fallback 降级改为响亮告警
+- 跨语言收敛向量：`NUMERIC_KNOWN_DIVERGENCE`（1e-7 vs 1e-07 已知分歧）翻转为 `NUMERIC_JCS_CONVERGENCE`（4 个指数边界向量 TS↔Python byte-equal）；clean-room 独立验证器样本补 1e-7
+- 独立浏览器验证页 `frontend/public/verify.html` 补齐 lone-surrogate fail-closed（四轴统一契约）
+- `fast-json-stable-stringify` 从 dependencies 移除（borrow_registry 决策翻案已登记）
+
+### Added — 浏览器侧 contentHash 独立重算
+- EvidencePage 新增 `CanonicalHashVerifier` 面板：粘贴 JSON + 期望 64-hex → 浏览器 RFC 8785 规范化 + Web Crypto SHA-256 比对（外部审计方验证 ProofEnvelope contentHash 无需信任服务端；与 Merkle 包含证明构成双重独立验证）；自检锚 `GOLDEN_JCS_SELF_TEST`（1e-7 边界样本，后端真实计算哈希）
+- Workbench 失败即主状态：provider 失败时结果区呈现原因 + `far doctor`/离线下一步指引（loop error 为主 alert，非脚注）
+- 导航重组：产品链主导航 + System 折叠子菜单（工程/评审入口；可见性≠权限）
+
+### Fixed
+- `scripts/baseline_cache.mjs` 对未跟踪目录（porcelain 目录形态）readFileSync 抛 EISDIR 崩溃——展开为包含文件后再哈希
+- API provider 失败两态契约：loop 内失败 → 200 + `loopState.error` 如实（无裁决/无信封零伪造）；逃逸路径全局 error_handler → 503 `LLM_PROVIDER_FAILED`（可行动指引 + 模型中立）
+- `hypothesize` 路由转发 `modelSnapshot`（G3 环境锚）——生产 REPRO_BRIDGE_NOT_CONFIGURED 裸 500 的根因修复
+
 ### Added — 跨平台支持
 - 三平台 CI 矩阵 `.github/workflows/cross-platform.yml`（Windows/macOS/Linux 全量 tests）
 - 跨平台路径工具 `src/paths.ts`：PATH_SEP / toPosixPath / toNativePath / safeJoin（拒 `..` 与绝对路径 fail-closed）/ isSubPath / crossPlatformTmpDir / crossPlatformHomeDir

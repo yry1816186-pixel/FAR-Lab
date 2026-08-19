@@ -314,7 +314,9 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
 
 ### 已知边界
 
-1. **浮点序列化** —— 字符串键哈希完全证明；浮点序列化正迁移至 RFC 8785 JCS 规范化。
+1. **浮点序列化** —— 字符串键哈希完全证明；浮点与指数边界序列化已在全轴遵循 RFC 8785 JCS
+   （TS 侧 vendor `canonicalize@4.0.0`、Python 侧 `rfc8785` 包、浏览器验证器镜像实现），
+   由收敛 golden 向量锁定字节相等。
 2. **多模态** —— 当前支持视觉（Qwen-VL）；音频/视频/表格在路线图中。
 3. **单机部署** —— 基于 SQLite；多节点 PostgreSQL 为未来工作。实测吞吐为消费级 SSD 上
    O(10²) 行/秒追加 + O(10⁴) 行/秒索引查询（单进程）。不适合高并发多写生产环境
@@ -322,7 +324,8 @@ pnpm run test:py     # Python 验证轴（SymPy / Z3 · 缺失则 graceful skip�
 4. **1.x 早期阶段** —— API 与 schema 可能在 1.x 线内调整。遵循 semver：破坏性变更升 minor
    版本（1.0 → 1.1），并保留至少一个 minor 版本的弃用窗口。
 5. **跨语言哈希范围** —— 字符串键哈希在 TypeScript/Python 间字节一致（CI 验证）；
-   浮点键哈希是第 1 项的 V3 RFC 8785 工作；浏览器端 ProofEnvelope 验证器尚未接线（#13）。
+   指数边界数值向量在 RFC 8785 JCS 下字节相等（收敛 golden 向量）；浏览器端 ProofEnvelope
+   验证器已接线（#13）：独立页 `frontend/public/verify.html` + 应用内浏览器重算面板。
 6. **TESS demo 科学保真度** —— 离线 demo 使用确定性合成光变曲线（box transit，
    无临边昏暗/污染）与粗粒度 BLS 网格（120 周期）。Bonferroni α'=0.0125 是预登记固定阈值
    （F8），**不是**真实 TESS 频率网格试验因子校正。这是诚实的教学简化，非生产 TESS 验证管线。

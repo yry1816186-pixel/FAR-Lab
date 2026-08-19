@@ -311,6 +311,24 @@
           }
         }
 
+        // RFC 8785 JCS 一致性：lone surrogate 不得进入规范 JSON（与后端 vendored
+        // canonicalize@4.0.0 的拒绝对齐——四轴〔TS/Python/浏览器组件/本独立页〕统一
+        // fail-closed 契约，而非静默转义后计算一个后端永不会产出的哈希）。
+        function hasLoneSurrogate(text) {
+          for (let i = 0; i < text.length; i += 1) {
+            const code = text.charCodeAt(i);
+            if (code >= 0xd800 && code <= 0xdbff) {
+              if (i === text.length - 1) return true;
+              const next = text.charCodeAt(i + 1);
+              if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+              i += 1;
+            } else if (code >= 0xdc00 && code <= 0xdfff) {
+              return true;
+            }
+          }
+          return false;
+        }
+
         function canonicalJson(value, path) {
           assertNoNonFiniteNumber(value, path || "canonicalJson");
 
@@ -318,6 +336,9 @@
             return "null";
           }
           if (typeof value === "string") {
+            if (hasLoneSurrogate(value)) {
+              throw new Error((path || "value") + ": lone surrogate is not allowed in canonical JSON (RFC 8785)");
+            }
             return JSON.stringify(value);
           }
           if (typeof value === "number") {

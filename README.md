@@ -467,8 +467,10 @@ not represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or 
 
 ### Known limits
 
-1. **Float serialization** — string-key hashing is fully proven; float serialization is migrating to
-   RFC 8785 JCS.
+1. **Float serialization** — string-key hashing is fully proven; float and exponent-boundary
+   serialization follows RFC 8785 JCS on all axes (vendored `canonicalize@4.0.0` in TS,
+   `rfc8785` in Python, mirrored in the browser verifiers), locked byte-equal by
+   convergence golden vectors.
 2. **Multimodal** — vision supported (Qwen-VL); audio/video/tabular are on the roadmap.
 3. **Single-node** — SQLite-based; multi-node PostgreSQL is future work. Tested throughput is
    O(10²) rows/sec append + O(10⁴) rows indexed lookups/sec on consumer SSD (single-process).
@@ -477,8 +479,9 @@ not represent the official position of Alibaba Cloud, DashScope, NAOC, NADC, or 
    breaking changes bump the minor version (1.0 → 1.1) with a deprecation window of at least
    one minor release.
 5. **Cross-language hashing scope** — string-key hashing is byte-identical across TypeScript/Python
-   (CI-verified); float-key hashing is the V3 RFC 8785 work in item 1; the browser ProofEnvelope
-   verifier is not yet wired (#13).
+   (CI-verified); exponent-boundary number vectors are byte-equal under RFC 8785 JCS (convergence
+   golden vectors); the browser ProofEnvelope verifier is wired (#13): standalone
+   `frontend/public/verify.html` + in-app browser-side recompute panels.
 6. **TESS demo scientific fidelity** — the offline demo uses a deterministic synthetic light curve
    (box transit, no limb darkening / contamination) and a coarse BLS grid (120 periods). The
    Bonferroni α'=0.0125 is a pre-registered fixed threshold (F8), **not** a real TESS frequency-grid
