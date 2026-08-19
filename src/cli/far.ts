@@ -1194,6 +1194,12 @@ USAGE:
                                      --db <path>         full integrity_check + chain verify (fail-closed, IC-03)
   far hardware [--json]              best-effort runtime compute-backend probe
                                      (CPU / GPU / WebGPU / WASM; never affects verdict determinism)
+  far monitor [--json]               system health snapshot — dual-sample CPU% differential (1s window),
+                                     memory, load average; threshold alerts (warn = yellow).
+                                     Read-only (node:os); never touches verdict paths.
+    --json              machine-readable single document (sample + alerts + thresholds + result)
+    exits 0 no alerts · 2 alerts present (WARN semantics, same tier as doctor WARN-only)
+
   far demo [tess-offline]            one-shot demo (14 Golden Vectors + end-to-end demo claim;
                                      fully offline, no credentials needed)
                                      tess-offline        focus on the TESS (C-ASTRO-0001 pulsar) offline verdict
@@ -1402,6 +1408,15 @@ USAGE:
     --json              emit a machine-readable summary
     exit codes: 0 PASS / 7 FAIL / 2 bad args / 1 runtime error
 
+  far plugin verify <manifest.json> [--json]
+                                     run the full plugin conformance battery against a third-party
+                                     verdict-detector manifest: malicious x4 / permission-denial /
+                                     version-mismatch / timeout / schema-output probes + target
+                                     registration (golden vectors, determinism double-run,
+                                     contentHash reconciliation). Host-side, no network.
+    --json              canonical single-document report (census §4-1)
+    exits 0 conformance PASS · 7 FAIL (probe or registration failed) · 2 bad args / unreadable file
+
   far export receipt (--envelope <path> | --bundle <path>) [--format json|markdown] [--out <path>]
                          Trust Receipt DOC projection (does not enter proofHash)
     --envelope <path>    ProofEnvelopeV2 JSON file
@@ -1498,6 +1513,17 @@ USAGE:
   far stream "<question>" [--mode] [--json]   like ask, but streams each stage live (onArtifact callback; real streaming, not replay)
   far repl                                  interactive REPL (ask / :fork <suffix> / :history / :quit)
   far replay --db <path> | --bundle <dir>   replay the evidence chain (time machine; hash-chain verify)
+  far snapshot-verify <run.json> [<run2.json> ...] [--json]
+                                     recompute each persisted corpus snapshot (snapshotId + rootHash)
+                                     and fail on drift; '-' reads run paths from stdin (one per line).
+  far snapshot-verify --increment <runA.json> <runB.json> [--json]
+                                     snapshot-to-snapshot increment report (added / retired /
+                                     unchanged doc ids + comparability statement).
+    --json              machine-readable SnapshotVerifyOutcome
+    exits 0 all runs verified · 1 any mismatch OR any unreadable/malformed run file
+          (fail-closed: one bad file never yields 0) · 2 usage error
+    cannot-prove: internal snapshot consistency, NOT that the snapshot matches what the
+    source API returned at fetch time (see retrieval/snapshot_integrity.ts)
   far court "<claim>" [--models a,b,c]      cross-model reliability court (issues a ReliabilityCertificate)
   far arena "<hypothesis>" [--refuters]     adversarial science arena (refuter attacks + deterministic arbiter scoreboard)
   far init <domain> [--out <dir>] [--force] scaffold a DomainPack (config + claim/fec templates)
@@ -1520,6 +1546,27 @@ USAGE:
       corrected     apply FAR-Lab's proper analysis (Bonferroni correction)
 
   far schedule <add|list|remove|run>       scheduled re-verification (re-verify claims over time; JSON-persisted)
+
+  far campaign <start|status|resume|report|replay>
+                        multi-day research campaigns on a hash-chained append-only ledger:
+                        budget guard (tokens/duration/loops), crash-resumable scheduler,
+                        md/latex/json report generation, deterministic replay from the ledger.
+    start "<objective>" [--budget-* <n>]  begin a campaign (writes genesis ledger entry)
+    status <campaignId>                   current state replayed from the event ledger
+    resume <campaignId>                   continue from the last checkpoint
+    report <campaignId> [--format md|latex|json]  render from ledger replay
+    replay <campaignId>                   recompute state end-to-end from genesis (integrity check)
+    exits 0 ok · 1 not found / runtime failure · 2 usage error · 7 replay integrity FAIL
+
+  far rubric <package|aggregate>
+                        blind human evaluation: package de-identified hypotheses for raters,
+                        aggregate their CSV ratings with inter-rater agreement stats
+                        (Cohen's kappa + Krippendorff's alpha; single-rater κ/α = null).
+    package <runId...> [--seed N] [--out <dir>]
+                                         emit a de-identified hypothesis pack (rater-facing)
+    aggregate <packageId> <ratings.csv>... [--out <dir>]
+                                         join ratings back to identities + agreement report
+    exits 0 ok · 2 usage error · 3 ratings parse error
     add --exec "<command>" [--every <days>] [--label <text>]
                           register a periodic re-verification job (--every default 7 days)
     list                  list all jobs with due status
@@ -1566,6 +1613,10 @@ VERIFICATION & TRUST
   far verify [--bundle|--envelope|--db] third-party independent re-computation verification
                                         (--v2: V2 six-dimension path; --explain expands the check tables)
   far verify-golden [--all|--case]      recompute the verdict golden vectors (node/python/browser axes)
+  far plugin verify <manifest.json>     run the plugin conformance battery (malicious/permission/timeout
+                                        probes + registration; 0 PASS · 7 FAIL · 2 bad args)
+  far snapshot-verify <run.json> [...]  recompute persisted corpus snapshots (drift = fail-closed);
+                                        --increment <A> <B> emits the snapshot delta report
   far fec <compile|freeze>              FEC V2 compile + fecHash recompute / freeze cross-check
   far replay --db <p> | --bundle <d>    replay the evidence chain (time machine; hash-chain verify)
   far court "<claim>"                   cross-model reliability court (issues a ReliabilityCertificate)
@@ -1584,6 +1635,7 @@ SYSTEM
   far doctor [--full-verify]            environment self-check (no network, no keys by default;
                                         env checks first, compact verify summary; --full-verify = full report)
   far hardware [--json]                 best-effort runtime compute-backend probe (CPU/GPU/WebGPU/WASM)
+  far monitor [--json]                  system health snapshot — CPU/memory thresholds with warn alerts
   far init <domain>                     scaffold a DomainPack (config + claim/fec templates)
   far api [--port <n>]                  start the REST API server (Fastify; frontend defaults to :3000)
   far status [--db <path>]              emit the single SSOT status report

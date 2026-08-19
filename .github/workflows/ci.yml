@@ -343,61 +343,45 @@ jobs:
         run: node --test --test-timeout=180000 tests/api/v2_receipts_contract.test.ts
 
   # ============================================================
-  # TEST_REGISTRY · CLI 命令注册表完整性
+  # TEST_REGISTRY · CLI 命令注册表完整性（2026-08-20 起为真实检查，不再是全量测试兜底）
+  # scripts/test_registry.mjs：COMMANDS↔help↔逐命令专属帮助三方一致
+  # （防隐藏命令/幽灵命令/DETAILED_HELP 缺段静默 fallback 三类漂移）
   # ============================================================
   test_registry:
     needs: test_py
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          fetch-depth: 0   # release_check 需 tags + 完整历史
-      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff275f7fcc4a7b6c09
+      - uses: pnpm/action-setup@a8198c4bff370c850618b0b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: pyproject.toml
       - run: pnpm install --frozen-lockfile
-      - run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-      - name: registry smoke (scripts/test_registry.ts 未实现；跑全量 TS 测试兜底)
-        run: pnpm run test
+      - name: registry check (命令注册表↔help↔专属帮助三方一致)
+        run: node scripts/test_registry.mjs
 
   # ============================================================
-  # STEP 8 · repro_check（Makefile 无 repro target → test:py 兜底）
+  # STEP 8 · repro_check（2026-08-20 起为真实复现检查，不再是 test:py 兜底）
+  # scripts/repro_check.mjs：同 DB 双导出 byte-identical + 双 bundle 第三方重算一致
   # ============================================================
   repro_check:
     needs: test_registry
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          fetch-depth: 0   # release_check 需 tags + 完整历史
-      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
+      - uses: pnpm/action-setup@a8198c4bff370c850618b0b035930dea56dbd5288
         with:
           version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: pyproject.toml
-      - run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-      - name: repro check (Makefile 无 repro target；跑 test:py 兜底)
-        run: pnpm run test:py
+      - run: pnpm install --frozen-lockfile
+      - name: repro check (同 DB 双导出 byte-identical + 双 bundle 重算一致)
+        run: node scripts/repro_check.mjs
 
   # ============================================================
   # STEP 9 · cross_lang（R2 最高优先闸门：TS canonicalHash === Python canonical_hash byte-equal）
