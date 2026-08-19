@@ -14,14 +14,18 @@ services:
     build: .
     image: far-lab:dev
     command: ["demo", "tess-offline"]
-    # 一次性 offline demo：14 Golden Vectors + C-ASTRO-0001 TESS 裁决 + 防篡改密封
+    # 一次性 offline demo：15 Golden Vectors + C-ASTRO-0001 TESS 裁决 + 防篡改密封
 
   far-api:
     build: .
     image: far-lab:dev
-    command: ["api", "--host", "0.0.0.0", "--port", "3000"]
+    # 非回环绑定（容器端口映射必需 0.0.0.0）必须走受保护模式——匿名模式允许未认证
+    # 写信任账本，api 启动安全门会拒绝在 0.0.0.0 上匿名运行（fail-closed，实测行为）。
+    # FAR_JWT_SECRET 用 :? 语法：缺失时 compose 显式报错并给修复指引，绝不硬编码演示密钥。
+    command: ["api", "--host", "0.0.0.0", "--port", "3000", "--protected"]
+    environment:
+      - FAR_JWT_SECRET=${FAR_JWT_SECRET:?far-api 容器绑定 0.0.0.0 必须受保护：在 .env 写入 FAR_JWT_SECRET=<强随机值> 后用 docker compose --env-file .env up far-api}
     ports:
       - "3000:3000"
-    # offline Web Cockpit 后端（匿名 demo·自动种子 C-ASTRO-0001）。
-    # 前端：本地 `cd frontend && npm install && npm run dev` 连 localhost:3000。
-    # 真实 provider：docker compose --env-file .env up far-api（.env 含 DASHSCOPE_API_KEY）
+    # 受保护 Web Cockpit 后端（JWT 门禁）。前端：本地 `cd frontend && npm install && npm run dev` 连 localhost:3000。
+    # offline 匿名体验（零配置）：docker compose up far-demo。

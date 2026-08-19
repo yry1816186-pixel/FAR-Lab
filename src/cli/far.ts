@@ -68,6 +68,11 @@ const COMMANDS: readonly CliCommand[] = [
     run: async (args) => (await import('../monitor/run_command.ts')).runMonitor({ json: args.includes('--json') }),
   },
   {
+    name: 'plugin',
+    description: 'verify a verdict-detector plugin manifest (conformance battery; --json)',
+    run: async (args) => (await import('./commands/plugin.ts')).runPluginCommand(args),
+  },
+  {
     name: 'status',
     description: 'emit the single SSOT status report',
     run: (args) => runStatusFromArgs(args),

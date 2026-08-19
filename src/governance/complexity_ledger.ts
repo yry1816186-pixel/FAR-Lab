@@ -47,7 +47,7 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'benchmark', budgetFiles: 4 },
   { module: 'campaign', budgetFiles: 13 },
   { module: 'cas', budgetFiles: 2 },
-  { module: 'cli', budgetFiles: 56 },
+  { module: 'cli', budgetFiles: 57 },  // 依据: 2026-08-19 +commands/plugin.ts(far plugin verify·插件 conformance CLI 出口);对账为真实文件数
   { module: 'confounding_gate', budgetFiles: 7 },
   { module: 'data_governance', budgetFiles: 2 },
   { module: 'db', budgetFiles: 4 },

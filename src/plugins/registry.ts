@@ -133,7 +133,7 @@ export type DetectorRun =
  */
 export function vectorOutputMatches(
   manifest: PluginManifest,
-  vector: { readonly vectorId: string; readonly input: unknown; readonly expectedOutput: unknown },
+  vector: { readonly vectorId: string; readonly input?: unknown; readonly expectedOutput?: unknown },
   fixedTimestamp: string,
 ): { readonly matches: boolean; readonly reason: string } {
   const vecInput = DetectorInputSchema.safeParse(vector.input);
