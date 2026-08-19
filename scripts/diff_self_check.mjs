@@ -51,7 +51,12 @@ const THRESHOLD_NUM_RE = /:\s*(-?\d+(?:\.\d+)?)\s*[,})]|=\s*(-?\d+(?:\.\d+)?)\s*
 
 const MODE_LABEL_RE = /'LIVE'|'RECORDED_REPLAY'|runMode|ExecutionMode|executionMode/;
 
-const PUBLIC_SCHEMA_RE = /^src\/(fec|schema|far_proof|proof_envelope|canonical)\/.*\.ts$|^schema\//;
+// R3 校准（依据: 粗信号误报实证——新增 proof_envelope/v2/ask_envelope.ts 生产模块
+// （零公共类型改动）被本信号拦截）：公共 schema 的真实来源即生成器 4 ENTRIES 的
+// source 文件 + schema/ 树；其余 watched-root 内的新增文件不改变任何已发布 schema
+// （精确校验 generate_json_schema --check 仍为最终裁决）。收窄不改放松——四个真实
+// 源文件的任何改动仍会触发本信号。
+const PUBLIC_SCHEMA_RE = /^src\/(fec\/fec_contract|proof_envelope\/types|schema\/enums|far_proof\/exporter)\.ts$|^schema\//;
 const SCHEMA_ARTIFACT_RE = /\.schema\.json|^schema\/migrations\//;
 
 const args = process.argv.slice(2);

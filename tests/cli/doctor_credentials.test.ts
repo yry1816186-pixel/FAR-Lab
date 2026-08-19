@@ -53,6 +53,10 @@ interface DoctorRun {
 function runDoctorWithCreds(args: readonly string[], creds: Record<string, string> = {}): DoctorRun {
   const env: Record<string, string | undefined> = { ...process.env };
   for (const v of CRED_ENV_VARS) delete env[v];
+  // hermetic 凭据真空：CLI 入口默认水合仓库真实 .env（含真实 DASHSCOPE key），
+  // 必须显式关闭，否则「全部缺失」用例被开发机真实凭据污染（本文件头设计纪律
+  // 第 3 条：开发机真实 .env 不得影响测试）。
+  env.FAR_DOTENV = 'off';
   for (const [k, v] of Object.entries(creds)) env[k] = v;
   const r = spawnSync(process.execPath, ['src/cli/far.ts', 'doctor', ...args], {
     encoding: 'utf8',

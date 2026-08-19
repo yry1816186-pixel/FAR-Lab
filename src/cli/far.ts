@@ -20,8 +20,11 @@ import type { ReceiptFormat } from './commands/export_receipt.ts';
 import type { VerifyMode } from './commands/verify.ts';
 import type { VerifyGoldenBackend } from './commands/verify_golden.ts';
 import type { CitationExportFormat } from './commands/export_citations.ts';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseOptions, reportErrors, type OptionSchema } from './parse_options.ts';
 import { runCli, type CliCommand } from './registry.ts';
+import { hydrateEnvFromDotEnv } from '../platform/dotenv.ts';
 
 // ---------------------------------------------------------------------------
 // 命令注册表（声明式）：每个描述符 = name / aliases / description / run。
@@ -380,6 +383,16 @@ const COMMANDS: readonly CliCommand[] = [
 ];
 
 async function main(): Promise<void> {
+  // .env 水合（dotenv 语义：真实环境变量优先；缺失即 no-op）——必须在任何
+  // 命令分发之前，使 `far doctor` / `far research` / `far api` 等所有
+  // process.env 消费点看到与文档承诺一致的凭据面。键名/值绝不打印。
+  // FAR_DOTENV=off 显式关闭（测试 hermetic 凭据真空 / 用户临时无凭据运行）。
+  if (process.env.FAR_DOTENV !== 'off') {
+    hydrateEnvFromDotEnv(
+      process.env,
+      resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '.env'),
+    );
+  }
   const exitCode = await runCli(
     { commands: COMMANDS, helpText: HELP_TEXT, commandHelp },
     process.argv.slice(2),

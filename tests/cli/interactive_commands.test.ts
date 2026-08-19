@@ -16,6 +16,9 @@ function runFar(args: readonly string[]): SpawnSyncReturns<string> {
   for (const name of RUNTIME_API_KEY_ENV_NAMES) {
     delete env[name];
   }
+  // hermetic 凭据真空：CLI 入口默认水合仓库真实 .env（arena/court 的
+  // credential-absence 断言会被开发机真实 key 污染）——显式关闭水合。
+  env.FAR_DOTENV = 'off';
   return spawnSync(process.execPath, ['src/cli/far.ts', ...args], {
     encoding: 'utf8',
     timeout: 120000,

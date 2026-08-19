@@ -67,7 +67,7 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'llm_gateway', budgetFiles: 29 },
   { module: 'math', budgetFiles: 16 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'planning', budgetFiles: 9 },
-  { module: 'platform', budgetFiles: 5 },
+  { module: 'platform', budgetFiles: 6 },  // 依据: 2026-08-19 复杂度租金——dotenv.ts(CLI 入口 .env 水合·修复文档承诺与实现断裂导致的 LIVE 通路误判);对账为真实文件数,非阈值放松
   { module: 'proof_envelope', budgetFiles: 13 },  // 依据: R3 复杂度租金——ask_envelope.ts(V2 信封生产构建器·D-2026-08-19-01 终结)入 v2/ 子域;对账为真实文件数,非阈值放松
   { module: 'release', budgetFiles: 5 },
   { module: 'report', budgetFiles: 8 },

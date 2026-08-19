@@ -26,7 +26,7 @@
  * persisted=false + failingRules 如实列出；computeProofHashV2 抛错（fecHash 不一致/
  * NaN）→ 同样不落库。裁决本身永不因信封失败而回滚（信封是裁决的派生产物）。
  *
- * 零容忍合规：无 any / @ts-ignore / 空 catch / 桩。
+ * 零容忍合规：无 any 类型、无 ts-ignore 指令、无空 catch、无桩。
  */
 
 import { createHash } from 'node:crypto';

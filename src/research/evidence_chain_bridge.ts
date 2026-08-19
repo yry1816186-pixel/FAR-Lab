@@ -24,7 +24,7 @@
  *   - 触发面：仅 API 驱动的运行（路由持有 db 与 store 双柄）；CLI 直驱 orchestrator
  *     的运行不经本桥（其文件收据链仍是其溯源面）——此为如实边界，非缺陷。
  *
- * 零容忍合规：无 any / @ts-ignore / 空 catch / 桩。链写走 appendRecord（prevHash
+ * 零容忍合规：无 any 类型、无 ts-ignore 指令、无空 catch、无桩。链写走 appendRecord（prevHash
  * fail-closed + IMMEDIATE 事务）——本模块不另造链逻辑。
  */
 
