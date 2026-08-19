@@ -1,0 +1,149 @@
+# FAR-Lab nightly — 兑现 ci.yml 声明的两项夜间承诺 + mutation 扩展监测。
+#
+# 为什么存在：ci.yml 头注释声称「C8 每日 snapshot 存活监控」，blocking_gates 的
+# fuzz 步骤注释声称「全量 100k 走 pnpm fuzz:proof 本地/夜间」——2026-08-20 之前
+# 两处承诺均无 workflow 承接（文档漂移）。本 workflow 是承接，不是新增承诺。
+#
+# 内容：
+#   snapshot_alive   — C8：离线主路径 + 三轴黄金向量 + 导出/重算链的每日存活检查
+#                      （防止依赖漂移/环境变化悄悄破坏零凭据路径）
+#   fuzz_full        — .far-proof 解析面全量 100k 模糊测试（CI 内 smoke 为 2k）
+#   mutation_gate    — 信任内核变异测试扩展（CI 内仅 fec/compiler 20 位点 smoke）
+#                      gate 档（阻断）：存活率 <10% 达标文件
+#                      monitor 档（不阻断）：全部内核文件存活率趋势报告（artifact）
+#                      —— monitor 档是诚实监测：未达标文件的存活率趋势可见、
+#                         不静默、不冒充达标（verdict_kernel_v2 等大文件债务登记在
+#                         .far 治理台账，补杀完成后移入 gate 档）。
+#
+# 边界：schedule 仅默认分支触发（GitHub 行为）；单文件时长以 2026-08-20 本地实测
+# 为锚（fuzz 2k≈65s → 100k≈55min；mutation 全位点 7-70s/文件）。
+name: nightly
+
+on:
+  schedule:
+    # 每日 18:30 UTC（北京 02:30）——错开 security-audit 的周一 02:00 UTC 班次。
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24.14.0'
+  PNPM_VERSION: '10.29.3'
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  # ============================================================
+  # C8 · 每日 snapshot 存活监控（ci.yml 头注释声明的承诺，本 job 承接）
+  # ============================================================
+  snapshot_alive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: pnpm/action-setup@a8198c4bff370c850618b0b035930dea56dbd5288
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: far doctor（环境自诊·零密钥·允许 WARN exit 2）
+        shell: bash
+        run: |
+          set +e
+          node src/cli/far.ts doctor
+          code=$?
+          echo "far doctor exit: $code"
+          if [ "$code" = "1" ]; then echo "FAIL: core capability broken"; exit 1; fi
+          exit 0
+      - name: far demo tess-offline（离线裁决存活）
+        run: node src/cli/far.ts demo tess-offline
+      - name: far verify-golden 三轴（node/python/browser 黄金向量存活）
+        run: |
+          node src/cli/far.ts verify-golden --all --backend node
+          node src/cli/far.ts verify-golden --all --backend python
+          node src/cli/far.ts verify-golden --all --backend browser
+      - name: far export + verify（第三方重算链存活）
+        run: |
+          node src/cli/far.ts export far-proof --demo-chain --force
+          node src/cli/far.ts verify .far-proof
+      - name: repro check（同 DB 双导出 byte-identical + 双 bundle 重算一致）
+        run: node scripts/repro_check.mjs
+
+  # ============================================================
+  # fuzz_full · .far-proof 解析面全量 100k（承诺：「全量走夜间」）
+  # ============================================================
+  fuzz_full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: pnpm/action-setup@a8198c4bff370c850618b0b035930dea56dbd5288
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: fuzz proof 全量 100k（固定 seed·crash/hang/OOM oracle）
+        run: node scripts/fuzz_proof.mjs --cases 100000
+      - name: 上传 fuzz 报告
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fuzz-full-report
+          path: .far/fuzz/
+          retention-days: 30
+
+  # ============================================================
+  # mutation_gate · 信任内核变异测试扩展（CI 内仅 1 文件 20 位点 smoke）
+  # ============================================================
+  mutation_gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: pnpm/action-setup@a8198c4bff370c850618b0b035930dea56dbd5288
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # gate 档：已达标（存活率 <10%）的信任内核文件——FAIL 即红。
+      - name: gate · hasher（canonical hash 根基·9 位点全杀）
+        run: node scripts/mutation_gate.mjs src/evidence_log/hasher.ts tests/evidence_log/canonical_json_guard.test.ts
+      - name: gate · bundle_verifier（.far-proof 第三方重算面·74 位点全杀）
+        run: node scripts/mutation_gate.mjs src/far_proof/bundle_verifier.ts tests/far_proof/bundle_verifier_hardening.test.ts --limit 100
+      # monitor 档：未达标文件的存活率趋势（不阻断；补杀达标后移入 gate 档）。
+      # 2026-08-20 全位点基线：integrity_check 24.2% · fec/compiler 31.7% ·
+      # p_value 53.8% · verdict_kernel_v2 54.5%（治理债务已登记）。
+      - name: monitor · integrity_check（趋势·非阻断）
+        continue-on-error: true
+        run: node scripts/mutation_gate.mjs src/far_proof/integrity_check.ts tests/far_proof/integrity_tamper.test.ts --limit 100 || true
+      - name: monitor · fec compiler（趋势·非阻断）
+        continue-on-error: true
+        run: node scripts/mutation_gate.mjs src/fec/compiler.ts tests/fec/fec_mandatory_gate.test.ts || true
+      - name: monitor · p_value（趋势·非阻断）
+        continue-on-error: true
+        run: node scripts/mutation_gate.mjs src/statistics/p_value.ts tests/statistics/p_value_boundaries.test.ts || true
+      - name: monitor · verdict_kernel_v2（趋势·非阻断·裁决内核债务）
+        continue-on-error: true
+        run: node scripts/mutation_gate.mjs src/falsifiability/verdict_kernel_v2.ts tests/falsifiability/verdict_kernel_v2.test.ts --limit 100 || true

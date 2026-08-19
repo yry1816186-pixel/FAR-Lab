@@ -1,4 +1,4 @@
-# FAR-Lab CI — 12 步串行 gate + competition_qwen_smoke 条件门 + C8 每日 snapshot 存活监控
+# FAR-Lab CI — 12 步串行 gate + competition_qwen_smoke 条件门（C8 每日 snapshot 存活监控由 nightly.yml 承接）
 # 运行时 SSOT 以本 workflow + package.json 为准
 # 作用域：对抗 LLM 幻觉的工程化兜底。cross_lang 是 R2 最高优先闸门。
 # 命名约定：job id 一律下划线（不用连字符），因 needs.<job_id>.result 表达式里连字符会被解析为减号
@@ -26,7 +26,7 @@ on:
 
 # 同一 ref 的新 push 取消旧 run（省额度，防并发写入 repro_runs）
 concurrency:
-  # 加 github.event_name：隔离 schedule 触发的 C8 snapshot 监控 run，避免 push 到 main 取消每日定时检查
+  # 加 github.event_name：隔离 schedule 触发的 run（C8 监控在 nightly.yml，concurrency 组独立）
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
@@ -633,7 +633,7 @@ jobs:
         run: node scripts/coverage_gate.mjs
       - name: repo_hygiene_gate（tracked 内容门禁 A–I · 递归扫描 git index）
         run: node scripts/repo_hygiene_gate.mjs
-      - name: fuzz_proof smoke（公开解析面模糊测试·增量档 2k 例；全量 100k 走 pnpm fuzz:proof 本地/夜间）
+      - name: fuzz_proof smoke（公开解析面模糊测试·增量档 2k 例；全量 100k 走 nightly.yml fuzz_full job）
         run: node scripts/fuzz_proof.mjs --smoke --seed 20260816
       - name: complexity_budget gate（圈复杂度 ≤15/文件 ≤800 行·新违规阻断·存量债务基线化）
         run: node scripts/complexity_budget_check.mjs
