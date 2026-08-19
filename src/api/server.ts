@@ -9,6 +9,20 @@ import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import type { Database } from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/** OpenAPI info.version 与 package.json 对齐（SSOT；此前硬编码日期会随发布漂移）。 */
+const API_VERSION: string = (() => {
+  const pkgPath = resolve(dirname(fileURLToPath(import.meta.url)), '../../package.json');
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 import { registerAuthMiddleware } from './auth/jwt_middleware.ts';
 import { errorHandler } from './errors/error_handler.ts';
@@ -155,7 +169,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
         title: 'FAR-Lab API',
         description:
           'FAR-Lab 对外 HTTP API（24§5）。V2 receipts 端点采用统一信封 { ok: true, data: T } + RFC 7807 错误响应（R-05）。',
-        version: '2026-06-27',
+        version: API_VERSION,
       },
       tags: [
         { name: 'health', description: 'Liveness + readiness probes' },

@@ -17,7 +17,7 @@
 # --format '{{index .RepoDigests 0}}'` 读回；imagetools inspect 需 CLI 直连 registry，
 # 本环境走 daemon 代理路径）。升级方式：
 #     docker buildx imagetools inspect node:24-slim --format '{{.Manifest.Digest}}'
-# → 更新下行 digest，并在发布流程（.far-release/RELEASE_CHECKLIST.md）记录变更。
+# → 更新下行 digest，并在 CHANGELOG.md 记录变更（digest 钉版升级是供应链事件）。
 # 注意：digest 钉住后升级需显式更新（浮动 tag 不再生效）。
 FROM node:24-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
 

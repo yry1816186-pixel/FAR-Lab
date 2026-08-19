@@ -100,6 +100,33 @@ jobs:
           node --test tests/evidence_log/cross_lang_consistency.test.ts
         timeout-minutes: 42
 
+      # g1. blocking_gates 对齐（2026-08-20）：发布门不得窄于开发门——此前 tag 发布
+      #     只跑上面的全量测试，coverage/mutation/zero_tolerance/anti_theater 等
+      #     14 项门禁只在 PR CI 生效（"开发门本地跑"的自认债务）。现对齐补入；
+      #     diff_self_check 除外（PR diff 语义，tag 发布无对应 diff 基线）。
+      - name: blocking_gates (dev-gate parity · supply chain + zero-tolerance + anti-theater)
+        run: |
+          node scripts/check-supply-chain.mjs
+          node scripts/zero_tolerance_scan.mjs
+          node scripts/anti_theater_deterministic_scan.mjs
+          node scripts/no_llm_final_judge_scan.mjs
+        timeout-minutes: 10
+      - name: blocking_gates (dev-gate parity · mutation smoke + risk map + claim/wording lints)
+        run: |
+          node scripts/mutation_gate.mjs src/fec/compiler.ts tests/fec/fec_mandatory_gate.test.ts --limit 20
+          pnpm run test:risk-map
+          node scripts/claim_lint.mjs
+          node scripts/novelty_wording_lint.mjs
+          node scripts/doc_command_check.mjs
+        timeout-minutes: 15
+      - name: blocking_gates (dev-gate parity · coverage + hygiene + fuzz smoke + complexity)
+        run: |
+          node scripts/coverage_gate.mjs
+          node scripts/repo_hygiene_gate.mjs
+          node scripts/fuzz_proof.mjs --smoke --seed 20260816
+          node scripts/complexity_budget_check.mjs
+        timeout-minutes: 30
+
       # g/h. 准备 release assets：install.sh + install.ps1 + SHA256SUMS
       # 契约（DR4-01 修复·2026-08-10）：install.sh 5b 段期望清单含 `scripts/install.*`
       # 前缀条目（grep/awk 匹配）；故在仓库根对 scripts/ 路径生成哈希，禁止在 staging

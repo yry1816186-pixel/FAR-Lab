@@ -3,7 +3,7 @@
   "info": {
     "title": "FAR-Lab API",
     "description": "FAR-Lab 对外 HTTP API（24§5）。V2 receipts 端点采用统一信封 { ok: true, data: T } + RFC 7807 错误响应（R-05）。",
-    "version": "2026-06-27"
+    "version": "1.1.0"
   },
   "components": {
     "schemas": {}
