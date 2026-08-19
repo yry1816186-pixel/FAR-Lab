@@ -14,7 +14,9 @@ CASE_DIR = Path("golden_vectors/cases")
 class VerdictKernelV2Test(unittest.TestCase):
     def test_gv_cases_match_expected_verdicts(self) -> None:
         files = sorted(CASE_DIR.glob("GV-*.json"))
-        self.assertEqual(len(files), 14)  # GV-01..12 (核心) + GV-13 (FUSION-OS-13 derivationForm) + GV-14 (FUSION-OS-14 identifier)
+        # GV-01..12 (核心) + GV-13 (FUSION-OS-13 derivationForm) + GV-14 (FUSION-OS-14 identifier)
+        # + GV-15 (R5 rule-order lock, commit 0d75530 —— TS 侧同步时本断言漏更新至 15)
+        self.assertEqual(len(files), 15)
         for path in files:
             with self.subTest(case=path.name):
                 case = json.loads(path.read_text(encoding="utf-8"))
