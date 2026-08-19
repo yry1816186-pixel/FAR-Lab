@@ -17,7 +17,7 @@ import { JsonBlock } from '@/shared/ui/JsonBlock.tsx';
 import { KeyValue, KeyValueList } from '@/shared/ui/KeyValue.tsx';
 import { PageHeader } from '@/shared/ui/JsonBlock.tsx';
 import { EmptyBlock, ErrorBlock, LoadingBlock, Section } from '@/shared/ui/StateBlock.tsx';
-import { GoldenVerifier, ProofRecompute } from '@/features/evidence/BrowserReproof.tsx';
+import { CanonicalHashVerifier, GoldenVerifier, ProofRecompute } from '@/features/evidence/BrowserReproof.tsx';
 import { VerdictBadge } from '@/shared/ui/VerdictBadge.tsx';
 
 const PAGE_SIZE = 25;
@@ -267,6 +267,7 @@ function IntegrityPanel() {
         </div>
       ) : null}
       <GoldenVerifier />
+      <CanonicalHashVerifier />
     </Section>
   );
 }

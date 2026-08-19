@@ -27,7 +27,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
 
-import { NAV_ITEMS } from './AppShell.tsx';
+import { NAV_ITEMS, SYSTEM_NAV_ITEMS } from './AppShell.tsx';
 import { useT, type MessageKey } from '@/shared/i18n/index.tsx';
 
 const BASE_TITLE = 'FAR-Lab';
@@ -35,6 +35,9 @@ const BASE_TITLE_FULL = 'FAR-Lab · Falsifiable · Auditable · Reproducible';
 
 /** Last-seen scroll position per pathname (module-local session memory). */
 const scrollMemory = new Map<string, number>();
+
+/** 主导航 + 系统深层合并的标题 SSOT（深层路由不丢标题——可见性≠权限但标题必须有）。 */
+const ALL_NAV_ITEMS = [...NAV_ITEMS, ...SYSTEM_NAV_ITEMS];
 
 /**
  * Resolve the title key for a pathname from the nav table (SSOT) by first
@@ -45,7 +48,7 @@ const scrollMemory = new Map<string, number>();
 function titleKeyFor(pathname: string): MessageKey | undefined {
   if (pathname === '/') return 'nav.home';
   const first = pathname.split('/')[1];
-  const hit = NAV_ITEMS.find((item) => item.to === `/${first}`);
+  const hit = ALL_NAV_ITEMS.find((item) => item.to === `/${first}`);
   if (hit !== undefined) return hit.key;
   if (first === 'receipts') return 'receipts.title';
   return undefined;

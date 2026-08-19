@@ -104,11 +104,24 @@ export default function HomePage() {
       {/* ── 裁决区：同页呈现，五值即排版事件 ────────────────── */}
       {result !== null ? (
         <section aria-label={t('workbench.resultRegion')} className="border-b border-border py-8" data-testid="workbench-result">
-          {verdict === null ? (
+          {/* 运行失败 = 结果区主状态（journey：失败不是脚注——给原因 + 给下一步） */}
+          {result.loopState.error !== null ? (
+            <div className="max-w-2xl rounded border border-danger/50 bg-danger/5 px-5 py-4" role="alert" data-testid="workbench-loop-error">
+              <p className="text-sm font-semibold text-danger">{t('workbench.loopFailed.title')}</p>
+              <p className="mt-1.5 text-sm leading-6 text-ink2">
+                <span className="font-mono text-xs">{result.loopState.error.code}</span>
+                {' · '}
+                {result.loopState.error.message}
+              </p>
+              <p className="mt-2.5 text-xs leading-5 text-ink3">{t('workbench.loopFailed.nextSteps')}</p>
+            </div>
+          ) : null}
+          {result.loopState.error === null && verdict === null ? (
             <p className="text-sm text-ink2" data-testid="workbench-no-verdict">
               {t('workbench.noVerdict')}
             </p>
-          ) : (
+          ) : null}
+          {verdict !== null ? (
             <div className="space-y-5">
               <p
                 className="font-display text-5xl leading-tight sm:text-6xl"
@@ -196,13 +209,8 @@ export default function HomePage() {
                   </p>
                 )}
               </details>
-              {result.loopState.error !== null ? (
-                <p role="alert" className="text-sm text-danger">
-                  {result.loopState.error.code} — {result.loopState.error.message}
-                </p>
-              ) : null}
             </div>
-          )}
+          ) : null}
         </section>
       ) : null}
 

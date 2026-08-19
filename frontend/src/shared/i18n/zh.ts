@@ -20,10 +20,11 @@ export const zh = {
   'app.notFound.back': '返回首页',
 
   // ---------- navigation ----------
-  'nav.home': '首页',
-  'nav.missions': '研究任务',
+  'nav.home': '检验',
+  'nav.system': '系统',
+  'nav.missions': '运行',
   'nav.assay': '断言检验',
-  'nav.verify': '验证',
+  'nav.verify': '证明',
   'nav.evidence': '证据',
   'nav.events': '事件',
   'nav.benchmark': '基准',
@@ -141,6 +142,8 @@ export const zh = {
   'workbench.recentRegion': '最近核验',
   'workbench.recent': '最近核验',
   'workbench.recentEmpty': '还没有核验记录。从上方粘贴一条断言开始。',
+  'workbench.loopFailed.title': '运行未能完成判定',
+  'workbench.loopFailed.nextSteps': '下一步：运行 far doctor 检查 API key 与账户状态；或改用离线回放路径重试。系统未产出任何裁决或信封——失败如实呈现，不伪造结果。',
   'home.newMission': '新建研究任务',
   'home.newMissionHint': '完整流程：接地 → 假设 → 评审 → 计划 → 验证',
   'home.quickAssay': '断言检验',
@@ -544,6 +547,11 @@ export const zh = {
   'evidence.golden.combine': 'combine(leaf0, leaf1) 与 golden 字节相等',
   'evidence.golden.root': '由 {count} 叶重建 Merkle 根与 golden 字节相等',
   'evidence.golden.proof': 'golden 包含证明独立重算通过',
+  'evidence.canonical.lede': 'contentHash 浏览器重算：粘贴 JSON 载荷与期望 64 位十六进制哈希，本浏览器按 RFC 8785 规范化 + SHA-256 独立重算比对——验证 ProofEnvelope 内容哈希无需信任服务端。',
+  'evidence.canonical.payloadLabel': 'JSON 载荷',
+  'evidence.canonical.expectedLabel': '期望哈希（64 位十六进制）',
+  'evidence.canonical.run': '重算 contentHash',
+  'evidence.canonical.selfTest': '运行自检（含 1e-7 指数边界样本）',
 
   // ---------- events ----------
   'events.title': '运行时事件流',

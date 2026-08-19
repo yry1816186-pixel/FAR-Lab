@@ -18,7 +18,8 @@ import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import EvidencePage from '@/features/evidence/EvidencePage.tsx';
-import { GoldenVerifier } from '@/features/evidence/BrowserReproof.tsx';
+import { CanonicalHashVerifier, GoldenVerifier } from '@/features/evidence/BrowserReproof.tsx';
+import { canonicalHash } from '@/shared/crypto/canonical.ts';
 import {
   buildMerkleTree,
   combineHashes,
@@ -30,6 +31,7 @@ import {
 } from '@/shared/crypto/merkle.ts';
 import {
   GOLDEN_COMBINE_LEAF0_LEAF1,
+  GOLDEN_JCS_SELF_TEST,
   GOLDEN_LEAVES,
   GOLDEN_MERKLE_ROOT,
   GOLDEN_PROOF_LEAF0,
@@ -166,5 +168,47 @@ describe('GoldenVerifier', () => {
     expect(badges.length).toBe(3);
     expect(screen.queryByText('FAIL')).not.toBeInTheDocument();
     expect(await screen.findByText(GOLDEN_MERKLE_ROOT)).toBeInTheDocument();
+  });
+});
+
+describe('CanonicalHashVerifier (RFC 8785 contentHash browser recompute)', () => {
+  it('self-test: 1e-7 exponent-boundary fixture recomputes byte-equal to the backend-computed hex', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CanonicalHashVerifier />, ['/evidence']);
+    await user.click(screen.getByTestId('canonical-selftest'));
+    await waitFor(() => expect(screen.getByTestId('canonical-result')).toBeInTheDocument());
+    expect(await screen.findByText('重算一致 — 叶确在链内')).toBeInTheDocument();
+    expect(await screen.findByText(GOLDEN_JCS_SELF_TEST.expectedHex)).toBeInTheDocument();
+  });
+
+  it('mismatch: wrong expected hash is reported honestly (no fabricated match)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CanonicalHashVerifier />, ['/evidence']);
+    const expected = screen.getByTestId('canonical-expected');
+    await user.clear(expected);
+    await user.type(expected, 'ff'.repeat(32));
+    await user.click(screen.getByTestId('canonical-run'));
+    await waitFor(() => expect(screen.getByTestId('canonical-result')).toBeInTheDocument());
+    expect(await screen.findByText('重算不符 — 篡改/漂移可观测')).toBeInTheDocument();
+  });
+
+  it('malformed JSON fails closed with the parse error (not a silent green)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CanonicalHashVerifier />, ['/evidence']);
+    const payload = screen.getByTestId('canonical-payload');
+    await user.clear(payload);
+    await user.type(payload, '{{not json'); // {{ = userEvent 字面量 { 转义
+    await user.click(screen.getByTestId('canonical-run'));
+    const err = await screen.findByTestId('canonical-error');
+    expect(err).toHaveAttribute('role', 'alert');
+    expect(screen.queryByTestId('canonical-result')).not.toBeInTheDocument();
+  });
+
+  it('key-order independence: reordered object yields the same contentHash as canonical key order', async () => {
+    // RFC 8785 契约：canonical 形式与键插入序无关。同一对象两种键序 → 同一 64-hex。
+    const a = await canonicalHash({ z: 'end', a: 'start', m: 1e-7 });
+    const b = await canonicalHash({ a: 'start', m: 1e-7, z: 'end' });
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
   });
 });

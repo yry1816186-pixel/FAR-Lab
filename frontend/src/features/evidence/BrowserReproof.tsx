@@ -15,6 +15,7 @@
 import { useState, type ReactNode } from 'react';
 
 import type { IntegrityProofDto } from '@/entities/dtos.ts';
+import { canonicalHash } from '@/shared/crypto/canonical.ts';
 import {
   combineHashes,
   computeMerkleRoot,
@@ -23,6 +24,7 @@ import {
 } from '@/shared/crypto/merkle.ts';
 import {
   GOLDEN_COMBINE_LEAF0_LEAF1,
+  GOLDEN_JCS_SELF_TEST,
   GOLDEN_LEAVES,
   GOLDEN_MERKLE_ROOT,
   GOLDEN_PROOF_LEAF0,
@@ -185,6 +187,86 @@ export function GoldenVerifier(): ReactNode {
       ) : null}
       {state.kind === 'error' ? (
         <p role="alert" className="mt-3 text-sm text-danger" data-testid="golden-error">
+          {t('evidence.reproof.error')}: {state.message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+type CanonicalState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'running' }
+  | { readonly kind: 'done'; readonly ok: boolean; readonly computed: string }
+  | { readonly kind: 'error'; readonly message: string };
+
+/** contentHash 浏览器重算：粘贴 JSON + 期望 64-hex，本地 RFC 8785 规范化 + SHA-256 比对。
+ * 外部审计方无需服务端即可验证 ProofEnvelope contentHash（与 Merkle 包含证明构成双重独立验证）。 */
+export function CanonicalHashVerifier(): ReactNode {
+  const t = useT();
+  const [payload, setPayload] = useState(JSON.stringify(GOLDEN_JCS_SELF_TEST.obj, null, 2));
+  const [expected, setExpected] = useState<string>(GOLDEN_JCS_SELF_TEST.expectedHex);
+  const [state, setState] = useState<CanonicalState>({ kind: 'idle' });
+
+  const run = (selfTest: boolean): void => {
+    setState({ kind: 'running' });
+    const text = selfTest ? JSON.stringify(GOLDEN_JCS_SELF_TEST.obj) : payload;
+    const target = selfTest ? GOLDEN_JCS_SELF_TEST.expectedHex : expected.trim().toLowerCase();
+    void (async () => {
+      const parsed: unknown = JSON.parse(text);
+      const computed = await canonicalHash(parsed);
+      return { ok: computed === target, computed };
+    })()
+      .then((r) => setState({ kind: 'done', ...r }))
+      .catch((e: unknown) =>
+        setState({ kind: 'error', message: e instanceof Error ? e.message : String(e) }),
+      );
+  };
+
+  return (
+    <div className="mt-3 rounded border border-border bg-surface2/40 p-3" data-testid="canonical-verifier">
+      <p className="mb-2 text-xs text-ink3">{t('evidence.canonical.lede')}</p>
+      <textarea
+        className="mb-2 w-full rounded border border-border bg-surface px-2 py-1.5 font-mono text-xs text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        rows={6}
+        value={payload}
+        onChange={(e) => setPayload(e.target.value)}
+        aria-label={t('evidence.canonical.payloadLabel')}
+        data-testid="canonical-payload"
+      />
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <input
+          className="w-full max-w-md rounded border border-border bg-surface px-2 py-1.5 font-mono text-xs text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none sm:w-auto sm:flex-1"
+          value={expected}
+          onChange={(e) => setExpected(e.target.value)}
+          aria-label={t('evidence.canonical.expectedLabel')}
+          data-testid="canonical-expected"
+        />
+        <Button size="sm" onClick={() => run(false)} disabled={state.kind === 'running'} data-testid="canonical-run">
+          {t('evidence.canonical.run')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => run(true)}
+          disabled={state.kind === 'running'}
+          data-testid="canonical-selftest"
+        >
+          {t('evidence.canonical.selfTest')}
+        </Button>
+      </div>
+      {state.kind === 'done' ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="canonical-result">
+          {state.ok ? (
+            <Badge tone="ok">{t('evidence.reproof.match')}</Badge>
+          ) : (
+            <Badge tone="danger">{t('evidence.reproof.mismatch')}</Badge>
+          )}
+          <HashValue value={state.computed} truncate={false} />
+        </div>
+      ) : null}
+      {state.kind === 'error' ? (
+        <p role="alert" className="mt-2 text-sm text-danger" data-testid="canonical-error">
           {t('evidence.reproof.error')}: {state.message}
         </p>
       ) : null}

@@ -20,10 +20,11 @@ export const en: Record<MessageKey, string> = {
   'app.notFound.back': 'Back to home',
 
   // ---------- navigation ----------
-  'nav.home': 'Home',
-  'nav.missions': 'Missions',
+  'nav.home': 'Check',
+  'nav.system': 'System',
+  'nav.missions': 'Runs',
   'nav.assay': 'Assay',
-  'nav.verify': 'Verify',
+  'nav.verify': 'Proof',
   'nav.evidence': 'Evidence',
   'nav.events': 'Events',
   'nav.benchmark': 'Benchmark',
@@ -141,6 +142,8 @@ export const en: Record<MessageKey, string> = {
   'workbench.recentRegion': 'Recent checks',
   'workbench.recent': 'Recent checks',
   'workbench.recentEmpty': 'No checks yet. Paste a claim above to start.',
+  'workbench.loopFailed.title': 'The run could not complete the verdict',
+  'workbench.loopFailed.nextSteps': 'Next: run far doctor to check your API key and account status, or retry with the offline replay path. No verdict or envelope was produced — failures are shown honestly, never fabricated.',
   'home.newMission': 'New research mission',
   'home.newMissionHint': 'Full pipeline: grounding → hypotheses → critique → plan → verification',
   'home.quickAssay': 'Claim assay',
@@ -544,6 +547,11 @@ export const en: Record<MessageKey, string> = {
   'evidence.golden.combine': 'combine(leaf0, leaf1) byte-equals the golden value',
   'evidence.golden.root': 'Merkle root rebuilt from {count} leaves byte-equals the golden root',
   'evidence.golden.proof': 'Golden inclusion proof recomputes independently',
+  'evidence.canonical.lede': 'Browser-side contentHash recompute: paste a JSON payload and its expected 64-hex hash; this browser independently canonicalizes (RFC 8785) + SHA-256 and compares — verifying a ProofEnvelope content hash without trusting the server.',
+  'evidence.canonical.payloadLabel': 'JSON payload',
+  'evidence.canonical.expectedLabel': 'Expected hash (64 hex)',
+  'evidence.canonical.run': 'Recompute contentHash',
+  'evidence.canonical.selfTest': 'Run self-test (includes 1e-7 exponent boundary sample)',
 
   // ---------- events ----------
   'events.title': 'Runtime event stream',

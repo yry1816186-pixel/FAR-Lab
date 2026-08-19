@@ -43,11 +43,11 @@ describe('RouteEffects — document.title（NAV 单一派生源）', () => {
   });
 
   it.each([
-    ['/', '首页'],
-    ['/missions', '研究任务'],
-    ['/missions/01M0B3C0TG/execution', '研究任务'],
+    ['/', '检验'],
+    ['/missions', '运行'],
+    ['/missions/01M0B3C0TG/execution', '运行'],
     ['/assay', '断言检验'],
-    ['/verify', '验证'],
+    ['/verify', '证明'],
     ['/receipts/rcpt-1', '已保存收据'],
     ['/evidence', '证据'],
     ['/benchmark', '基准'],

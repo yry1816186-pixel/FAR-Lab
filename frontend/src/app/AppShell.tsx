@@ -9,35 +9,56 @@ import { cx } from '@/shared/ui/cx.ts';
 
 export const NAV_ITEMS: readonly { readonly to: string; readonly key: MessageKey; readonly end?: boolean }[] = [
   { to: '/', key: 'nav.home', end: true },
-  { to: '/missions', key: 'nav.missions' },
-  { to: '/assay', key: 'nav.assay' },
-  { to: '/verify', key: 'nav.verify' },
   { to: '/evidence', key: 'nav.evidence' },
-  { to: '/events', key: 'nav.events' },
+  { to: '/missions', key: 'nav.missions' },
+  { to: '/verify', key: 'nav.verify' },
+];
+
+/** 系统深层（产品链 sitemap：工程/评审向入口收折叠层——可见性≠权限，URL/⌘K 永远可达）。 */
+export const SYSTEM_NAV_ITEMS: readonly { readonly to: string; readonly key: MessageKey }[] = [
   { to: '/benchmark', key: 'nav.benchmark' },
+  { to: '/events', key: 'nav.events' },
+  { to: '/assay', key: 'nav.assay' },
   { to: '/about', key: 'nav.about' },
 ];
 
 function NavLinks({ onNavigate }: { readonly onNavigate?: () => void }) {
   const t = useT();
+  const linkClass = ({ isActive }: { isActive: boolean }): string =>
+    cx(
+      'rounded px-2.5 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
+      isActive ? 'font-semibold text-ink underline decoration-accent decoration-2 underline-offset-4' : 'text-ink2 hover:bg-surface2 hover:text-ink',
+    );
   return (
     <>
       {NAV_ITEMS.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end ?? false}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cx(
-              'rounded px-2.5 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none',
-              isActive ? 'font-semibold text-ink underline decoration-accent decoration-2 underline-offset-4' : 'text-ink2 hover:bg-surface2 hover:text-ink',
-            )
-          }
-        >
+        <NavLink key={item.to} to={item.to} end={item.end ?? false} onClick={onNavigate} className={linkClass}>
           {t(item.key)}
         </NavLink>
       ))}
+      {/* 系统深层折叠层：工程/评审向入口（基准/事件/断言检验/关于） */}
+      <details className="group relative">
+        <summary className="cursor-pointer list-none rounded px-2.5 py-1.5 text-sm text-ink2 hover:bg-surface2 hover:text-ink focus-visible:ring-2 focus-visible:ring-accent [&::-webkit-details-marker]:hidden">
+          {t('nav.system')} ▾
+        </summary>
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-36 rounded border border-border bg-surface py-1 shadow-lg">
+          {SYSTEM_NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                cx(
+                  'block px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-accent',
+                  isActive ? 'font-semibold text-ink' : 'text-ink2 hover:bg-surface2 hover:text-ink',
+                )
+              }
+            >
+              {t(item.key)}
+            </NavLink>
+          ))}
+        </div>
+      </details>
     </>
   );
 }

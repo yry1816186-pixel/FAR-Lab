@@ -56,3 +56,13 @@ export const GOLDEN_PROOF_LEAF0 = {
   ],
   expectedRoot: GOLDEN_MERKLE_ROOT,
 } as const;
+
+/**
+ * RFC 8785 contentHash 自检 fixture（CanonicalHashVerifier 自检锚）。
+ * n=1e-7 刻意选用 RFC 8785 指数收敛边界样本（迁移前 TS/Python 在此分歧）。
+ * 期望哈希由后端 src/evidence_log hashCanonicalJson 真实计算（密码学常量，勿手改）。
+ */
+export const GOLDEN_JCS_SELF_TEST = {
+  obj: { claim: 'FAR-Lab browser-side JCS self-test', n: 1e-7, sorted: true },
+  expectedHex: '60c0fc07ac42e758cdf37d2767ec7ba16249a01f4b7b3133df6708d5dab85516',
+} as const;
