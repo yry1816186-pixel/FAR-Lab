@@ -132,7 +132,7 @@ test('全部缺失 → 每个 provider 一行 [WARN] + 能力说明 + 可执行�
   assert.match(r.stdout, detailLine('GITHUB_PAT', 'not configured[^\n]*release/publish tooling[^\n]*github\\.com/settings/tokens'));
 });
 
-test('R9 纪律：缺 key 不改 doctor exit code（缺 key vs 全 key 两次运行退出码一致，且无 credential FAIL 行）', () => {
+test('R9 纪律：缺 key 不产生 FAIL（退出码停在 WARN-only 档，且无 credential FAIL 行）', () => {
   const absent = runDoctorWithCreds([]);
   const present = runDoctorWithCreds([], {
     [DASH.envNames[1]!]: FAKE_DASHSCOPE,
@@ -140,8 +140,19 @@ test('R9 纪律：缺 key 不改 doctor exit code（缺 key vs 全 key 两次运
     [specOf('NUAA_API_KEY').envNames[0]!]: FAKE_NUAA,
     [specOf('GITHUB_PAT').envNames[0]!]: FAKE_GHP,
   });
-  assert.equal(absent.status, present.status, 'credential presence must not change the doctor exit code');
+  // R9 真实契约：缺 key 是能力 WARN（exit 2 档），永不 FAIL（exit 1）。
+  // 2026-08-20 修正：旧断言「缺/全 key 退出码恒等」只在 demo fixture 缺失（永久 WARN
+  // 把两側都拉平到 2）时偶然成立；fixture 就绪后全 key 合法地回到 0。改为锁定
+  // 不变量本身：缺 key 侧永不 exit 1、无 credential FAIL 行、退出码只会因缺 key
+  // 升入 WARN 档（absent >= present）而不会跌出合法档位。
+  assert.notEqual(absent.status, 1, 'missing optional keys must never FAIL (R9)');
+  assert.ok(absent.status === 0 || absent.status === 2, `absent exit must stay in ok/warn band, got ${absent.status}`);
   assert.ok(!absent.stdout.includes('[FAIL] credential'), 'absent optional keys must never FAIL (R9)');
+  assert.ok(present.status === 0 || present.status === 2, `present exit must stay in ok/warn band, got ${present.status}`);
+  assert.ok(
+    (absent.status ?? 0) >= (present.status ?? 0),
+    `missing keys may only add WARN (absent=${absent.status} present=${present.status})`,
+  );
 });
 
 test('形状错位 → WARN + 期望前缀提示与修复指引（ghp_ 值放 DASHSCOPE 槽 / sk- 值放 GITHUB_PAT 槽）', () => {

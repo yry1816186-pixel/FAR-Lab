@@ -14,7 +14,10 @@ import assert from 'node:assert/strict';
 const DOCTOR_HEADER = 'FAR-Lab · far doctor (environment self-check)';
 const VERIFY_REPORT = 'FAR-Lab Verify (third-party independent recomputation)';
 const VERIFY_SUMMARY = 'VERIFY SUMMARY (IC-03 · offline recompute of the demo bundle)';
-const DEMO_FIXTURE = resolve('.far-implementation/walking-skeleton/demo.far-proof');
+// 与 doctor.ts 的 fixture 解析同决策：现行导出位置 .far-proof/ 优先，遗留 walking-skeleton 兼容。
+const DEMO_FIXTURE = existsSync(resolve('.far-proof'))
+  ? resolve('.far-proof')
+  : resolve('.far-implementation/walking-skeleton/demo.far-proof');
 
 function runFarDoctor(args: readonly string[]): { status: number | null; stdout: string; stderr: string } {
   const r = spawnSync(process.execPath, ['src/cli/far.ts', 'doctor', ...args], {

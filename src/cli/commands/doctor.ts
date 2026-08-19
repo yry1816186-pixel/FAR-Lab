@@ -10,7 +10,7 @@
 // 退出码：0 全绿 / 1 有 FAIL（核心能力损坏）/ 2 仅 WARN（可用但受限）。
 
 import { accessSync, constants, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import {
@@ -206,11 +206,18 @@ function checkProject(root: string | null, checks: Check[]): void {
 
   // FIX-R6-003: 删除 examples/tess-offline 检查（examples/ 已 retire，demo.ts tess-offline 用 :memory: 不持久化；
   //   该检查必 warn 致 far doctor exit 2·F-R6-13 现场 1 分钟崩溃）。改为检查真实持久化 bundle。
-  const demoBundleOk = existsSync(resolve(root, '.far-implementation/walking-skeleton/demo.far-proof'));
+  // 2026-08-20：优先检查现行导出位置 `far export far-proof --demo-chain` 的默认输出 .far-proof/，
+  //   兼容遗留 walking-skeleton 路径；指引文案同步为真实生成命令（far demo 不产 bundle）。
+  const currentDemoBundle = resolve(root, '.far-proof');
+  const legacyDemoBundle = resolve(root, '.far-implementation/walking-skeleton/demo.far-proof');
+  const demoBundlePath = existsSync(currentDemoBundle) ? currentDemoBundle : legacyDemoBundle;
+  const demoBundleOk = existsSync(demoBundlePath);
   checks.push({
     name: 'demo.far-proof bundle',
     status: demoBundleOk ? 'ok' : 'warn',
-    detail: demoBundleOk ? 'present (.far-implementation/walking-skeleton)' : 'missing (run "far demo" to generate)',
+    detail: demoBundleOk
+      ? `present (${relative(root, demoBundlePath)})`
+      : 'missing (run "far export far-proof --demo-chain" to generate, then re-check)',
   });
 
   const schemaOk = existsSync(resolve(root, 'schema/migrations'));
@@ -271,14 +278,17 @@ async function checkCoreCapability(root: string | null, checks: Check[]): Promis
     return { ran: false, status: 'SKIPPED', reason: 'project root not found', fullReport: '' };
   }
   // FIX-R6-003: fixture 路径从已 retire 的 examples/tess-offline 改为真实持久化 bundle。
-  const fixture = resolve(root, '.far-implementation/walking-skeleton/demo.far-proof');
+  // 2026-08-20：与上 方 bundle 存在性检查同一决策——现行 .far-proof/ 优先，遗留路径兼容。
+  const fixture = existsSync(resolve(root, '.far-proof'))
+    ? resolve(root, '.far-proof')
+    : resolve(root, '.far-implementation/walking-skeleton/demo.far-proof');
   if (!existsSync(fixture)) {
     checks.push({
       name: 'offline verify (demo fixture)',
       status: 'warn',
-      detail: `fixture not found: ${fixture} (run "far demo" to generate it, then re-check)`,
+      detail: `fixture not found: ${fixture} (run "far export far-proof --demo-chain" to generate, then re-check)`,
     });
-    return { ran: false, status: 'SKIPPED', reason: `demo fixture missing (run "far demo" to generate)`, fullReport: '' };
+    return { ran: false, status: 'SKIPPED', reason: `demo fixture missing (run "far export far-proof --demo-chain" to generate)`, fullReport: '' };
   }
   const { exit, output } = await runVerifyCaptured(fixture);
   checks.push({
