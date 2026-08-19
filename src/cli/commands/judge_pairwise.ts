@@ -113,7 +113,7 @@ function writeLiveProfileUnavailable(out: (text: string) => void): void {
       '  fixture "judge" would fabricate winners (R9 zero-tolerance on fabricated model output).\n\n' +
       '  get a key  : https://bailian.console.aliyun.com/  then set the live key in the environment (see far doctor)\n' +
       '  free, now  : far research status <runId>          → deterministic tournament board, no key\n' +
-      '  real kernel: far demo                            → deterministic 14/14 golden vectors, no key\n',
+      '  real kernel: far demo                            → deterministic 15/15 golden vectors, no key\n',
   );
 }
 

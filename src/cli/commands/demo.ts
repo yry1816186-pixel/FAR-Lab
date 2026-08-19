@@ -14,6 +14,7 @@ import { buildDemoChain, type DemoChainResult } from '../../far_proof/demo_chain
 import { buildHeroAChain, type HeroAPipelineResult } from '../../science_harness/hero_a_pipeline.ts';
 import { probeEnvironment, retryGoldenOnce } from './demo_probe.ts';
 import { runVerifyGolden } from './verify_golden.ts';
+import { verdictText } from '../render.ts';
 
 // English prose is roughly twice as wide as the CJK it replaces, so the box banner is
 // padded programmatically to keep the right border aligned instead of hardcoding spaces.
@@ -45,7 +46,7 @@ function renderDemoClaim(c: DemoChainResult): string {
   return `
   claim               : ${c.claimId} — ${c.claimText}
   FEC gate            : allowed=${c.fecGate.allowed} (${c.fecGate.reason})
-  Machine verdict     : ${c.machineVerdict}
+  Machine verdict     : ${verdictText(c.machineVerdict)}
   Decisive rule       : ${k.decisiveRuleId}
   reasonCodes         : ${k.reasonCodes.join(', ')}
   Statistical signal  : effectSize=${k.statisticalReport.primaryEffectSize} · p=${k.statisticalReport.primaryAdjustedPValue}
@@ -61,7 +62,7 @@ function renderHeroClaim(h: HeroAPipelineResult): string {
   claim               : ${h.claimId} — ${h.claimText}
   Real statistics     : oneSampleZTest → p=${s.pValue?.toExponential(3)} · adjustedP=${s.adjustedPValue?.toExponential(3)} · effectSize=${s.effectSizeObserved} · ${s.effectDirection}
   FEC gate            : allowed=${h.fecGate.allowed} (${h.fecGate.reason})
-  Machine verdict     : ${h.machineVerdict}
+  Machine verdict     : ${verdictText(h.machineVerdict)}
   Decisive rule       : ${k.decisiveRuleId}
   reasonCodes         : ${k.reasonCodes.join(', ')}
   Sealed conclusion   : ${h.sealedConclusion}   ← CONFIRMED downgraded via ASK-9 (machine sealing cannot be CONFIRMED · requires human endorsement)
@@ -102,14 +103,17 @@ const TESS_OFFLINE_NOTE = `
  * Runs the far demo command: one-shot 6-stage FSM demo with offline replay.
  *
  * @param subcommand - Optional demo subcommand (e.g. tess-offline).
+ * @param opts - `--json`：stdout 单文档纯 JSON（CLI_JSON_CONTRACT_CENSUS P2-2；banner/阶段线抑制），
+ *               供 CI/验收脚本机器消费；exit code 语义不变（0 成功 / 1 环境失败 / 2 未知子命令 / 7 GV 失败）。
  * @returns Exit code: 0 on success, 1 on failure, 2 on unknown subcommand.
  */
-export function runDemo(subcommand: string | undefined = undefined): number {
+export function runDemo(subcommand: string | undefined = undefined, opts: { readonly json?: boolean } = {}): number {
   if (subcommand !== undefined && subcommand !== 'tess-offline') {
     process.stderr.write(`far demo: unknown subcommand '${subcommand}' (supported: 'tess-offline', or run the full demo with no argument)\n`);
     return 2;
   }
   const tessOnly = subcommand === 'tess-offline';
+  const json = opts.json === true;
 
   // P0-3（S1-69.2 修复）：启动前置环境探测——Node <24 / better-sqlite3 native
   // 不可用时立即 fail-fast（≤5s 退出非 0 + 可读错误 + Docker 后备指引），杜绝用户面前
@@ -118,6 +122,10 @@ export function runDemo(subcommand: string | undefined = undefined): number {
   if (!probe.ok) {
     process.stderr.write(`${probe.error}\n`);
     return 1;
+  }
+
+  if (json) {
+    return runDemoJson(tessOnly);
   }
 
   process.stdout.write(BANNER);
@@ -153,5 +161,95 @@ export function runDemo(subcommand: string | undefined = undefined): number {
   }
 
   process.stdout.write(NEXT_STEPS);
+  return 0;
+}
+
+/**
+ * --json 路径：跑与人读路径**完全相同**的真实阶段（GV 内核 / demo 链 / hero 链——
+ * 零罐头、零跳过），仅渲染层换为单文档 JSON。runVerifyGolden 的人读输出经 stdout
+ * 捕获抑制（与 doctor checkCoreCapability 同一捕获模式），防止污染 JSON 文档。
+ */
+function runDemoJson(tessOnly: boolean): number {
+  const origWrite = process.stdout.write.bind(process.stdout);
+  process.stdout.write = ((): boolean => true) as typeof process.stdout.write;
+  let gvExit: number;
+  try {
+    gvExit = retryGoldenOnce(() => runVerifyGolden({ backend: 'node' }));
+  } finally {
+    process.stdout.write = origWrite;
+  }
+  if (gvExit !== 0) {
+    process.stderr.write(`\nfar demo: golden vector stage failed (exit ${gvExit})\n`);
+    process.stdout.write(
+      `${JSON.stringify({ tool: 'far demo', result: 'fail', stages: { goldenVectors: { backend: 'node', exit: gvExit } } }, null, 2)}\n`,
+    );
+    return gvExit;
+  }
+
+  const db = new Database(':memory:');
+  let chain: DemoChainResult;
+  try {
+    chain = buildDemoChain(db);
+  } finally {
+    db.close();
+  }
+
+  let hero: HeroAPipelineResult | null = null;
+  if (!tessOnly) {
+    const heroDb = new Database(':memory:');
+    try {
+      hero = buildHeroAChain(heroDb);
+    } finally {
+      heroDb.close();
+    }
+  }
+
+  const claimDoc = (c: DemoChainResult) => ({
+    claimId: c.claimId,
+    claimText: c.claimText,
+    fecGate: { allowed: c.fecGate.allowed, reason: c.fecGate.reason },
+    machineVerdict: c.machineVerdict,
+    decisiveRule: c.kernelOutput.decisiveRuleId,
+    reasonCodes: c.kernelOutput.reasonCodes,
+    statisticalSignal: {
+      effectSize: c.kernelOutput.statisticalReport.primaryEffectSize,
+      adjustedPValue: c.kernelOutput.statisticalReport.primaryAdjustedPValue,
+    },
+    evidenceSufficiency: {
+      status: c.kernelOutput.evidenceSufficiency.status,
+      powerStatus: c.kernelOutput.evidenceSufficiency.powerStatus,
+    },
+    sealedConclusion: c.sealed.envelope.conclusion,
+  });
+
+  const doc = {
+    tool: 'far demo',
+    mode: tessOnly ? 'tess-offline' : 'full',
+    stages: {
+      goldenVectors: { backend: 'node', exit: 0 },
+      demoClaim: claimDoc(chain),
+      heroClaim:
+        hero === null
+          ? null
+          : {
+              claimId: hero.claimId,
+              claimText: hero.claimText,
+              statistics: {
+                test: 'oneSampleZTest',
+                pValue: hero.statistics.statisticalResult.pValue,
+                adjustedPValue: hero.statistics.statisticalResult.adjustedPValue,
+                effectSize: hero.statistics.statisticalResult.effectSizeObserved,
+                direction: hero.statistics.statisticalResult.effectDirection,
+              },
+              fecGate: { allowed: hero.fecGate.allowed, reason: hero.fecGate.reason },
+              machineVerdict: hero.machineVerdict,
+              decisiveRule: hero.kernelOutput.decisiveRuleId,
+              reasonCodes: hero.kernelOutput.reasonCodes,
+              sealedConclusion: hero.sealedConclusion,
+            },
+    },
+    result: 'ok' as const,
+  };
+  process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
   return 0;
 }

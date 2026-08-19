@@ -112,11 +112,11 @@ const BASELINE_SOURCE_ANCHOR: SourceAnchor = {
   rawResponseHash: 'c'.repeat(64),
 };
 
-// ========== GV-01..14 baseline 能跑通验证 ==========
+// ========== GV-01..15 baseline 能跑通验证 ==========
 
-test('baseline path runs on all GV-01..14 (V1 makeVerdict processes every case without error)', () => {
+test('baseline path runs on all GV-01..15 (V1 makeVerdict processes every case without error)', () => {
   const results = verifyBaselineOnGoldenVectors();
-  assert.equal(results.length, 14, 'must process all 14 golden vectors');
+  assert.equal(results.length, 15, 'must process all 15 golden vectors');
   for (const r of results) {
     assert.ok(r.baselineVerdict.length > 0, `${r.caseId} must produce a verdict`);
   }

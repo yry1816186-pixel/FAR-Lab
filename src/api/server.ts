@@ -86,6 +86,12 @@ function isV1SuccessEnvelope(payload: object): boolean {
 }
 
 /** Build a Fastify instance without starting a listener. */
+/** frontend/index.html 预渲染主题脚本（唯一内联脚本）的 sha256——CSP script-src 白名单。
+ *  哈希口径：HTML 解析器将脚本文本 CRLF→LF 规范化——本值必须按 LF 规范化后计算
+ *  （浏览器轴 E2E 实证：按原始 CRLF 计算会被 CSP 阻断，scripts/browser_smoke.mjs 可复验）。
+ *  与 tests/security/csp_theme_script.test.ts 漂移锁联动：脚本任何改动必须同步更新本值。 */
+const THEME_INLINE_SCRIPT_SHA256 = 'S6iXa2DU3NQROxhxq7llLxEtkqu4zIVz0jlpkvr7/9A=';
+
 export async function buildServer(config: ApiServerConfig): Promise<FastifyInstance> {
   const resolvedFromEnvironment = config.gateway === undefined
     ? resolveRuntimeGateway(process.env)
@@ -113,7 +119,25 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     connectionTimeout: 60_000,
   });
 
-  await app.register(helmet, { contentSecurityPolicy: false });
+  // CSP 硬化（v3.0 指令 Phase 5.3「禁止 unsafe-inline」）：
+  //   script-src 无 unsafe-inline——唯一的内联脚本（index.html 预渲染主题脚本，
+  //   防明暗闪烁）经 sha256 白名单；哈希漂移有 tests/security 契约测试锁定。
+  //   style-src 保留 unsafe-inline（React style 属性的工程现实，非脚本面）。
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", `'sha256-${THEME_INLINE_SCRIPT_SHA256}'`],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+  });
   await app.register(cors, {
     origin: resolveCorsOrigin(config.corsOrigins),
     credentials: true,
@@ -149,6 +173,15 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   await registerHealthRoutes(app, { db: config.db });
   await registerMetricsRoutes(app, { db: config.db });
 
+  // Monitor（v3.0 指令 Phase 3.3 · 架构 §3.3）：常驻采样器随 API 实例生命周期——
+  // 5s 节律环形缓冲（内存 <1MB），挂既有 Fastify 不立新服务器；onClose 优雅停止。
+  const { Sampler } = await import('../monitor/sampler.ts');
+  const monitorSampler = new Sampler();
+  monitorSampler.start();
+  app.addHook('onClose', async () => {
+    monitorSampler.stop();
+  });
+
   await app.register(async (v1) => {
     v1.addHook('preSerialization', async (_request, reply, payload) => {
       if (reply.statusCode >= 400) return payload;
@@ -170,6 +203,9 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerVerdictRoutes(v1, { db: config.db });
     await registerReportRoute(v1, { db: config.db });
     await registerIntegrityRoutes(v1, { db: config.db });
+
+    const { registerMonitorRoutes } = await import('./routes/monitor.ts');
+    await registerMonitorRoutes(v1, { sampler: monitorSampler });
 
     const { registerResearchRoutes } = await import('./routes/research.ts');
     await registerResearchRoutes(v1, { db: config.db });

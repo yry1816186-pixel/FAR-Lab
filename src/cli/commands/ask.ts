@@ -25,6 +25,7 @@ import {
   DEMO_MODEL_SNAPSHOT,
 } from '../../far_proof/demo_chain.ts';
 import { resolveGitCommitSha } from '../git_commit_sha.ts';
+import { verdictText } from '../render.ts';
 import { runExportFarProof } from './export_far_proof.ts';
 
 /** Input parameters for operations involving ask args. */
@@ -220,7 +221,7 @@ function renderHuman(args: AskArgs, render: AskRender): void {
     '  ─────────────────────────────────────────────────',
   );
   if (render.verdict !== null) {
-    lines.push(`  verdict  : ${render.verdict}`);
+    lines.push(`  verdict  : ${verdictText(render.verdict)}`);
     lines.push(`  rule     : ${render.decisiveRuleId}  (${render.reasonCodes.join(', ')})`);
   } else {
     lines.push('  verdict  : <verdict stage not reached>');
@@ -276,7 +277,7 @@ export async function runAsk(argv: readonly string[]): Promise<number> {
         'verdict for an arbitrary question would not be a real scientific verdict.\n\n' +
         '  get a key  : https://bailian.console.aliyun.com/  then set DASHSCOPE_API_KEY (or .env)\n' +
         '  free, now  : far ground "<your question>"      → real literature retrieval, no key\n' +
-        '  real kernel: far demo                          → deterministic 14/14 golden vectors, no key\n' +
+        '  real kernel: far demo                          → deterministic 15/15 golden vectors, no key\n' +
         '  wiring demo: far ask "<q>" --profile offline_replay                → fixture replay (explicit)\n',
     );
     return 2;

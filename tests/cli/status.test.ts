@@ -215,3 +215,38 @@ test('runStatus: repoRoot 无 .git → exit 2 + far doctor 指引（installed-pa
     rmSync(nonRepoRoot, { recursive: true, force: true });
   }
 });
+
+
+// ---------------------------------------------------------------------------
+// 无提示卡死红线修复（CLI_JSON_CONTRACT_CENSUS 追加发现，实测 ~83s 静默等待）
+// 判别：进度活信号必须在采集期内尽早出现在 stderr（不等 83s 全程——
+// 后台启动 → 窗口期读 stderr → 杀进程；契约是"先有提示"，不是"必须等完"）。
+// ---------------------------------------------------------------------------
+
+import { spawn } from 'node:child_process';
+
+test('far status: 长采集前 stderr 先出进度活信号（严禁无提示卡死）', async () => {
+  const child = spawn(process.execPath, ['src/cli/far.ts', 'status', '--json'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  try {
+    const note = await new Promise<string>((resolve, reject) => {
+      let err = '';
+      const timer = setTimeout(() => reject(new Error(`5s 内无进度提示（卡死红线）: ${err}`)), 5000);
+      child.stderr.on('data', (chunk: Buffer) => {
+        err += chunk.toString('utf8');
+        if (err.includes('collecting test counts')) {
+          clearTimeout(timer);
+          resolve(err);
+        }
+      });
+      child.on('error', (e) => {
+        clearTimeout(timer);
+        reject(e);
+      });
+    });
+    assert.ok(note.includes('~1-2 min') || note.includes('full test suite'), '进度提示须说明耗时来源');
+  } finally {
+    child.kill('SIGTERM');
+  }
+});

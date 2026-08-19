@@ -8,6 +8,8 @@
 //   · 非 TTY 环境（管道/CI）自动关闭 spinner/进度条，避免污染结构化输出。
 //   · ADDITIVE ONLY — 不修改现有命令输出。
 
+import { VERDICT_COLORS } from '../platform/design_tokens.ts';
+
 /** ANSI 颜色枚举（跨平台安全：Windows Terminal / VSCode 终端 / 现代 ConHost）。 */
 export type AnsiColor = 'red' | 'green' | 'yellow' | 'blue' | 'magenta' | 'cyan' | 'gray' | 'bold' | 'dim' | 'reset';
 
@@ -43,6 +45,55 @@ export function colorize(text: string, color: AnsiColor, enabled = true): string
   if (!enabled) return text;
   const code = ANSI_CODES[color];
   return `${code}${text}${ANSI_CODES.reset}`;
+}
+
+/**
+ * 256 色支持检测（DESIGN_SYSTEM §1.3 升级路径）。
+ * 判定链：NO_COLOR 关闭 > force > WT_SESSION（Windows Terminal）> TERM=*256color* > COLORTERM=truecolor/24bit。
+ * 保守默认 false——误判 256 色到不支持终端会输出乱码，误判降级只是色阶损失。
+ */
+export function ansi256Enabled(
+  opts: { force?: boolean; env?: { readonly [k: string]: string | undefined } } = {},
+): boolean {
+  const env = opts.env ?? process.env;
+  if (env.NO_COLOR !== undefined && env.NO_COLOR !== '') return false;
+  if (opts.force === true) return true;
+  if (env.WT_SESSION !== undefined && env.WT_SESSION !== '') return true;
+  if ((env.TERM ?? '').includes('256color')) return true;
+  const ct = env.COLORTERM ?? '';
+  return ct === 'truecolor' || ct === '24bit';
+}
+
+/**
+ * 经设计 Token 上色（SSOT = platform/design_tokens.ts 单一事实源）。
+ * 256 色终端用 token.ansi256（精确色），降级路径用 token.ansi8（语义族保持）。
+ * 这是 CLI 语义色的**唯一 Token 出口**——禁止绕过它手写 38;5 转义。
+ */
+export function colorizeToken(
+  text: string,
+  token: { readonly ansi256: number; readonly ansi8: AnsiColor },
+  enabled = true,
+): string {
+  if (!enabled) return text;
+  if (ansi256Enabled()) {
+    return `\x1b[38;5;${token.ansi256}m${text}${ANSI_CODES.reset}`;
+  }
+  return colorize(text, token.ansi8, true);
+}
+
+/**
+ * 裁决五值直染唯一出口（DESIGN_SYSTEM 动作 3）。
+ * 语义：CONFIRMED 绿 / REFUTED 红 / INCONCLUSIVE 琥珀 / DEGRADED_SCOPE 紫 / UNTESTED 灰
+ * （SSOT = platform/design_tokens.ts；256 终端精确色，降级语义族）。
+ * 默认随 ansiEnabled()——非 TTY / NO_COLOR / 管道场景输出纯文本（golden-text 零冲击）。
+ * 未知裁决字符串 fail-closed 返回原文（不着色、不染色撒谎）。
+ */
+export function verdictText(verdict: string, opts: { enabled?: boolean } = {}): string {
+  const token = VERDICT_COLORS[verdict as keyof typeof VERDICT_COLORS] as
+    | { readonly ansi256: number; readonly ansi8: AnsiColor }
+    | undefined;
+  if (token === undefined) return verdict;
+  return colorizeToken(verdict, token, opts.enabled ?? ansiEnabled());
 }
 
 /** 简单 spinner 帧序列。 */
@@ -152,13 +203,46 @@ function padDisplay(value: string, width: number): string {
 }
 
 /**
+ * CJK 安全截断（Phase 4 终端宽度折行契约的截断语义——截断而非折行：
+ * 折行会破坏表格行对齐，截断保对齐 + `…` 单格标记如实声明信息缺失）。
+ * ANSI 转义序列不参与宽度计算也不被截断（先剥离再截断——本渲染层约定
+ * 上色在表格之外进行，见 renderTable 的 dim 处理）。
+ */
+export function truncateDisplay(value: string, width: number): string {
+  if (width < 1) return '';
+  if (displayWidth(value) <= width) return value;
+  const marker = '…';
+  const budget = width - 1; // 给 … 留一格
+  if (budget <= 0) return marker;
+  let used = 0;
+  let out = '';
+  for (const char of Array.from(value)) {
+    const w = /\p{Mark}/u.test(char) ? 0 : isWideCodePoint(char.codePointAt(0) ?? 0) ? 2 : 1;
+    if (used + w > budget) break;
+    used += w;
+    out += char;
+  }
+  return `${out}${marker}`;
+}
+
+/** 表格列宽下限（截断也不低于此——再窄就只剩省略号，无信息量）。 */
+const MIN_COL_WIDTH = 6;
+
+/**
  * 渲染简单的对齐表格（markdown 风格分隔，跨平台）。
+ * Phase 4 契约：自然总宽超过 maxWidth（默认终端列数，非 TTY 80）时，
+ * 从最宽列起逐格压缩至 ≥MIN_COL_WIDTH，单元格内容经 truncateDisplay 截断——
+ * 保行对齐；绝不无声溢出终端（契约来源：指令 Phase 4.1「自动检测终端宽度折行」）。
  * @param headers - 列头
  * @param rows - 数据行
  */
-export function renderTable(headers: readonly string[], rows: readonly (readonly (string | number | null)[])[], enabled = true): string {
-  const allRows: Array<readonly (string | number | null)[]> = [headers as readonly (string | number | null)[], ...rows];
-  if (allRows.length === 0) return '';
+export function renderTable(
+  headers: readonly string[],
+  rows: readonly (readonly (string | number | null)[])[],
+  enabled = true,
+  opts: { maxWidth?: number } = {},
+): string {
+  const maxWidth = opts.maxWidth ?? (process.stdout.isTTY ? process.stdout.columns : 80) ?? 80;
 
   const colWidths = headers.map((_, col) => {
     const headerCell = headers[col] ?? '';
@@ -171,10 +255,24 @@ export function renderTable(headers: readonly string[], rows: readonly (readonly
     return max;
   });
 
+  // Phase 4 终端宽度契约：自然总宽超限 → 从最宽列起逐格压缩（保行对齐，截断不折行）。
+  const borders = headers.length * 3 + 1;
+  let total = colWidths.reduce((a, b) => a + b, 0) + borders;
+  while (total > maxWidth) {
+    let widest = -1;
+    for (let i = 0; i < colWidths.length; i += 1) {
+      const w = colWidths[i] ?? 0;
+      if (w > MIN_COL_WIDTH && (widest === -1 || w > (colWidths[widest] ?? 0))) widest = i;
+    }
+    if (widest === -1) break; // 全部到下限：如实输出（宁窄不乱）
+    colWidths[widest] = (colWidths[widest] ?? 0) - 1;
+    total -= 1;
+  }
+
   const fmtCell = (cell: string | number | null, width: number): string => {
     const s = cell === null ? '' : String(cell);
     const w = width < 0 ? 0 : width;
-    return padDisplay(s, w);
+    return padDisplay(truncateDisplay(s, w), w);
   };
 
   const sep = `+-${colWidths.map((w) => '-'.repeat(w)).join('-+-')}-+`;

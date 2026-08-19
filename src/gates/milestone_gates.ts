@@ -73,7 +73,7 @@ function runGate(repoRoot: string, gate: GateReport['gate'], assets: readonly Ev
 export function kernelGate(repoRoot: string): GateReport {
   return runGate(repoRoot, 'KERNEL', [
     { claim: 'deterministic/canonical：canonical 序列化 + 确定性内核', path: 'src/evidence_log/hasher.ts', mustContain: ['canonicalJson'] },
-    { claim: 'golden vectors：14/14 黄金向量', path: 'tests/golden_vectors' },
+    { claim: 'golden vectors：15/15 黄金向量', path: 'tests/golden_vectors' },
     { claim: '正/负/边界/篡改测试族', path: 'tests/falsifiability' },
     { claim: '数值稳定（NaN/Inf fail-closed）', path: 'tests/math' },
     { claim: 'proof 兼容 + 独立验证（.far-proof verify）', path: 'src/far_proof/bundle_verifier.ts', mustContain: ['verify'] },

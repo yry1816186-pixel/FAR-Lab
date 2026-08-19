@@ -104,9 +104,9 @@ test('benchmark: CLI FSM stage receipt hash throughput', () => {
   assert.ok(opsPerSec > 1000, `hash throughput ${opsPerSec} ops/s must be > 1000 ops/s`);
 });
 
-test(`benchmark: 14 GV × V2 kernel cross-lang consistency latency < ${GV_CROSS_LANG_THRESHOLD_MS}ms`, () => {
+test(`benchmark: 15 GV × V2 kernel cross-lang consistency latency < ${GV_CROSS_LANG_THRESHOLD_MS}ms`, () => {
   const kernels = loadAllGoldenVectorKernels();
-  assert.equal(kernels.length, 14, 'must load 14 GV kernels');
+  assert.equal(kernels.length, 15, 'must load 15 GV kernels');
 
   // warmup
   decideFiveValueVerdict(kernels[0]!);

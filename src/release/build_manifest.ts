@@ -9,7 +9,7 @@
 //   - compareBuildManifests(a, b)：字节级差异报告——哪个输入变了（changed/added/
 //     removed 三向）；输入全同而仅环境字段漂移 → 显式标注 EXPLAINED_ENV_DRIFT
 //     （CI vs 本地差异需要解释的机器面：能被解释的差异≠能被忽略的差异）。
-//   - buildArtifactTwice(repoRoot)：rebuild test——把 golden vector JSON（GV-01..14）
+//   - buildArtifactTwice(repoRoot)：rebuild test——把 golden vector JSON（GV-01..15）
 //     做 canonical 序列化作为确定性产物，在两个临时目录各生成一次，SHA-256 必须
 //     一致。规范化步骤诚实声明：golden vector 输入本身不含时间戳/随机字段；canonical
 //     序列化（key 排序 + 稳定缩进）消除的是跨次读取的 key 序差异，无其他归一化。

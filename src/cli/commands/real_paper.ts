@@ -23,6 +23,7 @@ import Database from 'better-sqlite3';
 import { buildBemChain, type BemAnalysisMode } from '../../science_harness/bem_pipeline.ts';
 import { buildRitchieChain } from '../../science_harness/ritchie_pipeline.ts';
 import { buildOscChain } from '../../science_harness/osc_pipeline.ts';
+import { verdictText } from '../render.ts';
 
 /** Type alias: paper run result. */
 interface PaperRunResult {
@@ -195,7 +196,7 @@ function renderOscResult(r: PaperRunResult): string {
     `  Survives FDR         : ${r.survivesCorrection ? 'YES' : 'NO'}`,
     '',
     '  \u2500\u2500 Deterministic verdict kernel (R0-R9) \u2500\u2500',
-    `  Machine verdict    : ${r.machineVerdict}`,
+    `  Machine verdict    : ${verdictText(r.machineVerdict)}`,
     `  Sealed conclusion  : ${r.sealedConclusion}`,
     `  Decisive rule      : ${r.decisiveRule}`,
     `  Reason codes       : ${r.reasonCodes.join(', ')}`,
@@ -257,7 +258,7 @@ function renderRitchieResult(r: PaperRunResult): string {
     `  Mean direction     : refutes (2 of 3 labs opposite to claim)`,
     '',
     '  \u2500\u2500 Deterministic verdict kernel (R0-R9) \u2500\u2500',
-    `  Machine verdict    : ${r.machineVerdict}`,
+    `  Machine verdict    : ${verdictText(r.machineVerdict)}`,
     `  Sealed conclusion  : ${r.sealedConclusion}`,
     `  Decisive rule      : ${r.decisiveRule}`,
     `  Reason codes       : ${r.reasonCodes.join(', ')}`,
@@ -317,7 +318,7 @@ function renderResult(r: PaperRunResult): string {
     `  Survives correction: ${r.survivesCorrection ? 'YES' : 'NO'}`,
     '',
     '  \u2500\u2500 Deterministic verdict kernel (R0-R9) \u2500\u2500',
-    `  Machine verdict    : ${r.machineVerdict}`,
+    `  Machine verdict    : ${verdictText(r.machineVerdict)}`,
     `  Sealed conclusion  : ${r.sealedConclusion}`,
     `  Decisive rule      : ${r.decisiveRule}`,
     `  Reason codes       : ${r.reasonCodes.join(', ')}`,

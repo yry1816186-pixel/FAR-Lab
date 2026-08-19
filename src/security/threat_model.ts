@@ -385,6 +385,7 @@ export const SURFACE_MODULE_MAP: Readonly<Record<string, readonly string[]>> = {
   hardware: ['sandbox-escape'],
   llm_gateway: ['ssrf', 'model-exfiltration'],
   math: ['proof-tamper'],
+  monitor: ['denial-of-service', 'privacy-insider'],
   planning: ['privacy-insider'],
   platform: ['denial-of-service', 'privacy-insider'],
   proof_envelope: ['proof-tamper'],

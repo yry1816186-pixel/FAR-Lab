@@ -89,7 +89,7 @@ test('REL-BUILD-001 diff: IDENTICAL / 输入变更三向 / 仅环境漂移 → E
 test('REL-BUILD-001 rebuild test: golden vector canonical 产物两次构建哈希一致（clean-build 代理）', () => {
   const result = buildArtifactTwice(REPO_ROOT);
   assert.equal(result.pass, true, JSON.stringify(result.runs.map((r) => r.sha256)));
-  assert.equal(result.inputCaseCount, 14, 'GV-01..14 golden vectors');
+  assert.equal(result.inputCaseCount, 15, 'GV-01..15 golden vectors');
   assert.equal(result.runs.length, 2);
   assert.notEqual(result.runs[0]?.dir, result.runs[1]?.dir, '两个独立临时目录');
   assert.match(result.runs[0]?.sha256 ?? '', /^[0-9a-f]{64}$/);

@@ -12,7 +12,10 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { runDemo } from '../../src/cli/commands/demo.ts';
 
-function runDemoCapture(subcommand: string | undefined): {
+function runDemoCapture(
+  subcommand: string | undefined,
+  opts: { readonly json?: boolean } = {},
+): {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
@@ -31,7 +34,7 @@ function runDemoCapture(subcommand: string | undefined): {
   }) as typeof process.stderr.write;
   let code: number;
   try {
-    code = runDemo(subcommand);
+    code = runDemo(subcommand, opts);
   } finally {
     process.stdout.write = origOut;
     process.stderr.write = origErr;
@@ -101,4 +104,79 @@ test('runDemo 未知子命令 → exit 2 + stderr 提示', () => {
   assert.equal(code, 2, '未知子命令 → exit 2');
   assert.match(stderr, /unknown subcommand/);
   assert.match(stderr, /tess-offline/);
+});
+
+
+// ---------------------------------------------------------------------------
+// --json 契约（CLI_JSON_CONTRACT_CENSUS P2-2 修复锁定）
+// 契约要点：JSON 路径必须跑与人读路径完全相同的真实阶段（GV 内核/demo 链/hero 链），
+// 仅渲染层换成单文档 JSON——零罐头、零跳过；GV 阶段的人读输出不得污染 JSON 文档。
+// ---------------------------------------------------------------------------
+
+test('runDemo --json: stdout 是单文档纯 JSON，banner/阶段分隔线/GV 人读输出零泄漏', () => {
+  const { code, stdout } = runDemoCapture(undefined, { json: true });
+  assert.equal(code, 0, 'demo --json 须正常退出');
+  const doc = JSON.parse(stdout) as {
+    tool: string;
+    mode: string;
+    stages: {
+      goldenVectors: { backend: string; exit: number };
+      demoClaim: { machineVerdict: string; decisiveRule: string; sealedConclusion: string };
+      heroClaim: { machineVerdict: string; statistics: { test: string } } | null;
+    };
+    result: string;
+  }; // 任何 banner/━━━━/GV 人读行混入都会让 JSON.parse 抛错——这就是判别
+  assert.equal(doc.tool, 'far demo');
+  assert.equal(doc.mode, 'full');
+  assert.equal(doc.result, 'ok');
+  assert.equal(doc.stages.goldenVectors.exit, 0, 'GV 阶段必须真实跑过（exit 0）');
+  assert.equal(stdout.indexOf('━━━━'), -1, '阶段分隔线泄漏');
+  assert.equal(stdout.indexOf('Golden Vectors via the real R0-R9'), -1, 'banner 文本泄漏');
+});
+
+test('runDemo --json: demoClaim/heroClaim 携带真实内核物证（非空壳字段）', () => {
+  const { code, stdout } = runDemoCapture(undefined, { json: true });
+  assert.equal(code, 0);
+  const doc = JSON.parse(stdout) as {
+    stages: {
+      demoClaim: {
+        claimId: string;
+        machineVerdict: string;
+        decisiveRule: string;
+        reasonCodes: string[];
+        fecGate: { allowed: boolean };
+        sealedConclusion: string;
+      };
+      heroClaim: {
+        machineVerdict: string;
+        decisiveRule: string;
+        statistics: { test: string; pValue: number | null };
+        sealedConclusion: string;
+      } | null;
+    };
+  };
+  const dc = doc.stages.demoClaim;
+  assert.ok(dc.claimId.length > 0 && dc.machineVerdict.length > 0, 'demoClaim 空壳');
+  assert.ok(dc.reasonCodes.length > 0, 'reasonCodes 不得为空（内核真实跑过的物证）');
+  assert.equal(typeof dc.fecGate.allowed, 'boolean');
+  const hero = doc.stages.heroClaim;
+  assert.ok(hero !== null, 'full 模式必须含 heroClaim');
+  assert.equal(hero.statistics.test, 'oneSampleZTest');
+  assert.equal(hero.machineVerdict, 'CONFIRMED', 'hero 链（真实统计注入）应达 CONFIRMED——与人读路径一致');
+  assert.equal(hero.sealedConclusion, 'INCONCLUSIVE', 'ASK-9 密封降级语义在 JSON 路径同样成立');
+});
+
+test('runDemo tess-offline --json: mode=tess-offline 且 heroClaim=null（与人读路径同语义）', () => {
+  const { code, stdout } = runDemoCapture('tess-offline', { json: true });
+  assert.equal(code, 0);
+  const doc = JSON.parse(stdout) as { mode: string; stages: { heroClaim: unknown } };
+  assert.equal(doc.mode, 'tess-offline');
+  assert.equal(doc.stages.heroClaim, null, 'tess-offline 不得编造 heroClaim');
+});
+
+test('runDemo 未知子命令在 --json 下仍 fail-closed（exit 2 + stderr，stdout 零输出）', () => {
+  const { code, stdout, stderr } = runDemoCapture('bogus', { json: true });
+  assert.equal(code, 2);
+  assert.equal(stdout, '', 'usage 错误路径 stdout 必须干净');
+  assert.ok(stderr.includes("unknown subcommand 'bogus'"));
 });

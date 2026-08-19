@@ -10,7 +10,7 @@
 //
 // 已实装子命令：`far status`（01 §5）+ `far verify`（04 §5 · FI-9 第三方独立重算）
 // + `far export receipt`（04 §9 Trust Receipt DOC 投影）+ `far export receipt-v2` + `far export far-proof` + `far bench run`
-// + `far verify-golden`（14 GV）+ `far fec compile|freeze` + `far fsm advance`（P2-2）
+// + `far verify-golden`（15 GV）+ `far fec compile|freeze` + `far fsm advance`（P2-2）
 // + `far demo`（一键演示）+ `far api`（REST server）+ `far ask`（6-stage FSM）。
 // Node 24 原生 type stripping 跑 .ts（package.json engines node>=24；
 // tsconfig noEmit，不构建 dist；bin 直接指向本文件）。
@@ -38,7 +38,7 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'version',
     aliases: ['--version', '-v'],
     description: 'print version + git HEAD',
-    run: async () => (await import('./commands/version.ts')).runVersion(),
+    run: async (args) => (await import('./commands/version.ts')).runVersion(args),
   },
   {
     name: 'doctor',
@@ -52,6 +52,7 @@ const COMMANDS: readonly CliCommand[] = [
       return runDoctor({
         liveQwenSmoke,
         fullVerify,
+        json: args.includes('--json'),
         ...(dbPath !== undefined ? { dbPath } : {}),
       });
     },
@@ -60,6 +61,11 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'hardware',
     description: 'best-effort runtime compute-backend probe',
     run: async (args) => (await import('./commands/hardware.ts')).runHardware({ json: args.includes('--json') }),
+  },
+  {
+    name: 'monitor',
+    description: 'system health snapshot — CPU/memory thresholds with warn alerts (--json)',
+    run: async (args) => (await import('../monitor/run_command.ts')).runMonitor({ json: args.includes('--json') }),
   },
   {
     name: 'status',
@@ -88,7 +94,10 @@ const COMMANDS: readonly CliCommand[] = [
         process.stdout.write(formatV2VerificationForDisplay(result) + '\n');
         return 0;
       }
-      return (await import('./commands/demo.ts')).runDemo(args[0]);
+      return (await import('./commands/demo.ts')).runDemo(
+        args.find((a) => !a.startsWith('--')),
+        { json: args.includes('--json') },
+      );
     },
   },
   {
@@ -497,7 +506,7 @@ async function runFsmAdvanceFromArgs(args: readonly string[]): Promise<number> {
 
 const VERIFY_GOLDEN_SCHEMA: readonly OptionSchema[] = [
   { name: '--json', type: 'boolean', description: 'emit a machine-readable summary' },
-  { name: '--all', type: 'boolean', description: 'run golden_vectors/cases/GV-01..GV-14.json (default)' },
+  { name: '--all', type: 'boolean', description: 'run golden_vectors/cases/GV-01..GV-15.json (default)' },
   { name: '--case', type: 'string', description: 'run a single case (e.g. GV-01)' },
   { name: '--case-dir', type: 'string', description: 'case directory path' },
   {
@@ -1378,7 +1387,7 @@ USAGE:
 
   far verify-golden [--all | --case GV-01] [--backend node|python|browser] [--json]
                          recompute the verdict golden vectors
-    --all               run golden_vectors/cases/GV-01..GV-14.json (default)
+    --all               run golden_vectors/cases/GV-01..GV-15.json (default)
     --case <id>         run a single case (e.g. GV-01)
     --case-dir <path>   specify a case directory (for tests / offline-bundle review)
     --backend node      run the Node/V2 kernel axis; really calls decideFiveValueVerdict
@@ -1529,7 +1538,7 @@ USAGE:
 const HELP_TEXT = `FAR-Lab CLI — claim-level verification for AI4S scientific claims
 
 GETTING STARTED (recommended order)
-  far demo                              see the deterministic kernel verify 14 golden vectors (no key)
+  far demo                              see the deterministic kernel verify 15 golden vectors (no key)
   far ground "<your question>"          real literature retrieval + counter-evidence — free, no key
   far research start "<your question>"  full research loop (live model when DASHSCOPE_API_KEY is set;
                                         without a key it fails closed with actionable guidance)
@@ -1548,7 +1557,7 @@ RESEARCH LOOP
   far repl                              interactive REPL (ask / :fork <suffix> / :history / :quit)
 
 VERIFICATION & TRUST
-  far demo [tess-offline]               one-shot demo: 14 golden vectors + end-to-end demo claim (offline)
+  far demo [tess-offline]               one-shot demo: 15 golden vectors + end-to-end demo claim (offline)
   far verify [--bundle|--envelope|--db] third-party independent re-computation verification
                                         (--v2: V2 six-dimension path; --explain expands the check tables)
   far verify-golden [--all|--case]      recompute the verdict golden vectors (node/python/browser axes)

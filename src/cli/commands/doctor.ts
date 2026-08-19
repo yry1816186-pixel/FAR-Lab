@@ -35,6 +35,11 @@ export interface DoctorOptions {
    * far.ts 本批未接线该 flag —— runDoctor 以 process.argv 兜底解析,保证 CLI 今日可用。
    */
   readonly probeCredentials?: boolean;
+  /**
+   * CLI_JSON_CONTRACT_CENSUS P2-3:stdout 输出单个合法 JSON 文档（banner/装饰全抑制）。
+   * 修复前 `--json` 被静默忽略（fail-open 违规，与 version 同类）。exit code 语义不变。
+   */
+  readonly json?: boolean;
 }
 
 /** IC-03 离线重算的紧凑结论(完整报告被捕获,仅 --full-verify 时回显)。 */
@@ -65,11 +70,24 @@ function resolveRepoRoot(): string | null {
   return existsSync(resolve(PACKAGE_ROOT, 'package.json')) ? PACKAGE_ROOT : null;
 }
 
-function probeBin(bin: string, args: readonly string[]): string | null {
+function probeBinOnce(bin: string, args: readonly string[]): string | null {
   try {
-    const r = spawnSync(bin, args, { encoding: 'utf8', shell: process.platform === 'win32' });
+    // DEP0190 合规（P5-sec 修复）：首选直 spawn（无 shell·数组参数）。
+    // 仅当 Windows 上 .cmd/.bat shim（如 pnpm）直 spawn 报 ENOENT/EINVAL 时，
+    // 回退 shell 字符串形式——该形式的命令行**只由本文件内的代码固定字面量**
+    // （pnpm/python3/python/git/docker + 固定参数）拼成，永不含外部输入；
+    // 若未来引入变量参数，必须先过白名单校验，否则视为红线违规。
+    const r = spawnSync(bin, args, { encoding: 'utf8' });
     if (r.status === 0 && r.stdout) {
       return r.stdout.trim();
+    }
+    const errCode = (r.error as { code?: string } | undefined)?.code;
+    if (process.platform === 'win32' && (errCode === 'ENOENT' || errCode === 'EINVAL')) {
+      const quoted = args.map((a) => (a.includes(' ') || a.includes('"') ? `"${a.replaceAll('"', '\\"')}"` : a));
+      const r2 = spawnSync(`"${bin}" ${quoted.join(' ')}`, { encoding: 'utf8', shell: true });
+      if (r2.status === 0 && r2.stdout) {
+        return r2.stdout.trim();
+      }
     }
     return null;
   } catch {
@@ -77,9 +95,37 @@ function probeBin(bin: string, args: readonly string[]): string | null {
   }
 }
 
+function probeBin(bin: string, args: readonly string[]): string | null {
+  const first = probeBinOnce(bin, args);
+  if (first !== null) {
+    return first;
+  }
+  // 高并发系统负载下的瞬时进程创建失败（全量测试数百进程竞争时实测：直 spawn 与
+  // cmd.exe 回退均可能刹那失败，单独重跑即恢复）。150ms 退避单次重试把偶发假 warn
+  // 变成最终一致探测——doctor 是交互诊断路径，150ms 尾延迟代价可接受；同步等待
+  // 用 Atomics.wait（仓库既有惯例：run_store_security.ts / retrieval/cache.ts）。
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 150);
+  return probeBinOnce(bin, args);
+}
+
 function nodeMajor(): number {
   const v = process.versions.node;
   return Number.parseInt(v.split('.')[0] ?? '0', 10);
+}
+
+/**
+ * pnpm 进程树内的权威回退（探测第三级）：pnpm 驱动子进程（pnpm test / pnpm run）
+ * 时自身注入 npm_config_user_agent（形如 "pnpm/10.29.3 npm/? node/v24.x ..."）。
+ * 需要它的原因：pnpm 进程树的 PATH 前部是 pnpm 自管理 shim
+ * （%LocalAppData%/pnpm/.tools/pnpm/<ver>/bin/pnpm.CMD），该 shim 以 CWD 相对
+ * 路径解析模块，在非 pnpm 源码仓库下必失败（实测 stderr: Cannot find module
+ * ...\node_modules\pnpm\bin\pnpm.cjs, exit 1）——spawn 探测在该环境下结构性
+ * 失效且重试无效。本信号与 `pnpm --version` 同源（包版本），非伪造。
+ */
+function pnpmVersionFromUserAgent(): string | null {
+  const ua = process.env.npm_config_user_agent ?? '';
+  const m = /pnpm\/(\d+\.\d+\.\d+)/.exec(ua);
+  return m ? `v${m[1]}` : null;
 }
 
 function checkEnv(checks: Check[]): void {
@@ -97,7 +143,7 @@ function checkEnv(checks: Check[]): void {
     detail: `v${process.versions.node} (type-stripping needs >=24; ${major >= 24 ? 'satisfied' : 'not satisfied, far cannot run .ts'})`,
   });
 
-  const pnpm = probeBin('pnpm', ['--version']);
+  const pnpm = probeBin('pnpm', ['--version']) ?? pnpmVersionFromUserAgent();
   checks.push({
     name: 'pnpm',
     status: pnpm ? 'ok' : 'warn',
@@ -630,6 +676,22 @@ export async function runDoctor(opts: DoctorOptions): Promise<number> {
 
   // 2026-08-14 UX reorder: 环境检查表先打印;IC-03 verify 降级为紧凑 VERIFY SUMMARY
   // (完整报告仅在 --full-verify 下回显)。旧输出把整份 far verify 报告放在最前,埋没了环境检查。
+  const hasFail = checks.some((c) => c.status === 'fail');
+  const hasWarn = checks.some((c) => c.status === 'warn');
+  const exitCode = hasFail ? 1 : hasWarn ? 2 : 0;
+
+  // --json: 单文档纯 JSON（census §4-1：banner/分隔线/ANSI 严禁混入 stdout）。
+  if (opts.json === true) {
+    const doc = {
+      tool: 'far doctor',
+      checks: checks.map((c) => ({ name: c.name, status: c.status, detail: c.detail })),
+      verify: { ran: verifySummary.ran, status: verifySummary.status, reason: verifySummary.reason },
+      result: hasFail ? 'fail' : hasWarn ? 'warn' : ('ok' as const),
+    };
+    process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
+    return exitCode;
+  }
+
   process.stdout.write('\n  FAR-Lab · far doctor (environment self-check)\n');
   process.stdout.write('  ─────────────────────────────────────────────────\n');
   for (const c of checks) {
@@ -652,8 +714,6 @@ export async function runDoctor(opts: DoctorOptions): Promise<number> {
   }
   process.stdout.write('  ─────────────────────────────────────────────────\n');
 
-  const hasFail = checks.some((c) => c.status === 'fail');
-  const hasWarn = checks.some((c) => c.status === 'warn');
   if (hasFail) {
     process.stdout.write('  result: FAIL present (core capability impaired) — fix the details above and rerun far doctor\n\n');
     return 1;

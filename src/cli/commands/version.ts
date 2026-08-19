@@ -21,11 +21,25 @@ function readRootPackage(): { readonly name: string; readonly version: string } 
 
 /**
  * run version.
+ * `--json`：stdout = 单个合法 JSON 文档（CLI_JSON_CONTRACT_CENSUS §4-1），banner 抑制。
+ * 未知参数：fail-closed —— stderr usage + exit 2（修复前为静默忽略，普查实证 P2-1）。
  */
-export function runVersion(): number {
+export function runVersion(args: readonly string[] = []): number {
+  const json = args.includes('--json');
+  const unknown = args.filter((a) => a !== '--json');
+  if (unknown.length > 0) {
+    process.stderr.write(`far version: unknown argument '${unknown[0]}'\n  usage: far version [--json]\n`);
+    return 2;
+  }
   const pkg = readRootPackage();
   const resolved = resolveGitCommitSha();
   const sha = resolved === DEMO_GIT_COMMIT_SHA ? null : resolved.slice(0, 12);
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify({ name: pkg?.name ?? 'far-chain', version: pkg?.version ?? '0.0.0', gitCommit: sha })}\n`,
+    );
+    return 0;
+  }
   process.stdout.write(`${pkg?.name ?? 'far-chain'} ${pkg?.version ?? '0.0.0'} · git ${sha ?? '(not a git checkout)'}\n`);
   process.stdout.write('  Falsification-Anchored Research Chain · deterministic R0-R9 kernel · tamper-detectable · anti-theater\n');
   return 0;

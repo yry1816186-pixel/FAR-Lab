@@ -41,7 +41,7 @@ export interface ModuleBudget {
 export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
 { module: 'agent_loop', budgetFiles: 26 },
   { module: 'anti_theater', budgetFiles: 35 },
-  { module: 'api', budgetFiles: 35 },  // 依据: Open-World R1 复杂度租金——static_web.ts 单进程产品形态(API 直托 frontend/dist),真实文件数对账,非阈值放松
+  { module: 'api', budgetFiles: 36 },  // 依据: Open-World R1 复杂度租金——static_web.ts 单进程产品形态(API 直托 frontend/dist);2026-08-19 +routes/monitor.ts(v3.0 指令 Phase 3.3 监控端点挂既有实例),真实文件数对账,非阈值放松
   { module: 'architecture', budgetFiles: 1 },
   { module: 'audit', budgetFiles: 1 },
   { module: 'benchmark', budgetFiles: 4 },
@@ -58,7 +58,7 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'evidence', budgetFiles: 2 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'evidence_log', budgetFiles: 10 },
   { module: 'evidence_quality', budgetFiles: 5 },
-  { module: 'falsifiability', budgetFiles: 19 },
+  { module: 'falsifiability', budgetFiles: 20 },  // 依据: 2026-08-19 be968c7 +verdict_semantics.ts(三正交语义轴单一契约 far.verdict-semantics.v1),对账为真实文件数,非阈值放松
   { module: 'far_proof', budgetFiles: 9 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'fec', budgetFiles: 6 },
   { module: 'gates', budgetFiles: 7 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
@@ -66,8 +66,9 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'hardware', budgetFiles: 1 },
   { module: 'llm_gateway', budgetFiles: 29 },
   { module: 'math', budgetFiles: 16 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
+  { module: 'monitor', budgetFiles: 4 },  // 依据: 2026-08-19 v3.0 指令 Phase 3.3——collect.ts(node:os 采集)+alerts.ts(CPU>80% warn)+run_command.ts(far monitor)+sampler.ts(5s 常驻环形缓冲·永不抛异常守护);监控唯一净新增运行时,对账为真实文件数
   { module: 'planning', budgetFiles: 9 },
-  { module: 'platform', budgetFiles: 6 },  // 依据: 2026-08-19 复杂度租金——dotenv.ts(CLI 入口 .env 水合·修复文档承诺与实现断裂导致的 LIVE 通路误判);对账为真实文件数,非阈值放松
+  { module: 'platform', budgetFiles: 7 },  // 依据: 2026-08-19 复杂度租金——dotenv.ts(CLI 入口 .env 水合)+design_tokens.ts(v3.0 指令 Phase 2·设计 Token SSOT·三范式语义色单一事实源·Web CSS 双源漂移有契约测试锁定);对账为真实文件数,非阈值放松
   { module: 'proof_envelope', budgetFiles: 13 },  // 依据: R3 复杂度租金——ask_envelope.ts(V2 信封生产构建器·D-2026-08-19-01 终结)入 v2/ 子域;对账为真实文件数,非阈值放松
   { module: 'release', budgetFiles: 5 },
   { module: 'report', budgetFiles: 8 },

@@ -1,7 +1,7 @@
 // tests/cli/verify_golden_cross_lang.test.ts
 //
 // P1-4 端到端物证：far verify-golden（runVerifyGolden @ verify_golden.ts:122）真调 decideFiveValueVerdict
-// 遍历 14 条落盘 GV（golden_vectors/cases/GV-01..GV-14.json），node backend 全 PASS（kernel oracle 自洽）。
+// 遍历 15 条落盘 GV（golden_vectors/cases/GV-01..GV-15.json），node backend 全 PASS（kernel oracle 自洽）。
 // python/browser backend 按环境能力 best-effort：可用则断言跨后端 per-case verdict 一致；不可用则显式 skip（带 reason）。
 //
 // 真实依赖：verify_golden.ts collectVerifyGoldenDump({backend:'node'}) → 每条 GV 调 decideFiveValueVerdict
@@ -22,7 +22,7 @@ import {
 
 const NODE_DUMP = collectVerifyGoldenDump({ backend: 'node' });
 
-test('node_python_browser_agree_on_GV: node backend runs all 14 GV through V2 kernel, PASS (P1-4 node axis)', () => {
+test('node_python_browser_agree_on_GV: node backend runs all 15 GV through V2 kernel, PASS (P1-4 node axis)', () => {
   // runVerifyGolden（verify_golden.ts:122）返回 0=PASS / 7=FAIL——证明 CLI 真路径驱动 kernel。
   // 捕获 stdout 避免 JSON 文本污染测试输出（runVerifyGolden 直写 process.stdout）。
   const origWrite = process.stdout.write.bind(process.stdout);
@@ -36,8 +36,8 @@ test('node_python_browser_agree_on_GV: node backend runs all 14 GV through V2 ke
   assert.equal(exit, 0, `runVerifyGolden node backend should exit 0 (PASS), got ${exit}`);
 
   assert.equal(NODE_DUMP.status, 'PASS', `node backend should PASS, errors: ${NODE_DUMP.errors.join('; ')}`);
-  assert.equal(NODE_DUMP.total, 14, `expected 14 golden vectors on disk, got ${NODE_DUMP.total}`);
-  assert.equal(NODE_DUMP.passed, 14, `all 14 GV should pass, got ${NODE_DUMP.passed} passed / ${NODE_DUMP.failed} failed`);
+  assert.equal(NODE_DUMP.total, 15, `expected 15 golden vectors on disk, got ${NODE_DUMP.total}`);
+  assert.equal(NODE_DUMP.passed, 15, `all 15 GV should pass, got ${NODE_DUMP.passed} passed / ${NODE_DUMP.failed} failed`);
   assert.equal(NODE_DUMP.failed, 0);
 
   // 每条 GV 都真调了 decideFiveValueVerdict：decisiveRuleId 非空（非占位）。

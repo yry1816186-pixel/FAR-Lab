@@ -53,6 +53,10 @@ export function runStatus(options: StatusOptions, repoRoot: string = REPO_ROOT):
     return 2;
   }
   const chainHead = options.dbPath !== undefined ? verifyDbChainHead(options.dbPath) : undefined;
+  // 无提示卡死红线修复（CLI_JSON_CONTRACT_CENSUS 追加发现）：下方两次全量测试套件
+  // spawn 实测 ~83s——必须先给用户活信号（stderr，不污染 stdout 纯 JSON 契约），
+  // 且单次采集有界超时（防真挂死时降级 pending 而非无限阻塞）。
+  process.stderr.write('far status: collecting test counts + coverage (spawns full test suite, ~1-2 min)…\n');
   const testCount = runTestCountSafe();
   const coverage = runCoverageSafe();
 
@@ -84,6 +88,7 @@ function runTestCount(): TestCountResult {
     encoding: 'utf8',
     cwd: REPO_ROOT,
     maxBuffer: 50 * 1024 * 1024,
+    timeout: 240_000, // 有界等待：真挂死时抛出 → runTestCountSafe 降级 pending（不无限阻塞）
   });
 
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
@@ -127,6 +132,7 @@ function runCoverage(): CoverageResult {
     encoding: 'utf8',
     cwd: REPO_ROOT,
     maxBuffer: 50 * 1024 * 1024,
+    timeout: 240_000, // 有界等待：真挂死时抛出 → runCoverageSafe 降级 pending（不无限阻塞）
   });
 
   // node --test coverage 表输出到 stdout（非 stderr·无 ANSI·glob 由 node 自展开）。
