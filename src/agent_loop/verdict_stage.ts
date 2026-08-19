@@ -57,6 +57,7 @@ import {
   verdictResultFromKernelOutput,
 } from '../falsifiability/legacy_kernel_adapter.ts';
 import { compileFec } from '../fec/compiler.ts';
+import { registerFecV2 } from '../fec/fec_repository.ts';
 import {
   assertFecGate,
   enforceFecMandatoryGate,
@@ -77,6 +78,13 @@ export interface RunVerdictStageArgs {
   readonly artifacts: readonly StageArtifact[];
   readonly gitCommitSha: string;
   readonly runId: string;
+  /**
+   * R3（V2 信封生产者）：裁决计算观测回调——事务**成功提交后**携带完整
+   * VerdictComputation（含 fec/kernelOutput——两者不落 verdict_nodes，缺此回调
+   * 即不可复原）通知调用方。缺省 undefined → 零行为变化（字节等同基线）。
+   * 契约：仅观测，不得 mutate computation；信封封存/落库是调用方职责。
+   */
+  readonly onComputation?: (computation: VerdictComputation) => void;
 }
 
 // ---------- 纯转换逻辑（导出供单测·无副作用） ----------
@@ -421,6 +429,13 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
       derivable: 1,
     });
 
+    // R3（V2 信封生产者·前置）：裁决所用的 legacy-compat FEC 契约随同事务落
+    // fec_contracts_v2（此前仅进内核内存态，事后不可复原）。fec_hash 由
+    // registerFecV2 经 computeFecHash 真实重算——修正 legacy 适配层的全零占位，
+    // 使第三方可互验「冻结契约内容 == 其声明哈希」。append-only 触发器天然幂等拒绝
+    // 重复 fecId（同 run 重裁决=同 fecId→事务回滚如旧，不产生半态）。
+    registerFecV2(args.db, { fec: computation.fec, compiledAt: sourceAnchor.isoTimestamp });
+
     return recordVerdict(args.db, {
       evidenceId: evidenceLogEntry.evidenceId,
       parentVerdictId: null,
@@ -446,5 +461,8 @@ export function runVerdictStage(args: RunVerdictStageArgs): VerdictNode | null {
   // 链写在 DEFERRED 下（读链头后才获 RESERVED·跨进程 TOCTOU 窗口），须用 txn.immediate() 在
   // BEGIN 即获 RESERVED 锁，使 chainHead 读 + INSERT 原子化（防两条记录接同一 prevHash 分叉）。
   // 单进程 better-sqlite3 同步执行下 immediate 不自阻塞；跨进程高争用时 SQLITE_BUSY=fail-closed（期望行为）。
-  return txn.immediate();
+  const node = txn.immediate();
+  // R3：事务提交成功后才暴露计算观测（未落库的裁决不产信封原料）。
+  args.onComputation?.(computation);
+  return node;
 }

@@ -172,7 +172,7 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
     await registerIntegrityRoutes(v1, { db: config.db });
 
     const { registerResearchRoutes } = await import('./routes/research.ts');
-    await registerResearchRoutes(v1, {});
+    await registerResearchRoutes(v1, { db: config.db });
     const { registerLifecycleRoutes } = await import('./routes/lifecycle.ts');
     await registerLifecycleRoutes(v1, { db: config.db });
     await registerBenchmarkRoute(v1);

@@ -146,10 +146,19 @@ function parseEnvelope(raw: string): ParsedEnvelope {
       (typeof receiptLike['claimText'] === 'string' && (receiptLike['claimText'] as string)) ||
       (typeof receiptLike['claim'] === 'object' && receiptLike['claim'] !== null && typeof (receiptLike['claim'] as Record<string, unknown>)['text'] === 'string'
         ? ((receiptLike['claim'] as Record<string, unknown>)['text'] as string)
+        : '') ||
+      // R3：真实 ProofEnvelopeV2 的 claim 文本在 claim.naturalLanguage（非 claim.text）——
+      // 缺此回落则 claimText='' → 保存收据被 schema 拒（min(1)）→ 真实信封无法持久化。
+      (typeof receiptLike['claim'] === 'object' && receiptLike['claim'] !== null && typeof (receiptLike['claim'] as Record<string, unknown>)['naturalLanguage'] === 'string'
+        ? ((receiptLike['claim'] as Record<string, unknown>)['naturalLanguage'] as string)
         : ''),
     verdict:
       (typeof receiptLike['verdict'] === 'string' && (receiptLike['verdict'] as string)) ||
       (typeof receiptLike['verdictLabel'] === 'string' && (receiptLike['verdictLabel'] as string)) ||
+      // R3：真实信封的裁决在 verdictTrace.verdict（非顶层 verdict 字段）。
+      (typeof receiptLike['verdictTrace'] === 'object' && receiptLike['verdictTrace'] !== null && typeof (receiptLike['verdictTrace'] as Record<string, unknown>)['verdict'] === 'string'
+        ? ((receiptLike['verdictTrace'] as Record<string, unknown>)['verdict'] as string)
+        : '') ||
       'UNTESTED',
     ...(manifestMembers !== undefined ? { manifestMembers } : {}),
   };

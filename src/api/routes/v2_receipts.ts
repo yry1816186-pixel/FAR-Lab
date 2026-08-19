@@ -10,6 +10,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
+import { createHash } from 'node:crypto';
 import {
   runV2ReceiptVerification,
   formatV2VerificationForDisplay,
@@ -76,29 +77,38 @@ export async function registerV2ReceiptRoutes(app: FastifyInstance): Promise<voi
 /** Convert envelope fields to manifest members for verification. */
 function envelopeToMembers(envelope: ProofEnvelopeV2): readonly { readonly kind: import('../../v2_domain/receipt_manifest.ts').ReceiptManifestMemberKind; readonly digest: string; readonly sizeBytes: number }[] {
   const members: { kind: import('../../v2_domain/receipt_manifest.ts').ReceiptManifestMemberKind; digest: string; sizeBytes: number }[] = [];
+  // R3 修复（真实信封全挂 MANDATORY_MEMBER_MISSING）：成员映射必须覆盖
+  // REQUIRED_MANIFEST_MEMBER_KINDS 全部 11 类——此前缺 experimentRuns /
+  // measurementResults / statisticalResults / ledgerRoot 四类，凡经本路由验证的
+  // 真实信封必缺员 FAIL（R2 真机 QA pass7 现场抓获）。
   const fields: Array<[import('../../v2_domain/receipt_manifest.ts').ReceiptManifestMemberKind, unknown]> = [
     ['claim', envelope.claim],
     ['fecSnapshot', envelope.fecSnapshot],
     ['protocolFreeze', envelope.protocolFreeze],
     ['datasetBindings', envelope.datasetBindings],
     ['workflowBindings', envelope.workflowBindings],
+    ['experimentRuns', envelope.experimentRuns],
+    ['measurementResults', envelope.measurementResults],
+    ['statisticalResults', envelope.statisticalResults],
     ['verdictTrace', envelope.verdictTrace],
     ['antiTheaterReport', envelope.antiTheaterReport],
+    ['ledgerRoot', envelope.ledgerRoot],
   ];
   for (const [kind, value] of fields) {
     if (value !== undefined && value !== null) {
       const json = JSON.stringify(value);
-      members.push({ kind, digest: 'sha256:' + simpleHash(json), sizeBytes: json.length });
+      members.push({ kind, digest: realSha256Hex(json), sizeBytes: json.length });
     }
   }
   return members;
 }
 
-/** Simple hash (not crypto — API path is for display, not trust). */
-function simpleHash(s: string): string {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h).toString(16).padStart(8, '0').repeat(8).slice(0, 64);
+/**
+ * 成员内容的真实 sha256（裸 64-hex·无前缀）。
+ * R3 修复：simpleHash（非密码学 DJB2 变体 + 'sha256:' 前缀）被 manifest 格式门
+ * 拒收（MANIFEST_DIGEST_INVALID）且其 'sha256:' 前缀谎称算法——display 面也不得
+ * 伪造算法标识。改为 node:crypto 真实 sha256，注释与事实一致。
+ */
+function realSha256Hex(s: string): string {
+  return createHash('sha256').update(s, 'utf8').digest('hex');
 }

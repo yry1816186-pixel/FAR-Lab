@@ -7,12 +7,13 @@ import { useTheme } from '@/shared/theme/ThemeProvider.tsx';
 import { Badge } from '@/shared/ui/Badge.tsx';
 import { cx } from '@/shared/ui/cx.ts';
 
-const NAV_ITEMS: readonly { readonly to: string; readonly key: MessageKey; readonly end?: boolean }[] = [
+export const NAV_ITEMS: readonly { readonly to: string; readonly key: MessageKey; readonly end?: boolean }[] = [
   { to: '/', key: 'nav.home', end: true },
   { to: '/missions', key: 'nav.missions' },
   { to: '/assay', key: 'nav.assay' },
   { to: '/verify', key: 'nav.verify' },
   { to: '/evidence', key: 'nav.evidence' },
+  { to: '/events', key: 'nav.events' },
   { to: '/benchmark', key: 'nav.benchmark' },
   { to: '/about', key: 'nav.about' },
 ];

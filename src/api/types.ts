@@ -88,6 +88,15 @@ export interface HypothesizeResponse {
   /** The runtime provider profile that produced this run (e.g. 'offline_replay',
    * 'competition_aliyun_qwen'). Full transparency beyond the binary label. */
   readonly providerProfile: string;
+  /**
+   * R3（V2 信封生产者）：本运行封存的 ProofEnvelopeV2（持久化于 proof_envelopes_v2，
+   * 可导出/可粘贴到 /verify 独立六维验证）。null = 未封存（原因见 note）。
+   */
+  readonly proofEnvelopeV2?: import('../proof_envelope/v2/types.ts').ProofEnvelopeV2 | null;
+  /** 封存状态：'sealed' 已落库 / 'skipped' 未落库（fail-closed，原因在 note）。 */
+  readonly proofEnvelopeV2Status?: 'sealed' | 'skipped';
+  /** 未封存时的如实原因（如「未接地→RULE-004 fail-closed」/「裁决阶段未到达」）。 */
+  readonly proofEnvelopeV2Note?: string | null;
 }
 
 /**

@@ -75,6 +75,13 @@ export interface LoopRunnerArgs {
   /** 可选：每阶段 artifact 入链后回调（透传 runAgentLoop.onArtifact·流式输出用）。 */
   readonly onArtifact?: (artifact: import('../../agent_loop/types.ts').StageArtifact) => void;
   /**
+   * R3（V2 信封生产者）：裁决计算观测回调（透传 runAgentLoop.onComputation）。
+   * 缺省 → 零行为变化（字节等同基线·回归兼容）。
+   */
+  readonly onComputation?: (
+    computation: import('../../agent_loop/verdict_stage.ts').VerdictComputation,
+  ) => void;
+  /**
    * P0-3 运行时事件流回调（透传 runAgentLoop.onEvent·SSE/CLI/前端实时显示）。
    * 缺省 undefined → 零行为（回归兼容）。
    */
@@ -274,6 +281,7 @@ export async function executeLoop(args: LoopRunnerArgs): Promise<LoopRunnerResul
     ...(termination === undefined ? {} : { termination }),
     ...(args.resumeStorePath === undefined ? {} : { resumeStorePath: args.resumeStorePath }),
     ...(args.onArtifact === undefined ? {} : { onArtifact: args.onArtifact }),
+    ...(args.onComputation === undefined ? {} : { onComputation: args.onComputation }),
     ...(args.onEvent === undefined ? {} : { onEvent: args.onEvent }),
     ...(args.verdictDrivenFeedback === undefined
       ? {}

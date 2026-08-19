@@ -20,10 +20,12 @@
  */
 
 import type { FastifyInstance } from 'fastify';
+import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { sseHeaders } from './sse.ts';
 
 import { ApiError } from '../errors/error_handler.ts';
+import { appendRunSummaryToChain } from '../../research/evidence_chain_bridge.ts';
 import { createLlmGateway, type LlmGateway } from '../../llm_gateway/gateway.ts';
 import { createOfflineReplayAdapter } from '../../llm_gateway/adapters/offline_replay/client.ts';
 import { resolveRuntimeGateway, RUNTIME_PROVIDER_PROFILE } from '../../llm_gateway/runtime_gateway.ts';
@@ -92,6 +94,13 @@ export interface ResearchRouteConfig {
   readonly store?: RunStore;
   /** Lifecycle executor override for deterministic concurrency/failure tests. */
   readonly executeRun?: (args: ExecuteResearchRunArgs) => Promise<ResearchRun>;
+  /**
+   * Evidence-chain DB handle (server injects; optional for embedders). When present,
+   * a completed run's summary is anchored into call_records (evidence_chain_bridge —
+   * dual-ledger unification, R3). Absent = bridge off, honestly (CLI/tests without db
+   * keep the file-receipt surface only).
+   */
+  readonly db?: Database.Database;
 }
 
 /** Checkpoint summary served by GET /:runId/status and the SSE `state` frame. */
@@ -269,6 +278,24 @@ export async function registerResearchRoutes(
             rejectPreparation(new Error('research executor resolved before reporting its prepared run id'));
           }
           registry.set(run.runId, run);
+          // 双账本桥（R3）：终态 COMPLETED 的运行摘要锚入 call_records 证据链。
+          // 桥失败不拖垮已完成的运行——警告日志如实记录，叶缺席可由
+          // verifyRunSummaryRecord 事后检出（leaf_absent）。
+          if (config?.db !== undefined) {
+            try {
+              const cp = store.loadCheckpoint(run.runId);
+              if (cp !== null && cp.state === 'COMPLETED') {
+                appendRunSummaryToChain(config.db, run, {
+                  completedAt: cp.completedAt ?? run.startedAt,
+                  providerProfile: pipeline.providerProfile,
+                });
+              }
+            } catch (err) {
+              request.log.warn(
+                `evidence-chain bridge failed for run ${run.runId} (run itself complete; leaf absent — detectable via verifyRunSummaryRecord): ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          }
         })
         .catch(logExecutionFailure);
     } catch (err) {

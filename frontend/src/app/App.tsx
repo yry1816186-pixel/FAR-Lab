@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { AppShell } from './AppShell.tsx';
 import { RouteErrorBoundary } from './ErrorBoundary.tsx';
+import { RouteEffects } from './RouteEffects.tsx';
 import { createQueryClient } from '@/shared/api/queryClient.ts';
 import { I18nProvider, useT } from '@/shared/i18n/index.tsx';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider.tsx';
@@ -17,6 +18,7 @@ const AssayPage = lazy(() => import('@/features/assay/AssayPage.tsx'));
 const VerifyPage = lazy(() => import('@/features/verify/VerifyPage.tsx'));
 const ReceiptPage = lazy(() => import('@/features/verify/ReceiptPage.tsx'));
 const EvidencePage = lazy(() => import('@/features/evidence/EvidencePage.tsx'));
+const EventsPage = lazy(() => import('@/features/events/EventsPage.tsx'));
 const BenchmarkPage = lazy(() => import('@/features/benchmark/BenchmarkPage.tsx'));
 const AboutPage = lazy(() => import('@/features/about/AboutPage.tsx'));
 
@@ -51,6 +53,7 @@ export default function App() {
       <I18nProvider>
         <ThemeProvider>
           <BrowserRouter>
+            <RouteEffects />
             <AppShell>
               <RouteErrorBoundary>
                 <Suspense fallback={<RouteFallback />}>
@@ -65,6 +68,7 @@ export default function App() {
                     <Route path="/verify" element={<VerifyPage />} />
                     <Route path="/receipts/:receiptId" element={<ReceiptPage />} />
                     <Route path="/evidence" element={<EvidencePage />} />
+                    <Route path="/events" element={<EventsPage />} />
                     <Route path="/benchmark" element={<BenchmarkPage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="*" element={<NotFoundPage />} />

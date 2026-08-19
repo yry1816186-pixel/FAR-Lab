@@ -17,6 +17,7 @@ import { JsonBlock } from '@/shared/ui/JsonBlock.tsx';
 import { KeyValue, KeyValueList } from '@/shared/ui/KeyValue.tsx';
 import { PageHeader } from '@/shared/ui/JsonBlock.tsx';
 import { EmptyBlock, ErrorBlock, LoadingBlock, Section } from '@/shared/ui/StateBlock.tsx';
+import { GoldenVerifier, ProofRecompute } from '@/features/evidence/BrowserReproof.tsx';
 import { VerdictBadge } from '@/shared/ui/VerdictBadge.tsx';
 
 const PAGE_SIZE = 25;
@@ -265,6 +266,7 @@ function IntegrityPanel() {
           <JsonBlock className="mt-2" value={receipt.data} />
         </div>
       ) : null}
+      <GoldenVerifier />
     </Section>
   );
 }
@@ -323,6 +325,7 @@ function ProofLookup() {
               </li>
             ))}
           </ol>
+          <ProofRecompute proof={proof.data} />
         </div>
       ) : null}
     </Section>

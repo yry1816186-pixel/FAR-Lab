@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 
 import { isVerdictValue } from '@/entities/verdict.ts';
 import type { HypothesizeResponse } from '@/entities/dtos.ts';
@@ -67,6 +68,8 @@ function ClaimTab() {
   const hypothesize = useHypothesize();
   const [claim, setClaim] = useState('');
   const [mode, setMode] = useState<'quick' | 'full'>('quick');
+  const [grounded, setGrounded] = useState(false);
+  const [envelopeCopied, setEnvelopeCopied] = useState(false);
   const [result, setResult] = useState<HypothesizeResponse | null>(null);
 
   const onSubmit = (evt: FormEvent<HTMLFormElement>): void => {
@@ -74,8 +77,9 @@ function ClaimTab() {
     const trimmed = claim.trim();
     if (trimmed.length === 0 || hypothesize.isPending) return;
     setResult(null);
+    setEnvelopeCopied(false);
     hypothesize.mutate(
-      { researchInput: trimmed, mode, dialogueMode: 'disabled' },
+      { researchInput: trimmed, mode, dialogueMode: 'disabled', grounded },
       { onSuccess: (data) => setResult(data) },
     );
   };
@@ -118,6 +122,17 @@ function ClaimTab() {
             {hypothesize.isPending ? t('assay.claim.running') : t('assay.claim.submit')}
           </Button>
         </div>
+        <label className="flex items-center gap-2 text-sm text-ink2">
+          <input
+            type="checkbox"
+            checked={grounded}
+            onChange={(evt) => setGrounded(evt.target.checked)}
+            className="h-4 w-4 accent-[var(--accent)] focus-visible:ring-2 focus-visible:ring-accent"
+            data-testid="assay-grounded"
+          />
+          {t('assay.claim.groundedLabel')}
+        </label>
+        <p className="-mt-2 text-xs text-ink3">{t('assay.claim.groundedHint')}</p>
       </form>
 
       {hypothesize.isError ? <ErrorBlock error={hypothesize.error} testId="assay-error" className="mt-4" /> : null}
@@ -175,6 +190,54 @@ function ClaimTab() {
               ) : null}
             </div>
           )}
+          <div className="mt-4 rounded border border-border bg-surface2/40 p-3" data-testid="envelope-panel">
+            {result.proofEnvelopeV2Status === 'sealed' && result.proofEnvelopeV2 != null ? (
+              <div>
+                <p className="mb-2 text-xs text-ink3">{t('assay.envelope.sealedNote')}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="envelope-copy"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(JSON.stringify(result.proofEnvelopeV2, null, 2)).then(() => {
+                        setEnvelopeCopied(true);
+                        window.setTimeout(() => setEnvelopeCopied(false), 1500);
+                      });
+                    }}
+                  >
+                    {envelopeCopied ? t('state.copied') : t('assay.envelope.copy')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="envelope-download"
+                    onClick={() => {
+                      const blob = new Blob([JSON.stringify(result.proofEnvelopeV2, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'proof-envelope-v2.json';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    {t('assay.envelope.download')}
+                  </Button>
+                  <Link
+                    to="/verify"
+                    className="text-xs text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    {t('assay.envelope.goVerify')}
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-warn" data-testid="envelope-skipped">
+                {t('assay.envelope.skipped')}{result.proofEnvelopeV2Note != null ? `：${result.proofEnvelopeV2Note}` : ''}
+              </p>
+            )}
+          </div>
         </Section>
       ) : null}
     </div>

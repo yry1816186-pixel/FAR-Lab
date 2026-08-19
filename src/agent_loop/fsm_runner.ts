@@ -154,6 +154,11 @@ export interface RunAgentLoopArgs {
    */
   readonly onEvent?: (evt: AgentLoopEvent) => void;
   /**
+   * R3（V2 信封生产者）：裁决计算观测回调（透传 runVerdictStage.onComputation）。
+   * 缺省 undefined → 零行为变化（字节等同基线·回归兼容）。
+   */
+  readonly onComputation?: (computation: import('./verdict_stage.ts').VerdictComputation) => void;
+  /**
    * IC-15 T1'（V2 裁决软建议）：上一次完整 runAgentLoop 调用的 verdict kind。
    * 可选；缺省 = undefined → stage6 prompt 不注入 verdict hint（字节等同基线·回归兼容）。
    * 仅传 5 值枚举本身；软建议非硬驱动（不触发自动 regen 循环，防 p-hacking）。
@@ -574,6 +579,7 @@ export async function runAgentLoop(args: RunAgentLoopArgs): Promise<LoopState> {
           artifacts,
           gitCommitSha: args.gitCommitSha,
           runId: args.runId,
+          ...(args.onComputation === undefined ? {} : { onComputation: args.onComputation }),
         });
         // P0-3 并行扩展阶段：主链收敛并产出裁决后，并发执行注册的扩展 executor
         // （order>6·独立分支·产物复用证据链/收据/事件语义）。扩展失败显式抛错

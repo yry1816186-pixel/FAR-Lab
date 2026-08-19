@@ -68,7 +68,7 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'math', budgetFiles: 16 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'planning', budgetFiles: 9 },
   { module: 'platform', budgetFiles: 5 },
-  { module: 'proof_envelope', budgetFiles: 12 },
+  { module: 'proof_envelope', budgetFiles: 13 },  // 依据: R3 复杂度租金——ask_envelope.ts(V2 信封生产构建器·D-2026-08-19-01 终结)入 v2/ 子域;对账为真实文件数,非阈值放松
   { module: 'release', budgetFiles: 5 },
   { module: 'report', budgetFiles: 8 },
   { module: 'research', budgetFiles: 39 },

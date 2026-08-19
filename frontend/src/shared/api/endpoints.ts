@@ -268,8 +268,9 @@ export function useHypothesize() {
   const queryClient = useQueryClient();
   return useMutation<HypothesizeResponse, Error, HypothesizeRequest>({
     mutationFn: async (body) => {
+      // R3：grounded 进幂等键——接地与否改变响应（信封有无），同键不复放异参结果。
       const idempotencyKey = fnvIdempotencyKey(
-        [body.researchInput, body.mode ?? '', body.dialogueMode ?? ''],
+        [body.researchInput, body.mode ?? '', body.dialogueMode ?? '', String(body.grounded ?? false)],
         'v1',
       );
       return parseV1Response<HypothesizeResponse>(

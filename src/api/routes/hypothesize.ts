@@ -23,6 +23,9 @@ import { executeLoop } from '../internal/loop_runner.ts';
 import { fetchHonestVerdictByEvidenceId } from '../internal/verdict_lookup.ts';
 import { extractHypothesisEvidenceId, buildSubtreeFromEvidence } from '../internal/hypothesis_helpers.ts';
 import { ApiError } from '../errors/error_handler.ts';
+import { buildAndSealAskEnvelope } from '../../proof_envelope/v2/ask_envelope.ts';
+import { createReplayAdapter } from '../../retrieval/index.ts';
+import { RESEARCH_DEMO_DOCS } from '../../research/research_fixtures.ts';
 import type { GraphSubtree, HypothesizeResponse } from '../types.ts';
 import type { AgentEventBus } from '../../agent_loop/events.ts';
 
@@ -46,6 +49,12 @@ const HypothesizeRequestSchema = z.object({
   researchInput: z.string().min(1).max(2000),
   mode: z.enum(['full', 'quick']).optional(),
   dialogueMode: z.enum(['disabled', 'enabled']).optional(),
+  /**
+   * R3：接地开关（opt-in）。true → 裁决前先跑文献接地（replay 模式用已提交的
+   * 重放语料·live 模式走真实源）——V2 证明信封的 datasetBinding 只有在接地运行
+   * 上才存在（RULE-004 fail-closed：未接地运行不产信封，如实说明）。
+   */
+  grounded: z.boolean().optional(),
   // 审计 P0-2：客户端幂等键（确定性生成·防双击/网络重试重复执行）。安全字符集 + 长度限制。
   idempotencyKey: z
     .string()
@@ -166,6 +175,9 @@ export async function registerHypothesizeRoute(
     }
 
     let loopResult: Awaited<ReturnType<typeof executeLoop>>;
+    // R3：裁决计算观测容器（onComputation 回调在 verdict 事务提交后点火一次）。
+    let capturedComputation: import('../../agent_loop/verdict_stage.ts').VerdictComputation | null = null;
+    const requestStartedAt = new Date().toISOString();
     try {
       loopResult = await executeLoop({
         researchInput: parsed.data.researchInput,
@@ -177,6 +189,23 @@ export async function registerHypothesizeRoute(
         ...(config.profile === undefined ? {} : { profile: config.profile }),
         ...(config.appendOptions === undefined ? {} : { appendOptions: config.appendOptions }),
         ...(config.eventBus === undefined ? {} : { onEvent: (evt) => config.eventBus?.emit(evt) }),
+        onComputation: (c) => {
+          capturedComputation = c;
+        },
+        // R3 接地（opt-in）：replay 面用已提交重放语料（hermetic·如实 replay 标注），
+        // live 面走真实源（live adapter 默认）。不接地在参数层面即不可能。
+        ...(parsed.data.grounded === true
+          ? {
+              grounding: {
+                question: parsed.data.researchInput,
+                source: 'openalex' as const,
+                maxPerQuery: 5,
+                ...(config.profile === undefined || config.profile === 'offline_replay'
+                  ? { adapter: createReplayAdapter('openalex', 'OpenAlex', RESEARCH_DEMO_DOCS) }
+                  : {}),
+              },
+            }
+          : {}),
       });
     } catch (err) {
       // 失败不残留 pending 占位——删除记录让重试可重新执行。
@@ -188,6 +217,37 @@ export async function registerHypothesizeRoute(
       throw err;
     }
     const { loopState, reproHash, runId, traceGrade } = loopResult;
+
+    // R3：V2 证明信封封存（断言检验路径的「产出→可独立验证」闭环）。
+    // 裁决计算在则尝试；validator FAIL（如未接地→RULE-004）→ fail-closed 不落库，
+    // 状态与原因如实进响应。信封失败绝不回滚裁决（派生产物纪律）。
+    let proofEnvelopeV2: import('../../proof_envelope/v2/types.ts').ProofEnvelopeV2 | null = null;
+    let proofEnvelopeV2Status: 'sealed' | 'skipped' = 'skipped';
+    let proofEnvelopeV2Note: string | null = null;
+    if (capturedComputation !== null) {
+      const seal = buildAndSealAskEnvelope(
+        config.db,
+        capturedComputation,
+        loopResult.grounding,
+        {
+          runId,
+          researchInput: parsed.data.researchInput,
+          reproHash,
+          gitCommitSha: config.gitCommitSha,
+          startedAt: requestStartedAt,
+          actor: 'api-hypothesize',
+          networkPolicy: config.gateway === undefined ? 'off' : 'allowlist',
+        },
+      );
+      if (seal.persisted) {
+        proofEnvelopeV2 = seal.envelope;
+        proofEnvelopeV2Status = 'sealed';
+      } else {
+        proofEnvelopeV2Note = seal.skipReason;
+      }
+    } else {
+      proofEnvelopeV2Note = 'no verdict computation captured (loop did not reach the verdict stage)';
+    }
 
     const hypothesisEvidenceId = extractHypothesisEvidenceId(config.db, loopState);
     const graphSubtree: GraphSubtree = hypothesisEvidenceId === null
@@ -206,6 +266,9 @@ export async function registerHypothesizeRoute(
       traceGrade,
       datasetSource: config.gateway === undefined ? 'replay' : 'real',
       providerProfile: config.profile ?? 'offline_replay',
+      proofEnvelopeV2,
+      proofEnvelopeV2Status,
+      proofEnvelopeV2Note,
     };
 
     // 幂等记录：规范化（JSON round-trip 保证重放字节一致）后持久化。

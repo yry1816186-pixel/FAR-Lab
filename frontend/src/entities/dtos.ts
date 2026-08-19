@@ -176,6 +176,11 @@ export interface HypothesizeRequest {
   readonly researchInput: string;
   readonly mode?: 'full' | 'quick';
   readonly dialogueMode?: 'disabled' | 'enabled';
+  /**
+   * R3：接地开关——true 时裁决前先跑文献接地（回放语料或真实源）。只有接地运行
+   * 才产 ProofEnvelopeV2（服务端 RULE-PE-004 fail-closed：未接地不产信封）。
+   */
+  readonly grounded?: boolean;
   /** Client-generated idempotency key (server replays same-key duplicates). */
   readonly idempotencyKey?: string;
 }
@@ -186,6 +191,13 @@ export interface HypothesizeResponse {
   readonly graphSubtree: GraphSubtree;
   readonly honestVerdict: VerdictNode | null;
   readonly reproHash: string;
+  /**
+   * R3：封存的 ProofEnvelopeV2（整体不透明传递——本页只复制/下载，不解读内部字段；
+   * 六维验证在 /verify 页进行）。null/缺席 = 未封存（原因见 note）。
+   */
+  readonly proofEnvelopeV2?: unknown;
+  readonly proofEnvelopeV2Status?: 'sealed' | 'skipped';
+  readonly proofEnvelopeV2Note?: string | null;
 }
 
 // ---------- Probes (bare root, no /api/v1 prefix) ----------

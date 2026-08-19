@@ -448,3 +448,6 @@ export interface ResearchPaperOutput {
 // 类型 re-export（供 stages/* 与 fsm_runner 引用）
 export type { SourceAnchor, VerdictNode } from '../falsifiability/types.ts';
 export type { LlmResponse } from '../llm_gateway/types.ts';
+// R3：裁决计算观测类型（onComputation 回调载荷）经契约文件导出——
+// kernel 侧（proof_envelope/v2/ask_envelope）只经本文件类型引用，R2 合规。
+export type { VerdictComputation } from './verdict_stage.ts';
