@@ -44,7 +44,8 @@ test('REL-COMPAT-001 真实源读取（续）: API 版本/export 格式交叉验
     info: { version: string };
   };
   assert.equal(readApiVersion(REPO_ROOT), openapi.info.version);
-  assert.match(readApiVersion(REPO_ROOT), /^\d{4}-\d{2}-\d{2}$/);
+  // 2026-08-20 起 info.version = package.json semver（SSOT·曾为硬编码日期会随发布漂移）
+  assert.match(readApiVersion(REPO_ROOT), /^\d+\.\d+\.\d+$/);
   assert.deepEqual([...readExportFormats(REPO_ROOT)], ['citations', 'far-proof', 'receipt', 'receipt-v2']);
 });
 

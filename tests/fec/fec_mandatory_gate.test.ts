@@ -290,7 +290,11 @@ test('mutation 边界: datasetRequirements=[] 单空 → EVIDENCE_REQUIREMENT_MI
 
 test('mutation 边界: 统计计划单字段 null → STAT_PLAN_MISSING（复合 is-missing 单支）', () => {
   const base = makeValidFec();
-  const fecNull = makeValidFec({ statisticalPlan: { ...base.statisticalPlan, nullHypothesis: null as unknown as string } });
+  // 经 JSON 往返注入 null（zero_tolerance 禁 as unknown as；单层 as typeof 是合规断言）
+  const planWithNull = JSON.parse(
+    JSON.stringify({ ...base.statisticalPlan, nullHypothesis: null }),
+  ) as typeof base.statisticalPlan;
+  const fecNull = makeValidFec({ statisticalPlan: planWithNull });
   const r1 = compileFec({ fec: fecNull });
   assert.ok(!r1.ok && r1.errors.some((e) => e.code === 'STAT_PLAN_MISSING'), 'nullHypothesis=null 须拒');
   const fecBlank = makeValidFec({ statisticalPlan: { ...base.statisticalPlan, primaryMetric: '   ' } });
