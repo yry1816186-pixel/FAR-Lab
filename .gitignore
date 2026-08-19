@@ -172,3 +172,6 @@ Thumbs.db
 src/llm_gateway/DIGEST.md
 .github/copilot-instructions.md
 .github/config.yml
+
+# --- Internal tooling (never tracked): 研发中枢套件源（.zcode/skills 为运行时副本）---
+far-lab-suite/

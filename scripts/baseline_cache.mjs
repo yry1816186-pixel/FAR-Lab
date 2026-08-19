@@ -29,7 +29,7 @@
 
 import { createHash } from 'node:crypto';
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import process from 'node:process';
@@ -68,15 +68,27 @@ function codeDirty() {
   return { dirty: relevant.length > 0, paths: relevant };
 }
 
-/** 对变更文件列表做内容聚合哈希（只读磁盘，含未提交修改；删除的文件用路径占位）。 */
+/** 对变更文件列表做内容聚合哈希（只读磁盘，含未提交修改；删除的文件用路径占位）。
+ *  未跟踪路径在 porcelain 中以目录形式出现（如 `src/vendor/`）——readFileSync 对
+ *  目录抛 EISDIR 会直接打断会话起手式，故目录展开为其包含的常规文件再哈希。 */
 function dirtyContentHash(paths) {
   const h = createHash('sha256');
-  const sorted = [...new Set(paths)].sort();
-  for (const p of sorted) {
+  const files = [];
+  for (const p of [...new Set(paths)].sort()) {
+    const abs = path.join(projectDir, p);
+    if (existsSync(abs) && statSync(abs).isDirectory()) {
+      for (const f of git(`ls-files --others --exclude-standard "${p}"`).split('\n').filter(Boolean)) {
+        files.push(f);
+      }
+    } else {
+      files.push(p);
+    }
+  }
+  for (const p of files.sort()) {
     h.update(p);
     h.update('\0');
     const abs = path.join(projectDir, p);
-    if (existsSync(abs)) {
+    if (existsSync(abs) && !statSync(abs).isDirectory()) {
       h.update(readFileSync(abs));
     } else {
       h.update('<deleted>');
