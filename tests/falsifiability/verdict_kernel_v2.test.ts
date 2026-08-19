@@ -646,3 +646,172 @@ test('R-causal guard: claimType=causal 但 confoundingGateResult 缺省 → no-o
   assert.equal(out.verdict, 'CONFIRMED');
   assert.equal(out.decisiveRuleId, 'R7_PRIMARY_TEST_CONFIRMS');
 });
+
+// ── 2026-08-20 mutation 盲区补杀（全位点跑出 54.5% 存活的偿还·逐状态 fixture）──
+// 本节 helpers：复用 GV-01 的 FEC 形状（fecId/claimId/metric/statPlan/threshold/powerPlan）。
+function baseFecOverrides(): Partial<FecContractV2> {
+  const sample = baseKernelInput();
+  if (sample.fec === null) return {};
+  return {
+    fecId: sample.fec.fecId,
+    claimId: sample.fec.claimId,
+    measurableImplication: sample.fec.measurableImplication,
+    metric: sample.fec.metric,
+    statisticalPlan: sample.fec.statisticalPlan,
+    direction: sample.fec.direction,
+    threshold: sample.fec.threshold,
+    ...(sample.fec.powerPlan !== undefined ? { powerPlan: sample.fec.powerPlan } : {}),
+  };
+}
+function primaryStat(overrides: Partial<StatisticalResult> = {}): StatisticalResult {
+  return {
+    testId: 'bls_power',
+    status: 'ran',
+    effectDirection: 'supports',
+    pValue: 0.003,
+    adjustedPValue: 0.003,
+    effectSizeObserved: 0.62,
+    confidenceInterval: [0.21, 0.95],
+    assumptionDiagnostics: [],
+    ...overrides,
+  };
+}
+// 根因：GV-01..GV-12 覆盖主路径，但 R7/R8 组合布尔的状态反相（underpowered/
+// insufficient/fail/warn/skipped/flags 非空/derivationForm 失配）大多未测。
+
+test('mutation 盲区: identifierClaims unresolved → UNTESTED / not_found → REFUTED（R-identifier 两向）', () => {
+  const unresolved = decideFiveValueVerdict(baseKernelInput({
+    identifierClaims: [{ kind: 'doi', value: '10.1/x', resolutionStatus: 'unresolved', harnessVerifiedSource: false }],
+  }));
+  assert.notEqual(unresolved.verdict, 'CONFIRMED', 'unresolved 不得 CONFIRMED（环境故障非伪造·UNTESTED 优先）');
+  assert.equal(unresolved.verdict, 'UNTESTED');
+  const fabricated = decideFiveValueVerdict(baseKernelInput({
+    identifierClaims: [{ kind: 'doi', value: '10.1/x', resolutionStatus: 'not_found', harnessVerifiedSource: false }],
+  }));
+  assert.equal(fabricated.verdict, 'REFUTED', 'not_found → 伪造信号 → REFUTED');
+});
+
+test('mutation 盲区: evidenceSufficiency.insufficient → 非 CONFIRMED（=== sufficient 位点）', () => {
+  const out = decideFiveValueVerdict(baseKernelInput({
+    evidenceSufficiency: { status: 'insufficient', powerStatus: 'adequate' },
+  }));
+  assert.notEqual(out.verdict, 'CONFIRMED', 'insufficient 不得 CONFIRMED（变异 === 后 insufficient 也放行）');
+});
+
+test('mutation 盲区: powerStatus=underpowered 双向（显著→CONFIRMED·不显著→R8 INCONCLUSIVE）', () => {
+  // 现行语义快照：统计显著本身证明 power 足够（underpowered 只能解释 null 结果），
+  // 故 R7 全绿 + underpowered → CONFIRMED；不显著 + underpowered → R8 INCONCLUSIVE。
+  const significant = decideFiveValueVerdict(baseKernelInput({
+    evidenceSufficiency: { status: 'sufficient', powerStatus: 'underpowered' },
+  }));
+  assert.equal(significant.verdict, 'CONFIRMED', '显著结果不受 powerStatus 贬低（R7 先于 R8）');
+  const nullResult = decideFiveValueVerdict(baseKernelInput({
+    statistics: [primaryStat({ pValue: 0.5, adjustedPValue: 0.5 })],
+    evidenceSufficiency: { status: 'sufficient', powerStatus: 'underpowered' },
+  }));
+  assert.equal(nullResult.verdict, 'INCONCLUSIVE', 'null 结果 + underpowered → R8（=== underpowered 位点）');
+});
+
+test('mutation 盲区: antiTheater fail → UNTESTED；warn → INCONCLUSIVE（severity 两向）', () => {
+  const failOut = decideFiveValueVerdict(baseKernelInput({
+    antiTheaterFindings: [{ kind: 'seed-cherry-picking', severity: 'fail' }],
+  }));
+  assert.equal(failOut.verdict, 'UNTESTED', 'fail 发现 → UNTESTED');
+  const warnOut = decideFiveValueVerdict(baseKernelInput({
+    antiTheaterFindings: [{ kind: 'seed-cherry-picking', severity: 'warn' }],
+  }));
+  assert.equal(warnOut.verdict, 'INCONCLUSIVE', 'warn 发现 → R8 INCONCLUSIVE');
+});
+
+test('mutation 盲区: integrityFlags 非空 → 非 CONFIRMED（R7 flags 门·length === 0 位点）', () => {
+  const out = decideFiveValueVerdict(baseKernelInput({
+    integrityFlags: ['p_hacking_risk'],
+  }));
+  assert.notEqual(out.verdict, 'CONFIRMED', 'integrityFlags 非空不得 CONFIRMED');
+});
+
+test('mutation 盲区: 全 skipped 统计 → 非 CONFIRMED（every skipped 位点）', () => {
+  const out = decideFiveValueVerdict(baseKernelInput({
+    statistics: [{
+      testId: 'bls_power', status: 'skipped', effectDirection: 'supports',
+      assumptionDiagnostics: [],
+    }],
+  }));
+  assert.notEqual(out.verdict, 'CONFIRMED', '全 skipped 不得 CONFIRMED');
+});
+
+test('mutation 盲区: effectSize < mde → 非 CONFIRMED（MDE 门两向）', () => {
+  // powerPlan.minimumDetectableEffect=0.5 > effectSize=0.2 → R7 效应量门拒。
+  const fec = makeValidFec(baseFecOverrides());
+  const out = decideFiveValueVerdict(baseKernelInput({
+    fec: { ...fec, powerPlan: { targetPower: 0.8, minimumDetectableEffect: 0.5, sampleSize: 120, powerMethod: 'ttest', alphaAssumed: 0.0125 } },
+    statistics: [primaryStat({ effectSizeObserved: 0.2 })],
+  }));
+  assert.notEqual(out.verdict, 'CONFIRMED', '效应量低于 MDE 不得 CONFIRMED（mde===undefined 位点变异会跳过该门）');
+});
+
+test('mutation 盲区: derivationForm 失配/匹配/缺省三向（formMismatch 链）', () => {
+  const withExpected = (expected: 'literal' | 'derived') => {
+    const fec = makeValidFec(baseFecOverrides());
+    return { ...fec, statisticalPlan: { ...fec.statisticalPlan, expectedDerivationForm: expected } };
+  };
+  // 失配：期望 literal、实际 derived → formMismatch → 降级非 CONFIRMED
+  const mismatch = decideFiveValueVerdict(baseKernelInput({
+    fec: withExpected('literal'),
+    statistics: [primaryStat({ derivationForm: 'derived' })],
+  }));
+  assert.notEqual(mismatch.verdict, 'CONFIRMED', 'derivationForm 失配（值相等也降级）');
+  // 全匹配：期望 literal、实际 literal → 通过
+  const match = decideFiveValueVerdict(baseKernelInput({
+    fec: withExpected('literal'),
+    statistics: [primaryStat({ derivationForm: 'literal' })],
+  }));
+  assert.equal(match.verdict, 'CONFIRMED', '全匹配必须放行（!== expectedForm 位点）');
+  // 统计侧缺省（无 derivationForm）+ 期望存在 → 不算失配
+  const absent = decideFiveValueVerdict(baseKernelInput({
+    fec: withExpected('literal'),
+  }));
+  assert.equal(absent.verdict, 'CONFIRMED', '统计侧缺省 derivationForm 不算失配（!== undefined 位点）');
+});
+
+test('mutation 盲区: 无 powerPlan → mde undefined 路径（report.effectSizeSufficient=null）', () => {
+  const fec = makeValidFec(baseFecOverrides());
+  const { powerPlan: _drop, ...fecNoPower } = fec;
+  const out = decideFiveValueVerdict(baseKernelInput({
+    fec: fecNoPower,
+  }));
+  assert.equal(out.verdict, 'CONFIRMED', '无 MDE 约束时显著支持仍 CONFIRMED（mde===undefined 放行）');
+});
+
+test('mutation 盲区: studyDesign 提供时输出证据质量层（=== undefined 位点）', () => {
+  const withDesign = decideFiveValueVerdict(baseKernelInput({
+    studyDesign: 'rct',
+  }));
+  const without = decideFiveValueVerdict(baseKernelInput());
+  // 提供与缺省的裁决必须一致（透明度层不进 verdict）
+  assert.equal(withDesign.verdict, without.verdict, 'META 层零回归');
+});
+
+test('mutation 盲区: protocolDeviations alpha_rewrite/metric_swap 附加 risk 旗标（d.kind 组合）', () => {
+  // critical 偏离 → R3 UNTESTED；此处测非 critical alpha_rewrite 附加 harking_risk 后的 R7 拒绝路径
+  // R3 critical 偏离 → UNTESTED；alpha_rewrite/metric_swap 附加对应风险旗标进输出
+  const alphaRewrite = decideFiveValueVerdict(baseKernelInput({
+    protocolDeviations: [{ kind: 'alpha_rewrite', severity: 'critical', details: 'alpha changed post-hoc' }],
+  }));
+  assert.equal(alphaRewrite.verdict, 'UNTESTED', 'critical 偏离 → R3 UNTESTED');
+  assert.ok(
+    alphaRewrite.integrityFlags.includes('harking_risk'),
+    `alpha_rewrite 须附加 harking_risk 旗标（输出 flags: ${JSON.stringify(alphaRewrite.integrityFlags)}）`,
+  );
+  const metricSwap = decideFiveValueVerdict(baseKernelInput({
+    protocolDeviations: [{ kind: 'metric_swap', severity: 'critical', details: 'metric swapped' }],
+  }));
+  assert.equal(metricSwap.verdict, 'UNTESTED');
+  assert.ok(metricSwap.integrityFlags.includes('p_hacking_risk'), 'metric_swap 须附加 p_hacking_risk');
+  // 对照：其他 critical 偏离不得误加 harking_risk（and→or 变异会误加 → 本断言杀之）
+  const lateExclusion = decideFiveValueVerdict(baseKernelInput({
+    protocolDeviations: [{ kind: 'late_exclusion', severity: 'critical', details: 'excluded post-hoc' }],
+  }));
+  assert.equal(lateExclusion.verdict, 'UNTESTED');
+  assert.ok(!lateExclusion.integrityFlags.includes('harking_risk'), 'late_exclusion 不得误加 harking_risk');
+});

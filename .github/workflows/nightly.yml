@@ -133,8 +133,9 @@ jobs:
       - name: gate · bundle_verifier（.far-proof 第三方重算面·74 位点全杀）
         run: node scripts/mutation_gate.mjs src/far_proof/bundle_verifier.ts tests/far_proof/bundle_verifier_hardening.test.ts --limit 100
       # monitor 档：未达标文件的存活率趋势（不阻断；补杀达标后移入 gate 档）。
-      # 2026-08-20 全位点基线：integrity_check 24.2% · fec/compiler 31.7% ·
-      # p_value 53.8% · verdict_kernel_v2 54.5%（治理债务已登记）。
+      # 2026-08-20 补杀后基线：integrity_check/fec/p_value 已达 0%（移入上方 gate 档的
+      # 候补）；verdict_kernel_v2 134 位点存活 47.0%（长尾状态分支债务·R5/R-causal/
+      # coverage/tolerance 边界 fixture 待补）。
       - name: monitor · integrity_check（趋势·非阻断）
         continue-on-error: true
         run: node scripts/mutation_gate.mjs src/far_proof/integrity_check.ts tests/far_proof/integrity_tamper.test.ts --limit 100 || true
