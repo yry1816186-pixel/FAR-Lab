@@ -359,15 +359,18 @@ test('mutation 盲区: integrity.json 校验层错误文本逐层断言（or_to_
 
     // 位点 3a/3b/3c：path/sha256/bytes 单字段类型无效 → 形状校验层
     rewrite((o) => {
-      ((o.files as { path: unknown }[])[0]).path = 123;
+      const entry0 = (o.files as { path: unknown }[])[0];
+      if (entry0 !== undefined) entry0.path = 123;
     });
     expectError('files[0] has invalid shape');
     rewrite((o) => {
-      ((o.files as { sha256: unknown }[])[0]).sha256 = null;
+      const entry0 = (o.files as { sha256: unknown }[])[0];
+      if (entry0 !== undefined) entry0.sha256 = null;
     });
     expectError('files[0] has invalid shape');
     rewrite((o) => {
-      ((o.files as { bytes: unknown }[])[0]).bytes = 'x';
+      const entry0 = (o.files as { bytes: unknown }[])[0];
+      if (entry0 !== undefined) entry0.bytes = 'x';
     });
     expectError('files[0] has invalid shape');
 
@@ -414,8 +417,10 @@ test('mutation 盲区: integrity.json 仅 bytes 字段失配须检出（内容�
     const integrityPath = join(dir, 'integrity.json');
     const original = readFileSync(integrityPath, 'utf8');
     const obj = JSON.parse(original) as { files: { path: string; sha256: string; bytes: number }[] };
+    const first = obj.files[0];
+    if (first === undefined) throw new Error('unreachable: demo bundle has files');
     // 篡改 bytes（保持 sha256 不变）→ sha 相等、bytes 失配 → or→and 变异下漏过
-    obj.files[0].bytes += 1;
+    first.bytes += 1;
     writeFileSync(integrityPath, `${JSON.stringify(obj)}\n`, 'utf8');
     const r = verifyFarProofPackageIntegrity(dir);
     assert.ok(

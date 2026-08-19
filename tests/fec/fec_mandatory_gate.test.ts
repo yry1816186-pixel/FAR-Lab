@@ -183,7 +183,7 @@ test('mutation 边界: alpha 恰为 0 / 1 → 拒（0 < alpha < 1 开区间）',
     const fec = makeValidFec({ statisticalPlan: { ...baseStatPlan(), alpha: badAlpha } });
     const result = compileFec({ fec });
     assert.ok(
-      result.errors.some((e) => e.code === 'STAT_PLAN_MISSING' && e.message.includes(`alpha=${badAlpha}`)),
+      !result.ok && result.errors.some((e) => e.code === 'STAT_PLAN_MISSING' && e.message.includes(`alpha=${badAlpha}`)),
       `alpha=${badAlpha} 须被拒（边界值本身非法）`,
     );
   }
@@ -225,14 +225,14 @@ test('mutation 边界: powerPlan sampleSize=1 / targetPower=0.5 恰好合法（�
       workflowRequirements: [{ name: 'w', engine: 'script', requireContainerDigest: false, requireCommandHash: false, expectedNetworkPolicy: 'off', requireFixedSeed: false }],
       metric: { ...baseMetric(), isDeterministic: true },
       requirePowerPlan: true,
-      powerPlan: { targetPower: 0.5, sampleSize: 1, alphaAssumed: 0.05 },
+      powerPlan: { targetPower: 0.5, minimumDetectableEffect: 0.2, sampleSize: 1, powerMethod: 'two-sample-t', alphaAssumed: 0.05 },
     }),
   });
-  assert.ok(okResult.ok, `sampleSize=1 + targetPower=0.5 必须通过（端点合法），实际: ${okResult.ok ? '' : JSON.stringify(okResult.errors.map((e) => e.code))}`);
+  assert.ok(okResult.ok, `sampleSize=1 + targetPower=0.5 必须通过（端点合法）${okResult.ok ? '' : `，实际: ${JSON.stringify(okResult.errors.map((e) => e.code))}`}`);
   // 对照：0 / 0.499 仍拒
-  const badSize = compileFec({ fec: makeValidFec({ requirePowerPlan: true, powerPlan: { targetPower: 0.8, sampleSize: 0, alphaAssumed: 0.05 } }) });
+  const badSize = compileFec({ fec: makeValidFec({ requirePowerPlan: true, powerPlan: { targetPower: 0.8, minimumDetectableEffect: 0.2, sampleSize: 0, powerMethod: 'two-sample-t', alphaAssumed: 0.05 } }) });
   assert.ok(!badSize.ok && badSize.errors.some((e) => e.code === 'POWER_PLAN_REQUIRED'), 'sampleSize=0 必须拒');
-  const badPower = compileFec({ fec: makeValidFec({ requirePowerPlan: true, powerPlan: { targetPower: 0.4999, sampleSize: 64, alphaAssumed: 0.05 } }) });
+  const badPower = compileFec({ fec: makeValidFec({ requirePowerPlan: true, powerPlan: { targetPower: 0.4999, minimumDetectableEffect: 0.2, sampleSize: 64, powerMethod: 'two-sample-t', alphaAssumed: 0.05 } }) });
   assert.ok(!badPower.ok && badPower.errors.some((e) => e.code === 'POWER_PLAN_REQUIRED'), 'targetPower<0.5 必须拒');
 });
 
@@ -240,7 +240,7 @@ test('mutation 边界: 仅 timeWindow 空白 → SCOPE_UNBOUNDED（复合 or 单
   const fec = makeValidFec({ scope: { ...baseScope(), timeWindow: '   ' } });
   const result = compileFec({ fec });
   assert.ok(
-    result.errors.some((e) => e.code === 'SCOPE_UNBOUNDED'),
+    !result.ok && result.errors.some((e) => e.code === 'SCOPE_UNBOUNDED'),
     '单字段空白必须拦截（or_to_and 变异下单支漏过）',
   );
 });
@@ -251,11 +251,11 @@ test('mutation 边界: 非确定 metric + 无固定种子要求 + seedPolicy.fix
   const fec = makeValidFec({
     workflowRequirements: [{ name: 'w', engine: 'script', requireContainerDigest: false, requireCommandHash: false, expectedNetworkPolicy: 'off', requireFixedSeed: false }],
     metric: { ...baseMetric(), isDeterministic: false },
-    seedPolicy: { fixed: false, seedValue: null, allowCherryPick: false },
+    seedPolicy: { fixed: false, allowCherryPick: false },
   });
   const result = compileFec({ fec });
   assert.ok(
-    result.errors.some((e) => e.code === 'PROTOCOL_INCOMPLETE'),
+    !result.ok && result.errors.some((e) => e.code === 'PROTOCOL_INCOMPLETE'),
     'metric 非确定性即涉及随机，fixed=false 必须报 PROTOCOL_INCOMPLETE',
   );
 });
