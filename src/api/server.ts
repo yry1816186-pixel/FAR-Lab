@@ -178,7 +178,16 @@ export async function buildServer(config: ApiServerConfig): Promise<FastifyInsta
   const { Sampler } = await import('../monitor/sampler.ts');
   const monitorSampler = new Sampler();
   monitorSampler.start();
+  // JSONL 落盘（架构 §2「定期落盘」）：默认开，FAR_MONITOR_PERSIST=off 显式关闭。
+  let monitorPersister: { detach(): void } | null = null;
+  if (process.env.FAR_MONITOR_PERSIST !== 'off') {
+    const { JsonlPersister } = await import('../monitor/persist.ts');
+    const persister = new JsonlPersister();
+    persister.attach(monitorSampler);
+    monitorPersister = persister;
+  }
   app.addHook('onClose', async () => {
+    monitorPersister?.detach();
     monitorSampler.stop();
   });
 

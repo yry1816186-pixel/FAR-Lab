@@ -388,6 +388,7 @@ export const SURFACE_MODULE_MAP: Readonly<Record<string, readonly string[]>> = {
   monitor: ['denial-of-service', 'privacy-insider'],
   planning: ['privacy-insider'],
   platform: ['denial-of-service', 'privacy-insider'],
+  plugins: ['sandbox-escape', 'supply-chain', 'denial-of-service'],
   proof_envelope: ['proof-tamper'],
   release: ['supply-chain'],
   report: ['model-exfiltration', 'privacy-insider'],

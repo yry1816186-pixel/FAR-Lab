@@ -79,6 +79,7 @@ const MD_ALLOWLIST = new Set([
   'golden_vectors/versioning/README.md',
   'schema/json/README.md', 'schema/migrations/README.md',
   'src/llm_gateway/adapters/openai_compatible/README.md',
+  'src/plugins/README.md',
   // 测试 fixture（requirements_registry 测试输入）
   'tests/scripts/fixtures/requirements_registry/CORE_CONSTITUTION.md',
   'tests/scripts/fixtures/requirements_registry/DOMAIN_PROTOCOLS.md',

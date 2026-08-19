@@ -66,9 +66,10 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'hardware', budgetFiles: 1 },
   { module: 'llm_gateway', budgetFiles: 29 },
   { module: 'math', budgetFiles: 16 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
-  { module: 'monitor', budgetFiles: 4 },  // 依据: 2026-08-19 v3.0 指令 Phase 3.3——collect.ts(node:os 采集)+alerts.ts(CPU>80% warn)+run_command.ts(far monitor)+sampler.ts(5s 常驻环形缓冲·永不抛异常守护);监控唯一净新增运行时,对账为真实文件数
+  { module: 'monitor', budgetFiles: 5 },  // 依据: 2026-08-19 v3.0 指令 Phase 3.3——collect+alerts+run_command+sampler+persist(JSONL 落盘·架构 §2 最后一环·单文件轮转零依赖);监控唯一净新增运行时,对账为真实文件数
   { module: 'planning', budgetFiles: 9 },
   { module: 'platform', budgetFiles: 7 },  // 依据: 2026-08-19 复杂度租金——dotenv.ts(CLI 入口 .env 水合)+design_tokens.ts(v3.0 指令 Phase 2·设计 Token SSOT·三范式语义色单一事实源·Web CSS 双源漂移有契约测试锁定);对账为真实文件数,非阈值放松
+  { module: 'plugins', budgetFiles: 6 },  // 依据: 2026-08-19 OSS-PLUGIN-001/SDK-001——manifest.ts(zod SSOT)+sandbox.ts(子进程隔离宿主侧)+runner.ts(子进程内侧·vm 确定性消毒)+registry.ts(哈希锚定注册)+conformance.ts(五类 Acceptance 探针)+sdk.ts(第三方构建入口);消费者=tests/plugins 5 文件,非无主注册表;对账为真实文件数
   { module: 'proof_envelope', budgetFiles: 13 },  // 依据: R3 复杂度租金——ask_envelope.ts(V2 信封生产构建器·D-2026-08-19-01 终结)入 v2/ 子域;对账为真实文件数,非阈值放松
   { module: 'release', budgetFiles: 5 },
   { module: 'report', budgetFiles: 8 },
