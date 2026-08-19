@@ -35,6 +35,7 @@ import stableStringify from 'fast-json-stable-stringify';
 
 import type { VerdictComputation } from '../../agent_loop/types.ts';
 import { computeChainMerkleRoot } from '../../evidence_log/merkle_root.ts';
+import { VERDICT_SEMANTICS_DECLARATION } from '../../falsifiability/verdict_semantics.ts';
 import { computeFecHash } from '../../fec/compiler.ts';
 import { sealProofEnvelopeV2 } from './sealer.ts';
 import type {
@@ -56,9 +57,11 @@ export interface GroundingAnchor {
 /** 内核版本字符串（verdictTrace metadata·锁定 R0-R9 语义代际）。 */
 export const ASK_ENVELOPE_KERNEL_VERSION = 'far.verdict_kernel.v2.r0-r9';
 
-/** R0-R9 固定优先级声明（verdict_kernel_v2.ts §6 F2 文档化锁死）的哈希输入。 */
-const RULE_PRIORITY_DECLARATION =
-  'DEGRADED_SCOPE>REFUTED>INCONCLUSIVE>CONFIRMED>UNTESTED';
+/**
+ * 五值语义合同声明(C-1 修复: 歧义「固定优先级」字符串不再入封条)。
+ * 哈希输入 = VERDICT_SEMANTICS_DECLARATION(含合同版本号; 语义轴 = 值序/规则序/支持度序)。
+ */
+const RULE_PRIORITY_DECLARATION = VERDICT_SEMANTICS_DECLARATION;
 
 function sha256Hex(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');

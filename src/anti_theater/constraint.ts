@@ -40,6 +40,8 @@ type ForcedVerdict = 'REFUTED' | 'DEGRADED_SCOPE' | 'UNTESTED' | 'INCONCLUSIVE';
  * 支持度（claim 友好度·高=支持 / 低=否定·D17）。anti-theater 只降级（支持度递减）。
  * 依据 03 §6.1 原则 1（UNTESTED 支持度 1 < INCONCLUSIVE 2·UNTESTED 更否定）+ 原则 2（REFUTED 支持度
  * 最低 0·不被洗白）+ R0-R9 决策树（UNTESTED R0-R3 先判=最严）。
+ * C-1 对齐: 本表 = 五值语义合同(verdict_semantics.ts)的「支持度序」轴, 与「值序」(展示)和
+ * 「规则序」(决策表)正交——反剧场只降级, 不参与规则触发顺序。
  */
 const SUPPORT_RANK: Readonly<Record<Verdict, number>> = {
   CONFIRMED: 4,

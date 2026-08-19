@@ -3,7 +3,11 @@
  *
  * 核心契约（F1-F9 红线）：
  *   - **全程无 LLM**：verdict 由 deterministic rule trace 产出，LLM evidence 不得直接升 CONFIRMED/REFUTED（F3）。
- *   - **R0-R9 固定优先级**：DEGRADED_SCOPE > REFUTED > INCONCLUSIVE > CONFIRMED > UNTESTED（§6 F2 锁死）。
+ *   - **五值语义三轴(单一合同·C-1)**: 值序(展示/文档严重度序)DEGRADED_SCOPE > REFUTED > INCONCLUSIVE >
+ *     CONFIRMED > UNTESTED ≠ 规则序(决策表实现权威·首条决定性规则胜出·R0→R9 顺序扫描)。
+ *     R5_CONTRADICTORY_SIGNIFICANT_EVIDENCE(→INCONCLUSIVE)在 R6_PRIMARY_TEST_REFUTES(→REFUTED)
+ *     之前触发——矛盾显著证据 → INCONCLUSIVE 是保守设计, 不是「REFUTED 优先」。三轴权威定义见
+ *     verdict_semantics.ts(合同版本号进信封 rulePriorityTableHash 哈希输入)。
  *   - **首条决定性规则胜出**：tie-break sort evidence by (evidenceId, sourceHash), tests by testId（§6.3）。
  *   - **浮点容差 1e-7**：所有 verdict-critical 数值比较用同一容差（§7.3 line 892 + APPENDIX_B §4.1）。
  *
@@ -290,7 +294,8 @@ export interface VerdictKernelOutput {
 /**
  * decideFiveValueVerdictInternal —— 确定性五值裁决核心（§7.3·R0-R9 决策树·与历史字节一致）。
  * 被公共包装 decideFiveValueVerdict 调用；分离是为了附加证据质量透明度层（零回归）。
- * 全程无 LLM；按 R0..R9 固定优先级，首条决定性规则胜出。
+ * 全程无 LLM；按规则序（verdict_semantics.RULE_ORDER 合同）首条决定性规则胜出。
+ * complexity-exempt: R0-R9 顺序决策表单函数实现——规则序即合同，拆分将切断「首条决定性规则胜出」的顺序可读性。复杂度 24 为 HEAD 存量值，2026-08-19 头注释扩行致基线行号键漂移，依豁免通道显式登记。
  */
 export function decideFiveValueVerdictInternal(input: VerdictKernelInput): VerdictKernelOutput {
   // ─────────────────────────────────────────────────────────────────────────────
