@@ -30,7 +30,7 @@
 
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import stableStringify from 'fast-json-stable-stringify';
+import canonicalize from '../vendor/canonicalize.js';
 
 import { appendRecord } from '../evidence_log/repository.ts';
 import type { ProvenanceReceipt } from './provenance.ts';
@@ -66,9 +66,7 @@ export interface RunSummaryReceiptProjection {
 }
 
 function canonical(value: unknown): string {
-  const s = stableStringify(value);
-  if (s === undefined) throw new Error('evidence_chain_bridge: stable stringify returned undefined');
-  return s;
+  return canonicalize(value);
 }
 
 /** ResearchRun → 稳定投影（仅收冻结后不变的字段）。 */

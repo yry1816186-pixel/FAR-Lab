@@ -11,7 +11,7 @@
  *   M2. Merkle 篡改敏感性：proof 中任一 sibling 单字符翻转 → verify === false
  *       （篡改证据：leaf 或 sibling 任一字节变即根不匹配）
  *   M3. Merkle 根确定性：同叶集 → 同根（跨调用幂等）
- *   M4. canonical 键序无关：同对象不同键插入序 → canonicalJson 字节相等（fast-json-stable-stringify 性质）
+ *   M4. canonical 键序无关：同对象不同键插入序 → canonicalJson 字节相等（RFC 8785 canonicalize 性质）
  *   M5. canonical round-trip：canonicalJson(JSON.parse(canonicalJson(x))) === canonicalJson(x)（幂等）
  *   M6. canonical 拒 NaN/Infinity：含非有限数 → 抛错（fail-closed）
  *

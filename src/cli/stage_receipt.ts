@@ -27,7 +27,7 @@ export function computeStageReceipt(prevReceipt: string, stageOutput: unknown): 
   if (prevReceipt.length === 0) {
     throw new Error('computeStageReceipt: prevReceipt 不能为空（链首须用 GENESIS_RECEIPT）');
   }
-  // 真实依赖：hashCanonicalJson 内部 stableStringify + sha256（确定性 key 排序、UTF-8、无空格）。
+  // 真实依赖：hashCanonicalJson 内部 RFC 8785 canonicalize + sha256（确定性 key 排序、UTF-8、无空格）。
   const outputHash = hashCanonicalJson(stageOutput as Record<string, unknown>);
   return createHash('sha256').update(`${prevReceipt}${outputHash}`, 'utf8').digest('hex');
 }

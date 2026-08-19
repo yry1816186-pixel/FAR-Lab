@@ -7,7 +7,7 @@
  *
  * IRG-009: "Two verifiers" can share a common-mode defect. This verifier
  * re-implements canonical JSON + sha256 from Node.js primitives (NOT reusing
- * the producer's fast-json-stable-stringify or canonicalJson from evidence_log/hasher.ts)
+ * the producer's vendored canonicalize or canonicalJson from evidence_log/hasher.ts)
  * to detect common-mode canonicalization/hash defects.
  *
  * 模型中立 · 零容忍合规.
@@ -107,7 +107,7 @@ export function verifyIndependence(decl: IndependenceDeclaration): IndependenceV
 
 /**
  * Independent canonical JSON serialization.
- * Does NOT reuse producer's fast-json-stable-stringify or canonicalJson.
+ * Does NOT reuse producer's vendored canonicalize (RFC 8785) or canonicalJson.
  * Sorts keys lexicographically (UTF-16 code-unit order), no whitespace.
  */
 export function independentCanonicalJson(value: unknown): string {

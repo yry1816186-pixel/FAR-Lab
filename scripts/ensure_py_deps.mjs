@@ -12,7 +12,7 @@ const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
 const pythonDepsDir = resolve(repoRoot, '.python-deps');
 const reproDir = resolve(repoRoot, 'repro');
 // 核心必装模块（缺则 ensure_py_deps 自动 pip install 进 .python-deps/）。
-const requiredModules = ['threadpoolctl', 'numpy', 'sympy', 'z3'];
+const requiredModules = ['threadpoolctl', 'numpy', 'sympy', 'z3', 'rfc8785'];
 // 可选 science 模块（C-ASTRO / Phase 5 真实取数）。重依赖，**不**自动安装——
 // 仅探测并报告可用性，缺失走 cached_fixture 降级（02 F1），非错误。
 const optionalModules = ['lightkurve', 'astroquery'];

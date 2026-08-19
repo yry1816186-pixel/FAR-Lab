@@ -16,7 +16,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import stableStringify from 'fast-json-stable-stringify';
+import canonicalize from '../vendor/canonicalize.js';
 import { z } from 'zod';
 
 import { detectCachedSecret } from '../retrieval/cache.ts';
@@ -138,11 +138,7 @@ export class TapeVersionDriftError extends Error {
 
 function canonicalJson(value: unknown, context: string): string {
   assertCanonicalJsonValue(value, context);
-  const canonical = stableStringify(value);
-  if (canonical === undefined) {
-    throw new Error(`${context}: value is not canonical-JSON serializable`);
-  }
-  return canonical;
+  return canonicalize(value);
 }
 
 function sha256Text(value: string): string {

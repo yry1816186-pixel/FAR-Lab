@@ -5,11 +5,11 @@
  *   V1 proofHash = TS 侧 self-check（sealer 计算 + verifyProofHash 重算同一 computeProofHash）。
  *   「第三方跨语言独立重算」需 Python proof envelope 镜像（repro/far_chain_repro/，V2+ 路线图）；
  *   V1 仅保证 TS 自洽（seal→verify 一致），跨语言 byte-equal 待 V2+ Python 镜像落地。
- *   算法复用 L0 canonicalHash（09 §3「不新增 hash 算法」）：fast-json-stable-stringify + sha256。
+ *   算法复用 L0 canonicalHash（09 §3「不新增 hash 算法」）：RFC 8785 canonicalize（vendor）+ sha256。
  *
  * 关键:
  *   - Python 侧: json.dumps(separators=(',',':'), ensure_ascii=False, sort_keys=True)
- *   - TS 侧: fast-json-stable-stringify (no spaces, consistent key ordering)
+ *   - TS 侧: vendored canonicalize@4.0.0 (RFC 8785 JCS: no spaces, consistent key ordering)
  *   - 两者只对有序值数组产生相同输出
  *   - proofHash 字段本身从计算中排除 (self-excluding hash)
  *   - checks/knownFailures 主动排序（见 computeProofHash 内）= V1 防御性序列化，
@@ -22,7 +22,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import stableStringify from 'fast-json-stable-stringify';
+import canonicalize from '../vendor/canonicalize.js';
 import { compareStringsDeterministic } from '../evidence_log/hasher.ts';
 import type { ProofEnvelope } from './types.ts';
 
@@ -31,7 +31,7 @@ import type { ProofEnvelope } from './types.ts';
  * 排除 proofHash 字段自身,对剩余字段做 canonical_json → sha256。
  *
  * 与 Python canonical_hash 对齐:
- *   - separators: no whitespace between keys/values (fast-json-stable-stringify default)
+ *   - separators: no whitespace between keys/values (RFC 8785 JCS)
  *   - sort_keys: consistent key ordering
  *   - ensure_ascii=False: Unicode 直传 (TS JSON 默认 UTF-8)
  */
@@ -49,15 +49,11 @@ export function computeProofHash(envelope: Omit<ProofEnvelope, 'proofHash'>): st
 
   const sortedFailures = [...knownFailures].sort(compareStringsDeterministic);
 
-  const canonical = stableStringify({
+  const canonical = canonicalize({
     ...rest,
     checks: sortedChecks,
     knownFailures: sortedFailures,
   });
-
-  if (canonical === undefined) {
-    throw new Error('computeProofHash: stable stringify returned undefined');
-  }
 
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }

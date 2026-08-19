@@ -18,7 +18,7 @@
  *     Record<string, unknown>，故包一层 key：hashCanonicalJson({ metric: input.fec.metric })，
  *     与 frozen 端 primaryMetricHash 的冻结口径一致（frozen 端在 deterministic_freezer 处用同口径
  *     产 primaryMetricHash）。MetricSpec 全字段（metricKey/description/unit/computationRef/isDeterministic）
- *     为 JSON 可序列化纯数据（fec_contract.ts:104-111），fast-json-stable-stringify 按键序排序确定性序列化。
+ *     为 JSON 可序列化纯数据（fec_contract.ts:104-111），RFC 8785 canonicalize（vendor）按键序排序确定性序列化。
  *   - frozen hash 来源：preregistrationRecord.primaryMetricHash（types.ts:261）。
  *   - 误报率=0 保证：hash 比对是密码学精确比较（64-hex sha256），无误报空间；NaN/Infinity 在
  *     hashCanonicalJson 内 assertNoNonFiniteNumber 直接 throw（hasher.ts:41-61），不静默放过。

@@ -31,7 +31,7 @@
 
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import stableStringify from 'fast-json-stable-stringify';
+import canonicalize from '../../vendor/canonicalize.js';
 
 import type { VerdictComputation } from '../../agent_loop/types.ts';
 import { computeChainMerkleRoot } from '../../evidence_log/merkle_root.ts';
@@ -68,9 +68,7 @@ function sha256Hex(text: string): string {
 }
 
 function canonical(value: unknown): string {
-  const s = stableStringify(value);
-  if (s === undefined) throw new Error('ask_envelope: stable stringify returned undefined');
-  return s;
+  return canonicalize(value);
 }
 
 /** 空输入的真实 sha256（stdout/stderr 未捕获时的诚实值——空输出的真实哈希）。 */

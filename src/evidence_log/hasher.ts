@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import stableStringify from 'fast-json-stable-stringify';
+import canonicalize from '../vendor/canonicalize.js';
 import type { CanonicalInput, VerifiedCanonicalInput } from './types.ts';
 
 /**
@@ -20,18 +20,18 @@ export function canonicalHash(input: CanonicalInput): string {
 
 /**
  * canonical hash verified.
+ * Uses RFC 8785 JSON Canonicalization Scheme (JCS) via `canonicalize`.
+ * Replaces the former `fast-json-stable-stringify` which only sorted keys
+ * but did not perform RFC 8785-compliant number serialization.
  */
 export function canonicalHashVerified(input: VerifiedCanonicalInput): string {
   assertNoNonFiniteNumber(input, 'CanonicalInput');
-  const canonical = stableStringify(input);
-  if (canonical === undefined) {
-    throw new Error('canonicalHash: stable stringify returned undefined');
-  }
+  const canonical = canonicalize(input);
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
 /**
- * hash canonical json.
+ * hash canonical json (RFC 8785 JCS).
  */
 export function hashCanonicalJson(value: unknown): string {
   const canonical = canonicalJson(value, 'hashCanonicalJson');
@@ -39,15 +39,11 @@ export function hashCanonicalJson(value: unknown): string {
 }
 
 /**
- * canonical json.
+ * canonical json (RFC 8785 JCS).
  */
 export function canonicalJson(value: unknown, context = 'canonicalJson'): string {
   assertNoNonFiniteNumber(value, context);
-  const canonical = stableStringify(value);
-  if (canonical === undefined) {
-    throw new Error(`${context}: stable stringify returned undefined`);
-  }
-  return canonical;
+  return canonicalize(value);
 }
 
 /**

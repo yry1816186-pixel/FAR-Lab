@@ -20,7 +20,7 @@
  *   - 伪代码 canonical_hash(threshold, direction, thresholdSemantics) 三参数散列，TS 无对应三参 API。
  *     适配为单对象 canonical JSON 散列 hashCanonicalJson({threshold, direction, thresholdSemantics})。
  *     注意：threshold 是完整 ThresholdSpec 对象（含 value/unit/thresholdSemantics/rangeUpper?/preregistered），
- *     rangeUpper optional 字段在 canonical JSON 中条件展开（hasher.ts fast-json-stable-stringify 按键序排序，
+ *     rangeUpper optional 字段在 canonical JSON 中条件展开（hasher.ts RFC 8785 canonicalize 按键序排序，
  *     undefined 字段不序列化·确定性）。伪代码原文仅取 threshold.thresholdSemantics 作为第三独立参数，
  *     但 threshold 对象本身已含 thresholdSemantics——按裁决以完整 threshold 对象 + direction + thresholdSemantics
  *     三元组入散列，与 frozen 端 thresholdHash 的冻结口径一致（frozen 端在 deterministic_freezer 处用同口径产 thresholdHash）。

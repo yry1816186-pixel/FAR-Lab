@@ -3,7 +3,7 @@
  *
  * 目标分支：
  *   - proof_hash.ts:47（tie-breaker：同 ruleId 不同 outcome 的 checks 排序确定性）
- *   - proof_hash.ts:59-60（stableStringify===undefined 防御性 throw·不可达代码·跳过）
+ *   - proof_hash.ts 旧 stableStringify===undefined 防御性 throw 已随 RFC 8785 迁移移除（canonicalize 不返回 undefined）
  *
  * 零容忍：无 any / @ts-ignore / 空 catch / 桩。
  */

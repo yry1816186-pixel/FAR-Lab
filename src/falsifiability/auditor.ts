@@ -174,7 +174,7 @@ export function auditContract(
     const eventId = ulid();
 
     // Canonical envelope hash: prevHash 并入哈希内容（保留链语义——任一前序事件变更 → prevHash 变 → 本哈希变）。
-    // 全字段经 hashCanonicalJson（fast-json-stable-stringify 排序 key + 拒 NaN/Infinity + 拒 undefined），
+    // 全字段经 hashCanonicalJson（RFC 8785 canonicalize 排序 key + 拒 NaN/Infinity + 拒 undefined），
     // 与 evidence_log canonicalHash 同一确定性契约，消除裸 JSON.stringify 的 key 顺序不确定性与
     // 中文 detail 在 TS(raw UTF-8) / Python(ensure_ascii=True 默认转义) 间的序列化差异。
     const currentHash = hashCanonicalJson({

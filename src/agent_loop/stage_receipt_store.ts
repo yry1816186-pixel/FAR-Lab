@@ -17,7 +17,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import stableStringify from 'fast-json-stable-stringify';
+import canonicalize from '../vendor/canonicalize.js';
 import { assertAgentWriteAllowed } from './guards.ts';
 import type { StageArtifact } from './types.ts';
 
@@ -54,9 +54,7 @@ function sha256Hex(text: string): string {
 }
 
 function canonical(value: unknown): string {
-  const s = stableStringify(value);
-  if (s === undefined) throw new Error('stage_receipt_store: stable stringify returned undefined');
-  return s;
+  return canonicalize(value);
 }
 
 /**

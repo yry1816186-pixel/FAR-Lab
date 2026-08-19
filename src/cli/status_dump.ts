@@ -250,7 +250,7 @@ export function toStatusJson(dump: StatusDump, generatedAt = new Date().toISOStr
       verdictCount: dump.verdictGoldenVectorCount,
       reproContextFixtureExpectedHex: dump.goldenReproFixtureHex,
       crossLangByteEqual: 'verified',
-      numericKnownDivergence: ['NUMERIC_KNOWN_DIVERGENCE: scientific-notation / >2^53 boundaries remain V3 JCS work'],
+      numericKnownDivergence: ['NUMERIC_JCS_CONVERGENCE: scientific-notation byte-equal since V3 RFC 8785 migration (2026-08-20)'],
     },
     capabilities: {
       canonicalHash: 'IMPLEMENTED_VERIFIED',

@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import stableStringify from 'fast-json-stable-stringify';
+import canonicalize from '../../src/vendor/canonicalize.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -42,8 +42,8 @@ function forgeEventHash(input: {
   targetKind: string; targetId: string; fromState: string; toState: string;
   actor: string; reason: string; prevHash: string;
 }): string {
-  const canonical = stableStringify(input);
-  return createHash('sha256').update(canonical as string, 'utf8').digest('hex');
+  const canonical = canonicalize(input);
+  return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
 test('V05-F3 孤对 surrogate 写入侧 fail-closed(actor/reason/targetId)', () => {

@@ -257,18 +257,21 @@ export const THREAT_SURFACES: readonly ThreatSurface[] = [
     id: 'supply-chain',
     title: '依赖/供应链（撤包/投毒/许可证）',
     facets: ['dependency/supply chain'],
-    assets: ['package.json', 'pnpm-lock.yaml', 'scripts/license_audit.mjs', 'src/security/dependency_risk.ts'],
+    assets: ['package.json', 'pnpm-lock.yaml', 'scripts/license_audit.mjs', 'src/security/dependency_risk.ts', 'src/vendor/LICENSE-canonicalize', 'src/vendor/canonicalize.js'],
     actors: ['被攻陷的 npm 包维护者', '恶意传递依赖', '许可证违规引入者'],
     trustBoundary: 'node_modules/* 第三方代码与本仓库代码同级运行——依赖代码不受信任。',
     abuseCases: [
       { id: 'SC-1', case: 'event-stream 式投毒：维护权转移后的依赖更新植入恶意代码', severity: 'high' },
-      { id: 'SC-2', case: 'xz 式潜伏：传递依赖长期维护后注入后门', severity: 'high' },
+      { id: 'SC-2', case: 'xz 式潜伏：传递依赖长期注入后门', severity: 'high' },
       { id: 'SC-3', case: '引入 GPL 依赖污染 MIT 分发（许可证合规）', severity: 'medium' },
+      { id: 'SC-4', case: 'vendor 副本被篡改：src/vendor 内逐字节复制的第三方库被本地修改后与上游语义漂移', severity: 'medium' },
     ],
     mitigations: [
       { asset: 'pnpm-lock.yaml', note: '锁定版本 + sha512 integrity + overrides 钉住（brace-expansion 等）' },
       { asset: 'scripts/license_audit.mjs', note: '发布前许可证门禁——copyleft/unknown → exit 1' },
       { asset: 'src/security/dependency_risk.ts', note: 'SEC-DEPENDENCY-001：inventory + 撤包演练（爆炸半径扫描）+ SBOM' },
+      { asset: 'src/vendor/LICENSE-canonicalize', note: 'vendor 副本携带上游 Apache-2.0 全文——许可证合规随源分发' },
+      { asset: 'src/vendor/canonicalize.js', note: 'vendor 快照与 npm canonicalize@4.0.0 逐字节一致（diff 验证入库）；升级=重新 diff+登记，禁止本地魔改' },
     ],
     residualRisk: 'lockfile 锁不住维护者已在历史版本植入的代码（只能锁增量）；integrity 校验不审计代码内容本身.',
     owner: 'far-compliance-counsel 角色',
@@ -402,6 +405,7 @@ export const SURFACE_MODULE_MAP: Readonly<Record<string, readonly string[]>> = {
   statistics: ['proof-tamper'],
   trace: ['proof-tamper'],
   v2_domain: ['proof-tamper'],
+  vendor: ['supply-chain', 'proof-tamper'],
   validation: ['deserialization'],
 };
 

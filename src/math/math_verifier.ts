@@ -355,7 +355,7 @@ export class MathVerifier {
  *
  * Root cause (audit [F] / Red Line #5): JS Number does not distinguish int/float
  * (1.0 === 1) → JSON.stringify(1.0)="1"; Python float → json.dumps(1.0)="1.0".
- * fast-json-stable-stringify (hashCanonicalJson 底层) and Python json.dumps diverge
+ * canonicalize (hashCanonicalJson 底层, RFC 8785) 与 Python rfc8785 曾在指数形式分歧（迁移前）
  * on integer-valued floats → computeInputHash byte-diverges when confidence===1.0.
  *
  * Strategy: fixed-point 6 decimals (toFixed(6) / Python f"{c:.6f}") — fixed-point

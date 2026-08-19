@@ -84,6 +84,9 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'trace', budgetFiles: 3 },
   { module: 'v2_domain', budgetFiles: 7 },
   { module: 'validation', budgetFiles: 1 },
+  // vendor：第三方库逐字节副本（canonicalize@4.0.0, Apache-2.0）——文件数冻结即冻结，
+  // 任何新增 = 供应链决策，必须走 borrow_registry + license_audit，不走复杂度豁免。
+  { module: 'vendor', budgetFiles: 2 },
 ];
 
 export interface FileOverage {

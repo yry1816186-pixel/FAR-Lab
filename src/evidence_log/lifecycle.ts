@@ -22,7 +22,7 @@
 import type Database from 'better-sqlite3';
 import { ulid } from 'ulid';
 import { createHash } from 'node:crypto';
-import stableStringify from 'fast-json-stable-stringify';
+import canonicalize from '../vendor/canonicalize.js';
 
 /** Constant: LIFECYCLE_STATES. */
 export const LIFECYCLE_STATES = ['active', 'contested', 'corrected', 'retracted', 'superseded'] as const;
@@ -140,10 +140,7 @@ export function computeEventHash(input: {
   readonly reason: string;
   readonly prevHash: string;
 }): string {
-  const canonical = stableStringify(input);
-  if (canonical === undefined) {
-    throw new Error('lifecycle.computeEventHash: stable stringify returned undefined');
-  }
+  const canonical = canonicalize(input);
   return createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 

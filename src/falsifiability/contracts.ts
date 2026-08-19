@@ -96,7 +96,7 @@ export function registerContract(
   const population = input.population ?? 'unknown';
 
   // 预注册哈希 = sha256(canonical JSON of 所有不可变输入)。
-  // hashCanonicalJson：fast-json-stable-stringify 排序 key + 拒 NaN/Infinity + 拒 undefined，
+  // hashCanonicalJson：RFC 8785 canonicalize（vendor）排序 key + 拒 NaN/Infinity + 拒 undefined，
   // 与 evidence_log canonicalHash 同一确定性契约——F8 反 p-hacking 锁须可由独立方重算验证。
   const preregistrationHash = hashCanonicalJson({
     contractId,

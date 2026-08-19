@@ -6,11 +6,11 @@
  *   2. 断言 FEC 一致性：envelope.fecHash === computeFecHash(envelope.fecSnapshot)
  *      （computeFecHash 排除 freeze.fecHash·自引用规避·fec/compiler.ts）
  *   3. 断言无 NaN/Infinity（canonicalJson 内置 assertNoNonFiniteNumber）
- *   4. canonical 序列化（fast-json-stable-stringify·§1）
+ *   4. canonical 序列化（RFC 8785 canonicalize·§1）
  *   5. sha256 → 64 hex 小写
  *
  * 跨语言 byte-equal（RULE-PE-010·APPENDIX_C §1.9）：
- *   TS fast-json-stable-stringify ↔ Python json.dumps(sort_keys=True, ensure_ascii=False, separators=(",",":"))
+ *   TS canonicalize (RFC 8785) ↔ Python rfc8785 包（2026-08-20 起；迁移前为 json.dumps sort_keys）
  *   在四字段白名单对象上已实证 byte-equal。Python 镜像见 repro/far_chain_repro/proof_hash.py。
  *
  * 关键裁决：metadata（kernelVersion/rulePriorityTableHash/proofHashInputs）在 verdictTrace 内，

@@ -235,22 +235,37 @@ export const NUMERIC_GREEN_VECTORS: ReadonlyArray<{
   },
 ];
 
-// 真实可观测的跨语言序列化格式鸿沟（day-0 PoC RED，证据驱动）。
-// 经 stdin-harness 实测，唯一能跨 JSON 传输保留的差异是【指数表示法格式】（TS 不补零 / Python 补零）。
-// 如实锁定 TS!==Python 作为 V3 RFC 8785 JCS 迁移的回归基线（迁移后此测试需更新为 byte-equal）。禁伪造绿。
-/** Constant: NUMERIC_KNOWN_DIVERGENCE. */
-export const NUMERIC_KNOWN_DIVERGENCE: ReadonlyArray<{
+// V3 RFC 8785 JCS 收敛向量（2026-08-20 迁移收尾）。
+// day-0 PoC 曾在此锁定 TS fast-json-stable-stringify !== Py json.dumps 的指数格式分歧
+// （TS "1e-7" / Py "1e-07"）作为迁移回归基线；两侧切换 RFC 8785（TS vendored
+// canonicalize@4.0.0 / Py rfc8785 包）后收敛为 byte-equal，测试断言同步翻转。
+// 残余域差异（诚实边界）：Py rfc8785 对 >2^53 整数抛 IntegerDomainError（fail-closed），
+// JS 侧在 JSON.parse 时已规约为 double——但经 stdin-harness 双向传输后两侧值相同，
+// 故不构成可观测分歧；信任根 cred 全 string 域不触及数值边界。
+/** Constant: NUMERIC_JCS_CONVERGENCE. */
+export const NUMERIC_JCS_CONVERGENCE: ReadonlyArray<{
   readonly name: string;
   readonly obj: Record<string, unknown>;
-  readonly tsSerial: string;
-  readonly pySerial: string;
   readonly note: string;
 }> = [
   {
     name: 'N2b_sci_1e-7',
     obj: { n: 1e-7 },
-    tsSerial: '{"n":1e-7}',
-    pySerial: '{"n":1e-07}',
-    note: '指数表示法零填充：TS fast-json-stable-stringify "1e-7" / Py json.dumps "1e-07"',
+    note: '指数表示法零填充：迁移前 TS "1e-7" / Py json.dumps "1e-07" 分歧；RFC 8785 两侧均 "1e-7"',
+  },
+  {
+    name: 'N2c_sci_1e21',
+    obj: { n: 1e21 },
+    note: '大指数形式：RFC 8785 两侧均 "1e+21"',
+  },
+  {
+    name: 'N2d_sci_1.5e300',
+    obj: { n: 1.5e300 },
+    note: '极值尾数+指数：RFC 8785 两侧均 "1.5e+300"',
+  },
+  {
+    name: 'N2e_fixed_0.000001',
+    obj: { n: 0.000001 },
+    note: '定点/指数切换边界（1e-6 定点、1e-7 指数）：RFC 8785 两侧均 "0.000001"',
   },
 ];

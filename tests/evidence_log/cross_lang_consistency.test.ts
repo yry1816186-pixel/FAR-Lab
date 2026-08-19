@@ -17,7 +17,7 @@ import {
 // NUMERIC_* 为 test-only 常量（数值域跨语言对拍专用），不从公共 API 导出——直接引用定义源。
 import {
   NUMERIC_GREEN_VECTORS,
-  NUMERIC_KNOWN_DIVERGENCE,
+  NUMERIC_JCS_CONVERGENCE,
 } from '../../src/evidence_log/golden_vectors.ts';
 import { PYTHON_SPAWN_TIMEOUT_MS, buildPythonPath, pythonSpawnFailureMessage } from '../_helpers/python.ts';
 
@@ -107,7 +107,7 @@ test('canonicalHash rejects non-finite numbers before JSON serialization', () =>
 
 test('numeric green vectors: TS hashCanonicalJson === Python (day-0 PoC byte-equal)', () => {
   // golden_vectors 必须含数值样本对拍（禁纯字符串占位蒙混）。
-  // GREEN 项经 hashCanonicalJson 数值序列化路径，TS fast-json-stable-stringify === Python json.dumps byte-equal。
+  // GREEN 项经 hashCanonicalJson 数值序列化路径，TS canonicalize (RFC 8785) === Python rfc8785 byte-equal。
   for (const v of NUMERIC_GREEN_VECTORS) {
     const tsHex = hashCanonicalJson(v.obj);
     const pyHex = runPythonCanonical(v.obj, 'hash');
@@ -117,17 +117,14 @@ test('numeric green vectors: TS hashCanonicalJson === Python (day-0 PoC byte-equ
 
 test('V2 clean-room independentCanonicalJson === Python canonical_json (no shared canonicalizer)', () => {
   // PS-04 (world-class parity): the V2 independent verifier re-implements
-  // canonical JSON from Node primitives (NOT the producer's
-  // fast-json-stable-stringify). It must still produce byte-identical
-  // canonical JSON and sha256 to the Python repro axis — this is the
-  // clean-room cross-language consistency proof.
+  // canonical JSON from Node primitives (NOT the producer's canonicalize).
+  // It must still produce byte-identical canonical JSON and sha256 to the
+  // Python repro axis — this is the clean-room cross-language consistency proof.
   const samples: Record<string, unknown>[] = [
     { a: true, b: [1, 2, { c: 'x', d: null }], c: 3.5 },
     { z: '中文测试', a: { nested: [1.5, -0, 'x'], flag: false }, empty: {}, arr: [] },
-    // NOTE: 1e-7 (V8 "1e-7") vs 1e-07 (Python) is a KNOWN divergence (N2b,
-    // V3 RFC 8785 JCS target) — excluded here; clean-room parity scope is the
-    // string/object/number-identical domain.
-    { s: 'nested "quotes" \\ backslash \n newline', n: -0, f: 1.25, t: [true, false, null] },
+    // 1e-7 自 V3 RFC 8785 迁移起两侧收敛（曾为已知分歧 N2b，V8 "1e-7" vs Py "1e-07"）。
+    { s: 'nested "quotes" \\ backslash \n newline', n: -0, f: 1.25, t: [true, false, null], sci: 1e-7 },
     { deep: { deeper: { deepest: { value: 42, list: [{ k: 'v' }, []] } } } },
   ];
   for (const [i, obj] of samples.entries()) {
@@ -143,14 +140,17 @@ test('V2 clean-room independentCanonicalJson === Python canonical_json (no share
   }
 });
 
-test('numeric known-divergence: TS !== Python (day-0 PoC red, V3 RFC 8785 JCS target)', () => {
-  // §74 day-0 PoC 红→数值域 byte-equal 部分不可达：
-  //   N1 浮点整数化（1.0→"1" vs "1.0"）/ N2b 科学计数零填充（1e-7 vs 1e-07）/ N3 >2^53 IEEE754 丢精度。
-  // canonicalHash 信任根（T3 白名单 cred 全 string）不碰数值，故信任根 byte-equal 不受影响。
-  // 如实锁定 TS!==Python 作为 V3 RFC 8785 JCS 迁移回归基线（迁移后此测试需更新为 byte-equal）。禁伪造绿。
-  for (const v of NUMERIC_KNOWN_DIVERGENCE) {
+test('numeric JCS convergence: TS === Python byte-equal (V3 RFC 8785 迁移收尾翻转)', () => {
+  // §74 day-0 PoC 曾在此锁定 RED（N2b 指数零填充 1e-7 vs 1e-07）作为迁移基线。
+  // 2026-08-20 V3 RFC 8785 JCS 迁移完成：TS vendored canonicalize@4.0.0 ↔ Py rfc8785
+  // 包，断言翻转为 byte-equal。若此测试失败=RFC 8785 轴回退（如 Python 侧静默
+  // fallback 到 json.dumps——canonical_json.py 的 WARNING 即此信号）。禁伪造绿。
+  for (const v of NUMERIC_JCS_CONVERGENCE) {
     const tsStr = canonicalJson(v.obj);
     const pyStr = runPythonCanonical(v.obj, 'str');
-    assert.notEqual(tsStr, pyStr, `${v.name} (${v.note}): expected known divergence, got equal`);
+    assert.equal(tsStr, pyStr, `${v.name} (${v.note}): expected RFC 8785 byte-equal, got divergence`);
+    const tsHex = hashCanonicalJson(v.obj);
+    const pyHex = runPythonCanonical(v.obj, 'hash');
+    assert.equal(tsHex, pyHex, `${v.name}: hash must be byte-equal when serialization is`);
   }
 });

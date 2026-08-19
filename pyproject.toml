@@ -12,6 +12,10 @@ dependencies = [
     "numpy>=1.24,<3.0",
     "sympy>=1.13,<2.0",
     "z3-solver>=4.13,<5.0",
+    # RFC 8785 JCS 规范序列化——跨语言 canonical_hash byte-equal 契约的 Python 轴。
+    # 缺失时 far_chain_repro.canonical_json 降级 json.dumps(sort_keys)（非 RFC 8785，
+    # 浮点指数形式有已知字节差异），故列为核心依赖而非可选。
+    "rfc8785>=0.1,<0.2",
 ]
 
 [project.optional-dependencies]

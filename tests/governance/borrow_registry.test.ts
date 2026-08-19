@@ -37,7 +37,8 @@ function makeRecord(overrides: Partial<BorrowRecord> = {}): BorrowRecord {
 test('real inventory: every production dependency in package.json has a borrow record with valid on-disk evidence', () => {
   const pkg = JSON.parse(readPkg()) as { dependencies: Record<string, string> };
   const deps = Object.keys(pkg.dependencies);
-  assert.ok(deps.length >= 13, 'production dependency set sanity');
+  // 2026-08-20：fast-json-stable-stringify 移除（RFC 8785 canonicalize vendor 取代）→ 12。
+  assert.ok(deps.length >= 12, 'production dependency set sanity');
   const check = checkBorrowDiscipline(BORROW_INVENTORY, REPO_ROOT, deps);
   assert.deepEqual(
     { unrecorded: check.unrecorded, broken: check.brokenEvidence, thin: check.thinComparisons },

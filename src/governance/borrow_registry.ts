@@ -109,14 +109,25 @@ export const BORROW_INVENTORY: readonly BorrowRecord[] = [
   },
   {
     technology: 'fast-json-stable-stringify',
-    usedFor: '规范 JSON 序列化（哈希链 contentHash 的确定性编码——键序无关）',
+    usedFor: '规范 JSON 序列化（哈希链 contentHash 的确定性编码——键序无关）。2026-08-20 起被 canonicalize（RFC 8785）取代并从 dependencies 移除；记录保留作决策史',
     alternativesConsidered: [
       { name: 'JSON.stringify + 手工递归排序', whyRejected: '哈希 SSOT 不容实现漂移；库实现被 evidence_log 全链测试锁定' },
-      { name: 'canonicalize', whyRejected: '维护不活跃；fast-json-stable-stringify 是该 niche 的长期事实标准' },
+      { name: 'canonicalize', whyRejected: '当时（2026-03）评估：维护不活跃——2026-08-20 翻案，见 canonicalize 记录（RFC 8785 合规需求 + vendor 字节钉住压过维护活跃度顾虑）' },
     ],
     trialEvidence: ['src:src/evidence_log/hasher.ts', 'tests:tests/evidence_log'],
     decision: 'adopted',
     decidedAt: '2026-03-12',
+  },
+  {
+    technology: 'canonicalize',
+    usedFor: 'RFC 8785 JCS 规范 JSON 序列化——信任内核 canonicalHash SSOT（evidence_log/agent_loop/lifecycle 哈希链 + 浏览器侧独立验证镜像）。取代 fast-json-stable-stringify：第三方审计方可用任意 RFC 8785 实现（Python rfc8785 / Go jcs 等）独立重算 contentHash，不再绑定 JS niche 库的行为',
+    alternativesConsidered: [
+      { name: '维持 fast-json-stable-stringify', whyRejected: '非 RFC 8785 实现——「独立重算」承诺依赖单一 JS 库行为；跨语言 byte-equal 无法对齐标准（Py json.dumps 1e-07 vs TS 1e-7 已知分歧）' },
+      { name: '自研 RFC 8785 序列化器', whyRejected: '数字最短表示/UTF-16 排序等边角极易做错；上游已有规范实现，自研=无租金复杂度' },
+    ],
+    trialEvidence: ['src:src/vendor/canonicalize.js', 'src:src/evidence_log/hasher.ts', 'tests:tests/golden_vectors'],
+    decision: 'adopted',
+    decidedAt: '2026-08-20',
   },
   {
     technology: 'zod-to-json-schema',
