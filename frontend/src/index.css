@@ -101,6 +101,13 @@
   .hash-wrap {
     word-break: break-all;
   }
+
+  /* REDESIGN_V2 编辑排版层：标题宋体系（系统字栈，零下载，守离线纪律）。
+     衬线对比是"人手感"的最大单一杠杆；中文严禁伪斜体（musepool 硬规则）。 */
+  .font-display {
+    font-family: 'Noto Serif SC', 'Songti SC', 'STSong', 'Source Han Serif SC', Georgia, 'Times New Roman', serif;
+    letter-spacing: -0.01em;
+  }
 }
 
 @layer components {

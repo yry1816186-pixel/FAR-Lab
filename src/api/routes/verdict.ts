@@ -51,6 +51,13 @@ export interface HonestVerdictDto {
   readonly updatedAt: string;
   /** B3：A1 决策路径追踪（透明度层·可选·A1 前旧行无此字段）。 */
   readonly decisionTrace: unknown;
+  /**
+   * 三视图字段一致性（指令 Phase 4.3）：内核 reasonCodes/decisiveRuleId 透传到 API 面——
+   * 修复前 dto 仅透传嵌套 decisionTrace 解释对象，内核规则码在 API 呈现层被丢弃
+   * （Web 无法展示「哪条规则决定了裁决」= 三视图逻辑断链）。additive 字段，旧行兜底。
+   */
+  readonly reasonCodes: readonly string[];
+  readonly decisiveRuleId: string | null;
 }
 
 /**
@@ -77,6 +84,9 @@ export function toHonestVerdictDto(node: HonestVerdictNode): HonestVerdictDto {
     // B3：透传 A1 decisionTrace（node.verdictTrace 来自 getVerdict 解析 verdict_trace_json·
     // 可选字段·旧行 undefined）。
     decisionTrace: node.verdictTrace.decisionTrace ?? null,
+    // 三视图一致性：内核规则码透传（additive；旧行 verdictTrace 字段可选，兜底空/ null）。
+    reasonCodes: node.verdictTrace.reasonCodes ?? [],
+    decisiveRuleId: node.verdictTrace.decisiveRuleId ?? null,
   };
 }
 

@@ -69,7 +69,7 @@ test('L5 时钟回拨 10 年 + Date 构造器冻结：15 GV 判决与基线 cano
         super(...(args as ConstructorParameters<typeof realDate>));
       }
     }
-    static now(): number {
+    static override now(): number {
       return FROZEN;
     }
   }
@@ -84,16 +84,37 @@ test('L5 时钟回拨 10 年 + Date 构造器冻结：15 GV 判决与基线 cano
 
 test('L5 随机源污染：Math.random 换递增伪源 + crypto.getRandomValues 填充确定性字节 → 判决全同', () => {
   const realRandom = Math.random;
+  const crypto = globalThis.crypto;
+  const originalGetRandomValues = Object.getOwnPropertyDescriptor(crypto, 'getRandomValues');
   let seq = 0;
   Math.random = () => {
     seq += 1;
     return (seq % 1000) / 1000; // 确定性但"内容丰富"的伪随机序列
   };
+  Object.defineProperty(crypto, 'getRandomValues', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: (bytes: Uint8Array): Uint8Array => {
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = (i + 1) & 0xff;
+      }
+      return bytes;
+    },
+  });
   try {
+    const sample = new Uint8Array(4);
+    crypto.getRandomValues(sample);
+    assert.deepEqual([...sample], [1, 2, 3, 4], 'crypto 注入必须实际返回确定性字节');
     const fp = verdictFingerprint(fullDump());
     assert.equal(fp, BASELINE_FP, '随机源污染后判决指纹漂移——裁决依赖了随机数');
   } finally {
     Math.random = realRandom;
+    if (originalGetRandomValues === undefined) {
+      Reflect.deleteProperty(crypto, 'getRandomValues');
+    } else {
+      Object.defineProperty(crypto, 'getRandomValues', originalGetRandomValues);
+    }
   }
 });
 
@@ -111,7 +132,6 @@ test('L5 乱序逐条重放（伪随机 shuffle × 3 轮）：每轮判决与基
     }
     const dump = collectVerifyGoldenDump({ backend: 'node', caseIds: order });
     assert.equal(dump.status, 'PASS');
-    const fp = canonicalJson(dump.cases.map((c) => ({ id: c.caseId, v: c.verdict, r: c.decisiveRuleId, codes: [...c.reasonCodes].sort() })));
     // 逐条重放的集合指纹应与基线同集（canonical 按 dump 顺序——caseIds 传入顺序保留？
     // collect 按目录序还是传入序：做集合等价断言（排序后比较），顺序无关性正是被测属性。
     const baselineSet = canonicalJson(BASELINE.cases.map((c) => ({ id: c.caseId, v: c.verdict, r: c.decisiveRuleId, codes: [...c.reasonCodes].sort() })).sort((a, b) => (a.id < b.id ? -1 : 1)));

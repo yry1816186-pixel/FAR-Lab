@@ -69,3 +69,12 @@ export function lifecycleTone(state: string): 'ok' | 'danger' | 'info' | 'muted'
   if (state === 'CANCELLED') return 'muted';
   return 'info';
 }
+
+/** 状态点颜色（REDESIGN_V2 发丝线流水用——CSS 变量语义色，非裸 hex）。 */
+export function lifecycleDot(state: string): string {
+  const tone = lifecycleTone(state);
+  if (tone === 'ok') return 'var(--ok)';
+  if (tone === 'danger') return 'var(--danger)';
+  if (tone === 'muted') return 'var(--ink-3)';
+  return 'var(--info)';
+}

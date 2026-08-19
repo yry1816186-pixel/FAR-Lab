@@ -5,7 +5,7 @@
 // 轮转触发与行边界完整（超限保留尾部·无半行）· fs 异常吞噬计数（守护不倒灌）·
 // attach 幂等（重复 attach 不双重写入）· detach 后不再写。
 
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { strict as assert } from 'node:assert';
@@ -102,21 +102,24 @@ test('persister: 轮转——超 maxBytes 保留尾部且每行仍完整可解�
   });
 });
 
-test('persister: fs 异常吞噬计数（路径不可写——守护不倒灌宿主）', () => {
-  const p = new JsonlPersister({ path: join('Z:', 'nonexistent-drive-9x7', 'deep', 'samples.jsonl') });
-  const s = new Sampler({ collectFn: () => fakeSample() });
-  // attach 的 mkdir 在 Windows 不存在盘符上抛错—— attach 前包一层验证吞噬纪律只覆盖 onSample：
-  // mkdir 失败属配置错误应显式抛出（fail-fast 配置层），onSample 失败才吞噬（运行层）。
-  try {
-    p.attach(s);
-  } catch {
-    // 配置层 fail-fast 合法——本测试走另一路径：attach 成功后运行期故障
-    return;
-  }
-  s.start();
-  s.stop();
-  p.detach();
-  assert.ok(p.failureCount >= 1 || p.writtenCount === 0, '运行期故障必须计数或零写入，不得无声成功');
+test('persister: fs 异常吞噬计数（运行期目录被替换为文件——守护不倒灌宿主）', () => {
+  withTempDir((dir) => {
+    const parent = join(dir, 'data');
+    const path = join(parent, 'samples.jsonl');
+    const p = new JsonlPersister({ path });
+    const s = new Sampler({ collectFn: () => fakeSample() });
+    p.attach(s); // 配置层 fail-fast 合法（mkdir 失败显式抛出），本测试针对运行层
+    // 运行期故障注入：父目录删除并以同名**文件**替换 → appendFileSync 必失败
+    // （ENOTDIR，全平台确定性，副作用限于临时目录——不得用盘符/系统路径注入：
+    //  曾以 'Z:' 注入，Windows 下被当相对目录在 repo 根创建垃圾树，已清除）。
+    rmSync(parent, { recursive: true, force: true });
+    writeFileSync(parent, 'not a directory', 'utf8');
+    s.start();
+    s.stop();
+    p.detach();
+    assert.equal(p.writtenCount, 0, '故障路径不得有写入');
+    assert.ok(p.failureCount >= 1, '运行期故障必须吞噬并计数，不得倒灌');
+  });
 });
 
 test('persister: attach 幂等（重复 attach 不双重写入）+ detach 后停写', () => {

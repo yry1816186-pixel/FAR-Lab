@@ -226,7 +226,10 @@ function renderHuman(args: AskArgs, render: AskRender): void {
   } else {
     lines.push('  verdict  : <verdict stage not reached>');
   }
-  const ls = render.intermediateVerdicts.length > 0 ? render.intermediateVerdicts.join(' → ') : '';
+  const ls =
+    render.intermediateVerdicts.length > 0
+      ? render.intermediateVerdicts.map((v) => verdictText(v)).join(' → ')
+      : '';
   if (ls !== '') {
     lines.push(`  iter verdicts : ${ls}  (deterministic kernel per iteration)`);
   }

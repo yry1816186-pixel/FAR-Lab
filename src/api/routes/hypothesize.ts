@@ -23,6 +23,7 @@ import { executeLoop } from '../internal/loop_runner.ts';
 import { fetchHonestVerdictByEvidenceId } from '../internal/verdict_lookup.ts';
 import { extractHypothesisEvidenceId, buildSubtreeFromEvidence } from '../internal/hypothesis_helpers.ts';
 import { ApiError } from '../errors/error_handler.ts';
+import { BailianHttpError, ProviderError } from '../../llm_gateway/fallback_chain/errors.ts';
 import { buildAndSealAskEnvelope } from '../../proof_envelope/v2/ask_envelope.ts';
 import { createReplayAdapter } from '../../retrieval/index.ts';
 import { RESEARCH_DEMO_DOCS } from '../../research/research_fixtures.ts';
@@ -213,6 +214,19 @@ export async function registerHypothesizeRoute(
         config.db
           .prepare(`DELETE FROM hypothesize_idempotency WHERE idempotency_key = ?`)
           .run(idemKey);
+      }
+      // Provider 传输层失败（HTTP 4xx/5xx、超时、网络）→ 503 fail-closed + 可行动指引，
+      // 不得扁平化成裸 500（裸 500 不给用户下一步——曾实测 arrearage 账户在此路径
+      // 输出无信息的 "internal server error"）。模型中立：不携带 provider 名/密钥形状。
+      if (err instanceof ProviderError) {
+        const status = err instanceof BailianHttpError ? err.status : null;
+        throw new ApiError({
+          statusCode: 503,
+          errorCode: 'LLM_PROVIDER_FAILED',
+          message:
+            `live model provider request failed${status !== null ? ` (HTTP ${status})` : ''}. ` +
+            'Check the configured API key and account status (quota/balance), or run with an offline profile. No verdict was fabricated.',
+        });
       }
       throw err;
     }

@@ -23,12 +23,14 @@ const RUN_ROW = {
 };
 
 describe('HomePage', () => {
-  it('renders the three primary actions and a real recent-missions list', async () => {
+  it('renders the claim workbench and a real recent-checks list', async () => {
     stubFetch((url) => (url === '/api/v1/research' ? okJson({ runs: [RUN_ROW] }) : undefined));
     renderWithProviders(<HomePage />, ['/']);
 
-    expect(screen.getByRole('link', { name: /断言检验/ })).toHaveAttribute('href', '/assay');
-    expect(screen.getByRole('link', { name: /验证证明包/ })).toHaveAttribute('href', '/verify');
+    // 工作台主角：断言输入 + 运行判定（产品链 flow-web F1 契约——首屏即干活）
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    expect(screen.getByTestId('workbench-submit')).toBeInTheDocument();
+    // 最近核验发丝线流水：真实数据 + 真实路由
     expect(await screen.findByText(RUN_ROW.question)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Does microplastic/ })).toHaveAttribute('href', '/missions/run-1');
   });
@@ -36,7 +38,7 @@ describe('HomePage', () => {
   it('shows the honest empty state for a fresh store', async () => {
     stubFetch((url) => (url === '/api/v1/research' ? okJson({ runs: [] }) : undefined));
     renderWithProviders(<HomePage />, ['/']);
-    expect(await screen.findByText(/还没有研究任务/)).toBeInTheDocument();
+    expect(await screen.findByText(/还没有核验记录/)).toBeInTheDocument();
   });
 });
 

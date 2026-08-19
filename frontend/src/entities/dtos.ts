@@ -122,6 +122,10 @@ export interface HonestVerdictDto {
   readonly updatedAt: string;
   /** Decision-path trace (transparency layer); null on pre-trace rows. */
   readonly decisionTrace: unknown;
+  /** Kernel rule codes (three-surface consistency, Phase 4.3); empty on legacy rows. */
+  readonly reasonCodes: readonly string[];
+  /** Kernel decisive rule id; null on legacy rows. */
+  readonly decisiveRuleId: string | null;
 }
 
 /** Raw VerdictNode inside POST /api/v1/hypothesize. Authority: src/falsifiability/types.ts. */

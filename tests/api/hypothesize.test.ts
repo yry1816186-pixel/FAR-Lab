@@ -269,3 +269,57 @@ test('POST /api/v1/hypothesize 幂等：pending 状态 → 409 IDEMPOTENCY_PENDI
 // 注：executeLoop 失败清理分支（hypothesize.ts line 141-148）正常路径不可达——
 // runAgentLoop（fsm_runner.ts:501-558）catch 全部错误并转 LoopState.error（不 throw）→
 // executeLoop 恒不 throw → hypothesize catch 分支是防御性代码（runAgentLoop 错误处理已覆盖）。
+
+
+// ---------------------------------------------------------------------------
+// Provider 失败 → 503 fail-closed 映射（裸 500 修复的判别锁）
+// 缺陷背景：arrearage 等 provider 传输层失败曾被扁平化为无信息的
+// "internal server error"（HTTP 500）——用户拿不到下一步。修复后：
+// ProviderError → 503 LLM_PROVIDER_FAILED + 可行动指引 + 模型中立（不带 provider 名）。
+// ---------------------------------------------------------------------------
+
+test('POST /api/v1/hypothesize: provider HTTP 失败 → 503 + 指引，不裸 500 不泄密', async () => {
+  const db = openDb();
+  const { BailianHttpError } = await import('../../src/llm_gateway/fallback_chain/errors.ts');
+  const { createLlmGateway } = await import('../../src/llm_gateway/gateway.ts');
+  const failingGateway = createLlmGateway([
+    {
+      profile: 'competition_aliyun_qwen',
+      call: () => {
+        throw new BailianHttpError(400, null, 'http_400 Arrearage: account overdue');
+      },
+    },
+  ]);
+  const app = await buildServer({
+    db,
+    gitCommitSha: 'a'.repeat(40),
+    jwtSecret: null,
+    gateway: failingGateway,
+    profile: 'competition_aliyun_qwen',
+    modelSnapshot: 'test-provider-fail-snapshot',
+    logger: false,
+  });
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/hypothesize',
+      payload: {
+        researchInput: 'On the TESS exoplanet sample, planet radius correlates with log10(insolation).',
+        mode: 'quick',
+        dialogueMode: 'disabled',
+        grounded: false,
+        idempotencyKey: 'provider-fail-test-0001',
+      },
+    });
+    assert.equal(response.statusCode, 503, `provider 失败必须 fail-closed 503，不得裸 500: ${response.body}`);
+    const body = response.json() as { error_code: string; message: string };
+    assert.equal(body.error_code, 'LLM_PROVIDER_FAILED');
+    assert.ok(body.message.includes('offline'), '必须给可行动下一步（offline profile 指引）');
+    assert.ok(body.message.includes('HTTP 400'), 'HTTP 状态应保留（诊断价值）');
+    // 模型中立红线：不得携带 provider 品牌字面量/密钥形状
+    assert.ok(!/dashscope|bailian|qwen|sk-/i.test(body.message), `消息泄漏 provider 信息: ${body.message}`);
+  } finally {
+    await app.close();
+    db.close();
+  }
+});
