@@ -41,6 +41,7 @@ frontend/0/
 
 # --- AI tooling & agent local state（本地编码工具配置不进入公开仓库）---
 AGENTS.md
+FARLAB_MISSION.md
 CLAUDE.md
 CLAUDE.local.md
 CLAUDE.local.example.md

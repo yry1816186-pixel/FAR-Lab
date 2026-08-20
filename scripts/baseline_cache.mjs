@@ -43,9 +43,11 @@ const CACHE_PATH = path.join(projectDir, '.far', 'state', 'baseline-cache.json')
 
 function git(args) {
   try {
+    // 只剥尾部换行，不 trim 行首：porcelain 首行以 ' M ' 开头，整体 trim 会把
+    // 该前导空格吃掉，导致 codeDirty 里 slice(3) 切错路径（首个脏文件永远漏检）。
     return execSync(`git ${args}`, {
       cwd: projectDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000,
-    }).trim();
+    }).replace(/\s+$/, '');
   } catch {
     return '';
   }
