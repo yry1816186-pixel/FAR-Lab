@@ -138,10 +138,9 @@ jobs:
         run: node scripts/mutation_gate.mjs src/fec/compiler.ts tests/fec/fec_mandatory_gate.test.ts --limit 500
       - name: gate · p_value（统计 p 值·8 杀+5 等价登记）
         run: node scripts/mutation_gate.mjs src/statistics/p_value.ts tests/statistics/p_value_boundaries.test.ts --limit 100
-      # monitor 档：未达标文件的存活率趋势（不阻断；补杀达标后移入 gate 档）。
-      # 2026-08-20 补杀后基线：integrity_check/fec/p_value 已达 0%（移入上方 gate 档的
-      # 候补）；verdict_kernel_v2 134 位点存活 47.0%（长尾状态分支债务·R5/R-causal/
-      # coverage/tolerance 边界 fixture 待补）。
-      - name: monitor · verdict_kernel_v2（趋势·非阻断·裁决内核债务）
-        continue-on-error: true
-        run: node scripts/mutation_gate.mjs src/falsifiability/verdict_kernel_v2.ts tests/falsifiability/verdict_kernel_v2.test.ts --limit 100 || true
+      # 2026-08-20 批次 2/3 补杀后 verdict_kernel_v2 从 monitor 档毕业：134 位点
+      # （129+1 杀 / 4 等价登记 / 0 存活·kill 率 99.2%）。多测试文件挂载是必要的：
+      # decisionTrace/exec_fingerprint/identifier/formMismatch/GRADE 各自的 feature 面
+      # 测试与主 golden-vector 文件互补——单文件挂载曾把真实覆盖率低估为 47% 存活。
+      - name: gate · verdict_kernel_v2（五值裁决内核·130 杀+4 等价登记·0 存活）
+        run: node scripts/mutation_gate.mjs src/falsifiability/verdict_kernel_v2.ts tests/falsifiability/verdict_kernel_v2.test.ts tests/falsifiability/decision_trace.test.ts tests/science_harness/exec_fingerprint.test.ts tests/falsifiability/identifier_fabrication.test.ts tests/falsifiability/form_mismatch.test.ts tests/falsifiability/kernel_evidence_quality.test.ts --limit 200

@@ -18,7 +18,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decideFiveValueVerdict } from '../../src/falsifiability/verdict_kernel_v2.ts';
+import {
+  decideFiveValueVerdict,
+  evaluateScope,
+  evaluateStatistics,
+  flagExecutionFingerprintMagnitudeMismatch,
+} from '../../src/falsifiability/verdict_kernel_v2.ts';
 import type { StatisticalResult, VerdictKernelInput } from '../../src/falsifiability/verdict_kernel_v2.ts';
 import { baseMetric, baseStatPlan, makeValidFec } from '../fec/fixtures.ts';
 import type { FecContractV2 } from '../../src/fec/fec_contract.ts';
@@ -748,6 +753,8 @@ test('mutation 盲区: effectSize < mde → 非 CONFIRMED（MDE 门两向）', (
     statistics: [primaryStat({ effectSizeObserved: 0.2 })],
   }));
   assert.notEqual(out.verdict, 'CONFIRMED', '效应量低于 MDE 不得 CONFIRMED（mde===undefined 位点变异会跳过该门）');
+  // 精确落点：R7 拒后由 R8 c3（效应量不足）接住——!==→=== 变异会让 c3 静默失效落 NO_DECISION_PATH。
+  assert.equal(out.decisiveRuleId, 'R8_INSUFFICIENT_POWER_OR_NULL', 'effectSize < mde 单条款 → R8');
 });
 
 test('mutation 盲区: derivationForm 失配/匹配/缺省三向（formMismatch 链）', () => {
@@ -814,4 +821,273 @@ test('mutation 盲区: protocolDeviations alpha_rewrite/metric_swap 附加 risk 
   }));
   assert.equal(lateExclusion.verdict, 'UNTESTED');
   assert.ok(!lateExclusion.integrityFlags.includes('harking_risk'), 'late_exclusion 不得误加 harking_risk');
+  // alpha_rewrite 只加 harking_risk，不得误加 p_hacking_risk（&&→|| 变异会误加 → 杀之）
+  assert.ok(!alphaRewrite.integrityFlags.includes('p_hacking_risk'), 'alpha_rewrite 不得误加 p_hacking_risk');
+});
+
+// ── 2026-08-20 mutation 补杀批次 2（全位点 47.0% 存活的剩余长尾·逐位点断言）──
+
+test('mutation 补杀: R0/R1/R2 早退输出 statisticalReport/scopeReport 须为空报告（字面量 false 位点）', () => {
+  // 早退路径（R0 schema / R1 fec null / R2 无绑定）共用 emptyStat/emptyScope 字面量；
+  // 变异其中任一 false → true 会污染早退输出的透明度报告——逐字段锁死。
+  const earlyExits = [
+    decideFiveValueVerdict(baseKernelInput({ fec: null })), // R1
+    decideFiveValueVerdict(baseKernelInput({ datasetBindings: [] })), // R2
+    decideFiveValueVerdict(baseKernelInput({
+      fec: { ...makeValidFec(baseFecOverrides()), contractVersion: 'FEC/1.0' as 'FEC/2.0' } as FecContractV2,
+    })), // R0
+  ];
+  for (const out of earlyExits) {
+    assert.deepEqual({ ...out.statisticalReport }, {
+      refutes: false, supports: false, conflicting: false, underpowered: false,
+      effectiveDirection: 'unknown', primaryAdjustedPValue: null, primaryEffectSize: null,
+      primaryConfidenceInterval: null, hasWarnAssumption: false, formMismatch: false,
+    }, '早退 statisticalReport 须为 emptyStat 原样（任一 false 变 true 都是透明度污染）');
+    assert.deepEqual({ ...out.scopeReport }, {
+      isDegraded: false, coverage: 'none', impactedScopeEdges: [], scopeSlipText: null,
+      hasSameScopeRefutation: false,
+    }, '早退 scopeReport 须为 emptyScope 原样');
+  }
+});
+
+test('mutation 补杀: evaluateStatistics/evaluateScope 直调 fec=null 分支输出空报告', () => {
+  // 内核主路径 R1 早退先于 evaluate* 调用，fec=null 分支只能经导出函数直达——
+  // 该分支的字面量 false 位点与 emptyStat 是独立副本，须单独锁定。
+  const nullFecInput = baseKernelInput({ fec: null });
+  assert.deepEqual({ ...evaluateStatistics(nullFecInput) }, {
+    refutes: false, supports: false, conflicting: false, underpowered: false,
+    effectiveDirection: 'unknown', primaryAdjustedPValue: null, primaryEffectSize: null,
+    primaryConfidenceInterval: null, hasWarnAssumption: false, formMismatch: false,
+  }, 'evaluateStatistics(fec=null) 须返回空统计报告');
+  assert.deepEqual({ ...evaluateScope(nullFecInput) }, {
+    isDegraded: false, coverage: 'none', impactedScopeEdges: [], scopeSlipText: null,
+    hasSameScopeRefutation: false,
+  }, 'evaluateScope(fec=null) 须返回空 scope 报告');
+});
+
+test('mutation 补杀: verdictLte 容差边界精确命中（a === b + 1e-7 → 仍 ≤ → CONFIRMED）', () => {
+  // 容差语义：a ≤ b + tol 的等号分支。测试侧用与内核相同的双精度表达式（0.0125 + 1e-7）
+  // 构造精确命中；变异 <= 为 < 后该统计不再显著 → R8，与断言冲突。
+  const edge = 0.0125 + 1e-7;
+  const out = decideFiveValueVerdict(baseKernelInput({
+    statistics: [primaryStat({ pValue: edge, adjustedPValue: edge })],
+  }));
+  assert.equal(out.verdict, 'CONFIRMED', `adjustedP === alpha + tol（${edge}）须视为 ≤ → CONFIRMED（容差等号分支）`);
+});
+
+test('mutation 补杀: verdictGte 容差边界精确命中（effect === mde − 1e-7 → 仍 ≥ → CONFIRMED）', () => {
+  // 容差语义：a ≥ b − tol 的等号分支。0.2 − 1e-7 与内核 b − VERDICT_FLOAT_TOLERANCE 位相同。
+  const edge = 0.2 - 1e-7;
+  const out = decideFiveValueVerdict(baseKernelInput({
+    statistics: [primaryStat({ effectSizeObserved: edge })],
+  }));
+  assert.equal(out.verdict, 'CONFIRMED', `effectSize === mde − tol（${edge}）须视为 ≥ → CONFIRMED（容差等号分支）`);
+});
+
+test('mutation 补杀: R-EF 直测（executionFingerprintMismatch=true → DEGRADED_SCOPE + isDegraded + 非空 slipText）', () => {
+  const out = decideFiveValueVerdict(baseKernelInput({ executionFingerprintMismatch: true }));
+  assert.equal(out.verdict, 'DEGRADED_SCOPE', '复算资源指纹量级发散 → R_EXECUTION_FINGERPRINT');
+  assert.equal(out.decisiveRuleId, 'R_EXECUTION_FINGERPRINT_MISMATCH');
+  assert.equal(out.reasonCodes[0], 'R_EXECUTION_FINGERPRINT_MISMATCH');
+  assert.equal(out.scopeReport.isDegraded, true, 'R-EF 的 scopeReport.isDegraded 须显式 true');
+  assert.ok(out.scopeReport.scopeSlipText !== null && out.scopeReport.scopeSlipText.length > 0,
+    'recordVerdict 契约：DEGRADED_SCOPE 须带非空 scopeSlipText');
+});
+
+test('mutation 补杀: ruleTrace[0].triggered 须为 true（决定性规则触发标记）', () => {
+  const out = decideFiveValueVerdict(baseKernelInput());
+  assert.equal(out.ruleTrace.length, 1);
+  const trace = out.ruleTrace[0];
+  assert.ok(trace !== undefined, 'ruleTrace[0] 须存在');
+  assert.equal(trace.ruleId, 'R7_PRIMARY_TEST_CONFIRMS');
+  assert.equal(trace.triggered, true, '触发记录的 triggered 须为 true（false 位点变异）');
+});
+
+test('mutation 补杀: scopeReport.coverage 三向（full / partial / none·eq 位点）', () => {
+  const full = decideFiveValueVerdict(baseKernelInput());
+  assert.equal(full.scopeReport.coverage, 'full', 'within 绑定 + 无 drift → coverage=full');
+  const partial = decideFiveValueVerdict(baseKernelInput({
+    datasetBindings: [{
+      datasetId: 'D1', contentHash: 'a'.repeat(64), sourceAnchor: { resolved: true },
+      scopeCoverage: { dimension: 'population', value: 'adults 25-40', relation: 'partial' },
+    }],
+  }));
+  assert.equal(partial.scopeReport.coverage, 'partial', 'scope 窄化 → coverage=partial');
+  const none = decideFiveValueVerdict(baseKernelInput({ datasetBindings: [] }));
+  assert.equal(none.scopeReport.coverage, 'none', '空绑定 → coverage=none');
+});
+
+test('mutation 补杀: 空 statistics → NO_DECISION_PATH（非 R9·length>0 guard）', () => {
+  const out = decideFiveValueVerdict(baseKernelInput({ statistics: [] }));
+  assert.equal(out.verdict, 'UNTESTED');
+  assert.equal(out.decisiveRuleId, 'NO_DECISION_PATH', 'statistics 空 → 不得落 R9（every([]) 恒真陷阱）');
+});
+
+test('mutation 补杀: statisticalReport.underpowered 输出字段（powerStatus 投影 eq 位点）', () => {
+  const under = decideFiveValueVerdict(baseKernelInput({
+    evidenceSufficiency: { status: 'sufficient', powerStatus: 'underpowered' },
+  }));
+  assert.equal(under.statisticalReport.underpowered, true, 'powerStatus=underpowered 须投影到 statisticalReport.underpowered');
+  const adequate = decideFiveValueVerdict(baseKernelInput());
+  assert.equal(adequate.statisticalReport.underpowered, false, 'powerStatus=adequate → underpowered=false');
+});
+
+test('mutation 补杀: 反证跨阈值但不同 scope → hasSameScopeRefutation=false → R4 保持（&&→|| 位点）', () => {
+  // crossesRefutationThreshold=true + sameScope=false：原版 some()=false → R4 照常降级；
+  // 变异 &&→|| 后 some()=true → R4 条件（isDegraded && !hasSameScopeRefutation）失效 → 漏放行到 R7。
+  const out = decideFiveValueVerdict(baseKernelInput({
+    datasetBindings: [{
+      datasetId: 'D1', contentHash: 'a'.repeat(64), sourceAnchor: { resolved: true },
+      scopeCoverage: { dimension: 'population', value: 'adults 25-40', relation: 'partial' },
+    }],
+    contradictionSet: [{ crossesRefutationThreshold: true, sameScope: false }],
+  }));
+  assert.equal(out.verdict, 'DEGRADED_SCOPE');
+  assert.equal(out.decisiveRuleId, 'R4_SCOPE_MISMATCH_NONCRITICAL', '不同 scope 的反证不得触发 hasSameScopeRefutation 升级');
+  assert.equal(out.scopeReport.hasSameScopeRefutation, false);
+});
+
+test('mutation 补杀: 无 adjustedPValue 的 refutes 统计不显著 → 不触发 R6（significant && 位点）', () => {
+  // adjustedPValue undefined 的统计必须被 significant 过滤排除（&&→|| 会把 undefined-p
+  // 也算显著 → refutes=true → R6 REFUTED）。保留 GV-01 主统计（supports 显著），
+  // 追加无 p 的 refutes 副统计：原版 → R7 CONFIRMED；变异 → R6 REFUTED。
+  const out = decideFiveValueVerdict(baseKernelInput({
+    statistics: [
+      primaryStat(),
+      {
+        testId: 'secondary-no-p', status: 'ran', effectDirection: 'refutes',
+        effectSizeObserved: -0.4, confidenceInterval: [-0.7, -0.1], assumptionDiagnostics: [],
+      },
+    ],
+  }));
+  assert.equal(out.verdict, 'CONFIRMED', '无 p 值的 refutes 统计不算显著反证（不得阻断 GV-01 主统计的 R7）');
+});
+
+test('mutation 补杀: R8 单条件精确触发（仅 p>alpha·neq/and 位点）', () => {
+  // 仅第 1 条款（p>alpha）成立：power adequate / effect≥mde / 无 warn / 无 flags。
+  // 断言落 R8 → 杀 !==→===（变异后该条款 false → 落 NO_DECISION_PATH）。
+  const out = decideFiveValueVerdict(baseKernelInput({
+    statistics: [primaryStat({ pValue: 0.5, adjustedPValue: 0.5 })],
+  }));
+  assert.equal(out.verdict, 'INCONCLUSIVE');
+  assert.equal(out.decisiveRuleId, 'R8_INSUFFICIENT_POWER_OR_NULL', 'p>alpha 单条件 → R8（不得静默落 NO_DECISION_PATH）');
+});
+
+test('mutation 补杀: p 显著 + status=insufficient → NO_DECISION_PATH 非 R8（R8 c1 的 ||→&& 位点）', () => {
+  // p≤alpha（显著）时 R8 第 1 条款 false；insufficient 不属于 R8 条款 → 不得落 R8。
+  // 变异 c1 的 &&→|| 后显著 p 也触发 R8 → 与断言冲突。
+  const out = decideFiveValueVerdict(baseKernelInput({
+    evidenceSufficiency: { status: 'insufficient', powerStatus: 'adequate' },
+  }));
+  assert.equal(out.verdict, 'UNTESTED');
+  assert.equal(out.decisiveRuleId, 'NO_DECISION_PATH', '显著 p + insufficient → 不得 R8（R8 只认五条款）');
+});
+
+test('mutation 补杀: underpowered 单条款 R8（R8 c2 的 ||→&& 位点）', () => {
+  // p 显著（c1 false）+ status=insufficient（R7 拒）+ powerStatus=underpowered（c2 单条成立）→ R8。
+  // 变异 c2 行 ||→&& 后 (c1&&c2)=false 且其余 false → 落 NO_DECISION_PATH → 与断言冲突。
+  const out = decideFiveValueVerdict(baseKernelInput({
+    evidenceSufficiency: { status: 'insufficient', powerStatus: 'underpowered' },
+  }));
+  assert.equal(out.verdict, 'INCONCLUSIVE');
+  assert.equal(out.decisiveRuleId, 'R8_INSUFFICIENT_POWER_OR_NULL', 'underpowered 单条款 → R8');
+});
+
+// ── mutation 补杀批次 3（多文件复跑后剩余 15 位点中的可杀 9 个）──
+
+test('mutation 补杀: p>alpha 的 refutes 统计不显著（significant &&→|| 位点·defined-p 分支）', () => {
+  // adjustedPValue 存在但 > alpha（不显著）的 refutes 统计必须被排除：
+  // &&→|| 变异后（true || verdictLte(0.5, α)=false → true）误判显著 → R6 REFUTED。
+  const out = decideFiveValueVerdict(baseKernelInput({
+    statistics: [
+      primaryStat(),
+      {
+        testId: 'secondary-ns-refutes', status: 'ran', effectDirection: 'refutes',
+        pValue: 0.5, adjustedPValue: 0.5,
+        effectSizeObserved: -0.4, confidenceInterval: [-0.7, -0.1], assumptionDiagnostics: [],
+      },
+    ],
+  }));
+  assert.equal(out.verdict, 'CONFIRMED', '不显著（p>α）的 refutes 统计不得触发 R6');
+});
+
+test('mutation 补杀: R8 c3 效应量缺失（effectSize=null 且 mde 有 → 不得仅凭 null 触发 R8）', () => {
+  // primary 无 effectSizeObserved：R7 因 effectSize=null 拒（c…见 r7Pass），但 R8 c3
+  // 要求 effectSize !== null 才比较 → 原版 c3 false → 落 NO_DECISION_PATH；
+  // !==→=== 变异后 null===null 且 !verdictGte(null→0 ≥ mde−tol)=true → 误触 R8。
+  const out = decideFiveValueVerdict(baseKernelInput({
+    statistics: [{
+      testId: 'bls_power', status: 'ran', effectDirection: 'supports',
+      pValue: 0.003, adjustedPValue: 0.003, assumptionDiagnostics: [],
+    }],
+  }));
+  assert.equal(out.verdict, 'UNTESTED');
+  assert.equal(out.decisiveRuleId, 'NO_DECISION_PATH', 'effectSize 缺失不得静默当 0 参与比较（c3 null guard）');
+});
+
+test('mutation 补杀: r7Gate.effectSizeSufficient 三态（false·null）+ 无 powerPlan 时 overallPassed=true', () => {
+  // evaluateR7Gate 镜像层。effectSizeSufficient=false 须用「非 null 且 < mde」场景：
+  // null 场景下 &&→|| 两分支均 false（verdictGte(null→0, mde)=false）不可区分。
+  const belowMde = decideFiveValueVerdict(baseKernelInput({
+    statistics: [primaryStat({ effectSizeObserved: 0.1 })], // 0.1 < mde 0.2
+  }));
+  assert.equal(belowMde.decisionTrace?.r7Gate?.effectSizeSufficient, false,
+    'effectSize=0.1 < mde=0.2 → r7Gate.effectSizeSufficient=false（&&→|| 变异会误判 true）');
+  const fec = makeValidFec(baseFecOverrides());
+  const { powerPlan: _drop, ...fecNoPower } = fec;
+  const noMde = decideFiveValueVerdict(baseKernelInput({ fec: fecNoPower }));
+  assert.equal(noMde.decisionTrace?.r7Gate?.effectSizeSufficient, null, '无 powerPlan → effectSizeSufficient=null（门跳过）');
+  assert.equal(noMde.decisionTrace?.r7Gate?.overallPassed, true, '(null ?? true) → overallPassed 不得被贬为 false');
+});
+
+test('mutation 补杀: R-causal FAIL 的 scopeReport.isDegraded 须显式 true（透明度位点）', () => {
+  const out = decideFiveValueVerdict(baseKernelInput({
+    claimType: 'causal',
+    evidenceBasis: 'observational_only',
+    confoundingGateResult: gateResult('FAIL'),
+  }));
+  assert.equal(out.verdict, 'DEGRADED_SCOPE');
+  assert.equal(out.scopeReport.isDegraded, true, 'R-causal 降级的 scopeReport.isDegraded 须 true');
+  assert.ok(out.scopeReport.scopeSlipText !== null && out.scopeReport.scopeSlipText.length > 0,
+    'recordVerdict 契约：DEGRADED_SCOPE 须带非空 rationale');
+});
+
+test('mutation 补杀: decisionTrace.metrics 的 antiTheater fail/warn 计数（filter eq 位点）', () => {
+  const out = decideFiveValueVerdict(baseKernelInput({
+    antiTheaterFindings: [
+      { kind: 'proof_tamper', severity: 'fail' },
+      { kind: 'seed-cherry-picking', severity: 'warn' },
+      { kind: 'heterogeneity', severity: 'warn' },
+    ],
+    // fail 会先触发 ANTI_THEATER_FAIL UNTESTED——但 decisionTrace 仍构建（透明度层不依赖 verdict）。
+  }));
+  assert.equal(out.decisionTrace?.metrics.antiTheaterFailCount, 1, 'fail 计数=1');
+  assert.equal(out.decisionTrace?.metrics.antiTheaterWarnCount, 2, 'warn 计数=2');
+});
+
+test('mutation 补杀: flagExecutionFingerprintMagnitudeMismatch 量级边界（ratio=10 不触发·未测量维不触发·单维发散触发）', () => {
+  const fp = (wallMs: number, cpuMs: number, peakRssKb: number) => ({ wallMs, cpuMs, peakRssKb });
+  // ratio 恰好 === 10（100/10）：严格大于才触发（> → >= 变异会误触发）。
+  assert.equal(
+    flagExecutionFingerprintMagnitudeMismatch(fp(100, 1, 1), fp(10, 1, 1)),
+    false,
+    'ratio=10（等于阈值）不触发——量级阈值为严格大于',
+  );
+  // a=0（未测量）维度：不可比 → 不触发（<=0 提前返回 false；< 变异后 0/50=Infinity 会误触发）。
+  assert.equal(
+    flagExecutionFingerprintMagnitudeMismatch(fp(0, 1, 1), fp(50, 1, 1)),
+    false,
+    'wallMs=0（未测量）不得触发（0 维度不可比）',
+  );
+  // 单维发散（其余正常）：必须触发（|| → && 变异会把单维发散漏放）。
+  assert.equal(
+    flagExecutionFingerprintMagnitudeMismatch(fp(100, 1, 1), fp(1, 1, 1)),
+    true,
+    '单 wallMs 维发散（100x）→ 触发',
+  );
+  assert.equal(
+    flagExecutionFingerprintMagnitudeMismatch(fp(1, 100, 1), fp(1, 1, 1)),
+    true,
+    '单 cpuMs 维发散（100x）→ 触发（三行 || 各自独立）',
+  );
 });

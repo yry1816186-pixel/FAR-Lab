@@ -68,6 +68,28 @@ const EQUIVALENT_MUTATIONS = {
       reason: 'erf(0)=0：x=0 时符号取 -1 或 1 结果均为 0（-0 与 0 数值相等），符号分支在 x=0 不可观测',
     },
   ],
+  'src/falsifiability/verdict_kernel_v2.ts': [
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'const ratio = a > b ? a / b : b / a',
+      reason: 'a===b 时两分支均得 ratio=1（除法对称），分支选择在相等点不可观测；a≠b 时 max/min 语义两分支同选大者',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (input.identifierClaims !== undefined && input.identifierClaims.length > 0) {',
+      reason: 'length>=0 恒真后空数组进入块，但 some() 对空数组恒 false → 无 return → 与跳过块输出等价；非空数组两判定同真',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: '.filter((p) => p.length > 0)',
+      reason: 'p 由模板 `${dimension}=${value}(${relation})` 生成，最少含 "=(" 与 ")" 共 3 字符，长度恒 >0，过滤谓词在 > 与 >= 下等价',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'return parts.length > 0 ?',
+      reason: 'renderScopeSlip 仅在 isDegraded=true 时被消费：scopePartial ⇒ impacted 非空、driftWarn ⇒ push 一项，parts 恒非空，三元条件在 > 与 >= 下等价（fallback 分支为不可达防御）',
+    },
+  ],
 };
 
 /** 位点是否命中等价变异登记（返回登记项或 null）。 */
