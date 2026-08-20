@@ -125,6 +125,31 @@ jobs:
         run: npm run test
       - name: build (tsc -b && vite build)
         run: npm run build
+      # ── CPS-5 收尾（2026-08-21）：e2e + a11y 入 frontend job ──────────────────
+      # e2e（playwright.config.ts webServer）拉起 `far api --port 3196`（单进程产品模式
+      # serve 本 job 刚构建的 dist）——需要根依赖（better-sqlite3 原生模块）。
+      - uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Install root pnpm deps (e2e webServer 拉起 far api · better-sqlite3 原生)
+        run: pnpm --dir .. install --frozen-lockfile
+      - name: Install playwright chromium (e2e/a11y 唯一浏览器轴)
+        run: npx playwright install --with-deps chromium
+      - name: e2e (playwright · workbench 基线 · webServer 自动拉起 far api :3196)
+        run: npm run test:e2e
+      # a11y 扫描是裸 node 脚本（非 playwright test）——手动起服务等 /health 再扫再收尾。
+      - name: a11y scan (axe · / /evidence /verify /missions · serious/critical=0)
+        run: |
+          node ../src/cli/far.ts api --port 3196 &
+          api_pid=$!
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3196/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          node e2e/a11y-scan.mjs
+          scan_exit=$?
+          kill "$api_pid" 2>/dev/null || true
+          exit "$scan_exit"
 
   # ============================================================
   # STEP 2 · typecheck（零容忍闸门 #1：tsc --noEmit，失败 block 之后全部）
