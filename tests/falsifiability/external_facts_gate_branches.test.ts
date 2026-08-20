@@ -264,6 +264,18 @@ describe('falsifiabilityGate: range semantics sub-branches', () => {
     );
   });
 
+  it('range semantics with lower === upper（单点区间）→ 合法返回 spec', () => {
+    // 边界语义锁定：lower === upper 是合法单点预测区间，不得被误拒
+    //（> → >= 变异会把单点区间当 inverted range 拒绝 → 本用例杀之）。
+    const spec = makeSpec({ thresholdSemantics: 'range' });
+    const result = falsifiabilityGate({
+      hypothesis: 'h',
+      falsificationSpec: spec,
+      thresholdSpec: rangeSpec({ lower: 0.5, upper: 0.5 }),
+    });
+    assert.equal(result, spec);
+  });
+
   it('range semantics happy path → returns spec', () => {
     const spec = makeSpec({ thresholdSemantics: 'range' });
     const result = falsifiabilityGate({

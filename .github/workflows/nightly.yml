@@ -144,3 +144,18 @@ jobs:
       # 测试与主 golden-vector 文件互补——单文件挂载曾把真实覆盖率低估为 47% 存活。
       - name: gate · verdict_kernel_v2（五值裁决内核·130 杀+4 等价登记·0 存活）
         run: node scripts/mutation_gate.mjs src/falsifiability/verdict_kernel_v2.ts tests/falsifiability/verdict_kernel_v2.test.ts tests/falsifiability/decision_trace.test.ts tests/science_harness/exec_fingerprint.test.ts tests/falsifiability/identifier_fabrication.test.ts tests/falsifiability/form_mismatch.test.ts tests/falsifiability/kernel_evidence_quality.test.ts --limit 200
+      # 2026-08-20 批次 4：falsifiability 域全量补杀后 7 文件全 0% 存活（详见各提交）。
+      # structural gate 含工厂注入接缝（memoize/bundle/fail-closed 状态机锁定）；
+      # verdict V1 挂 3 测试文件（bias 注记面与 decisiveness 面互补）。
+      - name: gate · verifier_structural_gate（AST 纯度门·34 杀+1 等价登记）
+        run: node scripts/mutation_gate.mjs src/falsifiability/verifier_structural_gate.ts tests/falsifiability/verifier_gate.test.ts --limit 100
+      - name: gate · verdict V1（legacy 裁决·37/37 全杀·3 文件挂载）
+        run: node scripts/mutation_gate.mjs src/falsifiability/verdict.ts tests/falsifiability/planb_risk_verdict.test.ts tests/falsifiability/verdict_decisiveness.test.ts tests/falsifiability/evidence_base_bias.test.ts --limit 100
+      - name: gate · falsifiability gate（外部门·11/11）
+        run: node scripts/mutation_gate.mjs src/falsifiability/gate.ts tests/falsifiability/external_facts_gate_branches.test.ts --limit 50
+      - name: gate · evidence_provenance（执行溯源·11 杀+1 等价登记）
+        run: node scripts/mutation_gate.mjs src/falsifiability/evidence_provenance.ts tests/falsifiability/evidence_provenance.test.ts --limit 50
+      - name: gate · evidence_contract_gate（证据合同门·6/6）
+        run: node scripts/mutation_gate.mjs src/falsifiability/evidence_contract_gate.ts tests/falsifiability/evidence_contract_gate.test.ts --limit 50
+      - name: gate · verifier（V1 验证链·5/5）
+        run: node scripts/mutation_gate.mjs src/falsifiability/verifier.ts tests/falsifiability/verifier_chain.test.ts --limit 50
