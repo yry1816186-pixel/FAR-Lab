@@ -169,3 +169,20 @@ jobs:
         run: node scripts/mutation_gate.mjs src/anti_theater/score.ts tests/anti_theater/lint_constraint_score_mutation.test.ts tests/anti_theater/false_green_rate.test.ts --limit 50
       - name: gate · confounding adjudicate（R-causal SSOT·6/6）
         run: node scripts/mutation_gate.mjs src/confounding_gate/adjudicate.ts tests/confounding_gate/adjudicate.test.ts --limit 50
+      # 2026-08-20 批次 7：23 detector 全量扫荡全 0% 存活（dep_float_drift/phack_alpha
+      # 无变异位点合理跳过）。多数 detector 经 attack_corpus + detectors_mutation 双挂
+      # 即 0%；带专项测试的单独挂载。bash -e 保证循环内任一非零退出即红。
+      - name: gate · anti_theater detectors 20 文件（attack_corpus + mutation 补杀双挂）
+        run: |
+          for d in data_hash_fake dataset_drift effect_p_consistency fake_degraded fake_pass hark judge_override label_only metric_swap missing_raw optional_stopping overfit phack_correction posthoc_threshold provenance_unbound report_mismatch scope_launder seed_cherry stopping_rule workflow_digest; do
+            echo "── detector $d ──"
+            node scripts/mutation_gate.mjs "src/anti_theater/detectors/$d.ts" tests/anti_theater/anti_theater_attack_corpus.test.ts tests/anti_theater/detectors_mutation.test.ts --limit 100
+          done
+      - name: gate · detector 专项挂载（phack_pcurve / effect_p / fake_degraded / provenance / report_mismatch / stopping_rule）
+        run: |
+          node scripts/mutation_gate.mjs src/anti_theater/detectors/phack_pcurve.ts tests/anti_theater/phack_pcurve.test.ts --limit 50
+          node scripts/mutation_gate.mjs src/anti_theater/detectors/effect_p_consistency.ts tests/anti_theater/effect_p_consistency.test.ts tests/anti_theater/detectors_mutation.test.ts --limit 100
+          node scripts/mutation_gate.mjs src/anti_theater/detectors/fake_degraded.ts tests/anti_theater/detector_branches_boost.test.ts --limit 50
+          node scripts/mutation_gate.mjs src/anti_theater/detectors/provenance_unbound.ts tests/anti_theater/provenance_unbound.test.ts --limit 50
+          node scripts/mutation_gate.mjs src/anti_theater/detectors/report_mismatch.ts tests/anti_theater/report_proof_mismatch.test.ts tests/anti_theater/detector_branches_boost.test.ts --limit 100
+          node scripts/mutation_gate.mjs src/anti_theater/detectors/stopping_rule.ts tests/anti_theater/detector_branches_boost.test.ts --limit 50

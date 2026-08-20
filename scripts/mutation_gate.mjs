@@ -137,6 +137,35 @@ const EQUIVALENT_MUTATIONS = {
       reason: '变异 && 恒假 → null/undefined 不再早退，但后续 inDangerZone 判定 primaryP >= 0.040：null 数值转换为 0、undefined 转 NaN，两者与 0.040 比较均为 false → 恒 return []，与原早退输出等价',
     },
   ],
+  'src/anti_theater/detectors/effect_p_consistency.ts': [
+    {
+      op: 'gt_to_gte',
+      linePrefix: "(direction === 'greater' && effectSize < 0) || (direction === 'less' && effectSi",
+      reason: '层 2 外层 guard effectSize !== 0 已排除零值，effectSize<0 与 <=0 在非零域等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: "(direction === 'greater' && effectSize < 0) || (direction === 'less' && effectSi",
+      reason: '同上：!==0 guard 使符号判定在 < 与 <= 下等价',
+    },
+    {
+      op: 'and_to_or',
+      linePrefix: 'effectSize !== null &&',
+      reason: '层 2 第三个 && 变异后 effectSize=null 可入层，但 signMismatch 谓词 null<0/null>0 均为 false（JS null→0 与 0 不满足 <0/>0），恒不产 finding，与原 guard 短路输出等价',
+    },
+    {
+      op: 'and_to_or',
+      linePrefix: "direction !== 'two_sided' &&",
+      reason: '层 2 多行 if 的第二个 &&：变异 (supports&&two_sided)||(其余) 后 two_sided 输入可入层，但层内 signMismatch 两支均要求 direction 为 greater/less，two_sided 恒 false，不产 finding——与原短路等价（层 3 同文本为单行 if，已由 refutes 反驳用例杀灭，不在此列）',
+    },
+  ],
+  'src/anti_theater/detectors/overfit.ts': [
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (splitName !== undefined && splitName.length > 0) {',
+      reason: '空串入 splitsRun 后 toLowerCase()=""，与 has("hidden")/has("public") 判定均不等——空串对 public-only 判定不可观测，>0 与 >=0 等价',
+    },
+  ],
 };
 
 /** 位点是否命中等价变异登记（返回登记项或 null）。 */
