@@ -73,14 +73,14 @@ export const MODULE_COMPLEXITY_BUDGETS: readonly ModuleBudget[] = [
   { module: 'proof_envelope', budgetFiles: 13 },  // 依据: R3 复杂度租金——ask_envelope.ts(V2 信封生产构建器·D-2026-08-19-01 终结)入 v2/ 子域;对账为真实文件数,非阈值放松
   { module: 'release', budgetFiles: 5 },
   { module: 'report', budgetFiles: 8 },
-  { module: 'research', budgetFiles: 39 },
+  { module: 'research', budgetFiles: 40 },  // 依据: 2026-08-21 复杂度租金——figure_extraction/recompute.ts(phase 2 复算敏感性层:r 仿射不变定理+斜率标定带,免 key 半边)入 adapters/;对账为真实文件数,非阈值放松
   { module: 'retrieval', budgetFiles: 17 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'safety', budgetFiles: 1 },
   { module: 'schema', budgetFiles: 3 },
   { module: 'science', budgetFiles: 3 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'science_harness', budgetFiles: 22 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'security', budgetFiles: 6 },
-  { module: 'statistics', budgetFiles: 11 },  // 依据: PR#101 复杂度租金支付——对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
+  { module: 'statistics', budgetFiles: 12 },  // 依据: 2026-08-21 复杂度租金——correlation.ts(pearsonR/pearsonTwoSidedP 跨领域 SSOT,自 research/adapters/exoplanet_analysis.ts 迁入,figure_extraction 复算层消费);对账为当前真实文件数(checkComplexityLedger 实测),非阈值放松
   { module: 'trace', budgetFiles: 3 },
   { module: 'v2_domain', budgetFiles: 7 },
   { module: 'validation', budgetFiles: 1 },

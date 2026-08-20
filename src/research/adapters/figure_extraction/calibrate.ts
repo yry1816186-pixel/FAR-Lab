@@ -23,6 +23,11 @@ export interface AxisFit {
   readonly slope: number;
   readonly intercept: number;
   readonly residualMax: number;
+  /**
+   * 刻度 OLS 斜率标准误（经典公式 se=sqrt((SSR/(n-2))/Sxx)，拟合域）。
+   * 恰 2 个刻度时无自由度 → null（拟合精确，标定误差=刻度读数误差，不可分离）。
+   */
+  readonly seSlope: number | null;
   /** 像素→值。 */
   toValue(pixel: number): number;
 }
@@ -51,6 +56,11 @@ export function fitAxis(axis: AxisCalibration, axisName: 'xAxis' | 'yAxis'): Axi
     const fitted = slope * t.pixel + intercept;
     return Math.max(m, Math.abs(fitted - target(t.value)));
   }, 0);
+  const ssr = ticks.reduce((s, t) => {
+    const fitted = slope * t.pixel + intercept;
+    return s + (fitted - target(t.value)) ** 2;
+  }, 0);
+  const seSlope = ticks.length > 2 ? Math.sqrt(ssr / (ticks.length - 2) / pixelVar) : null;
   const invert = (fitted: number): number =>
     axis.axisType === 'log' ? 10 ** fitted : fitted;
   const axisType = axis.axisType;
@@ -59,6 +69,7 @@ export function fitAxis(axis: AxisCalibration, axisName: 'xAxis' | 'yAxis'): Axi
     slope,
     intercept,
     residualMax,
+    seSlope,
     toValue(pixel: number): number {
       const v = invert(slope * pixel + intercept);
       if (!Number.isFinite(v)) {
@@ -76,11 +87,17 @@ export interface CalibratedExtraction {
   readonly chartType: FigureExtraction['chartType'];
   readonly series: ReadonlyArray<{
     readonly id: string;
-    readonly points: ReadonlyArray<{ readonly x: number; readonly y: number }>;
+    /** px/py=感知输入（保留：斜率解析式与审计需要）；x/y=确定性换算值。 */
+    readonly points: ReadonlyArray<{
+      readonly px: number;
+      readonly py: number;
+      readonly x: number;
+      readonly y: number;
+    }>;
   }>;
   readonly calibration: {
-    readonly xAxis: Pick<AxisFit, 'axisType' | 'residualMax'>;
-    readonly yAxis: Pick<AxisFit, 'axisType' | 'residualMax'>;
+    readonly xAxis: Pick<AxisFit, 'axisType' | 'slope' | 'seSlope' | 'residualMax'>;
+    readonly yAxis: Pick<AxisFit, 'axisType' | 'slope' | 'seSlope' | 'residualMax'>;
   };
   readonly caveats: readonly string[];
   readonly provenance: FigureExtraction['provenance'];
@@ -94,11 +111,26 @@ export function calibrateExtraction(extraction: FigureExtraction): CalibratedExt
     chartType: extraction.chartType,
     series: extraction.series.map((s) => ({
       id: s.id,
-      points: s.points.map((p) => ({ x: xFit.toValue(p.px), y: yFit.toValue(p.py) })),
+      points: s.points.map((p) => ({
+        px: p.px,
+        py: p.py,
+        x: xFit.toValue(p.px),
+        y: yFit.toValue(p.py),
+      })),
     })),
     calibration: {
-      xAxis: { axisType: xFit.axisType, residualMax: xFit.residualMax },
-      yAxis: { axisType: yFit.axisType, residualMax: yFit.residualMax },
+      xAxis: {
+        axisType: xFit.axisType,
+        slope: xFit.slope,
+        seSlope: xFit.seSlope,
+        residualMax: xFit.residualMax,
+      },
+      yAxis: {
+        axisType: yFit.axisType,
+        slope: yFit.slope,
+        seSlope: yFit.seSlope,
+        residualMax: yFit.residualMax,
+      },
     },
     caveats: extraction.caveats,
     provenance: extraction.provenance,
