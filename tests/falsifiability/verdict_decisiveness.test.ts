@@ -29,7 +29,9 @@ const SPEC = {
   falsificationThreshold: 1,
   thresholdSemantics: 'gt',
 } as const;
-const TH = { semantics: 'gt', threshold: 1 } as const;
+// 字段名为 value（ThresholdSpec 契约）——旧 fixture 误写 threshold，因历史用例均无
+// metricValue 从未触发 evaluateThreshold 而潜伏；2026-08-20 mutation 补杀用例暴露后修正。
+const TH = { semantics: 'gt', value: 1 } as const;
 
 test('unanimous CONFIRMED: every evidence is single-flip decisive, margin 1', () => {
   const d = analyzeVerdictDecisiveness('CONFIRMED', [ev('a', true), ev('b', true), ev('c', true)]);
@@ -110,4 +112,37 @@ test('determinism: same inputs → deep-equal decisiveness', () => {
 test('note is human-readable and mentions the mechanism', () => {
   const d = analyzeVerdictDecisiveness('INCONCLUSIVE', [ev('a', true), ev('b', false)]);
   assert.match(d?.note ?? '', /conflict 1:1/);
+});
+
+// ── 2026-08-20 mutation 补杀（firstMetricValue 两向 + minority 平局选择）──
+
+test('mutation 补杀: 平局冲突（1:1）minority 取 supports 侧（<= 含等号·平局取前侧）', () => {
+  const d = analyzeVerdictDecisiveness('INCONCLUSIVE', [ev('sup-1', true), ev('ref-1', false)]);
+  assert.deepEqual(d?.decisiveEvidenceClaims, ['sup-1'],
+    'supports.length <= refutes.length 含等号：1:1 平局时 minority=supports 侧（< 变异会误取 refutes 侧）');
+  assert.equal(d?.marginToAdjacent, 1);
+});
+
+test('mutation 补杀: makeVerdict 的 metricValue 取第一条含 metric 的证据（跳过缺省）', () => {
+  const noMetric = ev('no-metric-first', true);
+  const withMetric: EvidenceRecord = { ...ev('has-metric-second', true), metricValue: 2.5 };
+  const result = makeVerdict({
+    claim: 'first metric value surfaces',
+    evidences: [noMetric, withMetric],
+    falsificationSpec: SPEC,
+    thresholdSpec: TH,
+  });
+  assert.equal(result.metricValue, 2.5,
+    'firstMetricValue 须跳过无 metric 证据取第一条有值者（find !== undefined 位点）');
+});
+
+test('mutation 补杀: 全部证据无 metricValue → metricValue=null（不抛 TypeError）', () => {
+  const result = makeVerdict({
+    claim: 'no metric anywhere',
+    evidences: [ev('bare-1', true), ev('bare-2', true)],
+    falsificationSpec: SPEC,
+    thresholdSpec: TH,
+  });
+  assert.equal(result.metricValue, null,
+    '无任何 metric 证据须优雅返回 null（evidence === undefined 短路位点——!== 变异会读 undefined.metricValue 抛 TypeError）');
 });
