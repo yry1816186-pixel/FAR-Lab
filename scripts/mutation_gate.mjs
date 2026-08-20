@@ -130,6 +130,13 @@ const EQUIVALENT_MUTATIONS = {
       reason: 'score===70 ⟺ 恰扣 30；不产生 forced/blockSeal 的扣分源只有桶 6/7（max 20）与 DRIFT-WARN 桶 4（DRIFT forced DEGRADED_SCOPE）——可 seal 输入的 score 值域为 {80,90,100}，不含 70 边界，>= 与 > 在可达输入下等价',
     },
   ],
+  'src/anti_theater/detectors/phack_pcurve.ts': [
+    {
+      op: 'or_to_and',
+      linePrefix: 'if (primaryP === null || primaryP === undefined) {',
+      reason: '变异 && 恒假 → null/undefined 不再早退，但后续 inDangerZone 判定 primaryP >= 0.040：null 数值转换为 0、undefined 转 NaN，两者与 0.040 比较均为 false → 恒 return []，与原早退输出等价',
+    },
+  ],
 };
 
 /** 位点是否命中等价变异登记（返回登记项或 null）。 */
