@@ -174,7 +174,26 @@ function toOpenAiMessages(request: LlmRequest): OpenAiMessageParam[] {
   for (const msg of request.messages) {
     if (msg.role === 'tool') continue;
     if (msg.role === 'system' || msg.role === 'user' || msg.role === 'assistant') {
-      out.push({ role: msg.role, content: msg.content });
+      const hasImages = msg.imageParts !== undefined && msg.imageParts.length > 0;
+      if (hasImages && msg.role !== 'user') {
+        // 图像仅 user 角色合法（types.ts LlmMessage 契约）——fail-closed，不静默丢图。
+        throw new Error(
+          `qwen_adapter: imageParts are only allowed on 'user' messages, got '${msg.role}'`,
+        );
+      }
+      // 多模态：content 文本 + imageParts → OpenAI content 数组（协议组装归适配器层）。
+      // 数组分支只可能发生在 user（上方 role 守卫），用字面量 'user' 消解 SDK 联合类型。
+      if (hasImages && msg.role === 'user') {
+        out.push({
+          role: 'user',
+          content: [
+            { type: 'text' as const, text: msg.content },
+            ...msg.imageParts!.map((p) => ({ type: 'image_url' as const, image_url: p })),
+          ],
+        });
+      } else {
+        out.push({ role: msg.role, content: msg.content });
+      }
     }
   }
   return out;

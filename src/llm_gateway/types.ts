@@ -59,10 +59,22 @@ export interface LlmCallCredential {
   readonly finishReason?: string | null;
 }
 
+/**
+ * 图像附件（多模态调用，仅 user 角色合法；adapter 边界强制）。
+ * LlmMessage 保持 domain 形态：content 恒为文本视图（检索/审计/回放的单页事实），
+ * 图像是显式附加字段；OpenAI 线格式 content 数组由 adapter 组装（协议形态归适配器层）。
+ */
+export interface LlmImagePart {
+  readonly url: string;
+  readonly detail?: 'high' | 'low' | 'auto';
+}
+
 /** Interface defining llm message. */
 export interface LlmMessage {
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
   readonly content: string;
+  /** 仅 user 角色：设置时 adapter 在 content 文本后附图像部件并发送。 */
+  readonly imageParts?: readonly LlmImagePart[];
 }
 
 /**

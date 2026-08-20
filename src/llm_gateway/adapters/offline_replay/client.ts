@@ -26,7 +26,12 @@ export interface OfflineReplayOptions {
 }
 
 function countTextUnits(messages: LlmRequest['messages']): number {
-  return messages.reduce((total, message) => total + message.content.length, 0);
+  // 多模态口径：content 文本按字符、imageParts 按 URL 长度。offline_replay 的
+  // tokenUsage 本就是字符估算伪 token（measured=false，CU4-02）——扩展而非改变口径。
+  return messages.reduce((total, message) => {
+    const imageUnits = (message.imageParts ?? []).reduce((t, p) => t + p.url.length, 0);
+    return total + message.content.length + imageUnits;
+  }, 0);
 }
 
 /**
