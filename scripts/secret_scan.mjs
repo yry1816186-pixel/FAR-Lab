@@ -8,7 +8,8 @@
  *   3. .env 值内联：process.env 形状豁免（引用不是泄露）——引用与赋值区分是本扫描器的判别力核心
  *
  * 免检区：tests/fixtures 中的显式占位值（sk-test-* / ghp_test_* 等已声明假值）、
- * node_modules / .far（私有层不入公开扫描面）/ .git。
+ * node_modules / .far（私有层不入公开扫描面）/ .git / .cache（第三方运行时二进制缓存，
+ * 如 playwright 浏览器——gitignored，二进制内含厂商遥测 key 字符串属误报源，与 node_modules 同类）。
  * 用法：node scripts/secret_scan.mjs [--root <dir>] [--fail-on-hit]
  * 退出码：0 无命中 / 1 命中（--fail-on-hit）/ 2 参数错误。
  */
@@ -35,7 +36,7 @@ const PLACEHOLDER_PREFIXES = ['sk-test-', 'ghp_test_', 'sk-ant-test', 'test-', '
 /** 引用型豁免：右侧是 process.env.X / config 引用，不是泄露。 */
 const REFERENCE_VALUES = [/process\.env\./i, /\$\{/];
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.far', 'dist', 'coverage', '.venv', '.python-deps', '__pycache__']);
+const SKIP_DIRS = new Set(['node_modules', '.git', '.far', '.cache', 'dist', 'coverage', '.venv', '.python-deps', '__pycache__']);
 const SKIP_FILES = new Set(['secret_scan.mjs', 'package-lock.json', 'pnpm-lock.yaml', 'uv.lock']);
 const SKIP_SUFFIX = ['.lock', '.min.js'];
 
