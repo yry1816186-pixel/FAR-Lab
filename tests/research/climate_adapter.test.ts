@@ -45,7 +45,7 @@ test('trend: full record slope matches GISTEMP (~0.08-0.09 C/decade, significant
   assert.ok(t.trendPerDecadeC > 0.07 && t.trendPerDecadeC < 0.10,
     `full-record trend ${t.trendPerDecadeC.toFixed(3)} C/decade within GISTEMP range`);
   assert.ok(t.pValue < 0.001, 'full-record warming is significant');
-  assert.equal(t.significantAt005, true);
+  assert.equal(t.significantAt05, true);
   assert.equal(t.slopeIsZero, false);
 });
 
@@ -54,7 +54,7 @@ test('trend: since-1975 window shows acceleration (~0.2 C/decade)', () => {
   const t = analyzeClimateTrend(rows);
   assert.ok(t.trendPerDecadeC > 0.15 && t.trendPerDecadeC < 0.25,
     `since-1975 trend ${t.trendPerDecadeC.toFixed(3)} C/decade (IPCC ~0.2)`);
-  assert.equal(t.significantAt005, true);
+  assert.equal(t.significantAt05, true);
   assert.ok(t.ci95PerDecadeC[0]! > 0, 'CI excludes zero');
 });
 
@@ -66,7 +66,7 @@ test('trend: fewer than 3 points throws (no honest trend on nothing)', () => {
 test('trend: flat series yields non-significant slope (null preserved)', () => {
   const flat = Array.from({ length: 20 }, (_, i) => ({ year: 2000 + i, anomalyC: 0.1 + (i % 2) * 0.001 }));
   const t = analyzeClimateTrend(flat);
-  assert.equal(t.significantAt005, false);
+  assert.equal(t.significantAt05, false);
   assert.equal(t.slopeIsZero, true);
 });
 
@@ -95,7 +95,14 @@ test('runPlanExperiment routes a climate run to the GISS trend adapter (replay)'
       decomposition: null, requiresEthicsGate: false, assessedAt: 't', schemaVersion: 1,
     },
     corpus: { snapshotId: 's', rootHash: 'r', documentCount: 0, documents: [], sourceQueries: [], createdAt: 't' },
-    hypotheses: [{ id: 'h1' }] as never,
+    hypotheses: [{
+      id: 'h1',
+      falsificationMethod: {
+        prediction: 'global mean surface temperature shows a significant warming trend',
+        direction: 'positive',
+        metricShape: 'trend-slope',
+      },
+    }] as never,
     bindings: {},
     critiques: {},
     scorecards: {},
@@ -143,8 +150,14 @@ test('runPlanExperiment routes a climate run to the GISS trend adapter (replay)'
   assert.ok(t.trendPerDecadeC > 0.07 && t.trendPerDecadeC < 0.10);
   assert.equal(result.feedback.source, 'analysis');
   assert.match(result.feedback.text, /significant warming/);
-  // climate 观测是有效观测但非决定性契约输入（裁决族仅覆盖 exoplanet 相关统计）→ 诚实 REFUSED。
+  // climate 观测是决断契约输入（trend-slope 族）→ 编译 → 内核判定：显著升温支持 warming 假设。
   const adjudication = adjudicateRunObservation({ run: result.updatedRun, observation: result.observation });
-  assert.equal(adjudication.status, 'REFUSED');
-  assert.equal(adjudication.reason, 'observation_not_decisive');
+  assert.equal(adjudication.status, 'COMPILED');
+  assert.equal(adjudication.metricLabel, 'trendPerDecadeC (global annual temperature anomaly, GISTEMP v4)');
+  const decided = await import('../../src/discovery/adjudication.ts').then((m) => m.decideAdjudication(adjudication));
+  assert.equal(decided.status, 'VERDICT');
+  if (decided.status === 'VERDICT') {
+    assert.equal(decided.verdict, 'CONFIRMED', 'significant positive slope supports the warming hypothesis');
+    assert.ok(decided.metricValue > 0);
+  }
 });

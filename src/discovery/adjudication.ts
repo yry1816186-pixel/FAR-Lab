@@ -163,53 +163,81 @@ export function adjudicateRunObservation(input: {
   if (hypothesis === undefined || !input.observation.affectsHypothesisIds.includes(hypothesisId)) {
     return { status: 'REFUSED', reason: 'no_observation_for_hypothesis' };
   }
-  // Decisive-observation gate: only the exoplanet statistical analysis carries
-  // a decisive statistic. Landscape = recommendations; FAILED = no data.
+  // Decisive-observation gate: only the domain statistical analyses carry a
+  // decisive statistic — exoplanet correlation (Pearson r) and climate
+  // trend-slope (GISTEMP annual anomalies). Landscape = recommendations;
+  // FAILED = no data.
   if (isLandscapeObservation(input.observation)) {
     return { status: 'REFUSED', reason: 'observation_not_decisive' };
   }
-  if (input.observation.adapter === 'giss-global-annual-trend') {
-    // The decisive-observation family currently covers only the exoplanet
-    // correlation statistic. A climate trend is a VALID observation but not a
-    // decisive contract input yet — refused, never force-mapped onto the
-    // correlation metric (honest refusal).
-    return { status: 'REFUSED', reason: 'observation_not_decisive' };
+  const isClimateObservation = input.observation.adapter === 'giss-global-annual-trend';
+  // Decisive-observation gate + metric extraction by observation family
+  // (discriminated union — the adapter tag narrows the result shape).
+  let metricValue: number | null;
+  if (isClimateObservation) {
+    const trend = input.observation.result;
+    if (trend.significantAt05 !== true) {
+      // A null trend is a VALID observation but not a DECISIVE one — the null
+      // is preserved, the ladder is not climbed (no fake adjudication).
+      return { status: 'REFUSED', reason: 'observation_not_decisive' };
+    }
+    metricValue = trend.trendPerDecadeC;
+  } else {
+    const r = input.observation.result;
+    if (r.status === 'FAILED' || r.significantAt05 !== true) {
+      return { status: 'REFUSED', reason: 'observation_not_decisive' };
+    }
+    metricValue = r.pearsonR;
   }
-  const result = input.observation.result;
-  if (result.status === 'FAILED' || result.significantAt05 !== true) {
-    // A null/failed analysis is a VALID observation but not a DECISIVE one —
-    // the null is preserved, the ladder is not climbed (no fake adjudication).
-    return { status: 'REFUSED', reason: 'observation_not_decisive' };
-  }
-  const pearsonR = result.pearsonR;
-  if (pearsonR === undefined || pearsonR === null || !Number.isFinite(pearsonR)) {
+  if (metricValue === undefined || metricValue === null || !Number.isFinite(metricValue)) {
     return { status: 'REFUSED', reason: 'no_finite_statistic' };
   }
   const prediction = hypothesis.falsificationMethod.prediction;
   const predictionLower = prediction.toLowerCase();
-  // Prose metric-coverage proxy (necessary, not sufficient — declared in the
-  // header): the prediction must textually reference the correlation family.
-  const proseCoversMetric =
+  // Prose metric-coverage proxies (necessary, not sufficient — declared in the
+  // header): correlation-family words for exoplanet, trend-family words for
+  // climate.
+  const proseCoversCorrelation =
     predictionLower.includes('correlation') ||
     predictionLower.includes('correlate') ||
     predictionLower.includes('pearson') ||
     predictionLower.includes('association');
+  const proseCoversTrend =
+    predictionLower.includes('trend') ||
+    predictionLower.includes('warming') ||
+    predictionLower.includes('slope') ||
+    predictionLower.includes('degree') ||
+    predictionLower.includes('decade');
 
   // ── Metric coverage: structured metricShape FIRST, prose fallback (b6-S1) ──
   const metricShape = hypothesis.falsificationMethod.metricShape;
   if (metricShape !== undefined) {
-    if (metricShape !== 'correlation' && proseCoversMetric) {
-      // Structured says a non-correlation shape while the prose claims the
-      // correlation family — the two channels contradict → fail-closed.
-      return { status: 'REFUSED', reason: 'structured_prose_conflict' };
-    }
-    // Only 'correlation' is measured by the decisive observation family
-    // (Pearson r). difference/threshold/ratio predictions are honestly
-    // refused rather than force-mapped onto a correlation statistic.
-    if (metricShape !== 'correlation') {
+    if (metricShape === 'correlation') {
+      if (isClimateObservation) {
+        // correlation shape cannot be served by a trend observation.
+        return { status: 'REFUSED', reason: 'metric_not_covered' };
+      }
+      if (proseCoversTrend) {
+        return { status: 'REFUSED', reason: 'structured_prose_conflict' };
+      }
+    } else if (metricShape === 'trend-slope') {
+      if (!isClimateObservation) {
+        // trend-slope shape cannot be served by a correlation observation.
+        return { status: 'REFUSED', reason: 'metric_not_covered' };
+      }
+      if (proseCoversCorrelation) {
+        return { status: 'REFUSED', reason: 'structured_prose_conflict' };
+      }
+    } else {
+      // difference/threshold/ratio predictions are honestly refused rather
+      // than force-mapped onto either decisive statistic — but if the prose
+      // claims one of the decisive families, the two channels contradict.
+      if (proseCoversCorrelation || proseCoversTrend) {
+        return { status: 'REFUSED', reason: 'structured_prose_conflict' };
+      }
       return { status: 'REFUSED', reason: 'metric_not_covered' };
     }
-  } else if (!proseCoversMetric) {
+  } else if (!(isClimateObservation ? proseCoversTrend : proseCoversCorrelation)) {
     return { status: 'REFUSED', reason: 'metric_not_covered' };
   }
 
@@ -240,22 +268,27 @@ export function adjudicateRunObservation(input: {
   // evaluateThreshold(metricValue, threshold) re-derives them authoritatively.
   const evidence: EvidenceRecord = {
     claim,
-    metricValue: pearsonR,
-    supportsClaim: direction === 'positive' ? pearsonR > 0 : pearsonR < 0,
-    refutesClaim: direction === 'positive' ? pearsonR <= 0 : pearsonR >= 0,
+    metricValue,
+    supportsClaim: direction === 'positive' ? metricValue > 0 : metricValue < 0,
+    refutesClaim: direction === 'positive' ? metricValue <= 0 : metricValue >= 0,
     scopeNarrowerThanClaim: false,
     sourceAnchor: {
       gitCommitSha: input.gitCommitSha ?? 'unresolved',
       dashscopeRequestId: null,
       isoTimestamp: input.observation.producedAt,
-      rawResponseHash: `obs:${result.inputHash}`,
+      rawResponseHash:
+        input.observation.adapter === 'giss-global-annual-trend'
+          ? `obs:climate-${input.observation.result.windowYears[0]}-${input.observation.result.windowYears[1]}`
+          : `obs:${input.observation.result.inputHash}`,
     },
   };
   return {
     status: 'COMPILED',
     claim,
-    metricLabel: 'pearsonR (radius × insolation, hot-Jupiter sample)',
-    metricValue: pearsonR,
+    metricLabel: isClimateObservation
+      ? 'trendPerDecadeC (global annual temperature anomaly, GISTEMP v4)'
+      : 'pearsonR (radius × insolation, hot-Jupiter sample)',
+    metricValue,
     evidence,
     thresholdSemantics,
     ...(input.gitCommitSha !== undefined ? { gitCommitSha: input.gitCommitSha } : {}),

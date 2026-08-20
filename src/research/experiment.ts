@@ -334,7 +334,7 @@ export function interpretObservation(obs: Observation): {
   }
   if (obs.adapter === 'giss-global-annual-trend') {
     const t = obs.result;
-    if (t.significantAt005 === false) {
+    if (t.significantAt05 === false) {
       return {
         text: `giss trend: slope not significant (${t.trendPerDecadeC.toFixed(3)} °C/decade, p=${t.pValue.toFixed(3)}) over ${t.windowYears[0]}-${t.windowYears[1]} — no detectable warming trend in this window; null preserved`,
         changesScore: true,

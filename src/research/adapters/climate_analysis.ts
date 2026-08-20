@@ -26,7 +26,7 @@ export interface ClimateTrendResult {
   readonly pValue: number;
   /** Null hypothesis result: slope == 0. */
   readonly slopeIsZero: boolean;
-  readonly significantAt005: boolean;
+  readonly significantAt05: boolean;
 }
 
 /**
@@ -77,7 +77,7 @@ export function analyzeClimateTrend(points: readonly ClimateAnnualPoint[]): Clim
     ci95PerDecadeC: [perDecade(slopePerYear - halfWidth), perDecade(slopePerYear + halfWidth)],
     pValue,
     slopeIsZero: !Number.isFinite(pValue) || pValue > 0.05,
-    significantAt005: Number.isFinite(pValue) && pValue <= 0.05,
+    significantAt05: Number.isFinite(pValue) && pValue <= 0.05,
   };
 }
 

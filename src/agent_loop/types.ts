@@ -112,8 +112,11 @@ export interface FalsificationMethod {
 export const PREDICTION_DIRECTIONS = ['positive', 'negative', 'either'] as const;
 export type PredictionDirection = (typeof PREDICTION_DIRECTIONS)[number];
 
-/** 度量形状的结构化枚举（b6-S1）。编译门当前只认 'correlation'（唯一决断观察族）。 */
-export const METRIC_SHAPES = ['correlation', 'difference', 'threshold', 'ratio'] as const;
+/**
+ * 度量形状的结构化枚举（b6-S1）。编译门当前认 'correlation'（exoplanet 决断观察族）
+ * 与 'trend-slope'（climate 决断观察族，2026-08-21 迁移裁决：GISS 年度异常趋势）。
+ */
+export const METRIC_SHAPES = ['correlation', 'difference', 'threshold', 'ratio', 'trend-slope'] as const;
 export type MetricShape = (typeof METRIC_SHAPES)[number];
 
 /**
