@@ -40,5 +40,6 @@ export default defineConfig({
     setupFiles: ['./src/test-setup.ts'],
     globals: false,
     css: false,
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'], // e2e 由 playwright 跑（test:e2e）
   },
 });

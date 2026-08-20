@@ -63,7 +63,7 @@ export function VerdictBadge({
       <VerdictIcon kind={VERDICT_ICON[known]} color={color} />
       <span>{t('verdict.token', { raw: verdict })}</span>
       {showGloss && known === verdict ? (
-        <span className="font-sans font-normal opacity-80">{t(GLOSS_KEY[known])}</span>
+        <span className="font-sans font-normal">{t(GLOSS_KEY[known])}</span>
       ) : null}
     </span>
   );

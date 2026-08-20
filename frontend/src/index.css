@@ -20,7 +20,7 @@
   --border-strong: #c9c6bd;
   --ink: #1c1b18;
   --ink-2: #57544c;
-  --ink-3: #8a867c;
+  --ink-3: #6e6a60; /* AA 4.5:1 on #ffffff (was #8a867c @3.63:1 — a11y 2026-08-21) */
 
   /* Interactive accent (instrument blue) — interactive affordance only */
   --accent: #1a4fd6;
@@ -50,7 +50,7 @@
   --border-strong: #3d4046;
   --ink: #e9e7e2;
   --ink-2: #b3b0a7;
-  --ink-3: #7d7a72;
+  --ink-3: #8f8b82; /* AA 4.5:1 on #101113 (was #7d7a72 @4.41:1 — a11y 2026-08-21) */
 
   --accent: #7aa2ff;
   --accent-ink: #0d1526;
