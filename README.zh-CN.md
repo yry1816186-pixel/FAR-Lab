@@ -102,6 +102,8 @@ pnpm far research resume <runId>     # 从 checkpoint 续跑已崩溃/已取消�
 #    领域门控：非系外行星课题会被拒绝，绝不用错误数据集硬算。
 pnpm far research analyze run.json --live
 #   → n=392 颗热木星，r=0.587，p<0.001（相关性≠因果——如实表述）
+#     （live 实测 2026-08；复算：`pnpm far research analyze <run.json> --live`——
+#      数值跟随 NASA TAP 在线档案更新而自然漂移）
 
 # 3. 专家反馈 → 不可变修订 → 前后计划比较：
 pnpm far research feedback run.json --file feedback.json
@@ -225,7 +227,7 @@ FEC 编排 → 内核裁决 → fail-closed 密封。要验证持久化 bundle�
 
 ```bash
 export DASHSCOPE_API_KEY=sk-...          # 切勿提交；见 SECURITY.md
-pnpm far ask "<question>" --profile competition_aliyun_qwen
+pnpm far ask "Does stellar activity inflate hot Jupiter radii?" --profile competition_aliyun_qwen
 
 # 代表性 live 路径：真实 Qwen 生成 + 真实 OpenAlex 检索一次完成
 # 无需 --profile：默认即 auto —— 设了 DASHSCOPE_API_KEY 就是 LIVE

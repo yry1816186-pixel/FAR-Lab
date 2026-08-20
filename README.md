@@ -180,6 +180,8 @@ pnpm far research resume <runId>     # continue a crashed/cancelled run from its
 #    Domain-gated: a non-exoplanet run is REFUSED, never analyzed against the wrong dataset.
 pnpm far research analyze run.json --live
 #   → n=392 hot Jupiters, r=0.587, p<0.001 (association, not causation — honest wording)
+#     (live-measured 2026-08; recompute with `pnpm far research analyze <run.json> --live` —
+#      these values track the live NASA TAP archive and drift as it updates)
 
 # 3. Apply expert feedback → immutable revision → compare the before/after plan:
 pnpm far research feedback run.json --file feedback.json
@@ -308,7 +310,7 @@ TESS claim (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fai
 
 ```bash
 export DASHSCOPE_API_KEY=sk-...          # never commit this; see SECURITY.md
-pnpm far ask "<question>" --profile competition_aliyun_qwen
+pnpm far ask "Does stellar activity inflate hot Jupiter radii?" --profile competition_aliyun_qwen
 ```
 
 Core gates and the offline demo run **without** this key. The CI `competition_qwen_smoke` job is a

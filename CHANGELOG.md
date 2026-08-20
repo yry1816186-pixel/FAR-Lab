@@ -44,9 +44,95 @@ The format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added — CLI 渲染层与前端实时联动
 - CLI 渲染层 `src/cli/render.ts`（spinner/进度条/表格/ANSI，NO_COLOR 规范）
-- 表驱动 CLI 框架 `src/cli/registry.ts`（26 命令声明式注册 + runCli 分发器；run 返回 undefined 不 exit 保 api 长驻命令）
+- 表驱动 CLI 框架 `src/cli/registry.ts`（命令声明式注册 + runCli 分发器；命令数不在此写死，以 `far --help` 为准，doc↔CLI 一致性由 `node scripts/doc_command_check.mjs` 每次校验；run 返回 undefined 不 exit 保 api 长驻命令）
 - `far stream --events` 实时阶段事件流
 - 前端 SSE 实时联动：`useAgentEventStream` hook + `/events` 实时事件流页 + AppShell 导航 + i18n zh/en
+
+### Added — anti-theater 第 23 项检测器
+- `AT-EFFECT-P-MISMATCH`（`src/anti_theater/detectors/effect_p_consistency.ts`，2026-08-07）：统计报告内部一致性检测（effectSize / p / CI / direction 逻辑矛盾）；反剧场检测器总数 22 → 23（README 双语声明面已同步为 23；`far verify` 的 bundle 重算包含第 23 项）
+
+### Changed — REST API 端点增长
+- REST API 由 16 paths 增长到 39 paths（SSOT：`schema/openapi.json`，`pnpm openapi:check` 校验 schema 与实现零漂移；当前端点数不在正文多处重复写死，以 SSOT 为准）
+
+### Changed — docs/ 撤出 tracked 仓库
+- `docs/` 层级与 `DOCS_INDEX.md` 按 source-only content policy 撤出 tracked 仓库（#37）：源码库只保留代码与 tracked 发布面文档（README 双语 / SECURITY / CHANGELOG）；下方历史条目中曾指向 docs/ 的空链接已改为纯文字
+
+## [1.1.0] — 2026-08-05
+
+### Fixed
+
+- **Windows CI test failure**: `demo_chain_replay.test.ts:415` verify.sh MSYS path issue.
+  Root cause: git-bash `sh` reports MSYS-style paths (`/c/tmp/...`) but Windows Node.js
+  needs native paths (`C:\tmp\...`). Fix: `cygpath -w` conversion in verify.sh + defensive
+  `normalizeBundleDir()` in the Node heredoc. (`src/far_proof/offline_package.ts`)
+- **5 high-severity CVEs across 3 packages**: brace-expansion (DoS), find-my-way (HTTP2 DDoS),
+  fast-uri (host confusion). Fixed via `pnpm.overrides` — all were DoS-class transitive deps,
+  none touched the trust kernel. `pnpm audit` now reports zero vulnerabilities.
+
+### Added
+
+- **Judge Quick-Start guide**: 5-minute verification path
+  for competition judges — 60-second demo, 2-minute tamper hero, 5-minute kernel deep dive.
+- **Real-world science integrity cases**: maps famous
+  reproducibility failures (Bem 2011, OSC 2015, LK-99, Theranos) to FAR-Lab's 22
+  anti-theater detectors.
+- **API reference**: all 16 REST endpoints documented with
+  request/response shapes and error format.
+- **Repository navigation guide**: organizes 25 root-level documents
+  into clear reading paths for different audiences.
+
+### Added — supply-chain hardening
+
+- `.npmrc` save-exact=true; `package.json` dependencies + `pnpm.overrides` exact-pinned.
+- `scripts/check-supply-chain.mjs` gate (exact pins + lockfile specifier consistency) wired into
+  `ci.yml` blocking_gates; new weekly `.github/workflows/security-audit.yml`
+  (`pnpm audit --prod` + audit signatures).
+
+### Added — statistical trap taxonomy
+
+- `src/anti_theater/trap_taxonomy.ts`: 21-entry taxonomy (category/name/what/cures/realCase) for
+  every anti-theater attack kind + `summarizeTraps` aggregation.
+- Report layer: optional Statistical Trap Audit section rendering triggered trap categories
+  (zero regression when absent).
+
+### Added — evidence FTS5 search
+
+- `src/evidence_log/search.ts`: `ensureFtsIndex` / `reindexEvidenceFts` / `searchEvidence` /
+  `escapeFtsQuery`. Search auxiliary layer — never enters the hash chain.
+
+### Added — evidence quality grading
+
+- `src/evidence_quality/`: `gradeEvidenceTier` (RCT→1 … expert/unspecified→4) + Cochrane RoB 7-domain
+  assessment + `gradeEvidenceQuality`. Transparency layer only: `VerdictKernelOutput` gains optional
+  `evidenceQualityTier` / `evidenceQualityNote`; verdict logic and `proofHash` unchanged
+  (zero regression).
+
+### Added — evidence context compaction
+
+- `src/agent_loop/compaction.ts`: deterministic artifact compression (stage3/4 verdict-critical
+  payloads preserved verbatim; narrative fields clipped with hash anchors).
+- `runAgentLoop` optional `compactArtifacts` flag (default off → byte-identical).
+
+### Added — CLI state revert
+
+- `state_machine` gains 3 revert edges (STATISTICS→EVIDENCE_GATHERED, VERDICT→STATISTICS,
+  PROOF_SEALED→VERDICT); seal is a commit point — no revert after it (fail-closed).
+
+### Added — scheduled re-verification
+
+- `far schedule add|list|remove|run`: JSON-persisted re-verification jobs with due-date logic and
+  auditable exec runs (`schedules.json` under `$FAR_HOME` or `~/.far`).
+
+### Added — runtime JSONL session recording
+
+- `src/trace/session_recorder.ts`: `SessionRecorder` / `replaySession` / `serializeEvent`.
+- `runAgentLoop` optional `sessionPath`: records `run_started` / `stage_completed` ×N / `run_completed`.
+
+### Added — math backend fallback chains
+
+- `MathVerifier` fallback chains (default: SMT→CAS, Lean4→Dafny; overridable, `null` disables):
+  unavailable / throwing / honestly-degraded primary backend falls back to alternatives with
+  `fallback_from:<kind>` annotation. The primary conclusion is never overridden.
 
 ## [1.0.0] — initial open-source release
 
@@ -102,7 +188,7 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
   / FEC / anti-theater / determinism / evidence-ledger / far-proof), providers, demos.
 - `scripts/install.sh` + `scripts/install.ps1` — user-space installer (zero key, zero big-data).
 - `Dockerfile` + `docker-compose.yml` — default offline demo / API, no key required.
--  — offline demo walkthrough with a tested tamper-detection guide.
+- Offline demo walkthrough with a tested tamper-detection guide.
   > The `examples/` tree (tess-offline bundle, fec, statistical-claim) is documented but not
   > yet part of the shipped repository; it is a roadmap item. The tested demo path is
   > `node src/cli/far.ts demo tess-offline` + `far export far-proof` (see README §Offline demo).
@@ -123,80 +209,3 @@ independently-recomputable boundary. The verdict is produced by a deterministic 
   user-space hardening.
 - `NEEDS_RELEASE_PUBLICATION`: the package is build-ready and `npm install -g` works from a tarball,
   but is not yet published to the npm registry; the GitHub Release is pending.
-
-## [1.1.0] — 2026-08-05
-
-### Fixed
-
-- **Windows CI test failure**: `demo_chain_replay.test.ts:415` verify.sh MSYS path issue.
-  Root cause: git-bash `sh` reports MSYS-style paths (`/c/tmp/...`) but Windows Node.js
-  needs native paths (`C:\tmp\...`). Fix: `cygpath -w` conversion in verify.sh + defensive
-  `normalizeBundleDir()` in the Node heredoc. (`src/far_proof/offline_package.ts`)
-- **5 high-severity CVEs**: brace-expansion (DoS), find-my-way (HTTP2 DDoS), fast-uri
-  (host confusion). Fixed via `pnpm.overrides` — all were DoS-class transitive deps,
-  none touched the trust kernel. `pnpm audit` now reports zero vulnerabilities.
-
-### Added
-
-- **Judge Quick-Start guide** (): 5-minute verification path
-  for competition judges — 60-second demo, 2-minute tamper hero, 5-minute kernel deep dive.
-- **Real-world science integrity cases** (): maps famous
-  reproducibility failures (Bem 2011, OSC 2015, LK-99, Theranos) to FAR-Lab's 22
-  anti-theater detectors.
-- **API reference** (): all 16 REST endpoints documented with
-  request/response shapes and error format.
-- **Repository navigation guide** (`DOCS_INDEX.md`): organizes 25 root-level documents
-  into clear reading paths for different audiences.
-
-### Added — supply-chain hardening
-
-- `.npmrc` save-exact=true; `package.json` dependencies + `pnpm.overrides` exact-pinned.
-- `scripts/check-supply-chain.mjs` gate (exact pins + lockfile specifier consistency) wired into
-  `ci.yml` blocking_gates; new weekly `.github/workflows/security-audit.yml`
-  (`pnpm audit --prod` + audit signatures).
-
-### Added — statistical trap taxonomy
-
-- `src/anti_theater/trap_taxonomy.ts`: 21-entry taxonomy (category/name/what/cures/realCase) for
-  every anti-theater attack kind + `summarizeTraps` aggregation.
-- Report layer: optional Statistical Trap Audit section rendering triggered trap categories
-  (zero regression when absent).
-
-### Added — evidence FTS5 search
-
-- `src/evidence_log/search.ts`: `ensureFtsIndex` / `reindexEvidenceFts` / `searchEvidence` /
-  `escapeFtsQuery`. Search auxiliary layer — never enters the hash chain.
-
-### Added — evidence quality grading
-
-- `src/evidence_quality/`: `gradeEvidenceTier` (RCT→1 … expert/unspecified→4) + Cochrane RoB 7-domain
-  assessment + `gradeEvidenceQuality`. Transparency layer only: `VerdictKernelOutput` gains optional
-  `evidenceQualityTier` / `evidenceQualityNote`; verdict logic and `proofHash` unchanged
-  (zero regression).
-
-### Added — evidence context compaction
-
-- `src/agent_loop/compaction.ts`: deterministic artifact compression (stage3/4 verdict-critical
-  payloads preserved verbatim; narrative fields clipped with hash anchors).
-- `runAgentLoop` optional `compactArtifacts` flag (default off → byte-identical).
-
-### Added — CLI state revert
-
-- `state_machine` gains 3 revert edges (STATISTICS→EVIDENCE_GATHERED, VERDICT→STATISTICS,
-  PROOF_SEALED→VERDICT); seal is a commit point — no revert after it (fail-closed).
-
-### Added — scheduled re-verification
-
-- `far schedule add|list|remove|run`: JSON-persisted re-verification jobs with due-date logic and
-  auditable exec runs (`schedules.json` under `$FAR_HOME` or `~/.far`).
-
-### Added — runtime JSONL session recording
-
-- `src/trace/session_recorder.ts`: `SessionRecorder` / `replaySession` / `serializeEvent`.
-- `runAgentLoop` optional `sessionPath`: records `run_started` / `stage_completed` ×N / `run_completed`.
-
-### Added — math backend fallback chains
-
-- `MathVerifier` fallback chains (default: SMT→CAS, Lean4→Dafny; overridable, `null` disables):
-  unavailable / throwing / honestly-degraded primary backend falls back to alternatives with
-  `fallback_from:<kind>` annotation. The primary conclusion is never overridden.

@@ -52,10 +52,12 @@ docs, CI config, scripts, comments, or commit messages):
 
 ### Enforcement
 
-- CI scans for hardcoded secret patterns on every run.
-- Pre-commit hooks block commits containing high-entropy strings matching known key formats.
+- CI runs `scripts/secret_scan.mjs --root . --fail-on-hit` on every push and pull request
+  (`.github/workflows/ci.yml` secret_scan step) and again during release
+  (`.github/workflows/release.yml`).
+- There are **no** local pre-commit hooks; secret enforcement is CI-side only.
 - `.env.example` is the **only** allowed template file — it lists keys without values.
-- All CI logs are scrubbed before archival; never `echo` or `console.log` secrets.
+- Never `echo` or `console.log` secrets.
 
 ### If You Accidentally Commit a Secret
 

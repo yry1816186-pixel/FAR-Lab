@@ -57,8 +57,8 @@ function docCommands(readmePath) {
       continue;
     }
     if (!inFence) continue;
-    // 命令行：可选 $ 前缀，后跟 far <sub>
-    const m = raw.match(/^\$?\s*far\s+([A-Za-z][\w-]*)/);
+    // 命令行：可选 $ 前缀 + 可选包管理器前缀（pnpm far X / npm run far X），后跟 far <sub>
+    const m = raw.match(/^\$?\s*(?:pnpm\s+|npm\s+run\s+)?far\s+([A-Za-z][\w-]*)/);
     if (m !== null && m[1] !== undefined) {
       const sub = m[1];
       if (!cmds.has(sub)) cmds.set(sub, []);
@@ -80,7 +80,7 @@ function residualTokenScan(readmePath) {
       continue;
     }
     if (!inFence) continue;
-    if (!/^\$?\s*far\s/.test(raw)) continue;
+    if (!/^\$?\s*(?:pnpm\s+|npm\s+run\s+)?far\s/.test(raw)) continue;
     // 允许 <X_FROM_STATUS_DUMP>（CI backfill 合法占位）；其余 <lower> 形式视为未填残留
     const bad = raw.match(/<(?![A-Z_]+_FROM_STATUS_DUMP>)[a-z][a-z0-9_-]*>/g);
     if (bad !== null) residues.push({ line: raw.trim(), badTokens: bad });
