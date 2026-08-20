@@ -31,6 +31,8 @@ export interface GroundOptions {
   readonly json: boolean;
   /** Pin to a frozen snapshot instead of live retrieval (--reuse-snapshot <id>). */
   readonly reuseSnapshot: string | null;
+  /** Optional relevance floor (source absolute scores; unset = keep all). */
+  readonly minRelevance: number | null;
 }
 
 /** Parse `far ground` args (both `--flag value` and `--flag=value` forms). */
@@ -41,11 +43,25 @@ export function parseGroundArgs(args: readonly string[]): GroundOptions | { erro
   let includeCounterEvidence = true;
   let json = false;
   let reuseSnapshot: string | null = null;
+  let minRelevance: number | null = null;
 
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i]!;
     if (a === '--json') {
       json = true;
+      continue;
+    }
+    if (a.startsWith('--min-relevance')) {
+      const inline = a.startsWith('--min-relevance=') ? a.slice('--min-relevance='.length) : args[i + 1];
+      if (inline === undefined) {
+        return { error: 'far ground: --min-relevance needs a numeric floor (source absolute score; e.g. 50)' };
+      }
+      const n = Number(inline);
+      if (!Number.isFinite(n) || n < 0) {
+        return { error: `far ground: --min-relevance must be a non-negative number, got '${inline}'` };
+      }
+      minRelevance = n;
+      if (!a.startsWith('--min-relevance=')) i += 1;
       continue;
     }
     if (a === '--no-counter-evidence') {
@@ -106,6 +122,7 @@ export function parseGroundArgs(args: readonly string[]): GroundOptions | { erro
     includeCounterEvidence,
     json,
     reuseSnapshot,
+    minRelevance,
   };
 }
 
@@ -124,6 +141,9 @@ function formatHuman(g: GroundedCorpus): string {
   );
   lines.push(`  groundedAt     ${g.groundedAt}`);
   lines.push(`  documents      ${g.corpus.documentCount} (snapshotId ${g.corpus.snapshotId.slice(0, 12)}… / rootHash ${g.corpus.rootHash.slice(0, 12)}…)`);
+  if (g.filteredByRelevance !== undefined && g.filteredByRelevance > 0) {
+    lines.push(`  relevance-floor ${g.filteredByRelevance} doc(s) dropped below --min-relevance`);
+  }
   lines.push(`  queries issued:`);
   for (const qc of g.perQueryCounts) {
     lines.push(`    · [${qc.count}] ${qc.query}`);
@@ -131,7 +151,8 @@ function formatHuman(g: GroundedCorpus): string {
   lines.push(`  documents (first 10):`);
   for (const d of g.corpus.documents.slice(0, 10)) {
     const doi = d.doi ? ` · doi:${d.doi}` : '';
-    lines.push(`    - [${d.sourceType}] ${d.title}${doi}`);
+    const score = d.relevanceScore !== undefined && d.relevanceScore !== null ? ` · relevance=${d.relevanceScore.toFixed(1)}` : '';
+    lines.push(`    - [${d.sourceType}] ${d.title}${doi}${score}`);
     lines.push(`        ${d.canonicalUrl} · authors: ${d.authors.slice(0, 3).join(', ')}${d.authors.length > 3 ? ' et al.' : ''}`);
   }
   if (g.corpus.documentCount > 10) {
@@ -165,6 +186,7 @@ export async function runGround(args: readonly string[]): Promise<number> {
       maxPerQuery: parsed.maxPerQuery,
       includeCounterEvidence: parsed.includeCounterEvidence,
       ...(frozenCorpus !== undefined ? { frozenCorpus } : {}),
+      ...(parsed.minRelevance !== null ? { minRelevanceScore: parsed.minRelevance } : {}),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -183,6 +205,9 @@ export async function runGround(args: readonly string[]): Promise<number> {
         sourceQueries: grounded.corpus.sourceQueries,
       },
       perQueryCounts: grounded.perQueryCounts,
+      ...(grounded.filteredByRelevance !== undefined && grounded.filteredByRelevance > 0
+        ? { filteredByRelevance: grounded.filteredByRelevance }
+        : {}),
       documents: grounded.corpus.documents.map((d) => ({
         documentId: d.documentId,
         sourceType: d.sourceType,
@@ -192,6 +217,7 @@ export async function runGround(args: readonly string[]): Promise<number> {
         canonicalUrl: d.canonicalUrl,
         publicationDate: d.publicationDate,
         abstract: d.abstract,
+        relevanceScore: d.relevanceScore ?? null,
       })),
     }, null, 2)}\n`);
   } else {

@@ -86,6 +86,13 @@ export interface RetrievedDocument {
    * annotation only — deliberately NOT part of normalizedDocumentHash.
    */
   readonly abstractWithheldReason?: 'crossref_record_license_not_permissive' | undefined;
+  /**
+   * Source relevance score for the query that produced this hit (OpenAlex
+   * `search` returns an absolute relevance_score; arXiv/Crossref have none →
+   * null). Retrieval metadata only — deliberately NOT part of
+   * normalizedDocumentHash (a relevance number does not identify a document).
+   */
+  readonly relevanceScore?: number | null;
 }
 
 /** A retrieval request. */

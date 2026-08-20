@@ -42,6 +42,8 @@ interface OpenAlexWork {
   abstract_inverted_index?: Record<string, readonly number[]> | null;
   license?: string | null;
   open_access?: { oa_status?: string | null };
+  /** Absolute relevance score for the `search` query (present on search hits). */
+  relevance_score?: number;
 }
 
 /** Reconstruct abstract text from OpenAlex's inverted-index encoding. */
@@ -117,6 +119,7 @@ function mapOpenAlexWork(work: OpenAlexWork, rawBody: string, queryText: string,
     parserVersion: RETRIEVAL_PARSER_VERSION,
     abstract,
     licenseMetadata: license,
+    relevanceScore: work.relevance_score ?? null,
   };
 }
 

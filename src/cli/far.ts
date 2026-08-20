@@ -89,7 +89,7 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'demo',
-    description: 'one-shot demo (14 Golden Vectors + end-to-end demo claim; fully offline)',
+    description: 'one-shot demo (15 Golden Vectors + end-to-end demo claim; fully offline)',
     run: async (args) => {
       // `far demo v2` shows the V2 receipt verification path (six assurance dimensions).
       if (args[0] === 'v2' || args[0] === '--v2') {
@@ -249,7 +249,7 @@ const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'ground',
-    description: 'ground a research question in real literature + counter-evidence (OpenAlex/arXiv/Crossref; --json, --source, --max-per-query)',
+    description: 'ground a research question in real literature + counter-evidence (OpenAlex/arXiv/Crossref; --json, --source, --max-per-query, --min-relevance <floor>)',
     run: async (args) => (await import('./commands/ground.ts')).runGround(args),
   },
   {
@@ -1200,7 +1200,7 @@ USAGE:
     --json              machine-readable single document (sample + alerts + thresholds + result)
     exits 0 no alerts · 2 alerts present (WARN semantics, same tier as doctor WARN-only)
 
-  far demo [tess-offline]            one-shot demo (14 Golden Vectors + end-to-end demo claim;
+  far demo [tess-offline]            one-shot demo (15 Golden Vectors + end-to-end demo claim;
                                      fully offline, no credentials needed)
                                      tess-offline        focus on the TESS (C-ASTRO-0001 pulsar) offline verdict
 
@@ -1240,7 +1240,7 @@ USAGE:
     needs python+numpy; exits 1 if missing. exit 0 on run; 2 bad args. Honest: each round is a
     real BLS subprocess; depthSNR may plateau on a saturated signal (real measurement, not a stub).
 
-  far ground "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--no-counter-evidence] [--json]
+  far ground "<question>" [--source openalex|arxiv|crossref] [--max-per-query <n>] [--no-counter-evidence] [--min-relevance <floor>] [--json]
                         Ground a research question in REAL literature + adversarial counter-evidence
                         (hypothesis-generation acquisition layer). Retrieves supporting docs
                         + 5 counter-evidence queries (non-replication/null/failure/criticism/alternative),

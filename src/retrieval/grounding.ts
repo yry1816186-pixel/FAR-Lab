@@ -101,6 +101,15 @@ export interface GroundingOptions {
    * snapshot_store.ts.
    */
   readonly frozenCorpus?: CorpusSnapshot;
+  /**
+   * Optional relevance floor (source absolute scores, e.g. OpenAlex
+   * relevance_score). When set, documents whose source reports a score BELOW
+   * the floor are dropped before the corpus snapshot is built, and the number
+   * dropped is reported as filteredByRelevance (honest accounting; default
+   * unset = keep everything). Documents without a score (arXiv/Crossref)
+   * are never dropped by this gate.
+   */
+  readonly minRelevanceScore?: number;
 }
 
 /** The result of grounding a research question. */
@@ -125,6 +134,8 @@ export interface GroundedCorpus {
   readonly failedSources?: ReadonlyArray<{ readonly source: string; readonly error: string }>;
   /** Documents replayed from the persistent retrieval cache (honest accounting). */
   readonly cacheHits?: number;
+  /** Documents dropped by the optional minRelevanceScore floor (0 = none). */
+  readonly filteredByRelevance?: number;
   /** 'live' = real network fetch; 'replay' = injected adapter served fixtures. */
   readonly fetchMode: 'live' | 'replay' | 'frozen';
   /**
@@ -243,6 +254,23 @@ export async function groundResearchQuestion(opts: GroundingOptions): Promise<Gr
     await runQuery(eq);
   }
 
+  // 2c. Optional relevance floor: drop weak hits BEFORE the corpus snapshot is
+  // built (only sources that report a score; never silently — counted below).
+  let filteredByRelevance = 0;
+  if (opts.minRelevanceScore !== undefined) {
+    const floor = opts.minRelevanceScore;
+    const kept: typeof allDocs = [];
+    for (const doc of allDocs) {
+      if (doc.relevanceScore !== undefined && doc.relevanceScore !== null && doc.relevanceScore < floor) {
+        filteredByRelevance += 1;
+        continue;
+      }
+      kept.push(doc);
+    }
+    allDocs.length = 0;
+    allDocs.push(...kept);
+  }
+
   // 3. Merge + dedupe into an immutable corpus snapshot (sourceQueries provenance).
   const sourceQueries = [
     opts.question,
@@ -282,6 +310,7 @@ export async function groundResearchQuestion(opts: GroundingOptions): Promise<Gr
         }
       : {}),
     cacheHits: allDocs.filter((d) => d.retrievedFrom === 'cache').length,
+    ...(filteredByRelevance > 0 ? { filteredByRelevance } : {}),
     fetchMode: anyReplay ? 'replay' : 'live',
     groundedAt,
   };

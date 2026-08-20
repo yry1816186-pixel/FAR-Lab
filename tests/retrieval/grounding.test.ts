@@ -88,6 +88,31 @@ describe('grounding — research-question acquisition orchestration', () => {
     assert.ok(g.corpus.documentCount <= 3, 'deduped to the unique fixture docs');
   });
 
+  it('minRelevanceScore drops weak hits and reports the count (honest accounting)', async () => {
+    // replay 每查询返回同一组 3 篇 fixture（score 7725.91 / 1792.24 / 1661.96）：
+    // 6 个查询（1 supporting + 5 counter）× 3 = 18 条命中，floor 2000 滤掉 12 条弱相关副本，
+    // 保留 6 条 top 副本 → 去重后 corpus 恰 1 篇。
+    const g = await groundResearchQuestion({
+      question: 'estimating reproducibility psychological science',
+      adapter: replayAdapter,
+      maxPerQuery: 3,
+      minRelevanceScore: 2000,
+    });
+    assert.equal(g.filteredByRelevance, 12);
+    assert.equal(g.corpus.documentCount, 1);
+    assert.ok((g.corpus.documents[0]!.relevanceScore ?? 0) >= 2000);
+  });
+
+  it('no relevance floor → nothing filtered (default keeps all evidence)', async () => {
+    const g = await groundResearchQuestion({
+      question: 'replication crisis',
+      adapter: replayAdapter,
+      maxPerQuery: 3,
+    });
+    assert.equal(g.filteredByRelevance, undefined);
+    assert.equal(g.corpus.documentCount, 3, 'all fixture docs kept');
+  });
+
   it('the resolver binds citations to the grounded corpus', async () => {
     const g = await groundResearchQuestion({
       question: 'replication crisis',

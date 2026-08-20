@@ -68,6 +68,19 @@ describe('OpenAlex adapter — hermetic parse against recorded real response', (
     }
   });
 
+  it('preserves the source relevance_score as retrieval metadata (absolute score, not content)', () => {
+    const docs = parseOpenAlexResults(FIXTURE_BODY, QUERY_TEXT, '2026-08-12T00:00:00.000Z', 3);
+    assert.ok(docs.length >= 3);
+    for (const d of docs) {
+      assert.equal(typeof d.relevanceScore, 'number', 'OpenAlex search hits carry relevanceScore');
+    }
+    const [a, b] = docs;
+    assert.ok((a!.relevanceScore ?? 0) > (b!.relevanceScore ?? 0),
+      'fixture is relevance-sorted: top hit has the highest score');
+    // 元数据不进内容哈希：relevanceScore 与 normalizedHash 无关（哈希只覆盖文档身份字段）。
+    assert.match(docs[0]!.normalizedHash, /^[0-9a-f]{64}$/);
+  });
+
   it('documentId is deterministic — same content always hashes to the same id', () => {
     const d = docs[0];
     if (!d) assert.fail('fixture must yield at least one document');
