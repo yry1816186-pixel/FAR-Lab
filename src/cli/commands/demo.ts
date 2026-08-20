@@ -10,6 +10,8 @@
 // 「证据链工程完整性 + 确定性裁决内核 + 防篡改密封」，绝非「证明科学结论为真」。
 
 import Database from 'better-sqlite3';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { buildDemoChain, type DemoChainResult } from '../../far_proof/demo_chain.ts';
 import { buildHeroAChain, type HeroAPipelineResult } from '../../science_harness/hero_a_pipeline.ts';
 import { probeEnvironment, retryGoldenOnce } from './demo_probe.ts';
@@ -28,12 +30,26 @@ ${bannerLine('Claim-level AI4S verification (R0-R9 kernel · tamper-evident · a
 ╚${'═'.repeat(BANNER_WIDTH)}╝
 `;
 
-const PHASE1 = `
+const PHASE1 = (count: number) => `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ① Deterministic verdict kernel — 15 Golden Vectors via the real R0-R9 rule tree
+  ① Deterministic verdict kernel — ${count} Golden Vectors via the real R0-R9 rule tree
      (no LLM in the loop; five values: CONFIRMED/REFUTED/INCONCLUSIVE/DEGRADED_SCOPE/UNTESTED)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
+
+/**
+ * 当前 golden-vector case 实存数（golden_vectors/cases/GV-*.json）。
+ * 标题数字从此派生而不是硬编码——新增/删除 case 时不会再次漂移（声称-实测对齐）。
+ * verify-golden 遍历同一目录，故目录数 = 实跑数。
+ */
+function goldenCaseCount(): number {
+  try {
+    const dir = join(process.cwd(), 'golden_vectors', 'cases');
+    return readdirSync(dir).filter((f) => f.endsWith('.json')).length;
+  } catch {
+    return 0;
+  }
+}
 
 const PHASE2 = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -130,7 +146,7 @@ export function runDemo(subcommand: string | undefined = undefined, opts: { read
 
   process.stdout.write(BANNER);
 
-  process.stdout.write(PHASE1);
+  process.stdout.write(PHASE1(goldenCaseCount()));
   // P0-3（S1-69.3 修复）：GV 失败有界重试 1 次（瞬时波动容错·持续失败仍 exit 7 不掩盖）。
   const gvExit = retryGoldenOnce(() => runVerifyGolden({ backend: 'node' }));
   if (gvExit !== 0) {
