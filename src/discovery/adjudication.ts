@@ -168,6 +168,13 @@ export function adjudicateRunObservation(input: {
   if (isLandscapeObservation(input.observation)) {
     return { status: 'REFUSED', reason: 'observation_not_decisive' };
   }
+  if (input.observation.adapter === 'giss-global-annual-trend') {
+    // The decisive-observation family currently covers only the exoplanet
+    // correlation statistic. A climate trend is a VALID observation but not a
+    // decisive contract input yet — refused, never force-mapped onto the
+    // correlation metric (honest refusal).
+    return { status: 'REFUSED', reason: 'observation_not_decisive' };
+  }
   const result = input.observation.result;
   if (result.status === 'FAILED' || result.significantAt05 !== true) {
     // A null/failed analysis is a VALID observation but not a DECISIVE one —

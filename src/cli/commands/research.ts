@@ -1344,11 +1344,15 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
     const headline =
       isLandscapeObservation(observation)
         ? `literature-landscape, docs=${observation.result.totalDocuments}, counterShare=${(observation.result.counterEvidenceShare * 100).toFixed(1)}%, mode=${observation.mode}`
-        : `${observation.result.status}, n=${observation.result.n}, mode=${observation.mode}`;
+        : observation.adapter === 'giss-global-annual-trend'
+          ? `giss-global-annual-trend, n=${observation.result.n}, mode=${observation.mode}`
+          : `${observation.result.status}, n=${observation.result.n}, mode=${observation.mode}`;
     const resultLine =
       isLandscapeObservation(observation)
         ? `${observation.result.totalDocuments} docs · counter-evidence ${(observation.result.counterEvidenceShare * 100).toFixed(1)}% · fresh≤5y ${(observation.result.freshShare * 100).toFixed(1)}% · median year ${observation.result.medianPublicationYear ?? 'n/a'} · ${observation.result.sourceFamilies.join('+')}`
-        : observation.result.summary;
+        : observation.adapter === 'giss-global-annual-trend'
+          ? `${observation.result.trendPerDecadeC.toFixed(3)} °C/decade (95%CI ${observation.result.ci95PerDecadeC[0]!.toFixed(2)}..${observation.result.ci95PerDecadeC[1]!.toFixed(2)}, p=${observation.result.pValue.toExponential(1)}) over ${observation.result.windowYears[0]}-${observation.result.windowYears[1]}`
+          : observation.result.summary;
     process.stdout.write(
       `far research analyze: observation collected (${headline})\n` +
         `  result    : ${resultLine}\n` +

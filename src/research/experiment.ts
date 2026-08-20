@@ -44,6 +44,15 @@ export type Observation =
     }
   | {
       readonly id: string;
+      readonly adapter: 'giss-global-annual-trend';
+      readonly affectsHypothesisIds: readonly string[];
+      readonly result: ClimateTrendResult;
+      readonly datasetCard: ClimateDatasetCard;
+      readonly mode: ComponentMode;
+      readonly producedAt: string;
+    }
+  | {
+      readonly id: string;
       readonly adapter: 'literature-landscape';
       readonly affectsHypothesisIds: readonly string[];
       readonly result: LiteratureLandscapeObservation;
@@ -60,6 +69,10 @@ export interface RunExperimentOptions {
   readonly replayRows?: readonly PsRow[];
   /** Replay card (must accompany replayRows). */
   readonly replayCard?: ExoplanetDatasetCard;
+  /** Injected climate series (offline mode; live GISS fetch when omitted). */
+  readonly replayClimateRows?: readonly ClimateAnnualPoint[];
+  /** Replay climate card (must accompany replayClimateRows). */
+  readonly replayClimateCard?: ClimateDatasetCard;
   /** Time source (tests). */
   readonly now?: () => Date;
 }
@@ -83,42 +96,27 @@ const DEFAULT_CONFIDENCE = 0.95;
  * ("period", "radius") is deliberately NOT enough — a diabetes or NLP plan
  * must be REFUSED, not analyzed against hot-Jupiter data (2026-08-14 defect:
  * `far research analyze` grafted an exoplanet correlation onto a diabetes run).
+ *
+ * Terms/hints live in the domain-gate registry (src/research/domain_gates.ts);
+ * this function is the exoplanet-specific projection of matchingDomain().
  */
-const APPLICABILITY_TERMS = [
-  'exoplanet',
-  'transit',
-  'hot jupiter',
-  'planetary radius',
-  'planet radius',
-  'insolation',
-  'light curve',
-  'orbital period',
-  'starspot',
-  'photometric',
-  'radial velocity',
-  'planetary system',
-] as const;
+import { matchingDomain } from './domain_gates.ts';
+import { fetchGissGlobalAnomalies, type ClimateAnnualPoint, type ClimateDatasetCard } from './adapters/climate_dataset.ts';
+import { analyzeClimateTrend, type ClimateTrendResult } from './adapters/climate_analysis.ts';
 
-const ASTRO_DOMAIN_HINTS = ['astro', 'exoplanet', 'astronom', 'planetary science', 'stellar'];
-
-/** Does this run fall inside the exoplanet adapter's scientific domain? */
-export function isExoplanetApplicable(run: ResearchRun): boolean {
-  const domain = run.gateReport.scope.domain ?? '';
-  if (ASTRO_DOMAIN_HINTS.some((h) => domain.toLowerCase().includes(h))) {
-    return true;
-  }
-  const text = [
+/** The run's scientific text (question + hypotheses + plan) — shared by gates. */
+function runScientificText(run: ResearchRun): string {
+  return [
     run.question,
     ...run.hypotheses.map((h) => `${h.statement} ${h.mechanism}`),
     ...run.plan.variables,
     ...run.plan.dataRequirements,
-  ]
-    .join('\n')
-    .toLowerCase();
-  const hits = new Set(
-    APPLICABILITY_TERMS.filter((term) => text.includes(term)),
-  );
-  return hits.size >= 2;
+  ].join('\n');
+}
+
+/** Does this run fall inside the exoplanet adapter's scientific domain? */
+export function isExoplanetApplicable(run: ResearchRun): boolean {
+  return matchingDomain(run.gateReport.scope.domain, runScientificText(run)) === 'exoplanet';
 }
 
 /**
@@ -173,12 +171,15 @@ export async function runPlanExperiment(opts: RunExperimentOptions): Promise<Exp
   const producedAt = now().toISOString();
   const primaryId = opts.run.plan.primaryHypothesisId;
 
-  // 0. Adapter routing (fail-closed): the exoplanet adapter serves astro runs;
-  //    every other run gets the domain-general literature-landscape analysis
-  //    over its OWN frozen corpus (text modality — real retrieved documents).
-  //    An EMPTY corpus is refused: no honest analysis exists over zero docs.
-  const useExoplanet = isExoplanetApplicable(opts.run);
-  if (!useExoplanet && opts.run.corpus.documentCount === 0) {
+  // 0. Adapter routing (fail-closed): domain gates (registry) select the
+  //    domain adapter (exoplanet / climate); every other run gets the
+  //    domain-general literature-landscape analysis over its OWN frozen corpus
+  //    (text modality — real retrieved documents). An EMPTY corpus is refused:
+  //    no honest analysis exists over zero docs.
+  const domain = matchingDomain(opts.run.gateReport.scope.domain, runScientificText(opts.run));
+  const useExoplanet = domain === 'exoplanet';
+  const useClimate = domain === 'climate';
+  if (!useExoplanet && !useClimate && opts.run.corpus.documentCount === 0) {
     throw new Error(
       'experiment: no available ExperimentAdapter matches this run — the corpus is empty, so ' +
         'the literature-landscape analysis has no input and no domain adapter applies. ' +
@@ -218,6 +219,35 @@ export async function runPlanExperiment(opts: RunExperimentOptions): Promise<Exp
       adapter: 'exoplanet-archive-radius-insolation',
       affectsHypothesisIds: [primaryId],
       result,
+      datasetCard: card,
+      mode,
+      producedAt,
+    };
+  } else if (useClimate) {
+    // 1. Prepare inputs: full annual global series (live GISS fetch, or
+    //    injected replay rows for offline runs). 2. Execute: OLS trend of the
+    //    anomaly series with an exact Student-t test on the slope.
+    const liveFetch = opts.replayClimateRows === undefined;
+    const mode: ComponentMode = liveFetch ? 'LIVE' : 'RECORDED_REPLAY';
+    let rows: readonly ClimateAnnualPoint[];
+    let card: ClimateDatasetCard;
+    if (liveFetch) {
+      const fetched = await fetchGissGlobalAnomalies(now);
+      rows = fetched.rows;
+      card = fetched.card;
+    } else {
+      if (opts.replayClimateRows === undefined || opts.replayClimateCard === undefined) {
+        throw new Error('experiment: climate replay mode requires replayClimateRows + replayClimateCard');
+      }
+      rows = opts.replayClimateRows;
+      card = opts.replayClimateCard;
+    }
+    const trend = analyzeClimateTrend(rows);
+    observation = {
+      id: `climate-${rows[0]!.year}-${rows[rows.length - 1]!.year}`,
+      adapter: 'giss-global-annual-trend',
+      affectsHypothesisIds: [primaryId],
+      result: trend,
       datasetCard: card,
       mode,
       producedAt,
@@ -301,6 +331,21 @@ export function interpretObservation(obs: Observation): {
 } {
   if (isLandscapeObservation(obs)) {
     return interpretLandscape(obs.result);
+  }
+  if (obs.adapter === 'giss-global-annual-trend') {
+    const t = obs.result;
+    if (t.significantAt005 === false) {
+      return {
+        text: `giss trend: slope not significant (${t.trendPerDecadeC.toFixed(3)} °C/decade, p=${t.pValue.toFixed(3)}) over ${t.windowYears[0]}-${t.windowYears[1]} — no detectable warming trend in this window; null preserved`,
+        changesScore: true,
+        triggers: ['alternative_hypothesis'],
+      };
+    }
+    return {
+      text: `giss trend: significant warming (${t.trendPerDecadeC.toFixed(3)} °C/decade, 95%CI ${t.ci95PerDecadeC[0]!.toFixed(2)}..${t.ci95PerDecadeC[1]!.toFixed(2)}, p=${t.pValue.toExponential(1)}, n=${t.n}) over ${t.windowYears[0]}-${t.windowYears[1]} — trend quantified; no causal attribution (association, not causation)`,
+      changesScore: false,
+      triggers: ['none'],
+    };
   }
   const r = obs.result;
   if (r.status === 'FAILED') {
