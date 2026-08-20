@@ -151,11 +151,12 @@ test('② RT-05-B:备份存在时,删热 WAL 静默尾丢可恢复', async () =>
     // macOS 上 -shm 残留会让 SQLite 打开时恢复 WAL 帧索引→尾丢不可观测（2026-08-10 CI 实测）。
     const walPath = `${dbPath}-wal`;
     const shmPath = `${dbPath}-shm`;
-    // WAL 出现有界等待（≤2s/50ms 步进）：CI 高负载下 SIGKILL 与文件系统可见性存在
-    // 观测竞态（2026-08-19 第 4 次 flake 实测：written 已达而 -wal 尚不可见）。
+    // WAL 出现有界等待（≤5s/50ms 步进）：CI 高负载下 SIGKILL 与文件系统可见性存在
+    // 观测竞态（2026-08-19 第 4 次 flake 实测：written 已达而 -wal 尚不可见；
+    // 2026-08-20 win32 全量并行下 2s 窗再击穿一次 → 放宽至 5s）。
     // 持续缺失才红——红文带诊断分支，不再让后续断言背锅。
     let walVisible = existsSync(walPath);
-    for (let wait = 0; !walVisible && wait < 40; wait += 1) {
+    for (let wait = 0; !walVisible && wait < 100; wait += 1) {
       await new Promise((r) => setTimeout(r, 50));
       walVisible = existsSync(walPath);
     }
