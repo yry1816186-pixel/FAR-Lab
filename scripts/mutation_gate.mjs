@@ -90,6 +90,20 @@ const EQUIVALENT_MUTATIONS = {
       reason: 'renderScopeSlip 仅在 isDegraded=true 时被消费：scopePartial ⇒ impacted 非空、driftWarn ⇒ push 一项，parts 恒非空，三元条件在 > 与 >= 下等价（fallback 分支为不可达防御）',
     },
   ],
+  'src/falsifiability/evidence_provenance.ts': [
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'for (let i = 0; i < evidences.length; i += 1) {',
+      reason: '循环体首行对 evidences[i] 显式 undefined→continue 防御：i===length 的多余迭代取到 undefined 元素即跳过，边界迭代是 no-op，循环行为在 < 与 <= 下等价',
+    },
+  ],
+  'src/falsifiability/verifier_structural_gate.ts': [
+    {
+      op: 'true_to_false',
+      linePrefix: 'const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest,',
+      reason: 'setParentNodes 仅维护 node.parent 回指；本扫描器只用 ts.forEachChild 自顶向下遍历 + getStart/getEnd/getLineAndCharacterOfPosition（均不读 parent），parent 指针存缺不影响任何可观测输出',
+    },
+  ],
 };
 
 /** 位点是否命中等价变异登记（返回登记项或 null）。 */

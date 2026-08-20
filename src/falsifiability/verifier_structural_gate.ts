@@ -177,20 +177,40 @@ export function assertSourceClean(source: string, fileName: string): void {
 
 const GATE_DIR = dirname(fileURLToPath(import.meta.url));
 
-interface DeterministicModule {
+export interface DeterministicModule {
   readonly label: string;
   readonly path: string;
 }
 
-function listDeterministicModules(): readonly DeterministicModule[] {
+/** 门的文件系统依赖（工厂注入接缝·默认真实 fs——测试注入临时目录 fixture 杀 memoize/bundle 状态位点）。 */
+export interface StructuralGateFs {
+  existsSync(path: string): boolean;
+  readdirSync(path: string): string[];
+  readFileSync(path: string): string;
+}
+
+const REAL_FS: StructuralGateFs = {
+  existsSync: (path) => existsSync(path),
+  readdirSync: (path) => readdirSync(path),
+  readFileSync: (path) => readFileSync(path, 'utf8'),
+};
+
+/**
+ * 枚举确定性内核守护范围（导出供测试锁定扫描集合完整性：漏扫 = 检查器失效）。
+ * 纯函数：真实 fs 下 = verdict_kernel_v2 + anti_theater/{lint,constraint,score} + detectors/*.ts（排除 index.ts）。
+ */
+export function listDeterministicModules(
+  fs: StructuralGateFs = REAL_FS,
+  gateDir: string = GATE_DIR,
+): readonly DeterministicModule[] {
   const modules: DeterministicModule[] = [
-    { label: 'falsifiability/verdict_kernel_v2', path: join(GATE_DIR, 'verdict_kernel_v2.ts') },
-    { label: 'anti_theater/lint', path: join(GATE_DIR, '..', 'anti_theater', 'lint.ts') },
-    { label: 'anti_theater/constraint', path: join(GATE_DIR, '..', 'anti_theater', 'constraint.ts') },
-    { label: 'anti_theater/score', path: join(GATE_DIR, '..', 'anti_theater', 'score.ts') },
+    { label: 'falsifiability/verdict_kernel_v2', path: join(gateDir, 'verdict_kernel_v2.ts') },
+    { label: 'anti_theater/lint', path: join(gateDir, '..', 'anti_theater', 'lint.ts') },
+    { label: 'anti_theater/constraint', path: join(gateDir, '..', 'anti_theater', 'constraint.ts') },
+    { label: 'anti_theater/score', path: join(gateDir, '..', 'anti_theater', 'score.ts') },
   ];
-  const detectorsDir = join(GATE_DIR, '..', 'anti_theater', 'detectors');
-  for (const name of readdirSync(detectorsDir)) {
+  const detectorsDir = join(gateDir, '..', 'anti_theater', 'detectors');
+  for (const name of fs.readdirSync(detectorsDir)) {
     if (name.endsWith('.ts') && name !== 'index.ts') {
       modules.push({ label: `anti_theater/detectors/${name}`, path: join(detectorsDir, name) });
     }
@@ -203,10 +223,13 @@ function listDeterministicModules(): readonly DeterministicModule[] {
  * 真实生产依赖：readFileSync 读 verdict_kernel_v2.ts + anti_theater/{lint,constraint,score} + 20 detector 源 →
  * ts.createSourceFile 真实 AST 解析（非正则/非桩）。
  */
-export function scanDeterministicModules(): readonly ForbiddenCallHit[] {
+export function scanDeterministicModules(
+  fs: StructuralGateFs = REAL_FS,
+  gateDir: string = GATE_DIR,
+): readonly ForbiddenCallHit[] {
   const allHits: ForbiddenCallHit[] = [];
-  for (const mod of listDeterministicModules()) {
-    const source = readFileSync(mod.path, 'utf8');
+  for (const mod of listDeterministicModules(fs, gateDir)) {
+    const source = fs.readFileSync(mod.path);
     const hits = scanSourceForForbiddenCalls(source, mod.label);
     for (const hit of hits) {
       allHits.push(hit);
@@ -215,53 +238,81 @@ export function scanDeterministicModules(): readonly ForbiddenCallHit[] {
   return allHits;
 }
 
-let checkCompleted = false;
-let cachedError: VerifierStructuralGateError | null = null;
-/** 审计 P2-4：bundle 模式跳过告警已发出标志（一次性·防刷屏）。 */
-let bundleModeWarningEmitted = false;
+/** 门的运行态快照（透明度·测试锁定 memoize/bundle 状态机；不进任何裁决路径）。 */
+export interface StructuralGateState {
+  readonly checkCompleted: boolean;
+  readonly cachedError: VerifierStructuralGateError | null;
+  readonly bundleModeWarningEmitted: boolean;
+}
 
 /**
- * 加载期自检确定性内核全模块源码无 forbidden call——fail-closed。
- * memoized：每进程首次扫描后缓存；命中缓存错误后续重复抛（不静默放过）。
+ * 创建一个加载期自检门实例（fs/gateDir 可注入——纯接缝，默认真实 fs 无行为变化）。
+ * memoized：实例首次扫描后缓存；命中缓存错误后续重复抛（不静默放过）。
  * 文件读失败 → fail-closed 抛错（无法验证纯度 = 拒绝放行）。
- *
- * 生产入口：runAntiTheatorLint 每次调用先过此门（src/anti_theater/lint.ts）。
  */
-export function assertVerifierModulesClean(): void {
-  if (checkCompleted) {
-    if (cachedError !== null) {
+export function createVerifierStructuralGate(
+  fs: StructuralGateFs = REAL_FS,
+  gateDir: string = GATE_DIR,
+): {
+  assertClean(): void;
+  getState(): StructuralGateState;
+} {
+  let checkCompleted = false;
+  let cachedError: VerifierStructuralGateError | null = null;
+  /** 审计 P2-4：bundle 模式跳过告警已发出标志（一次性·防刷屏）。 */
+  let bundleModeWarningEmitted = false;
+
+  function assertClean(): void {
+    if (checkCompleted) {
+      if (cachedError !== null) {
+        throw cachedError;
+      }
+      return;
+    }
+    let hits: readonly ForbiddenCallHit[];
+    // Bundle mode: the gate AST-scans .ts source, which the published bundle doesn't ship
+    // (src/ is dev-only; G1). Source purity was verified before bundling by CI depth_gate;
+    // the bundle is the pre-verified artifact. Skip without throwing — the deterministic
+    // kernel (R0-R9) and the 23 detectors still run at verdict time; only this load-time
+    // source-scan is N/A when there is no source to scan.
+    if (!fs.existsSync(join(gateDir, 'verdict_kernel_v2.ts'))) {
+      checkCompleted = true;
+      // 审计 P2-4：bundle 模式从"静默跳过"改为"显式告警"——信任转移须可见（不吞不静默）。
+      // 一次性 stderr 告警（实例内仅一次·memoized 后不再打）。
+      if (!bundleModeWarningEmitted) {
+        bundleModeWarningEmitted = true;
+        process.stderr.write(
+          '[far-chain] verifier structural gate: bundle mode (no src/ to AST-scan) — load-time purity check SKIPPED; ' +
+            'trust is delegated to CI depth_gate pre-bundle verification (G1).\n',
+        );
+      }
+      return;
+    }
+    try {
+      hits = scanDeterministicModules(fs, gateDir);
+    } catch (err) {
+      // fail-closed：读不到源 = 无法验证 → 拒绝（不吞错·不静默放过），cause 保留原始栈。
+      throw new Error(`verifier structural gate: cannot scan deterministic modules: ${(err as Error).message}`, { cause: err });
+    }
+    checkCompleted = true;
+    if (hits.length > 0) {
+      cachedError = new VerifierStructuralGateError(hits);
       throw cachedError;
     }
-    return;
   }
-  let hits: readonly ForbiddenCallHit[];
-  // Bundle mode: the gate AST-scans .ts source, which the published bundle doesn't ship
-  // (src/ is dev-only; G1). Source purity was verified before bundling by CI depth_gate;
-  // the bundle is the pre-verified artifact. Skip without throwing — the deterministic
-  // kernel (R0-R9) and the 23 detectors still run at verdict time; only this load-time
-  // source-scan is N/A when there is no source to scan.
-  if (!existsSync(join(GATE_DIR, 'verdict_kernel_v2.ts'))) {
-    checkCompleted = true;
-    // 审计 P2-4：bundle 模式从"静默跳过"改为"显式告警"——信任转移须可见（不吞不静默）。
-    // 一次性 stderr 告警（进程内仅一次·memoized 后不再打）。
-    if (!bundleModeWarningEmitted) {
-      bundleModeWarningEmitted = true;
-      process.stderr.write(
-        '[far-chain] verifier structural gate: bundle mode (no src/ to AST-scan) — load-time purity check SKIPPED; ' +
-          'trust is delegated to CI depth_gate pre-bundle verification (G1).\n',
-      );
-    }
-    return;
-  }
-  try {
-    hits = scanDeterministicModules();
-  } catch (err) {
-    // fail-closed：读不到源 = 无法验证 → 拒绝（不吞错·不静默放过），cause 保留原始栈。
-    throw new Error(`verifier structural gate: cannot scan deterministic modules: ${(err as Error).message}`, { cause: err });
-  }
-  checkCompleted = true;
-  if (hits.length > 0) {
-    cachedError = new VerifierStructuralGateError(hits);
-    throw cachedError;
-  }
+
+  return {
+    assertClean,
+    getState: () => ({ checkCompleted, cachedError, bundleModeWarningEmitted }),
+  };
+}
+
+const DEFAULT_GATE = createVerifierStructuralGate();
+
+/**
+ * 加载期自检确定性内核全模块源码无 forbidden call——fail-closed（生产入口·默认实例）。
+ * 生产接线：runAntiTheaterLint 每次调用先过此门（src/anti_theater/lint.ts）。
+ */
+export function assertVerifierModulesClean(): void {
+  DEFAULT_GATE.assertClean();
 }

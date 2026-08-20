@@ -17,6 +17,8 @@ import {
   VerifierStructuralGateError,
   assertSourceClean,
   assertVerifierModulesClean,
+  createVerifierStructuralGate,
+  listDeterministicModules,
   scanDeterministicModules,
   scanSourceForForbiddenCalls,
 } from '../../src/falsifiability/verifier_structural_gate.ts';
@@ -70,6 +72,26 @@ test('scanSourceForForbiddenCalls distinguishes import / require / dynamic-impor
     'clean.ts',
   );
   assert.equal(clean.length, 0);
+
+  // mutation 补杀：合法 dynamic import / 合法 require 零命中（&&→|| 会把一切非 null
+  // 说明符误判 forbidden——三分支各需正例）。
+  const cleanDynamic = scanSourceForForbiddenCalls("const m = import('./local.ts');", 'dyn-clean.ts');
+  assert.equal(cleanDynamic.length, 0, '合法动态 import 不得误报');
+  const cleanRequire = scanSourceForForbiddenCalls("const u = require('./util.ts');", 'req-clean.ts');
+  assert.equal(cleanRequire.length, 0, '合法 require 不得误报');
+
+  // mutation 补杀：NoSubstitutionTemplateLiteral 说明符同受拦截（literalText 第二
+  // === 位点——模板字符串与普通字符串说明符语义等价，不得绕过门）。
+  const tmplImport = scanSourceForForbiddenCalls('import fs from `fs`;', 'tmpl-imp.ts');
+  assert.ok(tmplImport.some((h) => h.kind === 'forbidden-import' && h.specifier === 'fs'),
+    '模板字符串 import 说明符（`fs`）须同样被拦截');
+  const tmplDynamic = scanSourceForForbiddenCalls('const m = import(`node:child_process`);', 'tmpl-dyn.ts');
+  assert.ok(tmplDynamic.some((h) => h.kind === 'forbidden-dynamic-import' && h.specifier === 'node:child_process'),
+    '模板字符串动态 import 说明符须同样被拦截');
+
+  // mutation 补杀：assertSourceClean 干净源不抛（hits.length > 0 → >= 变异会连干净源也抛）。
+  assert.doesNotThrow(() => assertSourceClean("export const x = 1;", 'clean-assert.ts'),
+    '干净源过 assertSourceClean 不得抛');
 });
 
 test('production_deterministic_modules_pass_gate', () => {
@@ -128,4 +150,94 @@ test('F-4-006: legitimate Math.floor / Math.max are NOT flagged', () => {
   const clean = "export function ok() { return Math.floor(3.7) + Math.max(1, 2); }";
   const hits = scanSourceForForbiddenCalls(clean, 'ok2.ts');
   assert.equal(hits.length, 0);
+});
+
+// ===== 2026-08-20 mutation 补杀：门状态机（工厂注入接缝）+ 扫描集合完整性 =====
+
+test('mutation 补杀: 扫描集合完整性（listDeterministicModules 锁定守护范围）', () => {
+  const modules = listDeterministicModules();
+  const labels = modules.map((m) => m.label);
+  assert.ok(labels.includes('falsifiability/verdict_kernel_v2'), '须含裁决内核');
+  assert.ok(labels.includes('anti_theater/lint'), '须含 lint');
+  assert.ok(labels.includes('anti_theater/constraint'), '须含 constraint');
+  assert.ok(labels.includes('anti_theater/score'), '须含 score');
+  const detectorLabels = labels.filter((l) => l.startsWith('anti_theater/detectors/'));
+  assert.ok(detectorLabels.length >= 20, `detectors 须全量入扫描（实际 ${detectorLabels.length}）——漏扫 = 检查器失效`);
+  assert.ok(!labels.includes('anti_theater/detectors/index.ts'), 'index.ts 桶文件不得入扫描（&&→|| 变异会放进）');
+  for (const m of modules) {
+    assert.ok(m.path.endsWith('.ts'), `仅 .ts 入扫描（${m.path}）`);
+  }
+});
+
+test('mutation 补杀: dirty 首调抛 + memoized 二调重抛同一错误对象（cachedError 语义）', () => {
+  const dirtyFs = {
+    existsSync: () => true,
+    readdirSync: () => [],
+    readFileSync: () => 'export function bad() { return fetch("https://x"); }',
+  };
+  const gate = createVerifierStructuralGate(dirtyFs, '/fake-gate-dir');
+  const caught: unknown[] = [];
+  for (let call = 0; call < 2; call += 1) {
+    try {
+      gate.assertClean();
+      assert.fail(call === 0 ? 'dirty 源首调必抛' : 'memoized 二调须重抛（不得静默放过）');
+    } catch (e) {
+      caught.push(e);
+    }
+  }
+  assert.ok(caught[0] instanceof VerifierStructuralGateError, '首调抛 VerifierStructuralGateError');
+  assert.ok(caught[1] instanceof VerifierStructuralGateError, '二调抛 VerifierStructuralGateError');
+  assert.equal(caught[1], caught[0], '二调重抛的是缓存错误对象（同一引用）');
+  assert.equal(gate.getState().checkCompleted, true);
+  assert.equal(gate.getState().cachedError, caught[0]);
+});
+
+test('mutation 补杀: clean 首调过 + 二调短路不再读文件（checkCompleted memoize）', () => {
+  let readCount = 0;
+  const countingFs = {
+    existsSync: () => true,
+    readdirSync: () => [],
+    readFileSync: () => { readCount += 1; return 'export const clean = 1;'; },
+  };
+  const gate = createVerifierStructuralGate(countingFs, '/fake-gate-dir');
+  assert.doesNotThrow(() => gate.assertClean());
+  const readsAfterFirst = readCount;
+  assert.ok(readsAfterFirst > 0, '首调须真实扫描');
+  assert.doesNotThrow(() => gate.assertClean());
+  assert.equal(readCount, readsAfterFirst, '二调须短路（memoized·不再读文件）');
+  assert.equal(gate.getState().checkCompleted, true, 'clean 路径同样置完成标志');
+});
+
+test('mutation 补杀: bundle 模式（无 src 可扫）→ 不抛 + 一次性告警 + 完成标志', () => {
+  const writes: string[] = [];
+  const originalWrite = process.stderr.write;
+  process.stderr.write = ((chunk: unknown) => {
+    writes.push(String(chunk));
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    const bundleFs = { existsSync: () => false, readdirSync: () => [], readFileSync: () => { throw new Error('must not read in bundle mode'); } };
+    const gate = createVerifierStructuralGate(bundleFs, '/fake-bundle-dir');
+    assert.doesNotThrow(() => gate.assertClean(), 'bundle 模式信任转移至 CI depth_gate（G1）·不抛');
+    assert.equal(writes.length, 1, '首调告警一次');
+    assert.ok(writes[0]?.includes('bundle mode'), '告警内容须说明 bundle 跳过语义');
+    assert.equal(gate.getState().checkCompleted, true, 'bundle 分支同样置完成标志');
+    assert.equal(gate.getState().bundleModeWarningEmitted, true);
+    gate.assertClean(); // 二调：不再告警（一次性）
+    assert.equal(writes.length, 1, '二调不得重复告警（防刷屏）');
+    assert.equal(gate.getState().bundleModeWarningEmitted, true);
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+});
+
+test('mutation 补杀: 读失败 → fail-closed 包装错误（不吞不静默）', () => {
+  const brokenFs = {
+    existsSync: () => true,
+    readdirSync: () => [],
+    readFileSync: () => { throw new Error('EACCES: permission denied'); },
+  };
+  const gate = createVerifierStructuralGate(brokenFs, '/fake-gate-dir');
+  assert.throws(() => gate.assertClean(), /cannot scan deterministic modules: EACCES/,
+    '无法验证纯度 = 拒绝放行');
 });
