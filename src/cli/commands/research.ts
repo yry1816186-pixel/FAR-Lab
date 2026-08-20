@@ -42,6 +42,7 @@ import { runAllBaselines } from '../../research/evaluation/baseline.ts';
 import { exportResearchBundle, researchBundleSha256 } from '../../research/export_bundle.ts';
 import { runPlanExperiment, isLandscapeObservation } from '../../research/experiment.ts';
 import { loadExoplanetReplayRows } from '../../research/adapters/exoplanet_replay.ts';
+import { loadClimateReplayRows } from '../../research/adapters/climate_replay.ts';
 import { parseResearchRunJson, FeedbackInputZod } from '../../research/schemas.ts';
 import type { ResearchRun } from '../../research/types.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
@@ -1269,10 +1270,16 @@ export async function runResearchAnalyze(args: readonly string[]): Promise<numbe
   // 1. Execute the plan's first analysis step (live or committed-real replay).
   let experiment;
   try {
-    const replay = live ? undefined : loadExoplanetReplayRows();
+    // Offline (replay) mode loads BOTH domain fixtures; runPlanExperiment picks
+    // the right one by domain routing. Loading the climate replay here closes
+    // the CPS-4 G1 gap: without it a climate run fell through to a LIVE GISS
+    // fetch in offline mode (experiment=LIVE, offline contract violation).
+    const exoplanetReplay = live ? undefined : loadExoplanetReplayRows();
+    const climateReplay = live ? undefined : loadClimateReplayRows();
     experiment = await runPlanExperiment({
       run,
-      ...(replay !== undefined ? { replayRows: replay.rows, replayCard: replay.card } : {}),
+      ...(exoplanetReplay !== undefined ? { replayRows: exoplanetReplay.rows, replayCard: exoplanetReplay.card } : {}),
+      ...(climateReplay !== undefined ? { replayClimateRows: climateReplay.rows, replayClimateCard: climateReplay.card } : {}),
     });
   } catch (err) {
     process.stderr.write(

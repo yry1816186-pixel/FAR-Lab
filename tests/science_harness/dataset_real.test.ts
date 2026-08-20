@@ -111,6 +111,14 @@ test('fetchOnlineDataset: whitelisted host honestly returns null-or-result; spaw
         timeout: ONLINE_FETCH_PROOF_TIMEOUT_MS,
       },
     );
+    // 超时杀进程 = MAST 网络挂起 → 本环境无法诚实验证真取数。按本文件头部契约
+    // （缺网络 → skip，不当代码 bug，不伪造 hash）处理；网络健康时下方断言全量执行。
+    // 仅覆盖 signal-kill（超时）；spawn 自身失败（如 ENOENT，status=null 且无 signal）
+    // 仍落断言变红——那是真接线问题，不许 skip 掩盖。
+    if (direct.status === null && direct.signal != null) {
+      t.skip(`network to MAST hung — direct spawn killed at ${ONLINE_FETCH_PROOF_TIMEOUT_MS}ms; real online fetch not verifiable in this environment`);
+      return;
+    }
     assert.equal(direct.status, 0, `dataset_fetch.py must exit 0 with an honest envelope (not crash); stderr=${(direct.stderr ?? '').trim().slice(0, 200)}`);
     const envelope = JSON.parse(direct.stdout.trim()) as { ok: boolean; error?: string; contentHash?: string };
 

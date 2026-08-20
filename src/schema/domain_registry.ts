@@ -91,7 +91,7 @@ export const DOMAIN_OBJECTS: readonly DomainObjectEntry[] = [
     authoritativeModule: 'src/research/schemas.ts',
     exportName: 'ObservationZod',
     boundary: 'zod',
-    note: '真实数据/工具观测 discriminatedUnion（exoplanet / literature-landscape 两 adapter）；TS union 与 zod 双轨齐备',
+    note: '真实数据/工具观测 discriminatedUnion（exoplanet / climate / literature-landscape 三 adapter）；物理 SSOT=schemas_observation.ts（800 行预算拆分，2026-08-21），经 schemas.ts re-export 保持导入面；TS union（experiment.ts）与 zod 双轨齐备',
   },
   {
     object: 'Verdict',

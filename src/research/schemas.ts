@@ -474,100 +474,21 @@ export const FalsifiabilityGateReportZod = z.object({
 });
 
 // ── Observation (real-data analysis result) ──────────────────────────────────
+// Extracted to schemas_observation.ts (2026-08-21): the file grew past the
+// 800-line complexity budget when the climate adapter family (CPS-4 G2) was
+// added. New domain adapter zod members go there; this re-export keeps the
+// historical import surface (everything from './schemas.ts') stable.
 
-export const RadiusInsolationObservationZod = z.object({
-  status: z.enum(['SUCCESS', 'PARTIAL', 'FAILED']),
-  n: z.number().int().nonnegative(),
-  excludedMissing: z.number().int().nonnegative(),
-  pearsonR: z.number().nullable(),
-  pValue: z.number().nullable(),
-  confidenceInterval: z.tuple([z.number(), z.number()]).nullable(),
-  significantAt05: z.boolean(),
-  meanInsolation: z.number().nullable(),
-  params: z.object({
-    minRadiusEarth: z.number(),
-    maxPeriodDays: z.number(),
-    confidenceLevel: z.number(),
-    source: z.enum(['plan', 'default']),
-  }),
-  inputHash: z.string(),
-  analyzedAt: z.string(),
-  summary: z.string(),
-});
-
-export const ExoplanetDatasetCardZod = z.object({
-  source: z.string(),
-  sourceUrl: z.string(),
-  version: z.string(),
-  persistentId: z.string(),
-  license: z.string(),
-  downloadedAt: z.string(),
-  query: z.string(),
-  rawChecksum: z.string(),
-  rowCount: z.number().int().nonnegative(),
-  fields: z.array(z.string()),
-  units: z.record(z.string(), z.string()),
-  missingNotes: z.array(z.string()),
-  qualityNotes: z.array(z.string()),
-  allowedInference: z.string(),
-  forbiddenInference: z.string(),
-  reproductionCommand: z.string(),
-  fetchMode: z.enum(['LIVE', 'RECORDED_REPLAY']),
-});
-
-// ── Literature-landscape observation (domain-general adapter) ────────────────
-
-export const LiteratureLandscapeObservationZod = z.object({
-  kind: z.literal('literature-landscape'),
-  snapshotId: z.string(),
-  rootHash: z.string(),
-  totalDocuments: z.number().int().nonnegative(),
-  supportingDocuments: z.number().int().nonnegative(),
-  counterEvidenceDocuments: z.number().int().nonnegative(),
-  counterEvidenceShare: z.number().min(0).max(1),
-  medianPublicationYear: z.number().nullable(),
-  unknownYearDocuments: z.number().int().nonnegative(),
-  freshShare: z.number().min(0).max(1),
-  sourceFamilies: z.array(z.string()),
-  queryCount: z.number().int().nonnegative(),
-  producedAt: z.string(),
-});
-
-export const LandscapeDatasetCardZod = z.object({
-  source: z.string(),
-  sourceUrl: z.string(),
-  version: z.string(),
-  persistentId: z.string(),
-  license: z.string(),
-  downloadedAt: z.string(),
-  checksumField: z.string(),
-  checksumValue: z.string(),
-  fields: z.array(z.string()),
-  knownBias: z.string(),
-  allowedInference: z.string(),
-  forbiddenInference: z.string(),
-});
-
-export const ObservationZod = z.discriminatedUnion('adapter', [
-  z.object({
-    id: z.string(),
-    adapter: z.literal('exoplanet-archive-radius-insolation'),
-    affectsHypothesisIds: z.array(z.string()),
-    result: RadiusInsolationObservationZod,
-    datasetCard: ExoplanetDatasetCardZod,
-    mode: z.enum(['LIVE', 'RECORDED_REPLAY', 'SYNTHETIC_TEST', 'OFFLINE_DEVELOPMENT', 'NOT_EXECUTED']),
-    producedAt: z.string(),
-  }),
-  z.object({
-    id: z.string(),
-    adapter: z.literal('literature-landscape'),
-    affectsHypothesisIds: z.array(z.string()),
-    result: LiteratureLandscapeObservationZod,
-    datasetCard: LandscapeDatasetCardZod,
-    mode: z.enum(['LIVE', 'RECORDED_REPLAY', 'SYNTHETIC_TEST', 'OFFLINE_DEVELOPMENT', 'NOT_EXECUTED']),
-    producedAt: z.string(),
-  }),
-]);
+export {
+  RadiusInsolationObservationZod,
+  ExoplanetDatasetCardZod,
+  ClimateTrendObservationZod,
+  ClimateDatasetCardZod,
+  LiteratureLandscapeObservationZod,
+  LandscapeDatasetCardZod,
+  ObservationZod,
+} from './schemas_observation.ts';
+import { ObservationZod } from './schemas_observation.ts';
 
 // ── Discovery-layer accounting (schema v4+) ─────────────────────────────────
 

@@ -48,6 +48,7 @@ import { verifyResearchRunDeterministic } from '../../research/verification.ts';
 import { computeRunMetrics } from '../../research/evaluation/metrics.ts';
 import { RESEARCH_DEMO_DOCS, RESEARCH_DEMO_FIXTURES } from '../../research/research_fixtures.ts';
 import { loadExoplanetReplayRows } from '../../research/adapters/exoplanet_replay.ts';
+import { loadClimateReplayRows } from '../../research/adapters/climate_replay.ts';
 import type { ResearchRun } from '../../research/types.ts';
 import type { ProviderProfile } from '../../llm_gateway/types.ts';
 
@@ -546,11 +547,18 @@ export async function registerResearchRoutes(
       if (body.live) {
         experiment = await runPlanExperiment({ run });
       } else {
-        const replay = loadExoplanetReplayRows();
+        // Offline (replay) mode loads BOTH domain fixtures; runPlanExperiment
+        // picks the right one by domain routing. The climate replay closes the
+        // CPS-4 G1 gap: without it a climate run analyzed with live=false fell
+        // through to a LIVE GISS fetch (offline contract violation).
+        const exoplanetReplay = loadExoplanetReplayRows();
+        const climateReplay = loadClimateReplayRows();
         experiment = await runPlanExperiment({
           run,
-          replayRows: replay.rows,
-          replayCard: replay.card,
+          replayRows: exoplanetReplay.rows,
+          replayCard: exoplanetReplay.card,
+          replayClimateRows: climateReplay.rows,
+          replayClimateCard: climateReplay.card,
         });
       }
     } catch (err) {

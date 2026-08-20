@@ -513,6 +513,45 @@ test('POST /api/v1/research/:runId/analyze (replay sample) → observation + rev
   }
 });
 
+test('POST /api/v1/research/:runId/analyze (climate, offline) → GISS replay, zero network', async () => {
+  const app = await makeApp();
+  // 离线契约（CPS-4 G1 修复）：live=false 的 climate 分析必须走 committed
+  // fixture；修复前 replayClimateRows 缺失 → 真实 GISS fetch。此处把
+  // globalThis.fetch 换成必抛守卫——analyze 期间任何网络请求都让测试失败。
+  const realFetch = globalThis.fetch;
+  try {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/v1/research',
+      payload: { question: 'What is the global warming trend of surface temperature anomalies?', profile: 'offline_replay' },
+    });
+    const runId = (created.json() as { data: { runId: string } }).data.runId;
+    await waitForRunState(app, runId, ['COMPLETED', 'FAILED']);
+
+    globalThis.fetch = (() => {
+      throw new Error('network forbidden: offline analyze must replay the committed GISS fixture');
+    }) as typeof fetch;
+    const analyzed = await app.inject({
+      method: 'POST',
+      url: `/api/v1/research/${runId}/analyze`,
+      payload: { live: false },
+    });
+    assert.equal(analyzed.statusCode, 200, analyzed.body);
+    const body = analyzed.json() as {
+      ok: boolean;
+      data: { observation: { adapter: string; mode: string; datasetCard: { rowCount: number; reproductionCommand: string } } };
+    };
+    assert.equal(body.ok, true);
+    assert.equal(body.data.observation.adapter, 'giss-global-annual-trend');
+    assert.equal(body.data.observation.mode, 'RECORDED_REPLAY');
+    assert.equal(body.data.observation.datasetCard.rowCount, 146, 'committed fixture = 1880..2025');
+    assert.match(body.data.observation.datasetCard.reproductionCommand, /replay fixture:/);
+  } finally {
+    globalThis.fetch = realFetch;
+    await app.close();
+  }
+});
+
 test('GET /api/v1/research/:runId/evaluate → metrics + deterministic recompute PASS', async () => {
   const app = await makeApp();
   try {

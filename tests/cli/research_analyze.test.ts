@@ -58,6 +58,54 @@ test('far research analyze: offline run → observation + revision + RECORDED_RE
   }
 });
 
+test('far research analyze: offline climate run → GISS replay observation (committed fixture, no live fetch)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'far-analyze-climate-'));
+  try {
+    const runPath = join(dir, 'run.json');
+    const start = runFar(
+      ['research', 'start', 'What is the global warming trend of surface temperature anomalies?', '--profile', 'offline_replay', '--out', runPath],
+      { FAR_RESEARCH_RUNS_DIR: join(dir, 'runs') },
+    );
+    assert.equal(start.status, 0, start.stderr);
+
+    const analyze = runFar(['research', 'analyze', runPath, '--out', runPath]);
+    assert.equal(analyze.status, 0, analyze.stderr);
+    // 修复前（CPS-4 G1）：offline 分支只装 exoplanet replay，climate run 的
+    // replayClimateRows 缺失 → 掉进 live GISS 拉取（experiment=LIVE，离线契约违规）。
+    assert.match(analyze.stdout, /observation collected \(giss-global-annual-trend, n=146, mode=RECORDED_REPLAY\)/);
+    assert.match(analyze.stdout, /experiment=RECORDED_REPLAY/);
+
+    const run = JSON.parse(readFileSync(runPath, 'utf8')) as {
+      observations: Array<{
+        adapter: string;
+        mode: string;
+        datasetCard: { rowCount: number; reproductionCommand: string; downloadedAt: string };
+      }>;
+      modes: { experimentExecutionMode: string };
+      runMode: string;
+    };
+    const obs = run.observations[run.observations.length - 1]!;
+    assert.equal(obs.adapter, 'giss-global-annual-trend');
+    assert.equal(obs.mode, 'RECORDED_REPLAY');
+    assert.equal(obs.datasetCard.rowCount, 146, 'committed fixture = 1880..2025');
+    assert.match(obs.datasetCard.reproductionCommand, /replay fixture:/);
+    assert.equal(run.modes.experimentExecutionMode, 'RECORDED_REPLAY');
+    assert.equal(run.runMode, 'RECORDED_REPLAY', 'offline analyze must not degrade to MIXED/LIVE');
+
+    // CPS-4 G2 round-trip regression: the persisted climate observation must
+    // survive parseResearchRunJson strict re-read — every CLI run-reload path
+    // (inspect/verify/export/compare/feedback/second analyze) goes through it.
+    // Before the ObservationZod climate member, inspect failed exit 1 with
+    // "observations.0.adapter: Invalid discriminator value".
+    const inspect = runFar(['research', 'inspect', runPath]);
+    assert.equal(inspect.status, 0, inspect.stderr);
+    const secondAnalyze = runFar(['research', 'analyze', runPath, '--out', runPath]);
+    assert.equal(secondAnalyze.status, 0, secondAnalyze.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('far research analyze: missing file → exit 1; missing arg → exit 2', () => {
   const missing = runFar(['research', 'analyze', 'C:/nonexistent/run.json']);
   assert.equal(missing.status, 1);
