@@ -286,10 +286,18 @@ export function createQwenAdapter(config: QwenAdapterConfig = {}): ProviderAdapt
       const summary = chainResult.degradationSummary ?? 'unknown chain failure';
       if (chainResult.fatalEncountered) {
         const status = extractFatalStatus(chainResult.attempts) ?? 500;
+        // 可行动指引（README / `far research start` 承诺 "fails closed with actionable
+        // guidance"）：认证/账户类 4xx 是环境问题而非模型问题——给出修复路径。
+        const guidance =
+          status === 401 || status === 403
+            ? '；DASHSCOPE_API_KEY 无效或未授权：检查 .env 中的 key（Bailian 控制台 API-KEY 页重新生成），确认账户未冻结'
+            : status === 400
+              ? '；请求被拒（HTTP 400）：确认模型名可调用、账户余额/资源包充足（Bailian 控制台-模型广场与费用页）；欠费/冻结账户会以 400 形态出现'
+              : '';
         throw new BailianHttpError(
           status,
           null,
-          `qwen_adapter: fatal error during fallback chain: ${summary}`,
+          `qwen_adapter: fatal error during fallback chain: ${summary}${guidance}。修复后可重试 far research start/resume`,
         );
       }
       if (chainResult.chainExhausted) {
