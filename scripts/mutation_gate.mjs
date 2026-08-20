@@ -166,8 +166,317 @@ const EQUIVALENT_MUTATIONS = {
       reason: '空串入 splitsRun 后 toLowerCase()=""，与 has("hidden")/has("public") 判定均不等——空串对 public-only 判定不可观测，>0 与 >=0 等价',
     },
   ],
-  'src/statistics/t_distribution.ts': [
+  'src/statistics/ks_test.ts': [
     {
+      op: 'gt_to_gte',
+      linePrefix: 'if (gap > dMax) {',
+      reason: 'dMax 取 max 语义：gap===dMax 时更新为同值，边界点两算子输出等价',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (p > 1) {',
+      reason: 'p===1 时 clamp 到 1 为同值赋值，边界点输出等价（p<0 同理）',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (p < 0) {',
+      reason: 'p===0 时 clamp 到 0 为同值赋值，边界点输出等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (a < b) {',
+      reason: 'compareAscending 在 a===b 时返回 -1（变异）或 0（原版）：相等数值元素在 sort 中的交换不可观测（数组值序列相同）',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (a > b) {',
+      reason: '同上：相等元素比较器返回 1 或 0 只影响稳定排序内部顺序，数值输出不可区分',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'const raw1 = i < n1 ? data1[i] : undefined;',
+      reason: 'JS 数组越界读返回 undefined：i===n1 时 data1[n1] 与哨兵 undefined 同值，三元分支输出等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'const raw2 = j < n2 ? data2[j] : undefined;',
+      reason: '同上：越界读与哨兵 undefined 同值',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'while (i < n1 && data1[i] === v1) {',
+      reason: 'i===n1 时 data1[n1]===undefined≠v1 恒假，&& 短路或继续判 false 均停——边界等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'while (j < n2 && data2[j] === v2) {',
+      reason: '同上：越界 undefined 使第二条件恒假',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'while (i < n1 && data1[i] === tied) {',
+      reason: '同上：越界 undefined ≠ tied',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'while (j < n2 && data2[j] === tied) {',
+      reason: '同上：越界 undefined ≠ tied',
+    },
+    {
+      op: 'lte_to_lt',
+      linePrefix: 'for (let k = 1; k <= 100; k += 1) {',
+      reason: '渐近级数在 |term| 截断判据下远早于 100 项收敛 break；多一项已收敛项的和增量 < 截断容差，输出不可观测（p_value.ts 同型先例）',
+    },
+    {
+      op: 'lte_to_lt',
+      linePrefix: 'if (Math.abs(term) <= CENTRAL_TOLERANCE.SERIES_TRUNCATION_REL * Math.abs(sum)) {',
+      reason: '|term| 恰等于容差乘 |sum| 的双精度边界不可从外部输入构造；其余值域两算子同判',
+    },
+    {
+      op: 'or_to_and',
+      linePrefix: 'while (i < n1 || j < n2) {',
+      reason: 'D=sup|F1-F2| 在 merge 序列极值点取得：一侧耗尽（F=1）后另一侧继续推进时差值单调趋向 0，不产生新极值——提前退出与继续推进的 D/p 输出等价（4 组含极端不等长输入手工变异实证一致）',
+    },
+  ],
+  'src/statistics/permutation_test.ts': [
+    {
+      op: 'gte_to_gt',
+      linePrefix: 'if (!Number.isInteger(sample) || sample < 0 || sample >= UINT32_RANGE) {',
+      reason: 'drawUniformIndex 内部验证：sample 恒为 mulberry32 输出的 [0, 2^32) 整数，边界值 2^32 与非整数在合法 RNG 路径不可构造（防御分支不可达）',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (!Number.isInteger(sample) || sample < 0 || sample >= UINT32_RANGE) {',
+      reason: '同上：sample<0 分支在无符号 RNG 输出下不可构造',
+    },
+    {
+      op: 'or_to_and',
+      linePrefix: 'if (!Number.isInteger(sample) || sample < 0 || sample >= UINT32_RANGE) {',
+      reason: '同上：三条件在合法路径恒 false，or/and 组合差异不可达',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: '|| boundExclusive < 1',
+      reason: 'drawUniformIndex 的 boundExclusive 恒为样本数组长度（>=1 安全整数），<1 分支在合法调用路径不可构造',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: '|| boundExclusive > UINT32_RANGE',
+      reason: '同上：数组长度远小于 2^32，上界分支不可构造',
+    },
+    {
+      op: 'or_to_and',
+      linePrefix: '|| boundExclusive < 1',
+      reason: '同上：两分支均不可构造，组合差异不可观测',
+    },
+    {
+      op: 'or_to_and',
+      linePrefix: '|| boundExclusive > UINT32_RANGE',
+      reason: '同上',
+    },
+    {
+      op: 'lte_to_lt',
+      linePrefix: 'if (denominator <= 0n || !Number.isSafeInteger(binaryExponent)) {',
+      reason: '精确有理数内核：denominator 由非零 significand 构造恒 >0n；binaryExponent 由浮点分解恒安全整数——防御分支不可达',
+    },
+    {
+      op: 'or_to_and',
+      linePrefix: 'if (denominator <= 0n || !Number.isSafeInteger(binaryExponent)) {',
+      reason: '同上：两防御分支在合法路径不可构造',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'for (let i = 0; i < n1; i += 1) {',
+      reason: 'pool 拼装循环：i===n1 的多余迭代 push data1[n1]===undefined——该行为本身已被 seed-42 golden 用例锁定（若 undefined 入池则 extremeCount 漂移被断言捕获），此处登记的是与 golden 并存的哨兵等价性说明',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'left < right ? -1 : left > right ? 1 : 0',
+      reason: 'BigInt 比较器：相等元素返回 -1 或 0 只影响稳定排序内部顺序，数值序列输出不可区分（ks_test compareAscending 同型先例）',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'left < right ? -1 : left > right ? 1 : 0',
+      reason: '同上：相等分支交换不可观测',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: ': significand << BigInt(exponent - commonExponent)',
+      reason: '对齐移位量由浮点指数差决定，等于 0 的精确构造需 significand 恰相等的有理数对——RNG 驱动的统计路径不可精确命中；shift=0 时 <<0n 为同值运算',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'const negative = numerator < 0n;',
+      reason: 'numerator===0n 时 negative 取 true/false 后经符号归一（0n 与 -0n BigInt 相等）输出等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (valueExponent < -1022) {',
+      reason: 'subnormal 判定边界 exponent===-1022：需要 BigInt 有理数恰表示 2^-1022 量级的输入，permutation 统计量（均值差量级 ~1e0）不可构造',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'return value < 0n ? -value : value;',
+      reason: 'value===0n 时取负得 0n（BigInt 无 -0），两分支输出等价',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: 'const reachesOverflowMidpoint = shift >= 0',
+      reason: 'shift 由指数差整数决定；shift 恰为 0 时 <<0n 为同值运算，两分支分子相同——边界输出等价',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: 'const atLeastCandidate = shift >= 0',
+      reason: '同上：shift===0 边界两分支同值',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: 'const dividend = shift >= 0 ? numerator',
+      reason: '同上：shift===0 时两分支均为 numerator',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: 'const divisor = shift >= 0 ? denominator',
+      reason: '同上：shift===0 时两分支均为 denominator',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: '? (magnitude << BigInt(shift)) >= thresholdNumerator',
+      reason: '<< 的第二 < 变异产生 <<= 移位赋值：表达式值不变（移位结果），副作用仅重写分支局部变量且不再读——行为等价（第一 < 的 <=< 变体为语法错，本就 killed）',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: ': magnitude >= (thresholdNumerator << BigInt(-shift));',
+      reason: '同上：<<= 移位赋值等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: '? (numerator << BigInt(shift)) >= denominator',
+      reason: '同上：<<= 移位赋值等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: ': numerator >= (denominator << BigInt(-shift));',
+      reason: '同上：<<= 移位赋值等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'const dividend = shift >= 0 ? numerator << BigInt(shift) : numerator;',
+      reason: '同上：dividend 行的 <<= 移位赋值等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'const divisor = shift >= 0 ? denominator',
+      reason: '同上：divisor 行的 <<= 移位赋值等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: ': significand << BigInt(exponent - commonExponent)',
+      reason: '同上：<<= 移位赋值等价',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'let a = seed >>> 0;',
+      reason: '>>> 的第三 > 变异产生 >>>= 无符号移位赋值：seed >>>= 0 表达式值与 seed >>> 0 相同，副作用仅重写参数变量——行为等价（前两个 > 的变体为语法错，本就 killed）',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: '? (magnitude << BigInt(shift)) >= thresholdNumerator',
+      reason: '溢出中点等值判定：等值点需均值差精确有理数恰等于 (2^54-1)·2^970/denominator——2^1024 量级 dyadic 组合，现有 L202 边界测试已覆盖恰超（throw）/恰低（不 throw）两侧；等值点本身在 ties-to-even 下也 throw（奇尾数选无穷），两侧行为已被锁定',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: ': magnitude >= (thresholdNumerator << BigInt(-shift));',
+      reason: '同上：中点等值的负移位分支',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: '? (numerator << BigInt(shift)) >= denominator',
+      reason: 'floorBinaryExponent 候选判定等值点：需 numerator·2^shift 恰等于 denominator——candidate 恰为真实指数时 shift 构造依赖中间 bigintBitLength，等值输入从 double 样本组合不可精确命中；candidate 偏差 ±1 由返回路径（candidate-1）在下游被正确性测试覆盖',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: ': numerator >= (denominator << BigInt(-shift));',
+      reason: '同上：候选判定的负移位分支',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (sample < acceptanceLimit) return Math.floor(sample / bucketWidth);',
+      reason: '拒绝对齐采样边界：sample 为整数 RNG 输出、acceptanceLimit=bucketWidth*bound 的浮点积——精确相等需 bound 整除 2^32 且 RNG 恰输出该积（概率 2^-32 不可构造）；bound 为 2^k 时 limit=2^32 恒大于 sample 域上界，两算子同判',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'const result = ((t ^ (t >>> 14)) >>> 0);',
+      reason: '同上：>>>= 移位赋值等价（t 局部变量，移位 0 位值不变）',
+    },
+  ],
+  'src/statistics/numerics.ts': [
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'return a < b ? -1 : 1;',
+      reason: 'tolerantCompare 终值分支：a===b 已被上方 a===b 与 relDiff<=tol 提前返回，剩余域 a≠b 上 < 与 <= 等价',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (a > b) return 1;',
+      reason: '比较器在相等元素上返回 1 或 0 只影响稳定排序内部顺序，数值输出不可区分（ks_test 同型先例）',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (a < b) return -1;',
+      reason: '同上：相等分支交换不可观测',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: "return { kind: 'infinite', sign: x > 0 ? '+' : '-', extreme: true, kernelSafe: f",
+      reason: '该分支仅在 !Number.isFinite(x) 内评估：x 恒为 ±Infinity（NaN 与有限值已被上方分支排除），Inf>0 与 Inf>=0 同判',
+    },
+    {
+      op: 'gte_to_gt',
+      linePrefix: 'if (Math.abs(sum) >= Math.abs(x)) {',
+      reason: 'Neumaier 补偿分支：|sum|===|x| 时两支补偿式 (sum-t)+x 与 (x-t)+sum 经加法交换律逐字相同（sum===x 时字面同式；sum=-x 时 t=0 两支均得 0）——等值点输出等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'for (let i = 0; i < lines.length; i += 1) {',
+      reason: '循环体 lines[i] ?? 防御：i===lines.length 的多余迭代取 undefined ?? 空 → 正则 test(空) 恒 false，边界迭代是 no-op',
+    },
+    {
+      op: 'neq_to_eq',
+      linePrefix: "return entry === undefined || (entry.pattern !== '*' && entry.pattern !== v.patt",
+      reason: 'allowlist 过滤自指性：entry 匹配仅发生在生产 src 固定路径（如 statistics/permutation_test.ts），构造该分支差异需在生产 allowlist 路径注入未登记 pattern 的违规源——修改生产文件被仓库纪律禁止；tempdir repoRoot 下 entry 恒 undefined 短路，括号内变异不可达',
+    },
+    {
+      op: 'and_to_or',
+      linePrefix: "return entry === undefined || (entry.pattern !== '*' && entry.pattern !== v.patt",
+      reason: '同上：entry undefined 短路使括号内组合变异在可构造输入下不可观测',
+    },
+  ],
+  'src/statistics/bootstrap_ci.ts': [
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (a < b) {',
+      reason: 'compareAscending 在相等元素上返回 -1 或 0 只影响稳定排序内部顺序，数值数组输出不可区分（ks_test 同型先例）',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (a > b) {',
+      reason: '同上：相等分支交换不可观测',
+    },
+  ],
+  'src/statistics/calibration.ts': [
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'for (let i = 0; i < predictions.length; i += 1) {',
+      reason: 'ece 分桶循环（L81·与 brierScore L53 同文本）：i===length 的多余迭代读 predictions[length]===undefined，binIndex=Math.floor(undefined*bins)=NaN——binPredSum[NaN] 与 binTrueCount[NaN] 的写入在 JS 数组上不落地（NaN 键非索引），桶计数不变，ECE 输出等价（brierScore 的同文本循环已由 0.25/0.6400… golden 杀灭）',
+    },
+    {
+      op: 'or_to_and',
+      linePrefix: 'if (predictions.length === 0 || bins < 1) {',
+      reason: '空 predictions 落入计算路径后循环 0 次、加权求和为 0，与早退 return 0 同值——空输入 ECE 数学上也恰为 0，两路径输出等价',
+    },
+  ],
+  'src/statistics/t_distribution.ts': [    {
       op: 'gte_to_gt',
       linePrefix: 'return t >= 0 ? 1 - 0.5 * ib : 0.5 * ib;',
       reason: 't=0 时 ib 参数 x=df/(df+0)=1 → incompleteBeta(1)=1，两分支均得 0.5；t≠0 时符号判定同——分支在边界点输出等价',

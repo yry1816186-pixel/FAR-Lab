@@ -194,3 +194,13 @@ jobs:
           node scripts/mutation_gate.mjs src/statistics/multiple_testing.ts tests/statistics/statistics_math.test.ts tests/statistics/metamorphic_invariants.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 100
           node scripts/mutation_gate.mjs src/statistics/ci.ts tests/statistics/ci_error_paths.test.ts tests/statistics/ci_t_welch.test.ts tests/statistics/statistics_math.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 100
           node scripts/mutation_gate.mjs src/statistics/effect_size.ts tests/statistics/effect_size.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 50
+      # 2026-08-20 批次 9：statistics 域全量扫荡（10 文件全 0% 存活）。移位赋值型等价
+      #（<</>>> 单字符变异产生合法 <<= / >>>= 赋值表达式）与数值内部防御登记见
+      # mutation_gate.mjs EQUIVALENT_MUTATIONS（逐条论证）。
+      - name: gate · statistics 数值内核（ks / permutation / numerics / bootstrap / calibration）
+        run: |
+          node scripts/mutation_gate.mjs src/statistics/ks_test.ts tests/statistics/ks_test.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 100
+          node scripts/mutation_gate.mjs src/statistics/permutation_test.ts tests/statistics/permutation_test.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 200
+          node scripts/mutation_gate.mjs src/statistics/numerics.ts tests/statistics/numerics.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 100
+          node scripts/mutation_gate.mjs src/statistics/bootstrap_ci.ts tests/statistics/bootstrap_ci.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 50
+          node scripts/mutation_gate.mjs src/statistics/calibration.ts tests/statistics/calibration.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 50
