@@ -68,9 +68,12 @@ docs, CI config, scripts, comments, or commit messages):
 
 ## Dependency Security
 
-- `pnpm audit` runs on every CI pipeline.
+- `pnpm audit` runs weekly on `main` via the scheduled dependency-security workflow
+  (all deps + prod-only + frontend, `--audit-level=high` gate, plus registry-signature
+  verification), and license/supply-chain checks run as part of every release.
 - Python dependencies are pinned in `pyproject.toml` with version ranges.
-- Direct dependencies are audited for known CVEs before each release.
+- Direct dependencies are checked for known CVEs by the weekly audit above and the
+  release supply-chain gate.
 
 ## Model Neutrality & Security
 

@@ -2,7 +2,7 @@
 // far demo —— 一键展示 FAR-Lab 核心能力。
 //
 // 评审 / 新用户一条命令看到系统运转（全程 offline，无需凭据）：
-//   1. 确定性裁决内核 —— 14 Golden Vectors 经真实 R0-R9 kernel
+//   1. 确定性裁决内核 —— 15 Golden Vectors 经真实 R0-R9 kernel
 //   2. 端到端 demo claim（C-ASTRO-0001）—— FEC 编排 → kernel 裁决 → fail-closed 密封
 //   3. 指引下一步（far api 全栈 / far export / far verify）
 //
@@ -30,7 +30,7 @@ ${bannerLine('Claim-level AI4S verification (R0-R9 kernel · tamper-evident · a
 
 const PHASE1 = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ① Deterministic verdict kernel — 14 Golden Vectors via the real R0-R9 rule tree
+  ① Deterministic verdict kernel — 15 Golden Vectors via the real R0-R9 rule tree
      (no LLM in the loop; five values: CONFIRMED/REFUTED/INCONCLUSIVE/DEGRADED_SCOPE/UNTESTED)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;

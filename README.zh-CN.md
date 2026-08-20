@@ -59,11 +59,11 @@ pnpm far demo tess-offline # offline demo —— 零凭据
 ## 2 分钟 Quickstart
 
 ```bash
-# 1. 用确定性裁决内核跑 14 条 golden vector（offline·无 key）
+# 1. 用确定性裁决内核跑 15 条 golden vector（offline·无 key）
 pnpm far demo
-#   → 14/14 golden vectors PASS · end-to-end demo claim sealed · exit 0
+#   → 15/15 golden vectors PASS · end-to-end demo claim sealed · exit 0
 
-# 2. 用确定性裁决内核跑 14 条 golden vector
+# 2. 用确定性裁决内核跑 15 条 golden vector
 pnpm far verify-golden --all
 
 # 3. 导出证明 bundle（步骤 4 篡改演示需要先导出）
@@ -213,7 +213,7 @@ FAR-Lab 自带**冻结评估集**（`src/research/evaluation/frozen_eval_set.jso
 pnpm far demo tess-offline
 ```
 
-全程 offline：14 条 golden vector 经真实 R0–R9 内核，再跑端到端 TESS 声明（`C-ASTRO-0001`）经
+全程 offline：15 条 golden vector 经真实 R0–R9 内核，再跑端到端 TESS 声明（`C-ASTRO-0001`）经
 FEC 编排 → 内核裁决 → fail-closed 密封。要验证持久化 bundle，先运行
 `pnpm far export far-proof --demo-chain --force` 导出，再用 `far verify .far-proof` 验证。
 

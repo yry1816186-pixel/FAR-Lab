@@ -69,13 +69,13 @@ reads a key value.
 ## 2-minute Quickstart
 
 ```bash
-# 1. Run the offline demo through the real R0-R9 kernel (14 golden vectors + end-to-end, no key)
+# 1. Run the offline demo through the real R0-R9 kernel (15 golden vectors + end-to-end, no key)
 pnpm far demo
-#   → 14/14 golden vectors PASS · end-to-end demo claim sealed · exit 0
+#   → 15/15 golden vectors PASS · end-to-end demo claim sealed · exit 0
 #   (the `tess-offline` sub-mode focuses on C-ASTRO-0001 and may yield UNTESTED; for a full
 #    statistics-driven demo use `far demo`)
 
-# 2. Run the deterministic verdict kernel over 14 golden vectors
+# 2. Run the deterministic verdict kernel over 15 golden vectors
 pnpm far verify-golden --all
 
 # 3. See tamper detection in action (requires a .far-proof bundle — run step 4 first to export one)
@@ -297,7 +297,7 @@ Deeper: see the concept table above and `far <command> --help` for per-command c
 pnpm far demo tess-offline
 ```
 
-Runs entirely offline: 14 golden vectors through the real R0–R9 kernel, then an end-to-end
+Runs entirely offline: 15 golden vectors through the real R0–R9 kernel, then an end-to-end
 TESS claim (`C-ASTRO-0001`) through FEC orchestration → kernel verdict → fail-closed sealing.
 
 ---
