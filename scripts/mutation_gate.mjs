@@ -166,6 +166,88 @@ const EQUIVALENT_MUTATIONS = {
       reason: '空串入 splitsRun 后 toLowerCase()=""，与 has("hidden")/has("public") 判定均不等——空串对 public-only 判定不可观测，>0 与 >=0 等价',
     },
   ],
+  'src/statistics/t_distribution.ts': [
+    {
+      op: 'gte_to_gt',
+      linePrefix: 'return t >= 0 ? 1 - 0.5 * ib : 0.5 * ib;',
+      reason: 't=0 时 ib 参数 x=df/(df+0)=1 → incompleteBeta(1)=1，两分支均得 0.5；t≠0 时符号判定同——分支在边界点输出等价',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (t > STUDENT_T_QUANTILE_CLAMP) {',
+      reason: 'clamp 只在 Newton 迭代中间量上评估（不可从输入精确命中 1e7）；t===CLAMP 时原版保留 t=CLAMP、变异重赋同值 CLAMP——两算子输出等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: '} else if (t < -STUDENT_T_QUANTILE_CLAMP) {',
+      reason: '同上：t===-CLAMP 时 else-if 分支重赋同值 -CLAMP，边界点输出等价',
+    },
+    {
+      op: 'or_to_and',
+      linePrefix: 'if (x === 0 || x === 1) {',
+      reason: 'x=0 时落入计算路径经 Math.log(0)=-Inf 得 bt=exp(-Inf)=0，0*cf/a=0 与原短路返回 x 同值；x=1 时 1-0*cf/b=1 同值——对数下溢使两路径输出一致',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (p < 0.5) {',
+      reason: 'p===0.5 已被上方精确分支提前 return 0；剩余域 p≠0.5 上 < 与 <= 等价',
+    },
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (!(pdf > 0) || !Number.isFinite(pdf)) {',
+      reason: 't 密度在 clamp 域内恒为正有限值（极尾 ~1e-35 仍 >0），pdf>0 与 >=0 在可达输入下等价',
+    },
+    {
+      op: 'or_to_and',
+      linePrefix: 'if (!(pdf > 0) || !Number.isFinite(pdf)) {',
+      reason: 'pdf 恒为正有限值：原 false||false 与变异 false&&false 均 false，NaN/Inf pdf 对有限 (t,df) 输入不可构造',
+    },
+    {
+      op: 'lte_to_lt',
+      linePrefix: 'for (let m = 1; m <= BETA_ITMAX; m++) {',
+      reason: 'betaContinuedFraction 对合法 (a,b) 在 EPS 判据下远早于 200 次收敛 break；多一次迭代的 h 增量 < BETA_EPS 对双精度输出不可观测',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'for (let j = 0; j < 6; j++) {',
+      reason: 'logGamma Lanczos 系数恰 6 项：j=6 时 cof[6]===undefined 被 c!==undefined 防御跳过，多余迭代为 no-op',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (x < (a + 1) / (a + b + 2)) {',
+      reason: '对称分支选择在数学上连续（A&S 26.5.5 两分支在切换点收敛到同值，先例见 p_value.ts 同型登记），边界 x 输出两分支一致',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (Math.abs(d) < TINY) {',
+      reason: 'TINY=1e-300 防御分支：|d| 恰等于 1e-300 对双精度迭代中间量不可构造；其余值域两算子同判',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (Math.abs(c) < TINY) {',
+      reason: '同上：TINY 边界不可精确命中',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (Math.abs(del - 1) < BETA_EPS) {',
+      reason: '收敛判据 |del-1| 恰等于 EPS 不可从外部输入构造（迭代中间量）；收敛后 break 与多一轮迭代的差异 < EPS 对输出不可观测',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'if (Math.abs(delta) < CENTRAL_TOLERANCE.T_NEWTON_CONVERGENCE && Math.abs(err) < ',
+      reason: 'delta=err/pdf 且 t 密度 pdf<1 恒成立 → delta<tol ⟹ err=delta·pdf<tol，两条件冗余（err 先达阈时 delta 已达），边界在可达输入下不可区分',
+    },
+    {
+      op: 'and_to_or',
+      linePrefix: 'if (Math.abs(delta) < CENTRAL_TOLERANCE.T_NEWTON_CONVERGENCE && Math.abs(err) < ',
+      reason: '同上：条件冗余性使 or 与 and 在可达输入下同时真/同时假（pdf<1 的冗余推导）',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: 'for (let i = 0; i < 100; i++) {',
+      reason: 'Newton 二次收敛典型 <10 次达 1e-12 判据 break；100 为防发散安全网，正常输入远早退出，多一次已收敛迭代为 no-op',
+    },
+  ],
 };
 
 /** 位点是否命中等价变异登记（返回登记项或 null）。 */

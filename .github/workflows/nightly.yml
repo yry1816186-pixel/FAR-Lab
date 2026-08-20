@@ -186,3 +186,11 @@ jobs:
           node scripts/mutation_gate.mjs src/anti_theater/detectors/provenance_unbound.ts tests/anti_theater/provenance_unbound.test.ts --limit 50
           node scripts/mutation_gate.mjs src/anti_theater/detectors/report_mismatch.ts tests/anti_theater/report_proof_mismatch.test.ts tests/anti_theater/detector_branches_boost.test.ts --limit 100
           node scripts/mutation_gate.mjs src/anti_theater/detectors/stopping_rule.ts tests/anti_theater/detector_branches_boost.test.ts --limit 50
+      # 2026-08-20 批次 8：statistics 域核心 4 文件全 0% 存活。t_distribution 含 20 条
+      # 数值内部等价登记（收敛冗余性/TINY 不可构造/对称分支连续——先例 p_value.ts 同型）。
+      - name: gate · statistics 核心（t_distribution / multiple_testing / ci / effect_size）
+        run: |
+          node scripts/mutation_gate.mjs src/statistics/t_distribution.ts tests/statistics/t_distribution.test.ts tests/statistics/t_distribution_boundaries.test.ts tests/statistics/t_quantile.test.ts tests/statistics/statistics_math.test.ts --limit 100
+          node scripts/mutation_gate.mjs src/statistics/multiple_testing.ts tests/statistics/statistics_math.test.ts tests/statistics/metamorphic_invariants.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 100
+          node scripts/mutation_gate.mjs src/statistics/ci.ts tests/statistics/ci_error_paths.test.ts tests/statistics/ci_t_welch.test.ts tests/statistics/statistics_math.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 100
+          node scripts/mutation_gate.mjs src/statistics/effect_size.ts tests/statistics/effect_size.test.ts tests/statistics/mutation_kill_batch8.test.ts --limit 50
