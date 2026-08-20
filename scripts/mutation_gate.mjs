@@ -104,6 +104,32 @@ const EQUIVALENT_MUTATIONS = {
       reason: 'setParentNodes 仅维护 node.parent 回指；本扫描器只用 ts.forEachChild 自顶向下遍历 + getStart/getEnd/getLineAndCharacterOfPosition（均不读 parent），parent 指针存缺不影响任何可观测输出',
     },
   ],
+  'src/anti_theater/constraint.ts': [
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (blockSeal && (forced === undefined || SUPPORT_RANK[forced]',
+      reason: 'forced=UNTESTED(rank 1) 时变异 >= 触发重置，但重置值仍为 UNTESTED（同值赋值）；其余 rank 下 > 与 >= 同判——SUPPORT_RANK 双射使该分支在两算子下输出等价',
+    },
+    {
+      op: 'lt_to_lte',
+      linePrefix: '(forced === undefined || SUPPORT_RANK[candidate] < SUPPORT_RANK[forced])',
+      reason: 'SUPPORT_RANK 是五值双射（rank 相等 ⟺ verdict 相同）：<= 变异多出的相等分支只发生 candidate===forced，替换后 forced 值不变，循环终值等价',
+    },
+  ],
+  'src/anti_theater/score.ts': [
+    {
+      op: 'gt_to_gte',
+      linePrefix: 'if (intersection(attackIds, BUCKET_WEAK_DATASET).size > 0) {',
+      reason: '外层桶 4 守门与内层 DRIFT-WARN 检查同源：内层为 true 时 DRIFT finding 必在 findings 中（attackIds 由同一数组构建）故外层恒真；外层变异 >=0 恒真后内层谓词不变，扣分行为等价',
+    },
+  ],
+  'src/anti_theater/lint.ts': [
+    {
+      op: 'gte_to_gt',
+      linePrefix: 'antiTheaterScore >= SEAL_BLOCK_SCORE_THRESHOLD &&',
+      reason: 'score===70 ⟺ 恰扣 30；不产生 forced/blockSeal 的扣分源只有桶 6/7（max 20）与 DRIFT-WARN 桶 4（DRIFT forced DEGRADED_SCOPE）——可 seal 输入的 score 值域为 {80,90,100}，不含 70 边界，>= 与 > 在可达输入下等价',
+    },
+  ],
 };
 
 /** 位点是否命中等价变异登记（返回登记项或 null）。 */

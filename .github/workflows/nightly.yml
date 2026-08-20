@@ -159,3 +159,13 @@ jobs:
         run: node scripts/mutation_gate.mjs src/falsifiability/evidence_contract_gate.ts tests/falsifiability/evidence_contract_gate.test.ts --limit 50
       - name: gate · verifier（V1 验证链·5/5）
         run: node scripts/mutation_gate.mjs src/falsifiability/verifier.ts tests/falsifiability/verifier_chain.test.ts --limit 50
+      # 2026-08-20 批次 5：anti_theater 核心 + confounding adjudicate 全 0% 存活。
+      # lint 三重 canSeal 条件 / constraint 只降级模型边界 / score 7 桶精确扣分。
+      - name: gate · anti_theater lint（检测编排·8 杀+1 等价登记）
+        run: node scripts/mutation_gate.mjs src/anti_theater/lint.ts tests/anti_theater/lint_constraint_score_mutation.test.ts tests/anti_theater/anti_theater_attack_corpus.test.ts --limit 50
+      - name: gate · anti_theater constraint（只降级约束·29 杀+2 等价登记）
+        run: node scripts/mutation_gate.mjs src/anti_theater/constraint.ts tests/anti_theater/lint_constraint_score_mutation.test.ts tests/anti_theater/anti_theater_attack_corpus.test.ts --limit 100
+      - name: gate · anti_theater score（7 桶扣分·15 杀+1 等价登记）
+        run: node scripts/mutation_gate.mjs src/anti_theater/score.ts tests/anti_theater/lint_constraint_score_mutation.test.ts tests/anti_theater/false_green_rate.test.ts --limit 50
+      - name: gate · confounding adjudicate（R-causal SSOT·6/6）
+        run: node scripts/mutation_gate.mjs src/confounding_gate/adjudicate.ts tests/confounding_gate/adjudicate.test.ts --limit 50
