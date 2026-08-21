@@ -568,12 +568,20 @@ export const rankStage: StageHandler = {
           .map((m) => ({ aId: m.aId, bId: m.bId, outcome: m.outcome }));
         const bt = bradleyTerry(participantIds, contested);
         standings = new Map(bt.map((s) => [s.hypothesisId, s] as const));
+        // Deterministic bias proxy from REAL match data (architecture-critic ADOPT path,
+        // 2026-08-22): swap disagreement = both verdicts usable but order flipped them
+        // (position bias or genuine ambiguity); ties = both orders said tie.
+        const judgedPairs = tournamentMatches.filter((m) => m.aFirstVerdict !== 'incomparable' && m.bFirstVerdict !== 'incomparable');
+        const swapDisagreements = judgedPairs.filter((m) => m.aFirstVerdict !== m.bFirstVerdict).length;
+        const settledTies = judgedPairs.filter((m) => m.aFirstVerdict === 'tie' && m.bFirstVerdict === 'tie').length;
         tournamentNote =
-          `tournament: ${tournamentMatches.length} pair(s) judged (${contested.length} contested, ${tournamentMatches.length - contested.length} no-contest)`;
+          `tournament: ${tournamentMatches.length} pair(s) judged (${contested.length} contested, ${tournamentMatches.length - contested.length} no-contest); ` +
+          `order-swap disagreement ${swapDisagreements}/${judgedPairs.length}, settled ties ${settledTies}/${judgedPairs.length}`;
         tournamentUncertainty =
           'Pairwise verdicts are uncalibrated LLM judgments with order-swap consistency filtering; ' +
-          'Bradley-Terry scores are ordinal decision aids without confidence intervals. Coarse ordering is ' +
-          'credible, near-ties are not — treat adjacent ranks as interchangeable unless head-to-head says otherwise.';
+          `this batch: ${swapDisagreements}/${judgedPairs.length} judged pairs disagreed under order swap (position-bias/ambiguity signal) and ` +
+          `${settledTies}/${judgedPairs.length} settled as ties. Bradley-Terry scores are ordinal decision aids without confidence intervals. ` +
+          'Coarse ordering is credible, near-ties are not — treat adjacent ranks as interchangeable unless head-to-head says otherwise.';
         tournamentId = newId('trn');
       }
     }

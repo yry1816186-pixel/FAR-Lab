@@ -1012,6 +1012,9 @@ describe('rank stage', () => {
     expect(summary).toContain('hyp_unknown0000000000000000000aaa');
     expect(summary).toContain('clm_bogus00000000000000000000aaa');
     expect(summary).toContain('tournament: 3 pair(s) judged');
+    // deterministic bias proxy (architecture-critic ADOPT path): this fixture's 3 pairs
+    // are all swap-consistent (a/a) -> 0 disagreements, 0 settled ties, stated in the note
+    expect(summary).toContain('order-swap disagreement 0/3, settled ties 0/3');
 
     const cards = store.listObjects('scorecard', run.id);
     expect(cards).toHaveLength(3); // duplicate hdup and unknown id never scored
@@ -1047,6 +1050,7 @@ describe('rank stage', () => {
     expect(trn.matches.every((m) => m.outcome === 'a' || m.outcome === 'b' || m.outcome === 'tie')).toBe(true);
     expect(trn.algorithm).toBe('bradley-terry-ilsr-v1');
     expect(trn.uncertainty.length).toBeGreaterThan(20);
+    expect(trn.uncertainty).toContain('0/3 judged pairs disagreed under order swap');
     expect(trn.standings.map((s) => [s.hypothesisId, s.rank])).toEqual([
       [ha.id, 1],
       [hb.id, 2],
