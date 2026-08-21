@@ -32,7 +32,8 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       userPayload: { outputContract: describeShape(opts.schema), input: opts.payload },
       outputKind: 'json',
       temperature: opts.temperature,
-      maxTokens: opts.maxTokens,
+      // Default output budget: large structured payloads (rank/plan) must not truncate mid-JSON.
+      maxTokens: opts.maxTokens ?? 8192,
       purpose: opts.purpose,
     },
     (raw) => {
@@ -41,6 +42,13 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       // null-for-absent-optional tolerates the stripped retry. Required nulls fail both.
       let parsed = attempt(raw);
       if (!parsed.success) parsed = attempt(stripNulls(raw));
+      if (!parsed.success) {
+        // Third attempt: models emit enum variants with spaces/hyphens/case drift
+        // ('testable now' vs 'testable_now'). Normalize ONLY strings whose normalized
+        // form uniquely hits a schema enum value — content text is untouched.
+        const enumSet = collectEnumValues(opts.schema);
+        if (enumSet.size > 0) parsed = attempt(normalizeEnumVariants(stripNulls(raw), enumSet));
+      }
       return parsed.success ? (parsed.data as T) : new Error(`schema validation failed: ${parsed.error.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 5).join('; ')}`);
     },
   );
@@ -114,4 +122,39 @@ const describeShape = (schema: z.ZodTypeAny): string => {
     }
   };
   return walk(schema);
+};
+
+const collectEnumValues = (schema: z.ZodTypeAny, out = new Set<string>()): Set<string> => {
+  const walk = (t: z.ZodTypeAny, depth: number): void => {
+    if (depth > 12) return;
+    const d = t._def as { typeName?: string; values?: unknown; type?: z.ZodTypeAny; innerType?: z.ZodTypeAny; options?: Readonly<z.ZodTypeAny[]>; shape?: unknown };
+    if (d.typeName === 'ZodEnum') {
+      for (const v of (d.values as readonly string[]) ?? []) out.add(v);
+      return;
+    }
+    if (d.typeName === 'ZodOptional' || d.typeName === 'ZodNullable' || d.typeName === 'ZodDefault' || d.typeName === 'ZodArray') {
+      walk((d as { innerType?: z.ZodTypeAny; type?: z.ZodTypeAny }).innerType ?? (d as { type: z.ZodTypeAny }).type!, depth + 1);
+      return;
+    }
+    if (d.typeName === 'ZodObject') {
+      const shapeObj = typeof d.shape === 'function' ? (d.shape as () => Record<string, z.ZodTypeAny>)() : ((d.shape as Record<string, z.ZodTypeAny>) ?? {});
+      for (const v of Object.values(shapeObj)) walk(v, depth + 1);
+      return;
+    }
+    if (d.typeName === 'ZodUnion') { for (const o of d.options ?? []) walk(o, depth + 1); }
+  };
+  walk(schema, 0);
+  return out;
+};
+
+const normalizeEnumVariants = (v: unknown, enumSet: Set<string>): unknown => {
+  const norm = (x: string): string => x.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (typeof v === 'string' && !enumSet.has(v) && enumSet.has(norm(v))) return norm(v);
+  if (Array.isArray(v)) return v.map((x) => normalizeEnumVariants(x, enumSet));
+  if (v !== null && typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = normalizeEnumVariants(val, enumSet);
+    return out;
+  }
+  return v;
 };

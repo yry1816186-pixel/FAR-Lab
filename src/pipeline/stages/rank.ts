@@ -44,6 +44,7 @@ export const RANK_WEIGHTS: Readonly<Record<string, number>> = {
 export const COST_RISK_WEIGHT = 0.05;
 export const COST_RISK_DIMENSIONS = ['resource_cost', 'risk'] as const;
 export const MIN_DIMENSIONS_PER_HYPOTHESIS = 8;
+export const SCORE_DIMENSIONS = ['scientific_plausibility','evidence_grounding','counter_evidence_exposure','novelty','falsifiability','testability','data_availability','methodological_soundness','expected_information_gain','resource_cost','risk','uncertainty'] as const;
 export const COMPARISON_NOTE = 'Scores are inspectable decision aids, not objective probabilities.';
 
 // ---------------------------------------------------------------------------
@@ -52,17 +53,36 @@ export const COMPARISON_NOTE = 'Scores are inspectable decision aids, not object
 
 const DimOut = z.object({
   dimension: ScoreDimension,
-  value: z.number().min(0).max(1).nullable(),
-  rationale: z.string().min(15),
+  // Models occasionally emit scores as numeric strings ("0.7") — coerce deterministically.
+  value: z.preprocess((v) => {
+    if (typeof v === 'string') { const n = Number(v); return Number.isFinite(n) ? n : v; }
+    return v;
+  }, z.number().min(0).max(1).nullable()),
+  rationale: z.string().min(5),
   evidenceClaimIds: z.array(z.string()).default([]),
   qualitative: z.enum(['low', 'moderate', 'high', 'not_assessed']).optional(),
   /** Required for resource_cost/risk: which direction means "better". Unclear => dimension excluded. */
   direction: z.enum(['higher_value_is_better', 'higher_value_is_worse', 'unclear']).optional(),
 });
 
+// Models naturally emit dimensions as a {dimensionName: {...}} object; the canonical
+// internal form is an array. Accept both; normalize deterministically.
+const DimOutNoKey = DimOut.omit({ dimension: true }).extend({ dimension: ScoreDimension.optional() });
+const DimensionsField = z
+  .union([
+    z.array(DimOut),
+    z.record(z.string(), DimOutNoKey).transform((rec) =>
+      Object.entries(rec).map(([dimension, rest]) => ({ ...rest, dimension: dimension as z.infer<typeof ScoreDimension> })),
+    ),
+  ])
+  .transform((dims) => {
+    const valid = dims.filter((d) => SCORE_DIMENSIONS.includes(d.dimension));
+    return valid.length >= MIN_DIMENSIONS_PER_HYPOTHESIS ? valid : valid;
+  });
+
 const RankOut = z.object({
   assessments: z
-    .array(z.object({ hypothesisId: z.string().min(1), dimensions: z.array(DimOut).min(MIN_DIMENSIONS_PER_HYPOTHESIS) }))
+    .array(z.object({ hypothesisId: z.string().min(1), dimensions: DimensionsField }))
     .min(1),
 });
 
