@@ -45,11 +45,9 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       //      e.g. {"falsification-spec": {...}} — live DeepSeek failure 2026-08-22 P2)
       //   4. enum-variant normalization on top of each base
       const unwrapped = unwrapSingleKeyEnvelope(raw);
-      const enumSet = collectEnumValues(opts.schema);
       const candidates: unknown[] = [];
       for (const base of unwrapped === raw ? [raw] : [raw, unwrapped]) {
-        candidates.push(base, stripNulls(base));
-        if (enumSet.size > 0) candidates.push(normalizeEnumVariants(stripNulls(base), enumSet));
+        candidates.push(base, stripNulls(base), normalizeEnumFields(stripNulls(base), opts.schema));
       }
       let firstError: z.ZodError | null = null;
       for (const candidate of candidates) {
@@ -149,51 +147,59 @@ const describeShape = (schema: z.ZodTypeAny): string => {
   return walk(schema);
 };
 
-const collectEnumValues = (schema: z.ZodTypeAny, out = new Set<string>()): Set<string> => {
-  const walk = (t: z.ZodTypeAny, depth: number): void => {
-    if (depth > 12) return;
-    const d = t._def as { typeName?: string; values?: unknown; type?: z.ZodTypeAny; innerType?: z.ZodTypeAny; options?: Readonly<z.ZodTypeAny[]>; shape?: unknown };
-    if (d.typeName === 'ZodEnum') {
-      for (const v of (d.values as readonly string[]) ?? []) out.add(v);
-      return;
-    }
-    if (d.typeName === 'ZodOptional' || d.typeName === 'ZodNullable' || d.typeName === 'ZodDefault' || d.typeName === 'ZodArray') {
-      walk((d as { innerType?: z.ZodTypeAny; type?: z.ZodTypeAny }).innerType ?? (d as { type: z.ZodTypeAny }).type!, depth + 1);
-      return;
-    }
-    if (d.typeName === 'ZodObject') {
-      const shapeObj = typeof d.shape === 'function' ? (d.shape as () => Record<string, z.ZodTypeAny>)() : ((d.shape as Record<string, z.ZodTypeAny>) ?? {});
-      for (const v of Object.values(shapeObj)) walk(v, depth + 1);
-      return;
-    }
-    if (d.typeName === 'ZodUnion') { for (const o of d.options ?? []) walk(o, depth + 1); }
-  };
-  walk(schema, 0);
-  return out;
+/**
+ * Path-aware enum-variant normalization: canonical-fold (case/whitespace/hyphen/underscore
+ * differences) ONLY at payload locations whose schema type is a ZodEnum. Free-text strings
+ * are never rewritten, even when they canonically collide with an enum member living at a
+ * different schema path — the earlier flat-set version had exactly that cross-field
+ * rewrite hazard (adversarial audit P2, 2026-08-22). Replacements happen only when the
+ * fold maps to exactly one enum member; ambiguous folds stay untouched and fail validation
+ * rather than guessing.
+ */
+const foldToMember = (x: string, members: readonly string[]): string => {
+  if (members.includes(x)) return x;
+  const canon = (s: string): string => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const hits = members.filter((m) => canon(m) === canon(x));
+  return hits.length === 1 ? hits[0]! : x;
 };
 
-const normalizeEnumVariants = (v: unknown, enumSet: Set<string>): unknown => {
-  // Canonical fold: case, whitespace, hyphen and underscore differences collapse
-  // ('Evidence Derived' / 'evidence derived' -> 'evidencederived' = 'evidence-derived').
-  // Replace ONLY when the fold maps to exactly one enum member; ambiguous folds
-  // (two members collapsing together) stay untouched, and exact members pass through.
-  const canon = (x: string): string => x.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
-  const foldIndex = new Map<string, string[]>();
-  for (const member of enumSet) {
-    const c = canon(member);
-    foldIndex.set(c, [...(foldIndex.get(c) ?? []), member]);
+const unwrapTypeWrapper = (t: z.ZodTypeAny): z.ZodTypeAny => {
+  for (let i = 0; i < 12; i += 1) {
+    const d = t._def as { typeName?: string; innerType?: z.ZodTypeAny; schema?: z.ZodTypeAny; in?: z.ZodTypeAny };
+    if (
+      d.typeName === 'ZodOptional' || d.typeName === 'ZodNullable' || d.typeName === 'ZodDefault' ||
+      d.typeName === 'ZodEffects' || d.typeName === 'ZodPipeline'
+    ) {
+      const next = d.innerType ?? d.schema ?? d.in;
+      if (next === undefined || next === t) return t;
+      t = next;
+    } else {
+      return t;
+    }
   }
-  const norm = (x: string): string => {
-    if (enumSet.has(x)) return x;
-    const hits = foldIndex.get(canon(x));
-    return hits && hits.length === 1 ? hits[0]! : x;
-  };
-  if (typeof v === 'string') return norm(v);
-  if (Array.isArray(v)) return v.map((x) => normalizeEnumVariants(x, enumSet));
-  if (v !== null && typeof v === 'object') {
+  return t;
+};
+
+const normalizeEnumFields = (value: unknown, schema: z.ZodTypeAny, depth = 0): unknown => {
+  if (depth > 12) return value;
+  const t = unwrapTypeWrapper(schema);
+  const d = t._def as { typeName?: string; values?: unknown; type?: z.ZodTypeAny; shape?: unknown };
+  if (d.typeName === 'ZodEnum') {
+    const members = (d.values as readonly string[]) ?? [];
+    return typeof value === 'string' ? foldToMember(value, members) : value; // non-strings left for validation to reject
+  }
+  if (value === null || typeof value !== 'object') return value;
+  if (d.typeName === 'ZodObject' && !Array.isArray(value)) {
+    const shapeObj = typeof d.shape === 'function' ? (d.shape as () => Record<string, z.ZodTypeAny>)() : ((d.shape as Record<string, z.ZodTypeAny>) ?? {});
     const out: Record<string, unknown> = {};
-    for (const [k, val] of Object.entries(v as Record<string, unknown>)) out[k] = normalizeEnumVariants(val, enumSet);
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const field = shapeObj[k];
+      out[k] = field === undefined ? v : normalizeEnumFields(v, field, depth + 1); // unknown keys untouched
+    }
     return out;
   }
-  return v;
+  if (d.typeName === 'ZodArray' && Array.isArray(value)) {
+    return value.map((x) => normalizeEnumFields(x, (d as { type: z.ZodTypeAny }).type!, depth + 1));
+  }
+  return value; // unions/records/primitives: untouched (safe; validation still applies)
 };
