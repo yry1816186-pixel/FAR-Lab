@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "statusVocabulary": ["not_started", "implemented", "integrated", "tested", "live_verified", "blocked", "failed"],
+  "note": "Dynamic product-construction status only. ACCEPTANCE.md owns criteria; this file owns live status/evidence. benchmark/scientific-validation claims are attached as evidence to live_verified.",
+  "items": [
+    {"id":"ACC-01","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-02","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-03","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-04","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-05","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-06","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-07","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-08","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-09","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-10","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-11","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-12","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-13","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-14","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-15","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-16","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-17","target":"tested","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-18","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-19","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
+    {"id":"ACC-20","target":"live_verified","critical":true,"status":"not_started","evidence":[]}
+  ],
+  "gates": [
+    {"id":"G-01","question":"All critical acceptance items reached target status with concrete evidence?","satisfied":false,"evidence":""},
+    {"id":"G-02","question":"No critical blocker or production-path fake/mock/demo/stub remains?","satisfied":false,"evidence":""},
+    {"id":"G-03","question":"Canonical real researcher workflow exercised end-to-end?","satisfied":false,"evidence":""},
+    {"id":"G-04","question":"Current official competition compliance rechecked and live-verified?","satisfied":false,"evidence":""},
+    {"id":"G-05","question":"Independent adversarial audit accepted repository/runtime/scientific evidence?","satisfied":false,"evidence":""},
+    {"id":"G-06","question":"Reproducibility claims independently exercised to their stated level?","satisfied":false,"evidence":""},
+    {"id":"G-07","question":"Repository, runtime, scientific and user-visible state agree with completion claim?","satisfied":false,"evidence":""}
+  ]
+}

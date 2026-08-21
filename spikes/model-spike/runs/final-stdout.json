@@ -1,0 +1,306 @@
+{
+  "spike": "model-spike",
+  "timestampUtc": "2026-08-21T10:29:32.646Z",
+  "node": "v24.14.0",
+  "provider": "all",
+  "results": {
+    "zai": {
+      "provider": "zai",
+      "key": "494667...(49 chars)",
+      "modelListAttempts": [
+        {
+          "label": "list:https://api.z.ai/api/paas/v4",
+          "requestUrl": "https://api.z.ai/api/paas/v4/models",
+          "networkOk": true,
+          "httpStatus": 200,
+          "latencyMs": 209,
+          "outcome": "OK",
+          "count": 9,
+          "ids": [
+            "glm-4.5",
+            "glm-4.5-air",
+            "glm-4.6",
+            "glm-4.7",
+            "glm-5",
+            "glm-5-turbo",
+            "glm-5.1",
+            "glm-5.2",
+            "glm-5.3"
+          ]
+        },
+        {
+          "label": "list:https://open.bigmodel.cn/api/paas/v4",
+          "requestUrl": "https://open.bigmodel.cn/api/paas/v4/models",
+          "networkOk": true,
+          "httpStatus": 200,
+          "latencyMs": 92,
+          "outcome": "OK",
+          "count": 9,
+          "ids": [
+            "glm-4.5",
+            "glm-4.5-air",
+            "glm-4.6",
+            "glm-4.7",
+            "glm-5",
+            "glm-5-turbo",
+            "glm-5.1",
+            "glm-5.2",
+            "glm-5.3"
+          ]
+        },
+        {
+          "label": "list:https://api.z.ai/api/paas/v3",
+          "requestUrl": "https://api.z.ai/api/paas/v3/models",
+          "networkOk": true,
+          "httpStatus": 404,
+          "latencyMs": 106,
+          "outcome": "FAIL",
+          "parseError": "no .data array",
+          "bodyHead": "{\"timestamp\":\"2026-08-21T10:29:27.230+00:00\",\"status\":404,\"error\":\"Not Found\",\"path\":\"/v3/models\"}"
+        }
+      ],
+      "structuredAttempts": [
+        {
+          "label": "T1-prompt-only@https://api.z.ai/api/paas/v4",
+          "requestUrl": "https://api.z.ai/api/paas/v4/chat/completions",
+          "model": "glm-4.5",
+          "responseFormatMode": "prompt-only",
+          "httpStatus": 429,
+          "latencyMs": 117,
+          "responseBodySha256": "cb014b3986a19957e76833d9799e8ddb0da36f0445d71f62420a06a930857723",
+          "outcome": "HTTP_ERROR",
+          "errorBodyHead": "{\"error\":{\"code\":\"1113\",\"message\":\"Insufficient balance or no resource package. Please recharge.\"}}",
+          "errorFields": [
+            "error"
+          ]
+        },
+        {
+          "label": "T2-json-object@https://api.z.ai/api/paas/v4",
+          "requestUrl": "https://api.z.ai/api/paas/v4/chat/completions",
+          "model": "glm-4.5",
+          "responseFormatMode": "json_object",
+          "httpStatus": 429,
+          "latencyMs": 182,
+          "responseBodySha256": "cb014b3986a19957e76833d9799e8ddb0da36f0445d71f62420a06a930857723",
+          "outcome": "HTTP_ERROR",
+          "errorBodyHead": "{\"error\":{\"code\":\"1113\",\"message\":\"Insufficient balance or no resource package. Please recharge.\"}}",
+          "errorFields": [
+            "error"
+          ]
+        },
+        {
+          "label": "T1-prompt-only@https://open.bigmodel.cn/api/paas/v4",
+          "requestUrl": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+          "model": "glm-4.5",
+          "responseFormatMode": "prompt-only",
+          "httpStatus": 429,
+          "latencyMs": 78,
+          "responseBodySha256": "6b5344b98fd2a82b4853692b885dcec44cb4010b1a843c05d9ef2da25c02686d",
+          "outcome": "HTTP_ERROR",
+          "errorBodyHead": "{\"error\":{\"code\":\"1113\",\"message\":\"余额不足或无可用资源包,请充值。\"}}",
+          "errorFields": [
+            "error"
+          ]
+        },
+        {
+          "label": "T2-json-object@https://open.bigmodel.cn/api/paas/v4",
+          "requestUrl": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+          "model": "glm-4.5",
+          "responseFormatMode": "json_object",
+          "httpStatus": 429,
+          "latencyMs": 109,
+          "responseBodySha256": "6b5344b98fd2a82b4853692b885dcec44cb4010b1a843c05d9ef2da25c02686d",
+          "outcome": "HTTP_ERROR",
+          "errorBodyHead": "{\"error\":{\"code\":\"1113\",\"message\":\"余额不足或无可用资源包,请充值。\"}}",
+          "errorFields": [
+            "error"
+          ]
+        }
+      ],
+      "conclusion": "PARTIAL/FAIL: no schema-valid structured call (see attempts); base=https://api.z.ai/api/paas/v4",
+      "chatModel": "glm-4.5"
+    },
+    "deepseek": {
+      "provider": "deepseek",
+      "key": "sk-947...(35 chars)",
+      "modelListAttempts": [
+        {
+          "label": "list:https://api.deepseek.com",
+          "requestUrl": "https://api.deepseek.com/models",
+          "networkOk": true,
+          "httpStatus": 200,
+          "latencyMs": 116,
+          "outcome": "OK",
+          "count": 3,
+          "ids": [
+            "deepseek-v4-flash",
+            "deepseek-v4-pro",
+            "deepseek-v4-flash-vision-exp"
+          ]
+        }
+      ],
+      "structuredAttempts": [
+        {
+          "label": "T1-prompt-only",
+          "requestUrl": "https://api.deepseek.com/chat/completions",
+          "model": "deepseek-chat",
+          "responseFormatMode": "prompt-only",
+          "httpStatus": 200,
+          "latencyMs": 2962,
+          "responseBodySha256": "2f7f16f588c1bc204be1064d8094bf844cc97563f722004607c07a5afd539d10",
+          "respondedModel": "deepseek-v4-flash",
+          "usage": {
+            "prompt_tokens": 124,
+            "completion_tokens": 248,
+            "total_tokens": 372
+          },
+          "finishReason": "stop",
+          "jsonParse": [
+            {
+              "method": "direct JSON.parse",
+              "ok": true
+            }
+          ],
+          "schemaValidation": {
+            "valid": true,
+            "errors": [],
+            "extraFields": []
+          },
+          "outcome": "SCHEMA_VALID",
+          "parsedValue": {
+            "hypothesis": "Retrieval-augmented generation reduces hallucination because it grounds the model's generation in externally retrieved, verifiable context, which constrains the model's latent knowledge priors and reduces reliance on parametric memory that may be incomplete or outdated.",
+            "confidence": 0.78,
+            "supporting_evidence": [
+              "Studies show that when models are provided with relevant retrieved passages, they are less likely to fabricate facts that contradict the provided context, even when the context conflicts with the model's parametric knowledge.",
+              "Empirical evaluations on open-domain QA benchmarks (e.g., Natural Questions) demonstrate that RAG systems achieve higher factual accuracy and lower hallucination rates compared to non-retrieval baselines, especially for long-tail or recent information."
+            ],
+            "falsification_test": "Construct a dataset where the retrieved passages contain deliberately false but plausible information that contradicts well-known facts (e.g., 'The Eiffel Tower is in Berlin'). If RAG models still produce the correct fact (e.g., 'Paris') rather than following the retrieved misinformation, then the hypothesis that grounding in retrieved context reduces hallucination would be falsified, as it would show the model ignores retrieval when it conflicts with parametric knowledge."
+          }
+        },
+        {
+          "label": "T2-json-object",
+          "requestUrl": "https://api.deepseek.com/chat/completions",
+          "model": "deepseek-chat",
+          "responseFormatMode": "json_object",
+          "httpStatus": 200,
+          "latencyMs": 2563,
+          "responseBodySha256": "9df33459b93e19e8d3eb292d388b66d1e5527ecf7b7df1e12e3994716209883d",
+          "respondedModel": "deepseek-v4-flash",
+          "usage": {
+            "prompt_tokens": 144,
+            "completion_tokens": 218,
+            "total_tokens": 362
+          },
+          "finishReason": "stop",
+          "jsonParse": [
+            {
+              "method": "direct JSON.parse",
+              "ok": true
+            }
+          ],
+          "schemaValidation": {
+            "valid": true,
+            "errors": [],
+            "extraFields": []
+          },
+          "outcome": "SCHEMA_VALID",
+          "parsedValue": {
+            "hypothesis": "Retrieval-augmented generation reduces hallucination by grounding the model's generation in externally retrieved factual passages, which constrains the model's output to align with the retrieved evidence, thereby reducing the likelihood of generating unsupported or fabricated content.",
+            "confidence": 0.85,
+            "supporting_evidence": [
+              "Studies have shown that when models are provided with relevant retrieved passages, they tend to copy or paraphrase information from those passages, leading to higher factual accuracy on knowledge-intensive tasks (e.g., Lewis et al., 2020).",
+              "Empirical comparisons demonstrate that RAG models produce fewer hallucinations than their non-retrieval counterparts on open-domain question answering benchmarks, as measured by factuality metrics like FEVER or QAGS."
+            ],
+            "falsification_test": "Design an experiment where the retrieval component is intentionally corrupted to provide irrelevant or misleading passages, while keeping the generator unchanged. If the model's hallucination rate does not increase compared to a no-retrieval baseline, then the hypothesis that retrieval grounding reduces hallucination would be falsified."
+          }
+        }
+      ],
+      "conclusion": "REACHABLE: live chat completion OK via https://api.deepseek.com (model deepseek-chat); structured JSON validated",
+      "chatModel": "deepseek-chat"
+    },
+    "relay": {
+      "provider": "relay",
+      "key": "sk-kKk...(51 chars)",
+      "baseDiscovery": [],
+      "modelListAttempts": [
+        {
+          "label": "env:ZCODE_BASE_URL /v1",
+          "requestUrl": "https://zcode.z.ai/v1/models",
+          "networkOk": true,
+          "httpStatus": 404,
+          "latencyMs": 438,
+          "outcome": "FAIL",
+          "parseError": "unparsable JSON: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON",
+          "bodyHead": "<!DOCTYPE html><!--I_rkEcF_HmR8oFBIWR8tW--><html><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/webpack-b19e36650d0d6a99.js\"/><script src=\"/_next/static/chunks/e3a63e5d-c"
+        },
+        {
+          "label": "env:ZCODE_BASE_URL /api/v1",
+          "requestUrl": "https://zcode.z.ai/api/v1/models",
+          "networkOk": true,
+          "httpStatus": 404,
+          "latencyMs": 129,
+          "outcome": "FAIL",
+          "parseError": "unparsable JSON: Unexpected non-whitespace character after JSON at position 4 (line 1 column 5)",
+          "bodyHead": "404 page not found"
+        },
+        {
+          "label": "guess:relay.z.ai",
+          "requestUrl": "https://relay.z.ai/v1/models",
+          "networkOk": false,
+          "error": "TypeError: fetch failed",
+          "latencyMs": 19
+        },
+        {
+          "label": "guess:api.relay.z.ai",
+          "requestUrl": "https://api.relay.z.ai/v1/models",
+          "networkOk": false,
+          "error": "TypeError: fetch failed",
+          "latencyMs": 20
+        },
+        {
+          "label": "zai-paas:api.z.ai",
+          "requestUrl": "https://api.z.ai/api/paas/v4/models",
+          "networkOk": true,
+          "httpStatus": 401,
+          "latencyMs": 175,
+          "outcome": "FAIL",
+          "parseError": "no .data array",
+          "bodyHead": "{\"error\":{\"code\":\"401\",\"message\":\"token expired or incorrect\"}}"
+        },
+        {
+          "label": "zai-paas:open.bigmodel.cn",
+          "requestUrl": "https://open.bigmodel.cn/api/paas/v4/models",
+          "networkOk": true,
+          "httpStatus": 401,
+          "latencyMs": 93,
+          "outcome": "FAIL",
+          "parseError": "no .data array",
+          "bodyHead": "{\"error\":{\"code\":\"401\",\"message\":\"令牌已过期或验证不正确\"}}"
+        },
+        {
+          "label": "zai-coding:api.z.ai",
+          "requestUrl": "https://api.z.ai/api/coding/paas/v4/models",
+          "networkOk": true,
+          "httpStatus": 401,
+          "latencyMs": 95,
+          "outcome": "FAIL",
+          "parseError": "no .data array",
+          "bodyHead": "{\"error\":{\"code\":\"401\",\"message\":\"token expired or incorrect\"}}"
+        },
+        {
+          "label": "campus-relay:token.nuaa.edu.cn",
+          "requestUrl": "https://token.nuaa.edu.cn/v1/models",
+          "networkOk": true,
+          "httpStatus": 483,
+          "latencyMs": 198,
+          "outcome": "FAIL",
+          "parseError": "unparsable JSON: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON",
+          "bodyHead": "<!DOCTYPE html>\r\n<html lang=\"zh-CN\">\r\n<html>\r\n\t<head>\r\n\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, target-densitydpi=medium-dpi\">\r\n\t<title>访问被禁止"
+        }
+      ],
+      "structuredAttempts": [],
+      "qwenAvailability": null,
+      "conclusion": "BLOCKED: no reachable OpenAI-compatible base for RELAY_API_KEY (tried: https://zcode.z.ai/v1/models, https://zcode.z.ai/api/v1/models, https://relay.z.ai/v1/models, https://api.relay.z.ai/v1/models, https://api.z.ai/api/paas/v4/models, https://open.bigmodel.cn/api/paas/v4/models, https://api.z.ai/api/coding/paas/v4/models, https://token.nuaa.edu.cn/v1/models)"
+    }
+  }
+}

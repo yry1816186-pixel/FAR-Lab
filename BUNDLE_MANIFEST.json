@@ -1,0 +1,41 @@
+{
+  "name": "FAR-Lab ZCode Greenfield Workspace",
+  "version": "1.0.0",
+  "asOf": "2026-08-21",
+  "target": "XH-202619 Track 1 / Direction 1 / A",
+  "workspaceStatus": "READY_FOR_ZCODE_RUNTIME_VERIFICATION",
+  "startHere": "START_HERE.md",
+  "formalBuildController": "FINAL_BUILD_PROMPT.md",
+  "pluginMarketplace": "zcode-harness/marketplace.json",
+  "runtimeProfile": "zcode-harness/ZCODE_SETTINGS.md",
+  "truth": {
+    "offlineHarnessDoctor": "VERIFIED_PASS",
+    "hookProtocolTests": "VERIFIED_PASS",
+    "controlDoctor": "VERIFIED_PASS",
+    "secretScan": "VERIFIED_PASS_WITH_SEEDED_NEGATIVE_TEST",
+    "pathHygiene": "VERIFIED_PASS_WITH_SEEDED_NEGATIVE_TEST",
+    "productCompletionGate": "EXPECTED_NOT_READY_PRODUCT_NOT_BUILT",
+    "localZCodePluginRuntimeLoad": "UNVERIFIED_REQUIRES_USER_ZCODE_FRESH_SESSION",
+    "completionGatePositiveBranch": "VERIFIED_IN_ISOLATED_TEMP_COPY"
+  },
+  "competitionFacts": {
+    "officialPageRechecked": "2026-08-21",
+    "officialModelRouteRequirement": "model-calling route required by the current official rules; live proof required for competition release",
+    "technicalSolutionPdf": "<=20 pages",
+    "canonicalFile": "project-spec/COMPETITION.md"
+  },
+  "contextEconomy": {
+    "alwaysOn": "AGENTS.md",
+    "onDemandPolicies": "project-spec/policies/",
+    "dynamicState": ".control/",
+    "coldResearch": "research/reference/FARLAB_PRE_RESEARCH_INTELLIGENCE_BASELINE.md",
+    "coldResearchAutoLoad": false
+  },
+  "removedAsObsoleteOrMisleading": [
+    ".control/ACCEPTANCE_MATRIX.json",
+    "research/LEGACY_DECOMPOSITION.md",
+    "research/competition-page-2026-08-21.yml",
+    "eslint.config.js",
+    "empty tmp directory"
+  ]
+}

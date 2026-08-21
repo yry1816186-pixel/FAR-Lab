@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "items": [
+    {
+      "id": "B-HARNESS-RUNTIME",
+      "critical": true,
+      "status": "RESOLVED",
+      "scope": "zcode-runtime",
+      "reason": "Verified in the fresh ZCode session of 2026-08-21 (the current construction session).",
+      "resolution": "Real runtime evidence observed: (1) SessionStart hook fired - bootstrap context injected from farlab-control-plane hooks/session-context.mjs; (2) farlab-control-plane skills (architecture-convergence, evidence-research, integration-fusion, oss-due-diligence, scientific-method-and-competition, verification-audit) and agents (adversarial-auditor, architecture-critic, scientific-reviewer) visible and loadable in session; (3) PostToolUse lint hook fired on file writes (ESLint ran on Write outputs); (4) deterministic scripts pass: npm test 7/7, eslint clean."
+    },
+    {
+      "id": "B-QWEN-LIVE-ROUTE",
+      "critical": false,
+      "status": "OPEN",
+      "scope": "model-provider",
+      "reason": "Competition-preferred Qwen/Bailian route cannot be live-verified in this environment: no DASHSCOPE_API_KEY present and RELAY gateway base URL undiscoverable (8 candidate bases exhausted, see evidence/W0/model-spike-report.md).",
+      "resolution": "Provide DASHSCOPE_API_KEY or the RELAY base URL, then run `node spikes/model-spike/probe.mjs --provider relay` (or zai after 2026-08-22 10:03 quota reset for GLM) to attach live receipts. Model plane keeps first-class adapter slots; no fabricated live evidence allowed meanwhile."
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[probe] --- probing zai ---
+[probe] zai list https://api.z.ai/api/paas/v4 -> OK 200
+[probe] zai list https://open.bigmodel.cn/api/paas/v4 -> OK 200
+[probe] zai list https://api.z.ai/api/paas/v3 -> FAIL 404
+[probe] zai T1 https://api.z.ai/api/paas/v4 -> HTTP_ERROR
+[probe] zai T2 https://api.z.ai/api/paas/v4 -> HTTP_ERROR
+[probe] zai T1 https://open.bigmodel.cn/api/paas/v4 -> HTTP_ERROR
+[probe] zai T2 https://open.bigmodel.cn/api/paas/v4 -> HTTP_ERROR
+[probe] --- probing deepseek ---
+[probe] deepseek list -> OK 200
+[probe] deepseek T1 -> SCHEMA_VALID
+[probe] deepseek T2 -> SCHEMA_VALID
+[probe] --- probing relay ---
+[probe] relay list env:ZCODE_BASE_URL /v1 -> FAIL 404
+[probe] relay list env:ZCODE_BASE_URL /api/v1 -> FAIL 404
+[probe] relay list guess:relay.z.ai -> TypeError: fetch failed 
+[probe] relay list guess:api.relay.z.ai -> TypeError: fetch failed 
+[probe] relay list zai-paas:api.z.ai -> FAIL 401
+[probe] relay list zai-paas:open.bigmodel.cn -> FAIL 401
+[probe] relay list zai-coding:api.z.ai -> FAIL 401
+[probe] relay list campus-relay:token.nuaa.edu.cn -> FAIL 483
+[probe] evidence file: C:\Users\RichardYuan\Desktop\new\spikes\model-spike\runs\2026-08-21T10-29-32-646Z-all.json

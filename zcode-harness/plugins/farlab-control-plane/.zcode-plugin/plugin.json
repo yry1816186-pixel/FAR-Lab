@@ -1,0 +1,19 @@
+{
+  "name": "farlab-control-plane",
+  "version": "1.2.0",
+  "description": "Minimal high-signal control plane for evidence-backed FAR-Lab long-horizon research, architecture, scientific validation and delivery.",
+  "author": {
+    "name": "FAR-Lab"
+  },
+  "keywords": [
+    "ai4s",
+    "long-horizon",
+    "research",
+    "architecture",
+    "verification",
+    "competition"
+  ],
+  "commands": "commands",
+  "skills": "skills",
+  "agents": "agents"
+}
