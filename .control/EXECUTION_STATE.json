@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "mission": "Intelligence-driven evolution: absorb world-class external mechanisms (prior baseline + open-world scouts) into FAR-Lab's Direction-A core loop via source-level fusion, benchmarked before/after.",
   "status": "IN_PROGRESS",
-  "phase": "wave3-relation-reliability-fixed; backlog ranked",
+  "phase": "wave3: #1/#5/#6 done+live-verified; #2/#4/#3 backlog",
   "pauseReason": null,
-  "currentObjective": "EV2 CLOSED: MLR-Bench harvested (honest gap attribution), adversarial audit 4xP1+4xP2+6xP3 all fixed and committed, compliance recheck recorded verbatim (Qwen-via-Bailian submission-mandated; B-QWEN-LIVE-ROUTE credential-blocked), relation-reliability P1 root-fixed (topical gate + falsify schema v2) and live-verified (contradicts 0/21 post-fix, blind re-judge 54.5% vs 46%). Wave-3 backlog ranked in FRONTIER_STATUS; frontier NOT_SATURATED.",
+  "currentObjective": "EV2 closed; Wave-3 executing: relation-label reliability fixed live (D-023/024), POPPER multiple-testing discipline landed live (D-025), DeepSeek strict-FC default transport live-verified (D-026). Remaining backlog: trusted-anchor tournament gate, OpenAlex key/fulltext, FIRE-Bench harness, Idea2Plan fold, models.dev snapshot. Competition submission gated by B-QWEN-LIVE-ROUTE (user credentials).",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
@@ -51,13 +51,13 @@
     "Registry research/TECH_CANDIDATES.md; decisions D-015..D-019."
   ],
   "activeTasks": [
-    "Wave-3 backlog (ranked, research/WAVE3-SCOUT.md §4 + FRONTIER_STATUS wave3): #2 trusted-anchor tournament gate -> #5 POPPER e-value sequential falsification -> #4 OpenAlex key+fulltext -> #6 DeepSeek strict-FC beta -> #3 FIRE-Bench harness -> #8/#9 smaller items",
+    "Wave-3 remaining backlog (FRONTIER_STATUS wave3): #2 trusted-anchor tournament gate -> #4 OpenAlex key+fulltext -> #3 FIRE-Bench harness -> #8/#9 smaller items",
     "Compliance watch: B-QWEN-LIVE-ROUTE is submission-mandated per official verbatim rule (COMPETITION.md §0) — needs user-provided DASHSCOPE_API_KEY/Bailian credentials; cannot be fabricated",
-    "DONE this session: MLR-Bench harvest + adapter P0; audit 4P1/4P2/6P3 fixed (D-022); compliance recheck (D-020); relation-precision harvest + root fix + live verification (D-023/D-024); suite 240/240; commits through Wave-3 gate"
+    "DONE this session: MLR-Bench harvest + adapter P0; audit 4P1/4P2/6P3 fixed (D-022); compliance recheck (D-020); relation-reliability root fix + live verify (D-023/024); POPPER multiple-testing discipline + live verify (D-025); DeepSeek strict-FC default transport + live verify (D-026). Suite 246/246; strict-FC now DEFAULT for all pipeline calls"
   ],
   "blockerIds": [
     "B-QWEN-LIVE-ROUTE"
   ],
-  "lastVerifiedCommit": "Wave-3 gate commits 2026-08-22: 190cb1e (openalex 429 retry), e947d20 (path-aware enum), ea3fb1b (novelty receipts + topical gate), f87aded (mlr-bench P0), 0a02a26+384f2ef (evidence/control), plus falsify schema v2 commit",
-  "nextAction": "Wave-3 backlog #2 (trusted-anchor tournament gate) is next-highest value; competition submission blocked on B-QWEN-LIVE-ROUTE credentials (user action)."
+  "lastVerifiedCommit": "Wave-3 session commits 2026-08-22: 190cb1e, e947d20, ea3fb1b, f87aded, 0a02a26, 384f2ef, 96b9ae0, df3be48, 94278e6, ed6c1f3 (+final control commit)",
+  "nextAction": "Continue Wave-3 backlog #2 (trusted-anchor tournament gate) or #4 (OpenAlex key/fulltext) next session; competition submission blocked on B-QWEN-LIVE-ROUTE credentials (user action)."
 }
