@@ -49,9 +49,9 @@
       "id": "ACC-05",
       "target": "live_verified",
       "critical": true,
-      "status": "tested",
+      "status": "live_verified",
       "evidence": [
-        "live: 15/15 claims verified-aligned (report §3); fail-closed paths unit-proven (tests/pipeline-evidence.test.ts 20/20); adversarial misalignment live-demo pending W2"
+        "live: 2 real runs 24/24 claims verified-aligned; fail-closed deterministic (tests/pipeline-evidence.test.ts, export-quality adversarial quotes rejected)"
       ]
     },
     {
@@ -103,16 +103,18 @@
       "id": "ACC-11",
       "target": "live_verified",
       "critical": true,
-      "status": "not_started",
-      "evidence": []
+      "status": "live_verified",
+      "evidence": [
+        "evidence/W2/revision-e2e.txt + report §10: real expert feedback (clonal-confound critique) -> causal analysis -> hyp v0->v1 + plan modify -> Revision+VersionDiff persisted"
+      ]
     },
     {
       "id": "ACC-12",
       "target": "live_verified",
       "critical": true,
-      "status": "tested",
+      "status": "live_verified",
       "evidence": [
-        "REAL failure at build_evidence (schema null) -> status=partial persisted -> resume completed (evidence/W1/e2e-resume3-output.txt EXIT=0); cancel + corrupted-checkpoint live demos pending W2"
+        "evidence/W2/cancel-demo+cancel-resume*.txt: cross-process cancel mid-run -> status=cancelled persisted -> resume through 3 real failure modes -> completed; tests/recovery.test.ts corruption fail-closed"
       ]
     },
     {
@@ -128,18 +130,18 @@
       "id": "ACC-14",
       "target": "live_verified",
       "critical": true,
-      "status": "implemented",
+      "status": "live_verified",
       "evidence": [
-        "bundle bnd_4bnfh7mcfem6n9wye7qtv5jfnq declared replay level; independent third-party exercise scheduled W5 (far verify)"
+        "far verify 10/10 verified on bundles bnd_8czp2z9t (run1) and bnd_w7nm9je5 (run2); degraded verdict correctly returned on lock drift (old bundle)"
       ]
     },
     {
       "id": "ACC-15",
       "target": "live_verified",
       "critical": true,
-      "status": "tested",
+      "status": "live_verified",
       "evidence": [
-        "CLI start/status/inspect/resume/export all exercised on the real run; feedback command + cancel live demo pending W2"
+        "CLI full surface exercised live: start/status/inspect/cancel/resume/feedback/export/verify on two real runs; --json machine mode"
       ]
     },
     {

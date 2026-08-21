@@ -1,0 +1,192 @@
+import { useCallback } from 'react';
+import { isNotFound } from '../../api/client';
+import { getPlan } from '../../api/endpoints';
+import type { ResearchPlan, ResearchRun } from '../../api/types';
+import { useResource } from '../../hooks/useResource';
+import { useI18n } from '../../i18n/LanguageContext';
+import { Badge, EmptyState, ErrorBox, FieldList, Section, Skeleton } from '../common';
+
+export function PlanTab({ run }: { run: ResearchRun }): JSX.Element {
+  const { t } = useI18n();
+  const fetcher = useCallback((signal: AbortSignal) => getPlan(run.id, signal), [run.id]);
+  const res = useResource(fetcher, [run.id], `${run.updatedAt}:${run.status}`);
+
+  return (
+    <div className="tab-content">
+      {res.loading ? (
+        <Skeleton lines={6} />
+      ) : res.error !== null && isNotFound(res.error) ? (
+        <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+      ) : res.error !== null ? (
+        <ErrorBox error={res.error} onRetry={res.retry} />
+      ) : res.data !== null ? (
+        <PlanView plan={res.data} />
+      ) : (
+        <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+      )}
+    </div>
+  );
+}
+
+function PlanView({ plan }: { plan: ResearchPlan }): JSX.Element {
+  const { t } = useI18n();
+  const orNone = (items: string[] | undefined): JSX.Element | string =>
+    items !== undefined && items.length > 0 ? items.join('；') : <span className="muted">{t('common.none')}</span>;
+
+  const stepIds = new Set(plan.steps.map((s) => s.id));
+  /** Render-layer defense: `task_` ids not present in steps are fabrication artifacts — flag, never render as valid. */
+  const renderRef = (ref: string): JSX.Element | string =>
+    ref.startsWith('task_') && !stepIds.has(ref)
+      ? <span className="text-warn" title={ref}>{t('plan.invalidRef', { ref })}</span>
+      : ref;
+
+  const check = plan.executabilityCheck;
+
+  return (
+    <div>
+      <Section title={t('plan.objective')}>
+        <p className="plan-objective">{plan.objective}</p>
+        <FieldList
+          items={[
+            { key: t('plan.hypotheses'), value: <span className="mono">{plan.hypothesisIds.join('；')}</span> },
+            {
+              key: t('plan.execCheck'),
+              value: check === undefined ? <Badge tone="muted">{t('executability.unchecked')}</Badge> : check.passed ? <Badge tone="ok">{t('executability.passed')}</Badge> : <Badge tone="err" title={(check.missing ?? []).join('；')}>{t('executability.failed')}</Badge>,
+            },
+            { key: t('overview.createdAt'), value: <span className="mono">{plan.createdAt}</span> },
+          ]}
+        />
+        {check !== undefined && !check.passed && (check.missing ?? []).length > 0 && (
+          <p className="callout callout--err small">{t('executability.missing', { items: (check.missing ?? []).join('；') })}</p>
+        )}
+      </Section>
+
+      <Section title={t('plan.variables')}>
+        <FieldList
+          items={[
+            { key: t('plan.variables'), value: orNone(plan.variables) },
+            { key: t('plan.controls'), value: orNone(plan.controls) },
+            { key: t('plan.inclusion'), value: orNone(plan.inclusionCriteria) },
+            { key: t('plan.exclusion'), value: orNone(plan.exclusionCriteria) },
+            { key: t('plan.metrics'), value: orNone(plan.metrics) },
+            { key: t('plan.statistics'), value: orNone(plan.statistics) },
+          ]}
+        />
+      </Section>
+
+      {(plan.dataRequirements ?? []).length > 0 && (
+        <Section title={t('plan.dataReq')}>
+          <div className="table-scroll">
+            <table className="data-table">
+              <caption className="sr-only">{t('plan.dataReq')}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t('plan.dataReq.name')}</th>
+                  <th scope="col">{t('plan.dataReq.availability')}</th>
+                  <th scope="col">{t('plan.dataReq.sourceHint')}</th>
+                  <th scope="col">{t('plan.dataReq.variables')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(plan.dataRequirements ?? []).map((d) => (
+                  <tr key={d.name}>
+                    <th scope="row">{d.name}</th>
+                    <td>{t(`availability.${d.availability}` as never)}</td>
+                    <td>{d.sourceHint ?? <span className="muted">—</span>}</td>
+                    <td>{d.variables.join('、')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+
+      {(plan.toolRequirements ?? []).length > 0 && (
+        <Section title={t('plan.toolReq')}>
+          <div className="table-scroll">
+            <table className="data-table">
+              <caption className="sr-only">{t('plan.toolReq')}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t('plan.toolReq.name')}</th>
+                  <th scope="col">{t('plan.toolReq.kind')}</th>
+                  <th scope="col">{t('plan.toolReq.purpose')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(plan.toolRequirements ?? []).map((tool) => (
+                  <tr key={tool.name}>
+                    <th scope="row">{tool.name}</th>
+                    <td className="mono">{tool.kind}</td>
+                    <td>{tool.purpose}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      )}
+
+      <Section title={t('plan.steps')}>
+        <ol className="plan-steps">
+          {plan.steps.map((step, i) => (
+            <li key={step.id} className="plan-step">
+              <div className="plan-step-head">
+                <strong>{i + 1}. {step.title}</strong>
+                <Badge tone="muted">{t(`stepKind.${step.kind}` as never)}</Badge>
+                {step.estimatedCost !== undefined && <span className="muted small">{t('plan.steps.cost')}: {step.estimatedCost}</span>}
+              </div>
+              <p className="plan-step-method">{step.method}</p>
+              <FieldList
+                items={[
+                  { key: t('plan.steps.inputs'), value: <span className="mono">{(step.inputs ?? []).map(renderRef).join('、') || <span className="muted">{t('common.none')}</span>}</span> },
+                  { key: t('plan.steps.outputs'), value: <span className="mono">{(step.outputs ?? []).join('、') || <span className="muted">{t('common.none')}</span>}</span> },
+                  { key: t('plan.steps.failure'), value: orNone(step.failureConditions) },
+                  { key: t('plan.steps.dependsOn'), value: <span className="mono">{(step.dependsOn ?? []).map(renderRef).join('、') || <span className="muted">{t('common.none')}</span>}</span> },
+                ]}
+              />
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      <Section title={t('plan.decisionRules')}>
+        <FieldList
+          items={[
+            { key: t('plan.decisionRules.success'), value: plan.decisionRules.successCriterion },
+            { key: t('plan.decisionRules.weakening'), value: plan.decisionRules.weakeningCriterion },
+            { key: t('plan.decisionRules.falsification'), value: plan.decisionRules.falsificationCriterion },
+            { key: t('plan.decisionRules.stop'), value: plan.decisionRules.stopCriterion },
+          ]}
+        />
+      </Section>
+
+      <Section title={t('tab.plan')}>
+        <FieldList
+          items={[
+            { key: t('plan.confounders'), value: orNone(plan.confounders) },
+            { key: t('plan.altExplanations'), value: orNone(plan.alternativeExplanations) },
+            {
+              key: t('plan.resources'),
+              value: (
+                <span className="mono">
+                  {t('plan.resources.compute')}={plan.resources?.compute ?? t('common.unspecified')}；{' '}
+                  {t('plan.resources.cost')}={plan.resources?.cost ?? t('common.unspecified')}；{' '}
+                  {t('plan.resources.time')}={plan.resources?.time ?? t('common.unspecified')}
+                </span>
+              ),
+            },
+            { key: t('plan.risks'), value: orNone(plan.risks) },
+            { key: t('plan.ethics'), value: orNone(plan.ethics) },
+            { key: t('plan.prerequisites'), value: orNone(plan.prerequisites) },
+            ...(plan.expectedInformationGain !== undefined ? [{ key: t('plan.expectedGain'), value: plan.expectedInformationGain }] : []),
+            { key: t('plan.altBranches'), value: orNone(plan.alternativeBranches) },
+            { key: t('plan.reproducibility'), value: orNone(plan.reproducibilityRequirements) },
+            { key: t('plan.citedClaims'), value: <span className="mono">{(plan.evidenceClaimIds ?? []).join('；') || <span className="muted">{t('common.none')}</span>}</span> },
+          ]}
+        />
+      </Section>
+    </div>
+  );
+}

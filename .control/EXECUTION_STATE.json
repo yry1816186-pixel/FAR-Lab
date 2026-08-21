@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "mission": "Build FAR-Lab from greenfield to a complete, real, verified XH-202619 Track 1 Direction 1A AI Scientist system per FAR-LAB_DEVELOPMENT_MISSION.md.",
   "status": "IN_CONSTRUCTION",
-  "phase": "W1-vertical-slice",
-  "currentObjective": "W1: first real Direction-A vertical slice - persistence layer, orchestrator state machine, live retrieval pipeline, claim extraction with citation binding, hypothesis engine (multi-strategy + dedup + falsification), scorecard, research plan, provenance receipts, CLI, end-to-end real-question run with failure/resume path.",
+  "phase": "W3-web-workbench",
+  "currentObjective": "W3: HTTP API over the same application core + React web workbench (runs/evidence/hypotheses/plan/revisions/provenance/run-control) with real states and GUI verification.",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
@@ -12,9 +12,24 @@
     "Revision requires causal link to feedback; version diff must be explainable."
   ],
   "criticalProblemSet": [
-    { "id": "CP-002", "problem": "W1 vertical slice: persistence + orchestrator + evidence + hypothesis + plan + CLI end-to-end on a real question", "status": "OPEN", "evidenceNeeded": "real run artifacts + resume-after-failure demonstration + third-party inspectable export" },
-    { "id": "CP-003", "problem": "Claim-source alignment check: citations must resolve AND content must support the claim (R-03)", "status": "OPEN", "evidenceNeeded": "alignment checker with real corpus + deliberate misalignment rejected" },
-    { "id": "CP-004", "problem": "Hypothesis genuine diversity + falsification spec quality (R-06)", "status": "OPEN", "evidenceNeeded": "dedup/cluster evidence + falsification completeness checker output on real run" }
+    {
+      "id": "CP-005",
+      "problem": "W3 web workbench over shared app core with real states/actions (no fake dashboard)",
+      "status": "OPEN",
+      "evidenceNeeded": "GUI walkthrough evidence via real browser"
+    },
+    {
+      "id": "CP-006",
+      "problem": "W4 evaluation: representative problem set + runnable strong baselines + predeclared metrics",
+      "status": "OPEN",
+      "evidenceNeeded": "eval artifacts with real numbers"
+    },
+    {
+      "id": "CP-007",
+      "problem": "Qwen live route BLOCKED (B-QWEN-LIVE-ROUTE) - Z.ai quota resets 2026-08-22 10:03, retest then",
+      "status": "OPEN",
+      "evidenceNeeded": "live GLM receipts or documented BLOCKED"
+    }
   ],
   "verifiedWorkspaceFacts": [
     "W0 complete: toolchain green (typecheck/vitest 7/7/eslint), three spikes with live evidence in evidence/W0/.",
@@ -32,7 +47,9 @@
     "src/pipeline stages: scope/retrieve/verify/evidence/hypotheses/falsify/rank/plan/export",
     "src/cli main"
   ],
-  "blockerIds": ["B-QWEN-LIVE-ROUTE"],
+  "blockerIds": [
+    "B-QWEN-LIVE-ROUTE"
+  ],
   "lastVerifiedCommit": null,
   "nextAction": "Commit W0 baseline, then build W1 persistence + orchestrator first (critical path), fan out independent module implementation to subagents."
 }
