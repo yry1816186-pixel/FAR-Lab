@@ -32,3 +32,6 @@ Thumbs.db
 
 # Local research-run artifacts (export explicitly when needed)
 .far-run/
+
+# ZCode runtime-extracted local marketplace copy (runtime artifact, not source)
+FAR-Lab_ZCode_Control_Plane_*/
