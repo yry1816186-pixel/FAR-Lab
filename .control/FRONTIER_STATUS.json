@@ -51,16 +51,17 @@
     "done": [
       "#1 relation-label reliability (D-023/D-024: topical gate + falsify schema v2; contradicts 0/21 post-fix, live-verified)",
       "#5 POPPER multiple-testing discipline (D-025/D-025b: multipleTestingPolicy + executability gate + prompt + export; live-verified single_primary on 2-hypothesis plan)",
-      "#6 DeepSeek strict function calling (D-026: default transport via beta URL + zodToStrictJsonSchema; probe + live e2e verified; FARLAB_DEEPSEEK_STRICT=0 escape hatch)"
+      "#6 DeepSeek strict function calling (D-026: default transport via beta URL + zodToStrictJsonSchema; probe + live e2e verified; FARLAB_DEEPSEEK_STRICT=0 escape hatch)",
+      "#2 trusted-anchor gate (D-027: injection REJECTED by architecture-critic; deterministic swap-disagreement bias proxy ADOPTED into tournamentNote/uncertainty from real match data)",
+      "#4a OpenAlex optional API key (policy-drift adaptation; keyless default unchanged)"
     ],
     "backlog": [
-      "#2 trusted-anchor debiasing gate for tournament (identifiability result, zero-false-enable evidence)",
-      "#4 OpenAlex optional API key + fulltext download adoption (policy drift; GROBID stays deferred)",
-      "#3 FIRE-Bench rediscovery eval harness (objective-truth eval)",
-      "#8 Idea2Plan 5-section plan template fold (subset-run BLOCKED: repo 404; paper-level legal)",
-      "#9 models.dev provider registry snapshot (MIT)"
+      "#4b OpenAlex fulltext download adoption (PDF/TEI for 60M OA docs; interacts with GROBID decision)",
+      "#3 FIRE-Bench rediscovery eval harness (objective-truth eval; multi-session)",
+      "#8 Idea2Plan 5-section plan template fold (paper-level only; repo 404)",
+      "#9 models.dev snapshot (network-blocked in this environment 2026-08-22; retry later)"
     ],
-    "rejected": ["#10 jsonrepair (breaks zod-only invariant; strict-FC D-026 makes it moot)", "#11 ONNX NLI for this defect pattern (D-023)"],
+    "rejected": ["#10 jsonrepair (breaks zod-only invariant; strict-FC D-026 makes it moot)", "#11 ONNX NLI for this defect pattern (D-023)", "#2-as-injection (D-027: architecture-critic REJECT; swap-disagreement proxy adopted instead)"],
     "deferred": ["#12 ONNX rerank (trigger unmet: max pool 44 < 60)"]
   },
   "marginalValue": {

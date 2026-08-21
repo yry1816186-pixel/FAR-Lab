@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "mission": "Intelligence-driven evolution: absorb world-class external mechanisms (prior baseline + open-world scouts) into FAR-Lab's Direction-A core loop via source-level fusion, benchmarked before/after.",
   "status": "IN_PROGRESS",
-  "phase": "wave3: #1/#5/#6 done+live-verified; #2/#4/#3 backlog",
+  "phase": "wave3: #1/#2/#4a/#5/#6 done; #4b/#3/#8/#9 remain (network- or scale-gated)",
   "pauseReason": null,
-  "currentObjective": "EV2 closed; Wave-3 executing: relation-label reliability fixed live (D-023/024), POPPER multiple-testing discipline landed live (D-025), DeepSeek strict-FC default transport live-verified (D-026). Remaining backlog: trusted-anchor tournament gate, OpenAlex key/fulltext, FIRE-Bench harness, Idea2Plan fold, models.dev snapshot. Competition submission gated by B-QWEN-LIVE-ROUTE (user credentials).",
+  "currentObjective": "Wave-3 executed through the high-leverage core: relation-label reliability, trusted-anchor verdict (injection REJECTED, swap-disagreement proxy ADOPTED), POPPER multiple-testing discipline, DeepSeek strict-FC default transport, OpenAlex optional key — all with tests (248/248) and live verification where applicable. Remaining backlog is network-gated (models.dev unreachable), multi-session (#4b fulltext download, #3 FIRE-Bench) or presentation-level (#8 Idea2Plan fold). Competition submission still gated by B-QWEN-LIVE-ROUTE credentials (user action).",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
@@ -58,6 +58,6 @@
   "blockerIds": [
     "B-QWEN-LIVE-ROUTE"
   ],
-  "lastVerifiedCommit": "Wave-3 session commits 2026-08-22: 190cb1e, e947d20, ea3fb1b, f87aded, 0a02a26, 384f2ef, 96b9ae0, df3be48, 94278e6, ed6c1f3 (+final control commit)",
-  "nextAction": "Continue Wave-3 backlog #2 (trusted-anchor tournament gate) or #4 (OpenAlex key/fulltext) next session; competition submission blocked on B-QWEN-LIVE-ROUTE credentials (user action)."
+  "lastVerifiedCommit": "Wave-3 session 2026-08-22 final: cc641b8 (swap-disagreement proxy D-027) + c19cd4a (openalex key) + ed6c1f3 (strict-FC D-026) + df3be48 (multiple-testing D-025) + 96b9ae0 (falsify schema v2) + earlier audit/mlr-bench fixes; suite 248/248",
+  "nextAction": "Next session: #4b OpenAlex fulltext download (needs design vs GROBID) or #3 FIRE-Bench harness; competition submission blocked on B-QWEN-LIVE-ROUTE credentials (user action); models.dev retry when network allows."
 }
