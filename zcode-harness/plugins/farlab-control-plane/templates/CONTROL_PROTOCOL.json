@@ -1,0 +1,6 @@
+{
+  "name": "farlab-control-protocol",
+  "version": "2.0.0",
+  "frontierGateRequired": true,
+  "notes": "Optional compatibility metadata. Do not create this file if the workspace already has a canonical equivalent."
+}

@@ -1,0 +1,16 @@
+run run_2wmhyer1bdyqrangk2g757p9c2
+  status: partial  stage: plan  progress: 7/9 stages
+  lastError: model call failed (invalid_output) in plan/research-plan-design: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: steps.1.dependsOn.0:must be task_<random>; steps.2.dependsOn.0:must be task_<random>; steps.3.dependsOn.0:must be task_<random>; steps.4.dependsOn.0:must be task_<random>; last raw output head: {
+  "objective": "Test the hypothesis that impaired memory consolidation in sleep-deprived individuals with normal slow-wave sleep amounts is due to disruption of hippocampal-neocortical dialogue duri…[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    done     rank
+    failed   plan — model call failed (invalid_output) in plan/research-plan-design: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: steps.1.dependsOn.0:must be task_<random>; steps.2.dependsOn.0:must be task_<random>; steps.3.dependsOn.0:must be task_<random>; steps.4.dependsOn.0:must be task_<random>; last raw output head: {
+  "objective": "Test the hypothesis that impaired memory consolidation in sleep-deprived individuals with normal slow-wave sleep amounts is due to disruption of hippocampal-neocortical dialogue duri…[truncated]
+    pending  feedback
+    pending  revise
+    pending  export

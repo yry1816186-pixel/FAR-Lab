@@ -6,17 +6,19 @@
     {
       "name": "farlab-control-plane",
       "source": "./farlab-control-plane",
-      "description": "Evidence-driven research, architecture, scientific review, verification, long-horizon continuity and safety controls for FAR-Lab.",
-      "version": "1.2.0",
+      "description": "Frontier-grade long-horizon R&D control plane for FAR-Lab: mission orchestration, evidence research, scientific review, anti-fake completion, frontier saturation and safety hooks.",
+      "version": "2.0.0",
       "category": "development",
       "tags": [
-        "farlab",
         "ai4s",
         "long-horizon",
         "research",
-        "verification"
-      ]
+        "verification",
+        "frontier",
+        "zcode"
+      ],
+      "strict": true
     }
   ],
-  "version": "1.2.0"
+  "version": "2.0.0"
 }

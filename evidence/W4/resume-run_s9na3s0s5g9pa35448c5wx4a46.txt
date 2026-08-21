@@ -1,0 +1,16 @@
+run run_s9na3s0s5g9pa35448c5wx4a46
+  status: partial  stage: plan  progress: 7/9 stages
+  lastError: model call failed (invalid_output) in plan/research-plan-design: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: steps.1.dependsOn.0:must be task_<random>; steps.2.dependsOn.0:must be task_<random>; steps.3.dependsOn.0:must be task_<random>; steps.3.dependsOn.1:must be task_<random>; last raw output head: {
+  "objective": "Evaluate whether vitamin D supplementation reduces the risk of respiratory tract infections, with a focus on testing the hypothesis that the effect is dependent on baseline vitamin D…[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    done     rank
+    failed   plan — model call failed (invalid_output) in plan/research-plan-design: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: steps.1.dependsOn.0:must be task_<random>; steps.2.dependsOn.0:must be task_<random>; steps.3.dependsOn.0:must be task_<random>; steps.3.dependsOn.1:must be task_<random>; last raw output head: {
+  "objective": "Evaluate whether vitamin D supplementation reduces the risk of respiratory tract infections, with a focus on testing the hypothesis that the effect is dependent on baseline vitamin D…[truncated]
+    pending  feedback
+    pending  revise
+    pending  export

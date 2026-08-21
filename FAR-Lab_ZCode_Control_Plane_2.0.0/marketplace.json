@@ -1,0 +1,16 @@
+{
+  "name": "farlab-local-marketplace",
+  "description": "Local marketplace for the FAR-Lab frontier-grade ZCode control plane.",
+  "pluginRoot": "plugins",
+  "plugins": [
+    {
+      "name": "farlab-control-plane",
+      "source": "./farlab-control-plane",
+      "description": "Frontier-grade long-horizon R&D control plane for FAR-Lab: mission orchestration, evidence research, scientific review, anti-fake completion, frontier saturation and safety hooks.",
+      "version": "2.0.0",
+      "category": "development",
+      "tags": ["ai4s", "long-horizon", "research", "verification", "frontier", "zcode"],
+      "strict": true
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+  [run_9w34j5fs plan] no scorecards found — planning directly from stored hypotheses (capped at 2)
+  [run_9w34j5fs export] reproducibility bundle bnd_66jagxycrk0pntswwxt1vyrb89 (sha256:a896defb5878e814be58d05ce6b784fcae59e1c65757fab696c64ee645ed8db1); report sha256:cd14e99ca74292f47350c3bb05f6019ee218962530ef83ccb7bda731e5628e30; declaredEvidenceLevel=replay
+run run_9w34j5fszr6vqbx82tqptkweex
+  status: completed  stage: export  progress: 9/9 stages
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    skipped  critique_falsify
+    skipped  rank
+    done     plan
+    skipped  feedback
+    skipped  revise
+    done     export
