@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -579,7 +580,13 @@ describe('export stage', () => {
     const bundle = bundles[0]!;
 
     expect(bundle.declaredEvidenceLevel).toBe('replay');
-    expect(bundle.codeRevision).toBe('unknown'); // no fabrication
+    // D-EV1 provenance fix: env override first, else honest git rev-parse fallback —
+    // never a fabricated revision; a valid hex sha or the literal 'unknown'.
+    expect(bundle.codeRevision).toMatch(/^[0-9a-f]{7,40}$|^unknown$/);
+    if (bundle.codeRevision !== 'unknown') {
+      const real = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+      expect(bundle.codeRevision).toBe(real); // inside this repo the fallback must be exact
+    }
     expect(bundle.environmentFingerprint).toBe(`node ${process.version} ${process.platform}`);
     const lockPath = path.join(process.cwd(), 'package-lock.json');
     const expectedLock = fs.existsSync(lockPath)

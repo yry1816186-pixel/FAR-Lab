@@ -335,7 +335,7 @@ const readJsonl = (name) => {
   }
 };
 
-const problems = JSON.parse(readFileSync(new URL('./problems.json', import.meta.url), 'utf8')).problems;
+const problems = JSON.parse(readFileSync(new URL(process.env.FARLAB_PROBLEMS ?? './problems.json', import.meta.url), 'utf8')).problems;
 const crossref = createCrossrefAdapter();
 
 const farlab = {};
