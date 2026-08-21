@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-08-21",
+  "dimensions": [
+    { "id": "FD-01-scientific", "name": "Scientific frontier (no P0/P1 methodology defect; core mechanisms verified)", "status": "saturated", "evidence": ["evidence/W5/scientific-review.md (5 P1 findings, all fixed)", "evidence/W5/gapseek-trigger.txt + gapseek-verify.txt (mission s30 gap-seek live both paths)"] },
+    { "id": "FD-02-engineering", "name": "Engineering frontier (no structural weak point on critical path)", "status": "saturated", "evidence": ["evidence/W5/adversarial-audit.md verdict PASS 0 P0", "194/194 vitest green; rank batching fix live-proven (evidence/W5/regression-run2-resume.txt EXIT=0)"] },
+    { "id": "FD-03-performance", "name": "Performance frontier (measured budgets, no unbounded loops)", "status": "saturated", "evidence": ["eval/results/metrics.json per-run span/token/stage profile", "bounded design: retries<=2, rank batch<=4, corpus<=12 docs, gap-seek<=1 round"] },
+    { "id": "FD-04-product", "name": "Product frontier (researcher completes real workflow, not agent theater)", "status": "saturated", "evidence": ["evidence/W3/gui-*.png walkthrough on real data", "UI-created run progressed live (run_rnjevw1tez)"] },
+    { "id": "FD-05-architecture", "name": "Architecture frontier (no duplicate authority / technology collage)", "status": "saturated", "evidence": ["single app core (src/app/composition.ts) shared by CLI/API/Web", "adversarial-audit.md attack surface 10: no duplicate production path found"] },
+    { "id": "FD-06-evaluation", "name": "Evaluation frontier (compared against runnable strong baselines, predeclared)", "status": "saturated", "evidence": ["evidence/W4/evaluation-report.md + Addendum (6 problems vs direct/RAG, same model)", "eval/PROTOCOL.md predeclared before execution"] },
+    { "id": "FD-07-innovation", "name": "Innovation frontier (core mechanisms have implementation + evidence + baseline + failure analysis)", "status": "saturated", "evidence": ["fail-closed verbatim binding 58/58 independently realigned", "causal revision chain live (evidence/W2/revision-e2e.txt)", "honest abstention P5 vs both baselines fabricating"] },
+    { "id": "FD-08-ecosystem", "name": "Ecosystem frontier (materially valuable external tech checked)", "status": "saturated", "evidence": ["evidence/W5/frontier-sweep.md ecosystem scan (OpenAlex fulltext 57M docs, Semantic Scholar availability)", "cold pre-research corpus preserved as discovery seeds only"] },
+    { "id": "FD-09-reproducibility", "name": "Reproducibility frontier (third-party inspect/replay verified)", "status": "saturated", "evidence": ["far verify 10/10 on clean-chain bundles (bnd_wsavs0jq, bnd_w7nm9je5)", "degraded verdict correctly returned on lock drift (bnd_4bnfh7mc)"] },
+    { "id": "FD-10-marginal-value", "name": "Marginal-value test (no remaining significant-value executable work)", "status": "saturated", "evidence": ["evidence/W5/frontier-sweep.md Post-sweep execution record: GO-1 executed live; STOP list for performance/architecture/UI expansion; DEFER list recorded"] }
+  ],
+  "independentAudit": {
+    "status": "pass",
+    "evidence": [
+      "evidence/W5/adversarial-audit.md (independent adversarial audit: verdict PASS, 0 P0; 1 P1 + 6 P2 all fixed in commits c37170c/1b0e622)",
+      "evidence/W5/scientific-review.md (independent scientific red-team: 5 P1 findings all fixed with live-run regression evidence)"
+    ]
+  },
+  "opportunitySweep": {
+    "status": "saturated",
+    "decisionSaturation": true,
+    "evidence": ["evidence/W5/frontier-sweep.md (10-dimension sweep; GO-1 executed with live verification of both trigger paths; remaining STOP/DEFER items documented with reasons)"],
+    "highValueOpportunities": [
+      { "id": "GO-1-gap-seek", "name": "Bounded adaptive information-seeking (mission s30)", "status": "completed", "evidence": "src/pipeline/stages/evidence.ts gap-seek round; live: gapseek-verify.txt (not-triggered path) + gapseek-trigger.txt (triggered path, +5 docs, honest re-abstention)" },
+      { "id": "GO-3-glm-retest", "name": "GLM second live route retest", "status": "blocked", "evidence": "quota resets 2026-08-22 10:03; one command to attach live receipts; non-critical (competition route satisfied by DeepSeek)" }
+    ]
+  },
+  "marginalValue": {
+    "status": "saturated",
+    "reason": "All remaining candidates are either externally blocked (GLM quota timer), below the significant-value bar under current constraints (STOP: perf/architecture/UI expansion; DEFER: 4th source, seed PDFs, eval expansion), or release-engineering follow-ups recorded in final_delivery.md residual risks (competition URL recheck, FARLAB_GIT_COMMIT injection, web XSS pre-public audit). No executable high-value core work remains in this session's authority and budget.",
+    "evidence": ["final_delivery.md section 4 (residual risk list)", "evidence/W5/frontier-sweep.md STOP/DEFER tables"]
+  }
+}
