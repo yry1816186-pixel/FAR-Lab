@@ -44,11 +44,12 @@
     }
   ],
   "verifiedWorkspaceFacts": [
-    "EV1 after-batch 6/6 completed (P2 failed mid-batch on DeepSeek single-key envelope wrap -> root-fixed in callStructured layer 4 unwrap + canonical enum-fold; P2 resumed and completed 9/9, recovery live-verified).",
-    "Full suite 233/233 at commits 9107f59/17cf64f; tsc clean; lint clean on changed files.",
-    "metrics.mjs/lib.mjs FARLAB_PROBLEMS + llm-judge SEED/OUT overrides are cwd-relative (sandbox path-virtualization safe).",
-    "Live fulltext: identifier mix arxiv=3/pubmed=8 on the PPI run; deepen cap 3 -> 1 fetched (2010.08514 LaTeXML 200), 2 not_available (normal).",
-    "Registry research/TECH_CANDIDATES.md; decisions D-015..D-019."
+    "EV1 after-batch 6/6 completed; envelope-unwrap fix live-proven by P2 resume 9/9.",
+    "Full suite 265/265 (2026-08-22 Wave-3 session); tsc clean; lint clean.",
+    "OPERATIONAL (2026-08-22 ~21:15 UTC, live verbatim): OpenAlex keyless pool now carries a HARD DAILY BUDGET — 'Insufficient budget. This request costs $0.001 but you only have $0.0008 remaining. Resets at midnight UTC.' Keyless retrieval exhausted mid-eval; crossref (keyless, stable, probe 200) added as third retrieval family restoring redundancy; budget-429s skip the backoff retry.",
+    "DeepSeek strict-FC beta is the DEFAULT structured transport (probe + live e2e; escape FARLAB_DEEPSEEK_STRICT=0); decisionRuleProvenance gained 'mixed' after a live mid-run rejection (run_wkncq5p).",
+    "huggingface.co and models.dev unreachable from this environment (curl 000); arxiv.org/api.openalex.org/api.crossref.org/content.openalex.org reachable.",
+    "Registry research/TECH_CANDIDATES.md; decisions D-015..D-028 (+D-029/D-029b pending final record)."
   ],
   "activeTasks": [
     "Wave-3 remaining backlog (FRONTIER_STATUS wave3): #2 trusted-anchor tournament gate -> #4 OpenAlex key+fulltext -> #3 FIRE-Bench harness -> #8/#9 smaller items",
