@@ -267,3 +267,31 @@ Ranked by expected value (P1 first):
 | 10 | jsonrepair 5th tolerance layer | ISC zero-dep but breaks zod-only invariant (§3.2.4) | Gate decision; weigh vs strict-FC (#6) making it moot |
 | 11 | ONNX NLI cross-checker | trigger MET via §2 but D-023 REJECTs for this pattern (deterministic gate chosen instead) | REJECT for this pattern; wasm feasibility documented (§3.3) for future triggers |
 | 12 | ONNX rerank | NOT met (max pool 44<60) (§1.2) | stay DEFER |
+
+## 6. Post-execution verification record (scout session, 2026-08-22 04:35)
+
+Independent verification of the closeout session's Wave-3 landings (all recomputed from raw
+files by the session that produced §1-§5):
+
+- **ea3fb1b + 96b9ae0 (relation-label fix)**: reproduced post-fix measurement exactly —
+  `relation-precision-postfix.jsonl` N=11, exact 6/11 (54.5%), adjacent 7/11 (63.6%);
+  contradicts label class eliminated on the live run (0 produced vs pre-fix 11-19/run mostly
+  wrong). Pre-fix pooled baseline 26/57 (46%) reproduces from r1 10/25 + r2 0/12 + r3(F4)
+  16/20. Evidence file's run-heterogeneity disclosure (8/10 from run_28ph vs 0/12 across 8
+  ML runs) confirmed. Fix = all five §5 items landed (topical gate ea3fb1b; schema v2 +
+  definitions + quotes + weakens-default 96b9ae0).
+- **df3be48 (POPPER multiple-testing discipline)**: reviewed — declaration-gate design is
+  statistically sound (three policy definitions correct; single-hypothesis exemption valid;
+  no silent default). Tests cover the three states. **Two P3 hardening suggestions** (owner
+  decides): (a) `alpha_spending` without `multipleTestingNote` currently passes — the note IS
+  the allocation and should be gate-required for it; (b) `single_primary` passes without
+  designating WHICH comparison is primary — consider requiring the note for all multi-hypothesis
+  policies (schema docstring already says "auditable rationale, not just the label").
+- **Gate battery at this checkpoint**: `npm test` 241/241; `npm run typecheck` clean;
+  `completion-gate.mjs` VERIFIED_READY (19 live_verified + 1 tested, 0 missing/failed);
+  secret-scan PASS; path-hygiene was FAILED (fcdadd6 deleted START_HERE.md +
+  FINAL_BUILD_PROMPT.md) → restored in 69d4f1b, now WARN-only (gitignored dist/node_modules
+  notices, pre-existing).
+- **Open question for Gate**: post-fix supports precision (~62%) sits at the label-granularity
+  boundary (supports↔qualifies adjacency dominates residual error); N=11 single-run. A future
+  cross-domain postfix measurement would sharpen it — recorded, not blocking.
