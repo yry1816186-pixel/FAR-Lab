@@ -38,18 +38,26 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
     },
     (raw) => {
       const attempt = (input: unknown) => opts.schema.safeParse(input);
-      // null-as-meaningful schemas (e.g. value:null = not assessable) pass on the raw attempt;
-      // null-for-absent-optional tolerates the stripped retry. Required nulls fail both.
-      let parsed = attempt(raw);
-      if (!parsed.success) parsed = attempt(stripNulls(raw));
-      if (!parsed.success) {
-        // Third attempt: models emit enum variants with spaces/hyphens/case drift
-        // ('testable now' vs 'testable_now'). Normalize ONLY strings whose normalized
-        // form uniquely hits a schema enum value — content text is untouched.
-        const enumSet = collectEnumValues(opts.schema);
-        if (enumSet.size > 0) parsed = attempt(normalizeEnumVariants(stripNulls(raw), enumSet));
+      // Tolerance chain, in order; every candidate must still satisfy the FULL schema:
+      //   1. as-is
+      //   2. null-valued properties stripped (models emit null for optional fields)
+      //   3. single-key envelope unwrapped (models wrap the payload in the task name,
+      //      e.g. {"falsification-spec": {...}} — live DeepSeek failure 2026-08-22 P2)
+      //   4. enum-variant normalization on top of each base
+      const unwrapped = unwrapSingleKeyEnvelope(raw);
+      const enumSet = collectEnumValues(opts.schema);
+      const candidates: unknown[] = [];
+      for (const base of unwrapped === raw ? [raw] : [raw, unwrapped]) {
+        candidates.push(base, stripNulls(base));
+        if (enumSet.size > 0) candidates.push(normalizeEnumVariants(stripNulls(base), enumSet));
       }
-      return parsed.success ? (parsed.data as T) : new Error(`schema validation failed: ${parsed.error.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 5).join('; ')}`);
+      let firstError: z.ZodError | null = null;
+      for (const candidate of candidates) {
+        const parsed = attempt(candidate);
+        if (parsed.success) return parsed.data as T;
+        firstError ??= parsed.error;
+      }
+      return new Error(`schema validation failed: ${firstError!.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 5).join('; ')}`);
     },
   );
   ctx.recordReceipt({
@@ -74,6 +82,23 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
   }
   return { data: res.data, provider: res.receipt.provider, modelId: res.receipt.modelId, latencyMs: res.receipt.latencyMs };
 }
+
+/**
+ * Providers occasionally wrap the whole payload in one envelope key named after
+ * the task ("falsification-spec", "result", ...). When the top-level value is an
+ * object with exactly one own key whose value is an object or array, return that
+ * inner value (bounded to two levels for double wrapping). Returns the input
+ * unchanged otherwise. Purely a validation candidate — the caller still applies
+ * the full schema to the unwrapped value.
+ */
+const unwrapSingleKeyEnvelope = (v: unknown, depth = 0): unknown => {
+  if (depth >= 2 || v === null || typeof v !== 'object' || Array.isArray(v)) return v;
+  const entries = Object.entries(v as Record<string, unknown>);
+  if (entries.length !== 1) return v;
+  const inner = entries[0]![1];
+  if (inner === null || typeof inner !== 'object') return v;
+  return unwrapSingleKeyEnvelope(inner, depth + 1);
+};
 
 /**
  * Models routinely emit `null` for optional fields; canonical stage schemas use `.optional()`.
@@ -148,8 +173,22 @@ const collectEnumValues = (schema: z.ZodTypeAny, out = new Set<string>()): Set<s
 };
 
 const normalizeEnumVariants = (v: unknown, enumSet: Set<string>): unknown => {
-  const norm = (x: string): string => x.trim().toLowerCase().replace(/[\s-]+/g, '_');
-  if (typeof v === 'string' && !enumSet.has(v) && enumSet.has(norm(v))) return norm(v);
+  // Canonical fold: case, whitespace, hyphen and underscore differences collapse
+  // ('Evidence Derived' / 'evidence derived' -> 'evidencederived' = 'evidence-derived').
+  // Replace ONLY when the fold maps to exactly one enum member; ambiguous folds
+  // (two members collapsing together) stay untouched, and exact members pass through.
+  const canon = (x: string): string => x.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const foldIndex = new Map<string, string[]>();
+  for (const member of enumSet) {
+    const c = canon(member);
+    foldIndex.set(c, [...(foldIndex.get(c) ?? []), member]);
+  }
+  const norm = (x: string): string => {
+    if (enumSet.has(x)) return x;
+    const hits = foldIndex.get(canon(x));
+    return hits && hits.length === 1 ? hits[0]! : x;
+  };
+  if (typeof v === 'string') return norm(v);
   if (Array.isArray(v)) return v.map((x) => normalizeEnumVariants(x, enumSet));
   if (v !== null && typeof v === 'object') {
     const out: Record<string, unknown> = {};

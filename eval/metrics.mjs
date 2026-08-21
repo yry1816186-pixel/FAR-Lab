@@ -7,8 +7,9 @@
  * Run: node eval/metrics.mjs
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { z } from 'zod';
 import { HypothesisCandidate, ResearchPlan } from '../dist/domain/index.js';
 import { checkFalsificationCompleteness } from '../dist/pipeline/stages/falsify.js';
 import { checkPlanExecutability } from '../dist/pipeline/stages/plan.js';
@@ -297,7 +298,7 @@ const citationValidity = async (record, crossref) => {
         resolved = r.found === true;
         crossrefTitle = r.record?.title ?? null;
         if (resolved) titleMatch = tokenOverlap(c.title ?? '', crossrefTitle) >= 0.6;
-      } catch (e) {
+      } catch {
         resolved = false;
       }
     }
@@ -335,7 +336,14 @@ const readJsonl = (name) => {
   }
 };
 
-const problems = JSON.parse(readFileSync(new URL(process.env.FARLAB_PROBLEMS ?? './problems.json', import.meta.url), 'utf8')).problems;
+// FARLAB_PROBLEMS resolves against the CURRENT WORKING DIRECTORY (a plain path),
+// so pinned-problem files created next to this script are reachable regardless of
+// how the process addresses the repo (URL-based resolution breaks under path
+// virtualization where fresh writes are not visible through absolute file URLs).
+const problemsPath = process.env.FARLAB_PROBLEMS
+  ? resolve(process.cwd(), process.env.FARLAB_PROBLEMS)
+  : fileURLToPath(new URL('./problems.json', import.meta.url));
+const problems = JSON.parse(readFileSync(problemsPath, 'utf8')).problems;
 const crossref = createCrossrefAdapter();
 
 const farlab = {};

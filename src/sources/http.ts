@@ -1,4 +1,3 @@
-import type { SourceFamily } from '../domain/source.js';
 import { SourceAdapterError } from './error.js';
 
 /**
@@ -25,7 +24,8 @@ export interface SourceAdapterOptions {
 }
 
 export interface HttpGetContext {
-  family: SourceFamily;
+  /** Diagnostic family label (adapter SourceFamily or fulltext variant label). */
+  family: string;
   /** Query text or identifier rendering — carried onto network errors. */
   query: string;
 }

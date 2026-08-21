@@ -45,3 +45,16 @@ export { parseArxivAtom, type ArxivEntry, type ArxivFeed } from './arxiv.js';
 export { rebuildInvertedAbstract } from './openalex.js';
 export { SourceAdapterError, isSourceAdapterError, type SourceAdapterErrorKind } from './error.js';
 export type { FetchLike, FetchResponseLike, SourceAdapterOptions } from './http.js';
+export {
+  defaultFetchFullText,
+  extractJatsBodyText,
+  extractLaTeXmlText,
+  fetchArxivHtmlFullText,
+  fetchEuropePmcFullText,
+  fetchFullTextForRoute,
+  fullTextRoute,
+  type FullTextFetch,
+  type FullTextFetchResult,
+  type FullTextRoute,
+  type FullTextVariant,
+} from './fulltext.js';

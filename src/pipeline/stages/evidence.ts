@@ -11,6 +11,7 @@ import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { checkQuoteAlignment } from './align.js';
 import { toDocument } from './retrieve.js';
 import { snapshotHash } from '../../sources/snapshot.js';
+import { defaultFetchFullText } from '../../sources/fulltext.js';
 import type { CorpusSnapshot, SourceFamily } from '../../domain/source.js';
 
 /** Hard admission cap per source. Model output beyond the cap is dropped, never stored. */
@@ -19,14 +20,23 @@ export const MAX_CLAIMS_PER_SOURCE = 4;
 /** Sanity ceiling on a single model response; beyond it the schema rejects (fail-closed). */
 const MAX_MODEL_CLAIMS = 16;
 
+/**
+ * Fulltext deepening bounds (phase A): at most this many documents per stage run,
+ * each capped to this many characters of extracted text for the extraction prompt.
+ * The full artifact always holds the complete extracted text (nothing is silently lost);
+ * the cap applies only to what the model sees in one call.
+ */
+export const FULLTEXT_MAX_DOCS = 3;
+export const FULLTEXT_EXCERPT_CHARS = 16_000;
+
 const SYSTEM_PROMPT = [
   'You extract scientific claims from one research source for evidence binding.',
   'Strict rules:',
   '- Extract at most 4 claims; only scientific propositions relevant to the research question.',
-  "- Each claim carries a quote that MUST be copied verbatim (character-for-character) from the abstract. Never paraphrase, merge, or shorten sentences in the quote.",
+  "- Each claim carries a quote that MUST be copied verbatim (character-for-character) from the provided source text (abstract, or full-text excerpt when one is present). Never paraphrase, merge, or shorten sentences in the quote.",
   '- stance describes the claim\'s relation to the research question: supports | contradicts | neutral | unknown.',
   '- note (optional): one short honest caveat or uncertainty about the claim.',
-  '- If the abstract contains nothing relevant to the question, return {"claims":[]}.',
+  '- If the source text contains nothing relevant to the question, return {"claims":[]}.',
 ].join('\n');
 
 /**
@@ -222,6 +232,61 @@ export const buildEvidenceStage: StageHandler = {
     const claimed = claimedSourceIds(ctx);
     const pending = plan.usable.filter((doc) => !claimed.has(doc.id));
 
+    // ---- fulltext deepening (phase A): abstract -> full text for the most
+    // relevant routable docs, bounded and fail-visible. The artifact stores the
+    // COMPLETE extracted text; the excerpt cap applies only to the model view. ----
+    const excerptOf = (text: string): string => {
+      if (text.length <= FULLTEXT_EXCERPT_CHARS) return text;
+      const cut = text.slice(0, FULLTEXT_EXCERPT_CHARS);
+      const boundary = cut.lastIndexOf(' ');
+      return `${cut.slice(0, boundary > 0 ? boundary : FULLTEXT_EXCERPT_CHARS)}\n[full-text excerpt: first ${FULLTEXT_EXCERPT_CHARS} of ${text.length} chars]`;
+    };
+    const fetchFullText = ctx.fetchFullText ?? defaultFetchFullText;
+    const fullTextExcerpts = new Map<string, string>();
+    const deepenNotes: string[] = [];
+    const deepenCandidates = pending.filter((d) => d.contentDepth !== 'full_text').slice(0, FULLTEXT_MAX_DOCS);
+    for (const doc of deepenCandidates) {
+      if (ctx.cancelled()) throw new Error('cancelled by user in build_evidence fulltext deepening');
+      const res = await fetchFullText(doc);
+      if (res.status === 'fetched') {
+        const put = await ctx.artifacts.put(res.fetch.text);
+        const updated: SourceDocument = {
+          ...doc,
+          contentDepth: 'full_text',
+          fullTextRef: put.ref,
+          ...(res.fetch.license !== undefined ? { license: res.fetch.license } : {}),
+        };
+        ctx.store.putObject('source_document', updated);
+        fullTextExcerpts.set(doc.id, excerptOf(res.fetch.text));
+        deepenNotes.push(`${doc.id}:${res.fetch.variant}`);
+        ctx.recordReceipt({
+          kind: 'source_retrieval',
+          executionMode: 'live',
+          stage: 'build_evidence',
+          redactionNote: 'fulltext fetch: variant, url id, char count, artifact hash only',
+          sourceRetrieval: {
+            family: res.fetch.variant,
+            query: `fulltext:${res.fetch.sourceUrl}`,
+            httpStatus: res.fetch.httpStatus,
+            resultCount: 1,
+            contentHashes: [put.hash],
+          },
+        });
+      } else if (res.status === 'error') {
+        deepenNotes.push(`${doc.id}:error(${res.message.slice(0, 80)})`);
+      }
+      // not_available is the common case (no HTML rendering / no OA deposit) — silent.
+    }
+
+    // Resume/idempotency path: a previously deepened doc re-loads its excerpt
+    // from the artifact store so re-extraction still sees the full text.
+    for (const doc of pending) {
+      if (doc.contentDepth === 'full_text' && doc.fullTextRef && !fullTextExcerpts.has(doc.id)) {
+        const stored = await ctx.artifacts.get(doc.fullTextRef);
+        if (stored !== null) fullTextExcerpts.set(doc.id, excerptOf(stored));
+      }
+    }
+
     let claimsTotal = 0;
     let verifiedCount = 0;
     let unalignedCount = 0;
@@ -246,14 +311,23 @@ export const buildEvidenceStage: StageHandler = {
         throw new Error(`cancelled by user in build_evidence before extracting ${doc.id}`);
       }
       const abstractText = doc.abstractText ?? ''; // corpusPlan guarantees non-empty here
-      ctx.log(`extracting claims from ${doc.id} "${doc.title.slice(0, 60)}"`);
+      const fullTextExcerpt = fullTextExcerpts.get(doc.id);
+      // Quotes must ground in exactly the text the model was shown.
+      const sourceText =
+        fullTextExcerpt !== undefined ? `${abstractText}\n\n${fullTextExcerpt}` : abstractText;
+      ctx.log(`extracting claims from ${doc.id} "${doc.title.slice(0, 60)}"${fullTextExcerpt !== undefined ? ' (full-text)' : ''}`);
       const result = await callStructured<ClaimExtraction>(ctx, {
         stage: 'build_evidence',
         purpose: 'claim-extraction',
         systemPrompt: SYSTEM_PROMPT,
         payload: {
           question: question.text,
-          source: { id: doc.id, title: doc.title, abstract: abstractText },
+          source: {
+            id: doc.id,
+            title: doc.title,
+            abstract: abstractText,
+            ...(fullTextExcerpt !== undefined ? { fullTextExcerpt } : {}),
+          },
         },
         schema: ExtractionSchema,
         temperature: 0,
@@ -268,7 +342,7 @@ export const buildEvidenceStage: StageHandler = {
           throw new Error(`cancelled by user in build_evidence while binding claims of ${doc.id}`);
         }
         // Deterministic gate — never delegated to the model (D-006/R-03).
-        const alignment = checkQuoteAlignment(candidate.quote, abstractText);
+        const alignment = checkQuoteAlignment(candidate.quote, sourceText);
         const aligned = alignment.verdict !== 'unaligned';
 
         const claim: ScientificClaim = {
@@ -292,7 +366,7 @@ export const buildEvidenceStage: StageHandler = {
         if (!aligned) {
           // Fail-closed: an ungrounded claim never carries a supporting/counter relation,
           // and the degradation is stated in the rationale, not hidden.
-          rationale = `unaligned-claim (quote not grounded in the retrieved abstract, jaccard=${alignment.jaccard.toFixed(3)}): ${rationale}`;
+          rationale = `unaligned-claim (quote not grounded in the retrieved source text, jaccard=${alignment.jaccard.toFixed(3)}): ${rationale}`;
           if (candidate.stance === 'supports' || candidate.stance === 'contradicts') {
             relation = 'unknown';
           }
@@ -487,6 +561,7 @@ export const buildEvidenceStage: StageHandler = {
       `; relations supports=${relationCounts.supports} contradicts=${relationCounts.contradicts}` +
       ` qualifies=${relationCounts.qualifies} unknown=${relationCounts.unknown}` +
       `; truncated_to_cap=${truncatedCount}` +
+      `; fulltext=${deepenNotes.length > 0 ? deepenNotes.join(',') : 'none'}` +
       `; gap_seek=${gapSeekNote}` +
       `; cross_relations=${crossNote}`;
     return { kind: 'done', summary };

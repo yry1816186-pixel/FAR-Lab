@@ -13,7 +13,8 @@ export type SourceAdapterErrorKind =
   | 'unsupported_identifier'; // identifier kind this adapter cannot natively resolve
 
 export interface SourceAdapterErrorInit {
-  family: SourceFamily;
+  /** Originating family — a SourceFamily for adapters, a variant label for fulltext fetches. */
+  family: SourceFamily | string;
   /** Original query text, or the identifier rendering for resolve() paths. */
   query: string;
   /** HTTP status of the failing response; 0 when no response was received. */
@@ -26,7 +27,7 @@ export interface SourceAdapterErrorInit {
 }
 
 export class SourceAdapterError extends Error {
-  readonly family: SourceFamily;
+  readonly family: string;
   readonly query: string;
   readonly httpStatus: number;
   readonly kind: SourceAdapterErrorKind;

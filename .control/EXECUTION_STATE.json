@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "mission": "Intelligence-driven evolution: absorb world-class external mechanisms (prior baseline + open-world scouts) into FAR-Lab's Direction-A core loop via source-level fusion, benchmarked before/after.",
   "status": "IN_PROGRESS",
-  "phase": "EV1-wave1-fusion",
-  "currentObjective": "Implement Wave-1 fusions F1-F4 (retrieval rerank, tournament ranking, literature novelty, claim cross-relations), verify with full tests + live DeepSeek run + before/after eval on the 6-problem protocol.",
+  "phase": "EV1-wave1-live-verified-eval-running",
+  "currentObjective": "Wave-1 fusions F1-F4 live-verified end-to-end (DeepSeek, 47 live receipts, far verify 10/10). After-fusion 6-problem eval batch running in background (node eval/run-ev1-batch.mjs, run ids land in eval/results/ev1-runs.jsonl). Next: compute after-metrics (FARLAB_PROBLEMS override), compare vs before (eval/results/metrics.json 2026-08-21), then Wave-2 (fulltext phase A + S2AG + MLR-Bench + GLM retest after 10:03 quota reset).",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
@@ -14,16 +14,22 @@
   ],
   "criticalProblemSet": [
     {
-      "id": "CP-EV1",
-      "problem": "F1-F4 fusion implementation + integration (retrieve/rank/hypotheses/evidence stages)",
+      "id": "CP-EV2",
+      "problem": "Before/after eval: batch running (6 problems); metrics + comparison pending",
       "status": "IN_PROGRESS",
-      "evidenceNeeded": "vitest green incl. new behavior tests; typecheck clean; live run end-to-end"
+      "evidenceNeeded": "eval/results/ev1-runs.jsonl complete; FARLAB_PROBLEMS=eval/problems-ev1.json node eval/metrics.mjs; comparison table vs before metrics"
     },
     {
-      "id": "CP-EV2",
-      "problem": "Before/after benchmark on 6-problem protocol (baseline: eval/results/metrics.json 2026-08-21T15:17:49Z)",
+      "id": "CP-EV3",
+      "problem": "Wave-2 fusion: fulltext phase A (arXiv HTML + Europe PMC fullTextXML + S2AG citation contexts) — designs in research/TECH_CANDIDATES.md A",
       "status": "OPEN",
-      "evidenceNeeded": "post-fusion metrics.json + comparison vs baseline dimensions"
+      "evidenceNeeded": "source adapters + normalizer + grounding extension, tests, live run"
+    },
+    {
+      "id": "CP-EV4",
+      "problem": "MLR-Bench ideation+proposal adoption for external comparability (data CC BY 4.0, code MIT)",
+      "status": "OPEN",
+      "evidenceNeeded": "adapter + judged submission vs published model scores"
     },
     {
       "id": "CP-007",
@@ -33,22 +39,21 @@
     }
   ],
   "verifiedWorkspaceFacts": [
-    "R1 complete: 20/20 acceptance, completion gate VERIFIED_READY, 194/194 vitest green at W5 close (final commit 33aaa36).",
-    "Six-scout open-world expedition 2026-08-22 complete; registry at research/TECH_CANDIDATES.md; decisions D-015..D-019 recorded.",
-    "OpenAlex keyless polite pool verified working 2026-08-22 01:15 (policy-drift watch, not an outage); OpenAlex search= now maps to fulltext.search (x_query evidence) - semantics broader than title+abstract.",
-    "DeepSeek has NO embedding endpoint (verified) - rerank design uses LLM listwise, not embeddings.",
-    "Prior baseline digest + implementation weakness map archived in this session's agent outputs; fusion targets file-referenced in D-015..D-018."
+    "Wave-1 F1-F4 implemented, 203/203 vitest green, tsc clean; commits 98b1609 (fusions), 1e4f343 (web/API surfaces), latest (codeRevision fix + evidence + eval tooling).",
+    "Live verification run_zr0gc5jxykqmrztw11j9czqef0 completed 9/9: F1 8 queries/pool 18/rerank applied/counter seats 4-4; F2 tournament 7 participants x 15 matches, ALL order-swap consistent, standings stratified; F3 4/4 reps literature-assessed (2 novelty downgrades to incremental observed); F4 9 cross-paper claim relations; 47/47 live deepseek-chat receipts; far verify 10/10 verified exit 0.",
+    "evidence/W-EV1/{live-run-verification.md,live-run-report.md} persist the above.",
+    "residual risk 3 (codeRevision=unknown) closed: env override + honest git rev-parse fallback, test-asserted.",
+    "OpenAlex keyless polite pool verified working 2026-08-22 01:15 (monitor; search= now maps to fulltext.search semantics).",
+    "Registry research/TECH_CANDIDATES.md; decisions D-015..D-019; metrics.mjs parameterized via FARLAB_PROBLEMS (default unchanged)."
   ],
   "activeTasks": [
-    "F1: retrieve.ts all-queries + RRF + listwise rerank + counter quota; update tests",
-    "F2: scorecard.ts HypothesisTournament schema + store kind + rank.ts tournament + tests",
-    "F3: hypotheses.ts literature novelty two-layer + export disclosure + tests",
-    "F4: evidence.ts claim cross-relations prefilter + adjudication + tests",
-    "post-fusion: full vitest + tsc + completion-gate unaffected + live run + eval comparison"
+    "background: node eval/run-ev1-batch.mjs (6-problem after-fusion batch, ids -> eval/results/ev1-runs.jsonl)",
+    "after batch: build eval/problems-ev1.json (pin new farRunId per problem) -> FARLAB_PROBLEMS=... node eval/metrics.mjs > eval/results/metrics-ev1.json; write before/after comparison into evidence/W-EV1/",
+    "Wave-2: fulltext phase A adapters + S2AG; MLR-Bench adoption; GLM probe after 10:03"
   ],
   "blockerIds": [
     "B-QWEN-LIVE-ROUTE"
   ],
-  "lastVerifiedCommit": "33aaa36",
-  "nextAction": "Implement F1 in src/pipeline/stages/retrieve.ts per D-015."
+  "lastVerifiedCommit": "98b1609 (fusions; subsequent: 1e4f343 web, latest evidence/tooling)",
+  "nextAction": "Wait for eval batch completion notification; then compute after-metrics and write the before/after comparison."
 }
