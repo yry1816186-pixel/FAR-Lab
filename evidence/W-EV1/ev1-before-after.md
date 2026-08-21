@@ -66,3 +66,23 @@ enforces counter-evidence seats, and gap-seeks when verified claims stay thin.
   checkpoint and completed 9/9 — the recovery path is live-verified too.
 - These are single-batch numbers on 6 problems with a non-deterministic model;
   deltas are directional evidence, not significance-tested claims.
+
+## LLM-judge rerun + variance check (auxiliary, calibration=uncalibrated_llm_judgment)
+
+Files: `llm-judge.jsonl` (before batch, seed 20260821) vs `llm-judge-ev1{,-s2,-s3}.jsonl`
+(after batch, seeds 20260821/20260822/20260823 — three shuffle seeds on the SAME after
+data to measure judge variance; `FARLAB_JUDGE_SEED`/`FARLAB_JUDGE_OUT` added).
+
+Farlab quality/counter by seed (after batch): P1 5/3, 5/3, 3/4 · P2 4/2, 4/2, 3/2 ·
+P3 4/2, 5/3, 5/2 · P4 3/1, 4/1, 4/1 · P6 4/3, 4/2, 4/2 (P5 abstains, both batches).
+
+- **Judge variance on identical data is ±1–2 points per problem.** The before-batch
+  farlab mean (4.75, single seed) and after-batch mean (4.07, 3 seeds) differ by less
+  than the observed within-batch seed swing; no before→after judge claim is made.
+- What holds in EVERY seed of the after batch: farlab ≥ baselines on hypothesis
+  quality (3-seed means: farlab 4.07 vs direct 4.00 vs rag 3.40) and farlab clearly
+  ahead on counter-evidence coverage (2.2 vs 1.6/1.6, all 15 seed×problem cells).
+- Before-batch judge also had direct at 3.25 (single seed) — the direct 4.00 after
+  mean is likewise within noise; no baseline-improvement claim either.
+- Judge evidence stays AUXILIARY; the protocol's deterministic metrics carry the
+  before/after conclusions above.
