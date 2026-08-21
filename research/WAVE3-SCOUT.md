@@ -295,3 +295,19 @@ files by the session that produced §1-§5):
 - **Open question for Gate**: post-fix supports precision (~62%) sits at the label-granularity
   boundary (supports↔qualifies adjacency dominates residual error); N=11 single-run. A future
   cross-domain postfix measurement would sharpen it — recorded, not blocking.
+
+## 7. Final status (scout session, 2026-08-22 06:15)
+
+- #1 relation-label reliability: EXECUTED (ea3fb1b + 96b9ae0) + independently verified by
+  this session (§6).
+- #6 strict-FC: audited (D-029 — P1-1/P1-2 refuted with live-probe evidence, P2-1/P1-3
+  confirmed), fixed (7cd3100, 056e931 incl. the inner-quote corruption root-cause), and
+  FULLY live-verified: run_prrxcee6 41/41 tool_calls across all 9 stages, zero failures
+  (evidence/W-EV2/strict-fc-live-verification.md, D-030).
+- #8 Idea2Plan template: EXECUTED (a0d0af9) — eval rendering v2, five sections,
+  deterministically verified via --render-only; v1↔v2 comparability disclosed.
+- #3 FIRE-Bench rediscovery: harness landed by the closeout session (a05a746); live run in
+  flight at time of writing.
+- NEW USER-ACTION items surfaced live: OPENALEX_API_KEY (keyless pool now HARD budget-capped
+  daily — D-029b) and DASHSCOPE_API_KEY (B-QWEN-LIVE-ROUTE, submission-mandated).
+- #9 models.dev remains network-blocked; ONNX rerank/NLI stay DEFER/REJECT per §3.3/D-023.
