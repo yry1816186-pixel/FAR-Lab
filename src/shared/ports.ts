@@ -10,6 +10,13 @@ export interface StructuredCallRequest {
   outputKind: 'json';
   temperature?: number;
   maxTokens?: number;
+  /**
+   * Strict-FC projection of the zod schema (providers/http.ts zodToStrictJsonSchema).
+   * Providers with server-side schema enforcement (DeepSeek beta tools strict:true)
+   * use it as the transport-level shape contract; other providers ignore it and the
+   * caller's zod parse remains the semantic authority either way.
+   */
+  jsonSchema?: unknown;
   /** Retry budget owned by the plane (bounded, classified). */
   purpose: string; // e.g. 'claim-extraction', recorded in provenance
 }

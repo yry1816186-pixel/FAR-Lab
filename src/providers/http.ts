@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import { canonicalSha256 } from '../shared/crypto.js';
 import type { StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
 
@@ -115,13 +116,79 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
   const body: Record<string, unknown> = {
     model: modelId,
     messages,
+  };
+  if (req.jsonSchema !== undefined) {
+    // Strict function-calling mode (DeepSeek beta, probe-verified 2026-08-22): the server
+    // enforces the tool's JSON schema on the tool-call arguments — transport-level shape
+    // guarantee. The zod parse in the caller stays the SEMANTIC authority (min-lengths,
+    // refinements, defaults); this replaces response_format, not validation.
+    body.tools = [
+      {
+        type: 'function',
+        function: {
+          name: 'respond',
+          strict: true,
+          description: 'Respond with the structured output for this task.',
+          parameters: req.jsonSchema,
+        },
+      },
+    ];
+    body.tool_choice = { type: 'function', function: { name: 'respond' } };
+  } else {
     // Structured output preferred mode; W0 spike verified DeepSeek supports it and
     // the prompt still demands JSON-only as belt-and-braces.
-    response_format: { type: 'json_object' },
-  };
+    body.response_format = { type: 'json_object' };
+  }
   if (req.temperature !== undefined) body.temperature = req.temperature;
   if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens;
   return JSON.stringify(body);
+};
+
+/**
+ * Project a zod schema into the strict-function-calling JSON-Schema SUBSET
+ * (DeepSeek beta docs 2026-08-22: object/string/number/integer/boolean/array/enum/anyOf;
+ * every object property required + additionalProperties:false; NO min/maxLength on
+ * strings, NO min/maxItems on arrays). This is a transport-level SHAPE contract only —
+ * every constraint dropped here is still enforced by the caller's zod parse.
+ * Optional/nullable/defaulted fields become anyOf [inner, null]; the null-strip
+ * tolerance layer then maps model-emitted nulls back to absent optionals.
+ */
+export const zodToStrictJsonSchema = (schema: z.ZodTypeAny, depth = 0): unknown => {
+  if (depth > 12) return {};
+  const d = schema._def as {
+    typeName?: string; values?: unknown; value?: unknown; type?: z.ZodTypeAny; innerType?: z.ZodTypeAny;
+    options?: Readonly<z.ZodTypeAny[]>; shape?: unknown; schema?: z.ZodTypeAny; in?: z.ZodTypeAny; checks?: unknown[];
+  };
+  switch (d.typeName) {
+    case 'ZodString':
+      return { type: 'string' };
+    case 'ZodNumber': {
+      const isInt = Array.isArray(d.checks) && d.checks.some((c) => (c as { kind?: string }).kind === 'int');
+      return isInt ? { type: 'integer' } : { type: 'number' };
+    }
+    case 'ZodBoolean':
+      return { type: 'boolean' };
+    case 'ZodEnum':
+      return { type: 'string', enum: [...(d.values as readonly unknown[])] };
+    case 'ZodLiteral':
+      return { type: typeof d.value === 'string' ? 'string' : 'string', enum: [d.value] };
+    case 'ZodArray':
+      return { type: 'array', items: zodToStrictJsonSchema(d.type!, depth + 1) };
+    case 'ZodObject': {
+      const shapeObj = typeof d.shape === 'function' ? (d.shape as () => Record<string, z.ZodTypeAny>)() : ((d.shape as Record<string, z.ZodTypeAny>) ?? {});
+      const properties: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(shapeObj)) properties[k] = zodToStrictJsonSchema(v, depth + 1);
+      return { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
+    }
+    case 'ZodOptional': case 'ZodNullable': case 'ZodDefault': case 'ZodCatch':
+      return { anyOf: [zodToStrictJsonSchema(d.innerType ?? d.type!, depth + 1), { type: 'null' }] };
+    case 'ZodUnion':
+      return { anyOf: (d.options ?? []).map((o) => zodToStrictJsonSchema(o, depth + 1)) };
+    case 'ZodEffects': case 'ZodPipeline':
+      return zodToStrictJsonSchema(d.schema ?? d.in!, depth + 1);
+    default:
+      return {}; // records/unknowns: unconstrained at the transport layer, zod still enforces
+  }
 };
 
 const appendCorrection = (messages: ChatMessage[], reason: string): ChatMessage[] => {
@@ -253,14 +320,26 @@ const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt =
   const messageRaw = choice0?.message;
   const message = isRecord(messageRaw) ? messageRaw : null;
   const content = message?.content;
-  if (typeof content !== 'string') {
+  // Strict function-calling mode: the payload rides on tool_calls[0].function.arguments
+  // (a JSON string) and content is typically null — tool_calls take priority when present.
+  const toolCallsRaw = message?.tool_calls;
+  const toolCall0 = Array.isArray(toolCallsRaw) && isRecord(toolCallsRaw[0]) ? toolCallsRaw[0] : null;
+  const toolFn = isRecord(toolCall0?.function) ? toolCall0.function : null;
+  const args = toolFn?.arguments;
+  const rawContent =
+    toolFn !== undefined && typeof args === 'string'
+      ? args
+      : typeof content === 'string'
+        ? content
+        : null;
+  if (rawContent === null) {
     return {
       ok: false,
       failure: {
         kind: 'provider_error',
         retryable: false,
         httpStatus: 200,
-        message: `${providerName}: HTTP 200 body malformed (no choices[0].message.content string); body head: ${truncate(bodyText, 200)}`,
+        message: `${providerName}: HTTP 200 body malformed (no choices[0].message.content string or tool_calls arguments); body head: ${truncate(bodyText, 200)}`,
       },
     };
   }
@@ -275,7 +354,7 @@ const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt =
   const finishReason = choice0?.finish_reason;
   return {
     ok: true,
-    rawContent: content,
+    rawContent,
     ...(typeof respondedModel === 'string' && respondedModel.length > 0 ? { respondedModel } : {}),
     ...(typeof finishReason === 'string' ? { finishReason } : {}),
     usage,
