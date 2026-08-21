@@ -11,6 +11,7 @@ import {
 } from '../../domain/index.js';
 import type { HypothesisCandidate as Hypothesis } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, partitionClaimRefs, runClaimIds } from './shared.js';
+import { contentTokens, topicalOverlap } from './evidence.js';
 
 /**
  * critique_falsify — falsification specs that can actually decide something (mission §29).
@@ -218,15 +219,42 @@ export const falsifyStage: StageHandler = {
       if (droppedRefs.length > 0) {
         warnings.push(`${hyp.id}: dropped ${droppedRefs.length} non-existent claim reference(s) (${droppedRefs.join(', ')})`);
       }
+      const claimById = new Map(
+        ctx.store.listObjects('claim', runId).map((c) => [c.id, c] as const),
+      );
+      // ---- deterministic topical gate on critique links (2026-08-22 relation-precision spike) ----
+      // Blind re-judging measured contradicts-label precision at 1/8 exact (2 adjacent); the
+      // worst offenders were topically DISTANT claims the model linked as counter evidence.
+      // Same vocabulary-overlap rule as the D-018 claim-claim prefilter: a claim that shares
+      // no content vocabulary with the hypothesis cannot honestly weaken/contradict/support it.
+      const hypText = `${hyp.statement} ${hyp.mechanism}`;
+      const hypTokens = contentTokens(hypText);
+      const gateLinks = (ids: readonly string[]): { kept: string[]; dropped: string[] } => {
+        const kept: string[] = [];
+        const dropped: string[] = [];
+        for (const id of ids) {
+          const claim = claimById.get(id);
+          const passes = claim !== undefined && topicalOverlap(contentTokens(claim.text), hypTokens).passes;
+          if (passes) kept.push(id);
+          else dropped.push(id);
+        }
+        return { kept, dropped };
+      };
+      const gatedCounter = gateLinks(counter.valid);
+      const gatedSupporting = gateLinks(supportingRefs.valid);
+      for (const [label, gated] of [['counter', gatedCounter], ['supporting', gatedSupporting]] as const) {
+        if (gated.dropped.length > 0) {
+          warnings.push(
+            `${hyp.id}: dropped ${gated.dropped.length} topically non-overlapping ${label} claim link(s) (${gated.dropped.join(', ')}) — no shared content vocabulary with the hypothesis`,
+          );
+        }
+      }
       const now = new Date().toISOString();
       // ---- W5/S2: relation rationale must be auditable, never a constant template ----
       // Priority: the model's per-link linkReason (a specific argument, >= 20 chars).
       // Fallback: a dynamically constructed rationale carrying the claim text (first 120
       // chars) plus the association to this hypothesis — still claim-specific, never a
       // bare constant.
-      const claimById = new Map(
-        ctx.store.listObjects('claim', runId).map((c) => [c.id, c] as const),
-      );
       const counterReasons = new Map(out.counterLinks.map((l) => [l.claimId, l.linkReason] as const));
       const supportingReasons = new Map(out.supportingLinks.map((l) => [l.claimId, l.linkReason] as const));
       const hypShort = hyp.id.slice(0, 8); // e.g. hyp_k57p — readable short code
@@ -255,11 +283,11 @@ export const falsifyStage: StageHandler = {
           uncertainties: [],
           createdAt: now,
         });
-      for (const id of counter.valid) {
+      for (const id of gatedCounter.kept) {
         ctx.store.putObject('evidence_relation', mkRelation(weakening.has(id) ? 'weakens' : 'contradicts', id));
         relationsCreated += 1;
       }
-      for (const id of supportingRefs.valid) {
+      for (const id of gatedSupporting.kept) {
         ctx.store.putObject('evidence_relation', mkRelation('supports', id));
         relationsCreated += 1;
       }
@@ -283,14 +311,14 @@ export const falsifyStage: StageHandler = {
         uncertainties,
         falsification,
         testability,
-        supportingClaimIds: supportingRefs.valid,
-        counterClaimIds: counter.valid,
+        supportingClaimIds: gatedSupporting.kept,
+        counterClaimIds: gatedCounter.kept,
       });
       ctx.store.putObject('hypothesis', updated);
 
       results.push(
         completeness.passed
-          ? `${hyp.id}: falsification spec passed deterministic completeness (testability=${testability}; counter links ${counter.valid.length}, supporting links ${supportingRefs.valid.length})`
+          ? `${hyp.id}: falsification spec passed deterministic completeness (testability=${testability}; counter links ${gatedCounter.kept.length}${gatedCounter.dropped.length > 0 ? ` (${gatedCounter.dropped.length} dropped by topical gate)` : ''}, supporting links ${gatedSupporting.kept.length}${gatedSupporting.dropped.length > 0 ? ` (${gatedSupporting.dropped.length} dropped by topical gate)` : ''})`
           : `${hyp.id}: falsification spec REJECTED by deterministic completeness — missing: ${completeness.missing.join('; ')}; testability=untestable_currently`,
       );
     }

@@ -15,6 +15,7 @@ import type {
   LiteratureNoveltyNeighbor,
 } from '../../domain/index.js';
 import type { RawSourceRecord } from '../../shared/ports.js';
+import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import {
   assertNotCancelled,
@@ -570,6 +571,22 @@ export const generateHypothesesStage: StageHandler = {
               }
             } catch (e) {
               searchFailures += 1;
+              // Failed novelty searches keep the source-retrieval receipt invariant
+              // (same shape as retrieve-stage failures); without this, a 429 burst
+              // zeroed the neighbor layer with no receipt trail at all.
+              ctx.recordReceipt({
+                kind: 'source_retrieval',
+                executionMode: 'live',
+                stage: 'generate_hypotheses',
+                redactionNote: 'novelty-neighbor search FAILED (rate limit/network); affected hypotheses judged unclear when no neighbors',
+                sourceRetrieval: {
+                  family: 'openalex',
+                  query: q,
+                  httpStatus: isSourceAdapterError(e) ? e.httpStatus : 0,
+                  resultCount: 0,
+                  contentHashes: [],
+                },
+              });
               ctx.log(`generate_hypotheses: novelty neighbor search failed for "${q}": ${e instanceof Error ? e.message : String(e)}`);
             }
           }

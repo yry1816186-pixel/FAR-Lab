@@ -81,13 +81,30 @@ const CROSS_STOPWORDS = new Set([
   'study', 'studies', 'paper', 'papers', 'results', 'result', 'using', 'used', 'show', 'shown',
 ]);
 
-const contentTokens = (text: string): Set<string> =>
+export const contentTokens = (text: string): Set<string> =>
   new Set(
     text
       .toLowerCase()
       .split(/[^a-z0-9]+/)
       .filter((t) => t.length > 3 && !CROSS_STOPWORDS.has(t)),
   );
+
+/** Shared topical-overlap gate constants (claim-claim D-018 pairs AND claim-hypothesis critique links). */
+export const TOPICAL_CONTAINMENT_MIN = 0.25;
+export const TOPICAL_SHARED_MIN = 4;
+
+export const topicalOverlap = (
+  ta: ReadonlySet<string>,
+  tb: ReadonlySet<string>,
+): { shared: number; containment: number; passes: boolean } => {
+  let shared = 0;
+  for (const t of ta) if (tb.has(t)) shared += 1;
+  const containment = shared / Math.min(ta.size, tb.size);
+  return { shared, containment, passes: containment >= TOPICAL_CONTAINMENT_MIN || shared >= TOPICAL_SHARED_MIN };
+};
+
+/** True when two free texts share real content vocabulary (false-contradiction guard). */
+export const hasTopicalOverlap = (a: string, b: string): boolean => topicalOverlap(contentTokens(a), contentTokens(b)).passes;
 
 export interface CrossPairCandidate {
   a: ScientificClaim;
@@ -114,13 +131,9 @@ export const crossRelationPairs = (claims: readonly ScientificClaim[]): CrossPai
       if (docOf.get(a.id) === docOf.get(b.id)) continue; // cross-paper relations only
       const ta = tokens.get(a.id) ?? new Set<string>();
       const tb = tokens.get(b.id) ?? new Set<string>();
-      let shared = 0;
-      for (const t of ta) if (tb.has(t)) shared += 1;
-      if (shared === 0) continue;
-      const containment = shared / Math.min(ta.size, tb.size);
-      if (containment >= 0.25 || shared >= 4) {
-        scored.push({ a, b, overlap: containment * shared, shared });
-      }
+      const { shared, containment, passes } = topicalOverlap(ta, tb);
+      if (!passes) continue;
+      scored.push({ a, b, overlap: containment * shared, shared });
     }
   }
   scored.sort((x, y) => y.overlap - x.overlap || (x.a.id < x.b.id ? -1 : 1));
