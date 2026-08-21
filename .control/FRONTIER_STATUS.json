@@ -236,10 +236,12 @@
   "marginalValue": {
     "status": "saturated",
     "remainingHighValueWork": [],
-    "reason": "All GO-ranked opportunities executed and live-verified this session (D-023..D-029b). Remaining entries are deferred (presentation-level #8; judge-hardening follow-up), blocked on user credentials (Qwen/Bailian submission route; optional OpenAlex content key), or network-blocked (models.dev, HF). No remaining item is both high-value and executable under current environment conditions without user action.",
+    "reason": "All GO-ranked opportunities executed and live-verified (D-023..D-031, two parallel sessions). #8 Idea2Plan template v2 was EXECUTED by the scout session (a0d0af9: eval rendering v2 five-section, --render-only verified; cross-template comparability disclosed). Remaining entries are blocked on user credentials (Qwen/Bailian submission route; OPENALEX_API_KEY for retrieval budget + fulltext phase-B live fetch), network-blocked (models.dev, HF), or below the value bar (judge-decomposition hardening follow-up, zombie-run sweep, mechanism-aware counter-label gate). No remaining item is both high-value and executable under current environment conditions without user action.",
     "evidence": [
       ".control/EXECUTION_STATE.json activeTasks (user-action gates listed)",
-      "evidence/W-EV2/rediscovery.md, mlr-bench.md, relation-precision.md, fulltext-phase-b-openalex.md"
+      "evidence/W-EV2/rediscovery.md, mlr-bench.md, relation-precision.md, fulltext-phase-b-openalex.md",
+      "evidence/W-EV2/strict-fc-live-verification.md (D-030 41/41 tool_calls)",
+      "research/WAVE3-SCOUT.md sections 6-7 (scout-session verification record)"
     ]
   },
   "detail": {
@@ -301,10 +303,13 @@
         "#2 trusted-anchor gate (D-027: injection REJECTED by architecture-critic; deterministic swap-disagreement bias proxy ADOPTED into tournamentNote/uncertainty from real match data)",
         "#4a OpenAlex optional API key (policy-drift adaptation; keyless default unchanged)",
         "#4b fulltext phase B via OpenAlex content API GROBID TEI, local GROBID REJECTED as superseded (D-028; full-fetch verification gated on user OPENALEX_API_KEY)",
-        "#3 FIRE-Bench-design rediscovery harness + 5-task live eval (D-029: mean F1 0.58, 2/5 perfect rediscovery, large judge-step variance disclosed; HF import network-blocked)"
+        "#3 FIRE-Bench-design rediscovery harness + 5-task live eval (D-029: mean F1 0.58, 2/5 perfect rediscovery, large judge-step variance disclosed; HF import network-blocked)",
+        "#8 Idea2Plan 5-section template (scout session a0d0af9: eval rendering v2 + novelty-delta + per-doc relevance, --render-only verified)",
+        "strict-FC audit-fixes + full live verification (D-029/D-030: projection v2, JSON repair layer, 41/41 tool_calls run_prrxcee6)",
+        "dist-freshness guard (D-031: 2d77c97)",
+        "full-fix relation re-measurement (supports 8/8 exact)"
       ],
       "backlog": [
-        "#8 Idea2Plan 5-section plan template fold (paper-level only; repo 404; presentation-level)",
         "judge-hardening for rediscovery metric (deterministic matching or multi-pass median) — follow-up from D-029 variance finding",
         "#9 models.dev snapshot (network-blocked in this environment 2026-08-22; retry later)"
       ],
