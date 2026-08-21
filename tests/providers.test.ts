@@ -5,8 +5,9 @@ import type { StructuredCallRequest } from '../src/shared/ports.js';
 import { zodToStrictJsonSchema, strictSchemaOrUndefined, extractJsonText, repairUnescapedQuotes } from '../src/providers/http.js';
 import { createDeepSeekProvider } from '../src/providers/deepseek.js';
 import { createZaiProvider } from '../src/providers/zai.js';
+import { createDashScopeProvider } from '../src/providers/dashscope.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
-import { defaultLiveProvider, getProvider, listProviders } from '../src/providers/index.js';
+import { defaultLiveProvider, getProvider, listProviders, LIVE_PROVIDER_NAMES } from '../src/providers/index.js';
 
 /**
  * *** TEST FIXTURES ONLY ***
@@ -566,6 +567,58 @@ describe('zai adapter (mock fetch)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// dashscope (Bailian) adapter — submission-mandated Qwen route (B-QWEN-LIVE-ROUTE)
+// ---------------------------------------------------------------------------
+
+describe('dashscope adapter (mock fetch)', () => {
+  it('targets the compatible-mode/v1 endpoint with the qwen-plus default model', async () => {
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'qwen-plus'))]);
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
+    expect(provider.modelId).toBe('qwen-plus');
+    expect(provider.baseUrl).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1');
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(calls[0]?.url).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
+    expect(res.receipt.provider).toBe('dashscope');
+    expect(res.receipt.modelVersion).toBe('qwen-plus');
+  });
+
+  it('honors the FARLAB_DASHSCOPE_MODEL environment override', async () => {
+    vi.stubEnv('FARLAB_DASHSCOPE_MODEL', 'qwen-max');
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'qwen-max'))]);
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
+    expect(provider.modelId).toBe('qwen-max');
+    await provider.structuredCall(REQ, parseHypothesis);
+    expect(bodyOf(calls[0]!).model).toBe('qwen-max');
+  });
+
+  it('strips strict-FC tool payloads (same capability decision as zai) and fails closed without a key', async () => {
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'qwen-plus'))]);
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
+    const reqWithSchema: StructuredCallRequest = { ...REQ, jsonSchema: { type: 'object', properties: { hypothesis: { type: 'string' } }, required: ['hypothesis'], additionalProperties: false } };
+    const res = await provider.structuredCall(reqWithSchema, parseHypothesis);
+    expect(res.ok).toBe(true);
+    const body = bodyOf(calls[0]!);
+    expect(body.tools).toBeUndefined();
+    expect(body.response_format).toEqual({ type: 'json_object' });
+    // fail-closed: no key -> no network, no fabricated output
+    const bare = createDashScopeProvider({ fetchImpl });
+    expect(bare.liveReady).toBe(false);
+    const closed = await bare.structuredCall(REQ, parseHypothesis);
+    expect(closed.ok).toBe(false);
+    expect(calls.length).toBe(1); // no extra network call from the closed provider
+  });
+
+  it('is registered as a live provider selectable via FARLAB_MODEL_PROVIDER', () => {
+    expect(LIVE_PROVIDER_NAMES).toContain('dashscope');
+    const names = listProviders().map((p) => p.name);
+    expect(names).toContain('dashscope');
+    const byName = getProvider('dashscope');
+    expect(byName?.name).toBe('dashscope');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // TEST-ONLY stub
 // ---------------------------------------------------------------------------
 
@@ -633,8 +686,8 @@ describe('provider registry', () => {
 
   it('lists providers with kind and sanitized metadata (env var names, never values)', () => {
     const infos = listProviders();
-    expect(infos.map((i) => i.name)).toEqual(['deepseek', 'zai', 'test-stub']);
-    expect(infos.map((i) => i.kind)).toEqual(['live', 'live', 'test']);
+    expect(infos.map((i) => i.name)).toEqual(['deepseek', 'zai', 'dashscope', 'test-stub']);
+    expect(infos.map((i) => i.kind)).toEqual(['live', 'live', 'live', 'test']);
     const deepseek = infos[0]!;
     expect(deepseek.modelId).toBe('deepseek-chat');
     expect(deepseek.baseUrl).toBe('https://api.deepseek.com/beta'); // strict-FC default (D-026)
