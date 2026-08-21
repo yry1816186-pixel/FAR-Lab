@@ -24,6 +24,7 @@ import {
 } from '../src/pipeline/stages/falsify.js';
 import { COMPARISON_NOTE, RANK_WEIGHTS, aggregateOutcome, bradleyTerry, circleSchedule, compositeScore, rankStage, tournamentRounds } from '../src/pipeline/stages/rank.js';
 import { DUPLICATE_MARKER } from '../src/pipeline/stages/shared.js';
+import { SourceAdapterError } from '../src/sources/error.js';
 
 /**
  * *** TEST FIXTURES ONLY ***
@@ -507,6 +508,68 @@ describe('generate_hypotheses stage', () => {
     expect(first?.literatureNovelty?.justification).toContain('fixture adjudication');
   });
 
+  it('D-017 rate-limit burst: failed novelty searches keep source_retrieval receipts and degrade to unclear', async () => {
+    const { store, run } = setup();
+    store.putObject('claim', makeClaim(run.id, 'claim one'));
+    store.putObject('claim', makeClaim(run.id, 'claim two'));
+
+    let thrown = 0;
+    const openalex: SourceAdapter = {
+      family: 'openalex',
+      async search(query) {
+        thrown += 1;
+        throw new SourceAdapterError({
+          family: 'openalex', query, kind: 'http_status', httpStatus: 429,
+          message: 'OpenAlex search failed',
+        });
+      },
+      async resolve() { throw new Error('TEST FIXTURE: resolve not expected'); },
+    };
+
+    const steps: StubStep[] = [
+      { rawOutput: gen(cand('E1'), cand('E2')) },
+      { rawOutput: gen(cand('C1'), cand('C2')) },
+      { rawOutput: gen(cand('M1'), cand('M2')) },
+      { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0, 1], reason: 'paraphrases' }, { memberIndices: [2, 3], reason: 'paraphrases' }, { memberIndices: [4], reason: 'distinct' }, { memberIndices: [5], reason: 'distinct' }] }) },
+      { rawOutput: JSON.stringify({ labels: [{ index: 0, noveltyLabel: 'evidence_grounded' }] }) },
+    ];
+    const { ctx, receipts } = makeCtx(run, store, steps, {
+      openalex,
+      dynamic: {
+        'novelty-check:query-expansion': (req) => {
+          const input = (req.userPayload as { input?: { hypotheses?: Array<{ hypothesisId: string }> } }).input;
+          return {
+            hypotheses: (input?.hypotheses ?? []).map((h) => ({
+              hypothesisId: h.hypothesisId,
+              queries: ['neighbor paraphrase query', 'neighbor entity mechanism query'],
+            })),
+          };
+        },
+      },
+    });
+
+    const outcome = await generateHypothesesStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const summary = outcome.kind === 'done' ? outcome.summary : '';
+    expect(summary).toContain('literature novelty (D-017): 4/4');
+
+    // every attempted search failed AND was receipted (receipt invariant for failed retrievals)
+    expect(thrown).toBe(8); // 4 representatives x 2 queries
+    const failed = receipts.filter((r) => r.kind === 'source_retrieval');
+    expect(failed).toHaveLength(8);
+    for (const r of failed) {
+      const sr = r.sourceRetrieval as { family: string; httpStatus: number; resultCount: number };
+      expect(sr.family).toBe('openalex');
+      expect(sr.httpStatus).toBe(429);
+      expect(sr.resultCount).toBe(0);
+    }
+
+    // honest degradation: all literature layers unclear with zero neighbors, no fabrication
+    const lit = store.listObjects('hypothesis', run.id).filter((h) => h.literatureNovelty !== undefined);
+    expect(lit).toHaveLength(4);
+    expect(lit.every((h) => h.literatureNovelty?.verdict === 'unclear' && h.literatureNovelty.neighbors.length === 0)).toBe(true);
+  });
+
   it('skips honestly on an empty verified evidence base and fails fast when cancelled', async () => {
     const { store, run } = setup(); // no claims at all
     const empty = makeCtx(run, store, []);
@@ -531,8 +594,8 @@ describe('generate_hypotheses stage', () => {
 describe('critique_falsify stage', () => {
   it('writes a complete spec + evidence relations, and rejects a future-work hollow spec deterministically', async () => {
     const { store, run } = setup();
-    const c1 = makeClaim(run.id, 'counter claim: replication failed');
-    const c2 = makeClaim(run.id, 'supporting claim: dose-response observed');
+    const c1 = makeClaim(run.id, 'counter claim: replication failed for the duration-dependent off-targeting mechanism');
+    const c2 = makeClaim(run.id, 'supporting claim: dose-response increase observed for the duration-dependent off-targeting mechanism');
     store.putObject('claim', c1);
     store.putObject('claim', c2);
     const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
@@ -660,10 +723,11 @@ describe('critique_falsify stage', () => {
 
   it('W5/S2: without linkReason the rationale falls back to claim text + hypothesis association (never a bare constant)', async () => {
     const { store, run } = setup();
-    // 150-char counter claim text: exactly the first 120 chars may appear, the rest must be elided
-    const longCounterText = `${'C'.repeat(120)}COUNTERTAIL${'D'.repeat(10)}`;
+    // 150+ char counter claim text sharing real vocabulary with the hypothesis (topical gate),
+    // exactly the first 120 chars may appear, the rest must be elided
+    const longCounterText = `${'duration-dependent off-targeting counter evidence sentence. '.repeat(3)}COUNTERTAIL${'D'.repeat(10)}`;
     const cCounter = makeClaim(run.id, longCounterText);
-    const cSupporting = makeClaim(run.id, 'supporting claim text that is long enough to be identifiable too');
+    const cSupporting = makeClaim(run.id, 'supporting claim: duration-dependent off-targeting dose-response with identifiable text');
     store.putObject('claim', cCounter);
     store.putObject('claim', cSupporting);
     const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
@@ -702,17 +766,69 @@ describe('critique_falsify stage', () => {
     const counterRel = rels.find((r) => r.claimId === cCounter.id);
     const supportingRel = rels.find((r) => r.claimId === cSupporting.id);
     // counter fallback: claim text truncated to 120 chars + explicit association with the hypothesis
-    expect(counterRel?.rationale).toBe(`${'C'.repeat(120)}…（与假设 ${hypShort} 的 critique 关联）`);
+    expect(counterRel?.rationale).toBe(`${longCounterText.slice(0, 120)}…（与假设 ${hypShort} 的 critique 关联）`);
     expect(counterRel?.rationale).not.toContain('COUNTERTAIL');
     // supporting fallback: same construction with the supporting direction
     expect(supportingRel?.rationale).toBe(
-      `supporting claim text that is long enough to be identifiable too（与假设 ${hypShort} 的 critique 支持关联）`,
+      `supporting claim: duration-dependent off-targeting dose-response with identifiable text（与假设 ${hypShort} 的 critique 支持关联）`,
     );
     // never the pre-W5 constant templates
     for (const r of rels) {
       expect(r.rationale).not.toBe('critique-linked counter evidence');
       expect(r.rationale).not.toBe('critique-linked supporting evidence');
     }
+  });
+
+  it('topical gate: topically distant critique links are dropped with a warning, never become relations (relation-precision spike root fix)', async () => {
+    const { store, run } = setup();
+    // Blind re-judging (spikes/relation-precision.mjs, 2026-08-22) measured contradicts
+    // precision at 1/8; worst offenders were links with NO shared content vocabulary.
+    const distant = makeClaim(run.id, 'quantum error correction thresholds improve under surface code decoding schedules');
+    const near = makeClaim(run.id, 'counter claim: duration-independent off-targeting observed across exposure mechanism conditions');
+    store.putObject('claim', distant);
+    store.putObject('claim', near);
+    const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      observable: 'off-target edit frequency across exposure durations',
+      measurement: 'targeted deep sequencing across a duration gradient of at least six timepoints',
+      expectedRelation: 'monotonic increase of off-target rate with deaminase exposure duration',
+      decisionRule: 'ratio >= 2x long vs short exposure supports; no increase weakens',
+      decisionRuleProvenance: 'community-standard',
+      supportCondition: 'clear dose-response increase replicated across independent cell lines',
+      weakeningCondition: 'flat or inconsistent response across the duration gradient',
+      falsificationCondition: 'inverse relation or no relation replicated in three independent cell lines',
+      confounders: [],
+      alternativeExplanations: [],
+      dataRequirements: [],
+      method: 'controlled exposure series with structure-matched gRNA controls',
+      failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
+      assumptionCritiques: [],
+      counterClaimIds: [distant.id, near.id],
+      weakeningClaimIds: [],
+      counterLinks: [
+        { claimId: distant.id, linkReason: 'a specific-looking but topically hollow rationale that must not survive the gate' },
+        { claimId: near.id, linkReason: 'the duration-independent observation directly undermines the duration mechanism' },
+      ],
+      supportingClaimIds: [],
+      supportingLinks: [],
+      uncertainties: [],
+      testability: 'testable_now',
+    };
+    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }]);
+    const outcome = await falsifyStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const summary = outcome.kind === 'done' ? outcome.summary : '';
+    // dropped link is visible in the summary, and only the overlapping claim becomes a relation
+    expect(summary).toContain('topically non-overlapping counter claim link');
+    const rels = store.listObjects('evidence_relation', run.id);
+    expect(rels).toHaveLength(1);
+    expect(rels[0]?.claimId).toBe(near.id);
+    expect(rels[0]?.relation).toBe('contradicts');
+    // spec-side ids stay consistent with the gated relations
+    const h1After = store.getObject('hypothesis', h1.id);
+    expect(h1After?.counterClaimIds).toEqual([near.id]);
   });
 
   it('W5/S2: linkReason under 20 characters is a schema failure (fail-closed, no silent template fallback)', async () => {
