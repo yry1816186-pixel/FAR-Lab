@@ -1,0 +1,91 @@
+{"runId":"run_yhp0m4kg6qnjmemhj9k5wbmk00","status":"created"}
+  [run_yhp0m4kg build_evidence] extracting claims from src_kygt806wcz7xpqac7z0v03qa32 "The Human Gut Microbiome – A Potential Controller of Wellnes"
+  [run_yhp0m4kg build_evidence] extracting claims from src_74tcwy7hh51az80sq0qz2x0mbc "Immune mechanisms of toxicity from checkpoint inhibitors"
+  [run_yhp0m4kg build_evidence] extracting claims from src_jt7573jepdgr99pdv1gz3fnp51 "Microbiome-based interventions to modulate gut ecology and t"
+  [run_yhp0m4kg build_evidence] extracting claims from src_kynb1z81d780grxgyq0e0ze8xx "Gut microbiome modulates response to anti–PD-1 immunotherapy"
+  [run_yhp0m4kg build_evidence] extracting claims from src_7ng46bwznsbj09pk1ja6ddy2jg "Immune Checkpoint Inhibitors for the Treatment of Cancer: Cl"
+  [run_yhp0m4kg build_evidence] extracting claims from src_ss84d2hyam3sbe67mp7a07x2r1 "Immune-related adverse events and anti-tumor efficacy of imm"
+{
+  "id": "run_yhp0m4kg6qnjmemhj9k5wbmk00",
+  "questionId": "q_831p9t9m0wbr44nyf4zdg0vrv8",
+  "status": "cancelled",
+  "currentStage": "generate_hypotheses",
+  "createdAt": "2026-08-21T12:04:14.431Z",
+  "updatedAt": "2026-08-21T12:05:13.074Z",
+  "cancelRequested": false,
+  "tags": [],
+  "lastError": "cancelled by user during generate_hypotheses",
+  "progress": {
+    "known": true,
+    "done": 4,
+    "total": 9
+  },
+  "stages": [
+    {
+      "stage": "scope",
+      "state": "done",
+      "attempt": 1,
+      "startedAt": "2026-08-21T12:04:14.447Z",
+      "endedAt": "2026-08-21T12:04:17.562Z"
+    },
+    {
+      "stage": "retrieve",
+      "state": "done",
+      "attempt": 1,
+      "startedAt": "2026-08-21T12:04:17.567Z",
+      "endedAt": "2026-08-21T12:04:27.057Z"
+    },
+    {
+      "stage": "verify_sources",
+      "state": "done",
+      "attempt": 1,
+      "startedAt": "2026-08-21T12:04:27.061Z",
+      "endedAt": "2026-08-21T12:04:30.695Z"
+    },
+    {
+      "stage": "build_evidence",
+      "state": "done",
+      "attempt": 1,
+      "startedAt": "2026-08-21T12:04:30.701Z",
+      "endedAt": "2026-08-21T12:04:36.908Z"
+    },
+    {
+      "stage": "generate_hypotheses",
+      "state": "failed",
+      "attempt": 1,
+      "startedAt": "2026-08-21T12:04:36.912Z",
+      "endedAt": "2026-08-21T12:05:13.074Z",
+      "error": "cancelled by user during generate_hypotheses"
+    },
+    {
+      "stage": "critique_falsify",
+      "state": "pending",
+      "attempt": 1
+    },
+    {
+      "stage": "rank",
+      "state": "pending",
+      "attempt": 1
+    },
+    {
+      "stage": "plan",
+      "state": "pending",
+      "attempt": 1
+    },
+    {
+      "stage": "feedback",
+      "state": "pending",
+      "attempt": 1
+    },
+    {
+      "stage": "revise",
+      "state": "pending",
+      "attempt": 1
+    },
+    {
+      "stage": "export",
+      "state": "pending",
+      "attempt": 1
+    }
+  ]
+}

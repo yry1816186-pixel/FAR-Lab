@@ -1,0 +1,28 @@
+run run_yhp0m4kg6qnjmemhj9k5wbmk00
+  status: partial  stage: rank  progress: 6/9 stages
+  lastError: model call failed (invalid_output) in rank/hypothesis-ranking:dimension-scores: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: assessments.0.dimensions:Invalid input; assessments.1.dimensions:Invalid input; assessments.2.dimensions:Invalid input; assessments.3.dimensions:Invalid input; assessments.4.dimensions:Invalid input; last raw output head: {
+  "assessments": [
+    {
+      "hypothesisId": "hyp_5w5609m4kb6f8gvf78cm9pmgaq",
+      "dimensions": {
+        "scientific_plausibility": {
+          "value": 0.7,
+          "rationale": "The mechan…[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    failed   rank — model call failed (invalid_output) in rank/hypothesis-ranking:dimension-scores: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: assessments.0.dimensions:Invalid input; assessments.1.dimensions:Invalid input; assessments.2.dimensions:Invalid input; assessments.3.dimensions:Invalid input; assessments.4.dimensions:Invalid input; last raw output head: {
+  "assessments": [
+    {
+      "hypothesisId": "hyp_5w5609m4kb6f8gvf78cm9pmgaq",
+      "dimensions": {
+        "scientific_plausibility": {
+          "value": 0.7,
+          "rationale": "The mechan…[truncated]
+    pending  plan
+    pending  feedback
+    pending  revise
+    pending  export

@@ -1,0 +1,18 @@
+run run_yhp0m4kg6qnjmemhj9k5wbmk00
+  status: partial  stage: critique_falsify  progress: 5/9 stages
+  lastError: model call failed (invalid_output) in critique_falsify/falsification-spec:hyp_1xzwz1zmnsv7vfq4rq2h2hd7tn: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: testability:Invalid enum value. Expected 'testable_now' | 'testable_with_data' | 'untestable_currently' | 'unfalsifiable', received 'testable now'; last raw output head: {
+  "observable": "Adjusted odds ratio (aOR) for poor immunotherapy response comparing antibiotic users to non-users, after controlling for infection status and performance status.",
+  "measurement": …[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    failed   critique_falsify — model call failed (invalid_output) in critique_falsify/falsification-spec:hyp_1xzwz1zmnsv7vfq4rq2h2hd7tn: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: testability:Invalid enum value. Expected 'testable_now' | 'testable_with_data' | 'untestable_currently' | 'unfalsifiable', received 'testable now'; last raw output head: {
+  "observable": "Adjusted odds ratio (aOR) for poor immunotherapy response comparing antibiotic users to non-users, after controlling for infection status and performance status.",
+  "measurement": …[truncated]
+    pending  rank
+    pending  plan
+    pending  feedback
+    pending  revise
+    pending  export
