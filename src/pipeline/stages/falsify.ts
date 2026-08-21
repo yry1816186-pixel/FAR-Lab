@@ -34,6 +34,16 @@ const LinkReason = z.object({
   linkReason: z.string().min(20),
 });
 
+/**
+ * Counter link with an EXPLICIT relation label (Wave-3 relation-reliability fix, spec §5):
+ * 'contradicts' must be asserted by the model — absent or unparseable labels default to
+ * 'weakens' (never 'contradicts'), because blind re-judging measured contradicts precision
+ * at 30% exact (upper bound, 57 relations) when contradicts was the implicit default.
+ */
+const CounterLink = LinkReason.extend({
+  relation: z.enum(['contradicts', 'weakens', 'qualifies']).catch('weakens'),
+});
+
 const FalsifyOut = z.object({
   observable: z.string().min(1),
   measurement: z.string().min(1),
@@ -59,11 +69,7 @@ const FalsifyOut = z.object({
   assumptionCritiques: z
     .array(z.object({ assumptionIndex: z.number().int().nonnegative(), critique: z.string().min(1) }))
     .default([]),
-  counterClaimIds: z.array(z.string()).default([]),
-  /** Subset of counterClaimIds whose relation is 'weakens' rather than 'contradicts'. */
-  weakeningClaimIds: z.array(z.string()).default([]),
-  /** W5/S2: why each linked counter claim weakens/contradicts THIS hypothesis (>= 20 chars per reason). */
-  counterLinks: z.array(LinkReason).default([]),
+  counterLinks: z.array(CounterLink).default([]),
   supportingClaimIds: z.array(z.string()).default([]),
   /** W5/S2: why each linked supporting claim supports THIS hypothesis (>= 20 chars per reason). */
   supportingLinks: z.array(LinkReason).default([]),
@@ -167,10 +173,15 @@ export const falsifyStage: StageHandler = {
           '"evidence-derived" (the threshold is derived from the provided claims), ' +
           '"community-standard" (it is a customary value in the field\'s literature), or ' +
           '"model-stipulated" (you chose the number yourself without evidence support) — never dress a number you ' +
-          'invented as evidence-derived. Also critique each assumption, link real counter-evidence and supporting ' +
-          'claims by their ids (only ids from the provided claims list), and for EVERY linked claim give a specific ' +
-          'linkReason of at least 20 characters arguing why that particular claim weakens/contradicts or supports ' +
-          'THIS hypothesis (generic template phrases are invalid). State genuine uncertainties.',
+          'invented as evidence-derived. Also critique each assumption and link real counter-evidence and supporting ' +
+          'claims by their ids (only ids from the provided claims list). RELATION LABEL DISCIPLINE (strict): ' +
+          '"contradicts" ONLY when the claim asserts a finding directly incompatible with THIS hypothesis\'s core ' +
+          'mechanism or prediction about the SAME subject; "weakens" when the claim reduces confidence without ' +
+          'direct incompatibility; "qualifies" when the claim adds scope conditions or narrows applicability. ' +
+          'When in doubt choose the weaker label or do not link at all — never invent a conflict, never stretch a ' +
+          'claim from a different subject/domain onto this hypothesis. For EVERY linked claim give a specific ' +
+          'linkReason of at least 20 characters naming the exact tension or support (generic template phrases are ' +
+          'invalid). State genuine uncertainties.',
         payload: {
           hypothesis: {
             id: hyp.id,
@@ -182,7 +193,7 @@ export const falsifyStage: StageHandler = {
           },
           availableClaims: ctx.store
             .listObjects('claim', runId)
-            .map((c) => ({ id: c.id, text: c.text, bindingStatus: c.bindingStatus })),
+            .map((c) => ({ id: c.id, text: c.text, quote: c.locators[0]?.quote, bindingStatus: c.bindingStatus })),
         },
         schema: FalsifyOut,
       });
@@ -212,10 +223,17 @@ export const falsifyStage: StageHandler = {
       const testability = completeness.passed ? out.testability : 'untestable_currently';
 
       // ---- evidence reference filtering + relation links ----
-      const counter = partitionClaimRefs(out.counterClaimIds, existingClaimIds);
-      const weakening = new Set(partitionClaimRefs(out.weakeningClaimIds, existingClaimIds).valid);
+      // Counter links carry explicit per-link labels (contradicts/weakens/qualifies);
+      // duplicate claimIds keep the first link; invalid refs are dropped visibly.
+      const seenCounter = new Set<string>();
+      const validCounter = out.counterLinks.filter((l) => {
+        if (!existingClaimIds.has(l.claimId) || seenCounter.has(l.claimId)) return false;
+        seenCounter.add(l.claimId);
+        return true;
+      });
+      const droppedCounterRefs = [...new Set(out.counterLinks.filter((l) => !existingClaimIds.has(l.claimId)).map((l) => l.claimId))];
       const supportingRefs = partitionClaimRefs(out.supportingClaimIds, existingClaimIds);
-      const droppedRefs = [...counter.invalid, ...supportingRefs.invalid];
+      const droppedRefs = [...droppedCounterRefs, ...supportingRefs.invalid];
       if (droppedRefs.length > 0) {
         warnings.push(`${hyp.id}: dropped ${droppedRefs.length} non-existent claim reference(s) (${droppedRefs.join(', ')})`);
       }
@@ -240,7 +258,7 @@ export const falsifyStage: StageHandler = {
         }
         return { kept, dropped };
       };
-      const gatedCounter = gateLinks(counter.valid);
+      const gatedCounter = gateLinks(validCounter.map((l) => l.claimId));
       const gatedSupporting = gateLinks(supportingRefs.valid);
       for (const [label, gated] of [['counter', gatedCounter], ['supporting', gatedSupporting]] as const) {
         if (gated.dropped.length > 0) {
@@ -257,6 +275,7 @@ export const falsifyStage: StageHandler = {
       // bare constant.
       const counterReasons = new Map(out.counterLinks.map((l) => [l.claimId, l.linkReason] as const));
       const supportingReasons = new Map(out.supportingLinks.map((l) => [l.claimId, l.linkReason] as const));
+      const counterLinkByClaim = new Map(validCounter.map((l) => [l.claimId, l] as const));
       const hypShort = hyp.id.slice(0, 8); // e.g. hyp_k57p — readable short code
       const linkRationale = (claimId: string, direction: 'counter' | 'supporting'): string => {
         const reason = (direction === 'counter' ? counterReasons : supportingReasons).get(claimId)?.trim();
@@ -271,7 +290,7 @@ export const falsifyStage: StageHandler = {
           direction === 'counter' ? `与假设 ${hypShort} 的 critique 关联` : `与假设 ${hypShort} 的 critique 支持关联`;
         return `${text}（${association}）`;
       };
-      const mkRelation = (relation: 'contradicts' | 'weakens' | 'supports', claimId: string) =>
+      const mkRelation = (relation: 'contradicts' | 'weakens' | 'qualifies' | 'supports', claimId: string) =>
         EvidenceRelation.parse({
           id: newId('ev'),
           runId,
@@ -284,7 +303,10 @@ export const falsifyStage: StageHandler = {
           createdAt: now,
         });
       for (const id of gatedCounter.kept) {
-        ctx.store.putObject('evidence_relation', mkRelation(weakening.has(id) ? 'weakens' : 'contradicts', id));
+        const link = counterLinkByClaim.get(id);
+        // schema .catch already defaults unparseable labels to 'weakens'; the ?? guard
+        // keeps 'contradicts' from ever appearing without an explicit model assertion
+        ctx.store.putObject('evidence_relation', mkRelation(link?.relation ?? 'weakens', id));
         relationsCreated += 1;
       }
       for (const id of gatedSupporting.kept) {

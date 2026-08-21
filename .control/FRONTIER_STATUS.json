@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "asOf": "2026-08-22T03:10+08:00",
-  "note": "R1 dimensions remain SATURATED (evidence/W5/frontier-sweep.md). EV1 evaluation CLOSED with honest judge-variance study; EV2 fulltext phase A live-verified; MLR-Bench slice running; S2AG deferred on probe evidence. This file tracks EV-phase truth.",
+  "asOf": "2026-08-22T04:30+08:00",
+  "note": "EV2 CLOSED (mlr-bench harvested + audit-fixed + relation-reliability root fix live-verified). Wave-3 opened with ranked GO backlog from research/WAVE3-SCOUT.md; frontier NOT_SATURATED. R1 dimensions remain SATURATED (evidence/W5/frontier-sweep.md).",
   "r1Dimensions": "see evidence/W5/frontier-sweep.md (10 dimensions SATURATED at R1 close, 2026-08-21)",
   "ev1": {
     "wave1": {
@@ -14,7 +14,7 @@
     "evaluation": {
       "status": "live_verified",
       "evidence": [
-        "evidence/W-EV1/ev1-before-after.md: claims +40% (58->81), counter-evidence relations +104% (mean 16->32.67), claim binding 100% held, plans 5/5 held, falsification completeness 0.9667->0.9778, tokens +85% recorded",
+        "evidence/W-EV1/ev1-before-after.md (CORRECTED 2026-08-22 audit): claims +40% (58->81), counter-evidence relations +104% (mean 16->32.67) with quality asterisk (relation-precision spike), claim binding 100% held, plans 5/5 held, tokens +84.5% recorded",
         "judge 3-seed variance study (llm-judge-ev1{,-s2,-s3}.jsonl, corrected 2026-08-22 audit): identical-data seed swing +/-1-2 pts; AGGREGATE 3-seed means farlab 4.07 vs direct 3.73 / rag 3.33 quality, counter 2.2 vs 1.6/1.6 (counter advantage holds every seed); NOT per-cell dominance: farlab trails best baseline in 6/18 quality cells and 1/18 counter cells, seed-3 quality mean 3.80 < direct 4.20; no before->after judge claim (within noise); before batch P5+P6 both unjudged (n=4)",
         "P2 mid-batch envelope failure root-fixed (callStructured layer-4 unwrap) + resume completed 9/9 — recovery live-verified"
       ]
@@ -25,25 +25,43 @@
       "status": "live_verified",
       "evidence": [
         "evidence/W-EV2/fulltext-phase-a-live.md: run_8w2h8c — arXiv LaTeXML 200, receipt+artifact persisted, 4/4 fulltext-grounded verified claims, pubmed identifiers live",
-        "tests: sources-fulltext x17 + deepen x5, full suite 233/233 at 9107f59"
+        "tests: sources-fulltext x17 + deepen x5"
       ]
     },
     "mlrBench": {
-      "status": "harvest_done",
+      "status": "done",
       "evidence": [
-        "evidence/W-EV2/mlr-bench.md: same-judge same-tasks (deepseek-chat t=0, N=5, uncalibrated) farlab idea 7.00 / proposal 6.20 vs o4-mini 7.80/7.40, deepseek-r1 7.60/7.00; 30/30 judged 0 errors",
-        "gap attributed: task-alignment (mapping-level) + novelty presentation + rendering omissions; Feasibility 7.40 (idea) EXCEEDS both anchors — Direction-A core loop not the deficit",
-        "adapter P0 fixed this session: renderIdea/renderProposal closed SQLite handle before query closure execution; judge phase then 30/30 clean (eval/results/mlr-bench.jsonl)"
-      ],
-      "pending": "improvement candidates (provenance/novelty-delta rendering, venue-focus in question construction) routed to Marginal Value Gate"
+        "evidence/W-EV2/mlr-bench.md: same-judge same-tasks (deepseek-chat t=0, N=5, uncalibrated) farlab idea 7.00 / proposal 6.20 vs o4-mini 7.80/7.40, deepseek-r1 7.60/7.00; 30/30 judged 0 errors; gap attributed (task flattening, novelty presentation, rendering omissions); Feasibility 7.40 (idea) EXCEEDS both anchors",
+        "adapter close-before-use P0 fixed + committed; judge dimension-key validation; rate-limit finding root-fixed (openalex 429 backoff + novelty receipts)"
+      ]
+    },
+    "relationReliability": {
+      "status": "fixed_live_verified",
+      "evidence": [
+        "evidence/W-EV2/relation-precision.md: contradicts 30% exact (upper bound, 57 relations pooled) -> falsify schema v2 label discipline + topical gate; post-fix live run contradicts 0/21 (was 11-19 mostly-wrong), blind re-judge 54.5% exact vs 46% pre-fix; F4 claim-claim control 80% same judge",
+        "audit + main-agent recomputation of all corrected numbers; suite 240/240"
+      ]
     },
     "s2agCitationContexts": {
       "status": "deferred_on_evidence",
       "evidence": ["spikes/s2ag-probe.mjs 2026-08-22: keyless 200 but intents coverage 0/40, contexts <=9/20, contrastive hits 0; reversal trigger in research/TECH_CANDIDATES.md B"]
     }
   },
+  "wave3": {
+    "backlog": [
+      "#2 trusted-anchor debiasing gate for tournament (identifiability result, zero-false-enable evidence)",
+      "#5 POPPER e-value sequential falsification (paper-EXTRACT, zero supply-chain)",
+      "#4 OpenAlex optional API key + fulltext download adoption (policy drift; GROBID stays deferred)",
+      "#6 DeepSeek strict function-calling beta + provider capability matrix",
+      "#3 FIRE-Bench rediscovery eval harness (objective-truth eval)",
+      "#8 Idea2Plan 5-section plan template fold (subset-run BLOCKED: repo 404)",
+      "#9 models.dev provider registry snapshot (MIT)"
+    ],
+    "rejected": ["#10 jsonrepair (breaks zod-only invariant)", "#11 ONNX NLI for this defect pattern (D-023)"],
+    "deferred": ["#12 ONNX rerank (trigger unmet: max pool 44 < 60)"]
+  },
   "marginalValue": {
     "status": "not_saturated",
-    "reason": "MLR-Bench slice running; EV2 adversarial audit in flight; remaining: audit fixes (if any), EV2 close-out sweep."
+    "reason": "Wave-3 GO backlog above remains executable and high-value under current conditions; competition submission additionally gated by B-QWEN-LIVE-ROUTE credentials (user action)."
   }
 }

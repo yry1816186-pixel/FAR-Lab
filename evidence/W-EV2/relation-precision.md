@@ -25,6 +25,16 @@
 - `src/pipeline/stages/evidence.ts`: shared `topicalOverlap`/`hasTopicalOverlap` gate exported (same rule as the D-018 claim–claim prefilter: containment ≥ 0.25 or ≥ 4 shared content tokens).
 - `src/pipeline/stages/falsify.ts`: critique links (counter + supporting) now pass the deterministic topical gate against the hypothesis statement+mechanism; dropped links produce visible warnings + summary counts, do NOT become evidence relations, and the stored spec's claim-id lists stay consistent. Test: `topical gate: topically distant critique links are dropped with a warning` (tests/pipeline-hypotheses.test.ts). Suite 239/239.
 
+## Post-fix live verification (2026-08-22, same session)
+
+Fix = deterministic topical gate (D-023) + schema-v2 label discipline (Wave-3 spec §5: explicit per-link relation enum, F4-style strict definitions + abstention in the prompt, bound quotes in availableClaims, weakens default via zod `.catch`). Full suite 240/240.
+
+Live run `run_3c3zyycempz9dcqp509fmgmw8k` (P1 antibiotic-resistance domain, completed, exit 0): 21 claim→hypothesis relations = **contradicts 0** / weakens 1 / qualifies 2 / supports 18. Pre-fix runs on the SAME problem (P1 EV1 batch) produced 11–19 `contradicts` labels of which ~70% were wrong — the default-contradicts failure mode is structurally eliminated: `contradicts` now requires an explicit model assertion, and on this domain the model declined to make one.
+
+Blind re-judging of this run (`REL_PREC_RUN` filter, N=11, `spikes/output/relation-precision-postfix.jsonl`): overall exact 6/11 (54.5%), +adjacent 7/11 (63.6%); supports 5/8 (62.5% ≈ pre-fix 61% — the residual supports/qualifies granularity boundary is unchanged, as expected for a label-discipline fix). contradicts precision is not re-measurable on this run (zero contradicts labels exist); judge errors 0.
+
+Honest caveats: single run, N=11, same-family judge (upper bound); 0-contradicts could in principle be over-correction (missed genuine contradictions) — pre-fix evidence says its contradicts assertions were mostly wrong, so absence is more truthful than wrong assertions, but future domains should watch for missed genuine contradictions (follow-up recorded in D-024).
+
 ## What this spike does NOT justify
 
 - **ONNX NLI cross-checker activation (registry B deferred item):** the trigger condition ("LLM-only relation precision measured insufficient") is met for `contradicts`, but the measured defect pattern (topicaldistance + label granularity) is NOT what an NLI entailment model fixes — NLI contradiction-vs-neutral has the same granularity ambiguity on scientific text, adds ~227MB deps against the zero-runtime-dep protected invariant, and would flag most of the same boundary cases with different noise. REJECTED for this defect pattern; trigger rewritten in `research/TECH_CANDIDATES.md` B (re-activate only if topically-close pairs still show low precision after the gate).

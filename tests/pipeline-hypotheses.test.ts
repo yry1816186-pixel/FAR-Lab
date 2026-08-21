@@ -618,12 +618,16 @@ describe('critique_falsify stage', () => {
       method: 'controlled exposure series with structure-matched gRNA controls',
       failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
       assumptionCritiques: [{ assumptionIndex: 0, critique: 'assumption zero ignores cell-cycle confounding' }],
-      counterClaimIds: [c1.id, 'clm_bogus00000000000000000000aaa'],
-      weakeningClaimIds: [c1.id],
       counterLinks: [
         {
           claimId: c1.id,
+          relation: 'weakens',
           linkReason: 'the replication failure of the duration link directly contradicts this exposure mechanism',
+        },
+        {
+          claimId: 'clm_bogus00000000000000000000aaa',
+          relation: 'contradicts',
+          linkReason: 'a bogus claim reference that must be dropped with a visible warning',
         },
       ],
       supportingClaimIds: [c2.id],
@@ -651,8 +655,6 @@ describe('critique_falsify stage', () => {
       method: '未来工作中的一个潜在分析方向',
       failureInterpretation: '如果未来无法验证就说明当前还下不了结论',
       assumptionCritiques: [{ assumptionIndex: 7, critique: 'index out of range is preserved honestly' }],
-      counterClaimIds: [],
-      weakeningClaimIds: [],
       counterLinks: [],
       supportingClaimIds: [],
       supportingLinks: [],
@@ -727,7 +729,8 @@ describe('critique_falsify stage', () => {
     // exactly the first 120 chars may appear, the rest must be elided
     const longCounterText = `${'duration-dependent off-targeting counter evidence sentence. '.repeat(3)}COUNTERTAIL${'D'.repeat(10)}`;
     const cCounter = makeClaim(run.id, longCounterText);
-    const cSupporting = makeClaim(run.id, 'supporting claim: duration-dependent off-targeting dose-response with identifiable text');
+    const longSupportingText = `${'duration-dependent off-targeting supporting evidence sentence. '.repeat(3)}SUPPORTTAIL${'E'.repeat(10)}`;
+    const cSupporting = makeClaim(run.id, longSupportingText);
     store.putObject('claim', cCounter);
     store.putObject('claim', cSupporting);
     const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
@@ -748,9 +751,13 @@ describe('critique_falsify stage', () => {
       method: 'controlled exposure series with structure-matched gRNA controls',
       failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
       assumptionCritiques: [],
-      counterClaimIds: [cCounter.id],
-      weakeningClaimIds: [],
-      counterLinks: [], // NO linkReason provided -> deterministic fallback construction
+      counterLinks: [
+        {
+          claimId: cCounter.id,
+          relation: 'contradicts',
+          linkReason: 'explicit per-link reason passes through verbatim without fallback construction',
+        },
+      ],
       supportingClaimIds: [cSupporting.id],
       supportingLinks: [],
       uncertainties: [],
@@ -765,13 +772,13 @@ describe('critique_falsify stage', () => {
     expect(rels).toHaveLength(2);
     const counterRel = rels.find((r) => r.claimId === cCounter.id);
     const supportingRel = rels.find((r) => r.claimId === cSupporting.id);
-    // counter fallback: claim text truncated to 120 chars + explicit association with the hypothesis
-    expect(counterRel?.rationale).toBe(`${longCounterText.slice(0, 120)}…（与假设 ${hypShort} 的 critique 关联）`);
-    expect(counterRel?.rationale).not.toContain('COUNTERTAIL');
-    // supporting fallback: same construction with the supporting direction
-    expect(supportingRel?.rationale).toBe(
-      `supporting claim: duration-dependent off-targeting dose-response with identifiable text（与假设 ${hypShort} 的 critique 支持关联）`,
-    );
+    // counter (schema v2): every counter link carries its own >=20-char reason — passes through verbatim
+    expect(counterRel?.rationale).toBe('explicit per-link reason passes through verbatim without fallback construction');
+    expect(counterRel?.rationale).not.toContain(hypShort);
+    // supporting fallback: a supportingClaimIds entry with no matching supportingLinks reason gets the
+    // deterministic claim-text construction — truncated to 120 chars, never a bare constant
+    expect(supportingRel?.rationale).toBe(`${longSupportingText.slice(0, 120)}…（与假设 ${hypShort} 的 critique 支持关联）`);
+    expect(supportingRel?.rationale).not.toContain('SUPPORTTAIL');
     // never the pre-W5 constant templates
     for (const r of rels) {
       expect(r.rationale).not.toBe('critique-linked counter evidence');
@@ -805,11 +812,9 @@ describe('critique_falsify stage', () => {
       method: 'controlled exposure series with structure-matched gRNA controls',
       failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
       assumptionCritiques: [],
-      counterClaimIds: [distant.id, near.id],
-      weakeningClaimIds: [],
       counterLinks: [
-        { claimId: distant.id, linkReason: 'a specific-looking but topically hollow rationale that must not survive the gate' },
-        { claimId: near.id, linkReason: 'the duration-independent observation directly undermines the duration mechanism' },
+        { claimId: distant.id, relation: 'contradicts', linkReason: 'a specific-looking but topically hollow rationale that must not survive the gate' },
+        { claimId: near.id, relation: 'contradicts', linkReason: 'the duration-independent observation directly undermines the duration mechanism' },
       ],
       supportingClaimIds: [],
       supportingLinks: [],
@@ -829,6 +834,57 @@ describe('critique_falsify stage', () => {
     // spec-side ids stay consistent with the gated relations
     const h1After = store.getObject('hypothesis', h1.id);
     expect(h1After?.counterClaimIds).toEqual([near.id]);
+  });
+
+  it('relation-label discipline (schema v2): explicit labels pass through; absent/unparseable defaults to weakens, never contradicts', async () => {
+    const { store, run } = setup();
+    const cExplicitContra = makeClaim(run.id, 'counter claim: duration-independent off-targeting mechanism asserted by the exposure study');
+    const cExplicitQual = makeClaim(run.id, 'counter claim: duration-dependent off-targeting only under high-dose exposure conditions');
+    const cUnlabeled = makeClaim(run.id, 'counter claim: off-targeting duration gradient weaker than the mechanism predicts');
+    const cGarbageLabel = makeClaim(run.id, 'counter claim: duration exposure gradient off-targeting evidence with scope limits');
+    for (const c of [cExplicitContra, cExplicitQual, cUnlabeled, cGarbageLabel]) store.putObject('claim', c);
+    const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      observable: 'off-target edit frequency across exposure durations',
+      measurement: 'targeted deep sequencing across a duration gradient of at least six timepoints',
+      expectedRelation: 'monotonic increase of off-target rate with deaminase exposure duration',
+      decisionRule: 'ratio >= 2x long vs short exposure supports; no increase weakens',
+      decisionRuleProvenance: 'community-standard',
+      supportCondition: 'clear dose-response increase replicated across independent cell lines',
+      weakeningCondition: 'flat or inconsistent response across the duration gradient',
+      falsificationCondition: 'inverse relation or no relation replicated in three independent cell lines',
+      confounders: [],
+      alternativeExplanations: [],
+      dataRequirements: [],
+      method: 'controlled exposure series with structure-matched gRNA controls',
+      failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
+      assumptionCritiques: [],
+      counterLinks: [
+        { claimId: cExplicitContra.id, relation: 'contradicts', linkReason: 'explicitly asserted incompatibility with the duration mechanism prediction' },
+        { claimId: cExplicitQual.id, relation: 'qualifies', linkReason: 'scope condition limiting the duration effect to high-dose exposure only' },
+        { claimId: cUnlabeled.id, linkReason: 'weaker-than-predicted gradient reduces confidence in the duration mechanism' },
+        { claimId: cGarbageLabel.id, relation: 'DEFINITELY-CONTRADICTS!!', linkReason: 'an unparseable label must never surface as contradicts' },
+      ],
+      supportingClaimIds: [],
+      supportingLinks: [],
+      uncertainties: [],
+      testability: 'testable_now',
+    };
+    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }]);
+    const outcome = await falsifyStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+
+    const rels = store.listObjects('evidence_relation', run.id);
+    expect(rels).toHaveLength(4);
+    const byClaim = new Map(rels.map((r) => [r.claimId, r.relation] as const));
+    expect(byClaim.get(cExplicitContra.id)).toBe('contradicts'); // explicit assertion honored
+    expect(byClaim.get(cExplicitQual.id)).toBe('qualifies'); // scope conditions kept out of the counter polarity
+    expect(byClaim.get(cUnlabeled.id)).toBe('weakens'); // absent label -> weakens default
+    expect(byClaim.get(cGarbageLabel.id)).toBe('weakens'); // unparseable label -> weakens default (zod .catch)
+    const h1After = store.getObject('hypothesis', h1.id);
+    expect(h1After?.counterClaimIds).toHaveLength(4); // linkage preserved for all gated links
   });
 
   it('W5/S2: linkReason under 20 characters is a schema failure (fail-closed, no silent template fallback)', async () => {
@@ -888,8 +944,6 @@ describe('critique_falsify stage', () => {
       method: 'controlled exposure series with structure-matched gRNA controls',
       failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
       assumptionCritiques: [],
-      counterClaimIds: [],
-      weakeningClaimIds: [],
       counterLinks: [],
       supportingClaimIds: [],
       supportingLinks: [],

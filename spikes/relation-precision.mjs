@@ -48,9 +48,10 @@ const pickN = (arr, n, rand) => {
 const db = new DatabaseSync(resolve(process.cwd(), '.far-run/far.db'), { readOnly: true });
 const completedRuns = new Set(db.prepare("SELECT id FROM runs WHERE status='completed'").all().map((r) => r.id));
 const F4_MODE = process.env.REL_PREC_MODE === 'f4'; // claim-claim cross relations instead of claim->hypothesis
+const RUN_FILTER = process.env.REL_PREC_RUN; // optional: judge relations from ONE run only (post-fix verification)
 const relations = db.prepare("SELECT json FROM objects WHERE kind='evidence_relation'").all()
   .map((r) => JSON.parse(r.json))
-  .filter((r) => completedRuns.has(r.runId) && (F4_MODE ? r.targetClaimId !== undefined : r.targetClaimId === undefined && r.targetHypothesisId !== undefined));
+  .filter((r) => completedRuns.has(r.runId) && (!RUN_FILTER || r.runId === RUN_FILTER) && (F4_MODE ? r.targetClaimId !== undefined : r.targetClaimId === undefined && r.targetHypothesisId !== undefined));
 const claims = new Map(db.prepare("SELECT json FROM objects WHERE kind='claim'").all().map((r) => [JSON.parse(r.json).id, JSON.parse(r.json)]));
 const hyps = new Map(db.prepare("SELECT json FROM objects WHERE kind='hypothesis'").all().map((r) => [JSON.parse(r.json).id, JSON.parse(r.json)]));
 db.close();
