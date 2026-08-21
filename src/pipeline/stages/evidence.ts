@@ -9,6 +9,9 @@ import {
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { checkQuoteAlignment } from './align.js';
+import { toDocument } from './retrieve.js';
+import { snapshotHash } from '../../sources/snapshot.js';
+import type { CorpusSnapshot, SourceFamily } from '../../domain/source.js';
 
 /** Hard admission cap per source. Model output beyond the cap is dropped, never stored. */
 export const MAX_CLAIMS_PER_SOURCE = 4;
@@ -25,6 +28,22 @@ const SYSTEM_PROMPT = [
   '- note (optional): one short honest caveat or uncertainty about the claim.',
   '- If the abstract contains nothing relevant to the question, return {"claims":[]}.',
 ].join('\n');
+
+/**
+ * Bounded adaptive information-seeking (mission §30): when the first extraction pass
+ * yields a barren evidence base, ONE follow-up round of targeted retrieval may run.
+ * Hard bounds: max 1 round, max 2 queries, max 3 docs per query — never an open loop.
+ */
+export const GAP_SEEK_MIN_VERIFIED = 3;
+export const GAP_SEEK_MAX_QUERIES = 2;
+export const GAP_SEEK_MAX_DOCS_PER_QUERY = 3;
+
+const GapSeekSchema = z.object({
+  enoughEvidence: z.boolean(),
+  gapDescription: z.string().min(1),
+  queries: z.array(z.string().min(8)).max(GAP_SEEK_MAX_QUERIES).default([]),
+});
+type GapSeek = z.infer<typeof GapSeekSchema>;
 
 const ClaimStanceSchema = z.enum(['supports', 'contradicts', 'neutral', 'unknown']);
 export type ClaimStance = z.infer<typeof ClaimStanceSchema>;
@@ -149,7 +168,8 @@ export const buildEvidenceStage: StageHandler = {
       unknown: 0,
     };
 
-    for (const doc of pending) {
+    const processDocument = async (doc: SourceDocument): Promise<void> => {
+      {
       if (ctx.cancelled()) {
         throw new Error(`cancelled by user in build_evidence before extracting ${doc.id}`);
       }
@@ -218,6 +238,89 @@ export const buildEvidenceStage: StageHandler = {
         ctx.store.putObject('evidence_relation', relationRecord);
         relationCounts[relation] += 1;
       }
+      }
+    };
+
+    for (const doc of pending) {
+      await processDocument(doc);
+    }
+
+    // ---- bounded adaptive gap-seek round (mission §30) ----
+    let gapSeekNote = 'not triggered (enough verified evidence)';
+    if (verifiedCount < GAP_SEEK_MIN_VERIFIED) {
+      ctx.log(`verified claims ${verifiedCount} < ${GAP_SEEK_MIN_VERIFIED} — evaluating evidence gap`);
+      const gap = await callStructured<GapSeek>(ctx, {
+        stage: 'build_evidence',
+        purpose: 'evidence-gap-assessment',
+        systemPrompt:
+          'You assess whether the current verified evidence base is too barren to support ' +
+          'hypothesis generation for the research question, and if so, propose AT MOST 2 targeted ' +
+          'scholarly search queries that could close the most important gap. If the evidence is ' +
+          'adequate, or no retrieval could realistically improve it, set enoughEvidence=true and ' +
+          'return empty queries. Never invent facts to fill gaps.',
+        payload: {
+          question: question.text,
+          verifiedClaimCount: verifiedCount,
+          sourceTitles: plan.usable.map((d) => d.title),
+        },
+        schema: GapSeekSchema,
+        temperature: 0,
+      });
+      if (!gap.data.enoughEvidence && gap.data.queries.length > 0) {
+        gapSeekNote = `triggered: ${gap.data.gapDescription.slice(0, 120)}`;
+        const adapter = ctx.sourceFor('openalex' as SourceFamily);
+        const newDocIds: string[] = [];
+        const corpus = ctx.store.listObjects('corpus_snapshot' as never, ctx.run.id).at(-1) as CorpusSnapshot | undefined;
+        for (const q of gap.data.queries.slice(0, GAP_SEEK_MAX_QUERIES)) {
+          if (ctx.cancelled()) throw new Error('cancelled by user in build_evidence gap-seek');
+          const search = await adapter.search(q, { limit: GAP_SEEK_MAX_DOCS_PER_QUERY });
+          ctx.recordReceipt({
+            kind: 'source_retrieval',
+            executionMode: 'live',
+            stage: 'build_evidence',
+            redactionNote: 'query text and result count only',
+            sourceRetrieval: {
+              family: 'openalex',
+              query: q,
+              httpStatus: search.httpStatus,
+              resultCount: search.records.length,
+              contentHashes: search.records.map((r) => snapshotHash('openalex', r)),
+            },
+          });
+          for (const rec of search.records) {
+            if (!rec.abstractText || rec.abstractText.length < 100) continue; // gap docs must be claim-capable
+            const doc = await toDocument(ctx, 'openalex', rec);
+            doc.verification = {
+              method: 'openalex_id',
+              resolved: true,
+              detail: 'gap-seek: record obtained directly from the OpenAlex API (primary source); no secondary DOI cross-check',
+              checkedAt: new Date().toISOString(),
+            };
+            ctx.store.putObject('source_document', doc);
+            if (!newDocIds.includes(doc.id)) newDocIds.push(doc.id);
+          }
+        }
+        if (corpus && newDocIds.length > 0) {
+          const updated: CorpusSnapshot = {
+            ...corpus,
+            queries: [
+              ...corpus.queries,
+              ...gap.data.queries.slice(0, GAP_SEEK_MAX_QUERIES).map((q) => ({ purpose: 'gap_followup' as const, text: `[gap-seek] ${q}` })),
+            ],
+            documentIds: [...corpus.documentIds, ...newDocIds.filter((id) => !corpus.documentIds.includes(id))],
+          };
+          ctx.store.putObject('corpus_snapshot', updated);
+        }
+        for (const id of newDocIds) {
+          const doc = ctx.store.getObject('source_document', id);
+          if (doc && doc.abstractText) await processDocument(doc);
+        }
+        gapSeekNote += `; +${newDocIds.length} docs retrieved, claims now verified=${verifiedCount}`;
+      } else {
+        gapSeekNote = gap.data.enoughEvidence
+          ? `not triggered (model judged evidence adequate: ${gap.data.gapDescription.slice(0, 80)})`
+          : 'triggered but no actionable queries returned';
+      }
     }
 
     const summary =
@@ -226,7 +329,8 @@ export const buildEvidenceStage: StageHandler = {
       `; claims=${claimsTotal} verified=${verifiedCount} unaligned=${unalignedCount}` +
       `; relations supports=${relationCounts.supports} contradicts=${relationCounts.contradicts}` +
       ` qualifies=${relationCounts.qualifies} unknown=${relationCounts.unknown}` +
-      `; truncated_to_cap=${truncatedCount}`;
+      `; truncated_to_cap=${truncatedCount}` +
+      `; gap_seek=${gapSeekNote}`;
     return { kind: 'done', summary };
   },
 };

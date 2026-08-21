@@ -51,7 +51,7 @@ export const SourceDocument = z.object({
 export type SourceDocument = z.infer<typeof SourceDocument>;
 
 export const RetrievalQuery = z.object({
-  purpose: z.enum(['discovery', 'supporting', 'counter_evidence', 'methodological', 'identifier_resolution']),
+  purpose: z.enum(['discovery', 'supporting', 'counter_evidence', 'methodological', 'identifier_resolution', 'gap_followup']),
   text: z.string().min(1),
   family: SourceFamily.optional(),
 });
