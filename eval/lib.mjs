@@ -4,10 +4,17 @@
  * construction. No secret material in files: the provider reads DEEPSEEK_API_KEY from env.
  */
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createDeepSeekProvider } from '../dist/providers/deepseek.js';
 
 export const loadProblems = () => {
-  const raw = JSON.parse(readFileSync(new URL('./problems.json', import.meta.url), 'utf8'));
+  // FARLAB_PROBLEMS (cwd-relative path) pins run ids per problem — required when
+  // question texts repeat across batches (before/after) so the judge/metrics read
+  // the intended runs, not whichever happens to match newest.
+  const path = process.env.FARLAB_PROBLEMS
+    ? resolve(process.cwd(), process.env.FARLAB_PROBLEMS)
+    : new URL('./problems.json', import.meta.url);
+  const raw = JSON.parse(readFileSync(path, 'utf8'));
   return raw.problems;
 };
 

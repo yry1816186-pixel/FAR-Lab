@@ -16,7 +16,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { loadProblems, makeProvider } from './lib.mjs';
 import { isRepresentative } from '../dist/pipeline/stages/shared.js';
 
-const SEED = 20260821; // pre-declared fixed seed recorded with results
+const SEED = Number(process.env.FARLAB_JUDGE_SEED ?? 20260821); // recorded with results; env enables variance studies
 const DB_PATH = new URL('../.far-run/far.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const RESULTS = new URL('./results/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
@@ -163,5 +163,6 @@ Return ONLY a JSON object:
   console.log(`${p.id} judge_ok=${res.ok} mapping=${JSON.stringify(mapping)} scores=${res.ok ? JSON.stringify(Object.fromEntries(Object.entries(record.scores).map(([s, v]) => [s, `${v.hypothesis_quality}/${v.counter_evidence_coverage}`]))) : (record.judge_error && record.judge_error.kind)}`);
 }
 
-writeFileSync(RESULTS + 'llm-judge.jsonl', out.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8');
-console.log('DONE -> eval/results/llm-judge.jsonl (calibration=uncalibrated_llm_judgment, auxiliary only)');
+const outFile = process.env.FARLAB_JUDGE_OUT ?? 'llm-judge.jsonl';
+writeFileSync(RESULTS + outFile, out.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8');
+console.log(`DONE -> eval/results/${outFile} (calibration=uncalibrated_llm_judgment, auxiliary only)`);
