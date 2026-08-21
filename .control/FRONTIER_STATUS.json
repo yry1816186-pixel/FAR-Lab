@@ -1,34 +1,49 @@
 {
   "schemaVersion": 2,
-  "asOf": "2026-08-22",
-  "note": "R1 dimensions (below) remain valid as of R1 close. The evolution phase (EV1) opened NEW frontier work: Wave-1 external-intelligence fusions are live-verified; evaluation + Wave-2 are in progress/open. This file tracks EV1 truth; R1 saturation records live in evidence/W5/frontier-sweep.md.",
+  "asOf": "2026-08-22T03:10+08:00",
+  "note": "R1 dimensions remain SATURATED (evidence/W5/frontier-sweep.md). EV1 evaluation CLOSED with honest judge-variance study; EV2 fulltext phase A live-verified; MLR-Bench slice running; S2AG deferred on probe evidence. This file tracks EV-phase truth.",
   "r1Dimensions": "see evidence/W5/frontier-sweep.md (10 dimensions SATURATED at R1 close, 2026-08-21)",
   "ev1": {
     "wave1": {
       "status": "live_verified",
       "evidence": [
         "evidence/W-EV1/live-run-verification.md (run_zr0gc5jx: F1 fusion record, F2 15-match tournament all order-swap consistent, F3 4/4 literature novelty with 2 honest downgrades, F4 9 cross-paper claim relations)",
-        "far verify bnd_fgmxd7ywshm7mpmqekh3ksmvqf: verified 10/10, exit 0",
-        "203/203 vitest green at commit 98b1609+; tsc clean"
+        "far verify bnd_fgmxd7ywshm7mpmqekh3ksmvqf: verified 10/10, exit 0"
       ]
     },
     "evaluation": {
-      "status": "in_progress",
-      "evidence": ["background batch node eval/run-ev1-batch.mjs (started 2026-08-22 01:49); before-baseline eval/results/metrics.json (2026-08-21T15:17:49Z)"],
-      "pending": "after-metrics via FARLAB_PROBLEMS override + before/after comparison + llm-judge rerun"
-    },
-    "wave2": {
-      "status": "open",
-      "candidates": [
-        "fulltext phase A: arXiv HTML + Europe PMC fullTextXML + S2AG citation contexts (scout-verified keyless, designs in research/TECH_CANDIDATES.md)",
-        "MLR-Bench ideation+proposal slice for external comparability",
-        "GLM second live route retest (quota reset 2026-08-22 10:03)",
-        "GROBID sidecar for residual PDFs (deferred, evidence-gated)"
+      "status": "live_verified",
+      "evidence": [
+        "evidence/W-EV1/ev1-before-after.md: claims +40% (58->81), counter-evidence relations +104% (mean 16->32.67), claim binding 100% held, plans 5/5 held, falsification completeness 0.9667->0.9778, tokens +85% recorded",
+        "judge 3-seed variance study (llm-judge-ev1{,-s2,-s3}.jsonl): identical-data seed swing +/-1-2 pts; farlab >= baselines in every seed (quality 4.07 vs 4.00/3.40; counter coverage 2.2 vs 1.6/1.6 all 15 cells); no before->after judge claim (within noise)",
+        "P2 mid-batch envelope failure root-fixed (callStructured layer-4 unwrap) + resume completed 9/9 — recovery live-verified"
       ]
+    }
+  },
+  "ev2": {
+    "fulltextPhaseA": {
+      "status": "live_verified",
+      "evidence": [
+        "evidence/W-EV2/fulltext-phase-a-live.md: run_8w2h8c — arXiv LaTeXML 200, receipt+artifact persisted, 4/4 fulltext-grounded verified claims, pubmed identifiers live",
+        "tests: sources-fulltext x17 + deepen x5, full suite 233/233 at 9107f59"
+      ]
+    },
+    "mlrBench": {
+      "status": "in_progress",
+      "evidence": ["eval/mlr-bench.mjs (commit after 17cf64f): 5-task seeded sample running live; official rubrics verbatim; our-judge re-judging of published o4-mini/deepseek-r1 outputs"],
+      "pending": "results eval/results/mlr-bench.jsonl + comparison write-up evidence/W-EV2/mlr-bench.md"
+    },
+    "s2agCitationContexts": {
+      "status": "deferred_on_evidence",
+      "evidence": ["spikes/s2ag-probe.mjs 2026-08-22: keyless 200 but intents coverage 0/40, contexts <=9/20, contrastive hits 0; reversal trigger in research/TECH_CANDIDATES.md B"]
+    },
+    "glmSecondRoute": {
+      "status": "time_blocked",
+      "evidence": ["zai quota resets 2026-08-22 10:03; probe command staged: node spikes/model-spike/probe.mjs --provider zai"]
     }
   },
   "marginalValue": {
     "status": "not_saturated",
-    "reason": "EV1 opened by explicit user mission: after-fusion benchmark pending, fulltext/S2AG/benchmark adoption unstarted, GLM retest time-blocked. High-value executable work remains."
+    "reason": "MLR-Bench slice running; GLM retest time-blocked; EV2 adversarial audit in flight; remaining: audit fixes (if any), GLM probe, EV2 close-out sweep."
   }
 }
