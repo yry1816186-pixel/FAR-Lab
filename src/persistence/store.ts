@@ -77,13 +77,13 @@ export class Store {
   // ---- append-only event audit ----
 
   appendEvent(runId: string, e: { type: RunEvent['type']; status?: RunStatus; stage?: RunStageName; detail?: Record<string, unknown>; receiptId?: string }, at = new Date().toISOString()): RunEvent {
-    const evt: RunEvent = RunEvent.parse({
-      seq: 0, runId, at, type: e.type, status: e.status, stage: e.stage,
+    const payload = {
+      runId, at, type: e.type, status: e.status, stage: e.stage,
       detail: e.detail ?? {}, receiptId: e.receiptId,
-    });
-    this.db.prepare('INSERT INTO events (run_id, at, type, payload) VALUES (?,?,?,?)')
-      .run(runId, evt.at, evt.type, JSON.stringify({ ...evt, seq: undefined }));
-    return evt;
+    };
+    const res = this.db.prepare('INSERT INTO events (run_id, at, type, payload) VALUES (?,?,?,?)')
+      .run(runId, at, e.type, JSON.stringify(payload));
+    return RunEvent.parse({ ...payload, seq: Number(res.lastInsertRowid) });
   }
 
   listEvents(runId: string): RunEvent[] {
