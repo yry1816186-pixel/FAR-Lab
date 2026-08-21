@@ -53,7 +53,7 @@ const CandidateOut = z.object({
 });
 
 const StrategyOut = z.object({
-  candidates: z.array(CandidateOut).min(2).max(4), // prompt asks for 2; slight overshoot is kept (diversity never hurts)
+  candidates: z.array(CandidateOut).min(2), // prompt asks for 2; overflow is truncated deterministically post-parse (schema-level rejection wastes a retry)
 });
 
 const ClusterOut = z.object({
@@ -74,7 +74,7 @@ const NoveltyOut = z.object({
 });
 
 const SupplementOut = z.object({
-  candidates: z.array(CandidateOut).max(4).default([]), // empty allowed: honest "nothing more to add"
+  candidates: z.array(CandidateOut).default([]), // empty allowed: honest "nothing more to add"; overflow truncated post-parse
 });
 
 // ---------------------------------------------------------------------------
@@ -314,6 +314,10 @@ export const generateHypothesesStage: StageHandler = {
         id: string;
       }[];
       const fallbackInput = inputIds.map((c) => c.id as ClaimId);
+      if (res.data.candidates.length > 4) {
+        warnings.push(`${def.strategy}: model returned ${res.data.candidates.length} candidates; keeping first 4 (deterministic truncation)`);
+        res.data.candidates = res.data.candidates.slice(0, 4);
+      }
       for (const cand of res.data.candidates) {
         const cited = partitionClaimRefs(cand.evidenceClaimIds, existingClaimIds);
         if (cited.invalid.length > 0) {
@@ -360,6 +364,10 @@ export const generateHypothesesStage: StageHandler = {
         },
         schema: SupplementOut,
       });
+      if (res.data.candidates.length > 4) {
+        warnings.push(`diversity-supplement: model returned ${res.data.candidates.length}; keeping first 4`);
+        res.data.candidates = res.data.candidates.slice(0, 4);
+      }
       if (res.data.candidates.length > 0) {
         supplementUsed = true;
         for (const cand of res.data.candidates) {

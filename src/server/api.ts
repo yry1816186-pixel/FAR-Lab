@@ -560,10 +560,31 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     throw notFound(`no route: ${method} ${url.pathname}`);
   };
 
+  const effectivePort = opts.port ?? Number(process.env.PORT ?? 8787);
+  // Actual bound port (differs from effectivePort when ephemeral port 0 is used, e.g. tests).
+  let boundPort: number | null = null;
+  const effectiveHost = String(opts.host ?? process.env.HOST ?? '127.0.0.1');
   const server = http.createServer((req, res) => {
     void (async () => {
       try {
         const parsed = new URL(req.url ?? '/', 'http://localhost');
+        // F-1 guard (security audit): reject cross-origin/DNS-rebinding requests.
+        // This is a local single-user tool: only the loopback origin may drive it.
+        const host = String(req.headers.host ?? '').toLowerCase();
+        const okPort = boundPort ?? effectivePort;
+        const hostOk = host === `127.0.0.1:${okPort}` || host === `localhost:${okPort}` || host === `[::1]:${okPort}`;
+        if (!hostOk) throw validation(`unrecognized Host header: only loopback origins may use this API`);
+        const origin = req.headers.origin;
+        if (origin !== undefined && !/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(String(origin))) {
+          throw validation(`cross-origin request rejected`);
+        }
+        // State-changing verbs WITH A BODY must be JSON — blocks HTML/form-content CSRF
+        // even without CORS preflight. Bodyless requests fall through to normal routing
+        // (404 for unknown routes stays a 404, not a 400).
+        const hasBody = (Number(req.headers['content-length'] ?? 0) > 0) || req.headers['transfer-encoding'] !== undefined;
+        if (hasBody && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method ?? '') && !(req.headers['content-type'] ?? '').toLowerCase().includes('application/json')) {
+          throw validation(`content-type must be application/json for ${req.method}`);
+        }
         const segments = decodeSegments(parsed.pathname);
         if (segments === null) throw validation(`malformed path encoding: ${parsed.pathname}`);
         await route(req, res, parsed, segments);
@@ -586,14 +607,16 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
 
   const start = (): Promise<number> =>
     new Promise((resolve, reject) => {
-      const port = opts.port ?? Number(process.env.PORT ?? 8787);
-      const host = opts.host ?? process.env.HOST ?? '127.0.0.1';
+      const port = effectivePort;
+      const host = effectiveHost;
       const onError = (e: NodeJS.ErrnoException) => reject(e);
       server.once('error', onError);
       server.listen(port, host, () => {
         server.off('error', onError);
         const addr = server.address();
-        resolve(typeof addr === 'object' && addr !== null ? addr.port : port);
+        const actual = typeof addr === 'object' && addr !== null ? addr.port : port;
+        boundPort = actual;
+        resolve(actual);
       });
     });
 

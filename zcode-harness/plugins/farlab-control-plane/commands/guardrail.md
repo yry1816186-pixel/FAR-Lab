@@ -1,19 +1,17 @@
 ---
-description: Run the deterministic guardrail checks — secret scan, path hygiene (env/fixture/demo-marker/state files), and harness structure doctor — and fix every error before proceeding.
+description: Run the deterministic FAR-Lab workspace guardrails that actually exist, repair structural/secret/path/control errors, and distinguish deterministic hygiene from semantic/scientific verification.
 ---
 
-From the Workspace root run:
+From the Workspace root, inspect and run the project's real guardrail scripts if present, especially secret scanning, path hygiene, control-schema validation and Harness/plugin doctors. Do not invent command names: inspect the available scripts/package commands first.
 
-```bash
-node zcode-harness/scripts/secret-scan.mjs
-node zcode-harness/scripts/path-hygiene.mjs
-node zcode-harness/scripts/harness-doctor.mjs
-```
+Treat as blocking until repaired:
 
-Act on the output:
+- exposed secrets/private keys/real credential files;
+- malformed canonical control state;
+- production fixture/demo/mock leakage that misrepresents live capability;
+- path/repository hygiene that risks publishing runtime/cache/private artifacts;
+- broken plugin/hook/Harness structure needed by the mission.
 
-- `secret-scan` FAILED: HIGH findings (private keys, `.env`, known credential formats) must be removed/rotated before any further work; report honestly.
-- `path-hygiene` FAILED: fix errors (required state files, invalid status vocabulary, `.env` present, fixtures/demo/mock markers inside production roots) — do not proceed with a dirty path.
-- `harness-doctor` FAILED: repair the bundle structure before continuing.
+The plugin's PreToolUse hook is defense-in-depth only; it does not replace ZCode permissions, Git recovery, sandboxing or project security controls.
 
-Use `/completion-gate` separately before any completion claim. These scripts are the deterministic layer; semantic quality still belongs to the reviewers (`adversarial-auditor`, `architecture-critic`, `scientific-reviewer`).
+Passing deterministic guardrails does not prove scientific quality, production behavior, release readiness or frontier completion.

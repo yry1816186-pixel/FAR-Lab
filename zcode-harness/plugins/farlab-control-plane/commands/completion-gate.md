@@ -1,20 +1,22 @@
 ---
-description: Run the anti-fake-completion gate — verify .control/ACCEPTANCE_STATUS.json (items at target status with evidence, gates satisfied, no critical blocker) before ANY completion claim.
+description: Verify the FAR-Lab Acceptance Floor against canonical critical acceptance, evidence, P0/P1 problems and blockers. Passing this gate means acceptance-ready only; it never by itself proves frontier mission completion.
+skills: verification-audit
 ---
 
-Run from the Workspace root:
+Evaluate the canonical acceptance truth from the Workspace root.
 
-```bash
-node zcode-harness/scripts/completion-gate.mjs
-```
+If a project-native deterministic gate exists (for example under `zcode-harness/scripts/`), run it and inspect its source/output rather than guessing. Otherwise map every critical obligation explicitly:
 
-Interpretation:
+`Requirement -> target status -> implementation -> verification method -> concrete evidence -> current status`
 
-- `VERIFIED_READY` (exit 0): all critical items reached target status with non-empty evidence, all gates satisfied, no critical blocker. Only then may completion be claimed — and still only together with an independent adversarial audit.
-- `NOT_READY` (exit 1): do NOT declare completion. Read `missing`/`failed`/`errors`; either do the remaining work or truthfully set items to `blocked`/`failed` with reasons in `.control/BLOCKERS.json` and continue the highest-value repair path.
+Acceptance Floor requires:
 
-Rules:
+- every canonical critical item at its real target state;
+- non-empty, inspectable evidence for every promoted critical item;
+- required project-native gates satisfied;
+- no actionable P0/P1 Critical Problem;
+- no unresolved critical blocker masquerading as success.
 
-- Update `.control/ACCEPTANCE_STATUS.json` only with real evidence (command + exit code + key output, or audit report path). Empty-evidence status upgrades are gate violations.
-- Status vocabulary is fixed: `not_started / implemented / integrated / tested / live_verified / blocked / failed`. Never use "basically done".
-- The gate is a complement, not a substitute, for the independent `adversarial-auditor` review of the actual surface.
+Return only `ACCEPTANCE_READY` or `NOT_READY` plus the decisive missing items. If `NOT_READY`, continue the highest-value executable repair path instead of declaring completion.
+
+`ACCEPTANCE_READY` is a floor. Mission-level completion still requires independent adversarial audit and the Frontier Gate when the current mission contract requires them.

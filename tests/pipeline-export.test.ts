@@ -385,11 +385,15 @@ describe('plan stage', () => {
     expect(plan.evidenceClaimIds).toEqual([g.clmVerified.id]);
   });
 
-  it('fails visibly when the run has no hypotheses at all', async () => {
+  it('honestly skips (does not throw or fabricate) when the run has no hypotheses at all', async () => {
     const g = seedRun();
     db.raw.prepare('DELETE FROM objects WHERE kind=?').run('hypothesis');
     const ctx = makeCtx(g.run, stubFor(validPlanDraft([g.hyp.id], [g.clmVerified.id])));
-    await expect(planStage.execute(ctx)).rejects.toThrow(/no hypotheses to plan for/);
+    // Changed behavior (W4 evaluation finding): an evidence-starved run must complete
+    // honestly with a visible skip, not hard-fail and not fabricate a plan.
+    const outcome = await planStage.execute(ctx);
+    expect(outcome.kind).toBe('skipped');
+    if (outcome.kind === 'skipped') expect(outcome.reason).toMatch(/no defensible hypotheses/);
     expect(store.listObjects('plan', g.run.id)).toHaveLength(0);
   });
 
@@ -409,9 +413,12 @@ describe('plan stage', () => {
 
     // inputs: only the dangling task_ ref is removed; other inputs untouched
     expect(plan.steps[1]!.inputs).toEqual(['sequencing data']);
-    // dependsOn: invalid ref dropped, valid ref kept
+    // dependsOn: invalid ref dropped, valid ref kept. NOTE: the server now canonicalizes
+    // step ids (model ids remapped), so the surviving dep is step1's CANONICAL id, not the draft id.
     expect(plan.steps[1]!.dependsOn).toEqual([]);
-    expect(plan.steps[2]!.dependsOn).toEqual([step1Id]);
+    const canonicalStep1Id = plan.steps[0]!.id;
+    expect(plan.steps[2]!.dependsOn).toEqual([canonicalStep1Id]);
+    expect(canonicalStep1Id).toMatch(/^task_[0-9a-z]{20,32}$/);
     // dependency loss escalates into executabilityCheck.missing — visible, gate fails
     expect(plan.executabilityCheck?.passed).toBe(false);
     expect(

@@ -1,11 +1,13 @@
 ---
-description: Launch an independent adversarial FAR-Lab audit that tries to reject a completion or design claim and converts material findings into work.
+description: Launch an independent rejection-oriented FAR-Lab audit of a design, milestone, release or completion claim and convert material findings into Critical Problems instead of averaging them away.
 argument-hint: "[scope]"
-skills: verification-audit
+skills: verification-audit,frontier-evaluation
 ---
 
 Audit scope: `$ARGUMENTS`
 
-Prefer the `adversarial-auditor` project subagent or another genuinely independent fresh context that did not materially author the audited surface. It must distrust Builder summaries, inspect actual files/diffs/runs/evidence, attack fake capability, scientific validity, architecture ownership, security, performance, recovery, OSS/tool decisions, competition alignment and residual P0/P1 work.
+Prefer the `adversarial-auditor` or another fresh context that did not materially author the audited surface. It must distrust Builder summaries and inspect actual files/diffs/runs/evidence.
 
-Main Agent must adjudicate findings. Material deficiencies return the mission to active work; do not average away disagreement or self-certify completion.
+Attack fake capability, scientific validity, citation/evidence truth, architecture ownership, integration, security/trust/supply chain, performance/cost claims, failure/recovery, strong baselines/ablation, product workflow, reproducibility, actionable P0/P1 and mission-invalidating high-leverage P2/frontier gaps.
+
+Main Agent adjudicates findings against evidence. A material `REJECT` returns the mission to active repair and re-verification; do not self-certify completion after editing the audit report.

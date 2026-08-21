@@ -1,12 +1,17 @@
 ---
-description: Reconstruct truthful FAR-Lab mission state after interruption/compact, or show status and continue from the highest-leverage next action.
-argument-hint: "[status|resume]"
+description: Reconstruct or resume the FAR-Lab long-horizon mission from truthful state, rebuild the Critical Problem Set and dependency-aware work graph, then execute the highest-leverage path instead of returning only a plan/status.
+argument-hint: "[status|resume|reassess]"
+skills: mission-orchestration,verification-audit
 ---
 
 Mission operation: `$ARGUMENTS`
 
-Read root `AGENTS.md`, `.control/EXECUTION_STATE.json`, the relevant pending acceptance items, current Git/workspace reality, and only the project-spec documents needed for the current problem. Reconcile stale state before relying on it.
+Read root `AGENTS.md`, the minimum relevant canonical `project-spec`, `.control`, current Git/workspace/runtime truth and the evidence needed for the current problem. Reconcile stale persisted state before trusting it.
 
-If argument is `status`, report compact current truth, Critical Problem Set, blockers, verification gaps and exact next action without inventing progress.
+- `status`: return only compact current truth, Critical Problem Set, blockers, acceptance/frontier gaps, active delegated work and exact next action. Do not invent progress.
+- `resume` or omitted: resume the highest-leverage executable `nextAction` and do real work. Rebuild the dependency-aware work graph if stale. Use useful parallel subagents for independent work; use foreground when results are prerequisites and background only when ZCode actually supports/chooses it and the critical path can continue safely.
+- `reassess`: after a major slice, recompute global Critical Problem Set and critical path from real evidence before continuing.
 
-If argument is `resume` or omitted, resume the highest-leverage executable `nextAction`; do real work rather than returning only a status report. Keep the main Agent as architecture/integration authority and use useful parallel subagents for independent work.
+Keep the main Agent as architecture/interface/state-ownership/integration authority. Preserve project-native `.control` conventions. If the control schema explicitly supports mission-active/frontier fields, keep them truthful; do not invent incompatible state fields merely to satisfy this plugin.
+
+A completed phase/test/commit is a checkpoint, not automatically the mission end.

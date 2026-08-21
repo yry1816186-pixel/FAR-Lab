@@ -26,13 +26,35 @@ const PLAN_SYSTEM_PROMPT = [
 ].join(' ');
 
 /** Model-output shape: the full plan minus server-owned fields (id/runId/createdAt/check). */
+/** Model step ids and dep refs are arbitrary strings ('task_1', 's1'); the server owns canonical ids. */
+const PlanStepShapeLooseId = ResearchPlan.shape.steps.element
+  .omit({ id: true })
+  .extend({ id: z.string().min(1), dependsOn: z.array(z.string().min(1)).default([]) });
+
 const PlanDraftSchema = ResearchPlan.omit({
   id: true,
   runId: true,
   createdAt: true,
   executabilityCheck: true,
+}).extend({
+  steps: z.array(PlanStepShapeLooseId),
 });
 type PlanDraft = z.infer<typeof PlanDraftSchema>;
+
+/** Deterministically remap model step ids to canonical task_<rand> ids, rewriting inputs/dependsOn. */
+const canonicalizeStepIds = (draft: PlanDraft): PlanDraft => {
+  const mapping = new Map<string, string>();
+  for (const step of draft.steps) {
+    const canonical = newId('task');
+    mapping.set(step.id, canonical);
+    step.id = canonical;
+  }
+  for (const step of draft.steps) {
+    step.inputs = step.inputs.map((ref) => mapping.get(ref) ?? ref);
+    step.dependsOn = step.dependsOn.map((dep) => mapping.get(dep) ?? dep);
+  }
+  return draft;
+};
 
 export interface ExecutabilityCheck {
   passed: boolean;
@@ -166,7 +188,12 @@ export const planStage: StageHandler = {
       representatives = hypotheses.slice(0, MAX_REPRESENTATIVE_HYPOTHESES);
     }
     if (representatives.length === 0) {
-      throw new Error(`plan stage: run ${runId} has no hypotheses to plan for`);
+      // Honest abstention: with no hypotheses there is nothing a truthful plan could
+      // contain. Skipping (visible) beats fabricating a plan or hard-failing the run.
+      return {
+        kind: 'skipped',
+        reason: 'no defensible hypotheses were produced from the verified evidence — an honest plan is impossible; inspect the evidence tab for what was (in)sufficient',
+      };
     }
 
     const claims = ctx.store.listObjects('claim', runId);
@@ -210,6 +237,9 @@ export const planStage: StageHandler = {
       schema: PlanDraftSchema,
       temperature: 0.2,
     });
+
+    // The server owns canonical step ids: remap model ids (any shape) deterministically.
+    canonicalizeStepIds(res.data);
 
     // Reference integrity for claims: keep only ids that actually exist (drop, loudly).
     const knownClaimIds = new Set(claims.map((c) => c.id));

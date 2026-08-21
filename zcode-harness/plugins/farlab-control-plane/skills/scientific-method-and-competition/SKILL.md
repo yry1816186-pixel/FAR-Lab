@@ -1,42 +1,40 @@
 ---
 name: scientific-method-and-competition
-description: Use for FAR-Lab scientific hypotheses/evidence/plans/evaluation or XH-202619 Direction-A compliance. Separate scientific validity from software correctness and map claims to evidence.
-when_to_use: Scientific domain model, hypothesis/plan pipeline, evidence/citation logic, evaluation design, competition evidence, or scientific claims.
+description: Use for FAR-Lab scientific claims, evidence chains, hypotheses, falsification, research plans, information-seeking actions, feedback/revision, evaluation, reproducibility or Track-1 Direction-A compliance. Separate scientific validity from software correctness; treat competition requirements as a floor/boundary rather than the scientific quality ceiling.
+when_to_use: Scientific domain model, evidence/citation logic, hypothesis/plan pipeline, statistics/causal/experimental reasoning, evaluation design, Qwen/Bailian or competition evidence, scientific benchmarks, reproducibility or research-quality claims.
 metadata:
-  version: "1.0.0"
+  version: "2.0.0"
 ---
 
-# Scientific Method + Direction A Evaluation
+# Scientific Method + Direction A
 
 ## Competition boundary
-Revalidate the current official page before consequential compliance claims. Direction A remains centered on:
 
-`问题理解 -> 知识整合 -> 候选假设生成 -> 证据梳理 -> 研究计划输出 -> 反馈修正`
+Revalidate the current official competition source before consequential compliance claims. Preserve Direction A's core loop:
 
-Execution/simulation may support testability and feedback but must not replace the A loop with Direction B instrument execution.
+`problem understanding -> knowledge/evidence integration -> candidate hypotheses -> evidence/counter-evidence -> falsification/testability -> executable research plan -> feedback -> causal revision`
 
-## Scientific validity checks
+Execution/simulation can improve testability and feedback but must not replace the A loop with instrument execution. Competition readiness is a minimum floor, not the project frontier.
 
-For important outputs inspect separately:
+## Scientific validity
+
+Inspect separately from software correctness:
 
 - question/scope/constraint clarity;
-- evidence source quality and provenance;
-- citation -> claim alignment;
-- support, counter-evidence, conflict and unknowns;
-- hypothesis novelty relative to evidence/prior art;
-- falsifiability and concrete disconfirmation conditions;
-- testability and feasible observables;
-- research-plan variables, controls, data, methods, metrics, thresholds, stopping criteria, risks, resources and assumptions;
-- uncertainty and domain assumptions;
-- whether feedback actually changes the next version rather than cosmetically rewriting it;
+- source quality, provenance and citation-to-claim binding;
+- support, counter-evidence, conflicts, null/negative results and unknowns;
+- uncertainty/calibration where meaningful;
+- hypothesis diversity, novelty relative to evidence/prior art, assumptions and alternative explanations;
+- concrete observables, weakening conditions and falsification conditions;
+- plan variables, controls, data/sample, inclusion/exclusion, measurements, methods, statistics, metrics, thresholds, stopping criteria, confounders, resources, cost, risk and ethics when applicable;
+- leakage, bias, multiple comparisons, effect size, power/sample adequacy, causal assumptions and dataset shift when applicable;
+- whether the next scientific action is informative enough to distinguish competing hypotheses; use expected information gain only when it can be defined and interpreted honestly;
+- whether feedback causally changes claims/assumptions/hypotheses/plan rather than cosmetically regenerating text;
 - version-difference traceability;
-- reproducibility of inputs, retrieval, model/tool provenance and outputs.
+- reproducibility of inputs, retrieval, model/tool configuration, code/data/environment and artifacts.
 
 ## Evaluation
-Use strong baselines. For important claims prefer blind/independent assessment, ablations when mechanism attribution matters, negative-result preservation, realistic scientific tasks, and evidence that can be independently reproduced.
 
-Maintain Competition Evidence Matrix:
+Use strong current baselines, realistic tasks, negative/adversarial cases, blind/independent assessment where possible, and ablations when attribution of a claimed mechanism matters. LLM-as-judge may assist but is not automatically scientific ground truth.
 
-`criterion -> product capability -> implementation -> verification method -> evidence -> gap -> next action -> status`
-
-Never fabricate citations, experiments, expert review, model/provider usage proof, scores, or competition compliance.
+Never fabricate citations, experiments, expert review, scores, Qwen/Bailian execution proof, scientific consensus or compliance.

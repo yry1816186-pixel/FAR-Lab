@@ -1,0 +1,1435 @@
+{
+ "computedAt": "2026-08-21T15:17:49.072Z",
+ "protocol": "eval/PROTOCOL.md (pre-declared)",
+ "farlab": {
+  "per_run": {
+   "P1": {
+    "runId": "run_7zez1a8ezbbrrgw9begtta0gsw",
+    "status": "completed",
+    "sources_total": 8,
+    "sources_verified": 8,
+    "source_verification_rate": 1,
+    "claims_total": 15,
+    "claims_verified": 15,
+    "claim_binding_rate": 1,
+    "evidence_relations_total": 56,
+    "counter_evidence_relations": 12,
+    "relation_type_counts": {
+     "supports": 41,
+     "qualifies": 3,
+     "contradicts": 11,
+     "weakens": 1
+    },
+    "hypotheses_total": 11,
+    "representatives": 6,
+    "hypothesis_distinctness": 0.5454545454545454,
+    "falsification_total": 6,
+    "falsification_complete": 5,
+    "falsification_completeness_rate": 0.8333333333333334,
+    "plan_present": true,
+    "plan_executability_passed": true,
+    "plan_executability_missing": [],
+    "receipts": 41,
+    "model_calls": 26,
+    "live_receipts": 41,
+    "live_rate": 1,
+    "perf": {
+     "first_to_last_receipt_ms": 2141550,
+     "model_call_latency_ms": {
+      "min": 1683,
+      "median": 11859,
+      "max": 68744
+     },
+     "model_calls_by_stage": {
+      "scope": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1822,
+        "median": 1822,
+        "max": 1822
+       }
+      },
+      "retrieve": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1683,
+        "median": 1683,
+        "max": 1683
+       }
+      },
+      "build_evidence": {
+       "calls": 6,
+       "latencyMs": {
+        "min": 2669,
+        "median": 4977,
+        "max": 6194
+       }
+      },
+      "generate_hypotheses": {
+       "calls": 7,
+       "latencyMs": {
+        "min": 1994,
+        "median": 23058,
+        "max": 34395
+       }
+      },
+      "critique_falsify": {
+       "calls": 6,
+       "latencyMs": {
+        "min": 10151,
+        "median": 14970,
+        "max": 24231
+       }
+      },
+      "rank": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 68744,
+        "median": 68744,
+        "max": 68744
+       }
+      },
+      "plan": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 51900,
+        "median": 51900,
+        "max": 51900
+       }
+      },
+      "revise": {
+       "calls": 3,
+       "latencyMs": {
+        "min": 7335,
+        "median": 7365,
+        "max": 24347
+       }
+      }
+     },
+     "tokens": {
+      "prompt": 41793,
+      "completion": 30146,
+      "total": 71939
+     }
+    }
+   },
+   "P2": {
+    "runId": "run_yhp0m4kg6qnjmemhj9k5wbmk00",
+    "status": "completed",
+    "sources_total": 9,
+    "sources_verified": 9,
+    "source_verification_rate": 1,
+    "claims_total": 4,
+    "claims_verified": 4,
+    "claim_binding_rate": 1,
+    "evidence_relations_total": 43,
+    "counter_evidence_relations": 23,
+    "relation_type_counts": {
+     "supports": 20,
+     "weakens": 8,
+     "contradicts": 15
+    },
+    "hypotheses_total": 10,
+    "representatives": 9,
+    "hypothesis_distinctness": 0.9,
+    "falsification_total": 9,
+    "falsification_complete": 9,
+    "falsification_completeness_rate": 1,
+    "plan_present": true,
+    "plan_executability_passed": true,
+    "plan_executability_missing": [],
+    "receipts": 45,
+    "model_calls": 30,
+    "live_receipts": 45,
+    "live_rate": 1,
+    "perf": {
+     "first_to_last_receipt_ms": 803221,
+     "model_call_latency_ms": {
+      "min": 747,
+      "median": 13724,
+      "max": 96670
+     },
+     "model_calls_by_stage": {
+      "scope": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 3103,
+        "median": 3103,
+        "max": 3103
+       }
+      },
+      "retrieve": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1431,
+        "median": 1431,
+        "max": 1431
+       }
+      },
+      "build_evidence": {
+       "calls": 6,
+       "latencyMs": {
+        "min": 747,
+        "median": 834,
+        "max": 2171
+       }
+      },
+      "generate_hypotheses": {
+       "calls": 7,
+       "latencyMs": {
+        "min": 1781,
+        "median": 12172,
+        "max": 23985
+       }
+      },
+      "critique_falsify": {
+       "calls": 10,
+       "latencyMs": {
+        "min": 12690,
+        "median": 16030,
+        "max": 30008
+       }
+      },
+      "rank": {
+       "calls": 4,
+       "latencyMs": {
+        "min": 74063,
+        "median": 89396,
+        "max": 96670
+       }
+      },
+      "plan": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 45751,
+        "median": 45751,
+        "max": 45751
+       }
+      }
+     },
+     "tokens": {
+      "prompt": 54674,
+      "completion": 55703,
+      "total": 110377
+     }
+    }
+   },
+   "P3": {
+    "runId": "run_rnjevw1teza5bmjesxybc0g98y",
+    "status": "completed",
+    "sources_total": 11,
+    "sources_verified": 11,
+    "source_verification_rate": 1,
+    "claims_total": 4,
+    "claims_verified": 4,
+    "claim_binding_rate": 1,
+    "evidence_relations_total": 21,
+    "counter_evidence_relations": 2,
+    "relation_type_counts": {
+     "supports": 18,
+     "qualifies": 1,
+     "contradicts": 2
+    },
+    "hypotheses_total": 10,
+    "representatives": 5,
+    "hypothesis_distinctness": 0.5,
+    "falsification_total": 5,
+    "falsification_complete": 5,
+    "falsification_completeness_rate": 1,
+    "plan_present": true,
+    "plan_executability_passed": true,
+    "plan_executability_missing": [],
+    "receipts": 38,
+    "model_calls": 21,
+    "live_receipts": 38,
+    "live_rate": 1,
+    "perf": {
+     "first_to_last_receipt_ms": 199211,
+     "model_call_latency_ms": {
+      "min": 465,
+      "median": 2013,
+      "max": 41061
+     },
+     "model_calls_by_stage": {
+      "scope": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1603,
+        "median": 1603,
+        "max": 1603
+       }
+      },
+      "retrieve": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1459,
+        "median": 1459,
+        "max": 1459
+       }
+      },
+      "build_evidence": {
+       "calls": 7,
+       "latencyMs": {
+        "min": 465,
+        "median": 857,
+        "max": 2013
+       }
+      },
+      "generate_hypotheses": {
+       "calls": 5,
+       "latencyMs": {
+        "min": 1562,
+        "median": 6916,
+        "max": 14421
+       }
+      },
+      "critique_falsify": {
+       "calls": 5,
+       "latencyMs": {
+        "min": 11476,
+        "median": 12265,
+        "max": 13293
+       }
+      },
+      "rank": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 23518,
+        "median": 23518,
+        "max": 23518
+       }
+      },
+      "plan": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 41061,
+        "median": 41061,
+        "max": 41061
+       }
+      }
+     },
+     "tokens": {
+      "prompt": 25513,
+      "completion": 19495,
+      "total": 45008
+     }
+    }
+   },
+   "P4": {
+    "runId": "run_2wmhyer1bdyqrangk2g757p9c2",
+    "status": "completed",
+    "sources_total": 8,
+    "sources_verified": 8,
+    "source_verification_rate": 1,
+    "claims_total": 12,
+    "claims_verified": 12,
+    "claim_binding_rate": 1,
+    "evidence_relations_total": 42,
+    "counter_evidence_relations": 14,
+    "relation_type_counts": {
+     "supports": 21,
+     "qualifies": 7,
+     "contradicts": 12,
+     "weakens": 2
+    },
+    "hypotheses_total": 11,
+    "representatives": 5,
+    "hypothesis_distinctness": 0.45454545454545453,
+    "falsification_total": 5,
+    "falsification_complete": 5,
+    "falsification_completeness_rate": 1,
+    "plan_present": true,
+    "plan_executability_passed": true,
+    "plan_executability_missing": [],
+    "receipts": 37,
+    "model_calls": 23,
+    "live_receipts": 37,
+    "live_rate": 1,
+    "perf": {
+     "first_to_last_receipt_ms": 8516591,
+     "model_call_latency_ms": {
+      "min": 746,
+      "median": 11970,
+      "max": 57392
+     },
+     "model_calls_by_stage": {
+      "scope": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 2687,
+        "median": 2687,
+        "max": 2687
+       }
+      },
+      "retrieve": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1213,
+        "median": 1213,
+        "max": 1213
+       }
+      },
+      "build_evidence": {
+       "calls": 7,
+       "latencyMs": {
+        "min": 746,
+        "median": 2060,
+        "max": 2986
+       }
+      },
+      "generate_hypotheses": {
+       "calls": 5,
+       "latencyMs": {
+        "min": 1913,
+        "median": 11970,
+        "max": 17787
+       }
+      },
+      "critique_falsify": {
+       "calls": 5,
+       "latencyMs": {
+        "min": 14675,
+        "median": 30857,
+        "max": 35638
+       }
+      },
+      "rank": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 23521,
+        "median": 23521,
+        "max": 23521
+       }
+      },
+      "plan": {
+       "calls": 3,
+       "latencyMs": {
+        "min": 42222,
+        "median": 48768,
+        "max": 57392
+       }
+      }
+     },
+     "tokens": {
+      "prompt": 36336,
+      "completion": 28742,
+      "total": 65078
+     }
+    },
+    "resolvedByQuestionMatch": true
+   },
+   "P5": {
+    "runId": "run_9w34j5fszr6vqbx82tqptkweex",
+    "status": "completed",
+    "sources_total": 11,
+    "sources_verified": 11,
+    "source_verification_rate": 1,
+    "claims_total": 0,
+    "claims_verified": 0,
+    "claim_binding_rate": null,
+    "evidence_relations_total": 0,
+    "counter_evidence_relations": 0,
+    "relation_type_counts": {},
+    "hypotheses_total": 0,
+    "representatives": 0,
+    "hypothesis_distinctness": null,
+    "falsification_total": 0,
+    "falsification_complete": 0,
+    "falsification_completeness_rate": null,
+    "plan_present": false,
+    "plan_executability_passed": null,
+    "plan_executability_missing": null,
+    "receipts": 29,
+    "model_calls": 12,
+    "live_receipts": 29,
+    "live_rate": 1,
+    "perf": {
+     "first_to_last_receipt_ms": 808713,
+     "model_call_latency_ms": {
+      "min": 1078,
+      "median": 1845,
+      "max": 11498
+     },
+     "model_calls_by_stage": {
+      "scope": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 2356,
+        "median": 2356,
+        "max": 2356
+       }
+      },
+      "retrieve": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1768,
+        "median": 1768,
+        "max": 1768
+       }
+      },
+      "build_evidence": {
+       "calls": 10,
+       "latencyMs": {
+        "min": 1078,
+        "median": 1845,
+        "max": 11498
+       }
+      }
+     },
+     "tokens": {
+      "prompt": 7252,
+      "completion": 303,
+      "total": 7555
+     }
+    },
+    "resolvedByQuestionMatch": true
+   },
+   "P6": {
+    "runId": "run_s9na3s0s5g9pa35448c5wx4a46",
+    "status": "completed",
+    "sources_total": 10,
+    "sources_verified": 10,
+    "source_verification_rate": 1,
+    "claims_total": 23,
+    "claims_verified": 23,
+    "claim_binding_rate": 1,
+    "evidence_relations_total": 100,
+    "counter_evidence_relations": 45,
+    "relation_type_counts": {
+     "supports": 51,
+     "qualifies": 4,
+     "contradicts": 45
+    },
+    "hypotheses_total": 12,
+    "representatives": 8,
+    "hypothesis_distinctness": 0.6666666666666666,
+    "falsification_total": 8,
+    "falsification_complete": 8,
+    "falsification_completeness_rate": 1,
+    "plan_present": true,
+    "plan_executability_passed": true,
+    "plan_executability_missing": [],
+    "receipts": 46,
+    "model_calls": 30,
+    "live_receipts": 46,
+    "live_rate": 1,
+    "perf": {
+     "first_to_last_receipt_ms": 8210031,
+     "model_call_latency_ms": {
+      "min": 1191,
+      "median": 12341,
+      "max": 45791
+     },
+     "model_calls_by_stage": {
+      "scope": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1851,
+        "median": 1851,
+        "max": 1851
+       }
+      },
+      "retrieve": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 1980,
+        "median": 1980,
+        "max": 1980
+       }
+      },
+      "build_evidence": {
+       "calls": 9,
+       "latencyMs": {
+        "min": 1191,
+        "median": 2945,
+        "max": 3749
+       }
+      },
+      "generate_hypotheses": {
+       "calls": 8,
+       "latencyMs": {
+        "min": 2520,
+        "median": 20066,
+        "max": 45791
+       }
+      },
+      "critique_falsify": {
+       "calls": 8,
+       "latencyMs": {
+        "min": 10057,
+        "median": 17650,
+        "max": 31710
+       }
+      },
+      "rank": {
+       "calls": 1,
+       "latencyMs": {
+        "min": 41067,
+        "median": 41067,
+        "max": 41067
+       }
+      },
+      "plan": {
+       "calls": 2,
+       "latencyMs": {
+        "min": 15072,
+        "median": 33233,
+        "max": 33233
+       }
+      }
+     },
+     "tokens": {
+      "prompt": 61223,
+      "completion": 42522,
+      "total": 103745
+     }
+    },
+    "resolvedByQuestionMatch": true
+   }
+  },
+  "aggregate": {
+   "runs": 6,
+   "source_verification_rate": 1,
+   "claim_binding_rate": 1,
+   "counter_evidence_runs_with_any": 5,
+   "counter_evidence_coverage": 0.8333333333333334,
+   "counter_evidence_relations_mean": 16,
+   "hypothesis_distinctness": 0.6133,
+   "representatives_mean": 5.5,
+   "falsification_completeness_rate": 0.9667,
+   "plan_executability_pass_runs": 5,
+   "live_rate": 1
+  }
+ },
+ "baselines": {
+  "direct": {
+   "per_problem": [
+    {
+     "problemId": "P1",
+     "baseline": "direct",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 769,
+      "completionTokens": 3839,
+      "totalTokens": 4608
+     },
+     "wall_ms": 30680,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P2",
+     "baseline": "direct",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 775,
+      "completionTokens": 4314,
+      "totalTokens": 5089
+     },
+     "wall_ms": 36244,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P3",
+     "baseline": "direct",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 780,
+      "completionTokens": 5277,
+      "totalTokens": 6057
+     },
+     "wall_ms": 39912,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P4",
+     "baseline": "direct",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 778,
+      "completionTokens": 3890,
+      "totalTokens": 4668
+     },
+     "wall_ms": 33307,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P5",
+     "baseline": "direct",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 794,
+      "completionTokens": 5032,
+      "totalTokens": 5826
+     },
+     "wall_ms": 42373,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P6",
+     "baseline": "direct",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 765,
+      "completionTokens": 3994,
+      "totalTokens": 4759
+     },
+     "wall_ms": 32152,
+     "model_version": "deepseek-v4-flash"
+    }
+   ],
+   "aggregate": {
+    "problems": 6,
+    "call_ok": 6,
+    "shape_parse_ok": 6,
+    "zod_hypothesis_fully_parsed": 6,
+    "zod_plan_parsed": 6,
+    "falsification_completeness_rate": 1,
+    "plan_executability_pass": 6,
+    "hypotheses_mean": 5
+   },
+   "citations": {
+    "aggregate": {
+     "problems_with_citations": 6,
+     "problems_empty_citations": 0,
+     "citations_total": 18,
+     "doi_resolved": 11,
+     "title_matched": 1,
+     "quote_grounded": 0,
+     "unsupported_rate": 0.9444444444444444
+    },
+    "per_problem": [
+     {
+      "citations_total": 3,
+      "doi_resolved": 3,
+      "title_matched": 0,
+      "quote_grounded": 0,
+      "quote_checked": 0,
+      "unsupported_rate": 1,
+      "details": [
+       {
+        "doi": "10.1038/nrmicro1232",
+        "resolved": true,
+        "crossref_title": "Studying plasmid horizontal transfer in situ: a critical review",
+        "cited_title": "Mechanisms of, and barriers to, horizontal gene transfer between bacteria",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1128/CMR.00088-19",
+        "resolved": true,
+        "crossref_title": "Human and Animal Fascioliasis: Origins and Worldwide Evolving Scenario",
+        "cited_title": "Horizontal Gene Transfer in the Human Gut Microbiome: The Role of Mobile Genetic Elements",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1016/j.tim.2015.01.002",
+        "resolved": true,
+        "crossref_title": "Axonal spread of neuroinvasive viral infections",
+        "cited_title": "Biofilms: an emergent form of bacterial life",
+        "title_match": false,
+        "quote_grounded": null
+       }
+      ]
+     },
+     {
+      "citations_total": 3,
+      "doi_resolved": 1,
+      "title_matched": 0,
+      "quote_grounded": 0,
+      "quote_checked": 0,
+      "unsupported_rate": 1,
+      "details": [
+       {
+        "doi": "10.1126/science.aan3706",
+        "resolved": true,
+        "crossref_title": "Gut microbiome influences efficacy of PD-1–based immunotherapy against epithelial tumors",
+        "cited_title": "Gut microbiome modulates response to anti-PD-1 immunotherapy in melanoma patients",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1126/science.aan4231",
+        "resolved": false,
+        "crossref_title": null,
+        "cited_title": "Bifidobacterium promotes antitumor immunity and facilitates anti-PD-L1 efficacy",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1056/NEJMoa2002740",
+        "resolved": false,
+        "crossref_title": null,
+        "cited_title": "Fecal microbiota transplantation for the treatment of immune checkpoint inhibitor-induced colitis",
+        "title_match": false,
+        "quote_grounded": null
+       }
+      ]
+     },
+     {
+      "citations_total": 4,
+      "doi_resolved": 1,
+      "title_matched": 0,
+      "quote_grounded": 0,
+      "quote_checked": 0,
+      "unsupported_rate": 1,
+      "details": [
+       {
+        "doi": "10.1158/1078-0432.CCR-14-1849",
+        "resolved": false,
+        "crossref_title": null,
+        "cited_title": "Tumor-associated macrophages as major players in the tumor microenvironment",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1002/eji.201343758",
+        "resolved": false,
+        "crossref_title": null,
+        "cited_title": "Arginase-1-expressing macrophages suppress Th2 cytokine-driven inflammation and fibrosis",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1084/jem.20060450",
+        "resolved": false,
+        "crossref_title": null,
+        "cited_title": "Tumor-associated macrophages are a major source of IL-10 and TGF-β in the tumor microenvironment",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1016/j.immuni.2009.06.016",
+        "resolved": true,
+        "crossref_title": "Guidance of B Cells by the Orphan G Protein-Coupled Receptor EBI2 Shapes Humoral Immune Responses",
+        "cited_title": "Fas ligand expression on tumor-associated macrophages induces T-cell apoptosis",
+        "title_match": false,
+        "quote_grounded": null
+       }
+      ]
+     },
+     {
+      "citations_total": 3,
+      "doi_resolved": 3,
+      "title_matched": 0,
+      "quote_grounded": 0,
+      "quote_checked": 0,
+      "unsupported_rate": 1,
+      "details": [
+       {
+        "doi": "10.1523/JNEUROSCI.1234-18.2018",
+        "resolved": true,
+        "crossref_title": "Selective Loss of Thin Spines in Area 7a of the Primate Intraparietal Sulcus Predicts Age-Related Working Memory Impairment",
+        "cited_title": "Sleep Spindles and Memory Consolidation",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1016/j.neuron.2017.06.025",
+        "resolved": true,
+        "crossref_title": "Thalamic Spindles Promote Memory Formation during Sleep through Triple Phase-Locking of Cortical, Thalamic, and Hippocampal Rhythms",
+        "cited_title": "Sleep and Synaptic Homeostasis",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1016/j.bbi.2015.02.025",
+        "resolved": true,
+        "crossref_title": "Acute coronary syndrome-associated depression: The salience of a sickness response analogy?",
+        "cited_title": "Sleep Deprivation and Inflammation",
+        "title_match": false,
+        "quote_grounded": null
+       }
+      ]
+     },
+     {
+      "citations_total": 3,
+      "doi_resolved": 1,
+      "title_matched": 0,
+      "quote_grounded": 0,
+      "quote_checked": 0,
+      "unsupported_rate": 1,
+      "details": [
+       {
+        "doi": "10.1073/pnas.0608953103",
+        "resolved": false,
+        "crossref_title": null,
+        "cited_title": "Genome streamlining in a cosmopolitan oceanic bacterium",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1038/nature03959",
+        "resolved": true,
+        "crossref_title": "Genome sequencing in microfabricated high-density picolitre reactors",
+        "cited_title": "Cultivation of the ubiquitous SAR11 marine bacterioplankton clade",
+        "title_match": false,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1126/science.1113345",
+        "resolved": false,
+        "crossref_title": null,
+        "cited_title": "Genome divergence in two Prochlorococcus ecotypes reflects oceanic niche differentiation",
+        "title_match": false,
+        "quote_grounded": null
+       }
+      ]
+     },
+     {
+      "citations_total": 2,
+      "doi_resolved": 2,
+      "title_matched": 1,
+      "quote_grounded": 0,
+      "quote_checked": 0,
+      "unsupported_rate": 0.5,
+      "details": [
+       {
+        "doi": "10.1136/bmj.i6583",
+        "resolved": true,
+        "crossref_title": "Vitamin D supplementation to prevent acute respiratory tract infections: systematic review and meta-analysis of individual participant data",
+        "cited_title": "Vitamin D supplementation to prevent acute respiratory tract infections: systematic review and meta-analysis of individual participant data",
+        "title_match": true,
+        "quote_grounded": null
+       },
+       {
+        "doi": "10.1002/14651858.CD011597.pub2",
+        "resolved": true,
+        "crossref_title": "Vitamin D as an adjunct to antibiotics for the treatment of acute childhood pneumonia",
+        "cited_title": "Vitamin D supplementation for prevention of acute respiratory tract infection",
+        "title_match": false,
+        "quote_grounded": null
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "rag": {
+   "per_problem": [
+    {
+     "problemId": "P1",
+     "baseline": "rag",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 1373,
+      "completionTokens": 3424,
+      "totalTokens": 4797
+     },
+     "wall_ms": 29029,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P2",
+     "baseline": "rag",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 1909,
+      "completionTokens": 4424,
+      "totalTokens": 6333
+     },
+     "wall_ms": 36036,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P3",
+     "baseline": "rag",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 2157,
+      "completionTokens": 4639,
+      "totalTokens": 6796
+     },
+     "wall_ms": 33843,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P4",
+     "baseline": "rag",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 1792,
+      "completionTokens": 3828,
+      "totalTokens": 5620
+     },
+     "wall_ms": 30726,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P5",
+     "baseline": "rag",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 0.6,
+      "falsification_missing_examples": [
+       "decisionRule: no decidable comparison semantics (>=/</ratio/threshold/if-then criterion)",
+       "falsificationCondition: empty or trivial (<=10 chars)"
+      ],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 2310,
+      "completionTokens": 3306,
+      "totalTokens": 5616
+     },
+     "wall_ms": 27115,
+     "model_version": "deepseek-v4-flash"
+    },
+    {
+     "problemId": "P6",
+     "baseline": "rag",
+     "call_ok": true,
+     "shape_parse_ok": true,
+     "shape_parse_reason": null,
+     "hypotheses_n": 5,
+     "zod_hypothesis_parse_ok": true,
+     "zod_hypotheses_parsed": 5,
+     "zod_plan_parse_ok": true,
+     "zod_failures": [],
+     "checker": {
+      "falsification_completeness_rate": 1,
+      "falsification_missing_examples": [],
+      "plan_executability_passed": true,
+      "plan_executability_missing": []
+     },
+     "tokens": {
+      "promptTokens": 2171,
+      "completionTokens": 4259,
+      "totalTokens": 6430
+     },
+     "wall_ms": 35045,
+     "model_version": "deepseek-v4-flash"
+    }
+   ],
+   "aggregate": {
+    "problems": 6,
+    "call_ok": 6,
+    "shape_parse_ok": 6,
+    "zod_hypothesis_fully_parsed": 6,
+    "zod_plan_parsed": 6,
+    "falsification_completeness_rate": 0.9333,
+    "plan_executability_pass": 6,
+    "hypotheses_mean": 5
+   },
+   "citations": {
+    "aggregate": {
+     "problems_with_citations": 6,
+     "problems_empty_citations": 0,
+     "citations_total": 26,
+     "doi_resolved": 26,
+     "title_matched": 26,
+     "quote_grounded": 22,
+     "unsupported_rate": 0
+    },
+    "per_problem": [
+     {
+      "citations_total": 5,
+      "doi_resolved": 5,
+      "title_matched": 5,
+      "quote_grounded": 2,
+      "quote_checked": 5,
+      "unsupported_rate": 0,
+      "details": [
+       {
+        "doi": "10.1038/s41579-021-00649-x",
+        "resolved": true,
+        "crossref_title": "Antibiotic resistance in the environment",
+        "cited_title": "Antibiotic resistance in the environment",
+        "title_match": true,
+        "quote_grounded": false
+       },
+       {
+        "doi": "10.2147/idr.s173867",
+        "resolved": true,
+        "crossref_title": "Antibiotic resistance: a rundown of a global crisis",
+        "cited_title": "Antibiotic resistance: a rundown of a global crisis",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1016/j.scitotenv.2013.01.032",
+        "resolved": true,
+        "crossref_title": "Urban wastewater treatment plants as hotspots for antibiotic resistant bacteria and genes spread into the environment: A review",
+        "cited_title": "Urban wastewater treatment plants as hotspots for antibiotic resistant bacteria and genes spread into the environment: A review",
+        "title_match": true,
+        "quote_grounded": false
+       },
+       {
+        "doi": "10.1016/j.envint.2017.10.016",
+        "resolved": true,
+        "crossref_title": "Review of antibiotic resistance in China and its environment",
+        "cited_title": "Review of antibiotic resistance in China and its environment",
+        "title_match": true,
+        "quote_grounded": false
+       },
+       {
+        "doi": "10.3390/antibiotics12020328",
+        "resolved": true,
+        "crossref_title": "Horizontal Gene Transfer of Antibiotic Resistance Genes in Biofilms",
+        "cited_title": "Horizontal Gene Transfer of Antibiotic Resistance Genes in Biofilms",
+        "title_match": true,
+        "quote_grounded": true
+       }
+      ]
+     },
+     {
+      "citations_total": 3,
+      "doi_resolved": 3,
+      "title_matched": 3,
+      "quote_grounded": 3,
+      "quote_checked": 3,
+      "unsupported_rate": 0,
+      "details": [
+       {
+        "doi": "10.1146/annurev-pathol-042020-042741",
+        "resolved": true,
+        "crossref_title": "Immune Checkpoint Inhibitors for the Treatment of Cancer: Clinical Impact and Mechanisms of Response and Resistance",
+        "cited_title": "Immune Checkpoint Inhibitors for the Treatment of Cancer: Clinical Impact and Mechanisms of Response and Resistance",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1186/s40425-019-0805-8",
+        "resolved": true,
+        "crossref_title": "Immune-related adverse events and anti-tumor efficacy of immune checkpoint inhibitors",
+        "cited_title": "Immune-related adverse events and anti-tumor efficacy of immune checkpoint inhibitors",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1200/jco.21.01440",
+        "resolved": true,
+        "crossref_title": "Management of Immune-Related Adverse Events in Patients Treated With Immune Checkpoint Inhibitor Therapy: ASCO Guideline Update",
+        "cited_title": "Management of Immune-Related Adverse Events in Patients Treated With Immune Checkpoint Inhibitor Therapy: ASCO Guideline Update",
+        "title_match": true,
+        "quote_grounded": true
+       }
+      ]
+     },
+     {
+      "citations_total": 5,
+      "doi_resolved": 5,
+      "title_matched": 5,
+      "quote_grounded": 5,
+      "quote_checked": 5,
+      "unsupported_rate": 0,
+      "details": [
+       {
+        "doi": "10.1155/2012/948098",
+        "resolved": true,
+        "crossref_title": "Macrophages in Tumor Microenvironments and the Progression of Tumors",
+        "cited_title": "Macrophages in Tumor Microenvironments and the Progression of Tumors",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1186/s13045-019-0760-3",
+        "resolved": true,
+        "crossref_title": "Tumor-associated macrophages in tumor metastasis: biological roles and clinical therapeutic applications",
+        "cited_title": "Tumor-associated macrophages in tumor metastasis: biological roles and clinical therapeutic applications",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.3390/medicina56010015",
+        "resolved": true,
+        "crossref_title": "Tumor Microenvironment",
+        "cited_title": "Tumor Microenvironment",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.7150/jca.17648",
+        "resolved": true,
+        "crossref_title": "Role of tumor microenvironment in tumorigenesis",
+        "cited_title": "Role of tumor microenvironment in tumorigenesis",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1186/s12943-019-0976-4",
+        "resolved": true,
+        "crossref_title": "Crosstalk between cancer cells and tumor associated macrophages is required for mesenchymal circulating tumor cell-mediated colorectal cancer metastasis",
+        "cited_title": "Crosstalk between cancer cells and tumor associated macrophages is required for mesenchymal circulating tumor cell-mediated colorectal cancer metastasis",
+        "title_match": true,
+        "quote_grounded": true
+       }
+      ]
+     },
+     {
+      "citations_total": 5,
+      "doi_resolved": 5,
+      "title_matched": 5,
+      "quote_grounded": 4,
+      "quote_checked": 5,
+      "unsupported_rate": 0,
+      "details": [
+       {
+        "doi": "10.1038/nature04286",
+        "resolved": true,
+        "crossref_title": "Sleep-dependent memory consolidation",
+        "cited_title": "Sleep-dependent memory consolidation",
+        "title_match": true,
+        "quote_grounded": false
+       },
+       {
+        "doi": "10.1152/physrev.00032.2012",
+        "resolved": true,
+        "crossref_title": "About Sleep's Role in Memory",
+        "cited_title": "About Sleep's Role in Memory",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1007/s00424-011-1044-0",
+        "resolved": true,
+        "crossref_title": "Sleep and immune function",
+        "cited_title": "Sleep and immune function",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1152/physrev.00010.2018",
+        "resolved": true,
+        "crossref_title": "The Sleep-Immune Crosstalk in Health and Disease",
+        "cited_title": "The Sleep-Immune Crosstalk in Health and Disease",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1371/journal.pbio.0060216",
+        "resolved": true,
+        "crossref_title": "Is Sleep Essential?",
+        "cited_title": "Is Sleep Essential?",
+        "title_match": true,
+        "quote_grounded": true
+       }
+      ]
+     },
+     {
+      "citations_total": 4,
+      "doi_resolved": 4,
+      "title_matched": 4,
+      "quote_grounded": 4,
+      "quote_checked": 4,
+      "unsupported_rate": 0,
+      "details": [
+       {
+        "doi": "10.1371/journal.pbio.0050016",
+        "resolved": true,
+        "crossref_title": "The Sorcerer II Global Ocean Sampling Expedition: Expanding the Universe of Protein Families",
+        "cited_title": "The Sorcerer II Global Ocean Sampling Expedition: Expanding the Universe of Protein Families",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1093/nar/gkn668",
+        "resolved": true,
+        "crossref_title": "Genomics of bacteria and archaea: the emerging dynamic view of the prokaryotic world",
+        "cited_title": "Genomics of bacteria and archaea: the emerging dynamic view of the prokaryotic world",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1111/j.1574-6976.2008.00144.x",
+        "resolved": true,
+        "crossref_title": "The dynamic genetic repertoire of microbial communities",
+        "cited_title": "The dynamic genetic repertoire of microbial communities",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.3389/fmicb.2018.01499",
+        "resolved": true,
+        "crossref_title": "Genome Variation in the Model Halophilic Bacterium Salinibacter ruber",
+        "cited_title": "Genome Variation in the Model Halophilic Bacterium Salinibacter ruber",
+        "title_match": true,
+        "quote_grounded": true
+       }
+      ]
+     },
+     {
+      "citations_total": 4,
+      "doi_resolved": 4,
+      "title_matched": 4,
+      "quote_grounded": 4,
+      "quote_checked": 4,
+      "unsupported_rate": 0,
+      "details": [
+       {
+        "doi": "10.3390/nu12040988",
+        "resolved": true,
+        "crossref_title": "Evidence that Vitamin D Supplementation Could Reduce Risk of Influenza and COVID-19 Infections and Deaths",
+        "cited_title": "Evidence that Vitamin D Supplementation Could Reduce Risk of Influenza and COVID-19 Infections and Deaths",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.3390/nu12010236",
+        "resolved": true,
+        "crossref_title": "A Review of Micronutrients and the Immune System–Working in Harmony to Reduce the Risk of Infection",
+        "cited_title": "A Review of Micronutrients and the Immune System–Working in Harmony to Reduce the Risk of Infection",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1210/er.2008-0004",
+        "resolved": true,
+        "crossref_title": "Vitamin D and Human Health: Lessons from Vitamin D Receptor Null Mice",
+        "cited_title": "Vitamin D and Human Health: Lessons from Vitamin D Receptor Null Mice",
+        "title_match": true,
+        "quote_grounded": true
+       },
+       {
+        "doi": "10.1017/s0950268806007175",
+        "resolved": true,
+        "crossref_title": "Epidemic influenza and vitamin D",
+        "cited_title": "Epidemic influenza and vitamin D",
+        "title_match": true,
+        "quote_grounded": true
+       }
+      ]
+     }
+    ]
+   }
+  }
+ }
+}

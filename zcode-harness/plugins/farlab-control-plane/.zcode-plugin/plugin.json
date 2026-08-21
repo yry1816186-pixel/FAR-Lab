@@ -1,7 +1,7 @@
 {
   "name": "farlab-control-plane",
-  "version": "1.2.0",
-  "description": "Minimal high-signal control plane for evidence-backed FAR-Lab long-horizon research, architecture, scientific validation and delivery.",
+  "version": "2.0.0",
+  "description": "Frontier-grade high-signal control plane for FAR-Lab long-horizon research, architecture, scientific validity, integration, verification and mission completion.",
   "author": {
     "name": "FAR-Lab"
   },
@@ -11,7 +11,9 @@
     "research",
     "architecture",
     "verification",
-    "competition"
+    "frontier",
+    "scientific-method",
+    "multi-agent"
   ],
   "commands": "commands",
   "skills": "skills",

@@ -1,18 +1,15 @@
 ---
-description: Persist a compact truthful FAR-Lab checkpoint before interruption, compact, or a major phase transition.
+description: Persist a compact truthful FAR-Lab checkpoint before interruption, compact, handoff or a major phase transition without creating narrative progress diaries.
+skills: mission-orchestration
 ---
 
-Reconcile real workspace/Git/runtime first. Update only materially changed:
+Reconcile actual workspace/Git/runtime first. Update only materially changed state using the project's existing `.control` schema:
 
-- `.control/EXECUTION_STATE.json` — current objective, critical problems, exact nextAction;
-- `.control/ACCEPTANCE_STATUS.json` — only evidence-backed status changes;
-- `.control/BLOCKERS.json` — genuine blockers;
-- `.control/DECISIONS.jsonl` — consequential decisions/reversal triggers.
+- `EXECUTION_STATE.json` — current objective/phase, Critical Problem Set, in-flight work and exact nextAction;
+- `ACCEPTANCE_STATUS.json` — only evidence-backed status changes;
+- `BLOCKERS.json` — genuine blockers and exact missing dependency;
+- `DECISIONS.jsonl` — consequential decisions/reversal triggers;
+- `DELEGATION_LEDGER.json` — only active/material delegation state;
+- frontier status record, if the canonical project uses one and it materially changed.
 
-Then run:
-
-```bash
-node zcode-harness/scripts/control-doctor.mjs
-```
-
-Do not create a narrative progress diary.
+Run project-native control/harness doctors if they exist. Preserve a recoverable Git state. Do not create a prose memory diary, do not promote unverified status, and do not rewrite stable project-spec merely to summarize progress.

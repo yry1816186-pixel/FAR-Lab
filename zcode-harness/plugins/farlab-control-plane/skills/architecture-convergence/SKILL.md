@@ -1,19 +1,20 @@
 ---
 name: architecture-convergence
-description: Use for consequential FAR-Lab architecture/state/runtime/persistence/protocol decisions. Compare real alternatives, make ownership explicit, spike key uncertainty, then converge with evidence.
-when_to_use: Architecture-changing decisions or unresolved technical hypotheses with high downstream cost.
+description: Use for consequential FAR-Lab architecture, platform, data, workflow, runtime, agent, model, tool, protocol or subsystem decisions. Force evidence-driven convergence, explicit ownership, alternatives, reversal triggers and migration discipline instead of framework churn or architecture collage.
+when_to_use: Major architecture/ADR decisions, subsystem replacement, new infrastructure boundaries, repeated structural failures, scaling/recovery/security problems, or when a stronger external route may justify change.
 metadata:
-  version: "1.0.0"
+  version: "2.0.0"
 ---
 
 # Architecture Convergence
 
-1. Define the product/scientific requirement and protected invariants before technology names.
-2. Classify the capability as Commodity, Integration, or Unique Core.
-3. Produce at least two genuinely distinct viable routes when the decision is consequential; do not create cosmetic alternatives.
-4. Compare correctness, complexity, performance, reliability, security, portability, extensibility, maintainability, DX/UX, operational cost, ecosystem, implementation risk and long-term evolution as applicable.
-5. Make ownership explicit for state/data, persistence, execution/lifecycle, retries/errors/cancellation, permissions/security, provenance/observability, compatibility/upgrades and migrations.
-6. Identify assumptions that documentation cannot settle. Use a small isolated Spike only when real execution can materially reduce uncertainty.
-7. Attack the preferred route for failure modes, scale limits, duplicate authority, irreversible coupling and migration traps.
-8. Converge using Evidence -> Decision -> Exit Gate. Do not code a major irreversible foundation while a Critical Architecture Issue remains unresolved.
-9. Record a compact decision and reversal trigger. Delete failed spikes and superseded design clutter after conclusions are preserved.
+1. Define the product/scientific requirement and protected invariants before naming technologies.
+2. Classify the capability as **Commodity / Integration / Unique Core**.
+3. For consequential decisions, compare at least two genuinely distinct viable routes; do not create cosmetic alternatives.
+4. Compare only relevant dimensions: correctness, scientific semantics, complexity, reliability/recovery, security/trust, performance/scale, portability, interoperability, maintainability, ecosystem, migration cost, DX/UX and long-term evolution.
+5. Make ownership explicit for state/data, persistence, execution/lifecycle, retry/error/cancel/recovery, permissions/security, provenance/observability, schema/version compatibility and upgrades.
+6. Identify assumptions documentation cannot settle. Run a small isolated spike only when execution can materially reduce uncertainty.
+7. Attack the preferred route for duplicate authority, hidden coupling, irreversible lock-in, migration traps, performance cliffs and false extensibility.
+8. Converge with `Evidence -> Decision -> Exit Gate`. Do not implement a major irreversible foundation while a critical architecture uncertainty remains unresolved.
+9. Record decisive evidence, rejected alternatives and a reversal trigger. Preserve migration safety; remove obsolete duplicate production paths after replacement is proven.
+10. Reopen architecture only for measured structural evidence: repeated failure, scientific-semantic mismatch, security blocker, recovery impossibility, measured bottleneck, or a materially stronger external solution.

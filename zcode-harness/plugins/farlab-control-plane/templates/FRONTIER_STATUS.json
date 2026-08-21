@@ -1,0 +1,33 @@
+{
+  "protocolVersion": "2.0.0",
+  "required": true,
+  "status": "not_started",
+  "dimensions": [
+    {"id": "scientific-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []},
+    {"id": "engineering-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []},
+    {"id": "performance-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []},
+    {"id": "product-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []},
+    {"id": "architecture-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []},
+    {"id": "evaluation-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []},
+    {"id": "innovation-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []},
+    {"id": "ecosystem-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []},
+    {"id": "reproducibility-frontier", "required": true, "target": "verified", "status": "not_started", "evidence": [], "residualRisks": []}
+  ],
+  "independentAudit": {
+    "status": "not_started",
+    "evidence": []
+  },
+  "opportunitySweep": {
+    "status": "not_started",
+    "decisionSaturation": false,
+    "searchFamilies": [],
+    "highValueOpportunities": [],
+    "evidence": []
+  },
+  "marginalValue": {
+    "status": "not_started",
+    "remainingHighValueWork": [],
+    "reason": "",
+    "evidence": []
+  }
+}
