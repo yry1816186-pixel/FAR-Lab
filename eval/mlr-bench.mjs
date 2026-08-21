@@ -32,9 +32,9 @@ import { isRepresentative } from '../dist/pipeline/stages/shared.js';
 const SEED = 20260822;
 const SAMPLE_N = Number(process.env.MLR_SAMPLE_N ?? 5);
 const REPO = resolve(process.cwd(), process.env.MLRBENCH_REPO ?? '.cache/repos/mlrbench');
-const RESULTS_DIR = resolve(process.cwd(), 'eval/results/');
-const OUT = RESULTS_DIR + 'mlr-bench.jsonl';
-const RUNS_FILE = RESULTS_DIR + 'mlr-bench-runs.jsonl';
+const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
+const OUT = join(RESULTS_DIR, 'mlr-bench.jsonl');
+const RUNS_FILE = join(RESULTS_DIR, 'mlr-bench-runs.jsonl');
 const SKIP_RUNS = process.argv.includes('--skip-runs');
 const ANCHOR_AGENTS = ['o4-mini-2025-04-16', 'deepseek-r1'];
 
@@ -234,9 +234,8 @@ mkdirSync(RESULTS_DIR, { recursive: true });
 
 // phase 1: FAR-Lab runs (sequential, ids recorded incrementally for resume)
 if (!SKIP_RUNS) {
-  const done = new Set(
-    existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).task) : [],
-  );
+  const priorLines = existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  const done = new Set(priorLines.filter((r) => r.runId).map((r) => r.task));
   for (const task of sampled) {
     if (done.has(task)) { console.log(`[mlr-bench] ${task}: run exists, skipping`); continue; }
     const q = questionFor(task);
@@ -246,8 +245,8 @@ if (!SKIP_RUNS) {
       writeFileSync(RUNS_FILE, (existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8') : '') + JSON.stringify({ task, runId: r.runId, status: r.status }) + '\n');
       console.log(`[mlr-bench] ${task} -> ${r.runId} (${r.status})`);
     } catch (e) {
-      writeFileSync(RUNS_FILE, (existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8') : '') + JSON.stringify({ task, error: String(e.message).slice(0, 300) }) + '\n');
-      console.error(`[mlr-bench] ${task} RUN FAILED: ${e.message}`);
+      writeFileSync(RUNS_FILE, (existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8') : '') + JSON.stringify({ task, error: String(e.message).slice(0, 300), stderr: String(e.stderr ?? '').slice(0, 500) }) + '\n');
+      console.error(`[mlr-bench] ${task} RUN FAILED: ${e.message}${e.stderr ? '\nstderr: ' + String(e.stderr).slice(0, 1000) : ''}`);
     }
   }
 }
