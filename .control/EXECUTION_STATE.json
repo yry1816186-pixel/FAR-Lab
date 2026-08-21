@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
   "mission": "Build FAR-Lab from greenfield to a complete, real, verified XH-202619 Track 1 Direction 1A AI Scientist system per FAR-LAB_DEVELOPMENT_MISSION.md.",
-  "status": "IN_CONSTRUCTION",
-  "phase": "W5-audit-fixes",
-  "currentObjective": "W5: land adversarial-audit (D-1..D-7) and scientific-review (S1-S5) repairs without regressing the verified W1-W4 capability base; keep evidence sets reconciled with DB/metrics truth.",
+  "status": "MISSION_COMPLETE_PENDING_USER_ACCEPTANCE",
+  "phase": "W5-delivered",
+  "currentObjective": "All 20 acceptance items at target; completion gate VERIFIED_READY (exit 0); independent audits passed with all P1/P2 fixed; frontier SATURATED with recorded deferrals; final_delivery.md written.",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
@@ -13,22 +13,10 @@
   ],
   "criticalProblemSet": [
     {
-      "id": "CP-008",
-      "problem": "W5 audit bookkeeping repairs: orphan ACC-14 bundle pointer, ACC-05 count, report/metrics 3/6-vs-6/6 reconciliation, P5 abstention wording, orchestrator attempt regression",
-      "status": "OPEN",
-      "evidenceNeeded": "ACCEPTANCE_STATUS evidence rewritten to DB-reproducible ids/numbers; Addendum in evidence/W4/evaluation-report.md; orchestrator-attempt test green; this EXECUTION_STATE refreshed (bookkeeping group, in progress this session)"
-    },
-    {
-      "id": "CP-009",
-      "problem": "Scientific-review P1 substance repairs (parallel groups): evidence-sufficiency gate for plan/thresholds, counter-evidence retrieval+rationale substance, semantic decidability check, novelty corpus-relative disclosure, llm-judge input parity rerun",
-      "status": "OPEN",
-      "evidenceNeeded": "eval/llm-judge.mjs field parity landed (this session); symmetric judge rerun + deterministic gates for S1/S2/S4 + novelty disclosure at all presentation points still pending"
-    },
-    {
       "id": "CP-007",
-      "problem": "Qwen live route BLOCKED (B-QWEN-LIVE-ROUTE) - Z.ai quota resets 2026-08-22 10:03, retest then",
+      "problem": "GLM second live route retest after 2026-08-22 10:03 quota reset (non-critical; competition route satisfied by DeepSeek)",
       "status": "OPEN",
-      "evidenceNeeded": "live GLM receipts or documented BLOCKED"
+      "evidenceNeeded": "node spikes/model-spike/probe.mjs --provider zai"
     }
   ],
   "verifiedWorkspaceFacts": [
@@ -47,6 +35,6 @@
   "blockerIds": [
     "B-QWEN-LIVE-ROUTE"
   ],
-  "lastVerifiedCommit": "83c9117",
-  "nextAction": "Finish W5 fix groups, rerun node zcode-harness/scripts/completion-gate.mjs (expect NOT_READY until G-01..G-07 evidence lands), then retest Qwen live route after 2026-08-22 10:03 quota reset."
+  "lastVerifiedCommit": "1b0e622",
+  "nextAction": "User review of final_delivery.md residual risks (competition page URL recheck before submission; FARLAB_GIT_COMMIT injection for release builds; optional GLM retest after quota reset)."
 }
