@@ -3,6 +3,18 @@ import { createApp } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
+import { staleDistFiles } from './dist-freshness.js';
+
+/** D-031: refuse to execute stages on a dist older than src (stale-build live incident). */
+const assertDistFresh = (): void => {
+  const stale = staleDistFiles();
+  if (stale.length > 0) {
+    die(
+      `dist is stale relative to src (${stale.length} file(s): ${stale.slice(0, 3).join(', ')}${stale.length > 3 ? ' …' : ''}) — run npm run build first. Refusing to execute stale compiled behavior (D-031).`,
+      3,
+    );
+  }
+};
 
 const HELP = `far — FAR-Lab research workbench (XH-202619 Track 1 Direction 1A)
 
@@ -97,6 +109,7 @@ const main = async (): Promise<void> => {
   if (sub === 'start') {
     const question = positional(4);
     if (!question) die('research start requires a question text', 2);
+    assertDistFresh();
     const goalType = arg('--goal') ?? 'explanatory';
     const domain = arg('--domain') ?? 'unspecified';
     const app = await createApp();
@@ -184,6 +197,7 @@ const main = async (): Promise<void> => {
   }
 
   if (sub === 'resume') {
+    assertDistFresh();
     const app = await createApp();
     try {
       const stopAfter = arg('--stop-after');
