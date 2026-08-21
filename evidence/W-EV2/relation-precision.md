@@ -1,15 +1,18 @@
 # Claim→Hypothesis Relation Precision Spike (W-EV2 close-out)
 
-**Date:** 2026-08-22 · **Spike:** `spikes/relation-precision.mjs` (blind re-judging) · **Output:** `spikes/output/relation-precision.jsonl` (25 records) · **Judge:** deepseek-chat t=0 — SAME family as the pipeline generator, so agreement is an UPPER BOUND on precision; disagreement may be judge error as well as pipeline error. N=25 stratified (supports 12 / contradicts 8 / weakens 5; qualifies quota unfilled).
+**Date:** 2026-08-22 · **Spike:** `spikes/relation-precision.mjs` (blind re-judging) · **Outputs:** `spikes/output/relation-precision{,-contradicts-r2,-f4}.jsonl` (3 rounds, 57 unique relations) · **Judge:** deepseek-chat t=0 — SAME family as the pipeline generator, so agreement is an UPPER BOUND on precision; disagreement may be judge error as well as pipeline error. Rounds 1/2/3: N=25 mixed / 12 contradicts-focused / 20 mixed (11 from a single run).
 
-## Result (upper-bound estimates)
+## Result (upper-bound estimates, deduped across all rounds)
 
 | pipeline label | exact match | +adjacent (contradicts↔weakens, qualifies→supports) | verdict |
 |---|---|---|---|
-| supports | 7/12 (58%) | 9/12 (75%) | tolerable upper bound; disagreements are granularity (supports vs qualifies) |
-| contradicts | **1/8 (13%)** | 3/8 (38%) | **insufficient** — D-018 reversal trigger condition met |
-| weakens | 2/5 (40%) | 3/5 (60%) | small n, ambiguous |
-| overall | 10/25 (40%) | 14/25 (56%) | — |
+| supports | 11/18 (61%) | 14/18 (78%) | tolerable upper bound; disagreements are granularity (supports vs qualifies) |
+| contradicts | **9/30 (30%)** | 12/30 (40%) | **insufficient** — D-018 reversal trigger condition met |
+| weakens | 2/5 (40%) | 2/5 (40%) | small n, ambiguous |
+| qualifies | 4/4 (100%) | 4/4 (100%) | small n, encouraging |
+| overall | 26/57 (46%) | 32/57 (56%) | — |
+
+**Run heterogeneity (disclosed):** contradicts precision is strongly run-dependent — round 3 drew 10 contradicts from one run (`run_28ph6sqq…`) and scored 8/10 exact there, while round 2 (12 fresh contradicts across 8 runs) scored 0/12. A per-run defect pattern, not a uniform failure: some runs label counter-evidence cleanly, others (including MLR-Bench ML-domain runs) systematically over-commit.
 
 ## Attribution (main-agent inspection of all 15 disagreements)
 
