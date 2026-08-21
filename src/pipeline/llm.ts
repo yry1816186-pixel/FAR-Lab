@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { StageContext } from './types.js';
 import type { RunStageName } from '../domain/run.js';
+import { zodToStrictJsonSchema } from '../providers/http.js';
 
 export interface LlmCallOptions {
   stage: RunStageName;
@@ -34,6 +35,9 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       temperature: opts.temperature,
       // Default output budget: large structured payloads (rank/plan) must not truncate mid-JSON.
       maxTokens: opts.maxTokens ?? 8192,
+      // Strict-FC projection for providers with server-side tool-schema enforcement
+      // (D-026); providers without the capability ignore it, zod stays the authority.
+      jsonSchema: zodToStrictJsonSchema(opts.schema),
       purpose: opts.purpose,
     },
     (raw) => {

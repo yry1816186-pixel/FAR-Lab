@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { z } from 'zod';
 import { canonicalSha256 } from '../src/shared/crypto.js';
 import type { StructuredCallRequest } from '../src/shared/ports.js';
+import { zodToStrictJsonSchema } from '../src/providers/http.js';
 import { createDeepSeekProvider } from '../src/providers/deepseek.js';
 import { createZaiProvider } from '../src/providers/zai.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
@@ -71,6 +73,10 @@ const chatOk = (content: string, model = 'deepseek-v4-flash') =>
     { status: 200, headers: { 'content-type': 'application/json' } },
   );
 
+/** HTTP 200 with a PRE-BUILT body (strict-FC tool_calls shapes differ from content shapes). */
+const chatOkRaw = (bodyText: string) =>
+  new Response(bodyText, { status: 200, headers: { 'content-type': 'application/json' } });
+
 const httpError = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
@@ -98,6 +104,31 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 // deepseek adapter — success path, receipt integrity, request shaping
 // ---------------------------------------------------------------------------
+
+describe('zodToStrictJsonSchema (strict-FC subset projection, D-026)', () => {
+  it('projects objects as all-required with additionalProperties:false; strings lose min-length', () => {
+    const S = z.object({ a: z.string().min(1), b: z.enum(['x', 'y']), c: z.number().int(), d: z.boolean() });
+    expect(zodToStrictJsonSchema(S)).toEqual({
+      type: 'object',
+      properties: { a: { type: 'string' }, b: { type: 'string', enum: ['x', 'y'] }, c: { type: 'integer' }, d: { type: 'boolean' } },
+      required: ['a', 'b', 'c', 'd'],
+      additionalProperties: false,
+    });
+  });
+  it('optional/defaulted fields become anyOf [inner, null] (nulls map back to absent via tolerance)', () => {
+    const S = z.object({ req: z.string(), opt: z.string().optional(), arr: z.array(z.string()).default([]) });
+    const j = zodToStrictJsonSchema(S) as { properties: Record<string, unknown> };
+    expect(j.properties['opt']).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] });
+    expect(j.properties['arr']).toEqual({ anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }] });
+    expect(j.required).toEqual(['req', 'opt', 'arr']); // strict subset: everything listed
+  });
+  it('unions become anyOf; refinements/effects are transparent (zod stays the semantic authority)', () => {
+    const S = z.object({ u: z.union([z.literal('a'), z.string()]), r: z.string().refine(() => true) });
+    const j = zodToStrictJsonSchema(S) as { properties: Record<string, unknown> };
+    expect(j.properties['u']).toEqual({ anyOf: [{ type: 'string', enum: ['a'] }, { type: 'string' }] });
+    expect(j.properties['r']).toEqual({ type: 'string' });
+  });
+});
 
 describe('deepseek adapter (mock fetch)', () => {
   it('succeeds with a complete, correctly hashed receipt', async () => {
@@ -127,14 +158,61 @@ describe('deepseek adapter (mock fetch)', () => {
     );
     expect(res.receipt.outputHash).toBe(canonicalSha256(RAW_OK));
 
-    // Request shaping: OpenAI-compat endpoint, bearer auth, json_object preferred mode.
+    // Request shaping: OpenAI-compat endpoint, bearer auth. Default is the strict-FC beta
+    // base URL (D-026); without jsonSchema on the request the body stays json_object mode.
     expect(calls.length).toBe(1);
-    expect(calls[0]?.url).toBe('https://api.deepseek.com/chat/completions');
+    expect(calls[0]?.url).toBe('https://api.deepseek.com/beta/chat/completions');
     const auth = calls[0]?.init.headers as Record<string, string>;
     expect(auth.authorization).toBe('Bearer test-fixture-key-ds');
     expect(bodyOf(calls[0]!).response_format).toEqual({ type: 'json_object' });
     // No key material anywhere in the result envelope.
     expect(JSON.stringify(res)).not.toContain('test-fixture-key-ds');
+  });
+
+  it('strict mode: requests carrying jsonSchema use tools+strict+tool_choice and parse tool_calls arguments', async () => {
+    const toolCallBody = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{
+        index: 0,
+        message: {
+          role: 'assistant',
+          content: null,
+          tool_calls: [{
+            index: 0,
+            id: 'call_test',
+            type: 'function',
+            function: { name: 'respond', arguments: RAW_OK },
+          }],
+        },
+        finish_reason: 'tool_calls',
+      }],
+      usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
+    });
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOkRaw(toolCallBody))]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const schema = { type: 'object', properties: { hypothesis: { type: 'string' } }, required: ['hypothesis'], additionalProperties: false };
+    const res = await provider.structuredCall({ ...REQ, jsonSchema: schema }, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(res.data).toEqual({ hypothesis: 'Chunk-level retrieval grounding reduces hallucinated entity spans' });
+    expect(res.receipt.finishReason).toBe('tool_calls');
+    const body = bodyOf(calls[0]!);
+    expect(body.response_format).toBeUndefined();
+    expect(body.tools).toEqual([
+      { type: 'function', function: { name: 'respond', strict: true, description: 'Respond with the structured output for this task.', parameters: schema } },
+    ]);
+    expect(body.tool_choice).toEqual({ type: 'function', function: { name: 'respond' } });
+  });
+
+  it('strictTools=false keeps the stable base URL and strips jsonSchema (mode fixed at construction, no mid-flight switch)', async () => {
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK))]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, strictTools: false });
+    expect(provider.strictTools).toBe(false);
+    expect(provider.baseUrl).toBe('https://api.deepseek.com');
+    const schema = { type: 'object', properties: {}, required: [], additionalProperties: false };
+    await provider.structuredCall({ ...REQ, jsonSchema: schema }, parseHypothesis);
+    const body = bodyOf(calls[0]!);
+    expect(body.tools).toBeUndefined();
+    expect(body.response_format).toEqual({ type: 'json_object' });
   });
 
   it('passes through temperature/maxTokens and demands JSON-only in the system message', async () => {
@@ -480,7 +558,7 @@ describe('provider registry', () => {
     expect(infos.map((i) => i.kind)).toEqual(['live', 'live', 'test']);
     const deepseek = infos[0]!;
     expect(deepseek.modelId).toBe('deepseek-chat');
-    expect(deepseek.baseUrl).toBe('https://api.deepseek.com');
+    expect(deepseek.baseUrl).toBe('https://api.deepseek.com/beta'); // strict-FC default (D-026)
     expect(deepseek.apiKeyEnvVar).toBe('DEEPSEEK_API_KEY');
     expect(JSON.stringify(infos)).not.toMatch(/sk-[A-Za-z0-9]{8,}/); // no key material
   });
