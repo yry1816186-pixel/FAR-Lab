@@ -39,6 +39,14 @@ export const SourceDocument = z.object({
   fullTextRef: z.string().optional(), // artifact-store ref when depth=full_text
   license: z.string().optional(),
   oaUrl: z.string().url().optional(),
+  /** Result of identifier-resolution verification (verify_sources stage). Absent = not yet verified. */
+  verification: z.object({
+    method: z.enum(['crossref_doi', 'arxiv_id', 'openalex_id', 'url']),
+    resolved: z.boolean(),
+    titleMatch: z.boolean().optional(),
+    detail: z.string().optional(),
+    checkedAt: z.string().datetime(),
+  }).optional(),
 });
 export type SourceDocument = z.infer<typeof SourceDocument>;
 
