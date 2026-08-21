@@ -13,6 +13,12 @@ export interface OpenAlexAdapterOptions extends SourceAdapterOptions {
   baseUrl?: string;
   /** Polite-pool identifier (api.openalex.org#polite-pool); env OPENALEX_MAILTO overrides the default. */
   mailto?: string;
+  /**
+   * Optional API key (env OPENALEX_API_KEY). Keyless polite pool still works (verified
+   * 2026-08-22) but OpenAlex announced mandatory-key + usage-pricing policy drift; a key
+   * moves requests to the keyed tier and survives the drift when one appears.
+   */
+  apiKey?: string;
   /** Backoff before the single 429 retry; tests shrink it to keep suites fast. */
   rateLimitBackoffMs?: number;
 }
@@ -105,7 +111,8 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
   const userAgent = `FAR-Lab/0.1 (mailto:${mailto})`;
 
   const requestUrl = (pathAndQuery: string): string => `${baseUrl}${pathAndQuery}`;
-  const mailtoQuery = `mailto=${encodeURIComponent(mailto)}`;
+  const apiKey = opts.apiKey ?? process.env['OPENALEX_API_KEY'] ?? '';
+  const mailtoQuery = `mailto=${encodeURIComponent(mailto)}${apiKey ? `&api_key=${encodeURIComponent(apiKey)}` : ''}`;
 
   // One bounded retry on 429 (2026-08-22 eval burst evidence: the keyless shared
   // pool rate-limited every query after a heavy run, silently zeroing the novelty

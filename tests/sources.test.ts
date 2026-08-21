@@ -352,6 +352,23 @@ describe('openalex adapter', () => {
     });
   });
 
+  it('optional API key rides the query string when provided (OpenAlex policy-drift adaptation)', async () => {
+    const { fetch, urls } = fakeFetch([jsonResponse(200, oaSearchFixture)]);
+    const adapter = createOpenAlexAdapter({
+      fetchImpl: fetch, baseUrl: 'https://openalex.test', mailto: TEST_MAILTO, apiKey: 'test-key-123',
+    });
+    await adapter.search('keyed query');
+    expect(urls[0]).toContain('mailto=unit-test%40example.com');
+    expect(urls[0]).toContain('api_key=test-key-123');
+  });
+
+  it('without a key the request stays keyless (polite pool)', async () => {
+    const { fetch, urls } = fakeFetch([jsonResponse(200, oaSearchFixture)]);
+    const adapter = createOpenAlexAdapter({ fetchImpl: fetch, baseUrl: 'https://openalex.test', mailto: TEST_MAILTO });
+    await adapter.search('keyless query');
+    expect(urls[0]).not.toContain('api_key=');
+  });
+
   it('search 429 then 200: single bounded retry recovers (keyless pool burst case)', async () => {
     const { fetch, urls } = fakeFetch([jsonResponse(429, { error: 'rate limited' }), jsonResponse(200, oaSearchFixture)]);
     const adapter = createOpenAlexAdapter({
