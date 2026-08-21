@@ -1,16 +1,20 @@
 import type { AccessState, SourceIdentifier } from '../domain/source.js';
 import type { RawRetrievalResult, RawSourceRecord, SourceAdapter } from '../shared/ports.js';
 import { SourceAdapterError } from './error.js';
-import { type SourceAdapterOptions, clampLimit, httpGet } from './http.js';
+import { type HttpGetResult, type SourceAdapterOptions, clampLimit, httpGet } from './http.js';
 import { asArray, asObject, boolField, numField, strField } from './json.js';
 
 const DEFAULT_BASE_URL = 'https://api.openalex.org';
 const DEFAULT_MAILTO = 'far-lab@example.com';
+/** Backoff before the single 429 retry (OpenAlex keyless shared pool; Retry-After is not exposed by the fetch contract). */
+const DEFAULT_RATE_LIMIT_BACKOFF_MS = 3_000;
 
 export interface OpenAlexAdapterOptions extends SourceAdapterOptions {
   baseUrl?: string;
   /** Polite-pool identifier (api.openalex.org#polite-pool); env OPENALEX_MAILTO overrides the default. */
   mailto?: string;
+  /** Backoff before the single 429 retry; tests shrink it to keep suites fast. */
+  rateLimitBackoffMs?: number;
 }
 
 /** Rebuild abstract text from OpenAlex abstract_inverted_index (word -> [positions]). */
@@ -103,6 +107,23 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
   const requestUrl = (pathAndQuery: string): string => `${baseUrl}${pathAndQuery}`;
   const mailtoQuery = `mailto=${encodeURIComponent(mailto)}`;
 
+  // One bounded retry on 429 (2026-08-22 eval burst evidence: the keyless shared
+  // pool rate-limited every query after a heavy run, silently zeroing the novelty
+  // neighbor layer; a single polite backoff recovers the transient window).
+  const getWith429Retry = (
+    url: string,
+    context: { family: string; query: string },
+  ): Promise<HttpGetResult> => {
+    const headers = { 'User-Agent': userAgent };
+    const call = (): Promise<HttpGetResult> =>
+      httpGet(url, { fetchImpl: opts.fetchImpl, timeoutMs: opts.timeoutMs, headers, context });
+    return call().then((first) =>
+      first.status === 429
+        ? new Promise<void>((resolveSleep) => setTimeout(resolveSleep, opts.rateLimitBackoffMs ?? DEFAULT_RATE_LIMIT_BACKOFF_MS)).then(call)
+        : first,
+    );
+  };
+
   const search = async (
     query: string,
     so?: { limit?: number },
@@ -117,12 +138,7 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
     const url = requestUrl(
       `/works?search=${encodeURIComponent(q)}&per-page=${perPage}&${mailtoQuery}`,
     );
-    const res = await httpGet(url, {
-      fetchImpl: opts.fetchImpl,
-      timeoutMs: opts.timeoutMs,
-      headers: { 'User-Agent': userAgent },
-      context: { family, query: q },
-    });
+    const res = await getWith429Retry(url, { family, query: q });
     if (res.status !== 200) {
       throw new SourceAdapterError({
         family, query: q, kind: 'http_status', httpStatus: res.status,
@@ -169,12 +185,7 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
     }
     // encodeURI keeps '/' ( meaningful in DOIs ) while encoding spaces/parens etc.
     const url = requestUrl(`/works/${encodeURI(pathId)}?${mailtoQuery}`);
-    const res = await httpGet(url, {
-      fetchImpl: opts.fetchImpl,
-      timeoutMs: opts.timeoutMs,
-      headers: { 'User-Agent': userAgent },
-      context: { family, query: `${identifier.kind}:${identifier.value}` },
-    });
+    const res = await getWith429Retry(url, { family, query: `${identifier.kind}:${identifier.value}` });
     if (res.status === 404) return { found: false, httpStatus: 404 };
     if (res.status !== 200) {
       throw new SourceAdapterError({

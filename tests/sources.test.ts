@@ -351,6 +351,42 @@ describe('openalex adapter', () => {
       return true;
     });
   });
+
+  it('search 429 then 200: single bounded retry recovers (keyless pool burst case)', async () => {
+    const { fetch, urls } = fakeFetch([jsonResponse(429, { error: 'rate limited' }), jsonResponse(200, oaSearchFixture)]);
+    const adapter = createOpenAlexAdapter({
+      fetchImpl: fetch, baseUrl: 'https://openalex.test', mailto: TEST_MAILTO, rateLimitBackoffMs: 0,
+    });
+    const result = await adapter.search('retry probe');
+    expect(result.httpStatus).toBe(200);
+    expect(result.records).toHaveLength(1);
+    expect(urls).toHaveLength(2); // exactly one retry, no more
+    expect(urls[1]).toBe(urls[0]); // identical request replayed after backoff
+  });
+
+  it('search 429 twice: structured 429 error after the single retry (no retry storm)', async () => {
+    const { fetch, urls } = fakeFetch([jsonResponse(429, { m: 'limited' }), jsonResponse(429, { m: 'limited' })]);
+    const adapter = createOpenAlexAdapter({
+      fetchImpl: fetch, baseUrl: 'https://openalex.test', mailto: TEST_MAILTO, rateLimitBackoffMs: 0,
+    });
+    await expect(adapter.search('still limited')).rejects.toSatisfy((e: unknown) => {
+      if (!isSourceAdapterError(e)) return false;
+      expect(e.httpStatus).toBe(429);
+      expect(e.kind).toBe('http_status');
+      return true;
+    });
+    expect(urls).toHaveLength(2); // hard-bounded: two attempts total
+  });
+
+  it('resolve 429 then 200: retry recovers the work record', async () => {
+    const { fetch } = fakeFetch([jsonResponse(429, {}), jsonResponse(200, oaWorkFixture)]);
+    const adapter = createOpenAlexAdapter({
+      fetchImpl: fetch, baseUrl: 'https://openalex.test', mailto: TEST_MAILTO, rateLimitBackoffMs: 0,
+    });
+    const r = await adapter.resolve({ kind: 'doi', value: '10.1000/fake.2026.001' });
+    expect(r.found).toBe(true);
+    expect(r.httpStatus).toBe(200);
+  });
 });
 
 /* ------------------------- Crossref adapter ------------------------- */
