@@ -1,0 +1,449 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {
+  RELATION_POLARITY,
+  newId,
+  ReproducibilityBundle,
+} from '../../domain/index.js';
+import type {
+  CitationBindingStatus,
+  CorpusSnapshot,
+  EvidenceRelation,
+  EvidenceRelationType,
+  HypothesisCandidate,
+  HypothesisScorecard,
+  ProvenanceReceipt,
+  ResearchPlan,
+  ResearchQuestion,
+  ResearchRun,
+  ScientificClaim,
+  SourceDocument,
+} from '../../domain/index.js';
+import { canonicalJson, canonicalSha256, sha256Hex } from '../../shared/crypto.js';
+import type { StageHandler } from '../types.js';
+
+/**
+ * export stage (mission §55/§56): render a human-readable report STRICTLY from stored
+ * objects (zero fabrication — absent data is displayed as missing), then build a
+ * ReproducibilityBundle whose declaredEvidenceLevel honestly reflects what a third
+ * party can replay from the recorded snapshots, receipts and artifact hashes.
+ */
+
+const SCORE_DISCLAIMER = '分数为可检查的决策辅助，非客观概率。';
+
+interface ExportInputs {
+  run: ResearchRun;
+  question: ResearchQuestion | null;
+  corpus: CorpusSnapshot | null;
+  sources: SourceDocument[];
+  claims: ScientificClaim[];
+  relations: EvidenceRelation[];
+  hypotheses: HypothesisCandidate[];
+  /** rank-sorted ascending */
+  scorecards: HypothesisScorecard[];
+  plan: ResearchPlan | null;
+  /** receipts as of render time (does not include the export receipt itself) */
+  receipts: ProvenanceReceipt[];
+}
+
+const orNone = (items: string[]): string => (items.length > 0 ? items.join('；') : '（未声明）');
+
+/** Material missing/incomplete items shared by report §9 and bundle limitations — one owner. */
+const collectMissing = (
+  inputs: ExportInputs,
+  facts: { lockMissing: boolean; receipts: ProvenanceReceipt[] },
+): string[] => {
+  const out: string[] = [];
+  if (!inputs.question) out.push('question 对象缺失');
+  if (!inputs.corpus) out.push('corpus_snapshot 缺失');
+  if (inputs.sources.length === 0) out.push('无任何 source_document');
+  else {
+    const unverified = inputs.sources.filter((s) => !s.verification).length;
+    if (unverified > 0) out.push(`${unverified} 个来源缺少 verification 结果（未核验）`);
+  }
+  const unaligned = inputs.claims.filter((c) => c.bindingStatus === 'resolved_unaligned').length;
+  if (unaligned > 0) out.push(`${unaligned} 条声明为 resolved_unaligned（来源已解析但检索内容不覆盖声明）`);
+  if (inputs.scorecards.length === 0) out.push('无 scorecard（排序未完成或未记录）');
+  if (!inputs.plan) out.push('无研究计划对象（plan 未生成）');
+  else if (!inputs.plan.executabilityCheck) out.push('计划缺少 executabilityCheck 结果');
+  else if (!inputs.plan.executabilityCheck.passed) {
+    out.push(`计划 executabilityCheck 未通过：${inputs.plan.executabilityCheck.missing.join('；')}`);
+  }
+  const nonLive = facts.receipts.filter((r) => r.executionMode !== 'live');
+  if (nonLive.length > 0) {
+    out.push(`${nonLive.length} 条 receipt 的 executionMode 非 live：模型/来源环节未全部走 live 路由`);
+  }
+  if (facts.lockMissing) {
+    out.push('package-lock.json 不可读：dependencyLockHash=sha256("missing") 为占位值，依赖锁定不可核验');
+  }
+  return out;
+};
+
+const buildReport = (d: ExportInputs, missingItems: string[]): string => {
+  const L: string[] = [];
+  const push = (...lines: string[]) => L.push(...lines);
+
+  push(`# FAR-Lab 研究报告 — run ${d.run.id}`, '');
+  push('> 本报告由本 run 的存储对象确定性渲染生成：每一节均来自持久化对象，未记录的内容以「缺失」明示，不含任何补造。', '');
+
+  // ---- 1. question & scope ----
+  push('## 1. 问题与范围', '');
+  if (d.question) {
+    const q = d.question;
+    push(`- 问题（${q.id}）：${q.text}`);
+    push(`- 目标类型：${q.goalType}`);
+    if (q.background.trim().length > 0) push(`- 背景：${q.background}`);
+    push(`- 领域：${q.scope.domain}`);
+    push(`- 现象：${q.scope.phenomena.join('；')}`);
+    if (q.scope.temporalBoundary) push(`- 时间边界：${q.scope.temporalBoundary}`);
+    if (q.scope.spatialOrSystemBoundary) push(`- 系统/空间边界：${q.scope.spatialOrSystemBoundary}`);
+    if (q.scope.populationOrScopeNotes) push(`- 总体/范围备注：${q.scope.populationOrScopeNotes}`);
+    if (q.scope.inScope.length > 0) push(`- 范围内：${q.scope.inScope.join('；')}`);
+    if (q.scope.outOfScope.length > 0) push(`- 范围外：${q.scope.outOfScope.join('；')}`);
+    const c = q.constraints;
+    const constraintGroups: readonly [string, string[]][] = [
+      ['前提假设', c.assumptions],
+      ['数据约束', c.dataConstraints],
+      ['资源约束', c.resourceConstraints],
+      ['伦理约束', c.ethicalConstraints],
+      ['方法学约束', c.methodologicalConstraints],
+    ];
+    for (const [label, items] of constraintGroups) {
+      if (items.length > 0) push(`- ${label}：${items.join('；')}`);
+    }
+  } else {
+    push('（缺失：question 对象不可读）');
+  }
+  push('');
+
+  // ---- 2. corpus & source verification ----
+  push('## 2. 语料与来源核验', '');
+  if (d.corpus) {
+    push(`- 语料快照 ${d.corpus.id}：检索查询 ${d.corpus.queries.length} 条，文档 ${d.corpus.documentIds.length} 篇`);
+    for (const q of d.corpus.queries) push(`  - 查询（${q.purpose}）：${q.text}`);
+    for (const f of d.corpus.familyFailures) push(`  - 失败来源族：${f.family} — ${f.reason}`);
+  } else {
+    push('（缺失：corpus_snapshot）');
+  }
+  if (d.sources.length > 0) {
+    push('| 标题 | 年份 | 深度 | 访问态 | 核验结果 | contentHash(前12位) |');
+    push('|---|---|---|---|---|---|');
+    for (const s of d.sources) {
+      const verify = s.verification
+        ? `${s.verification.method} · resolved=${s.verification.resolved}` +
+          (s.verification.titleMatch !== undefined ? ` · titleMatch=${s.verification.titleMatch}` : '')
+        : '未核验';
+      push(`| ${s.title} | ${s.publicationYear ?? '未知'} | ${s.contentDepth} | ${s.accessState} | ${verify} | ${s.contentHash.slice(0, 12)} |`);
+    }
+  } else {
+    push('（缺失：无 source_document）');
+  }
+  push('');
+
+  // ---- 3. claims & binding status ----
+  push('## 3. 声明与绑定状态', '');
+  push(`- 声明总数：${d.claims.length}`);
+  const statuses: readonly CitationBindingStatus[] = ['verified', 'resolved_unaligned', 'unresolved', 'missing'];
+  for (const st of statuses) {
+    push(`- ${st}：${d.claims.filter((c) => c.bindingStatus === st).length} 条`);
+  }
+  const unaligned = d.claims.filter((c) => c.bindingStatus === 'resolved_unaligned');
+  if (unaligned.length > 0) {
+    push('- resolved_unaligned 明示（来源已解析但检索内容不覆盖声明，不得当作已证实证据）：');
+    for (const c of unaligned) push(`  - ${c.id}：${c.text}`);
+  } else {
+    push('- 无 resolved_unaligned 声明。');
+  }
+  push('');
+
+  // ---- 4. evidence relations ----
+  push('## 4. 证据关系汇总', '');
+  push(`- 关系总数：${d.relations.length}`);
+  const coreTypes: readonly EvidenceRelationType[] = ['supports', 'contradicts', 'qualifies', 'unknown'];
+  for (const t of coreTypes) {
+    push(`- ${t}：${d.relations.filter((r) => r.relation === t).length} 条`);
+  }
+  const presentTypes = new Set(d.relations.map((r) => r.relation));
+  for (const t of presentTypes) {
+    if (!coreTypes.includes(t)) push(`- ${t}：${d.relations.filter((r) => r.relation === t).length} 条`);
+  }
+  const counter = d.relations.filter((r) => RELATION_POLARITY[r.relation] === 'counter');
+  if (counter.length > 0) {
+    push('- 关键反证：');
+    for (const r of counter) push(`  - [${r.relation}] ${r.rationale}（strength=${r.strength}）`);
+  } else {
+    push('- 关键反证：本 run 检索范围内未记录反证关系（仅代表检索范围内未发现，不等于不存在）。');
+  }
+  push('');
+
+  // ---- 5. hypotheses (ranked representatives) ----
+  push('## 5. 假设（排序代表）', '');
+  const byId = new Map(d.hypotheses.map((h) => [h.id, h] as const));
+  const representatives =
+    d.scorecards.length > 0
+      ? d.scorecards
+          .map((s) => byId.get(s.hypothesisId))
+          .filter((h): h is HypothesisCandidate => h !== undefined)
+      : d.hypotheses;
+  if (representatives.length === 0) {
+    push('（缺失：无假设候选）');
+  } else {
+    for (const h of representatives) {
+      push(`### ${h.id}（版本 v${h.version}）`, '');
+      push(`- 陈述：${h.statement}`);
+      push(`- 机制：${h.mechanism.trim().length > 0 ? h.mechanism : '（未提供）'}`);
+      if (h.assumptions.length > 0) {
+        push('- 关键前提：');
+        for (const a of h.assumptions) push(`  - [${a.kind}] ${a.statement}`);
+      } else {
+        push('- 关键前提：（未声明）');
+      }
+      const f = h.falsification;
+      if (f) {
+        push(
+          `- 证伪规格要点：观测=${f.observable}；测量=${f.measurement}；判定规则=${f.decisionRule}；证伪条件=${f.falsificationCondition}`,
+        );
+        push(
+          `- 证伪规格完整性（completenessCheck）：${
+            f.completenessCheck
+              ? f.completenessCheck.passed
+                ? '通过'
+                : `未通过（缺：${f.completenessCheck.missing.join('；')}）`
+              : '未检查'
+          }`,
+        );
+      } else {
+        push('- 证伪规格：缺失');
+      }
+      push(`- testability：${h.testability}；noveltyLabel：${h.noveltyLabel}`);
+      const clusterSize = h.clusterKey
+        ? d.hypotheses.filter((x) => x.clusterKey === h.clusterKey).length
+        : 1;
+      push(`- 簇内候选数（含本代表）：${clusterSize}`);
+      push('');
+    }
+    const extras = d.hypotheses.filter((h) => !representatives.includes(h));
+    if (extras.length > 0) push(`（另有 ${extras.length} 个未进入排序代表的候选，未在本节展开）`);
+  }
+  push('');
+
+  // ---- 6. ranking & scores ----
+  push('## 6. 排序与评分', '');
+  push(`> 声明：${SCORE_DISCLAIMER}`);
+  if (d.scorecards.length === 0) push('（缺失：无 scorecard，本 run 未记录排序）');
+  for (const s of d.scorecards) {
+    push('', `### rank ${s.rank} / ${s.rankedOutOf} — ${s.hypothesisId}`, '');
+    push(`- 总评：${s.overallRationale}`);
+    if (s.comparisonNote.trim().length > 0) push(`- 比较说明：${s.comparisonNote}`);
+    push('- 各维度评分：');
+    for (const dim of s.dimensions) {
+      const value = dim.value === null ? '未评估（null）' : String(dim.value);
+      push(
+        `  - ${dim.dimension}：${value}${dim.qualitative ? `（${dim.qualitative}）` : ''} — ${dim.rationale} [producer=${dim.producer}; calibration=${dim.calibration}]`,
+      );
+    }
+  }
+  push('');
+
+  // ---- 7. research plan ----
+  push('## 7. 研究计划', '');
+  if (d.plan) {
+    const p = d.plan;
+    push(`- 计划 ${p.id}；objective：${p.objective}`);
+    push(`- 绑定假设：${p.hypothesisIds.join('；')}`);
+    push(`- 变量：${orNone(p.variables)}`);
+    push(`- 对照：${orNone(p.controls)}`);
+    push(`- 纳入标准：${orNone(p.inclusionCriteria)}`);
+    push(`- 排除标准：${orNone(p.exclusionCriteria)}`);
+    if (p.dataRequirements.length > 0) {
+      push('- 数据需求：');
+      for (const req of p.dataRequirements) {
+        push(
+          `  - ${req.name}（availability=${req.availability}${req.sourceHint ? `，sourceHint=${req.sourceHint}` : ''}）：variables=${req.variables.join('、')}`,
+        );
+      }
+    } else {
+      push('- 数据需求：（未声明）');
+    }
+    if (p.toolRequirements.length > 0) {
+      push('- 工具需求：');
+      for (const t of p.toolRequirements) push(`  - ${t.name}（${t.kind}）：${t.purpose}`);
+    } else {
+      push('- 工具需求：（未声明）');
+    }
+    push('- 步骤：');
+    p.steps.forEach((s, i) => {
+      push(`  ${i + 1}. ${s.title}（${s.kind}）`);
+      push(`     - method：${s.method}`);
+      push(`     - inputs：${orNone(s.inputs)}；outputs：${orNone(s.outputs)}`);
+      push(`     - failureConditions：${s.failureConditions.length > 0 ? s.failureConditions.join('；') : '（未声明）'}`);
+      if (s.dependsOn.length > 0) push(`     - dependsOn：${s.dependsOn.join('、')}`);
+      if (s.estimatedCost) push(`     - 预估成本：${s.estimatedCost}`);
+    });
+    push(`- 指标：${p.metrics.join('；')}`);
+    if (p.statistics.length > 0) push(`- 统计方法：${p.statistics.join('；')}`);
+    push('- 判定规则（decisionRules）：');
+    push(`  - 成功判据：${p.decisionRules.successCriterion}`);
+    push(`  - 弱化判据：${p.decisionRules.weakeningCriterion}`);
+    push(`  - 证伪判据：${p.decisionRules.falsificationCriterion}`);
+    push(`  - 判停判据：${p.decisionRules.stopCriterion}`);
+    push(`- 混杂因素：${orNone(p.confounders)}`);
+    push(`- 备择解释：${orNone(p.alternativeExplanations)}`);
+    push(`- 资源：compute=${p.resources.compute}；cost=${p.resources.cost}；time=${p.resources.time}`);
+    push(`- 风险：${orNone(p.risks)}`);
+    push(`- 伦理：${orNone(p.ethics)}`);
+    push(`- 前置条件：${orNone(p.prerequisites)}`);
+    if (p.expectedInformationGain) push(`- 预期信息增益：${p.expectedInformationGain}`);
+    push(`- 备选分支：${orNone(p.alternativeBranches)}`);
+    push(`- 可复现性要求：${orNone(p.reproducibilityRequirements)}`);
+    push(`- 引用证据声明：${p.evidenceClaimIds.length > 0 ? p.evidenceClaimIds.join('；') : '（无）'}`);
+    const check = p.executabilityCheck;
+    push(
+      `- executabilityCheck：${
+        check ? (check.passed ? '通过' : `未通过 — 缺失项：${check.missing.join('；')}`) : '未检查'
+      }`,
+    );
+  } else {
+    push('（缺失：本 run 未生成研究计划）');
+  }
+  push('');
+
+  // ---- 8. uncertainties & open questions ----
+  push('## 8. 不确定性与未决问题', '');
+  const claimUnc = d.claims.flatMap((c) => c.uncertainties.map((u) => `- 声明 ${c.id}：${u}`));
+  const hypUnc = d.hypotheses.flatMap((h) => h.uncertainties.map((u) => `- 假设 ${h.id}：${u}`));
+  if (claimUnc.length + hypUnc.length === 0) push('存储对象中未记录不确定性条目。');
+  else push(...claimUnc, ...hypUnc);
+  push('');
+
+  // ---- 9. provenance summary ----
+  push('## 9. 溯源（Provenance）摘要', '');
+  const modelCalls = d.receipts.filter((r) => r.kind === 'model_call');
+  const nonLive = d.receipts.filter((r) => r.executionMode !== 'live');
+  push(`- provenance receipts：${d.receipts.length} 条（统计截至报告渲染时，不含本次导出动作自身的 export receipt）`);
+  push(`- 模型调用：${modelCalls.length} 次`);
+  push(
+    `- executionMode 全部为 live：${
+      nonLive.length === 0
+        ? '是'
+        : `否（${nonLive.length} 条非 live：${nonLive.map((r) => r.executionMode).join('、')}）`
+    }`,
+  );
+  push(`- 缺失项：${missingItems.length === 0 ? '无已知缺失项' : missingItems.join('；')}`);
+  push('');
+
+  return L.join('\n');
+};
+
+/** Distinct (provider, modelId) pairs actually seen in model_call receipts, routed honestly. */
+const aggregateModelMetadata = (
+  receipts: ProvenanceReceipt[],
+): ReproducibilityBundle['modelMetadata'] => {
+  const map = new Map<string, ReproducibilityBundle['modelMetadata'][number]>();
+  for (const r of receipts) {
+    if (r.kind !== 'model_call' || !r.modelCall) continue;
+    const route: ReproducibilityBundle['modelMetadata'][number]['route'] =
+      r.executionMode === 'live' ? 'live' : 'test_only';
+    const key = `${r.modelCall.provider}|${r.modelCall.modelId}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { provider: r.modelCall.provider, modelId: r.modelCall.modelId, route });
+    } else if (route === 'live') {
+      existing.route = 'live'; // if the same pair ever ran live, record the stronger truth
+    }
+  }
+  return [...map.values()];
+};
+
+export const exportStage: StageHandler = {
+  stage: 'export',
+  applicable: async (ctx) => ctx.store.listObjects('bundle', ctx.run.id).length === 0,
+
+  execute: async (ctx) => {
+    if (ctx.cancelled()) throw new Error('cancelled by user');
+    const run = ctx.run;
+
+    const question = ctx.store.getObject('question', run.questionId);
+    const corpus = ctx.store.listObjects('corpus_snapshot', run.id).at(-1) ?? null;
+    const sources = ctx.store.listObjects('source_document', run.id);
+    const claims = ctx.store.listObjects('claim', run.id);
+    const relations = ctx.store.listObjects('evidence_relation', run.id);
+    const hypotheses = ctx.store.listObjects('hypothesis', run.id);
+    const scorecards = ctx.store
+      .listObjects('scorecard', run.id)
+      .sort((a, b) => a.rank - b.rank);
+    const plan = ctx.store.listObjects('plan', run.id).at(-1) ?? null;
+    const receipts = ctx.store.listObjects('receipt', run.id);
+
+    // Hash of what is actually on disk; a marked placeholder when missing (never invented).
+    let dependencyLockHash: string;
+    let lockMissing = false;
+    try {
+      dependencyLockHash = sha256Hex(fs.readFileSync(path.join(process.cwd(), 'package-lock.json')));
+    } catch {
+      dependencyLockHash = sha256Hex('missing');
+      lockMissing = true;
+    }
+
+    const inputs: ExportInputs = {
+      run, question, corpus, sources, claims, relations, hypotheses, scorecards, plan, receipts,
+    };
+    const missingItems = collectMissing(inputs, { lockMissing, receipts });
+    const report = buildReport(inputs, missingItems);
+    const reportPut = await ctx.artifacts.put(report);
+
+    ctx.recordReceipt({
+      kind: 'export',
+      executionMode: 'live', // deterministic local rendering of stored objects — actually executed
+      stage: 'export',
+      redactionNote: 'deterministic render of stored objects; no model call involved',
+      toolExec: {
+        tool: 'pipeline/export',
+        inputHash: canonicalSha256({
+          runId: run.id,
+          questionId: question?.id ?? null,
+          corpusId: corpus?.id ?? null,
+          sourceIds: sources.map((s) => s.id),
+          claimIds: claims.map((c) => c.id),
+          relationIds: relations.map((r) => r.id),
+          hypothesisIds: hypotheses.map((h) => h.id),
+          scorecardIds: scorecards.map((s) => s.id),
+          planId: plan?.id ?? null,
+          receiptIds: receipts.map((r) => r.id),
+        }),
+        outputHash: reportPut.hash,
+      },
+    });
+
+    const allReceipts = ctx.store.listObjects('receipt', run.id);
+    const limitations = [
+      '模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新生成逐字节一致的输出。',
+      ...collectMissing(inputs, { lockMissing, receipts: allReceipts }),
+    ];
+
+    const bundleId = newId('bnd');
+    const bundle = ReproducibilityBundle.parse({
+      id: bundleId,
+      runId: run.id,
+      declaredEvidenceLevel: 'replay',
+      codeRevision: process.env.FARLAB_GIT_COMMIT ?? 'unknown',
+      environmentFingerprint: `node ${process.version} ${process.platform}`,
+      dependencyLockHash,
+      questionRef: question?.id ?? 'missing:question',
+      corpusSnapshotRef: corpus?.id ?? 'missing:corpus_snapshot',
+      sourceArtifactHashes: sources.map((s) => s.contentHash),
+      modelMetadata: aggregateModelMetadata(allReceipts),
+      receiptIds: allReceipts.map((r) => r.id),
+      finalArtifactHashes: [reportPut.hash],
+      verificationInstructions: `far verify --bundle ${bundleId}（第三方核验：按 receiptIds 比对 receipts、按 sourceArtifactHashes 比对来源快照、按 finalArtifactHashes 比对导出工件）`,
+      limitations,
+      createdAt: new Date().toISOString(),
+    });
+    ctx.store.putObject('bundle', bundle);
+    const bundlePut = await ctx.artifacts.put(canonicalJson(bundle));
+
+    const summary = `reproducibility bundle ${bundle.id} (${bundlePut.ref}); report ${reportPut.ref}; declaredEvidenceLevel=replay`;
+    ctx.log(summary);
+    return { kind: 'done', summary, artifacts: [reportPut.ref, bundlePut.ref] };
+  },
+};
