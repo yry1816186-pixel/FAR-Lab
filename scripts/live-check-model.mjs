@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable no-undef -- node globals (console, process) are not declared for .mjs by the shared flat config; config file is outside this workstream's write boundary */
+ 
 /**
  * FAR-Lab W1 live model smoke check — Model Execution Plane.
  *

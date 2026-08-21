@@ -4,7 +4,7 @@ import type { RetrievalQuery, SourceFamily } from '../../domain/source.js';
 import { canonicalJson } from '../../shared/crypto.js';
 import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
-import { snapshotHash } from '../../sources/snapshot.js';
+import { snapshotHash, excludeVolatile } from '../../sources/snapshot.js';
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { throwIfCancelled } from './guard.js';
@@ -96,7 +96,9 @@ const toDocument = async (
   rec: RawSourceRecord,
 ): Promise<SourceDocument> => {
   const contentHash = snapshotHash(family, rec);
-  const artifact = await ctx.artifacts.put(canonicalJson(rec.normalized));
+  // Store the artifact over the SAME volatile-excluded canonical payload that contentHash
+  // addresses, so a third party can retrieve the snapshot by the bundle's declared hash.
+  const artifact = await ctx.artifacts.put(canonicalJson(excludeVolatile(family, rec.normalized)));
   return SourceDocument.parse({
     id: newId('src'),
     runId: ctx.run.id,

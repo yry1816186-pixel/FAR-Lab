@@ -98,11 +98,14 @@ export class Store {
 
   putObject<K extends ObjectKind>(kind: K, obj: DomainObject<K>): void {
     const schema = KIND_SCHEMAS[kind] as AnySchema;
-    const parsed = schema.parse(obj) as { id: string; runId?: string; createdAt?: string };
-    const runId = (parsed as { runId?: string }).runId ?? '__none__';
-    const createdAt = (parsed as { createdAt?: string }).createdAt ?? new Date().toISOString();
+    const parsed = schema.parse(obj) as { id?: string; revisionId?: string; runId?: string; createdAt?: string };
+    // VersionDiff is the one kind keyed by revisionId instead of id; fail loud if neither exists.
+    const id = parsed.id ?? parsed.revisionId;
+    if (id === undefined) throw new Error(`object of kind ${kind} has neither id nor revisionId — cannot persist`);
+    const runId = parsed.runId ?? '__none__';
+    const createdAt = parsed.createdAt ?? new Date().toISOString();
     this.db.prepare('INSERT OR REPLACE INTO objects (kind, id, run_id, json, created_at) VALUES (?,?,?,?,?)')
-      .run(kind, parsed.id, runId, JSON.stringify(parsed), createdAt);
+      .run(kind, id, runId, JSON.stringify(parsed), createdAt);
   }
 
   getObject<K extends ObjectKind>(kind: K, id: string): DomainObject<K> | null {

@@ -62,7 +62,7 @@ export class Orchestrator {
           detail: { kind: receipt.kind, id: receipt.id }, receiptId: receipt.id,
         });
       },
-      cancelled: () => signal.cancelled,
+      cancelled: () => signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false),
       log: (msg) => process.stdout.write(`  [${run.id.slice(0, 12)} ${run.currentStage}] ${msg}\n`),
     };
   }
@@ -71,7 +71,25 @@ export class Orchestrator {
   async execute(runId: string, opts?: { stopAfter?: RunStageName }): Promise<ResearchRun> {
     let run = this.deps.store.getRun(runId);
     if (!run) throw new Error(`run not found: ${runId}`);
-    if (run.status === 'completed' || run.status === 'cancelled') return run;
+    if (run.status === 'completed') {
+      // A completed run reopens ONLY when new feedback signals arrived: feedback -> revise -> export
+      // re-run so the revision chain and bundle reflect the feedback. Without signals, resume is a no-op.
+      const signals = this.deps.store.listObjects('feedback', runId);
+      if (signals.length === 0) return run;
+      run = await this.transition(runId, (r) => {
+        for (const stage of ['feedback', 'revise', 'export'] as RunStageName[]) {
+          const rec = r.stages.find((x) => x.stage === stage);
+          if (rec && (rec.state === 'done' || rec.state === 'skipped')) {
+            rec.state = 'pending';
+            delete rec.endedAt;
+            delete rec.error;
+          }
+        }
+        r.status = 'running';
+        return r;
+      });
+      this.deps.store.appendEvent(runId, { type: 'run_resumed', status: 'running', detail: { reopened: 'feedback' } });
+    }
 
     const signal = this.deps.signals.get(runId) ?? { cancelled: false };
     this.deps.signals.set(runId, signal);
@@ -104,7 +122,7 @@ export class Orchestrator {
       const ctx = this.makeContext(run);
       try {
         if (await handler.applicable(ctx)) {
-          if (signal.cancelled) throw new Error('cancelled by user');
+          if (signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false)) throw new Error('cancelled by user');
           const outcome = await handler.execute(ctx);
           run = await this.transition(runId, (r) => {
             this.setStage(r, stage, { state: 'done', endedAt: new Date().toISOString() }, rec?.attempt ?? 1);
@@ -123,11 +141,13 @@ export class Orchestrator {
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        const isCancel = signal.cancelled || /^cancelled/i.test(msg);
+        const persistedCancel = this.deps.store.getRun(runId)?.cancelRequested ?? false;
+        const isCancel = signal.cancelled || persistedCancel || /^cancelled/i.test(msg);
         run = await this.transition(runId, (r) => {
           this.setStage(r, stage, { state: 'failed', endedAt: new Date().toISOString(), error: msg }, rec?.attempt ?? 1);
           r.status = (isCancel ? 'cancelled' : 'partial') satisfies RunStatus;
           r.lastError = msg;
+          if (isCancel) r.cancelRequested = false; // consumed; resume clears the slate
           return r;
         });
         this.deps.store.appendEvent(runId, {
@@ -151,9 +171,11 @@ export class Orchestrator {
   }
 
   cancel(runId: string): boolean {
-    const signal = this.deps.signals.get(runId);
-    if (!signal) return false;
-    signal.cancelled = true;
+    const run = this.deps.store.getRun(runId);
+    if (!run || run.status === 'completed' || run.status === 'cancelled') return false;
+    run.cancelRequested = true;
+    this.deps.store.updateRun(run);
+    this.deps.store.appendEvent(runId, { type: 'run_cancelled', detail: { via: 'persisted-request' } });
     return true;
   }
 }

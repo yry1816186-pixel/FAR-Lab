@@ -43,6 +43,12 @@ export interface ExecutabilityCheck {
  * Deterministic executability gate (pure function). Encodes the §31 essentials that
  * zod counts/cross-references cannot express on their own. Unknown hypothesis ids
  * are reported as failures; callers render `missing` verbatim to humans.
+ *
+ * Step-reference integrity (W2): LLMs fabricate sequential-looking step ids
+ * (`task_1a2b…`) that are not ids of any step in this plan. Inputs may carry non-task
+ * refs (claim ids, free-text resource names) — only refs starting with `task_` must
+ * resolve to a real step id of this plan. dependsOn refs must ALL resolve; a dangling
+ * dependency makes the step ordering undefined, so it is a hard failure.
  */
 export const checkPlanExecutability = (
   plan: Pick<
@@ -59,9 +65,20 @@ export const checkPlanExecutability = (
     if (!known.has(id)) missing.push(`hypothesisIds 引用不存在的假设：${id}`);
   }
   if (plan.steps.length < MIN_STEPS) missing.push(`steps 数量不足：${plan.steps.length} < ${MIN_STEPS}`);
+  const stepIds = new Set(plan.steps.map((s) => s.id));
   plan.steps.forEach((step, i) => {
     if (!step.method.trim()) missing.push(`steps[${i}]「${step.title}」缺少 method`);
     if (step.failureConditions.length === 0) missing.push(`steps[${i}]「${step.title}」缺少 failureConditions`);
+    for (const ref of step.inputs) {
+      if (ref.startsWith('task_') && !stepIds.has(ref)) {
+        missing.push(`steps[${i}]「${step.title}」inputs 含无效步骤引用（task_ 前缀必须为本 plan 内真实 step id）：${ref}`);
+      }
+    }
+    for (const dep of step.dependsOn) {
+      if (!stepIds.has(dep)) {
+        missing.push(`steps[${i}]「${step.title}」dependsOn 引用不存在的步骤：${dep}`);
+      }
+    }
   });
   if (plan.metrics.length < MIN_METRICS) missing.push(`metrics 数量不足：${plan.metrics.length} < ${MIN_METRICS}`);
   const ruleFields: readonly [keyof ResearchPlan['decisionRules'], string][] = [
@@ -77,6 +94,47 @@ export const checkPlanExecutability = (
     if (req.variables.length === 0) missing.push(`dataRequirements[${i}]「${req.name}」未声明 variables`);
   });
   return { passed: missing.length === 0, missing };
+};
+
+interface DroppedStepRef {
+  stepIndex: number;
+  stepTitle: string;
+  ref: string;
+}
+
+interface StepRefSanitizeResult {
+  /** Invalid `task_` refs removed from step.inputs — warning severity, logged loudly. */
+  droppedInputs: DroppedStepRef[];
+  /** Invalid dependsOn refs removed — dependency loss, escalated into executabilityCheck.missing. */
+  droppedDeps: DroppedStepRef[];
+}
+
+/**
+ * Post-generation sanitization (deterministic, no LLM): strip fabricated task
+ * references from the model draft BEFORE it is persisted. inputs keep non-task refs
+ * (claim ids / free text); dependsOn entries that do not resolve to a real step id
+ * are removed and reported by the caller — never silently papered over.
+ */
+const sanitizeStepTaskReferences = (draft: PlanDraft): StepRefSanitizeResult => {
+  const stepIds = new Set(draft.steps.map((s) => s.id));
+  const result: StepRefSanitizeResult = { droppedInputs: [], droppedDeps: [] };
+  draft.steps.forEach((step, i) => {
+    step.inputs = step.inputs.filter((ref) => {
+      if (ref.startsWith('task_') && !stepIds.has(ref)) {
+        result.droppedInputs.push({ stepIndex: i, stepTitle: step.title, ref });
+        return false;
+      }
+      return true;
+    });
+    step.dependsOn = step.dependsOn.filter((dep) => {
+      if (!stepIds.has(dep)) {
+        result.droppedDeps.push({ stepIndex: i, stepTitle: step.title, ref: dep });
+        return false;
+      }
+      return true;
+    });
+  });
+  return result;
 };
 
 export const planStage: StageHandler = {
@@ -160,6 +218,17 @@ export const planStage: StageHandler = {
       ctx.log(`dropping evidenceClaimIds that do not exist in store: ${droppedClaimIds.join(', ')}`);
     }
 
+    // Reference integrity for steps: fabricated task_ refs are stripped before persist.
+    const refSanitize = sanitizeStepTaskReferences(res.data);
+    for (const d of refSanitize.droppedInputs) {
+      ctx.log(
+        `warning: dropped invalid task_ input ref (not a step id of this plan): steps[${d.stepIndex}]「${d.stepTitle}」inputs=${d.ref}`,
+      );
+    }
+    for (const d of refSanitize.droppedDeps) {
+      ctx.log(`dropped invalid dependsOn ref: steps[${d.stepIndex}]「${d.stepTitle}」dependsOn=${d.ref}`);
+    }
+
     const plan = ResearchPlan.parse({
       ...res.data,
       id: newId('pln'),
@@ -167,7 +236,16 @@ export const planStage: StageHandler = {
       evidenceClaimIds: res.data.evidenceClaimIds.filter((id) => knownClaimIds.has(id)),
       createdAt: new Date().toISOString(),
     });
-    plan.executabilityCheck = checkPlanExecutability(plan, hypotheses.map((h) => h.id));
+    // A dropped dependency leaves the step ordering undefined — recorded in `missing`,
+    // never silent; dropped input refs stay warning-level (ctx.log above).
+    const check = checkPlanExecutability(plan, hypotheses.map((h) => h.id));
+    const missing = [
+      ...check.missing,
+      ...refSanitize.droppedDeps.map(
+        (d) => `steps[${d.stepIndex}]「${d.stepTitle}」依赖缺失：dependsOn 引用 ${d.ref} 不在本 plan 内，已剔除`,
+      ),
+    ];
+    plan.executabilityCheck = { passed: missing.length === 0, missing };
     ctx.store.putObject('plan', plan);
 
     const summary = plan.executabilityCheck.passed

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createApp } from '../app/composition.js';
-import { ResearchQuestion, newId, runProgress } from '../domain/index.js';
+import { verifyBundle } from '../app/verify.js';
+import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
 
 const HELP = `far — FAR-Lab research workbench (XH-202619 Track 1 Direction 1A)
@@ -16,7 +17,13 @@ Usage:
                                                   Resume a partial/failed run from its persisted checkpoint
   far research export <run-id> --format report|bundle [--out <dir>] [--json]
                                                   Export human report / reproducibility bundle to --out (default .far-run/exports)
+  far research feedback <run-id> --source <kind> --content <text> [--target-kind <kind> --target-id <id>] [--json]
+                                                  Record feedback on a run (source: human_expert|new_literature|new_dataset|
+                                                  tool_result|simulation|experiment|reviewer|verification_failure|
+                                                  reproduction_failure); consumed causally by the revise stage
   far runs [--json]                              List runs
+  far verify <bundle-id> [--json]                Independently verify a reproducibility bundle
+                                                  (exit 0=verified, 1=failed/degraded)
 
 Exit codes: 0 ok, 1 runtime failure, 2 usage error. Diagnostics on stderr.`;
 
@@ -36,7 +43,7 @@ const positional = (after: number): string | undefined => {
   const rest = process.argv.slice(after).filter((a) => !a.startsWith('--') && !COMMAND_WORDS.has(a));
   return rest[0];
 };
-const COMMAND_WORDS = new Set(['research', 'start', 'status', 'inspect', 'cancel', 'resume', 'export', 'runs', '--evidence', '--hypotheses', '--plan', '--sources']);
+const COMMAND_WORDS = new Set(['research', 'start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'runs', '--evidence', '--hypotheses', '--plan', '--sources', '--source', '--content', '--target-kind', '--target-id']);
 
 const printRun = (run: ResearchRun, verbose = true) => {
   const p = runProgress(run);
@@ -64,6 +71,24 @@ const main = async (): Promise<void> => {
     if (json()) console.log(JSON.stringify(runs, null, 2));
     else for (const r of runs) console.log(`${r.id}  ${r.status.padEnd(10)} ${r.currentStage.padEnd(20)} ${r.createdAt}`);
     app.close();
+    return;
+  }
+
+  if (cmd === 'verify') {
+    const bundleId = positional(3);
+    if (!bundleId) die('verify requires a bundle id', 2);
+    const app = await createApp();
+    try {
+      const report = await verifyBundle(bundleId, { store: app.store, artifacts: app.artifacts });
+      if (json()) console.log(JSON.stringify(report, null, 2));
+      else {
+        console.log(`bundle ${report.bundleId} (run ${report.runId}) — declared evidence level: ${report.declaredEvidenceLevel}`);
+        console.log(`verdict: ${report.verdict} (${report.checks.filter((c) => c.passed).length}/${report.checks.length} checks passed)`);
+        for (const c of report.checks) console.log(`  ${c.passed ? 'PASS' : 'FAIL'}  ${c.name} — ${c.detail}`);
+        if (report.replayGuidance) console.log(`\n${report.replayGuidance}`);
+      }
+      process.exitCode = report.verdict === 'verified' ? 0 : 1;
+    } finally { app.close(); }
     return;
   }
 
@@ -181,7 +206,7 @@ const main = async (): Promise<void> => {
       if (format === 'bundle') {
         const bundles = app.store.listObjects('bundle', run.id);
         if (bundles.length === 0) die('no bundle stored for this run — run the export stage first (far research resume <id>)');
-        const b = bundles[0]!;
+        const b = bundles[bundles.length - 1]!; // latest bundle (revisions may supersede earlier exports)
         const file = `${outDir}/${b.id}.bundle.json`;
         fs.writeFileSync(file, JSON.stringify(b, null, 2));
         console.log(json() ? JSON.stringify({ file, bundleId: b.id }) : `bundle written: ${file}`);
@@ -191,7 +216,7 @@ const main = async (): Promise<void> => {
         if (reportReceipt && reports.length === 0) { /* report stored in artifacts */ }
         const artifactsDir = `${app.dataDir}/artifacts`;
         // the export stage writes the report into the artifact store; find it via the bundle's finalArtifactHashes
-        const bundle = app.store.listObjects('bundle', run.id)[0];
+        const bundle = app.store.listObjects('bundle', run.id).at(-1);
         if (!bundle) die('export stage has not produced artifacts yet — run: far research resume <id>');
         const first = bundle.finalArtifactHashes[0];
         if (!first) die('bundle has no report artifact hash');
@@ -201,6 +226,46 @@ const main = async (): Promise<void> => {
         fs.writeFileSync(file, content);
         console.log(json() ? JSON.stringify({ file }) : `report written: ${file}`);
       }
+    } finally { app.close(); }
+    return;
+  }
+
+  if (sub === 'feedback') {
+    // W2: record external/human feedback as a persisted FeedbackSignal; the revise
+    // stage consumes it causally on the next pipeline pass (never re-prompt-and-replace).
+    const source = arg('--source');
+    const content = arg('--content');
+    if (!source || !content) die('research feedback requires --source <kind> and --content <text>', 2);
+    const parsedSource = FeedbackSourceKind.safeParse(source);
+    if (!parsedSource.success) die(`invalid --source "${source}" — must be one of: ${FeedbackSourceKind.options.join(', ')}`, 2);
+    const targetKind = arg('--target-kind');
+    const targetId = arg('--target-id');
+    if ((targetKind !== undefined) !== (targetId !== undefined)) die('--target-kind and --target-id must be given together', 2);
+    const app = await createApp();
+    try {
+      const run = app.store.getRun(rid);
+      if (!run) die(`run not found: ${runId}`);
+      let target: ObjectRef | undefined;
+      if (targetKind !== undefined && targetId !== undefined) {
+        const ref = ObjectRef.safeParse({ kind: targetKind, id: targetId });
+        if (!ref.success) die(`invalid --target-kind "${targetKind}"`, 2);
+        // fail-closed: a targeted signal must point at an object that actually exists
+        const STORE_KINDS = { hypothesis: 'hypothesis', plan: 'plan', claim: 'claim', question: 'question' } as const;
+        const kind = STORE_KINDS[ref.data.kind as keyof typeof STORE_KINDS];
+        if (kind !== undefined && app.store.getObject(kind, ref.data.id) === null) die(`${ref.data.kind} not found: ${ref.data.id}`, 2);
+        target = ref.data;
+      }
+      const signal = FeedbackSignal.parse({
+        id: newId('fbk'), runId: rid, source: parsedSource.data, content,
+        ...(target ? { target } : {}),
+        provenance: `cli:far research feedback (source=${parsedSource.data}, recorded at terminal)`,
+        receivedAt: new Date().toISOString(),
+      });
+      app.store.putObject('feedback', signal);
+      app.store.appendEvent(rid, { type: 'feedback_received', detail: { feedbackId: signal.id, source: signal.source, via: 'cli' } });
+      console.log(json()
+        ? JSON.stringify({ recorded: true, feedbackId: signal.id, runId: rid, source: signal.source, receivedAt: signal.receivedAt })
+        : `feedback ${signal.id} recorded on run ${rid} (source=${parsedSource.data}); awaiting causal revision`);
     } finally { app.close(); }
     return;
   }

@@ -8,6 +8,9 @@ import {
 import type {
   CitationBindingStatus,
   CorpusSnapshot,
+  FeedbackSignal,
+  Revision,
+  VersionDiff,
   EvidenceRelation,
   EvidenceRelationType,
   HypothesisCandidate,
@@ -44,9 +47,15 @@ interface ExportInputs {
   plan: ResearchPlan | null;
   /** receipts as of render time (does not include the export receipt itself) */
   receipts: ProvenanceReceipt[];
+  feedbacks: FeedbackSignal[];
+  revisions: Revision[];
+  versionDiffs: VersionDiff[];
 }
 
 const orNone = (items: string[]): string => (items.length > 0 ? items.join('；') : '（未声明）');
+
+/** Deterministic ellipsis truncation for report lines (never fabricates, only shortens). */
+const truncate = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max)}…`);
 
 /** Material missing/incomplete items shared by report §9 and bundle limitations — one owner. */
 const collectMissing = (
@@ -170,7 +179,29 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
   const counter = d.relations.filter((r) => RELATION_POLARITY[r.relation] === 'counter');
   if (counter.length > 0) {
     push('- 关键反证：');
-    for (const r of counter) push(`  - [${r.relation}] ${r.rationale}（strength=${r.strength}）`);
+    // A counter-evidence line must carry the actual claim text and its source title —
+    // a bare generic rationale is unusable to a researcher. Claim text comes from the
+    // stored claim object; source-level relations (no claimId) render the source title.
+    const claimById = new Map(d.claims.map((c) => [c.id, c] as const));
+    const sourceById = new Map(d.sources.map((s) => [s.id, s] as const));
+    for (const r of counter) {
+      const claim = r.claimId ? claimById.get(r.claimId) : undefined;
+      const sourceId = claim?.locators[0]?.sourceDocumentId ?? r.sourceDocumentId;
+      const source = sourceId !== undefined ? sourceById.get(sourceId) : undefined;
+      const sourceLabel = source
+        ? truncate(source.title, 40)
+        : sourceId !== undefined
+          ? `${sourceId}（来源对象缺失）`
+          : '未记录来源';
+      const main = claim
+        ? truncate(claim.text, 120)
+        : r.claimId
+          ? `claim ${r.claimId} 未在 store 中（悬空引用）`
+          : source
+            ? truncate(source.title, 40)
+            : r.rationale;
+      push(`  - [${r.relation}] ${main}（来源: ${sourceLabel}，strength=${r.strength}）`);
+    }
   } else {
     push('- 关键反证：本 run 检索范围内未记录反证关系（仅代表检索范围内未发现，不等于不存在）。');
   }
@@ -271,13 +302,18 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
     } else {
       push('- 工具需求：（未声明）');
     }
+    // Render-layer defense: plans persisted before W2 reference-integrity sanitization
+    // can still contain fabricated `task_` ids; never render them as if they were valid.
+    const stepIds = new Set(p.steps.map((s) => s.id));
+    const renderRef = (ref: string): string =>
+      ref.startsWith('task_') && !stepIds.has(ref) ? '(invalid ref removed at render)' : ref;
     push('- 步骤：');
     p.steps.forEach((s, i) => {
       push(`  ${i + 1}. ${s.title}（${s.kind}）`);
       push(`     - method：${s.method}`);
-      push(`     - inputs：${orNone(s.inputs)}；outputs：${orNone(s.outputs)}`);
+      push(`     - inputs：${orNone(s.inputs.map(renderRef))}；outputs：${orNone(s.outputs)}`);
       push(`     - failureConditions：${s.failureConditions.length > 0 ? s.failureConditions.join('；') : '（未声明）'}`);
-      if (s.dependsOn.length > 0) push(`     - dependsOn：${s.dependsOn.join('、')}`);
+      if (s.dependsOn.length > 0) push(`     - dependsOn：${s.dependsOn.map(renderRef).join('、')}`);
       if (s.estimatedCost) push(`     - 预估成本：${s.estimatedCost}`);
     });
     push(`- 指标：${p.metrics.join('；')}`);
@@ -321,6 +357,37 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
   const modelCalls = d.receipts.filter((r) => r.kind === 'model_call');
   const nonLive = d.receipts.filter((r) => r.executionMode !== 'live');
   push(`- provenance receipts：${d.receipts.length} 条（统计截至报告渲染时，不含本次导出动作自身的 export receipt）`);
+  push('');
+
+  // ---- 10. feedback / revision / version diff (causal chain, mission §33/§34) ----
+  push('## 10. 反馈与修订（因果链）', '');
+  if (d.feedbacks.length === 0) {
+    push('本 run 尚无反馈信号（feedback channel 未使用或未触发修订）。');
+  } else {
+    for (const f of d.feedbacks) {
+      push(`- 反馈 ${f.id}（source=${f.source}，${f.receivedAt}）：${f.content.slice(0, 200)}`);
+    }
+    push('');
+    if (d.revisions.length === 0) {
+      push('- 已记录反馈但尚无修订（revise 阶段未执行或判定无可修订对象）。');
+    }
+    for (const r of d.revisions) {
+      push(`- 修订 ${r.id}（${r.fromVersionLabel} -> ${r.toVersionLabel}，触发反馈 ${r.triggerFeedbackId}）：`);
+      push(`  - 因果：${r.causalReason.slice(0, 300)}`);
+      for (const op of r.operations) {
+        push(`  - [${op.objectType}/${op.operation}] ${op.objectId}：${(op.before ?? '').slice(0, 80)}… -> ${(op.after ?? '').slice(0, 80)}…（${op.reason.slice(0, 120)}）`);
+      }
+      push(`  - 质量变化：${r.qualityDelta.status} — ${r.qualityDelta.claim.slice(0, 160)}`);
+    }
+    for (const vd of d.versionDiffs) {
+      push(`- 版本差异 ${vd.revisionId}：${vd.semanticSummary.slice(0, 240)}`);
+      for (const e of vd.entries) {
+        push(`  - ${e.objectType} ${e.objectId}：${e.summary.slice(0, 120)}（changed: ${e.changedFields.join(', ')}）`);
+      }
+      if (vd.remainingUncertainties.length > 0) push(`  - 剩余不确定性：${vd.remainingUncertainties.slice(0, 3).join('；').slice(0, 240)}`);
+    }
+  }
+  push('');
   push(`- 模型调用：${modelCalls.length} 次`);
   push(
     `- executionMode 全部为 live：${
@@ -357,7 +424,17 @@ const aggregateModelMetadata = (
 
 export const exportStage: StageHandler = {
   stage: 'export',
-  applicable: async (ctx) => ctx.store.listObjects('bundle', ctx.run.id).length === 0,
+  applicable: async (ctx) => {
+    // Re-export when no bundle exists OR when a revision landed after the newest bundle,
+    // so the report/bundle always reflect the latest causal revision state.
+    const bundles = ctx.store.listObjects('bundle', ctx.run.id);
+    if (bundles.length === 0) return true;
+    const latestBundle = bundles[bundles.length - 1]!;
+    const newerRevision = ctx.store
+      .listObjects('revision', ctx.run.id)
+      .find((r) => r.createdAt > latestBundle.createdAt);
+    return newerRevision !== undefined;
+  },
 
   execute: async (ctx) => {
     if (ctx.cancelled()) throw new Error('cancelled by user');
@@ -374,6 +451,9 @@ export const exportStage: StageHandler = {
       .sort((a, b) => a.rank - b.rank);
     const plan = ctx.store.listObjects('plan', run.id).at(-1) ?? null;
     const receipts = ctx.store.listObjects('receipt', run.id);
+    const feedbacks = ctx.store.listObjects('feedback', run.id);
+    const revisions = ctx.store.listObjects('revision', run.id);
+    const versionDiffs = ctx.store.listObjects('version_diff', run.id);
 
     // Hash of what is actually on disk; a marked placeholder when missing (never invented).
     let dependencyLockHash: string;
@@ -386,7 +466,7 @@ export const exportStage: StageHandler = {
     }
 
     const inputs: ExportInputs = {
-      run, question, corpus, sources, claims, relations, hypotheses, scorecards, plan, receipts,
+      run, question, corpus, sources, claims, relations, hypotheses, scorecards, plan, receipts, feedbacks, revisions, versionDiffs,
     };
     const missingItems = collectMissing(inputs, { lockMissing, receipts });
     const report = buildReport(inputs, missingItems);

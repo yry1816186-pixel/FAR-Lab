@@ -59,6 +59,8 @@ export const ResearchRun = z.object({
   updatedAt: z.string().datetime(),
   /** Structured failure summary when status=failed/partial; visible, never swallowed. */
   lastError: z.string().optional(),
+  /** Persisted cancellation request — cross-process visible (CLI cancel -> running orchestrator). */
+  cancelRequested: z.boolean().default(false),
   parentRunId: RunId.optional(), // revision lineage: a revised run points at its predecessor
   tags: z.array(z.string()).default([]),
 });
