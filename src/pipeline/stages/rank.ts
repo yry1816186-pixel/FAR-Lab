@@ -174,7 +174,19 @@ export const rankStage: StageHandler = {
 
     assertNotCancelled(ctx, 'rank');
     const existingClaimIds = runClaimIds(ctx);
-    const res = await callStructured<z.infer<typeof RankOut>>(ctx, {
+    // Batch the scoring calls: large single outputs (10+ hypotheses) exceed the model's
+    // practical JSON output budget and truncate mid-array. 4 per call keeps outputs well
+    // inside budget; scores are per-hypothesis independent so batching is semantically safe.
+    const BATCH_SIZE = 4;
+    const batches: HypothesisCandidate[][] = [];
+    for (let i = 0; i < targets.length; i += BATCH_SIZE) batches.push(targets.slice(i, i + BATCH_SIZE));
+    const allClaims = ctx.store
+      .listObjects('claim', runId)
+      .map((c) => ({ id: c.id, text: c.text, bindingStatus: c.bindingStatus }));
+    const batchResults: { provider: string; modelId: string; data: z.infer<typeof RankOut> }[] = [];
+    for (const batch of batches) {
+      assertNotCancelled(ctx, 'rank');
+      const res = await callStructured<z.infer<typeof RankOut>>(ctx, {
       stage: 'rank',
       purpose: 'hypothesis-ranking:dimension-scores',
       systemPrompt:
@@ -185,7 +197,7 @@ export const rankStage: StageHandler = {
         'high cost/risk); use "unclear" only if you cannot commit — the dimension is then excluded. ' +
         'Scores are ordinal decision aids, not probabilities.',
       payload: {
-        hypotheses: targets.map((h) => ({
+        hypotheses: batch.map((h) => ({
           id: h.id,
           statement: h.statement,
           mechanism: h.mechanism,
@@ -204,14 +216,17 @@ export const rankStage: StageHandler = {
           supportingClaimIds: h.supportingClaimIds,
           counterClaimIds: h.counterClaimIds,
         })),
-        availableClaims: ctx.store
-          .listObjects('claim', runId)
-          .map((c) => ({ id: c.id, text: c.text, bindingStatus: c.bindingStatus })),
+        availableClaims: allClaims,
       },
       schema: RankOut,
-    });
+      });
+      batchResults.push(res);
+    }
+    const merged: z.infer<typeof RankOut> = { assessments: batchResults.flatMap((b) => b.data.assessments) };
+    const firstProvider = batchResults[0]?.provider ?? 'unknown';
+    const firstModel = batchResults[0]?.modelId ?? 'unknown';
 
-    const producer = `${res.provider}/${res.modelId} structured critique`;
+    const producer = `${firstProvider}/${firstModel} structured critique`;
     const warnings: string[] = [];
     const claimFilter = (ids: readonly string[], hypId: string): string[] => {
       const p = partitionClaimRefs(ids, existingClaimIds);
@@ -232,7 +247,7 @@ export const rankStage: StageHandler = {
     const byId = new Map(targets.map((h) => [h.id, h]));
     const ranked: Ranked[] = [];
     const unknown: string[] = [];
-    for (const a of res.data.assessments) {
+    for (const a of merged.assessments) {
       const hyp = byId.get(a.hypothesisId);
       if (!hyp) {
         unknown.push(a.hypothesisId);

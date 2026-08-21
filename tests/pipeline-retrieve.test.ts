@@ -254,7 +254,11 @@ const PLAN = {
     'calorie restriction glucose metabolism adults',
   ],
   supporting: ['intermittent fasting insulin sensitivity meta-analysis'],
-  counter: ['intermittent fasting insulin sensitivity failed replication'],
+  // W5/S1: the schema now requires exactly 2 counter queries (two distinct angles)
+  counter: [
+    'intermittent fasting insulin sensitivity failed replication',
+    'intermittent fasting insulin sensitivity negative result',
+  ],
 };
 
 describe('retrieve stage', () => {
@@ -311,11 +315,11 @@ describe('retrieve stage', () => {
     for (const s of openalex.calls.searches) expect(s.limit).toBe(4);
     for (const s of arxiv.calls.searches) expect(s.limit).toBe(4);
 
-    // receipts: exactly 1 model_call + 5 source_retrieval (oa/oa/arxiv x discovery+supporting + counter)
+    // receipts: exactly 1 model_call + 6 source_retrieval (counter x2 on oa/arxiv + oa/arxiv x discovery + supporting)
     const receipts = env.store.listObjects('receipt', env.run.id);
     expect(receipts.filter((r) => r.kind === 'model_call')).toHaveLength(1);
     const retrieval = receipts.filter((r) => r.kind === 'source_retrieval');
-    expect(retrieval).toHaveLength(5);
+    expect(retrieval).toHaveLength(6);
     for (const r of retrieval) {
       expect(r.executionMode).toBe('live');
       expect(r.stage).toBe('retrieve');
@@ -328,6 +332,17 @@ describe('retrieve stage', () => {
     expect(counterReceipt.sourceRetrieval?.family).toBe('openalex');
     expect(counterReceipt.sourceRetrieval?.resultCount).toBe(2);
     expect(counterReceipt.sourceRetrieval?.contentHashes).toHaveLength(2);
+    // W5/S1: the SECOND planned counter query is executed too (arxiv side), never dropped
+    const counterReceipt2 = defined(
+      retrieval.find((r) => r.sourceRetrieval?.query === PLAN.counter[1]),
+      'second counter receipt',
+    );
+    expect(counterReceipt2.sourceRetrieval?.family).toBe('arxiv');
+    // both counter searches run before any discovery/supporting search (R-05 ordering)
+    const indexOfQuery = (text: string) =>
+      retrieval.findIndex((r) => r.sourceRetrieval?.query === text);
+    expect(indexOfQuery(PLAN.counter[0] as string)).toBeLessThan(indexOfQuery(PLAN.discovery[0] as string));
+    expect(indexOfQuery(PLAN.counter[1] as string)).toBeLessThan(indexOfQuery(PLAN.discovery[0] as string));
 
     // idempotent skip once a corpus exists
     expect(await retrieveStage.applicable(env.ctx)).toBe(false);
@@ -392,7 +407,7 @@ describe('retrieve stage', () => {
     const failedReceipts = env.store
       .listObjects('receipt', env.run.id)
       .filter((r) => r.kind === 'source_retrieval' && r.sourceRetrieval?.family === 'arxiv');
-    expect(failedReceipts).toHaveLength(2); // discovery + supporting 都真实尝试过 arxiv
+    expect(failedReceipts).toHaveLength(3); // counter[1] + discovery + supporting 都真实尝试过 arxiv
     for (const r of failedReceipts) {
       expect(r.sourceRetrieval?.httpStatus).toBe(504);
       expect(r.sourceRetrieval?.resultCount).toBe(0);
@@ -416,7 +431,7 @@ describe('retrieve stage', () => {
       { openalex: failAll('openalex'), arxiv: failAll('arxiv') },
     );
 
-    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/all 5 source searches failed/);
+    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/all 6 source searches failed/);
     expect(env.store.listObjects('corpus_snapshot', env.run.id)).toHaveLength(0);
     expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(0);
     expect(await retrieveStage.applicable(env.ctx)).toBe(true); // 可重试
@@ -436,11 +451,35 @@ describe('retrieve stage', () => {
     expect(env.store.listObjects('corpus_snapshot', env.run.id)).toHaveLength(0);
   });
 
-  it('fails when counter queries carry no counter-evidence vocabulary', async () => {
+  it('rejects a single-counter-query plan (W5/S1: one counter query is structural decoration, not a search)', async () => {
     const openalex = fakeAdapter('openalex', { search: async () => [] });
     const arxiv = fakeAdapter('arxiv', { search: async () => [] });
     const env = makeEnv(
-      [{ rawOutput: JSON.stringify({ ...PLAN, counter: ['intermittent fasting benefits review'] }) }],
+      [{ rawOutput: JSON.stringify({ ...PLAN, counter: [PLAN.counter[0]] }) }],
+      { openalex, arxiv },
+    );
+
+    // min(2) schema: a 1-counter plan is invalid output — the second counter query
+    // must be planned AND executed, never silently dropped as before W5.
+    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/model call failed \(invalid_output\)/);
+    expect(openalex.calls.searches).toHaveLength(0);
+    expect(arxiv.calls.searches).toHaveLength(0);
+    expect(env.store.listObjects('corpus_snapshot', env.run.id)).toHaveLength(0);
+  });
+
+  it('fails when counter queries carry no counter-evidence vocabulary', async () => {
+    const openalex = fakeAdapter('openalex', { search: async () => [] });
+    const arxiv = fakeAdapter('arxiv', { search: async () => [] });
+    // two queries (schema-valid count) but NEITHER carries counter-evidence vocabulary
+    const env = makeEnv(
+      [
+        {
+          rawOutput: JSON.stringify({
+            ...PLAN,
+            counter: ['intermittent fasting benefits review', 'intermittent fasting advantages meta-analysis'],
+          }),
+        },
+      ],
       { openalex, arxiv },
     );
 
@@ -461,11 +500,15 @@ describe('retrieve stage', () => {
     const docs = env.store.listObjects('source_document', env.run.id);
     expect(docs).toHaveLength(12);
     expect(out.summary).toContain('truncated at cap 12');
-    // counter 查询先执行（R-05 不被截断挤掉）：其 4 条记录都在
+    // 两条 counter 查询都先执行（R-05 不被截断挤掉）：各自的 4 条记录都在
     const counterIds = docs.filter((d) =>
       d.identifiers.some((i) => i.value.startsWith('10.1000/fake.intermittentfastinginsulinsensitivityfailedreplication.')),
     );
     expect(counterIds).toHaveLength(4);
+    const counterIds2 = docs.filter((d) =>
+      d.identifiers.some((i) => i.value.startsWith('10.1000/fake.aintermittentfastinginsulinsensitivitynegativeresult.')),
+    );
+    expect(counterIds2).toHaveLength(4);
   });
 
   it('honors the cancellation checkpoint before any work', async () => {

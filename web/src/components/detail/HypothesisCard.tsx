@@ -25,6 +25,8 @@ export function HypothesisCard({
         <span className="muted small">{t('hyp.version', { n: hypothesis.version })}</span>
         <Badge tone={testabilityTone(hypothesis.testability)}>{t(testabilityKey(hypothesis.testability))}</Badge>
         <Badge tone={noveltyTone(hypothesis.noveltyLabel)}>{t(noveltyKey(hypothesis.noveltyLabel))}</Badge>
+        {/* W5/S4: noveltyLabel is corpus-relative — the qualifier is mandatory wherever the label is shown */}
+        <span className="muted small novelty-qualifier">{t('novelty.qualifier')}</span>
         {completeness !== undefined ? (
           completeness.passed ? (
             <Badge tone="ok">{t('completeness.passed')}</Badge>

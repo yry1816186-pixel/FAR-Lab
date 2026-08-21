@@ -22,6 +22,14 @@ export const Assumption = z.object({
 });
 export type Assumption = z.infer<typeof Assumption>;
 
+/**
+ * W5/S3 — where the quantitative thresholds of a decision rule come from
+ * (model self-assessment, disclosed in the report). Optional: specs persisted
+ * before W5 have no provenance and render as「来源未声明」.
+ */
+export const DecisionRuleProvenance = z.enum(['evidence-derived', 'community-standard', 'model-stipulated']);
+export type DecisionRuleProvenance = z.infer<typeof DecisionRuleProvenance>;
+
 /** Mission §29 — a real falsification spec, not "could be tested in the future". */
 export const FalsificationSpec = z.object({
   observable: z.string().min(1),
@@ -29,6 +37,8 @@ export const FalsificationSpec = z.object({
   /** Expected relation + decision threshold; qualitative decision rules are legitimate. */
   expectedRelation: z.string().min(1),
   decisionRule: z.string().min(1),
+  /** Self-assessed source of the decision rule's thresholds (W5/S3; backward-compatible optional). */
+  decisionRuleProvenance: DecisionRuleProvenance.optional(),
   supportCondition: z.string().min(1),
   weakeningCondition: z.string().min(1),
   falsificationCondition: z.string().min(1),

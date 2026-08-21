@@ -17,11 +17,13 @@ const QueryPlan = z.object({
   discovery: z.array(z.string().min(1)).length(2),
   supporting: z.array(z.string().min(1)).min(1).max(2),
   /**
-   * R-05 (forced counter-evidence search): min(1) makes a zero-counter-query
-   * plan a schema failure, so the stage fails loudly instead of silently
-   * running a counter-evidence-blind retrieval.
+   * R-05 (forced counter-evidence search): min(2) makes a zero- or single-counter-query
+   * plan a schema failure, so the stage fails loudly instead of silently running a
+   * counter-evidence-blind (or token) retrieval. W5/S1: BOTH planned counter queries
+   * are executed — one per source family — so counter search is structural, not
+   * decorative (the old code executed only counter[0] and dropped the second).
    */
-  counter: z.array(z.string().min(1)).min(1).max(2),
+  counter: z.array(z.string().min(1)).min(2).max(2),
 });
 type QueryPlan = z.infer<typeof QueryPlan>;
 
@@ -44,7 +46,7 @@ const SYSTEM_PROMPT = `You plan the evidence retrieval for one scientific resear
 Return ONE JSON object with exactly these fields:
 - "discovery": exactly 2 English scholarly search queries that map the field broadly,
 - "supporting": 1 or 2 English queries aimed at direct evidence about the question's expected relationship,
-- "counter": 1 or 2 English queries aimed at COUNTER-EVIDENCE: limitations, failed replications, contradictory findings, negative results, or methodological critiques.
+- "counter": exactly 2 DIFFERENT English queries aimed at COUNTER-EVIDENCE: limitations, failed replications, contradictory findings, negative results, or methodological critiques. Cover two distinct counter-evidence angles (e.g. one on failed/negative results, one on methodological critiques or limitations).
 Rules:
 - All queries in English, written as plain keyword phrases for academic search engines (no boolean operators, no quotes).
 - Ground every query in the question's topic; never invent specific papers, authors, journals or results.
@@ -62,6 +64,21 @@ const firstQuery = (queries: readonly string[], label: string): string => {
     throw new Error(`retrieve: no usable ${label} query in the plan — refusing to search blindly`);
   }
   return q;
+};
+
+/**
+ * W5/S1: every planned counter query is executed (schema guarantees exactly 2) —
+ * counter[0] on OpenAlex, counter[1] on arXiv. Returning fewer than 2 is a schema
+ * violation, but the extraction stays total for TypeScript's noUncheckedIndexedAccess.
+ */
+const counterQueries = (queries: readonly string[]): readonly [string, string] => {
+  const [a, b] = queries;
+  if (a === undefined || a.trim().length === 0 || b === undefined || b.trim().length === 0) {
+    throw new Error(
+      `retrieve: expected 2 usable counter queries in the plan, got ${JSON.stringify(queries)} — refusing to run a one-sided counter-evidence search`,
+    );
+  }
+  return [a, b];
 };
 
 /** R-05 enforcement: schema guarantees >=1 counter query; this guarantees orientation. */
@@ -150,12 +167,15 @@ export const retrieveStage: StageHandler = {
     const plan = planRes.data;
     enforceCounterEvidence(plan);
 
-    // Counter-evidence search runs FIRST so the corpus cap can never crowd it out.
+    // Counter-evidence searches run FIRST so the corpus cap can never crowd them out.
+    // W5/S1: BOTH counter queries execute, one per source family — the second planned
+    // counter query is no longer silently dropped (structural, not decorative, R-05).
     const discoveryQ = firstQuery(plan.discovery, 'discovery');
     const supportingQ = firstQuery(plan.supporting, 'supporting');
-    const counterQ = firstQuery(plan.counter, 'counter');
+    const [counterOpenalex, counterArxiv] = counterQueries(plan.counter);
     const targets: readonly SearchTarget[] = [
-      { purpose: 'counter_evidence', text: counterQ, family: 'openalex' },
+      { purpose: 'counter_evidence', text: counterOpenalex, family: 'openalex' },
+      { purpose: 'counter_evidence', text: counterArxiv, family: 'arxiv' },
       { purpose: 'discovery', text: discoveryQ, family: 'openalex' },
       { purpose: 'discovery', text: discoveryQ, family: 'arxiv' },
       { purpose: 'supporting', text: supportingQ, family: 'openalex' },

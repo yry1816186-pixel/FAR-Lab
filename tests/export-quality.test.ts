@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   EvidenceRelation,
+  HypothesisCandidate,
   ProvenanceReceipt,
   ResearchPlan,
   ResearchQuestion,
@@ -278,5 +279,66 @@ describe('export report quality (W2)', () => {
   it('keeps the claim-id prefix on every §8 uncertainty line (regression)', async () => {
     const { report, clmLong } = await renderPreW2Report();
     expect(report).toContain(`- 声明 ${clmLong.id}：only one hospital sampled`);
+  });
+
+  it('W5/S5: appends the evidence-ceiling declaration to §7 with store-computed counts', async () => {
+    const { report } = await renderPreW2Report();
+    // fixture corpus: 2 sources, both abstract-depth (0 metadata_only)
+    expect(report).toContain('**证据上限声明**');
+    expect(report).toContain('本计划基于 2 篇来源（2 篇摘要级/0 篇元数据级）生成');
+    expect(report).toContain('资源规模、样本量与量化阈值为模型拟定值');
+    expect(report).toContain('decisionRuleProvenance 标注');
+  });
+
+  it('W5/S3: pre-W5 specs without decisionRuleProvenance render「来源未声明」(no invented source)', async () => {
+    const g = seedPreW2Run();
+    // representative-style hypothesis carrying a PRE-W5 falsification spec: no
+    // decisionRuleProvenance field persisted. The report must show it honestly.
+    const hyp = HypothesisCandidate.parse({
+      id: `hyp_${'2'.repeat(26)}`,
+      runId: g.run.id,
+      version: 0,
+      statement: 'biofilm growth rate drives ARG transfer frequency',
+      mechanism: 'dense biofilm matrix increases conjugative contact',
+      derivation: { strategy: 'evidence_conditioned', rationale: 'from biofilm survey claims', inputClaimIds: [] },
+      assumptions: [{ id: 'a1', statement: 'conjugation scales with cell contact', kind: 'stipulated', backingClaimIds: [] }],
+      predictions: ['higher biofilm mass raises transfer rate'],
+      supportingClaimIds: [],
+      counterClaimIds: [],
+      uncertainties: [],
+      noveltyLabel: 'mixed',
+      testability: 'testable_now',
+      falsification: {
+        observable: 'ARG transfer rate per gram of biofilm',
+        measurement: 'qPCR quantification across biofilm mass gradient',
+        expectedRelation: 'monotonic increase with biofilm mass',
+        decisionRule: '>=10x transfer rate in high-mass vs low-mass biofilms supports',
+        supportCondition: 'clear mass-response across sampled sinks',
+        weakeningCondition: 'flat response across the gradient',
+        falsificationCondition: 'no transfer events in any high-mass sample',
+        confounders: [],
+        alternativeExplanations: [],
+        dataRequirements: [],
+        method: 'paired sink sampling with mass stratification',
+        failureInterpretation: 'biofilm-mass mechanism unsupported',
+        completenessCheck: { passed: true, missing: [] },
+      },
+      clusterKey: 'biofilm-mass',
+      createdAt: ts(7),
+    });
+    store.putObject('hypothesis', hyp);
+
+    const outcome = await exportStage.execute(makeCtx(g.run));
+    if (outcome.kind !== 'done') throw new Error('expected done outcome');
+    const report = await artifacts.get(outcome.artifacts[0]!);
+    if (report === null) throw new Error('report artifact missing');
+
+    expect(report).toContain('来源未声明');
+    expect(report).not.toContain('⚠ 阈值为模型拟定');
+    expect(report).not.toContain('来源：证据推导');
+    // W5/S4 regression in the same render: the novelty line still carries the corpus qualifier
+    expect(report).toContain(
+      'noveltyLabel：mixed（仅相对本 run 检索语料判定，未做全文献新颖性检索）',
+    );
   });
 });
