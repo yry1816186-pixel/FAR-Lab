@@ -145,6 +145,16 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
 };
 
 /**
+ * Internal sentinel: this zod node has NO strict-FC-acceptable JSON-Schema shape
+ * (records/unknowns/any, empty objects, non-string literals, depth overflow). Live
+ * probes 2026-08-22 (spikes/output/strict-fc-null-probe.json, strict-fc-shape-probe.json):
+ * the beta endpoint 400s on bare {} ("missing field type"), property-less objects
+ * ("An object with no properties is not allowed") and items-less arrays; anyOf-with-null
+ * IS accepted. Callers fall back to the json_object transport for sentinel schemas.
+ */
+const UNPROJECTABLE = Symbol('farlab-strict-fc-unprojectable');
+
+/**
  * Project a zod schema into the strict-function-calling JSON-Schema SUBSET
  * (DeepSeek beta docs 2026-08-22: object/string/number/integer/boolean/array/enum/anyOf;
  * every object property required + additionalProperties:false; NO min/maxLength on
@@ -152,9 +162,10 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
  * every constraint dropped here is still enforced by the caller's zod parse.
  * Optional/nullable/defaulted fields become anyOf [inner, null]; the null-strip
  * tolerance layer then maps model-emitted nulls back to absent optionals.
+ * Returns UNPROJECTABLE when no valid strict shape exists for the node.
  */
 export const zodToStrictJsonSchema = (schema: z.ZodTypeAny, depth = 0): unknown => {
-  if (depth > 12) return {};
+  if (depth > 12) return UNPROJECTABLE;
   const d = schema._def as {
     typeName?: string; values?: unknown; value?: unknown; type?: z.ZodTypeAny; innerType?: z.ZodTypeAny;
     options?: Readonly<z.ZodTypeAny[]>; shape?: unknown; schema?: z.ZodTypeAny; in?: z.ZodTypeAny; checks?: unknown[];
@@ -171,24 +182,91 @@ export const zodToStrictJsonSchema = (schema: z.ZodTypeAny, depth = 0): unknown 
     case 'ZodEnum':
       return { type: 'string', enum: [...(d.values as readonly unknown[])] };
     case 'ZodLiteral':
-      return { type: typeof d.value === 'string' ? 'string' : 'string', enum: [d.value] };
-    case 'ZodArray':
-      return { type: 'array', items: zodToStrictJsonSchema(d.type!, depth + 1) };
+      return typeof d.value === 'string' ? { type: 'string', enum: [d.value] } : UNPROJECTABLE;
+    case 'ZodArray': {
+      const items = zodToStrictJsonSchema(d.type!, depth + 1);
+      if (items === UNPROJECTABLE) return UNPROJECTABLE;
+      return { type: 'array', items };
+    }
     case 'ZodObject': {
       const shapeObj = typeof d.shape === 'function' ? (d.shape as () => Record<string, z.ZodTypeAny>)() : ((d.shape as Record<string, z.ZodTypeAny>) ?? {});
       const properties: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(shapeObj)) properties[k] = zodToStrictJsonSchema(v, depth + 1);
+      for (const [k, v] of Object.entries(shapeObj)) {
+        const p = zodToStrictJsonSchema(v, depth + 1);
+        if (p === UNPROJECTABLE) return UNPROJECTABLE;
+        properties[k] = p;
+      }
+      if (Object.keys(properties).length === 0) return UNPROJECTABLE;
       return { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
     }
-    case 'ZodOptional': case 'ZodNullable': case 'ZodDefault': case 'ZodCatch':
-      return { anyOf: [zodToStrictJsonSchema(d.innerType ?? d.type!, depth + 1), { type: 'null' }] };
-    case 'ZodUnion':
-      return { anyOf: (d.options ?? []).map((o) => zodToStrictJsonSchema(o, depth + 1)) };
+    case 'ZodOptional': case 'ZodNullable': case 'ZodDefault': case 'ZodCatch': {
+      const inner = zodToStrictJsonSchema(d.innerType ?? d.type!, depth + 1);
+      if (inner === UNPROJECTABLE) return UNPROJECTABLE;
+      return { anyOf: [inner, { type: 'null' }] };
+    }
+    case 'ZodUnion': {
+      // Drop unprojectable arms (e.g. rank's map-form dimensions arm): the model is
+      // steered to a projectable arm, zod still accepts every arm. All arms
+      // unprojectable -> sentinel (json_object fallback for the whole call).
+      const arms = (d.options ?? [])
+        .map((o) => zodToStrictJsonSchema(o, depth + 1))
+        .filter((p): p is Record<string, unknown> => p !== UNPROJECTABLE);
+      if (arms.length === 0) return UNPROJECTABLE;
+      return { anyOf: arms };
+    }
     case 'ZodEffects': case 'ZodPipeline':
       return zodToStrictJsonSchema(d.schema ?? d.in!, depth + 1);
     default:
-      return {}; // records/unknowns: unconstrained at the transport layer, zod still enforces
+      return UNPROJECTABLE;
   }
+};
+
+/**
+ * Endpoint-contract invariant for strict-FC projections, enforced at the projection
+ * boundary (live-probed 2026-08-22): every node carries an explicit type; objects have
+ * non-empty properties; arrays have items; anyOf arms are themselves valid. A walker
+ * violation is a programming error — fail fast and visibly, never send an invalid tool
+ * schema. All pipeline stage schemas exercise this through callStructured in the suite.
+ */
+const assertStrictFcValid = (node: unknown, path: string): void => {
+  if (typeof node !== 'object' || node === null || Array.isArray(node)) {
+    throw new Error(`strict-FC projection invariant: ${path} is not a schema object`);
+  }
+  const n = node as Record<string, unknown>;
+  if (Array.isArray(n['anyOf'])) {
+    const arms = n['anyOf'] as unknown[];
+    if (arms.length === 0) throw new Error(`strict-FC projection invariant: ${path} anyOf is empty`);
+    arms.forEach((arm, i) => assertStrictFcValid(arm, `${path}.anyOf[${i}]`));
+    return;
+  }
+  if (typeof n['type'] !== 'string') {
+    throw new Error(`strict-FC projection invariant: ${path} has no explicit type`);
+  }
+  if (n['type'] === 'object') {
+    const props = n['properties'];
+    if (typeof props !== 'object' || props === null || Array.isArray(props) || Object.keys(props).length === 0) {
+      throw new Error(`strict-FC projection invariant: ${path} object without properties (endpoint 400s)`);
+    }
+    for (const [k, v] of Object.entries(props)) assertStrictFcValid(v, `${path}.properties.${k}`);
+    return;
+  }
+  if (n['type'] === 'array' && n['items'] === undefined) {
+    throw new Error(`strict-FC projection invariant: ${path} array without items (endpoint 400s)`);
+  }
+  if (n['type'] === 'array') assertStrictFcValid(n['items'], `${path}.items`);
+};
+
+/**
+ * Strict-FC projection with capability fallback (audit P2-1 fix): the tool schema when
+ * fully projectable, undefined when any node has no strict-FC shape. undefined keeps the
+ * call on the json_object transport — never an invalid strict payload and never a
+ * silently-degraded one. The emitted projection is invariant-checked before use.
+ */
+export const strictSchemaOrUndefined = (schema: z.ZodTypeAny): unknown | undefined => {
+  const projected = zodToStrictJsonSchema(schema);
+  if (projected === UNPROJECTABLE) return undefined;
+  assertStrictFcValid(projected, '$');
+  return projected;
 };
 
 const appendCorrection = (messages: ChatMessage[], reason: string): ChatMessage[] => {

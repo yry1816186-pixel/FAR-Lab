@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { z } from 'zod';
 import { canonicalSha256 } from '../src/shared/crypto.js';
 import type { StructuredCallRequest } from '../src/shared/ports.js';
-import { zodToStrictJsonSchema } from '../src/providers/http.js';
+import { zodToStrictJsonSchema, strictSchemaOrUndefined } from '../src/providers/http.js';
 import { createDeepSeekProvider } from '../src/providers/deepseek.js';
 import { createZaiProvider } from '../src/providers/zai.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
@@ -127,6 +127,44 @@ describe('zodToStrictJsonSchema (strict-FC subset projection, D-026)', () => {
     const j = zodToStrictJsonSchema(S) as { properties: Record<string, unknown> };
     expect(j.properties['u']).toEqual({ anyOf: [{ type: 'string', enum: ['a'] }, { type: 'string' }] });
     expect(j.properties['r']).toEqual({ type: 'string' });
+  });
+});
+
+describe('strictSchemaOrUndefined (audit P2-1 fix: unprojectable nodes fall back, never break)', () => {
+  it('drops unprojectable union arms — the model is steered to the projectable form (rank dimensions pattern)', () => {
+    const S = z.object({
+      dims: z.union([
+        z.array(z.object({ score: z.number() })),
+        z.record(z.string(), z.object({ score: z.number() })),
+      ]),
+    });
+    const j = strictSchemaOrUndefined(S) as { properties: Record<string, unknown> };
+    expect(j?.properties['dims']).toEqual({
+      anyOf: [{ type: 'array', items: { type: 'object', properties: { score: { type: 'number' } }, required: ['score'], additionalProperties: false } }],
+    });
+  });
+  it('returns undefined for records/unknowns (json_object fallback — live probe: bare {} 400s)', () => {
+    expect(strictSchemaOrUndefined(z.record(z.string(), z.unknown()))).toBeUndefined();
+    expect(strictSchemaOrUndefined(z.object({ x: z.unknown() }))).toBeUndefined();
+    expect(strictSchemaOrUndefined(z.any())).toBeUndefined();
+  });
+  it('returns undefined for empty objects and non-string literals (endpoint rejects both shapes)', () => {
+    expect(strictSchemaOrUndefined(z.object({}))).toBeUndefined();
+    expect(strictSchemaOrUndefined(z.object({ n: z.literal(42) }))).toBeUndefined();
+    expect(strictSchemaOrUndefined(z.object({ s: z.literal('keep') }))).toEqual({
+      type: 'object',
+      properties: { s: { type: 'string', enum: ['keep'] } },
+      required: ['s'],
+      additionalProperties: false,
+    });
+  });
+  it('emitted projections satisfy the endpoint contract (typed nodes, objects have properties, arrays have items)', () => {
+    const S = z.object({
+      a: z.array(z.object({ b: z.enum(['x', 'y']).optional(), c: z.array(z.string()).default([]) })).default([]),
+      d: z.union([z.string(), z.number().int()]).optional(),
+    });
+    expect(() => strictSchemaOrUndefined(S)).not.toThrow();
+    expect(strictSchemaOrUndefined(S)).toBeDefined();
   });
 });
 
@@ -483,6 +521,21 @@ describe('zai adapter (mock fetch)', () => {
     expect(provider.modelId).toBe('glm-5');
     await provider.structuredCall(REQ, parseHypothesis);
     expect(bodyOf(calls[0]!).model).toBe('glm-5');
+  });
+
+  it('strips strict-FC tool payloads (audit P1-3): jsonSchema requests stay on json_object', async () => {
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'glm-4.6'))]);
+    const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl });
+    const reqWithSchema: StructuredCallRequest = {
+      ...REQ,
+      jsonSchema: { type: 'object', properties: { hypothesis: { type: 'string' } }, required: ['hypothesis'], additionalProperties: false },
+    };
+    const res = await provider.structuredCall(reqWithSchema, parseHypothesis);
+    expect(res.ok).toBe(true);
+    const body = bodyOf(calls[0]!);
+    expect(body.tools).toBeUndefined();
+    expect(body.tool_choice).toBeUndefined();
+    expect(body.response_format).toEqual({ type: 'json_object' });
   });
 });
 

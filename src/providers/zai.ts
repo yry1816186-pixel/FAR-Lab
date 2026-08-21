@@ -59,7 +59,10 @@ export function createZaiProvider(opts: ZaiProviderOptions = {}): ZaiProvider {
       }
       return runOpenAICompatStructuredCall(
         { providerName: 'zai', baseUrl, apiKey, modelId, executionMode: 'live' },
-        req,
+        // Strict-FC tool payloads are a DeepSeek-beta capability (D-026); zai never opted
+        // into tools and is unverified there (audit P1-3, 2026-08-22) — strip the
+        // projection so this route stays on the json_object transport it was built for.
+        req.jsonSchema === undefined ? req : { ...req, jsonSchema: undefined },
         parse,
         { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs },
       );

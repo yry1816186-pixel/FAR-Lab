@@ -75,6 +75,11 @@ const PlanRevisionOut = z.object({
   steps: z.array(PlanStep).min(1),
   metrics: z.array(z.string().min(1)).min(1),
   decisionRules: DecisionRules,
+  /** Optional so single-hypothesis plans stay valid; multi-hypothesis plans REVISION must
+   * carry the discipline (the post-revision executability gate re-requires it — audit P2-2:
+   * without this field a pre-D-025 multi-hypothesis plan could never pass revision again). */
+  multipleTestingPolicy: z.enum(['single_primary', 'alpha_spending', 'e_value_accumulation']).optional(),
+  multipleTestingNote: z.string().optional(),
   revisionRationale: z.string().min(1),
 });
 
@@ -105,6 +110,9 @@ const PLAN_REVISION_PROMPT = [
   'metrics and decisionRules. Keep existing step ids (format task_<26 lowercase alphanumerics>) for steps that',
   'survive; give new steps fresh ids of the same format; dependsOn must only reference step ids present in your',
   'returned steps. Every step keeps a non-empty method and at least one failure condition.',
+  'When the plan discriminates more than one hypothesis, also state multipleTestingPolicy',
+  '(single_primary / alpha_spending / e_value_accumulation) and justify it in multipleTestingNote —',
+  'the deterministic gate rejects multi-hypothesis revisions without an explicit discipline.',
   'revisionRationale states what changed and why, causally tied to the feedback.',
 ].join(' ');
 
@@ -314,6 +322,8 @@ const revisePlan = async (
     steps: out.data.steps,
     metrics: out.data.metrics,
     decisionRules: out.data.decisionRules,
+    ...(out.data.multipleTestingPolicy !== undefined ? { multipleTestingPolicy: out.data.multipleTestingPolicy } : {}),
+    ...(out.data.multipleTestingNote !== undefined ? { multipleTestingNote: out.data.multipleTestingNote } : {}),
   });
   // deterministic re-gate after revision (mission §31: missing pieces are recorded, never papered over)
   after.executabilityCheck = checkPlanExecutability(after, knownHypothesisIds);

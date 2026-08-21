@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { StageContext } from './types.js';
 import type { RunStageName } from '../domain/run.js';
-import { zodToStrictJsonSchema } from '../providers/http.js';
+import { strictSchemaOrUndefined } from '../providers/http.js';
 
 export interface LlmCallOptions {
   stage: RunStageName;
@@ -36,8 +36,10 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       // Default output budget: large structured payloads (rank/plan) must not truncate mid-JSON.
       maxTokens: opts.maxTokens ?? 8192,
       // Strict-FC projection for providers with server-side tool-schema enforcement
-      // (D-026); providers without the capability ignore it, zod stays the authority.
-      jsonSchema: zodToStrictJsonSchema(opts.schema),
+      // (D-026); schemas containing nodes with no strict-FC shape (records/unknowns)
+      // return undefined and stay on the json_object transport (audit P2-1 fix —
+      // the beta endpoint 400s on bare-{} subschemas, live-probed 2026-08-22).
+      jsonSchema: strictSchemaOrUndefined(opts.schema),
       purpose: opts.purpose,
     },
     (raw) => {
@@ -139,8 +141,8 @@ const describeShape = (schema: z.ZodTypeAny): string => {
       case 'ZodBoolean': return 'boolean';
       case 'ZodEnum': return `one of ${(d.values as readonly string[]).map((v) => JSON.stringify(v)).join('|')}`;
       case 'ZodLiteral': return JSON.stringify((d as { value: unknown }).value);
-      case 'ZodOptional': case 'ZodNullable': case 'ZodDefault':
-        return `${walk((d as { innerType: z.ZodTypeAny }).innerType!)}?`;
+      case 'ZodOptional': case 'ZodNullable': case 'ZodDefault': case 'ZodCatch':
+        return `${walk((d as { innerType?: z.ZodTypeAny; type?: z.ZodTypeAny }).innerType ?? (d as { type: z.ZodTypeAny }).type!)}?`;
       case 'ZodUnion': return (d.options ?? []).map(walk).join('|');
       case 'ZodEffects': case 'ZodPipeline':
         return walk((d as { schema?: z.ZodTypeAny; in?: z.ZodTypeAny }).schema ?? (d as { in: z.ZodTypeAny }).in!);
@@ -172,7 +174,7 @@ const unwrapTypeWrapper = (t: z.ZodTypeAny): z.ZodTypeAny => {
     const d = t._def as { typeName?: string; innerType?: z.ZodTypeAny; schema?: z.ZodTypeAny; in?: z.ZodTypeAny };
     if (
       d.typeName === 'ZodOptional' || d.typeName === 'ZodNullable' || d.typeName === 'ZodDefault' ||
-      d.typeName === 'ZodEffects' || d.typeName === 'ZodPipeline'
+      d.typeName === 'ZodCatch' || d.typeName === 'ZodEffects' || d.typeName === 'ZodPipeline'
     ) {
       const next = d.innerType ?? d.schema ?? d.in;
       if (next === undefined || next === t) return t;
