@@ -36,6 +36,7 @@ const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
 const OUT = join(RESULTS_DIR, 'mlr-bench.jsonl');
 const RUNS_FILE = join(RESULTS_DIR, 'mlr-bench-runs.jsonl');
 const SKIP_RUNS = process.argv.includes('--skip-runs');
+const RENDER_ONLY = process.argv.includes('--render-only'); // deterministic render check, no judge calls, no API key needed
 const ANCHOR_AGENTS = ['o4-mini-2025-04-16', 'deepseek-r1'];
 
 // deterministic PRNG (mulberry32) — same family as llm-judge.mjs
@@ -128,7 +129,10 @@ const renderIdea = (runId) => {
     (f.expectedRelation ? `expected relation: ${f.expectedRelation}. ` : '') +
     (f.decisionRule ? `Decision rule: ${f.decisionRule} (provenance: ${f.decisionRuleProvenance ?? 'unspecified'}). ` : '') +
     (f.falsificationCondition ? `The idea is weakened if: ${f.weakeningCondition ?? ''}; falsified if: ${f.falsificationCondition}.` : '') +
-    (lit ? ` Literature-novelty assessment against retrieved neighbors: ${lit.verdict} (${lit.neighbors.length} neighbors; ${lit.justification}).` : '');
+    (lit
+      ? ` Literature-novelty assessment against retrieved neighbors: ${lit.verdict} (${lit.neighbors.length} neighbors; ${lit.justification}).` +
+        ` Delta vs nearest neighbors: ${lit.neighbors.slice(0, 3).map((n) => `${n.title}${n.year ? ` (${n.year})` : ''}`).join('; ')}.`
+      : '');
   return { idea, hypId: top.id };
 };
 
@@ -139,6 +143,8 @@ const renderProposal = (runId) => {
   const hyps = objs('hypothesis').filter(isRepresentative);
   const tournament = objs('tournament').at(-1);
   const corpus = objs('source_document');
+  const claims = objs('claim');
+  const relations = objs('evidence_relation');
   db.close();
   let top = hyps[0];
   if (tournament && hyps.length > 1) {
@@ -146,20 +152,55 @@ const renderProposal = (runId) => {
     top = order.map((id) => hyps.find((h) => h.id === id)).find(Boolean) ?? hyps[0];
   }
   if (!plan) return { proposal: null, reason: 'no plan object' };
+  // Idea2Plan 5-section alignment (Wave-3 #8): render what the persisted objects ALREADY
+  // carry (resources/ethics/confounders/policy/provenance) — fidelity, not embellishment.
+  // Per-doc relevance is derived deterministically from bound claims + relation polarity.
+  const claimsByDoc = new Map();
+  const counterClaimIds = new Set(
+    relations.filter((r) => r.relation === 'contradicts' || r.relation === 'weakens').map((r) => r.claimId),
+  );
+  for (const c of claims) {
+    for (const loc of c.locators ?? []) {
+      const entry = claimsByDoc.get(loc.sourceDocumentId) ?? { verified: 0, counter: 0 };
+      if (c.bindingStatus === 'verified') entry.verified += 1;
+      if (counterClaimIds.has(c.id)) entry.counter += 1;
+      claimsByDoc.set(loc.sourceDocumentId, entry);
+    }
+  }
+  const relOf = (d) => {
+    const e = claimsByDoc.get(d.id);
+    if (e === undefined) return 'no bound claims (context only)';
+    return `${e.verified} verified claim${e.verified === 1 ? '' : 's'}${e.counter > 0 ? `, ${e.counter} counter-evidence` : ''}`;
+  };
+  const f = top?.falsification ?? {};
+  const mt = plan.multipleTestingPolicy
+    ? `Multiple-testing discipline: ${plan.multipleTestingPolicy}${plan.multipleTestingNote ? ` — ${plan.multipleTestingNote}` : ''}\n`
+    : '';
   const step = (s, i) => `${i + 1}. [${s.kind}] ${s.title}: ${s.method ?? ''}` + (Array.isArray(s.failureConditions) && s.failureConditions.length ? ` Failure conditions: ${s.failureConditions.join('; ')}.` : '');
   const proposal =
     `Title\n${top ? top.statement : plan.objective}\n\n` +
-    `Introduction\nObjective: ${plan.objective ?? ''}\n` +
-    `The proposal discriminates between ${hyps.length} evidence-grounded hypotheses; the leading candidate is stated in the title, ranked by pairwise tournament with Bradley-Terry aggregation (uncertainty reported in the run scorecard).\n\n` +
-    `Methodology\n${(plan.steps ?? []).map(step).join('\n')}\n\n` +
-    `Metrics\n${(plan.metrics ?? []).map((m, i) => `${i + 1}. ${typeof m === 'string' ? m : JSON.stringify(m)}`).join('\n')}\n\n` +
-    `Decision Rules\n` +
+    `1. Introduction\nObjective: ${plan.objective ?? ''}\n` +
+    `The proposal discriminates between ${hyps.length} evidence-grounded hypotheses; the leading candidate is stated in the title (ranked by pairwise tournament with Bradley-Terry aggregation; uncertainty reported in the run scorecard). Its mechanism: ${(top?.mechanism ?? '').slice(0, 400)}\n\n` +
+    `2. Key Literatures (${corpus.length} retrieved sources; every claim is bound to text actually retrieved — no ungrounded citations):\n` +
+    corpus.slice(0, 12).map((d) => `- ${d.title} (${d.publicationYear ?? 'n.d.'})${d.identifiers.find((i) => i.kind === 'doi') ? ' doi:' + d.identifiers.find((i) => i.kind === 'doi').value : ''} — relevance: ${relOf(d)}`).join('\n') +
+    (corpus.length > 12 ? `\n- … ${corpus.length - 12} more` : '') + '\n\n' +
+    `3. Methods\n${(plan.steps ?? []).map(step).join('\n')}\n\n` +
+    `4. Initial Experimental Design\n` +
+    (plan.statistics?.length ? `Statistics: ${plan.statistics.join('; ')}\n` : '') +
+    `Metrics:\n${(plan.metrics ?? []).map((m, i) => `${i + 1}. ${typeof m === 'string' ? m : JSON.stringify(m)}`).join('\n')}\n` +
+    `Decision Rules:\n` +
     `Success: ${plan.decisionRules?.successCriterion ?? ''}\n` +
     `Weakening: ${plan.decisionRules?.weakeningCriterion ?? ''}\n` +
     `Falsification: ${plan.decisionRules?.falsificationCriterion ?? ''}\n` +
-    `Stop: ${plan.decisionRules?.stopCriterion ?? ''}\n\n` +
-    `Literature basis (${corpus.length} retrieved sources, claims bound to retrieved text only):\n` +
-    corpus.slice(0, 8).map((d) => `- ${d.title} (${d.publicationYear ?? 'n.d.'})${d.identifiers.find((i) => i.kind === 'doi') ? ' doi:' + d.identifiers.find((i) => i.kind === 'doi').value : ''}`).join('\n');
+    `Stop: ${plan.decisionRules?.stopCriterion ?? ''}\n` +
+    (f.decisionRuleProvenance ? `Threshold provenance (leading hypothesis): ${f.decisionRuleProvenance}.\n` : '') +
+    mt + '\n' +
+    `5. Resources, Compliance, and Ethical Considerations\n` +
+    `Compute: ${plan.resources?.compute ?? 'n/a'}; cost: ${plan.resources?.cost ?? 'n/a'}; time: ${plan.resources?.time ?? 'n/a'}.\n` +
+    (plan.confounders?.length ? `Confounders: ${plan.confounders.join('; ')}.\n` : '') +
+    (plan.alternativeExplanations?.length ? `Alternative explanations: ${plan.alternativeExplanations.join('; ')}.\n` : '') +
+    (plan.ethics?.length ? `Ethics: ${plan.ethics.join('; ')}.\n` : '') +
+    (plan.risks?.length ? `Risks: ${plan.risks.join('; ')}.` : '');
   return { proposal };
 };
 
@@ -219,7 +260,7 @@ const judgeOne = async (provider, rubric, expectedDims, stage, contentMd, taskTe
 // ---------------------------------------------------------------------------
 
 const provider = makeProvider();
-if (!provider.liveReady) die('DEEPSEEK_API_KEY not set');
+if (!provider.liveReady && !RENDER_ONLY) die('DEEPSEEK_API_KEY not set');
 
 const eligible = eligibleTasks();
 if (eligible.length < SAMPLE_N) die(`only ${eligible.length} eligible tasks with full anchor coverage`);
@@ -278,6 +319,18 @@ if (uniqueRuns.length !== runs.filter((r) => r.runId).length) {
   console.warn(`[mlr-bench] NOTE: duplicate task runId lines in ${RUNS_FILE}; judging each task once (first line)`);
 }
 
+// deterministic render verification (no model calls): REL_RENDER_RUN=<runId> node eval/mlr-bench.mjs --render-only
+if (RENDER_ONLY) {
+  const runId = process.env.REL_RENDER_RUN ?? uniqueRuns.at(-1)?.runId;
+  if (!runId) die('--render-only: no runId available (pass REL_RENDER_RUN)');
+  const { idea } = renderIdea(runId);
+  const { proposal } = renderProposal(runId);
+  console.log(`[mlr-bench] render-only for ${runId} (rendering: idea-proposal-v2)`);
+  console.log('===== IDEA =====\n' + (idea ?? '(null: no representative hypotheses)'));
+  console.log('===== PROPOSAL =====\n' + (proposal ?? '(null: no plan object)'));
+  process.exit(0);
+}
+
 // phase 2: render + judge everything (resume-safe by rewriting whole file each pass)
 const records = [];
 for (const r of uniqueRuns) {
@@ -300,6 +353,7 @@ for (const r of uniqueRuns) {
         const review = await judgeOne(provider, rubric, dims, stage, md, taskText, r.task, agent);
         records.push({
           task: r.task, runId: r.runId, agent, stage, judge: 'deepseek-chat', temperature: 0,
+          ...(agent === 'farlab' ? { rendering: 'idea-proposal-v2' } : {}),
           scores: Object.fromEntries(Object.entries(review).map(([k, v]) => [k, v.score])),
           overall: review.OverallAssessment.score,
           strengths: review.OverallAssessment.strengths,
