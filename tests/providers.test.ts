@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { z } from 'zod';
 import { canonicalSha256 } from '../src/shared/crypto.js';
 import type { StructuredCallRequest } from '../src/shared/ports.js';
-import { zodToStrictJsonSchema, strictSchemaOrUndefined } from '../src/providers/http.js';
+import { zodToStrictJsonSchema, strictSchemaOrUndefined, extractJsonText, repairUnescapedQuotes } from '../src/providers/http.js';
 import { createDeepSeekProvider } from '../src/providers/deepseek.js';
 import { createZaiProvider } from '../src/providers/zai.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
@@ -165,6 +165,32 @@ describe('strictSchemaOrUndefined (audit P2-1 fix: unprojectable nodes fall back
     });
     expect(() => strictSchemaOrUndefined(S)).not.toThrow();
     expect(strictSchemaOrUndefined(S)).toBeDefined();
+  });
+});
+
+describe('extractJsonText repair layer (live strict-FC failure class 2026-08-22)', () => {
+  it('repairs unescaped inner quotes inside string values (real failure shape: ex"expected)', () => {
+    // captured live: "...epithelial damage could\"expected morphology in culture absent\"..." —
+    // the model emitted an unescaped quote mid-string, closing the JSON string early
+    const corrupted = '{"candidates": [{"statement": "Fibroblast co-culture models", "mechanism": "methylation model in ex-secreasing + epithelial damage could"expected morphology in culture absent" large H3 lysine repositions fro…"}]}';
+    const parsed = extractJsonText(corrupted);
+    expect(parsed).not.toBeNull();
+    const mechanism = (parsed?.value as { candidates: Array<{ mechanism: string }> }).candidates[0]!.mechanism;
+    expect(mechanism).toContain('could"expected morphology');
+  });
+  it('repairs raw control characters inside strings', () => {
+    const corrupted = '{"a": "line1\nline2\ttab"}';
+    const parsed = extractJsonText(corrupted);
+    expect(parsed?.value).toEqual({ a: 'line1\nline2\ttab' });
+  });
+  it('never rewrites valid documents (repair runs only after direct parses fail)', () => {
+    const valid = '{"text": "ends with quote\\" then comma", "n": 1}';
+    expect(extractJsonText(valid)?.value).toEqual({ text: 'ends with quote" then comma', n: 1 });
+    // structural closes (quote followed by , } ] :) stay closes under the repair scan
+    expect(repairUnescapedQuotes(valid)).toBe(valid);
+  });
+  it('returns null for unrecoverable garbage (bounded failure preserved)', () => {
+    expect(extractJsonText('not json at all {{{')).toBeNull();
   });
 });
 
