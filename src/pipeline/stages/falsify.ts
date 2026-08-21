@@ -169,11 +169,11 @@ export const falsifyStage: StageHandler = {
           'what observable to measure, how, the expected relation, and a DECIDABLE decision rule (a comparison, ' +
           'ratio, threshold, or explicit if-then criterion) that separates support from weakening from refutation. ' +
           '"Could be tested in future work" without a decision rule is invalid. Self-assess the provenance of every ' +
-          'quantitative threshold in the decision rule and set decisionRuleProvenance to exactly one of: ' +
-          '"evidence-derived" (the threshold is derived from the provided claims), ' +
-          '"community-standard" (it is a customary value in the field\'s literature), or ' +
-          '"model-stipulated" (you chose the number yourself without evidence support) — never dress a number you ' +
-          'invented as evidence-derived. Also critique each assumption and link real counter-evidence and supporting ' +
+          'quantitative threshold in the decision rule. Set decisionRuleProvenance to exactly one of: ' +
+          '"evidence-derived" (every quantitative threshold is derived from the provided claims), ' +
+          '"community-standard" (customary values in the field\'s literature), "model-stipulated" (you chose the ' +
+          'numbers yourself without evidence support), or "mixed" (some thresholds have a real source and others are ' +
+          'stipulated — never dress invented numbers as sourced). Also critique each assumption and link real counter-evidence and supporting ' +
           'claims by their ids (only ids from the provided claims list). RELATION LABEL DISCIPLINE (strict): ' +
           '"contradicts" ONLY when the claim asserts a finding directly incompatible with THIS hypothesis\'s core ' +
           'mechanism or prediction about the SAME subject; "weakens" when the claim reduces confidence without ' +

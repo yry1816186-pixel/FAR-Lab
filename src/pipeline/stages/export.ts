@@ -51,6 +51,8 @@ const decisionRuleProvenanceLabel = (p: string | undefined): string => {
       return '来源：证据推导';
     case 'community-standard':
       return '来源：学界惯常';
+    case 'mixed':
+      return '⚠ 阈值来源混合（部分有据、部分模型拟定）';
     default:
       return '来源未声明';
   }
