@@ -1,0 +1,31 @@
+{
+  "name": "far-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FAR-Lab — evidence-constrained, falsifiable, revisable scientific hypothesis generation and research-plan design (XH-202619 Track 1 Direction 1A)",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "far": "dist/cli/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "far": "node dist/cli/main.js"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.8.1",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^3.0.0"
+  }
+}

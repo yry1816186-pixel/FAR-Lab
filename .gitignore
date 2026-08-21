@@ -1,0 +1,34 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependency/build/test output (technology-specific rules may replace this later)
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.tmp/
+tmp/
+*.log
+
+# Isolated external-source research clones/staging
+research/clones/
+research/staging/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*.log
+
+# Browser automation temp snapshots
+.playwright-mcp/
+
+# Local research-run artifacts (export explicitly when needed)
+.far-run/

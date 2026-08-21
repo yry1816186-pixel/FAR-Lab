@@ -1,0 +1,84 @@
+import { z } from 'zod';
+import { BundleId, ReceiptId, RunId } from './ids.js';
+
+/**
+ * Execution facts captured AS THEY HAPPEN (mission §36/§55). Missing data stays missing —
+ * fabrication is prohibited. Sensitive payloads are hashed/redacted by default.
+ */
+export const ReceiptKind = z.enum([
+  'model_call', 'source_retrieval', 'tool_exec', 'stage_transition', 'export', 'revision',
+]);
+export type ReceiptKind = z.infer<typeof ReceiptKind>;
+
+export const ExecutionMode = z.enum(['live', 'test']);
+export type ExecutionMode = z.infer<typeof ExecutionMode>;
+
+export const ModelCallFacts = z.object({
+  provider: z.string().min(1),
+  modelId: z.string().min(1),
+  modelVersion: z.string().optional(),
+  usage: z.object({
+    promptTokens: z.number().int().nonnegative().optional(),
+    completionTokens: z.number().int().nonnegative().optional(),
+    totalTokens: z.number().int().nonnegative().optional(),
+  }).default({}),
+  latencyMs: z.number().int().nonnegative(),
+  requestHash: z.string().length(64),   // canonical hash of redacted request
+  outputHash: z.string().length(64),
+  finishReason: z.string().optional(),
+});
+
+export const SourceRetrievalFacts = z.object({
+  family: z.string().min(1),
+  query: z.string(),
+  httpStatus: z.number().int(),
+  resultCount: z.number().int().nonnegative(),
+  contentHashes: z.array(z.string().length(64)).default([]),
+});
+
+export const ProvenanceReceipt = z.object({
+  id: ReceiptId,
+  runId: RunId,
+  kind: ReceiptKind,
+  executionMode: ExecutionMode,
+  at: z.string().datetime(),
+  modelCall: ModelCallFacts.optional(),
+  sourceRetrieval: SourceRetrievalFacts.optional(),
+  toolExec: z.object({
+    tool: z.string(), inputHash: z.string().length(64), outputHash: z.string().length(64),
+    exitCode: z.number().int().optional(), durationMs: z.number().int().nonnegative().optional(),
+  }).optional(),
+  stage: z.string().optional(),
+  codeRevision: z.string().optional(),   // git commit at execution time
+  environmentFingerprint: z.string().optional(),
+  redactionNote: z.string().default('raw prompts/responses not retained; hashes only'),
+});
+export type ProvenanceReceipt = z.infer<typeof ProvenanceReceipt>;
+export type ModelCallFacts = z.infer<typeof ModelCallFacts>;
+
+/** What a third party can do with the bundle — declared honestly (ACC-14). */
+export const EvidenceLevel = z.enum(['inspect', 'replay', 'recompute']);
+export type EvidenceLevel = z.infer<typeof EvidenceLevel>;
+
+export const ReproducibilityBundle = z.object({
+  id: BundleId,
+  runId: RunId,
+  declaredEvidenceLevel: EvidenceLevel,
+  codeRevision: z.string(),
+  environmentFingerprint: z.string().min(1),
+  dependencyLockHash: z.string().length(64),
+  questionRef: z.string(),
+  corpusSnapshotRef: z.string(),
+  sourceArtifactHashes: z.array(z.string().length(64)),
+  modelMetadata: z.array(z.object({
+    provider: z.string(), modelId: z.string(),
+    route: z.enum(['live_official', 'live', 'test_only']),
+  })),
+  receiptIds: z.array(ReceiptId),
+  finalArtifactHashes: z.array(z.string().length(64)),
+  verificationInstructions: z.string().min(1),
+  /** External/non-deterministic factors that prevent exact reproduction — mandatory honesty. */
+  limitations: z.array(z.string()).default([]),
+  createdAt: z.string().datetime(),
+});
+export type ReproducibilityBundle = z.infer<typeof ReproducibilityBundle>;
