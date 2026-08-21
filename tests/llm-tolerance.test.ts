@@ -151,6 +151,37 @@ describe('callStructured tolerance chain', () => {
     })).rejects.toThrow(/schema validation failed: variant/);
   });
 
+  it('path-aware normalization: free text colliding with an enum member at ANOTHER path is never rewritten', async () => {
+    // Adversarial-audit P2 (2026-08-22): the flat-enum-set version rewrote any string
+    // anywhere that canon-folds to some member; 'Evidence Derived' in a free-text field
+    // would silently become 'evidence-derived'. Path-aware folding must leave it alone
+    // while still normalizing genuine enum-position variants.
+    const PathAware = z.object({
+      provenance: z.enum(['evidence-derived', 'model-stipulated']),
+      confounderNote: z.string().min(1),
+      nested: z.object({ status: z.enum(['testable_now']) }).default({ status: 'testable_now' }),
+    });
+    const ctx = makeCtx([
+      {
+        rawOutput: JSON.stringify({
+          provenance: 'Model Stipulated', // enum position: SHOULD fold
+          confounderNote: 'Evidence Derived', // free-text position: must stay verbatim
+          nested: { status: 'Testable Now' }, // nested enum position: SHOULD fold
+        }),
+      },
+    ]);
+    const r = await callStructured(ctx, {
+      stage: 'critique_falsify',
+      purpose: 'enum-path-aware',
+      systemPrompt: 's',
+      payload: {},
+      schema: PathAware,
+    });
+    expect(r.data.provenance).toBe('model-stipulated');
+    expect(r.data.confounderNote).toBe('Evidence Derived');
+    expect(r.data.nested.status).toBe('testable_now');
+  });
+
   it('no false positive: wrapped content that still fails the schema is rejected', async () => {
     const ctx = makeCtx([
       {
