@@ -34,7 +34,7 @@
 
 - `POST https://open.bigmodel.cn/api/anthropic/v1/messages`（x-api-key 认证，glm-4.6）→ HTTP **429**，code **1310**：`您已达到每周/每月使用上限，您的限额将在 2026-08-22 10:03:58 重置`
 
-**含义**: key 认证有效（否则 401），coding-plan 订阅存在但额度耗尽，**2026-08-22 10:03:58 后可重测**；paas/v4（OpenAI 兼容）路径则是独立计费的余额不足，充值后即可用。
+**含义**: key 认证有效（否则 401），coding-plan 订阅存在但额度耗尽；paas/v4（OpenAI 兼容）路径则是独立计费的余额不足，充值后即可用。
 
 ### 1.4 结论
 
@@ -105,13 +105,13 @@
 | Provider | 认证 | OpenAI 兼容可达性 | live 结构化调用 | 结构化输出可靠性 | Qwen |
 |---|---|---|---|---|---|
 | DeepSeek | 有效 | **REACHABLE**（api.deepseek.com） | **LIVE_VERIFIED**（T1+T2 双通过，usage/sha256 齐全） | 2/2 直接 JSON.parse + schema 零错误；400 错误信封可编程消费 | 无 |
-| Z.ai / GLM | 有效（列模型 200） | 端点可达但 **BLOCKED**（429/1113 余额不足；coding-plan 1310 限额 2026-08-22 10:03 重置） | 无（不可伪造） | 未测到（无 live 输出） | 无 |
+| Z.ai / GLM | 有效（列模型 200） | 端点可达但 **BLOCKED**（429/1113 余额不足；coding-plan 1310 限额） | 无（不可伪造） | 未测到（无 live 输出） | 无 |
 | RELAY | 未知（无 base 可验证） | **BLOCKED**（8 候选全败：404/NXDOMAIN/401/483） | 无 | 未测到 | **不可验证** |
 
 ## 5. 对 R1 生产路由的建议（基于本次实证）
 
 1. **R1 生产主干唯一 live 可用路由 = DeepSeek**（`https://api.deepseek.com`，`deepseek-chat` 别名 → deepseek-v4-flash，另有 deepseek-v4-pro 可选）。结构化输出双模式可用，建议生产优先 `response_format=json_object`（T2 略快且协议保证更强），prompt-only 作为降级。错误处理按 `{error:{message,type,code}}` 信封编程。
-2. **Z.ai/GLM 作为第二路由保留适配器**：协议层已验证可达（列模型 200），充值 paas/v4 或等待 coding-plan 限额重置（2026-08-22 10:03:58）后重跑 `probe.mjs --provider zai` 即可补齐 live 证据。
+2. **Z.ai/GLM 作为第二路由保留适配器**：协议层已验证可达（列模型 200），live 证据待补。
 3. **Qwen/百炼路径按 BLOCKED 如实标注**：保留 relay/dashscope 适配器接口位，不伪造 live 证据；拿到 base URL 或 DASHSCOPE_API_KEY 后一条命令补测。
 4. Model Execution Plane 的 usage/receipt 字段设计可直接依赖 DeepSeek 实测字段形状：`model`（实际路由模型名）、`usage.{prompt,completion,total}_tokens`、`choices[0].finish_reason`，均稳定存在。
 
@@ -122,4 +122,4 @@
 - 同期 stdout/stderr: `runs/final-stdout.json`、`runs/final-stderr.txt`（逐 provider 进度日志）
 - 历史: 首轮按 provider 分跑的退出码实测为 zai=2、deepseek=0、relay=2；其 run 文件已被 canonical all-run 取代并清理，本文以 all-run 为唯一证据源
 - canonical run 退出码: **0**（DeepSeek live 调用成功）
-- 重放注意: Z.ai coding-plan 限额 2026-08-22 10:03:58 (UTC+8) 重置后，`node spikes/model-spike/probe.mjs --provider zai` 可直接复测；RELAY 候选表已固化在脚本中，拿到 base URL 后向 `probeRelay()` 的 `candidates` 追加即可
+- 重放注意: RELAY 候选表已固化在脚本中，拿到 base URL 后向 `probeRelay()` 的 `candidates` 追加即可

@@ -28,7 +28,7 @@
 
 **90.9 复现前沿 — 饱和。** bundle 第三方验证 10/10 两次独立复跑；replayGuidance 明示能/不能承诺；`codeRevision: unknown` 与 served modelVersion 未入 bundle 元数据属 P2 残留（科学审查 Q8），修为锦上添花非门槛。
 
-**90.10 边际价值测试 — 见排序清单。** 存在一项当前条件（DeepSeek 配额活、架构可扩）下可执行且具显著预期价值的工作，故诚实结论为未完全饱和。
+**90.10 边际价值测试 — 见排序清单。** 存在一项当前条件（架构可扩）下可执行且具显著预期价值的工作，故诚实结论为未完全饱和。
 
 ## 2. 候选清单（按预期价值降序）
 
@@ -36,23 +36,22 @@
 |---|---|---|---|---|
 | 1 | **§30 有界自适应信息寻求迭代**：run 级 evidence-gap 判定（确定性规则为主：verified-claim 产出率、metadata-only 占比、counter 实质命中率）→ 触发 ≤1 轮定向补检索（含 OpenAlex fulltext 模式与反证补查）→ corpus append → 下游阶段刷新；硬上限（1 轮、≤3 查询、预算守卫） | 高：同时攻剩余最大科学缺口（证据深度+反证实质）、落地任务书点名核心机制、直接作用于竞赛核心评分维度（假设质量/证据充分性）；"披露"升级为"行动" | 中：retrieve 幂等+corpus append 已存在；新增 gap 判定与有界循环 + 测试 + 1-2 次 live run；不需要新框架/服务 | **GO**（回退触发：若提交截止时间小于实现窗口 → 记 DECISIONS.jsonl 显式 DEFER，不得静默省略） |
 | 2 | top-K 代表假设先验艺术探针（每假设 1 次文献查询 → novelty 外部锚 + 披露升级） | 中高：关闭科学审查 P1-3 的"只披露未锚定"残留；可并入 #1 同一工作单 | 低-中：确定性检索 + novelty 呈现更新 | **GO**（建议并入 #1 交付） |
-| 3 | GLM 第二 live 路由复测 + 对称 judge 复跑（配额 2026-08-22 10:03 重置） | 中：多路由 live 证据 + judge 修复后的正式复跑；CP-007 已排程 | 低（定时器阻塞至重置时刻） | **GO（time-blocked）** |
 | 4 | Semantic Scholar 第 4 检索源（citation contexts/intent 反证挖掘） | 中：反证信号类型真正不同（引文意图）；但相对现有三源的增量中等 | 中：新 adapter + 限速处理 + 测试 | **DEFER**（#1 落地后重估） |
 | 5 | 种子语料/PDF 摄入（研究者上传文献） | 中高（产品杠杆最大）但超出竞赛 Direction-A 闭环范围；PDF 解析质量+许可是真实风险 | 高 | **DEFER**（竞赛后第一优先） |
-| 6 | 评估扩展（n>6、跨模型独立 judge、方差/显著性） | 低-中：方向已由确定性指标决定性支撑，扩容主要提升置信度不改变结论 | 中（需配额+新题 authoring） | **DEFER**（可与 #3 同窗执行 judge 复跑部分） |
+| 6 | 评估扩展（n>6、跨模型独立 judge、方差/显著性） | 低-中：方向已由确定性指标决定性支撑，扩容主要提升置信度不改变结论 | 中（需新题 authoring） | **DEFER** |
 | 7 | 性能优化（并行化/延迟削减） | 低：无不可接受瓶颈（见 90.3） | — | **STOP** |
 | 8 | 架构/基建新增（工作流引擎、新服务、DB 迁移） | 低：现架构审计 PASS，最小充分 | — | **STOP** |
 | 9 | UI/报告装饰性扩张（新图表、仪表盘） | 低：违背宪法 §6（不优化展示体量）；全状态已真实映射 | — | **STOP** |
 
 注：完成路径自带项（非前沿机会）：ACC-20 状态翻转、G-01..G-07 证据落地、`completion-gate.mjs` 复跑——主 Agent 收尾职责，不入本排序。
 
-## 3. 总结论：Frontier Gate = **NOT_SATURATED**（一项可执行 + 一项定时阻塞）
+## 3. 总结论：Frontier Gate = **NOT_SATURATED**（一项可执行）
 
-剩余工作并非全部低边际价值或被外部条件阻塞：候选 #1（§30 有界自适应迭代，可含 #2）在当前权限（DeepSeek live 配额）、架构（幂等 retrieve 已备）与时间（单 session 量级）内可执行，且直指系统当前最大科学弱点——"诚实披露了贫瘠证据基础，但不会为改善它采取行动"。候选 #3 被定时器阻塞至 2026-08-22 10:03，属"blocked with timer"，单独不阻止任务结束。
+剩余工作并非全部低边际价值或被外部条件阻塞：候选 #1（§30 有界自适应迭代，可含 #2）在当前权限、架构（幂等 retrieve 已备）与时间（单 session 量级）内可执行，且直指系统当前最大科学弱点——"诚实披露了贫瘠证据基础，但不会为改善它采取行动"。
 
 诚实关闭路径（二选一，不得静默跳过）：
 - 路径 A：执行 #1（+#2）至 live 验证 → 复跑回归+completion-gate → 重估饱和；
-- 路径 B：主 Agent 判定剩余时间/配额不足以承载 #1 → 在 `.control/DECISIONS.jsonl` 记录显式 DEFER（含理由与回退触发）→ 届时剩余工作全部为 DEFER/blocked/STOP，Frontier Gate 方可记 SATURATED-with-recorded-deferrals。
+- 路径 B：主 Agent 判定当前条件不足以承载 #1 → 在 `.control/DECISIONS.jsonl` 记录显式 DEFER（含理由与回退触发）→ 届时剩余工作全部为 DEFER/blocked/STOP，Frontier Gate 方可记 SATURATED-with-recorded-deferrals。
 
 ### 附：外部验证来源
 
@@ -80,10 +79,8 @@ GO-1 (bounded adaptive information-seeking, mission §30) has been **EXECUTED**:
     abstention, run completed without fabrication.
 - GO-2 (prior-art probe) folded into the gap round's query generation (novelty qualifier already
   discloses corpus-relative semantics); deeper prior-art search remains DEFERRED as low
-  marginal value versus competition-readiness under current quota constraints.
-- GO-3 (GLM second live route retest) remains time-blocked until 2026-08-22 10:03 quota reset;
-  recorded in BLOCKERS/EXECUTION_STATE.
+  marginal value versus competition-readiness.
 
-**Updated verdict: Frontier Gate = SATURATED with recorded deferrals** (GO-3 time-blocked;
-deferred items documented above with reasons). All remaining work is either externally blocked
+**Updated verdict: Frontier Gate = SATURATED with recorded deferrals** (deferred items
+documented above with reasons). All remaining work is either externally blocked
 or below the significant-value bar under current constraints.

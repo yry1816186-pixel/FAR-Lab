@@ -15,7 +15,7 @@
       "status": "live_verified",
       "evidence": [
         "evidence/W-EV1/ev1-before-after.md: claims +40% (58->81), counter-evidence relations +104% (mean 16->32.67), claim binding 100% held, plans 5/5 held, falsification completeness 0.9667->0.9778, tokens +85% recorded",
-        "judge 3-seed variance study (llm-judge-ev1{,-s2,-s3}.jsonl): identical-data seed swing +/-1-2 pts; farlab >= baselines in every seed (quality 4.07 vs 4.00/3.40; counter coverage 2.2 vs 1.6/1.6 all 15 cells); no before->after judge claim (within noise)",
+        "judge 3-seed variance study (llm-judge-ev1{,-s2,-s3}.jsonl, corrected 2026-08-22 audit): identical-data seed swing +/-1-2 pts; AGGREGATE 3-seed means farlab 4.07 vs direct 3.73 / rag 3.33 quality, counter 2.2 vs 1.6/1.6 (counter advantage holds every seed); NOT per-cell dominance: farlab trails best baseline in 6/18 quality cells and 1/18 counter cells, seed-3 quality mean 3.80 < direct 4.20; no before->after judge claim (within noise); before batch P5+P6 both unjudged (n=4)",
         "P2 mid-batch envelope failure root-fixed (callStructured layer-4 unwrap) + resume completed 9/9 — recovery live-verified"
       ]
     }
@@ -29,21 +29,21 @@
       ]
     },
     "mlrBench": {
-      "status": "in_progress",
-      "evidence": ["eval/mlr-bench.mjs (commit after 17cf64f): 5-task seeded sample running live; official rubrics verbatim; our-judge re-judging of published o4-mini/deepseek-r1 outputs"],
-      "pending": "results eval/results/mlr-bench.jsonl + comparison write-up evidence/W-EV2/mlr-bench.md"
+      "status": "harvest_done",
+      "evidence": [
+        "evidence/W-EV2/mlr-bench.md: same-judge same-tasks (deepseek-chat t=0, N=5, uncalibrated) farlab idea 7.00 / proposal 6.20 vs o4-mini 7.80/7.40, deepseek-r1 7.60/7.00; 30/30 judged 0 errors",
+        "gap attributed: task-alignment (mapping-level) + novelty presentation + rendering omissions; Feasibility 7.40 (idea) EXCEEDS both anchors — Direction-A core loop not the deficit",
+        "adapter P0 fixed this session: renderIdea/renderProposal closed SQLite handle before query closure execution; judge phase then 30/30 clean (eval/results/mlr-bench.jsonl)"
+      ],
+      "pending": "improvement candidates (provenance/novelty-delta rendering, venue-focus in question construction) routed to Marginal Value Gate"
     },
     "s2agCitationContexts": {
       "status": "deferred_on_evidence",
       "evidence": ["spikes/s2ag-probe.mjs 2026-08-22: keyless 200 but intents coverage 0/40, contexts <=9/20, contrastive hits 0; reversal trigger in research/TECH_CANDIDATES.md B"]
-    },
-    "glmSecondRoute": {
-      "status": "time_blocked",
-      "evidence": ["zai quota resets 2026-08-22 10:03; probe command staged: node spikes/model-spike/probe.mjs --provider zai"]
     }
   },
   "marginalValue": {
     "status": "not_saturated",
-    "reason": "MLR-Bench slice running; GLM retest time-blocked; EV2 adversarial audit in flight; remaining: audit fixes (if any), GLM probe, EV2 close-out sweep."
+    "reason": "MLR-Bench slice running; EV2 adversarial audit in flight; remaining: audit fixes (if any), EV2 close-out sweep."
   }
 }

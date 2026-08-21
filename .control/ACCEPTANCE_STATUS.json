@@ -17,7 +17,8 @@
       "critical": true,
       "status": "live_verified",
       "evidence": [
-        "No-drift proof across 8 real runs (all execute the Direction-A loop scope->hypotheses->plan; no chatbot/RAG-wrapper surfaces); competition facts rechecked 2026-08-21 in project-spec/COMPETITION.md (official page URL not recorded in workspace — see final_delivery residual risk)"
+        "No-drift proof across 8 real runs (all execute the Direction-A loop scope->hypotheses->plan; no chatbot/RAG-wrapper surfaces)",
+        "Official page URLs recorded + rechecked 2026-08-22 (project-spec/COMPETITION.md §0: aliyun topic page + NADC release); verbatim model-route rule captured (Qwen-series via Bailian + receipts) — official-route live compliance remains gated by B-QWEN-LIVE-ROUTE credentials"
       ]
     },
     {

@@ -27,7 +27,7 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 | GROBID Docker sidecar (Apache-2.0, 0.9.1 active) | DEFER (fulltext phase B) | When fulltext phase A ships and residual pdf_url demand is real |
 | docling-serve (MIT) | DEFER | Non-scholarly document need |
 | Local ONNX cross-encoder rerank (transformers.js + onnxruntime-node, Apache/MIT) | DEFER | Pool >60 or offline need; requires latency spike; ~227MB optional dep |
-| Local ONNX NLI (Xenova/nli-deberta) as claim-relation cross-checker | DEFER | If LLM-only relation precision measured insufficient |
+| Local ONNX NLI (Xenova/nli-deberta) as claim-relation cross-checker | DEFER (trigger rewritten 2026-08-22, D-023: relation-precision spike measured contradicts 1/8 exact, but the defect pattern = topical distance + label granularity, which NLI does not fix; deterministic topical gate shipped instead) | Re-activate only if a POST-GATE blind re-judging (evidence/W-EV2/relation-precision.md reproduction) still shows low precision on topically-close pairs; would also need a zero-runtime-dep exception |
 | OpenAlex API key | DEFER (monitor) | keyless polite pool verified working 2026-08-22 01:15; keyless limited tier is a policy-drift risk, not an outage |
 | CORE API v3 | DEFER | Marginal coverage over A+B |
 | Idea2Plan protocol | ADAPT later | Verify repo license before running subset; borrow 5-section template + JudgeEval now |
@@ -65,4 +65,3 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 - OpenAlex keyless polite pool WORKS as of 2026-08-22 01:15 (HTTP 200, real results) — scout-reported "key mandatory" is a production-scale policy, monitor only.
 - DeepSeek has NO embedding endpoint (verified) — any embedding route requires a new pluggable provider contract; hence cross-encoder/LLM rerank preferred.
 - Semantic Scholar keyless shared pool rate-limits aggressively; free key (1 RPS) recommended before S2AG integration; exponential backoff mandatory.
-- GLM (Z.ai) quota resets 2026-08-22 10:03 — second live route retest pending (CP-007).

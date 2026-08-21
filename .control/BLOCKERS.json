@@ -14,8 +14,8 @@
       "critical": false,
       "status": "OPEN",
       "scope": "model-provider",
-      "reason": "Competition-preferred Qwen/Bailian route cannot be live-verified in this environment: no DASHSCOPE_API_KEY present and RELAY gateway base URL undiscoverable (8 candidate bases exhausted, see evidence/W0/model-spike-report.md).",
-      "resolution": "Provide DASHSCOPE_API_KEY or the RELAY base URL, then run `node spikes/model-spike/probe.mjs --provider relay` (or zai after 2026-08-22 10:03 quota reset for GLM) to attach live receipts. Model plane keeps first-class adapter slots; no fabricated live evidence allowed meanwhile."
+      "reason": "Officially SUBMISSION-MANDATED model route cannot be live-verified in this environment (verbatim rule recorded 2026-08-22 in project-spec/COMPETITION.md §0: 基座模型须基于千问(Qwen)系列模型，开发平台需通过阿里云百炼平台调用或比赛官网推荐工具，并提供调用凭证或截图). No DASHSCOPE_API_KEY present and RELAY gateway base URL undiscoverable (8 candidates exhausted, see evidence/W0/model-spike-report.md). Current DeepSeek live route proves the system works but does NOT satisfy the official Qwen-via-Bailian route.",
+      "resolution": "User provides DASHSCOPE_API_KEY (or Bailian/official-tool credentials), then run the model-plane probe to attach live receipts; product gateway is model-agnostic so no architecture change is expected. No fabricated live evidence allowed meanwhile."
     }
   ]
 }

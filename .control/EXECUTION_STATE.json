@@ -1,10 +1,10 @@
 {
   "schemaVersion": 2,
   "mission": "Intelligence-driven evolution: absorb world-class external mechanisms (prior baseline + open-world scouts) into FAR-Lab's Direction-A core loop via source-level fusion, benchmarked before/after.",
-  "status": "PAUSED_BY_USER_HANDOFF",
-  "phase": "EV2-fulltext-A-live-verified",
-  "pauseReason": "User paused the session to move all work to a new ZCode window (2026-08-22 ~03:20 local). Handoff prompt issued. This is a true PAUSE, not mission completion: frontier sweep for EV2, audit fixes, GLM CP-007 close and Marginal Value Gate are still outstanding. New session must resume from activeTasks, NOT restart.",
-  "currentObjective": "EV1 closed: before/after metrics + 3-seed judge variance study persisted (evidence/W-EV1/ev1-before-after.md). Fulltext phase A (arXiv LaTeXML + EuropePMC JATS, keyless, zero new deps) live-verified on run_8w2h8ctns2a149j0hc0yb9gmep (1 doc deepened, 4/4 claims grounded in fulltext body). Envelope-unwrap tolerance fix live-proven by P2 resume completion. Remaining Wave-2: S2AG citation contexts (design-gated), MLR-Bench adoption, GLM retest after 10:03.",
+  "status": "IN_PROGRESS",
+  "phase": "EV2-mlrbench-judge-harvest",
+  "pauseReason": "User paused the session to move all work to a new ZCode window (2026-08-22 ~03:20 local). Handoff prompt issued. This is a true PAUSE, not mission completion: frontier sweep for EV2, audit fixes and Marginal Value Gate are still outstanding. New session must resume from activeTasks, NOT restart.",
+  "currentObjective": "EV1 closed: before/after metrics + 3-seed judge variance study persisted (evidence/W-EV1/ev1-before-after.md). Fulltext phase A (arXiv LaTeXML + EuropePMC JATS, keyless, zero new deps) live-verified on run_8w2h8ctns2a149j0hc0yb9gmep (1 doc deepened, 4/4 claims grounded in fulltext body). Envelope-unwrap tolerance fix live-proven by P2 resume completion. Remaining Wave-2: S2AG citation contexts (design-gated), MLR-Bench adoption.",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
@@ -31,14 +31,9 @@
     {
       "id": "CP-EV4",
       "problem": "MLR-Bench ideation+proposal adoption for external comparability (data CC BY 4.0, code MIT)",
-      "status": "OPEN",
-      "evidenceNeeded": "adapter + judged submission vs published model scores"
-    },
-    {
-      "id": "CP-007",
-      "problem": "GLM second live route retest after 2026-08-22 10:03 quota reset (non-critical)",
-      "status": "OPEN",
-      "evidenceNeeded": "node spikes/model-spike/probe.mjs --provider zai"
+      "status": "DONE",
+      "evidenceNeeded": "adapter + judged submission vs published model scores",
+      "outcome": "5/5 live runs completed + 30/30 same-judge comparisons (evidence/W-EV2/mlr-bench.md): farlab idea 7.00/proposal 6.20 vs anchors 7.80/7.40 and 7.60/7.00; gap attributed to mapping/novelty-presentation/rendering, Feasibility exceeds anchors; adapter close-before-use P0 fixed; improvement candidates deferred to Marginal Value Gate"
     }
   ],
   "verifiedWorkspaceFacts": [
@@ -49,14 +44,13 @@
     "Registry research/TECH_CANDIDATES.md; decisions D-015..D-019."
   ],
   "activeTasks": [
-    "HARVEST (first): MLR-Bench batch started by prior session (independent OS process, survives window switch) — progress: eval/results/mlr-bench-runs.jsonl; final: eval/results/mlr-bench.jsonl; prior-session stdout log readable at C:/Users/RichardYuan/.zcode/cli/exec/sess_f63e4452-6b21-4847-a76e-9059c1863537/call_12da1929d5fe42ffb70c67f0-stdout.log; if judge phase interrupted, resume with `node eval/mlr-bench.mjs --skip-runs`; then write evidence/W-EV2/mlr-bench.md (same-judge same-tasks comparison, calibration + N=5 disclosed)",
-    "RE-ISSUE: adversarial audit of commits 9107f59/17cf64f + eval/mlr-bench.mjs + evidence-number honesty check (prior session's audit subagent notification does not transfer across windows)",
-    "GLM retest: scheduled automation-85c9d254 fires 2026-08-22 10:05 local (CronList to check outcome); close CP-007 from its record or manual probe",
-    "EV2 close-out: audit fixes (if any) with tests -> frontier-evaluation sweep -> Marginal Value Gate -> control-plane reconcile + hook-safe commit (types: feat|fix|refactor|perf|docs|test|build|ci|chore|style|revert only)"
+    "AUDIT (in flight): adversarial audit of commits 9107f59/17cf64f + eval/mlr-bench.mjs + evidence-number honesty — background subagent agent_00e132f3 re-issued this session (prior session's notification did not transfer); fix all P0/P1 with tests when it reports",
+    "EV2 close-out: audit fixes (if any) -> frontier-evaluation sweep -> Marginal Value Gate (mlr-bench improvement candidates included) -> control-plane reconcile + hook-safe commit (types: feat|fix|refactor|perf|docs|test|build|ci|chore|style|revert only)",
+    "DONE this session: MLR-Bench harvested (evidence/W-EV2/mlr-bench.md; adapter P0 close-before-use fixed, judge 30/30); compliance recheck D-020 (official URLs recorded, verbatim Qwen/Bailian route rule; B-QWEN-LIVE-ROUTE = submission-mandated, credential-blocked)"
   ],
   "blockerIds": [
     "B-QWEN-LIVE-ROUTE"
   ],
   "lastVerifiedCommit": "9107f59 (fulltext phase A + tolerance); 17cf64f (judge variance study); e61a275 (control/EV2 evidence); plus test(ev2) mlr-bench adapter + s2ag deferral commit",
-  "nextAction": "PAUSED_BY_USER. New session: harvest MLR-Bench batch results, re-issue audit, close CP-007 via scheduled probe, then EV2 frontier sweep + Marginal Value Gate. Do NOT restart completed EV1/EV2-A work."
+  "nextAction": "PAUSED_BY_USER. New session: harvest MLR-Bench batch results, re-issue audit, then EV2 frontier sweep + Marginal Value Gate. Do NOT restart completed EV1/EV2-A work."
 }
