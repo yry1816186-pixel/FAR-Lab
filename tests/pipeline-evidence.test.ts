@@ -348,6 +348,102 @@ describe('build_evidence stage', () => {
     expect(receipts[1]?.modelCall?.usage).toBeDefined();
   });
 
+  it('D-018: cross-paper claim pairs with topical overlap get adjudicated claim-claim relations (targetClaimId)', async () => {
+    const ABSTRACT_B =
+      'A three-year trial of CRISPR base editing of the maize DREB gene does not increase kernel yield under drought conditions. ' +
+      'Edited lines matched control yields in every season, and the initial report likely reflected site-specific conditions.';
+    const { ctx, store } = bench([
+      extractionStep([
+        {
+          text: 'Base editing of the maize DREB gene increases kernel yield under drought.',
+          quote: Q_VERBATIM[1],
+          stance: 'supports',
+        },
+      ]),
+      extractionStep([
+        {
+          text: 'Base editing of the maize DREB gene does not increase kernel yield under drought.',
+          quote: 'base editing of the maize DREB gene does not increase kernel yield under drought conditions',
+          stance: 'contradicts',
+        },
+      ]),
+      // verified=2 < GAP_SEEK_MIN_VERIFIED -> gap assessment runs; script "adequate"
+      { rawOutput: JSON.stringify({ enoughEvidence: true, gapDescription: 'fixture: evidence adequate for cross-relation testing', queries: [] }) },
+      // D-018 adjudication: the one prefiltered pair is a contradiction
+      {
+        rawOutput: JSON.stringify({
+          verdicts: [
+            {
+              pairId: 0,
+              verdict: 'contradicts',
+              sharedSubject: 'effect of maize DREB base editing on kernel yield under drought',
+              conflictPoint: 'direction of the yield effect',
+              confidence: 'moderate',
+            },
+          ],
+        }),
+      },
+    ]);
+    const docA = mkSource(ctx.run.id, newId('src'));
+    const docB = mkSource(ctx.run.id, newId('src'), { abstractText: ABSTRACT_B });
+    corpusOf(ctx, [docA, docB]);
+
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') {
+      expect(outcome.summary).toContain('claims=2');
+      expect(outcome.summary).toContain('cross_relations=1 persisted (0 not_comparable) of 1 prefiltered pairs');
+    }
+
+    const claims = store.listObjects('claim', ctx.run.id);
+    expect(claims).toHaveLength(2);
+    const relations = store.listObjects('evidence_relation', ctx.run.id);
+    expect(relations).toHaveLength(3); // 2 per-claim stance relations + 1 cross-paper claim-claim relation
+    const cross = defined(
+      relations.find((r) => r.targetClaimId !== undefined),
+      'cross relation',
+    );
+    expect(cross.relation).toBe('contradicts');
+    expect(cross.claimId).toBeDefined();
+    expect(cross.targetClaimId).toBeDefined();
+    expect(cross.claimId).not.toBe(cross.targetClaimId);
+    // both endpoints are real verified claims from different documents
+    const a = claims.find((c) => c.id === cross.claimId);
+    const b = claims.find((c) => c.id === cross.targetClaimId);
+    expect(a?.locators[0]?.sourceDocumentId).not.toBe(b?.locators[0]?.sourceDocumentId);
+    expect(cross.rationale).toContain('claim-claim contradicts');
+    expect(cross.rationale).toContain('direction of the yield effect');
+
+    // 4 model calls: 2 extractions + gap assessment + cross adjudication
+    const modelCalls = store.listObjects('receipt', ctx.run.id).filter((r) => r.kind === 'model_call');
+    expect(modelCalls).toHaveLength(4);
+
+    // idempotent: a re-execution (new pending doc) does not re-adjudicate existing pairs
+    const docC = mkSource(ctx.run.id, newId('src'), {
+      abstractText: ABSTRACT_B,
+      title: 'Fixture duplicate-abstract study',
+    });
+    const snap = store.listObjects('corpus_snapshot', ctx.run.id)[0]!;
+    ctx.store.putObject('corpus_snapshot', { ...snap, documentIds: [...snap.documentIds, docC.id] });
+    ctx.store.putObject('source_document', docC);
+    const rerun = await buildEvidenceStage.execute({
+      ...ctx,
+      provider: createTestStubProvider([
+        extractionStep([
+          {
+            text: 'Base editing of the maize DREB gene does not increase kernel yield under drought.',
+            quote: 'base editing of the maize DREB gene does not increase kernel yield under drought conditions',
+            stance: 'contradicts',
+          },
+        ]),
+        gapAdequateStep(),
+      ]),
+    });
+    expect(rerun.kind).toBe('done');
+    if (rerun.kind === 'done') expect(rerun.summary).toContain('cross_relations=already present (1)');
+    expect(store.listObjects('evidence_relation', ctx.run.id)).toHaveLength(4); // +1 stance relation from docC only
+  });
+
   it('high-overlap non-substring quote (jaccard >= 0.8) → verified with alignmentChecked=true', async () => {
     // fixture sanity pinned at unit level too: this quote is a fuzzy, not verbatim, match
     expect(checkQuoteAlignment(Q_FUZZY, ABSTRACT_A).verdict).toBe('fuzzy');

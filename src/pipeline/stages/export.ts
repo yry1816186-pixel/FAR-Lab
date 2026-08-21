@@ -237,6 +237,20 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
   } else {
     push('- 关键反证：本 run 检索范围内未记录反证关系（仅代表检索范围内未发现，不等于不存在）。');
   }
+  // D-018: claim-claim cross relations (contradictions/support between papers) get their own lines —
+  // they are cross-source findings, not per-claim stances toward the question.
+  const cross = d.relations.filter((r) => r.targetClaimId !== undefined);
+  if (cross.length > 0) {
+    const claimById = new Map(d.claims.map((c) => [c.id, c] as const));
+    push(`- 跨文献声明间关系（D-018，claim↔claim）：${cross.length} 条`);
+    for (const r of cross) {
+      const a = r.claimId !== undefined ? claimById.get(r.claimId) : undefined;
+      const b = claimById.get(r.targetClaimId!);
+      push(
+        `  - [${r.relation}] 「${a ? truncate(a.text, 80) : r.claimId ?? '?'}」 vs 「${b ? truncate(b.text, 80) : r.targetClaimId ?? '?'}」— ${truncate(r.rationale, 160)}`,
+      );
+    }
+  }
   push('');
 
   // ---- 5. hypotheses (ranked representatives) ----
@@ -281,6 +295,17 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
       // W5/S4: noveltyLabel is corpus-relative — the qualifier is mandatory at every
       // presentation point so the label can never be read as a literature-level verdict.
       push(`- testability：${h.testability}；noveltyLabel：${h.noveltyLabel}${NOVELTY_CORPUS_QUALIFIER}`);
+      // D-017: second novelty layer, judged against retrieved literature neighbors.
+      const lit = h.literatureNovelty;
+      if (lit) {
+        push(
+          `- 文献级新颖性（对照检索到的近邻文献判定）：${lit.verdict}` +
+            (lit.neighbors.length > 0
+              ? `；最近邻：${lit.neighbors.slice(0, 3).map((n) => `${n.title}${n.year !== undefined ? ` (${n.year})` : ''}`).join('；')}`
+              : '；近邻：（未检索到）'),
+        );
+        push(`  - 判定依据：${lit.justification}（producer=${lit.producer}；calibration=${lit.calibration}）`);
+      }
       const clusterSize = h.clusterKey
         ? d.hypotheses.filter((x) => x.clusterKey === h.clusterKey).length
         : 1;

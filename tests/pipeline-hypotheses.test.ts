@@ -7,20 +7,22 @@ import {
   ResearchQuestion,
   ResearchRun,
   ScientificClaim,
+  SourceDocument,
   newId,
 } from '../src/domain/index.js';
 import type { RunId } from '../src/domain/index.js';
 import type { StageContext } from '../src/pipeline/types.js';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
-import type { ArtifactStore, ModelProvider, StructuredCallRequest } from '../src/shared/ports.js';
+import type { ArtifactStore, ModelProvider, StructuredCallRequest, SourceAdapter, RawSourceRecord } from '../src/shared/ports.js';
 import { canonicalSha256 } from '../src/shared/crypto.js';
+import { computeRequestHash } from '../src/providers/http.js';
 import { generateHypothesesStage, MIN_REPRESENTATIVES } from '../src/pipeline/stages/hypotheses.js';
 import {
   checkFalsificationCompleteness,
   falsifyStage,
   hasDecidableSemantics,
 } from '../src/pipeline/stages/falsify.js';
-import { COMPARISON_NOTE, RANK_WEIGHTS, compositeScore, rankStage } from '../src/pipeline/stages/rank.js';
+import { COMPARISON_NOTE, RANK_WEIGHTS, aggregateOutcome, bradleyTerry, circleSchedule, compositeScore, rankStage, tournamentRounds } from '../src/pipeline/stages/rank.js';
 import { DUPLICATE_MARKER } from '../src/pipeline/stages/shared.js';
 
 /**
@@ -129,17 +131,39 @@ const memArtifacts = (): ArtifactStore => {
 interface CtxOpts {
   cancelled?: () => boolean;
   capture?: { reqs: StructuredCallRequest[] };
+  openalex?: SourceAdapter;
+  /** Per-purpose dynamic responses computed from the live request (for runtime-generated ids). */
+  dynamic?: Record<string, (req: StructuredCallRequest) => unknown>;
 }
 
 const makeCtx = (run: { id: RunId }, store: Store, steps: StubStep[], opts: CtxOpts = {}) => {
   const artifacts = memArtifacts();
   const receipts: Array<Record<string, unknown>> = [];
   const inner = createTestStubProvider(steps);
-  const provider: ModelProvider = opts.capture
+  const wrapDynamic = opts.dynamic || opts.capture;
+  const provider: ModelProvider = wrapDynamic
     ? {
         name: inner.name,
         liveReady: inner.liveReady,
-        structuredCall(req, parse) {
+        async structuredCall(req, parse) {
+          if (opts.dynamic && req.task in opts.dynamic && req.task !== '') {
+            const data = opts.dynamic[req.task]!(req);
+            const parsedDyn = parse(data);
+            if (parsedDyn instanceof Error) throw new Error(`TEST dynamic response failed schema for ${req.task}: ${parsedDyn.message}`);
+            return {
+              ok: true as const,
+              data: parsedDyn,
+              receipt: {
+                provider: inner.name,
+                modelId: 'test-stub',
+                latencyMs: 0,
+                usage: {},
+                requestHash: computeRequestHash(req),
+                outputHash: canonicalSha256(JSON.stringify(data)),
+                executionMode: 'test' as const,
+              },
+            };
+          }
           opts.capture?.reqs.push(req);
           return inner.structuredCall(req, parse);
         },
@@ -150,8 +174,9 @@ const makeCtx = (run: { id: RunId }, store: Store, steps: StubStep[], opts: CtxO
     store,
     artifacts,
     provider,
-    sourceFor: () => {
-      throw new Error('sources are not used by hypothesis-group stages');
+    sourceFor: (family) => {
+      if (family === 'openalex' && opts.openalex) return opts.openalex;
+      throw new Error(`TEST FIXTURE: no fake adapter registered for ${family}`);
     },
     recordReceipt: (r) => {
       receipts.push(r as Record<string, unknown>);
@@ -229,6 +254,8 @@ describe('generate_hypotheses stage', () => {
           ],
         }),
       },
+      // D-017 expansion: no matching hypothesis id -> all novelty-neighbor searches skipped
+      { rawOutput: JSON.stringify({ hypotheses: [{ hypothesisId: 'hyp_notarget00000000000000000aaa', queries: ['ignored neighbor query one', 'ignored neighbor query two'] }] }) },
     ];
     const { ctx, receipts } = makeCtx(run, store, steps);
     expect(await generateHypothesesStage.applicable(ctx)).toBe(true);
@@ -266,9 +293,14 @@ describe('generate_hypotheses stage', () => {
     expect(hyps.find((h) => h.statement === 'statement C1')?.noveltyLabel).toBe('novel_speculation');
     expect(hyps.find((h) => h.statement === 'statement M2')?.noveltyLabel).toBe('mixed');
 
-    // receipts: 3 strategy calls + 1 clustering + 1 novelty, all model_call at this stage
-    expect(receipts).toHaveLength(5);
+    // receipts: 3 strategy calls + 1 clustering + 1 novelty + 1 literature expansion, all model_call at this stage
+    expect(receipts).toHaveLength(6);
     expect(receipts.every((r) => r.kind === 'model_call' && r.stage === 'generate_hypotheses')).toBe(true);
+    // D-017: no neighbors retrieved -> deterministic honest 'unclear' layer on every assessed representative
+    const litLayers = store.listObjects('hypothesis', run.id).filter((h) => h.literatureNovelty !== undefined);
+    expect(litLayers).toHaveLength(4); // cap LIT_NOVELTY_MAX_HYPS = 4 (5 representatives)
+    expect(litLayers.every((h) => h.literatureNovelty?.verdict === 'unclear')).toBe(true);
+    expect(summary).toContain('literature novelty (D-017): 4/4');
 
     // regeneration is not applicable once hypotheses exist
     expect(await generateHypothesesStage.applicable({ ...ctx, run: { ...ctx.run } })).toBe(false);
@@ -288,12 +320,13 @@ describe('generate_hypotheses stage', () => {
       { rawOutput: gen(cand('M1'), cand('M2')) },
       { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0], reason: 'single' }] }) },
       { rawOutput: JSON.stringify({ labels: [{ index: 0, noveltyLabel: 'evidence_grounded' }] }) },
+      { rawOutput: JSON.stringify({ hypotheses: [{ hypothesisId: 'hyp_notarget00000000000000000aaa', queries: ['ignored neighbor query one', 'ignored neighbor query two'] }] }) },
     ];
     const { ctx } = makeCtx(run, store, steps, { capture });
     const outcome = await generateHypothesesStage.execute(ctx);
     expect(outcome.kind).toBe('done');
 
-    expect(capture.reqs).toHaveLength(5);
+    expect(capture.reqs).toHaveLength(6);
     const ec0 = capture.reqs[0]?.userPayload as { input?: Record<string, unknown> };
     const ec = (ec0.input ?? {}) as Record<string, unknown>;
     const supporting = ec.supportingClaims as Array<{ id: string }>;
@@ -323,6 +356,7 @@ describe('generate_hypotheses stage', () => {
       { rawOutput: gen(cand('S1'), cand('S2')) }, // supplement
       { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0, 1, 2, 3], reason: 'same mechanism' }, { memberIndices: [4, 5], reason: 'same premise' }, { memberIndices: [6], reason: 'distinct' }, { memberIndices: [7], reason: 'distinct' }] }) },
       { rawOutput: JSON.stringify({ labels: [{ index: 6, noveltyLabel: 'novel_speculation' }] }) },
+      { rawOutput: JSON.stringify({ hypotheses: [{ hypothesisId: 'hyp_notarget00000000000000000aaa', queries: ['ignored neighbor query one', 'ignored neighbor query two'] }] }) },
     ];
     const { ctx, receipts } = makeCtx(run, store, steps);
     const outcome = await generateHypothesesStage.execute(ctx);
@@ -335,7 +369,7 @@ describe('generate_hypotheses stage', () => {
     expect(hyps.filter((h) => h.derivation.strategy === 'assumption_perturbation')).toHaveLength(2);
     expect(new Set(hyps.map((h) => h.clusterKey)).size).toBe(4); // 4 representatives after supplement
     expect(hyps.filter((h) => h.derivation.rationale.includes(DUPLICATE_MARKER))).toHaveLength(4);
-    expect(receipts).toHaveLength(7); // 3 strategies + cluster + supplement + recluster + novelty
+    expect(receipts).toHaveLength(8); // 3 strategies + cluster + supplement + recluster + novelty + literature expansion
   });
 
   it(`stores an honest diversity shortfall when even the supplement stays below ${MIN_REPRESENTATIVES} representatives`, async () => {
@@ -352,6 +386,7 @@ describe('generate_hypotheses stage', () => {
       // supplement candidates merge into the existing clusters: still 2 representatives
       { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0, 1, 2, 6], reason: 'same' }, { memberIndices: [3, 4, 5, 7], reason: 'same' }] }) },
       { rawOutput: JSON.stringify({ labels: [{ index: 0, noveltyLabel: 'evidence_grounded' }] }) },
+      { rawOutput: JSON.stringify({ hypotheses: [{ hypothesisId: 'hyp_notarget00000000000000000aaa', queries: ['ignored neighbor query one', 'ignored neighbor query two'] }] }) },
     ];
     const { ctx } = makeCtx(run, store, steps);
     const outcome = await generateHypothesesStage.execute(ctx);
@@ -361,6 +396,115 @@ describe('generate_hypotheses stage', () => {
     const hyps = store.listObjects('hypothesis', run.id);
     expect(hyps).toHaveLength(8);
     expect(new Set(hyps.map((h) => h.clusterKey)).size).toBe(2);
+  });
+
+  it('D-017: literature novelty full path — neighbors retrieved, deduped vs corpus, facet-ranked, adjudicated', async () => {
+    const { store, run } = setup();
+    store.putObject('claim', makeClaim(run.id, 'claim one'));
+    store.putObject('claim', makeClaim(run.id, 'claim two'));
+    // a corpus document whose DOI must NOT come back as a "neighbor"
+    store.putObject(
+      'source_document',
+      SourceDocument.parse({
+        id: newId('src'), runId: run.id, family: 'openalex',
+        identifiers: [{ kind: 'doi', value: '10.1000/in-corpus' }],
+        title: 'Corpus doc', authors: [], contentDepth: 'abstract', accessState: 'open',
+        contentHash: 'ab'.repeat(32), retrievedAt: new Date().toISOString(), parseStatus: 'ok',
+      }),
+    );
+
+    let searchCount = 0;
+    const neighborRecord = (title: string, doi: string): RawSourceRecord => ({
+      identifiers: [{ kind: 'doi', value: doi }],
+      title,
+      publicationYear: 2025,
+      authors: ['Nb Author'],
+      contentDepth: 'abstract',
+      accessState: 'open',
+      abstractText: `Neighbor abstract for ${title}.`,
+      normalized: { DOI: doi, title },
+    });
+    const openalex: SourceAdapter = {
+      family: 'openalex',
+      async search(query) {
+        searchCount += 1;
+        return {
+          family: 'openalex', query, httpStatus: 200,
+          records: [
+            neighborRecord(`Neighbor paper ${searchCount}`, `10.1000/nb.${searchCount}`),
+            neighborRecord('Corpus duplicate', '10.1000/in-corpus'), // must be filtered (already in corpus)
+          ],
+          latencyMs: 1,
+        };
+      },
+      async resolve() { throw new Error('TEST FIXTURE: resolve not expected'); },
+    };
+
+    const steps: StubStep[] = [
+      { rawOutput: gen(cand('E1'), cand('E2')) },
+      { rawOutput: gen(cand('C1'), cand('C2')) },
+      { rawOutput: gen(cand('M1'), cand('M2')) },
+      { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0, 1], reason: 'paraphrases' }, { memberIndices: [2, 3], reason: 'paraphrases' }, { memberIndices: [4], reason: 'distinct' }, { memberIndices: [5], reason: 'distinct' }] }) },
+      { rawOutput: JSON.stringify({ labels: [{ index: 0, noveltyLabel: 'evidence_grounded' }] }) },
+    ];
+    // dynamic per-purpose responses: echo the runtime-generated hypothesis ids
+    const { ctx, receipts } = makeCtx(run, store, steps, {
+      openalex,
+      dynamic: {
+        'novelty-check:query-expansion': (req) => {
+          const input = (req.userPayload as { input?: { hypotheses?: Array<{ hypothesisId: string }> } }).input;
+          return {
+            hypotheses: (input?.hypotheses ?? []).map((h) => ({
+              hypothesisId: h.hypothesisId,
+              queries: ['neighbor paraphrase query', 'neighbor entity mechanism query'],
+            })),
+          };
+        },
+        'novelty-check:facet-rerank': (req) => {
+          const input = (req.userPayload as { input?: { hypotheses?: Array<{ hypothesisId: string; neighbors: unknown[] }> } }).input;
+          return {
+            rankings: (input?.hypotheses ?? []).map((h) => ({
+              hypothesisId: h.hypothesisId,
+              rankedNeighborIndices: h.neighbors.map((_, i) => i).reverse(), // deterministic reversed order
+            })),
+          };
+        },
+        'novelty-check:adjudication': (req) => {
+          const input = (req.userPayload as { input?: { hypotheses?: Array<{ hypothesisId: string }> } }).input;
+          return {
+            verdicts: (input?.hypotheses ?? []).map((h, i) => ({
+              hypothesisId: h.hypothesisId,
+              verdict: i === 0 ? 'incremental' : 'unclear',
+              nearestNeighborIndex: 0,
+              justification: `fixture adjudication against retrieved neighbors for ${h.hypothesisId}`,
+            })),
+          };
+        },
+      },
+    });
+
+    const outcome = await generateHypothesesStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const summary = outcome.kind === 'done' ? outcome.summary : '';
+    expect(summary).toContain('literature novelty (D-017): 4/4');
+    expect(summary).toContain('0 novel / 1 incremental / 0 already_done / 3 unclear');
+
+    // 4 representatives x 2 queries = 8 real searches, each receipted as live source retrieval
+    expect(searchCount).toBe(8);
+    const nbReceipts = receipts.filter((r) => r.kind === 'source_retrieval');
+    expect(nbReceipts).toHaveLength(8);
+
+    const hyps = store.listObjects('hypothesis', run.id);
+    const withLit = hyps.filter((h) => h.literatureNovelty !== undefined);
+    expect(withLit).toHaveLength(4);
+    const first = withLit.find((h) => h.literatureNovelty?.verdict === 'incremental');
+    expect(first?.literatureNovelty?.neighbors.length).toBeGreaterThan(0);
+    expect(first?.literatureNovelty?.neighbors.every((n) => n.contentHash.length === 64)).toBe(true);
+    // corpus doc never resurfaces as a neighbor
+    expect(withLit.every((h) => !h.literatureNovelty?.neighbors.some((n) => n.doi === '10.1000/in-corpus'))).toBe(true);
+    // two-layer novelty state: corpus-relative label still present alongside the literature layer
+    expect(first?.noveltyLabel).toBeDefined();
+    expect(first?.literatureNovelty?.justification).toContain('fixture adjudication');
   });
 
   it('skips honestly on an empty verified evidence base and fails fast when cancelled', async () => {
@@ -683,7 +827,13 @@ describe('rank stage', () => {
         { hypothesisId: 'hyp_unknown0000000000000000000aaa', dimensions: [...CORE_DIMS(0.5), dim('uncertainty', null)] },
       ],
     };
-    const { ctx, artifacts } = makeCtx(run, store, [{ rawOutput: JSON.stringify(rankOut) }]);
+    const { ctx, artifacts } = makeCtx(run, store, [
+      { rawOutput: JSON.stringify(rankOut) },
+      // D-016 tournament, seed order [ha, hb, hc] -> circle rounds: (hb, hc), (ha, hc), (ha, hb)
+      { rawOutput: JSON.stringify({ aFirstVerdict: 'a', bFirstVerdict: 'a', rationale: 'fixture judgement: first hypothesis has the sharper decision rule' }) },
+      { rawOutput: JSON.stringify({ aFirstVerdict: 'a', bFirstVerdict: 'a', rationale: 'fixture judgement: first hypothesis is better grounded in claims' }) },
+      { rawOutput: JSON.stringify({ aFirstVerdict: 'a', bFirstVerdict: 'a', rationale: 'fixture judgement: first hypothesis is more falsifiable' }) },
+    ]);
     expect(await rankStage.applicable(ctx)).toBe(true);
     const outcome = await rankStage.execute(ctx);
     expect(outcome.kind).toBe('done');
@@ -691,6 +841,7 @@ describe('rank stage', () => {
     expect(summary).toMatch(/ranked 3 of 3/);
     expect(summary).toContain('hyp_unknown0000000000000000000aaa');
     expect(summary).toContain('clm_bogus00000000000000000000aaa');
+    expect(summary).toContain('tournament: 3 pair(s) judged');
 
     const cards = store.listObjects('scorecard', run.id);
     expect(cards).toHaveLength(3); // duplicate hdup and unknown id never scored
@@ -718,9 +869,95 @@ describe('rank stage', () => {
     expect(comparison.criteria.some((c: { favors: string }) => c.favors === 'a')).toBe(true);
     expect(comparison.criteria.some((c: { favors: string }) => c.favors === 'b')).toBe(true);
 
+    // D-016: tournament persisted with all 3 matches, order-swapped verdicts, standings
+    const tournaments = store.listObjects('tournament', run.id);
+    expect(tournaments).toHaveLength(1);
+    const trn = tournaments[0]!;
+    expect(trn.matches).toHaveLength(3);
+    expect(trn.matches.every((m) => m.outcome === 'a' || m.outcome === 'b' || m.outcome === 'tie')).toBe(true);
+    expect(trn.algorithm).toBe('bradley-terry-ilsr-v1');
+    expect(trn.uncertainty.length).toBeGreaterThan(20);
+    expect(trn.standings.map((s) => [s.hypothesisId, s.rank])).toEqual([
+      [ha.id, 1],
+      [hb.id, 2],
+      [hc.id, 3],
+    ]);
+    const haStanding = trn.standings.find((s) => s.hypothesisId === ha.id);
+    expect(haStanding).toMatchObject({ wins: 2, losses: 0, ties: 0, winRate: 1 });
+    // head-to-head criterion recorded from the tournament (top-2 met in the schedule)
+    expect(
+      comparison.criteria.some(
+        (c: { criterion: string; favors: string }) =>
+          c.criterion === 'pairwise_tournament_head_to_head' && c.favors === 'a',
+      ),
+    ).toBe(true);
+    // scorecards disclose the tournament record in their rationale
+    expect(cardOf(ha.id)?.overallRationale).toContain('2W-0L-0T');
+    expect(cardOf(ha.id)?.overallRationale).toContain('bt=');
+
     // all representatives scored -> not applicable anymore
     const after = makeCtx(run, store, []);
     expect(await rankStage.applicable(after.ctx)).toBe(false);
+  });
+
+  it('records judge-call failures as honest no-contests and falls back to composite ordering (D-016 fail-visible)', async () => {
+    const { store, run } = setup();
+    const h1 = makeHyp(run.id, 'hypothesis one', { createdAt: ts(0) });
+    const h2 = makeHyp(run.id, 'hypothesis two', { createdAt: ts(1) });
+    const h3 = makeHyp(run.id, 'hypothesis three', { createdAt: ts(2) });
+    for (const h of [h1, h2, h3]) store.putObject('hypothesis', h);
+    const rankOut = {
+      assessments: [
+        { hypothesisId: h1.id, dimensions: [...CORE_DIMS(0.8), dim('uncertainty', null)] },
+        { hypothesisId: h2.id, dimensions: [...CORE_DIMS(0.6), dim('uncertainty', null)] },
+        { hypothesisId: h3.id, dimensions: [...CORE_DIMS(0.4), dim('uncertainty', null)] },
+      ],
+    };
+    const { ctx } = makeCtx(run, store, [
+      { rawOutput: JSON.stringify(rankOut) },
+      { fail: { kind: 'provider_error', message: 'fixture judge outage 1' } },
+      { fail: { kind: 'provider_error', message: 'fixture judge outage 2' } },
+      { fail: { kind: 'provider_error', message: 'fixture judge outage 3' } },
+    ]);
+    const outcome = await rankStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const summary = outcome.kind === 'done' ? outcome.summary : '';
+    expect(summary).toContain('0 contested, 3 no-contest');
+    const trn = store.listObjects('tournament', run.id)[0]!;
+    expect(trn.matches.every((m) => m.outcome === 'no_contest')).toBe(true);
+    expect(trn.matches.every((m) => m.rationale.includes('not judged'))).toBe(true);
+    // all-neutral BT (1.0) -> deterministic composite tie-break decides the order
+    const cards = store.listObjects('scorecard', run.id);
+    expect(cards.find((c) => c.hypothesisId === h1.id)?.rank).toBe(1);
+    expect(cards.find((c) => c.hypothesisId === h2.id)?.rank).toBe(2);
+    expect(cards.find((c) => c.hypothesisId === h3.id)?.rank).toBe(3);
+  });
+
+  it('treats order-swap verdict disagreement as an honest tie, never a position-bias win (D-016)', async () => {
+    const { store, run } = setup();
+    const h1 = makeHyp(run.id, 'hypothesis one', { createdAt: ts(0) });
+    const h2 = makeHyp(run.id, 'hypothesis two', { createdAt: ts(1) });
+    store.putObject('hypothesis', h1);
+    store.putObject('hypothesis', h2);
+    const rankOut = {
+      assessments: [
+        { hypothesisId: h1.id, dimensions: [...CORE_DIMS(0.7), dim('uncertainty', null)] },
+        { hypothesisId: h2.id, dimensions: [...CORE_DIMS(0.5), dim('uncertainty', null)] },
+      ],
+    };
+    // n=2 -> one round -> one match (h1 vs h2); judge verdicts FLIP across the swap.
+    const { ctx } = makeCtx(run, store, [
+      { rawOutput: JSON.stringify(rankOut) },
+      { rawOutput: JSON.stringify({ aFirstVerdict: 'a', bFirstVerdict: 'b', rationale: 'fixture contradictory verdicts across presentation order' }) },
+    ]);
+    const outcome = await rankStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const trn = store.listObjects('tournament', run.id)[0]!;
+    expect(trn.matches).toHaveLength(1);
+    expect(trn.matches[0]).toMatchObject({ outcome: 'tie' });
+    expect(trn.standings.every((s) => s.ties === 1)).toBe(true);
+    // equal BT -> composite tie-break keeps h1 first
+    expect(store.listObjects('scorecard', run.id).find((c) => c.hypothesisId === h1.id)?.rank).toBe(1);
   });
 
   it('reports unscored representatives honestly when the model returns no usable assessment for them', async () => {
@@ -824,5 +1061,64 @@ describe('deterministic composite scoring (pure)', () => {
   it('returns null when nothing is scoreable', () => {
     expect(compositeScore([{ dimension: 'evidence_grounding', value: null }])).toBeNull();
     expect(compositeScore([])).toBeNull();
+  });
+});
+
+describe('pairwise tournament machinery (pure, D-016)', () => {
+  it('circleSchedule gives every participant real matches (odd n includes BYE rounds)', () => {
+    // n=3: 3 rounds -> full round-robin, everyone plays twice
+    const pairs3 = circleSchedule(['A', 'B', 'C'], tournamentRounds(3));
+    expect(tournamentRounds(3)).toBe(3);
+    const played = new Map<string, number>([['A', 0], ['B', 0], ['C', 0]]);
+    for (const p of pairs3) {
+      played.set(p.aId, played.get(p.aId)! + 1);
+      played.set(p.bId, played.get(p.bId)! + 1);
+    }
+    expect([...played.values()].every((v) => v === 2)).toBe(true);
+    expect(pairs3).toHaveLength(3);
+    // n=4: rounds capped at 5 -> full round robin of 6 pairs, 3 each
+    const pairs4 = circleSchedule(['A', 'B', 'C', 'D'], tournamentRounds(4));
+    expect(pairs4).toHaveLength(6);
+    // n=8: rounds capped at 5 -> 20 pairs, 5 each (Si et al. sweet spot)
+    const pairs8 = circleSchedule(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], tournamentRounds(8));
+    expect(pairs8).toHaveLength(20);
+    const counts8 = new Map<string, number>();
+    for (const p of pairs8) {
+      counts8.set(p.aId, (counts8.get(p.aId) ?? 0) + 1);
+      counts8.set(p.bId, (counts8.get(p.bId) ?? 0) + 1);
+    }
+    expect([...counts8.values()].every((v) => v === 5)).toBe(true);
+  });
+
+  it('aggregateOutcome: consistency required across the order swap', () => {
+    expect(aggregateOutcome({ aFirstVerdict: 'a', bFirstVerdict: 'a' })).toBe('a');
+    expect(aggregateOutcome({ aFirstVerdict: 'b', bFirstVerdict: 'b' })).toBe('b');
+    expect(aggregateOutcome({ aFirstVerdict: 'tie', bFirstVerdict: 'tie' })).toBe('tie');
+    expect(aggregateOutcome({ aFirstVerdict: 'a', bFirstVerdict: 'b' })).toBe('tie'); // position-bias disagreement -> no signal
+    expect(aggregateOutcome({ aFirstVerdict: 'a', bFirstVerdict: 'incomparable' })).toBe('no_contest');
+    expect(aggregateOutcome({ aFirstVerdict: 'incomparable', bFirstVerdict: 'incomparable' })).toBe('no_contest');
+  });
+
+  it('bradleyTerry ranks by strength; ties split points; winless-but-contested sinks to 0', () => {
+    const ids = ['W', 'N', 'L'];
+    const standings = bradleyTerry(ids, [
+      { aId: 'W', bId: 'N', outcome: 'a' },
+      { aId: 'W', bId: 'L', outcome: 'a' },
+      { aId: 'N', bId: 'L', outcome: 'b' }, // L beats N
+    ]);
+    const by = new Map(standings.map((s) => [s.hypothesisId, s] as const));
+    // W 2-0 > L 1-1 > N 0-2 — strictly ordered strengths
+    expect(by.get('W')!.btScore).toBeGreaterThan(by.get('L')!.btScore);
+    expect(by.get('L')!.btScore).toBeGreaterThan(by.get('N')!.btScore);
+    expect(by.get('W')).toMatchObject({ wins: 2, losses: 0 });
+    expect(by.get('L')).toMatchObject({ wins: 1, losses: 1 });
+    expect(by.get('N')).toMatchObject({ wins: 0, losses: 2 });
+    // tie match splits half-points to both sides
+    const tieSt = bradleyTerry(['X', 'Y'], [{ aId: 'X', bId: 'Y', outcome: 'tie' }]);
+    expect(tieSt[0]).toMatchObject({ wins: 0, losses: 0, ties: 1 });
+    expect(tieSt[0]!.btScore).toBeCloseTo(tieSt[1]!.btScore, 6);
+    // no contested matches -> everyone stays neutral 1.0
+    const neutral = bradleyTerry(['P', 'Q'], []);
+    expect(neutral.every((s) => s.btScore === 1)).toBe(true);
   });
 });

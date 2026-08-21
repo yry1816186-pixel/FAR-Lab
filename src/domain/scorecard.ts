@@ -50,3 +50,49 @@ export const HypothesisComparison = z.object({
   uncertainty: z.string().optional(),
 });
 export type HypothesisComparison = z.infer<typeof HypothesisComparison>;
+
+/**
+ * D-016 pairwise tournament record. Every match is judged TWICE in mirrored
+ * presentation order within one call (position-bias cancellation, MT-Bench
+ * methodology); verdict disagreement across the swap is an honest tie, and
+ * 'incomparable' judge abstentions become no-contests. Bradley-Terry ILSR
+ * aggregates contested matches into standings. All of it stays an
+ * uncalibrated decision aid — never displayed as objective truth.
+ */
+export const TournamentMatch = z.object({
+  aId: HypothesisId,
+  bId: HypothesisId,
+  aFirstVerdict: z.enum(['a', 'b', 'tie', 'incomparable']),
+  bFirstVerdict: z.enum(['a', 'b', 'tie', 'incomparable']),
+  rationale: z.string().min(10),
+  producer: z.string().min(1),
+  /** DETERMINISTIC aggregation of the two order-swapped verdicts. */
+  outcome: z.enum(['a', 'b', 'tie', 'no_contest']),
+});
+export type TournamentMatch = z.infer<typeof TournamentMatch>;
+
+export const TournamentStanding = z.object({
+  hypothesisId: HypothesisId,
+  /** Bradley-Terry strength (ILSR, ties counted as half-wins). Ordinal decision aid. */
+  btScore: z.number().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  ties: z.number().int().nonnegative(),
+  /** (wins + 0.5*ties) / contested matches; 0 when never contested. */
+  winRate: z.number().min(0).max(1),
+  rank: z.number().int().positive(),
+});
+export type TournamentStanding = z.infer<typeof TournamentStanding>;
+
+export const HypothesisTournament = z.object({
+  id: z.string().min(1),
+  runId: RunId,
+  participantIds: z.array(HypothesisId).min(2),
+  matches: z.array(TournamentMatch).min(1),
+  /** Empty when every match was a no-contest — ordering then falls back to the composite. */
+  standings: z.array(TournamentStanding),
+  algorithm: z.literal('bradley-terry-ilsr-v1'),
+  uncertainty: z.string().min(1),
+  createdAt: z.string().datetime(),
+});
+export type HypothesisTournament = z.infer<typeof HypothesisTournament>;

@@ -45,6 +45,78 @@ const GapSeekSchema = z.object({
 });
 type GapSeek = z.infer<typeof GapSeekSchema>;
 
+// ---- D-018 claim-claim cross relations ----
+const CrossRelationOut = z.object({
+  verdicts: z
+    .array(
+      z.object({
+        pairId: z.number().int().nonnegative(),
+        verdict: z.enum(['contradicts', 'supports', 'qualifies', 'unrelated', 'not_comparable']),
+        sharedSubject: z.string().min(5),
+        conflictPoint: z.string().min(5).optional(),
+        confidence: z.enum(['low', 'moderate', 'high']),
+      }),
+    )
+    .min(1),
+});
+
+/** Hard bound on judged pairs per run (LLM budget + attention guard). */
+export const CROSS_RELATION_MAX_PAIRS = 60;
+
+const CROSS_STOPWORDS = new Set([
+  'that', 'this', 'with', 'from', 'have', 'been', 'were', 'their', 'which', 'about', 'would', 'could',
+  'between', 'because', 'while', 'these', 'those', 'such', 'than', 'then', 'also', 'into', 'over',
+  'after', 'under', 'other', 'more', 'most', 'less', 'least', 'some', 'both', 'each', 'only', 'very',
+  'much', 'many', 'when', 'where', 'what', 'whose', 'being', 'does', 'doing', 'done', 'having',
+  'study', 'studies', 'paper', 'papers', 'results', 'result', 'using', 'used', 'show', 'shown',
+]);
+
+const contentTokens = (text: string): Set<string> =>
+  new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 3 && !CROSS_STOPWORDS.has(t)),
+  );
+
+export interface CrossPairCandidate {
+  a: ScientificClaim;
+  b: ScientificClaim;
+}
+
+/**
+ * Deterministic prefilter: pairs of VERIFIED claims from different source documents
+ * with real topical overlap (containment >= 0.25 or >= 4 shared content tokens).
+ * Claims without shared referents are never sent to judgment (false-contradiction guard).
+ */
+export const crossRelationPairs = (claims: readonly ScientificClaim[]): CrossPairCandidate[] => {
+  const tokens = new Map<string, Set<string>>();
+  const docOf = new Map<string, string>();
+  for (const c of claims) {
+    tokens.set(c.id, contentTokens(c.text));
+    docOf.set(c.id, c.locators[0]?.sourceDocumentId ?? c.id);
+  }
+  const scored: { a: ScientificClaim; b: ScientificClaim; overlap: number; shared: number }[] = [];
+  for (let i = 0; i < claims.length; i++) {
+    for (let j = i + 1; j < claims.length; j++) {
+      const a = claims[i]!;
+      const b = claims[j]!;
+      if (docOf.get(a.id) === docOf.get(b.id)) continue; // cross-paper relations only
+      const ta = tokens.get(a.id) ?? new Set<string>();
+      const tb = tokens.get(b.id) ?? new Set<string>();
+      let shared = 0;
+      for (const t of ta) if (tb.has(t)) shared += 1;
+      if (shared === 0) continue;
+      const containment = shared / Math.min(ta.size, tb.size);
+      if (containment >= 0.25 || shared >= 4) {
+        scored.push({ a, b, overlap: containment * shared, shared });
+      }
+    }
+  }
+  scored.sort((x, y) => y.overlap - x.overlap || (x.a.id < x.b.id ? -1 : 1));
+  return scored.slice(0, CROSS_RELATION_MAX_PAIRS).map(({ a, b }) => ({ a, b }));
+};
+
 const ClaimStanceSchema = z.enum(['supports', 'contradicts', 'neutral', 'unknown']);
 export type ClaimStance = z.infer<typeof ClaimStanceSchema>;
 
@@ -323,6 +395,91 @@ export const buildEvidenceStage: StageHandler = {
       }
     }
 
+    // ---- D-018 claim-claim cross relations (populate the unused targetClaimId channel) ----
+    // Deterministic prefilter first: NAACL-2025 reference-indeterminacy work shows
+    // pairwise contradiction judgments on claims without shared referents produce
+    // >80% false contradictions, so only topical-overlapping pairs are judged, and
+    // 'not_comparable' is a first-class verdict.
+    let crossNote: string;
+    const existingCross = ctx.store.listObjects('evidence_relation', ctx.run.id)
+      .filter((r) => r.targetClaimId !== undefined);
+    if (existingCross.length > 0) {
+      crossNote = `already present (${existingCross.length})`;
+    } else {
+      const verifiedClaims = ctx.store
+        .listObjects('claim', ctx.run.id)
+        .filter((c) => c.bindingStatus === 'verified');
+      const candidates = crossRelationPairs(verifiedClaims);
+      if (candidates.length > 0) {
+        try {
+          const crossRes = await callStructured<z.infer<typeof CrossRelationOut>>(ctx, {
+            stage: 'build_evidence',
+            purpose: 'claim-cross-relations',
+            systemPrompt:
+              'You adjudicate pairs of evidence claims extracted from DIFFERENT retrieved papers. ' +
+              'For each pair decide: "contradicts" if they assert incompatible findings about the same subject ' +
+              '(different papers, same quantity/relationship); "supports" if they corroborate each other; ' +
+              '"qualifies" if one restricts the conditions of the other; "unrelated" if they are about different ' +
+              'subjects; "not_comparable" if they cannot be compared on the given text (missing referents, ' +
+              'different measures, insufficient context) — when in doubt choose not_comparable, never invent a ' +
+              'conflict. Name the shared subject for every pair.',
+            payload: {
+              question: question.text,
+              pairs: candidates.map((p, i) => ({
+                pairId: i,
+                claimA: { id: p.a.id, text: p.a.text },
+                claimB: { id: p.b.id, text: p.b.text },
+              })),
+            },
+            schema: CrossRelationOut,
+            temperature: 0,
+          });
+          const persistable = new Set(['contradicts', 'supports', 'qualifies']);
+          const byIdA = new Map(verifiedClaims.map((c) => [c.id, c] as const));
+          const byIdB = new Map(verifiedClaims.map((c) => [c.id, c] as const));
+          let persisted = 0;
+          let notComparable = 0;
+          const seenPairs = new Set<string>();
+          for (const v of crossRes.data.verdicts) {
+            const pair = candidates[v.pairId];
+            if (!pair || persistable.has(v.verdict) === false) {
+              if (v.verdict === 'not_comparable') notComparable += 1;
+              continue;
+            }
+            const a = byIdA.get(pair.a.id);
+            const b = byIdB.get(pair.b.id);
+            if (!a || !b) continue;
+            const dedupKey = [pair.a.id, pair.b.id].sort().join('|');
+            if (seenPairs.has(dedupKey)) continue;
+            seenPairs.add(dedupKey);
+            const crossRelation: EvidenceRelation = {
+              id: newId('ev'),
+              runId: ctx.run.id,
+              relation: v.verdict as EvidenceRelationType,
+              claimId: a.id,
+              targetClaimId: b.id,
+              rationale:
+                `claim-claim ${v.verdict} (shared subject: ${v.sharedSubject}` +
+                (v.conflictPoint !== undefined ? `; conflict point: ${v.conflictPoint}` : '') +
+                `; confidence: ${v.confidence}; direction A->B as extracted, pair judged as a whole)`,
+              strength: 'unrated',
+              uncertainties: [],
+              createdAt: new Date().toISOString(),
+            };
+            ctx.store.putObject('evidence_relation', crossRelation);
+            relationCounts[v.verdict as keyof typeof relationCounts] += 1;
+            persisted += 1;
+          }
+          crossNote = `${persisted} persisted (${notComparable} not_comparable) of ${candidates.length} prefiltered pairs`;
+        } catch (e) {
+          // Enrichment only: a failure degrades to no cross-relations (visible), never blocks.
+          crossNote = `skipped: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      } else {
+        crossNote = 'no topical-overlap pairs among verified claims';
+      }
+    }
+
     const summary =
       `build_evidence: sources usable=${plan.usable.length} processed=${pending.length}` +
       ` skipped_no_abstract=${plan.skippedNoAbstract} skipped_unresolved=${plan.skippedUnresolved}` +
@@ -330,7 +487,8 @@ export const buildEvidenceStage: StageHandler = {
       `; relations supports=${relationCounts.supports} contradicts=${relationCounts.contradicts}` +
       ` qualifies=${relationCounts.qualifies} unknown=${relationCounts.unknown}` +
       `; truncated_to_cap=${truncatedCount}` +
-      `; gap_seek=${gapSeekNote}`;
+      `; gap_seek=${gapSeekNote}` +
+      `; cross_relations=${crossNote}`;
     return { kind: 'done', summary };
   },
 };
