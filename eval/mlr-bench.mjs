@@ -92,7 +92,7 @@ const farRun = (task, question) => {
   const stdout = execFileSync('node', [
     'dist/cli/main.js', 'research', 'start', question,
     '--domain', 'machine learning', '--goal', 'exploratory', '--json',
-  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], timeout: 30 * 60_000 });
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30 * 60_000 });
   const line = stdout.split('\n').find((l) => l.trim().startsWith('{'));
   return JSON.parse(line ?? '{}');
 };
@@ -102,9 +102,9 @@ const DB_PATH = resolve(process.cwd(), '.far-run/far.db');
 const renderIdea = (runId) => {
   const db = new DatabaseSync(DB_PATH, { readOnly: true });
   const objs = (kind) => db.prepare('SELECT json FROM objects WHERE kind=? AND run_id=?').all(kind, runId).map((r) => JSON.parse(r.json));
-  db.close();
   const hyps = objs('hypothesis').filter(isRepresentative);
   const tournament = objs('tournament').at(-1);
+  db.close();
   let top;
   if (tournament && hyps.length > 1) {
     const order = tournament.standings.map((s) => s.hypothesisId ?? s.id).filter(Boolean);
@@ -135,16 +135,16 @@ const renderIdea = (runId) => {
 const renderProposal = (runId) => {
   const db = new DatabaseSync(DB_PATH, { readOnly: true });
   const objs = (kind) => db.prepare('SELECT json FROM objects WHERE kind=? AND run_id=?').all(kind, runId).map((r) => JSON.parse(r.json));
-  db.close();
   const plan = objs('plan').at(-1);
   const hyps = objs('hypothesis').filter(isRepresentative);
   const tournament = objs('tournament').at(-1);
+  const corpus = objs('source_document');
+  db.close();
   let top = hyps[0];
   if (tournament && hyps.length > 1) {
     const order = tournament.standings.map((s) => s.hypothesisId ?? s.id).filter(Boolean);
     top = order.map((id) => hyps.find((h) => h.id === id)).find(Boolean) ?? hyps[0];
   }
-  const corpus = objs('source_document');
   if (!plan) return { proposal: null, reason: 'no plan object' };
   const step = (s, i) => `${i + 1}. [${s.kind}] ${s.title}: ${s.method ?? ''}` + (Array.isArray(s.failureConditions) && s.failureConditions.length ? ` Failure conditions: ${s.failureConditions.join('; ')}.` : '');
   const proposal =
@@ -167,10 +167,20 @@ const renderProposal = (runId) => {
 // judging (official rubric verbatim; our DeepSeek judge, temperature 0)
 // ---------------------------------------------------------------------------
 
-const parseReview = (raw) => {
+// Official dimension key sets (must match the verbatim rubrics; asserted at startup so an
+// upstream rename fails fast instead of silently admitting garbage dimension names).
+const IDEA_DIMS = ['Consistency', 'Clarity', 'Novelty', 'Feasibility', 'Significance', 'OverallAssessment'];
+const PROPOSAL_DIMS = ['Consistency', 'Clarity', 'Novelty', 'Soundness', 'Feasibility', 'Significance', 'OverallAssessment'];
+const dimName = (rubric, dim) => rubric.toUpperCase().includes(dim.toUpperCase());
+
+const parseReview = (expectedDims, raw) => {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
   const entries = Object.entries(raw);
-  if (entries.length < 6) return new Error(`expected >=6 dimensions, got ${entries.length}`);
+  const got = [...entries.map(([k]) => k)].sort();
+  const want = [...expectedDims].sort();
+  if (got.length !== want.length || got.some((k, i) => k !== want[i])) {
+    return new Error(`dimension key set mismatch: got [${got.join(',')}] want [${want.join(',')}]`);
+  }
   for (const [k, v] of entries) {
     if (v === null || typeof v !== 'object') return new Error(`missing ${k}`);
     if (!Number.isInteger(v.score) || v.score < 1 || v.score > 10) return new Error(`${k}.score invalid`);
@@ -180,11 +190,10 @@ const parseReview = (raw) => {
       return new Error(`${k}.justification missing`);
     }
   }
-  if (!('OverallAssessment' in raw)) return new Error('missing OverallAssessment');
   return raw;
 };
 
-const judgeOne = async (provider, rubric, stage, contentMd, taskText, task, agent) => {
+const judgeOne = async (provider, rubric, expectedDims, stage, contentMd, taskText, task, agent) => {
   const res = await provider.structuredCall(
     {
       task: rubric,
@@ -199,7 +208,7 @@ const judgeOne = async (provider, rubric, stage, contentMd, taskText, task, agen
       maxTokens: 3000,
       purpose: `mlr-bench-${stage}-judge`,
     },
-    parseReview,
+    (raw) => parseReview(expectedDims, raw),
   );
   if (!res.ok) throw new Error(`judge failed ${task}/${agent}/${stage}: ${res.error?.message}`);
   return res.data;
@@ -232,6 +241,10 @@ if (process.argv.includes('--dry-run')) {
 
 mkdirSync(RESULTS_DIR, { recursive: true });
 
+// fail fast if upstream renames a rubric dimension (expected key sets must match verbatim rubrics)
+for (const d of IDEA_DIMS) if (!dimName(IDEA_RUBRIC, d)) die(`idea rubric no longer mentions dimension '${d}'`);
+for (const d of PROPOSAL_DIMS) if (!dimName(PROPOSAL_RUBRIC, d)) die(`proposal rubric no longer mentions dimension '${d}'`);
+
 // phase 1: FAR-Lab runs (sequential, ids recorded incrementally for resume)
 if (!SKIP_RUNS) {
   const priorLines = existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
@@ -252,10 +265,22 @@ if (!SKIP_RUNS) {
 }
 
 const runs = existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+// dedupe by task (first runId line wins; a duplicate could only appear if the CLI printed
+// JSON then still exited non-zero — surfaced loudly instead of double-judged silently)
+const seenTasks = new Set();
+const uniqueRuns = [];
+for (const r of runs) {
+  if (!r.runId || seenTasks.has(r.task)) continue;
+  seenTasks.add(r.task);
+  uniqueRuns.push(r);
+}
+if (uniqueRuns.length !== runs.filter((r) => r.runId).length) {
+  console.warn(`[mlr-bench] NOTE: duplicate task runId lines in ${RUNS_FILE}; judging each task once (first line)`);
+}
 
 // phase 2: render + judge everything (resume-safe by rewriting whole file each pass)
 const records = [];
-for (const r of runs) {
+for (const r of uniqueRuns) {
   if (!r.runId) continue;
   const taskText = taskMd(r.task);
   const { idea } = renderIdea(r.runId);
@@ -266,13 +291,13 @@ for (const r of runs) {
       readFileSync(join(REPO, 'agent_results/ideas_and_proposals', r.task, 'idea', `idea_${a}.md`), 'utf8'),
       readFileSync(join(REPO, 'agent_results/ideas_and_proposals', r.task, 'proposal', `proposal_${a}.md`), 'utf8')]),
   ]) {
-    for (const [stage, md, rubric] of [['idea', ideaMd, IDEA_RUBRIC], ['proposal', proposalMd, PROPOSAL_RUBRIC]]) {
+    for (const [stage, md, rubric, dims] of [['idea', ideaMd, IDEA_RUBRIC, IDEA_DIMS], ['proposal', proposalMd, PROPOSAL_RUBRIC, PROPOSAL_DIMS]]) {
       if (md === null || md === undefined) {
         records.push({ task: r.task, runId: r.runId, agent, stage, skipped: true, reason: 'no farlab output' });
         continue;
       }
       try {
-        const review = await judgeOne(provider, rubric, stage, md, taskText, r.task, agent);
+        const review = await judgeOne(provider, rubric, dims, stage, md, taskText, r.task, agent);
         records.push({
           task: r.task, runId: r.runId, agent, stage, judge: 'deepseek-chat', temperature: 0,
           scores: Object.fromEntries(Object.entries(review).map(([k, v]) => [k, v.score])),
