@@ -26,7 +26,7 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 
 | Candidate | Decision | Trigger |
 |---|---|---|
-| GROBID Docker sidecar (Apache-2.0, 0.9.1 active) | DEFER (fulltext phase B) | When fulltext phase A ships and residual pdf_url demand is real |
+| GROBID Docker sidecar (Apache-2.0, 0.9.1 active) | REJECT (superseded 2026-08-22, D-028): OpenAlex content API serves SERVER-SIDE GROBID TEI per work ($0.01/file, free key ~100/day ≥ our ≤3/run deepening cap; probe: metadata keyless, download 401-without-key) — same GROBID output, zero JVM/Docker infra. Route `openalex_tei_v1` landed in fulltext phase B | Re-open only if OpenAlex content API pricing/access changes materially |
 | docling-serve (MIT) | DEFER | Non-scholarly document need |
 | Local ONNX cross-encoder rerank (transformers.js + onnxruntime-node, Apache/MIT) | DEFER | Pool >60 or offline need; requires latency spike; ~227MB optional dep |
 | Local ONNX NLI (Xenova/nli-deberta) as claim-relation cross-checker | DEFER (trigger rewritten 2026-08-22, D-023: relation-precision spike measured contradicts 1/8 exact, but the defect pattern = topical distance + label granularity, which NLI does not fix; deterministic topical gate shipped instead) | Re-activate only if a POST-GATE blind re-judging (evidence/W-EV2/relation-precision.md reproduction) still shows low precision on topically-close pairs; would also need a zero-runtime-dep exception |

@@ -4,12 +4,17 @@ import { isSourceAdapterError } from './error.js';
 
 /**
  * Fulltext phase A (2026-08-22, W-EV2): deepen selected corpus documents from
- * abstract to full text via two keyless, license-clean endpoints —
+ * abstract to full text via keyless, license-clean endpoints —
  *   - arXiv LaTeXML HTML   https://arxiv.org/html/{id}      (probe: 200, ltx markers)
  *   - Europe PMC JATS XML  /rest/{pmcid}/fullTextXML        (probe: 200, JATS article)
+ * Phase B via OpenAlex content API (2026-08-22, D-028): server-side GROBID TEI XML
+ *   - https://content.openalex.org/works/{W-id}.grobid-xml  (probe: metadata keyless,
+ *     download requires OPENALEX_API_KEY; $0.01/file, free key ~100/day ≥ our ≤3/run cap).
+ *     This SUPERSEDES a local GROBID sidecar (registry B): same GROBID output, zero infra.
+ *     Keyless docs simply stay abstract-depth — honest not_available, no error, no cost.
  * NOT a SourceAdapter: these do not search/resolve; they deepen an existing
- * document through identifiers the corpus already carries. PDFs are out of
- * scope for phase A (no zero-dep PDF text extraction; AGPL minefield — D-019).
+ * document through identifiers the corpus already carries. Raw-PDF fetching stays
+ * out of scope (no zero-dep PDF text extraction; AGPL minefield — D-019).
  *
  * Failures are explicit result states, never exceptions for expected outcomes:
  *   'fetched'        — full text extracted, license recorded when present
@@ -17,7 +22,7 @@ import { isSourceAdapterError } from './error.js';
  *   'error'          — infrastructure failure (visible, caller degrades honestly)
  */
 
-export type FullTextVariant = 'arxiv_html_v1' | 'europepmc_jats_v1';
+export type FullTextVariant = 'arxiv_html_v1' | 'europepmc_jats_v1' | 'openalex_tei_v1';
 
 export interface FullTextFetch {
   variant: FullTextVariant;
@@ -36,16 +41,17 @@ export type FullTextFetchResult =
   | { status: 'error'; message: string };
 
 export interface FullTextRoute {
-  kind: 'arxiv_html' | 'europepmc_jats';
-  /** Canonical id: bare arXiv id, PMC-prefixed id, or PMID:-prefixed id. */
+  kind: 'arxiv_html' | 'europepmc_jats' | 'openalex_tei';
+  /** Canonical id: bare arXiv id, PMC-prefixed id, PMID:-prefixed id, or bare OpenAlex W-id. */
   id: string;
   sourceUrl: string;
 }
 
 const ARXIV_HTML_BASE = 'https://arxiv.org/html';
 const EPMC_BASE = 'https://www.ebi.ac.uk/europepmc/webservices/rest';
+const OPENALEX_CONTENT_BASE = 'https://content.openalex.org/works';
 /** Endpoint families for receipts/notes (not SourceFamily — these never search). */
-export const FULLTEXT_FAMILIES = ['arxiv_html', 'europepmc_jats'] as const;
+export const FULLTEXT_FAMILIES = ['arxiv_html', 'europepmc_jats', 'openalex_tei'] as const;
 const USER_AGENT = 'FAR-Lab/0.1 (compatible; farlab fulltext phase A)';
 
 /**
@@ -71,6 +77,15 @@ export const fullTextRoute = (doc: Pick<SourceDocument, 'identifiers'>): FullTex
     if (/^\d+$/.test(v)) {
       // Bare PMID: the REST path needs the explicit PMID: prefix.
       return { kind: 'europepmc_jats', id: `PMID:${v}`, sourceUrl: `${EPMC_BASE}/PMID:${v}/fullTextXML` };
+    }
+  }
+  // OpenAlex server-side GROBID TEI (phase B, D-028): last priority — keyless-key
+  // docs stay abstract-depth, and arXiv/EPMC render richer structures for free.
+  for (const id of doc.identifiers) {
+    if (id.kind !== 'openalex') continue;
+    const bare = id.value.trim().replace(/^https?:\/\/openalex\.org\//i, '').replace(/^W/i, (m) => m.toUpperCase());
+    if (/^W\d+$/.test(bare)) {
+      return { kind: 'openalex_tei', id: bare, sourceUrl: `${OPENALEX_CONTENT_BASE}/${bare}.grobid-xml` };
     }
   }
   return null;
@@ -121,6 +136,24 @@ export interface JatsExtraction {
   text: string;
   license?: string;
 }
+
+/**
+ * GROBID TEI XML (OpenAlex content API variant, D-028): root <TEI> with a
+ * <teiHeader> (dropped — metadata, not claim material) and <text><body> prose.
+ * The trailing <listBibl> bibliography is cut like the LaTeXML case. Returns
+ * null when the payload is not a TEI document.
+ */
+export const extractTeiBodyText = (xml: string): string | null => {
+  if (!/<TEI[\s>]/i.test(xml)) return null;
+  const bodyMatch = xml.match(/<body\b[^>]*>([\s\S]*)<\/body>/i);
+  if (bodyMatch === null) return null;
+  let body = bodyMatch[1]!;
+  const bibStart = body.search(/<listBibl\b/i);
+  if (bibStart > 0) body = body.slice(0, bibStart);
+  body = body.replace(/<figure\b[\s\S]*?<\/figure>/gi, ' ');
+  const text = collapseWs(tagsToSpaces(stripInertBlocks(body)));
+  return text.length > 0 ? text : null;
+};
 
 /**
  * Europe PMC JATS fullTextXML: one top-level <body> inside <article>; license
@@ -227,15 +260,67 @@ export const fetchEuropePmcFullText = async (
   }
 };
 
+/**
+ * OpenAlex content API GROBID TEI (phase B, D-028). Download REQUIRES an API key
+ * (probe 2026-08-22: keyless → 401 "Content downloads require an API key"); without
+ * OPENALEX_API_KEY (or opts.apiKey) the doc honestly stays abstract-depth — no
+ * error, no cost. 401/404 are not_available (capability/coverage facts), 5xx/other
+ * are visible errors.
+ */
+export const fetchOpenAlexTeiFullText = async (
+  route: FullTextRoute,
+  opts: SourceAdapterOptions & { apiKey?: string } = {},
+): Promise<FullTextFetchResult> => {
+  const apiKey = opts.apiKey ?? process.env['OPENALEX_API_KEY'] ?? '';
+  if (apiKey === '') {
+    return {
+      status: 'not_available',
+      reason: `openalex TEI for ${route.id}: content downloads require an API key (free at openalex.org/users) — OPENALEX_API_KEY not set`,
+    };
+  }
+  try {
+    const res = await httpGet(`${route.sourceUrl}?api_key=${encodeURIComponent(apiKey)}`, {
+      fetchImpl: opts.fetchImpl,
+      timeoutMs: opts.timeoutMs,
+      headers: { 'User-Agent': USER_AGENT },
+      context: { family: 'openalex_tei', query: route.id },
+    });
+    if (res.status === 404) {
+      return { status: 'not_available', reason: `no GROBID TEI content for ${route.id} (404)` };
+    }
+    if (res.status === 401 || res.status === 403) {
+      return { status: 'not_available', reason: `openalex TEI ${route.id}: key rejected (${res.status}) — check OPENALEX_API_KEY` };
+    }
+    if (res.status !== 200) {
+      return { status: 'error', message: `openalex tei ${route.id}: http ${res.status}` };
+    }
+    const text = extractTeiBodyText(res.bodyText);
+    if (text === null) {
+      return { status: 'not_available', reason: `200 response is not GROBID TEI for ${route.id}` };
+    }
+    if (text.length < MIN_FULLTEXT_CHARS) {
+      return { status: 'not_available', reason: `degenerate TEI body (${text.length} chars) for ${route.id}` };
+    }
+    return {
+      status: 'fetched',
+      fetch: { variant: 'openalex_tei_v1', sourceUrl: route.sourceUrl, text, httpStatus: res.status },
+    };
+  } catch (e) {
+    return { status: 'error', message: `openalex tei ${route.id}: ${e instanceof Error ? e.message : String(e)}` };
+  }
+};
+
 /** Fetch fulltext for a routed document (null route → not_available). */
 export const fetchFullTextForRoute = async (
   route: FullTextRoute | null,
   opts: SourceAdapterOptions = {},
 ): Promise<FullTextFetchResult> => {
-  if (route === null) return { status: 'not_available', reason: 'no routable identifier (arxiv/PMC)' };
+  if (route === null) return { status: 'not_available', reason: 'no routable identifier (arxiv/PMC/openalex)' };
   return route.kind === 'arxiv_html'
     ? fetchArxivHtmlFullText(route, opts)
-    : fetchEuropePmcFullText(route, opts);
+    : route.kind === 'europepmc_jats'
+      ? fetchEuropePmcFullText(route, opts)
+      : fetchOpenAlexTeiFullText(route, opts);
 };
 
 /** Live default: route by identifiers then fetch. Stages/tests inject their own via ctx. */

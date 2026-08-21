@@ -9,9 +9,11 @@ import { describe, expect, it } from 'vitest';
 import {
   extractJatsBodyText,
   extractLaTeXmlText,
+  extractTeiBodyText,
   fetchArxivHtmlFullText,
   fetchEuropePmcFullText,
   fetchFullTextForRoute,
+  fetchOpenAlexTeiFullText,
   fullTextRoute,
   type FullTextRoute,
 } from '../src/sources/fulltext.js';
@@ -50,9 +52,26 @@ describe('fullTextRoute', () => {
     expect(r?.kind).toBe('arxiv_html');
   });
 
+  it('routes openalex W-ids to the GROBID TEI content endpoint (phase B, lowest priority)', () => {
+    const r = fullTextRoute(docOf([{ kind: 'openalex', value: 'W3035965352' }]));
+    expect(r).toEqual({
+      kind: 'openalex_tei',
+      id: 'W3035965352',
+      sourceUrl: 'https://content.openalex.org/works/W3035965352.grobid-xml',
+    });
+    const bare = fullTextRoute(docOf([{ kind: 'openalex', value: 'https://openalex.org/W123' }]));
+    expect(bare?.id).toBe('W123');
+    // arXiv and PMC stay higher priority than the keyed OpenAlex route
+    const prio = fullTextRoute(docOf([
+      { kind: 'openalex', value: 'W9' },
+      { kind: 'arxiv', value: '2501.00001' },
+    ]));
+    expect(prio?.kind).toBe('arxiv_html');
+  });
+
   it('returns null for unroutable identifiers', () => {
     expect(fullTextRoute(docOf([{ kind: 'doi', value: '10.1/x' }]))).toBeNull();
-    expect(fullTextRoute(docOf([{ kind: 'openalex', value: 'W1' }]))).toBeNull();
+    expect(fullTextRoute(docOf([{ kind: 'openalex', value: 'not-a-wid' }]))).toBeNull();
   });
 });
 
@@ -183,5 +202,76 @@ describe('fetchFullTextForRoute', () => {
   it('null route is not_available (common case: no arxiv/PMC identifier)', async () => {
     const res = await fetchFullTextForRoute(null);
     expect(res).toMatchObject({ status: 'not_available' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OpenAlex GROBID TEI (phase B, D-028)
+// ---------------------------------------------------------------------------
+
+const grobidTei = (prose: string) =>
+  '<?xml version="1.0" encoding="UTF-8"?><TEI xmlns="http://www.tei-c.org/ns/1.0">' +
+  '<teiHeader><fileDesc><titleStmt><title>Fixture Paper</title></titleStmt></fileDesc></teiHeader>' +
+  '<text><body><div><head>Results</head>' +
+  `<p>${prose}</p>` +
+  '<figure><graphic url="fig1.png"/></figure>' +
+  '</div><listBibl><biblStruct>Smith J 1999 irrelevant bibliography</biblStruct></listBibl>' +
+  '</body></text></TEI>';
+
+describe('extractTeiBodyText', () => {
+  it('extracts body prose, drops header/figure/bibliography', () => {
+    const text = extractTeiBodyText(grobidTei(LONG_PROSE));
+    expect(text).not.toBeNull();
+    expect(text).toContain('Deep sequencing');
+    expect(text).not.toContain('Fixture Paper'); // teiHeader dropped
+    expect(text).not.toContain('irrelevant bibliography'); // listBibl cut
+  });
+
+  it('returns null for non-TEI payloads', () => {
+    expect(extractTeiBodyText('<html><body>nope</body></html>')).toBeNull();
+    expect(extractTeiBodyText('<TEI><text></text></TEI>')).toBeNull(); // no body
+  });
+});
+
+describe('fetchOpenAlexTeiFullText', () => {
+  const route: FullTextRoute = { kind: 'openalex_tei', id: 'W3035965352', sourceUrl: 'https://content.openalex.org/works/W3035965352.grobid-xml' };
+
+  it('no API key -> honest not_available (no error, no network attempt)', async () => {
+    let called = 0;
+    const fetchImpl: FetchLike = async () => { called += 1; throw new Error('must not be called'); };
+    const res = await fetchOpenAlexTeiFullText(route, { fetchImpl, apiKey: '' });
+    expect(res).toMatchObject({ status: 'not_available' });
+    expect(res.status === 'not_available' ? res.reason : '').toContain('OPENALEX_API_KEY');
+    expect(called).toBe(0);
+  });
+
+  it('fetches GROBID TEI into text with the key on the query string', async () => {
+    let seenUrl = '';
+    const fetchImpl: FetchLike = async (url) => {
+      seenUrl = String(url);
+      return { ok: true, status: 200, text: async () => grobidTei(LONG_PROSE) };
+    };
+    const res = await fetchOpenAlexTeiFullText(route, { fetchImpl, apiKey: 'test-key' });
+    expect(res.status).toBe('fetched');
+    if (res.status === 'fetched') {
+      expect(res.fetch.variant).toBe('openalex_tei_v1');
+      expect(res.fetch.text).toContain('Deep sequencing');
+      expect(res.fetch.license).toBeUndefined();
+    }
+    expect(seenUrl).toContain('api_key=test-key');
+  });
+
+  it('401/403 (key rejected) and 404 (no content) are not_available, not errors', async () => {
+    const r401 = await fetchOpenAlexTeiFullText(route, { fetchImpl: statusFetch(401, '{"error":"API key required"}'), apiKey: 'k' });
+    expect(r401).toMatchObject({ status: 'not_available' });
+    const r404 = await fetchOpenAlexTeiFullText(route, { fetchImpl: statusFetch(404, 'gone'), apiKey: 'k' });
+    expect(r404).toMatchObject({ status: 'not_available' });
+  });
+
+  it('a non-TEI 200 is not_available; server errors are visible', async () => {
+    const notTei = await fetchOpenAlexTeiFullText(route, { fetchImpl: statusFetch(200, '<html>landing</html>'), apiKey: 'k' });
+    expect(notTei).toMatchObject({ status: 'not_available' });
+    const err = await fetchOpenAlexTeiFullText(route, { fetchImpl: statusFetch(503, 'unavailable'), apiKey: 'k' });
+    expect(err).toMatchObject({ status: 'error' });
   });
 });
