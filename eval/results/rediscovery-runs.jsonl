@@ -1,0 +1,6 @@
+{"task":"antibiotic-cdiff","runId":"run_a73mdjamb4pf4f1gqt274pss1p","status":"completed"}
+{"task":"egfr-tki-resistance","error":"Command failed: node dist/cli/main.js research start What mechanisms drive acquired resistance to EGFR tyrosine kinase inhibitors in non-small cell lung cancer? --domain oncology --goal explanatory --json\n(node:11752) ExperimentalWarning: SQLite is an experimental feature and might change at any tim","stderr":"(node:11752) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"}
+{"task":"arg-plasmid-transfer","runId":"run_1egsvvs4s98zgsh5bkp0h5ct6x","status":"completed"}
+{"task":"crispr-offtarget","runId":"run_ffv483wv1yv3mk05kvde53h761","status":"completed"}
+{"task":"crc-ici-failure","runId":"run_0ryc6a6cn1mdpssjj1j2bhsve6","status":"completed"}
+{"task":"egfr-tki-resistance","runId":"run_en8b1xjxb8h0064v1y9jq133f3","status":"completed"}
