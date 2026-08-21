@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global console, process, fetch, setTimeout, clearTimeout, AbortController, performance */
 /**
  * FAR-Lab W1 live source smoke check (real APIs, one search per family).
  *

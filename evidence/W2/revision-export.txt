@@ -1,0 +1,14 @@
+  [run_7zez1a8e export] reproducibility bundle bnd_wsavs0jq7bfhvkb02n1j629d8e (sha256:6f8c7b8939316e89c7dd1d4adcdb77e24f4d28a2a95e6f953d93eb2124cebb74); report sha256:f9b60d1be588056367e42d2c5978741966c014514a9bd9f1cb0c390289252634; declaredEvidenceLevel=replay
+run run_7zez1a8ezbbrrgw9begtta0gsw
+  status: completed  stage: export  progress: 9/9 stages
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    done     rank
+    done     plan
+    done     feedback
+    skipped  revise
+    done     export

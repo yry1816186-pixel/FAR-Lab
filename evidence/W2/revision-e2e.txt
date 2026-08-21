@@ -1,0 +1,13 @@
+run run_7zez1a8ezbbrrgw9begtta0gsw
+  status: completed  stage: export  progress: 9/9 stages
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    done     rank
+    done     plan
+    done     feedback
+    done     revise
+    skipped  export

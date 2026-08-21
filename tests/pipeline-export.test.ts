@@ -18,7 +18,7 @@ import { openDb, type Db } from '../src/persistence/db.js';
 import { Store, STAGE_ALL } from '../src/persistence/store.js';
 import { openArtifactStore, type ArtifactStore } from '../src/persistence/artifacts.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
-import { planStage } from '../src/pipeline/stages/plan.js';
+import { planStage, checkPlanExecutability } from '../src/pipeline/stages/plan.js';
 import { exportStage } from '../src/pipeline/stages/export.js';
 import type { StageContext } from '../src/pipeline/types.js';
 import { canonicalJson, canonicalSha256, sha256Hex } from '../src/shared/crypto.js';
@@ -392,6 +392,86 @@ describe('plan stage', () => {
     await expect(planStage.execute(ctx)).rejects.toThrow(/no hypotheses to plan for/);
     expect(store.listObjects('plan', g.run.id)).toHaveLength(0);
   });
+
+  it('sanitizes fabricated task refs and fails the gate on dropped dependencies (not silent)', async () => {
+    const g = seedRun();
+    const draft = validPlanDraft([g.hyp.id], [g.clmVerified.id]);
+    // well-formed TaskId that is NOT a step id of this plan (mirrors run_7zez1a8ezbbrrgw9begtta0gsw)
+    const ghostTask = 'task_1a2b3c4d5e6f7a8b9c0d1e2f';
+    const step1Id = draft.steps[0]!.id;
+    draft.steps[1]!.inputs = [...draft.steps[1]!.inputs, ghostTask];
+    draft.steps[1]!.dependsOn = [ghostTask];
+    draft.steps[2]!.dependsOn = [step1Id]; // a valid dependency must survive sanitization
+    const ctx = makeCtx(g.run, stubFor(draft));
+
+    await planStage.execute(ctx);
+    const plan = store.listObjects('plan', g.run.id)[0]!;
+
+    // inputs: only the dangling task_ ref is removed; other inputs untouched
+    expect(plan.steps[1]!.inputs).toEqual(['sequencing data']);
+    // dependsOn: invalid ref dropped, valid ref kept
+    expect(plan.steps[1]!.dependsOn).toEqual([]);
+    expect(plan.steps[2]!.dependsOn).toEqual([step1Id]);
+    // dependency loss escalates into executabilityCheck.missing — visible, gate fails
+    expect(plan.executabilityCheck?.passed).toBe(false);
+    expect(
+      plan.executabilityCheck?.missing.some((m) => m.includes(ghostTask) && m.includes('依赖缺失')),
+    ).toBe(true);
+  });
+
+  it('keeps claim-id and free-text inputs while dropping only dangling task_ refs (gate can still pass)', async () => {
+    const g = seedRun();
+    const draft = validPlanDraft([g.hyp.id], [g.clmVerified.id]);
+    const ghostTask = 'task_2b3c4d5e6f7a8b9c0d1e2f3a';
+    draft.steps[0]!.inputs = [g.clmVerified.id, 'lab notebook resource', ghostTask];
+    const ctx = makeCtx(g.run, stubFor(draft));
+
+    await planStage.execute(ctx);
+    const plan = store.listObjects('plan', g.run.id)[0]!;
+    // non-task refs survive (claim ids / free text are legal inputs); only task_ refs must resolve
+    expect(plan.steps[0]!.inputs).toEqual([g.clmVerified.id, 'lab notebook resource']);
+    // dropped input ref is warning-level: the gate itself is not failed by an input drop alone
+    expect(plan.executabilityCheck?.passed).toBe(true);
+  });
+
+  it('checkPlanExecutability enforces task-reference integrity directly (defense in depth)', () => {
+    const hypId = ghost('hyp');
+    const ghostTask = `task_${'9'.repeat(24)}`;
+    const mkStep = (id: string, extra: Partial<{ inputs: string[]; dependsOn: string[] }>) => ({
+      id,
+      title: `step ${id.slice(5, 7)}`,
+      kind: 'experiment' as const,
+      inputs: ['cells'],
+      outputs: [],
+      method: 'do the work',
+      failureConditions: ['it breaks'],
+      dependsOn: [],
+      ...extra,
+    });
+    const check = checkPlanExecutability(
+      {
+        objective: 'discriminate mechanisms',
+        hypothesisIds: [hypId],
+        steps: [
+          mkStep(`task_${'a'.repeat(24)}`, {}),
+          mkStep(`task_${'b'.repeat(24)}`, { inputs: [ghostTask, 'clm_x', 'free-text dataset'], dependsOn: [ghostTask] }),
+          mkStep(`task_${'c'.repeat(24)}`, {}),
+        ],
+        metrics: ['m1', 'm2'],
+        decisionRules: {
+          successCriterion: 's',
+          weakeningCriterion: 'w',
+          falsificationCriterion: 'f',
+          stopCriterion: 't',
+        },
+        dataRequirements: [],
+      },
+      [hypId],
+    );
+    expect(check.passed).toBe(false);
+    expect(check.missing.some((m) => m.includes('inputs 含无效步骤引用') && m.includes(ghostTask))).toBe(true);
+    expect(check.missing.some((m) => m.includes('dependsOn 引用不存在的步骤') && m.includes(ghostTask))).toBe(true);
+  });
 });
 
 describe('export stage', () => {
@@ -443,10 +523,15 @@ describe('export stage', () => {
     // section 3: binding status counts + unaligned claims made explicit
     expect(report).toContain('resolved_unaligned');
     expect(report).toContain(g.clmUnaligned.id);
-    // section 4: relation counts + key counter evidence
+    // section 4: relation counts + key counter evidence rendered from stored claims/sources.
+    // (W2 behavior change: the line now carries the claim TEXT and source TITLE — the old
+    // assertion on the rationale string was replaced because generic rationale lines were
+    // the defect being fixed; claiming the claim-text line is strictly more specific.)
     expect(report).toContain('supports：1 条');
     expect(report).toContain('contradicts：1 条');
-    expect(report).toContain('counter observation incompatible');
+    expect(report).toContain(`[contradicts] ${g.clmUnaligned.text}`);
+    expect(report).toContain(`来源: ${g.srcFailed.title}`);
+    expect(report).toContain('strength=weak');
     // section 5: hypothesis essentials
     expect(report).toContain(g.hyp.statement);
     expect(report).toContain('completenessCheck');
