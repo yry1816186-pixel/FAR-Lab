@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import {
   RELATION_POLARITY,
   newId,
@@ -495,6 +496,18 @@ const aggregateModelMetadata = (
   return [...map.values()];
 };
 
+/** Provenance: release builds inject FARLAB_GIT_COMMIT; otherwise read the working repo honestly. */
+const resolveCodeRevision = (): string => {
+  const fromEnv = process.env.FARLAB_GIT_COMMIT;
+  if (fromEnv !== undefined && fromEnv.trim().length > 0) return fromEnv.trim();
+  try {
+    const rev = execSync('git rev-parse HEAD', { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return /^[0-9a-f]{7,40}$/.test(rev) ? rev : 'unknown';
+  } catch {
+    return 'unknown'; // not a git checkout (e.g. installed distribution) — honest, never invented
+  }
+};
+
 export const exportStage: StageHandler = {
   stage: 'export',
   applicable: async (ctx) => {
@@ -579,7 +592,7 @@ export const exportStage: StageHandler = {
       id: bundleId,
       runId: run.id,
       declaredEvidenceLevel: 'replay',
-      codeRevision: process.env.FARLAB_GIT_COMMIT ?? 'unknown',
+      codeRevision: resolveCodeRevision(),
       environmentFingerprint: `node ${process.version} ${process.platform}`,
       dependencyLockHash,
       questionRef: question?.id ?? 'missing:question',
