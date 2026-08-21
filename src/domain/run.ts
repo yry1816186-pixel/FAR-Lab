@@ -71,8 +71,8 @@ export const STAGE_ORDER: readonly RunStageName[] = [
 ] as const;
 
 export const runProgress = (run: ResearchRun): { known: boolean; done: number; total: number } => {
-  const core = STAGE_ORDER.filter((s) => s !== 'feedback');
-  const done = core.filter((s) => run.stages.find((r) => r.stage === s)?.state === 'done').length;
+  const core = STAGE_ORDER.filter((s) => s !== 'feedback' && s !== 'revise');
+  const done = core.filter((s) => ['done', 'skipped'].includes(String(run.stages.find((r) => r.stage === s)?.state))).length;
   return { known: true, done, total: core.length };
 };
 

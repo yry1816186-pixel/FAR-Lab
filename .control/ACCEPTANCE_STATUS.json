@@ -1,36 +1,225 @@
 {
   "schemaVersion": 2,
-  "statusVocabulary": ["not_started", "implemented", "integrated", "tested", "live_verified", "blocked", "failed"],
+  "statusVocabulary": [
+    "not_started",
+    "implemented",
+    "integrated",
+    "tested",
+    "live_verified",
+    "blocked",
+    "failed"
+  ],
   "note": "Dynamic product-construction status only. ACCEPTANCE.md owns criteria; this file owns live status/evidence. benchmark/scientific-validation claims are attached as evidence to live_verified.",
   "items": [
-    {"id":"ACC-01","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-02","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-03","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-04","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-05","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-06","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-07","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-08","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-09","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-10","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-11","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-12","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-13","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-14","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-15","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-16","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-17","target":"tested","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-18","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-19","target":"live_verified","critical":true,"status":"not_started","evidence":[]},
-    {"id":"ACC-20","target":"live_verified","critical":true,"status":"not_started","evidence":[]}
+    {
+      "id": "ACC-01",
+      "target": "live_verified",
+      "critical": true,
+      "status": "tested",
+      "evidence": [
+        "task_plan.md §0.3; project-spec/COMPETITION.md rechecked 2026-08-21 (official page); scope enforced in AGENTS.md + pipeline design"
+      ]
+    },
+    {
+      "id": "ACC-02",
+      "target": "live_verified",
+      "critical": true,
+      "status": "not_started",
+      "evidence": []
+    },
+    {
+      "id": "ACC-03",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "evidence/W1/run_7zez1a8ezbbrrgw9begtta0gsw.report.md §1 (LLM-refined scope persisted, drives retrieval/hypotheses/plan)"
+      ]
+    },
+    {
+      "id": "ACC-04",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "report §2: 8 sources from 5 queries (incl. mandatory counter-evidence query), all contentHash sha256-canonical, artifacts stored"
+      ]
+    },
+    {
+      "id": "ACC-05",
+      "target": "live_verified",
+      "critical": true,
+      "status": "tested",
+      "evidence": [
+        "live: 15/15 claims verified-aligned (report §3); fail-closed paths unit-proven (tests/pipeline-evidence.test.ts 20/20); adversarial misalignment live-demo pending W2"
+      ]
+    },
+    {
+      "id": "ACC-06",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "report §4: 56 relations (41 supports/11 contradicts/1 weakens/3 qualifies) + §8 uncertainty inventory"
+      ]
+    },
+    {
+      "id": "ACC-07",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "report §5: 6 distinct mechanism-level hypothesis clusters; 5 paraphrase duplicates marked duplicate-of-representative"
+      ]
+    },
+    {
+      "id": "ACC-08",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "report §5: quantitative falsification specs with decision rules; hyp_bjps30gs honestly failed completenessCheck -> untestable_currently"
+      ]
+    },
+    {
+      "id": "ACC-09",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "report §6: per-dimension rationale + producer + calibration=uncalibrated_llm_judgment; deterministic fixed weights documented"
+      ]
+    },
+    {
+      "id": "ACC-10",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "report §7: 6-step plan w/ variables/controls/data/method/metrics/decisionRules/resources($2M/36mo)/ethics; executabilityCheck passed"
+      ]
+    },
+    {
+      "id": "ACC-11",
+      "target": "live_verified",
+      "critical": true,
+      "status": "not_started",
+      "evidence": []
+    },
+    {
+      "id": "ACC-12",
+      "target": "live_verified",
+      "critical": true,
+      "status": "tested",
+      "evidence": [
+        "REAL failure at build_evidence (schema null) -> status=partial persisted -> resume completed (evidence/W1/e2e-resume3-output.txt EXIT=0); cancel + corrupted-checkpoint live demos pending W2"
+      ]
+    },
+    {
+      "id": "ACC-13",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "report §9: 36 receipts, 23 model calls, executionMode all live; requestHash/outputHash recorded"
+      ]
+    },
+    {
+      "id": "ACC-14",
+      "target": "live_verified",
+      "critical": true,
+      "status": "implemented",
+      "evidence": [
+        "bundle bnd_4bnfh7mcfem6n9wye7qtv5jfnq declared replay level; independent third-party exercise scheduled W5 (far verify)"
+      ]
+    },
+    {
+      "id": "ACC-15",
+      "target": "live_verified",
+      "critical": true,
+      "status": "tested",
+      "evidence": [
+        "CLI start/status/inspect/resume/export all exercised on the real run; feedback command + cancel live demo pending W2"
+      ]
+    },
+    {
+      "id": "ACC-16",
+      "target": "live_verified",
+      "critical": true,
+      "status": "not_started",
+      "evidence": []
+    },
+    {
+      "id": "ACC-17",
+      "target": "tested",
+      "critical": true,
+      "status": "not_started",
+      "evidence": []
+    },
+    {
+      "id": "ACC-18",
+      "target": "live_verified",
+      "critical": true,
+      "status": "not_started",
+      "evidence": []
+    },
+    {
+      "id": "ACC-19",
+      "target": "live_verified",
+      "critical": true,
+      "status": "not_started",
+      "evidence": []
+    },
+    {
+      "id": "ACC-20",
+      "target": "live_verified",
+      "critical": true,
+      "status": "not_started",
+      "evidence": []
+    }
   ],
   "gates": [
-    {"id":"G-01","question":"All critical acceptance items reached target status with concrete evidence?","satisfied":false,"evidence":""},
-    {"id":"G-02","question":"No critical blocker or production-path fake/mock/demo/stub remains?","satisfied":false,"evidence":""},
-    {"id":"G-03","question":"Canonical real researcher workflow exercised end-to-end?","satisfied":false,"evidence":""},
-    {"id":"G-04","question":"Current official competition compliance rechecked and live-verified?","satisfied":false,"evidence":""},
-    {"id":"G-05","question":"Independent adversarial audit accepted repository/runtime/scientific evidence?","satisfied":false,"evidence":""},
-    {"id":"G-06","question":"Reproducibility claims independently exercised to their stated level?","satisfied":false,"evidence":""},
-    {"id":"G-07","question":"Repository, runtime, scientific and user-visible state agree with completion claim?","satisfied":false,"evidence":""}
+    {
+      "id": "G-01",
+      "question": "All critical acceptance items reached target status with concrete evidence?",
+      "satisfied": false,
+      "evidence": ""
+    },
+    {
+      "id": "G-02",
+      "question": "No critical blocker or production-path fake/mock/demo/stub remains?",
+      "satisfied": false,
+      "evidence": ""
+    },
+    {
+      "id": "G-03",
+      "question": "Canonical real researcher workflow exercised end-to-end?",
+      "satisfied": false,
+      "evidence": ""
+    },
+    {
+      "id": "G-04",
+      "question": "Current official competition compliance rechecked and live-verified?",
+      "satisfied": false,
+      "evidence": ""
+    },
+    {
+      "id": "G-05",
+      "question": "Independent adversarial audit accepted repository/runtime/scientific evidence?",
+      "satisfied": false,
+      "evidence": ""
+    },
+    {
+      "id": "G-06",
+      "question": "Reproducibility claims independently exercised to their stated level?",
+      "satisfied": false,
+      "evidence": ""
+    },
+    {
+      "id": "G-07",
+      "question": "Repository, runtime, scientific and user-visible state agree with completion claim?",
+      "satisfied": false,
+      "evidence": ""
+    }
   ]
 }

@@ -1,0 +1,23 @@
+  [run_7zez1a8e build_evidence] extracting claims from src_hnj2n0y6e3fccxxpeavk3z0nna "Horizontal transfer of antibiotic resistance genes in clinic"
+  [run_7zez1a8e build_evidence] extracting claims from src_zkw42wmjxgwtqcxh8txk1x0kan "Dissemination of Antimicrobial Resistance in Microbial Ecosy"
+  [run_7zez1a8e build_evidence] extracting claims from src_8nz1kpcczrkcsm7jeca8pv8xc6 "Genomic islands: tools of bacterial horizontal gene transfer"
+run run_7zez1a8ezbbrrgw9begtta0gsw
+  status: partial  stage: generate_hypotheses  progress: 4/10 stages
+  lastError: model call failed (invalid_output) in generate_hypotheses/hypothesis-search:evidence-conditioned: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: candidates.0.statement:Required; candidates.0.mechanism:Required; candidates.0.rationale:Required; candidates.0.distinctnessRationale:Required; candidates.1.statement:Required; last raw output head: {
+  "candidates": [
+    {
+      "hypothesis": "In hospital biofilms, conjugation is the dominant mechanism of ARG transfer because biofilms increase cell-to-cell contact and stabilize mating pairs, an…[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    failed   generate_hypotheses — model call failed (invalid_output) in generate_hypotheses/hypothesis-search:evidence-conditioned: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: candidates.0.statement:Required; candidates.0.mechanism:Required; candidates.0.rationale:Required; candidates.0.distinctnessRationale:Required; candidates.1.statement:Required; last raw output head: {
+  "candidates": [
+    {
+      "hypothesis": "In hospital biofilms, conjugation is the dominant mechanism of ARG transfer because biofilms increase cell-to-cell contact and stabilize mating pairs, an…[truncated]
+    pending  critique_falsify
+    pending  rank
+    pending  plan
+    pending  feedback
+    pending  revise
+    pending  export

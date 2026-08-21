@@ -1,0 +1,74 @@
+{
+  "id": "bnd_4bnfh7mcfem6n9wye7qtv5jfnq",
+  "runId": "run_7zez1a8ezbbrrgw9begtta0gsw",
+  "declaredEvidenceLevel": "replay",
+  "codeRevision": "unknown",
+  "environmentFingerprint": "node v24.14.0 win32",
+  "dependencyLockHash": "d02f02c254e7c068d196006eedbe3108e4a03397cb4aac943c387d9fc61dfbf1",
+  "questionRef": "q_sq0zx0hesntnn85jyhw1qfgh1x",
+  "corpusSnapshotRef": "corp_agz6ww59cfdxtthtycjt44d8aa",
+  "sourceArtifactHashes": [
+    "6e985facbb6d68fd3e798cb477bd6de0993faf88be0e7a4c9bdcba54eddf820d",
+    "2cce4de380afc5633a0fb5ff94bcdd9c4633ddae2a362a2ec9eac9c18a5722d4",
+    "e59f5bbd490695e9e84ba08d5b44ef29b9ed1aa983723616d35dfc4998af90c8",
+    "9ccba8ac1b236379ca306a137f195cb1910acc0d940bceee69d330b7b8dade1a",
+    "0ec267209aeed0af5819c309aeac11a5156c1faf913d315b98dcf9fd5b217d45",
+    "4dab2e7b437632297f71bdb266b1a7934305054ab820b5df6c33436edc935eec",
+    "8a85d5e12e09e34f8c39b6a9e3fd36b18d21a3940db1f41420850cd3886c93ff",
+    "e7a83d7c7361ed21e8972bec6e1e98aecd2d6a9da20bcfb7402caa1a6f314c94"
+  ],
+  "modelMetadata": [
+    {
+      "provider": "deepseek",
+      "modelId": "deepseek-chat",
+      "route": "live"
+    }
+  ],
+  "receiptIds": [
+    "rcp_tprt6m9fy7bkx1vbyb7bmawgkb",
+    "rcp_fdwcpahbhrcby2p8q14r9mht96",
+    "rcp_e76x3pk0hbzcf8ffxm4prbrxh9",
+    "rcp_ewn0cyy42narm8g3sw5tk3r3wn",
+    "rcp_ngp64cbqygcpshd5fe63hvwngm",
+    "rcp_49qyw8e16m9pdcbs95gfbedjk0",
+    "rcp_crjswth2gakpmsnhe5rf8jhvap",
+    "rcp_gphhmq1h31ts4khy34racsncq8",
+    "rcp_d3epy1pkhej5mn175y0xnxf91p",
+    "rcp_9f2s59kq050n1n84kvcgt221e2",
+    "rcp_qksp1fvrpt4cxkzgybygmnm4qd",
+    "rcp_9a5b3869p5h23amx56edmf8778",
+    "rcp_ph1e9cd0fegdnfe9apnnha7ffv",
+    "rcp_psq1fmzstpncpxv8gdj8c83b9w",
+    "rcp_p10ytapwr6c7bvfpqd17t3ntw4",
+    "rcp_g5y1zfdk85qe2mggbn001ysdve",
+    "rcp_r5qt62sc9asq77z14zgdw1k963",
+    "rcp_x12k6r43g566tt35dacmjna1sk",
+    "rcp_5ayt8ccx9994b388h0p44zcwgb",
+    "rcp_f82vs77v7svtnxnhwajv50byzb",
+    "rcp_y4yhz05f10jm4gr08jds0ah1w6",
+    "rcp_cwav6d4vf4nmdxk8ynbwtef2vr",
+    "rcp_hv33pj2j1kqvzkw06dx8x1vt2a",
+    "rcp_jacwvfnvej9cnv9082fmb3qkpp",
+    "rcp_y76xtsk1tba6p4bya3jwgccfr2",
+    "rcp_97k0cm3r8egken88vbz7d1dakm",
+    "rcp_239kck5hf1f0reywc76nd72q52",
+    "rcp_mta0y33tyg7k6wnrq19xm19ngz",
+    "rcp_hagk11hd9tambfn9fpae9fa6bh",
+    "rcp_c7x02rm8brprvweeqer74wwcys",
+    "rcp_k8zrj7sc5vffhn3zp8x140gj2b",
+    "rcp_5qgtt70nwykvkgfhb7mm0ths97",
+    "rcp_3faq34thfwqwa2444bs0z1cn5n",
+    "rcp_cvmavwpq9fq4jbd8fw6ce5035y",
+    "rcp_q8p1y5we8zs24hddeznppf7mce",
+    "rcp_r8j50gc4xxjcxs64n1mb4fedvy",
+    "rcp_7magndzk8bpmj8sg6acjm1ndjp"
+  ],
+  "finalArtifactHashes": [
+    "5a11abea92cecbe632383226330acfd34e528bf75337f83e33d7500e96f9161b"
+  ],
+  "verificationInstructions": "far verify --bundle bnd_4bnfh7mcfem6n9wye7qtv5jfnq（第三方核验：按 receiptIds 比对 receipts、按 sourceArtifactHashes 比对来源快照、按 finalArtifactHashes 比对导出工件）",
+  "limitations": [
+    "模型环节为 LLM 生成、具有非确定性：bundle 可复放的是输入快照、模型元数据、receipts 与工件哈希，不保证重新生成逐字节一致的输出。"
+  ],
+  "createdAt": "2026-08-21T11:37:20.744Z"
+}

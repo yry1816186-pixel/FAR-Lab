@@ -1,0 +1,18 @@
+created run run_7zez1a8ezbbrrgw9begtta0gsw
+  [run_7zez1a8e build_evidence] extracting claims from src_0pqs162jyr08wq73wpjswky7qs "Horizontal Gene Transfer of Antibiotic Resistance Genes in B"
+  [run_7zez1a8e build_evidence] extracting claims from src_xrn3prsarhw05wahj183pwy048 "Acquired Antibiotic Resistance Genes: An Overview"
+  [run_7zez1a8e build_evidence] extracting claims from src_hnj2n0y6e3fccxxpeavk3z0nna "Horizontal transfer of antibiotic resistance genes in clinic"
+run run_7zez1a8ezbbrrgw9begtta0gsw
+  status: partial  stage: build_evidence  progress: 3/10 stages
+  lastError: model call failed (invalid_output) in build_evidence/claim-extraction: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: claims.0.note:Expected string, received null; claims.2.note:Expected string, received null; last raw output head: {"claims":[{"text":"Conjugation by plasmids, transduction by bacteriophages, and natural transformation by extracellular DNA each allow genetic material to jump between strains and species.","quote":"…[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    failed   build_evidence — model call failed (invalid_output) in build_evidence/claim-extraction: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: claims.0.note:Expected string, received null; claims.2.note:Expected string, received null; last raw output head: {"claims":[{"text":"Conjugation by plasmids, transduction by bacteriophages, and natural transformation by extracellular DNA each allow genetic material to jump between strains and species.","quote":"…[truncated]
+    pending  generate_hypotheses
+    pending  critique_falsify
+    pending  rank
+    pending  plan
+    pending  feedback
+    pending  revise
+    pending  export

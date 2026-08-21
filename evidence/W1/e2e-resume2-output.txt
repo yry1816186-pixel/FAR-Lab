@@ -1,0 +1,20 @@
+run run_7zez1a8ezbbrrgw9begtta0gsw
+  status: partial  stage: generate_hypotheses  progress: 4/10 stages
+  lastError: model call failed (invalid_output) in generate_hypotheses/hypothesis-search:evidence-conditioned: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: candidates.0.statement:Required; candidates.0.mechanism:Required; candidates.0.rationale:Required; candidates.0.distinctnessRationale:Required; candidates.1.statement:Required; last raw output head: {
+  "candidates": [
+    {
+      "hypothesis": "Biofilm-associated conjugative plasmid transfer is the dominant mechanism for ARG dissemination in hospital environments, driven by high cell density and…[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    failed   generate_hypotheses — model call failed (invalid_output) in generate_hypotheses/hypothesis-search:evidence-conditioned: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: candidates.0.statement:Required; candidates.0.mechanism:Required; candidates.0.rationale:Required; candidates.0.distinctnessRationale:Required; candidates.1.statement:Required; last raw output head: {
+  "candidates": [
+    {
+      "hypothesis": "Biofilm-associated conjugative plasmid transfer is the dominant mechanism for ARG dissemination in hospital environments, driven by high cell density and…[truncated]
+    pending  critique_falsify
+    pending  rank
+    pending  plan
+    pending  feedback
+    pending  revise
+    pending  export

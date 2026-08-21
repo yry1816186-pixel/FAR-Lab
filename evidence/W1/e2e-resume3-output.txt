@@ -1,0 +1,19 @@
+  [run_7zez1a8e plan] plan pln_4kc6thg3g6ds6vg15wtg7qvhyd covers 2 hypothesis(es); executabilityCheck passed
+  [run_7zez1a8e export] reproducibility bundle bnd_4bnfh7mcfem6n9wye7qtv5jfnq (sha256:0c2d8f9b8556bc7c5f1c8d0e6dc68e4d2b6d909150a51d83beaa359ab5d30814); report sha256:5a11abea92cecbe632383226330acfd34e528bf75337f83e33d7500e96f9161b; declaredEvidenceLevel=replay
+run run_7zez1a8ezbbrrgw9begtta0gsw
+  status: completed  stage: export  progress: 9/10 stages
+  lastError: model call failed (invalid_output) in generate_hypotheses/hypothesis-search:evidence-conditioned: deepseek: structured output rejected even after 1 corrective retry: schema validation failed: candidates.0.statement:Required; candidates.0.mechanism:Required; candidates.0.rationale:Required; candidates.0.distinctnessRationale:Required; candidates.1.statement:Required; last raw output head: {
+  "candidates": [
+    {
+      "hypothesis": "Biofilm-associated conjugative plasmid transfer is the dominant mechanism for ARG dissemination in hospital environments, driven by high cell density and…[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    done     rank
+    done     plan
+    skipped  feedback
+    skipped  revise
+    done     export
