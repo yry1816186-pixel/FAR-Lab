@@ -1,10 +1,9 @@
 {
   "schemaVersion": 2,
   "mission": "Intelligence-driven evolution: absorb world-class external mechanisms (prior baseline + open-world scouts) into FAR-Lab's Direction-A core loop via source-level fusion, benchmarked before/after.",
-  "status": "IN_PROGRESS",
-  "phase": "wave3 complete: all GO items executed + live-verified (#1/#2/#3/#4a/#4b/#5/#6); backlog = presentation-level or externally blocked",
-  "pauseReason": null,
-  "currentObjective": "Wave-3 closed: relation reliability, anchor verdict + swap-disagreement proxy, rediscovery eval (mean F1 0.58, judge variance disclosed), OpenAlex TEI phase B (local GROBID superseded), POPPER multiple-testing discipline, DeepSeek strict-FC default transport, crossref third retrieval family + OpenAlex budget adaptations. Remaining: #8 Idea2Plan fold (presentation), rediscovery judge-hardening (follow-up), #9 models.dev (network-blocked), B-QWEN submission route + OPENALEX_API_KEY (user credentials).",
+  "status": "waiting_for_user",
+  "phase": "wave3 complete: all GO items executed + live-verified; frontier gate record ready (stop-guard schema); remaining high-value work gated on user credentials/network",
+  "pauseReason": "Development mission at decision saturation for current environment conditions (2026-08-22 ~23:50 local): all GO-ranked Wave-3 items executed with live verification (D-023..D-029b); frontier record rewritten in stop-guard schema and reads ready:true with evidence; completion-gate VERIFIED_READY. The remaining high-value items cannot proceed without user action: B-QWEN-LIVE-ROUTE (DASHSCOPE_API_KEY/Bailian credentials — submission-mandated per official verbatim rule), optional OPENALEX_API_KEY (phase-B full-fetch verification), or network access to models.dev/huggingface.co. Presentation-level leftovers (#8 fold, judge-hardening) are recorded deferrals below the high-value bar. This is NOT mission-completion self-certification: resume by providing credentials or picking up a recorded deferral.",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",

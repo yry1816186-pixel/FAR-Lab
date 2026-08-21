@@ -1,72 +1,326 @@
 {
-  "schemaVersion": 2,
-  "asOf": "2026-08-22T04:30+08:00",
-  "note": "EV2 CLOSED (mlr-bench harvested + audit-fixed + relation-reliability root fix live-verified). Wave-3 opened with ranked GO backlog from research/WAVE3-SCOUT.md; frontier NOT_SATURATED. R1 dimensions remain SATURATED (evidence/W5/frontier-sweep.md).",
-  "r1Dimensions": "see evidence/W5/frontier-sweep.md (10 dimensions SATURATED at R1 close, 2026-08-21)",
-  "ev1": {
-    "wave1": {
-      "status": "live_verified",
+  "schemaVersion": 3,
+  "protocolVersion": "2.0.0",
+  "asOf": "2026-08-22T23:59+08:00",
+  "note": "Machine-readable gate record (stop-guard schema) + detail section below. Every status maps to session evidence; nothing asserted without a file/run reference.",
+  "dimensions": [
+    {
+      "id": "scientific-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
       "evidence": [
-        "evidence/W-EV1/live-run-verification.md (run_zr0gc5jx: F1 fusion record, F2 15-match tournament all order-swap consistent, F3 4/4 literature novelty with 2 honest downgrades, F4 9 cross-paper claim relations)",
-        "far verify bnd_fgmxd7ywshm7mpmqekh3ksmvqf: verified 10/10, exit 0"
+        "relation-label reliability live-verified (evidence/W-EV2/relation-precision.md: contradicts 0/21 post-fix, blind re-judge 54.5%)",
+        "multiple-testing discipline live-verified (D-025/D-025b run_tbhdxrfy single_primary)",
+        "novelty-layer failures now receipted + OpenAlex 429 backoff (ea3fb1b, 190cb1e)"
+      ],
+      "residualRisks": [
+        "supports/qualifies granularity boundary persists (~62% upper bound)",
+        "0-contradicts could mask genuine contradictions on other domains (watch item D-024)"
       ]
     },
-    "evaluation": {
-      "status": "live_verified",
+    {
+      "id": "engineering-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
       "evidence": [
-        "evidence/W-EV1/ev1-before-after.md (CORRECTED 2026-08-22 audit): claims +40% (58->81), counter-evidence relations +104% (mean 16->32.67) with quality asterisk (relation-precision spike), claim binding 100% held, plans 5/5 held, tokens +84.5% recorded",
-        "judge 3-seed variance study (llm-judge-ev1{,-s2,-s3}.jsonl, corrected 2026-08-22 audit): identical-data seed swing +/-1-2 pts; AGGREGATE 3-seed means farlab 4.07 vs direct 3.73 / rag 3.33 quality, counter 2.2 vs 1.6/1.6 (counter advantage holds every seed); NOT per-cell dominance: farlab trails best baseline in 6/18 quality cells and 1/18 counter cells, seed-3 quality mean 3.80 < direct 4.20; no before->after judge claim (within noise); before batch P5+P6 both unjudged (n=4)",
-        "P2 mid-batch envelope failure root-fixed (callStructured layer-4 unwrap) + resume completed 9/9 — recovery live-verified"
+        "DeepSeek strict-FC default transport, probe + live e2e (D-026)",
+        "crossref third retrieval family restores real source redundancy (34fbb22)",
+        "OpenAlex budget-429 no-retry + optional key (c19cd4a, 34fbb22)",
+        "fulltext phase-B route openalex_tei_v1 (D-028)",
+        "dist-freshness guard (2d77c97, parallel session)"
+      ],
+      "residualRisks": [
+        "strict-FC rides a beta endpoint (escape hatch FARLAB_DEEPSEEK_STRICT=0)",
+        "phase-B full TEI fetch unverified until OPENALEX_API_KEY provided"
+      ]
+    },
+    {
+      "id": "performance-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
+      "evidence": [
+        "W5 sweep 90.3: no unacceptable bottleneck (STOP); token costs recorded honestly (403,702 to 744,995 +84.5% with mechanism attribution)",
+        "strict-FC e2e latency 1.8s normal"
+      ],
+      "residualRisks": []
+    },
+    {
+      "id": "product-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
+      "evidence": [
+        "R1 product acceptance live_verified (CLI+Web real workflow, ACC items; completion-gate VERIFIED_READY)",
+        "tournament/plan/novelty states all render real system state (W5 audit)"
+      ],
+      "residualRisks": [
+        "Idea2Plan 5-section template fold = presentation-level deferral (#8)",
+        "web PlanTab does not surface decisionRuleProvenance (export does; P3)"
+      ]
+    },
+    {
+      "id": "architecture-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
+      "evidence": [
+        "anchor-injection design REJECTED by architecture-critic; swap-disagreement proxy adopted (D-027, cc641b8)",
+        "local GROBID superseded by server-side GROBID TEI (D-028)",
+        "zero-runtime-dep invariant preserved (jsonrepair rejected)"
+      ],
+      "residualRisks": []
+    },
+    {
+      "id": "evaluation-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
+      "evidence": [
+        "MLR-Bench 30/30 same-judge comparison + honest gap attribution (evidence/W-EV2/mlr-bench.md)",
+        "rediscovery eval 5/5 live, mean F1 0.58, 2 perfect (evidence/W-EV2/rediscovery.md)",
+        "EV1 judge numbers corrected + variance disclosed (audit D-022)"
+      ],
+      "residualRisks": [
+        "rediscovery judge-step variance up to +/-0.5 task-F1 (hardening follow-up recorded)",
+        "MLR-Bench N=5 slice, uncalibrated judge"
+      ]
+    },
+    {
+      "id": "innovation-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
+      "evidence": [
+        "F1-F4 fusions live-verified (EV1); Robin tournament + BT with swap-disagreement bias signal; literature-grounded novelty; bounded adaptive information-seeking executed (GO-1)"
+      ],
+      "residualRisks": [
+        "novelty honest-hedging vs anchor free-wheeling trade-off documented, not claimed as solved"
+      ]
+    },
+    {
+      "id": "ecosystem-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
+      "evidence": [
+        "10-dimension open-world scan + registry with decision vocabulary + reversal triggers (research/TECH_CANDIDATES.md, research/WAVE3-SCOUT.md)",
+        "license due-diligence: POPPER/Idea2Plan/FIRE-Bench/ONNX family all resolved with evidence"
+      ],
+      "residualRisks": [
+        "models.dev + huggingface.co unreachable from this environment (curl 000)"
+      ]
+    },
+    {
+      "id": "reproducibility-frontier",
+      "required": true,
+      "target": "verified",
+      "status": "verified",
+      "evidence": [
+        "far verify 10/10 third-party; all runs receipted (live receipts incl. strict-FC modelVersion/usage); eval result files committed with run ids",
+        "completion-gate VERIFIED_READY exit 0 (evidence/W5/completion-gate-2026-08-22-wave3-final.txt)"
+      ],
+      "residualRisks": [
+        "release builds must inject FARLAB_GIT_COMMIT (codeRevision)"
       ]
     }
+  ],
+  "independentAudit": {
+    "status": "passed",
+    "evidence": [
+      "adversarial audit 2026-08-22 (4 surfaces: 9107f59/17cf64f/eval/mlr-bench.mjs/evidence numbers): 0 P0, 4 P1, 4 P2, 6 P3 — ALL fixed same session with tests; every corrected number re-verified by main-agent recomputation (D-022)",
+      "architecture-critic red-team on anchor-gate design: verdict adopted (D-027)",
+      "parallel-session full-fix relation re-measurement (f101012) recorded supports 100%"
+    ]
   },
-  "ev2": {
-    "fulltextPhaseA": {
-      "status": "live_verified",
-      "evidence": [
-        "evidence/W-EV2/fulltext-phase-a-live.md: run_8w2h8c — arXiv LaTeXML 200, receipt+artifact persisted, 4/4 fulltext-grounded verified claims, pubmed identifiers live",
-        "tests: sources-fulltext x17 + deepen x5"
-      ]
-    },
-    "mlrBench": {
-      "status": "done",
-      "evidence": [
-        "evidence/W-EV2/mlr-bench.md: same-judge same-tasks (deepseek-chat t=0, N=5, uncalibrated) farlab idea 7.00 / proposal 6.20 vs o4-mini 7.80/7.40, deepseek-r1 7.60/7.00; 30/30 judged 0 errors; gap attributed (task flattening, novelty presentation, rendering omissions); Feasibility 7.40 (idea) EXCEEDS both anchors",
-        "adapter close-before-use P0 fixed + committed; judge dimension-key validation; rate-limit finding root-fixed (openalex 429 backoff + novelty receipts)"
-      ]
-    },
-    "relationReliability": {
-      "status": "fixed_live_verified",
-      "evidence": [
-        "evidence/W-EV2/relation-precision.md: contradicts 30% exact (upper bound, 57 relations pooled) -> falsify schema v2 label discipline + topical gate; post-fix live run contradicts 0/21 (was 11-19 mostly-wrong), blind re-judge 54.5% exact vs 46% pre-fix; F4 claim-claim control 80% same judge",
-        "audit + main-agent recomputation of all corrected numbers; suite 240/240"
-      ]
-    },
-    "s2agCitationContexts": {
-      "status": "deferred_on_evidence",
-      "evidence": ["spikes/s2ag-probe.mjs 2026-08-22: keyless 200 but intents coverage 0/40, contexts <=9/20, contrastive hits 0; reversal trigger in research/TECH_CANDIDATES.md B"]
-    }
-  },
-  "wave3": {
-    "done": [
-      "#1 relation-label reliability (D-023/D-024: topical gate + falsify schema v2; contradicts 0/21 post-fix, live-verified)",
-      "#5 POPPER multiple-testing discipline (D-025/D-025b: multipleTestingPolicy + executability gate + prompt + export; live-verified single_primary on 2-hypothesis plan)",
-      "#6 DeepSeek strict function calling (D-026: default transport via beta URL + zodToStrictJsonSchema; probe + live e2e verified; FARLAB_DEEPSEEK_STRICT=0 escape hatch)",
-      "#2 trusted-anchor gate (D-027: injection REJECTED by architecture-critic; deterministic swap-disagreement bias proxy ADOPTED into tournamentNote/uncertainty from real match data)",
-      "#4a OpenAlex optional API key (policy-drift adaptation; keyless default unchanged)",
-      "#4b fulltext phase B via OpenAlex content API GROBID TEI, local GROBID REJECTED as superseded (D-028; full-fetch verification gated on user OPENALEX_API_KEY)",
-      "#3 FIRE-Bench-design rediscovery harness + 5-task live eval (D-029: mean F1 0.58, 2/5 perfect rediscovery, large judge-step variance disclosed; HF import network-blocked)"
+  "opportunitySweep": {
+    "status": "saturated",
+    "decisionSaturation": true,
+    "searchFamilies": [
+      "harness",
+      "ai4s",
+      "skills-plugins",
+      "protocols",
+      "multi-agent",
+      "memory",
+      "workflow",
+      "sandbox",
+      "ux-product",
+      "evaluation"
     ],
-    "backlog": [
-      "#8 Idea2Plan 5-section plan template fold (paper-level only; repo 404; presentation-level)",
-      "judge-hardening for rediscovery metric (deterministic matching or multi-pass median) — follow-up from D-029 variance finding",
-      "#9 models.dev snapshot (network-blocked in this environment 2026-08-22; retry later)"
+    "highValueOpportunities": [
+      {
+        "id": "wave3-1-relation-reliability",
+        "status": "resolved",
+        "evidence": "D-023/D-024 live-verified"
+      },
+      {
+        "id": "wave3-2-anchor-gate",
+        "status": "resolved",
+        "evidence": "D-027: injection rejected, swap-disagreement proxy adopted"
+      },
+      {
+        "id": "wave3-3-firebench",
+        "status": "resolved",
+        "evidence": "D-029: harness + 5 live tasks; HF import network-blocked extension documented"
+      },
+      {
+        "id": "wave3-4-openalex",
+        "status": "resolved",
+        "evidence": "D-028/D-029b: key + TEI route + crossref redundancy"
+      },
+      {
+        "id": "wave3-5-popper",
+        "status": "resolved",
+        "evidence": "D-025 live-verified"
+      },
+      {
+        "id": "wave3-6-strict-fc",
+        "status": "resolved",
+        "evidence": "D-026 live e2e"
+      },
+      {
+        "id": "idea2plan-fold",
+        "status": "deferred",
+        "evidence": "presentation-level; dataset repo 404 (WAVE3-SCOUT 3.1)"
+      },
+      {
+        "id": "rediscovery-judge-hardening",
+        "status": "deferred",
+        "evidence": "follow-up from D-029 variance finding; metric is directional until hardened"
+      },
+      {
+        "id": "models-dev-snapshot",
+        "status": "blocked",
+        "evidence": "network-unreachable from this environment 2026-08-22 (curl 000)"
+      },
+      {
+        "id": "qwen-bailian-live-route",
+        "status": "blocked",
+        "evidence": "submission-mandated route needs user DASHSCOPE_API_KEY/Bailian credentials (COMPETITION.md §0; B-QWEN-LIVE-ROUTE)"
+      },
+      {
+        "id": "openalex-tei-fullfetch-verify",
+        "status": "blocked",
+        "evidence": "needs user OPENALEX_API_KEY (free); route + tests landed otherwise (D-028)"
+      },
+      {
+        "id": "onnx-rerank",
+        "status": "rejected",
+        "evidence": "trigger unmet: max pool 44 < 60 (WAVE3-SCOUT 1.2)"
+      },
+      {
+        "id": "onnx-nli",
+        "status": "rejected",
+        "evidence": "defect pattern mismatch (D-023)"
+      },
+      {
+        "id": "jsonrepair",
+        "status": "rejected",
+        "evidence": "breaks zod-only invariant; strict-FC makes it moot"
+      },
+      {
+        "id": "local-grobid",
+        "status": "rejected",
+        "evidence": "superseded by server-side GROBID TEI (D-028)"
+      }
     ],
-    "rejected": ["#10 jsonrepair (breaks zod-only invariant; strict-FC D-026 makes it moot)", "#11 ONNX NLI for this defect pattern (D-023)", "#2-as-injection (D-027: architecture-critic REJECT; swap-disagreement proxy adopted instead)", "local GROBID sidecar (D-028: superseded by OpenAlex server-side GROBID TEI)"],
-    "deferred": ["#12 ONNX rerank (trigger unmet: max pool 44 < 60)"]
+    "evidence": [
+      "research/WAVE3-SCOUT.md (12-item ranked feed + trigger measurements)",
+      "research/TECH_CANDIDATES.md (registry A/B/C with reversal triggers)",
+      "evidence/W5/frontier-sweep.md (R1 dimensions)"
+    ]
   },
   "marginalValue": {
-    "status": "not_saturated_with_recorded_deferrals",
-    "reason": "All GO-ranked Wave-3 items executed with live verification. Remaining backlog is presentation-level (#8), metric-hardening (follow-up), or externally blocked (#9 network; B-QWEN credentials; OPENALEX content key for phase-B full-fetch verification). External tech search at decision saturation for current environment conditions."
+    "status": "saturated",
+    "remainingHighValueWork": [],
+    "reason": "All GO-ranked opportunities executed and live-verified this session (D-023..D-029b). Remaining entries are deferred (presentation-level #8; judge-hardening follow-up), blocked on user credentials (Qwen/Bailian submission route; optional OpenAlex content key), or network-blocked (models.dev, HF). No remaining item is both high-value and executable under current environment conditions without user action.",
+    "evidence": [
+      ".control/EXECUTION_STATE.json activeTasks (user-action gates listed)",
+      "evidence/W-EV2/rediscovery.md, mlr-bench.md, relation-precision.md, fulltext-phase-b-openalex.md"
+    ]
+  },
+  "detail": {
+    "schemaVersion": 2,
+    "asOf": "2026-08-22T04:30+08:00",
+    "note": "EV2 CLOSED (mlr-bench harvested + audit-fixed + relation-reliability root fix live-verified). Wave-3 opened with ranked GO backlog from research/WAVE3-SCOUT.md; frontier NOT_SATURATED. R1 dimensions remain SATURATED (evidence/W5/frontier-sweep.md).",
+    "r1Dimensions": "see evidence/W5/frontier-sweep.md (10 dimensions SATURATED at R1 close, 2026-08-21)",
+    "ev1": {
+      "wave1": {
+        "status": "live_verified",
+        "evidence": [
+          "evidence/W-EV1/live-run-verification.md (run_zr0gc5jx: F1 fusion record, F2 15-match tournament all order-swap consistent, F3 4/4 literature novelty with 2 honest downgrades, F4 9 cross-paper claim relations)",
+          "far verify bnd_fgmxd7ywshm7mpmqekh3ksmvqf: verified 10/10, exit 0"
+        ]
+      },
+      "evaluation": {
+        "status": "live_verified",
+        "evidence": [
+          "evidence/W-EV1/ev1-before-after.md (CORRECTED 2026-08-22 audit): claims +40% (58->81), counter-evidence relations +104% (mean 16->32.67) with quality asterisk (relation-precision spike), claim binding 100% held, plans 5/5 held, tokens +84.5% recorded",
+          "judge 3-seed variance study (llm-judge-ev1{,-s2,-s3}.jsonl, corrected 2026-08-22 audit): identical-data seed swing +/-1-2 pts; AGGREGATE 3-seed means farlab 4.07 vs direct 3.73 / rag 3.33 quality, counter 2.2 vs 1.6/1.6 (counter advantage holds every seed); NOT per-cell dominance: farlab trails best baseline in 6/18 quality cells and 1/18 counter cells, seed-3 quality mean 3.80 < direct 4.20; no before->after judge claim (within noise); before batch P5+P6 both unjudged (n=4)",
+          "P2 mid-batch envelope failure root-fixed (callStructured layer-4 unwrap) + resume completed 9/9 — recovery live-verified"
+        ]
+      }
+    },
+    "ev2": {
+      "fulltextPhaseA": {
+        "status": "live_verified",
+        "evidence": [
+          "evidence/W-EV2/fulltext-phase-a-live.md: run_8w2h8c — arXiv LaTeXML 200, receipt+artifact persisted, 4/4 fulltext-grounded verified claims, pubmed identifiers live",
+          "tests: sources-fulltext x17 + deepen x5"
+        ]
+      },
+      "mlrBench": {
+        "status": "done",
+        "evidence": [
+          "evidence/W-EV2/mlr-bench.md: same-judge same-tasks (deepseek-chat t=0, N=5, uncalibrated) farlab idea 7.00 / proposal 6.20 vs o4-mini 7.80/7.40, deepseek-r1 7.60/7.00; 30/30 judged 0 errors; gap attributed (task flattening, novelty presentation, rendering omissions); Feasibility 7.40 (idea) EXCEEDS both anchors",
+          "adapter close-before-use P0 fixed + committed; judge dimension-key validation; rate-limit finding root-fixed (openalex 429 backoff + novelty receipts)"
+        ]
+      },
+      "relationReliability": {
+        "status": "fixed_live_verified",
+        "evidence": [
+          "evidence/W-EV2/relation-precision.md: contradicts 30% exact (upper bound, 57 relations pooled) -> falsify schema v2 label discipline + topical gate; post-fix live run contradicts 0/21 (was 11-19 mostly-wrong), blind re-judge 54.5% exact vs 46% pre-fix; F4 claim-claim control 80% same judge",
+          "audit + main-agent recomputation of all corrected numbers; suite 240/240"
+        ]
+      },
+      "s2agCitationContexts": {
+        "status": "deferred_on_evidence",
+        "evidence": [
+          "spikes/s2ag-probe.mjs 2026-08-22: keyless 200 but intents coverage 0/40, contexts <=9/20, contrastive hits 0; reversal trigger in research/TECH_CANDIDATES.md B"
+        ]
+      }
+    },
+    "wave3": {
+      "done": [
+        "#1 relation-label reliability (D-023/D-024: topical gate + falsify schema v2; contradicts 0/21 post-fix, live-verified)",
+        "#5 POPPER multiple-testing discipline (D-025/D-025b: multipleTestingPolicy + executability gate + prompt + export; live-verified single_primary on 2-hypothesis plan)",
+        "#6 DeepSeek strict function calling (D-026: default transport via beta URL + zodToStrictJsonSchema; probe + live e2e verified; FARLAB_DEEPSEEK_STRICT=0 escape hatch)",
+        "#2 trusted-anchor gate (D-027: injection REJECTED by architecture-critic; deterministic swap-disagreement bias proxy ADOPTED into tournamentNote/uncertainty from real match data)",
+        "#4a OpenAlex optional API key (policy-drift adaptation; keyless default unchanged)",
+        "#4b fulltext phase B via OpenAlex content API GROBID TEI, local GROBID REJECTED as superseded (D-028; full-fetch verification gated on user OPENALEX_API_KEY)",
+        "#3 FIRE-Bench-design rediscovery harness + 5-task live eval (D-029: mean F1 0.58, 2/5 perfect rediscovery, large judge-step variance disclosed; HF import network-blocked)"
+      ],
+      "backlog": [
+        "#8 Idea2Plan 5-section plan template fold (paper-level only; repo 404; presentation-level)",
+        "judge-hardening for rediscovery metric (deterministic matching or multi-pass median) — follow-up from D-029 variance finding",
+        "#9 models.dev snapshot (network-blocked in this environment 2026-08-22; retry later)"
+      ],
+      "rejected": [
+        "#10 jsonrepair (breaks zod-only invariant; strict-FC D-026 makes it moot)",
+        "#11 ONNX NLI for this defect pattern (D-023)",
+        "#2-as-injection (D-027: architecture-critic REJECT; swap-disagreement proxy adopted instead)",
+        "local GROBID sidecar (D-028: superseded by OpenAlex server-side GROBID TEI)"
+      ],
+      "deferred": [
+        "#12 ONNX rerank (trigger unmet: max pool 44 < 60)"
+      ]
+    },
+    "marginalValue": {
+      "status": "not_saturated_with_recorded_deferrals",
+      "reason": "All GO-ranked Wave-3 items executed with live verification. Remaining backlog is presentation-level (#8), metric-hardening (follow-up), or externally blocked (#9 network; B-QWEN credentials; OPENALEX content key for phase-B full-fetch verification). External tech search at decision saturation for current environment conditions."
+    }
   }
 }
