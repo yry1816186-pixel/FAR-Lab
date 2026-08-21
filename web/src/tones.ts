@@ -1,7 +1,7 @@
 /** Tone + label-key mapping for domain enum values (single owner of badge semantics). */
 import type { BadgeTone } from './components/common';
 import type { DictKey } from './i18n/dict';
-import type { CitationBindingStatus, NoveltyLabel, RunStatus, StageState, TestabilityStatus } from './api/types';
+import type { CitationBindingStatus, LiteratureNoveltyVerdict, NoveltyLabel, RunStatus, StageState, TestabilityStatus } from './api/types';
 
 export function runStatusTone(status: RunStatus): BadgeTone {
   switch (status) {
@@ -61,3 +61,15 @@ export const noveltyKey = (label: NoveltyLabel): DictKey => `novelty.${label}` a
 export function checkTone(passed: boolean): BadgeTone {
   return passed ? 'ok' : 'err';
 }
+
+// ---- D-017 literature novelty verdicts ----
+export function litNoveltyTone(verdict: LiteratureNoveltyVerdict): BadgeTone {
+  switch (verdict) {
+    case 'novel': return 'ok';
+    case 'incremental': return 'info';
+    case 'already_done': return 'warn';
+    case 'unclear': return 'muted';
+  }
+}
+
+export const litNoveltyKey = (verdict: LiteratureNoveltyVerdict): DictKey => `litNovelty.${verdict}` as DictKey;

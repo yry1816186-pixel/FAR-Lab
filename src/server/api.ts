@@ -527,6 +527,8 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
           return sendJson(res, 200, {
             hypotheses: app.store.listObjects('hypothesis', runId),
             scorecards: app.store.listObjects('scorecard', runId),
+            // D-016: pairwise tournament evidence behind the final ordering (uncertainty included)
+            tournament: app.store.listObjects('tournament', runId).at(-1) ?? null,
           });
         }
         if (leaf === 'plan' && method === 'GET') {

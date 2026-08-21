@@ -272,6 +272,8 @@ export interface HypothesisCandidate {
   counterClaimIds?: string[];
   uncertainties?: string[];
   noveltyLabel: NoveltyLabel;
+  /** D-017 second novelty layer: judged against retrieved literature neighbors. */
+  literatureNovelty?: LiteratureNovelty;
   testability: TestabilityStatus;
   falsification?: FalsificationSpec;
   clusterKey?: string;
@@ -280,6 +282,60 @@ export interface HypothesisCandidate {
 }
 
 // ---- scorecards (src/domain/scorecard.ts) ----
+
+// ---- D-017 literature novelty + D-016 tournament (src/domain/hypothesis.ts / scorecard.ts) ----
+
+export interface LiteratureNoveltyNeighbor {
+  title: string;
+  year?: number;
+  doi?: string;
+  openalexId?: string;
+  venue?: string;
+  contentHash: string;
+  query: string;
+}
+
+export type LiteratureNoveltyVerdict = 'novel' | 'incremental' | 'already_done' | 'unclear';
+
+export interface LiteratureNovelty {
+  verdict: LiteratureNoveltyVerdict;
+  neighbors: LiteratureNoveltyNeighbor[];
+  justification: string;
+  producer: string;
+  calibration: 'uncalibrated_llm_judgment';
+  assessedAt: string;
+}
+
+export interface TournamentMatch {
+  aId: string;
+  bId: string;
+  aFirstVerdict: 'a' | 'b' | 'tie' | 'incomparable';
+  bFirstVerdict: 'a' | 'b' | 'tie' | 'incomparable';
+  rationale: string;
+  producer: string;
+  outcome: 'a' | 'b' | 'tie' | 'no_contest';
+}
+
+export interface TournamentStanding {
+  hypothesisId: string;
+  btScore: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  winRate: number;
+  rank: number;
+}
+
+export interface HypothesisTournament {
+  id: string;
+  runId: string;
+  participantIds: string[];
+  matches: TournamentMatch[];
+  standings: TournamentStanding[];
+  algorithm: string;
+  uncertainty: string;
+  createdAt: string;
+}
 
 export type ScoreDimension =
   | 'scientific_plausibility' | 'evidence_grounding' | 'counter_evidence_exposure' | 'novelty'
