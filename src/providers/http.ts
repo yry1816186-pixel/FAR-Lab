@@ -46,7 +46,9 @@ const QUOTA_ERROR_CODES: ReadonlySet<string> = new Set(['1113', 'insufficient_qu
 const QUOTA_MESSAGE_RE = /insufficient\s+(?:balance|quota)|余额不足|no resource package/i;
 
 const JSON_ONLY_SUFFIX =
-  'Output ONLY a single valid JSON object. No markdown fences, no commentary, no text before or after the JSON.';
+  'Output ONLY a single valid JSON object. No markdown fences, no commentary, no text before or after the JSON. ' +
+  'The JSON object must match the outputContract shape at the TOP LEVEL: never wrap it in an envelope key ' +
+  '(e.g. the task name, "result" or "output").';
 
 interface ChatMessage {
   role: 'system' | 'user';

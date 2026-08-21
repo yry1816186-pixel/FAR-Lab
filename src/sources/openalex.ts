@@ -40,6 +40,14 @@ const mapWork = (work: unknown): RawSourceRecord | undefined => {
   if (openalexId) identifiers.push({ kind: 'openalex', value: openalexId });
   const doi = strField(w, 'doi')?.replace(/^https?:\/\/doi\.org\//i, '');
   if (doi) identifiers.push({ kind: 'doi', value: doi });
+  // ids.pmcid / ids.pmid enable Europe PMC fulltext deepening (fulltext phase A).
+  const ids = asObject(w['ids']);
+  const pmcid = strField(ids, 'pmcid');
+  if (pmcid !== undefined) identifiers.push({ kind: 'pubmed', value: pmcid });
+  else {
+    const pmid = strField(ids, 'pmid');
+    if (pmid !== undefined) identifiers.push({ kind: 'pubmed', value: pmid });
+  }
   if (identifiers.length === 0) return undefined; // nothing persistent to anchor the record to
 
   // open_access/best_oa_location feed the ACCESS projection but are excluded from the

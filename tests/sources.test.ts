@@ -54,6 +54,8 @@ const deepClone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const oaWorkFixture = {
   id: 'https://openalex.org/W1234567890',
   doi: 'https://doi.org/10.1000/fake.2026.001',
+  // pmcid present -> fulltext phase A deepening becomes possible for this work
+  ids: { openalex: 'https://openalex.org/W1234567890', doi: 'https://doi.org/10.1000/fake.2026.001', pmid: '38729648', pmcid: 'PMC11032673' },
   display_name: 'Fixture Study of Base Editing',
   publication_year: 2026,
   type: 'article',
@@ -220,6 +222,7 @@ describe('snapshotHash', () => {
   it('is invariant to object key insertion order (canonical JSON basis)', () => {
     // same fields as oaWorkFixture, deliberately reversed insertion order
     const reordered = {
+      ids: oaWorkFixture.ids,
       abstract_inverted_index: oaWorkFixture.abstract_inverted_index,
       primary_location: oaWorkFixture.primary_location,
       authorships: oaWorkFixture.authorships,
@@ -283,6 +286,7 @@ describe('openalex adapter', () => {
     expect(rec.identifiers).toEqual([
       { kind: 'openalex', value: 'W1234567890' },
       { kind: 'doi', value: '10.1000/fake.2026.001' },
+      { kind: 'pubmed', value: 'PMC11032673' }, // pmcid preferred over bare pmid (fulltext routing)
     ]);
     expect(rec.title).toBe('Fixture Study of Base Editing');
     expect(rec.publicationYear).toBe(2026);

@@ -2,7 +2,8 @@ import type { ResearchRun, RunStageName } from '../domain/index.js';
 import type { ProvenanceReceipt } from '../domain/provenance.js';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
-import type { SourceFamily } from '../domain/source.js';
+import type { SourceFamily, SourceDocument } from '../domain/source.js';
+import type { FullTextFetchResult } from '../sources/fulltext.js';
 
 /** What a stage may touch. Stage handlers stay pure of infrastructure wiring. */
 export interface StageContext {
@@ -11,6 +12,12 @@ export interface StageContext {
   artifacts: ArtifactStore;
   provider: ModelProvider;
   sourceFor: (family: SourceFamily) => SourceAdapter;
+  /**
+   * Fulltext deepening (phase A): fetch full text for a corpus document through
+   * its identifiers. Absent = the live router (arXiv HTML / Europe PMC JATS);
+   * tests inject deterministic fakes.
+   */
+  fetchFullText?: (doc: SourceDocument) => Promise<FullTextFetchResult>;
   /** Persist a provenance receipt tied to this run (models/sources/tools must call this). */
   recordReceipt: (receipt: Omit<ProvenanceReceipt, 'id' | 'runId' | 'at' | 'stage'> & {
     stage?: RunStageName;

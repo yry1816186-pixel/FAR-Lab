@@ -83,7 +83,11 @@ const gapAdequateStep = (): StubStep => ({
   rawOutput: JSON.stringify({ enoughEvidence: true, gapDescription: 'fixture: adequate for the test scenario', queries: [] }),
 });
 
-const bench = (scriptedSteps: StubStep[], cancelled: () => boolean = () => false): Bench => {
+const bench = (
+  scriptedSteps: StubStep[],
+  cancelled: () => boolean = () => false,
+  extra: { fetchFullText?: StageContext['fetchFullText'] } = {},
+): Bench => {
   const steps = [...scriptedSteps, gapAdequateStep()];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-evidence-'));
   const db: Db = openDb(path.join(dir, 'run.db'));
@@ -124,6 +128,7 @@ const bench = (scriptedSteps: StubStep[], cancelled: () => boolean = () => false
     artifacts: openArtifactStore(path.join(dir, 'artifacts')),
     provider: createTestStubProvider(steps),
     sourceFor: throwingSourceFor,
+    ...(extra.fetchFullText !== undefined ? { fetchFullText: extra.fetchFullText } : {}),
     recordReceipt: (partial) => {
       const receipt = ProvenanceReceipt.parse({
         ...partial,
@@ -644,5 +649,170 @@ describe('build_evidence stage', () => {
     await expect(buildEvidenceStage.execute(ctx)).rejects.toThrow(
       /^cancelled by user in build_evidence/,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fulltext deepening (phase A) — abstract → full text, bounded and fail-visible
+// ---------------------------------------------------------------------------
+
+const FULLTEXT_SENTENCE =
+  'Deep sequencing of the treated cohorts revealed a consistent shift in community composition.';
+const FULLTEXT_BODY = `${FULLTEXT_SENTENCE} `.repeat(40).trim();
+const ARXIV_DOC = {
+  identifiers: [
+    { kind: 'openalex' as const, value: 'W-arx' },
+    { kind: 'doi' as const, value: '10.1/arxiv.1' },
+    { kind: 'arxiv' as const, value: '2401.04088v2' },
+  ],
+};
+
+describe('build_evidence fulltext deepening (phase A)', () => {
+  it('deepens a routed doc: artifact stored, doc upgraded, claims ground in full text', async () => {
+    const fetchedCalls: string[] = [];
+    const { ctx, store, run } = bench(
+      [
+        extractionStep([
+          { text: 'Fulltext claim', quote: FULLTEXT_SENTENCE, stance: 'supports' },
+        ]),
+      ],
+      () => false,
+      {
+        fetchFullText: async (doc) => {
+          fetchedCalls.push(doc.id);
+          return {
+            status: 'fetched',
+            fetch: {
+              variant: 'arxiv_html_v1',
+              sourceUrl: 'https://arxiv.org/html/2401.04088',
+              text: FULLTEXT_BODY,
+              license: 'arXiv.org perpetual, non-exclusive license',
+              httpStatus: 200,
+            },
+          };
+        },
+      },
+    );
+    const doc = mkSource(run.id, newId('src'), ARXIV_DOC);
+    corpusOf(ctx, [doc]);
+
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') {
+      expect(outcome.summary).toContain('fulltext=');
+      expect(outcome.summary).toContain('arxiv_html_v1');
+    }
+    expect(fetchedCalls).toEqual([doc.id]);
+
+    // claim verified against the COMBINED text (sentence absent from the abstract)
+    const claim = claimByText(store, run.id, 'Fulltext claim');
+    expect(claim.bindingStatus).toBe('verified');
+
+    // document upgraded with artifact ref + license
+    const stored = store.getObject('source_document', doc.id)!;
+    expect(stored.contentDepth).toBe('full_text');
+    expect(stored.fullTextRef).toBeDefined();
+    expect(stored.license).toBe('arXiv.org perpetual, non-exclusive license');
+
+    // artifact round-trips the FULL text
+    const artifactText = await ctx.artifacts.get(stored.fullTextRef!);
+    expect(artifactText).toBe(FULLTEXT_BODY);
+
+    // provenance receipt for the fetch
+    const receipt = store
+      .listObjects('receipt', run.id)
+      .find((r) => r.sourceRetrieval?.family === 'arxiv_html_v1');
+    expect(receipt?.sourceRetrieval?.resultCount).toBe(1);
+  });
+
+  it('not_available (no rendering) degrades silently to abstract extraction', async () => {
+    const { ctx, store, run } = bench(
+      [extractionStep([{ text: 'Abstract claim', quote: Q_VERBATIM[0], stance: 'supports' }])],
+      () => false,
+      { fetchFullText: async () => ({ status: 'not_available', reason: 'no HTML rendering (404)' }) },
+    );
+    corpusOf(ctx, [mkSource(run.id, newId('src'), ARXIV_DOC)]);
+
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') expect(outcome.summary).toContain('fulltext=none');
+    expect(claimByText(store, run.id, 'Abstract claim').bindingStatus).toBe('verified');
+    const stored = store.listObjects('source_document', run.id)[0]!;
+    expect(stored.contentDepth).toBe('abstract');
+  });
+
+  it('fetch errors are visible in the summary and never block extraction', async () => {
+    const { ctx, run } = bench(
+      [extractionStep([{ text: 'Abstract claim', quote: Q_VERBATIM[1], stance: 'supports' }])],
+      () => false,
+      { fetchFullText: async () => ({ status: 'error', message: 'boom: http 503' }) },
+    );
+    corpusOf(ctx, [mkSource(run.id, newId('src'), ARXIV_DOC)]);
+
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind === 'done') {
+      expect(outcome.summary).toContain('fulltext=');
+      expect(outcome.summary).toContain('error(boom: http 503)');
+    }
+  });
+
+  it('resume path: already-deepened doc reloads its excerpt from the artifact store', async () => {
+    // First: write the artifact the earlier attempt would have stored.
+    const { ctx, store, run } = bench(
+      [extractionStep([{ text: 'Resume claim', quote: FULLTEXT_SENTENCE, stance: 'neutral' }])],
+      () => false,
+      {
+        fetchFullText: async () => {
+          throw new Error('must NOT be called: doc already deepened');
+        },
+      },
+    );
+    const put = await ctx.artifacts.put(FULLTEXT_BODY);
+    const doc = mkSource(run.id, newId('src'), {
+      ...ARXIV_DOC,
+      contentDepth: 'full_text',
+      fullTextRef: put.ref,
+    });
+    corpusOf(ctx, [doc]);
+
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    // The quote exists ONLY in the stored fulltext artifact — alignment must pass.
+    const claim = claimByText(store, run.id, 'Resume claim');
+    expect(claim.bindingStatus).toBe('verified');
+  });
+
+  it('excerpt cap keeps the model view bounded while the artifact stays complete', async () => {
+    const longText = `${'Sentence that repeats to exceed the cap. '.repeat(900)}`;
+    const recordedPayloads: unknown[] = [];
+    const { ctx } = bench(
+      [
+        {
+          rawOutput: JSON.stringify({ claims: [] }),
+        },
+      ],
+      () => false,
+      { fetchFullText: async () => ({ status: 'fetched', fetch: { variant: 'europepmc_jats_v1', sourceUrl: 'https://www.ebi.ac.uk/europepmc/webservices/rest/PMC1/fullTextXML', text: longText, license: 'CC BY 4.0', httpStatus: 200 } }) },
+    );
+    // intercept the model payload through a spy provider wrapper
+    const originalProvider = ctx.provider;
+    ctx.provider = {
+      ...originalProvider,
+      structuredCall: ((req: unknown, parse: unknown) => {
+        recordedPayloads.push((req as { userPayload?: unknown }).userPayload);
+        return originalProvider.structuredCall(req as never, parse as never);
+      }) as typeof originalProvider.structuredCall,
+    };
+    corpusOf(ctx, [mkSource(ctx.run.id, newId('src'), ARXIV_DOC)]);
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const extractionPayload = recordedPayloads.find((p) =>
+      JSON.stringify(p).includes('fullTextExcerpt')) as { input?: { source?: { fullTextExcerpt?: string } } } | undefined;
+    expect(extractionPayload?.input?.source?.fullTextExcerpt).toBeDefined();
+    expect(extractionPayload!.input!.source!.fullTextExcerpt!.length).toBeLessThanOrEqual(16_200);
+    const stored = ctx.store.listObjects('source_document', ctx.run.id)[0]!;
+    const artifactText = await ctx.artifacts.get(stored.fullTextRef!);
+    expect(artifactText).toBe(longText);
   });
 });
