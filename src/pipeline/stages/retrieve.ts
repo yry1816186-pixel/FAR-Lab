@@ -107,7 +107,7 @@ const primaryKey = (rec: RawSourceRecord): string | null => {
  * as snapshotHash, so the artifact hash equals contentHash. fullTextRef is only
  * set for full_text-depth records (the deepest content the record carries).
  */
-const toDocument = async (
+export const toDocument = async (
   ctx: StageContext,
   family: SourceFamily,
   rec: RawSourceRecord,

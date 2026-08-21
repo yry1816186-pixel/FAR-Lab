@@ -1,0 +1,26 @@
+created run run_h1tmxmv1zz04153bynt28bct3v
+  [run_h1tmxmv1 build_evidence] extracting claims from src_v93b305cwq7s7f2t29148c3s1s "Metabolic Syndrome: Updates on Pathophysiology and Managemen"
+  [run_h1tmxmv1 build_evidence] extracting claims from src_gxgjk04asyy9ge9np6ga2fbvkv "Adipose Tissue and Metabolic Health"
+  [run_h1tmxmv1 build_evidence] extracting claims from src_4d5mfvek3z5y0bfkay0xkarabm "Pancreatic β cells control glucose homeostasis via the secre"
+  [run_h1tmxmv1 build_evidence] extracting claims from src_dpqjdj1br9f9p4kw3dcm34mv8b "Serum miRNA Signatures Are Indicative of Skeletal Fractures "
+  [run_h1tmxmv1 build_evidence] extracting claims from src_6wjjpwpwq5j41k9vepdvqgjpk1 "Exosome biogenesis, secretion and function of exosomal miRNA"
+  [run_h1tmxmv1 build_evidence] extracting claims from src_fa44dwxsmcanz7gbp4ay22vr2v "Trends in insulin resistance: insights into mechanisms and t"
+  [run_h1tmxmv1 build_evidence] extracting claims from src_e3mdrjx6c5dxtbnaehffskver6 "The Liver as an Endocrine Organ—Linking NAFLD and Insulin Re"
+  [run_h1tmxmv1 build_evidence] extracting claims from src_k36hy62w2440rz1m082m0v0zzv "Gonadal white adipose tissue-derived exosomal MiR-222 promot"
+  [run_h1tmxmv1 build_evidence] extracting claims from src_x69q9veh2s3e7jw4qck7ex09yx "Effect of exosomal miRNA on cancer biology and clinical appl"
+  [run_h1tmxmv1 build_evidence] extracting claims from src_k72e2xkvtcr2653wh8px1hhzn9 "Obesity-associated exosomal miRNAs modulate glucose and lipi"
+  [run_h1tmxmv1 plan] plan pln_90pa1jjxskc83h8h291v0n22c5 covers 2 hypothesis(es); executabilityCheck passed
+  [run_h1tmxmv1 export] reproducibility bundle bnd_896vmk853wckrezv5p45jknr2g (sha256:cf954c6cedc1220f93e25f6f99e17481625aebe32a854638f705fc9dff1b323a); report sha256:bc6e9f72f36a008c62ef674d1891afd8b040b5164501bbf758a4012f6164ed00; declaredEvidenceLevel=replay
+run run_h1tmxmv1zz04153bynt28bct3v
+  status: completed  stage: export  progress: 9/9 stages
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    done     rank
+    done     plan
+    skipped  feedback
+    skipped  revise
+    done     export

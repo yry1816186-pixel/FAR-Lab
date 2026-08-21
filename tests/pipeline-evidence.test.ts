@@ -74,7 +74,17 @@ interface Bench {
   run: ResearchRun;
 }
 
-const bench = (steps: StubStep[], cancelled: () => boolean = () => false): Bench => {
+/**
+ * Gap-assessment trailing step: build_evidence now ends with one evidence-gap
+ * assessment call whenever verified claims are below the seek threshold; bench-built
+ * stubs therefore always script it last (adequate evidence -> no follow-up round).
+ */
+const gapAdequateStep = (): StubStep => ({
+  rawOutput: JSON.stringify({ enoughEvidence: true, gapDescription: 'fixture: adequate for the test scenario', queries: [] }),
+});
+
+const bench = (scriptedSteps: StubStep[], cancelled: () => boolean = () => false): Bench => {
+  const steps = [...scriptedSteps, gapAdequateStep()];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-evidence-'));
   const db: Db = openDb(path.join(dir, 'run.db'));
   const store = new Store(db);
@@ -331,9 +341,11 @@ describe('build_evidence stage', () => {
     expect(RELATION_POLARITY[rel.relation]).toBe('supporting');
 
     const receipts = store.listObjects('receipt', ctx.run.id);
-    expect(receipts).toHaveLength(1);
+    // 2 model calls now: claim-extraction + the trailing evidence-gap assessment (W5 §30 addition).
+    expect(receipts).toHaveLength(2);
     expect(receipts[0]?.kind).toBe('model_call');
     expect(receipts[0]?.stage).toBe('build_evidence');
+    expect(receipts[1]?.modelCall?.usage).toBeDefined();
   });
 
   it('high-overlap non-substring quote (jaccard >= 0.8) → verified with alignmentChecked=true', async () => {

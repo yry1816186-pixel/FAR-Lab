@@ -1,0 +1,29 @@
+created run run_qmesn5fg64yk31mdt0de0bwg2n
+  [run_qmesn5fg build_evidence] extracting claims from src_511kg7njdgw6k4k8rg0eq7wdvv "Epidemiology of colorectal cancer: incidence, mortality, sur"
+  [run_qmesn5fg build_evidence] extracting claims from src_dj7h9ngn14v10qytr5h6mnd1q8 "Colorectal cancer screening for average‐risk adults: 2018 gu"
+  [run_qmesn5fg build_evidence] extracting claims from src_n1cth584abkh6w2em0d97876m0 "Colorectal cancer screening: Clinical guidelines and rationa"
+  [run_qmesn5fg build_evidence] extracting claims from src_rad4n5nphracfd1anq0bg1nmkw "Epidemiology of Prostate Cancer"
+  [run_qmesn5fg build_evidence] extracting claims from src_ejjp5kwtg7kf5n7k48a4edjrhw "Global colorectal cancer burden in 2020 and projections to 2"
+  [run_qmesn5fg build_evidence] extracting claims from src_6v27vvm0y1k2vm6ggxg9vva955 "Colorectal Carcinoma: A General Overview and Future Perspect"
+  [run_qmesn5fg build_evidence] extracting claims from src_zy96we389exc0ygvbt80b0tqwt "Interaction between drugs and the gut microbiome"
+  [run_qmesn5fg build_evidence] verified claims 0 < 3 — evaluating evidence gap
+  [run_qmesn5fg build_evidence] extracting claims from src_k1teb5rq7by9ee9nmdep0yyekz "Global colorectal cancer burden in 2020 and projections to 2"
+  [run_qmesn5fg build_evidence] extracting claims from src_eqmt7d07degakwjsp3sgm5m066 "Colorectal Carcinoma: A General Overview and Future Perspect"
+  [run_qmesn5fg build_evidence] extracting claims from src_n54khtmchb64gypebh0gxyswqa "Epidemiology of colorectal cancer: incidence, mortality, sur"
+  [run_qmesn5fg build_evidence] extracting claims from src_rdceg8b185wg0bp4mnz6jsdjjn "Global colorectal cancer burden in 2020 and projections to 2"
+  [run_qmesn5fg build_evidence] extracting claims from src_ws1xgc98ycaph4wgs53n6ragrk "Epidemiology of colorectal cancer: incidence, mortality, sur"
+  [run_qmesn5fg plan] no scorecards found — planning directly from stored hypotheses (capped at 2)
+  [run_qmesn5fg export] reproducibility bundle bnd_pryw928gdzjsa0tfvezrq9prat (sha256:1059f1716378989ef8903051d302e1da05deddac418a3b571e46861d830bfe19); report sha256:a789f75211e5ccfb4523bdde02d76ca4f28ed6afd260371ce5c2af387d26e1d0; declaredEvidenceLevel=replay
+run run_qmesn5fg64yk31mdt0de0bwg2n
+  status: completed  stage: export  progress: 9/9 stages
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    skipped  critique_falsify
+    skipped  rank
+    done     plan
+    skipped  feedback
+    skipped  revise
+    done     export
