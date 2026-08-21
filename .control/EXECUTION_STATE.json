@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "mission": "Intelligence-driven evolution: absorb world-class external mechanisms (prior baseline + open-world scouts) into FAR-Lab's Direction-A core loop via source-level fusion, benchmarked before/after.",
   "status": "IN_PROGRESS",
-  "phase": "wave3: #1/#2/#4a/#5/#6 done; #4b/#3/#8/#9 remain (network- or scale-gated)",
+  "phase": "wave3 complete: all GO items executed + live-verified (#1/#2/#3/#4a/#4b/#5/#6); backlog = presentation-level or externally blocked",
   "pauseReason": null,
-  "currentObjective": "Wave-3 executed through the high-leverage core: relation-label reliability, trusted-anchor verdict (injection REJECTED, swap-disagreement proxy ADOPTED), POPPER multiple-testing discipline, DeepSeek strict-FC default transport, OpenAlex optional key — all with tests (248/248) and live verification where applicable. Remaining backlog is network-gated (models.dev unreachable), multi-session (#4b fulltext download, #3 FIRE-Bench) or presentation-level (#8 Idea2Plan fold). Competition submission still gated by B-QWEN-LIVE-ROUTE credentials (user action).",
+  "currentObjective": "Wave-3 closed: relation reliability, anchor verdict + swap-disagreement proxy, rediscovery eval (mean F1 0.58, judge variance disclosed), OpenAlex TEI phase B (local GROBID superseded), POPPER multiple-testing discipline, DeepSeek strict-FC default transport, crossref third retrieval family + OpenAlex budget adaptations. Remaining: #8 Idea2Plan fold (presentation), rediscovery judge-hardening (follow-up), #9 models.dev (network-blocked), B-QWEN submission route + OPENALEX_API_KEY (user credentials).",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
@@ -52,13 +52,13 @@
     "Registry research/TECH_CANDIDATES.md; decisions D-015..D-028 (+D-029/D-029b pending final record)."
   ],
   "activeTasks": [
-    "Wave-3 remaining backlog (FRONTIER_STATUS wave3): #2 trusted-anchor tournament gate -> #4 OpenAlex key+fulltext -> #3 FIRE-Bench harness -> #8/#9 smaller items",
-    "Compliance watch: B-QWEN-LIVE-ROUTE is submission-mandated per official verbatim rule (COMPETITION.md §0) — needs user-provided DASHSCOPE_API_KEY/Bailian credentials; cannot be fabricated",
-    "DONE this session: MLR-Bench harvest + adapter P0; audit 4P1/4P2/6P3 fixed (D-022); compliance recheck (D-020); relation-reliability root fix + live verify (D-023/024); POPPER multiple-testing discipline + live verify (D-025); DeepSeek strict-FC default transport + live verify (D-026). Suite 246/246; strict-FC now DEFAULT for all pipeline calls"
+    "Remaining backlog (all presentation-level or externally blocked): #8 Idea2Plan 5-section template fold; rediscovery judge-hardening (deterministic matching / multi-pass median per D-029); #9 models.dev retry when network allows",
+    "USER ACTION REQUIRED (submission gates): B-QWEN-LIVE-ROUTE credentials (DASHSCOPE_API_KEY/Bailian, verbatim official rule COMPETITION.md §0) and optional OPENALEX_API_KEY (fulltext phase-B full-fetch verification)",
+    "DONE this session: EV2 closeout + audit fixes + compliance recheck (D-020..D-022); Wave-3 #1..#6 + #4b + judge-hardening finding (D-023..D-029b); suite 265/265; crossref third family; OpenAlex budget adaptations"
   ],
   "blockerIds": [
     "B-QWEN-LIVE-ROUTE"
   ],
-  "lastVerifiedCommit": "Wave-3 session 2026-08-22 final: cc641b8 (swap-disagreement proxy D-027) + c19cd4a (openalex key) + ed6c1f3 (strict-FC D-026) + df3be48 (multiple-testing D-025) + 96b9ae0 (falsify schema v2) + earlier audit/mlr-bench fixes; suite 248/248",
-  "nextAction": "Next session: #4b OpenAlex fulltext download (needs design vs GROBID) or #3 FIRE-Bench harness; competition submission blocked on B-QWEN-LIVE-ROUTE credentials (user action); models.dev retry when network allows."
+  "lastVerifiedCommit": "Wave-3 session final 2026-08-22: through a05a746 + rediscovery evidence/D-029 + control sync commit; suite 265/265; completion-gate VERIFIED_READY (evidence/W5/completion-gate-2026-08-22-wave3.txt)",
+  "nextAction": "Marginal Value Gate: frontier at decision saturation for current environment conditions (remaining items presentation-level or user-credential/network-gated). Next lever is user-provided credentials; otherwise next session can take #8 fold or judge-hardening."
 }
