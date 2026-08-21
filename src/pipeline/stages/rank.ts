@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { callStructured } from '../llm.js';
-import { HypothesisComparison, HypothesisScorecard, ScoreDimension, newId } from '../../domain/index.js';
+import { HypothesisComparison, HypothesisScorecard, HypothesisTournament, ScoreDimension, newId } from '../../domain/index.js';
+import type { TournamentMatch } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, partitionClaimRefs, runClaimIds } from './shared.js';
 
@@ -151,6 +152,164 @@ export const compositeScore = (dims: readonly ScoredDim[]): CompositeResult | nu
 };
 
 // ---------------------------------------------------------------------------
+// D-016 pairwise tournament (Robin/FutureHouse mechanism, evidence-anchored).
+// Pure deterministic parts exported for direct testing; judging is one LLM call
+// per pair returning BOTH order-swapped verdicts (MT-Bench position-bias control).
+// ---------------------------------------------------------------------------
+
+/** Each candidate should get ~5 comparisons (Si et al. ICLR 2025 sweet spot), bounded. */
+export const TOURNAMENT_ROUNDS_PER_CANDIDATE = 5;
+/** Hard ceiling on judged pairs per ranking round (LLM budget guard). */
+export const TOURNAMENT_MAX_PAIRS = 24;
+
+export interface ScheduledPair {
+  aId: string;
+  bId: string;
+}
+
+/** Circle-method round-robin for `rounds` rounds over a deterministic seeding order. */
+export const circleSchedule = (seedOrder: readonly string[], rounds: number): ScheduledPair[] => {
+  const arr = [...seedOrder];
+  if (arr.length < 2) return [];
+  if (arr.length % 2 === 1) arr.push('__bye__');
+  const n = arr.length;
+  const pairs: ScheduledPair[] = [];
+  for (let r = 0; r < rounds; r++) {
+    for (let i = 0; i < n / 2; i++) {
+      const a = arr[i]!;
+      const b = arr[n - 1 - i]!;
+      if (a !== '__bye__' && b !== '__bye__') pairs.push({ aId: a, bId: b });
+    }
+    arr.splice(1, 0, arr.pop()!); // keep seat 0 fixed, rotate the rest
+  }
+  return pairs;
+};
+
+/** Rounds needed so every participant actually plays (odd n adds a BYE seat). */
+export const tournamentRounds = (participants: number): number => {
+  const seats = participants + (participants % 2 === 1 ? 1 : 0);
+  return Math.min(TOURNAMENT_ROUNDS_PER_CANDIDATE, seats - 1);
+};
+
+export interface SwapVerdicts {
+  aFirstVerdict: 'a' | 'b' | 'tie' | 'incomparable';
+  bFirstVerdict: 'a' | 'b' | 'tie' | 'incomparable';
+}
+
+/**
+ * Deterministic aggregation of the two order-swapped verdicts:
+ * - either 'incomparable' -> no_contest (judge abstention is honored, never coerced);
+ * - both 'tie' -> tie; both name the same winner -> that winner;
+ * - they disagree (a vs b across the swap) -> tie: position bias or genuine ambiguity,
+ *   the pair carries no signal and we do not pretend otherwise.
+ */
+export const aggregateOutcome = (v: SwapVerdicts): 'a' | 'b' | 'tie' | 'no_contest' => {
+  if (v.aFirstVerdict === 'incomparable' || v.bFirstVerdict === 'incomparable') return 'no_contest';
+  if (v.aFirstVerdict === 'tie' && v.bFirstVerdict === 'tie') return 'tie';
+  if (v.aFirstVerdict === v.bFirstVerdict) return v.aFirstVerdict;
+  return 'tie';
+};
+
+export interface ContestedMatch {
+  aId: string;
+  bId: string;
+  outcome: 'a' | 'b' | 'tie';
+}
+
+export interface BtStanding {
+  hypothesisId: string;
+  btScore: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  contested: number;
+}
+
+/**
+ * Bradley-Terry via Iterative Luce-Spearmanki Rank (ILSR). Ties count half a win
+ * each. Uncontested candidates keep score 1.0-neutral (reported as never contested).
+ * Convergence: max relative change < 1e-10 within 200 iterations (always reached
+ * at our scale). Pure and deterministic.
+ */
+export const bradleyTerry = (ids: readonly string[], matches: readonly ContestedMatch[]): BtStanding[] => {
+  const idx = new Map(ids.map((id, i) => [id, i] as const));
+  const n = ids.length;
+  const wins = Array.from({ length: n }, () => new Array<number>(n).fill(0)); // wins[i][j] = points i earned vs j
+  const contests = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  for (const m of matches) {
+    const i = idx.get(m.aId);
+    const j = idx.get(m.bId);
+    if (i === undefined || j === undefined) continue;
+    contests[i]![j]! += 1;
+    contests[j]![i]! += 1;
+    if (m.outcome === 'a') { wins[i]![j]! += 1; }
+    else if (m.outcome === 'b') { wins[j]![i]! += 1; }
+    else { wins[i]![j]! += 0.5; wins[j]![i]! += 0.5; }
+  }
+  const p = new Array<number>(n).fill(1);
+  const totalWins = wins.map((row) => row.reduce((a, b) => a + b, 0));
+  for (let iter = 0; iter < 200; iter++) {
+    const next = new Array<number>(n).fill(1);
+    for (let i = 0; i < n; i++) {
+      let denom = 0;
+      for (let j = 0; j < n; j++) {
+        if (i === j || contests[i]![j]! === 0) continue;
+        denom += contests[i]![j]! / (p[i]! + p[j]!);
+      }
+      next[i] = denom > 0 ? (totalWins[i]! + 1e-9) / denom : 1; // uncontested stays neutral
+    }
+    const mean = next.reduce((a, b) => a + b, 0) / (n || 1);
+    for (let i = 0; i < n; i++) next[i] = next[i]! / (mean || 1);
+    let delta = 0;
+    for (let i = 0; i < n; i++) delta = Math.max(delta, Math.abs(next[i]! - p[i]!));
+    for (let i = 0; i < n; i++) p[i] = next[i]!;
+    if (delta < 1e-10) break;
+  }
+  return ids.map((id, i) => {
+    let w = 0, l = 0, t = 0;
+    for (let j = 0; j < n; j++) {
+      if (j === i || contests[i]![j]! === 0) continue;
+      const earned = wins[i]![j]!;
+      const c = contests[i]![j]!;
+      if (earned === c) w += c;
+      else if (earned === 0) l += c;
+      else { // mixed (from ties): ties earn exactly 0.5 each
+        t += Math.round(earned * 2) === c ? c : Math.min(earned, c - earned) * 2;
+      }
+    }
+    const contested = contests[i]!.reduce((a, b) => a + b, 0);
+    return {
+      hypothesisId: id,
+      btScore: Math.round(p[i]! * 1e6) / 1e6,
+      wins: w,
+      losses: l,
+      ties: t,
+      contested,
+    };
+  });
+};
+
+const PairJudgeOut = z.object({
+  aFirstVerdict: z.enum(['a', 'b', 'tie', 'incomparable']),
+  bFirstVerdict: z.enum(['a', 'b', 'tie', 'incomparable']),
+  rationale: z.string().min(10),
+});
+type PairJudgeOut = z.infer<typeof PairJudgeOut>;
+
+const PAIR_JUDGE_SYSTEM_PROMPT = `You are a rigorous research supervisor comparing exactly two competing scientific hypotheses.
+Judge which one is the STRONGER RESEARCH BET on substance only:
+- grounding of its assumptions in the cited evidence claims,
+- falsifiability: does its decision rule have decidable, quantified thresholds,
+- testability and mechanism specificity,
+- honest exposure to counter-evidence (known limits, confounders).
+IGNORE writing style, verbosity, confidence tone, and elegance of phrasing.
+The SAME pair is judged twice below in mirrored presentation order — your verdicts must be about the hypotheses
+(hypothesisA / hypothesisB identities), never about which one you saw first.
+Answer 'a' or 'b' for the stronger hypothesis in BOTH judgments; 'tie' only when genuinely balanced;
+'incomparable' only when they compete on incommensurable axes.
+Return ONE JSON object: { "aFirstVerdict": "a"|"b"|"tie"|"incomparable", "bFirstVerdict": (same options), "rationale": "at least 10 chars citing the decisive substantive difference" }.`;
+
+// ---------------------------------------------------------------------------
 // stage handler
 // ---------------------------------------------------------------------------
 
@@ -291,7 +450,7 @@ export const rankStage: StageHandler = {
       throw new Error(`rank: no usable assessments produced (warnings: ${warnings.join(' | ') || 'none'})`);
     }
 
-    // ---- deterministic ordering: composite desc, tie-break evidence_grounding desc, then id ----
+    // ---- seed ordering: composite desc, tie-break evidence_grounding desc, then id ----
     ranked.sort((x, y) => {
       if (y.composite !== x.composite) return y.composite - x.composite;
       const egx = x.evidenceGrounding ?? -1;
@@ -308,12 +467,177 @@ export const rankStage: StageHandler = {
       `methodological_soundness ${RANK_WEIGHTS.methodological_soundness}` +
       ` (+cost/risk ${COST_RISK_WEIGHT} each when direction-known, renormalized)`;
 
+    // ---- D-016 pairwise tournament: selection pressure on the composite seed order ----
+    let standings: Map<string, BtStanding> | null = null;
+    let tournamentMatches: TournamentMatch[] = [];
+    let tournamentNote = 'no tournament (fewer than 2 scored hypotheses)';
+    let tournamentUncertainty = '';
+    let tournamentId: string | null = null;
+    const questionText = ctx.store.getObject('question', ctx.run.questionId)?.text ?? undefined;
+    if (n >= 2) {
+      const participantIds = ranked.map((r) => r.hyp.id);
+      const sameSet = (a: readonly string[], b: readonly string[]) =>
+        a.length === b.length && [...a].sort().join('\u0000') === [...b].sort().join('\u0000');
+      const existing = ctx.store
+        .listObjects('tournament', runId)
+        .find((t) => sameSet(t.participantIds, participantIds));
+      if (existing && existing.matches.length > 0) {
+        standings = new Map(
+          existing.standings.map((s) => [
+            s.hypothesisId,
+            { hypothesisId: s.hypothesisId, btScore: s.btScore, wins: s.wins, losses: s.losses, ties: s.ties, contested: s.wins + s.losses + s.ties },
+          ] as const),
+        );
+        tournamentMatches = existing.matches;
+        tournamentNote = `reused stored tournament (${existing.matches.length} matches)`;
+        tournamentUncertainty = existing.uncertainty;
+        tournamentId = existing.id;
+      } else {
+        const rounds = tournamentRounds(participantIds.length);
+        const pairs = circleSchedule(participantIds, rounds).slice(0, TOURNAMENT_MAX_PAIRS);
+        const claimText = (id: string): string | undefined => allClaims.find((c) => c.id === id)?.text;
+        const card = (r: Ranked) => ({
+          id: r.hyp.id,
+          statement: r.hyp.statement,
+          mechanism: r.hyp.mechanism,
+          predictions: r.hyp.predictions.slice(0, 3),
+          assumptions: r.hyp.assumptions.slice(0, 3).map((a) => a.statement),
+          decisionRule: r.hyp.falsification?.decisionRule ?? null,
+          noveltyLabel: r.hyp.noveltyLabel,
+          testability: r.hyp.testability,
+          dimensionScores: r.dimensions
+            .filter((d) => d.value !== null)
+            .map((d) => ({ dimension: d.dimension, value: d.value })),
+          supportingClaims: r.hyp.supportingClaimIds.slice(0, 3).map(claimText).filter((t): t is string => t !== undefined),
+          counterClaims: r.hyp.counterClaimIds.slice(0, 3).map(claimText).filter((t): t is string => t !== undefined),
+        });
+        const byIdRanked = new Map(ranked.map((r) => [r.hyp.id, r] as const));
+        const producerJudge = `${firstProvider}/${firstModel} pairwise judge`;
+        for (const pair of pairs) {
+          assertNotCancelled(ctx, 'rank');
+          const ra = byIdRanked.get(pair.aId);
+          const rb = byIdRanked.get(pair.bId);
+          if (!ra || !rb) continue;
+          let judged: z.infer<typeof PairJudgeOut> | null = null;
+          let failure: string | undefined;
+          try {
+            const res = await callStructured<z.infer<typeof PairJudgeOut>>(ctx, {
+              stage: 'rank',
+              purpose: 'hypothesis-ranking:pairwise-tournament',
+              systemPrompt: PAIR_JUDGE_SYSTEM_PROMPT,
+              payload: {
+                ...(questionText !== undefined ? { questionText } : {}),
+                hypothesisA: card(ra),
+                hypothesisB: card(rb),
+              },
+              schema: PairJudgeOut,
+              temperature: 0.1,
+              maxTokens: 1024,
+            });
+            judged = res.data;
+          } catch (e) {
+            failure = e instanceof Error ? e.message : String(e);
+            ctx.log(`rank: tournament judge call failed for ${pair.aId} vs ${pair.bId}: ${failure}`);
+          }
+          if (judged) {
+            tournamentMatches.push({
+              aId: pair.aId,
+              bId: pair.bId,
+              aFirstVerdict: judged.aFirstVerdict,
+              bFirstVerdict: judged.bFirstVerdict,
+              rationale: judged.rationale,
+              producer: producerJudge,
+              outcome: aggregateOutcome(judged),
+            });
+          } else {
+            // Fail-visible no-contest: a match we could not judge is recorded as such,
+            // never silently dropped and never invented.
+            tournamentMatches.push({
+              aId: pair.aId,
+              bId: pair.bId,
+              aFirstVerdict: 'incomparable',
+              bFirstVerdict: 'incomparable',
+              rationale: `not judged: judge call failed (${failure ?? 'unknown error'}) — recorded honestly as no-contest`,
+              producer: producerJudge,
+              outcome: 'no_contest',
+            });
+          }
+        }
+        const contested: ContestedMatch[] = tournamentMatches
+          .filter((m): m is TournamentMatch & { outcome: 'a' | 'b' | 'tie' } => m.outcome !== 'no_contest')
+          .map((m) => ({ aId: m.aId, bId: m.bId, outcome: m.outcome }));
+        const bt = bradleyTerry(participantIds, contested);
+        standings = new Map(bt.map((s) => [s.hypothesisId, s] as const));
+        tournamentNote =
+          `tournament: ${tournamentMatches.length} pair(s) judged (${contested.length} contested, ${tournamentMatches.length - contested.length} no-contest)`;
+        tournamentUncertainty =
+          'Pairwise verdicts are uncalibrated LLM judgments with order-swap consistency filtering; ' +
+          'Bradley-Terry scores are ordinal decision aids without confidence intervals. Coarse ordering is ' +
+          'credible, near-ties are not — treat adjacent ranks as interchangeable unless head-to-head says otherwise.';
+        tournamentId = newId('trn');
+      }
+    }
+
+    // ---- final ordering: tournament-first (bt desc), composite + grounding as deterministic tie-breaks ----
+    const standingsRef = standings;
+    if (standingsRef !== null) {
+      ranked.sort((x, y) => {
+        const bx = standingsRef.get(x.hyp.id)?.btScore ?? 0;
+        const by = standingsRef.get(y.hyp.id)?.btScore ?? 0;
+        if (by !== bx) return by - bx;
+        if (y.composite !== x.composite) return y.composite - x.composite;
+        const egx = x.evidenceGrounding ?? -1;
+        const egy = y.evidenceGrounding ?? -1;
+        if (egy !== egx) return egy - egx;
+        return x.hyp.id < y.hyp.id ? -1 : 1;
+      });
+    }
+
+    // persist the tournament with final ranks (upsert keeps resume idempotent)
+    if (tournamentId !== null && n >= 2 && tournamentMatches.length > 0) {
+      ctx.store.putObject(
+        'tournament',
+        HypothesisTournament.parse({
+          id: tournamentId,
+          runId,
+          participantIds: ranked.map((r) => r.hyp.id),
+          matches: tournamentMatches,
+          standings: ranked.map((r, i) => {
+            const s = standingsRef?.get(r.hyp.id);
+            const w = s?.wins ?? 0;
+            const l = s?.losses ?? 0;
+            const t = s?.ties ?? 0;
+            const contestedN = s?.contested ?? 0;
+            return {
+              hypothesisId: r.hyp.id,
+              btScore: s?.btScore ?? 1,
+              wins: w,
+              losses: l,
+              ties: t,
+              winRate: contestedN > 0 ? Math.round(((w + 0.5 * t) / contestedN) * 1e4) / 1e4 : 0,
+              rank: i + 1,
+            };
+          }),
+          algorithm: 'bradley-terry-ilsr-v1',
+          uncertainty: tournamentUncertainty,
+          createdAt: new Date().toISOString(),
+        }),
+      );
+    }
+
     ranked.forEach((r, i) => {
       const rank = i + 1;
+      const standing = standingsRef?.get(r.hyp.id);
+      const tournamentLine = standing
+        ? ` Tournament (D-016; pairwise, order-swap consistent, Bradley-Terry ILSR): record ` +
+          `${standing.wins}W-${standing.losses}L-${standing.ties}T over ${standing.contested} contested match(es), ` +
+          `bt=${standing.btScore.toFixed(4)} — final order is tournament-first with the composite as deterministic tie-break.`
+        : '';
       const overallRationale =
         `Composite ${r.composite.toFixed(4)} = weighted average of valid dimensions (${weightDescription}). ` +
         `Deterministic tie-break on evidence_grounding. Excluded dimensions: ${r.excluded.length > 0 ? r.excluded.join('; ') : 'none'}. ` +
-        `All dimension scores are uncalibrated LLM judgments produced by ${producer} — decision support only.`;
+        tournamentLine +
+        ` All dimension scores are uncalibrated LLM judgments produced by ${producer} — decision support only.`;
       ctx.store.putObject(
         'scorecard',
         HypothesisScorecard.parse({
@@ -340,7 +664,7 @@ export const rankStage: StageHandler = {
       const shared = a.dimensions
         .map((d) => d.dimension)
         .filter((dim) => b.dimensions.some((d) => d.dimension === dim));
-      const criteria = shared
+      const criteria: { criterion: string; favors: 'a' | 'b' | 'neither'; rationale: string }[] = shared
         .map((dim) => {
           const va = valueOf(a, dim);
           const vb = valueOf(b, dim);
@@ -352,6 +676,25 @@ export const rankStage: StageHandler = {
           };
         })
         .filter((c): c is NonNullable<typeof c> => c !== null);
+      // head-to-head from the tournament, when the top-2 actually met
+      const h2h = tournamentMatches.find(
+        (m) => (m.aId === a.hyp.id && m.bId === b.hyp.id) || (m.aId === b.hyp.id && m.bId === a.hyp.id),
+      );
+      if (h2h) {
+        const winnerId = h2h.outcome === 'a' ? h2h.aId : h2h.outcome === 'b' ? h2h.bId : null;
+        criteria.push({
+          criterion: 'pairwise_tournament_head_to_head',
+          favors: winnerId === null ? 'neither' : winnerId === a.hyp.id ? 'a' : 'b',
+          rationale:
+            `order-swapped judge verdicts (${h2h.aFirstVerdict}/${h2h.bFirstVerdict}) -> ${h2h.outcome}. ${h2h.rationale}`,
+        });
+      } else if (tournamentMatches.length > 0) {
+        criteria.push({
+          criterion: 'pairwise_tournament_head_to_head',
+          favors: 'neither',
+          rationale: 'top-2 did not meet in the tournament schedule; relative order comes from Bradley-Terry standings',
+        });
+      }
       const tieExact = a.composite === b.composite && a.evidenceGrounding === b.evidenceGrounding;
       const comparison = HypothesisComparison.parse({
         runId,
@@ -359,7 +702,8 @@ export const rankStage: StageHandler = {
         bId: b.hyp.id,
         preferred: tieExact ? 'incomparable' : 'a',
         criteria,
-        uncertainty: 'Dimension scores are uncalibrated LLM judgments; the comparison is a decision aid, not a proof.',
+        uncertainty:
+          'Dimension scores and pairwise verdicts are uncalibrated LLM judgments; the comparison is a decision aid, not a proof.',
       });
       const stored = await ctx.artifacts.put(JSON.stringify(comparison, null, 2));
       artifacts.push(stored.ref);
@@ -371,6 +715,7 @@ export const rankStage: StageHandler = {
       `ranked ${n} of ${targets.length} representative hypothesis/hypotheses (rankedOutOf=${n}); ${comparisonNoteDone}.`,
       `weights: ${weightDescription}.`,
     ];
+    if (n >= 2) parts.push(tournamentNote);
     if (unknown.length > 0) parts.push(`ignored assessments for unknown hypothesis ids: ${unknown.join(', ')}`);
     if (unscored.length > 0) parts.push(`not scored this round (no usable assessment): ${unscored.join(', ')}`);
     if (warnings.length > 0) parts.push(`warnings: ${warnings.join(' | ')}`);

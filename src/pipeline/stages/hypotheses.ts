@@ -7,7 +7,15 @@ import {
   NoveltyLabel,
   newId,
 } from '../../domain/index.js';
-import type { ClaimId, EvidenceRelation, HypothesisCandidate as Hypothesis } from '../../domain/index.js';
+import type {
+  ClaimId,
+  EvidenceRelation,
+  HypothesisCandidate as Hypothesis,
+  LiteratureNovelty,
+  LiteratureNoveltyNeighbor,
+} from '../../domain/index.js';
+import type { RawSourceRecord } from '../../shared/ports.js';
+import { snapshotHash } from '../../sources/snapshot.js';
 import {
   assertNotCancelled,
   bucketClaims,
@@ -76,6 +84,41 @@ const NoveltyOut = z.object({
 const SupplementOut = z.object({
   candidates: z.array(CandidateOut).default([]), // empty allowed: honest "nothing more to add"; overflow truncated post-parse
 });
+
+// ---- D-017 literature-grounded novelty (second layer) ----
+const LitExpansionOut = z.object({
+  hypotheses: z
+    .array(z.object({
+      hypothesisId: z.string().min(1),
+      /** Exactly 2: one paraphrase of the hypothesis, one entity/mechanism vocabulary query. */
+      queries: z.array(z.string().min(4)).length(2),
+    }))
+    .min(1),
+});
+const LitFacetOut = z.object({
+  rankings: z
+    .array(z.object({
+      hypothesisId: z.string().min(1),
+      rankedNeighborIndices: z.array(z.number().int().nonnegative()).default([]),
+    }))
+    .min(1),
+});
+const LitVerdictOut = z.object({
+  verdicts: z
+    .array(z.object({
+      hypothesisId: z.string().min(1),
+      verdict: z.enum(['novel', 'incremental', 'already_done', 'unclear']),
+      nearestNeighborIndex: z.number().int().nonnegative().optional(),
+      justification: z.string().min(30),
+    }))
+    .min(1),
+});
+
+/** D-017 bounds: literature novelty runs on representatives only, with hard caps. */
+export const LIT_NOVELTY_MAX_HYPS = 4;
+const LIT_QUERIES_PER_HYP = 2;
+const LIT_SEARCH_LIMIT = 10;
+const LIT_MAX_RANKED_NEIGHBORS = 5;
 
 // ---------------------------------------------------------------------------
 // strategy definitions
@@ -433,6 +476,248 @@ export const generateHypothesesStage: StageHandler = {
       });
     });
 
+    // ---- D-017 literature-grounded novelty: second layer, representatives only ----
+    // The corpus-relative noveltyLabel above stays; this judges each representative
+    // against LIVE literature neighbors (expansion -> retrieve -> facet rerank ->
+    // adjudication). 'unclear' is the honest default; no neighbors -> no fabrication.
+    const litNotes: string[] = [];
+    const litVerdictCounts: Record<string, number> = { novel: 0, incremental: 0, already_done: 0, unclear: 0 };
+    const litTargets = clusters
+      .map((cl) => cl.members[0] ?? 0)
+      .slice(0, LIT_NOVELTY_MAX_HYPS)
+      .map((i) => ({ id: idOfIndex(i), raw: raws[i] }))
+      .filter((t): t is { id: string; raw: RawCandidate } => t.raw !== undefined);
+    const persistLitNovelty = (hypId: string, layer: LiteratureNovelty): void => {
+      const stored = ctx.store.getObject('hypothesis', hypId);
+      if (!stored) return;
+      litVerdictCounts[layer.verdict] = (litVerdictCounts[layer.verdict] ?? 0) + 1;
+      ctx.store.putObject('hypothesis', { ...stored, literatureNovelty: layer });
+    };
+    if (litTargets.length > 0) {
+      const litProducer = 'literature-novelty pipeline (retrieved neighbors, facet rerank, LLM adjudication)';
+      try {
+        assertNotCancelled(ctx, 'generate_hypotheses');
+        // (1) query expansion — dual vocabulary against the known AI-Scientist failure
+        //     mode of missing the nearest prior work (Beel et al. 2025).
+        const expRes = await callStructured<z.infer<typeof LitExpansionOut>>(ctx, {
+          stage: 'generate_hypotheses',
+          purpose: 'novelty-check:query-expansion',
+          systemPrompt:
+            'For each hypothesis, write exactly 2 English scholarly search queries to find the CLOSEST prior work: ' +
+            '(a) a natural-language paraphrase of the hypothesis itself, and (b) a keyword query built from its key ' +
+            'entities and mechanism terms. The goal is to retrieve the nearest neighbors that already exist in the ' +
+            'literature, so novelty can be judged against real prior work — not to support the hypothesis.',
+          payload: {
+            hypotheses: litTargets.map((t) => ({ hypothesisId: t.id, statement: t.raw.out.statement, mechanism: t.raw.out.mechanism })),
+          },
+          schema: LitExpansionOut,
+          temperature: 0.2,
+        });
+        const queriesByHyp = new Map(
+          expRes.data.hypotheses
+            .filter((h) => litTargets.some((t) => t.id === h.hypothesisId))
+            .map((h) => [h.hypothesisId, h.queries.slice(0, LIT_QUERIES_PER_HYP)] as const),
+        );
+        // (2) neighbor retrieval on OpenAlex (bounded, receipted, deduped vs corpus and across hypotheses)
+        const corpusKeys = new Set<string>();
+        for (const doc of ctx.store.listObjects('source_document', runId)) {
+          for (const id of doc.identifiers) corpusKeys.add(`${id.kind}:${id.value.toLowerCase()}`);
+        }
+        const neighborKey = (rec: RawSourceRecord): string | null => {
+          const id = rec.identifiers.find((i) => i.kind === 'doi') ?? rec.identifiers.find((i) => i.kind === 'openalex') ?? rec.identifiers[0];
+          return id ? `${id.kind}:${id.value.toLowerCase()}` : null;
+        };
+        const neighborsByHyp = new Map<string, LiteratureNoveltyNeighbor[]>();
+        const seenNeighborKeys = new Set<string>(corpusKeys);
+        let searchFailures = 0;
+        for (const t of litTargets) {
+          const queries = queriesByHyp.get(t.id) ?? [];
+          const found: LiteratureNoveltyNeighbor[] = [];
+          for (const q of queries) {
+            assertNotCancelled(ctx, 'generate_hypotheses');
+            try {
+              const res = await ctx.sourceFor('openalex').search(q, { limit: LIT_SEARCH_LIMIT });
+              ctx.recordReceipt({
+                kind: 'source_retrieval',
+                executionMode: 'live',
+                stage: 'generate_hypotheses',
+                redactionNote: 'novelty-neighbor search; per-record content hashes retained',
+                sourceRetrieval: {
+                  family: 'openalex',
+                  query: q,
+                  httpStatus: res.httpStatus,
+                  resultCount: res.records.length,
+                  contentHashes: res.records.map((r) => snapshotHash('openalex', r)),
+                },
+              });
+              for (const rec of res.records) {
+                const key = neighborKey(rec);
+                if (key === null || seenNeighborKeys.has(key)) continue;
+                seenNeighborKeys.add(key);
+                found.push({
+                  title: rec.title,
+                  ...(rec.publicationYear !== undefined ? { year: rec.publicationYear } : {}),
+                  ...(rec.identifiers.find((i) => i.kind === 'doi') !== undefined
+                    ? { doi: rec.identifiers.find((i) => i.kind === 'doi')?.value }
+                    : {}),
+                  ...(rec.identifiers.find((i) => i.kind === 'openalex') !== undefined
+                    ? { openalexId: rec.identifiers.find((i) => i.kind === 'openalex')?.value }
+                    : {}),
+                  ...(rec.venue !== undefined ? { venue: rec.venue } : {}),
+                  contentHash: snapshotHash('openalex', rec),
+                  query: q,
+                });
+              }
+            } catch (e) {
+              searchFailures += 1;
+              ctx.log(`generate_hypotheses: novelty neighbor search failed for "${q}": ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          neighborsByHyp.set(t.id, found);
+        }
+        if (searchFailures > 0) litNotes.push(`${searchFailures} novelty-neighbor search(es) failed (receipted; affected hypotheses judged 'unclear' when no neighbors)`);
+        // hypotheses with no neighbors get the deterministic honest 'unclear' — no empty-grounding LLM calls
+        const withNeighbors = litTargets.filter((t) => (neighborsByHyp.get(t.id) ?? []).length > 0);
+        for (const t of litTargets) {
+          if ((neighborsByHyp.get(t.id) ?? []).length === 0) {
+            persistLitNovelty(t.id, {
+              verdict: 'unclear',
+              neighbors: [],
+              justification: 'no literature neighbors retrieved (search failed or empty) — novelty remains corpus-relative only',
+              producer: litProducer,
+              calibration: 'uncalibrated_llm_judgment',
+              assessedAt: new Date().toISOString(),
+            });
+          }
+        }
+        // (3) facet rerank — the decisive step per arXiv 2506.22026
+        let rankedByHyp = new Map<string, LiteratureNoveltyNeighbor[]>(
+          withNeighbors.map((t) => {
+            const all = neighborsByHyp.get(t.id) ?? [];
+            return [t.id, all.slice(0, LIT_MAX_RANKED_NEIGHBORS)] as const;
+          }),
+        );
+        if (withNeighbors.length > 0) {
+          try {
+            const facetRes = await callStructured<z.infer<typeof LitFacetOut>>(ctx, {
+              stage: 'generate_hypotheses',
+              purpose: 'novelty-check:facet-rerank',
+              systemPrompt:
+                'Rerank the retrieved papers by how close each is to the hypothesis across facets: question overlap, ' +
+                'method overlap, mechanism overlap, and finding overlap. A paper is a NEAR neighbor if it addresses ' +
+                'substantially the same question/mechanism, even with different methods. Rank the closest first. ' +
+                'Return rankedNeighborIndices with at most the 5 closest indices per hypothesis.',
+              payload: {
+                hypotheses: withNeighbors.map((t) => ({
+                  hypothesisId: t.id,
+                  statement: t.raw.out.statement,
+                  mechanism: t.raw.out.mechanism,
+                  neighbors: (neighborsByHyp.get(t.id) ?? []).map((nb, i) => ({
+                    index: i,
+                    title: nb.title,
+                    ...(nb.year !== undefined ? { year: nb.year } : {}),
+                    ...(nb.venue !== undefined ? { venue: nb.venue } : {}),
+                  })),
+                })),
+              },
+              schema: LitFacetOut,
+              temperature: 0.1,
+            });
+            const next = new Map<string, LiteratureNoveltyNeighbor[]>();
+            for (const t of withNeighbors) {
+              const all = neighborsByHyp.get(t.id) ?? [];
+              const rank = facetRes.data.rankings.find((r) => r.hypothesisId === t.id);
+              if (!rank) {
+                next.set(t.id, all.slice(0, LIT_MAX_RANKED_NEIGHBORS));
+                continue;
+              }
+              const seen = new Set<number>();
+              const picked: LiteratureNoveltyNeighbor[] = [];
+              for (const i of rank.rankedNeighborIndices) {
+                if (i >= 0 && i < all.length && !seen.has(i) && picked.length < LIT_MAX_RANKED_NEIGHBORS) {
+                  seen.add(i);
+                  picked.push(all[i]!);
+                }
+              }
+              // incomplete permutations fall back to retrieval order for the missing tail
+              for (let i = 0; i < all.length && picked.length < LIT_MAX_RANKED_NEIGHBORS; i++) {
+                if (!seen.has(i)) { seen.add(i); picked.push(all[i]!); }
+              }
+              next.set(t.id, picked);
+            }
+            rankedByHyp = next;
+          } catch (e) {
+            litNotes.push(`facet rerank failed — retrieval order used (${e instanceof Error ? e.message : String(e)})`);
+          }
+        }
+        // (4) adjudication against the ranked neighbors
+        const toJudge = withNeighbors.filter((t) => (rankedByHyp.get(t.id) ?? []).length > 0);
+        const verdictByHyp = new Map<string, z.infer<typeof LitVerdictOut>['verdicts'][number]>();
+        if (toJudge.length > 0) {
+          try {
+            const verdictRes = await callStructured<z.infer<typeof LitVerdictOut>>(ctx, {
+              stage: 'generate_hypotheses',
+              purpose: 'novelty-check:adjudication',
+              systemPrompt:
+                'Judge the literature novelty of each hypothesis STRICTLY against its retrieved nearest-neighbor papers. ' +
+                'Verdicts: "already_done" if a neighbor substantially states or proves the same hypothesis; ' +
+                '"incremental" if neighbors address the same question/mechanism and the hypothesis only varies a ' +
+                'detail; "novel" only if no neighbor comes close on question AND mechanism; "unclear" when retrieval ' +
+                'looks insufficient to decide. Cite the decisive neighbor in the justification. Never inflate novelty.',
+              payload: {
+                hypotheses: toJudge.map((t) => ({
+                  hypothesisId: t.id,
+                  statement: t.raw.out.statement,
+                  mechanism: t.raw.out.mechanism,
+                  rankedNeighbors: (rankedByHyp.get(t.id) ?? []).map((nb, i) => ({
+                    index: i,
+                    title: nb.title,
+                    ...(nb.year !== undefined ? { year: nb.year } : {}),
+                    ...(nb.venue !== undefined ? { venue: nb.venue } : {}),
+                  })),
+                })),
+              },
+              schema: LitVerdictOut,
+              temperature: 0.1,
+            });
+            for (const v of verdictRes.data.verdicts) {
+              if (toJudge.some((t) => t.id === v.hypothesisId) && !verdictByHyp.has(v.hypothesisId)) {
+                verdictByHyp.set(v.hypothesisId, v);
+              }
+            }
+          } catch (e) {
+            litNotes.push(`novelty adjudication failed (${e instanceof Error ? e.message : String(e)})`);
+          }
+        }
+        for (const t of toJudge) {
+          const ranked = rankedByHyp.get(t.id) ?? [];
+          const v = verdictByHyp.get(t.id);
+          persistLitNovelty(t.id, v
+            ? {
+                verdict: v.verdict,
+                neighbors: ranked,
+                justification: v.justification,
+                producer: litProducer,
+                calibration: 'uncalibrated_llm_judgment',
+                assessedAt: new Date().toISOString(),
+              }
+            : {
+                verdict: 'unclear',
+                neighbors: ranked,
+                justification: `adjudication unavailable for this hypothesis — neighbors retrieved and ranked, verdict honestly unclear`,
+                producer: litProducer,
+                calibration: 'uncalibrated_llm_judgment',
+                assessedAt: new Date().toISOString(),
+              });
+        }
+      } catch (e) {
+        // The whole literature layer is best-effort on top of the core loop: a failure
+        // here degrades novelty back to corpus-relative (disclosed), never blocks the run.
+        const msg = e instanceof Error ? e.message : String(e);
+        litNotes.push(`literature novelty layer skipped: ${msg}`);
+      }
+    }
+
     const representatives = clusters.length;
     const parts = [
       `generated ${raws.length} candidates via 3 strategies (${STRATEGY_DEFS.map((d) => d.strategy).join(', ')});`,
@@ -451,6 +736,13 @@ export const generateHypothesesStage: StageHandler = {
       );
     }
     if (warnings.length > 0) parts.push(`warnings: ${warnings.join(' | ')}`);
+    if (litTargets.length > 0) {
+      parts.push(
+        `literature novelty (D-017): ${Object.values(litVerdictCounts).reduce((a, b) => a + b, 0)}/${litTargets.length} representatives assessed against retrieved neighbors ` +
+          `(${litVerdictCounts.novel} novel / ${litVerdictCounts.incremental} incremental / ${litVerdictCounts.already_done} already_done / ${litVerdictCounts.unclear} unclear).`,
+      );
+    }
+    if (litNotes.length > 0) parts.push(`literature-novelty notes: ${litNotes.join(' | ')}`);
     return { kind: 'done', summary: parts.join(' ') };
   },
 };

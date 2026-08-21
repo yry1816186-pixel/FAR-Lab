@@ -57,6 +57,25 @@ export const RetrievalQuery = z.object({
 });
 export type RetrievalQuery = z.infer<typeof RetrievalQuery>;
 
+/**
+ * D-015 retrieval fusion record: how the raw multi-query pool became the final corpus.
+ * Absent on pre-fusion snapshots (optional keeps stored objects readable).
+ */
+export const RetrievalFusion = z.object({
+  algorithm: z.literal('rrf-k60+llm-listwise-rerank-v1'),
+  /** Unique documents in the post-dedup pool BEFORE corpus-cap selection. */
+  poolSize: z.number().int().nonnegative(),
+  /** Whether the LLM listwise rerank reordered the pool (false = fallback to RRF order). */
+  rerankApplied: z.boolean(),
+  /** When rerank was attempted but failed: the visible failure reason (absent when not attempted). */
+  rerankFailure: z.string().optional(),
+  /** Counter-origin documents kept in the final corpus (quota floor evidence). */
+  counterSeatsKept: z.number().int().nonnegative(),
+  /** Compact human-auditable note of the selection (e.g. "cap 12 of pool 31"). */
+  selection: z.string().min(1),
+});
+export type RetrievalFusion = z.infer<typeof RetrievalFusion>;
+
 /** Immutable record of what the system actually searched and saw. */
 export const CorpusSnapshot = z.object({
   id: CorpusSnapshotId,
@@ -66,5 +85,6 @@ export const CorpusSnapshot = z.object({
   createdAt: z.string().datetime(),
   /** Which families were attempted but unavailable/failed — failures stay visible. */
   familyFailures: z.array(z.object({ family: SourceFamily, reason: z.string() })).default([]),
+  fusion: RetrievalFusion.optional(),
 });
 export type CorpusSnapshot = z.infer<typeof CorpusSnapshot>;

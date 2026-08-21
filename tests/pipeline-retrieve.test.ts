@@ -17,7 +17,7 @@ import { createTestStubProvider, type StubStep } from '../src/providers/test-stu
 import type { RawSourceRecord, SourceAdapter } from '../src/shared/ports.js';
 import type { StageContext } from '../src/pipeline/types.js';
 import { scopeStage } from '../src/pipeline/stages/scope.js';
-import { retrieveStage } from '../src/pipeline/stages/retrieve.js';
+import { retrieveStage, selectFinal, fusedOrder, rrfScore, type PoolEntry } from '../src/pipeline/stages/retrieve.js';
 import { verifyStage } from '../src/pipeline/stages/verify.js';
 import { snapshotHash } from '../src/sources/snapshot.js';
 import { SourceAdapterError } from '../src/sources/error.js';
@@ -311,19 +311,20 @@ describe('retrieve stage', () => {
       canonicalJson(counterRec.normalized),
     );
 
-    // every executed search saw limit=4
-    for (const s of openalex.calls.searches) expect(s.limit).toBe(4);
-    for (const s of arxiv.calls.searches) expect(s.limit).toBe(4);
+    // every executed search saw limit=6 (D-015: deeper per-query pool for RRF fusion)
+    for (const s of openalex.calls.searches) expect(s.limit).toBe(6);
+    for (const s of arxiv.calls.searches) expect(s.limit).toBe(6);
 
-    // receipts: exactly 1 model_call + 6 source_retrieval (counter x2 on oa/arxiv + oa/arxiv x discovery + supporting)
+    // receipts: exactly 1 model_call (no rerank — pool 4 <= cap) + 8 source_retrieval
+    // (counter x2 + BOTH discovery queries x2 families + supporting x2 families)
     const receipts = env.store.listObjects('receipt', env.run.id);
     expect(receipts.filter((r) => r.kind === 'model_call')).toHaveLength(1);
     const retrieval = receipts.filter((r) => r.kind === 'source_retrieval');
-    expect(retrieval).toHaveLength(6);
+    expect(retrieval).toHaveLength(8);
     for (const r of retrieval) {
       expect(r.executionMode).toBe('live');
       expect(r.stage).toBe('retrieve');
-      expect(defined(r.sourceRetrieval, 'retrieval facts').httpStatus).toBe(200);
+      expect(defined(r.sourceRetrieval, 'source retrieval facts').httpStatus).toBe(200);
     }
     const counterReceipt = defined(
       retrieval.find((r) => r.sourceRetrieval?.query === PLAN.counter[0]),
@@ -376,7 +377,7 @@ describe('retrieve stage', () => {
     expect(sharedDocs).toHaveLength(1);
     // 首见优先：openalex（先执行）版本胜出
     expect(sharedDocs[0]?.title).toBe('Fixture Shared via OpenAlex');
-    expect(out.summary).toContain('1 duplicate record(s) dropped');
+    expect(out.summary).toContain('1 duplicate record(s) merged');
   });
 
   it('records familyFailures and continues when one family fails (single-source failure)', async () => {
@@ -407,7 +408,7 @@ describe('retrieve stage', () => {
     const failedReceipts = env.store
       .listObjects('receipt', env.run.id)
       .filter((r) => r.kind === 'source_retrieval' && r.sourceRetrieval?.family === 'arxiv');
-    expect(failedReceipts).toHaveLength(3); // counter[1] + discovery + supporting 都真实尝试过 arxiv
+    expect(failedReceipts).toHaveLength(4); // counter[1] + BOTH discovery queries + supporting all really attempted arxiv
     for (const r of failedReceipts) {
       expect(r.sourceRetrieval?.httpStatus).toBe(504);
       expect(r.sourceRetrieval?.resultCount).toBe(0);
@@ -431,7 +432,7 @@ describe('retrieve stage', () => {
       { openalex: failAll('openalex'), arxiv: failAll('arxiv') },
     );
 
-    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/all 6 source searches failed/);
+    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/all 8 source searches failed/);
     expect(env.store.listObjects('corpus_snapshot', env.run.id)).toHaveLength(0);
     expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(0);
     expect(await retrieveStage.applicable(env.ctx)).toBe(true); // 可重试
@@ -487,28 +488,115 @@ describe('retrieve stage', () => {
     expect(openalex.calls.searches).toHaveLength(0);
   });
 
-  it('caps the corpus at 12 documents and notes the truncation in the summary', async () => {
+  it('caps the corpus at 12 via rerank+quota, records the fusion, and keeps counter seats (D-015)', async () => {
+    // Deterministic pool: 2 counter searches x 6 docs + 6 other searches x 1 doc = 18 unique.
     const slug = (q: string) => q.replace(/\W+/g, '');
-    const fourUnique = (prefix: string) =>
-      Array.from({ length: 4 }, (_, i) => fakeRecord(`Fixture ${prefix} ${i}`, `10.1000/fake.${prefix}.${i}`));
-    const openalex = fakeAdapter('openalex', { search: async (q) => fourUnique(slug(q)) });
-    const arxiv = fakeAdapter('arxiv', { search: async (q) => fourUnique(`a${slug(q)}`) });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv });
+    const counterDocs = (prefix: string) =>
+      Array.from({ length: 6 }, (_, i) => fakeRecord(`Fixture ${prefix} ${i}`, `10.1000/fake.${prefix}.${i}`));
+    const openalex = fakeAdapter('openalex', {
+      search: async (q) =>
+        q === PLAN.counter[0] ? counterDocs(slug(q)) : [fakeRecord(`Fixture ${slug(q)}`, `10.1000/fake.${slug(q)}`)],
+    });
+    const arxiv = fakeAdapter('arxiv', {
+      search: async (q) =>
+        q === PLAN.counter[1] ? counterDocs(`a${slug(q)}`) : [fakeRecord(`Fixture a${slug(q)}`, `10.1000/fake.a${slug(q)}`)],
+    });
+    // Rerank script: identity permutation over the 18-candidate pool (order = fused order).
+    const identityRerank = {
+      ranked: Array.from({ length: 18 }, (_, i) => ({
+        index: i,
+        relevance: i < 12 ? ('high' as const) : ('medium' as const),
+        reason: 'fixture identity rerank reason',
+      })),
+    };
+    const env = makeEnv(
+      [{ rawOutput: JSON.stringify(PLAN) }, { rawOutput: JSON.stringify(identityRerank) }],
+      { openalex, arxiv },
+    );
 
     const out = await retrieveStage.execute(env.ctx);
     expect(out.kind).toBe('done');
     const docs = env.store.listObjects('source_document', env.run.id);
     expect(docs).toHaveLength(12);
     expect(out.summary).toContain('truncated at cap 12');
-    // 两条 counter 查询都先执行（R-05 不被截断挤掉）：各自的 4 条记录都在
-    const counterIds = docs.filter((d) =>
+
+    const corpus = defined(env.store.listObjects('corpus_snapshot', env.run.id)[0], 'corpus');
+    expect(corpus.fusion).toMatchObject({
+      algorithm: 'rrf-k60+llm-listwise-rerank-v1',
+      poolSize: 18,
+      rerankApplied: true,
+    });
+    // counter-evidence quota floor honored under cap pressure
+    expect(defined(corpus.fusion, 'fusion').counterSeatsKept).toBeGreaterThanOrEqual(4);
+    // both planned counter queries still contribute documents to the final corpus
+    const docsFromCounter1 = docs.filter((d) =>
       d.identifiers.some((i) => i.value.startsWith('10.1000/fake.intermittentfastinginsulinsensitivityfailedreplication.')),
     );
-    expect(counterIds).toHaveLength(4);
-    const counterIds2 = docs.filter((d) =>
+    const docsFromCounter2 = docs.filter((d) =>
       d.identifiers.some((i) => i.value.startsWith('10.1000/fake.aintermittentfastinginsulinsensitivitynegativeresult.')),
     );
-    expect(counterIds2).toHaveLength(4);
+    expect(docsFromCounter1.length).toBeGreaterThanOrEqual(1);
+    expect(docsFromCounter2.length).toBeGreaterThanOrEqual(1);
+    // rerank happened as a real second model call with its own receipt
+    const modelReceipts = env.store
+      .listObjects('receipt', env.run.id)
+      .filter((r) => r.kind === 'model_call');
+    expect(modelReceipts).toHaveLength(2);
+  });
+
+  it('falls back VISIBLE to the RRF order when the listwise rerank fails (no silent success theater)', async () => {
+    const slug = (q: string) => q.replace(/\W+/g, '');
+    const fourUnique = (prefix: string) =>
+      Array.from({ length: 4 }, (_, i) => fakeRecord(`Fixture ${prefix} ${i}`, `10.1000/fake.${prefix}.${i}`));
+    const openalex = fakeAdapter('openalex', { search: async (q) => fourUnique(slug(q)) });
+    const arxiv = fakeAdapter('arxiv', { search: async (q) => fourUnique(`a${slug(q)}`) });
+    const env = makeEnv(
+      [
+        { rawOutput: JSON.stringify(PLAN) },
+        { fail: { kind: 'provider_error', message: 'fixture rerank outage' } },
+      ],
+      { openalex, arxiv },
+    );
+
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(12);
+    expect(out.summary).toContain('listwise rerank FAILED');
+    const corpus = defined(env.store.listObjects('corpus_snapshot', env.run.id)[0], 'corpus');
+    expect(corpus.fusion).toMatchObject({ rerankApplied: false });
+    expect(corpus.fusion?.rerankFailure).toContain('fixture rerank outage');
+  });
+
+  it('selectFinal enforces the counter quota floor deterministically (pure function)', async () => {
+    const entry = (key: string, target: number, rank: number, counter: boolean): PoolEntry => ({
+      key,
+      record: fakeRecord(`Fixture ${key}`, `10.1000/fake.${key}`),
+      family: 'openalex',
+      firstSeen: target,
+      purposes: new Set(counter ? (['counter_evidence'] as const) : (['discovery'] as const)),
+      ranks: [{ target, rank }],
+    });
+    // 15 non-counter entries (targets 2.., rank 0) + 3 counter entries seen LAST (rank 2)
+    const pool: PoolEntry[] = [];
+    for (let i = 0; i < 15; i++) pool.push(entry(`n${i}`, 2 + i, 0, false));
+    pool.push(entry('c0', 0, 2, true));
+    pool.push(entry('c1', 0, 3, true));
+    pool.push(entry('c2', 1, 2, true));
+    const ordered = fusedOrder(pool);
+    // non-counter rank-0 docs (1/61) outrank counter rank-2/3 docs in RRF — greedy alone would evict all counter docs
+    expect(ordered.slice(0, 12).every((e) => !e.purposes.has('counter_evidence'))).toBe(true);
+    const selected = selectFinal(ordered, 12, 4);
+    expect(selected).toHaveLength(12);
+    const counterSeats = selected.filter((e) => e.purposes.has('counter_evidence')).length;
+    expect(counterSeats).toBe(3); // floor = min(4, available 3)
+    // swapped-in counter docs displace the TAIL of the greedy selection
+    expect(selected.some((e) => e.key === 'n14')).toBe(false);
+    expect(selected.some((e) => e.key === 'c0')).toBe(true);
+    // RRF math spot-check: rank0 -> 1/(60+0+1)
+    expect(rrfScore(pool[0]!)).toBeCloseTo(1 / 61, 12);
+    // pool <= cap: no selection pressure, order preserved
+    const small = selectFinal(ordered.slice(0, 5), 12, 4);
+    expect(small).toHaveLength(5);
   });
 
   it('honors the cancellation checkpoint before any work', async () => {

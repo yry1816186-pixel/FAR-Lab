@@ -58,6 +58,36 @@ export type FalsificationSpec = z.infer<typeof FalsificationSpec>;
 export const TestabilityStatus = z.enum(['testable_now', 'testable_with_data', 'untestable_currently', 'unfalsifiable']);
 export type TestabilityStatus = z.infer<typeof TestabilityStatus>;
 
+/**
+ * D-017 — literature-grounded novelty layer. The corpus-relative noveltyLabel stays;
+ * this SECOND layer judges each representative against neighbors actually retrieved
+ * from the live literature (facet-reranked), with 'unclear' as the honest default.
+ * RQ-Bench forbids pure LLM novelty scores — neighbors are mandatory grounding.
+ */
+export const LiteratureNoveltyNeighbor = z.object({
+  title: z.string().min(1),
+  year: z.number().int().optional(),
+  doi: z.string().optional(),
+  openalexId: z.string().optional(),
+  venue: z.string().optional(),
+  /** sha256 over the neighbor's normalized source record — auditable against OpenAlex. */
+  contentHash: z.string().length(64),
+  /** Which expansion query surfaced this neighbor. */
+  query: z.string().min(1),
+});
+export type LiteratureNoveltyNeighbor = z.infer<typeof LiteratureNoveltyNeighbor>;
+
+export const LiteratureNovelty = z.object({
+  verdict: z.enum(['novel', 'incremental', 'already_done', 'unclear']),
+  /** Facet-reranked nearest neighbors the verdict was judged against (empty when none retrieved). */
+  neighbors: z.array(LiteratureNoveltyNeighbor).default([]),
+  justification: z.string().min(10),
+  producer: z.string().min(1),
+  calibration: z.literal('uncalibrated_llm_judgment'),
+  assessedAt: z.string().datetime(),
+});
+export type LiteratureNovelty = z.infer<typeof LiteratureNovelty>;
+
 export const HypothesisCandidate = z.object({
   id: HypothesisId,
   runId: RunId,
@@ -76,6 +106,8 @@ export const HypothesisCandidate = z.object({
   counterClaimIds: z.array(ClaimId).default([]),
   uncertainties: z.array(z.string()).default([]),
   noveltyLabel: NoveltyLabel.default('mixed'),
+  /** D-017 second novelty layer: judged against retrieved literature neighbors. */
+  literatureNovelty: LiteratureNovelty.optional(),
   testability: TestabilityStatus.default('testable_with_data'),
   falsification: FalsificationSpec.optional(),
   /** Cluster of paraphrase-equivalent candidates; one representative survives ranking. */

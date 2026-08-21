@@ -2,7 +2,7 @@ import type { Db } from './db.js';
 import {
   ResearchRun, RunEvent, RunStatus, RunStageName, StageRecord, ResearchQuestion,
   CorpusSnapshot, SourceDocument, ScientificClaim, EvidenceRelation, HypothesisCandidate,
-  HypothesisScorecard, ResearchPlan, FeedbackSignal, Revision, VersionDiff,
+  HypothesisScorecard, HypothesisTournament, ResearchPlan, FeedbackSignal, Revision, VersionDiff,
   ProvenanceReceipt, ReproducibilityBundle, newId,
 } from '../domain/index.js';
 import { z } from 'zod';
@@ -16,6 +16,7 @@ const KIND_SCHEMAS = {
   evidence_relation: EvidenceRelation,
   hypothesis: HypothesisCandidate,
   scorecard: HypothesisScorecard,
+  tournament: HypothesisTournament,
   plan: ResearchPlan,
   feedback: FeedbackSignal,
   revision: Revision,
