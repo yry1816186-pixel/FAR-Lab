@@ -1,6 +1,7 @@
 import type { ModelProvider } from '../shared/ports.js';
 import { createDeepSeekProvider } from './deepseek.js';
 import { createZaiProvider } from './zai.js';
+import { createDashScopeProvider } from './dashscope.js';
 import { createTestStubProvider } from './test-stub.js';
 
 /**
@@ -13,7 +14,7 @@ import { createTestStubProvider } from './test-stub.js';
  * fallback, ever.
  */
 
-export const LIVE_PROVIDER_NAMES = ['deepseek', 'zai'] as const;
+export const LIVE_PROVIDER_NAMES = ['deepseek', 'zai', 'dashscope'] as const;
 export type LiveProviderName = (typeof LIVE_PROVIDER_NAMES)[number];
 export const DEFAULT_LIVE_PROVIDER: LiveProviderName = 'deepseek';
 export const TEST_STUB_PROVIDER_NAME = 'test-stub';
@@ -40,6 +41,8 @@ export function getProvider(name: string): ModelProvider | undefined {
       return createDeepSeekProvider();
     case 'zai':
       return createZaiProvider();
+    case 'dashscope':
+      return createDashScopeProvider();
     case TEST_STUB_PROVIDER_NAME:
       return createTestStubProvider([]);
     default:
@@ -60,13 +63,18 @@ export function defaultLiveProvider(): ModelProvider {
         `(live options: ${LIVE_PROVIDER_NAMES.join(', ')}; default: ${DEFAULT_LIVE_PROVIDER}); refusing silent fallback`,
     );
   }
-  return configured === 'zai' ? createZaiProvider() : createDeepSeekProvider();
+  return configured === 'zai'
+    ? createZaiProvider()
+    : configured === 'dashscope'
+      ? createDashScopeProvider()
+      : createDeepSeekProvider();
 }
 
 /** Discovery view of the plane (no secrets: env var NAMES only, never values). */
 export function listProviders(): ProviderInfo[] {
   const ds = createDeepSeekProvider();
   const zai = createZaiProvider();
+  const bailian = createDashScopeProvider();
   return [
     {
       name: 'deepseek',
@@ -83,6 +91,14 @@ export function listProviders(): ProviderInfo[] {
       modelId: zai.modelId,
       baseUrl: zai.baseUrl,
       apiKeyEnvVar: 'ZHIPU_API_KEY',
+    },
+    {
+      name: 'dashscope',
+      kind: 'live',
+      liveReady: bailian.liveReady,
+      modelId: bailian.modelId,
+      baseUrl: bailian.baseUrl,
+      apiKeyEnvVar: 'DASHSCOPE_API_KEY',
     },
     {
       name: TEST_STUB_PROVIDER_NAME,
