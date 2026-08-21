@@ -272,13 +272,69 @@ export const strictSchemaOrUndefined = (schema: z.ZodTypeAny): unknown | undefin
 const appendCorrection = (messages: ChatMessage[], reason: string): ChatMessage[] => {
   const correction =
     `\n\nYour previous reply was rejected: ${reason}\n` +
-    'Reply again with ONLY the corrected JSON object matching the requested structure. No markdown fences, no commentary.';
+    'Reply again with ONLY the corrected JSON object matching the requested structure. No markdown fences, no commentary. ' +
+    'Escape every double quote inside string values as \\" — never emit a raw " inside a string.';
   return messages.map((m, i) => (i === messages.length - 1 ? { ...m, content: m.content + correction } : m));
 };
 
 /**
+ * Deterministic repair for the two corruption classes observed in live strict-FC tool
+ * arguments (2026-08-22, spikes/output/strict-fc-corrupted-args.json): unescaped INNER
+ * quotes inside string values (the model emits e.g. `...damage could"expected...`, closing
+ * the JSON string early) and raw control characters inside strings. Legality rule: in
+ * VALID JSON a closing quote is always followed (after optional whitespace) by one of
+ * `, } ] :` or end-of-input — a quote followed by anything else inside a string state is
+ * an inner quote and gets escaped. Only applied after direct parses have failed, so valid
+ * documents are never rewritten.
+ */
+export const repairUnescapedQuotes = (raw: string): string => {
+  let out = '';
+  let inString = false;
+  for (let i = 0; i < raw.length; i += 1) {
+    const ch = raw[i]!; // loop bound guarantees presence; strict-index narrowing below
+    if (!inString) {
+      if (ch === '"') inString = true;
+      out += ch;
+      continue;
+    }
+    if (ch === '\\') {
+      out += ch + (raw[i + 1] ?? '');
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < raw.length && /\s/.test(raw[j]!)) j += 1;
+      const next = raw[j];
+      if (next === undefined || next === ',' || next === '}' || next === ']' || next === ':') {
+        inString = false;
+        out += ch;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    if (ch.charCodeAt(0) < 0x20) {
+      if (ch === '\n') out += '\\n';
+      else if (ch === '\r') out += '\\r';
+      else if (ch === '\t') out += '\\t';
+      else out += `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+};
+
+/**
  * Parse raw model output as JSON. Direct JSON.parse first; if that fails, strip a
- * surrounding ```json fence once and retry (spike-observed provider behavior).
+ * surrounding ```json fence once and retry (spike-observed provider behavior); if that
+ * fails too, apply the CONTENT-PRESERVING repair scan (inner quotes that cannot be
+ * structural closes + raw control characters — the parsed string content is identical
+ * to the model's intent) and retry. Deliberately NO structural flip-retry: escaping a
+ * quote that could be a structural close can yield a valid parse with MOVED string
+ * boundaries (semantically distorted content) — a bounded corrective retry that
+ * fail-visibly rejects is worth more than silently accepted distortion.
  */
 export const extractJsonText = (raw: string): { value: unknown } | null => {
   try {
@@ -293,8 +349,16 @@ export const extractJsonText = (raw: string): { value: unknown } | null => {
   try {
     return { value: JSON.parse(stripped) as unknown };
   } catch {
-    return null;
+    // fall through to repair
   }
+  for (const candidate of [raw, stripped]) {
+    try {
+      return { value: JSON.parse(repairUnescapedQuotes(candidate)) as unknown };
+    } catch {
+      // unrecoverable — bounded corrective retry remains the backstop
+    }
+  }
+  return null;
 };
 
 // ---------------------------------------------------------------------------
