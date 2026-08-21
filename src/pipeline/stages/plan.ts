@@ -23,6 +23,10 @@ const PLAN_SYSTEM_PROMPT = [
   'Decision rules must cover success, weakening, falsification and stopping.',
   'Reference ONLY the hypothesis ids and claim ids given in the payload, verbatim; never invent ids, data or sources.',
   'Where something is unknown, surface it in risks/prerequisites instead of fabricating it.',
+  'Scale discipline: the payload states the actual evidence base size and depth. Resource scale, sample sizes, budgets, ' +
+    'timelines and quantitative thresholds that are not derived from the provided claims are MODEL-STIPULATED estimates — ' +
+    'keep them proportionate to that evidence base and record the disproportion in risks/prerequisites instead of ' +
+    'presenting invented numbers as if they were evidence-derived.',
 ].join(' ');
 
 /** Model-output shape: the full plan minus server-owned fields (id/runId/createdAt/check). */
@@ -199,7 +203,19 @@ export const planStage: StageHandler = {
     const claims = ctx.store.listObjects('claim', runId);
     const verifiedClaims = claims.filter((c) => c.bindingStatus === 'verified');
 
+    // W5/S5: the real evidence ceiling, computed from the store (not asserted by the
+    // model) — the plan generator must see the corpus it is extrapolating from.
+    const sources = ctx.store.listObjects('source_document', runId);
+    const metadataOnlySources = sources.filter((s) => s.contentDepth === 'metadata_only').length;
+
     const payload = {
+      evidenceBase: {
+        sourcesTotal: sources.length,
+        abstractDepthOrDeeper: sources.length - metadataOnlySources,
+        metadataOnly: metadataOnlySources,
+        verifiedClaims: verifiedClaims.length,
+        note: 'the plan extrapolates from THIS evidence base; unsupported scale numbers are model-stipulated',
+      },
       question: question
         ? {
             id: question.id,

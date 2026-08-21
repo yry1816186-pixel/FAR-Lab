@@ -34,6 +34,27 @@ import type { StageHandler } from '../types.js';
 
 const SCORE_DISCLAIMER = '分数为可检查的决策辅助，非客观概率。';
 
+/** W5/S4 — noveltyLabel is judged only against THIS run's retrieved corpus; never presented as literature-level novelty. */
+const NOVELTY_CORPUS_QUALIFIER = '（仅相对本 run 检索语料判定，未做全文献新颖性检索）';
+
+/**
+ * W5/S3 — disclosure label for the provenance of a falsification spec's decision-rule
+ * thresholds. Missing provenance (pre-W5 specs) is NOT a completeness failure; it is
+ * rendered honestly as「来源未声明」.
+ */
+const decisionRuleProvenanceLabel = (p: string | undefined): string => {
+  switch (p) {
+    case 'model-stipulated':
+      return '⚠ 阈值为模型拟定，无证据来源';
+    case 'evidence-derived':
+      return '来源：证据推导';
+    case 'community-standard':
+      return '来源：学界惯常';
+    default:
+      return '来源未声明';
+  }
+};
+
 interface ExportInputs {
   run: ResearchRun;
   question: ResearchQuestion | null;
@@ -91,6 +112,17 @@ const collectMissing = (
 const buildReport = (d: ExportInputs, missingItems: string[]): string => {
   const L: string[] = [];
   const push = (...lines: string[]) => L.push(...lines);
+
+  // Honest-abstention banner (audit D-7): a run that ends completed with zero hypotheses
+  // and no plan abstained by design — evidence was insufficient for any defensible
+  // hypothesis and the system refused to fabricate. The list-level status alone
+  // ("completed") must not be able to mislead; the banner says what actually happened.
+  if (d.hypotheses.length === 0 && !d.plan) {
+    push(
+      '> **本 run 为诚实弃权：检索证据不足以支撑任何可辩护假设，系统拒绝编造（这是设计行为，非故障）。**',
+      '',
+    );
+  }
 
   push(`# FAR-Lab 研究报告 — run ${d.run.id}`, '');
   push('> 本报告由本 run 的存储对象确定性渲染生成：每一节均来自持久化对象，未记录的内容以「缺失」明示，不含任何补造。', '');
@@ -232,7 +264,7 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
       const f = h.falsification;
       if (f) {
         push(
-          `- 证伪规格要点：观测=${f.observable}；测量=${f.measurement}；判定规则=${f.decisionRule}；证伪条件=${f.falsificationCondition}`,
+          `- 证伪规格要点：观测=${f.observable}；测量=${f.measurement}；判定规则=${f.decisionRule}；证伪条件=${f.falsificationCondition}；${decisionRuleProvenanceLabel(f.decisionRuleProvenance)}`,
         );
         push(
           `- 证伪规格完整性（completenessCheck）：${
@@ -246,7 +278,9 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
       } else {
         push('- 证伪规格：缺失');
       }
-      push(`- testability：${h.testability}；noveltyLabel：${h.noveltyLabel}`);
+      // W5/S4: noveltyLabel is corpus-relative — the qualifier is mandatory at every
+      // presentation point so the label can never be read as a literature-level verdict.
+      push(`- testability：${h.testability}；noveltyLabel：${h.noveltyLabel}${NOVELTY_CORPUS_QUALIFIER}`);
       const clusterSize = h.clusterKey
         ? d.hypotheses.filter((x) => x.clusterKey === h.clusterKey).length
         : 1;
@@ -338,6 +372,20 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
       `- executabilityCheck：${
         check ? (check.passed ? '通过' : `未通过 — 缺失项：${check.missing.join('；')}`) : '未检查'
       }`,
+    );
+    // ---- W5/S5: evidence-ceiling disclosure (computed from the store, never asserted by the model) ----
+    // The plan's scale/sample sizes/quantitative thresholds routinely exceed what the
+    // corpus can support; the report must say so with the real counts.
+    const metadataOnly = d.sources.filter((s) => s.contentDepth === 'metadata_only').length;
+    const abstractOrDeeper = d.sources.length - metadataOnly;
+    push('');
+    push(
+      `**证据上限声明**：本计划基于 ${d.sources.length} 篇来源（${abstractOrDeeper} 篇摘要级/${metadataOnly} 篇元数据级）生成；` +
+        '计划中的资源规模、样本量与量化阈值为模型拟定值，其证据支撑度见各假设的 decisionRuleProvenance 标注。',
+    );
+    push('');
+    push(
+      `（注：摘要级 = contentDepth 为 abstract/full_text/data 的来源；元数据级 = metadata_only，未参与声明提取。）`,
     );
   } else {
     push('（缺失：本 run 未生成研究计划）');

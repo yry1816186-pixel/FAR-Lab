@@ -24,8 +24,10 @@
       "id": "ACC-02",
       "target": "live_verified",
       "critical": true,
-      "status": "not_started",
-      "evidence": []
+      "status": "live_verified",
+      "evidence": [
+        "DeepSeek (domestic open-source model route) live production path: 124+ structured calls with provider/model/usage/receipt evidence across 6 real runs; executionMode=live 100% measured"
+      ]
     },
     {
       "id": "ACC-03",
@@ -51,7 +53,7 @@
       "critical": true,
       "status": "live_verified",
       "evidence": [
-        "live: 2 real runs 24/24 claims verified-aligned; fail-closed deterministic (tests/pipeline-evidence.test.ts, export-quality adversarial quotes rejected)"
+        "live: 2 real runs 19/19 claims verified-aligned (run1 P1 15/15 + run2 P2 4/4, reproducible from eval/results/metrics.json per_run claims_verified/claims_total; W5 audit independently re-verified 58/58 pooled across all 6 runs); fail-closed deterministic (tests/pipeline-evidence.test.ts, export-quality adversarial quotes rejected). 2026-08-21 correction: earlier '24/24' was not reproducible from the DB (audit D-4)"
       ]
     },
     {
@@ -132,7 +134,8 @@
       "critical": true,
       "status": "live_verified",
       "evidence": [
-        "far verify 10/10 verified on bundles bnd_8czp2z9t (run1) and bnd_w7nm9je5 (run2); degraded verdict correctly returned on lock drift (old bundle)"
+        "far verify 10/10 verified on fully evented bundles bnd_wsavs0jq7bfhvkb02n1j629d8e (run_7zez1a8ezbbrrgw9begtta0gsw; export receipt rcp_1axk022xmxpsk89yfg5fe47g3t at 2026-08-21T12:03:07.806Z + event chain seq 90-93, re-verified by W5 audit) and bnd_w7nm9je5vwsxka7en603gzcshr (run_yhp0m4kg6qnjmemhj9k5wbmk00); degraded verdict correctly returned on lock drift (old bundle)",
+        "2026-08-21 migration note (audit D-1, P1): previously cited bundle bnd_8czp2z9tmzkwanx6h4bd6kmp4c (run_7zez, created 12:00:01Z) was produced by a one-off out-of-band re-export during the W2 hash-basis migration window (commit c656699 20:04 local; source artifacts re-put 19:59:52) and has no export receipt/event twin. Its content is internally consistent (still verifies 10/10) but it is no longer cited as acceptance evidence; the replacement bnd_wsavs0jq… has the full production receipt+event chain"
       ]
     },
     {
@@ -148,29 +151,37 @@
       "id": "ACC-16",
       "target": "live_verified",
       "critical": true,
-      "status": "not_started",
-      "evidence": []
+      "status": "live_verified",
+      "evidence": [
+        "GUI walkthrough on real data (evidence/W3/gui-*.png): runs list/new run form (live run created & progressed in UI)/evidence tab (15 verified claims + 12 counter-evidence)/revisions tab (causal chain rendered)/EN-ZH switch; keyboard tablist a11y"
+      ]
     },
     {
       "id": "ACC-17",
       "target": "tested",
       "critical": true,
-      "status": "not_started",
-      "evidence": []
+      "status": "tested",
+      "evidence": [
+        "evidence/W4/security-audit.md: 0 P0/0 P1; path traversal 8 payloads 404, SQL parameterized live-tested, 1MB cap, loopback bind, env-only secrets; both P2 findings fixed (Host/Origin/Content-Type guards + untrusted-data prompt fencing) with 186/186 green"
+      ]
     },
     {
       "id": "ACC-18",
       "target": "live_verified",
       "critical": true,
-      "status": "not_started",
-      "evidence": []
+      "status": "live_verified",
+      "evidence": [
+        "evidence/W4/evaluation-report.md + eval/results/: 6-problem predeclared set vs direct & RAG baselines (same model): source verification 57/57, claim binding 58/58, counter-evidence 9.3/run vs 0 baselines, direct unsupported-citation rate 94.4% measured, P5 honest-abstention PASS vs baselines both fabricating"
+      ]
     },
     {
       "id": "ACC-19",
       "target": "live_verified",
       "critical": true,
-      "status": "not_started",
-      "evidence": []
+      "status": "live_verified",
+      "evidence": [
+        "metrics.json performance profile: per-run span/tokens/stage latency from receipts; bounded by design (retries<=2, fan-in limits, 12-doc corpus cap); representative workloads 6 runs, 124+ model calls all receipted"
+      ]
     },
     {
       "id": "ACC-20",

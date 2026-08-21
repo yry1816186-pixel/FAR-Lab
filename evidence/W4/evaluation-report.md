@@ -181,3 +181,56 @@ falsification and ranking.
 - Judge: `node eval/llm-judge.mjs` → `eval/results/llm-judge.jsonl` (SEED=20260821).
 - FAR-Lab runs: `node dist/cli/main.js research start "<question>" --domain <d> --goal <g> --json`
   (P4/P5/P6 executed this session; P1/P2/P3 pre-existing run ids recorded in problems.json).
+
+---
+
+## Addendum (post-fix rerun) — added 2026-08-21 after W5 audit D-5 reconciliation
+
+The §2–§4 numbers above are the **pre-fix baseline snapshot** (report mtime 21:08 local) and are
+preserved unchanged: the failures they document were real and remain in the DB event streams.
+They must not be cited as the current state, because after this report was written the pipeline
+fixes landed (commit `1522579` "eval fixes – plan id remap, honest skip, caps, security P2
+guards; all 6 problems complete"), P4/P6 were re-resumed through the product path, and P5
+reached its terminal state via the honest-skip path (plan stage skips with "no defensible
+hypotheses" instead of failing). `eval/results/metrics.json` was recomputed at
+`2026-08-21T15:17:49.072Z` from the same `.far-run/far.db`.
+
+Post-fix headline numbers (source: `eval/results/metrics.json`, `farlab.aggregate` /
+`farlab.per_run`):
+
+| Metric | Pre-fix (this report §3) | Post-fix (metrics.json) |
+|---|---|---|
+| Completed problems | 3/6 | **6/6** (all `status:"completed"`) |
+| claim binding | 58/58 (over runs that produced claims) | 58/58 = 100% (unchanged claims; P1 15, P2 4, P3 4, P4 12, P5 0, P6 23) |
+| falsification completeness | 24/25 specs pooled = 96.0% | **32/33 pooled = 97.0%** (mean of per-run rates 0.9667; P4 5/5, P6 8/8 restored, P5 n/a) |
+| plan executability | 3/3 plans (3 runs never produced one) | **5/5** plan-producing runs pass (P5 has no plan — honest abstention, not a failure) |
+| counter-evidence relations | 56 total / 9.3 per run | 262 total / mean 16 per run (P6 re-run persisted 45 counter relations vs 5 pre-fix) |
+| live receipts | 215/215 | 236/236 = 100% live |
+
+P5 semantics note (audit D-7): P5's `completed` status means **honest abstention** — 11 sources
+retrieved, 0 verifiable claims, 0 hypotheses, no plan; the system refused to fabricate. The
+export report now opens with a prominent honest-abstention banner stating exactly this
+(`src/pipeline/stages/export.ts`, fixed 2026-08-21), so the list-level status cannot mislead.
+
+### LLM-judge limitations disclosure (W5 scientific review Q7 — supersedes the weight §6 may be given)
+
+The §6 judge table is retained as recorded, but three defects mean its numbers are
+**auxiliary observations only and must not be cited quantitatively** (including the
+4.75 vs 3.25 hq means):
+
+1. **Input-construction asymmetry (fixed post-hoc):** at judge time, baseline hypotheses were
+   trimmed to statement+mechanism while the FAR-Lab list additionally rendered uncertainty
+   notes — the judge's one-line reasons ("no counter-evidence or uncertainty notes",
+   "no stated assumptions") describe the *trimmed input*, not the baselines' actual output
+   (their JSONL contains assumptions/predictions/falsification fields). A material part of the
+   cec gap (4.75 vs 1.00) is this artifact. `eval/llm-judge.mjs` now projects every system
+   through identical fields (statement / mechanism / assumptions / falsification decisionRule);
+   the recorded scores predate this fix and no symmetric re-judge has been run.
+2. **Blinding was breakable by format:** the uncertainty-notes field existed only on one list,
+   so the seeded shuffle's blind labels could be defeated by output format alone.
+3. **Same model, tiny n:** judge = same DeepSeek model as all three systems (self-preference
+   risk, already disclosed in §6), n=4 problems, one judge, one call, no variance/significance.
+
+The system-level comparison rests on the deterministic metrics (source verification, claim
+binding, citation unsupported rates, structured counter-evidence, P5 honesty probe); §6 is
+color, not evidence.

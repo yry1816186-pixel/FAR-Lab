@@ -146,6 +146,7 @@ const seedRun = () => {
       measurement: 'targeted deep sequencing across duration gradient',
       expectedRelation: 'monotonic increase with duration',
       decisionRule: '>=2x off-target rate at long vs short duration supports; no increase weakens',
+      decisionRuleProvenance: 'model-stipulated', // W5/S3: thresholds the model chose itself
       supportCondition: 'dose-response present',
       weakeningCondition: 'flat response',
       falsificationCondition: 'inverse or no relationship across independent cell lines',
@@ -543,11 +544,22 @@ describe('export stage', () => {
     expect(report).toContain(g.hyp.statement);
     expect(report).toContain('completenessCheck');
     expect(report).toContain('簇内候选数');
+    // W5/S3: model-stipulated thresholds get the prominent warning in §5
+    expect(report).toContain('⚠ 阈值为模型拟定，无证据来源');
+    // W5/S4: noveltyLabel carries the corpus-relative qualifier at the presentation point
+    expect(report).toContain(
+      `noveltyLabel：${g.hyp.noveltyLabel}（仅相对本 run 检索语料判定，未做全文献新颖性检索）`,
+    );
     // section 6: fixed decision-aid disclaimer
     expect(report).toContain('分数为可检查的决策辅助，非客观概率');
     // section 7: plan fields + executability outcome
     expect(report).toContain('executabilityCheck：通过');
     expect(report).toContain('判停判据');
+    // W5/S5: evidence-ceiling declaration computed from the store (2 sources: 1 abstract, 1 metadata_only)
+    expect(report).toContain('证据上限声明');
+    expect(report).toContain('本计划基于 2 篇来源（1 篇摘要级/1 篇元数据级）生成');
+    expect(report).toContain('资源规模、样本量与量化阈值为模型拟定值');
+    expect(report).toContain('decisionRuleProvenance');
     // section 8: recorded uncertainties from claims and hypotheses
     expect(report).toContain('single-cell-line evidence only');
     expect(report).toContain('dose-response shape unknown');

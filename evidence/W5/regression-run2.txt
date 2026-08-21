@@ -1,0 +1,34 @@
+created run run_bbnbjqywdktdyc60srya9qg39d
+  [run_bbnbjqyw build_evidence] extracting claims from src_xx1v1mrh56end4hwcxsygzxr3v "Immune evasion in cancer: Mechanistic basis and therapeutic "
+  [run_bbnbjqyw build_evidence] extracting claims from src_x2dsz2kzpq2f771x70b4whbvyb "Interferon-Gamma at the Crossroads of Tumor Immune Surveilla"
+  [run_bbnbjqyw build_evidence] extracting claims from src_r1c7cvck317x88mn2rsttp5mdv "Cold Tumors: A Therapeutic Challenge for Immunotherapy"
+  [run_bbnbjqyw build_evidence] extracting claims from src_26d35ss8hy1m5ywx71msw5h0wr "The history and advances in cancer immunotherapy: understand"
+  [run_bbnbjqyw build_evidence] extracting claims from src_v5wh6xpqrz9t9azaxggsgfrxj8 "Crosstalk between cancer-associated fibroblasts and immune c"
+run run_bbnbjqywdktdyc60srya9qg39d
+  status: partial  stage: rank  progress: 6/9 stages
+  lastError: model call failed (invalid_output) in rank/hypothesis-ranking:dimension-scores: deepseek: model output was not valid JSON after 1 corrective retry; last raw output head: {
+  "assessments": [
+    {
+      "hypothesisId": "hyp_abre45rkeqdk52bc23ajrr9c50",
+      "dimensions": {
+        "scientific_plausibility": {
+          "value": 0.7,
+          "rationale": "TGF-β is a…[truncated]
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    failed   rank — model call failed (invalid_output) in rank/hypothesis-ranking:dimension-scores: deepseek: model output was not valid JSON after 1 corrective retry; last raw output head: {
+  "assessments": [
+    {
+      "hypothesisId": "hyp_abre45rkeqdk52bc23ajrr9c50",
+      "dimensions": {
+        "scientific_plausibility": {
+          "value": 0.7,
+          "rationale": "TGF-β is a…[truncated]
+    pending  plan
+    pending  feedback
+    pending  revise
+    pending  export

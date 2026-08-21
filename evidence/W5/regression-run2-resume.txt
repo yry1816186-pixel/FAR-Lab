@@ -1,0 +1,15 @@
+  [run_bbnbjqyw plan] plan pln_3ntzhfxe66891w7220gcyeaj3w covers 2 hypothesis(es); executabilityCheck passed
+  [run_bbnbjqyw export] reproducibility bundle bnd_565gnbhs4erbtprb5v1r2tcdj3 (sha256:eb0e3f68273b8f287be85e7d1f324c23c7bcca7d0b4d2d44227f3baf3817a632); report sha256:692dc2186e04199279e10a58ae2379afee17b79e11e934e24cfe100863d451ad; declaredEvidenceLevel=replay
+run run_bbnbjqywdktdyc60srya9qg39d
+  status: completed  stage: export  progress: 9/9 stages
+    done     scope
+    done     retrieve
+    done     verify_sources
+    done     build_evidence
+    done     generate_hypotheses
+    done     critique_falsify
+    done     rank
+    done     plan
+    skipped  feedback
+    skipped  revise
+    done     export

@@ -35,9 +35,15 @@ export class Orchestrator {
     return next;
   }
 
-  private setStage(run: ResearchRun, stage: RunStageName, patch: Partial<ResearchRun['stages'][number]>, attempt: number): ResearchRun {
+  /**
+   * Patch a stage record. `attempt` is only overwritten when explicitly provided (stage
+   * start increments it); done/skipped/failed transitions omit it so the attempt count
+   * already persisted in the run row survives — attempts are provenance facts and must
+   * never regress (audit D-3: run doc showed attempt=1 while events showed attempt=2).
+   */
+  private setStage(run: ResearchRun, stage: RunStageName, patch: Partial<ResearchRun['stages'][number]>, attempt?: number): ResearchRun {
     const rec = run.stages.find((s) => s.stage === stage);
-    if (rec) Object.assign(rec, patch, { attempt });
+    if (rec) Object.assign(rec, patch, attempt !== undefined ? { attempt } : {});
     run.currentStage = stage;
     return run;
   }
@@ -113,11 +119,16 @@ export class Orchestrator {
       const handler = this.deps.stages.get(stage);
       if (!handler) continue; // not implemented in this build — stays pending and visible
 
+      // Cumulative 1-based attempt counting: a stage that has never started (no startedAt,
+      // e.g. fresh pending records whose zod default attempt=1 must not act as a prior try)
+      // counts from 0; a restarted stage (failed/resumed or reopened) increments from its
+      // persisted attempt. Terminal transitions then preserve this value (see setStage).
+      const nextAttempt = (rec && rec.startedAt !== undefined ? rec.attempt : 0) + 1;
       run = await this.transition(runId, (r) => {
-        this.setStage(r, stage, { state: 'running', startedAt: new Date().toISOString(), error: undefined }, (rec?.attempt ?? 0) + 1);
+        this.setStage(r, stage, { state: 'running', startedAt: new Date().toISOString(), error: undefined }, nextAttempt);
         return r;
       });
-      this.deps.store.appendEvent(runId, { type: 'stage_started', stage, detail: { attempt: (rec?.attempt ?? 0) + 1 } });
+      this.deps.store.appendEvent(runId, { type: 'stage_started', stage, detail: { attempt: nextAttempt } });
 
       const ctx = this.makeContext(run);
       try {
@@ -125,7 +136,8 @@ export class Orchestrator {
           if (signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false)) throw new Error('cancelled by user');
           const outcome = await handler.execute(ctx);
           run = await this.transition(runId, (r) => {
-            this.setStage(r, stage, { state: 'done', endedAt: new Date().toISOString() }, rec?.attempt ?? 1);
+            // no attempt arg: keep the attempt count persisted by the running transition
+            this.setStage(r, stage, { state: 'done', endedAt: new Date().toISOString() });
             return r;
           });
           this.deps.store.appendEvent(runId, {
@@ -134,7 +146,8 @@ export class Orchestrator {
           });
         } else {
           run = await this.transition(runId, (r) => {
-            this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString() }, rec?.attempt ?? 1);
+            // no attempt arg: keep the attempt count persisted by the running transition
+            this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString() });
             return r;
           });
           this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: {} });
@@ -144,7 +157,8 @@ export class Orchestrator {
         const persistedCancel = this.deps.store.getRun(runId)?.cancelRequested ?? false;
         const isCancel = signal.cancelled || persistedCancel || /^cancelled/i.test(msg);
         run = await this.transition(runId, (r) => {
-          this.setStage(r, stage, { state: 'failed', endedAt: new Date().toISOString(), error: msg }, rec?.attempt ?? 1);
+          // no attempt arg: keep the attempt count persisted by the running transition
+          this.setStage(r, stage, { state: 'failed', endedAt: new Date().toISOString(), error: msg });
           r.status = (isCancel ? 'cancelled' : 'partial') satisfies RunStatus;
           r.lastError = msg;
           if (isCancel) r.cancelRequested = false; // consumed; resume clears the slate

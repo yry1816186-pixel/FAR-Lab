@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { callStructured } from '../llm.js';
-import { EvidenceRelation, FalsificationSpec, HypothesisCandidate, TestabilityStatus, newId } from '../../domain/index.js';
+import {
+  DecisionRuleProvenance,
+  EvidenceRelation,
+  FalsificationSpec,
+  HypothesisCandidate,
+  TestabilityStatus,
+  newId,
+} from '../../domain/index.js';
 import type { HypothesisCandidate as Hypothesis } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, partitionClaimRefs, runClaimIds } from './shared.js';
 
@@ -20,11 +27,25 @@ import { assertNotCancelled, isRepresentative, partitionClaimRefs, runClaimIds }
 // model output schema
 // ---------------------------------------------------------------------------
 
+/** A critique link reason must be a substantive argument (>= 20 chars), never a template (W5/S2). */
+const LinkReason = z.object({
+  claimId: z.string().min(1),
+  linkReason: z.string().min(20),
+});
+
 const FalsifyOut = z.object({
   observable: z.string().min(1),
   measurement: z.string().min(1),
   expectedRelation: z.string().min(1),
   decisionRule: z.string().min(1),
+  /**
+   * W5/S3 (threshold provenance disclosure): self-assess where every quantitative
+   * threshold in decisionRule comes from. Exactly one of:
+   * - 'evidence-derived': the threshold is derived from the provided claims;
+   * - 'community-standard': it is customary in the field's literature;
+   * - 'model-stipulated': you chose the number yourself without evidence support.
+   */
+  decisionRuleProvenance: DecisionRuleProvenance,
   supportCondition: z.string().min(1),
   weakeningCondition: z.string().min(1),
   falsificationCondition: z.string().min(1),
@@ -40,7 +61,11 @@ const FalsifyOut = z.object({
   counterClaimIds: z.array(z.string()).default([]),
   /** Subset of counterClaimIds whose relation is 'weakens' rather than 'contradicts'. */
   weakeningClaimIds: z.array(z.string()).default([]),
+  /** W5/S2: why each linked counter claim weakens/contradicts THIS hypothesis (>= 20 chars per reason). */
+  counterLinks: z.array(LinkReason).default([]),
   supportingClaimIds: z.array(z.string()).default([]),
+  /** W5/S2: why each linked supporting claim supports THIS hypothesis (>= 20 chars per reason). */
+  supportingLinks: z.array(LinkReason).default([]),
   uncertainties: z.array(z.string().min(1)).default([]),
   testability: TestabilityStatus,
 });
@@ -136,9 +161,15 @@ export const falsifyStage: StageHandler = {
           'You are an adversarial reviewer. Produce a COMPLETE falsification specification for the hypothesis: ' +
           'what observable to measure, how, the expected relation, and a DECIDABLE decision rule (a comparison, ' +
           'ratio, threshold, or explicit if-then criterion) that separates support from weakening from refutation. ' +
-          '"Could be tested in future work" without a decision rule is invalid. Also critique each assumption, ' +
-          'link real counter-evidence and supporting claims by their ids (only ids from the provided claims list), ' +
-          'and state genuine uncertainties.',
+          '"Could be tested in future work" without a decision rule is invalid. Self-assess the provenance of every ' +
+          'quantitative threshold in the decision rule and set decisionRuleProvenance to exactly one of: ' +
+          '"evidence-derived" (the threshold is derived from the provided claims), ' +
+          '"community-standard" (it is a customary value in the field\'s literature), or ' +
+          '"model-stipulated" (you chose the number yourself without evidence support) — never dress a number you ' +
+          'invented as evidence-derived. Also critique each assumption, link real counter-evidence and supporting ' +
+          'claims by their ids (only ids from the provided claims list), and for EVERY linked claim give a specific ' +
+          'linkReason of at least 20 characters arguing why that particular claim weakens/contradicts or supports ' +
+          'THIS hypothesis (generic template phrases are invalid). State genuine uncertainties.',
         payload: {
           hypothesis: {
             id: hyp.id,
@@ -163,6 +194,9 @@ export const falsifyStage: StageHandler = {
         measurement: out.measurement,
         expectedRelation: out.expectedRelation,
         decisionRule: out.decisionRule,
+        // W5/S3: threshold provenance is carried through (optional in the domain schema
+        // for backward compatibility with pre-W5 stored specs).
+        decisionRuleProvenance: out.decisionRuleProvenance,
         supportCondition: out.supportCondition,
         weakeningCondition: out.weakeningCondition,
         falsificationCondition: out.falsificationCondition,
@@ -185,6 +219,30 @@ export const falsifyStage: StageHandler = {
         warnings.push(`${hyp.id}: dropped ${droppedRefs.length} non-existent claim reference(s) (${droppedRefs.join(', ')})`);
       }
       const now = new Date().toISOString();
+      // ---- W5/S2: relation rationale must be auditable, never a constant template ----
+      // Priority: the model's per-link linkReason (a specific argument, >= 20 chars).
+      // Fallback: a dynamically constructed rationale carrying the claim text (first 120
+      // chars) plus the association to this hypothesis — still claim-specific, never a
+      // bare constant.
+      const claimById = new Map(
+        ctx.store.listObjects('claim', runId).map((c) => [c.id, c] as const),
+      );
+      const counterReasons = new Map(out.counterLinks.map((l) => [l.claimId, l.linkReason] as const));
+      const supportingReasons = new Map(out.supportingLinks.map((l) => [l.claimId, l.linkReason] as const));
+      const hypShort = hyp.id.slice(0, 8); // e.g. hyp_k57p — readable short code
+      const linkRationale = (claimId: string, direction: 'counter' | 'supporting'): string => {
+        const reason = (direction === 'counter' ? counterReasons : supportingReasons).get(claimId)?.trim();
+        if (reason !== undefined && reason.length >= 20) return reason;
+        const claim = claimById.get(claimId);
+        const text = claim
+          ? claim.text.length > 120
+            ? `${claim.text.slice(0, 120)}…`
+            : claim.text
+          : `claim ${claimId} 对象缺失`;
+        const association =
+          direction === 'counter' ? `与假设 ${hypShort} 的 critique 关联` : `与假设 ${hypShort} 的 critique 支持关联`;
+        return `${text}（${association}）`;
+      };
       const mkRelation = (relation: 'contradicts' | 'weakens' | 'supports', claimId: string) =>
         EvidenceRelation.parse({
           id: newId('ev'),
@@ -192,8 +250,7 @@ export const falsifyStage: StageHandler = {
           relation,
           claimId,
           targetHypothesisId: hyp.id,
-          rationale:
-            relation === 'supports' ? 'critique-linked supporting evidence' : 'critique-linked counter evidence',
+          rationale: linkRationale(claimId, relation === 'supports' ? 'supporting' : 'counter'),
           strength: 'unrated',
           uncertainties: [],
           createdAt: now,

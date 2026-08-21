@@ -401,6 +401,7 @@ describe('critique_falsify stage', () => {
       measurement: 'targeted deep sequencing across a duration gradient of at least six timepoints',
       expectedRelation: 'monotonic increase of off-target rate with deaminase exposure duration',
       decisionRule: '若长暴露组比短暴露组高出至少2倍的脱靶率，则支持假设；若无显著差异则削弱',
+      decisionRuleProvenance: 'evidence-derived',
       supportCondition: 'clear dose-response increase replicated across independent cell lines',
       weakeningCondition: 'flat or inconsistent response across the duration gradient',
       falsificationCondition: 'inverse relation or no relation replicated in three independent cell lines',
@@ -412,7 +413,19 @@ describe('critique_falsify stage', () => {
       assumptionCritiques: [{ assumptionIndex: 0, critique: 'assumption zero ignores cell-cycle confounding' }],
       counterClaimIds: [c1.id, 'clm_bogus00000000000000000000aaa'],
       weakeningClaimIds: [c1.id],
+      counterLinks: [
+        {
+          claimId: c1.id,
+          linkReason: 'the replication failure of the duration link directly contradicts this exposure mechanism',
+        },
+      ],
       supportingClaimIds: [c2.id],
+      supportingLinks: [
+        {
+          claimId: c2.id,
+          linkReason: 'the observed dose-response is the exact monotonic pattern this hypothesis predicts',
+        },
+      ],
       uncertainties: ['measurement noise at low edit frequencies'],
       testability: 'testable_now',
     };
@@ -421,6 +434,7 @@ describe('critique_falsify stage', () => {
       measurement: '将来有了合适的数据之后可以进行相应的测量分析工作',
       expectedRelation: '预期将来数据中会出现某种形式的相关趋势',
       decisionRule: '可以在未来的工作中通过更多实验进一步验证这个想法',
+      decisionRuleProvenance: 'model-stipulated',
       supportCondition: '如果未来的结果看起来与预期一致就算支持',
       weakeningCondition: '如果未来的结果看起来与预期不一致就算削弱',
       falsificationCondition: '如果未来很多年后依然没有数据那就无法证伪',
@@ -432,7 +446,9 @@ describe('critique_falsify stage', () => {
       assumptionCritiques: [{ assumptionIndex: 7, critique: 'index out of range is preserved honestly' }],
       counterClaimIds: [],
       weakeningClaimIds: [],
+      counterLinks: [],
       supportingClaimIds: [],
+      supportingLinks: [],
       uncertainties: [],
       testability: 'testable_with_data',
     };
@@ -453,33 +469,42 @@ describe('critique_falsify stage', () => {
     // h1: complete spec accepted, links created, critique attached to the right assumption
     const h1After = store.getObject('hypothesis', h1.id);
     expect(h1After?.falsification?.completenessCheck).toEqual({ passed: true, missing: [] });
+    expect(h1After?.falsification?.decisionRuleProvenance).toBe('evidence-derived'); // W5/S3 carried through
     expect(h1After?.testability).toBe('testable_now');
     expect(h1After?.supportingClaimIds).toEqual([c2.id]);
     expect(h1After?.counterClaimIds).toEqual([c1.id]);
     expect(h1After?.assumptions[0]?.uncertainty).toContain('cell-cycle confounding');
     expect(h1After?.uncertainties).toContain('measurement noise at low edit frequencies');
 
+    // W5/S2: link rationales are the model's specific per-link reasons, never a constant template
     const rels = store.listObjects('evidence_relation', run.id);
     expect(rels).toHaveLength(2);
     expect(rels).toContainEqual(
       expect.objectContaining({
         relation: 'weakens', claimId: c1.id, targetHypothesisId: h1.id,
-        rationale: 'critique-linked counter evidence', strength: 'unrated',
+        rationale: 'the replication failure of the duration link directly contradicts this exposure mechanism',
+        strength: 'unrated',
       }),
     );
     expect(rels).toContainEqual(
       expect.objectContaining({
         relation: 'supports', claimId: c2.id, targetHypothesisId: h1.id,
-        rationale: 'critique-linked supporting evidence',
+        rationale: 'the observed dose-response is the exact monotonic pattern this hypothesis predicts',
       }),
     );
+    for (const r of rels) {
+      expect(r.rationale).not.toBe('critique-linked counter evidence');
+      expect(r.rationale).not.toBe('critique-linked supporting evidence');
+    }
 
-    // h2: hollow "future work" spec rejected by the pure check; hypothesis honestly untestable
+    // h2: hollow "future work" spec rejected by the pure check; hypothesis honestly untestable.
+    // W5/S3: provenance still stored — 'model-stipulated' survives the completeness rejection.
     const h2After = store.getObject('hypothesis', h2.id);
     expect(h2After?.falsification?.completenessCheck?.passed).toBe(false);
     expect(h2After?.falsification?.completenessCheck?.missing?.join(' ')).toMatch(
       /decisionRule: no decidable comparison semantics/,
     );
+    expect(h2After?.falsification?.decisionRuleProvenance).toBe('model-stipulated');
     expect(h2After?.testability).toBe('untestable_currently');
     expect(h2After?.uncertainties.some((u) => u.includes('unattached'))).toBe(true);
 
@@ -487,6 +512,133 @@ describe('critique_falsify stage', () => {
     expect(store.getObject('hypothesis', hdup.id)?.falsification).toBeUndefined();
     const after = makeCtx(run, store, []);
     expect(await falsifyStage.applicable(after.ctx)).toBe(false);
+  });
+
+  it('W5/S2: without linkReason the rationale falls back to claim text + hypothesis association (never a bare constant)', async () => {
+    const { store, run } = setup();
+    // 150-char counter claim text: exactly the first 120 chars may appear, the rest must be elided
+    const longCounterText = `${'C'.repeat(120)}COUNTERTAIL${'D'.repeat(10)}`;
+    const cCounter = makeClaim(run.id, longCounterText);
+    const cSupporting = makeClaim(run.id, 'supporting claim text that is long enough to be identifiable too');
+    store.putObject('claim', cCounter);
+    store.putObject('claim', cSupporting);
+    const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      observable: 'off-target edit frequency across exposure durations',
+      measurement: 'targeted deep sequencing across a duration gradient of at least six timepoints',
+      expectedRelation: 'monotonic increase of off-target rate with deaminase exposure duration',
+      decisionRule: 'ratio >= 2x long vs short exposure supports; no increase weakens',
+      decisionRuleProvenance: 'community-standard',
+      supportCondition: 'clear dose-response increase replicated across independent cell lines',
+      weakeningCondition: 'flat or inconsistent response across the duration gradient',
+      falsificationCondition: 'inverse relation or no relation replicated in three independent cell lines',
+      confounders: [],
+      alternativeExplanations: [],
+      dataRequirements: [],
+      method: 'controlled exposure series with structure-matched gRNA controls',
+      failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
+      assumptionCritiques: [],
+      counterClaimIds: [cCounter.id],
+      weakeningClaimIds: [],
+      counterLinks: [], // NO linkReason provided -> deterministic fallback construction
+      supportingClaimIds: [cSupporting.id],
+      supportingLinks: [],
+      uncertainties: [],
+      testability: 'testable_now',
+    };
+    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }]);
+    const outcome = await falsifyStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+
+    const hypShort = h1.id.slice(0, 8);
+    const rels = store.listObjects('evidence_relation', run.id);
+    expect(rels).toHaveLength(2);
+    const counterRel = rels.find((r) => r.claimId === cCounter.id);
+    const supportingRel = rels.find((r) => r.claimId === cSupporting.id);
+    // counter fallback: claim text truncated to 120 chars + explicit association with the hypothesis
+    expect(counterRel?.rationale).toBe(`${'C'.repeat(120)}…（与假设 ${hypShort} 的 critique 关联）`);
+    expect(counterRel?.rationale).not.toContain('COUNTERTAIL');
+    // supporting fallback: same construction with the supporting direction
+    expect(supportingRel?.rationale).toBe(
+      `supporting claim text that is long enough to be identifiable too（与假设 ${hypShort} 的 critique 支持关联）`,
+    );
+    // never the pre-W5 constant templates
+    for (const r of rels) {
+      expect(r.rationale).not.toBe('critique-linked counter evidence');
+      expect(r.rationale).not.toBe('critique-linked supporting evidence');
+    }
+  });
+
+  it('W5/S2: linkReason under 20 characters is a schema failure (fail-closed, no silent template fallback)', async () => {
+    const { store, run } = setup();
+    const c1 = makeClaim(run.id, 'claim one for the short-reason case');
+    store.putObject('claim', c1);
+    const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      observable: 'off-target edit frequency across exposure durations',
+      measurement: 'targeted deep sequencing across a duration gradient of at least six timepoints',
+      expectedRelation: 'monotonic increase of off-target rate with deaminase exposure duration',
+      decisionRule: 'ratio >= 2x long vs short exposure supports; no increase weakens',
+      decisionRuleProvenance: 'evidence-derived',
+      supportCondition: 'clear dose-response increase replicated across independent cell lines',
+      weakeningCondition: 'flat or inconsistent response across the duration gradient',
+      falsificationCondition: 'inverse relation or no relation replicated in three independent cell lines',
+      confounders: [],
+      alternativeExplanations: [],
+      dataRequirements: [],
+      method: 'controlled exposure series with structure-matched gRNA controls',
+      failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
+      assumptionCritiques: [],
+      counterClaimIds: [c1.id],
+      weakeningClaimIds: [],
+      counterLinks: [{ claimId: c1.id, linkReason: 'too short' }], // < 20 chars -> schema rejection
+      supportingClaimIds: [],
+      supportingLinks: [],
+      uncertainties: [],
+      testability: 'testable_now',
+    };
+    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }]);
+    await expect(falsifyStage.execute(ctx)).rejects.toThrow(/invalid_output/);
+    expect(store.listObjects('evidence_relation', run.id)).toHaveLength(0);
+    expect(store.getObject('hypothesis', h1.id)?.falsification).toBeUndefined();
+  });
+
+  it('W5/S3: a missing decisionRuleProvenance is a schema failure for new specs (the field is mandatory in the LLM contract)', async () => {
+    const { store, run } = setup();
+    store.putObject('claim', makeClaim(run.id, 'claim one'));
+    const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      observable: 'off-target edit frequency across exposure durations',
+      measurement: 'targeted deep sequencing across a duration gradient of at least six timepoints',
+      expectedRelation: 'monotonic increase of off-target rate with deaminase exposure duration',
+      decisionRule: 'ratio >= 2x long vs short exposure supports; no increase weakens',
+      // decisionRuleProvenance intentionally omitted
+      supportCondition: 'clear dose-response increase replicated across independent cell lines',
+      weakeningCondition: 'flat or inconsistent response across the duration gradient',
+      falsificationCondition: 'inverse relation or no relation replicated in three independent cell lines',
+      confounders: [],
+      alternativeExplanations: [],
+      dataRequirements: [],
+      method: 'controlled exposure series with structure-matched gRNA controls',
+      failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
+      assumptionCritiques: [],
+      counterClaimIds: [],
+      weakeningClaimIds: [],
+      counterLinks: [],
+      supportingClaimIds: [],
+      supportingLinks: [],
+      uncertainties: [],
+      testability: 'testable_now',
+    };
+    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }]);
+    await expect(falsifyStage.execute(ctx)).rejects.toThrow(/invalid_output.*decisionRuleProvenance|decisionRuleProvenance.*invalid_output/s);
+    expect(store.getObject('hypothesis', h1.id)?.falsification).toBeUndefined();
   });
 });
 

@@ -4,6 +4,10 @@
  * baseline-direct vs baseline-rag) in seeded-random blind order. The judge does NOT know
  * which system produced which list. Scores: hypothesis_quality (1-5), counter_evidence_
  * coverage (1-5) with the rubric embedded in the prompt. Same DeepSeek provider.
+ * W5 field-parity fix (scientific review Q7): every list is sent through the SAME
+ * projection (statement/mechanism/assumptions/falsification decisionRule) — baselines'
+ * assumptions+decisionRule must reach the judge exactly like FAR-Lab's, and no field may
+ * be rendered for one system only (format signatures de-blind the shuffled labels).
  * Run: node eval/llm-judge.mjs   (after baselines + FAR-Lab runs exist)
  * Output: eval/results/llm-judge.jsonl
  */
@@ -46,10 +50,24 @@ if (!provider.liveReady) {
   process.exit(1);
 }
 
+/** Identical projection for ALL systems — the only way the blind labels stay blind. */
+const toJudgeFields = (h) => ({
+  statement: h.statement,
+  mechanism: h.mechanism,
+  assumptions: (Array.isArray(h.assumptions) ? h.assumptions : [])
+    .map((a) => (typeof a === 'string' ? a : a?.statement))
+    .filter((s) => typeof s === 'string' && s.trim().length > 0),
+  falsificationDecisionRule: typeof h.falsification?.decisionRule === 'string' ? h.falsification.decisionRule : '',
+});
+
 const fmtHyps = (list, label) =>
   `=== OUTPUT ${label} ===\n` +
   list
-    .map((h, i) => `[${label}${i + 1}] ${h.statement}\n    mechanism: ${String(h.mechanism ?? '').slice(0, 300)}\n    counter-evidence/uncertainty notes: ${[...(h.uncertainties ?? []), ...(h.counter ?? [])].slice(0, 3).join(' | ') || '(none stated)'}`)
+    .map((h, i) =>
+      `[${label}${i + 1}] ${h.statement}\n` +
+      `    mechanism: ${String(h.mechanism ?? '').slice(0, 300)}\n` +
+      `    assumptions: ${h.assumptions.slice(0, 5).map((a) => a.slice(0, 160)).join(' | ') || '(none stated)'}\n` +
+      `    falsification decisionRule: ${h.falsificationDecisionRule.slice(0, 300) || '(none stated)'}`)
     .join('\n');
 
 const RUBRIC = `Score EACH output on two dimensions, 1-5 integers:
@@ -70,10 +88,10 @@ for (const p of problems) {
     }
   }
   const farHyps = farRunId
-    ? objects('hypothesis', farRunId).filter(isRepresentative).map((h) => ({ statement: h.statement, mechanism: h.mechanism, uncertainties: h.uncertainties, counter: [] }))
+    ? objects('hypothesis', farRunId).filter(isRepresentative).map(toJudgeFields)
     : [];
-  const directHyps = direct[p.id]?.output?.hypotheses?.map((h) => ({ statement: h.statement, mechanism: h.mechanism })) ?? [];
-  const ragHyps = rag[p.id]?.output?.hypotheses?.map((h) => ({ statement: h.statement, mechanism: h.mechanism })) ?? [];
+  const directHyps = direct[p.id]?.output?.hypotheses?.map(toJudgeFields) ?? [];
+  const ragHyps = rag[p.id]?.output?.hypotheses?.map(toJudgeFields) ?? [];
 
   if (farHyps.length === 0 || directHyps.length === 0 || ragHyps.length === 0) {
     out.push({ problemId: p.id, skipped: true, reason: `missing lists: far=${farHyps.length} direct=${directHyps.length} rag=${ragHyps.length}` });
@@ -100,7 +118,7 @@ Research question: ${p.text}
 
 Three anonymous candidate outputs (hypothesis lists):
 
-${entries.map((e, i) => fmtHyps(e.hyps.map((h) => ({ ...h, counter: h.uncertainties ?? [] })), labels[i])).join('\n\n')}
+${entries.map((e, i) => fmtHyps(e.hyps, labels[i])).join('\n\n')}
 
 Return ONLY a JSON object:
 {"X":{"hypothesis_quality":1-5,"counter_evidence_coverage":1-5,"one_line_reason":"..."},"Y":{...},"Z":{...}}
