@@ -31,7 +31,7 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 | OpenAlex API key | DEFER (monitor) | keyless polite pool verified working 2026-08-22 01:15; keyless limited tier is a policy-drift risk, not an outage |
 | CORE API v3 | DEFER | Marginal coverage over A+B |
 | Idea2Plan protocol | ADAPT later | Verify repo license before running subset; borrow 5-section template + JudgeEval now |
-| POPPER falsification slice | DEFER | Repo has NO LICENSE file — verify before any use |
+| POPPER falsification slice | EXTRACTED 2026-08-22 (D-025): multiple-testing discipline (single_primary/alpha_spending/e_value_accumulation) landed in plan domain + executability gate + prompt + export; code itself stays DEFER (repo has NO LICENSE file) | Code adoptable only if a LICENSE appears; deeper e-value runtime aggregation belongs to Direction-B execution adapters |
 | Query decomposition/sufficiency iteration | DEFER | As evaluated experiment only |
 | S2AG citation contexts (contrastive-reception discovery) | DEFER (evidence-gated, 2026-08-22 probe spikes/s2ag-probe.mjs: keyless 200 works; intents coverage 0/40 citations, contexts ≤9/20, contrastive hits 0) | Revisit when S2AG intent coverage improves or an API key materially raises citation-context quality; premise (structured contrast intents) does not hold on current data |
 | LiteLLM | REJECT (pattern absorbed) | Own provider plane is strong; Python dep incompatible; no silent fallback allowed anyway |
