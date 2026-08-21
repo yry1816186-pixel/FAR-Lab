@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { HypothesisCandidate } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, IdText } from '../common';
-import { checkTone, noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../tones';
+import { checkTone, litNoveltyKey, litNoveltyTone, noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../tones';
 
 export function HypothesisCard({
   hypothesis,
@@ -104,6 +104,39 @@ export function HypothesisCard({
           </p>
         )}
       </div>
+
+      {hypothesis.literatureNovelty !== undefined && (
+        <div className="hyp-block">
+          <h4 className="minor-title">{t('litNovelty.title')}</h4>
+          <p>
+            <Badge tone={litNoveltyTone(hypothesis.literatureNovelty.verdict)}>
+              {t(litNoveltyKey(hypothesis.literatureNovelty.verdict))}
+            </Badge>{' '}
+            {hypothesis.literatureNovelty.neighbors.length > 0 ? (
+              <span className="muted small">
+                {t('litNovelty.neighbors', { n: hypothesis.literatureNovelty.neighbors.length })}
+              </span>
+            ) : (
+              <span className="muted small">{t('litNovelty.noNeighbors')}</span>
+            )}
+          </p>
+          <p className="muted small">{hypothesis.literatureNovelty.justification}</p>
+          {hypothesis.literatureNovelty.neighbors.length > 0 && (
+            <details className="hyp-details">
+              <summary>{t('litNovelty.neighbors', { n: hypothesis.literatureNovelty.neighbors.length })}</summary>
+              <ul>
+                {hypothesis.literatureNovelty.neighbors.map((nb, i) => (
+                  <li key={`${nb.contentHash}-${i}`}>
+                    {nb.title}
+                    {nb.year !== undefined ? ` (${nb.year})` : ''}
+                    {nb.venue !== undefined ? ` — ${nb.venue}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
 
       <footer className="hyp-foot">
         {hypothesis.clusterKey !== undefined ? (

@@ -11,7 +11,7 @@
  */
 import { ApiError } from './client';
 import type {
-  EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard,
+  EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard, HypothesisTournament,
   ProvenanceReceipt, ResearchPlan, ResearchQuestion, ResearchRun, RunEvent,
   RunSummary, ScientificClaim, SourceDocument, VersionDiff, Revision,
 } from './types';
@@ -168,9 +168,14 @@ const looksLikeHypothesis = (v: unknown): v is HypothesisCandidate =>
 const looksLikeScorecard = (v: unknown): v is HypothesisScorecard =>
   isRecord(v) && typeof v.rank === 'number' && Array.isArray(v.dimensions);
 
+const looksLikeTournament = (v: unknown): v is HypothesisTournament =>
+  isRecord(v) && Array.isArray(v.matches) && Array.isArray(v.standings) && typeof v.algorithm === 'string';
+
 export interface HypothesesBundle {
   hypotheses: HypothesisCandidate[];
   scorecards: HypothesisScorecard[];
+  /** D-016 pairwise tournament behind the final ordering; null when absent. */
+  tournament: HypothesisTournament | null;
 }
 
 export function normalizeHypotheses(data: unknown): HypothesesBundle {
@@ -181,6 +186,7 @@ export function normalizeHypotheses(data: unknown): HypothesesBundle {
       return {
         hypotheses: firstArray(data, ['hypotheses', 'candidates']).filter(looksLikeHypothesis),
         scorecards: firstArray(data, ['scorecards', 'cards']).filter(looksLikeScorecard),
+        tournament: looksLikeTournament(data.tournament) ? data.tournament : null,
       };
     }
   }
@@ -193,7 +199,7 @@ export function normalizeHypotheses(data: unknown): HypothesesBundle {
     else if (looksLikeScorecard(item)) scorecards.push(item);
   }
   if (items.length > 0 && hypotheses.length + scorecards.length === 0) throw schemaError('hypotheses');
-  return { hypotheses, scorecards };
+  return { hypotheses, scorecards, tournament: null };
 }
 
 // ---- feedbacks / revisions / version diffs ----

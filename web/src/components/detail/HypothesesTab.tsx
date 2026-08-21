@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { isNotFound } from '../../api/client';
 import { getHypotheses } from '../../api/endpoints';
-import type { HypothesisCandidate, HypothesisScorecard, ResearchRun } from '../../api/types';
+import type { HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { EmptyState, ErrorBox, Section, Skeleton } from '../common';
@@ -26,6 +26,11 @@ export function HypothesesTab({ run }: { run: ResearchRun }): JSX.Element {
           <Section title={t('scorecards.title')}>
             <ScorecardsTable scorecards={res.data.scorecards} />
           </Section>
+          {res.data.tournament !== null && (
+            <Section title={t('tournament.title')}>
+              <TournamentView tournament={res.data.tournament} hypotheses={res.data.hypotheses} />
+            </Section>
+          )}
           <Section
             title={res.data.scorecards.length > 0 ? t('hyp.representatives', { n: representativesOf(res.data).length }) : t('tab.hypotheses')}
             count={res.data.scorecards.length === 0 ? <span className="muted small">{t('hyp.notRanked')}</span> : undefined}
@@ -41,6 +46,62 @@ export function HypothesesTab({ run }: { run: ResearchRun }): JSX.Element {
 interface HypoData {
   hypotheses: HypothesisCandidate[];
   scorecards: HypothesisScorecard[];
+  tournament?: HypothesisTournament | null;
+}
+
+function TournamentView({ tournament, hypotheses }: { tournament: HypothesisTournament; hypotheses: HypothesisCandidate[] }): JSX.Element {
+  const { t } = useI18n();
+  const statementOf = (id: string): string => {
+    const h = hypotheses.find((x) => x.id === id);
+    if (!h) return id;
+    return h.statement.length > 90 ? `${h.statement.slice(0, 90)}…` : h.statement;
+  };
+  if (tournament.standings.length === 0) {
+    return <p className="muted small">{t('tournament.empty')}</p>;
+  }
+  return (
+    <div>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>{t('tournament.rank')}</th>
+            <th>{t('hyp.statement')}</th>
+            <th>{t('tournament.record')}</th>
+            <th>{t('tournament.winRate')}</th>
+            <th>{t('tournament.bt')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tournament.standings.map((s) => (
+            <tr key={s.hypothesisId}>
+              <td className="mono">{s.rank}</td>
+              <td>{statementOf(s.hypothesisId)}</td>
+              <td className="mono">{s.wins}-{s.losses}-{s.ties}</td>
+              <td className="mono">{(s.winRate * 100).toFixed(0)}%</td>
+              <td className="mono">{s.btScore.toFixed(3)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <details className="hyp-details">
+        <summary>{t('tournament.matches', { n: tournament.matches.length })}</summary>
+        <ul>
+          {tournament.matches.map((m, i) => (
+            <li key={i}>
+              <span className="mono">[{m.outcome === 'no_contest' ? t('tournament.noContest') : m.outcome}]</span>{' '}
+              {statementOf(m.aId)} <strong>vs</strong> {statementOf(m.bId)}
+              <span className="muted small">
+                {' '}
+                — {t('tournament.verdicts')}: {m.aFirstVerdict}/{m.bFirstVerdict}
+              </span>
+              <div className="muted small">{m.rationale}</div>
+            </li>
+          ))}
+        </ul>
+      </details>
+      <p className="muted small">{tournament.uncertainty}</p>
+    </div>
+  );
 }
 
 function representativesOf(data: HypoData): HypothesisCandidate[] {
