@@ -46,3 +46,27 @@ Honest caveats: single run, N=11, same-family judge (upper bound); 0-contradicts
 node spikes/relation-precision.mjs            # live DeepSeek judge, ~25 calls
 # resume/extend: REL_PREC_QUOTA='{"contradicts":12}' REL_PREC_EXCLUDE=<file> node spikes/relation-precision.mjs
 ```
+
+## Full-fix re-measurement (scout session, 2026-08-22 06:20 — completes the P1 evidence chain)
+
+The 54.5% post-fix measurement above (§ run_3c3z) ran with the topical gate ONLY — falsify
+schema v2 (explicit per-link labels) landed after that run started. Blind re-judging of the
+FULLY-fixed pipeline output (topical gate + schema v2 + quotes + weakens-default +
+mixed-provenance), `REL_PREC_RUN=run_prrxcee6x58fv44temqa02b9mj` seed 9090 N=20
+(`spikes/output/relation-precision-fullfix.jsonl`):
+
+| label | exact | flow of mismatches |
+|---|---|---|
+| supports | **8/8 (100%)** | — |
+| qualifies | 0/5 | 4× judged `supports` (conditional-support adjacency), 1× `unrelated` |
+| weakens | 0/5 | 5× judged `unrelated` |
+| contradicts | 1/2 | 1× judged `supports` (contestable direction) |
+
+Reading: the DOMINANT relation class is now perfectly stable under blind re-judging
+(supports 100% vs 58–62% pre-fix); counter-side labels remain judge-contestable — the
+weakens→unrelated flow is the predicted lexical-gate mechanism-blindness (vocabulary overlap
+without mechanistic relevance), qualifies↔supports is the granularity boundary. Exact
+9/20 (45%), adjacency-corrected 13/20 (65%) vs pre-fix pooled 46%/56%. Honest residual,
+not a regression: counter-label semantics need either richer judge context or an NLI-grade
+cross-checker to move further (ONNX NLI remains REJECTed for THIS pattern per D-023; a
+future mechanism-aware gate is the recorded follow-up).
