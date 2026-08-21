@@ -26,8 +26,10 @@ export type Assumption = z.infer<typeof Assumption>;
  * W5/S3 — where the quantitative thresholds of a decision rule come from
  * (model self-assessment, disclosed in the report). Optional: specs persisted
  * before W5 have no provenance and render as「来源未声明」.
+ * 'mixed' (2026-08-22 live incident run_wkncq5pvs): some thresholds have a real
+ * source while others are stipulated — a truthful state the 3-value enum rejected.
  */
-export const DecisionRuleProvenance = z.enum(['evidence-derived', 'community-standard', 'model-stipulated']);
+export const DecisionRuleProvenance = z.enum(['evidence-derived', 'community-standard', 'model-stipulated', 'mixed']);
 export type DecisionRuleProvenance = z.infer<typeof DecisionRuleProvenance>;
 
 /** Mission §29 — a real falsification spec, not "could be tested in the future". */
