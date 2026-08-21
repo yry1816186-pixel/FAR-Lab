@@ -275,7 +275,8 @@ describe('retrieve stage', () => {
       }),
     });
     const arxiv = fakeAdapter('arxiv', { search: async () => [] });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
 
     expect(await retrieveStage.applicable(env.ctx)).toBe(true);
     const out = await retrieveStage.execute(env.ctx);
@@ -320,7 +321,7 @@ describe('retrieve stage', () => {
     const receipts = env.store.listObjects('receipt', env.run.id);
     expect(receipts.filter((r) => r.kind === 'model_call')).toHaveLength(1);
     const retrieval = receipts.filter((r) => r.kind === 'source_retrieval');
-    expect(retrieval).toHaveLength(8);
+    expect(retrieval).toHaveLength(11); // counter x2 + discovery 2x3 + supporting 1x3 (crossref added D-029b)
     for (const r of retrieval) {
       expect(r.executionMode).toBe('live');
       expect(r.stage).toBe('retrieve');
@@ -366,7 +367,8 @@ describe('retrieve stage', () => {
     const arxiv = fakeAdapter('arxiv', {
       search: async (q) => (q === PLAN.discovery[0] ? [arxivRec] : []),
     });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
 
     const out = await retrieveStage.execute(env.ctx);
     expect(out.kind).toBe('done');
@@ -394,7 +396,8 @@ describe('retrieve stage', () => {
           message: 'fixture arxiv gateway timeout',
         }),
     });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
 
     const out = await retrieveStage.execute(env.ctx);
     expect(out.kind).toBe('done');
@@ -429,10 +432,10 @@ describe('retrieve stage', () => {
       });
     const env = makeEnv(
       [{ rawOutput: JSON.stringify(PLAN) }],
-      { openalex: failAll('openalex'), arxiv: failAll('arxiv') },
+      { openalex: failAll('openalex'), arxiv: failAll('arxiv'), crossref: failAll('crossref') },
     );
 
-    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/all 8 source searches failed/);
+    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/all 11 source searches failed/);
     expect(env.store.listObjects('corpus_snapshot', env.run.id)).toHaveLength(0);
     expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(0);
     expect(await retrieveStage.applicable(env.ctx)).toBe(true); // 可重试
@@ -780,7 +783,7 @@ describe('retrieve -> verify chain', () => {
     const rec = fakeRecord('Fixture Chain Study', '10.1000/fake.chain');
     const openalex = fakeAdapter('openalex', { search: async () => [rec] });
     const arxiv = fakeAdapter('arxiv', { search: async () => [] });
-    const crossref = fakeAdapter('crossref', { resolve: crossrefEcho });
+    const crossref = fakeAdapter('crossref', { search: async () => [], resolve: crossrefEcho });
     function crossrefEcho(identifier: SourceIdentifier) {
       return { found: true, httpStatus: 200, record: fakeRecord('Fixture Chain Study', identifier.value) };
     }

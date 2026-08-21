@@ -395,6 +395,21 @@ describe('openalex adapter', () => {
     expect(urls).toHaveLength(2); // hard-bounded: two attempts total
   });
 
+  it('budget-exhaustion 429 (Insufficient budget / Resets at) is NOT retried — a backoff cannot recover a daily cap', async () => {
+    const budgetBody = JSON.stringify({ error: 'Rate limit exceeded', message: 'Insufficient budget. This request costs $0.001 but you only have $0.0008 remaining. Resets at midnight UTC.' });
+    const { fetch, urls } = fakeFetch([jsonResponse(429, JSON.parse(budgetBody))]);
+    const adapter = createOpenAlexAdapter({
+      fetchImpl: fetch, baseUrl: 'https://openalex.test', mailto: TEST_MAILTO, rateLimitBackoffMs: 0,
+    });
+    await expect(adapter.search('budget gone')).rejects.toSatisfy((e: unknown) => {
+      if (!isSourceAdapterError(e)) return false;
+      expect(e.httpStatus).toBe(429);
+      expect(e.bodyPreview ?? '').toContain('Insufficient budget');
+      return true;
+    });
+    expect(urls).toHaveLength(1); // exactly ONE attempt — no pointless retry
+  });
+
   it('resolve 429 then 200: retry recovers the work record', async () => {
     const { fetch } = fakeFetch([jsonResponse(429, {}), jsonResponse(200, oaWorkFixture)]);
     const adapter = createOpenAlexAdapter({

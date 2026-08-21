@@ -103,6 +103,10 @@ const counterQueries = (queries: readonly string[]): readonly [string, string] =
  * supporting[1]. Counter targets stay FIRST: the quota selector (not search order)
  * now protects counter-evidence seats, but running them first also keeps the
  * R-05 ordering guarantee intact for receipts.
+ * Crossref joins discovery/supporting as the third family (2026-08-22, D-029b):
+ * OpenAlex keyless now has a hard daily budget ("Insufficient budget … Resets at
+ * midnight UTC", live-observed) and arXiv covers ML/physics only — Crossref
+ * (keyless, stable) restores genuine source redundancy, especially for biomed.
  */
 const buildTargets = (plan: QueryPlan): readonly SearchTarget[] => {
   const [counterOpenalex, counterArxiv] = counterQueries(plan.counter);
@@ -113,10 +117,12 @@ const buildTargets = (plan: QueryPlan): readonly SearchTarget[] => {
   for (const q of plan.discovery) {
     targets.push({ purpose: 'discovery', text: q, family: 'openalex' });
     targets.push({ purpose: 'discovery', text: q, family: 'arxiv' });
+    targets.push({ purpose: 'discovery', text: q, family: 'crossref' });
   }
   for (const q of plan.supporting) {
     targets.push({ purpose: 'supporting', text: q, family: 'openalex' });
     targets.push({ purpose: 'supporting', text: q, family: 'arxiv' });
+    targets.push({ purpose: 'supporting', text: q, family: 'crossref' });
   }
   return targets;
 };

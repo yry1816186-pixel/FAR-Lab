@@ -117,6 +117,9 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
   // One bounded retry on 429 (2026-08-22 eval burst evidence: the keyless shared
   // pool rate-limited every query after a heavy run, silently zeroing the novelty
   // neighbor layer; a single polite backoff recovers the transient window).
+  // BUDGET-EXHAUSTION 429s are NOT retried: live-observed 2026-08-22, keyless pool
+  // now carries a hard daily budget ("Insufficient budget … Resets at midnight UTC") —
+  // a backoff cannot recover it inside the day, so the retry would only burn time.
   const getWith429Retry = (
     url: string,
     context: { family: string; query: string },
@@ -124,11 +127,12 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
     const headers = { 'User-Agent': userAgent };
     const call = (): Promise<HttpGetResult> =>
       httpGet(url, { fetchImpl: opts.fetchImpl, timeoutMs: opts.timeoutMs, headers, context });
-    return call().then((first) =>
-      first.status === 429
-        ? new Promise<void>((resolveSleep) => setTimeout(resolveSleep, opts.rateLimitBackoffMs ?? DEFAULT_RATE_LIMIT_BACKOFF_MS)).then(call)
-        : first,
-    );
+    return call().then((first) => {
+      if (first.status !== 429) return first;
+      const budgetExhausted = /insufficient budget|resets at/i.test(first.bodyText);
+      if (budgetExhausted) return first;
+      return new Promise<void>((resolveSleep) => setTimeout(resolveSleep, opts.rateLimitBackoffMs ?? DEFAULT_RATE_LIMIT_BACKOFF_MS)).then(call);
+    });
   };
 
   const search = async (
