@@ -27,6 +27,12 @@ const PLAN_SYSTEM_PROMPT = [
     'timelines and quantitative thresholds that are not derived from the provided claims are MODEL-STIPULATED estimates — ' +
     'keep them proportionate to that evidence base and record the disproportion in risks/prerequisites instead of ' +
     'presenting invented numbers as if they were evidence-derived.',
+  'Multiple-testing discipline (POPPER-extracted): when the plan discriminates between MORE THAN ONE hypothesis, several ' +
+    'inferential checks will run and the chance that something looks falsified/supportive by luck grows with their number. ' +
+    'State multipleTestingPolicy explicitly — "single_primary" (designate THE primary comparison that carries the decision; ' +
+    'everything else is secondary/descriptive), "alpha_spending" (split a pre-declared error budget across staged checks), ' +
+    'or "e_value_accumulation" (anytime-valid e-values aggregated across checks) — and justify the allocation in ' +
+    'multipleTestingNote. Single-hypothesis plans may omit it (one primary comparison by construction).',
 ].join(' ');
 
 /** Model-output shape: the full plan minus server-owned fields (id/runId/createdAt/check). */
@@ -79,7 +85,7 @@ export interface ExecutabilityCheck {
 export const checkPlanExecutability = (
   plan: Pick<
     ResearchPlan,
-    'objective' | 'hypothesisIds' | 'steps' | 'metrics' | 'decisionRules' | 'dataRequirements'
+    'objective' | 'hypothesisIds' | 'steps' | 'metrics' | 'decisionRules' | 'dataRequirements' | 'multipleTestingPolicy'
   >,
   knownHypothesisIds: Iterable<string>,
 ): ExecutabilityCheck => {
@@ -115,6 +121,14 @@ export const checkPlanExecutability = (
   ];
   for (const [field, label] of ruleFields) {
     if (!plan.decisionRules[field].trim()) missing.push(`decisionRules 缺少${label}（${field} 为空）`);
+  }
+  // POPPER-extracted multiple-testing discipline (D-024 Wave-3 #5): multi-hypothesis
+  // plans run several inferential checks; an explicit policy is REQUIRED, no silent
+  // default. Single-hypothesis plans have one primary comparison by construction.
+  if (plan.hypothesisIds.length > 1 && plan.multipleTestingPolicy === undefined) {
+    missing.push(
+      'multipleTestingPolicy 缺失：区分多个假设的计划必须显式声明多重检验纪律（single_primary / alpha_spending / e_value_accumulation），未声明的多重比较会膨胀假发现率',
+    );
   }
   plan.dataRequirements.forEach((req, i) => {
     if (req.variables.length === 0) missing.push(`dataRequirements[${i}]「${req.name}」未声明 variables`);
