@@ -21,6 +21,24 @@ export const DecisionRules = z.object({
   stopCriterion: z.string().min(1),
 });
 
+/**
+ * Mission §29 multiple-testing discipline (POPPER paper-EXTRACT, D-024 Wave-3 #5):
+ * a plan that discriminates between several hypotheses runs several inferential
+ * checks; without an explicit policy the chance that SOMETHING looks
+ * falsified/supportive by luck grows with the number of checks.
+ * - single_primary: one designated primary comparison carries the decision, all
+ *   others are secondary/descriptive;
+ * - alpha_spending: explicit error budget split across staged checks (fixed
+ *   allocation, decided before looking at the data);
+ * - e_value_accumulation: anytime-valid e-values aggregated across checks
+ *   (no fixed schedule needed).
+ * Deliberately optional in the schema (single-hypothesis plans have one primary
+ * comparison by construction); the deterministic executability gate REQUIRES it
+ * when hypothesisIds.length > 1 — no silent default.
+ */
+export const MultipleTestingPolicy = z.enum(['single_primary', 'alpha_spending', 'e_value_accumulation']);
+export type MultipleTestingPolicy = z.infer<typeof MultipleTestingPolicy>;
+
 export const DatasetRequirement = z.object({
   name: z.string().min(1),
   variables: z.array(z.string()).min(1),
@@ -49,6 +67,10 @@ export const ResearchPlan = z.object({
   metrics: z.array(z.string()).min(1),
   statistics: z.array(z.string()).default([]),
   decisionRules: DecisionRules,
+  /** Required by the executability gate when the plan discriminates >1 hypothesis (see MultipleTestingPolicy). */
+  multipleTestingPolicy: MultipleTestingPolicy.optional(),
+  /** How the error budget / primary comparison is allocated — auditable rationale, not just the label. */
+  multipleTestingNote: z.string().optional(),
   confounders: z.array(z.string()).default([]),
   alternativeExplanations: z.array(z.string()).default([]),
   resources: z.object({

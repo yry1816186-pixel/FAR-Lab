@@ -383,6 +383,14 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
     push(`  - 弱化判据：${p.decisionRules.weakeningCriterion}`);
     push(`  - 证伪判据：${p.decisionRules.falsificationCriterion}`);
     push(`  - 判停判据：${p.decisionRules.stopCriterion}`);
+    if (p.multipleTestingPolicy) {
+      const mtLabel: Record<typeof p.multipleTestingPolicy, string> = {
+        single_primary: '单一主要比较（其余为次要/描述性）',
+        alpha_spending: '预分配错误预算（alpha-spending）',
+        e_value_accumulation: 'e 值累证（anytime-valid）',
+      };
+      push(`  - 多重检验纪律（multipleTestingPolicy）：${mtLabel[p.multipleTestingPolicy]}${p.multipleTestingNote ? `——${p.multipleTestingNote}` : ''}`);
+    }
     push(`- 混杂因素：${orNone(p.confounders)}`);
     push(`- 备择解释：${orNone(p.alternativeExplanations)}`);
     push(`- 资源：compute=${p.resources.compute}；cost=${p.resources.cost}；time=${p.resources.time}`);

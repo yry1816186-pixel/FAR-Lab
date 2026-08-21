@@ -481,6 +481,34 @@ describe('plan stage', () => {
     expect(check.missing.some((m) => m.includes('inputs 含无效步骤引用') && m.includes(ghostTask))).toBe(true);
     expect(check.missing.some((m) => m.includes('dependsOn 引用不存在的步骤') && m.includes(ghostTask))).toBe(true);
   });
+
+  it('multiple-testing discipline (POPPER-extracted): required for multi-hypothesis plans, optional for single-hypothesis', () => {
+    const h1 = `hyp_${'1'.repeat(26)}`;
+    const h2 = `hyp_${'2'.repeat(26)}`;
+    const base = {
+      objective: 'discriminate mechanisms',
+      steps: [
+        { id: `task_${'a'.repeat(24)}`, title: 's1', kind: 'experiment' as const, inputs: [], outputs: [], method: 'do', failureConditions: ['x'], dependsOn: [] },
+        { id: `task_${'b'.repeat(24)}`, title: 's2', kind: 'analysis' as const, inputs: [], outputs: [], method: 'do', failureConditions: ['x'], dependsOn: [] },
+        { id: `task_${'c'.repeat(24)}`, title: 's3', kind: 'analysis' as const, inputs: [], outputs: [], method: 'do', failureConditions: ['x'], dependsOn: [] },
+      ],
+      metrics: ['m1', 'm2'],
+      decisionRules: { successCriterion: 's', weakeningCriterion: 'w', falsificationCriterion: 'f', stopCriterion: 't' },
+      dataRequirements: [],
+    };
+    // multi-hypothesis WITHOUT policy -> hard failure naming the discipline
+    const noPolicy = checkPlanExecutability({ ...base, hypothesisIds: [h1, h2] }, [h1, h2]);
+    expect(noPolicy.passed).toBe(false);
+    expect(noPolicy.missing.some((m) => m.includes('multipleTestingPolicy 缺失'))).toBe(true);
+    // multi-hypothesis WITH an explicit policy (any of the three) -> passes
+    for (const policy of ['single_primary', 'alpha_spending', 'e_value_accumulation'] as const) {
+      const withPolicy = checkPlanExecutability({ ...base, hypothesisIds: [h1, h2], multipleTestingPolicy: policy }, [h1, h2]);
+      expect(withPolicy.passed).toBe(true);
+    }
+    // single-hypothesis plan without policy -> one primary comparison by construction, passes
+    const single = checkPlanExecutability({ ...base, hypothesisIds: [h1] }, [h1]);
+    expect(single.passed).toBe(true);
+  });
 });
 
 describe('export stage', () => {
