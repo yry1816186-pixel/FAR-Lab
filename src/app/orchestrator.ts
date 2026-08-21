@@ -142,6 +142,7 @@ export class Orchestrator {
     if (unfinished.length === 0 && !failed) {
       run = await this.transition(runId, (r) => {
         r.status = 'completed' satisfies RunStatus;
+        delete r.lastError; // a completed run must not keep a stale failure banner
         return r;
       });
       this.deps.store.appendEvent(runId, { type: 'run_status_changed', status: 'completed', detail: {} });

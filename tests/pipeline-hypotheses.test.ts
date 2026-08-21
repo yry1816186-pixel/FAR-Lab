@@ -294,10 +294,12 @@ describe('generate_hypotheses stage', () => {
     expect(outcome.kind).toBe('done');
 
     expect(capture.reqs).toHaveLength(5);
-    const ec = capture.reqs[0]?.userPayload as Record<string, unknown>;
+    const ec0 = capture.reqs[0]?.userPayload as { input?: Record<string, unknown> };
+    const ec = (ec0.input ?? {}) as Record<string, unknown>;
     const supporting = ec.supportingClaims as Array<{ id: string }>;
     expect(supporting.map((c) => c.id).sort()).toEqual([c1.id, c2.id].sort());
-    const cd = capture.reqs[1]?.userPayload as Record<string, unknown>;
+    const cd0 = capture.reqs[1]?.userPayload as { input?: Record<string, unknown> };
+    const cd = (cd0.input ?? {}) as Record<string, unknown>;
     expect(cd.counterEvidenceAbsent).toBe(true);
     expect(String(cd.instruction)).toMatch(/COULD be wrong/i);
     expect((cd.counterDirectionClaims as Array<{ id: string }>).map((c) => c.id).sort()).toEqual(
