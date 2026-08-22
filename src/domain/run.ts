@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RunId, QuestionId, ReceiptId } from './ids.js';
+import { RunId, QuestionId, ReceiptId, ModelConfigId } from './ids.js';
 
 /** Run lifecycle — INTERFACES.md §1. No invented percentage progress. */
 export const RunStatus = z.enum([
@@ -41,6 +41,8 @@ export const RunEvent = z.object({
     'run_status_changed', 'checkpoint_saved', 'run_resumed', 'run_cancelled',
     'feedback_received', 'revision_created', 'receipt_recorded', 'note',
     'experiment_queued', 'experiment_started', 'experiment_completed', 'experiment_failed', 'experiment_canceled',
+    // Agent harness (H1): additive audit types — consumers must tolerate unknown types.
+    'agent_started', 'agent_tool_used', 'agent_finished',
   ]),
   status: RunStatus.optional(),
   stage: RunStageName.optional(),
@@ -63,6 +65,13 @@ export const ResearchRun = z.object({
   cancelRequested: z.boolean().default(false),
   parentRunId: RunId.optional(), // revision lineage: a revised run points at its predecessor
   tags: z.array(z.string()).default([]),
+  /**
+   * Explicit model route for THIS run (user-selected at creation). Resolution order:
+   * run.providerConfigId > meta activeModelConfigId > env chain (FARLAB_MODEL_PROVIDER).
+   * A dangling id fails closed at call time — never a silent fallback to another model
+   * (reproducibility over availability).
+   */
+  providerConfigId: ModelConfigId.optional(),
 });
 export type ResearchRun = z.infer<typeof ResearchRun>;
 

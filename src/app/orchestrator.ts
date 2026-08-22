@@ -10,6 +10,8 @@ export interface OrchestratorDeps {
   store: Store;
   artifacts: ArtifactStore;
   provider: ModelProvider;
+  /** Per-run provider override (user model-config layer); null/absent -> deps.provider (env chain). */
+  providerFor?: (run: ResearchRun) => ModelProvider | null;
   sourceFor: (family: SourceFamily) => SourceAdapter;
   stages: Map<RunStageName, StageHandler>;
   signals: Map<string, { cancelled: boolean }>;
@@ -98,7 +100,7 @@ export class Orchestrator {
       run,
       store,
       artifacts: this.deps.artifacts,
-      provider: this.deps.provider,
+      provider: this.deps.providerFor?.(run) ?? this.deps.provider,
       sourceFor: this.deps.sourceFor,
       recordReceipt: (partial) => {
         const receipt = ProvenanceReceipt.parse({

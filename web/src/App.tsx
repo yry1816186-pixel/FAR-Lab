@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, BellOff, RefreshCw, Search } from 'lucide-react';
+import { Bell, BellOff, RefreshCw, Search, Settings } from 'lucide-react';
 import { ApiError } from './api/client';
 import { getEvents, getRun, listRuns, searchAll } from './api/endpoints';
 import type { ResearchRun, RunEvent, RunSummary } from './api/types';
@@ -16,6 +16,7 @@ import { RunsList, runLabel } from './components/RunsSidebar';
 import { AwarenessBar } from './components/AwarenessBar';
 import { RunDetail, isTabId } from './components/RunDetail';
 import { CommandPalette, type Command, type PaletteSearch } from './components/CommandPalette';
+import { SettingsPanel } from './components/SettingsPanel';
 import type { EventsState } from './components/RunDetail';
 import { ErrorBox } from './components/common';
 
@@ -232,6 +233,7 @@ export function App(): JSX.Element {
 
   // ---- command palette (S5): every entry is a real capability ----
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
@@ -277,6 +279,13 @@ export function App(): JSX.Element {
       },
       ...navCmds,
       ...runCmds,
+      {
+        id: 'settings',
+        labelKey: 'palette.openSettings',
+        groupKey: 'palette.groupActions',
+        keywords: 'settings model provider config 配置 模型',
+        run: () => setSettingsOpen(true),
+      },
       {
         id: 'theme',
         labelKey: 'palette.toggleTheme',
@@ -374,6 +383,15 @@ export function App(): JSX.Element {
                 : <BellOff size={12} aria-hidden="true" />}
             </button>
           )}
+          <button
+            type="button"
+            className="btn btn--small palette-toggle"
+            onClick={() => setSettingsOpen(true)}
+            aria-label={t('settings.open')}
+            title={t('settings.open')}
+          >
+            <Settings size={12} aria-hidden="true" />
+          </button>
           <button
             type="button"
             className="btn btn--small palette-toggle"
@@ -483,6 +501,7 @@ export function App(): JSX.Element {
         commands={commands}
         search={paletteSearch}
       />
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

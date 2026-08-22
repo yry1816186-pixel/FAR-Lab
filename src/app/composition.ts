@@ -5,6 +5,7 @@ import { Store } from '../persistence/store.js';
 import { openArtifactStore } from '../persistence/artifacts.js';
 import { defaultLiveProvider, getProvider } from '../providers/index.js';
 import { sourceAdapterFor } from '../sources/index.js';
+import { resolveRunProvider } from './provider-resolver.js';
 import { Orchestrator } from './orchestrator.js';
 import type { StageHandler } from '../pipeline/types.js';
 import type { RunStageName } from '../domain/run.js';
@@ -71,9 +72,10 @@ export const createApp = async (opts: AppOptions = {}): Promise<App> => {
   const stageMap = new Map(HANDLED_STAGES.map((s) => [s, stages[s]] as [RunStageName, StageHandler]));
   const orchestrator = new Orchestrator({
     store, artifacts, provider,
+    providerFor: (run) => resolveRunProvider(store, run),
     sourceFor: (family) => sourceAdapterFor(family),
     stages: stageMap,
-    signals: new Map<string, { cancelled: boolean }>(),
+    signals: new Map(),
   });
   return {
     store, orchestrator, artifacts, provider, dataDir,

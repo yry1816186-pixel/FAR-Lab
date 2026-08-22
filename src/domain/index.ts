@@ -10,3 +10,5 @@ export * from './plan.js';
 export * from './feedback.js';
 export * from './provenance.js';
 export * from './experiment.js';
+export * from './model-config.js';
+export * from './agent.js';

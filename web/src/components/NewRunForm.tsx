@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { useI18n } from '../i18n/LanguageContext';
 import { errorText } from './common';
 import { goalTypeKey } from '../i18n/keys';
 import { useCreateRun } from '../hooks/useCreateRun';
+import { listModelConfigs } from '../api/endpoints';
+import type { ModelConfigsResponse } from '../api/types';
 import type { ScientificGoalType } from '../api/types';
 
 const GOAL_TYPES: ScientificGoalType[] = ['explanatory', 'predictive', 'interventional', 'methodological', 'exploratory'];
@@ -13,9 +16,19 @@ const GOAL_TYPES: ScientificGoalType[] = ['explanatory', 'predictive', 'interven
  */
 export function NewRunForm({ onCreated }: { onCreated: (runId: string) => void }): JSX.Element {
   const { t } = useI18n();
-  const { text, setText, domain, setDomain, goalType, setGoalType, showValidationError, submitting, error, submit } =
+  const { text, setText, domain, setDomain, goalType, setGoalType, providerConfigId, setProviderConfigId, showValidationError, submitting, error, submit } =
     useCreateRun(onCreated);
   const canSubmit = !submitting && text.trim().length > 0;
+  // Model-route picker data (custom configs + the env default): fetched once per
+  // mount; failures leave the picker at the env default (never block creation).
+  const [modelConfigs, setModelConfigs] = useState<ModelConfigsResponse | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    listModelConfigs(controller.signal)
+      .then((res) => { setModelConfigs(res); })
+      .catch(() => { /* picker stays on the env default — creation must not depend on it */ });
+    return () => controller.abort();
+  }, []);
 
   return (
     <form className="hero-form" onSubmit={(e) => void submit(e)} noValidate>
@@ -64,6 +77,22 @@ export function NewRunForm({ onCreated }: { onCreated: (runId: string) => void }
             {GOAL_TYPES.map((g) => (
               <option key={g} value={g}>
                 {t(goalTypeKey(g))}
+              </option>
+            ))}
+          </select>
+          <label className="field-label" htmlFor="newrun-model">
+            {t('settings.modelRoute')}
+          </label>
+          <select id="newrun-model" value={providerConfigId} onChange={(e) => setProviderConfigId(e.target.value)} disabled={submitting}>
+            <option value="">
+              {t('settings.modelRouteEnvDefault')}
+              {modelConfigs?.envDefault !== null && modelConfigs?.envDefault !== undefined
+                ? `（${modelConfigs.envDefault.name} · ${modelConfigs.envDefault.modelId}）`
+                : ''}
+            </option>
+            {(modelConfigs?.configs ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}（{c.modelId}）
               </option>
             ))}
           </select>
