@@ -22,8 +22,11 @@ import {
 import type {
   CitationBindingStatus,
   CorpusSnapshot,
+  ExperimentRun,
   FeedbackSignal,
+  ResultSet,
   Revision,
+  StatReport,
   VersionDiff,
   EvidenceRelation,
   EvidenceRelationType,
@@ -87,6 +90,10 @@ interface ExportInputs {
   feedbacks: FeedbackSignal[];
   revisions: Revision[];
   versionDiffs: VersionDiff[];
+  /** EEL (D-081): executed experiment objects for §7a + bundle experimentEvidence. */
+  experimentRuns: ExperimentRun[];
+  resultSets: ResultSet[];
+  statReports: StatReport[];
 }
 
 const orNone = (items: string[]): string => (items.length > 0 ? items.join('；') : '（未声明）');
@@ -452,6 +459,35 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
   }
   push('');
 
+  // ---- 7a. executed experiment results (EEL, D-081) ----
+  if (d.experimentRuns.length > 0) {
+    push('### 7a. 实验执行结果（真实运行）', '');
+    for (const xr of d.experimentRuns) {
+      push(`- 实验 ${xr.id}：${xr.status}（executor=${xr.executor}；spec=${xr.specId}@${xr.specHash.slice(0, 12)}；python=${xr.environment?.pythonVersion ?? 'unknown'}${xr.environment?.lockfileHash ? `；envLock=${xr.environment.lockfileHash.slice(0, 12)}` : ''}）`);
+      if (xr.error) push(`  - 错误：${xr.error}`);
+      for (const rs of d.resultSets.filter((r) => r.experimentRunId === xr.id)) {
+        push(`  - 数据集 ${rs.datasetRecordId}（split ${rs.splitHash.slice(0, 12)}）：`);
+        for (const c of rs.cells) {
+          const metrics = Object.entries(c.metrics).map(([k, v]) => `${k}=${Number(v).toFixed(4)}`).join(', ');
+          push(`    - ${c.modelName}${c.tags.length > 0 ? ` [${c.tags.join(', ')}]` : ''}: ${metrics}（train/test=${c.nTrain}/${c.nTest}，${c.timingMs}ms）`);
+        }
+      }
+      for (const rep of d.statReports.filter((s) => s.experimentRunId === xr.id)) {
+        const parts = [`比较 ${rep.comparisonId} [${rep.metricKey}]`];
+        if (rep.hypothesisId) parts.push(`假设 ${rep.hypothesisId}@v${rep.hypothesisVersion ?? '?'}`);
+        parts.push(`point=${rep.pointEstimate.toFixed(4)}，CI${rep.ci.level.toFixed(3)}[${rep.ci.low.toFixed(4)}, ${rep.ci.high.toFixed(4)}]`);
+        if (rep.adjustedAlpha !== undefined) parts.push(`校正α=${rep.adjustedAlpha}`);
+        parts.push(`阈值来源=${rep.thresholdProvenance}`);
+        if (rep.verdict !== undefined) parts.push(`verdict=${rep.verdict}`);
+        if (rep.secondary) parts.push('secondary（描述性）');
+        if (rep.exploratory) parts.push('exploratory');
+        parts.push(`iteration=${rep.analysisIteration}`);
+        push(`  - 判定报告 ${rep.id}：${parts.join('；')}`);
+      }
+    }
+    push('');
+  }
+
   // ---- 8. uncertainties & open questions ----
   push('## 8. 不确定性与未决问题', '');
   const claimUnc = d.claims.flatMap((c) => c.uncertainties.map((u) => `- 声明 ${c.id}：${u}`));
@@ -574,6 +610,9 @@ export const exportStage: StageHandler = {
     const feedbacks = ctx.store.listObjects('feedback', run.id);
     const revisions = ctx.store.listObjects('revision', run.id);
     const versionDiffs = ctx.store.listObjects('version_diff', run.id);
+    const experimentRuns = ctx.store.listObjects('experiment_run', run.id);
+    const resultSets = ctx.store.listObjects('result_set', run.id);
+    const statReports = ctx.store.listObjects('stat_report', run.id);
 
     // Hash of what is actually on disk; a marked placeholder when missing (never invented).
     // Resolved from THIS module's location (WP2 F2), not process.cwd(): `far research`
@@ -593,6 +632,9 @@ export const exportStage: StageHandler = {
 
     const inputs: ExportInputs = {
       run, question, corpus, sources, claims, relations, hypotheses, scorecards, plan, receipts, feedbacks, revisions, versionDiffs,
+      experimentRuns: ctx.store.listObjects('experiment_run', run.id),
+      resultSets: ctx.store.listObjects('result_set', run.id),
+      statReports: ctx.store.listObjects('stat_report', run.id),
     };
     const missingItems = collectMissing(inputs, { lockMissing, receipts });
     const report = buildReport(inputs, missingItems);
@@ -645,6 +687,19 @@ export const exportStage: StageHandler = {
       limitations,
       // SWAN interchange (W-G follow-up): surviving hypotheses as JSON-LD ResearchStatements.
       ...(hypotheses.length > 0 ? { hypothesisJsonLd: hypotheses.map((h) => toSwanJsonLd(h)) } : {}),
+      // EEL evidence (D-081): experiment object ids + content-addressed artifact hashes.
+      ...(experimentRuns.length > 0 ? {
+        experimentEvidence: experimentRuns.map((xr) => ({
+          experimentRunId: xr.id,
+          resultIds: xr.resultIds,
+          statReportIds: xr.statReportIds,
+          artifactHashes: [
+            ...resultSets.filter((rs) => rs.experimentRunId === xr.id).flatMap((rs) => rs.cells.map((c) => c.perRowRef.replace('sha256:', ''))),
+            ...(xr.trainingLogRef !== undefined ? [xr.trainingLogRef.replace('sha256:', '')] : []),
+          ],
+          ...(xr.environment?.lockfileHash !== undefined ? { lockfileHash: xr.environment.lockfileHash } : {}),
+        })),
+      } : {}),
       createdAt: new Date().toISOString(),
     });
     ctx.store.putObject('bundle', bundle);
