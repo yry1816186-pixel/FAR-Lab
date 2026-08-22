@@ -35,3 +35,6 @@ Thumbs.db
 
 # ZCode runtime-extracted local marketplace copy (runtime artifact, not source)
 FAR-Lab_ZCode_Control_Plane_*/
+
+# Python lint cache (self-ignores, but explicit for robustness)
+.ruff_cache/
