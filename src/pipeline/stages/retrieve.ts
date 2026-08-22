@@ -7,7 +7,7 @@ import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash, excludeVolatile } from '../../sources/snapshot.js';
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
-import { throwIfCancelled } from './guard.js';
+import { isCancellationError, throwIfCancelled } from './guard.js';
 
 /** Hard corpus cap (contract): excess documents are truncated, visibly noted in the summary. */
 export const MAX_DOCUMENTS = 12;
@@ -15,8 +15,14 @@ export const MAX_DOCUMENTS = 12;
 const SEARCH_LIMIT = 6;
 /** Reciprocal Rank Fusion constant (SIGIR 2009 standard k=60). */
 const RRF_K = 60;
-/** Max pool entries sent to the LLM listwise rerank (RankGPT pattern, single window). */
-const RERANK_POOL = 24;
+/**
+ * Max pool entries eligible for the LLM listwise rerank (W6/F4 RankGPT sliding
+ * window): pools up to 48 rerank in bottom-up windows of 24 (step 12); pools
+ * above 48 keep the deterministic RRF order for entries beyond the window pool.
+ */
+const RERANK_POOL = 48;
+/** One listwise window (RankGPT window=20 analog, sized for our abstract excerpts). */
+const RERANK_WINDOW = 24;
 /** D-015: minimum corpus seats reserved for counter-evidence-origin documents when the cap bites. */
 export const COUNTER_MIN_SEATS = 4;
 
@@ -38,8 +44,10 @@ type QueryPlan = z.infer<typeof QueryPlan>;
  * Counter-evidence orientation screen (substring, case-insensitive). At least
  * one counter query must contain explicit counter-evidence vocabulary —
  * limitation / failed replication / contradiction / negative result / critique.
+ * Exported since Wave-6: eval/retrieval-baseline.mjs replays THIS exact gate
+ * over historical plans (no drift-prone copy).
  */
-const COUNTER_TERM_RE = new RegExp(
+export const COUNTER_TERM_RE = new RegExp(
   [
     'limitation', 'limit(ed)?', 'fail(ed|ure)?', 'negative', 'null', 'replicat', 'contradict',
     'disput', 'inconsisten', 'critique', 'criticis', 'challeng', 'rebut', 'controvers', 'retract',
@@ -107,12 +115,20 @@ const counterQueries = (queries: readonly string[]): readonly [string, string] =
  * OpenAlex keyless now has a hard daily budget ("Insufficient budget … Resets at
  * midnight UTC", live-observed) and arXiv covers ML/physics only — Crossref
  * (keyless, stable) restores genuine source redundancy, especially for biomed.
+ *
+ * W6/F1 (2026-08-22): counter[1] reroutes arxiv→crossref. Measured on 46 runs:
+ * arXiv returned zero results for 82.3% of executed searches (AND-intersection
+ * emptiness on 8-12-term keyword phrases) while crossref returned zero for 0%
+ * (68/68 historical counter queries replayed live: mean 6.0 results) — the old
+ * routing left counter-evidence effectively single-sourced on OpenAlex and the
+ * D-029b crossref redundancy never covered counter queries. arXiv still serves
+ * discovery/supporting (with the W6/F2 cascade below recovering its zeros).
  */
 const buildTargets = (plan: QueryPlan): readonly SearchTarget[] => {
-  const [counterOpenalex, counterArxiv] = counterQueries(plan.counter);
+  const [counterOpenalex, counterCrossref] = counterQueries(plan.counter);
   const targets: SearchTarget[] = [
     { purpose: 'counter_evidence', text: counterOpenalex, family: 'openalex' },
-    { purpose: 'counter_evidence', text: counterArxiv, family: 'arxiv' },
+    { purpose: 'counter_evidence', text: counterCrossref, family: 'crossref' },
   ];
   for (const q of plan.discovery) {
     targets.push({ purpose: 'discovery', text: q, family: 'openalex' });
@@ -230,6 +246,48 @@ const applyRerank = (out: RerankOut, candidates: readonly PoolEntry[]): PoolEntr
 };
 
 /**
+ * W6/F4 (RankGPT EXTRACT, rank_gpt.py:234-244): bottom-up sliding-window plan for
+ * pools larger than one window. Window size w, step s (s = w/2 keeps RankGPT's
+ * overlap-ratio). Windows are generated from the BOTTOM ([n-w, n)) upward in steps
+ * of s to [0, w), and processed in that order — the head window runs LAST so the
+ * entries a lower window floated up get re-judged with maximal context (upstream
+ * chaining behavior). n <= w collapses to one full window. Upstream's edge bug
+ * (w > n silently skips reranking) is structurally impossible here.
+ */
+export const rerankWindowPlan = (n: number, w: number, s: number): readonly [number, number][] => {
+  if (n <= w) return [[0, n]];
+  const windows: [number, number][] = [];
+  for (let start = n - w; start > 0; start -= s) windows.push([start, start + w]);
+  windows.push([0, w]);
+  return windows;
+};
+
+/**
+ * W6/F4 windowed rerank core (pure apart from rerankOne): applies each window's
+ * validated permutation onto `working` in bottom-up order. INVARIANTS (unit-
+ * pinned per W6 audit P2-4): the result is a permutation of the input (every
+ * entry exactly once, same multiset), and any rerankOne failure propagates so
+ * the caller falls back to the deterministic RRF order — partial window results
+ * are discarded, never half-spliced.
+ */
+export const applyWindowedRerank = async (
+  working: readonly PoolEntry[],
+  windows: readonly (readonly [number, number])[],
+  rerankOne: (slice: readonly PoolEntry[]) => Promise<PoolEntry[]>,
+): Promise<PoolEntry[]> => {
+  const out = [...working];
+  for (const [start, end] of windows) {
+    const slice = out.slice(start, end);
+    const permuted = await rerankOne(slice);
+    if (permuted.length !== slice.length) {
+      throw new Error(`rerank window [${start},${end}) returned ${permuted.length} of ${slice.length} entries`);
+    }
+    out.splice(start, end - start, ...permuted);
+  }
+  return out;
+};
+
+/**
  * RawSourceRecord -> SourceDocument. The normalized payload is ALWAYS archived
  * content-addressed; the artifact is stored over canonicalJson, the same basis
  * as snapshotHash, so the artifact hash equals contentHash. fullTextRef is only
@@ -263,6 +321,29 @@ export const toDocument = async (
     ...(rec.license !== undefined ? { license: rec.license } : {}),
     ...(rec.oaUrl !== undefined ? { oaUrl: rec.oaUrl } : {}),
   });
+};
+
+/**
+ * W6/F2: deterministic arXiv zero-result recovery variants. arXiv's `all:t AND …`
+ * engine returns empty for most 8-12-term keyword phrases (82.3% of historical
+ * searches; AND-intersection emptiness — NOT a syntax defect). Live probe
+ * (spikes/output/arxiv-truncate-probe.json, 30 historical zero queries):
+ * first-6-terms 100% zero, first-4 53.3% zero (mean 1.4), first-2 6.7% zero
+ * (mean 5.0). Cascade keeps the full query first (proven matches stay
+ * maximally specific), then k4 (specific recovery), then k2 (near-total
+ * fallback; drift bounded by single-list RRF contribution + rerank + cap).
+ * Same mechanism family as open-deep-research legacy/utils.py:1274-1283
+ * (deterministic query mutation on empty results) and node-DeepResearch's
+ * 2-5-word query discipline (schemas.ts:198).
+ */
+export const arxivRecoveryVariants = (query: string): readonly string[] => {
+  const terms = query.trim().split(/\s+/);
+  const candidates = [terms.slice(0, 4).join(' '), terms.slice(0, 2).join(' ')];
+  const variants: string[] = [];
+  for (const c of candidates) {
+    if (c !== query.trim() && c.length > 0 && !variants.includes(c)) variants.push(c);
+  }
+  return variants;
 };
 
 export const retrieveStage: StageHandler = {
@@ -303,51 +384,117 @@ export const retrieveStage: StageHandler = {
     let succeeded = 0;
     let duplicates = 0;
     let droppedNoIdentifier = 0;
+    let variantSearches = 0;
+
+    /** Execute one search (planned or recovery variant), receipt it, pool its records. */
+    const runSearch = async (
+      t: { purpose: RetrievalQuery['purpose']; family: SourceFamily },
+      targetIdx: number,
+      queryText: string,
+      isVariant: boolean,
+    ): Promise<number> => {
+      // Count the ATTEMPT before the call: executed means attempted, success or
+      // failure (W6 audit P3-1). The redactionNote marker distinguishes variant
+      // attempts in receipts so the eval harness can split planned vs cascade
+      // metrics without schema changes (W6 audit P2-3).
+      if (isVariant) variantSearches += 1;
+      const redactionNote = isVariant
+        ? 'arxiv recovery variant search; query text and per-record content hashes retained; payloads archived content-addressed'
+        : 'query text and per-record content hashes retained; payloads archived content-addressed';
+      const res = await ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT });
+      ctx.recordReceipt({
+        kind: 'source_retrieval',
+        executionMode: 'live',
+        stage: 'retrieve',
+        redactionNote,
+        sourceRetrieval: {
+          family: t.family,
+          query: queryText,
+          httpStatus: res.httpStatus,
+          resultCount: res.records.length,
+          contentHashes: res.records.map((r) => snapshotHash(t.family, r)),
+        },
+      });
+      for (const [rank, rec] of res.records.entries()) {
+        const key = primaryKey(rec);
+        if (key === null) {
+          droppedNoIdentifier += 1;
+          ctx.log(`retrieve: dropping record without identifiers: "${rec.title}"`);
+          continue;
+        }
+        const existing = pool.get(key);
+        if (existing) {
+          duplicates += 1;
+          existing.purposes.add(t.purpose);
+          existing.ranks.push({ target: targetIdx, rank });
+          continue;
+        }
+        pool.set(key, {
+          key,
+          record: rec,
+          family: t.family,
+          firstSeen: targetIdx,
+          purposes: new Set([t.purpose]),
+          ranks: [{ target: targetIdx, rank }],
+        });
+      }
+      return res.records.length;
+    };
+
+    /** Receipt a FAILED variant attempt — attempts are provenance facts (P3-1). */
+    const receiptVariantFailure = (
+      t: { purpose: RetrievalQuery['purpose']; family: SourceFamily },
+      queryText: string,
+      e: unknown,
+    ): void => {
+      ctx.recordReceipt({
+        kind: 'source_retrieval',
+        executionMode: 'live',
+        stage: 'retrieve',
+        redactionNote: 'arxiv recovery variant search; query text and per-record content hashes retained; payloads archived content-addressed',
+        sourceRetrieval: {
+          family: t.family,
+          query: queryText,
+          httpStatus: isSourceAdapterError(e) ? e.httpStatus : 0,
+          resultCount: 0,
+          contentHashes: [],
+        },
+      });
+    };
 
     for (const [targetIdx, t] of targets.entries()) {
       throwIfCancelled(ctx);
       executedQueries.push({ purpose: t.purpose, text: t.text, family: t.family });
       attempted += 1;
       try {
-        const res = await ctx.sourceFor(t.family).search(t.text, { limit: SEARCH_LIMIT });
+        const count = await runSearch(t, targetIdx, t.text, false);
         succeeded += 1;
-        ctx.recordReceipt({
-          kind: 'source_retrieval',
-          executionMode: 'live',
-          stage: 'retrieve',
-          redactionNote: 'query text and per-record content hashes retained; payloads archived content-addressed',
-          sourceRetrieval: {
-            family: t.family,
-            query: t.text,
-            httpStatus: res.httpStatus,
-            resultCount: res.records.length,
-            contentHashes: res.records.map((r) => snapshotHash(t.family, r)),
-          },
-        });
-        for (const [rank, rec] of res.records.entries()) {
-          const key = primaryKey(rec);
-          if (key === null) {
-            droppedNoIdentifier += 1;
-            ctx.log(`retrieve: dropping record without identifiers: "${rec.title}"`);
-            continue;
+        // W6/F2: arXiv AND-emptiness recovery — only when the FULL query came
+        // back empty; each variant is its own receipted search and an extra RRF
+        // list (a recovered doc ranks via the variant list it came from).
+        if (t.family === 'arxiv' && count === 0) {
+          for (const variant of arxivRecoveryVariants(t.text)) {
+            throwIfCancelled(ctx);
+            try {
+              const vCount = await runSearch(t, targetIdx, variant, true);
+              if (vCount > 0) break; // first recovering variant wins; deeper truncation only on another zero
+            } catch (e) {
+              // Cancellation propagates (outer catch rethrows it); a failed variant
+              // attempt is receipted and the cascade CONTINUES to the next variant —
+              // one transient error must not kill the whole recovery (P3-1).
+              if (isCancellationError(e)) throw e;
+              receiptVariantFailure(t, variant, e);
+              ctx.log(
+                `retrieve: arxiv recovery variant failed for "${t.text}" -> "${variant}": ${e instanceof Error ? e.message : String(e)}`,
+              );
+            }
           }
-          const existing = pool.get(key);
-          if (existing) {
-            duplicates += 1;
-            existing.purposes.add(t.purpose);
-            existing.ranks.push({ target: targetIdx, rank });
-            continue;
-          }
-          pool.set(key, {
-            key,
-            record: rec,
-            family: t.family,
-            firstSeen: targetIdx,
-            purposes: new Set([t.purpose]),
-            ranks: [{ target: targetIdx, rank }],
-          });
         }
       } catch (e) {
+        // Cancellation aborts the stage FIRST — a cancel mid-cascade must never
+        // be bookkept as a family failure nor write a contradicting 0-result
+        // receipt for a query that already succeeded (W6 audit P2-2).
+        if (isCancellationError(e)) throw e;
         // Single-source failure stays visible (familyFailures + receipt) and the
         // stage continues; only total failure aborts (below).
         const msg = e instanceof Error ? e.message : String(e);
@@ -386,34 +533,47 @@ export const retrieveStage: StageHandler = {
     }
 
     // ---- D-015 fusion: deterministic RRF order, then (under cap pressure) LLM listwise rerank ----
+    // W6/F4: pools above one window rerank via the RankGPT bottom-up sliding window
+    // (w=24, s=12) — each window is a full permutation over its slice, renumbered
+    // locally; a lower window's floated-up entries are re-judged by the next window.
     const fused = fusedOrder([...pool.values()]);
     let finalOrder: PoolEntry[] = fused;
     let rerankApplied = false;
     let rerankFailure: string | undefined;
+    let rerankWindows: number | undefined;
     if (fused.length > MAX_DOCUMENTS) {
       const candidates = fused.slice(0, RERANK_POOL);
+      const windows = rerankWindowPlan(candidates.length, RERANK_WINDOW, RERANK_WINDOW / 2);
       try {
-        const res = await callStructured<RerankOut>(ctx, {
-          stage: 'retrieve',
-          purpose: 'listwise-rerank',
-          systemPrompt: RERANK_SYSTEM_PROMPT,
-          payload: {
-            questionText: question.text,
-            candidates: candidates.map((e, i) => ({
-              index: i,
-              title: e.record.title,
-              ...(e.record.publicationYear !== undefined ? { year: e.record.publicationYear } : {}),
-              ...(e.record.venue !== undefined ? { venue: e.record.venue } : {}),
-              abstractExcerpt: (e.record.abstractText ?? '').slice(0, 450),
-              originatingPurposes: [...e.purposes],
-            })),
-          },
-          schema: RerankOut,
-          temperature: 0.1,
+        const working = await applyWindowedRerank(candidates, windows, async (slice) => {
+          throwIfCancelled(ctx);
+          const res = await callStructured<RerankOut>(ctx, {
+            stage: 'retrieve',
+            purpose: 'listwise-rerank',
+            systemPrompt: RERANK_SYSTEM_PROMPT,
+            payload: {
+              questionText: question.text,
+              candidates: slice.map((e, i) => ({
+                index: i,
+                title: e.record.title,
+                ...(e.record.publicationYear !== undefined ? { year: e.record.publicationYear } : {}),
+                ...(e.record.venue !== undefined ? { venue: e.record.venue } : {}),
+                abstractExcerpt: (e.record.abstractText ?? '').slice(0, 450),
+                originatingPurposes: [...e.purposes],
+              })),
+            },
+            schema: RerankOut,
+            temperature: 0.1,
+          });
+          return applyRerank(res.data, slice);
         });
-        finalOrder = [...applyRerank(res.data, candidates), ...fused.slice(RERANK_POOL)];
+        finalOrder = [...working, ...fused.slice(RERANK_POOL)];
         rerankApplied = true;
+        if (windows.length > 1) rerankWindows = windows.length;
       } catch (e) {
+        // Cancellation aborts the stage — never degrade a user cancel into
+        // "rerank failed, corpus completed anyway" (W6 audit P1-1).
+        if (isCancellationError(e)) throw e;
         // Fail-VISIBLE fallback: the corpus still builds on the deterministic RRF order;
         // the failure is recorded in the snapshot and summary, never silently dropped.
         rerankFailure = e instanceof Error ? e.message : String(e);
@@ -444,6 +604,8 @@ export const retrieveStage: StageHandler = {
         rerankApplied,
         ...(rerankFailure !== undefined ? { rerankFailure } : {}),
         counterSeatsKept,
+        ...(variantSearches > 0 ? { variantSearches } : {}),
+        ...(rerankWindows !== undefined ? { rerankWindows } : {}),
         selection: `cap ${selected.length} of pool ${pool.size} (RRF${rerankApplied ? ' + listwise rerank' : rerankFailure !== undefined ? ' after failed rerank' : ''})`,
       },
     });
@@ -455,6 +617,7 @@ export const retrieveStage: StageHandler = {
       `counter-evidence seats kept: ${counterSeatsKept}${selected.length < fused.length ? ` of ${Math.min(COUNTER_MIN_SEATS, fused.filter(isCounterOrigin).length)} reserved` : ''}`,
     ];
     if (rerankFailure !== undefined) parts.push(`listwise rerank FAILED — deterministic RRF order used (${rerankFailure})`);
+    if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
     if (droppedNoIdentifier > 0) parts.push(`${droppedNoIdentifier} record(s) without identifiers dropped`);
     if (selected.length < fused.length) parts.push(`truncated at cap ${MAX_DOCUMENTS}`);

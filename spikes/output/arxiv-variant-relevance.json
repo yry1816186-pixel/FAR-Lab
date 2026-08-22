@@ -1,0 +1,84 @@
+[
+ {
+  "query": "T790M mutation acquired resistance EGFR TKI NSCLC",
+  "k4": [],
+  "k2": [
+   "Predicting Targeted Therapy Resistance in Non-Small Cell Lung Cancer Using Multimodal Machine Learning"
+  ]
+ },
+ {
+  "query": "acquired resistance mechanisms EGFR tyrosine kinase inhibitors non-small cell lung cancer",
+  "k4": [
+   "Discovering novel cancer bio-markers in acquired lapatinib resistance using Bayesian methods"
+  ],
+  "k2": [
+   "Consequences of cell-to-cell P-glycoprotein transfer on acquired multidrug resistance in breast cancer: a cell population dynamics model",
+   "HIV drug resistance: problems and perspectives",
+   "Rapid emergence of co-colonization with community-acquired and hospital-acquired methicillin-resistant Staphylococcus aureus strains in the hospital setting"
+  ]
+ },
+ {
+  "query": "conjugation transformation transduction antibiotic resistance gene transfer hospitals",
+  "k4": [],
+  "k2": [
+   "Population Dynamics Model and Analysis for Bacteria Transformation and Conjugation",
+   "Perfect NOT transformation and conjugate transformation",
+   "Simultaneous double transformations of functions depending on space and time"
+  ]
+ },
+ {
+  "query": "limitations horizontal gene transfer studies hospital environments",
+  "k4": [
+   "Supra-operonic clusters of functionally related genes (SOCs) are a source of horizontal gene co-transfers",
+   "Horizontal gene transfer: numerical comparison between stochastic and deterministic approaches",
+   "Gaussian process modeling in approximate Bayesian computation to estimate horizontal gene transfer in bacteria"
+  ],
+  "k2": [
+   "Natural R Parity Conservation with Horizontal Symmetries. a Four Generation Model",
+   "Tripod of Requirements in Horizontal Heterogeneous Mobile Cloud Computing",
+   "Theoretical results on the topological properties of the limited penetrable horizontal visibility graph family"
+  ]
+ },
+ {
+  "query": "vitamin D supplementation respiratory tract infections",
+  "k4": [
+   "Decreased serum vitamin D level as a prognostic marker in patients with COVID-19",
+   "Review: dual benefits, compositions, recommended storage, and intake duration of mother's milk"
+  ],
+  "k2": [
+   "Quantifying vitamin D intake among Aboriginal and Torres Strait Islander peoples in Australia",
+   "Modelling vitamin D food fortification among Aboriginal and Torres Strait Islander peoples in Australia",
+   "ViTaMIn-B: A Reliable and Efficient Visuo-Tactile Bimanual Manipulation Interface"
+  ]
+ },
+ {
+  "query": "CRISPR-Cas9 specificity mismatch tolerance guide RNA",
+  "k4": [
+   "A small PAM optimises target recognition in the CRISPR-Cas immune system"
+  ],
+  "k2": [
+   "Search and localization dynamics of the CRISPR/Cas9 system",
+   "Knockdown of human AMPK using the CRISPR-Cas9 genome-editing system",
+   "DeepFM-Crispr: Prediction of CRISPR On-Target Effects via Deep Learning"
+  ]
+ },
+ {
+  "query": "vitamin D supplementation reduces respiratory tract infection risk",
+  "k4": [
+   "Dietary Supplements and Nutraceuticals Under Investigation for COVID-19 Prevention and Treatment"
+  ],
+  "k2": [
+   "Quantifying vitamin D intake among Aboriginal and Torres Strait Islander peoples in Australia",
+   "Modelling vitamin D food fortification among Aboriginal and Torres Strait Islander peoples in Australia",
+   "ViTaMIn-B: A Reliable and Efficient Visuo-Tactile Bimanual Manipulation Interface"
+  ]
+ },
+ {
+  "query": "EGFR T790M acquired resistance mechanism NSCLC evidence",
+  "k4": [],
+  "k2": [
+   "In Silico Design, Extended Molecular Dynamic Simulations and Binding Energy Calculations for a New Series of Dually Acting Inhibitors against EGFR and HER2",
+   "Predicting Targeted Therapy Resistance in Non-Small Cell Lung Cancer Using Multimodal Machine Learning"
+  ]
+ }
+]
