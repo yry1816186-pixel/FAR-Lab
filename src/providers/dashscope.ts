@@ -29,6 +29,8 @@ export interface DashScopeProviderOptions {
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   totalTimeoutMs?: number;
+  /** Deterministic jitter seam for tests (W4-F1). */
+  random?: () => number;
 }
 
 export interface DashScopeProvider extends ModelProvider {
@@ -61,7 +63,7 @@ export function createDashScopeProvider(opts: DashScopeProviderOptions = {}): Da
         // stays on the json_object transport it was verified for.
         req.jsonSchema === undefined ? req : { ...req, jsonSchema: undefined },
         parse,
-        { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs },
+        { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs, random: opts.random },
       );
     },
   };

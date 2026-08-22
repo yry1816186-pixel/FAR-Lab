@@ -38,6 +38,8 @@ export interface DeepSeekProviderOptions {
   fetchImpl?: FetchLike;
   sleep?: SleepLike;
   totalTimeoutMs?: number;
+  /** Deterministic jitter seam for tests (W4-F1). */
+  random?: () => number;
 }
 
 export interface DeepSeekProvider extends ModelProvider {
@@ -73,7 +75,7 @@ export function createDeepSeekProvider(opts: DeepSeekProviderOptions = {}): Deep
         // changes otherwise for callers that never opted into tools form)
         strictTools || req.jsonSchema === undefined ? req : { ...req, jsonSchema: undefined },
         parse,
-        { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs },
+        { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs, random: opts.random },
       );
     },
   };

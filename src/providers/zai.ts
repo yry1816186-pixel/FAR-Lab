@@ -31,6 +31,8 @@ export interface ZaiProviderOptions {
   fetchImpl?: FetchLike;
   sleep?: SleepLike;
   totalTimeoutMs?: number;
+  /** Deterministic jitter seam for tests (W4-F1). */
+  random?: () => number;
 }
 
 export interface ZaiProvider extends ModelProvider {
@@ -64,7 +66,7 @@ export function createZaiProvider(opts: ZaiProviderOptions = {}): ZaiProvider {
         // projection so this route stays on the json_object transport it was built for.
         req.jsonSchema === undefined ? req : { ...req, jsonSchema: undefined },
         parse,
-        { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs },
+        { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs, random: opts.random },
       );
     },
   };

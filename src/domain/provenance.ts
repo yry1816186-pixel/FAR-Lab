@@ -26,6 +26,9 @@ export const ModelCallFacts = z.object({
   requestHash: z.string().length(64),   // canonical hash of redacted request
   outputHash: z.string().length(64),
   finishReason: z.string().optional(),
+  /** W4-F1 retry observability (bounded-retry counts actually consumed, 0 = clean first pass). */
+  transportRetries: z.number().int().nonnegative().optional(),
+  correctiveReasks: z.number().int().nonnegative().optional(),
 });
 
 export const SourceRetrievalFacts = z.object({

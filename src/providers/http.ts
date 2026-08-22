@@ -40,8 +40,7 @@ export type ModelCallErrorKind =
 
 export const DEFAULT_TOTAL_TIMEOUT_MS = 120_000;
 
-const MAX_TRANSPORT_RETRIES = 2;
-const TRANSPORT_BACKOFF_MS: readonly number[] = [1_000, 3_000];
+export const MAX_TRANSPORT_RETRIES = 2;
 /**
  * Invalid-output re-asks (fresh model sample each): the live-observed corruption class
  * (unescaped inner quotes in long tool arguments, ~20% at >=20k chars, D-030/D-034 era
@@ -55,6 +54,74 @@ const TRANSIENT_5XX: ReadonlySet<number> = new Set([500, 502, 503, 504]);
 /** Z.ai returns HTTP 429 + code 1113 for exhausted balance — that is a quota wall, not a rate limit. */
 const QUOTA_ERROR_CODES: ReadonlySet<string> = new Set(['1113', 'insufficient_quota']);
 const QUOTA_MESSAGE_RE = /insufficient\s+(?:balance|quota)|余额不足|no resource package/i;
+
+// ---------------------------------------------------------------------------
+// W4-F1 retry timing (source-fused 2026-08-22, Wave-4 harness expedition):
+//   - deepseek-ai/deepseek-harness packages/llm/llm-retry (MIT) — symmetric
+//     multiplicative jitter delay×(1−r+2r·rand) with a hard cap; vendor defaults
+//     500ms/10s/±10% validated the shape, FAR-Lab keeps its own 1s base.
+//   - sst/opencode packages/opencode/src/session/retry.ts (MIT) — server
+//     Retry-After precedence: retry-after-ms (ms) > retry-after (seconds or
+//     HTTP-date), every accepted delay capped.
+// Server guidance wins when present and parseable; both paths cap at 30s.
+// ---------------------------------------------------------------------------
+
+export const RETRY_MAX_BACKOFF_MS = 30_000;
+const RETRY_INITIAL_DELAY_MS = 1_000;
+const RETRY_JITTER_RATIO = 0.25;
+
+export const backoffDelayMs = (
+  attempt: number,
+  retryAfterMs?: number,
+  random: () => number = Math.random,
+): number => {
+  const cap = (ms: number) => Math.max(0, Math.min(Math.ceil(ms), RETRY_MAX_BACKOFF_MS));
+  if (retryAfterMs !== undefined && Number.isFinite(retryAfterMs)) return cap(retryAfterMs);
+  const exponent = Math.min(Math.max(attempt, 1) - 1, 16);
+  const base = RETRY_INITIAL_DELAY_MS * 2 ** exponent;
+  const jitter = 1 - RETRY_JITTER_RATIO + 2 * RETRY_JITTER_RATIO * random();
+  return cap(base * jitter);
+};
+
+/**
+ * Parse Retry-After guidance from response headers: `retry-after-ms` (milliseconds)
+ * first, then the standard `retry-after` (numeric seconds, or HTTP-date → delta from
+ * now). Undefined when headers are absent or nothing parseable. Dates already in the
+ * past return 0 (retry promptly), never negative.
+ */
+export const parseRetryAfterMs = (headers: { get(name: string): string | null } | undefined): number | undefined => {
+  const msRaw = headers?.get?.('retry-after-ms');
+  if (msRaw !== null && msRaw !== undefined && msRaw.trim() !== '') {
+    const ms = Number.parseFloat(msRaw);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  const raw = headers?.get?.('retry-after');
+  if (raw !== null && raw !== undefined && raw.trim() !== '') {
+    const trimmed = raw.trim();
+    if (/^\d+(?:\.\d+)?$/.test(trimmed)) return Number.parseFloat(trimmed) * 1_000;
+    const date = Date.parse(trimmed);
+    if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  }
+  return undefined;
+};
+
+// ---------------------------------------------------------------------------
+// W4-F3 credential redaction (source-fused from openai/codex
+// codex-rs/secrets/src/sanitizer.rs, Apache-2.0; ported to JS regex). Best-effort:
+// applied at the persistence chokepoint (fail) so no provider-echoed,
+// credential-shaped substring reaches sqlite receipts, run.lastError or logs.
+// Classification stays on the RAW message (quota regex needs the original text).
+// ---------------------------------------------------------------------------
+
+const SECRET_PATTERNS: readonly (readonly [RegExp, string])[] = [
+  [/\bBearer[ \t]+[A-Za-z0-9._~+/=-]{16,}/gi, 'Bearer [REDACTED_SECRET]'],
+  [/sk-[A-Za-z0-9]{20,}/g, '[REDACTED_SECRET]'],
+  [/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED_SECRET]'],
+  [/\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)(["']?)[^\s"']{8,}/gi, '$1$2$3[REDACTED_SECRET]'],
+];
+
+export const redactSecrets = (text: string): string =>
+  SECRET_PATTERNS.reduce((acc, [re, replacement]) => acc.replace(re, replacement), text);
 
 const JSON_ONLY_SUFFIX =
   'Output ONLY a single valid JSON object. No markdown fences, no commentary, no text before or after the JSON. ' +
@@ -531,6 +598,8 @@ export interface TransportDeps {
   sleep?: SleepLike;
   /** Total budget including retries/sleeps; default 120s. */
   totalTimeoutMs?: number;
+  /** Deterministic jitter seam for tests (W4-F1); default Math.random. */
+  random?: () => number;
 }
 
 /** Fail-closed result for a provider whose live credentials are absent. Never fabricated output. */
@@ -564,6 +633,7 @@ export async function runOpenAICompatStructuredCall<T>(
 ): Promise<StructuredCallResult<T>> {
   const fetchImpl: FetchLike = deps.fetchImpl ?? ((url, init) => fetch(url, init));
   const sleep: SleepLike = deps.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const random: () => number = deps.random ?? Math.random;
   const totalTimeoutMs = deps.totalTimeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS;
   const url = `${cfg.baseUrl.replace(/\/+$/, '')}/chat/completions`;
   const requestHash = computeRequestHash(req);
@@ -582,7 +652,7 @@ export async function runOpenAICompatStructuredCall<T>(
     ok: false,
     error: {
       kind: failure.kind,
-      message: failure.message,
+      message: redactSecrets(failure.message),
       retryable: failure.retryable,
       ...(failure.httpStatus !== undefined ? { httpStatus: failure.httpStatus } : {}),
     },
@@ -595,6 +665,8 @@ export async function runOpenAICompatStructuredCall<T>(
       requestHash,
       outputHash: canonicalSha256(lastRawContent),
       ...(last200?.finishReason ? { finishReason: last200.finishReason } : {}),
+      transportRetries,
+      correctiveReasks: invalidOutputRetries,
       executionMode: cfg.executionMode,
     },
   });
@@ -612,6 +684,7 @@ export async function runOpenAICompatStructuredCall<T>(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), remaining);
     let attempt: ChatAttempt;
+    let retryAfterMsHint: number | undefined;
     try {
       const res = await fetchImpl(url, {
         method: 'POST',
@@ -620,10 +693,12 @@ export async function runOpenAICompatStructuredCall<T>(
         signal: controller.signal,
       });
       const bodyText = await res.text();
-      attempt =
-        res.status === 200
-          ? parseSuccessBody(bodyText, cfg.providerName)
-          : { ok: false, failure: classifyHttpStatus(res.status, bodyText, cfg.providerName) };
+      if (res.status === 200) {
+        attempt = parseSuccessBody(bodyText, cfg.providerName);
+      } else {
+        retryAfterMsHint = parseRetryAfterMs(res.headers);
+        attempt = { ok: false, failure: classifyHttpStatus(res.status, bodyText, cfg.providerName) };
+      }
     } catch (err) {
       attempt = { ok: false, failure: classifyTransportError(err, cfg.providerName) };
     } finally {
@@ -649,6 +724,8 @@ export async function runOpenAICompatStructuredCall<T>(
               requestHash,
               outputHash: canonicalSha256(attempt.rawContent),
               ...(attempt.finishReason ? { finishReason: attempt.finishReason } : {}),
+              transportRetries,
+              correctiveReasks: invalidOutputRetries,
               executionMode: cfg.executionMode,
             },
           };
@@ -689,7 +766,9 @@ export async function runOpenAICompatStructuredCall<T>(
           : f,
       );
     }
-    await sleep(TRANSPORT_BACKOFF_MS[Math.min(transportRetries, TRANSPORT_BACKOFF_MS.length - 1)] ?? 3_000);
+    // W4-F1: server Retry-After (when the failing response carried one) beats the
+    // jittered exponential curve; both cap at RETRY_MAX_BACKOFF_MS.
+    await sleep(backoffDelayMs(transportRetries + 1, retryAfterMsHint, random));
     transportRetries += 1;
   }
 }
