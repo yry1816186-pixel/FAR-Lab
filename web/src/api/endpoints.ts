@@ -16,7 +16,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSources,
 } from './normalize';
-import type { FeedbackSourceKind, ResearchRun, RunEvent, RunSummary, ScientificGoalType, VerificationReport } from './types';
+import type { BundleSummary, FeedbackSourceKind, ResearchRun, RunEvent, RunSummary, ScientificGoalType, VerificationReport } from './types';
 
 const BASE = '/api/v1';
 
@@ -53,6 +53,33 @@ export const getRevisions = async (runId: string, signal?: AbortSignal) =>
 
 export const getReceipts = async (runId: string, signal?: AbortSignal) =>
   normalizeReceipts(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/receipts`, signal));
+
+/** First-class bundle discovery (D-060) — replaces the event-regex scan in ProvenanceTab. */
+export const getBundles = async (runId: string, signal?: AbortSignal): Promise<BundleSummary[]> => {
+  const data: unknown = await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/bundles`, signal);
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { bundles?: unknown }).bundles)) {
+    const list = (data as { bundles: unknown[] }).bundles;
+    const out: BundleSummary[] = [];
+    for (const item of list) {
+      if (typeof item === 'object' && item !== null) {
+        const b = item as { id?: unknown; createdAt?: unknown; evidenceLevel?: unknown };
+        if (typeof b.id === 'string' && typeof b.createdAt === 'string') {
+          out.push({ id: b.id, createdAt: b.createdAt, evidenceLevel: typeof b.evidenceLevel === 'string' ? b.evidenceLevel : '' });
+        }
+      }
+    }
+    if (list.length > 0 && out.length === 0) {
+      throw new ApiError({ code: 'unexpected_schema', message: 'bundles 列表结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'bundles list' } });
+    }
+    return out;
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: 'bundles 响应缺少 bundles 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'bundles envelope' } });
+};
+
+/** Re-run the export stage for a settled run whose revision is newer than its latest bundle (server-guarded). */
+export const reexportRun = async (runId: string, signal?: AbortSignal): Promise<void> => {
+  await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/reexport`, {}, signal);
+};
 
 export const getReport = async (runId: string, signal?: AbortSignal): Promise<string> => {
   const text = await api.getText(`${BASE}/runs/${encodeURIComponent(runId)}/report`, signal);

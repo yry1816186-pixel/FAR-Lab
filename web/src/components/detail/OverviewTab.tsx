@@ -55,6 +55,9 @@ export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: (
         {run.cancelRequested && (
           <p className="callout callout--warn">{t('controls.cancelRequested')}</p>
         )}
+        {(run.status === 'running' || run.status === 'queued') && run.leaseInfo !== undefined && !run.leaseInfo.live && (
+          <p className="callout callout--warn" role="status">{t('overview.frozenHint')}</p>
+        )}
         {(run.status === 'partial' || run.status === 'failed') && (
           <div className="callout callout--err" role="alert">
             <strong>{run.status === 'partial' ? t('overview.partialNotice') : t('status.failed')}</strong>

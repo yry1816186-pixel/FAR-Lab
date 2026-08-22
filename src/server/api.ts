@@ -344,7 +344,27 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
   };
 
   const runDetail = (res: http.ServerResponse, runId: string): void => {
-    sendJson(res, 200, mustGetRun(runId));
+    const run = mustGetRun(runId);
+    // Lease projection (W8 single-writer semantics) so the UI can surface frozen-run
+    // state honestly instead of inferring it from silence. `live` uses the same
+    // computation as the CLI status command.
+    const lease = app.store.getRunLease(runId);
+    const leaseLive = lease.holder !== null && (lease.expiresAt ?? '') > new Date().toISOString();
+    sendJson(res, 200, {
+      ...run,
+      leaseInfo: { holder: lease.holder, expiresAt: lease.expiresAt ?? null, live: leaseLive },
+    });
+  };
+
+  /** First-class bundle discovery (D-060: replaces the client-side event-regex scan). */
+  const runBundles = (res: http.ServerResponse, runId: string): void => {
+    mustGetRun(runId);
+    const bundles = app.store.listObjects('bundle', runId).map((b) => ({
+      id: b.id,
+      createdAt: b.createdAt,
+      evidenceLevel: b.declaredEvidenceLevel,
+    }));
+    sendJson(res, 200, { bundles });
   };
 
   const runEvents = (res: http.ServerResponse, runId: string, url: URL): void => {
@@ -589,6 +609,7 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
           mustGetRun(runId);
           return sendJson(res, 200, { receipts: app.store.listObjects('receipt', runId) });
         }
+        if (leaf === 'bundles' && method === 'GET') return runBundles(res, runId);
         if (leaf === 'cancel' && method === 'POST') return cancelRun(res, runId);
         if (leaf === 'resume' && method === 'POST') return resumeRun(res, runId);
         if (leaf === 'feedback' && method === 'POST') return receiveFeedback(req, res, runId);

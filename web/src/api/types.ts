@@ -50,6 +50,13 @@ export interface RunEvent {
   receiptId?: string;
 }
 
+/** Cross-process single-writer lease projection (W8); `live=false` while status='running' = frozen-run signal. */
+export interface RunLeaseInfo {
+  holder: string | null;
+  expiresAt: string | null;
+  live: boolean;
+}
+
 export interface ResearchRun {
   id: string;
   questionId: string;
@@ -62,6 +69,15 @@ export interface ResearchRun {
   cancelRequested: boolean;
   parentRunId?: string;
   tags: string[];
+  /** Present since D-060: server projects lease state on the run detail. */
+  leaseInfo?: RunLeaseInfo;
+}
+
+/** Bundle summary served by GET /runs/:id/bundles (first-class discovery, D-060). */
+export interface BundleSummary {
+  id: string;
+  createdAt: string;
+  evidenceLevel: string;
 }
 
 /**

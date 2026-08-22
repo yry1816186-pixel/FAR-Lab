@@ -71,7 +71,7 @@ export function RunDetail({
       case 'hypotheses': return <HypothesesTab run={run} />;
       case 'plan': return <PlanTab run={run} />;
       case 'revisions': return <RevisionsTab run={run} />;
-      case 'provenance': return <ProvenanceTab run={run} events={events} />;
+      case 'provenance': return <ProvenanceTab run={run} events={events} onMutated={onMutated} />;
       case 'events': return <EventsTab run={run} events={events} />;
     }
   };
