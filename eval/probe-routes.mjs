@@ -9,14 +9,14 @@ import { loadLocalSecrets } from './load-secrets.mjs';
 loadLocalSecrets(); // .far-run/secrets.env keys (names only in any output)
 
 const ROUTES = [
-  { name: 'deepseek', url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat', keyEnv: 'DEEPSEEK_API_KEY' },
-  { name: 'zai', url: 'https://api.z.ai/api/paas/v4/chat/completions', model: 'glm-4.6', keyEnv: 'ZAI_API_KEY' },
+  // DeepSeek REMOVED 2026-08-22: user directive — this project must not use ANY DeepSeek model.
   { name: 'dashscope', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', model: 'qwen-plus', keyEnv: 'DASHSCOPE_API_KEY' },
+  { name: 'zai', url: 'https://api.z.ai/api/paas/v4/chat/completions', model: 'glm-5.3', keyEnv: 'ZHIPU_API_KEY', fallbackEnv: 'ZAI_API_KEY' },
 ];
 
 let live = 0;
 for (const r of ROUTES) {
-  const key = process.env[r.keyEnv];
+  const key = process.env[r.keyEnv] ?? (r.fallbackEnv ? process.env[r.fallbackEnv] : undefined);
   if (!key) { console.log(`${r.name}: NO-KEY`); continue; }
   try {
     const res = await fetch(r.url, {

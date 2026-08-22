@@ -21,16 +21,38 @@
  * measurement: eval/judge-variance.mjs.
  *
  * Usage: node eval/rediscovery.mjs [--skip-runs] [--sample N]
- * Env: DEEPSEEK_API_KEY. Writes eval/results/rediscovery.jsonl (+ -runs.jsonl).
+ * Env: FARLAB_JUDGE_PROVIDER=zai|dashscope (deepseek banned 2026-08-22; default zai); key via env or .far-run/secrets.env.
+ * Writes eval/results/rediscovery.jsonl (+ -runs.jsonl).
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { makeProvider } from './lib.mjs';
 import { TASKS, renderTopHypothesis, waitForTerminal, GT_REV } from './rediscovery-tasks.mjs';
 import { judgeRediscovery } from './rediscovery-judge.mjs';
 import { loadLocalSecrets } from './load-secrets.mjs';
 loadLocalSecrets(); // .far-run/secrets.env keys (names only in any output)
+import { createZaiProvider } from '../dist/providers/zai.js';
+import { createDashScopeProvider } from '../dist/providers/dashscope.js';
+import { createGlmAnthropicProvider } from './glm-anthropic-provider.mjs';
+
+// Judge + run-generation provider (deepseek BANNED by user directive 2026-08-22).
+// Default 'glm' = Zhipu bigmodel.cn ANTHROPIC protocol, glm-5.3 (user's funded route).
+const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'glm';
+// Main-pipeline provider for RUN GENERATION: only deepseek/zai/dashscope exist there
+// (OpenAI protocol). deepseek banned; zai endpoint has no resource pack for this
+// account; so with PROVIDER='glm' the pipeline CANNOT generate new runs — run
+// generation is skipped with an explicit message (the glm route serves JUDGING only).
+const PIPELINE_PROVIDER = { glm: null, zai: 'zai', dashscope: 'dashscope' }[PROVIDER] ?? null;
+const farRunEnv = () => (PIPELINE_PROVIDER ? { ...process.env, FARLAB_MODEL_PROVIDER: PIPELINE_PROVIDER } : null);
+const makeLiveProvider = () => {
+  if (PROVIDER === 'glm') return createGlmAnthropicProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+  if (PROVIDER === 'zai') {
+    process.env.ZHIPU_API_KEY ??= process.env.ZAI_API_KEY; // secrets.env may use either name
+    return createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+  }
+  if (PROVIDER === 'dashscope') return createDashScopeProvider({ totalTimeoutMs: 300_000 });
+  die(`unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (glm|zai|dashscope; deepseek banned by user directive)`);
+};
 
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
 const OUT = join(RESULTS_DIR, 'rediscovery.jsonl');
@@ -39,17 +61,19 @@ const SKIP_RUNS = process.argv.includes('--skip-runs');
 const SAMPLE_N = Number(process.env.REDISCOVERY_N ?? 5);
 
 const die = (msg) => { console.error('FATAL: ' + msg); process.exit(1); };
-const provider = makeProvider();
-if (!provider.liveReady) die('DEEPSEEK_API_KEY not set');
+const provider = makeLiveProvider();
+if (!provider.liveReady) die(`${PROVIDER} route not live-ready (missing API key?)`);
 
 const sample = TASKS.slice(0, SAMPLE_N);
 mkdirSync(RESULTS_DIR, { recursive: true });
 
 const farRun = (t) => {
+  const env = farRunEnv();
+  if (!env) die(`run generation unavailable on PROVIDER='${PROVIDER}': the main pipeline (OpenAI-protocol providers only) has no funded route for this account; glm serves JUDGING only. Rerun with --skip-runs to judge existing runs.`);
   const stdout = execFileSync('node', [
     'dist/cli/main.js', 'research', 'start', t.question,
     '--domain', t.domain, '--goal', t.goal, '--json',
-  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30 * 60_000 });
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30 * 60_000, env });
   const line = stdout.split('\n').find((l) => l.trim().startsWith('{'));
   return JSON.parse(line ?? '{}');
 };
@@ -98,7 +122,7 @@ for (const r of runs) {
     continue;
   }
   records.push({
-    task: r.task, runId: r.runId, judge: 'deepseek-chat', temperature: 0, gtRev: GT_REV,
+    task: r.task, runId: r.runId, judge: provider.modelId, judgeRoute: PROVIDER, temperature: 0, gtRev: GT_REV,
     matcher: res.matcher,
     decomposition: res.decomposition,
     agentClaims: res.agentClaims.length, gtClaims: t.gtClaims.length,
