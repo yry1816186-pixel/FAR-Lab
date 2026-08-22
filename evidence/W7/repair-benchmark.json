@@ -1,0 +1,35 @@
+{
+ "corpus": {
+  "valid": {
+   "n": 6,
+   "before": 6,
+   "after": 6
+  },
+  "broken": {
+   "n": 75,
+   "before": 12,
+   "after": 75
+  }
+ },
+ "fuzz": {
+  "n": 192,
+  "before": 192,
+  "after": 192,
+  "afterExactIntent": 192
+ },
+ "latency": {
+  "liveSample24kMsPerCall": {
+   "before": 1.1,
+   "after": 1.55
+  },
+  "midDocRepairMsPerCall": {
+   "after": 0.011
+  }
+ },
+ "live": {
+  "fullSample": {
+   "before": false,
+   "after": false
+  }
+ }
+}

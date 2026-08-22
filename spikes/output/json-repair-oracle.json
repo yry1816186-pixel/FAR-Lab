@@ -1,0 +1,500 @@
+[
+ {
+  "name": "fence-basic",
+  "input": "```json\n{\"a\":1}\n```",
+  "output": "\n{\"a\":1}\n",
+  "error": null
+ },
+ {
+  "name": "fence-no-lang",
+  "input": "```\n{\"a\":1}\n```",
+  "output": "\n{\"a\":1}\n",
+  "error": null
+ },
+ {
+  "name": "fence-array",
+  "input": "[```json\n[1,2]\n```",
+  "output": "\n[1,2]\n",
+  "error": null
+ },
+ {
+  "name": "fence-object",
+  "input": "{```json\n{\"a\":1}\n```",
+  "output": "\n{\"a\":1}\n",
+  "error": null
+ },
+ {
+  "name": "fence-leading-space",
+  "input": "  ```json\n{\"a\":1}\n```",
+  "output": "  \n{\"a\":1}\n",
+  "error": null
+ },
+ {
+  "name": "fence-leading-tab",
+  "input": "\t```\n{\"a\":1}\n```",
+  "output": "\t\n{\"a\":1}\n",
+  "error": null
+ },
+ {
+  "name": "fence-leading-newline",
+  "input": "\n```json\n{\"a\":1}\n```",
+  "output": "\n\n{\"a\":1}\n",
+  "error": null
+ },
+ {
+  "name": "ndjson-two-objects",
+  "input": "{\"a\":1}\n{\"b\":2}",
+  "output": "[\n{\"a\":1},\n{\"b\":2}\n]",
+  "error": null
+ },
+ {
+  "name": "ndjson-missing-comma",
+  "input": "{\"a\":1}\n{\"b\":2},\n{\"c\":3}",
+  "output": "[\n{\"a\":1},\n{\"b\":2},\n{\"c\":3}\n]",
+  "error": null
+ },
+ {
+  "name": "root-trailing-comma",
+  "input": "{\"a\":1},",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "redundant-closers",
+  "input": "{\"a\":1}}]",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "obj-leading-comma",
+  "input": "{, \"a\":1}",
+  "output": "{ \"a\":1}",
+  "error": null
+ },
+ {
+  "name": "arr-leading-comma",
+  "input": "[, 1, 2]",
+  "output": "[ 1, 2]",
+  "error": null
+ },
+ {
+  "name": "obj-missing-comma",
+  "input": "{\"a\":1 \"b\":2}",
+  "output": "{\"a\":1, \"b\":2}",
+  "error": null
+ },
+ {
+  "name": "arr-missing-comma",
+  "input": "[1 2 3]",
+  "output": "[1, 2, 3]",
+  "error": null
+ },
+ {
+  "name": "obj-trailing-comma",
+  "input": "{\"a\":1,}",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "arr-trailing-comma",
+  "input": "[1,2,]",
+  "output": "[1,2]",
+  "error": null
+ },
+ {
+  "name": "obj-trailing-comma-multiline",
+  "input": "{\n  \"a\": 1,\n}",
+  "output": "{\n  \"a\": 1\n}",
+  "error": null
+ },
+ {
+  "name": "missing-colon",
+  "input": "{\"a\" 1}",
+  "output": "{\"a\": 1}",
+  "error": null
+ },
+ {
+  "name": "missing-value",
+  "input": "{\"a\":}",
+  "output": "{\"a\":null}",
+  "error": null
+ },
+ {
+  "name": "missing-value-truncated",
+  "input": "{\"a\":",
+  "output": "{\"a\":null}",
+  "error": null
+ },
+ {
+  "name": "missing-obj-close",
+  "input": "{\"a\":1",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "missing-arr-close",
+  "input": "[1,2",
+  "output": "[1,2]",
+  "error": null
+ },
+ {
+  "name": "missing-nested-close",
+  "input": "{\"a\":{\"b\":[1,2 {\"c\":3}",
+  "output": "{\"a\":{\"b\":[1,2, {\"c\":3}]}}",
+  "error": null
+ },
+ {
+  "name": "missing-close-in-string-value",
+  "input": "{\"a\":\"hello",
+  "output": "{\"a\":\"hello\"}",
+  "error": null
+ },
+ {
+  "name": "truncated-in-string-array",
+  "input": "{\"items\": [\"one",
+  "output": "{\"items\": [\"one\"]}",
+  "error": null
+ },
+ {
+  "name": "ellipsis-array",
+  "input": "[1,2,3,...]",
+  "output": "[1,2,3]",
+  "error": null
+ },
+ {
+  "name": "ellipsis-array-mid",
+  "input": "[1,2,3,...,9]",
+  "output": "[1,2,3,9]",
+  "error": null
+ },
+ {
+  "name": "ellipsis-array-leading",
+  "input": "[...,7,8,9]",
+  "output": "[7,8,9]",
+  "error": null
+ },
+ {
+  "name": "ellipsis-object",
+  "input": "{\"a\":1,...}",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "single-quoted",
+  "input": "{'a':1}",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "single-quoted-values",
+  "input": "{'a':'hello'}",
+  "output": "{\"a\":\"hello\"}",
+  "error": null
+ },
+ {
+  "name": "smart-double-quotes",
+  "input": "{\"a\": “hello”}",
+  "output": "{\"a\": \"hello\"}",
+  "error": null
+ },
+ {
+  "name": "smart-single-quotes",
+  "input": "{'a': ‘hello’}",
+  "output": "{\"a\": \"hello\"}",
+  "error": null
+ },
+ {
+  "name": "backtick-quotes",
+  "input": "{'a': `hello`}",
+  "output": "{\"a\": \"hello\"}",
+  "error": null
+ },
+ {
+  "name": "escaped-string",
+  "input": "\\\"hello world\\\"",
+  "output": "\"hello world\"",
+  "error": null
+ },
+ {
+  "name": "inner-quote-basic",
+  "input": "{\"a\":\"say \"hello\" now\"}",
+  "output": "{\"a\":\"say \\\"hello\\\" now\"}",
+  "error": null
+ },
+ {
+  "name": "inner-quote-live-shape",
+  "input": "{\"note\":\"damage could...\"expected morphology\" large H3\" }",
+  "output": "{\"note\":\"damage could...\\\"expected morphology\\\" large H3\" }",
+  "error": null
+ },
+ {
+  "name": "inner-quote-no-space",
+  "input": "{\"a\":\"he said \"hi\"}",
+  "output": "{\"a\":\"he said \\\"hi\"}",
+  "error": null
+ },
+ {
+  "name": "inner-quote-digit-after",
+  "input": "{\"a\":\"size 72\"5\"}",
+  "output": null,
+  "error": "Colon expected at position 16"
+ },
+ {
+  "name": "inner-quote-unclosed-bracket",
+  "input": "{\"a\":\"a (b\" ) c\"}",
+  "output": "{\"a\":\"a (b\\\" ) c\"}",
+  "error": null
+ },
+ {
+  "name": "missing-end-quote-delimiter-tail",
+  "input": "[\"hello,",
+  "output": "[\"hello\"]",
+  "error": null
+ },
+ {
+  "name": "missing-end-quote-comma-tail",
+  "input": "{\"a\":\"b,c,\"d\":\"e\"}",
+  "output": "{\"a\":\"b,c\",\"d\":\"e\"}",
+  "error": null
+ },
+ {
+  "name": "missing-end-quote-stop-at-delim",
+  "input": "{\"a\":\"hello world, \"b\": 2}",
+  "output": "{\"a\":\"hello world\", \"b\": 2}",
+  "error": null
+ },
+ {
+  "name": "truncated-unicode",
+  "input": "{\"a\":\"\\u26\"]",
+  "output": null,
+  "error": "Invalid unicode character \"\\u26\"]\" at position 6"
+ },
+ {
+  "name": "truncated-unicode-eof",
+  "input": "{\"a\":\"\\u26",
+  "output": "{\"a\":\"\"}",
+  "error": null
+ },
+ {
+  "name": "invalid-escape",
+  "input": "{\"a\":\"x\\qy\"}",
+  "output": "{\"a\":\"xqy\"}",
+  "error": null
+ },
+ {
+  "name": "backslash-newline",
+  "input": "{\"a\":\"x\\\ny\"}",
+  "output": "{\"a\":\"x\\ny\"}",
+  "error": null
+ },
+ {
+  "name": "raw-newline-in-string",
+  "input": "{\"a\":\"line1\nline2\"}",
+  "output": "{\"a\":\"line1\\nline2\"}",
+  "error": null
+ },
+ {
+  "name": "raw-tab-in-string",
+  "input": "{\"a\":\"x\ty\"}",
+  "output": "{\"a\":\"x\\ty\"}",
+  "error": null
+ },
+ {
+  "name": "concatenated",
+  "input": "{\"a\":\"hello\" + \"world\"}",
+  "output": "{\"a\":\"helloworld\"}",
+  "error": null
+ },
+ {
+  "name": "leading-zeros",
+  "input": "{\"a\":00123}",
+  "output": "{\"a\":\"00123\"}",
+  "error": null
+ },
+ {
+  "name": "missing-leading-zero",
+  "input": "{\"a\":.5}",
+  "output": "{\"a\":0.5}",
+  "error": null
+ },
+ {
+  "name": "missing-leading-zero-neg",
+  "input": "{\"a\":-.5}",
+  "output": "{\"a\":-0.5}",
+  "error": null
+ },
+ {
+  "name": "truncated-dot-number",
+  "input": "{\"a\":2.",
+  "output": "{\"a\":2.0}",
+  "error": null
+ },
+ {
+  "name": "truncated-exp-number",
+  "input": "{\"a\":2e}",
+  "output": "{\"a\":2e0}",
+  "error": null
+ },
+ {
+  "name": "lone-minus",
+  "input": "{\"a\":-}",
+  "output": "{\"a\":-0}",
+  "error": null
+ },
+ {
+  "name": "multi-dot-fallback-string",
+  "input": "{\"a\":1.2.3}",
+  "output": "{\"a\":\"1.2.3\"}",
+  "error": null
+ },
+ {
+  "name": "python-true",
+  "input": "{\"a\":True}",
+  "output": "{\"a\":true}",
+  "error": null
+ },
+ {
+  "name": "python-false",
+  "input": "{\"a\":False}",
+  "output": "{\"a\":false}",
+  "error": null
+ },
+ {
+  "name": "python-none",
+  "input": "{\"a\":None}",
+  "output": "{\"a\":null}",
+  "error": null
+ },
+ {
+  "name": "js-undefined",
+  "input": "{\"a\":undefined}",
+  "output": "{\"a\":null}",
+  "error": null
+ },
+ {
+  "name": "unquoted-key",
+  "input": "{a:1}",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "unquoted-value",
+  "input": "{\"a\":hello}",
+  "output": "{\"a\":\"hello\"}",
+  "error": null
+ },
+ {
+  "name": "unquoted-multiword-value",
+  "input": "{status: ok fine}",
+  "output": "{\"status\": \"ok fine\"}",
+  "error": null
+ },
+ {
+  "name": "jsonp-callback",
+  "input": "callback({\"a\":1});",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "mongodb-numberlong",
+  "input": "{\"a\":NumberLong(\"2\")}",
+  "output": "{\"a\":\"2\"}",
+  "error": null
+ },
+ {
+  "name": "regex-literal",
+  "input": "{\"a\":/ab+c/}",
+  "output": "{\"a\":\"/ab+c/\"}",
+  "error": null
+ },
+ {
+  "name": "block-comment",
+  "input": "{/* c */\"a\":1}",
+  "output": "{\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "line-comment",
+  "input": "{\n// note\n\"a\":1}",
+  "output": "{\n\n\"a\":1}",
+  "error": null
+ },
+ {
+  "name": "special-whitespace",
+  "input": "{ \"a\":1}",
+  "output": "{ \"a\":1}",
+  "error": null
+ },
+ {
+  "name": "valid-object",
+  "input": "{\"a\":1,\"b\":[1,2,{\"c\":\"x\"}]}",
+  "output": "{\"a\":1,\"b\":[1,2,{\"c\":\"x\"}]}",
+  "error": null
+ },
+ {
+  "name": "valid-array",
+  "input": "[1,2.5,-3,\"s\",true,false,null]",
+  "output": "[1,2.5,-3,\"s\",true,false,null]",
+  "error": null
+ },
+ {
+  "name": "valid-unicode-escape",
+  "input": "{\"a\":\"\\u00e9t\\u00e9\"}",
+  "output": "{\"a\":\"\\u00e9t\\u00e9\"}",
+  "error": null
+ },
+ {
+  "name": "valid-escaped-quotes",
+  "input": "{\"a\":\"say \\\"hello\\\" now\"}",
+  "output": "{\"a\":\"say \\\"hello\\\" now\"}",
+  "error": null
+ },
+ {
+  "name": "compound-fence-singleq-comma",
+  "input": "```json\n{'a': 'x', 'b': [1,2,],}\n```",
+  "output": "\n{\"a\": \"x\", \"b\": [1,2]}\n",
+  "error": null
+ },
+ {
+  "name": "compound-truncation",
+  "input": "{\"candidates\": [{\"t\": \"a\"}, {\"t\": \"b\"",
+  "output": "{\"candidates\": [{\"t\": \"a\"}, {\"t\": \"b\"}]}",
+  "error": null
+ },
+ {
+  "name": "entity-quoted-string",
+  "input": "&quot;hello&quot;",
+  "output": "\"hello\"",
+  "error": null
+ },
+ {
+  "name": "entity-inside-string",
+  "input": "{\"a\":\"x &quot;inner&quot; y\"}",
+  "output": "{\"a\":\"x &quot;inner&quot; y\"}",
+  "error": null
+ },
+ {
+  "name": "entity-numeric-quote",
+  "input": "{\"a\":&#34;v&#34;}",
+  "output": "{\"a\":\"v\"}",
+  "error": null
+ },
+ {
+  "name": "entity-amp-content",
+  "input": "{\"a\":\"A &amp; B\"}",
+  "output": "{\"a\":\"A &amp; B\"}",
+  "error": null
+ },
+ {
+  "name": "url-in-unquoted-value",
+  "input": "{\"a\":https://example.com/x}",
+  "output": "{\"a\":\"https://example.com/x\"}",
+  "error": null
+ },
+ {
+  "name": "url-in-quoted-string-stop-mode",
+  "input": "{\"a\":\"see https://example.com/x, plus notes\"",
+  "output": "{\"a\":\"see https://example.com/x, plus notes\"}",
+  "error": null
+ }
+]
