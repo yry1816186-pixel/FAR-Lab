@@ -1,0 +1,124 @@
+{
+  "mode": "live",
+  "gtRev": "gt-fixed-2026-08-22",
+  "repeats": 3,
+  "judgeRoute": {
+    "provider": "glm",
+    "modelId": "glm-5.3"
+  },
+  "generated": "2026-08-22T07:23:42.802Z",
+  "tasks": [
+    {
+      "task": "arg-plasmid-transfer",
+      "gtClaims": 9,
+      "repeatsOk": 3,
+      "f1s": [
+        0,
+        0,
+        0
+      ],
+      "maxAbsSwing": 0,
+      "variance": 0,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              11,
+              10,
+              11
+            ],
+            "selected": 11
+          },
+          "borderline": 0
+        },
+        {
+          "repeat": 2,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              10,
+              10,
+              11
+            ],
+            "selected": 10
+          },
+          "borderline": 0
+        },
+        {
+          "repeat": 3,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              11,
+              11,
+              11
+            ],
+            "selected": 11
+          },
+          "borderline": 0
+        }
+      ]
+    },
+    {
+      "task": "crc-ici-failure",
+      "gtClaims": 8,
+      "repeatsOk": 3,
+      "f1s": [
+        0.645,
+        0.706,
+        0.656
+      ],
+      "maxAbsSwing": 0.061,
+      "variance": 0.000705,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0.645,
+          "decomposition": {
+            "passes": [
+              11,
+              12,
+              12
+            ],
+            "selected": 12
+          },
+          "borderline": 13
+        },
+        {
+          "repeat": 2,
+          "f1": 0.706,
+          "decomposition": {
+            "passes": [
+              12,
+              12,
+              11
+            ],
+            "selected": 12
+          },
+          "borderline": 13
+        },
+        {
+          "repeat": 3,
+          "f1": 0.656,
+          "decomposition": {
+            "passes": [
+              12,
+              10,
+              12
+            ],
+            "selected": 12
+          },
+          "borderline": 13
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "tasksMeasured": 2,
+    "worstTaskSwing": 0.061,
+    "allUnderTarget015": true,
+    "allUnderStretch008": true
+  }
+}

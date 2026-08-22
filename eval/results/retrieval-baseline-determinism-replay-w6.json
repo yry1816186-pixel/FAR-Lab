@@ -1,6 +1,6 @@
 {
   "meta": {
-    "computedAt": "2026-08-22T03:45:53.324Z",
+    "computedAt": "2026-08-22T07:26:35.011Z",
     "db": "C:\\Users\\RichardYuan\\Desktop\\new\\.far-run\\far.db",
     "runsIncluded": [
       "run_7zez1a8ezbbrrgw9begtta0gsw",
@@ -48,17 +48,20 @@
       "run_vhhfvqtz9gscqd818x8e00v1w9",
       "run_s3vsdy5ny3rjv5mq2gd2kp8r1r",
       "run_zkk6d4575n7dxfnm5x78533585",
-      "run_rrm0z56gr214pbcs29bftr67q1"
+      "run_rrm0z56gr214pbcs29bftr67q1",
+      "run_bvzyg47e5g9gm4p8d1rq0sk5y3",
+      "run_52bfbgycjbxsx8qa9tw6rwrnyd",
+      "run_2p7jzqbc75gjqr8c8a4smb7h92"
     ]
   },
   "aggregate": {
     "pooled": {
-      "runs": 46,
-      "resolvedRatePooled": 0.9887,
+      "runs": 49,
+      "resolvedRatePooled": 0.9859,
       "counterSeatsKeptMin": 0,
       "counterGatePassRate": 1,
-      "rerankAppliedRate": 0.7391,
-      "truncatedRate": 0.7391
+      "rerankAppliedRate": 0.7551,
+      "truncatedRate": 0.7551
     },
     "medians": {
       "verification.resolvedRate": 1,
@@ -67,10 +70,10 @@
       "corpus.identifierResolvability": 1,
       "searches.zeroResultRate": 0.4286,
       "searches.counterZero": 1,
-      "pool.poolSize": 23.5,
-      "pool.poolYield": 0.8918,
+      "pool.poolSize": 24,
+      "pool.poolYield": 0.9048,
       "searches.totalResultCount": 24,
-      "corpus.yearMedian": 2018.5
+      "corpus.yearMedian": 2019
     }
   },
   "runs": [
@@ -114,7 +117,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 8,
@@ -184,7 +189,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 9,
@@ -254,7 +261,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 11,
@@ -324,7 +333,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 8,
@@ -394,7 +405,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 11,
@@ -464,7 +477,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 10,
@@ -534,7 +549,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 8,
@@ -604,7 +621,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 7,
@@ -674,7 +693,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 10,
@@ -744,7 +765,9 @@
         "poolYield": null,
         "rerankApplied": null,
         "rerankFailure": null,
-        "counterSeatsKept": null
+        "counterSeatsKept": null,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 13,
@@ -814,7 +837,9 @@
         "poolYield": 0.75,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -884,7 +909,9 @@
         "poolYield": 0.7083,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -954,7 +981,9 @@
         "poolYield": 0.7917,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1024,7 +1053,9 @@
         "poolYield": 0.7083,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1094,7 +1125,9 @@
         "poolYield": 0.64,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1164,7 +1197,9 @@
         "poolYield": 0.625,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 5
+        "counterSeatsKept": 5,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 15,
@@ -1234,7 +1269,9 @@
         "poolYield": 0.8333,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1304,7 +1341,9 @@
         "poolYield": 0.7838,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1374,7 +1413,9 @@
         "poolYield": 1,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1444,7 +1485,9 @@
         "poolYield": 1,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1514,7 +1557,9 @@
         "poolYield": 1,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1584,7 +1629,9 @@
         "poolYield": 1,
         "rerankApplied": false,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1654,7 +1701,9 @@
         "poolYield": 0.86,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1724,7 +1773,9 @@
         "poolYield": 0.9167,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1794,7 +1845,9 @@
         "poolYield": 0.9211,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1864,7 +1917,9 @@
         "poolYield": 1,
         "rerankApplied": false,
         "rerankFailure": null,
-        "counterSeatsKept": 6
+        "counterSeatsKept": 6,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -1934,7 +1989,9 @@
         "poolYield": 0.7,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2004,7 +2061,9 @@
         "poolYield": 0.7667,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2074,7 +2133,9 @@
         "poolYield": 0.8667,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2144,7 +2205,9 @@
         "poolYield": 0.8571,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2214,7 +2277,9 @@
         "poolYield": 0.9167,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2284,7 +2349,9 @@
         "poolYield": 0.9583,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2354,7 +2421,9 @@
         "poolYield": 1,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2424,7 +2493,9 @@
         "poolYield": 0.9545,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2494,7 +2565,9 @@
         "poolYield": 1,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2564,7 +2637,9 @@
         "poolYield": 1,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2634,7 +2709,9 @@
         "poolYield": 0.9545,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2704,7 +2781,9 @@
         "poolYield": 0.8947,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2774,7 +2853,9 @@
         "poolYield": 1,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2844,7 +2925,9 @@
         "poolYield": 1,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 0
+        "counterSeatsKept": 0,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2914,7 +2997,9 @@
         "poolYield": 0.8333,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -2984,7 +3069,9 @@
         "poolYield": 0.9048,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -3054,7 +3141,9 @@
         "poolYield": 0.8889,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -3124,7 +3213,9 @@
         "poolYield": 0.8364,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -3194,7 +3285,9 @@
         "poolYield": 0.8864,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -3264,7 +3357,9 @@
         "poolYield": 0.8704,
         "rerankApplied": true,
         "rerankFailure": null,
-        "counterSeatsKept": 4
+        "counterSeatsKept": 4,
+        "variantSearches": null,
+        "rerankWindows": null
       },
       "corpus": {
         "size": 12,
@@ -3292,6 +3387,222 @@
         "noIdentifier": 0,
         "pendingOrError": 0,
         "holeRate": 0
+      }
+    },
+    {
+      "runId": "run_bvzyg47e5g9gm4p8d1rq0sk5y3",
+      "snapshotCreatedAt": "2026-08-22T07:13:53.381Z",
+      "plan": {
+        "queryTotal": 14,
+        "byPurpose": {
+          "discovery": 6,
+          "supporting": 6,
+          "counter_evidence": 2
+        },
+        "byFamily": {
+          "openalex": 5,
+          "arxiv": 4,
+          "crossref": 5
+        },
+        "counterGatePass": true,
+        "familyFailures": 0
+      },
+      "searches": {
+        "attempted": 14,
+        "ok": 14,
+        "failed": 0,
+        "zeroResult": 3,
+        "zeroResultRate": 0.2143,
+        "counterOk": 2,
+        "counterZero": 0,
+        "totalResultCount": 61
+      },
+      "variantRecovery": {
+        "attempted": 5,
+        "ok": 5,
+        "failed": 0,
+        "recovered": 3,
+        "recoveredDocs": 13
+      },
+      "pool": {
+        "poolSize": 62,
+        "poolYield": 1.0164,
+        "rerankApplied": true,
+        "rerankFailure": null,
+        "counterSeatsKept": 4,
+        "variantSearches": 5,
+        "rerankWindows": 3
+      },
+      "corpus": {
+        "size": 12,
+        "cap": 12,
+        "truncated": true,
+        "abstractCoverage": 0.8333,
+        "parseOk": 0.8333,
+        "identifierResolvability": 0.9167,
+        "familyShare": {
+          "openalex": 0.5833,
+          "arxiv": 0,
+          "crossref": 0.4167
+        },
+        "distinctKeys": 12,
+        "yearMedian": 2018,
+        "yearMissing": 0
+      },
+      "verification": {
+        "checked": 12,
+        "resolved": 11,
+        "resolvedRate": 0.9167,
+        "titleMatchRate": 1,
+        "wrongPaperSuspect": 0,
+        "notFound": 0,
+        "noIdentifier": 1,
+        "pendingOrError": 0,
+        "holeRate": 0.0833
+      }
+    },
+    {
+      "runId": "run_52bfbgycjbxsx8qa9tw6rwrnyd",
+      "snapshotCreatedAt": "2026-08-22T07:19:59.334Z",
+      "plan": {
+        "queryTotal": 14,
+        "byPurpose": {
+          "discovery": 6,
+          "supporting": 6,
+          "counter_evidence": 2
+        },
+        "byFamily": {
+          "openalex": 5,
+          "arxiv": 4,
+          "crossref": 5
+        },
+        "counterGatePass": true,
+        "familyFailures": 0
+      },
+      "searches": {
+        "attempted": 14,
+        "ok": 14,
+        "failed": 0,
+        "zeroResult": 4,
+        "zeroResultRate": 0.2857,
+        "counterOk": 2,
+        "counterZero": 0,
+        "totalResultCount": 60
+      },
+      "variantRecovery": {
+        "attempted": 8,
+        "ok": 8,
+        "failed": 0,
+        "recovered": 4,
+        "recoveredDocs": 22
+      },
+      "pool": {
+        "poolSize": 70,
+        "poolYield": 1.1667,
+        "rerankApplied": true,
+        "rerankFailure": null,
+        "counterSeatsKept": 4,
+        "variantSearches": 8,
+        "rerankWindows": 3
+      },
+      "corpus": {
+        "size": 12,
+        "cap": 12,
+        "truncated": true,
+        "abstractCoverage": 0.75,
+        "parseOk": 0.75,
+        "identifierResolvability": 1,
+        "familyShare": {
+          "openalex": 0.8333,
+          "arxiv": 0,
+          "crossref": 0.1667
+        },
+        "distinctKeys": 12,
+        "yearMedian": 2020,
+        "yearMissing": 1
+      },
+      "verification": {
+        "checked": 12,
+        "resolved": 12,
+        "resolvedRate": 1,
+        "titleMatchRate": 1,
+        "wrongPaperSuspect": 0,
+        "notFound": 0,
+        "noIdentifier": 0,
+        "pendingOrError": 0,
+        "holeRate": 0
+      }
+    },
+    {
+      "runId": "run_2p7jzqbc75gjqr8c8a4smb7h92",
+      "snapshotCreatedAt": "2026-08-22T07:24:13.981Z",
+      "plan": {
+        "queryTotal": 14,
+        "byPurpose": {
+          "discovery": 6,
+          "supporting": 6,
+          "counter_evidence": 2
+        },
+        "byFamily": {
+          "openalex": 5,
+          "arxiv": 4,
+          "crossref": 5
+        },
+        "counterGatePass": true,
+        "familyFailures": 1
+      },
+      "searches": {
+        "attempted": 14,
+        "ok": 9,
+        "failed": 5,
+        "zeroResult": 4,
+        "zeroResultRate": 0.4444,
+        "counterOk": 1,
+        "counterZero": 0,
+        "totalResultCount": 30
+      },
+      "variantRecovery": {
+        "attempted": 6,
+        "ok": 6,
+        "failed": 0,
+        "recovered": 3,
+        "recoveredDocs": 18
+      },
+      "pool": {
+        "poolSize": 48,
+        "poolYield": 1.6,
+        "rerankApplied": true,
+        "rerankFailure": null,
+        "counterSeatsKept": 4,
+        "variantSearches": 6,
+        "rerankWindows": 3
+      },
+      "corpus": {
+        "size": 12,
+        "cap": 12,
+        "truncated": true,
+        "abstractCoverage": 0.5833,
+        "parseOk": 0.5833,
+        "identifierResolvability": 1,
+        "familyShare": {
+          "openalex": 0,
+          "arxiv": 0.4167,
+          "crossref": 0.5833
+        },
+        "distinctKeys": 12,
+        "yearMedian": 2023,
+        "yearMissing": 1
+      },
+      "verification": {
+        "checked": 11,
+        "resolved": 11,
+        "resolvedRate": 0.9167,
+        "titleMatchRate": 1,
+        "wrongPaperSuspect": 0,
+        "notFound": 0,
+        "noIdentifier": 0,
+        "pendingOrError": 1,
+        "holeRate": 0.0833
       }
     }
   ]

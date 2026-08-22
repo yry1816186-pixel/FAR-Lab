@@ -148,6 +148,8 @@ export const computeRunMetrics = (snapshot, docs, searchReceipts) => {
       rerankApplied: snapshot.fusion?.rerankApplied ?? null,
       rerankFailure: snapshot.fusion?.rerankFailure ?? null,
       counterSeatsKept: snapshot.fusion?.counterSeatsKept ?? null,
+      variantSearches: snapshot.fusion?.variantSearches ?? null,
+      rerankWindows: snapshot.fusion?.rerankWindows ?? null,
     },
     corpus: {
       size: total,
@@ -261,8 +263,11 @@ export const compareReports = (before, after) => {
 // ---- main (CLI only; pure functions above stay importable for tests) ----
 const isMainModule = import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
 if (isMainModule && has('--compare')) {
-  const beforePath = flag('--compare');
-  const afterPath = args[args.indexOf('--compare') + 1];
+  // Two positional args after --compare: BEFORE then AFTER (the old code read the
+  // same index twice and compared a file with itself — caught on the first real use).
+  const cmpIdx = args.indexOf('--compare');
+  const beforePath = args[cmpIdx + 1];
+  const afterPath = args[cmpIdx + 2];
   const before = JSON.parse(readFileSync(resolve(process.cwd(), beforePath), 'utf8'));
   const after = JSON.parse(readFileSync(resolve(process.cwd(), afterPath), 'utf8'));
   const report = compareReports(before, after);

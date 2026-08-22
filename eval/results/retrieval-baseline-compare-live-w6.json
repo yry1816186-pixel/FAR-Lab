@@ -1,0 +1,116 @@
+{
+  "before": {
+    "computedAt": "2026-08-22T03:46:03.071Z",
+    "db": "C:\\Users\\RichardYuan\\Desktop\\new\\.far-run\\far.db",
+    "runsIncluded": [
+      "run_7zez1a8ezbbrrgw9begtta0gsw",
+      "run_yhp0m4kg6qnjmemhj9k5wbmk00",
+      "run_rnjevw1teza5bmjesxybc0g98y",
+      "run_2wmhyer1bdyqrangk2g757p9c2",
+      "run_9w34j5fszr6vqbx82tqptkweex",
+      "run_s9na3s0s5g9pa35448c5wx4a46",
+      "run_5s1kf7qa86g0qewphw7e5v241p",
+      "run_bbnbjqywdktdyc60srya9qg39d",
+      "run_h1tmxmv1zz04153bynt28bct3v",
+      "run_qmesn5fg64yk31mdt0de0bwg2n",
+      "run_zr0gc5jxykqmrztw11j9czqef0",
+      "run_nmzfz3qbhd3394bgzvg4bpqca2",
+      "run_z8xetk84z399yzedftkygr1je5",
+      "run_e8d53awf276b01fmycaebtze8c",
+      "run_fr67580x6asqm0mgnncbmpppph",
+      "run_1egthjvkgwbssw93bz2y7yqzdk",
+      "run_28ph6sqq4ahc2fr8zn4yrpcceh",
+      "run_8w2h8ctns2a149j0hc0yb9gmep",
+      "run_q17j6mehhbhxvx1szdsqhemvq7",
+      "run_tcvvqcwstf32t7mkzpe64b3cp6",
+      "run_bbr9jt165n52j1wf6s1m8734eh",
+      "run_z8b0yy8b432n9ybfssw1rh3s2a",
+      "run_aqbhgzjq33ag398bwh73qhqj6b",
+      "run_sgc9cy4cqgjz64xznqcgefp270",
+      "run_1vfwhd8w7fp8d303evyrwye1k2",
+      "run_3c3zyycempz9dcqp509fmgmw8k",
+      "run_tbhdxrfytc8z4yhepf5xtfjcya",
+      "run_8n37pfxnmjd0tyqggf4zgj03dm",
+      "run_30zhf7nptvycfgtdjmngws44yp",
+      "run_wbdtbwm0wvq3f5ynjceg1p9v71",
+      "run_wkncq5pvspphp5y24gs817gnzh",
+      "run_a73mdjamb4pf4f1gqt274pss1p",
+      "run_56x0tj68dyjh0w5rca644dchdw",
+      "run_z1d63kcbpe4x523arjxpypgd4m",
+      "run_prrxcee6x58fv44temqa02b9mj",
+      "run_tvan8acwv69k0r0zhqr2hprtf3",
+      "run_1egsvvs4s98zgsh5bkp0h5ct6x",
+      "run_ffv483wv1yv3mk05kvde53h761",
+      "run_0ryc6a6cn1mdpssjj1j2bhsve6",
+      "run_en8b1xjxb8h0064v1y9jq133f3",
+      "run_9f7tvkf7fk3j71bfb7rrxgwzn8",
+      "run_j5mjznfp8bp502axcavr2wy2yf",
+      "run_vhhfvqtz9gscqd818x8e00v1w9",
+      "run_s3vsdy5ny3rjv5mq2gd2kp8r1r",
+      "run_zkk6d4575n7dxfnm5x78533585",
+      "run_rrm0z56gr214pbcs29bftr67q1"
+    ]
+  },
+  "after": {
+    "computedAt": "2026-08-22T07:25:53.897Z",
+    "db": "C:\\Users\\RichardYuan\\Desktop\\new\\.far-run\\far.db",
+    "runsIncluded": [
+      "run_2p7jzqbc75gjqr8c8a4smb7h92",
+      "run_52bfbgycjbxsx8qa9tw6rwrnyd",
+      "run_bvzyg47e5g9gm4p8d1rq0sk5y3"
+    ]
+  },
+  "rows": [
+    {
+      "metric": "verification.resolvedRate",
+      "before": 1,
+      "after": 0.9167,
+      "delta": -0.0833,
+      "verdict": "REGRESSION"
+    },
+    {
+      "metric": "verification.holeRate",
+      "before": 0,
+      "after": 0.0833,
+      "delta": 0.0833,
+      "verdict": "REGRESSION"
+    },
+    {
+      "metric": "corpus.abstractCoverage",
+      "before": 0.8333,
+      "after": 0.75,
+      "delta": -0.0833,
+      "verdict": "REGRESSION"
+    },
+    {
+      "metric": "corpus.identifierResolvability",
+      "before": 1,
+      "after": 1,
+      "delta": 0,
+      "verdict": "unchanged"
+    },
+    {
+      "metric": "searches.zeroResultRate",
+      "before": 0.4286,
+      "after": 0.2857,
+      "delta": -0.1429,
+      "verdict": "improved"
+    },
+    {
+      "metric": "searches.counterZero",
+      "before": 1,
+      "after": 0,
+      "delta": -1,
+      "verdict": "improved"
+    },
+    {
+      "metric": "pooled.resolvedRatePooled",
+      "before": 0.9887,
+      "after": 0.9444,
+      "verdict": "REGRESSION"
+    }
+  ],
+  "counterSeatsFloorHeld": true,
+  "regressionCount": 4,
+  "verdict": "HAS_REGRESSIONS"
+}
