@@ -142,18 +142,40 @@ const dispatch = async (sub: string | undefined, a: Args, usage: string): Promis
     const w = openWorld(a.dataDir);
     try {
       const maxJobs = a.arg('--max-jobs') !== undefined ? Number(a.arg('--max-jobs')) : undefined;
+      const device = a.arg('--device') ?? 'local';
+      const { openDeviceRegistry } = await import('../experiment/devices.js');
+      const registry = openDeviceRegistry(path.join(a.dataDir, 'devices.json'));
+      if (!registry.ids().includes(device)) {
+        return { code: 2, text: `unknown device '${device}' (declared: ${registry.ids().join(', ')})` };
+      }
+      const executeVia = registry.isLocal(device) ? undefined : async (
+        store: import('../persistence/store.js').Store,
+        artifacts: import('../shared/ports.js').ArtifactStore,
+        spec: import('../domain/index.js').ExperimentSpec,
+        o: { allowLocalDatasets?: boolean; existingRunId: { toString(): string }; shouldCancel: () => boolean },
+      ) => {
+        const { executeRemoteExperiment } = await import('../experiment/remote-executor.js');
+        await executeRemoteExperiment(store, artifacts, spec, {
+          gateway: registry.gatewayFor(device), deviceId: device,
+          allowLocalDatasets: o.allowLocalDatasets,
+          existingRunId: o.existingRunId as never,
+          shouldCancel: o.shouldCancel,
+        });
+      };
       const out = await runSchedulerWorker(w.store, w.artifacts, w.scheduler, {
-        worker: `cli-${process.pid}`,
+        worker: `cli-${process.pid}-${device}`,
         maxRunning: Number(a.arg('--max-running') ?? 2),
         heartbeatTtlMs: 120_000,
         heartbeatMs: Number(a.arg('--heartbeat-ms') ?? 5_000),
         allowLocalDatasets: a.flag('--allow-local-datasets'),
         maxJobs,
+        device,
+        executeVia: executeVia as never,
       });
       return {
         code: out.failed > 0 ? 1 : 0,
-        json: out,
-        text: `worker drained: executed=${out.executed} failed=${out.failed}`,
+        json: { ...out, device },
+        text: `worker(${device}) drained: executed=${out.executed} failed=${out.failed}`,
       };
     } finally {
       w.close();

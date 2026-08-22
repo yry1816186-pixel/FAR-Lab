@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { newId, type ExperimentRunId, type RunId, type ExperimentSpec, checkExperimentSpec } from '../domain/index.js';
+import { newId, ExperimentSpec, type ExperimentRunId, type ExperimentRun, type RunId, checkExperimentSpec } from '../domain/index.js';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
 import { experimentSpecHash, executeExperiment } from './executor.js';
@@ -46,6 +46,9 @@ const SCHEMA_V1 = `
   CREATE INDEX IF NOT EXISTS idx_jobs_heartbeat ON jobs(status, heartbeat_at);
 `;
 
+/** v2: per-device dispatch — workers bind to one device and only claim its jobs. */
+const MIGRATION_V2 = 'ALTER TABLE jobs ADD COLUMN device TEXT NOT NULL DEFAULT \'local\'; CREATE INDEX IF NOT EXISTS idx_jobs_device ON jobs(device, status, priority DESC);';
+
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled';
 
 export interface SchedulerJob {
@@ -60,6 +63,7 @@ export interface SchedulerJob {
   heartbeatAt: string | null;
   attempts: number;
   cancelRequested: boolean;
+  device: string;
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
@@ -72,9 +76,9 @@ export interface Claim {
 }
 
 export interface Scheduler {
-  enqueue(input: { experimentRunId: string; runId: string; specId: string; priority?: number; at?: string }): SchedulerJob;
-  /** Atomically claim the highest-priority runnable job (fresh queued, or running with an expired heartbeat). */
-  claimNext(worker: string, opts: { maxRunning: number; heartbeatTtlMs: number; at?: string }): Claim | null;
+  enqueue(input: { experimentRunId: string; runId: string; specId: string; priority?: number; device?: string; at?: string }): SchedulerJob;
+  /** Atomically claim the highest-priority runnable job (fresh queued, or running with an expired heartbeat) on THIS device. */
+  claimNext(worker: string, opts: { maxRunning: number; heartbeatTtlMs: number; device?: string; at?: string }): Claim | null;
   heartbeat(jobId: string, worker: string, fenceToken: number, at?: string): boolean;
   /** Terminal write; requires the current fence token+worker — disowned writers are rejected loudly. */
   complete(jobId: string, worker: string, fenceToken: number, outcome: { ok: boolean; error?: string }, at?: string): boolean;
@@ -99,6 +103,7 @@ const rowToJob = (r: Record<string, unknown>): SchedulerJob => ({
   heartbeatAt: r.heartbeat_at === null || r.heartbeat_at === undefined ? null : String(r.heartbeat_at),
   attempts: Number(r.attempts),
   cancelRequested: Number(r.cancel_requested) === 1,
+  device: r.device === null || r.device === undefined ? 'local' : String(r.device),
   createdAt: String(r.created_at),
   startedAt: r.started_at === null || r.started_at === undefined ? null : String(r.started_at),
   endedAt: r.ended_at === null || r.ended_at === undefined ? null : String(r.ended_at),
@@ -111,6 +116,21 @@ export const openScheduler = (dbPath: string): Scheduler => {
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA_V1);
+  // Own tiny migration track (user_version), independent of far.db migrations.
+  if (Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0) < 2) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const current = Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0);
+      if (current < 2) {
+        db.exec(MIGRATION_V2);
+        db.exec('PRAGMA user_version = 2');
+      }
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
 
   const prepare = (sql: string) => db.prepare(sql);
   const tx = <T>(fn: () => T): T => {
@@ -126,27 +146,27 @@ export const openScheduler = (dbPath: string): Scheduler => {
   };
 
   const scheduler: Scheduler = {
-    enqueue({ experimentRunId, runId, specId, priority = 0, at }) {
+    enqueue({ experimentRunId, runId, specId, priority = 0, device = 'local', at }) {
       const now = at ?? new Date().toISOString();
       const jobId = newId('job');
       tx(() => {
-        prepare('INSERT INTO jobs (job_id, experiment_run_id, run_id, spec_id, priority, status, fence_token, attempts, cancel_requested, created_at) VALUES (?,?,?,?,?,?,?,?,0,?)')
-          .run(jobId, experimentRunId, runId, specId, priority, 'queued', 0, 0, now);
+        prepare('INSERT INTO jobs (job_id, experiment_run_id, run_id, spec_id, priority, status, fence_token, attempts, cancel_requested, created_at, device) VALUES (?,?,?,?,?,?,?,?,0,?,?)')
+          .run(jobId, experimentRunId, runId, specId, priority, 'queued', 0, 0, now, device);
       });
       return scheduler.get(jobId)!;
     },
 
-    claimNext(worker, { maxRunning, heartbeatTtlMs, at }) {
+    claimNext(worker, { maxRunning, heartbeatTtlMs, at, device = 'local' }) {
       const now = at ?? new Date().toISOString();
       const staleBefore = new Date(Date.parse(now) - heartbeatTtlMs).toISOString();
       return tx(() => {
         // Only LIVE running jobs (heartbeat newer than the TTL) occupy concurrency
         // slots; a stale running job is a dead worker and is reclaimable below.
-        const running = prepare("SELECT COUNT(*) AS n FROM jobs WHERE status='running' AND heartbeat_at >= ?").get(staleBefore);
+        const running = prepare("SELECT COUNT(*) AS n FROM jobs WHERE status='running' AND heartbeat_at >= ? AND device=?").get(staleBefore, device);
         if (Number(running?.n ?? 0) >= maxRunning) return null;
         const row = prepare(
-          "SELECT * FROM jobs WHERE status='queued' OR (status='running' AND heartbeat_at IS NOT NULL AND heartbeat_at < ?) ORDER BY priority DESC, id ASC LIMIT 1",
-        ).get(staleBefore);
+          "SELECT * FROM jobs WHERE device=? AND (status='queued' OR (status='running' AND heartbeat_at IS NOT NULL AND heartbeat_at < ?)) ORDER BY priority DESC, id ASC LIMIT 1",
+        ).get(device, staleBefore);
         if (row === undefined) return null;
         const job = rowToJob(row);
         const reclaimed = job.status === 'running';
@@ -223,7 +243,7 @@ export const enqueueExperiment = (
   store: Store,
   scheduler: Scheduler,
   spec: ExperimentSpec,
-  opts: { priority?: number; allowLocalDatasets?: boolean } = {},
+  opts: { priority?: number; allowLocalDatasets?: boolean; device?: string } = {},
 ): { experimentRunId: ExperimentRunId; jobId: string } => {
   const hypotheses = store.listObjects('hypothesis', spec.runId);
   const validation = checkExperimentSpec(spec, {
@@ -231,7 +251,9 @@ export const enqueueExperiment = (
     allowLocalDatasets: opts.allowLocalDatasets,
   });
   if (!validation.passed) throw new Error(`spec failed validation: ${validation.missing.join('; ')}`);
-  const validated = { ...spec, validation };
+  // Parse FIRST: defaults filled here must match what the worker reads back from the
+  // store, or the hash comparison would false-positive on default-valued fields.
+  const validated = ExperimentSpec.parse({ ...spec, validation });
   store.putObject('experiment_spec', validated); // the worker reads the spec back by id
   const specHash = experimentSpecHash(validated);
   // Reuse a prior queued run for this spec if present (enqueue idempotence).
@@ -251,14 +273,15 @@ export const enqueueExperiment = (
     createdAt: new Date().toISOString(),
   };
   store.putObjectEvented('experiment_run', run, { type: 'experiment_queued', detail: { specId: spec.id, specHash } });
-  const job = scheduler.enqueue({ experimentRunId: run.id, runId: spec.runId, specId: spec.id, priority: opts.priority ?? 0 });
+  const job = scheduler.enqueue({ experimentRunId: run.id, runId: spec.runId, specId: spec.id, priority: opts.priority ?? 0, device: opts.device ?? 'local' });
   return { experimentRunId: run.id as ExperimentRunId, jobId: job.jobId };
 };
 
 /**
- * Worker loop: claim -> execute (reusing the queued experiment_run) -> terminal
- * projection in far.db (executeExperiment) + scheduler completion. Heartbeats are
- * renewed around each model to keep long trainings adopted (D-085 P0-2 note).
+ * Worker loop: claim (on the bound device) -> execute -> terminal projection in far.db
+ * (executeExperiment) + scheduler completion. Heartbeats renew around each job to keep
+ * long trainings adopted (D-085 P0-2 note). `executeVia` lets a device-specific runner
+ * replace the local sidecar path (P3: remote executor over the SSH gateway).
  */
 export const runSchedulerWorker = async (
   store: Store,
@@ -271,6 +294,13 @@ export const runSchedulerWorker = async (
     heartbeatMs?: number;
     allowLocalDatasets?: boolean;
     maxJobs?: number;
+    device?: string;
+    executeVia?: (
+      store: Store,
+      artifacts: ArtifactStore,
+      spec: ExperimentSpec,
+      o: { allowLocalDatasets?: boolean; existingRunId: ExperimentRun['id']; shouldCancel: () => boolean },
+    ) => Promise<unknown>;
   },
 ): Promise<{ executed: number; failed: number }> => {
   let executed = 0;
@@ -278,9 +308,10 @@ export const runSchedulerWorker = async (
   let beat: ReturnType<typeof setInterval> | undefined;
   let current: { jobId: string; fenceToken: number } | undefined;
   let taken = 0;
+  const device = opts.device ?? 'local';
   try {
     while (opts.maxJobs === undefined || taken < opts.maxJobs) {
-      const claim = scheduler.claimNext(opts.worker, { maxRunning: opts.maxRunning, heartbeatTtlMs: opts.heartbeatTtlMs });
+      const claim = scheduler.claimNext(opts.worker, { maxRunning: opts.maxRunning, heartbeatTtlMs: opts.heartbeatTtlMs, device });
       if (claim === null) break;
       taken += 1;
       current = { jobId: claim.job.jobId, fenceToken: claim.fenceToken };
@@ -288,11 +319,13 @@ export const runSchedulerWorker = async (
       try {
         const spec = store.getObject('experiment_spec', claim.job.specId);
         if (spec === null) throw new Error(`spec ${claim.job.specId} not found in far.db`);
-        await executeExperiment(store, artifacts, spec, {
+        const execOpts = {
           allowLocalDatasets: opts.allowLocalDatasets,
-          existingRunId: claim.job.experimentRunId as ExperimentRunId,
+          existingRunId: claim.job.experimentRunId as ExperimentRun['id'],
           shouldCancel: () => scheduler.cancelRequested(claim.job.jobId),
-        });
+        };
+        if (opts.executeVia !== undefined) await opts.executeVia(store, artifacts, spec, execOpts);
+        else await executeExperiment(store, artifacts, spec, execOpts);
         executed += 1;
         scheduler.complete(claim.job.jobId, opts.worker, claim.fenceToken, { ok: true });
       } catch (e) {

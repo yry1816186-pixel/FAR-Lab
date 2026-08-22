@@ -3,9 +3,9 @@ import { canonicalJson } from '../shared/crypto.js';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
 import {
-  newId,
+  newId, ExperimentSpec,
   checkExperimentSpec, mechanicalVerdict,
-  type ExperimentRun, type ExperimentSpec, type ResultCell, type ResultSet, type StatReport,
+  type ExperimentRun, type ResultCell, type ResultSet, type StatReport,
   type FeedbackSignal, type HypothesisCandidate, type SplitOutcome, type SidecarStatsResult,
 } from '../domain/index.js';
 import { acquireDataset } from './datasets.js';
@@ -59,6 +59,113 @@ export interface ExecutedExperiment {
   feedback: FeedbackSignal[];
 }
 
+/** Statistics-call seam: local sidecar or a remote-backed implementation (P3). */
+export type StatCall = (op: 'abs_stats' | 'paired_stats', payload: Record<string, unknown>) => Promise<SidecarStatsResult>;
+
+/**
+ * Shared terminal statistics (P3 refactor): the preregistered comparison loop with
+ * multiple-testing enforcement and mechanical verdicts — identical semantics whether
+ * cells were produced locally or on a remote device.
+ */
+export const computeStatReports = async (args: {
+  spec: ExperimentSpec;
+  hypotheses: HypothesisCandidate[];
+  priorReports: StatReport[];
+  perRowByModel: Map<number, number[]>;
+  statCall: StatCall;
+  fail: (message: string) => never;
+  now: () => string;
+}): Promise<StatReport[]> => {
+  const { spec, hypotheses, priorReports, perRowByModel, statCall, fail, now } = args;
+  const datasetIteration = priorReports.length + 1;
+  const sequential = datasetIteration > 1;
+  const confirmatoryCount = spec.statistics.multipleTestingPolicy === 'alpha_spending' ? spec.comparisons.length : 0;
+  const statReports: StatReport[] = [];
+  for (const comp of spec.comparisons) {
+    const secondary = spec.statistics.multipleTestingPolicy === 'single_primary' ? !comp.primary : false;
+    const effectiveAlpha = confirmatoryCount > 0 ? spec.statistics.alpha / confirmatoryCount : spec.statistics.alpha;
+    let stat: SidecarStatsResult;
+    if (comp.kind === 'absolute') {
+      const rows = perRowByModel.get(comp.modelIdx ?? -1);
+      if (rows === undefined) fail(`comparison ${comp.id}: model ${comp.modelIdx} has no per-row results`);
+      const r = await statCall('abs_stats', { rows, alpha: effectiveAlpha, nBoot: spec.statistics.nBoot, analysisSeed: spec.statistics.analysisSeed });
+      stat = r;
+    } else {
+      const rowsA = perRowByModel.get(comp.modelAIdx ?? -1);
+      const rowsB = perRowByModel.get(comp.modelBIdx ?? -1);
+      if (rowsA === undefined || rowsB === undefined) fail(`comparison ${comp.id}: paired models missing per-row results`);
+      const r = await statCall('paired_stats', {
+        rowsA, rowsB, diffMode: 'correctness',
+        kind: spec.statistics.test === 'paired_t' ? 'paired_t' : 'paired_bootstrap_ci',
+        alpha: effectiveAlpha, nBoot: spec.statistics.nBoot, analysisSeed: spec.statistics.analysisSeed,
+      });
+      stat = r;
+    }
+    const hyp = comp.hypothesisId !== undefined ? hypotheses.find((h) => h.id === comp.hypothesisId) : undefined;
+    const bound = comp.hypothesisId !== undefined && hyp !== undefined;
+    const verdict = bound && !sequential ? mechanicalVerdict(comp, stat.ci) : undefined;
+    const derivation = bound
+      ? [
+        `rule: ${comp.metricKey}(${describe(comp)}) ${comp.direction === 'above' ? '>' : '<'} ${comp.threshold} [threshold source: ${comp.thresholdProvenance}]`,
+        `measured: point=${stat.pointEstimate.toFixed(4)} CI${(1 - effectiveAlpha).toFixed(3)}[${stat.ci.low.toFixed(4)}, ${stat.ci.high.toFixed(4)}]${stat.pValue !== undefined ? ` p=${stat.pValue.toFixed(4)}` : ''}`,
+        `verdict: ${verdict ?? 'inconclusive (sequential re-analysis on this dataset is labelled exploratory)'}`,
+      ].join('; ')
+      : undefined;
+    statReports.push({
+      id: newId('srep') as StatReport['id'],
+      experimentRunId: '', // caller binds to the run
+      runId: spec.runId,
+      comparisonId: comp.id,
+      metricKey: comp.metricKey,
+      primary: comp.primary,
+      pointEstimate: stat.pointEstimate,
+      ci: { level: 1 - effectiveAlpha, low: stat.ci.low, high: stat.ci.high },
+      test: { kind: spec.statistics.test, alpha: spec.statistics.alpha, pValue: stat.pValue, nBoot: stat.nBoot },
+      effect: stat.effect,
+      hypothesisId: comp.hypothesisId,
+      hypothesisVersion: hyp?.version,
+      thresholdProvenance: comp.thresholdProvenance,
+      verdict,
+      secondary,
+      adjustedAlpha: confirmatoryCount > 0 ? effectiveAlpha : undefined,
+      verdictDerivation: derivation,
+      exploratory: !bound || sequential,
+      analysisIteration: datasetIteration,
+      createdAt: now(),
+    });
+  }
+  return statReports;
+};
+
+/** Shared feedback aggregation: confirmatory, non-sequential, non-secondary only (D-086-6 + P2 policy). */
+export const buildFeedback = (spec: ExperimentSpec, statReports: StatReport[], experimentRunId: string, specHash: string, now: () => string): FeedbackSignal[] => {
+  const feedback: FeedbackSignal[] = [];
+  const byHypothesis = new Map<string, StatReport[]>();
+  for (const rep of statReports) {
+    if (rep.hypothesisId !== undefined && !rep.exploratory && !rep.secondary) {
+      const list = byHypothesis.get(rep.hypothesisId);
+      if (list === undefined) byHypothesis.set(rep.hypothesisId, [rep]);
+      else list.push(rep);
+    }
+  }
+  for (const [hypId, reps] of byHypothesis) {
+    feedback.push({
+      id: newId('fbk') as FeedbackSignal['id'],
+      runId: spec.runId,
+      source: 'experiment',
+      content: reps.map((r) => `comparison ${r.comparisonId} on ${r.metricKey}: verdict=${r.verdict} (point=${r.pointEstimate.toFixed(4)}, CI[${r.ci.low.toFixed(4)},${r.ci.high.toFixed(4)}], threshold source=${r.thresholdProvenance})`).join(' | '),
+      structured: { experimentRunId, statReportIds: reps.map((r) => r.id), verdicts: reps.map((r) => r.verdict) },
+      target: { kind: 'hypothesis', id: hypId },
+      provenance: `experiment-executor:${experimentRunId} (spec ${spec.id}@v${spec.version}, hash ${specHash.slice(0, 12)})`,
+      receivedAt: now(),
+    });
+  }
+  return feedback;
+};
+
+const describe = (comp: { kind: string; modelIdx?: number; modelAIdx?: number; modelBIdx?: number }): string =>
+  comp.kind === 'absolute' ? `model[${comp.modelIdx}]` : `model[${comp.modelAIdx}] - model[${comp.modelBIdx}]`;
+
 export const executeExperiment = async (
   store: Store,
   artifacts: ArtifactStore,
@@ -73,7 +180,7 @@ export const executeExperiment = async (
   if (!validation.passed) {
     throw new Error(`spec failed validation: ${validation.missing.join('; ')}`);
   }
-  const validated: ExperimentSpec = { ...spec, validation };
+  const validated: ExperimentSpec = ExperimentSpec.parse({ ...spec, validation });
   store.putObject('experiment_spec', validated);
 
   const use = spec.datasets[0];
@@ -202,100 +309,22 @@ export const executeExperiment = async (
     };
     store.putObjectEvented('result_set', resultSet, { type: 'note', detail: { result_set: resultSet.id, cells: cells.length } }, now());
 
-    // 5. Preregistered statistics on the SAME sidecar session, then mechanical verdicts.
-    // P2 multiple-testing enforcement (EVALUATION §10): single_primary => only the primary
-    // comparison is confirmatory (others descriptive, never feed feedback); alpha_spending
-    // => equal Bonferroni-style split over ALL confirmatory comparisons, adjustedAlpha recorded.
-    const datasetIteration = priorReports.length + 1;
-    const sequential = datasetIteration > 1;
-    const confirmatoryCount = spec.statistics.multipleTestingPolicy === 'alpha_spending'
-      ? spec.comparisons.length
-      : 0;
-    const statReports: StatReport[] = [];
-    for (const comp of spec.comparisons) {
-      const secondary = spec.statistics.multipleTestingPolicy === 'single_primary' ? !comp.primary : false;
-      const effectiveAlpha = confirmatoryCount > 0 ? spec.statistics.alpha / confirmatoryCount : spec.statistics.alpha;
-      let stat: SidecarStatsResult;
-      if (comp.kind === 'absolute') {
-        const rows = perRowByModel.get(comp.modelIdx ?? -1);
-        if (rows === undefined) fail(`comparison ${comp.id}: model ${comp.modelIdx} has no per-row results`);
-        const r = await sidecar.call<SidecarStatsResult>('abs_stats', {
-          rows, alpha: effectiveAlpha, nBoot: spec.statistics.nBoot, analysisSeed: spec.statistics.analysisSeed,
-        }, spec.compute.timeoutMs);
-        if (!r.ok || r.result === undefined) fail(r.error?.message ?? 'abs_stats failed');
-        stat = r.result;
-      } else {
-        const rowsA = perRowByModel.get(comp.modelAIdx ?? -1);
-        const rowsB = perRowByModel.get(comp.modelBIdx ?? -1);
-        if (rowsA === undefined || rowsB === undefined) fail(`comparison ${comp.id}: paired models missing per-row results`);
-        const r = await sidecar.call<SidecarStatsResult>('paired_stats', {
-          rowsA, rowsB, diffMode: 'correctness',
-          kind: spec.statistics.test === 'paired_t' ? 'paired_t' : 'paired_bootstrap_ci',
-          alpha: effectiveAlpha, nBoot: spec.statistics.nBoot, analysisSeed: spec.statistics.analysisSeed,
-        }, spec.compute.timeoutMs);
-        if (!r.ok || r.result === undefined) fail(r.error?.message ?? 'paired_stats failed');
-        stat = r.result;
-      }
-      const hyp = comp.hypothesisId !== undefined ? hypotheses.find((h) => h.id === comp.hypothesisId) : undefined;
-      const bound = comp.hypothesisId !== undefined && hyp !== undefined;
-      const verdict = bound && !sequential ? mechanicalVerdict(comp, stat.ci) : undefined;
-      const derivation = bound
-        ? [
-          `rule: ${comp.metricKey}(${describe(comp)}) ${comp.direction === 'above' ? '>' : '<'} ${comp.threshold} [threshold source: ${comp.thresholdProvenance}]`,
-          `measured: point=${stat.pointEstimate.toFixed(4)} CI${spec.statistics.ciLevel}[${stat.ci.low.toFixed(4)}, ${stat.ci.high.toFixed(4)}]${stat.pValue !== undefined ? ` p=${stat.pValue.toFixed(4)}` : ''}`,
-          `verdict: ${verdict ?? 'inconclusive (sequential re-analysis on this dataset is labelled exploratory)'}`,
-        ].join('; ')
-        : undefined;
-      const report: StatReport = {
-        id: newId('srep') as StatReport['id'],
-        experimentRunId: expRun.id,
-        runId: spec.runId,
-        comparisonId: comp.id,
-        metricKey: comp.metricKey,
-        primary: comp.primary,
-        pointEstimate: stat.pointEstimate,
-        ci: { level: 1 - effectiveAlpha, low: stat.ci.low, high: stat.ci.high },
-        test: { kind: spec.statistics.test, alpha: spec.statistics.alpha, pValue: stat.pValue, nBoot: stat.nBoot },
-        effect: stat.effect,
-        hypothesisId: comp.hypothesisId,
-        hypothesisVersion: hyp?.version,
-        thresholdProvenance: comp.thresholdProvenance,
-        verdict,
-        secondary,
-        adjustedAlpha: confirmatoryCount > 0 ? effectiveAlpha : undefined,
-        verdictDerivation: derivation,
-        exploratory: !bound || sequential,
-        analysisIteration: datasetIteration,
-        createdAt: now(),
-      };
-      statReports.push(report);
-      store.putObjectEvented('stat_report', report, { type: 'note', detail: { stat_report: report.id, comparison: comp.id, verdict } }, now());
+    // 5-6. Shared terminal statistics + feedback aggregation (identical for local/remote cells).
+    const statReports = (await computeStatReports({
+      spec, hypotheses, priorReports, perRowByModel,
+      statCall: async (op, payload) => {
+        const r = await sidecar.call<SidecarStatsResult>(op, payload, spec.compute.timeoutMs);
+        if (!r.ok || r.result === undefined) fail(r.error?.message ?? `${op} failed`);
+        return r.result;
+      },
+      fail, now,
+    })).map((r) => ({ ...r, experimentRunId: expRun.id }));
+    for (const report of statReports) {
+      store.putObjectEvented('stat_report', report, { type: 'note', detail: { stat_report: report.id, comparison: report.comparisonId, verdict: report.verdict } }, now());
     }
-
-    // 6. Confirmatory verdicts become feedback signals (exploratory results never revise
-    // hypotheses, D-086-6; secondary/descriptive comparisons never do either, P2 policy).
-    const feedback: FeedbackSignal[] = [];
-    const byHypothesis = new Map<string, StatReport[]>();
-    for (const rep of statReports) {
-      if (rep.hypothesisId !== undefined && !rep.exploratory && !rep.secondary) {
-        const list = byHypothesis.get(rep.hypothesisId);
-        if (list === undefined) byHypothesis.set(rep.hypothesisId, [rep]);
-        else list.push(rep);
-      }
-    }
-    for (const [hypId, reps] of byHypothesis) {
-      const sig: FeedbackSignal = {
-        id: newId('fbk') as FeedbackSignal['id'],
-        runId: spec.runId,
-        source: 'experiment',
-        content: reps.map((r) => `comparison ${r.comparisonId} on ${r.metricKey}: verdict=${r.verdict} (point=${r.pointEstimate.toFixed(4)}, CI[${r.ci.low.toFixed(4)},${r.ci.high.toFixed(4)}], threshold source=${r.thresholdProvenance})`).join(' | '),
-        structured: { experimentRunId: expRun.id, statReportIds: reps.map((r) => r.id), verdicts: reps.map((r) => r.verdict) },
-        target: { kind: 'hypothesis', id: hypId },
-        provenance: `experiment-executor:${expRun.id} (spec ${spec.id}@v${spec.version}, hash ${specHash.slice(0, 12)})`,
-        receivedAt: now(),
-      };
-      feedback.push(sig);
-      store.putObjectEvented('feedback', sig, { type: 'feedback_received', detail: { feedback: sig.id, source: 'experiment', target: hypId } }, now());
+    const feedback = buildFeedback(spec, statReports, expRun.id, specHash, now);
+    for (const sig of feedback) {
+      store.putObjectEvented('feedback', sig, { type: 'feedback_received', detail: { feedback: sig.id, source: 'experiment', target: sig.target?.id ?? null } }, now());
     }
 
     const completed: ExperimentRun = {
@@ -321,6 +350,3 @@ export const executeExperiment = async (
     sidecar.close();
   }
 };
-
-const describe = (comp: { kind: string; modelIdx?: number; modelAIdx?: number; modelBIdx?: number }): string =>
-  comp.kind === 'absolute' ? `model[${comp.modelIdx}]` : `model[${comp.modelAIdx}] - model[${comp.modelBIdx}]`;
