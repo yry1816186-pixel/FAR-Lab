@@ -24,6 +24,7 @@ import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { makeProvider } from './lib.mjs';
+import { thresholdMatch, finalizeCounts } from './claim-match.mjs';
 import { isRepresentative } from '../dist/pipeline/stages/shared.js';
 
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
@@ -130,16 +131,6 @@ const DecomposeOut = {
   required: ['agentClaims', 'gtClaims'],
   additionalProperties: false,
 };
-const MatchOut = {
-  type: 'object',
-  properties: {
-    agentMatch: { type: 'array', items: { type: 'integer' } }, // per agent claim: matching gt index or -1
-    gtMatch: { type: 'array', items: { type: 'integer' } }, // per gt claim: matching agent index or -1
-  },
-  required: ['agentMatch', 'gtMatch'],
-  additionalProperties: false,
-};
-
 const die = (msg) => { console.error('FATAL: ' + msg); process.exit(1); };
 const provider = makeProvider();
 if (!provider.liveReady) die('DEEPSEEK_API_KEY not set');
@@ -209,30 +200,63 @@ for (const r of runs) {
   const { text } = renderTopHypothesis(r.runId);
   if (text === null) { records.push({ task: r.task, skipped: true, reason: 'no top hypothesis' }); continue; }
   try {
-    const dec = await structuredJson('rediscovery:decompose', { agentOutput: text, establishedFinding: t.establishedFinding, instruction: 'Decompose BOTH texts into atomic, verifiable scientific claims (subject-mechanism-direction units; 2-12 claims each; no overlap).' }, DecomposeOut);
-    const agentClaims = dec.agentClaims ?? [];
-    const gtClaims = dec.gtClaims ?? [];
+    // Judge v2 (hardening, 2026-08-22): same-run re-judging swung F1 by ±0.5 — both LLM
+    // steps were single-pass. v2 = 3-pass decomposition with median claim count +
+    // deterministic TF-IDF threshold matching (clear extremes decided without the LLM) +
+    // 3-vote LLM majority ONLY for the borderline band. Reproducibility first: absolute
+    // generosity levels shift together under the fixed rule, run-to-run comparisons stay valid.
+    const decPasses = [];
+    for (let p = 0; p < 3; p += 1) {
+      const d = await structuredJson('rediscovery:decompose', { agentOutput: text, establishedFinding: t.establishedFinding, instruction: 'Decompose BOTH texts into atomic, verifiable scientific claims (subject-mechanism-direction units; 2-12 claims each; no overlap).' }, DecomposeOut);
+      decPasses.push({ agent: d.agentClaims ?? [], gt: d.gtClaims ?? [], total: (d.agentClaims ?? []).length + (d.gtClaims ?? []).length });
+    }
+    decPasses.sort((a, b) => a.total - b.total);
+    const median = decPasses[1] ?? decPasses[0];
+    const agentClaims = median.agent;
+    const gtClaims = median.gt;
     if (agentClaims.length === 0 || gtClaims.length === 0) throw new Error('decomposition empty');
-    const m = await structuredJson('rediscovery:match', {
-      agentClaims, gtClaims,
-      instruction: 'For EACH agent claim give the index of the ground-truth claim asserting substantially the same scientific finding (same entity/mechanism/direction), else -1. For EACH ground-truth claim likewise against agent claims. Match content, not wording; a vaguer version covering the same finding still matches; a fabricated/unrelated claim does not.',
-    }, MatchOut);
-    const agentMatched = (m.agentMatch ?? []).filter((i) => i >= 0 && i < gtClaims.length).length;
-    const gtMatched = (m.gtMatch ?? []).filter((i) => i >= 0 && i < agentClaims.length).length;
-    const precision = agentMatched / agentClaims.length;
-    const recall = gtMatched / gtClaims.length;
-    const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+    const MATCH = { high: 0.55, low: 0.15 };
+    const m = thresholdMatch(agentClaims, gtClaims, MATCH);
+    const adjudications = [];
+    if (m.borderline.length > 0) {
+      const AdjudicateOut = {
+        type: 'object',
+        properties: { verdicts: { type: 'array', items: { type: 'boolean' } } },
+        required: ['verdicts'], additionalProperties: false,
+      };
+      const items = m.borderline.map((b) => ({
+        claim: b.side === 'agent' ? agentClaims[b.i] : gtClaims[b.i],
+        bestCounterpart: b.side === 'agent' ? gtClaims[m.agentSide[b.i].match ?? -1] ?? gtClaims[0] : agentClaims[m.gtSide[b.i].match ?? -1] ?? agentClaims[0],
+      }));
+      const votes = [];
+      for (let v = 0; v < 3; v += 1) {
+        try {
+          const adj = await structuredJson('rediscovery:adjudicate', {
+            pairs: items.map((x, k) => ({ k, claim: x.claim, candidate: x.bestCounterpart })),
+            instruction: 'For each pair decide: does the CLAIM assert substantially the same scientific finding (same entity/mechanism/direction) as the CANDIDATE? Synonyms count; vague-but-covering counts; unrelated or fabricated does not. Return verdicts array aligned with k order.',
+          }, AdjudicateOut);
+          votes.push(Array.isArray(adj.verdicts) ? adj.verdicts : []);
+        } catch { votes.push([]); }
+      }
+      m.borderline.forEach((b, k) => {
+        const vs = votes.map((arr) => arr[k] === true).filter(Boolean).length;
+        adjudications.push({ matched: vs >= 2 });
+      });
+    }
+    const counts = finalizeCounts(agentClaims, gtClaims, m, adjudications);
     records.push({
       task: r.task, runId: r.runId, judge: 'deepseek-chat', temperature: 0,
+      matcher: { version: 'tfidf-threshold+v3-vote-adjudication', ...MATCH, borderline: m.borderline.length },
+      decomposition: { passes: decPasses.map((p) => p.total), selected: median.total },
       agentClaims: agentClaims.length, gtClaims: gtClaims.length,
-      agentMatched, gtMatched,
-      precision: Math.round(precision * 1000) / 1000,
-      recall: Math.round(recall * 1000) / 1000,
-      f1: Math.round(f1 * 1000) / 1000,
-      claims: { agent: agentClaims, gt: gtClaims, agentMatch: m.agentMatch, gtMatch: m.gtMatch },
+      agentMatched: counts.agentMatched, gtMatched: counts.gtMatched,
+      precision: Math.round(counts.precision * 1000) / 1000,
+      recall: Math.round(counts.recall * 1000) / 1000,
+      f1: Math.round(counts.f1 * 1000) / 1000,
+      claims: { agent: agentClaims, gt: gtClaims },
       topHypothesis: text,
     });
-    console.log(`[rediscovery] ${r.task}: P=${precision.toFixed(2)} R=${recall.toFixed(2)} F1=${f1.toFixed(2)} (${agentMatched}/${agentClaims.length} agent, ${gtMatched}/${gtClaims.length} gt)`);
+    console.log(`[rediscovery] ${r.task}: P=${counts.precision.toFixed(2)} R=${counts.recall.toFixed(2)} F1=${counts.f1.toFixed(2)} (${counts.agentMatched}/${agentClaims.length} agent, ${counts.gtMatched}/${gtClaims.length} gt, borderline ${m.borderline.length})`);
   } catch (e) {
     records.push({ task: r.task, runId: r.runId, error: String(e.message).slice(0, 300) });
     console.error(`[rediscovery] judge error ${r.task}: ${e.message}`);
