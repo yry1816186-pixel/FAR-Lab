@@ -121,7 +121,9 @@ const STAGE_STATE_INK: Record<string, (s: string) => string> = {
  * visual language across surfaces; plain ASCII under non-UTF8 terminals.
  */
 const UNICODE_OK = (() => {
-  try { return new TextEncoder().encode('✓').length === 3 && process.stdout.isTTY !== false; }
+  // Node sets isTTY to true or leaves it undefined (never false) — the probe
+  // must be === true so piped/redirected output falls back to ASCII glyphs.
+  try { return new TextEncoder().encode('✓').length === 3 && process.stdout.isTTY === true; }
   catch { return false; }
 })();
 const STAGE_GLYPH: Record<string, string> = UNICODE_OK
