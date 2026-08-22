@@ -11,7 +11,7 @@
  */
 import { ApiError } from './client';
 import type {
-  EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard, HypothesisTournament,
+  AchAnalysis, EvidenceBody, EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard, HypothesisTournament,
   ProvenanceReceipt, ResearchPlan, ResearchQuestion, ResearchRun, RunEvent,
   RunSummary, ScientificClaim, SearchResponse, SearchHit, SourceDocument, VersionDiff, Revision,
 } from './types';
@@ -174,11 +174,24 @@ const looksLikeScorecard = (v: unknown): v is HypothesisScorecard =>
 const looksLikeTournament = (v: unknown): v is HypothesisTournament =>
   isRecord(v) && Array.isArray(v.matches) && Array.isArray(v.standings) && typeof v.algorithm === 'string';
 
+/** Wave-S g8: hypothesis-level evidence body (deterministic, no LLM in the rating). */
+const looksLikeEvidenceBody = (v: unknown): v is EvidenceBody =>
+  isRecord(v) && typeof v.hypothesisId === 'string' && typeof v.qbafScore === 'number'
+  && typeof v.logLrBand === 'string' && typeof v.promotion === 'string';
+
+/** Wave-S g9: ACH diagnosticity/removal-sensitivity audit (Heuer steps 4-6). */
+const looksLikeAchAnalysis = (v: unknown): v is AchAnalysis =>
+  isRecord(v) && Array.isArray(v.diagnosticity) && isRecord(v.removalSensitivity);
+
 export interface HypothesesBundle {
   hypotheses: HypothesisCandidate[];
   scorecards: HypothesisScorecard[];
   /** D-016 pairwise tournament behind the final ordering; null when absent. */
   tournament: HypothesisTournament | null;
+  /** Wave-S g8 evidence bodies per hypothesis; empty on older runs. */
+  evidenceBodies: EvidenceBody[];
+  /** Wave-S g9 ACH audit; null on older runs. */
+  achAnalysis: AchAnalysis | null;
 }
 
 export function normalizeHypotheses(data: unknown): HypothesesBundle {
@@ -190,6 +203,8 @@ export function normalizeHypotheses(data: unknown): HypothesesBundle {
         hypotheses: firstArray(data, ['hypotheses', 'candidates']).filter(looksLikeHypothesis),
         scorecards: firstArray(data, ['scorecards', 'cards']).filter(looksLikeScorecard),
         tournament: looksLikeTournament(data.tournament) ? data.tournament : null,
+        evidenceBodies: Array.isArray(data.evidenceBodies) ? data.evidenceBodies.filter(looksLikeEvidenceBody) : [],
+        achAnalysis: looksLikeAchAnalysis(data.achAnalysis) ? data.achAnalysis : null,
       };
     }
   }
@@ -203,7 +218,7 @@ export function normalizeHypotheses(data: unknown): HypothesesBundle {
     else if (looksLikeScorecard(item)) scorecards.push(item);
   }
   if (items.length > 0 && hypotheses.length + scorecards.length === 0) throw schemaError('hypotheses');
-  return { hypotheses, scorecards, tournament: null };
+  return { hypotheses, scorecards, tournament: null, evidenceBodies: [], achAnalysis: null };
 }
 
 // ---- feedbacks / revisions / version diffs ----

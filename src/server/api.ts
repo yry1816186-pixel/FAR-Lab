@@ -16,6 +16,7 @@ import {
   ResearchQuestion,
   ScientificGoalType,
   SourceDocument,
+  calibrationReport,
   maskApiKey,
   newId,
   runProgress,
@@ -1071,6 +1072,10 @@ function parseSeedSources(raw: unknown): string | {
             scorecards: app.store.listObjects('scorecard', runId),
             // D-016: pairwise tournament evidence behind the final ordering (uncertainty included)
             tournament: app.store.listObjects('tournament', runId).at(-1) ?? null,
+            // Wave-S g8/g9: hypothesis-level evidence bodies (floor certainty, independent
+            // sources, Σlog-LR band, QBAF+Carneades, orthogonal promotion) + ACH audit
+            evidenceBodies: app.store.listObjects('evidence_body', runId),
+            achAnalysis: app.store.listObjects('ach_analysis', runId).at(-1) ?? null,
           });
         }
         if (leaf === 'plan' && method === 'GET') {
@@ -1098,6 +1103,14 @@ function parseSeedSources(raw: unknown): string | {
         if (leaf === 'receipts' && method === 'GET') {
           mustGetRun(runId);
           return sendJson(res, 200, { receipts: app.store.listObjects('receipt', runId) });
+        }
+        if (leaf === 'calibration' && method === 'GET') {
+          // Wave-S L4 self-calibration surface: the system's own forward predictions,
+          // settlement state, and the pooled proper-score report (RPS vs the ignorance
+          // baseline; n<30 strata honestly say "insufficient evidence").
+          mustGetRun(runId);
+          const entries = app.store.listObjects('prediction', runId);
+          return sendJson(res, 200, { entries, report: calibrationReport(entries) });
         }
         if (leaf === 'bundles' && method === 'GET') return runBundles(res, runId);
         if (leaf === 'corpus' && method === 'GET') return runCorpus(res, runId);

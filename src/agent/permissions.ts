@@ -9,6 +9,20 @@ import { canonicalSha256 } from '../shared/crypto.js';
 
 export type PermissionEffect = 'allow' | 'deny' | 'ask';
 
+/**
+ * Session-level permission mode (Wave-S v2-harness, agentscope _engine.py:594-848
+ * lineage): a coarse session stance that composes with the rule set — mode effects act
+ * as an implicit rule that still LOSES to explicit deny (strictest-wins is preserved).
+ * - default: rules alone decide;
+ * - explore: research/read-only — non-read tools are denied even when rules allow;
+ * - accept_edits: edit-class tools auto-allowed (explicit deny still wins);
+ * - bypass: everything allowed EXCEPT rules marked bypassImmune (dangerous operations
+ *   can never be bypassed by a mode switch — the switch itself is auditable).
+ */
+export type PermissionMode = 'default' | 'explore' | 'accept_edits' | 'bypass';
+
+export type ToolRiskClass = 'read' | 'edit' | 'execute' | 'destructive';
+
 export interface PermissionRule {
   /** Exact tool name; undefined matches any tool. */
   tool?: string;
@@ -16,6 +30,8 @@ export interface PermissionRule {
   argsMatch?: (args: unknown) => boolean;
   effect: PermissionEffect;
   note?: string;
+  /** Survives bypass mode: dangerous operations cannot be mode-switched away. */
+  bypassImmune?: boolean;
 }
 
 export interface PermissionDecision {
@@ -37,31 +53,69 @@ export interface PermissionEngineOptions {
   ask?: AskHandler;
   /** TTL of ask-grants in ms (default 5 min). */
   approvalTtlMs?: number;
+  /** Initial session mode (default 'default'); switch at runtime via setMode. */
+  mode?: PermissionMode;
   now?: () => number;
 }
 
 export class PermissionEngine {
   private readonly grants = new Map<string, number>();
+  private mode: PermissionMode;
 
-  constructor(private readonly opts: PermissionEngineOptions) {}
+  constructor(private readonly opts: PermissionEngineOptions) {
+    this.mode = opts.mode ?? 'default';
+  }
+
+  getMode(): PermissionMode {
+    return this.mode;
+  }
+
+  /** Session stance switch (agentscope mode machine). Every switch is caller-auditable. */
+  setMode(mode: PermissionMode): void {
+    this.mode = mode;
+  }
 
   /**
    * Codex execpolicy discipline (ported, Apache-2.0): collect EVERY matching rule and
    * take the STRICTEST effect (deny > ask > allow). An early permissive rule can never
    * override a later restriction — policy composition is safe by construction, unlike
-   * first-match-wins where rule order silently changes security.
+   * first-match-wins where rule order silently changes security. The session mode
+   * contributes one implicit rule under the same strictest-wins composition.
    */
-  async decide(tool: string, args: unknown): Promise<PermissionDecision> {
+  async decide(tool: string, args: unknown, riskClass?: ToolRiskClass): Promise<PermissionDecision> {
     const RANK: Record<PermissionEffect, number> = { deny: 3, ask: 2, allow: 1 };
+    const effectiveRisk: ToolRiskClass = riskClass ?? 'execute';
     let strictest: PermissionEffect | undefined;
     let via: string | undefined;
+    const consider = (effect: PermissionEffect, label: string): void => {
+      if (strictest === undefined || RANK[effect] > RANK[strictest]) {
+        strictest = effect;
+        via = label;
+      }
+    };
     for (const rule of this.opts.rules ?? []) {
+      if (this.mode === 'bypass' && rule.bypassImmune !== true) continue;
       if (rule.tool !== undefined && rule.tool !== tool) continue;
       if (rule.argsMatch !== undefined && !rule.argsMatch(args)) continue;
-      if (strictest === undefined || RANK[rule.effect] > RANK[strictest]) {
-        strictest = rule.effect;
-        via = rule.note ?? rule.tool ?? 'rule';
-      }
+      consider(rule.effect, rule.note ?? rule.tool ?? 'rule');
+    }
+    // Mode implicit rules — composed via strictest-wins; explicit DENY always outranks
+    // any mode. accept_edits additionally answers 'ask' affirmatively for edit-class
+    // tools (that is the mode's entire purpose) without touching explicit denies.
+    let modeAllow = false;
+    if (this.mode === 'explore' && effectiveRisk !== 'read') {
+      consider('deny', 'mode=explore(non-read tool)');
+    }
+    if (this.mode === 'accept_edits' && effectiveRisk === 'edit') {
+      modeAllow = true;
+      consider('allow', 'mode=accept_edits(edit-class tool)');
+    }
+    if (this.mode === 'bypass') {
+      consider('allow', 'mode=bypass');
+    }
+    if (modeAllow && strictest === 'ask') {
+      strictest = 'allow';
+      via = 'mode=accept_edits(auto-accepts ask for edit-class)';
     }
     if (strictest === undefined) {
       const fallback = this.opts.defaultEffect ?? 'deny';

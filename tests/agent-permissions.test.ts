@@ -106,3 +106,59 @@ describe('permission engine (deny > ask > allow, fail-closed)', () => {
     expect(d2.effect).toBe('deny');
   });
 });
+
+// ---- Wave-S v2-harness: session permission mode machine (agentscope lineage) ----
+
+describe('permission mode machine (default / explore / accept_edits / bypass)', () => {
+  it('explore denies non-read tools even when a rule allows them; read tools pass', async () => {
+    const engine = new PermissionEngine({
+      rules: [{ effect: 'allow' }],
+      defaultEffect: 'deny',
+    });
+    engine.setMode('explore');
+    const write = await engine.decide('write_file', {}, 'edit');
+    expect(write.effect).toBe('deny');
+    expect(write.rule).toContain('explore');
+    // undeclared risk class is conservative: treated as non-read
+    expect((await engine.decide('mystery', {})).effect).toBe('deny');
+    const read = await engine.decide('search', { q: 'x' }, 'read');
+    expect(read.effect).toBe('allow');
+  });
+
+  it('accept_edits auto-allows edit-class tools, but an explicit deny still wins', async () => {
+    const engine = new PermissionEngine({
+      rules: [{ tool: 'rm_rf', effect: 'deny', note: 'never' }, { effect: 'ask' }],
+      ask: async () => true,
+    });
+    engine.setMode('accept_edits');
+    const edit = await engine.decide('write_file', {}, 'edit');
+    expect(edit.effect).toBe('allow');
+    expect(edit.rule).toContain('accept_edits');
+    const denied = await engine.decide('rm_rf', {}, 'destructive');
+    expect(denied.effect).toBe('deny'); // strictest-wins: explicit deny > mode allow
+  });
+
+  it('bypass allows everything EXCEPT bypassImmune rules — modes cannot switch away danger', async () => {
+    const engine = new PermissionEngine({
+      rules: [
+        { tool: 'exec', effect: 'deny', note: 'immune danger', bypassImmune: true },
+        { tool: 'write_file', effect: 'ask', note: 'normal gate' },
+      ],
+    });
+    engine.setMode('bypass');
+    expect((await engine.decide('write_file', {}, 'edit')).effect).toBe('allow'); // gate bypassed
+    const danger = await engine.decide('exec', { cmd: 'x' }, 'execute');
+    expect(danger.effect).toBe('deny');
+    expect(danger.rule).toContain('immune danger');
+  });
+
+  it('mode switch is auditable and default mode leaves rule semantics untouched', async () => {
+    const engine = new PermissionEngine({ rules: [{ tool: 'write_file', effect: 'deny' }] });
+    expect(engine.getMode()).toBe('default');
+    expect((await engine.decide('write_file', {}, 'edit')).effect).toBe('deny');
+    engine.setMode('accept_edits');
+    expect(engine.getMode()).toBe('accept_edits');
+    // the mode allow composes but explicit deny remains strictest
+    expect((await engine.decide('write_file', {}, 'edit')).effect).toBe('deny');
+  });
+});
