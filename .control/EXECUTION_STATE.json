@@ -65,12 +65,12 @@
     "P5 batch B (0746bd0) left a committed regression: CLI feedback output moved console.log->stdout.write without updating the test spy; fixed in PEX batch (spy captures both channels)."
   ],
   "activeTasks": [
-    "PEX Phase-2 B3 next: receipt payload enrichment + StageRecord.subtasks + note milestones + ActivityFeed upgrade + SSE channel + version-compare view (live v0->v1 data) + ExperimentsTab i18n hardening + web notifications + multi-run awareness bar.",
-    "PEX Phase-2 done so far: B0 reconciliation (d3fa71c), B1 full-journey baseline + 4 hotfixes (3fa745d), B2 skeleton: universal search API + palette + quick-capture n + IA reorder + progressive disclosure (this commit).",
-    "Parallel-session leftovers absorbed into program: desktop quick capture -> B10; EEL experiments-tab UX alignment -> B3-8; oaUrl pipeline population -> B3/B9; search ranking/snippets/totals -> B14.",
-    "EEL lane dormant (their queue): remote gateway when user starts Docker; execute-stage integration scheduled B8."
+    "PEX Phase-2 B3-2 remaining: web notifications (default-off, terminal-state driven) + multi-run awareness bar; visual re-verification of version-compare disclosure + EN experiments tab (ENV-LIMITED: prior IAB session degraded; use a FRESH browser session).",
+    "PEX Phase-2 done: B0 (d3fa71c), B1 baseline+4 hotfixes (3fa745d), B2 skeleton search/capture/disclosure (d56912c), B3-1 wait-time root fix + critique round (be13a42+429bb5b: subtasks/milestones/enriched receipts/SSE/version compare/experiments i18n).",
+    "Absorbed/backlog: desktop quick capture -> B10; oaUrl pipeline population -> B9; search ranking/snippets/totals+hasMore -> B14; hypothesis lifecycle status field -> B5; source dedup (duplicate DOI rows) -> B6/B13 pipeline.",
+    "EEL lane dormant: remote gateway when user starts Docker; execute-stage integration scheduled B8."
   ],
   "blockerIds": [],
-  "lastVerifiedCommit": "PEX B2 2026-08-22: universal search verified live (TMAO/nucleosome; claim nav -> evidence flash; Esc focus-restore to opener); ACH three-source matrix (46749c9) + compare export landed by sibling session; gates 661/663 + tsc/build 0 + secret-scan PASS.",
-  "nextAction": "B3 wait-time root fix (receipt enrichment, subtasks, note milestones, SSE) + version compare. Two sessions co-editing: commit via explicit pathspec only; ach-matrix-v2.yml scratch at root belongs to the sibling session."
+  "lastVerifiedCommit": "PEX B3-1 2026-08-22 (429bb5b): wait-time substage truth live-verified on real battery run (subtasks 14/14,12/12,8/8; 17 milestones; enriched model/retrieval lines rendered; SSE ESTABLISHED); critique round fixed 2 P0 (falsify counter closure race, progress stale-doc write) + feed stage-slot window + poll-cadence remount; gates 661/663 + tsc/build 0 + secret-scan PASS.",
+  "nextAction": "B3-2 finish (notifications + awareness bar) in a FRESH browser session, then B4 object-level AI research actions (POST /runs/:id/actions server first — browser-independent), B6 binding enrichment, B11 CLI. Two sibling sessions may co-edit: commit via explicit pathspec only."
 }
