@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { App } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
+import { listProviders } from '../providers/index.js';
 import {
   FeedbackSignal,
   FeedbackSourceKind,
@@ -367,6 +368,34 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     sendJson(res, 200, { bundles });
   };
 
+  /**
+   * Real health (D-060 phase-3): DB actually readable + model-route readiness
+   * (env-presence only — never key values) + build revision. 503 when the DB
+   * check fails; never a fake "ok".
+   */
+  const health = (res: http.ServerResponse): void => {
+    const providers = listProviders().map((p) => ({ name: p.name, kind: p.kind, liveReady: p.liveReady }));
+    try {
+      app.store.listRuns();
+      sendJson(res, 200, {
+        status: 'ok',
+        db: 'ok',
+        providers,
+        gitCommit: process.env.FARLAB_GIT_COMMIT ?? null,
+        time: new Date().toISOString(),
+      });
+    } catch (e) {
+      sendJson(res, 503, {
+        status: 'degraded',
+        db: 'error',
+        detail: e instanceof Error ? e.message : String(e),
+        providers,
+        gitCommit: process.env.FARLAB_GIT_COMMIT ?? null,
+        time: new Date().toISOString(),
+      });
+    }
+  };
+
   const runEvents = (res: http.ServerResponse, runId: string, url: URL): void => {
     mustGetRun(runId);
     const raw = url.searchParams.get('afterSeq');
@@ -616,6 +645,10 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
         if (leaf === 'reexport' && method === 'POST') return reexport(res, runId);
       }
       throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
+    if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
+      return health(res);
     }
 
     if (segments[2] === 'verify' && segments.length === 4 && method === 'GET') {
