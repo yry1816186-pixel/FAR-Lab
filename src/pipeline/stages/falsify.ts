@@ -217,6 +217,10 @@ export const falsifyStage: StageHandler = {
     const warnings: string[] = [];
     const results: string[] = [];
     let relationsCreated = 0;
+    // Shared across the bounded-concurrency callbacks below (B3-critique P0-1:
+    // a per-callback counter reset to 0 on every hypothesis and the stage
+    // record stuck at done=1 while notes kept firing).
+    let hypothesesDone = 0;
 
     // Per-hypothesis work is independent (all inputs read from the store — no
     // cross-iteration coupling), so bounded overlap (WP4) cuts wall-clock on this
@@ -226,7 +230,6 @@ export const falsifyStage: StageHandler = {
       assertNotCancelled(ctx, 'critique_falsify');
       const warnings: string[] = [];
       let relations = 0;
-      let done = 0;
       const res = await callStructured<z.infer<typeof FalsifyOut>>(ctx, {
         stage: 'critique_falsify',
         purpose: `falsification-spec:${hyp.id}`,
@@ -510,8 +513,8 @@ export const falsifyStage: StageHandler = {
 
       // B3 milestone: hypotheses materialize one by one in the workbench feed
       // instead of appearing in silence after a minutes-long stage.
-      done += 1;
-      ctx.progress?.(done, targets.length, {
+      hypothesesDone += 1;
+      ctx.progress?.(hypothesesDone, targets.length, {
         reason: 'hypothesis_critiqued',
         detail: {
           hypothesisId: hyp.id,

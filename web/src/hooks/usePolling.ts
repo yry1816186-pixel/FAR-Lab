@@ -17,6 +17,11 @@ import { useEffect, useRef } from 'react';
 export function usePolling(fn: () => Promise<void>, intervalMs: number, enabled: boolean): void {
   const fnRef = useRef(fn);
   fnRef.current = fn;
+  // Interval via ref (B3-critique P1-5): cadence changes (SSE healthy ->
+  // 15s safety net) must not tear the loop down and re-fire an immediate
+  // redundant fetch; the next scheduled tick simply uses the latest value.
+  const intervalRef = useRef(intervalMs);
+  intervalRef.current = intervalMs;
 
   useEffect(() => {
     if (!enabled) return;
@@ -39,7 +44,7 @@ export function usePolling(fn: () => Promise<void>, intervalMs: number, enabled:
           }
         }
         if (g !== generation) return;
-        timer = window.setTimeout(() => void step(), intervalMs);
+        timer = window.setTimeout(() => void step(), intervalRef.current);
       };
       void step();
     };
@@ -55,5 +60,5 @@ export function usePolling(fn: () => Promise<void>, intervalMs: number, enabled:
       if (timer !== undefined) window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [intervalMs, enabled]);
+  }, [enabled]);
 }
