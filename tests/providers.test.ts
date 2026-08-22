@@ -847,31 +847,35 @@ describe('TEST-ONLY stub provider', () => {
 // ---------------------------------------------------------------------------
 
 describe('provider registry', () => {
-  it('resolves known providers and returns undefined for unknown names', () => {
-    expect(getProvider('deepseek')?.name).toBe('deepseek');
+  it('resolves known providers; deepseek (BANNED 2026-08-22) resolves to nothing', () => {
+    expect(getProvider('deepseek')).toBeUndefined(); // user directive: no DeepSeek models in this project
     expect(getProvider('zai')?.name).toBe('zai');
+    expect(getProvider('dashscope')?.name).toBe('dashscope');
     expect(getProvider('test-stub')?.name).toBe('test-stub');
     expect(getProvider('nonexistent')).toBeUndefined();
   });
 
-  it('defaults to deepseek and honors FARLAB_MODEL_PROVIDER for live providers only', () => {
-    expect(defaultLiveProvider().name).toBe('deepseek');
-    vi.stubEnv('FARLAB_MODEL_PROVIDER', 'zai');
+  it('defaults to zai (post-DeepSeek-ban) and honors FARLAB_MODEL_PROVIDER for live providers only', () => {
     expect(defaultLiveProvider().name).toBe('zai');
+    vi.stubEnv('FARLAB_MODEL_PROVIDER', 'dashscope');
+    expect(defaultLiveProvider().name).toBe('dashscope');
+    vi.stubEnv('FARLAB_MODEL_PROVIDER', 'deepseek');
+    expect(() => defaultLiveProvider()).toThrow(/BANNED in this project/); // ban is fail-visible
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'test-stub');
     expect(() => defaultLiveProvider()).toThrow(/does not name a live provider/);
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'openai');
     expect(() => defaultLiveProvider()).toThrow(/does not name a live provider/);
+    vi.unstubAllEnvs();
   });
 
   it('lists providers with kind and sanitized metadata (env var names, never values)', () => {
     const infos = listProviders();
-    expect(infos.map((i) => i.name)).toEqual(['deepseek', 'zai', 'dashscope', 'test-stub']);
-    expect(infos.map((i) => i.kind)).toEqual(['live', 'live', 'live', 'test']);
-    const deepseek = infos[0]!;
-    expect(deepseek.modelId).toBe('deepseek-chat');
-    expect(deepseek.baseUrl).toBe('https://api.deepseek.com/beta'); // strict-FC default (D-026)
-    expect(deepseek.apiKeyEnvVar).toBe('DEEPSEEK_API_KEY');
+    expect(infos.map((i) => i.name)).toEqual(['zai', 'dashscope', 'deepseek', 'test-stub']);
+    expect(infos.map((i) => i.kind)).toEqual(['live', 'live', 'archived', 'test']);
+    const zai = infos[0]!;
+    expect(zai.baseUrl).toBe('https://open.bigmodel.cn/api/anthropic'); // Anthropic wire (D-058)
+    const deepseek = infos[2]!;
+    expect(deepseek.liveReady).toBe(false); // archived: unreachable by construction
     expect(JSON.stringify(infos)).not.toMatch(/sk-[A-Za-z0-9]{8,}/); // no key material
   });
 });

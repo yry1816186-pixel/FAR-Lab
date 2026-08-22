@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npm run build                                   # once, before first run
- *   node scripts/live-check-model.mjs               # default provider (FARLAB_MODEL_PROVIDER, else deepseek)
+ *   node scripts/live-check-model.mjs               # default provider (FARLAB_MODEL_PROVIDER, else zai; deepseek banned)
  *   node scripts/live-check-model.mjs --provider zai
  *
  * Exit codes: 0 = live structured call verified; 2 = provider BLOCKED or call

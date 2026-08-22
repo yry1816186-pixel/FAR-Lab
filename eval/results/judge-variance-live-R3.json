@@ -3,10 +3,10 @@
   "gtRev": "gt-fixed-2026-08-22",
   "repeats": 3,
   "judgeRoute": {
-    "provider": "glm",
+    "provider": "zai",
     "modelId": "glm-5.3"
   },
-  "generated": "2026-08-22T07:23:42.802Z",
+  "generated": "2026-08-22T08:25:55.540Z",
   "tasks": [
     {
       "task": "arg-plasmid-transfer",
@@ -25,13 +25,13 @@
           "f1": 0,
           "decomposition": {
             "passes": [
-              11,
               10,
-              11
+              10,
+              10
             ],
-            "selected": 11
+            "selected": 10
           },
-          "borderline": 0
+          "borderline": 3
         },
         {
           "repeat": 2,
@@ -40,24 +40,24 @@
             "passes": [
               10,
               10,
-              11
+              10
             ],
             "selected": 10
           },
-          "borderline": 0
+          "borderline": 4
         },
         {
           "repeat": 3,
           "f1": 0,
           "decomposition": {
             "passes": [
-              11,
-              11,
+              10,
+              9,
               11
             ],
-            "selected": 11
+            "selected": 10
           },
-          "borderline": 0
+          "borderline": 7
         }
       ]
     },
@@ -66,59 +66,212 @@
       "gtClaims": 8,
       "repeatsOk": 3,
       "f1s": [
-        0.645,
-        0.706,
-        0.656
+        0.333,
+        0.143,
+        0.235
       ],
-      "maxAbsSwing": 0.061,
-      "variance": 0.000705,
+      "maxAbsSwing": 0.19,
+      "variance": 0.006019,
       "detail": [
         {
           "repeat": 1,
-          "f1": 0.645,
+          "f1": 0.333,
           "decomposition": {
             "passes": [
-              11,
-              12,
-              12
+              9,
+              10,
+              10
             ],
-            "selected": 12
+            "selected": 10
           },
-          "borderline": 13
+          "borderline": 9
         },
         {
           "repeat": 2,
-          "f1": 0.706,
+          "f1": 0.143,
           "decomposition": {
             "passes": [
-              12,
-              12,
-              11
+              10,
+              10,
+              10
             ],
-            "selected": 12
+            "selected": 10
           },
           "borderline": 13
         },
         {
           "repeat": 3,
-          "f1": 0.656,
+          "f1": 0.235,
           "decomposition": {
             "passes": [
-              12,
               10,
-              12
+              9,
+              9
             ],
-            "selected": 12
+            "selected": 9
           },
-          "borderline": 13
+          "borderline": 12
+        }
+      ]
+    },
+    {
+      "task": "egfr-tki-resistance",
+      "gtClaims": 8,
+      "repeatsOk": 3,
+      "f1s": [
+        0,
+        0,
+        0
+      ],
+      "maxAbsSwing": 0,
+      "variance": 0,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 7
+        },
+        {
+          "repeat": 2,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 7
+        },
+        {
+          "repeat": 3,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 2
+        }
+      ]
+    },
+    {
+      "task": "antibiotic-cdiff",
+      "gtClaims": 6,
+      "repeatsOk": 2,
+      "f1s": [
+        0,
+        0
+      ],
+      "maxAbsSwing": 0,
+      "variance": 0,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              7,
+              7,
+              7
+            ],
+            "selected": 7
+          },
+          "borderline": 2
+        },
+        {
+          "repeat": 2,
+          "error": {
+            "stage": "decompose",
+            "pass": 2,
+            "message": "zai: total budget 300000ms (incl. retries) exhausted before next attempt"
+          }
+        },
+        {
+          "repeat": 3,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              8,
+              8,
+              8
+            ],
+            "selected": 8
+          },
+          "borderline": 2
+        }
+      ]
+    },
+    {
+      "task": "crispr-offtarget",
+      "gtClaims": 5,
+      "repeatsOk": 3,
+      "f1s": [
+        0,
+        0,
+        0
+      ],
+      "maxAbsSwing": 0,
+      "variance": 0,
+      "detail": [
+        {
+          "repeat": 1,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              5,
+              5,
+              5
+            ],
+            "selected": 5
+          },
+          "borderline": 2
+        },
+        {
+          "repeat": 2,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              6,
+              5,
+              5
+            ],
+            "selected": 5
+          },
+          "borderline": 2
+        },
+        {
+          "repeat": 3,
+          "f1": 0,
+          "decomposition": {
+            "passes": [
+              7,
+              5,
+              5
+            ],
+            "selected": 5
+          },
+          "borderline": 2
         }
       ]
     }
   ],
   "summary": {
-    "tasksMeasured": 2,
-    "worstTaskSwing": 0.061,
-    "allUnderTarget015": true,
-    "allUnderStretch008": true
+    "tasksMeasured": 5,
+    "worstTaskSwing": 0.19,
+    "allUnderTarget015": false,
+    "allUnderStretch008": false
   }
 }

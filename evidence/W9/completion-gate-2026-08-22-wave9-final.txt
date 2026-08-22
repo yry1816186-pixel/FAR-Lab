@@ -1,0 +1,6 @@
+  },
+  "missing": [],
+  "failed": [],
+  "errors": [],
+  "message": "Completion gate passed: all critical items at target status with evidence, gates satisfied, no critical blocker."
+}

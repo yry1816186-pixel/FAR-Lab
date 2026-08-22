@@ -105,26 +105,22 @@ if (mode === 'replay') {
 }
 
 // --live R: identical pipeline R times over the same completed runs.
-// Provider routes (deepseek BANNED by user directive 2026-08-22): 'glm' = Zhipu
-// bigmodel.cn via ANTHROPIC protocol, model glm-5.3 (the user's funded route — the
-// OpenAI-protocol api.z.ai endpoint returns 1113 for this account); 'zai'/'dashscope'
-// available when funded. The judge model identity is recorded per run — a route
-// switch is a judge-protocol change, disclosed with the numbers.
+// Provider routes (deepseek BANNED by user directive 2026-08-22): default 'zai' =
+// the PRODUCTION src provider (Anthropic Messages wire on open.bigmodel.cn, glm-5.3
+// funded model). The judge model identity is recorded per run — a route switch is a
+// judge-protocol change, disclosed with the numbers.
 const R = Number(process.argv.find((a, i) => process.argv[i - 1] === '--live') ?? 3);
-const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'glm';
+const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'zai';
 let provider;
-if (PROVIDER === 'glm') {
-  const { createGlmAnthropicProvider } = await import('./glm-anthropic-provider.mjs');
-  provider = createGlmAnthropicProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+if (PROVIDER === 'zai') {
+  process.env.ZAI_API_KEY ??= process.env.ZHIPU_API_KEY; // secrets.env may use either name
+  const { createZaiProvider } = await import('../dist/providers/zai.js');
+  provider = createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
 } else if (PROVIDER === 'dashscope') {
   const { createDashScopeProvider } = await import('../dist/providers/dashscope.js');
   provider = createDashScopeProvider({ totalTimeoutMs: 300_000 });
-} else if (PROVIDER === 'zai') {
-  process.env.ZHIPU_API_KEY ??= process.env.ZAI_API_KEY; // secrets.env may use either name
-  const { createZaiProvider } = await import('../dist/providers/zai.js');
-  provider = createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
 } else {
-  console.error(`FATAL: unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (glm|zai|dashscope; deepseek banned by user directive)`);
+  console.error(`FATAL: unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (zai|dashscope; deepseek banned by user directive)`);
   process.exit(1);
 }
 if (!provider.liveReady) { console.error(`FATAL: ${PROVIDER} route not live-ready (missing API key?)`); process.exit(1); }

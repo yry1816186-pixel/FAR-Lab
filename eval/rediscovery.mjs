@@ -24,7 +24,7 @@
  * Env: FARLAB_JUDGE_PROVIDER=zai|dashscope (deepseek banned 2026-08-22; default zai); key via env or .far-run/secrets.env.
  * Writes eval/results/rediscovery.jsonl (+ -runs.jsonl).
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { TASKS, renderTopHypothesis, waitForTerminal, GT_REV } from './rediscovery-tasks.mjs';
@@ -33,31 +33,30 @@ import { loadLocalSecrets } from './load-secrets.mjs';
 loadLocalSecrets(); // .far-run/secrets.env keys (names only in any output)
 import { createZaiProvider } from '../dist/providers/zai.js';
 import { createDashScopeProvider } from '../dist/providers/dashscope.js';
-import { createGlmAnthropicProvider } from './glm-anthropic-provider.mjs';
 
 // Judge + run-generation provider (deepseek BANNED by user directive 2026-08-22).
-// Default 'glm' = Zhipu bigmodel.cn ANTHROPIC protocol, glm-5.3 (user's funded route).
-const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'glm';
-// Main-pipeline provider for RUN GENERATION: only deepseek/zai/dashscope exist there
-// (OpenAI protocol). deepseek banned; zai endpoint has no resource pack for this
-// account; so with PROVIDER='glm' the pipeline CANNOT generate new runs — run
-// generation is skipped with an explicit message (the glm route serves JUDGING only).
-const PIPELINE_PROVIDER = { glm: null, zai: 'zai', dashscope: 'dashscope' }[PROVIDER] ?? null;
-const farRunEnv = () => (PIPELINE_PROVIDER ? { ...process.env, FARLAB_MODEL_PROVIDER: PIPELINE_PROVIDER } : null);
+// Default 'zai' = PRODUCTION src provider: Anthropic Messages wire on
+// open.bigmodel.cn, glm-5.3 (the funded model) — used for BOTH judging and,
+// via FARLAB_MODEL_PROVIDER=zai, main-pipeline run generation.
+const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'zai';
+const PIPELINE_PROVIDER = { zai: 'zai', dashscope: 'dashscope' }[PROVIDER] ?? null;
+const farRunEnv = () => (PIPELINE_PROVIDER
+  ? { ...process.env, FARLAB_MODEL_PROVIDER: PIPELINE_PROVIDER, ...(PIPELINE_PROVIDER === 'zai' ? { FARLAB_ZAI_MODEL: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' } : {}) }
+  : null);
 const makeLiveProvider = () => {
-  if (PROVIDER === 'glm') return createGlmAnthropicProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
   if (PROVIDER === 'zai') {
-    process.env.ZHIPU_API_KEY ??= process.env.ZAI_API_KEY; // secrets.env may use either name
+    process.env.ZAI_API_KEY ??= process.env.ZHIPU_API_KEY; // secrets.env may use either name
     return createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
   }
   if (PROVIDER === 'dashscope') return createDashScopeProvider({ totalTimeoutMs: 300_000 });
-  die(`unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (glm|zai|dashscope; deepseek banned by user directive)`);
+  die(`unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (zai|dashscope; deepseek banned by user directive)`);
 };
 
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
 const OUT = join(RESULTS_DIR, 'rediscovery.jsonl');
 const RUNS_FILE = join(RESULTS_DIR, 'rediscovery-runs.jsonl');
 const SKIP_RUNS = process.argv.includes('--skip-runs');
+const RUNS_ONLY = process.argv.includes('--runs-only'); // generate missing runs, skip judging (quota discipline)
 const SAMPLE_N = Number(process.env.REDISCOVERY_N ?? 5);
 
 const die = (msg) => { console.error('FATAL: ' + msg); process.exit(1); };
@@ -89,10 +88,10 @@ if (!SKIP_RUNS) {
     try {
       const r = farRun(t);
       const finalStatus = waitForTerminal(r.runId);
-      writeFileSync(RUNS_FILE, readFileSync(RUNS_FILE, 'utf8') + JSON.stringify({ task: t.id, runId: r.runId, status: finalStatus }) + '\n');
+      appendFileSync(RUNS_FILE, JSON.stringify({ task: t.id, runId: r.runId, status: finalStatus }) + '\n');
       console.log(`[rediscovery] ${t.id} -> ${r.runId} (${finalStatus})`);
     } catch (e) {
-      writeFileSync(RUNS_FILE, (existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8') : '') + JSON.stringify({ task: t.id, error: String(e.message).slice(0, 300), stderr: String(e.stderr ?? '').slice(0, 500) }) + '\n');
+      appendFileSync(RUNS_FILE, JSON.stringify({ task: t.id, error: String(e.message).slice(0, 300), stderr: String(e.stderr ?? '').slice(0, 500) }) + '\n');
       console.error(`[rediscovery] ${t.id} RUN FAILED: ${e.message}`);
     }
   }
@@ -101,6 +100,10 @@ if (!SKIP_RUNS) {
 // phase 2: score (each run waits for its terminal state before rendering — the CLI
 // returns at creation while a detached engine keeps executing; judging an unfinished
 // run would render a mid-pipeline hypothesis)
+if (RUNS_ONLY) {
+  console.log('[rediscovery] --runs-only: generation complete, scoring skipped (quota discipline)');
+  process.exit(0);
+}
 const runs = existsSync(RUNS_FILE) ? readFileSync(RUNS_FILE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
 const byTask = new Map(TASKS.map((t) => [t.id, t]));
 const records = [];
