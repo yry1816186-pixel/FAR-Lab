@@ -7,6 +7,7 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { EmptyState, ErrorBox, Section, Skeleton } from '../common';
 import { HypothesisCard } from './HypothesisCard';
 import { ScorecardsTable } from './ScorecardsTable';
+import { stageKey } from '../../i18n/keys';
 
 export function HypothesesTab({ run }: { run: ResearchRun }): JSX.Element {
   const { t } = useI18n();
@@ -18,7 +19,7 @@ export function HypothesesTab({ run }: { run: ResearchRun }): JSX.Element {
       {res.loading ? (
         <Skeleton lines={6} />
       ) : res.error !== null && isNotFound(res.error) ? (
-        <EmptyState titleKey="hyp.empty" hint={t('hyp.emptyHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+        <EmptyState titleKey="hyp.empty" hint={t('hyp.emptyHint', { stage: t(stageKey(run.currentStage)) })} />
       ) : res.error !== null ? (
         <ErrorBox error={res.error} onRetry={res.retry} />
       ) : res.data === null ? null : (

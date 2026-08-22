@@ -11,6 +11,7 @@ import { Badge, CountProgress, EmptyState, ErrorBox, FieldList, IdText, Section,
 import { StageTimeline } from './StageTimeline';
 import { RunControls } from './RunControls';
 import { FeedbackForm } from './FeedbackForm';
+import { stageKey, goalTypeKey } from '../../i18n/keys';
 
 export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: () => void }): JSX.Element {
   const { t } = useI18n();
@@ -37,7 +38,7 @@ export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: (
               value: (
                 <>
                   <Badge tone={runStatusTone(run.status)}>{t(runStatusKey(run.status))}</Badge>{' '}
-                  {t(`stage.${run.currentStage}` as never)}
+                  {t(stageKey(run.currentStage))}
                 </>
               ),
             },
@@ -66,7 +67,7 @@ export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: (
             {failedStages.length > 0 && (
               <div>
                 {t('overview.failedStages')}:{' '}
-                {failedStages.map((s) => t(`stage.${s.stage}` as never)).join(t('common.sep'))}
+                {failedStages.map((s) => t(stageKey(s.stage))).join(t('common.sep'))}
               </div>
             )}
           </div>
@@ -77,7 +78,7 @@ export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: (
         {questionRes.loading ? (
           <Skeleton lines={4} />
         ) : questionRes.error !== null && isNotFound(questionRes.error) ? (
-          <EmptyState titleKey="overview.noQuestion" hint={t('overview.noQuestionHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+          <EmptyState titleKey="overview.noQuestion" hint={t('overview.noQuestionHint', { stage: t(stageKey(run.currentStage)) })} />
         ) : questionRes.error !== null ? (
           <ErrorBox error={questionRes.error} onRetry={questionRes.retry} />
         ) : questionRes.data !== null ? (
@@ -117,7 +118,7 @@ function QuestionScope({ question }: { question: ResearchQuestion }): JSX.Elemen
       <p className="question-text">{question.text}</p>
       <FieldList
         items={[
-          { key: t('overview.goalType'), value: t(`goalType.${question.goalType}` as never) },
+          { key: t('overview.goalType'), value: t(goalTypeKey(question.goalType)) },
           { key: t('overview.domain'), value: question.scope.domain },
           ...(question.background.trim().length > 0 ? [{ key: t('overview.background'), value: question.background }] : []),
           { key: t('overview.phenomena'), value: question.scope.phenomena.join('；') },

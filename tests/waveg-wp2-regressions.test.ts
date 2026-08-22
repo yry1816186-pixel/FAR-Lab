@@ -270,3 +270,26 @@ describe('W-G/F-B GRADE-lite deterministic certainty ladder', () => {
       .toEqual(['risk_of_bias:unverified_binding', 'inconsistency:1_contradiction_signal(s)']);
   });
 });
+
+describe('W-G follow-up: statistical-design advisory (Maastricht pattern)', () => {
+  it('quantitative plan without statistical elements gets an advisory note WITHOUT failing the gate', async () => {
+    const { checkPlanExecutability } = await import('../src/pipeline/stages/plan.js');
+    const mk = (metrics: string[], rules: string) => checkPlanExecutability({
+      objective: 'discriminate mechanisms', hypothesisIds: ['hyp_aaaaaaaaaaaaaaaaaaaaaaaa01'],
+      steps: [
+        { id: 'task_aaaaaaaaaaaaaaaaaaaaaaaa01', title: 's1', kind: 'experiment', method: 'm', inputs: [], outputs: [], failureConditions: ['f'], dependsOn: [] },
+        { id: 'task_aaaaaaaaaaaaaaaaaaaaaaaa02', title: 's2', kind: 'data_analysis', method: 'm', inputs: [], outputs: [], failureConditions: ['f'], dependsOn: [] },
+        { id: 'task_aaaaaaaaaaaaaaaaaaaaaaaa03', title: 's3', kind: 'tool_run', method: 'm', inputs: [], outputs: [], failureConditions: ['f'], dependsOn: [] },
+      ],
+      metrics, decisionRules: { successCriterion: rules, weakeningCriterion: 'w', falsificationCriterion: 'f', stopCriterion: 's' },
+      dataRequirements: [{ name: 'duration series', variables: ['duration'], availability: 'must_collect' }],
+    }, ['hyp_aaaaaaaaaaaaaaaaaaaaaaaa01']);
+    const underSpecified = mk(['off-target edit rate per cell line', 'on-target edit frequency'], 'rate at least 2x higher');
+    expect(underSpecified.passed).toBe(true);
+    expect(underSpecified.statisticalDesignNote).toBeDefined();
+    const powered = mk(['off-target edit rate (power = 0.8, n = 12 per arm)', 'on-target edit frequency'], 'rate at least 2x higher with significance 0.05');
+    expect(powered.statisticalDesignNote).toBeUndefined();
+    const qualitative = mk(['mechanism coherence judged by panel', 'reviewer agreement count'], 'panel majority agrees');
+    expect(qualitative.statisticalDesignNote).toBeUndefined();
+  });
+});

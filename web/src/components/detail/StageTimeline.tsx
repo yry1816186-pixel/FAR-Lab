@@ -3,6 +3,7 @@ import { stageStateKey, stageStateTone } from '../../tones';
 import { STAGE_ORDER } from '../../api/types';
 import type { ResearchRun, StageRecord } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
+import { stageKey } from '../../i18n/keys';
 
 /**
  * Full stage timeline: all canonical stages in STAGE_ORDER; stages without a
@@ -31,7 +32,7 @@ export function StageTimeline({ run }: { run: ResearchRun }): JSX.Element {
           const state = record?.state ?? 'pending';
           return (
             <tr key={name} className={`stage-row stage-row--${state}`}>
-              <th scope="row">{t(`stage.${name}` as never)}</th>
+              <th scope="row">{t(stageKey(name))}</th>
               <td>
                 <Badge tone={stageStateTone(state)}>{t(stageStateKey(state))}</Badge>
               </td>

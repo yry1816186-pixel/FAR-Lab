@@ -2,6 +2,7 @@ import { Badge, CountProgress, IdText, Skeleton, TimeText } from './common';
 import { runStatusKey, runStatusTone } from '../tones';
 import type { RunSummary } from '../api/types';
 import { useI18n } from '../i18n/LanguageContext';
+import { stageKey } from '../i18n/keys';
 
 export function RunListItem({
   run,
@@ -27,7 +28,7 @@ export function RunListItem({
         </span>
         <span className="run-item-mid">
           <span className="run-item-stage">
-            {t('runs.currentStage')}: {t(`stage.${run.currentStage}` as never)}
+            {t('runs.currentStage')}: {t(stageKey(run.currentStage))}
           </span>
           {run.progress !== undefined ? (
             <CountProgress done={run.progress.done} total={run.progress.total} label={t('runs.progress', run.progress)} />

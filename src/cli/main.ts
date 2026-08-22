@@ -61,11 +61,33 @@ const positional = (after: number): string | undefined => {
 };
 const COMMAND_WORDS = new Set(['research', 'start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'runs', 'probe', 'data', 'info', '--live', '--evidence', '--hypotheses', '--plan', '--sources', '--source', '--content', '--target-kind', '--target-id']);
 
+/**
+ * Machine-mode output helper (WP2 F-005): --json consumers parse stdout as ONE JSON
+ * document. A serialization crash mid-write would emit truncated JSON that looks like
+ * valid EOF — surface the failure on stderr with a non-zero exit instead.
+ */
+const jsonOutput = (data: unknown): void => {
+  try {
+    jsonOutput(data);
+  } catch (e) {
+    process.stderr.write(`far: json serialization failed: ${e instanceof Error ? e.message : String(e)}\n`);
+    process.exitCode = 1;
+  }
+};
+
+/** run ids are prefix-branded; reject malformed args before store-layer use (WP2 F-003). */
+const RUN_ID_RE = /^run_[0-9a-z]{20,32}$/;
+const runIdArg = (raw: string | undefined, sub: string): string => {
+  const rid = raw ?? die(`${sub} requires a run id`, 2);
+  if (!RUN_ID_RE.test(rid)) die(`invalid run id format: ${rid} (expected run_<26-char id>)`, 2);
+  return rid;
+};
+
 const printRun = (run: ResearchRun, verbose = true) => {
   const p = runProgress(run);
   if (json()) {
     const { stages, ...rest } = run;
-    console.log(JSON.stringify({ ...rest, progress: p, stages: verbose ? stages : undefined }, null, 2));
+    jsonOutput({ ...rest, progress: p, stages: verbose ? stages : undefined });
   } else {
     console.log(`run ${run.id}`);
     console.log(`  status: ${run.status}  stage: ${run.currentStage}  progress: ${p.done}/${p.total} stages`);
@@ -84,7 +106,7 @@ const main = async (): Promise<void> => {
   if (cmd === 'runs') {
     const app = await createApp();
     const runs = app.store.listRuns();
-    if (json()) console.log(JSON.stringify(runs, null, 2));
+    if (json()) jsonOutput(runs);
     else for (const r of runs) console.log(`${r.id}  ${r.status.padEnd(10)} ${r.currentStage.padEnd(20)} ${r.createdAt}`);
     app.close();
     return;
@@ -133,7 +155,7 @@ const main = async (): Promise<void> => {
       }
       results.push(entry);
     }
-    if (json()) console.log(JSON.stringify(results, null, 2));
+    if (json()) jsonOutput(results);
     else for (const r of results) {
       console.log(`${String(r.provider).padEnd(10)} ${String(r.status).padEnd(12)} model=${String(r.model)}${r.httpStatus !== undefined ? `  http=${r.httpStatus}` : ''}${r.detail !== undefined ? `\n  ${r.detail}` : ''}`);
     }
@@ -181,7 +203,7 @@ const main = async (): Promise<void> => {
       dbBytes: sizeOf(db), dbWalBytes: sizeOf(`${db}-wal`), dbShmBytes: sizeOf(`${db}-shm`),
       artifacts, exports: exportsDir,
     };
-    if (json()) console.log(JSON.stringify(info, null, 2));
+    if (json()) jsonOutput(info);
     else {
       console.log(`data dir: ${info.dataDir}`);
       console.log(`runs: ${info.totalRuns} (${Object.entries(runsByStatus).map(([s, n]) => `${s}=${n}`).join(' ') || 'none'})`);
@@ -199,7 +221,7 @@ const main = async (): Promise<void> => {
     const app = await createApp();
     try {
       const report = await verifyBundle(bundleId, { store: app.store, artifacts: app.artifacts });
-      if (json()) console.log(JSON.stringify(report, null, 2));
+      if (json()) jsonOutput(report);
       else {
         console.log(`bundle ${report.bundleId} (run ${report.runId}) — declared evidence level: ${report.declaredEvidenceLevel}`);
         console.log(`verdict: ${report.verdict} (${report.checks.filter((c) => c.passed).length}/${report.checks.length} checks passed)`);
@@ -227,7 +249,7 @@ const main = async (): Promise<void> => {
         constraints: {}, createdAt: new Date().toISOString(),
       });
       const run = app.store.createRun(q);
-      if (json()) console.log(JSON.stringify({ runId: run.id, status: run.status }));
+      if (json()) jsonOutput({ runId: run.id, status: run.status });
       else console.log(`created run ${run.id}`);
       const done = await app.orchestrator.execute(run.id);
       printRun(done);
@@ -239,7 +261,7 @@ const main = async (): Promise<void> => {
   const runId = positional(4);
   const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export'] as const;
   if (sub !== undefined && (NEEDS_RUN as readonly string[]).includes(sub) && !runId) die(`${sub} requires a run id`, 2);
-  const rid: string = runId ?? die(`${sub} requires a run id`, 2);
+  const rid: string = runIdArg(runId, sub ?? 'command');
 
   if (sub === 'status') {
     const app = await createApp();
@@ -253,7 +275,7 @@ const main = async (): Promise<void> => {
       if (json()) {
         // single JSON object for machine consumers (two blobs would break JSON.parse(stdout))
         const { stages, ...rest } = run;
-        console.log(JSON.stringify({ ...rest, progress: runProgress(run), stages, lease: { holder: lease.holder, expiresAt: lease.expiresAt, live } }, null, 2));
+        jsonOutput({ ...rest, progress: runProgress(run), stages, lease: { holder: lease.holder, expiresAt: lease.expiresAt, live } });
       } else {
         printRun(run);
         console.log(`  lease: ${lease.holder === null ? 'none' : `${lease.holder} (expires ${lease.expiresAt})`}${run.status === 'running' && !live ? '  [FROZEN — resume to recover]' : ''}`);
@@ -269,12 +291,12 @@ const main = async (): Promise<void> => {
       if (!run) die(`run not found: ${runId}`);
       if (flag('--sources')) {
         const docs = app.store.listObjects('source_document', run.id);
-        if (json()) console.log(JSON.stringify(docs, null, 2));
+        if (json()) jsonOutput(docs);
         else for (const d of docs) console.log(`${d.id} [${d.family}] ${(d.title ?? '').slice(0, 80)} depth=${d.contentDepth} verified=${d.verification?.resolved ?? 'not-checked'}`);
       } else if (flag('--evidence')) {
         const claims = app.store.listObjects('claim', run.id);
         const rels = app.store.listObjects('evidence_relation', run.id);
-        if (json()) console.log(JSON.stringify({ claims, relations: rels }, null, 2));
+        if (json()) jsonOutput({ claims, relations: rels });
         else {
           for (const c of claims) console.log(`[${c.bindingStatus}] ${c.text.slice(0, 100)}`);
           for (const r of rels) console.log(`(${r.relation}) claim=${r.claimId ?? '-'} hyp=${r.targetHypothesisId ?? '-'} :: ${r.rationale.slice(0, 80)}`);
@@ -282,7 +304,7 @@ const main = async (): Promise<void> => {
       } else if (flag('--hypotheses')) {
         const hyps = app.store.listObjects('hypothesis', run.id);
         const scores = app.store.listObjects('scorecard', run.id);
-        if (json()) console.log(JSON.stringify({ hypotheses: hyps, scorecards: scores }, null, 2));
+        if (json()) jsonOutput({ hypotheses: hyps, scorecards: scores });
         else {
           for (const h of hyps) console.log(`${h.clusterKey ? `[cluster ${h.clusterKey.slice(0, 12)}]` : ''} ${h.statement.slice(0, 100)} (testability=${h.testability}, novelty=${h.noveltyLabel})`);
           for (const s of scores) console.log(`scorecard hyp=${s.hypothesisId} rank=${s.rank}/${s.rankedOutOf}`);
@@ -290,7 +312,7 @@ const main = async (): Promise<void> => {
       } else if (flag('--plan')) {
         const plans = app.store.listObjects('plan', run.id);
         if (plans.length === 0) console.log('(no plan yet)');
-        else if (json()) console.log(JSON.stringify(plans, null, 2));
+        else if (json()) jsonOutput(plans);
         else for (const p of plans) {
           console.log(`objective: ${p.objective}`);
           console.log(`executabilityCheck: ${p.executabilityCheck?.passed ? 'PASS' : `FAIL missing=${p.executabilityCheck?.missing.join('; ')}`}`);

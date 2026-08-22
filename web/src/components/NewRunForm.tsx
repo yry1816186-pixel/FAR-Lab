@@ -4,6 +4,7 @@ import { createRun } from '../api/endpoints';
 import type { ScientificGoalType } from '../api/types';
 import { useI18n } from '../i18n/LanguageContext';
 import { errorText } from './common';
+import { goalTypeKey } from '../i18n/keys';
 
 const GOAL_TYPES: ScientificGoalType[] = ['explanatory', 'predictive', 'interventional', 'methodological', 'exploratory'];
 
@@ -94,7 +95,7 @@ export function NewRunForm({ onCreated }: Props): JSX.Element {
         <option value="">{t('goalType.unset')}</option>
         {GOAL_TYPES.map((g) => (
           <option key={g} value={g}>
-            {t(`goalType.${g}` as never)}
+            {t(goalTypeKey(g))}
           </option>
         ))}
       </select>

@@ -15,16 +15,6 @@ export function Badge({ tone, children, title }: { tone: BadgeTone; children: Re
   );
 }
 
-/** Labeled badge from an i18n key + tone. */
-export function LabeledBadge({ tone, labelKey, title }: { tone: BadgeTone; labelKey: DictKey; title?: string }): JSX.Element {
-  const { t } = useI18n();
-  return (
-    <Badge tone={tone} title={title}>
-      {t(labelKey)}
-    </Badge>
-  );
-}
-
 export function Skeleton({ lines = 3, ariaLabelKey }: { lines?: number; ariaLabelKey?: DictKey }): JSX.Element {
   const { t } = useI18n();
   const label = ariaLabelKey !== undefined ? t(ariaLabelKey) : t('common.loading');

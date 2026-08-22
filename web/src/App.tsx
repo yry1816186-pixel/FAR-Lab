@@ -121,9 +121,17 @@ export function App(): JSX.Element {
     lastSeqRef.current = 0;
   }, [selectedRunId]);
 
+  // Track the in-flight events request so it can be cancelled (WP2 F-03): without
+  // this, a slow poll from the PREVIOUS run can resolve after a run switch and append
+  // its events into the new run's list, and rapid switches leak pending fetches.
+  const eventsAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => { eventsAbortRef.current?.abort(); }, []);
+
   const pollEvents = useCallback((): Promise<void> => {
     if (selectedRunId === null) return Promise.resolve();
+    eventsAbortRef.current?.abort();
     const controller = new AbortController();
+    eventsAbortRef.current = controller;
     return (async () => {
       try {
         const incoming = await getEvents(selectedRunId, lastSeqRef.current, controller.signal);

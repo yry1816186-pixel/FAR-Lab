@@ -69,6 +69,7 @@ const canonicalizeStepIds = (draft: PlanDraft): PlanDraft => {
 export interface ExecutabilityCheck {
   passed: boolean;
   missing: string[];
+  statisticalDesignNote?: string;
 }
 
 /**
@@ -133,7 +134,19 @@ export const checkPlanExecutability = (
   plan.dataRequirements.forEach((req, i) => {
     if (req.variables.length === 0) missing.push(`dataRequirements[${i}]「${req.name}」未声明 variables`);
   });
-  return { passed: missing.length === 0, missing };
+  // Statistical-design advisory (W-G follow-up; Maastricht QA-checklist pattern):
+  // quantitative metrics (rates/ratios/threshold comparisons) with NO statistical design
+  // element (power, sample size, effect size, significance, CI) leave the plan executable
+  // but statistically under-specified. Advisory only — never fails the gate: qualitative
+  // plans legitimately omit statistical design.
+  const quantitative = plan.metrics.some((m) => /(rate|ratio|percent|frequency|difference|fold|比率|频率)/i.test(m))
+    || /[≥<>=]\s*\d/.test(plan.decisionRules.successCriterion);
+  const hasStatsDesign = [plan.objective, ...plan.metrics, ...Object.values(plan.decisionRules), ...plan.dataRequirements.map((d) => d.name)]
+    .some((t) => /(power|sample size|effect size|significance|confidence interval|alpha|功效|样本量|效应量|显著性)/i.test(t));
+  const statisticalDesignNote = quantitative && !hasStatsDesign
+    ? '定量指标缺少统计设计要素（power/样本量/效应量/显著性水平）——计划可执行但统计上欠规范，建议实施前补齐'
+    : undefined;
+  return { passed: missing.length === 0, missing, ...(statisticalDesignNote !== undefined ? { statisticalDesignNote } : {}) };
 };
 
 interface DroppedStepRef {
