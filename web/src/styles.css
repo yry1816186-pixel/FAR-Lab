@@ -217,6 +217,97 @@ a:hover { text-decoration: underline; }
   border: 0;
 }
 
+/* ---------- logo (P-IA): evidence-quadrant mark = the product's own semantics ---------- */
+.app-brand { display: flex; flex-direction: column; gap: 2px; }
+.logo-full { display: inline-flex; align-items: center; gap: var(--sp-2); font-weight: 600; font-size: 16px; color: var(--text); letter-spacing: 0.01em; }
+.logo-mark { display: inline-block; flex-shrink: 0; }
+.logo-cell { stroke-width: 0; }
+.logo-cell--verified { fill: var(--v2-verified-tint); }
+.logo-cell--refuted  { fill: var(--v2-refuted-tint); }
+.logo-cell--unknown  { fill: var(--v2-unknown-tint); }
+.logo-cell--caution  { fill: var(--v2-caution-tint); }
+.logo-glyph { font-size: 12px; font-weight: 700; font-family: var(--font-ui); }
+.logo-glyph--verified { fill: var(--v2-verified); }
+.logo-glyph--refuted  { fill: var(--v2-refuted); }
+.logo-glyph--unknown  { fill: var(--v2-unknown); }
+.logo-glyph--caution  { fill: var(--v2-caution); }
+
+/* ---------- workbench home (P-IA) ---------- */
+.welcome {
+  max-width: 640px;
+  margin: var(--sp-6) auto var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  padding: 0 var(--sp-4);
+}
+.welcome-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); }
+.welcome-title { font-size: 26px; letter-spacing: -0.01em; }
+.welcome-subtitle { margin: 0; font-size: var(--fs-body); line-height: var(--lh-read); max-width: 46ch; }
+
+.welcome-main { display: flex; flex-direction: column; gap: var(--sp-5); }
+
+/* the creation card is THE first visual anchor of the workbench home */
+.welcome-card {
+  background: var(--surface);
+  border: 1px solid var(--v2-border);
+  border-radius: 8px;
+  padding: var(--sp-5);
+  box-shadow: 0 2px 8px rgb(15 18 21 / 6%), 0 12px 32px rgb(15 18 21 / 5%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .welcome-card { box-shadow: 0 2px 8px rgb(0 0 0 / 30%), 0 12px 32px rgb(0 0 0 / 25%); }
+}
+:root[data-theme='dark'] .welcome-card { box-shadow: 0 2px 8px rgb(0 0 0 / 30%), 0 12px 32px rgb(0 0 0 / 25%); }
+
+.hero-form { display: flex; flex-direction: column; gap: var(--sp-2); }
+.hero-input {
+  font-size: 15px;
+  line-height: var(--lh-read);
+  padding: var(--sp-3) var(--sp-4);
+  min-height: 96px;
+  background: var(--surface);
+  border: 1px solid var(--form-border);
+}
+.hero-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
+.hero-advanced { border: 1px dashed var(--border); border-radius: var(--radius-s); padding: var(--sp-2) var(--sp-3); }
+.hero-advanced summary { cursor: pointer; font-size: var(--fs-aux); color: var(--muted); }
+.hero-advanced-body { display: flex; flex-direction: column; gap: var(--sp-2); padding-top: var(--sp-2); }
+.hero-actions { display: flex; align-items: center; gap: var(--sp-3); }
+.btn--hero { font-size: 14px; padding: 9px var(--sp-5); }
+.hero-hint { font-size: var(--fs-aux); }
+
+.welcome-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.welcome-step {
+  flex: 1 1 160px;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: var(--fs-aux);
+  line-height: var(--lh-aux);
+  color: var(--text-2);
+  border-top: 2px solid var(--v2-border);
+  padding-top: var(--sp-2);
+}
+.welcome-step--verified { border-top-color: var(--v2-verified); }
+.welcome-step--unknown  { border-top-color: var(--v2-unknown); }
+.welcome-step--caution  { border-top-color: var(--v2-caution); }
+.welcome-step .ev-glyph { min-height: 18px; line-height: 18px; width: 18px; font-size: 13px; }
+.welcome-foot { font-size: var(--fs-aux); text-align: center; margin: 0; }
+
+/* ---------- sidebar groups (P-IA) ---------- */
+.sidebar-head-actions { display: flex; gap: var(--sp-1); align-items: center; }
+.runs-groups { display: flex; flex-direction: column; gap: var(--sp-4); }
+.runs-group { display: flex; flex-direction: column; gap: var(--sp-2); }
+.runs-group-title { font-size: var(--fs-aux); font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; margin: 0; }
+
 /* ---------- app frame ---------- */
 .app { min-height: 100vh; display: flex; flex-direction: column; }
 

@@ -63,6 +63,18 @@ export function RunListItem({
   );
 }
 
+/** Status groups (P-IA: the sidebar reads as tasks-at-a-glance, not a flat feed).
+ *  The last entry is a true fallback: it only receives statuses no named group claimed. */
+const NAMED_GROUPS: { key: 'runs.groupActive' | 'runs.groupAttention' | 'runs.groupDone'; match: (s: string) => boolean }[] = [
+  { key: 'runs.groupActive', match: (s) => s === 'running' || s === 'queued' },
+  { key: 'runs.groupAttention', match: (s) => s === 'partial' || s === 'failed' || s === 'cancelled' },
+  { key: 'runs.groupDone', match: (s) => s === 'completed' },
+];
+const GROUP_ORDER: { key: 'runs.groupActive' | 'runs.groupAttention' | 'runs.groupDone' | 'runs.groupOther'; match: (s: string) => boolean }[] = [
+  ...NAMED_GROUPS,
+  { key: 'runs.groupOther', match: (s) => !NAMED_GROUPS.some((g) => g.match(s)) },
+];
+
 export function RunsList({
   runs,
   loading,
@@ -92,11 +104,21 @@ export function RunsList({
       </p>
     );
   }
+  const grouped = GROUP_ORDER.map((g) => ({ ...g, items: runs.filter((r) => g.match(r.status)) })).filter(
+    (g) => g.items.length > 0,
+  );
   return (
-    <ul className="runs-list" aria-label={t('runs.title')}>
-      {runs.map((run) => (
-        <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={onSelect} />
+    <nav className="runs-groups" aria-label={t('runs.title')}>
+      {grouped.map((g) => (
+        <section key={g.key} className="runs-group">
+          <h3 className="runs-group-title">{t(g.key)} <span className="muted small">{g.items.length}</span></h3>
+          <ul className="runs-list">
+            {g.items.map((run) => (
+              <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={onSelect} />
+            ))}
+          </ul>
+        </section>
       ))}
-    </ul>
+    </nav>
   );
 }
