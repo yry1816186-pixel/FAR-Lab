@@ -24,14 +24,14 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { TASKS, GT_REV, renderTopHypothesis, waitForTerminal } from './rediscovery-tasks.mjs';
-import { thresholdMatch, finalizeCounts } from './claim-match.mjs';
+import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS } from './claim-match.mjs';
 import { judgeRediscovery } from './rediscovery-judge.mjs';
 import { maxAbsSwing, variance } from './stats.mjs';
 
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
 const REPLAY_SOURCES = ['rediscovery-v1-degraded.jsonl', 'rediscovery-v2-pass1.jsonl'];
 const RUNS_FILE = join(RESULTS_DIR, 'rediscovery-runs.jsonl');
-const MATCH = { high: 0.40, low: 0.12 }; // gold-calibrated (same as rediscovery-judge.mjs)
+const MATCH = MATCH_DEFAULTS; // single source with the production pipeline (audit P1 #3)
 
 const loadRecorded = () => {
   const byTask = new Map();
@@ -73,7 +73,6 @@ mkdirSync(RESULTS_DIR, { recursive: true });
 if (mode === 'replay') {
   const byTask = loadRecorded();
   const out = { mode: 'replay', gtRev: GT_REV, sources: REPLAY_SOURCES, generated: new Date().toISOString(), tasks: [] };
-  const v1Swing = { arg: 0.33, crc: 0.52 }; // recorded v1 LLM-matcher swing (0.17-0.50, 1.00-0.48) for对照
   for (const t of TASKS) {
     const passes = byTask.get(t.id) ?? [];
     if (passes.length === 0) { out.tasks.push({ task: t.id, skipped: true, reason: 'no recorded decomposition' }); continue; }
@@ -99,7 +98,7 @@ if (mode === 'replay') {
   out.summary = summary;
   const outFile = join(RESULTS_DIR, 'judge-variance-replay.json');
   writeFileSync(outFile, JSON.stringify(out, null, 2) + '\n');
-  console.log(JSON.stringify({ summary, v1SwingNotes: v1Swing, outFile }, null, 2));
+  console.log(JSON.stringify({ summary: out.summary, v1RecordedLLMMatcherSwing: out.summary.v1RecordedLLMMatcherSwingForComparison, outFile }, null, 2));
   process.exit(0);
 }
 

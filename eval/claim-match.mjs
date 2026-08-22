@@ -108,15 +108,17 @@ export const thresholdMatch = (agentClaims, gtClaims, { high = MATCH_DEFAULTS.hi
     return { bestIdx, bestSim };
   };
   const decide = ({ bestIdx, bestSim }) => {
-    if (bestSim >= high) return { match: bestIdx, sim: bestSim };
-    if (bestSim < low) return { match: -1, sim: bestSim };
-    return { match: null, sim: bestSim };
+    // bestIdx is retained on EVERY outcome (including borderline) — adjudication
+    // needs the actual best counterpart, never a positional fallback (audit P0 #1)
+    if (bestSim >= high) return { match: bestIdx, sim: bestSim, bestIdx };
+    if (bestSim < low) return { match: -1, sim: bestSim, bestIdx };
+    return { match: null, sim: bestSim, bestIdx };
   };
   const agentSide = agentTokens.map((_, i) => decide(bestFor(i, agentTokens.length, gtTokens.length)));
   const gtSide = gtTokens.map((_, j) => decide(bestFor(agentTokens.length + j, 0, agentTokens.length)));
   const borderline = [];
-  agentSide.forEach((r, i) => { if (r.match === null) borderline.push({ side: 'agent', i, bestSim: r.sim }); });
-  gtSide.forEach((r, j) => { if (r.match === null) borderline.push({ side: 'gt', i: j, bestSim: r.sim }); });
+  agentSide.forEach((r, i) => { if (r.match === null) borderline.push({ side: 'agent', i, bestSim: r.sim, bestIdx: r.bestIdx }); });
+  gtSide.forEach((r, j) => { if (r.match === null) borderline.push({ side: 'gt', i: j, bestSim: r.sim, bestIdx: r.bestIdx }); });
   return { agentSide, gtSide, borderline };
 };
 

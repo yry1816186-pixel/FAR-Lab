@@ -16,17 +16,21 @@
  *
  * Usage: node eval/stats-report.mjs
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { bootstrapMeanCI, pairedPermutationTest, wilsonInterval, cohensKappa, clusterStderr, decideDeltaReality } from './stats.mjs';
+import { bootstrapMeanCI, pairedPermutationTest, wilsonInterval, cohensKappa, krippendorffAlpha, pooledStderr, clusterStderr, decideDeltaReality } from './stats.mjs';
 
 const RESULTS = resolve(process.cwd(), 'eval/results');
 const SEED = 20260822; // recorded with the report; same seed -> identical report
 
 const readJsonl = (name) => {
-  try {
-    return readFileSync(join(RESULTS, name), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
-  } catch { return null; }
+  const p = join(RESULTS, name);
+  if (!existsSync(p)) return null; // absent file -> section omitted
+  // corrupt file -> fail visibly (a silently shrunk report is worse than no report)
+  const text = readFileSync(p, 'utf8');
+  return text.trim().split('\n').filter(Boolean).map((l) => {
+    try { return JSON.parse(l); } catch (e) { throw new Error(`corrupt jsonl ${name}: ${e instanceof Error ? e.message : String(e)}`, { cause: e }); }
+  });
 };
 
 const report = { generatedFor: 'wave9-statistics-tier', seed: SEED, deterministic: 'same seed -> identical report', sections: {} };
@@ -75,7 +79,7 @@ try {
   };
 } catch { /* gold not present -> section omitted */ }
 
-// --- 4. kappa probe: v1 vs v2-pass1 decomposition-count agreement (judge-noise proxy) ---
+// --- 4. agreement probes: decomposition-count kappa AND krippendorff alpha (nominal) ---
 if (v1) {
   const v2p1 = readJsonl('rediscovery-v2-pass1.jsonl');
   if (v2p1) {
@@ -85,21 +89,34 @@ if (v1) {
       const a = shared.map((r) => String(r.claims.agent.length));
       const b = shared.map((r) => String(v2Counts.get(r.task)));
       report.sections.decompositionAgreement = {
-        ...cohensKappa(a, b),
-        note: 'claim-count agreement between two recorded decomposition passes (coarse buckets); low kappa = decomposition noise the v2.1 median + fixed protocol target',
+        kappa: cohensKappa(a, b),
+        krippendorffNominal: krippendorffAlpha([a, b], 'nominal'),
+        note: 'claim-count agreement between two recorded decomposition passes (coarse buckets); low agreement = decomposition noise the v2.1 median + fixed protocol target',
       };
     }
   }
 }
 
-// --- 5. cluster SE demo: F1 scores clustered by task family (oncology vs microbiology vs molbio) ---
+// --- 5. cluster SE + pooled SE across domain families ---
 if (v1) {
   const scored = v1.filter((r) => typeof r.f1 === 'number');
   const families = { oncology: [], microbiology: [], 'molecular biology': [] };
   const familyOf = { 'egfr-tki-resistance': 'oncology', 'crc-ici-failure': 'oncology', 'antibiotic-cdiff': 'microbiology', 'arg-plasmid-transfer': 'microbiology', 'crispr-offtarget': 'molecular biology' };
   for (const r of scored) { const f = familyOf[r.task]; if (f) families[f].push(r.f1); }
-  const clusters = Object.values(families).filter((c) => c.length > 0);
-  report.sections.clusterStderr = { ...clusterStderr(clusters), note: 'F1 scores clustered by domain family (Miller Eq.4/8 cluster-robust SE)' };
+  const clusters = Object.entries(families).filter(([, c]) => c.length > 0);
+  const clusterVals = clusters.map(([, c]) => c);
+  // per-family mean/stderr feed the pooled SE (lm-eval pooled_sample_stderr pattern)
+  const groupStats = clusters.map(([name, vals]) => {
+    const mean = vals.reduce((x, y) => x + y, 0) / vals.length;
+    const sd = vals.length > 1 ? Math.sqrt(vals.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (vals.length - 1)) : 0;
+    return { name, mean, stderr: sd / Math.sqrt(vals.length), n: vals.length };
+  });
+  report.sections.clusterStderr = {
+    ...clusterStderr(clusterVals),
+    perFamily: groupStats,
+    pooledAcrossFamilies: pooledStderr(groupStats),
+    note: 'F1 scores clustered by domain family; cluster-robust SE (Miller Eq.4/8) + pooled SE of the size-weighted family mean (lm-eval pooled_sample_stderr)',
+  };
 }
 
 const out = join(RESULTS, 'stats-report.json');
