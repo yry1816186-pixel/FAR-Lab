@@ -82,7 +82,16 @@ async function request(
   }
 
   if (init.text === true) {
-    const text = await res.text();
+    let text: string;
+    try {
+      text = await res.text();
+    } catch (e) {
+      // Mid-body abort (run/tab switch) rejects the stream read; that is a
+      // cancellation, not a transport failure — surface AbortError so
+      // consumer-side AbortError filters classify it correctly.
+      if (init.signal?.aborted === true) throw new DOMException('aborted', 'AbortError');
+      throw e;
+    }
     // Honest handling: an endpoint contracted to return markdown text must not
     // silently pass a JSON envelope through as if it were report content.
     const contentType = res.headers.get('content-type') ?? '';
@@ -109,7 +118,12 @@ async function request(
 
   try {
     return await res.json();
-  } catch {
+  } catch (e) {
+    // Same mid-body-abort class: a truncated stream parses as a SyntaxError,
+    // which used to be misreported as bad_json on every run/tab switch (B1).
+    if (init.signal?.aborted === true) {
+      throw e instanceof DOMException && e.name === 'AbortError' ? e : new DOMException('aborted', 'AbortError');
+    }
     throw new ApiError({
       code: 'bad_json',
       message: `API 返回了无法解析的 JSON（${path}）`,

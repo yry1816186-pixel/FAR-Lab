@@ -59,10 +59,15 @@ export function App(): JSX.Element {
 
   usePolling(refreshRunsWithAbort, RUNS_POLL_MS, true);
 
-  // Keep a valid selection: drop it if the run disappears from the list.
+  // Keep the selection honest: if the selected run vanished from a FRESH list
+  // (no delete API exists today; DB reset is the realistic path), deselect back
+  // to the welcome view. Never silently swap the researcher to a different
+  // study — context switching on their behalf breaks train of thought (B1 P0:
+  // this guard fired on the STALE list right after run creation and hijacked
+  // the selection to an unrelated run, corrupting the hash URL too).
   useEffect(() => {
     if (selectedRunId !== null && !runsLoading && runs.length > 0 && !runs.some((r) => r.id === selectedRunId)) {
-      setSelectedRunId(runs[0]!.id);
+      setSelectedRunId(null);
     }
   }, [runs, runsLoading, selectedRunId]);
 
@@ -164,6 +169,16 @@ export function App(): JSX.Element {
   const eventsEnabled = selectedRunId !== null && detailStatus !== 'failed' && detailStatus !== 'cancelled';
   usePolling(pollEvents, EVENTS_POLL_MS, eventsEnabled);
 
+  // Initial events fetch on run selection (parity with the detail fetch above):
+  // the visibility-gated poll may legitimately skip every tick while the page
+  // is hidden (deep link opened into a background tab; embedded webviews whose
+  // visibilityState stays hidden) — event history must not depend on that.
+  // The reset effect above is declared first, so state clears before this fills.
+  useEffect(() => {
+    if (selectedRunId === null) return;
+    void pollEvents();
+  }, [selectedRunId, pollEvents]);
+
   const eventsState = useMemo<EventsState>(
     () => ({ events, lastSeq: lastSeqRef.current, total: eventsTotal, error: eventsError }),
     [events, eventsTotal, eventsError],
@@ -178,6 +193,10 @@ export function App(): JSX.Element {
   const onCreated = useCallback((runId: string): void => {
     setSelectedRunId(runId);
     setRouteTab(null);
+    // A list refresh is now in flight: mark it so the selection guard above
+    // stays suspended until the FRESH list (containing the new run) arrives.
+    // Without this, the guard sees the stale list and deselects mid-create.
+    setRunsLoading(true);
     void refreshRunsWithAbort();
   }, [refreshRunsWithAbort]);
 

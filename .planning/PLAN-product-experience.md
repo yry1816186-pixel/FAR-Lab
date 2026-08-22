@@ -16,8 +16,8 @@
 
 ### Wave 1 — 根基
 
-- **B0 状态对账**：EXECUTION_STATE 补 S2/S3 证据；散落 yml 移 evidence/W-PEX/；总纲落盘；提交推送。
-- **B1 全程审判基线（指令 §2 正式化）**：以首次使用的科研者身份完整走通 Idea→输入→问题→文献→反证→假设→比较质疑→证伪→计划→实验→结果→修订→版本→导出；逐点记录迷惑/后台感/工程细节暴露/信息过载或不足/跳转/响应慢/层级错误/思维断续；产出摩擦清单 + CPP v2 重排 + 各表面设计方向（timebox，结论喂后续批）。
+- **B0（已完成 2026-08-22，d3fa71c）**：总纲落盘；EXECUTION_STATE 同步（CP-PEX1/2 DONE、CP-PEX3 IN_PROGRESS）；S5 会话收尾记录入库；散落 yml 归档 evidence/W-PEX/；D-091 记录。
+- **B1（已完成 2026-08-22，全程 GUI 实走）**：基线报告 = evidence/W-PEX/b1-baseline.md（度量+正面清单+摩擦清单+CPP v2+B2 设计输入）。**4 项热修**（F-01 创建后选中劫持 P0/F-02 事件流可见性死亡 P0/F-03 轮询首拉门控 P0/F-04 abort 误分类 P1），全部 GUI 验证（第二个真实 run run_751xw3 创建即落自己研究）。关键实测：完整研究周期 8m28s；修订因果链（run_7zez1a8e）为验证过的差异化资产。CPP v2 = CPP-8..13（见基线报告 §5）。
 - **B2 工作台骨架重构**：①IA 按任务心智重排——科学面一级（问题/证据/假设/计划/实验/修订链），工程面渐进披露（events/receipts/元数据→「技术细节」检查器），run ID 全面退居次级；②palette 扩全量搜索（按问题搜 run、按陈述搜假设、按文本搜 claim，新增 `GET /api/v1/search?q=` SQL LIKE 零依赖；命令面板本体 S5 已落地，本批接搜索）；③quick capture：`n`/`#new`/全局捕获条/首访 onboarding 空态引导；④视觉层级升级：密度/留白/typography scale/motion tokens 重校（对齐 Wave-Aesthetics craft-spec-v2 既有规格），科学语义组件语言统一；⑤键盘流（n、/、Cmd+K、←→、Esc）+ 响应式审计。
 - **B3 等待期根修 + 实时性**：①receipt payload 富化（模型 modelId/purpose/latencyMs；检索 family/query/resultCount/httpStatus，零 schema 变更）；②StageRecord.subtasks 仅真实总量处填充；③note 里程碑让假设逐条浮现、falsify 逐假设播报；④ActivityFeed 富化 + StageTimeline 真实计数；⑤SSE 事件流（Node 原生 http 零依赖，替代 2s 轮询，降级保轮询）；⑥多 run 后台感知条 + web 通知（默认关、真实终态驱动）；⑦版本对比视图（side-by-side before/after + VersionDiff + 剩余不确定项；live v0→v1 真数据已在库——S3 时"无数据"降级已解除）；⑧PlanTab 质疑接线、ExperimentsTab i18n 硬化、对比导出 Markdown、反证检索记录结构化。
 
