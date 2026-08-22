@@ -9,6 +9,7 @@ import { parseCsv } from '../src/experiment/csv.js';
 import { applySplit } from '../src/experiment/split.js';
 import { datasetIdFor, acquireDataset } from '../src/experiment/datasets.js';
 import { executeExperiment } from '../src/experiment/executor.js';
+import { expandAblationModels } from '../src/experiment/matrix.js';
 import {
   ResearchQuestion, HypothesisCandidate, newId,
   checkExperimentSpec, mechanicalVerdict,
@@ -192,6 +193,16 @@ describe('E1 spec validation (fail-closed)', () => {
     expect(r.missing.join(' ')).toContain('exactly one primary');
     expect(r.missing.join(' ')).toContain('multipleTestingPolicy');
   });
+  it('rejects e_value_accumulation loudly (unimplemented policy is never silently downgraded)', () => {
+    const r = checkExperimentSpec(base, { hypothesisIds: [hyp as never], allowLocalDatasets: true });
+    const ev = checkExperimentSpec(
+      { ...base, statistics: { ...base.statistics, multipleTestingPolicy: 'e_value_accumulation' } },
+      { hypothesisIds: [hyp as never], allowLocalDatasets: true },
+    );
+    expect(r.passed).toBe(true);
+    expect(ev.passed).toBe(false);
+    expect(ev.missing.join(' ')).toContain('e_value_accumulation');
+  });
   it('passes a fully valid spec with approval and flag', () => {
     const r = checkExperimentSpec(base, { hypothesisIds: [hyp as never], allowLocalDatasets: true });
     expect(r.missing).toEqual([]);
@@ -352,6 +363,108 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
       const a2 = await acquireDataset(store, artifacts, runId as never, use);
       expect(a1.record.id).toBe(a2.record.id);
       expect(store.listObjects('dataset_record', runId)).toHaveLength(1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('P2 alpha_spending: multi-comparison run adjusts alpha, labels all confirmatory, feeds feedback', async () => {
+    const { store, dir, cleanup } = makeStore();
+    try {
+      const artifacts = openArtifactStore(join(dir, 'artifacts'));
+      const runId = makeRun(store);
+      const hyp = makeHypothesis(runId);
+      store.putObject('hypothesis', hyp);
+      const csvPath = join(dir, 'fixture.csv');
+      writeFileSync(csvPath, fixtureCsv(), 'utf8');
+      const spec = makeSpec(runId, csvPath, hyp.id);
+      spec.models.push({ name: 'rf', builderId: 'random_forest_classifier', hyperparams: { n_estimators: 50 }, seed: 3, tags: [] });
+      spec.comparisons = [
+        { ...spec.comparisons[0]!, primary: true },
+        { ...spec.comparisons[0]!, id: 'cmp-rf-vs-baseline', modelAIdx: 2, primary: false },
+      ];
+      spec.statistics = { ...spec.statistics, multipleTestingPolicy: 'alpha_spending', multipleTestingNote: 'equal split over 2 confirmatory comparisons' };
+      spec.approvals[0]!.comparisonIds = ['cmp-primary', 'cmp-rf-vs-baseline'];
+
+      const out = await executeExperiment(store, artifacts, spec, { allowLocalDatasets: true });
+      expect(out.run.status).toBe('completed');
+      expect(out.resultSet.cells).toHaveLength(3);
+      expect(out.statReports).toHaveLength(2);
+      for (const rep of out.statReports) {
+        expect(rep.secondary).toBe(false);
+        expect(rep.adjustedAlpha).toBeCloseTo(0.025, 10); // 0.05 / 2, recorded never silent
+        expect(rep.ci.level).toBeCloseTo(0.975, 10);
+      }
+      // Both comparisons bind the same hypothesis -> one aggregated confirmatory feedback signal.
+      expect(out.feedback).toHaveLength(1);
+      expect(out.feedback[0]!.structured?.verdicts).toHaveLength(2);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('P2 single_primary: secondary comparisons stay descriptive and never feed feedback', async () => {
+    const { store, dir, cleanup } = makeStore();
+    try {
+      const artifacts = openArtifactStore(join(dir, 'artifacts'));
+      const runId = makeRun(store);
+      const hyp = makeHypothesis(runId);
+      store.putObject('hypothesis', hyp);
+      const csvPath = join(dir, 'fixture.csv');
+      writeFileSync(csvPath, fixtureCsv(), 'utf8');
+      const spec = makeSpec(runId, csvPath, hyp.id);
+      spec.models.push({ name: 'rf', builderId: 'random_forest_classifier', hyperparams: { n_estimators: 50 }, seed: 3, tags: [] });
+      spec.comparisons = [
+        { ...spec.comparisons[0]!, primary: true },
+        { ...spec.comparisons[0]!, id: 'cmp-rf-vs-baseline', modelAIdx: 2, primary: false },
+      ];
+      spec.statistics = { ...spec.statistics, multipleTestingPolicy: 'single_primary' };
+      spec.approvals[0]!.comparisonIds = ['cmp-primary', 'cmp-rf-vs-baseline'];
+
+      const out = await executeExperiment(store, artifacts, spec, { allowLocalDatasets: true });
+      const primary = out.statReports.find((r) => r.comparisonId === 'cmp-primary')!;
+      const secondary = out.statReports.find((r) => r.comparisonId === 'cmp-rf-vs-baseline')!;
+      expect(primary.secondary).toBe(false);
+      expect(primary.adjustedAlpha).toBeUndefined(); // full alpha, no adjustment
+      expect(secondary.secondary).toBe(true);
+      expect(out.feedback).toHaveLength(1); // primary only
+      expect(out.feedback[0]!.structured?.verdicts).toHaveLength(1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('P2 ablation matrix: full-factorial expansion carries tags into result cells', async () => {
+    const cells = expandAblationModels(
+      { name: 'rf', builderId: 'random_forest_classifier', hyperparams: { n_estimators: 200 }, seed: 7, tags: [] },
+      [
+        { name: 'trees', levels: [{ label: 'many', hyperparams: { n_estimators: 200 } }, { label: 'few', hyperparams: { n_estimators: 25 } }] },
+        { name: 'depth', levels: [{ label: 'capped', hyperparams: { max_depth: 3 } }, { label: 'free', hyperparams: {} }] },
+      ],
+    );
+    expect(cells).toHaveLength(4);
+    expect(cells.map((c) => c.tags.join(',')).sort()).toEqual(['trees=few,depth=capped', 'trees=few,depth=free', 'trees=many,depth=capped', 'trees=many,depth=free']);
+
+    const { store, dir, cleanup } = makeStore();
+    try {
+      const artifacts = openArtifactStore(join(dir, 'artifacts'));
+      const runId = makeRun(store);
+      const hyp = makeHypothesis(runId);
+      store.putObject('hypothesis', hyp);
+      const csvPath = join(dir, 'fixture.csv');
+      writeFileSync(csvPath, fixtureCsv(), 'utf8');
+      const spec = makeSpec(runId, csvPath, hyp.id);
+      spec.models = [spec.models[0]!, ...cells];
+      spec.comparisons = [{ ...spec.comparisons[0]!, modelAIdx: 1 }]; // full-trees-many vs baseline (first expanded cell)
+      spec.approvals[0]!.comparisonIds = ['cmp-primary'];
+
+      const out = await executeExperiment(store, artifacts, spec, { allowLocalDatasets: true });
+      expect(out.resultSet.cells).toHaveLength(5);
+      const tagged = out.resultSet.cells.filter((c) => c.modelName.startsWith('rf|'));
+      expect(tagged).toHaveLength(4);
+      for (const cell of tagged) expect(cell.tags.length).toBe(2);
+      // Distinct hyperparams => distinct fingerprints (no accidental dedup collapse).
+      expect(new Set(tagged.map((c) => c.fingerprint)).size).toBe(4);
     } finally {
       cleanup();
     }

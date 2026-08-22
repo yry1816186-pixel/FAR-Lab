@@ -236,14 +236,14 @@
       "id": "ACC-24",
       "target": "live_verified",
       "critical": true,
-      "status": "implemented",
+      "status": "live_verified",
       "evidence": [
-        "src/domain/experiment.ts mechanicalVerdict (CI-entirely-beyond rule) + thresholdProvenance carried from FalsificationSpec decisionRuleProvenance into every stat_report",
-        "live evidence (single-comparison path): paired bootstrap CI[0.4667,0.7333] -> verdict=supports with full derivation string incl. threshold source (2026-08-22 live e2e)",
-        "REMAINING for live_verified: multi-comparison run under multipleTestingPolicy adjustment + exploratory labeling exercised end-to-end"
+        "src/domain/experiment.ts mechanicalVerdict (CI-entirely-beyond) + thresholdProvenance disclosed on every report; live single-comparison evidence 2026-08-22: paired bootstrap CI[0.4667,0.7333] -> supports (OpenML iris, logistic 0.9333 vs dummy 0.3333)",
+        "P2 multiple-testing enforcement on REAL execution paths: alpha_spending -> adjustedAlpha=0.025 recorded per report, CI computed+labelled at 0.975; single_primary -> secondary comparisons descriptive-only, never feed feedback; e_value_accumulation fail-closed rejected (unimplemented never silently downgraded)",
+        "P2 ablation matrix: expandAblationModels full-factorial (4 cells, tags into result cells, distinct fingerprints) green on real sidecar; tests/experiment.test.ts 24 EEL cases green in full suite 642/642 (2026-08-22)"
       ],
       "note": "EEL E4 statistics/verdicts (D-081)",
-      "lastUpdated": "2026-08-22T09:15:20.950Z"
+      "lastUpdated": "2026-08-22T09:25:06.172Z"
     },
     {
       "id": "ACC-25",
