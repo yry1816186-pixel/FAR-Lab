@@ -5,7 +5,13 @@ import { CorpusSnapshotId, SourceDocumentId, RunId } from './ids.js';
 export const ContentDepth = z.enum(['metadata_only', 'abstract', 'full_text', 'data']);
 export type ContentDepth = z.infer<typeof ContentDepth>;
 
-export const SourceFamily = z.enum(['openalex', 'arxiv', 'crossref']);
+/**
+ * Retrieval family. 'user_provided' marks documents the RESEARCHER supplied
+ * at run creation (R1 entry upgrade) — they bypass search adapters entirely
+ * (sourceAdapterFor fails closed on them), join the corpus as guaranteed
+ * entries, and carry provenance explicitly.
+ */
+export const SourceFamily = z.enum(['openalex', 'arxiv', 'crossref', 'user_provided']);
 export type SourceFamily = z.infer<typeof SourceFamily>;
 
 /** Persistent external identifier types the system can resolve and cross-check. */

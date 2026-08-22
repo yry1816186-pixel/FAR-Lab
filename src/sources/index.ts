@@ -15,10 +15,12 @@ export interface AdapterFactoryOptions extends SourceAdapterOptions {
 
 type AdapterFactory = (opts?: AdapterFactoryOptions) => SourceAdapter;
 
-const FACTORIES: Record<SourceFamily, AdapterFactory> = {
+const FACTORIES: Record<SourceFamily, AdapterFactory | null> = {
   openalex: (o) => createOpenAlexAdapter(o satisfies OpenAlexAdapterOptions | undefined),
   arxiv: (o) => createArxivAdapter(o satisfies ArxivAdapterOptions | undefined),
   crossref: (o) => createCrossrefAdapter(o satisfies CrossrefAdapterOptions | undefined),
+  // User-provided seeds never search — no adapter can exist for this family.
+  user_provided: null,
 };
 
 export const SOURCE_FAMILIES: readonly SourceFamily[] = ['openalex', 'arxiv', 'crossref'];
@@ -26,7 +28,8 @@ export const SOURCE_FAMILIES: readonly SourceFamily[] = ['openalex', 'arxiv', 'c
 /** Small factory registry: fetch the adapter for a family (optionally configured). */
 export const sourceAdapterFor = (family: SourceFamily, opts?: AdapterFactoryOptions): SourceAdapter => {
   const factory = FACTORIES[family];
-  if (factory === undefined) {
+  if (factory === undefined || factory === null) {
+    // 'user_provided' lands here too — seeds never search, by design.
     throw new Error(`no source adapter registered for family: ${String(family)}`);
   }
   return factory(opts);

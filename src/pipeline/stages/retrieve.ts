@@ -568,7 +568,14 @@ export const retrieveStage: StageHandler = {
       }
     }
 
-    if (succeeded === 0) {
+    // R1: user-provided seeds, loaded early so the empty-corpus guards below
+    // know the researcher already supplied evidence — a corpus of seeds alone
+    // is legitimate; the failure disclosure then lives in the summary.
+    const userSeeds = ctx.store
+      .listObjects('source_document', ctx.run.id)
+      .filter((d) => d.family === 'user_provided');
+
+    if (succeeded === 0 && userSeeds.length === 0) {
       const reason = [...failuresByFamily.entries()]
         .map(([family, msgs]) => `${family}: ${[...new Set(msgs)].join(' | ')}`)
         .join('; ');
@@ -576,7 +583,7 @@ export const retrieveStage: StageHandler = {
         `retrieve: all ${attempted} source searches failed — refusing to fabricate an empty-success corpus (${reason})`,
       );
     }
-    if (pool.size === 0) {
+    if (pool.size === 0 && userSeeds.length === 0) {
       throw new Error(
         `retrieve: all ${succeeded}/${attempted} searches succeeded but returned no identifiable documents — refusing to fabricate an empty corpus`,
       );
@@ -636,6 +643,25 @@ export const retrieveStage: StageHandler = {
 
     const documents: SourceDocument[] = [];
     for (const entry of selected) documents.push(await toDocument(ctx, entry.family, entry.record));
+
+    // R1 entry upgrade: user-provided seeds (family 'user_provided', created at
+    // run creation) join the corpus as GUARANTEED entries — they bypass the
+    // search pool and the cap (the researcher chose them explicitly), deduped
+    // against searched documents by primary identifier so a seeded paper the
+    // search also found is not double-counted.
+    const identifierKey = (ids: readonly { kind: string; value: string }[]): string => {
+      const id = ids.find((i) => i.kind === 'doi') ?? ids.find((i) => i.kind === 'arxiv') ?? ids[0];
+      return id === undefined ? '' : `${id.kind}:${id.kind === 'doi' ? id.value.toLowerCase() : id.value}`;
+    };
+    const searchedKeys = new Set(
+      documents.flatMap((d) => d.identifiers.filter((i) => i.kind === 'doi' || i.kind === 'arxiv').map((i) => identifierKey([i]))),
+    );
+    const seeds = userSeeds.filter((d) => {
+      const key = identifierKey(d.identifiers.filter((i) => i.kind === 'doi' || i.kind === 'arxiv'));
+      return key === '' || !searchedKeys.has(key);
+    });
+    documents.push(...seeds);
+
     for (const doc of documents) ctx.store.putObject('source_document', doc);
     const familyFailures = [...failuresByFamily.entries()].map(([family, msgs]) => ({
       family,
@@ -671,6 +697,7 @@ export const retrieveStage: StageHandler = {
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
     if (droppedNoIdentifier > 0) parts.push(`${droppedNoIdentifier} record(s) without identifiers dropped`);
     if (selected.length < fused.length) parts.push(`truncated at cap ${MAX_DOCUMENTS}`);
+    if (seeds.length > 0) parts.push(`${seeds.length} user-provided source(s) included (guaranteed, provenance=user_provided)`);
     if (familyFailures.length > 0) parts.push(`family failures: ${familyFailures.map((f) => f.family).join(', ')}`);
     return { kind: 'done', summary: parts.join('; ') };
   },

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -10,6 +11,15 @@ import tailwindcss from '@tailwindcss/vite';
  */
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      // citation-js's sync-fetch/node-fetch are Node-only (URL-input paths we
+      // never take — FAR-Lab passes string payloads only): stub them so no
+      // Node polyfills enter the browser bundle.
+      'sync-fetch': fileURLToPath(new URL('./src/stubs/sync-fetch.ts', import.meta.url)),
+      'node-fetch': fileURLToPath(new URL('./src/stubs/node-fetch.ts', import.meta.url)),
+    },
+  },
   server: {
     port: 5173,
     proxy: {
