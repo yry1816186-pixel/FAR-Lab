@@ -1,7 +1,6 @@
 import type { Store } from '../persistence/store.js';
 import type { ResearchRun } from '../domain/run.js';
 import type { ModelProvider } from '../shared/ports.js';
-import type { ModelProviderConfig } from '../domain/model-config.js';
 import { createCustomProvider, missingConfigProvider, CUSTOM_PROVIDER_PREFIX } from '../providers/custom.js';
 import { createFallbackProvider } from '../providers/fallback.js';
 
@@ -24,20 +23,29 @@ import { createFallbackProvider } from '../providers/fallback.js';
 
 export const ACTIVE_MODEL_CONFIG_META_KEY = 'activeModelConfigId';
 
-/** Max routes in a chain: primary + 4 declared fallbacks (schema max) — cycles are cut, not errors. */
+/** Max routes in a chain (primary + declared fallbacks, cycles cut by the visited set). */
+const MAX_CHAIN_ROUTES = 6;
+
+/**
+ * Flatten the declared failover chain breadth-first: primary, then ITS fallbacks in
+ * declared order, then each fallback's own fallbacks — a declared fallback is never
+ * silently ignored (red-team P1-2). Cycles are cut by the visited set; dangling ids
+ * stop that branch without failing the rest of the chain.
+ */
 const buildChain = (store: Store, firstConfigId: string): ModelProviderConfigChain => {
+  const firstCfg = store.getObject('model_config', firstConfigId);
+  if (firstCfg === null) return { kind: 'missing', configId: firstConfigId };
   const routes: Array<{ provider: ModelProvider; configId: string }> = [];
   const seen = new Set<string>();
-  let currentId: string | null = firstConfigId;
-  while (currentId !== null && !seen.has(currentId) && routes.length < 5) {
-    seen.add(currentId);
-    const cfg: ModelProviderConfig | null = store.getObject('model_config', currentId);
-    if (cfg === null) {
-      if (routes.length === 0) return { kind: 'missing', configId: firstConfigId };
-      break; // dangling fallback id: cut the chain here, keep what resolved
-    }
+  const queue: string[] = [firstConfigId];
+  while (queue.length > 0 && routes.length < MAX_CHAIN_ROUTES) {
+    const configId = queue.shift()!;
+    if (seen.has(configId)) continue;
+    seen.add(configId);
+    const cfg = store.getObject('model_config', configId);
+    if (cfg === null) continue; // dangling id: cut this branch, keep the rest
     routes.push({ provider: createCustomProvider(cfg), configId: cfg.id });
-    currentId = cfg.fallbackConfigIds.length > 0 ? cfg.fallbackConfigIds[0]! : null;
+    queue.push(...cfg.fallbackConfigIds);
   }
   return { kind: 'routes', routes };
 };

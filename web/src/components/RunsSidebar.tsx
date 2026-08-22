@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Badge, CountProgress, Skeleton, TimeText } from './common';
+import { Badge, CountProgress, Skeleton, TimeAgo } from './common';
 import { runStatusKey, runStatusTone } from '../tones';
 import type { RunSummary } from '../api/types';
 import { useI18n } from '../i18n/LanguageContext';
@@ -72,7 +72,7 @@ export function RunListItem({
               {run.domain !== undefined && run.domain.length > 0 && (
                 <span className="run-item-domain" title={t('runs.domain')}>{run.domain}</span>
               )}
-              <TimeText iso={run.createdAt} />
+              <TimeAgo iso={run.createdAt} />
             </>
           )}
         </span>

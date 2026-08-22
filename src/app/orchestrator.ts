@@ -334,6 +334,10 @@ export class Orchestrator {
             const signalQg = evaluateQualityGate(scorecards, tournament);
             if (signalQg.weak && round < MAX_QUALITY_ROUNDS && budget.hasRemaining()) {
               this.deps.store.setMeta(qgRoundKey(runId), String(round + 1));
+              // The reopen flag the hypotheses stage's applicable() consumes — WITHOUT it
+              // the reopened stage would see existing hypotheses and legitimately skip,
+              // making the whole regeneration loop dead code (red-team P0-1).
+              this.deps.store.setMeta(`qg:active:${runId}`, '1');
               this.deps.store.appendEvent(runId, {
                 type: 'note', stage: 'rank',
                 detail: {

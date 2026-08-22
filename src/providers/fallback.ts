@@ -24,6 +24,18 @@ import type { ModelProvider, StructuredCallRequest, StructuredCallResult } from 
 
 export const COOLDOWN_MS = 60_000;
 
+/**
+ * Process-wide cooldown registry keyed by config id (LiteLLM's deployment-cooldown
+ * cache is process-level for the same reason): the resolver rebuilds provider chains
+ * per stage, so a per-instance map would be written and thrown away — the cooldown
+ * must outlive one makeContext to suppress retry storms across stages of a run.
+ */
+const cooldownUntilByConfig = new Map<string, number>();
+
+export const clearFallbackCooldowns = (): void => {
+  cooldownUntilByConfig.clear();
+};
+
 type ProviderError = NonNullable<StructuredCallResult<unknown>['error']>;
 
 /** Should this failure justify trying a DIFFERENT config? (LiteLLM _should_retry lineage.) */
@@ -62,7 +74,6 @@ export const createFallbackProvider = (
   events: FallbackChainEvents = {},
 ): ModelProvider => {
   if (routes.length === 0) throw new Error('fallback chain requires at least one route');
-  const cooldownUntil = new Map<string, number>();
 
   const firstRoute = routes[0]!;
   return {
@@ -73,7 +84,7 @@ export const createFallbackProvider = (
       parse: (raw: unknown) => T | Error,
     ): Promise<StructuredCallResult<T>> {
       const t = nowMs();
-      const usable = routes.filter((r) => r.configId === '' || (cooldownUntil.get(r.configId) ?? 0) <= t);
+      const usable = routes.filter((r) => r.configId === '' || (cooldownUntilByConfig.get(r.configId) ?? 0) <= t);
       // Cooldown never empties the chain: if every route is cooling, try them all in
       // order anyway (LiteLLM exempts single-deployment groups for the same reason —
       // cooling the only option equals stopping the product).
@@ -88,7 +99,7 @@ export const createFallbackProvider = (
           // terminal: no route left, or the failure says "another config won't help"
           return res;
         }
-        if (route.configId !== '') cooldownUntil.set(route.configId, nowMs() + COOLDOWN_MS);
+        if (route.configId !== '') cooldownUntilByConfig.set(route.configId, nowMs() + COOLDOWN_MS);
         events.onFailover?.(route.provider.name, next.provider.name, err);
       }
       // The loop always returns on its last iteration (next === undefined -> return);
