@@ -5,6 +5,9 @@
  *
  * Usage: node eval/probe-routes.mjs
  */
+import { loadLocalSecrets } from './load-secrets.mjs';
+loadLocalSecrets(); // .far-run/secrets.env keys (names only in any output)
+
 const ROUTES = [
   { name: 'deepseek', url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat', keyEnv: 'DEEPSEEK_API_KEY' },
   { name: 'zai', url: 'https://api.z.ai/api/paas/v4/chat/completions', model: 'glm-4.6', keyEnv: 'ZAI_API_KEY' },
