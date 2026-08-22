@@ -67,3 +67,24 @@
 ## 五、真实能力一句话总结
 
 一个真实用户现在可以：输入真实科学问题 → 系统真实检索三源并核验来源 → 强制反证搜索 → 逐字绑定声明（对不上就降级）→ 多策略生成实质不同的候选假设并聚类去重 → 生成含量化证伪规格（阈值来源如实标注）的可比较假设集 → 确定性排序 → 产出带证据上限声明的可执行研究计划 → 接受专家反馈并留下可解释的因果修订链 → 全程 live 模型回执 → 导出可被第三方 `far verify`（10/10）独立核验的复现包 —— 经 CLI 与 Web 工作台双入口使用，面对失败/取消/损坏如实降级，且对证据不足的问题诚实弃权而非编造。
+
+---
+
+## 六、R1 后演进（EV1 → Wave-3，2026-08-22，本节为增补）
+
+以下全部为 R1 报告之后、分支 `build/ev2-closeout` 上经双并行会话执行并 live 验证的增量（决策 D-015..D-035，证据均在 `evidence/W-EV1/`、`evidence/W-EV2/`、`research/WAVE3-SCOUT.md`）：
+
+**EV1（外部机制融合四件套 + 评估收口）**：F1 RRF+listwise rerank+反证席位、F2 Robin 式锦标赛 Bradley-Terry 聚合、F3 文献级新颖性判定（对检索邻居，含诚实降级）、F4 跨文献 claim-claim 关系。前后对比（`evidence/W-EV1/ev1-before-after.md`，审计修正后数字）：claims +40%（58→81）、反证关系 +90%（含关系精度质量注脚，见下）、claim binding 100% 保持、tokens +84.5% 如实记录；judge 3-seed 方差研究诚实不宣称序内优势。
+
+**科学真实性修复（关系标签 P1，本会话发现并闭环）**：盲判重审发现 claim→假设关系标签不可靠（contradicts 合并 1/20 精确、2 例方向反转）；对照实验（F4 同裁判同协议 80% vs falsify 40%）证明根因是 falsify 阶段设计（contradicts 默认标签/无定义/无原文引用）。修复=topical gate + schema v2 显式标签（`evidence/W-EV2/relation-precision.md`）；完整修复后复测 **supports 8/8=100%**，反证侧残余为已记录的判分粒度边界。
+
+**EV2 + Wave-3（十二项决策馈送全部闭合）**：fulltext phase A（arXiv LaTeXML + EuropePMC JATS，零新依赖）与 phase B（OpenAlex content API GROBID TEI 路由，本地 GROBID 以"同输出零基建"否决）；POPPER 多重检验纪律（多假设计划强制声明 policy，live 验证 single_primary）；DeepSeek strict function calling 成为默认结构化传输（**全链 live 验证 41/41 tool_calls 九阶段零失败**，`evidence/W-EV2/strict-fc-live-verification.md`，含投影 v2 与内容保持 JSON 修复层两轮对抗审计修复）；MLR-Bench 外部可比评估（同裁判同任务 N=5，差距诚实归因于任务扁平化/呈现/渲染，Feasibility 反超锚点，渲染 v2 已落地）；FIRE-Bench 设计复现评估 harness（5 题 live，均值 F1=0.58，判分方差 ±0.5 如实披露）；Idea2Plan 五段模板折叠；models.dev 193-provider 目录（经本地代理解锁）；DashScope/百炼适配器（竞赛强制路由的产品侧就绪）；另落地 dist-freshness 防复发守卫、僵尸 run 清扫、invalid_output 重试 1→3。
+
+## 七、当前状态与三项外部门（2026-08-22 09:07 实测）
+
+- 测试 **274/274 绿**、typecheck 干净、path-hygiene 0 错误；completion-gate **NOT_READY，唯一失败项 = B-DEEPSEEK-BALANCE（critical，外部）**。
+- **三项用户行动门**（均有直接探针证据，不可会话内解除、不可伪造）：
+  1. **DeepSeek 账户充值**（实测 HTTP 402 Insufficient Balance）——阻塞全部 live 管线与判分；充值后 `node eval/rediscovery.mjs` 自动续传完成 v2 去混杂对比。
+  2. **DASHSCOPE_API_KEY**（实测 ABSENT）——竞赛强制"千问经百炼+凭证"路由的 live 验证；适配器已就绪，`node spikes/qwen-route-probe.mjs` 一命令出回执（提交截止 2026-09-05）。
+  3. **OPENALEX_API_KEY**（可选，实测 ABSENT）——不间断检索 + fulltext phase-B TEI 抓取验证（keyless 匿名层已恢复且适配器 live 验证通过，key 提供确定性与全文能力）。
+- §四 遗留风险清单中第 5 条（摘要级证据天花板）已由 fulltext phase A/B 部分解除；第 1/2/3/6/7 条仍有效。
