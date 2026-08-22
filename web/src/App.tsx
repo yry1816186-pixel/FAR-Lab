@@ -5,12 +5,13 @@ import { getEvents, getRun, listRuns } from './api/endpoints';
 import type { ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
+import { parseHash, useHashRoute } from './hooks/useHashRoute';
 import { useConnection } from './state/connection';
 import { useTheme } from './state/theme';
 import { LogoFull } from './components/Logo';
 import { WelcomeView } from './components/WelcomeView';
 import { RunsList } from './components/RunsSidebar';
-import { RunDetail } from './components/RunDetail';
+import { RunDetail, isTabId } from './components/RunDetail';
 import type { EventsState } from './components/RunDetail';
 import { ErrorBox } from './components/common';
 
@@ -175,8 +176,24 @@ export function App(): JSX.Element {
 
   const onCreated = useCallback((runId: string): void => {
     setSelectedRunId(runId);
+    setRouteTab(null);
     void refreshRunsWithAbort();
   }, [refreshRunsWithAbort]);
+
+  // ---- shareable hash route: #run/<runId>/<tab> (S3) ----
+  // Mount restore + back/forward + typed links all flow through here.
+  const [routeTab, setRouteTab] = useState<string | null>(null);
+  useEffect(() => {
+    const route = parseHash(window.location.hash);
+    if (route.runId !== null) setSelectedRunId(route.runId);
+    setRouteTab(route.tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only route restore
+  }, []);
+  useHashRoute(selectedRunId, routeTab, (route) => {
+    if (route.runId !== null && route.runId !== selectedRunId) setSelectedRunId(route.runId);
+    if (route.runId === null && selectedRunId !== null) setSelectedRunId(null);
+    setRouteTab(route.tab);
+  });
 
   // IDE convention: "/" focuses the task filter unless typing in a field.
   const filterRef = useRef<HTMLInputElement | null>(null);
@@ -285,7 +302,13 @@ export function App(): JSX.Element {
               </div>
             )
           ) : (
-            <RunDetail run={runDetail} events={eventsState} onMutated={onMutated} />
+            <RunDetail
+              run={runDetail}
+              events={eventsState}
+              onMutated={onMutated}
+              tab={routeTab !== null && isTabId(routeTab) ? routeTab : undefined}
+              onTabChange={(tab) => setRouteTab(tab)}
+            />
           )}
         </main>
       </div>
