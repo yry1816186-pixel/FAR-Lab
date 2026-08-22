@@ -34,6 +34,10 @@ Usage:
                                                   tool_result|simulation|experiment|reviewer|verification_failure|
                                                   reproduction_failure); consumed causally by the revise stage
   far runs [--json]                              List runs
+  far probe [provider] [--live] [--json]         Model-route health: config check by default
+                                                  (key presence, never values); --live makes one
+                                                  minimal real chat call per route (costs ~1 token)
+  far data info [--json]                         Data footprint: runs, db size, artifacts, exports
   far verify <bundle-id> [--json]                Independently verify a reproducibility bundle
                                                   (exit 0=verified, 1=failed/degraded)
 
@@ -55,7 +59,7 @@ const positional = (after: number): string | undefined => {
   const rest = process.argv.slice(after).filter((a) => !a.startsWith('--') && !COMMAND_WORDS.has(a));
   return rest[0];
 };
-const COMMAND_WORDS = new Set(['research', 'start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'runs', '--evidence', '--hypotheses', '--plan', '--sources', '--source', '--content', '--target-kind', '--target-id']);
+const COMMAND_WORDS = new Set(['research', 'start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'runs', 'probe', 'data', 'info', '--live', '--evidence', '--hypotheses', '--plan', '--sources', '--source', '--content', '--target-kind', '--target-id']);
 
 const printRun = (run: ResearchRun, verbose = true) => {
   const p = runProgress(run);
@@ -85,6 +89,109 @@ const main = async (): Promise<void> => {
     app.close();
     return;
   }
+
+  if (cmd === 'probe') {
+    // Route health (D-060 phase-3). Config mode never touches the network; --live makes
+    // ONE minimal chat call per route (explicit user action — no ambient probing).
+    const { listProviders } = await import('../providers/index.js');
+    const wanted = positional(3);
+    const all = listProviders().filter((p) => wanted === undefined || p.name === wanted);
+    if (all.length === 0) die(`unknown provider: ${wanted}`, 2);
+    const results: Array<Record<string, unknown>> = [];
+    for (const p of all) {
+      const entry: Record<string, unknown> = {
+        provider: p.name, kind: p.kind, model: p.modelId, baseUrl: p.baseUrl, apiKeyEnvVar: p.apiKeyEnvVar,
+      };
+      const key = p.apiKeyEnvVar.startsWith('(') ? '' : (process.env[p.apiKeyEnvVar] ?? '');
+      if (p.kind !== 'live') {
+        entry.status = 'test-only';
+      } else if (key.length === 0) {
+        entry.status = 'missing-key';
+      } else if (!flag('--live')) {
+        entry.status = 'key-present';
+      } else {
+        try {
+          const res = await fetch(`${p.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+            body: JSON.stringify({ model: p.modelId, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }),
+            signal: AbortSignal.timeout(20_000),
+          });
+          const bodyText = await res.text();
+          if (res.ok) {
+            entry.status = 'ready';
+            entry.httpStatus = res.status;
+          } else {
+            entry.status = 'blocked';
+            entry.httpStatus = res.status;
+            entry.detail = bodyText.slice(0, 200); // honest cause (401/402/429 …), key never echoed
+          }
+        } catch (e) {
+          entry.status = 'unreachable';
+          entry.detail = e instanceof Error ? e.message : String(e);
+        }
+      }
+      results.push(entry);
+    }
+    if (json()) console.log(JSON.stringify(results, null, 2));
+    else for (const r of results) {
+      console.log(`${String(r.provider).padEnd(10)} ${String(r.status).padEnd(12)} model=${String(r.model)}${r.httpStatus !== undefined ? `  http=${r.httpStatus}` : ''}${r.detail !== undefined ? `\n  ${r.detail}` : ''}`);
+    }
+    const bad = results.filter((r) => r.status === 'missing-key' || r.status === 'blocked' || r.status === 'unreachable');
+    if (bad.length > 0 && (flag('--live') || all.some((p) => p.kind === 'live' && wanted !== undefined))) process.exitCode = 1;
+    return;
+  }
+
+  if (cmd === 'data' && sub === 'info') {
+    // Data footprint (read-only, honest numbers from the real directory).
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const dataDir = path.resolve(process.env.FARLAB_DATA_DIR ?? '.far-run');
+    const sizeOf = (p: string): number => { try { return fs.statSync(p).size; } catch { return -1; } };
+    const dirStats = (d: string): { files: number; bytes: number } => {
+      // Recursive walk: the artifact store is sharded (artifacts/ab/cdef…), so a
+      // flat readdir would count directories as 0-byte entries on Windows.
+      let files = 0;
+      let bytes = 0;
+      const walk = (dir: string): void => {
+        let list: string[];
+        try { list = fs.readdirSync(dir); } catch { return; }
+        for (const f of list) {
+          const p = path.join(dir, f);
+          try {
+            const st = fs.statSync(p);
+            if (st.isDirectory()) walk(p);
+            else { files += 1; bytes += st.size; }
+          } catch { /* racing deletion — skip this entry */ }
+        }
+      };
+      walk(d);
+      return { files, bytes };
+    };
+    const db = path.join(dataDir, 'far.db');
+    const artifacts = dirStats(path.join(dataDir, 'artifacts'));
+    const exportsDir = dirStats(path.join(dataDir, 'exports'));
+    const app = await createApp({ dataDir });
+    let runsByStatus: Record<string, number>;
+    try {
+      runsByStatus = app.store.listRuns().reduce<Record<string, number>>((acc, r) => { acc[r.status] = (acc[r.status] ?? 0) + 1; return acc; }, {});
+    } finally { app.close(); }
+    const info = {
+      dataDir, runsByStatus, totalRuns: Object.values(runsByStatus).reduce((a, b) => a + b, 0),
+      dbBytes: sizeOf(db), dbWalBytes: sizeOf(`${db}-wal`), dbShmBytes: sizeOf(`${db}-shm`),
+      artifacts, exports: exportsDir,
+    };
+    if (json()) console.log(JSON.stringify(info, null, 2));
+    else {
+      console.log(`data dir: ${info.dataDir}`);
+      console.log(`runs: ${info.totalRuns} (${Object.entries(runsByStatus).map(([s, n]) => `${s}=${n}`).join(' ') || 'none'})`);
+      console.log(`db: ${info.dbBytes < 0 ? 'missing' : `${info.dbBytes} B`}${info.dbWalBytes >= 0 ? ` (+wal ${info.dbWalBytes} B)` : ''}`);
+      console.log(`artifacts: ${artifacts.files} files, ${artifacts.bytes} B`);
+      console.log(`exports: ${exportsDir.files} files, ${exportsDir.bytes} B`);
+    }
+    return;
+  }
+  if (cmd === 'data') die('data requires a subcommand: info', 2);
 
   if (cmd === 'verify') {
     const bundleId = positional(3);

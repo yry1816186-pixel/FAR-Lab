@@ -583,6 +583,20 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(ghostRes.status).toBe(404);
   });
 
+  it('GET /api/v1/health reports real DB state and route readiness without key values (D-060)', async () => {
+    const { status, body } = await getJson(`${base}/api/v1/health`);
+    expect(status).toBe(200);
+    expect(body.status).toBe('ok');
+    expect(body.db).toBe('ok');
+    expect(Array.isArray(body.providers)).toBe(true);
+    const deepseek = body.providers.find((p: { name: string }) => p.name === 'deepseek');
+    expect(deepseek).toBeDefined();
+    expect(typeof deepseek.liveReady).toBe('boolean');
+    // no key material may ever appear on the health surface
+    expect(JSON.stringify(body)).not.toMatch(/sk-[A-Za-z0-9]/);
+    expect(typeof body.time).toBe('string');
+  });
+
   it('404s JSON for unknown routes and wrong methods', async () => {
     const unknown = await getJson(`${base}/api/v1/nope`);
     expect(unknown.status).toBe(404);
