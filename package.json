@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "far": "node dist/cli/main.js",
-    "serve": "node scripts/serve.mjs"
+    "serve": "node scripts/serve.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "zod": "^3.24.0"
