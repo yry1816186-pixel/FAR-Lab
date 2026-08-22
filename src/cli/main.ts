@@ -432,6 +432,14 @@ const main = async (): Promise<void> => {
 
   if (cmd === 'verify') {
     const bundleId = positional(3);
+    // The natural mistake is passing the export file path (export prints one);
+    // verify reads the store by bundle ID — redirect with the usable form.
+    if (bundleId !== undefined && /[\\/]/.test(bundleId)) {
+      const guess = bundleId.split(/[\\/]/).pop() ?? '';
+      const cleaned = guess.replace(/\.bundle\.json$/i, '');
+      die(`verify takes a bundle id, not a file path (got "${bundleId}")`, 2,
+        /^bnd_[0-9a-z]+$/.test(cleaned) ? `try: far verify ${cleaned}` : 'list one with: far research export <run-id> --format bundle');
+    }
     if (!bundleId) die('verify requires a bundle id', 2);
     const app = await createApp();
     try {
