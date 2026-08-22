@@ -311,6 +311,11 @@
         "id": "wave9-judge-calibration-fusions",
         "status": "deferred",
         "evidence": "D-052: Yale EM-DS/Beta-Bernoulli + AlpacaEval LC-winrate + IBM anchor-selection (all Apache-2.0, source-read) deferred on live-data + human-gold-set trigger; three license-null repos code-REJECTED"
+      },
+      {
+        "id": "wave-product-phase1",
+        "status": "resolved",
+        "evidence": "D-045 + D-053: 18-section panoramic design plan delivered (research/WAVE-PRODUCT-DESIGN-PLAN.md) with 7-line sourced research reports (research/wave-product-reports/), 8 audits two-round reviewed (2+1 refutations, +6 new findings), reuse-vs-build triple-gate table; HARD USER GATE: waiting_for_user_review — no implementation until explicit approval of decision points (narrative/aesthetic/desktop-framework/deployment-form/Tier-0-deps)"
       }
     ],
     "evidence": [

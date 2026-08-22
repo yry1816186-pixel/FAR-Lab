@@ -128,10 +128,10 @@
       "id": "run-reliability",
       "what": "Full-run terminal-state reliability: frozen/crashed runs detected+swept+resumable; no silent hangs",
       "current": {
-        "value": "swept-manually",
-        "detail": "frozen runs occurred twice this session; zombie sweep script exists (97311cb); auto-detection not wired",
+        "value": "lease-watchdog-auto",
+        "detail": "D-054: injected kill 20/20 recovered; kill->adoption 5033-5060ms (TTL + 1 poll cycle); redo <= 1 in-flight subtask (was 100% of stage); outputs byte-identical to no-kill baseline x20",
         "at": "2026-08-22",
-        "evidence": "D-029b; scripts sweep-zombie-runs.mjs"
+        "evidence": "evidence/W8/fault-injection.json; evidence/W8/fusion-verification.md; tests/wave8-durability.test.ts 12/12 (D-054)"
       },
       "target": "auto-detect+resume on injected failure, 100% within 1 poll cycle",
       "stretch": "zero frozen runs across 20-run soak",

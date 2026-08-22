@@ -65,14 +65,22 @@ const PROPOSAL_RUBRIC = extractRubric(join(REPO, 'mlrbench/evals/review_proposal
 
 const taskMd = (task) => readFileSync(join(REPO, 'tasks', task + '.md'), 'utf8');
 
-/** MLR-Bench task -> FAR-Lab research question (deterministic mapping, recorded). */
+/** MLR-Bench task -> FAR-Lab research question (deterministic mapping, recorded).
+ * W5-F3 fidelity fix: the CFP's paragraph/list STRUCTURE is preserved (newlines kept)
+ * instead of being collapsed into one whitespace-flattened run — the flattening was a
+ * diagnosed gap (evidence/W-EV2/mlr-bench.md "task flattening"): FAR-Lab's scope stage
+ * cannot see topic boundaries it was never shown. Only markdown noise chars are stripped. */
 const questionFor = (task) => {
   const md = taskMd(task);
   const title = md.match(/^#\s+(.+)$/m)?.[1] ?? task;
   let body = md;
   if (body.startsWith('# ')) body = body.slice(body.indexOf('\n') + 1); // heading dropped; title already prepended
-  body = body.slice(0, 5_000);
-  return `${title}. ${body.replace(/[#*`]/g, '').replace(/\s+/g, ' ').trim()}`;
+  // strip markdown emphasis/code markers but KEEP line structure; cap at a line boundary
+  const stripped = body.replace(/[#*`]/g, '');
+  const cut = stripped.slice(0, 5_000);
+  const lastBreak = cut.lastIndexOf('\n');
+  const capped = cut.length >= 5_000 && lastBreak > 2_000 ? cut.slice(0, lastBreak) : cut;
+  return `${title}.\n${capped.trim()}`;
 };
 
 const eligibleTasks = () => {
@@ -186,6 +194,13 @@ const renderProposal = (runId) => {
     (corpus.length > 12 ? `\n- … ${corpus.length - 12} more` : '') + '\n\n' +
     `3. Methods\n${(plan.steps ?? []).map(step).join('\n')}\n\n` +
     `4. Initial Experimental Design\n` +
+    (top && Array.isArray(top.predictions) && top.predictions.length
+      ? `Predictions of the leading hypothesis:\n${top.predictions.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n`
+      : '') +
+    (f.observable || f.measurement || f.expectedRelation
+      ? `Falsification design (leading hypothesis): observable: ${f.observable ?? 'n/a'}; measurement: ${f.measurement ?? 'n/a'}; expected relation: ${f.expectedRelation ?? 'n/a'}.\n`
+      : '') +
+    (f.decisionRule ? `Decision rule: ${f.decisionRule}\n` : '') +
     (plan.statistics?.length ? `Statistics: ${plan.statistics.join('; ')}\n` : '') +
     `Metrics:\n${(plan.metrics ?? []).map((m, i) => `${i + 1}. ${typeof m === 'string' ? m : JSON.stringify(m)}`).join('\n')}\n` +
     `Decision Rules:\n` +
@@ -234,7 +249,7 @@ const parseReview = (expectedDims, raw) => {
   return raw;
 };
 
-const judgeOne = async (provider, rubric, expectedDims, stage, contentMd, taskText, task, agent) => {
+const judgeOne = async (provider, rubric, expectedDims, stage, contentMd, taskText, task, agent, contextMd) => {
   const res = await provider.structuredCall(
     {
       task: rubric,
@@ -243,6 +258,13 @@ const judgeOne = async (provider, rubric, expectedDims, stage, contentMd, taskTe
         stage,
         review_target: contentMd,
         task_description: taskText,
+        // W5-F3 grounding-context parity: upstream proposal judges read task + IDEA +
+        // related work together (mlrbench review_proposal.py:169-185) — consistency is
+        // only gradeable against the upstream artifact. Context for judging only;
+        // the idea itself is NOT re-scored here.
+        ...(stage === 'proposal' && contextMd
+          ? { idea_for_consistency_context: contextMd, context_note: 'idea provided as consistency-judging context only; score the PROPOSAL against the rubric' }
+          : {}),
       },
       outputKind: 'json',
       temperature: 0.0,
@@ -350,7 +372,7 @@ for (const r of uniqueRuns) {
         continue;
       }
       try {
-        const review = await judgeOne(provider, rubric, dims, stage, md, taskText, r.task, agent);
+        const review = await judgeOne(provider, rubric, dims, stage, md, taskText, r.task, agent, ideaMd);
         records.push({
           task: r.task, runId: r.runId, agent, stage, judge: 'deepseek-chat', temperature: 0,
           ...(agent === 'farlab' ? { rendering: 'idea-proposal-v2' } : {}),
