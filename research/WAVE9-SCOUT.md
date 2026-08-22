@@ -133,3 +133,13 @@
 
 - **BLOCKED（用户动作）**：live 方差重测（`node eval/judge-variance.mjs --live 3`）+ live counter-evidence 重测——等 D-036 任一路由充值；恢复后北极星 `rediscovery-judge-variance` 换实测值。
 - W-P2 候选沉淀：污染分层评估（open-compass 模式）× counter-seat 定向检索联合提升 counter-evidence-substantive-hit（当前 0.143 → 目标 0.70）。
+
+## 8. 离线增值（2026-08-22 晚，live 暂停期间）
+
+### 8.1 EV1 judge 3-seed 一致性严格化（`eval/ev1-judge-agreement.mjs` → `evidence/W9/ev1-judge-seed-agreement.md`）
+
+当年"±1-2pt 摆动"的描述性披露升级为 krippendorff 度量：**hypothesis_quality α=0.228**（低于 0.667 可靠门槛——该维单 seed 数字不可引用，seed-3 排序反转是固有噪声非孤立事件）；**counter_evidence_coverage α=0.605**（aggregate 级完全稳定：farlab 2.2 vs 1.6/1.6 每个 seed 成立，per-cell 仍方向性）。这为 W4-F4 多遍中位融合提供定量动机：live 恢复后 EV1 judge 建议默认 N≥3 并以 α 为运行级信度探头。测试锁定关键数字（36/36）。
+
+### 8.2 counter-evidence empty-miss 逐例诊断（`evidence/W9/counter-evidence-miss-diagnosis.md`）
+
+0.143 strict 的 7 个 miss 逐例归因：**5/7 empty = counter 席位内容与假设特异性的粒度错配**（同主题泛文献 vs 假设具体机制，非反断言）；1/7 inverted = falsify 标签方向错误（案例 6 实际支持假设）；1 真正例。改进设计 A/B/C 已细化：**A. counter-seat 定向检索（query 从 falsification observable 构造——主攻，治 5/7，检索面 W-P2 候选）**；B. falsify 方向校验（治 inverted，可离线设计 live 后用本 7 例回归）；C. qualifies 语义归位。
