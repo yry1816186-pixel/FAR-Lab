@@ -73,6 +73,18 @@ node spikes/wave8-pain-measurement.mjs           # 融合前基线取证
 node spikes/wave8-signal-gap.mjs                 # TTL 设计输入
 ```
 
+
+## 5b. LIVE 故障注入（真实路由，成本封顶 4 调用，用户额度纪律 2026-08-22）
+
+路由：zai glm-4.6 **Anthropic wire**（open.bigmodel.cn/api/anthropic；协议根修与产品传输由并行会话落地 a50d2ec/b5c0481，D-058fix/D-071——本会话实测复用，零重复探针调用）。
+
+场景（`spikes/wave8-live-fi.mjs` + `wave8-live-fi-run.mjs`，输出 `evidence/W8/live-fault-injection.json`，exit 0）：
+- 3 个 checkpointed 子任务、worker 在子任务 2 的真实调用完成后/持久化前被杀（exit 86）
+- 冻结签名观察：status=running + step_outputs 恰 1 条（子任务 1 已存）
+- watchdog（跨进程轮询过期租约）**62.02s 接管**（TTL 60s + poll 3s = 租约过期后一个轮询周期内）→ 终态 completed
+- **真实调用分布：子任务1 ×1（worker；采纳者缓存命中未重调）/ 子任务2 ×2（worker 在飞丢失 + 采纳者恰好重做一次）/ 子任务3 ×1（仅采纳者）**——离线 soak 的全部断言在真实路由复现：重做=在飞数（≤1）、缓存逐字节复用（outputHash 一致）
+- 全程恰好 **4 次小结构化调用**（每次 max_tokens 60），之后停止——按用户「节省额度」指令，20-run LIVE soak 不做（离线 20/20 已覆盖统计面；live 单场景覆盖机制面），如实记录为有意限定范围
+
 ## 6. 对抗审计（独立子 Agent，2026-08-2２）与修复闭环
 
 审计范围：W8 全部 11 个改动文件 + 证据 JSON 交叉复算 + 生产库只读核验。判定：主张 1/2/5 SUPPORTED；主张 3/4 原仅在合成 harness 上成立（被 P0-1 在真实 rank stage 击破）→ 修复后成立。

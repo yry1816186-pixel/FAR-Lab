@@ -1,0 +1,52 @@
+{
+  "measuredAt": "2026-08-22T07:26:08.907Z",
+  "costNote": "EXACTLY 4 real structured calls (glm-4.6 Anthropic wire, ~60 max_tokens each); zero other model usage",
+  "config": {
+    "subtasks": 3,
+    "killAt": 2,
+    "ttl": "FARLAB_LEASE_TTL_MS=60000 (set inside driver), poll 3s",
+    "pollMs": 3000
+  },
+  "worker": {
+    "exit": 86,
+    "wallMs": 3145
+  },
+  "frozenBeforeAdoption": {
+    "status": "running",
+    "persistedStepOutputs": 1,
+    "stepKeys": [
+      "sub:1"
+    ]
+  },
+  "watchdog": {
+    "exit": 0,
+    "wallMs": 62078,
+    "out": "{\"mode\":\"watchdog\",\"adopted\":true,\"status\":\"completed\",\"msSinceWatchdogStart\":62020}"
+  },
+  "finalStatus": "completed",
+  "realCallsPerSubtask": {
+    "1": 1,
+    "2": 2,
+    "3": 1
+  },
+  "totalRealCalls": 4,
+  "persistedOutputs": [
+    {
+      "step_key": "sub:1",
+      "json": "{\"subtask\":1,\"hypothesis\":\"Bacteria develop antibiotic resistance quickly because their high mutation rates and large population sizes increase the probability of random genetic mutations that confer survival advantages.\",\"outputHash\":\"a0e1557254f2a3b4b5f17e8be949ee84d4a7e25d57c3321ed2ecc803a26fe506\"}"
+    },
+    {
+      "step_key": "sub:2",
+      "json": "{\"subtask\":2,\"hypothesis\":\"Bacteria develop antibiotic resistance quickly because their large population sizes and rapid generation times significantly increase the probability of random mutations conferring resistance occurring during DNA replication.\",\"outputHash\":\"9835962e9e823e8b04704f72b928aa7d738c3aadcaa7038972fcdf5a592fe844\"}"
+    },
+    {
+      "step_key": "sub:3",
+      "json": "{\"subtask\":3,\"hypothesis\":\"Bacteria develop antibiotic resistance quickly because their large population sizes and short generation times increase the probability of random mutations that confer survival advantages.\",\"outputHash\":\"27a929e8d271527ee18b6ffdf3126055036358949c45f23f78d72660c11dfd12\"}"
+    }
+  ],
+  "auditNotes": [
+    "live_harness_adoption"
+  ],
+  "receipts": 0,
+  "pass": true
+}
