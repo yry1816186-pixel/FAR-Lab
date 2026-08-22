@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { ApiError } from './api/client';
 import { getEvents, getRun, listRuns } from './api/endpoints';
 import type { ResearchRun, RunEvent, RunSummary } from './api/types';
@@ -210,7 +211,7 @@ export function App(): JSX.Element {
           <div className="sidebar-head">
             <h2 className="sidebar-title">{t('runs.title')}</h2>
             <button type="button" className="btn btn--small" onClick={() => void refreshRunsWithAbort()}>
-              {t('runs.refresh')}
+              <RefreshCw size={12} aria-hidden="true" /> {t('runs.refresh')}
             </button>
           </div>
           {runsError !== null && <ErrorBox error={runsError} onRetry={() => void refreshRunsWithAbort()} />}

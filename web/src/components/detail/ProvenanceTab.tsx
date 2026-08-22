@@ -1,4 +1,6 @@
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
+import { Download, RefreshCw } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
 import { getBundles, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
 import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
@@ -253,6 +255,7 @@ function BundleVerify({
     const controller = new AbortController();
     try {
       await reexportRun(run.id, withTimeout(controller.signal, 15_000));
+      toast.success(t('bundle.reexportStarted'));
       onMutated(); // refresh run detail; the new bundle appears in the chips below
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
@@ -309,7 +312,7 @@ function BundleVerify({
           </button>
           {reexportable && (
             <button type="button" className="btn" disabled={reexporting} onClick={() => void doReexport()} title={t('bundle.reexportHint')}>
-              {reexporting ? t('common.loading') : t('bundle.reexport')}
+              {reexporting ? <RefreshCw size={13} aria-hidden="true" className="spin" /> : <RefreshCw size={13} aria-hidden="true" />} {t('bundle.reexport')}
             </button>
           )}
         </div>
@@ -391,7 +394,7 @@ function ReportBlock({ runId, markdown }: { runId: string; markdown: string }): 
     <div className="report-block">
       <div className="report-actions">
         <button type="button" className="btn" onClick={download}>
-          {t('report.download')}
+          <Download size={13} aria-hidden="true" /> {t('report.download')}
         </button>
         <button type="button" className="btn" aria-expanded={showPreview} onClick={() => setShowPreview((v) => !v)}>
           {showPreview ? t('common.collapse') : t('report.preview')}
