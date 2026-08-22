@@ -9,7 +9,7 @@ import {
   TestabilityStatus,
   newId,
 } from '../../domain/index.js';
-import type { HypothesisCandidate as Hypothesis } from '../../domain/index.js';
+import type { HypothesisCandidate as Hypothesis, ScientificClaim } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
 import { contentTokens, topicalOverlap } from './evidence.js';
 
@@ -73,6 +73,13 @@ const FalsifyOut = z.object({
   supportingClaimIds: z.array(z.string()).default([]),
   /** W5/S2: why each linked supporting claim supports THIS hypothesis (>= 20 chars per reason). */
   supportingLinks: z.array(LinkReason).default([]),
+  /**
+   * B6 binding-density enrichment: ids of provided claims the model EXPLICITLY evaluated
+   * and rejected as bearing no real relation to THIS hypothesis — distinguishes
+   * "evaluated, no relation" from "not evaluated". Transport-only telemetry: persisted
+   * nowhere; ids unknown to the run are filtered deterministically before counting.
+   */
+  consideredClaimIds: z.array(z.string()).default([]),
   uncertainties: z.array(z.string().min(1)).default([]),
   testability: TestabilityStatus,
 });
@@ -134,6 +141,36 @@ export const applyLinkAudit = (
     } // 'confirm' → keep as proposed, no note
   }
   return out;
+};
+
+/**
+ * B6: deterministic topical gate for critique LINK CANDIDATES — pure, exported for
+ * direct testing. The gate SURFACE is statement + mechanism + PREDICTIONS (widened
+ * 2026-08-22 from statement+mechanism only): B1 measured 11 hypotheses with just 1+1
+ * explicit critique bindings, and predictions are the hypothesis's concrete testable
+ * content — a claim sharing vocabulary with a prediction is a legitimate link candidate
+ * even when the claim's vocabulary does not overlap statement/mechanism. The
+ * vocabulary-overlap THRESHOLD is unchanged (D-018 rule: containment >= 0.25 or >= 4
+ * shared content tokens), so a claim with NO content vocabulary overlap anywhere in
+ * statement+mechanism+predictions still fails the gate — widening the surface cannot
+ * weaken it for claims with no overlap at all.
+ */
+export const gateCritiqueLinks = (
+  hyp: Pick<Hypothesis, 'statement' | 'mechanism' | 'predictions'>,
+  claims: readonly Pick<ScientificClaim, 'id' | 'text'>[],
+  ids: readonly string[],
+): { kept: string[]; dropped: string[] } => {
+  const hypTokens = contentTokens(`${hyp.statement} ${hyp.mechanism} ${hyp.predictions.join(' ')}`);
+  const textById = new Map(claims.map((c) => [c.id, c.text] as const));
+  const kept: string[] = [];
+  const dropped: string[] = [];
+  for (const id of ids) {
+    const text = textById.get(id);
+    const passes = text !== undefined && topicalOverlap(contentTokens(text), hypTokens).passes;
+    if (passes) kept.push(id);
+    else dropped.push(id);
+  }
+  return { kept, dropped };
 };
 
 // ---------------------------------------------------------------------------
@@ -230,6 +267,10 @@ export const falsifyStage: StageHandler = {
       assertNotCancelled(ctx, 'critique_falsify');
       const warnings: string[] = [];
       let relations = 0;
+      // Read once per hypothesis and reused for the prompt projection, the claim lookup
+      // map and the B6 density/contrastivity signals below (no claims are written during
+      // this stage, so a single snapshot is authoritative for the whole callback).
+      const runClaims = ctx.store.listObjects('claim', runId);
       const res = await callStructured<z.infer<typeof FalsifyOut>>(ctx, {
         stage: 'critique_falsify',
         purpose: `falsification-spec:${hyp.id}`,
@@ -250,7 +291,10 @@ export const falsifyStage: StageHandler = {
           'the same subject AND the same quantity/relationship; "weakens" when the claim reduces confidence without ' +
           'direct incompatibility (uncontrolled confounder, weaker effect than the mechanism requires); "qualifies" when ' +
           'the claim bounds the conditions under which the hypothesis applies. A claim stretched from a different ' +
-          'subject, measure, or mechanistic layer must not be linked at all. When in doubt choose the weaker label or ' +
+          'subject, measure, or mechanistic layer must not be linked at all. For claims that bear NO real relation ' +
+          'to this hypothesis, do NOT link them — list their ids in consideredClaimIds instead: the claims you ' +
+          'examined and rejected as unrelated (a claim absent from both the links and consideredClaimIds reads as ' +
+          'never evaluated). When in doubt choose the weaker label or ' +
           'do not link — never invent a conflict, and never pad the evidence base with topic-neighbors that do not ' +
           'actually bear on the mechanism. For EVERY linked claim give a specific ' +
           'linkReason of at least 20 characters naming the exact tension or support (generic template phrases are ' +
@@ -264,9 +308,7 @@ export const falsifyStage: StageHandler = {
             predictions: hyp.predictions,
             noveltyLabel: hyp.noveltyLabel,
           },
-          availableClaims: ctx.store
-            .listObjects('claim', runId)
-            .map((c) => ({ id: c.id, text: c.text, quote: c.locators[0]?.quote, bindingStatus: c.bindingStatus, ...(c.gradeCertainty !== undefined ? { gradeCertainty: c.gradeCertainty } : {}) })),
+          availableClaims: runClaims.map((c) => ({ id: c.id, text: c.text, quote: c.locators[0]?.quote, bindingStatus: c.bindingStatus, ...(c.gradeCertainty !== undefined ? { gradeCertainty: c.gradeCertainty } : {}) })),
         },
         schema: FalsifyOut,
       });
@@ -310,27 +352,16 @@ export const falsifyStage: StageHandler = {
       if (droppedRefs.length > 0) {
         warnings.push(`${hyp.id}: dropped ${droppedRefs.length} non-existent claim reference(s) (${droppedRefs.join(', ')})`);
       }
-      const claimById = new Map(
-        ctx.store.listObjects('claim', runId).map((c) => [c.id, c] as const),
-      );
+      const claimById = new Map(runClaims.map((c) => [c.id, c] as const));
       // ---- deterministic topical gate on critique links (2026-08-22 relation-precision spike) ----
       // Blind re-judging measured contradicts-label precision at 1/8 exact (2 adjacent); the
       // worst offenders were topically DISTANT claims the model linked as counter evidence.
       // Same vocabulary-overlap rule as the D-018 claim-claim prefilter: a claim that shares
       // no content vocabulary with the hypothesis cannot honestly weaken/contradict/support it.
-      const hypText = `${hyp.statement} ${hyp.mechanism}`;
-      const hypTokens = contentTokens(hypText);
-      const gateLinks = (ids: readonly string[]): { kept: string[]; dropped: string[] } => {
-        const kept: string[] = [];
-        const dropped: string[] = [];
-        for (const id of ids) {
-          const claim = claimById.get(id);
-          const passes = claim !== undefined && topicalOverlap(contentTokens(claim.text), hypTokens).passes;
-          if (passes) kept.push(id);
-          else dropped.push(id);
-        }
-        return { kept, dropped };
-      };
+      // B6 (2026-08-22): the gate SURFACE now includes hypothesis predictions (see
+      // gateCritiqueLinks) — the threshold is unchanged.
+      const gateLinks = (ids: readonly string[]): { kept: string[]; dropped: string[] } =>
+        gateCritiqueLinks(hyp, runClaims, ids);
       const gatedCounter = gateLinks(validCounter.map((l) => l.claimId));
       const gatedSupporting = gateLinks(supportingRefs.valid);
       for (const [label, gated] of [['counter', gatedCounter], ['supporting', gatedSupporting]] as const) {
@@ -485,6 +516,28 @@ export const falsifyStage: StageHandler = {
         const decision = audit.get(id);
         ctx.store.putObject('evidence_relation', mkRelation(decision?.relation ?? 'supports', id, proposalFamilyOf.get(id) ?? 'supporting', decision?.note));
         relations += 1;
+      }
+
+      // ---- B6 binding-density observability (EMR-ACH contrastivity) ----
+      // Contrastivity: evidence bound to zero compared hypotheses has zero diagnostic
+      // value in the ACH matrix; symmetrically, a hypothesis bound to zero evidence is
+      // invisible to it. The density line makes per-hypothesis binding coverage visible
+      // without persisting anything new; considered-nolink counts only run-known ids the
+      // model explicitly judged as no-relation and that did not end up linked.
+      const finalLinkedIds = new Set([...finalCounter, ...finalSupporting]);
+      const consideredNolink = new Set(
+        out.consideredClaimIds.filter((id) => existingClaimIds.has(id) && !finalLinkedIds.has(id)),
+      ).size;
+      ctx.log(
+        `critique bindings: hyp=${hyp.id} support=${finalSupporting.length} counter=${finalCounter.length} considered-nolink=${consideredNolink} of ${runClaims.length}`,
+      );
+      // Zero links on both sides while a real verified evidence base exists is a density
+      // anomaly worth surfacing in the stage summary (visible, never silently green).
+      const verifiedCount = runClaims.filter((c) => c.bindingStatus === 'verified').length;
+      if (finalSupporting.length === 0 && finalCounter.length === 0 && verifiedCount >= 3) {
+        warnings.push(
+          `${hyp.id}: 0 supporting and 0 counter critique links while ${verifiedCount} verified claim(s) exist in the run — zero evidence binding (ACH contrastivity: no claim can discriminate this hypothesis)`,
+        );
       }
 
       // ---- assumption critiques: attach in range, preserve overflow honestly ----
