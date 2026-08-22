@@ -24,6 +24,13 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 | W4-F1 jittered exponential backoff + Retry-After precedence (vendor-shaped) | deepseek-ai/deepseek-harness llm-retry + retry-policy (MIT) + sst/opencode session/retry.ts (MIT) | MIT | ADOPT (W4, D-039; TS 重写非拷贝) | backoffDelayMs(1000·2^(n-1) × 对称 ±25% 抖动, cap 30s) + parseRetryAfterMs(ms>秒>HTTP-date) 优先；W1 契约语义不变 | evidence/W-H4/fusion-f1-f3-f4.md：295/295；退避表实测 random∈{0,.5,1}×attempt1-5；Retry-After 7s→7000ms 实测 |
 | W4-F3 error-path credential redaction | openai/codex codex-rs/secrets/src/sanitizer.rs (Apache-2.0) | Apache-2.0 | ADOPT (W4, D-039; 正则族 TS 重写+attribution) | redactSecrets 4 模式应用于 fail() 持久化咽喉——错误消息入 sqlite/日志前脱敏；分类先于脱敏（quota 正则依赖原文） | 同上：脱敏语料 5 例实测无误伤；端到端 429 回显密钥测试 |
 | W4-F4 judge self-consistency (median + spread disclosure) | google-gemini/gemini-cli evals/llm-judge.ts (Apache-2.0) | Apache-2.0 | ADOPT (W4, D-039; majority→median 适配对齐 D-037) | FARLAB_JUDGE_VOTES N 次同盲序投票→per-dimension 中位数+min/max spread+per_vote 全量留档；默认 N=1 行为不变 | 单测 5 例；live 方差削减 UNVERIFIED（D-036 路由阻断，恢复后待验） |
+| W9 rediscovery judge v2.1: fixed GT + granularity protocol + gold-calibrated matcher | FIRE-Bench design (repo no-license, harness ours) + main-agent gold set (in-repo) | in-repo | BUILD/ADAPT (W9, D-042) | GT 分解固定（GT_REV）；agent 分解固定粒度协议（原子单元+GT 锚定计数+排除方法论预测）；TF-IDF 阈值金标零误校准 0.40/0.12（104 对主 Agent 标注）；管线单源化+防御性校验 | evidence/W9/judge-variance-hardening.md；replay 跨分解 swing ≤0.091（保守口径）；live 重判 BLOCKED（D-036） |
+| W9 deterministic statistics tier (eval/stats.mjs) | Miller arXiv:2411.00640 + lm-eval/FastChat seeded-bootstrap 纪律 + inspect_ai cluster-robust SE + statsforevals 规则（openai/evals+inspect_ai 未播种 bootstrap 为反面教材） | papers/MIT-Apache sources read | EXTRACT/BUILD (W9, D-043) | 播种 mulberry32 bootstrap CI、小 N 精确配对置换（零 RNG）、Wilson、Cohen's kappa、BH step-up、聚类 SE、MDE 决策门（REAL/NOT_SIGNIFICANT/INSUFFICIENT_N + N<15 exploratory 降级）；stats-report.mjs 双跑 bit-identical | eval/results/stats-report.json；tests 23/23；同 seed 同结果实测 |
+| W9 counter-evidence-substantive-hit metric (defined+backfilled) | in-repo metric over recorded blind re-judges | in-repo | BUILD (W9, D-043) | strict=counter 标签关系盲判存活率（contradicts/weakens）+ limiting(+qualifies) + miss 分解（inverted/empty/qualifies-only）+ Wilson；回填：post-fix 0.143 strict（诚实远低 0.70 目标） | evidence/W9/counter-evidence-metric.md；eval/counter-evidence-metric.mjs |
+
+| W7-F1 JSON repair engine (full state machine) | josdejong/jsonrepair 3.15.0 regular variant | ISC | ADOPT (W7, D-044; EXTRACT 算法重写非引包——WAVE3 #10 的引包 REJECT 不冲突) | 四层链 direct→fence→legacy 引号扫描→引擎；oracle 74 例逐字节等价；损坏修复 9/68→68/68；live 类 192/192 保持；三突变全 CAUGHT | evidence/W7/repair-benchmark.md；live e2e 待路由恢复（402） |
+| W7-F2 truncation discipline | instructor v2 retry.py (MIT, IncompleteOutput 不重试哲学) + openai-partial-json-parser (MIT, NUM 排除洞见) | MIT | ADOPT (W7, D-044) | finishReason=length→引擎补全不验收+专用简洁重问；部分值永不静默验收（伪造红线） | 同上 |
+| W7-F3 DashScope max_tokens 剥离 | 百炼官方结构化输出文档（2026-08-18 版逐字） | 官方文档 | ADOPT (W7, D-044) | 结构化输出+max_tokens=官方确认的截断根因；dashscope 路由恒剥 | providers 测试断言请求体无 max_tokens |
 
 ## B. Deferred (evidence-gated or later-phase)
 
@@ -40,6 +47,14 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 | W4-R3 repo-map PageRank+token 二分预算 | aider repomap.py (Apache-2.0) | DEFER — 与 ONNX rerank 同触发（池>60，当前 max 44） |
 | W4-R4 background-review 方法论沉淀 + auto-memory | hermes-agent background_review.py (MIT) + Claude Code auto-memory 公开文档 | DEFER — 触发=live 路由恢复（需模型调用） |
 | W4-R6 evidence 全文摘录保尾（head→head+tail，码点计数） | deepseek-harness compaction-tool-result-pruner (MIT) | DEFER — 触及 claim 提取生产语义，需 live A/B 验证后动 |
+| W7 partial-value parser（partial-json 家族 B 设计：Allow 掩码+原子前缀补全） | partial-json 0.1.7 / openai-partial-json-parser（均 MIT，实读） | DEFER (W7) — 接受路径有静默丢尾风险（截断数组过 schema=伪造完整），红线不碰；价值在流式 UI 渐进呈现 |
+| W7 SSE 流式渐进校验面 | partial-json 家族 + instructor M3/M7 | DEFER (W7) — 触发=产品立项流式呈现或长输出延迟实测 |
+| W7 re-ask 消息按通道分化（role:tool 应答） | instructor M2 | DEFER (W7) — 现形状 live 证实（0d1706e）；改动需 live A/B（D-036 阻断） |
+| W7 token_budget 跨重试预算 | instructor retry.py | DEFER (W7) — 重问率低，痛点未实证 |
+| W7 Mode×Provider 声明式能力矩阵 | instructor M1/M5 + DashScope json_schema 严格模式（官方文档实证，Qwen3.7/3.8-Max 窄面） | DEFER (W7) — 触发=B-QWEN key 到位或第二家 provider 需差异传输；届时 DashScope json_schema 升级路径在案 |
+| W7 zod v4 z.toJSONSchema 投影替代 | zod 3.25.76 同包（MIT） | DEFER (W7, D-044) — v3 schema 无法喂 v4（reading def 抛错实测）；$ref/allOf/propertyNames 超出端点子集；触发=全仓 zod/v4 迁移 |
+| W7 约束解码四库深钻（outlines/xgrammar/lm-format-enforcer/guidance） | Apache-2.0/MIT 已核验 | learn-only (W7) — API 侧无本地解码；触发=本地推理/流式 token 级约束立项 |
+
 | FIRE-Bench rediscovery eval (arXiv 2602.02905, ICML 2026) | ADAPT (design extracted 2026-08-22, D-029): atomic-claim decomposition + set-matching P/R/F1 vs ESTABLISHED findings — objective GT, no quality-judge circularity. Official repo NO LICENSE (harness self-implemented); HF dataset Apache-2.0 but network-blocked (huggingface.co unreachable) — seed set authored in-repo (eval/rediscovery.mjs), HF import = documented extension | Import HF task set when network allows; never compare hypothesis-level F1 to official full-cycle agent scores |
 | CORE API v3 | DEFER | Marginal coverage over A+B |
 | Idea2Plan protocol | ADAPT later | Verify repo license before running subset; borrow 5-section template + JudgeEval now (dataset repo 404 as of 2026-08-22 — subset-run BLOCKED, paper-level only) |
@@ -76,3 +91,72 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 - OpenAlex keyless polite pool WORKS as of 2026-08-22 01:15 (HTTP 200, real results) — scout-reported "key mandatory" is a production-scale policy, monitor only.
 - DeepSeek has NO embedding endpoint (verified) — any embedding route requires a new pluggable provider contract; hence cross-encoder/LLM rerank preferred.
 - Semantic Scholar keyless shared pool rate-limits aggressively; free key (1 RPS) recommended before S2AG integration; exponential backoff mandatory.
+
+## E. Wave-6 retrieval/RAG expedition (2026-08-22; D-046..D-048; research/WAVE6-SCOUT.md)
+
+### E1. Adopted / Extracted (source-level, zero new runtime deps)
+
+| Candidate | Source (license verified) | Decision | Capability fused | Evidence |
+|---|---|---|---|---|
+| Counter-query family rerouting | node-DeepResearch per-query routing precedent (agent.ts:305-322, Apache-2.0) | BUILD (F1) | counter[1] arxiv→crossref in buildTargets; crossref redundancy now covers counter queries | live replay 68/68 historical counter queries: crossref 0% zero / mean 6.0 vs arxiv 82.3% zero (spikes/output/crossref-counter-probe.json) |
+| Deterministic zero-result query-mutation cascade (full→k4→k2) | open-deep-research legacy/utils.py:1274-1283 (MIT) + node-DeepResearch 2-5-word discipline schemas.ts:198 (Apache-2.0) | EXTRACT mechanism (F2) | arXiv empty searches retry strictly-shorter variants, each attempt receipted, first hit stops | probe: k6 100% / k4 53.3% / k2 6.7% zero on 30 historical zero queries (spikes/output/arxiv-truncate-probe.json) + relevance spot-check |
+| Wrong-paper multi-signal guard | markrussinovich/refchecker enhanced_hybrid_checker.py:687-870 (MIT) | EXTRACT (F3) | verify.ts: title-failed resolves graded by surname overlap + year gap + venue compat; wrongPaperSuspect surfaced, identifier stays authoritative | tests/pipeline-retrieve.test.ts W6/F3 cases; refchecker report wave6-reports/refchecker.md |
+| RankGPT bottom-up sliding window | sunnweiwei/RankGPT rank_gpt.py:234-244 (Apache-2.0) | EXTRACT (F4, extends D-015) | rerank pool 24→48; windows w=24/s=12, bottom-up head-last; per-window permutation validation; rerankWindows recorded | rerankWindowPlan tests + 3-window e2e; upstream w>n silent-skip structurally impossible |
+| Fulltext citation-marker strip | AkariAsai/OpenScholar open_scholar.py:717-720 (Apache-2.0) | ADAPT (F5) | numeric [n]/[n,m]/[n-m] markers stripped in all 3 extractors (LaTeXML/TEI/JATS); bracketed prose kept | tests/sources-fulltext.test.ts W6/F5 |
+| Deterministic retrieval-quality baseline harness | beir-cellar/beir metric methodology (Apache-2.0, file:line in report) | BUILD with BEIR provenance | eval/retrieval-baseline.mjs: offline replay of persisted runs, guarded before/after compare exit-1-on-regression, hole-analogue metric | evidence/W6/retrieval-baseline-harness.md; before/after snapshots frozen |
+
+### E2. Deferred (reversal triggers)
+
+| Candidate | Decision | Trigger |
+|---|---|---|
+| Bounded feedback retrieval round (critique→≤2 follow-ups→RRF merge→replace-within-cap) | DEFER (F7, top candidate) | any model route returns (D-036) + ≥3 runs with measured query-sufficiency gaps |
+| pqac opaque-ID citation binding (paper-qa types.py:249-316) | DEFER (F8) | claim binding already 100%; revisit with live LLM + binding failure evidence |
+| LLM support-verification Yes/No judge (OpenScholar instructions.py:282-301) | DEFER (F9) | live LLM routes |
+| Purpose-weighted RRF (rag-fusion query_weights) | evaluate-first (F6) | quality proxy metric defined (quota floor already guarantees seats) |
+| storm / ai2-scholarqa-lib / rank_llm / ranx | fetched, not deep-read | residual defect in their dimension (query planning / pipeline alignment / rerank orchestration / metric oracle) or next wave budget |
+| gpt-researcher breadth-halving descent + researchGoal queries | design reference only | a future iterative-retrieval decision (see C below) |
+
+### E3. Rejected this wave
+
+| Candidate | Reason |
+|---|---|
+| Iterative sufficiency loops as a class | crosscut C2: no demonstrated failure class that iteration fixes; wall-clock hard gate; ODR's own adaptive value depends on web-page bodies scholarly APIs never return |
+| Pre-shuffle for rerank position bias | RankGPT has NO such upstream mechanism (verified absent) — would be FAR-Lab invention, not fusion; window chaining already re-judges floated entries |
+| RankGPT token-budget machinery | upstream does not exist (only 300-word per-item truncation + an unchecked ERROR sentinel) — nothing to port |
+| Embedding/BM25/tantivy local corpus retrieval | zod-only invariant + no local corpus (paper-qa's tantivy path acknowledged as industrial precedent for lexical-only retrieval) |
+
+## F. Wave-5 scientific-AI-systems expedition (2026-08-22; reports research/wave5-reports/, decisions D-049/D-050)
+
+### F1. Adopted (fused this wave; live re-measurement queued on D-036)
+
+| Candidate | Source | License | Decision | Capability fused | Evidence |
+|---|---|---|---|---|---|
+| Cross-strategy negative conditioning (previouslyProposed history + explicit differentiation) | AI-Scientist-v2 perform_ideation_temp_free.py mechanism | RAIL (mechanism-only, clean-room) | ADAPT (prompt assembly) | generate_hypotheses strategies 2/3 see all prior candidates; measured premise 30% duplicate rate (136/455) | tests/pipeline-hypotheses.test.ts W5-F4; evidence/W5A/fusion-evidence.md |
+| Evolution-operator supplement repertoire (integrate/reduce/make-feasible/transplant) | Kaimen Co-Scientist evolution.py taxonomy | Apache-2.0 | ADAPT (prompt) | diversity supplement gains four explicit operators | same tests |
+| Anchored-band relation label discipline | MLR-Bench review_idea/proposal rubric structure | MIT | ADAPT (prompt) | falsify.ts + evidence.ts adjudication prompts: full-sentence anchors, same-subject+same-quantity gates, anti-leniency, not_comparable default | evidence/W5A/fusion-evidence.md |
+| Independent adversarial link audit (confirm/relabel/drop) | AI-Scientist v1 ensemble+AC review + pessimistic-critic default (mechanism-level) | RAIL (mechanism-only) | ADAPT (new pass + pure applyLinkAudit) | post-gate audit of claim→hypothesis links; failure keeps originals visibly | tests W5-F5 (pure + stage) |
+| MLR-Bench adapter fidelity trio | mlrbench internals (idea_generator/proposal_generator/review_proposal) | MIT | ADAPT (eval adapter) | question structure preservation; rendering of persisted predictions/falsification/decision-rule; proposal judge sees same-agent idea (upstream parity) | eval/mlr-bench.mjs --dry-run/--render-only exit 0 |
+
+### F2. Deferred (reversal triggers)
+
+| Candidate | Decision | Trigger |
+|---|---|---|
+| Cross-family near-dup corpus merge (OpenScholar MinHash pattern) | DEFER (measured 3 pairs/46 runs, sub-threshold; retrieve.ts W6-locked) | rerun spikes/wave5-near-dup-probe.mjs after W6-F1 crossref reroute lands |
+| paper-qa citation-sanitization presentation pipeline | DEFER | P1 product wave (inline-citation rendering) |
+| Structured gap-question targeted re-retrieval (OpenScholar corrective RAG) | DEFER | live routes + ≥3 runs with measured sufficiency gaps |
+| Per-stage budget enforcement (Kaimen budgets.py shares) | DEFER | runaway-cost evidence |
+| Embedding dedup clustering (Kaimen proximity) | DEFER | embedding endpoint (ONNX or API) |
+| Robin 3-partite experimental-insights taxonomy + tested-entities blacklist | DEFER | Direction-B experiment-feedback adapter / multi-round runs |
+| Deterministic clustering for paraphrase dedup (replacing LLM cluster call) | DEFER | embedding endpoint (same trigger as above) |
+
+### F3. Rejected this wave (with reasons — do not revisit without new evidence)
+
+| Candidate | Reason |
+|---|---|
+| Matcher citation-noise stripping (paper-qa strip_citations) | premise falsified on recorded data: 0/104 gold pairs contain citation noise (claims are proposition extractions) |
+| LLNL open-ai-co-scientist (all sub-mechanisms) | demo-grade: lenient defaults mask failures, static hard-coded meta-review strings; Kaimen supersedes on every surface |
+| aviary framework adoption | RL gymnasium paradigm — wrong shape; Robin's MultiTrajectoryRunner is the closer adapter reference |
+| Elo ranking core / generate-debate-evolve whole mechanism | registry C standing (sign-flipping gains); sub-mechanisms only via Robin/Kaimen entries |
+| Resident multi-agent committees / role-play hierarchies | AIS2 §3.1: committee = schema'd call points + shared state — FAR-Lab stage machine already is this; AgentLab six roles have no capability differentiation |
+| Revision regression guard (edit length-ratio gate) | would false-positive legitimate assumption-dropping revisions; revision semantics = soul boundary (causal-link stays) |
+| Citation-count priors in retrieval (OpenScholar min_citation/norm_cite) | biases toward old famous work — scientifically wrong for recency-sensitive hypothesis generation |

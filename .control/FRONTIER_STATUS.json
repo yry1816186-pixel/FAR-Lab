@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "protocolVersion": "2.0.0",
-  "asOf": "2026-08-22T10:00+08:00",
+  "asOf": "2026-08-22T11:30+08:00",
   "note": "Machine-readable gate record (stop-guard schema) + detail section below. Every status maps to session evidence; nothing asserted without a file/run reference. WAVE-4 OPENED by user handoff 2026-08-22: harness-source expedition in progress; dimensions below reflect Wave-3 close state until Wave-4 fusion lands.",
   "dimensions": [
     {
@@ -220,7 +220,7 @@
       {
         "id": "jsonrepair",
         "status": "rejected",
-        "evidence": "breaks zod-only invariant; strict-FC makes it moot"
+        "evidence": "package REJECT stands (WAVE3 #10: breaks zod-only); REVISITED via EXTRACT algorithm path (W7-F1, D-044): full state machine rewritten as zero-dep TS src/providers/json-repair.ts, oracle-equivalent 74/74, repair coverage 9/68->68/68 (evidence/W7/repair-benchmark.md)"
       },
       {
         "id": "local-grobid",
@@ -249,43 +249,63 @@
       },
       {
         "id": "wave5-breadth-scan",
-        "status": "in_progress",
-        "evidence": "opened 2026-08-22 by user /goal; per-system mechanism inventories (AI-Scientist v1/v2, paper-qa, aviary, robin remainder, AgentLaboratory, OpenScholar, mlrbench internals, co-scientist repro sub-mechanisms + expansion) pending"
+        "status": "resolved",
+        "evidence": "10/10 repo reports research/wave5-reports/ (3 main-agent-authored after subagent rate-limit 1302); licenses verified; WAVE5-SCOUT.md cross-compare; D-049"
       },
       {
         "id": "wave5-fusion",
-        "status": "not_started",
-        "evidence": "placeholder; C4/C5 evidence anchoring + D2-D5 review-revision + B5/B6 context-budget fusions with offline benchmarks (live gated by D-036)"
+        "status": "resolved",
+        "evidence": "premise-gated per Marginal Value Gate: F2 REJECTED (0/104 gold pairs carry citation noise), F1 DEFER->B (3 near-dup pairs/46 runs; probe kept), A1 AUDIT PASS; F4/F5/F3 fused with tests (D-050): hypotheses.ts negative conditioning+operators, falsify.ts anchored bands+independent link audit, evidence.ts anchored bands, eval/mlr-bench.mjs adapter fidelity — suite 455/456 (sole red = Wave-8 in-flight durability test), typecheck 0, build 0; live north-star re-measurement queued on D-036 with disclosure notes in eval/north-star.json"
       },
       {
         "id": "wave6-breadth-scan",
-        "status": "in_progress",
-        "evidence": "opened 2026-08-22 by user /goal; retrieval/RAG infra expedition (paper-qa retrieval face, gpt-researcher, open-deep-research family, dzhng/deep-research + TS peers, RankGPT source, query decomposition revisit, retrieval evaluators + proactive expansion) pending per-repo inventories"
+        "status": "resolved",
+        "evidence": "COMPLETE 2026-08-22 (D-046): 10 report lines (paper-qa retrieval face, gpt-researcher main-read, open-deep-research, TS dzhng+node-DeepResearch comparison, RankGPT source detail, query-decomposition crosscut incl. rag-fusion 2026 replication, BEIR metric extraction, OpenScholar, refchecker main-read, expansion scan) in research/wave6-reports/ + research/WAVE6-SCOUT.md cross-comparison; file:line spot-verified by main agent; 3 subagent lines rate-limited and absorbed by main agent (noted per report)"
       },
       {
         "id": "wave6-retrieval-baseline-harness",
-        "status": "not_started",
-        "evidence": "placeholder; deterministic regressable retrieval-quality baseline harness MUST land before any main-path retrieval change (wave prompt hard precondition; north-star retrieval-verified-rate owner)"
+        "status": "resolved",
+        "evidence": "LANDED BEFORE any main-path change (D-046): eval/retrieval-baseline.mjs deterministic offline replay (46 runs, 455 receipts) + guarded before/after compare exit-1-on-regression + tests 10/10 mutation-checked + frozen before/after snapshots; headline defect measured: arXiv 82.3% zero-result rate, counter queries never reach crossref (counterZero median 1/run)"
       },
       {
         "id": "wave6-fusion",
-        "status": "not_started",
-        "evidence": "placeholder; fusion candidates with before/after retrieval-quality benchmarks, zero north-star regression, three-source keyless backend preserved"
+        "status": "resolved",
+        "evidence": "F1-F5 EXECUTED (D-047): counter[1]->crossref (probe 68/68: 0% zero vs 82.3%), arXiv full->k4->k2 cascade (probe: 6.7% residual zero), refchecker wrong-paper guard in verify, RankGPT bottom-up sliding window (pool 48, w24/s12), OpenScholar citation-marker strip; W6 suites green (retrieve 29/29, fulltext 28/28, baseline 10/10); frozen-DB guarded compare ZERO_GUARDED_REGRESSION exit 0; live end-to-end verification BLOCKED on D-036 model routes (honestly recorded, wall-clock +9s cost noted); deferred F7-F9 with triggers (D-048)"
       },
       {
         "id": "wave9-breadth-scan",
-        "status": "not_started",
-        "evidence": "opened 2026-08-22 by user /goal; per-framework mechanism inventories (inspect_ai scorer/task abstractions, promptfoo assertions/CI, lm-eval-harness task-spec/aggregation, deepeval judge metrics/g-eval, open-compass orchestration/contamination, judge-calibration research: swap/anchor/kappa/bootstrap) pending"
+        "status": "in_progress",
+        "evidence": "statistics line COMPLETE (paired-permutation standard, seeded-bootstrap discipline incl. negative examples, BH absent in HELM/promptfoo, cluster-robust SE formula, MDE gate); inspect_ai/promptfoo/deepeval scouts relaunched serially after account rate-limit killed first fan-out; lm-eval-harness/open-compass/judge-calibration lines queued"
       },
       {
         "id": "wave9-judge-variance-hardening",
         "status": "in_progress",
-        "evidence": "opened 2026-08-22; D-037 judge v2 landed (deterministic TF-IDF + 3-vote), remaining: fixed decomposition-granularity protocol + same-run re-judge variance measurement <0.15 (stretch 0.08); live measurement gated on model routes (D-036) unless probe recovers"
+        "evidence": "offline COMPLETE 2026-08-22 (D-042): fixed GT (GT_REV) + granularity protocol + gold-calibrated 0.40/0.12 (104-pair main-agent gold, zero-error) + replay swing<=0.091 conservative; LIVE re-judge measurement ready via judge-variance.mjs --live but BLOCKED on model routes (deepseek 402 chat, zai 401, dashscope keyless)"
       },
       {
         "id": "wave9-counter-evidence-metric",
-        "status": "not_started",
-        "evidence": "opened 2026-08-22; north-star counter-evidence-substantive-hit (target 0.70, stretch 0.85) needs definition + historical backfill from recorded blind re-judge data"
+        "status": "resolved",
+        "evidence": "D-043: metric defined (strict/limiting + miss decomposition + Wilson) and backfilled on recorded blind re-judges: post-fix 0.143 strict [0.026,0.513] honestly recorded (far below 0.70 target; misses mostly EMPTY not inverted; improvement route = judge-v2 adjudication + counter-seat targeting, live re-measure gated on D-036)"
+      },
+      {
+        "id": "wave7-breadth-scan",
+        "status": "resolved",
+        "evidence": "8 report lines: instructor (dead-agent complete report, spot-verified), jsonrepair, streaming-partial-json, zod-v4-tojsonschema, failure-taxonomy, provider-strict-diff, constrained-decoding-libs compact (research/wave7-reports/); sub-agent fan-out killed by account rate limit 1302 — 5 lines main-agent executed personally (disclosed per report)"
+      },
+      {
+        "id": "wave7-fusion-shortlist",
+        "status": "resolved",
+        "evidence": "research/WAVE7-SCOUT.md: F1/F2/F3 GO, KEEP hand-written projection (zod/v4 bridge absent, live-tested), 6 DEFER->B with triggers"
+      },
+      {
+        "id": "wave7-fusion",
+        "status": "resolved",
+        "evidence": "D-044 executed: engine EXTRACT (74 oracle byte-equal, 86/86 tests), truncation discipline (finishReason=length gate + dedicated re-ask), dashscope max_tokens strip; mutation 3/3 CAUGHT; zone 157/157; full suite 455/456 (1 fail in W8 zone)"
+      },
+      {
+        "id": "wave7-live-e2e",
+        "status": "blocked",
+        "evidence": "model routes 402/429-1113 at wave-open probe (spikes/model-spike/runs/2026-08-22T02-38-26-825Z-deepseek.json); live verification debt recorded — rerun per D-026 template when a route is funded"
       }
     ],
     "evidence": [
