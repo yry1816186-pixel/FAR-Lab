@@ -53,7 +53,7 @@
   "activeTasks": [
     "WAVE5 CLOSED offline 2026-08-22: 10/10 repo reports (research/wave5-reports/) + WAVE5-SCOUT.md + fusions in hypotheses/falsify/evidence stages + eval/mlr-bench.mjs; tests: pipeline-hypotheses 32/32 (4 new, mutation-hardened), tsc 0, build 0; full-suite reds attributed to Wave-6 in-flight (W6/F4, W6/F5) — evidence/W5A/fusion-evidence.md, D-049/D-050; ALL W5 code committed through dd13945 (falsify.ts was the last piece — W8 commit had briefly left the tree inconsistent, fixed + fresh-checkout verified)",
     "WAVE9 CLOSED offline: 42/42 scope tests green (35 judge + 7 claim-match); full suite 469/471 with 2 reds in Wave-6 in-flight sources-fulltext tests (not W9 scope, evidence in git status)",
-    "USER ACTION REQUIRED: any ONE funded route (deepseek top-up / zai recharge / DASHSCOPE_API_KEY) unblocks the pooled live-verification queue (W9: judge-variance + counter-evidence; W5: rediscovery F1 + relation blind-agreement + mlr-bench new-protocol re-run); DASHSCOPE specifically for submission route (B-QWEN-LIVE-ROUTE)",
+    "USER ACTION REQUIRED: zai balance covers only tiny probe calls (D-058 verbatim 429-1113 on real pipeline calls); deepseek user-banned; no DASHSCOPE key in secrets.env. ANY ONE of: z.ai recharge OR provide DASHSCOPE_API_KEY unblocks the pooled live queue (W9 judge-variance + counter-evidence; W5 rediscovery F1 + relation blind-agreement + mlr-bench new-protocol)",
     "W-P2 candidates harvested: contamination-stratified reporting (open-compass pattern) x counter-seat targeted retrieval for counter-evidence-substantive-hit 0.143->0.70; Yale EM-DS judge confusion-matrix calibration (needs human gold set); W5 additions in registry F2/F3"
   ],
   "blockerIds": [
