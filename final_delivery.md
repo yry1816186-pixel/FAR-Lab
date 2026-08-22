@@ -61,7 +61,7 @@
 3. **codeRevision=unknown**：本地构建未注入 git commit（export 阶段读 FARLAB_GIT_COMMIT env）。发布构建时应注入（一行修复，已在 bundle limitations 如实标注）。
 4. **评分与 LLM-judge 的校准极限**：所有模型分数标注 uncalibrated_llm_judgment；judge 差距（4.75 vs 3.25）不可量化引用（已在评估报告披露）。
 5. **摘要级证据天花板**：当前源适配器以摘要为主；全文献新颖性检索未做（novelty 已带语料相对限定语；全文适配器为后续增强方向）。
-6. **Web 前端 XSS 面未审计**（安全审计范围外，本机 127.0.0.1 部署下风险有限；公网部署前需补审）。
+6. ~~**Web 前端 XSS 面未审计**~~ **已审计关闭**（2026-08-22，`evidence/W-WEB/xss-surface-audit.md`：零危险 sink、无 markdown→HTML 渲染路径、React 默认转义覆盖；公网部署前若引入 markdown 渲染器则必须加 DOMPurify——常设条件）。
 7. **human README/开发者文档未写**：交付以报告/测试/代码为准；发布包装（README/安装脚本/PDF 方案）属发布工程后续项，不影响已验证能力。
 
 ## 五、真实能力一句话总结
