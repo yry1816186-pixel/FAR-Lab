@@ -16,6 +16,7 @@ import type { DictKey } from '../../i18n/dict';
 const NARRATIVE: ReadonlySet<string> = new Set([
   'stage_started', 'stage_done', 'stage_failed', 'stage_skipped',
   'receipt_recorded', 'feedback_received', 'run_status_changed', 'note',
+  'agent_started', 'agent_tool_used', 'agent_finished',
 ]);
 
 /** B3-critique P1-3: milestone floods must never evict the stage boundaries —
@@ -123,6 +124,19 @@ export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEve
         }
         case 'feedback_received':
           return { key: `b${e.seq}`, at: e.at, glyph: '⚑', tone: 'info', text: t('activity.feedback') };
+        case 'agent_started': {
+          const task = typeof e.detail?.task === 'string' ? e.detail.task : '';
+          return { key: `as${e.seq}`, at: e.at, glyph: '◇', tone: 'info', text: t('activity.agentStarted'), summary: task.length > 0 ? task : undefined };
+        }
+        case 'agent_tool_used': {
+          const tool = typeof e.detail?.tool === 'string' ? e.detail.tool : '';
+          const summary = typeof e.detail?.summary === 'string' ? e.detail.summary : undefined;
+          return { key: `at${e.seq}`, at: e.at, glyph: '⚙', tone: e.detail?.ok === true ? 'muted' : 'err', text: t('activity.agentTool', { tool }), summary };
+        }
+        case 'agent_finished': {
+          const status = typeof e.detail?.status === 'string' ? e.detail.status : '';
+          return { key: `af${e.seq}`, at: e.at, glyph: '▣', tone: status === 'completed' ? 'ok' : 'err', text: t('activity.agentFinished', { status }) };
+        }
         case 'run_status_changed':
           return { key: `c${e.seq}`, at: e.at, glyph: '≫', tone: 'muted', text: t('activity.statusChanged') };
         default:

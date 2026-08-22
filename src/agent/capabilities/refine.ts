@@ -1,15 +1,18 @@
 import { z } from 'zod';
+import path from 'node:path';
 import { canonicalSha256 } from '../../shared/crypto.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../../shared/ports.js';
 import type { Store } from '../../persistence/store.js';
 import type { SourceFamily } from '../../domain/source.js';
-import { newId, ProvenanceReceipt, AgentSession, AgentReport, type AgentTelemetrySummary } from '../../domain/index.js';
+import { newId, ProvenanceReceipt, AgentSession, AgentReport, type AgentTelemetrySummary, type AgentTurnRecord } from '../../domain/index.js';
 import { ToolRegistry, type AgentTool, type ToolContext, type ToolResult } from '../tool.js';
 import { PermissionEngine } from '../permissions.js';
 import { SessionTelemetry } from '../telemetry.js';
 import { runAgentLoop, type AgentLoopConfig, type AgentLoopResult } from '../loop.js';
 import { runSubagents, type SubagentResult } from '../subagents.js';
-import type { AgentEventSink, ReceiptSink } from '../protocol.js';
+import { openRolloutWriter, readRollout, reconstructSession, rolloutFile, type InterruptedTurnDisposition } from '../rollout.js';
+import { loadSkillsFromDir, selectSkills, renderSkillsPrompt, type AgentSkill } from '../skills.js';
+import type { AgentEventSink, ReceiptSink, TranscriptEntry } from '../protocol.js';
 
 /**
  * Real consumer of the agent kernel (H1-H5 vertical slice): iterative EVIDENCE-GAP
@@ -60,6 +63,10 @@ export interface RefineDeps {
   artifacts: ArtifactStore;
   provider: ModelProvider;
   sourceFor: (family: SourceFamily) => SourceAdapter;
+  /** Directory for append-only session rollouts (H6 durability + resume). */
+  rolloutDir: string;
+  /** Skill directories by tier; defaults to repo `skills/` (builtin) + `<rolloutDir>/../skills` (user). */
+  skillDirs?: Array<{ dir: string; tier: 'builtin' | 'project' | 'user' }>;
 }
 
 export interface RefineOptions {
@@ -67,6 +74,8 @@ export interface RefineOptions {
   /** Hypotheses each getting pro/contra sub-agents (default 2, capped at 3). */
   topK?: number;
   maxConcurrent?: number;
+  /** Resume a persisted session (H6): replay its rollout transcript and continue the turn budget. */
+  resumeSessionId?: string;
 }
 
 export interface RefineOutcome {
@@ -76,6 +85,9 @@ export interface RefineOutcome {
   result?: RefineResult;
   telemetry: AgentTelemetrySummary;
   subagentSessions: Array<{ label: string; sessionId: string; status: string }>;
+  /** Names of skills actually injected into this session's system prompt (empty = none matched). */
+  skillsUsed: string[];
+  resumed: boolean;
   error?: string;
 }
 
@@ -236,7 +248,44 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
     shouldAbort: () => deps.store.getRun(runId)?.cancelRequested === true,
   };
 
-  const sessionId = newId('ags');
+  // --- skills (H4 conditional injection): repo builtin tier + user tier, relevance-selected ---
+  const skillDirs = deps.skillDirs ?? [
+    { dir: path.join(process.cwd(), 'skills'), tier: 'builtin' as const },
+    { dir: path.resolve(deps.rolloutDir, '..', 'skills'), tier: 'user' as const },
+  ];
+  const allSkills: AgentSkill[] = [];
+  for (const { dir, tier } of skillDirs) allSkills.push(...loadSkillsFromDir(dir, tier).skills);
+  const selectedSkills = selectSkills(
+    `${question.text} refine evidence gaps counter evidence hypotheses ${topHypotheses.map((h) => h.statement).join(' ')}`,
+    allSkills,
+    { maxCount: 3, maxChars: 4000 },
+  );
+  const skillsSection = renderSkillsPrompt(selectedSkills);
+
+  // --- session + rollout (H6): fresh session, or resume of a persisted one ---
+  const sessionId = opts.resumeSessionId ?? newId('ags');
+  let resumeCtx: {
+    transcript: TranscriptEntry[];
+    priorTurns: number;
+    priorTurnRecords: AgentTurnRecord[];
+    startedAt: string;
+    openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition };
+  } | undefined;
+  if (opts.resumeSessionId !== undefined) {
+    const { lines } = readRollout(rolloutFile(deps.rolloutDir, opts.resumeSessionId));
+    if (lines.length === 0) throw new Error(`resume: no rollout found for session ${opts.resumeSessionId}`);
+    const rec = reconstructSession(lines);
+    if (rec.meta !== undefined && rec.meta.capability !== CAPABILITY) {
+      throw new Error(`resume: session ${opts.resumeSessionId} belongs to capability '${rec.meta.capability}', not ${CAPABILITY}`);
+    }
+    resumeCtx = {
+      transcript: rec.transcript,
+      priorTurns: rec.turns.length > 0 ? Math.max(...rec.turns.map((t) => t.turn)) : 0,
+      priorTurnRecords: rec.turns,
+      startedAt: rec.meta?.at ?? new Date().toISOString(),
+      ...(rec.openTurn !== undefined ? { openTurn: rec.openTurn } : {}),
+    };
+  }
   const telemetry = new SessionTelemetry();
   const mainDeps = {
     provider: deps.provider,
@@ -248,41 +297,47 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
     recordReceipt,
     telemetry,
     artifacts: deps.artifacts,
+    rollout: openRolloutWriter(deps.rolloutDir, sessionId),
+    rolloutFactory: (sid: string) => openRolloutWriter(deps.rolloutDir, sid),
   };
 
-  // --- phase 1: parallel pro/contra literature sub-agents per top hypothesis ---
-  const specs = topHypotheses.flatMap((h) => [
-    {
-      label: `pro:${h.id}`,
-      task: `Search the literature FOR this hypothesis: "${h.statement}". Use search_sources with precise scientific queries (mechanism terms, population/phenomenon, method names). Finish with the sources that genuinely SUPPORT it (verdict 'supports'; 'mixed' when partial). If nothing relevant is found, return empty findings — never invent sources.`,
-      toolNames: ['search_sources'],
-      maxTurns: 4,
-    },
-    {
-      label: `contra:${h.id}`,
-      task: `Search the literature AGAINST this hypothesis: "${h.statement}". Hunt for contradicting results, failed replications, boundary conditions and competing mechanisms (verdict 'contradicts' or 'mixed'). If no counter-evidence is found, return empty findings and say so — absence of hits is a finding, not a failure.`,
-      toolNames: ['search_sources'],
-      maxTurns: 4,
-    },
-  ]);
-  const subResults: SubagentResult[] = await runSubagents(
-    // task is a placeholder — runSubagents replaces it per spec; only the base fields are shared.
-    { ...baseConfig, task: 'literature pro/contra verification (per-sub-agent task overrides this)', resultSchema: SubagentFindingsSchema, maxTurns: 4 },
-    mainDeps,
-    specs,
-    { maxConcurrent: opts.maxConcurrent ?? 3, maxDepth: 1 },
-  );
+  // --- phase 1 (fresh runs only): parallel pro/contra literature sub-agents per top hypothesis.
+  // On resume the sub-agent findings already live in the persisted transcript as context entries.
+  let subResults: SubagentResult[] = [];
+  if (resumeCtx === undefined) {
+    const specs = topHypotheses.flatMap((h) => [
+      {
+        label: `pro:${h.id}`,
+        task: `Search the literature FOR this hypothesis: "${h.statement}". Use search_sources with precise scientific queries (mechanism terms, population/phenomenon, method names). Finish with the sources that genuinely SUPPORT it (verdict 'supports'; 'mixed' when partial). If nothing relevant is found, return empty findings — never invent sources.`,
+        toolNames: ['search_sources'],
+        maxTurns: 4,
+      },
+      {
+        label: `contra:${h.id}`,
+        task: `Search the literature AGAINST this hypothesis: "${h.statement}". Hunt for contradicting results, failed replications, boundary conditions and competing mechanisms (verdict 'contradicts' or 'mixed'). If no counter-evidence is found, return empty findings and say so — absence of hits is a finding, not a failure.`,
+        toolNames: ['search_sources'],
+        maxTurns: 4,
+      },
+    ]);
+    subResults = await runSubagents(
+      // task is a placeholder — runSubagents replaces it per spec; only the base fields are shared.
+      { ...baseConfig, task: 'literature pro/contra verification (per-sub-agent task overrides this)', resultSchema: SubagentFindingsSchema, maxTurns: 4 },
+      mainDeps,
+      specs,
+      { maxConcurrent: opts.maxConcurrent ?? 3, maxDepth: 1 },
+    );
 
-  // Child sessions are audit objects too (startedAt derived from measured wall time).
-  for (const sub of subResults) {
-    const startedAt = new Date(Date.now() - sub.telemetry.wallMs).toISOString();
-    deps.store.putObject('agent_session', AgentSession.parse({
-      id: sub.sessionId, runId, capability: CAPABILITY, parentSessionId: sessionId,
-      purpose: `${PURPOSE}:sub:${sub.label}`, status: sub.status === 'completed' ? 'completed' : 'failed',
-      startedAt, endedAt: new Date().toISOString(),
-      task: head(subsTaskFor(specs, sub.label), 2000), config: {}, turns: sub.turns,
-      ...(sub.error !== undefined ? { lastError: sub.error } : {}),
-    }));
+    // Child sessions are audit objects too (startedAt derived from measured wall time).
+    for (const sub of subResults) {
+      const startedAt = new Date(Date.now() - sub.telemetry.wallMs).toISOString();
+      deps.store.putObject('agent_session', AgentSession.parse({
+        id: sub.sessionId, runId, capability: CAPABILITY, parentSessionId: sessionId,
+        purpose: `${PURPOSE}:sub:${sub.label}`, status: sub.status === 'completed' ? 'completed' : 'failed',
+        startedAt, endedAt: new Date().toISOString(),
+        task: head(subsTaskFor(specs, sub.label), 2000), config: {}, turns: sub.turns,
+        ...(sub.error !== undefined ? { lastError: sub.error } : {}),
+      }));
+    }
   }
 
   // --- phase 2: parent refinement loop over the run + sub-agent findings ---
@@ -290,7 +345,12 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
   const relations = deps.store.listObjects('evidence_relation', runId);
   const cfg: AgentLoopConfig = {
     ...baseConfig,
+    systemPrompt: `${baseConfig.systemPrompt}${skillsSection}`,
     task: `Refine the evidence base of run ${runId}: for each listed hypothesis, identify concrete evidence gaps and counter-evidence, verify against the run's own claims/relations with read_evidence, cross-check the sub-agent literature findings, and finish with the refinement report contract.`,
+    initialTranscript: resumeCtx?.transcript,
+    resume: resumeCtx !== undefined
+      ? { priorTurns: resumeCtx.priorTurns, ...(resumeCtx.openTurn !== undefined ? { openTurn: resumeCtx.openTurn } : {}) }
+      : undefined,
     contextEntries: [
       { label: 'research_question', payload: { text: question.text, background: head(question.background, 400), domain: question.scope.domain, goalType: question.goalType } },
       { label: 'hypotheses', payload: topHypotheses.map((h) => ({ id: h.id, statement: h.statement, mechanism: h.mechanism, uncertainties: h.uncertainties })) },
@@ -307,11 +367,11 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
   const session = AgentSession.parse({
     id: sessionId, runId, capability: CAPABILITY, purpose: PURPOSE,
     status: res.status === 'completed' ? 'completed' : res.status === 'aborted' ? 'cancelled' : 'failed',
-    startedAt: new Date(Date.now() - telemetry.summary().wallMs).toISOString(),
+    startedAt: resumeCtx?.startedAt ?? new Date(Date.now() - telemetry.summary().wallMs).toISOString(),
     endedAt: new Date().toISOString(),
     task: head(cfg.task, 2000),
-    config: { maxTurns: cfg.maxTurns ?? 8, topK },
-    turns: res.turns,
+    config: { maxTurns: cfg.maxTurns ?? 8, topK, ...(resumeCtx !== undefined ? { resumed: true } : {}) },
+    turns: [...(resumeCtx?.priorTurnRecords ?? []), ...res.turns],
     ...(res.error !== undefined ? { lastError: res.error } : {}),
   });
   deps.store.putObject('agent_session', session);
@@ -333,6 +393,8 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
     ...(res.result !== undefined ? { result: RefineResultSchema.parse(res.result) } : {}),
     telemetry: telemetry.summary(),
     subagentSessions: subResults.map((s) => ({ label: s.label, sessionId: s.sessionId, status: s.status })),
+    skillsUsed: selectedSkills.map((s) => s.name),
+    resumed: resumeCtx !== undefined,
     ...(res.error !== undefined ? { error: res.error } : {}),
   };
 };

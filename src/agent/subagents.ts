@@ -62,6 +62,7 @@ export const runSubagents = async (
       telemetry,
       tools: spec.toolNames !== undefined ? deps.tools.restrict(spec.toolNames) : deps.tools,
     };
+    if (deps.rolloutFactory !== undefined) childDeps.rollout = deps.rolloutFactory(childDeps.sessionId);
     const res = await runAgentLoop(
       {
         ...cfg,

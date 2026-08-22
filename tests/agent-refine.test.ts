@@ -43,6 +43,7 @@ const setup = () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-refine-'));
   const store = new Store(openDb(path.join(dir, 'far.db')));
   const artifacts = openArtifactStore(path.join(dir, 'artifacts'));
+  const rolloutDir = path.join(dir, 'agent-sessions');
   const question = ResearchQuestion.parse({
     id: newId('q'),
     text: 'What mechanisms drive photosynthetic efficiency in low light?',
@@ -69,7 +70,7 @@ const setup = () => {
   });
   store.putObject('hypothesis', hyp1);
   store.putObject('hypothesis', hyp2);
-  return { store, artifacts, run, hyp1, hyp2 };
+  return { store, artifacts, rolloutDir, run, hyp1, hyp2 };
 };
 
 const providerFor = (hypId: string): StubStep[] => [
@@ -91,10 +92,10 @@ const providerFor = (hypId: string): StubStep[] => [
 
 describe('evidence-gap refinement capability (end-to-end on a real store)', () => {
   it('completes and lands the full audit chain: sessions, report, events, receipts', async () => {
-    const { store, artifacts, run, hyp1 } = setup();
+    const { store, artifacts, rolloutDir, run, hyp1 } = setup();
     try {
       const outcome = await runEvidenceGapRefinement(
-        { store, artifacts, provider: createTestStubProvider(providerFor(hyp1.id)), sourceFor: fakeAdapter },
+        { store, artifacts, provider: createTestStubProvider(providerFor(hyp1.id)), sourceFor: fakeAdapter, rolloutDir, skillDirs: [] },
         run.id,
         { topK: 1, maxTurns: 4 },
       );
@@ -102,7 +103,8 @@ describe('evidence-gap refinement capability (end-to-end on a real store)', () =
       expect(outcome.reportId).toMatch(/^agr_/);
       expect(outcome.result?.evidenceGaps.length).toBe(1);
       expect(outcome.subagentSessions.map((s) => s.status)).toEqual(['completed', 'completed']);
-      // 2 parent turns on the parent telemetry; the 2 child calls live in their own sessions
+      expect(outcome.resumed).toBe(false);
+      // 2 parent turns + 2 child single-turn finishes
       expect(outcome.telemetry.modelCalls).toBe(2);
 
       // persisted domain objects re-validate on read (fail-closed store)
@@ -132,7 +134,7 @@ describe('evidence-gap refinement capability (end-to-end on a real store)', () =
   });
 
   it('refuses a run without hypotheses (usage error, not a silent pass)', async () => {
-    const { store, artifacts } = setup();
+    const { store, artifacts, rolloutDir } = setup();
     try {
       const question = ResearchQuestion.parse({
         id: newId('q'), text: 'Empty question?', goalType: 'exploratory',
@@ -140,7 +142,7 @@ describe('evidence-gap refinement capability (end-to-end on a real store)', () =
       });
       const emptyRun = store.createRun(question);
       await expect(runEvidenceGapRefinement(
-        { store, artifacts, provider: createTestStubProvider([]), sourceFor: fakeAdapter },
+        { store, artifacts, provider: createTestStubProvider([]), sourceFor: fakeAdapter, rolloutDir },
         emptyRun.id,
       )).rejects.toThrow(/has no hypotheses/);
     } finally {
@@ -149,7 +151,7 @@ describe('evidence-gap refinement capability (end-to-end on a real store)', () =
   });
 
   it('a failing child model call does not sink the session — it surfaces as a failed sub-agent', async () => {
-    const { store, artifacts, run, hyp1 } = setup();
+    const { store, artifacts, rolloutDir, run, hyp1 } = setup();
     try {
       const steps: StubStep[] = [
         { rawOutput: JSON.stringify({ action: 'finish', reason: 'done', result: {
@@ -160,7 +162,7 @@ describe('evidence-gap refinement capability (end-to-end on a real store)', () =
         { fail: { kind: 'auth_error', message: 'route exhausted' }, forPurpose: `agent:refine-evidence-gaps:sub:contra:${hyp1.id}:turn` },
       ];
       const outcome = await runEvidenceGapRefinement(
-        { store, artifacts, provider: createTestStubProvider(steps), sourceFor: fakeAdapter },
+        { store, artifacts, provider: createTestStubProvider(steps), sourceFor: fakeAdapter, rolloutDir },
         run.id,
         { topK: 1, maxTurns: 2 },
       );
@@ -169,6 +171,61 @@ describe('evidence-gap refinement capability (end-to-end on a real store)', () =
       expect(contra.status).toBe('failed');
       const childSession = store.listObjects('agent_session', run.id).find((s) => s.id === contra.sessionId);
       expect(childSession?.lastError).toMatch(/auth_error.*route exhausted/);
+    } finally {
+      (store as unknown as { db: { close(): void } }).db.close();
+    }
+  });
+
+  it('injects task-relevant skills into the session and reports which were used', async () => {
+    const { store, artifacts, rolloutDir, run, hyp1 } = setup();
+    const skillDir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-skills-e2e-'));
+    fs.writeFileSync(path.join(skillDir, 'relevant.md'), '---\nname: counter-evidence-hunting\ndescription: hunt contradicting evidence and counter evidence systematically\nwhenToUse: refining hypotheses counter evidence\n---\nBe systematic about absence.');
+    fs.writeFileSync(path.join(skillDir, 'irrelevant.md'), '---\nname: table-formatting\ndescription: markdown table formatting tricks\n---\nNope.');
+    try {
+      const outcome = await runEvidenceGapRefinement(
+        { store, artifacts, provider: createTestStubProvider(providerFor(hyp1.id)), sourceFor: fakeAdapter, rolloutDir, skillDirs: [{ dir: skillDir, tier: 'builtin' }] },
+        run.id, { topK: 1, maxTurns: 4 },
+      );
+      expect(outcome.status).toBe('completed');
+      expect(outcome.skillsUsed).toContain('counter-evidence-hunting');
+      expect(outcome.skillsUsed).not.toContain('table-formatting');
+    } finally {
+      (store as unknown as { db: { close(): void } }).db.close();
+    }
+  });
+
+  it('resumes a max-turns-exhausted session from its rollout and completes (H6)', async () => {
+    const { store, artifacts, rolloutDir, run, hyp1 } = setup();
+    try {
+      const childFinish = (label: 'pro' | 'contra'): StubStep => ({
+        rawOutput: JSON.stringify({ action: 'finish', reason: 'ok', result: { findings: [], queriesUsed: [] } }),
+        forPurpose: `agent:refine-evidence-gaps:sub:${label}:${hyp1.id}:turn`,
+      });
+      const first = await runEvidenceGapRefinement(
+        { store, artifacts, provider: createTestStubProvider([
+          { rawOutput: JSON.stringify({ action: 'use_tool', tool: 'list_hypotheses', args: {}, reason: 'survey' }) },
+          childFinish('pro'), childFinish('contra'),
+        ]), sourceFor: fakeAdapter, rolloutDir, skillDirs: [] },
+        run.id, { topK: 1, maxTurns: 1 },
+      );
+      expect(first.status).toBe('max_turns');
+
+      const second = await runEvidenceGapRefinement(
+        { store, artifacts, provider: createTestStubProvider([
+          { rawOutput: JSON.stringify({ action: 'finish', reason: 'resumed and done', result: {
+            summary: 'Resumed refinement identified the missing replication evidence.',
+            evidenceGaps: [{ hypothesisId: hyp1.id, missing: 'No replication study exists for the shade mechanism.', suggestedQueries: ['shade tolerance replication'], severity: 'low' }],
+          } }) },
+        ]), sourceFor: fakeAdapter, rolloutDir, skillDirs: [] },
+        run.id, { topK: 1, maxTurns: 4, resumeSessionId: first.sessionId },
+      );
+      expect(second.resumed).toBe(true);
+      expect(second.sessionId).toBe(first.sessionId);
+      expect(second.status).toBe('completed');
+      expect(second.subagentSessions).toEqual([]); // sub-agent phase is skipped on resume
+      const session = store.getObject('agent_session', first.sessionId);
+      expect(session?.turns.map((t) => t.turn)).toEqual([1, 2]);
+      expect(session?.config.resumed).toBe(true);
     } finally {
       (store as unknown as { db: { close(): void } }).db.close();
     }

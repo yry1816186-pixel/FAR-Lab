@@ -65,7 +65,7 @@ export const AgentEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('model_call_done'), sessionId: z.string(), turn: z.number().int().positive(), latencyMs: z.number().int().nonnegative(), usage: TokenUsage.optional(), at: z.string() }),
   z.object({ type: z.literal('tool_used'), sessionId: z.string(), turn: z.number().int().positive(), tool: z.string(), ok: z.boolean(), durationMs: z.number().int().nonnegative(), truncated: z.boolean().optional(), spilledTo: z.string().optional(), summary: z.string().optional(), at: z.string() }),
   z.object({ type: z.literal('permission_asked'), sessionId: z.string(), turn: z.number().int().positive(), tool: z.string(), granted: z.boolean(), at: z.string() }),
-  z.object({ type: z.literal('compaction'), sessionId: z.string(), layer: z.enum(['micro', 'full']), tokensBefore: z.number().int().nonnegative(), tokensAfter: z.number().int().nonnegative(), at: z.string() }),
+  z.object({ type: z.literal('compaction'), sessionId: z.string(), layer: z.enum(['micro', 'full', 'degrade']), tokensBefore: z.number().int().nonnegative(), tokensAfter: z.number().int().nonnegative(), bySourceAfter: z.record(z.string(), z.number().int()).optional(), at: z.string() }),
   z.object({ type: z.literal('steered'), sessionId: z.string(), turn: z.number().int().positive(), at: z.string() }),
   z.object({ type: z.literal('tool_note'), sessionId: z.string(), turn: z.number().int().positive(), tool: z.string(), note: z.string(), detail: z.record(z.string(), z.unknown()).optional(), at: z.string() }),
   z.object({ type: z.literal('session_finished'), sessionId: z.string(), status: z.enum(['completed', 'max_turns', 'aborted', 'failed']), turns: z.number().int().nonnegative(), at: z.string() }),

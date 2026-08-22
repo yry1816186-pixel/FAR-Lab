@@ -34,10 +34,13 @@ export interface StageRecord {
   checkpointRef?: string;
 }
 
+/** Mirror of the backend RunEvent enum (src/domain/run.ts) — keep in sync. */
 export type RunEventType =
   | 'run_created' | 'stage_started' | 'stage_done' | 'stage_failed' | 'stage_skipped'
   | 'run_status_changed' | 'checkpoint_saved' | 'run_resumed' | 'run_cancelled'
-  | 'feedback_received' | 'revision_created' | 'receipt_recorded' | 'note';
+  | 'feedback_received' | 'revision_created' | 'receipt_recorded' | 'note'
+  | 'experiment_queued' | 'experiment_started' | 'experiment_completed' | 'experiment_failed' | 'experiment_canceled'
+  | 'agent_started' | 'agent_tool_used' | 'agent_finished';
 
 export interface RunEvent {
   seq: number;

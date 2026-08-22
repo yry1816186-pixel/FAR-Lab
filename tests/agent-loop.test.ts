@@ -186,8 +186,7 @@ describe('agent kernel loop', () => {
     expect(res.transcript.some((e) => e.kind === 'error' && e.message.includes('finish payload rejected'))).toBe(true);
   });
 
-  it('spills oversized tool results to the artifact store and leaves a ref in the transcript', async () => {
-    const big: AgentTool = {
+  it('spills oversized tool results to the artifact store and leaves a ref in the transcript', async () => {    const big: AgentTool = {
       name: 'bigpayload',
       description: 'returns a huge payload',
       inputSchema: z.object({}),
@@ -218,5 +217,33 @@ describe('agent kernel loop', () => {
     expect(spilled && spilled.kind === 'tool_result' && spilled.spilledTo).toMatch(/^sha256:/);
     const ref = spilled && spilled.kind === 'tool_result' ? spilled.spilledTo! : '';
     expect(await artifacts.get(ref)).toContain('blob');
+  });
+
+  it('degrades by dropping oldest tool results when even a full handoff overflows the hard budget', async () => {
+    const big: AgentTool = {
+      name: 'echo',
+      description: 'echo text back',
+      inputSchema: z.object({ text: z.string() }),
+      async execute(args) { return { ok: true, data: { echo: (args as { text: string }).text, blob: 'x'.repeat(2_000) } }; },
+    };
+    const { deps, events } = depsFor([
+      { rawOutput: useTool('echo', { text: 'a' }) },
+      { rawOutput: useTool('echo', { text: 'b' }) },
+      { rawOutput: finish({ answer: 'ok' }) },
+      // purpose-keyed handoff step: full-compaction model call (does not consume the cursor)
+      { rawOutput: '{"summary":"handoff: objective, one tool done, remaining finish"}', forPurpose: 'test:loop:compact' },
+    ]);
+    const res = await runAgentLoop(
+      baseCfg({ maxTurns: 3, budget: { transcriptSoft: 60, transcriptHard: 120, maxToolResultChars: 100_000 } }),
+      { ...deps, tools: new ToolRegistry().register(big) },
+    );
+    expect(res.status).toBe('completed');
+    const layers = events.filter((e): e is Extract<AgentEvent, { type: 'compaction' }> => e.type === 'compaction').map((e) => e.layer);
+    expect(layers).toContain('full');
+    expect(layers).toContain('degrade');
+    // degradation actually reclaimed budget and the session survived to finish
+    const degradeEvent = events.find((e): e is Extract<AgentEvent, { type: 'compaction' }> => e.type === 'compaction' && e.layer === 'degrade');
+    expect(degradeEvent?.tokensAfter).toBeLessThanOrEqual(120);
+    expect(degradeEvent?.bySourceAfter).toBeDefined();
   });
 });

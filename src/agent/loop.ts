@@ -4,12 +4,13 @@ import { validateStructured, recordModelReceipt, describeShape } from '../pipeli
 import type { ModelProvider, ArtifactStore } from '../shared/ports.js';
 import type { AgentTurnRecord } from '../domain/agent.js';
 import { AgentActionSchema, type AgentAction, type AgentEventSink, type ReceiptSink, type TranscriptEntry } from './protocol.js';
+import type { RolloutWriter, InterruptedTurnDisposition } from './rollout.js';
 import { ToolRegistry, validateToolArgs, type ToolContext, type ToolResult } from './tool.js';
 import type { ExtensionBus } from './hooks.js';
 import type { PermissionEngine } from './permissions.js';
 import type { SessionTelemetry } from './telemetry.js';
 import { defaultBudget, type TokenBudget } from './budget.js';
-import { microcompact, compactedTranscript, transcriptTokens, HANDOFF_PROMPT } from './compaction.js';
+import { microcompact, compactedTranscript, transcriptTokens, transcriptTokensBySource, HANDOFF_PROMPT } from './compaction.js';
 
 /**
  * Agent kernel loop (H1) — the FAR-Lab equivalent of Codex CodexThread / Claude Code
@@ -46,6 +47,13 @@ export interface AgentLoopConfig {
   shouldAbort?: () => boolean;
   /** Compaction window: tool results kept verbatim (default 4). */
   keepLast?: number;
+  /**
+   * Resume (H6, Codex rollout semantics): continue a persisted session instead of
+   * starting fresh. initialTranscript is the reconstructed rollout transcript;
+   * resume.priorTurns continues turn numbering within the SAME maxTurns budget.
+   */
+  initialTranscript?: TranscriptEntry[];
+  resume?: { priorTurns: number; openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition } };
 }
 
 export interface AgentLoopDeps {
@@ -61,6 +69,10 @@ export interface AgentLoopDeps {
   hooks?: ExtensionBus;
   /** Enables spill-to-artifact for oversized tool results (content-addressed ref). */
   artifacts?: ArtifactStore;
+  /** Append-only session rollout (H6 durability). Absent = in-memory session only. */
+  rollout?: RolloutWriter;
+  /** Sub-agent rollout factory; children get their own JSONL files when present. */
+  rolloutFactory?: (sessionId: string) => RolloutWriter;
   parentSessionId?: string;
   /** Sub-agent depth (0 = main session). */
   depth?: number;
@@ -85,13 +97,53 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
   const maxConsecutiveInvalid = cfg.maxConsecutiveInvalid ?? 3;
   const at = (): string => deps.clock?.() ?? new Date().toISOString();
   const signal = { aborted: false };
+  const rl = (): { append(line: Parameters<RolloutWriter['append']>[0]): void } => deps.rollout ?? { append: () => {} };
 
-  const transcript: TranscriptEntry[] = [
-    { kind: 'task', text: cfg.task },
-    ...(cfg.contextEntries ?? []).map((c): TranscriptEntry => ({ kind: 'context', label: c.label, payload: c.payload })),
-  ];
+  const transcript: TranscriptEntry[] = [];
   const turns: AgentTurnRecord[] = [];
+  /** Every transcript mutation flows through here so the rollout cannot drift from memory. */
+  const pushEntry = (entry: TranscriptEntry): void => {
+    transcript.push(entry);
+    rl().append({ type: 'transcript_item', at: at(), entry });
+  };
+  const pushTurn = (record: AgentTurnRecord): void => {
+    turns.push(record);
+    rl().append({ type: 'turn_record', at: at(), record });
+  };
+
+  if (cfg.initialTranscript !== undefined) {
+    transcript.push(...cfg.initialTranscript);
+    rl().append({
+      type: 'resumed', at: at(), priorTurns: cfg.resume?.priorTurns ?? 0,
+      ...(cfg.resume?.openTurn !== undefined ? { disposition: cfg.resume.openTurn.disposition } : {}),
+    });
+    // Orphaned tool_use repair (Claude Code pattern): the interrupted turn's missing
+    // tool_result is synthesized so the model sees an honest, valid transcript.
+    const open = cfg.resume?.openTurn;
+    if (open !== undefined) {
+      pushEntry({
+        kind: 'tool_result', turn: open.turn, tool: open.tool, ok: false,
+        payload: {
+          interrupted: true, disposition: open.disposition,
+          note: open.disposition === 'tool_outcome_unknown'
+            ? 'the session crashed during this tool call — its outcome is unknown; do not assume it succeeded'
+            : 'the session was interrupted before this tool call started',
+        },
+      });
+      pushTurn({ turn: open.turn, action: 'tool_error', tool: open.tool, ok: false, reason: `interrupted: ${open.disposition}` });
+    }
+  } else {
+    pushEntry({ kind: 'task', text: cfg.task });
+    for (const c of cfg.contextEntries ?? []) pushEntry({ kind: 'context', label: c.label, payload: c.payload });
+    rl().append({
+      type: 'session_meta', at: at(), sessionId: deps.sessionId, capability: cfg.capability, purpose: deps.purpose,
+      task: cfg.task, maxTurns,
+      ...(deps.parentSessionId !== undefined ? { parentSessionId: deps.parentSessionId } : {}),
+    });
+  }
+
   const finish = (status: AgentLoopStatus, extra: Partial<AgentLoopResult>): AgentLoopResult => {
+    rl().append({ type: 'session_end', at: at(), status });
     deps.emit({ type: 'session_finished', sessionId: deps.sessionId, status, turns: turns.length, at: at() });
     return { status, turns, transcript, ...extra };
   };
@@ -104,20 +156,20 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
   let consecutiveInvalid = 0;
   let finishReasks = 0;
 
-  for (let turn = 1; turn <= maxTurns; turn++) {
+  for (let turn = (cfg.resume?.priorTurns ?? 0) + 1; turn <= maxTurns; turn++) {
     if (cfg.shouldAbort?.() === true) return finish('aborted', { error: 'aborted by caller' });
 
     const steerText = cfg.steer?.() ?? null;
     if (steerText !== null) {
-      transcript.push({ kind: 'steer', text: steerText });
-      turns.push({ turn, action: 'steer', reason: steerText.slice(0, 200) });
+      pushEntry({ kind: 'steer', text: steerText });
+      pushTurn({ turn, action: 'steer', reason: steerText.slice(0, 200) });
       deps.emit({ type: 'steered', sessionId: deps.sessionId, turn, at: at() });
     }
 
     deps.telemetry.recordTurn();
     deps.emit({ type: 'turn_started', sessionId: deps.sessionId, turn, at: at() });
 
-    // --- compaction gate (H2): micro beyond soft, full handoff before hard ---
+    // --- compaction gate (H2): micro beyond soft, full handoff before hard, degrade as last resort ---
     const tokensBefore = transcriptTokens(transcript);
     if (tokensBefore > budget.transcriptSoft) {
       const micro = microcompact(transcript, deps.tools, keepLast);
@@ -127,14 +179,30 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
         const compacted = compactedTranscript(micro, cfg.task, summary, keepLast);
         transcript.length = 0;
         transcript.push(...compacted);
+        rl().append({ type: 'compacted', at: at(), summary });
         deps.telemetry.recordCompaction();
-        deps.emit({ type: 'compaction', sessionId: deps.sessionId, layer: 'full', tokensBefore, tokensAfter: transcriptTokens(transcript), at: at() });
-        turns.push({ turn, action: 'compaction', reason: 'full handoff' });
+        // The handoff model call really happened (receipted) — its event is emitted
+        // even when degradation follows; layers tell the full story.
+        deps.emit({ type: 'compaction', sessionId: deps.sessionId, layer: 'full', tokensBefore, tokensAfter: transcriptTokens(transcript), bySourceAfter: transcriptTokensBySource(transcript), at: at() });
+        let after = transcriptTokens(transcript);
+        // Degradation chain (Codex skip-summary fallback): if even the handoff baseline
+        // exceeds the hard limit, DROP oldest tool results entirely rather than overflow.
+        if (after > budget.transcriptHard) {
+          while (transcriptTokens(transcript) > budget.transcriptHard) {
+            const idx = transcript.findIndex((e) => e.kind === 'tool_result');
+            if (idx < 0) break;
+            transcript.splice(idx, 1);
+          }
+          after = transcriptTokens(transcript);
+          deps.telemetry.recordCompaction();
+          deps.emit({ type: 'compaction', sessionId: deps.sessionId, layer: 'degrade', tokensBefore, tokensAfter: after, bySourceAfter: transcriptTokensBySource(transcript), at: at() });
+        }
+        pushTurn({ turn, action: 'compaction', reason: 'full handoff' });
       } else if (afterMicro < tokensBefore) {
         transcript.length = 0;
         transcript.push(...micro);
         deps.telemetry.recordCompaction();
-        deps.emit({ type: 'compaction', sessionId: deps.sessionId, layer: 'micro', tokensBefore, tokensAfter: afterMicro, at: at() });
+        deps.emit({ type: 'compaction', sessionId: deps.sessionId, layer: 'micro', tokensBefore, tokensAfter: afterMicro, bySourceAfter: transcriptTokensBySource(transcript), at: at() });
       }
     }
 
@@ -171,8 +239,8 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       if (err.kind === 'invalid_output') {
         // Corrective feedback: the model answered outside the action contract.
         consecutiveInvalid += 1;
-        transcript.push({ kind: 'error', turn, message: `your reply was not a valid action object: ${err.message}` });
-        turns.push({ turn, action: 'invalid_action', ok: false, reason: err.message.slice(0, 500) });
+        pushEntry({ kind: 'error', turn, message: `your reply was not a valid action object: ${err.message}` });
+        pushTurn({ turn, action: 'invalid_action', ok: false, reason: err.message.slice(0, 500) });
         if (consecutiveInvalid >= maxConsecutiveInvalid) {
           return finish('failed', { error: `${consecutiveInvalid} consecutive invalid model actions` });
         }
@@ -184,7 +252,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
 
     // --- finish ---
     if (action.action === 'finish') {
-      transcript.push({ kind: 'action', turn, action: 'finish', reason: action.reason });
+      pushEntry({ kind: 'action', turn, action: 'finish', reason: action.reason });
       if (cfg.resultSchema !== undefined) {
         const check = cfg.resultSchema.safeParse(action.result);
         if (!check.success) {
@@ -192,27 +260,29 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
           if (finishReasks > maxFinishReasks) {
             return finish('failed', { error: `finish payload rejected ${finishReasks} times: ${check.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).slice(0, 3).join('; ')}` });
           }
-          transcript.push({
+          pushEntry({
             kind: 'error', turn,
             message: `finish payload rejected by the result contract: ${check.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).slice(0, 5).join('; ')} — fix the payload and finish again`,
           });
-          turns.push({ turn, action: 'invalid_action', reason: 'finish-rejected' });
+          pushTurn({ turn, action: 'invalid_action', reason: 'finish-rejected' });
           continue;
         }
         await deps.hooks?.turnEnd({ turn, action: 'finish', finished: true });
+        pushTurn({ turn, action: 'finish', ok: true, reason: action.reason.slice(0, 200) });
         return finish('completed', { result: check.data as Record<string, unknown> });
       }
       await deps.hooks?.turnEnd({ turn, action: 'finish', finished: true });
+      pushTurn({ turn, action: 'finish', ok: true, reason: action.reason.slice(0, 200) });
       return finish('completed', { result: action.result });
     }
 
     // --- use_tool ---
-    transcript.push({ kind: 'action', turn, action: 'use_tool', tool: action.tool, args: action.args, reason: action.reason });
+    pushEntry({ kind: 'action', turn, action: 'use_tool', tool: action.tool, args: action.args, reason: action.reason });
     const tool = deps.tools.get(action.tool);
     if (tool === undefined) {
       consecutiveInvalid += 1;
-      transcript.push({ kind: 'error', turn, message: `unknown tool '${action.tool}' — available: ${deps.tools.names().join(', ')}` });
-      turns.push({ turn, action: 'invalid_action', tool: action.tool, ok: false });
+      pushEntry({ kind: 'error', turn, message: `unknown tool '${action.tool}' — available: ${deps.tools.names().join(', ')}` });
+      pushTurn({ turn, action: 'invalid_action', tool: action.tool, ok: false });
       if (consecutiveInvalid >= maxConsecutiveInvalid) return finish('failed', { error: `${consecutiveInvalid} consecutive invalid actions` });
       continue;
     }
@@ -223,8 +293,8 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       deps.emit({ type: 'permission_asked', sessionId: deps.sessionId, turn, tool: action.tool, granted: decision.effect === 'allow', at: at() });
     }
     if (decision.effect !== 'allow') {
-      transcript.push({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { denied: true, reason: decision.rule ?? 'permission denied' } });
-      turns.push({ turn, action: 'permission_denied', tool: action.tool, ok: false, reason: decision.rule });
+      pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { denied: true, reason: decision.rule ?? 'permission denied' } });
+      pushTurn({ turn, action: 'permission_denied', tool: action.tool, ok: false, reason: decision.rule });
       await deps.hooks?.turnEnd({ turn, action: 'use_tool', finished: false });
       continue;
     }
@@ -232,8 +302,8 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
     const hookOut = await deps.hooks?.beforeToolCall({ tool: action.tool, args: action.args, turn });
     if (hookOut?.terminate !== undefined) return finish('aborted', { error: `terminated by hook: ${hookOut.terminate}` });
     if (hookOut?.blocked !== undefined) {
-      transcript.push({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { blocked: true, reason: hookOut.blocked } });
-      turns.push({ turn, action: 'permission_denied', tool: action.tool, ok: false, reason: `hook: ${hookOut.blocked}` });
+      pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { blocked: true, reason: hookOut.blocked } });
+      pushTurn({ turn, action: 'permission_denied', tool: action.tool, ok: false, reason: `hook: ${hookOut.blocked}` });
       await deps.hooks?.turnEnd({ turn, action: 'use_tool', finished: false });
       continue;
     }
@@ -242,8 +312,8 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
     const validated = validateToolArgs(tool, hookArgs);
     if (!validated.ok) {
       consecutiveInvalid += 1;
-      transcript.push({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { validationError: validated.message } });
-      turns.push({ turn, action: 'invalid_action', tool: action.tool, ok: false, reason: 'args validation failed' });
+      pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { validationError: validated.message } });
+      pushTurn({ turn, action: 'invalid_action', tool: action.tool, ok: false, reason: 'args validation failed' });
       if (consecutiveInvalid >= maxConsecutiveInvalid) return finish('failed', { error: `${consecutiveInvalid} consecutive invalid actions` });
       continue;
     }
@@ -260,6 +330,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       recordReceipt: deps.recordReceipt,
       depth: deps.depth ?? 0,
     };
+    // Rollout write order is the crash-classification contract (rollout.ts):
+    // started marker BEFORE execution; tool_result BEFORE the finished marker.
+    rl().append({ type: 'tool_lifecycle', at: at(), turn, tool: action.tool, phase: 'started' });
     try {
       result = await tool.execute(validated.value, toolCtx);
     } catch (e) {
@@ -283,9 +356,10 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       }
     }
 
-    transcript.push({ kind: 'tool_result', turn, tool: action.tool, ok: result.ok, payload, ...(truncated === true ? { truncated } : {}), ...(spilledTo !== undefined ? { spilledTo } : {}) });
+    pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: result.ok, payload, ...(truncated === true ? { truncated } : {}), ...(spilledTo !== undefined ? { spilledTo } : {}) });
+    rl().append({ type: 'tool_lifecycle', at: at(), turn, tool: action.tool, phase: 'finished' });
     deps.telemetry.recordToolCall(result.ok);
-    turns.push({ turn, action: 'use_tool', tool: action.tool, ok: result.ok, reason: result.summary, latencyMs: durationMs });
+    pushTurn({ turn, action: 'use_tool', tool: action.tool, ok: result.ok, reason: result.summary, latencyMs: durationMs });
     deps.emit({
       type: 'tool_used', sessionId: deps.sessionId, turn, tool: action.tool, ok: result.ok, durationMs,
       ...(truncated === true ? { truncated } : {}), ...(spilledTo !== undefined ? { spilledTo } : {}),
