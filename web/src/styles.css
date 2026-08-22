@@ -388,6 +388,26 @@ a:hover { text-decoration: underline; }
   transition: width var(--dur-med) var(--ease-standard);
 }
 
+/* rank medal on hypothesis cards (P-PRO) */
+.rank-medal {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-data);
+  font-size: var(--fs-aux);
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--v2-surface-2);
+  border-radius: var(--radius-pill);
+  padding: 2px var(--sp-2);
+}
+.rank-medal--first { color: var(--v2-verified-on-tint); background: var(--v2-verified-tint); }
+
+/* sidebar task filter */
+.runs-filter { margin-bottom: var(--sp-2); }
+
+/* latest event line under the run banner */
+.latest-event { margin: 0 0 var(--sp-2); }
+
 /* ---------- sidebar groups (P-IA) ---------- */
 .sidebar-head-actions { display: flex; gap: var(--sp-1); align-items: center; }
 .runs-groups { display: flex; flex-direction: column; gap: var(--sp-4); }

@@ -66,7 +66,7 @@ export function RunDetail({
 
   const renderPanel = (): ReactNode => {
     switch (tabId) {
-      case 'overview': return <OverviewTab run={run} onMutated={onMutated} />;
+      case 'overview': return <OverviewTab run={run} events={events} onMutated={onMutated} />;
       case 'evidence': return <EvidenceTab run={run} />;
       case 'hypotheses': return <HypothesesTab run={run} />;
       case 'plan': return <PlanTab run={run} />;

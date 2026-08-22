@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { Badge, CountProgress, IdText, Skeleton, TimeText } from './common';
 import { runStatusKey, runStatusTone } from '../tones';
 import type { RunSummary } from '../api/types';
@@ -75,18 +76,36 @@ const GROUP_ORDER: { key: 'runs.groupActive' | 'runs.groupAttention' | 'runs.gro
   { key: 'runs.groupOther', match: (s) => !NAMED_GROUPS.some((g) => g.match(s)) },
 ];
 
+/** Sidebar task filter (P-PRO): match on id, status label and stage label. */
+function matchesQuery(run: RunSummary, q: string, t: (k: DictKey) => string): boolean {
+  if (q.length === 0) return true;
+  const needle = q.toLowerCase();
+  return (
+    run.id.toLowerCase().includes(needle) ||
+    t(runStatusKey(run.status)).toLowerCase().includes(needle) ||
+    t(stageKey(run.currentStage)).toLowerCase().includes(needle)
+  );
+}
+
 export function RunsList({
   runs,
   loading,
   selectedId,
   onSelect,
+  filterRef,
 }: {
   runs: RunSummary[];
   loading: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  filterRef?: React.RefObject<HTMLInputElement>;
 }): JSX.Element {
   const { t } = useI18n();
+  const [query, setQuery] = useState('');
+  const filtered = useMemo(
+    () => runs.filter((r) => matchesQuery(r, query, t)),
+    [runs, query, t],
+  );
   if (loading && runs.length === 0) {
     return (
       <div role="status">
@@ -104,11 +123,23 @@ export function RunsList({
       </p>
     );
   }
-  const grouped = GROUP_ORDER.map((g) => ({ ...g, items: runs.filter((r) => g.match(r.status)) })).filter(
+  const grouped = GROUP_ORDER.map((g) => ({ ...g, items: filtered.filter((r) => g.match(r.status)) })).filter(
     (g) => g.items.length > 0,
   );
   return (
     <nav className="runs-groups" aria-label={t('runs.title')}>
+      <input
+        ref={filterRef}
+        type="text"
+        className="runs-filter"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t('runs.filterPlaceholder')}
+        aria-label={t('runs.filterLabel')}
+      />
+      {query.length > 0 && filtered.length === 0 && (
+        <p className="sidebar-empty">{t('runs.filterEmpty')}</p>
+      )}
       {grouped.map((g) => (
         <section key={g.key} className="runs-group">
           <h3 className="runs-group-title">{t(g.key)} <span className="muted small">{g.items.length}</span></h3>

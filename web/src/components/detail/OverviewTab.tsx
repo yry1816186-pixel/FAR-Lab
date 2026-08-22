@@ -13,8 +13,10 @@ import { RunControls } from './RunControls';
 import { RunStatusBanner } from './RunStatusBanner';
 import { FeedbackForm } from './FeedbackForm';
 import { stageKey, goalTypeKey } from '../../i18n/keys';
+import type { EventsState } from '../RunDetail';
+import type { DictKey } from '../../i18n/dict';
 
-export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: () => void }): JSX.Element {
+export function OverviewTab({ run, events, onMutated }: { run: ResearchRun; events: EventsState; onMutated: () => void }): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
 
@@ -27,10 +29,21 @@ export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: (
 
   const progress = runProgress(run);
   const failedStages = run.stages.filter((s) => s.state === 'failed');
+  const latestEvent = events.events.length > 0
+    ? [...events.events].sort((a, b) => b.seq - a.seq)[0]
+    : undefined;
 
   return (
     <div className="tab-content">
       <RunStatusBanner run={run} onMutated={onMutated} />
+      {latestEvent !== undefined && (
+        <p className="latest-event muted small arrive" role="status">
+          {t('overview.latestEvent')}{' '}
+          <span className="mono">#{latestEvent.seq}</span>{' '}
+          {t(`event.${latestEvent.type}` as DictKey)}
+          {latestEvent.stage !== undefined && <> · {t(stageKey(latestEvent.stage))}</>}
+        </p>
+      )}
       <Section title={t('overview.meta')}>
         <FieldList
           items={[
