@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { ApiError } from './api/client';
 import { getEvents, getRun, listRuns } from './api/endpoints';
 import type { ResearchRun, RunEvent, RunSummary } from './api/types';
@@ -10,8 +10,9 @@ import { useConnection } from './state/connection';
 import { useTheme } from './state/theme';
 import { LogoFull } from './components/Logo';
 import { WelcomeView } from './components/WelcomeView';
-import { RunsList } from './components/RunsSidebar';
+import { RunsList, runLabel } from './components/RunsSidebar';
 import { RunDetail, isTabId } from './components/RunDetail';
+import { CommandPalette, type Command } from './components/CommandPalette';
 import type { EventsState } from './components/RunDetail';
 import { ErrorBox } from './components/common';
 
@@ -195,6 +196,68 @@ export function App(): JSX.Element {
     setRouteTab(route.tab);
   });
 
+  // ---- command palette (S5): every entry is a real capability ----
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const commands = useMemo<Command[]>(() => {
+    const goTab = (tab: string): void => {
+      if (selectedRunId === null) return;
+      if (isTabId(tab)) setRouteTab(tab);
+    };
+    const navCmds: Command[] = selectedRunId === null
+      ? []
+      : (['overview', 'evidence', 'hypotheses', 'plan', 'experiments', 'revisions', 'provenance', 'events'] as const)
+          .map((tab) => ({
+            id: `nav-${tab}`,
+            labelKey: `tab.${tab}` as Command['labelKey'],
+            groupKey: 'palette.groupNav' as Command['groupKey'],
+            keywords: `go ${tab}`,
+            run: () => goTab(tab),
+          }));
+    const runCmds: Command[] = runs.slice(0, 8).map((r) => {
+      const text = runLabel(r);
+      return {
+        id: `run-${r.id}`,
+        label: text.length > 72 ? `${text.slice(0, 72)}…` : text,
+        groupKey: 'palette.groupRuns' as Command['groupKey'],
+        keywords: `${text} ${r.id} ${r.status}`,
+        run: () => { setSelectedRunId(r.id); setRouteTab(null); },
+      };
+    });
+    return [
+      {
+        id: 'new-research',
+        labelKey: 'welcome.newResearch',
+        groupKey: 'palette.groupActions',
+        run: () => { setSelectedRunId(null); setRouteTab(null); },
+      },
+      ...navCmds,
+      ...runCmds,
+      {
+        id: 'theme',
+        labelKey: 'palette.toggleTheme',
+        groupKey: 'palette.groupActions',
+        run: cycleTheme,
+      },
+      {
+        id: 'lang',
+        labelKey: 'palette.toggleLang',
+        groupKey: 'palette.groupActions',
+        run: () => setLang(lang === 'zh' ? 'en' : 'zh'),
+      },
+    ];
+  }, [runs, selectedRunId, cycleTheme, lang, setLang]);
+
   // IDE convention: "/" focuses the task filter unless typing in a field.
   const filterRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
@@ -221,6 +284,14 @@ export function App(): JSX.Element {
             <span className="conn-dot" aria-hidden="true" />
             {online ? <span className="sr-only">{t('conn.online')}</span> : t('conn.offline')}
           </div>
+          <button
+            type="button"
+            className="btn btn--small palette-toggle"
+            onClick={() => setPaletteOpen(true)}
+            title="Ctrl K"
+          >
+            <Search size={12} aria-hidden="true" /> {t('palette.open')}
+          </button>
           <button
             type="button"
             className="theme-toggle"
@@ -312,6 +383,7 @@ export function App(): JSX.Element {
           )}
         </main>
       </div>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
     </div>
   );
 }
