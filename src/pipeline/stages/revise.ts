@@ -20,6 +20,7 @@ import type {
 } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative } from './shared.js';
 import { checkPlanExecutability } from './plan.js';
+import { alphaSpendLedger, checkStructuredPreregistration, freezePlan } from './plan-formal.js';
 
 /**
  * revise — mission §33/§34: feedback must cause a CAUSAL revision, never
@@ -331,7 +332,27 @@ const revisePlan = async (
     ...(out.data.multipleTestingNote !== undefined ? { multipleTestingNote: out.data.multipleTestingNote } : {}),
   });
   // deterministic re-gate after revision (mission §31: missing pieces are recorded, never papered over)
-  after.executabilityCheck = checkPlanExecutability(after, knownHypothesisIds);
+  // Wave-S: the structured preregistration layer is re-audited too, and the revised plan
+  // is RE-FROZEN (a revision is a new registration; the pre-revision plan is archived above).
+  const baseCheck = checkPlanExecutability(after, knownHypothesisIds);
+  const structuredCheck = checkStructuredPreregistration(after, knownHypothesisIds);
+  const refreeze = freezePlan(after, new Date().toISOString());
+  after.planHash = refreeze.planHash;
+  after.frozenAt = refreeze.frozenAt;
+  after.executabilityCheck = {
+    passed: baseCheck.passed && structuredCheck.errors.length === 0,
+    missing: [...baseCheck.missing, ...structuredCheck.errors.map((e) => `结构化预注册校验：${e}`)],
+    structuredWarnings: structuredCheck.warnings,
+  };
+  // g6: re-testing the same hypothesis across versions spends error budget — disclosed.
+  const alphaLedger = alphaSpendLedger([before, after]);
+  if (alphaLedger.length > 0) {
+    ctx.log(
+      `g6 α-spend across versions: ${alphaLedger
+        .map((r) => `${r.hypothesisId} versions=${r.versions} cumulativeAlpha=${r.totalAlpha}`)
+        .join('; ')}`,
+    );
+  }
   ctx.store.putObject('plan', after);
 
   const changedFields = (['steps', 'metrics', 'decisionRules', 'executabilityCheck'] as const).filter(
