@@ -1,0 +1,224 @@
+import path from 'node:path';
+import fs from 'node:fs';
+import { openDb } from '../persistence/db.js';
+import { Store } from '../persistence/store.js';
+import { openArtifactStore } from '../persistence/artifacts.js';
+import { openScheduler, enqueueExperiment, runSchedulerWorker } from '../experiment/scheduler.js';
+import { ExperimentSpec } from '../domain/index.js';
+import type { ExperimentRun } from '../domain/index.js';
+
+/**
+ * `far experiment ...` — the scheduler as a user-operable product surface (P3 CLI).
+ * Owns nothing: far.db stays the domain authority, far-scheduler.db the job lifecycle,
+ * artifacts the training logs. This layer only parses/validates input and renders
+ * truthful state (no invented progress).
+ *
+ * Commands:
+ *   far experiment run     <spec.json> [--priority N] [--allow-local-datasets]
+ *   far experiment enqueue <spec.json> (queue only; a worker executes later)
+ *   far experiment worker  [--max-jobs N] [--max-running N] [--heartbeat-ms MS]
+ *   far experiment status  [--job <id>]
+ *   far experiment cancel  <jobId>
+ *   far experiment logs    <experimentRunId>
+ * All accept --data-dir <dir> (default .far-run) and --json.
+ */
+
+export interface CliResult {
+  code: number;
+  json?: unknown;
+  text?: string;
+}
+
+const JOB_ID_RE = /^job_[0-9a-z]{20,32}$/;
+const XRUN_ID_RE = /^xrun_[0-9a-z]{20,32}$/;
+
+interface Args {
+  dataDir: string;
+  positional: string | undefined;
+  flag: (name: string) => boolean;
+  arg: (name: string) => string | undefined;
+}
+
+const openWorld = (dataDir: string) => {
+  const dir = path.resolve(dataDir);
+  const db = openDb(path.join(dir, 'far.db'));
+  const scheduler = openScheduler(path.join(dir, 'far-scheduler.db'));
+  const artifacts = openArtifactStore(path.join(dir, 'artifacts'));
+  return {
+    store: new Store(db),
+    scheduler,
+    artifacts,
+    close: () => { db.close(); scheduler.close(); },
+  };
+};
+
+const readSpec = (specPath: string, allowLocalDatasets: boolean): ExperimentSpec => {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+  } catch (e) {
+    throw new UsageError(`cannot read spec file ${specPath}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const parsed = ExperimentSpec.safeParse(raw);
+  if (!parsed.success) {
+    throw new UsageError(`spec file is not a valid ExperimentSpec: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+  }
+  if (parsed.data.datasets.some((d) => d.source.resolver === 'local') && !allowLocalDatasets) {
+    throw new UsageError('spec references a local-path dataset; pass --allow-local-datasets (operator-only, D-086-4)');
+  }
+  return parsed.data;
+};
+
+class UsageError extends Error {}
+
+const summarizeRun = (store: Store, runId: string): ExperimentRun | null => store.getObject('experiment_run', runId);
+
+const statLines = (job: {
+  jobId: string; experimentRunId: string; status: string; priority: number; attempts: number;
+  worker: string | null; heartbeatAt: string | null; error: string | null;
+}, run: ExperimentRun | null): string =>
+  `${job.jobId}  status=${job.status}  run=${job.experimentRunId}${run ? `(${run.status})` : '(missing in far.db)'}  prio=${job.priority} attempts=${job.attempts}` +
+  `${job.worker ? ` worker=${job.worker}` : ''}${job.error ? `  error=${job.error}` : ''}`;
+
+export const experimentCommand = async (sub: string | undefined, a: Args): Promise<CliResult> => {
+  const usage = `far experiment requires a subcommand: run <spec.json> | enqueue <spec.json> | worker | status [--job <id>] | cancel <jobId> | logs <experimentRunId>`;
+  try {
+    return await dispatch(sub, a, usage);
+  } catch (e) {
+    if (e instanceof UsageError) return { code: 2, text: e.message };
+    throw e;
+  }
+};
+
+const dispatch = async (sub: string | undefined, a: Args, usage: string): Promise<CliResult> => {
+
+  if (sub === 'run' || sub === 'enqueue') {
+    const specPath = a.positional;
+    if (specPath === undefined) return { code: 2, text: `${sub} requires a spec JSON file path.\n${usage}` };
+    const spec = readSpec(specPath, a.flag('--allow-local-datasets'));
+    const priority = Number(a.arg('--priority') ?? 0);
+    if (!Number.isInteger(priority)) return { code: 2, text: '--priority must be an integer' };
+    const w = openWorld(a.dataDir);
+    try {
+      const { experimentRunId, jobId } = enqueueExperiment(w.store, w.scheduler, spec, {
+        priority,
+        allowLocalDatasets: a.flag('--allow-local-datasets'),
+      });
+      if (sub === 'enqueue') {
+        return {
+          code: 0,
+          json: { jobId, experimentRunId, status: 'queued' },
+          text: `queued ${jobId} (experiment ${experimentRunId}, priority ${priority}); run 'far experiment worker' to execute`,
+        };
+      }
+      const out = await runSchedulerWorker(w.store, w.artifacts, w.scheduler, {
+        worker: `cli-${process.pid}`,
+        maxRunning: 1,
+        heartbeatTtlMs: 120_000,
+        heartbeatMs: 5_000,
+        allowLocalDatasets: a.flag('--allow-local-datasets'),
+        maxJobs: 1,
+      });
+      const job = w.scheduler.get(jobId)!;
+      const run = summarizeRun(w.store, experimentRunId);
+      const ok = job.status === 'completed';
+      return {
+        code: ok ? 0 : 1,
+        json: {
+          jobId, experimentRunId, jobStatus: job.status, farStatus: run?.status ?? null,
+          executed: out.executed, failed: out.failed,
+          resultIds: run?.resultIds ?? [], statReportIds: run?.statReportIds ?? [], error: job.error,
+        },
+        text: ok
+          ? `completed ${jobId}: experiment ${experimentRunId} -> ${run?.status}; results ${run?.resultIds.join(', ') ?? '-'}`
+          : `failed ${jobId}: ${job.error ?? 'unknown error'} (experiment ${experimentRunId})`,
+      };
+    } finally {
+      w.close();
+    }
+  }
+
+  if (sub === 'worker') {
+    const w = openWorld(a.dataDir);
+    try {
+      const maxJobs = a.arg('--max-jobs') !== undefined ? Number(a.arg('--max-jobs')) : undefined;
+      const out = await runSchedulerWorker(w.store, w.artifacts, w.scheduler, {
+        worker: `cli-${process.pid}`,
+        maxRunning: Number(a.arg('--max-running') ?? 2),
+        heartbeatTtlMs: 120_000,
+        heartbeatMs: Number(a.arg('--heartbeat-ms') ?? 5_000),
+        allowLocalDatasets: a.flag('--allow-local-datasets'),
+        maxJobs,
+      });
+      return {
+        code: out.failed > 0 ? 1 : 0,
+        json: out,
+        text: `worker drained: executed=${out.executed} failed=${out.failed}`,
+      };
+    } finally {
+      w.close();
+    }
+  }
+
+  if (sub === 'status') {
+    const w = openWorld(a.dataDir);
+    try {
+      const jobId = a.arg('--job');
+      if (jobId !== undefined) {
+        if (!JOB_ID_RE.test(jobId)) return { code: 2, text: `invalid job id: ${jobId}` };
+        const job = w.scheduler.get(jobId);
+        if (job === null) return { code: 1, text: `job not found: ${jobId}` };
+        const run = summarizeRun(w.store, job.experimentRunId);
+        return { code: 0, json: { job, farRun: run }, text: statLines(job, run) };
+      }
+      const jobs = w.scheduler.list();
+      const stats = w.scheduler.stats();
+      const rows = jobs.map((j) => ({
+        jobId: j.jobId, experimentRunId: j.experimentRunId, status: j.status, priority: j.priority,
+        attempts: j.attempts, worker: j.worker, heartbeatAt: j.heartbeatAt, error: j.error,
+        farStatus: summarizeRun(w.store, j.experimentRunId)?.status ?? null,
+      }));
+      return {
+        code: 0,
+        json: { stats, jobs: rows },
+        text: rows.length === 0 ? 'no jobs queued' : `${JSON.stringify(stats)}\n${rows.map((j) => statLines(j, null)).join('\n')}`,
+      };
+    } finally {
+      w.close();
+    }
+  }
+
+  if (sub === 'cancel') {
+    const jobId = a.positional;
+    if (jobId === undefined || !JOB_ID_RE.test(jobId)) return { code: 2, text: `cancel requires a valid job id (${usage})` };
+    const w = openWorld(a.dataDir);
+    try {
+      const ok = w.scheduler.cancel(jobId);
+      const job = w.scheduler.get(jobId);
+      return ok
+        ? { code: 0, json: { jobId, status: job?.status, cancelRequested: job?.cancelRequested }, text: `cancel applied to ${jobId} (status=${job?.status})` }
+        : { code: 1, text: `cannot cancel ${jobId}: not queued or running` };
+    } finally {
+      w.close();
+    }
+  }
+
+  if (sub === 'logs') {
+    const runId = a.positional;
+    if (runId === undefined || !XRUN_ID_RE.test(runId)) return { code: 2, text: `logs requires a valid experiment run id (${usage})` };
+    const w = openWorld(a.dataDir);
+    try {
+      const run = summarizeRun(w.store, runId);
+      if (run === null) return { code: 1, text: `experiment run not found: ${runId}` };
+      if (run.trainingLogRef === undefined) {
+        return { code: 0, json: { runId, trainingLogRef: null }, text: `no training log artifact recorded for ${runId} (sidecar emitted no output)` };
+      }
+      const log = await w.artifacts.get(run.trainingLogRef);
+      return { code: 0, json: { runId, trainingLogRef: run.trainingLogRef, lines: log?.split('\n').length ?? 0 }, text: log ?? '' };
+    } finally {
+      w.close();
+    }
+  }
+
+  return { code: 2, text: usage };
+};
