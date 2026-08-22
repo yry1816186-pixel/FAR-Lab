@@ -26,12 +26,13 @@ const FAMILIES = ['openalex', 'arxiv', 'crossref'] as const;
 
 export const RefineResultSchema = z.object({
   summary: z.string().min(20),
+  /** Empty is a legitimate honest outcome ("no material gaps found") — never forced. */
   evidenceGaps: z.array(z.object({
     hypothesisId: z.string().min(1),
     missing: z.string().min(10),
     suggestedQueries: z.array(z.string().min(4)).min(1).max(5),
     severity: z.enum(['high', 'medium', 'low']),
-  })).min(1).max(10),
+  })).max(10).default([]),
   counterEvidenceFound: z.array(z.object({
     hypothesisId: z.string().min(1),
     finding: z.string().min(5),

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { strictSchemaOrUndefined } from '../providers/http.js';
-import { validateStructured, recordModelReceipt } from '../pipeline/llm.js';
+import { validateStructured, recordModelReceipt, describeShape } from '../pipeline/llm.js';
 import type { ModelProvider, ArtifactStore } from '../shared/ports.js';
 import type { AgentTurnRecord } from '../domain/agent.js';
 import { AgentActionSchema, type AgentAction, type AgentEventSink, type ReceiptSink, type TranscriptEntry } from './protocol.js';
@@ -24,8 +24,10 @@ const PROTOCOL_PROMPT = `You act inside a tool-using agent loop. Each turn you M
 {"action":"finish","reason":"<why the objective is met>","result":{...the task's result contract...}}
 Rules:
 - One tool call per turn. Read the tool_result in the transcript before your next move.
-- Never fabricate tool output, sources or numbers. If a tool fails or returns nothing, adapt or state the failure honestly in the final result.
-- Only finish when the result contract can be satisfied honestly; otherwise keep working.`;
+- Your turn budget is in turnBudget of every payload. Budget tool calls: finish as soon as the result contract can be satisfied honestly. When turnsRemaining is low, finish NOW with what you have.
+- Empty tool results ARE findings — report them honestly (e.g. no counter-evidence found) instead of re-querying with variations.
+- Never fabricate tool output, sources or numbers. If a tool fails, state the failure honestly in the final result.
+- Only postpone finishing when a specific, named piece of evidence is still missing and one more tool call can plausibly get it.`;
 
 export interface AgentLoopConfig {
   capability: string;
@@ -141,7 +143,15 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       {
         task: `${deps.purpose}:turn`,
         systemPrompt: `${cfg.systemPrompt}\n\n${PROTOCOL_PROMPT}`,
-        userPayload: { task: cfg.task, transcript, tools: deps.tools.catalog() },
+        userPayload: {
+          task: cfg.task,
+          transcript,
+          tools: deps.tools.catalog(),
+          turnBudget: { turn, maxTurns, turnsRemaining: maxTurns - turn },
+          // Same lesson as callStructured's outputContract: field-name drift is the
+          // dominant structured-output failure mode — the model must SEE the finish shape.
+          ...(cfg.resultSchema !== undefined ? { resultContract: describeShape(cfg.resultSchema) } : {}),
+        },
         outputKind: 'json',
         maxTokens: 4096,
         jsonSchema: strictSchemaOrUndefined(AgentActionSchema),
