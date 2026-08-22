@@ -5,6 +5,7 @@ import {
   HypothesisScorecard, HypothesisTournament, ResearchPlan, FeedbackSignal, Revision, VersionDiff,
   ProvenanceReceipt, ReproducibilityBundle, newId,
   ExperimentSpec, ExperimentRun, DatasetRecord, ResultSet, StatReport,
+  ModelProviderConfig, AgentSession, AgentReport,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -30,6 +31,9 @@ const KIND_SCHEMAS = {
   dataset_record: DatasetRecord,
   result_set: ResultSet,
   stat_report: StatReport,
+  model_config: ModelProviderConfig,
+  agent_session: AgentSession,
+  agent_report: AgentReport,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});
@@ -46,11 +50,12 @@ export class Store {
 
   // ---- runs (transactional mutable authority) ----
 
-  createRun(question: ResearchQuestion, now = new Date().toISOString()): ResearchRun {
+  createRun(question: ResearchQuestion, opts: { providerConfigId?: string } = {}, now = new Date().toISOString()): ResearchRun {
     const run: ResearchRun = ResearchRun.parse({
       id: newId('run'), questionId: question.id, status: 'created', currentStage: 'scope',
       stages: STAGE_ALL.map((stage) => ({ stage, state: 'pending' })),
       createdAt: now, updatedAt: now, tags: [],
+      ...(opts.providerConfigId !== undefined ? { providerConfigId: opts.providerConfigId } : {}),
     });
     this.db.transaction(() => {
       this.putObject('question', question);
@@ -137,6 +142,27 @@ export class Store {
   listObjects<K extends ObjectKind>(kind: K, runId: string): DomainObject<K>[] {
     return this.db.prepare('SELECT json FROM objects WHERE kind=? AND run_id=? ORDER BY created_at ASC').all(kind, runId)
       .map((r) => KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as DomainObject<K>);
+  }
+
+  /** Hard delete of one stored object; false when nothing matched (idempotent). */
+  deleteObject(kind: ObjectKind, id: string): boolean {
+    const res = this.db.prepare('DELETE FROM objects WHERE kind=? AND id=?').run(kind, id);
+    return Number(res.changes) === 1;
+  }
+
+  // ---- meta KV (workspace-level facts: active model config, ...) ----
+
+  getMeta(key: string): string | null {
+    const row = this.db.prepare('SELECT value FROM meta WHERE key=?').get(key);
+    return row === undefined ? null : String(row.value);
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)').run(key, value);
+  }
+
+  deleteMeta(key: string): void {
+    this.db.prepare('DELETE FROM meta WHERE key=?').run(key);
   }
 
   /**

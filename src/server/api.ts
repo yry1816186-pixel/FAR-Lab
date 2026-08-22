@@ -3,13 +3,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { App } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
-import { listProviders } from '../providers/index.js';
+import { listProviders, defaultLiveProvider } from '../providers/index.js';
+import { createCustomProvider } from '../providers/custom.js';
+import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
 import {
   FeedbackSignal,
   FeedbackSourceKind,
+  ModelProviderConfig,
   ObjectRef,
   ResearchQuestion,
   ScientificGoalType,
+  maskApiKey,
   newId,
   runProgress,
 } from '../domain/index.js';
@@ -429,7 +433,19 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
       constraints: {},
       createdAt: new Date().toISOString(),
     });
-    const run = app.store.createRun(question);
+    // Optional user-selected model route for THIS run (resolution: run > active default > env chain).
+    const runOpts: { providerConfigId?: string } = {};
+    if (body.providerConfigId !== undefined) {
+      const providerConfigId = body.providerConfigId;
+      if (typeof providerConfigId !== 'string' || !MODEL_CONFIG_ID_RE.test(providerConfigId)) {
+        throw validation('field "providerConfigId" must be a model config id (mcfg_...)');
+      }
+      if (app.store.getObject('model_config', providerConfigId) === null) {
+        throw notFound(`model config not found: ${providerConfigId}`);
+      }
+      runOpts.providerConfigId = providerConfigId;
+    }
+    const run = app.store.createRun(question, runOpts);
     startRun(run.id); // async execution — the 202 returns immediately; failures land in run state
     sendJson(res, 202, { runId: run.id });
   };
@@ -679,6 +695,179 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     }
   };
 
+  // ---- model configs (user-defined model routes) ----
+
+  /** Model configs are workspace-global: stored under the '__none__' run bucket (like questions). */
+  const listModelConfigsAll = () => app.store.listObjects('model_config', '__none__');
+
+  const MODEL_CONFIG_ID_RE = /^mcfg_[0-9a-z]{20,32}$/;
+  const assertModelConfigId = (id: string): void => {
+    if (!MODEL_CONFIG_ID_RE.test(id)) throw validation(`invalid model config id format: ${id}`);
+  };
+
+  const mustGetModelConfig = (id: string) => {
+    const cfg = app.store.getObject('model_config', id);
+    if (cfg === null) throw notFound(`model config not found: ${id}`);
+    return cfg;
+  };
+
+  /** Response projection — the plaintext key NEVER leaves the server. */
+  const modelConfigSummary = (cfg: ModelProviderConfig, activeId: string | null) => ({
+    id: cfg.id,
+    label: cfg.label,
+    wire: cfg.wire,
+    baseUrl: cfg.baseUrl,
+    modelId: cfg.modelId,
+    apiKeySet: cfg.apiKey.length > 0,
+    apiKeyMasked: maskApiKey(cfg.apiKey),
+    active: activeId === cfg.id,
+    createdAt: cfg.createdAt,
+    updatedAt: cfg.updatedAt,
+  });
+
+  const listModelConfigs = (res: http.ServerResponse): void => {
+    const activeId = app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
+    const configs = listModelConfigsAll().map((c) => modelConfigSummary(c, activeId));
+    // What the env chain (competition/automation layer) would select with no user config.
+    const envDefaultView = (): { name: string; modelId: string; liveReady: boolean } | null => {
+      try {
+        const provider = defaultLiveProvider();
+        const info = listProviders().find((p) => p.name === provider.name);
+        return { name: provider.name, modelId: info?.modelId ?? '(unknown)', liveReady: info?.liveReady ?? provider.liveReady };
+      } catch {
+        return null; // env names an unknown/banned provider — health owns that failure story
+      }
+    };
+    sendJson(res, 200, { configs, activeModelConfigId: activeId, envDefault: envDefaultView() });
+  };
+
+  const getModelConfig = (res: http.ServerResponse, id: string): void => {
+    assertModelConfigId(id);
+    const cfg = mustGetModelConfig(id);
+    sendJson(res, 200, { config: modelConfigSummary(cfg, app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY)) });
+  };
+
+  const invalidConfigMessage = (issues: { path: (string | number)[]; message: string }[]): string =>
+    `invalid model config: ${issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')}`;
+
+  const createModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+    const body = await readJsonObject(req);
+    const now = new Date().toISOString();
+    const parsed = ModelProviderConfig.safeParse({
+      id: newId('mcfg'),
+      label: body.label,
+      wire: body.wire,
+      baseUrl: body.baseUrl,
+      modelId: body.modelId,
+      apiKey: body.apiKey ?? '',
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (!parsed.success) throw validation(invalidConfigMessage(parsed.error.issues));
+    app.store.putObject('model_config', parsed.data);
+    sendJson(res, 201, { config: modelConfigSummary(parsed.data, app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY)) });
+  };
+
+  const updateModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse, id: string): Promise<void> => {
+    assertModelConfigId(id);
+    const existing = mustGetModelConfig(id);
+    const body = await readJsonObject(req);
+    // apiKey semantics: absent field = keep stored value; present string (even empty) = replace.
+    let apiKey: string;
+    if (body.apiKey === undefined) {
+      apiKey = existing.apiKey;
+    } else {
+      if (typeof body.apiKey !== 'string') throw validation('field "apiKey" must be a string when present');
+      apiKey = body.apiKey;
+    }
+    const parsed = ModelProviderConfig.safeParse({
+      ...existing,
+      ...(typeof body.label === 'string' ? { label: body.label } : {}),
+      ...(body.wire !== undefined ? { wire: body.wire } : {}),
+      ...(typeof body.baseUrl === 'string' ? { baseUrl: body.baseUrl } : {}),
+      ...(typeof body.modelId === 'string' ? { modelId: body.modelId } : {}),
+      apiKey,
+      updatedAt: new Date().toISOString(),
+    });
+    if (!parsed.success) throw validation(invalidConfigMessage(parsed.error.issues));
+    app.store.putObject('model_config', parsed.data);
+    sendJson(res, 200, { config: modelConfigSummary(parsed.data, app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY)) });
+  };
+
+  const deleteModelConfig = (res: http.ServerResponse, id: string): void => {
+    assertModelConfigId(id);
+    const existed = app.store.deleteObject('model_config', id);
+    if (!existed) throw notFound(`model config not found: ${id}`);
+    // Deleting the active default clears it (falls back to the env chain); runs that
+    // reference the deleted config keep their reference and fail closed at call time.
+    if (app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY) === id) {
+      app.store.deleteMeta(ACTIVE_MODEL_CONFIG_META_KEY);
+    }
+    sendJson(res, 200, { deleted: id });
+  };
+
+  const setActiveModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+    const body = await readJsonObject(req);
+    if (!('id' in body)) throw validation('field "id" is required (a model config id, or null to clear the default)');
+    const id = body.id;
+    if (id === null) {
+      app.store.deleteMeta(ACTIVE_MODEL_CONFIG_META_KEY);
+      sendJson(res, 200, { activeModelConfigId: null });
+      return;
+    }
+    if (typeof id !== 'string') throw validation('field "id" must be a model config id string or null');
+    assertModelConfigId(id);
+    mustGetModelConfig(id);
+    app.store.setMeta(ACTIVE_MODEL_CONFIG_META_KEY, id);
+    sendJson(res, 200, { activeModelConfigId: id });
+  };
+
+  /**
+   * Connectivity probe: ONE tiny live call (maxTokens 16) against the given route.
+   * Accepts a stored config id (server supplies its key) or an unsaved draft with
+   * the key in the body — the form can test before saving.
+   */
+  const testModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+    const body = await readJsonObject(req);
+    let cfg: ModelProviderConfig;
+    if (typeof body.configId === 'string') {
+      const stored = mustGetModelConfig(body.configId);
+      cfg = typeof body.apiKey === 'string' && body.apiKey.length > 0 ? { ...stored, apiKey: body.apiKey } : stored;
+    } else {
+      const now = new Date().toISOString();
+      const parsed = ModelProviderConfig.safeParse({
+        id: newId('mcfg'), // throwaway identity for this probe only; nothing is persisted
+        label: typeof body.label === 'string' && body.label.trim().length > 0 ? body.label : '(draft)',
+        wire: body.wire,
+        baseUrl: body.baseUrl,
+        modelId: body.modelId,
+        apiKey: body.apiKey ?? '',
+        createdAt: now,
+        updatedAt: now,
+      });
+      if (!parsed.success) throw validation(invalidConfigMessage(parsed.error.issues));
+      cfg = parsed.data;
+    }
+    const provider = createCustomProvider(cfg);
+    const result = await provider.structuredCall(
+      {
+        task: 'model config connectivity test',
+        userPayload: { instruction: 'Reply with exactly the JSON object {"ok":true} and nothing else.' },
+        outputKind: 'json',
+        maxTokens: 16,
+        purpose: 'model-config-test',
+      },
+      (raw) => raw,
+    );
+    sendJson(res, 200, {
+      ok: result.ok,
+      modelId: cfg.modelId,
+      latencyMs: result.receipt.latencyMs,
+      ...(result.ok && result.data !== undefined ? { sample: result.data } : {}),
+      ...(!result.ok && result.error !== undefined ? { error: result.error } : {}),
+    });
+  };
+
   // ---- router ----
 
   const route = async (
@@ -773,6 +962,23 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
         if (leaf === 'resume' && method === 'POST') return resumeRun(res, runId);
         if (leaf === 'feedback' && method === 'POST') return receiveFeedback(req, res, runId);
         if (leaf === 'reexport' && method === 'POST') return reexport(res, runId);
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
+    if (segments[2] === 'model-configs') {
+      if (segments.length === 3) {
+        if (method === 'GET') return listModelConfigs(res);
+        if (method === 'POST') return createModelConfig(req, res);
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
+      const leaf = segments[3]!;
+      if (leaf === 'active' && segments.length === 4 && method === 'PUT') return setActiveModelConfig(req, res);
+      if (leaf === 'test' && segments.length === 4 && method === 'POST') return testModelConfig(req, res);
+      if (segments.length === 4) {
+        if (method === 'GET') return getModelConfig(res, leaf);
+        if (method === 'PUT') return updateModelConfig(req, res, leaf);
+        if (method === 'DELETE') return deleteModelConfig(res, leaf);
       }
       throw notFound(`no route: ${method} ${url.pathname}`);
     }

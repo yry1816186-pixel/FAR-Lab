@@ -141,6 +141,10 @@ export const api = {
   getText: (path: string, signal?: AbortSignal): Promise<unknown> => request(path, { signal, text: true }),
   post: (path: string, body?: unknown, signal?: AbortSignal): Promise<unknown> =>
     request(path, { method: 'POST', body, signal }),
+  put: (path: string, body?: unknown, signal?: AbortSignal): Promise<unknown> =>
+    request(path, { method: 'PUT', body, signal }),
+  del: (path: string, signal?: AbortSignal): Promise<unknown> =>
+    request(path, { method: 'DELETE', signal }),
 };
 
 export type Api = typeof api;

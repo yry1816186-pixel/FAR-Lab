@@ -15,6 +15,8 @@ export function useCreateRun(onCreated: (runId: string) => void): {
   setDomain: (v: string) => void;
   goalType: string;
   setGoalType: (v: string) => void;
+  providerConfigId: string;
+  setProviderConfigId: (v: string) => void;
   showValidationError: boolean;
   submitting: boolean;
   error: ApiError | null;
@@ -23,6 +25,7 @@ export function useCreateRun(onCreated: (runId: string) => void): {
   const [text, setText] = useState('');
   const [domain, setDomain] = useState('');
   const [goalType, setGoalType] = useState('');
+  const [providerConfigId, setProviderConfigId] = useState('');
   const [showValidationError, setShowValidationError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
@@ -38,13 +41,15 @@ export function useCreateRun(onCreated: (runId: string) => void): {
     setSubmitting(true);
     const controller = new AbortController();
     try {
-      const input: { text: string; domain?: string; goalType?: ScientificGoalType } = { text: text.trim() };
+      const input: { text: string; domain?: string; goalType?: ScientificGoalType; providerConfigId?: string } = { text: text.trim() };
       if (domain.trim().length > 0) input.domain = domain.trim();
       if (goalType !== '') input.goalType = goalType as ScientificGoalType;
+      if (providerConfigId !== '') input.providerConfigId = providerConfigId;
       const runId = await createRun(input, withTimeout(controller.signal, 20_000));
       setText('');
       setDomain('');
       setGoalType('');
+      setProviderConfigId('');
       onCreated(runId);
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
@@ -57,5 +62,5 @@ export function useCreateRun(onCreated: (runId: string) => void): {
     }
   };
 
-  return { text, setText, domain, setDomain, goalType, setGoalType, showValidationError, submitting, error, submit };
+  return { text, setText, domain, setDomain, goalType, setGoalType, providerConfigId, setProviderConfigId, showValidationError, submitting, error, submit };
 }

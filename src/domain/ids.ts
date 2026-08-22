@@ -24,6 +24,7 @@ export const ExperimentRunId = idOf('xrun');
 export const DatasetRecordId = idOf('ds');
 export const ResultSetId = idOf('rset');
 export const StatReportId = idOf('srep');
+export const ModelConfigId = idOf('mcfg');
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -45,6 +46,7 @@ export type ExperimentRunId = z.infer<typeof ExperimentRunId>;
 export type DatasetRecordId = z.infer<typeof DatasetRecordId>;
 export type ResultSetId = z.infer<typeof ResultSetId>;
 export type StatReportId = z.infer<typeof StatReportId>;
+export type ModelConfigId = z.infer<typeof ModelConfigId>;
 
 /** kind -> the ID shape that kind legitimately takes. */
 const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {
