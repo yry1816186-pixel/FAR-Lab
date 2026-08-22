@@ -4,6 +4,7 @@ import { verifyBundle } from '../app/verify.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
 import { staleDistFiles } from './dist-freshness.js';
+import { ink, marker, out, table, padColumns } from './term.js';
 
 /** D-031: refuse to execute stages on a dist older than src (stale-build live incident). */
 const assertDistFresh = (): void => {
@@ -44,7 +45,7 @@ Usage:
 Exit codes: 0 ok, 1 runtime failure, 2 usage error. Diagnostics on stderr.`;
 
 function die(msg: string, code = 1): never {
-  process.stderr.write(`far: ${msg}\n`);
+  process.stderr.write(`${ink.err('far')} ${msg}\n`);
   process.exitCode = code;
   throw new Error('__exit__');
 }
@@ -83,18 +84,32 @@ const runIdArg = (raw: string | undefined, sub: string): string => {
   return rid;
 };
 
+const STATUS_INK: Record<string, (s: string) => string> = {
+  completed: ink.ok,
+  running: ink.info,
+  queued: ink.muted,
+  partial: ink.warn,
+  failed: ink.err,
+  cancelled: ink.muted,
+};
+const statusInk = (s: string): ((x: string) => string) => STATUS_INK[s] ?? ((x) => x);
+const STAGE_STATE_INK: Record<string, (s: string) => string> = {
+  done: ink.ok, failed: ink.err, running: ink.info, skipped: ink.muted, pending: ink.muted,
+};
+
 const printRun = (run: ResearchRun, verbose = true) => {
   const p = runProgress(run);
   if (json()) {
     const { stages, ...rest } = run;
     jsonOutput({ ...rest, progress: p, stages: verbose ? stages : undefined });
   } else {
-    console.log(`run ${run.id}`);
-    console.log(`  status: ${run.status}  stage: ${run.currentStage}  progress: ${p.done}/${p.total} stages`);
-    if (run.lastError) console.log(`  lastError: ${run.lastError}`);
+    out(`${marker()} ${ink.bold(`run ${run.id}`)}`);
+    out(`  ${ink.bold('status')}: ${statusInk(run.status)(run.status)}  ${ink.bold('stage')}: ${run.currentStage}  ${ink.bold('progress')}: ${p.done}/${p.total} stages`);
+    if (run.lastError) out(`  ${ink.err('lastError')}: ${ink.muted(run.lastError)}`);
     if (verbose) for (const s of run.stages) {
+      const tone = STAGE_STATE_INK[s.state] ?? ((x: string) => x);
       const note = s.state === 'running' ? ` (attempt ${s.attempt})` : '';
-      console.log(`    ${s.state.padEnd(8)} ${s.stage}${note}${s.error ? ` — ${s.error}` : ''}`);
+      out(`    ${tone(padColumns(s.state, 8))} ${s.stage}${note}${s.error ? ` — ${ink.err(s.error)}` : ''}`);
     }
   }
 };
@@ -107,7 +122,11 @@ const main = async (): Promise<void> => {
     const app = await createApp();
     const runs = app.store.listRuns();
     if (json()) jsonOutput(runs);
-    else for (const r of runs) console.log(`${r.id}  ${r.status.padEnd(10)} ${r.currentStage.padEnd(20)} ${r.createdAt}`);
+    else if (runs.length === 0) out(ink.muted('(no runs yet — create one: far research start "<question>")'));
+    else table(
+      ['run', 'status', 'stage', 'created'],
+      runs.map((r) => [r.id, statusInk(r.status)(r.status), r.currentStage, r.createdAt]),
+    );
     app.close();
     return;
   }
@@ -157,7 +176,8 @@ const main = async (): Promise<void> => {
     }
     if (json()) jsonOutput(results);
     else for (const r of results) {
-      console.log(`${String(r.provider).padEnd(10)} ${String(r.status).padEnd(12)} model=${String(r.model)}${r.httpStatus !== undefined ? `  http=${r.httpStatus}` : ''}${r.detail !== undefined ? `\n  ${r.detail}` : ''}`);
+      const tone = r.status === 'ready' ? ink.ok : r.status === 'key-present' ? ink.info : ink.err;
+      out(`${padColumns(String(r.provider), 10)} ${tone(padColumns(String(r.status), 12))} model=${String(r.model)}${r.httpStatus !== undefined ? `  http=${r.httpStatus}` : ''}${r.detail !== undefined ? `\n  ${ink.muted(String(r.detail))}` : ''}`);
     }
     const bad = results.filter((r) => r.status === 'missing-key' || r.status === 'blocked' || r.status === 'unreachable');
     if (bad.length > 0 && (flag('--live') || all.some((p) => p.kind === 'live' && wanted !== undefined))) process.exitCode = 1;
@@ -223,10 +243,10 @@ const main = async (): Promise<void> => {
       const report = await verifyBundle(bundleId, { store: app.store, artifacts: app.artifacts });
       if (json()) jsonOutput(report);
       else {
-        console.log(`bundle ${report.bundleId} (run ${report.runId}) — declared evidence level: ${report.declaredEvidenceLevel}`);
-        console.log(`verdict: ${report.verdict} (${report.checks.filter((c) => c.passed).length}/${report.checks.length} checks passed)`);
-        for (const c of report.checks) console.log(`  ${c.passed ? 'PASS' : 'FAIL'}  ${c.name} — ${c.detail}`);
-        if (report.replayGuidance) console.log(`\n${report.replayGuidance}`);
+        out(`bundle ${report.bundleId} (run ${report.runId}) — declared evidence level: ${report.declaredEvidenceLevel}`);
+        out(`verdict: ${ink.bold(report.verdict)} (${report.checks.filter((c) => c.passed).length}/${report.checks.length} checks passed)`);
+        for (const c of report.checks) out(`  ${c.passed ? ink.ok('PASS') : ink.err('FAIL')}  ${c.name} — ${c.detail}`);
+        if (report.replayGuidance) out(`\n${report.replayGuidance}`);
       }
       process.exitCode = report.verdict === 'verified' ? 0 : 1;
     } finally { app.close(); }
@@ -250,7 +270,7 @@ const main = async (): Promise<void> => {
       });
       const run = app.store.createRun(q);
       if (json()) jsonOutput({ runId: run.id, status: run.status });
-      else console.log(`created run ${run.id}`);
+      else out(`${marker()} ${ink.ok('created')} run ${ink.bold(run.id)} — executing pipeline (progress on stderr)`);
       const done = await app.orchestrator.execute(run.id);
       printRun(done);
       process.exitCode = done.status === 'completed' ? 0 : 1;
@@ -278,7 +298,7 @@ const main = async (): Promise<void> => {
         jsonOutput({ ...rest, progress: runProgress(run), stages, lease: { holder: lease.holder, expiresAt: lease.expiresAt, live } });
       } else {
         printRun(run);
-        console.log(`  lease: ${lease.holder === null ? 'none' : `${lease.holder} (expires ${lease.expiresAt})`}${run.status === 'running' && !live ? '  [FROZEN — resume to recover]' : ''}`);
+        out(`  ${ink.bold('lease')}: ${lease.holder === null ? 'none' : `${lease.holder} (expires ${lease.expiresAt})`}${run.status === 'running' && !live ? `  ${ink.warn('[FROZEN — resume to recover]')}` : ''}`);
       }
     } finally { app.close(); }
     return;
@@ -331,7 +351,7 @@ const main = async (): Promise<void> => {
       const ok = app.orchestrator.cancel(rid);
       if (!ok) die(`no active run to cancel: ${runId}`);
       app.store.appendEvent(rid, { type: 'run_cancelled', detail: { via: 'cli' } });
-      console.log(`cancellation requested for ${runId} (takes effect between stage operations)`);
+      out(`${marker()} ${ink.warn('cancellation requested')} for ${runId} (takes effect between stage operations)`);
     } finally { app.close(); }
     return;
   }
@@ -417,9 +437,8 @@ const main = async (): Promise<void> => {
       });
       app.store.putObject('feedback', signal);
       app.store.appendEvent(rid, { type: 'feedback_received', detail: { feedbackId: signal.id, source: signal.source, via: 'cli' } });
-      console.log(json()
-        ? JSON.stringify({ recorded: true, feedbackId: signal.id, runId: rid, source: signal.source, receivedAt: signal.receivedAt })
-        : `feedback ${signal.id} recorded on run ${rid} (source=${parsedSource.data}); awaiting causal revision`);
+      if (json()) jsonOutput({ recorded: true, feedbackId: signal.id, runId: rid, source: signal.source, receivedAt: signal.receivedAt });
+      else out(`${marker()} ${ink.ok('feedback recorded')} ${signal.id} on run ${rid} (source=${parsedSource.data}); awaiting causal revision`);
     } finally { app.close(); }
     return;
   }
