@@ -3,6 +3,20 @@ import { runStatusKey, runStatusTone } from '../tones';
 import type { RunSummary } from '../api/types';
 import { useI18n } from '../i18n/LanguageContext';
 import { stageKey } from '../i18n/keys';
+import type { DictKey } from '../i18n/dict';
+
+/**
+ * Collapse a raw lastError string into a human-readable category line
+ * (gap-audit: full stack excerpts in the sidebar were a density disaster).
+ * The full text stays available via the title tooltip and the Overview tab.
+ */
+function errorCategoryKey(raw: string): DictKey {
+  if (raw.includes('quota_exceeded')) return 'runs.errQuota';
+  if (raw.includes('invalid_output')) return 'runs.errInvalidOutput';
+  if (raw.includes('provider_error') || raw.includes('network-')) return 'runs.errProvider';
+  if (raw.startsWith('retrieve:')) return 'runs.errRetrieve';
+  return 'runs.errFallback';
+}
 
 export function RunListItem({
   run,
@@ -41,7 +55,7 @@ export function RunListItem({
         </span>
         {run.lastError !== undefined && run.lastError.length > 0 && (
           <span className="run-item-error" title={run.lastError}>
-            {t('runs.errorPrefix')}: {run.lastError.length > 80 ? `${run.lastError.slice(0, 80)}…` : run.lastError}
+            {t('runs.errorPrefix')}: {t(errorCategoryKey(run.lastError))}
           </span>
         )}
       </button>

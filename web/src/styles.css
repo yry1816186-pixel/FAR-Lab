@@ -464,6 +464,14 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 .section-actions { display: flex; gap: var(--sp-2); }
 .section-body { padding: var(--sp-3) var(--sp-4); }
 
+/* collapsible section (progressive disclosure, craft-spec-v2 §3) */
+.section--collapsible > summary { list-style: none; cursor: pointer; }
+.section--collapsible > summary::-webkit-details-marker { display: none; }
+.section--collapsible > summary::after { content: '▸'; color: var(--muted); margin-left: auto; transition: transform var(--dur-fast) var(--ease-standard); }
+.section--collapsible[open] > summary::after { transform: rotate(90deg); }
+.section--collapsible > summary:hover { background: var(--surface-2); }
+.section-head--summary { display: flex; align-items: center; }
+
 .minor-title { font-size: var(--fs-aux); color: var(--muted); margin: var(--sp-2) 0 var(--sp-1); }
 
 /* ---------- field lists ---------- */
@@ -474,35 +482,45 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 
 /* ---------- tables ---------- */
 .table-scroll { overflow-x: auto; }
-.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+/* craft-spec-v2 §4: table body 14/18 compact rows (~32px row rhythm), tabular numerals */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-variant-numeric: tabular-nums;
+}
 .data-table th, .data-table td {
   text-align: left;
-  padding: 6px 8px;
+  padding: 7px var(--sp-2);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 .data-table thead th {
-  font-size: 11.5px;
-  color: var(--muted);
+  font-size: var(--fs-body);
+  color: var(--text-2);
   font-weight: 600;
   text-transform: none;
+  background: var(--v2-surface-2);
   border-bottom: 1px solid var(--border-strong);
   white-space: nowrap;
 }
 .data-table tbody th[scope='row'] { font-weight: 600; }
+.data-table tbody tr { transition: background-color var(--dur-fast) var(--ease-standard); }
 .data-table tbody tr:hover { background: var(--surface-2); }
 
 .hash-cell { white-space: nowrap; }
 .source-row:target { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .source-title { font-weight: 600; }
 
-/* ---------- badges ---------- */
+/* ---------- badges (craft-spec-v2 §5: 12px pill, PX-C8 GitHub label geometry) ---------- */
 .badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: var(--fs-aux);
+  line-height: var(--lh-aux);
   font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 9px;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   white-space: nowrap;
 }
@@ -562,11 +580,11 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 .callout--err  { background: var(--v2-refuted-tint);  color: var(--v2-refuted-on-tint);  border-color: var(--err-border); }
 .callout--info { background: var(--v2-info-tint);     color: var(--v2-info-on-tint);     border-color: var(--info-border); }
 
-/* ---------- question / scope ---------- */
-.question-scope .question-text { font-family: var(--serif); font-size: 15.5px; font-weight: 600; line-height: 1.6; margin: 0 0 10px; }
-.scope-lists { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 8px; }
-.scope-lists ul { margin: 4px 0; padding-left: 18px; font-size: 12.5px; }
-.constraints summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 8px; }
+/* ---------- question / scope (reading view: lh-read partitions density, craft-spec-v2 §3) ---------- */
+.question-scope .question-text { font-family: var(--serif); font-size: 16px; font-weight: 600; line-height: var(--lh-read); margin: 0 0 var(--sp-3); }
+.scope-lists { display: flex; gap: var(--sp-5); flex-wrap: wrap; margin-top: var(--sp-2); }
+.scope-lists ul { margin: var(--sp-1) 0; padding-left: 18px; font-size: var(--fs-body); line-height: var(--lh-read); }
+.constraints summary { cursor: pointer; font-size: var(--fs-aux); color: var(--muted); margin-top: var(--sp-2); }
 
 /* ---------- stage timeline ---------- */
 .stage-row--failed th, .stage-row--failed td { background: var(--err-bg); }
@@ -584,15 +602,16 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 .control-reason { color: var(--muted); font-size: 12px; margin: 0; }
 .feedback-block { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 8px; }
 
-/* ---------- evidence-line signature (§8.3): epistemic glyphs — saturated color ONLY for evidence semantics */
+/* ---------- evidence-line signature (§8.3): epistemic glyphs — saturated color ONLY for evidence semantics
+   craft-spec-v2 §8: glyph promoted from 11px badge furniture to a 16-20px page-level signature voice */
 .ev-glyph {
   display: inline-block;
-  width: 18px;
+  width: 22px;
   min-height: 24px;
   line-height: 24px;
   text-align: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 16px;
 }
 .ev-glyph--verified { color: var(--v2-verified); }
 .ev-glyph--refuted  { color: var(--v2-refuted); }
@@ -638,7 +657,7 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 .hyp-card { border: 1px solid var(--border); border-radius: var(--radius-s); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-3); background: var(--surface); }
 .hyp-card--extra { opacity: 0.85; }
 .hyp-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-.hyp-statement { font-family: var(--serif); font-size: 15px; font-weight: 600; line-height: 1.6; }
+.hyp-statement { font-family: var(--serif); font-size: 15.5px; font-weight: 600; line-height: var(--lh-read); }
 .hyp-block { margin-top: 8px; }
 .assumptions { margin: 4px 0; padding-left: 18px; font-size: 12.5px; }
 .assumption-kind { color: var(--muted); font-size: 11.5px; }

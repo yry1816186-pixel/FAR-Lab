@@ -163,31 +163,38 @@ function PlanView({ plan }: { plan: ResearchPlan }): JSX.Element {
         />
       </Section>
 
-      <Section title={t('tab.plan')}>
-        <FieldList
-          items={[
-            { key: t('plan.confounders'), value: orNone(plan.confounders) },
-            { key: t('plan.altExplanations'), value: orNone(plan.alternativeExplanations) },
-            {
-              key: t('plan.resources'),
-              value: (
-                <span className="mono">
-                  {t('plan.resources.compute')}={plan.resources?.compute ?? t('common.unspecified')}；{' '}
-                  {t('plan.resources.cost')}={plan.resources?.cost ?? t('common.unspecified')}；{' '}
-                  {t('plan.resources.time')}={plan.resources?.time ?? t('common.unspecified')}
-                </span>
-              ),
-            },
-            { key: t('plan.risks'), value: orNone(plan.risks) },
-            { key: t('plan.ethics'), value: orNone(plan.ethics) },
-            { key: t('plan.prerequisites'), value: orNone(plan.prerequisites) },
-            ...(plan.expectedInformationGain !== undefined ? [{ key: t('plan.expectedGain'), value: plan.expectedInformationGain }] : []),
-            { key: t('plan.altBranches'), value: orNone(plan.alternativeBranches) },
-            { key: t('plan.reproducibility'), value: orNone(plan.reproducibilityRequirements) },
-            { key: t('plan.citedClaims'), value: <span className="mono">{(plan.evidenceClaimIds ?? []).join('；') || <span className="muted">{t('common.none')}</span>}</span> },
-          ]}
-        />
-      </Section>
+      {/* Progressive disclosure (craft-spec-v2 §3): supplementary methodological
+          details collapse by default; the core flow above stays scannable. */}
+      <details className="section section--collapsible">
+        <summary className="section-head section-head--summary">
+          <span className="section-title">{t('plan.metaSection')}</span>
+        </summary>
+        <div className="section-body">
+          <FieldList
+            items={[
+              { key: t('plan.confounders'), value: orNone(plan.confounders) },
+              { key: t('plan.altExplanations'), value: orNone(plan.alternativeExplanations) },
+              {
+                key: t('plan.resources'),
+                value: (
+                  <span className="mono">
+                    {t('plan.resources.compute')}={plan.resources?.compute ?? t('common.unspecified')}；{' '}
+                    {t('plan.resources.cost')}={plan.resources?.cost ?? t('common.unspecified')}；{' '}
+                    {t('plan.resources.time')}={plan.resources?.time ?? t('common.unspecified')}
+                  </span>
+                ),
+              },
+              { key: t('plan.risks'), value: orNone(plan.risks) },
+              { key: t('plan.ethics'), value: orNone(plan.ethics) },
+              { key: t('plan.prerequisites'), value: orNone(plan.prerequisites) },
+              ...(plan.expectedInformationGain !== undefined ? [{ key: t('plan.expectedGain'), value: plan.expectedInformationGain }] : []),
+              { key: t('plan.altBranches'), value: orNone(plan.alternativeBranches) },
+              { key: t('plan.reproducibility'), value: orNone(plan.reproducibilityRequirements) },
+              { key: t('plan.citedClaims'), value: <span className="mono">{(plan.evidenceClaimIds ?? []).join('；') || <span className="muted">{t('common.none')}</span>}</span> },
+            ]}
+          />
+        </div>
+      </details>
     </div>
   );
 }

@@ -92,20 +92,27 @@
 - 空态/首次启动：采用 [PX]C7（产品真实输出作为视觉主体）——空 runs 列表展示一次真实 run 的时间线示意（来自 smoke 数据），非插画
 - 具体形态在 P2/P3 出 2 个变体截图供用户选（human-verify）
 
-## 9. CLI 规格（Node/TS 实现）
+## 9. CLI 规格（Node/TS 实现）——终端 agent 体验范式
+
+> 本节经用户点名双案例（opencode + claude code，2026-08-22 源码级/解包级调研完成）升级：从"传统 CLI 工具"范式升级为"终端 agent 长任务体验"范式。出处新增 [OC]=`case-opencode.md`、[CC]=`case-claude-code.md`。
 
 | 项 | 规格 | 出处 |
 |---|---|---|
 | 颜色库 | **vendored 抄 picocolors**（76 行 ISC 源码入 `src/cli/vendor/`，保留版权声明）——含 NO_COLOR/FORCE_COLOR/win32/isTTY/CI 完整判定顺序 | [NLIB] 组合 A + 用户"抄/借鉴/使用"授权 |
-| 色彩语义 | 绿=verified/成功、红=refuted/错误、黄=UNVERIFIED/caution、cyan=进行中、muted=元信息 | [CLI] 共性①（gh/lazygit/Optuna/Snakemake 4/6 一致） |
-| 关色纪律 | 非 TTY / NO_COLOR 非空 / TERM=dumb / --no-color 任一 → 零 ANSI | [CLI] 共性② + clig.dev [既有 line-a §6] |
-| 进度 | 已知量 `Stage k of N (x%)` 静态文本行；未知量单行 `Working…` + stderr（无动画）；非 TTY 零动画 | [CLI] 共性③ + [M3] §1.5 |
-| 日志格式 | `[LEVEL FAR-NNNN] msg` 消息编号制（编号段按模块分配） | [CLI] OpenROAD utl::Logger |
-| 输出通道 | report/结果表 → stdout 无前缀；日志/进度 → stderr | [CLI] OpenROAD report()/log 分离 + clig.dev |
-| 表格 | padEnd 对齐 + **CJK 双宽字符修正**（East Asian Width 计算） | [NLIB] 零依赖坑④ + 现有 padEnd 基础 |
-| 错误呈现 | 结构化块：标题行 + 缩进字段（cause/stage/fix 建议）+ 内嵌关键日志摘录；退出码非 0 | [CLI] Snakemake 错误块 + 共性⑤ + clig.dev |
-| 机读 | `--json` 全局保持不变；`far probe --json` 等回归验证 | 既有纪律 |
-| 交互确认 | 破坏性操作 `--yes` flag + stdin 确认（零交互库） | [NLIB] + clig.dev 分级确认 |
+| 色彩语义（6 色最小集） | 绿=verified/成功、红=refuted/错误、黄=UNVERIFIED/caution、cyan=进行中、muted=元信息、bold=强调——**固定 6 色 ANSI，不做 truecolor**（天然免疫色深降级问题） | [OC] CLI 固定 6 色最小集 + [CLI] 共性① |
+| 关色纪律 | 非 TTY / NO_COLOR 非空 / TERM=dumb / --no-color 任一 → 零 ANSI；非 TTY 零动画 | [OC] 非 TTY 剥 ANSI + [CLI] 共性② + clig.dev |
+| **阶段输出形态** | `⏺ 阶段名(关键参数)` 一行摘要（Windows 降级 `●`）+ `--verbose` 内联展开证据原文——长流水线不刷屏零丢失 | [CC] Tool 行摘要 + verbose 展开；符号降级 darwin/其他 |
+| 进度 | 已知量 `Stage k of N`（阶段清单可勾选 ✻/✓/→ 状态符）+ 动词式状态行（"检索中…"/"生成假设…"）；**禁止百分比**（宪法 §6 不发明进度） | [CC] todo 清单+动词 spinner 禁百分比 + [M3] §1.5 + [OC] 子任务单行镜像 |
+| 流式转写 | 阶段事件按 scrollback 追加打印（非全屏重绘）；子动作单行镜像 `↳ 动作 · N calls · 时长` | [CC] scrollback 转写 + [OC] 运行态镜像 |
+| 日志格式 | `[LEVEL FAR-NNNN] msg` 消息编号制（编号段按模块分配）；思考/内部细节用暗淡（opacity 0.6 等价=ANSI 90 灰）不换色 | [CLI] OpenROAD utl::Logger + [OC] thinkingOpacity |
+| 输出通道 | **stdout/stderr 物理分离**：人读 report/结果表 → stdout 无前缀；日志/进度/状态行 → stderr；`--json` 时 stdout 只产 NDJSON 事件 | [OC] ui.ts/run.ts 双通道 + [CLI] OpenROAD + clig.dev |
+| **JSON 信封** | result 信封照抄 claude code 契约：`{subtype: success|error_*, is_error, result?, error?, duration_ms, usage}`——subtype 与 is_error 分离，错误原文进 result 字段 | [CC] result 信封 schema（npm 解包实证） |
+| 表格 | padEnd 对齐 + **CJK 双宽字符修正**（East Asian Width 计算） | [NLIB] 零依赖坑④ |
+| 错误呈现 | 结构化块：`⏺` 红色标题行 + 缩进字段（cause/stage/fix 建议）+ 内嵌关键日志摘录；退出码非 0 | [CLI] Snakemake 错误块 + [CC] 权限框样式（带色边框框住原文） |
+| 交互确认 | 破坏性操作三选项内联面板（是/总是/否+理由），非交互模式自动决策并打印决策 | [OC] 权限三选项 + [CC] 允许一次/不再询问/拒绝 |
+| 机读 | `--json` 全局保持；`far probe --json` 等回归验证；新增 result 信封 schema 对齐 | 既有纪律 + [CC] |
+
+**不建议抄**（[OC]/[CC] 明确标注）：Knight Rider 品牌 spinner、34 套主题、完整 TUI 栈（opentui/Ink fork 成熟度与 Windows 兼容 UNVERIFIED；FAR-Lab CLI 为非交互优先 + --json 通道，不需要全屏 TUI）。
 
 ## 10. 现状→spec 差距总表（P2-P5 实施清单映射）
 
