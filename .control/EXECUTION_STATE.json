@@ -59,5 +59,5 @@
     "B-QWEN-LIVE-ROUTE"
   ],
   "lastVerifiedCommit": "Wave-3 session final 2026-08-22: through a05a746 + rediscovery evidence/D-029 + control sync commit; suite 265/265; completion-gate VERIFIED_READY (evidence/W5/completion-gate-2026-08-22-wave3.txt)",
-  "nextAction": "WAITING_FOR_USER: frontier saturated under current environment; #9 resolved (D-033). Remaining levers are USER-ACTION only: (1) DASHSCOPE_API_KEY -> node spikes/qwen-route-probe.mjs closes B-QWEN-LIVE-ROUTE (submission-mandated route, deadline 2026-09-05); (2) OPENALEX_API_KEY -> uninterrupted search + fulltext phase-B live verification. HF direct remains unreachable (proxy reaches models.dev only)."
+  "nextAction": "WAITING_FOR_USER (3 external gates): (1) DeepSeek account top-up — B-DEEPSEEK-BALANCE, blocks all live runs/judging incl. rediscovery v2 completion (D-035); (2) DASHSCOPE_API_KEY — B-QWEN-LIVE-ROUTE, submission-mandated Qwen route (probe ready, one command); (3) OPENALEX_API_KEY — uninterrupted retrieval + fulltext phase-B (keyless recovered today, D-034). All code paths prepared; nothing executable without these."
 }
