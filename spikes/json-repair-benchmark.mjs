@@ -52,7 +52,7 @@ const oldChain = (raw) => {
 };
 
 // ---- corpus ----
-const oracle = JSON.parse(readFileSync(new URL('./output/json-repair-oracle.json', import.meta.url), 'utf8'));
+const oracle = JSON.parse(readFileSync(new URL('./../tests/fixtures/json-repair-oracle.json', import.meta.url), 'utf8'));
 const corpus = oracle.filter((e) => e.error === null && e.output !== null); // 72 repairable entries
 const validDocs = corpus.filter((e) => { try { JSON.parse(e.input); return true; } catch { return false; } }); // must stay unchanged
 const brokenDocs = corpus.filter((e) => !validDocs.includes(e));
@@ -131,7 +131,7 @@ AFTER = current chain (… -> legacy scan -> jsonrepair engine EXTRACT).
 - live 24k sample (colon-after-inner-quote ambiguity): before=${results.live.fullSample.before}, after=${results.live.fullSample.after} — both correctly refuse; corrective re-ask owns that class (0d1706e ~99% cumulative recovery).
 - latency (worst case, both repair layers attempt + fail on 24k): before ${results.latency.liveSample24kMsPerCall.before}ms after ${results.latency.liveSample24kMsPerCall.after}ms per call — negligible vs the 2s strict-FC e2e budget; mid-doc successful repair ${results.latency.midDocRepairMsPerCall.after}ms/call.
 
-Raw: evidence/W7/repair-benchmark.json; corpus spikes/json-repair-corpus.mjs -> spikes/output/json-repair-oracle.json; fuzz class spikes/json-repair-fuzz.mjs.
+Raw: evidence/W7/repair-benchmark.json; corpus spikes/json-repair-corpus.mjs -> spikes/../tests/fixtures/json-repair-oracle.json; fuzz class spikes/json-repair-fuzz.mjs.
 `;
 writeFileSync(new URL('../evidence/W7/repair-benchmark.md', import.meta.url), md);
 console.log(md);
