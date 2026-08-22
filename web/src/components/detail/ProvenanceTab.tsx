@@ -340,6 +340,16 @@ function BundleVerify({
               {report.bundleId} · declaredEvidenceLevel={report.declaredEvidenceLevel}
             </span>
           </p>
+          {/* S2b: the bundle's own declared reproduction limits — part of the verdict,
+              never buried (mandatory honesty travels with the check table). */}
+          {(report.limitations ?? []).length > 0 && (
+            <div className="callout callout--warn small">
+              <strong>{t('bundle.limitations')}</strong>
+              <ul className="bundle-limitations">
+                {report.limitations!.map((l, i) => <li key={i}>{l}</li>)}
+              </ul>
+            </div>
+          )}
           <div className="table-scroll">
             <table className="data-table">
               <caption className="sr-only">{t('bundle.checks', { n: report.checks.length })}</caption>

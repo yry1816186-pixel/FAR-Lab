@@ -7,6 +7,12 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
 import { bindingKey, bindingTone } from '../../tones';
 import { stageKey, contentDepthKey, accessStateKey, bindingZhKey, relationKey, retrievalPurposeKey } from '../../i18n/keys';
+import type { DictKey } from '../../i18n/dict';
+
+/** GRADE-lite certainty (deterministic ladder, W-G F-B) — label key per level. */
+function gradeKey(level: NonNullable<ScientificClaim['gradeCertainty']>): DictKey {
+  return `grade.${level}` as DictKey;
+}
 
 export function EvidenceTab({
   run,
@@ -143,6 +149,10 @@ function SourcesTable({ sources }: { sources: SourceDocument[] }): JSX.Element {
 
 function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChallenge: (id: string, label: string) => void }): JSX.Element {
   const { t } = useI18n();
+  const gradeTitle = (level: NonNullable<ScientificClaim['gradeCertainty']>, downgraded: string[]): string => {
+    const reasons = downgraded.length > 0 ? downgraded.join('；') : t('grade.noDowngrades');
+    return `${t('grade.titlePrefix')}（${level}）— ${reasons}`;
+  };
   if (claims.length === 0) return <EmptyState titleKey="evidence.noClaims" />;
   return (
     <ul className="claims-list">
@@ -161,6 +171,14 @@ function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChal
             <Badge tone={bindingTone(claim.bindingStatus)} title={t(bindingZhKey(claim.bindingStatus))}>
               {t(bindingKey(claim.bindingStatus))}
             </Badge>
+            {claim.gradeCertainty !== undefined && (
+              <Badge
+                tone={claim.gradeCertainty === 'high' ? 'ok' : claim.gradeCertainty === 'moderate' ? 'info' : claim.gradeCertainty === 'low' ? 'warn' : 'err'}
+                title={gradeTitle(claim.gradeCertainty, claim.downgraded ?? [])}
+              >
+                {t(gradeKey(claim.gradeCertainty))}
+              </Badge>
+            )}
             {claim.alignmentChecked === true ? (
               <span className="muted small">{t('evidence.alignmentChecked')}</span>
             ) : (

@@ -86,6 +86,19 @@ export function CompareView({
               cols={hypotheses.map((h) => h.falsification?.decisionRule ?? '')}
               missingWhen={t('hyp.falsification.missing')}
             />
+            <CompareRow
+              label={t('compare.verdictThresholds')}
+              cols={hypotheses.map((h) => {
+                const f = h.falsification;
+                if (f === undefined) return '';
+                const parts: string[] = [];
+                if (f.supportCondition.trim().length > 0) parts.push(`${t('compare.verdictSupport')} ${f.supportCondition}`);
+                if (f.weakeningCondition.trim().length > 0) parts.push(`${t('compare.verdictWeaken')} ${f.weakeningCondition}`);
+                if (f.falsificationCondition.trim().length > 0) parts.push(`${t('compare.verdictFalsify')} ${f.falsificationCondition}`);
+                return parts.join(' ｜ ');
+              })}
+              missingWhen={t('hyp.falsification.missing')}
+            />
             <CompareCountRow
               label={t('compare.evidenceBalance')}
               cols={hypotheses.map((h) => ({

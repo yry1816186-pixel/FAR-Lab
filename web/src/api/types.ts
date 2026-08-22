@@ -243,6 +243,9 @@ export interface ScientificClaim {
   alignmentChecked?: boolean;
   extractionModelRef?: string;
   uncertainties?: string[];
+  /** GRADE-lite deterministic certainty ladder (W-G F-B); downgrade reasons ride along. */
+  gradeCertainty?: 'high' | 'moderate' | 'low' | 'very_low';
+  downgraded?: string[];
 }
 
 // ---- evidence relations (src/domain/evidence.ts) ----
@@ -477,7 +480,10 @@ export interface ResearchPlan {
   alternativeBranches?: string[];
   reproducibilityRequirements?: string[];
   evidenceClaimIds?: string[];
-  executabilityCheck?: { passed: boolean; missing?: string[] };
+  /** POPPER discipline (D-025): mandatory when a plan discriminates multiple hypotheses. */
+  multipleTestingPolicy?: string;
+  multipleTestingNote?: string;
+  executabilityCheck?: { passed: boolean; missing?: string[]; statisticalDesignNote?: string };
   createdAt: string;
 }
 
@@ -585,4 +591,6 @@ export interface VerificationReport {
   verdict: 'verified' | 'failed' | 'degraded';
   failedChecks: string[];
   replayGuidance?: string;
+  /** The bundle's own declared reproduction limits — mandatory honesty, shown not buried. */
+  limitations?: string[];
 }
