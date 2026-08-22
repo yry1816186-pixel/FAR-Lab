@@ -23,10 +23,12 @@ import {
   bucketClaims,
   claimsForPrompt,
   DUPLICATE_MARKER,
+  isRepresentative,
   partitionClaimRefs,
   runClaimIds,
   verifiedClaims,
 } from './shared.js';
+import { evaluateQualityGate, type QualityGateSignal } from '../../app/quality-gate.js';
 
 /**
  * generate_hypotheses — multi-strategy hypothesis search (mission §26, R-06).
@@ -42,10 +44,37 @@ import {
  *   ONE supplementary explicitly-different generation is attempted; if diversity
  *   is still short, the shortfall is stored and reported honestly — never padded;
  * - evidence references are filtered against ids that actually exist in this run.
+ *
+ * BP-1 quality-gate regeneration: when the orchestrator's post-rank quality gate
+ * reopens this stage (meta qg:active:<run> = '1'), a SECOND round runs with the
+ * deterministic critique of round 1 (weak dimensions, swap-disagreement, prior
+ * statements) injected into every strategy prompt, a deterministic paraphrase
+ * guard against round-1 statements, and round-2 candidates ADDED to the store —
+ * clustering/rank then re-select representatives across old+new. The flag is
+ * consumed at execute start so a crash/resume cannot loop regeneration.
  */
 
 /** Fewest distinct representatives acceptable without an explicit diversity shortfall note. */
 export const MIN_REPRESENTATIVES = 3;
+
+/** Regeneration-round paraphrase threshold: round-2 statements at/above this Jaccard vs any round-1 representative are dropped. */
+export const REGEN_PARAPHRASE_JACCARD = 0.85;
+
+const contentTokenSet = (s: string): Set<string> =>
+  new Set(s.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2));
+
+const jaccard = (a: Set<string>, b: Set<string>): number => {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const t of a) if (b.has(t)) inter += 1;
+  return inter / (a.size + b.size - inter);
+};
+
+/** Deterministic regeneration guard: is `statement` a paraphrase of any prior statement? */
+export const isParaphrase = (statement: string, priorStatements: string[]): boolean => {
+  const cand = contentTokenSet(statement);
+  return priorStatements.some((p) => jaccard(cand, contentTokenSet(p)) >= REGEN_PARAPHRASE_JACCARD);
+};
 
 // ---------------------------------------------------------------------------
 // model output schemas (fail-closed via callStructured)
@@ -297,13 +326,35 @@ export const generateHypothesesStage: StageHandler = {
   stage: 'generate_hypotheses',
 
   async applicable(ctx) {
-    return ctx.store.listObjects('hypothesis', ctx.run.id).length === 0;
+    if (ctx.store.listObjects('hypothesis', ctx.run.id).length === 0) return true;
+    // BP-1 regeneration round: the orchestrator's quality gate reopens this stage by
+    // setting qg:active — hypotheses exist, but a weak ranked set justifies one more round.
+    return ctx.store.getMeta(`qg:active:${ctx.run.id}`) === '1';
   },
 
   async execute(ctx: StageContext): Promise<StageOutcome> {
     const runId = ctx.run.id;
     const question = ctx.store.getObject('question', ctx.run.questionId);
     if (!question) throw new Error(`research question not found: ${ctx.run.questionId}`);
+
+    // ---- BP-1 regeneration round: consume the flag, derive the deterministic critique ----
+    const regeneration = ctx.store.getMeta(`qg:active:${runId}`) === '1';
+    let critique: QualityGateSignal | null = null;
+    let priorStatements: string[] = [];
+    if (regeneration) {
+      ctx.store.setMeta(`qg:active:${runId}`, '0'); // consume first: crash/resume must not loop
+      const scorecards = ctx.store.listObjects('scorecard', runId);
+      const tournament = ctx.store.listObjects('tournament', runId)[0] ?? null;
+      critique = evaluateQualityGate(scorecards, tournament);
+      priorStatements = ctx.store
+        .listObjects('hypothesis', runId)
+        .filter(isRepresentative)
+        .map((h) => h.statement);
+      ctx.progress?.(0, 1, {
+        reason: 'quality_gate_regeneration_round',
+        detail: { priorRepresentatives: priorStatements.length, reasons: critique.reasons, weakDimensions: critique.weakDimensions },
+      });
+    }
 
     const claims = verifiedClaims(ctx);
     if (claims.length === 0) {
@@ -318,7 +369,7 @@ export const generateHypothesesStage: StageHandler = {
     const existingClaimIds = runClaimIds(ctx);
 
     const warnings: string[] = [];
-    const raws: RawCandidate[] = [];
+    let raws: RawCandidate[] = [];
     const questionForPrompt = {
       text: question.text,
       background: question.background,
@@ -370,18 +421,32 @@ export const generateHypothesesStage: StageHandler = {
     // The inputs fingerprint covers the conditioning base AND the instruction constants
     // (def.instruction + DIVERSITY_DISCIPLINE): a prompt upgrade invalidates the family's
     // cache instead of replaying stale generations (Wave-5 audit P3 / W8 audit P1-1).
+    // BP-1: the round number rides BOTH the key and the fingerprint — a regeneration
+    // round must never replay round-1 cached generations as if they were new critique-
+    // conditioned candidates.
+    const round = regeneration ? 2 : 1;
     const strategyInputs = canonicalSha256({
       question: questionForPrompt,
       claims: claimsForPrompt(claims),
       relations: relations.map((r) => ({ id: r.id, relation: r.relation })),
       instructions: STRATEGY_DEFS.map((d) => d.instruction),
       discipline: DIVERSITY_DISCIPLINE,
+      ...(regeneration && critique !== null
+        ? { regenerationCritique: { reasons: critique.reasons, weakDimensions: critique.weakDimensions, priorStatements } }
+        : {}),
     });
-    const res = await ctx.checkpointed('generate_hypotheses', 'strategies', `strategy:${def.strategy}`, strategyInputs, () =>
+    const res = await ctx.checkpointed('generate_hypotheses', 'strategies', `strategy:${def.strategy}:r${round}`, strategyInputs, () =>
         callStructured<z.infer<typeof StrategyOut>>(ctx, {
           stage: 'generate_hypotheses',
           purpose: def.purpose,
-          systemPrompt: `${def.instruction}${antiRepetitionInstruction(raws.length)} ${DIVERSITY_DISCIPLINE}`,
+          systemPrompt:
+            `${def.instruction}${antiRepetitionInstruction(raws.length)} ${DIVERSITY_DISCIPLINE}` +
+            (regeneration && critique !== null
+              ? ' REGENERATION ROUND: a previous hypothesis set was judged WEAK by deterministic quality gates ' +
+                `(${critique.reasons.join('; ')}). Propose hypotheses that materially differ in mechanism from ` +
+                'every statement in priorStatements and directly strengthen the weakDimensions listed in the payload. ' +
+                'Restating or lightly rephrasing prior statements is worthless.'
+              : ''),
           payload: {
             ...payload,
             ...(raws.length > 0
@@ -390,6 +455,16 @@ export const generateHypothesesStage: StageHandler = {
                     statement: r.out.statement,
                     mechanism: r.out.mechanism,
                   })),
+                }
+              : {}),
+            ...(regeneration && critique !== null
+              ? {
+                  previousRoundCritique: {
+                    reasons: critique.reasons,
+                    metrics: critique.metrics,
+                    weakDimensions: critique.weakDimensions,
+                    priorStatements: priorStatements.slice(0, 12),
+                  },
                 }
               : {}),
           },
@@ -419,6 +494,22 @@ export const generateHypothesesStage: StageHandler = {
           supplement: false,
         });
       }
+    }
+
+    // ---- BP-1 regeneration paraphrase guard: round-2 candidates that deterministically
+    // paraphrase a round-1 representative are dropped BEFORE clustering/persistence.
+    // Token-set Jaccard over normalized content words — cheap, deterministic, and a hard
+    // backstop behind the prompt-level anti-restatement instruction.
+    if (regeneration && priorStatements.length > 0) {
+      const kept: RawCandidate[] = [];
+      for (const raw of raws) {
+        if (isParaphrase(raw.out.statement, priorStatements)) {
+          warnings.push(`regeneration: dropped a candidate as a paraphrase of a round-1 statement (Jaccard >= ${REGEN_PARAPHRASE_JACCARD})`);
+        } else {
+          kept.push(raw);
+        }
+      }
+      raws = kept;
     }
 
     // ---- paraphrase clustering / dedup ----

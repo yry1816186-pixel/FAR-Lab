@@ -5,6 +5,13 @@ import type { StageHandler, StageContext } from '../pipeline/types.js';
 import { STAGE_ORDER } from '../domain/run.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
 import type { SourceFamily } from '../domain/source.js';
+import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './run-budget.js';
+import { evaluateQualityGate, MAX_QUALITY_ROUNDS } from './quality-gate.js';
+
+/** Meta key for the persisted quality-gate round counter (round 1 = initial generation). */
+const qgRoundKey = (runId: string) => `qg:round:${runId}`;
+/** Skip-reason marker persisted on stages skipped for budget exhaustion (resume re-opens these). */
+export const BUDGET_EXHAUSTED_REASON = 'budget_exhausted';
 
 export interface OrchestratorDeps {
   store: Store;
@@ -92,7 +99,7 @@ export class Orchestrator {
     return run;
   }
 
-  private makeContext(run: ResearchRun, lease?: string): StageContext {
+  private makeContext(run: ResearchRun, lease?: string, budget?: RunBudgetView): StageContext {
     const { store, signals } = this.deps;
     const signal = signals.get(run.id) ?? { cancelled: false };
     signals.set(run.id, signal);
@@ -101,6 +108,7 @@ export class Orchestrator {
       store,
       artifacts: this.deps.artifacts,
       provider: this.deps.providerFor?.(run) ?? this.deps.provider,
+      budget,
       sourceFor: this.deps.sourceFor,
       recordReceipt: (partial) => {
         const receipt = ProvenanceReceipt.parse({
@@ -228,6 +236,28 @@ export class Orchestrator {
     const signal = this.deps.signals.get(runId) ?? { cancelled: false };
     this.deps.signals.set(runId, signal);
 
+    // BP-1 budget governance: one view per execution, spend re-derived from receipts
+    // (resume after a raised cap re-derives honestly). Budget-exhaustion skips from a
+    // previous execution are operational pauses, not domain skips — reopen them so a
+    // resume with budget actually continues the research.
+    const budget = makeRunBudget(this.deps.store, runId);
+    const exhaustedSkips = run.stages.filter((s) => s.state === 'skipped' && (s.error ?? '').startsWith(BUDGET_EXHAUSTED_REASON));
+    if (exhaustedSkips.length > 0) {
+      run = await this.transition(runId, (r) => {
+        for (const s of exhaustedSkips) {
+          const rec = r.stages.find((x) => x.stage === s.stage);
+          if (rec !== undefined) {
+            rec.state = 'pending';
+            delete rec.endedAt;
+            delete rec.error;
+          }
+        }
+        return r;
+      }, lease);
+      this.deps.store.appendEvent(runId, { type: 'note', detail: { reason: 'budget_skip_reopened', stages: exhaustedSkips.map((s) => s.stage) } });
+    }
+    let budgetWarned = budget.nearLimit();
+
     if (run.status !== 'running') {
       const prev = run.status;
       run = await this.transition(runId, (r) => {
@@ -239,13 +269,31 @@ export class Orchestrator {
       });
     }
 
-    for (const stage of STAGE_ORDER) {
+    // Index-based cursor (not for-of): the BP-1 quality gate may jump the cursor BACK to
+    // generate_hypotheses for one bounded regeneration round — adaptive sequencing, still
+    // fully auditable through stage attempts + events.
+    let cursor = 0;
+    while (cursor < STAGE_ORDER.length) {
+      const stage = STAGE_ORDER[cursor]!;
       if (opts?.stopAfter && stage === opts.stopAfter) break;
       const rec = this.stageRecord(run, stage);
-      if (rec?.state === 'done' || rec?.state === 'skipped') continue;
+      if (rec?.state === 'done' || rec?.state === 'skipped') { cursor += 1; continue; }
+
+      // Budget boundary: once the cap is spent, remaining model/retrieval stages are
+      // skipped with the marker reason (resume with a raised cap reopens them). export
+      // is never budget-gated — the honest partial bundle must still be produced.
+      if (stage !== 'export' && !budget.hasRemaining()) {
+        run = await this.transition(runId, (r) => {
+          this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString(), error: `${BUDGET_EXHAUSTED_REASON}: spent ${budget.spent} of cap ${budget.cap}` });
+          return r;
+        }, lease);
+        this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: { reason: BUDGET_EXHAUSTED_REASON, spent: budget.spent, cap: budget.cap } });
+        cursor += 1;
+        continue;
+      }
 
       const handler = this.deps.stages.get(stage);
-      if (!handler) continue; // not implemented in this build — stays pending and visible
+      if (!handler) { cursor += 1; continue; } // not implemented in this build — stays pending and visible
 
       // Cumulative 1-based attempt counting: a stage that has never started (no startedAt,
       // e.g. fresh pending records whose zod default attempt=1 must not act as a prior try)
@@ -258,7 +306,7 @@ export class Orchestrator {
       }, lease);
       this.deps.store.appendEvent(runId, { type: 'stage_started', stage, detail: { attempt: nextAttempt } });
 
-      const ctx = this.makeContext(run, lease);
+      const ctx = this.makeContext(run, lease, budget);
       try {
         if (await handler.applicable(ctx)) {
           if (signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false)) throw new Error('cancelled by user');
@@ -274,6 +322,55 @@ export class Orchestrator {
             type: 'stage_done', stage,
             detail: { summary: outcome.kind === 'done' ? outcome.summary : outcome.reason },
           });
+
+          // ---- BP-1 quality gate: after rank, decide whether the ranked set is strong
+          // enough to plan against. Weak signal + rounds remaining + budget remaining
+          // => reopen generate_hypotheses..rank for ONE regeneration round with the
+          // deterministic critique persisted as the audit trail.
+          if (stage === 'rank' && outcome.kind === 'done') {
+            const round = Number(this.deps.store.getMeta(qgRoundKey(runId)) ?? '1');
+            const scorecards = this.deps.store.listObjects('scorecard', runId);
+            const tournament = this.deps.store.listObjects('tournament', runId)[0] ?? null;
+            const signalQg = evaluateQualityGate(scorecards, tournament);
+            if (signalQg.weak && round < MAX_QUALITY_ROUNDS && budget.hasRemaining()) {
+              this.deps.store.setMeta(qgRoundKey(runId), String(round + 1));
+              this.deps.store.appendEvent(runId, {
+                type: 'note', stage: 'rank',
+                detail: {
+                  reason: 'quality_gate_regeneration',
+                  round: round + 1,
+                  signal: { metrics: signalQg.metrics, reasons: signalQg.reasons, weakDimensions: signalQg.weakDimensions },
+                },
+              });
+              run = await this.transition(runId, (r) => {
+                for (const s of ['generate_hypotheses', 'critique_falsify', 'rank'] as RunStageName[]) {
+                  const rec2 = r.stages.find((x) => x.stage === s);
+                  if (rec2 !== undefined) {
+                    rec2.state = 'pending';
+                    delete rec2.endedAt;
+                    delete rec2.error;
+                  }
+                }
+                return r;
+              }, lease);
+              cursor = STAGE_ORDER.indexOf('generate_hypotheses');
+              continue;
+            }
+            if (signalQg.weak && (round >= MAX_QUALITY_ROUNDS || !budget.hasRemaining())) {
+              this.deps.store.appendEvent(runId, {
+                type: 'note', stage: 'rank',
+                detail: { reason: 'quality_gate_weak_proceeding', round, budgetRemaining: budget.hasRemaining(), metrics: signalQg.metrics, reasons: signalQg.reasons },
+              });
+            }
+          }
+
+          if (!budgetWarned && budget.nearLimit()) {
+            budgetWarned = true;
+            this.deps.store.appendEvent(runId, {
+              type: 'note', stage,
+              detail: { reason: 'budget_warning', spent: budget.spent, cap: budget.cap, note: '>=80% of run token budget spent' },
+            });
+          }
         } else {
           run = await this.transition(runId, (r) => {
             // no attempt arg: keep the attempt count persisted by the running transition
@@ -283,6 +380,18 @@ export class Orchestrator {
           this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: {} });
         }
       } catch (e) {
+        if (e instanceof RunBudgetExhaustedError) {
+          // Mid-stage exhaustion: the stage cannot honestly complete — record it as an
+          // operational skip (marker reason), NOT a failure; downstream stages hit the
+          // boundary skip above and export still runs for the honest partial bundle.
+          run = await this.transition(runId, (r) => {
+            this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString(), error: `${BUDGET_EXHAUSTED_REASON}: ${e.message}` });
+            return r;
+          }, lease);
+          this.deps.store.appendEvent(runId, { type: 'stage_skipped', stage, detail: { reason: BUDGET_EXHAUSTED_REASON, midStage: true } });
+          cursor += 1;
+          continue;
+        }
         if (e instanceof RunLeaseLostError || /^run lease lost/i.test(e instanceof Error ? e.message : String(e))) {
           // Disowned worker: another executor adopted this run. Abort WITHOUT touching run
           // state — the adopter owns transitions now. Audit note only.
@@ -305,6 +414,7 @@ export class Orchestrator {
         });
         return run; // stop pipeline on failure — resume continues from this stage
       }
+      cursor += 1;
     }
 
     const unfinished = run.stages.filter((s) => s.state === 'pending' || s.state === 'running');

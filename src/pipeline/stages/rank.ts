@@ -6,6 +6,7 @@ import type { TournamentMatch } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
+import { deterministicId } from '../../app/quality-gate.js';
 
 /** DimensionScore has no exported type alias in the domain — derive it from the scorecard schema type. */
 type DimensionScoreT = HypothesisScorecard['dimensions'][number];
@@ -685,7 +686,9 @@ export const rankStage: StageHandler = {
       ctx.store.putObject(
         'scorecard',
         HypothesisScorecard.parse({
-          id: newId('sc'),
+          // deterministic id: re-ranking rounds (quality-gate regeneration) overwrite the
+          // same scorecard object instead of accumulating duplicates — latest wins.
+          id: deterministicId('sc', runId, r.hyp.id),
           runId,
           hypothesisId: r.hyp.id,
           dimensions: r.dimensions,
@@ -772,7 +775,7 @@ export const rankStage: StageHandler = {
         ctx.store.putObject(
           'evidence_body',
           buildEvidenceBody({
-            id: newId('evb'),
+            id: deterministicId('evb', runId, r.hyp.id),
             runId,
             hypothesisId: r.hyp.id,
             relations,
@@ -785,7 +788,7 @@ export const rankStage: StageHandler = {
       ctx.store.putObject(
         'ach_analysis',
         buildAchAnalysis({
-          id: newId('ach'),
+          id: deterministicId('ach', runId),
           runId,
           hypothesisIds: ranked.map((r) => r.hyp.id),
           relations,
