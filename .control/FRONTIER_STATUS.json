@@ -270,7 +270,7 @@
       {
         "id": "wave6-fusion",
         "status": "resolved",
-        "evidence": "F1-F5 EXECUTED (D-047): counter[1]->crossref (probe 68/68: 0% zero vs 82.3%), arXiv full->k4->k2 cascade (probe: 6.7% residual zero), refchecker wrong-paper guard in verify, RankGPT bottom-up sliding window (pool 48, w24/s12), OpenScholar citation-marker strip; W6 suites green (retrieve 29/29, fulltext 28/28, baseline 10/10); frozen-DB guarded compare ZERO_GUARDED_REGRESSION exit 0; live end-to-end verification BLOCKED on D-036 model routes (honestly recorded, wall-clock +9s cost noted); deferred F7-F9 with triggers (D-048)"
+        "evidence": "F1-F5 EXECUTED (D-047): counter[1]->crossref (probe 68/68: 0% zero vs 82.3%), arXiv full->k4->k2 cascade (probe: 6.7% residual zero), refchecker wrong-paper guard in verify, RankGPT bottom-up sliding window (pool 48, w24/s12), OpenScholar citation-marker strip; adversarial audit REQUEST CHANGES 2P1+4P2+3P3 ALL root-fixed same session (D-056, 79/79 W6 tests, cancellation-safety + planned/variant metric split + pure windowed-rerank invariants); determinism replay identical (measurement determinism only — guarded gate honestly UNDISCHARGED until live runs, model routes blocked D-036); deferred F7-F9 with triggers (D-048)"
       },
       {
         "id": "wave9-breadth-scan",

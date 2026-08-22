@@ -106,11 +106,14 @@ to crossref), net ≈ +9s typical vs 360s p50 budget — recorded as the honest 
 - F1/F2 (retrieval behavior): deterministic unit tests on target-building/query-construction +
   live keyless probes (arxiv.org / api.crossref.org reachable) replaying HISTORICAL queries —
   before/after zero-rate on the same query population = the benchmark. Wall-clock: F1 net-zero
-  (reroute), F2 chosen to avoid extra calls (upfront shortening) or bounded one retry.
+  (reroute), F2 bounded cascade (≤2 extra arXiv calls per zero search, ~+9s typical).
 - F3/F4/F5 (deterministic logic): unit tests incl. failure paths; full suite + build after.
-- AFTER: rerun harness on same DB (historical runs unchanged → proves no regression on frozen
-  data) + probes table + fresh live runs when model routes return (verify-rate north-star update
-  then, honestly gated by D-036).
+- AFTER (audit-corrected, D-056): offline harness metrics are a pure function of PERSISTED
+  runs — post-fusion code cannot move them without new runs. The same-DB rerun
+  (`retrieval-baseline-determinism-replay-w6.json`) proves measurement determinism only; the
+  W6 guarded gate is **UNDISCHARGED until fresh live runs exist** (model routes blocked D-036).
+  The behavioral before/after evidence today = the probe table (§3/§3.1); guarded compare on
+  live runs discharges the gate when routes return.
 - Adversarial audit of the fused code after landing (subagent or main-agent red review), fixes to
   root cause, evidence/W6/ artifacts.
 
