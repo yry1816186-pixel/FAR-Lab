@@ -6,6 +6,7 @@ import { createApp } from '../src/app/composition.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import {
   connectClaim,
+  editHypothesis,
   forkHypothesis,
   HypothesisOpError,
   promoteHypothesis,
@@ -266,5 +267,62 @@ describe('ownership guards (404, never cross-run mutation)', () => {
 
   it('404s for an unknown claim id', () => {
     expect(() => connectClaim(app, runA, hyp2, { claimId: 'clm_ghost000000000000000000000x', direction: 'supports' })).toThrowError(HypothesisOpError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BP-2 researcher sovereignty: direct edit into the causal revision chain
+// ---------------------------------------------------------------------------
+
+describe('editHypothesis (BP-2 direct researcher correction)', () => {
+  it('edits statement+mechanism into the causal chain: feedback -> revision -> version bump -> staleness disclosure', async () => {
+    const before = app.store.getObject('hypothesis', hyp1)!;
+    const result = await editHypothesis(app, runA, hyp1, {
+      statement: 'Interfacial void accumulation initiates lithium dendrite penetration through grain boundaries.',
+      mechanism: 'Voids concentrate current at contact-loss points, preferentially at boundary defects.',
+      note: 'misleading phrasing: the penetration path was unspecified',
+    });
+
+    expect(result.changedFields).toEqual(['statement', 'mechanism']);
+    expect(result.version).toBe(before.version + 1);
+
+    const after = app.store.getObject('hypothesis', hyp1)!;
+    expect(after.version).toBe(before.version + 1);
+    expect(after.statement).toContain('grain boundaries');
+    // monotonic staleness uncertainty is ADDED, pre-existing ones preserved
+    expect(after.uncertainties.length).toBe(before.uncertainties.length + 1);
+    expect(after.uncertainties.at(-1)).toContain('predate this edit');
+
+    // the causal chain: human_expert feedback signal exists and targets the hypothesis
+    const feedback = app.store.getObject('feedback', result.feedbackId)!;
+    expect(feedback.source).toBe('human_expert');
+    expect(feedback.target).toEqual({ kind: 'hypothesis', id: hyp1 });
+
+    // revision with modify operations carrying real before/after
+    const revision = app.store.getObject('revision', result.revisionId)!;
+    expect(revision.triggerFeedbackId).toBe(result.feedbackId);
+    expect(revision.fromVersionLabel).toBe(`v${before.version}`);
+    expect(revision.toVersionLabel).toBe(`v${after.version}`);
+    expect(revision.operations.every((op) => op.objectType === 'hypothesis' && op.operation === 'modify')).toBe(true);
+    const stmtOp = revision.operations.find((op) => op.before === before.statement);
+    expect(stmtOp?.after).toContain('grain boundaries');
+
+    // predecessor archived immutably as a content-addressed artifact
+    const archived = JSON.parse(await app.artifacts.get(result.predecessorArtifactRef)) as { id: string; version: number };
+    expect(archived.id).toBe(hyp1);
+    expect(archived.version).toBe(before.version);
+
+    // audit event on the same stream the workbench renders
+    const events = app.store.listEvents(runA);
+    expect(events.some((e) => e.type === 'revision_created' && e.detail.reason === 'hypothesis_edited_human')).toBe(true);
+  });
+
+  it('rejects edits with no editable field and validates ownership', async () => {
+    await expect(editHypothesis(app, runA, hyp1, { note: 'no field changed' })).rejects.toMatchObject({
+      code: 'validation',
+    });
+    await expect(editHypothesis(app, runB, hyp1, { statement: 'x'.repeat(30), note: 'cross-run attempt' })).rejects.toMatchObject({
+      code: 'target_not_found',
+    });
   });
 });

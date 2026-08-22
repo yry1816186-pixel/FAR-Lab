@@ -6,7 +6,7 @@ import { verifyBundle } from '../app/verify.js';
 import { listProviders, defaultLiveProvider } from '../providers/index.js';
 import { createCustomProvider } from '../providers/custom.js';
 import { runResearchAction, ActionError } from './actions.js';
-import { connectClaim, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
+import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
 import {
   FeedbackSignal,
@@ -1016,18 +1016,19 @@ function parseSeedSources(raw: unknown): string | {
         if (method === 'GET') return runEventStream(req, res, runId, url);
         throw notFound(`method ${method} not allowed for ${url.pathname}`);
       }
-      // B5 hypothesis lifecycle (R3): POST /runs/:id/hypotheses/:hypId/<op>.
+      // B5 hypothesis lifecycle (R3) + BP-2 direct edit: POST /runs/:id/hypotheses/:hypId/<op>.
       // Ownership (run owns the hypothesis / the linked claim) is guarded inside
-      // hypothesis-ops; this branch only dispatches the four known verbs.
+      // hypothesis-ops; this branch only dispatches the known verbs.
       if (segments.length === 7 && segments[4] === 'hypotheses') {
         const hypId = segments[5]!;
         const op = segments[6]!;
-        if (method === 'POST' && (op === 'promote' || op === 'reject' || op === 'fork' || op === 'connect')) {
+        if (method === 'POST' && (op === 'promote' || op === 'reject' || op === 'fork' || op === 'connect' || op === 'edit')) {
           const body = await readJsonObject(req);
           try {
             const result = op === 'promote' ? promoteHypothesis(app, runId, hypId, body)
               : op === 'reject' ? rejectHypothesis(app, runId, hypId, body)
               : op === 'fork' ? forkHypothesis(app, runId, hypId, body)
+              : op === 'edit' ? await editHypothesis(app, runId, hypId, body)
               : connectClaim(app, runId, hypId, body);
             sendJson(res, 200, result);
             return;

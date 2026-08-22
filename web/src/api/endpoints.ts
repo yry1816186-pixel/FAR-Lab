@@ -316,6 +316,12 @@ export interface HypothesisOpResult {
   forkedFrom?: string;
   claimId?: string;
   direction?: ClaimLinkDirection;
+  /** BP-2 edit op: the causal-chain ids of the applied correction. */
+  version?: number;
+  revisionId?: string;
+  feedbackId?: string;
+  predecessorArtifactRef?: string;
+  changedFields?: string[];
 }
 
 /** Fail-visible response narrowing (same style as modelConfigOf): shape-checked, single assertion. */
@@ -329,6 +335,11 @@ const hypOpResultOf = (data: unknown): HypothesisOpResult => {
     forkedFrom?: unknown;
     claimId?: unknown;
     direction?: unknown;
+    version?: unknown;
+    revisionId?: unknown;
+    feedbackId?: unknown;
+    predecessorArtifactRef?: unknown;
+    changedFields?: unknown;
   };
   if (typeof r.hypothesisId !== 'string' || r.hypothesisId.length === 0) {
     throw new ApiError({ code: 'unexpected_schema', message: '假设操作响应缺少 hypothesisId', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'hypothesis op result' } });
@@ -339,13 +350,18 @@ const hypOpResultOf = (data: unknown): HypothesisOpResult => {
     ...(typeof r.forkedFrom === 'string' ? { forkedFrom: r.forkedFrom } : {}),
     ...(typeof r.claimId === 'string' ? { claimId: r.claimId } : {}),
     ...(typeof r.direction === 'string' ? { direction: r.direction as ClaimLinkDirection } : {}),
+    ...(typeof r.version === 'number' ? { version: r.version } : {}),
+    ...(typeof r.revisionId === 'string' ? { revisionId: r.revisionId } : {}),
+    ...(typeof r.feedbackId === 'string' ? { feedbackId: r.feedbackId } : {}),
+    ...(typeof r.predecessorArtifactRef === 'string' ? { predecessorArtifactRef: r.predecessorArtifactRef } : {}),
+    ...(Array.isArray(r.changedFields) && r.changedFields.every((f) => typeof f === 'string') ? { changedFields: r.changedFields as string[] } : {}),
   };
 };
 
 const postHypOp = (
   runId: string,
   hypId: string,
-  op: 'promote' | 'reject' | 'fork' | 'connect',
+  op: 'promote' | 'reject' | 'fork' | 'connect' | 'edit',
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<HypothesisOpResult> =>
@@ -361,6 +377,15 @@ export const rejectHypothesis = (runId: string, hypId: string, signal?: AbortSig
 
 export const forkHypothesis = (runId: string, hypId: string, signal?: AbortSignal): Promise<HypothesisOpResult> =>
   postHypOp(runId, hypId, 'fork', {}, signal);
+
+/** BP-2: direct researcher correction — enters the causal revision chain (feedback -> revision -> version bump). */
+export const editHypothesis = (
+  runId: string,
+  hypId: string,
+  body: { statement?: string; mechanism?: string; note: string },
+  signal?: AbortSignal,
+): Promise<HypothesisOpResult> =>
+  postHypOp(runId, hypId, 'edit', body as Record<string, unknown>, signal);
 
 export const connectClaim = (
   runId: string,
