@@ -1,0 +1,222 @@
+import { describe, it, expect } from 'vitest';
+import { z } from 'zod';
+import { runAgentLoop, type AgentLoopConfig, type AgentLoopDeps } from '../src/agent/loop.js';
+import { ToolRegistry, type AgentTool } from '../src/agent/tool.js';
+import { PermissionEngine } from '../src/agent/permissions.js';
+import { SessionTelemetry } from '../src/agent/telemetry.js';
+import { ExtensionBus } from '../src/agent/hooks.js';
+import type { AgentEvent, ReceiptSink } from '../src/agent/protocol.js';
+import type { ArtifactStore } from '../src/shared/ports.js';
+import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
+
+const echoTool = (spy?: { calls: unknown[] }): AgentTool => ({
+  name: 'echo',
+  description: 'echo text back',
+  inputSchema: z.object({ text: z.string() }),
+  async execute(args) {
+    spy?.calls.push(args);
+    return { ok: true, data: { echo: (args as { text: string }).text } };
+  },
+});
+
+function depsFor(steps: StubStep[]) {
+  const events: AgentEvent[] = [];
+  const receipts: Parameters<ReceiptSink>[0][] = [];
+  const telemetry = new SessionTelemetry();
+  const tools = new ToolRegistry().register(echoTool());
+  const deps: AgentLoopDeps = {
+    provider: createTestStubProvider(steps),
+    tools,
+    permissions: new PermissionEngine({ rules: [{ effect: 'allow' }], defaultEffect: 'deny' }),
+    sessionId: 'ags_testsession0000000000aaaa',
+    purpose: 'test:loop',
+    emit: (ev) => { events.push(ev); },
+    recordReceipt: (r) => { receipts.push(r); },
+    telemetry,
+  };
+  return { deps, events, receipts, telemetry, tools };
+}
+
+const baseCfg = (over: Partial<AgentLoopConfig> = {}): AgentLoopConfig => ({
+  capability: 'test-cap',
+  systemPrompt: 'test system',
+  task: 'do the thing',
+  maxTurns: 6,
+  resultSchema: z.object({ answer: z.string().min(2) }),
+  ...over,
+});
+
+const useTool = (tool: string, args: Record<string, unknown> = {}): string =>
+  JSON.stringify({ action: 'use_tool', tool, args, reason: 'progress' });
+const finish = (result: Record<string, unknown>): string => JSON.stringify({ action: 'finish', reason: 'done', result });
+
+describe('agent kernel loop', () => {
+  it('runs tool call then finish; emits ordered events and records receipts per model call', async () => {
+    const { deps, events, receipts, telemetry } = depsFor([
+      { rawOutput: useTool('echo', { text: 'hi' }) },
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const res = await runAgentLoop(baseCfg(), deps);
+    expect(res.status).toBe('completed');
+    expect(res.result).toEqual({ answer: 'ok' });
+    expect(receipts.length).toBe(2);
+    expect(receipts.every((r) => r.kind === 'model_call')).toBe(true);
+    expect(telemetry.summary().modelCalls).toBe(2);
+    expect(telemetry.summary().toolCalls).toBe(1);
+    const types = events.map((e) => e.type);
+    expect(types[0]).toBe('session_started');
+    expect(types).toContain('tool_used');
+    expect(types.at(-1)).toBe('session_finished');
+    const toolEvent = events.find((e) => e.type === 'tool_used');
+    expect(toolEvent && toolEvent.type === 'tool_used' && toolEvent.tool).toBe('echo');
+  });
+
+  it('feeds schema-invalid tool args back to the model instead of crashing', async () => {
+    const spy: { calls: unknown[] } = { calls: [] };
+    const { deps } = depsFor([
+      { rawOutput: useTool('echo', { text: 42 }) }, // wrong type: string required
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const res = await runAgentLoop(baseCfg(), { ...deps, tools: new ToolRegistry().register(echoTool(spy)) });
+    expect(res.status).toBe('completed');
+    expect(spy.calls.length).toBe(0); // never executed with invalid args
+    const feedback = res.transcript.find((e) => e.kind === 'tool_result');
+    expect(feedback && feedback.kind === 'tool_result' && (feedback.payload as { validationError?: string }).validationError).toMatch(/invalid arguments/);
+  });
+
+  it('feeds unknown-tool calls back with the available catalog', async () => {
+    const { deps } = depsFor([
+      { rawOutput: useTool('nonexistent_tool') },
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const res = await runAgentLoop(baseCfg(), deps);
+    expect(res.status).toBe('completed');
+    const err = res.transcript.find((e) => e.kind === 'error');
+    expect(err && err.kind === 'error' && err.message).toMatch(/unknown tool 'nonexistent_tool' — available: echo/);
+  });
+
+  it('fails closed on provider failure (no silent retry at loop level)', async () => {
+    const { deps } = depsFor([{ fail: { kind: 'rate_limited', message: 'slow down' } }]);
+    const res = await runAgentLoop(baseCfg(), deps);
+    expect(res.status).toBe('failed');
+    expect(res.error).toMatch(/rate_limited.*slow down/);
+  });
+
+  it('stops after N consecutive unparseable model actions', async () => {
+    const { deps } = depsFor([
+      { rawOutput: 'this is not json' },
+      { rawOutput: 'still not json' },
+      { rawOutput: '{"action":"bogus"}' },
+    ]);
+    const res = await runAgentLoop(baseCfg({ maxConsecutiveInvalid: 3 }), deps);
+    expect(res.status).toBe('failed');
+    expect(res.error).toMatch(/consecutive invalid/);
+  });
+
+  it('stops at max turns when the model never finishes', async () => {
+    const { deps } = depsFor([
+      { rawOutput: useTool('echo', { text: 'a' }) },
+      { rawOutput: useTool('echo', { text: 'b' }) },
+      { rawOutput: useTool('echo', { text: 'c' }) },
+    ]);
+    const res = await runAgentLoop(baseCfg({ maxTurns: 3 }), deps);
+    expect(res.status).toBe('max_turns');
+    expect(res.error).toMatch(/max turns \(3\)/);
+  });
+
+  it('injects steering text between turns and records it', async () => {
+    let steeredOnce = false;
+    const { deps, events } = depsFor([
+      { rawOutput: useTool('echo', { text: 'x' }) },
+      { rawOutput: finish({ answer: 'steered ok' }) },
+    ]);
+    const res = await runAgentLoop(baseCfg({ steer: () => (steeredOnce ? null : (steeredOnce = true, 'focus on mechanism')) }), deps);
+    expect(res.status).toBe('completed');
+    expect(res.transcript.some((e) => e.kind === 'steer')).toBe(true);
+    expect(events.some((e) => e.type === 'steered')).toBe(true);
+  });
+
+  it('aborts cooperatively before the first turn', async () => {
+    const { deps, events } = depsFor([{ rawOutput: finish({ answer: 'never' }) }]);
+    const res = await runAgentLoop(baseCfg({ shouldAbort: () => true }), deps);
+    expect(res.status).toBe('aborted');
+    // provider step untouched: the loop never made a model call (no turn ever started)
+    expect(events.filter((e) => e.type === 'turn_started').length).toBe(0);
+  });
+
+  it('hook block feeds the refusal back; rewrite reaches the tool; terminate ends the session', async () => {
+    const spy: { calls: unknown[] } = { calls: [] };
+    const blocked = new ExtensionBus();
+    blocked.onBeforeToolCall(() => ({ blocked: 'forbidden by policy' }));
+    const { deps: d1 } = depsFor([
+      { rawOutput: useTool('echo', { text: 'hi' }) },
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const r1 = await runAgentLoop(baseCfg(), { ...d1, tools: new ToolRegistry().register(echoTool(spy)), hooks: blocked });
+    expect(r1.status).toBe('completed');
+    expect(spy.calls.length).toBe(0);
+    expect(r1.transcript.some((e) => e.kind === 'tool_result' && (e.payload as { blocked?: boolean }).blocked === true)).toBe(true);
+
+    const rewriter = new ExtensionBus();
+    rewriter.onBeforeToolCall(() => ({ args: { text: 'rewritten' } }));
+    const { deps: d2 } = depsFor([
+      { rawOutput: useTool('echo', { text: 'original' }) },
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const spy2: { calls: unknown[] } = { calls: [] };
+    await runAgentLoop(baseCfg(), { ...d2, tools: new ToolRegistry().register(echoTool(spy2)), hooks: rewriter });
+    expect(spy2.calls[0]).toEqual({ text: 'rewritten' });
+
+    const terminator = new ExtensionBus();
+    terminator.onBeforeToolCall(() => ({ terminate: 'budget exhausted' }));
+    const { deps: d3 } = depsFor([{ rawOutput: useTool('echo', { text: 'x' }) }]);
+    const r3 = await runAgentLoop(baseCfg(), { ...d3, tools: new ToolRegistry().register(echoTool()), hooks: terminator });
+    expect(r3.status).toBe('aborted');
+    expect(r3.error).toMatch(/terminated by hook: budget exhausted/);
+  });
+
+  it('rejects a contract-violating finish, feeds the reasons back, and accepts the corrected one', async () => {
+    const { deps } = depsFor([
+      { rawOutput: finish({ wrong: 'shape' }) },
+      { rawOutput: finish({ answer: 'fixed' }) },
+    ]);
+    const res = await runAgentLoop(baseCfg({ maxFinishReasks: 2 }), deps);
+    expect(res.status).toBe('completed');
+    expect(res.result).toEqual({ answer: 'fixed' });
+    expect(res.transcript.some((e) => e.kind === 'error' && e.message.includes('finish payload rejected'))).toBe(true);
+  });
+
+  it('spills oversized tool results to the artifact store and leaves a ref in the transcript', async () => {
+    const big: AgentTool = {
+      name: 'bigpayload',
+      description: 'returns a huge payload',
+      inputSchema: z.object({}),
+      async execute() {
+        return { ok: true, data: { blob: 'x'.repeat(5000) } };
+      },
+    };
+    const store = new Map<string, string>();
+    const artifacts: ArtifactStore = {
+      put: async (payload: string) => {
+        const ref = `sha256:${'a'.repeat(63)}${store.size}`;
+        store.set(ref, payload);
+        return { ref, hash: ref.slice(7), size: payload.length };
+      },
+      get: async (ref: string) => store.get(ref) ?? null,
+      path: (ref: string) => `/tmp/${ref}`,
+    };
+    const { deps } = depsFor([
+      { rawOutput: useTool('bigpayload') },
+      { rawOutput: finish({ answer: 'ok' }) },
+    ]);
+    const res = await runAgentLoop(
+      baseCfg({ budget: { transcriptSoft: 1_000_000, transcriptHard: 2_000_000, maxToolResultChars: 200 } }),
+      { ...deps, tools: new ToolRegistry().register(big), artifacts },
+    );
+    expect(res.status).toBe('completed');
+    const spilled = res.transcript.find((e) => e.kind === 'tool_result');
+    expect(spilled && spilled.kind === 'tool_result' && spilled.spilledTo).toMatch(/^sha256:/);
+    const ref = spilled && spilled.kind === 'tool_result' ? spilled.spilledTo! : '';
+    expect(await artifacts.get(ref)).toContain('blob');
+  });
+});

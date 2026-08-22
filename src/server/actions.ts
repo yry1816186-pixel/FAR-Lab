@@ -203,7 +203,9 @@ export async function runResearchAction(app: App, runId: string, rawBody: unknow
   app.store.putObject('receipt', receipt);
   app.store.appendEvent(runId, {
     type: 'receipt_recorded',
-    detail: { kind: receipt.kind, id: receipt.id, provider: receipt.modelCall.provider, modelId: receipt.modelCall.modelId, latencyMs: receipt.modelCall.latencyMs },
+    // modelCall is always present on this receipt (constructed two lines up with kind 'model_call');
+    // optional chaining only satisfies the schema-level optionality, wire shape unchanged.
+    detail: { kind: receipt.kind, id: receipt.id, provider: receipt.modelCall?.provider, modelId: receipt.modelCall?.modelId, latencyMs: receipt.modelCall?.latencyMs },
     receiptId: receipt.id,
   });
   app.store.appendEvent(runId, {
