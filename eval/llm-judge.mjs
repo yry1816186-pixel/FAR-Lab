@@ -1,9 +1,12 @@
 /**
  * W4 LLM-judge (AUXILIARY evidence; calibration = uncalibrated_llm_judgment).
- * ONE judge call per problem comparing THREE hypothesis lists (FAR-Lab representatives vs
+ * FARLAB_JUDGE_VOTES identical calls per problem (W4-F4 self-consistency; default 1 =
+ * unchanged single-pass) comparing THREE hypothesis lists (FAR-Lab representatives vs
  * baseline-direct vs baseline-rag) in seeded-random blind order. The judge does NOT know
  * which system produced which list. Scores: hypothesis_quality (1-5), counter_evidence_
- * coverage (1-5) with the rubric embedded in the prompt. Same DeepSeek provider.
+ * coverage (1-5) with the rubric embedded in the prompt; votes aggregate to the
+ * per-dimension MEDIAN with min/max spread and every raw vote retained (judge-votes.mjs).
+ * Same DeepSeek provider.
  * W5 field-parity fix (scientific review Q7): every list is sent through the SAME
  * projection (statement/mechanism/assumptions/falsification decisionRule) — baselines'
  * assumptions+decisionRule must reach the judge exactly like FAR-Lab's, and no field may
@@ -15,8 +18,11 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { loadProblems, makeProvider } from './lib.mjs';
 import { isRepresentative } from '../dist/pipeline/stages/shared.js';
+import { aggregateVotes } from './judge-votes.mjs';
 
 const SEED = Number(process.env.FARLAB_JUDGE_SEED ?? 20260821); // recorded with results; env enables variance studies
+/** W4-F4 self-consistency votes per problem (default 1 = unchanged single-pass behavior). */
+const VOTES = Math.max(1, Number(process.env.FARLAB_JUDGE_VOTES ?? 1));
 const DB_PATH = new URL('../.far-run/far.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const RESULTS = new URL('./results/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
@@ -123,44 +129,74 @@ ${entries.map((e, i) => fmtHyps(e.hyps, labels[i])).join('\n\n')}
 Return ONLY a JSON object:
 {"X":{"hypothesis_quality":1-5,"counter_evidence_coverage":1-5,"one_line_reason":"..."},"Y":{...},"Z":{...}}
 `;
-  const res = await provider.structuredCall(
-    {
-      task,
-      systemPrompt: 'You are a strict, neutral scientific reviewer scoring anonymous outputs against a fixed rubric. You do not know or guess which system produced them.',
-      userPayload: { problemId: p.id, rubricDimensions: ['hypothesis_quality', 'counter_evidence_coverage'] },
-      outputKind: 'json',
-      temperature: 0.0,
-      maxTokens: 1024,
-      purpose: 'w4-eval-llm-judge',
-    },
-    (raw) => {
-      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
-      for (const l of ['X', 'Y', 'Z']) {
-        const v = raw[l];
-        if (v === null || typeof v !== 'object') return new Error(`missing ${l}`);
-        const hq = v.hypothesis_quality, cc = v.counter_evidence_coverage;
-        if (!Number.isInteger(hq) || hq < 1 || hq > 5) return new Error(`${l}.hypothesis_quality invalid`);
-        if (!Number.isInteger(cc) || cc < 1 || cc > 5) return new Error(`${l}.counter_evidence_coverage invalid`);
-      }
-      return raw;
-    },
-  );
+  // W4-F4 self-consistency: FARLAB_JUDGE_VOTES identical calls of the SAME blind task
+  // (same mapping — votes measure judge variance, never ordering variance); per-dimension
+  // median + min/max spread, every raw vote recorded (disagreement is never hidden).
+  const voteResults = [];
+  for (let v = 0; v < VOTES; v++) {
+    // sequential by design: gentle on rate-limited/budget routes
+    voteResults.push(await provider.structuredCall(
+      {
+        task,
+        systemPrompt: 'You are a strict, neutral scientific reviewer scoring anonymous outputs against a fixed rubric. You do not know or guess which system produced them.',
+        userPayload: { problemId: p.id, rubricDimensions: ['hypothesis_quality', 'counter_evidence_coverage'] },
+        outputKind: 'json',
+        temperature: 0.0,
+        maxTokens: 1024,
+        purpose: 'w4-eval-llm-judge',
+      },
+      (raw) => {
+        if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
+        for (const l of ['X', 'Y', 'Z']) {
+          const v2 = raw[l];
+          if (v2 === null || typeof v2 !== 'object') return new Error(`missing ${l}`);
+          const hq = v2.hypothesis_quality, cc = v2.counter_evidence_coverage;
+          if (!Number.isInteger(hq) || hq < 1 || hq > 5) return new Error(`${l}.hypothesis_quality invalid`);
+          if (!Number.isInteger(cc) || cc < 1 || cc > 5) return new Error(`${l}.counter_evidence_coverage invalid`);
+        }
+        return raw;
+      },
+    ));
+  }
+  const agg = aggregateVotes(voteResults.map((r) => (r.ok ? { ok: true, data: r.data } : { ok: false })));
   const record = {
     problemId: p.id,
     problemType: p.type,
     seed: SEED,
+    votes: { requested: VOTES, ok: agg ? agg.okVotes : 0, aggregation: VOTES > 1 ? 'median_selfconsistency' : 'single_pass' },
     blind_mapping: mapping,
-    judge_ok: res.ok,
-    judge_error: res.error ? { kind: res.error.kind, message: res.error.message } : null,
-    calibration: 'uncalibrated_llm_judgment',
-    scores: res.ok
-      ? Object.fromEntries(Object.entries(mapping).map(([label, system]) => [system, { label, ...res.data[label] }]))
+    judge_ok: agg !== null,
+    judge_error: agg === null
+      ? { kind: voteResults[voteResults.length - 1].error?.kind ?? 'provider_error', message: voteResults[voteResults.length - 1].error?.message ?? 'all judge votes failed' }
       : null,
-    receipt: { modelId: res.receipt.modelId, modelVersion: res.receipt.modelVersion, latencyMs: res.receipt.latencyMs, usage: res.receipt.usage },
+    calibration: 'uncalibrated_llm_judgment',
+    scores: agg
+      ? Object.fromEntries(Object.entries(mapping).map(([label, system]) => [system, {
+          label,
+          hypothesis_quality: agg.labels[label].hypothesis_quality.median,
+          counter_evidence_coverage: agg.labels[label].counter_evidence_coverage.median,
+          spread: {
+            hypothesis_quality: [agg.labels[label].hypothesis_quality.min, agg.labels[label].hypothesis_quality.max],
+            counter_evidence_coverage: [agg.labels[label].counter_evidence_coverage.min, agg.labels[label].counter_evidence_coverage.max],
+          },
+          one_line_reason: agg.labels[label].one_line_reason,
+        }]))
+      : null,
+    per_vote: voteResults.map((r, i) => (r.ok
+      ? { vote: i + 1, ok: true, data: r.data }
+      : { vote: i + 1, ok: false, error: { kind: r.error?.kind ?? 'provider_error', message: r.error?.message ?? '' } })),
+    receipt: {
+      modelId: voteResults[0].receipt.modelId,
+      usage: voteResults.reduce((acc, r) => ({
+        promptTokens: (acc.promptTokens ?? 0) + (r.receipt.usage.promptTokens ?? 0),
+        completionTokens: (acc.completionTokens ?? 0) + (r.receipt.usage.completionTokens ?? 0),
+      }), {}),
+      latencyMs: voteResults.reduce((acc, r) => acc + r.receipt.latencyMs, 0),
+    },
     at: new Date().toISOString(),
   };
   out.push(record);
-  console.log(`${p.id} judge_ok=${res.ok} mapping=${JSON.stringify(mapping)} scores=${res.ok ? JSON.stringify(Object.fromEntries(Object.entries(record.scores).map(([s, v]) => [s, `${v.hypothesis_quality}/${v.counter_evidence_coverage}`]))) : (record.judge_error && record.judge_error.kind)}`);
+  console.log(`${p.id} judge_ok=${record.judge_ok} votes=${record.votes.ok}/${VOTES} mapping=${JSON.stringify(mapping)} scores=${record.judge_ok ? JSON.stringify(Object.fromEntries(Object.entries(record.scores).map(([s, v3]) => [s, `${v3.hypothesis_quality}/${v3.counter_evidence_coverage}`]))) : (record.judge_error && record.judge_error.kind)}`);
 }
 
 const outFile = process.env.FARLAB_JUDGE_OUT ?? 'llm-judge.jsonl';
