@@ -1,0 +1,248 @@
+{
+  "db": "C:\\Users\\RichardYuan\\Desktop\\new\\.far-run\\far.db",
+  "measuredAt": "2026-08-22T02:36:32.679Z",
+  "totals": {
+    "runs": 51,
+    "completed": 34,
+    "partial": 17
+  },
+  "p1_frozenRun": {
+    "claim": "no auto-detection exists anywhere in src/ (only manual sweep script zcode-harness/scripts/sweep-zombie-runs.mjs)",
+    "silentKills": 3,
+    "visibleStageFailures": 14,
+    "partialsEverResumed": 0,
+    "sweepDetectionLatencyMinutes": [
+      {
+        "run": "run_aqbhgzjq33ag",
+        "minutes": 243
+      },
+      {
+        "run": "run_wbdtbwm0wvq3",
+        "minutes": 121
+      },
+      {
+        "run": "run_z1d63kcbpe4x",
+        "minutes": 93
+      }
+    ],
+    "sweepNeverResumes": true
+  },
+  "p2_detachedExecution": {
+    "claim": "research start prints runId at creation then executes in-process; host reaping kills the worker mid-run with no supervisor to re-launch",
+    "partialsKilledMidStage": [
+      {
+        "run": "run_aqbhgzjq33ag",
+        "stuckStage": "critique_falsify",
+        "deathMode": "KILLED-silent(no stage_failed event)",
+        "lastEventAt": "2026-08-21T23:20:25.163Z",
+        "resumedAttempts": 0,
+        "llmCallsSoFar": 21
+      },
+      {
+        "run": "run_wbdtbwm0wvq3",
+        "stuckStage": "critique_falsify",
+        "deathMode": "KILLED-silent(no stage_failed event)",
+        "lastEventAt": "2026-08-21T23:20:25.163Z",
+        "resumedAttempts": 0,
+        "llmCallsSoFar": 24
+      },
+      {
+        "run": "run_z1d63kcbpe4x",
+        "stuckStage": "rank",
+        "deathMode": "KILLED-silent(no stage_failed event)",
+        "lastEventAt": "2026-08-21T23:20:25.163Z",
+        "resumedAttempts": 0,
+        "llmCallsSoFar": 34
+      }
+    ],
+    "note": "these runs required a FRESH run to redo work (see everResumed=0) unless manually resumed"
+  },
+  "p3_resumeGranularity": {
+    "claim": "checkpoint unit = stage (run row); StageRecord.checkpointRef is declared in src/domain/run.ts:31 but has zero users in src/ or tests/",
+    "perStageModelCalls": {
+      "scope": {
+        "calls": 34,
+        "meanCallsPerRun": 1,
+        "runs": 34
+      },
+      "retrieve": {
+        "calls": 57,
+        "meanCallsPerRun": 1.7,
+        "runs": 34
+      },
+      "build_evidence": {
+        "calls": 328,
+        "meanCallsPerRun": 9.6,
+        "runs": 34
+      },
+      "generate_hypotheses": {
+        "calls": 206,
+        "meanCallsPerRun": 6.9,
+        "runs": 30
+      },
+      "critique_falsify": {
+        "calls": 240,
+        "meanCallsPerRun": 8,
+        "runs": 30
+      },
+      "rank": {
+        "calls": 501,
+        "meanCallsPerRun": 16.7,
+        "runs": 30
+      },
+      "plan": {
+        "calls": 33,
+        "meanCallsPerRun": 1.1,
+        "runs": 30
+      },
+      "revise": {
+        "calls": 3,
+        "meanCallsPerRun": 3,
+        "runs": 1
+      }
+    },
+    "completedRunWallClockMin": {
+      "n": 34,
+      "p50": 8.4,
+      "max": 142
+    }
+  },
+  "forensicDetail": [
+    {
+      "run": "run_z8b0yy8b432n",
+      "stuckStage": "rank",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-21T19:08:42.954Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 33
+    },
+    {
+      "run": "run_17bss0pc3a84",
+      "stuckStage": "scope",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-21T19:08:53.800Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 1
+    },
+    {
+      "run": "run_aqbhgzjq33ag",
+      "stuckStage": "critique_falsify",
+      "deathMode": "KILLED-silent(no stage_failed event)",
+      "lastEventAt": "2026-08-21T23:20:25.163Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 21
+    },
+    {
+      "run": "run_8n37pfxnmjd0",
+      "stuckStage": "generate_hypotheses",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-21T21:04:29.265Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 16
+    },
+    {
+      "run": "run_30zhf7nptvyc",
+      "stuckStage": "rank",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-21T21:14:16.451Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 31
+    },
+    {
+      "run": "run_wbdtbwm0wvq3",
+      "stuckStage": "critique_falsify",
+      "deathMode": "KILLED-silent(no stage_failed event)",
+      "lastEventAt": "2026-08-21T23:20:25.163Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 24
+    },
+    {
+      "run": "run_a7z246try8cs",
+      "stuckStage": "retrieve",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-21T21:19:44.288Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 2
+    },
+    {
+      "run": "run_bh6xj02kegcb",
+      "stuckStage": "retrieve",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-21T21:21:12.430Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 2
+    },
+    {
+      "run": "run_wkncq5pvspph",
+      "stuckStage": "critique_falsify",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-21T21:28:26.539Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 17
+    },
+    {
+      "run": "run_z1d63kcbpe4x",
+      "stuckStage": "rank",
+      "deathMode": "KILLED-silent(no stage_failed event)",
+      "lastEventAt": "2026-08-21T23:20:25.163Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 34
+    },
+    {
+      "run": "run_tvan8acwv69k",
+      "stuckStage": "critique_falsify",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-21T22:14:43.606Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 19
+    },
+    {
+      "run": "run_9f7tvkf7fk3j",
+      "stuckStage": "plan",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-22T00:26:43.434Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 46
+    },
+    {
+      "run": "run_j5mjznfp8bp5",
+      "stuckStage": "generate_hypotheses",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-22T00:28:45.256Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 16
+    },
+    {
+      "run": "run_s3vsdy5ny3rj",
+      "stuckStage": "plan",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-22T00:49:38.860Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 45
+    },
+    {
+      "run": "run_rrm0z56gr214",
+      "stuckStage": "critique_falsify",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-22T01:05:19.766Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 23
+    },
+    {
+      "run": "run_c2e1sbw97gf2",
+      "stuckStage": "scope",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-22T01:05:20.333Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 1
+    },
+    {
+      "run": "run_hbdgmvy7x61g",
+      "stuckStage": "scope",
+      "deathMode": "stage_failed(visible)",
+      "lastEventAt": "2026-08-22T01:05:20.893Z",
+      "resumedAttempts": 0,
+      "llmCallsSoFar": 1
+    }
+  ]
+}

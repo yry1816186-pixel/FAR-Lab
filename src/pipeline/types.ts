@@ -25,6 +25,25 @@ export interface StageContext {
   }) => void;
   /** Structured cancellation signal checked between expensive operations inside stages. */
   cancelled: () => boolean;
+  /**
+   * W8 S2 intra-stage step checkpoint (dbos OAOO pattern), per FAMILY: return the
+   * persisted result for (stage, family, key) when present, else run fn once and persist.
+   * Keys must be stable domain ids (not loop counters) so they survive re-ordering and
+   * enable parallelism; `family` separates independent checkpoint groups inside one stage
+   * (rank: 'scoring' batches vs 'pairs') so their fingerprints cannot clear each other.
+   * inputsFingerprint: hash of the family's FULL prompt-bearing inputs (projections +
+   * prompt text + batch partition); a change (code/prompt upgrade mid-run) invalidates
+   * only that family's cached outputs instead of replaying stale responses under
+   * rebuilt prompts (Wave-5 audit P3 hardening). Pass undefined only when the subtask
+   * inputs are provably key-bound.
+   */
+  checkpointed: <T>(stage: RunStageName, family: string, key: string, inputsFingerprint: string | undefined, fn: () => Promise<T>) => Promise<T>;
+  /**
+   * True when this executor lost the run lease (adopted elsewhere after expiry). Stage
+   * loops surface this through assertNotCancelled so a disowned worker stops before its
+   * next domain-object write instead of racing the adopter (W8 audit P1-3 fencing).
+   */
+  disowned: () => boolean;
   log: (msg: string) => void;
 }
 

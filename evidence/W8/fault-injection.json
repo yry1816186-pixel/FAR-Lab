@@ -1,0 +1,347 @@
+{
+  "measuredAt": "2026-08-22T04:07:50.803Z",
+  "config": {
+    "runs": 20,
+    "subtasks": 12,
+    "ttlMs": 5000,
+    "pollMs": 1000
+  },
+  "northStar": {
+    "metric": "run-reliability",
+    "claim": "injected failure (worker kill) 100% recovered within one poll cycle of lease expiry; 20-run soak zero frozen; redo <= in-flight subtask (1)",
+    "injectedFailures": 20,
+    "recovered": 20,
+    "zeroFrozen": true,
+    "maxExecutionsPerRun": 13,
+    "theoreticalMax": 13
+  },
+  "runs": [
+    {
+      "label": "baseline",
+      "killAt": 0,
+      "status": "completed",
+      "executions": 12,
+      "identicalToBaseline": true
+    },
+    {
+      "label": "soak-01",
+      "killAt": 5,
+      "workerDiedAtMs": 125,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "35720-ysry2ozb",
+        "leaseExpiresAt": "2026-08-22T04:06:07.544Z"
+      },
+      "msKillToAdoption": 5039,
+      "msWatchdogStartToComplete": 5217,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-02",
+      "killAt": 8,
+      "workerDiedAtMs": 139,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "24044-42v5cq1i",
+        "leaseExpiresAt": "2026-08-22T04:06:12.963Z"
+      },
+      "msKillToAdoption": 5034,
+      "msWatchdogStartToComplete": 5213,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-03",
+      "killAt": 11,
+      "workerDiedAtMs": 163,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "35704-h4dasq3i",
+        "leaseExpiresAt": "2026-08-22T04:06:18.406Z"
+      },
+      "msKillToAdoption": 5035,
+      "msWatchdogStartToComplete": 5197,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-04",
+      "killAt": 4,
+      "workerDiedAtMs": 165,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "43152-zgbvv4ju",
+        "leaseExpiresAt": "2026-08-22T04:06:23.828Z"
+      },
+      "msKillToAdoption": 5039,
+      "msWatchdogStartToComplete": 5230,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-05",
+      "killAt": 7,
+      "workerDiedAtMs": 131,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "38352-6fhyva10",
+        "leaseExpiresAt": "2026-08-22T04:06:29.273Z"
+      },
+      "msKillToAdoption": 5034,
+      "msWatchdogStartToComplete": 5201,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-06",
+      "killAt": 10,
+      "workerDiedAtMs": 178,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "25788-w5qmuvbj",
+        "leaseExpiresAt": "2026-08-22T04:06:34.720Z"
+      },
+      "msKillToAdoption": 5043,
+      "msWatchdogStartToComplete": 5205,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-07",
+      "killAt": 3,
+      "workerDiedAtMs": 117,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "41044-d0b30k0c",
+        "leaseExpiresAt": "2026-08-22T04:06:40.115Z"
+      },
+      "msKillToAdoption": 5057,
+      "msWatchdogStartToComplete": 5274,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-08",
+      "killAt": 6,
+      "workerDiedAtMs": 135,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "2444-lafvc41k",
+        "leaseExpiresAt": "2026-08-22T04:06:45.586Z"
+      },
+      "msKillToAdoption": 5048,
+      "msWatchdogStartToComplete": 5182,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-09",
+      "killAt": 9,
+      "workerDiedAtMs": 98,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "36640-cfsjzsty",
+        "leaseExpiresAt": "2026-08-22T04:06:50.930Z"
+      },
+      "msKillToAdoption": 5050,
+      "msWatchdogStartToComplete": 5196,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-10",
+      "killAt": 2,
+      "workerDiedAtMs": 110,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "40372-w7hipmbt",
+        "leaseExpiresAt": "2026-08-22T04:06:56.303Z"
+      },
+      "msKillToAdoption": 5030,
+      "msWatchdogStartToComplete": 5219,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-11",
+      "killAt": 5,
+      "workerDiedAtMs": 124,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "9384-q66igt79",
+        "leaseExpiresAt": "2026-08-22T04:07:01.722Z"
+      },
+      "msKillToAdoption": 5038,
+      "msWatchdogStartToComplete": 5208,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-12",
+      "killAt": 8,
+      "workerDiedAtMs": 141,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "43840-pduegnt0",
+        "leaseExpiresAt": "2026-08-22T04:07:07.134Z"
+      },
+      "msKillToAdoption": 5051,
+      "msWatchdogStartToComplete": 5227,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-13",
+      "killAt": 11,
+      "workerDiedAtMs": 179,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "42248-0ixwd534",
+        "leaseExpiresAt": "2026-08-22T04:07:12.620Z"
+      },
+      "msKillToAdoption": 5046,
+      "msWatchdogStartToComplete": 5190,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-14",
+      "killAt": 4,
+      "workerDiedAtMs": 120,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "33920-uxsmw8ni",
+        "leaseExpiresAt": "2026-08-22T04:07:18.001Z"
+      },
+      "msKillToAdoption": 5030,
+      "msWatchdogStartToComplete": 5204,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-15",
+      "killAt": 7,
+      "workerDiedAtMs": 129,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "40044-gvzabsj5",
+        "leaseExpiresAt": "2026-08-22T04:07:23.407Z"
+      },
+      "msKillToAdoption": 5039,
+      "msWatchdogStartToComplete": 5197,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-16",
+      "killAt": 10,
+      "workerDiedAtMs": 145,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "38596-u4x1xriy",
+        "leaseExpiresAt": "2026-08-22T04:07:28.812Z"
+      },
+      "msKillToAdoption": 5051,
+      "msWatchdogStartToComplete": 5193,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-17",
+      "killAt": 3,
+      "workerDiedAtMs": 113,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "43436-g6765ny7",
+        "leaseExpiresAt": "2026-08-22T04:07:34.196Z"
+      },
+      "msKillToAdoption": 5042,
+      "msWatchdogStartToComplete": 5232,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-18",
+      "killAt": 6,
+      "workerDiedAtMs": 140,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "43992-j1k77nx2",
+        "leaseExpiresAt": "2026-08-22T04:07:39.634Z"
+      },
+      "msKillToAdoption": 5060,
+      "msWatchdogStartToComplete": 5228,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-19",
+      "killAt": 9,
+      "workerDiedAtMs": 149,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "41252-on9q3c9l",
+        "leaseExpiresAt": "2026-08-22T04:07:45.089Z"
+      },
+      "msKillToAdoption": 5056,
+      "msWatchdogStartToComplete": 5213,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    },
+    {
+      "label": "soak-20",
+      "killAt": 2,
+      "workerDiedAtMs": 111,
+      "frozenBeforeRecovery": {
+        "status": "running",
+        "leaseHolder": "42648-ppqs5v54",
+        "leaseExpiresAt": "2026-08-22T04:07:50.481Z"
+      },
+      "msKillToAdoption": 5030,
+      "msWatchdogStartToComplete": 5240,
+      "finalStatus": "completed",
+      "subtaskExecutionsAcrossProcesses": 13,
+      "identicalToBaseline": true,
+      "pass": true
+    }
+  ]
+}

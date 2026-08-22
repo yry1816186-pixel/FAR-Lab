@@ -43,6 +43,13 @@ export interface ApiServerOptions {
   executor?: (runId: string) => Promise<unknown>;
   /** Static root served when present (SPA fallback to index.html). Default: <cwd>/web/dist. */
   staticRoot?: string;
+  /**
+   * W8 S1 frozen-run watchdog: poll interval (ms) for runs stuck status='running' with
+   * an expired lease; detected runs are adopted (re-executed — resume semantics skip
+   * done stages and checkpointed subtasks). Default 30_000; 0 disables. Runs inside
+   * this server process (no new service).
+   */
+  watchdogIntervalMs?: number;
 }
 
 export interface ApiServer {
@@ -173,6 +180,40 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     executing.set(runId, run);
     return true;
   };
+
+  // W8 S1 watchdog: frozen runs (status='running', lease expired) are detected within one
+  // poll cycle and adopted — execute() reclaims the expired lease and resume semantics
+  // (stage skip + step checkpoints) continue the run instead of abandoning paid work.
+  // An in-memory per-run backoff prevents a hot adoption loop when an adopted run keeps
+  // failing fast (dbos recovery_attempts pattern, embedded form).
+  const watchdogIntervalMs = opts.watchdogIntervalMs ?? 30_000;
+  const adoptionBackoffMs = Math.max(watchdogIntervalMs * 10, 60_000);
+  const lastAdoptedAt = new Map<string, number>();
+  let watchdogTimer: NodeJS.Timeout | null = null;
+  const sweepExpiredLeases = (): void => {
+    try {
+      const now = Date.now();
+      for (const stale of app.store.listExpiredLeaseRuns(new Date().toISOString())) {
+        if (executing.has(stale.id)) continue;
+        const last = lastAdoptedAt.get(stale.id) ?? 0;
+        if (now - last < adoptionBackoffMs) continue;
+        lastAdoptedAt.set(stale.id, now);
+        app.store.appendEvent(stale.id, {
+          type: 'note',
+          detail: { reason: 'watchdog_adoption', holder: stale.leaseHolder ?? null, stage: stale.currentStage },
+        });
+        startRun(stale.id);
+      }
+    } catch (e) {
+      // The watchdog must never take the server down (audit P2-2): a transient store
+      // error (e.g. SQLITE_BUSY beyond busy_timeout) is logged and retried next cycle.
+      process.stderr.write(`far-api: lease sweep failed: ${e instanceof Error ? e.message : String(e)}\n`);
+    }
+  };
+  if (watchdogIntervalMs > 0) {
+    watchdogTimer = setInterval(sweepExpiredLeases, watchdogIntervalMs);
+    watchdogTimer.unref();
+  }
 
   // ---- response helpers ----
 
@@ -624,6 +665,7 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
 
   const stop = (): Promise<void> =>
     new Promise((resolve) => {
+      if (watchdogTimer !== null) clearInterval(watchdogTimer);
       server.close(() => resolve());
       server.closeIdleConnections();
       server.closeAllConnections();

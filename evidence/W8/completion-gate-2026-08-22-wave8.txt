@@ -1,0 +1,18 @@
+{
+  "verdict": "NOT_READY",
+  "gateFile": ".control/ACCEPTANCE_STATUS.json",
+  "itemStats": {
+    "live_verified": 19,
+    "tested": 1
+  },
+  "missing": [],
+  "failed": [
+    {
+      "id": "B-DEEPSEEK-BALANCE",
+      "status": "OPEN",
+      "reason": "critical-blocker-open"
+    }
+  ],
+  "errors": [],
+  "message": "Do NOT declare completion: resolve the listed items with real evidence, update .control/ACCEPTANCE_STATUS.json, and re-run."
+}

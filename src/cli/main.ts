@@ -139,7 +139,18 @@ const main = async (): Promise<void> => {
     try {
       const run = app.store.getRun(rid);
       if (!run) die(`run not found: ${runId}`);
-      printRun(run);
+      // W8 S1: real lease state — a status='running' run with no live lease is frozen
+      // (recoverable via `far research resume <id>`: expired leases are reclaimable).
+      const lease = app.store.getRunLease(rid);
+      const live = lease.holder !== null && (lease.expiresAt ?? '') > new Date().toISOString();
+      if (json()) {
+        // single JSON object for machine consumers (two blobs would break JSON.parse(stdout))
+        const { stages, ...rest } = run;
+        console.log(JSON.stringify({ ...rest, progress: runProgress(run), stages, lease: { holder: lease.holder, expiresAt: lease.expiresAt, live } }, null, 2));
+      } else {
+        printRun(run);
+        console.log(`  lease: ${lease.holder === null ? 'none' : `${lease.holder} (expires ${lease.expiresAt})`}${run.status === 'running' && !live ? '  [FROZEN — resume to recover]' : ''}`);
+      }
     } finally { app.close(); }
     return;
   }

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
   "protocolVersion": "2.0.0",
-  "asOf": "2026-08-22T11:30+08:00",
-  "note": "Machine-readable gate record (stop-guard schema) + detail section below. Every status maps to session evidence; nothing asserted without a file/run reference. WAVE-4 OPENED by user handoff 2026-08-22: harness-source expedition in progress; dimensions below reflect Wave-3 close state until Wave-4 fusion lands.",
+  "asOf": "2026-08-22T12:10+08:00",
+  "note": "Machine-readable gate record + detail. W8 fusion landed 2026-08-22 (D-054): leases/heartbeat/watchdog + step_outputs checkpoints, offline fault-injection 20/20; adversarial audit in flight. Parallel sessions W5/W7/W9 closed; W6 + W-PRODUCT still in flight.",
   "dimensions": [
     {
       "id": "scientific-frontier",
@@ -316,6 +316,26 @@
         "id": "wave-product-phase1",
         "status": "resolved",
         "evidence": "D-045 + D-053: 18-section panoramic design plan delivered (research/WAVE-PRODUCT-DESIGN-PLAN.md) with 7-line sourced research reports (research/wave-product-reports/), 8 audits two-round reviewed (2+1 refutations, +6 new findings), reuse-vs-build triple-gate table; HARD USER GATE: waiting_for_user_review — no implementation until explicit approval of decision points (narrative/aesthetic/desktop-framework/deployment-form/Tier-0-deps)"
+      },
+      {
+        "id": "wave8-pain-measurement",
+        "status": "resolved",
+        "evidence": "P1/P2/P3 all quantified pre-fusion: 93-243min frozen detection, 0/17 auto-resume, 21/24/34 paid calls abandoned, 60% subtask loss on resume (evidence/W8/pain-report.md)"
+      },
+      {
+        "id": "wave8-s1-lease-watchdog",
+        "status": "resolved",
+        "evidence": "D-054: runs-row leases + heartbeat-piggyback renewal + embedded server watchdog w/ adoption backoff + lease-lost fencing; fault-injection 20/20, kill->adoption 5033-5060ms (evidence/W8/fault-injection.json)"
+      },
+      {
+        "id": "wave8-s2-step-checkpoints",
+        "status": "resolved",
+        "evidence": "D-054: step_outputs OAOO table + ctx.checkpointed + inputs-fingerprint gate (Wave-5 audit P3 fix); rank/hypotheses adopted; redo 100%-of-stage -> <=1 in-flight subtask; outputs byte-identical x20; tests 13/13, mutations M1/M2/M3 red-then-green"
+      },
+      {
+        "id": "wave8-live-soak",
+        "status": "blocked",
+        "evidence": "20-run LIVE soak (real model routes) pending funded route (D-036); offline deterministic-subtask soak passed 20/20"
       }
     ],
     "evidence": [

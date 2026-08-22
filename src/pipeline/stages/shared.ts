@@ -19,8 +19,13 @@ export const DUPLICATE_MARKER = 'duplicate-of-representative:';
 export const isRepresentative = (h: Pick<HypothesisCandidate, 'derivation'>): boolean =>
   !h.derivation.rationale.includes(DUPLICATE_MARKER);
 
-/** Structured cancellation checkpoint — the message prefix is what the orchestrator matches. */
+/**
+ * Structured cancellation checkpoint — the message prefix is what the orchestrator matches.
+ * Also a W8 lease-fencing checkpoint (audit P1-3): a worker disowned via lease adoption
+ * stops here BEFORE its next domain-object write instead of racing the adopter.
+ */
 export const assertNotCancelled = (ctx: StageContext, stage: string): void => {
+  if (ctx.disowned?.()) throw new Error(`run lease lost during ${stage} (adopted by another executor)`);
   if (ctx.cancelled()) throw new Error(`cancelled by user during ${stage}`);
 };
 

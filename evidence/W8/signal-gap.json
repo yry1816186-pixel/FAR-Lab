@@ -1,0 +1,14 @@
+{
+  "measuredAt": "2026-08-22T02:38:15.308Z",
+  "completedRuns": 34,
+  "interSignalGapsMs": {
+    "n": 3157,
+    "p50": 1248,
+    "p95": 28572,
+    "p99": 57404,
+    "max": 7374996,
+    "maxRun": "run_2wmhyer1bdyq",
+    "maxMinutes": 122.9
+  },
+  "designImplication": "a staleness threshold must sit safely above the legit p99/max gap; current manual sweep uses 30min with no liveness heartbeat of its own (updated_at only advances at stage transitions AND on receipts, so mid-stage calls DO heartbeat — but nothing polls)"
+}

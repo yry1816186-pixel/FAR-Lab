@@ -1,0 +1,17 @@
+{
+  "measuredAt": "2026-08-22T02:39:23.532Z",
+  "subtasksTotal": 10,
+  "subtasksCompletedBeforeKill": 6,
+  "persistedSubtaskResultsAfterKill": 0,
+  "deadRunRow": {
+    "status": "running",
+    "retrieveStageState": "running",
+    "note": "status=running + stage=running is EXACTLY the frozen-run signature the real DB shows (3 silent-kill victims, evidence/W8/pain-measurement.json)"
+  },
+  "resumeOutcome": {
+    "status": "completed",
+    "subtasksReExecutedOnResume": 10
+  },
+  "waste": "6 of 10 completed subtasks were lost (60%); resume redid all 10",
+  "wallClockAnalogy": "mean rank stage = 17 model calls; a kill at 90% through rank re-pays all 17 on resume today"
+}
