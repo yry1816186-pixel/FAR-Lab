@@ -582,6 +582,20 @@ function parseSeedSources(raw: unknown): string | {
    */
   const health = (res: http.ServerResponse): void => {
     const providers = listProviders().map((p) => ({ name: p.name, kind: p.kind, liveReady: p.liveReady }));
+    // B12-G1: the health strip must reflect the ACTIVE route — when the user's
+    // active default is a CUSTOM config, the env-route list alone misrepresents
+    // readiness. Project the active route (masked key, never the value).
+    const activeConfigId = app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
+    let activeRoute: Record<string, unknown> | null = null;
+    if (typeof activeConfigId === 'string' && activeConfigId.length > 0) {
+      const cfg = app.store.getObject('model_config', activeConfigId);
+      if (cfg !== null) {
+        activeRoute = {
+          id: cfg.id, label: cfg.label, wire: cfg.wire, baseUrl: cfg.baseUrl,
+          modelId: cfg.modelId, apiKeySet: cfg.apiKey.length > 0, apiKeyMasked: maskApiKey(cfg.apiKey),
+        };
+      }
+    }
     const watchdog = consecutiveSweepFailures === 0
       ? 'ok'
       : `degraded (${consecutiveSweepFailures} consecutive sweep failures — frozen-run adoption stalled)`;
@@ -592,6 +606,7 @@ function parseSeedSources(raw: unknown): string | {
         db: 'ok',
         watchdog,
         providers,
+        ...(activeRoute !== null ? { activeRoute } : {}),
         gitCommit: process.env.FARLAB_GIT_COMMIT ?? null,
         time: new Date().toISOString(),
       });
@@ -602,6 +617,7 @@ function parseSeedSources(raw: unknown): string | {
         watchdog,
         detail: e instanceof Error ? e.message : String(e),
         providers,
+        ...(activeRoute !== null ? { activeRoute } : {}),
         gitCommit: process.env.FARLAB_GIT_COMMIT ?? null,
         time: new Date().toISOString(),
       });

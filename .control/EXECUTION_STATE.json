@@ -65,12 +65,11 @@
     "P5 batch B (0746bd0) left a committed regression: CLI feedback output moved console.log->stdout.write without updating the test spy; fixed in PEX batch (spy captures both channels)."
   ],
   "activeTasks": [
-    "PEX Phase-2 B3-2 remaining: web notifications (default-off, terminal-state driven) + multi-run awareness bar; visual re-verification of version-compare disclosure + EN experiments tab (ENV-LIMITED: prior IAB session degraded; use a FRESH browser session).",
-    "PEX Phase-2 done: B0 (d3fa71c), B1 baseline+4 hotfixes (3fa745d), B2 skeleton search/capture/disclosure (d56912c), B3-1 wait-time root fix + critique round (be13a42+429bb5b: subtasks/milestones/enriched receipts/SSE/version compare/experiments i18n).",
-    "Absorbed/backlog: desktop quick capture -> B10; oaUrl pipeline population -> B9; search ranking/snippets/totals+hasMore -> B14; hypothesis lifecycle status field -> B5; source dedup (duplicate DOI rows) -> B6/B13 pipeline.",
-    "EEL lane dormant: remote gateway when user starts Docker; execute-stage integration scheduled B8."
+    "PEX Phase-2 COMPLETE (2026-08-22, commits d3fa71c..B12-G1 batch): all B-batches landed — B0-B4, B7 graph, B10 desktop, R1 ingestion (unpdf->pdfjs-dist/citation-js/Zotero/seeds), R2 CLI (completion/new/watch), R3 (jsdiff/KaTeX/axe + B5 hypothesis ops), R4 binding enrichment, B8 execute stage (3 live paths: honest-skip x2, column-drift retry, real training DONE), D-101 FTS5 search (bm25+snippets) + cmdk IME guard, B12-G1 health activeRoute.",
+    "Remaining recorded debts (all owned): ENV-LIMITED GUI interaction re-verification (version-compare disclosure visuals, experiments-tab EN, Zotero degrade panel) — B13 list, needs healthy browser session; B6 binding-density live A/B PENDING_LIVE; CLI watch TTY repaint IMPLEMENTED_UNVERIFIED-live; oaUrl pipeline population; source DOI dedup; sibling sessions' in-flight README/agent work untouched.",
+    "EEL lane dormant: remote gateway when user starts Docker."
   ],
   "blockerIds": [],
-  "lastVerifiedCommit": "PEX B3-1 2026-08-22 (429bb5b): wait-time substage truth live-verified on real battery run (subtasks 14/14,12/12,8/8; 17 milestones; enriched model/retrieval lines rendered; SSE ESTABLISHED); critique round fixed 2 P0 (falsify counter closure race, progress stale-doc write) + feed stage-slot window + poll-cadence remount; gates 661/663 + tsc/build 0 + secret-scan PASS.",
-  "nextAction": "B3-2 finish (notifications + awareness bar) in a FRESH browser session, then B4 object-level AI research actions (POST /runs/:id/actions server first — browser-independent), B6 binding enrichment, B11 CLI. Two sibling sessions may co-edit: commit via explicit pathspec only."
+  "lastVerifiedCommit": "PEX Phase-2 close 2026-08-22: final audit 11-pass + 2 blockers adjudicated (FTS live-verified post-restart with snippet «» + bm25 rank; seeds = citation typo, data intact — evidence/W-PEX/phase2-final-audit.md); B12-G1 health activeRoute live-verified; gates 804/806 + tsc/build 0 + secret-scan + completion-gate VERIFIED_READY (26/26).",
+  "nextAction": "Program-level done. Optional polish queue: ENV-LIMITED GUI re-verifications when a stable browser session is available; B6 live A/B on next real run; performance-budget audit consuming the web-vitals console collector (B14 instrument landed)."
 }
