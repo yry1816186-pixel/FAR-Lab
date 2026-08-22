@@ -1133,6 +1133,11 @@ select option { color: var(--text); background: var(--surface); }
 /* S3: ACH evidence analysis + in-tab filters + cross-tab claim flash */
 .ach-evidence { margin-top: 12px; }
 .ach-evidence .compare-table { margin-top: 4px; }
+.ach-table .compare-label-col { width: auto; min-width: 220px; }
+.ach-cell { text-align: center; width: 56px; }
+.ach-legend { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.ach-legend .ev-glyph { flex-shrink: 0; }
+.compare-export { margin-top: 10px; display: flex; justify-content: flex-end; }
 .compare-claim-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .compare-claim-text { text-align: left; overflow-wrap: anywhere; }
 .in-tab-filter {
