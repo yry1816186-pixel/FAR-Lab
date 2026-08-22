@@ -102,14 +102,27 @@ if (mode === 'replay') {
   process.exit(0);
 }
 
-// --live R: identical pipeline R times over the same completed runs
+// --live R: identical pipeline R times over the same completed runs.
+// Provider route: default deepseek; FARLAB_JUDGE_PROVIDER=dashscope uses the
+// Qwen/Bailian route (the competition-mandated family) — EITHER funded route
+// unblocks the live measurement (D-036 three-way unblock, made real in code).
 const R = Number(process.argv.find((a, i) => process.argv[i - 1] === '--live') ?? 3);
-const { makeProvider } = await import('./lib.mjs');
-const provider = makeProvider();
-if (!provider.liveReady) { console.error('FATAL: DEEPSEEK_API_KEY not set'); process.exit(1); }
+const PROVIDER = process.env.FARLAB_JUDGE_PROVIDER ?? 'deepseek';
+let provider;
+if (PROVIDER === 'dashscope') {
+  const { createDashScopeProvider } = await import('../dist/providers/dashscope.js');
+  provider = createDashScopeProvider({ totalTimeoutMs: 300_000 });
+} else if (PROVIDER === 'deepseek') {
+  const { makeProvider } = await import('./lib.mjs');
+  provider = makeProvider();
+} else {
+  console.error(`FATAL: unknown FARLAB_JUDGE_PROVIDER '${PROVIDER}' (deepseek|dashscope)`);
+  process.exit(1);
+}
+if (!provider.liveReady) { console.error(`FATAL: ${PROVIDER} route not live-ready (missing API key?)`); process.exit(1); }
 const runs = readFileSync(RUNS_FILE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const byTask = new Map(TASKS.map((t) => [t.id, t]));
-const out = { mode: 'live', gtRev: GT_REV, repeats: R, generated: new Date().toISOString(), tasks: [] };
+const out = { mode: 'live', gtRev: GT_REV, repeats: R, judgeRoute: { provider: PROVIDER, modelId: provider.modelId }, generated: new Date().toISOString(), tasks: [] };
 for (const r of runs) {
   const t = byTask.get(r.task);
   if (!t || !r.runId) continue;
