@@ -348,19 +348,31 @@ a:hover { text-decoration: underline; }
 
 textarea, input[type='text'], select {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
+  line-height: var(--lh-body);
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 6px 8px;
+  border: 1px solid var(--form-border);
+  border-radius: var(--radius-s);
+  padding: 6px var(--sp-2);
   width: 100%;
 }
-textarea { resize: vertical; font-family: inherit; }
+textarea { resize: vertical; font-family: inherit; min-height: 72px; }
+textarea:hover, input[type='text']:hover, select:hover { border-color: var(--text-2); }
 textarea:focus-visible, input:focus-visible, select:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 0;
 }
+/* craft-spec-v2 §5: unified custom select appearance (no engine-default chrome) */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: var(--sp-5);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23717375' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+select option { color: var(--text); background: var(--surface); }
 
 .field-error { color: var(--err-text); font-size: 12px; margin: 2px 0; }
 .field-ok { color: var(--ok-text); font-size: 12px; margin: 2px 0; }
@@ -372,18 +384,21 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 /* ---------- buttons ---------- */
 .btn {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   background: var(--btn-bg);
   color: var(--btn-text);
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  padding: 5px 12px;
+  border-radius: var(--radius-s);
+  padding: 6px var(--sp-3);
   cursor: pointer;
 }
 .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+/* active = 8% state-layer darkening (M3 pressed state, craft-spec-v2 §6) — no transform */
+.btn:active:not(:disabled) { background: color-mix(in oklab, var(--text-1) 8%, var(--btn-bg)); }
 .btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-text); border-color: var(--btn-primary-bg); }
 .btn--primary:hover:not(:disabled) { color: var(--btn-primary-text); opacity: 0.92; }
-.btn--small { padding: 2px 8px; font-size: 12px; min-height: 24px; min-width: 24px; } /* 24px: WCAG 2.2 SC 2.5.8 AA target size */
+.btn--primary:active:not(:disabled) { background: color-mix(in oklab, var(--surface) 12%, var(--btn-primary-bg)); opacity: 1; }
+.btn--small { padding: 3px var(--sp-2); font-size: var(--fs-aux); min-height: 24px; min-width: 24px; } /* 24px: WCAG 2.2 SC 2.5.8 AA target size */
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .link-button {
@@ -591,10 +606,23 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 .stage-row--running th { font-weight: 700; }
 
 .count-progress { display: inline-flex; align-items: center; gap: 6px; }
-.count-progress progress { width: 72px; height: 8px; }
-.count-progress progress::-webkit-progress-bar { background: var(--surface-2); border-radius: 4px; }
-.count-progress progress::-webkit-progress-value { background: var(--accent); border-radius: 4px; }
-.count-progress progress::-moz-progress-bar { background: var(--accent); }
+/* custom determinate progress (craft-spec-v2 §5): 4px track, info fill, engine-consistent */
+.progress-track {
+  display: inline-block;
+  width: 72px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--v2-surface-2);
+  overflow: hidden;
+  vertical-align: middle;
+}
+.progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width var(--dur-med) var(--ease-standard);
+}
 
 /* ---------- run controls ---------- */
 .run-controls { display: flex; flex-direction: column; gap: 6px; }
