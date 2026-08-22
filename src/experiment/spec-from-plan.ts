@@ -48,15 +48,31 @@ const DraftOut = z.object({
   }
 });
 
+/**
+ * The sidecar's CLOSED hyperparameter space (experiment-runtime builders.py
+ * _ALLOWED_HPARAMS) — mirrored here so the prompt carries the real whitelist
+ * and the deterministic pre-filter can reject drift before a sidecar hop.
+ */
+export const ALLOWED_HPARAMS: Readonly<Record<string, readonly string[]>> = {
+  dummy_most_frequent: ['strategy'],
+  logistic_regression: ['C', 'max_iter', 'solver'],
+  random_forest_classifier: ['n_estimators', 'max_depth', 'min_samples_leaf'],
+  gradient_boosting_classifier: ['n_estimators', 'max_depth', 'learning_rate'],
+};
+
 const SYSTEM_PROMPT =
   'You convert a research plan into ONE tabular ML experiment spec draft, or declare it infeasible. ' +
   'Feasible ONLY when the plan\'s data requirements plausibly map to a PUBLIC tabular OpenML dataset ' +
   '(classification). If the plan needs wet-lab data, private records, imaging, or text corpora, set ' +
   'feasible=false with a skipReason naming what is missing. Choose an existing OpenML dataset id you ' +
-  'are confident exists (classic tabular benchmarks); the targetColumn must be a real column of that ' +
-  'dataset. Prefer 2-3 models that differ structurally (e.g. logistic_regression vs ' +
-  'random_forest_classifier) so comparisons discriminate. hyperparams keys must match sklearn parameter ' +
-  'names (e.g. n_estimators, max_depth, C). Output JSON only.';
+  'are confident exists (classic tabular benchmarks). The targetColumn MUST be that dataset\'s DEFAULT ' +
+  'target attribute — the deterministic layer verifies it against the catalog and rejects mismatches ' +
+  '(e.g. openml 61 -> Class, openml 1468 -> Class, openml 426 -> oz10). Prefer 2-3 models that differ ' +
+  'structurally (e.g. logistic_regression vs random_forest_classifier). hyperparams keys MUST come ' +
+  'from the builder\'s whitelist ONLY: logistic_regression: C, max_iter, solver; ' +
+  'random_forest_classifier: n_estimators, max_depth, min_samples_leaf; ' +
+  'gradient_boosting_classifier: n_estimators, max_depth, learning_rate; ' +
+  'dummy_most_frequent: strategy. Any other key is rejected before training. Output JSON only.';
 
 export const draftSpecFromPlan = async (
   plan: ResearchPlan,
@@ -102,6 +118,19 @@ export const draftSpecFromPlan = async (
   if (!draft.feasible || draft.openmlDatasetId === undefined || draft.targetColumn === undefined || draft.models.length === 0) {
     return { kind: 'skip', reason: draft.skipReason ?? 'plan data requirements do not map to a public tabular dataset' };
   }
+  // Deterministic pre-filter (live-observed failure class: the model emitted
+  // 'min_samples_split', the sidecar whitelist rejects it): drop out-of-space
+  // keys BEFORE any resource is spent and disclose the strip in the tags.
+  const stripped: string[] = [];
+  const models = draft.models.map((m) => {
+    const allowed = ALLOWED_HPARAMS[m.builderId] ?? [];
+    const hyperparams: Record<string, string | number | boolean> = {};
+    for (const [k, v] of Object.entries(m.hyperparams)) {
+      if (allowed.includes(k)) hyperparams[k] = v;
+      else stripped.push(`${m.builderId}.${k}`);
+    }
+    return { ...m, hyperparams };
+  });
   // The plan's free-text decision rule cannot seed a verified numeric threshold:
   // the draft marks every threshold as model-stipulated (auditable, honest).
   const spec = ExperimentSpec.parse({
@@ -117,15 +146,15 @@ export const draftSpecFromPlan = async (
       targetColumn: draft.targetColumn,
       split: { method: 'random_stratified', ratios: { train: 0.7, val: 0.15, test: 0.15 }, seed: 42 },
     }],
-    models: draft.models.map((m, i) => ({
+    models: models.map((m, i) => ({
       name: m.name,
       builderId: m.builderId,
       hyperparams: m.hyperparams,
       seed: 42 + i,
-      tags: [`plan:${plan.id.slice(0, 10)}`],
+      tags: [`plan:${plan.id.slice(0, 10)}`, ...(stripped.length > 0 ? [`hparams-stripped:${stripped.join(',')}`.slice(0, 120)] : [])],
     })),
     metrics: ['accuracy'],
-    comparisons: draft.models.length >= 2
+    comparisons: models.length >= 2
       ? [{
           id: `cmp_${plan.id.slice(4, 12)}`,
           metricKey: 'accuracy',
