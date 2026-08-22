@@ -6,6 +6,15 @@ import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, FieldList, Section, Skeleton } from '../common';
 import { stageKey, availabilityKey, stepKindKey } from '../../i18n/keys';
+import type { DictKey } from '../../i18n/dict';
+
+/** Human hint per POPPER policy (domain enum single_primary|alpha_spending|e_value_accumulation). */
+function policyHint(policy: string): DictKey | null {
+  if (policy === 'single_primary') return 'plan.policy.single_primary';
+  if (policy === 'alpha_spending') return 'plan.policy.alpha_spending';
+  if (policy === 'e_value_accumulation') return 'plan.policy.e_value_accumulation';
+  return null;
+}
 
 export function PlanTab({
   run,
@@ -174,6 +183,27 @@ function PlanView({ plan, onChallenge }: { plan: ResearchPlan; onChallenge: () =
             { key: t('plan.decisionRules.stop'), value: plan.decisionRules.stopCriterion },
           ]}
         />
+        {/* POPPER discipline (D-025, S2b): how this plan guards against multiple-hypothesis
+            false positives — mandatory whenever a plan discriminates several hypotheses. */}
+        {(plan.multipleTestingPolicy !== undefined || (check?.statisticalDesignNote ?? '').length > 0) && (
+          <div className="callout callout--info small stat-discipline">
+            <strong>{t('plan.statDiscipline')}</strong>
+            {plan.multipleTestingPolicy !== undefined && (
+              <div>
+                {t('plan.multipleTestingPolicy')}：<span className="mono">{plan.multipleTestingPolicy}</span>
+                {policyHint(plan.multipleTestingPolicy) !== null && <span className="muted"> — {t(policyHint(plan.multipleTestingPolicy)!)}</span>}
+              </div>
+            )}
+            {plan.multipleTestingNote !== undefined && plan.multipleTestingNote.length > 0 && (
+              <div className="muted">{plan.multipleTestingNote}</div>
+            )}
+            {check?.statisticalDesignNote !== undefined && check.statisticalDesignNote.length > 0 && (
+              <div className="muted">
+                <strong>{t('plan.statDesignNote')}</strong>：{check.statisticalDesignNote}
+              </div>
+            )}
+          </div>
+        )}
       </Section>
 
       {/* Progressive disclosure (craft-spec-v2 §3): supplementary methodological

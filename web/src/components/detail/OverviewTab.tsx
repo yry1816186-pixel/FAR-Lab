@@ -11,10 +11,10 @@ import { Badge, CountProgress, EmptyState, ErrorBox, FieldList, IdText, Section,
 import { StageTimeline } from './StageTimeline';
 import { RunControls } from './RunControls';
 import { RunStatusBanner } from './RunStatusBanner';
+import { ActivityFeed } from './ActivityFeed';
 import type { FeedbackTarget } from './FeedbackForm';
 import { stageKey, goalTypeKey } from '../../i18n/keys';
 import type { EventsState } from '../RunDetail';
-import type { DictKey } from '../../i18n/dict';
 
 export function OverviewTab({
   run,
@@ -39,21 +39,13 @@ export function OverviewTab({
 
   const progress = runProgress(run);
   const failedStages = run.stages.filter((s) => s.state === 'failed');
-  const latestEvent = events.events.length > 0
-    ? [...events.events].sort((a, b) => b.seq - a.seq)[0]
-    : undefined;
 
   return (
     <div className="tab-content">
       <RunStatusBanner run={run} onMutated={onMutated} />
-      {latestEvent !== undefined && (
-        <p className="latest-event muted small arrive" role="status">
-          {t('overview.latestEvent')}{' '}
-          <span className="mono">#{latestEvent.seq}</span>{' '}
-          {t(`event.${latestEvent.type}` as DictKey)}
-          {latestEvent.stage !== undefined && <> · {t(stageKey(latestEvent.stage))}</>}
-        </p>
-      )}
+      <Section title={t('activity.title')} count={<span className="muted small">{t('activity.liveHint')}</span>}>
+        <ActivityFeed run={run} events={events.events} />
+      </Section>
       <Section title={t('overview.meta')}>
         <FieldList
           items={[

@@ -1000,6 +1000,50 @@ select option { color: var(--text); background: var(--surface); }
 .event-detail summary { cursor: pointer; color: var(--muted); font-size: 11.5px; }
 .event-detail .pre-block { max-height: 220px; }
 
+/* ---------- research activity feed (S2a: the wait tells a true story) ---------- */
+.activity { display: flex; flex-direction: column; gap: 6px; }
+.activity-now {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 13.5px;
+}
+.activity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--info-text);
+  align-self: center;
+  animation: activity-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-dot { animation: none; }
+}
+@keyframes activity-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.activity-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.activity-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.activity-item time { font-size: 11px; flex-shrink: 0; }
+.activity-glyph { flex-shrink: 0; width: 14px; text-align: center; }
+.activity-item--ok .activity-glyph { color: var(--ok-text); }
+.activity-item--err .activity-glyph { color: var(--err-text); }
+.activity-item--info .activity-glyph { color: var(--info-text); }
+.activity-item--muted .activity-glyph { color: var(--muted); }
+.activity-text { min-width: 0; overflow-wrap: anywhere; }
+.activity-summary { display: block; }
+.activity-cadence { margin: 2px 0 0; }
+.stat-discipline { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.bundle-limitations { margin: 4px 0 0; padding-left: 18px; }
+
 /* ---------- feedback drawer (CPP-1: feedback reachable from every object) ---------- */
 .drawer-backdrop {
   position: fixed;

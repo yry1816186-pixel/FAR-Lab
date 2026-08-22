@@ -51,7 +51,7 @@
   4. **对比模式**：卡片选择 2-3 个假设 → 并排对比（陈述/机制/前提/预测/证伪/支持反证计数/得分/不确定性）
   5. **反馈抽屉**：FeedbackForm 提升为全局抽屉，可预置目标；假设卡"质疑此假设"、计划页、证据页 claims 行内动作直开
   6. dogfood（GUI 全流程）+ 测量 + 三视角批判 + 修复
-- **S2**：信任信号显性化（GRADE 徽章/多重检验策略/bundle limitations/反证检索记录）+ 证据页丰富（作者/venue/DOI/OA 链接）+ 运行中活动叙事（events 驱动）
+- **S2（已落地 2026-08-22，真实 run dogfood 验证）**：①概览页「研究动态」活动流——真实事件流驱动（阶段转换带 pipeline 摘要/每次模型与检索调用/状态变更），运行中带当前阶段说明与呼吸点（reduced-motion 降级），无虚构进度，已完成 run 保留全程记录（evidence/W-PEX/s2-activity-live.jpeg）；②信任信号——claims GRADE-lite 徽章（hover 降级因素轨迹，实测 18 claims）、计划页统计纪律块（policy 人话+分配理由+statisticalDesignNote）、verify 报告附挂 bundle 自报 limitations（API 层注入，避开 EEL 在途 verify.ts；测试断言）；③对比判定阈值行（支持/弱化/证伪三条件，实测两列完整）；④真实新 run（prime editing）z.ai 3 分钟 9 阶段，等待期全程有叙事；⑤门禁 656/658（2 既定 skip）+ 双端 tsc/build 0 + lint 0 + secret-scan PASS。剩余（S2 尾巴）：证据页作者/venue/DOI/OA 链接丰富、反证检索记录结构化展示（无端点，需 API）
 - **S3**：ACH 假设×证据矩阵（关系绑定全量核查后）+ in-tab 过滤 + 跨 Tab 对象导航
 - **S4**：orchestrator 子任务事件（消除盲等的根因修复）+ quick capture
 - **S5**：命令面板 + 键盘流 + 桌面端 quick capture（托盘/全局快捷键）

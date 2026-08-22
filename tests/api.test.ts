@@ -981,6 +981,10 @@ describe('GET /api/v1/verify/:bundleId', () => {
     expect(body.checks.every((c: { passed: boolean; detail: string }) => typeof c.passed === 'boolean' && c.detail.length > 0)).toBe(true);
     expect(['verified', 'failed', 'degraded']).toContain(body.verdict);
     expect(body.replayGuidance).toContain('far verify');
+    // S2b trust surface: the bundle's own declared limitations ride with the report
+    expect(Array.isArray(body.limitations)).toBe(true);
+    expect(body.limitations.length).toBeGreaterThan(0);
+    expect(body.limitations.every((l: string) => typeof l === 'string' && l.length > 0)).toBe(true);
   });
 
   it('returns a fail-closed failed report (not 404) for an unknown bundle', async () => {
