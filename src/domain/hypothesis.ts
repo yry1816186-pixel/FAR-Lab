@@ -118,3 +118,25 @@ export const HypothesisCandidate = z.object({
   createdAt: z.string().datetime(),
 });
 export type HypothesisCandidate = z.infer<typeof HypothesisCandidate>;
+
+/**
+ * SWAN interchange serialization (W-G follow-up; W3C SWAN 1.2 discourse elements,
+ * https://www.w3.org/TR/hcls-swan/ — stable public standard). Emits each hypothesis as
+ * a swande:ResearchStatement qualified as a hypothesis, for external semantic-web
+ * consumers of the reproducibility bundle. Only SWAN terms documented in the TR are
+ * used; the internal schema above stays authoritative.
+ */
+export const toSwanJsonLd = (hyp: HypothesisCandidate): Record<string, unknown> => ({
+  '@context': {
+    swande: 'http://purl.org/swan/1.2/discourse-elements/',
+    swanco: 'http://purl.org/swan/1.2/discourse-relations/',
+    pav: 'http://purl.org/pav/',
+  },
+  '@type': 'swande:ResearchStatement',
+  '@id': `urn:farlab:${hyp.id}`,
+  'swanco:researchStatementQualifiedAs': { '@id': 'http://purl.org/swan/1.2/discourse-relations/hypothesis' },
+  statement: hyp.statement,
+  mechanism: hyp.mechanism,
+  'pav:version': hyp.version,
+  createdAt: hyp.createdAt,
+});

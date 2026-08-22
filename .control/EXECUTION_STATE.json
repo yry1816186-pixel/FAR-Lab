@@ -61,5 +61,5 @@
     "B-QWEN-LIVE-ROUTE"
   ],
   "lastVerifiedCommit": "Wave-G final gate 2026-08-22: vitest 604/604 (27 files), typecheck 0, eslint 0, build 0, secret-scan PASS, path-hygiene PASS; WP3/WP4 batch adversarially audited PASS (evidence/W-G/audit-wp3wp4.md); completion-gate rerun archived (still NOT_READY solely on user-gated B-DEEPSEEK-BALANCE).",
-  "nextAction": "Wave-G + follow-up batch closed (D-069). Remaining honest debts: public-release export build (blocked solely on LICENSE choice), live re-measurements (user-side model routes), NOVA-Test contradiction gate (needs live LLM), SWAN JSON-LD export (with the export build)."
+  "nextAction": "Public-release pipeline COMPLETE (D-070): Apache-2.0 LICENSE + NOTICE + verified 255-file export (scripts/export-public.mjs, in-copy gates green). Remaining debts: live re-measurements (user-side model routes), NOVA-Test contradiction gate (live-gated). Publishing the export to a remote host is a user action when desired."
 }

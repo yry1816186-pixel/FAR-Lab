@@ -82,6 +82,12 @@ export const ReproducibilityBundle = z.object({
   verificationInstructions: z.string().min(1),
   /** External/non-deterministic factors that prevent exact reproduction — mandatory honesty. */
   limitations: z.array(z.string()).default([]),
+  /**
+   * SWAN-ontology interchange view of the surviving hypotheses (W-G follow-up; W3C SWAN
+   * is a stable public standard — ResearchStatement qualified as hypothesis). For
+   * external semantic-web consumers only; the internal domain model is authoritative.
+   */
+  hypothesisJsonLd: z.array(z.unknown()).optional(),
   createdAt: z.string().datetime(),
 });
 export type ReproducibilityBundle = z.infer<typeof ReproducibilityBundle>;

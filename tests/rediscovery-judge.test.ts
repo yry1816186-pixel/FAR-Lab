@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 import { medianPass, buildDecomposeTask, judgeRediscovery } from '../eval/rediscovery-judge.mjs';
 import { thresholdMatch, MATCH_DEFAULTS } from '../eval/claim-match.mjs';
 import { mulberry32, seedFromString, bootstrapMeanCI, pairedPermutationTest, wilsonInterval, maxAbsSwing, variance, cohensKappa, benjaminiHochberg, clusterStderr, decideDeltaReality, krippendorffAlpha, pooledStderr } from '../eval/stats.mjs';
@@ -400,7 +401,12 @@ describe('gold calibration regression (claim-pair-gold.jsonl)', () => {
     expect(GT_REV).toBe('gt-fixed-2026-08-22');
   });
 
-  it('EV1 3-seed agreement re-analysis is REPRODUCIBLE and its headline numbers are locked', async () => {
+  // The judge seed files are internal eval data (excluded from the public release by
+  // decision D-069); the public tree skips this reproducibility lock VISIBLY instead
+  // of failing on absent fixtures.
+  const ev1SeedsPresent = ['llm-judge-ev1.jsonl', 'llm-judge-ev1-s2.jsonl', 'llm-judge-ev1-s3.jsonl']
+    .every((f) => existsSync(resolve(process.cwd(), 'eval/results', f)));
+  (ev1SeedsPresent ? it : it.skip)('EV1 3-seed agreement re-analysis is REPRODUCIBLE and its headline numbers are locked', async () => {
     const { execFileSync } = await import('node:child_process');
     const out = execFileSync('node', ['eval/ev1-judge-agreement.mjs'], { encoding: 'utf8' });
     expect(out).toContain('krippendorff alpha (ordinal, 3 seeds): 0.228'); // quality-dim unreliability locked

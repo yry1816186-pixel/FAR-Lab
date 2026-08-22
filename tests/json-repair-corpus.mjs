@@ -144,7 +144,7 @@ for (const [name, input] of corpus) {
   }
   results.push({ name, input, output, error });
 }
-writeFileSync(new URL('./output/json-repair-oracle.json', import.meta.url), JSON.stringify(results, null, 1));
+writeFileSync(new URL('./fixtures/json-repair-oracle.json', import.meta.url), JSON.stringify(results, null, 1));
 const ok = results.filter((r) => !r.error).length;
 console.log(`corpus=${results.length} repaired=${ok} errors=${results.length - ok}`);
 for (const r of results.filter((x) => x.error)) console.log('  ERR', r.name, '|', r.error.slice(0, 60));

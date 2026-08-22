@@ -38,7 +38,7 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 | GRADE certainty framework (public methodology; GRADEpro tooling commercial and NOT used) | EXTRACTED-EXECUTED (W-G/F-B): gradeClaimCertainty deterministic 4-level ladder on claims, surfaced to relation-judge payloads; metric impact UNVERIFIED-live | Reversal: judge-calibration live data shows certainty labels add no agreement value |
 | Maastricht statistical-design checklist (public rubric) | DEFER->B: deterministic power/effect-size checks as checkPlanExecutability extension; trigger = dedicated slice with tests | research/WAVE-G-SCOUT.md L4 |
 | NOVA-Test 3-gate hypothesis audit (ICML 2026 workshop paper-only) | DEFER->B: gates 1/3 already covered by zod schema + completenessCheck; novel contradiction gate needs live LLM (D-036) | research/WAVE-G-SCOUT.md L4 |
-| SWAN ontology ResearchStatement (W3C) | DEFER->B: JSON-LD export interchange for the public-release export (WP1 proposal) | research/WAVE-G-SCOUT.md L4 |
+| SWAN ontology ResearchStatement (W3C) | EXECUTED (D-070): toSwanJsonLd ResearchStatement serialization in bundle hypothesisJsonLd — was DEFER->B | research/WAVE-G-SCOUT.md L4 |
 | scite contrast sub-types (public paper taxonomy; API proprietary) | DEFER->B: contrastType sub-label when relation-blind-agreement live data justifies it | research/WAVE-G-SCOUT.md L1 |
 | OrchBench deterministic plan simulator / Ancestor trust scoring / Critiplot / args.me / SparseCL / AI-Researcher | REJECTED/DEFERRED with reasons (license unverified/NOASSERTION, domain mismatch, visualization-only, needs embeddings) | research/WAVE-G-SCOUT.md L1/L4 |
 

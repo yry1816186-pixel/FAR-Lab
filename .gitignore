@@ -41,3 +41,6 @@ FAR-Lab_ZCode_Control_Plane_*/
 
 # Tauri/Rust build output (desktop/, product session)
 desktop/src-tauri/target/
+
+# Public-release export output (local build artifact, never committed)
+build/

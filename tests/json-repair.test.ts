@@ -2,11 +2,11 @@
  * W7-F1 repair-engine tests (D-044). Two evidence sources:
  *  1. ORACLE EQUIVALENCE: the upstream jsonrepair 3.15.0 package was executed locally
  *     (verification only, not a dependency) over the 83-entry corpus in
- *     spikes/json-repair-corpus.mjs; its recorded outputs
- *     (spikes/output/json-repair-oracle.json) are ground truth this TS port must
+ *     tests/json-repair-corpus.mjs; its recorded outputs
+ *     (tests/fixtures/json-repair-oracle.json) are ground truth this TS port must
  *     reproduce byte-for-byte — including the two entries upstream throws on.
  *  2. LIVE CORPUS: the real corrupted strict-FC tool arguments captured 2026-08-22
- *     (spikes/output/strict-fc-corrupted-args.json, argsFull) — the corruption class
+ *     (tests/fixtures/strict-fc-corrupted-args.json, argsFull) — the corruption class
  *     that killed run_8n37 mid-flight (D-029/D-030).
  */
 import { readFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ interface OracleEntry {
 }
 
 const loadOracle = (): OracleEntry[] =>
-  JSON.parse(readFileSync(new URL('../spikes/output/json-repair-oracle.json', import.meta.url), 'utf8')) as OracleEntry[];
+  JSON.parse(readFileSync(new URL('./fixtures/json-repair-oracle.json', import.meta.url), 'utf8')) as OracleEntry[];
 
 describe('repairJson oracle equivalence (upstream jsonrepair 3.15.0, 83-entry corpus)', () => {
   const oracle = loadOracle();
@@ -70,7 +70,7 @@ describe('repairJson content-preservation invariants', () => {
 
 describe('live corrupted strict-FC tool arguments (spikes/output/strict-fc-corrupted-args.json)', () => {
   const captured = JSON.parse(
-    readFileSync(new URL('../spikes/output/strict-fc-corrupted-args.json', import.meta.url), 'utf8'),
+    readFileSync(new URL('./fixtures/strict-fc-corrupted-args.json', import.meta.url), 'utf8'),
   ) as { argsFull: string; errPos: number };
 
   it('the captured sample is genuinely invalid JSON (fixture sanity)', () => {

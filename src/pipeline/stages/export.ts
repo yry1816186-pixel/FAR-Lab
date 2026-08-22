@@ -17,6 +17,7 @@ import {
   RELATION_POLARITY,
   newId,
   ReproducibilityBundle,
+  toSwanJsonLd,
 } from '../../domain/index.js';
 import type {
   CitationBindingStatus,
@@ -642,6 +643,8 @@ export const exportStage: StageHandler = {
       finalArtifactHashes: [reportPut.hash],
       verificationInstructions: `far verify --bundle ${bundleId}（第三方核验：按 receiptIds 比对 receipts、按 sourceArtifactHashes 比对来源快照、按 finalArtifactHashes 比对导出工件）`,
       limitations,
+      // SWAN interchange (W-G follow-up): surviving hypotheses as JSON-LD ResearchStatements.
+      ...(hypotheses.length > 0 ? { hypothesisJsonLd: hypotheses.map((h) => toSwanJsonLd(h)) } : {}),
       createdAt: new Date().toISOString(),
     });
     ctx.store.putObject('bundle', bundle);

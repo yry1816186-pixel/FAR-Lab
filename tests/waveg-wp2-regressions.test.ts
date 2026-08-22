@@ -293,3 +293,22 @@ describe('W-G follow-up: statistical-design advisory (Maastricht pattern)', () =
     expect(qualitative.statisticalDesignNote).toBeUndefined();
   });
 });
+
+describe('W-G follow-up: SWAN JSON-LD interchange serialization', () => {
+  it('emits a ResearchStatement qualified as hypothesis with stable ids', async () => {
+    const { toSwanJsonLd } = await import('../src/domain/hypothesis.js');
+    const hyp = {
+      id: 'hyp_03krx9rhyea5ars67zq45ab0gw', runId: 'run_03krx9rhyea5ars67zq45ab0gw', version: 1,
+      statement: 'Off-targeting scales with exposure duration', mechanism: 'longer deaminase window',
+      derivation: { strategy: 'mechanism_driven', rationale: 'r', inputClaimIds: [] },
+      assumptions: [], predictions: [], supportingClaimIds: [], counterClaimIds: [],
+      uncertainties: [], noveltyLabel: 'evidence_grounded', testability: 'testable_now',
+      clusterKey: 'k', createdAt: new Date().toISOString(),
+    } as never;
+    const ld = toSwanJsonLd(hyp);
+    expect(ld['@type']).toBe('swande:ResearchStatement');
+    expect(ld['@id']).toBe('urn:farlab:hyp_03krx9rhyea5ars67zq45ab0gw');
+    expect(JSON.stringify(ld['swanco:researchStatementQualifiedAs'])).toContain('hypothesis');
+    expect(ld['pav:version']).toBe(1);
+  });
+});
