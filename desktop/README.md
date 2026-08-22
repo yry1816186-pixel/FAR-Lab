@@ -22,9 +22,9 @@ API server 的 loopback 安全守卫（api.ts F-1）天然只放行本机访问�
 
 | 平台 | 状态 | 前提 |
 |---|---|---|
-| Windows | **本仓库开发机（Windows 10+）真实构建验证** | WebView2 运行时（Win10 1803+ 预装） |
-| macOS | 代码层就绪，**未实测**（无本机）——宣称前须在 macOS 实测一次 | macOS 10.15+（系统 WebKit） |
-| Linux 桌面 | 代码层就绪，**未实测**——宣称前须实测 | webkit2gtk-4.1：Debian 12+ / Ubuntu 22.04+ 才有该包；NVIDIA/Wayland 下 WebKitGTK 有已知驱动问题（官方绕行页在 line-b2 报告） |
+| Windows | **本仓库开发机真实构建+端到端验证**（拉起 health 200/1s；强杀经 Job Object 随行终止 server，4521 隔离端口复测 000） | WebView2 运行时（Win10 1803+ 预装） |
+| Linux | **Ubuntu 24.04（WSL2）真实构建+端到端验证**（`desktop/wsl-e2e-test.sh` 一键复现：cargo build → WSLg 窗口 → health 200 → 强杀 → `node-died-with-shell`——PR_SET_PDEATHSIG）；其他发行版未实测 | webkit2gtk-4.1（Debian 12+/Ubuntu 22.04+）；Node ≥24；NVIDIA/Wayland 已知 WebKitGTK 驱动坑见 line-b2 报告 |
+| macOS | 代码就绪，**未实测**（无法在本环境合法安装 macOS——Apple 许可将 macOS 限定于 Apple 硬件；宣称前须在真实 Mac 实测一次） | macOS 10.15+（系统 WebKit） |
 
 ## 已知边界（不掩盖）
 

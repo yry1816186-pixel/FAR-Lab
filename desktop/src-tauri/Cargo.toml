@@ -20,5 +20,11 @@ windows-sys = { version = "0.60", features = [
   "Win32_Security",
 ] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# PR_SET_PDEATHSIG via pre_exec: Linux counterpart of the Job-Object guarantee
+# (parent death => SIGKILL to the spawned server). Confirmed needed by the WSL2
+# force-kill e2e test (D-068): without it, kill -9 on the shell orphans node.
+libc = "0.2"
+
 # Deliberately minimal: the shell only spawns the Node server, waits for its
 # health endpoint and opens a webview. No second business logic lives here.

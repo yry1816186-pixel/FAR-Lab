@@ -56,4 +56,6 @@ ico.writeUInt32LE(png.length, 14); ico.writeUInt32LE(22, 18);
 const out = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), 'src-tauri', 'icons', 'icon.ico');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, Buffer.concat([ico, png]));
-console.log('icon written:', out, fs.statSync(out).size, 'bytes');
+// Linux builds require icons/icon.png (Windows needs only .ico — platform split discovered in WSL2 real build, D-068)
+fs.writeFileSync(path.join(path.dirname(out), 'icon.png'), png);
+console.log('icons written:', out, fs.statSync(out).size, 'bytes + icon.png', png.length, 'bytes');

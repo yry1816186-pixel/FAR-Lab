@@ -29,6 +29,21 @@ impl Drop for ServerGuard {
 /// force-killed shell (TerminateProcess — no Drop, no exit event) still takes the
 /// node server down. The handle leaks intentionally: the OS closes it when this
 /// process dies, which terminates every process in the job.
+/// Linux: PDEATHSIG must be set in the child before exec — the only portable
+/// hook is pre_exec (unsafe, single-threaded at this point: we are).
+#[cfg(target_os = "linux")]
+fn before_spawn(cmd: &mut Command) {
+    use std::os::unix::process::CommandExt;
+    unsafe {
+        cmd.pre_exec(|| {
+            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL);
+            Ok(())
+        });
+    }
+}
+#[cfg(not(target_os = "linux"))]
+fn before_spawn(_cmd: &mut Command) {}
+
 #[cfg(windows)]
 fn assign_kill_on_close(child: &Child) {
     use std::os::windows::io::AsRawHandle;
@@ -113,12 +128,12 @@ fn main() {
         None
     } else {
         let root = repo_root();
-        match Command::new("node")
-            .arg("scripts/serve.mjs")
+        let mut cmd = Command::new("node");
+        cmd.arg("scripts/serve.mjs")
             .current_dir(root)
-            .env("PORT", port.to_string())
-            .spawn()
-        {
+            .env("PORT", port.to_string());
+        before_spawn(&mut cmd);
+        match cmd.spawn() {
             Ok(child) => {
                 assign_kill_on_close(&child);
                 Some(child)
