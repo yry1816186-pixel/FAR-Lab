@@ -10,6 +10,7 @@ import { runStatusKey, runStatusTone } from '../../tones';
 import { Badge, CountProgress, EmptyState, ErrorBox, FieldList, IdText, Section, Skeleton, TimeText } from '../common';
 import { StageTimeline } from './StageTimeline';
 import { RunControls } from './RunControls';
+import { RunStatusBanner } from './RunStatusBanner';
 import { FeedbackForm } from './FeedbackForm';
 import { stageKey, goalTypeKey } from '../../i18n/keys';
 
@@ -29,6 +30,7 @@ export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: (
 
   return (
     <div className="tab-content">
+      <RunStatusBanner run={run} onMutated={onMutated} />
       <Section title={t('overview.meta')}>
         <FieldList
           items={[

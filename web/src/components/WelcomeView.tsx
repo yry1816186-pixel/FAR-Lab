@@ -1,14 +1,33 @@
 import { useI18n } from '../i18n/LanguageContext';
 import { LogoMark } from './Logo';
 import { NewRunForm } from './NewRunForm';
+import { healthProjection, useHealth } from '../hooks/useHealth';
+import { runStatusTone } from '../tones';
+import { runStatusKey } from '../tones';
+import { stageKey } from '../i18n/keys';
+import { IdText, TimeText } from './common';
+import type { RunSummary } from '../api/types';
 
 /**
  * Workbench home (P-IA): what this is, how to work here, and the central way
- * to start — one question in, a research run out. Shown whenever no run is
- * selected; picking a run in the sidebar switches to the workspace view.
+ * to start — one question in, a research run out. The status strip and recent
+ * tasks are real system state (health API + runs list), never decoration.
  */
-export function WelcomeView({ onCreated }: { onCreated: (runId: string) => void }): JSX.Element {
+export function WelcomeView({
+  onCreated,
+  runs,
+  onSelectRun,
+}: {
+  onCreated: (runId: string) => void;
+  runs: RunSummary[];
+  onSelectRun: (id: string) => void;
+}): JSX.Element {
   const { t } = useI18n();
+  const { health, healthError } = useHealth();
+  const hp = healthProjection(health, healthError);
+  const recent = [...runs]
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .slice(0, 3);
   const steps = [
     { key: 'welcome.step1', glyph: '✓', tone: 'verified' },
     { key: 'welcome.step2', glyph: '▲', tone: 'unknown' },
@@ -21,12 +40,42 @@ export function WelcomeView({ onCreated }: { onCreated: (runId: string) => void 
         <LogoMark size={72} />
         <h1 className="welcome-title">{t('app.title')}</h1>
         <p className="welcome-subtitle muted">{t('welcome.subtitle')}</p>
+        <div className={`health-strip health-strip--${hp.tone}`} role="status">
+          <span className="health-dot" aria-hidden="true" />
+          {hp.tone === 'err' ? (
+            t('health.unknown')
+          ) : (
+            t('health.ready', { ready: hp.liveReady, total: hp.liveTotal })
+          )}
+        </div>
       </div>
 
       <div className="welcome-main">
         <div className="welcome-card">
           <NewRunForm onCreated={onCreated} />
         </div>
+
+        {recent.length > 0 && (
+          <div className="welcome-recent">
+            <h2 className="welcome-recent-title">{t('welcome.recentTitle')}</h2>
+            <ul className="recent-cards">
+              {recent.map((run) => (
+                <li key={run.id}>
+                  <button type="button" className="recent-card" onClick={() => onSelectRun(run.id)}>
+                    <span className="recent-card-top">
+                      <IdText value={run.id} />
+                      <span className={`badge badge--${runStatusTone(run.status)}`}>{t(runStatusKey(run.status))}</span>
+                    </span>
+                    <span className="recent-card-mid muted">{t(stageKey(run.currentStage))}</span>
+                    <span className="recent-card-bottom muted small">
+                      <TimeText iso={run.createdAt} />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <ol className="welcome-steps">
           {steps.map((s) => (

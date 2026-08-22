@@ -255,7 +255,7 @@ export function App(): JSX.Element {
 
         <main className="content" aria-label={t('app.title')}>
           {selectedRunId === null ? (
-            <WelcomeView onCreated={onCreated} />
+            <WelcomeView onCreated={onCreated} runs={runs} onSelectRun={setSelectedRunId} />
           ) : runDetail === null ? (
             detailLoading ? (
               <div className="select-hint" role="status">
