@@ -13,6 +13,28 @@ import type { TranscriptEntry } from './protocol.js';
 export const transcriptTokens = (entries: readonly TranscriptEntry[]): number =>
   entries.reduce((sum, e) => sum + estimateTokens(e), 0);
 
+/**
+ * Per-source token accounting (Claude Code /context discipline): where the
+ * estimated transcript budget actually goes. Estimates only — surfaced for
+ * observability, never billed as exact token counts.
+ */
+export const SOURCE_KEYS = ['task', 'context', 'actions', 'toolResults', 'steer', 'handoff'] as const;
+export type TranscriptSource = (typeof SOURCE_KEYS)[number];
+
+export const transcriptTokensBySource = (entries: readonly TranscriptEntry[]): Record<TranscriptSource, number> => {
+  const out: Record<TranscriptSource, number> = { task: 0, context: 0, actions: 0, toolResults: 0, steer: 0, handoff: 0 };
+  for (const e of entries) {
+    const n = estimateTokens(e);
+    if (e.kind === 'task') out.task += n;
+    else if (e.kind === 'context') out.context += n;
+    else if (e.kind === 'action') out.actions += n;
+    else if (e.kind === 'tool_result') out.toolResults += n;
+    else if (e.kind === 'steer') out.steer += n;
+    else out.handoff += n;
+  }
+  return out;
+};
+
 /** Serialize a payload; oversized ones become a head stub with the true size recorded. */
 export const headTrim = (payload: unknown, maxChars: number): Record<string, unknown> => {
   let text: string;
@@ -56,5 +78,14 @@ export const compactedTranscript = (
   ...entries.slice(-keepLast),
 ];
 
-/** Prompt for the handoff summarizer — written for a SUCCESSOR LLM that never saw this session. */
-export const HANDOFF_PROMPT = `You are writing a handoff summary for another AI agent that takes over this research session mid-flight and has seen NOTHING of it. Compress the transcript into: (1) the objective, (2) work completed and what the tools actually returned (keep concrete identifiers, titles and numbers), (3) decisions made and why, (4) open questions and remaining work. Never invent facts absent from the transcript. Reply as {"summary": "<compact handoff>"}.`;
+/**
+ * Prompt for the handoff summarizer — structure ported from openai/codex
+ * prompts/templates/compact/{prompt.md, summary_prefix.md} (Apache-2.0): a
+ * successor-facing four-point handoff that explicitly says NOT to redo work.
+ */
+export const HANDOFF_PROMPT = `Another AI agent already worked on this task for a while and you are taking over mid-flight. Summarize its transcript so far as a handoff for the next agent, which cannot see the conversation. The summary must cover, in this order:
+1. Objective and work completed so far (with concrete results and tool outputs — keep identifiers, titles, numbers).
+2. Decisions made and their reasons.
+3. Remaining work and open questions.
+4. Key data references (ids, query texts, source titles) the successor will need.
+Do not redo work already described. Be concise and structured. Never invent facts absent from the transcript. Reply as {"summary": "<handoff text>"}.`;

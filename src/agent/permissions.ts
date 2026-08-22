@@ -45,26 +45,39 @@ export class PermissionEngine {
 
   constructor(private readonly opts: PermissionEngineOptions) {}
 
+  /**
+   * Codex execpolicy discipline (ported, Apache-2.0): collect EVERY matching rule and
+   * take the STRICTEST effect (deny > ask > allow). An early permissive rule can never
+   * override a later restriction — policy composition is safe by construction, unlike
+   * first-match-wins where rule order silently changes security.
+   */
   async decide(tool: string, args: unknown): Promise<PermissionDecision> {
+    const RANK: Record<PermissionEffect, number> = { deny: 3, ask: 2, allow: 1 };
+    let strictest: PermissionEffect | undefined;
+    let via: string | undefined;
     for (const rule of this.opts.rules ?? []) {
       if (rule.tool !== undefined && rule.tool !== tool) continue;
       if (rule.argsMatch !== undefined && !rule.argsMatch(args)) continue;
-      if (rule.effect !== 'ask') {
-        return { effect: rule.effect, rule: rule.note ?? rule.tool ?? 'rule', cachedGrant: false, asked: false };
+      if (strictest === undefined || RANK[rule.effect] > RANK[strictest]) {
+        strictest = rule.effect;
+        via = rule.note ?? rule.tool ?? 'rule';
       }
-      return this.decideAsk(tool, args, rule);
     }
-    const fallback = this.opts.defaultEffect ?? 'deny';
-    if (fallback === 'ask') return this.decideAsk(tool, args, undefined);
-    return { effect: fallback, cachedGrant: false, asked: false };
+    if (strictest === undefined) {
+      const fallback = this.opts.defaultEffect ?? 'deny';
+      if (fallback === 'ask') return this.decideAsk(tool, args, undefined);
+      return { effect: fallback, cachedGrant: false, asked: false };
+    }
+    if (strictest !== 'ask') return { effect: strictest, rule: via, cachedGrant: false, asked: false };
+    return this.decideAsk(tool, args, via);
   }
 
-  private async decideAsk(tool: string, args: unknown, rule: PermissionRule | undefined): Promise<PermissionDecision> {
+  private async decideAsk(tool: string, args: unknown, label: string | undefined): Promise<PermissionDecision> {
     const key = grantKey(tool, args);
     const now = this.opts.now?.() ?? Date.now();
     const expiry = this.grants.get(key);
     if (expiry !== undefined && expiry > now) {
-      return { effect: 'allow', rule: rule?.note ?? `${tool}:cached-grant`, cachedGrant: true, asked: false };
+      return { effect: 'allow', rule: label ?? `${tool}:cached-grant`, cachedGrant: true, asked: false };
     }
     if (expiry !== undefined) this.grants.delete(key); // expired grants never authorize
     const ask = this.opts.ask;

@@ -13,6 +13,21 @@ describe('permission engine (deny > ask > allow, fail-closed)', () => {
     expect((await engine.decide('search', { q: 'x' })).effect).toBe('allow');
   });
 
+  it('strictest matching rule wins regardless of order (Codex execpolicy discipline)', async () => {
+    const engine = new PermissionEngine({
+      rules: [
+        { effect: 'allow' },                                  // permissive global rule first
+        { tool: 'exec', effect: 'deny', note: 'no shell' },   // later restriction MUST win
+      ],
+      defaultEffect: 'allow',
+    });
+    expect((await engine.decide('exec', {})).effect).toBe('deny');
+    expect((await engine.decide('other', {})).effect).toBe('allow');
+    // a matching ask ranks above allow too
+    const asker = new PermissionEngine({ rules: [{ effect: 'allow' }, { tool: 'write', effect: 'ask' }] });
+    expect((await asker.decide('write', {})).effect).toBe('deny'); // no ask handler => ask degrades to deny
+  });
+
   it('fails closed on unmatched tools (default deny)', async () => {
     const engine = new PermissionEngine({ rules: [{ tool: 'search', effect: 'allow' }] });
     const d = await engine.decide('unlisted_tool', {});
