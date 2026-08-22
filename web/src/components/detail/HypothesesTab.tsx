@@ -139,6 +139,7 @@ function HypothesisList({ data }: { data: HypoData }): JSX.Element {
     const key = h.clusterKey ?? h.id;
     clusterCounts.set(key, (clusterCounts.get(key) ?? 0) + 1);
   }
+  const rankOf = new Map(data.scorecards.map((s) => [s.hypothesisId, s.rank] as const));
 
   return (
     <div>
@@ -148,6 +149,7 @@ function HypothesisList({ data }: { data: HypoData }): JSX.Element {
           hypothesis={h}
           clusterSize={clusterCounts.get(h.clusterKey ?? h.id) ?? 1}
           isRepresentative
+          rank={rankOf.get(h.id)}
         />
       ))}
       {extras.length > 0 && (

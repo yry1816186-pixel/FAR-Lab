@@ -178,6 +178,20 @@ export function App(): JSX.Element {
     void refreshRunsWithAbort();
   }, [refreshRunsWithAbort]);
 
+  // IDE convention: "/" focuses the task filter unless typing in a field.
+  const filterRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el !== null && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      e.preventDefault();
+      filterRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <div className="app">
       <header className="app-header">
@@ -250,6 +264,7 @@ export function App(): JSX.Element {
             loading={runsLoading}
             selectedId={selectedRunId}
             onSelect={setSelectedRunId}
+            filterRef={filterRef}
           />
         </aside>
 

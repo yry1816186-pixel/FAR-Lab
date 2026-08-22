@@ -8,10 +8,12 @@ export function HypothesisCard({
   hypothesis,
   clusterSize,
   isRepresentative,
+  rank,
 }: {
   hypothesis: HypothesisCandidate;
   clusterSize: number;
   isRepresentative: boolean;
+  rank?: number;
 }): JSX.Element {
   const { t } = useI18n();
   const [specOpen, setSpecOpen] = useState(false);
@@ -21,6 +23,11 @@ export function HypothesisCard({
   return (
     <article className={`hyp-card${isRepresentative ? '' : ' hyp-card--extra'}`}>
       <header className="hyp-head">
+        {rank !== undefined && (
+          <span className={`rank-medal${rank === 1 ? ' rank-medal--first' : ''}`} title={t('hyp.rankOf', { rank })}>
+            №{rank}
+          </span>
+        )}
         <IdText value={hypothesis.id} />
         <span className="muted small">{t('hyp.version', { n: hypothesis.version })}</span>
         <Badge tone={testabilityTone(hypothesis.testability)}>{t(testabilityKey(hypothesis.testability))}</Badge>

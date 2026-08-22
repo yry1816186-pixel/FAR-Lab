@@ -86,7 +86,13 @@ export function ScorecardsTable({ scorecards }: { scorecards: HypothesisScorecar
                                     {d.value === null ? (
                                       <Badge tone="muted">{t('scorecards.notAssessed')}</Badge>
                                     ) : (
-                                      `${d.value}${d.qualitative !== undefined ? ` (${d.qualitative})` : ''}`
+                                      <span className="rank-cell" title={`${d.value.toFixed(2)} / 1.00`}>
+                                        {/* proportional ink: dimension scores are 0-1 (domain schema), zero base */}
+                                        <span className="rank-bar" aria-hidden="true">
+                                          <span className="rank-fill" style={{ width: `${Math.round(d.value * 100)}%` }} />
+                                        </span>
+                                        {d.value.toFixed(2)}{d.qualitative !== undefined ? ` (${d.qualitative})` : ''}
+                                      </span>
                                     )}
                                   </td>
                                   <td>
