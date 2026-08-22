@@ -26,6 +26,24 @@ export const ModelProviderConfig = z.object({
    * out: API/UI projections carry maskApiKey() output only.
    */
   apiKey: z.string(),
+  /**
+   * BP-4 failover chain (LiteLLM-verified semantics, adapted to one-call granularity):
+   * ordered ids tried AFTER this config exhausts its own provider-plane retries with
+   * a failover-worthy failure (rate_limited/timeout/quota/auth/5xx). 400-class and
+   * invalid-output failures do NOT fail over — a malformed request stays malformed.
+   * Cycles are cut at resolution time; empty (default) = no failover, zero behavior
+   * change for existing configs.
+   */
+  fallbackConfigIds: z.array(ModelConfigId).max(4).default([]),
+  /**
+   * BP-4 cost ledger: user-declared list pricing (USD per 1M tokens). FAR-Lab ships
+   * NO invented price tables — costs are computed only when the researcher enters
+   * their real per-config prices; otherwise usage shows tokens + "pricing unknown".
+   */
+  pricing: z.object({
+    inputUsdPerMTok: z.number().min(0).max(10_000),
+    outputUsdPerMTok: z.number().min(0).max(10_000),
+  }).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });

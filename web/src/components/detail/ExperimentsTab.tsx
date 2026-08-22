@@ -17,6 +17,8 @@ interface ReportLike {
   verdict?: string; secondary?: boolean; exploratory?: boolean; adjustedAlpha?: number;
   thresholdProvenance?: string; analysisIteration?: number; experimentRunId?: string;
   verdictDerivation?: string;
+  /** BP-5: power implied by the declared MDE at the achieved nTest (disclosed convention). */
+  impliedPower?: number;
 }
 
 const num = (v: unknown, digits = 4): string => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—');
@@ -109,6 +111,14 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
                   {rep.exploratory === true && <Badge tone="muted">{t('exp.exploratory')}</Badge>}
                   <span className="muted small">{t('exp.iteration', { n: str(rep.analysisIteration) })}</span>
                 </div>
+                {rep.impliedPower !== undefined && (
+                  <p className="small" style={{ marginTop: 4 }}>
+                    <Badge tone={rep.impliedPower < 0.5 ? 'warn' : 'muted'}>
+                      {t('exp.impliedPower', { p: (rep.impliedPower * 100).toFixed(1) })}
+                    </Badge>
+                    {rep.impliedPower < 0.5 ? ` ${t('exp.underPowered')}` : ''}
+                  </p>
+                )}
                 {rep.verdictDerivation !== undefined && (
                   <p className="mono small muted" style={{ marginTop: 4 }}>{str(rep.verdictDerivation)}</p>
                 )}

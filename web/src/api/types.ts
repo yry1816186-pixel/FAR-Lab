@@ -702,6 +702,11 @@ export interface ResearchActionResponse {
 export type ProviderWireProtocol = 'openai' | 'anthropic';
 
 /** Server projection of a stored model config — the plaintext key NEVER crosses the wire. */
+export interface ModelConfigPricing {
+  inputUsdPerMTok: number;
+  outputUsdPerMTok: number;
+}
+
 export interface ModelConfigSummary {
   id: string;
   label: string;
@@ -711,8 +716,24 @@ export interface ModelConfigSummary {
   apiKeySet: boolean;
   apiKeyMasked: string;
   active: boolean;
+  /** BP-4 failover chain (server schema default [] for pre-existing configs). */
+  fallbackConfigIds?: string[];
+  /** BP-4 user-declared list pricing; absent = cost shown as unknown. */
+  pricing?: ModelConfigPricing;
   createdAt: string;
   updatedAt: string;
+}
+
+/** BP-4 usage ledger aggregate (receipt-derived). */
+export interface UsageAggregate {
+  provider: string;
+  modelId: string;
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costUsd: number | null;
+  pricingBasis: 'user-configured' | 'unknown';
 }
 
 export interface EnvDefaultInfo {
