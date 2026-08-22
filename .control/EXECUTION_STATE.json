@@ -71,6 +71,6 @@
     "EEL lane dormant: remote gateway when user starts Docker."
   ],
   "blockerIds": [],
-  "lastVerifiedCommit": "WAVE-PRODUCT Phase-2 rebuild committed 2026-08-22 (researcher IA + page header + outcome summary + library sidebar + zh terminology + CLI glyphs). Gates re-run live: vitest 805/806, tsc/build both ends 0, secret-scan PASS, completion-gate PASS (26/26); real-run GUI journey verified end-to-end (creation->stages->summary) with browser-cache pitfall resolved via full reload.",
+  "lastVerifiedCommit": "WAVE-PRODUCT Phase-2 + gap closure 2026-08-23: researcher IA rebuild, page header, outcome summary, library sidebar, zh terminology, CLI glyphs — all GUI-verified. Completion-gap pass closed: real Failure->Resume journey (1/9->4/9, then zai 5h-quota wall at generate_hypotheses — external condition, resets 01:42:57), export bundle + far verify 10/10 PASS exit 0, verify path-arg hint added, settings panel + Tauri shell regression (shell inherits new IA via web/dist; deep-link/quick-capture compatible; zero stale tab ids). export.ts lint fixed by sibling session. USER DIRECTIVE 2026-08-23: no further real-API testing on the project. Final gates: vitest 842/844 (2 skip = Docker user-side condition), tsc/build/lint 0 both ends, secret-scan PASS, completion-gate PASS.",
   "nextAction": "Program-level done. Optional polish queue: ENV-LIMITED GUI re-verifications when a stable browser session is available; B6 live A/B on next real run; performance-budget audit consuming the web-vitals console collector (B14 instrument landed)."
 }
