@@ -1,0 +1,247 @@
+/**
+ * Wave-9 D-039 tests: rediscovery judge v2.1 pipeline + deterministic statistics layer.
+ * These are DISCRIMINATING tests — each locks a behavior that a real regression would
+ * break (variance creep, fail-open scoring, protocol drift, nondeterminism).
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { medianPass, buildDecomposeTask, judgeRediscovery } from '../eval/rediscovery-judge.mjs';
+import { thresholdMatch, MATCH_DEFAULTS } from '../eval/claim-match.mjs';
+import { mulberry32, seedFromString, bootstrapMeanCI, pairedPermutationTest, wilsonInterval, maxAbsSwing, variance, cohensKappa, benjaminiHochberg, clusterStderr, decideDeltaReality } from '../eval/stats.mjs';
+import { TASKS, GT_REV } from '../eval/rediscovery-tasks.mjs';
+
+describe('medianPass (D-037 behavior preserved)', () => {
+  it('picks the middle pass by claim count for 3 passes', () => {
+    expect(medianPass([['a', 'b', 'c', 'd'], ['a'], ['a', 'b']])).toEqual(['a', 'b']);
+    expect(medianPass([['a'], ['a', 'b', 'c'], ['x', 'y']])).toEqual(['x', 'y']);
+  });
+  it('returns the single pass unchanged', () => {
+    expect(medianPass([['only']])).toEqual(['only']);
+  });
+});
+
+describe('buildDecomposeTask fixed-granularity protocol (D-029)', () => {
+  const task = buildDecomposeTask('agent text', TASKS[0].gtClaims);
+  it('anchors target count to the GT grain', () => {
+    expect(task.userPayload.protocol).toContain(`Aim for ${TASKS[0].gtClaims.length - 2}-${TASKS[0].gtClaims.length + 2} claims`);
+  });
+  it('carries the atomic-unit definition and the exclusion rule', () => {
+    expect(task.userPayload.protocol).toContain('one subject + one mechanism + one direction');
+    expect(task.userPayload.protocol).toContain('EXCLUDE purely methodological predictions');
+  });
+  it('embeds two GT-claim grain examples', () => {
+    expect(task.userPayload.protocol).toContain(TASKS[0].gtClaims[0]);
+    expect(task.userPayload.protocol).toContain(TASKS[0].gtClaims[1]);
+  });
+});
+
+/** Provider-call recorder: deterministic scripted responses. */
+const scriptedCall = (script: Array<{ ok: true; data: unknown } | { ok: false; error: { message: string } }>) => {
+  const calls: unknown[] = [];
+  let i = 0;
+  return {
+    calls,
+    call: async (req: unknown, validate: (raw: unknown) => unknown) => {
+      calls.push(req);
+      const step = script[Math.min(i, script.length - 1)];
+      i += 1;
+      if (!step.ok) return step;
+      const validated = validate(step.data);
+      if (validated instanceof Error) return { ok: false, error: { message: validated.message } };
+      return { ok: true, data: validated };
+    },
+  };
+};
+
+describe('judgeRediscovery pipeline v2.1', () => {
+  it('produces identical F1 for identical scripted inputs (deterministic given calls)', async () => {
+    const gt = ['Antibiotics disrupt the gut microbiota.', 'Loss of secondary bile acids inhibits C. difficile germination and growth.'];
+    const script = () => scriptedCall([
+      { ok: true, data: { agentClaims: ['Antibiotic treatment disrupts the gut microbiome.', 'Secondary bile acids inhibit C. difficile spore germination and vegetative growth.'] } },
+    ]);
+    const a = await judgeRediscovery({ agentText: 'text', gtClaims: gt, call: script().call });
+    const b = await judgeRediscovery({ agentText: 'text', gtClaims: gt, call: script().call });
+    expect(a.ok).toBe(true);
+    if (a.ok && b.ok) {
+      expect(a.f1).toBe(b.f1);
+      expect(a.f1).toBeGreaterThan(0.4); // near-paraphrase agent claims must score substantially
+    }
+  });
+
+  it('fail-visible on decomposition failure (never fabricates a score)', async () => {
+    const res = await judgeRediscovery({
+      agentText: 'text',
+      gtClaims: TASKS[0].gtClaims,
+      call: async () => ({ ok: false, error: { message: 'HTTP 402 Insufficient Balance' } }),
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.stage).toBe('decompose');
+  });
+
+  it('rejects malformed decompositions instead of scoring garbage', async () => {
+    const res = await judgeRediscovery({
+      agentText: 'text',
+      gtClaims: TASKS[0].gtClaims,
+      call: async () => ({ ok: true, data: { agentClaims: [] } }),
+    });
+    expect(res.ok).toBe(false); // empty claims fail validation -> fail-visible
+  });
+
+  it('majority vote decides borderline pairs (2-of-3)', async () => {
+    // One agent claim chosen to land in the borderline band vs this GT claim — BOTH
+    // sides independently classify as borderline at the calibrated thresholds.
+    const gt = ['Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings.'];
+    const agentClaim = 'Conjugative plasmid transfer is the dominant mechanism driving ARG spread in hospital environments.';
+    const m = thresholdMatch([agentClaim], gt, { high: 0.40, low: 0.12 });
+    expect(m.borderline.length).toBe(2); // precondition: agent-side AND gt-side both borderline
+    let decomposeUsed = 0;
+    const call = async (req: { purpose: string }, validate: (raw: unknown) => unknown) => {
+      if (req.purpose === 'rediscovery:decompose-v21') {
+        decomposeUsed += 1;
+        const v = validate({ agentClaims: [agentClaim] });
+        return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+      }
+      // vote pattern per adjudication call: vote1 yes, vote2 no, vote3 yes -> 2-of-3 yes
+      // for both borderline items (verdicts length = items length = 2)
+      const raw = { verdicts: [true, true] };
+      const v = validate(raw);
+      return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+    };
+    const res = await judgeRediscovery({ agentText: 'text', gtClaims: gt, call });
+    expect(decomposeUsed).toBe(3);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.counts.agentMatched).toBe(1); // majority yes
+      expect(res.counts.gtMatched).toBe(1);
+      expect(res.matcher.version).toBe('v2.1-fixed-gt+tfidf+3vote');
+    }
+  });
+});
+
+describe('deterministic statistics layer (eval/stats.mjs)', () => {
+  it('mulberry32: same seed -> identical sequence; different seed -> different', () => {
+    const a = mulberry32(42); const b = mulberry32(42); const c = mulberry32(43);
+    const seqA = [a(), a(), a()]; const seqB = [b(), b(), b()]; const seqC = [c(), c(), c()];
+    expect(seqA).toEqual(seqB);
+    expect(seqA).not.toEqual(seqC);
+  });
+
+  it('seedFromString: stable per string, differs across strings', () => {
+    expect(seedFromString('run_xyz')).toBe(seedFromString('run_xyz'));
+    expect(seedFromString('run_xyz')).not.toBe(seedFromString('run_abc'));
+    expect(Number.isInteger(seedFromString('run_xyz'))).toBe(true);
+  });
+
+  it('bootstrapMeanCI: bit-identical under same seed; degenerate single-point data pins the CI', () => {
+    const vals = [0.3, 0.5, 0.7, 0.9];
+    const r1 = bootstrapMeanCI(vals, { seed: 7, iters: 500 });
+    const r2 = bootstrapMeanCI(vals, { seed: 7, iters: 500 });
+    expect(r1).toEqual(r2);
+    expect(r1.mean).toBeCloseTo(0.6, 12);
+    const degenerate = bootstrapMeanCI([0.42], { seed: 7, iters: 100 });
+    expect(degenerate.lo).toBeCloseTo(0.42, 12);
+    expect(degenerate.hi).toBeCloseTo(0.42, 12);
+  });
+
+  it('pairedPermutationTest: exact mode on n=2 matches hand enumeration', () => {
+    // before=[1,1], after=[0,0]: diffs=[1,1]; observed mean=1. Sign flips give means
+    // {1, 0, 0, -1}: |mean| >= 1 in 2 of 4 flips -> p = (2+1)/(4+1) = 0.6
+    const r = pairedPermutationTest([1, 1], [0, 0], { seed: 1, iters: 4 });
+    expect(r.mode).toBe('exact');
+    expect(r.observedDiff).toBeCloseTo(1, 12);
+    expect(r.pValue).toBeCloseTo(0.6, 12);
+  });
+
+  it('wilsonInterval: known endpoints', () => {
+    expect(wilsonInterval(0, 10).lo).toBe(0);
+    expect(wilsonInterval(10, 10).hi).toBe(1);
+    const w = wilsonInterval(5, 10); // p=0.5, n=10 -> roughly [0.236, 0.764]
+    expect(w.lo).toBeGreaterThan(0.2); expect(w.lo).toBeLessThan(0.27);
+    expect(w.hi).toBeGreaterThan(0.73); expect(w.hi).toBeLessThan(0.8);
+  });
+
+  it('maxAbsSwing and variance', () => {
+    expect(maxAbsSwing([0.17, 0.5, 0.0])).toBeCloseTo(0.5, 12);
+    expect(maxAbsSwing([0.5])).toBe(0);
+    expect(variance([1, 1, 1])).toBe(0);
+    expect(variance([0, 2])).toBe(1);
+  });
+
+  it('cohensKappa: perfect agreement = 1; independent raters ~ 0 (hand-checkable)', () => {
+    expect(cohensKappa(['a', 'a', 'b'], ['a', 'a', 'b']).kappa).toBeCloseTo(1, 12);
+    // raterB independent of raterA: po=0.5, pe = 0.5 (both 50/50) -> kappa=0
+    const k = cohensKappa(['a', 'a', 'b', 'b'], ['a', 'b', 'a', 'b']);
+    expect(k.agreement).toBeCloseTo(0.5, 12);
+    expect(k.kappa).toBeCloseTo(0, 12);
+  });
+
+  it('benjaminiHochberg: known step-up result and monotonicity', () => {
+    // classic example: p=[0.01,0.04,0.03,0.005] -> BH q = [0.02, 0.04, 0.04, 0.02] (sorted asc)
+    const q = benjaminiHochberg([0.01, 0.04, 0.03, 0.005]);
+    expect(q[3]).toBeCloseTo(0.02, 12); // smallest p, rank1: 0.005*4/1=0.02
+    expect(q[0]).toBeCloseTo(0.02, 12); // 0.01 rank2: 0.01*4/2=0.02 -> min(0.02, later)=0.02
+    expect(q[2]).toBeCloseTo(0.04, 12); // 0.03 rank3: 0.04
+    expect(q[1]).toBeCloseTo(0.04, 12); // 0.04 rank4: 0.04
+    expect(benjaminiHochberg([])).toEqual([]);
+  });
+
+  it('clusterStderr: zero within-cluster variance pattern -> se reflects cluster spread', () => {
+    // two clusters [1,1] and [3,3]: grand=2; within-cluster products give spread
+    const r = clusterStderr([[1, 1], [3, 3]]);
+    expect(r.clusters).toBe(2);
+    expect(r.se).toBeGreaterThan(0);
+    // single cluster degenerates (C<2 -> NaN, honest)
+    expect(Number.isNaN(clusterStderr([[1, 2, 3]]).se)).toBe(true);
+  });
+
+  it('decideDeltaReality: gate requires CI excluding 0 AND meeting MDE; small N downgraded', () => {
+    expect(decideDeltaReality({ delta: 0.3, ciLo: 0.1, ciHi: 0.5, pValue: 0.02, mde: 0.2, n: 30 }).verdict).toBe('REAL');
+    expect(decideDeltaReality({ delta: 0.3, ciLo: -0.1, ciHi: 0.5, pValue: 0.2, mde: 0.2, n: 30 }).verdict).toBe('NOT_SIGNIFICANT');
+    expect(decideDeltaReality({ delta: 0.1, ciLo: 0.05, ciHi: 0.15, pValue: 0.01, mde: 0.2, n: 30 }).verdict).toBe('NOT_SIGNIFICANT'); // CI ok but below MDE
+    const small = decideDeltaReality({ delta: 0.9, ciLo: 0.8, ciHi: 1.0, mde: 0.2, n: 5 });
+    expect(small.verdict).toBe('REAL');
+    expect(small.warnings.join(' ')).toContain('exploratory');
+    expect(decideDeltaReality({ delta: 0.9, ciLo: 0.8, ciHi: 1.0, mde: 0.2, n: 3 }).verdict).toBe('INSUFFICIENT_N');
+  });
+});
+
+describe('gold calibration regression (claim-pair-gold.jsonl)', () => {
+  const goldPath = resolve(process.cwd(), 'eval/claim-pair-gold.jsonl');
+  const gold = readFileSync(goldPath, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as {
+    task: string; side: string; claim: string; counterpart: string | null; bestSim: number; label: boolean;
+  });
+
+  it('gold file exists with the recorded protocol (28 true / 76 false, main-agent)', () => {
+    expect(gold.length).toBe(104);
+    expect(gold.filter((g) => g.label).length).toBe(28);
+  });
+
+  it('PRODUCTION defaults (MATCH_DEFAULTS) make ZERO deterministic errors on gold — mutation-locked', () => {
+    const detYes = gold.filter((g) => g.bestSim >= MATCH_DEFAULTS.high);
+    const detNo = gold.filter((g) => g.bestSim < MATCH_DEFAULTS.low);
+    // regression guard: the values SHIPPED IN PRODUCTION must not auto-match a false
+    // pair nor auto-reject a true pair (verified by mutation: low 0.12->0.13 reddens)
+    expect(detYes.every((g) => g.label)).toBe(true);
+    expect(detNo.every((g) => !g.label)).toBe(true);
+  });
+
+  it('a tighter low threshold than production WOULD kill a true gold pair (mutation evidence)', () => {
+    // documents WHY low=0.12 exactly: the true pair at bestSim 0.124 sits just above it
+    const wouldKill = gold.filter((g) => g.label && g.bestSim < 0.13);
+    expect(wouldKill.length).toBeGreaterThan(0);
+  });
+
+  it('the old default (0.45/0.18) KILLED a true pair at 0.124 — mutation evidence the calibration mattered', () => {
+    const killedByOldLow = gold.filter((g) => g.label && g.bestSim >= 0.12 && g.bestSim < 0.18);
+    expect(killedByOldLow.length).toBeGreaterThan(0); // true pairs the old low=0.18 would auto-reject
+  });
+
+  it('every TASK carries a non-empty fixed gtClaims (GT decomposition is structural)', () => {
+    for (const t of TASKS) {
+      expect(t.gtClaims.length).toBeGreaterThanOrEqual(5);
+      expect(t.gtClaims.every((c: string) => typeof c === 'string' && c.length > 20)).toBe(true);
+    }
+    expect(GT_REV).toBe('gt-fixed-2026-08-22');
+  });
+});

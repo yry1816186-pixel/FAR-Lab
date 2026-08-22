@@ -5,99 +5,197 @@
     {
       "id": "rediscovery-mean-f1",
       "what": "Rediscovery eval mean F1 vs established findings (5-task authored seed, hypothesis-level)",
-      "current": { "value": 0.58, "at": "2026-08-22", "evidence": "eval/results/rediscovery.jsonl; evidence/W-EV2/rediscovery.md" },
+      "current": {
+        "value": 0.58,
+        "at": "2026-08-22",
+        "evidence": "eval/results/rediscovery.jsonl; evidence/W-EV2/rediscovery.md"
+      },
       "target": 0.7,
       "stretch": 0.8,
       "subGoals": ">=4/5 tasks at F1>=0.7; zero tasks below 0.4",
-      "ownerWaves": ["W-P2", "W5"]
+      "ownerWaves": [
+        "W-P2",
+        "W5"
+      ]
     },
     {
       "id": "rediscovery-judge-variance",
       "what": "Same-run re-judging task-F1 swing (decomposition+matching noise)",
-      "current": { "value": 0.5, "unit": "max abs swing", "at": "2026-08-22", "evidence": "evidence/W-EV2/rediscovery.md variance table" },
+      "current": {
+        "value": 0.5,
+        "unit": "max abs swing",
+        "at": "2026-08-22",
+        "evidence": "evidence/W-EV2/rediscovery.md variance table"
+      },
       "target": 0.15,
       "stretch": 0.08,
-      "ownerWaves": ["W9", "W-P2"]
+      "ownerWaves": [
+        "W9",
+        "W-P2"
+      ]
     },
     {
       "id": "relation-blind-agreement",
       "what": "Blind same-family re-judging exact agreement, claim->hypothesis relations (upper bound)",
-      "current": { "value": 0.61, "detail": "supports 11/18 pooled; contradicts structurally eliminated (0/21 post-fix)", "at": "2026-08-22", "evidence": "evidence/W-EV2/relation-precision.md" },
+      "current": {
+        "value": 0.61,
+        "detail": "supports 11/18 pooled; contradicts structurally eliminated (0/21 post-fix)",
+        "at": "2026-08-22",
+        "evidence": "evidence/W-EV2/relation-precision.md"
+      },
       "target": 0.8,
       "stretch": 0.9,
-      "ownerWaves": ["W-P2", "W5"]
+      "ownerWaves": [
+        "W-P2",
+        "W5"
+      ]
     },
     {
       "id": "mlr-bench-overall",
       "what": "MLR-Bench same-judge Overall (farlab vs best anchor o4-mini 7.80/7.40)",
-      "current": { "value": 7.0, "detail": "idea 7.00 / proposal 6.20; Feasibility 7.40 already exceeds anchors", "at": "2026-08-22", "evidence": "eval/results/mlr-bench.jsonl; evidence/W-EV2/mlr-bench.md" },
-      "target": { "idea": 7.4, "proposal": 7.0 },
-      "stretch": { "idea": 7.7, "proposal": 7.4, "note": "match anchors on rendered slice" },
-      "ownerWaves": ["W-P2", "W5", "W6"]
+      "current": {
+        "value": 7.0,
+        "detail": "idea 7.00 / proposal 6.20; Feasibility 7.40 already exceeds anchors",
+        "at": "2026-08-22",
+        "evidence": "eval/results/mlr-bench.jsonl; evidence/W-EV2/mlr-bench.md"
+      },
+      "target": {
+        "idea": 7.4,
+        "proposal": 7.0
+      },
+      "stretch": {
+        "idea": 7.7,
+        "proposal": 7.4,
+        "note": "match anchors on rendered slice"
+      },
+      "ownerWaves": [
+        "W-P2",
+        "W5",
+        "W6"
+      ]
     },
     {
       "id": "structured-output-failure",
       "what": "Schema-validation failure rate AFTER full tolerance chain + strict-FC (per model call)",
-      "current": { "value": 0.011, "detail": "1 mid-run rejection (mixed provenance) across ~91 calls in strict-FC verification runs; fixed at schema level", "at": "2026-08-22", "evidence": "D-026/D-029b; run_prrxcee6 41/41 tool_calls zero failures" },
+      "current": {
+        "value": 0.011,
+        "detail": "1 mid-run rejection (mixed provenance) across ~91 calls in strict-FC verification runs; fixed at schema level",
+        "at": "2026-08-22",
+        "evidence": "D-026/D-029b; run_prrxcee6 41/41 tool_calls zero failures"
+      },
       "target": 0.005,
       "stretch": 0.001,
-      "ownerWaves": ["W7"]
+      "ownerWaves": [
+        "W7"
+      ]
     },
     {
       "id": "retrieval-verified-rate",
       "what": "source_verification_rate across eval runs (fail-closed grounding ceiling held)",
-      "current": { "value": 0.9667, "at": "2026-08-21", "evidence": "eval/results/metrics-ev1.json" },
+      "current": {
+        "value": 0.9667,
+        "at": "2026-08-21",
+        "evidence": "eval/results/metrics-ev1.json"
+      },
       "target": 0.98,
       "stretch": 0.995,
-      "ownerWaves": ["W6", "W5"]
+      "ownerWaves": [
+        "W6",
+        "W5"
+      ]
     },
     {
       "id": "counter-evidence-substantive-hit",
       "what": "Counter-evidence seats whose relation survives blind re-judging as genuine counter signal (NEW metric: define in W-P2, backfill historical)",
-      "current": { "value": null, "detail": "metric not yet defined; relation quality asterisk exists on EV1 +104% quantity claim", "at": "2026-08-22", "evidence": "evidence/W-EV1/ev1-before-after.md; evidence/W-EV2/relation-precision.md" },
+      "current": {
+        "value": 0.143,
+        "detail": "strict (judge in contradicts/weakens) post-fix fullfix blind re-judge sample: 1/7, Wilson 95% [0.026,0.513]; limiting (+qualifies) also 0.143; misses mostly EMPTY (5 unrelated) not inverted (1 supports) — semantic residual per D-038, fix route = judge v2 adjudication layer once routes funded; pre-fix pooled was 0.308 strict / 0.615 limiting (relation-precision.jsonl n=13)",
+        "at": "2026-08-22",
+        "evidence": "eval/counter-evidence-metric.mjs run on spikes/output/relation-precision{,-contradicts-r2,-fullfix}.jsonl; evidence/W9/counter-evidence-metric.md"
+      },
       "target": 0.7,
       "stretch": 0.85,
-      "ownerWaves": ["W-P2", "W9"]
+      "ownerWaves": [
+        "W-P2",
+        "W9"
+      ],
+      "subGoals": "metric DEFINED (strict/limiting + miss decomposition) and backfilled; improvement route = falsify-stage adjudication via judge v2 borderline layer; live re-measurement gated on model routes (D-036)"
     },
     {
       "id": "run-reliability",
       "what": "Full-run terminal-state reliability: frozen/crashed runs detected+swept+resumable; no silent hangs",
-      "current": { "value": "swept-manually", "detail": "frozen runs occurred twice this session; zombie sweep script exists (97311cb); auto-detection not wired", "at": "2026-08-22", "evidence": "D-029b; scripts sweep-zombie-runs.mjs" },
+      "current": {
+        "value": "swept-manually",
+        "detail": "frozen runs occurred twice this session; zombie sweep script exists (97311cb); auto-detection not wired",
+        "at": "2026-08-22",
+        "evidence": "D-029b; scripts sweep-zombie-runs.mjs"
+      },
       "target": "auto-detect+resume on injected failure, 100% within 1 poll cycle",
       "stretch": "zero frozen runs across 20-run soak",
-      "ownerWaves": ["W8"]
+      "ownerWaves": [
+        "W8"
+      ]
     },
     {
       "id": "run-wall-clock",
       "what": "Typical full research run wall-clock (first-to-last receipt), single run",
-      "current": { "value": "6-8min typical; pre-fusion outliers were network stalls", "at": "2026-08-22", "evidence": "evidence/W-EV1/ev1-before-after.md (P4 5.0min, P6 8.0min post)" },
+      "current": {
+        "value": "6-8min typical; pre-fusion outliers were network stalls",
+        "at": "2026-08-22",
+        "evidence": "evidence/W-EV1/ev1-before-after.md (P4 5.0min, P6 8.0min post)"
+      },
       "target": "p50 <= 6min with crossref third source added",
       "stretch": "p50 <= 4.5min via parallelizable stages if W8 justifies",
-      "ownerWaves": ["W8", "W6"]
+      "ownerWaves": [
+        "W8",
+        "W6"
+      ]
     },
     {
       "id": "plan-executability",
       "what": "Deterministic plan executability pass rate on eval problems",
-      "current": { "value": "5/5", "at": "2026-08-21", "evidence": "eval/results/metrics-ev1.json" },
+      "current": {
+        "value": "5/5",
+        "at": "2026-08-21",
+        "evidence": "eval/results/metrics-ev1.json"
+      },
       "target": "held at 5/5 under multiple-testing gate",
       "stretch": "external reviewer sample rates plans >=8/10 executable",
-      "ownerWaves": ["W-P2", "W5"]
+      "ownerWaves": [
+        "W-P2",
+        "W5"
+      ]
     },
     {
       "id": "hci-audit-p1",
       "what": "Open P1 findings after nielsen + cognitive-walkthrough double audit of web workbench",
-      "current": { "value": "unaudited-this-cycle", "detail": "R1 audits passed; P2/P3 residuals known (PlanTab provenance)", "at": "2026-08-22", "evidence": ".control/ACCEPTANCE_STATUS.json" },
+      "current": {
+        "value": "unaudited-this-cycle",
+        "detail": "R1 audits passed; P2/P3 residuals known (PlanTab provenance)",
+        "at": "2026-08-22",
+        "evidence": ".control/ACCEPTANCE_STATUS.json"
+      },
       "target": 0,
       "stretch": "5/5 core task walkthroughs unassisted completion",
-      "ownerWaves": ["W-P1", "W4-H-group"]
+      "ownerWaves": [
+        "W-P1",
+        "W4-H-group"
+      ]
     },
     {
       "id": "delivery-number-honesty",
       "what": "Mismatches between submission doc numbers and raw result JSONs (adversarial re-audit)",
-      "current": { "value": 0, "detail": "after D-022 correction wave", "at": "2026-08-22", "evidence": "evidence/W-EV1/ev1-before-after.md audit note" },
+      "current": {
+        "value": 0,
+        "detail": "after D-022 correction wave",
+        "at": "2026-08-22",
+        "evidence": "evidence/W-EV1/ev1-before-after.md audit note"
+      },
       "target": 0,
       "stretch": 0,
-      "ownerWaves": ["W-P1"]
+      "ownerWaves": [
+        "W-P1"
+      ]
     }
   ],
   "antiInflationRules": [

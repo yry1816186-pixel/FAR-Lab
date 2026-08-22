@@ -84,7 +84,16 @@ export const tfidfCosine = (docsTokens) => {
  * Symmetric for both sides, independent per claim (mirrors the LLM instruction
  * that several claims may map to the same counterpart).
  */
-export const thresholdMatch = (agentClaims, gtClaims, { high = 0.45, low = 0.18 } = {}) => {
+/**
+ * Production matching thresholds. Calibrated 2026-08-22 against the main-agent gold
+ * set (eval/claim-pair-gold.jsonl, 104 pairs) under a ZERO-gold-error constraint
+ * (claim-match-calibrate.mjs v2); equivalence band 0.34-0.50 at detShare 33% — the
+ * lexical-semantic separation ceiling. Exported so tests can lock the PRODUCTION
+ * values (a mutation here must redden the gold regression test).
+ */
+export const MATCH_DEFAULTS = Object.freeze({ high: 0.40, low: 0.12 });
+
+export const thresholdMatch = (agentClaims, gtClaims, { high = MATCH_DEFAULTS.high, low = MATCH_DEFAULTS.low } = {}) => {
   const agentTokens = agentClaims.map(contentTokens);
   const gtTokens = gtClaims.map(contentTokens);
   const allDocs = [...agentTokens, ...gtTokens];

@@ -13,8 +13,12 @@
  * The scored artifact is the TOP HYPOTHESIS (statement + mechanism + predictions +
  * falsification expectation) of a real research start run — rediscovery at hypothesis
  * level. NOT comparable to official FIRE-Bench agent scores (full-cycle, executed).
- * Claim decomposition and claim matching are uncalibrated DeepSeek steps; only the
- * ground-truth CONTENT is objective.
+ *
+ * Judge v2.1 (Wave-9 D-029, 2026-08-22): FIXED ground-truth claims (rediscovery-tasks.mjs,
+ * GT_REV) + agent-side fixed-granularity 3-pass-median decomposition + deterministic
+ * TF-IDF threshold matching + 3-vote LLM adjudication ONLY for the borderline band
+ * (pipeline single-sourced in rediscovery-judge.mjs). Variance budget and offline/live
+ * measurement: eval/judge-variance.mjs.
  *
  * Usage: node eval/rediscovery.mjs [--skip-runs] [--sample N]
  * Env: DEEPSEEK_API_KEY. Writes eval/results/rediscovery.jsonl (+ -runs.jsonl).
@@ -22,10 +26,9 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { DatabaseSync } from 'node:sqlite';
 import { makeProvider } from './lib.mjs';
-import { thresholdMatch, finalizeCounts } from './claim-match.mjs';
-import { isRepresentative } from '../dist/pipeline/stages/shared.js';
+import { TASKS, renderTopHypothesis, waitForTerminal, GT_REV } from './rediscovery-tasks.mjs';
+import { judgeRediscovery } from './rediscovery-judge.mjs';
 
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
 const OUT = join(RESULTS_DIR, 'rediscovery.jsonl');
@@ -33,57 +36,12 @@ const RUNS_FILE = join(RESULTS_DIR, 'rediscovery-runs.jsonl');
 const SKIP_RUNS = process.argv.includes('--skip-runs');
 const SAMPLE_N = Number(process.env.REDISCOVERY_N ?? 5);
 
-// ---------------------------------------------------------------------------
-// seed task set — established findings, authored 2026-08-22 (main agent, from
-// textbook-level established science; each rationale states why it is established)
-// ---------------------------------------------------------------------------
+const die = (msg) => { console.error('FATAL: ' + msg); process.exit(1); };
+const provider = makeProvider();
+if (!provider.liveReady) die('DEEPSEEK_API_KEY not set');
 
-const TASKS = [
-  {
-    id: 'egfr-tki-resistance',
-    question: 'What mechanisms drive acquired resistance to EGFR tyrosine kinase inhibitors in non-small cell lung cancer?',
-    domain: 'oncology', goal: 'explanatory',
-    establishedFinding:
-      'The dominant acquired-resistance mechanism is the EGFR T790M gatekeeper mutation in the kinase domain, which sterically reduces inhibitor binding while preserving ATP affinity. A secondary mechanism is MET/HER3 pathway amplification that bypasses EGFR signaling blockade without a second EGFR mutation. Resistance emerges under the selective pressure of inhibitor treatment, expanding pre-existing resistant clones.',
-    rationale: 'Textbook oncology; Jackman & Engelman reviews; established since ~2005.',
-  },
-  {
-    id: 'antibiotic-cdiff',
-    question: 'Why does antibiotic treatment predispose patients to Clostridioides difficile infection?',
-    domain: 'microbiology', goal: 'explanatory',
-    establishedFinding:
-      'Antibiotics disrupt the gut microbiota, depleting bacteria that convert primary bile acids to secondary bile acids. Loss of secondary bile acids (which inhibit C. difficile germination and growth) together with accumulation of taurocholate-like germinants enables C. difficile spore germination and outgrowth. The infection is therefore a dysbiosis-driven loss of colonization resistance rather than a direct antibiotic effect on the pathogen.',
-    rationale: 'Established mechanistic model (Buffie/Young & Abt reviews); bile-acid axis.',
-  },
-  {
-    id: 'arg-plasmid-transfer',
-    question: 'What mechanisms drive the horizontal transfer of antibiotic resistance genes in hospital environments?',
-    domain: 'microbiology', goal: 'explanatory',
-    establishedFinding:
-      'Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings; integrons and transposons capture and mobilize resistance cassettes onto those plasmids; and sustained antibiotic selective pressure enriches resistant strains, maintaining and spreading the plasmid pool. Patient-to-patient transmission via hands and equipment amplifies spread but is not the gene-transfer mechanism itself.',
-    rationale: 'Textbook medical microbiology (plasmid conjugation, integrons, selection).',
-  },
-  {
-    id: 'crispr-offtarget',
-    question: 'What mechanism causes CRISPR-Cas9 off-target genome editing?',
-    domain: 'molecular biology', goal: 'explanatory',
-    establishedFinding:
-      'Off-target editing arises because the Cas9-guide RNA complex tolerates sequence mismatches between the guide and off-target genomic sites. Mismatch tolerance is highest distal to the PAM and lowest in the PAM-proximal seed region; off-target activity therefore correlates with genome-wide guide-sequence similarity and cannot be fully eliminated by requiring a perfect match in design.',
-    rationale: 'Established since Doudna/Charpentier-era characterization; seed-region model.',
-  },
-  {
-    id: 'crc-ici-failure',
-    question: 'Why does immune checkpoint blockade benefit only a minority of colorectal cancer patients?',
-    domain: 'oncology', goal: 'explanatory',
-    establishedFinding:
-      'Most colorectal tumors are microsatellite-stable (MSS) with functioning mismatch repair, yielding low tumor mutational burden and few neoantigens, so there is insufficient T-cell priming for checkpoint blockade to amplify. The microsatellite-instable (MSI-high/dMMR) subset carries high mutational/neoantigen burden and is the minority that responds. Response failure is thus primarily an antigenicity/immunogenicity deficit, not a drug-delivery issue.',
-    rationale: 'Established since 2015 (Le/Overman); MSI-TMB-neoantigen axis is textbook.',
-  },
-];
-
-// ---------------------------------------------------------------------------
-// FAR-Lab run + top-hypothesis conclusion rendering (deterministic)
-// ---------------------------------------------------------------------------
+const sample = TASKS.slice(0, SAMPLE_N);
+mkdirSync(RESULTS_DIR, { recursive: true });
 
 const farRun = (t) => {
   const stdout = execFileSync('node', [
@@ -92,78 +50,6 @@ const farRun = (t) => {
   ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30 * 60_000 });
   const line = stdout.split('\n').find((l) => l.trim().startsWith('{'));
   return JSON.parse(line ?? '{}');
-};
-
-const DB_PATH = resolve(process.cwd(), '.far-run/far.db');
-
-const renderTopHypothesis = (runId) => {
-  const db = new DatabaseSync(DB_PATH, { readOnly: true });
-  const objs = (kind) => db.prepare('SELECT json FROM objects WHERE kind=? AND run_id=?').all(kind, runId).map((r) => JSON.parse(r.json));
-  const hyps = objs('hypothesis').filter(isRepresentative);
-  const tournament = objs('tournament').at(-1);
-  const plan = objs('plan').at(-1);
-  db.close();
-  if (hyps.length === 0) return { text: null, reason: 'no representative hypotheses' };
-  let top = hyps[0];
-  if (tournament && hyps.length > 1) {
-    const order = tournament.standings.map((s) => s.hypothesisId ?? s.id).filter(Boolean);
-    top = order.map((id) => hyps.find((h) => h.id === id)).find(Boolean) ?? hyps[0];
-  }
-  const f = top.falsification ?? {};
-  const text =
-    `Hypothesis: ${top.statement}\n` +
-    `Mechanism: ${top.mechanism ?? ''}\n` +
-    `Predictions: ${(top.predictions ?? []).join(' | ')}\n` +
-    `Expected relation: ${f.expectedRelation ?? ''} (observable: ${f.observable ?? ''}).`;
-  return { text, hypId: top.id, planObjective: plan?.objective ?? null };
-};
-
-// ---------------------------------------------------------------------------
-// judge: atomic-claim decomposition + matching (uncalibrated steps, objective GT)
-// ---------------------------------------------------------------------------
-
-const DecomposeOut = {
-  type: 'object',
-  properties: {
-    agentClaims: { type: 'array', items: { type: 'string' } },
-    gtClaims: { type: 'array', items: { type: 'string' } },
-  },
-  required: ['agentClaims', 'gtClaims'],
-  additionalProperties: false,
-};
-const die = (msg) => { console.error('FATAL: ' + msg); process.exit(1); };
-const provider = makeProvider();
-if (!provider.liveReady) die('DEEPSEEK_API_KEY not set');
-
-const structuredJson = async (task, payload, schema) => {
-  const res = await provider.structuredCall(
-    { task, systemPrompt: 'You are a precise scientific evaluation engine. Follow the requested JSON shape exactly.', userPayload: payload, outputKind: 'json', temperature: 0, maxTokens: 4000, purpose: task, jsonSchema: schema },
-    (raw) => {
-      if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');
-      return raw;
-    },
-  );
-  if (!res.ok) throw new Error(`${task} failed: ${res.error?.message}`);
-  return res.data;
-};
-
-const sample = TASKS.slice(0, SAMPLE_N);
-mkdirSync(RESULTS_DIR, { recursive: true });
-
-const waitForTerminal = (runId, maxMs = 20 * 60_000) => {
-  const db = new DatabaseSync(DB_PATH, { readOnly: true });
-  const deadline = Date.now() + maxMs;
-  let status;
-  for (;;) {
-    // each .get() is a fresh read transaction on the WAL — engine commits become visible
-    const row = db.prepare('SELECT status FROM runs WHERE id=?').get(runId);
-    status = row === undefined ? 'missing' : row.status;
-    if (status !== 'running' && status !== 'created') break;
-    if (Date.now() > deadline) break;
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10_000);
-  }
-  db.close();
-  return status;
 };
 
 // phase 1: runs (the CLI may return at creation while a detached engine keeps
@@ -199,68 +85,29 @@ for (const r of runs) {
   if (status !== 'completed') { records.push({ task: r.task, runId: r.runId, skipped: true, reason: `run terminal status: ${status}` }); console.log(`[rediscovery] ${r.task}: skipped (status ${status})`); continue; }
   const { text } = renderTopHypothesis(r.runId);
   if (text === null) { records.push({ task: r.task, skipped: true, reason: 'no top hypothesis' }); continue; }
-  try {
-    // Judge v2 (hardening, 2026-08-22): same-run re-judging swung F1 by ±0.5 — both LLM
-    // steps were single-pass. v2 = 3-pass decomposition with median claim count +
-    // deterministic TF-IDF threshold matching (clear extremes decided without the LLM) +
-    // 3-vote LLM majority ONLY for the borderline band. Reproducibility first: absolute
-    // generosity levels shift together under the fixed rule, run-to-run comparisons stay valid.
-    const decPasses = [];
-    for (let p = 0; p < 3; p += 1) {
-      const d = await structuredJson('rediscovery:decompose', { agentOutput: text, establishedFinding: t.establishedFinding, instruction: 'Decompose BOTH texts into atomic, verifiable scientific claims (subject-mechanism-direction units; 2-12 claims each; no overlap).' }, DecomposeOut);
-      decPasses.push({ agent: d.agentClaims ?? [], gt: d.gtClaims ?? [], total: (d.agentClaims ?? []).length + (d.gtClaims ?? []).length });
-    }
-    decPasses.sort((a, b) => a.total - b.total);
-    const median = decPasses[1] ?? decPasses[0];
-    const agentClaims = median.agent;
-    const gtClaims = median.gt;
-    if (agentClaims.length === 0 || gtClaims.length === 0) throw new Error('decomposition empty');
-    const MATCH = { high: 0.55, low: 0.15 };
-    const m = thresholdMatch(agentClaims, gtClaims, MATCH);
-    const adjudications = [];
-    if (m.borderline.length > 0) {
-      const AdjudicateOut = {
-        type: 'object',
-        properties: { verdicts: { type: 'array', items: { type: 'boolean' } } },
-        required: ['verdicts'], additionalProperties: false,
-      };
-      const items = m.borderline.map((b) => ({
-        claim: b.side === 'agent' ? agentClaims[b.i] : gtClaims[b.i],
-        bestCounterpart: b.side === 'agent' ? gtClaims[m.agentSide[b.i].match ?? -1] ?? gtClaims[0] : agentClaims[m.gtSide[b.i].match ?? -1] ?? agentClaims[0],
-      }));
-      const votes = [];
-      for (let v = 0; v < 3; v += 1) {
-        try {
-          const adj = await structuredJson('rediscovery:adjudicate', {
-            pairs: items.map((x, k) => ({ k, claim: x.claim, candidate: x.bestCounterpart })),
-            instruction: 'For each pair decide: does the CLAIM assert substantially the same scientific finding (same entity/mechanism/direction) as the CANDIDATE? Synonyms count; vague-but-covering counts; unrelated or fabricated does not. Return verdicts array aligned with k order.',
-          }, AdjudicateOut);
-          votes.push(Array.isArray(adj.verdicts) ? adj.verdicts : []);
-        } catch { votes.push([]); }
-      }
-      m.borderline.forEach((b, k) => {
-        const vs = votes.map((arr) => arr[k] === true).filter(Boolean).length;
-        adjudications.push({ matched: vs >= 2 });
-      });
-    }
-    const counts = finalizeCounts(agentClaims, gtClaims, m, adjudications);
-    records.push({
-      task: r.task, runId: r.runId, judge: 'deepseek-chat', temperature: 0,
-      matcher: { version: 'tfidf-threshold+v3-vote-adjudication', ...MATCH, borderline: m.borderline.length },
-      decomposition: { passes: decPasses.map((p) => p.total), selected: median.total },
-      agentClaims: agentClaims.length, gtClaims: gtClaims.length,
-      agentMatched: counts.agentMatched, gtMatched: counts.gtMatched,
-      precision: Math.round(counts.precision * 1000) / 1000,
-      recall: Math.round(counts.recall * 1000) / 1000,
-      f1: Math.round(counts.f1 * 1000) / 1000,
-      claims: { agent: agentClaims, gt: gtClaims },
-      topHypothesis: text,
-    });
-    console.log(`[rediscovery] ${r.task}: P=${counts.precision.toFixed(2)} R=${counts.recall.toFixed(2)} F1=${counts.f1.toFixed(2)} (${counts.agentMatched}/${agentClaims.length} agent, ${counts.gtMatched}/${gtClaims.length} gt, borderline ${m.borderline.length})`);
-  } catch (e) {
-    records.push({ task: r.task, runId: r.runId, error: String(e.message).slice(0, 300) });
-    console.error(`[rediscovery] judge error ${r.task}: ${e.message}`);
+  const res = await judgeRediscovery({
+    agentText: text,
+    gtClaims: t.gtClaims,
+    call: (req, validate) => provider.structuredCall(req, validate),
+  });
+  if (!res.ok) {
+    records.push({ task: r.task, runId: r.runId, error: `${res.error.stage}: ${res.error.message}`.slice(0, 300) });
+    console.error(`[rediscovery] judge error ${r.task}: ${res.error.stage}: ${res.error.message}`);
+    continue;
   }
+  records.push({
+    task: r.task, runId: r.runId, judge: 'deepseek-chat', temperature: 0, gtRev: GT_REV,
+    matcher: res.matcher,
+    decomposition: res.decomposition,
+    agentClaims: res.agentClaims.length, gtClaims: t.gtClaims.length,
+    agentMatched: res.counts.agentMatched, gtMatched: res.counts.gtMatched,
+    precision: Math.round(res.counts.precision * 1000) / 1000,
+    recall: Math.round(res.counts.recall * 1000) / 1000,
+    f1: res.f1,
+    claims: { agent: res.agentClaims, gt: t.gtClaims },
+    topHypothesis: text,
+  });
+  console.log(`[rediscovery] ${r.task}: P=${res.counts.precision.toFixed(2)} R=${res.counts.recall.toFixed(2)} F1=${res.f1.toFixed(2)} (${res.counts.agentMatched}/${res.agentClaims.length} agent, ${res.counts.gtMatched}/${t.gtClaims.length} gt, borderline ${res.matcher.borderline})`);
 }
 writeFileSync(OUT, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8');
 
