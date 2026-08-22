@@ -489,6 +489,23 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 .control-reason { color: var(--muted); font-size: 12px; margin: 0; }
 .feedback-block { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 8px; }
 
+/* ---------- evidence-line signature (§8.3): epistemic glyphs — saturated color ONLY for evidence semantics */
+.ev-glyph {
+  display: inline-block;
+  width: 18px;
+  min-height: 24px;
+  line-height: 24px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+.ev-glyph--verified { color: var(--v2-verified); }
+.ev-glyph--refuted  { color: var(--v2-refuted); }
+.ev-glyph--unknown  { color: var(--v2-unknown); }
+.ev-glyph--caution  { color: var(--v2-caution); }
+
+.bundle-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* ---------- evidence ---------- */
 .claims-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .claim-item { border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }

@@ -559,6 +559,30 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     }
   });
 
+  it('projects leaseInfo so the UI can surface frozen-run state (D-060)', async () => {
+    const { status, body } = await getJson(`${base}/api/v1/runs/${run1}`);
+    expect(status).toBe(200);
+    expect(typeof body.leaseInfo.live).toBe('boolean');
+    expect(body.leaseInfo).toHaveProperty('holder');
+    // no executor holds a lease in these tests — live must be false, holder null
+    expect(body.leaseInfo.live).toBe(false);
+    expect(body.leaseInfo.holder).toBeNull();
+  });
+
+  it('lists bundles as a first-class resource (D-060: replaces client event-regex scan)', async () => {
+    const { status, body } = await getJson(`${base}/api/v1/runs/${run1}/bundles`);
+    expect(status).toBe(200);
+    expect(Array.isArray(body.bundles)).toBe(true);
+    expect(body.bundles.length).toBeGreaterThan(0);
+    const seeded = body.bundles.find((b: { id: string }) => b.id === bundle1);
+    expect(seeded).toBeDefined();
+    expect(seeded.evidenceLevel).toBeDefined();
+
+    const ghost = `run_${'0'.repeat(26)}`;
+    const ghostRes = await getJson(`${base}/api/v1/runs/${ghost}/bundles`);
+    expect(ghostRes.status).toBe(404);
+  });
+
   it('404s JSON for unknown routes and wrong methods', async () => {
     const unknown = await getJson(`${base}/api/v1/nope`);
     expect(unknown.status).toBe(404);

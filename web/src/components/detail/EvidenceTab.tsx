@@ -117,6 +117,14 @@ function ClaimsList({ claims }: { claims: ScientificClaim[] }): JSX.Element {
       {claims.map((claim) => (
         <li key={claim.id} className="claim-item">
           <div className="claim-head">
+            {/* Evidence-line signature (§8.3): the epistemic glyph is the claim's cognitive
+                state — the only saturated color in the chrome. Same mapping as the badge. */}
+            <span
+              className={`ev-glyph ev-glyph--${claim.bindingStatus === 'verified' ? 'verified' : claim.bindingStatus === 'resolved_unaligned' ? 'caution' : claim.bindingStatus === 'unresolved' ? 'refuted' : 'unknown'}`}
+              aria-hidden="true"
+            >
+              {claim.bindingStatus === 'verified' ? '✓' : claim.bindingStatus === 'resolved_unaligned' ? '▲' : claim.bindingStatus === 'unresolved' ? '✗' : '–'}
+            </span>
             <IdText value={claim.id} />
             <Badge tone={bindingTone(claim.bindingStatus)} title={t(`binding.${claim.bindingStatus}.zh` as never)}>
               {t(bindingKey(claim.bindingStatus))}
@@ -189,6 +197,9 @@ function RelationsSummary({
       <ul className="relation-counts">
         {[...byType.entries()].map(([type, n]) => (
           <li key={type} className={`relation-chip relation-chip--${polarityOf(type)}`}>
+            <span className={`ev-glyph ev-glyph--${polarityOf(type) === 'supporting' ? 'verified' : polarityOf(type) === 'counter' ? 'refuted' : 'unknown'}`} aria-hidden="true">
+              {polarityOf(type) === 'supporting' ? '✓' : polarityOf(type) === 'counter' ? '✗' : '–'}
+            </span>
             <Badge tone={polarityTone(polarityOf(type))}>{t(`relation.${type}` as never)}</Badge>
             <span className="mono count">{n}</span>
           </li>

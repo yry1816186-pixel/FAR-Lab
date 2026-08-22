@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
-import { getReceipts, getReport, verifyBundle } from '../../api/endpoints';
+import { getBundles, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
 import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
+import { isSettled } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton, TimeText, errorText } from '../common';
 import type { EventsState } from '../RunDetail';
 
-/** Best-effort discovery: bundle ids that actually appeared in the event stream (e.g. export stage summaries). */
+/** Best-effort discovery kept only as a graceful fallback while the bundles API 404s on older servers (D-060). */
 function discoverBundleIds(events: EventsState): string[] {
   const found = new Set<string>();
   for (const ev of events.events) {
@@ -18,16 +19,22 @@ function discoverBundleIds(events: EventsState): string[] {
   return [...found];
 }
 
-export function ProvenanceTab({ run, events }: { run: ResearchRun; events: EventsState }): JSX.Element {
+export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; events: EventsState; onMutated: () => void }): JSX.Element {
   const { t } = useI18n();
   const receiptsFetcher = useCallback((signal: AbortSignal) => getReceipts(run.id, signal), [run.id]);
   const receiptsRes = useResource(receiptsFetcher, [run.id], `${run.updatedAt}:${run.status}`);
+
+  const bundlesFetcher = useCallback((signal: AbortSignal) => getBundles(run.id, signal), [run.id]);
+  const bundlesRes = useResource(bundlesFetcher, [run.id], `${run.updatedAt}:${run.status}`);
+  // Fallback to the event scan only when the first-class endpoint is missing (older server).
+  const discovered = bundlesRes.error !== null && isNotFound(bundlesRes.error) ? discoverBundleIds(events) : [];
 
   const reportFetcher = useCallback((signal: AbortSignal) => getReport(run.id, signal), [run.id]);
   const reportRes = useResource(reportFetcher, [run.id], `${run.updatedAt}:${run.status}`);
 
   const modelCalls = (receiptsRes.data ?? []).filter((r) => r.kind === 'model_call');
   const nonLive = (receiptsRes.data ?? []).filter((r) => r.executionMode !== 'live');
+  const bundles = bundlesRes.data ?? [];
 
   return (
     <div className="tab-content">
@@ -50,7 +57,7 @@ export function ProvenanceTab({ run, events }: { run: ResearchRun; events: Event
       </Section>
 
       <Section title={t('bundle.title')}>
-        <BundleVerify discovered={discoverBundleIds(events)} />
+        <BundleVerify bundles={bundles} fallbackIds={discovered} run={run} onMutated={onMutated} bundlesLoading={bundlesRes.loading} />
       </Section>
 
       <Section title={t('report.title')}>
@@ -195,16 +202,30 @@ function ReceiptRow({
   );
 }
 
-function BundleVerify({ discovered }: { discovered: string[] }): JSX.Element {
+function BundleVerify({
+  bundles,
+  fallbackIds,
+  run,
+  onMutated,
+  bundlesLoading,
+}: {
+  bundles: { id: string; createdAt: string; evidenceLevel: string }[];
+  fallbackIds: string[];
+  run: ResearchRun;
+  onMutated: () => void;
+  bundlesLoading: boolean;
+}): JSX.Element {
   const { t } = useI18n();
   const [bundleId, setBundleId] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [report, setReport] = useState<VerificationReport | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  const [reexporting, setReexporting] = useState(false);
+  const [reexportError, setReexportError] = useState<ApiError | null>(null);
 
   const effectiveId = bundleId.trim();
 
-  const run = async (id: string): Promise<void> => {
+  const runVerify = async (id: string): Promise<void> => {
     setError(null);
     setReport(null);
     setVerifying(true);
@@ -223,15 +244,46 @@ function BundleVerify({ discovered }: { discovered: string[] }): JSX.Element {
     }
   };
 
+  // Re-export: server re-runs the export stage only when a revision is newer than the
+  // latest bundle (honest guards: 409 busy / 400 no-bundle / 400 no-newer-revision).
+  const reexportable = isSettled(run.status) && bundles.length > 0;
+  const doReexport = async (): Promise<void> => {
+    setReexportError(null);
+    setReexporting(true);
+    const controller = new AbortController();
+    try {
+      await reexportRun(run.id, withTimeout(controller.signal, 15_000));
+      onMutated(); // refresh run detail; the new bundle appears in the chips below
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setReexportError(new ApiError({ code: 'timeout', message: '请求超时（15s）', retryable: true, i18nKey: 'err.timeout', i18nVars: { seconds: 15 } }));
+      } else {
+        setReexportError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
+      }
+    } finally {
+      setReexporting(false);
+    }
+  };
+
   const verdictTone = report === null ? 'muted' : report.verdict === 'verified' ? 'ok' : report.verdict === 'degraded' ? 'warn' : 'err';
 
   return (
     <div className="bundle-verify">
       <p className="muted small">{t('bundle.intro')}</p>
-      {discovered.length > 0 && (
+      {!bundlesLoading && bundles.length > 0 && (
         <p className="small">
           {t('bundle.discovered')}{' '}
-          {discovered.map((id) => (
+          {bundles.map((b) => (
+            <button key={b.id} type="button" className="chip-button mono" onClick={() => setBundleId(b.id)} title={`${b.createdAt} · ${b.evidenceLevel}`}>
+              {b.id}
+            </button>
+          ))}
+        </p>
+      )}
+      {bundles.length === 0 && fallbackIds.length > 0 && (
+        <p className="small">
+          {t('bundle.discovered')}{' '}
+          {fallbackIds.map((id) => (
             <button key={id} type="button" className="chip-button mono" onClick={() => setBundleId(id)}>
               {id}
             </button>
@@ -251,10 +303,22 @@ function BundleVerify({ discovered }: { discovered: string[] }): JSX.Element {
           onChange={(e) => setBundleId(e.target.value)}
           disabled={verifying}
         />
-        <button type="button" className="btn btn--primary" disabled={verifying || effectiveId.length === 0} onClick={() => void run(effectiveId)}>
-          {verifying ? t('bundle.verifying') : t('bundle.verify')}
-        </button>
+        <div className="bundle-actions">
+          <button type="button" className="btn btn--primary" disabled={verifying || effectiveId.length === 0} onClick={() => void runVerify(effectiveId)}>
+            {verifying ? t('bundle.verifying') : t('bundle.verify')}
+          </button>
+          {reexportable && (
+            <button type="button" className="btn" disabled={reexporting} onClick={() => void doReexport()} title={t('bundle.reexportHint')}>
+              {reexporting ? t('common.loading') : t('bundle.reexport')}
+            </button>
+          )}
+        </div>
       </div>
+      {reexportError !== null && (
+        <p className="field-error" role="alert">
+          {t('bundle.reexportFailed')}：{errorText(reexportError)}
+        </p>
+      )}
       {error !== null && (
         <div role="alert">
           <p className="field-error">
