@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { GitCompareArrows, X } from 'lucide-react';
 import { isNotFound } from '../../api/client';
-import { getHypotheses } from '../../api/endpoints';
+import { getEvidence, getHypotheses } from '../../api/endpoints';
 import type { HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
@@ -17,16 +17,23 @@ const COMPARE_LIMIT = 3;
 export function HypothesesTab({
   run,
   onFeedback,
+  onOpenClaim,
 }: {
   run: ResearchRun;
   onFeedback: (target?: FeedbackTarget) => void;
+  /** Cross-tab navigation (S3): jump to a claim's anchor in the evidence tab. */
+  onOpenClaim?: (claimId: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const fetcher = useCallback((signal: AbortSignal) => getHypotheses(run.id, signal), [run.id]);
   const res = useResource(fetcher, [run.id], `${run.updatedAt}:${run.status}`);
-
-  // Compare selection (CPP-3): up to COMPARE_LIMIT ranked hypotheses, order = rank.
+  // Claims feed the ACH evidence analysis in compare view (fetched only when
+  // a compare is active — no extra request for the plain browsing path).
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const evidenceFetcher = useCallback((signal: AbortSignal) => getEvidence(run.id, signal), [run.id]);
+  const compareActive = compareIds.length >= 2;
+  const evidenceRes = useResource(evidenceFetcher, [run.id, compareActive], compareActive ? `${run.updatedAt}` : 'off');
+
   const toggleCompare = (id: string): void => {
     setCompareIds((prev) =>
       prev.includes(id)
@@ -76,8 +83,10 @@ export function HypothesesTab({
               <CompareView
                 hypotheses={compareHyps}
                 scorecards={data.scorecards}
+                claims={evidenceRes.data?.claims}
                 onRemove={(id) => setCompareIds((prev) => prev.filter((x) => x !== id))}
                 onChallenge={(id, label) => onFeedback({ kind: 'hypothesis', id, label })}
+                onOpenClaim={onOpenClaim}
               />
             </Section>
           )}
@@ -213,12 +222,23 @@ function HypothesisList({
   onChallenge: (id: string, label: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
+  const [filter, setFilter] = useState('');
   const { hypotheses } = data;
   if (hypotheses.length === 0) {
     return <EmptyState titleKey="hyp.empty" />;
   }
-  const reps = representativesOf(data);
-  const repIds = new Set(reps.map((h) => h.id));
+  // In-tab filter (CPP-6): match statement/mechanism text — the researcher's
+  // mental query, not machine ids.
+  const needle = filter.trim().toLowerCase();
+  const matches = needle.length === 0
+    ? () => true
+    : (h: HypothesisCandidate): boolean =>
+        h.statement.toLowerCase().includes(needle) ||
+        h.mechanism.toLowerCase().includes(needle) ||
+        h.id.toLowerCase().includes(needle);
+  const repsAll = representativesOf(data);
+  const reps = repsAll.filter(matches);
+  const repIds = new Set(repsAll.map((h) => h.id));
   const extras = hypotheses.filter((h) => !repIds.has(h.id));
   const clusterCounts = new Map<string, number>();
   for (const h of hypotheses) {
@@ -229,6 +249,15 @@ function HypothesisList({
 
   return (
     <div>
+      <input
+        type="text"
+        className="in-tab-filter"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        placeholder={t('hyp.filterPlaceholder')}
+        aria-label={t('hyp.filterLabel')}
+      />
+      {reps.length === 0 && <p className="muted small">{t('hyp.filterEmpty')}</p>}
       {reps.map((h) => (
         <HypothesisCard
           key={h.id}

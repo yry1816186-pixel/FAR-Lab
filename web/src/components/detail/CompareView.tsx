@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Assumption, HypothesisCandidate, HypothesisScorecard, ScoreDimension } from '../../api/types';
+import type { Assumption, HypothesisCandidate, HypothesisScorecard, ScoreDimension, ScientificClaim } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge } from '../common';
 import { noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../tones';
@@ -13,17 +13,27 @@ import { noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../
  * overallRationale text, so we show dimensions, which ARE structured).
  * Score dimension rows carry an inline "uncalibrated" marker: hover-only
  * calibration hints are lost on touch and in print (scientific-critique F5).
+ *
+ * ACH evidence analysis (S3): claim rows marked SHARED (bound to 2+ compared
+ * hypotheses — cannot discriminate between them) vs DISCRIMINATING (bound to
+ * exactly one). Rendered ONLY from real hypothesis claim bindings; when the
+ * pipeline produced no bindings, the honest empty state says so — never a
+ * fabricated matrix (the binding sparsity itself is pipeline feedback).
  */
 export function CompareView({
   hypotheses,
   scorecards,
+  claims,
   onRemove,
   onChallenge,
+  onOpenClaim,
 }: {
   hypotheses: HypothesisCandidate[];
   scorecards: HypothesisScorecard[];
+  claims?: ScientificClaim[];
   onRemove: (id: string) => void;
   onChallenge: (id: string, label: string) => void;
+  onOpenClaim?: (claimId: string) => void;
 }): JSX.Element | null {
   const { t } = useI18n();
   if (hypotheses.length < 2) return null;
@@ -145,6 +155,87 @@ export function CompareView({
         </table>
       </div>
       <p className="muted small">{t('compare.disclaimer')}</p>
+      <AchEvidence hypotheses={hypotheses} claims={claims} onOpenClaim={onOpenClaim} />
+    </div>
+  );
+}
+
+/**
+ * ACH-style evidence discrimination over the REAL hypothesis↔claim bindings.
+ * Shared claims (2+ hypotheses) cannot discriminate; unique bindings are where
+ * the comparison is actually decided. Bindings are sparse today — the empty
+ * state states that plainly instead of rendering an invented matrix.
+ */
+function AchEvidence({
+  hypotheses,
+  claims,
+  onOpenClaim,
+}: {
+  hypotheses: HypothesisCandidate[];
+  claims?: ScientificClaim[];
+  onOpenClaim?: (claimId: string) => void;
+}): JSX.Element | null {
+  const { t } = useI18n();
+  const byId = claims !== undefined ? new Map(claims.map((c) => [c.id, c] as const)) : null;
+
+  // claimId -> { polarity per hypothesis }
+  const matrix = new Map<string, { hypId: string; polarity: 'support' | 'counter' }[]>();
+  for (const h of hypotheses) {
+    for (const cid of h.supportingClaimIds ?? []) {
+      const row = matrix.get(cid) ?? [];
+      row.push({ hypId: h.id, polarity: 'support' });
+      matrix.set(cid, row);
+    }
+    for (const cid of h.counterClaimIds ?? []) {
+      const row = matrix.get(cid) ?? [];
+      row.push({ hypId: h.id, polarity: 'counter' });
+      matrix.set(cid, row);
+    }
+  }
+  if (matrix.size === 0) return null; // no bindings at all: count row already says 0
+  const shared = [...matrix.entries()].filter(([, rows]) => rows.length > 1);
+  const discriminating = [...matrix.entries()].filter(([, rows]) => rows.length === 1);
+
+  const renderRow = (claimId: string, rows: { hypId: string; polarity: 'support' | 'counter' }[]): JSX.Element => {
+    const claim = byId?.get(claimId);
+    const text = claim !== undefined ? (claim.text.length > 130 ? `${claim.text.slice(0, 130)}…` : claim.text) : claimId;
+    return (
+      <tr key={claimId}>
+        <th scope="row" className="compare-label-col">
+          <span className={rows.length > 1 ? 'muted' : undefined} title={claimId}>
+            {rows.length > 1 ? t('compare.achShared') : t('compare.achDiscriminating')}
+          </span>
+        </th>
+        <td colSpan={hypotheses.length}>
+          <span className="compare-claim-row">
+            <span className={`ev-glyph ev-glyph--${rows[0]!.polarity === 'support' ? 'verified' : 'refuted'}`} aria-hidden="true">
+              {rows[0]!.polarity === 'support' ? '✓' : '✗'}
+            </span>
+            {onOpenClaim !== undefined && claim !== undefined ? (
+              <button type="button" className="link-button compare-claim-text" onClick={() => onOpenClaim(claimId)} title={t('compare.openClaim')}>
+                {text}
+              </button>
+            ) : (
+              <span className="compare-claim-text">{text}</span>
+            )}
+            {rows.length > 1 && <span className="muted small"> — {t('compare.achSharedNote', { n: rows.length })}</span>}
+          </span>
+        </td>
+      </tr>
+    );
+  };
+
+  return (
+    <div className="ach-evidence">
+      <h4 className="minor-title">{t('compare.achTitle')}</h4>
+      <table className="data-table compare-table">
+        <caption className="sr-only">{t('compare.achTitle')}</caption>
+        <tbody>
+          {discriminating.map(([cid, rows]) => renderRow(cid, rows))}
+          {shared.map(([cid, rows]) => renderRow(cid, rows))}
+        </tbody>
+      </table>
+      <p className="muted small">{t('compare.achNote')}</p>
     </div>
   );
 }

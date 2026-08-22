@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
@@ -14,7 +14,12 @@ import { FeedbackDrawer } from './detail/FeedbackDrawer';
 import type { FeedbackTarget } from './detail/FeedbackForm';
 import { ExperimentsTab } from './detail/ExperimentsTab';
 
-type TabId = 'overview' | 'evidence' | 'hypotheses' | 'plan' | 'experiments' | 'revisions' | 'provenance' | 'events';
+export type TabId = 'overview' | 'evidence' | 'hypotheses' | 'plan' | 'experiments' | 'revisions' | 'provenance' | 'events';
+
+/** Route strings come from the URL — validate before casting to TabId. */
+export function isTabId(v: string): v is TabId {
+  return ['overview', 'evidence', 'hypotheses', 'plan', 'experiments', 'revisions', 'provenance', 'events'].includes(v);
+}
 
 const TABS: { id: TabId; labelKey: DictKey }[] = [
   { id: 'overview', labelKey: 'tab.overview' },
@@ -34,29 +39,74 @@ export interface EventsState {
   error: string | null;
 }
 
+/**
+ * Cross-tab claim navigation (S3): switching to the evidence tab mounts it
+ * fresh; the anchor scroll must run AFTER mount — hence the timeout + a
+ * focus() so keyboard users land on the claim, not just a visual jump.
+ */
+function HypothesisTabWithNav({
+  run,
+  onFeedback,
+  setTabId,
+}: {
+  run: ResearchRun;
+  onFeedback: (target?: FeedbackTarget) => void;
+  setTabId: (tab: TabId) => void;
+}): JSX.Element {
+  const openClaim = useCallback((claimId: string): void => {
+    setTabId('evidence');
+    window.setTimeout(() => {
+      const el = document.getElementById(`claim-${claimId}`);
+      if (el !== null) {
+        el.scrollIntoView({ block: 'center' });
+        el.classList.add('claim-flash');
+        window.setTimeout(() => el.classList.remove('claim-flash'), 1600);
+      }
+    }, 250);
+  }, [setTabId]);
+  return <HypothesesTab run={run} onFeedback={onFeedback} onOpenClaim={openClaim} />;
+}
+
 export function RunDetail({
   run,
   events,
   onMutated,
+  tab,
+  onTabChange,
 }: {
   run: ResearchRun;
   events: EventsState;
   onMutated: () => void;
+  /** Controlled tab (hash-route shareable, S3): undefined = use internal state. */
+  tab?: TabId;
+  onTabChange?: (tab: TabId) => void;
 }): JSX.Element {
   const { t } = useI18n();
-  const [tabId, setTabId] = useState<TabId>('overview');
+  const [tabId, setTabIdState] = useState<TabId>(tab ?? 'overview');
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const setTabId = (next: TabId): void => {
+    setTabIdState(next);
+    onTabChange?.(next);
+  };
 
   // Feedback drawer (CPP-1): the causal-revision entry, reachable from every
   // tab and pre-targetable by inline object actions. null = open untargeted.
   const [feedbackTarget, setFeedbackTarget] = useState<FeedbackTarget | null | undefined>(undefined);
   const openFeedback = (target?: FeedbackTarget): void => setFeedbackTarget(target ?? null);
 
-  // Run switch resets to the overview tab and closes the drawer.
+  // Run switch resets to the overview tab and closes the drawer. A route-named
+  // tab wins over the default on the next render (controlled tab effect below).
   useEffect(() => {
-    setTabId('overview');
+    setTabIdState(tab ?? 'overview');
     setFeedbackTarget(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run-switch only; later `tab` values flow through the controlled effect
   }, [run.id]);
+
+  // External tab control: hash navigation while the same run stays open.
+  useEffect(() => {
+    if (tab !== undefined) setTabIdState(tab);
+  }, [tab]);
 
   const focusTab = (index: number): void => {
     const clamped = Math.max(0, Math.min(TABS.length - 1, index));
@@ -78,7 +128,9 @@ export function RunDetail({
     switch (tabId) {
       case 'overview': return <OverviewTab run={run} events={events} onMutated={onMutated} onFeedback={openFeedback} />;
       case 'evidence': return <EvidenceTab run={run} onFeedback={openFeedback} />;
-      case 'hypotheses': return <HypothesesTab run={run} onFeedback={openFeedback} />;
+      case 'hypotheses': return (
+        <HypothesisTabWithNav run={run} onFeedback={openFeedback} setTabId={setTabId} />
+      );
       case 'plan': return <PlanTab run={run} onFeedback={openFeedback} />;
       case 'experiments': return <ExperimentsTab run={run} />;
       case 'revisions': return <RevisionsTab run={run} />;

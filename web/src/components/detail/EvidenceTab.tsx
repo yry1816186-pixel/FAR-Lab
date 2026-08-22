@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { isNotFound } from '../../api/client';
 import { getCorpus, getEvidence, getReceipts, getSources } from '../../api/endpoints';
 import type { CorpusQueryInfo, CorpusSnapshotInfo, EvidenceRelation, EvidenceRelationType, ProvenanceReceipt, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
@@ -149,14 +149,29 @@ function SourcesTable({ sources }: { sources: SourceDocument[] }): JSX.Element {
 
 function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChallenge: (id: string, label: string) => void }): JSX.Element {
   const { t } = useI18n();
+  const [filter, setFilter] = useState('');
   const gradeTitle = (level: NonNullable<ScientificClaim['gradeCertainty']>, downgraded: string[]): string => {
     const reasons = downgraded.length > 0 ? downgraded.join('；') : t('grade.noDowngrades');
     return `${t('grade.titlePrefix')}（${level}）— ${reasons}`;
   };
   if (claims.length === 0) return <EmptyState titleKey="evidence.noClaims" />;
+  const needle = filter.trim().toLowerCase();
+  const visible = needle.length === 0
+    ? claims
+    : claims.filter((c) => c.text.toLowerCase().includes(needle) || c.id.toLowerCase().includes(needle));
   return (
+    <div>
+      <input
+        type="text"
+        className="in-tab-filter"
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
+        placeholder={t('evidence.claimFilter')}
+        aria-label={t('evidence.claimFilterLabel')}
+      />
+      {visible.length === 0 && <p className="muted small">{t('evidence.claimFilterEmpty')}</p>}
     <ul className="claims-list">
-      {claims.map((claim) => (
+      {visible.map((claim) => (
         <li key={claim.id} id={`claim-${claim.id}`} className="claim-item">
           <div className="claim-head">
             {/* Evidence-line signature (§8.3): the epistemic glyph is the claim's cognitive
@@ -225,6 +240,7 @@ function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChal
         </li>
       ))}
     </ul>
+    </div>
   );
 }
 
