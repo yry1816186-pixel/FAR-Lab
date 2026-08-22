@@ -11,6 +11,7 @@ import { datasetIdFor, acquireDataset } from '../src/experiment/datasets.js';
 import { executeExperiment } from '../src/experiment/executor.js';
 import { expandAblationModels } from '../src/experiment/matrix.js';
 import { exportStage } from '../src/pipeline/stages/export.js';
+import { reviseStage } from '../src/pipeline/stages/revise.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import { ProvenanceReceipt, type ResearchRun } from '../src/domain/index.js';
 import type { StageContext } from '../src/pipeline/types.js';
@@ -528,6 +529,70 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
       expect(report).toContain('阈值来源=model-stipulated');
       expect(report).toContain(`假设 ${hyp.id}@v0`);
       expect(report).toContain('verdict=');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('traceable revision: experiment feedback consumed by revise -> causal Revision + VersionDiff (ACC-26)', async () => {
+    const { store, dir, cleanup } = makeStore();
+    try {
+      const artifacts = openArtifactStore(join(dir, 'artifacts'));
+      const runId = makeRun(store);
+      const hyp = makeHypothesis(runId);
+      store.putObject('hypothesis', hyp);
+      const csvPath = join(dir, 'fixture.csv');
+      writeFileSync(csvPath, fixtureCsv(), 'utf8');
+      const out = await executeExperiment(store, artifacts, makeSpec(runId, csvPath, hyp.id), { allowLocalDatasets: true });
+      const signal = out.feedback[0]!;
+      expect(signal.source).toBe('experiment');
+
+      // Scripted LLM proposals; the CAUSAL/verdict/persistence mechanics under test are
+      // the real revise-stage code paths (fixture LLM content, real pipeline).
+      const stub = createTestStubProvider([
+        {
+          forPurpose: 'causal-revision-analysis',
+          rawOutput: JSON.stringify({
+            affected: [{ objectType: 'hypothesis', objectId: hyp.id, reason: 'experiment verdict=supports with CI clear of threshold replaces the stipulated boundary assumption' }],
+            causalChain: 'experiment cmp-primary verdict=supports (paired CI clear of 0) -> the mechanism assumption is upgraded from stipulated to measured',
+            expectedQualityDelta: { status: 'improved', claim: 'measured evidence replaces a stipulated assumption' },
+          }),
+        },
+        {
+          forPurpose: `hypothesis-revision:${hyp.id}`,
+          rawOutput: JSON.stringify({
+            statement: 'feature X separates the classes: measured paired accuracy difference is decisively above the majority baseline',
+            mechanism: 'linear separation of x1 with measured support',
+            assumptions: [{ statement: 'paired accuracy diff > 0 (experiment cmp-primary, CI clear of threshold)', kind: 'empirical' }],
+            predictions: ['logistic keeps beating the majority baseline on fresh stratified splits'],
+            addedUncertainties: ['behavior beyond the tested split is unmeasured'],
+            revisionRationale: 'experiment verdict=supports; assumption upgraded from stipulated to empirical with recorded CI',
+          }),
+        },
+      ]);
+      const run = store.getRun(runId) as ResearchRun;
+      const ctx: StageContext = {
+        run, store, artifacts, provider: stub,
+        sourceFor: () => { throw new Error('no source adapter in test'); },
+        recordReceipt: () => {},
+        cancelled: () => false,
+        log: () => {},
+      };
+      const outcome = await reviseStage.execute(ctx);
+      expect(outcome.kind).toBe('done');
+
+      const revisions = store.listObjects('revision', runId);
+      expect(revisions).toHaveLength(1);
+      expect(revisions[0]!.triggerFeedbackId).toBe(signal.id); // causal link points at the EXPERIMENT feedback
+      expect(revisions[0]!.causalReason.length).toBeGreaterThan(0);
+      const diffs = store.listObjects('version_diff', runId);
+      expect(diffs).toHaveLength(1);
+      expect(diffs[0]!.entries.some((e) => e.objectType === 'hypothesis' && e.objectId === hyp.id)).toBe(true);
+      const revised = store.getObject('hypothesis', hyp.id)!;
+      expect(revised.version).toBe(1);
+      expect(store.listEvents(runId).map((e) => e.type)).toContain('revision_created');
+      // Consumed signal closes the loop: revise becomes inapplicable until new evidence arrives.
+      expect(await reviseStage.applicable(ctx)).toBe(false);
     } finally {
       cleanup();
     }

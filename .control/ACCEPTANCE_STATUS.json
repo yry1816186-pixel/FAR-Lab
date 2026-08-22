@@ -262,15 +262,16 @@
       "id": "ACC-26",
       "target": "live_verified",
       "critical": true,
-      "status": "implemented",
+      "status": "live_verified",
       "evidence": [
-        "FeedbackSignal generation from confirmatory verdicts (live OpenML run 2026-08-22 + tests; aggregated per hypothesis, exploratory/secondary excluded)",
-        "Export integration: report §7a 实验执行结果 (metrics cells, stat reports with verdict/阈值来源/iteration/secondary) + ReproducibilityBundle.experimentEvidence (object ids + per-row artifact hashes + training log hash + lockfile hash); tests/experiment.test.ts export-integration case green on real executor+real export (full suite 643/643, 2026-08-22)",
-        "trainingLogRef persisted on experiment_run (executor finally block, note-audited)",
-        "REMAINING for live_verified: end-to-end traceable revision — experiment feedback consumed by the revise stage producing a causally-linked Revision + version diff on a real run"
+        "FeedbackSignal generation from confirmatory verdicts (live OpenML run 2026-08-22; aggregated per hypothesis, exploratory/secondary excluded)",
+        "Export integration: report §7a + ReproducibilityBundle.experimentEvidence (object ids + per-row artifact hashes + training log hash + lockfile hash); export-integration test on real executor + real export stage (suite 643/643 -> 644 with traceable-revision case, 2026-08-22)",
+        "LIVE traceable revision (evidence/W-EEL/live-traceable-revision.md): real OpenML iris experiment -> verdict=falsifies -> FeedbackSignal(source=experiment) consumed by revise stage on the LIVE zai provider -> Revision rev_62hfj5j4phr6sq22a0tka7b80b with triggerFeedbackId === the experiment feedback id, causalReason citing cmp-primary/measured 0.6/threshold, hypothesis v0->v1 (statement direction reversed by measurement), VersionDiff (statement+mechanism+assumptions+predictions+uncertainties+version), qualityDelta=improved",
+        "Structural companion test green: same chain with scripted LLM proposal asserts triggerFeedbackId identity, version bump, revision_created event, applicable() closure after consumption",
+        "Semantics recorded: supports verdicts do not force revisions (live-observed, scientifically correct); revisions fire under falsification/weakening pressure"
       ],
       "note": "EEL E6 feedback loop + export integration (D-081)",
-      "lastUpdated": "2026-08-22T09:36:29.077Z"
+      "lastUpdated": "2026-08-22T09:41:01.460Z"
     }
   ],
   "gates": [
