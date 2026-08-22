@@ -18,7 +18,7 @@ export function RevisionsTab({ run }: { run: ResearchRun }): JSX.Element {
   const res = useResource(fetcher, [run.id], `${run.updatedAt}:${run.status}`);
 
   return (
-    <div className="tab-content">
+    <>
       {res.loading ? (
         <Skeleton lines={4} />
       ) : res.error !== null ? (
@@ -28,7 +28,7 @@ export function RevisionsTab({ run }: { run: ResearchRun }): JSX.Element {
       ) : (
         <RevisionChain data={res.data} />
       )}
-    </div>
+    </>
   );
 }
 

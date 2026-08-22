@@ -603,6 +603,18 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(typeof body.time).toBe('string');
   });
 
+  it('GET /runs/:id projects the researcher identity (questionText/domain, product rebuild)', async () => {
+    // The research page header leads with the question the researcher asked;
+    // the detail endpoint must carry it with the same semantics as the list.
+    const list = await getJson(`${base}/api/v1/runs`);
+    expect(list.status).toBe(200);
+    const first = (list.body.runs as { id: string; questionText?: string }[]).find((r) => r.questionText !== undefined);
+    expect(first).toBeDefined();
+    const res = await getJson(`${base}/api/v1/runs/${first!.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.questionText).toBe(first!.questionText);
+  });
+
   it('GET /runs/:id rejects malformed runId formats at the boundary (W-G follow-up F-003)', async () => {
     // Garbage/traversal-shaped ids are a 400 validation error, never a store lookup.
     for (const bad of ['not_a_run_id', 'run_short', '../../etc/passwd', 'RUN_0000000000000000000000abc']) {

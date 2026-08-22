@@ -72,6 +72,9 @@ export interface ResearchRun {
   cancelRequested: boolean;
   parentRunId?: string;
   tags: string[];
+  /** Researcher identity projection (same semantics as RunSummary). */
+  questionText?: string;
+  domain?: string;
   /** Present since D-060: server projects lease state on the run detail. */
   leaseInfo?: RunLeaseInfo;
 }

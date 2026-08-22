@@ -16,7 +16,7 @@ import { LogoFull } from './components/Logo';
 import { WelcomeView } from './components/WelcomeView';
 import { RunsList, runLabel } from './components/RunsSidebar';
 import { AwarenessBar } from './components/AwarenessBar';
-import { RunDetail, isTabId } from './components/RunDetail';
+import { RunDetail, resolveTabId } from './components/RunDetail';
 import { CommandPalette, type Command, type PaletteSearch } from './components/CommandPalette';
 import { SettingsPanel } from './components/SettingsPanel';
 import type { EventsState } from './components/RunDetail';
@@ -252,11 +252,12 @@ export function App(): JSX.Element {
   const commands = useMemo<Command[]>(() => {
     const goTab = (tab: string): void => {
       if (selectedRunId === null) return;
-      if (isTabId(tab)) setRouteTab(tab);
+      const resolved = resolveTabId(tab);
+      if (resolved !== null) setRouteTab(resolved);
     };
     const navCmds: Command[] = selectedRunId === null
       ? []
-      : (['overview', 'evidence', 'hypotheses', 'plan', 'experiments', 'revisions', 'provenance', 'events'] as const)
+      : (['research', 'evidence', 'hypotheses', 'plan', 'revisions', 'verify'] as const)
           .map((tab) => ({
             id: `nav-${tab}`,
             labelKey: `tab.${tab}` as Command['labelKey'],
@@ -491,7 +492,7 @@ export function App(): JSX.Element {
               run={runDetail}
               events={eventsState}
               onMutated={onMutated}
-              tab={routeTab !== null && isTabId(routeTab) ? routeTab : undefined}
+              tab={routeTab !== null ? resolveTabId(routeTab) ?? undefined : undefined}
               onTabChange={(tab) => setRouteTab(tab)}
               focusClaimId={focusClaimId}
               onClaimFocused={() => setFocusClaimId(null)}

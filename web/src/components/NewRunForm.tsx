@@ -137,6 +137,21 @@ export function NewRunForm({ onCreated }: { onCreated: (runId: string) => void }
         // the question box — idea → FAR-Lab friction ≈ 0 (also reached via `n`).
         autoFocus
       />
+      {/* Example questions: one tap fills the field — the blank-box problem is
+          the #1 first-run friction (NN/g empty-state guidance + onboarding
+          research: teach the expected question FORMAT, don't just say "ask"). */}
+      {text.trim().length === 0 && (
+        <div className="example-questions">
+          <span className="muted small">{t('form.tryExamples')}</span>
+          <div className="example-chips">
+            {(['example.q1', 'example.q2', 'example.q3'] as const).map((k) => (
+              <button key={k} type="button" className="example-chip" onClick={() => setText(t(k))}>
+                {t(k).length > 64 ? `${t(k).slice(0, 64)}…` : t(k)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {/* R1 ingestion surface: seed chips + status line + Zotero picker. */}
       {seeds.length > 0 && (
         <div className="seed-chips" role="list" aria-label={t('ingest.seedsLabel')}>

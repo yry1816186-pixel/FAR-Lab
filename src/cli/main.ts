@@ -68,8 +68,11 @@ Usage:
 
 Exit codes: 0 ok, 1 runtime failure, 2 usage error. Diagnostics on stderr.`;
 
-function die(msg: string, code = 1): never {
+function die(msg: string, code = 1, hint?: string): never {
+  // Three-part error contract (NN/g + craft-spec §9): what happened, why it
+  // matters here, and the single next action — on stderr so stdout stays clean.
   process.stderr.write(`${ink.err('far')} ${msg}\n`);
+  if (hint !== undefined) process.stderr.write(`  ${ink.muted(`→ ${hint}`)}\n`);
   process.exitCode = code;
   throw new Error('__exit__');
 }
@@ -103,14 +106,27 @@ const jsonOutput = (data: unknown): void => {
 /** run ids are prefix-branded; reject malformed args before store-layer use (WP2 F-003). */
 const RUN_ID_RE = /^run_[0-9a-z]{20,32}$/;
 const runIdArg = (raw: string | undefined, sub: string): string => {
-  const rid = raw ?? die(`${sub} requires a run id`, 2);
-  if (!RUN_ID_RE.test(rid)) die(`invalid run id format: ${rid} (expected run_<26-char id>)`, 2);
+  const rid = raw ?? die(`${sub} requires a run id`, 2, `find one with: far runs`);
+  if (!RUN_ID_RE.test(rid)) die(`invalid run id format: ${rid} (expected run_<26-char id>)`, 2, `copy the id from: far runs`);
   return rid;
 };
 
 const STAGE_STATE_INK: Record<string, (s: string) => string> = {
   done: ink.ok, failed: ink.err, running: ink.info, skipped: ink.muted, pending: ink.muted,
 };
+
+/**
+ * Epistemic stage glyphs — the SAME four-signature the web workbench renders
+ * (verified ✓ / refuted ✗ / weakened ▲ / not assessed —). One product, one
+ * visual language across surfaces; plain ASCII under non-UTF8 terminals.
+ */
+const UNICODE_OK = (() => {
+  try { return new TextEncoder().encode('✓').length === 3 && process.stdout.isTTY !== false; }
+  catch { return false; }
+})();
+const STAGE_GLYPH: Record<string, string> = UNICODE_OK
+  ? { done: '✓', failed: '✗', running: '●', skipped: '▲', pending: '—' }
+  : { done: '+', failed: 'x', running: '>', skipped: '^', pending: '-' };
 
 /**
  * Shared creation+execution path for `research start` and `far new` (B11): both must
@@ -223,8 +239,9 @@ const printRun = (run: ResearchRun, verbose = true) => {
     if (run.lastError) out(`  ${ink.err('lastError')}: ${ink.muted(run.lastError)}`);
     if (verbose) for (const s of run.stages) {
       const tone = STAGE_STATE_INK[s.state] ?? ((x: string) => x);
+      const glyph = STAGE_GLYPH[s.state] ?? '·';
       const note = s.state === 'running' ? ` (attempt ${s.attempt})` : '';
-      out(`    ${tone(padColumns(s.state, 8))} ${s.stage}${note}${s.error ? ` — ${ink.err(s.error)}` : ''}`);
+      out(`    ${tone(`${glyph} ${padColumns(s.state, 8)}`)} ${s.stage}${note}${s.error ? ` — ${ink.err(s.error)}` : ''}`);
     }
   }
 };

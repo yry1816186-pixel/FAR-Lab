@@ -40,7 +40,7 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
   const bundles = bundlesRes.data ?? [];
 
   return (
-    <div className="tab-content">
+    <>
       <Section title={t('prov.receipts', { n: receiptsRes.data?.length ?? 0 })}>
         {receiptsRes.loading ? (
           <Skeleton lines={4} />
@@ -74,7 +74,7 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
           <ReportBlock runId={run.id} markdown={reportRes.data} />
         ) : null}
       </Section>
-    </div>
+    </>
   );
 }
 
