@@ -10,7 +10,7 @@
  * chosen label is compared only AFTER the judge answers. Stratified seeded
  * sample across completed runs.
  *
- * Calibration disclosure: judge is deepseek-chat (temperature 0), the same
+ * Calibration disclosure: judge is the zai route model (glm-4.6 via open.bigmodel.cn anthropic wire, temperature 0), the same
  * model family that generated the relations — self-agreement bias inflates
  * precision, so the result is an UPPER BOUND estimate, not ground truth.
  *
@@ -19,7 +19,7 @@
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { createDeepSeekProvider } from '../dist/providers/deepseek.js';
+import { createZaiProvider } from '../dist/providers/zai.js'; // judge route switch 2026-08-22: deepseek user-banned; zai speaks the bigmodel Anthropic wire (D-071)
 
 const SEED = Number(process.env.REL_PREC_SEED ?? 20260822);
 // quota override: REL_PREC_QUOTA='{"contradicts":12}' (+ optional REL_PREC_EXCLUDE file of relationIds already sampled)
@@ -69,7 +69,7 @@ for (const [kind, n] of Object.entries(QUOTA)) {
 }
 console.log(`[rel-prec] mode=${F4_MODE ? 'f4-claim-claim' : 'claim-to-hypothesis'} sampled ${sample.length} of ${relations.length} relations (completed runs only), quota=${JSON.stringify(QUOTA)}`);
 
-const provider = createDeepSeekProvider({ totalTimeoutMs: 120_000 });
+const provider = createZaiProvider({ totalTimeoutMs: 120_000 });
 const KINDS = ['supports', 'contradicts', 'weakens', 'qualifies', 'unrelated', 'not_comparable'];
 const parseVerdict = (raw) => {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return new Error('not an object');

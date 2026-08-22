@@ -14,6 +14,10 @@ export const zh = {
   'app.langToggle': '切换语言',
   'app.langZh': '中文',
   'app.langEn': 'English',
+  'app.themeToggle': '切换主题',
+  'app.themeAuto': '主题：跟随系统',
+  'app.themeLight': '主题：浅色',
+  'app.themeDark': '主题：深色',
 
   'conn.offline': 'API 连接中断 — 自动重试中',
   'conn.online': '已连接',
@@ -512,6 +516,10 @@ export const en: Record<DictKey, string> = {
   'app.langToggle': 'Switch language',
   'app.langZh': '中文',
   'app.langEn': 'English',
+  'app.themeToggle': 'Switch theme',
+  'app.themeAuto': 'Theme: system',
+  'app.themeLight': 'Theme: light',
+  'app.themeDark': 'Theme: dark',
 
   'conn.offline': 'API connection lost — retrying automatically',
   'conn.online': 'Connected',
