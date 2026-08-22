@@ -10,7 +10,7 @@ import {
   newId,
 } from '../../domain/index.js';
 import type { HypothesisCandidate as Hypothesis } from '../../domain/index.js';
-import { assertNotCancelled, isRepresentative, partitionClaimRefs, runClaimIds } from './shared.js';
+import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
 import { contentTokens, topicalOverlap } from './evidence.js';
 
 /**
@@ -218,8 +218,14 @@ export const falsifyStage: StageHandler = {
     const results: string[] = [];
     let relationsCreated = 0;
 
-    for (const hyp of targets) {
+    // Per-hypothesis work is independent (all inputs read from the store — no
+    // cross-iteration coupling), so bounded overlap (WP4) cuts wall-clock on this
+    // model-bound stage; per-item warnings/results are collected locally and merged
+    // in INPUT order below, keeping stage aggregates deterministic.
+    const outs = await mapBounded(targets, STAGE_CONCURRENCY, async (hyp): Promise<{ warnings: string[]; result: string; relations: number }> => {
       assertNotCancelled(ctx, 'critique_falsify');
+      const warnings: string[] = [];
+      let relations = 0;
       const res = await callStructured<z.infer<typeof FalsifyOut>>(ctx, {
         stage: 'critique_falsify',
         purpose: `falsification-spec:${hyp.id}`,
@@ -256,7 +262,7 @@ export const falsifyStage: StageHandler = {
           },
           availableClaims: ctx.store
             .listObjects('claim', runId)
-            .map((c) => ({ id: c.id, text: c.text, quote: c.locators[0]?.quote, bindingStatus: c.bindingStatus })),
+            .map((c) => ({ id: c.id, text: c.text, quote: c.locators[0]?.quote, bindingStatus: c.bindingStatus, ...(c.gradeCertainty !== undefined ? { gradeCertainty: c.gradeCertainty } : {}) })),
         },
         schema: FalsifyOut,
       });
@@ -469,12 +475,12 @@ export const falsifyStage: StageHandler = {
           'evidence_relation',
           mkRelation(decision?.relation ?? counterLinkByClaim.get(id)?.relation ?? 'weakens', id, proposalFamilyOf.get(id) ?? 'counter', decision?.note),
         );
-        relationsCreated += 1;
+        relations += 1;
       }
       for (const id of finalSupporting) {
         const decision = audit.get(id);
         ctx.store.putObject('evidence_relation', mkRelation(decision?.relation ?? 'supports', id, proposalFamilyOf.get(id) ?? 'supporting', decision?.note));
-        relationsCreated += 1;
+        relations += 1;
       }
 
       // ---- assumption critiques: attach in range, preserve overflow honestly ----
@@ -501,11 +507,18 @@ export const falsifyStage: StageHandler = {
       });
       ctx.store.putObject('hypothesis', updated);
 
-      results.push(
-        completeness.passed
+      return {
+        warnings,
+        relations,
+        result: completeness.passed
           ? `${hyp.id}: falsification spec passed deterministic completeness (testability=${testability}; counter links ${finalCounter.length}${gatedCounter.dropped.length > 0 ? ` (${gatedCounter.dropped.length} dropped by topical gate)` : ''}, supporting links ${finalSupporting.length}${gatedSupporting.dropped.length > 0 ? ` (${gatedSupporting.dropped.length} dropped by topical gate)` : ''}${auditDropped.length > 0 ? `, ${auditDropped.length} dropped by link audit` : ''})`
           : `${hyp.id}: falsification spec REJECTED by deterministic completeness — missing: ${completeness.missing.join('; ')}; testability=untestable_currently`,
-      );
+      };
+    });
+    for (const o of outs) {
+      warnings.push(...o.warnings);
+      results.push(o.result);
+      relationsCreated += o.relations;
     }
 
     const parts = [

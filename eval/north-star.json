@@ -115,7 +115,8 @@
         "value": 0.143,
         "detail": "strict (judge in contradicts/weakens) post-fix fullfix blind re-judge sample: 1/7, Wilson 95% [0.026,0.513]; limiting (+qualifies) also 0.143; misses mostly EMPTY (5 unrelated) not inverted (1 supports) — semantic residual per D-038, fix route = judge v2 adjudication layer once routes funded; pre-fix pooled was 0.308 strict / 0.615 limiting (relation-precision.jsonl n=13)",
         "at": "2026-08-22",
-        "evidence": "eval/counter-evidence-metric.mjs run on spikes/output/relation-precision{,-contradicts-r2,-fullfix}.jsonl; evidence/W9/counter-evidence-metric.md"
+        "evidence": "eval/counter-evidence-metric.mjs run on spikes/output/relation-precision{,-contradicts-r2,-fullfix}.jsonl; evidence/W9/counter-evidence-metric.md",
+        "note": "strict 1/7 Wilson [0.026,0.513] stands (live-gated). W-G/F-A anchored counter queries LANDED offline: anchor pass-rate 0.563->0.825 on 80 real historical counter queries (retrieval-side root cause of EMPTY misses); live re-measure of the metric gated on D-036. W-G/F-B GRADE-lite certainty labels now surface to relation judges."
       },
       "target": 0.7,
       "stretch": 0.85,
@@ -146,7 +147,8 @@
       "current": {
         "value": "6-8min typical; pre-fusion outliers were network stalls",
         "at": "2026-08-22",
-        "evidence": "evidence/W-EV1/ev1-before-after.md (P4 5.0min, P6 8.0min post)"
+        "evidence": "evidence/W-EV1/ev1-before-after.md (P4 5.0min, P6 8.0min post)",
+        "note": "W-G (2026-08-22): bounded intra-stage concurrency LANDED (mapBounded, falsify/rank/evidence; stub benchmark 1.96x falsify segment, outputs byte-identical; receipts-profile projection: full-run wall-clock cut ~35-45%, stretch p50<=4.5min potentially met) — live full-run re-measurement BLOCKED on model routes (D-036), projection is UNVERIFIED-live."
       },
       "target": "p50 <= 6min with crossref third source added",
       "stretch": "p50 <= 4.5min via parallelizable stages if W8 justifies",

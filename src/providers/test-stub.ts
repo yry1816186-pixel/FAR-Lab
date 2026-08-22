@@ -24,6 +24,13 @@ export interface StubStep {
   delayMs?: number;
   /** Scripted structured failure (injected, never a real provider state). */
   fail?: { kind: ModelCallErrorKind; message: string; httpStatus?: number };
+  /**
+   * Key this step to a call PURPOSE (e.g. 'falsification-spec:hyp_x') instead of call
+   * sequence. Purpose-keyed scripts are interleaving-proof: stage-level bounded
+   * concurrency (mapBounded) changes call ORDER but never call identity, so tests that
+   * script multiple same-stage calls must key by purpose, not position.
+   */
+  forPurpose?: string;
 }
 
 export interface TestStubOptions {
@@ -35,6 +42,10 @@ export function createTestStubProvider(steps: StubStep[], opts: TestStubOptions 
   const name = opts.name ?? 'test-stub';
   const sleep: SleepLike = opts.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   let cursor = 0;
+  const nextSequential = (): StubStep | undefined => {
+    while (cursor < steps.length && steps[cursor]!.forPurpose !== undefined) cursor += 1;
+    return steps[cursor++];
+  };
   return {
     name,
     // A stub is by definition never live.
@@ -43,8 +54,8 @@ export function createTestStubProvider(steps: StubStep[], opts: TestStubOptions 
       req: StructuredCallRequest,
       parse: (raw: unknown) => T | Error,
     ): Promise<StructuredCallResult<T>> {
-      const step = steps[cursor];
-      cursor += 1;
+      const keyed = steps.find((s) => s.forPurpose !== undefined && s.forPurpose === req.purpose);
+      const step = keyed ?? nextSequential();
       if (!step) {
         // Test-authoring bug: loud, never silently satisfied.
         throw new Error(

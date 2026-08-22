@@ -106,3 +106,41 @@ export const runClaimIds = (ctx: StageContext): Set<string> =>
 /** Verified claims of the run (the only admissible conditioning base for generation). */
 export const verifiedClaims = (ctx: StageContext): ScientificClaim[] =>
   ctx.store.listObjects('claim', ctx.run.id).filter((c) => c.bindingStatus === 'verified');
+
+/**
+ * Bounded-concurrency ordered map (WP4, W8 parallelization stretch): items are
+ * independent calls whose inputs come from the store (no cross-iteration coupling) —
+ * overlapping them cuts wall-clock on model-bound stages without changing call count,
+ * payloads, per-item failure semantics, or output order (results indexed by input
+ * position; first-by-index error wins). `limit` 1 degenerates to sequential execution
+ * (determinism escape hatch). Default ceiling comes from FARLAB_STAGE_CONCURRENCY
+ * (floor 1) — 3 overlaps provider politeness (transport 429 backoff stays the guard).
+ */
+export const STAGE_CONCURRENCY = Math.max(1, Number(process.env.FARLAB_STAGE_CONCURRENCY ?? 3) || 3);
+
+export async function mapBounded<T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  const errors: Array<{ index: number; error: unknown }> = [];
+  let nextIndex = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      if (errors.length > 0) return; // stop launching; in-flight work settles
+      const i = nextIndex;
+      nextIndex += 1;
+      if (i >= items.length) return;
+      try {
+        results[i] = await fn(items[i]!, i);
+      } catch (error) {
+        errors.push({ index: i, error });
+        return;
+      }
+    }
+  };
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, () => worker());
+  await Promise.all(workers);
+  if (errors.length > 0) {
+    errors.sort((a, b) => a.index - b.index);
+    throw errors[0]!.error;
+  }
+  return results;
+}

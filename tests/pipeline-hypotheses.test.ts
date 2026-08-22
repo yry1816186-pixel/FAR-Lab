@@ -758,10 +758,12 @@ describe('critique_falsify stage', () => {
       testability: 'testable_with_data',
     };
 
+    // Purpose-keyed script (interleaving-proof): stage concurrency may overlap the two
+    // falsification calls and the link audit, so outputs must key on call identity.
     const steps: StubStep[] = [
-      { rawOutput: JSON.stringify(goodSpec) },
-      auditConfirm(c1.id, c2.id), // W5-F5 link audit for h1's gated links
-      { rawOutput: JSON.stringify(hollowSpec) },
+      { forPurpose: `falsification-spec:${h1.id}`, rawOutput: JSON.stringify(goodSpec) },
+      { forPurpose: `link-verification:${h1.id}`, ...auditConfirm(c1.id, c2.id) }, // W5-F5 link audit for h1's gated links
+      { forPurpose: `falsification-spec:${h2.id}`, rawOutput: JSON.stringify(hollowSpec) },
     ];
     const { ctx } = makeCtx(run, store, steps);
     expect(await falsifyStage.applicable(ctx)).toBe(true);
