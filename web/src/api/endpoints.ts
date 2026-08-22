@@ -16,7 +16,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSources,
 } from './normalize';
-import type { BundleSummary, FeedbackSourceKind, ResearchRun, RunEvent, RunSummary, ScientificGoalType, VerificationReport } from './types';
+import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, ResearchRun, RunEvent, RunSummary, ScientificGoalType, VerificationReport } from './types';
 
 const BASE = '/api/v1';
 
@@ -79,6 +79,19 @@ export const getBundles = async (runId: string, signal?: AbortSignal): Promise<B
 /** Re-run the export stage for a settled run whose revision is newer than its latest bundle (server-guarded). */
 export const reexportRun = async (runId: string, signal?: AbortSignal): Promise<void> => {
   await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/reexport`, {}, signal);
+};
+
+/** Executed query plan with purposes (transparency panel, D-060). Server answers {corpus: null} when absent. */
+export const getCorpus = async (runId: string, signal?: AbortSignal): Promise<CorpusSnapshotInfo | null> => {
+  const data: unknown = await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/corpus`, signal);
+  if (typeof data === 'object' && data !== null && 'corpus' in data) {
+    const corpus = (data as { corpus?: unknown }).corpus;
+    if (corpus === null) return null;
+    if (typeof corpus === 'object' && corpus !== null && Array.isArray((corpus as { queries?: unknown }).queries)) {
+      return corpus as CorpusSnapshotInfo;
+    }
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: 'corpus 响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'corpus envelope' } });
 };
 
 export const getReport = async (runId: string, signal?: AbortSignal): Promise<string> => {

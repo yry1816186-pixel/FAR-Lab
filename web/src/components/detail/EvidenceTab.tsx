@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { isNotFound } from '../../api/client';
-import { getEvidence, getSources } from '../../api/endpoints';
-import type { EvidenceRelation, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
+import { getCorpus, getEvidence, getReceipts, getSources } from '../../api/endpoints';
+import type { CorpusQueryInfo, CorpusSnapshotInfo, EvidenceRelation, ProvenanceReceipt, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
@@ -17,11 +17,36 @@ export function EvidenceTab({ run }: { run: ResearchRun }): JSX.Element {
   const evidenceFetcher = useCallback((signal: AbortSignal) => getEvidence(run.id, signal), [run.id]);
   const evidenceRes = useResource(evidenceFetcher, [run.id], refreshKey);
 
+  const corpusFetcher = useCallback((signal: AbortSignal) => getCorpus(run.id, signal), [run.id]);
+  const corpusRes = useResource(corpusFetcher, [run.id], refreshKey);
+
+  const receiptsFetcher = useCallback((signal: AbortSignal) => getReceipts(run.id, signal), [run.id]);
+  const receiptsRes = useResource(receiptsFetcher, [run.id], refreshKey);
+
   const claims = evidenceRes.data?.claims ?? null;
   const relations = evidenceRes.data?.relations ?? null;
 
   return (
     <div className="tab-content">
+      <Section title={t('retrieval.title')}>
+        {corpusRes.loading ? (
+          <Skeleton lines={3} />
+        ) : corpusRes.error !== null && isNotFound(corpusRes.error) ? (
+          <EmptyState titleKey="retrieval.noCorpus" hint={t('retrieval.noCorpusHint')} />
+        ) : corpusRes.error !== null ? (
+          <ErrorBox error={corpusRes.error} onRetry={corpusRes.retry} />
+        ) : corpusRes.data !== null ? (
+          <RetrievalPanel
+            queries={corpusRes.data.queries}
+            familyFailures={corpusRes.data.familyFailures ?? []}
+            fusion={corpusRes.data.fusion}
+            receipts={receiptsRes.data ?? []}
+          />
+        ) : (
+          <EmptyState titleKey="retrieval.noCorpus" hint={t('retrieval.noCorpusHint')} />
+        )}
+      </Section>
+
       <Section title={t('evidence.sources', { n: sourcesRes.data?.length ?? 0 })}>
         {sourcesRes.loading ? (
           <Skeleton lines={4} />
@@ -248,4 +273,98 @@ function polarityOf(relationType: string): 'supporting' | 'counter' | 'neutral' 
     case 'contradicts': case 'weakens': case 'fails_to_replicate': case 'alternative_explanation': return 'counter';
     default: return 'neutral';
   }
+}
+
+/**
+ * Retrieval transparency (D-060 phase-1): every planned query with its purpose
+ * (counter-evidence queries structurally guaranteed), joined against the real
+ * source_retrieval receipts for hits/http status, plus fusion stats and honest
+ * family failures. No invented numbers — anything without a receipt shows "—".
+ */
+function RetrievalPanel({
+  queries,
+  familyFailures,
+  fusion,
+  receipts,
+}: {
+  queries: CorpusQueryInfo[];
+  familyFailures: { family: string; reason: string }[];
+  fusion?: NonNullable<CorpusSnapshotInfo['fusion']>;
+  receipts: ProvenanceReceipt[];
+}): JSX.Element {
+  const { t } = useI18n();
+  const retrievals = receipts.filter((r) => r.kind === 'source_retrieval' && r.sourceRetrieval !== undefined);
+  // Join by query text; planned queries are unique, receipts may repeat (variants/failures).
+  const receiptByText = new Map<string, ProvenanceReceipt[]>();
+  for (const r of retrievals) {
+    const q = r.sourceRetrieval!.query;
+    receiptByText.set(q, [...(receiptByText.get(q) ?? []), r]);
+  }
+  const plannedTexts = new Set(queries.map((q) => q.text));
+  const extras = retrievals.filter((r) => !plannedTexts.has(r.sourceRetrieval!.query));
+
+  const purposeTone = (p: CorpusQueryInfo['purpose']): 'info' | 'ok' | 'warn' | 'muted' =>
+    p === 'counter_evidence' ? 'warn' : p === 'supporting' ? 'ok' : p === 'discovery' ? 'info' : 'muted';
+
+  const rerankLabel = fusion?.rerankFailure !== undefined
+    ? t('retrieval.rerank.failed')
+    : fusion?.rerankApplied === true ? t('retrieval.rerank.on') : t('retrieval.rerank.off');
+
+  return (
+    <div className="retrieval-panel">
+      <p className="muted small">{t('retrieval.plan', { n: queries.length })}</p>
+      <table className="data-table">
+        <caption className="sr-only">{t('retrieval.title')}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t('events.type')}</th>
+            <th scope="col">source</th>
+            <th scope="col">query</th>
+            <th scope="col">hits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {queries.map((q, i) => {
+            const rs = receiptByText.get(q.text) ?? [];
+            const ok = rs.find((r) => (r.sourceRetrieval!.httpStatus ?? 0) < 400 && r.sourceRetrieval!.resultCount >= 0);
+            const fail = rs.find((r) => (r.sourceRetrieval!.httpStatus ?? 0) >= 400);
+            const hits = ok !== undefined ? ok.sourceRetrieval!.resultCount : null;
+            return (
+              <tr key={`${q.text}-${i}`}>
+                <td>
+                  <Badge tone={purposeTone(q.purpose)}>{t(`retrieval.purpose.${q.purpose}` as never)}</Badge>
+                </td>
+                <td className="mono small">{q.family}</td>
+                <td className="mono small" title={q.text}>{q.text.length > 72 ? `${q.text.slice(0, 72)}…` : q.text}</td>
+                <td className="mono small">
+                  {hits !== null ? t('retrieval.hits', { n: hits }) : fail !== undefined
+                    ? <span className="text-warn">{t('retrieval.httpFail', { n: fail.sourceRetrieval!.httpStatus })}</span>
+                    : <span className="muted">—</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {extras.length > 0 && (
+        <p className="muted small">{t('retrieval.extraReceipts', { n: extras.length })}</p>
+      )}
+      {fusion !== undefined && (
+        <p className="muted small mono">
+          {t('retrieval.fusion', {
+            pool: fusion.poolSize ?? '—',
+            rerank: rerankLabel,
+            seats: fusion.counterSeatsKept ?? '—',
+            variants: fusion.variantSearches !== undefined ? t('retrieval.variants', { n: fusion.variantSearches }) : '',
+          })}
+        </p>
+      )}
+      {familyFailures.length > 0 && (
+        <div className="callout callout--warn small" role="status">
+          <strong>{t('retrieval.familyFailures')}：</strong>
+          {familyFailures.map((f) => `${f.family} — ${f.reason}`).join('；')}
+        </div>
+      )}
+    </div>
+  );
 }
