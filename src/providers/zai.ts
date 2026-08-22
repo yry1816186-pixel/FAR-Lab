@@ -7,17 +7,20 @@ import {
 } from './http.js';
 
 /**
- * Z.ai / GLM live adapter (OpenAI-compatible paas/v4 route).
+ * Zhipu GLM live adapter (Anthropic-Messages wire on open.bigmodel.cn).
  *
- * W0 spike status: protocol reachable and key valid (model list 200), but live
- * chat was BLOCKED 2026-08-21 by code 1113 (insufficient balance, surfaced as
- * HTTP 429). The core therefore classifies 429+1113 as quota_exceeded — NOT a
- * transient rate limit — so it is never blindly retried. Once the account is
- * recharged, `node scripts/live-check-model.mjs --provider zai` completes the
- * live evidence without code changes.
+ * Route history: the OpenAI-compat paas/v4 endpoints (api.z.ai AND open.bigmodel.cn)
+ * both failed live with 429 code 1113 "insufficient balance" on this account (D-036/
+ * D-058). The user-identified correct route for the funded key is the Anthropic-
+ * compatible endpoint `open.bigmodel.cn/api/anthropic` (probe-verified 2026-08-22:
+ * glm-4.6 chat 200 with real completion + usage on BOTH x-api-key and Bearer auth;
+ * the OpenAI-compat path on the same account returns 1113). The provider therefore
+ * speaks the Anthropic Messages wire: x-api-key header, top-level system param,
+ * content-block responses. The core still classifies 429 + balance-text as
+ * quota_exceeded (never a transient rate limit).
  */
 
-export const ZAI_BASE_URL = 'https://api.z.ai/api/paas/v4';
+export const ZAI_BASE_URL = 'https://open.bigmodel.cn/api/anthropic';
 export const ZAI_DEFAULT_MODEL = 'glm-4.6';
 // Primary env is ZAI_API_KEY; ZHIPU_API_KEY stays as legacy fallback (W0 convention).
 // Precedence matters: a funded ZAI_API_KEY must win over a stale legacy value in the shell.
@@ -64,10 +67,10 @@ export function createZaiProvider(opts: ZaiProviderOptions = {}): ZaiProvider {
         );
       }
       return runOpenAICompatStructuredCall(
-        { providerName: 'zai', baseUrl, apiKey, modelId, executionMode: 'live' },
-        // Strict-FC tool payloads are a DeepSeek-beta capability (D-026); zai never opted
-        // into tools and is unverified there (audit P1-3, 2026-08-22) — strip the
-        // projection so this route stays on the json_object transport it was built for.
+        { providerName: 'zai', baseUrl, apiKey, modelId, executionMode: 'live', wire: 'anthropic' },
+        // The Anthropic Messages wire has no tools/response_format concepts — the
+        // JSON-only system suffix carries the output contract. Strip any strict-FC
+        // projection (zai never opted into tools; audit P1-3 stands).
         req.jsonSchema === undefined ? req : { ...req, jsonSchema: undefined },
         parse,
         { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs, random: opts.random },

@@ -74,6 +74,21 @@ const chatOk = (content: string, model = 'deepseek-v4-flash') =>
     { status: 200, headers: { 'content-type': 'application/json' } },
   );
 
+/** Anthropic-Messages-shaped 200 (zai wire since the open.bigmodel.cn route switch). */
+const anthropicOk = (content: string, model = 'glm-4.6', stopReason = 'end_turn') =>
+  new Response(
+    JSON.stringify({
+      id: 'msg-test-fixture',
+      type: 'message',
+      role: 'assistant',
+      model,
+      content: [{ type: 'text', text: content }],
+      stop_reason: stopReason,
+      usage: { input_tokens: 11, output_tokens: 7 },
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  );
+
 /** HTTP 200 with a PRE-BUILT body (strict-FC tool_calls shapes differ from content shapes). */
 const chatOkRaw = (bodyText: string) =>
   new Response(bodyText, { status: 200, headers: { 'content-type': 'application/json' } });
@@ -553,7 +568,7 @@ describe('transport failure classification and retry budget', () => {
     const { fetchImpl, calls } = recorderFetch([
       () => Promise.resolve(httpError(500, { error: { message: 'internal error' } })),
       () => Promise.resolve(httpError(503, { error: { message: 'unavailable' } })),
-      () => Promise.resolve(chatOk(RAW_OK)),
+      () => Promise.resolve(anthropicOk(RAW_OK)),
     ]);
     const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
@@ -673,30 +688,31 @@ describe('total-deadline timeout', () => {
 // ---------------------------------------------------------------------------
 
 describe('zai adapter (mock fetch)', () => {
-  it('targets the paas/v4 endpoint with the glm default model', async () => {
-    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'glm-4.6'))]);
+  it('targets the open.bigmodel.cn Anthropic-Messages endpoint with the glm default model', async () => {
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK, 'glm-4.6'))]);
     const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl });
     expect(provider.modelId).toBe('glm-4.6');
-    expect(provider.baseUrl).toBe('https://api.z.ai/api/paas/v4');
+    expect(provider.baseUrl).toBe('https://open.bigmodel.cn/api/anthropic');
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
-    expect(calls[0]?.url).toBe('https://api.z.ai/api/paas/v4/chat/completions');
+    expect(calls[0]?.url).toBe('https://open.bigmodel.cn/api/anthropic/v1/messages');
     expect(bodyOf(calls[0]!).model).toBe('glm-4.6');
+    expect(typeof bodyOf(calls[0]!).system).toBe('string'); // system is top-level on this wire
     expect(res.receipt.modelVersion).toBe('glm-4.6');
     expect(res.receipt.provider).toBe('zai');
   });
 
   it('honors the FARLAB_ZAI_MODEL environment override', async () => {
     vi.stubEnv('FARLAB_ZAI_MODEL', 'glm-5');
-    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'glm-5'))]);
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK, 'glm-5'))]);
     const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl });
     expect(provider.modelId).toBe('glm-5');
     await provider.structuredCall(REQ, parseHypothesis);
     expect(bodyOf(calls[0]!).model).toBe('glm-5');
   });
 
-  it('strips strict-FC tool payloads (audit P1-3): jsonSchema requests stay on json_object', async () => {
-    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'glm-4.6'))]);
+  it('strips strict-FC tool payloads (audit P1-3): no tools/response_format exist on the Anthropic wire — the system suffix carries the contract', async () => {
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(anthropicOk(RAW_OK, 'glm-4.6'))]);
     const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl });
     const reqWithSchema: StructuredCallRequest = {
       ...REQ,
@@ -707,7 +723,8 @@ describe('zai adapter (mock fetch)', () => {
     const body = bodyOf(calls[0]!);
     expect(body.tools).toBeUndefined();
     expect(body.tool_choice).toBeUndefined();
-    expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body.response_format).toBeUndefined();
+    expect(String(body.system)).toContain('JSON'); // contract rides the system param
   });
 });
 
