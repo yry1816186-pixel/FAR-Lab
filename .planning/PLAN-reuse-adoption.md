@@ -116,3 +116,19 @@
 ## 7. estimate 基线（供 actuals 校准，超 20% 停下重估）
 
 R1 180k / R2 120k / R3 220k / R4 200k / R5 250k / R6 250k，合计 ~1.22M tokens / 37 任务 / 整体 med-low（跨多会话，兄弟会话并行项不计入）
+
+## 8. 手写面复审（2026-08-22 用户指令强化："特别难的、做不到的，去 GitHub 拿开源源码融入，不闭门造车"）
+
+对项目至今所有手写自研表面的逐项裁决（每条有实跑/实时核验依据）：
+
+| 手写面 | 裁决 | 依据 |
+|---|---|---|
+| 全局搜索 SQL LIKE | **改用 SQLite FTS5**（内置，零新依赖）：bm25 排名 + `snippet()` 高亮 + unicode61 分词，直接消掉 B2 批判 P0/P1（无排序/无片段）两大遗留 | 本机实测 `PRAGMA compile_options` 含 `ENABLE_FTS5`，`MATCH` 查询通过（Node v24.14.0 自带；Node<24 无 FTS5 的旧约束不再适用）；[nodejs/node#56951](https://github.com/nodejs/node/issues/56951) 已在 Node 24 线落地 |
+| 命令面板（~250 行手写） | **移植 cmdk 的 IME 守卫**（`event.nativeEvent.isComposing` 检查）：cmdk v1.1.1 修的正是 Enter 在中文输入法组词期双触发——我们的面板无此守卫，中文用户必踩。整体换 cmdk 不做：面板已 live 验证（焦点归还/Tab 圈禁/扁平 option），cmdk（现 dip/cmdk，2.6M 周下载，MIT）作为其劣化时的既定替换路径记入 D-090 reversal trigger | cmdk v1.1.1 changelog 实核（IME double-triggering fix）；[dip/cmdk](https://github.com/dip/cmdk) |
+| 证据图谱 SVG（零依赖） | 维持既定阈值迁移：>500 元素换 Sigma.js（MIT，WebGL 5k 节点实证）。当前 ~40 节点 SVG 更优 | B7 尽调（PLAN §2） |
+| 实验规格起草（LLM 闭域提案） | **保留自研闭域合同**——不存在可直接采用的"plan→实验规格"开源库；执行引擎已是 sklearn sidecar（复用）。AutoGluon/FLAML 等重型 AutoML 作为 sidecar 候选记入未来评估，不在本程 | 领域检索（R1 尽调 + B8 实作）；live 抓到的列漂移/超参漂移均已加确定性守卫+重试 |
+| SSE 事件流（~60 行） | 保留：Node 原生 http 的规范用法，无值得引入的库（ws/socket.io 为全双工场景，过重） | 标准库纪律 |
+| CLI completion 脚本生成 | 保留：~90 行纯函数+测试已验（bash -n / pwsh AST）；commander/oclif 是路由器重写非补全增强 | R2 实作 |
+| 已采纳面 | pdfjs-dist/citation-js/jsdiff/KaTeX/axe-core/web-vitals（R1/R3/B14）；TanStack Virtual 按 B14 实测引入 | §2 裁决表 |
+
+**新增排除**：整包换 cmdk（现面板已验证，仅移植其 IME 守卫这一关键修复）；引入 socket.io/ws 做 SSE（场景不符）。

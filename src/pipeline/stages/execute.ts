@@ -1,4 +1,5 @@
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
+import { ExperimentSpec } from '../../domain/index.js';
 import { draftSpecFromPlan } from '../../experiment/spec-from-plan.js';
 import { executeExperiment } from '../../experiment/executor.js';
 
@@ -50,11 +51,31 @@ export const executeStage: StageHandler = {
 
     // 2. Execute on the local executor (real path only). Existing completed
     //    runs for this spec hash make this a no-op report (idempotency).
-    try {
-      const executed = await executeExperiment(ctx.store, ctx.artifacts, draft.spec, {
+    const runOnce = async (): ReturnType<typeof executeExperiment> =>
+      executeExperiment(ctx.store, ctx.artifacts, draft.spec, {
         shouldCancel: () => ctx.cancelled() || ctx.disowned(),
         allowLocalDatasets: false, // plan-drafted specs use public OpenML only
       });
+    try {
+      let executed: Awaited<ReturnType<typeof runOnce>>;
+      try {
+        executed = await runOnce();
+      } catch (first) {
+        // Deterministic single retry for target-column drift (live-observed on
+        // openml 426: the draft declared 'Diagnosis', the catalog default is
+        // 'oz10'): re-drafting the spec with the CATALOG's fact — the error
+        // message itself carries the true column — is a correction from
+        // authoritative data, never a fabrication.
+        const msg = first instanceof Error ? first.message : String(first);
+        const m = /default target is '([^']+)'/.exec(msg);
+        if (m === null) throw first;
+        ctx.log(`execute: target-column drift detected — retrying with catalog default '${m[1]}'`);
+        draft.spec = ExperimentSpec.parse({
+          ...draft.spec,
+          datasets: [{ ...draft.spec.datasets[0]!, targetColumn: m[1]! }],
+        });
+        executed = await runOnce();
+      }
       const verdicts = executed.statReports.map((r) => r.verdict).join(', ');
       const feedbackNote = executed.feedback.length > 0 ? `; ${executed.feedback.length} feedback signal(s) queued for revise` : '';
       return {
