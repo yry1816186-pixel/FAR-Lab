@@ -24,6 +24,12 @@ This file defines **what must be proven**. Live status/evidence exists only in `
 | ACC-18 | Representative scientific workloads are evaluated against runnable strong baselines with predeclared metrics and no result cherry-picking | live_verified |
 | ACC-19 | Performance/resource behavior is measured on representative workloads; no unbounded concurrency/model/tool loops and budgets are evidence-based | live_verified + benchmark artifact |
 | ACC-20 | Independent engineering/scientific adversarial audit finds no unresolved critical product/scientific truth failure | live_verified |
+| ACC-21 | ExperimentSpec derives from plan steps + hypothesis FalsificationSpec with preregistered statistical analysis and passes deterministic validation before any execution (D-081) | tested |
+| ACC-22 | Dataset layer acquires real external datasets (checksum/license/lineage persisted) with seeded reproducible splits and declared leakage controls | live_verified |
+| ACC-23 | Model lab builds/trains/evaluates real domain models; identical (spec, seed, env) executions reproduce identical results | live_verified |
+| ACC-24 | Executed experiments produce ResultSet + StatReport with effect sizes/uncertainty under the preregistered multiple-testing policy; verdicts derive mechanically from hypothesis decision rules, never LLM judgment | live_verified |
+| ACC-25 | Execution infrastructure: per-experiment environment pinning (lockfile hash), local execution with cancel/checkpoint/resume, remote device via gateway on a real Linux target | live_verified |
+| ACC-26 | Experiment results feed FeedbackSignal → traceable revision and appear in export/bundle with artifact hashes | live_verified |
 
 
 ## Completion gate

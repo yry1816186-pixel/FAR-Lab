@@ -40,6 +40,7 @@ export const RunEvent = z.object({
     'run_created', 'stage_started', 'stage_done', 'stage_failed', 'stage_skipped',
     'run_status_changed', 'checkpoint_saved', 'run_resumed', 'run_cancelled',
     'feedback_received', 'revision_created', 'receipt_recorded', 'note',
+    'experiment_queued', 'experiment_started', 'experiment_completed', 'experiment_failed', 'experiment_canceled',
   ]),
   status: RunStatus.optional(),
   stage: RunStageName.optional(),

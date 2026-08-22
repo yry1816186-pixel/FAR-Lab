@@ -4,6 +4,7 @@ import {
   CorpusSnapshot, SourceDocument, ScientificClaim, EvidenceRelation, HypothesisCandidate,
   HypothesisScorecard, HypothesisTournament, ResearchPlan, FeedbackSignal, Revision, VersionDiff,
   ProvenanceReceipt, ReproducibilityBundle, newId,
+  ExperimentSpec, ExperimentRun, DatasetRecord, ResultSet, StatReport,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -24,6 +25,11 @@ const KIND_SCHEMAS = {
   version_diff: VersionDiff,
   receipt: ProvenanceReceipt,
   bundle: ReproducibilityBundle,
+  experiment_spec: ExperimentSpec,
+  experiment_run: ExperimentRun,
+  dataset_record: DatasetRecord,
+  result_set: ResultSet,
+  stat_report: StatReport,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});
@@ -122,6 +128,25 @@ export class Store {
   listObjects<K extends ObjectKind>(kind: K, runId: string): DomainObject<K>[] {
     return this.db.prepare('SELECT json FROM objects WHERE kind=? AND run_id=? ORDER BY created_at ASC').all(kind, runId)
       .map((r) => KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as DomainObject<K>);
+  }
+
+  /**
+   * D-085 P0-2: experiment state transitions write the object projection AND the audit
+   * event in ONE transaction — a crash between the two must not be expressible.
+   * Restricted to objects carrying a runId (all experiment kinds do).
+   */
+  putObjectEvented<K extends ObjectKind>(
+    kind: K,
+    obj: DomainObject<K>,
+    event: { type: RunEvent['type']; detail?: Record<string, unknown> },
+    at = new Date().toISOString(),
+  ): void {
+    const runId = (obj as { runId?: string }).runId;
+    if (runId === undefined) throw new Error(`putObjectEvented: kind ${kind} has no runId`);
+    this.db.transaction(() => {
+      this.putObject(kind, obj);
+      this.appendEvent(runId, event, at);
+    });
   }
 
   // ---- W8 S2: idempotent intra-stage step checkpoints (dbos operation_outputs pattern) ----

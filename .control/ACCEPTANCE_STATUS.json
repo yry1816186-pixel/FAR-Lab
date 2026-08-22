@@ -192,6 +192,79 @@
       "evidence": [
         "Two independent audits executed on real repo/runtime/data: evidence/W5/adversarial-audit.md (verdict PASS, 0 P0; 1 P1 + 6 P2 all fixed & committed c37170c/1b0e622) + evidence/W5/scientific-review.md (5 P1 science-substance findings all fixed with live-run regression evidence); frontier sweep evidence/W5/frontier-sweep.md (GO-1 executed live, verdict SATURATED with recorded deferrals)"
       ]
+    },
+    {
+      "id": "ACC-21",
+      "target": "tested",
+      "critical": true,
+      "status": "tested",
+      "evidence": [
+        "src/domain/experiment.ts checkExperimentSpec fail-closed gate (binding approvals D-085 P0-1, exploratory notes, local-path guard, primary/multiple-testing rules, metric/builder compatibility)",
+        "tests/experiment.test.ts \"E1 spec validation (fail-closed)\" 6 cases green (vitest 638/638, 2026-08-22)",
+        "preregistration: statistics plan frozen in spec; analysisIteration guards sequential re-analysis (D-086-7, tested)"
+      ],
+      "note": "EEL E1 spec layer (D-081)",
+      "lastUpdated": "2026-08-22T09:15:20.950Z"
+    },
+    {
+      "id": "ACC-22",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "live OpenML iris (id 61) acquisition through https://www.openml.org/api/v1/json/data/61 + official ARFF url -> canonical CSV, 2026-08-22 (.far-run/tmp-openml-e2e.mjs one-off, output recorded in session): 105/45 stratified split, license/name/target persisted in dataset_record",
+        "src/experiment/datasets.ts content-addressed dedup (datasetIdFor) + checksum verification; tests/experiment.test.ts dedup case green",
+        "src/experiment/split.ts platform-stable seeded split (unit tests: reproducibility, stratification exactness, group integrity)"
+      ],
+      "note": "EEL E2 dataset layer (D-081)",
+      "lastUpdated": "2026-08-22T09:15:20.950Z"
+    },
+    {
+      "id": "ACC-23",
+      "target": "live_verified",
+      "critical": true,
+      "status": "live_verified",
+      "evidence": [
+        "experiment-runtime/ uv-pinned sidecar (uv.lock committed; sklearn 1.9.0/scipy 1.18.1/numpy 2.5.2 recorded into ExperimentRun.environment)",
+        "determinism gate green on REAL training: tests/experiment.test.ts \"identical (spec, seed, env) reproduces identical results\" (2 fresh runs, metrics + bootstrap point identical)",
+        "live iris run: logistic accuracy 0.9333 / f1_macro 0.9333 vs dummy baseline 0.3333 (real sklearn fit, 2026-08-22)"
+      ],
+      "note": "EEL E3 model lab + determinism gate (D-081)",
+      "lastUpdated": "2026-08-22T09:15:20.950Z"
+    },
+    {
+      "id": "ACC-24",
+      "target": "live_verified",
+      "critical": true,
+      "status": "implemented",
+      "evidence": [
+        "src/domain/experiment.ts mechanicalVerdict (CI-entirely-beyond rule) + thresholdProvenance carried from FalsificationSpec decisionRuleProvenance into every stat_report",
+        "live evidence (single-comparison path): paired bootstrap CI[0.4667,0.7333] -> verdict=supports with full derivation string incl. threshold source (2026-08-22 live e2e)",
+        "REMAINING for live_verified: multi-comparison run under multipleTestingPolicy adjustment + exploratory labeling exercised end-to-end"
+      ],
+      "note": "EEL E4 statistics/verdicts (D-081)",
+      "lastUpdated": "2026-08-22T09:15:20.950Z"
+    },
+    {
+      "id": "ACC-25",
+      "target": "live_verified",
+      "critical": true,
+      "status": "implemented",
+      "evidence": [
+        "env pinning implemented: uv --frozen family lockfile, lockfileHash recorded per run; OMP/BLAS threads pinned (src/experiment/python.ts)",
+        "local execution with cancel probe between models + failure persistence (tests: failure path green)",
+        "REMAINING for live_verified: durable scheduler (far-scheduler.db per D-085 P0-3), remote gateway to Docker/WSL2 target (D-084, daemon currently stopped), checkpoint/resume of long runs"
+      ],
+      "note": "EEL E5 infra: env pinning + local exec + remote gateway (D-081)",
+      "lastUpdated": "2026-08-22T09:15:20.950Z"
+    },
+    {
+      "id": "ACC-26",
+      "target": "live_verified",
+      "critical": true,
+      "status": "not_started",
+      "evidence": [],
+      "note": "EEL E6 feedback loop + export integration (D-081)"
     }
   ],
   "gates": [

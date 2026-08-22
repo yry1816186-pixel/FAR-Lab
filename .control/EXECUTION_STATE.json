@@ -1,64 +1,63 @@
 {
   "schemaVersion": 2,
-  "mission": "Wave-G governance summit: world-class open-source project governance — WP1 file governance (manifest-driven deletion + public-release structure proposal) -> WP2 full-code adversarial review & quality (root-cause fixes + regression tests + mutation checks) -> WP3 weakness-driven OSS scouting & source-level fusion -> WP4 measurement-first performance optimization. Zero silent operations: every cleanup/fix/optimization leaves a record (decisions, manifests, before/after data).",
+  "mission": "EEL (Experiment Execution Layer, D-081 user mandate): close the falsification loop with real experiments — E1 ExperimentSpec/E2 datasets/E3 model lab/E4 matrices+statistics/E5 devices-env-gateway-scheduling/E6 feedback integration. Direction-A loop stays the orchestrating authority; zero theatrical demos; LLM proposes specs, deterministic code produces verdicts.",
   "status": "in_progress",
-  "phase": "wave-governance CLOSED 2026-08-22: WP1 file governance (D-064, deletion-manifest + release-structure proposal + hygiene gates), WP2 full-code adversarial review (D-067: 10 review agents ~80 findings, 19-file root-cause fix batch, 28+9 new tests, mutation checks, adversarial audit PASS catching one self-inflicted fix loss — re-applied), WP3 weakness-driven scouting (D-068: 4 lines triple-gated, WAVE-G-SCOUT.md, CounterRefine-anchored counter queries 0.563->0.825 anchor pass-rate on 80 real queries, GRADE-lite certainty, SECURITY.md+DEPENDENCY_POLICY.md), WP4 measurement-first perf (D-068: receipts profile model-bound 67% parallelizable; mapBounded concurrency landed, falsify segment 1.96x stub-measured byte-identical outputs; live full-run re-measure gated D-036). Final gate: typecheck 0 / eslint 0 / vitest 604/604 / build 0 / secret-scan PASS / path-hygiene PASS.",
-  "pauseReason": "Live model routes remain user-gated (D-036/D-059/D-061: deepseek 402 banned anyway, zai 429-1113 on real calls, DASHSCOPE empty) — pooled live queue (W9 judge variance, W5 re-measurements, W8 live soak) deferred until user funds any route; per probing discipline no repeated probing. WAVE-PRODUCT (D-060) parked user-gated after slice-1. Wave-G governance work is fully offline-executable.",
+  "phase": "EEL P0+P1 COMPLETE 2026-08-22: constitution amended, ACC-21..26 registered, D-081..D-086 recorded, red-team APPROVED WITH CONDITIONS integrated (evidence/W-EEL/red-team-architecture-critic.md). P1 vertical slice LIVE: real OpenML iris (id 61) -> ARFF->CSV -> stratified split -> sklearn train (logistic 0.9333 vs dummy 0.3333) -> paired bootstrap CI[0.4667,0.7333] -> mechanical verdict supports (threshold provenance disclosed) -> FeedbackSignal bound to hypothesis. Gates: tsc 0 / eslint 0 / vitest 638/638 / secret-scan PASS / path-hygiene 0 errors. NEXT: P2 experiment matrix (ablation/baselines/multi-comparison policy), CLI+web surfaces (after parallel session frees src/cli), P3 scheduler+gateway (far-scheduler.db per D-085 P0-3; Docker/WSL2 target).",
+  "pauseReason": "",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
     "No demo/mock/fixture/fake success may masquerade as production capability.",
     "Scores are decision aids with producer+calibration, never objective truth (tournament included: uncertainty reported).",
     "Revision requires causal link to feedback; version diff must be explainable.",
-    "Zero new runtime dependencies (zod-only preserved through EV2-A)."
+    "Zero new runtime dependencies in the Node product (zod-only); experiment-runtime sidecar deps isolated + lockfile-pinned.",
+    "Statistical analysis is preregistered in the ExperimentSpec before execution; verdicts derive mechanically from decision rules, never from LLM judgment."
   ],
   "criticalProblemSet": [
     {
-      "id": "CP-EV2",
-      "problem": "Before/after eval",
+      "id": "CP-EEL0",
+      "problem": "P0 governance convergence (spec amendments + acceptance + decisions + red-team)",
       "status": "DONE",
-      "evidenceNeeded": "evidence/W-EV1/ev1-before-after.md; eval/results/metrics-ev1.json; llm-judge-ev1{,-s2,-s3}.jsonl",
-      "outcome": "claims +40%, counter-evidence relations +104%, claim binding 100% held, plans 5/5 held, P5 abstention unchanged; judge deltas within +/-1-2pt seed variance (honest no-claim); tokens +85% recorded"
+      "evidenceNeeded": "project-spec diffs; .control/ACCEPTANCE_STATUS.json ACC-21..26; DECISIONS D-081..086; red-team report",
+      "outcome": "amendments + ACC + D-081..D-086 landed 2026-08-22; red-team APPROVED WITH CONDITIONS, all 3 P0 rulings adopted as D-085/D-086"
     },
     {
-      "id": "CP-EV3",
-      "problem": "Wave-2 fulltext phase A",
+      "id": "CP-EEL1",
+      "problem": "P1 vertical slice end-to-end on real data (OpenML -> spec -> split -> sklearn train/eval -> StatReport -> FeedbackSignal)",
       "status": "LIVE_VERIFIED",
-      "evidenceNeeded": "evidence/W-EV2/fulltext-phase-a-live.md",
-      "outcome": "arXiv HTML + EuropePMC JATS deepening in build_evidence; 1/3 docs deepened live, receipt+artifact persisted, 4/4 fulltext-grounded claims; S2AG citation-contexts sub-item still OPEN (design-gated: claims-bind-to-retrieved-docs invariant)"
+      "evidenceNeeded": "real run artifacts in far.db + experiment results",
+      "outcome": "live OpenML iris 2026-08-22: logistic 0.9333 vs dummy 0.3333, CI[0.4667,0.7333], verdict supports, feedback bound; vitest 638/638 incl. 20 EEL tests (determinism double-run green)"
     },
     {
-      "id": "CP-EV4",
-      "problem": "MLR-Bench ideation+proposal adoption for external comparability (data CC BY 4.0, code MIT)",
+      "id": "CP-EEL2",
+      "problem": "Determinism gate: identical (spec, seed, env) -> identical results; failure/cancel paths truthful",
       "status": "DONE",
-      "evidenceNeeded": "adapter + judged submission vs published model scores",
-      "outcome": "5/5 live runs + 30/30 same-judge comparisons (evidence/W-EV2/mlr-bench.md): farlab idea 7.00/proposal 6.20 vs anchors 7.80/7.40 and 7.60/7.00; gap attributed to mapping/novelty-presentation/rendering, Feasibility exceeds anchors; adapter P0 fixed"
+      "evidenceNeeded": "green regression test + live double-run comparison",
+      "outcome": "tests/experiment.test.ts determinism + failure-path + sequential-guard cases green; failure persists verbatim error (sidecar rejection case)"
     },
     {
-      "id": "CP-W3-1",
-      "problem": "Relation-label reliability (contradicts 30% exact, upper bound)",
-      "status": "FIXED_LIVE_VERIFIED",
-      "evidenceNeeded": "evidence/W-EV2/relation-precision.md; spikes/output/relation-precision-postfix.jsonl",
-      "outcome": "Topical gate (D-023) + falsify schema v2 label discipline (D-024): post-fix run contradicts 0/21 (explicit-assertion only), blind re-judge 54.5% exact vs 46% pooled pre-fix; watch item: possible over-correction on other domains"
+      "id": "CP-EEL3",
+      "problem": "E5 infra: env pinning (uv lockfile hash), scheduler, remote gateway to Docker/WSL2 Linux target (D-084)",
+      "status": "IN_PROGRESS",
+      "evidenceNeeded": "remote real execution + kill-resume evidence",
+      "outcome": "env pinning + lockfileHash recorded per run (implemented); scheduler (far-scheduler.db) + ssh2 gateway pending P3"
     }
   ],
   "verifiedWorkspaceFacts": [
-    "EV1 after-batch 6/6 completed; envelope-unwrap fix live-proven by P2 resume 9/9.",
-    "Full suite 265/265 (2026-08-22 Wave-3 session); tsc clean; lint clean.",
-    "OPERATIONAL (2026-08-22 ~21:15 UTC, live verbatim): OpenAlex keyless pool now carries a HARD DAILY BUDGET — 'Insufficient budget. This request costs $0.001 but you only have $0.0008 remaining. Resets at midnight UTC.' Keyless retrieval exhausted mid-eval; crossref (keyless, stable, probe 200) added as third retrieval family restoring redundancy; budget-429s skip the backoff retry.",
-    "DeepSeek strict-FC beta is the DEFAULT structured transport (probe + live e2e; escape FARLAB_DEEPSEEK_STRICT=0); decisionRuleProvenance gained 'mixed' after a live mid-run rejection (run_wkncq5p).",
-    "huggingface.co and models.dev unreachable from this environment (curl 000); arxiv.org/api.openalex.org/api.crossref.org/content.openalex.org reachable.",
-    "Registry research/TECH_CANDIDATES.md; decisions D-015..D-028 (+D-029/D-029b pending final record)."
+    "www.openml.org/api reachable (HTTP 200, 1.35s, 2026-08-22); huggingface.co unreachable from this environment — OpenML is the P1 dataset resolver (D-082).",
+    "Local Python 3.12.10 + uv 0.12.1; sklearn 1.9.0 / scipy 1.17.1 / joblib 1.5.3 present in system python; sidecar still gets its own uv-pinned env.",
+    "Parallel session actively owns src/cli, desktop/, .planning/PLAN.md and appends DECISIONS.jsonl (Wave-Aesthetics P5/P6/P7) — EEL must not write those paths; commits stage EEL-owned files only.",
+    "Docker 29.5.2 CLI present, daemon stopped (user action to start for P3)."
   ],
   "activeTasks": [
-    "WAVE-G ACTIVE: WP1 file governance -> WP2 deep code review -> WP3 OSS scouting -> WP4 perf optimization; all cleanup/fix/optimization documented (evidence/W-G/).",
+    "EEL P1 build in progress (this session): src/domain/experiment.ts + KIND_SCHEMAS/ids extension, src/experiment/* (dataset resolver, spec validation, executor), experiment-runtime/ Python sidecar, tests.",
     "USER ACTION (unchanged, single record): any ONE funded route (z.ai recharge / DASHSCOPE_API_KEY fill) unblocks the pooled live queue (W9 judge-variance live, W5 rediscovery F1 + relation blind-agreement + mlr-bench new protocol, W8 live soak).",
-    "WAVE-PRODUCT D-060 parked after slice-1 (commit 26593eb): remaining slices phase-1 trust presentation / phase-3 ops / phase-5 full migration / phase-6 Tauri desktop await user re-prioritization.",
-    "W-P2 candidates harvested: contamination-stratified reporting (open-compass pattern) x counter-seat targeted retrieval for counter-evidence-substantive-hit 0.143->0.70; Yale EM-DS judge confusion-matrix calibration (needs human gold set)."
+    "Wave-Aesthetics P5/P6/P7 owned by parallel session (src/cli, desktop, DECISIONS.jsonl); EEL CLI/web surfaces coordinate behind it.",
+    "USER ACTION (P3): start Docker Desktop/WSL2 daemon when remote-gateway work begins."
   ],
   "blockerIds": [
     "B-QWEN-LIVE-ROUTE"
   ],
-  "lastVerifiedCommit": "Wave-G final gate 2026-08-22: vitest 604/604 (27 files), typecheck 0, eslint 0, build 0, secret-scan PASS, path-hygiene PASS; WP3/WP4 batch adversarially audited PASS (evidence/W-G/audit-wp3wp4.md); completion-gate rerun archived (still NOT_READY solely on user-gated B-DEEPSEEK-BALANCE).",
-  "nextAction": "Public-release pipeline COMPLETE (D-070): Apache-2.0 LICENSE + NOTICE + verified 255-file export (scripts/export-public.mjs, in-copy gates green). Remaining debts: live re-measurements (user-side model routes), NOVA-Test contradiction gate (live-gated). Publishing the export to a remote host is a user action when desired."
+  "lastVerifiedCommit": "Wave-G final gate 2026-08-22: vitest 604/604 (27 files), typecheck 0, eslint 0, build 0, secret-scan PASS, path-hygiene PASS; public export D-070 complete.",
+  "nextAction": "Finish P0 red-team integration, then build P1 E1 domain layer (src/domain/experiment.ts Zod schemas: ExperimentSpec/DatasetRecord/ModelSpec/ResultSet/StatReport/ExperimentRun) wiring into ids.ts ObjectRef kinds + store.ts KIND_SCHEMAS."
 }
