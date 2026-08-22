@@ -369,6 +369,25 @@ a:hover { text-decoration: underline; }
   .run-banner-pulse { animation: none; opacity: 0.7; }
 }
 
+/* rank bar: true win-rate ratio, zero base (proportional ink, craft-spec-v2 §7) */
+.rank-cell { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.rank-bar {
+  display: inline-block;
+  width: 64px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--v2-surface-2);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.rank-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width var(--dur-med) var(--ease-standard);
+}
+
 /* ---------- sidebar groups (P-IA) ---------- */
 .sidebar-head-actions { display: flex; gap: var(--sp-1); align-items: center; }
 .runs-groups { display: flex; flex-direction: column; gap: var(--sp-4); }
