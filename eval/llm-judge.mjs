@@ -55,7 +55,7 @@ const problems = loadProblems();
 const direct = Object.fromEntries(readJsonl('baseline-direct.jsonl').map((r) => [r.problemId, r]));
 const rag = Object.fromEntries(readJsonl('baseline-rag.jsonl').map((r) => [r.problemId, r]));
 
-const provider = makeProvider();
+const provider = await makeProvider();
 if (!provider.liveReady) {
   console.error('FATAL: DEEPSEEK_API_KEY not set');
   process.exit(1);

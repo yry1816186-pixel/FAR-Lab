@@ -38,3 +38,6 @@ FAR-Lab_ZCode_Control_Plane_*/
 
 # Python lint cache (self-ignores, but explicit for robustness)
 .ruff_cache/
+
+# Tauri/Rust build output (desktop/, product session)
+desktop/src-tauri/target/

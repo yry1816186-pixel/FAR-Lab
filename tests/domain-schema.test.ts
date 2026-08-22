@@ -80,7 +80,7 @@ export const fullRunGraph = () => {
     clusterKey: 'duration-mechanism', createdAt: now,
   });
   const score = HypothesisScorecard.parse({
-    id: newId('ev'), runId, hypothesisId: hyp.id,
+    id: newId('sc'), runId, hypothesisId: hyp.id,
     dimensions: [{
       dimension: 'evidence_grounding', value: 0.6, rationale: 'one supporting claim',
       evidenceClaimIds: [clm.id], producer: 'test', calibration: 'uncalibrated_llm_judgment',

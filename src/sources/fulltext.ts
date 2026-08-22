@@ -50,9 +50,16 @@ export interface FullTextRoute {
 const ARXIV_HTML_BASE = 'https://arxiv.org/html';
 const EPMC_BASE = 'https://www.ebi.ac.uk/europepmc/webservices/rest';
 const OPENALEX_CONTENT_BASE = 'https://content.openalex.org/works';
-/** Endpoint families for receipts/notes (not SourceFamily — these never search). */
-export const FULLTEXT_FAMILIES = ['arxiv_html', 'europepmc_jats', 'openalex_tei'] as const;
+/** Wait before the single network-error retry against EuropePMC (WP2 F5). */
+const EPMC_RETRY_BACKOFF_MS = 1_000;
 const USER_AGENT = 'FAR-Lab/0.1 (compatible; farlab fulltext phase A)';
+/**
+ * Accepts modern (`2401.04088`) and legacy (`math.GT/0309136`) arXiv ids while rejecting
+ * anything path/scheme-hostile (`..`, `?`, `#`, `%`, `:`, whitespace) — the id is
+ * interpolated into a URL, so the sibling routes' strict regex discipline applies here
+ * too (Wave-G WP2 sources review F4).
+ */
+const ARXIV_ID_RE = /^(?![.-/])[A-Za-z0-9._/-]{4,40}$/;
 
 /**
  * Route a corpus document to a fulltext endpoint through its identifiers.
@@ -63,7 +70,7 @@ export const fullTextRoute = (doc: Pick<SourceDocument, 'identifiers'>): FullTex
   for (const id of doc.identifiers) {
     if (id.kind === 'arxiv') {
       const bare = id.value.trim().replace(/v\d+$/, '');
-      if (bare) {
+      if (ARXIV_ID_RE.test(bare) && !bare.split('/').some((seg) => seg === '.' || seg === '..')) {
         return { kind: 'arxiv_html', id: bare, sourceUrl: `${ARXIV_HTML_BASE}/${bare}` };
       }
     }
@@ -95,12 +102,20 @@ export const fullTextRoute = (doc: Pick<SourceDocument, 'identifiers'>): FullTex
 // text extraction — regex-based, zero third-party deps (repo convention, arxiv.ts)
 // ---------------------------------------------------------------------------
 
-const stripInertBlocks = (html: string): string =>
-  html
-    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<table\b[\s\S]*?<\/table>/gi, ' '); // numeric mash; prose carries the claims
+const stripInertBlocks = (html: string): string => {
+  // Non-greedy spans stop at the FIRST closer, so nested tables (common in LaTeXML
+  // renders) leave outer-table markup behind — repeat until stable (Wave-G WP2 F9).
+  let out = html;
+  for (;;) {
+    const next = out
+      .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<table\b[\s\S]*?<\/table>/gi, ' '); // numeric mash; prose carries the claims
+    if (next === out) return out;
+    out = next;
+  }
+};
 
 /** Keep paragraph/heading boundaries as newlines before removing inline markup. */
 const BLOCK_END = /<\/(?:p|section|h[1-6]|li|figcaption|abstract|title)>/gi;
@@ -269,7 +284,12 @@ export const fetchEuropePmcFullText = async (
       };
     } catch (e) {
       const network = isSourceAdapterError(e) && e.kind === 'network';
-      if (network && attempt === 1) continue;
+      if (network && attempt === 1) {
+        // Politeness backoff, not an immediate tight re-entry (WP2 F5): a persistent
+        // EBI outage must not turn this loop into a sub-second request hammer.
+        await new Promise<void>((resolve) => { setTimeout(resolve, EPMC_RETRY_BACKOFF_MS); });
+        continue;
+      }
       return { status: 'error', message: `europepmc ${route.id}: ${e instanceof Error ? e.message : String(e)}` };
     }
   }

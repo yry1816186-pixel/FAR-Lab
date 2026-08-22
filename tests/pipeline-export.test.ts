@@ -163,7 +163,7 @@ const seedRun = () => {
   });
 
   const score = HypothesisScorecard.parse({
-    id: 'scorecard-1',
+    id: newId('sc'),
     runId: run.id,
     hypothesisId: hyp.id,
     dimensions: [

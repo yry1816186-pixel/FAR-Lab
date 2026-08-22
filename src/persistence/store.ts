@@ -6,6 +6,7 @@ import {
   ProvenanceReceipt, ReproducibilityBundle, newId,
 } from '../domain/index.js';
 import { z } from 'zod';
+import { STAGE_ORDER } from '../domain/run.js';
 
 /** Domain object kinds stored in the generic objects table, with their canonical schemas (fail-closed reads). */
 const KIND_SCHEMAS = {
@@ -49,8 +50,10 @@ export class Store {
       this.putObject('question', question);
       this.db.prepare('INSERT INTO runs (id, question_id, status, current_stage, doc, created_at, updated_at) VALUES (?,?,?,?,?,?,?)')
         .run(run.id, run.questionId, run.status, run.currentStage, JSON.stringify(run), now, now);
+      // Inside the transaction (Wave-G WP2): a run row without its run_created event
+      // would be an unauditable run after a crash between the two writes.
+      this.appendEvent(run.id, { type: 'run_created', status: 'created', detail: { questionId: question.id } }, now);
     });
-    this.appendEvent(run.id, { type: 'run_created', status: 'created', detail: { questionId: question.id } });
     return run;
   }
 
@@ -121,10 +124,6 @@ export class Store {
       .map((r) => KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as DomainObject<K>);
   }
 
-  integrity(): string {
-    return this.db.integrityCheck();
-  }
-
   // ---- W8 S2: idempotent intra-stage step checkpoints (dbos operation_outputs pattern) ----
   // `family` separates independent checkpoint families inside one stage (audit P0-1:
   // rank hosts scoring batches AND tournament pairs with different inputs fingerprints —
@@ -137,9 +136,11 @@ export class Store {
   }
 
   putStepOutput(runId: string, stage: RunStageName, family: string, stepKey: string, value: unknown, at = new Date().toISOString()): void {
-    this.db.prepare('INSERT OR REPLACE INTO step_outputs (run_id, stage, family, step_key, json, created_at) VALUES (?,?,?,?,?,?)')
-      .run(runId, stage, family, stepKey, JSON.stringify(value), at);
-    this.appendEvent(runId, { type: 'checkpoint_saved', stage, detail: { family, stepKey } }, at);
+    this.db.transaction(() => {
+      this.db.prepare('INSERT OR REPLACE INTO step_outputs (run_id, stage, family, step_key, json, created_at) VALUES (?,?,?,?,?,?)')
+        .run(runId, stage, family, stepKey, JSON.stringify(value), at);
+      this.appendEvent(runId, { type: 'checkpoint_saved', stage, detail: { family, stepKey } }, at);
+    });
   }
 
   countStepOutputs(runId: string, stage: RunStageName, family?: string): number {
@@ -237,9 +238,9 @@ export class Store {
   }
 }
 
-const STAGE_ALL: readonly RunStageName[] = [
-  'scope', 'retrieve', 'verify_sources', 'build_evidence', 'generate_hypotheses',
-  'critique_falsify', 'rank', 'plan', 'feedback', 'revise', 'export',
-];
+// Single source of truth is the domain's STAGE_ORDER (Wave-G WP2: three independent
+// copies of the stage list — store, composition import map, domain — silently drift;
+// consumers that need "all stages" must derive from here).
+const STAGE_ALL: readonly RunStageName[] = STAGE_ORDER;
 export { STAGE_ALL };
 export type { StageRecord, ResearchRun };

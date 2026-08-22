@@ -319,7 +319,6 @@ export const buildEvidenceStage: StageHandler = {
     };
 
     const processDocument = async (doc: SourceDocument): Promise<void> => {
-      {
       if (ctx.cancelled()) {
         throw new Error(`cancelled by user in build_evidence before extracting ${doc.id}`);
       }
@@ -397,7 +396,6 @@ export const buildEvidenceStage: StageHandler = {
         ctx.store.putObject('evidence_relation', relationRecord);
         relationCounts[relation] += 1;
       }
-      }
     };
 
     for (const doc of pending) {
@@ -429,7 +427,7 @@ export const buildEvidenceStage: StageHandler = {
         gapSeekNote = `triggered: ${gap.data.gapDescription.slice(0, 120)}`;
         const adapter = ctx.sourceFor('openalex' as SourceFamily);
         const newDocIds: string[] = [];
-        const corpus = ctx.store.listObjects('corpus_snapshot' as never, ctx.run.id).at(-1) as CorpusSnapshot | undefined;
+        const corpus = ctx.store.listObjects('corpus_snapshot', ctx.run.id).at(-1);
         for (const q of gap.data.queries.slice(0, GAP_SEEK_MAX_QUERIES)) {
           if (ctx.cancelled()) throw new Error('cancelled by user in build_evidence gap-seek');
           const search = await adapter.search(q, { limit: GAP_SEEK_MAX_DOCS_PER_QUERY });

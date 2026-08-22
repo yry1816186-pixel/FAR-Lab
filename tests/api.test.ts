@@ -166,7 +166,7 @@ const seedCompletedRun = async (): Promise<void> => {
   app.store.putObject(
     'scorecard',
     HypothesisScorecard.parse({
-      id: 'scorecard-seed-1',
+      id: newId('sc'),
       runId: run.id,
       hypothesisId: hyp.id,
       dimensions: [

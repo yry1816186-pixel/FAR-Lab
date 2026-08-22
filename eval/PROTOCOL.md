@@ -1,5 +1,14 @@
 # W4 Evaluation Protocol (PRE-DECLARED)
 
+> **ADDENDUM 2026-08-22 (Wave-G WP2, doc-drift fix — the pre-declared text below is unchanged):**
+> the model route tables below were written when DeepSeek was the live route. DeepSeek is now
+> BANNED in this project (user directive 2026-08-22). Current default judge/baseline route is GLM
+> (Zhipu bigmodel.cn, Anthropic-compatible endpoint, `glm-5.3`) via `eval/glm-anthropic-provider.mjs`;
+> alternates `zai`/`dashscope` via `FARLAB_JUDGE_PROVIDER`/`FARLAB_BASELINE_PROVIDER`. Any FUTURE
+> numbers produced under a different route than the 2026-08-21 DeepSeek runs are a judge-protocol
+> change and are disclosed with the route identity per run — historical numbers below are NOT
+> re-measured or re-attributed.
+
 Written 2026-08-21 BEFORE: any new FAR-Lab run on P4-P6, any baseline execution, any metric computation.
 Three prior runs (P1, P2, P3) already existed when this protocol was written; they were the first
 three runs ever executed in this workspace (no selection on outcome). P3 was still running at

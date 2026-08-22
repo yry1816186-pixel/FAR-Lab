@@ -89,3 +89,15 @@ export const clampLimit = (limit: number | undefined, fallback: number, max: num
   if (!Number.isInteger(limit) || limit < 1) return fallback;
   return Math.min(limit, max);
 };
+
+/**
+ * Encode an identifier (e.g. a DOI) for interpolation as a single URL PATH segment.
+ * encodeURIComponent escapes everything path/host-significant (`?`, `#`, `&`, `=`),
+ * then `/` and `:` are selectively restored: DOIs legally contain forward slashes and
+ * OpenAlex's canonical work path uses a `doi:` prefix — both are legal pchars
+ * (RFC 3986) inside an absolute-URL path segment, and canonical shapes stay
+ * server-cache-friendly. encodeURI alone leaves `?` and `#` unescaped — a DOI like
+ * `10.1/x#v2` would truncate the path at the fragment and drop the query string.
+ */
+export const encodePathSegment = (id: string): string =>
+  encodeURIComponent(id).replace(/%2F/gi, '/').replace(/%3A/g, ':');

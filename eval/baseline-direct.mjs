@@ -12,7 +12,7 @@ const OUT = DIR + 'baseline-direct.jsonl';
 mkdirSync(DIR, { recursive: true });
 
 const problems = loadProblems();
-const provider = makeProvider();
+const provider = await makeProvider();
 if (!provider.liveReady) {
   console.error('FATAL: DEEPSEEK_API_KEY not set — baseline cannot run (fail closed, no fabrication)');
   process.exit(1);

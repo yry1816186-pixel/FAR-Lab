@@ -1,7 +1,7 @@
 import type { AccessState, SourceIdentifier } from '../domain/source.js';
 import type { RawRetrievalResult, RawSourceRecord, SourceAdapter } from '../shared/ports.js';
 import { SourceAdapterError } from './error.js';
-import { type HttpGetResult, type SourceAdapterOptions, clampLimit, httpGet } from './http.js';
+import { type HttpGetResult, type SourceAdapterOptions, clampLimit, encodePathSegment, httpGet } from './http.js';
 import { asArray, asObject, boolField, numField, strField } from './json.js';
 
 const DEFAULT_BASE_URL = 'https://api.openalex.org';
@@ -194,8 +194,8 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
         message: `OpenAlex resolves doi/openalex(/works-url) identifiers, got kind '${identifier.kind}'`,
       });
     }
-    // encodeURI keeps '/' ( meaningful in DOIs ) while encoding spaces/parens etc.
-    const url = requestUrl(`/works/${encodeURI(pathId)}?${mailtoQuery}`);
+    // Path-segment-safe encoding: keeps '/' (legal inside DOIs), escapes `?`/`#` etc.
+    const url = requestUrl(`/works/${encodePathSegment(pathId)}?${mailtoQuery}`);
     const res = await getWith429Retry(url, { family, query: `${identifier.kind}:${identifier.value}` });
     if (res.status === 404) return { found: false, httpStatus: 404 };
     if (res.status !== 200) {

@@ -21,9 +21,13 @@ export const FeedbackSignal = z.object({
 });
 export type FeedbackSignal = z.infer<typeof FeedbackSignal>;
 
+/** The object types a revision can touch — shared by RevisionOperation and VersionDiffEntry (WP2 F6). */
+export const RevisedObjectType = z.enum(['hypothesis', 'plan', 'claim', 'evidence_relation', 'scope', 'assumption']);
+export type RevisedObjectType = z.infer<typeof RevisedObjectType>;
+
 /** Mission §33 — a revision is a causal operation, never "prompt again, new answer". */
 export const RevisionOperation = z.object({
-  objectType: z.enum(['hypothesis', 'plan', 'claim', 'evidence_relation', 'scope', 'assumption']),
+  objectType: RevisedObjectType,
   objectId: z.string().min(1),
   operation: z.enum(['create', 'modify', 'weaken', 'strengthen', 'invalidate', 'retire', 'refine']),
   before: z.string().optional(),
@@ -51,7 +55,7 @@ export const Revision = z.object({
 export type Revision = z.infer<typeof Revision>;
 
 export const VersionDiffEntry = z.object({
-  objectType: z.string(),
+  objectType: RevisedObjectType,
   objectId: z.string(),
   summary: z.string().min(1),
   changedFields: z.array(z.string()).default([]),

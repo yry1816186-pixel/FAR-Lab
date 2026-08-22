@@ -17,12 +17,13 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { wilsonInterval } from './stats.mjs';
 
 const COUNTER_FAMILY = new Set(['contradicts', 'weakens']);
 const LIMITING = new Set(['contradicts', 'weakens', 'qualifies']);
 
-const evaluate = (rows, label) => {
+export const evaluate = (rows, label) => {
   const counter = rows.filter((r) => COUNTER_FAMILY.has(r.pipelineLabel));
   const strict = counter.filter((r) => COUNTER_FAMILY.has(r.judgeLabel)).length;
   const limiting = counter.filter((r) => LIMITING.has(r.judgeLabel)).length;
@@ -40,6 +41,10 @@ const evaluate = (rows, label) => {
   };
 };
 
+// CLI body runs only when executed directly — importing this module (tests, composition)
+// must not parse argv or exit.
+const runAsCli = import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href;
+if (runAsCli) {
 const files = process.argv.slice(2);
 if (files.length === 0) { console.error('usage: node eval/counter-evidence-metric.mjs <re-judge.jsonl> [...]'); process.exit(1); }
 const results = [];
@@ -58,3 +63,4 @@ for (const r of results) {
 }
 console.log('\nProtocol: strict = judge in {contradicts,weakens}; limiting = +qualifies; misses decompose into inverted vs empty (different remedies).');
 console.log('Small-n honesty: Wilson intervals are wide; treat point estimates as directional until larger samples exist.');
+}

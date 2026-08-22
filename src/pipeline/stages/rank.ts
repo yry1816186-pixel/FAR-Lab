@@ -77,10 +77,11 @@ const DimensionsField = z
       Object.entries(rec).map(([dimension, rest]) => ({ ...rest, dimension: dimension as z.infer<typeof ScoreDimension> })),
     ),
   ])
-  .transform((dims) => {
-    const valid = dims.filter((d) => SCORE_DIMENSIONS.includes(d.dimension));
-    return valid.length >= MIN_DIMENSIONS_PER_HYPOTHESIS ? valid : valid;
-  });
+  .transform((dims) => dims.filter((d) => SCORE_DIMENSIONS.includes(d.dimension)));
+// Dimension-floor enforcement is per-hypothesis at the stage level (see the
+// MIN_DIMENSIONS_PER_HYPOTHESIS discard below), NOT here: a schema-level throw would
+// reject the whole multi-hypothesis payload and re-ask when ONE hypothesis is
+// under-scored — the honest degradation is to discard that assessment with a warning.
 
 const RankOut = z.object({
   assessments: z

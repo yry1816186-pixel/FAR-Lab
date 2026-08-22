@@ -17,4 +17,8 @@ export const throwIfCancelled = (ctx: StageContext): void => {
  * P1-1/P2-2 root fix).
  */
 export const isCancellationError = (e: unknown): boolean =>
-  e instanceof Error && e.message === 'cancelled by user';
+  // Stage-suffixed cancellation messages must match (shared.ts throws
+  // `cancelled by user during ${stage}`; guard.ts throws the bare form) — but a
+  // mere string EXTENSION like 'cancelled by userX' is a different message and
+  // must not be treated as a cancellation (word-boundary regex, WP2).
+  e instanceof Error && /^cancelled by user(?:\s|$)/.test(e.message);

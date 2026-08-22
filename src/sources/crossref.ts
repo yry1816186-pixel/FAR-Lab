@@ -1,7 +1,7 @@
 import type { SourceIdentifier } from '../domain/source.js';
 import type { RawRetrievalResult, RawSourceRecord, SourceAdapter } from '../shared/ports.js';
 import { SourceAdapterError } from './error.js';
-import { type SourceAdapterOptions, clampLimit, httpGet } from './http.js';
+import { type SourceAdapterOptions, clampLimit, encodePathSegment, httpGet } from './http.js';
 import { asArray, asObject, strField } from './json.js';
 import { stripMarkup } from './text.js';
 
@@ -154,7 +154,7 @@ export const createCrossrefAdapter = (opts: CrossrefAdapterOptions = {}): Source
         message: `Crossref resolves doi(/doi-org-url) identifiers, got kind '${identifier.kind}'`,
       });
     }
-    const url = `${baseUrl}/works/${encodeURI(doi)}?${mailtoQuery}`;
+    const url = `${baseUrl}/works/${encodePathSegment(doi)}?${mailtoQuery}`;
     const res = await httpGet(url, {
       fetchImpl: opts.fetchImpl,
       timeoutMs: opts.timeoutMs,

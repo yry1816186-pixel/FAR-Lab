@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { canonicalJson } from '../../shared/crypto.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { callStructured } from '../llm.js';
 import {
@@ -267,9 +268,13 @@ const reviseHypothesis = async (
   });
   ctx.store.putObject('hypothesis', after);
 
+  // Key-order-canonical comparison (WP2 F1): JSON.stringify reflects insertion order,
+  // so a semantically identical `after` whose object keys enumerate differently would
+  // report false changedFields — the audit trail must not lie. canonicalJson sorts keys,
+  // matching what the export hashes actually compare.
   const changedFields = (
     ['statement', 'mechanism', 'assumptions', 'predictions', 'uncertainties', 'version'] as const
-  ).filter((f) => JSON.stringify(hyp[f]) !== JSON.stringify(after[f]));
+  ).filter((f) => canonicalJson(hyp[f]) !== canonicalJson(after[f]));
   return {
     before: `v${before.version} — ${truncate(before.statement)}`,
     after: `v${after.version} — ${truncate(after.statement)}`,

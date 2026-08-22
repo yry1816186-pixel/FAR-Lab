@@ -1,5 +1,4 @@
 import type { ContentDepth, SourceFamily, SourceIdentifier, AccessState } from '../domain/source.js';
-import type { RunId } from '../domain/ids.js';
 
 /** Structured model call request — the narrow semantic boundary (INTERFACES.md §5). */
 export interface StructuredCallRequest {
@@ -92,9 +91,4 @@ export interface ArtifactStore {
   put(payload: string | Uint8Array): Promise<{ ref: string; hash: string; size: number }>;
   get(ref: string): Promise<string | null>;
   path(ref: string): string;
-}
-
-export interface ReceiptSink {
-  // implemented by persistence; providers/sources report receipt facts through the pipeline.
-  runId: RunId;
 }

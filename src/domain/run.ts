@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { RunId, QuestionId, ReceiptId } from './ids.js';
-import { ObjectRef } from './ids.js';
 
 /** Run lifecycle — INTERFACES.md §1. No invented percentage progress. */
 export const RunStatus = z.enum([
@@ -77,5 +76,3 @@ export const runProgress = (run: ResearchRun): { known: boolean; done: number; t
   const done = core.filter((s) => ['done', 'skipped'].includes(String(run.stages.find((r) => r.stage === s)?.state))).length;
   return { known: true, done, total: core.length };
 };
-
-export const objectRefFor = (kind: z.infer<typeof ObjectRef.shape.kind>, id: string): ObjectRef => ({ kind, id });
