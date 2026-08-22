@@ -320,7 +320,7 @@ export const buildEvidenceStage: StageHandler = {
       unknown: 0,
     };
 
-    const processDocument = async (doc: SourceDocument): Promise<void> => {
+    const processDocument = async (doc: SourceDocument): Promise<number> => {
       if (ctx.cancelled()) {
         throw new Error(`cancelled by user in build_evidence before extracting ${doc.id}`);
       }
@@ -350,6 +350,10 @@ export const buildEvidenceStage: StageHandler = {
       const extracted = result.data.claims;
       const admitted = extracted.slice(0, MAX_CLAIMS_PER_SOURCE);
       truncatedCount += extracted.length - admitted.length;
+      // Captured after the last await: the candidate loop below is synchronous,
+      // so this diff is exactly THIS document's yield even under mapBounded
+      // concurrency (B3 per-document milestone accuracy).
+      const claimsByThisDoc = -claimsTotal;
 
       for (const candidate of admitted) {
         if (ctx.cancelled()) {
@@ -406,13 +410,27 @@ export const buildEvidenceStage: StageHandler = {
         ctx.store.putObject('evidence_relation', relationRecord);
         relationCounts[relation] += 1;
       }
+      return claimsByThisDoc + claimsTotal;
     };
 
     // Bounded overlap of independent per-document extractions (WP4): per-doc work reads
     // store state fixed before the loop; shared counters are order-insensitive sums, and
     // the gap-seek decision below waits for ALL documents either way.
+    // B3: pending.length is a REAL total — each completed document advances the
+    // wait narrative ("extracting evidence 3/9") and emits a milestone with the
+    // per-document claim yield (returned synchronously, so concurrency cannot
+    // misattribute counts).
+    let docsDone = 0;
     await mapBounded(pending, STAGE_CONCURRENCY, async (doc) => {
-      await processDocument(doc);
+      const docClaims = await processDocument(doc);
+      docsDone += 1;
+      ctx.progress?.(docsDone, pending.length, {
+        reason: 'document_extracted',
+        detail: {
+          sourceTitle: doc.title.length > 70 ? `${doc.title.slice(0, 70)}…` : doc.title,
+          claims: docClaims,
+        },
+      });
     });
 
     // ---- bounded adaptive gap-seek round (mission §30) ----

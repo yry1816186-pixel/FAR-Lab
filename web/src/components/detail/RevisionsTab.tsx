@@ -94,6 +94,28 @@ function RevisionChain({ data }: { data: RevisionsBundle }): JSX.Element {
                           {op.before !== undefined && <div><span className="muted">before:</span> <span className="mono">{truncate(op.before)}</span></div>}
                           {op.after !== undefined && <div><span className="muted">after:</span> <span className="mono">{truncate(op.after)}</span></div>}
                           <div className="muted small">{op.reason}</div>
+                          {(op.before !== undefined || op.after !== undefined) && (
+                            /* B3-7 version compare: full-text before/after stays
+                               one disclosure away — the truncated line is a
+                               preview, never the whole story. */
+                            <details className="op-compare">
+                              <summary className="muted small">{t('rev.compareFull')}</summary>
+                              <div className="op-compare-grid">
+                                {op.before !== undefined && (
+                                  <div>
+                                    <span className="muted small">{t('rev.before')}（{revision.fromVersionLabel}）</span>
+                                    <pre className="op-compare-text mono">{op.before}</pre>
+                                  </div>
+                                )}
+                                {op.after !== undefined && (
+                                  <div>
+                                    <span className="muted small">{t('rev.after')}（{revision.toVersionLabel}）</span>
+                                    <pre className="op-compare-text mono">{op.after}</pre>
+                                  </div>
+                                )}
+                              </div>
+                            </details>
+                          )}
                         </div>
                       </li>
                     ))}

@@ -104,6 +104,15 @@ export class Store {
       });
   }
 
+  /** Events with seq strictly greater than the cursor (B3 SSE incremental feed). */
+  listEventsAfter(runId: string, afterSeq: number): RunEvent[] {
+    return this.db.prepare('SELECT seq, payload FROM events WHERE run_id=? AND seq>? ORDER BY seq ASC').all(runId, afterSeq)
+      .map((r) => {
+        const p = JSON.parse(String(r.payload)) as Record<string, unknown>;
+        return RunEvent.parse({ ...p, seq: Number(r.seq) });
+      });
+  }
+
   // ---- generic canonical object storage ----
 
   putObject<K extends ObjectKind>(kind: K, obj: DomainObject<K>): void {

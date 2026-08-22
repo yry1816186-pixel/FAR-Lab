@@ -167,8 +167,9 @@ export const verifyStage: StageHandler = {
     let noIdCount = 0;
     let errorCount = 0;
 
-    for (const doc of pending) {
+    for (const [idx, doc] of pending.entries()) {
       throwIfCancelled(ctx);
+      if (idx === 0) ctx.progress?.(0, pending.length);
       const doi = doc.identifiers.find((i) => i.kind === 'doi');
       const arxivId = doc.identifiers.find((i) => i.kind === 'arxiv');
       if (doi) {
@@ -198,6 +199,7 @@ export const verifyStage: StageHandler = {
         });
         ctx.log(`verify_sources: ${doc.id} has no persistent identifier — marked unresolved`);
       }
+      ctx.progress?.(idx + 1, pending.length);
     }
 
     const parts = [

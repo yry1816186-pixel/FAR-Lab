@@ -5,6 +5,7 @@ import { getEvents, getRun, listRuns, searchAll } from './api/endpoints';
 import type { ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
+import { useEventStream } from './hooks/useEventStream';
 import { parseHash, useHashRoute } from './hooks/useHashRoute';
 import { useConnection } from './state/connection';
 import { useTheme } from './state/theme';
@@ -20,6 +21,8 @@ const RUNS_POLL_MS = 5_000;
 const DETAIL_POLL_ACTIVE_MS = 3_000;
 const DETAIL_POLL_WAITING_MS = 10_000;
 const EVENTS_POLL_MS = 2_000;
+/** Safety-net cadence while SSE push is healthy (B3). */
+const EVENTS_POLL_SSE_MS = 15_000;
 const MAX_EVENTS_KEPT = 2_000;
 
 export function App(): JSX.Element {
@@ -137,6 +140,21 @@ export function App(): JSX.Element {
   const eventsAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => { eventsAbortRef.current?.abort(); }, []);
 
+  const applyIncomingEvents = useCallback((incoming: RunEvent[]): void => {
+    if (incoming.length === 0) return;
+    // Shared merge path for polled AND streamed events (B3): the seq cursor
+    // makes SSE redelivery after reconnect idempotent.
+    const fresh = incoming.filter((e) => e.seq > lastSeqRef.current);
+    if (fresh.length === 0) return;
+    const maxSeq = fresh[fresh.length - 1]!.seq;
+    lastSeqRef.current = Math.max(lastSeqRef.current, maxSeq);
+    setEventsTotal((n) => n + fresh.length);
+    setEvents((prev) => {
+      const merged = [...prev, ...fresh];
+      return merged.length > MAX_EVENTS_KEPT ? merged.slice(merged.length - MAX_EVENTS_KEPT) : merged;
+    });
+  }, []);
+
   const pollEvents = useCallback((): Promise<void> => {
     if (selectedRunId === null) return Promise.resolve();
     eventsAbortRef.current?.abort();
@@ -145,15 +163,7 @@ export function App(): JSX.Element {
     return (async () => {
       try {
         const incoming = await getEvents(selectedRunId, lastSeqRef.current, controller.signal);
-        if (incoming.length > 0) {
-          const maxSeq = incoming[incoming.length - 1]!.seq;
-          lastSeqRef.current = Math.max(lastSeqRef.current, maxSeq);
-          setEventsTotal((n) => n + incoming.length);
-          setEvents((prev) => {
-            const merged = [...prev, ...incoming];
-            return merged.length > MAX_EVENTS_KEPT ? merged.slice(merged.length - MAX_EVENTS_KEPT) : merged;
-          });
-        }
+        applyIncomingEvents(incoming);
         setEventsError(null);
         markOnline();
       } catch (e) {
@@ -162,12 +172,15 @@ export function App(): JSX.Element {
         markOffline();
       }
     })();
-  }, [selectedRunId, markOnline, markOffline]);
+  }, [selectedRunId, markOnline, markOffline, applyIncomingEvents]);
 
   // Poll events for any selected run except hard-terminal failed/cancelled:
   // a completed run can still receive feedback (feedback -> revision) events.
   const eventsEnabled = selectedRunId !== null && detailStatus !== 'failed' && detailStatus !== 'cancelled';
-  usePolling(pollEvents, EVENTS_POLL_MS, eventsEnabled);
+  // B3 realtime: SSE push is primary; polling continues as a safety net at a
+  // slower cadence while the stream is healthy.
+  const sseActive = useEventStream(selectedRunId, eventsEnabled, applyIncomingEvents);
+  usePolling(pollEvents, sseActive ? EVENTS_POLL_SSE_MS : EVENTS_POLL_MS, eventsEnabled);
 
   // Initial events fetch on run selection (parity with the detail fetch above):
   // the visibility-gated poll may legitimately skip every tick while the page
