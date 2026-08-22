@@ -25,7 +25,6 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '—');
 type BadgeTone = 'ok' | 'warn' | 'err' | 'info' | 'muted';
 const verdictTone = (v: unknown): BadgeTone =>
   v === 'supports' ? 'ok' : v === 'falsifies' ? 'err' : 'muted';
-
 export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
   const { t } = useI18n();
   const fetcher = useCallback((signal: AbortSignal) => getExperiments(run.id, signal), [run.id]);
@@ -62,7 +61,12 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
             <header className="card__head" style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
               <Badge tone={status === 'completed' ? 'ok' : status === 'failed' ? 'err' : 'muted'}>{status}</Badge>
               <IdText value={xid} />
-              <span className="muted small">{t('exp.executor', { executor: str(xr.executor), attempts: str(xr.attempts) })}</span>
+              <span className="muted small">
+                {t('exp.executor', {
+                  executor: str(xr.executor) === 'local' ? t('exp.executorLocal') : str(xr.executor) === 'remote' ? t('exp.executorRemote') : str(xr.executor),
+                  attempts: str(xr.attempts),
+                })}
+              </span>
               <TimeText iso={str(xr.createdAt)} />
             </header>
             {xr.error !== undefined && xr.error !== null && (

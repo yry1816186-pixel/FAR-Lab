@@ -18,12 +18,27 @@ const NARRATIVE: ReadonlySet<string> = new Set([
   'receipt_recorded', 'feedback_received', 'run_status_changed', 'note',
 ]);
 
+/** B3-critique P1-3: milestone floods must never evict the stage boundaries —
+ *  the window below always reserves slots for the latest transitions. */
+const STAGE_TRANSITIONS: ReadonlySet<string> = new Set([
+  'stage_started', 'stage_done', 'stage_failed', 'stage_skipped',
+]);
+const RESERVED_STAGE_SLOTS = 5;
+
 /** B3 milestone notes worth a researcher's attention (internal notes stay hidden). */
 const NOTE_MILESTONES: ReadonlySet<string> = new Set([
   'hypothesis_critiqued', 'document_extracted', 'query_plan_ready',
 ]);
 
 const MAX_LINES = 14;
+
+/** Selection window: the newest RESERVED_STAGE_SLOTS stage transitions are
+ *  always visible; remaining slots go to the newest other narrative lines. */
+function windowOf(events: RunEvent[]): RunEvent[] {
+  const stage = events.filter((e) => STAGE_TRANSITIONS.has(e.type)).slice(-RESERVED_STAGE_SLOTS);
+  const others = events.filter((e) => !STAGE_TRANSITIONS.has(e.type)).slice(-(MAX_LINES - stage.length));
+  return [...stage, ...others].sort((a, b) => a.seq - b.seq);
+}
 
 interface ActivityLine {
   key: string;
@@ -36,9 +51,7 @@ interface ActivityLine {
 
 export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEvent[] }): JSX.Element {
   const { t, formatTime } = useI18n();
-  const lines = events
-    .filter((e) => NARRATIVE.has(e.type))
-    .slice(-MAX_LINES)
+  const lines = windowOf(events.filter((e) => NARRATIVE.has(e.type)))
     .reverse()
     .map((e): ActivityLine | null => {
       const stageLabel = e.stage !== undefined ? t(stageKey(e.stage)) : '';

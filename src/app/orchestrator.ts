@@ -132,12 +132,18 @@ export class Orchestrator {
       progress: (done, total, note) => {
         // B3 sub-stage granularity: update the CURRENT stage record's subtasks
         // (known totals only — callers pass real domain counts) and append the
-        // milestone note. Synchronous doc write; stage handlers call this from
-        // their work loops between awaits, so there is no interleaved write.
-        const rec = run.stages.find((s) => s.stage === run.currentStage);
-        if (rec !== undefined && total > 0) {
-          rec.subtasks = { known: true, done: Math.max(0, Math.min(done, total)), total };
-          store.updateRun(run);
+        // milestone note. Reads a FRESH run doc first (B3-critique P0-2): the
+        // stage closure's `run` can be stale relative to other writers
+        // (adoption, watchdog), and updateRun must never roll the row back.
+        if (total > 0) {
+          const fresh = store.getRun(run.id);
+          if (fresh !== null) {
+            const rec = fresh.stages.find((s) => s.stage === fresh.currentStage);
+            if (rec !== undefined) {
+              rec.subtasks = { known: true, done: Math.max(0, Math.min(done, total)), total };
+              store.updateRun(fresh);
+            }
+          }
         }
         if (note !== undefined) {
           store.appendEvent(run.id, { type: 'note', stage: run.currentStage, detail: { reason: note.reason, ...note.detail } });
