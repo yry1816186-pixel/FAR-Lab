@@ -19,8 +19,12 @@ import {
 
 export const ZAI_BASE_URL = 'https://api.z.ai/api/paas/v4';
 export const ZAI_DEFAULT_MODEL = 'glm-4.6';
-const ENV_API_KEY = 'ZHIPU_API_KEY';
+// Primary env is ZAI_API_KEY; ZHIPU_API_KEY stays as legacy fallback (W0 convention).
+// Precedence matters: a funded ZAI_API_KEY must win over a stale legacy value in the shell.
+const ENV_API_KEY = 'ZAI_API_KEY';
+const ENV_API_KEY_LEGACY = 'ZHIPU_API_KEY';
 const ENV_MODEL = 'FARLAB_ZAI_MODEL';
+const ENV_BASE_URL = 'FARLAB_ZAI_BASE_URL';
 
 export interface ZaiProviderOptions {
   /** Overrides ZHIPU_API_KEY (tests inject a fake value; real secrets never enter files/logs). */
@@ -41,9 +45,9 @@ export interface ZaiProvider extends ModelProvider {
 }
 
 export function createZaiProvider(opts: ZaiProviderOptions = {}): ZaiProvider {
-  const apiKey = opts.apiKey ?? process.env[ENV_API_KEY] ?? '';
+  const apiKey = opts.apiKey ?? process.env[ENV_API_KEY] ?? process.env[ENV_API_KEY_LEGACY] ?? '';
   const modelId = opts.model ?? process.env[ENV_MODEL] ?? ZAI_DEFAULT_MODEL;
-  const baseUrl = opts.baseUrl ?? ZAI_BASE_URL;
+  const baseUrl = opts.baseUrl ?? process.env[ENV_BASE_URL] ?? ZAI_BASE_URL;
   return {
     name: 'zai',
     liveReady: apiKey.length > 0,

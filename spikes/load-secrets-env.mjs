@@ -15,7 +15,7 @@ for (const line of readFileSync(ENV_FILE, 'utf8').split(/\r?\n/)) {
   if (trimmed === '' || trimmed.startsWith('#')) continue;
   const m = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(trimmed);
   if (!m || m[1] === undefined || m[2] === undefined) { skipped++; continue; }
-  let value = m[2];
+  let value = m[2].trim(); // tolerate "KEY= value" (leading/trailing whitespace breaks Bearer auth)
   if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
     value = value.slice(1, -1);
   }

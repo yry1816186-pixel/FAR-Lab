@@ -1,0 +1,61 @@
+{
+ "at": "2026-08-22T04:36:36.538Z",
+ "results": [
+  {
+   "endpoint": "international api.z.ai",
+   "httpStatus": 200,
+   "wallMs": 24080,
+   "bodyKeys": [
+    "choices",
+    "created",
+    "id",
+    "model",
+    "object",
+    "request_id",
+    "usage"
+   ],
+   "error": null,
+   "content": "",
+   "usage": {
+    "completion_tokens": 8,
+    "completion_tokens_details": {
+     "reasoning_tokens": 8
+    },
+    "prompt_tokens": 12,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    },
+    "total_tokens": 20
+   },
+   "model": "glm-4.6"
+  },
+  {
+   "endpoint": "china open.bigmodel.cn",
+   "httpStatus": 200,
+   "wallMs": 1103,
+   "bodyKeys": [
+    "choices",
+    "created",
+    "id",
+    "model",
+    "object",
+    "request_id",
+    "usage"
+   ],
+   "error": null,
+   "content": "",
+   "usage": {
+    "completion_tokens": 8,
+    "completion_tokens_details": {
+     "reasoning_tokens": 8
+    },
+    "prompt_tokens": 12,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    },
+    "total_tokens": 20
+   },
+   "model": "glm-4.6"
+  }
+ ]
+}

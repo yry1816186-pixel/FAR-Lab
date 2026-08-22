@@ -90,7 +90,7 @@ export function listProviders(): ProviderInfo[] {
       liveReady: zai.liveReady,
       modelId: zai.modelId,
       baseUrl: zai.baseUrl,
-      apiKeyEnvVar: 'ZHIPU_API_KEY',
+      apiKeyEnvVar: 'ZAI_API_KEY (legacy ZHIPU_API_KEY)',
     },
     {
       name: 'dashscope',
