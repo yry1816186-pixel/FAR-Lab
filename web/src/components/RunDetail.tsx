@@ -12,14 +12,16 @@ import { ProvenanceTab } from './detail/ProvenanceTab';
 import { EventsTab } from './detail/EventsTab';
 import { FeedbackDrawer } from './detail/FeedbackDrawer';
 import type { FeedbackTarget } from './detail/FeedbackForm';
+import { ExperimentsTab } from './detail/ExperimentsTab';
 
-type TabId = 'overview' | 'evidence' | 'hypotheses' | 'plan' | 'revisions' | 'provenance' | 'events';
+type TabId = 'overview' | 'evidence' | 'hypotheses' | 'plan' | 'experiments' | 'revisions' | 'provenance' | 'events';
 
 const TABS: { id: TabId; labelKey: DictKey }[] = [
   { id: 'overview', labelKey: 'tab.overview' },
   { id: 'evidence', labelKey: 'tab.evidence' },
   { id: 'hypotheses', labelKey: 'tab.hypotheses' },
   { id: 'plan', labelKey: 'tab.plan' },
+  { id: 'experiments', labelKey: 'tab.experiments' },
   { id: 'revisions', labelKey: 'tab.revisions' },
   { id: 'provenance', labelKey: 'tab.provenance' },
   { id: 'events', labelKey: 'tab.events' },
@@ -78,6 +80,7 @@ export function RunDetail({
       case 'evidence': return <EvidenceTab run={run} onFeedback={openFeedback} />;
       case 'hypotheses': return <HypothesesTab run={run} onFeedback={openFeedback} />;
       case 'plan': return <PlanTab run={run} onFeedback={openFeedback} />;
+      case 'experiments': return <ExperimentsTab run={run} />;
       case 'revisions': return <RevisionsTab run={run} />;
       case 'provenance': return <ProvenanceTab run={run} events={events} onMutated={onMutated} />;
       case 'events': return <EventsTab run={run} events={events} />;

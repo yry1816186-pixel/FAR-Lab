@@ -568,7 +568,11 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     // verifyBundle is fail-closed by design: a missing bundle yields a report with
     // verdict 'failed' (all checks passed=false) — the report itself is the answer.
     const report = await verifyBundle(bundleId, { store: app.store, artifacts: app.artifacts });
-    sendJson(res, 200, report);
+    // Trust surface (S2b): the bundle's own declared reproduction limits ride with
+    // the report — "what this bundle cannot reproduce" is part of the verdict.
+    const bundle = app.store.getObject('bundle', bundleId);
+    const limitations = bundle?.limitations.filter((l) => l.trim().length > 0) ?? [];
+    sendJson(res, 200, { ...report, ...(limitations.length > 0 ? { limitations } : {}) });
   };
 
   // ---- static frontend (only when web/dist exists; never pretend otherwise) ----
@@ -675,6 +679,16 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
             feedbacks: app.store.listObjects('feedback', runId),
             revisions: app.store.listObjects('revision', runId),
             versionDiffs: app.store.listObjects('version_diff', runId),
+          });
+        }
+        if (leaf === 'experiments' && method === 'GET') {
+          // EEL read surface (D-081): far.db projections only — queue-level operational
+          // detail (fence tokens, heartbeats) stays with `far experiment status`.
+          mustGetRun(runId);
+          return sendJson(res, 200, {
+            experimentRuns: app.store.listObjects('experiment_run', runId),
+            resultSets: app.store.listObjects('result_set', runId),
+            statReports: app.store.listObjects('stat_report', runId),
           });
         }
         if (leaf === 'receipts' && method === 'GET') {
