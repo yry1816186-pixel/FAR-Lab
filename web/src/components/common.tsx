@@ -120,6 +120,35 @@ export function TimeText({ iso }: { iso: string }): JSX.Element {
   );
 }
 
+/** Relative time for scan contexts ("3 小时前"); precise local timestamp and
+ *  raw ISO stay on hover (audit-grade honesty). Falls back to absolute when
+ *  the value is unparseable or the local clock is behind (skew — never guess). */
+export function relativeTime(iso: string, lang: 'zh' | 'en'): string {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return iso;
+  const diffMs = Date.now() - at;
+  if (diffMs < -60_000) return iso;
+  const rtf = new Intl.RelativeTimeFormat(lang === 'zh' ? 'zh-CN' : 'en', { numeric: 'auto' });
+  const min = Math.round(diffMs / 60_000);
+  if (min < 1) return rtf.format(0, 'minute');
+  if (min < 60) return rtf.format(-min, 'minute');
+  const hours = Math.round(min / 60);
+  if (hours < 24) return rtf.format(-hours, 'hour');
+  const days = Math.round(hours / 24);
+  if (days < 30) return rtf.format(-days, 'day');
+  return rtf.format(-Math.round(days / 30), 'month');
+}
+
+/** Relative-first variant for list surfaces (sidebar/cards). */
+export function TimeAgo({ iso }: { iso: string }): JSX.Element {
+  const { formatTime, lang } = useI18n();
+  return (
+    <time dateTime={iso} title={`${formatTime(iso)} · ${iso}`} className="mono">
+      {relativeTime(iso, lang)}
+    </time>
+  );
+}
+
 /**
  * Determinate progress ONLY: n/total counts the runtime actually knows
  * (INTERFACES §1 — never an invented percentage). Custom track/fill replaces

@@ -1,10 +1,11 @@
+import { BookOpenCheck, Scale, SearchCheck } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
-import { NewRunForm } from './NewRunForm';
+import { ResearchComposer } from './ResearchComposer';
 import { healthProjection, useHealth } from '../hooks/useHealth';
 import { runStatusTone } from '../tones';
 import { runStatusKey } from '../tones';
 import { stageKey } from '../i18n/keys';
-import { TimeText } from './common';
+import { TimeAgo } from './common';
 import { runLabel } from './RunsSidebar';
 import type { RunSummary } from '../api/types';
 
@@ -29,9 +30,9 @@ export function WelcomeView({
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, 3);
   const steps = [
-    { key: 'welcome.step1', glyph: '✓', tone: 'verified' },
-    { key: 'welcome.step2', glyph: '▲', tone: 'unknown' },
-    { key: 'welcome.step3', glyph: '—', tone: 'caution' },
+    { key: 'welcome.step1', icon: SearchCheck, tone: 'verified' },
+    { key: 'welcome.step2', icon: Scale, tone: 'unknown' },
+    { key: 'welcome.step3', icon: BookOpenCheck, tone: 'caution' },
   ] as const;
 
   return (
@@ -44,14 +45,14 @@ export function WelcomeView({
           {hp.tone === 'err' ? (
             t('health.unknown')
           ) : (
-            t('health.ready', { ready: hp.liveReady, total: hp.liveTotal })
+            t('health.readyPlain', { ready: hp.liveReady, total: hp.liveTotal })
           )}
         </div>
       </div>
 
       <div className="welcome-main">
         <div className="welcome-card">
-          <NewRunForm onCreated={onCreated} />
+          <ResearchComposer onCreated={onCreated} />
         </div>
 
         {recent.length > 0 && (
@@ -67,7 +68,7 @@ export function WelcomeView({
                     </span>
                     <span className="recent-card-mid muted">{t(stageKey(run.currentStage))}</span>
                     <span className="recent-card-bottom muted small">
-                      <TimeText iso={run.createdAt} />
+                      <TimeAgo iso={run.createdAt} />
                     </span>
                   </button>
                 </li>
@@ -77,14 +78,17 @@ export function WelcomeView({
         )}
 
         <ol className="welcome-steps">
-          {steps.map((s) => (
-            <li key={s.key} className={`welcome-step welcome-step--${s.tone}`}>
-              <span className={`ev-glyph ev-glyph--${s.tone}`} aria-hidden="true">
-                {s.glyph}
-              </span>
-              <span>{t(s.key)}</span>
-            </li>
-          ))}
+          {steps.map((s) => {
+            const Icon = s.icon;
+            return (
+              <li key={s.key} className={`welcome-step welcome-step--${s.tone}`}>
+                <span className={`ev-glyph ev-glyph--${s.tone}`} aria-hidden="true">
+                  <Icon size={14} />
+                </span>
+                <span>{t(s.key)}</span>
+              </li>
+            );
+          })}
         </ol>
 
         <p className="welcome-foot muted">{t('welcome.foot')}</p>

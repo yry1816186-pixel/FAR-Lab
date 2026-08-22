@@ -47,10 +47,10 @@ export const discoverModels = async (
         ? { authorization: `Bearer ${input.apiKey}` }
         : {};
   const res = await fetchImpl(url, { method: 'GET', headers });
-  const body = await res.json();
   if (!res.ok) {
     throw new Error(`model discovery failed: HTTP ${res.status} from ${url}`);
   }
+  const body = await res.json(); // only parsed after the ok gate — an HTML error page never becomes a parse error
   const models = parseModels(body);
   return { models, httpStatus: res.status, rawCount: models.length };
 };

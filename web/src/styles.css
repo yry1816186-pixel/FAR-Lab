@@ -1658,3 +1658,104 @@ select option { color: var(--text); background: var(--surface); }
 /* Section navigation hover affordance (row-style, Raycast-like quiet lift) */
 .tab { border-radius: var(--radius-s) var(--radius-s) 0 0; }
 .tab:hover { background: var(--v2-surface-2); }
+
+/* ---------- Research Composer (HX2) ---------- */
+.composer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--sp-4);
+  border: 1px solid var(--v2-form-border);
+  border-radius: var(--radius-s);
+  background: var(--v2-surface);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.composer--drag { border-color: var(--v2-info); box-shadow: 0 0 0 3px var(--v2-info-tint); }
+.composer-input {
+  width: 100%;
+  resize: none;
+  min-height: 76px;
+  padding: var(--sp-2) var(--sp-3);
+  font: inherit;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--v2-text-1);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-form-border);
+  border-radius: var(--radius-s);
+}
+.composer-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.composer-drag-note {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  background: var(--v2-info-tint);
+  color: var(--v2-info-on-tint);
+  font-size: var(--fs-aux);
+}
+.attach-tray { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; }
+.attach-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px 8px;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--radius-s);
+  background: var(--v2-surface);
+}
+.attach-card--parsing { border-style: dashed; }
+.attach-card--failed { border-color: var(--v2-refuted); }
+.attach-icon { color: var(--v2-text-2); display: inline-flex; flex: none; }
+.attach-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.attach-title {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attach-spinner { color: var(--v2-text-3); animation: attach-spin 1s linear infinite; }
+@keyframes attach-spin { to { transform: rotate(360deg); } }
+.attach-action {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--v2-text-2);
+  padding: 3px;
+  border-radius: var(--radius-s);
+  display: inline-flex;
+  flex: none;
+}
+.attach-action:hover { color: var(--v2-text-1); background: var(--v2-surface-2); }
+.attach-cap { font-size: var(--fs-aux); }
+.composer-tools { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.link-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--v2-form-border);
+  border-radius: var(--radius-s);
+  padding: 2px 4px 2px 8px;
+  background: var(--v2-surface);
+  flex: 0 1 340px;
+  min-width: 200px;
+}
+.link-add-icon { color: var(--v2-text-3); display: inline-flex; flex: none; }
+.link-add input {
+  border: none;
+  outline: none;
+  background: transparent;
+  flex: 1;
+  min-width: 80px;
+  font: inherit;
+  font-size: var(--fs-aux);
+  color: var(--v2-text-1);
+}
+.composer-drop-hint { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.composer-actions { display: flex; align-items: center; gap: var(--sp-3); }
+.composer-submit { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .attach-spinner { animation: none; }
+}

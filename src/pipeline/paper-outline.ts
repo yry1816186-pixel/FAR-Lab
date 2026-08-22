@@ -381,7 +381,8 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
     const ta = sa.retrievedAt ?? '';
     const tb = sb.retrievedAt ?? '';
     if (ta !== tb) return ta < tb ? -1 : 1;
-    return sa.contentHash < sb.contentHash ? -1 : sa.contentHash > sb.contentHash ? 1 : 0;
+    if (sa.contentHash !== sb.contentHash) return sa.contentHash < sb.contentHash ? -1 : 1;
+    return sa.id < sb.id ? -1 : 1; // total order even for identical-content duplicates
   });
   const allocateKey = keyAllocator();
   const seenIdentifierKeys = new Set<string>();

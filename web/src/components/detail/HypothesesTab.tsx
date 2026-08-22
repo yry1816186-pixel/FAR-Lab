@@ -86,13 +86,19 @@ export function HypothesesTab({
     onConnect: (claimId, direction) => runHypOp(h.id, 'connect', (signal) => connectClaim(run.id, h.id, claimId, direction, signal)),
     editOpen: editOpenFor === h.id,
     onEditToggle: () => setEditOpenFor((prev) => (prev === h.id ? null : h.id)),
-    // Only CHANGED fields ride the request — an untouched mechanism is not an edit.
-    onEditSubmit: ({ statement, mechanism, note }) => runHypOp(h.id, 'edit', (signal) =>
-      editHypothesis(run.id, h.id, {
+    // Only CHANGED fields ride the request — an untouched mechanism is not an edit;
+    // a whitespace-only edit is blocked HERE, not by a server 400 after the fact.
+    onEditSubmit: ({ statement, mechanism, note }) => {
+      const fields = {
         ...(statement.trim() !== h.statement ? { statement: statement.trim() } : {}),
         ...(mechanism.trim() !== h.mechanism ? { mechanism: mechanism.trim() } : {}),
-        note,
-      }, signal)),
+      };
+      if (Object.keys(fields).length === 0) {
+        setOpError(t('hyp.editNoChange'));
+        return;
+      }
+      runHypOp(h.id, 'edit', (signal) => editHypothesis(run.id, h.id, { ...fields, note }, signal));
+    },
   });
 
   const toggleCompare = (id: string): void => {
