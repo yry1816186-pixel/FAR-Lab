@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { canonicalJson } from '../shared/crypto.js';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
 import {
@@ -28,6 +29,12 @@ export interface ExecuteOptions {
   sidecar?: () => Sidecar;
   /** D-086-4: local-path datasets are operator-only; tests set this explicitly. */
   allowLocalDatasets?: boolean;
+  /**
+   * P3 scheduler path: reuse an already-queued experiment_run (created by
+   * enqueueExperiment) instead of minting a new one — the job and the far.db projection
+   * then refer to the same id. attempts increments per execution try.
+   */
+  existingRunId?: ExperimentRun['id'];
   now?: () => string;
 }
 
@@ -40,7 +47,10 @@ interface TrainEvalResult {
 }
 
 export const experimentSpecHash = (spec: ExperimentSpec): string =>
-  createHash('sha256').update(JSON.stringify(spec)).digest('hex');
+  // Canonical (key-sorted) serialization: a spec round-tripped through the store comes
+  // back with zod schema key ORDER, which plain JSON.stringify would hash differently —
+  // the executor's drift check must never false-positive on serialization order.
+  createHash('sha256').update(canonicalJson(spec)).digest('hex');
 
 export interface ExecutedExperiment {
   run: ExperimentRun;
@@ -72,24 +82,40 @@ export const executeExperiment = async (
   const priorReports = store.listObjects('stat_report', spec.runId) as StatReport[];
 
   const specHash = experimentSpecHash(validated);
-  let expRun: ExperimentRun = {
-    id: newId('xrun') as ExperimentRun['id'],
-    runId: spec.runId,
-    specId: spec.id,
-    specHash,
-    status: 'queued',
-    attempts: 1,
-    executor: 'local',
-    cancelRequested: false,
-    resultIds: [],
-    statReportIds: [],
-    createdAt: now(),
-  };
+  let expRun: ExperimentRun;
+  if (opts.existingRunId !== undefined) {
+    const existing = store.getObject('experiment_run', opts.existingRunId);
+    if (existing === null) throw new Error(`existing experiment_run ${opts.existingRunId} not found`);
+    if (existing.specHash !== specHash) {
+      throw new Error(`spec drifted since ${opts.existingRunId} was queued: expected hash ${existing.specHash}, computed ${specHash}`);
+    }
+    expRun = { ...existing, status: 'queued', attempts: existing.attempts + 1, cancelRequested: false, error: undefined };
+  } else {
+    expRun = {
+      id: newId('xrun') as ExperimentRun['id'],
+      runId: spec.runId,
+      specId: spec.id,
+      specHash,
+      status: 'queued',
+      attempts: 1,
+      executor: 'local',
+      cancelRequested: false,
+      resultIds: [],
+      statReportIds: [],
+      createdAt: now(),
+    };
+  }
   const persist = (run: ExperimentRun, type: 'experiment_queued' | 'experiment_started' | 'experiment_completed' | 'experiment_failed' | 'experiment_canceled', detail: Record<string, unknown>): void => {
     store.putObjectEvented('experiment_run', run, { type, detail }, now());
     expRun = run;
   };
-  persist(expRun, 'experiment_queued', { specId: spec.id, specHash });
+  if (opts.existingRunId === undefined) {
+    persist(expRun, 'experiment_queued', { specId: spec.id, specHash });
+  } else {
+    // enqueueExperiment already emitted the queued event; this is a claim-time object
+    // projection only (status reset, attempts+1) — the started event follows shortly.
+    store.putObject('experiment_run', expRun);
+  }
 
   // Explicit variable annotation: TS only narrows via never-returning calls on
   // const declarations with an explicit function type (env/raw/res guards below rely on it).
