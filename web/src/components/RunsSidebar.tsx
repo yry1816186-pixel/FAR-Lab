@@ -180,7 +180,12 @@ export function RunsList({
       {grouped.map((g) => {
         const open = !isCollapsed(g.key, g.items);
         const isLibrary = g.key === 'runs.groupDone';
-        const visible = isLibrary && !libraryExpanded && query.length === 0
+        // A selection beyond the preview window must stay visible (deep link,
+        // palette navigation, or 12+ newer studies landing while one is open) —
+        // widen to the full library in that case, mirroring the group guard.
+        const selIdx = selectedId !== null ? g.items.findIndex((r) => r.id === selectedId) : -1;
+        const previewing = isLibrary && !libraryExpanded && query.length === 0 && selIdx >= LIBRARY_PREVIEW;
+        const visible = isLibrary && !libraryExpanded && query.length === 0 && !previewing
           ? g.items.slice(0, LIBRARY_PREVIEW)
           : g.items;
         const hiddenCount = g.items.length - visible.length;
