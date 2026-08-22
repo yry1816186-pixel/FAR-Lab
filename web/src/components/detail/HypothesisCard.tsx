@@ -9,11 +9,15 @@ export function HypothesisCard({
   clusterSize,
   isRepresentative,
   rank,
+  onChallenge,
+  compare,
 }: {
   hypothesis: HypothesisCandidate;
   clusterSize: number;
   isRepresentative: boolean;
   rank?: number;
+  onChallenge?: (id: string, label: string) => void;
+  compare?: { selected: boolean; onToggle: () => void; disabled?: boolean };
 }): JSX.Element {
   const { t } = useI18n();
   const [specOpen, setSpecOpen] = useState(false);
@@ -21,7 +25,7 @@ export function HypothesisCard({
   const completeness = f?.completenessCheck;
 
   return (
-    <article className={`hyp-card${isRepresentative ? '' : ' hyp-card--extra'}`}>
+    <article id={`hyp-${hypothesis.id}`} className={`hyp-card${isRepresentative ? '' : ' hyp-card--extra'}${compare?.selected ? ' hyp-card--compare' : ''}`}>
       <header className="hyp-head">
         {rank !== undefined && (
           <span className={`rank-medal${rank === 1 ? ' rank-medal--first' : ''}`} title={t('hyp.rankOf', { rank })}>
@@ -46,6 +50,30 @@ export function HypothesisCard({
         ) : (
           <Badge tone="muted">{t('completeness.unchecked')}</Badge>
         )}
+        <span className="hyp-actions">
+          {compare !== undefined && (
+            <button
+              type="button"
+              className={`btn btn--small${compare.selected ? ' btn--primary' : ''}`}
+              aria-pressed={compare.selected}
+              disabled={compare.disabled && !compare.selected}
+              onClick={compare.onToggle}
+              title={compare.disabled && !compare.selected ? t('compare.limitReached') : undefined}
+            >
+              {compare.selected ? t('compare.selected') : t('compare.add')}
+            </button>
+          )}
+          {onChallenge !== undefined && (
+            <button
+              type="button"
+              className="btn btn--small"
+              onClick={() => onChallenge(hypothesis.id, hypothesis.statement)}
+              title={t('compare.challengeHint')}
+            >
+              {t('compare.challenge')}
+            </button>
+          )}
+        </span>
       </header>
 
       {completeness !== undefined && !completeness.passed && (completeness.missing ?? []).length > 0 && (

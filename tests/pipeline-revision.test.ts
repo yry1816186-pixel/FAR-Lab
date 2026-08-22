@@ -494,6 +494,14 @@ describe('CLI far research feedback', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => {
       logs.push(a.map(String).join(' '));
     });
+    // P5 (0746bd0): the CLI report channel is process.stdout.write (out()/jsonOutput),
+    // not console.log — capture both so the helper tracks the real stdout contract.
+    const outSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(((chunk: unknown) => {
+        logs.push(String(chunk));
+        return true;
+      }) as typeof process.stdout.write);
     const errSpy = vi
       .spyOn(process.stderr, 'write')
       .mockImplementation(((chunk: unknown) => {
@@ -511,6 +519,7 @@ describe('CLI far research feedback', () => {
     } finally {
       exitCode = process.exitCode;
       logSpy.mockRestore();
+      outSpy.mockRestore();
       errSpy.mockRestore();
       process.argv = prevArgv;
       process.exitCode = prevExit;

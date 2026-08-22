@@ -19,6 +19,16 @@ function errorCategoryKey(raw: string): DictKey {
   return 'runs.errFallback';
 }
 
+/**
+ * The run's human label is the question the researcher asked (CPP-2) — the
+ * machine id is metadata, never the primary identity. Shared by sidebar and
+ * welcome cards so the whole workbench agrees on what a run IS.
+ */
+export function runLabel(run: RunSummary): string {
+  const text = run.questionText?.trim();
+  return text !== undefined && text.length > 0 ? text : run.id;
+}
+
 export function RunListItem({
   run,
   selected,
@@ -38,10 +48,16 @@ export function RunListItem({
         aria-current={selected ? 'true' : undefined}
       >
         <span className="run-item-top">
-          <IdText value={run.id} />
+          <span className="run-item-question" title={runLabel(run)}>{runLabel(run)}</span>
           <Badge tone={runStatusTone(run.status)}>{t(runStatusKey(run.status))}</Badge>
         </span>
         <span className="run-item-mid">
+          <span className="run-item-idline">
+            <IdText value={run.id} />
+            {run.domain !== undefined && run.domain.length > 0 && (
+              <span className="run-item-domain" title={t('runs.domain')}>{run.domain}</span>
+            )}
+          </span>
           <span className="run-item-stage">
             {t('runs.currentStage')}: {t(stageKey(run.currentStage))}
           </span>
@@ -76,11 +92,13 @@ const GROUP_ORDER: { key: 'runs.groupActive' | 'runs.groupAttention' | 'runs.gro
   { key: 'runs.groupOther', match: (s) => !NAMED_GROUPS.some((g) => g.match(s)) },
 ];
 
-/** Sidebar task filter (P-PRO): match on id, status label and stage label. */
+/** Sidebar task filter (P-PRO): match on question text first, then id/status/stage labels. */
 function matchesQuery(run: RunSummary, q: string, t: (k: DictKey) => string): boolean {
   if (q.length === 0) return true;
   const needle = q.toLowerCase();
   return (
+    runLabel(run).toLowerCase().includes(needle) ||
+    (run.domain ?? '').toLowerCase().includes(needle) ||
     run.id.toLowerCase().includes(needle) ||
     t(runStatusKey(run.status)).toLowerCase().includes(needle) ||
     t(stageKey(run.currentStage)).toLowerCase().includes(needle)

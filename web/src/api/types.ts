@@ -127,6 +127,9 @@ export interface RunSummary {
   status: RunStatus;
   currentStage: RunStageName;
   createdAt: string;
+  /** Researcher-facing identity (CPP-2): the question the user actually asked. */
+  questionText?: string;
+  domain?: string;
   lastError?: string;
   progress?: { done: number; total: number };
 }

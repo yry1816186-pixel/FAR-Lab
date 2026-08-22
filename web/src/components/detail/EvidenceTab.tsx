@@ -8,7 +8,13 @@ import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton } from '../commo
 import { bindingKey, bindingTone } from '../../tones';
 import { stageKey, contentDepthKey, accessStateKey, bindingZhKey, relationKey, retrievalPurposeKey } from '../../i18n/keys';
 
-export function EvidenceTab({ run }: { run: ResearchRun }): JSX.Element {
+export function EvidenceTab({
+  run,
+  onFeedback,
+}: {
+  run: ResearchRun;
+  onFeedback: (target?: { kind: string; id: string; label?: string }) => void;
+}): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
 
@@ -68,7 +74,7 @@ export function EvidenceTab({ run }: { run: ResearchRun }): JSX.Element {
         ) : evidenceRes.error !== null ? (
           <ErrorBox error={evidenceRes.error} onRetry={evidenceRes.retry} />
         ) : claims !== null ? (
-          <ClaimsList claims={claims} />
+          <ClaimsList claims={claims} onChallenge={(id, label) => onFeedback({ kind: 'claim', id, label })} />
         ) : null}
         {evidenceRes.data !== null && evidenceRes.data.unclassified > 0 && (
           <p className="callout callout--warn" role="status">
@@ -135,13 +141,13 @@ function SourcesTable({ sources }: { sources: SourceDocument[] }): JSX.Element {
   );
 }
 
-function ClaimsList({ claims }: { claims: ScientificClaim[] }): JSX.Element {
+function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChallenge: (id: string, label: string) => void }): JSX.Element {
   const { t } = useI18n();
   if (claims.length === 0) return <EmptyState titleKey="evidence.noClaims" />;
   return (
     <ul className="claims-list">
       {claims.map((claim) => (
-        <li key={claim.id} className="claim-item">
+        <li key={claim.id} id={`claim-${claim.id}`} className="claim-item">
           <div className="claim-head">
             {/* Evidence-line signature (§8.3): the epistemic glyph is the claim's cognitive
                 state — the only saturated color in the chrome. Same mapping as the badge. */}
@@ -163,6 +169,16 @@ function ClaimsList({ claims }: { claims: ScientificClaim[] }): JSX.Element {
             {claim.extractionModelRef !== undefined && (
               <span className="muted small mono"> · {claim.extractionModelRef}</span>
             )}
+            <span className="claim-actions">
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => onChallenge(claim.id, claim.text)}
+                title={t('compare.challengeClaimHint')}
+              >
+                {t('compare.challengeClaim')}
+              </button>
+            </span>
           </div>
           <p className="claim-text">{claim.text}</p>
           {claim.locators.slice(0, 3).map((loc, i) => (

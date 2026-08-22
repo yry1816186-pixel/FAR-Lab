@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "mission": "EEL (Experiment Execution Layer, D-081 user mandate): close the falsification loop with real experiments — E1 ExperimentSpec/E2 datasets/E3 model lab/E4 matrices+statistics/E5 devices-env-gateway-scheduling/E6 feedback integration. Direction-A loop stays the orchestrating authority; zero theatrical demos; LLM proposes specs, deterministic code produces verdicts.",
+  "mission": "DUAL LANE since 2026-08-22 (user mandates): LANE-1 Product Experience Rebuild (D-086, .planning/PLAN-product-experience.md) — world-class researcher workbench: researcher identity, hypothesis comparison canvas (verified market gap), thinking-collision actions, trust surfaces; LANE-2 EEL (D-081) — real experiment execution closing the falsification loop. Lane ownership: PEX owns web/ + src/server/api.ts researcher projections + presentation; EEL owns src/experiment, experiment-runtime, src/pipeline experiment integration. EEL's web/CLI experiment surfaces are the PEX lane's next integration surface.",
   "status": "in_progress",
-  "phase": "EEL P0..P2 + EXPORT + LIVE TRACEABLE REVISION COMPLETE 2026-08-22 (423dba3, 3d4aa2f, b200e70 + this batch): full scientific loop proven LIVE — real OpenML experiment falsified a hypothesis, experiment feedback consumed by revise on the live zai provider, causally-linked Revision v0->v1 + VersionDiff (evidence/W-EEL/live-traceable-revision.md). ACC-21..24 + ACC-26 at target; ACC-25 implemented (scheduler+gateway remain). Semantics recorded: supports verdicts do not force revisions (live-observed). Gates: vitest 644/644 / eslint 0 / tsc 0 / secret-scan PASS / path-hygiene 0. NEXT: (1) CLI/web experiment surfaces (parallel session owns src/server+web+src/cli); (2) P3 scheduler far-scheduler.db + ssh2 gateway (user starts Docker for the WSL2 target).",
+  "phase": "EEL P0..P2 + EXPORT + LIVE TRACEABLE REVISION COMPLETE 2026-08-22 (423dba3, 3d4aa2f, b200e70 + EEL batch): full scientific loop proven LIVE (real OpenML experiment falsified a hypothesis, live revise consumption, causally-linked Revision + VersionDiff, evidence/W-EEL/live-traceable-revision.md). ACC-21..24 + ACC-26 at target; ACC-25 implemented (scheduler+gateway remain). PEX LANE S1 LANDED same day: researcher identity (GET /runs questionText+domain, sidebar/welcome human labels), hypothesis compare canvas (2-3 side-by-side, falsification rules + evidence balance), pre-targeted feedback drawer with causal-chain success closure, statement-labeled scorecards + rank-vs-composite coherence note; three-critique batch fixed (focus trap/stability, dirty-close confirm, success panel -> revisions tab, target statement chips, category-error labels) and GUI-regression-verified; dogfood evidence evidence/W-PEX/. Gates at PEX S1: vitest my-surface 48/48 + suite 618/618 (EEL file mid-edit excluded transiently), web tsc 0, web build 0, secret-scan PASS. PEX NEXT: S2 wait-time activity narrative + trust signals (gradeCertainty/multipleTestingPolicy/bundle limitations), S3 ACH discriminating-evidence matrix + version compare, EEL experiment surfaces in web.",
   "pauseReason": "",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
@@ -11,53 +11,66 @@
     "Scores are decision aids with producer+calibration, never objective truth (tournament included: uncertainty reported).",
     "Revision requires causal link to feedback; version diff must be explainable.",
     "Zero new runtime dependencies in the Node product (zod-only); experiment-runtime sidecar deps isolated + lockfile-pinned.",
-    "Statistical analysis is preregistered in the ExperimentSpec before execution; verdicts derive mechanically from decision rules, never from LLM judgment."
+    "Statistical analysis is preregistered in the ExperimentSpec before execution; verdicts derive mechanically from decision rules, never from LLM judgment.",
+    "UX truth rules (PRODUCT_HCI): UI state maps real runtime state; no fake progress; uncertainty never erased by presentation; every displayed control maps real capability."
   ],
   "criticalProblemSet": [
     {
-      "id": "CP-EEL0",
-      "problem": "P0 governance convergence (spec amendments + acceptance + decisions + red-team)",
-      "status": "DONE",
-      "evidenceNeeded": "project-spec diffs; .control/ACCEPTANCE_STATUS.json ACC-21..26; DECISIONS D-081..086; red-team report",
-      "outcome": "amendments + ACC + D-081..D-086 landed 2026-08-22; red-team APPROVED WITH CONDITIONS, all 3 P0 rulings adopted as D-085/D-086"
+      "id": "CP-PEX1",
+      "problem": "S2 wait-time zero-value: run creation lands on overview echoing the question; hypotheses do not materialize progressively (Product-critique fatal #1)",
+      "status": "NOT_STARTED",
+      "evidenceNeeded": "events-driven activity narrative + progressive hypothesis appearance in GUI dogfood",
+      "outcome": ""
+    },
+    {
+      "id": "CP-PEX2",
+      "problem": "S2/S3 trust surfaces + discriminating evidence: gradeCertainty/multipleTestingPolicy/bundle limitations unrendered; compare evidence balance is counts-only (claim-level drill + shared-vs-discriminating analysis missing)",
+      "status": "NOT_STARTED",
+      "evidenceNeeded": "rendered trust fields; compare rows link claims; ACH matrix slice",
+      "outcome": ""
+    },
+    {
+      "id": "CP-PEX3",
+      "problem": "S3+ version compare + shareable state: no v2-vs-v3 revision compare in UI; run/tab/compare not in URL; compare not exportable",
+      "status": "NOT_STARTED",
+      "evidenceNeeded": "version-compare view; URL routing; markdown export",
+      "outcome": ""
     },
     {
       "id": "CP-EEL1",
-      "problem": "P1 vertical slice end-to-end on real data (OpenML -> spec -> split -> sklearn train/eval -> StatReport -> FeedbackSignal)",
-      "status": "LIVE_VERIFIED",
-      "evidenceNeeded": "real run artifacts in far.db + experiment results",
-      "outcome": "live OpenML iris 2026-08-22: logistic 0.9333 vs dummy 0.3333, CI[0.4667,0.7333], verdict supports, feedback bound; vitest 638/638 incl. 20 EEL tests (determinism double-run green)"
+      "problem": "EEL vertical slice end-to-end on real data (OpenML -> spec -> split -> sklearn train/eval -> StatReport -> FeedbackSignal -> revise -> export)",
+      "status": "DONE",
+      "evidenceNeeded": "real run artifacts in far.db + experiment results in export bundle",
+      "outcome": "LIVE proven 2026-08-22: real OpenML experiment falsified a hypothesis; live revise consumed experiment feedback; Revision v0->v1 + VersionDiff persisted (evidence/W-EEL/live-traceable-revision.md)"
     },
     {
       "id": "CP-EEL2",
       "problem": "Determinism gate: identical (spec, seed, env) -> identical results; failure/cancel paths truthful",
       "status": "DONE",
       "evidenceNeeded": "green regression test + live double-run comparison",
-      "outcome": "tests/experiment.test.ts determinism + failure-path + sequential-guard cases green; failure persists verbatim error (sidecar rejection case)"
+      "outcome": "vitest 644/644 green (EEL batch); double-run determinism verified"
     },
     {
       "id": "CP-EEL3",
       "problem": "E5 infra: env pinning (uv lockfile hash), scheduler, remote gateway to Docker/WSL2 Linux target (D-084)",
       "status": "IN_PROGRESS",
       "evidenceNeeded": "remote real execution + kill-resume evidence",
-      "outcome": "env pinning + lockfileHash recorded per run (implemented); scheduler (far-scheduler.db) + ssh2 gateway pending P3"
+      "outcome": "ACC-25 implemented; far-scheduler.db + ssh2 gateway remain; user starts Docker daemon"
     }
   ],
   "verifiedWorkspaceFacts": [
-    "www.openml.org/api reachable (HTTP 200, 1.35s, 2026-08-22); huggingface.co unreachable from this environment — OpenML is the P1 dataset resolver (D-082).",
-    "Local Python 3.12.10 + uv 0.12.1; sklearn 1.9.0 / scipy 1.17.1 / joblib 1.5.3 present in system python; sidecar still gets its own uv-pinned env.",
-    "Parallel session actively owns src/cli, desktop/, .planning/PLAN.md and appends DECISIONS.jsonl (Wave-Aesthetics P5/P6/P7) — EEL must not write those paths; commits stage EEL-owned files only.",
-    "Docker 29.5.2 CLI present, daemon stopped (user action to start for P3)."
+    "zai route liveReady 2026-08-22 17:19 (post-reset); pooled live queue unblocked by EEL live pass.",
+    "Web workbench = React18+Vite+Tailwind4, ~4.6k LOC; GUI dogfood loop proven via serve.mjs + Playwright (evidence/W-PEX/).",
+    "Parallel EEL session owns src/experiment, experiment-runtime/, src/pipeline/stages/export.ts, src/domain/experiment.ts+provenance.ts — PEX commits must not stage those.",
+    "P5 batch B (0746bd0) left a committed regression: CLI feedback output moved console.log->stdout.write without updating the test spy; fixed in PEX batch (spy captures both channels)."
   ],
   "activeTasks": [
-    "EEL P1 build in progress (this session): src/domain/experiment.ts + KIND_SCHEMAS/ids extension, src/experiment/* (dataset resolver, spec validation, executor), experiment-runtime/ Python sidecar, tests.",
-    "USER ACTION (unchanged, single record): any ONE funded route (z.ai recharge / DASHSCOPE_API_KEY fill) unblocks the pooled live queue (W9 judge-variance live, W5 rediscovery F1 + relation blind-agreement + mlr-bench new protocol, W8 live soak).",
-    "Wave-Aesthetics P5/P6/P7 owned by parallel session (src/cli, desktop, DECISIONS.jsonl); EEL CLI/web surfaces coordinate behind it.",
-    "USER ACTION (P3): start Docker Desktop/WSL2 daemon when remote-gateway work begins."
+    "PEX S2: wait-time activity narrative + trust-signal rendering (gradeCertainty badges, multipleTestingPolicy, bundle limitations, counter-evidence search records).",
+    "PEX S3: ACH discriminating-evidence matrix (claim-level, shared-vs-discriminating), in-tab filters, version compare v2-vs-v3.",
+    "EEL next (their lane): far-scheduler.db + ssh2 gateway (user starts Docker); web/CLI experiment surfaces via PEX lane.",
+    "USER ACTION (P3/EEL): start Docker Desktop/WSL2 daemon when remote-gateway work begins."
   ],
-  "blockerIds": [
-    "B-QWEN-LIVE-ROUTE"
-  ],
-  "lastVerifiedCommit": "Wave-G final gate 2026-08-22: vitest 604/604 (27 files), typecheck 0, eslint 0, build 0, secret-scan PASS, path-hygiene PASS; public export D-070 complete.",
-  "nextAction": "Finish P0 red-team integration, then build P1 E1 domain layer (src/domain/experiment.ts Zod schemas: ExperimentSpec/DatasetRecord/ModelSpec/ResultSet/StatReport/ExperimentRun) wiring into ids.ts ObjectRef kinds + store.ts KIND_SCHEMAS."
+  "blockerIds": [],
+  "lastVerifiedCommit": "PEX S1 2026-08-22: vitest 618/618 + my-surface 48/48, web tsc 0, web build 0, secret-scan PASS; GUI dogfood: compare №1-vs-№2 + challenge №1 persisted fbk_7tg3… + event #5612; post-critique regression: focus stable across 6s polling, Esc clean-close, focus restore, statement chips.",
+  "nextAction": "Commit PEX S1 (web/ + api.ts + tests + plan + evidence; EEL-owned files excluded), then build S2 wait-time narrative slice."
 }

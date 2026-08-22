@@ -11,12 +11,22 @@ import { Badge, CountProgress, EmptyState, ErrorBox, FieldList, IdText, Section,
 import { StageTimeline } from './StageTimeline';
 import { RunControls } from './RunControls';
 import { RunStatusBanner } from './RunStatusBanner';
-import { FeedbackForm } from './FeedbackForm';
+import type { FeedbackTarget } from './FeedbackForm';
 import { stageKey, goalTypeKey } from '../../i18n/keys';
 import type { EventsState } from '../RunDetail';
 import type { DictKey } from '../../i18n/dict';
 
-export function OverviewTab({ run, events, onMutated }: { run: ResearchRun; events: EventsState; onMutated: () => void }): JSX.Element {
+export function OverviewTab({
+  run,
+  events,
+  onMutated,
+  onFeedback,
+}: {
+  run: ResearchRun;
+  events: EventsState;
+  onMutated: () => void;
+  onFeedback: (target?: FeedbackTarget) => void;
+}): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
 
@@ -109,7 +119,10 @@ export function OverviewTab({ run, events, onMutated }: { run: ResearchRun; even
         <RunControls run={run} hasFeedback={hasFeedback} onMutated={onMutated} />
         <div className="feedback-block">
           <h4 className="minor-title">{t('feedback.title')}</h4>
-          <FeedbackForm runId={run.id} onSubmitted={onMutated} />
+          <p className="muted small">{t('feedback.intro')}</p>
+          <button type="button" className="btn" onClick={() => onFeedback()}>
+            {t('feedback.openDrawer')}
+          </button>
         </div>
       </Section>
     </div>

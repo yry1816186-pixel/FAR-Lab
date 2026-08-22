@@ -317,11 +317,19 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     const runs = app.store.listRuns().map((row) => {
       const run = app.store.getRun(row.id);
       const p = run ? runProgress(run) : null;
+      // Researcher-facing projection (CPP-2): the question text IS the run's identity
+      // for the person who wrote it — machine ids stay available but never primary.
+      // getObject is schema-validated on read, so the zod types are authoritative here.
+      const question = run ? app.store.getObject('question', run.questionId) : null;
+      const questionText = question !== null && question.text.trim().length > 0 ? question.text : undefined;
+      const domain = question !== null && question.scope.domain.trim().length > 0 ? question.scope.domain : undefined;
       return {
         id: row.id,
         status: row.status,
         currentStage: row.currentStage,
         createdAt: row.createdAt,
+        ...(questionText !== undefined ? { questionText } : {}),
+        ...(domain !== undefined ? { domain } : {}),
         ...(run?.lastError !== undefined ? { lastError: run.lastError } : {}),
         ...(p?.known ? { progress: { done: p.done, total: p.total } } : {}),
       };
