@@ -61,7 +61,8 @@ function TournamentView({ tournament, hypotheses }: { tournament: HypothesisTour
   }
   return (
     <div>
-      <table className="table">
+      <table className="data-table">
+        <caption className="sr-only">{t('tournament.title')}</caption>
         <thead>
           <tr>
             <th>{t('tournament.rank')}</th>

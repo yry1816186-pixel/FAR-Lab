@@ -3,6 +3,7 @@ import { ApiError, withTimeout } from '../../api/client';
 import { postFeedback } from '../../api/endpoints';
 import type { FeedbackSourceKind } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
+import { errorText } from '../common';
 
 const SOURCE_KINDS: FeedbackSourceKind[] = [
   'human_expert', 'new_literature', 'new_dataset', 'tool_result', 'simulation',
@@ -51,7 +52,7 @@ export function FeedbackForm({ runId, onSubmitted }: { runId: string; onSubmitte
       onSubmitted();
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
-        setError(new ApiError({ code: 'timeout', message: '请求超时（15s）', retryable: true }));
+        setError(new ApiError({ code: 'timeout', message: '请求超时（15s）', retryable: true, i18nKey: 'err.timeout', i18nVars: { seconds: 15 } }));
       } else {
         setError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
       }
@@ -124,7 +125,7 @@ export function FeedbackForm({ runId, onSubmitted }: { runId: string; onSubmitte
 
       {error !== null && (
         <p className="field-error" role="alert">
-          {t('controls.actionFailed')}：{error.message}
+          {t('controls.actionFailed')}：{errorText(error)}
         </p>
       )}
       {ok && (

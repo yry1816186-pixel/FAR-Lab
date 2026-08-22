@@ -88,6 +88,7 @@ const TARGET_STORE_KINDS = {
   plan: 'plan',
   claim: 'claim',
   question: 'question',
+  evidence_relation: 'evidence_relation',
 } as const;
 
 class HttpError extends Error {

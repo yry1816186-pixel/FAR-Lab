@@ -72,6 +72,7 @@ export const verifyBundle = async (bundleId: string, signal?: AbortSignal): Prom
     message: '验证报告结构与预期不符（缺少 verdict/checks）',
     status: 200,
     retryable: false,
+    i18nKey: 'err.verifySchema',
   });
 };
 
@@ -91,9 +92,10 @@ export const createRun = async (input: CreateRunInput, signal?: AbortSignal): Pr
   if (typeof runId === 'string' && runId.length > 0) return runId;
   throw new ApiError({
     code: 'unexpected_schema',
-    message: '创建 run 的响应缺少 runId（期望 202 {runId}）',
+    message: '创建 run 的响应缺少 runId（期望 202 响应含 runId 字段）',
     status: 202,
     retryable: false,
+    i18nKey: 'err.createRunShape',
   });
 };
 

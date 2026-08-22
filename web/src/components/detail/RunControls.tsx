@@ -5,6 +5,7 @@ import type { ResearchRun } from '../../api/types';
 import { isSettled } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { runStatusKey } from '../../tones';
+import { errorText } from '../common';
 /**
  * Run control buttons are enabled ONLY when the real run state makes the action
  * meaningful; every disabled state carries the honest reason (PRODUCT_HCI §2:
@@ -54,7 +55,7 @@ export function RunControls({
       onMutated();
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
-        setError(new ApiError({ code: 'timeout', message: '请求超时（15s）', retryable: true }));
+        setError(new ApiError({ code: 'timeout', message: '请求超时（15s）', retryable: true, i18nKey: 'err.timeout', i18nVars: { seconds: 15 } }));
       } else {
         setError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
       }
@@ -87,7 +88,7 @@ export function RunControls({
       {resumeReason !== null && <p className="control-reason">{t('controls.resume')}: {resumeReason}</p>}
       {error !== null && (
         <p className="field-error" role="alert">
-          {t('controls.actionFailed')}：{error.message}
+          {t('controls.actionFailed')}：{errorText(error)}
         </p>
       )}
     </div>

@@ -4,7 +4,7 @@ import { getReceipts, getReport, verifyBundle } from '../../api/endpoints';
 import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
-import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton, TimeText } from '../common';
+import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton, TimeText, errorText } from '../common';
 import type { EventsState } from '../RunDetail';
 
 /** Best-effort discovery: bundle ids that actually appeared in the event stream (e.g. export stage summaries). */
@@ -214,7 +214,7 @@ function BundleVerify({ discovered }: { discovered: string[] }): JSX.Element {
       setReport(result);
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
-        setError(new ApiError({ code: 'timeout', message: '验证请求超时（30s）', retryable: true }));
+        setError(new ApiError({ code: 'timeout', message: '验证请求超时（30s）', retryable: true, i18nKey: 'err.timeout', i18nVars: { seconds: 30 } }));
       } else {
         setError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
       }
@@ -258,7 +258,7 @@ function BundleVerify({ discovered }: { discovered: string[] }): JSX.Element {
       {error !== null && (
         <div role="alert">
           <p className="field-error">
-            {error.message}
+            {errorText(error)}
             {isNotFound(error) ? ` — ${t('bundle.notFoundHint')}` : ''}
           </p>
         </div>

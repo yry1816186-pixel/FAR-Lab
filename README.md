@@ -11,7 +11,7 @@ npm install && npm run build
 DEEPSEEK_API_KEY=... node dist/cli/main.js research start "你的科学问题" --domain oncology --goal exploratory
 
 # 查看进度 / 导出 / 第三方核验
-node dist/cli/main.js research runs
+node dist/cli/main.js runs
 node dist/cli/main.js research export <run-id> --format bundle --out out/
 node dist/cli/main.js verify <bundle-id>     # 独立复算，exit 0 = verified
 
@@ -24,7 +24,7 @@ npm run serve          # scripts/serve.mjs：API + web/dist（SPA 回退）；PO
 
 ## 质量与真实验证（不是宣称，是命令）
 
-- `npm test` — 274/274（vitest）；`npm run typecheck`。
+- `npm test` — 测试数以实跑为准（多 Wave 并行开发中数字持续变化，不在此冻结宣称）；`npm run typecheck`。
 - `node zcode-harness/scripts/completion-gate.mjs` — 完成门禁（当前 NOT_READY：唯一失败项为外部 DeepSeek 余额阻塞，见下）。
 - 证据目录 `evidence/`（每个能力对应真实 run 的命令级证据）；决策账本 `.control/DECISIONS.jsonl`（D-001..D-035）；评估 `eval/`（MLR-Bench 外部对比 / FIRE-Bench 复现评估 / LLM-judge）。
 

@@ -11,13 +11,25 @@ export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly retryable: boolean;
+  /** i18n override: when present, UI surfaces translate this key instead of the raw message. */
+  readonly i18nKey?: import('../i18n/dict').DictKey;
+  readonly i18nVars?: Record<string, string | number>;
 
-  constructor(args: { code: string; message: string; status?: number; retryable?: boolean }) {
+  constructor(args: {
+    code: string;
+    message: string;
+    status?: number;
+    retryable?: boolean;
+    i18nKey?: import('../i18n/dict').DictKey;
+    i18nVars?: Record<string, string | number>;
+  }) {
     super(args.message);
     this.name = 'ApiError';
     this.code = args.code;
     this.status = args.status ?? 0;
     this.retryable = args.retryable ?? (args.status !== undefined && (args.status === 0 || args.status >= 500));
+    this.i18nKey = args.i18nKey;
+    this.i18nVars = args.i18nVars;
   }
 }
 
@@ -46,6 +58,8 @@ async function request(
       message: `无法连接 API（${path}）：${e instanceof Error ? e.message : String(e)}`,
       status: 0,
       retryable: true,
+      i18nKey: 'err.network',
+      i18nVars: { path, cause: e instanceof Error ? e.message : String(e) },
     });
   }
 
@@ -87,6 +101,7 @@ async function request(
         message: '报告端点返回了无法识别的 JSON 信封（期望 markdown 文本或含 report/content/markdown 字段）',
         status: res.status,
         retryable: false,
+        i18nKey: 'err.reportEnvelope',
       });
     }
     return text;
@@ -100,6 +115,8 @@ async function request(
       message: `API 返回了无法解析的 JSON（${path}）`,
       status: res.status,
       retryable: true,
+      i18nKey: 'err.badJson',
+      i18nVars: { path },
     });
   }
 }

@@ -22,7 +22,7 @@ export function EventsTab({ run, events }: { run: ResearchRun; events: EventsSta
       {events.error !== null && <p className="callout callout--warn small">{events.error}</p>}
       {run.status === 'running' || run.status === 'queued' ? (
         <p className="muted small mono" aria-live="off">
-          ● polling · 2s
+          {t('events.pollingLive')}
         </p>
       ) : (
         <p className="muted small mono">⏸ {t(runStatusKey(run.status))}</p>
