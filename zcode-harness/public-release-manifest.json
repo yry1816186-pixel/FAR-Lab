@@ -1,0 +1,49 @@
+{
+  "$schema": "public-release allowlist (Wave-G WP1 proposal §3, adjudicated D-069/D-070)",
+  "license": "Apache-2.0",
+  "include": [
+    "src/**",
+    "tests/**",
+    "web/**",
+    "desktop/**",
+    "eval/**",
+    "scripts/**",
+    "zcode-harness/**",
+    "project-spec/**",
+    "README.md",
+    "package.json",
+    "package-lock.json",
+    "tsconfig.json",
+    "vitest.config.ts",
+    "eslint.config.js",
+    ".gitignore",
+    "LICENSE",
+    "NOTICE",
+    "SECURITY.md",
+    "DEPENDENCY_POLICY.md"
+  ],
+  "exclude": [
+    "eval/results/**",
+    "project-spec/COMPETITION.md",
+    "research/**",
+    "evidence/**",
+    ".control/**",
+    "spikes/**",
+    "AGENTS.md",
+    "START_HERE.md",
+    "HANDOFF_PROMPT.md",
+    "FINAL_BUILD_PROMPT.md",
+    "FAR-Lab_DEVELOPMENT_MISSION.md",
+    "BUNDLE_MANIFEST.json",
+    "final_delivery.md",
+    "artifacts/**"
+  ],
+  "copyFilters": [
+    "node_modules",
+    "dist",
+    "target",
+    ".cache",
+    "coverage"
+  ],
+  "notes": "exclude wins over include; copyFilters prune directories at ANY depth. research/evidence/.control/spikes are the workspace fact system (constitution §2) — never published."
+}

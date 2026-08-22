@@ -1,0 +1,32 @@
+FAR-Lab
+Copyright 2026 The FAR-Lab Authors
+
+This product includes software developed as part of the FAR-Lab project
+(https://github.com/yry1816186-pixel/FAR-Lab).
+
+===============================================================================
+Adapted / extracted third-party components (attribution retained in source headers)
+===============================================================================
+
+src/providers/json-repair.ts
+  Algorithmic extract of jsonrepair 3.15.0 (https://github.com/josdejong/jsonrepair)
+  Copyright (c) 2020-2026 Jos de Jong — ISC License. Rewritten as a
+  zero-dependency TypeScript port of the upstream repair heuristics.
+
+src/providers/http.ts (redactSecrets)
+  Credential-redaction patterns ported from codex-rs secrets sanitizer
+  (https://github.com/openai/codex, codex-rs/secrets/src/sanitizer.rs)
+  Copyright OpenAI — Apache License 2.0.
+
+src/providers/http.ts (retry timing), src/sources/* (W6 retrieval fusions)
+  Mechanism-level adaptations of retry/backoff shapes and sliding-window
+  listwise-rerank planning originally observed in:
+  - deepseek-ai/deepseek-harness (MIT) — llm-retry delay shape
+  - sst/opencode (MIT) — Retry-After precedence
+  - RankGPT (https://github.com/sunnweiwei/RankGPT, MIT) — bottom-up
+    sliding-window rerank plan (rank_gpt.py)
+  No upstream code is included; the mechanisms were reimplemented.
+
+Web font bundles (built artifacts only; source pulls them via @fontsource):
+  - IBM Plex Sans / IBM Plex Mono — SIL Open Font License 1.1
+  - Source Serif 4 — SIL Open Font License 1.1
