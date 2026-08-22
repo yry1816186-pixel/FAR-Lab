@@ -1,67 +1,18 @@
+@import 'tailwindcss';
+
 /* ============================================================
-   FAR-Lab 研究工作台 — 手写样式（无 UI 库）
-   原则（PRODUCT_HCI §10）：typography/hierarchy/density/restraint；
-   语义色只表达语义；无渐变/发光/玻璃拟态/装饰动画。
-   浅/深色跟随 prefers-color-scheme；所有文本/背景组合对比度 >= 4.5:1。
+   FAR-Lab 研究工作台 — Evidence Typography (§8.3, D-060 phase-5)
+   三声三字体：UI 声=IBM Plex Sans · 溯源声=IBM Plex Mono · 陈述声=Source Serif 4/思源宋
+   色彩论文：无彩色界面，彩色即证据（饱和色只出现在认知状态语义上）
+   全部色值=design-palette-v1.json 数学验证值（OKLCH→sRGB + WCAG 逐对验证；
+   复算：node spikes/design-palette-probe.mjs）
+   Tailwind v4 CSS-first：@theme inline 把 v2 token 映射为一等 utilities；
+   存量 BEM 类与 utilities 共存（迁移策略，非装饰性引入）。
    ============================================================ */
 
-/* ---------- tokens: light (default) ---------- */
+/* ---------- authoritative v2 tokens: light ---------- */
 :root {
-  --bg: #f4f5f7;
-  --surface: #ffffff;
-  --surface-2: #eef0f3;
-  --text: #1b1f24;
-  --muted: #565d66;
-  --border: #d3d7dc;
-  --border-strong: #b6bdc6;
-  --accent: #1a56a8;          /* links, focus, primary (on white 6.5:1) */
-  --accent-soft: #e6f0fa;
-  --btn-primary-bg: #1a56a8;
-  --btn-primary-text: #ffffff;
-  --btn-bg: #ffffff;
-  --btn-text: #1b1f24;
-  --ok-text: #0e6b33;   --ok-bg: #e2f2e7;   --ok-border: #b7dcc4;
-  --warn-text: #7a4d00; --warn-bg: #fbf0d9; --warn-border: #e8d3a4;
-  --err-text: #b3261e;  --err-bg: #fbe6e4;  --err-border: #efc2bd;
-  --info-text: #175fa8; --info-bg: #e6f0fa; --info-border: #c2daf1;
-  --focus-ring: #1a56a8;
-  --code-bg: #eef0f3;
-  --shadow: 0 1px 2px rgba(27, 31, 36, 0.08);
-  --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, 'Courier New', monospace;
-  --sans: -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Noto Sans', sans-serif;
-}
-
-/* ---------- tokens: dark ---------- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141619;
-    --surface: #1b1e22;
-    --surface-2: #22262b;
-    --text: #e8eaed;
-    --muted: #a4abb4;
-    --border: #363b42;
-    --border-strong: #4a505a;
-    --accent: #8ab6f0;
-    --accent-soft: #16283d;
-    --btn-primary-bg: #3568b5;
-    --btn-primary-text: #ffffff;
-    --btn-bg: #242930;
-    --btn-text: #e8eaed;
-    --ok-text: #7ed9a4;   --ok-bg: #17301f;   --ok-border: #2b5a3c;
-    --warn-text: #e5b45c; --warn-bg: #33290f; --warn-border: #5f4d1d;
-    --err-text: #ff9d94;  --err-bg: #3a1d1a;  --err-border: #74362e;
-    --info-text: #86b9f2; --info-bg: #16283d; --info-border: #2e4f75;
-    --focus-ring: #8ab6f0;
-    --code-bg: #22262b;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  }
-}
-
-/* ---------- v2 tokens (design-palette-v1, D-060 §8.3 — math-verified OKLCH→sRGB, WCAG-checked) ----------
-   Full migration happens in roadmap phase 5; these land first as the authoritative layer.
-   Verified ratios: see research/wave-product-reports/design-palette-v1.json + spikes/design-palette-probe.mjs */
-:root {
-  /* neutral ramp (hue 250, C 0.004) — light */
+  /* neutral ramp (hue 250, C 0.004) */
   --v2-page-bg: #f1f4f6;
   --v2-surface: #fafcfe;
   --v2-surface-2: #ebedef;
@@ -70,15 +21,21 @@
   --v2-text-1: #4b4d4f;      /* 8.26:1 */
   --v2-text-2: #717375;      /* 4.63:1 */
   --v2-text-3: #909295;      /* 3.03:1 placeholders */
-  --v2-btn-ink: #0f1215;     /* near-black primary button; white text 18.79:1 */
-  /* epistemic states — color = evidence semantics only (无彩色界面，彩色即证据) */
+  --v2-btn-ink: #0f1215;     /* near-black primary button */
+  --v2-btn-ink-fg: #ffffff;  /* 18.79:1 on btn-ink */
+  /* epistemic states — color = evidence semantics only */
   --v2-verified: #2c8447;  --v2-verified-tint: #ddfbe2;  --v2-verified-on-tint: #277f43;
   --v2-refuted: #c44c44;   --v2-refuted-tint: #ffe7e2;   --v2-refuted-on-tint: #b9423b;
   --v2-unknown: #8463b8;   --v2-unknown-tint: #f6ecff;   --v2-unknown-on-tint: #7c5cb0;
   --v2-caution: #8a7300;   --v2-caution-tint: #fbf2d0;   --v2-caution-on-tint: #826b00;
   --v2-info: #2d78bd;      --v2-info-tint: #dcf5ff;      --v2-info-on-tint: #2470b5;
+  /* three voices */
+  --font-ui: 'IBM Plex Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-data: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --font-statement: 'Source Serif 4', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif;
 }
 
+/* ---------- authoritative v2 tokens: dark ---------- */
 @media (prefers-color-scheme: dark) {
   :root {
     --v2-page-bg: #0d0f10;
@@ -89,12 +46,69 @@
     --v2-text-1: #acaeb0;   /* 8.07:1 */
     --v2-text-2: #7e8082;   /* 4.53:1 */
     --v2-text-3: #636567;
-    --v2-btn-ink: #d4d8dd;  /* dark-mode primary = lifted neutral (black text 13.19:1) */
+    --v2-btn-ink: #d4d8dd;  /* dark-mode primary = lifted neutral */
+    --v2-btn-ink-fg: #0f1215; /* 13.19:1 on btn-ink */
     --v2-verified: #3f9557;  --v2-verified-tint: #0f2e17;  --v2-verified-on-tint: #4b9f61;
     --v2-refuted: #d35a51;   --v2-refuted-tint: #3d1b17;   --v2-refuted-on-tint: #e1675c;
     --v2-unknown: #906fc5;   --v2-unknown-tint: #2b203d;   --v2-unknown-on-tint: #9d7dd4;
     --v2-caution: #967f1a;   --v2-caution-tint: #2f2600;   --v2-caution-on-tint: #a48c2d;
     --v2-info: #3a84ca;      --v2-info-tint: #0f2840;      --v2-info-on-tint: #4992d9;
+  }
+}
+
+/* ---------- tailwind v4 theme bridge: v2 tokens become first-class utilities ---------- */
+@theme inline {
+  --color-page: var(--v2-page-bg);
+  --color-surface: var(--v2-surface);
+  --color-surface-2: var(--v2-surface-2);
+  --color-line: var(--v2-border);
+  --color-ink: var(--v2-text-1);
+  --color-ink-2: var(--v2-text-2);
+  --color-verified: var(--v2-verified);
+  --color-refuted: var(--v2-refuted);
+  --color-unknown: var(--v2-unknown);
+  --color-caution: var(--v2-caution);
+  --color-info: var(--v2-info);
+  --font-ui: var(--font-ui);
+  --font-data: var(--font-data);
+  --font-statement: var(--font-statement);
+}
+
+/* ---------- legacy semantic aliases → v2 (all consumers keep working, values now v2) ---------- */
+:root {
+  --bg: var(--v2-page-bg);
+  --surface: var(--v2-surface);
+  --surface-2: var(--v2-surface-2);
+  --text: var(--v2-text-1);
+  --muted: var(--v2-text-2);
+  --border: var(--v2-border);
+  --border-strong: var(--v2-form-border);
+  /* interactive accent = info semantic (navigation/informational); NOT a brand color */
+  --accent: var(--v2-info);
+  --accent-soft: var(--v2-info-tint);
+  --btn-primary-bg: var(--v2-btn-ink);
+  --btn-primary-text: var(--v2-btn-ink-fg);
+  --btn-bg: var(--v2-surface);
+  --btn-text: var(--v2-text-1);
+  /* standalone state text (on page/surface backgrounds — verified ≥4.5:1 there) */
+  --ok-text: var(--v2-verified);   --warn-text: var(--v2-caution);
+  --err-text: var(--v2-refuted);   --info-text: var(--v2-info);
+  /* tint backgrounds for callouts/badges (paired with on-tint text in the classes below) */
+  --ok-bg: var(--v2-verified-tint);   --ok-border: color-mix(in oklab, var(--v2-verified) 35%, transparent);
+  --warn-bg: var(--v2-caution-tint);  --warn-border: color-mix(in oklab, var(--v2-caution) 35%, transparent);
+  --err-bg: var(--v2-refuted-tint);   --err-border: color-mix(in oklab, var(--v2-refuted) 35%, transparent);
+  --info-bg: var(--v2-info-tint);     --info-border: color-mix(in oklab, var(--v2-info) 35%, transparent);
+  --focus-ring: var(--v2-text-1);
+  --code-bg: var(--v2-surface-2);
+  --shadow: 0 1px 2px rgb(15 18 21 / 8%);
+  --mono: var(--font-data);
+  --sans: var(--font-ui);
+  --serif: var(--font-statement);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%);
   }
 }
 
@@ -190,8 +204,8 @@ a:hover { text-decoration: underline; }
 .lang-btn--active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 
 .offline-banner {
-  background: var(--err-bg);
-  color: var(--err-text);
+  background: var(--v2-refuted-tint);
+  color: var(--v2-refuted-on-tint);
   border-bottom: 1px solid var(--err-border);
   padding: 6px 16px;
   font-size: 12.5px;
@@ -418,11 +432,13 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
   border: 1px solid transparent;
   white-space: nowrap;
 }
-.badge--ok     { color: var(--ok-text);   background: var(--ok-bg);   border-color: var(--ok-border); }
-.badge--warn   { color: var(--warn-text); background: var(--warn-bg); border-color: var(--warn-border); }
-.badge--err    { color: var(--err-text);  background: var(--err-bg);  border-color: var(--err-border); }
-.badge--info   { color: var(--info-text); background: var(--info-bg); border-color: var(--info-border); }
-.badge--muted  { color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+/* Badge text = the ON-TINT variant of each state (its own ≥4.5:1 pair, verified in
+   design-palette-v1.json) — not the standalone text color. */
+.badge--ok     { color: var(--v2-verified-on-tint); background: var(--v2-verified-tint); border-color: var(--ok-border); }
+.badge--warn   { color: var(--v2-caution-on-tint);  background: var(--v2-caution-tint);  border-color: var(--warn-border); }
+.badge--err    { color: var(--v2-refuted-on-tint);  background: var(--v2-refuted-tint);  border-color: var(--err-border); }
+.badge--info   { color: var(--v2-info-on-tint);     background: var(--v2-info-tint);     border-color: var(--info-border); }
+.badge--muted  { color: var(--v2-text-2); background: var(--v2-surface-2); border-color: var(--v2-border); }
 
 /* ---------- skeleton / empty / error ---------- */
 .skeleton { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
@@ -445,14 +461,14 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 
 .errorbox {
   border: 1px solid var(--err-border);
-  background: var(--err-bg);
+  background: var(--v2-refuted-tint);
   border-radius: 6px;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.errorbox-title { font-size: 12.5px; color: var(--err-text); }
+.errorbox-title { font-size: 12.5px; color: var(--v2-refuted-on-tint); }
 .errorbox-message { font-size: 12.5px; overflow-wrap: anywhere; }
 .errorbox-meta { display: flex; align-items: center; gap: 8px; }
 
@@ -463,12 +479,12 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
   font-size: 12.5px;
   border: 1px solid;
 }
-.callout--warn { background: var(--warn-bg); color: var(--warn-text); border-color: var(--warn-border); }
-.callout--err  { background: var(--err-bg);  color: var(--err-text);  border-color: var(--err-border); }
-.callout--info { background: var(--info-bg); color: var(--info-text); border-color: var(--info-border); }
+.callout--warn { background: var(--v2-caution-tint); color: var(--v2-caution-on-tint); border-color: var(--warn-border); }
+.callout--err  { background: var(--v2-refuted-tint);  color: var(--v2-refuted-on-tint);  border-color: var(--err-border); }
+.callout--info { background: var(--v2-info-tint);     color: var(--v2-info-on-tint);     border-color: var(--info-border); }
 
 /* ---------- question / scope ---------- */
-.question-scope .question-text { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+.question-scope .question-text { font-family: var(--serif); font-size: 15.5px; font-weight: 600; line-height: 1.6; margin: 0 0 10px; }
 .scope-lists { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 8px; }
 .scope-lists ul { margin: 4px 0; padding-left: 18px; font-size: 12.5px; }
 .constraints summary { cursor: pointer; font-size: 12px; color: var(--muted); margin-top: 8px; }
@@ -506,6 +522,14 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 
 .bundle-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
+/* Functional status indicator (motion whitelist: same class as skeleton pulse) */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}
+.btn svg { vertical-align: -2px; }
+
 /* ---------- evidence ---------- */
 .claims-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .claim-item { border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }
@@ -535,7 +559,7 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 .hyp-card { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; background: var(--surface); }
 .hyp-card--extra { opacity: 0.85; }
 .hyp-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-.hyp-statement { font-weight: 600; }
+.hyp-statement { font-family: var(--serif); font-size: 15px; font-weight: 600; line-height: 1.6; }
 .hyp-block { margin-top: 8px; }
 .assumptions { margin: 4px 0; padding-left: 18px; font-size: 12.5px; }
 .assumption-kind { color: var(--muted); font-size: 11.5px; }

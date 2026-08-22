@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { TriangleAlert } from 'lucide-react';
 import { isNotFound } from '../../api/client';
 import { getQuestion, getRevisions } from '../../api/endpoints';
 import type { ResearchQuestion, ResearchRun } from '../../api/types';
@@ -56,7 +57,7 @@ export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: (
           <p className="callout callout--warn">{t('controls.cancelRequested')}</p>
         )}
         {(run.status === 'running' || run.status === 'queued') && run.leaseInfo !== undefined && !run.leaseInfo.live && (
-          <p className="callout callout--warn" role="status">{t('overview.frozenHint')}</p>
+          <p className="callout callout--warn" role="status"><TriangleAlert size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {t('overview.frozenHint')}</p>
         )}
         {(run.status === 'partial' || run.status === 'failed') && (
           <div className="callout callout--err" role="alert">

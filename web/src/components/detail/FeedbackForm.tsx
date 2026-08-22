@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { ApiError, withTimeout } from '../../api/client';
 import { postFeedback } from '../../api/endpoints';
 import type { FeedbackSourceKind } from '../../api/types';
@@ -22,12 +23,10 @@ export function FeedbackForm({ runId, onSubmitted }: { runId: string; onSubmitte
   const [showRequired, setShowRequired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
-  const [ok, setOk] = useState(false);
 
   const submit = async (ev: React.FormEvent): Promise<void> => {
     ev.preventDefault();
     setError(null);
-    setOk(false);
     if (content.trim().length === 0) {
       setShowRequired(true);
       return;
@@ -45,7 +44,7 @@ export function FeedbackForm({ runId, onSubmitted }: { runId: string; onSubmitte
         input.targetId = targetId.trim();
       }
       await postFeedback(runId, input, withTimeout(controller.signal, 15_000));
-      setOk(true);
+      toast.success(t('feedback.ok'));
       setContent('');
       setTargetKind('');
       setTargetId('');
@@ -126,11 +125,6 @@ export function FeedbackForm({ runId, onSubmitted }: { runId: string; onSubmitte
       {error !== null && (
         <p className="field-error" role="alert">
           {t('controls.actionFailed')}：{errorText(error)}
-        </p>
-      )}
-      {ok && (
-        <p className="field-ok" role="status">
-          {t('feedback.ok')}
         </p>
       )}
 
