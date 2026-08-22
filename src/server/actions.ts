@@ -29,8 +29,15 @@ export const ResearchActionName = z.enum([
 ]);
 export type ResearchActionName = z.infer<typeof ResearchActionName>;
 
+export type ActionErrorCode =
+  | 'invalid_action_request'
+  | 'question_required'
+  | 'target_not_found'
+  | 'not_found'
+  | 'action_model_failed';
+
 export class ActionError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) {
+  constructor(readonly status: number, readonly code: ActionErrorCode, message: string) {
     super(message);
   }
 }
@@ -96,7 +103,10 @@ export async function runResearchAction(app: App, runId: string, rawBody: unknow
   let evidenceClaims: { id: string; text: string; quote: string; gradeCertainty?: string }[];
   if (req.targetType === 'hypothesis') {
     const hyp = app.store.getObject('hypothesis', req.targetId);
-    if (hyp === null) throw new ActionError(404, 'target_not_found', `hypothesis ${req.targetId} not found in run`);
+    // Objects are stored globally by id — the target MUST belong to THIS run
+    // (cross-run access is a truthfulness violation: grounding evidence would
+    // come from one study while the target belongs to another).
+    if (hyp === null || hyp.runId !== runId) throw new ActionError(404, 'target_not_found', `hypothesis ${req.targetId} not found in run`);
     const relevant = new Set([...hyp.supportingClaimIds, ...hyp.counterClaimIds]);
     evidenceClaims = claims
       .filter((c) => relevant.has(c.id))
@@ -114,7 +124,7 @@ export async function runResearchAction(app: App, runId: string, rawBody: unknow
         : undefined,
     };
   } else if (req.targetType === 'claim') {
-    const claim = claimById.get(req.targetId);
+    const claim = claimById.get(req.targetId); // map is run-scoped by construction
     if (claim === undefined) throw new ActionError(404, 'target_not_found', `claim ${req.targetId} not found in run`);
     const srcTitle = claim.locators[0] !== undefined
       ? app.store.getObject('source_document', claim.locators[0].sourceDocumentId)?.title
@@ -132,7 +142,7 @@ export async function runResearchAction(app: App, runId: string, rawBody: unknow
     };
   } else {
     const plan = app.store.getObject('plan', req.targetId);
-    if (plan === null) throw new ActionError(404, 'target_not_found', `plan ${req.targetId} not found in run`);
+    if (plan === null || plan.runId !== runId) throw new ActionError(404, 'target_not_found', `plan ${req.targetId} not found in run`);
     evidenceClaims = claims
       .slice(0, 24)
       .map((c) => ({ id: c.id, text: c.text, quote: c.locators[0]?.quote ?? '', ...(c.gradeCertainty !== undefined ? { gradeCertainty: c.gradeCertainty } : {}) }));

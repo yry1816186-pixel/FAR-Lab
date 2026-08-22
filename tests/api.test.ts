@@ -73,6 +73,7 @@ const ts = (i: number) => new Date(T0 + i * 1000).toISOString();
 const REPORT_MD = '# FAR-Lab 研究报告（test seed）\n\n来自预置对象图的确定性报告内容。\n';
 
 let run1 = ''; // completed run with the full object graph (bundle NEWER than revision)
+let run1ClaimId = ''; // the seeded verified claim on run1
 let run2 = ''; // run whose revision is NEWER than its bundle (re-exportable)
 let run3 = ''; // partial run with lastError, no objects
 let run4 = ''; // corrupted doc row (fail-closed 500 path)
@@ -142,6 +143,7 @@ const seedCompletedRun = async (): Promise<void> => {
     uncertainties: [],
   });
   app.store.putObject('claim', clm);
+  run1ClaimId = clm.id;
 
   const hyp = HypothesisCandidate.parse({
     id: newId('hyp'),
@@ -965,6 +967,33 @@ describe('POST /api/v1/runs/:id/reexport', () => {
     expect(noBundle.body.error.message).toContain('no bundle');
     const ghost = await postJson(`${base}/api/v1/runs/run_${'0'.repeat(26)}/reexport`, {});
     expect(ghost.status).toBe(404);
+  });
+});
+
+// ---- B4 research actions (HTTP surface; success path unit-covered in api-actions.test.ts) ----
+
+describe('POST /api/v1/runs/:id/actions', () => {
+  it('400s for ask without question; 404s for missing target', async () => {
+    const noQ = await postJson(`${base}/api/v1/runs/${run1}/actions`, { action: 'ask', targetType: 'hypothesis', targetId: 'hyp_x' });
+    expect(noQ.status).toBe(400);
+    expect(noQ.body.error.code).toBe('question_required');
+    const ghost = await postJson(`${base}/api/v1/runs/${run1}/actions`, { action: 'challenge', targetType: 'claim', targetId: 'clm_missing0000000000000000000x' });
+    expect(ghost.status).toBe(404);
+    expect(ghost.body.error.code).toBe('target_not_found');
+  });
+
+  it('400s for malformed bodies', async () => {
+    const bad = await postJson(`${base}/api/v1/runs/${run1}/actions`, { action: 'nuke', targetType: 'claim', targetId: 'x' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('invalid_action_request');
+  });
+
+  it('fails honestly (500 family) when the model route is not scripted — never fabricates analysis', async () => {
+    // The suite's stub provider has an empty script: any real model call
+    // throws. The route must surface that as a server error, not a fake 200.
+    const res = await postJson(`${base}/api/v1/runs/${run1}/actions`, { action: 'challenge', targetType: 'claim', targetId: run1ClaimId });
+    expect([500, 502]).toContain(res.status);
+    expect(res.body.error.code).toBeDefined();
   });
 });
 
