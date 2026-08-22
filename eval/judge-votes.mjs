@@ -10,6 +10,11 @@
  * disagreement behind a point estimate.
  *
  * Pure functions only; unit-tested in tests/judge-votes.test.ts. No API calls.
+ *
+ * Note: with an EVEN number of successful votes the per-dimension median may be a
+ * half value (e.g. 3.5) — downstream readers must treat scores as numbers, not
+ * integers. There is no automated consumer of llm-judge.jsonl today (audited
+ * 2026-08-22); humans read the spread fields alongside.
  */
 
 /** Median of numbers: middle element for odd counts, mean of the two middles for even. */

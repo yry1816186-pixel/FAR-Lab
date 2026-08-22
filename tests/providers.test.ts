@@ -827,4 +827,41 @@ describe('W4-F3 credential redaction (source-fused: openai/codex secrets sanitiz
     expect(redactSecrets(prose)).toBe(prose);
     expect(redactSecrets('task sk-short')).toBe('task sk-short'); // below 20 chars — not credential-shaped
   });
+
+  it('redacts hyphenated modern key shapes (sk-proj-…) beyond the codex upstream pattern', () => {
+    expect(redactSecrets('leak sk-proj-AbCdEf1234567890GhIjKlMnOpQrStUv'))
+      .toBe('leak [REDACTED_SECRET]');
+  });
+
+  it('redacts BEFORE the 300-char window truncates — no key-prefix fragment survives (W4 audit P3)', async () => {
+    const { sleep } = sleepRecorder();
+    // key spans chars 276..305: the OLD truncate-first path leaked a full 24-char usable
+    // fragment past the 300 window; redact-first replaces the whole key with the marker
+    // which lands inside the window.
+    const padding = 'x'.repeat(275);
+    const straddling = () =>
+      Promise.resolve(httpError(429, { error: { message: `${padding} sk-abc123def456ghi789jklmn`, code: 'rate_limit' } }));
+    const { fetchImpl } = recorderFetch([straddling, straddling, straddling]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(false);
+    expect(res.error?.message).not.toMatch(/sk-[A-Za-z0-9-]{8,}/); // no key fragment of any size
+    expect(res.error?.message).toContain('[REDACTED_SECRET]');
+  });
+
+  it('quota classification keeps its semantics on raw text — "Insufficient balance" survives redaction intact', async () => {
+    const { sleep, sleeps } = sleepRecorder();
+    const quota = () =>
+      Promise.resolve(
+        httpError(429, { error: { code: '1113', message: 'Insufficient balance or no resource package. Please recharge.' } }),
+      );
+    const { fetchImpl, calls } = recorderFetch([quota]);
+    const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl, sleep });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(false);
+    expect(res.error?.kind).toBe('quota_exceeded');
+    expect(res.error?.message).toContain('Insufficient balance or no resource package');
+    expect(calls.length).toBe(1);
+    expect(sleeps).toEqual([]);
+  });
 });

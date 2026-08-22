@@ -22,7 +22,12 @@ import { aggregateVotes } from './judge-votes.mjs';
 
 const SEED = Number(process.env.FARLAB_JUDGE_SEED ?? 20260821); // recorded with results; env enables variance studies
 /** W4-F4 self-consistency votes per problem (default 1 = unchanged single-pass behavior). */
-const VOTES = Math.max(1, Number(process.env.FARLAB_JUDGE_VOTES ?? 1));
+const VOTES_RAW = Number(process.env.FARLAB_JUDGE_VOTES ?? 1);
+if (!Number.isInteger(VOTES_RAW) || VOTES_RAW < 1) {
+  console.error(`FARLAB_JUDGE_VOTES must be a positive integer (got ${JSON.stringify(process.env.FARLAB_JUDGE_VOTES)})`);
+  process.exit(2);
+}
+const VOTES = VOTES_RAW;
 const DB_PATH = new URL('../.far-run/far.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const RESULTS = new URL('./results/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
@@ -183,10 +188,11 @@ Return ONLY a JSON object:
         }]))
       : null,
     per_vote: voteResults.map((r, i) => (r.ok
-      ? { vote: i + 1, ok: true, data: r.data }
+      ? { vote: i + 1, ok: true, data: r.data, usage: r.receipt.usage, latencyMs: r.receipt.latencyMs }
       : { vote: i + 1, ok: false, error: { kind: r.error?.kind ?? 'provider_error', message: r.error?.message ?? '' } })),
     receipt: {
       modelId: voteResults[0].receipt.modelId,
+      modelVersion: voteResults[0].receipt.modelVersion,
       usage: voteResults.reduce((acc, r) => ({
         promptTokens: (acc.promptTokens ?? 0) + (r.receipt.usage.promptTokens ?? 0),
         completionTokens: (acc.completionTokens ?? 0) + (r.receipt.usage.completionTokens ?? 0),

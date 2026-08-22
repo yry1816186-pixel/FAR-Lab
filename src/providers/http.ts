@@ -10,8 +10,11 @@ import type { StructuredCallRequest, StructuredCallResult } from '../shared/port
  * adapters (deepseek.ts, zai.ts) are thin configurations over this core.
  *
  * W1 retry discipline (contract, exhaustive):
- *   - rate_limited / timeout / transient 5xx (500,502,503,504): at most 2 retries,
- *     exponential backoff 1s / 3s.
+ *   - rate_limited / timeout / transient 5xx (500,502,503,504): at most 2 retries.
+ *     Delay = server Retry-After when parseable (ms header > seconds > HTTP-date),
+ *     else jittered exponential 1000·2^(n-1) with symmetric ±25% multiplicative jitter;
+ *     every delay capped at 30s (W4-F1, 2026-08-22 — deepseek-harness llm-retry shape
+ *     + opencode Retry-After precedence; deterministic seam via deps.random).
  *   - invalid_output: at most 3 corrective re-asks with an appended instruction
  *     (independent-sample corruption ~20% at large outputs; ~99% cumulative recovery,
  *     every attempt must still fully parse and zod-validate — D-034 era evidence).
@@ -115,7 +118,10 @@ export const parseRetryAfterMs = (headers: { get(name: string): string | null } 
 
 const SECRET_PATTERNS: readonly (readonly [RegExp, string])[] = [
   [/\bBearer[ \t]+[A-Za-z0-9._~+/=-]{16,}/gi, 'Bearer [REDACTED_SECRET]'],
-  [/sk-[A-Za-z0-9]{20,}/g, '[REDACTED_SECRET]'],
+  // codex uses sk-[A-Za-z0-9]{20,}; extended with hyphens for the modern OpenAI
+  // sk-proj-/sk-svcacct- key shapes (W4 audit P3; a 20+ char token starting sk- is
+  // not plausible prose)
+  [/sk-[A-Za-z0-9-]{20,}/g, '[REDACTED_SECRET]'],
   [/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED_SECRET]'],
   [/\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)(["']?)[^\s"']{8,}/gi, '$1$2$3[REDACTED_SECRET]'],
 ];
@@ -475,7 +481,9 @@ const classifyHttpStatus = (status: number, bodyText: string, providerName: stri
   const envelope = parseErrorEnvelope(bodyText);
   const code = envelope?.code;
   const rawMsg = envelope?.message ?? '';
-  const msg = rawMsg.length > 0 ? truncate(rawMsg, 300) : `(empty body) ${truncate(bodyText, 200)}`;
+  // W4-F3 audit fix (P3): redact BEFORE truncating — a credential split across the
+  // 300-char window would otherwise leak a key-prefix fragment past the redactor.
+  const msg = rawMsg.length > 0 ? truncate(redactSecrets(rawMsg), 300) : `(empty body) ${truncate(redactSecrets(bodyText), 200)}`;
   const base = `${providerName}: HTTP ${status}${code ? ` code ${code}` : ''}: ${msg}`;
 
   if (status === 401 || status === 403) {
@@ -558,7 +566,7 @@ const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt =
         kind: 'provider_error',
         retryable: false,
         httpStatus: 200,
-        message: `${providerName}: HTTP 200 body malformed (no choices[0].message.content string or tool_calls arguments); body head: ${truncate(bodyText, 200)}`,
+        message: `${providerName}: HTTP 200 body malformed (no choices[0].message.content string or tool_calls arguments); body head: ${truncate(redactSecrets(bodyText), 200)}`,
       },
     };
   }
