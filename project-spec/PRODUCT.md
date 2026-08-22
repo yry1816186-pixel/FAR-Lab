@@ -4,7 +4,7 @@
 
 FAR-Lab is a research workbench for **evidence-constrained, falsifiable, revisable scientific hypothesis generation and research-plan design**. It helps a researcher turn a concrete scientific question into multiple inspectable hypotheses and executable plans whose evidence, counter-evidence, uncertainty, revision history and provenance can be independently checked.
 
-It is not a chatbot, generic RAG, literature summarizer, paper generator, generic coding agent, fake multi-agent demo or Direction-B instrument-control platform.
+It is not a chatbot, generic RAG, literature summarizer, paper generator, generic coding agent, fake multi-agent demo or Direction-B instrument-control platform. Its experiment execution subsystem (D-081) executes real datasets/models/statistics to test generated hypotheses — never theatrical demos.
 
 ## Primary users and jobs
 
@@ -22,7 +22,7 @@ Core jobs:
 
 ## Canonical product loop
 
-`Question -> Scope -> Retrieval/Source Verification -> Claim/Evidence Graph -> Candidate Hypotheses -> Critique/Falsification -> Ranking -> Research Plan -> Feedback -> Revision/Version Diff -> Provenance/Reproducibility Export`
+`Question -> Scope -> Retrieval/Source Verification -> Claim/Evidence Graph -> Candidate Hypotheses -> Critique/Falsification -> Ranking -> Research Plan -> Experiment Execution (opt-in; datasets/models/matrices/statistics) -> Feedback -> Revision/Version Diff -> Provenance/Reproducibility Export`
 
 Every stage must preserve partial/failed state and be recoverable where practical.
 
@@ -64,4 +64,4 @@ Every stage must preserve partial/failed state and be recoverable where practica
 A narrow but complete Direction-A loop on a representative problem set, a live model path on the officially required route, real source retrieval, real provenance/recovery, mature CLI/Web workflow and reproducible evaluation. Scope may be narrow; truth may not be.
 
 ### Later evolution
-Broader disciplines/sources/tools, scientific-compute adapters, collaboration, remote/HPC execution and richer extension ecosystems only after the R1 core proves their need.
+The experiment execution subsystem (datasets, domain models, experiment matrices, device/env/gateway/scheduling) is activated by the 2026-08-22 user mandate (D-081) as an in-scope build with its own acceptance criteria. Broader disciplines/sources, collaboration and richer extension ecosystems follow after the core loop proves their need; instrument control and foundation-model training remain out of scope.

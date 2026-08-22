@@ -44,3 +44,6 @@ desktop/src-tauri/target/
 
 # Public-release export output (local build artifact, never committed)
 build/
+
+# EEL sidecar venv (uv-managed, machine-local)
+experiment-runtime/.venv/

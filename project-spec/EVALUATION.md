@@ -44,7 +44,8 @@ Useful comparisons:
 Only ablate mechanisms tied to a real product/scientific claim. Candidate examples:
 - without counter-evidence search;
 - without deterministic citation/falsification checks;
-- without structured revision chain.
+- without structured revision chain;
+- executed-experiment factor ablation (D-081): components/factors declared in an ExperimentSpec, removed or varied in a preregistered matrix — never ad-hoc runs to inflate counts.
 
 Do not create ablations merely to inflate experiment count.
 
@@ -71,3 +72,13 @@ Usability feedback is valuable when representative users are available; do not f
 ## 9. Evidence reporting
 
 For each result record environment, code version, model/provider/version/config, source snapshot, sample/problem IDs, metric/rubric, repeated-run/uncertainty treatment and raw artifact location. Report negative/inconclusive results, not only winners.
+
+## 10. Experiment-outcome evaluation (D-081)
+
+Executed experiments are evaluated on their own evidence plane, separate from pipeline-output metrics:
+- determinism gate: identical (spec, seed, environment) executions reproduce identical results;
+- statistical honesty: effect sizes with uncertainty under the preregistered analysis; multiple-testing policy enforced mechanically, not advisory;
+- verdict integrity: supports/weakens/falsifies/inconclusive derives from the hypothesis' decision rule against measured values, never from LLM judgment;
+- negative/inconclusive outcomes reported with the same prominence as supportive ones;
+- dataset hygiene: splits are seeded/reproducible, leakage controls declared, lineage (source → checksum → recipe) resolvable;
+- execution truth: run states map to real scheduler/executor state; canceled/failed/partial paths exercised, not only happy paths.

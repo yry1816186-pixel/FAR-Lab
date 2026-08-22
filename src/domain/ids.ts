@@ -19,6 +19,11 @@ export const BundleId = idOf('bnd');
 export const TaskId = idOf('task');
 export const ScorecardId = idOf('sc');
 export const TournamentId = idOf('trn');
+export const ExperimentSpecId = idOf('xsp');
+export const ExperimentRunId = idOf('xrun');
+export const DatasetRecordId = idOf('ds');
+export const ResultSetId = idOf('rset');
+export const StatReportId = idOf('srep');
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -35,6 +40,11 @@ export type BundleId = z.infer<typeof BundleId>;
 export type TaskId = z.infer<typeof TaskId>;
 export type ScorecardId = z.infer<typeof ScorecardId>;
 export type TournamentId = z.infer<typeof TournamentId>;
+export type ExperimentSpecId = z.infer<typeof ExperimentSpecId>;
+export type ExperimentRunId = z.infer<typeof ExperimentRunId>;
+export type DatasetRecordId = z.infer<typeof DatasetRecordId>;
+export type ResultSetId = z.infer<typeof ResultSetId>;
+export type StatReportId = z.infer<typeof StatReportId>;
 
 /** kind -> the ID shape that kind legitimately takes. */
 const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {
@@ -51,6 +61,11 @@ const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {
   revision: /^rev_[0-9a-z]{20,32}$/,
   receipt: /^rcp_[0-9a-z]{20,32}$/,
   bundle: /^bnd_[0-9a-z]{20,32}$/,
+  experiment_spec: /^xsp_[0-9a-z]{20,32}$/,
+  experiment_run: /^xrun_[0-9a-z]{20,32}$/,
+  dataset_record: /^ds_[0-9a-z]{20,32}$/,
+  result_set: /^rset_[0-9a-z]{20,32}$/,
+  stat_report: /^srep_[0-9a-z]{20,32}$/,
   // Artifact refs are content addresses, not prefixed entity ids.
   artifact: /^sha256:[0-9a-f]{64}$/,
 };
@@ -59,6 +74,7 @@ const OBJECT_REF_KINDS = [
   'question', 'run', 'corpus_snapshot', 'source_document', 'claim',
   'evidence_relation', 'hypothesis', 'plan', 'task', 'feedback', 'revision',
   'receipt', 'bundle', 'artifact',
+  'experiment_spec', 'experiment_run', 'dataset_record', 'result_set', 'stat_report',
 ] as const;
 type ObjectRefKind = (typeof OBJECT_REF_KINDS)[number];
 

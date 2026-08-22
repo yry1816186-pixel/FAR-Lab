@@ -12,6 +12,7 @@ ResearchQuestion + ResearchScope + ConstraintSet
      -> HypothesisCandidate[] -> Assumption[] -> FalsificationSpec/TestabilitySpec
      -> HypothesisScorecard / Comparison
      -> ResearchPlan -> ValidationTask/DatasetRequirement/ToolRequirement
+     -> ExperimentSpec -> ExperimentRun (DatasetRecord / ModelSpec) -> ResultSet -> StatReport
      -> FeedbackSignal -> Revision -> VersionDiff
      -> ProvenanceReceipt -> ReproducibilityBundle
 ```
@@ -56,7 +57,7 @@ Scores are decision aids, not objective truth. Each score/rank must expose ratio
 
 A **ResearchPlan** encodes what is needed to test/discriminate candidates: objective, variables/observables, controls/baselines, data/sample requirements, methods/tasks, metrics/evaluation, decision/stopping rules, resources/cost, dependencies, risks/ethics and human approval points as applicable.
 
-Each step has inspectable inputs/outputs/failure conditions. Simulation/public-data/scientific-tool adapters may validate executability while remaining subordinate to the Direction-A product core.
+Each step has inspectable inputs/outputs/failure conditions. The experiment execution subsystem (D-081, user-mandated) makes selected plan steps machine-executable: dataset acquisition/splitting/preprocessing, domain-model building/training/evaluation, experiment matrices and statistical analysis. It is a first-class subsystem with its own acceptance criteria, but its authority is subordinate: it exists to test hypotheses, and the Direction-A loop (question → hypotheses → plan) remains the orchestrating core.
 
 ## 8. Feedback and revision
 
@@ -72,9 +73,21 @@ Improvement is a claim requiring evaluation evidence; some revisions may be neut
 
 **ReproducibilityBundle** packages the code/config/input/source references/artifacts/instructions necessary to replay/recompute to a declared evidence level. It must state anything external, inaccessible or non-deterministic that prevents exact reproduction.
 
-## 10. Non-goals
+## 10. Experiment execution semantics (D-081)
+
+**ExperimentSpec** binds a plan step to the hypotheses it discriminates: it carries the independent/dependent/controlled variables, dataset references, model-builder configuration, metric definitions, the preregistered statistical analysis (test, α, multiple-testing policy), seeds and compute profile. The statistical analysis is frozen in the spec **before** execution; post-hoc analysis changes require a new spec version, not a silent mutation (anti p-hacking).
+
+**DatasetRecord** identities external data immutably: resolver (e.g. OpenML dataset id), content hash, license, variable schema and lineage (acquisition → split → preprocessing recipe). Splits are seeded and deterministic; the same spec + seed must reproduce the same data partition. Leakage controls (stratification, group-awareness) are declared, not incidental.
+
+**ModelSpec** identifies a registered model builder plus hyperparameters and seed. Trained models are artifacts with content hashes; training curves/logs are events.
+
+**ResultSet/StatReport** record executed measurements and their statistical interpretation: effect sizes with uncertainty, tests applied under the preregistered policy, and a verdict per bound hypothesis — `supports` / `weakens` / `falsifies` / `inconclusive` — derived mechanically from the hypothesis' FalsificationSpec decision rule against measured values. A verdict never comes from an LLM judgment; LLMs may propose specs, never interpret results into verdicts. Inconclusive and negative outcomes are first-class results.
+
+**ExperimentRun** owns a persisted lifecycle like ResearchRun (queued/running/checkpointed/completed/failed/canceled) with lease/cancel/resume semantics. Executed-once determinism: identical (spec, seed, environment hash) re-executions must reproduce identical results or report the divergence honestly.
+
+## 11. Non-goals
 
 - LLM output is never a scientific source by itself.
 - Evidence graph is not a generic knowledge-graph product.
-- Execution adapters do not turn FAR-Lab into Direction B.
+- The experiment execution subsystem serves falsification of Direction-A hypotheses (D-081); it does not turn FAR-Lab into a Direction-B instrument-control product, a general ML platform, or a foundation-model training system.
 - Software green tests do not prove scientific validity.
