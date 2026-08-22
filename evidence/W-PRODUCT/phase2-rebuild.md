@@ -84,3 +84,55 @@ FAIL 全部修复并验证（commit "fix(pex): adversarial-audit fixes…"）：
   中间态，非本批，复跑全绿）——退出码 0
 - typecheck 双端 0 错；build 双端成功；secret-scan PASS；completion-gate PASS
 - 已知遗留：export.ts 1 个既有 eslint 错误（EEL lane 所有权文件，本会话未触碰，如实记录）
+
+## 补齐批次：完成门槛缺口闭环（2026-08-23 追加）
+
+> 用户指令：后续禁用真实 API 实测（Key 纪律收紧）；以下验证中仅 resume 一步发生在
+> 该指令之前，其余全部为本地渲染/读取态验证。
+
+### ① Failure → Resume → Export/Reproduce 真实路径（CLI+GUI 双面）
+
+- **Failure 呈现（GUI）**：partial run_bbgtvep5bwdy26n0kvxkw0epvn 研究页 = err banner +
+  诚实 callout（"本研究部分完成…不伪造完成态"+ quota_exceeded 错误原文）+ 恢复按钮
+  ENABLED + 取消禁用带原因 + 页头"1/9 阶段·文献检索"。
+- **Resume 真实执行（CLI，zai 路由，指令前一次）**：`research resume` 从 checkpoint
+  续跑——retrieve→verify_sources→build_evidence 三阶段完成（1/9→4/9，逐源 claim
+  提取日志可见），后在 generate_hypotheses 遇 zai 5 小时配额上限（HTTP 429 code 1308，
+  限额 2026-08-23 01:42:57 重置，retry budget 2 耗尽）→ 诚实转为新 partial 态。
+  CLI 输出：`✓ done×4 / ✗ failed(generate_hypotheses, 错误原文) / pending×6`。
+- **Resume 后 GUI 状态**：页头"4/9 阶段·假设生成"、callout 更新为 rate_limited 原文、
+  恢复按钮仍 ENABLED（配额重置后可再续）、时间线 4 done。
+- **Export**：`research export run_hzxxc7tg… --format bundle` → bnd_mk7vtt4zdn2zgtvxg0hac6p1q8
+  （87 receipts、12 来源哈希、1 终工件哈希、limitations 2 条）。
+- **Verify（10/10 PASS，真实 exit 0）**：schema/hash/receipts 一致性/corpus/question/
+  重放指引/limitations/lockfile 哈希/证据级别全部 PASS；replay 指引明确"核验输入快照
+  与哈希，不承诺逐字节重生成"（诚实）。
+- **顺带修复的可用性缺口**：`far verify <文件路径>`（export 刚输出路径，用户自然粘它）
+  原来只报"bundle 不存在"——现在识别路径形态给出 `→ try: far verify bnd_…` 或
+  `→ list one with: far research export <run-id> --format bundle`（双分支实测）。
+- **外部限制记录（非工程缺口）**：zai 5h 配额上限至 01:42:57 重置——resume 全通需
+  等配额窗口；Docker daemon 未启动——2 个 skip 测试（D-084 远程面）为用户侧条件。
+
+### ② 设置/模型面回归（GUI，读取态）
+
+SettingsPanel 打开正常：模型配置标题、环境默认路由（zai · glm-4.6）真实显示、
+空态诚实（"还没有自定义模型配置"）、新建配置表单五字段完整（名称/协议/Base URL/
+模型 ID/API Key）。此前一次 formOpen=false 为 Playwright 双 tab 干扰假象，复验排除。
+
+### ③ 桌面壳（Tauri）回归（静态+装载面）
+
+- frontendDist=../../web/dist——壳直接装载重构后 bundle，**桌面形态自动继承新 IA**。
+- 深链 far://run/<id> → location.hash="#run/<id>"（无 tab 段，与 parseHash 新解析
+  兼容）；快捕 Alt+Shift+F → #new → 欢迎页（兼容）。
+- 壳 Rust 源零旧 IA 引用（grep overview/provenance/events/experiments 无命中）。
+- 能力面保持最小权限（core:default，无原生 API 暴露给页面代码）。
+
+### ④ export.ts lint
+
+兄弟会话已修复（statReports → _statReports 带意图注释）；本轮复验 `npm run lint`
+全仓 0 错误。
+
+### ⑤ 最终门禁（补齐批次后复跑）
+
+vitest 842/844（2 skip=Docker 用户侧条件，见①）；typecheck 0；lint 0；
+secret-scan PASS；completion-gate PASS。
