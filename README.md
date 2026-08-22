@@ -16,8 +16,8 @@ node dist/cli/main.js research export <run-id> --format bundle --out out/
 node dist/cli/main.js verify <bundle-id>     # 独立复算，exit 0 = verified
 
 # 本地 Web 工作台（React + HTTP API）
-# API 服务器：src/server/api.ts 的 createApiServer(app)（tests/api.test.ts 覆盖 33 项契约）；
-# 独立启动脚本属发布工程待办（如实：当前以编程方式装配，W3 GUI 实测见 evidence/W3/）。
+npm run serve          # scripts/serve.mjs：API + web/dist（SPA 回退）；PORT 默认 3196
+#（API 契约 33 项测试覆盖于 tests/api.test.ts；启动器带 dist 陈旧守卫，W3 GUI 实测见 evidence/W3/）
 ```
 
 模型路由 model-agnostic：`FARLAB_MODEL_PROVIDER` = `deepseek`（默认，strict function calling）| `dashscope`（阿里云百炼 Qwen，竞赛强制路由）| `zai`。各路由独立 env key，fail-closed。
