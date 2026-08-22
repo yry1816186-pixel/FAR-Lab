@@ -173,7 +173,7 @@ export function RunDetail({
   const renderPanel = (): ReactNode => {
     switch (tabId) {
       case 'overview': return <OverviewTab run={run} events={events} onMutated={onMutated} onFeedback={openFeedback} />;
-      case 'evidence': return <EvidenceTab run={run} onFeedback={openFeedback} />;
+      case 'evidence': return <EvidenceTab run={run} onFeedback={openFeedback} onOpenHypotheses={() => setTabId('hypotheses')} />;
       case 'hypotheses': return (
         <HypothesisTabWithNav run={run} onFeedback={openFeedback} setTabId={setTabId} />
       );
