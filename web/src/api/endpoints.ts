@@ -14,9 +14,9 @@
 import { api, ApiError } from './client';
 import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
-  normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSources,
+  normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ResearchRun, RunEvent, RunSummary, ScientificGoalType, VerificationReport } from './types';
+import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, VerificationReport } from './types';
 
 const BASE = '/api/v1';
 
@@ -53,6 +53,10 @@ export const getRevisions = async (runId: string, signal?: AbortSignal) =>
 
 export const getReceipts = async (runId: string, signal?: AbortSignal) =>
   normalizeReceipts(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/receipts`, signal));
+
+/** B2 universal search: cross-run lookup by question / hypothesis statement / claim text. */
+export const searchAll = async (q: string, signal?: AbortSignal): Promise<SearchResponse> =>
+  normalizeSearch(await api.getJson(`${BASE}/search?q=${encodeURIComponent(q)}`, signal));
 
 /** EEL (D-081): executed-experiment projections — runs, result cells, stat reports. */
 export interface ExperimentEvidence {

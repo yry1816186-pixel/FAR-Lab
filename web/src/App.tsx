@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { ApiError } from './api/client';
-import { getEvents, getRun, listRuns } from './api/endpoints';
+import { getEvents, getRun, listRuns, searchAll } from './api/endpoints';
 import type { ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
@@ -12,7 +12,7 @@ import { LogoFull } from './components/Logo';
 import { WelcomeView } from './components/WelcomeView';
 import { RunsList, runLabel } from './components/RunsSidebar';
 import { RunDetail, isTabId } from './components/RunDetail';
-import { CommandPalette, type Command } from './components/CommandPalette';
+import { CommandPalette, type Command, type PaletteSearch } from './components/CommandPalette';
 import type { EventsState } from './components/RunDetail';
 import { ErrorBox } from './components/common';
 
@@ -277,15 +277,46 @@ export function App(): JSX.Element {
     ];
   }, [runs, selectedRunId, cycleTheme, lang, setLang]);
 
-  // IDE convention: "/" focuses the task filter unless typing in a field.
+  // ---- universal search wiring (B2): palette -> cross-run object lookup ----
+  // A claim hit focuses the evidence tab and flash-highlights the claim row
+  // (same affordance as the ACH block); the pending id is consumed by RunDetail.
+  const [focusClaimId, setFocusClaimId] = useState<string | null>(null);
+  const paletteSearch = useMemo<PaletteSearch>(() => ({
+    fetch: (q, signal) => searchAll(q, signal),
+    navigate: {
+      run: (runId) => { setSelectedRunId(runId); setRouteTab(null); setFocusClaimId(null); },
+      hypothesis: (runId) => { setSelectedRunId(runId); setRouteTab('hypotheses'); setFocusClaimId(null); },
+      claim: (runId, claimId) => { setSelectedRunId(runId); setRouteTab('evidence'); setFocusClaimId(claimId); },
+    },
+    // setSelectedRunId/setRouteTab are stable state setters; routeTab semantics captured per call
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
+  // IDE convention: "/" focuses the task filter unless typing in a field;
+  // "n" is quick capture (B2): idea friction ≈ 0 — one key from anywhere to
+  // a fresh question box.
   const filterRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
+    const inField = (el: HTMLElement | null): boolean =>
+      el !== null && (
+        el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
+        // ARIA textbox roles and elements inside them (B2-critique F-06):
+        // custom editors do not always use native input tags.
+        || el.closest('[role="textbox"]') !== null
+      );
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
-      if (el !== null && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
-      e.preventDefault();
-      filterRef.current?.focus();
+      if (e.key === '/') {
+        if (inField(el)) return;
+        e.preventDefault();
+        filterRef.current?.focus();
+      } else if (e.key === 'n' || e.key === 'N') {
+        if (inField(el)) return;
+        e.preventDefault();
+        setSelectedRunId(null);
+        setRouteTab(null);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -398,11 +429,18 @@ export function App(): JSX.Element {
               onMutated={onMutated}
               tab={routeTab !== null && isTabId(routeTab) ? routeTab : undefined}
               onTabChange={(tab) => setRouteTab(tab)}
+              focusClaimId={focusClaimId}
+              onClaimFocused={() => setFocusClaimId(null)}
             />
           )}
         </main>
       </div>
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={commands} />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        commands={commands}
+        search={paletteSearch}
+      />
     </div>
   );
 }

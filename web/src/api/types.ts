@@ -594,3 +594,19 @@ export interface VerificationReport {
   /** The bundle's own declared reproduction limits — mandatory honesty, shown not buried. */
   limitations?: string[];
 }
+
+// ---- universal search (B2) ----
+
+/** One cross-run search hit; `text` is the researcher-meaningful string (question / statement / claim). */
+export interface SearchHit {
+  runId: string;
+  id: string;
+  text: string;
+}
+
+export interface SearchResponse {
+  query: string;
+  questions: SearchHit[];
+  hypotheses: SearchHit[];
+  claims: SearchHit[];
+}

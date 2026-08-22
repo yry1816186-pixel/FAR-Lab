@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Badge, CountProgress, IdText, Skeleton, TimeText } from './common';
+import { Badge, CountProgress, Skeleton, TimeText } from './common';
 import { runStatusKey, runStatusTone } from '../tones';
 import type { RunSummary } from '../api/types';
 import { useI18n } from '../i18n/LanguageContext';
@@ -46,6 +46,9 @@ export function RunListItem({
         className={`run-item${selected ? ' run-item--selected' : ''}`}
         onClick={() => onSelect(run.id)}
         aria-current={selected ? 'true' : undefined}
+        // Machine id is metadata (B1 F-09): available on hover and in the
+        // detail page, never a primary identity line in the list.
+        title={`${runLabel(run)} · ${run.id}`}
       >
         <span className="run-item-top">
           <span className="run-item-question" title={runLabel(run)}>{runLabel(run)}</span>
@@ -53,7 +56,6 @@ export function RunListItem({
         </span>
         <span className="run-item-mid">
           <span className="run-item-idline">
-            <IdText value={run.id} />
             {run.domain !== undefined && run.domain.length > 0 && (
               <span className="run-item-domain" title={t('runs.domain')}>{run.domain}</span>
             )}
@@ -120,6 +122,10 @@ export function RunsList({
 }): JSX.Element {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
+  // B1 F-09: the "needs attention" wall (historical ops/probe runs) is collapsed
+  // by default — it stays reachable and countable, but no longer shouts over
+  // the researcher's active work. Selection or filtering re-expands a group.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ 'runs.groupAttention': true });
   const filtered = useMemo(
     () => runs.filter((r) => matchesQuery(r, query, t)),
     [runs, query, t],
@@ -144,6 +150,11 @@ export function RunsList({
   const grouped = GROUP_ORDER.map((g) => ({ ...g, items: filtered.filter((r) => g.match(r.status)) })).filter(
     (g) => g.items.length > 0,
   );
+  const isCollapsed = (key: string, items: RunSummary[]): boolean => {
+    if (query.length > 0) return false; // filtering: show everything that matches
+    if (selectedId !== null && items.some((r) => r.id === selectedId)) return false; // never hide the selection
+    return collapsed[key] === true;
+  };
   return (
     <nav className="runs-groups" aria-label={t('runs.title')}>
       <input
@@ -158,16 +169,33 @@ export function RunsList({
       {query.length > 0 && filtered.length === 0 && (
         <p className="sidebar-empty">{t('runs.filterEmpty')}</p>
       )}
-      {grouped.map((g) => (
+      {grouped.map((g) => {
+        const open = !isCollapsed(g.key, g.items);
+        return (
         <section key={g.key} className="runs-group">
-          <h3 className="runs-group-title">{t(g.key)} <span className="muted small">{g.items.length}</span></h3>
-          <ul className="runs-list">
-            {g.items.map((run) => (
-              <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={onSelect} />
-            ))}
-          </ul>
+          {/* Valid heading pattern (B2-critique F-01): the button lives INSIDE
+              the h3 — interactive content must not contain flow content. */}
+          <h3 className="runs-group-title">
+            <button
+              type="button"
+              className="runs-group-toggle"
+              aria-expanded={open}
+              onClick={() => setCollapsed((prev) => ({ ...prev, [g.key]: open }))}
+            >
+              <span>{t(g.key)} <span className="muted small">{g.items.length}</span></span>
+              <span className="runs-group-caret muted" aria-hidden="true">{open ? '▾' : '▸'}</span>
+            </button>
+          </h3>
+          {open && (
+            <ul className="runs-list">
+              {g.items.map((run) => (
+                <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={onSelect} />
+              ))}
+            </ul>
+          )}
         </section>
-      ))}
+        );
+      })}
     </nav>
   );
 }

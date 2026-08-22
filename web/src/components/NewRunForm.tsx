@@ -32,6 +32,9 @@ export function NewRunForm({ onCreated }: { onCreated: (runId: string) => void }
         aria-required="true"
         aria-invalid={showValidationError}
         disabled={submitting}
+        // Quick capture (B2): landing on the welcome view puts the cursor in
+        // the question box — idea → FAR-Lab friction ≈ 0 (also reached via `n`).
+        autoFocus
       />
       {showValidationError && (
         <p className="field-error" role="alert">
@@ -80,6 +83,7 @@ export function NewRunForm({ onCreated }: { onCreated: (runId: string) => void }
         </button>
         <span className="hero-hint muted">{t('form.heroHint')}</span>
       </div>
+      <p className="hero-hint muted small">{t('form.kbdHint')}</p>
       <p aria-live="polite" className="sr-only">
         {submitting ? t('form.submitting') : ''}
       </p>

@@ -13,7 +13,7 @@ import { ApiError } from './client';
 import type {
   EvidenceRelation, FeedbackSignal, HypothesisCandidate, HypothesisScorecard, HypothesisTournament,
   ProvenanceReceipt, ResearchPlan, ResearchQuestion, ResearchRun, RunEvent,
-  RunSummary, ScientificClaim, SourceDocument, VersionDiff, Revision,
+  RunSummary, ScientificClaim, SearchResponse, SearchHit, SourceDocument, VersionDiff, Revision,
 } from './types';
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -248,5 +248,24 @@ const looksLikeReceipt = (v: unknown): v is ProvenanceReceipt =>
   isRecord(v) && typeof v.kind === 'string' && typeof v.executionMode === 'string';
 
 export function normalizeReceipts(data: unknown): ProvenanceReceipt[] {
-  return filterOrThrow(requireArray(data, ['receipts', 'items', 'data'], 'receipts'), looksLikeReceipt, 'receipts');
+  return filterOrThrow(requireArray(data, ['receipts', 'items', 'data'], 'receipts'), looksLikeReceipt, 'receipts');}
+
+// ---- universal search (B2) ----
+
+const looksLikeSearchHit = (v: unknown): v is SearchHit =>
+  isRecord(v) && typeof v.runId === 'string' && typeof v.id === 'string' && typeof v.text === 'string';
+
+/** Fail-closed: a malformed search payload surfaces as an error, never as silently empty results. */
+export function normalizeSearch(data: unknown): SearchResponse {
+  if (!isRecord(data)) throw schemaError('search');
+  const hits = (key: string): SearchHit[] => {
+    if (!Array.isArray(data[key])) throw schemaError(`search.${key}`);
+    return data[key].filter(looksLikeSearchHit);
+  };
+  return {
+    query: typeof data.query === 'string' ? data.query : '',
+    questions: hits('questions'),
+    hypotheses: hits('hypotheses'),
+    claims: hits('claims'),
+  };
 }

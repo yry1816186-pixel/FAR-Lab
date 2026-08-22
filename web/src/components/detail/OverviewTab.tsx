@@ -46,7 +46,29 @@ export function OverviewTab({
       <Section title={t('activity.title')} count={<span className="muted small">{t('activity.liveHint')}</span>}>
         <ActivityFeed run={run} events={events.events} />
       </Section>
-      <Section title={t('overview.meta')}>
+      {/* Operational alerts stay visible; the raw metadata block (ids,
+          timestamps, tags, lease internals) is a collapsed disclosure (B1
+          F-09: stage/progress already live in the banner + timeline). */}
+      {run.cancelRequested && (
+        <p className="callout callout--warn">{t('controls.cancelRequested')}</p>
+      )}
+      {(run.status === 'running' || run.status === 'queued') && run.leaseInfo !== undefined && !run.leaseInfo.live && (
+        <p className="callout callout--warn" role="status"><TriangleAlert size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {t('overview.frozenHint')}</p>
+      )}
+      {(run.status === 'partial' || run.status === 'failed') && (
+        <div className="callout callout--err" role="alert">
+          <strong>{run.status === 'partial' ? t('overview.partialNotice') : t('status.failed')}</strong>
+          {run.lastError !== undefined && <div className="mono small">{run.lastError}</div>}
+          {failedStages.length > 0 && (
+            <div>
+              {t('overview.failedStages')}:{' '}
+              {failedStages.map((s) => t(stageKey(s.stage))).join(t('common.sep'))}
+            </div>
+          )}
+        </div>
+      )}
+      <details className="tech-details">
+        <summary>{t('overview.techTitle')}</summary>
         <FieldList
           items={[
             { key: t('overview.runId'), value: <IdText value={run.id} /> },
@@ -71,25 +93,7 @@ export function OverviewTab({
             ...(run.tags.length > 0 ? [{ key: t('overview.tags'), value: <span className="mono">{run.tags.join(', ')}</span> }] : []),
           ]}
         />
-        {run.cancelRequested && (
-          <p className="callout callout--warn">{t('controls.cancelRequested')}</p>
-        )}
-        {(run.status === 'running' || run.status === 'queued') && run.leaseInfo !== undefined && !run.leaseInfo.live && (
-          <p className="callout callout--warn" role="status"><TriangleAlert size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {t('overview.frozenHint')}</p>
-        )}
-        {(run.status === 'partial' || run.status === 'failed') && (
-          <div className="callout callout--err" role="alert">
-            <strong>{run.status === 'partial' ? t('overview.partialNotice') : t('status.failed')}</strong>
-            {run.lastError !== undefined && <div className="mono small">{run.lastError}</div>}
-            {failedStages.length > 0 && (
-              <div>
-                {t('overview.failedStages')}:{' '}
-                {failedStages.map((s) => t(stageKey(s.stage))).join(t('common.sep'))}
-              </div>
-            )}
-          </div>
-        )}
-      </Section>
+      </details>
 
       <Section title={t('overview.question')}>
         {questionRes.loading ? (

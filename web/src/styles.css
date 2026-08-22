@@ -1222,3 +1222,55 @@ select option { color: var(--text); background: var(--surface); }
   .drawer { width: 100vw; border-left: none; }
   .compare-table .compare-label-col { width: 96px; }
 }
+
+/* ---- B2: progressive disclosure + universal search surfaces ---- */
+
+/* Collapsed technical disclosure (retrieval transparency, source verification
+   detail, run metadata): quiet by design — real data, secondary prominence. */
+.tech-details {
+  margin-top: var(--sp-4);
+  border-top: 1px solid var(--v2-border);
+  padding-top: var(--sp-2);
+}
+.tech-details > summary {
+  cursor: pointer;
+  /* WCAG AA at this size needs text-2 (~4.6:1), not text-3 (~3:1) */
+  color: var(--v2-text-2);
+  font-size: var(--fs-aux);
+  padding: var(--sp-2) 0;
+  user-select: none;
+}
+.tech-details > summary:hover { color: var(--v2-text-1); }
+.tech-list { margin: var(--sp-2) 0; display: grid; gap: var(--sp-1); }
+
+/* Source rows: researcher-meaningful subtitle (authors · venue) under title. */
+.source-subtitle { display: block; font-weight: 400; }
+.source-links { display: flex; gap: var(--sp-3); align-items: baseline; }
+
+/* Sidebar group collapse: the button lives inside the h3 (valid heading
+   pattern); it owns the full row hit area. */
+.runs-group-title { margin: 0; font-size: var(--fs-h3); }
+.runs-group-toggle {
+  all: unset;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.runs-group-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.runs-group-caret { font-size: var(--fs-aux); }
+
+/* Palette options are flat listbox rows (no nested buttons): hit text leads,
+   object id trails as muted metadata. */
+.palette-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  cursor: pointer;
+}
+.palette-option--active { background: var(--v2-surface-2); }
+.palette-option .palette-item-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-option .palette-item-hint { flex: 0 0 auto; font-size: var(--fs-aux); }
