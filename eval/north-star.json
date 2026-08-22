@@ -8,7 +8,8 @@
       "current": {
         "value": 0.58,
         "at": "2026-08-22",
-        "evidence": "eval/results/rediscovery.jsonl; evidence/W-EV2/rediscovery.md"
+        "evidence": "eval/results/rediscovery.jsonl; evidence/W-EV2/rediscovery.md",
+        "note": "live re-measurement BLOCKED (D-036); W5-F4 diversity loop landed (premise: measured 30% duplicate rate, spikes/wave5-diversity-probe.mjs) — effect UNVERIFIED-live until a model route returns (D-050)"
       },
       "target": 0.7,
       "stretch": 0.8,
@@ -41,7 +42,8 @@
         "value": 0.61,
         "detail": "supports 11/18 pooled; contradicts structurally eliminated (0/21 post-fix)",
         "at": "2026-08-22",
-        "evidence": "evidence/W-EV2/relation-precision.md"
+        "evidence": "evidence/W-EV2/relation-precision.md",
+        "note": "live re-measurement BLOCKED (D-036); W5-F5 anchored bands + independent link audit landed (D-050) — expected direction: audited labels are modal labels, raising expected single-draw agreement; NOT claimed as measured until re-judged live"
       },
       "target": 0.8,
       "stretch": 0.9,
@@ -54,14 +56,15 @@
       "id": "mlr-bench-overall",
       "what": "MLR-Bench same-judge Overall (farlab vs best anchor o4-mini 7.80/7.40)",
       "current": {
-        "value": 7.0,
+        "value": 7,
         "detail": "idea 7.00 / proposal 6.20; Feasibility 7.40 already exceeds anchors",
         "at": "2026-08-22",
-        "evidence": "eval/results/mlr-bench.jsonl; evidence/W-EV2/mlr-bench.md"
+        "evidence": "eval/results/mlr-bench.jsonl; evidence/W-EV2/mlr-bench.md",
+        "note": "W5-F3 adapter fidelity landed (D-050): judging protocol now includes idea-consistency context — post-D-050 numbers NOT directly comparable to the recorded 30/30 (old/new protocols must both be reported); farlab-vs-anchor internal comparisons stay symmetric; live re-run queued on D-036"
       },
       "target": {
         "idea": 7.4,
-        "proposal": 7.0
+        "proposal": 7
       },
       "stretch": {
         "idea": 7.7,
@@ -79,9 +82,9 @@
       "what": "Schema-validation failure rate AFTER full tolerance chain + strict-FC (per model call)",
       "current": {
         "value": 0.011,
-        "detail": "1 mid-run rejection (mixed provenance) across ~91 calls in strict-FC verification runs; fixed at schema level",
+        "detail": "Live value 0.011 stands (1 mixed-provenance rejection / ~91 calls, run_prrxcee6 41/41 after schema fix). W7 (2026-08-22): per-call live re-measurement BLOCKED (DeepSeek 402, wave-open probe archived); deterministic same-corpus repair-layer coverage improved 9/68 -> 68/68 corruption classes (evidence/W7/repair-benchmark.md), live-class 192/192 held, repair worst-path 1.39ms vs 2s budget",
         "at": "2026-08-22",
-        "evidence": "D-026/D-029b; run_prrxcee6 41/41 tool_calls zero failures"
+        "evidence": "D-026/D-029b; run_prrxcee6; evidence/W7/repair-benchmark.md; spikes/model-spike/runs/2026-08-22T02-38-26-825Z-deepseek.json"
       },
       "target": 0.005,
       "stretch": 0.001,
