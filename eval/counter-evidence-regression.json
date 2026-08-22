@@ -1,0 +1,63 @@
+{
+  "purpose": "regression set for counter-evidence improvement designs B (falsify direction check) and C (qualifies rehoming) from evidence/W9/counter-evidence-miss-diagnosis.md (D-057). Run against any improved labeling after live routes return; strict-hit metric must reach >=0.70 north-star on a LARGER fresh sample, this set only guards against regressing on known cases.",
+  "annotator": "main-agent (from blind-rejudge justifications, spikes/output/relation-precision-fullfix.jsonl)",
+  "protocol": "goldDirection = the defensible semantic relation of claim->hypothesis read from the blind judge justification + mechanism text; empty-seat cases the judge already labeled unrelated (agreement); the two reclassifications (qualifies/supports) are main-agent adjudications of the judge's own reasoning, disclosed as such",
+  "cases": [
+    {
+      "relationId": "ev_tc2gj6mxqqcmd8c",
+      "pipelineLabel": "weakens",
+      "goldDirection": "unrelated",
+      "failureMode": "empty-seat-granularity-mismatch",
+      "claimSummary": "T790M clinical timeline/marker",
+      "hypothesisMechanism": "ecDNA-mediated intratumoral heterogeneity"
+    },
+    {
+      "relationId": "ev_9dqvzrkyzyxj4sx",
+      "pipelineLabel": "weakens",
+      "goldDirection": "unrelated",
+      "failureMode": "empty-seat-granularity-mismatch",
+      "claimSummary": "AKT3 upregulation resistance",
+      "hypothesisMechanism": "IGF/IGF1R + HSP90-Met bypass"
+    },
+    {
+      "relationId": "ev_7en2jdtmtv47j6t",
+      "pipelineLabel": "weakens",
+      "goldDirection": "unrelated",
+      "failureMode": "empty-seat-granularity-mismatch",
+      "claimSummary": "T790M incidence statistics",
+      "hypothesisMechanism": "ecDNA amplification heterogeneity"
+    },
+    {
+      "relationId": "ev_51dwfd6273qa99b",
+      "pipelineLabel": "weakens",
+      "goldDirection": "qualifies",
+      "failureMode": "qualifies-misfiled-as-counter",
+      "claimSummary": "dual-resistant clones lack T790M/Met (alternative mechanisms)",
+      "hypothesisMechanism": "ecDNA-mediated amplification (claim is co-directional but mechanism-untouched)"
+    },
+    {
+      "relationId": "ev_5sn82717dgjshge",
+      "pipelineLabel": "weakens",
+      "goldDirection": "unrelated",
+      "failureMode": "empty-seat-granularity-mismatch",
+      "claimSummary": "gefitinib+anlotinib VEGFR2 synergy",
+      "hypothesisMechanism": "AKT3/PI3K survival signaling"
+    },
+    {
+      "relationId": "ev_h7vxmjgvamjn9d4",
+      "pipelineLabel": "contradicts",
+      "goldDirection": "supports",
+      "failureMode": "inverted-label-direction",
+      "claimSummary": "resistance via alternative mechanisms, not specific mutations",
+      "hypothesisMechanism": "subclonal diversity governs resistance (claim SUPPORTS it)"
+    },
+    {
+      "relationId": "ev_ya66v7gay7kda59",
+      "pipelineLabel": "contradicts",
+      "goldDirection": "contradicts",
+      "failureMode": "true-positive",
+      "claimSummary": "AKT3 knockdown does NOT restore TKI sensitivity",
+      "hypothesisMechanism": "AKT3 upregulation sustains PI3K/AKT survival"
+    }
+  ]
+}
