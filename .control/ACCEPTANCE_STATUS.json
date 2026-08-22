@@ -251,12 +251,14 @@
       "critical": true,
       "status": "implemented",
       "evidence": [
-        "env pinning implemented: uv --frozen family lockfile, lockfileHash recorded per run; OMP/BLAS threads pinned (src/experiment/python.ts)",
-        "local execution with cancel probe between models + failure persistence (tests: failure path green)",
-        "REMAINING for live_verified: durable scheduler (far-scheduler.db per D-085 P0-3), remote gateway to Docker/WSL2 target (D-084, daemon currently stopped), checkpoint/resume of long runs"
+        "env pinning: uv --frozen family lockfile, lockfileHash recorded per run; OMP/BLAS threads pinned (src/experiment/python.ts)",
+        "DURABLE SCHEDULER LANDED (D-085 P0-3): src/experiment/scheduler.ts — independent far-scheduler.db (WAL, own v1 schema), priority DESC dispatch, per-worker concurrency slots counting only live heartbeats, cooperative cancel (queued instant / running flag), fence-token terminal writes rejecting disowned zombies, crash-window idempotence via ResultCell fingerprint replay (tests/scheduler.test.ts: lifecycle/priority, heartbeat-expiry reclaim + zombie rejection, cancel, e2e worker projection into BOTH stores with same run id, 2-worker mutual exclusion draining 4 real jobs attempts-all-1 in 4.6s)",
+        "spec-hash canonicalization fix (root cause): zod round-trip reorders keys vs literal construction — experimentSpecHash now uses key-sorted canonicalJson, eliminating false drift positives",
+        "training logs remain content-addressed artifacts (never queue rows, never run events)",
+        "REMAINING for live_verified: ssh2 gateway execution on the Docker/WSL2 Linux target (D-084; Docker daemon user-side) + long-run lease/heartbeat integration with the orchestrator execute stage"
       ],
       "note": "EEL E5 infra: env pinning + local exec + remote gateway (D-081)",
-      "lastUpdated": "2026-08-22T09:15:20.950Z"
+      "lastUpdated": "2026-08-22T09:51:04.201Z"
     },
     {
       "id": "ACC-26",
