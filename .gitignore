@@ -47,3 +47,6 @@ build/
 
 # EEL sidecar venv (uv-managed, machine-local)
 experiment-runtime/.venv/
+
+# ZCode session-local state (plans, memories, runtime artifacts)
+.zcode/
