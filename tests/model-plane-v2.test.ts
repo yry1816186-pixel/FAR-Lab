@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openDb } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
-import { createFallbackProvider, isFailoverWorthy, COOLDOWN_MS } from '../src/providers/fallback.js';
+import { createFallbackProvider, isFailoverWorthy, clearFallbackCooldowns, COOLDOWN_MS } from '../src/providers/fallback.js';
 import { parseModels } from '../src/providers/discovery.js';
 import { aggregateRunUsage, aggregateWorkspaceUsage } from '../src/app/usage-ledger.js';
 import { resolveChainNames } from '../src/app/provider-resolver.js';
@@ -61,6 +61,7 @@ describe('failover classification (LiteLLM-verified semantics)', () => {
 });
 
 describe('fallback chain behavior', () => {
+  beforeEach(() => clearFallbackCooldowns());
   it('fails over to the second route after a failover-worthy exhaustion and reports the serving route', async () => {
     const failovers: Array<{ from: string; to: string }> = [];
     const chain = createFallbackProvider(
@@ -138,6 +139,17 @@ describe('resolver chain building (cycles cut, depth bounded)', () => {
     store.putObject('model_config', cfg(idB, [idA])); // cycle back to A
     const names = resolveChainNames(store, idA);
     expect(names).toEqual([`custom:${idA}`, `custom:${idB}`]); // A not repeated
+  });
+
+  it('flattens ALL declared fallbacks breadth-first — none silently ignored (red-team P1-2)', () => {
+    const store = mkStore();
+    const idC = newId('mcfg');
+    const idD = newId('mcfg');
+    store.putObject('model_config', cfg(idA, [idB, idC, idD]));
+    store.putObject('model_config', cfg(idB, []));
+    store.putObject('model_config', cfg(idC, []));
+    store.putObject('model_config', cfg(idD, []));
+    expect(resolveChainNames(store, idA)).toEqual([`custom:${idA}`, `custom:${idB}`, `custom:${idC}`, `custom:${idD}`]);
   });
 
   it('cuts at a dangling fallback id without failing the primary', () => {

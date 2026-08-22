@@ -21,7 +21,10 @@ import {
 import type { RunStageName } from '../src/domain/index.js';
 import { STAGE_ORDER } from '../src/domain/run.js';
 import type { StageHandler } from '../src/pipeline/types.js';
+import type { RunStageName } from '../src/domain/run.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../src/shared/ports.js';
+import type { StageHandler } from '../src/pipeline/types.js';
+import type { RunStageName } from '../src/domain/run.js';
 import type { SourceFamily } from '../src/domain/source.js';
 
 /**
@@ -341,6 +344,148 @@ describe('orchestrator quality-gate regeneration loop', () => {
     // the second weak evaluation is disclosed, not silently swallowed
     const proceeding = store.listEvents(run.id).find((e) => e.detail.reason === 'quality_gate_weak_proceeding');
     expect(proceeding?.detail.round).toBe(MAX_QUALITY_ROUNDS);
+    db.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P0-1 regression (red-team): the regeneration loop must work with the REAL
+// generate_hypotheses stage handler — stub handlers with applicable:()=>true once
+// masked a dead reopen flag. This test drives the orchestrator with the real stage
+// and asserts round-2 hypotheses are actually generated and persisted.
+// ---------------------------------------------------------------------------
+
+describe('quality-gate regeneration with the REAL generate_hypotheses stage', () => {
+  const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'far-qg-real-'));
+
+  it('reopens, re-runs the real stage, persists NEW hypotheses, consumes the reopen flag', async () => {
+    const { createTestStubProvider } = await import('../src/providers/test-stub.js');
+    const { generateHypothesesStage } = await import('../src/pipeline/stages/hypotheses.js');
+    const { ScientificClaim, SourceDocument } = await import('../src/domain/index.js');
+    const { Orchestrator } = await import('../src/app/orchestrator.js');
+    const { STAGE_ORDER } = await import('../src/domain/run.js');
+
+    const dir = tmp();
+    const db = openDb(path.join(dir, 'far.db'));
+    const store = new Store(db);
+    const q = ResearchQuestion.parse({
+      id: newId('q'), text: 'Why do base editors cause off-target deamination?', background: '', goalType: 'explanatory',
+      scope: { domain: 'genome editing', phenomena: ['off-target'] }, constraints: {}, createdAt: new Date().toISOString(),
+    });
+    const run = store.createRun(q);
+    const SRC = newId('src');
+    store.putObject('source_document', SourceDocument.parse({
+      id: SRC, runId: run.id, family: 'openalex', identifiers: [{ kind: 'doi', value: '10.1/x' }],
+      title: 'Source', retrievedAt: new Date().toISOString(), contentHash: 'a'.repeat(64),
+      contentDepth: 'abstract', accessState: 'unknown', parseStatus: 'ok',
+    }));
+    for (const text of ['claim one about deamination windows', 'claim two about inhibitor effects']) {
+      store.putObject('claim', ScientificClaim.parse({
+        id: newId('clm'), runId: run.id, text, bindingStatus: 'verified', alignmentChecked: true,
+        locators: [{ sourceDocumentId: SRC, quote: 'verbatim: ' + text }],
+      }));
+    }
+
+    // Purpose-keyed dynamic responses: round 1 vs round 2 (payload carries
+    // previousRoundCritique in the regeneration round) return DIFFERENT candidates,
+    // so round 2 must persist genuinely new hypotheses.
+    // Round flavors are MATERIALLY different words (not near-verbatim), so the
+    // regeneration paraphrase guard must let round-2 candidates through.
+    const cand = (n: string, flavor: string) => ({
+      statement: 'Hypothesis ' + n + ': the ' + flavor + ' pathway explains the observed off-target deamination pattern',
+      mechanism: 'mechanism via ' + flavor,
+      assumptions: ['assumption ' + n + ' a', 'assumption ' + n + ' b'],
+      predictions: ['prediction ' + n],
+      rationale: 'rationale ' + n,
+      distinctnessRationale: 'distinct ' + n,
+      evidenceClaimIds: [],
+    });
+    const flavorOf = (r: 1 | 2): string => (r === 1 ? 'cytosine deamination window widening' : 'polymerase slippage at repeat loci');
+    type StubReq = { task?: string; userPayload?: { input?: { previousRoundCritique?: unknown; numberedCandidates?: Array<{ index: number }> } } };
+    const rround = (req: StubReq): 1 | 2 => (req.userPayload?.input?.previousRoundCritique !== undefined ? 2 : 1);
+    const dynamics: Record<string, (req: StubReq) => unknown> = {
+      'hypothesis-search:evidence-conditioned': (req) => ({ candidates: [cand('ec1-r' + rround(req), flavorOf(rround(req))), cand('ec2-r' + rround(req), flavorOf(rround(req)))] }),
+      'hypothesis-search:contradiction-driven': (req) => ({ candidates: [cand('cd1-r' + rround(req), flavorOf(rround(req))), cand('cd2-r' + rround(req), flavorOf(rround(req)))] }),
+      'hypothesis-search:mechanism-driven': (req) => ({ candidates: [cand('md1-r' + rround(req), flavorOf(rround(req))), cand('md2-r' + rround(req), flavorOf(rround(req)))] }),
+      // Cluster/novelty handlers answer with a minimal schema-valid response; the
+      // stage's own normalization treats unmentioned candidates as distinct
+      // singletons / 'mixed' — no payload introspection needed (and none trusted).
+      'hypothesis-search:cluster-dedup': () => ({ clusters: [{ memberIndices: [0], reason: 'scripted singleton; the rest normalize to distinct' }] }),
+      'hypothesis-search:novelty-labels': () => ({ labels: [{ index: 0, noveltyLabel: 'mixed' }] }),
+      // the scripted single-cluster answer drops the representative count below
+      // MIN_REPRESENTATIVES, so the stage asks for a supplement — answer honestly empty
+      'hypothesis-search:diversity-supplement': () => ({ candidates: [] }),
+      'novelty-check:query-expansion': () => ({ hypotheses: [{ hypothesisId: 'unused', queries: ['q one about editors', 'q two about deamination'] }] }),
+    };
+    const inner = createTestStubProvider([]);
+    const provider: ModelProvider = {
+      name: inner.name,
+      liveReady: true,
+      async structuredCall(req, parse) {
+        const dyn = dynamics[req.task];
+        if (dyn === undefined) throw new Error('TEST: unexpected purpose ' + String(req.task));
+        const data = dyn(req as StubReq);
+        const parsed = parse(data);
+        if (parsed instanceof Error) throw new Error('TEST dynamic schema fail for ' + String(req.task) + ': ' + parsed.message);
+        return {
+          ok: true as const, data: parsed as unknown,
+          receipt: { provider: inner.name, modelId: 'test-stub', latencyMs: 0, usage: {},
+            requestHash: 'a'.repeat(64), outputHash: 'b'.repeat(64), executionMode: 'test' as const },
+        };
+      },
+    };
+
+    const h1 = 'hyp_' + 'd'.repeat(21);
+    const h2 = 'hyp_' + 'e'.repeat(21);
+    const h3 = 'hyp_' + 'f'.repeat(21);
+    let rankCalls = 0;
+    const okHandler = (stage: RunStageName): StageHandler => ({
+      stage, applicable: async () => true, execute: async () => ({ kind: 'done', summary: String(stage) + ' done' }),
+    });
+    const stages = new Map<RunStageName, StageHandler>(
+      STAGE_ORDER.map((stage) => [
+        stage,
+        stage === 'generate_hypotheses' ? generateHypothesesStage
+          : stage === 'rank'
+            ? {
+              stage,
+              applicable: async () => true,
+              execute: async () => {
+                rankCalls += 1;
+                const cards = rankCalls === 1
+                  ? [makeScorecard(run.id, h1, 1, [0.2, 0.2, 0.2]), makeScorecard(run.id, h2, 2, [0.15, 0.15, 0.15]), makeScorecard(run.id, h3, 3, [0.1, 0.1, 0.1])]
+                  : [makeScorecard(run.id, h1, 1, [0.9, 0.85, 0.9]), makeScorecard(run.id, h2, 2, [0.8, 0.8, 0.8]), makeScorecard(run.id, h3, 3, [0.7, 0.7, 0.7])];
+                for (const c of cards) store.putObject('scorecard', c);
+                return { kind: 'done', summary: 'rank ' + rankCalls };
+              },
+            }
+            : okHandler(stage),
+      ] as const),
+    );
+    const artifacts = {
+      async put(payload: string | Uint8Array) { return { ref: 'sha256:' + '0'.repeat(64), bytes: typeof payload === 'string' ? payload.length : payload.length }; },
+      async get() { throw new Error('no artifacts in this test'); },
+    } as unknown as ArtifactStore;
+    const orch = new Orchestrator({
+      store, artifacts, provider,
+      sourceFor: () => { throw new Error('no source adapter - literature novelty degrades honestly'); },
+      stages, signals: new Map(),
+    });
+    const after = await orch.execute(run.id);
+    if (after.status !== 'completed') {
+      throw new Error('run ended ' + after.status + ' | failed: ' + after.stages.filter((x) => x.state === 'failed').map((x) => x.stage + ' :: ' + String(x.error)).join(' ; '));
+    }
+
+    expect(after.status).toBe('completed');
+    expect(rankCalls).toBe(2);
+    // THE load-bearing assertions: the real stage ran twice and round-2 hypotheses
+    // are persisted (6 singleton clusters per round -> 12 hypotheses).
+    const hypotheses = store.listObjects('hypothesis', run.id);
+    expect(hypotheses.length).toBe(12);
+    expect(hypotheses.some((h) => h.statement.includes('r2'))).toBe(true);
+    expect(after.stages.find((s) => s.stage === 'generate_hypotheses')?.attempt).toBe(2);
+    expect(store.getMeta('qg:active:' + run.id)).toBe('0'); // consumed, never re-loops
+    expect(store.listEvents(run.id).some((e) => e.type === 'note' && e.detail.reason === 'quality_gate_regeneration')).toBe(true);
     db.close();
   });
 });
