@@ -12,7 +12,7 @@ import {
 import { acquireDataset } from './datasets.js';
 import { applySplit } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
-import { SSHGateway } from './gateway.js';
+import { SSHGateway, remoteTimeoutWrap, truncateOutput } from './gateway.js';
 import { experimentSpecHash, computeStatReports, buildFeedback } from './executor.js';
 
 /**
@@ -135,9 +135,21 @@ export const executeRemoteExperiment = async (
       await opts.gateway.putFile(payloadPath, `${remoteDir}/payload.json`);
       fs.rmSync(path.dirname(payloadPath), { recursive: true, force: true });
       const t0 = Date.now();
-      const r = await opts.gateway.exec(`python3 ${remoteDir}/train_eval.py ${remoteDir}/payload.json`, spec.compute.timeoutMs);
-      logLines.push(`model=${model.name} exit=${r.code} ${r.stderr.trim().slice(0, 300)}`);
-      if (r.code !== 0) fail(`remote training ${model.name} exited ${r.code}: ${r.stderr.trim().slice(0, 400)}`);
+      // ag2 remote kill discipline: the REMOTE side enforces the timeout (TERM→KILL),
+      // so a hung training dies on the device instead of orphaning past a local ssh kill.
+      // The local ssh timeout sits slightly beyond the remote one so the exit-124 DATA
+      // comes back instead of a client-side throw.
+      const trainCmd = `python3 ${remoteDir}/train_eval.py ${remoteDir}/payload.json`;
+      const r = await opts.gateway.exec(
+        remoteTimeoutWrap(trainCmd, spec.compute.timeoutMs),
+        spec.compute.timeoutMs + 15_000,
+      );
+      const stderrTail = truncateOutput(r.stderr.trim(), 400);
+      logLines.push(`model=${model.name} exit=${r.code} ${stderrTail}`);
+      if (r.code === 124 || r.code === 137) {
+        fail(`remote training ${model.name} timed out on the device (exit ${r.code}: ${r.code === 124 ? 'TERM' : 'SIGKILL escalation'}, budget ${spec.compute.timeoutMs}ms)`);
+      }
+      if (r.code !== 0) fail(`remote training ${model.name} exited ${r.code}: ${stderrTail}`);
       const res = JSON.parse(r.stdout.trim()) as RemoteTrainResult;
       if (res.nTrain !== outcome.trainIdx.length || res.nTest !== outcome.testIdx.length) {
         fail(`remote row-count mismatch for ${model.name}: ${res.nTrain}/${res.nTest} != ${outcome.trainIdx.length}/${outcome.testIdx.length}`);

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { PlanDeviation, ResearchPlan, TestSpec } from '../../domain/index.js';
 import { newId } from '../../domain/index.js';
+import { numericProvenanceAudit } from '../../shared/numeric-provenance.js';
 
 /**
  * Wave-S deterministic checks over the structured preregistration layer (plan.ts g1):
@@ -18,6 +19,8 @@ export interface StructuredCheckInput {
   predictions: ResearchPlan['predictions'];
   expectedInfoGain?: ResearchPlan['expectedInfoGain'];
   alternativeBranches: readonly string[];
+  bayesianCalibrationNote?: string;
+  decisionRules?: ResearchPlan['decisionRules'];
 }
 
 export interface StructuredCheckResult {
@@ -156,6 +159,44 @@ export const checkStructuredPreregistration = (
   // evidence would decide.
   if ((plan.hypothesisIds.length > 1 || plan.alternativeBranches.length > 0) && plan.expectedInfoGain === undefined) {
     errors.push('expectedInfoGain 缺失：多假设/含分支的计划必须给出结构化信息价值块（decisionAtStake/ambiguitySource/discriminatingMetric/expectedSeparation）');
+  }
+
+  // g4 (d4) — inference-framework coherence: one framework per test (structurally
+  // guaranteed: TestSpec.interpretation is a single enum, so cross-framework atom
+  // conjunction inside one rule is impossible by construction). What remains checkable:
+  // Bayesian tests must DECLARE how their thresholds calibrate to error rates, and mixed
+  // frameworks within one plan are disclosed (their error-rate interpretations are
+  // mutually exclusive — Lovric 2020 / FDA Bayesian guidance lineage).
+  const frameworks = new Set(plan.testSpecs.map((t) => t.interpretation));
+  if (frameworks.has('bayesian') && plan.bayesianCalibrationNote === undefined) {
+    errors.push('interpretation=bayesian 的检验必须声明校准策略（bayesianCalibrationNote：贝叶斯决策阈值如何映射到频率派错误率）——未声明的贝叶斯判据不可审计');
+  }
+  if (frameworks.size > 1) {
+    warnings.push(
+      `同计划混用 ${frameworks.size} 种推断框架（${[...frameworks].join(' + ')}）——各框架的错误率解释互斥，呈现层必须分轨披露，禁止跨框架合取判据`,
+    );
+  }
+
+  // g11-lite (s5, AutoResearchClaw VerifiedRegistry semantics): numbers asserted in the
+  // free-text decision layer must have a structured anchor (testSpec threshold/alpha).
+  // An unanchored number is surfaced as a stipulation — visible, never silently surviving.
+  if (plan.testSpecs.length > 0 && plan.decisionRules !== undefined) {
+    const whitelist = plan.testSpecs.flatMap((t) =>
+      [t.alpha, t.threshold].filter((v): v is number => v !== undefined),
+    );
+    const freeText = [
+      plan.decisionRules.successCriterion,
+      plan.decisionRules.weakeningCriterion,
+      plan.decisionRules.falsificationCriterion,
+      plan.decisionRules.stopCriterion,
+      ...plan.metricSpecs.map((m) => m.definition),
+    ].join('\n');
+    const audit = numericProvenanceAudit(freeText, whitelist);
+    for (const token of audit.unverified) {
+      warnings.push(
+        `自由文本判据中的数值 ${token.raw} 在结构化层（testSpecs 的 threshold/alpha）无锚点——该数值按 model-stipulated 对待，无预注册出处`,
+      );
+    }
   }
 
   return { structured: true, errors, warnings };
