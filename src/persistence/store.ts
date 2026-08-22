@@ -6,6 +6,7 @@ import {
   ProvenanceReceipt, ReproducibilityBundle, newId,
   ExperimentSpec, ExperimentRun, DatasetRecord, ResultSet, StatReport,
   ModelProviderConfig, AgentSession, AgentReport,
+  EvidenceBody, AchAnalysis, LedgerEntry,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -34,6 +35,9 @@ const KIND_SCHEMAS = {
   model_config: ModelProviderConfig,
   agent_session: AgentSession,
   agent_report: AgentReport,
+  evidence_body: EvidenceBody,
+  ach_analysis: AchAnalysis,
+  prediction: LedgerEntry,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});

@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { newId, ResearchPlan } from '../../domain/index.js';
+import { newId, ResearchPlan, LedgerEntry, probsFromExpected } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
 import { callStructured } from '../llm.js';
 import type { StageHandler } from '../types.js';
+import { checkStructuredPreregistration, freezePlan } from './plan-formal.js';
 
 /**
  * plan stage (mission §31): turn the top-ranked representative hypotheses into a
@@ -33,6 +34,16 @@ const PLAN_SYSTEM_PROMPT = [
     'everything else is secondary/descriptive), "alpha_spending" (split a pre-declared error budget across staged checks), ' +
     'or "e_value_accumulation" (anytime-valid e-values aggregated across checks) — and justify the allocation in ' +
     'multipleTestingNote. Single-hypothesis plans may omit it (one primary comparison by construction).',
+  'Structured preregistration (Wave-S): alongside the prose fields, provide metricSpecs (name/definition/role primary|secondary/' +
+    'direction higher_better|lower_better|two_sided), testSpecs (metric binding + statistic permutation|bootstrap_ci|wilson|kappa|' +
+    'mde_gate|descriptive + predicted effect supports|weakens|excludes + threshold + thresholdOp), and predictions per hypothesis ' +
+    '{observable, condition, expectedRelation} — two hypotheses genuinely compete ONLY if they predict different relations for the ' +
+    'same observable+condition. Provide expectedInfoGain {decisionAtStake, ambiguitySource, discriminatingMetric, expectedSeparation} ' +
+    'when the plan discriminates >1 hypothesis or has branches; step gates {proceedIf, killIf} for experiment steps; replication ' +
+    '{type} when a step repeats prior work; targetTrialProtocol (7 elements) when making causal claims from observational data; ' +
+    'and measurable/estimand/controlRun one-liners when applicable. Thresholds must follow the metric direction (a higher_better ' +
+    'metric succeeds at ">= threshold" and weakens/excludes at "<= threshold"). Leave a field absent rather than fabricating it — ' +
+    'absence is disclosed, fabrication is not tolerated.',
 ].join(' ');
 
 /** Model-output shape: the full plan minus server-owned fields (id/runId/createdAt/check). */
@@ -312,17 +323,69 @@ export const planStage: StageHandler = {
     // A dropped dependency leaves the step ordering undefined — recorded in `missing`,
     // never silent; dropped input refs stay warning-level (ctx.log above).
     const check = checkPlanExecutability(plan, hypotheses.map((h) => h.id));
+    // Wave-S g2/g3: the structured preregistration layer is audited exactly when present.
+    const structured = checkStructuredPreregistration(plan, hypotheses.map((h) => h.id));
     const missing = [
       ...check.missing,
+      ...structured.errors.map((e) => `结构化预注册校验：${e}`),
       ...refSanitize.droppedDeps.map(
         (d) => `steps[${d.stepIndex}]「${d.stepTitle}」依赖缺失：dependsOn 引用 ${d.ref} 不在本 plan 内，已剔除`,
       ),
     ];
-    plan.executabilityCheck = { passed: missing.length === 0, missing };
+    // g13 freeze (RR stage-1): register the content hash BEFORE anything can drift.
+    const now = new Date().toISOString();
+    const freeze = freezePlan(plan, now);
+    plan.planHash = freeze.planHash;
+    plan.frozenAt = freeze.frozenAt;
+    plan.executabilityCheck = {
+      passed: missing.length === 0,
+      missing,
+      structuredWarnings: structured.warnings,
+    };
     ctx.store.putObject('plan', plan);
 
+    // L4 self-calibration loop: forward predictions go on the ledger at EMISSION time —
+    // every structured prediction and the tournament's top call become scoreable claims.
+    for (const p of plan.predictions) {
+      ctx.store.putObject(
+        'prediction',
+        LedgerEntry.parse({
+          id: newId('prd'),
+          runId,
+          kind: 'expected_relation',
+          stage: 'plan',
+          predictor: 'plan-structured-preregistration',
+          assertion: {
+            hypothesisId: p.hypothesisId,
+            observable: p.observable,
+            condition: p.condition,
+            expectedRelation: p.expectedRelation,
+          },
+          probs: probsFromExpected(p.expectedRelation),
+          predictedAt: now,
+          settlesWith: 'experiment_verdict',
+        }),
+      );
+    }
+    const topScorecard = scorecards[0];
+    if (topScorecard !== undefined) {
+      ctx.store.putObject(
+        'prediction',
+        LedgerEntry.parse({
+          id: newId('prd'),
+          runId,
+          kind: 'rank_order',
+          stage: 'rank',
+          predictor: 'rank-tournament-bt',
+          assertion: { topHypothesisId: topScorecard.hypothesisId },
+          predictedAt: now,
+          settlesWith: 'experiment_verdict',
+        }),
+      );
+    }
+
     const summary = plan.executabilityCheck.passed
-      ? `plan ${plan.id} covers ${plan.hypothesisIds.length} hypothesis(es); executabilityCheck passed`
+      ? `plan ${plan.id} covers ${plan.hypothesisIds.length} hypothesis(es); executabilityCheck passed; frozen ${plan.planHash.slice(0, 12)}; ${plan.predictions.length} prediction(s) on ledger`
       : `plan ${plan.id} persisted with executabilityCheck FAILED — missing: ${plan.executabilityCheck.missing.join('; ')}`;
     ctx.log(summary);
     return { kind: 'done', summary };

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { callStructured } from '../llm.js';
-import { HypothesisComparison, HypothesisScorecard, HypothesisTournament, ScoreDimension, newId } from '../../domain/index.js';
+import { HypothesisComparison, HypothesisScorecard, HypothesisTournament, ScoreDimension, newId, buildAchAnalysis, buildEvidenceBody, countExperimentalAxes } from '../../domain/index.js';
 import type { TournamentMatch } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
@@ -752,6 +752,49 @@ export const rankStage: StageHandler = {
       const stored = await ctx.artifacts.put(JSON.stringify(comparison, null, 2));
       artifacts.push(stored.ref);
       comparisonNoteDone = `top-2 comparison (${a.hyp.id} vs ${b.hyp.id}, preferred=${comparison.preferred}, ${criteria.length} criteria) stored as artifact ${stored.ref}`;
+    }
+
+    // Wave-S g8/g9 — deterministic evidence-body ratings (floor certainty, independent
+    // sources, Σlog-LR band, QBAF + Carneades standard, g7 orthogonal promotion) and the
+    // ACH diagnosticity/removal-sensitivity audit (Heuer steps 4-6). Pure functions over
+    // stored relations/claims; no LLM anywhere. Additive analysis: a failure here is
+    // logged loudly but must not fail scoring itself.
+    try {
+      const relations = ctx.store.listObjects('evidence_relation', runId);
+      const allClaims = ctx.store.listObjects('claim', runId);
+      const feedbackSignals = ctx.store.listObjects('feedback', runId);
+      const now = new Date().toISOString();
+      for (const r of ranked) {
+        const relevant = feedbackSignals.filter((s) => {
+          const target = s.target;
+          return target === undefined || target.kind !== 'hypothesis' || target.id === r.hyp.id;
+        });
+        ctx.store.putObject(
+          'evidence_body',
+          buildEvidenceBody({
+            id: newId('evb'),
+            runId,
+            hypothesisId: r.hyp.id,
+            relations,
+            claims: allClaims,
+            experimentalAxes: countExperimentalAxes(relevant),
+            now,
+          }),
+        );
+      }
+      ctx.store.putObject(
+        'ach_analysis',
+        buildAchAnalysis({
+          id: newId('ach'),
+          runId,
+          hypothesisIds: ranked.map((r) => r.hyp.id),
+          relations,
+          now,
+        }),
+      );
+      ctx.log(`g8/g9: ${ranked.length} evidence body rating(s) + ACH diagnosticity analysis persisted`);
+    } catch (e) {
+      ctx.log(`g8/g9 evidence-body computation failed (non-fatal, additive analysis only): ${e instanceof Error ? e.message : String(e)}`);
     }
 
     const unscored = targets.filter((h) => !ranked.some((r) => r.hyp.id === h.id)).map((h) => h.id);

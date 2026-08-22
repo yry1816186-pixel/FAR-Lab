@@ -25,6 +25,9 @@ export const DatasetRecordId = idOf('ds');
 export const ResultSetId = idOf('rset');
 export const StatReportId = idOf('srep');
 export const ModelConfigId = idOf('mcfg');
+export const EvidenceBodyId = idOf('evb');
+export const AchAnalysisId = idOf('ach');
+export const PredictionId = idOf('prd');
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -47,6 +50,9 @@ export type DatasetRecordId = z.infer<typeof DatasetRecordId>;
 export type ResultSetId = z.infer<typeof ResultSetId>;
 export type StatReportId = z.infer<typeof StatReportId>;
 export type ModelConfigId = z.infer<typeof ModelConfigId>;
+export type EvidenceBodyId = z.infer<typeof EvidenceBodyId>;
+export type AchAnalysisId = z.infer<typeof AchAnalysisId>;
+export type PredictionId = z.infer<typeof PredictionId>;
 
 /** kind -> the ID shape that kind legitimately takes. */
 const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {
@@ -68,6 +74,9 @@ const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {
   dataset_record: /^ds_[0-9a-z]{20,32}$/,
   result_set: /^rset_[0-9a-z]{20,32}$/,
   stat_report: /^srep_[0-9a-z]{20,32}$/,
+  evidence_body: /^evb_[0-9a-z]{20,32}$/,
+  ach_analysis: /^ach_[0-9a-z]{20,32}$/,
+  prediction: /^prd_[0-9a-z]{20,32}$/,
   // Artifact refs are content addresses, not prefixed entity ids.
   artifact: /^sha256:[0-9a-f]{64}$/,
 };
@@ -77,6 +86,7 @@ const OBJECT_REF_KINDS = [
   'evidence_relation', 'hypothesis', 'plan', 'task', 'feedback', 'revision',
   'receipt', 'bundle', 'artifact',
   'experiment_spec', 'experiment_run', 'dataset_record', 'result_set', 'stat_report',
+  'evidence_body', 'ach_analysis', 'prediction',
 ] as const;
 type ObjectRefKind = (typeof OBJECT_REF_KINDS)[number];
 

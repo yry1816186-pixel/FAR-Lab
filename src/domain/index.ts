@@ -12,3 +12,7 @@ export * from './provenance.js';
 export * from './experiment.js';
 export * from './model-config.js';
 export * from './agent.js';
+export * from './formal.js';
+export * from './evidence-body.js';
+export * from './ach.js';
+export * from './prediction.js';

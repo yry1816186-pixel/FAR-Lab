@@ -1,5 +1,6 @@
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { unconsumedSignals } from './revise.js';
+import { VERDICT_CLASSES, settleEntry, type VerdictClass } from '../../domain/index.js';
 
 /**
  * feedback — intake bookkeeping (mission §33). The signal itself was already
@@ -9,6 +10,10 @@ import { unconsumedSignals } from './revise.js';
  * (idempotent per signal id — an event written at intake time counts, so the
  * CLI path and this stage never double-record). Absorbing a signal is NOT done
  * here: that is the revise stage's causal revision. No LLM runs in this stage.
+ *
+ * Wave-S/L4: experiment-verdict signals also SETTLE the plan's registered
+ * predictions on the ledger (proper scoring rules vs the ignorance baseline) —
+ * the self-calibration loop closes here, deterministically.
  */
 export const feedbackStage: StageHandler = {
   stage: 'feedback',
@@ -36,12 +41,44 @@ export const feedbackStage: StageHandler = {
         type: 'feedback_received',
         detail: { feedbackId: signal.id, source: signal.source, target: signal.target ?? null },
       });
-      appended += 1;
+      appended = 1 + appended;
     }
+
+    // L4 settlement: experiment verdicts score the expected_relation ledger entries.
+    let settledCount = 0;
+    const openEntries = ctx.store
+      .listObjects('prediction', ctx.run.id)
+      .filter((e) => e.kind === 'expected_relation' && e.settledAt === undefined && e.voidReason === undefined);
+    const settledEntryIds = new Set<string>();
+    for (const signal of signals) {
+      if (signal.source !== 'experiment') continue;
+      const st = signal.structured ?? {};
+      const hypothesisId = typeof st.hypothesisId === 'string' ? st.hypothesisId : null;
+      const verdict = typeof st.verdict === 'string' && (VERDICT_CLASSES as readonly string[]).includes(st.verdict)
+        ? (st.verdict as VerdictClass)
+        : null;
+      if (hypothesisId === null || verdict === null) continue;
+      for (const entry of openEntries) {
+        if (settledEntryIds.has(entry.id)) continue;
+        if ((entry.assertion as { hypothesisId?: unknown }).hypothesisId !== hypothesisId) continue;
+        ctx.store.putObject(
+          'prediction',
+          settleEntry(entry, {
+            outcomeClass: verdict,
+            settledAt: new Date().toISOString(),
+            outcome: { signalId: signal.id, verdict },
+          }),
+        );
+        settledEntryIds.add(entry.id);
+        settledCount += 1;
+      }
+    }
+
     const pending = unconsumedSignals(ctx);
     const summary =
       `${signals.length} feedback signal(s) stored; ${appended} feedback_received event(s) appended; ` +
-      `${pending.length} unconsumed — awaiting causal revision in the revise stage` +
+      `${settledCount} ledger prediction(s) settled by experiment verdict(s)` +
+      `; ${pending.length} unconsumed — awaiting causal revision in the revise stage` +
       (pending.length > 0 ? `: ${pending.map((s) => s.id).join(', ')}` : '');
     return { kind: 'done', summary };
   },
