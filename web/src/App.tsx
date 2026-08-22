@@ -6,6 +6,7 @@ import type { ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
 import { useConnection } from './state/connection';
+import { useTheme } from './state/theme';
 import { NewRunForm } from './components/NewRunForm';
 import { RunsList } from './components/RunsSidebar';
 import { RunDetail } from './components/RunDetail';
@@ -21,6 +22,7 @@ const MAX_EVENTS_KEPT = 2_000;
 export function App(): JSX.Element {
   const { t, lang, setLang } = useI18n();
   const { online, markOnline, markOffline } = useConnection();
+  const { theme, cycleTheme } = useTheme();
 
   // ---- runs list (5s poll) ----
   const [runs, setRuns] = useState<RunSummary[]>([]);
@@ -187,6 +189,14 @@ export function App(): JSX.Element {
             <span className="conn-dot" aria-hidden="true" />
             {online ? <span className="sr-only">{t('conn.online')}</span> : t('conn.offline')}
           </div>
+          <button
+            type="button"
+            className="theme-toggle"
+            aria-label={t('app.themeToggle')}
+            onClick={cycleTheme}
+          >
+            {t(theme === 'auto' ? 'app.themeAuto' : theme === 'light' ? 'app.themeLight' : 'app.themeDark')}
+          </button>
           <div className="lang-toggle" role="group" aria-label={t('app.langToggle')}>
             <button
               type="button"
