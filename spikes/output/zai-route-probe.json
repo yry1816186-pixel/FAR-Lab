@@ -1,0 +1,14 @@
+{
+ "at": "2026-08-22T04:31:57.652Z",
+ "route": "zai (GLM, bigmodel.cn OpenAI-compatible)",
+ "modelId": "glm-4.6",
+ "ok": false,
+ "wallMs": 248,
+ "error": {
+  "kind": "quota_exceeded",
+  "message": "zai: HTTP 429 code 1113: Insufficient balance or no resource package. Please recharge. — balance/quota exhausted (not a transient rate limit)",
+  "retryable": false,
+  "httpStatus": 429
+ },
+ "note": "API key deliberately absent from this record; hashes only."
+}

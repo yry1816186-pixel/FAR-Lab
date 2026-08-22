@@ -14,16 +14,16 @@
       "critical": false,
       "status": "OPEN",
       "scope": "model-provider",
-      "reason": "Officially SUBMISSION-MANDATED model route cannot be live-verified in this environment (verbatim rule recorded 2026-08-22 in project-spec/COMPETITION.md §0: 基座模型须基于千问(Qwen)系列模型，开发平台需通过阿里云百炼平台调用或比赛官网推荐工具，并提供调用凭证或截图). No DASHSCOPE_API_KEY present and RELAY gateway base URL undiscoverable (8 candidates exhausted, see evidence/W0/model-spike-report.md). Current DeepSeek live route proves the system works but does NOT satisfy the official Qwen-via-Bailian route.",
-      "resolution": "READY-TO-VERIFY: DashScope/Bailian adapter landed (commit bbbb8a8, compatible-mode/v1 qwen-plus default, suite 272/272). The moment the user provides DASHSCOPE_API_KEY (session env, same channel as DEEPSEEK_API_KEY): run node spikes/qwen-route-probe.mjs -> persists the live receipt (spikes/output/qwen-route-probe.json, key never recorded); then optionally one pipeline run with FARLAB_MODEL_PROVIDER=dashscope for end-to-end evidence. No architecture change needed."
+      "reason": "Officially SUBMISSION-MANDATED model route cannot be live-verified in this environment (verbatim rule recorded 2026-08-22 in project-spec/COMPETITION.md §0: 基座模型须基于千问(Qwen)系列模型，开发平台需通过阿里云百炼平台调用或比赛官网推荐工具，并提供调用凭证或截图). No DASHSCOPE_API_KEY present and RELAY gateway base URL undiscoverable (8 candidates exhausted, see evidence/W0/model-spike-report.md). Current DeepSeek live route proves the system works but does NOT satisfy the official Qwen-via-Bailian route. UPDATE 2026-08-22 (W8 session): user delivered .far-run/secrets.env; its DASHSCOPE_API_KEY line carries an EMPTY value (structure-verified with masking; never read into logs) — key still not usable. Route remains OPEN.",
+      "resolution": "READY-TO-VERIFY: adapter landed (bbbb8a8). User action refined: fill DASHSCOPE_API_KEY=<百炼API-KEY> in .far-run/secrets.env (the line currently ends right after \"=\"), then run: node -e \"import('./spikes/load-secrets-env.mjs').then(()=>import('./spikes/qwen-route-probe.mjs'))\" from repo root — persists spikes/output/qwen-route-probe.json receipt without exposing the key."
     },
     {
       "id": "B-DEEPSEEK-BALANCE",
       "critical": true,
       "status": "OPEN",
       "scope": "model-provider",
-      "reason": "Project DeepSeek key balance exhausted (live probe 2026-08-22: HTTP 402 Insufficient Balance). Blocks every live pipeline run and LLM judging (rediscovery v2 completion, any further live verification).",
-      "resolution": "User tops up the DeepSeek account (platform.deepsseek.com). No code change needed; resume by rerunning eval/rediscovery.mjs (failed tasks retry automatically)."
+      "reason": "Project DeepSeek key balance exhausted (live probe 2026-08-22: HTTP 402 Insufficient Balance). Blocks every live pipeline run and LLM judging (rediscovery v2 completion, any further live verification). UPDATE 2026-08-22 (W8 session): ZAI_API_KEY delivered in .far-run/secrets.env but live probe returned HTTP 429 code 1113 Insufficient balance or no resource package (verbatim, spikes/output/zai-route-probe.json) — the GLM route is balance-blocked too. ALL model routes still blocked.",
+      "resolution": "Any ONE of: top up DeepSeek (platform.deepseek.com), recharge z.ai resource package for the provided ZAI key, or fill the (currently empty) DASHSCOPE_API_KEY value. Each unblocks the pooled live-verification queue (W9 judge variance, W5 re-measurements, W8 live soak)."
     }
   ]
 }
