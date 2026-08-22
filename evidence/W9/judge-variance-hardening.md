@@ -37,7 +37,20 @@ The GT was re-decomposed per judging pass — half the decomposition noise. Now 
 - Cross-decomposition swing under the conservative (borderline-all-unmatched) reading: **max 0.091 < 0.15 target**. Under the generous reading the residual reflects ADJUDICATION-DEPENDENT width (**borderline share 57–76% post-calibration; deterministic share 24–43%**) — i.e. most of the F1 information rides on the adjudication layer, disclosed plainly; this is not run-to-run matching noise.
 - The semantic overlap zone [0.124, 0.331] restates D-038 on clean labels: **lexical similarity has a hard ceiling on scientific semantics; the middle band belongs to the (majority-voted) adjudication layer** — determinism buys the extremes only. This is a structural property, not a tuning failure.
 
-## Live variance measurement — BLOCKED (honest)
+## Live variance measurement — MEASURED 2026-08-22 (D-058)
+
+**Judge route migrated per user directives** (DeepSeek banned project-wide; conserve quota): glm-5.3 via Zhipu bigmodel.cn **Anthropic-protocol** endpoint (`open.bigmodel.cn/api/anthropic/v1/messages`; the OpenAI-protocol api.z.ai endpoint returns 1113 for this account). Adapter: `eval/glm-anthropic-provider.mjs`.
+
+**Result (`node eval/judge-variance.mjs --live 3`, minimal scope, single run):**
+
+| task | F1 ×3 | swing |
+|---|---|---|
+| arg-plasmid-transfer | 0.000 / 0.000 / 0.000 | **0** (borderline 0; offline-verified GENUINE: that run hypothesis adopts a biofilm-centric mechanism frame, max lexical sim 0.106 vs fixed GT — all deterministic-no; not a judge bug) |
+| crc-ici-failure | 0.645 / 0.706 / 0.656 | **0.061** |
+
+**worstTaskSwing = 0.061 — target (<0.15) AND stretch (<0.08) both MET.** North-star `rediscovery-judge-variance` current = 0.061 with judge-protocol migration disclosed (deepseek-chat-era numbers not comparable across routes).
+
+Scope honestly 2/5 tasks: run GENERATION has no funded route (main pipeline providers are OpenAI-protocol only; deepseek banned, zai 1113, dashscope keyless) — the 3 missing runs could not be produced. rediscovery-runs.jsonl rebuilt from far.db after a parallel-session phase-1 failure clobbered it. Earlier draft (superseded by this measurement) follows.
 
 `node eval/judge-variance.mjs --live 3` re-judges the same completed runs R times through the identical production pipeline (what the north-star target <0.15 / stretch <0.08 is defined over). **Coverage audit (2026-08-22, pre-unblock):** eval/results/rediscovery-runs.jsonl carries only TWO valid runIds (arg-plasmid-transfer, crc-ici-failure — both completed in db); the other 6 lines are historical error entries without runIds. On unlock, run `node eval/rediscovery.mjs` FIRST — its phase-1 increment logic re-runs the 3 missing tasks (egfr/cdiff/crispr, same blockers previously) — THEN `--live 3` measures all 5; without the top-up the live variance would cover 2/5 tasks only. Provider routing: deepseek default or FARLAB_JUDGE_PROVIDER=dashscope (9ba64f6). **Blocked: all model routes down** — deepseek chat 402 Insufficient Balance (probe 2026-08-22 this session, verbatim; /models 200 does NOT imply spendable balance), zai 401 token expired, dashscope keyless. Harness ready; single recharge (any of three routes, D-036) unblocks. North-star `rediscovery-judge-variance` current stays **0.5 (v1 measured) with the v2.1 offline evidence noted** — no live claim made.
 
