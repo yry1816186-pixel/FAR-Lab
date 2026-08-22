@@ -367,6 +367,22 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
     seenSourceIds.add(sourceId);
     citedSourceIds.push(sourceId);
   }
+  // Deterministic encounter order INDEPENDENT of random object ids (a claim-id sort is
+  // per-store stable but run-to-run random, which made DOI dedupe flip winners).
+  // Canonical record wins: resolved verification first, then earliest retrieval, then
+  // content hash — a fully derived total order.
+  citedSourceIds.sort((a, b) => {
+    const sa = sourceById.get(a);
+    const sb = sourceById.get(b);
+    if (sa === undefined || sb === undefined) return a < b ? -1 : 1;
+    const ra = sa.verification?.resolved === true ? 0 : 1;
+    const rb = sb.verification?.resolved === true ? 0 : 1;
+    if (ra !== rb) return ra - rb;
+    const ta = sa.retrievedAt ?? '';
+    const tb = sb.retrievedAt ?? '';
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    return sa.contentHash < sb.contentHash ? -1 : sa.contentHash > sb.contentHash ? 1 : 0;
+  });
   const allocateKey = keyAllocator();
   const seenIdentifierKeys = new Set<string>();
   const references = citedSourceIds
