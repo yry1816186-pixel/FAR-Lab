@@ -8,7 +8,7 @@
       "current": {
         "value": 0.58,
         "at": "2026-08-22",
-        "evidence": "eval/results/rediscovery.jsonl; evidence/W-EV2/rediscovery.md",
+        "evidence": "eval/results/rediscovery-v2-pass1.jsonl (W9 renamed; legacy: rediscovery-v1-degraded.jsonl); evidence/W-EV2/rediscovery.md",
         "note": "live re-measurement BLOCKED (D-036); W5-F4 diversity loop landed (premise: measured 30% duplicate rate, spikes/wave5-diversity-probe.mjs) — effect UNVERIFIED-live until a model route returns (D-050)"
       },
       "target": 0.7,

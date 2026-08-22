@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
 import { isNotFound } from '../../api/client';
 import { getCorpus, getEvidence, getReceipts, getSources } from '../../api/endpoints';
-import type { CorpusQueryInfo, CorpusSnapshotInfo, EvidenceRelation, ProvenanceReceipt, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
+import type { CorpusQueryInfo, CorpusSnapshotInfo, EvidenceRelation, EvidenceRelationType, ProvenanceReceipt, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
 import { bindingKey, bindingTone } from '../../tones';
+import { stageKey, contentDepthKey, accessStateKey, bindingZhKey, relationKey, retrievalPurposeKey } from '../../i18n/keys';
 
 export function EvidenceTab({ run }: { run: ResearchRun }): JSX.Element {
   const { t } = useI18n();
@@ -51,7 +52,7 @@ export function EvidenceTab({ run }: { run: ResearchRun }): JSX.Element {
         {sourcesRes.loading ? (
           <Skeleton lines={4} />
         ) : sourcesRes.error !== null && isNotFound(sourcesRes.error) ? (
-          <EmptyState titleKey="evidence.noSources" hint={t('evidence.noSourcesHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+          <EmptyState titleKey="evidence.noSources" hint={t('evidence.noSourcesHint', { stage: t(stageKey(run.currentStage)) })} />
         ) : sourcesRes.error !== null ? (
           <ErrorBox error={sourcesRes.error} onRetry={sourcesRes.retry} />
         ) : sourcesRes.data !== null ? (
@@ -63,7 +64,7 @@ export function EvidenceTab({ run }: { run: ResearchRun }): JSX.Element {
         {evidenceRes.loading ? (
           <Skeleton lines={4} />
         ) : evidenceRes.error !== null && isNotFound(evidenceRes.error) ? (
-          <EmptyState titleKey="evidence.noClaims" hint={t('evidence.noClaimsHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+          <EmptyState titleKey="evidence.noClaims" hint={t('evidence.noClaimsHint', { stage: t(stageKey(run.currentStage)) })} />
         ) : evidenceRes.error !== null ? (
           <ErrorBox error={evidenceRes.error} onRetry={evidenceRes.retry} />
         ) : claims !== null ? (
@@ -117,8 +118,8 @@ function SourcesTable({ sources }: { sources: SourceDocument[] }): JSX.Element {
                   <span className="source-title" title={s.id}>{s.title}</span>
                 </th>
                 <td className="mono">{s.publicationYear ?? '—'}</td>
-                <td>{t(`depth.${s.contentDepth}` as never)}</td>
-                <td>{t(`access.${s.accessState}` as never)}</td>
+                <td>{t(contentDepthKey(s.contentDepth))}</td>
+                <td>{t(accessStateKey(s.accessState))}</td>
                 <td>
                   {verifyBadge}
                   {v?.titleMatch === false && <span className="muted small"> titleMatch=false</span>}
@@ -151,7 +152,7 @@ function ClaimsList({ claims }: { claims: ScientificClaim[] }): JSX.Element {
               {claim.bindingStatus === 'verified' ? '✓' : claim.bindingStatus === 'resolved_unaligned' ? '▲' : claim.bindingStatus === 'unresolved' ? '✗' : '–'}
             </span>
             <IdText value={claim.id} />
-            <Badge tone={bindingTone(claim.bindingStatus)} title={t(`binding.${claim.bindingStatus}.zh` as never)}>
+            <Badge tone={bindingTone(claim.bindingStatus)} title={t(bindingZhKey(claim.bindingStatus))}>
               {t(bindingKey(claim.bindingStatus))}
             </Badge>
             {claim.alignmentChecked === true ? (
@@ -207,7 +208,7 @@ function RelationsSummary({
     return <EmptyState titleKey="evidence.noRelations" />;
   }
 
-  const byType = new Map<string, number>();
+  const byType = new Map<EvidenceRelationType, number>();
   for (const r of relations) byType.set(r.relation, (byType.get(r.relation) ?? 0) + 1);
   const claimById = new Map(claims.map((c) => [c.id, c] as const));
   const sourceById = new Map(sources.map((s) => [s.id, s] as const));
@@ -225,7 +226,7 @@ function RelationsSummary({
             <span className={`ev-glyph ev-glyph--${polarityOf(type) === 'supporting' ? 'verified' : polarityOf(type) === 'counter' ? 'refuted' : 'unknown'}`} aria-hidden="true">
               {polarityOf(type) === 'supporting' ? '✓' : polarityOf(type) === 'counter' ? '✗' : '–'}
             </span>
-            <Badge tone={polarityTone(polarityOf(type))}>{t(`relation.${type}` as never)}</Badge>
+            <Badge tone={polarityTone(polarityOf(type))}>{t(relationKey(type))}</Badge>
             <span className="mono count">{n}</span>
           </li>
         ))}
@@ -242,7 +243,7 @@ function RelationsSummary({
             return (
               <li key={r.id} className="counter-item">
                 <div className="counter-head">
-                  <Badge tone="err">{t(`relation.${r.relation}` as never)}</Badge>
+                  <Badge tone="err">{t(relationKey(r.relation))}</Badge>
                   <span className="muted small mono">strength={r.strength ?? 'unrated'}</span>
                 </div>
                 <p className="counter-text">
@@ -332,7 +333,7 @@ function RetrievalPanel({
             return (
               <tr key={`${q.text}-${i}`}>
                 <td>
-                  <Badge tone={purposeTone(q.purpose)}>{t(`retrieval.purpose.${q.purpose}` as never)}</Badge>
+                  <Badge tone={purposeTone(q.purpose)}>{t(retrievalPurposeKey(q.purpose))}</Badge>
                 </td>
                 <td className="mono small">{q.family}</td>
                 <td className="mono small" title={q.text}>{q.text.length > 72 ? `${q.text.slice(0, 72)}…` : q.text}</td>

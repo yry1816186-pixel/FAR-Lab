@@ -89,6 +89,13 @@ export const ResearchPlan = z.object({
   executabilityCheck: z.object({
     passed: z.boolean(),
     missing: z.array(z.string()).default([]),
+    /**
+     * Statistical-design advisory (W-G follow-up, Maastricht-checklist pattern):
+     * quantitative plans with no power/sample-size/effect-size/significance declaration
+     * are executable but statistically under-specified. Advisory only — never fails
+     * the gate (qualitative plans legitimately omit statistical design).
+     */
+    statisticalDesignNote: z.string().optional(),
   }).optional(),
   createdAt: z.string().datetime(),
 });

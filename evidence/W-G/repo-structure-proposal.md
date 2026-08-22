@@ -1,8 +1,21 @@
 # Wave-G WP1 · Open-Source Release Structure Proposal
 
-Status: PROPOSAL (user-gated decision points marked ⚠). No large moves executed in Wave-G WP1; the
-workspace layout stays as-is. This document defines the boundary and the export mechanism so a public
-release can be produced deterministically when the user approves.
+Status: **PARTIALLY ADJUDICATED (user decisions 2026-08-22)** — recorded below; the export build
+itself remains unbuilt (queued work). No large moves executed in Wave-G WP1; the workspace layout
+stays as-is. This document defines the boundary and the export mechanism so a public release can be
+produced deterministically when the user approves.
+
+## USER DECISIONS (2026-08-22, post-Wave-G)
+
+1. **LICENSE choice: DEFERRED** — no license selected yet; the export gate (§3) still refuses to
+   run without one. This remains the single blocking decision for any public release.
+2. **`project-spec/COMPETITION.md`: EXCLUDED from the public export** (ADJUDICATED — was ⚠).
+   The public allowlist for project-spec/ becomes: all files EXCEPT COMPETITION.md.
+3. **`eval/results/**`: EXCLUDED from the public export** (ADJUDICATED — was ⚠, default adopted).
+   Live run outputs stay workspace-only; the reproducibility story for the public repo is the
+   harness (`eval/*.mjs` + gold inputs + PROTOCOL.md), not the historical result payloads.
+4. Live re-measurements: remain deferred (user-side model routes) — recorded, not blocking the
+   export mechanism work.
 
 Reference standards applied (world-class OSS repo conventions): a public repository contains source,
 tests, build/config, licensing, contribution & usage docs, and CI — NOT internal process state,

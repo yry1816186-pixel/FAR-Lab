@@ -9,6 +9,7 @@ import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton, TimeText, errorText } from '../common';
 import type { EventsState } from '../RunDetail';
+import { stageKey, receiptKindKey, executionModeKey } from '../../i18n/keys';
 
 /** Best-effort discovery kept only as a graceful fallback while the bundles API 404s on older servers (D-060). */
 function discoverBundleIds(events: EventsState): string[] {
@@ -66,7 +67,7 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
         {reportRes.loading ? (
           <Skeleton lines={3} />
         ) : reportRes.error !== null && isNotFound(reportRes.error) ? (
-          <EmptyState titleKey="report.none" hint={t('report.noneHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+          <EmptyState titleKey="report.none" hint={t('report.noneHint', { stage: t(stageKey(run.currentStage)) })} />
         ) : reportRes.error !== null ? (
           <ErrorBox error={reportRes.error} onRetry={reportRes.retry} />
         ) : reportRes.data !== null ? (
@@ -148,9 +149,9 @@ function ReceiptRow({
     <>
       <tr className={`receipt-row${r.executionMode === 'live' ? '' : ' receipt-row--nonlive'}`}>
         <th scope="row"><IdText value={r.id} /></th>
-        <td>{t(`receiptKind.${r.kind}` as never)}</td>
+        <td>{t(receiptKindKey(r.kind))}</td>
         <td>
-          <Badge tone={r.executionMode === 'live' ? 'ok' : 'warn'}>{t(`mode.${r.executionMode}` as never)}</Badge>
+          <Badge tone={r.executionMode === 'live' ? 'ok' : 'warn'}>{t(executionModeKey(r.executionMode))}</Badge>
         </td>
         <td className="mono">{r.stage ?? '—'}</td>
         <td className="mono small">

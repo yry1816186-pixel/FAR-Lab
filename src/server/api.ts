@@ -192,6 +192,9 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
   const adoptionBackoffMs = Math.max(watchdogIntervalMs * 10, 60_000);
   const lastAdoptedAt = new Map<string, number>();
   let watchdogTimer: NodeJS.Timeout | null = null;
+  // Sweep-health visibility (WP2 F-007): a persistent store error would otherwise
+  // silently stop adoptions forever with only a stderr line — /health reports it.
+  let consecutiveSweepFailures = 0;
   const sweepExpiredLeases = (): void => {
     try {
       const now = Date.now();
@@ -206,10 +209,16 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
         });
         startRun(stale.id);
       }
+      consecutiveSweepFailures = 0; // reset only AFTER a fully successful sweep
     } catch (e) {
       // The watchdog must never take the server down (audit P2-2): a transient store
       // error (e.g. SQLITE_BUSY beyond busy_timeout) is logged and retried next cycle.
-      process.stderr.write(`far-api: lease sweep failed: ${e instanceof Error ? e.message : String(e)}\n`);
+      consecutiveSweepFailures += 1;
+      if (consecutiveSweepFailures >= 3) {
+        process.stderr.write(`far-api: lease sweep DEGRADED (${consecutiveSweepFailures} consecutive failures) — frozen-run adoption is stalled\n`);
+      } else {
+        process.stderr.write(`far-api: lease sweep failed: ${e instanceof Error ? e.message : String(e)}\n`);
+      }
     }
   };
   if (watchdogIntervalMs > 0) {
@@ -290,9 +299,14 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     return run;
   };
 
+  /** run ids are prefix-branded by construction; reject malformed path params before they cross into the store layer. */
+  const RUN_ID_RE = /^run_[0-9a-z]{20,32}$/;
+  const assertRunId = (runId: string): void => {
+    if (!RUN_ID_RE.test(runId)) throw validation(`invalid runId format: ${runId}`);
+  };
+
   /** Whether a revision landed after the newest bundle (the export stage's own re-export rule). */
-  const revisionNewerThanBundle = (runId: string): boolean => {
-    const latestBundle = app.store.listObjects('bundle', runId).at(-1);
+  const revisionNewerThanBundle = (runId: string, latestBundle: { createdAt: string } | undefined): boolean => {
     if (!latestBundle) return false;
     return app.store.listObjects('revision', runId).some((r) => r.createdAt > latestBundle.createdAt);
   };
@@ -386,11 +400,15 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
    */
   const health = (res: http.ServerResponse): void => {
     const providers = listProviders().map((p) => ({ name: p.name, kind: p.kind, liveReady: p.liveReady }));
+    const watchdog = consecutiveSweepFailures === 0
+      ? 'ok'
+      : `degraded (${consecutiveSweepFailures} consecutive sweep failures — frozen-run adoption stalled)`;
     try {
       app.store.listRuns();
       sendJson(res, 200, {
         status: 'ok',
         db: 'ok',
+        watchdog,
         providers,
         gitCommit: process.env.FARLAB_GIT_COMMIT ?? null,
         time: new Date().toISOString(),
@@ -399,6 +417,7 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
       sendJson(res, 503, {
         status: 'degraded',
         db: 'error',
+        watchdog,
         detail: e instanceof Error ? e.message : String(e),
         providers,
         gitCommit: process.env.FARLAB_GIT_COMMIT ?? null,
@@ -526,8 +545,12 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     if (bundles.length === 0) {
       throw validation(`no bundle stored for run ${runId} yet — resume the run to run the export stage`);
     }
-    if (!revisionNewerThanBundle(runId)) {
-      throw validation(`no revision newer than the latest bundle (${bundles.at(-1)!.id}) — nothing to re-export`);
+    // Anchor ONCE from the same listing the message quotes (WP2 F-006): a second
+    // independent listObjects inside the check could observe a different latest bundle
+    // than the id we report, or return undefined mid-concurrent-write.
+    const latest = bundles.at(-1);
+    if (!latest || !revisionNewerThanBundle(runId, latest)) {
+      throw validation(`no revision newer than the latest bundle (${latest?.id ?? 'unknown'}) — nothing to re-export`);
     }
     startRun(runId);
     sendJson(res, 202, { runId });
@@ -604,6 +627,7 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
       }
       const runId = segments[3];
       if (runId === undefined) throw notFound(`no route: ${method} ${url.pathname}`);
+      assertRunId(runId); // format gate before any store-layer use (WP2 F-003)
       if (segments.length === 4) {
         if (method === 'GET') return runDetail(res, runId);
         throw notFound(`method ${method} not allowed for ${url.pathname}`);
@@ -709,7 +733,17 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
           res.end();
         }
       }
-    })();
+    })().catch((err: unknown) => {
+      // Last-resort rejection handler (WP2 F-002): the catch above covers route errors,
+      // but a failure inside the error path itself (sendError after a socket reset)
+      // would otherwise surface as an unhandled rejection and crash the process.
+      process.stderr.write(`far-api: unhandled rejection in request handler: ${err instanceof Error ? err.message : String(err)}\n`);
+      try {
+        if (!res.writableEnded) res.end();
+      } catch {
+        /* socket already destroyed */
+      }
+    });
   });
   server.on('clientError', (_err, socket) => {
     socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');

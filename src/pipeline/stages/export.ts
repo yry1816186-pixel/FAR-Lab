@@ -119,6 +119,11 @@ const collectMissing = (
   else if (!inputs.plan.executabilityCheck.passed) {
     out.push(`计划 executabilityCheck 未通过：${inputs.plan.executabilityCheck.missing.join('；')}`);
   }
+  else if (inputs.plan.executabilityCheck.statisticalDesignNote !== undefined) {
+    // Passed the structural gate but statistically under-specified — disclosed in the
+    // honesty inventory, never hidden (W-G Maastricht advisory).
+    out.push(`统计设计提示：${inputs.plan.executabilityCheck.statisticalDesignNote}`);
+  }
   const nonLive = facts.receipts.filter((r) => r.executionMode !== 'live');
   if (nonLive.length > 0) {
     out.push(`${nonLive.length} 条 receipt 的 executionMode 非 live：模型/来源环节未全部走 live 路由`);

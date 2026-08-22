@@ -5,6 +5,7 @@ import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Skeleton, TimeText } from '../common';
 import type { RevisionsBundle } from '../../api/normalize';
+import { qualityKey } from '../../i18n/keys';
 
 /**
  * Causal revision chain (mission §33/§34, report §10): every revision MUST link
@@ -74,7 +75,7 @@ function RevisionChain({ data }: { data: RevisionsBundle }): JSX.Element {
               <div className="chain-node chain-node--revision">
                 <div className="chain-node-head">
                   <strong>{t('rev.revision', { from: revision.fromVersionLabel, to: revision.toVersionLabel })}</strong>
-                  <Badge tone={qualityTone(revision.qualityDelta.status)}>{t(`quality.${revision.qualityDelta.status}` as never)}</Badge>
+                  <Badge tone={qualityTone(revision.qualityDelta.status)}>{t(qualityKey(revision.qualityDelta.status))}</Badge>
                   <TimeText iso={revision.createdAt} />
                 </div>
                 <p className="muted small">
@@ -99,7 +100,7 @@ function RevisionChain({ data }: { data: RevisionsBundle }): JSX.Element {
                   </ul>
                 </div>
                 <p className="quality-delta">
-                  <strong>{t('rev.quality')}:</strong> {t(`quality.${revision.qualityDelta.status}` as never)} — {revision.qualityDelta.claim}
+                  <strong>{t('rev.quality')}:</strong> {t(qualityKey(revision.qualityDelta.status))} — {revision.qualityDelta.claim}
                 </p>
                 <div className="chain-arrow" aria-hidden="true">↓</div>
                 {diff === undefined ? (

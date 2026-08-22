@@ -4,6 +4,7 @@ import type { DictKey } from '../../i18n/dict';
 import { Badge, EmptyState, IdText, TimeText } from '../common';
 import type { EventsState } from '../RunDetail';
 import { runStatusKey, runStatusTone } from '../../tones';
+import { stageKey } from '../../i18n/keys';
 
 const MAX_RENDER = 300;
 
@@ -41,7 +42,7 @@ export function EventsTab({ run, events }: { run: ResearchRun; events: EventsSta
                 <Badge tone={eventTone(ev.type)}>{t(eventKey(ev.type))}</Badge>
                 <TimeText iso={ev.at} />
                 {ev.stage !== undefined && (
-                  <span className="muted small">{t(`stage.${ev.stage}` as never)}</span>
+                  <span className="muted small">{t(stageKey(ev.stage))}</span>
                 )}
                 {ev.status !== undefined && (
                   <Badge tone={runStatusTone(ev.status)}>{t(runStatusKey(ev.status))}</Badge>

@@ -5,6 +5,7 @@ import type { ResearchPlan, ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, FieldList, Section, Skeleton } from '../common';
+import { stageKey, availabilityKey, stepKindKey } from '../../i18n/keys';
 
 export function PlanTab({ run }: { run: ResearchRun }): JSX.Element {
   const { t } = useI18n();
@@ -16,13 +17,13 @@ export function PlanTab({ run }: { run: ResearchRun }): JSX.Element {
       {res.loading ? (
         <Skeleton lines={6} />
       ) : res.error !== null && isNotFound(res.error) ? (
-        <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+        <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(stageKey(run.currentStage)) })} />
       ) : res.error !== null ? (
         <ErrorBox error={res.error} onRetry={res.retry} />
       ) : res.data !== null ? (
         <PlanView plan={res.data} />
       ) : (
-        <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(`stage.${run.currentStage}` as never) })} />
+        <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(stageKey(run.currentStage)) })} />
       )}
     </div>
   );
@@ -91,7 +92,7 @@ function PlanView({ plan }: { plan: ResearchPlan }): JSX.Element {
                 {(plan.dataRequirements ?? []).map((d) => (
                   <tr key={d.name}>
                     <th scope="row">{d.name}</th>
-                    <td>{t(`availability.${d.availability}` as never)}</td>
+                    <td>{t(availabilityKey(d.availability))}</td>
                     <td>{d.sourceHint ?? <span className="muted">—</span>}</td>
                     <td>{d.variables.join('、')}</td>
                   </tr>
@@ -134,7 +135,7 @@ function PlanView({ plan }: { plan: ResearchPlan }): JSX.Element {
             <li key={step.id} className="plan-step">
               <div className="plan-step-head">
                 <strong>{i + 1}. {step.title}</strong>
-                <Badge tone="muted">{t(`stepKind.${step.kind}` as never)}</Badge>
+                <Badge tone="muted">{t(stepKindKey(step.kind))}</Badge>
                 {step.estimatedCost !== undefined && <span className="muted small">{t('plan.steps.cost')}: {step.estimatedCost}</span>}
               </div>
               <p className="plan-step-method">{step.method}</p>

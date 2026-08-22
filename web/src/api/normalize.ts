@@ -149,8 +149,9 @@ export function normalizeEvidence(data: unknown): EvidenceBundle {
       };
     }
   }
-  // Bare mixed array: classify each item by domain discriminators.
-  const items = firstArray(data, ['evidence', 'items', 'data']);
+  // Bare mixed array: classify each item by domain discriminators. Fail-closed: an
+  // object envelope without a recognized array key is a schema error, never "no data".
+  const items = requireArray(data, ['evidence', 'items', 'data'], 'evidence collection');
   const claims: ScientificClaim[] = [];
   const relations: EvidenceRelation[] = [];
   let unclassified = 0;
@@ -192,8 +193,9 @@ export function normalizeHypotheses(data: unknown): HypothesesBundle {
       };
     }
   }
-  // Bare mixed array: classify each item.
-  const items = firstArray(data, ['hypotheses', 'items', 'data']);
+  // Bare mixed array: classify each item. Fail-closed (WP2 F-01): unknown envelope
+  // shapes are schema errors, never a silently empty hypothesis list.
+  const items = requireArray(data, ['hypotheses', 'items', 'data'], 'hypotheses collection');
   const hypotheses: HypothesisCandidate[] = [];
   const scorecards: HypothesisScorecard[] = [];
   for (const item of items) {
@@ -223,13 +225,16 @@ export interface RevisionsBundle {
 
 export function normalizeRevisions(data: unknown): RevisionsBundle {
   if (isRecord(data)) {
+    // Fail-closed (WP2 F-01): the API envelope always carries all three arrays (empty
+    // runs carry empty arrays, not absent keys) — a missing key is a shape change and
+    // must surface as an error, never as a silently empty tab.
     return {
-      feedbacks: firstArray(data, ['feedbacks', 'feedback', 'feedbackSignals']).filter(looksLikeFeedback),
-      revisions: firstArray(data, ['revisions']).filter(looksLikeRevision),
-      diffs: firstArray(data, ['versionDiffs', 'diffs']).filter(looksLikeDiff),
+      feedbacks: requireArray(data, ['feedbacks', 'feedback', 'feedbackSignals'], 'revisions collection (feedbacks)').filter(looksLikeFeedback),
+      revisions: requireArray(data, ['revisions'], 'revisions collection (revisions)').filter(looksLikeRevision),
+      diffs: requireArray(data, ['versionDiffs', 'diffs'], 'revisions collection (diffs)').filter(looksLikeDiff),
     };
   }
-  const items = firstArray(data, ['items', 'data']);
+  const items = requireArray(data, ['items', 'data'], 'revisions collection');
   return {
     feedbacks: items.filter(looksLikeFeedback),
     revisions: items.filter(looksLikeRevision),

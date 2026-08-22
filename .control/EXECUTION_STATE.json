@@ -61,5 +61,5 @@
     "B-QWEN-LIVE-ROUTE"
   ],
   "lastVerifiedCommit": "Wave-G final gate 2026-08-22: vitest 604/604 (27 files), typecheck 0, eslint 0, build 0, secret-scan PASS, path-hygiene PASS; WP3/WP4 batch adversarially audited PASS (evidence/W-G/audit-wp3wp4.md); completion-gate rerun archived (still NOT_READY solely on user-gated B-DEEPSEEK-BALANCE).",
-  "nextAction": "Wave-G closed. Remaining honest debts (all recorded, none silent): (1) LIVE re-measurements pooled behind funded model routes (D-036): run-wall-clock parallelization, counter-evidence-substantive-hit after anchored queries, judge-variance, rediscovery F1; (2) parallel-zone WP2 queue (api.ts/cli/web fixes) when WAVE-PRODUCT session closes; (3) public-release export build (WP1 proposal) is USER-GATED: LICENSE choice + COMPETITION.md/results include-exclude; (4) CI workflow + release automation USER-GATED."
+  "nextAction": "Wave-G + follow-up batch closed (D-069). Remaining honest debts: public-release export build (blocked solely on LICENSE choice), live re-measurements (user-side model routes), NOVA-Test contradiction gate (needs live LLM), SWAN JSON-LD export (with the export build)."
 }
