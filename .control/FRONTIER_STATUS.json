@@ -236,7 +236,7 @@
   "marginalValue": {
     "status": "saturated",
     "remainingHighValueWork": [],
-    "reason": "All GO-ranked opportunities executed and live-verified (D-023..D-031, two parallel sessions). #8 Idea2Plan template v2 was EXECUTED by the scout session (a0d0af9: eval rendering v2 five-section, --render-only verified; cross-template comparability disclosed). Remaining entries are blocked on user credentials (Qwen/Bailian submission route; OPENALEX_API_KEY for retrieval budget + fulltext phase-B live fetch), network-blocked (models.dev, HF), or below the value bar (judge-decomposition hardening follow-up, zombie-run sweep, mechanism-aware counter-label gate). No remaining item is both high-value and executable under current environment conditions without user action.",
+    "reason": "All GO-ranked opportunities executed and live-verified (D-023..D-031, two parallel sessions). #8 Idea2Plan template v2 was EXECUTED by the scout session (a0d0af9: eval rendering v2 five-section, --render-only verified; cross-template comparability disclosed). Remaining entries are blocked on user credentials (Qwen/Bailian submission route; OPENALEX_API_KEY for retrieval budget + fulltext phase-B live fetch), network-blocked (HF only — models.dev RESOLVED via local proxy, D-033: 193-provider catalog integrated), or below the value bar (judge-decomposition hardening follow-up, zombie-run sweep, mechanism-aware counter-label gate). No remaining item is both high-value and executable under current environment conditions without user action.",
     "evidence": [
       ".control/EXECUTION_STATE.json activeTasks (user-action gates listed)",
       "evidence/W-EV2/rediscovery.md, mlr-bench.md, relation-precision.md, fulltext-phase-b-openalex.md",
@@ -307,11 +307,11 @@
         "#8 Idea2Plan 5-section template (scout session a0d0af9: eval rendering v2 + novelty-delta + per-doc relevance, --render-only verified)",
         "strict-FC audit-fixes + full live verification (D-029/D-030: projection v2, JSON repair layer, 41/41 tool_calls run_prrxcee6)",
         "dist-freshness guard (D-031: 2d77c97)",
-        "full-fix relation re-measurement (supports 8/8 exact)"
+        "full-fix relation re-measurement (supports 8/8 exact)",
+        "#9 models.dev registry (D-033/b2f812a: catalog + fetcher + DashScope intl override)"
       ],
       "backlog": [
-        "judge-hardening for rediscovery metric (deterministic matching or multi-pass median) — follow-up from D-029 variance finding",
-        "#9 models.dev snapshot (network-blocked in this environment 2026-08-22; retry later)"
+        "judge-hardening for rediscovery metric (deterministic matching or multi-pass median) — follow-up from D-029 variance finding"
       ],
       "rejected": [
         "#10 jsonrepair (breaks zod-only invariant; strict-FC D-026 makes it moot)",
