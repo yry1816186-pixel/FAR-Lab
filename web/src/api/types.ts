@@ -350,6 +350,51 @@ export interface HypothesisCandidate {
 
 // ---- scorecards (src/domain/scorecard.ts) ----
 
+// ---- Wave-S g8/g9: evidence bodies + ACH audit (src/domain/evidence-body.ts / ach.ts) ----
+
+/** Deterministic hypothesis-level evidence-body rating — every field is computed, none judged. */
+export interface EvidenceBody {
+  id: string;
+  runId: string;
+  hypothesisId: string;
+  /** Min GRADE certainty across key supporting claims; absent when none are graded. */
+  floorCertainty?: 'high' | 'moderate' | 'low' | 'very_low';
+  independentSources: number;
+  sumLogLrLow: number;
+  sumLogLrHigh: number;
+  logLrBand: string;
+  qbafScore: number;
+  proofStandard: 'unproven' | 'scintilla' | 'preponderance' | 'clear_and_convincing' | 'beyond_reasonable_doubt';
+  experimentalAxes: number;
+  promotion: 'orthogonal' | 'single_source' | 'literature_only_unverified' | 'none';
+  disclosure: string;
+  createdAt: string;
+}
+
+export interface AchDiagnosticityScore {
+  claimId: string;
+  score: number;
+  netByHypothesis: Record<string, number>;
+}
+
+export interface AchRemovalSensitivity {
+  removedTopK: number;
+  orderBefore: string[];
+  orderAfter: string[];
+  inversions: number;
+  stable: boolean;
+}
+
+export interface AchAnalysis {
+  id: string;
+  runId: string;
+  hypothesisIds: string[];
+  diagnosticity: AchDiagnosticityScore[];
+  removalSensitivity: AchRemovalSensitivity;
+  method: string;
+  createdAt: string;
+}
+
 // ---- D-017 literature novelty + D-016 tournament (src/domain/hypothesis.ts / scorecard.ts) ----
 
 export interface LiteratureNoveltyNeighbor {

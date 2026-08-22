@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { HypothesisCandidate } from '../../api/types';
+import type { EvidenceBody, HypothesisCandidate } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, IdText } from '../common';
 import { checkTone, litNoveltyKey, litNoveltyTone, noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../tones';
@@ -33,6 +33,7 @@ export function HypothesisCard({
   compare,
   aiActions,
   ops,
+  evidenceBody,
 }: {
   hypothesis: HypothesisCandidate;
   clusterSize: number;
@@ -44,6 +45,8 @@ export function HypothesisCard({
   aiActions?: React.ReactNode;
   /** B5: researcher lifecycle operations (promote/reject/fork/connect). */
   ops?: HypothesisCardOps;
+  /** Wave-S g8: deterministic evidence-body rating (floor/sources/band/promotion); tooltip = full disclosure. */
+  evidenceBody?: EvidenceBody;
 }): JSX.Element {
   const { t } = useI18n();
   const [specOpen, setSpecOpen] = useState(false);
@@ -69,6 +72,26 @@ export function HypothesisCard({
         {status === 'rejected' && <Badge tone="err">{t('hyp.statusRejected')}</Badge>}
         <Badge tone={testabilityTone(hypothesis.testability)}>{t(testabilityKey(hypothesis.testability))}</Badge>
         <Badge tone={noveltyTone(hypothesis.noveltyLabel)}>{t(noveltyKey(hypothesis.noveltyLabel))}</Badge>
+        {/* Wave-S g8 evidence body — deterministic rating; the disclosure tooltip carries
+            the full derivation (capped sources, excluded relations, band, proof standard). */}
+        {evidenceBody !== undefined && (
+          <>
+            <Badge
+              tone={evidenceBody.promotion === 'orthogonal' ? 'ok' : evidenceBody.promotion === 'none' ? 'muted' : 'warn'}
+              title={evidenceBody.disclosure}
+            >
+              {t(`evbody.promotion.${evidenceBody.promotion}`)}
+            </Badge>
+            <Badge tone="info" title={evidenceBody.disclosure}>
+              {t('evbody.sources', { n: evidenceBody.independentSources })}
+            </Badge>
+            {evidenceBody.floorCertainty !== undefined && (
+              <Badge tone="muted" title={evidenceBody.disclosure}>
+                {t('evbody.floor', { level: evidenceBody.floorCertainty })}
+              </Badge>
+            )}
+          </>
+        )}
         {/* W5/S4: noveltyLabel is corpus-relative — the qualifier is mandatory wherever the label is shown */}
         <span className="muted small novelty-qualifier">{t('novelty.qualifier')}</span>
         {completeness !== undefined ? (

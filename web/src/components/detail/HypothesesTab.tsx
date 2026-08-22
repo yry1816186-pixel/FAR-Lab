@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { GitCompareArrows, X } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
 import { connectClaim, forkHypothesis, getEvidence, getHypotheses, promoteHypothesis, rejectHypothesis } from '../../api/endpoints';
-import type { HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
+import type { AchAnalysis, EvidenceBody, HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
-import { EmptyState, ErrorBox, Section, Skeleton } from '../common';
+import { EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
 import { HypothesisCard } from './HypothesisCard';
 import type { HypothesisCardOps } from './HypothesisCard';
 import { ScorecardsTable } from './ScorecardsTable';
@@ -154,6 +154,26 @@ export function HypothesesTab({
               <TournamentView tournament={data.tournament} hypotheses={data.hypotheses} />
             </Section>
           )}
+          {data.achAnalysis != null && data.achAnalysis.diagnosticity.length > 0 && (
+            <Section title={t('ach.title')}>
+              <p className="muted small">{t('ach.intro')}</p>
+              <ul className="plain-list small">
+                {data.achAnalysis.diagnosticity.slice(0, 3).map((d) => (
+                  <li key={d.claimId}>
+                    <IdText value={d.claimId} /> — {t('ach.diagnosticity', { score: d.score.toFixed(2) })}
+                  </li>
+                ))}
+              </ul>
+              <p className="muted small">
+                {data.achAnalysis.removalSensitivity.stable
+                  ? t('ach.removalStable', { k: data.achAnalysis.removalSensitivity.removedTopK })
+                  : t('ach.removalUnstable', {
+                      k: data.achAnalysis.removalSensitivity.removedTopK,
+                      n: data.achAnalysis.removalSensitivity.inversions,
+                    })}
+              </p>
+            </Section>
+          )}
           <Section
             title={data.scorecards.length > 0 ? t('hyp.representatives', { n: representativesOf(data).length }) : t('tab.hypotheses')}
             count={data.scorecards.length === 0 ? <span className="muted small">{t('hyp.notRanked')}</span> : undefined}
@@ -187,6 +207,9 @@ interface HypoData {
   hypotheses: HypothesisCandidate[];
   scorecards: HypothesisScorecard[];
   tournament?: HypothesisTournament | null;
+  /** Wave-S g8/g9 (optional: older runs render without them, never fake values). */
+  evidenceBodies?: EvidenceBody[];
+  achAnalysis?: AchAnalysis | null;
 }
 
 function TournamentView({ tournament, hypotheses }: { tournament: HypothesisTournament; hypotheses: HypothesisCandidate[] }): JSX.Element {
@@ -315,6 +338,7 @@ function HypothesisList({
     clusterCounts.set(key, (clusterCounts.get(key) ?? 0) + 1);
   }
   const rankOf = new Map(data.scorecards.map((s) => [s.hypothesisId, s.rank] as const));
+  const evidenceBodyOf = new Map((data.evidenceBodies ?? []).map((b) => [b.hypothesisId, b] as const));
 
   return (
     <div>
@@ -351,6 +375,7 @@ function HypothesisList({
             disabled: compareIds.length >= compareLimit,
           }}
           ops={opsFor(h)}
+          evidenceBody={evidenceBodyOf.get(h.id)}
         />
       ))}
       {extras.length > 0 && (

@@ -34,7 +34,13 @@ export interface AgentTool {
   readonly description: string;
   readonly inputSchema: z.ZodType<unknown>;
   /** Deterministic cheap summary for compaction; absent => raw payload is head-truncated. */
-  summarize?: (payload: unknown) => string;
+  readonly summarize?: (payload: unknown) => string;
+  /**
+   * Risk class (Wave-S v2-harness, agentscope permission-mode lineage) drives the
+   * session mode machine in permissions.ts. Absent = 'execute' (conservative: the
+   * explore mode treats undeclared tools as non-read and denies them).
+   */
+  readonly riskClass?: 'read' | 'edit' | 'execute' | 'destructive';
   execute(args: unknown, ctx: ToolContext): Promise<ToolResult>;
 }
 

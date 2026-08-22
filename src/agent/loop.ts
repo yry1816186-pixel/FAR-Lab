@@ -353,7 +353,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       continue;
     }
 
-    const decision = await deps.permissions.decide(action.tool, action.args);
+    const decision = await deps.permissions.decide(action.tool, action.args, tool.riskClass);
     if (decision.asked) deps.telemetry.recordAsk();
     if (decision.asked || decision.cachedGrant) {
       deps.emit({ type: 'permission_asked', sessionId: deps.sessionId, turn, tool: action.tool, granted: decision.effect === 'allow', at: at() });
