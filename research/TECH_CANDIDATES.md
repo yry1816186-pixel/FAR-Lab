@@ -182,3 +182,57 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
   rerankWindowPlan/applyWindowedRerank port; their pre-shuffle finding recorded in E3.
 - **trectools** (BSD-3) evaluated as oracle first — its TrecEval requires the external
   trec_eval binary (not bundled) → replaced by pytrec_eval (self-contained C extension).
+
+## G. Porting-fusion seeds + sandbox expedition (2026-08-22; reports research/oss-porting-scan/)
+
+| Candidate | Source | License | Decision | Capability / reason | Evidence |
+|---|---|---|---|---|---|
+| cgast/harness (whole repo) | github.com/cgast/harness | **NO LICENSE** (API license:null, main-agent verified; package.json "MIT" is metadata only, no legal grant) | REJECT — copy/fork legally infeasible; B conflicts zod-only (better-sqlite3/yaml/uuid); stalled 5.7mo single-author (pushed_at 2026-03-02); sandbox interceptor double-execution defect (interceptor.ts:37-74, `__sandboxHandled` unchecked) | — | oss-porting-scan/cgast-harness.md |
+| HITL feedback five-type typology | cgast/harness feedback/types.ts:10-102 (subagent-read ◇, not line-verified by main agent) | typology only — clean-room zod rewrite if ever | DEFER — merges into W8 HITL interrupt registry entry; trigger = in-run approval gate feature; any port must add approval TTL (openai-agents precedent from W8) | confirm(defaultDeny timeout-deny)/choice/text/review(4 verdicts+line annotations)/form + four-state response | same report |
+| Sandbox category | E2B / microsandbox / gvisor / kata / firecracker / daytona / modal scan | verified per report (E2B Apache-2.0 main-agent verified) | **KEEP D-087** baseline (OpenSSH subprocess gateway + Docker/WSL2 + lockfile sidecar, live-verified); E2B = REFERENCE (self-host needs Firecracker+KVM+Nomad/Consul cluster — disproportionate; hosted = compliance risk); microsandbox = DEFER (v0.6.x, KVM, SDK no snapshot/pause API); gvisor/kata/firecracker = REFERENCE; daytona/modal = REJECT | E2B API semantics borrowed into EEL E5: onTimeout kill/pause state machine + dynamic renewal; createSnapshot → docker pause/commit layered kill-resume; deny-all egress allowlist (OpenML/PyPI only); SandboxMetrics receipt fields | oss-porting-scan/sandbox-category.md; D-087 in .control/DECISIONS.jsonl |
+
+## G2. v2 full-list porting-fusion expedition (2026-08-22; plan research/oss-porting-scan/PORTING-FUSION-PLAN.md, 底稿 v2-*.md)
+
+User list (8 categories, 25 items) quality-gated + 10 proactive adds; all load-bearing claims main-agent spot-verified.
+
+| Candidate | Source (license/stars API-verified) | Decision | Capability / reason | Evidence |
+|---|---|---|---|---|
+| MCP client pagination+refresh patches | our src/agent/mcp.ts:73-82,140 (defects, main-agent verified) | **ADOPT-GO** | ① tools/list drops nextCursor (paginated servers silently truncated) ② notifications (tools/list_changed) dropped at :140 — ~30-60 lines self-owned fix, no SDK | v2-tools-sandbox.md; mcp.ts direct read |
+| ag2 container lifecycle discipline ×5 | ag2/ag2/extensions/docker/sandbox.py L25-256 (Apache-2.0; L25/44-46/53-54 main-agent verified) | **EXTRACT-GO (EEL lane)** | timeout→restart+exit124 (L126-132), network none+mem 512m defaults (L44-49), atexit crash cleanup (L188-190,241-247), timeout lower-bound (L53-54), 100k output truncation; our remote/train_eval.py has no timeout/kill | v2-tools-sandbox.md |
+| agentscope permission/hint mechanisms | modelscope/agentscope (Apache-2.0, 29.3k★; "HarnessAgent" VERIFIED-ABSENT) | ADAPT (GO) | permission mode machine + bypass_immune + ask→deny suggestion-preserving (_engine.py:594-848); HintBlock runtime state injection (_agent.py:1197); Offloader protocol; oversized tool-result splitting (:2823) | v2-harness.md |
+| vercel/ai micro-mechanisms ×3 | vercel/ai (Apache-2.0, 26.3k★) | EXTRACT (GO) | HMAC-signed tool approval (anti-TOCTOU ask→execute), StopCondition combinators, corrupt tool-call repair loop | v2-harness.md |
+| mastra dual timeout | mastra-ai/mastra loop/timeout.ts (core Apache-2.0, 27.4k★) | EXTRACT (GO) | step/total dual timeout + distinct error types + abort synthesis, 149 lines zero-dep; thread fork/clone REFERENCE | v2-harness.md |
+| MCP official TypeScript SDK | modelcontextprotocol/typescript-sdk (13.2k★) | DEFER — trigger: remote HTTP server / resources-prompts need / modern epoch mainstream; adoption = new npm dep → change-confirmation gate; sampling/roots deprecated by 2026-07-28 spec (SEP-2577) | | v2-tools-sandbox.md |
+| A2A | a2aproject/A2A (Apache-2.0, 25.5k★) | DEFER+REFERENCE — in-process subagents have no network boundary; TaskState↔RunStatus mapping archived; trigger: multi-instance / 3rd-party agents / SaaS multi-tenant | | v2-protocols.md |
+| AG-UI | ag-ui-protocol/ag-ui (MIT, 15.5k★) | DEFER+REFERENCE — AgentEvent→SSE 同构，9-event mapping archived; our 4 unique events stronger (no adoption); borrow vocabulary on triggers (interrupt/resume, StateDelta, streaming) | | v2-protocols.md |
+| OTel GenAI semconv alignment | open-telemetry/semantic-conventions + openllmetry (Apache-2.0) | EXTRACT semantics + DEFER — receipts/rollout/eval→semconv 9-row field map archived, no zod change, no SDK; trigger: first external consumer; langfuse (license Other) / phoenix (ELv2) REFERENCE; LangSmith commercial | | v2-algo-multi-obs.md |
+| elizaOS mechanisms | elizaOS/eliza (MIT, 19.1k★) | REJECT — all four user-list claims VERIFIED-FALSE (no langgraph dep, no Atom, snapshot=systemd, subprocess=memory Map crash-lost, dag mode fake-parallel serial) | | v2-statemachine.md |
+| cordis (real chain) | dsh pnpm-lock:129-131 → vendor/@deepseek-ai/cordis (author Shigma, MIT) → upstream cordiverse/cordis (7.1k★); deepseek-ai/cordis = 404 | REFERENCE + DEFER — disposer 纪律 (~20 lines) trigger ≥2 resource-holding handlers; reverse-order onClose (avvio) trigger ≥3 shutdown subsystems; 2693-line kernel = net-negative for compiled assembly + MCP process boundary | | v2-plugin.md |
+| Quality-gate kills | gecko(8★)/ZyHive(19★ AGPL)/AgentForge(4★)/brunogcar-agent(1★)/agent-contracts(5★)/langgraph-reflection(185★ archived, intrinsic signal→registry C)/openpeng agent-protocol(0★)/agi-inc(16mo stale)/JSON-Agents(20★)/inngest(SSPL)/Eko(registerPlugin VERIFIED-ABSENT) | REJECT/KILL — do not revisit without new evidence | | v2-*.md |
+
+## H. Wave-S scientific-methodology expedition (2026-08-22; plan research/PLAN-DESIGN-RESTRUCTURE.md, 底稿 wave-s-reports/s1..s6)
+
+Source-verified methodologies (PRISMA 2020 / RoB2-ROBINS-I / GRADE full / Platt-Chamberlin / VOI / DOE-PB / OCBA / E-value / target-trial / SCA-multiverse / RR-AsPredicted-NeurIPS / Toulmin / Heuer ACH 8-step) + quality-gated AI systems (aiming-lab/AutoResearchClaw MIT ~14.1k★ — org main-agent verified; frontier-evals PaperBench MIT 1287★; era Apache-2.0 Nature-2026; Curie/discoverybench gate-killed, mechanisms recorded).
+
+| Candidate | Source | Decision | Capability | Trigger |
+|---|---|---|---|---|
+| Plan-layer structured preregistration (MetricSpec/TestSpec/predicate decisionRules/predictions{observable,condition,expectedRelation}/VOI block/gate{proceedIf,killIf}/negative_control+replication/targetTrialProtocol/measurable+estimand+control_run/robustnessPlan) | s4 P0 + s1/s2/s5 (Claesen 2021; Platt 1964; ARC manifest; FDA TPP) | **ADOPT-GO (P0)** — 自由文本预注册不可审计≈没预注册；确定性校验器扩展 checkPlanExecutability | plan schema + validators | implementation batch |
+| Orthogonal-evidence promotion + dual-layer GRADE + per-source RoB + ACH diagnosticity/removal-sensitivity | s2#5 + s3 (Hughes 2011; GRADE Handbook; RoB2/ROBINS-I; Heuer 1999) | **ADOPT-GO (P1)** — 单数据集单比较即可判 supports = 最大科学性缺口；hypothesis 级证据体评级（floor+独立来源数+worst-domain） | EEL 比较层 + 信任面/导出 | implementation batch |
+| Plan freeze triplet (planHash/frozenAt + Deviation + compliance audit) + AsPredicted-8 & NeurIPS-16 gates | s6 (Chambers & Tzavella 2022; official PDFs verified) | **ADOPT-GO (P1)** — RR stage-1/2 形态补全 | plan/export/verify | implementation batch |
+| VerifiedRegistry numeric whitelist + verifier_wrote_list + control auto-derivation | aiming-lab/AutoResearchClaw verified_registry.py:1-75 等 (MIT) | ADOPT/EXTRACT (P1) — EEL 报告侧数值出处门 | experiment runtime 报告层 | EEL lane |
+| specificationMatrix + SpecificationCurveReport (descriptive) / E-value section / PB fractional screening / MDE hard gate at spec time / OCBA info-score reorder | s4 + s2 (SCA 2020—authorship corrected; VanderWeele-Ding 2017; Plackett-Burman 1946; Chen 2000) | ADOPT (P1) — 全确定性代码，zod-only 不动 | matrix.ts/spec 校验/StatReport | EEL lane |
+| B4 adversarial_review action family | s6 (arXiv 2607.16374 五步模板) | ADOPT (P1) — 复用 Comparison，零新信任模型 | PEX B4 | PEX B4 batch |
+| Publication-bias statistics / D-A-E solvers / hypothesis-bandits / SCA inferential stats / pre-mortem schema / ISA-Tab / 23-stage pipeline | s2/s3/s4/s6 | REJECT/DEFER with reasons | — | triggers in plan §3 |
+
+### H2. Wave-S depth batch (d1..d4, 2026-08-22; plan v2 = six-layer protocol stack, research/PLAN-DESIGN-RESTRUCTURE.md)
+
+| Candidate | Source (verified) | Decision | Capability | Trigger |
+|---|---|---|---|---|
+| L1 formal-semantics layer: log-LR interval algebra (ΣlogLR + source cap, log-pool) + QBAF gradual semantics + Carneades proof standards + distribution-valued GRADE ratings | d1 (Kent 1964; Mosteller-Youtz 1990; Kass-Raftery 1995; Potyka KR2020; Gordon-Prakken-Walton AIJ 2007; Zlotnick 1972) | **ADOPT (P1)** — 可计算 claim-假设推断代数，<300 行 TS + 配置表 | new src/domain/formal/ layer | P1 batch |
+| L4 self-calibration loop: PredictionLedger + RPS primary + Brier/clamp-log + ignorance/base-rate skill anchors + stratified pooled reporting + judge-vs-aggregate double-entry | d3 (Gneiting-Raftery 2007; Dreber 2015 PNAS; Metaculus/ForecastBench anchors; no verified precedent found) | **ADOPT (P1, 技术制高点)** — 系统对自己前向预测上账结分 | new ledger + settle hooks in execute/feedback | P1 batch |
+| Decision-predicate interval V&V (unreachable/conflict/direction-contradiction/coverage grid, hitPolicy) | d4 (decision-table V&V: Vanthienen/Prologa/DMN; polynomial, no SAT) | **ADOPT (P1)** — checkPlanExecutability 扩展 | plan gate | P1 batch |
+| Generation-time novelty conditioning + deterministic diversity disclosure (strategyCoverage/gapCoverage + TF-IDF dispersion); FIRE-Bench time-slice masking + bridge_completion operator; OpenAlex topics+referenced_works → analogyDistance | d2 (SciMON ACL 2024; Si et al. ICLR 2025; Swanson 1986/1988; Dunbar in-vivo) | **ADOPT (P1/P1/P2)** | hypotheses/retrieve stages + eval | P1/P2 batches |
+| Framework-declaration gate (np_test/estimation_ci/bayesian + calibration-strategy rule) | d4 (FDA Bayesian guidance; Berger 1997; Lovric 2020) | ADOPT (P2) | TestSpec | P2 batch |
+| Causal discovery as hypothesis generator (PC-stable/GES + edge bootstrap; causal-learn MIT 子代理直链核验; CPDAG 无向边禁因果渲染) | d4 (Reisach NeurIPS 2021 var-sortability 批评链; Ng 2024; Machlanski 2024) | ADOPT (P2, EEL sidecar only) | PlanStep kind=simulation + confounders schema 升级 | P2 batch |
+| Cooke classical-model judge weights (50-100 human gold seed set) | d1 (Eggstaff 2014 RESS: PW stable > equal) | ADOPT (P2) — 与 L4 结分数据联动 | judge aggregation | after L4 has ≥50 settled entries |
+| REJECT (depth batch): preferred-AF semantics(NP-c); MDL/AIC/BIC simplicity ranking; SemMedDB/UMLS; SPECTER2 local; TRIZ; real-options pricing; SMT; NOTEARS; quantitative bias analysis; per-run calibration curves; auto-debias promises | d1/d2/d3/d4 | REJECT with reasons | — | — |
