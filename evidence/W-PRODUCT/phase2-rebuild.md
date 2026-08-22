@@ -63,3 +63,24 @@
 ## 记录的后续候选（不阻塞本批）
 
 - VSUP 粒度坍缩、CLI TSV 双模式/相对时间、修订链 OSF 式视觉增强（见 phase2-design-intelligence §B）
+
+## 对抗审计与修复（同日追加）
+
+独立 adversarial-auditor 子 Agent 对 commit 703296b 审计 7 项主张：4 PASS / 3 FAIL。
+FAIL 全部修复并验证（commit "fix(pex): adversarial-audit fixes…"）：
+1. **侧栏选中截断缺陷**（审计发现的真实缺陷）：深链/palette 导航到研究库第 13+ 项时
+   选中项不可见——修复=选中索引 ≥ LIBRARY_PREVIEW 时自动展开全库。GUI 实证：
+   深链 run_fbcc5ksh4pqbxvz89e5e2swvzg（第 13 项）→ 52 项全显+选中可见（硬刷新后）。
+2. **CLI UNICODE_OK 探测 no-op**：`isTTY !== false` 在 Node 永真（isTTY∈{true,undefined}）
+   → 改 `=== true`。实证：管道输出现在正确降级 ASCII（`+ done`）。
+3. **i18n 残留**：en 'form.tryExamples' 误存中文、5 处 event/controls zh 'run' 残留、
+   runs.loading——全部清理。
+审计同时确认：IA 重定向全路径正确、旧 tab 零死引用、ResearchSummary 全分支诚实、
+服务端投影空值安全且测试具判别力。
+
+## 最终门禁（审计修复后）
+
+- vitest 全量 842/844 通过（2 skip=既有环境项；期间一次 5-fail 为兄弟会话管线
+  中间态，非本批，复跑全绿）——退出码 0
+- typecheck 双端 0 错；build 双端成功；secret-scan PASS；completion-gate PASS
+- 已知遗留：export.ts 1 个既有 eslint 错误（EEL lane 所有权文件，本会话未触碰，如实记录）
