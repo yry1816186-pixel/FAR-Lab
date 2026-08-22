@@ -56,6 +56,51 @@ export const MIGRATIONS: readonly { version: number; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS idx_objects_run ON objects(run_id, kind);
     `,
   },
+  {
+    // W8 S2+S1: idempotent intra-stage step checkpoints + run leases (D-039 mechanism
+    // extraction from dbos operation_outputs / langgraph put_writes / temporal leases).
+    version: 2,
+    sql: `
+      CREATE TABLE IF NOT EXISTS step_outputs (
+        run_id TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        step_key TEXT NOT NULL,
+        json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (run_id, stage, step_key)
+      );
+      ALTER TABLE runs ADD COLUMN lease_holder TEXT;
+      ALTER TABLE runs ADD COLUMN lease_expires_at TEXT;
+    `,
+  },
+  {
+    // W8 audit P0-1: one stage can host SEVERAL checkpoint families with different
+    // inputs fingerprints (rank: scoring batches vs tournament pairs) — the fingerprint
+    // row and invalidation must be keyed per family or the families clear each other on
+    // every resume. Both tables were empty at rollout (verified on production copy), so
+    // a PK rebuild via drop+recreate is lossless.
+    version: 3,
+    sql: `
+      DROP TABLE IF EXISTS step_outputs;
+      DROP TABLE IF EXISTS step_fingerprints;
+      CREATE TABLE step_outputs (
+        run_id TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        family TEXT NOT NULL DEFAULT '',
+        step_key TEXT NOT NULL,
+        json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (run_id, stage, family, step_key)
+      );
+      CREATE TABLE step_fingerprints (
+        run_id TEXT NOT NULL,
+        stage TEXT NOT NULL,
+        family TEXT NOT NULL DEFAULT '',
+        fingerprint TEXT NOT NULL,
+        PRIMARY KEY (run_id, stage, family)
+      );
+    `,
+  },
 ];
 
 export const openDb = (dbPath: string): Db => {
@@ -94,10 +139,15 @@ export const openDb = (dbPath: string): Db => {
 };
 
 const migrate = (db: Db): void => {
-  const current = Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0);
+  let current = Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0);
   for (const m of MIGRATIONS) {
     if (m.version <= current) continue;
     db.transaction(() => {
+      // Re-check INSIDE the transaction: a concurrent process may have committed this
+      // migration between our read and BEGIN IMMEDIATE (W8 audit P2-1 — the ALTERs in
+      // v2 would otherwise throw duplicate-column on the loser).
+      current = Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0);
+      if (m.version <= current) return;
       db.exec(m.sql);
       db.exec(`PRAGMA user_version = ${m.version}`);
     });

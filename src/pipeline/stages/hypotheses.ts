@@ -17,6 +17,7 @@ import type {
 import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash } from '../../sources/snapshot.js';
+import { canonicalSha256 } from '../../shared/crypto.js';
 import {
   assertNotCancelled,
   bucketClaims,
@@ -159,6 +160,22 @@ const DIVERSITY_DISCIPLINE =
   'Scientific discipline: every hypothesis must differ from the others in mechanism, core assumptions, ' +
   'or the dimension of its predictions. Paraphrases of one idea are NOT distinct hypotheses. ' +
   'Respond only with JSON matching the required schema.';
+
+/**
+ * Cross-strategy negative conditioning (Wave-5 F4; mechanism learned from AI-Scientist-v2's
+ * iterative ideation — full history visible + explicit differentiation demand — and Kaimen's
+ * evolution-operator taxonomy, both clean-room paraphrased): strategy calls after the first
+ * see every candidate already proposed in this run and must differ in mechanism or core
+ * premise. Attacks the measured failure class: 136/455 (30%) of persisted candidates were
+ * paraphrase duplicates pooled across recorded runs (spikes/wave5-diversity-probe.mjs).
+ */
+const antiRepetitionInstruction = (previouslyProposedCount: number): string =>
+  previouslyProposedCount === 0
+    ? ''
+    : ` ${previouslyProposedCount} candidate hypothesis statement(s) already proposed in this run are ` +
+      'listed under previouslyProposed. EVERY candidate you return must differ from each of them in ' +
+      'mechanism or core premise — restating, inverting phrasing, or recombining the same core idea ' +
+      'produces a duplicate that will be clustered away and discarded.';
 
 // ---------------------------------------------------------------------------
 // clustering helpers (deterministic post-processing of the LLM partition)
@@ -346,13 +363,38 @@ export const generateHypothesesStage: StageHandler = {
         };
       }
 
-      const res = await callStructured<z.infer<typeof StrategyOut>>(ctx, {
-        stage: 'generate_hypotheses',
-        purpose: def.purpose,
-        systemPrompt: `${def.instruction} ${DIVERSITY_DISCIPLINE}`,
-        payload,
-        schema: StrategyOut,
-      });
+    // W8 S2: per-strategy step checkpoint (stable domain key, family 'strategies').
+    // Strategies execute in fixed order and each prompt depends only on earlier
+    // strategies' results, so a resume replays cached strategies first and rebuilds
+    // `raws` identically — the next uncached strategy sees a byte-identical prompt.
+    // The inputs fingerprint covers the conditioning base AND the instruction constants
+    // (def.instruction + DIVERSITY_DISCIPLINE): a prompt upgrade invalidates the family's
+    // cache instead of replaying stale generations (Wave-5 audit P3 / W8 audit P1-1).
+    const strategyInputs = canonicalSha256({
+      question: questionForPrompt,
+      claims: claimsForPrompt(claims),
+      relations: relations.map((r) => ({ id: r.id, relation: r.relation })),
+      instructions: STRATEGY_DEFS.map((d) => d.instruction),
+      discipline: DIVERSITY_DISCIPLINE,
+    });
+    const res = await ctx.checkpointed('generate_hypotheses', 'strategies', `strategy:${def.strategy}`, strategyInputs, () =>
+        callStructured<z.infer<typeof StrategyOut>>(ctx, {
+          stage: 'generate_hypotheses',
+          purpose: def.purpose,
+          systemPrompt: `${def.instruction}${antiRepetitionInstruction(raws.length)} ${DIVERSITY_DISCIPLINE}`,
+          payload: {
+            ...payload,
+            ...(raws.length > 0
+              ? {
+                  previouslyProposed: raws.map((r) => ({
+                    statement: r.out.statement,
+                    mechanism: r.out.mechanism,
+                  })),
+                }
+              : {}),
+          },
+          schema: StrategyOut,
+        }).then((r) => ({ provider: r.provider, modelId: r.modelId, data: r.data })));
       const modelRef = `${res.provider}/${res.modelId}`;
       const inputIds = (payload.supportingClaims ?? payload.counterDirectionClaims ?? payload.claims ?? []) as {
         id: string;
@@ -391,10 +433,15 @@ export const generateHypothesesStage: StageHandler = {
         stage: 'generate_hypotheses',
         purpose: 'hypothesis-search:diversity-supplement',
         systemPrompt:
-          'The current hypothesis candidate set is too homogeneous. Generate additional candidates that are ' +
-          'REQUIRED to differ from every existing candidate in mechanism or core premise — perturb the existing ' +
-          'assumptions, invert them, or import a mechanism from an adjacent domain. Paraphrases are useless here. ' +
-          'If genuinely no additional distinct hypothesis is defensible from the evidence, return an empty list. ' +
+          'The current hypothesis candidate set is too homogeneous. Generate additional candidates by ' +
+          'applying ONE of these operators to the existing set: (a) integrate — merge the cores of two ' +
+          'mechanistically distant candidates into one hypothesis neither supports alone; (b) reduce — ' +
+          'strip one candidate to its single load-bearing causal claim under a sharper mechanism; ' +
+          '(c) make-feasible — reshape the strongest candidate to be executable with current methods and ' +
+          'measurements; (d) transplant — import a causal mechanism from an adjacent domain and apply it ' +
+          'to this question. Every candidate must differ from ALL existing candidates in mechanism or ' +
+          'core premise. Paraphrases are useless here. If genuinely no additional distinct hypothesis is ' +
+          'defensible from the evidence, return an empty list. ' +
           DIVERSITY_DISCIPLINE,
         payload: {
           question: questionForPrompt,

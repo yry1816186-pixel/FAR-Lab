@@ -124,6 +124,117 @@ export class Store {
   integrity(): string {
     return this.db.integrityCheck();
   }
+
+  // ---- W8 S2: idempotent intra-stage step checkpoints (dbos operation_outputs pattern) ----
+  // `family` separates independent checkpoint families inside one stage (audit P0-1:
+  // rank hosts scoring batches AND tournament pairs with different inputs fingerprints —
+  // a per-stage fingerprint row made the families clear each other on every resume).
+
+  getStepOutput<T>(runId: string, stage: RunStageName, family: string, stepKey: string): T | null {
+    const row = this.db.prepare('SELECT json FROM step_outputs WHERE run_id=? AND stage=? AND family=? AND step_key=?')
+      .get(runId, stage, family, stepKey);
+    return row ? (JSON.parse(String(row.json)) as T) : null;
+  }
+
+  putStepOutput(runId: string, stage: RunStageName, family: string, stepKey: string, value: unknown, at = new Date().toISOString()): void {
+    this.db.prepare('INSERT OR REPLACE INTO step_outputs (run_id, stage, family, step_key, json, created_at) VALUES (?,?,?,?,?,?)')
+      .run(runId, stage, family, stepKey, JSON.stringify(value), at);
+    this.appendEvent(runId, { type: 'checkpoint_saved', stage, detail: { family, stepKey } }, at);
+  }
+
+  countStepOutputs(runId: string, stage: RunStageName, family?: string): number {
+    const n = family === undefined
+      ? this.db.prepare('SELECT COUNT(*) AS n FROM step_outputs WHERE run_id=? AND stage=?').get(runId, stage)?.n
+      : this.db.prepare('SELECT COUNT(*) AS n FROM step_outputs WHERE run_id=? AND stage=? AND family=?').get(runId, stage, family)?.n;
+    return Number(n ?? 0);
+  }
+
+  /**
+   * Stage-inputs fingerprint per family (W8 S2 hardening, audit P3 + P0-1): checkpoint
+   * keys alone are not payload-bound — a code/prompt upgrade mid-run would otherwise
+   * replay stale cached responses under rebuilt prompts (dbos application_version gate,
+   * embedded form). A mismatch invalidates only that FAMILY's step outputs.
+   */
+  getStepFingerprint(runId: string, stage: RunStageName, family: string): string | null {
+    const row = this.db.prepare('SELECT fingerprint FROM step_fingerprints WHERE run_id=? AND stage=? AND family=?')
+      .get(runId, stage, family);
+    return row ? String(row.fingerprint) : null;
+  }
+
+  putStepFingerprint(runId: string, stage: RunStageName, family: string, fingerprint: string): void {
+    this.db.prepare('INSERT OR REPLACE INTO step_fingerprints (run_id, stage, family, fingerprint) VALUES (?,?,?,?)')
+      .run(runId, stage, family, fingerprint);
+  }
+
+  clearStepOutputs(runId: string, stage: RunStageName, family: string): number {
+    const res = this.db.prepare('DELETE FROM step_outputs WHERE run_id=? AND stage=? AND family=?').run(runId, stage, family);
+    return Number(res.changes);
+  }
+
+  // ---- W8 S1: run leases (single-writer discipline across CLI/server processes) ----
+
+  /** Current lease state of a run (row-level operational state, deliberately outside the run doc). */
+  getRunLease(runId: string): { holder: string | null; expiresAt: string | null } {
+    const row = this.db.prepare('SELECT lease_holder, lease_expires_at FROM runs WHERE id=?').get(runId);
+    if (!row) return { holder: null, expiresAt: null };
+    return {
+      holder: row.lease_holder === null || row.lease_holder === undefined ? null : String(row.lease_holder),
+      expiresAt: row.lease_expires_at === null || row.lease_expires_at === undefined ? null : String(row.lease_expires_at),
+    };
+  }
+
+  /**
+   * Conditionally claim execution ownership. Atomic under sqlite's single-writer
+   * transactions: succeeds only when no live lease exists (expired leases are
+   * reclaimable — the holder's process is presumed dead, temporal sticky-lease pattern).
+   */
+  acquireLease(runId: string, holder: string, expiresAt: string): boolean {
+    const res = this.db.transaction(() => {
+      const row = this.db.prepare('SELECT lease_holder, lease_expires_at FROM runs WHERE id=?').get(runId);
+      if (!row) throw new Error(`run not found: ${runId}`);
+      const now = new Date().toISOString();
+      const live = row.lease_holder !== null && row.lease_holder !== undefined
+        && String(row.lease_expires_at ?? '') > now;
+      if (live && String(row.lease_holder) !== holder) return false;
+      this.db.prepare('UPDATE runs SET lease_holder=?, lease_expires_at=? WHERE id=?')
+        .run(holder, expiresAt, runId);
+      return true;
+    });
+    return res;
+  }
+
+  /** Extend the lease; no-op when this holder does not own it (lost adoption race). */
+  renewLease(runId: string, holder: string, expiresAt: string): void {
+    this.db.prepare('UPDATE runs SET lease_expires_at=? WHERE id=? AND lease_holder=?')
+      .run(expiresAt, runId, holder);
+  }
+
+  releaseLease(runId: string, holder: string): void {
+    this.db.prepare('UPDATE runs SET lease_holder=NULL, lease_expires_at=NULL WHERE id=? AND lease_holder=?')
+      .run(runId, holder);
+  }
+
+  /**
+   * Runs stuck in status='running' whose lease expired — i.e. the frozen-run signature
+   * (P1): a dead worker holds no live lease. Threshold is absolute (ISO) so callers
+   * control the grace window.
+   */
+  listExpiredLeaseRuns(nowIso: string): { id: string; currentStage: string; leaseHolder: string | null }[] {
+    return this.db.prepare(
+      "SELECT id, current_stage, lease_holder FROM runs WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at <= ?)",
+    ).all(nowIso).map((r) => ({ id: String(r.id), currentStage: String(r.current_stage), leaseHolder: r.lease_holder === null ? null : String(r.lease_holder) }));
+  }
+
+  /**
+   * Atomic cancellation flag write (W8 audit P2-4): a whole-doc read-modify-write races
+   * the owning executor's transitions (lost update can resurrect done stages or erase
+   * the flag). json_set touches only the flag inside one statement.
+   */
+  requestCancel(runId: string): boolean {
+    const res = this.db.prepare("UPDATE runs SET doc = json_set(doc, '$.cancelRequested', json('true')), updated_at = updated_at WHERE id=? AND status IN ('created','queued','running','paused','partial')")
+      .run(runId);
+    return Number(res.changes) === 1;
+  }
 }
 
 const STAGE_ALL: readonly RunStageName[] = [

@@ -5,6 +5,7 @@ import { HypothesisComparison, HypothesisScorecard, HypothesisTournament, ScoreD
 import type { TournamentMatch } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, partitionClaimRefs, runClaimIds } from './shared.js';
+import { canonicalSha256 } from '../../shared/crypto.js';
 
 /** DimensionScore has no exported type alias in the domain — derive it from the scorecard schema type. */
 type DimensionScoreT = HypothesisScorecard['dimensions'][number];
@@ -343,42 +344,50 @@ export const rankStage: StageHandler = {
       .listObjects('claim', runId)
       .map((c) => ({ id: c.id, text: c.text, bindingStatus: c.bindingStatus }));
     const batchResults: { provider: string; modelId: string; data: z.infer<typeof RankOut> }[] = [];
+    // 'scoring' family inputs fingerprint: hashes the FULL prompt-bearing projection —
+    // hypothesis content (not just ids), claims, the batch partition (BATCH_SIZE changes
+    // repartition keys) and the scoring system prompt. Any upgrade that changes ANY of
+    // these invalidates only this family's cached outputs (no stale replay, audit P1-1).
+    const scoringPrompt =
+      'Score each hypothesis on at least 8 of the 12 dimensions (0..1, or null when genuinely not assessable). ' +
+      'Each rationale must be at least 15 characters and cite real claim ids from the provided list where ' +
+      'evidence is used. For resource_cost and risk you MUST state the value direction: ' +
+      '"higher_value_is_better" (e.g. you scored low-cost as high) or "higher_value_is_worse" (high value = ' +
+      'high cost/risk); use "unclear" only if you cannot commit — the dimension is then excluded. ' +
+      'Scores are ordinal decision aids, not probabilities.';
+    const hypProjection = (h: HypothesisCandidate) => ({
+      id: h.id, statement: h.statement, mechanism: h.mechanism,
+      assumptions: h.assumptions.map((a) => a.statement), predictions: h.predictions,
+      noveltyLabel: h.noveltyLabel, testability: h.testability,
+      falsification: h.falsification ? {
+        decisionRule: h.falsification.decisionRule,
+        completenessCheck: h.falsification.completenessCheck,
+        confounders: h.falsification.confounders,
+        alternativeExplanations: h.falsification.alternativeExplanations,
+      } : null,
+      supportingClaimIds: h.supportingClaimIds, counterClaimIds: h.counterClaimIds,
+    });
+    const scoringInputs = canonicalSha256({
+      batches: batches.map((b) => b.map((h) => h.id)),
+      hypotheses: targets.map(hypProjection),
+      claims: allClaims,
+      systemPrompt: scoringPrompt,
+    });
     for (const batch of batches) {
       assertNotCancelled(ctx, 'rank');
-      const res = await callStructured<z.infer<typeof RankOut>>(ctx, {
-      stage: 'rank',
-      purpose: 'hypothesis-ranking:dimension-scores',
-      systemPrompt:
-        'Score each hypothesis on at least 8 of the 12 dimensions (0..1, or null when genuinely not assessable). ' +
-        'Each rationale must be at least 15 characters and cite real claim ids from the provided list where ' +
-        'evidence is used. For resource_cost and risk you MUST state the value direction: ' +
-        '"higher_value_is_better" (e.g. you scored low-cost as high) or "higher_value_is_worse" (high value = ' +
-        'high cost/risk); use "unclear" only if you cannot commit — the dimension is then excluded. ' +
-        'Scores are ordinal decision aids, not probabilities.',
-      payload: {
-        hypotheses: batch.map((h) => ({
-          id: h.id,
-          statement: h.statement,
-          mechanism: h.mechanism,
-          assumptions: h.assumptions.map((a) => a.statement),
-          predictions: h.predictions,
-          noveltyLabel: h.noveltyLabel,
-          testability: h.testability,
-          falsification: h.falsification
-            ? {
-                decisionRule: h.falsification.decisionRule,
-                completenessCheck: h.falsification.completenessCheck,
-                confounders: h.falsification.confounders,
-                alternativeExplanations: h.falsification.alternativeExplanations,
-              }
-            : null,
-          supportingClaimIds: h.supportingClaimIds,
-          counterClaimIds: h.counterClaimIds,
-        })),
-        availableClaims: allClaims,
-      },
-      schema: RankOut,
-      });
+      // W8 S2: per-batch step checkpoint keyed by the batch's first hypothesis id — a
+      // stable domain key, so a mid-stage kill + resume re-runs only unfinished batches.
+      const res = await ctx.checkpointed('rank', 'scoring', `score-batch:${batch[0]!.id}`, scoringInputs, () =>
+        callStructured<z.infer<typeof RankOut>>(ctx, {
+          stage: 'rank',
+          purpose: 'hypothesis-ranking:dimension-scores',
+          systemPrompt: scoringPrompt,
+          payload: {
+            hypotheses: batch.map(hypProjection),
+            availableClaims: allClaims,
+          },
+          schema: RankOut,
+        }).then((r) => ({ provider: r.provider, modelId: r.modelId, data: r.data })));
       batchResults.push(res);
     }
     const merged: z.infer<typeof RankOut> = { assessments: batchResults.flatMap((b) => b.data.assessments) };
@@ -513,6 +522,13 @@ export const rankStage: StageHandler = {
         });
         const byIdRanked = new Map(ranked.map((r) => [r.hyp.id, r] as const));
         const producerJudge = `${firstProvider}/${firstModel} pairwise judge`;
+        // Same inputs-fingerprint discipline for pair judging: question + full participant
+        // cards + judge prompt (any upgrade to these invalidates cached pair verdicts).
+        const pairInputs = canonicalSha256({
+          questionText: questionText ?? null,
+          cards: ranked.map((r) => card(r)),
+          prompt: PAIR_JUDGE_SYSTEM_PROMPT,
+        });
         for (const pair of pairs) {
           assertNotCancelled(ctx, 'rank');
           const ra = byIdRanked.get(pair.aId);
@@ -521,20 +537,25 @@ export const rankStage: StageHandler = {
           let judged: z.infer<typeof PairJudgeOut> | null = null;
           let failure: string | undefined;
           try {
-            const res = await callStructured<z.infer<typeof PairJudgeOut>>(ctx, {
-              stage: 'rank',
-              purpose: 'hypothesis-ranking:pairwise-tournament',
-              systemPrompt: PAIR_JUDGE_SYSTEM_PROMPT,
-              payload: {
-                ...(questionText !== undefined ? { questionText } : {}),
-                hypothesisA: card(ra),
-                hypothesisB: card(rb),
-              },
-              schema: PairJudgeOut,
-              temperature: 0.1,
-              maxTokens: 1024,
-            });
-            judged = res.data;
+            // W8 S2: per-pair step checkpoint keyed by the domain pair (aId:bId). Only
+            // SUCCESSFUL judgments are cached — a pair whose judge call failed stays
+            // uncached and gets a fresh attempt on resume (transient failures, not
+            // seed-dependent outcomes, so same-seed-same-output holds for fresh runs).
+            const cached = await ctx.checkpointed('rank', 'pairs', `pair:${pair.aId}:${pair.bId}`, pairInputs, () =>
+              callStructured<z.infer<typeof PairJudgeOut>>(ctx, {
+                stage: 'rank',
+                purpose: 'hypothesis-ranking:pairwise-tournament',
+                systemPrompt: PAIR_JUDGE_SYSTEM_PROMPT,
+                payload: {
+                  ...(questionText !== undefined ? { questionText } : {}),
+                  hypothesisA: card(ra),
+                  hypothesisB: card(rb),
+                },
+                schema: PairJudgeOut,
+                temperature: 0.1,
+                maxTokens: 1024,
+              }).then((r) => ({ data: r.data as z.infer<typeof PairJudgeOut> })));
+            judged = cached.data;
           } catch (e) {
             failure = e instanceof Error ? e.message : String(e);
             ctx.log(`rank: tournament judge call failed for ${pair.aId} vs ${pair.bId}: ${failure}`);

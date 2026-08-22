@@ -21,6 +21,7 @@ import {
   checkFalsificationCompleteness,
   falsifyStage,
   hasDecidableSemantics,
+  applyLinkAudit,
 } from '../src/pipeline/stages/falsify.js';
 import { COMPARISON_NOTE, RANK_WEIGHTS, aggregateOutcome, bradleyTerry, circleSchedule, compositeScore, rankStage, tournamentRounds } from '../src/pipeline/stages/rank.js';
 import { DUPLICATE_MARKER } from '../src/pipeline/stages/shared.js';
@@ -184,6 +185,8 @@ const makeCtx = (run: { id: RunId }, store: Store, steps: StubStep[], opts: CtxO
     },
     cancelled: opts.cancelled ?? (() => false),
     log: () => {},
+    // W8 checkpointing contract: tests pass through unless a test exercises checkpoint semantics
+    checkpointed: async <T>(_stage: string, _family: string, _key: string, _fp: string | undefined, fn: () => Promise<T>) => fn(),
   };
   return { ctx, receipts, artifacts };
 };
@@ -199,6 +202,17 @@ const cand = (n: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 const gen = (...cs: unknown[]) => JSON.stringify({ candidates: cs });
+
+/** W5-F5 link-audit scripted response: confirm every listed link. */
+const auditConfirm = (...claimIds: string[]) => ({
+  rawOutput: JSON.stringify({
+    verdicts: claimIds.map((claimId) => ({
+      claimId,
+      verdict: 'confirm',
+      reason: 'audit confirms the claim bears directly on the hypothesis mechanism',
+    })),
+  }),
+});
 const NOVELTY_MIXED = 'mixed';
 
 const dim = (name: string, value: number | null, extra: Record<string, unknown> = {}) => ({
@@ -305,6 +319,88 @@ describe('generate_hypotheses stage', () => {
 
     // regeneration is not applicable once hypotheses exist
     expect(await generateHypothesesStage.applicable({ ...ctx, run: { ...ctx.run } })).toBe(false);
+  });
+
+  it('W5-F4: later strategy calls see previouslyProposed negative conditioning; first does not', async () => {
+    const { store, run } = setup();
+    const c1 = makeClaim(run.id, 'claim one text');
+    const c2 = makeClaim(run.id, 'claim two text');
+    store.putObject('claim', c1);
+    store.putObject('claim', c2);
+
+    const capture: { reqs: StructuredCallRequest[] } = { reqs: [] };
+    const steps: StubStep[] = [
+      { rawOutput: gen(cand('E1'), cand('E2')) },
+      { rawOutput: gen(cand('C1'), cand('C2')) },
+      { rawOutput: gen(cand('M1'), cand('M2')) },
+      { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0], reason: 'single' }] }) },
+      { rawOutput: JSON.stringify({ labels: [{ index: 0, noveltyLabel: 'evidence_grounded' }] }) },
+      { rawOutput: JSON.stringify({ hypotheses: [{ hypothesisId: 'hyp_notarget00000000000000000aaa', queries: ['ignored neighbor query one', 'ignored neighbor query two'] }] }) },
+    ];
+    const { ctx } = makeCtx(run, store, steps, { capture });
+    const outcome = await generateHypothesesStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+
+    const purposes = ['hypothesis-search:evidence-conditioned', 'hypothesis-search:contradiction-driven', 'hypothesis-search:mechanism-driven'];
+    const stratReqs = purposes.map((p) => capture.reqs.find((r) => r.task === p));
+    expect(stratReqs.every((r) => r !== undefined)).toBe(true);
+    const body = (r: StructuredCallRequest | undefined): Record<string, unknown> =>
+      ((r?.userPayload as { input?: Record<string, unknown> })?.input ?? {}) as Record<string, unknown>;
+
+    // first strategy: no history, no negative constraint
+    const first = body(stratReqs[0]);
+    expect(first).not.toHaveProperty('previouslyProposed');
+    expect(String(stratReqs[0]?.systemPrompt)).not.toContain('previouslyProposed');
+
+    // second strategy: sees the first strategy's two candidates, verbatim statements+mechanisms
+    const second = body(stratReqs[1]);
+    const prev2 = (second.previouslyProposed ?? []) as Array<{ statement: string; mechanism: string }>;
+    expect(prev2.map((p) => p.statement).sort()).toEqual(['statement E1', 'statement E2'].sort());
+    expect(prev2.every((p) => p.mechanism.startsWith('mechanism '))).toBe(true);
+    expect(String(stratReqs[1]?.systemPrompt)).toContain('2 candidate hypothesis statement(s) already proposed');
+
+    // third strategy: sees all four prior candidates
+    const third = body(stratReqs[2]);
+    const prev3 = (third.previouslyProposed ?? []) as Array<{ statement: string }>;
+    expect(prev3.map((p) => p.statement).sort()).toEqual(
+      ['statement C1', 'statement C2', 'statement E1', 'statement E2'].sort(),
+    );
+    expect(String(stratReqs[2]?.systemPrompt)).toContain('4 candidate hypothesis statement(s) already proposed');
+  });
+
+  it('W5-F4: diversity supplement instructs the four explicit operators and keeps full existing-set visibility', async () => {
+    const { store, run } = setup();
+    const c1 = makeClaim(run.id, 'claim one text');
+    const c2 = makeClaim(run.id, 'claim two text');
+    store.putObject('claim', c1);
+    store.putObject('claim', c2);
+
+    const capture: { reqs: StructuredCallRequest[] } = { reqs: [] };
+    const steps: StubStep[] = [
+      { rawOutput: gen(cand('E1'), cand('E2')) },
+      { rawOutput: gen(cand('C1'), cand('C2')) },
+      { rawOutput: gen(cand('M1'), cand('M2')) },
+      // all six collapse into one cluster -> supplement fires
+      { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0, 1, 2, 3, 4, 5], reason: 'all paraphrases' }] }) },
+      { rawOutput: gen(cand('S1'), cand('S2')) }, // supplement
+      { rawOutput: JSON.stringify({ clusters: [{ memberIndices: [0], reason: 'single' }] }) }, // recluster
+      { rawOutput: JSON.stringify({ labels: [{ index: 0, noveltyLabel: 'evidence_grounded' }] }) },
+      { rawOutput: JSON.stringify({ hypotheses: [{ hypothesisId: 'hyp_notarget00000000000000000aaa', queries: ['ignored neighbor query one', 'ignored neighbor query two'] }] }) },
+    ];
+    const { ctx } = makeCtx(run, store, steps, { capture });
+    const outcome = await generateHypothesesStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+
+    const supplement = capture.reqs.find((r) => r.task === 'hypothesis-search:diversity-supplement');
+    expect(supplement).toBeDefined();
+    const sys = String(supplement?.systemPrompt);
+    for (const operator of ['integrate', 'reduce', 'make-feasible', 'transplant']) {
+      expect(sys).toContain(operator);
+    }
+    const payload = ((supplement?.userPayload as { input?: Record<string, unknown> })?.input ?? {}) as Record<string, unknown>;
+    const existing = (payload.existingCandidates ?? []) as Array<{ statement: string }>;
+    expect(existing).toHaveLength(6); // the six primary candidates are fully visible when the supplement generates
+    expect(existing.some((c) => c.statement === 'statement E1')).toBe(true);
   });
 
   it('falls back for contradiction_driven when no counter-evidence exists (explicit where-could-it-be-wrong instruction)', async () => {
@@ -664,6 +760,7 @@ describe('critique_falsify stage', () => {
 
     const steps: StubStep[] = [
       { rawOutput: JSON.stringify(goodSpec) },
+      auditConfirm(c1.id, c2.id), // W5-F5 link audit for h1's gated links
       { rawOutput: JSON.stringify(hollowSpec) },
     ];
     const { ctx } = makeCtx(run, store, steps);
@@ -763,7 +860,7 @@ describe('critique_falsify stage', () => {
       uncertainties: [],
       testability: 'testable_now',
     };
-    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }]);
+    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }, auditConfirm(cCounter.id, cSupporting.id)]);
     const outcome = await falsifyStage.execute(ctx);
     expect(outcome.kind).toBe('done');
 
@@ -821,7 +918,7 @@ describe('critique_falsify stage', () => {
       uncertainties: [],
       testability: 'testable_now',
     };
-    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }]);
+    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }, auditConfirm(near.id)]);
     const outcome = await falsifyStage.execute(ctx);
     expect(outcome.kind).toBe('done');
     const summary = outcome.kind === 'done' ? outcome.summary : '';
@@ -872,7 +969,10 @@ describe('critique_falsify stage', () => {
       uncertainties: [],
       testability: 'testable_now',
     };
-    const { ctx } = makeCtx(run, store, [{ rawOutput: JSON.stringify(spec) }]);
+    const { ctx } = makeCtx(run, store, [
+      { rawOutput: JSON.stringify(spec) },
+      auditConfirm(cExplicitContra.id, cExplicitQual.id, cUnlabeled.id, cGarbageLabel.id),
+    ]);
     const outcome = await falsifyStage.execute(ctx);
     expect(outcome.kind).toBe('done');
 
@@ -885,6 +985,166 @@ describe('critique_falsify stage', () => {
     expect(byClaim.get(cGarbageLabel.id)).toBe('weakens'); // unparseable label -> weakens default (zod .catch)
     const h1After = store.getObject('hypothesis', h1.id);
     expect(h1After?.counterClaimIds).toHaveLength(4); // linkage preserved for all gated links
+  });
+
+  it('W5-F5 applyLinkAudit (pure): confirm keeps, relabel changes label only with a relation, drop removes, unknown ids ignored, silence defaults to confirm', () => {
+    const proposed = [
+      { claimId: 'clm_a', relation: 'supports' as const },
+      { claimId: 'clm_b', relation: 'contradicts' as const },
+      { claimId: 'clm_c', relation: 'weakens' as const },
+      { claimId: 'clm_d', relation: 'qualifies' as const },
+    ];
+    const audit = applyLinkAudit(proposed, [
+      { claimId: 'clm_a', verdict: 'confirm', reason: 'direct evidence for the mechanism prediction' },
+      { claimId: 'clm_b', verdict: 'drop', reason: 'stretched from a different subject and measure onto this hypothesis' },
+      { claimId: 'clm_c', verdict: 'relabel', reason: 'relabel verdict missing the relation field entirely here' },
+      { claimId: 'clm_x', verdict: 'drop', reason: 'hallucinated claim id must be ignored deterministically' },
+      // clm_d unmentioned -> confirm-by-silence
+    ]);
+    // hallucinated ids never enter the map (audit mutation-check: guard removal must fail here)
+    expect(audit.size).toBe(4);
+    expect(audit.has('clm_x')).toBe(false);
+    // drop on a PROPOSED id actually drops (audit mutation-check: no-op drop must fail here)
+    expect(audit.get('clm_b')).toMatchObject({ relation: 'contradicts', dropped: true });
+    expect(audit.get('clm_b')?.note).toContain('dropped by link audit');
+    expect(audit.get('clm_a')).toMatchObject({ relation: 'supports', dropped: false });
+    expect(audit.get('clm_a')?.note).toBeUndefined();
+    expect(audit.get('clm_c')).toMatchObject({ relation: 'weakens', dropped: false });
+    expect(audit.get('clm_c')?.note).toContain('relabel verdict without relation');
+    expect(audit.get('clm_d')).toMatchObject({ relation: 'qualifies', dropped: false });
+  });
+
+  it('W5-F5 audit P1: a cross-polarity relabel lands in the hypothesis id-array matching the PERSISTED relation, keeping the proposer rationale', async () => {
+    const { store, run } = setup();
+    const cCounterProposed = makeClaim(run.id, 'claim: dose-response evidence sharing vocabulary with the duration off-targeting mechanism');
+    store.putObject('claim', cCounterProposed);
+    const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      observable: 'off-target edit frequency per exposure duration bin',
+      measurement: 'targeted deep sequencing across matched duration series with gRNA controls',
+      expectedRelation: 'edit frequency increases monotonically with exposure duration',
+      decisionRule: 'if median fold-change >= 2 between longest and shortest duration, mechanism supported; < 1.3 refuted',
+      decisionRuleProvenance: 'model-stipulated',
+      supportCondition: 'monotonic increase with at least 2-fold range',
+      weakeningCondition: 'sub-linear or noisy increase below 2-fold',
+      falsificationCondition: 'no duration dependence across the full series',
+      confounders: [],
+      alternativeExplanations: [],
+      dataRequirements: [],
+      method: 'controlled exposure series with structure-matched gRNA controls',
+      failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
+      assumptionCritiques: [],
+      counterLinks: [
+        { claimId: cCounterProposed.id, relation: 'weakens', linkReason: 'the proposer argued this weakens the duration mechanism claim' },
+      ],
+      supportingClaimIds: [],
+      supportingLinks: [],
+      uncertainties: [],
+      testability: 'testable_now',
+    };
+    const audit = {
+      verdicts: [
+        { claimId: cCounterProposed.id, verdict: 'relabel', relation: 'supports', reason: 'on reflection the finding directly corroborates the duration mechanism' },
+      ],
+    };
+    const { ctx } = makeCtx(run, store, [
+      { rawOutput: JSON.stringify(spec) },
+      { rawOutput: JSON.stringify(audit) },
+    ]);
+    const outcome = await falsifyStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+
+    // persisted relation carries the AUDITED label …
+    const rels = store.listObjects('evidence_relation', run.id);
+    expect(rels).toHaveLength(1);
+    expect(rels[0]).toMatchObject({ relation: 'supports', claimId: cCounterProposed.id, targetHypothesisId: h1.id });
+    // … and the hypothesis id-arrays follow the PERSISTED relation (rank/renderers read both)
+    const h1After = store.getObject('hypothesis', h1.id);
+    expect(h1After?.supportingClaimIds).toEqual([cCounterProposed.id]);
+    expect(h1After?.counterClaimIds).toEqual([]);
+    // rationale keeps the PROPOSER's substantive argument; the relabel is disclosed in uncertainties
+    expect(rels[0]?.rationale).toBe('the proposer argued this weakens the duration mechanism claim');
+    expect(rels[0]?.uncertainties[0]).toContain('weakens->supports');
+  });
+
+  it('W5-F5 stage: audit relabels and drops links; hypothesis claimIds follow the audit; audit failure keeps originals visibly', async () => {
+    const { store, run } = setup();
+    const cSup = makeClaim(run.id, 'claim: dose-response evidence directly supports the duration mechanism of off-targeting');
+    const cStretch = makeClaim(run.id, 'claim: a different organism shows a duration-independent off-targeting pattern');
+    store.putObject('claim', cSup);
+    store.putObject('claim', cStretch);
+    const h1 = makeHyp(run.id, 'duration drives off-targeting', { createdAt: ts(0) });
+    store.putObject('hypothesis', h1);
+
+    const spec = {
+      observable: 'off-target edit frequency per exposure duration bin',
+      measurement: 'targeted deep sequencing across matched duration series with gRNA controls',
+      expectedRelation: 'edit frequency increases monotonically with exposure duration',
+      decisionRule: 'if median fold-change >= 2 between longest and shortest duration, mechanism supported; < 1.3 refuted',
+      decisionRuleProvenance: 'model-stipulated',
+      supportCondition: 'monotonic increase with at least 2-fold range',
+      weakeningCondition: 'sub-linear or noisy increase below 2-fold',
+      falsificationCondition: 'no duration dependence across the full series',
+      confounders: [],
+      alternativeExplanations: [],
+      dataRequirements: [],
+      method: 'controlled exposure series with structure-matched gRNA controls',
+      failureInterpretation: 'duration mechanism unsupported; revisit the mechanism class',
+      assumptionCritiques: [],
+      counterLinks: [
+        { claimId: cStretch.id, relation: 'contradicts', linkReason: 'asserted incompatibility with the duration mechanism prediction' },
+      ],
+      supportingClaimIds: [cSup.id],
+      supportingLinks: [
+        { claimId: cSup.id, linkReason: 'the dose-response evidence directly supports the duration mechanism' },
+      ],
+      uncertainties: [],
+      testability: 'testable_now',
+    };
+    const audit = {
+      verdicts: [
+        { claimId: cStretch.id, verdict: 'relabel', relation: 'weakens', reason: 'different organism means reduced confidence, not direct incompatibility' },
+        { claimId: cSup.id, verdict: 'drop', reason: 'dose-response is about dose, not duration — stretched onto this hypothesis' },
+      ],
+    };
+    const { ctx } = makeCtx(run, store, [
+      { rawOutput: JSON.stringify(spec) },
+      { rawOutput: JSON.stringify(audit) },
+    ]);
+    const outcome = await falsifyStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+
+    const rels = store.listObjects('evidence_relation', run.id);
+    expect(rels).toHaveLength(1); // supporting dropped by audit
+    expect(rels[0]).toMatchObject({ relation: 'weakens', claimId: cStretch.id, targetHypothesisId: h1.id });
+    expect(rels[0]?.rationale).toBe('asserted incompatibility with the duration mechanism prediction');
+    expect(rels[0]?.uncertainties[0]).toContain('contradicts->weakens');
+    const h1After = store.getObject('hypothesis', h1.id);
+    expect(h1After?.counterClaimIds).toEqual([cStretch.id]);
+    expect(h1After?.supportingClaimIds).toEqual([]);
+    const summary = outcome.kind === 'done' ? outcome.summary : '';
+    expect(summary).toContain('link audit dropped 1 link(s)');
+
+    // audit-call failure keeps the originally gated links, visibly
+    const h2 = makeHyp(run.id, 'dose magnitude drives off-targeting', { createdAt: ts(5) });
+    store.putObject('hypothesis', h2);
+    const spec2 = { ...spec, counterLinks: [{ claimId: cSup.id, relation: 'weakens', linkReason: 'dose-response evidence weakens the dose-magnitude claim specifically' }], supportingClaimIds: [], supportingLinks: [] };
+    const { ctx: ctx2 } = makeCtx(run, store, [
+      { rawOutput: JSON.stringify(spec2) },
+      { rawOutput: 'not json at all' }, // audit call fails schema -> failure path
+    ]);
+    const outcome2 = await falsifyStage.execute(ctx2);
+    expect(outcome2.kind).toBe('done');
+    const rels2 = store.listObjects('evidence_relation', run.id).filter((r) => r.targetHypothesisId === h2.id);
+    expect(rels2).toHaveLength(1); // original kept
+    expect(rels2[0]).toMatchObject({ relation: 'weakens', claimId: cSup.id });
+    // audit failure must not desynchronize the hypothesis id-arrays either (audit P3)
+    const h2After = store.getObject('hypothesis', h2.id);
+    expect(h2After?.counterClaimIds).toEqual([cSup.id]);
+    expect(h2After?.supportingClaimIds).toEqual([]);
+    expect(outcome2.kind === 'done' ? outcome2.summary : '').toContain('link audit failed');
   });
 
   it('W5/S2: linkReason under 20 characters is a schema failure (fail-closed, no silent template fallback)', async () => {
