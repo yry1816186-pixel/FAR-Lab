@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { z } from 'zod';
 import { canonicalSha256 } from '../src/shared/crypto.js';
 import type { StructuredCallRequest } from '../src/shared/ports.js';
-import { zodToStrictJsonSchema, strictSchemaOrUndefined, extractJsonText, repairUnescapedQuotes } from '../src/providers/http.js';
+import { zodToStrictJsonSchema, strictSchemaOrUndefined, extractJsonText, repairUnescapedQuotes, backoffDelayMs, parseRetryAfterMs, redactSecrets, RETRY_MAX_BACKOFF_MS } from '../src/providers/http.js';
 import { createDeepSeekProvider } from '../src/providers/deepseek.js';
 import { createZaiProvider } from '../src/providers/zai.js';
 import { createDashScopeProvider } from '../src/providers/dashscope.js';
@@ -369,12 +369,12 @@ describe('invalid_output retry discipline', () => {
 // ---------------------------------------------------------------------------
 
 describe('transport failure classification and retry budget', () => {
-  it('classifies 429 as rate_limited, retries at most twice with 1s/3s backoff', async () => {
+  it('classifies 429 as rate_limited, retries at most twice with jittered 1s/2s backoff (W4-F1)', async () => {
     const { sleep, sleeps } = sleepRecorder();
     const rateLimited = () =>
       Promise.resolve(httpError(429, { error: { message: 'Too many requests', type: 'rate_limit_error', code: 'rate_limit_exceeded' } }));
     const { fetchImpl, calls } = recorderFetch([rateLimited, rateLimited, rateLimited, rateLimited]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep });
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
 
     expect(res.ok).toBe(false);
@@ -382,8 +382,61 @@ describe('transport failure classification and retry budget', () => {
     expect(res.error?.retryable).toBe(true);
     expect(res.error?.httpStatus).toBe(429);
     expect(calls.length).toBe(3); // initial + 2 retries = hard cap
-    expect(sleeps).toEqual([1_000, 3_000]);
+    // random()=0.5 → jitter factor exactly 1.0: pure exponential 1000·2^(n-1)
+    expect(sleeps).toEqual([1_000, 2_000]);
     expect(res.error?.message).toContain('retry budget of 2 exhausted');
+    // W4-F1 observability: the receipt records consumed retries
+    expect(res.receipt.transportRetries).toBe(2);
+    expect(res.receipt.correctiveReasks).toBe(0);
+  });
+
+  it('honors server Retry-After seconds over the exponential curve (W4-F1)', async () => {
+    const { sleep, sleeps } = sleepRecorder();
+    const withRetryAfter = () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ error: { message: 'slow down', code: 'rate_limit' } }),
+          { status: 429, headers: { 'content-type': 'application/json', 'retry-after': '7' } },
+        ),
+      );
+    const { fetchImpl, calls } = recorderFetch([withRetryAfter, withRetryAfter, withRetryAfter]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(false);
+    expect(calls.length).toBe(3);
+    expect(sleeps).toEqual([7_000, 7_000]);
+  });
+
+  it('caps an absurd server Retry-After at the 30s maximum (W4-F1)', async () => {
+    const { sleep, sleeps } = sleepRecorder();
+    const withRetryAfter = () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ error: { message: 'slow down', code: 'rate_limit' } }),
+          { status: 429, headers: { 'content-type': 'application/json', 'retry-after-ms': '600000' } },
+        ),
+      );
+    const { fetchImpl } = recorderFetch([withRetryAfter, withRetryAfter, withRetryAfter]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(false);
+    expect(sleeps).toEqual([30_000, 30_000]);
+  });
+
+  it('redacts credential-shaped text echoed in provider error bodies before persistence (W4-F3)', async () => {
+    const { sleep } = sleepRecorder();
+    const leaking = () =>
+      Promise.resolve(
+        httpError(429, { error: { message: 'rejected for key sk-abc123def456ghi789jklmn and api_key = "z9y8x7w6v5u4t3s2r1q0"', code: 'rate_limit' } }),
+      );
+    const { fetchImpl, calls } = recorderFetch([leaking, leaking, leaking]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(false);
+    expect(calls.length).toBe(3);
+    expect(res.error?.message).not.toContain('sk-abc123def456ghi789jklmn');
+    expect(res.error?.message).not.toContain('z9y8x7w6v5u4t3s2r1q0');
+    expect(res.error?.message).toContain('[REDACTED_SECRET]');
   });
 
   it('recovers when a 429 is followed by a good response', async () => {
@@ -392,11 +445,12 @@ describe('transport failure classification and retry budget', () => {
       () => Promise.resolve(httpError(429, { error: { message: 'slow down', code: 'rate_limit' } })),
       () => Promise.resolve(chatOk(RAW_OK)),
     ]);
-    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep });
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(2);
     expect(sleeps).toEqual([1_000]);
+    expect(res.receipt.transportRetries).toBe(1);
   });
 
   it('treats Z.ai 429 + code 1113 as quota_exceeded (NOT retryable rate limiting)', async () => {
@@ -423,11 +477,11 @@ describe('transport failure classification and retry budget', () => {
       () => Promise.resolve(httpError(503, { error: { message: 'unavailable' } })),
       () => Promise.resolve(chatOk(RAW_OK)),
     ]);
-    const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl, sleep });
+    const provider = createZaiProvider({ apiKey: 'test-fixture-key-zai', fetchImpl, sleep, random: () => 0.5 });
     const res = await provider.structuredCall(REQ, parseHypothesis);
     expect(res.ok).toBe(true);
     expect(calls.length).toBe(3);
-    expect(sleeps).toEqual([1_000, 3_000]);
+    expect(sleeps).toEqual([1_000, 2_000]);
   });
 
   it('does NOT retry permanent 4xx (400 invalid model)', async () => {
@@ -715,5 +769,62 @@ describe('provider registry', () => {
     expect(deepseek.baseUrl).toBe('https://api.deepseek.com/beta'); // strict-FC default (D-026)
     expect(deepseek.apiKeyEnvVar).toBe('DEEPSEEK_API_KEY');
     expect(JSON.stringify(infos)).not.toMatch(/sk-[A-Za-z0-9]{8,}/); // no key material
+  });
+});
+
+describe('W4-F1 retry timing policy (source-fused: deepseek-harness llm-retry + opencode retry.ts)', () => {
+  it('exponential base 1s·2^(n-1) with symmetric ±25% multiplicative jitter', () => {
+    // random=0 → factor 0.75; random=0.5 → exactly 1.0; random=1 → factor 1.25
+    expect(backoffDelayMs(1, undefined, () => 0)).toBe(750);
+    expect(backoffDelayMs(1, undefined, () => 0.5)).toBe(1_000);
+    expect(backoffDelayMs(1, undefined, () => 1)).toBe(1_250);
+    expect(backoffDelayMs(2, undefined, () => 0.5)).toBe(2_000);
+    expect(backoffDelayMs(3, undefined, () => 0.5)).toBe(4_000);
+  });
+
+  it('caps every delay at RETRY_MAX_BACKOFF_MS (30s)', () => {
+    expect(backoffDelayMs(20, undefined, () => 1)).toBe(RETRY_MAX_BACKOFF_MS);
+    expect(backoffDelayMs(1, 999_999, () => 0.5)).toBe(RETRY_MAX_BACKOFF_MS);
+  });
+
+  it('server Retry-After beats the exponential curve when parseable', () => {
+    expect(backoffDelayMs(1, 7_000, () => 0)).toBe(7_000);
+    expect(backoffDelayMs(5, 250, () => 1)).toBe(250);
+  });
+
+  it('parseRetryAfterMs: retry-after-ms wins, then numeric seconds, then HTTP-date; absent → undefined', () => {
+    const headersOf = (entries: Record<string, string>) => ({
+      get: (name: string) => entries[name.toLowerCase()] ?? null,
+    });
+    expect(parseRetryAfterMs(headersOf({ 'retry-after-ms': '1500' }))).toBe(1_500);
+    expect(parseRetryAfterMs(headersOf({ 'retry-after': '7' }))).toBe(7_000);
+    expect(parseRetryAfterMs(headersOf({ 'retry-after': '2.5' }))).toBe(2_500);
+    const future = new Date(Date.now() + 8_000).toUTCString();
+    const dated = parseRetryAfterMs(headersOf({ 'retry-after': future }));
+    expect(dated).not.toBeUndefined();
+    expect(dated!).toBeGreaterThan(7_000);
+    expect(dated!).toBeLessThanOrEqual(8_000);
+    // a date already in the past retries promptly (0), never negative
+    expect(parseRetryAfterMs(headersOf({ 'retry-after': new Date(Date.now() - 60_000).toUTCString() }))).toBe(0);
+    expect(parseRetryAfterMs(headersOf({}))).toBeUndefined();
+    expect(parseRetryAfterMs(undefined)).toBeUndefined();
+    expect(parseRetryAfterMs(headersOf({ 'retry-after': 'garbage' }))).toBeUndefined();
+  });
+});
+
+describe('W4-F3 credential redaction (source-fused: openai/codex secrets sanitizer, Apache-2.0)', () => {
+  it('redacts OpenAI-style keys, AWS access keys, bearer tokens and secret assignments', () => {
+    expect(redactSecrets('key sk-abc123def456ghi789jklmn leaked')).toBe('key [REDACTED_SECRET] leaked');
+    expect(redactSecrets('aws AKIAIOSFODNN7EXAMPLE used')).toBe('aws [REDACTED_SECRET] used');
+    expect(redactSecrets('Authorization: Bearer abcdef1234567890abcdef sent'))
+      .toBe('Authorization: Bearer [REDACTED_SECRET] sent');
+    expect(redactSecrets('api_key = "z9y8x7w6v5u4t3s2r1q0"')).toBe('api_key = "[REDACTED_SECRET]"');
+    expect(redactSecrets('password: hunter2hunter2')).toBe('password: [REDACTED_SECRET]');
+  });
+
+  it('leaves ordinary prose and short tokens untouched', () => {
+    const prose = 'deepseek: HTTP 429 code rate_limit: Too many requests (retry budget of 2 exhausted)';
+    expect(redactSecrets(prose)).toBe(prose);
+    expect(redactSecrets('task sk-short')).toBe('task sk-short'); // below 20 chars — not credential-shaped
   });
 });

@@ -40,6 +40,9 @@ export interface StructuredCallResult<T> {
     requestHash: string;
     outputHash: string;
     finishReason?: string;
+    /** W4-F1 retry observability: transport retries / corrective re-asks consumed by this call. */
+    transportRetries?: number;
+    correctiveReasks?: number;
     executionMode: 'live' | 'test';
   };
 }

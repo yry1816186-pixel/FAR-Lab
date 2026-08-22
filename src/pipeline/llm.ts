@@ -78,6 +78,8 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       requestHash: res.receipt.requestHash,
       outputHash: res.receipt.outputHash,
       finishReason: res.receipt.finishReason,
+      ...(res.receipt.transportRetries !== undefined ? { transportRetries: res.receipt.transportRetries } : {}),
+      ...(res.receipt.correctiveReasks !== undefined ? { correctiveReasks: res.receipt.correctiveReasks } : {}),
     },
   });
   if (!res.ok || res.data === undefined) {
