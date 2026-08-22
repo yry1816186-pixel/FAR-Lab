@@ -504,12 +504,16 @@ export const buildEvidenceStage: StageHandler = {
             purpose: 'claim-cross-relations',
             systemPrompt:
               'You adjudicate pairs of evidence claims extracted from DIFFERENT retrieved papers. ' +
-              'For each pair decide: "contradicts" if they assert incompatible findings about the same subject ' +
-              '(different papers, same quantity/relationship); "supports" if they corroborate each other; ' +
-              '"qualifies" if one restricts the conditions of the other; "unrelated" if they are about different ' +
-              'subjects; "not_comparable" if they cannot be compared on the given text (missing referents, ' +
-              'different measures, insufficient context) — when in doubt choose not_comparable, never invent a ' +
-              'conflict. Name the shared subject for every pair.',
+              'Anchored discipline (strict): "contradicts" ONLY if the two claims assert incompatible findings about ' +
+              'the SAME subject and the SAME quantity/relationship (different papers, same measure) — a difference in ' +
+              'population, method, dose, or organism is NOT a contradiction by itself. "supports" ONLY if the claims ' +
+              'independently corroborate the same finding in the same direction — topical kinship or shared ' +
+              'vocabulary is NOT support. "qualifies" ONLY if one claim restricts or bounds the conditions under ' +
+              'which the other\'s finding holds. "unrelated" if the claims are about different subjects. ' +
+              '"not_comparable" if they cannot be compared on the given text (missing referents, different measures, ' +
+              'insufficient context) — this is the DEFAULT under any doubt, and inventing a conflict is the worst ' +
+              'error you can make here. Do not stretch a claim from a different subject or mechanistic layer onto ' +
+              'the other. Name the shared subject for every pair.',
             payload: {
               question: question.text,
               pairs: candidates.map((p, i) => ({
