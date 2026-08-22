@@ -1,45 +1,282 @@
-# FAR-Lab — 证据约束的科学假说生成与研究计划工作台
+# FAR-Lab
 
-XH-202619 赛道一 · 方向 1 · A：科学假说生成与研究计划设计。输入一个真实科学问题，系统执行：真实文献检索（OpenAlex/arXiv/Crossref/EuropePMC，含强制反证搜索）→ 逐字绑定声明（对不上就降级，绝不编造）→ 多策略生成可证伪假设集 → 锦标赛排序（Bradley-Terry，含不确定性）→ 带阈值来源标注与多重检验纪律的可执行研究计划 → 因果反馈修订 → 可第三方独立核验的复现导出。
+Evidence-constrained, falsifiable scientific hypothesis generation and research-plan design workbench. Given a research question, it retrieves literature, generates competing hypotheses ranked by evidence support and falsifiability, synthesizes executable research plans, and produces reproducibility bundles with independent verification.
 
-## 快速开始
+## Features
+
+- **Full research pipeline** — 11 stages: `scope` → `retrieve` → `verify_sources` → `build_evidence` → `generate_hypotheses` → `critique_falsify` → `rank` → `plan` → `feedback` → `revise` → `export`; literature sources: OpenAlex, arXiv, CrossRef, EuropePMC
+- **Claim-source word-by-word binding** — every evidential claim is bound to its source text span; alignment is machine-verifiable, not free-text assertion
+- **Hypothesis comparison with evidence discrimination** — structured comparison view with per-cell evidence support/contradiction states; falsification stage produces ACH-style contrastivity analysis
+- **Model-agnostic provider layer** — pluggable LLM backends via `FARLAB_MODEL_PROVIDER`; built-in adapters for Zhipu GLM (`zai`) and Alibaba DashScope/Qwen (`dashscope`)
+- **CLI workbench** (`far` binary) — 15+ commands covering the full lifecycle: create runs, inspect objects, resume from checkpoint, export reports/bundles, record feedback, run experiments, verify reproducibility
+- **Web workbench** — React SPA with real-time SSE streaming, run sidebar, hypothesis tournament table, ACH comparison canvas, command palette (`Ctrl+K`), i18n (zh/en), dark/light theme
+- **Reproducibility bundles** — self-contained export with provenance receipts, content-addressed artifacts, lockfile-based dependency pinning; verifiable independently via `far verify`
+- **Experiment execution layer** — Python sidecar (`experiment-runtime/`) with durable scheduler, dataset acquisition (ARFF/CSV), train/test splitting, remote execution over stdio JSON protocol
+- **Agent-driven refinement** — parallel sub-agent evidence-gap hunting with tool-using loops; full session audit trail
+- **Human-in-the-loop feedback** — structured feedback signals (expert judgment, new literature, experiment results, reviewer comments) that causally drive the revise stage
+- **Tauri desktop shell** — system tray, deep links, hotkey bindings (optional)
+
+## Requirements
+
+| Dependency | Version |
+|------------|---------|
+| Node.js | >= 24 |
+| npm | >= 10 |
+| Python + uv | >= 3.11 (experiment sidecar only) |
+| SQLite | bundled via `node:sqlite` |
+
+Runtime dependencies (production): **zod** ^3.24.0 (single runtime invariant — schema validation only).
+
+All other npm packages are devDependencies (TypeScript, Vitest, ESLint).
+
+## Quick Start
 
 ```bash
-npm install && npm run build
+# Clone and install
+git clone https://github.com/yry1816186-pixel/FAR-Lab.git
+cd FAR-Lab
+npm install
+npm run build
 
-# 一条真实研究问题走完整管线（live 模型路由）
-DEEPSEEK_API_KEY=... node dist/cli/main.js research start "你的科学问题" --domain oncology --goal exploratory
+# Set model provider key (choose one)
+export ZAI_API_KEY=your_zhipu_api_key          # Zhipu GLM (default)
+# export DASHSCOPE_API_KEY=your_dashscope_key   # Alibaba Qwen (competition route)
 
-# 查看进度 / 导出 / 第三方核验
-node dist/cli/main.js runs
-node dist/cli/main.js research export <run-id> --format bundle --out out/
-node dist/cli/main.js verify <bundle-id>     # 独立复算，exit 0 = verified
+# Run a minimal research pipeline
+far research start "What mechanisms drive horizontal transfer of antibiotic resistance genes in biofilms?" \
+  --domain microbiology --goal exploratory
 
-# 本地 Web 工作台（React + HTTP API）
-npm run serve          # scripts/serve.mjs：API + web/dist（SPA 回退）；PORT 默认 3196
-#（API 契约 33 项测试覆盖于 tests/api.test.ts；启动器带 dist 陈旧守卫，W3 GUI 实测见 evidence/W3/）
+# Watch progress in real time
+far research status <run-id> --watch
+
+# Inspect results
+far research inspect <run-id> --hypotheses
+far research inspect <run-id> --plan
+
+# Export reproducibility bundle
+far research export <run-id> --format bundle --out ./output
+
+# Verify bundle independently
+far verify <bundle-id>
 ```
 
-模型路由 model-agnostic：`FARLAB_MODEL_PROVIDER` = `zai`（默认；智谱 GLM，Anthropic 兼容协议 open.bigmodel.cn/api/anthropic）| `dashscope`（阿里云百炼 Qwen，竞赛强制路由）。DeepSeek 已被用户禁令排除（2026-08-22，不可达）。各路由独立 env key，fail-closed。
+### Web Workbench
 
-## 质量与真实验证（不是宣称，是命令）
+```bash
+# Terminal 1: start API server + web frontend on port 3196
+npm run serve
 
-- `npm test` — 测试数以实跑为准（多 Wave 并行开发中数字持续变化，不在此冻结宣称）；`npm run typecheck`。
-- `node zcode-harness/scripts/completion-gate.mjs` — 完成门禁（当前 NOT_READY：唯一失败项为外部 DeepSeek 余额阻塞，见下）。
-- 证据目录 `evidence/`（每个能力对应真实 run 的命令级证据）；决策账本 `.control/DECISIONS.jsonl`（D-001..D-035）；评估 `eval/`（MLR-Bench 外部对比 / FIRE-Bench 复现评估 / LLM-judge）。
+# Open http://localhost:3196 in browser
+```
 
-## 当前三项外部门（2026-08-22 实测）
+## Usage
 
-1. **DeepSeek 账户余额耗尽**（HTTP 402）——阻塞全部 live 运行与判分；充值即恢复。
-2. **DASHSCOPE_API_KEY 缺席**——竞赛强制“千问经百炼+凭证”路由待 live 验证（`node spikes/qwen-route-probe.mjs` 一命令出回执；提交截止 2026-09-05）。
-3. **OPENALEX_API_KEY 可选**——不间断检索与全文（GROBID TEI）抓取。
+### CLI Commands
 
-## 文档地图
+```bash
+# Create and execute a full research run
+far research start "Your research question here" \
+  --domain oncology \
+  --goal explanatory    # explanatory|predictive|interventional|methodological|exploratory
 
-- 交付报告：`final_delivery.md`（R1 全量 + EV1→Wave-3 增补）
-- 宪法与规范：`AGENTS.md`、`project-spec/`（ACCEPTANCE.md 等）
-- 控制面：`.control/`（EXECUTION_STATE / FRONTIER_STATUS / BLOCKERS / DECISIONS）
-- 技术注册表：`research/TECH_CANDIDATES.md`（KEEP/ADOPT/EXTRACT/REJECT 全记录）；Wave-3 决策馈送 `research/WAVE3-SCOUT.md`
-- 模型目录快照：`research/reference/models-dev-catalog.json`（193 providers，MIT）
+# List all runs
+far runs [--json]
 
-安全基线：secrets 永不入库/入日志；web 工作台 XSS 面已审计（`evidence/W-WEB/xss-surface-audit.md`）；不可信文献数据在 prompt 中带围栏。
+# Check run status (single snapshot)
+far research status <run-id>
+
+# Live monitoring (TTY repaints every 2s)
+far research status <run-id> --watch
+
+# Inspect specific output objects
+far research inspect <run-id> --evidence
+far research inspect <run-id> --hypotheses
+far research inspect <run-id> --plan
+far research inspect <run-id> --sources
+
+# Resume a failed/partial run from last checkpoint
+far research resume <run-id>
+
+# Record human feedback (drives causal revision)
+far research feedback <run-id> \
+  --source human_expert \
+  --content "The mechanism proposed in H-003 contradicts recent CRISPR-Cas studies" \
+  --target-kind hypothesis \
+  --target-id H-003
+
+# Export human-readable report or reproducibility bundle
+far research export <run-id> --format report   # Markdown report
+far research export <run-id> --format bundle  # Verification-ready bundle
+
+# Cancel a running pipeline
+far research cancel <run-id>
+
+# Interactive wizard (TTY only, Chinese prompts)
+far new
+
+# Model route health check
+far probe              # Config check (key presence, no tokens consumed)
+far probe zai --live   # Real chat call (~1 token)
+
+# Data footprint
+far data info
+
+# Shell completion
+far completion bash >> ~/.bashrc
+far completion zsh >> ~/.zshrc
+```
+
+### Experiment Execution
+
+```bash
+# Execute an experiment spec
+far experiment run spec.json
+
+# Queue with priority
+far experiment enqueue spec.json --priority 1
+
+# Drain queue as worker
+far experiment worker --max-jobs 10 --max-running 3
+
+# Monitor jobs
+far experiment status
+far experiment status --job <job-id>
+far experiment logs <experiment-run-id>
+
+# Cooperative cancellation
+far experiment cancel <job-id>
+```
+
+### Agent Refinement
+
+```bash
+# Evidence-gap refinement on a completed run
+far agent refine <run-id> \
+  --turns 5 \
+  --top-k 3 \
+  --max-concurrent 4
+```
+
+### Programmatic Usage (Node.js)
+
+```typescript
+import { createApp } from 'far-lab/app/composition.js';
+import { ResearchQuestion, ScientificGoalType } from 'far-lab/domain/index.js';
+
+const app = await createApp({
+  providerName: process.env.FARLAB_MODEL_PROVIDER ?? 'zai',
+});
+
+// Create a run and execute the pipeline
+const question = ResearchQuestion.parse({
+  text: "How does tumor heterogeneity affect immunotherapy response?",
+  domain: 'oncology',
+  goal: ScientificGoalType.Explanatory,
+});
+const run = app.store.createRun(question);
+const result = await app.orchestrator.execute(run.id);
+
+// Inspect output objects
+const hypotheses = app.store.listObjects('hypothesis', run.id);
+const plan = app.store.listObjects('plan', run.id);
+
+console.log('Status:', result.status);
+console.log('Hypotheses:', hypotheses.length);
+```
+
+## Project Structure
+
+```
+far-lab/
+├── src/                      # Core TypeScript source
+│   ├── cli/                  # CLI entry point (`far` binary), commands, terminal rendering
+│   ├── agent/                # Agent runtime: loop, sub-agents, permissions, MCP, skills
+│   ├── app/                  # Orchestration: composition root, provider resolver, verification
+│   ├── domain/               # Pure domain model: Question, Hypothesis, Claim, Evidence, Plan, Run
+│   ├── pipeline/             # 11-stage research pipeline (scope → retrieve → ... → export)
+│   │   └── stages/           # Individual stage implementations
+│   ├── providers/            # LLM provider adapters (zai, dashscope, custom)
+│   ├── sources/              # Literature source adapters (OpenAlex, arXiv, CrossRef, fulltext)
+│   ├── server/               # HTTP API server (default port via PORT env, serve.mjs defaults to 3196)
+│   ├── experiment/           # Experiment execution layer (scheduler, executor, datasets)
+│   ├── persistence/          # SQLite store + content-addressed artifact storage
+│   └── shared/               # Crypto utilities, port abstractions
+├── web/                      # React 18 frontend (Vite 6 + Tailwind CSS v4)
+│   └── src/
+│       ├── api/              # API client, endpoint definitions, response normalization
+│       ├── components/       # UI components (runs sidebar, detail views, ACH canvas, etc.)
+│       ├── hooks/            # React hooks (SSE streaming, hash routing, polling)
+│       ├── state/            # Global state (connection, theme)
+│       └── i18n/             # Internationalization (zh/en dictionaries)
+├── experiment-runtime/       # Python sidecar for experiment execution (uv-managed)
+├── tests/                    # 54+ test suites (Vitest, forks pool)
+├── eval/                     # Evaluation protocols & benchmark scripts
+├── scripts/                  # Operational scripts (serve, health checks, export)
+├── project-spec/             # Formal specification documents & policies
+├── desktop/                  # Tauri v2 desktop shell (Rust backend)
+├── dist/                     # Compiled output (git-ignored)
+└── .far-run/                 # Runtime data (SQLite DB, artifacts, exports)
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# === Required (at least one) ===
+ZAI_API_KEY=                  # Zhipu GLM API key (default provider)
+DASHSCOPE_API_KEY=            # Alibaba DashScope / Qwen API key
+
+# === Optional ===
+FARLAB_MODEL_PROVIDER=zai     # Default model provider: zai | dashscope
+FARLAB_DATA_DIR=.far-run      # Root directory for database and artifacts
+PORT=3196                    # HTTP API / serve port (server/main.ts also listens on 8787 when PORT is unset)
+HOST=127.0.0.1                # Server bind address
+FARLAB_LEASE_TTL_MS=240000    # Run lease TTL (milliseconds)
+FARLAB_STAGE_CONCURRENCY=3    # Max concurrent sub-tasks per stage
+FARLAB_GIT_COMMIT=auto        # Git commit hash for provenance (auto-detected)
+
+# === Literature Sources ===
+OPENALEX_API_KEY=             # OpenAlex API key (higher rate limits)
+OPENALEX_MAILTO=              # OpenAlex polite-pool identifier
+CROSSREF_MAILTO=              # CrossRef polite-pool identifier
+```
+
+### Provider Selection
+
+Set `FARLAB_MODEL_PROVIDER` to choose the default LLM backend:
+
+| Value | Provider | Notes |
+|-------|----------|-------|
+| `zai` | Zhipu GLM (GLM-4-plus) | Default; Anthropic-compatible API |
+| `dashscope` | Alibaba DashScope | Qwen series; competition route |
+
+Custom providers can be registered programmatically via the provider registry in `src/providers/custom.ts`.
+
+## Run Tests
+
+```bash
+# Full test suite
+npm test
+
+# Watch mode (re-runs on file change)
+npm run test:watch
+
+# Type checking (strict mode, noUncheckedIndexedAccess enabled)
+npm run typecheck
+
+# Linting
+npm run lint
+```
+
+Test configuration:
+- **Runner:** Vitest 3+ with `forks` pool
+- **Timeouts:** 120s per test, 60s per hook
+- **Coverage:** `tests/**/*.test.ts`, `src/**/*.test.ts`
+- **Count:** 54+ test files covering domain schemas, pipeline stages, providers, sources, agent loop, API endpoints, CLI commands, experiment execution, and regression guards
+
+## License
+
+[Apache License 2.0](./LICENSE)
+
+Copyright 2026 The FAR-Lab Authors. See [NOTICE](./NOTICE) for third-party attributions.

@@ -1,0 +1,46 @@
+- generic [ref=f7e2229]:
+  - heading "判别性证据分析（ACH）" [level=4] [ref=f7e2230]
+  - table [ref=f7e2232]:
+    - caption [ref=f7e2233]: 判别性证据分析（ACH）
+    - rowgroup [ref=f7e2234]:
+      - row [ref=f7e2235]:
+        - columnheader "声明" [ref=f7e2236]
+        - columnheader "H1" [ref=f7e2237]
+        - columnheader "H2" [ref=f7e2238]
+        - columnheader "判别性" [ref=f7e2239]
+    - rowgroup [ref=f7e2240]:
+      - row [ref=f7e2241]:
+        - rowheader [ref=f7e2242]:
+          - button "Regional constitutive heterochromatin and local nucleosome occlusion of target sites impede prime editing." [ref=f7e2243] [cursor=pointer]
+        - cell "显式支持绑定" [ref=f7e2244]:
+          - generic "显式支持绑定" [ref=f7e2245]: ✓
+        - cell "·" [ref=f7e2246]
+        - cell "判别" [ref=f7e2247]
+      - row [ref=f7e2248]:
+        - rowheader [ref=f7e2249]:
+          - button "Regional constitutive heterochromatin and local nucleosome occlusion of target sites impede prime editing." [ref=f7e2250] [cursor=pointer]
+        - cell "显式支持绑定" [ref=f7e2251]:
+          - generic "显式支持绑定" [ref=f7e2252]: ✓
+        - cell "·" [ref=f7e2253]
+        - cell "判别" [ref=f7e2254]
+      - row [ref=f7e2255]:
+        - rowheader [ref=f7e2256]:
+          - button "Prime editing efficiency is limited in non-immortalized cells." [ref=f7e2257] [cursor=pointer]
+        - cell "·" [ref=f7e2258]
+        - cell "推导输入声明" [ref=f7e2259]:
+          - generic "推导输入声明" [ref=f7e2260]: △
+        - cell "判别" [ref=f7e2261]
+      - row [ref=f7e2262]:
+        - rowheader [ref=f7e2263]:
+          - button "Optimization of prime editing in hiPSCs can achieve near-complete editing of a BFP transgene." [ref=f7e2264] [cursor=pointer]
+        - cell "·" [ref=f7e2265]
+        - cell "推导输入声明" [ref=f7e2266]:
+          - generic "推导输入声明" [ref=f7e2267]: △
+        - cell "判别" [ref=f7e2268]
+  - paragraph [ref=f7e2269]:
+    - generic [ref=f7e2270]: ✓
+    - text: 显式支持绑定
+    - generic [ref=f7e2271]: ✗
+    - text: 显式反对绑定
+    - generic [ref=f7e2272]: △
+    - text: 推导输入声明 — △=该假设的推导输入 claim（来源声明），✓/✗=批判阶段的显式支持/反对绑定；仅绑定一个所比假设=判别（对比由此决定），绑定多个=共享（无判别力）。
