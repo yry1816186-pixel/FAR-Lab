@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { canonicalSha256 } from '../shared/crypto.js';
+import { repairJson } from './json-repair.js';
 import type { StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
 
 /**
@@ -361,34 +362,111 @@ const appendCorrection = (messages: ChatMessage[], reason: string): ChatMessage[
 };
 
 /**
- * Deterministic repair for the two corruption classes observed in live strict-FC tool
+ * Truncation-disciplined corrective re-ask (W7-F2, instructor IncompleteOutput philosophy):
+ * when the transport confirmed truncation (finish_reason=length), re-asking with the same
+ * shape mostly re-truncates. The correction tells the model to shorten content and stay
+ * under the limit, instead of replaying the generic validation error.
+ */
+const appendTruncationCorrection = (messages: ChatMessage[], reason: string): ChatMessage[] => {
+  const correction =
+    `\n\nYour previous reply was TRUNCATED at the token limit and is not complete JSON (${reason}).\n` +
+    'Reply again with the COMPLETE JSON object matching the requested structure, staying safely under the token limit: ' +
+    'shorten text values, merge or drop lower-priority entries, keep every required field. No markdown fences, no commentary. ' +
+    'Escape every double quote inside string values as \\" — never emit a raw " inside a string.';
+  return messages.map((m, i) => (i === messages.length - 1 ? { ...m, content: m.content + correction } : m));
+};
+
+/**
+ * Parse raw model output as JSON. Layer order (every repair layer must still produce
+ * text that JSON.parses; a layer whose guess yields invalid JSON self-corrects by
+ * falling through to the next):
+ *   1. direct JSON.parse (valid documents are never rewritten)
+ *   2. ```json fence stripped once + parse
+ *   3. local quote/control-char scan (live corruption class; only inserts escapes)
+ *   4. full repair engine (W7-F1 EXTRACT of jsonrepair 3.15.0, ISC, Jos de Jong —
+ *      see src/providers/json-repair.ts: truncation completion, structural-char
+ *      repairs, quote-family normalization, NDJSON, comments, …)
+ * With allowRepair:false (transport-confirmed truncation, finish_reason=length) layers
+ * 1-2 only: an engine-COMPLETED truncated document must never be accepted as complete
+ * output — that would fabricate content the model never finished emitting. Truncated
+ * output fails visibly into the truncation-disciplined corrective re-ask instead.
+ */
+export const extractJsonText = (raw: string, opts: { allowRepair?: boolean } = {}): { value: unknown } | null => {
+  const { allowRepair = true } = opts;
+  try {
+    return { value: JSON.parse(raw) as unknown };
+  } catch {
+    // fall through to fence stripping
+  }
+  const stripped = raw
+    .replace(/^\s*```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/, '')
+    .trim();
+  try {
+    return { value: JSON.parse(stripped) as unknown };
+  } catch {
+    // fall through to repair
+  }
+  if (!allowRepair) return null;
+  // Repair layer 3 — legacy quote/control-char scan (live strict-FC corpus layer,
+  // 056e931): escapes any quote inside a string state that cannot be a structural
+  // close. By construction it only INSERTS escapes (string boundaries never move),
+  // and on the live corruption class (inner quotes inside prose values) it is the
+  // strongest layer: 796/796 exact-intent repairs in the property fuzz
+  // (spikes/json-repair-fuzz{,2}.mjs), including the adjacent-quote shape
+  // (`c""lonal`) where the engine's two-stage heuristics throw. A wrong guess here
+  // yields invalid JSON and falls through to the engine below.
+  for (const candidate of [raw, stripped]) {
+    try {
+      return { value: JSON.parse(repairUnescapedQuotes(candidate)) as unknown };
+    } catch {
+      // fall through to the full repair engine
+    }
+  }
+  // Repair layer 4 — full repair engine (W7-F1 EXTRACT of jsonrepair 3.15.0, ISC):
+  // 38 rule classes the local scan cannot see — truncation completion, missing/
+  // duplicated structural characters, single/smart quotes, NDJSON, Python constants,
+  // comments, number fixes, JSONP unwrapping. Engine output must itself parse.
+  for (const candidate of [raw, stripped]) {
+    try {
+      return { value: JSON.parse(repairJson(candidate)) as unknown };
+    } catch {
+      // unrecoverable — bounded corrective retry remains the backstop
+    }
+  }
+  return null;
+};
+
+/**
+ * Local blind repair for the two corruption classes observed in live strict-FC tool
  * arguments (2026-08-22, spikes/output/strict-fc-corrupted-args.json): unescaped INNER
- * quotes inside string values (the model emits e.g. `...damage could"expected...`, closing
- * the JSON string early) and raw control characters inside strings. Legality rule: in
- * VALID JSON a closing quote is always followed (after optional whitespace) by one of
+ * quotes inside string values and raw control characters inside strings. Legality rule:
+ * in valid JSON a closing quote is always followed (after optional whitespace) by one of
  * `, } ] :` or end-of-input — a quote followed by anything else inside a string state is
- * an inner quote and gets escaped. Only applied after direct parses have failed, so valid
- * documents are never rewritten.
+ * an inner quote and gets escaped. Retained after the W7-F1 engine EXTRACT because the
+ * engine's end-quote candidacy heuristics (bracket balance, next-quote peek, stop-and-
+ * reparse) throw on the captured live corruption (inner quotes shaped like key: value
+ * boundaries), while this local rule repairs it — verified against the 24k-char sample.
  */
 export const repairUnescapedQuotes = (raw: string): string => {
   let out = '';
   let inString = false;
   for (let i = 0; i < raw.length; i += 1) {
-    const ch = raw[i]!; // loop bound guarantees presence; strict-index narrowing below
+    const ch = raw.charAt(i);
     if (!inString) {
       if (ch === '"') inString = true;
       out += ch;
       continue;
     }
     if (ch === '\\') {
-      out += ch + (raw[i + 1] ?? '');
+      out += ch + raw.charAt(i + 1);
       i += 1;
       continue;
     }
     if (ch === '"') {
       let j = i + 1;
-      while (j < raw.length && /\s/.test(raw[j]!)) j += 1;
-      const next = raw[j];
+      while (j < raw.length && /\s/.test(raw.charAt(j))) j += 1;
+      const next = j < raw.length ? raw.charAt(j) : undefined;
       if (next === undefined || next === ',' || next === '}' || next === ']' || next === ':') {
         inString = false;
         out += ch;
@@ -407,41 +485,6 @@ export const repairUnescapedQuotes = (raw: string): string => {
     out += ch;
   }
   return out;
-};
-
-/**
- * Parse raw model output as JSON. Direct JSON.parse first; if that fails, strip a
- * surrounding ```json fence once and retry (spike-observed provider behavior); if that
- * fails too, apply the CONTENT-PRESERVING repair scan (inner quotes that cannot be
- * structural closes + raw control characters — the parsed string content is identical
- * to the model's intent) and retry. Deliberately NO structural flip-retry: escaping a
- * quote that could be a structural close can yield a valid parse with MOVED string
- * boundaries (semantically distorted content) — a bounded corrective retry that
- * fail-visibly rejects is worth more than silently accepted distortion.
- */
-export const extractJsonText = (raw: string): { value: unknown } | null => {
-  try {
-    return { value: JSON.parse(raw) as unknown };
-  } catch {
-    // fall through to fence stripping
-  }
-  const stripped = raw
-    .replace(/^\s*```(?:json)?\s*/i, '')
-    .replace(/\s*```\s*$/, '')
-    .trim();
-  try {
-    return { value: JSON.parse(stripped) as unknown };
-  } catch {
-    // fall through to repair
-  }
-  for (const candidate of [raw, stripped]) {
-    try {
-      return { value: JSON.parse(repairUnescapedQuotes(candidate)) as unknown };
-    } catch {
-      // unrecoverable — bounded corrective retry remains the backstop
-    }
-  }
-  return null;
 };
 
 // ---------------------------------------------------------------------------
@@ -716,7 +759,17 @@ export async function runOpenAICompatStructuredCall<T>(
     if (attempt.ok) {
       lastRawContent = attempt.rawContent;
       last200 = attempt;
-      const extracted = extractJsonText(attempt.rawContent);
+      // W7-F2 truncation discipline: when the transport confirmed truncation
+      // (finish_reason=length) the repair engine must NOT complete the document —
+      // a completed truncation passing schema would fabricate content the model
+      // never finished. Only direct/fence-stripped parses may succeed; everything
+      // else goes to the concise-completion re-ask. Providers that do NOT report
+      // finish_reason (undefined) fall through to the full repair chain: an
+      // actually-truncated doc could then be engine-completed and accepted — a
+      // disclosed residual risk (our registered providers all report finish_reason;
+      // D-030 live evidence 41/41).
+      const truncationConfirmed = attempt.finishReason === 'length';
+      const extracted = extractJsonText(attempt.rawContent, { allowRepair: !truncationConfirmed });
       if (extracted !== null) {
         const parsed = parse(extracted.value);
         if (!(parsed instanceof Error)) {
@@ -741,25 +794,29 @@ export async function runOpenAICompatStructuredCall<T>(
         // invalid_output: caller's schema parse rejected the JSON — bounded corrective re-asks.
         if (invalidOutputRetries < MAX_INVALID_OUTPUT_RETRIES) {
           invalidOutputRetries += 1;
-          messages = appendCorrection(messages, parsed.message);
+          messages = truncationConfirmed
+            ? appendTruncationCorrection(messages, parsed.message)
+            : appendCorrection(messages, parsed.message);
           continue;
         }
         return fail({
           kind: 'invalid_output',
           retryable: false,
-          message: `${cfg.providerName}: structured output rejected even after ${MAX_INVALID_OUTPUT_RETRIES} corrective re-asks: ${parsed.message}; last raw output head: ${truncate(lastRawContent, 200)}`,
+          message: `${cfg.providerName}: structured output rejected even after ${MAX_INVALID_OUTPUT_RETRIES} corrective re-asks${truncationConfirmed ? ' (output truncated at token limit)' : ''}: ${parsed.message}; last raw output head: ${truncate(lastRawContent, 200)}`,
         });
       }
       // Output was not JSON at all (direct parse and fence-strip both failed).
       if (invalidOutputRetries < MAX_INVALID_OUTPUT_RETRIES) {
         invalidOutputRetries += 1;
-        messages = appendCorrection(messages, 'output was not valid JSON (direct parse and fence-stripped parse both failed)');
+        messages = truncationConfirmed
+          ? appendTruncationCorrection(messages, 'direct parse and fence-stripped parse both failed')
+          : appendCorrection(messages, 'output was not valid JSON (direct parse and fence-stripped parse both failed)');
         continue;
       }
       return fail({
         kind: 'invalid_output',
         retryable: false,
-          message: `${cfg.providerName}: model output was not valid JSON after ${MAX_INVALID_OUTPUT_RETRIES} corrective re-asks; last raw output head: ${truncate(lastRawContent, 200)}`,
+        message: `${cfg.providerName}: model output was not valid JSON after ${MAX_INVALID_OUTPUT_RETRIES} corrective re-asks${truncationConfirmed ? ' (output truncated at token limit)' : ''}; last raw output head: ${truncate(lastRawContent, 200)}`,
       });
     }
 

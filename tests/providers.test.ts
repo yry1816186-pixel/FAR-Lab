@@ -365,6 +365,84 @@ describe('invalid_output retry discipline', () => {
 });
 
 // ---------------------------------------------------------------------------
+// W7-F2 truncation discipline: finish_reason=length gets no engine completion
+// and a concise-completion re-ask; completed truncation never passes silently
+// ---------------------------------------------------------------------------
+
+const chatOkFinish = (content: string, finishReason: string, model = 'deepseek-v4-flash') =>
+  chatOkRaw(JSON.stringify({
+    model,
+    choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: finishReason }],
+    usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
+  }));
+
+describe('truncation discipline (W7-F2, finish_reason=length)', () => {
+  it('truncated output is NOT engine-completed — it goes to a TRUNCATED-specific re-ask', async () => {
+    const truncated = '{"hypothesis": "partial hypothesis text that the model never fin'; // engine would close-quote+brace
+    const { fetchImpl, calls } = recorderFetch([
+      () => Promise.resolve(chatOkFinish(truncated, 'length')),
+      () => Promise.resolve(chatOk(RAW_OK)),
+    ]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(calls.length).toBe(2); // the truncated completion was never accepted as-is
+    expect(lastUserContent(calls[1]!)).toContain('TRUNCATED');
+    expect(lastUserContent(calls[1]!)).toContain('COMPLETE JSON');
+  });
+
+  it('truncated output that is nevertheless complete valid JSON is accepted without a re-ask', async () => {
+    // trailing whitespace hit the token limit after the document closed — the doc is whole
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOkFinish(RAW_OK, 'length'))]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(calls.length).toBe(1);
+    expect(res.receipt.finishReason).toBe('length');
+  });
+
+  it('same corrupted shape WITHOUT truncation confirmation IS engine-repaired (gate is truncation-specific)', async () => {
+    const truncatedShape = '{"hypothesis": "partial text that looks truncated but was not flagged'; // finish_reason=stop
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOkFinish(truncatedShape, 'stop'))]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true); // engine completed the un-flagged structural omission
+    expect(calls.length).toBe(1);
+    expect(res.data.hypothesis).toContain('partial text that looks truncated');
+  });
+
+  it('ABSENT finish_reason (provider does not report it) falls through to the full repair chain — disclosed default', async () => {
+    // Some OpenAI-compatible endpoints omit finish_reason. The truncation gate keys on
+    // the transport's own truncation signal; without it the repair layers stay armed
+    // (W7 audit P2-2 disclosure: an actually-truncated doc could be engine-completed
+    // here; all FAR-Lab registered providers report finish_reason — D-030 41/41).
+    const raw = JSON.stringify({
+      model: 'deepseek-v4-flash',
+      choices: [{ index: 0, message: { role: 'assistant', content: '{"hypothesis": "unflagged structural omission' }, finish_reason: undefined }],
+      usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
+    });
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOkRaw(raw))]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(calls.length).toBe(1);
+    expect(res.data.hypothesis).toContain('unflagged structural omission');
+  });
+
+  it('truncation re-asks stay within the same 3-re-ask budget and fail visibly as invalid_output', async () => {
+    const { fetchImpl, calls } = recorderFetch([
+      () => Promise.resolve(chatOkFinish('{"hypothesis": "cut short', 'length')),
+    ]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(false);
+    expect(res.error?.kind).toBe('invalid_output');
+    expect(calls.length).toBe(4); // 1 + 3 re-asks
+    expect(String(res.error?.message)).toContain('truncated at token limit');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // transport failures: classification + bounded retry
 // ---------------------------------------------------------------------------
 
@@ -638,6 +716,15 @@ describe('zai adapter (mock fetch)', () => {
 // ---------------------------------------------------------------------------
 
 describe('dashscope adapter (mock fetch)', () => {
+  it('strips max_tokens on the structured-output route (W7-F3: official Bailian doc warns max_tokens truncates structured output into invalid JSON)', async () => {
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'qwen-plus'))]);
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
+    await provider.structuredCall({ ...REQ, maxTokens: 8192 }, parseHypothesis);
+    const body = bodyOf(calls[0]!);
+    expect(body.max_tokens).toBeUndefined();
+    // other providers keep the budget (deepseek request shaping asserted elsewhere carries it)
+  });
+
   it('targets the compatible-mode/v1 endpoint with the qwen-plus default model', async () => {
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'qwen-plus'))]);
     const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });

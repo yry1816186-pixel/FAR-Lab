@@ -61,7 +61,15 @@ export function createDashScopeProvider(opts: DashScopeProviderOptions = {}): Da
         { providerName: 'dashscope', baseUrl, apiKey, modelId, executionMode: 'live' },
         // Strict-FC tool payloads are a DeepSeek-beta capability (D-026/D-029); this route
         // stays on the json_object transport it was verified for.
-        req.jsonSchema === undefined ? req : { ...req, jsonSchema: undefined },
+        // W7-F3: max_tokens is stripped on this route — official Bailian structured-output
+        // docs (help.aliyun.com/zh/model-studio/qwen-structured-output, 2026-08) warn that
+        // setting max_tokens with structured output "可能导致 JSON 字符串在输出过程中被
+        // 截断，产生无效 JSON" (truncated invalid JSON). Other providers keep the budget.
+        {
+          ...req,
+          jsonSchema: undefined,
+          maxTokens: undefined,
+        },
         parse,
         { fetchImpl: opts.fetchImpl, sleep: opts.sleep, totalTimeoutMs: opts.totalTimeoutMs, random: opts.random },
       );
