@@ -4,6 +4,7 @@ import type { RunStageName } from '../domain/run.js';
 import type { ProvenanceReceipt } from '../domain/provenance.js';
 import type { StructuredCallResult } from '../shared/ports.js';
 import { strictSchemaOrUndefined } from '../providers/http.js';
+import { RunBudgetExhaustedError } from '../app/run-budget.js';
 
 export interface LlmCallOptions {
   stage: RunStageName;
@@ -28,6 +29,12 @@ export interface LlmResult<T> {
  * validation, receipt recorded, provider failure thrown (fail-closed — never fabricate).
  */
 export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions): Promise<LlmResult<T>> {
+  // BP-1 budget governance: refuse NEW model calls once the run's token cap is spent.
+  // In-flight provider work is bounded by the provider plane's own discipline; this
+  // gate keeps the NEXT call from starting (fail-visible, never a fabricated result).
+  if (ctx.budget !== undefined && !ctx.budget.hasRemaining()) {
+    throw new RunBudgetExhaustedError(ctx.run.id, ctx.budget.cap ?? 0, ctx.budget.spent);
+  }
   const res = await ctx.provider.structuredCall(
     {
       task: opts.purpose,
@@ -46,6 +53,7 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
     },
     (raw) => validateStructured<T>(raw, opts.schema),
   );
+  ctx.budget?.spend(res.receipt.usage.totalTokens);
   recordModelReceipt(
     (p) => ctx.recordReceipt({
       kind: p.kind, executionMode: p.executionMode, redactionNote: p.redactionNote,

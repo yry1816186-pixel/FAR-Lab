@@ -4,6 +4,7 @@ import type { Store } from '../persistence/store.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
 import type { SourceFamily, SourceDocument } from '../domain/source.js';
 import type { FullTextFetchResult } from '../sources/fulltext.js';
+import type { RunBudgetView } from '../app/run-budget.js';
 
 /** What a stage may touch. Stage handlers stay pure of infrastructure wiring. */
 export interface StageContext {
@@ -25,6 +26,13 @@ export interface StageContext {
   }) => void;
   /** Structured cancellation signal checked between expensive operations inside stages. */
   cancelled: () => boolean;
+  /**
+   * Run token budget (BP-1 governance). Absent = unlimited (tests/minimal harnesses).
+   * callStructured consults this before every model call (exhaustion throws
+   * RunBudgetExhaustedError) and reports usage after; the orchestrator honors the
+   * same view at stage boundaries. Spend authority stays with receipts.
+   */
+  budget?: RunBudgetView;
   /**
    * W8 S2 intra-stage step checkpoint (dbos OAOO pattern), per FAMILY: return the
    * persisted result for (stage, family, key) when present, else run fn once and persist.
