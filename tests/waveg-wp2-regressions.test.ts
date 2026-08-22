@@ -163,3 +163,110 @@ describe('WP2 stage fixes', () => {
     expect(isCancellationError(new Error('other failure'))).toBe(false);
   });
 });
+
+describe('WP4 mapBounded (stage concurrency primitive)', () => {
+  const delay = (ms: number) => new Promise<void>((r) => { setTimeout(r, ms); });
+
+  it('preserves output order regardless of completion timing', async () => {
+    const { mapBounded } = await import('../src/pipeline/stages/shared.js');
+    const out = await mapBounded([40, 10, 30, 1, 20], 5, async (ms, i) => {
+      await delay(ms);
+      return `${i}:${ms}`;
+    });
+    expect(out).toEqual(['0:40', '1:10', '2:30', '3:1', '4:20']);
+  });
+
+  it('never exceeds the concurrency limit', async () => {
+    const { mapBounded } = await import('../src/pipeline/stages/shared.js');
+    let inFlight = 0;
+    let peak = 0;
+    await mapBounded([50, 50, 50, 50, 50, 50], 3, async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await delay(20);
+      inFlight -= 1;
+    });
+    expect(peak).toBeLessThanOrEqual(3);
+  });
+
+  it('throws the FIRST-by-index error after in-flight work settles (deterministic failure choice)', async () => {
+    const { mapBounded } = await import('../src/pipeline/stages/shared.js');
+    // items 1 and 2 BOTH fail; item 2 fails sooner but item 1 has the lower index —
+    // the lower index must win so failure selection is input-order-deterministic.
+    await expect(mapBounded([10, 40, 1], 3, async (ms, i) => {
+      await delay(ms);
+      if (i === 0) return i;
+      throw new Error(`fail-${i}`);
+    })).rejects.toThrow('fail-1');
+    await expect(mapBounded([10, 40, 5], 1, async (_ms, i) => {
+      if (i === 0) throw new Error('seq-fail');
+      return i;
+    })).rejects.toThrow('seq-fail');
+  });
+
+  it('limit 1 degenerates to sequential (determinism escape hatch)', async () => {
+    const { mapBounded } = await import('../src/pipeline/stages/shared.js');
+    const events: number[] = [];
+    await mapBounded([1, 2, 3], 1, async (n) => {
+      events.push(n); // start
+      await delay(5);
+      events.push(-n); // end
+      return n;
+    });
+    expect(events).toEqual([1, -1, 2, -2, 3, -3]);
+  });
+});
+
+describe('W-G/F-A anchored counter queries (CounterRefine-pattern repair)', () => {
+  const Q = 'Why do CRISPR base editors cause off-target cytosine edits in hematopoietic cells?';
+
+  it('a topically drifting counter query is repaired with the question anchor terms', async () => {
+    const { anchorCounterQueries, anchorContainment, COUNTER_ANCHOR_MIN } = await import('../src/pipeline/stages/retrieve.js');
+    const drifting = 'limitations of pharmacological interventions failed replication';
+    expect(anchorContainment(drifting, Q)).toBeLessThan(COUNTER_ANCHOR_MIN);
+    const [repaired] = anchorCounterQueries([drifting, 'CRISPR off-target contradictory findings'], Q);
+    // counter vocabulary preserved + anchor terms appended + containment now passes
+    expect(repaired).toContain('failed replication');
+    expect(anchorContainment(repaired, Q)).toBeGreaterThanOrEqual(COUNTER_ANCHOR_MIN);
+  });
+
+  it('an already-anchored counter query passes through untouched (no gratuitous edits)', async () => {
+    const { anchorCounterQueries } = await import('../src/pipeline/stages/retrieve.js');
+    const anchored = 'CRISPR base editor off-target cytosine edits contradictory findings negative result';
+    const [kept] = anchorCounterQueries([anchored, anchored], Q);
+    expect(kept).toBe(anchored);
+  });
+
+  it('repair is deterministic and bounded', async () => {
+    const { anchorCounterQueries, COUNTER_ANCHOR_APPEND_MAX } = await import('../src/pipeline/stages/retrieve.js');
+    const r1 = anchorCounterQueries(['generic critique limitations', 'generic negative result'], Q);
+    const r2 = anchorCounterQueries(['generic critique limitations', 'generic negative result'], Q);
+    expect(r1).toEqual(r2);
+    const appended = r1[0]!.split(' ').length - 'generic critique limitations'.split(' ').length;
+    expect(appended).toBeLessThanOrEqual(COUNTER_ANCHOR_APPEND_MAX);
+  });
+
+  it('empty anchor text is vacuously anchored (no division by zero, no edits)', async () => {
+    const { anchorCounterQueries } = await import('../src/pipeline/stages/retrieve.js');
+    const q = 'anything limitations';
+    expect(anchorCounterQueries([q, q], '   ')).toEqual([q, q]);
+  });
+});
+
+describe('W-G/F-B GRADE-lite deterministic certainty ladder', () => {
+  it('maps domain failures to the 4-level ladder deterministically', async () => {
+    const mod = await import('../src/domain/claim.js');
+    const grade = mod.gradeClaimCertainty;
+    // all domains satisfied -> high
+    expect(grade({ verifiedBinding: true, quantitative: true, recentSource: true, contradictionSignals: 0 })).toEqual({ certainty: 'high', downgraded: [] });
+    // one failure -> moderate
+    expect(grade({ verifiedBinding: true, quantitative: false, recentSource: true, contradictionSignals: 0 }).certainty).toBe('moderate');
+    // two failures -> low
+    expect(grade({ verifiedBinding: false, quantitative: true, recentSource: false, contradictionSignals: 0 }).certainty).toBe('low');
+    // saturation -> very_low (floor)
+    expect(grade({ verifiedBinding: false, quantitative: false, recentSource: false, contradictionSignals: 3 }).certainty).toBe('very_low');
+    // downgraded reasons are named per GRADE domain
+    expect(grade({ verifiedBinding: false, quantitative: true, recentSource: true, contradictionSignals: 1 }).downgraded)
+      .toEqual(['risk_of_bias:unverified_binding', 'inconsistency:1_contradiction_signal(s)']);
+  });
+});

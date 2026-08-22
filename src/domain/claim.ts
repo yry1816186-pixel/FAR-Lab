@@ -33,5 +33,38 @@ export const ScientificClaim = z.object({
   alignmentChecked: z.boolean().default(false),
   extractionModelRef: z.string().optional(), // provider/model that extracted it (provenance)
   uncertainties: z.array(z.string()).default([]),
+  /**
+   * Deterministic GRADE-lite certainty (W-G/F-B; the GRADE approach is a public
+   * methodology, gradeworkinggroup.org — the mapping to our attributes is ours).
+   * Set at claim-admission time; NOT an LLM judgment and never a scientific truth claim.
+   */
+  gradeCertainty: z.enum(['high', 'moderate', 'low', 'very_low']).optional(),
 });
 export type ScientificClaim = z.infer<typeof ScientificClaim>;
+
+/** GRADE-lite inputs — each field is a deterministic proxy for one GRADE domain. */
+export interface GradeEvidence {
+  /** GRADE risk-of-bias proxy: quote-alignment passed (bindingStatus verified). */
+  verifiedBinding: boolean;
+  /** GRADE imprecision proxy: the claim text carries explicit quantities/effects. */
+  quantitative: boolean;
+  /** GRADE indirectness proxy: grounding source published within the recency window. */
+  recentSource: boolean;
+  /** GRADE inconsistency proxy: count of contradicting/qualifying relations touching this claim. */
+  contradictionSignals: number;
+}
+
+/**
+ * Deterministic certainty downgrade ladder (GRADE-lite): start high; each failed
+ * domain steps down one level (floor very_low). Pure, total, offline-testable.
+ */
+export const gradeClaimCertainty = (e: GradeEvidence): { certainty: ScientificClaim['gradeCertainty']; downgraded: string[] } => {
+  const ladder = ['high', 'moderate', 'low', 'very_low'] as const;
+  const downgraded: string[] = [];
+  let level = 0;
+  if (!e.verifiedBinding) { level += 1; downgraded.push('risk_of_bias:unverified_binding'); }
+  if (!e.quantitative) { level += 1; downgraded.push('imprecision:no_explicit_quantity'); }
+  if (!e.recentSource) { level += 1; downgraded.push('indirectness:stale_source'); }
+  if (e.contradictionSignals > 0) { level += 1; downgraded.push(`inconsistency:${e.contradictionSignals}_contradiction_signal(s)`); }
+  return { certainty: ladder[Math.min(level, ladder.length - 1)], downgraded };
+};

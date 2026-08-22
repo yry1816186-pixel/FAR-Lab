@@ -4,7 +4,7 @@ import { callStructured } from '../llm.js';
 import { HypothesisComparison, HypothesisScorecard, HypothesisTournament, ScoreDimension, newId } from '../../domain/index.js';
 import type { TournamentMatch } from '../../domain/index.js';
 import type { HypothesisCandidate } from '../../domain/index.js';
-import { assertNotCancelled, isRepresentative, partitionClaimRefs, runClaimIds } from './shared.js';
+import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
 
 /** DimensionScore has no exported type alias in the domain — derive it from the scorecard schema type. */
@@ -344,7 +344,6 @@ export const rankStage: StageHandler = {
     const allClaims = ctx.store
       .listObjects('claim', runId)
       .map((c) => ({ id: c.id, text: c.text, bindingStatus: c.bindingStatus }));
-    const batchResults: { provider: string; modelId: string; data: z.infer<typeof RankOut> }[] = [];
     // 'scoring' family inputs fingerprint: hashes the FULL prompt-bearing projection —
     // hypothesis content (not just ids), claims, the batch partition (BATCH_SIZE changes
     // repartition keys) and the scoring system prompt. Any upgrade that changes ANY of
@@ -374,11 +373,14 @@ export const rankStage: StageHandler = {
       claims: allClaims,
       systemPrompt: scoringPrompt,
     });
-    for (const batch of batches) {
+    // Bounded overlap of independent batch calls (WP4); order-preserving collection keeps
+    // the merged assessment order (and thus downstream dedup determinism) identical to
+    // the sequential loop. Per-batch checkpoint keys unchanged.
+    const batchResults = await mapBounded(batches, STAGE_CONCURRENCY, async (batch) => {
       assertNotCancelled(ctx, 'rank');
       // W8 S2: per-batch step checkpoint keyed by the batch's first hypothesis id — a
       // stable domain key, so a mid-stage kill + resume re-runs only unfinished batches.
-      const res = await ctx.checkpointed('rank', 'scoring', `score-batch:${batch[0]!.id}`, scoringInputs, () =>
+      return ctx.checkpointed('rank', 'scoring', `score-batch:${batch[0]!.id}`, scoringInputs, () =>
         callStructured<z.infer<typeof RankOut>>(ctx, {
           stage: 'rank',
           purpose: 'hypothesis-ranking:dimension-scores',
@@ -389,8 +391,7 @@ export const rankStage: StageHandler = {
           },
           schema: RankOut,
         }).then((r) => ({ provider: r.provider, modelId: r.modelId, data: r.data })));
-      batchResults.push(res);
-    }
+    });
     const merged: z.infer<typeof RankOut> = { assessments: batchResults.flatMap((b) => b.data.assessments) };
     const firstProvider = batchResults[0]?.provider ?? 'unknown';
     const firstModel = batchResults[0]?.modelId ?? 'unknown';
@@ -530,11 +531,24 @@ export const rankStage: StageHandler = {
           cards: ranked.map((r) => card(r)),
           prompt: PAIR_JUDGE_SYSTEM_PROMPT,
         });
-        for (const pair of pairs) {
+        // Bounded overlap of independent pair judgments (WP4); matches collected in pair
+        // order so the tournament schedule, BT iteration input order, and all derived
+        // notes stay byte-identical to the sequential loop.
+        const pairMatches = await mapBounded(pairs, STAGE_CONCURRENCY, async (pair): Promise<TournamentMatch> => {
           assertNotCancelled(ctx, 'rank');
           const ra = byIdRanked.get(pair.aId);
           const rb = byIdRanked.get(pair.bId);
-          if (!ra || !rb) continue;
+          if (!ra || !rb) {
+            return {
+              aId: pair.aId,
+              bId: pair.bId,
+              aFirstVerdict: 'incomparable',
+              bFirstVerdict: 'incomparable',
+              rationale: 'not judged: participant missing from ranked set',
+              producer: producerJudge,
+              outcome: 'no_contest',
+            };
+          }
           let judged: z.infer<typeof PairJudgeOut> | null = null;
           let failure: string | undefined;
           try {
@@ -562,7 +576,7 @@ export const rankStage: StageHandler = {
             ctx.log(`rank: tournament judge call failed for ${pair.aId} vs ${pair.bId}: ${failure}`);
           }
           if (judged) {
-            tournamentMatches.push({
+            return {
               aId: pair.aId,
               bId: pair.bId,
               aFirstVerdict: judged.aFirstVerdict,
@@ -570,21 +584,21 @@ export const rankStage: StageHandler = {
               rationale: judged.rationale,
               producer: producerJudge,
               outcome: aggregateOutcome(judged),
-            });
-          } else {
-            // Fail-visible no-contest: a match we could not judge is recorded as such,
-            // never silently dropped and never invented.
-            tournamentMatches.push({
-              aId: pair.aId,
-              bId: pair.bId,
-              aFirstVerdict: 'incomparable',
-              bFirstVerdict: 'incomparable',
-              rationale: `not judged: judge call failed (${failure ?? 'unknown error'}) — recorded honestly as no-contest`,
-              producer: producerJudge,
-              outcome: 'no_contest',
-            });
+            };
           }
-        }
+          // Fail-visible no-contest: a match we could not judge is recorded as such,
+          // never silently dropped and never invented.
+          return {
+            aId: pair.aId,
+            bId: pair.bId,
+            aFirstVerdict: 'incomparable',
+            bFirstVerdict: 'incomparable',
+            rationale: `not judged: judge call failed (${failure ?? 'unknown error'}) — recorded honestly as no-contest`,
+            producer: producerJudge,
+            outcome: 'no_contest',
+          };
+        });
+        tournamentMatches.push(...pairMatches);
         const contested: ContestedMatch[] = tournamentMatches
           .filter((m): m is TournamentMatch & { outcome: 'a' | 'b' | 'tie' } => m.outcome !== 'no_contest')
           .map((m) => ({ aId: m.aId, bId: m.bId, outcome: m.outcome }));

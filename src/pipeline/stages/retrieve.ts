@@ -7,6 +7,7 @@ import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash, excludeVolatile } from '../../sources/snapshot.js';
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
+import { contentTokens } from './evidence.js';
 import { isCancellationError, throwIfCancelled } from './guard.js';
 
 /** Hard corpus cap (contract): excess documents are truncated, visibly noted in the summary. */
@@ -65,7 +66,8 @@ Return ONE JSON object with exactly these fields:
 Rules:
 - All queries in English, written as plain keyword phrases for academic search engines (no boolean operators, no quotes).
 - Ground every query in the question's topic; never invent specific papers, authors, journals or results.
-- Counter queries MUST carry explicit counter-evidence vocabulary (e.g. "failed replication", "limitations", "contradictory findings", "negative result").`;
+- Counter queries MUST carry explicit counter-evidence vocabulary (e.g. "failed replication", "limitations", "contradictory findings", "negative result").
+- Anchor EVERY counter query in the question's specific topic and expected relationship: it must reuse the question's own key entities/terms. A generic drift like "limitations of pharmacological interventions" for a CRISPR off-target question is INVALID — retrieved counter-evidence must be about THIS question's subject.`;
 
 /** D-015 rerank output: a permutation of the input indices with graded relevance. */
 const RerankEntry = z.object({
@@ -105,6 +107,45 @@ const counterQueries = (queries: readonly string[]): readonly [string, string] =
   return [a, b];
 };
 
+// ---------------------------------------------------------------------------
+// W-G/F-A anchored counter queries (CounterRefine-pattern, answer-conditioned
+// expansion adapted to our pre-hypothesis retrieve stage): the measured failure
+// mode behind counter-evidence-substantive-hit 0.143 is EMPTY misses (5/7 — the
+// judge reads "unrelated") because counter queries carry counter vocabulary but
+// drift off the question's topic entities. Deterministic repair: a counter query
+// whose content-token containment in the question falls under the floor gets the
+// question's UNCOVERED anchor tokens appended — the query keeps its counter
+// vocabulary and GAINS the topic anchor, so retrieved documents cannot be
+// topically unrelated by construction. Pure function; no LLM call.
+// ---------------------------------------------------------------------------
+/** Containment floor: |queryTokens ∩ anchorTokens| / |anchorTokens|. */
+export const COUNTER_ANCHOR_MIN = 0.3;
+/** Max anchor tokens appended to a drifting query (keeps queries engine-friendly). */
+export const COUNTER_ANCHOR_APPEND_MAX = 4;
+
+export const anchorContainment = (query: string, anchorText: string): number => {
+  const anchor = contentTokens(anchorText);
+  if (anchor.size === 0) return 1; // nothing to anchor against — vacuously anchored
+  const q = contentTokens(query);
+  let shared = 0;
+  for (const t of anchor) if (q.has(t)) shared += 1;
+  return shared / anchor.size;
+};
+
+export const anchorCounterQueries = (
+  counter: readonly [string, string],
+  anchorText: string,
+): readonly [string, string] => {
+  const anchor = contentTokens(anchorText);
+  const repair = (q: string): string => {
+    if (anchor.size === 0 || anchorContainment(q, anchorText) >= COUNTER_ANCHOR_MIN) return q;
+    // First-appearance order (Set insertion order) keeps the repair deterministic.
+    const missing = [...anchor].filter((t) => !q.toLowerCase().includes(t)).slice(0, COUNTER_ANCHOR_APPEND_MAX);
+    return missing.length === 0 ? q : `${q} ${missing.join(' ')}`;
+  };
+  return [repair(counter[0]), repair(counter[1])];
+};
+
 /**
  * D-015: build one search per (planned query x family). ALL planned discovery and
  * supporting queries execute now — the old code silently dropped discovery[1] and
@@ -124,8 +165,8 @@ const counterQueries = (queries: readonly string[]): readonly [string, string] =
  * D-029b crossref redundancy never covered counter queries. arXiv still serves
  * discovery/supporting (with the W6/F2 cascade below recovering its zeros).
  */
-const buildTargets = (plan: QueryPlan): readonly SearchTarget[] => {
-  const [counterOpenalex, counterCrossref] = counterQueries(plan.counter);
+const buildTargets = (plan: QueryPlan, anchorText: string): readonly SearchTarget[] => {
+  const [counterOpenalex, counterCrossref] = anchorCounterQueries(counterQueries(plan.counter), anchorText);
   const targets: SearchTarget[] = [
     { purpose: 'counter_evidence', text: counterOpenalex, family: 'openalex' },
     { purpose: 'counter_evidence', text: counterCrossref, family: 'crossref' },
@@ -375,7 +416,7 @@ export const retrieveStage: StageHandler = {
     });
     const plan = planRes.data;
     enforceCounterEvidence(plan);
-    const targets = buildTargets(plan);
+    const targets = buildTargets(plan, `${question.text} ${question.background}`);
 
     const executedQueries: RetrievalQuery[] = [];
     const failuresByFamily = new Map<SourceFamily, string[]>();

@@ -9,9 +9,11 @@ import {
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { checkQuoteAlignment } from './align.js';
+import { mapBounded, STAGE_CONCURRENCY } from './shared.js';
 import { toDocument } from './retrieve.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import { defaultFetchFullText } from '../../sources/fulltext.js';
+import { gradeClaimCertainty } from '../../domain/claim.js';
 import type { CorpusSnapshot, SourceFamily } from '../../domain/source.js';
 
 /** Hard admission cap per source. Model output beyond the cap is dropped, never stored. */
@@ -367,6 +369,14 @@ export const buildEvidenceStage: StageHandler = {
           extractionModelRef: `${result.provider}/${result.modelId}`,
           uncertainties:
             candidate.note && candidate.note.trim().length > 0 ? [candidate.note.trim()] : [],
+          // GRADE-lite at admission (W-G/F-B): contradiction signals are unknown this
+          // early (relations are judged later) — honestly 0 at this point.
+          gradeCertainty: gradeClaimCertainty({
+            verifiedBinding: aligned,
+            quantitative: /\d|fold|percent|%|higher|lower|increase|decrease|significant/i.test(candidate.text),
+            recentSource: doc.publicationYear != null && doc.publicationYear >= new Date().getUTCFullYear() - 15,
+            contradictionSignals: 0,
+          }).certainty,
         };
         ctx.store.putObject('claim', claim);
         claimsTotal += 1;
@@ -398,9 +408,12 @@ export const buildEvidenceStage: StageHandler = {
       }
     };
 
-    for (const doc of pending) {
+    // Bounded overlap of independent per-document extractions (WP4): per-doc work reads
+    // store state fixed before the loop; shared counters are order-insensitive sums, and
+    // the gap-seek decision below waits for ALL documents either way.
+    await mapBounded(pending, STAGE_CONCURRENCY, async (doc) => {
       await processDocument(doc);
-    }
+    });
 
     // ---- bounded adaptive gap-seek round (mission §30) ----
     let gapSeekNote = 'not triggered (enough verified evidence)';
