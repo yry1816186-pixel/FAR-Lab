@@ -1,0 +1,24 @@
+[package]
+name = "far-lab-desktop"
+version = "0.1.0"
+description = "FAR-Lab desktop shell — Tauri v2 webview over the local FAR-Lab API server"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[target.'cfg(windows)'.dependencies]
+# Job Object (KILL_ON_JOB_CLOSE): the spawned node server must die with the shell
+# even when the shell is force-killed (TerminateProcess skips Drop/exit handlers).
+windows-sys = { version = "0.60", features = [
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+  "Win32_Foundation",
+  "Win32_Security",
+] }
+
+# Deliberately minimal: the shell only spawns the Node server, waits for its
+# health endpoint and opens a webview. No second business logic lives here.
