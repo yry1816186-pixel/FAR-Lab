@@ -77,6 +77,65 @@ const FalsifyOut = z.object({
   testability: TestabilityStatus,
 });
 
+/**
+ * W5-F5 link-verification verdicts: an independent, differently-framed audit of every
+ * proposed claim->hypothesis link. Anchored-band discipline follows the MLR-Bench
+ * judge-anchoring pattern (full-sentence bands + anti-leniency) and AI-Scientist v1's
+ * pessimistic-reviewer default (strictness under doubt), both mechanism-level borrows.
+ */
+const LinkVerifyOut = z.object({
+  verdicts: z
+    .array(
+      z.object({
+        claimId: z.string().min(1),
+        verdict: z.enum(['confirm', 'relabel', 'drop']),
+        relation: z.enum(['contradicts', 'weakens', 'qualifies', 'supports']).optional(),
+        reason: z.string().min(20),
+      }),
+    )
+    .min(1),
+});
+
+export type LinkVerdict = z.infer<typeof LinkVerifyOut>['verdicts'][number];
+type CritiqueRelation = 'contradicts' | 'weakens' | 'qualifies' | 'supports';
+
+export interface LinkAuditDecision {
+  relation: CritiqueRelation;
+  dropped: boolean;
+  note?: string;
+}
+
+/**
+ * Deterministic application of audit verdicts to proposed links (pure, exported for tests).
+ * Rules: verdicts for unknown claimIds are ignored; a claim the audit did not mention
+ * stays as proposed (the audit is enrichment, silence is not rejection); 'relabel'
+ * without a valid relation stays as proposed with a note; only an explicit 'drop'
+ * removes a link, and only an explicit 'relabel' with a valid relation changes the label.
+ */
+export const applyLinkAudit = (
+  proposed: readonly { claimId: string; relation: CritiqueRelation }[],
+  verdicts: readonly LinkVerdict[],
+): Map<string, LinkAuditDecision> => {
+  const byId = new Map(proposed.map((p) => [p.claimId, p] as const));
+  const out = new Map<string, LinkAuditDecision>(
+    proposed.map((p) => [p.claimId, { relation: p.relation, dropped: false }] as const),
+  );
+  for (const v of verdicts) {
+    const p = byId.get(v.claimId);
+    if (p === undefined) continue; // audit hallucinated an id — ignore deterministically
+    if (v.verdict === 'drop') {
+      out.set(v.claimId, { relation: p.relation, dropped: true, note: `dropped by link audit: ${v.reason}` });
+    } else if (v.verdict === 'relabel') {
+      if (v.relation !== undefined) {
+        out.set(v.claimId, { relation: v.relation, dropped: false, note: `relabelled ${p.relation}->${v.relation} by link audit: ${v.reason}` });
+      } else {
+        out.set(v.claimId, { relation: p.relation, dropped: false, note: `relabel verdict without relation kept as ${p.relation}: ${v.reason}` });
+      }
+    } // 'confirm' → keep as proposed, no note
+  }
+  return out;
+};
+
 // ---------------------------------------------------------------------------
 // deterministic completeness check — pure, exported for direct testing
 // ---------------------------------------------------------------------------
@@ -174,12 +233,16 @@ export const falsifyStage: StageHandler = {
           '"community-standard" (customary values in the field\'s literature), "model-stipulated" (you chose the ' +
           'numbers yourself without evidence support), or "mixed" (some thresholds have a real source and others are ' +
           'stipulated — never dress invented numbers as sourced). Also critique each assumption and link real counter-evidence and supporting ' +
-          'claims by their ids (only ids from the provided claims list). RELATION LABEL DISCIPLINE (strict): ' +
-          '"contradicts" ONLY when the claim asserts a finding directly incompatible with THIS hypothesis\'s core ' +
-          'mechanism or prediction about the SAME subject; "weakens" when the claim reduces confidence without ' +
-          'direct incompatibility; "qualifies" when the claim adds scope conditions or narrows applicability. ' +
-          'When in doubt choose the weaker label or do not link at all — never invent a conflict, never stretch a ' +
-          'claim from a different subject/domain onto this hypothesis. For EVERY linked claim give a specific ' +
+          'claims by their ids (only ids from the provided claims list). RELATION LABEL DISCIPLINE, anchored (strict): ' +
+          '"supports" ONLY when the claim\'s finding is direct evidence for THIS hypothesis\'s core mechanism or prediction ' +
+          'about the same subject — topical kinship or shared vocabulary alone is NOT support; ' +
+          '"contradicts" ONLY when the claim asserts a finding incompatible with the hypothesis\'s core prediction about ' +
+          'the same subject AND the same quantity/relationship; "weakens" when the claim reduces confidence without ' +
+          'direct incompatibility (uncontrolled confounder, weaker effect than the mechanism requires); "qualifies" when ' +
+          'the claim bounds the conditions under which the hypothesis applies. A claim stretched from a different ' +
+          'subject, measure, or mechanistic layer must not be linked at all. When in doubt choose the weaker label or ' +
+          'do not link — never invent a conflict, and never pad the evidence base with topic-neighbors that do not ' +
+          'actually bear on the mechanism. For EVERY linked claim give a specific ' +
           'linkReason of at least 20 characters naming the exact tension or support (generic template phrases are ' +
           'invalid). State genuine uncertainties.',
         payload: {
@@ -290,27 +353,127 @@ export const falsifyStage: StageHandler = {
           direction === 'counter' ? `与假设 ${hypShort} 的 critique 关联` : `与假设 ${hypShort} 的 critique 支持关联`;
         return `${text}（${association}）`;
       };
-      const mkRelation = (relation: 'contradicts' | 'weakens' | 'qualifies' | 'supports', claimId: string) =>
+      const mkRelation = (
+        relation: 'contradicts' | 'weakens' | 'qualifies' | 'supports',
+        claimId: string,
+        proposalFamily: 'counter' | 'supporting',
+        auditNote?: string,
+      ) =>
         EvidenceRelation.parse({
           id: newId('ev'),
           runId,
           relation,
           claimId,
           targetHypothesisId: hyp.id,
-          rationale: linkRationale(claimId, relation === 'supports' ? 'supporting' : 'counter'),
+          // rationale keyed to the PROPOSAL family so the substantive proposer argument
+          // survives even when the audit relabels the link across polarity
+          rationale: linkRationale(claimId, proposalFamily),
           strength: 'unrated',
-          uncertainties: [],
+          uncertainties: auditNote !== undefined ? [auditNote] : [],
           createdAt: now,
         });
+
+      // ---- W5-F5: independent adversarial audit of the proposed links ----
+      // Blind re-judging measured only 11/18 supports links surviving exact agreement
+      // (relation-blind-agreement north-star 0.61). A second, differently-framed
+      // examination (auditor vs proposer) relabels or drops links that do not
+      // survive. Audit-call failure keeps the already-gated original links with a
+      // visible warning — the audit is enrichment, never a silent drop path.
+      const proposedLinks: { claimId: string; relation: CritiqueRelation; linkReason: string }[] = [
+        ...gatedCounter.kept.map((id) => ({
+          claimId: id,
+          relation: (counterLinkByClaim.get(id)?.relation ?? 'weakens') as CritiqueRelation,
+          linkReason: linkRationale(id, 'counter'),
+        })),
+        ...gatedSupporting.kept.map((id) => ({
+          claimId: id,
+          relation: 'supports' as const,
+          linkReason: linkRationale(id, 'supporting'),
+        })),
+      ];
+      let audit = new Map<string, LinkAuditDecision>();
+      if (proposedLinks.length > 0) {
+        try {
+          const verifyRes = await callStructured<z.infer<typeof LinkVerifyOut>>(ctx, {
+            stage: 'critique_falsify',
+            purpose: `link-verification:${hyp.id}`,
+            systemPrompt:
+              'You are a skeptical auditor of evidence links proposed by a different reviewer. For EACH proposed ' +
+              'claim->hypothesis link decide exactly one of: "confirm" (the proposed relation is defensible), ' +
+              '"relabel" (a different relation fits; supply it), or "drop" (the link is not defensible). Anchored ' +
+              'discipline: a claim SUPPORTS only if its finding is direct evidence for THIS hypothesis\'s core ' +
+              'mechanism or prediction on the same subject — topical kinship is NOT support. A claim CONTRADICTS ' +
+              'only if its finding is incompatible with the core prediction about the same subject and the same ' +
+              'quantity/relationship. A claim WEAKENS if it reduces confidence without direct incompatibility. A ' +
+              'claim QUALIFIES if it bounds the conditions under which the hypothesis applies. A link stretched from ' +
+              'a different subject, measure, or mechanistic layer must be DROPped. Be strict: a wrong support or ' +
+              'contradiction is worse than an honest drop; do not confirm out of politeness. Every verdict needs a ' +
+              'reason of at least 20 characters naming the exact evidence-to-mechanism relationship.',
+            payload: {
+              hypothesis: {
+                id: hyp.id,
+                statement: hyp.statement,
+                mechanism: hyp.mechanism,
+                predictions: hyp.predictions,
+              },
+              proposedLinks: proposedLinks.map((l) => ({
+                claimId: l.claimId,
+                proposedRelation: l.relation,
+                claimText: claimById.get(l.claimId)?.text ?? '(claim text unavailable)',
+                proposedReason: l.linkReason,
+              })),
+            },
+            schema: LinkVerifyOut,
+            temperature: 0,
+          });
+          audit = applyLinkAudit(proposedLinks, verifyRes.data.verdicts);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          warnings.push(`${hyp.id}: link audit failed — original gated links kept unchanged (${msg.slice(0, 120)})`);
+        }
+      }
+      const auditDropped = [...audit.entries()].filter(([, d]) => d.dropped).map(([id]) => id);
+      if (auditDropped.length > 0) {
+        warnings.push(`${hyp.id}: link audit dropped ${auditDropped.length} link(s) (${auditDropped.join(', ')})`);
+      }
+      // Persist by FINAL decision polarity (audit P1 fix): a relabelled link must land in
+      // the hypothesis id-array matching the label the persisted relation carries — the
+      // rank judge and renderers read both, and a supports-relation listed as counter
+      // evidence desynchronizes the persisted object graph.
+      const finalCounter: string[] = [];
+      const finalSupporting: string[] = [];
+      const finalRelationOf = (id: string, proposed: CritiqueRelation): CritiqueRelation =>
+        audit.get(id)?.relation ?? proposed;
+      // proposal family = where the link was PROPOSED, independent of the audited label
+      const proposalFamilyOf = new Map<string, 'counter' | 'supporting'>([
+        ...gatedCounter.kept.map((id) => [id, 'counter'] as const),
+        ...gatedSupporting.kept.map((id) => [id, 'supporting'] as const),
+      ]);
       for (const id of gatedCounter.kept) {
-        const link = counterLinkByClaim.get(id);
-        // schema .catch already defaults unparseable labels to 'weakens'; the ?? guard
-        // keeps 'contradicts' from ever appearing without an explicit model assertion
-        ctx.store.putObject('evidence_relation', mkRelation(link?.relation ?? 'weakens', id));
-        relationsCreated += 1;
+        if (audit.get(id)?.dropped) continue;
+        const proposed = (counterLinkByClaim.get(id)?.relation ?? 'weakens') as CritiqueRelation;
+        (finalRelationOf(id, proposed) === 'supports' ? finalSupporting : finalCounter).push(id);
       }
       for (const id of gatedSupporting.kept) {
-        ctx.store.putObject('evidence_relation', mkRelation('supports', id));
+        if (audit.get(id)?.dropped) continue;
+        (finalRelationOf(id, 'supports') === 'supports' ? finalSupporting : finalCounter).push(id);
+      }
+      for (const id of finalCounter) {
+        const decision = audit.get(id);
+        // schema .catch already defaults unparseable labels to 'weakens'; the ?? guard
+        // keeps 'contradicts' from ever appearing without an explicit model assertion.
+        // Rationale keyed to the PROPOSAL family (audit P2 fix): the proposer's
+        // linkReason is the substantive argument; a cross-polarity relabel is disclosed
+        // in uncertainties via the audit note, never silently re-worded.
+        ctx.store.putObject(
+          'evidence_relation',
+          mkRelation(decision?.relation ?? counterLinkByClaim.get(id)?.relation ?? 'weakens', id, proposalFamilyOf.get(id) ?? 'counter', decision?.note),
+        );
+        relationsCreated += 1;
+      }
+      for (const id of finalSupporting) {
+        const decision = audit.get(id);
+        ctx.store.putObject('evidence_relation', mkRelation(decision?.relation ?? 'supports', id, proposalFamilyOf.get(id) ?? 'supporting', decision?.note));
         relationsCreated += 1;
       }
 
@@ -333,14 +496,14 @@ export const falsifyStage: StageHandler = {
         uncertainties,
         falsification,
         testability,
-        supportingClaimIds: gatedSupporting.kept,
-        counterClaimIds: gatedCounter.kept,
+        supportingClaimIds: finalSupporting,
+        counterClaimIds: finalCounter,
       });
       ctx.store.putObject('hypothesis', updated);
 
       results.push(
         completeness.passed
-          ? `${hyp.id}: falsification spec passed deterministic completeness (testability=${testability}; counter links ${gatedCounter.kept.length}${gatedCounter.dropped.length > 0 ? ` (${gatedCounter.dropped.length} dropped by topical gate)` : ''}, supporting links ${gatedSupporting.kept.length}${gatedSupporting.dropped.length > 0 ? ` (${gatedSupporting.dropped.length} dropped by topical gate)` : ''})`
+          ? `${hyp.id}: falsification spec passed deterministic completeness (testability=${testability}; counter links ${finalCounter.length}${gatedCounter.dropped.length > 0 ? ` (${gatedCounter.dropped.length} dropped by topical gate)` : ''}, supporting links ${finalSupporting.length}${gatedSupporting.dropped.length > 0 ? ` (${gatedSupporting.dropped.length} dropped by topical gate)` : ''}${auditDropped.length > 0 ? `, ${auditDropped.length} dropped by link audit` : ''})`
           : `${hyp.id}: falsification spec REJECTED by deterministic completeness — missing: ${completeness.missing.join('; ')}; testability=untestable_currently`,
       );
     }
