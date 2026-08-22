@@ -5,25 +5,30 @@
  * "regular" recursive-descent variant; algorithm-faithful including its repair
  * heuristics and error behavior (D-044, blueprint research/wave7-reports/jsonrepair.md).
  *
- * Repair philosophy (content preservation): CONTENT characters are never changed —
- * only structural characters (quotes, commas, colons, brackets) are inserted,
- * removed, or quote-wrapped. A quote that cannot be a structural close (verified by
- * delimiter lookahead, bracket-balance counting and next-quote peeking) is escaped
- * in place — the same legality rule class as the retired repairUnescapedQuotes,
- * strictly stronger. Unrepairable input throws JsonRepairError; callers fail
- * visibly and fall back to the bounded corrective re-ask.
- *
- * Equivalence evidence: upstream package executed locally as an oracle over the
- * 74-entry corpus (spikes/json-repair-corpus.mjs → spikes/output/json-repair-oracle.json);
- * this port must reproduce those outputs byte-for-byte, including the two throw cases.
+ * Repair philosophy (content preservation): content is never silently REWRITTEN —
+ * repairs insert/remove structural characters (quotes, commas, colons, brackets),
+ * quote-wrap bare tokens, escape quotes/control characters in place, and normalize a
+ * small set of bare literals (undefined→null, Python True/False/None, truncated
+ * numbers, HTML entities — all pinned by the upstream suite). A quote that cannot be
+ * a structural close (verified by delimiter lookahead, bracket-balance counting and
+ * next-quote peeking) is escaped in place — the same legality rule class as the
+ * retired repairUnescapedQuotes, strictly stronger. Unrepairable input throws
+ * JsonRepairError; callers fail visibly and fall back to the bounded corrective
+ * re-ask. Equivalence evidence (two independent oracles): the 83-entry corpus
+ * (spikes/output/json-repair-oracle.json) matches byte-for-byte including throw
+ * cases, AND the upstream project's own suite (tests/json-repair-upstream.test.ts,
+ * retargeted imports only) passes 78/78 against this port.
  */
 
-/** Error thrown when the text cannot be repaired into valid JSON. Position is the index where parsing gave up. */
+/** charAt with upstream text[index] semantics: undefined past end (diagnostics parity). */
+const charAtOrUndefined = (text: string, index: number): string | undefined =>
+  index < text.length ? text.charAt(index) : undefined;
+
+/** Error thrown when the text cannot be repaired into valid JSON. Mirrors the upstream class byte-for-byte: message carries an ` at position N` suffix and no custom name. */
 export class JsonRepairError extends Error {
   public readonly position: number;
   constructor(message: string, position: number) {
-    super(message);
-    this.name = 'JsonRepairError';
+    super(`${message} at position ${position}`);
     this.position = position;
   }
 }
@@ -204,7 +209,7 @@ export const repairJson = (input: string): string => {
   if (i >= text.length) {
     return output;
   }
-  throw new JsonRepairError(`Unexpected character ${JSON.stringify(text.charAt(i))}`, i);
+  throw new JsonRepairError(`Unexpected character ${JSON.stringify(charAtOrUndefined(text, i))}`, i);
 
   function parseValue(): boolean {
     parseWhitespaceAndSkipComments();
@@ -447,7 +452,7 @@ export const repairJson = (input: string): string => {
     if (skipEscapeChars) {
       i += 1; // repair: remove the first escape character
       if (!isQuote(text.charAt(i))) {
-        throw new JsonRepairError(`Unexpected character ${JSON.stringify(text.charAt(i))}`, i);
+        throw new JsonRepairError(`Unexpected character ${JSON.stringify(charAtOrUndefined(text, i))}`, i);
       }
     }
 
@@ -506,7 +511,7 @@ export const repairJson = (input: string): string => {
             return true;
           }
           if (text.charAt(i) === '\\') {
-            throw new JsonRepairError(`Unexpected character ${JSON.stringify(text.charAt(i))}`, i);
+            throw new JsonRepairError(`Unexpected character ${JSON.stringify(charAtOrUndefined(text, i))}`, i);
           }
           const iPrevChar = prevNonWhitespaceIndex(iQuote - 1);
           const prevChar = text.charAt(iPrevChar);
