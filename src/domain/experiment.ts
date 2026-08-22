@@ -136,6 +136,24 @@ export const MetricKey = z.enum([
 ]);
 export type MetricKey = z.infer<typeof MetricKey>;
 
+/** Metrics bounded in [0,1] — the only ones the conservative MDE floor applies to.
+ * (Regression metrics are scale-dependent; a floor in raw metric units would be fake
+ * precision — Wave-S/d4 discipline: no fabricated attainability bounds.) */
+export const BOUNDED_METRICS: readonly MetricKey[] = ['accuracy', 'balanced_accuracy', 'f1_macro', 'roc_auc'];
+
+/** Wave-S/s2 #6 convention: minimum test rows for a confirmatory verdict (CLT-ish floor). */
+export const MIN_CONFIRMATORY_NTEST = 30;
+
+/**
+ * Conservative attainability floor for a paired difference on a [0,1] metric with nTest
+ * rows: worst-case SE of the difference of two INDEPENDENT proportions at p=0.5
+ * (sqrt(0.25 + 0.25) = sqrt(0.5)), two-sided 95% ⇒ 1.96·sqrt(0.5)/sqrt(nTest). Pairing can
+ * only shrink variance, so a declared MDE below this floor is under-powered even in the
+ * best case. Disclosed convention (mapping on Button 2013 / Card 2020 power discipline),
+ * not a calibrated promise.
+ */
+export const mdeFloorFor = (nTest: number): number => (1.96 * Math.sqrt(0.5)) / Math.sqrt(nTest);
+
 /**
  * A comparison is the unit of statistical analysis. `absolute` scores one model
  * against a threshold; `paired_diff` scores modelA − modelB (same split rows).
@@ -158,6 +176,14 @@ export const Comparison = z.object({
   thresholdProvenance: DecisionRuleProvenance,
   hypothesisId: HypothesisId.optional(),
   primary: z.boolean().default(false),
+  /**
+   * Wave-S/s2 #6 (g5): minimum detectable effect this comparison is designed to resolve.
+   * REQUIRED (hard gate) for hypothesis-bound confirmatory comparisons — a verdict-capable
+   * comparison with no declared detectable effect is statistically under-specified.
+   * Optional for exploratory comparisons. When nRows is known at validation time the gate
+   * also checks attainability against `mdeFloorFor` ([0,1] metrics only).
+   */
+  mde: z.number().positive().optional(),
 });
 export type Comparison = z.infer<typeof Comparison>;
 
@@ -341,8 +367,15 @@ export const checkExperimentSpec = (
     hypothesisIds: readonly HypothesisId[];
     /** D-086-4: local-path datasets are operator-only; LLM-proposed specs must use registered resolvers. */
     allowLocalDatasets?: boolean;
+    /**
+     * Wave-S/s2 #6 (g5): dataset row count, known only AFTER acquisition. When provided,
+     * the confirmatory gate also enforces the nTest floor and MDE attainability; when
+     * absent (spec-time validation) the MDE declaration is still required and the floor
+     * check is deferred to the post-acquisition re-check (see statisticalNote).
+     */
+    nRows?: number;
   },
-): { passed: boolean; missing: string[] } => {
+): { passed: boolean; missing: string[]; statisticalNote?: string } => {
   const missing: string[] = [];
   const nModels = spec.models.length;
   const hypSet = new Set(ctx.hypothesisIds);
@@ -393,6 +426,44 @@ export const checkExperimentSpec = (
   if (boundComparisons.size === 0 && spec.exploratoryNote === undefined) {
     missing.push('no hypothesis-bound comparison and no exploratoryNote — exploratory runs must be explicit');
   }
+  // Wave-S/s2 #6 (g5) — confirmatory statistical-design hard gate. Hypothesis-bound
+  // comparisons MUST declare their minimum detectable effect; when nRows is known the
+  // declared MDE is also checked for attainability against the conservative floor
+  // ([0,1] metrics only — regression metrics are scale-dependent, no honest unit floor).
+  // Exploratory runs keep the advisory lane: nothing verdict-bound, nothing demanded.
+  const boundList = spec.comparisons.filter((c) => c.hypothesisId !== undefined);
+  let statisticalNote: string | undefined;
+  for (const [ci, c] of spec.comparisons.entries()) {
+    if (c.hypothesisId !== undefined && c.mde === undefined) {
+      missing.push(
+        `comparisons[${ci}] is hypothesis-bound (confirmatory) but declares no mde — the minimum detectable effect is required before a verdict may bind (Wave-S/s2 #6)`,
+      );
+    }
+  }
+  if (boundList.length > 0) {
+    const testRatio = spec.datasets[0]?.split.ratios.test ?? 0;
+    if (ctx.nRows !== undefined) {
+      const nTest = Math.floor(ctx.nRows * testRatio);
+      if (nTest < MIN_CONFIRMATORY_NTEST) {
+        missing.push(
+          `nTest=${nTest} (nRows ${ctx.nRows} × test ratio ${testRatio}) < ${MIN_CONFIRMATORY_NTEST}: too few test rows for a confirmatory verdict`,
+        );
+      }
+      for (const [ci, c] of spec.comparisons.entries()) {
+        if (c.hypothesisId === undefined || c.mde === undefined) continue;
+        if (!BOUNDED_METRICS.includes(c.metricKey)) continue;
+        const floor = mdeFloorFor(nTest);
+        if (c.mde < floor) {
+          missing.push(
+            `comparisons[${ci}] mde=${c.mde} is below the attainability floor ${floor.toFixed(4)} at nTest=${nTest} ([0,1] metric, conservative worst-case SE) — declare a larger MDE or add test rows`,
+          );
+        }
+      }
+    } else {
+      statisticalNote =
+        'nRows unknown at spec time — MDE declaration enforced here; nTest floor and attainability re-checked after dataset acquisition';
+    }
+  }
   const primaries = spec.comparisons.filter((c) => c.primary);
   if (spec.comparisons.length > 1) {
     if (primaries.length !== 1) missing.push('multiple comparisons require exactly one primary');
@@ -413,7 +484,11 @@ export const checkExperimentSpec = (
   if (spec.models.every((m) => classifierBuilders.includes(m.builderId)) && spec.metrics.some((mk) => regressionMetrics.includes(mk))) {
     missing.push('classifier-only spec declares regression metrics');
   }
-  return { passed: missing.length === 0, missing };
+  return {
+    passed: missing.length === 0,
+    missing,
+    ...(statisticalNote !== undefined ? { statisticalNote } : {}),
+  };
 };
 
 /**

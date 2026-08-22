@@ -106,7 +106,7 @@ describe('P3 remote executor: device-bound queue -> remote training -> local ver
           { name: 'logistic', builderId: 'logistic_regression', hyperparams: {}, seed: 7 },
         ],
         metrics: ['accuracy'],
-        comparisons: [{ id: 'cmp', metricKey: 'accuracy', kind: 'paired_diff', modelAIdx: 1, modelBIdx: 0, direction: 'above', threshold: 0, thresholdProvenance: 'model-stipulated', hypothesisId: hyp.id, primary: true }],
+        comparisons: [{ id: 'cmp', metricKey: 'accuracy', kind: 'paired_diff', modelAIdx: 1, modelBIdx: 0, direction: 'above', threshold: 0, thresholdProvenance: 'model-stipulated', hypothesisId: hyp.id, primary: true, mde: 0.3 }],
         statistics: { test: 'paired_bootstrap_ci', alpha: 0.05, nBoot: 500, analysisSeed: 11, ciLevel: 0.95 },
         approvals: [{ hypothesisId: hyp.id, comparisonIds: ['cmp'], decisionRuleSnapshot: 'diff > 0', approvedBy: 'remote-test', approvedAt: new Date().toISOString() }],
         createdAt: new Date().toISOString(),

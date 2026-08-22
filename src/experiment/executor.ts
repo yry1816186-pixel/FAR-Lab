@@ -236,6 +236,16 @@ export const executeExperiment = async (
   try {
     // 2. Dataset acquisition + deterministic split.
     const { record, parsed } = await acquireDataset(store, artifacts, spec.runId, use);
+    // Wave-S/s2 #6 (g5) post-acquisition re-check: nRows is known now, so the nTest floor
+    // and MDE attainability floor apply for real. Fail-closed before any training spend.
+    const postAcquisition = checkExperimentSpec(validated, {
+      hypothesisIds: hypotheses.map((h) => h.id),
+      allowLocalDatasets: opts.allowLocalDatasets,
+      nRows: record.nRows,
+    });
+    if (!postAcquisition.passed) {
+      throw new Error(`spec failed post-acquisition statistical gate: ${postAcquisition.missing.join('; ')}`);
+    }
     if (opts.shouldCancel?.()) throw new Error('canceled before split');
     const outcome: SplitOutcome = applySplit(parsed.header, parsed.rows, {
       datasetRecordId: record.id,
