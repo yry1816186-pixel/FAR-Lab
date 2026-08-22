@@ -6,6 +6,7 @@ import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
 import { ResearchActions } from './ResearchActions';
+import { EvidenceGraph } from './EvidenceGraph';
 import { bindingKey, bindingTone } from '../../tones';
 import { stageKey, contentDepthKey, accessStateKey, bindingZhKey, relationKey, retrievalPurposeKey } from '../../i18n/keys';
 import type { DictKey } from '../../i18n/dict';
@@ -18,9 +19,12 @@ function gradeKey(level: NonNullable<ScientificClaim['gradeCertainty']>): DictKe
 export function EvidenceTab({
   run,
   onFeedback,
+  onOpenHypotheses,
 }: {
   run: ResearchRun;
   onFeedback: (target?: { kind: string; id: string; label?: string; content?: string }) => void;
+  /** B7 graph navigation: jump to the hypotheses tab. */
+  onOpenHypotheses?: () => void;
 }): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
@@ -78,6 +82,28 @@ export function EvidenceTab({
         {!evidenceRes.loading && evidenceRes.error === null && relations !== null ? (
           <RelationsSummary relations={relations} claims={claims ?? []} sources={sourcesRes.data ?? []} />
         ) : null}
+      </Section>
+
+      <Section title={t('graph.title')}>
+        {!evidenceRes.loading && evidenceRes.error === null && claims !== null && sourcesRes.data !== null ? (
+          <EvidenceGraph
+            run={run}
+            sources={sourcesRes.data}
+            claims={claims}
+            relations={relations ?? []}
+            onOpenClaim={(claimId) => {
+              const el = document.getElementById(`claim-${claimId}`);
+              if (el !== null) {
+                el.scrollIntoView({ block: 'center' });
+                el.classList.add('claim-flash');
+                window.setTimeout(() => el.classList.remove('claim-flash'), 1600);
+              }
+            }}
+            onOpenHypothesis={() => onOpenHypotheses?.()}
+          />
+        ) : (
+          <p className="muted small">{t('common.loading')}</p>
+        )}
       </Section>
 
       <details className="tech-details">
