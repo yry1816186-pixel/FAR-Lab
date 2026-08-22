@@ -1489,3 +1489,6 @@ select option { color: var(--text); background: var(--surface); }
 .hyp-connect select { max-width: 320px; min-width: 160px; }
 .hyp-connect-confirm { flex-shrink: 0; }
 .math-fallback { color: var(--v2-refuted); }
+
+/* D-101 FTS search hit emphasis in palette rows. */
+.palette-hit { background: transparent; color: inherit; font-weight: 700; text-decoration: underline; text-decoration-color: var(--v2-info); text-underline-offset: 2px; }

@@ -607,6 +607,10 @@ export interface SearchHit {
   runId: string;
   id: string;
   text: string;
+  /** FTS5 snippet with «hit» markers (D-101; present on the FTS path only). */
+  snippet?: string;
+  /** bm25 rank (lower = more relevant; FTS path only). */
+  rank?: number;
 }
 
 export interface SearchResponse {

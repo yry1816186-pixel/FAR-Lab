@@ -253,7 +253,7 @@ export function normalizeReceipts(data: unknown): ProvenanceReceipt[] {
 // ---- universal search (B2) ----
 
 const looksLikeSearchHit = (v: unknown): v is SearchHit =>
-  isRecord(v) && typeof v.runId === 'string' && typeof v.id === 'string' && typeof v.text === 'string';
+  isRecord(v) && typeof v.runId === 'string' && typeof v.id === 'string' && typeof v.text === 'string'; // snippet/rank optional (FTS path only)
 
 /** Fail-closed: a malformed search payload surfaces as an error, never as silently empty results. */
 export function normalizeSearch(data: unknown): SearchResponse {
