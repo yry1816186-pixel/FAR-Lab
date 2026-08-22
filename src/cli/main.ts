@@ -1,10 +1,13 @@
 #!/usr/bin/env node
+import { createInterface } from 'node:readline/promises';
 import { createApp } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
-import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, newId, runProgress } from '../domain/index.js';
+import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
+import { completionScript } from './completion.js';
 import { staleDistFiles } from './dist-freshness.js';
 import { ink, marker, out, table, padColumns } from './term.js';
+import { isActiveStatus, statusInk, watchLines } from './watch.js';
 
 /** D-031: refuse to execute stages on a dist older than src (stale-build live incident). */
 const assertDistFresh = (): void => {
@@ -23,7 +26,9 @@ Usage:
   far research start <question text> [--domain <d>] [--goal <type>] [--json]
       Create a research run from a real scientific question and execute the full pipeline.
       --goal: explanatory|predictive|interventional|methodological|exploratory (default explanatory)
-  far research status <run-id> [--json]          Show run status/stages/progress (no invented percentages)
+  far research status <run-id> [--json] [--watch]  Show run status/stages/progress (no invented percentages)
+                                                  --watch: TTY live view, repaints every 2s until a final
+                                                  state; Ctrl-C exits (non-TTY: single snapshot)
   far research inspect <run-id> --evidence|--hypotheses|--plan|--sources [--json]
   far research cancel <run-id>                   Request cancellation (checked between stage operations)
   far research resume <run-id> [--stop-after <stage>] [--json]
@@ -35,6 +40,9 @@ Usage:
                                                   tool_result|simulation|experiment|reviewer|verification_failure|
                                                   reproduction_failure); consumed causally by the revise stage
   far runs [--json]                              List runs
+  far new                                        Interactive wizard (TTY only): prompts for question /
+                                                  domain / goal type, then runs the exact same pipeline
+                                                  as research start (non-interactive: far research start)
   far experiment run|enqueue <spec.json> [--priority N] [--allow-local-datasets]
                                                   Execute / queue an ExperimentSpec through the
                                                   durable scheduler (real datasets+models+stats)
@@ -54,6 +62,9 @@ Usage:
   far data info [--json]                         Data footprint: runs, db size, artifacts, exports
   far verify <bundle-id> [--json]                Independently verify a reproducibility bundle
                                                   (exit 0=verified, 1=failed/degraded)
+  far completion <bash|zsh|pwsh>                 Print a static shell completion script (real command
+                                                  tree) — pipe into your profile, e.g.
+                                                  far completion bash >> ~/.bashrc
 
 Exit codes: 0 ok, 1 runtime failure, 2 usage error. Diagnostics on stderr.`;
 
@@ -97,17 +108,108 @@ const runIdArg = (raw: string | undefined, sub: string): string => {
   return rid;
 };
 
-const STATUS_INK: Record<string, (s: string) => string> = {
-  completed: ink.ok,
-  running: ink.info,
-  queued: ink.muted,
-  partial: ink.warn,
-  failed: ink.err,
-  cancelled: ink.muted,
-};
-const statusInk = (s: string): ((x: string) => string) => STATUS_INK[s] ?? ((x) => x);
 const STAGE_STATE_INK: Record<string, (s: string) => string> = {
   done: ink.ok, failed: ink.err, running: ink.info, skipped: ink.muted, pending: ink.muted,
+};
+
+/**
+ * Shared creation+execution path for `research start` and `far new` (B11): both must
+ * behave identically after the question/domain/goal are known.
+ */
+const startRun = async (question: string, goalType: string, domain: string): Promise<void> => {
+  assertDistFresh();
+  const app = await createApp();
+  try {
+    const q = ResearchQuestion.parse({
+      id: newId('q'), text: question, background: '', goalType,
+      scope: { domain, phenomena: [question] },
+      constraints: {}, createdAt: new Date().toISOString(),
+    });
+    const run = app.store.createRun(q);
+    if (json()) jsonOutput({ runId: run.id, status: run.status });
+    else out(`${marker()} ${ink.ok('created')} run ${ink.bold(run.id)} — executing pipeline (progress on stderr)`);
+    const done = await app.orchestrator.execute(run.id);
+    printRun(done);
+    process.exitCode = done.status === 'completed' ? 0 : 1;
+  } finally { app.close(); }
+};
+
+/**
+ * B11 `far new` wizard prompts (TTY-only). Returns null when input ends before all
+ * answers are given (EOF/Ctrl-D) — the caller converts that into a usage hint.
+ */
+const promptForRunSpec = async (): Promise<{ question: string; domain: string; goalType: string } | null> => {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  // EOF closes the interface; a pending question() would otherwise hang forever.
+  const closed = new Promise<never>((_, reject) => {
+    rl.once('close', () => reject(new Error('__stdin_closed__')));
+  });
+  closed.catch(() => { /* observed only via Promise.race in ask(); pre-attach so it can never be unhandled */ });
+  const ask = (query: string): Promise<string> => Promise.race([rl.question(query), closed]);
+  const GOALS = ScientificGoalType.options.join('|');
+  const VALID_GOALS = ScientificGoalType.options as readonly string[];
+  try {
+    let question = (await ask('研究问题（必填，一句话科学问题）: ')).trim();
+    while (question.length === 0) question = (await ask(ink.warn('研究问题不能为空。研究问题（必填）: '))).trim();
+    const domainRaw = (await ask('领域（回车=不限）: ')).trim();
+    let goalRaw = (await ask(`目标类型（回车=explanatory；可选：${GOALS}）: `)).trim();
+    while (goalRaw.length > 0 && !VALID_GOALS.includes(goalRaw)) {
+      goalRaw = (await ask(ink.warn(`无效目标类型 "${goalRaw}"。可选：${GOALS}（回车=explanatory）: `))).trim();
+    }
+    return {
+      question,
+      domain: domainRaw.length === 0 ? 'unspecified' : domainRaw,
+      goalType: goalRaw.length === 0 ? 'explanatory' : goalRaw,
+    };
+  } catch (e) {
+    if (e instanceof Error && e.message === '__stdin_closed__') return null; // input ended mid-wizard
+    throw e; // anything unexpected stays visible (fatal handler prints it)
+  } finally {
+    rl.close();
+  }
+};
+
+const WATCH_TICK_MS = 2_000;
+
+/**
+ * B11 `research status --watch`: poll the real store and repaint in place until the run
+ * reaches a final state. Stage counts and real events only — no invented percentages.
+ */
+const watchRun = async (rid: string): Promise<void> => {
+  const app = await createApp();
+  // Default SIGINT terminates without running the finally below; exit cleanly instead
+  // (130 = 128 + SIGINT convention) after closing the db handle.
+  const onSigint = (): void => { app.close(); process.exit(130); };
+  process.on('SIGINT', onSigint);
+  process.stdout.write('\u001b[?25l'); // hide cursor while repainting
+  let painted = 0;
+  try {
+    for (;;) {
+      const run = app.store.getRun(rid);
+      if (!run) die(`run not found: ${rid}`);
+      const lease = app.store.getRunLease(rid);
+      const live = lease.holder !== null && (lease.expiresAt ?? '') > new Date().toISOString();
+      const last = app.store.listEvents(rid).at(-1) ?? null;
+      const lines = watchLines({
+        run, lease, leaseLive: live,
+        lastEvent: last === null ? null : { at: last.at, type: last.type, stage: last.stage },
+        now: new Date().toISOString(),
+      });
+      if (painted > 0) { // move up over the previous frame, clear each line, redraw
+        process.stdout.write(`\u001b[${painted}A`);
+        for (let i = 0; i < painted; i += 1) process.stdout.write('\u001b[2K\u001b[1B');
+        process.stdout.write(`\u001b[${painted}A`);
+      }
+      for (const line of lines) process.stdout.write(`${line}\n`);
+      painted = lines.length;
+      if (!isActiveStatus(run.status)) return; // final state: leave the last frame on screen
+      await new Promise<void>((resolve) => setTimeout(resolve, WATCH_TICK_MS));
+    }
+  } finally {
+    process.stdout.write('\u001b[?25h'); // restore cursor
+    process.off('SIGINT', onSigint);
+    app.close();
+  }
 };
 
 const printRun = (run: ResearchRun, verbose = true) => {
@@ -162,6 +264,33 @@ const main = async (): Promise<void> => {
     if (json() && result.json !== undefined) jsonOutput(result.json);
     else if (result.text !== undefined) out(result.text);
     if (result.code !== 0) process.exitCode = result.code;
+    return;
+  }
+
+  if (cmd === 'completion') {
+    // B11: static completion script from the real command tree — print to stdout so
+    // users pipe it into their profile (`far completion bash >> ~/.bashrc`).
+    const shell = positional(3);
+    if (!shell) die('completion requires a shell: far completion <bash|zsh|pwsh>', 2);
+    try {
+      out(completionScript(shell));
+    } catch (e) {
+      die(e instanceof Error ? e.message : String(e), 2);
+    }
+    return;
+  }
+
+  if (cmd === 'new') {
+    // B11: interactive wizard — TTY-only; the creation+execution path is IDENTICAL to
+    // `research start` (shared startRun helper). Non-interactive users get a pointer.
+    if (process.stdin.isTTY !== true || process.stdout.isTTY !== true) {
+      die('far new is an interactive wizard and needs a terminal — non-interactive use: far research start "<question>" [--domain <d>] [--goal <type>]', 2);
+    }
+    const stray = positional(3);
+    if (stray !== undefined) die(`far new takes no arguments (got "${stray}") — it is an interactive wizard`, 2);
+    const spec = await promptForRunSpec();
+    if (spec === null) die('interactive input ended before the wizard completed — non-interactive use: far research start "<question>"', 2);
+    await startRun(spec.question, spec.goalType, spec.domain);
     return;
   }
 
@@ -305,23 +434,7 @@ const main = async (): Promise<void> => {
   if (sub === 'start') {
     const question = positional(4);
     if (!question) die('research start requires a question text', 2);
-    assertDistFresh();
-    const goalType = arg('--goal') ?? 'explanatory';
-    const domain = arg('--domain') ?? 'unspecified';
-    const app = await createApp();
-    try {
-      const q = ResearchQuestion.parse({
-        id: newId('q'), text: question, background: '', goalType,
-        scope: { domain, phenomena: [question] },
-        constraints: {}, createdAt: new Date().toISOString(),
-      });
-      const run = app.store.createRun(q);
-      if (json()) jsonOutput({ runId: run.id, status: run.status });
-      else out(`${marker()} ${ink.ok('created')} run ${ink.bold(run.id)} — executing pipeline (progress on stderr)`);
-      const done = await app.orchestrator.execute(run.id);
-      printRun(done);
-      process.exitCode = done.status === 'completed' ? 0 : 1;
-    } finally { app.close(); }
+    await startRun(question, arg('--goal') ?? 'explanatory', arg('--domain') ?? 'unspecified');
     return;
   }
 
@@ -331,6 +444,14 @@ const main = async (): Promise<void> => {
   const rid: string = runIdArg(runId, sub ?? 'command');
 
   if (sub === 'status') {
+    if (flag('--watch')) {
+      // B11 live view: TTY-only repaint loop. --json consumers should poll the plain
+      // snapshot form instead — a streaming JSON protocol is a different contract.
+      if (process.stdout.isTTY !== true) die('--watch needs an interactive terminal (TTY) — plain `far research status <run-id>` prints one snapshot', 2);
+      if (json()) die('--watch renders a live TTY view and cannot be combined with --json — poll `far research status <run-id> --json` instead', 2);
+      await watchRun(rid);
+      return;
+    }
     const app = await createApp();
     try {
       const run = app.store.getRun(rid);
