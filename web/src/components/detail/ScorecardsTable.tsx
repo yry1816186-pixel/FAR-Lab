@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import type { HypothesisScorecard } from '../../api/types';
+import type { HypothesisCandidate, HypothesisScorecard } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, IdText } from '../common';
 
@@ -8,11 +8,22 @@ import { Badge, IdText } from '../common';
  * decision aids produced by uncalibrated LLM judgments — never objective
  * probabilities. Producer + calibration travel with every dimension.
  * Rows expand to the full per-dimension rationale (keyboard accessible).
+ * The hypothesis column shows the STATEMENT (researcher identity, CPP-2);
+ * rows link down to the corresponding card. Rank (pairwise tournament) and
+ * the composite inside the rationale can legitimately disagree — the
+ * coherence note says so instead of leaving the inversion unexplained.
  */
-export function ScorecardsTable({ scorecards }: { scorecards: HypothesisScorecard[] }): JSX.Element {
+export function ScorecardsTable({
+  scorecards,
+  hypotheses,
+}: {
+  scorecards: HypothesisScorecard[];
+  hypotheses: HypothesisCandidate[];
+}): JSX.Element {
   const { t } = useI18n();
   const [openRank, setOpenRank] = useState<number | null>(null);
   const sorted = [...scorecards].sort((a, b) => a.rank - b.rank);
+  const statementOf = new Map(hypotheses.map((h) => [h.id, h.statement] as const));
 
   if (sorted.length === 0) {
     return <p className="muted">{t('scorecards.empty')}</p>;
@@ -23,6 +34,7 @@ export function ScorecardsTable({ scorecards }: { scorecards: HypothesisScorecar
       <p className="callout callout--info" role="note">
         {t('scorecards.disclaimer')}
       </p>
+      <p className="muted small">{t('scorecards.coherenceNote')}</p>
       <div className="table-scroll">
         <table className="data-table scorecards">
           <caption className="sr-only">{t('scorecards.title')}</caption>
@@ -38,18 +50,27 @@ export function ScorecardsTable({ scorecards }: { scorecards: HypothesisScorecar
             {sorted.map((card) => {
               const open = openRank === card.rank;
               const valueCount = card.dimensions.filter((d) => d.value !== null).length;
+              const statement = statementOf.get(card.hypothesisId);
               return (
                 <Fragment key={card.id}>
                   <tr className="scorecard-row">
                     <th scope="row" className="mono">{t('scorecards.ofN', { rank: card.rank, total: card.rankedOutOf })}</th>
-                    <td><IdText value={card.hypothesisId} /></td>
+                    <td>
+                      {statement !== undefined ? (
+                        <a className="hyp-anchor-link" href={`#hyp-${card.hypothesisId}`} title={`${card.hypothesisId} — ${statement}`}>
+                          {statement.length > 110 ? `${statement.slice(0, 110)}…` : statement}
+                        </a>
+                      ) : (
+                        <IdText value={card.hypothesisId} />
+                      )}
+                    </td>
                     <td className="overall-cell">{summarize(card.overallRationale)}</td>
                     <td>
                       <button
                         type="button"
                         className="link-button"
                         aria-expanded={open}
-                        aria-label={`${t('scorecards.expandRow')} — ${card.hypothesisId}`}
+                        aria-label={`${t('scorecards.expandRow')} — ${statement ?? card.hypothesisId}`}
                         onClick={() => setOpenRank(open ? null : card.rank)}
                       >
                         {open ? t('common.collapse') : `${valueCount} / ${card.dimensions.length}`}

@@ -7,7 +7,13 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, FieldList, Section, Skeleton } from '../common';
 import { stageKey, availabilityKey, stepKindKey } from '../../i18n/keys';
 
-export function PlanTab({ run }: { run: ResearchRun }): JSX.Element {
+export function PlanTab({
+  run,
+  onFeedback,
+}: {
+  run: ResearchRun;
+  onFeedback: (target?: { kind: string; id: string; label?: string }) => void;
+}): JSX.Element {
   const { t } = useI18n();
   const fetcher = useCallback((signal: AbortSignal) => getPlan(run.id, signal), [run.id]);
   const res = useResource(fetcher, [run.id], `${run.updatedAt}:${run.status}`);
@@ -21,7 +27,7 @@ export function PlanTab({ run }: { run: ResearchRun }): JSX.Element {
       ) : res.error !== null ? (
         <ErrorBox error={res.error} onRetry={res.retry} />
       ) : res.data !== null ? (
-        <PlanView plan={res.data} />
+        <PlanView plan={res.data} onChallenge={() => onFeedback({ kind: 'plan', id: res.data!.id, label: res.data!.objective })} />
       ) : (
         <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(stageKey(run.currentStage)) })} />
       )}
@@ -29,7 +35,7 @@ export function PlanTab({ run }: { run: ResearchRun }): JSX.Element {
   );
 }
 
-function PlanView({ plan }: { plan: ResearchPlan }): JSX.Element {
+function PlanView({ plan, onChallenge }: { plan: ResearchPlan; onChallenge: () => void }): JSX.Element {
   const { t } = useI18n();
   const orNone = (items: string[] | undefined): JSX.Element | string =>
     items !== undefined && items.length > 0 ? items.join('；') : <span className="muted">{t('common.none')}</span>;
@@ -45,7 +51,14 @@ function PlanView({ plan }: { plan: ResearchPlan }): JSX.Element {
 
   return (
     <div>
-      <Section title={t('plan.objective')}>
+      <Section
+        title={t('plan.objective')}
+        actions={
+          <button type="button" className="btn btn--small" onClick={onChallenge} title={t('compare.challengePlanHint')}>
+            {t('compare.challengePlan')}
+          </button>
+        }
+      >
         <p className="plan-objective">{plan.objective}</p>
         <FieldList
           items={[

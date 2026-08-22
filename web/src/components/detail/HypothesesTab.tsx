@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { GitCompareArrows, X } from 'lucide-react';
 import { isNotFound } from '../../api/client';
 import { getHypotheses } from '../../api/endpoints';
 import type { HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
@@ -7,12 +8,51 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { EmptyState, ErrorBox, Section, Skeleton } from '../common';
 import { HypothesisCard } from './HypothesisCard';
 import { ScorecardsTable } from './ScorecardsTable';
+import { CompareView } from './CompareView';
+import type { FeedbackTarget } from './FeedbackForm';
 import { stageKey } from '../../i18n/keys';
 
-export function HypothesesTab({ run }: { run: ResearchRun }): JSX.Element {
+const COMPARE_LIMIT = 3;
+
+export function HypothesesTab({
+  run,
+  onFeedback,
+}: {
+  run: ResearchRun;
+  onFeedback: (target?: FeedbackTarget) => void;
+}): JSX.Element {
   const { t } = useI18n();
   const fetcher = useCallback((signal: AbortSignal) => getHypotheses(run.id, signal), [run.id]);
   const res = useResource(fetcher, [run.id], `${run.updatedAt}:${run.status}`);
+
+  // Compare selection (CPP-3): up to COMPARE_LIMIT ranked hypotheses, order = rank.
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const toggleCompare = (id: string): void => {
+    setCompareIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : prev.length >= COMPARE_LIMIT
+          ? prev
+          : [...prev, id],
+    );
+  };
+  // Run switch invalidates the compare selection (hypotheses belong to a run).
+  useEffect(() => {
+    setCompareIds([]);
+  }, [run.id]);
+
+  const data = res.data;
+  const byId = data !== null ? new Map(data.hypotheses.map((h) => [h.id, h] as const)) : null;
+  // Compare columns are ordered by scorecard rank (stable, matches the medals),
+  // never by click order (critique: unstable column order reads as chaos).
+  const rankById = data !== null ? new Map(data.scorecards.map((s) => [s.hypothesisId, s.rank] as const)) : null;
+  const compareHyps =
+    byId !== null && rankById !== null && compareIds.length > 0
+      ? compareIds
+          .map((id) => byId.get(id))
+          .filter((h): h is HypothesisCandidate => h !== undefined)
+          .sort((a, b) => (rankById.get(a.id) ?? 99) - (rankById.get(b.id) ?? 99))
+      : [];
 
   return (
     <div className="tab-content">
@@ -22,21 +62,51 @@ export function HypothesesTab({ run }: { run: ResearchRun }): JSX.Element {
         <EmptyState titleKey="hyp.empty" hint={t('hyp.emptyHint', { stage: t(stageKey(run.currentStage)) })} />
       ) : res.error !== null ? (
         <ErrorBox error={res.error} onRetry={res.retry} />
-      ) : res.data === null ? null : (
+      ) : data === null ? null : (
         <>
+          {compareHyps.length >= 2 && (
+            <Section
+              title={t('compare.title')}
+              actions={
+                <button type="button" className="btn btn--small" onClick={() => setCompareIds([])}>
+                  <X size={12} aria-hidden="true" /> {t('compare.clear')}
+                </button>
+              }
+            >
+              <CompareView
+                hypotheses={compareHyps}
+                scorecards={data.scorecards}
+                onRemove={(id) => setCompareIds((prev) => prev.filter((x) => x !== id))}
+                onChallenge={(id, label) => onFeedback({ kind: 'hypothesis', id, label })}
+              />
+            </Section>
+          )}
           <Section title={t('scorecards.title')}>
-            <ScorecardsTable scorecards={res.data.scorecards} />
+            <ScorecardsTable scorecards={data.scorecards} hypotheses={data.hypotheses} />
           </Section>
-          {res.data.tournament !== null && (
+          {data.tournament !== null && (
             <Section title={t('tournament.title')}>
-              <TournamentView tournament={res.data.tournament} hypotheses={res.data.hypotheses} />
+              <TournamentView tournament={data.tournament} hypotheses={data.hypotheses} />
             </Section>
           )}
           <Section
-            title={res.data.scorecards.length > 0 ? t('hyp.representatives', { n: representativesOf(res.data).length }) : t('tab.hypotheses')}
-            count={res.data.scorecards.length === 0 ? <span className="muted small">{t('hyp.notRanked')}</span> : undefined}
+            title={data.scorecards.length > 0 ? t('hyp.representatives', { n: representativesOf(data).length }) : t('tab.hypotheses')}
+            count={data.scorecards.length === 0 ? <span className="muted small">{t('hyp.notRanked')}</span> : undefined}
+            actions={
+              compareIds.length > 0 ? (
+                <span className="compare-bar-inline muted small" aria-live="polite">
+                  <GitCompareArrows size={12} aria-hidden="true" /> {t('compare.selectedCount', { n: compareIds.length, max: COMPARE_LIMIT })}
+                </span>
+              ) : undefined
+            }
           >
-            <HypothesisList data={res.data} />
+            <HypothesisList
+              data={data}
+              compareIds={compareIds}
+              compareLimit={COMPARE_LIMIT}
+              onToggleCompare={toggleCompare}
+              onChallenge={(id, label) => onFeedback({ kind: 'hypothesis', id, label })}
+            />
           </Section>
         </>
       )}
@@ -77,7 +147,11 @@ function TournamentView({ tournament, hypotheses }: { tournament: HypothesisTour
           {tournament.standings.map((s) => (
             <tr key={s.hypothesisId}>
               <td className="mono">{s.rank}</td>
-              <td>{statementOf(s.hypothesisId)}</td>
+              <td>
+                <a className="hyp-anchor-link" href={`#hyp-${s.hypothesisId}`} title={statementOf(s.hypothesisId)}>
+                  {statementOf(s.hypothesisId)}
+                </a>
+              </td>
               <td className="mono">{s.wins}-{s.losses}-{s.ties}</td>
               <td>
                 <span className="rank-cell">
@@ -125,7 +199,19 @@ function representativesOf(data: HypoData): HypothesisCandidate[] {
   return data.hypotheses; // no scorecards yet: all candidates, honestly labeled as unranked
 }
 
-function HypothesisList({ data }: { data: HypoData }): JSX.Element {
+function HypothesisList({
+  data,
+  compareIds,
+  compareLimit,
+  onToggleCompare,
+  onChallenge,
+}: {
+  data: HypoData;
+  compareIds: string[];
+  compareLimit: number;
+  onToggleCompare: (id: string) => void;
+  onChallenge: (id: string, label: string) => void;
+}): JSX.Element {
   const { t } = useI18n();
   const { hypotheses } = data;
   if (hypotheses.length === 0) {
@@ -150,6 +236,12 @@ function HypothesisList({ data }: { data: HypoData }): JSX.Element {
           clusterSize={clusterCounts.get(h.clusterKey ?? h.id) ?? 1}
           isRepresentative
           rank={rankOf.get(h.id)}
+          onChallenge={(id, label) => onChallenge(id, label)}
+          compare={{
+            selected: compareIds.includes(h.id),
+            onToggle: () => onToggleCompare(h.id),
+            disabled: compareIds.length >= compareLimit,
+          }}
         />
       ))}
       {extras.length > 0 && (

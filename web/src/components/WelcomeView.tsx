@@ -5,7 +5,8 @@ import { healthProjection, useHealth } from '../hooks/useHealth';
 import { runStatusTone } from '../tones';
 import { runStatusKey } from '../tones';
 import { stageKey } from '../i18n/keys';
-import { IdText, TimeText } from './common';
+import { TimeText } from './common';
+import { runLabel } from './RunsSidebar';
 import type { RunSummary } from '../api/types';
 
 /**
@@ -63,7 +64,7 @@ export function WelcomeView({
                 <li key={run.id}>
                   <button type="button" className="recent-card" onClick={() => onSelectRun(run.id)}>
                     <span className="recent-card-top">
-                      <IdText value={run.id} />
+                      <span className="recent-card-question" title={runLabel(run)}>{runLabel(run)}</span>
                       <span className={`badge badge--${runStatusTone(run.status)}`}>{t(runStatusKey(run.status))}</span>
                     </span>
                     <span className="recent-card-mid muted">{t(stageKey(run.currentStage))}</span>

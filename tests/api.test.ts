@@ -495,7 +495,7 @@ const waitUntil = async (pred: () => boolean, ms = 5000): Promise<void> => {
 // ---- runs list / detail ------------------------------------------------------
 
 describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
-  it('lists runs with domain progress and no invented fields', async () => {
+  it('lists runs with domain progress, question text projection and no invented fields', async () => {
     const { status, body } = await getJson(`${base}/api/v1/runs`);
     expect(status).toBe(200);
     const ids = body.runs.map((r: { id: string }) => r.id);
@@ -507,12 +507,16 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(typeof completed.createdAt).toBe('string');
     expect(completed.progress).toEqual({ done: 9, total: 9 }); // core stages only (feedback/revise excluded)
     expect(completed.lastError).toBeUndefined();
+    // CPP-2: the researcher's question text is the run's human identity in list views
+    expect(typeof completed.questionText).toBe('string');
+    expect(completed.questionText.length).toBeGreaterThan(0);
+    expect(typeof completed.domain).toBe('string');
     const partial = body.runs.find((r: { id: string }) => r.id === run3);
     expect(partial.lastError).toContain('retrieve failed');
     expect(partial.progress).toEqual({ done: 0, total: 9 }); // failed stage: honestly not done
     for (const r of body.runs) {
       const keys = Object.keys(r);
-      expect(keys.every((k) => ['id', 'status', 'currentStage', 'createdAt', 'lastError', 'progress'].includes(k))).toBe(true);
+      expect(keys.every((k) => ['id', 'status', 'currentStage', 'createdAt', 'questionText', 'domain', 'lastError', 'progress'].includes(k))).toBe(true);
     }
   });
 

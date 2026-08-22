@@ -10,6 +10,8 @@ import { PlanTab } from './detail/PlanTab';
 import { RevisionsTab } from './detail/RevisionsTab';
 import { ProvenanceTab } from './detail/ProvenanceTab';
 import { EventsTab } from './detail/EventsTab';
+import { FeedbackDrawer } from './detail/FeedbackDrawer';
+import type { FeedbackTarget } from './detail/FeedbackForm';
 
 type TabId = 'overview' | 'evidence' | 'hypotheses' | 'plan' | 'revisions' | 'provenance' | 'events';
 
@@ -43,9 +45,15 @@ export function RunDetail({
   const [tabId, setTabId] = useState<TabId>('overview');
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Run switch resets to the overview tab.
+  // Feedback drawer (CPP-1): the causal-revision entry, reachable from every
+  // tab and pre-targetable by inline object actions. null = open untargeted.
+  const [feedbackTarget, setFeedbackTarget] = useState<FeedbackTarget | null | undefined>(undefined);
+  const openFeedback = (target?: FeedbackTarget): void => setFeedbackTarget(target ?? null);
+
+  // Run switch resets to the overview tab and closes the drawer.
   useEffect(() => {
     setTabId('overview');
+    setFeedbackTarget(undefined);
   }, [run.id]);
 
   const focusTab = (index: number): void => {
@@ -66,10 +74,10 @@ export function RunDetail({
 
   const renderPanel = (): ReactNode => {
     switch (tabId) {
-      case 'overview': return <OverviewTab run={run} events={events} onMutated={onMutated} />;
-      case 'evidence': return <EvidenceTab run={run} />;
-      case 'hypotheses': return <HypothesesTab run={run} />;
-      case 'plan': return <PlanTab run={run} />;
+      case 'overview': return <OverviewTab run={run} events={events} onMutated={onMutated} onFeedback={openFeedback} />;
+      case 'evidence': return <EvidenceTab run={run} onFeedback={openFeedback} />;
+      case 'hypotheses': return <HypothesesTab run={run} onFeedback={openFeedback} />;
+      case 'plan': return <PlanTab run={run} onFeedback={openFeedback} />;
       case 'revisions': return <RevisionsTab run={run} />;
       case 'provenance': return <ProvenanceTab run={run} events={events} onMutated={onMutated} />;
       case 'events': return <EventsTab run={run} events={events} />;
@@ -106,6 +114,18 @@ export function RunDetail({
       >
         {renderPanel()}
       </div>
+      {feedbackTarget !== undefined && (
+        <FeedbackDrawer
+          run={run}
+          target={feedbackTarget ?? undefined}
+          onClose={() => setFeedbackTarget(undefined)}
+          onSubmitted={onMutated}
+          onViewRevisions={() => {
+            setFeedbackTarget(undefined);
+            setTabId('revisions');
+          }}
+        />
+      )}
     </div>
   );
 }

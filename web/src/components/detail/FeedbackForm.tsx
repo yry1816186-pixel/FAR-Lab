@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
+import { ArrowRight } from 'lucide-react';
 import { ApiError, withTimeout } from '../../api/client';
 import { postFeedback } from '../../api/endpoints';
 import type { FeedbackSourceKind } from '../../api/types';
@@ -14,15 +14,61 @@ const SOURCE_KINDS: FeedbackSourceKind[] = [
 /** Valid ObjectRef kinds (src/domain/ids.ts) that make researcher-facing feedback targets; the API existence-checks these. */
 const TARGET_KINDS = ['hypothesis', 'plan', 'claim', 'question', 'evidence_relation'] as const;
 
-export function FeedbackForm({ runId, onSubmitted }: { runId: string; onSubmitted: () => void }): JSX.Element {
+export interface FeedbackTarget {
+  kind: string;
+  id: string;
+  /** Researcher-readable label (statement excerpt) — the object's identity, not its id (CPP-2). */
+  label?: string;
+}
+
+/**
+ * Researcher feedback into the causal revision chain (W2). An optional
+ * `initialTarget` comes from inline object actions ("质疑此假设" etc.) — the
+ * target then shows as a visible chip with its STATEMENT (never a bare id).
+ * After a successful submit the form is replaced by a success panel that
+ * closes the loop: where the revision will land and how to watch it (critique:
+ * "201 Created" as toast copy was a broken narrative link).
+ */
+export function FeedbackForm({
+  runId,
+  onSubmitted,
+  initialTarget,
+  onClose,
+  onViewRevisions,
+  onDirtyChange,
+}: {
+  runId: string;
+  onSubmitted: () => void;
+  initialTarget?: FeedbackTarget;
+  onClose?: () => void;
+  onViewRevisions?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+}): JSX.Element {
   const { t } = useI18n();
   const [source, setSource] = useState<FeedbackSourceKind>('human_expert');
   const [content, setContent] = useState('');
-  const [targetKind, setTargetKind] = useState('');
-  const [targetId, setTargetId] = useState('');
+  const [targetKind, setTargetKind] = useState(initialTarget?.kind ?? '');
+  const [targetId, setTargetId] = useState(initialTarget?.id ?? '');
   const [showRequired, setShowRequired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  // A drawer reopen with a different pre-target (e.g. challenging another
+  // hypothesis) must re-seed the fields — remount is not guaranteed.
+  useEffect(() => {
+    if (initialTarget !== undefined) {
+      setTargetKind(initialTarget.kind);
+      setTargetId(initialTarget.id);
+    }
+  }, [initialTarget]);
+
+  // Dirty tracking lets the drawer warn before discarding TYPED content.
+  // A pre-seeded target chip is one click to re-establish — not a loss worth
+  // blocking close over — so only the free-text body counts as dirty.
+  useEffect(() => {
+    onDirtyChange?.(content.trim().length > 0);
+  }, [content, onDirtyChange]);
 
   const submit = async (ev: React.FormEvent): Promise<void> => {
     ev.preventDefault();
@@ -44,10 +90,8 @@ export function FeedbackForm({ runId, onSubmitted }: { runId: string; onSubmitte
         input.targetId = targetId.trim();
       }
       await postFeedback(runId, input, withTimeout(controller.signal, 15_000));
-      toast.success(t('feedback.ok'));
-      setContent('');
-      setTargetKind('');
-      setTargetId('');
+      onDirtyChange?.(false);
+      setSubmitted(true);
       onSubmitted();
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
@@ -60,9 +104,61 @@ export function FeedbackForm({ runId, onSubmitted }: { runId: string; onSubmitte
     }
   };
 
+  if (submitted) {
+    return (
+      <div className="feedback-success" role="status">
+        <p className="feedback-success-title">{t('feedback.successTitle')}</p>
+        <p className="muted">{t('feedback.successBody')}</p>
+        <div className="feedback-success-actions">
+          {onViewRevisions !== undefined && (
+            <button type="button" className="btn btn--primary" onClick={onViewRevisions}>
+              {t('feedback.viewRevisions')} <ArrowRight size={13} aria-hidden="true" />
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setSubmitted(false);
+              setContent('');
+              setTargetKind('');
+              setTargetId('');
+            }}
+          >
+            {t('feedback.another')}
+          </button>
+          {onClose !== undefined && (
+            <button type="button" className="btn" onClick={onClose}>
+              {t('feedback.close')}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const targetLabel = initialTarget?.label;
+
   return (
     <form className="feedback-form" onSubmit={(e) => void submit(e)} noValidate>
       <p className="muted">{t('feedback.intro')}</p>
+
+      {targetKind !== '' && targetId.trim().length > 0 && (
+        <p className="feedback-target-chip" title={targetId}>
+          {targetLabel !== undefined && targetLabel.length > 0 ? (
+            <span className="feedback-target-label">{targetLabel}</span>
+          ) : (
+            <span className="mono">{targetKind}:{targetId}</span>
+          )}
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => { setTargetKind(''); setTargetId(''); }}
+          >
+            {t('feedback.clearTarget')}
+          </button>
+        </p>
+      )}
 
       <label className="field-label" htmlFor="fb-source">
         {t('feedback.source')}
