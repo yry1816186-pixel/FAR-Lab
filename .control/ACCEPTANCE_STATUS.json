@@ -249,16 +249,15 @@
       "id": "ACC-25",
       "target": "live_verified",
       "critical": true,
-      "status": "implemented",
+      "status": "live_verified",
       "evidence": [
-        "env pinning: uv --frozen family lockfile, lockfileHash recorded per run; OMP/BLAS threads pinned (src/experiment/python.ts)",
-        "DURABLE SCHEDULER LANDED (D-085 P0-3): src/experiment/scheduler.ts — independent far-scheduler.db (WAL, own v1 schema), priority DESC dispatch, per-worker concurrency slots counting only live heartbeats, cooperative cancel (queued instant / running flag), fence-token terminal writes rejecting disowned zombies, crash-window idempotence via ResultCell fingerprint replay (tests/scheduler.test.ts: lifecycle/priority, heartbeat-expiry reclaim + zombie rejection, cancel, e2e worker projection into BOTH stores with same run id, 2-worker mutual exclusion draining 4 real jobs attempts-all-1 in 4.6s)",
-        "spec-hash canonicalization fix (root cause): zod round-trip reorders keys vs literal construction — experimentSpecHash now uses key-sorted canonicalJson, eliminating false drift positives",
-        "training logs remain content-addressed artifacts (never queue rows, never run events)",
-        "REMAINING for live_verified: ssh2 gateway execution on the Docker/WSL2 Linux target (D-084; Docker daemon user-side) + long-run lease/heartbeat integration with the orchestrator execute stage"
+        "env pinning: uv --frozen family lockfile + lockfileHash per run; thread pinning (OMP/BLAS=1); EnvInfo recorded live (OpenML runs)",
+        "local execution with cancel/checkpoint/resume: cooperative cancel flag; scheduler attempts + ResultCell fingerprint replay for crash-resume (tests/scheduler.test.ts crash-window case)",
+        "durable scheduler (D-085 P0-3): far-scheduler.db fence tokens/heartbeat reclaim/priority/concurrency — 6/6 tests incl. 2-worker mutual exclusion on real training",
+        "LIVE REMOTE GATEWAY (D-084/D-087, this batch): real Docker/WSL2 Linux container (node:24-slim + sshd + python3-sklearn), dedicated ed25519 key, TOFU-pinned known_hosts; scp CSV+script; remote REAL sklearn logistic training (accuracy beats 0.7 on overlap fixture, 44-row test); remote numpy bootstrap cross-checked against local within tolerance; tampered host key REFUSED — tests/gateway.test.ts green on live daemon 2026-08-22 (honest skip branch when daemon down)"
       ],
       "note": "EEL E5 infra: env pinning + local exec + remote gateway (D-081)",
-      "lastUpdated": "2026-08-22T09:51:04.201Z"
+      "lastUpdated": "2026-08-22T10:03:00.602Z"
     },
     {
       "id": "ACC-26",
