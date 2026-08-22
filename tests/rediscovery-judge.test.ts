@@ -399,4 +399,17 @@ describe('gold calibration regression (claim-pair-gold.jsonl)', () => {
     }
     expect(GT_REV).toBe('gt-fixed-2026-08-22');
   });
+
+  it('EV1 3-seed agreement re-analysis is REPRODUCIBLE and its headline numbers are locked', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const out = execFileSync('node', ['eval/ev1-judge-agreement.mjs'], { encoding: 'utf8' });
+    expect(out).toContain('krippendorff alpha (ordinal, 3 seeds): 0.228'); // quality-dim unreliability locked
+    expect(out).toContain('krippendorff alpha (ordinal, 3 seeds): 0.605'); // counter-dim moderate
+    // the farlab counter advantage held at EVERY seed (aggregate-level stability claim)
+    expect(out).toContain('2.2 CI [2.20, 2.20]');
+    expect(out).toContain('1.6 CI [1.60, 1.60]');
+    // mutation guard: if the stats layer or data changes these, the test reddens
+    expect(out).toContain('exact 3-seed agreement: 3/15');
+    expect(out).toContain('exact 3-seed agreement: 7/15');
+  });
 });
