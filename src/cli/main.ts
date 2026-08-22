@@ -35,6 +35,14 @@ Usage:
                                                   tool_result|simulation|experiment|reviewer|verification_failure|
                                                   reproduction_failure); consumed causally by the revise stage
   far runs [--json]                              List runs
+  far experiment run|enqueue <spec.json> [--priority N] [--allow-local-datasets]
+                                                  Execute / queue an ExperimentSpec through the
+                                                  durable scheduler (real datasets+models+stats)
+  far experiment worker [--max-jobs N] [--max-running N]
+                                                  Drain queued experiments as a worker
+  far experiment status [--job <id>] | cancel <job-id> | logs <experiment-run-id>
+                                                  Job/experiment truth: queue state, cooperative
+                                                  cancel, content-addressed training logs
   far probe [provider] [--live] [--json]         Model-route health: config check by default
                                                   (key presence, never values); --live makes one
                                                   minimal real chat call per route (costs ~1 token)
@@ -117,6 +125,23 @@ const printRun = (run: ResearchRun, verbose = true) => {
 const main = async (): Promise<void> => {
   const [, , cmd, sub] = process.argv;
   if (!cmd || flag('--help') || flag('-h') || cmd === 'help') { console.log(HELP); return; }
+
+  if (cmd === 'experiment') {
+    // EEL surface (D-081/P3): scheduler as a user-operable command. Own module so this
+    // router stays a one-line hook.
+    const { experimentCommand } = await import('./experiment.js');
+    const args = process.argv.slice(4).filter((x) => !x.startsWith('--') && x !== sub);
+    const result = await experimentCommand(sub, {
+      dataDir: arg('--data-dir') ?? '.far-run',
+      positional: args[0],
+      flag,
+      arg,
+    });
+    if (json() && result.json !== undefined) jsonOutput(result.json);
+    else if (result.text !== undefined) out(result.text);
+    if (result.code !== 0) process.exitCode = result.code;
+    return;
+  }
 
   if (cmd === 'runs') {
     const app = await createApp();
