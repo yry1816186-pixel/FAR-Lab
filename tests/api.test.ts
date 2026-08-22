@@ -804,6 +804,32 @@ describe('POST /api/v1/runs/:id/feedback', () => {
     expect(stored?.target).toEqual({ kind: 'hypothesis', id: hyp1 });
   });
 
+  it('existence-checks evidence_relation targets too (D-060 audit-1 fix: mapping was missing)', async () => {
+    const rels = app.store.listObjects('evidence_relation', run1);
+    expect(rels.length).toBeGreaterThan(0);
+    const relId = rels[0]!.id;
+    const ghostRel = `ev_${'0'.repeat(26)}`;
+
+    const ghost = await postJson(`${base}/api/v1/runs/${run1}/feedback`, {
+      source: 'reviewer',
+      content: 'x',
+      targetKind: 'evidence_relation',
+      targetId: ghostRel,
+    });
+    expect(ghost.status).toBe(400);
+    expect(ghost.body.error.message).toContain(ghostRel);
+
+    const real = await postJson(`${base}/api/v1/runs/${run1}/feedback`, {
+      source: 'reviewer',
+      content: 'this support relation looks overstated',
+      targetKind: 'evidence_relation',
+      targetId: relId,
+    });
+    expect(real.status).toBe(201);
+    const stored = app.store.getObject('feedback', real.body.feedbackId);
+    expect(stored?.target).toEqual({ kind: 'evidence_relation', id: relId });
+  });
+
   it('400s on invalid source, empty content, half-given target and fail-closed missing target', async () => {
     const badSource = await postJson(`${base}/api/v1/runs/${run1}/feedback`, { source: 'gossip', content: 'x' });
     expect(badSource.status).toBe(400);

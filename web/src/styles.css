@@ -57,6 +57,47 @@
   }
 }
 
+/* ---------- v2 tokens (design-palette-v1, D-060 §8.3 — math-verified OKLCH→sRGB, WCAG-checked) ----------
+   Full migration happens in roadmap phase 5; these land first as the authoritative layer.
+   Verified ratios: see research/wave-product-reports/design-palette-v1.json + spikes/design-palette-probe.mjs */
+:root {
+  /* neutral ramp (hue 250, C 0.004) — light */
+  --v2-page-bg: #f1f4f6;
+  --v2-surface: #fafcfe;
+  --v2-surface-2: #ebedef;
+  --v2-border: #d2d4d7;      /* decorative separators only (1.44:1 — not for control borders) */
+  --v2-form-border: #909295; /* 3.03:1 vs surface — WCAG 1.4.11 non-text */
+  --v2-text-1: #4b4d4f;      /* 8.26:1 */
+  --v2-text-2: #717375;      /* 4.63:1 */
+  --v2-text-3: #909295;      /* 3.03:1 placeholders */
+  --v2-btn-ink: #0f1215;     /* near-black primary button; white text 18.79:1 */
+  /* epistemic states — color = evidence semantics only (无彩色界面，彩色即证据) */
+  --v2-verified: #2c8447;  --v2-verified-tint: #ddfbe2;  --v2-verified-on-tint: #277f43;
+  --v2-refuted: #c44c44;   --v2-refuted-tint: #ffe7e2;   --v2-refuted-on-tint: #b9423b;
+  --v2-unknown: #8463b8;   --v2-unknown-tint: #f6ecff;   --v2-unknown-on-tint: #7c5cb0;
+  --v2-caution: #8a7300;   --v2-caution-tint: #fbf2d0;   --v2-caution-on-tint: #826b00;
+  --v2-info: #2d78bd;      --v2-info-tint: #dcf5ff;      --v2-info-on-tint: #2470b5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --v2-page-bg: #0d0f10;
+    --v2-surface: #151719;
+    --v2-surface-2: #1f2123;
+    --v2-border: #2e3133;
+    --v2-form-border: #636567; /* 3.07:1 vs dark surface */
+    --v2-text-1: #acaeb0;   /* 8.07:1 */
+    --v2-text-2: #7e8082;   /* 4.53:1 */
+    --v2-text-3: #636567;
+    --v2-btn-ink: #d4d8dd;  /* dark-mode primary = lifted neutral (black text 13.19:1) */
+    --v2-verified: #3f9557;  --v2-verified-tint: #0f2e17;  --v2-verified-on-tint: #4b9f61;
+    --v2-refuted: #d35a51;   --v2-refuted-tint: #3d1b17;   --v2-refuted-on-tint: #e1675c;
+    --v2-unknown: #906fc5;   --v2-unknown-tint: #2b203d;   --v2-unknown-on-tint: #9d7dd4;
+    --v2-caution: #967f1a;   --v2-caution-tint: #2f2600;   --v2-caution-on-tint: #a48c2d;
+    --v2-info: #3a84ca;      --v2-info-tint: #0f2840;      --v2-info-on-tint: #4992d9;
+  }
+}
+
 /* ---------- base ---------- */
 * { box-sizing: border-box; }
 
@@ -185,7 +226,6 @@ a:hover { text-decoration: underline; }
   background: var(--btn-bg);
   color: var(--btn-text);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
   border-radius: 4px;
   padding: 8px 10px;
   cursor: pointer;
@@ -194,8 +234,10 @@ a:hover { text-decoration: underline; }
   gap: 3px;
   font: inherit;
 }
-.run-item:hover { border-color: var(--border-strong); border-left-color: var(--border-strong); }
-.run-item--selected { border-left-color: var(--accent); background: var(--accent-soft); }
+/* D-060: selection = full-border + background (the previous 3px left accent strip was the
+   #1 "AI-slop tell" per the anti-slop research — removed, not restyled). */
+.run-item:hover { border-color: var(--border-strong); }
+.run-item--selected { border-color: var(--accent); background: var(--accent-soft); }
 
 .run-item-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .run-item-mid { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; }
@@ -253,7 +295,7 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
 .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-text); border-color: var(--btn-primary-bg); }
 .btn--primary:hover:not(:disabled) { color: var(--btn-primary-text); opacity: 0.92; }
-.btn--small { padding: 2px 8px; font-size: 12px; }
+.btn--small { padding: 2px 8px; font-size: 12px; min-height: 24px; min-width: 24px; } /* 24px: WCAG 2.2 SC 2.5.8 AA target size */
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .link-button {
@@ -277,6 +319,7 @@ textarea:focus-visible, input:focus-visible, select:focus-visible {
   padding: 1px 8px;
   margin-right: 6px;
   cursor: pointer;
+  min-height: 24px; /* WCAG 2.2 SC 2.5.8 AA */
 }
 .chip-button:hover { border-color: var(--accent); color: var(--accent); }
 

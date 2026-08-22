@@ -275,7 +275,7 @@ const main = async (): Promise<void> => {
         const ref = ObjectRef.safeParse({ kind: targetKind, id: targetId });
         if (!ref.success) die(`invalid --target-kind "${targetKind}"`, 2);
         // fail-closed: a targeted signal must point at an object that actually exists
-        const STORE_KINDS = { hypothesis: 'hypothesis', plan: 'plan', claim: 'claim', question: 'question' } as const;
+        const STORE_KINDS = { hypothesis: 'hypothesis', plan: 'plan', claim: 'claim', question: 'question', evidence_relation: 'evidence_relation' } as const;
         const kind = STORE_KINDS[ref.data.kind as keyof typeof STORE_KINDS];
         if (kind !== undefined && app.store.getObject(kind, ref.data.id) === null) die(`${ref.data.kind} not found: ${ref.data.id}`, 2);
         target = ref.data;

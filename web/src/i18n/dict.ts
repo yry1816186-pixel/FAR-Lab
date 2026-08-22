@@ -429,6 +429,7 @@ export const zh = {
   'events.type': '类型',
   'events.detail': '详情',
   'events.truncated': '（截断显示，共 {n} 字符）',
+  'events.pollingLive': '● 实时轮询 · 2s',
   'event.run_created': 'run 创建',
   'event.stage_started': '阶段开始',
   'event.stage_done': '阶段完成',
@@ -469,6 +470,14 @@ export const zh = {
   'common.copied': '已复制',
   'common.copyId': '复制 ID',
   'common.notReady': '数据尚未生成',
+  'common.sep': '、',
+  'err.network': '无法连接 API（{path}）：{cause}',
+  'err.reportEnvelope': '报告端点返回了无法识别的 JSON 信封（期望 markdown 文本或含 report/content/markdown 字段）',
+  'err.badJson': 'API 返回了无法解析的 JSON（{path}）',
+  'err.verifySchema': '验证报告结构与预期不符（缺少 verdict/checks）',
+  'err.createRunShape': '创建 run 的响应缺少 runId（期望 202 响应含 runId 字段）',
+  'err.schema': 'API 响应结构与预期不符（{what}）— 前端归一层无法识别该信封，请对照 /api/v1 契约检查',
+  'err.timeout': '请求超时（{seconds}s）',
 } as const;
 
 export type DictKey = keyof typeof zh;
@@ -894,6 +903,7 @@ export const en: Record<DictKey, string> = {
   'events.type': 'Type',
   'events.detail': 'Detail',
   'events.truncated': '(truncated; {n} characters total)',
+  'events.pollingLive': '● live polling · 2s',
   'event.run_created': 'Run created',
   'event.stage_started': 'Stage started',
   'event.stage_done': 'Stage done',
@@ -934,6 +944,14 @@ export const en: Record<DictKey, string> = {
   'common.copied': 'Copied',
   'common.copyId': 'Copy ID',
   'common.notReady': 'Data not generated yet',
+  'common.sep': ', ',
+  'err.network': 'Cannot reach the API ({path}): {cause}',
+  'err.reportEnvelope': 'Report endpoint returned an unrecognized JSON envelope (expected markdown text or a report/content/markdown field)',
+  'err.badJson': 'API returned unparseable JSON ({path})',
+  'err.verifySchema': 'Verification report shape mismatch (missing verdict/checks)',
+  'err.createRunShape': 'Create-run response is missing runId (expected a 202 body with a runId field)',
+  'err.schema': 'API response shape mismatch ({what}) — the frontend normalizer does not recognize this envelope; check it against the /api/v1 contract',
+  'err.timeout': 'Request timed out ({seconds}s)',
 };
 
 export const dictionaries: Record<Lang, Record<DictKey, string>> = { zh, en };

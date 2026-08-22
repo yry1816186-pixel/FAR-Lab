@@ -3,6 +3,7 @@ import { ApiError, withTimeout } from '../api/client';
 import { createRun } from '../api/endpoints';
 import type { ScientificGoalType } from '../api/types';
 import { useI18n } from '../i18n/LanguageContext';
+import { errorText } from './common';
 
 const GOAL_TYPES: ScientificGoalType[] = ['explanatory', 'predictive', 'interventional', 'methodological', 'exploratory'];
 
@@ -42,7 +43,7 @@ export function NewRunForm({ onCreated }: Props): JSX.Element {
       onCreated(runId);
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') {
-        setError(new ApiError({ code: 'timeout', message: '请求超时（20s）— run 创建请求无响应', retryable: true }));
+        setError(new ApiError({ code: 'timeout', message: '请求超时（20s）— run 创建请求无响应', retryable: true, i18nKey: 'err.timeout', i18nVars: { seconds: 20 } }));
       } else {
         setError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
       }
@@ -100,7 +101,7 @@ export function NewRunForm({ onCreated }: Props): JSX.Element {
 
       {error !== null && (
         <p className="field-error" role="alert">
-          {t('form.submitFailed')}：{error.message}
+          {t('form.submitFailed')}：{errorText(error)}
           {error.retryable ? `（${t('common.retryable')}）` : ''}
         </p>
       )}

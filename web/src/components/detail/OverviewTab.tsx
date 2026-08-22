@@ -62,7 +62,7 @@ export function OverviewTab({ run, onMutated }: { run: ResearchRun; onMutated: (
             {failedStages.length > 0 && (
               <div>
                 {t('overview.failedStages')}:{' '}
-                {failedStages.map((s) => t(`stage.${s.stage}` as never)).join('、')}
+                {failedStages.map((s) => t(`stage.${s.stage}` as never)).join(t('common.sep'))}
               </div>
             )}
           </div>

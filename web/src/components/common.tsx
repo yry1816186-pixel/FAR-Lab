@@ -42,15 +42,24 @@ export function Skeleton({ lines = 3, ariaLabelKey }: { lines?: number; ariaLabe
  * classification (code, retryability) and the recovery action (retry button
  * only when retry is actually safe).
  */
+/** Translated message for an ApiError (i18nKey when present, raw message otherwise). */
+export function errorText(error: ApiError): string {
+  const { t } = useI18n();
+  return error.i18nKey !== undefined ? t(error.i18nKey, error.i18nVars ?? {}) : error.message;
+}
+
 export function ErrorBox({ error, onRetry }: { error: ApiError; onRetry: () => void }): JSX.Element {
   const { t } = useI18n();
+  // Layer-constructed errors carry an i18nKey so the message follows the UI language;
+  // the raw message is kept as a tooltip for audit-grade fidelity of the original text.
+  const message = error.i18nKey !== undefined ? t(error.i18nKey, error.i18nVars ?? {}) : error.message;
   return (
     <div className="errorbox" role="alert">
       <div className="errorbox-title">
         <strong>{t('common.errorTitle')}</strong>
         <span className="mono"> {t('common.errorCode', { code: error.code })}</span>
       </div>
-      <div className="errorbox-message">{error.message}</div>
+      <div className="errorbox-message" title={message === error.message ? undefined : error.message}>{message}</div>
       <div className="errorbox-meta">
         <Badge tone={error.retryable ? 'info' : 'err'}>{error.retryable ? t('common.retryable') : t('common.nonRetryable')}</Badge>
         {error.retryable && (

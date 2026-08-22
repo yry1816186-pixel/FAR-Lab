@@ -59,6 +59,8 @@ function schemaError(what: string): ApiError {
     message: `API 响应结构与预期不符（${what}）— 前端归一层无法识别该信封，请对照 /api/v1 契约检查`,
     status: 200,
     retryable: false,
+    i18nKey: 'err.schema',
+    i18nVars: { what },
   });
 }
 

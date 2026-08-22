@@ -1,0 +1,103 @@
+{
+  "generatedAt": "2026-08-22T04:38:10.762Z",
+  "method": "OKLCH->sRGB (CSS Color 4) -> WCAG relative luminance contrast; L search to satisfy thresholds; no manual eyeballing",
+  "light": {
+    "neutrals": {
+      "pageBg": "#f1f4f6",
+      "surface": "#fafcfe",
+      "surface2": "#ebedef",
+      "border": "#d2d4d7",
+      "formBorder": "#909295",
+      "text3": "#909295",
+      "text2": "#717375",
+      "text1": "#4b4d4f",
+      "btnInk": "#0f1215"
+    },
+    "states": {
+      "verified": {
+        "text": "#2c8447",
+        "tint": "#ddfbe2",
+        "textOnTint": "#277f43",
+        "onSurface": 4.54,
+        "onTint": 4.51
+      },
+      "refuted": {
+        "text": "#c44c44",
+        "tint": "#ffe7e2",
+        "textOnTint": "#b9423b",
+        "onSurface": 4.57,
+        "onTint": 4.55
+      },
+      "unknown": {
+        "text": "#8463b8",
+        "tint": "#f6ecff",
+        "textOnTint": "#7c5cb0",
+        "onSurface": 4.58,
+        "onTint": 4.57
+      },
+      "caution": {
+        "text": "#8a7300",
+        "tint": "#fbf2d0",
+        "textOnTint": "#826b00",
+        "onSurface": 4.5,
+        "onTint": 4.62
+      },
+      "info": {
+        "text": "#2d78bd",
+        "tint": "#dcf5ff",
+        "textOnTint": "#2470b5",
+        "onSurface": 4.5,
+        "onTint": 4.57
+      }
+    }
+  },
+  "dark": {
+    "neutrals": {
+      "pageBg": "#0d0f10",
+      "surface": "#151719",
+      "surface2": "#1f2123",
+      "border": "#2e3133",
+      "formBorder": "#636567",
+      "text2": "#7e8082",
+      "text1": "#acaeb0",
+      "btnInk": "#d4d8dd"
+    },
+    "states": {
+      "verified": {
+        "text": "#3f9557",
+        "tint": "#0f2e17",
+        "textOnTint": "#4b9f61",
+        "onSurface": 4.83,
+        "onTint": 4.52
+      },
+      "refuted": {
+        "text": "#d35a51",
+        "tint": "#3d1b17",
+        "textOnTint": "#e1675c",
+        "onSurface": 4.58,
+        "onTint": 4.6
+      },
+      "unknown": {
+        "text": "#906fc5",
+        "tint": "#2b203d",
+        "textOnTint": "#9d7dd4",
+        "onSurface": 4.51,
+        "onTint": 4.59
+      },
+      "caution": {
+        "text": "#967f1a",
+        "tint": "#2f2600",
+        "textOnTint": "#a48c2d",
+        "onSurface": 4.58,
+        "onTint": 4.55
+      },
+      "info": {
+        "text": "#3a84ca",
+        "tint": "#0f2840",
+        "textOnTint": "#4992d9",
+        "onSurface": 4.56,
+        "onTint": 4.58
+      }
+    }
+  }
+}
