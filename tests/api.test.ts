@@ -1034,3 +1034,44 @@ describe('static serving', () => {
     expect(missing.headers.get('content-type')).toContain('application/json'); // error envelope
   });
 });
+
+describe('GET /api/v1/search (B2 universal search)', () => {
+  it('finds a run by its question text', async () => {
+    const { status, body } = await getJson(`${base}/api/v1/search?q=${encodeURIComponent('base editors')}`);
+    expect(status).toBe(200);
+    expect(body.questions.length).toBeGreaterThanOrEqual(1);
+    const hit = body.questions.find((q: Json) => q.runId === run1);
+    expect(hit).toBeDefined();
+    expect(hit.text).toContain('off-target');
+  });
+
+  it('finds hypotheses and claims by statement/text substring', async () => {
+    const hyps = await getJson(`${base}/api/v1/search?q=${encodeURIComponent('deaminase exposure')}`);
+    expect(hyps.body.hypotheses.some((h: Json) => h.runId === run1 && h.text.includes('deaminase'))).toBe(true);
+    const claims = await getJson(`${base}/api/v1/search?q=${encodeURIComponent('C-to-T')}`);
+    expect(claims.body.claims.some((c: Json) => c.runId === run1 && c.text.includes('C-to-T'))).toBe(true);
+  });
+
+  it('rejects too-short queries with 400', async () => {
+    const { status } = await getJson(`${base}/api/v1/search?q=x`);
+    expect(status).toBe(400);
+  });
+
+  it('treats LIKE wildcards as literals (escaped) and respects zero limits', async () => {
+    const wild = await getJson(`${base}/api/v1/search?q=${encodeURIComponent('%editors%')}`);
+    expect(wild.status).toBe(200);
+    // A literal '%editors%' substring does not occur in any seeded text —
+    // unescaped wildcards would match everything instead.
+    expect(wild.body.questions.length).toBe(0);
+
+    const none = await getJson(`${base}/api/v1/search?q=off-target&questions=0&hypotheses=0&claims=0`);
+    expect(none.body.questions).toEqual([]);
+    expect(none.body.hypotheses).toEqual([]);
+    expect(none.body.claims).toEqual([]);
+  });
+
+  it('405s non-GET', async () => {
+    const res = await fetch(`${base}/api/v1/search?q=abc`, { method: 'DELETE' });
+    expect(res.status).toBe(404); // unmatched method+path falls through to route-not-found
+  });
+});

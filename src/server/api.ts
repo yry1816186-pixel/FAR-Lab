@@ -305,6 +305,24 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     if (!RUN_ID_RE.test(runId)) throw validation(`invalid runId format: ${runId}`);
   };
 
+  /** B2 universal search: cross-run lookup by researcher-meaningful text (question/hypothesis/claim). */
+  const search = (res: http.ServerResponse, url: URL): void => {
+    const q = (url.searchParams.get('q') ?? '').trim();
+    if (q.length < 2 || q.length > 200) {
+      throw validation(`query length must be 2-200 chars (got ${q.length})`);
+    }
+    const clamp = (raw: string | null, dflt: number, max: number): number => {
+      const n = Number.parseInt(raw ?? '', 10);
+      return Number.isFinite(n) ? Math.min(Math.max(n, 0), max) : dflt;
+    };
+    const result = app.store.searchText(q, {
+      questions: clamp(url.searchParams.get('questions'), 8, 25),
+      hypotheses: clamp(url.searchParams.get('hypotheses'), 8, 25),
+      claims: clamp(url.searchParams.get('claims'), 8, 25),
+    });
+    sendJson(res, 200, { query: q, ...result });
+  };
+
   /** Whether a revision landed after the newest bundle (the export stage's own re-export rule). */
   const revisionNewerThanBundle = (runId: string, latestBundle: { createdAt: string } | undefined): boolean => {
     if (!latestBundle) return false;
@@ -707,6 +725,10 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
 
     if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
       return health(res);
+    }
+
+    if (segments[2] === 'search' && segments.length === 3 && method === 'GET') {
+      return search(res, url);
     }
 
     if (segments[2] === 'verify' && segments.length === 4 && method === 'GET') {

@@ -236,6 +236,16 @@ export const zh = {
   'palette.groupRuns': '切换研究',
   'palette.toggleTheme': '切换主题（浅色/深色/跟随系统）',
   'palette.toggleLang': '切换语言（中文/English）',
+  'palette.searchRuns': '研究（按问题搜索）',
+  'palette.searchHypotheses': '假设（按陈述搜索）',
+  'palette.searchClaims': '主张（按文本搜索）',
+  'palette.searchEmpty': '未找到匹配的研究/假设/主张。',
+  'palette.searchError': '搜索请求失败，请重试。',
+
+  'evidence.col.links': '链接',
+  'evidence.techTitle': '技术校验明细（哈希 / 解析 / 访问状态 / 标识符）',
+  'overview.techTitle': '运行元信息（ID / 时间戳 / 标签）',
+  'form.kbdHint': '快捷键：N 新建研究 · / 搜索列表 · Ctrl K 命令面板',
 
   'compare.verdictThresholds': '判定阈值（支持/弱化/证伪）',
   'compare.verdictSupport': '支持:',
@@ -892,6 +902,16 @@ export const en: Record<DictKey, string> = {
   'palette.groupRuns': 'Switch research',
   'palette.toggleTheme': 'Toggle theme (light/dark/system)',
   'palette.toggleLang': 'Toggle language (中文/English)',
+  'palette.searchRuns': 'Research (by question)',
+  'palette.searchHypotheses': 'Hypotheses (by statement)',
+  'palette.searchClaims': 'Claims (by text)',
+  'palette.searchEmpty': 'No matching research/hypotheses/claims.',
+  'palette.searchError': 'Search request failed — please retry.',
+
+  'evidence.col.links': 'Links',
+  'evidence.techTitle': 'Technical verification details (hash / parse / access / identifiers)',
+  'overview.techTitle': 'Run metadata (ID / timestamps / tags)',
+  'form.kbdHint': 'Shortcuts: N new research · / filter list · Ctrl K command palette',
 
   'compare.verdictThresholds': 'Verdict thresholds (support/weaken/falsify)',
   'compare.verdictSupport': 'support:',

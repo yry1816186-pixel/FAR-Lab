@@ -65,12 +65,12 @@
     "P5 batch B (0746bd0) left a committed regression: CLI feedback output moved console.log->stdout.write without updating the test spy; fixed in PEX batch (spy captures both channels)."
   ],
   "activeTasks": [
-    "PEX Phase-2 B1: full-journey baseline trial (walk complete researcher journey on live build; record friction inventory + Steps/Time/Confusion/ContextSwitches; re-rank CPP v2).",
-    "PEX Phase-2 B2: workbench skeleton (IA task-model reorder + GET /api/v1/search + quick capture n/#new + visual hierarchy per craft-spec-v2).",
-    "Parallel-session leftovers absorbed into program: orchestrator subtask events -> B3; desktop quick capture (tray/global shortcut) -> B10; claim-hypothesis binding enrichment -> B6; compare markdown export -> B3-8/B5; EEL experiment-surface UX alignment -> B3-8.",
+    "PEX Phase-2 B3 next: receipt payload enrichment + StageRecord.subtasks + note milestones + ActivityFeed upgrade + SSE channel + version-compare view (live v0->v1 data) + ExperimentsTab i18n hardening + web notifications + multi-run awareness bar.",
+    "PEX Phase-2 done so far: B0 reconciliation (d3fa71c), B1 full-journey baseline + 4 hotfixes (3fa745d), B2 skeleton: universal search API + palette + quick-capture n + IA reorder + progressive disclosure (this commit).",
+    "Parallel-session leftovers absorbed into program: desktop quick capture -> B10; EEL experiments-tab UX alignment -> B3-8; oaUrl pipeline population -> B3/B9; search ranking/snippets/totals -> B14.",
     "EEL lane dormant (their queue): remote gateway when user starts Docker; execute-stage integration scheduled B8."
   ],
   "blockerIds": [],
-  "lastVerifiedCommit": "PEX S5 2026-08-22 (669fd2e): command palette Ctrl+K verified live (19 commands, run switch + tab nav with URL sync); gates 656/658 + tsc/build 0 + secret-scan PASS.",
-  "nextAction": "B0 reconciliation complete (program landed in PLAN-product-experience.md, stray evidence filed, state synced). Next: B1 full-journey baseline trial on live build -> friction inventory + CPP v2 -> feeds B2 skeleton."
+  "lastVerifiedCommit": "PEX B2 2026-08-22: universal search verified live (TMAO/nucleosome; claim nav -> evidence flash; Esc focus-restore to opener); ACH three-source matrix (46749c9) + compare export landed by sibling session; gates 661/663 + tsc/build 0 + secret-scan PASS.",
+  "nextAction": "B3 wait-time root fix (receipt enrichment, subtasks, note milestones, SSE) + version compare. Two sessions co-editing: commit via explicit pathspec only; ach-matrix-v2.yml scratch at root belongs to the sibling session."
 }

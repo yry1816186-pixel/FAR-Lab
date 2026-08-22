@@ -131,6 +131,54 @@ export class Store {
   }
 
   /**
+   * Cross-run substring search over researcher-meaningful object text
+   * (B2 universal search): question text, hypothesis statements, claim text.
+   * Case-insensitive for ASCII (SQLite LIKE default), substring for CJK.
+   * Caller validates/clamps the query; results are schema-validated on read.
+   */
+  searchText(
+    q: string,
+    limits: { questions: number; hypotheses: number; claims: number },
+  ): { questions: { runId: string; id: string; text: string }[]; hypotheses: { runId: string; id: string; text: string }[]; claims: { runId: string; id: string; text: string }[] } {
+    const esc = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const like = `%${esc}%`;
+    const fetch = (kind: 'question' | 'hypothesis' | 'claim', limit: number): { runId: string; id: string; text: string }[] =>
+      limit <= 0
+        ? []
+        : this.db
+            .prepare(
+              "SELECT run_id, id, json FROM objects WHERE kind=? AND json LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",
+            )
+            .all(kind, like, limit)
+            .map((r) => {
+              const parsed = KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as unknown as {
+                id: string; runId?: string; text?: string; statement?: string;
+              };
+              return { runId: String(r.run_id), id: String(r.id), text: String(parsed.text ?? parsed.statement ?? '') };
+            });
+    // ResearchQuestion carries no runId in its payload, so its objects row is
+    // stored under '__none__'; the question->run association lives in the run
+    // doc (questionId). Resolve it so search results are navigable to a run.
+    const questionOwner = new Map<string, string>();
+    if (limits.questions > 0) {
+      for (const row of this.db.prepare('SELECT id, doc FROM runs').all() as { id: string; doc: string }[]) {
+        const run = JSON.parse(row.doc) as { questionId?: string };
+        if (typeof run.questionId === 'string') questionOwner.set(run.questionId, row.id);
+      }
+    }
+    const questions = fetch('question', limits.questions)
+      .flatMap((hit) => {
+        const owner = questionOwner.get(hit.id);
+        return owner === undefined ? [] : [{ ...hit, runId: owner }];
+      });
+    return {
+      questions,
+      hypotheses: fetch('hypothesis', limits.hypotheses),
+      claims: fetch('claim', limits.claims),
+    };
+  }
+
+  /**
    * D-085 P0-2: experiment state transitions write the object projection AND the audit
    * event in ONE transaction — a crash between the two must not be expressible.
    * Restricted to objects carrying a runId (all experiment kinds do).

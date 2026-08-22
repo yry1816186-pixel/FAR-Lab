@@ -41,25 +41,9 @@ export function EvidenceTab({
 
   return (
     <div className="tab-content">
-      <Section title={t('retrieval.title')}>
-        {corpusRes.loading ? (
-          <Skeleton lines={3} />
-        ) : corpusRes.error !== null && isNotFound(corpusRes.error) ? (
-          <EmptyState titleKey="retrieval.noCorpus" hint={t('retrieval.noCorpusHint')} />
-        ) : corpusRes.error !== null ? (
-          <ErrorBox error={corpusRes.error} onRetry={corpusRes.retry} />
-        ) : corpusRes.data !== null ? (
-          <RetrievalPanel
-            queries={corpusRes.data.queries}
-            familyFailures={corpusRes.data.familyFailures ?? []}
-            fusion={corpusRes.data.fusion}
-            receipts={receiptsRes.data ?? []}
-          />
-        ) : (
-          <EmptyState titleKey="retrieval.noCorpus" hint={t('retrieval.noCorpusHint')} />
-        )}
-      </Section>
-
+      {/* B1 reorder: the researcher's substance leads (sources → claims →
+          relations); retrieval transparency stays fully available but is a
+          collapsed trust disclosure, not the first screen of the tab. */}
       <Section title={t('evidence.sources', { n: sourcesRes.data?.length ?? 0 })}>
         {sourcesRes.loading ? (
           <Skeleton lines={4} />
@@ -94,6 +78,26 @@ export function EvidenceTab({
           <RelationsSummary relations={relations} claims={claims ?? []} sources={sourcesRes.data ?? []} />
         ) : null}
       </Section>
+
+      <details className="tech-details">
+        <summary>{t('retrieval.title')}</summary>
+        {corpusRes.loading ? (
+          <Skeleton lines={3} />
+        ) : corpusRes.error !== null && isNotFound(corpusRes.error) ? (
+          <EmptyState titleKey="retrieval.noCorpus" hint={t('retrieval.noCorpusHint')} />
+        ) : corpusRes.error !== null ? (
+          <ErrorBox error={corpusRes.error} onRetry={corpusRes.retry} />
+        ) : corpusRes.data !== null ? (
+          <RetrievalPanel
+            queries={corpusRes.data.queries}
+            familyFailures={corpusRes.data.familyFailures ?? []}
+            fusion={corpusRes.data.fusion}
+            receipts={receiptsRes.data ?? []}
+          />
+        ) : (
+          <EmptyState titleKey="retrieval.noCorpus" hint={t('retrieval.noCorpusHint')} />
+        )}
+      </details>
     </div>
   );
 }
@@ -101,48 +105,109 @@ export function EvidenceTab({
 function SourcesTable({ sources }: { sources: SourceDocument[] }): JSX.Element {
   const { t } = useI18n();
   if (sources.length === 0) return <EmptyState titleKey="evidence.noSources" />;
+  // Honest links (B2-critique): a DOI link is only rendered for values that
+  // actually look like DOIs; anything else stays a plain "—" instead of a
+  // confident-looking link that 404s. OA links must be https.
+  const DOI_RE = /^\d{2,}\.\d{4,}\/\S+$/;
+  const doiOf = (s: SourceDocument): string | undefined => {
+    const raw = s.identifiers.find((i) => i.kind.toLowerCase() === 'doi')?.value.trim();
+    return raw !== undefined && DOI_RE.test(raw) && !raw.startsWith('http') ? raw : undefined;
+  };
+  const oaUrlOf = (s: SourceDocument): string | undefined => {
+    const raw = s.oaUrl;
+    if (raw === undefined) return undefined;
+    try {
+      return new URL(raw).protocol === 'https:' ? raw : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const authorLine = (s: SourceDocument): string | undefined => {
+    if (s.authors === undefined || s.authors.length === 0) return undefined;
+    const names = s.authors.slice(0, 3).join(', ');
+    return s.authors.length > 3 ? `${names} et al.` : names;
+  };
   return (
-    <div className="table-scroll">
-      <table className="data-table">
-        <caption className="sr-only">{t('evidence.sources', { n: sources.length })}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{t('evidence.col.title')}</th>
-            <th scope="col">{t('evidence.col.year')}</th>
-            <th scope="col">{t('evidence.col.depth')}</th>
-            <th scope="col">{t('evidence.col.access')}</th>
-            <th scope="col">{t('evidence.col.verify')}</th>
-            <th scope="col">{t('evidence.col.hash')}</th>
-            <th scope="col">parse</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sources.map((s) => {
-            const v = s.verification;
-            const verifyBadge = v === undefined
-              ? <Badge tone="muted">{t('evidence.unverified')}</Badge>
-              : v.resolved
-                ? <Badge tone="ok" title={v.detail}>{t('evidence.verified')} · {v.method}</Badge>
-                : <Badge tone="err" title={v.detail}>{t('evidence.verifyFail')} · {v.method}</Badge>;
-            return (
-              <tr key={s.id} id={`src-${s.id}`} className="source-row">
-                <th scope="row">
-                  <span className="source-title" title={s.id}>{s.title}</span>
-                </th>
-                <td className="mono">{s.publicationYear ?? '—'}</td>
-                <td>{t(contentDepthKey(s.contentDepth))}</td>
-                <td>{t(accessStateKey(s.accessState))}</td>
-                <td>
-                  {verifyBadge}
-                  {v?.titleMatch === false && <span className="muted small"> titleMatch=false</span>}
-                </td>
-                <td className="mono hash-cell" title={s.contentHash}>{s.contentHash.slice(0, 12)}</td>
-                <td>{s.parseStatus === 'ok' ? <span className="muted">ok</span> : <span className="text-warn mono">{s.parseStatus}</span>}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div>
+      <div className="table-scroll">
+        <table className="data-table">
+          <caption className="sr-only">{t('evidence.sources', { n: sources.length })}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{t('evidence.col.title')}</th>
+              <th scope="col">{t('evidence.col.year')}</th>
+              <th scope="col">{t('evidence.col.depth')}</th>
+              <th scope="col">{t('evidence.col.verify')}</th>
+              <th scope="col">{t('evidence.col.links')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sources.map((s) => {
+              const v = s.verification;
+              const verifyBadge = v === undefined
+                ? <Badge tone="muted">{t('evidence.unverified')}</Badge>
+                : v.resolved
+                  ? <Badge tone="ok" title={v.detail}>{t('evidence.verified')} · {v.method}</Badge>
+                  : <Badge tone="err" title={v.detail}>{t('evidence.verifyFail')} · {v.method}</Badge>;
+              const doi = doiOf(s);
+              const oa = oaUrlOf(s);
+              const authors = authorLine(s);
+              return (
+                <tr key={s.id} id={`src-${s.id}`} className="source-row">
+                  <th scope="row">
+                    <span className="source-title" title={s.id}>{s.title}</span>
+                    {(authors !== undefined || s.venue !== undefined) && (
+                      <span className="source-subtitle muted small">
+                        {authors}
+                        {authors !== undefined && s.venue !== undefined && ' · '}
+                        {s.venue}
+                      </span>
+                    )}
+                  </th>
+                  <td className="mono">{s.publicationYear ?? '—'}</td>
+                  <td>{t(contentDepthKey(s.contentDepth))}</td>
+                  <td>
+                    {verifyBadge}
+                    {v?.titleMatch === false && <span className="muted small"> titleMatch=false</span>}
+                    {/* Epistemic caveat stays inline (B2-critique): claims from
+                        partially parsed sources read like abstract-only reads. */}
+                    {s.parseStatus !== 'ok' && <span className="muted small"> · parse:{s.parseStatus}</span>}
+                  </td>
+                  <td className="source-links">
+                    {doi !== undefined ? (
+                      <a href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer" className="source-link mono">
+                        DOI
+                      </a>
+                    ) : (
+                      <span className="muted small">—</span>
+                    )}
+                    {oa !== undefined && (
+                      <a href={oa} target="_blank" rel="noreferrer" className="source-link">
+                        OA
+                      </a>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {/* Engineering verification data (B1 F-09): content hashes, parse states,
+          access states and identifiers stay fully inspectable — as a collapsed
+          disclosure, not primary table columns. */}
+      <details className="tech-details">
+        <summary>{t('evidence.techTitle')}</summary>
+        <ul className="tech-list mono small">
+          {sources.map((s) => (
+            <li key={s.id} id={`src-tech-${s.id}`}>
+              {s.id} · hash {s.contentHash.slice(0, 12)} · parse {s.parseStatus} · {t(accessStateKey(s.accessState))}
+              {s.license !== undefined && <> · {s.license}</>}
+              {s.identifiers.length > 0 && <> · {s.identifiers.map((i) => `${i.kind}:${i.value}`).join(' | ')}</>}
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }
@@ -172,7 +237,10 @@ function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChal
       {visible.length === 0 && <p className="muted small">{t('evidence.claimFilterEmpty')}</p>}
     <ul className="claims-list">
       {visible.map((claim) => (
-        <li key={claim.id} id={`claim-${claim.id}`} className="claim-item">
+        <li key={claim.id} id={`claim-${claim.id}`} className="claim-item" title={claim.id}>
+          {/* B1 F-09: the claim's statement is the label; provenance metadata
+              follows it — the machine id trails the meta line, never leads. */}
+          <p className="claim-text">{claim.text}</p>
           <div className="claim-head">
             {/* Evidence-line signature (§8.3): the epistemic glyph is the claim's cognitive
                 state — the only saturated color in the chrome. Same mapping as the badge. */}
@@ -182,7 +250,6 @@ function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChal
             >
               {claim.bindingStatus === 'verified' ? '✓' : claim.bindingStatus === 'resolved_unaligned' ? '▲' : claim.bindingStatus === 'unresolved' ? '✗' : '–'}
             </span>
-            <IdText value={claim.id} />
             <Badge tone={bindingTone(claim.bindingStatus)} title={t(bindingZhKey(claim.bindingStatus))}>
               {t(bindingKey(claim.bindingStatus))}
             </Badge>
@@ -202,6 +269,7 @@ function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChal
             {claim.extractionModelRef !== undefined && (
               <span className="muted small mono"> · {claim.extractionModelRef}</span>
             )}
+            <IdText value={claim.id} />
             <span className="claim-actions">
               <button
                 type="button"
@@ -213,15 +281,13 @@ function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChal
               </button>
             </span>
           </div>
-          <p className="claim-text">{claim.text}</p>
           {claim.locators.slice(0, 3).map((loc, i) => (
             <blockquote key={i} className="claim-quote">
               <p>{loc.quote}</p>
               <cite>
-                <a href={`#src-${loc.sourceDocumentId}`} className="source-link">
+                <a href={`#src-${loc.sourceDocumentId}`} className="source-link" title={loc.sourceDocumentId}>
                   {t('evidence.jumpToSource', { n: i + 1 })}
-                </a>{' '}
-                <IdText value={loc.sourceDocumentId} className="muted" />
+                </a>
                 {loc.section !== undefined && <span className="muted"> · {loc.section}</span>}
               </cite>
             </blockquote>

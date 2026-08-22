@@ -73,6 +73,8 @@ export function RunDetail({
   onMutated,
   tab,
   onTabChange,
+  focusClaimId,
+  onClaimFocused,
 }: {
   run: ResearchRun;
   events: EventsState;
@@ -80,6 +82,9 @@ export function RunDetail({
   /** Controlled tab (hash-route shareable, S3): undefined = use internal state. */
   tab?: TabId;
   onTabChange?: (tab: TabId) => void;
+  /** Pending claim to reveal (B2 palette search): switches to evidence and flash-highlights. */
+  focusClaimId?: string | null;
+  onClaimFocused?: () => void;
 }): JSX.Element {
   const { t } = useI18n();
   const [tabId, setTabIdState] = useState<TabId>(tab ?? 'overview');
@@ -107,6 +112,47 @@ export function RunDetail({
   useEffect(() => {
     if (tab !== undefined) setTabIdState(tab);
   }, [tab]);
+
+  // Palette claim navigation (B2): same affordance as the ACH block — switch
+  // to evidence, scroll the claim into view, flash it, then clear the pending
+  // request. The evidence tab loads claims asynchronously, so presence is
+  // retried a bounded number of times; the pending id is ALWAYS consumed
+  // (cleanup included) so a stale request can never replay onto another run.
+  useEffect(() => {
+    if (focusClaimId === null || focusClaimId === undefined) return;
+    setTabId('evidence');
+    const claimId = focusClaimId;
+    let consumed = false;
+    const consume = (): void => {
+      if (consumed) return;
+      consumed = true;
+      onClaimFocused?.();
+    };
+    let attempt = 0;
+    let flashTimer = 0;
+    const timer = window.setInterval(() => {
+      attempt += 1;
+      const el = document.getElementById(`claim-${claimId}`);
+      if (el !== null) {
+        window.clearInterval(timer);
+        el.scrollIntoView({ block: 'center' });
+        el.classList.add('claim-flash');
+        flashTimer = window.setTimeout(() => el.classList.remove('claim-flash'), 1600);
+        consume();
+      } else if (attempt >= 12) {
+        // ~3s total: honest give-up — the claim may have been superseded by a
+        // revision since the search index saw it; the tab switch still landed.
+        window.clearInterval(timer);
+        consume();
+      }
+    }, 250);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(flashTimer);
+      consume();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run on pending claim only
+  }, [focusClaimId]);
 
   const focusTab = (index: number): void => {
     const clamped = Math.max(0, Math.min(TABS.length - 1, index));
