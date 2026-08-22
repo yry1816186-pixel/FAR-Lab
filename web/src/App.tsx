@@ -7,7 +7,8 @@ import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
 import { useConnection } from './state/connection';
 import { useTheme } from './state/theme';
-import { NewRunForm } from './components/NewRunForm';
+import { LogoFull } from './components/Logo';
+import { WelcomeView } from './components/WelcomeView';
 import { RunsList } from './components/RunsSidebar';
 import { RunDetail } from './components/RunDetail';
 import type { EventsState } from './components/RunDetail';
@@ -181,7 +182,7 @@ export function App(): JSX.Element {
     <div className="app">
       <header className="app-header">
         <div className="app-brand">
-          <h1>{t('app.title')}</h1>
+          <LogoFull size={26} />
           <p className="muted">{t('app.subtitle')}</p>
         </div>
         <div className="app-header-right">
@@ -228,9 +229,20 @@ export function App(): JSX.Element {
         <aside className="sidebar" aria-label={t('runs.title')}>
           <div className="sidebar-head">
             <h2 className="sidebar-title">{t('runs.title')}</h2>
-            <button type="button" className="btn btn--small" onClick={() => void refreshRunsWithAbort()}>
-              <RefreshCw size={12} aria-hidden="true" /> {t('runs.refresh')}
-            </button>
+            <div className="sidebar-head-actions">
+              <button
+                type="button"
+                className="btn btn--small btn--primary"
+                onClick={() => setSelectedRunId(null)}
+                aria-label={t('welcome.newResearch')}
+                title={t('welcome.newResearch')}
+              >
+                ＋ {t('welcome.newResearch')}
+              </button>
+              <button type="button" className="btn btn--small" onClick={() => void refreshRunsWithAbort()}>
+                <RefreshCw size={12} aria-hidden="true" /> {t('runs.refresh')}
+              </button>
+            </div>
           </div>
           {runsError !== null && <ErrorBox error={runsError} onRetry={() => void refreshRunsWithAbort()} />}
           <RunsList
@@ -239,16 +251,17 @@ export function App(): JSX.Element {
             selectedId={selectedRunId}
             onSelect={setSelectedRunId}
           />
-          <NewRunForm onCreated={onCreated} />
         </aside>
 
         <main className="content" aria-label={t('app.title')}>
-          {selectedRunId === null || runDetail === null ? (
-            detailLoading && selectedRunId !== null ? (
+          {selectedRunId === null ? (
+            <WelcomeView onCreated={onCreated} />
+          ) : runDetail === null ? (
+            detailLoading ? (
               <div className="select-hint" role="status">
                 {t('common.loading')}
               </div>
-            ) : detailError !== null && selectedRunId !== null ? (
+            ) : detailError !== null ? (
               <ErrorBox error={detailError} onRetry={() => void refreshDetail()} />
             ) : (
               <div className="select-hint">
