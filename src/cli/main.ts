@@ -43,6 +43,11 @@ Usage:
   far experiment status [--job <id>] | cancel <job-id> | logs <experiment-run-id>
                                                   Job/experiment truth: queue state, cooperative
                                                   cancel, content-addressed training logs
+  far agent refine <run-id> [--turns N] [--top-k N] [--max-concurrent N] [--json]
+                                                  Iterative evidence-gap refinement on a
+                                                  completed run: parallel pro/contra literature
+                                                  sub-agents + tool-using refinement loop;
+                                                  sessions/reports/events fully audited
   far probe [provider] [--live] [--json]         Model-route health: config check by default
                                                   (key presence, never values); --live makes one
                                                   minimal real chat call per route (costs ~1 token)
@@ -68,7 +73,7 @@ const positional = (after: number): string | undefined => {
   const rest = process.argv.slice(after).filter((a) => !a.startsWith('--') && !COMMAND_WORDS.has(a));
   return rest[0];
 };
-const COMMAND_WORDS = new Set(['research', 'start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'runs', 'probe', 'data', 'info', '--live', '--evidence', '--hypotheses', '--plan', '--sources', '--source', '--content', '--target-kind', '--target-id']);
+const COMMAND_WORDS = new Set(['research', 'start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'runs', 'probe', 'data', 'info', 'agent', 'refine', '--live', '--evidence', '--hypotheses', '--plan', '--sources', '--source', '--content', '--target-kind', '--target-id']);
 
 /**
  * Machine-mode output helper (WP2 F-005): --json consumers parse stdout as ONE JSON
@@ -132,6 +137,23 @@ const main = async (): Promise<void> => {
     const { experimentCommand } = await import('./experiment.js');
     const args = process.argv.slice(4).filter((x) => !x.startsWith('--') && x !== sub);
     const result = await experimentCommand(sub, {
+      dataDir: arg('--data-dir') ?? '.far-run',
+      positional: args[0],
+      flag,
+      arg,
+    });
+    if (json() && result.json !== undefined) jsonOutput(result.json);
+    else if (result.text !== undefined) out(result.text);
+    if (result.code !== 0) process.exitCode = result.code;
+    return;
+  }
+
+  if (cmd === 'agent') {
+    // Agent-harness surface (H1): refinement capability. Own module so this router
+    // stays a one-line hook.
+    const { agentCommand } = await import('./agent.js');
+    const args = process.argv.slice(4).filter((x) => !x.startsWith('--') && x !== sub);
+    const result = await agentCommand(sub, {
       dataDir: arg('--data-dir') ?? '.far-run',
       positional: args[0],
       flag,

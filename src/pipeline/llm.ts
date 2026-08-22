@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { StageContext } from './types.js';
 import type { RunStageName } from '../domain/run.js';
+import type { ProvenanceReceipt } from '../domain/provenance.js';
+import type { StructuredCallResult } from '../shared/ports.js';
 import { strictSchemaOrUndefined } from '../providers/http.js';
 
 export interface LlmCallOptions {
@@ -42,32 +44,39 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       jsonSchema: strictSchemaOrUndefined(opts.schema),
       purpose: opts.purpose,
     },
-    (raw) => {
-      const attempt = (input: unknown) => opts.schema.safeParse(input);
-      // Tolerance chain, in order; every candidate must still satisfy the FULL schema:
-      //   1. as-is
-      //   2. null-valued properties stripped (models emit null for optional fields)
-      //   3. single-key envelope unwrapped (models wrap the payload in the task name,
-      //      e.g. {"falsification-spec": {...}} — live DeepSeek failure 2026-08-22 P2)
-      //   4. enum-variant normalization on top of each base
-      const unwrapped = unwrapSingleKeyEnvelope(raw);
-      const candidates: unknown[] = [];
-      for (const base of unwrapped === raw ? [raw] : [raw, unwrapped]) {
-        candidates.push(base, stripNulls(base), normalizeEnumFields(stripNulls(base), opts.schema));
-      }
-      let firstError: z.ZodError | null = null;
-      for (const candidate of candidates) {
-        const parsed = attempt(candidate);
-        if (parsed.success) return parsed.data as T;
-        firstError ??= parsed.error;
-      }
-      return new Error(`schema validation failed: ${firstError!.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 5).join('; ')}`);
-    },
+    (raw) => validateStructured<T>(raw, opts.schema),
   );
-  ctx.recordReceipt({
+  recordModelReceipt(
+    (p) => ctx.recordReceipt({
+      kind: p.kind, executionMode: p.executionMode, redactionNote: p.redactionNote,
+      modelCall: p.modelCall, stage: opts.stage,
+    }),
+    { stage: opts.stage },
+    res,
+  );
+  if (!res.ok || res.data === undefined) {
+    const err = res.error ?? { kind: 'provider_error', message: 'unknown provider failure' };
+    throw new Error(`model call failed (${err.kind}) in ${opts.stage}/${opts.purpose}: ${err.message}`);
+  }
+  return { data: res.data, provider: res.receipt.provider, modelId: res.receipt.modelId, latencyMs: res.receipt.latencyMs };
+}
+
+/** Receipt partial accepted by recordModelReceipt — stage is free-form (agent sessions use 'agent:<capability>'). */
+export type ModelReceiptPartial = Omit<ProvenanceReceipt, 'id' | 'runId' | 'at'> & { at?: string };
+
+/**
+ * Shape the model-call receipt for ANY caller (stages via callStructured AND the agent
+ * kernel). Single source for the receipt body so the two paths cannot drift.
+ */
+export const recordModelReceipt = (
+  record: (partial: ModelReceiptPartial) => void,
+  meta: { stage?: string },
+  res: StructuredCallResult<unknown>,
+): void => {
+  record({
     kind: 'model_call',
     executionMode: res.receipt.executionMode,
-    stage: opts.stage,
+    stage: meta.stage,
     redactionNote: 'raw prompts/responses not retained; hashes only',
     modelCall: {
       provider: res.receipt.provider,
@@ -82,12 +91,32 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       ...(res.receipt.correctiveReasks !== undefined ? { correctiveReasks: res.receipt.correctiveReasks } : {}),
     },
   });
-  if (!res.ok || res.data === undefined) {
-    const err = res.error ?? { kind: 'provider_error', message: 'unknown provider failure' };
-    throw new Error(`model call failed (${err.kind}) in ${opts.stage}/${opts.purpose}: ${err.message}`);
+};
+
+/**
+ * Tolerance-chain structured validation (the parse callback of callStructured, exported
+ * for the agent kernel so both callers share one validation authority).
+ * Candidates in order; every candidate must still satisfy the FULL schema:
+ *   1. as-is
+ *   2. null-valued properties stripped (models emit null for optional fields)
+ *   3. single-key envelope unwrapped (models wrap the payload in the task name,
+ *      e.g. {"falsification-spec": {...}} — live DeepSeek failure 2026-08-22 P2)
+ *   4. enum-variant normalization on top of each base
+ */
+export const validateStructured = <T>(raw: unknown, schema: z.ZodType<unknown>): T | Error => {
+  const unwrapped = unwrapSingleKeyEnvelope(raw);
+  const candidates: unknown[] = [];
+  for (const base of unwrapped === raw ? [raw] : [raw, unwrapped]) {
+    candidates.push(base, stripNulls(base), normalizeEnumFields(stripNulls(base), schema));
   }
-  return { data: res.data, provider: res.receipt.provider, modelId: res.receipt.modelId, latencyMs: res.receipt.latencyMs };
-}
+  let firstError: z.ZodError | null = null;
+  for (const candidate of candidates) {
+    const parsed = schema.safeParse(candidate);
+    if (parsed.success) return parsed.data as T;
+    firstError ??= parsed.error;
+  }
+  return new Error(`schema validation failed: ${firstError!.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 5).join('; ')}`);
+};
 
 /**
  * Providers occasionally wrap the whole payload in one envelope key named after
@@ -128,7 +157,7 @@ const stripNulls = (v: unknown): unknown => {
  * Field-name drift (e.g. "hypothesis" vs "statement") is the dominant structured-output
  * failure mode; showing the exact contract reduces it at the root for all stages.
  */
-const describeShape = (schema: z.ZodTypeAny): string => {
+export const describeShape = (schema: z.ZodTypeAny): string => {
   const walk = (t: z.ZodTypeAny): string => {
     const d = t._def as { typeName?: string; type?: z.ZodTypeAny; values?: unknown; shape?: Record<string, z.ZodTypeAny>; valueType?: z.ZodTypeAny; innerType?: z.ZodTypeAny; options?: Readonly<z.ZodTypeAny[]> };
     switch (d.typeName) {
