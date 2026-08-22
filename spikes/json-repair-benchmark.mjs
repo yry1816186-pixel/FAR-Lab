@@ -4,13 +4,18 @@
  * legacy quote scan, the verbatim implementation from src/providers/http.ts at 3186e1c)
  * vs AFTER (current chain: ... -> legacy scan -> jsonrepair engine). Deterministic:
  * fixed corpus + seeded fuzz, no LLM. Writes evidence/W7/repair-benchmark.{json,md}.
+ *
+ * The AFTER chain imports the targeted compile of the repair subtree (NOT the whole
+ * project build, which may be broken by parallel sessions' in-flight files). Regenerate
+ * it with exactly:
+ *   npx tsc src/providers/http.ts --outDir .cache/bench --module nodenext \
+ *     --moduleResolution nodenext --target es2022 --strict --skipLibCheck
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require_ = createRequire(import.meta.url);
 const { extractJsonText: newChain } = require_('../.cache/bench/providers/http.js');
-const { extractJsonText: newChainNoRepair } = { extractJsonText: (t) => newChain(t, { allowRepair: false }) };
 
 // ---- BEFORE chain: verbatim pre-W7 implementation (http.ts@3186e1c) ----
 const repairUnescapedQuotesOld = (raw) => {

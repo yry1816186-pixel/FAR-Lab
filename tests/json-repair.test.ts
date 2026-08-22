@@ -1,7 +1,7 @@
 /**
  * W7-F1 repair-engine tests (D-044). Two evidence sources:
  *  1. ORACLE EQUIVALENCE: the upstream jsonrepair 3.15.0 package was executed locally
- *     (verification only, not a dependency) over the 80-entry corpus in
+ *     (verification only, not a dependency) over the 83-entry corpus in
  *     spikes/json-repair-corpus.mjs; its recorded outputs
  *     (spikes/output/json-repair-oracle.json) are ground truth this TS port must
  *     reproduce byte-for-byte — including the two entries upstream throws on.
@@ -24,7 +24,7 @@ interface OracleEntry {
 const loadOracle = (): OracleEntry[] =>
   JSON.parse(readFileSync(new URL('../spikes/output/json-repair-oracle.json', import.meta.url), 'utf8')) as OracleEntry[];
 
-describe('repairJson oracle equivalence (upstream jsonrepair 3.15.0, 80-entry corpus)', () => {
+describe('repairJson oracle equivalence (upstream jsonrepair 3.15.0, 83-entry corpus)', () => {
   const oracle = loadOracle();
   it('fixture loaded with the full corpus', () => {
     expect(oracle.length).toBe(83);
@@ -35,6 +35,9 @@ describe('repairJson oracle equivalence (upstream jsonrepair 3.15.0, 80-entry co
         expect(repairJson(entry.input)).toBe(entry.output);
         JSON.parse(repairJson(entry.input)); // engine output is itself valid JSON
       } else {
+        // full-message equality: the constructor carries the upstream
+        // ` at position N` suffix, so this pins message AND position
+        expect(() => repairJson(entry.input)).toThrowError(entry.error);
         expect(() => repairJson(entry.input)).toThrow(JsonRepairError);
       }
     });
@@ -78,6 +81,8 @@ describe('live corrupted strict-FC tool arguments (spikes/output/strict-fc-corru
     const excerpt = '{"candidates": [{"statement": "Fibroblast co-culture models", "mechanism": "methylation model in ex-secreasing + epithelial damage could"expected morphology in culture absent" large H3 lysine repositions"}]}';
     const parsed = extractJsonText(excerpt);
     expect(parsed).not.toBeNull();
+    // cast justified: successful repair means a JSON object parsed; the property chain
+    // below is the runtime assertion (any structural mismatch fails the expect)
     const mechanism = (parsed?.value as { candidates: Array<{ mechanism: string }> }).candidates[0]!.mechanism;
     expect(mechanism).toContain('could"expected morphology in culture absent');
   });
@@ -100,6 +105,7 @@ describe('repair layer composition (fuzz-supported, spikes/json-repair-fuzz{,2}.
     const intended = 'tumor clon"al axis c""lonal cohort';
     expect(() => repairJson(doc)).toThrow(JsonRepairError); // engine's two-stage heuristics bail
     const parsed = extractJsonText(doc);
+    // cast justified: the doc parses to {a: <string>} by construction; .a access below is the runtime check
     expect((parsed?.value as { a: string }).a).toBe(intended); // local scan layer covers it
   });
 

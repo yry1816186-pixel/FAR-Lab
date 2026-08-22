@@ -108,7 +108,7 @@ parseNumber(): 符号/前导零/整数/小数/指数 各段修复；atEndOfNumbe
 
 ## 4. 测试语料来源
 
-upstream 测试不在 npm tarball 内——从 GitHub 仓库 tests/test.js 提取（收口前补）；本地基线：`spikes/output/strict-fc-corrupted-args.json`（live 损坏 tool args，errPos=4854 内引号类）+ 本报告规则表逐条最小用例（每规则 1-2 个 before/after）。
+upstream 测试不在 npm tarball 内——**已履行（审计 P3-4 后续）**：src/index.test.ts 经 GitHub API 取回（.cache/repos/jsonrepair-upstream-test.ts，923 行），仅改导入指向移植版后全套入仓为 tests/json-repair-upstream.test.ts——**78/78 绿（约 400 断言，含错误消息断言）= 等价性最强证明**；本地基线：`spikes/output/strict-fc-corrupted-args.json`（live 损坏 tool args，errPos=4854 内引号类）+ 本报告规则表逐条最小用例（每规则 1-2 个 before/after）。
 
 ## 5. 来源清单
 

@@ -82,7 +82,7 @@
       "what": "Schema-validation failure rate AFTER full tolerance chain + strict-FC (per model call)",
       "current": {
         "value": 0.011,
-        "detail": "Live value 0.011 stands (1 mixed-provenance rejection / ~91 calls, run_prrxcee6 41/41 after schema fix). W7 (2026-08-22): per-call live re-measurement BLOCKED (DeepSeek 402, wave-open probe archived); deterministic same-corpus repair-layer coverage improved 9/68 -> 68/68 corruption classes (evidence/W7/repair-benchmark.md), live-class 192/192 held, repair worst-path 1.39ms vs 2s budget",
+        "detail": "Live value 0.011 stands (1 mixed-provenance rejection / ~91 calls, run_prrxcee6 41/41 after schema fix). W7 (2026-08-22): per-call live re-measurement BLOCKED (DeepSeek 402, wave-open probe archived); deterministic same-corpus repair-layer coverage improved 12/75 -> 75/75 corruption classes (evidence/W7/repair-benchmark.md), live-class 192/192 held, repair worst-path 1.39ms vs 2s budget",
         "at": "2026-08-22",
         "evidence": "D-026/D-029b; run_prrxcee6; evidence/W7/repair-benchmark.md; spikes/model-spike/runs/2026-08-22T02-38-26-825Z-deepseek.json"
       },
