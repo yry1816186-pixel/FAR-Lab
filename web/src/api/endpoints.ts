@@ -143,6 +143,8 @@ export interface CreateRunInput {
   goalType?: ScientificGoalType;
   /** Optional user-defined model route for this run (mcfg_… id). */
   providerConfigId?: string;
+  /** R1: user-provided seed sources (PDF text / parsed citations / Zotero picks). */
+  seeds?: import('../utils/ingest').SeedInput[];
 }
 
 export const createRun = async (input: CreateRunInput, signal?: AbortSignal): Promise<string> => {

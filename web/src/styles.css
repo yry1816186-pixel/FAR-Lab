@@ -1438,3 +1438,25 @@ select option { color: var(--text); background: var(--surface); }
   background: var(--v2-refuted-tint);
   border-color: var(--err-border);
 }
+
+/* R1 ingestion: seed chips + Zotero picker. */
+.seed-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
+.seed-chip {
+  display: inline-flex; align-items: baseline; gap: var(--sp-2);
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--radius-pill);
+  background: var(--v2-surface-2);
+  max-width: 100%;
+}
+.seed-chip-kind { font-size: var(--fs-aux); font-weight: 600; color: var(--v2-info); }
+.seed-chip-title { font-size: var(--fs-aux); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.seed-chip-remove { all: unset; cursor: pointer; padding: 0 2px; color: var(--v2-text-3); }
+.seed-chip-remove:hover { color: var(--v2-refuted); }
+.ingest-row { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); }
+.zotero-picker { margin-top: var(--sp-2); border: 1px solid var(--v2-border); border-radius: var(--radius-s); padding: var(--sp-3); background: var(--v2-surface); }
+.zotero-list { list-style: none; margin: var(--sp-2) 0; padding: 0; max-height: 240px; overflow: auto; display: grid; gap: 2px; }
+.zotero-item { all: unset; cursor: pointer; display: block; width: 100%; padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-s); }
+.zotero-item:hover { background: var(--v2-surface-2); }
+.zotero-item:focus-visible { outline: 2px solid var(--focus-ring); }
+.zotero-item-title { font-size: var(--fs-body); }

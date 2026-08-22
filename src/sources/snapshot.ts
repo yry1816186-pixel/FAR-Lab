@@ -37,6 +37,10 @@ const VOLATILE_PATHS: Record<SourceFamily, readonly (readonly PathSegment[])[]> 
     ['reference', '*', 'deposited'],
   ],
   arxiv: [['updated']], // new author versions flip this; version itself stays in the snapshot
+  // User-provided seeds never enter the search-normalization path (they are
+  // SourceDocuments at creation, not RawSourceRecords), but the Record must
+  // stay exhaustive: an empty list is the honest no-op.
+  user_provided: [],
 };
 
 const pathMatches = (path: readonly (string | number)[], pattern: readonly PathSegment[]): boolean => {
