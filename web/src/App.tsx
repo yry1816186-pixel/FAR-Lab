@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw, Search } from 'lucide-react';
+import { Bell, BellOff, RefreshCw, Search } from 'lucide-react';
 import { ApiError } from './api/client';
 import { getEvents, getRun, listRuns, searchAll } from './api/endpoints';
 import type { ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
 import { useEventStream } from './hooks/useEventStream';
+import { useNotifications } from './hooks/useNotifications';
 import { parseHash, useHashRoute } from './hooks/useHashRoute';
 import { useConnection } from './state/connection';
 import { useTheme } from './state/theme';
 import { LogoFull } from './components/Logo';
 import { WelcomeView } from './components/WelcomeView';
 import { RunsList, runLabel } from './components/RunsSidebar';
+import { AwarenessBar } from './components/AwarenessBar';
 import { RunDetail, isTabId } from './components/RunDetail';
 import { CommandPalette, type Command, type PaletteSearch } from './components/CommandPalette';
 import type { EventsState } from './components/RunDetail';
@@ -335,6 +337,18 @@ export function App(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // ---- B3-2: multi-run awareness + completion notifications ----
+  const activeRuns = useMemo(
+    () => runs.filter((r) => r.status === 'running' || r.status === 'queued'),
+    [runs],
+  );
+  const notifications = useNotifications(
+    runs,
+    selectedRunId,
+    useCallback((runId: string): void => { setSelectedRunId(runId); setRouteTab(null); }, []),
+    useCallback((): string => t('notify.doneTitle'), [t]),
+  );
+
   return (
     <div className="app">
       <header className="app-header">
@@ -347,6 +361,19 @@ export function App(): JSX.Element {
             <span className="conn-dot" aria-hidden="true" />
             {online ? <span className="sr-only">{t('conn.online')}</span> : t('conn.offline')}
           </div>
+          {notifications.supported && (
+            <button
+              type="button"
+              className="btn btn--small palette-toggle"
+              onClick={notifications.toggle}
+              aria-pressed={notifications.enabled}
+              title={t(notifications.enabled ? 'notify.onHint' : 'notify.offHint')}
+            >
+              {notifications.enabled
+                ? <Bell size={12} aria-hidden="true" />
+                : <BellOff size={12} aria-hidden="true" />}
+            </button>
+          )}
           <button
             type="button"
             className="btn btn--small palette-toggle"
@@ -389,6 +416,8 @@ export function App(): JSX.Element {
           {t('conn.offline')}
         </div>
       )}
+
+      <AwarenessBar activeRuns={activeRuns} selectedRunId={selectedRunId} onSelect={setSelectedRunId} />
 
       <div className="app-body">
         <aside className="sidebar" aria-label={t('runs.title')}>

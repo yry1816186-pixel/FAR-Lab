@@ -9,6 +9,7 @@ import { EmptyState, ErrorBox, Section, Skeleton } from '../common';
 import { HypothesisCard } from './HypothesisCard';
 import { ScorecardsTable } from './ScorecardsTable';
 import { CompareView } from './CompareView';
+import { ResearchActions } from './ResearchActions';
 import type { FeedbackTarget } from './FeedbackForm';
 import { stageKey } from '../../i18n/keys';
 
@@ -111,10 +112,13 @@ export function HypothesesTab({
           >
             <HypothesisList
               data={data}
+              runId={run.id}
               compareIds={compareIds}
               compareLimit={COMPARE_LIMIT}
               onToggleCompare={toggleCompare}
               onChallenge={(id, label) => onFeedback({ kind: 'hypothesis', id, label })}
+              onOpenClaim={onOpenClaim}
+              onToFeedback={onFeedback}
             />
           </Section>
         </>
@@ -210,16 +214,22 @@ function representativesOf(data: HypoData): HypothesisCandidate[] {
 
 function HypothesisList({
   data,
+  runId,
   compareIds,
   compareLimit,
   onToggleCompare,
   onChallenge,
+  onOpenClaim,
+  onToFeedback,
 }: {
   data: HypoData;
+  runId: string;
   compareIds: string[];
   compareLimit: number;
   onToggleCompare: (id: string) => void;
   onChallenge: (id: string, label: string) => void;
+  onOpenClaim?: (claimId: string) => void;
+  onToFeedback: (target: { kind: string; id: string; label?: string; content?: string }) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const [filter, setFilter] = useState('');
@@ -266,6 +276,16 @@ function HypothesisList({
           isRepresentative
           rank={rankOf.get(h.id)}
           onChallenge={(id, label) => onChallenge(id, label)}
+          aiActions={
+            <ResearchActions
+              runId={runId}
+              targetType="hypothesis"
+              targetId={h.id}
+              targetLabel={h.statement.length > 60 ? `${h.statement.slice(0, 60)}…` : h.statement}
+              onOpenClaim={(claimId) => onOpenClaim?.(claimId)}
+              onToFeedback={(content) => onToFeedback({ kind: 'hypothesis', id: h.id, label: h.statement, content })}
+            />
+          }
           compare={{
             selected: compareIds.includes(h.id),
             onToggle: () => onToggleCompare(h.id),

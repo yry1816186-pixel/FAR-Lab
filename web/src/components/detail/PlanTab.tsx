@@ -5,6 +5,7 @@ import type { ResearchPlan, ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, FieldList, Section, Skeleton } from '../common';
+import { ResearchActions } from './ResearchActions';
 import { stageKey, availabilityKey, stepKindKey } from '../../i18n/keys';
 import type { DictKey } from '../../i18n/dict';
 
@@ -21,7 +22,7 @@ export function PlanTab({
   onFeedback,
 }: {
   run: ResearchRun;
-  onFeedback: (target?: { kind: string; id: string; label?: string }) => void;
+  onFeedback: (target?: { kind: string; id: string; label?: string; content?: string }) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const fetcher = useCallback((signal: AbortSignal) => getPlan(run.id, signal), [run.id]);
@@ -36,7 +37,20 @@ export function PlanTab({
       ) : res.error !== null ? (
         <ErrorBox error={res.error} onRetry={res.retry} />
       ) : res.data !== null ? (
-        <PlanView plan={res.data} onChallenge={() => onFeedback({ kind: 'plan', id: res.data!.id, label: res.data!.objective })} />
+        <PlanView
+          plan={res.data}
+          onChallenge={() => onFeedback({ kind: 'plan', id: res.data!.id, label: res.data!.objective })}
+          aiActions={
+            <ResearchActions
+              runId={run.id}
+              targetType="plan"
+              targetId={res.data.id}
+              targetLabel={res.data.objective.length > 60 ? `${res.data.objective.slice(0, 60)}…` : res.data.objective}
+              onOpenClaim={() => {/* plans cite claims across tabs; navigation lands on evidence tab via URL */}}
+              onToFeedback={(content) => onFeedback({ kind: 'plan', id: res.data!.id, label: res.data!.objective, content })}
+            />
+          }
+        />
       ) : (
         <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(stageKey(run.currentStage)) })} />
       )}
@@ -44,7 +58,7 @@ export function PlanTab({
   );
 }
 
-function PlanView({ plan, onChallenge }: { plan: ResearchPlan; onChallenge: () => void }): JSX.Element {
+function PlanView({ plan, onChallenge, aiActions }: { plan: ResearchPlan; onChallenge: () => void; aiActions?: React.ReactNode }): JSX.Element {
   const { t } = useI18n();
   const orNone = (items: string[] | undefined): JSX.Element | string =>
     items !== undefined && items.length > 0 ? items.join('；') : <span className="muted">{t('common.none')}</span>;
@@ -63,9 +77,12 @@ function PlanView({ plan, onChallenge }: { plan: ResearchPlan; onChallenge: () =
       <Section
         title={t('plan.objective')}
         actions={
-          <button type="button" className="btn btn--small" onClick={onChallenge} title={t('compare.challengePlanHint')}>
-            {t('compare.challengePlan')}
-          </button>
+          <>
+            <button type="button" className="btn btn--small" onClick={onChallenge} title={t('compare.challengePlanHint')}>
+              {t('compare.challengePlan')}
+            </button>
+            {aiActions}
+          </>
         }
       >
         <p className="plan-objective">{plan.objective}</p>

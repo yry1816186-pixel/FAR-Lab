@@ -11,6 +11,7 @@ export function HypothesisCard({
   rank,
   onChallenge,
   compare,
+  aiActions,
 }: {
   hypothesis: HypothesisCandidate;
   clusterSize: number;
@@ -18,6 +19,8 @@ export function HypothesisCard({
   rank?: number;
   onChallenge?: (id: string, label: string) => void;
   compare?: { selected: boolean; onToggle: () => void; disabled?: boolean };
+  /** B4: grounded AI research actions (challenge/weakest-assumption/falsify/…). */
+  aiActions?: React.ReactNode;
 }): JSX.Element {
   const { t } = useI18n();
   const [specOpen, setSpecOpen] = useState(false);
@@ -73,6 +76,7 @@ export function HypothesisCard({
               {t('compare.challenge')}
             </button>
           )}
+          {aiActions}
         </span>
       </header>
 

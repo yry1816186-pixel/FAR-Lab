@@ -19,6 +19,8 @@ export interface FeedbackTarget {
   id: string;
   /** Researcher-readable label (statement excerpt) — the object's identity, not its id (CPP-2). */
   label?: string;
+  /** Prefilled content (B4: promoting an AI action analysis into feedback). */
+  content?: string;
 }
 
 /**
@@ -46,7 +48,7 @@ export function FeedbackForm({
 }): JSX.Element {
   const { t } = useI18n();
   const [source, setSource] = useState<FeedbackSourceKind>('human_expert');
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(initialTarget?.content ?? '');
   const [targetKind, setTargetKind] = useState(initialTarget?.kind ?? '');
   const [targetId, setTargetId] = useState(initialTarget?.id ?? '');
   const [showRequired, setShowRequired] = useState(false);

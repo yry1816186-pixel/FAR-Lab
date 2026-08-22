@@ -5,6 +5,7 @@ import type { CorpusQueryInfo, CorpusSnapshotInfo, EvidenceRelation, EvidenceRel
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
+import { ResearchActions } from './ResearchActions';
 import { bindingKey, bindingTone } from '../../tones';
 import { stageKey, contentDepthKey, accessStateKey, bindingZhKey, relationKey, retrievalPurposeKey } from '../../i18n/keys';
 import type { DictKey } from '../../i18n/dict';
@@ -19,7 +20,7 @@ export function EvidenceTab({
   onFeedback,
 }: {
   run: ResearchRun;
-  onFeedback: (target?: { kind: string; id: string; label?: string }) => void;
+  onFeedback: (target?: { kind: string; id: string; label?: string; content?: string }) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
@@ -64,7 +65,7 @@ export function EvidenceTab({
         ) : evidenceRes.error !== null ? (
           <ErrorBox error={evidenceRes.error} onRetry={evidenceRes.retry} />
         ) : claims !== null ? (
-          <ClaimsList claims={claims} onChallenge={(id, label) => onFeedback({ kind: 'claim', id, label })} />
+          <ClaimsList claims={claims} runId={run.id} onFeedback={onFeedback} />
         ) : null}
         {evidenceRes.data !== null && evidenceRes.data.unclassified > 0 && (
           <p className="callout callout--warn" role="status">
@@ -212,7 +213,11 @@ function SourcesTable({ sources }: { sources: SourceDocument[] }): JSX.Element {
   );
 }
 
-function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChallenge: (id: string, label: string) => void }): JSX.Element {
+function ClaimsList({ claims, runId, onFeedback }: {
+  claims: ScientificClaim[];
+  runId: string;
+  onFeedback: (target?: { kind: string; id: string; label?: string; content?: string }) => void;
+}): JSX.Element {
   const { t } = useI18n();
   const [filter, setFilter] = useState('');
   const gradeTitle = (level: NonNullable<ScientificClaim['gradeCertainty']>, downgraded: string[]): string => {
@@ -274,11 +279,26 @@ function ClaimsList({ claims, onChallenge }: { claims: ScientificClaim[]; onChal
               <button
                 type="button"
                 className="link-button"
-                onClick={() => onChallenge(claim.id, claim.text)}
+                onClick={() => onFeedback({ kind: 'claim', id: claim.id, label: claim.text })}
                 title={t('compare.challengeClaimHint')}
               >
                 {t('compare.challengeClaim')}
               </button>
+              <ResearchActions
+                runId={runId}
+                targetType="claim"
+                targetId={claim.id}
+                targetLabel={claim.text.length > 60 ? `${claim.text.slice(0, 60)}…` : claim.text}
+                onOpenClaim={(cid) => {
+                  const el = document.getElementById(`claim-${cid}`);
+                  if (el !== null) {
+                    el.scrollIntoView({ block: 'center' });
+                    el.classList.add('claim-flash');
+                    window.setTimeout(() => el.classList.remove('claim-flash'), 1600);
+                  }
+                }}
+                onToFeedback={(content) => onFeedback({ kind: 'claim', id: claim.id, label: claim.text, content })}
+              />
             </span>
           </div>
           {claim.locators.slice(0, 3).map((loc, i) => (
