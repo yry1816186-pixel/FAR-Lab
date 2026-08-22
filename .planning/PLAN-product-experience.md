@@ -54,7 +54,7 @@
 - **S2（已落地 2026-08-22，真实 run dogfood 验证）**：①概览页「研究动态」活动流——真实事件流驱动（阶段转换带 pipeline 摘要/每次模型与检索调用/状态变更），运行中带当前阶段说明与呼吸点（reduced-motion 降级），无虚构进度，已完成 run 保留全程记录（evidence/W-PEX/s2-activity-live.jpeg）；②信任信号——claims GRADE-lite 徽章（hover 降级因素轨迹，实测 18 claims）、计划页统计纪律块（policy 人话+分配理由+statisticalDesignNote）、verify 报告附挂 bundle 自报 limitations（API 层注入，避开 EEL 在途 verify.ts；测试断言）；③对比判定阈值行（支持/弱化/证伪三条件，实测两列完整）；④真实新 run（prime editing）z.ai 3 分钟 9 阶段，等待期全程有叙事；⑤门禁 656/658（2 既定 skip）+ 双端 tsc/build 0 + lint 0 + secret-scan PASS。剩余（S2 尾巴）：证据页作者/venue/DOI/OA 链接丰富、反证检索记录结构化展示（无端点，需 API）
 - **S3（已落地 2026-08-22，GUI 全链路验证）**：①可分享 hash 路由 `#run/<id>/<tab>`（useHashRoute：mount 恢复/replaceState 同步/hashchange 后退；深链实测恢复 hypotheses/evidence，跨轮询 9s+ 稳定无漂移，tab↔URL 双向同步）；②ACH 判别性证据分析块（CompareView 内：共享=绑定多个所比假设无判别力/判别=仅绑定一个——完全由真实 supporting/counterClaimIds 计算；诚实注记披露管线绑定稀疏（11 假设仅 1+1 绑定），无绑定不渲染，不做空壳矩阵）；③跨 Tab claim 导航（ACH 点击→证据页→scrollIntoView+flash 高亮，实测 claim-clm_n1j5… 视口内）；④in-tab 过滤（claims "nucleosome" 18→2；假设按陈述/机制/id）。**诚实降级记录**：版本对比 v2-vs-v3 不做——实测 DB 无 version>0 假设，无数据不做 UI；claim↔hypothesis 绑定稀疏是管线能力缺口（build_evidence 关系只绑 question），ACH 全量矩阵需管线侧增强，记为管线 lane 债务。门禁：656/658 + web tsc 0 + build 0 + secret-scan PASS
 - **S4**：orchestrator 子任务事件（消除盲等的根因修复）+ quick capture
-- **S5**：命令面板 + 键盘流 + 桌面端 quick capture（托盘/全局快捷键）
+- **S5（已落地 2026-08-22，GUI 全流程验证）**：命令面板（Ctrl/Cmd+K）——Linear/Raycast/VS Code 模式，科学软件品类缺席的键盘中枢。零依赖自研（子串分词匹配）；命令集全部真实能力：新建研究、8 个 tab 导航（含 EEL 实验执行）、最近 8 个 run 切换（动态标签=问题文本，可按问题文本/status/id 搜索）、主题/语言切换；↑↓ 导航/Enter 执行/Esc 关闭/焦点自动落输入框/分组渲染。实测：Ctrl+K 打开（19 命令 4 组）→"EGFR" 过滤出 2 runs→Enter 切换 run_fbcc5ksh（URL+侧栏同步）→"溯源"→Enter 切 provenance tab（URL 同步）。桌面端 quick capture（托盘/全局快捷键）仍为后续项。门禁：656/658 + tsc/build 0 + secret-scan PASS
 
 ## 6. 验收（S1）
 

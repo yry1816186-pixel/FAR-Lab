@@ -226,6 +226,17 @@ export const zh = {
 
   'bundle.limitations': '复现限制（bundle 自报）',
 
+  'palette.title': '命令面板',
+  'palette.open': '命令',
+  'palette.placeholder': '输入命令或搜索研究…（↑↓ 选择，Enter 执行，Esc 关闭）',
+  'palette.empty': '无匹配命令。',
+  'palette.hint': 'Ctrl K 打开/关闭 · ↑↓ 导航 · Enter 执行 · Esc 关闭',
+  'palette.groupActions': '操作',
+  'palette.groupNav': '跳转（当前研究）',
+  'palette.groupRuns': '切换研究',
+  'palette.toggleTheme': '切换主题（浅色/深色/跟随系统）',
+  'palette.toggleLang': '切换语言（中文/English）',
+
   'compare.verdictThresholds': '判定阈值（支持/弱化/证伪）',
   'compare.verdictSupport': '支持:',
   'compare.verdictWeaken': '弱化:',
@@ -863,6 +874,17 @@ export const en: Record<DictKey, string> = {
   'plan.policy.e_value_accumulation': 'accumulating evidence via E-values without a fixed α',
 
   'bundle.limitations': 'Reproduction limitations (declared by the bundle)',
+
+  'palette.title': 'Command palette',
+  'palette.open': 'Commands',
+  'palette.placeholder': 'Type a command or search research… (↑↓ select, Enter run, Esc close)',
+  'palette.empty': 'No matching commands.',
+  'palette.hint': 'Ctrl K toggle · ↑↓ navigate · Enter run · Esc close',
+  'palette.groupActions': 'Actions',
+  'palette.groupNav': 'Go to (current research)',
+  'palette.groupRuns': 'Switch research',
+  'palette.toggleTheme': 'Toggle theme (light/dark/system)',
+  'palette.toggleLang': 'Toggle language (中文/English)',
 
   'compare.verdictThresholds': 'Verdict thresholds (support/weaken/falsify)',
   'compare.verdictSupport': 'support:',
