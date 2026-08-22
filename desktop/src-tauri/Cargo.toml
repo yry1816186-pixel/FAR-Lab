@@ -8,7 +8,11 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2.3.2"
+tauri-plugin-single-instance = "2.4.3"
+tauri-plugin-window-state = "2.4.1"
+windows-sys = { version = "0.60", features = ["Win32_System_Registry"] }
 
 [target.'cfg(windows)'.dependencies]
 # Job Object (KILL_ON_JOB_CLOSE): the spawned node server must die with the shell
