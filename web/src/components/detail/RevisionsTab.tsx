@@ -6,6 +6,7 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Skeleton, TimeText } from '../common';
 import type { RevisionsBundle } from '../../api/normalize';
 import { qualityKey } from '../../i18n/keys';
+import { DiffText } from '../../utils/diffview';
 
 /**
  * Causal revision chain (mission §33/§34, report §10): every revision MUST link
@@ -95,25 +96,36 @@ function RevisionChain({ data }: { data: RevisionsBundle }): JSX.Element {
                           {op.after !== undefined && <div><span className="muted">after:</span> <span className="mono">{truncate(op.after)}</span></div>}
                           <div className="muted small">{op.reason}</div>
                           {(op.before !== undefined || op.after !== undefined) && (
-                            /* B3-7 version compare: full-text before/after stays
-                               one disclosure away — the truncated line is a
-                               preview, never the whole story. */
+                            /* B3-7 version compare (R3 upgrade): when BOTH sides
+                               exist, the two raw <pre> blocks become ONE word-level
+                               jsdiff view (green added / red removed, both readable);
+                               single-sided operations keep the raw pre — a diff
+                               against nothing would be noise, not information. */
                             <details className="op-compare">
                               <summary className="muted small">{t('rev.compareFull')}</summary>
-                              <div className="op-compare-grid">
-                                {op.before !== undefined && (
-                                  <div>
-                                    <span className="muted small">{t('rev.before')}（{revision.fromVersionLabel}）</span>
-                                    <pre className="op-compare-text mono">{op.before}</pre>
-                                  </div>
-                                )}
-                                {op.after !== undefined && (
-                                  <div>
-                                    <span className="muted small">{t('rev.after')}（{revision.toVersionLabel}）</span>
-                                    <pre className="op-compare-text mono">{op.after}</pre>
-                                  </div>
-                                )}
-                              </div>
+                              {op.before !== undefined && op.after !== undefined ? (
+                                <div>
+                                  <div className="muted small">{t('rev.diffLegend')}</div>
+                                  <pre className="op-compare-text mono">
+                                    <DiffText before={op.before} after={op.after} />
+                                  </pre>
+                                </div>
+                              ) : (
+                                <div className="op-compare-grid">
+                                  {op.before !== undefined && (
+                                    <div>
+                                      <span className="muted small">{t('rev.before')}（{revision.fromVersionLabel}）</span>
+                                      <pre className="op-compare-text mono">{op.before}</pre>
+                                    </div>
+                                  )}
+                                  {op.after !== undefined && (
+                                    <div>
+                                      <span className="muted small">{t('rev.after')}（{revision.toVersionLabel}）</span>
+                                      <pre className="op-compare-text mono">{op.after}</pre>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </details>
                           )}
                         </div>

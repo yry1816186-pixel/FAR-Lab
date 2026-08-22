@@ -3,6 +3,26 @@ import type { HypothesisCandidate } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, IdText } from '../common';
 import { checkTone, litNoveltyKey, litNoveltyTone, noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../tones';
+import { WithMath } from '../../utils/math';
+
+/**
+ * B5 lifecycle operations, wired by the owning tab (HypothesesTab owns the
+ * POST calls + refetch + busy/error state — the card stays presentational).
+ * `busy` disables the whole row while any op for THIS card is in flight
+ * (clean degrade when the endpoint is missing: buttons disable, never fake success).
+ */
+export interface HypothesisCardOps {
+  busy: boolean;
+  /** The run's claims, for the inline connect picker; absent/empty -> honest hint. */
+  claims?: { id: string; text: string }[];
+  /** Whether this card's connect picker is open (state lives in the tab). */
+  connectOpen: boolean;
+  onConnectToggle: () => void;
+  onPromote: () => void;
+  onReject: () => void;
+  onFork: () => void;
+  onConnect: (claimId: string, direction: 'supports' | 'counters') => void;
+}
 
 export function HypothesisCard({
   hypothesis,
@@ -12,6 +32,7 @@ export function HypothesisCard({
   onChallenge,
   compare,
   aiActions,
+  ops,
 }: {
   hypothesis: HypothesisCandidate;
   clusterSize: number;
@@ -21,11 +42,17 @@ export function HypothesisCard({
   compare?: { selected: boolean; onToggle: () => void; disabled?: boolean };
   /** B4: grounded AI research actions (challenge/weakest-assumption/falsify/…). */
   aiActions?: React.ReactNode;
+  /** B5: researcher lifecycle operations (promote/reject/fork/connect). */
+  ops?: HypothesisCardOps;
 }): JSX.Element {
   const { t } = useI18n();
   const [specOpen, setSpecOpen] = useState(false);
+  const [connectClaimId, setConnectClaimId] = useState('');
+  const [connectDirection, setConnectDirection] = useState<'supports' | 'counters'>('supports');
   const f = hypothesis.falsification;
   const completeness = f?.completenessCheck;
+  const status = hypothesis.status ?? 'active';
+  const claims = ops?.claims;
 
   return (
     <article id={`hyp-${hypothesis.id}`} className={`hyp-card${isRepresentative ? '' : ' hyp-card--extra'}${compare?.selected ? ' hyp-card--compare' : ''}`}>
@@ -37,6 +64,9 @@ export function HypothesisCard({
         )}
         <IdText value={hypothesis.id} />
         <span className="muted small">{t('hyp.version', { n: hypothesis.version })}</span>
+        {/* B5 triage outcome — visible only once decided; 'active' is the unmarked default */}
+        {status === 'promoted' && <Badge tone="ok">{t('hyp.statusPromoted')}</Badge>}
+        {status === 'rejected' && <Badge tone="err">{t('hyp.statusRejected')}</Badge>}
         <Badge tone={testabilityTone(hypothesis.testability)}>{t(testabilityKey(hypothesis.testability))}</Badge>
         <Badge tone={noveltyTone(hypothesis.noveltyLabel)}>{t(noveltyKey(hypothesis.noveltyLabel))}</Badge>
         {/* W5/S4: noveltyLabel is corpus-relative — the qualifier is mandatory wherever the label is shown */}
@@ -77,8 +107,77 @@ export function HypothesisCard({
             </button>
           )}
           {aiActions}
+          {ops !== undefined && (
+            /* B5 ops row: promote/reject only while active (a decided hypothesis
+               is fork-able but not re-decidable without a revision); fork always. */
+            <span className="hyp-ops">
+              {status === 'active' && (
+                <>
+                  <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onPromote}>
+                    {t('hyp.promote')}
+                  </button>
+                  <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onReject}>
+                    {t('hyp.reject')}
+                  </button>
+                </>
+              )}
+              <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onFork}>
+                {t('hyp.fork')}
+              </button>
+              <button
+                type="button"
+                className="btn btn--small"
+                disabled={ops.busy}
+                aria-expanded={ops.connectOpen}
+                onClick={ops.onConnectToggle}
+              >
+                {t('hyp.connect')}
+              </button>
+            </span>
+          )}
         </span>
       </header>
+
+      {ops?.connectOpen === true && (
+        <div className="hyp-connect" role="group" aria-label={t('hyp.connectPrompt')}>
+          {(claims?.length ?? 0) === 0 ? (
+            <span className="muted small">{t('hyp.connectNoClaims')}</span>
+          ) : (
+            <>
+              <label className="small">
+                <span className="muted small">{t('hyp.connectClaimLabel')}</span>{' '}
+                <select
+                  value={connectClaimId}
+                  onChange={(e) => setConnectClaimId(e.target.value)}
+                >
+                  <option value="">—</option>
+                  {claims!.map((c) => (
+                    <option key={c.id} value={c.id}>{c.text}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="small">
+                <span className="muted small">{t('hyp.connectDirectionLabel')}</span>{' '}
+                <select
+                  value={connectDirection}
+                  onChange={(e) => setConnectDirection(e.target.value === 'counters' ? 'counters' : 'supports')}
+                >
+                  <option value="supports">{t('hyp.connectSupports')}</option>
+                  <option value="counters">{t('hyp.connectCounters')}</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="btn btn--small hyp-connect-confirm"
+                disabled={ops.busy || connectClaimId.length === 0}
+                onClick={() => ops.onConnect(connectClaimId, connectDirection)}
+              >
+                {t('hyp.connectConfirm')}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {completeness !== undefined && !completeness.passed && (completeness.missing ?? []).length > 0 && (
         <p className="callout callout--err small">
@@ -89,12 +188,12 @@ export function HypothesisCard({
       <dl className="fieldlist">
         <div className="fieldlist-row">
           <dt>{t('hyp.statement')}</dt>
-          <dd className="hyp-statement">{hypothesis.statement}</dd>
+          <dd className="hyp-statement"><WithMath text={hypothesis.statement} /></dd>
         </div>
         {hypothesis.mechanism.trim().length > 0 && (
           <div className="fieldlist-row">
             <dt>{t('hyp.mechanism')}</dt>
-            <dd>{hypothesis.mechanism}</dd>
+            <dd><WithMath text={hypothesis.mechanism} /></dd>
           </div>
         )}
       </dl>

@@ -7,6 +7,7 @@ import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
 import { useEventStream } from './hooks/useEventStream';
 import { useNotifications } from './hooks/useNotifications';
+import { useAxeAudit } from './hooks/useAxeAudit';
 import { parseHash, useHashRoute } from './hooks/useHashRoute';
 import { useConnection } from './state/connection';
 import { useTheme } from './state/theme';
@@ -30,6 +31,7 @@ const MAX_EVENTS_KEPT = 2_000;
 
 export function App(): JSX.Element {
   const { t, lang, setLang } = useI18n();
+  useAxeAudit(import.meta.env.DEV); // R3: dev-only axe-core a11y audit → console
   const { online, markOnline, markOffline } = useConnection();
   const { theme, cycleTheme } = useTheme();
 

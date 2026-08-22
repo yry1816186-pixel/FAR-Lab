@@ -30,7 +30,7 @@ export interface App {
 }
 
 const stageModules = async (): Promise<Partial<Record<RunStageName, StageHandler>>> => {
-  const [scope, retrieve, verify, evidence, hypotheses, falsify, rank, plan, exportStage, feedbackMod, reviseMod] = await Promise.all([
+  const [scope, retrieve, verify, evidence, hypotheses, falsify, rank, plan, execute, exportStage, feedbackMod, reviseMod] = await Promise.all([
     import('../pipeline/stages/scope.js'),
     import('../pipeline/stages/retrieve.js'),
     import('../pipeline/stages/verify.js'),
@@ -39,6 +39,7 @@ const stageModules = async (): Promise<Partial<Record<RunStageName, StageHandler
     import('../pipeline/stages/falsify.js'),
     import('../pipeline/stages/rank.js'),
     import('../pipeline/stages/plan.js'),
+    import('../pipeline/stages/execute.js'),
     import('../pipeline/stages/export.js'),
     import('../pipeline/stages/feedback.js'),
     import('../pipeline/stages/revise.js'),
@@ -52,13 +53,14 @@ const stageModules = async (): Promise<Partial<Record<RunStageName, StageHandler
     critique_falsify: falsify.falsifyStage,
     rank: rank.rankStage,
     plan: plan.planStage,
+    execute: execute.executeStage,
     export: exportStage.exportStage,
     feedback: feedbackMod.feedbackStage,
     revise: reviseMod.reviseStage,
   };
 };
 
-const HANDLED_STAGES: RunStageName[] = ['scope','retrieve','verify_sources','build_evidence','generate_hypotheses','critique_falsify','rank','plan','feedback','revise','export'];
+const HANDLED_STAGES: RunStageName[] = ['scope','retrieve','verify_sources','build_evidence','generate_hypotheses','critique_falsify','rank','plan','execute','feedback','revise','export'];
 
 export const createApp = async (opts: AppOptions = {}): Promise<App> => {
   const dataDir = path.resolve(opts.dataDir ?? '.far-run');

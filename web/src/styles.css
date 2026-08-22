@@ -1460,3 +1460,32 @@ select option { color: var(--text); background: var(--surface); }
 .zotero-item:hover { background: var(--v2-surface-2); }
 .zotero-item:focus-visible { outline: 2px solid var(--focus-ring); }
 .zotero-item-title { font-size: var(--fs-body); }
+
+/* ---- R3 (reuse plan): word-level version-compare tints (jsdiff, BSD-3) ---- */
+.diff-add {
+  background: color-mix(in srgb, var(--v2-verified-tint) 70%, transparent);
+  border-radius: 2px;
+}
+.diff-del {
+  background: color-mix(in srgb, var(--v2-refuted-tint) 70%, transparent);
+  border-radius: 2px;
+  /* removed text is the content under review — readable, never struck through */
+  text-decoration: none;
+}
+
+/* ---- B5 hypothesis lifecycle ops (promote / reject / fork / connect) ---- */
+.hyp-ops { display: inline-flex; gap: 6px; margin-left: 6px; padding-left: 6px; border-left: 1px solid var(--v2-border); }
+.hyp-connect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  border: 1px dashed var(--v2-border);
+  border-radius: var(--radius-s);
+  background: var(--v2-surface);
+}
+.hyp-connect select { max-width: 320px; min-width: 160px; }
+.hyp-connect-confirm { flex-shrink: 0; }
+.math-fallback { color: var(--v2-refuted); }

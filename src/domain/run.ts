@@ -7,10 +7,12 @@ export const RunStatus = z.enum([
 ]);
 export type RunStatus = z.infer<typeof RunStatus>;
 
-/** Canonical Direction-A stages — ARCHITECTURE.md §7. */
+/** Canonical Direction-A stages — ARCHITECTURE.md §7. `execute` (B8) runs the
+ *  plan-drafted enrichment experiment after `plan`; it SKIPS honestly when the
+ *  plan maps to no public tabular dataset, so it never gates completion. */
 export const RunStageName = z.enum([
   'scope', 'retrieve', 'verify_sources', 'build_evidence', 'generate_hypotheses',
-  'critique_falsify', 'rank', 'plan', 'feedback', 'revise', 'export',
+  'critique_falsify', 'rank', 'plan', 'execute', 'feedback', 'revise', 'export',
 ]);
 export type RunStageName = z.infer<typeof RunStageName>;
 
@@ -75,14 +77,16 @@ export const ResearchRun = z.object({
 });
 export type ResearchRun = z.infer<typeof ResearchRun>;
 
-/** Legal stage ordering used by the orchestrator (feedback/revise may interleave after plan). */
+/** Legal stage ordering used by the orchestrator (feedback/revise may interleave after plan).
+ *  `execute` sits between plan and feedback; skipped-state counts toward progress
+ *  (runProgress below) so infeasible plans do not stall the bar. */
 export const STAGE_ORDER: readonly RunStageName[] = [
   'scope', 'retrieve', 'verify_sources', 'build_evidence', 'generate_hypotheses',
-  'critique_falsify', 'rank', 'plan', 'feedback', 'revise', 'export',
+  'critique_falsify', 'rank', 'plan', 'execute', 'feedback', 'revise', 'export',
 ] as const;
 
 export const runProgress = (run: ResearchRun): { known: boolean; done: number; total: number } => {
-  const core = STAGE_ORDER.filter((s) => s !== 'feedback' && s !== 'revise');
+  const core = STAGE_ORDER.filter((s) => s !== 'feedback' && s !== 'revise' && s !== 'execute');
   const done = core.filter((s) => ['done', 'skipped'].includes(String(run.stages.find((r) => r.stage === s)?.state))).length;
   return { known: true, done, total: core.length };
 };
