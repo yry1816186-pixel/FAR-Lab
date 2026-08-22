@@ -79,7 +79,15 @@ function TournamentView({ tournament, hypotheses }: { tournament: HypothesisTour
               <td className="mono">{s.rank}</td>
               <td>{statementOf(s.hypothesisId)}</td>
               <td className="mono">{s.wins}-{s.losses}-{s.ties}</td>
-              <td className="mono">{(s.winRate * 100).toFixed(0)}%</td>
+              <td>
+                <span className="rank-cell">
+                  <span className="rank-bar" aria-hidden="true">
+                    {/* proportional ink (Wilke §17): width is the true win-rate ratio on a zero base */}
+                    <span className="rank-fill" style={{ width: `${Math.round(s.winRate * 100)}%` }} />
+                  </span>
+                  <span className="mono">{(s.winRate * 100).toFixed(0)}%</span>
+                </span>
+              </td>
               <td className="mono">{s.btScore.toFixed(3)}</td>
             </tr>
           ))}
