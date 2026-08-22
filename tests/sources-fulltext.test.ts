@@ -102,6 +102,45 @@ describe('extractLaTeXmlText', () => {
   it('returns null for non-LaTeXML pages', () => {
     expect(extractLaTeXmlText('<html><body><p>plain landing page</p></body></html>')).toBeNull();
   });
+
+  it('W6/F5: strips inherited numeric citation markers, keeps bracketed prose', () => {
+    const html = ltxHtml(
+      'Prior work showed replication failures [12] and null results [3,7] across cohorts [2\u20134]. ' +
+        'See also [Figure 3] and the panel [in review].',
+    );
+    const text = extractLaTeXmlText(html)!;
+    expect(text).toContain('Prior work showed replication failures and null results across cohorts.');
+    expect(text).not.toMatch(/\[\s*\d/);
+    expect(text).toContain('[Figure 3]');
+    expect(text).toContain('[in review]');
+  });
+});
+
+describe('stripCitationMarkers', () => {
+  it('removes single, comma-list, and range (hyphen/en-dash) numeric brackets', async () => {
+    const { stripCitationMarkers } = await import('../src/sources/fulltext.js');
+    expect(stripCitationMarkers('alpha [12] beta')).toBe('alpha beta');
+    expect(stripCitationMarkers('alpha [3,7] beta')).toBe('alpha beta');
+    expect(stripCitationMarkers('alpha [2-4] beta')).toBe('alpha beta');
+    expect(stripCitationMarkers('alpha [2\u20134] beta')).toBe('alpha beta');
+    expect(stripCitationMarkers('alpha [ 12 ] beta')).toBe('alpha beta');
+    expect(stripCitationMarkers('alpha[12]beta')).toBe('alpha beta');
+    expect(stripCitationMarkers('[1][2] tail')).toBe('tail');
+  });
+
+  it('keeps non-numeric brackets, absorbs spaces ONLY at real removals (W6 audit P2-1)', async () => {
+    const { stripCitationMarkers } = await import('../src/sources/fulltext.js');
+    expect(stripCitationMarkers('see [Figure 3] and [Appendix B]')).toBe('see [Figure 3] and [Appendix B]');
+    expect(stripCitationMarkers('no brackets here')).toBe('no brackets here');
+    expect(stripCitationMarkers('claim [12].')).toBe('claim.');
+    expect(stripCitationMarkers('claim [12],')).toBe('claim,');
+    // prose parentheses are NEVER glued to the preceding word
+    expect(stripCitationMarkers('results (n = 30) shown')).toBe('results (n = 30) shown');
+    expect(stripCitationMarkers('we compare (baseline) results')).toBe('we compare (baseline) results');
+    expect(stripCitationMarkers('values [3] (post-hoc) held')).toBe('values (post-hoc) held');
+    // trade-off: year brackets are numeric and also stripped — documented, rare in prose
+    expect(stripCitationMarkers('cohort [2018] analysis')).toBe('cohort analysis');
+  });
 });
 
 describe('extractJatsBodyText', () => {
@@ -117,6 +156,15 @@ describe('extractJatsBodyText', () => {
     expect(out.text).toContain('We measured the primary outcome across all sites.');
     expect(out.text).not.toContain('CC BY');
     expect(out.license).toMatch(/CC BY 4\.0/);
+  });
+
+  it('W6/F5: JATS xref citation markers are stripped from body text', () => {
+    const withXref =
+      `<?xml version="1.0"?><article><body><sec><title>Results</title>` +
+      `<p>We measured the primary outcome <xref ref-type="bibr" rid="B12">[12]</xref> across all sites.</p></sec></body></article>`;
+    const out = extractJatsBodyText(withXref)!;
+    expect(out.text).toContain('primary outcome across all sites');
+    expect(out.text).not.toMatch(/\[\s*\d/);
   });
 
   it('returns null for non-JATS payloads', () => {

@@ -1,4 +1,5 @@
 import type { SourceDocument, SourceIdentifier, SourceFamily } from '../../domain/source.js';
+import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
@@ -7,6 +8,61 @@ import { TITLE_MATCH_THRESHOLD, titleJaccard } from './title-normalize.js';
 
 type Verification = NonNullable<SourceDocument['verification']>;
 type VerifyOutcome = 'resolved' | 'not_found' | 'error';
+
+/**
+ * W6/F3 (refchecker EXTRACT, enhanced_hybrid_checker.py:687-870): conservative
+ * multi-signal wrong-paper risk grade. Only applies when the title gate already
+ * FAILED; flags zero-surname-overlap AND (year gap >= 2 or unknown year) AND
+ * venue-incompatible. The identifier stays authoritative (refchecker never
+ * rejects DOI/arXiv/PMID-anchored matches) — we surface, never flip, resolved.
+ */
+const asciiFold = (s: string): string => s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
+/** Surname token set: fold case/diacritics, keep trailing name tokens of length >= 3. */
+const surnameSet = (names: readonly string[]): Set<string> => {
+  const out = new Set<string>();
+  for (const n of names) {
+    const toks = asciiFold(n.trim().toLowerCase()).replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+    while (toks.length > 1 && toks[toks.length - 1]!.replace(/\./g, '').length <= 3) toks.pop();
+    if (toks.length === 0) continue;
+    const last = toks[toks.length - 1]!.replace(/\./g, '');
+    if (last.length >= 3) out.add(last);
+  }
+  return out;
+};
+
+const venueCompatible = (a: string | undefined, b: string | undefined): boolean => {
+  if (!a || !b) return true; // missing data — never reject on absent signals
+  const norm = (v: string) => v.toLowerCase().replace(/[.,;:()[\]"'`]/g, ' ').replace(/\s+/g, ' ').trim();
+  const na = norm(a);
+  const nb = norm(b);
+  if (!na || !nb) return true;
+  return na === nb || na.includes(nb) || nb.includes(na);
+};
+
+export const wrongPaperRisk = (
+  doc: SourceDocument,
+  record: RawSourceRecord,
+): { suspect: boolean; note: string } => {
+  const overlap = surnameSet(doc.authors ?? []);
+  const recOverlap = surnameSet(record.authors ?? []);
+  const shared = [...overlap].filter((s) => recOverlap.has(s));
+  const yearGap =
+    typeof doc.publicationYear === 'number' && typeof record.publicationYear === 'number'
+      ? Math.abs(doc.publicationYear - record.publicationYear)
+      : null;
+  const venueOk = venueCompatible(doc.venue, record.venue);
+  const authorSignal = overlap.size === 0 || recOverlap.size === 0 ? 'unknown' : `${shared.length}/${Math.min(overlap.size, recOverlap.size)} shared surnames`;
+  const yearSignal = yearGap === null ? 'year unknown' : `year gap ${yearGap}`;
+  const suspect =
+    (overlap.size > 0 && recOverlap.size > 0 && shared.length === 0) &&
+    (yearGap === null || yearGap >= 2) &&
+    !venueOk;
+  return {
+    suspect,
+    note: `wrong-paper signals: ${authorSignal}, ${yearSignal}, venue ${venueOk ? 'compatible' : 'mismatch'}`,
+  };
+};
 
 const writeVerification = (ctx: StageContext, doc: SourceDocument, verification: Verification): void => {
   ctx.store.putObject('source_document', { ...doc, verification });
@@ -42,11 +98,18 @@ const verifyByIdentifier = async (
     });
     if (res.found && res.record) {
       const similarity = titleJaccard(doc.title, res.record.title);
+      const titleMatch = similarity >= TITLE_MATCH_THRESHOLD;
+      // W6/F3: only grade wrong-paper risk when the title gate failed — a passed
+      // title with shared identifier needs no second opinion.
+      const risk = titleMatch ? undefined : wrongPaperRisk(doc, res.record);
       writeVerification(ctx, doc, {
         method,
         resolved: true,
-        titleMatch: similarity >= TITLE_MATCH_THRESHOLD,
-        detail: `resolved via ${family}; title jaccard=${similarity.toFixed(2)} (threshold ${TITLE_MATCH_THRESHOLD})`,
+        titleMatch,
+        ...(risk?.suspect ? { wrongPaperSuspect: true } : {}),
+        detail:
+          `resolved via ${family}; title jaccard=${similarity.toFixed(2)} (threshold ${TITLE_MATCH_THRESHOLD})` +
+          (risk ? `; ${risk.note}` : ''),
         checkedAt,
       });
       return 'resolved';

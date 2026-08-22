@@ -117,6 +117,21 @@ const collapseWs = (s: string): string =>
     .trim();
 
 /**
+ * W6/F5 (OpenScholar ADAPT, open_scholar.py:717-720): numeric citation markers
+ * inherited from the source render ([12], [3,7], [1-4] incl. en-dash ranges)
+ * are layout noise in deepened fulltext, not claim material. Numeric-only
+ * brackets keep legitimate bracketed prose ("[Figure 3]", "[in review]") intact.
+ */
+export const stripCitationMarkers = (s: string): string => {
+  // Punctuation absorption happens ONLY where a marker is actually removed —
+  // a global "space-before-punctuation" rule would glue legitimate prose
+  // parentheses onto the preceding word ("results (n = 30)" — W6 audit P2-1).
+  const beforePunct = / ?\[\s*\d+(?:\s*[,\u2013-]\s*\d+)*\s*\][ \t]*(?=[.,;:)])/g;
+  const anyMarker = /\[\s*\d+(?:\s*[,\u2013-]\s*\d+)*\s*\]/g;
+  return s.replace(beforePunct, '').replace(anyMarker, ' ').replace(/ {2,}/g, ' ').trim();
+};
+
+/**
  * LaTeXML (arXiv HTML) text. Returns null when the page is not a LaTeXML render
  * (landing/404 pages are HTML too — the ltx markers are the contract).
  * The bibliography block is dropped: reference lists are not claim material.
@@ -129,7 +144,7 @@ export const extractLaTeXmlText = (html: string): string | null => {
   // attribute alone would leak a partial unclosed tag into the text).
   const bibTag = body.match(/<[^>]*class="[^"]*ltx_bibliography[^"]*"[^>]*>/i);
   if (bibTag !== null && bibTag.index !== undefined) body = body.slice(0, bibTag.index);
-  return collapseWs(tagsToSpaces(stripInertBlocks(body))) || null;
+  return stripCitationMarkers(collapseWs(tagsToSpaces(stripInertBlocks(body)))) || null;
 };
 
 export interface JatsExtraction {
@@ -151,7 +166,7 @@ export const extractTeiBodyText = (xml: string): string | null => {
   const bibStart = body.search(/<listBibl\b/i);
   if (bibStart > 0) body = body.slice(0, bibStart);
   body = body.replace(/<figure\b[\s\S]*?<\/figure>/gi, ' ');
-  const text = collapseWs(tagsToSpaces(stripInertBlocks(body)));
+  const text = stripCitationMarkers(collapseWs(tagsToSpaces(stripInertBlocks(body))));
   return text.length > 0 ? text : null;
 };
 
@@ -170,7 +185,7 @@ export const extractJatsBodyText = (xml: string): JatsExtraction | null => {
       ?.replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-  const text = collapseWs(tagsToSpaces(stripInertBlocks(bodyMatch[1]!)));
+  const text = stripCitationMarkers(collapseWs(tagsToSpaces(stripInertBlocks(bodyMatch[1]!))));
   if (text.length === 0) return null;
   return { text, license: license !== undefined && license.length > 0 ? license : undefined };
 };

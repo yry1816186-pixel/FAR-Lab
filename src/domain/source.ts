@@ -44,6 +44,13 @@ export const SourceDocument = z.object({
     method: z.enum(['crossref_doi', 'arxiv_id', 'openalex_id', 'url']),
     resolved: z.boolean(),
     titleMatch: z.boolean().optional(),
+    /**
+     * W6/F3 (refchecker EXTRACT): multi-signal wrong-paper risk grade for resolved
+     * docs whose title did NOT match — zero surname overlap AND (year gap >=2 or
+     * unknown) AND venue-incompatible. Identifier stays authoritative (resolved is
+     * never flipped); the flag makes the metadata conflict visible and countable.
+     */
+    wrongPaperSuspect: z.boolean().optional(),
     detail: z.string().optional(),
     checkedAt: z.string().datetime(),
   }).optional(),
@@ -71,6 +78,13 @@ export const RetrievalFusion = z.object({
   rerankFailure: z.string().optional(),
   /** Counter-origin documents kept in the final corpus (quota floor evidence). */
   counterSeatsKept: z.number().int().nonnegative(),
+  /**
+   * W6/F2: arXiv zero-result recovery searches executed (k4/k2 cascades).
+   * Absent when no recovery was needed (all arXiv searches returned results).
+   */
+  variantSearches: z.number().int().nonnegative().optional(),
+  /** W6/F4: listwise-rerank sliding windows executed (absent = single window / no rerank). */
+  rerankWindows: z.number().int().positive().optional(),
   /** Compact human-auditable note of the selection (e.g. "cap 12 of pool 31"). */
   selection: z.string().min(1),
 });

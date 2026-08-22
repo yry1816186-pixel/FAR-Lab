@@ -98,7 +98,14 @@ const byQuery = (map: Record<string, RawSourceRecord[]>) => async (query: string
 
 const makeDoc = (
   runId: string,
-  init: { identifiers: SourceIdentifier[]; title: string; family?: SourceFamily },
+  init: {
+    identifiers: SourceIdentifier[];
+    title: string;
+    family?: SourceFamily;
+    authors?: string[];
+    publicationYear?: number;
+    venue?: string;
+  },
 ): SourceDocument =>
   SourceDocument.parse({
     id: newId('src'),
@@ -106,7 +113,9 @@ const makeDoc = (
     family: init.family ?? 'openalex',
     identifiers: init.identifiers,
     title: init.title,
-    authors: [],
+    authors: init.authors ?? [],
+    ...(init.publicationYear !== undefined ? { publicationYear: init.publicationYear } : {}),
+    ...(init.venue !== undefined ? { venue: init.venue } : {}),
     contentDepth: 'abstract',
     accessState: 'open',
     contentHash: 'ab'.repeat(32),
@@ -316,12 +325,14 @@ describe('retrieve stage', () => {
     for (const s of openalex.calls.searches) expect(s.limit).toBe(6);
     for (const s of arxiv.calls.searches) expect(s.limit).toBe(6);
 
-    // receipts: exactly 1 model_call (no rerank — pool 4 <= cap) + 8 source_retrieval
-    // (counter x2 + BOTH discovery queries x2 families + supporting x2 families)
+    // receipts: exactly 1 model_call (no rerank — pool 4 <= cap) + source_retrieval:
+    // 11 planned searches (counter x2 + discovery 2x3 + supporting 1x3) PLUS W6/F2
+    // recovery variants — every empty arXiv search retries k4 then k2 (3 empty arXiv
+    // searches x 2 variants each = 6 extra receipted attempts, all still empty here).
     const receipts = env.store.listObjects('receipt', env.run.id);
     expect(receipts.filter((r) => r.kind === 'model_call')).toHaveLength(1);
     const retrieval = receipts.filter((r) => r.kind === 'source_retrieval');
-    expect(retrieval).toHaveLength(11); // counter x2 + discovery 2x3 + supporting 1x3 (crossref added D-029b)
+    expect(retrieval).toHaveLength(17);
     for (const r of retrieval) {
       expect(r.executionMode).toBe('live');
       expect(r.stage).toBe('retrieve');
@@ -334,12 +345,26 @@ describe('retrieve stage', () => {
     expect(counterReceipt.sourceRetrieval?.family).toBe('openalex');
     expect(counterReceipt.sourceRetrieval?.resultCount).toBe(2);
     expect(counterReceipt.sourceRetrieval?.contentHashes).toHaveLength(2);
-    // W5/S1: the SECOND planned counter query is executed too (arxiv side), never dropped
+    // W5/S1: the SECOND planned counter query is executed too, never dropped.
+    // W6/F1: it now routes to crossref (arXiv measured 82.3% zero on counter queries,
+    // crossref 0% zero / mean 6.0 on the same historical population).
     const counterReceipt2 = defined(
       retrieval.find((r) => r.sourceRetrieval?.query === PLAN.counter[1]),
       'second counter receipt',
     );
-    expect(counterReceipt2.sourceRetrieval?.family).toBe('arxiv');
+    expect(counterReceipt2.sourceRetrieval?.family).toBe('crossref');
+    // W6/F2: the arXiv zero-result cascade fired and each variant attempt is receipted
+    const variantReceipts = retrieval.filter(
+      (r) => r.sourceRetrieval?.family === 'arxiv' && !PLAN.discovery.concat(PLAN.supporting).includes(r.sourceRetrieval?.query ?? ''),
+    );
+    expect(variantReceipts).toHaveLength(6); // 3 empty searches x (k4 + k2)
+    const disc0Terms = (PLAN.discovery[0] as string).split(/\s+/);
+    expect(
+      variantReceipts.some((r) => r.sourceRetrieval?.query === disc0Terms.slice(0, 4).join(' ')),
+    ).toBe(true);
+    expect(
+      variantReceipts.some((r) => r.sourceRetrieval?.query === disc0Terms.slice(0, 2).join(' ')),
+    ).toBe(true);
     // both counter searches run before any discovery/supporting search (R-05 ordering)
     const indexOfQuery = (text: string) =>
       retrieval.findIndex((r) => r.sourceRetrieval?.query === text);
@@ -411,11 +436,284 @@ describe('retrieve stage', () => {
     const failedReceipts = env.store
       .listObjects('receipt', env.run.id)
       .filter((r) => r.kind === 'source_retrieval' && r.sourceRetrieval?.family === 'arxiv');
-    expect(failedReceipts).toHaveLength(4); // counter[1] + BOTH discovery queries + supporting all really attempted arxiv
+    expect(failedReceipts).toHaveLength(3); // W6/F1: counter[1] moved to crossref; arXiv still attempts BOTH discovery + supporting
     for (const r of failedReceipts) {
       expect(r.sourceRetrieval?.httpStatus).toBe(504);
       expect(r.sourceRetrieval?.resultCount).toBe(0);
     }
+  });
+
+  it('W6/F2: recovers arXiv zero-results via the k4 variant and stops the cascade at the first hit', async () => {
+    const disc0 = PLAN.discovery[0] as string;
+    const k4 = disc0.split(/\s+/).slice(0, 4).join(' ');
+    const k2 = disc0.split(/\s+/).slice(0, 2).join(' ');
+    const recovered = fakeRecord('Fixture arXiv k4 Recovery', '10.1000/fake.arxiv-k4');
+    const arxivCalls: string[] = [];
+    const arxiv = fakeAdapter('arxiv', {
+      search: async (q) => {
+        arxivCalls.push(q);
+        return q === k4 ? [recovered] : [];
+      },
+    });
+    const openalex = fakeAdapter('openalex', {
+      search: async (q) => (q === PLAN.counter[0] ? [fakeRecord('Fixture Counter', '10.1000/fake.counter')] : []),
+    });
+    const crossref = fakeAdapter('crossref', {
+      search: async (q) => (q === PLAN.counter[1] ? [fakeRecord('Fixture Counter X', '10.1000/fake.counterx')] : []),
+    });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+
+    // discovery[0] on arXiv: full -> zero, k4 -> hit, k2 NEVER fired (cascade stops at first hit)
+    expect(arxivCalls).toContain(disc0);
+    expect(arxivCalls).toContain(k4);
+    expect(arxivCalls).not.toContain(k2);
+    // other empty arXiv searches (discovery[1], supporting[0]) cascade fully: full + k4 + k2
+    expect(arxivCalls.filter((q) => q === disc0).length).toBe(1);
+
+    // the recovered document really entered the corpus
+    const docs = env.store.listObjects('source_document', env.run.id);
+    expect(docs.some((d) => d.identifiers.some((i) => i.value === '10.1000/fake.arxiv-k4'))).toBe(true);
+
+    // variant searches are visible: fusion note + summary + per-variant receipts.
+    // Count: disc0 -> k4 HIT (stop) = 1; disc1 -> k4 zero, k2 zero = 2; supp ->
+    // k4 ("intermittent fasting insulin sensitivity" — SAME string as disc0's k4,
+    // which this fixture answers with a hit) = 1. Total 4, not 5.
+    const corpus = defined(env.store.listObjects('corpus_snapshot', env.run.id)[0], 'corpus');
+    expect(corpus.fusion?.variantSearches).toBe(4);
+    expect(out.summary).toContain('arXiv recovery variant search(es)');
+    const variantReceipts = env.store
+      .listObjects('receipt', env.run.id)
+      .filter((r) => r.kind === 'source_retrieval' && r.sourceRetrieval?.family === 'arxiv')
+      .filter((r) => {
+        const q = r.sourceRetrieval?.query ?? '';
+        return ![PLAN.discovery[0], PLAN.discovery[1], PLAN.supporting[0]].includes(q);
+      });
+    expect(variantReceipts).toHaveLength(4);
+  });
+
+  it('W6/F2 audit P3-1: a failed variant attempt is receipted and the cascade continues to k2', async () => {
+    const disc0 = PLAN.discovery[0] as string;
+    const k4 = disc0.split(/\s+/).slice(0, 4).join(' ');
+    const k2 = disc0.split(/\s+/).slice(0, 2).join(' ');
+    const recovered = fakeRecord('Fixture arXiv k2 after k4 error', '10.1000/fake.arxiv-k2b');
+    const arxiv = fakeAdapter('arxiv', {
+      search: async (q) => {
+        if (q === k4) {
+          throw new SourceAdapterError({
+            family: 'arxiv', query: q, kind: 'http_status', httpStatus: 429,
+            message: 'fixture transient rate limit',
+          });
+        }
+        return q === k2 ? [recovered] : [];
+      },
+    });
+    const openalex = fakeAdapter('openalex', { search: async () => [] });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    // k2 recovery really ran and its document entered the corpus despite the k4 error
+    const docs = env.store.listObjects('source_document', env.run.id);
+    expect(docs.some((d) => d.identifiers.some((i) => i.value === '10.1000/fake.arxiv-k2b'))).toBe(true);
+    // the FAILED k4 attempt carries its own receipt with the real httpStatus
+    const k4Receipt = env.store
+      .listObjects('receipt', env.run.id)
+      .find((r) => r.sourceRetrieval?.query === k4);
+    expect(defined(k4Receipt, 'k4 failure receipt').sourceRetrieval?.httpStatus).toBe(429);
+    expect(k4Receipt?.redactionNote).toContain('arxiv recovery variant');
+    // variant attempts are countable and distinguishable from planned searches
+    const corpus = defined(env.store.listObjects('corpus_snapshot', env.run.id)[0], 'corpus');
+    expect(corpus.fusion?.variantSearches).toBeGreaterThanOrEqual(2);
+  });
+
+  it('W6/F2: falls through to the k2 variant when k4 also returns nothing', async () => {
+    const supp = PLAN.supporting[0] as string;
+    const k2 = supp.split(/\s+/).slice(0, 2).join(' ');
+    const bottomRecovered = fakeRecord('Fixture arXiv k2 Recovery', '10.1000/fake.arxiv-k2');
+    const arxiv = fakeAdapter('arxiv', {
+      search: async (q) => (q === k2 ? [bottomRecovered] : []),
+    });
+    const openalex = fakeAdapter('openalex', { search: async () => [] });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    const docs = env.store.listObjects('source_document', env.run.id);
+    expect(docs.some((d) => d.identifiers.some((i) => i.value === '10.1000/fake.arxiv-k2'))).toBe(true);
+    // the k2 receipt proves the full cascade ran for this query
+    const k2Receipt = env.store
+      .listObjects('receipt', env.run.id)
+      .find((r) => r.sourceRetrieval?.query === k2);
+    expect(defined(k2Receipt, 'k2 receipt').sourceRetrieval?.resultCount).toBe(1);
+  });
+
+  it('W6/F2: arxivRecoveryVariants only yields strictly-shorter distinct queries (pure)', async () => {
+    const { arxivRecoveryVariants } = await import('../src/pipeline/stages/retrieve.js');
+    // 6 terms: k4 and k2 both differ from full and each other
+    expect(arxivRecoveryVariants('a b c d e f')).toEqual(['a b c d', 'a b']);
+    // 4 terms: k4 === full -> skipped, k2 kept
+    expect(arxivRecoveryVariants('a b c d')).toEqual(['a b']);
+    // 2 terms: no strictly-shorter variant exists
+    expect(arxivRecoveryVariants('a b')).toEqual([]);
+    // 3 terms: k4 === full (slice clamps) -> only k2
+    expect(arxivRecoveryVariants('a b c')).toEqual(['a b']);
+  });
+
+  it('W6/F4: rerankWindowPlan yields bottom-up overlapping windows, head last (RankGPT)', async () => {
+    const { rerankWindowPlan } = await import('../src/pipeline/stages/retrieve.js');
+    // n <= w: single full window (RankGPT's w>n silent-skip bug impossible here)
+    expect(rerankWindowPlan(12, 24, 12)).toEqual([[0, 12]]);
+    expect(rerankWindowPlan(24, 24, 12)).toEqual([[0, 24]]);
+    // n=30, w=24, s=12: bottom window [6,30) first, head window [0,24) last
+    expect(rerankWindowPlan(30, 24, 12)).toEqual([
+      [6, 30],
+      [0, 24],
+    ]);
+    // n=48: three windows, bottoms-up, 12-overlap chaining
+    expect(rerankWindowPlan(48, 24, 12)).toEqual([
+      [24, 48],
+      [12, 36],
+      [0, 24],
+    ]);
+  });
+
+  it('W6/F4 audit P2-4: applyWindowedRerank output is a permutation; mid-window failure propagates', async () => {
+    const { applyWindowedRerank } = await import('../src/pipeline/stages/retrieve.js');
+    const entry = (i: number): PoolEntry => ({
+      key: `k${i}`,
+      record: fakeRecord(`Fixture ${i}`, `10.1000/fake.w${i}`),
+      family: 'openalex',
+      firstSeen: 0,
+      purposes: new Set(['discovery'] as const),
+      ranks: [{ target: 0, rank: i }],
+    });
+    const working = Array.from({ length: 47 }, (_, i) => entry(i));
+    const windows = [
+      [23, 47],
+      [11, 35],
+      [0, 24],
+    ] as const;
+    const reverse = (slice: readonly PoolEntry[]) => [...slice].reverse();
+
+    const out = await applyWindowedRerank(working, windows, reverse);
+    // permutation invariant: every input key exactly once — exact multiset equality
+    expect(out).toHaveLength(47);
+    expect(out.map((e) => e.key).sort()).toEqual(
+      Array.from({ length: 47 }, (_, i) => `k${i}`).sort(),
+    );
+    expect(new Set(out.map((e) => e.key)).size).toBe(47);
+    // input is not mutated (callers fall back to it on failure)
+    expect(working.map((e) => e.key)).toEqual(Array.from({ length: 47 }, (_, i) => `k${i}`));
+
+    // failure in window 2 (after window 1 spliced) propagates — no half-spliced return
+    let calls = 0;
+    await expect(
+      applyWindowedRerank(working, windows, async (slice) => {
+        calls += 1;
+        if (calls === 2) throw new Error('fixture window-2 outage');
+        return reverse(slice);
+      }),
+    ).rejects.toThrow('fixture window-2 outage');
+    expect(calls).toBe(2);
+
+    // a wrong-length permutation is rejected, not silently truncated
+    await expect(
+      applyWindowedRerank(working, [[0, 24]] as const, async (slice) => slice.slice(0, 20)),
+    ).rejects.toThrow(/returned 20 of 24/);
+  });
+
+  it('W6/F4 audit P1-1: cancellation during the window loop aborts the stage, never completes it', async () => {
+    const manyDocs = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) => fakeRecord(`Fixture ${prefix} ${i}`, `10.1000/fake.${prefix}.${i}`));
+    const openalex = fakeAdapter('openalex', {
+      search: async (q) => (q === PLAN.counter[0] ? manyDocs('ctr', 8) : manyDocs(q.replace(/\W+/g, ''), 6)),
+    });
+    const crossref = fakeAdapter('crossref', {
+      search: async (q) => (q === PLAN.counter[1] ? manyDocs('ctrx', 6) : manyDocs(`x${q.replace(/\W+/g, '')}`, 3)),
+    });
+    const arxiv = fakeAdapter('arxiv', { search: async () => manyDocs('ax', 2) });
+    const permute = (n: number) => ({
+      ranked: Array.from({ length: n }, (_, i) => ({
+        index: i,
+        relevance: 'high' as const,
+        reason: 'fixture identity rerank reason',
+      })),
+    });
+    const env = makeEnv(
+      [
+        { rawOutput: JSON.stringify(PLAN) },
+        { rawOutput: JSON.stringify(permute(24)) },
+        { rawOutput: JSON.stringify(permute(24)) },
+        { rawOutput: JSON.stringify(permute(24)) },
+      ],
+      { openalex, arxiv, crossref },
+    );
+    // Drive cancellation off REAL observable state: once the plan call AND the
+    // first window call have been receipted (2 model_call receipts), the next
+    // window checkpoint must abort the stage — never degrade to rerankFailure.
+    const modelCallReceipts = () =>
+      env.store.listObjects('receipt', env.run.id).filter((r) => r.kind === 'model_call');
+    env.ctx.cancelled = () => modelCallReceipts().length >= 2;
+
+    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow('cancelled by user');
+    // no corpus snapshot persisted post-cancel; no fake failure receipt for the
+    // already-successful searches (P2-2)
+    expect(env.store.listObjects('corpus_snapshot', env.run.id)).toHaveLength(0);
+    const failReceipts = env.store
+      .listObjects('receipt', env.run.id)
+      .filter((r) => r.kind === 'source_retrieval' && (r.sourceRetrieval?.httpStatus ?? 200) === 0);
+    expect(failReceipts).toHaveLength(0);
+  });
+
+  it('W6/F4: pools above one rerank window execute multiple window calls and record rerankWindows', async () => {
+    // Pool 47 unique docs -> candidates = top 48 -> window plan over 47:
+    // [23,47), [11,35), [0,24) = 3 windows (bottom-up, head last).
+    const manyDocs = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) => fakeRecord(`Fixture ${prefix} ${i}`, `10.1000/fake.${prefix}.${i}`));
+    const openalex = fakeAdapter('openalex', {
+      search: async (q) => (q === PLAN.counter[0] ? manyDocs('ctr', 8) : manyDocs(q.replace(/\W+/g, ''), 6)),
+    });
+    const crossref = fakeAdapter('crossref', {
+      search: async (q) => (q === PLAN.counter[1] ? manyDocs('ctrx', 6) : manyDocs(`x${q.replace(/\W+/g, '')}`, 3)),
+    });
+    const arxiv = fakeAdapter('arxiv', { search: async (q) => manyDocs(`a${q.replace(/\W+/g, '')}`, 2) });
+    // pool: 8 + 6*3(openalex others) + 6 + 3*2(crossref others) + 2*3(arxiv) = 47
+    const permute = (n: number) => ({
+      ranked: Array.from({ length: n }, (_, i) => ({
+        index: n - 1 - i, // strict reversal — maximal permutation distance from identity
+        relevance: 'high' as const,
+        reason: 'fixture reversal rerank reason',
+      })),
+    });
+    const env = makeEnv(
+      [
+        { rawOutput: JSON.stringify(PLAN) },
+        { rawOutput: JSON.stringify(permute(24)) },
+        { rawOutput: JSON.stringify(permute(24)) },
+        { rawOutput: JSON.stringify(permute(24)) },
+      ],
+      { openalex, arxiv, crossref },
+    );
+
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    const corpus = defined(env.store.listObjects('corpus_snapshot', env.run.id)[0], 'corpus');
+    expect(corpus.fusion?.rerankApplied).toBe(true);
+    expect(corpus.fusion?.rerankWindows).toBe(3);
+    expect(corpus.fusion?.poolSize).toBe(47);
+    // plan call + 3 window calls = 4 model calls
+    const modelReceipts = env.store
+      .listObjects('receipt', env.run.id)
+      .filter((r) => r.kind === 'model_call');
+    expect(modelReceipts).toHaveLength(4);
+    const docs = env.store.listObjects('source_document', env.run.id);
+    expect(docs.length).toBeLessThanOrEqual(12);
+    expect(out.summary).toContain('truncated at cap 12');
   });
 
   it('fails the stage when every source family fails — no fake empty success', async () => {
@@ -492,21 +790,24 @@ describe('retrieve stage', () => {
   });
 
   it('caps the corpus at 12 via rerank+quota, records the fusion, and keeps counter seats (D-015)', async () => {
-    // Deterministic pool: 2 counter searches x 6 docs + 6 other searches x 1 doc = 18 unique.
+    // Deterministic pool: 2 counter searches x 6 docs + 9 other searches x 1 doc = 21 unique.
+    // W6/F1: counter[1] now routes to crossref (was arxiv).
     const slug = (q: string) => q.replace(/\W+/g, '');
     const counterDocs = (prefix: string) =>
       Array.from({ length: 6 }, (_, i) => fakeRecord(`Fixture ${prefix} ${i}`, `10.1000/fake.${prefix}.${i}`));
+    const oneDoc = (prefix: string) => (q: string) => [
+      fakeRecord(`Fixture ${prefix}${slug(q)}`, `10.1000/fake.${prefix}${slug(q)}`),
+    ];
     const openalex = fakeAdapter('openalex', {
-      search: async (q) =>
-        q === PLAN.counter[0] ? counterDocs(slug(q)) : [fakeRecord(`Fixture ${slug(q)}`, `10.1000/fake.${slug(q)}`)],
+      search: async (q) => (q === PLAN.counter[0] ? counterDocs(slug(q)) : oneDoc('')(q)),
     });
-    const arxiv = fakeAdapter('arxiv', {
-      search: async (q) =>
-        q === PLAN.counter[1] ? counterDocs(`a${slug(q)}`) : [fakeRecord(`Fixture a${slug(q)}`, `10.1000/fake.a${slug(q)}`)],
+    const arxiv = fakeAdapter('arxiv', { search: async (q) => oneDoc('a')(q) });
+    const crossref = fakeAdapter('crossref', {
+      search: async (q) => (q === PLAN.counter[1] ? counterDocs(`a${slug(q)}`) : oneDoc('x')(q)),
     });
-    // Rerank script: identity permutation over the 18-candidate pool (order = fused order).
+    // Rerank script: identity permutation over the 21-candidate pool (order = fused order).
     const identityRerank = {
-      ranked: Array.from({ length: 18 }, (_, i) => ({
+      ranked: Array.from({ length: 21 }, (_, i) => ({
         index: i,
         relevance: i < 12 ? ('high' as const) : ('medium' as const),
         reason: 'fixture identity rerank reason',
@@ -514,7 +815,7 @@ describe('retrieve stage', () => {
     };
     const env = makeEnv(
       [{ rawOutput: JSON.stringify(PLAN) }, { rawOutput: JSON.stringify(identityRerank) }],
-      { openalex, arxiv },
+      { openalex, arxiv, crossref },
     );
 
     const out = await retrieveStage.execute(env.ctx);
@@ -526,7 +827,7 @@ describe('retrieve stage', () => {
     const corpus = defined(env.store.listObjects('corpus_snapshot', env.run.id)[0], 'corpus');
     expect(corpus.fusion).toMatchObject({
       algorithm: 'rrf-k60+llm-listwise-rerank-v1',
-      poolSize: 18,
+      poolSize: 21,
       rerankApplied: true,
     });
     // counter-evidence quota floor honored under cap pressure
@@ -663,6 +964,80 @@ describe('verify stage', () => {
     const verification = env.store.getObject('source_document', doc.id)?.verification;
     expect(verification?.resolved).toBe(true);
     expect(verification?.titleMatch).toBe(false);
+    // W6/F3: risk graded (authors empty -> unknown signal) but NOT suspected —
+    // venue/year both consistent, identifier stays authoritative.
+    expect(verification?.wrongPaperSuspect).toBeUndefined();
+    expect(verification?.detail).toContain('wrong-paper signals');
+  });
+
+  it('W6/F3: flags wrongPaperSuspect on disjoint authors + year gap + venue mismatch (refchecker rules)', async () => {
+    // fixture-resolved record carries DIFFERENT authors/year/venue than the doc
+    const crossref = fakeAdapter('crossref', {
+      resolve: async (identifier) => ({
+        found: true,
+        httpStatus: 200,
+        record: {
+          ...fakeRecord('quantum dot synthesis pathway in semiconductor nanowires', identifier.value),
+          authors: ['Zoe Gamma', 'Yan Delta'],
+          publicationYear: 2024,
+          venue: 'Nature Fixture Methods',
+        },
+      }),
+    });
+    const env = makeEnv([], { crossref });
+    const doc = makeDoc(env.run.id, {
+      identifiers: [{ kind: 'doi', value: '10.1000/fake.verify-wp' }],
+      title: 'Fixture Study of Base Editing in Human Cells',
+      authors: ['Alice Alpha', 'Bob Beta'],
+      publicationYear: 2018,
+      venue: 'Journal of Fixture Editing',
+    });
+    env.store.putObject('source_document', doc);
+
+    await verifyStage.execute(env.ctx);
+    const verification = defined(
+      env.store.getObject('source_document', doc.id)?.verification,
+      'verification',
+    );
+    // identifier stays authoritative (refchecker: never reject anchored matches)
+    expect(verification.resolved).toBe(true);
+    expect(verification.titleMatch).toBe(false);
+    expect(verification.wrongPaperSuspect).toBe(true);
+    expect(verification.detail).toContain('0/2 shared surnames');
+    expect(verification.detail).toContain('year gap 6');
+    expect(verification.detail).toContain('venue mismatch');
+  });
+
+  it('W6/F3: title mismatch with shared authors stays unsuspicious (metadata variant, not wrong paper)', async () => {
+    const crossref = fakeAdapter('crossref', {
+      resolve: async (identifier) => ({
+        found: true,
+        httpStatus: 200,
+        record: {
+          ...fakeRecord('slightly different rendered title of the same work', identifier.value),
+          authors: ['A. Alpha', 'Carl Beta'],
+          publicationYear: 2018,
+        },
+      }),
+    });
+    const env = makeEnv([], { crossref });
+    const doc = makeDoc(env.run.id, {
+      identifiers: [{ kind: 'doi', value: '10.1000/fake.verify-wp2' }],
+      title: 'Fixture Study of Base Editing in Human Cells',
+      authors: ['Alice Alpha', 'Bob Beta'],
+      publicationYear: 2018,
+    });
+    env.store.putObject('source_document', doc);
+
+    await verifyStage.execute(env.ctx);
+    const verification = defined(
+      env.store.getObject('source_document', doc.id)?.verification,
+      'verification',
+    );
+    expect(verification.resolved).toBe(true);
+    expect(verification.titleMatch).toBe(false);
+    expect(verification.wrongPaperSuspect).toBeUndefined(); // 2 shared surnames -> not a suspect
+    expect(verification.detail).toContain('2/2 shared surnames');
   });
 
   it('marks a DOI resolve 404 as resolved=false (honest unresolved, not a silent pass)', async () => {

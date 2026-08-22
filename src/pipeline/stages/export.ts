@@ -175,7 +175,8 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
     for (const s of d.sources) {
       const verify = s.verification
         ? `${s.verification.method} · resolved=${s.verification.resolved}` +
-          (s.verification.titleMatch !== undefined ? ` · titleMatch=${s.verification.titleMatch}` : '')
+          (s.verification.titleMatch !== undefined ? ` · titleMatch=${s.verification.titleMatch}` : '') +
+          (s.verification.wrongPaperSuspect === true ? ' · ⚠️wrongPaperSuspect' : '')
         : '未核验';
       push(`| ${s.title} | ${s.publicationYear ?? '未知'} | ${s.contentDepth} | ${s.accessState} | ${verify} | ${s.contentHash.slice(0, 12)} |`);
     }
