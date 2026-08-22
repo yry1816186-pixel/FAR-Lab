@@ -38,3 +38,9 @@
 | 4 | 融合计划（对照 Marginal Value Gate + 灵魂边界逐项审查） | DECISIONS 记录排序理由 |
 | 5 | 执行融合（源码级+测试+benchmark before/after+对抗审计） | 证据落 evidence/W5A/ |
 | 6 | 收口（基线 DoD 全项） | 三处一致，提交成功 |
+
+## 五、本 Wave 量化野心（北极星映射，eval/north-star.json）
+- 融合准入线：对映射指标带来 >=5% 可测提升或消除一类已实证失败模式；零北极星回退。
+- 直接负责：rediscovery-mean-f1（当前 0.58 → target 0.70 / stretch 0.80，>=4/5 任务 >=0.70）；relation-blind-agreement（0.61 → 0.80/0.90）。
+- 间接拉动：mlr-bench-overall（idea 7.00 → 7.40/7.70）；counter-evidence-substantive-hit（先定义后 >=0.70）。
+- 收口前更新账本 current 值（命令级证据）；只达 baseline 如实记录差距原因。

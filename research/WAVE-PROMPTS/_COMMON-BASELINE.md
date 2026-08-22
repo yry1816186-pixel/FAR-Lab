@@ -21,6 +21,15 @@
 - 并行研究会话可能共享分支：提交前 `git status`，DECISIONS append 前查尾。
 - DeepSeek strict-FC 为默认传输（`FARLAB_DEEPSEEK_STRICT=0` 可关）；官方提交路由=千问系列经百炼（COMPETITION.md §0，B-QWEN-LIVE-ROUTE 等用户凭证，不可伪造）。
 
+## 性能与质量野心硬门（v2，全部 Wave 生效）
+- **北极星账本**：`eval/north-star.json` 是唯一量化真源——每 Wave 收口前把其负责指标的 current 更新为实测值（命令级证据），target/stretch 阶梯保持或上调、**只升不降**（调整须 DECISIONS 记录理由）。
+- **采用阈值**：外部机制融合的默认准入线 = 目标指标可测提升 ≥5%（或消除一类已实证失败模式）且**零北极星回退**；不足者最多记"评估后不采用"结论，不入主路径。
+- **反回归铁律**：任何 Wave 收口时若任一北极星指标回退，revert 或修复后才能宣称完成；禁止为过门槛弱化测试/诚实披露/指标口径。
+- **测试判别力**：新增测试必须能因真实缺陷而红（对关键修复做一次 mutation 抽查：注入缺陷→测试红→还原）；禁止 `toBeDefined` 级装饰断言；新代码零 `any`/吞错/空 catch（宪法零容忍）。
+- **基准方法论**：before/after 必须同数据同口径同 seed，样本量与方差如实给出（沿用 D-022 复算纪律：结论数字由主 Agent 从原始 JSON 独立重算）。
+- **野心阶梯强制**：每 Wave 计划须写明自身指标的 baseline→target→stretch；只达 baseline 时如实记录差距原因，不得宣称达标。
+- **工程完成度**：生产路径改动必须带失败路径测试（超时/限流/坏输入/部分失败）+ 一次真实路径验证；UI 改动带真实状态绑定核验（假状态零容忍）。
+
 ## 每 Wave 收口 DoD（不可缺项）
 1. 融合项 = 源码级移植入权威路径 + 测试 + benchmark before/after + 对抗审计（子 Agent 审，主 Agent 修根因）。
 2. 重要结论落 `evidence/W-{wave}/`；每个决策落 `.control/DECISIONS.jsonl`；注册表/控制面/记忆同步。

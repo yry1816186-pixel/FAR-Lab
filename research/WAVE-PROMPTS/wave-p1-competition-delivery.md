@@ -28,3 +28,8 @@
 | 2 | 交付物 1→5 顺序执行（1 与 2 可并行子 Agent 起草，主 Agent 统稿核数） | 每项 DoD 达成 |
 | 3 | 数字诚实审计（子 Agent 对照原始 JSON 全量核对文档数字） | 0 不符 |
 | 4 | 收口：交付物入 `artifacts/delivery/`（或根目录约定位置）；决策/控制面/记忆同步；completion-gate 复跑 | 提交成功 |
+
+## 五、本 Wave 量化野心（北极星映射）
+- 直接负责：hci-audit-p1（双审计后 0 个 P1；stretch = 5/5 核心任务无辅助走查完成）；delivery-number-honesty（文档数字 vs 原始 JSON 对抗复算 0 不符）。
+- 硬线：PDF 每个数字旁注证据文件路径可点验；演示脚本每步绑定真实命令/页面截图来源。
+- 官方八要素逐项对照表落 evidence/；缺凭证项如实标注 READY-TO-VERIFY + 一条命令验证路径。

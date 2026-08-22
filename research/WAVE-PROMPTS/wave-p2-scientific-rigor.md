@@ -29,3 +29,8 @@
 | 2 | 按表逐项执行（可两线并行：1/5/6 为判分线，2/3/4 为管线线） | 每项 DoD |
 | 3 | 全量回归 + live 验证 + 对抗审计（重点：诚实性不减） | 审计 PASS |
 | 4 | 收口（基线 DoD 全项；新旧口径并报写入证据） | 三处一致，提交成功 |
+
+## 五、本 Wave 量化野心（北极星映射）
+- rediscovery-mean-f1 0.58 → 0.70（stretch 0.80）；relation-blind-agreement 0.61 → 0.80（stretch 0.90）；mlr-bench proposal 6.20 → 7.00（stretch 7.40，渲染 A/B 同 run 对比实测）。
+- 阈值溯源：live run 中 evidence-derived 占比从 ~17%（2/12 抽样）→ >=30%（stretch 50%）；BT 置信区间入 scorecard（bootstrap 确定性）。
+- 反注水：判分指标改善不得来自讨好判分器的措辞调整——凡 prompt 改动需在证据中说明为何是保真提升而非分数工程；新旧口径并报。

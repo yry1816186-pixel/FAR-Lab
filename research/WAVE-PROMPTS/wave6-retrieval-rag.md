@@ -36,3 +36,9 @@
 | 4 | 融合计划 + DECISIONS | 理由落盘 |
 | 5 | 执行融合：**先基线后改动**，benchmark before/after + 对抗审计 | 证据落 evidence/W6/ |
 | 6 | 收口（基线 DoD 全项） | 三处一致，提交成功 |
+
+## 五、本 Wave 量化野心（北极星映射）
+- 融合准入线：检索质量基准（verify 率/反证席命中/claim binding）>=3pt 提升或 nDCG 类指标 >=5%，且零回退。
+- 直接负责：retrieval-verified-rate（0.9667 → 0.98/0.995）；run-wall-clock（加第三源后 p50 <=6min 不回退，stretch <=4.5min）。
+- 间接拉动：mlr-bench-overall、rediscovery-mean-f1。
+- 必须先落检索质量基线器（可回归、确定性）再动主路径。
