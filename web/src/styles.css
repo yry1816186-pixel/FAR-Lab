@@ -302,6 +302,73 @@ a:hover { text-decoration: underline; }
 .welcome-step .ev-glyph { min-height: 18px; line-height: 18px; width: 18px; font-size: 13px; }
 .welcome-foot { font-size: var(--fs-aux); text-align: center; margin: 0; }
 
+/* ---------- health strip (P-PRO): real /api/v1/health projection ---------- */
+.health-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-aux);
+  padding: 4px var(--sp-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+}
+.health-strip--ok   { color: var(--v2-verified-on-tint); background: var(--v2-verified-tint); border-color: var(--ok-border); }
+.health-strip--warn { color: var(--v2-caution-on-tint);  background: var(--v2-caution-tint);  border-color: var(--warn-border); }
+.health-strip--err  { color: var(--v2-refuted-on-tint);  background: var(--v2-refuted-tint);  border-color: var(--err-border); }
+.health-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+/* ---------- recent task cards (P-PRO: continue where you left off) ---------- */
+.welcome-recent { display: flex; flex-direction: column; gap: var(--sp-2); }
+.welcome-recent-title { font-size: var(--fs-h3); margin: 0; }
+.recent-cards { list-style: none; margin: 0; padding: 0; display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.recent-card {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  font: inherit;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--radius-s);
+  padding: var(--sp-3);
+  cursor: pointer;
+}
+.recent-card:hover { border-color: var(--accent); }
+.recent-card-top { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); min-width: 0; }
+.recent-card-mid { font-size: var(--fs-aux); }
+.recent-card-bottom { font-size: var(--fs-aux); }
+
+/* ---------- proactive run banner (P-PRO) ---------- */
+.run-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-s);
+  border: 1px solid;
+  font-size: var(--fs-body);
+}
+.run-banner--info { background: var(--v2-info-tint); color: var(--v2-info-on-tint); border-color: var(--info-border); }
+.run-banner--ok   { background: var(--v2-verified-tint); color: var(--v2-verified-on-tint); border-color: var(--ok-border); }
+.run-banner--warn { background: var(--v2-caution-tint); color: var(--v2-caution-on-tint); border-color: var(--warn-border); }
+.run-banner--err  { background: var(--v2-refuted-tint); color: var(--v2-refuted-on-tint); border-color: var(--err-border); }
+.run-banner-text { flex: 1 1 auto; }
+.run-banner-meta { font-size: var(--fs-aux); }
+/* live pulse — motion whitelist: opacity only, reduced-motion disables */
+.run-banner-pulse {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor;
+  animation: banner-pulse 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes banner-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .run-banner-pulse { animation: none; opacity: 0.7; }
+}
+
 /* ---------- sidebar groups (P-IA) ---------- */
 .sidebar-head-actions { display: flex; gap: var(--sp-1); align-items: center; }
 .runs-groups { display: flex; flex-direction: column; gap: var(--sp-4); }

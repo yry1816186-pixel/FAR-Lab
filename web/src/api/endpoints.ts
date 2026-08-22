@@ -16,7 +16,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSources,
 } from './normalize';
-import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, ResearchRun, RunEvent, RunSummary, ScientificGoalType, VerificationReport } from './types';
+import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ResearchRun, RunEvent, RunSummary, ScientificGoalType, VerificationReport } from './types';
 
 const BASE = '/api/v1';
 
@@ -145,6 +145,25 @@ export const cancelRun = async (runId: string, signal?: AbortSignal): Promise<vo
 
 export const resumeRun = async (runId: string, signal?: AbortSignal): Promise<void> => {
   await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/resume`, {}, signal);
+};
+
+/** Workbench health strip (P-IA) — fail-visible: schema drift surfaces as ApiError, never as fake-ok. */
+export const getHealth = async (signal?: AbortSignal): Promise<HealthReport> => {
+  const data: unknown = await api.getJson(`${BASE}/health`, signal);
+  if (
+    typeof data === 'object' && data !== null &&
+    'status' in data && 'db' in data && 'watchdog' in data && 'providers' in data &&
+    Array.isArray((data as { providers: unknown }).providers)
+  ) {
+    return data as HealthReport;
+  }
+  throw new ApiError({
+    code: 'unexpected_schema',
+    message: '健康检查响应结构与预期不符（缺少 status/db/watchdog/providers）',
+    status: 200,
+    retryable: false,
+    i18nKey: 'err.healthShape',
+  });
 };
 
 export interface FeedbackInput {

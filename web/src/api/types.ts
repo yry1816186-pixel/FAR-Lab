@@ -73,6 +73,21 @@ export interface ResearchRun {
   leaseInfo?: RunLeaseInfo;
 }
 
+/** GET /api/v1/health projection (P-IA proactive status strip). */
+export interface HealthProvider {
+  name: string;
+  kind: 'live' | 'test';
+  liveReady: boolean;
+}
+export interface HealthReport {
+  status: 'ok' | 'degraded';
+  db: string;
+  watchdog: string;
+  providers: HealthProvider[];
+  gitCommit: string | null;
+  time: string;
+}
+
 /** Bundle summary served by GET /runs/:id/bundles (first-class discovery, D-060). */
 export interface BundleSummary {
   id: string;
