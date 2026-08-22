@@ -592,6 +592,15 @@ describe('dashscope adapter (mock fetch)', () => {
     expect(bodyOf(calls[0]!).model).toBe('qwen-max');
   });
 
+  it('honors the FARLAB_DASHSCOPE_BASE_URL override (intl endpoint, registry-informed)', async () => {
+    vi.stubEnv('FARLAB_DASHSCOPE_BASE_URL', 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1');
+    const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'qwen-plus'))]);
+    const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });
+    expect(provider.baseUrl).toBe('https://dashscope-intl.aliyuncs.com/compatible-mode/v1');
+    await provider.structuredCall(REQ, parseHypothesis);
+    expect(calls[0]?.url).toBe('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions');
+  });
+
   it('strips strict-FC tool payloads (same capability decision as zai) and fails closed without a key', async () => {
     const { fetchImpl, calls } = recorderFetch([() => Promise.resolve(chatOk(RAW_OK, 'qwen-plus'))]);
     const provider = createDashScopeProvider({ apiKey: 'test-fixture-key-dashscope', fetchImpl });

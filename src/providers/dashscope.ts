@@ -15,6 +15,10 @@ export const DASHSCOPE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mod
 export const DASHSCOPE_DEFAULT_MODEL = 'qwen-plus';
 const ENV_API_KEY = 'DASHSCOPE_API_KEY';
 const ENV_MODEL = 'FARLAB_DASHSCOPE_MODEL';
+/** Registry-informed (research/reference/models-dev-catalog.json, alibaba entry): the
+ * international endpoint serves accounts provisioned outside mainland China with its
+ * own key; mainland remains the default. */
+const ENV_BASE_URL = 'FARLAB_DASHSCOPE_BASE_URL';
 
 export interface DashScopeProviderOptions {
   /** Overrides DASHSCOPE_API_KEY (tests inject a fake value; real secrets never enter files/logs). */
@@ -35,7 +39,7 @@ export interface DashScopeProvider extends ModelProvider {
 export function createDashScopeProvider(opts: DashScopeProviderOptions = {}): DashScopeProvider {
   const apiKey = opts.apiKey ?? process.env[ENV_API_KEY] ?? '';
   const modelId = opts.model ?? process.env[ENV_MODEL] ?? DASHSCOPE_DEFAULT_MODEL;
-  const baseUrl = opts.baseUrl ?? DASHSCOPE_BASE_URL;
+  const baseUrl = opts.baseUrl ?? process.env[ENV_BASE_URL] ?? DASHSCOPE_BASE_URL;
   return {
     name: 'dashscope',
     liveReady: apiKey.length > 0,
