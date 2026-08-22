@@ -305,6 +305,56 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
     if (!RUN_ID_RE.test(runId)) throw validation(`invalid runId format: ${runId}`);
   };
 
+  /**
+   * B3 SSE push channel for run events — Node-native, zero dependencies.
+   * Server push replaces the 2s polling cadence; clients keep polling as the
+   * fallback for environments where EventSource is unavailable. Cursor comes
+   * from Last-Event-ID (reconnects) or ?afterSeq (first open). Bounded
+   * lifetime (10 min): EventSource auto-reconnects and resumes from its cursor.
+   */
+  const runEventStream = (req: http.IncomingMessage, res: http.ServerResponse, runId: string, url: URL): void => {
+    mustGetRun(runId);
+    const fromHeader = Number.parseInt(String(req.headers['last-event-id'] ?? ''), 10);
+    const fromQuery = Number.parseInt(url.searchParams.get('afterSeq') ?? '0', 10);
+    let cursor = Number.isFinite(fromHeader) && fromHeader > 0
+      ? fromHeader
+      : Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : 0;
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      // Reverse proxies must not buffer the stream.
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(': stream open\n\n');
+    let closed = false;
+    const close = (): void => {
+      if (closed) return;
+      closed = true;
+      clearInterval(timer);
+      clearTimeout(lifetime);
+      res.end();
+    };
+    const lifetime = setTimeout(close, 10 * 60_000);
+    // close() only ever runs from async events (connection close, stream error,
+    // lifetime) — by then both timers below are initialized; no TDZ window.
+    const timer = setInterval(() => {
+      if (closed) return;
+      try {
+        const fresh = app.store.listEventsAfter(runId, cursor);
+        for (const e of fresh) {
+          res.write(`id: ${e.seq}\nevent: run-event\ndata: ${JSON.stringify(e)}\n\n`);
+          cursor = e.seq;
+        }
+        if (fresh.length === 0) res.write(': ping\n\n');
+      } catch {
+        close();
+      }
+    }, 1_000);
+    req.on('close', close);
+    res.on('error', close);
+  };
+
   /** B2 universal search: cross-run lookup by researcher-meaningful text (question/hypothesis/claim). */
   const search = (res: http.ServerResponse, url: URL): void => {
     const q = (url.searchParams.get('q') ?? '').trim();
@@ -658,6 +708,10 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
       const runId = segments[3];
       if (runId === undefined) throw notFound(`no route: ${method} ${url.pathname}`);
       assertRunId(runId); // format gate before any store-layer use (WP2 F-003)
+      if (segments.length === 6 && segments[4] === 'events' && segments[5] === 'stream') {
+        if (method === 'GET') return runEventStream(req, res, runId, url);
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
       if (segments.length === 4) {
         if (method === 'GET') return runDetail(res, runId);
         throw notFound(`method ${method} not allowed for ${url.pathname}`);

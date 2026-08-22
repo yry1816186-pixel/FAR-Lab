@@ -1274,3 +1274,21 @@ select option { color: var(--text); background: var(--surface); }
 .palette-option--active { background: var(--v2-surface-2); }
 .palette-option .palette-item-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette-option .palette-item-hint { flex: 0 0 auto; font-size: var(--fs-aux); }
+
+/* B3-7 version compare: full-text before/after side-by-side in revision ops. */
+.op-compare { margin-top: var(--sp-1); }
+.op-compare > summary { cursor: pointer; user-select: none; }
+.op-compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); margin-top: var(--sp-2); }
+@media (max-width: 900px) { .op-compare-grid { grid-template-columns: 1fr; } }
+.op-compare-text {
+  margin: var(--sp-1) 0 0;
+  padding: var(--sp-2);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--radius-s);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--fs-aux);
+  max-height: 420px;
+  overflow: auto;
+}

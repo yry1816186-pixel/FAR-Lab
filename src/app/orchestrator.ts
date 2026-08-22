@@ -107,10 +107,41 @@ export class Orchestrator {
         store.putObject('receipt', receipt);
         // every persisted write is a lease heartbeat (W8 S1): a live worker keeps its lease warm
         if (lease !== undefined) store.renewLease(run.id, lease, new Date(Date.now() + LEASE_TTL_MS).toISOString());
+        // B3: the event carries the facts the wait-time narrative renders —
+        // model identity/latency for model calls, query/hits for retrievals.
+        // (detail is free-form; this enriches WITHOUT changing the event enum.)
         store.appendEvent(run.id, {
           type: 'receipt_recorded', stage: partial.stage,
-          detail: { kind: receipt.kind, id: receipt.id }, receiptId: receipt.id,
+          detail: {
+            kind: receipt.kind, id: receipt.id,
+            ...(receipt.modelCall !== undefined ? {
+              provider: receipt.modelCall.provider,
+              modelId: receipt.modelCall.modelId,
+              latencyMs: receipt.modelCall.latencyMs,
+              ...(receipt.modelCall.usage.totalTokens !== undefined ? { totalTokens: receipt.modelCall.usage.totalTokens } : {}),
+            } : {}),
+            ...(receipt.sourceRetrieval !== undefined ? {
+              family: receipt.sourceRetrieval.family,
+              query: receipt.sourceRetrieval.query,
+              httpStatus: receipt.sourceRetrieval.httpStatus,
+              resultCount: receipt.sourceRetrieval.resultCount,
+            } : {}),
+          }, receiptId: receipt.id,
         });
+      },
+      progress: (done, total, note) => {
+        // B3 sub-stage granularity: update the CURRENT stage record's subtasks
+        // (known totals only — callers pass real domain counts) and append the
+        // milestone note. Synchronous doc write; stage handlers call this from
+        // their work loops between awaits, so there is no interleaved write.
+        const rec = run.stages.find((s) => s.stage === run.currentStage);
+        if (rec !== undefined && total > 0) {
+          rec.subtasks = { known: true, done: Math.max(0, Math.min(done, total)), total };
+          store.updateRun(run);
+        }
+        if (note !== undefined) {
+          store.appendEvent(run.id, { type: 'note', stage: run.currentStage, detail: { reason: note.reason, ...note.detail } });
+        }
       },
       checkpointed: async <T>(stage: RunStageName, family: string, key: string, inputsFingerprint: string | undefined, fn: () => Promise<T>): Promise<T> => {
         // Inputs-fingerprint gate, per FAMILY (audit P0-1: rank's scoring and pair

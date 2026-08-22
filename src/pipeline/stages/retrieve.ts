@@ -505,11 +505,20 @@ export const retrieveStage: StageHandler = {
 
     for (const [targetIdx, t] of targets.entries()) {
       throwIfCancelled(ctx);
+      if (targetIdx === 0) {
+        // B3 milestone: the plan is real and its size is a REAL total — the
+        // wait narrative can say "检索 14 项计划查询" and count them down.
+        ctx.progress?.(0, targets.length, {
+          reason: 'query_plan_ready',
+          detail: { plannedQueries: targets.length, counterQueries: targets.filter((x) => x.purpose === 'counter_evidence').length },
+        });
+      }
       executedQueries.push({ purpose: t.purpose, text: t.text, family: t.family });
       attempted += 1;
       try {
         const count = await runSearch(t, targetIdx, t.text, false);
         succeeded += 1;
+        ctx.progress?.(targetIdx + 1, targets.length);
         // W6/F2: arXiv AND-emptiness recovery — only when the FULL query came
         // back empty; each variant is its own receipted search and an extra RRF
         // list (a recovered doc ranks via the variant list it came from).

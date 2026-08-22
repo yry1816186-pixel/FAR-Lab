@@ -226,6 +226,7 @@ export const falsifyStage: StageHandler = {
       assertNotCancelled(ctx, 'critique_falsify');
       const warnings: string[] = [];
       let relations = 0;
+      let done = 0;
       const res = await callStructured<z.infer<typeof FalsifyOut>>(ctx, {
         stage: 'critique_falsify',
         purpose: `falsification-spec:${hyp.id}`,
@@ -506,6 +507,20 @@ export const falsifyStage: StageHandler = {
         counterClaimIds: finalCounter,
       });
       ctx.store.putObject('hypothesis', updated);
+
+      // B3 milestone: hypotheses materialize one by one in the workbench feed
+      // instead of appearing in silence after a minutes-long stage.
+      done += 1;
+      ctx.progress?.(done, targets.length, {
+        reason: 'hypothesis_critiqued',
+        detail: {
+          hypothesisId: hyp.id,
+          statement: hyp.statement.length > 90 ? `${hyp.statement.slice(0, 90)}…` : hyp.statement,
+          supportingLinks: finalSupporting.length,
+          counterLinks: finalCounter.length,
+          testability,
+        },
+      });
 
       return {
         warnings,

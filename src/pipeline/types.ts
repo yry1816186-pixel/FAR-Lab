@@ -44,6 +44,16 @@ export interface StageContext {
    * next domain-object write instead of racing the adopter (W8 audit P1-3 fencing).
    */
   disowned: () => boolean;
+  /**
+   * B3 wait-time granularity: stages with a REAL, known work total report
+   * incremental progress (done/total) so the workbench can narrate sub-stage
+   * advancement instead of a minutes-long stage-level silence. `note`, when
+   * given, appends a milestone note event (reason + free-form detail). Totals
+   * must be actual domain counts (hypotheses, planned queries, sources) —
+   * never estimates; stages without a known total simply never call this.
+   * Optional so test contexts and minimal harnesses need not stub it.
+   */
+  progress?: (done: number, total: number, note?: { reason: string; detail?: Record<string, unknown> }) => void;
   log: (msg: string) => void;
 }
 
