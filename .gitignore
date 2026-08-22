@@ -50,3 +50,17 @@ experiment-runtime/.venv/
 
 # ZCode session-local state (plans, memories, runtime artifacts)
 .zcode/
+
+# Control-plane runtime state (execution state, decisions, blockers — local only)
+.control/
+
+# Eval/spike run outputs (generated results, databases, temp builds)
+eval/results/
+spikes/**/output/
+spikes/**/runs/
+spikes/**/results/
+spikes/**/data/
+spikes/**/tmp-*/
+*.db
+*.db-wal
+*.db-shm
