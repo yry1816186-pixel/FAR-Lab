@@ -303,3 +303,70 @@ export const postResearchAction = async (
   }
   return data as ResearchActionResponse;
 };
+
+// ---- B5: hypothesis lifecycle operations (POST /runs/:id/hypotheses/:hypId/<op>) ----
+
+export type HypothesisOpStatus = 'active' | 'promoted' | 'rejected';
+export type ClaimLinkDirection = 'supports' | 'counters';
+
+/** Every op contract anchors on hypothesisId; the rest is op-specific. */
+export interface HypothesisOpResult {
+  hypothesisId: string;
+  status?: HypothesisOpStatus;
+  forkedFrom?: string;
+  claimId?: string;
+  direction?: ClaimLinkDirection;
+}
+
+/** Fail-visible response narrowing (same style as modelConfigOf): shape-checked, single assertion. */
+const hypOpResultOf = (data: unknown): HypothesisOpResult => {
+  if (typeof data !== 'object' || data === null) {
+    throw new ApiError({ code: 'unexpected_schema', message: '假设操作响应不是对象', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'hypothesis op result' } });
+  }
+  const r = data as {
+    hypothesisId?: unknown;
+    status?: unknown;
+    forkedFrom?: unknown;
+    claimId?: unknown;
+    direction?: unknown;
+  };
+  if (typeof r.hypothesisId !== 'string' || r.hypothesisId.length === 0) {
+    throw new ApiError({ code: 'unexpected_schema', message: '假设操作响应缺少 hypothesisId', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'hypothesis op result' } });
+  }
+  return {
+    hypothesisId: r.hypothesisId,
+    ...(typeof r.status === 'string' ? { status: r.status as HypothesisOpStatus } : {}),
+    ...(typeof r.forkedFrom === 'string' ? { forkedFrom: r.forkedFrom } : {}),
+    ...(typeof r.claimId === 'string' ? { claimId: r.claimId } : {}),
+    ...(typeof r.direction === 'string' ? { direction: r.direction as ClaimLinkDirection } : {}),
+  };
+};
+
+const postHypOp = (
+  runId: string,
+  hypId: string,
+  op: 'promote' | 'reject' | 'fork' | 'connect',
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<HypothesisOpResult> =>
+  api
+    .post(`${BASE}/runs/${encodeURIComponent(runId)}/hypotheses/${encodeURIComponent(hypId)}/${op}`, body, signal)
+    .then(hypOpResultOf);
+
+export const promoteHypothesis = (runId: string, hypId: string, signal?: AbortSignal): Promise<HypothesisOpResult> =>
+  postHypOp(runId, hypId, 'promote', {}, signal);
+
+export const rejectHypothesis = (runId: string, hypId: string, signal?: AbortSignal): Promise<HypothesisOpResult> =>
+  postHypOp(runId, hypId, 'reject', {}, signal);
+
+export const forkHypothesis = (runId: string, hypId: string, signal?: AbortSignal): Promise<HypothesisOpResult> =>
+  postHypOp(runId, hypId, 'fork', {}, signal);
+
+export const connectClaim = (
+  runId: string,
+  hypId: string,
+  claimId: string,
+  direction: ClaimLinkDirection,
+  signal?: AbortSignal,
+): Promise<HypothesisOpResult> =>
+  postHypOp(runId, hypId, 'connect', { claimId, direction }, signal);

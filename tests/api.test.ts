@@ -528,7 +528,7 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(body.id).toBe(run1);
     expect(body.status).toBe('completed');
     expect(Array.isArray(body.stages)).toBe(true);
-    expect(body.stages).toHaveLength(11);
+    expect(body.stages).toHaveLength(12); // B8: +execute
     expect(body.lastError).toBeUndefined();
   });
 
@@ -1102,5 +1102,51 @@ describe('GET /api/v1/search (B2 universal search)', () => {
   it('405s non-GET', async () => {
     const res = await fetch(`${base}/api/v1/search?q=abc`, { method: 'DELETE' });
     expect(res.status).toBe(404); // unmatched method+path falls through to route-not-found
+  });
+});
+
+// ---- B5 hypothesis lifecycle ops (HTTP surface; unit semantics in hypothesis-ops.test.ts) ----
+
+describe('POST /api/v1/runs/:id/hypotheses/:hypId/<op> (B5)', () => {
+  it('promotes the seeded hypothesis: 200, status persisted, audit event appended', async () => {
+    const { status, body } = await postJson(`${base}/api/v1/runs/${run1}/hypotheses/${hyp1}/promote`, {});
+    expect(status).toBe(200);
+    expect(body).toEqual({ hypothesisId: hyp1, status: 'promoted' });
+    expect(app.store.getObject('hypothesis', hyp1)?.status).toBe('promoted');
+    const events = app.store.listEvents(run1);
+    const ev = events.find((e) => e.type === 'note' && e.detail?.reason === 'hypothesis_status_changed');
+    expect(ev?.detail).toMatchObject({ hypothesisId: hyp1, from: 'active', to: 'promoted', actor: 'human' });
+    // second promote is an idempotent no-op (no second event)
+    const again = await postJson(`${base}/api/v1/runs/${run1}/hypotheses/${hyp1}/promote`, {});
+    expect(again.status).toBe(200);
+    expect(again.body.status).toBe('promoted');
+    expect(app.store.listEvents(run1).filter((e) => e.detail?.reason === 'hypothesis_status_changed')).toHaveLength(1);
+  });
+
+  it('400s on an invalid connect body (bad direction)', async () => {
+    const bad = await postJson(`${base}/api/v1/runs/${run1}/hypotheses/${hyp1}/connect`, {
+      claimId: run1ClaimId,
+      direction: 'sideways',
+    });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('validation');
+    expect(bad.body.error.message).toContain('direction');
+  });
+
+  it('404s for an unknown run (envelope carries the runId)', async () => {
+    const ghost = `run_${'0'.repeat(26)}`;
+    const res = await postJson(`${base}/api/v1/runs/${ghost}/hypotheses/${hyp1}/promote`, {});
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('not_found');
+    expect(res.body.error.runId).toBe(ghost);
+  });
+
+  it('404s for a hypothesis that does not exist in the run (ownership-checked)', async () => {
+    const ghost = `hyp_${'0'.repeat(26)}`;
+    const res = await postJson(`${base}/api/v1/runs/${run1}/hypotheses/${ghost}/fork`, {});
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('target_not_found');
+    // no fork object leaked into the run
+    expect(app.store.getObject('hypothesis', ghost)).toBeNull();
   });
 });

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { GitCompareArrows, X } from 'lucide-react';
-import { isNotFound } from '../../api/client';
-import { getEvidence, getHypotheses } from '../../api/endpoints';
+import { ApiError, isNotFound, withTimeout } from '../../api/client';
+import { connectClaim, forkHypothesis, getEvidence, getHypotheses, promoteHypothesis, rejectHypothesis } from '../../api/endpoints';
 import type { HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { EmptyState, ErrorBox, Section, Skeleton } from '../common';
 import { HypothesisCard } from './HypothesisCard';
+import type { HypothesisCardOps } from './HypothesisCard';
 import { ScorecardsTable } from './ScorecardsTable';
 import { CompareView } from './CompareView';
 import { ResearchActions } from './ResearchActions';
@@ -28,12 +29,60 @@ export function HypothesesTab({
   const { t } = useI18n();
   const fetcher = useCallback((signal: AbortSignal) => getHypotheses(run.id, signal), [run.id]);
   const res = useResource(fetcher, [run.id], `${run.updatedAt}:${run.status}`);
-  // Claims feed the ACH evidence analysis in compare view (fetched only when
-  // a compare is active — no extra request for the plain browsing path).
+  // Claims feed the ACH evidence analysis in compare view AND the B5 connect
+  // picker (fetched only when either is active — no extra request for the
+  // plain browsing path).
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const evidenceFetcher = useCallback((signal: AbortSignal) => getEvidence(run.id, signal), [run.id]);
   const compareActive = compareIds.length >= 2;
-  const evidenceRes = useResource(evidenceFetcher, [run.id, compareActive], compareActive ? `${run.updatedAt}` : 'off');
+  // B5 ops state: which card's connect picker is open, in-flight op key, last error.
+  const [connectOpenFor, setConnectOpenFor] = useState<string | null>(null);
+  const [opBusy, setOpBusy] = useState<string | null>(null);
+  const [opError, setOpError] = useState<string | null>(null);
+  const evidenceNeeded = compareActive || connectOpenFor !== null;
+  const evidenceRes = useResource(evidenceFetcher, [run.id, evidenceNeeded], evidenceNeeded ? `${run.updatedAt}` : 'off');
+
+  /**
+   * B5 op runner: POST, then refetch the tab's resource on success (new status
+   * badge / forked card / linked claim counts). Failures surface inline below —
+   * buttons disable while posting, so a missing endpoint degrades cleanly and
+   * never shows fake success.
+   */
+  const runHypOp = (
+    hypId: string,
+    op: 'promote' | 'reject' | 'fork' | 'connect',
+    act: (signal: AbortSignal) => Promise<unknown>,
+  ): void => {
+    setOpError(null);
+    setOpBusy(`${hypId}:${op}`);
+    const controller = new AbortController();
+    act(withTimeout(controller.signal, 30_000))
+      .then(() => {
+        setOpBusy(null);
+        if (op === 'connect') setConnectOpenFor(null);
+        res.retry();
+      })
+      .catch((e: unknown) => {
+        setOpBusy(null);
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        setOpError(e instanceof ApiError ? e.message : String(e));
+      });
+  };
+
+  const connectClaims = evidenceRes.data?.claims.map((c) => ({
+    id: c.id,
+    text: c.text.length > 70 ? `${c.text.slice(0, 70)}…` : c.text,
+  }));
+  const buildOps = (h: HypothesisCandidate): HypothesisCardOps => ({
+    busy: opBusy !== null && opBusy.startsWith(`${h.id}:`),
+    claims: connectClaims,
+    connectOpen: connectOpenFor === h.id,
+    onConnectToggle: () => setConnectOpenFor((prev) => (prev === h.id ? null : h.id)),
+    onPromote: () => runHypOp(h.id, 'promote', (signal) => promoteHypothesis(run.id, h.id, signal)),
+    onReject: () => runHypOp(h.id, 'reject', (signal) => rejectHypothesis(run.id, h.id, signal)),
+    onFork: () => runHypOp(h.id, 'fork', (signal) => forkHypothesis(run.id, h.id, signal)),
+    onConnect: (claimId, direction) => runHypOp(h.id, 'connect', (signal) => connectClaim(run.id, h.id, claimId, direction, signal)),
+  });
 
   const toggleCompare = (id: string): void => {
     setCompareIds((prev) =>
@@ -47,6 +96,7 @@ export function HypothesesTab({
   // Run switch invalidates the compare selection (hypotheses belong to a run).
   useEffect(() => {
     setCompareIds([]);
+    setConnectOpenFor(null);
   }, [run.id]);
 
   const data = res.data;
@@ -72,6 +122,11 @@ export function HypothesesTab({
         <ErrorBox error={res.error} onRetry={res.retry} />
       ) : data === null ? null : (
         <>
+          {opError !== null && (
+            <p className="field-error small" role="alert">
+              {t('hyp.opFailed')}：{opError}
+            </p>
+          )}
           {compareHyps.length >= 2 && (
             <Section
               title={t('compare.title')}
@@ -119,6 +174,7 @@ export function HypothesesTab({
               onChallenge={(id, label) => onFeedback({ kind: 'hypothesis', id, label })}
               onOpenClaim={onOpenClaim}
               onToFeedback={onFeedback}
+              opsFor={buildOps}
             />
           </Section>
         </>
@@ -221,6 +277,7 @@ function HypothesisList({
   onChallenge,
   onOpenClaim,
   onToFeedback,
+  opsFor,
 }: {
   data: HypoData;
   runId: string;
@@ -230,6 +287,8 @@ function HypothesisList({
   onChallenge: (id: string, label: string) => void;
   onOpenClaim?: (claimId: string) => void;
   onToFeedback: (target: { kind: string; id: string; label?: string; content?: string }) => void;
+  /** B5: builds the lifecycle-ops prop for each card (POST+refetch live in the tab). */
+  opsFor: (h: HypothesisCandidate) => HypothesisCardOps;
 }): JSX.Element {
   const { t } = useI18n();
   const [filter, setFilter] = useState('');
@@ -291,6 +350,7 @@ function HypothesisList({
             onToggle: () => onToggleCompare(h.id),
             disabled: compareIds.length >= compareLimit,
           }}
+          ops={opsFor(h)}
         />
       ))}
       {extras.length > 0 && (

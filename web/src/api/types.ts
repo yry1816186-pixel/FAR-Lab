@@ -320,6 +320,8 @@ export interface HypothesisCandidate {
   id: string;
   runId: string;
   version: number;
+  /** B5 lifecycle triage (R3); absent on objects created before B5 — treat as 'active'. */
+  status?: 'active' | 'promoted' | 'rejected';
   statement: string;
   mechanism: string;
   derivation: {

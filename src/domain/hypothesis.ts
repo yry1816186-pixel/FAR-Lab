@@ -61,6 +61,16 @@ export const TestabilityStatus = z.enum(['testable_now', 'testable_with_data', '
 export type TestabilityStatus = z.infer<typeof TestabilityStatus>;
 
 /**
+ * B5 researcher-driven lifecycle triage (R3): 'promoted' = advanced into the
+ * active research line; 'rejected' = ruled out by the researcher. The field is
+ * triage bookkeeping only — the scientific reason lives in the feedback/
+ * revision chain and the event stream, never here. ADDITIVE with .default:
+ * hypotheses persisted before B5 parse as 'active' (store reads re-validate).
+ */
+export const HypothesisStatus = z.enum(['active', 'promoted', 'rejected']);
+export type HypothesisStatus = z.infer<typeof HypothesisStatus>;
+
+/**
  * D-017 — literature-grounded novelty layer. The corpus-relative noveltyLabel stays;
  * this SECOND layer judges each representative against neighbors actually retrieved
  * from the live literature (facet-reranked), with 'unclear' as the honest default.
@@ -94,6 +104,7 @@ export const HypothesisCandidate = z.object({
   id: HypothesisId,
   runId: RunId,
   version: z.number().int().nonnegative().default(0), // bumped on causal revision
+  status: HypothesisStatus.default('active'), // B5 triage; default keeps old objects parsing
   statement: z.string().min(1),
   mechanism: z.string().default(''),
   derivation: z.object({
