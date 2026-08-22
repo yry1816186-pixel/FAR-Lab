@@ -66,3 +66,15 @@ Direct DB cross-check (independent of harness code, 2026-08-22):
   WAVE6-SCOUT measurement plan for the golden-fixture replay strategy).
 - The harness is Wave-6's fusion gate executor: every fusion lands only with
   `ZERO_GUARDED_REGRESSION` (or better) on before/after.
+
+## Post-audit verification addendum (2026-08-22, D-057 window)
+
+- **Oracle cross-validation**: `ndcgAtK` == pytrec_eval (the library BEIR itself delegates to)
+  on 17/17 cases (7 hand-computed fixtures + 10 seeded-random) to 1e-9.
+  Commands: `pip install pytrec_eval` → `python spikes/ndcg-oracle-pytrec.py` (writes
+  spikes/output/ndcg-oracle-pytrec.jsonl + ndcg-random-cases.json) →
+  `node spikes/ndcg-oracle-compare.mjs` → `cases=17 mismatches=0` exit 0.
+- **Live-route state (recorded once, D-061)**: user-supplied ZAI key (complete 32hex.16hex
+  format, not truncated) 401 code 1000 on all three GLM endpoints; host z.ai key 429 code 1113
+  insufficient balance (D-036 unchanged); DASHSCOPE slot empty. W6 guarded-gate live discharge
+  remains deferred — no live claim.

@@ -1,0 +1,17 @@
+{"name": "ideal_abc_k3", "k": 3, "pytrec_ndcg": 1.0}
+{"name": "ideal_abc_k10", "k": 10, "pytrec_ndcg": 1.0}
+{"name": "reversed_k3", "k": 3, "pytrec_ndcg": 0.7899980042}
+{"name": "late_hit_xa_k2", "k": 2, "pytrec_ndcg": 0.4441228664}
+{"name": "early_hit_ax_k2", "k": 2, "pytrec_ndcg": 0.703918089}
+{"name": "no_relevant", "k": 2, "pytrec_ndcg": 0.0}
+{"name": "empty_qrels", "k": 2, "pytrec_ndcg": 0.0}
+{"name": "rand0", "k": 8, "pytrec_ndcg": 0.5201730212}
+{"name": "rand1", "k": 5, "pytrec_ndcg": 0.7013347773}
+{"name": "rand2", "k": 8, "pytrec_ndcg": 0.6832891952}
+{"name": "rand3", "k": 3, "pytrec_ndcg": 0.4909032264}
+{"name": "rand4", "k": 3, "pytrec_ndcg": 0.7454516132}
+{"name": "rand5", "k": 8, "pytrec_ndcg": 0.8596904727}
+{"name": "rand6", "k": 8, "pytrec_ndcg": 0.7292257748}
+{"name": "rand7", "k": 5, "pytrec_ndcg": 0.2859192639}
+{"name": "rand8", "k": 3, "pytrec_ndcg": 0.5950234417}
+{"name": "rand9", "k": 8, "pytrec_ndcg": 0.6712213894}

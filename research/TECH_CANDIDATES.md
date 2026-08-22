@@ -122,7 +122,7 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 | Candidate | Reason |
 |---|---|
 | Iterative sufficiency loops as a class | crosscut C2: no demonstrated failure class that iteration fixes; wall-clock hard gate; ODR's own adaptive value depends on web-page bodies scholarly APIs never return |
-| Pre-shuffle for rerank position bias | RankGPT has NO such upstream mechanism (verified absent) — would be FAR-Lab invention, not fusion; window chaining already re-judges floated entries |
+| Pre-shuffle for rerank position bias | CORRECTED 2026-08-22 (rank_llm read): sunnweiwei/RankGPT verified absent, BUT castorini/rank_llm implements it (listwise_rankllm.py:271-290 shuffle_and_rescore, random.sample unseeded, opt-in flag default OFF). Any FAR-Lab port must inject a SEEDED rng (determinism discipline); effect needs live LLM behavior — deferred with trigger = model routes return + position-bias evidence in rerank receipts |
 | RankGPT token-budget machinery | upstream does not exist (only 300-word per-item truncation + an unchecked ERROR sentinel) — nothing to port |
 | Embedding/BM25/tantivy local corpus retrieval | zod-only invariant + no local corpus (paper-qa's tantivy path acknowledged as industrial precedent for lexical-only retrieval) |
 
@@ -161,3 +161,15 @@ Merged candidate space = prior baseline (`research/reference/FARLAB_PRE_RESEARCH
 | Resident multi-agent committees / role-play hierarchies | AIS2 §3.1: committee = schema'd call points + shared state — FAR-Lab stage machine already is this; AgentLab six roles have no capability differentiation |
 | Revision regression guard (edit length-ratio gate) | would false-positive legitimate assumption-dropping revisions; revision semantics = soul boundary (causal-link stays) |
 | Citation-count priors in retrieval (OpenScholar min_citation/norm_cite) | biases toward old famous work — scientifically wrong for recency-sensitive hypothesis generation |
+
+### E4. Post-audit verification addenda (2026-08-22, D-057 window)
+
+- **nDCG oracle-verified**: eval/retrieval-baseline.mjs ndcgAtK = pytrec_eval (BEIR's own delegate,
+  beir/retrieval/evaluation.py:98-101) on 17/17 cases (7 hand-fixtures + 10 seeded-random) to
+  1e-9 — `node spikes/ndcg-oracle-compare.mjs` exit 0 (spikes/output/ndcg-oracle-pytrec.jsonl).
+- **F4 window mechanics cross-validated** against castorini/rank_llm (Apache-2.0)
+  listwise_rankllm.py:292-358: bottom-up window construction (end-window first, stride steps
+  down, clamped to rank_start), per-window slicing on the mutated list — agrees with our
+  rerankWindowPlan/applyWindowedRerank port; their pre-shuffle finding recorded in E3.
+- **trectools** (BSD-3) evaluated as oracle first — its TrecEval requires the external
+  trec_eval binary (not bundled) → replaced by pytrec_eval (self-contained C extension).
