@@ -11,6 +11,7 @@ Fusion sources (all license-verified, main-agent first-hand code reads):
 |---|---|---|
 | baseline (BEFORE fusion) | `npm test` @ 10:11 | 281/281 passed, exit 0 |
 | AFTER fusion | `npm test` @ 10:29 | **295/295 passed** (18→19 files; +14 new tests), exit 0 |
+| AFTER audit-P3 fixes | `npm test` @ 10:43 | **298/298 passed** (+3 audit-driven discriminating tests), exit 0 |
 | typecheck | `npm run typecheck` | exit 0 |
 | lint | `npx eslint src tests eval --max-warnings=0` | exit 0 |
 | build | `npm run build` | exit 0 (dist fresh, D-031 discipline) |
@@ -47,7 +48,7 @@ Server guidance precedence (measured): `Retry-After: 7` → 7000ms（压过任�
 | `api_key = "z9y8x7w6v5u4t3s2r1q0"` | `api_key = "[REDACTED_SECRET]"` |
 | 普通 429 错误文案 | 原样（无误伤） |
 
-脱敏点在 `fail()` 持久化咽喉（分类先于脱敏——quota 正则依赖原文，有测试锁定顺序正确性）。端到端测试：429 响应体含回显密钥 → `res.error.message` 不含密钥。
+脱敏点在 `fail()` 持久化咽喉 + classifyHttpStatus/malformed-200 的消息构建处（**先脱敏后截断**——审计 P3 修复）；quota 分类先于脱敏在原文执行且有测试锁定（kind=quota_exceeded + "Insufficient balance" 原文保留 + 零重试）。端到端测试：429 响应体含回显密钥 → `res.error.message` 不含密钥；跨界密钥零片段泄漏测试。
 
 ## F4 before/after
 
@@ -63,6 +64,18 @@ Server guidance precedence (measured): `Retry-After: 7` → 7000ms（压过任�
 - **F1**：消除类 = "服务端 Retry-After 指令被物理忽略 + 固定退避零抖动（雷群）"——旧代码无 parseRetryAfterMs/无 jitter（git diff 可证模式存在）；判别性测试在新代码通过、对旧代码必然失败（honors Retry-After / jitter bounds 两组）。北极星零回退：295/295 全绿，分类语义测试锁定。
 - **F3**：消除类 = "凭证形态子串可入持久化错误路径"——判别性端到端测试（429 回显密钥→消息脱敏）对旧代码必然失败。
 - **F4**：**不主张消除已实证失败**（默认 N=1 行为不变；方差仍在）——按门禁措辞属"机制已具备（opt-in）"，live 验证后方差削减 ≥5% 才可转默认推荐，否则记"评估后不采用"。此边界已写入 DECISIONS。
+
+## Adversarial audit (2026-08-22, fresh adversarial-auditor subagent)
+
+**判定：ACCEPT — 0 P0 / 0 P1 / 0 P2 / 6 P3**。审计实证：2990 条持久化旧 receipt 用新 ProvenanceReceipt schema 全量 reparse 通过（0 失败）；dist 新鲜度核对；四上游许可证与源码逐一独立复核（机制=重写/适配非拷贝，attribution 双处到位）；绕过语料实测（发现 sk-proj- 假阴性=忠实继承 codex 上游局限）。
+
+**6 项 P3 已全部同会话修复**（复跑门禁 298/298，+3 判别性测试）：
+1. W1 契约注释过时（1s/3s）→ 已更新为新曲线描述（http.ts:12-19）
+2. 先截断后脱敏可漏密钥前缀片段 → 改为**先脱敏后截断**（classifyHttpStatus + malformed-200 两处）；新增跨 300 字符边界判别测试（旧代码该配置泄漏 24 字符完整可用片段，新代码零片段）
+3. sk-proj- 连字符格式假阴性 → sk- 模式扩展 `[A-Za-z0-9-]`（超出 codex 上游的已文档化改进）+ 测试
+4. "顺序正确性有测试锁定"表述强于覆盖 → 补齐 quota 语义保留测试（"Insufficient balance" 原文经脱敏不变 + kind=quota_exceeded + 零重试）后表述成立
+5. FARLAB_JUDGE_VOTES 非法值崩溃且丢全量记录 → 启动时 Number.isInteger 校验 + exit 2 快速失败
+6. 判分 receipt 丢 modelVersion / per_vote 无 usage → 恢复 modelVersion + per_vote 增 usage/latencyMs；偶数票 x.5 中位数已在 judge-votes.mjs 模块文档声明
 
 ## Attribution
 

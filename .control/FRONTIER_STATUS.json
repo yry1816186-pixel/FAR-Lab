@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
   "protocolVersion": "2.0.0",
-  "asOf": "2026-08-22T23:59+08:00",
-  "note": "Machine-readable gate record (stop-guard schema) + detail section below. Every status maps to session evidence; nothing asserted without a file/run reference.",
+  "asOf": "2026-08-22T10:00+08:00",
+  "note": "Machine-readable gate record (stop-guard schema) + detail section below. Every status maps to session evidence; nothing asserted without a file/run reference. WAVE-4 OPENED by user handoff 2026-08-22: harness-source expedition in progress; dimensions below reflect Wave-3 close state until Wave-4 fusion lands.",
   "dimensions": [
     {
       "id": "scientific-frontier",
@@ -29,7 +29,8 @@
         "crossref third retrieval family restores real source redundancy (34fbb22)",
         "OpenAlex budget-429 no-retry + optional key (c19cd4a, 34fbb22)",
         "fulltext phase-B route openalex_tei_v1 (D-028)",
-        "dist-freshness guard (2d77c97, parallel session)"
+        "dist-freshness guard (2d77c97, parallel session)",
+        "W4 harness fusion (D-039): Retry-After-precedent jittered backoff + error-path credential redaction + receipt retry counters; 295/295, deterministic before/after in evidence/W-H4/fusion-f1-f3-f4.md"
       ],
       "residualRisks": [
         "strict-FC rides a beta endpoint (escape hatch FARLAB_DEEPSEEK_STRICT=0)",
@@ -136,8 +137,8 @@
     ]
   },
   "opportunitySweep": {
-    "status": "saturated",
-    "decisionSaturation": true,
+    "status": "in_progress",
+    "decisionSaturation": false,
     "searchFamilies": [
       "harness",
       "ai4s",
@@ -225,6 +226,66 @@
         "id": "local-grobid",
         "status": "rejected",
         "evidence": "superseded by server-side GROBID TEI (D-028)"
+      },
+      {
+        "id": "wave4-breadth-scan",
+        "status": "resolved",
+        "evidence": "12/12 breadth reports in research/wave4-reports/ (11 local repos license-verified: 5 MIT + 6 Apache-2.0; Claude Code public-docs-only per proprietary rule); every load-bearing file:line claim main-agent spot-verified"
+      },
+      {
+        "id": "wave4-crosscut-comparison",
+        "status": "resolved",
+        "evidence": "research/WAVE4-HARNESS-SCOUT.md §2: 5-repo convergent retry family; truncation/verification-loop/corrective-reask already at parity or FAR-Lab ahead; compaction family deferred (no multi-turn sessions)"
+      },
+      {
+        "id": "wave4-fusion-shortlist",
+        "status": "resolved",
+        "evidence": "scout §3: F1/F3/F4 GO (executed same session, D-039), R1-R6 DEFER with reversal triggers (registry TECH_CANDIDATES B), R5 REJECT (minimal-architecture bar)"
+      },
+      {
+        "id": "wave4-f4-live-variance-verification",
+        "status": "blocked",
+        "evidence": "FARLAB_JUDGE_VOTES live variance-reduction demo needs model routes (D-036: deepseek 402 / zai 429-1113 / dashscope keyless); mechanism + offline tests landed, default N=1 unchanged"
+      },
+      {
+        "id": "wave5-breadth-scan",
+        "status": "in_progress",
+        "evidence": "opened 2026-08-22 by user /goal; per-system mechanism inventories (AI-Scientist v1/v2, paper-qa, aviary, robin remainder, AgentLaboratory, OpenScholar, mlrbench internals, co-scientist repro sub-mechanisms + expansion) pending"
+      },
+      {
+        "id": "wave5-fusion",
+        "status": "not_started",
+        "evidence": "placeholder; C4/C5 evidence anchoring + D2-D5 review-revision + B5/B6 context-budget fusions with offline benchmarks (live gated by D-036)"
+      },
+      {
+        "id": "wave6-breadth-scan",
+        "status": "in_progress",
+        "evidence": "opened 2026-08-22 by user /goal; retrieval/RAG infra expedition (paper-qa retrieval face, gpt-researcher, open-deep-research family, dzhng/deep-research + TS peers, RankGPT source, query decomposition revisit, retrieval evaluators + proactive expansion) pending per-repo inventories"
+      },
+      {
+        "id": "wave6-retrieval-baseline-harness",
+        "status": "not_started",
+        "evidence": "placeholder; deterministic regressable retrieval-quality baseline harness MUST land before any main-path retrieval change (wave prompt hard precondition; north-star retrieval-verified-rate owner)"
+      },
+      {
+        "id": "wave6-fusion",
+        "status": "not_started",
+        "evidence": "placeholder; fusion candidates with before/after retrieval-quality benchmarks, zero north-star regression, three-source keyless backend preserved"
+      },
+      {
+        "id": "wave9-breadth-scan",
+        "status": "not_started",
+        "evidence": "opened 2026-08-22 by user /goal; per-framework mechanism inventories (inspect_ai scorer/task abstractions, promptfoo assertions/CI, lm-eval-harness task-spec/aggregation, deepeval judge metrics/g-eval, open-compass orchestration/contamination, judge-calibration research: swap/anchor/kappa/bootstrap) pending"
+      },
+      {
+        "id": "wave9-judge-variance-hardening",
+        "status": "in_progress",
+        "evidence": "opened 2026-08-22; D-037 judge v2 landed (deterministic TF-IDF + 3-vote), remaining: fixed decomposition-granularity protocol + same-run re-judge variance measurement <0.15 (stretch 0.08); live measurement gated on model routes (D-036) unless probe recovers"
+      },
+      {
+        "id": "wave9-counter-evidence-metric",
+        "status": "not_started",
+        "evidence": "opened 2026-08-22; north-star counter-evidence-substantive-hit (target 0.70, stretch 0.85) needs definition + historical backfill from recorded blind re-judge data"
       }
     ],
     "evidence": [
@@ -234,9 +295,11 @@
     ]
   },
   "marginalValue": {
-    "status": "saturated",
-    "remainingHighValueWork": [],
-    "reason": "All GO-ranked opportunities executed and live-verified (D-023..D-031, two parallel sessions). #8 Idea2Plan template v2 was EXECUTED by the scout session (a0d0af9: eval rendering v2 five-section, --render-only verified; cross-template comparability disclosed). Remaining entries are blocked on user credentials (Qwen/Bailian submission route; OPENALEX_API_KEY for retrieval budget + fulltext phase-B live fetch), network-blocked (HF only — models.dev RESOLVED via local proxy, D-033: 193-provider catalog integrated), or below the value bar (judge-decomposition hardening follow-up, zombie-run sweep, mechanism-aware counter-label gate). No remaining item is both high-value and executable under current environment conditions without user action.",
+    "status": "not_saturated",
+    "remainingHighValueWork": [
+      "Wave-6 retrieval/RAG infrastructure expedition (user directive): breadth scan of paper-qa retrieval face + gpt-researcher + open-deep-research family + dzhng/deep-research + TS-native peers + RankGPT source detail + query decomposition revisit + retrieval evaluators -> cross-compare -> deterministic retrieval-quality baseline harness FIRST -> shortlist -> source-level fusion with before/after benchmark. Source analysis + offline/deterministic benchmarks are executable NOW; live LLM verification gated on model-route blockers (D-036). Wave-4 fusion in flight in parallel session (owns providers/llm/ports/provenance files)."
+    ],
+    "reason": "User /goal (2026-08-22) opens Wave-6 with a concrete high-value executable surface: retrieval/RAG mechanism research and the deterministic baseline harness do not require live model routes, and retrieval itself is keyless. Live-dependent leftovers remain blocked on user credentials (Qwen/Bailian submission route; OPENALEX_API_KEY; DeepSeek/z.ai balance) per D-035/D-036.",
     "evidence": [
       ".control/EXECUTION_STATE.json activeTasks (user-action gates listed)",
       "evidence/W-EV2/rediscovery.md, mlr-bench.md, relation-precision.md, fulltext-phase-b-openalex.md",
