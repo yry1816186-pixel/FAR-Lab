@@ -334,7 +334,7 @@ describe('invalid_output retry discipline', () => {
     expect(lastUserContent(calls[1]!)).toContain('"hypothesis" must be a non-empty string');
   });
 
-  it('fails as invalid_output after exactly one corrective retry (no third attempt)', async () => {
+  it('fails as invalid_output after 3 corrective re-asks — the 4th attempt never happens (D-034 policy)', async () => {
     const { sleep, sleeps } = sleepRecorder();
     const { fetchImpl, calls } = recorderFetch([
       () => Promise.resolve(chatOk('still not json')),
@@ -345,9 +345,22 @@ describe('invalid_output retry discipline', () => {
     expect(res.ok).toBe(false);
     expect(res.error?.kind).toBe('invalid_output');
     expect(res.error?.retryable).toBe(false);
-    expect(calls.length).toBe(2); // 1 attempt + 1 corrective retry, never more
-    expect(sleeps).toEqual([]); // invalid_output retries do not consume backoff sleeps
+    expect(calls.length).toBe(4); // 1 attempt + 3 corrective re-asks, never more
+    expect(sleeps).toEqual([]); // invalid_output re-asks do not consume backoff sleeps
     expect(res.receipt.outputHash).toBe(canonicalSha256('again not json')); // last raw output
+    expect(String(res.error?.message)).toContain('3 corrective re-asks');
+  });
+
+  it('recovers on a later corrective re-ask (independent-sample corruption, ~20% class)', async () => {
+    const { fetchImpl, calls } = recorderFetch([
+      () => Promise.resolve(chatOk('corrupted first sample')),
+      () => Promise.resolve(chatOk('corrupted second sample')),
+      () => Promise.resolve(chatOk(RAW_OK)),
+    ]);
+    const provider = createDeepSeekProvider({ apiKey: 'test-fixture-key-ds', fetchImpl });
+    const res = await provider.structuredCall(REQ, parseHypothesis);
+    expect(res.ok).toBe(true);
+    expect(calls.length).toBe(3); // succeeded on the 2nd re-ask within the 3-re-ask budget
   });
 });
 

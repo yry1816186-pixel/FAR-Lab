@@ -12,7 +12,9 @@ import type { StructuredCallRequest, StructuredCallResult } from '../shared/port
  * W1 retry discipline (contract, exhaustive):
  *   - rate_limited / timeout / transient 5xx (500,502,503,504): at most 2 retries,
  *     exponential backoff 1s / 3s.
- *   - invalid_output: exactly 1 corrective retry with an appended instruction.
+ *   - invalid_output: at most 3 corrective re-asks with an appended instruction
+ *     (independent-sample corruption ~20% at large outputs; ~99% cumulative recovery,
+ *     every attempt must still fully parse and zod-validate — D-034 era evidence).
  *   - everything else (auth_error, quota_exceeded, permanent 4xx, network-level
  *     transport failures): NO retry — never silently convert failure into success.
  *   - Total budget (including retries, sleeps and JSON correction) defaults to 120s.
@@ -40,7 +42,15 @@ export const DEFAULT_TOTAL_TIMEOUT_MS = 120_000;
 
 const MAX_TRANSPORT_RETRIES = 2;
 const TRANSPORT_BACKOFF_MS: readonly number[] = [1_000, 3_000];
-const MAX_INVALID_OUTPUT_RETRIES = 1;
+/**
+ * Invalid-output re-asks (fresh model sample each): the live-observed corruption class
+ * (unescaped inner quotes in long tool arguments, ~20% at >=20k chars, D-030/D-034 era
+ * rediscovery-v2 batch: 3/5 runs died on it) is INDEPENDENT per sample, and the
+ * content-preserving repair layer deliberately does not touch the ambiguous subclass.
+ * 3 bounded re-asks give ~1-(0.2^3)≈99% cumulative recovery with zero semantic risk —
+ * every attempt must still fully parse and zod-validate.
+ */
+const MAX_INVALID_OUTPUT_RETRIES = 3;
 const TRANSIENT_5XX: ReadonlySet<number> = new Set([500, 502, 503, 504]);
 /** Z.ai returns HTTP 429 + code 1113 for exhausted balance — that is a quota wall, not a rate limit. */
 const QUOTA_ERROR_CODES: ReadonlySet<string> = new Set(['1113', 'insufficient_quota']);
@@ -643,7 +653,7 @@ export async function runOpenAICompatStructuredCall<T>(
             },
           };
         }
-        // invalid_output: caller's schema parse rejected the JSON — one corrective retry.
+        // invalid_output: caller's schema parse rejected the JSON — bounded corrective re-asks.
         if (invalidOutputRetries < MAX_INVALID_OUTPUT_RETRIES) {
           invalidOutputRetries += 1;
           messages = appendCorrection(messages, parsed.message);
@@ -652,7 +662,7 @@ export async function runOpenAICompatStructuredCall<T>(
         return fail({
           kind: 'invalid_output',
           retryable: false,
-          message: `${cfg.providerName}: structured output rejected even after ${MAX_INVALID_OUTPUT_RETRIES} corrective retry: ${parsed.message}; last raw output head: ${truncate(lastRawContent, 200)}`,
+          message: `${cfg.providerName}: structured output rejected even after ${MAX_INVALID_OUTPUT_RETRIES} corrective re-asks: ${parsed.message}; last raw output head: ${truncate(lastRawContent, 200)}`,
         });
       }
       // Output was not JSON at all (direct parse and fence-strip both failed).
@@ -664,7 +674,7 @@ export async function runOpenAICompatStructuredCall<T>(
       return fail({
         kind: 'invalid_output',
         retryable: false,
-        message: `${cfg.providerName}: model output was not valid JSON after ${MAX_INVALID_OUTPUT_RETRIES} corrective retry; last raw output head: ${truncate(lastRawContent, 200)}`,
+          message: `${cfg.providerName}: model output was not valid JSON after ${MAX_INVALID_OUTPUT_RETRIES} corrective re-asks; last raw output head: ${truncate(lastRawContent, 200)}`,
       });
     }
 
