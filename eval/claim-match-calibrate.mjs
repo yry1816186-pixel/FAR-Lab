@@ -1,59 +1,66 @@
 /**
- * Offline threshold calibration for the deterministic claim matcher (no API calls).
+ * Gold-grounded threshold calibration for the deterministic claim matcher (v2, Wave-9).
  *
- * Inputs: the RECORDED v1 judge outputs (eval/results/rediscovery-v1-degraded.jsonl
- * carries per-task claim sets + the LLM's matched counts). We sweep (high, low)
- * thresholds, report per-task deterministic counts vs the recorded LLM counts, and
- * the size of the borderline band (adjudication cost proxy). The chosen thresholds
- * minimize count discrepancy while keeping the borderline band small.
+ * v1 (D-037) calibrated against the recorded v1 LLM match COUNTS — circular, since the
+ * LLM matcher is itself the noisy process being replaced. v2 calibrates against the
+ * MAIN-AGENT gold pair set (eval/claim-pair-gold.jsonl: 104 best-counterpart pairs,
+ * 28 substantive-match / 76 not, protocol recorded per row).
  *
- * Usage: node eval/claim-match-calibrate.mjs [results.jsonl]
+ * Constraint by design: the deterministic layer has NO human review, so it must make
+ * ZERO gold errors — a claim with bestSim >= high may only be a true pair, a claim with
+ * bestSim < low may only be a false pair. Under that constraint we maximize the
+ * deterministic-decision share (minimize the borderline band handed to LLM adjudication).
+ *
+ * Zero API calls; pure function of the gold file.
+ *
+ * Usage: node eval/claim-match-calibrate.mjs
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { contentTokens, tfidfCosine, thresholdMatch, finalizeCounts } from './claim-match.mjs';
 
-const FILE = resolve(process.cwd(), process.argv[2] ?? 'eval/results/rediscovery-v1-degraded.jsonl');
-const records = readFileSync(FILE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l))
-  .filter((r) => r.claims?.agent && r.claims?.gt);
+const GOLD = resolve(process.cwd(), 'eval/claim-pair-gold.jsonl');
+const rows = readFileSync(GOLD, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+const nTrue = rows.filter((r) => r.label).length;
+const nFalse = rows.length - nTrue;
 
-const GRID_HIGH = [0.35, 0.40, 0.45, 0.50, 0.55];
-const GRID_LOW = [0.10, 0.15, 0.20, 0.25];
+const GRID_HIGH = [0.30, 0.32, 0.33, 0.34, 0.36, 0.38, 0.40, 0.42, 0.45, 0.48, 0.50, 0.55];
+const GRID_LOW = [0.05, 0.08, 0.10, 0.11, 0.12, 0.13, 0.14, 0.15, 0.18, 0.20];
 
-const scoreThresholds = (high, low) => {
-  let totalAbsDiff = 0;
-  let totalBorderline = 0;
-  let totalPairs = 0;
-  const perTask = [];
-  for (const r of records) {
-    const agent = r.claims.agent;
-    const gt = r.claims.gt;
-    const m = thresholdMatch(agent, gt, { high, low });
-    const counts = finalizeCounts(agent, gt, m, m.borderline.map((b) => ({ matched: b.bestSim >= (high + low) / 2 }))); // midpoint adjudication for calibration only
-    const diff = Math.abs(counts.agentMatched - r.agentMatched) + Math.abs(counts.gtMatched - r.gtMatched);
-    totalAbsDiff += diff;
-    totalBorderline += m.borderline.length;
-    totalPairs += agent.length + gt.length;
-    perTask.push({ task: r.task, det: `${counts.agentMatched}/${counts.gtMatched}`, llm: `${r.agentMatched}/${r.gtMatched}`, diff, borderline: m.borderline.length });
-  }
-  return { high, low, totalAbsDiff, totalBorderline, borderPct: Math.round((100 * totalBorderline) / totalPairs), perTask };
+const score = (high, low) => {
+  const detYes = rows.filter((r) => r.bestSim >= high);
+  const detNo = rows.filter((r) => r.bestSim < low);
+  const detYesErrors = detYes.filter((r) => !r.label).length; // false pairs auto-matched
+  const detNoErrors = detNo.filter((r) => r.label).length; // true pairs auto-rejected
+  const borderline = rows.length - detYes.length - detNo.length;
+  return {
+    high, low,
+    detYes: detYes.length, detYesErrors,
+    detNo: detNo.length, detNoErrors,
+    borderline, detShare: Math.round((100 * (detYes.length + detNo.length)) / rows.length),
+    totalErrors: detYesErrors + detNoErrors,
+  };
 };
 
-console.log(`calibrating on ${records.length} tasks from ${FILE}\n`);
-const rows = [];
-for (const high of GRID_HIGH) for (const low of GRID_LOW) if (low < high) rows.push(scoreThresholds(high, low));
-rows.sort((a, b) => (a.totalAbsDiff - b.totalAbsDiff) || (a.borderPct - b.borderPct));
-console.log('high  low   | Σ|Δcounts| | borderline% | per-task det-vs-llm');
-for (const r of rows.slice(0, 8)) {
+console.log(`gold: ${rows.length} pairs (${nTrue} true / ${nFalse} false) from ${GOLD}`);
+const trueSims = rows.filter((r) => r.label).map((r) => r.bestSim).sort((a, b) => a - b);
+const falseSims = rows.filter((r) => !r.label).map((r) => r.bestSim).sort((a, b) => a - b);
+console.log(`true-pair bestSim: min ${trueSims[0]}, max ${trueSims[trueSims.length - 1]}`);
+console.log(`false-pair bestSim: min ${falseSims[0]}, max ${falseSims[falseSims.length - 1]}`);
+console.log(`overlap zone: [${trueSims[0]}, ${falseSims[falseSims.length - 1]}] — lexical separation is INCOMPLETE by construction\n`);
+
+const all = [];
+for (const high of GRID_HIGH) for (const low of GRID_LOW) if (low < high) all.push(score(high, low));
+const zeroError = all.filter((r) => r.totalErrors === 0);
+zeroError.sort((a, b) => b.detShare - a.detShare);
+console.log('zero-gold-error threshold sets (deterministic share desc, top 8):');
+console.log('high   low    | detYes | detNo | borderline | detShare% | errors');
+for (const r of zeroError.slice(0, 8)) {
   console.log(
-    `${r.high.toFixed(2)} ${r.low.toFixed(2)} |    ${String(r.totalAbsDiff).padStart(3)}     |    ${String(r.borderPct).padStart(3)}%      | ` +
-    r.perTask.map((t) => `${t.task.slice(0, 10)} det=${t.det} llm=${t.llm}`).join('  '),
+    `${r.high.toFixed(2)}  ${r.low.toFixed(2)}  |   ${String(r.detYes).padStart(2)}   |  ${String(r.detNo).padStart(3)}  |    ${String(r.borderline).padStart(3)}     |    ${String(r.detShare).padStart(3)}    | ${r.totalErrors}`,
   );
 }
-
-// similarity sanity: the near-paraphrase pair from arg-plasmid, and an unrelated pair
-const paraphrase = [ 'Conjugative plasmid transfer is the dominant mechanism driving ARG spread in hospital environments.', 'Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings.' ];
-const unrelated = [ 'Antibiotics disrupt the gut microbiota.', 'Off-target editing arises because the Cas9-guide RNA complex tolerates sequence mismatches.' ];
-const sim12 = tfidfCosine([contentTokens(paraphrase[0]), contentTokens(paraphrase[1]), contentTokens(unrelated[0]), contentTokens(unrelated[1])]);
-console.log(`\nparaphrase-pair tfidf-cosine: ${sim12(0, 1).toFixed(3)} (expect HIGH side)`);
-console.log(`unrelated-pair tfidf-cosine: ${sim12(2, 3).toFixed(3)} (expect LOW side)`);
+const best = zeroError[0];
+const nearMiss = all.filter((r) => r.totalErrors === 1).sort((a, b) => b.detShare - a.detShare)[0];
+console.log(`\nRECOMMENDED: high=${best.high.toFixed(2)} low=${best.low.toFixed(2)} (zero gold errors, detShare ${best.detShare}%)`);
+if (nearMiss) console.log(`1-error alternative: high=${nearMiss.high.toFixed(2)} low=${nearMiss.low.toFixed(2)} (detShare ${nearMiss.detShare}%) — rejected: deterministic layer is unreviewed by design`);
+console.log('\nNote: gold N=104, single decomposition pass, 3 biomedical domains; thresholds generalize modulo that sample (disclosed limitation). The overlap zone itself is the D-038 finding restated on clean labels: scientific-semantic matching needs the adjudication layer; determinism buys the extremes only.');

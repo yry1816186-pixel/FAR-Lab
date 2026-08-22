@@ -1,0 +1,78 @@
+{
+  "generatedFor": "wave9-statistics-tier",
+  "seed": 20260822,
+  "deterministic": "same seed -> identical report",
+  "sections": {
+    "rediscovery": {
+      "meanF1Bootstrap": {
+        "n": 5,
+        "mean": 0.5820000000000001,
+        "lo": 0.4218,
+        "hi": 0.8019999999999999,
+        "note": "v1 unhardened judge pass; F1 values are the recorded ones"
+      },
+      "sameTaskTwoPassDelta": {
+        "n": 2,
+        "tasks": [
+          "arg-plasmid-transfer",
+          "crc-ici-failure"
+        ],
+        "before": [
+          0.505,
+          0.483
+        ],
+        "after": [
+          0,
+          0.578
+        ],
+        "meanDelta": 0.20500000000000002,
+        "deltaCI": {
+          "lo": -0.09499999999999997,
+          "hi": 0.505
+        },
+        "exactPairedPermutation": {
+          "pValue": 1,
+          "mode": "exact"
+        },
+        "decision": {
+          "verdict": "INSUFFICIENT_N",
+          "ciExcludesZero": false,
+          "meetsMde": true,
+          "warnings": [
+            "n<15: exploratory only (statsforevals rule)"
+          ]
+        },
+        "note": "the two passes are UNHARDENED v1-era judge runs — this demonstrates the statistic, it is NOT a pipeline before/after claim"
+      }
+    },
+    "goldClaimMatching": {
+      "prevalenceWilson": {
+        "p": 0.2692307692307692,
+        "lo": 0.19333139862414106,
+        "hi": 0.3615713476259146
+      },
+      "calibratedDetYes": {
+        "k": 4,
+        "n": 4,
+        "precisionWilson": {
+          "p": 1,
+          "lo": 0.5100999795960008,
+          "hi": 1
+        }
+      },
+      "note": "gold set 104 pairs; deterministic-yes precision = 1.0 by zero-error calibration constraint"
+    },
+    "decompositionAgreement": {
+      "kappa": 0,
+      "agreement": 0,
+      "n": 2,
+      "note": "claim-count agreement between two recorded decomposition passes (coarse buckets); low kappa = decomposition noise the v2.1 median + fixed protocol target"
+    },
+    "clusterStderr": {
+      "se": 0.117953041503812,
+      "n": 5,
+      "clusters": 3,
+      "note": "F1 scores clustered by domain family (Miller Eq.4/8 cluster-robust SE)"
+    }
+  }
+}

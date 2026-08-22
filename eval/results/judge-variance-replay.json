@@ -1,0 +1,166 @@
+{
+  "mode": "replay",
+  "gtRev": "gt-fixed-2026-08-22",
+  "sources": [
+    "rediscovery-v1-degraded.jsonl",
+    "rediscovery-v2-pass1.jsonl"
+  ],
+  "generated": "2026-08-22T03:03:00.061Z",
+  "tasks": [
+    {
+      "task": "egfr-tki-resistance",
+      "gtClaims": 8,
+      "recordedPasses": 1,
+      "swingLower": 0,
+      "swingUpper": 0,
+      "recordedV1Swing": 0,
+      "passes": [
+        {
+          "source": "rediscovery-v1-degraded.jsonl",
+          "agentClaims": 16,
+          "matcher": {
+            "high": 0.4,
+            "low": 0.12,
+            "borderline": 14
+          },
+          "deterministicShare": 0.41666666666666663,
+          "f1Lower": 0.083,
+          "f1Upper": 0.685,
+          "recordedF1": null,
+          "recordedV1F1": 0.341
+        }
+      ]
+    },
+    {
+      "task": "antibiotic-cdiff",
+      "gtClaims": 6,
+      "recordedPasses": 1,
+      "swingLower": 0,
+      "swingUpper": 0,
+      "recordedV1Swing": 0,
+      "passes": [
+        {
+          "source": "rediscovery-v1-degraded.jsonl",
+          "agentClaims": 15,
+          "matcher": {
+            "high": 0.4,
+            "low": 0.12,
+            "borderline": 16
+          },
+          "deterministicShare": 0.23809523809523814,
+          "f1Lower": 0.095,
+          "f1Upper": 0.85,
+          "recordedF1": null,
+          "recordedV1F1": 1
+        }
+      ]
+    },
+    {
+      "task": "arg-plasmid-transfer",
+      "gtClaims": 9,
+      "recordedPasses": 2,
+      "swingLower": 0,
+      "swingUpper": 0.543,
+      "recordedV1Swing": 0.505,
+      "passes": [
+        {
+          "source": "rediscovery-v1-degraded.jsonl",
+          "agentClaims": 12,
+          "matcher": {
+            "high": 0.4,
+            "low": 0.12,
+            "borderline": 12
+          },
+          "deterministicShare": 0.4285714285714286,
+          "f1Lower": 0,
+          "f1Upper": 0.543,
+          "recordedF1": null,
+          "recordedV1F1": 0.505
+        },
+        {
+          "source": "rediscovery-v2-pass1.jsonl",
+          "agentClaims": 14,
+          "matcher": {
+            "high": 0.4,
+            "low": 0.12,
+            "borderline": 0
+          },
+          "deterministicShare": 1,
+          "f1Lower": 0,
+          "f1Upper": 0,
+          "recordedF1": null,
+          "recordedV1F1": 0
+        }
+      ]
+    },
+    {
+      "task": "crispr-offtarget",
+      "gtClaims": 5,
+      "recordedPasses": 1,
+      "swingLower": 0,
+      "swingUpper": 0,
+      "recordedV1Swing": 0,
+      "passes": [
+        {
+          "source": "rediscovery-v1-degraded.jsonl",
+          "agentClaims": 16,
+          "matcher": {
+            "high": 0.4,
+            "low": 0.12,
+            "borderline": 15
+          },
+          "deterministicShare": 0.2857142857142857,
+          "f1Lower": 0,
+          "f1Upper": 0.769,
+          "recordedF1": null,
+          "recordedV1F1": 0.581
+        }
+      ]
+    },
+    {
+      "task": "crc-ici-failure",
+      "gtClaims": 8,
+      "recordedPasses": 2,
+      "swingLower": 0.091,
+      "swingUpper": 0.069,
+      "recordedV1Swing": 0.095,
+      "passes": [
+        {
+          "source": "rediscovery-v1-degraded.jsonl",
+          "agentClaims": 9,
+          "matcher": {
+            "high": 0.4,
+            "low": 0.12,
+            "borderline": 13
+          },
+          "deterministicShare": 0.23529411764705888,
+          "f1Lower": 0,
+          "f1Upper": 0.764,
+          "recordedF1": null,
+          "recordedV1F1": 0.483
+        },
+        {
+          "source": "rediscovery-v2-pass1.jsonl",
+          "agentClaims": 14,
+          "matcher": {
+            "high": 0.4,
+            "low": 0.12,
+            "borderline": 16
+          },
+          "deterministicShare": 0.2727272727272727,
+          "f1Lower": 0.091,
+          "f1Upper": 0.833,
+          "recordedF1": null,
+          "recordedV1F1": 0.578
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "tasksMeasured": 5,
+    "medianDeterministicShare": 0.2857142857142857,
+    "maxCrossDecompositionSwingLower": 0.091,
+    "maxCrossDecompositionSwingUpper": 0.543,
+    "v1RecordedLLMMatcherSwingForComparison": 0.5
+  }
+}
