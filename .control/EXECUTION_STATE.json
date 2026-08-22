@@ -56,6 +56,7 @@
     "USER ACTION REQUIRED unchanged: DASHSCOPE_API_KEY (submission route B-QWEN-LIVE-ROUTE) / any one recharge (deepseek/zai) unblocks live re-measurement / OPENALEX_API_KEY optional"
   ],
   "blockerIds": [
+    "B-DEEPSEEK-BALANCE",
     "B-QWEN-LIVE-ROUTE"
   ],
   "lastVerifiedCommit": "Wave-9 mid-state 2026-08-22: suite 332/332, tsc clean, lint clean (new: eval/rediscovery-judge.mjs, rediscovery-tasks.mjs, stats.mjs, stats-report.mjs, judge-variance.mjs, counter-evidence-metric.mjs, claim-pair-gold, 24-test file; D-042/D-043 recorded)",
