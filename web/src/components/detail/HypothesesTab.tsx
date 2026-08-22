@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { GitCompareArrows, X } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
-import { connectClaim, forkHypothesis, getEvidence, getHypotheses, promoteHypothesis, rejectHypothesis } from '../../api/endpoints';
+import { connectClaim, editHypothesis, forkHypothesis, getEvidence, getHypotheses, promoteHypothesis, rejectHypothesis } from '../../api/endpoints';
 import type { AchAnalysis, EvidenceBody, HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
@@ -37,6 +37,7 @@ export function HypothesesTab({
   const compareActive = compareIds.length >= 2;
   // B5 ops state: which card's connect picker is open, in-flight op key, last error.
   const [connectOpenFor, setConnectOpenFor] = useState<string | null>(null);
+  const [editOpenFor, setEditOpenFor] = useState<string | null>(null);
   const [opBusy, setOpBusy] = useState<string | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
   const evidenceNeeded = compareActive || connectOpenFor !== null;
@@ -50,7 +51,7 @@ export function HypothesesTab({
    */
   const runHypOp = (
     hypId: string,
-    op: 'promote' | 'reject' | 'fork' | 'connect',
+    op: 'promote' | 'reject' | 'fork' | 'connect' | 'edit',
     act: (signal: AbortSignal) => Promise<unknown>,
   ): void => {
     setOpError(null);
@@ -60,6 +61,7 @@ export function HypothesesTab({
       .then(() => {
         setOpBusy(null);
         if (op === 'connect') setConnectOpenFor(null);
+        if (op === 'edit') setEditOpenFor(null);
         res.retry();
       })
       .catch((e: unknown) => {
@@ -82,6 +84,15 @@ export function HypothesesTab({
     onReject: () => runHypOp(h.id, 'reject', (signal) => rejectHypothesis(run.id, h.id, signal)),
     onFork: () => runHypOp(h.id, 'fork', (signal) => forkHypothesis(run.id, h.id, signal)),
     onConnect: (claimId, direction) => runHypOp(h.id, 'connect', (signal) => connectClaim(run.id, h.id, claimId, direction, signal)),
+    editOpen: editOpenFor === h.id,
+    onEditToggle: () => setEditOpenFor((prev) => (prev === h.id ? null : h.id)),
+    // Only CHANGED fields ride the request — an untouched mechanism is not an edit.
+    onEditSubmit: ({ statement, mechanism, note }) => runHypOp(h.id, 'edit', (signal) =>
+      editHypothesis(run.id, h.id, {
+        ...(statement.trim() !== h.statement ? { statement: statement.trim() } : {}),
+        ...(mechanism.trim() !== h.mechanism ? { mechanism: mechanism.trim() } : {}),
+        note,
+      }, signal)),
   });
 
   const toggleCompare = (id: string): void => {
@@ -97,6 +108,7 @@ export function HypothesesTab({
   useEffect(() => {
     setCompareIds([]);
     setConnectOpenFor(null);
+    setEditOpenFor(null);
   }, [run.id]);
 
   const data = res.data;

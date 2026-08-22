@@ -22,6 +22,11 @@ export interface HypothesisCardOps {
   onReject: () => void;
   onFork: () => void;
   onConnect: (claimId: string, direction: 'supports' | 'counters') => void;
+  /** BP-2 direct edit: whether this card's edit form is open (state lives in the tab). */
+  editOpen: boolean;
+  onEditToggle: () => void;
+  /** Submit the correction; the tab owns the POST + refetch + error surface. */
+  onEditSubmit: (fields: { statement: string; mechanism: string; note: string }) => void;
 }
 
 export function HypothesisCard({
@@ -52,6 +57,9 @@ export function HypothesisCard({
   const [specOpen, setSpecOpen] = useState(false);
   const [connectClaimId, setConnectClaimId] = useState('');
   const [connectDirection, setConnectDirection] = useState<'supports' | 'counters'>('supports');
+  const [editStatement, setEditStatement] = useState(hypothesis.statement);
+  const [editMechanism, setEditMechanism] = useState(hypothesis.mechanism);
+  const [editNote, setEditNote] = useState('');
   const f = hypothesis.falsification;
   const completeness = f?.completenessCheck;
   const status = hypothesis.status ?? 'active';
@@ -156,6 +164,16 @@ export function HypothesisCard({
               >
                 {t('hyp.connect')}
               </button>
+              <button
+                type="button"
+                className="btn btn--small"
+                disabled={ops.busy}
+                aria-expanded={ops.editOpen}
+                onClick={ops.onEditToggle}
+                title={t('hyp.editHint')}
+              >
+                {t('hyp.edit')}
+              </button>
             </span>
           )}
         </span>
@@ -199,6 +217,52 @@ export function HypothesisCard({
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {ops?.editOpen === true && (
+        <div className="hyp-connect" role="group" aria-label={t('hyp.edit')}>
+          <p className="muted small">{t('hyp.editHint')}</p>
+          <label className="edit-field">
+            <span className="muted small">{t('hyp.editStatement')}</span>
+            <textarea
+              rows={3}
+              value={editStatement}
+              onChange={(e) => setEditStatement(e.target.value)}
+              disabled={ops.busy}
+            />
+          </label>
+          <label className="edit-field">
+            <span className="muted small">{t('hyp.editMechanism')}</span>
+            <textarea
+              rows={4}
+              value={editMechanism}
+              onChange={(e) => setEditMechanism(e.target.value)}
+              disabled={ops.busy}
+            />
+          </label>
+          <label className="edit-field">
+            <span className="muted small">{t('hyp.editNote')}</span>
+            <input
+              type="text"
+              value={editNote}
+              onChange={(e) => setEditNote(e.target.value)}
+              disabled={ops.busy}
+            />
+          </label>
+          <span className="hyp-connect-confirm">
+            <button
+              type="button"
+              className="btn btn--small btn--primary"
+              disabled={ops.busy || editNote.trim().length < 3 || editStatement.trim().length < 20}
+              onClick={() => ops.onEditSubmit({ statement: editStatement, mechanism: editMechanism, note: editNote.trim() })}
+            >
+              {t('hyp.editSubmit')}
+            </button>
+            <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onEditToggle}>
+              {t('hyp.editCancel')}
+            </button>
+          </span>
         </div>
       )}
 

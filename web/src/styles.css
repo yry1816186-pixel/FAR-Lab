@@ -1488,6 +1488,9 @@ select option { color: var(--text); background: var(--surface); }
 }
 .hyp-connect select { max-width: 320px; min-width: 160px; }
 .hyp-connect-confirm { flex-shrink: 0; }
+/* BP-2 direct-edit form: full-width fields stack vertically inside the dashed group. */
+.edit-field { display: flex; flex-direction: column; gap: var(--sp-1); flex: 1 1 100%; }
+.edit-field textarea, .edit-field input { width: 100%; font: inherit; padding: var(--sp-1); border: 1px solid var(--v2-border); border-radius: var(--radius-s); background: var(--v2-surface); color: inherit; resize: vertical; }
 .math-fallback { color: var(--v2-refuted); }
 
 /* D-101 FTS search hit emphasis in palette rows. */

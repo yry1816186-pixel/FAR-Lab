@@ -1155,6 +1155,22 @@ describe('POST /api/v1/runs/:id/hypotheses/:hypId/<op> (B5)', () => {
     expect(bad.body.error.message).toContain('direction');
   });
 
+  it('edits the hypothesis over HTTP (BP-2): version bump + causal revision persisted', async () => {
+    const before = app.store.getObject('hypothesis', hyp1)!;
+    const res = await postJson(`${base}/api/v1/runs/${run1}/hypotheses/${hyp1}/edit`, {
+      statement: 'Corrected statement with materially different causal wording for the test.',
+      note: 'http-level correction check',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.version).toBe(before.version + 1);
+    expect(res.body.changedFields).toEqual(['statement']);
+    expect(app.store.getObject('hypothesis', hyp1)?.version).toBe(before.version + 1);
+    expect(app.store.getObject('revision', res.body.revisionId as string)).toBeDefined();
+    // 400 when nothing editable is provided
+    const empty = await postJson(`${base}/api/v1/runs/${run1}/hypotheses/${hyp1}/edit`, { note: 'no field' });
+    expect(empty.status).toBe(400);
+  });
+
   it('404s for an unknown run (envelope carries the runId)', async () => {
     const ghost = `run_${'0'.repeat(26)}`;
     const res = await postJson(`${base}/api/v1/runs/${ghost}/hypotheses/${hyp1}/promote`, {});
