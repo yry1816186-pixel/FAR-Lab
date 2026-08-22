@@ -413,3 +413,34 @@ describe('gold calibration regression (claim-pair-gold.jsonl)', () => {
     expect(out).toContain('exact 3-seed agreement: 7/15');
   });
 });
+
+describe('local secrets loader (unlock path)', () => {
+  it('loads filled keys, skips empty slots and comments, never overrides existing env', async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { tmpdir } = await import('node:os');
+    const dir = mkdtempSync(join(tmpdir(), 'farlab-secrets-'));
+    const f = join(dir, 'secrets.env');
+    writeFileSync(f, '# comment\nTESTKEY_UNSET_A=alpha\nTESTKEY_UNSET_B=\n\nTESTKEY_SET_A=beta\n');
+    const prev = process.env.TESTKEY_SET_A;
+    process.env.TESTKEY_SET_A = 'existing';
+    try {
+      const { loadLocalSecrets } = await import('../eval/load-secrets.mjs');
+      const r = loadLocalSecrets(f);
+      expect(r.loaded).toEqual(['TESTKEY_UNSET_A']); // filled key loaded; empty slot skipped
+      expect(process.env.TESTKEY_UNSET_A).toBe('alpha');
+      expect(process.env.TESTKEY_SET_A).toBe('existing'); // env wins, file never overrides
+      expect(r.loaded.join()).not.toContain('beta'); // names only, values never reported
+    } finally {
+      if (prev === undefined) delete process.env.TESTKEY_SET_A; else process.env.TESTKEY_SET_A = prev;
+      delete process.env.TESTKEY_UNSET_A;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('absent file -> env-only mode, no throw', async () => {
+    const { loadLocalSecrets } = await import('../eval/load-secrets.mjs');
+    const r = loadLocalSecrets('Z:/definitely/not/here/secrets.env');
+    expect(r.loaded).toEqual([]);
+  });
+});

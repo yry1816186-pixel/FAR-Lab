@@ -27,6 +27,8 @@ import { TASKS, GT_REV, renderTopHypothesis, waitForTerminal } from './rediscove
 import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS } from './claim-match.mjs';
 import { judgeRediscovery } from './rediscovery-judge.mjs';
 import { maxAbsSwing, variance } from './stats.mjs';
+import { loadLocalSecrets } from './load-secrets.mjs';
+loadLocalSecrets(); // .far-run/secrets.env keys (names only in any output)
 
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
 const REPLAY_SOURCES = ['rediscovery-v1-degraded.jsonl', 'rediscovery-v2-pass1.jsonl'];

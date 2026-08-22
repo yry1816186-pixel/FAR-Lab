@@ -29,6 +29,8 @@ import { execFileSync } from 'node:child_process';
 import { makeProvider } from './lib.mjs';
 import { TASKS, renderTopHypothesis, waitForTerminal, GT_REV } from './rediscovery-tasks.mjs';
 import { judgeRediscovery } from './rediscovery-judge.mjs';
+import { loadLocalSecrets } from './load-secrets.mjs';
+loadLocalSecrets(); // .far-run/secrets.env keys (names only in any output)
 
 const RESULTS_DIR = resolve(process.cwd(), 'eval/results');
 const OUT = join(RESULTS_DIR, 'rediscovery.jsonl');
