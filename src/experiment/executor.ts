@@ -287,7 +287,10 @@ export const executeExperiment = async (
   } finally {
     const logs = sidecar.logs();
     if (logs.length > 0) {
-      await artifacts.put(`[experiment ${expRun.id}]\n${logs.join('\n')}`);
+      const logRef = (await artifacts.put(`[experiment ${expRun.id}]\n${logs.join('\n')}`)).ref;
+      // Metadata completion (not a state transition): attach the log artifact to the
+      // run object so export/bundle can reference it; audited as a note event.
+      store.putObjectEvented('experiment_run', { ...expRun, trainingLogRef: logRef }, { type: 'note', detail: { trainingLog: logRef } }, now());
     }
     sidecar.close();
   }

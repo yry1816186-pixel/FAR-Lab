@@ -10,6 +10,10 @@ import { applySplit } from '../src/experiment/split.js';
 import { datasetIdFor, acquireDataset } from '../src/experiment/datasets.js';
 import { executeExperiment } from '../src/experiment/executor.js';
 import { expandAblationModels } from '../src/experiment/matrix.js';
+import { exportStage } from '../src/pipeline/stages/export.js';
+import { createTestStubProvider } from '../src/providers/test-stub.js';
+import { ProvenanceReceipt, type ResearchRun } from '../src/domain/index.js';
+import type { StageContext } from '../src/pipeline/types.js';
 import {
   ResearchQuestion, HypothesisCandidate, newId,
   checkExperimentSpec, mechanicalVerdict,
@@ -465,6 +469,65 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
       for (const cell of tagged) expect(cell.tags.length).toBe(2);
       // Distinct hyperparams => distinct fingerprints (no accidental dedup collapse).
       expect(new Set(tagged.map((c) => c.fingerprint)).size).toBe(4);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('export integration: executed experiment renders into report §7a and bundle experimentEvidence (ACC-26)', async () => {
+    const { store, dir, cleanup } = makeStore();
+    try {
+      const artifacts = openArtifactStore(join(dir, 'artifacts'));
+      const runId = makeRun(store);
+      const hyp = makeHypothesis(runId);
+      store.putObject('hypothesis', hyp);
+      const csvPath = join(dir, 'fixture.csv');
+      writeFileSync(csvPath, fixtureCsv(), 'utf8');
+      const spec = makeSpec(runId, csvPath, hyp.id);
+      const out = await executeExperiment(store, artifacts, spec, { allowLocalDatasets: true });
+      expect(out.run.status).toBe('completed');
+
+      const run = store.getRun(runId) as ResearchRun;
+      const ctx: StageContext = {
+        run,
+        store,
+        artifacts,
+        provider: createTestStubProvider([]), // export performs no model call; empty script fails loudly if that changes
+        sourceFor: () => { throw new Error('no source adapter in test'); },
+        recordReceipt: (partial) => {
+          store.putObject('receipt', ProvenanceReceipt.parse({ ...partial, id: newId('rcp'), runId, at: partial.at ?? new Date().toISOString() }));
+        },
+        cancelled: () => false,
+        log: () => {},
+      };
+      const outcome = await exportStage.execute(ctx);
+      expect(outcome.kind).toBe('done');
+
+      const bundle = store.listObjects('bundle', runId).at(-1)!;
+      expect(bundle.experimentEvidence).toHaveLength(1);
+      const evidence = bundle.experimentEvidence![0]!;
+      expect(evidence.experimentRunId).toBe(out.run.id);
+      expect(evidence.resultIds).toEqual([out.resultSet.id]);
+      // per-row artifacts of both cells are hash-bound; the training log binds too WHEN
+      // the sidecar actually emitted output (silent success legitimately has none).
+      expect(evidence.artifactHashes!.length).toBeGreaterThanOrEqual(out.resultSet.cells.length);
+      for (const cell of out.resultSet.cells) {
+        expect(evidence.artifactHashes).toContain(cell.perRowRef.replace('sha256:', ''));
+      }
+      const persistedRun = store.getObject('experiment_run', out.run.id)!;
+      if (persistedRun.trainingLogRef !== undefined) {
+        expect(persistedRun.trainingLogRef).toMatch(/^sha256:[0-9a-f]{64}$/);
+        expect(evidence.artifactHashes).toContain(persistedRun.trainingLogRef.replace('sha256:', ''));
+      }
+      expect(evidence.lockfileHash).toBe(out.run.environment?.lockfileHash);
+
+      const report = await artifacts.get(outcome.artifacts[0]!);
+      expect(report).toContain('### 7a. 实验执行结果（真实运行）');
+      expect(report).toContain(`- 实验 ${out.run.id}：completed`);
+      expect(report).toMatch(/logistic: accuracy=[01]\.\d{4}（train\/test=/);
+      expect(report).toContain('阈值来源=model-stipulated');
+      expect(report).toContain(`假设 ${hyp.id}@v0`);
+      expect(report).toContain('verdict=');
     } finally {
       cleanup();
     }

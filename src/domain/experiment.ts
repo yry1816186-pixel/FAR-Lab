@@ -256,6 +256,8 @@ export const ExperimentRun = z.object({
   cancelRequested: z.boolean().default(false),
   resultIds: z.array(ResultSetId).default([]),
   statReportIds: z.array(StatReportId).default([]),
+  /** Content-addressed sidecar training logs (executor flushes on close; audits replay, not state). */
+  trainingLogRef: z.string().regex(/^sha256:[0-9a-f]{64}$/).optional(),
   createdAt: z.string().datetime(),
 });
 export type ExperimentRun = z.infer<typeof ExperimentRun>;

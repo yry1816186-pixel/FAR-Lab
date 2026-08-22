@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BundleId, ReceiptId, RunId } from './ids.js';
+import { BundleId, ReceiptId, RunId, ExperimentRunId, ResultSetId, StatReportId } from './ids.js';
 
 /**
  * Execution facts captured AS THEY HAPPEN (mission §36/§55). Missing data stays missing —
@@ -88,6 +88,14 @@ export const ReproducibilityBundle = z.object({
    * external semantic-web consumers only; the internal domain model is authoritative.
    */
   hypothesisJsonLd: z.array(z.unknown()).optional(),
+  /** EEL (D-081): executed-experiment evidence — object ids plus content-addressed artifact hashes (P2, ACC-26). */
+  experimentEvidence: z.array(z.object({
+    experimentRunId: ExperimentRunId,
+    resultIds: z.array(ResultSetId),
+    statReportIds: z.array(StatReportId),
+    artifactHashes: z.array(z.string().length(64)),
+    lockfileHash: z.string().length(64).optional(),
+  })).optional(),
   createdAt: z.string().datetime(),
 });
 export type ReproducibilityBundle = z.infer<typeof ReproducibilityBundle>;
