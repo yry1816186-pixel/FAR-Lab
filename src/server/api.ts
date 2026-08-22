@@ -5,6 +5,7 @@ import type { App } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { listProviders, defaultLiveProvider } from '../providers/index.js';
 import { createCustomProvider } from '../providers/custom.js';
+import { runResearchAction, ActionError } from './actions.js';
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
 import {
   FeedbackSignal,
@@ -31,7 +32,7 @@ import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'internal';
+  code: 'not_found' | 'validation' | 'already_running' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'invalid_action_request';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -962,6 +963,20 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
         if (leaf === 'resume' && method === 'POST') return resumeRun(res, runId);
         if (leaf === 'feedback' && method === 'POST') return receiveFeedback(req, res, runId);
         if (leaf === 'reexport' && method === 'POST') return reexport(res, runId);
+        if (leaf === 'actions' && method === 'POST') {
+          // B4 object-level AI research actions: grounded adversarial analysis
+          // (store facts only; receipts + audit events like any pipeline call).
+          const body = await readJsonObject(req);
+          try {
+            const result = await runResearchAction(app, runId, body);
+            sendJson(res, 200, result);
+          } catch (e) {
+            if (e instanceof ActionError) {
+              throw new HttpError(e.status, { code: e.code, message: e.message, retryable: e.status >= 500 });
+            }
+            throw e;
+          }
+        }
       }
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
