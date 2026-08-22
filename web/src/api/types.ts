@@ -610,3 +610,88 @@ export interface SearchResponse {
   hypotheses: SearchHit[];
   claims: SearchHit[];
 }
+
+// ---- object-level AI research actions (B4) ----
+
+export type ResearchActionName = 'challenge' | 'weakest_assumption' | 'falsify_probe' | 'counter_evidence' | 'ask' | 'what_next';
+export type ResearchActionTargetType = 'hypothesis' | 'claim' | 'plan';
+
+export interface ActionPoint {
+  kind: 'argument' | 'evidence_link' | 'caveat' | 'gap';
+  text: string;
+  claimId?: string;
+}
+
+export interface ActionAnalysis {
+  headline: string;
+  points: ActionPoint[];
+  uncertainties: string[];
+  nextStep?: string;
+}
+
+export interface ResearchActionResponse {
+  action: ResearchActionName;
+  targetType: ResearchActionTargetType;
+  targetId: string;
+  model: { provider: string; modelId: string; latencyMs: number };
+  analysis: ActionAnalysis;
+  droppedRefs: string[];
+  groundingClaims: number;
+  note: string;
+}
+
+// ---- user-defined model configurations (custom model routes) ----
+
+export type ProviderWireProtocol = 'openai' | 'anthropic';
+
+/** Server projection of a stored model config — the plaintext key NEVER crosses the wire. */
+export interface ModelConfigSummary {
+  id: string;
+  label: string;
+  wire: ProviderWireProtocol;
+  baseUrl: string;
+  modelId: string;
+  apiKeySet: boolean;
+  apiKeyMasked: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EnvDefaultInfo {
+  name: string;
+  modelId: string;
+  liveReady: boolean;
+}
+
+export interface ModelConfigsResponse {
+  configs: ModelConfigSummary[];
+  activeModelConfigId: string | null;
+  envDefault: EnvDefaultInfo | null;
+}
+
+export interface ModelConfigInput {
+  label: string;
+  wire: ProviderWireProtocol;
+  baseUrl: string;
+  modelId: string;
+  apiKey: string;
+}
+
+export interface ModelConfigTestInput {
+  /** Test a stored config; the server supplies its key. */
+  configId?: string;
+  label?: string;
+  wire: ProviderWireProtocol;
+  baseUrl: string;
+  modelId: string;
+  apiKey?: string;
+}
+
+export interface ModelConfigTestResult {
+  ok: boolean;
+  modelId: string;
+  latencyMs: number;
+  sample?: unknown;
+  error?: { kind: string; message: string; retryable: boolean; httpStatus?: number };
+}

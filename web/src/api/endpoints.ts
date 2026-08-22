@@ -16,7 +16,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, VerificationReport } from './types';
+import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, VerificationReport } from './types';
 
 const BASE = '/api/v1';
 
@@ -141,6 +141,8 @@ export interface CreateRunInput {
   text: string;
   domain?: string;
   goalType?: ScientificGoalType;
+  /** Optional user-defined model route for this run (mcfg_… id). */
+  providerConfigId?: string;
 }
 
 export const createRun = async (input: CreateRunInput, signal?: AbortSignal): Promise<string> => {
@@ -196,6 +198,83 @@ export const postFeedback = async (runId: string, input: FeedbackInput, signal?:
   await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/feedback`, input, signal);
 };
 
+// ---- user-defined model configurations (custom model routes) ----
+
+const modelConfigOf = (data: unknown): ModelConfigSummary => {
+  if (typeof data === 'object' && data !== null) {
+    const c = data as Record<string, unknown>;
+    if (typeof c.id === 'string' && typeof c.label === 'string' && (c.wire === 'openai' || c.wire === 'anthropic')
+      && typeof c.baseUrl === 'string' && typeof c.modelId === 'string') {
+      return {
+        id: c.id,
+        label: c.label,
+        wire: c.wire,
+        baseUrl: c.baseUrl,
+        modelId: c.modelId,
+        apiKeySet: c.apiKeySet === true,
+        apiKeyMasked: typeof c.apiKeyMasked === 'string' ? c.apiKeyMasked : '',
+        active: c.active === true,
+        createdAt: typeof c.createdAt === 'string' ? c.createdAt : '',
+        updatedAt: typeof c.updatedAt === 'string' ? c.updatedAt : '',
+      };
+    }
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '模型配置结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'model config' } });
+};
+
+export const listModelConfigs = async (signal?: AbortSignal): Promise<ModelConfigsResponse> => {
+  const data: unknown = await api.getJson(`${BASE}/model-configs`, signal);
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { configs?: unknown }).configs)) {
+    const env = (data as { envDefault?: unknown }).envDefault;
+    return {
+      configs: ((data as { configs: unknown[] }).configs).map(modelConfigOf),
+      activeModelConfigId: typeof (data as { activeModelConfigId?: unknown }).activeModelConfigId === 'string'
+        ? (data as { activeModelConfigId: string }).activeModelConfigId
+        : null,
+      envDefault: typeof env === 'object' && env !== null
+        ? env as ModelConfigsResponse['envDefault']
+        : null,
+    };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '模型配置列表响应缺少 configs 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'model configs envelope' } });
+};
+
+export const createModelConfig = async (input: ModelConfigInput, signal?: AbortSignal): Promise<ModelConfigSummary> =>
+  modelConfigOf((await api.post(`${BASE}/model-configs`, input, signal) as { config?: unknown }).config);
+
+/** Full update; omit `apiKey` to keep the stored key (the server treats absence as keep). */
+export const updateModelConfig = async (
+  id: string,
+  input: Omit<ModelConfigInput, 'apiKey'> & { apiKey?: string },
+  signal?: AbortSignal,
+): Promise<ModelConfigSummary> =>
+  modelConfigOf((await api.put(`${BASE}/model-configs/${encodeURIComponent(id)}`, input, signal) as { config?: unknown }).config);
+
+export const deleteModelConfig = async (id: string, signal?: AbortSignal): Promise<void> => {
+  await api.del(`${BASE}/model-configs/${encodeURIComponent(id)}`, signal);
+};
+
+/** Set (id) or clear (null) the workspace default model config. */
+export const setActiveModelConfig = async (id: string | null, signal?: AbortSignal): Promise<void> => {
+  await api.put(`${BASE}/model-configs/active`, { id }, signal);
+};
+
+/** ONE tiny live call against the route (stored config by id, or an unsaved draft with its key). */
+export const testModelConfig = async (input: ModelConfigTestInput, signal?: AbortSignal): Promise<ModelConfigTestResult> => {
+  const data: unknown = await api.post(`${BASE}/model-configs/test`, input, signal);
+  if (typeof data === 'object' && data !== null && typeof (data as { ok?: unknown }).ok === 'boolean') {
+    const r = data as Record<string, unknown>;
+    return {
+      ok: r.ok === true,
+      modelId: typeof r.modelId === 'string' ? r.modelId : '',
+      latencyMs: typeof r.latencyMs === 'number' ? r.latencyMs : 0,
+      ...(r.sample !== undefined ? { sample: r.sample } : {}),
+      ...(typeof r.error === 'object' && r.error !== null ? { error: r.error as ModelConfigTestResult['error'] } : {}),
+    };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '连接测试响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'model config test result' } });
+};
+
 // ---- small helper (local, avoids repeating the 404-passthrough pattern) ----
 
 function normalizeWrap<T>(
@@ -205,3 +284,20 @@ function normalizeWrap<T>(
   return async (runId: string, signal?: AbortSignal): Promise<T> =>
     normalize(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/${resource}`, signal));
 }
+
+/** B4: object-level AI research action (grounded adversarial analysis). */
+export const postResearchAction = async (
+  runId: string,
+  input: { action: string; targetType: string; targetId: string; question?: string },
+  signal?: AbortSignal,
+): Promise<ResearchActionResponse> => {
+  const data = await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/actions`, input, signal);
+  // Fail-closed shape check: the contract is fixed and every field is load-bearing.
+  if (
+    typeof data !== 'object' || data === null || typeof (data as ResearchActionResponse).analysis !== 'object'
+    || !Array.isArray((data as ResearchActionResponse).analysis.points)
+  ) {
+    throw new ApiError({ code: 'unexpected_schema', message: 'research action response malformed', retryable: false });
+  }
+  return data as ResearchActionResponse;
+};
