@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "mission": "EEL (Experiment Execution Layer, D-081 user mandate): close the falsification loop with real experiments — E1 ExperimentSpec/E2 datasets/E3 model lab/E4 matrices+statistics/E5 devices-env-gateway-scheduling/E6 feedback integration. Direction-A loop stays the orchestrating authority; zero theatrical demos; LLM proposes specs, deterministic code produces verdicts.",
   "status": "in_progress",
-  "phase": "EEL P0+P1+P2 COMPLETE 2026-08-22 (commits 423dba3, 3d4aa2f): P2 multiple-testing enforcement live (alpha_spending adjustedAlpha recorded; single_primary secondaries descriptive-only; e_value fail-closed), ablation factorial matrix with tags into result cells. ACC-24 live_verified. Gates: vitest 642/642 / eslint 0 / tsc 0. NEXT: CLI+web experiment surfaces (after parallel session frees src/cli+desktop), P3 scheduler (far-scheduler.db, D-085 P0-3) + ssh2 gateway to Docker/WSL2 (needs user to start daemon), export integration for experiment results (ACC-26).",
+  "phase": "EEL P0..P2 + EXPORT COMPLETE 2026-08-22 (423dba3, 3d4aa2f, b200e70): report §7a + bundle experimentEvidence live; ACC-21..24 at target, ACC-25/26 implemented with named remainders. Gates: vitest 643/643 / eslint 0 / tsc 0 / secret-scan PASS / path-hygiene 0. NEXT: (1) live traceable revision (experiment feedback -> revise -> causally-linked Revision, closes ACC-26); (2) CLI/web experiment surfaces (parallel session owns src/server+web+src/cli); (3) P3 scheduler far-scheduler.db + ssh2 gateway (user starts Docker for the WSL2 target).",
   "pauseReason": "",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
