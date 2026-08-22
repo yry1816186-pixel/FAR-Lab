@@ -68,7 +68,7 @@ const COMMAND_WORDS = new Set(['research', 'start', 'status', 'inspect', 'cancel
  */
 const jsonOutput = (data: unknown): void => {
   try {
-    jsonOutput(data);
+    process.stdout.write(JSON.stringify(data) + '\n');
   } catch (e) {
     process.stderr.write(`far: json serialization failed: ${e instanceof Error ? e.message : String(e)}\n`);
     process.exitCode = 1;
