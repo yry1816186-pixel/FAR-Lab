@@ -20,10 +20,10 @@
     {
       "id": "B-DEEPSEEK-BALANCE",
       "critical": true,
-      "status": "OPEN",
+      "status": "RESOLVED_BY_ROUTE_CHANGE",
       "scope": "model-provider",
       "reason": "Project DeepSeek key balance exhausted (live probe 2026-08-22: HTTP 402 Insufficient Balance). Blocks every live pipeline run and LLM judging (rediscovery v2 completion, any further live verification). UPDATE 2026-08-22 (W8 session): ZAI_API_KEY delivered in .far-run/secrets.env but live probe returned HTTP 429 code 1113 Insufficient balance or no resource package (verbatim, spikes/output/zai-route-probe.json) — the GLM route is balance-blocked too. ALL model routes still blocked.",
-      "resolution": "Any ONE of: top up DeepSeek (platform.deepseek.com), recharge z.ai resource package for the provided ZAI key, or fill the (currently empty) DASHSCOPE_API_KEY value. Each unblocks the pooled live-verification queue (W9 judge variance, W5 re-measurements, W8 live soak)."
+      "resolution": "2026-08-22 D-058: DeepSeek models BANNED from this project by user directive (permanent constraint, recorded in memory + eval wiring) — the balance question is moot. Live evaluation capability restored via glm-5.3 (Zhipu bigmodel Anthropic protocol, user-funded): judge-variance --live 3 measured successfully (worstTaskSwing 0.061, target+stretch met). Submission-mandated Qwen/Bailian route remains B-QWEN-LIVE-ROUTE (separate, unchanged)."
     }
   ]
 }

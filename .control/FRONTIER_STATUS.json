@@ -279,8 +279,8 @@
       },
       {
         "id": "wave9-judge-variance-hardening",
-        "status": "in_progress",
-        "evidence": "offline COMPLETE + audit-P0 root-fixed (borderline bestIdx, mutation-verified): replay cross-decomposition swing <=0.091 conservative < 0.15 target; LIVE re-judge (judge-variance.mjs --live 3) ready and BLOCKED solely on model routes (deepseek 402 spendable-probe verbatim / zai 401 / dashscope keyless); north-star stays 0.5 with offline evidence, no live claim"
+        "status": "resolved",
+        "evidence": "D-058 LIVE MEASURED 2026-08-22: judge-variance --live 3 on glm-5.3 (Anthropic-protocol route): worstTaskSwing 0.061 < 0.15 target AND < 0.08 stretch; scope 2/5 tasks honestly disclosed (arg swing 0, crc 0.061); judge protocol migration from deepseek-chat recorded; north-star current = 0.061"
       },
       {
         "id": "wave9-counter-evidence-metric",

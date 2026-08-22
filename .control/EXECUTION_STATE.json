@@ -57,7 +57,6 @@
     "W-P2 candidates harvested: contamination-stratified reporting (open-compass pattern) x counter-seat targeted retrieval for counter-evidence-substantive-hit 0.143->0.70; Yale EM-DS judge confusion-matrix calibration (needs human gold set)."
   ],
   "blockerIds": [
-    "B-DEEPSEEK-BALANCE",
     "B-QWEN-LIVE-ROUTE"
   ],
   "lastVerifiedCommit": "Wave-G final gate 2026-08-22: vitest 604/604 (27 files), typecheck 0, eslint 0, build 0, secret-scan PASS, path-hygiene PASS; WP3/WP4 batch adversarially audited PASS (evidence/W-G/audit-wp3wp4.md); completion-gate rerun archived (still NOT_READY solely on user-gated B-DEEPSEEK-BALANCE).",
