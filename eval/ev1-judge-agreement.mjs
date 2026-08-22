@@ -67,5 +67,24 @@ for (const dim of DIMS) {
   for (const ps of perSystem) console.log(`   ${ps.system.padEnd(7)}: seed means ${ps.seedMeans.join('/')} aggregate ${ps.aggregateMean} CI [${ps.ci.lo.toFixed(2)}, ${ps.ci.hi.toFixed(2)}]`);
 }
 const out = join(resolve(process.cwd(), 'eval/results'), 'ev1-judge-agreement.json');
-writeFileSync(out, JSON.stringify(report, null, 2) + '\n');
-console.log(`\nDONE -> ${out}`);
+// Write-if-changed (WP2 P0-1): the numbers are a pure function of the committed judge
+// files, so a rerun with unchanged inputs must NOT touch the committed artifact —
+// the old unconditional write churned the `generated` timestamp on every suite run
+// (tests/rediscovery-judge.test.ts execs this script for its locked-value assertions).
+const nextReport = { ...report, generated: undefined };
+const write = () => {
+  writeFileSync(out, JSON.stringify({ ...nextReport, generated: new Date().toISOString() }, null, 2) + '\n');
+  console.log(`\nDONE -> ${out}`);
+};
+try {
+  const existing = JSON.parse(readFileSync(out, 'utf8'));
+  const { generated: _prev, ...existingBody } = existing;
+  const changed = JSON.stringify(existingBody) !== JSON.stringify(nextReport);
+  if (!changed) {
+    console.log(`\nUNCHANGED -> ${out} (content identical; timestamp not churned)`);
+  } else {
+    write();
+  }
+} catch {
+  write();
+}

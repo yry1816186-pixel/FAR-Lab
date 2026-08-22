@@ -1,5 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
+
+/** Nearest ancestor directory (inclusive) containing `name`; null when absent. */
+const findUp = (name: string, fromDir: string): string | null => {
+  let dir = path.resolve(fromDir);
+  for (;;) {
+    const candidate = path.join(dir, name);
+    if (fs.existsSync(candidate)) return candidate;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+};
 import { execSync } from 'node:child_process';
 import {
   RELATION_POLARITY,
@@ -78,8 +90,13 @@ interface ExportInputs {
 
 const orNone = (items: string[]): string => (items.length > 0 ? items.join('；') : '（未声明）');
 
-/** Deterministic ellipsis truncation for report lines (never fabricates, only shortens). */
-const truncate = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max)}…`);
+/** Deterministic ellipsis truncation for report lines (never fabricates, only shortens).
+ * Codepoint-aware (WP2 F3): slicing on UTF-16 units can split surrogate pairs (emoji,
+ * CJK ext-B) and emit a corrupted half-pair before the ellipsis. */
+const truncate = (s: string, max: number): string => {
+  const cps = [...s];
+  return cps.length <= max ? s : `${cps.slice(0, max).join('')}…`;
+};
 
 /** Material missing/incomplete items shared by report §9 and bundle limitations — one owner. */
 const collectMissing = (
@@ -553,10 +570,16 @@ export const exportStage: StageHandler = {
     const versionDiffs = ctx.store.listObjects('version_diff', run.id);
 
     // Hash of what is actually on disk; a marked placeholder when missing (never invented).
+    // Resolved from THIS module's location (WP2 F2), not process.cwd(): `far research`
+    // can run from any directory, and a cwd-relative read would hash the user's
+    // unrelated lockfile (or 'missing') into the reproducibility bundle.
     let dependencyLockHash: string;
     let lockMissing = false;
     try {
-      dependencyLockHash = sha256Hex(fs.readFileSync(path.join(process.cwd(), 'package-lock.json')));
+      const lockPath = process.env.FARLAB_LOCKFILE_PATH
+        ?? findUp('package-lock.json', import.meta.dirname ?? process.cwd());
+      if (lockPath === null) throw new Error('package-lock.json not found on any ancestor of the module');
+      dependencyLockHash = sha256Hex(fs.readFileSync(lockPath));
     } catch {
       dependencyLockHash = sha256Hex('missing');
       lockMissing = true;

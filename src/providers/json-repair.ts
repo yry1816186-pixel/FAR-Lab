@@ -447,7 +447,14 @@ export const repairJson = (input: string): string => {
     return at < i + MAX_HTML_ENTITY_LENGTH ? text.substring(at, i + MAX_HTML_ENTITY_LENGTH) : '';
   }
 
-  function parseString(stopAtDelimiter = false, stopAtIndex = -1): boolean {
+  function parseString(stopAtDelimiter = false, stopAtIndex = -1, depth = 0): boolean {
+    // Recursion guard (WP2): each retry re-entry can itself hit the retry conditions
+    // again; a future grammar change could chain retries unboundedly on crafted input.
+    // Same discipline as zodToStrictJsonSchema's depth cap. (2026-08-22 probing found no
+    // currently-craftable divergent input — this is defense-in-depth, not a live fix.)
+    if (depth > 20) {
+      throw new JsonRepairError('String parsing depth exceeded', i);
+    }
     const skipEscapeChars = text.charAt(i) === '\\';
     if (skipEscapeChars) {
       i += 1; // repair: remove the first escape character
@@ -478,7 +485,7 @@ export const repairJson = (input: string): string => {
             // belongs right before it: retry stopping at the first next delimiter
             i = iBefore;
             output = output.substring(0, oBefore);
-            return parseString(true);
+            return parseString(true, -1, depth + 1);
           }
           str = insertBeforeLastWhitespace(str, '"'); // repair missing quote
           output += str;
@@ -519,14 +526,14 @@ export const repairJson = (input: string): string => {
             // '{"a":"b,c,"d":"e"}': the end quote should have been right before the comma
             i = iBefore;
             output = output.substring(0, oBefore);
-            return parseString(false, iPrevChar);
+            return parseString(false, iPrevChar, depth + 1);
           }
           if (isDelimiter(prevChar)) {
             // not the right end quote (preceded by a delimiter, not followed by one):
             // an end quote is missing — re-parse stopping at the first next delimiter
             i = iBefore;
             output = output.substring(0, oBefore);
-            return parseString(true);
+            return parseString(true, -1, depth + 1);
           }
 
           // revert to right after the quote and continue parsing the string

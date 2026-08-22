@@ -281,7 +281,7 @@ const judgeOne = async (provider, rubric, expectedDims, stage, contentMd, taskTe
 // main
 // ---------------------------------------------------------------------------
 
-const provider = makeProvider();
+const provider = await makeProvider();
 if (!provider.liveReady && !RENDER_ONLY) die('DEEPSEEK_API_KEY not set');
 
 const eligible = eligibleTasks();

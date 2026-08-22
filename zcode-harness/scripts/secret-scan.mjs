@@ -32,6 +32,9 @@ const ALLOWED_SYNTHETIC_SUBSTRINGS = [
   'AKIAIOSFODNN7EXAMPLE',
   'sk-abc123def456ghi789jklmn',
   'sk-proj-AbCdEf1234567890GhIjKl',
+  // Planted redaction-test vectors in tests/waveg-wp2-regressions.test.ts (the
+  // redaction unit test must feed real-shaped fakes to assert they get redacted).
+  'sk-abcdefghij0123456789qrstuv',
   'xoxb-123456789-abcdef',
   'AIzaSyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q',
   // Built by concatenation so this source file never contains a contiguous

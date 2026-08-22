@@ -1,11 +1,15 @@
 /**
- * Shared helpers for W4 evaluation baselines. Node ESM, imports the SAME dist/ modules
+ * Shared helpers for evaluation baselines. Node ESM, imports the SAME dist/ modules
  * the FAR-Lab pipeline uses (same provider route, same source adapters) — fairness by
- * construction. No secret material in files: the provider reads DEEPSEEK_API_KEY from env.
+ * construction. No secret material in files: providers read keys from env
+ * (ZHIPU_API_KEY/ZAI_API_KEY), never from this repo.
+ *
+ * DeepSeek is BANNED in this project (user directive 2026-08-22). Default route =
+ * GLM via bigmodel.cn's Anthropic-compatible endpoint (eval/glm-anthropic-provider.mjs);
+ * FARLAB_BASELINE_PROVIDER=zai|dashscope selects the other OpenAI-protocol routes.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createDeepSeekProvider } from '../dist/providers/deepseek.js';
 
 export const loadProblems = () => {
   // FARLAB_PROBLEMS (cwd-relative path) pins run ids per problem — required when
@@ -18,8 +22,28 @@ export const loadProblems = () => {
   return raw.problems;
 };
 
-export const makeProvider = () =>
-  createDeepSeekProvider({ totalTimeoutMs: 300_000 }); // single-shot baseline needs a longer budget than one pipeline stage; recorded in results
+export const makeProvider = async () => {
+  const route = process.env.FARLAB_BASELINE_PROVIDER ?? 'glm';
+  if (route === 'deepseek') {
+    console.error('FATAL: deepseek is banned in this project (user directive 2026-08-22); use glm|zai|dashscope');
+    process.exit(1);
+  }
+  if (route === 'glm') {
+    const { createGlmAnthropicProvider } = await import('./glm-anthropic-provider.mjs');
+    return createGlmAnthropicProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+  }
+  if (route === 'zai') {
+    process.env.ZHIPU_API_KEY ??= process.env.ZAI_API_KEY; // secrets.env may use either name
+    const { createZaiProvider } = await import('../dist/providers/zai.js');
+    return createZaiProvider({ totalTimeoutMs: 300_000, model: process.env.FARLAB_ZAI_MODEL ?? 'glm-5.3' });
+  }
+  if (route === 'dashscope') {
+    const { createDashScopeProvider } = await import('../dist/providers/dashscope.js');
+    return createDashScopeProvider({ totalTimeoutMs: 300_000 });
+  }
+  console.error(`FATAL: unknown FARLAB_BASELINE_PROVIDER '${route}' (glm|zai|dashscope)`);
+  process.exit(1);
+};
 
 /** Strong-baseline task prompt. Describes the TARGET SHAPE (fields), not our checker internals. */
 export const baselineTaskPrompt = ({ question, domain, hasCorpus }) => `

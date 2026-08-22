@@ -23,7 +23,7 @@ const extractJson = (text) => {
   return direct;
 };
 
-const tolerantParse = (text) => {
+export const tolerantParse = (text) => {
   const t = String(text ?? '').trim();
   try { return { ok: true, value: extractJson(t) }; } catch { /* fall through */ }
   const start = t.indexOf('{');
@@ -41,6 +41,7 @@ export const createGlmAnthropicProvider = (opts = {}) => {
   const apiKey = opts.apiKey ?? process.env.ZHIPU_API_KEY ?? process.env.ZAI_API_KEY ?? '';
   const model = opts.model ?? process.env.FARLAB_ZAI_MODEL ?? MODEL_DEFAULT;
   const totalTimeoutMs = opts.totalTimeoutMs ?? 300_000;
+  const fetchImpl = opts.fetchImpl ?? ((url, init) => fetch(url, init));
   const maxTransportRetries = 2;
   return {
     liveReady: apiKey !== '',
@@ -69,7 +70,7 @@ export const createGlmAnthropicProvider = (opts = {}) => {
         const timer = setTimeout(() => controller.abort(), totalTimeoutMs);
         let res;
         try {
-          res = await fetch(BASE, {
+          res = await fetchImpl(BASE, {
             method: 'POST',
             headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
             body: JSON.stringify(body),

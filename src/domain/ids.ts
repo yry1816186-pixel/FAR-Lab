@@ -17,6 +17,8 @@ export const RevisionId = idOf('rev');
 export const ReceiptId = idOf('rcp');
 export const BundleId = idOf('bnd');
 export const TaskId = idOf('task');
+export const ScorecardId = idOf('sc');
+export const TournamentId = idOf('trn');
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -31,15 +33,50 @@ export type RevisionId = z.infer<typeof RevisionId>;
 export type ReceiptId = z.infer<typeof ReceiptId>;
 export type BundleId = z.infer<typeof BundleId>;
 export type TaskId = z.infer<typeof TaskId>;
+export type ScorecardId = z.infer<typeof ScorecardId>;
+export type TournamentId = z.infer<typeof TournamentId>;
 
-/** Cross-kind object reference inside a run, e.g. { kind: 'hypothesis', id: 'hyp_...' }. */
+/** kind -> the ID shape that kind legitimately takes. */
+const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {
+  question: /^q_[0-9a-z]{20,32}$/,
+  run: /^run_[0-9a-z]{20,32}$/,
+  corpus_snapshot: /^corp_[0-9a-z]{20,32}$/,
+  source_document: /^src_[0-9a-z]{20,32}$/,
+  claim: /^clm_[0-9a-z]{20,32}$/,
+  evidence_relation: /^ev_[0-9a-z]{20,32}$/,
+  hypothesis: /^hyp_[0-9a-z]{20,32}$/,
+  plan: /^pln_[0-9a-z]{20,32}$/,
+  task: /^task_[0-9a-z]{20,32}$/,
+  feedback: /^fbk_[0-9a-z]{20,32}$/,
+  revision: /^rev_[0-9a-z]{20,32}$/,
+  receipt: /^rcp_[0-9a-z]{20,32}$/,
+  bundle: /^bnd_[0-9a-z]{20,32}$/,
+  // Artifact refs are content addresses, not prefixed entity ids.
+  artifact: /^sha256:[0-9a-f]{64}$/,
+};
+
+const OBJECT_REF_KINDS = [
+  'question', 'run', 'corpus_snapshot', 'source_document', 'claim',
+  'evidence_relation', 'hypothesis', 'plan', 'task', 'feedback', 'revision',
+  'receipt', 'bundle', 'artifact',
+] as const;
+type ObjectRefKind = (typeof OBJECT_REF_KINDS)[number];
+
+/**
+ * Cross-kind object reference inside a run, e.g. { kind: 'hypothesis', id: 'hyp_...' }.
+ * The id is shape-checked against the kind (WP2 F5): a garbage id previously parsed
+ * fine and only failed later at store lookup — now fabrication fails at the boundary.
+ */
 export const ObjectRef = z.object({
-  kind: z.enum([
-    'question', 'run', 'corpus_snapshot', 'source_document', 'claim',
-    'evidence_relation', 'hypothesis', 'plan', 'task', 'feedback', 'revision',
-    'receipt', 'bundle', 'artifact',
-  ]),
+  kind: z.enum(OBJECT_REF_KINDS),
   id: z.string().min(1),
+}).superRefine((ref, ctx) => {
+  if (!OBJECT_REF_ID_SHAPES[ref.kind].test(ref.id)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `id '${ref.id}' does not match the ${ref.kind} id shape`,
+    });
+  }
 });
 export type ObjectRef = z.infer<typeof ObjectRef>;
 

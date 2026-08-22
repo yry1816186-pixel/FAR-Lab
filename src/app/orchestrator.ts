@@ -1,4 +1,5 @@
 import { ResearchRun, RunStatus, RunStageName, ProvenanceReceipt, newId } from '../domain/index.js';
+import { randomBytes } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -37,7 +38,7 @@ export class RunLeaseLostError extends Error {
 export const LEASE_TTL_MS = Math.max(5_000, Number(process.env.FARLAB_LEASE_TTL_MS ?? 240_000) || 240_000);
 
 /** Stable per-process holder identity (pid + random boot nonce: pid reuse must not merge identities). */
-const BOOT_NONCE = Math.random().toString(36).slice(2, 10);
+const BOOT_NONCE = randomBytes(4).toString('hex');
 export const leaseHolderId = (): string => `${process.pid}-${BOOT_NONCE}`;
 
 /**
@@ -63,6 +64,13 @@ export class Orchestrator {
     const run = this.deps.store.getRun(runId);
     if (!run) throw new Error(`run not found: ${runId}`);
     const next = await fn(run);
+    // Re-check after the await (Wave-G WP2 hardening): transition fns are synchronous
+    // today, but a future async fn would reopen an adoption window between the entry
+    // check and this write — a disowned worker must never write run state.
+    if (lease !== undefined) {
+      const row = this.deps.store.getRunLease(runId);
+      if (row?.holder !== lease) throw new RunLeaseLostError(runId);
+    }
     next.updatedAt = new Date().toISOString();
     this.deps.store.updateRun(next);
     if (lease !== undefined) this.deps.store.renewLease(runId, lease, new Date(Date.now() + LEASE_TTL_MS).toISOString());

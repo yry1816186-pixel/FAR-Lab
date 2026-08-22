@@ -101,6 +101,16 @@ export const MIGRATIONS: readonly { version: number; sql: string }[] = [
       );
     `,
   },
+  {
+    // Wave-G WP2 (persistence review F5): listExpiredLeaseRuns (watchdog poll, every
+    // ~5s per running run) filters runs on (status, lease_expires_at) — without a
+    // covering index this is a full scan whose read transaction lengthens with run
+    // count and blocks WAL writers under load.
+    version: 4,
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_runs_status_lease ON runs(status, lease_expires_at);
+    `,
+  },
 ];
 
 export const openDb = (dbPath: string): Db => {

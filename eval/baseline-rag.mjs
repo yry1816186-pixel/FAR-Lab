@@ -13,7 +13,7 @@ const OUT = DIR + 'baseline-rag.jsonl';
 mkdirSync(DIR, { recursive: true });
 
 const problems = loadProblems();
-const provider = makeProvider();
+const provider = await makeProvider();
 const openalex = createOpenAlexAdapter();
 if (!provider.liveReady) {
   console.error('FATAL: DEEPSEEK_API_KEY not set — fail closed');

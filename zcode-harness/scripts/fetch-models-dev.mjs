@@ -24,13 +24,14 @@ const PROXY = process.argv.find((a, i, argv) => argv[i - 1] === '--proxy') ?? 'h
 // node's native fetch has no proxy option in this runtime; curl is the proven channel
 // here (direct egress is blocked in this environment, the local proxy git uses is not).
 const attempt = (viaProxy) => {
+  const startedAt = Date.now();
   try {
     const body = execFileSync('curl', ['-s', '-m', '30', ...(viaProxy ? ['-x', PROXY] : []), URL], {
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
     });
     const json = JSON.parse(body);
-    return { json, via: viaProxy ? `proxy ${PROXY}` : 'direct' };
+    return { json, via: viaProxy ? `proxy ${PROXY}` : 'direct', ms: Date.now() - startedAt };
   } catch {
     return null;
   }

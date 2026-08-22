@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ClaimId, HypothesisId, RunId } from './ids.js';
+import { ClaimId, HypothesisId, RunId, ScorecardId, TournamentId } from './ids.js';
 
 /**
  * Mission §28 — every score is a decision aid. Producer, basis and calibration state are
@@ -25,7 +25,7 @@ export const DimensionScore = z.object({
 });
 
 export const HypothesisScorecard = z.object({
-  id: z.string().min(1),
+  id: ScorecardId,
   runId: RunId,
   hypothesisId: HypothesisId,
   dimensions: z.array(DimensionScore).min(1),
@@ -85,7 +85,7 @@ export const TournamentStanding = z.object({
 export type TournamentStanding = z.infer<typeof TournamentStanding>;
 
 export const HypothesisTournament = z.object({
-  id: z.string().min(1),
+  id: TournamentId,
   runId: RunId,
   participantIds: z.array(HypothesisId).min(2),
   matches: z.array(TournamentMatch).min(1),

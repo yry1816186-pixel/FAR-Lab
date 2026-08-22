@@ -74,8 +74,13 @@ const prune = (
 };
 
 /** Pure: returns a fresh pruned copy; the input payload is never mutated. */
-export const excludeVolatile = (family: SourceFamily, normalized: unknown): unknown =>
-  prune(normalized, [], VOLATILE_PATHS[family]);
+export const excludeVolatile = (family: SourceFamily, normalized: unknown): unknown => {
+  // A family added to SourceFamily without a VOLATILE_PATHS entry would crash inside
+  // prune (patterns.some on undefined) at hash time — fail loud at the boundary (WP2 F10).
+  const patterns = VOLATILE_PATHS[family];
+  if (patterns === undefined) throw new Error(`no volatile-exclusion list for source family '${family}'`);
+  return prune(normalized, [], patterns);
+};
 
 /**
  * Content-addressed snapshot hash (64-char sha256 hex) over the volatile-excluded

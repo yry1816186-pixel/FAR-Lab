@@ -55,7 +55,11 @@ export const parseArxivAtom = (xml: string): ArxivFeed => {
     };
     const links = [...block.matchAll(/<link\b([^>]*)\/?>/g)].map((m) => {
       const attrs: Record<string, string> = {};
-      for (const a of m[1]?.matchAll(/([\w:-]+)="([^"]*)"/g) ?? []) attrs[a[1] as string] = a[2] as string;
+      // Both XML quoting styles are legal (single or double); matching only one would
+      // silently drop every link attribute for serializers that prefer the other.
+      for (const a of m[1]?.matchAll(/([\w:-]+)=(?:"([^"]*)"|'([^']*)')/g) ?? []) {
+        attrs[a[1] as string] = (a[2] ?? a[3] ?? '') as string;
+      }
       return attrs;
     });
     const rawId = tag('id') ?? '';
@@ -165,7 +169,11 @@ export const createArxivAdapter = (opts: ArxivAdapterOptions = {}): SourceAdapte
     }
     const maxResults = clampLimit(so?.limit, 10, 100);
     // Tokenized AND query by default — spike §3.1: exact phrase `all:"..."` matched 0.
-    const searchQuery = q.split(/\s+/).map((t) => `all:${t}`).join(' AND ');
+    // Queries that already carry arXiv query syntax (field prefixes, quoted phrases,
+    // boolean operators) pass through untouched — tokenizing them would destroy their
+    // semantics (an `AND`/`OR` keyword would become a search term).
+    const hasQuerySyntax = /["(]|(?:^|\s)(?:AND|OR|ANDNOT)(?:\s|$)|\b(?:all|ti|abs|au|cat|jr|rn|co):/.test(q);
+    const searchQuery = hasQuerySyntax ? q : q.split(/\s+/).map((t) => `all:${t}`).join(' AND ');
     const url = `${endpoint}?search_query=${encodeURIComponent(searchQuery)}&start=0&max_results=${maxResults}&sortBy=relevance&sortOrder=descending`;
     const res = await fetchAtom(url, q);
     const feed = parseArxivAtom(res.bodyText);

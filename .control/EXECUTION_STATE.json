@@ -61,5 +61,5 @@
     "B-QWEN-LIVE-ROUTE"
   ],
   "lastVerifiedCommit": "2026-08-22 D-062 reconciliation: typecheck 0, eslint 0, vitest 562/562 (24 files), build exit 0; completion-gate NOT_READY solely on user-gated B-DEEPSEEK-BALANCE (20/20 acceptance items at target).",
-  "nextAction": "Wave-G WP2 next: full-code adversarial review by module (src/domain, pipeline stages, sources, providers, persistence, CLI, web/, eval/, zcode-harness, scripts+spikes) — correctness/dead-code/swallowed-errors/type-escapes/unawaited-async/mutation/injection/shallow-tests/naming/doc-drift; root-cause fixes + regression tests + mutation spot-checks + adversarial re-audit; reports to evidence/W-G/code-review/. Parallel WAVE-PRODUCT session actively writing web/src + src/server/api.ts + src/cli/main.ts + tests/api.test.ts — Wave-G must not touch those files until that session closes."
+  "nextAction": "Wave-G WP3 next: weakness-driven OSS scouting (inputs: WP2 findings + north-star laggards + registry B deferrals) -> parallel research lines (complete projects / agent projects / Skills-plugins / scientific tools; triple-gate license+activity) -> research/WAVE-G-SCOUT.md -> Marginal-Value-Gate source-level fusions with tests+benchmarks+audit."
 }
