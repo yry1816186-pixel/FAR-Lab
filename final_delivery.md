@@ -1,8 +1,8 @@
 # final_delivery.md — FAR-Lab 赛道一方向 1A 正式开发交付报告
 
-> 生成时间：2026-08-21（本 Goal 会话内完成全部施工与验收）
+> 生成时间：2026-08-21（R1 施工与验收）｜**增补 2026-08-22（EV1→Wave-3 演进，见 §六/§七）**
 > 任务书：`FAR-LAB_DEVELOPMENT_MISSION.md`（98 节总指令）｜规划：`task_plan.md`
-> 代码基线：branch `build/far-lab-r1`，最终提交 `1b0e622`；测试 **194/194 全绿**；完成门禁 **VERIFIED_READY (exit 0)**
+> R1 代码基线：branch `build/far-lab-r1`，提交 `1b0e622`，测试 194/194；**当前基线：branch `build/ev2-closeout`（R1 已合入 main），测试 274/274，完成门禁 NOT_READY——唯一失败项为外部余额阻塞（§七）**
 
 ---
 
