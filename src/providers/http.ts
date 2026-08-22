@@ -586,6 +586,77 @@ const classifyTransportError = (err: unknown, providerName: string): ClassifiedF
   };
 };
 
+/**
+ * Anthropic Messages wire (open.bigmodel.cn /api/anthropic, probe-verified 2026-08-22):
+ * parses {content:[{type:'text',text}...], stop_reason, model, usage:{input_tokens,
+ * output_tokens}} into the shared ChatAttempt. stop_reason 'max_tokens' maps to the
+ * OpenAI 'length' semantics so the W7-F2 truncation discipline applies unchanged.
+ */
+const parseAnthropicSuccessBody = (bodyText: string, providerName: string): ChatAttempt => {
+  let body: unknown;
+  try {
+    body = JSON.parse(bodyText);
+  } catch {
+    body = null;
+  }
+  const record = isRecord(body) ? body : null;
+  const blocksRaw = record?.content;
+  const blocks: unknown[] = Array.isArray(blocksRaw) ? blocksRaw : [];
+  const text = blocks
+    .filter((b): b is Record<string, unknown> => isRecord(b) && b['type'] === 'text')
+    .map((b) => (typeof b['text'] === 'string' ? b['text'] : ''))
+    .join('');
+  if (text.length === 0) {
+    return {
+      ok: false,
+      failure: {
+        kind: 'provider_error',
+        retryable: false,
+        httpStatus: 200,
+        message: `${providerName}: HTTP 200 body malformed (no text content blocks); body head: ${truncate(redactSecrets(bodyText), 200)}`,
+      },
+    };
+  }
+  const usageRaw = isRecord(record?.usage) ? (record?.usage as Record<string, unknown>) : {};
+  const usage = {
+    ...(typeof usageRaw.input_tokens === 'number' ? { promptTokens: usageRaw.input_tokens } : {}),
+    ...(typeof usageRaw.output_tokens === 'number' ? { completionTokens: usageRaw.output_tokens } : {}),
+  };
+  const stopReason = typeof record?.stop_reason === 'string' ? record.stop_reason : undefined;
+  const finishReason =
+    stopReason === 'max_tokens' ? 'length' : stopReason === 'end_turn' || stopReason === 'stop_sequence' ? 'stop' : stopReason;
+  const respondedModel = typeof record?.model === 'string' ? record.model : undefined;
+  return {
+    ok: true,
+    rawContent: text,
+    ...(respondedModel !== undefined && respondedModel.length > 0 ? { respondedModel } : {}),
+    ...(finishReason !== undefined ? { finishReason } : {}),
+    usage,
+  };
+};
+
+/**
+ * Anthropic Messages request body from the shared ChatMessage[] shape: the leading
+ * system message becomes the top-level `system` param (Anthropic has no system role
+ * in messages); remaining messages pass through as-is. Corrective re-asks append to
+ * the LAST message in place (appendCorrection), so role alternation is preserved by
+ * construction. max_tokens is REQUIRED by the protocol and defaults to 4096. The
+ * protocol has no response_format/tools — the JSON-only system suffix carries the
+ * output contract (callers on this wire must not pass jsonSchema; zai strips it).
+ */
+const buildAnthropicRequestBody = (modelId: string, messages: ChatMessage[], req: StructuredCallRequest): Record<string, unknown> => {
+  const systemMessages = messages.filter((m) => m.role === 'system');
+  const rest = messages.filter((m) => m.role !== 'system');
+  const body: Record<string, unknown> = {
+    model: modelId,
+    max_tokens: req.maxTokens ?? 4096,
+    system: systemMessages.map((m) => m.content).join('\n\n'),
+    messages: rest.map((m) => ({ role: m.role, content: m.content })),
+  };
+  if (req.temperature !== undefined) body.temperature = req.temperature;
+  return body;
+};
+
 const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt => {
   let body: unknown;
   try {
@@ -653,6 +724,14 @@ export interface OpenAICompatCallConfig {
   apiKey: string;
   modelId: string;
   executionMode: 'live' | 'test';
+  /**
+   * Wire protocol (default 'openai'): 'openai' = {base}/chat/completions with Bearer
+   * auth; 'anthropic' = {base}/v1/messages with x-api-key + anthropic-version (the
+   * open.bigmodel.cn /api/anthropic route). Retry/timeout/redaction/re-ask machinery
+   * is protocol-independent and shared; only URL, headers, body shape and success
+   * parsing differ.
+   */
+  wire?: 'openai' | 'anthropic';
 }
 
 export interface TransportDeps {
@@ -697,10 +776,25 @@ export async function runOpenAICompatStructuredCall<T>(
   const sleep: SleepLike = deps.sleep ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const random: () => number = deps.random ?? Math.random;
   const totalTimeoutMs = deps.totalTimeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS;
-  const url = `${cfg.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const wire = cfg.wire ?? 'openai';
+  const url = wire === 'anthropic' ? `${cfg.baseUrl.replace(/\/+$/, '')}/v1/messages` : `${cfg.baseUrl.replace(/\/+$/, '')}/chat/completions`;
   const requestHash = computeRequestHash(req);
   const startedAt = performance.now();
   const elapsedMs = () => Math.round(performance.now() - startedAt);
+
+  /** Wire-specific request construction (URL line + headers + serialized body). */
+  const wireRequest = (messages: ChatMessage[]): { headers: Record<string, string>; body: string } =>
+    wire === 'anthropic'
+      ? {
+          headers: { 'content-type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify(buildAnthropicRequestBody(cfg.modelId, messages, req)),
+        }
+      : {
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.apiKey}` },
+          body: buildRequestBody(cfg.modelId, messages, req),
+        };
+  const parseWireSuccess = (bodyText: string): ChatAttempt =>
+    wire === 'anthropic' ? parseAnthropicSuccessBody(bodyText, cfg.providerName) : parseSuccessBody(bodyText, cfg.providerName);
 
   let messages = buildMessages(req, random);
   let transportRetries = 0;
@@ -748,15 +842,16 @@ export async function runOpenAICompatStructuredCall<T>(
     let attempt: ChatAttempt;
     let retryAfterMsHint: number | undefined;
     try {
+      const wire = wireRequest(messages);
       const res = await fetchImpl(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.apiKey}` },
-        body: buildRequestBody(cfg.modelId, messages, req),
+        headers: wire.headers,
+        body: wire.body,
         signal: controller.signal,
       });
       const bodyText = await res.text();
       if (res.status === 200) {
-        attempt = parseSuccessBody(bodyText, cfg.providerName);
+        attempt = parseWireSuccess(bodyText);
       } else {
         retryAfterMsHint = parseRetryAfterMs(res.headers);
         attempt = { ok: false, failure: classifyHttpStatus(res.status, bodyText, cfg.providerName) };
