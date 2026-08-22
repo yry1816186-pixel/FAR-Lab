@@ -267,13 +267,15 @@ Wave-PRODUCT 交付了功能完整、工程合规的三个交互面，但最终�
 
 ## 6. 当前状态（执行时滚动更新）
 
-- [x] **P0 差距审计与截图基线（2026-08-22 完成）**：gap-audit.md（G1-G10 三源证据交叉 + 4 条附带发现）＋ 12 张基线截图（evidence/W-A/baseline/，真实历史数据 + 空态隔离实例）；服务实例 PORT=3210 保留供实施对比
-- [x] **P1 案例驱动研究（2026-08-22 完成）**：case-pixels-web.md（8 产品截图解构+8 条收敛）＋ case-cli-opensource.md（OpenROAD/PyHessian/Hermes 裁决+5 补充案例+6 共性）＋ case-cli-node-libs.md（库对比+知名 CLI 实测）＋ case-datadense-systems.md（四家数字）＋ **craft-spec-v2.md（全规格带出处）**——待用户批准 spec = 实施解锁；**opencode + claude code 补充调研进行中**（用户点名更正：终端 agent 同类，返回后更新 spec §9）
-- [x] **P2 Web 骨架与全局层（2026-08-22 完成）**：type scale/spacing/motion/radius token 全套落地（styles.css token 层）＋ h1-h4 层级 22/16/14＋正文 14/18＋shell 呼吸感（header/侧栏/content/tabs 网格化）＋手动主题切换（data-theme 三态循环 + localStorage far-theme，实测通过）＋自定义滚动条＋全局 150ms 过渡 + arrive fade-in＋圆角 6→4px 统一。门禁：web typecheck+build 0、根 vitest 620/620、视觉对比确认（evidence/W-A/p2/，"粗糙→精细、拥挤→舒展可见改善"）。**未动**：表格表头/Badge/控件（P3/P4 范围，视觉审计确认现为下一短板）
-- [ ] P3 Web 数据呈现层
-- [ ] P4 Web 控件与微交互层
-- [ ] P5 CLI 视觉（spec §9 已定：vendored picocolors + OpenROAD 消息编号 + Snakemake 错误块，待批准）
-- [ ] P6 Desktop 壳打磨
-- [ ] P7 回归防护 + 收口 + completion-gate
+- [x] **P-PRO 主动智能层（2026-08-22 完成，用户指令"更强的主动意识和功能"，提交 7ec2eef+604d746）**：设计铁律=主动感只由真实系统信号驱动（宪法 §6 不造假）。① 首页健康状态条（真实 GET /api/v1/health 投影：db/watchdog/live 路由就绪度，fail-visible 未知态，30s 轮询——前端首次消费此 API）② RunStatusBanner 运行叙事横幅（running/queued 实时叙述[阶段+N/M+时长+距上次更新秒数+pulse]、冻结租约恢复建议、配额感知恢复建议+内联按钮、完成下一步引导——全部真实 run 状态派生）③ 首页"继续最近的研究"任务卡（3 张最新，点击进入）④ 锦标赛 win-rate 排名条（比例墨水：宽度=真实胜率零基线线性映射；BT 分数非 0-1 比率不画条防误导）。实测：健康条"2/3 路由就绪"、配额横幅+恢复按钮、3 卡、7 排名条。running 分支当时无活跃实例未截图（与实测分支同构，如实记录）
+- [x] **P-IA 首启体验与信息架构重做（2026-08-22 完成，用户裁决"设计思路不对，重新做"后的最高优先级）**：Logo（证据四象限 mark=产品语义签名）＋ WelcomeView 工作台首页（品牌 hero + 中心创建卡片[大输入+折叠高级+主按钮] + 三步引导 + 诚实脚注，IDE 范式"身份-行动-指引"）＋ 侧栏任务分组（进行中/需注意/已完成，真 fallback）＋"新建研究"主按钮回家 ＋ useCreateRun hook（逻辑原样提取）。实测修复分组重复 bug（144→72）。视觉复评："主行动入口成为第一视觉锚点，基本达到可用产品首页水准"
+- [x] P0 差距审计与截图基线（gap-audit.md G1-G10 + 12 张基线）
+- [x] P1 案例驱动研究 + craft-spec-v2（spec §9 已按 opencode+claude code 升级为终端 agent 范式）
+- [x] P2 Web 骨架层（41339c6）｜ [x] P3 数据呈现层（bbf1b7f）｜ [x] P4 控件层（f2396ed）｜ final 截图（3aa6605）
+- [ ] P5 CLI 视觉 — spec §9 已定案（终端 agent 范式）；**缓行：并行会话正在改 src/cli（D-069 jsonOutput 修复已提交 5cebe30）+ 工作区有其未提交变更，避免撞车，待其落地后动工**
+- [ ] P6 Desktop 壳打磨 — 同因缓行（并行会话刚提交 D-068 Linux 验证）
+- [ ] P7 回归防护 + TESTING.md + 政策修订 + completion-gate — 缓行（DECISIONS.jsonl 正被并行会话写入）
+
+**状态（2026-08-22 收口）：Web 三层（P2/P3/P4）全部完成、提交并经视觉复评（"从原型稿升级为产品级"，字体层级 8.5/10）。P5/P6/P7 因并行会话在同一仓库活跃推进 CLI/desktop/DECISIONS 而暂缓，避免双写冲突。测试红澄清：tests/glm-anthropic-provider.test.ts 失败源于并行会话未提交的 eval/glm-anthropic-provider.mjs 删除，与本 Wave 无关（排除后 610/610 绿）。**
 
 **状态：P1 研究完成，craft-spec-v2 待用户批准（HARD-GATE），未进入实施。**

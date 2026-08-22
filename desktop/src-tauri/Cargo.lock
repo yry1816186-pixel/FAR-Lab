@@ -753,6 +753,7 @@ dependencies = [
 name = "far-lab-desktop"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "tauri",
  "tauri-build",
  "windows-sys 0.60.2",

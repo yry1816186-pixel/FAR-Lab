@@ -1,0 +1,63 @@
+- list [ref=f8e1264]:
+  - listitem [ref=f8e1265]:
+    - time [ref=f8e1266]: 18:17:51
+    - generic [ref=f8e1267]: ≫
+    - generic [ref=f8e1268]: 运行状态变更
+  - listitem [ref=f8e1269]:
+    - time [ref=f8e1270]: 18:17:51
+    - generic [ref=f8e1271]: ✓
+    - generic [ref=f8e1272]:
+      - text: 导出 完成
+      - generic [ref=f8e1273]: — reproducibility bundle bnd_0jmb25bdrqby594427gtpw0bq1 (sha256:26c00fd64f6db3853d382efeea398be0fdc90a5f929ee0d1e0ccf9628db50a7b); report sha256:ce9ac00819dff1f864a35eb157379de35cd8efef5774c1a459aa791ee263d1ad; declaredEvidenceLevel=replay
+  - listitem [ref=f8e1274]:
+    - time [ref=f8e1275]: 18:17:51
+    - generic [ref=f8e1276]: ↳
+    - generic [ref=f8e1277]: 模型调用 · 导出
+  - listitem [ref=f8e1278]:
+    - time [ref=f8e1279]: 18:17:51
+    - generic [ref=f8e1280]: ●
+    - generic [ref=f8e1281]: 导出 开始
+  - listitem [ref=f8e1282]:
+    - time [ref=f8e1283]: 18:17:51
+    - generic [ref=f8e1284]: —
+    - generic [ref=f8e1285]: 修订 跳过
+  - listitem [ref=f8e1286]:
+    - time [ref=f8e1287]: 18:17:51
+    - generic [ref=f8e1288]: ●
+    - generic [ref=f8e1289]: 修订 开始
+  - listitem [ref=f8e1290]:
+    - time [ref=f8e1291]: 18:17:51
+    - generic [ref=f8e1292]: —
+    - generic [ref=f8e1293]: 反馈 跳过
+  - listitem [ref=f8e1294]:
+    - time [ref=f8e1295]: 18:17:51
+    - generic [ref=f8e1296]: ●
+    - generic [ref=f8e1297]: 反馈 开始
+  - listitem [ref=f8e1298]:
+    - time [ref=f8e1299]: 18:17:51
+    - generic [ref=f8e1300]: ✓
+    - generic [ref=f8e1301]:
+      - text: 研究计划 完成
+      - generic [ref=f8e1302]: — plan pln_xtjk0qa6hepyptx458yfhp4vwt covers 2 hypothesis(es); executabilityCheck passed
+  - listitem [ref=f8e1303]:
+    - time [ref=f8e1304]: 18:17:51
+    - generic [ref=f8e1305]: ↳
+    - generic [ref=f8e1306]: 模型调用 · 研究计划
+  - listitem [ref=f8e1307]:
+    - time [ref=f8e1308]: 18:17:29
+    - generic [ref=f8e1309]: ●
+    - generic [ref=f8e1310]: 研究计划 开始
+  - listitem [ref=f8e1311]:
+    - time [ref=f8e1312]: 18:17:29
+    - generic [ref=f8e1313]: ✓
+    - generic [ref=f8e1314]:
+      - text: 排序评分 完成
+      - generic [ref=f8e1315]: "— ranked 11 of 11 representative hypothesis/hypotheses (rankedOutOf=11); top-2 comparison (hyp_gkh0tgqxmrcnxeqffrq680hthm vs hyp_bdgys3mc54f6wtr2p7k2js37gg, preferred=a, 7 criteria) stored as artifact sha256:c15df410be8c647e64515647cbf450452b9b1e21ca6b1525ccfb42010c8894a0. weights: fixed weights evidence_grounding 0.2, falsifiability 0.15, testability 0.1, counter_evidence_exposure 0.15, scientific_plausibility 0.15, novelty 0.1, methodological_soundness 0.15 (+cost/risk 0.05 each when direction-known, renormalized). tournament: 24 pair(s) judged (24 contested, 0 no-contest); order-swap disagreement 0/24, settled ties 0/24"
+  - listitem [ref=f8e1316]:
+    - time [ref=f8e1317]: 18:17:29
+    - generic [ref=f8e1318]: ↳
+    - generic [ref=f8e1319]: 模型调用 · 排序评分
+  - listitem [ref=f8e1320]:
+    - time [ref=f8e1321]: 18:17:28
+    - generic [ref=f8e1322]: ↳
+    - generic [ref=f8e1323]: 模型调用 · 排序评分
