@@ -20,7 +20,7 @@ npm run serve          # scripts/serve.mjs：API + web/dist（SPA 回退）；PO
 #（API 契约 33 项测试覆盖于 tests/api.test.ts；启动器带 dist 陈旧守卫，W3 GUI 实测见 evidence/W3/）
 ```
 
-模型路由 model-agnostic：`FARLAB_MODEL_PROVIDER` = `deepseek`（默认，strict function calling）| `dashscope`（阿里云百炼 Qwen，竞赛强制路由）| `zai`。各路由独立 env key，fail-closed。
+模型路由 model-agnostic：`FARLAB_MODEL_PROVIDER` = `zai`（默认；智谱 GLM，Anthropic 兼容协议 open.bigmodel.cn/api/anthropic）| `dashscope`（阿里云百炼 Qwen，竞赛强制路由）。DeepSeek 已被用户禁令排除（2026-08-22，不可达）。各路由独立 env key，fail-closed。
 
 ## 质量与真实验证（不是宣称，是命令）
 
