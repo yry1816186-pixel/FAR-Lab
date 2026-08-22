@@ -58,7 +58,7 @@
 
 1. **官方竞赛页面 URL 已记录并复核**（2026-08-22，`project-spec/COMPETITION.md` §0：阿里云榜题页 university.aliyun.com/action/tzbjbgs2026 + NADC 发布页 nadc.china-vo.org/article/20260624094452）。提交前仍需人工再核对当前官方规则。
 2. **官方指定模型路由（Qwen 系列·百炼调用·需凭证）尚未 live 验证**（B-QWEN-LIVE-ROUTE）：官方规则原文要求"基座模型须基于千问（Qwen）系列模型，开发平台需通过阿里云百炼平台调用，或者采用比赛官网推荐工具调用系列模型，并提供调用凭证或截图"。当前 DeepSeek live 路由证明系统能力但**不满足该官方指定路由**；产品网关 model-agnostic，拿到 DASHSCOPE_API_KEY/百炼凭证后即可补齐 Qwen live 路由与凭证，不可伪造。
-3. **codeRevision=unknown**：本地构建未注入 git commit（export 阶段读 FARLAB_GIT_COMMIT env）。发布构建时应注入（一行修复，已在 bundle limitations 如实标注）。
+3. ~~**codeRevision=unknown**~~ **已解除**（2026-08-22 核验：export 阶段带 git 回退读取——env FARLAB_GIT_COMMIT 优先，否则 `git rev-parse HEAD`；最新 bundle 实测携带真实提交 0d1706e...，非 git 环境下诚实标注 unknown）。
 4. **评分与 LLM-judge 的校准极限**：所有模型分数标注 uncalibrated_llm_judgment；judge 差距（4.75 vs 3.25）不可量化引用（已在评估报告披露）。
 5. **摘要级证据天花板**：当前源适配器以摘要为主；全文献新颖性检索未做（novelty 已带语料相对限定语；全文适配器为后续增强方向）。
 6. ~~**Web 前端 XSS 面未审计**~~ **已审计关闭**（2026-08-22，`evidence/W-WEB/xss-surface-audit.md`：零危险 sink、无 markdown→HTML 渲染路径、React 默认转义覆盖；公网部署前若引入 markdown 渲染器则必须加 DOMPurify——常设条件）。
