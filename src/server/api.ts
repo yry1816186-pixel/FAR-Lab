@@ -369,6 +369,17 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
   };
 
   /**
+   * Retrieval transparency (D-060 phase-1): the executed query plan with purposes
+   * (incl. the two structurally-guaranteed counter-evidence queries), per-family
+   * failures and fusion stats — the retrieve stage stops being a black box.
+   */
+  const runCorpus = (res: http.ServerResponse, runId: string): void => {
+    mustGetRun(runId);
+    const corpus = app.store.listObjects('corpus_snapshot', runId).at(-1) ?? null;
+    sendJson(res, 200, { corpus });
+  };
+
+  /**
    * Real health (D-060 phase-3): DB actually readable + model-route readiness
    * (env-presence only — never key values) + build revision. 503 when the DB
    * check fails; never a fake "ok".
@@ -639,6 +650,7 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
           return sendJson(res, 200, { receipts: app.store.listObjects('receipt', runId) });
         }
         if (leaf === 'bundles' && method === 'GET') return runBundles(res, runId);
+        if (leaf === 'corpus' && method === 'GET') return runCorpus(res, runId);
         if (leaf === 'cancel' && method === 'POST') return cancelRun(res, runId);
         if (leaf === 'resume' && method === 'POST') return resumeRun(res, runId);
         if (leaf === 'feedback' && method === 'POST') return receiveFeedback(req, res, runId);

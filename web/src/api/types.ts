@@ -80,6 +80,28 @@ export interface BundleSummary {
   evidenceLevel: string;
 }
 
+/** Retrieval-plan projection served by GET /runs/:id/corpus (transparency panel, D-060). */
+export interface CorpusQueryInfo {
+  purpose: 'discovery' | 'supporting' | 'counter_evidence' | 'methodological' | 'identifier_resolution' | 'gap_followup';
+  text: string;
+  family: string;
+}
+
+export interface CorpusSnapshotInfo {
+  queries: CorpusQueryInfo[];
+  familyFailures?: { family: string; reason: string }[];
+  fusion?: {
+    algorithm?: string;
+    poolSize?: number;
+    rerankApplied?: boolean;
+    rerankFailure?: string;
+    counterSeatsKept?: number;
+    variantSearches?: number;
+    rerankWindows?: string;
+    selection?: string;
+  };
+}
+
 /**
  * Run list summary as actually served by GET /api/v1/runs (no stages array).
  * `progress` is the server-computed determinate count — present only when the

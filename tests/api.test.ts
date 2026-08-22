@@ -597,6 +597,22 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(typeof body.time).toBe('string');
   });
 
+  it('GET /runs/:id/corpus exposes the executed query plan for retrieval transparency (D-060)', async () => {
+    const seeded = await getJson(`${base}/api/v1/runs/${run1}/corpus`);
+    expect(seeded.status).toBe(200);
+    expect(Array.isArray(seeded.body.corpus.queries)).toBe(true);
+    expect(seeded.body.corpus.queries[0]).toMatchObject({ purpose: 'discovery' });
+
+    // honest empty: run3 is "partial run with lastError, no objects" — no snapshot, no 404 lie
+    const none = await getJson(`${base}/api/v1/runs/${run3}/corpus`);
+    expect(none.status).toBe(200);
+    expect(none.body.corpus).toBeNull();
+
+    const ghost = `run_${'0'.repeat(26)}`;
+    const ghostRes = await getJson(`${base}/api/v1/runs/${ghost}/corpus`);
+    expect(ghostRes.status).toBe(404);
+  });
+
   it('404s JSON for unknown routes and wrong methods', async () => {
     const unknown = await getJson(`${base}/api/v1/nope`);
     expect(unknown.status).toBe(404);
