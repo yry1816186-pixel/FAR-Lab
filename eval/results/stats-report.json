@@ -63,16 +63,47 @@
       "note": "gold set 104 pairs; deterministic-yes precision = 1.0 by zero-error calibration constraint"
     },
     "decompositionAgreement": {
-      "kappa": 0,
-      "agreement": 0,
-      "n": 2,
-      "note": "claim-count agreement between two recorded decomposition passes (coarse buckets); low kappa = decomposition noise the v2.1 median + fixed protocol target"
+      "kappa": {
+        "kappa": 0,
+        "agreement": 0,
+        "n": 2
+      },
+      "krippendorffNominal": {
+        "alpha": -0.19999999999999996,
+        "nUnits": 2,
+        "nPairs": 4
+      },
+      "note": "claim-count agreement between two recorded decomposition passes (coarse buckets); low agreement = decomposition noise the v2.1 median + fixed protocol target"
     },
     "clusterStderr": {
       "se": 0.117953041503812,
       "n": 5,
       "clusters": 3,
-      "note": "F1 scores clustered by domain family (Miller Eq.4/8 cluster-robust SE)"
+      "perFamily": [
+        {
+          "name": "oncology",
+          "mean": 0.41200000000000003,
+          "stderr": 0.07099999999999997,
+          "n": 2
+        },
+        {
+          "name": "microbiology",
+          "mean": 0.7525,
+          "stderr": 0.2475,
+          "n": 2
+        },
+        {
+          "name": "molecular biology",
+          "mean": 0.581,
+          "stderr": 0,
+          "n": 1
+        }
+      ],
+      "pooledAcrossFamilies": {
+        "se": 0.12347153518119063,
+        "n": 5
+      },
+      "note": "F1 scores clustered by domain family; cluster-robust SE (Miller Eq.4/8) + pooled SE of the size-weighted family mean (lm-eval pooled_sample_stderr)"
     }
   }
 }

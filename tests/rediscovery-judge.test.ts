@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { medianPass, buildDecomposeTask, judgeRediscovery } from '../eval/rediscovery-judge.mjs';
 import { thresholdMatch, MATCH_DEFAULTS } from '../eval/claim-match.mjs';
-import { mulberry32, seedFromString, bootstrapMeanCI, pairedPermutationTest, wilsonInterval, maxAbsSwing, variance, cohensKappa, benjaminiHochberg, clusterStderr, decideDeltaReality } from '../eval/stats.mjs';
+import { mulberry32, seedFromString, bootstrapMeanCI, pairedPermutationTest, wilsonInterval, maxAbsSwing, variance, cohensKappa, benjaminiHochberg, clusterStderr, decideDeltaReality, krippendorffAlpha, pooledStderr } from '../eval/stats.mjs';
+import { median, mode, majAtK, atLeast, passAtK, namedReductions } from '../eval/reducers.mjs';
 import { TASKS, GT_REV } from '../eval/rediscovery-tasks.mjs';
 
 describe('medianPass (D-037 behavior preserved)', () => {
@@ -86,6 +87,89 @@ describe('judgeRediscovery pipeline v2.1', () => {
       call: async () => ({ ok: true, data: { agentClaims: [] } }),
     });
     expect(res.ok).toBe(false); // empty claims fail validation -> fail-visible
+  });
+
+  it('adjudication receives the SIMILARITY-BEST counterpart, never a positional fallback (P0 audit regression)', async () => {
+    // GT[0] is about sodium azide (unrelated); GT[1] is the real counterpart of the
+    // borderline agent claim. The pre-fix bug fed GT[0] to adjudication because
+    // borderline entries had no bestIdx and fell back to index 0.
+    const gt = [
+      'Sodium azide inhibits cytochrome oxidase in the electron transport chain.',
+      'Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings.',
+      'Transposons capture and mobilize resistance cassettes onto conjugative plasmids.',
+    ];
+    const agentClaim = 'Conjugative plasmid transfer is the dominant mechanism driving ARG spread in hospital environments.';
+    const m = thresholdMatch([agentClaim], gt, MATCH_DEFAULTS);
+    expect(m.borderline.length).toBeGreaterThan(0);
+    expect(m.borderline[0].bestIdx).toBe(1); // precondition: best counterpart is GT[1], NOT GT[0]
+    const seenPairs: Array<{ claim: string; candidate: string | undefined }> = [];
+    const call = async (req: { purpose: string; userPayload?: { pairs?: Array<{ claim: string; candidate: string | undefined }> } }, validate: (raw: unknown) => unknown) => {
+      if (req.purpose === 'rediscovery:decompose-v21') {
+        const v = validate({ agentClaims: [agentClaim] });
+        return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+      }
+      for (const p of req.userPayload?.pairs ?? []) seenPairs.push(p);
+      const v = validate({ verdicts: (req.userPayload?.pairs ?? []).map(() => true) });
+      return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+    };
+    const res = await judgeRediscovery({ agentText: 'text', gtClaims: gt, call });
+    expect(res.ok).toBe(true);
+    // the agent-side borderline item must have been adjudicated against GT[1]
+    const agentSidePair = seenPairs.find((p) => p.claim === agentClaim);
+    expect(agentSidePair?.candidate).toBe(gt[1]);
+    expect(agentSidePair?.candidate).not.toBe(gt[0]);
+  });
+
+  it('partial vote failure: 1-of-3 votes fail -> 2 valid; 1-1 tie does NOT match, 2-0 matches, all-fail is fail-visible', async () => {
+    const gt = ['Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings.'];
+    const agentClaim = 'Conjugative plasmid transfer is the dominant mechanism driving ARG spread in hospital environments.';
+    const makeCall = (verdictPlan: Array<boolean[] | 'fail'>) => {
+      let adjCall = 0;
+      return async (req: { purpose: string }, validate: (raw: unknown) => unknown) => {
+        if (req.purpose === 'rediscovery:decompose-v21') {
+          const v = validate({ agentClaims: [agentClaim] });
+          return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+        }
+        const plan = verdictPlan[Math.min(adjCall, verdictPlan.length - 1)];
+        adjCall += 1;
+        if (plan === 'fail') return { ok: false, error: { message: 'HTTP 429' } };
+        const v = validate({ verdicts: plan });
+        return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+      };
+    };
+    // both sides of the pair are borderline -> each adjudication call carries TWO items
+    // vote1 fail, vote2 [T,T], vote3 [F,F] -> 1-1 tie among 2 valid -> NOT matched
+    const tie = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall(['fail', [true, true], [false, false]]) });
+    expect(tie.ok).toBe(true);
+    if (tie.ok) {
+      expect(tie.counts.agentMatched).toBe(0);
+      expect(tie.scoredUnscored.votesFailed).toBe(1);
+      expect(tie.adjudicationVotes[0].votesOk).toBe(2);
+    }
+    // vote1 fail, vote2/vote3 unanimous yes -> 2-0 among 2 valid -> matched
+    const unanim = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall(['fail', [true, true], [true, true]]) });
+    expect(unanim.ok).toBe(true);
+    if (unanim.ok) expect(unanim.counts.agentMatched).toBe(1);
+    // all three fail -> fail-visible error
+    const allFail = await judgeRediscovery({ agentText: 't', gtClaims: gt, call: makeCall(['fail', 'fail', 'fail']) });
+    expect(allFail.ok).toBe(false);
+    if (!allFail.ok) expect(allFail.error.stage).toBe('adjudicate');
+  });
+
+  it('misaligned verdicts (wrong length) are discarded as failed votes, not spliced into the decision', async () => {
+    const gt = ['Conjugative plasmids are the dominant horizontal-transfer vector for resistance genes in hospital settings.'];
+    const agentClaim = 'Conjugative plasmid transfer is the dominant mechanism driving ARG spread in hospital environments.';
+    const call = async (req: { purpose: string }, validate: (raw: unknown) => unknown) => {
+      if (req.purpose === 'rediscovery:decompose-v21') {
+        const v = validate({ agentClaims: [agentClaim] });
+        return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+      }
+      const v = validate({ verdicts: [true, true, true] }); // wrong length: 3 verdicts for 2 items
+      return v instanceof Error ? { ok: false, error: { message: v.message } } : { ok: true, data: v };
+    };
+    const res = await judgeRediscovery({ agentText: 't', gtClaims: gt, call });
+    expect(res.ok).toBe(false); // all votes discarded by validation -> fail-visible
+    if (!res.ok) expect(res.error.stage).toBe('adjudicate');
   });
 
   it('majority vote decides borderline pairs (2-of-3)', async () => {
@@ -204,6 +288,77 @@ describe('deterministic statistics layer (eval/stats.mjs)', () => {
     expect(small.warnings.join(' ')).toContain('exploratory');
     expect(decideDeltaReality({ delta: 0.9, ciLo: 0.8, ciHi: 1.0, mde: 0.2, n: 3 }).verdict).toBe('INSUFFICIENT_N');
   });
+
+  it('krippendorffAlpha: perfect=1, anti-agreement negative, nominal hand-check vs kappa', () => {
+    expect(krippendorffAlpha([[1, 2, 3, 4], [1, 2, 3, 4]]).alpha).toBeCloseTo(1, 10);
+    expect(krippendorffAlpha([[1, 1, 2, 2], [2, 2, 1, 1]]).alpha).toBeLessThan(0);
+    // independent balanced raters -> ~0 (same property kappa showed)
+    const ind = krippendorffAlpha([[1, 1, 1, 1, 2, 2, 2, 2], [1, 2, 1, 2, 1, 2, 1, 2]]);
+    expect(Math.abs(ind.alpha)).toBeLessThan(0.15);
+    // single-value domain -> NaN (honest degenerate)
+    expect(Number.isNaN(krippendorffAlpha([[1, 1], [1, 1]]).alpha)).toBe(true);
+    // missing values (null) are excluded per-unit, not imputed
+    const withMissing = krippendorffAlpha([[1, null, 3], [1, 2, 3]]);
+    expect(withMissing.alpha).toBeCloseTo(1, 10); // the two co-rated units agree perfectly
+  });
+
+  it('pooledStderr: identical groups reduce to single-group SE/sqrt(k); degenerate empty -> NaN', () => {
+    const g = { mean: 0.5, stderr: 0.1, n: 10 };
+    const r = pooledStderr([g, g, g, g]);
+    expect(r.n).toBe(40);
+    expect(r.se).toBeCloseTo(0.1 / 2, 10); // equal means: pooled SE = sqrt(4*100)/40 = 0.05
+    expect(Number.isNaN(pooledStderr([]).se)).toBe(true);
+    // divergent group means inflate pooled SE far beyond within-group noise
+    // hand-check: means 0/1 (n=10 each), stderr 0.01 -> se = sqrt(10*(0.001+0.25)*2)/20 = 0.112
+    const far = pooledStderr([{ mean: 0, stderr: 0.01, n: 10 }, { mean: 1, stderr: 0.01, n: 10 }]);
+    expect(far.se).toBeGreaterThan(0.1);
+    expect(far.se).toBeLessThan(0.12);
+  });
+
+describe('reducers (inspect_ai at_least/mode + lm-eval maj@k pattern)', () => {
+  it('median handles odd/even/degenerate', () => {
+    expect(median([3, 1, 2])).toBe(2);
+    expect(median([1, 2, 3, 4])).toBe(2.5);
+    expect(median([])).toBeUndefined();
+  });
+
+  it('mode: strict majority only; ties are honest undefined', () => {
+    expect(mode([true, true, false])).toBe(true);
+    expect(mode([true, false])).toBeUndefined();
+    expect(mode([])).toBeUndefined();
+  });
+
+  it('majAtK: majority over prefix slice', () => {
+    expect(majAtK([true, false, true, false], 3)).toBe(true); // [T,F,T] -> T
+    expect(majAtK([true, false, true, false], 2)).toBeUndefined(); // [T,F] tie
+  });
+
+  it('atLeast: k-of-n gate semantics', () => {
+    expect(atLeast([true, false, true], 2)).toBe(true);
+    expect(atLeast([true, false, false], 2)).toBe(false);
+    expect(atLeast([], 1)).toBe(false);
+  });
+
+  it('passAtK: unbiased estimator matches hand-computed cases', () => {
+    // n=10, c=1, k=1: 1 - C(9,1)/C(10,1) = 1 - 9/10 = 0.1
+    expect(passAtK(10, 1, 1)).toBeCloseTo(0.1, 12);
+    // n=10, c=5, k=5: 1 - C(5,5)/C(10,5) = 1 - 1/252
+    expect(passAtK(10, 5, 5)).toBeCloseTo(1 - 1 / 252, 12);
+    // boundary: c=0 -> 0; c covers all -> 1
+    expect(passAtK(10, 0, 3)).toBe(0);
+    expect(passAtK(10, 10, 3)).toBe(1);
+    expect(passAtK(10, 8, 3)).toBe(1); // c > n-k
+  });
+
+  it('namedReductions: one budget -> multiple named readouts', () => {
+    const r = namedReductions([true, false, true]);
+    expect(r.first).toBe(true);
+    expect(r.majAll).toBe(true);
+    expect(r.atLeastHalf).toBe(true);
+    expect(r.unanimous).toBe(false);
+    expect(r.n).toBe(3);
+  });
+});
 });
 
 describe('gold calibration regression (claim-pair-gold.jsonl)', () => {

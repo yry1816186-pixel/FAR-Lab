@@ -18,7 +18,8 @@
  *   borderline adjudication -> 3-vote majority (same)
  */
 
-import { thresholdMatch, finalizeCounts } from './claim-match.mjs';
+import { thresholdMatch, finalizeCounts, MATCH_DEFAULTS } from './claim-match.mjs';
+import { atLeast } from './reducers.mjs';
 
 const DECOMPOSE_SCHEMA = {
   type: 'object',
@@ -57,7 +58,8 @@ export const buildDecomposeTask = (agentText, gtClaims) => {
         `(the reference granularity is ${target} claims). Do NOT split one mechanism into fragments; do NOT merge two mechanisms into one claim. ` +
         `INCLUDE mechanistic/factual assertions the output commits to (hypothesis, mechanism, expected relations). ` +
         `EXCLUDE purely methodological predictions about experiments or measurements that assert no substantive finding. ` +
-        `Granularity reference (two example claims at the target grain): ` +
+        `Granularity reference (two example claims at the target grain — DISCLOSED: these two GT claims are visible ` +
+        `to decomposition as a bounded granularity anchor; decomposition does not see the rest of the GT): ` +
         `"<1> ${gtClaims[0] ?? ''}" and "<2> ${gtClaims[1] ?? gtClaims[0] ?? ''}".`,
     },
     outputKind: 'json',
@@ -68,7 +70,8 @@ export const buildDecomposeTask = (agentText, gtClaims) => {
   };
 };
 
-/** Median pass by claim count (odd pass count assumed; D-037 behavior preserved). */
+/** Median pass by claim count. Odd pass counts (the pipeline default, 3) take the
+ * true middle; an even count takes the UPPER middle pass (documented behavior). */
 export const medianPass = (passes) => {
   const sorted = [...passes].sort((a, b) => a.length - b.length);
   return sorted[Math.floor(sorted.length / 2)] ?? [];
@@ -97,16 +100,18 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, 
     decPasses.push(r.data.agentClaims.map((c) => String(c).trim()).filter(Boolean));
   }
   const agentClaims = medianPass(decPasses);
-  const MATCH = { high: 0.40, low: 0.12 }; // gold-calibrated 2026-08-22 (claim-pair-gold.jsonl, 104 pairs, zero-error constraint)
+  const MATCH = MATCH_DEFAULTS; // gold-calibrated 2026-08-22 (claim-pair-gold.jsonl, 104 pairs, zero-error constraint) — single source, mutation-locked by tests
   const m = thresholdMatch(agentClaims, gtClaims, MATCH);
   const adjudications = [];
+  let adjudicationVotes = [];
+  let votesFailed = 0;
   if (m.borderline.length > 0) {
     const items = m.borderline.map((b) => ({
       claim: b.side === 'agent' ? agentClaims[b.i] : gtClaims[b.i],
       bestCounterpart:
         b.side === 'agent'
-          ? gtClaims[m.agentSide[b.i].match ?? -1] ?? gtClaims[0]
-          : agentClaims[m.gtSide[b.i].match ?? -1] ?? agentClaims[0],
+          ? gtClaims[b.bestIdx] ?? gtClaims[0]
+          : agentClaims[b.bestIdx] ?? agentClaims[0],
     }));
     const voteRows = [];
     const validateAdjudicate = (raw) => {
@@ -132,24 +137,31 @@ export const judgeRediscovery = async ({ agentText, gtClaims, call, passes = 3, 
         },
         validateAdjudicate,
       );
-      if (!r.ok) { voteRows.push(null); continue; }
+      if (!r.ok) { voteRows.push(null); votesFailed += 1; continue; }
       const checked = validateAdjudicate(r.data);
-      voteRows.push(checked instanceof Error ? null : r.data.verdicts.map((x) => x === true));
+      if (checked instanceof Error) { voteRows.push(null); votesFailed += 1; continue; }
+      voteRows.push(r.data.verdicts.map((x) => x === true));
     }
     const valid = voteRows.filter((row) => row !== null);
     if (valid.length === 0) return { ok: false, error: { stage: 'adjudicate', message: 'all adjudication votes failed' } };
+    const majorityThreshold = Math.floor(valid.length / 2) + 1;
     m.borderline.forEach((_, k) => {
-      const yes = valid.filter((row) => row[k] === true).length;
-      adjudications.push({ matched: yes * 2 > valid.length });
+      const perItem = valid.map((row) => row[k] === true);
+      const matched = atLeast(perItem, majorityThreshold);
+      adjudications.push({ matched });
+      adjudicationVotes.push({ k, votesOk: valid.length, yes: perItem.filter(Boolean).length, matched, unanimous: perItem.every(Boolean) });
     });
   }
   const counts = finalizeCounts(agentClaims, gtClaims, m, adjudications);
+  const votesRequested = m.borderline.length * votes;
   return {
     ok: true,
     agentClaims,
     decomposition: { passes: decPasses.map((p) => p.length), selected: agentClaims.length },
     matcher: { version: 'v2.1-fixed-gt+tfidf+3vote', ...MATCH, borderline: m.borderline.length },
     adjudications,
+    adjudicationVotes,
+    scoredUnscored: { votesRequested, votesOk: votesRequested - votesFailed, votesFailed, note: 'failed votes are excluded from the decision, never counted as no (inspect_ai unscored semantics)' },
     counts,
     f1: Math.round(counts.f1 * 1000) / 1000,
   };

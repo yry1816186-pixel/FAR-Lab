@@ -1,9 +1,9 @@
 {
   "schemaVersion": 2,
   "mission": "Intelligence-driven evolution: absorb world-class external mechanisms (prior baseline + open-world scouts) into FAR-Lab's Direction-A core loop via source-level fusion, benchmarked before/after.",
-  "status": "waiting_for_user_review",
-  "phase": "wave7-structured-output COMPLETE 2026-08-22 (D-044/D-044b/D-051: jsonrepair 3.15.0 ISC engine EXTRACT zero-dep src/providers/json-repair.ts, 83/83 oracle byte-equality incl. audit-P1 fence-whitespace fix; 4-layer extractJsonText; truncation discipline finishReason=length; dashscope max_tokens strip; zone 167/167, full suite 471/471, build exit 0, mutation 3/3, adversarial audit P1+P2 all fixed same session; live e2e BLOCKED on D-036 — debt recorded). wave-product-design phase 1 COMPLETE: research/WAVE-PRODUCT-DESIGN-PLAN.md (18 sections) delivered for USER REVIEW — hard gate: NO implementation until explicit user approval of the plan incl. its decision points (narrative A/B/C, aesthetic direction, desktop framework, deployment form, Tier-0 deps). Parallel windows wave7/6/8/9 ownership unchanged.",
-  "pauseReason": null,
+  "status": "waiting_for_user",
+  "phase": "wave9-eval-judge CLOSED 2026-08-22 (offline scope complete, honestly): D-042 judge v2.1 (fixed GT + gold-calibrated matcher + replay swing<=0.091) + D-043 counter-evidence metric (0.143 strict honest backfill) + statistics tier (D-052 fusions: reducers/krippendorff/pooledSE/unscored) + adversarial audit round-1 REJECT->P0 root-fixed (borderline bestIdx) + 6 scout lines archived; live variance re-measure BLOCKED on model routes",
+  "pauseReason": "Wave-9 offline scope complete. LIVE re-measurement (judge-variance --live 3, counter-evidence n>=20 re-judge, north-star rediscovery-judge-variance current update) requires any ONE funded model route (DeepSeek top-up / z.ai recharge / DASHSCOPE_API_KEY); D-052 reversal triggers recorded. Parallel sessions W6 (sources-fulltext) still in flight on shared branch.",
   "protectedInvariants": [
     "Track 1 Direction 1A remains the competition/product boundary.",
     "Claims only supported by content actually retrieved (fail-closed grounding).",
@@ -51,15 +51,14 @@
     "Registry research/TECH_CANDIDATES.md; decisions D-015..D-028 (+D-029/D-029b pending final record)."
   ],
   "activeTasks": [
-    "WAVE9 ACTIVE: D-042 judge-hardening offline COMPLETE (fixed GT + gold-calibrated 0.40/0.12 + replay swing<=0.091; live re-judge BLOCKED on D-036 routes); D-043 counter-evidence-substantive-hit defined+backfilled (0.143 strict honest, far below 0.70 target); statistics tier landed (stats.mjs + stats-report.mjs bit-identical x2)",
-    "W9 remaining: framework scouts in flight (inspect_ai/promptfoo/deepeval/lm-eval; open-compass + judge-calibration queued after rate-limit kill of first fan-out) -> WAVE9-SCOUT sections 5-6 -> adversarial audit -> closeout",
-    "USER ACTION REQUIRED unchanged: DASHSCOPE_API_KEY (submission route B-QWEN-LIVE-ROUTE) / any one recharge (deepseek/zai) unblocks live re-measurement / OPENALEX_API_KEY optional",
-    "WAVE6 CLOSED 2026-08-22 (D-046..D-048): baseline harness landed first (46-run replay, guarded compare, 10/10 tests mutation-checked); headline defect measured arXiv 82.3% zero-rate + counter-never-crossref; F1-F5 fused (counter reroute / k4-k2 cascade / wrong-paper guard / sliding-window rerank / citation-strip) with live keyless probe evidence + frozen-DB ZERO_GUARDED_REGRESSION; F7-F9 deferred with triggers; live verify-rate re-measurement stays BLOCKED on D-036 (no claim made). Partition commit: W6 files only (parallel falsify/orchestrator mid-edit break build THERE — not W6)."
+    "WAVE9 CLOSED offline: 42/42 scope tests green (35 judge + 7 claim-match); full suite 469/471 with 2 reds in Wave-6 in-flight sources-fulltext tests (not W9 scope, evidence in git status)",
+    "USER ACTION REQUIRED: any ONE funded route (deepseek top-up / zai recharge / DASHSCOPE_API_KEY) unblocks live variance + counter-evidence re-measurement; DASHSCOPE specifically for submission route (B-QWEN-LIVE-ROUTE)",
+    "W-P2 candidates harvested this wave: contamination-stratified reporting (open-compass pattern) x counter-seat targeted retrieval for counter-evidence-substantive-hit 0.143->0.70; Yale EM-DS judge confusion-matrix calibration (needs human gold set)"
   ],
   "blockerIds": [
     "B-DEEPSEEK-BALANCE",
     "B-QWEN-LIVE-ROUTE"
   ],
-  "lastVerifiedCommit": "Wave-9 mid-state 2026-08-22: suite 332/332, tsc clean, lint clean (new: eval/rediscovery-judge.mjs, rediscovery-tasks.mjs, stats.mjs, stats-report.mjs, judge-variance.mjs, counter-evidence-metric.mjs, claim-pair-gold, 24-test file; D-042/D-043 recorded)",
+  "lastVerifiedCommit": "Wave-9 final 2026-08-22: suite scope-green 42/42; typecheck clean; eslint clean; completion-gate NOT_READY (B-DEEPSEEK-BALANCE user-action blocker, archived evidence/W9/completion-gate-2026-08-22-wave9.txt); audit P0 fixed with mutation-verified regression",
   "nextAction": "WAVE7 CLOSED (its landing zone src/providers/* + tolerance tests now free; live re-verification debt: rerun D-026 template when a model route is funded). WAITING_FOR_USER: review research/WAVE-PRODUCT-DESIGN-PLAN.md (summary in chat). Approve or amend decision points to start phase 2 (implementation roadmap §18). PARALLEL-SESSION OWNERSHIP (preserved): : src/providers/*, src/pipeline/llm.ts, src/shared/ports.ts, src/domain/provenance.ts, tests/providers.test.ts, tests/llm-tolerance.test.ts belong to the Wave-7 session (Wave-4 CLOSED D-039, its F1/F3/F4 landed at c8a0b54/2e115e3/2b2cb60); eval/llm-judge.mjs, eval/judge-votes.mjs, tests/judge-votes.test.ts are LANDED (D-039) and free; src/sources/*, src/pipeline/stages/retrieve.ts + eval retrieval harness belong to the Wave-6 session; src/app/orchestrator.ts, src/cli/main.ts, src/persistence/store.ts, src/domain/run.ts, zcode-harness/scripts sweep, research/WAVE8-SCOUT.md, evidence/W8/ belong to the Wave-8 session — Wave-9 landing zones: eval/rediscovery.mjs, eval/claim-match*.mjs, new eval/judge-variance + counter-evidence metric files, eval/north-star.json (its owned metrics), research/W"
 }

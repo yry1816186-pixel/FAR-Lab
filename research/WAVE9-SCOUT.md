@@ -74,16 +74,62 @@
 
 判分方差（replay 已 <0.15 保守口径，live 待测）+ counter-evidence 指标（0.143 诚实基线）+ 统计判决层 = 后续所有 Wave 的达标宣称均经此复核（Wave 提示词 §五第 3 条兑现）。
 
-## 5. 框架深读结果
+## 5. 框架深读结果（5 线全部返回，license 逐仓核验，file:line 实读）
 
-（inspect_ai / promptfoo / deepeval / lm-evaluation-harness / open-compass / judge-calibration 研究代码——随侦察返回填写）
+### 5.1 横切结论（多源独立一致）
 
-## 6. 融合决策与准入判定
+1. **FAR-Lab 播种统计层领先全部上游**：inspect_ai bootstrap 无 seed（`std.py:48` 裸 np.random.choice）、deepeval 仅 temp=0 无 seed、promptfoo 无任何统计/CI、openai/evals 未播种非配对。三家独立确认。**移植警示：上游统计代码不可照抄。**
+2. **deepeval OSS 无人工-judge 一致性工具**（全库检索证实，为商业平台功能）；inspect_ai 无第一方 CI gating；lm-eval 核心无 token-F1 且 `combined_sample_stderr` 被上游自我废弃——**负发现防止找错搬运源**。
+3. 高价值增量集中在 **judge 协议防御**（注入对抗、unscored 三态、解析率守门）与 **评估矩阵工程**（预测/评分分离、cell 复用、污染分层），不在统计层。
 
-（待 §5 补齐后统一排序；已定：统计层 A-H 全采纳=已实现；序贯/贝叶斯/控制变量回归本波不采用）
+### 5.2 各仓 top 机制（完整清单见各侦察报告，落 `research/wave9-reports/`）
+
+| 仓（license） | 核心机制（源位置） | 判定 |
+|---|---|---|
+| inspect_ai（MIT，已迁 UKGovernmentBEIS） | unscored 三态（`_metric.py:114-134`）；Grade last-match 防注入（`_model.py:213-230`）；at_least(k)/pass@k reducer（`_reducer/reducer.py:85-161`）；krippendorff ordinal α（`_metrics/krippendorff.py:84-210`）；eval_set 矩阵+cell 复用（`_eval/evalset.py:873-943`）；score() 存量重打分（`_eval/score.py:79-150`）；fail_on_error 错误预算（`task/error.py:23-60`） | **已融合**：at_least/mode reducer + krippendorff + unscored 计数；**DEFERRED（路由解锁后）**：异构 judge panel、eval_set 矩阵、重打分管线 |
+| promptfoo（MIT） | 加权断言聚合+阈值覆盖（`assertionsResult.ts`）；namedScores 账本；renderedGradingPrompt 溯源（`rubric.ts`）；`--filter-failing` 回归重跑；注入优先级约定（`plugins/base.ts`）；无错误磁盘缓存+单飞 | **采思想**：renderedPrompt 溯源已由我们 per_vote 留档满足；filter-failing 是 live 恢复后的回归工作流件；**REJECT** 朴素 pass-rate 门控（我们按 CI 下限门控更强） |
+| deepeval（Apache-2.0） | G-Eval 步骤编译器；**logprob 期望分**（`g_eval/utils.py calculate_weighted_summed_score`）；verdict 归一化+尾逗号抢救（`metrics/utils.py`）；idk 三态+penalize_ambiguous（faithfulness）；GEPA 播种进化 rubric 优化（`optimizer/algorithms/gepa`）；**示例分锚定最低档（负例警示）** | **DEFERRED（需 live/logprobs）**：logprob 期望分（±0.5 方差的正攻）、GEPA judge 校准；**already-have-by-construction**：verdict 归一化/JSON 抢救（strict-FC+四层容错已结构性消除该失败类）；**警示采纳**：judge prompt 示例分禁用固定低分 |
+| lm-evaluation-harness（MIT） | pooled_sample_stderr；weight_by_size micro/macro；四种子纪律；repeats×maj@k 命名多管线（`filters/selection.py`）；doc/prompt/target 三哈希溯源；**do_sample 请求永不回放缓存**（`api/model.py` CachingLM）；任务版本纪律 | **已融合**：pooledStderr、maj@k/atLeast 命名归约；**已内建等价**：种子纪律（我们的 seed 全记录）；**纪律采纳**：温度>0 判定不得缓存回放（live judge 缓存实现时的硬规则）、GT_REV 即任务版本纪律 |
+| open-compass（Apache-2.0，正确仓 `open-compass/opencompass`） | **预测/评分分离 + 幂等重评**（`tasks/openicl_eval.py`，存在即跳过）；分片合并长度守恒（`prediction_merger.py`）；污染分层评估（`AccContaminationEvaluator` 按 is_clean 分桶）；污染标注 row_id join；judge 换位 double 判（`partitioners/sub_naive.py`）；meta-judge 两段聚合；**解析率 <95% 硬告警**（`summarizers/subjective/utils.py`）；prompt-hash 溯源 | **已融合（等价物）**：judge-variance replay 即预测/评分分离的重放层；**DEFERRED**：污染分层（需先给 GT/语料标污染位——记为 W-P2 候选）、meta-judge、换位 double 判（live 后给 3-vote 升级）；**纪律采纳**：解析率守门（我们 votesFailed 显式计数等价）；prompt-hash 溯源（GT_REV+seed 已覆盖，judge prompt hash 在 live 重测时加入） |
+
+### 5.3 融合执行记录（本波已落地代码）
+
+| 融合件 | 来源 | 验证 |
+|---|---|---|
+| `eval/reducers.mjs`（median/mode/majAtK/atLeast/passAtK/namedReductions） | inspect_ai reducer 库 + lm-eval selection filter（均 MIT，算法级 TS 重写） | 6 测试组（pass@k 手算边界、tie-诚实-undefined、named reductions） |
+| `krippendorffAlpha`（nominal+ordinal） | inspect_ai krippendorff.py（MIT）语义 TS 重写 | 手工验证 perfect=1/anti=-0.75/缺值剔除；独立测试组 |
+| `pooledStderr` | lm-eval pooled_sample_stderr（MIT）公式 | 手算锁定（同组 4×→SE/2；发现并修复实现漏乘 n 的真缺陷） |
+| 裁决投票走 atLeast(majority) + scored/unscored 计数 + per-item 票明细 | inspect_ai unscored 语义 + at_least | judge 测试（现 35/35）；adjudicationVotes 留档 |
+| P0 审计修复：borderline 条目保留 bestIdx（裁决拿相似度最优候选，杜绝位置回退） | 对抗审计发现（首轮 REJECT） | 回归测试（无关 GT[0] 陷阱）+ mutation 注入红/还原绿闭环 |
+
+### 5.4 judge-calibration 研究代码线（第 6 线，2026-08-22 返回）
+
+| 方法 | 仓库（license） | 判定 |
+|---|---|---|
+| EM Dawid-Skene + Beta-Bernoulli 闭式后验 judge 混淆矩阵校准 | yale-nlp/bay-calibration-llm-evaluators（Apache-2.0，源码全读） | **DEFERRED（高优）**：纯算术确定性可移植；从"测一致性"升级到"用金标校正/加权 judge 聚合"；需人类金标集+live |
+| 长度控制胜率（CV 逻辑回归，非论文 GLMM——以代码为准） | tatsu-lab/alpaca_eval glm_winrate.py（Apache-2.0） | **DEFERRED**：补长度混杂轴（现有 swap 是位置轴）；HF 预计算向量不可达须自估/用 minimal 变体 |
+| 锚点选择+BT（中等锚点最优，极强/极弱崩塌） | IBM/Anchor-Selection（Apache-2.0） | **DEFERRED**：锦标赛锚点设计规则+功效分析；BT-逻辑回归+自有 seeded bootstrap |
+| JudgeBench 协议 / 双序概率归一化 / UDA | license null ×3 | **REJECT 代码**（无许可证不可复用）；UDA 另与 zod-only/确定性冲突；swap+3-vote 已覆盖一致性思想 |
+
+三条 Apache-2.0 线均需 live 数据，触发器=路由解锁+人类金标集；完整报告 `research/wave9-reports/judge-calibration-research.md`。
+
+## 6. 融合决策与准入判定（决策词汇强制）
+
+**ADOPTED（本波落地，零运行时依赖）**：reducers（at_least/mode/maj@k/pass@k）、krippendorff α（nominal/ordinal）、pooled SE、unscored 三态计数、投票明细留档、防御性校验。准入依据 = 各消除一类已实证失败模式（装饰性测试、裁决静默吞败、跨域聚合无 SE）或升级测量能力，全部离线判别性测试锁定，零北极星回退（332→全量绿）。
+
+**DEFERRED（证据门控，路由解锁即触发）**：
+- 异构 judge panel + panel α（需 ≥2 条 live 路由）
+- logprob 期望分数（需 provider logprobs；deepeval 证实是 ±0.5 方差正攻）
+- GEPA 判官 rubric 进化校准（需 live 循环）
+- eval_set 式矩阵 manifest + cell 复用、score() 存量重打分产品化（replay harness 已是雏形）
+- open-compass 污染分层汇报（需先定义 GT/语料污染标注方案——W-P2 候选）
+- judge 换位 double 判 + meta-judge 终裁（live 3-vote 升级路径）
+
+**REJECTED（带理由）**：嵌入相似度匹配器（破 zod-only/隔离面；TF-IDF+裁决已覆盖语义带）；ROUGE（与 TF-IDF 同构）；inspect_ai/promptfoo/openai-evals 的未播种统计（反面教材）；promptfoo 朴素 pass-rate 门控（CI 下限门控更强）；序贯早停/贝叶斯/控制变量回归（N=5 不成比例、零依赖冲突）。
+
+**纪律采纳（不成代码的规则）**：温度>0 的 judge 判定永不缓存回放（lm-eval CachingLM 纪律）；judge prompt 示例分禁锚定最低档（deepeval 负例）；解析率守门等价物（votesFailed）必须随结果输出。
 
 ## 7. 剩余开放项
 
-- live 方差重测 + live counter-evidence 重测（等 D-036 任一路由解锁）
-- judge-calibration 研究代码线（swap/anchor/BT-anchor 开源实现核证）重发
-- 框架侦察补齐（lm-eval-harness / open-compass）
+- **BLOCKED（用户动作）**：live 方差重测（`node eval/judge-variance.mjs --live 3`）+ live counter-evidence 重测——等 D-036 任一路由充值；恢复后北极星 `rediscovery-judge-variance` 换实测值。
+- W-P2 候选沉淀：污染分层评估（open-compass 模式）× counter-seat 定向检索联合提升 counter-evidence-substantive-hit（当前 0.143 → 目标 0.70）。

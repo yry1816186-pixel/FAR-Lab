@@ -34,15 +34,26 @@ The GT was re-decomposed per judging pass — half the decomposition noise. Now 
 
 - **Matching-layer variance = 0 by construction** (pure function; same inputs → same F1; test-locked).
 - **GT-decomposition variance = 0 by construction** (fixed claims).
-- Cross-decomposition swing under the conservative (borderline-all-unmatched) reading: **max 0.091 < 0.15 target**. Under the generous reading the residual reflects ADJUDICATION-DEPENDENT width (borderline share 24–43% post-calibration), not run-to-run matching noise.
+- Cross-decomposition swing under the conservative (borderline-all-unmatched) reading: **max 0.091 < 0.15 target**. Under the generous reading the residual reflects ADJUDICATION-DEPENDENT width (**borderline share 57–76% post-calibration; deterministic share 24–43%**) — i.e. most of the F1 information rides on the adjudication layer, disclosed plainly; this is not run-to-run matching noise.
 - The semantic overlap zone [0.124, 0.331] restates D-038 on clean labels: **lexical similarity has a hard ceiling on scientific semantics; the middle band belongs to the (majority-voted) adjudication layer** — determinism buys the extremes only. This is a structural property, not a tuning failure.
 
 ## Live variance measurement — BLOCKED (honest)
 
 `node eval/judge-variance.mjs --live 3` re-judges the same completed runs R times through the identical production pipeline (what the north-star target <0.15 / stretch <0.08 is defined over). **Blocked: all model routes down** — deepseek chat 402 Insufficient Balance (probe 2026-08-22 this session, verbatim; /models 200 does NOT imply spendable balance), zai 401 token expired, dashscope keyless. Harness ready; single recharge (any of three routes, D-036) unblocks. North-star `rediscovery-judge-variance` current stays **0.5 (v1 measured) with the v2.1 offline evidence noted** — no live claim made.
 
+## Adversarial audit (2026-08-22, post-fix record)
+
+First audit round verdict REJECT: 1 P0 + 3 P1. All fixed same session:
+- **P0** borderline adjudication received a POSITIONAL fallback (`gtClaims[0]`) instead of the similarity-best counterpart (borderline entries had `match:null` and the `?? [0]` fallback fired — majority of live adjudications would have compared the wrong candidate). Root fix: `thresholdMatch` borderline entries now carry `bestIdx`; regression test with an unrelated GT[0] locks the correct counterpart is delivered (35-test suite).
+- P1 label swap in this file (deterministicShare vs borderline share) — corrected above.
+- P1 three unsynchronized threshold copies — `rediscovery-judge.mjs` and `judge-variance.mjs` now import `MATCH_DEFAULTS` (single source, mutation-locked).
+- P1 missing partial-vote-failure tests — added (1-1 tie no-match, 2-0 match, all-fail visible, misaligned verdicts discarded).
+- P2 stats-report catch-all now fails visibly on corrupt jsonl (missing file still skips); P2 decompose-prompt justification rewritten truthfully (two GT claims ARE visible to decomposition — bounded granularity anchor, disclosed as a limitation, not "leaks nothing"); P3 docstring/count/comment fixes included.
+
+Statistics layer was independently recomputed by the auditor (permutation exact-mode enumeration, BH monotonicity, Wilson endpoints, krippendorff hand case, cluster SE closed form, pooled SE, pass@k product form) — all correct. Gold labels spot-checked 14 pairs: coherent with protocol; single-annotator circularity remains a disclosed limitation (second annotator when a live route funds an independent labeling pass).
+
 ## Tests
 
-`npx vitest run tests/rediscovery-judge.test.ts` → **24/24 green** (median pass behavior, protocol anchoring, determinism-given-calls, fail-visible on 402/malformed/empty, majority-vote, defense-in-depth validation, gold zero-error regression, old-threshold mutation evidence, statistics layer incl. exact-permutation hand-enumeration, kappa, BH step-up, cluster SE, MDE gate).
+`npx vitest run tests/rediscovery-judge.test.ts` → **35/35 green** (median pass behavior, protocol anchoring, determinism-given-calls, fail-visible on 402/malformed/empty, majority-vote, defense-in-depth validation, P0 counterpart regression, partial-vote failures, misaligned verdicts, gold zero-error regression, old-threshold mutation evidence, statistics layer incl. exact-permutation hand-enumeration, kappa, krippendorff, BH step-up, cluster SE, pooled SE, MDE gate, reducers incl. pass@k hand cases).
 
-**Mutation spot-check discipline (required by baseline) — and what it caught:** the first mutation attempt (default `low` 0.12→0.13 inside `thresholdMatch`) did NOT redden the gold test — the test hardcoded its own thresholds and was **decorative against exactly that defect class** (test passed while production was broken). Root fix: production defaults exported as `MATCH_DEFAULTS` (frozen) in `claim-match.mjs`, test now imports and locks THEM. Re-run of the same mutation on the constant → test RED (1 failed) → revert → 24/24 green. Verified discriminating.
+**Mutation spot-check discipline (required by baseline) — and what it caught:** the first mutation attempt (default `low` 0.12→0.13 inside `thresholdMatch`) did NOT redden the gold test — the test hardcoded its own thresholds and was **decorative against exactly that defect class** (test passed while production was broken). Root fix: production defaults exported as `MATCH_DEFAULTS` (frozen) in `claim-match.mjs`, test now imports and locks THEM. Re-run of the same mutation on the constant → test RED (1 failed) → revert → green. Verified discriminating. The adversarial audit later proved the same lesson on the P0: a single-claim GT in the majority-vote test masked the counterpart-selection bug; the new regression test uses a 3-claim GT with an unrelated GT[0].

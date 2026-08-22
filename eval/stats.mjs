@@ -61,8 +61,9 @@ export const bootstrapMeanCI = (values, { seed = 20260822, iters = 10_000 } = {}
  * Paired permutation test for BEFORE vs AFTER on the same tasks (H0: mean
  * difference = 0, two-sided). Exact when iters >= 2^n (enumerates all sign
  * flips); otherwise sampled with the seeded RNG. Returns {observedDiff, pValue}
- * with pValue = fraction of |flipped means| >= |observed mean| (add-1 smoothed
- * to avoid p=0 claims from finite sampling).
+ * with pValue = fraction of |flipped means| >= |observed mean| (add-1 smoothed:
+ * even in exact mode an all-extreme enumeration reports 2/(2^n+1), never 0 —
+ * deliberately conservative so a finite test can never certify p = 0).
  */
 export const pairedPermutationTest = (before, after, { seed = 20260822, iters = 10_000 } = {}) => {
   if (before.length !== after.length || before.length === 0) return { observedDiff: NaN, pValue: NaN, n: 0 };
@@ -106,6 +107,82 @@ export const variance = (values) => {
   if (!Array.isArray(values) || values.length < 2) return 0;
   const m = values.reduce((a, b) => a + b, 0) / values.length;
   return values.reduce((a, b) => a + (b - m) * (b - m), 0) / values.length;
+};
+
+/**
+ * Krippendorff's alpha for inter-rater agreement (Wave-9; semantics per Krippendorff
+ * 2011 "Computing Krippendorff's Alpha-Reliability" as implemented in inspect_ai
+ * scorer/_metrics/krippendorff.py (MIT) — TS rewrite).
+ * raters[i][j] = rating of item j by rater i; null = missing.
+ * level 'nominal': delta(c,k)=1 if c!=k. level 'ordinal': midrank marginal formula
+ *   delta(c,k) = ( sum_g=n_c..n_k n_g - (n_c+n_k)/2 )^2 for ordered categories.
+ * alpha = 1 - D_o/D_e. 1=perfect, 0=chance, negative=below chance.
+ */
+export const krippendorffAlpha = (raters, level = 'nominal') => {
+  const nItems = raters[0]?.length ?? 0;
+  if (raters.length < 2 || nItems === 0) return { alpha: NaN, nUnits: 0, nPairs: 0 };
+  const values = new Set();
+  for (const row of raters) for (const v of row) if (v !== null && v !== undefined) values.add(v);
+  const vals = [...values].sort((a, b) => (typeof a === 'number' && typeof b === 'number' ? a - b : String(a) < String(b) ? -1 : 1));
+  const q = vals.length;
+  if (q < 2) return { alpha: NaN, nUnits: nItems, nPairs: 0, reason: 'single-value domain' };
+  const catIndex = new Map(vals.map((v, i) => [v, i]));
+  // coincidence matrix: unit with m>=2 ratings contributes 1/(m-1) per ordered pair
+  const o = Array.from({ length: q }, () => new Array(q).fill(0));
+  let pairsTotal = 0;
+  let unitsUsed = 0;
+  for (let j = 0; j < nItems; j += 1) {
+    const obs = raters.map((row) => (row[j] === null || row[j] === undefined ? null : catIndex.get(row[j]))).filter((x) => x !== null && x !== undefined);
+    if (obs.length < 2) continue;
+    unitsUsed += 1;
+    const w = 1 / (obs.length - 1);
+    for (let a = 0; a < obs.length; a += 1) for (let b = 0; b < obs.length; b += 1) { if (a === b) continue; o[obs[a]][obs[b]] += w; pairsTotal += w; }
+  }
+  if (pairsTotal === 0) return { alpha: NaN, nUnits: unitsUsed, nPairs: 0 };
+  const marg = o.map((row) => row.reduce((x, y) => x + y, 0));
+  const total = marg.reduce((x, y) => x + y, 0);
+  // ordinal cumulative midranks
+  const cum = new Array(q).fill(0);
+  for (let g = 1; g < q; g += 1) cum[g] = cum[g - 1] + marg[g - 1];
+  const delta = (c, k) => {
+    if (c === k) return 0;
+    if (level === 'nominal') return 1;
+    const [lo, hi] = c < k ? [c, k] : [k, c];
+    let between = 0;
+    for (let g = lo; g <= hi; g += 1) between += marg[g];
+    return (between - (marg[lo] + marg[hi]) / 2) ** 2;
+  };
+  let dObsNum = 0;
+  for (let c = 0; c < q; c += 1) for (let k = 0; k < q; k += 1) dObsNum += o[c][k] * delta(c, k);
+  const dO = dObsNum / total;
+  let dExpNum = 0;
+  for (let c = 0; c < q; c += 1) for (let k = 0; k < q; k += 1) {
+    const nK = c === k ? marg[k] - 1 : marg[k];
+    dExpNum += marg[c] * nK * delta(c, k);
+  }
+  const dE = dExpNum / (total * (total - 1));
+  if (dE === 0) return { alpha: NaN, nUnits: unitsUsed, nPairs: pairsTotal, reason: 'degenerate expected disagreement' };
+  return { alpha: 1 - dO / dE, nUnits: unitsUsed, nPairs: pairsTotal };
+};
+
+/**
+ * Pooled standard error across subgroups (lm-evaluation-harness pooled_sample_stderr,
+ * MIT — pooled variance): groups = [{mean, stderr, n}]; SE of the size-weighted
+ * pooled mean. FAR-Lab use: cross-domain claim-match aggregation with proper SE.
+ */
+export const pooledStderr = (groups) => {
+  const valid = groups.filter((g) => g && g.n > 0 && Number.isFinite(g.stderr) && Number.isFinite(g.mean));
+  const nTotal = valid.reduce((a, g) => a + g.n, 0);
+  if (nTotal === 0) return { se: NaN, n: 0 };
+  let mean = 0;
+  for (const g of valid) mean += g.mean * g.n;
+  mean /= nTotal;
+  let num = 0;
+  for (const g of valid) {
+    const obsVar = g.stderr * g.stderr * g.n; // per-OBSERVATION variance (stderr is the SE of the group mean)
+    num += g.n * (obsVar + (g.mean - mean) ** 2);
+  }
+  return { se: Math.sqrt(num) / nTotal, n: nTotal };
 };
 
 /**

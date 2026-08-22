@@ -274,18 +274,18 @@
       },
       {
         "id": "wave9-breadth-scan",
-        "status": "in_progress",
-        "evidence": "statistics line COMPLETE (paired-permutation standard, seeded-bootstrap discipline incl. negative examples, BH absent in HELM/promptfoo, cluster-robust SE formula, MDE gate); inspect_ai/promptfoo/deepeval scouts relaunched serially after account rate-limit killed first fan-out; lm-eval-harness/open-compass/judge-calibration lines queued"
+        "status": "resolved",
+        "evidence": "D-052: six lines complete (stats + inspect_ai + promptfoo + deepeval + lm-eval + open-compass + judge-calib research), licenses verified, reports in research/wave9-reports/; cross-source: FAR-Lab seeded stats tier ahead of all upstream"
       },
       {
         "id": "wave9-judge-variance-hardening",
         "status": "in_progress",
-        "evidence": "offline COMPLETE 2026-08-22 (D-042): fixed GT (GT_REV) + granularity protocol + gold-calibrated 0.40/0.12 (104-pair main-agent gold, zero-error) + replay swing<=0.091 conservative; LIVE re-judge measurement ready via judge-variance.mjs --live but BLOCKED on model routes (deepseek 402 chat, zai 401, dashscope keyless)"
+        "evidence": "offline COMPLETE + audit-P0 root-fixed (borderline bestIdx, mutation-verified): replay cross-decomposition swing <=0.091 conservative < 0.15 target; LIVE re-judge (judge-variance.mjs --live 3) ready and BLOCKED solely on model routes (deepseek 402 spendable-probe verbatim / zai 401 / dashscope keyless); north-star stays 0.5 with offline evidence, no live claim"
       },
       {
         "id": "wave9-counter-evidence-metric",
         "status": "resolved",
-        "evidence": "D-043: metric defined (strict/limiting + miss decomposition + Wilson) and backfilled on recorded blind re-judges: post-fix 0.143 strict [0.026,0.513] honestly recorded (far below 0.70 target; misses mostly EMPTY not inverted; improvement route = judge-v2 adjudication + counter-seat targeting, live re-measure gated on D-036)"
+        "evidence": "D-043/D-052: metric defined (strict/limiting/miss-decomposition + Wilson) + backfilled 0.143 [0.026,0.513] honest (far below 0.70 target; misses mostly EMPTY not inverted); improvement route recorded (adjudication + counter-seat targeting), live re-measure gated on routes"
       },
       {
         "id": "wave7-breadth-scan",
@@ -306,6 +306,11 @@
         "id": "wave7-live-e2e",
         "status": "blocked",
         "evidence": "model routes 402/429-1113 at wave-open probe (spikes/model-spike/runs/2026-08-22T02-38-26-825Z-deepseek.json); live verification debt recorded — rerun per D-026 template when a route is funded"
+      },
+      {
+        "id": "wave9-judge-calibration-fusions",
+        "status": "deferred",
+        "evidence": "D-052: Yale EM-DS/Beta-Bernoulli + AlpacaEval LC-winrate + IBM anchor-selection (all Apache-2.0, source-read) deferred on live-data + human-gold-set trigger; three license-null repos code-REJECTED"
       }
     ],
     "evidence": [
