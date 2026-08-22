@@ -25,8 +25,9 @@
       "current": {
         "value": 0.5,
         "unit": "max abs swing",
+        "detail": "LIVE v1-measured value (unchanged - live re-measurement BLOCKED: deepseek chat 402 spendable-probe 2026-08-22, zai 401, dashscope keyless). OFFLINE v2.1 evidence (judge-hardening D-042): matching-layer variance 0 by construction, GT-decomposition variance 0 (fixed GT_REV), cross-decomposition replay swing 0.091 conservative reading (target 0.15 met offline; stretch 0.08 not met - gap 0.011 from crc 9-vs-14 claim-count decomposition spread). Harness ready: node eval/judge-variance.mjs --live 3 (audit-P0 fixed); any ONE funded route unblocks.",
         "at": "2026-08-22",
-        "evidence": "evidence/W-EV2/rediscovery.md variance table"
+        "evidence": "evidence/W-EV2/rediscovery.md variance table (live v1); eval/results/judge-variance-replay.json + evidence/W9/judge-variance-hardening.md (offline v2.1)"
       },
       "target": 0.15,
       "stretch": 0.08,
