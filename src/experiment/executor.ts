@@ -4,7 +4,7 @@ import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
 import {
   newId, ExperimentSpec,
-  checkExperimentSpec, mechanicalVerdict,
+  checkExperimentSpec, mechanicalVerdict, impliedPowerFor, POWER_METHOD,
   type ExperimentRun, type ResultCell, type ResultSet, type StatReport,
   type FeedbackSignal, type HypothesisCandidate, type SplitOutcome, type SidecarStatsResult,
 } from '../domain/index.js';
@@ -104,6 +104,11 @@ export const computeStatReports = async (args: {
     const hyp = comp.hypothesisId !== undefined ? hypotheses.find((h) => h.id === comp.hypothesisId) : undefined;
     const bound = comp.hypothesisId !== undefined && hyp !== undefined;
     const verdict = bound && !sequential ? mechanicalVerdict(comp, stat.ci) : undefined;
+    // BP-5: disclosed-convention implied power — visible BEFORE results are over-read.
+    const nTest = comp.kind === 'absolute'
+      ? (perRowByModel.get(comp.modelIdx ?? -1)?.length ?? 0)
+      : (perRowByModel.get(comp.modelAIdx ?? -1)?.length ?? 0);
+    const impliedPower = comp.mde !== undefined ? impliedPowerFor(comp.mde, effectiveAlpha, nTest) : null;
     const derivation = bound
       ? [
         `rule: ${comp.metricKey}(${describe(comp)}) ${comp.direction === 'above' ? '>' : '<'} ${comp.threshold} [threshold source: ${comp.thresholdProvenance}]`,
@@ -129,6 +134,7 @@ export const computeStatReports = async (args: {
       secondary,
       adjustedAlpha: confirmatoryCount > 0 ? effectiveAlpha : undefined,
       verdictDerivation: derivation,
+      ...(impliedPower !== null ? { impliedPower, powerMethod: POWER_METHOD } : {}),
       exploratory: !bound || sequential,
       analysisIteration: datasetIteration,
       createdAt: now(),

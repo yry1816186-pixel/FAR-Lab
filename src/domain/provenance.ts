@@ -79,6 +79,12 @@ export const ReproducibilityBundle = z.object({
   })),
   receiptIds: z.array(ReceiptId),
   finalArtifactHashes: z.array(z.string().length(64)),
+  /**
+   * BP-3 research-product artifact: content-addressed ref of the rendered paper markdown
+   * (`<runId>.paper.md` download). Absent on pre-BP3 bundles — the /paper endpoint 404s
+   * honestly instead of guessing. finalArtifactHashes[0] remains the report artifact.
+   */
+  paperOutlineRef: z.string().optional(),
   verificationInstructions: z.string().min(1),
   /** External/non-deterministic factors that prevent exact reproduction — mandatory honesty. */
   limitations: z.array(z.string()).default([]),

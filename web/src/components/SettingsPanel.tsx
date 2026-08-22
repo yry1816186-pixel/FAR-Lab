@@ -3,6 +3,9 @@ import { Pencil, Settings, Trash2 } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import { useModelConfigs } from '../hooks/useModelConfigs';
+import { discoverModels, getUsage } from '../api/endpoints';
+import type { UsageAggregate } from '../api/types';
+import type { DiscoveredModel } from '../api/endpoints';
 import { errorText } from './common';
 import type { ModelConfigSummary, ModelConfigTestResult, ProviderWireProtocol } from '../api/types';
 
@@ -21,9 +24,13 @@ interface FormState {
   baseUrl: string;
   modelId: string;
   apiKey: string;
+  /** BP-4: ordered failover chain + user-declared pricing (empty string = unset). */
+  fallbackConfigIds: string[];
+  pricingIn: string;
+  pricingOut: string;
 }
 
-const EMPTY_FORM: FormState = { id: null, label: '', wire: 'openai', baseUrl: '', modelId: '', apiKey: '' };
+const EMPTY_FORM: FormState = { id: null, label: '', wire: 'openai', baseUrl: '', modelId: '', apiKey: '', fallbackConfigIds: [], pricingIn: '', pricingOut: '' };
 
 /** Quick-fill presets (baseUrl + wire only; label/model stay the researcher's). */
 const PRESETS: ReadonlyArray<{ key: DictKey; wire: ProviderWireProtocol; baseUrl: string }> = [
@@ -42,6 +49,9 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   /** Test outcome per config id (or 'draft' for the unsaved form). */
   const [testResults, setTestResults] = useState<Record<string, ModelConfigTestResult>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** BP-4: workspace usage ledger + discovery results. */
+  const [usage, setUsage] = useState<UsageAggregate[] | null>(null);
+  const [discovered, setDiscovered] = useState<Record<string, DiscoveredModel[]>>({});
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
@@ -51,6 +61,9 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
     setFormError(null);
     setTestResults({});
     setDeletingId(null);
+    setUsage(null);
+    setDiscovered({});
+    void getUsage().then((r) => setUsage(r.aggregates)).catch(() => setUsage([]));
     restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     window.setTimeout(() => dialogRef.current?.focus(), 0);
     const onKey = (e: KeyboardEvent): void => {
@@ -74,7 +87,12 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
 
   const startEdit = (cfg: ModelConfigSummary): void => {
     setFormError(null);
-    setForm({ id: cfg.id, label: cfg.label, wire: cfg.wire, baseUrl: cfg.baseUrl, modelId: cfg.modelId, apiKey: '' });
+    setForm({
+      id: cfg.id, label: cfg.label, wire: cfg.wire, baseUrl: cfg.baseUrl, modelId: cfg.modelId, apiKey: '',
+      fallbackConfigIds: cfg.fallbackConfigIds ?? [],
+      pricingIn: cfg.pricing !== undefined ? String(cfg.pricing.inputUsdPerMTok) : '',
+      pricingOut: cfg.pricing !== undefined ? String(cfg.pricing.outputUsdPerMTok) : '',
+    });
   };
 
   const runTest = async (target: { configId?: string; label?: string; wire: ProviderWireProtocol; baseUrl: string; modelId: string; apiKey?: string }): Promise<void> => {
@@ -95,9 +113,14 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
       return;
     }
     setFormError(null);
+    const inPrice = Number.parseFloat(form.pricingIn);
+    const outPrice = Number.parseFloat(form.pricingOut);
+    const pricing = form.pricingIn.trim() !== '' && form.pricingOut.trim() !== '' && Number.isFinite(inPrice) && Number.isFinite(outPrice) && inPrice >= 0 && outPrice >= 0
+      ? { inputUsdPerMTok: inPrice, outputUsdPerMTok: outPrice }
+      : undefined;
     try {
       if (form.id === null) {
-        await create({ label: form.label.trim(), wire: form.wire, baseUrl: form.baseUrl.trim(), modelId: form.modelId.trim(), apiKey: form.apiKey });
+        await create({ label: form.label.trim(), wire: form.wire, baseUrl: form.baseUrl.trim(), modelId: form.modelId.trim(), apiKey: form.apiKey, fallbackConfigIds: form.fallbackConfigIds, ...(pricing !== undefined ? { pricing } : {}) } as Parameters<typeof create>[0]);
       } else {
         // apiKey absent from the payload = keep the stored key (server contract).
         await update(form.id, {
@@ -105,8 +128,10 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
           wire: form.wire,
           baseUrl: form.baseUrl.trim(),
           modelId: form.modelId.trim(),
+          fallbackConfigIds: form.fallbackConfigIds,
+          ...(pricing !== undefined ? { pricing } : {}),
           ...(form.apiKey.length > 0 ? { apiKey: form.apiKey } : {}),
-        });
+        } as Parameters<typeof update>[1]);
       }
       setForm(null);
     } catch (e) {
@@ -156,6 +181,35 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
             {envDefault.liveReady ? '' : ` — ${t('settings.envNotReady')}`}
           </p>
         )}
+
+        <section className="settings-usage" aria-label={t('settings.usage')}>
+          <h3 className="settings-form-title">{t('settings.usage')}</h3>
+          <p className="muted small">{t('settings.usageHint')}</p>
+          {usage === null ? (
+            <p className="muted small">{t('common.loading')}</p>
+          ) : usage.length === 0 ? (
+            <p className="muted small">{t('settings.usageEmpty')}</p>
+          ) : (
+            <table className="settings-usage-table">
+              <thead>
+                <tr>
+                  <th>{t('settings.usageProvider')}</th>
+                  <th>{t('settings.usageTokens')}</th>
+                  <th>{t('settings.usageCost')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usage.map((u) => (
+                  <tr key={`${u.provider}/${u.modelId}`}>
+                    <td><span className="mono">{u.provider}</span> · <span className="mono">{u.modelId}</span> · {u.calls}×</td>
+                    <td>{u.totalTokens.toLocaleString()}</td>
+                    <td>{u.costUsd !== null ? `$${u.costUsd.toFixed(4)}` : <span className="muted">{t('settings.usageUnknownCost')}</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
 
         {loading ? (
           <p className="muted">{t('common.loading')}</p>
@@ -255,6 +309,69 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
               placeholder={form.id === null ? t('settings.apiKeyPlaceholder') : t('settings.apiKeyKeep')}
               autoComplete="off" />
             <p className="muted small">{t('settings.keyNeverShown')}</p>
+
+            <label className="field-label" htmlFor="mcfg-fallback">{t('settings.fallback')}</label>
+            {configs.filter((c) => c.id !== form.id).length === 0 ? (
+              <p className="muted small">{t('settings.fallbackNone')}</p>
+            ) : (
+              <select
+                id="mcfg-fallback"
+                multiple
+                size={Math.min(3, Math.max(2, configs.length - 1))}
+                value={form.fallbackConfigIds}
+                onChange={(e) => setForm({
+                  ...form,
+                  fallbackConfigIds: Array.from(e.target.selectedOptions, (o) => o.value),
+                })}
+              >
+                {configs.filter((c) => c.id !== form.id).map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+            )}
+
+            <label className="field-label" htmlFor="mcfg-price-in">{t('settings.pricing')}</label>
+            <span className="muted small">
+              {t('settings.pricingIn')}：
+              <input id="mcfg-price-in" type="number" min="0" step="0.1" value={form.pricingIn}
+                onChange={(e) => setForm({ ...form, pricingIn: e.target.value })} style={{ width: '90px' }} />
+              {' '}{t('settings.pricingOut')}：
+              <input type="number" min="0" step="0.1" value={form.pricingOut}
+                onChange={(e) => setForm({ ...form, pricingOut: e.target.value })} style={{ width: '90px' }} />
+            </span>
+
+            <p className="muted small">
+              <button
+                type="button"
+                className="btn btn--small"
+                title={t('settings.discoverHint')}
+                onClick={() => {
+                  const key = form.id ?? 'draft';
+                  void discoverModels({
+                    ...(form.id !== null ? { configId: form.id } : { wire: form.wire, baseUrl: form.baseUrl.trim(), ...(form.apiKey.length > 0 ? { apiKey: form.apiKey } : {}) }),
+                  })
+                    .then((r) => setDiscovered((prev) => ({ ...prev, [key]: r.models })))
+                    .catch((e: unknown) => setFormError(e instanceof Error ? e.message : String(e)));
+                }}
+              >
+                {t('settings.discover')}
+              </button>
+              {discovered[form.id ?? 'draft'] !== undefined && (
+                <span> {t('settings.discoverOk', { n: discovered[form.id ?? 'draft']?.length ?? 0 })}</span>
+              )}
+            </p>
+            {(discovered[form.id ?? 'draft'] ?? []).length > 0 && (
+              <select
+                aria-label={t('settings.discover')}
+                value=""
+                onChange={(e) => { if (e.target.value.length > 0) setForm({ ...form, modelId: e.target.value }); }}
+              >
+                <option value="">—</option>
+                {discovered[form.id ?? 'draft']!.map((m) => (
+                  <option key={m.id} value={m.id}>{m.id}{m.displayName !== undefined ? ` (${m.displayName})` : ''}</option>
+                ))}
+              </select>
+            )}
 
             <p className="muted small">
               {t('settings.presets')}：{' '}

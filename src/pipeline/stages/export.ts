@@ -40,6 +40,7 @@ import type {
   SourceDocument,
 } from '../../domain/index.js';
 import { canonicalJson, canonicalSha256, sha256Hex } from '../../shared/crypto.js';
+import { buildPaperOutline, renderPaperMarkdown } from '../paper-outline.js';
 import type { StageHandler } from '../types.js';
 
 /**
@@ -645,6 +646,12 @@ export const exportStage: StageHandler = {
     const report = buildReport(inputs, missingItems);
     const reportPut = await ctx.artifacts.put(report);
 
+    // BP-3 research-product layer: IMRaD paper outline + deterministic limitations +
+    // BibTeX references, projected from the SAME stored objects (zero LLM). Rendered
+    // markdown becomes the second export artifact; served as `<runId>.paper.md`.
+    const paperOutline = buildPaperOutline(ctx.store, run.id);
+    const paperPut = await ctx.artifacts.put(renderPaperMarkdown(paperOutline));
+
     ctx.recordReceipt({
       kind: 'export',
       executionMode: 'live', // deterministic local rendering of stored objects — actually executed
@@ -687,7 +694,9 @@ export const exportStage: StageHandler = {
       sourceArtifactHashes: sources.map((s) => s.contentHash),
       modelMetadata: aggregateModelMetadata(allReceipts),
       receiptIds: allReceipts.map((r) => r.id),
-      finalArtifactHashes: [reportPut.hash],
+      // [0] stays the report (CLI/`GET /report` depend on it); [1] is the BP-3 paper markdown.
+      finalArtifactHashes: [reportPut.hash, paperPut.hash],
+      paperOutlineRef: paperPut.ref,
       verificationInstructions: `far verify --bundle ${bundleId}（第三方核验：按 receiptIds 比对 receipts、按 sourceArtifactHashes 比对来源快照、按 finalArtifactHashes 比对导出工件）`,
       limitations,
       // SWAN interchange (W-G follow-up): surviving hypotheses as JSON-LD ResearchStatements.
@@ -710,8 +719,8 @@ export const exportStage: StageHandler = {
     ctx.store.putObject('bundle', bundle);
     const bundlePut = await ctx.artifacts.put(canonicalJson(bundle));
 
-    const summary = `reproducibility bundle ${bundle.id} (${bundlePut.ref}); report ${reportPut.ref}; declaredEvidenceLevel=replay`;
+    const summary = `reproducibility bundle ${bundle.id} (${bundlePut.ref}); report ${reportPut.ref}; paper ${paperPut.ref}; declaredEvidenceLevel=replay`;
     ctx.log(summary);
-    return { kind: 'done', summary, artifacts: [reportPut.ref, bundlePut.ref] };
+    return { kind: 'done', summary, artifacts: [reportPut.ref, bundlePut.ref, paperPut.ref] };
   },
 };

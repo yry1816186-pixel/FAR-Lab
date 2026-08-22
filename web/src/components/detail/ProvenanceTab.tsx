@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { Download, RefreshCw } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
-import { getBundles, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
+import { getBundles, getPaper, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
 import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
 import { isSettled } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
@@ -34,6 +34,11 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
 
   const reportFetcher = useCallback((signal: AbortSignal) => getReport(run.id, signal), [run.id]);
   const reportRes = useResource(reportFetcher, [run.id], `${run.updatedAt}:${run.status}`);
+
+  // BP-3 paper artifact: a 404 (pre-BP3 bundle, or export not run) simply hides the
+  // download button — the report block above keeps the report-only story intact.
+  const paperFetcher = useCallback((signal: AbortSignal) => getPaper(run.id, signal), [run.id]);
+  const paperRes = useResource(paperFetcher, [run.id], `${run.updatedAt}:${run.status}`);
 
   const modelCalls = (receiptsRes.data ?? []).filter((r) => r.kind === 'model_call');
   const nonLive = (receiptsRes.data ?? []).filter((r) => r.executionMode !== 'live');
@@ -71,7 +76,7 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
         ) : reportRes.error !== null ? (
           <ErrorBox error={reportRes.error} onRetry={reportRes.retry} />
         ) : reportRes.data !== null ? (
-          <ReportBlock runId={run.id} markdown={reportRes.data} />
+          <ReportBlock runId={run.id} markdown={reportRes.data} paperMarkdown={paperRes.data} />
         ) : null}
       </Section>
     </>
@@ -385,7 +390,7 @@ function BundleVerify({
   );
 }
 
-function ReportBlock({ runId, markdown }: { runId: string; markdown: string }): JSX.Element {
+function ReportBlock({ runId, markdown, paperMarkdown }: { runId: string; markdown: string; paperMarkdown: string | null }): JSX.Element {
   const { t } = useI18n();
   const [showPreview, setShowPreview] = useState(false);
 
@@ -401,12 +406,31 @@ function ReportBlock({ runId, markdown }: { runId: string; markdown: string }): 
     URL.revokeObjectURL(url);
   };
 
+  // BP-3: same blob download pattern as the report button, for the paper skeleton.
+  const downloadPaper = (): void => {
+    if (paperMarkdown === null) return;
+    const blob = new Blob([paperMarkdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${runId}.paper.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="report-block">
       <div className="report-actions">
         <button type="button" className="btn" onClick={download}>
           <Download size={13} aria-hidden="true" /> {t('report.download')}
         </button>
+        {paperMarkdown !== null && (
+          <button type="button" className="btn" onClick={downloadPaper}>
+            <Download size={13} aria-hidden="true" /> {t('report.downloadPaper')}
+          </button>
+        )}
         <button type="button" className="btn" aria-expanded={showPreview} onClick={() => setShowPreview((v) => !v)}>
           {showPreview ? t('common.collapse') : t('report.preview')}
         </button>

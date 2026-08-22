@@ -532,9 +532,12 @@ describe('export stage', () => {
     const g = seedRun();
     const { outcome } = await runPlanThenExport(g);
     if (outcome.kind !== 'done') throw new Error('expected done outcome');
-    expect(outcome.artifacts).toHaveLength(2);
+    // BP-3: report, bundle, paper markdown (report stays [0]; CLI//report rely on it)
+    expect(outcome.artifacts).toHaveLength(3);
     const report = await artifacts.get(outcome.artifacts[0]!);
     expect(report).toBeTruthy();
+    const paper = await artifacts.get(outcome.artifacts[2]!);
+    expect(paper).toContain('## Abstract');
 
     const headings = [
       '## 1. 问题与范围',
@@ -631,9 +634,11 @@ describe('export stage', () => {
     expect(bundle.receiptIds).toHaveLength(receipts.length);
     expect(bundle.modelMetadata).toEqual([{ provider: 'test-stub', modelId: 'test-stub', route: 'test_only' }]);
 
-    // final artifact hash covers the rendered report
+    // final artifact hashes cover the rendered report AND the BP-3 paper markdown
     const report = await artifacts.get(outcome.artifacts[0]!);
-    expect(bundle.finalArtifactHashes).toEqual([sha256Hex(report!)]);
+    const paper = await artifacts.get(outcome.artifacts[2]!);
+    expect(bundle.finalArtifactHashes).toEqual([sha256Hex(report!), sha256Hex(paper!)]);
+    expect(bundle.paperOutlineRef).toBe(outcome.artifacts[2]);
 
     // mandatory honesty: LLM non-determinism + missing/non-live items
     expect(bundle.limitations.some((l) => l.includes('非确定性'))).toBe(true);

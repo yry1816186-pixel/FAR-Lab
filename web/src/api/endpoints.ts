@@ -6,6 +6,7 @@
  *   GET  /api/v1/runs/:id/events?afterSeq=N          incremental event feed
  *   GET  /api/v1/runs/:id/question|sources|evidence|hypotheses|plan|revisions|receipts
  *   GET  /api/v1/runs/:id/report                     markdown text
+ *   GET  /api/v1/runs/:id/paper                      IMRaD paper markdown (BP-3; 404 pre-BP3)
  *   POST /api/v1/runs              {text,domain?,goalType?} -> 202 {runId}
  *   POST /api/v1/runs/:id/cancel | /resume           run control
  *   POST /api/v1/runs/:id/feedback {source,content,targetKind?,targetId?} -> 201
@@ -16,7 +17,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, VerificationReport } from './types';
+import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, UsageAggregate, VerificationReport } from './types';
 
 const BASE = '/api/v1';
 
@@ -115,6 +116,15 @@ export const getCorpus = async (runId: string, signal?: AbortSignal): Promise<Co
 
 export const getReport = async (runId: string, signal?: AbortSignal): Promise<string> => {
   const text = await api.getText(`${BASE}/runs/${encodeURIComponent(runId)}/report`, signal);
+  return typeof text === 'string' ? text : String(text);
+};
+
+/**
+ * BP-3 research-product artifact: the deterministic IMRaD paper markdown. 404 on runs
+ * whose latest bundle predates BP-3 (no paperOutlineRef) — callers treat that as absent.
+ */
+export const getPaper = async (runId: string, signal?: AbortSignal): Promise<string> => {
+  const text = await api.getText(`${BASE}/runs/${encodeURIComponent(runId)}/paper`, signal);
   return typeof text === 'string' ? text : String(text);
 };
 
@@ -275,6 +285,36 @@ export const testModelConfig = async (input: ModelConfigTestInput, signal?: Abor
     };
   }
   throw new ApiError({ code: 'unexpected_schema', message: '连接测试响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'model config test result' } });
+};
+
+// ---- BP-4 model control plane v2: usage ledger + model discovery ----
+
+export interface DiscoveredModel {
+  id: string;
+  ownedBy?: string;
+  displayName?: string;
+  createdAt?: string;
+}
+
+/** Workspace-wide usage aggregates (GET /model-configs/usage). */
+export const getUsage = async (signal?: AbortSignal): Promise<{ aggregates: UsageAggregate[] }> => {
+  const data: unknown = await api.getJson(`${BASE}/model-configs/usage`, signal);
+  if (typeof data !== 'object' || data === null || !Array.isArray((data as { aggregates?: unknown }).aggregates)) {
+    throw new ApiError({ code: 'unexpected_schema', message: '用量响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'usage aggregates' } });
+  }
+  return { aggregates: (data as { aggregates: UsageAggregate[] }).aggregates };
+};
+
+/** List the models an endpoint serves (POST /model-configs/discover). */
+export const discoverModels = async (
+  input: { configId?: string; wire?: string; baseUrl?: string; apiKey?: string },
+  signal?: AbortSignal,
+): Promise<{ models: DiscoveredModel[] }> => {
+  const data: unknown = await api.post(`${BASE}/model-configs/discover`, input, signal);
+  if (typeof data !== 'object' || data === null || !Array.isArray((data as { models?: unknown }).models)) {
+    throw new ApiError({ code: 'unexpected_schema', message: '模型发现响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'discovered models' } });
+  }
+  return { models: (data as { models: DiscoveredModel[] }).models };
 };
 
 // ---- small helper (local, avoids repeating the 404-passthrough pattern) ----

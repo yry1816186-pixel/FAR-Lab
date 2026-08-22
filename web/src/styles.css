@@ -1488,6 +1488,12 @@ select option { color: var(--text); background: var(--surface); }
 }
 .hyp-connect select { max-width: 320px; min-width: 160px; }
 .hyp-connect-confirm { flex-shrink: 0; }
+/* BP-4 usage ledger table in the settings panel. */
+.settings-usage { margin: var(--sp-3) 0; }
+.settings-usage-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.settings-usage-table th, .settings-usage-table td { text-align: left; padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--v2-border); }
+.settings-usage-table th { color: var(--v2-muted, gray); font-weight: 600; }
+
 /* BP-2 direct-edit form: full-width fields stack vertically inside the dashed group. */
 .edit-field { display: flex; flex-direction: column; gap: var(--sp-1); flex: 1 1 100%; }
 .edit-field textarea, .edit-field input { width: 100%; font: inherit; padding: var(--sp-1); border: 1px solid var(--v2-border); border-radius: var(--radius-s); background: var(--v2-surface); color: inherit; resize: vertical; }

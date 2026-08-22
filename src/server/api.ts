@@ -8,6 +8,9 @@ import { createCustomProvider } from '../providers/custom.js';
 import { runResearchAction, ActionError } from './actions.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
+import { discoverModels } from '../providers/discovery.js';
+import { approveExperiment, ExperimentOpError } from './experiment-ops.js';
+import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
 import {
   FeedbackSignal,
   FeedbackSourceKind,
@@ -36,7 +39,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'invalid_action_request';
+  code: 'not_found' | 'validation' | 'already_running' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'invalid_action_request' | 'provider_unreachable';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -559,6 +562,9 @@ function parseSeedSources(raw: unknown): string | {
       ...(questionText !== undefined ? { questionText } : {}),
       ...(domain !== undefined ? { domain } : {}),
       leaseInfo: { holder: lease.holder, expiresAt: lease.expiresAt ?? null, live: leaseLive },
+      // BP-4 usage ledger: receipt-derived tokens/cost for THIS run (pricing only
+      // when user-declared; unknown stays unknown — no invented price tables).
+      usage: aggregateRunUsage(app.store, runId),
     });
   };
 
@@ -667,6 +673,28 @@ function parseSeedSources(raw: unknown): string | {
     const content = await app.artifacts.get(reportHash);
     if (content === null) {
       throw notFound(`report artifact missing in artifact store (${reportHash.slice(0, 16)}…)`, runId);
+    }
+    sendText(res, 200, 'text/markdown; charset=utf-8', content);
+  };
+
+  /**
+   * BP-3 research-product artifact: the deterministic IMRaD paper markdown. Mirrors
+   * runReport's artifact-lookup pattern, but resolves the bundle's paperOutlineRef —
+   * absent on pre-BP3 bundles, which 404 honestly instead of serving the wrong artifact.
+   */
+  const runPaper = async (res: http.ServerResponse, runId: string): Promise<void> => {
+    mustGetRun(runId);
+    const latestBundle = app.store.listObjects('bundle', runId).at(-1);
+    if (!latestBundle) {
+      throw notFound(`no bundle stored for run ${runId} — the export stage has not produced one yet`, runId);
+    }
+    const paperRef = latestBundle.paperOutlineRef;
+    if (paperRef === undefined) {
+      throw notFound(`latest bundle ${latestBundle.id} carries no paper-outline artifact (pre-BP3 export)`, runId);
+    }
+    const content = await app.artifacts.get(paperRef);
+    if (content === null) {
+      throw notFound(`paper artifact missing in artifact store (${paperRef.slice(0, 16)}…)`, runId);
     }
     sendText(res, 200, 'text/markdown; charset=utf-8', content);
   };
@@ -836,6 +864,8 @@ function parseSeedSources(raw: unknown): string | {
     apiKeySet: cfg.apiKey.length > 0,
     apiKeyMasked: maskApiKey(cfg.apiKey),
     active: activeId === cfg.id,
+    fallbackConfigIds: cfg.fallbackConfigIds,
+    pricing: cfg.pricing,
     createdAt: cfg.createdAt,
     updatedAt: cfg.updatedAt,
   });
@@ -875,6 +905,8 @@ function parseSeedSources(raw: unknown): string | {
       baseUrl: body.baseUrl,
       modelId: body.modelId,
       apiKey: body.apiKey ?? '',
+      ...(Array.isArray(body.fallbackConfigIds) ? { fallbackConfigIds: body.fallbackConfigIds } : {}),
+      ...(body.pricing !== undefined ? { pricing: body.pricing } : {}),
       createdAt: now,
       updatedAt: now,
     });
@@ -901,12 +933,57 @@ function parseSeedSources(raw: unknown): string | {
       ...(body.wire !== undefined ? { wire: body.wire } : {}),
       ...(typeof body.baseUrl === 'string' ? { baseUrl: body.baseUrl } : {}),
       ...(typeof body.modelId === 'string' ? { modelId: body.modelId } : {}),
+      ...(Array.isArray(body.fallbackConfigIds) ? { fallbackConfigIds: body.fallbackConfigIds } : {}),
+      ...(body.pricing !== undefined ? { pricing: body.pricing } : {}),
       apiKey,
       updatedAt: new Date().toISOString(),
     });
     if (!parsed.success) throw validation(invalidConfigMessage(parsed.error.issues));
+    if (parsed.data.fallbackConfigIds.includes(parsed.data.id)) {
+      throw validation('a config cannot list itself as its own fallback (direct cycle)');
+    }
     app.store.putObject('model_config', parsed.data);
     sendJson(res, 200, { config: modelConfigSummary(parsed.data, app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY)) });
+  };
+
+  /** BP-4 usage ledger: workspace-wide receipt-derived usage (tokens; cost only when user-priced). */
+  const listWorkspaceUsage = (res: http.ServerResponse): void => {
+    sendJson(res, 200, { aggregates: aggregateWorkspaceUsage(app.store) });
+  };
+
+  /**
+   * BP-4 model discovery: list the models an endpoint serves (GET {base}/models or
+   * /v1/models per wire). Accepts a stored configId or a draft {wire, baseUrl, apiKey?}.
+   * Live discovery needs real credentials (BLOCKED-live under the no-live-API
+   * directive); failures are honest 502s, never an empty-catalog success.
+   */
+  const discoverFromModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+    const body = await readJsonObject(req);
+    let wire: 'openai' | 'anthropic';
+    let baseUrl: string;
+    let apiKey: string;
+    if (typeof body.configId === 'string') {
+      const stored = mustGetModelConfig(body.configId);
+      wire = stored.wire;
+      baseUrl = stored.baseUrl;
+      apiKey = typeof body.apiKey === 'string' && body.apiKey.length > 0 ? body.apiKey : stored.apiKey;
+    } else {
+      if (body.wire !== 'openai' && body.wire !== 'anthropic') throw validation('discovery requires wire ("openai"|"anthropic") and baseUrl, or a stored configId');
+      if (typeof body.baseUrl !== 'string' || body.baseUrl.length === 0) throw validation('discovery requires baseUrl');
+      wire = body.wire;
+      baseUrl = body.baseUrl;
+      apiKey = typeof body.apiKey === 'string' ? body.apiKey : '';
+    }
+    try {
+      const result = await discoverModels({ wire, baseUrl, apiKey }, fetch as unknown as Parameters<typeof discoverModels>[1]);
+      sendJson(res, 200, result);
+    } catch (e) {
+      throw new HttpError(502, {
+        code: 'provider_unreachable',
+        message: `model discovery failed: ${e instanceof Error ? e.message : String(e)}`,
+        retryable: true,
+      });
+    }
   };
 
   const deleteModelConfig = (res: http.ServerResponse, id: string): void => {
@@ -1046,6 +1123,25 @@ function parseSeedSources(raw: unknown): string | {
         }
         throw notFound(`no route: ${method} ${url.pathname}`);
       }
+        if (segments.length === 7 && segments[4] === 'experiments' && segments[6] === 'approve' && method === 'POST') {
+          // BP-5 confirmatory binding approval (hypothesis-bound comparisons).
+          const body = await readJsonObject(req);
+          try {
+            const result = approveExperiment(app, runId, segments[5]!, body);
+            sendJson(res, 200, result);
+            return;
+          } catch (e) {
+            if (e instanceof ExperimentOpError) {
+              throw new HttpError(e.status, {
+                code: e.code,
+                message: e.message,
+                retryable: false,
+                ...(e.code === 'not_found' ? { runId } : {}),
+              });
+            }
+            throw e;
+          }
+        }
       if (segments.length === 4) {
         if (method === 'GET') return runDetail(res, runId);
         throw notFound(`method ${method} not allowed for ${url.pathname}`);
@@ -1055,6 +1151,7 @@ function parseSeedSources(raw: unknown): string | {
         if (leaf === 'events' && method === 'GET') return runEvents(res, runId, url);
         if (leaf === 'question' && method === 'GET') return runQuestion(res, runId);
         if (leaf === 'report' && method === 'GET') return runReport(res, runId);
+        if (leaf === 'paper' && method === 'GET') return runPaper(res, runId);
         if (leaf === 'sources' && method === 'GET') {
           mustGetRun(runId);
           return sendJson(res, 200, { sources: app.store.listObjects('source_document', runId) });
@@ -1099,6 +1196,7 @@ function parseSeedSources(raw: unknown): string | {
             experimentRuns: app.store.listObjects('experiment_run', runId),
             resultSets: app.store.listObjects('result_set', runId),
             statReports: app.store.listObjects('stat_report', runId),
+            experimentSpecs: app.store.listObjects('experiment_spec', runId),
           });
         }
         if (leaf === 'receipts' && method === 'GET') {
@@ -1146,6 +1244,8 @@ function parseSeedSources(raw: unknown): string | {
       const leaf = segments[3]!;
       if (leaf === 'active' && segments.length === 4 && method === 'PUT') return setActiveModelConfig(req, res);
       if (leaf === 'test' && segments.length === 4 && method === 'POST') return testModelConfig(req, res);
+      if (leaf === 'usage' && segments.length === 4 && method === 'GET') return listWorkspaceUsage(res);
+      if (leaf === 'discover' && segments.length === 4 && method === 'POST') return discoverFromModelConfig(req, res);
       if (segments.length === 4) {
         if (method === 'GET') return getModelConfig(res, leaf);
         if (method === 'PUT') return updateModelConfig(req, res, leaf);
