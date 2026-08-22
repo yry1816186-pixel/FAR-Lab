@@ -54,6 +54,21 @@ export const getRevisions = async (runId: string, signal?: AbortSignal) =>
 export const getReceipts = async (runId: string, signal?: AbortSignal) =>
   normalizeReceipts(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/receipts`, signal));
 
+/** EEL (D-081): executed-experiment projections — runs, result cells, stat reports. */
+export interface ExperimentEvidence {
+  experimentRuns: Array<Record<string, unknown>>;
+  resultSets: Array<Record<string, unknown>>;
+  statReports: Array<Record<string, unknown>>;
+}
+export const getExperiments = async (runId: string, signal?: AbortSignal): Promise<ExperimentEvidence> => {
+  const data = (await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/experiments`, signal)) as ExperimentEvidence;
+  return {
+    experimentRuns: Array.isArray(data?.experimentRuns) ? data.experimentRuns : [],
+    resultSets: Array.isArray(data?.resultSets) ? data.resultSets : [],
+    statReports: Array.isArray(data?.statReports) ? data.statReports : [],
+  };
+};
+
 /** First-class bundle discovery (D-060) — replaces the event-regex scan in ProvenanceTab. */
 export const getBundles = async (runId: string, signal?: AbortSignal): Promise<BundleSummary[]> => {
   const data: unknown = await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/bundles`, signal);
