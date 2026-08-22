@@ -23,11 +23,11 @@
       "id": "rediscovery-judge-variance",
       "what": "Same-run re-judging task-F1 swing (decomposition+matching noise)",
       "current": {
-        "value": 0.5,
-        "unit": "max abs swing",
-        "detail": "LIVE v1-measured value (unchanged - live re-measurement BLOCKED: deepseek chat 402 spendable-probe 2026-08-22, zai 401, dashscope keyless). OFFLINE v2.1 evidence (judge-hardening D-042): matching-layer variance 0 by construction, GT-decomposition variance 0 (fixed GT_REV), cross-decomposition replay swing 0.091 conservative reading (target 0.15 met offline; stretch 0.08 not met - gap 0.011 from crc 9-vs-14 claim-count decomposition spread). Harness ready: node eval/judge-variance.mjs --live 3 (audit-P0 fixed); any ONE funded route unblocks. UNLOCK SEQUENCE (verified 2026-08-22): runs file has only 2/5 valid runIds — run node eval/rediscovery.mjs first (phase-1 re-runs the 3 missing tasks), then judge-variance --live 3; provider routing deepseek|dashscope via FARLAB_JUDGE_PROVIDER. NOTE: env DASHSCOPE_API_KEY now EXISTS but is rejected (Incorrect API key provided — dashscope probe 2026-08-22): likely truncated/expired key, user should re-check the value.",
+        "value": 0.061,
+        "unit": "max abs swing, task-level F1",
+        "detail": "LIVE MEASURED 2026-08-22 (judge glm-5.3 via Zhipu bigmodel Anthropic protocol; judge protocol MIGRATED from deepseek-chat per user DeepSeek ban — numbers not comparable across judge routes). 2/5 tasks (arg,crc; generation route unavailable so the other 3 runs could not be produced): arg 0.000/0.000/0.000 (swing 0 — hypothesis adopts a biofilm-centric mechanism frame, genuinely low overlap with fixed GT, all deterministic-no, borderline 0), crc 0.645/0.706/0.656 (swing 0.061). BOTH target 0.15 and stretch 0.08 met on measured scope.",
         "at": "2026-08-22",
-        "evidence": "evidence/W-EV2/rediscovery.md variance table (live v1); eval/results/judge-variance-replay.json + evidence/W9/judge-variance-hardening.md (offline v2.1)"
+        "evidence": "eval/results/judge-variance-live-R3.json; evidence/W9/judge-variance-hardening.md; D-058"
       },
       "target": 0.15,
       "stretch": 0.08,
@@ -131,7 +131,7 @@
       "what": "Full-run terminal-state reliability: frozen/crashed runs detected+swept+resumable; no silent hangs",
       "current": {
         "value": "lease-watchdog-auto",
-        "detail": "D-054: injected kill 20/20 recovered; kill->adoption 5033-5060ms (TTL + 1 poll cycle); redo <= 1 in-flight subtask (was 100% of stage); outputs byte-identical to no-kill baseline x20",
+        "detail": "D-054 offline 20/20 (kill->adoption 5033-5060ms, redo <=1, outputs identical); LIVE single-shot on zai glm-4.6 Anthropic wire verified same semantics (62.02s adoption = TTL+1 poll, calls 1x1/2x2/3x1, evidence/W8/live-fault-injection.json)",
         "at": "2026-08-22",
         "evidence": "evidence/W8/fault-injection.json; evidence/W8/fusion-verification.md; tests/wave8-durability.test.ts 12/12 (D-054)"
       },
