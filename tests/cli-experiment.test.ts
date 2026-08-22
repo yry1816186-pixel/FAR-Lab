@@ -123,7 +123,7 @@ describe('far experiment CLI surface', { timeout: 300_000 }, () => {
       // A worker draining afterwards finds nothing to do.
       const worker = await experimentCommand('worker', argv(w.dataDir, undefined, ['--allow-local-datasets']));
       expect(worker.code).toBe(0);
-      expect(worker.json).toEqual({ executed: 0, failed: 0 });
+      expect(worker.json).toEqual({ executed: 0, failed: 0, device: 'local' });
     } finally {
       w.cleanup();
     }
