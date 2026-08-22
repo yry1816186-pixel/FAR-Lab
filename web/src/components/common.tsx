@@ -122,12 +122,23 @@ export function TimeText({ iso }: { iso: string }): JSX.Element {
 
 /**
  * Determinate progress ONLY: n/total counts the runtime actually knows
- * (INTERFACES §1 — never an invented percentage).
+ * (INTERFACES §1 — never an invented percentage). Custom track/fill replaces
+ * the native <progress> whose pseudo-element styling diverges per engine.
  */
 export function CountProgress({ done, total, label }: { done: number; total: number; label: string }): JSX.Element {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
     <span className="count-progress">
-      <progress max={total} value={done} aria-label={label} />{' '}
+      <span
+        className="progress-track"
+        role="progressbar"
+        aria-label={label}
+        aria-valuenow={done}
+        aria-valuemin={0}
+        aria-valuemax={total}
+      >
+        <span className="progress-fill" style={{ width: `${pct}%` }} />
+      </span>{' '}
       <span className="mono">{done}/{total}</span>
     </span>
   );
