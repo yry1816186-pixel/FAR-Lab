@@ -1086,12 +1086,13 @@ describe('GET /api/v1/search (B2 universal search)', () => {
     expect(status).toBe(400);
   });
 
-  it('treats LIKE wildcards as literals (escaped) and respects zero limits', async () => {
+  it('wildcard characters are tokenizer punctuation (FTS5 semantics) and zero limits hold', async () => {
+    // D-101 FTS: '%editors%' tokenizes to the word 'editors' (punctuation
+    // stripped) — SQL-wildcard injection is structurally impossible, and the
+    // seeded question ('base editors') legitimately matches.
     const wild = await getJson(`${base}/api/v1/search?q=${encodeURIComponent('%editors%')}`);
     expect(wild.status).toBe(200);
-    // A literal '%editors%' substring does not occur in any seeded text —
-    // unescaped wildcards would match everything instead.
-    expect(wild.body.questions.length).toBe(0);
+    expect(wild.body.questions.some((x: Json) => x.runId === run1)).toBe(true);
 
     const none = await getJson(`${base}/api/v1/search?q=off-target&questions=0&hypotheses=0&claims=0`);
     expect(none.body.questions).toEqual([]);
@@ -1102,6 +1103,15 @@ describe('GET /api/v1/search (B2 universal search)', () => {
   it('405s non-GET', async () => {
     const res = await fetch(`${base}/api/v1/search?q=abc`, { method: 'DELETE' });
     expect(res.status).toBe(404); // unmatched method+path falls through to route-not-found
+  });
+
+  it('FTS5 path: bm25 ranking + snippet markers ride along (D-101)', async () => {
+    const { body } = await getJson(`${base}/api/v1/search?q=${encodeURIComponent('off-target mutations')}`);
+    const hit = body.claims.find((c: Json) => c.runId === run1);
+    expect(hit).toBeDefined();
+    expect(typeof hit.snippet).toBe('string');
+    expect(hit.snippet).toContain('«');
+    expect(typeof hit.rank).toBe('number');
   });
 });
 

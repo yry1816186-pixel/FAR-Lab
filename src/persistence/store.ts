@@ -45,8 +45,68 @@ export type DomainObject<K extends ObjectKind> = z.infer<(typeof KIND_SCHEMAS)[K
  * events are append-only audit; objects are re-validated by their zod schema on read
  * (corrupt/mismatched rows fail closed instead of silently propagating).
  */
+export interface SearchHit {
+  runId: string;
+  id: string;
+  text: string;
+  /** FTS5 snippet with «hit» markers (present on the FTS path only). */
+  snippet?: string;
+  /** bm25 rank (lower = more relevant; present on the FTS path only). */
+  rank?: number;
+}
+
 export class Store {
+  private ftsReady = false;
+
   constructor(private readonly db: Db) {}
+
+  /**
+   * FTS5 mirror for universal search (D-101): one contentless-ish table over
+   * the three searchable kinds. Built lazily on first search; kept in sync by
+   * re-indexing the touched kind (delete+reinsert is cheap at our scale —
+   * hundreds of objects per kind — and avoids trigger drift across the
+   * INSERT OR REPLACE write path). Runtimes without FTS5 degrade to LIKE
+   * (searchText already handles that).
+   */
+  private ensureFts(): void {
+    if (this.ftsReady) return;
+    try {
+      this.db.prepare(
+        'CREATE VIRTUAL TABLE IF NOT EXISTS far_search USING fts5(kind UNINDEXED, obj_id UNINDEXED, body, tokenize = \'unicode61\')',
+      ).run();
+      this.reindexFts('question');
+      this.reindexFts('hypothesis');
+      this.reindexFts('claim');
+      this.ftsReady = true;
+    } catch {
+      this.ftsReady = false; // stays on the LIKE path
+    }
+  }
+
+  private reindexFts(kind: 'question' | 'hypothesis' | 'claim'): void {
+    const rows = this.db.prepare('SELECT id, json FROM objects WHERE kind=?').all(kind);
+    this.db.prepare('DELETE FROM far_search WHERE kind=?').run(kind);
+    const insert = this.db.prepare('INSERT INTO far_search (kind, obj_id, body) VALUES (?,?,?)');
+    const textOf = (json: string): string => {
+      const parsed = JSON.parse(json) as { text?: unknown; statement?: unknown };
+      return String(parsed.text ?? parsed.statement ?? '');
+    };
+    for (const r of rows) {
+      const body = textOf(String(r.json));
+      if (body.length > 0) insert.run(kind, String(r.id), body);
+    }
+  }
+
+  /** Called after object writes to keep the FTS mirror fresh (best-effort). */
+  private touchFts(kind: string): void {
+    if (kind !== 'question' && kind !== 'hypothesis' && kind !== 'claim') return;
+    if (!this.ftsReady) return;
+    try {
+      this.reindexFts(kind);
+    } catch {
+      // Mirror drift only costs ranking freshness until the next full reindex.
+    }
+  }
 
   // ---- runs (transactional mutable authority) ----
 
@@ -130,6 +190,7 @@ export class Store {
     const createdAt = parsed.createdAt ?? new Date().toISOString();
     this.db.prepare('INSERT OR REPLACE INTO objects (kind, id, run_id, json, created_at) VALUES (?,?,?,?,?)')
       .run(kind, id, runId, JSON.stringify(parsed), createdAt);
+    this.touchFts(kind);
   }
 
   getObject<K extends ObjectKind>(kind: K, id: string): DomainObject<K> | null {
@@ -166,31 +227,61 @@ export class Store {
   }
 
   /**
-   * Cross-run substring search over researcher-meaningful object text
-   * (B2 universal search): question text, hypothesis statements, claim text.
-   * Case-insensitive for ASCII (SQLite LIKE default), substring for CJK.
-   * Caller validates/clamps the query; results are schema-validated on read.
+   * Cross-run search over researcher-meaningful object text (B2 universal
+   * search; FTS5 upgrade D-101): SQLite's built-in full-text engine gives
+   * bm25 relevance ranking and snippet() highlighting with ZERO new
+   * dependencies (ENABLE_FTS5 verified on the Node 24 runtime). unicode61
+   * tokenizes CJK runs as sequences, so CJK queries match too; any tokenized
+   * miss falls back to the original LIKE substring path (which also keeps
+   * pre-FTS5 Node runtimes honest). Results carry { runId, id, text, snippet,
+   * rank } — the API layer keeps its shape; snippets/rank ride along.
    */
   searchText(
     q: string,
     limits: { questions: number; hypotheses: number; claims: number },
-  ): { questions: { runId: string; id: string; text: string }[]; hypotheses: { runId: string; id: string; text: string }[]; claims: { runId: string; id: string; text: string }[] } {
-    const esc = q.replace(/[\\%_]/g, (c) => `\\${c}`);
-    const like = `%${esc}%`;
-    const fetch = (kind: 'question' | 'hypothesis' | 'claim', limit: number): { runId: string; id: string; text: string }[] =>
-      limit <= 0
-        ? []
-        : this.db
-            .prepare(
-              "SELECT run_id, id, json FROM objects WHERE kind=? AND json LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",
-            )
-            .all(kind, like, limit)
-            .map((r) => {
-              const parsed = KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as unknown as {
-                id: string; runId?: string; text?: string; statement?: string;
-              };
-              return { runId: String(r.run_id), id: String(r.id), text: String(parsed.text ?? parsed.statement ?? '') };
-            });
+  ): {
+    questions: SearchHit[]; hypotheses: SearchHit[]; claims: SearchHit[];
+  } {
+    this.ensureFts();
+    interface Row { run_id: string; id: string; json: string; snippet?: string; rank?: number }
+    const fetch = (kind: 'question' | 'hypothesis' | 'claim', limit: number): SearchHit[] => {
+      if (limit <= 0) return [];
+      const parse = (r: Row): SearchHit => {
+        const parsed = KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as unknown as {
+          id: string; runId?: string; text?: string; statement?: string;
+        };
+        return {
+          runId: String(r.run_id), id: String(r.id),
+          text: String(parsed.text ?? parsed.statement ?? ''),
+          ...(r.snippet !== undefined ? { snippet: String(r.snippet) } : {}),
+          ...(r.rank !== undefined ? { rank: Number(r.rank) } : {}),
+        };
+      };
+      // 1) FTS5 path: rank by bm25, snippet around the match column.
+      // NOTE: snippet()'s column argument is an INTEGER INDEX (kind=0,
+      // obj_id=1, body=2) — a column-name expression silently resolves to 0
+      // and snippets the wrong column (live-isolated during D-101).
+      const ftsQuery = `"${q.replace(/"/g, '""')}"`; // phrase — substring semantics preserved per token run
+      try {
+        const rows = this.db.prepare(
+          `SELECT o.run_id AS run_id, o.id, o.json, snippet(far_search, 2, '«', '»', '…', 12) AS snippet, rank
+             FROM far_search f JOIN objects o ON o.id = f.obj_id AND o.kind = f.kind
+            WHERE far_search MATCH ? AND f.kind = ?
+            ORDER BY rank LIMIT ?`,
+        ).all(ftsQuery, kind, limit) as unknown as Row[];
+        if (rows.length > 0) return rows.map(parse);
+      } catch {
+        // FTS5 unavailable (pre-Node-24 runtime) — fall through to LIKE below.
+      }
+      // 2) LIKE fallback (and FTS-miss safety net for odd tokenization).
+      const esc = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+      const rows = this.db
+        .prepare(
+          "SELECT run_id, id, json FROM objects WHERE kind=? AND json LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT ?",
+        )
+        .all(kind, `%${esc}%`, limit) as unknown as Row[];
+      return rows.map(parse);
+    };
     // ResearchQuestion carries no runId in its payload, so its objects row is
     // stored under '__none__'; the question->run association lives in the run
     // doc (questionId). Resolve it so search results are navigable to a run.

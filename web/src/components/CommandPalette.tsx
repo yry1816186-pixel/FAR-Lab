@@ -46,6 +46,8 @@ interface Row {
   key: string;
   groupLabel: string;
   text: string;
+  /** FTS snippet with «» markers (D-101) — rendered with hit emphasis. */
+  snippet?: string;
   /** Secondary line (e.g. object id for search hits) — muted, never primary. */
   hint?: string;
   execute: () => void;
@@ -140,7 +142,13 @@ export function CommandPalette({
     }));
     if (search === undefined || query.trim().length < 2) return cmdRows;
     const hitRows = (hits: SearchResponse['questions'], groupLabel: string, execute: (hit: SearchResponse['questions'][number]) => void): Row[] =>
-      hits.map((h) => ({ key: `${groupLabel}-${h.id}`, groupLabel, text: clip(h.text), hint: h.id, execute: () => execute(h) }));
+      hits.map((h) => ({
+        key: `${groupLabel}-${h.id}`, groupLabel,
+        text: clip(h.text),
+        ...(h.snippet !== undefined ? { snippet: clip(h.snippet) } : {}),
+        hint: h.id,
+        execute: () => execute(h),
+      }));
     return [
       ...cmdRows,
       ...hitRows(results?.questions ?? [], t('palette.searchRuns'), (h) => search.navigate.run(h.runId)),
@@ -162,6 +170,10 @@ export function CommandPalette({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent): void => {
+      // IME guard (ported from cmdk v1.1.1): while a Chinese/Japanese/Korean
+      // composition is in progress, Enter confirms the composition — it must
+      // NOT execute the highlighted row (the classic double-trigger bug).
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -211,7 +223,14 @@ export function CommandPalette({
         onMouseEnter={() => setIndex(i)}
         onClick={() => { onClose(); row.execute(); }}
       >
-        <span className="palette-item-text">{row.text}</span>
+        <span className="palette-item-text">
+          {row.snippet !== undefined
+            ? row.snippet.split(/(«[^»]*»)/g).map((part, i) =>
+                part.startsWith('«') && part.endsWith('»')
+                  ? <mark key={i} className="palette-hit">{part.slice(1, -1)}</mark>
+                  : <span key={i}>{part}</span>)
+            : row.text}
+        </span>
         {row.hint !== undefined && <span className="palette-item-hint muted small">{row.hint}</span>}
       </li>,
     );
