@@ -48,7 +48,7 @@ const specJson = (runId: string, hypId: string, csvPath: string): string => JSON
     { name: 'logistic', builderId: 'logistic_regression', hyperparams: {}, seed: 7 },
   ],
   metrics: ['accuracy'],
-  comparisons: [{ id: 'cmp', metricKey: 'accuracy', kind: 'paired_diff', modelAIdx: 1, modelBIdx: 0, direction: 'above', threshold: 0, thresholdProvenance: 'model-stipulated', hypothesisId: hypId, primary: true }],
+  comparisons: [{ id: 'cmp', metricKey: 'accuracy', kind: 'paired_diff', modelAIdx: 1, modelBIdx: 0, direction: 'above', threshold: 0, thresholdProvenance: 'model-stipulated', hypothesisId: hypId, primary: true, mde: 0.3 }],
   statistics: { test: 'paired_bootstrap_ci', alpha: 0.05, nBoot: 200, analysisSeed: 11, ciLevel: 0.95 },
   approvals: [{ hypothesisId: hypId, comparisonIds: ['cmp'], decisionRuleSnapshot: 'diff > 0', approvedBy: 'cli-test', approvedAt: new Date().toISOString() }],
   createdAt: new Date().toISOString(),
@@ -56,7 +56,8 @@ const specJson = (runId: string, hypId: string, csvPath: string): string => JSON
 
 const fixtureCsv = (): string => {
   const rows = ['x0,label'];
-  for (let i = 0; i < 30; i += 1) {
+  // 100 data rows => nTest=30 at the 0.3 test ratio — the g5 confirmatory floor.
+  for (let i = 0; i < 50; i += 1) {
     rows.push(`${2 + (i % 8) * 0.1},pos`);
     rows.push(`${0.1 + (i % 6) * 0.1},neg`);
   }

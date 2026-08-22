@@ -92,3 +92,72 @@ describe('MCP stdio client (real child process)', () => {
     await expect(client.listTools()).rejects.toThrow(/not connected/);
   });
 });
+
+// ---- Wave-S/v2-tools-sandbox: pagination + list_changed (two real defects, main-agent verified) ----
+
+const PAGINATING_SERVER = `
+const readline = require('node:readline');
+const send = (id, result) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n');
+const notify = (method) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method }) + '\\n');
+const rl = readline.createInterface({ input: process.stdin });
+rl.on('line', (line) => {
+  const trimmed = line.trim();
+  if (!trimmed) return;
+  let msg;
+  try { msg = JSON.parse(trimmed); } catch { return; }
+  if (msg.method === 'initialize') {
+    send(msg.id, { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: 'paged-mcp', version: '0.0.1' } });
+    // real servers push list_changed after registration/hot-reload; emit right after init
+    setTimeout(() => notify('notifications/tools/list_changed'), 50);
+  } else if (msg.method === 'tools/list') {
+    const cursor = msg.params && msg.params.cursor;
+    if (!cursor) {
+      send(msg.id, {
+        tools: [
+          { name: 'alpha', description: 'page 1', inputSchema: { type: 'object' } },
+          { name: 'echo', description: 'repeated across pages', inputSchema: { type: 'object' } },
+        ],
+        nextCursor: 'page2',
+      });
+    } else if (cursor === 'page2') {
+      send(msg.id, {
+        tools: [
+          { name: 'echo', description: 'REPEAT — must dedupe', inputSchema: { type: 'object' } },
+          { name: 'beta', description: 'page 2', inputSchema: { type: 'object' } },
+        ],
+      });
+    } else {
+      send(msg.id, { tools: [] });
+    }
+  } else {
+    send(msg.id, { tools: [] });
+  }
+});
+`;
+
+const pagedScriptPath = path.join(path.dirname(scriptPath), 'paged-server.cjs');
+fs.writeFileSync(pagedScriptPath, PAGINATING_SERVER);
+
+describe('MCP client pagination + tools/list_changed (real child process)', () => {
+  it('follows nextCursor pages and dedupes repeated tool names (silent-truncation defect)', async () => {
+    const client = new McpStdioClient({ command: process.execPath, args: [pagedScriptPath], timeoutMs: 5000 });
+    clients.push(client);
+    await client.connect();
+    const tools = await client.listTools();
+    const names = tools.map((t) => t.name);
+    expect(names).toEqual(['alpha', 'echo', 'beta']);
+  });
+
+  it('notifications/tools/list_changed reaches subscribers (previously dropped at the dispatch guard)', async () => {
+    const client = new McpStdioClient({ command: process.execPath, args: [pagedScriptPath], timeoutMs: 5000 });
+    clients.push(client);
+    let fired = 0;
+    const unsubscribe = client.onToolsChanged(() => { fired += 1; });
+    await client.connect();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(fired).toBe(1);
+    unsubscribe();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(fired).toBe(1); // unsubscribed handlers stop firing
+  });
+});

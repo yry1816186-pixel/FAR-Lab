@@ -98,6 +98,15 @@ export const executeRemoteExperiment = async (
   try {
     // 1. Data identity locally; ship raw CSV + split assignment to the device.
     const { record, parsed } = await acquireDataset(store, artifacts, spec.runId, use);
+    // Wave-S/s2 #6 (g5) post-acquisition re-check (nRows known → nTest + MDE floors apply).
+    const postAcquisition = checkExperimentSpec(validated, {
+      hypothesisIds: hypotheses.map((h) => h.id),
+      allowLocalDatasets: opts.allowLocalDatasets,
+      nRows: record.nRows,
+    });
+    if (!postAcquisition.passed) {
+      throw new Error(`spec failed post-acquisition statistical gate: ${postAcquisition.missing.join('; ')}`);
+    }
     const outcome: SplitOutcome = applySplit(parsed.header, parsed.rows, {
       datasetRecordId: record.id, datasetContentRef: record.contentRef,
       targetColumn: use.targetColumn, split: use.split, groupColumn: use.groupColumn,

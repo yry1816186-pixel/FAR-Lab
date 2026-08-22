@@ -85,7 +85,7 @@ const makeSpec = (runId: string, csvPath: string, hypothesisId: string): Experim
     id: 'cmp-primary', metricKey: 'accuracy', kind: 'paired_diff',
     modelAIdx: 1, modelBIdx: 0, direction: 'above', threshold: 0,
     thresholdProvenance: 'model-stipulated', hypothesisId: hypothesisId as ExperimentSpec['comparisons'][number]['hypothesisId'],
-    primary: true,
+    primary: true, mde: 0.3,
   }],
   statistics: { test: 'paired_bootstrap_ci', alpha: 0.05, nBoot: 500, analysisSeed: 11, ciLevel: 0.95 },
   compute: { device: 'local', maxParallel: 1, timeoutMs: 120_000 },

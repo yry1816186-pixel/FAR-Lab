@@ -44,7 +44,8 @@ const makeHyp = (runId: string) =>
 
 const fixtureCsv = (): string => {
   const rows = ['x0,label'];
-  for (let i = 0; i < 40; i += 1) {
+  // 100 data rows => nTest=30 at the 0.3 test ratio — the g5 confirmatory floor.
+  for (let i = 0; i < 50; i += 1) {
     rows.push(`${2 + (i % 9) * 0.1},pos`);
     rows.push(`${0.1 + (i % 7) * 0.1},neg`);
   }
@@ -60,7 +61,7 @@ const makeSpec = (runId: string, csvPath: string, hypothesisId: string, variant 
     { name: 'logistic', builderId: 'logistic_regression', hyperparams: {}, seed: 7 + variant, tags: [] },
   ],
   metrics: ['accuracy'],
-  comparisons: [{ id: 'cmp', metricKey: 'accuracy', kind: 'paired_diff', modelAIdx: 1, modelBIdx: 0, direction: 'above', threshold: 0, thresholdProvenance: 'model-stipulated', hypothesisId: hypothesisId as never, primary: true }],
+  comparisons: [{ id: 'cmp', metricKey: 'accuracy', kind: 'paired_diff', modelAIdx: 1, modelBIdx: 0, direction: 'above', threshold: 0, thresholdProvenance: 'model-stipulated', hypothesisId: hypothesisId as never, primary: true, mde: 0.3 }],
   statistics: { test: 'paired_bootstrap_ci', alpha: 0.05, nBoot: 200, analysisSeed: 11, ciLevel: 0.95 },
   compute: { device: 'local', maxParallel: 1, timeoutMs: 120_000 },
   approvals: [{ hypothesisId: hypothesisId as never, comparisonIds: ['cmp'], decisionRuleSnapshot: 'diff > 0', approvedBy: 'op', approvedAt: new Date().toISOString() }],

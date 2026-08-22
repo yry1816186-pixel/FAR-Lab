@@ -71,14 +71,35 @@ export class McpStdioClient {
   }
 
   async listTools(): Promise<McpToolInfo[]> {
-    const res = await this.request('tools/list', {}) as { tools?: unknown };
-    const parsed = z.array(z.object({
-      name: z.string().min(1),
-      description: z.string().optional(),
-      inputSchema: z.unknown().optional(),
-    })).safeParse(res?.tools);
-    if (!parsed.success) throw new Error(`mcp: tools/list returned unexpected shape: ${parsed.error.issues[0]?.message}`);
-    return parsed.data;
+    // MCP tools/list is CURSOR-PAGINATED (nextCursor per spec) — a single request silently
+    // truncates paginated servers. Loop pages, dedupe repeated names across pages.
+    const pageSchema = z.object({
+      tools: z.array(z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        inputSchema: z.unknown().optional(),
+      })),
+      nextCursor: z.string().min(1).optional(),
+    });
+    const tools: McpToolInfo[] = [];
+    const seen = new Set<string>();
+    let cursor: string | undefined;
+    for (let page = 0; ; page += 1) {
+      if (page > 100) throw new Error('mcp: tools/list pagination exceeded 100 pages — aborting (server-side pagination bug)');
+      const res = await this.request('tools/list', cursor === undefined ? {} : { cursor });
+      const parsed = pageSchema.safeParse(res);
+      if (!parsed.success) {
+        throw new Error(`mcp: tools/list page ${page} returned unexpected shape: ${parsed.error.issues[0]?.message}`);
+      }
+      for (const tool of parsed.data.tools) {
+        if (seen.has(tool.name)) continue;
+        seen.add(tool.name);
+        tools.push(tool);
+      }
+      cursor = parsed.data.nextCursor;
+      if (cursor === undefined) break;
+    }
+    return tools;
   }
 
   async callTool(name: string, args: unknown): Promise<{ ok: boolean; content: unknown; isError: boolean }> {
@@ -137,7 +158,11 @@ export class McpStdioClient {
       } catch {
         continue; // non-protocol stderr-style noise on stdout is ignored (server contract)
       }
-      if (!('id' in msg) || this.isRequest(msg)) continue; // server->client requests unsupported (narrow surface)
+      if (!('id' in msg)) {
+        this.handleNotification(msg);
+        continue;
+      }
+      if (this.isRequest(msg)) continue; // server->client requests unsupported (narrow surface)
       const waiter = this.pending.get(msg.id);
       if (waiter === undefined) continue;
       clearTimeout(waiter.timer);
@@ -149,6 +174,27 @@ export class McpStdioClient {
 
   private isRequest(m: JsonRpcMessage): m is JsonRpcRequest {
     return 'method' in m && 'id' in m;
+  }
+
+  private readonly toolsChangedHandlers = new Set<() => void>();
+
+  /** Subscribe to `notifications/tools/list_changed` (MCP spec); returns an unsubscribe fn.
+   * Registrars use this to re-run listTools when a server's toolset changes. */
+  onToolsChanged(handler: () => void): () => void {
+    this.toolsChangedHandlers.add(handler);
+    return () => {
+      this.toolsChangedHandlers.delete(handler);
+    };
+  }
+
+  /** Notifications (messages WITHOUT id) were previously dropped wholesale — the
+   * tools/list_changed signal never reached anyone, so server-side tool updates went
+   * unnoticed for the whole session. Route them; unknown notifications stay ignored
+   * (forward-compatible per spec). */
+  private handleNotification(msg: { jsonrpc: '2.0'; method: string; params?: unknown }): void {
+    if (msg.method === 'notifications/tools/list_changed') {
+      for (const handler of this.toolsChangedHandlers) handler();
+    }
   }
 
   private failAll(error: Error): void {
