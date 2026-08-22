@@ -18,7 +18,7 @@ export function EventsTab({ run, events }: { run: ResearchRun; events: EventsSta
   const shown = ordered.slice(0, MAX_RENDER);
 
   return (
-    <div className="tab-content">
+    <>
       <p className="muted small">{t('events.intro')}</p>
       {events.error !== null && <p className="callout callout--warn small">{events.error}</p>}
       {run.status === 'running' || run.status === 'queued' ? (
@@ -59,7 +59,7 @@ export function EventsTab({ run, events }: { run: ResearchRun; events: EventsSta
           </ol>
         </>
       )}
-    </div>
+    </>
   );
 }
 

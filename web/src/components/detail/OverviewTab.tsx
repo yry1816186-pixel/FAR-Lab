@@ -12,20 +12,25 @@ import { StageTimeline } from './StageTimeline';
 import { RunControls } from './RunControls';
 import { RunStatusBanner } from './RunStatusBanner';
 import { ActivityFeed } from './ActivityFeed';
+import { ResearchSummary } from './ResearchSummary';
 import type { FeedbackTarget } from './FeedbackForm';
 import { stageKey, goalTypeKey } from '../../i18n/keys';
 import type { EventsState } from '../RunDetail';
+import type { TabId } from '../RunDetail';
 
 export function OverviewTab({
   run,
   events,
   onMutated,
   onFeedback,
+  onNavigate,
 }: {
   run: ResearchRun;
   events: EventsState;
   onMutated: () => void;
   onFeedback: (target?: FeedbackTarget) => void;
+  /** Section navigation for the landing summary's deep links. */
+  onNavigate: (tab: TabId) => void;
 }): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
@@ -41,8 +46,15 @@ export function OverviewTab({
   const failedStages = run.stages.filter((s) => s.state === 'failed');
 
   return (
-    <div className="tab-content">
+    <>
       <RunStatusBanner run={run} onMutated={onMutated} />
+      {/* Landing answer: for a settled study, "what came of it" leads —
+          leading hypothesis, standing with uncertainty, corpus counts. */}
+      <ResearchSummary
+        run={run}
+        onOpenHypotheses={() => onNavigate('hypotheses')}
+        onOpenEvidence={() => onNavigate('evidence')}
+      />
       <Section title={t('activity.title')} count={<span className="muted small">{t('activity.liveHint')}</span>}>
         <ActivityFeed run={run} events={events.events} />
       </Section>
@@ -110,7 +122,6 @@ export function OverviewTab({
       <Section title={t('overview.timeline')}>
         <StageTimeline run={run} />
       </Section>
-
       <Section title={t('overview.controls')}>
         <RunControls run={run} hasFeedback={hasFeedback} onMutated={onMutated} />
         <div className="feedback-block">
@@ -121,7 +132,7 @@ export function OverviewTab({
           </button>
         </div>
       </Section>
-    </div>
+    </>
   );
 }
 

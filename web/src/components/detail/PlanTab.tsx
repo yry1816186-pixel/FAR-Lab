@@ -29,7 +29,7 @@ export function PlanTab({
   const res = useResource(fetcher, [run.id], `${run.updatedAt}:${run.status}`);
 
   return (
-    <div className="tab-content">
+    <>
       {res.loading ? (
         <Skeleton lines={6} />
       ) : res.error !== null && isNotFound(res.error) ? (
@@ -54,7 +54,7 @@ export function PlanTab({
       ) : (
         <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(stageKey(run.currentStage)) })} />
       )}
-    </div>
+    </>
   );
 }
 

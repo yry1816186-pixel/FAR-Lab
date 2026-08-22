@@ -1492,3 +1492,160 @@ select option { color: var(--text); background: var(--surface); }
 
 /* D-101 FTS search hit emphasis in palette rows. */
 .palette-hit { background: transparent; color: inherit; font-weight: 700; text-decoration: underline; text-decoration-color: var(--v2-info); text-underline-offset: 2px; }
+
+/* ============================================================
+   Product rebuild (2026-08): research page header, segmented
+   navigation, library sidebar, research summary. Extends the
+   evidence-typography system — chrome stays neutral, statement
+   voice leads, color remains evidence-only.
+   ============================================================ */
+
+/* ---------- research page header ---------- */
+.run-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4) 0 var(--sp-4);
+  border-bottom: 1px solid var(--v2-border);
+  margin-bottom: var(--sp-2);
+}
+.run-header-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  font-size: var(--fs-aux);
+}
+.run-header-domain {
+  color: var(--v2-text-2);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--sp-2);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-header-id { color: var(--v2-text-3); font-size: 10.5px; margin-left: auto; }
+.run-header-question {
+  font-family: var(--font-statement);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 30px;
+  letter-spacing: 0.005em;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.run-header-question--pending { color: var(--v2-text-2); font-style: italic; }
+.run-header-progress {
+  margin: 0;
+  font-size: var(--fs-aux);
+  color: var(--v2-text-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.run-header-sep { color: var(--v2-text-3); }
+.run-header-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--v2-info);
+  flex-shrink: 0;
+  animation: run-header-pulse 1.6s ease-in-out infinite;
+}
+@keyframes run-header-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .run-header-pulse { animation: none; opacity: 0.7; } }
+
+/* ---------- segmented section navigation (icons join the underline tabs) ---------- */
+.tab { display: inline-flex; align-items: center; gap: 6px; }
+.tab svg { flex-shrink: 0; opacity: 0.75; }
+.tab--active svg { opacity: 1; }
+
+/* ---------- library sidebar: two-line study entries ---------- */
+.run-item { padding: var(--sp-2) 10px; gap: 4px; }
+.run-item-mid {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--v2-text-2);
+}
+.run-item-mid .progress-track { width: 48px; }
+.run-item-mid .count-progress { gap: 4px; }
+.run-item-live {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--v2-info);
+  flex-shrink: 0;
+  animation: run-header-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .run-item-live { animation: none; } }
+.run-item--active { border-color: var(--v2-info); }
+.runs-more { display: block; text-align: center; padding: var(--sp-1) 0; }
+.run-item .mono { font-size: 10.5px; }
+
+/* ---------- research summary (landing answer for settled studies) ---------- */
+.research-summary .section-body { display: flex; flex-direction: column; gap: var(--sp-2); }
+.summary-top-statement {
+  font-family: var(--font-statement);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: var(--lh-read);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.summary-meta { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.summary-evidence-balance { display: inline-flex; align-items: baseline; gap: 5px; }
+.summary-evidence-balance .ev-glyph { width: 16px; min-height: 16px; line-height: 16px; font-size: 13px; }
+.summary-top-note { margin: 0; max-width: 72ch; }
+.summary-evidence-link { align-self: flex-start; }
+
+/* ---------- raw event audit stream lives one disclosure away ---------- */
+.events-disclosure { margin-top: var(--sp-2); }
+.events-disclosure .muted { color: var(--v2-text-2); }
+
+/* ---------- example question chips (first-run teaching) ---------- */
+.example-questions { display: flex; flex-direction: column; gap: var(--sp-1); }
+.example-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.example-chip {
+  font: inherit;
+  font-size: var(--fs-aux);
+  line-height: 1.4;
+  text-align: left;
+  color: var(--v2-text-2);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--radius-s);
+  padding: var(--sp-1) var(--sp-2);
+  cursor: pointer;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.example-chip:hover { border-color: var(--v2-form-border); color: var(--v2-text-1); }
+.example-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+/* ---------- evidence overview strip ---------- */
+.evidence-overview {
+  display: flex;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
+  padding: var(--sp-2) 0 var(--sp-1);
+  border-bottom: 1px solid var(--v2-border);
+  margin-bottom: var(--sp-1);
+}
+.evidence-stat { display: flex; align-items: baseline; gap: var(--sp-2); }
+.evidence-stat-num { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.evidence-stat-label { font-size: var(--fs-aux); color: var(--v2-text-2); display: inline-flex; align-items: baseline; gap: 3px; }
+.evidence-stat-label .ev-glyph { width: 14px; min-height: 14px; line-height: 14px; font-size: 12px; }
+
+/* ---------- global craft details ---------- */
+/* CJK/Latin automatic 1/4-em spacing (progressive enhancement, Chrome 140+/Safari 18.4+) */
+@supports (text-autospace: ideograph-alpha) {
+  body { text-autospace: ideograph-alpha ideograph-numeric; }
+}
+/* Section navigation hover affordance (row-style, Raycast-like quiet lift) */
+.tab { border-radius: var(--radius-s) var(--radius-s) 0 0; }
+.tab:hover { background: var(--v2-surface-2); }

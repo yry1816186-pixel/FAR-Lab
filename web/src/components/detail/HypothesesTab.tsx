@@ -113,7 +113,7 @@ export function HypothesesTab({
       : [];
 
   return (
-    <div className="tab-content">
+    <>
       {res.loading ? (
         <Skeleton lines={6} />
       ) : res.error !== null && isNotFound(res.error) ? (
@@ -179,7 +179,7 @@ export function HypothesesTab({
           </Section>
         </>
       )}
-    </div>
+    </>
   );
 }
 

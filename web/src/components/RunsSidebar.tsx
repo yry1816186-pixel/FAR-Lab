@@ -39,11 +39,12 @@ export function RunListItem({
   onSelect: (id: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
+  const active = run.status === 'running' || run.status === 'queued';
   return (
     <li>
       <button
         type="button"
-        className={`run-item${selected ? ' run-item--selected' : ''}`}
+        className={`run-item${selected ? ' run-item--selected' : ''}${active ? ' run-item--active' : ''}`}
         onClick={() => onSelect(run.id)}
         aria-current={selected ? 'true' : undefined}
         // Machine id is metadata (B1 F-09): available on hover and in the
@@ -54,23 +55,26 @@ export function RunListItem({
           <span className="run-item-question" title={runLabel(run)}>{runLabel(run)}</span>
           <Badge tone={runStatusTone(run.status)}>{t(runStatusKey(run.status))}</Badge>
         </span>
+        {/* Two-line rhythm (product rebuild): what a researcher needs at a glance.
+            Active studies pulse with their live stage; settled studies show
+            domain + time; failures carry their category forward. */}
         <span className="run-item-mid">
-          <span className="run-item-idline">
-            {run.domain !== undefined && run.domain.length > 0 && (
-              <span className="run-item-domain" title={t('runs.domain')}>{run.domain}</span>
-            )}
-          </span>
-          <span className="run-item-stage">
-            {t('runs.currentStage')}: {t(stageKey(run.currentStage))}
-          </span>
-          {run.progress !== undefined ? (
-            <CountProgress done={run.progress.done} total={run.progress.total} label={t('runs.progress', run.progress)} />
+          {active ? (
+            <>
+              <span className="run-item-live" aria-hidden="true" />
+              <span className="run-item-stage">{t(stageKey(run.currentStage))}</span>
+              {run.progress !== undefined && (
+                <CountProgress done={run.progress.done} total={run.progress.total} label={t('runs.progress', run.progress)} />
+              )}
+            </>
           ) : (
-            <span className="muted small">—</span>
+            <>
+              {run.domain !== undefined && run.domain.length > 0 && (
+                <span className="run-item-domain" title={t('runs.domain')}>{run.domain}</span>
+              )}
+              <TimeText iso={run.createdAt} />
+            </>
           )}
-        </span>
-        <span className="run-item-bottom">
-          <TimeText iso={run.createdAt} />
         </span>
         {run.lastError !== undefined && run.lastError.length > 0 && (
           <span className="run-item-error" title={run.lastError}>
@@ -107,6 +111,9 @@ function matchesQuery(run: RunSummary, q: string, t: (k: DictKey) => string): bo
   );
 }
 
+/** Library section: show the most recent studies by default, expand on demand. */
+const LIBRARY_PREVIEW = 12;
+
 export function RunsList({
   runs,
   loading,
@@ -126,6 +133,7 @@ export function RunsList({
   // by default — it stays reachable and countable, but no longer shouts over
   // the researcher's active work. Selection or filtering re-expands a group.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ 'runs.groupAttention': true });
+  const [libraryExpanded, setLibraryExpanded] = useState(false);
   const filtered = useMemo(
     () => runs.filter((r) => matchesQuery(r, query, t)),
     [runs, query, t],
@@ -171,6 +179,11 @@ export function RunsList({
       )}
       {grouped.map((g) => {
         const open = !isCollapsed(g.key, g.items);
+        const isLibrary = g.key === 'runs.groupDone';
+        const visible = isLibrary && !libraryExpanded && query.length === 0
+          ? g.items.slice(0, LIBRARY_PREVIEW)
+          : g.items;
+        const hiddenCount = g.items.length - visible.length;
         return (
         <section key={g.key} className="runs-group">
           {/* Valid heading pattern (B2-critique F-01): the button lives INSIDE
@@ -187,11 +200,18 @@ export function RunsList({
             </button>
           </h3>
           {open && (
+            <>
             <ul className="runs-list">
-              {g.items.map((run) => (
+              {visible.map((run) => (
                 <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={onSelect} />
               ))}
             </ul>
+            {hiddenCount > 0 && (
+              <button type="button" className="runs-more link-button small" onClick={() => setLibraryExpanded(true)}>
+                {t('runs.showAll', { n: hiddenCount })}
+              </button>
+            )}
+            </>
           )}
         </section>
         );

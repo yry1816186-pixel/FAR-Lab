@@ -45,7 +45,37 @@ export function EvidenceTab({
   const relations = evidenceRes.data?.relations ?? null;
 
   return (
-    <div className="tab-content">
+    <>
+      {/* Evidence overview strip: the corpus at a glance before the tables —
+          counts are the bundle's real objects (no invented metrics). */}
+      {!sourcesRes.loading && !evidenceRes.loading && sourcesRes.error === null && evidenceRes.error === null && (
+        <div className="evidence-overview" aria-label={t('evidence.overviewLabel')}>
+          <div className="evidence-stat">
+            <span className="evidence-stat-num mono">{sourcesRes.data?.length ?? 0}</span>
+            <span className="evidence-stat-label">{t('evidence.statSources')}</span>
+          </div>
+          <div className="evidence-stat">
+            <span className="evidence-stat-num mono">{claims?.length ?? 0}</span>
+            <span className="evidence-stat-label">{t('evidence.statClaims')}</span>
+          </div>
+          <div className="evidence-stat">
+            <span className="evidence-stat-num mono">
+              {relations?.filter((r) => r.relation === 'supports').length ?? 0}
+            </span>
+            <span className="evidence-stat-label">
+              <span className="ev-glyph ev-glyph--verified" aria-hidden="true">✓</span> {t('evidence.statSupporting')}
+            </span>
+          </div>
+          <div className="evidence-stat">
+            <span className="evidence-stat-num mono">
+              {relations?.filter((r) => r.relation === 'contradicts').length ?? 0}
+            </span>
+            <span className="evidence-stat-label">
+              <span className="ev-glyph ev-glyph--refuted" aria-hidden="true">✗</span> {t('evidence.statContradicting')}
+            </span>
+          </div>
+        </div>
+      )}
       {/* B1 reorder: the researcher's substance leads (sources → claims →
           relations); retrieval transparency stays fully available but is a
           collapsed trust disclosure, not the first screen of the tab. */}
@@ -125,7 +155,7 @@ export function EvidenceTab({
           <EmptyState titleKey="retrieval.noCorpus" hint={t('retrieval.noCorpusHint')} />
         )}
       </details>
-    </div>
+    </>
   );
 }
 

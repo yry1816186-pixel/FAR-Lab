@@ -1,5 +1,4 @@
 import { useI18n } from '../i18n/LanguageContext';
-import { LogoMark } from './Logo';
 import { NewRunForm } from './NewRunForm';
 import { healthProjection, useHealth } from '../hooks/useHealth';
 import { runStatusTone } from '../tones';
@@ -38,7 +37,6 @@ export function WelcomeView({
   return (
     <div className="welcome arrive">
       <div className="welcome-hero">
-        <LogoMark size={72} />
         <h1 className="welcome-title">{t('app.title')}</h1>
         <p className="welcome-subtitle muted">{t('welcome.subtitle')}</p>
         <div className={`health-strip health-strip--${hp.tone}`} role="status">

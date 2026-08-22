@@ -547,8 +547,16 @@ function parseSeedSources(raw: unknown): string | {
     // computation as the CLI status command.
     const lease = app.store.getRunLease(runId);
     const leaseLive = lease.holder !== null && (lease.expiresAt ?? '') > new Date().toISOString();
+    // Researcher identity projection (same semantics as listRuns): the detail
+    // endpoint feeds the research page header, which leads with the question
+    // the researcher actually asked — not the machine id.
+    const question = app.store.getObject('question', run.questionId);
+    const questionText = question !== null && question.text.trim().length > 0 ? question.text : undefined;
+    const domain = question !== null && question.scope.domain.trim().length > 0 ? question.scope.domain : undefined;
     sendJson(res, 200, {
       ...run,
+      ...(questionText !== undefined ? { questionText } : {}),
+      ...(domain !== undefined ? { domain } : {}),
       leaseInfo: { holder: lease.holder, expiresAt: lease.expiresAt ?? null, live: leaseLive },
     });
   };

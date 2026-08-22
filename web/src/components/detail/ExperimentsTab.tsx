@@ -36,7 +36,7 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
   const reports = data?.statReports ?? [];
 
   return (
-    <div className="tab-content">
+    <>
       <p className="muted small">
         {t('exp.intro')} <code>far experiment run|status|cancel</code>。
         <button type="button" className="btn btn--sm" onClick={res.retry} style={{ marginLeft: 8 }}>
@@ -117,6 +117,6 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
           </section>
         );
       })}
-    </div>
+    </>
   );
 }

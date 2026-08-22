@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { FileSearch, FlaskConical, History, Lightbulb, ListChecks, ShieldCheck } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import type { ResearchRun, RunEvent } from '../api/types';
+import { RunHeader } from './detail/RunHeader';
 import { OverviewTab } from './detail/OverviewTab';
 import { EvidenceTab } from './detail/EvidenceTab';
 import { HypothesesTab } from './detail/HypothesesTab';
@@ -14,22 +17,37 @@ import { FeedbackDrawer } from './detail/FeedbackDrawer';
 import type { FeedbackTarget } from './detail/FeedbackForm';
 import { ExperimentsTab } from './detail/ExperimentsTab';
 
-export type TabId = 'overview' | 'evidence' | 'hypotheses' | 'plan' | 'experiments' | 'revisions' | 'provenance' | 'events';
+/**
+ * Research page information architecture (2026-08 product rebuild): the eight
+ * pipeline-projection tabs collapse into six task-oriented sections that match
+ * the researcher's mental model. Old hash routes keep working — LEGACY_TABS
+ * redirects them (shareable links from earlier versions never break).
+ */
+export type TabId = 'research' | 'evidence' | 'hypotheses' | 'plan' | 'revisions' | 'verify';
 
-/** Route strings come from the URL — validate before casting to TabId. */
-export function isTabId(v: string): v is TabId {
-  return ['overview', 'evidence', 'hypotheses', 'plan', 'experiments', 'revisions', 'provenance', 'events'].includes(v);
+const TAB_IDS: readonly TabId[] = ['research', 'evidence', 'hypotheses', 'plan', 'revisions', 'verify'];
+
+/** Pre-rebuild tab ids -> current sections (hash-route compatibility). */
+const LEGACY_TABS: Record<string, TabId> = {
+  overview: 'research',
+  events: 'research',
+  experiments: 'plan',
+  provenance: 'verify',
+};
+
+/** Route strings come from the URL — resolve (incl. legacy ids) before casting to TabId. */
+export function resolveTabId(v: string): TabId | null {
+  if ((TAB_IDS as readonly string[]).includes(v)) return v as TabId;
+  return LEGACY_TABS[v] ?? null;
 }
 
-const TABS: { id: TabId; labelKey: DictKey }[] = [
-  { id: 'overview', labelKey: 'tab.overview' },
-  { id: 'evidence', labelKey: 'tab.evidence' },
-  { id: 'hypotheses', labelKey: 'tab.hypotheses' },
-  { id: 'plan', labelKey: 'tab.plan' },
-  { id: 'experiments', labelKey: 'tab.experiments' },
-  { id: 'revisions', labelKey: 'tab.revisions' },
-  { id: 'provenance', labelKey: 'tab.provenance' },
-  { id: 'events', labelKey: 'tab.events' },
+const TABS: { id: TabId; labelKey: DictKey; Icon: LucideIcon }[] = [
+  { id: 'research', labelKey: 'tab.research', Icon: FlaskConical },
+  { id: 'evidence', labelKey: 'tab.evidence', Icon: FileSearch },
+  { id: 'hypotheses', labelKey: 'tab.hypotheses', Icon: Lightbulb },
+  { id: 'plan', labelKey: 'tab.plan', Icon: ListChecks },
+  { id: 'revisions', labelKey: 'tab.revisions', Icon: History },
+  { id: 'verify', labelKey: 'tab.verify', Icon: ShieldCheck },
 ];
 
 export interface EventsState {
@@ -87,7 +105,7 @@ export function RunDetail({
   onClaimFocused?: () => void;
 }): JSX.Element {
   const { t } = useI18n();
-  const [tabId, setTabIdState] = useState<TabId>(tab ?? 'overview');
+  const [tabId, setTabIdState] = useState<TabId>(tab ?? 'research');
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const setTabId = (next: TabId): void => {
@@ -100,10 +118,10 @@ export function RunDetail({
   const [feedbackTarget, setFeedbackTarget] = useState<FeedbackTarget | null | undefined>(undefined);
   const openFeedback = (target?: FeedbackTarget): void => setFeedbackTarget(target ?? null);
 
-  // Run switch resets to the overview tab and closes the drawer. A route-named
+  // Run switch resets to the research tab and closes the drawer. A route-named
   // tab wins over the default on the next render (controlled tab effect below).
   useEffect(() => {
-    setTabIdState(tab ?? 'overview');
+    setTabIdState(tab ?? 'research');
     setFeedbackTarget(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run-switch only; later `tab` values flow through the controlled effect
   }, [run.id]);
@@ -172,21 +190,37 @@ export function RunDetail({
 
   const renderPanel = (): ReactNode => {
     switch (tabId) {
-      case 'overview': return <OverviewTab run={run} events={events} onMutated={onMutated} onFeedback={openFeedback} />;
+      case 'research':
+        return (
+          <>
+            <OverviewTab run={run} events={events} onMutated={onMutated} onFeedback={openFeedback} onNavigate={setTabId} />
+            {/* The raw event stream stays one disclosure away (audit-grade
+                transparency without making it the researcher's daily view). */}
+            <details className="tech-details events-disclosure">
+              <summary>{t('events.disclosureTitle')}</summary>
+              <EventsTab run={run} events={events} />
+            </details>
+          </>
+        );
       case 'evidence': return <EvidenceTab run={run} onFeedback={openFeedback} onOpenHypotheses={() => setTabId('hypotheses')} />;
       case 'hypotheses': return (
         <HypothesisTabWithNav run={run} onFeedback={openFeedback} setTabId={setTabId} />
       );
-      case 'plan': return <PlanTab run={run} onFeedback={openFeedback} />;
-      case 'experiments': return <ExperimentsTab run={run} />;
+      case 'plan':
+        return (
+          <>
+            <PlanTab run={run} onFeedback={openFeedback} />
+            <ExperimentsTab run={run} />
+          </>
+        );
       case 'revisions': return <RevisionsTab run={run} />;
-      case 'provenance': return <ProvenanceTab run={run} events={events} onMutated={onMutated} />;
-      case 'events': return <EventsTab run={run} events={events} />;
+      case 'verify': return <ProvenanceTab run={run} events={events} onMutated={onMutated} />;
     }
   };
 
   return (
     <div className="run-detail">
+      <RunHeader run={run} />
       <div className="tabs" role="tablist" aria-label={t('tab.listLabel')}>
         {TABS.map((tab, i) => (
           <button
@@ -202,6 +236,7 @@ export function RunDetail({
             onClick={() => setTabId(tab.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
           >
+            <tab.Icon size={14} aria-hidden="true" />
             {t(tab.labelKey)}
           </button>
         ))}
@@ -213,7 +248,9 @@ export function RunDetail({
         aria-labelledby={`tab-${tabId}`}
         tabIndex={0}
       >
-        {renderPanel()}
+        <div className="tab-content">
+          {renderPanel()}
+        </div>
       </div>
       {feedbackTarget !== undefined && (
         <FeedbackDrawer
