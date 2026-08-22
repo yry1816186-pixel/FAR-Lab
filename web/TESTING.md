@@ -54,8 +54,13 @@
 
 ### 10. 溯源与 bundle 验证 + 报告下载
 - 溯源 tab：receipts 表（kind/执行模式 live·test 徽章/provider/model/延迟/哈希短码/时间），行可展开看 usage/查询/工具明细；非 live 存在时显示黄色警示横幅。
-- Bundle 验证：输入 bundle id（若事件流中出现过 bnd_… 会提供快填 chip），点「验证」→ 渲染 verdict（verified/degraded/failed）+ 10 项检查逐项 PASS/FAIL 与详情；replay 级别另显示重放指引。
+- Bundle 验证：输入 bundle id（D-060 起快填 chip 来自一等 API `GET /runs/:id/bundles`；旧服务器 404 时回退事件流扫描），点「验证」→ 渲染 verdict（verified/degraded/failed）+ 10 项检查逐项 PASS/FAIL 与详情；replay 级别另显示重放指引。
+- 重新导出（D-060）：run 已结算且有 bundle 时出现「重新导出（含最新修订）」按钮；无新于 bundle 的修订时服务端诚实拒绝并显示原因；成功后 bundle chips 刷新出现新 id。
 - 报告：点「下载报告 (.md)」下载 `<runId>.report.md`；「报告预览」展开原始 markdown；报告未生成（export 未完成）时显示阶段感知空态而非报错。
+
+### 10b. 冻结可见性与证据行（D-060 新增）
+- 冻结提示：run 显示「执行中」但 `leaseInfo.live=false` 时，概览出现黄色提示（服务器 watchdog 约一个轮询周期 ~30s 内自动领养续跑；也可手动恢复）——测试法：kill 执行进程后立即查看概览。
+- 证据行前导符：证据 tab claims 列表与关系汇总出现认知状态字形 ✓（已验证/绿）✗（未解析/红）▲（对齐存疑/琥珀）–（缺失/灰）——这是界面中唯一饱和色出现处（§8.3「无彩色界面，彩色即证据」）。
 
 ## 附加状态纪律检查（建议纳入走查）
 - 断连：停掉 API 进程 → 顶部出现红色「API 连接中断 — 自动重试中」横幅，轮询自动继续；重启 API → 横幅消失，数据恢复。不出现假成功。
