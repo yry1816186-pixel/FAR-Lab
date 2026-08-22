@@ -109,8 +109,24 @@ export const ModelSpec = z.object({
   builderId: BuilderId,
   hyperparams: Hyperparams.default({}),
   seed: z.number().int().nonnegative(),
+  /** Ablation/matrix provenance (P2): factor assignments like ['n_estimators=200','depth=full']. */
+  tags: z.array(z.string().min(1)).default([]),
 });
 export type ModelSpec = z.infer<typeof ModelSpec>;
+
+/**
+ * P2 ablation matrix: factors are NAMED hyperparameter-override LEVELS over one base
+ * model — declarative and LLM-safe (no free-form code/values). Full factorial expansion;
+ * the caller includes the base config as a level (typically label 'full', empty override).
+ */
+export const AblationFactor = z.object({
+  name: z.string().min(1),
+  levels: z.array(z.object({
+    label: z.string().min(1),
+    hyperparams: Hyperparams.default({}),
+  })).min(1),
+});
+export type AblationFactor = z.infer<typeof AblationFactor>;
 
 // ---- metrics & comparisons ----
 
@@ -253,6 +269,8 @@ export const ResultCell = z.object({
   perRowRef: z.string().regex(/^sha256:[0-9a-f]{64}$/),
   /** D-086-1: result identity — hash(specHash + dataset contentRef + env identity + modelIdx + seed). Executor dedups on it. */
   fingerprint: z.string().length(64),
+  /** Ablation factor assignments echoed from ModelSpec.tags (P2). */
+  tags: z.array(z.string().min(1)).default([]),
   nTrain: z.number().int().positive(),
   nTest: z.number().int().positive(),
   timingMs: z.number().nonnegative(),
@@ -296,6 +314,10 @@ export const StatReport = z.object({
   /** D-085 P0-1: echoed threshold provenance — must be displayed wherever this report renders. */
   thresholdProvenance: DecisionRuleProvenance,
   verdict: ExperimentVerdict.optional(),
+  /** P2 multiple-testing enforcement: descriptive-only under single_primary; never feeds feedback. */
+  secondary: z.boolean().default(false),
+  /** P2 alpha_spending: the per-comparison adjusted alpha actually used (recorded, never silent). */
+  adjustedAlpha: z.number().positive().max(0.5).optional(),
   /** Human-readable derivation: rule + measured values -> verdict. Auditable, mechanical. */
   verdictDerivation: z.string().optional(),
   exploratory: z.boolean().default(false),
@@ -376,6 +398,12 @@ export const checkExperimentSpec = (
   }
   if (spec.statistics.multipleTestingPolicy !== undefined && primaries.length < 1) {
     missing.push('multipleTestingPolicy set but no primary comparison');
+  }
+  // Fail-closed: the policy enum is shared with plan-level text, but the executor only
+  // implements single_primary + alpha_spending. Declaring e_value_accumulation here is
+  // rejected loudly instead of silently downgraded (zero-theater rule).
+  if (spec.statistics.multipleTestingPolicy === 'e_value_accumulation') {
+    missing.push('multipleTestingPolicy=e_value_accumulation is not implemented in the executor (D-086); use single_primary or alpha_spending');
   }
   // Classification builders + regression metrics is a semantic mismatch the sidecar would only hit mid-run.
   const regressionMetrics: MetricKey[] = ['mean_squared_error', 'r2'];

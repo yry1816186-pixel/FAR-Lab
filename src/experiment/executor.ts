@@ -162,7 +162,7 @@ export const executeExperiment = async (
       }
       const perRowRef = (await artifacts.put(JSON.stringify(res.perRowCorrect))).ref;
       perRowByModel.set(modelIdx, res.perRowCorrect);
-      cells.push({ modelIdx, modelName: model.name, metrics: res.metrics, perRowRef, fingerprint, nTrain: res.nTrain, nTest: res.nTest, timingMs: Date.now() - t0 });
+      cells.push({ modelIdx, modelName: model.name, metrics: res.metrics, perRowRef, fingerprint, tags: model.tags, nTrain: res.nTrain, nTest: res.nTest, timingMs: Date.now() - t0 });
     }
 
     const resultSet: ResultSet = {
@@ -177,16 +177,24 @@ export const executeExperiment = async (
     store.putObjectEvented('result_set', resultSet, { type: 'note', detail: { result_set: resultSet.id, cells: cells.length } }, now());
 
     // 5. Preregistered statistics on the SAME sidecar session, then mechanical verdicts.
+    // P2 multiple-testing enforcement (EVALUATION §10): single_primary => only the primary
+    // comparison is confirmatory (others descriptive, never feed feedback); alpha_spending
+    // => equal Bonferroni-style split over ALL confirmatory comparisons, adjustedAlpha recorded.
     const datasetIteration = priorReports.length + 1;
     const sequential = datasetIteration > 1;
+    const confirmatoryCount = spec.statistics.multipleTestingPolicy === 'alpha_spending'
+      ? spec.comparisons.length
+      : 0;
     const statReports: StatReport[] = [];
     for (const comp of spec.comparisons) {
+      const secondary = spec.statistics.multipleTestingPolicy === 'single_primary' ? !comp.primary : false;
+      const effectiveAlpha = confirmatoryCount > 0 ? spec.statistics.alpha / confirmatoryCount : spec.statistics.alpha;
       let stat: SidecarStatsResult;
       if (comp.kind === 'absolute') {
         const rows = perRowByModel.get(comp.modelIdx ?? -1);
         if (rows === undefined) fail(`comparison ${comp.id}: model ${comp.modelIdx} has no per-row results`);
         const r = await sidecar.call<SidecarStatsResult>('abs_stats', {
-          rows, alpha: spec.statistics.alpha, nBoot: spec.statistics.nBoot, analysisSeed: spec.statistics.analysisSeed,
+          rows, alpha: effectiveAlpha, nBoot: spec.statistics.nBoot, analysisSeed: spec.statistics.analysisSeed,
         }, spec.compute.timeoutMs);
         if (!r.ok || r.result === undefined) fail(r.error?.message ?? 'abs_stats failed');
         stat = r.result;
@@ -197,7 +205,7 @@ export const executeExperiment = async (
         const r = await sidecar.call<SidecarStatsResult>('paired_stats', {
           rowsA, rowsB, diffMode: 'correctness',
           kind: spec.statistics.test === 'paired_t' ? 'paired_t' : 'paired_bootstrap_ci',
-          alpha: spec.statistics.alpha, nBoot: spec.statistics.nBoot, analysisSeed: spec.statistics.analysisSeed,
+          alpha: effectiveAlpha, nBoot: spec.statistics.nBoot, analysisSeed: spec.statistics.analysisSeed,
         }, spec.compute.timeoutMs);
         if (!r.ok || r.result === undefined) fail(r.error?.message ?? 'paired_stats failed');
         stat = r.result;
@@ -220,13 +228,15 @@ export const executeExperiment = async (
         metricKey: comp.metricKey,
         primary: comp.primary,
         pointEstimate: stat.pointEstimate,
-        ci: { level: spec.statistics.ciLevel, low: stat.ci.low, high: stat.ci.high },
+        ci: { level: 1 - effectiveAlpha, low: stat.ci.low, high: stat.ci.high },
         test: { kind: spec.statistics.test, alpha: spec.statistics.alpha, pValue: stat.pValue, nBoot: stat.nBoot },
         effect: stat.effect,
         hypothesisId: comp.hypothesisId,
         hypothesisVersion: hyp?.version,
         thresholdProvenance: comp.thresholdProvenance,
         verdict,
+        secondary,
+        adjustedAlpha: confirmatoryCount > 0 ? effectiveAlpha : undefined,
         verdictDerivation: derivation,
         exploratory: !bound || sequential,
         analysisIteration: datasetIteration,
@@ -236,11 +246,12 @@ export const executeExperiment = async (
       store.putObjectEvented('stat_report', report, { type: 'note', detail: { stat_report: report.id, comparison: comp.id, verdict } }, now());
     }
 
-    // 6. Confirmatory verdicts become feedback signals (exploratory results never revise hypotheses, D-086-6).
+    // 6. Confirmatory verdicts become feedback signals (exploratory results never revise
+    // hypotheses, D-086-6; secondary/descriptive comparisons never do either, P2 policy).
     const feedback: FeedbackSignal[] = [];
     const byHypothesis = new Map<string, StatReport[]>();
     for (const rep of statReports) {
-      if (rep.hypothesisId !== undefined && !rep.exploratory) {
+      if (rep.hypothesisId !== undefined && !rep.exploratory && !rep.secondary) {
         const list = byHypothesis.get(rep.hypothesisId);
         if (list === undefined) byHypothesis.set(rep.hypothesisId, [rep]);
         else list.push(rep);
