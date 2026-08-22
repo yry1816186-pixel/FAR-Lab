@@ -37,6 +37,23 @@ export interface AgentLoopConfig {
   contextEntries?: Array<{ label: string; payload: unknown }>;
   maxTurns?: number;
   budget?: TokenBudget;
+  /**
+   * Dual timeout (Wave-S v2-harness, mastra loop/timeout lineage): per-TURN budget and
+   * TOTAL session budget in ms, enforced cooperatively at turn boundaries, at
+   * model-call return and before tool execution — the in-flight provider call itself is
+   * bounded by the provider plane's own timeout/retry discipline. Distinct statuses
+   * ('step_timeout' | 'total_timeout') keep "one turn hung" separable from "session out
+   * of budget" in the rollout.
+   */
+  stepTimeoutMs?: number;
+  totalTimeoutMs?: number;
+  /**
+   * Composable stop conditions (vercel/ai StopCondition lineage), evaluated at turn
+   * boundaries BEFORE work starts; the first firing condition ends the loop with
+   * status 'stop_condition' and its name in the error. Combine freely — the loop owns
+   * no opinion about what "enough" means.
+   */
+  stopWhen?: readonly LoopStopCondition[];
   /** Capability result contract; finish payloads failing it are fed back (bounded re-asks). */
   resultSchema?: z.ZodType<unknown>;
   maxFinishReasks?: number;
@@ -55,6 +72,31 @@ export interface AgentLoopConfig {
   initialTranscript?: TranscriptEntry[];
   resume?: { priorTurns: number; openTurn?: { turn: number; tool: string; disposition: InterruptedTurnDisposition } };
 }
+
+/** Read-only facts about the session a stop condition may predicate on. */
+export interface LoopStopContext {
+  turn: number;
+  turnsRemaining: number;
+  tokensUsed: number;
+  transcriptTokens: number;
+}
+
+export interface LoopStopCondition {
+  name: string;
+  shouldStop: (ctx: LoopStopContext) => boolean;
+}
+
+/** Hard turn ceiling independent of maxTurns (e.g. capability-tier quotas). */
+export const stopAfterTurns = (n: number): LoopStopCondition => ({
+  name: `turns>=${n}`,
+  shouldStop: (ctx) => ctx.turn >= n,
+});
+
+/** Session token ceiling (sum of receipt usage totals across model calls). */
+export const stopOnTokenBudget = (maxTokens: number): LoopStopCondition => ({
+  name: `tokens>=${maxTokens}`,
+  shouldStop: (ctx) => ctx.tokensUsed >= maxTokens,
+});
 
 export interface AgentLoopDeps {
   provider: ModelProvider;
@@ -79,7 +121,7 @@ export interface AgentLoopDeps {
   clock?: () => string;
 }
 
-export type AgentLoopStatus = 'completed' | 'max_turns' | 'aborted' | 'failed';
+export type AgentLoopStatus = 'completed' | 'max_turns' | 'aborted' | 'failed' | 'step_timeout' | 'total_timeout' | 'stop_condition';
 
 export interface AgentLoopResult {
   status: AgentLoopStatus;
@@ -155,9 +197,26 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
 
   let consecutiveInvalid = 0;
   let finishReasks = 0;
+  let totalTokens = 0;
+  const totalDeadline = cfg.totalTimeoutMs !== undefined ? Date.now() + cfg.totalTimeoutMs : null;
 
   for (let turn = (cfg.resume?.priorTurns ?? 0) + 1; turn <= maxTurns; turn++) {
     if (cfg.shouldAbort?.() === true) return finish('aborted', { error: 'aborted by caller' });
+    if (totalDeadline !== null && Date.now() >= totalDeadline) {
+      return finish('total_timeout', { error: `session exceeded totalTimeoutMs (${cfg.totalTimeoutMs}ms) before turn ${turn}` });
+    }
+    for (const condition of cfg.stopWhen ?? []) {
+      const ctx: LoopStopContext = {
+        turn,
+        turnsRemaining: maxTurns - turn + 1,
+        tokensUsed: totalTokens,
+        transcriptTokens: transcriptTokens(transcript),
+      };
+      if (condition.shouldStop(ctx)) {
+        return finish('stop_condition', { error: `stop condition fired before turn ${turn}: ${condition.name}` });
+      }
+    }
+    const stepDeadline = cfg.stepTimeoutMs !== undefined ? Date.now() + cfg.stepTimeoutMs : null;
 
     const steerText = cfg.steer?.() ?? null;
     if (steerText !== null) {
@@ -228,11 +287,18 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       (raw) => validateStructured<AgentAction>(raw, AgentActionSchema),
     );
     recordModelReceipt(deps.recordReceipt, { stage: deps.purpose }, res);
+    totalTokens += res.receipt.usage.totalTokens ?? 0;
     deps.telemetry.recordModelCall(res.receipt.usage);
     deps.emit({
       type: 'model_call_done', sessionId: deps.sessionId, turn, latencyMs: res.receipt.latencyMs,
       ...(res.receipt.usage.totalTokens !== undefined ? { usage: res.receipt.usage } : {}), at: at(),
     });
+    // Step timeout (cooperative): the model call itself is bounded by the provider plane;
+    // an over-deadline turn ends HERE instead of paying for a tool call it cannot finish.
+    if (stepDeadline !== null && Date.now() >= stepDeadline) {
+      pushTurn({ turn, action: 'tool_error', tool: '-', ok: false, reason: `step timeout ${cfg.stepTimeoutMs}ms` });
+      return finish('step_timeout', { error: `turn ${turn} exceeded stepTimeoutMs (${cfg.stepTimeoutMs}ms) after the model call — not starting the tool phase` });
+    }
 
     if (!res.ok || res.data === undefined) {
       const err = res.error ?? { kind: 'provider_error' as const, message: 'unknown provider failure' };
@@ -321,6 +387,12 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
 
     if (cfg.shouldAbort?.() === true) return finish('aborted', { error: 'aborted by caller' });
     signal.aborted = cfg.shouldAbort?.() === true;
+    // Step timeout before tool spend: a turn already over budget must not pay for tools.
+    if (stepDeadline !== null && Date.now() >= stepDeadline) {
+      pushEntry({ kind: 'tool_result', turn, tool: action.tool, ok: false, payload: { skipped: true, reason: 'step timeout' } });
+      pushTurn({ turn, action: 'tool_error', tool: action.tool, ok: false, reason: `step timeout ${cfg.stepTimeoutMs}ms` });
+      return finish('step_timeout', { error: `turn ${turn} exceeded stepTimeoutMs (${cfg.stepTimeoutMs}ms) before tool execution` });
+    }
 
     const startedMs = Date.now();
     let result: ToolResult;

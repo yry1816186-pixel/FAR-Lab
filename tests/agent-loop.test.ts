@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { runAgentLoop, type AgentLoopConfig, type AgentLoopDeps } from '../src/agent/loop.js';
+import { runAgentLoop, stopAfterTurns, stopOnTokenBudget, type AgentLoopConfig, type AgentLoopDeps } from '../src/agent/loop.js';
 import { ToolRegistry, type AgentTool } from '../src/agent/tool.js';
 import { PermissionEngine } from '../src/agent/permissions.js';
 import { SessionTelemetry } from '../src/agent/telemetry.js';
@@ -245,5 +245,50 @@ describe('agent kernel loop', () => {
     const degradeEvent = events.find((e): e is Extract<AgentEvent, { type: 'compaction' }> => e.type === 'compaction' && e.layer === 'degrade');
     expect(degradeEvent?.tokensAfter).toBeLessThanOrEqual(120);
     expect(degradeEvent?.bySourceAfter).toBeDefined();
+  });
+});
+
+// ---- Wave-S v2-harness: dual timeout + composable stop conditions ----
+
+describe('agent loop dual timeout + stop conditions', () => {
+  it('totalTimeoutMs exhausted ends the session with the distinct total_timeout status', async () => {
+    const { deps } = depsFor([{ rawOutput: useTool('echo', { text: 'x' }) }, { rawOutput: finish({ answer: 'ok' }) }]);
+    const res = await runAgentLoop(baseCfg({ totalTimeoutMs: 0 }), deps);
+    expect(res.status).toBe('total_timeout');
+    expect(res.error).toContain('totalTimeoutMs');
+  });
+
+  it('stepTimeoutMs exceeded after the model call skips the tool phase (step_timeout)', async () => {
+    const { deps } = depsFor([{ rawOutput: useTool('echo', { text: 'x' }) }, { rawOutput: finish({ answer: 'ok' }) }]);
+    const res = await runAgentLoop(baseCfg({ stepTimeoutMs: 0 }), deps);
+    expect(res.status).toBe('step_timeout');
+    expect(res.error).toContain('stepTimeoutMs');
+    // the tool must NOT have executed — an over-budget turn does not pay for tools
+    expect(res.turns.every((t) => t.action !== 'use_tool' || t.ok === undefined)).toBe(true);
+  });
+
+  it('a custom stop condition fires with its name recorded; conditions run before work', async () => {
+    const { deps } = depsFor([{ rawOutput: finish({ answer: 'ok' }) }]);
+    const res = await runAgentLoop(baseCfg({
+      stopWhen: [{ name: 'never-answer-on-turn-1', shouldStop: (ctx) => ctx.turn === 1 }],
+    }), deps);
+    expect(res.status).toBe('stop_condition');
+    expect(res.error).toContain('never-answer-on-turn-1');
+    // nothing ran: no model receipts burned after the condition fired
+    expect(res.turns).toHaveLength(0);
+  });
+
+  it('builtin factories: stopOnTokenBudget uses cumulative receipt tokens', async () => {
+    const { deps } = depsFor([{ rawOutput: finish({ answer: 'ok' }) }]);
+    // threshold 0 fires before turn 1 regardless of the stub's usage numbers
+    const res = await runAgentLoop(baseCfg({ stopWhen: [stopOnTokenBudget(0)] }), deps);
+    expect(res.status).toBe('stop_condition');
+    expect(res.error).toContain('tokens>=0');
+  });
+
+  it('unfired conditions never interfere with a normal completed session', async () => {
+    const { deps } = depsFor([{ rawOutput: finish({ answer: 'ok' }) }]);
+    const res = await runAgentLoop(baseCfg({ stepTimeoutMs: 60_000, totalTimeoutMs: 60_000, stopWhen: [stopAfterTurns(99)] }), deps);
+    expect(res.status).toBe('completed');
   });
 });

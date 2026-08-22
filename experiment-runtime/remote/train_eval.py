@@ -1,7 +1,12 @@
 """Reviewed remote training template (D-086-5): the ONLY code that runs on remote
 devices. The orchestrator ships data + this file + a JSON payload; it returns metrics
 and per-row correctness. Encoding is fitted on the train split only (D-086-10).
-No user/LLM-supplied code executes remotely."""
+No user/LLM-supplied code executes remotely.
+
+Target-side container discipline (Wave-S ag2, DockerSandbox lineage): run the SSH
+device container with `--network none --memory 512m --rm` and let the orchestrator's
+remote `timeout` wrapper (TERM→SIGKILL, exit 124/137) own lifecycle — no egress,
+bounded memory, guaranteed teardown."""
 import csv
 import json
 import sys

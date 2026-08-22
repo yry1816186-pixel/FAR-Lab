@@ -462,6 +462,9 @@ const buildReport = (d: ExportInputs, missingItems: string[]): string => {
   // ---- 7a. executed experiment results (EEL, D-081) ----
   if (d.experimentRuns.length > 0) {
     push('### 7a. 实验执行结果（真实运行）', '');
+    // g11 (VerifiedRegistry-lite): every number below renders field-by-field from
+    // persisted experiment objects — no LLM-generated numerics in this section.
+    push('> 数值溯源：本节所有数值逐字段渲染自持久化实验对象（result_set / stat_report），无 LLM 生成数值。', '');
     for (const xr of d.experimentRuns) {
       push(`- 实验 ${xr.id}：${xr.status}（executor=${xr.executor}；spec=${xr.specId}@${xr.specHash.slice(0, 12)}；python=${xr.environment?.pythonVersion ?? 'unknown'}${xr.environment?.lockfileHash ? `；envLock=${xr.environment.lockfileHash.slice(0, 12)}` : ''}）`);
       if (xr.error) push(`  - 错误：${xr.error}`);
@@ -612,7 +615,9 @@ export const exportStage: StageHandler = {
     const versionDiffs = ctx.store.listObjects('version_diff', run.id);
     const experimentRuns = ctx.store.listObjects('experiment_run', run.id);
     const resultSets = ctx.store.listObjects('result_set', run.id);
-    const statReports = ctx.store.listObjects('stat_report', run.id);
+    // Collected for bundle completeness accounting; report rendering reads experiment runs
+    // directly — underscore keeps the unused-name honest instead of deleting the read.
+    const _statReports = ctx.store.listObjects('stat_report', run.id);
 
     // Hash of what is actually on disk; a marked placeholder when missing (never invented).
     // Resolved from THIS module's location (WP2 F2), not process.cwd(): `far research`

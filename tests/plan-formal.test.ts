@@ -138,6 +138,39 @@ describe('g2/g3 checkStructuredPreregistration', () => {
     }), known);
     expect(r.warnings.some((w) => w.includes(h2) && w.includes('non-crucial'))).toBe(true);
   });
+
+  it('g4: a bayesian test without a calibration note is a hard error; mixed frameworks warn', () => {
+    const base = {
+      hypothesisIds: [h1] as string[],
+      metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' as const }],
+      predictions: [{ hypothesisId: h1, observable: 'p@5', condition: 'on', expectedRelation: 'increases' }],
+    };
+    const bayesianNoNote = checkStructuredPreregistration({
+      ...base,
+      alternativeBranches: [],
+      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'bayesian', threshold: 0.6, thresholdOp: '>=' }],
+    }, known);
+    expect(bayesianNoNote.errors.some((e) => e.includes('bayesianCalibrationNote'))).toBe(true);
+
+    const mixed = checkStructuredPreregistration({
+      ...base,
+      alternativeBranches: [],
+      testSpecs: [
+        { id: 't1', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' },
+        { id: 't2', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'weakens', interpretation: 'estimation_ci', threshold: 0.4, thresholdOp: '<=' },
+      ],
+      bayesianCalibrationNote: undefined,
+    }, known);
+    expect(mixed.warnings.some((w) => w.includes('混用'))).toBe(true);
+
+    const withNote = checkStructuredPreregistration({
+      ...base,
+      alternativeBranches: [],
+      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'bayesian', threshold: 0.6, thresholdOp: '>=' }],
+      bayesianCalibrationNote: 'thresholds calibrated by simulation to <=5% one-sided error under H0',
+    }, known);
+    expect(withNote.errors.some((e) => e.includes('bayesianCalibrationNote'))).toBe(false);
+  });
 });
 
 describe('g13 freeze triplet', () => {

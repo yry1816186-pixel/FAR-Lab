@@ -175,6 +175,12 @@ export const ResearchPlan = z.object({
   estimand: z.string().optional(),
   controlRun: z.string().optional(),
   robustnessPlan: z.array(z.string()).default([]),
+  /**
+   * g4 (d4): required when any testSpec declares interpretation='bayesian' — how the
+   * Bayesian decision thresholds are calibrated to error rates (FDA-device-Bayesian
+   * guidance lineage). Frequency-side vocabulary needs no calibration note.
+   */
+  bayesianCalibrationNote: z.string().min(1).optional(),
   // ---- g13 freeze triplet (RR stage-1): hash at registration + first-class deviations ----
   planHash: z.string().optional(),
   frozenAt: z.string().datetime().optional(),

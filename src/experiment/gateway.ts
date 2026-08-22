@@ -98,6 +98,24 @@ export class SSHGateway {
 /** POSIX single-quoting safe for ssh command strings (the remote side runs POSIX sh). */
 export const shellQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`;
 
+/**
+ * Wave-S ag2 (s2 #5) — remote-side kill discipline. A LOCAL ssh timeout kills only the
+ * ssh client; the remote python keeps burning as an orphan. Wrapping the command in GNU
+ * coreutils `timeout` (TERM then SIGKILL after 5s) makes the kill happen ON THE DEVICE:
+ * exit 124 = remote TERM timeout, 137 = SIGKILL escalation. Both are honest, distinct
+ * failure data the caller can report.
+ */
+export const remoteTimeoutWrap = (command: string, timeoutMs: number): string => {
+  const seconds = Math.max(1, Math.ceil(timeoutMs / 1000));
+  return `timeout --signal=TERM --kill-after=5 ${seconds} sh -c ${shellQuote(command)}`;
+};
+
+/** ag2 output discipline: cap any persisted raw output with a FIXED truncation marker —
+ * silent clipping is indistinguishable from corruption, a marker is not. */
+export const TRUNCATION_MARKER = '[... output truncated at limit ...]';
+export const truncateOutput = (s: string, maxChars = 100_000): string =>
+  s.length <= maxChars ? s : `${s.slice(0, maxChars)}\n${TRUNCATION_MARKER}`;
+
 /** Generate a dedicated ed25519 keypair for a target (test/ops helper). */
 export const generateTargetKey = async (identityFile: string): Promise<void> => {
   if (fs.existsSync(identityFile)) return;
