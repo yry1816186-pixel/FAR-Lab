@@ -373,7 +373,15 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       continue;
     }
 
-    const decision = await deps.permissions.decide(action.tool, action.args, tool.riskClass);
+    let decision = await deps.permissions.decide(action.tool, action.args, tool.riskClass);
+    // RU-3 T3 (FIDES P-T adapted, proportionate tiering): an action whose args
+    // EMBED content from an untrusted tool_result may not cause effects. Read-class
+    // tools stay free (querying by a document's title is legitimate research flow);
+    // edit/execute/destructive tools are denied fail-closed — external documents
+    // must never drive side effects through the agent.
+    if (decision.effect === 'allow' && (tool.riskClass ?? 'execute') !== 'read' && argsEmbedUntrusted(action.args, transcript)) {
+      decision = { effect: 'deny', asked: false, cachedGrant: false, rule: 'untrusted-content policy (RU-3 T3): effectful tool args embed untrusted external content' };
+    }
     if (decision.asked) deps.telemetry.recordAsk();
     if (decision.asked || decision.cachedGrant) {
       deps.emit({ type: 'permission_asked', sessionId: deps.sessionId, turn, tool: action.tool, granted: decision.effect === 'allow', at: at() });
@@ -474,6 +482,33 @@ const safeJson = (v: unknown): string | null => {
   } catch {
     return null;
   }
+};
+
+/**
+ * RU-3 T3 untrusted-embedding check (deterministic substring heuristic, FIDES
+ * P-T lineage): does the serialized action embed a distinctive slice of any
+ * untrusted tool_result payload? Windows of 48 chars (stride 24) over
+ * whitespace-normalized payloads, capped per entry — cheap, no false positives
+ * on short strings, honest limitation: paraphrased launders are NOT caught
+ * (that class needs the T8 quarantined-LLM slice, not a deterministic gate).
+ */
+export const argsEmbedUntrusted = (args: unknown, transcript: readonly TranscriptEntry[]): boolean => {
+  const argsJson = safeJson(args);
+  if (argsJson === null || argsJson.length === 0) return false;
+  const untrusted = transcript.filter((e) => e.kind === 'tool_result' && e.untrusted === true && e.ok);
+  for (const entry of untrusted.slice(0, 20)) {
+    if (entry.kind !== 'tool_result') continue;
+    const payload = String(safeJson(entry.payload) ?? '').replace(/\s+/g, ' ');
+    if (payload.length < 48) continue;
+    const windows: string[] = [];
+    for (let i = 0; i + 48 <= payload.length && windows.length < 200; i += 24) {
+      windows.push(payload.slice(i, i + 48));
+    }
+    for (const w of windows) {
+      if (argsJson.includes(w)) return true;
+    }
+  }
+  return false;
 };
 
 /** Full handoff compaction: one structured LLM call (receipted); failure is fail-closed. */
