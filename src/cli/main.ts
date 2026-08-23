@@ -9,6 +9,8 @@ import { staleDistFiles } from './dist-freshness.js';
 import { runGc } from './gc.js';
 import { ink, marker, out, table, padColumns } from './term.js';
 import { isActiveStatus, statusInk, watchLines } from './watch.js';
+import { analyzeTrajectory } from '../app/supervisor.js';
+import { buildLineageGraph } from '../app/lineage.js';
 
 /** D-031: refuse to execute stages on a dist older than src (stale-build live incident). */
 const assertDistFresh = (): void => {
@@ -489,7 +491,7 @@ const main = async (): Promise<void> => {
   }
 
   const runId = positional(4);
-  const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export'] as const;
+  const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export', 'lineage', 'supervise'] as const;
   if (sub !== undefined && (NEEDS_RUN as readonly string[]).includes(sub) && !runId) die(`${sub} requires a run id`, 2);
   const rid: string = runIdArg(runId, sub ?? 'command');
 
@@ -558,6 +560,40 @@ const main = async (): Promise<void> => {
         }
       } else {
         die('inspect requires one of --sources --evidence --hypotheses --plan', 2);
+      }
+    } finally { app.close(); }
+    return;
+  }
+
+  if (sub === 'lineage' || sub === 'supervise') {
+    // AVO fusion G2/G3 CLI projections: the trajectory graph and the live
+    // supervisor analysis. Both read-only; --json is the stable contract.
+    const app = await createApp();
+    try {
+      const run = app.store.getRun(rid);
+      if (!run) die(`run not found: ${runId}`);
+      if (sub === 'lineage') {
+        const graph = buildLineageGraph({ store: app.store, rootRunId: rid });
+        if (json()) jsonOutput(graph);
+        else {
+          out(ink.bold(`lineage of ${rid} — ${graph.nodes.length} nodes, ${graph.edges.length} edges`));
+          const byKind = new Map<string, number>();
+          for (const n of graph.nodes) byKind.set(n.kind, (byKind.get(n.kind) ?? 0) + 1);
+          for (const [kind, count] of [...byKind.entries()].sort()) console.log(`  ${kind}: ${count}`);
+          const counter = graph.edges.filter((e) => e.kind === 'counter_evidence');
+          console.log(`  ${ink.warn('counter-evidence edges')}: ${counter.length}`);
+          for (const e of graph.edges.filter((x) => x.kind === 'revised_into')) console.log(`  revision chain: ${e.from} -> ${e.to}`);
+        }
+      } else {
+        const obs = analyzeTrajectory({ store: app.store, runId: rid });
+        if (json()) jsonOutput(obs);
+        else if (obs.signals.length === 0) out(`${ink.ok('healthy')} — no supervisor signals on this trajectory`);
+        else
+          for (const s of obs.signals) {
+            const sev = s.severity === 'high' ? ink.err(s.severity) : s.severity === 'medium' ? ink.warn(s.severity) : s.severity;
+            console.log(`${marker()} [${sev}] ${s.kind}: ${s.recommendation.rationale}`);
+            console.log(`    action hint: ${s.recommendation.action}`);
+          }
       }
     } finally { app.close(); }
     return;

@@ -10,6 +10,8 @@ import {
   readBuiltinOverrides, setBuiltinDefaultName, writeBuiltinOverrides,
 } from '../providers/builtin-overrides.js';
 import { createCustomProvider } from '../providers/custom.js';
+import { analyzeTrajectory } from '../app/supervisor.js';
+import { buildLineageGraph } from '../app/lineage.js';
 import { runResearchAction, ActionError } from './actions.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
@@ -1500,6 +1502,21 @@ function parseSeedSources(raw: unknown): string | {
             throw e;
           }
         }
+      if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
+        // AVO fusion G3 projection: the queryable research trajectory graph
+        // (run revision family + hypotheses + evidence + causal revisions).
+        // Read-only over the store; 404s honestly when the run does not exist.
+        mustGetRun(runId);
+        sendJson(res, 200, buildLineageGraph({ store: app.store, rootRunId: runId }));
+        return;
+      }
+      if (segments.length === 5 && segments[4] === 'supervision' && method === 'GET') {
+        // AVO fusion G2 projection: current supervisor analysis (fresh, not a
+        // stored snapshot) so UX shows the live trajectory health. Read-only.
+        mustGetRun(runId);
+        sendJson(res, 200, analyzeTrajectory({ store: app.store, runId }));
+        return;
+      }
       if (segments.length === 4) {
         if (method === 'GET') return runDetail(res, runId);
         if (method === 'DELETE') {
