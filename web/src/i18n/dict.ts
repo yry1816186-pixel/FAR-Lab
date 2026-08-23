@@ -558,6 +558,18 @@ export const zh = {
   'composer.addFiles': '资料',
   'composer.autoScope': '领域与目标类型由 AI 在范围界定阶段自动分析确定，结果可在研究页查看、经反馈修订',
   'activity.telemetry': '技术轨迹（{n} 条：模型调用 · 工具 · 原始事件）',
+
+  // ---- research iteration controller (research-loop lane) ----
+  'iter.section': '研究迭代',
+  'iter.round': '研究迭代 · 第 {n} 轮 · {label}',
+  'iter.trigger.feedback': '反馈待因果吸收',
+  'iter.trigger.plan': '计划可执行但尚未实验',
+  'iter.trigger.other': '存在可执行的下一步',
+  'iter.stopped': '迭代停止 · {label}',
+  'iter.stop.roundCap': '轮次上限',
+  'iter.stop.budget': '预算耗尽',
+  'iter.stop.noDelta': '本轮无实质增量',
+  'iter.stop.noWork': '无可执行迭代',
   'welcome.howsLabel': '工作方式',
   // ---- HX4: hypothesis workspace redo ----
   'hyp.counts': '共 {total} 组假设 · {reps} 组簇代表参与排序 · {extras} 组同簇合并',
@@ -1776,6 +1788,18 @@ export const en: Record<DictKey, string> = {
   'composer.addFiles': 'Sources',
   'composer.autoScope': 'Domain and goal type are analyzed and decided automatically by AI during scoping — visible on the research page, correctable via feedback',
   'activity.telemetry': 'Technical trace ({n} entries: model calls · tools · raw events)',
+
+  // ---- research iteration controller (research-loop lane) ----
+  'iter.section': 'Research iterations',
+  'iter.round': 'Iteration round {n} · {label}',
+  'iter.trigger.feedback': 'feedback awaiting causal revision',
+  'iter.trigger.plan': 'executable plan without an experiment',
+  'iter.trigger.other': 'an actionable next step exists',
+  'iter.stopped': 'Iteration stopped · {label}',
+  'iter.stop.roundCap': 'round cap',
+  'iter.stop.budget': 'budget exhausted',
+  'iter.stop.noDelta': 'no material change this round',
+  'iter.stop.noWork': 'no actionable iteration leg',
   'welcome.howsLabel': 'How it works',
   // ---- HX4: hypothesis workspace redo ----
   'hyp.counts': '{total} hypotheses · {reps} cluster representatives ranked · {extras} merged into clusters',

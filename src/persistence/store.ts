@@ -11,6 +11,7 @@ import {
   ConversationSchema,
   AutomationSchema,
   ToolIntegrationSchema,
+  IterationRecord,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -47,6 +48,7 @@ const KIND_SCHEMAS = {
   conversation: ConversationSchema,
   automation: AutomationSchema,
   tool_integration: ToolIntegrationSchema,
+  iteration: IterationRecord,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});

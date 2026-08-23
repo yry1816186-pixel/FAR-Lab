@@ -19,6 +19,8 @@ const STAGE_TRANSITIONS: ReadonlySet<string> = new Set([
 const NOTE_MILESTONES: ReadonlySet<string> = new Set([
   'hypothesis_critiqued', 'document_extracted', 'query_plan_ready',
 ]);
+/** Research iteration controller decisions — rounds and why they ended. */
+const ITERATION_REASONS: ReadonlySet<string> = new Set(['iteration_round_started', 'iteration_decided']);
 /** L3 telemetry: real receipts that belong under the disclosure, not the story. */
 const TELEMETRY: ReadonlySet<string> = new Set([
   'receipt_recorded', 'agent_started', 'agent_tool_used', 'agent_finished',
@@ -34,10 +36,11 @@ interface StageRow {
 }
 
 /** Latest transition per stage wins; milestones attach to their own stage. */
-function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRow[]; telemetry: RunEvent[] } {
+function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRow[]; telemetry: RunEvent[]; iterations: RunEvent[] } {
   const byStage = new Map<string, StageRow>();
   const milestones: RunEvent[] = [];
   const telemetry: RunEvent[] = [];
+  const iterations: RunEvent[] = [];
   for (const e of events) {
     if (STAGE_TRANSITIONS.has(e.type)) {
       const stage = e.stage;
@@ -50,6 +53,8 @@ function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRo
         stage, status, at: e.at, summary: summary ?? prev?.summary,
         milestones: prev?.milestones ?? [],
       });
+    } else if (e.type === 'note' && typeof e.detail?.reason === 'string' && ITERATION_REASONS.has(e.detail.reason)) {
+      iterations.push(e);
     } else if (e.type === 'note' && typeof e.detail?.reason === 'string' && NOTE_MILESTONES.has(e.detail.reason)) {
       milestones.push(e);
     } else if (TELEMETRY.has(e.type)) {
@@ -69,7 +74,7 @@ function deriveTimeline(events: RunEvent[], run: ResearchRun): { stages: StageRo
     const row = byStage.get(cur);
     if (row !== undefined && row.status !== 'done' && row.status !== 'failed') row.status = 'running';
   }
-  return { stages: [...byStage.values()], telemetry };
+  return { stages: [...byStage.values()], telemetry, iterations };
 }
 
 function StageIcon({ status }: { status: StageRow['status'] }): JSX.Element {
@@ -82,10 +87,31 @@ function StageIcon({ status }: { status: StageRow['status'] }): JSX.Element {
 
 export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEvent[] }): JSX.Element {
   const { t, formatTime } = useI18n();
-  const { stages, telemetry } = deriveTimeline(events, run);
+  const { stages, telemetry, iterations } = deriveTimeline(events, run);
   const active = run.status === 'running' || run.status === 'queued';
   const currentDesc: string | null = active ? t(`activity.stageDesc.${run.currentStage}` as DictKey) : null;
   const ordered = [...stages].reverse(); // newest first, matching the live-feed reading direction
+
+  /** Iteration event → one researcher-readable line (defensive: event detail is untrusted). */
+  const iterationText = (e: RunEvent): string => {
+    const d = e.detail ?? {};
+    const round = typeof d.round === 'number' ? d.round : 0;
+    if (d.reason === 'iteration_round_started') {
+      const trigger = d.trigger as { kind?: unknown } | undefined;
+      const kind = typeof trigger?.kind === 'string' ? trigger.kind : '';
+      const label = kind === 'unconsumed_feedback' ? t('iter.trigger.feedback')
+        : kind === 'executable_plan_unexecuted' ? t('iter.trigger.plan')
+        : t('iter.trigger.other');
+      return t('iter.round', { n: round, label });
+    }
+    const stop = d.stopReason as { kind?: unknown } | undefined;
+    const kind = typeof stop?.kind === 'string' ? stop.kind : '';
+    const label = kind === 'round_cap' ? t('iter.stop.roundCap')
+      : kind === 'budget_exhausted' ? t('iter.stop.budget')
+      : kind === 'no_material_delta' ? t('iter.stop.noDelta')
+      : t('iter.stop.noWork');
+    return t('iter.stopped', { label });
+  };
 
   const milestoneText = (key: string, detail: RunEvent['detail']): { text: string; extra?: string } => {
     const d = detail ?? {};
@@ -145,6 +171,17 @@ export function ActivityFeed({ run, events }: { run: ResearchRun; events: RunEve
             </li>
           ))}
         </ol>
+      )}
+
+      {iterations.length > 0 && (
+        <div className="tl-iterations" aria-label={t('iter.section')}>
+          {iterations.slice(-6).reverse().map((e) => (
+            <p key={e.seq} className="tl-iteration small">
+              <time className="mono muted" dateTime={e.at}>{formatTime(e.at).split(' ').pop()}</time>
+              <span>{iterationText(e)}</span>
+            </p>
+          ))}
+        </div>
       )}
 
       {telemetry.length > 0 && (
