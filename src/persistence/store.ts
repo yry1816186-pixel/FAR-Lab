@@ -169,6 +169,15 @@ export class Store {
    * changed inputs mismatch their fingerprints and recompute (checkpointed()
    * owns that logic). The fork reason is audited as the fork run's first note.
    */
+  /** Child-run ids by parentRunId (lineage traversal; indexed on runs.question_id
+   *  is NOT usable here, so this is a bounded scan — acceptable: called per
+   *  lineage node, and the runs table stays small relative to events/objects). */
+  listRunsByParent(parentRunId: string): string[] {
+    return this.db.prepare('SELECT id FROM runs WHERE json_extract(doc, \'$.parentRunId\') = ? ORDER BY created_at ASC')
+      .all(parentRunId)
+      .map((r) => String(r.id));
+  }
+
   forkRun(sourceRunId: string, opts: { reason: string }, now = new Date().toISOString()): ResearchRun {
     const source = this.getRun(sourceRunId);
     if (source === null) throw new Error(`forkRun: no such run ${sourceRunId}`);
@@ -576,6 +585,42 @@ export class Store {
       this.putObject(kind, obj);
       this.appendEvent(runId, event, at);
     });
+  }
+
+  /**
+   * RU-7.4: domain object + audit event + scheduler outbox intent in ONE
+   * transaction. The drain (scheduler side) is idempotent by intent id, so a
+   * crash after this call leaves a pending intent — never a lost enqueue.
+   */
+  putObjectEventedOutboxed<K extends ObjectKind>(
+    kind: K,
+    obj: DomainObject<K>,
+    event: { type: RunEvent['type']; detail?: Record<string, unknown> },
+    outbox: { intentId: string; kind: string; payload: unknown },
+    at = new Date().toISOString(),
+  ): void {
+    const runId = (obj as { runId?: string }).runId;
+    if (runId === undefined) throw new Error(`putObjectEventedOutboxed: kind ${kind} has no runId`);
+    this.db.transaction(() => {
+      this.putObject(kind, obj);
+      this.appendEvent(runId, event, at);
+      this.recordOutbox(outbox.intentId, outbox.kind, outbox.payload, at);
+    });
+  }
+
+  /** Insert-only by intent id (first write wins); safe inside or outside a transaction. */
+  recordOutbox(intentId: string, kind: string, payload: unknown, at = new Date().toISOString()): void {
+    this.db.prepare('INSERT OR IGNORE INTO outbox (intent_id, kind, payload, created_at) VALUES (?,?,?,?)')
+      .run(intentId, kind, JSON.stringify(payload), at);
+  }
+
+  pendingOutbox(): Array<{ intentId: string; kind: string; payload: string; createdAt: string }> {
+    return this.db.prepare('SELECT intent_id, kind, payload, created_at FROM outbox WHERE drained_at IS NULL ORDER BY created_at ASC').all()
+      .map((r) => ({ intentId: String(r.intent_id), kind: String(r.kind), payload: String(r.payload), createdAt: String(r.created_at) }));
+  }
+
+  markOutboxDrained(intentId: string, at = new Date().toISOString()): void {
+    this.db.prepare('UPDATE outbox SET drained_at=? WHERE intent_id=? AND drained_at IS NULL').run(at, intentId);
   }
 
   // ---- W8 S2: idempotent intra-stage step checkpoints (dbos operation_outputs pattern) ----

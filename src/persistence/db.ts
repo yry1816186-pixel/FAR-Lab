@@ -210,6 +210,23 @@ export const MIGRATIONS: readonly { version: number; sql: string }[] = [
       );
     `,
   },
+  {
+    // RU-7.4 cross-store outbox: far.db domain writes and their scheduler intents
+    // land in ONE transaction; the drain is idempotent by intent id. Closes the
+    // dual-write window (experiment_run persisted, scheduler.enqueue lost to a
+    // crash between the two writes — a silently stalled queue entry).
+    version: 8,
+    sql: `
+      CREATE TABLE IF NOT EXISTS outbox (
+        intent_id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        drained_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(drained_at) WHERE drained_at IS NULL;
+    `,
+  },
 ];
 
 export const openDb = (dbPath: string): Db => {

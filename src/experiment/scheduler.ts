@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { newId, ExperimentSpec, type ExperimentRunId, type ExperimentRun, type RunId, checkExperimentSpec } from '../domain/index.js';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
@@ -112,7 +113,7 @@ export interface Claim {
 }
 
 export interface Scheduler {
-  enqueue(input: { experimentRunId: string; runId: string; specId: string; priority?: number; device?: string; at?: string }): SchedulerJob;
+  enqueue(input: { experimentRunId: string; runId: string; specId: string; priority?: number; device?: string; at?: string; intentId?: string }): SchedulerJob;
   /** Atomically claim the highest-priority runnable job (fresh queued, or running with an expired heartbeat) on THIS device. */
   claimNext(worker: string, opts: { maxRunning: number; heartbeatTtlMs: number; device?: string; at?: string }): Claim | null;
   heartbeat(jobId: string, worker: string, fenceToken: number, at?: string): boolean;
@@ -191,11 +192,13 @@ export const openScheduler = (dbPath: string): Scheduler => {
   };
 
   const scheduler: Scheduler = {
-    enqueue({ experimentRunId, runId, specId, priority = 0, device = 'local', at }) {
+    enqueue({ experimentRunId, runId, specId, priority = 0, device = 'local', at, intentId }) {
       const now = at ?? new Date().toISOString();
-      const jobId = newId('job');
+      // RU-7.4: an explicit intentId makes enqueue idempotent (job_id UNIQUE +
+      // INSERT OR IGNORE) — the outbox drain can retry without duplicating jobs.
+      const jobId = intentId ?? newId('job');
       tx(() => {
-        prepare('INSERT INTO jobs (job_id, experiment_run_id, run_id, spec_id, priority, status, fence_token, attempts, cancel_requested, created_at, device) VALUES (?,?,?,?,?,?,?,?,0,?,?)')
+        prepare('INSERT OR IGNORE INTO jobs (job_id, experiment_run_id, run_id, spec_id, priority, status, fence_token, attempts, cancel_requested, created_at, device) VALUES (?,?,?,?,?,?,?,?,0,?,?)')
           .run(jobId, experimentRunId, runId, specId, priority, 'queued', 0, 0, now, device);
       });
       return scheduler.get(jobId)!;
@@ -300,6 +303,32 @@ export const openScheduler = (dbPath: string): Scheduler => {
 };
 
 /**
+ * RU-7.4 outbox drain: hand pending far.db intents to the scheduler, idempotent
+ * by intent id (the intent id IS the job id). Called opportunistically after
+ * enqueueExperiment and at worker start — a crash between the far.db write and
+ * the original enqueue is recovered here, never lost.
+ */
+export const drainOutbox = (store: Store, scheduler: Scheduler, at = new Date().toISOString()): { drained: number; failed: string[] } => {
+  const failed: string[] = [];
+  let drained = 0;
+  for (const intent of store.pendingOutbox()) {
+    if (intent.kind !== 'experiment_job') {
+      failed.push(`${intent.intentId}: unknown outbox kind ${intent.kind}`);
+      continue;
+    }
+    try {
+      const payload = JSON.parse(intent.payload) as { experimentRunId: string; runId: string; specId: string; priority?: number; device?: string };
+      scheduler.enqueue({ ...payload, intentId: intent.intentId, at });
+      store.markOutboxDrained(intent.intentId, at);
+      drained += 1;
+    } catch (e) {
+      failed.push(`${intent.intentId}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { drained, failed };
+};
+
+/**
  * Validate + persist the spec as an experiment_run(queued) and enqueue it — the split
  * between "accepted for execution" and "actually executing" is what the queue owns.
  */
@@ -336,8 +365,21 @@ export const enqueueExperiment = (
     statReportIds: [],
     createdAt: new Date().toISOString(),
   };
-  store.putObjectEvented('experiment_run', run, { type: 'experiment_queued', detail: { specId: spec.id, specHash } });
-  const job = scheduler.enqueue({ experimentRunId: run.id, runId: spec.runId, specId: spec.id, priority: opts.priority ?? 0, device: opts.device ?? 'local' });
+  // RU-7.4: the run + its scheduler intent land in ONE far.db transaction; the
+  // immediate drain is best-effort (normal path), and any crash before it is
+  // recovered by the next drain (worker start / next enqueue) — never lost.
+  // Intent stays job_-shaped (deterministic hash of the run id) so the CLI's
+  // job-id format gate and every existing surface keep working unchanged.
+  const intentId = `job_${createHash('sha256').update(run.id).digest('hex').slice(0, 24)}`;
+  drainOutbox(store, scheduler); // recovery pass for prior crashes
+  store.putObjectEventedOutboxed(
+    'experiment_run', run,
+    { type: 'experiment_queued', detail: { specId: spec.id, specHash } },
+    { intentId, kind: 'experiment_job', payload: { experimentRunId: run.id, runId: spec.runId, specId: spec.id, priority: opts.priority ?? 0, device: opts.device ?? 'local' } },
+  );
+  const job = drainOutbox(store, scheduler).drained > 0
+    ? scheduler.get(intentId)!
+    : scheduler.enqueue({ experimentRunId: run.id, runId: spec.runId, specId: spec.id, priority: opts.priority ?? 0, device: opts.device ?? 'local', intentId });
   return { experimentRunId: run.id as ExperimentRunId, jobId: job.jobId };
 };
 
@@ -367,6 +409,9 @@ export const runSchedulerWorker = async (
     ) => Promise<unknown>;
   },
 ): Promise<{ executed: number; failed: number }> => {
+  // RU-7.4 crash recovery: any far.db outbox intent that never reached the
+  // scheduler (enqueue process died between the two stores) drains here first.
+  drainOutbox(store, scheduler);
   let executed = 0;
   let failed = 0;
   let beat: ReturnType<typeof setInterval> | undefined;
