@@ -91,7 +91,9 @@ export const runExploration = async (input: RunExplorationInput): Promise<Explor
     const artifact = await input.artifacts.put(stdoutText);
 
     const outputFingerprint = sha256(JSON.stringify({ ok: execution.ok, stdoutHash: sha256(stdoutText) }));
-    const inputHash = sha256(gate.codeHash);
+    // P2 fix (adversarial review 06): inputHash must be sha256 of the RAW code —
+    // gate.codeHash already is exactly that; double-hashing broke verifiability.
+    const inputHash = gate.codeHash;
 
     const receipt = {
       id: newId('rcp'),

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
-import { MemoryItemSchema, type MemoryItem } from '../domain/memory.js';
+import { MemoryItemSchema, deriveTrustClass, type MemoryItem } from '../domain/memory.js';
 import type { ExperimentRun } from '../domain/index.js';
 
 /**
@@ -148,7 +148,7 @@ export const semanticFindingsForRun = (
       title: claim.text.slice(0, 200),
       body: JSON.stringify({ claimId: claim.id, relations: rels, sourceDocumentId: docId ?? null }),
       status: 'active',
-      trustClass: sourceRef !== undefined ? 'external_literature' : 'external_untrusted',
+      trustClass: deriveTrustClass('derived_untrusted', { runId, ...(sourceRef !== undefined ? { sourceRef } : {}) }),
       taint: 'derived_untrusted',
       provenance: {
         runId,

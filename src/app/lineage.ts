@@ -1,5 +1,5 @@
 import type { Store } from '../persistence/store.js';
-import type { EvidenceRelation, HypothesisCandidate } from '../domain/index.js';
+import type { EvidenceRelation, HypothesisCandidate, ResearchRun } from '../domain/index.js';
 import { LINEAGE_COUNTER_RELATIONS } from '../domain/lineage.js';
 
 /**
@@ -66,35 +66,39 @@ export const buildLineageGraph = (opts: { store: Store; rootRunId: string }): Li
   const edges: LineageEdge[] = [];
 
   // ---- runs: the revision chain around the root ----
-  // listRuns returns a projection without parentRunId; hydrate full docs.
-  const allRuns = store
-    .listRuns(1000)
-    .map((r) => store.getRun(r.id))
-    .filter((r): r is NonNullable<typeof r> => r !== null);
-  const byParent = new Map<string, string[]>();
-  for (const r of allRuns) {
-    if (r.parentRunId) {
-      byParent.set(r.parentRunId, [...(byParent.get(r.parentRunId) ?? []), r.id]);
-    }
-  }
-  // collect the connected family: ancestors up + descendants down
+  // P1-2 fix (adversarial review 06): walk the parentRunId chain hop-by-hop via
+  // getRun (indexed PK lookups) instead of listRuns(1000) — a deep/old lineage
+  // can no longer be silently truncated by a scan limit. family.has guards make
+  // parent cycles terminate; the root itself anchors traversal.
   const family = new Set<string>();
+  const runsById = new Map<string, ResearchRun>();
+  const loadRun = (id: string): ResearchRun | null => {
+    let run = runsById.get(id) ?? null;
+    if (run === null) {
+      run = store.getRun(id);
+      if (run !== null) runsById.set(id, run);
+    }
+    return run;
+  };
   const walkUp = (id: string): void => {
     if (family.has(id)) return;
+    const run = loadRun(id);
+    if (run === null) return;
     family.add(id);
-    const run = allRuns.find((r) => r.id === id);
-    if (run?.parentRunId) walkUp(run.parentRunId);
+    if (run.parentRunId) walkUp(run.parentRunId);
   };
   const walkDown = (id: string): void => {
-    for (const child of byParent.get(id) ?? []) {
-      if (!family.has(child)) { family.add(child); walkDown(child); }
+    const children = store.listRunsByParent(id);
+    for (const childId of children) {
+      if (!family.has(childId)) { family.add(childId); walkDown(childId); }
     }
   };
   walkUp(rootRunId);
   walkDown(rootRunId);
 
   for (const id of family) {
-    const r = allRuns.find((x) => x.id === id)!;
+    const r = loadRun(id);
+    if (r === null) continue; // defensive: walkDown children always resolvable, but never invent nodes
     nodes.push({
       id, kind: 'run', runId: id,
       label: `run ${r.status} @ ${r.currentStage}`,
