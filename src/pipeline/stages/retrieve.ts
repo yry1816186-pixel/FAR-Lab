@@ -322,6 +322,26 @@ const applyRerank = (out: RerankOut, candidates: readonly PoolEntry[]): PoolEntr
  * chaining behavior). n <= w collapses to one full window. Upstream's edge bug
  * (w > n silently skips reranking) is structurally impossible here.
  */
+/**
+ * RU-9 GO1b cache-aware layout: the rerank payload renders a STABLE PREFIX
+ * (questionText — identical across every window) followed by the VARIABLE TAIL
+ * (the window's candidates, list order, insertion-stable keys). Consecutive
+ * bottom-up windows share their leading items, so provider prefix caches can
+ * reuse the question + shared-item span. Pure + deterministic: the same slice
+ * always renders byte-identically (snapshot-locked in tests/cache-layout).
+ */
+export const renderRerankPayload = (questionText: string, slice: readonly PoolEntry[]): Record<string, unknown> => ({
+  questionText,
+  candidates: slice.map((e, i) => ({
+    index: i,
+    title: e.record.title,
+    ...(e.record.publicationYear !== undefined ? { year: e.record.publicationYear } : {}),
+    ...(e.record.venue !== undefined ? { venue: e.record.venue } : {}),
+    abstractExcerpt: (e.record.abstractText ?? '').slice(0, 450),
+    originatingPurposes: [...e.purposes],
+  })),
+});
+
 export const rerankWindowPlan = (n: number, w: number, s: number): readonly [number, number][] => {
   if (n <= w) return [[0, n]];
   const windows: [number, number][] = [];
@@ -709,17 +729,7 @@ export const retrieveStage: StageHandler = {
             stage: 'retrieve',
             purpose: 'listwise-rerank',
             systemPrompt: RERANK_SYSTEM_PROMPT,
-            payload: {
-              questionText: question.text,
-              candidates: slice.map((e, i) => ({
-                index: i,
-                title: e.record.title,
-                ...(e.record.publicationYear !== undefined ? { year: e.record.publicationYear } : {}),
-                ...(e.record.venue !== undefined ? { venue: e.record.venue } : {}),
-                abstractExcerpt: (e.record.abstractText ?? '').slice(0, 450),
-                originatingPurposes: [...e.purposes],
-              })),
-            },
+            payload: renderRerankPayload(question.text, slice),
             schema: RerankOut,
             temperature: 0.1,
           });
