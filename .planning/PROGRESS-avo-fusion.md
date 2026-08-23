@@ -10,15 +10,13 @@
 
 ## S8 剩余
 - ~~evaluator 家族显式化 (G8)~~ DONE 917f5ed (5 evaluators + /evaluations API)
-- exploratory CodeAct 执行接线（sidecar 沙箱 op + receipt 落库）——静态门已落
-- pass-by-reference / event query API (G5/G6, P1) — 可与 CodeAct 层合并推进
+- ~~exploratory CodeAct 执行接线~~ DONE 35c99a1 (run_exploration op + runExploration 编排器, 4 真实 sidecar 测试)
+- pass-by-reference / event query API (G5/G6, P1) — 下一批
 
-## 门禁证据 (2026-08-24 03:17 → 03:28 复核)
-- vitest 全量: **1268 passed / 2 skipped** (110 files, 新增 ~30 个 AVO-fusion 测试)
-- tsc --noEmit GREEN; npm run build GREEN
-- secret-scan PASS (57 MEDIUM 全部在 .venv/桌面 target 等忽略路径, 与既有基线一致)
-- path-hygiene WARN-only (0 errors; desktop/experiment-runtime 构建产物, gitignore 覆盖)
-- completion-gate PASS
+## 门禁证据 (2026-08-24 03:17 → 本轮)
+- vitest 全量: **1285 passed / 2 skipped** (114 files)
+- tsc --noEmit GREEN; npm run build GREEN; eslint 全仓 GREEN
+- secret-scan PASS · path-hygiene 0 errors · completion-gate PASS
 
 ## 关键不变量 (实现中已验证)
 - supervisor/lineage 均为只读视图, 不产生第二权威
