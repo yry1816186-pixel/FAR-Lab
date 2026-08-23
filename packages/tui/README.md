@@ -1,15 +1,23 @@
 # @far-lab/tui
 
-FAR-Lab 终端研究浏览器（只读 v1）。
+FAR-Lab 终端研究工作台（v2：只读浏览 + 交互 composer）。
 
 ```
 cd packages/tui && npm install
-npm start            # 或: node --experimental-strip-types src/main.ts
+npm start            # node --experimental-strip-types src/main.ts
+npm test             # node:test 确定性核心测试（7 用例）
 FAR_URL=http://127.0.0.1:3196/api/v1  # 默认
 ```
 
-- 全屏模式（Ink 7，MIT）：↑↓/jk 选择 · Enter 查看 · q 退出；阶段叙事与 Web 时间线同语义
-- 行式降级：终端无法进入 raw mode 时（Git Bash/mintty/管道）自动切换，同能力
-- 能力边界（诚实）：v1 只读——浏览研究与阶段叙事；不含创建研究（会触发真实模型/检索调用）
-- 隔离性：独立 package.json + node_modules，主产品 far 依赖面零改动（zod-only 不变）
-- 验证状态：行式模式实测（52 研究列表 + 12 阶段详情真实渲染）；Ink 全屏路径 UNVERIFIED-live（需真实交互终端）
+## 能力
+- 浏览：研究列表（↑↓/jk·Enter·q）+ 阶段叙事详情（与 Web 时间线同语义：✓✗● + 中文阶段名 + 真实 pipeline 摘要）
+- Composer（v2，Ink 全屏 + 行式降级双实现）：多行输入（Ctrl+J 换行——终端无法传 Shift+Enter）；
+  bracketed-paste 原文插入（粘贴永不解析为命令键，Codex paste-burst 语义）；CJK IME 多字符负载按文本插入；
+  提交确认走审批词汇表（y/n/a/s/d/q，Aider io.py 血统）
+- 提交纪律：确认后**就绪即止**——真实 POST 由 FAR_ALLOW_LIVE=1 门控，默认禁用（2026-08-23 no-live-API 指令，与 Web 走查步骤 05 同纪律）
+- 隔离：独立 package.json + lockfile；主产品 far 依赖面零改动（zod-only 不变）；发布 @far-lab/tui 为未来独立确认步骤
+
+## 验证状态
+- 行式模式：真实服务器端到端实测（列表/详情叙事/composer 确认流）
+- 核心逻辑：node:test 7/7（粘贴提取/IME 注入/控制序列过滤/换行-回删/就绪门/词汇表状态机）
+- Ink 全屏渲染路径：UNVERIFIED-live（需真实交互终端跑 npm start）

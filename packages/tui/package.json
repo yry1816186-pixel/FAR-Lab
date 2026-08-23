@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "description": "FAR-Lab interactive terminal research browser (read-only v1; Ink full-screen + readline line-mode fallback)",
   "scripts": {
-    "start": "node --experimental-strip-types src/main.ts"
+    "start": "node --experimental-strip-types src/main.ts",
+    "test": "node --experimental-strip-types --test test/core.test.ts"
   },
   "license": "MIT",
   "type": "module",
