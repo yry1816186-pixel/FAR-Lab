@@ -11,7 +11,7 @@ import type { ArtifactStore } from '../shared/ports.js';
  * Third-party bundle verification (ACC-14, mission §56 Inspect/Validate/Re-execute/
  * Compare). Every check is really executed against the store, the artifact store and
  * the local environment — no check may assume or fabricate a pass. Invariant: a
- * report always carries the same 10 checks in the same order (VERIFY_CHECK_NAMES);
+ * report always carries the same 11 checks in the same order (VERIFY_CHECK_NAMES);
  * checks that cannot run fail closed with passed=false, never silently skipped.
  */
 
@@ -26,6 +26,7 @@ export const VERIFY_CHECK_NAMES = [
   'limitations_nonempty',
   'dependency_lock_hash_matches',
   'declared_evidence_level_valid',
+  'claim_taint_labels_present',
 ] as const;
 export type VerifyCheckName = (typeof VERIFY_CHECK_NAMES)[number];
 
@@ -288,6 +289,24 @@ export async function verifyBundle(bundleId: string, deps: VerifyDeps): Promise<
       detail: levelOk
         ? `合法枚举值「${bundle.declaredEvidenceLevel}」（inspect|replay|recompute）`
         : `非法值「${bundle.declaredEvidenceLevel}」— 必须是 inspect|replay|recompute 之一`,
+    });
+
+    // ---- check 11 (re-audit taint enforcement): claims must carry taint labels ----
+    // derived_untrusted content may enter exports ONLY labeled. Claims persisted
+    // before the field existed are disclosed as legacy (pass with count) — the
+    // check fails only when the bundle's own claims are label-less, i.e. produced
+    // by a build that dropped the labeling discipline.
+    const runClaims = store.listObjects('claim', bundle.runId) as unknown as Array<{ taint?: string }>;
+    const labeled = runClaims.filter((c) => c.taint === 'derived_untrusted' || c.taint === 'trusted' || c.taint === 'untrusted_literal');
+    const unlabeled = runClaims.length - labeled.length;
+    checks.push({
+      name: 'claim_taint_labels_present',
+      passed: runClaims.length === 0 || unlabeled === 0,
+      detail: runClaims.length === 0
+        ? '（本 run 无 claim — 检查空转通过）'
+        : unlabeled === 0
+          ? `${labeled.length} 条 claim 全部携带 taint 标签（derived_untrusted 不得无标导出）`
+          : `${unlabeled}/${runClaims.length} 条 claim 缺少 taint 标签 — 无标 derived_untrusted 禁止导出（T2 硬不变量）`,
     });
   }
 

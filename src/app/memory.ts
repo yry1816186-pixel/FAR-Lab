@@ -219,11 +219,11 @@ export const memoryNegativeConditioning = (
     .filter((w) => w.length > 4)
     .sort((a, b) => b.length - a.length)
     .slice(0, 3);
-  if (words.length === 0) return [];
-  // keyword OR semantics — a phrase match would demand adjacent ordered terms,
-  // which question-derived keywords never satisfy against stored titles/bodies.
+  if (words.length === 0 && !/[一-鿿]/.test(questionText)) return [];
+  // keyword OR semantics; CJK questions fall back to character trigrams inside
+  // searchMemory (single owner of or-tokenization).
   const hits = store.searchMemory({
-    query: words.join(' '),
+    query: questionText,
     mode: 'or',
     kinds: ['experiment_outcome', 'episodic'],
     trustClasses: ['own_verified', 'own_unverified'],

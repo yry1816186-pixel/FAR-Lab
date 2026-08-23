@@ -933,7 +933,17 @@ export class Store {
     if (opts.mode === 'or') {
       // keyword OR semantics: sanitized bare tokens joined with OR (question-derived
       // keywords are unordered; a phrase match would demand adjacency they lack).
-      const tokens = opts.query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 1);
+      // CJK queries tokenize to nothing under [^a-z0-9] - character trigrams are
+      // the fallback (unicode61 stores CJK runs; LIKE matches substrings).
+      const alphaTokens = opts.query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 1);
+      const cjkRun = /[一-鿿]/.test(opts.query);
+      const trigrams = cjkRun && alphaTokens.length === 0
+        ? Array.from(new Set(
+            Array.from({ length: opts.query.length - 2 }, (_, i) => opts.query.slice(i, i + 3))
+              .filter((g) => /[一-鿿]{3}/.test(g)),
+          )).slice(0, 6)
+        : [];
+      const tokens = alphaTokens.length > 0 ? alphaTokens : trigrams;
       if (tokens.length > 0) {
         const ftsOr = tokens.map((t) => `"${t}"`).join(' OR ');
         try {
