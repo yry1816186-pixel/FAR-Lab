@@ -49,7 +49,43 @@ const SCHEMA_V1 = `
 /** v2: per-device dispatch — workers bind to one device and only claim its jobs. */
 const MIGRATION_V2 = 'ALTER TABLE jobs ADD COLUMN device TEXT NOT NULL DEFAULT \'local\'; CREATE INDEX IF NOT EXISTS idx_jobs_device ON jobs(device, status, priority DESC);';
 
-export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled';
+/**
+ * RU-7.2 poison-job dead-letter queue: SQLite cannot ALTER a CHECK constraint,
+ * so v3 rebuilds the jobs table with 'dead' admitted. Bounded redelivery: a job
+ * whose attempts reach MAX_JOB_ATTEMPTS goes dead on its next claim instead of
+ * being reclaimed forever (crash-looping workers no longer spin a poison spec).
+ */
+const MIGRATION_V3 = `
+  CREATE TABLE jobs_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL UNIQUE,
+    experiment_run_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    spec_id TEXT NOT NULL,
+    priority INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('queued','running','completed','failed','canceled','dead')),
+    fence_token INTEGER NOT NULL DEFAULT 0,
+    worker TEXT,
+    heartbeat_at TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    cancel_requested INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    ended_at TEXT,
+    error TEXT,
+    device TEXT NOT NULL DEFAULT 'local'
+  );
+  INSERT INTO jobs_new SELECT id, job_id, experiment_run_id, run_id, spec_id, priority, status, fence_token, worker, heartbeat_at, attempts, cancel_requested, created_at, started_at, ended_at, error, device FROM jobs;
+  DROP TABLE jobs;
+  ALTER TABLE jobs_new RENAME TO jobs;
+  CREATE INDEX IF NOT EXISTS idx_jobs_dispatch ON jobs(status, priority DESC, id ASC);
+  CREATE INDEX IF NOT EXISTS idx_jobs_heartbeat ON jobs(status, heartbeat_at);
+  CREATE INDEX IF NOT EXISTS idx_jobs_device ON jobs(device, status, priority DESC);
+`;
+
+export const MAX_JOB_ATTEMPTS = Math.min(Math.max(Number(process.env.FARLAB_JOB_MAX_ATTEMPTS ?? 5) || 5, 1), 20);
+
+export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled' | 'dead';
 
 export interface SchedulerJob {
   jobId: string;
@@ -87,6 +123,10 @@ export interface Scheduler {
   cancelRequested(jobId: string): boolean;
   get(jobId: string): SchedulerJob | null;
   list(filter?: { status?: JobStatus }): SchedulerJob[];
+  /** RU-7.2: dead-lettered jobs (attempts exhausted) for ops inspection. */
+  listDead(): SchedulerJob[];
+  /** RU-7.2: explicit operator resurrection — requeue with a fresh attempt budget. */
+  requeueDead(jobId: string, at?: string): boolean;
   stats(): Record<JobStatus | 'total', number>;
   close(): void;
 }
@@ -117,13 +157,18 @@ export const openScheduler = (dbPath: string): Scheduler => {
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA_V1);
   // Own tiny migration track (user_version), independent of far.db migrations.
-  if (Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0) < 2) {
+  const uv = () => Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0);
+  if (uv() < 3) {
     db.exec('BEGIN IMMEDIATE');
     try {
-      const current = Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0);
+      const current = uv();
       if (current < 2) {
         db.exec(MIGRATION_V2);
         db.exec('PRAGMA user_version = 2');
+      }
+      if (current < 3) {
+        db.exec(MIGRATION_V3); // RU-7.2: admit 'dead' (CHECK rebuild)
+        db.exec('PRAGMA user_version = 3');
       }
       db.exec('COMMIT');
     } catch (e) {
@@ -169,6 +214,15 @@ export const openScheduler = (dbPath: string): Scheduler => {
         ).get(device, staleBefore);
         if (row === undefined) return null;
         const job = rowToJob(row);
+        // RU-7.2 bounded redelivery: attempts at the cap means every prior
+        // execution died without completing — dead-letter instead of reclaiming
+        // forever. The claim returns null (honest: nothing claimable THIS pass);
+        // the next claim call proceeds to the next job.
+        if (job.attempts >= MAX_JOB_ATTEMPTS) {
+          prepare("UPDATE jobs SET status='dead', ended_at=?, error=? WHERE job_id=? AND status IN ('queued','running')")
+            .run(now, `dead-letter: ${job.attempts} attempts exhausted (worker crash loop or poison spec)`, job.jobId);
+          return null;
+        }
         const reclaimed = job.status === 'running';
         const token = job.fenceToken + 1;
         const res = prepare(
@@ -219,6 +273,16 @@ export const openScheduler = (dbPath: string): Scheduler => {
         ? prepare('SELECT * FROM jobs WHERE status=? ORDER BY id ASC').all(filter.status)
         : prepare('SELECT * FROM jobs ORDER BY id ASC').all();
       return rows.map(rowToJob);
+    },
+
+    listDead() {
+      return prepare("SELECT * FROM jobs WHERE status='dead' ORDER BY ended_at ASC").all().map(rowToJob);
+    },
+
+    requeueDead(jobId, at) {
+      const now = at ?? new Date().toISOString();
+      const res = prepare("UPDATE jobs SET status='queued', attempts=0, worker=NULL, heartbeat_at=NULL, ended_at=NULL, error=NULL, fence_token=fence_token+1, created_at=? WHERE job_id=? AND status='dead'").run(now, jobId);
+      return Number(res.changes) === 1;
     },
 
     stats() {
