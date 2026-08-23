@@ -855,6 +855,9 @@ export interface ConversationProposal {
   status: 'pending' | 'executed' | 'rejected' | 'failed';
   result?: string;
   autoApproved?: boolean;
+  /** RU-3 T6: server-computed disclosure (never accepted from model input). */
+  riskLevel?: 'low' | 'moderate' | 'high';
+  argSummary?: Record<string, string>;
   createdAt: string;
   resolvedAt?: string;
 }

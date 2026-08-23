@@ -269,12 +269,35 @@ const makeProposeAction = (app: App, conv: Conversation, proposals: Conversation
       if (target.conversationId !== conv.id) return { ok: false, error: { kind: 'validation', message: 'that automation belongs to a different conversation' } };
     }
     const autoApproved = conv.autoApprove.includes(parsed.kind);
+    // RU-3 T6: server-computed disclosure — the model cannot forge risk level
+    // or arg rendering; the card's title stays explicitly model-authored.
+    const RISK_BY_KIND: Record<typeof parsed.kind, 'low' | 'moderate' | 'high'> = {
+      launch_research: 'moderate',
+      create_automation: 'moderate',
+      cancel_automation: 'low',
+      create_tool_integration: 'high',
+    };
+    const renderArgs = (kind: typeof parsed.kind, a: Record<string, unknown>): Record<string, string> => {
+      const s = (v: unknown, max = 160): string => String(v ?? '').slice(0, max);
+      switch (kind) {
+        case 'launch_research':
+          return { question: s(a.question), seeds: s((a.seedTexts as unknown[] | undefined)?.length ?? 0) };
+        case 'create_automation':
+          return { task: s(a.task), trigger: s(a.schedule ?? a.onRunCompleted) };
+        case 'cancel_automation':
+          return { automationId: s(a.automationId) };
+        case 'create_tool_integration':
+          return { toolType: s((a.draft as { toolType?: string } | undefined)?.toolType), label: s((a.draft as { label?: string } | undefined)?.label) };
+      }
+    };
     const proposal: ConversationProposal = {
       id: newId('act'),
       kind: parsed.kind,
       title: parsed.title,
       args: argCheck.data as Record<string, unknown>,
       status: 'pending',
+      riskLevel: RISK_BY_KIND[parsed.kind],
+      argSummary: renderArgs(parsed.kind, argCheck.data as Record<string, unknown>),
       ...(autoApproved ? { autoApproved: true } : {}),
       createdAt: new Date().toISOString(),
     };
