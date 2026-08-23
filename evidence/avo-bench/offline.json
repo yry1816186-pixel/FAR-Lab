@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-08-23T20:07:29.413Z",
+  "mode": "offline-deterministic",
+  "workloads": [
+    {
+      "runId": "run_jpktce50q7wqc68rkg64ztm3me",
+      "question": "Does vitamin D supplementation reduce the risk of respirator",
+      "hypotheses": 10,
+      "evidenceRelations": 15,
+      "counterEvidence": 1,
+      "experimentSpecs": 0,
+      "nextAction": "draft_experiment",
+      "timingsMs": {
+        "inspectIpc": 59,
+        "planNextAction": 1
+      }
+    },
+    {
+      "runId": "run_bbgtvep5bwdy26n0kvxkw0epvn",
+      "question": "Does machine-learning prediction of protein stability genera",
+      "hypotheses": 0,
+      "evidenceRelations": 33,
+      "counterEvidence": 3,
+      "experimentSpecs": 0,
+      "nextAction": "review_counter_evidence",
+      "timingsMs": {
+        "inspectIpc": 1,
+        "planNextAction": 1
+      }
+    }
+  ],
+  "finishedAt": "2026-08-23T20:07:29.477Z"
+}
