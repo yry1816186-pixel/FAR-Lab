@@ -17,7 +17,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { Automation, BuiltinRouteSummary, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
+import type { Automation, BuiltinRouteSummary, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
 
 const BASE = '/api/v1';
 
@@ -45,6 +45,89 @@ export const getSources = async (runId: string, signal?: AbortSignal) =>
 
 export const getEvidence = async (runId: string, signal?: AbortSignal) =>
   normalizeEvidence(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/evidence`, signal));
+
+/* ---- active-learning screening (ASReview-pattern loop) ---- */
+
+const screeningViewOf = (data: unknown): ScreeningView => {
+  const err = new ApiError({ code: 'unexpected_schema', message: '筛选会话响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'screening' } });
+  if (typeof data !== 'object' || data === null) throw err;
+  const r = data as Record<string, unknown>;
+  const sess = r.session, stop = r.stop, next = r.next;
+  if (typeof sess !== 'object' || sess === null || typeof stop !== 'object' || stop === null || !Array.isArray(next)) throw err;
+  const sv = sess as Record<string, unknown>;
+  const st = stop as Record<string, unknown>;
+  if (typeof sv.id !== 'string' || (sv.state !== 'active' && sv.state !== 'stopped') || typeof sv.poolSize !== 'number') throw err;
+  return {
+    session: {
+      id: sv.id,
+      state: sv.state,
+      poolSize: sv.poolSize,
+      includeCount: typeof sv.includeCount === 'number' ? sv.includeCount : 0,
+      excludeCount: typeof sv.excludeCount === 'number' ? sv.excludeCount : 0,
+      corpusGrew: sv.corpusGrew === true,
+    },
+    next: next.filter((n): n is ScreeningView['next'][number] => {
+      if (typeof n !== 'object' || n === null) return false;
+      const q = n as Record<string, unknown>;
+      return typeof q.srcId === 'string' && typeof q.title === 'string' && Array.isArray(q.authors)
+        && (q.phase === 'random' || q.phase === 'model');
+    }).map((n) => {
+      const q = n as unknown as Record<string, unknown>;
+      return {
+        srcId: String(q.srcId),
+        title: String(q.title),
+        authors: (q.authors as unknown[]).map(String),
+        ...(q.year !== undefined ? { year: Number(q.year) } : {}),
+        ...(typeof q.abstractText === 'string' && q.abstractText.length > 0 ? { abstractText: q.abstractText } : {}),
+        pRelevant: q.pRelevant === null || q.pRelevant === undefined ? null : Number(q.pRelevant),
+        rank: typeof q.rank === 'number' ? q.rank : 0,
+        phase: q.phase === 'model' ? 'model' as const : 'random' as const,
+      };
+    }),
+    stop: {
+      eligible: st.eligible === true,
+      labeledCount: typeof st.labeledCount === 'number' ? st.labeledCount : 0,
+      includeCount: typeof st.includeCount === 'number' ? st.includeCount : 0,
+      predictedRelevantRemaining: typeof st.predictedRelevantRemaining === 'number' ? st.predictedRelevantRemaining : null,
+      coverageEstimate: typeof st.coverageEstimate === 'number' ? st.coverageEstimate : null,
+      basis: typeof st.basis === 'string' ? st.basis : '',
+    },
+  };
+};
+
+export const getScreening = async (runId: string, signal?: AbortSignal): Promise<ScreeningView> =>
+  screeningViewOf(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/screening`, signal));
+
+export const decideScreening = async (
+  runId: string,
+  srcId: string,
+  verdict: 'include' | 'exclude',
+  reason?: string,
+  signal?: AbortSignal,
+): Promise<ScreeningDecisionResult> => {
+  const data = await api.post(
+    `${BASE}/runs/${encodeURIComponent(runId)}/screening/decisions`,
+    { srcId, verdict, ...(reason !== undefined && reason.length > 0 ? { reason } : {}) },
+    signal,
+  );
+  if (typeof data !== 'object' || data === null || (data as Record<string, unknown>).view === undefined) {
+    throw new ApiError({ code: 'unexpected_schema', message: '筛选判定响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'screening decision' } });
+  }
+  const r = data as Record<string, unknown>;
+  return { duplicate: r.duplicate === true, view: screeningViewOf(r.view) };
+};
+
+export const stopScreening = async (runId: string, signal?: AbortSignal): Promise<ScreeningStopResult> => {
+  const data = await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/screening/stop`, {}, signal);
+  if (typeof data !== 'object' || data === null || (data as Record<string, unknown>).view === undefined) {
+    throw new ApiError({ code: 'unexpected_schema', message: '筛选停止响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'screening stop' } });
+  }
+  const r = data as Record<string, unknown>;
+  return {
+    view: screeningViewOf(r.view),
+    ...(typeof r.feedbackId === 'string' ? { feedbackId: r.feedbackId } : {}),
+  };
+};
 
 export const getHypotheses = async (runId: string, signal?: AbortSignal) =>
   normalizeHypotheses(await api.getJson(`${BASE}/runs/${encodeURIComponent(runId)}/hypotheses`, signal));

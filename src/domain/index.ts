@@ -18,4 +18,8 @@ export * from './ach.js';
 export * from './prediction.js';
 export * from './meta.js';
 export * from './paper-outline.js';
+export * from './conversation.js';
+export * from './automation.js';
+export * from './tool-integration.js';
 export * from './iteration.js';
+export * from './screening.js';

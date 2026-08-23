@@ -1003,3 +1003,45 @@ export interface ToolIntegrationView {
   match?: { toolPattern?: string; riskClass?: string };
   action?: { type: 'block' | 'require_approval' | 'log'; reason?: string; note?: string };
 }
+
+// ---- active-learning screening (ASReview-pattern loop) ----
+
+export interface ScreeningView {
+  session: {
+    id: string;
+    state: 'active' | 'stopped';
+    poolSize: number;
+    includeCount: number;
+    excludeCount: number;
+    /** Live corpus grew beyond the pool snapshot — offer an honest restart note. */
+    corpusGrew: boolean;
+  };
+  next: Array<{
+    srcId: string;
+    title: string;
+    authors: string[];
+    year?: number;
+    abstractText?: string;
+    pRelevant: number | null;
+    rank: number;
+    phase: 'random' | 'model';
+  }>;
+  stop: {
+    eligible: boolean;
+    labeledCount: number;
+    includeCount: number;
+    predictedRelevantRemaining: number | null;
+    coverageEstimate: number | null;
+    basis: string;
+  };
+}
+
+export interface ScreeningDecisionResult {
+  duplicate: boolean;
+  view: ScreeningView;
+}
+
+export interface ScreeningStopResult {
+  view: ScreeningView;
+  feedbackId?: string;
+}

@@ -1,3 +1,4 @@
+import { ScreeningWorkbench } from '../ScreeningWorkbench.js';
 import { useCallback, useState } from 'react';
 import { isNotFound } from '../../api/client';
 import { getCorpus, getEvidence, getReceipts, getSources } from '../../api/endpoints';
@@ -28,6 +29,8 @@ export function EvidenceTab({
 }): JSX.Element {
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
+  const [screeningOpen, setScreeningOpen] = useState(false);
+
 
   const sourcesFetcher = useCallback((signal: AbortSignal) => getSources(run.id, signal), [run.id]);
   const sourcesRes = useResource(sourcesFetcher, [run.id], refreshKey);
@@ -76,6 +79,19 @@ export function EvidenceTab({
           </div>
         </div>
       )}
+      {/* Active-learning screening (ASReview-pattern): enter once the pool is
+          big enough for the loop to mean anything; smaller pools are honestly
+          not worth a screening pass. */}
+      {!sourcesRes.loading && (sourcesRes.data?.length ?? 0) >= 6 && (
+        <div className="screening-entry">
+          <button type="button" className="btn btn--small" onClick={() => setScreeningOpen(true)}>
+            {t('screening.entry', { n: sourcesRes.data?.length ?? 0 })}
+          </button>
+          <span className="muted small">{t('screening.entryHint')}</span>
+        </div>
+      )}
+      {screeningOpen && <ScreeningWorkbench runId={run.id} onClose={() => setScreeningOpen(false)} />}
+
       {/* B1 reorder: the researcher's substance leads (sources → claims →
           relations); retrieval transparency stays fully available but is a
           collapsed trust disclosure, not the first screen of the tab. */}
