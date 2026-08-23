@@ -32,6 +32,14 @@
 - sibling 落地(非本 lane): dunder-escape 封禁/T3/T4 安全层/forkRun+PROV-O/ACC-39..41
 - 全量: 1321 passed / 3 skipped / 120 files (fork 前复测)
 
+
+## Adversarial Review 完成 (44a5d08)
+- 委派双审查因子 agent 402 失败 -> 主 Agent 自查 + 生产数据实证 (06-adversarial-review.md)
+- P1-1 unproductive_cycle 死路径修复: 改消费真实 IterationRecord.snapshot.fingerprint
+- P1-2 lineage 截断修复: parentRunId 逐跳 getRun + listRunsByParent, 不再有 1000 上限静默丢失
+- P2 inputHash 双哈希修正: receipt 恢复第三方可验证性
+- 全量复测: 1352 passed / 3 skipped / 128 files
+
 ## 关键不变量 (实现中已验证)
 - supervisor/lineage 均为只读视图, 不产生第二权威
 - supervisor_observation note 每边界恰好一条 (幂等可审计)
