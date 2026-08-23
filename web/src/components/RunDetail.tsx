@@ -13,6 +13,7 @@ import { PlanTab } from './detail/PlanTab';
 import { RevisionsTab } from './detail/RevisionsTab';
 import { ProvenanceTab } from './detail/ProvenanceTab';
 import { EventsTab } from './detail/EventsTab';
+import { ResearchStatePanel } from './detail/ResearchStatePanel';
 import { FeedbackDrawer } from './detail/FeedbackDrawer';
 import type { FeedbackTarget } from './detail/FeedbackForm';
 import { ExperimentsTab } from './detail/ExperimentsTab';
@@ -199,6 +200,10 @@ export function RunDetail({
         return (
           <>
             <OverviewTab run={run} events={events} onMutated={onMutated} onFeedback={openFeedback} onNavigate={setTabId} />
+            {/* AVO fusion (G2/G3/G8): living research state — supervisor health,
+                evaluator family and trajectory lineage. Progressive disclosure
+                inside; raw event stream remains one disclosure below. */}
+            <ResearchStatePanel runId={run.id} />
             {/* The raw event stream stays one disclosure away (audit-grade
                 transparency without making it the researcher's daily view). */}
             <details className="tech-details events-disclosure">
