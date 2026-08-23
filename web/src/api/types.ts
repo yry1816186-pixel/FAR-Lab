@@ -880,6 +880,9 @@ export interface ConversationMessage {
     inputTokens?: number; outputTokens?: number;
     modelCalls?: number; toolCalls?: number;
   };
+  /** researcher messages only: why this message's agent reply failed — the
+   * message itself is durable history; retry clears this by landing the reply. */
+  replyError?: string;
   createdAt: string;
 }
 

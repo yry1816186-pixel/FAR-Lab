@@ -485,10 +485,16 @@ export const createConversation = async (input: { title?: string; providerConfig
 /** One dialogue turn: researcher message (with materials) → the agent's real reply. */
 export const postConversationMessage = async (
   id: string,
-  input: { text: string; seeds?: import('../utils/ingest').SeedInput[] },
+  input: { text: string; seeds?: unknown },
   signal?: AbortSignal,
 ): Promise<Conversation> =>
   conversationOf((await api.post(`${BASE}/conversations/${encodeURIComponent(id)}/messages`, input, signal) as { conversation?: unknown }).conversation);
+
+/** Re-run the resident agent's reply for the conversation's last (unanswered)
+ * researcher message — the failed-turn retry path; the message itself is
+ * already durable history and never re-sent. */
+export const retryConversationTurn = async (id: string, messageId: string, signal?: AbortSignal): Promise<Conversation> =>
+  conversationOf((await api.post(`${BASE}/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/retry`, {}, signal) as { conversation?: unknown }).conversation);
 
 /** The conversation's reasoning-capability view (route-declared) and current gear. */
 export interface ConversationReasoningInfo {

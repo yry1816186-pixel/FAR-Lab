@@ -92,6 +92,13 @@ export const ConversationMessageSchema = z.object({
   proposals: z.array(ConversationProposalSchema).max(10).optional(),
   /** Honest per-turn model usage summary (receipts stay run-scoped). */
   usage: MessageUsageSchema.optional(),
+  /**
+   * researcher-message-only: why this message's agent reply failed (provider/
+   * model error). The researcher's words are history — they persist even when
+   * the turn fails; landing a reply (post-retry or re-run) clears this. Absent
+   * = replied, or reply never attempted.
+   */
+  replyError: z.string().max(2000).optional(),
   createdAt: ISO,
 });
 export type ConversationMessage = z.infer<typeof ConversationMessageSchema>;
