@@ -12,6 +12,7 @@ import {
 import { createCustomProvider } from '../providers/custom.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { buildLineageGraph } from '../app/lineage.js';
+import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
@@ -1502,6 +1503,13 @@ function parseSeedSources(raw: unknown): string | {
             throw e;
           }
         }
+      if (segments.length === 5 && segments[4] === 'evaluations' && method === 'GET') {
+        // AVO fusion G8 projection: the deterministic evaluator family over this
+        // run's scientific state (multi-dimensional, no invented single score).
+        mustGetRun(runId);
+        sendJson(res, 200, { runId, evaluations: runEvaluators({ store: app.store, runId, now: new Date().toISOString() }) });
+        return;
+      }
       if (segments.length === 5 && segments[4] === 'lineage' && method === 'GET') {
         // AVO fusion G3 projection: the queryable research trajectory graph
         // (run revision family + hypotheses + evidence + causal revisions).

@@ -558,6 +558,18 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(missing.status).toBe(404);
   });
 
+  it('projects the evaluator family for a run (AVO fusion G8)', async () => {
+    const { status, body } = await getJson(`${base}/api/v1/runs/${run1}/evaluations`);
+    expect(status).toBe(200);
+    expect(body.runId).toBe(run1);
+    const ids = body.evaluations.map((e: { id: string }) => e.id).sort();
+    expect(ids).toEqual(['evidence_balance', 'falsifiability', 'hypothesis_diversity', 'provenance_completeness', 'uncertainty_transparency']);
+    for (const e of body.evaluations) {
+      expect(['pass', 'warn', 'fail']).toContain(e.status);
+      expect(typeof e.detail).toBe('string');
+    }
+  });
+
   it('projects iteration records with trigger/stop rationale (research-loop lane)', async () => {
     app.store.putObject('iteration', IterationRecord.parse({
       id: newId('itr'), runId: run2, round: 1, decidedAt: ts(50), decision: 'continue',
