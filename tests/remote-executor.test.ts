@@ -67,8 +67,17 @@ describe('P3 remote executor: device-bound queue -> remote training -> local ver
       'farlab-ssh-target',
       'sh', '-c', `echo "$AUTHORIZED_KEY" > /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys && exec /usr/sbin/sshd -D -e`,
     ]);
-    await new Promise<void>((r) => setTimeout(r, 1500));
-    const hostKey = execFileSync('docker', ['exec', CONTAINER, 'cat', '/etc/ssh/ssh_host_ed25519_key.pub'], { encoding: 'utf8' }).trim();
+    // Poll for sshd readiness instead of a blind sleep — under full-suite load
+    // 1500ms is not always enough and scp then fails with "Connection closed".
+    let hostKey = '';
+    for (let i = 0; i < 40; i++) {
+      await new Promise<void>((r) => setTimeout(r, 500));
+      try {
+        hostKey = execFileSync('docker', ['exec', CONTAINER, 'cat', '/etc/ssh/ssh_host_ed25519_key.pub'], { encoding: 'utf8' }).trim();
+        if (hostKey) break;
+      } catch { /* container starting */ }
+    }
+    if (!hostKey) throw new Error('ssh target never produced a host key within 20s');
     const knownHosts = join(dir, 'known_hosts');
     writeFileSync(knownHosts, `[localhost]:${PORT} ${hostKey}\n`);
 
