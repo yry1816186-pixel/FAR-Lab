@@ -19,9 +19,13 @@ export interface StageContext {
    * tests inject deterministic fakes.
    */
   fetchFullText?: (doc: SourceDocument) => Promise<FullTextFetchResult>;
-  /** Persist a provenance receipt tied to this run (models/sources/tools must call this). */
+  /**
+   * Persist a provenance receipt tied to this run (models/sources/tools must call this).
+   * `stage` is free-form: pipeline stages pass the RunStageName; the agent kernel uses
+   * 'agent:<capability>' (matches the ProvenanceReceipt schema and ModelReceiptPartial).
+   */
   recordReceipt: (receipt: Omit<ProvenanceReceipt, 'id' | 'runId' | 'at' | 'stage'> & {
-    stage?: RunStageName;
+    stage?: string;
     at?: string;
   }) => void;
   /** Structured cancellation signal checked between expensive operations inside stages. */

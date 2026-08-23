@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { strictSchemaOrUndefined } from '../providers/http.js';
-import { validateStructured, recordModelReceipt, describeShape } from '../pipeline/llm.js';
+import { validateStructured, recordModelReceipt, describeShape, withModelSlot } from '../pipeline/llm.js';
+import type { RunBudgetView } from '../app/run-budget.js';
 import type { ModelProvider, ArtifactStore } from '../shared/ports.js';
 import type { AgentTurnRecord } from '../domain/agent.js';
 import { AgentActionSchema, type AgentAction, type AgentEventSink, type ReceiptSink, type TranscriptEntry } from './protocol.js';
@@ -108,6 +109,13 @@ export interface AgentLoopDeps {
   emit: AgentEventSink;
   recordReceipt: ReceiptSink;
   telemetry: SessionTelemetry;
+  /**
+   * Run token-budget governance (BP-1 unified model plane): gates NEW turns before
+   * the model call and records usage after — an agent session bound to a run spends
+   * from the SAME receipt-derived budget the pipeline honors. Absent = unlimited
+   * (sessions without a run, minimal harnesses).
+   */
+  budget?: RunBudgetView;
   hooks?: ExtensionBus;
   /** Enables spill-to-artifact for oversized tool results (content-addressed ref). */
   artifacts?: ArtifactStore;
@@ -265,8 +273,11 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
       }
     }
 
-    // --- model call (fail-closed; plane owns retries) ---
-    const res = await deps.provider.structuredCall(
+    // --- model call (fail-closed; plane owns retries; budget gates NEW turns) ---
+    if (deps.budget !== undefined && !deps.budget.hasRemaining()) {
+      return finish('stop_condition', { error: `run token budget exhausted before turn ${turn} — raise FARLAB_RUN_TOKEN_BUDGET and resume` });
+    }
+    const res = await withModelSlot(() => deps.provider.structuredCall(
       {
         task: `${deps.purpose}:turn`,
         systemPrompt: `${cfg.systemPrompt}\n\n${PROTOCOL_PROMPT}`,
@@ -285,8 +296,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
         purpose: `${deps.purpose}:turn`,
       },
       (raw) => validateStructured<AgentAction>(raw, AgentActionSchema),
-    );
+    ));
     recordModelReceipt(deps.recordReceipt, { stage: deps.purpose }, res);
+    deps.budget?.spend(res.receipt.usage.totalTokens);
     totalTokens += res.receipt.usage.totalTokens ?? 0;
     deps.telemetry.recordModelCall(res.receipt.usage);
     deps.emit({
@@ -455,7 +467,10 @@ const safeJson = (v: unknown): string | null => {
 /** Full handoff compaction: one structured LLM call (receipted); failure is fail-closed. */
 const handoffSummary = async (deps: AgentLoopDeps, transcript: readonly TranscriptEntry[], task: string): Promise<string> => {
   const schema = z.object({ summary: z.string().min(1).max(8000) });
-  const res = await deps.provider.structuredCall(
+  // No budget GATE here (deliberate): compaction is what lets the session CONTINUE
+  // under its context budget — gating it would deadlock an over-soft-limit session.
+  // The call is still receipted and SPENDS from the run budget (honest accounting).
+  const res = await withModelSlot(() => deps.provider.structuredCall(
     {
       task: `${deps.purpose}:compact`,
       systemPrompt: HANDOFF_PROMPT,
@@ -465,8 +480,9 @@ const handoffSummary = async (deps: AgentLoopDeps, transcript: readonly Transcri
       purpose: `${deps.purpose}:compact`,
     },
     (raw) => validateStructured<{ summary: string }>(raw, schema),
-  );
+  ));
   recordModelReceipt(deps.recordReceipt, { stage: deps.purpose }, res);
+  deps.budget?.spend(res.receipt.usage.totalTokens);
   deps.telemetry.recordModelCall(res.receipt.usage);
   if (!res.ok || res.data === undefined) {
     const err = res.error ?? { kind: 'provider_error' as const, message: 'unknown provider failure' };

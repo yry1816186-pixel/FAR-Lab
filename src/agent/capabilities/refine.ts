@@ -5,6 +5,9 @@ import type { ArtifactStore, ModelProvider, SourceAdapter } from '../../shared/p
 import type { Store } from '../../persistence/store.js';
 import type { SourceFamily } from '../../domain/source.js';
 import { newId, ProvenanceReceipt, AgentSession, AgentReport, type AgentTelemetrySummary, type AgentTurnRecord } from '../../domain/index.js';
+import { receiptEventDetail } from '../../pipeline/llm.js';
+import { makeRunBudget } from '../../app/run-budget.js';
+import { resolveRunProvider } from '../../app/provider-resolver.js';
 import { ToolRegistry, type AgentTool, type ToolContext, type ToolResult } from '../tool.js';
 import { PermissionEngine } from '../permissions.js';
 import { SessionTelemetry } from '../telemetry.js';
@@ -132,8 +135,19 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
   const recordReceipt: ReceiptSink = (partial) => {
     const receipt = ProvenanceReceipt.parse({ ...partial, id: newId('rcp'), runId, at: partial.at ?? new Date().toISOString() });
     deps.store.putObject('receipt', receipt);
-    deps.store.appendEvent(runId, { type: 'receipt_recorded', detail: { kind: partial.kind, stage: partial.stage } });
+    deps.store.appendEvent(runId, {
+      type: 'receipt_recorded',
+      stage: partial.stage,
+      detail: receiptEventDetail(receipt),
+      receiptId: receipt.id,
+    });
   };
+
+  // Unified model plane: the session serves from the run's CONFIGURED provider chain
+  // (user model-config + failover, BP-4) and spends from the SAME receipt-derived
+  // run budget the pipeline honors — an agent session on a run is not a budget escape hatch.
+  const sessionProvider = resolveRunProvider(deps.store, run) ?? deps.provider;
+  const sessionBudget = makeRunBudget(deps.store, runId);
 
   // --- tools (read-only over the run + live literature search) ---
   const makeTools = (): ToolRegistry => {
@@ -291,13 +305,14 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
   }
   const telemetry = new SessionTelemetry();
   const mainDeps = {
-    provider: deps.provider,
+    provider: sessionProvider,
     tools: makeTools(),
     permissions,
     sessionId,
     purpose: PURPOSE,
     emit,
     recordReceipt,
+    budget: sessionBudget,
     telemetry,
     artifacts: deps.artifacts,
     rollout: openRolloutWriter(deps.rolloutDir, sessionId),

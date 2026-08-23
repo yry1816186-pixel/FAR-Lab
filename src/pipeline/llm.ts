@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import type { StageContext } from './types.js';
 import type { RunStageName } from '../domain/run.js';
-import type { ProvenanceReceipt } from '../domain/provenance.js';
-import type { StructuredCallResult } from '../shared/ports.js';
+import { ProvenanceReceipt } from '../domain/provenance.js';
+import { newId } from '../domain/ids.js';
+import type { Store } from '../persistence/store.js';
+import type { ModelProvider, StructuredCallResult } from '../shared/ports.js';
 import { strictSchemaOrUndefined } from '../providers/http.js';
 import { RunBudgetExhaustedError } from '../app/run-budget.js';
 
@@ -25,17 +27,75 @@ export interface LlmResult<T> {
 }
 
 /**
- * Single disciplined bridge from stages to the model plane: one call, deterministic zod
- * validation, receipt recorded, provider failure thrown (fail-closed — never fabricate).
+ * Invocation options for the unified model plane. `stage` is a free-form string:
+ * pipeline stages pass the RunStageName; the agent kernel uses 'agent:<capability>',
+ * research actions 'action:<name>', the experiment executors 'execute'.
  */
-export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions): Promise<LlmResult<T>> {
+export interface InvokeOptions extends Omit<LlmCallOptions, 'stage'> {
+  stage: string;
+}
+
+/** What a caller must supply to reach the model plane — the four disciplines in one type. */
+export interface ModelPlaneDeps {
+  provider: ModelProvider;
+  /** Run-budget governance (BP-1); absent = unlimited (tests, minimal harnesses). */
+  budget?: Parameters<typeof callStructured>[0]['budget'];
+  /** Receipt sink: StageContext.recordReceipt (lease-aware) or makeStoreReceiptRecorder. */
+  recordReceipt: (partial: ModelReceiptPartial) => void;
+  /** Run id for the budget-exhaustion error (non-pipeline callers bound their own run). */
+  runId?: string;
+}
+
+/**
+ * Process-wide in-flight cap on provider structured calls (FIFO queue, no new
+ * dependencies): parallel stage batches (mapBounded) overlap politely instead of
+ * stampeding one route. Transport-level 429 backoff stays the deeper guard
+ * (src/providers/http.ts); this is the proactive ceiling. FARLAB_MODEL_CONCURRENCY
+ * (floor 1) overrides for tight-quota deployments.
+ */
+const MODEL_CALL_CONCURRENCY = Math.max(1, Number(process.env.FARLAB_MODEL_CONCURRENCY ?? 6) || 6);
+let modelCallsInFlight = 0;
+const modelCallWaiters: Array<() => void> = [];
+
+const acquireModelSlot = async (): Promise<void> => {
+  if (modelCallsInFlight < MODEL_CALL_CONCURRENCY) {
+    modelCallsInFlight += 1;
+    return;
+  }
+  await new Promise<void>((resolve) => modelCallWaiters.push(resolve));
+  modelCallsInFlight += 1;
+};
+
+const releaseModelSlot = (): void => {
+  modelCallsInFlight -= 1;
+  modelCallWaiters.shift()?.();
+};
+
+/** Run one provider call under the global in-flight cap (the agent kernel routes its bespoke calls through this too). */
+export const withModelSlot = async <T>(fn: () => Promise<T>): Promise<T> => {
+  await acquireModelSlot();
+  try {
+    return await fn();
+  } finally {
+    releaseModelSlot();
+  }
+};
+
+/**
+ * THE unified model-plane entry: every non-pipeline caller (research actions,
+ * experiment spec-draft/meta-extraction, agent kernel helpers) goes through this
+ * so budget governance, receipt shape, structured-output tolerance and the
+ * concurrency cap cannot drift per call site. Pipeline stages reach it via the
+ * callStructured wrapper below (same discipline, StageContext-shaped).
+ */
+export async function invokeStructured<T>(deps: ModelPlaneDeps, opts: InvokeOptions): Promise<LlmResult<T>> {
   // BP-1 budget governance: refuse NEW model calls once the run's token cap is spent.
   // In-flight provider work is bounded by the provider plane's own discipline; this
   // gate keeps the NEXT call from starting (fail-visible, never a fabricated result).
-  if (ctx.budget !== undefined && !ctx.budget.hasRemaining()) {
-    throw new RunBudgetExhaustedError(ctx.run.id, ctx.budget.cap ?? 0, ctx.budget.spent);
+  if (deps.budget !== undefined && !deps.budget.hasRemaining()) {
+    throw new RunBudgetExhaustedError(deps.runId ?? 'unknown', deps.budget.cap ?? 0, deps.budget.spent);
   }
-  const res = await ctx.provider.structuredCall(
+  const res = await withModelSlot(() => deps.provider.structuredCall(
     {
       task: opts.purpose,
       systemPrompt: opts.systemPrompt,
@@ -52,16 +112,9 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
       purpose: opts.purpose,
     },
     (raw) => validateStructured<T>(raw, opts.schema),
-  );
-  ctx.budget?.spend(res.receipt.usage.totalTokens);
-  recordModelReceipt(
-    (p) => ctx.recordReceipt({
-      kind: p.kind, executionMode: p.executionMode, redactionNote: p.redactionNote,
-      modelCall: p.modelCall, stage: opts.stage,
-    }),
-    { stage: opts.stage },
-    res,
-  );
+  ));
+  deps.budget?.spend(res.receipt.usage.totalTokens);
+  recordModelReceipt(deps.recordReceipt, { stage: opts.stage }, res);
   if (!res.ok || res.data === undefined) {
     const err = res.error ?? { kind: 'provider_error', message: 'unknown provider failure' };
     throw new Error(`model call failed (${err.kind}) in ${opts.stage}/${opts.purpose}: ${err.message}`);
@@ -69,8 +122,62 @@ export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions)
   return { data: res.data, provider: res.receipt.provider, modelId: res.receipt.modelId, latencyMs: res.receipt.latencyMs };
 }
 
+/**
+ * Single disciplined bridge from stages to the model plane: one call, deterministic zod
+ * validation, receipt recorded, provider failure thrown (fail-closed — never fabricate).
+ */
+export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions): Promise<LlmResult<T>> {
+  return invokeStructured(
+    { provider: ctx.provider, budget: ctx.budget, recordReceipt: ctx.recordReceipt, runId: ctx.run.id },
+    { ...opts, stage: opts.stage },
+  );
+}
+
 /** Receipt partial accepted by recordModelReceipt — stage is free-form (agent sessions use 'agent:<capability>'). */
 export type ModelReceiptPartial = Omit<ProvenanceReceipt, 'id' | 'runId' | 'at'> & { at?: string };
+
+/** receipt_recorded event detail — ONE shape for every recording path (orchestrator, store recorder). */
+export const receiptEventDetail = (receipt: ProvenanceReceipt): Record<string, unknown> => ({
+  kind: receipt.kind,
+  id: receipt.id,
+  ...(receipt.modelCall !== undefined ? {
+    provider: receipt.modelCall.provider,
+    modelId: receipt.modelCall.modelId,
+    latencyMs: receipt.modelCall.latencyMs,
+    ...(receipt.modelCall.usage.totalTokens !== undefined ? { totalTokens: receipt.modelCall.usage.totalTokens } : {}),
+  } : {}),
+  ...(receipt.sourceRetrieval !== undefined ? {
+    family: receipt.sourceRetrieval.family,
+    query: receipt.sourceRetrieval.query,
+    httpStatus: receipt.sourceRetrieval.httpStatus,
+    resultCount: receipt.sourceRetrieval.resultCount,
+  } : {}),
+});
+
+/**
+ * Store-backed receipt sink for NON-pipeline callers (research actions, experiment
+ * executors): same ProvenanceReceipt.parse + putObject + receipt_recorded event as
+ * the orchestrator's context sink, minus lease heartbeating (no lease outside
+ * execute()). Building the recorder (not recording inline in callers) keeps the
+ * receipt body and event shape from drifting per call site.
+ */
+export const makeStoreReceiptRecorder = (store: Store, runId: string): ((partial: ModelReceiptPartial) => void) => {
+  return (partial) => {
+    const receipt = ProvenanceReceipt.parse({
+      ...partial,
+      id: newId('rcp'),
+      runId,
+      at: partial.at ?? new Date().toISOString(),
+    });
+    store.putObject('receipt', receipt);
+    store.appendEvent(runId, {
+      type: 'receipt_recorded',
+      stage: partial.stage,
+      detail: receiptEventDetail(receipt),
+      receiptId: receipt.id,
+    });
+  };
+};
 
 /**
  * Shape the model-call receipt for ANY caller (stages via callStructured AND the agent

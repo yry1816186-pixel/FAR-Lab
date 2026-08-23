@@ -47,7 +47,9 @@ export const RunEvent = z.object({
     'agent_started', 'agent_tool_used', 'agent_finished',
   ]),
   status: RunStatus.optional(),
-  stage: RunStageName.optional(),
+  // Free-form: pipeline stages pass the RunStageName; receipt events also carry
+  // non-stage origins ('action:<name>' research actions, 'agent:<capability>' sessions).
+  stage: z.string().optional(),
   detail: z.record(z.string(), z.unknown()).default({}),
   receiptId: ReceiptId.optional(),
 });

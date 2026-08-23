@@ -1,9 +1,8 @@
 import { z } from 'zod';
-import { newId } from '../domain/ids.js';
-import { ProvenanceReceipt } from '../domain/provenance.js';
-import { strictSchemaOrUndefined } from '../providers/http.js';
+import { invokeStructured, makeStoreReceiptRecorder, type LlmResult } from '../pipeline/llm.js';
+import { resolveRunProvider } from '../app/provider-resolver.js';
+import { makeRunBudget, RunBudgetExhaustedError } from '../app/run-budget.js';
 import type { App } from '../app/composition.js';
-import type { StructuredCallResult } from '../shared/ports.js';
 
 /**
  * B4 object-level AI research actions (thinking-collision surface): one click
@@ -34,6 +33,7 @@ export type ActionErrorCode =
   | 'question_required'
   | 'target_not_found'
   | 'not_found'
+  | 'action_budget_exhausted'
   | 'action_model_failed';
 
 export class ActionError extends Error {
@@ -165,68 +165,45 @@ export async function runResearchAction(app: App, runId: string, rawBody: unknow
     'color reasoning but must NEVER be asserted as fact — mark such points as caveats. Cite claims by their ' +
     'exact id in points of kind "evidence_link". Task: ' + ACTION_PROMPTS[req.action];
 
-  const res: StructuredCallResult<z.infer<typeof ActionAnalysis>> = await app.provider.structuredCall(
-    {
-      task: `research-action:${req.action}`,
-      systemPrompt,
-      userPayload: {
-        outputContract: '{headline: string, points: [{kind: one of "argument"|"evidence_link"|"caveat"|"gap", text: string, claimId?: string}], uncertainties: string[], nextStep?: string}',
-        input: {
+  // Unified model plane (same disciplines as pipeline calls): the run's configured
+  // provider chain (user model-config + failover), BP-1 budget governance, and the
+  // shared receipt body — an API-triggered analysis leaves the identical provenance
+  // trail a stage call would, including transportRetries/correctiveReasks facts.
+  let res: LlmResult<z.infer<typeof ActionAnalysis>>;
+  try {
+    res = await invokeStructured(
+      {
+        provider: resolveRunProvider(app.store, run) ?? app.provider,
+        budget: makeRunBudget(app.store, runId),
+        recordReceipt: makeStoreReceiptRecorder(app.store, runId),
+        runId,
+      },
+      {
+        stage: `action:${req.action}`,
+        purpose: `research-action:${req.action}`,
+        systemPrompt,
+        payload: {
           action: req.action,
           researcherQuestion: req.action === 'ask' ? req.question : undefined,
           researchQuestion: question?.text,
           target: { type: req.targetType, ...targetPayload },
           evidenceClaims,
         },
+        schema: ActionAnalysis,
+        temperature: 0.2,
+        maxTokens: 4096,
       },
-      outputKind: 'json',
-      temperature: 0.2,
-      maxTokens: 4096,
-      jsonSchema: strictSchemaOrUndefined(ActionAnalysis),
-      purpose: `research-action:${req.action}`,
-    },
-    (raw) => {
-      const p = ActionAnalysis.safeParse(raw);
-      return p.success ? p.data : new Error(`action analysis schema failed: ${p.error.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 4).join('; ')}`);
-    },
-  );
-
-  // Provenance parity with pipeline calls: receipt + event, same shapes.
-  const at = new Date().toISOString();
-  const receipt = ProvenanceReceipt.parse({
-    id: newId('rcp'), runId,
-    kind: 'model_call',
-    executionMode: res.receipt.executionMode,
-    at,
-    redactionNote: 'raw prompts/responses not retained; hashes only',
-    modelCall: {
-      provider: res.receipt.provider,
-      modelId: res.receipt.modelId,
-      modelVersion: res.receipt.modelVersion,
-      usage: res.receipt.usage,
-      latencyMs: res.receipt.latencyMs,
-      requestHash: res.receipt.requestHash,
-      outputHash: res.receipt.outputHash,
-      finishReason: res.receipt.finishReason,
-    },
-  });
-  app.store.putObject('receipt', receipt);
-  app.store.appendEvent(runId, {
-    type: 'receipt_recorded',
-    // modelCall is always present on this receipt (constructed two lines up with kind 'model_call');
-    // optional chaining only satisfies the schema-level optionality, wire shape unchanged.
-    detail: { kind: receipt.kind, id: receipt.id, provider: receipt.modelCall?.provider, modelId: receipt.modelCall?.modelId, latencyMs: receipt.modelCall?.latencyMs },
-    receiptId: receipt.id,
-  });
+    );
+  } catch (e) {
+    if (e instanceof RunBudgetExhaustedError) {
+      throw new ActionError(429, 'action_budget_exhausted', e.message);
+    }
+    throw new ActionError(502, 'action_model_failed', e instanceof Error ? e.message : String(e));
+  }
   app.store.appendEvent(runId, {
     type: 'note',
     detail: { reason: 'research_action', action: req.action, targetType: req.targetType, targetId: req.targetId },
   });
-
-  if (!res.ok || res.data === undefined) {
-    const err = res.error ?? { kind: 'provider_error', message: 'unknown provider failure' };
-    throw new ActionError(502, 'action_model_failed', `model call failed (${err.kind}): ${err.message}`);
-  }
 
   // Ref honesty: non-existent cited ids are dropped and disclosed.
   const droppedRefs: string[] = [];
@@ -245,7 +222,7 @@ export async function runResearchAction(app: App, runId: string, rawBody: unknow
     action: req.action,
     targetType: req.targetType,
     targetId: req.targetId,
-    model: { provider: res.receipt.provider, modelId: res.receipt.modelId, latencyMs: res.receipt.latencyMs },
+    model: { provider: res.provider, modelId: res.modelId, latencyMs: res.latencyMs },
     analysis,
     droppedRefs,
     groundingClaims: evidenceClaims.length,

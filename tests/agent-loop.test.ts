@@ -292,3 +292,34 @@ describe('agent loop dual timeout + stop conditions', () => {
     expect(res.status).toBe('completed');
   });
 });
+
+describe('agent kernel on the unified model plane (run-budget governance)', () => {
+  const budgetView = (over: Partial<{ cap: number | null; spent: number; has: boolean }> = {}) => ({
+    cap: over.cap ?? 1000,
+    spent: over.spent ?? 0,
+    remaining: () => (over.cap === null ? null : 100),
+    hasRemaining: () => over.has ?? true,
+    nearLimit: () => false,
+    spend: (_t?: number) => {},
+  });
+
+  it('an exhausted run budget ends the session before ANY model call (stop_condition, no receipt)', async () => {
+    const { deps, receipts } = depsFor([{ rawOutput: finish({ answer: 'ok' }) }]);
+    const res = await runAgentLoop(baseCfg(), { ...deps, budget: budgetView({ has: false, spent: 1000 }) });
+    expect(res.status).toBe('stop_condition');
+    expect(res.error).toContain('run token budget exhausted');
+    expect(receipts).toHaveLength(0); // the gate fired BEFORE the provider call
+  });
+
+  it('a healthy budget leaves the session running and spends usage per model call', async () => {
+    const spends: Array<number | undefined> = [];
+    const { deps } = depsFor([{ rawOutput: finish({ answer: 'ok' }) }]);
+    const res = await runAgentLoop(baseCfg(), {
+      ...deps,
+      budget: { ...budgetView(), spend: (t?: number) => { spends.push(t); } },
+    });
+    expect(res.status).toBe('completed');
+    expect(spends).toHaveLength(1); // one turn model call, one spend record
+    expect(spends[0]).toBeUndefined(); // stub usage is {} (no real token accounting) — the spend CALL is the wiring fact
+  });
+});

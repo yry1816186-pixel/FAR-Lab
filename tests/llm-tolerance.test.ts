@@ -26,6 +26,7 @@ const makeCtx = (steps: StubStep[]): StageContext => {
   const ctx = {
     provider: createTestStubProvider(steps),
     recordReceipt: () => {},
+    run: { id: 'run_test000000000000000000000001' },
   };
   return ctx as unknown as StageContext;
 };

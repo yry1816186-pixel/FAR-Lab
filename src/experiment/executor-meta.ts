@@ -10,6 +10,8 @@ import {
   type StatReport, type FeedbackSignal, type HypothesisCandidate,
 } from '../domain/index.js';
 import { checkMetaSpec } from '../domain/meta.js';
+import { invokeStructured, makeStoreReceiptRecorder, type ModelReceiptPartial } from '../pipeline/llm.js';
+import { RunBudgetExhaustedError, type RunBudgetView } from '../app/run-budget.js';
 import { poolFixed, poolRandomDL, leaveOneOut, eggerTest, chiSquareP, type StudyEstimate } from './meta-math.js';
 import {
   validateEffectEstimate, toStudyEstimate, dedupeEstimates,
@@ -29,6 +31,14 @@ export interface MetaExecuteOptions {
   provider: ModelProvider;
   shouldCancel?: () => boolean;
   now?: () => string;
+  /**
+   * Model-plane governance: run budget + receipt sink. Absent recordReceipt falls
+   * back to a store-backed recorder bound to the spec's run — the extraction call
+   * ALWAYS leaves a receipt (it spends real tokens and proposes the numbers the
+   * verdict derives from; unrecorded = unaccountable).
+   */
+  budget?: RunBudgetView;
+  recordReceipt?: (partial: ModelReceiptPartial) => void;
 }
 
 export interface ExecutedMeta {
@@ -112,42 +122,52 @@ export const executeMetaAnalysis = async (
     throw new Error(`meta experiment ${expRun.id} failed: ${message}`);
   };
 
-  // 2. LLM PROPOSES numbers from the run's VERIFIED claims (grounding surface).
+  // 2. LLM PROPOSES numbers from the run's VERIFIED claims (grounding surface) —
+  //    through the unified model plane: budget-gated, receipted, concurrency-capped.
   const claims = store
     .listObjects('claim', spec.runId)
     .filter((c) => c.bindingStatus === 'verified');
   if (claims.length === 0) fail('no verified claims in the run — nothing to extract effect estimates from');
 
-  const extraction = await opts.provider.structuredCall(
-    {
-      task: 'meta-effect-extraction',
-      systemPrompt: EXTRACTION_PROMPT,
-      userPayload: {
-        researchQuestion: spec.question,
-        requestedMeasure: RAW_MEASURE[spec.effectMeasure],
-        inclusionCriteria: spec.inclusionCriteria,
-        claims: claims.map((c) => ({
-          claimId: c.id,
-          sourceDocumentId: c.locators[0]?.sourceDocumentId ?? '',
-          text: c.text,
-          quote: c.locators[0]?.quote ?? '',
-        })),
+  let extData: z.infer<typeof ExtractionOut>;
+  let extractionModel: { provider: string; modelId: string };
+  try {
+    const res = await invokeStructured<z.infer<typeof ExtractionOut>>(
+      {
+        provider: opts.provider,
+        budget: opts.budget,
+        recordReceipt: opts.recordReceipt ?? makeStoreReceiptRecorder(store, spec.runId),
+        runId: spec.runId,
       },
-      outputKind: 'json',
-      temperature: 0,
-      maxTokens: 4096,
-      purpose: 'meta-effect-extraction',
-    },
-    (raw) => {
-      const parsed = ExtractionOut.safeParse(raw);
-      return parsed.success ? parsed.data : new Error(`extraction schema failed: ${parsed.error.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 4).join('; ')}`);
-    },
-  );
-  const extData = extraction.data;
-  if (!extraction.ok || extData === undefined) {
-    return fail(`effect-estimate extraction failed (${extraction.error?.kind ?? 'unknown'}): ${(extraction.error?.message ?? '').slice(0, 200)}`);
+      {
+        stage: 'execute',
+        purpose: 'meta-effect-extraction',
+        systemPrompt: EXTRACTION_PROMPT,
+        payload: {
+          researchQuestion: spec.question,
+          requestedMeasure: RAW_MEASURE[spec.effectMeasure],
+          inclusionCriteria: spec.inclusionCriteria,
+          claims: claims.map((c) => ({
+            claimId: c.id,
+            sourceDocumentId: c.locators[0]?.sourceDocumentId ?? '',
+            text: c.text,
+            quote: c.locators[0]?.quote ?? '',
+          })),
+        },
+        schema: ExtractionOut,
+        temperature: 0,
+        maxTokens: 4096,
+      },
+    );
+    extData = res.data;
+    extractionModel = { provider: res.provider, modelId: res.modelId };
+  } catch (e) {
+    // Operational budget pause propagates to the orchestrator's stage boundary —
+    // it is not a domain failure of this experiment.
+    if (e instanceof RunBudgetExhaustedError) throw e;
+    return fail(`effect-estimate extraction failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 200)}`);
   }
-  const modelRef = `${extraction.receipt.provider}/${extraction.receipt.modelId}`;
+  const modelRef = `${extractionModel.provider}/${extractionModel.modelId}`;
   persist({ ...expRun, status: 'running', startedAt: now() }, 'experiment_started', { id: expRun.id, extractionModel: modelRef });
 
   // 3. DETERMINISTIC admission: every proposal passes the numeric invariants or is
