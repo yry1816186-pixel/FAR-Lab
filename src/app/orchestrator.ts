@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
 import type { StageHandler, StageContext } from '../pipeline/types.js';
 import { STAGE_ORDER } from '../domain/run.js';
+import { canonicalJson } from '../shared/crypto.js';
 import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/ports.js';
 import type { SourceFamily } from '../domain/source.js';
 import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './run-budget.js';
@@ -311,60 +312,74 @@ export class Orchestrator {
         if (await handler.applicable(ctx)) {
           if (signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false)) throw new Error('cancelled by user');
           const outcome = await handler.execute(ctx);
-          run = await this.transition(runId, (r) => {
-            // no attempt arg: keep the attempt count persisted by the running transition
-            const outputs = this.deps.store.countStepOutputs(runId, stage);
-            // activate the (previously unused) checkpointRef schema field as a visible pointer
-            this.setStage(r, stage, { state: 'done', endedAt: new Date().toISOString(), ...(outputs > 0 ? { checkpointRef: `step_outputs:${outputs}` } : {}) });
-            return r;
-          }, lease);
-          this.deps.store.appendEvent(runId, {
-            type: 'stage_done', stage,
-            detail: { summary: outcome.kind === 'done' ? outcome.summary : outcome.reason },
-          });
+          if (outcome.kind === 'skipped') {
+            // W-E truth fix: a handler that legitimately has nothing to do returns
+            // {kind:'skipped', reason} — persisting that as 'done' erased the
+            // distinction and let the UI claim a closed loop ("研究已完成") over an
+            // open one (e.g. execute's honest no-applicable-experiment skip).
+            run = await this.transition(runId, (r) => {
+              this.setStage(r, stage, { state: 'skipped', endedAt: new Date().toISOString(), error: outcome.reason });
+              return r;
+            }, lease);
+            this.deps.store.appendEvent(runId, {
+              type: 'stage_skipped', stage, detail: { reason: outcome.reason },
+            });
+          } else {
+            run = await this.transition(runId, (r) => {
+              // no attempt arg: keep the attempt count persisted by the running transition
+              const outputs = this.deps.store.countStepOutputs(runId, stage);
+              // activate the (previously unused) checkpointRef schema field as a visible pointer
+              this.setStage(r, stage, { state: 'done', endedAt: new Date().toISOString(), ...(outputs > 0 ? { checkpointRef: `step_outputs:${outputs}` } : {}) });
+              return r;
+            }, lease);
+            this.deps.store.appendEvent(runId, {
+              type: 'stage_done', stage,
+              detail: { summary: outcome.summary },
+            });
 
-          // ---- BP-1 quality gate: after rank, decide whether the ranked set is strong
-          // enough to plan against. Weak signal + rounds remaining + budget remaining
-          // => reopen generate_hypotheses..rank for ONE regeneration round with the
-          // deterministic critique persisted as the audit trail.
-          if (stage === 'rank' && outcome.kind === 'done') {
-            const round = Number(this.deps.store.getMeta(qgRoundKey(runId)) ?? '1');
-            const scorecards = this.deps.store.listObjects('scorecard', runId);
-            const tournament = this.deps.store.listObjects('tournament', runId)[0] ?? null;
-            const signalQg = evaluateQualityGate(scorecards, tournament);
-            if (signalQg.weak && round < MAX_QUALITY_ROUNDS && budget.hasRemaining()) {
-              this.deps.store.setMeta(qgRoundKey(runId), String(round + 1));
-              // The reopen flag the hypotheses stage's applicable() consumes — WITHOUT it
-              // the reopened stage would see existing hypotheses and legitimately skip,
-              // making the whole regeneration loop dead code (red-team P0-1).
-              this.deps.store.setMeta(`qg:active:${runId}`, '1');
-              this.deps.store.appendEvent(runId, {
-                type: 'note', stage: 'rank',
-                detail: {
-                  reason: 'quality_gate_regeneration',
-                  round: round + 1,
-                  signal: { metrics: signalQg.metrics, reasons: signalQg.reasons, weakDimensions: signalQg.weakDimensions },
-                },
-              });
-              run = await this.transition(runId, (r) => {
-                for (const s of ['generate_hypotheses', 'critique_falsify', 'rank'] as RunStageName[]) {
-                  const rec2 = r.stages.find((x) => x.stage === s);
-                  if (rec2 !== undefined) {
-                    rec2.state = 'pending';
-                    delete rec2.endedAt;
-                    delete rec2.error;
+            // ---- BP-1 quality gate: after rank, decide whether the ranked set is strong
+            // enough to plan against. Weak signal + rounds remaining + budget remaining
+            // => reopen generate_hypotheses..rank for ONE regeneration round with the
+            // deterministic critique persisted as the audit trail.
+            if (stage === 'rank' && outcome.kind === 'done') {
+              const round = Number(this.deps.store.getMeta(qgRoundKey(runId)) ?? '1');
+              const scorecards = this.deps.store.listObjects('scorecard', runId);
+              const tournament = this.deps.store.listObjects('tournament', runId)[0] ?? null;
+              const signalQg = evaluateQualityGate(scorecards, tournament);
+              if (signalQg.weak && round < MAX_QUALITY_ROUNDS && budget.hasRemaining()) {
+                this.deps.store.setMeta(qgRoundKey(runId), String(round + 1));
+                // The reopen flag the hypotheses stage's applicable() consumes — WITHOUT it
+                // the reopened stage would see existing hypotheses and legitimately skip,
+                // making the whole regeneration loop dead code (red-team P0-1).
+                this.deps.store.setMeta(`qg:active:${runId}`, '1');
+                this.deps.store.appendEvent(runId, {
+                  type: 'note', stage: 'rank',
+                  detail: {
+                    reason: 'quality_gate_regeneration',
+                    round: round + 1,
+                    signal: { metrics: signalQg.metrics, reasons: signalQg.reasons, weakDimensions: signalQg.weakDimensions },
+                  },
+                });
+                run = await this.transition(runId, (r) => {
+                  for (const s of ['generate_hypotheses', 'critique_falsify', 'rank'] as RunStageName[]) {
+                    const rec2 = r.stages.find((x) => x.stage === s);
+                    if (rec2 !== undefined) {
+                      rec2.state = 'pending';
+                      delete rec2.endedAt;
+                      delete rec2.error;
+                    }
                   }
-                }
-                return r;
-              }, lease);
-              cursor = STAGE_ORDER.indexOf('generate_hypotheses');
-              continue;
-            }
-            if (signalQg.weak && (round >= MAX_QUALITY_ROUNDS || !budget.hasRemaining())) {
-              this.deps.store.appendEvent(runId, {
-                type: 'note', stage: 'rank',
-                detail: { reason: 'quality_gate_weak_proceeding', round, budgetRemaining: budget.hasRemaining(), metrics: signalQg.metrics, reasons: signalQg.reasons },
-              });
+                  return r;
+                }, lease);
+                cursor = STAGE_ORDER.indexOf('generate_hypotheses');
+                continue;
+              }
+              if (signalQg.weak && (round >= MAX_QUALITY_ROUNDS || !budget.hasRemaining())) {
+                this.deps.store.appendEvent(runId, {
+                  type: 'note', stage: 'rank',
+                  detail: { reason: 'quality_gate_weak_proceeding', round, budgetRemaining: budget.hasRemaining(), metrics: signalQg.metrics, reasons: signalQg.reasons },
+                });
+              }
             }
           }
 
@@ -430,6 +445,52 @@ export class Orchestrator {
         return r;
       }, lease);
       this.deps.store.appendEvent(runId, { type: 'run_status_changed', status: 'completed', detail: {} });
+
+      // W-E closed-loop guidance (idempotent by loop-state fingerprint): 'completed'
+      // must not mask an open falsification loop. The loop is closed iff the revise
+      // stage actually ran (a causal revision consumed feedback); otherwise the
+      // researcher gets one event explaining each open leg and the real next actions.
+      // A no-op resume re-runs this block, so the note only re-fires when the loop
+      // states actually changed since the last guidance event.
+      const LOOP_STAGES = ['execute', 'feedback', 'revise'] as const;
+      const DEFAULT_SKIP_REASON: Record<(typeof LOOP_STAGES)[number], string> = {
+        execute: 'no plan-drafted experiment applied (plan cannot map to a public tabular dataset)',
+        feedback: 'no feedback signals stored for this run',
+        revise: 'no unconsumed feedback signals (nothing to revise from)',
+      };
+      const reviseDone = run.stages.find((s) => s.stage === 'revise')?.state === 'done';
+      if (!reviseDone) {
+        const loop = LOOP_STAGES.map((s) => {
+          const rec = run.stages.find((x) => x.stage === s);
+          return {
+            stage: s,
+            state: rec?.state ?? 'pending',
+            reason: rec?.error ?? DEFAULT_SKIP_REASON[s],
+          };
+        });
+        const fingerprint = canonicalJson(loop);
+        const lastGuidance = this.deps.store
+          .listEvents(runId)
+          .filter((e) => (e.detail as { reason?: unknown })?.reason === 'loop_status_guidance')
+          .at(-1);
+        const lastFingerprint =
+          lastGuidance === undefined ? null : canonicalJson((lastGuidance.detail as { loop?: unknown }).loop);
+        if (lastFingerprint !== fingerprint) {
+          this.deps.store.appendEvent(runId, {
+            type: 'note',
+            detail: {
+              reason: 'loop_status_guidance',
+              closed: false,
+              loop,
+              nextActions: [
+                'add a feedback signal (expert judgment / new literature / reviewer comment) — feedback -> revise -> export reopen automatically on the next execution',
+                'materialize report + bundle files: far export <runId>',
+                'literature-type questions cannot yet run a dataset experiment (statistical meta-analysis experiment type: designed, awaiting user gate)',
+              ],
+            },
+          });
+        }
+      }
     }
     return run;
   }
