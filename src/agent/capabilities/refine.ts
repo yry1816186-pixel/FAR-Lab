@@ -25,7 +25,10 @@ import type { AgentEventSink, ReceiptSink, TranscriptEntry } from '../protocol.j
 
 export const CAPABILITY = 'refine-evidence-gaps';
 const PURPOSE = `agent:${CAPABILITY}`;
-const FAMILIES = ['openalex', 'arxiv', 'crossref'] as const;
+// W-A: europepmc joins the hunting families — keyless, abstract-bearing biomed
+// coverage; the gap-hunting sub-agents must not lose it when the OpenAlex keyless
+// budget is exhausted (the observed vitamin-D failure mode).
+const FAMILIES = ['openalex', 'arxiv', 'crossref', 'europepmc'] as const;
 
 export const RefineResultSchema = z.object({
   summary: z.string().min(20),

@@ -200,9 +200,14 @@ export const executeMetaAnalysis = async (
   const cmp = spec.comparison;
   const bound = cmp.hypothesisId !== undefined;
   const hyp = bound ? hypotheses.find((h) => h.id === cmp.hypothesisId) : undefined;
-  const priorSameComparison = (store.listObjects('stat_report', spec.runId) as StatReport[])
-    .filter((r) => r.comparisonId === cmp.id);
-  const sequential = priorSameComparison.length > 0;
+  // D-086-7 sequential-analysis guard, hash-scoped: re-running the SAME analysis
+  // (same spec hash) is labelled exploratory — data-peeking discipline. A genuinely
+  // NEW preregistered analysis (e.g. an operator-approved binding bumps the version
+  // and therefore the hash) is confirmatory, exactly what the approval legitimizes.
+  const priorSameAnalysis = (store.listObjects('stat_report', spec.runId) as StatReport[])
+    .filter((r) => r.comparisonId === cmp.id
+      && (store.getObject('experiment_run', r.experimentRunId) as { specHash?: string } | null)?.specHash === specHash);
+  const sequential = priorSameAnalysis.length > 0;
 
   const studies: StudyEstimate[] = kept.map((e) => ({
     ...toStudyEstimate(e, e.claimId),
@@ -239,7 +244,7 @@ export const executeMetaAnalysis = async (
     verdictDerivation: bound ? fields.derivation : undefined,
     exploratory: !bound || sequential,
     meta: fields.meta,
-    analysisIteration: priorSameComparison.length + 1,
+    analysisIteration: priorSameAnalysis.length + 1,
     createdAt: now(),
   });
 

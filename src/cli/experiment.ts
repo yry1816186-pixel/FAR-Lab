@@ -6,6 +6,7 @@ import { openArtifactStore } from '../persistence/artifacts.js';
 import { openScheduler, enqueueExperiment, runSchedulerWorker } from '../experiment/scheduler.js';
 import { ExperimentSpec } from '../domain/index.js';
 import type { ExperimentRun } from '../domain/index.js';
+import { SPEC_ID_RE } from '../experiment/approve.js';
 
 /**
  * `far experiment ...` — the scheduler as a user-operable product surface (P3 CLI).
@@ -20,6 +21,8 @@ import type { ExperimentRun } from '../domain/index.js';
  *   far experiment status  [--job <id>]
  *   far experiment cancel  <jobId>
  *   far experiment logs    <experimentRunId>
+ *   far experiment approve <specId> --by <operator> [--hypothesis <hypId>] [--mde <value>]
+ *   far experiment rerun   <specId> [--provider <name>] (confirmatory run after approval)
  * All accept --data-dir <dir> (default .far-run) and --json.
  */
 
@@ -81,7 +84,7 @@ const statLines = (job: {
   `${job.worker ? ` worker=${job.worker}` : ''}${job.error ? `  error=${job.error}` : ''}`;
 
 export const experimentCommand = async (sub: string | undefined, a: Args): Promise<CliResult> => {
-  const usage = `far experiment requires a subcommand: run <spec.json> | enqueue <spec.json> | worker | status [--job <id>] | cancel <jobId> | logs <experimentRunId>`;
+  const usage = `far experiment requires a subcommand: run <spec.json> | enqueue <spec.json> | worker | status [--job <id>] | cancel <jobId> | logs <experimentRunId> | approve <specId> --by <operator> [--hypothesis <hypId>] [--mde <value>] | rerun <specId>`;
   try {
     return await dispatch(sub, a, usage);
   } catch (e) {
@@ -237,6 +240,68 @@ const dispatch = async (sub: string | undefined, a: Args, usage: string): Promis
       }
       const log = await w.artifacts.get(run.trainingLogRef);
       return { code: 0, json: { runId, trainingLogRef: run.trainingLogRef, lines: log?.split('\n').length ?? 0 }, text: log ?? '' };
+    } finally {
+      w.close();
+    }
+  }
+
+  if (sub === 'approve') {
+    const specId = a.positional;
+    if (specId === undefined || !SPEC_ID_RE.test(specId)) return { code: 2, text: `approve requires a spec id (${usage})` };
+    const by = a.arg('--by');
+    if (by === undefined || by.length === 0) return { code: 2, text: 'approve requires --by <operator> (the approving human — D-085 binding approvals are never self-granted)' };
+    const mde = a.arg('--mde') !== undefined ? Number(a.arg('--mde')) : undefined;
+    if (mde !== undefined && (!Number.isFinite(mde) || mde <= 0)) return { code: 2, text: '--mde must be a positive number (minimum detectable effect)' };
+    const w = openWorld(a.dataDir);
+    try {
+      const { approveSpec } = await import('../experiment/approve.js');
+      const outcome = approveSpec(w.store, specId, {
+        by,
+        ...(a.arg('--hypothesis') !== undefined ? { hypothesis: a.arg('--hypothesis') } : {}),
+        ...(mde !== undefined ? { mde } : {}),
+      });
+      if (outcome.kind === 'error') return { code: outcome.code, text: outcome.message };
+      const s = outcome.spec.spec;
+      return {
+        code: 0,
+        json: {
+          specId, version: s.version, kind: outcome.spec.kind,
+          approvalsAdded: outcome.approvalsAdded, boundHypothesisIds: outcome.boundHypothesisIds, approvedBy: by,
+        },
+        text:
+          `approved ${specId} v${s.version} (${outcome.spec.kind}; ${outcome.approvalsAdded} approval(s) covering ${outcome.boundHypothesisIds.join(', ')}) ` +
+          `— confirmatory rerun: far experiment rerun ${specId}`,
+      };
+    } finally {
+      w.close();
+    }
+  }
+
+  if (sub === 'rerun') {
+    const specId = a.positional;
+    if (specId === undefined || !SPEC_ID_RE.test(specId)) return { code: 2, text: `rerun requires a spec id (${usage})` };
+    const w = openWorld(a.dataDir);
+    try {
+      const { rerunSpec } = await import('../experiment/approve.js');
+      const { getProvider, defaultLiveProvider } = await import('../providers/index.js');
+      const providerName = a.arg('--provider');
+      const provider = providerName !== undefined ? getProvider(providerName) : defaultLiveProvider();
+      const out = await rerunSpec(w.store, w.artifacts, specId, {
+        provider,
+        allowLocalDatasets: a.flag('--allow-local-datasets'),
+      });
+      const verdicts = out.statReports.map((r) => `${r.comparisonId}=${r.verdict ?? 'exploratory'}`).join(', ');
+      return {
+        code: out.run.status === 'completed' ? 0 : 1,
+        json: {
+          specId, kind: out.kind, experimentRunId: out.run.id, status: out.run.status,
+          statReports: out.statReports.map((r) => ({ id: r.id, comparison: r.comparisonId, verdict: r.verdict ?? null, metric: r.metricKey })),
+          feedbackSignals: out.feedback.map((f) => f.id),
+        },
+        text:
+          `rerun ${specId} (${out.kind}) -> ${out.run.status}: ${out.statReports.length} stat report(s) [${verdicts}], ` +
+          `${out.feedback.length} feedback signal(s) queued for revision`,
+      };
     } finally {
       w.close();
     }
