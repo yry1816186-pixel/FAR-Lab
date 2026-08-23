@@ -409,6 +409,7 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
       questions: clamp(url.searchParams.get('questions'), 8, 25),
       hypotheses: clamp(url.searchParams.get('hypotheses'), 8, 25),
       claims: clamp(url.searchParams.get('claims'), 8, 25),
+      conversations: clamp(url.searchParams.get('conversations'), 5, 25),
     });
     sendJson(res, 200, { query: q, ...result });
   };

@@ -664,11 +664,14 @@ export interface SearchHit {
   rank?: number;
 }
 
+/** Palette search (Ctrl+K) also finds conversations by title (unified timeline).
+ *  conversations hits carry the conversation id in `id`; `runId` is the unscoped slot. */
 export interface SearchResponse {
   query: string;
   questions: SearchHit[];
   hypotheses: SearchHit[];
   claims: SearchHit[];
+  conversations?: SearchHit[];
 }
 
 // ---- object-level AI research actions (B4) ----

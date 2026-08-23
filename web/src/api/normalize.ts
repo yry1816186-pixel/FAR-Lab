@@ -282,5 +282,7 @@ export function normalizeSearch(data: unknown): SearchResponse {
     questions: hits('questions'),
     hypotheses: hits('hypotheses'),
     claims: hits('claims'),
+    // Optional since the segment is new (older servers omit it).
+    ...(Array.isArray(data.conversations) ? { conversations: data.conversations.filter(looksLikeSearchHit) } : {}),
   };
 }

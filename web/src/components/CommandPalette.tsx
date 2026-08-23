@@ -39,6 +39,8 @@ export interface PaletteSearch {
     run: (runId: string) => void;
     hypothesis: (runId: string) => void;
     claim: (runId: string, claimId: string) => void;
+    /** Unified timeline: a conversation hit opens the conversation (id = convId). */
+    conversation?: (convId: string) => void;
   };
 }
 
@@ -151,6 +153,8 @@ export function CommandPalette({
       }));
     return [
       ...cmdRows,
+      // Conversations first: the resident-agent entry point leads the unified timeline.
+      ...hitRows(results?.conversations ?? [], t('palette.searchConversations'), (h) => search.navigate.conversation?.(h.id)),
       ...hitRows(results?.questions ?? [], t('palette.searchRuns'), (h) => search.navigate.run(h.runId)),
       ...hitRows(results?.hypotheses ?? [], t('palette.searchHypotheses'), (h) => search.navigate.hypothesis(h.runId)),
       ...hitRows(results?.claims ?? [], t('palette.searchClaims'), (h) => search.navigate.claim(h.runId, h.id)),
