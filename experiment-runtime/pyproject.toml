@@ -7,6 +7,9 @@ dependencies = [
     "numpy>=2.0,<3",
     "scikit-learn>=1.5,<2",
     "scipy>=1.14,<2",
+    # RU-8 GO1 (cleanlab, Apache-2.0): pre-execution dataset audit — label
+    # errors / train-test leakage / exact duplicates. Deterministic (seeded).
+    "cleanlab>=2.6,<3",
 ]
 
 [build-system]
