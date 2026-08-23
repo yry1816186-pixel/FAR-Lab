@@ -25,6 +25,13 @@
 - live-LLM 对比矩阵: BLOCKED-live (zai 周限额至 08-29 10:03; 无其他可用路由, 已穷尽实测)
 - adversarial review: 待 web 投影完成后与 S10b 一并执行 (Santa 双审查)
 
+
+## 本轮新增 (04:2x-04:4x, 与 sibling 安全 lane 并行)
+- 5772dec: web ResearchStatePanel (G2/G3/G8 三投影进 research tab), web build 绿
+- f489e78: far research fork CLI (RU-2 分支写入面), 真实 fork 验证 + lineage 立现 revision chain
+- sibling 落地(非本 lane): dunder-escape 封禁/T3/T4 安全层/forkRun+PROV-O/ACC-39..41
+- 全量: 1321 passed / 3 skipped / 120 files (fork 前复测)
+
 ## 关键不变量 (实现中已验证)
 - supervisor/lineage 均为只读视图, 不产生第二权威
 - supervisor_observation note 每边界恰好一条 (幂等可审计)
