@@ -60,9 +60,17 @@ describe('cli term: report channel', () => {
 
 describe('cli vendored picocolors: color discipline', () => {
   it('colors are disabled in non-TTY test stdout unless forced', () => {
-    // vitest pipes stdout (no TTY); FORCE_COLOR absent here, so colors must die
-    expect(pc.isColorSupported).toBe(false);
-    expect(pc.red('x')).toBe('x');
+    // vitest pipes stdout (no TTY). Color still turns ON under CI=true: the
+    // vendored detector treats CI as an explicit force (vendor/picocolors.ts
+    // `|| !!env.CI`) — found by the first real CI run. Discipline unchanged:
+    // only explicit forcing (FORCE_COLOR/CI/--color) enables color on a pipe.
+    const forced = process.env.FORCE_COLOR !== undefined || process.env.CI !== undefined;
+    if (!forced) {
+      expect(pc.isColorSupported).toBe(false);
+      expect(pc.red('x')).toBe('x');
+    } else {
+      expect(pc.isColorSupported).toBe(true);
+    }
   });
 
   it('FORCE_COLOR re-enables and emits ANSI sequences', async () => {
