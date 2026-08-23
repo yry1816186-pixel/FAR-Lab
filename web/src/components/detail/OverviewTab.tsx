@@ -162,6 +162,11 @@ function QuestionScope({ question }: { question: ResearchQuestion }): JSX.Elemen
           ...(question.scope.populationOrScopeNotes !== undefined ? [{ key: t('overview.populationNotes'), value: question.scope.populationOrScopeNotes }] : []),
         ]}
       />
+      {/* Decision provenance (decision-allocation directive): the scope stage's
+          model analysis is the authority for these fields — even caller-hints
+          pass through refinement. State it plainly instead of leaving the
+          researcher to wonder who decided. */}
+      <p className="muted small scope-provenance">{t('overview.scopeProvenance')}</p>
       <div className="scope-lists">
         {question.scope.inScope.length > 0 && (
           <div>
