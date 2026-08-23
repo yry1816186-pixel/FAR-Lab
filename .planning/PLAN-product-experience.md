@@ -1,3 +1,5 @@
+Status: ARCHIVED (PEX phases complete; B-batches landed 2026-08-22) — 2026-08-24
+
 # Product Experience Mission — PEX 二期：全项目彻底升级总计划
 
 > 2026-08-22 用户批准（指令 = FAR-Lab World-Class Human Experience Rebuild 全文，两轮扩范围后终批）。

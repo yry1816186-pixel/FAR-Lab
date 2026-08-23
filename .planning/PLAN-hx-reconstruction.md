@@ -1,3 +1,5 @@
+Status: ACTIVE — HX0-HX7 landed; HX6 TUI residuals are user-physical (publish/mintty feel-check); palette/unified-sidebar continuation in flight — 2026-08-24
+
 # PLAN — Human Experience Layer 全面重构（Research Operating Environment）
 
 > 规范文档：本次重构的唯一设计事实源。基线审计见 `evidence/hx/audit-baseline-2026-08-23.md`。

@@ -1,3 +1,5 @@
+Status: EXECUTED (V1-V6 landed d749d4e..d3161b9) — 2026-08-24
+
 # PROPOSAL — 可视化与交互深化波（VIZ，暂名 HX9）
 
 > **状态：EXECUTED（2026-08-23）— V1-V6 全部落地（用户批准范围），栈 A。**

@@ -1,3 +1,5 @@
+Status: EXECUTED (TIS kernel landed cf26c90) — 2026-08-24
+
 # DECISION: 工具接入系统（Tool Integrations, TIS）
 
 日期：2026-08-23

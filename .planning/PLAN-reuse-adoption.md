@@ -1,3 +1,5 @@
+Status: ACTIVE — docling-mcp live-validated (evidence/oss-integration/), product wiring pending; playwright-mcp queued — 2026-08-24
+
 # 复用优先采纳计划（Reuse-First Adoption Plan）
 
 > 2026-08-22 用户指令：**"如果你做不到，直接去 github 调研找高性能强大的项目直接移植源码，不要闭门造车"**。

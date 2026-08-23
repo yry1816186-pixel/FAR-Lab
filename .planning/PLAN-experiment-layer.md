@@ -1,3 +1,5 @@
+Status: ARCHIVED (EEL lane landed + live-verified; residuals tracked as CP-EEL3 in EXECUTION_STATE) — 2026-08-24
+
 # EV-Layer Plan: Real Experiment Execution Layer (EEL)
 
 - **Version**: v1.1 (2026-08-22)

@@ -1,3 +1,5 @@
+Status: ARCHIVED (gap-closeout wave landed, see commits f7c92c1..0d69f8e) — 2026-08-24
+
 # PLAN — GAP-CLOSEOUT（用户实测反馈五缺口全量闭环）
 
 > 触发：2026-08-23 用户真实使用反馈（run_jpktce50q7wqc68rkg64ztm3me）。

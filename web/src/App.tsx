@@ -377,6 +377,7 @@ export function App(): JSX.Element {
       run: (runId) => { selectRun(runId); setFocusClaimId(null); },
       hypothesis: (runId) => { selectRun(runId); setRouteTab('hypotheses'); setFocusClaimId(null); },
       claim: (runId, claimId) => { selectRun(runId); setRouteTab('evidence'); setFocusClaimId(claimId); },
+      conversation: (convId) => { openConversationRef.current?.(convId); },
     },
     // setSelectedRunId/setRouteTab are stable state setters; routeTab semantics captured per call
     // eslint-disable-next-line react-hooks/exhaustive-deps

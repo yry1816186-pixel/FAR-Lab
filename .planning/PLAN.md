@@ -1,3 +1,5 @@
+Status: ARCHIVED (historical root plan; what actually landed is recorded in .control/EXECUTION_STATE.json) — 2026-08-24
+
 # Wave-Aesthetics：HCI 层美学执行重做计划
 
 > 计划版本 v1（2026-08-22）｜档位 Heavy（完整门禁）｜状态：**待用户批准（HARD-GATE）**

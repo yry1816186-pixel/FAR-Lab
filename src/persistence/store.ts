@@ -90,6 +90,7 @@ export class Store {
       this.reindexFts('question');
       this.reindexFts('hypothesis');
       this.reindexFts('claim');
+      this.reindexFts('conversation');
       this.ftsReady = true;
     } catch {
       this.ftsReady = false; // stays on the LIKE path
@@ -101,8 +102,8 @@ export class Store {
     this.db.prepare('DELETE FROM far_search WHERE kind=?').run(kind);
     const insert = this.db.prepare('INSERT INTO far_search (kind, obj_id, body) VALUES (?,?,?)');
     const textOf = (json: string): string => {
-      const parsed = JSON.parse(json) as { text?: unknown; statement?: unknown };
-      return String(parsed.text ?? parsed.statement ?? '');
+      const parsed = JSON.parse(json) as { text?: unknown; statement?: unknown; title?: unknown };
+      return String(parsed.text ?? parsed.statement ?? parsed.title ?? '');
     };
     for (const r of rows) {
       const body = textOf(String(r.json));
@@ -110,8 +111,10 @@ export class Store {
     }
   }
 
-  /** Object kinds whose text is mirrored into far_search — single source for mirror writes AND deletes. */
-  private static readonly FTS_MIRRORED_KINDS: ReadonlySet<string> = new Set(['question', 'hypothesis', 'claim']);
+  /** Object kinds whose text is mirrored into far_search — single source for mirror writes AND deletes.
+   *  'conversation' mirrors its title so the palette (Ctrl+K) finds chats too —
+   *  the unified-timeline rule: every record surface is reachable from search. */
+  private static readonly FTS_MIRRORED_KINDS: ReadonlySet<string> = new Set(['question', 'hypothesis', 'claim', 'conversation']);
 
   /** Called after object writes to keep the FTS mirror fresh (best-effort). */
   private touchFts(kind: string): void {
@@ -223,11 +226,14 @@ export class Store {
 
   /** Hard delete of one stored object; false when nothing matched (idempotent).
    *  FTS mirror rows for mirrored kinds are dropped with the object, or search
-   *  would keep returning deleted questions/hypotheses/claims. */
+   *  would keep returning deleted questions/hypotheses/claims/conversations.
+   *  Gated on ftsReady: the mirror table is created lazily by the first search,
+   *  and the LIKE path reads objects directly — no mirror to clean when FTS
+   *  never initialized. */
   deleteObject(kind: ObjectKind, id: string): boolean {
     const res = this.db.prepare('DELETE FROM objects WHERE kind=? AND id=?').run(kind, id);
     if (Number(res.changes) !== 1) return false;
-    if (Store.FTS_MIRRORED_KINDS.has(kind)) {
+    if (Store.FTS_MIRRORED_KINDS.has(kind) && this.ftsReady) {
       this.db.prepare('DELETE FROM far_search WHERE kind=? AND obj_id=?').run(kind, id);
     }
     return true;
@@ -242,16 +248,19 @@ export class Store {
   deleteRunCascade(runId: string): { events: number; objects: number; checkpoints: number; searchRows: number } | null {
     const run = this.getRun(runId);
     if (run === null) return null;
+    this.ensureFts(); // mirror table is lazy; absent + !ftsReady -> no mirror rows exist
     const counts = { events: 0, objects: 0, checkpoints: 0, searchRows: 0 };
     this.db.transaction(() => {
       const mirrored = this.db.prepare(
         'SELECT id FROM objects WHERE run_id=? AND kind IN (\'question\',\'hypothesis\',\'claim\')',
       ).all(runId) as Array<{ id: string }>;
-      const dropSearch = this.db.prepare('DELETE FROM far_search WHERE kind=? AND obj_id=?');
-      for (const r of mirrored) {
-        counts.searchRows += Number(dropSearch.run('question', r.id).changes)
-          + Number(dropSearch.run('hypothesis', r.id).changes)
-          + Number(dropSearch.run('claim', r.id).changes);
+      if (this.ftsReady) {
+        const dropSearch = this.db.prepare('DELETE FROM far_search WHERE kind=? AND obj_id=?');
+        for (const r of mirrored) {
+          counts.searchRows += Number(dropSearch.run('question', r.id).changes)
+            + Number(dropSearch.run('hypothesis', r.id).changes)
+            + Number(dropSearch.run('claim', r.id).changes);
+        }
       }
       counts.objects = Number(this.db.prepare('DELETE FROM objects WHERE run_id=?').run(runId).changes);
       counts.events = Number(this.db.prepare('DELETE FROM events WHERE run_id=?').run(runId).changes);
@@ -303,21 +312,21 @@ export class Store {
    */
   searchText(
     q: string,
-    limits: { questions: number; hypotheses: number; claims: number },
+    limits: { questions: number; hypotheses: number; claims: number; conversations?: number },
   ): {
-    questions: SearchHit[]; hypotheses: SearchHit[]; claims: SearchHit[];
+    questions: SearchHit[]; hypotheses: SearchHit[]; claims: SearchHit[]; conversations?: SearchHit[];
   } {
     this.ensureFts();
     interface Row { run_id: string; id: string; json: string; snippet?: string; rank?: number }
-    const fetch = (kind: 'question' | 'hypothesis' | 'claim', limit: number): SearchHit[] => {
+    const fetch = (kind: 'question' | 'hypothesis' | 'claim' | 'conversation', limit: number): SearchHit[] => {
       if (limit <= 0) return [];
       const parse = (r: Row): SearchHit => {
         const parsed = KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as unknown as {
-          id: string; runId?: string; text?: string; statement?: string;
+          id: string; runId?: string; text?: string; statement?: string; title?: string;
         };
         return {
           runId: String(r.run_id), id: String(r.id),
-          text: String(parsed.text ?? parsed.statement ?? ''),
+          text: String(parsed.text ?? parsed.statement ?? parsed.title ?? ''),
           ...(r.snippet !== undefined ? { snippet: String(r.snippet) } : {}),
           ...(r.rank !== undefined ? { rank: Number(r.rank) } : {}),
         };
@@ -366,6 +375,7 @@ export class Store {
       questions,
       hypotheses: fetch('hypothesis', limits.hypotheses),
       claims: fetch('claim', limits.claims),
+      ...(limits.conversations !== undefined ? { conversations: fetch('conversation', limits.conversations) } : {}),
     };
   }
 
