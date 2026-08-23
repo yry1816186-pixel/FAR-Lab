@@ -39,7 +39,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'invalid_action_request' | 'provider_unreachable';
+  code: 'not_found' | 'validation' | 'already_running' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable';
   message: string;
   retryable: boolean;
   runId?: string;

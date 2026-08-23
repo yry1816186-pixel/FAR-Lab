@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createApp } from '../src/app/composition.js';
 import { createTestStubProvider } from '../src/providers/test-stub.js';
 import { draftSpecFromPlan } from '../src/experiment/spec-from-plan.js';
+import { makeStoreReceiptRecorder } from '../src/pipeline/llm.js';
 import { ResearchPlan } from '../src/domain/plan.js';
 import type { App } from '../src/app/composition.js';
 
@@ -55,6 +56,14 @@ afterAll(() => {
 });
 
 describe('draftSpecFromPlan', () => {
+  // Drafting now runs on the unified model plane: the plane REQUIRES a receipt
+  // sink (unaccountable calls are the coordination gap this closes). Tests bind a
+  // real store-backed recorder to the plan's run — receipts land in the temp db.
+  const plane = (provider: ReturnType<typeof createTestStubProvider>) => ({
+    provider,
+    recordReceipt: makeStoreReceiptRecorder(app.store, plan.runId),
+  });
+
   it('maps a feasible draft onto the real ExperimentSpec schema (paired, exploratory, stipulated)', async () => {
     const provider = createTestStubProvider([{
       forPurpose: 'experiment-spec-draft',
@@ -68,7 +77,7 @@ describe('draftSpecFromPlan', () => {
         ],
       }),
     }]);
-    const res = await draftSpecFromPlan(plan, 'Which model family wins on clinical tabs?', provider);
+    const res = await draftSpecFromPlan(plan, 'Which model family wins on clinical tabs?', { provider, recordReceipt: plane(provider).recordReceipt });
     expect(res.kind).toBe('spec');
     if (res.kind !== 'spec') return;
     const spec = res.spec;
@@ -91,7 +100,7 @@ describe('draftSpecFromPlan', () => {
         models: [{ name: 'single', builderId: 'gradient_boosting_classifier', hyperparams: {} }],
       }),
     }]);
-    const res = await draftSpecFromPlan(plan, 'q', provider);
+    const res = await draftSpecFromPlan(plan, 'q', { provider, recordReceipt: plane(provider).recordReceipt });
     expect(res.kind).toBe('spec');
     if (res.kind === 'spec') expect(res.spec.comparisons[0]?.kind).toBe('absolute');
   });
@@ -101,7 +110,7 @@ describe('draftSpecFromPlan', () => {
       forPurpose: 'experiment-spec-draft',
       rawOutput: JSON.stringify({ feasible: false, skipReason: 'requires wet-lab assays no public tabular dataset provides' }),
     }]);
-    const res = await draftSpecFromPlan(plan, 'q', provider);
+    const res = await draftSpecFromPlan(plan, 'q', { provider, recordReceipt: plane(provider).recordReceipt });
     expect(res).toMatchObject({ kind: 'skip', reason: expect.stringContaining('wet-lab') });
   });
 
@@ -110,7 +119,7 @@ describe('draftSpecFromPlan', () => {
       forPurpose: 'experiment-spec-draft',
       fail: { kind: 'quota_exceeded', message: 'no balance (scripted)' },
     }]);
-    const res = await draftSpecFromPlan(plan, 'q', provider);
+    const res = await draftSpecFromPlan(plan, 'q', { provider, recordReceipt: plane(provider).recordReceipt });
     expect(res.kind).toBe('skip');
     if (res.kind === 'skip') expect(res.reason).toContain('quota_exceeded');
   });

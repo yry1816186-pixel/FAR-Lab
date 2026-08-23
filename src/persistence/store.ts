@@ -158,7 +158,7 @@ export class Store {
 
   // ---- append-only event audit ----
 
-  appendEvent(runId: string, e: { type: RunEvent['type']; status?: RunStatus; stage?: RunStageName; detail?: Record<string, unknown>; receiptId?: string }, at = new Date().toISOString()): RunEvent {
+  appendEvent(runId: string, e: { type: RunEvent['type']; status?: RunStatus; stage?: string; detail?: Record<string, unknown>; receiptId?: string }, at = new Date().toISOString()): RunEvent {
     const payload = {
       runId, at, type: e.type, status: e.status, stage: e.stage,
       detail: e.detail ?? {}, receiptId: e.receiptId,

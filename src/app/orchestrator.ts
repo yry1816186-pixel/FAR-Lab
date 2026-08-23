@@ -8,6 +8,7 @@ import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/port
 import type { SourceFamily } from '../domain/source.js';
 import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './run-budget.js';
 import { evaluateQualityGate, MAX_QUALITY_ROUNDS } from './quality-gate.js';
+import { receiptEventDetail } from '../pipeline/llm.js';
 
 /** Meta key for the persisted quality-gate round counter (round 1 = initial generation). */
 const qgRoundKey = (runId: string) => `qg:round:${runId}`;
@@ -118,26 +119,11 @@ export class Orchestrator {
         store.putObject('receipt', receipt);
         // every persisted write is a lease heartbeat (W8 S1): a live worker keeps its lease warm
         if (lease !== undefined) store.renewLease(run.id, lease, new Date(Date.now() + LEASE_TTL_MS).toISOString());
-        // B3: the event carries the facts the wait-time narrative renders —
-        // model identity/latency for model calls, query/hits for retrievals.
-        // (detail is free-form; this enriches WITHOUT changing the event enum.)
+        // B3: the event carries the facts the wait-time narrative renders — one shared
+        // detail shape with the store-backed recorder (src/pipeline/llm.ts receiptEventDetail).
         store.appendEvent(run.id, {
           type: 'receipt_recorded', stage: partial.stage,
-          detail: {
-            kind: receipt.kind, id: receipt.id,
-            ...(receipt.modelCall !== undefined ? {
-              provider: receipt.modelCall.provider,
-              modelId: receipt.modelCall.modelId,
-              latencyMs: receipt.modelCall.latencyMs,
-              ...(receipt.modelCall.usage.totalTokens !== undefined ? { totalTokens: receipt.modelCall.usage.totalTokens } : {}),
-            } : {}),
-            ...(receipt.sourceRetrieval !== undefined ? {
-              family: receipt.sourceRetrieval.family,
-              query: receipt.sourceRetrieval.query,
-              httpStatus: receipt.sourceRetrieval.httpStatus,
-              resultCount: receipt.sourceRetrieval.resultCount,
-            } : {}),
-          }, receiptId: receipt.id,
+          detail: receiptEventDetail(receipt), receiptId: receipt.id,
         });
       },
       progress: (done, total, note) => {

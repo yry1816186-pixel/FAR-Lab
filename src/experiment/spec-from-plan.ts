@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { newId, ExperimentSpec } from '../domain/index.js';
 import { MetaAnalysisSpec } from '../domain/meta.js';
 import type { ResearchPlan } from '../domain/plan.js';
-import type { ModelProvider } from '../shared/ports.js';
-import { strictSchemaOrUndefined } from '../providers/http.js';
+import { invokeStructured, type ModelPlaneDeps } from '../pipeline/llm.js';
+import { RunBudgetExhaustedError } from '../app/run-budget.js';
 
 /**
  * B8: research-plan -> ExperimentSpec drafting.
@@ -83,44 +83,39 @@ const SYSTEM_PROMPT =
 export const draftSpecFromPlan = async (
   plan: ResearchPlan,
   questionText: string,
-  provider: ModelProvider,
+  plane: ModelPlaneDeps,
 ): Promise<SpecDraftOutcome> => {
-  const res = await provider.structuredCall(
-    {
-      task: 'experiment-spec-draft',
+  let draft: z.infer<typeof DraftOut>;
+  try {
+    const res = await invokeStructured<z.infer<typeof DraftOut>>(plane, {
+      stage: 'execute',
+      purpose: 'experiment-spec-draft',
       systemPrompt: SYSTEM_PROMPT,
-      userPayload: {
-        outputContract: '{feasible: boolean, skipReason?: string, openmlDatasetId?: number, targetColumn?: string, models: [{name, builderId: "logistic_regression"|"random_forest_classifier"|"gradient_boosting_classifier"|"dummy_most_frequent", hyperparams: object}]}',
-        input: {
-          researchQuestion: questionText,
-          objective: plan.objective,
-          dataRequirements: plan.dataRequirements.map((d) => ({ name: d.name, availability: d.availability, variables: d.variables })),
-          variables: plan.variables,
-          metrics: plan.metrics,
-          decisionRules: {
-            success: plan.decisionRules.successCriterion,
-            falsification: plan.decisionRules.falsificationCriterion,
-          },
-          hypothesisIds: plan.hypothesisIds,
+      payload: {
+        researchQuestion: questionText,
+        objective: plan.objective,
+        dataRequirements: plan.dataRequirements.map((d) => ({ name: d.name, availability: d.availability, variables: d.variables })),
+        variables: plan.variables,
+        metrics: plan.metrics,
+        decisionRules: {
+          success: plan.decisionRules.successCriterion,
+          falsification: plan.decisionRules.falsificationCriterion,
         },
+        hypothesisIds: plan.hypothesisIds,
       },
-      outputKind: 'json',
+      schema: DraftOut,
       temperature: 0.1,
       maxTokens: 2048,
-      jsonSchema: strictSchemaOrUndefined(DraftOut),
-      purpose: 'experiment-spec-draft',
-    },
-    (raw) => {
-      const parsed = DraftOut.safeParse(raw);
-      return parsed.success ? parsed.data : new Error(`draft schema failed: ${parsed.error.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 4).join('; ')}`);
-    },
-  );
-  if (!res.ok || res.data === undefined) {
+    });
+    draft = res.data;
+  } catch (e) {
+    // Budget exhaustion is an operational pause the ORCHESTRATOR owns (mid-stage
+    // boundary handling) — it must not be downgraded to a domain skip here.
+    if (e instanceof RunBudgetExhaustedError) throw e;
     // Drafting failure is a SKIP-with-reason, not a run failure: experiments
     // ENRICH the loop; their absence must not kill an otherwise complete run.
-    return { kind: 'skip', reason: `spec drafting failed (${res.error?.kind ?? 'unknown'}): ${(res.error?.message ?? '').slice(0, 140)}` };
+    return { kind: 'skip', reason: `spec drafting failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}` };
   }
-  const draft = res.data;
   if (!draft.feasible || draft.openmlDatasetId === undefined || draft.targetColumn === undefined || draft.models.length === 0) {
     return { kind: 'skip', reason: draft.skipReason ?? 'plan data requirements do not map to a public tabular dataset' };
   }
@@ -231,38 +226,31 @@ export const META_DEFAULT_MIN_STUDIES = 3;
 export const draftMetaSpecFromPlan = async (
   plan: ResearchPlan,
   questionText: string,
-  provider: ModelProvider,
+  plane: ModelPlaneDeps,
 ): Promise<MetaSpecDraftOutcome> => {
-  const res = await provider.structuredCall(
-    {
-      task: 'meta-spec-draft',
+  let draft: z.infer<typeof MetaDraftOut>;
+  try {
+    const res = await invokeStructured<z.infer<typeof MetaDraftOut>>(plane, {
+      stage: 'execute',
+      purpose: 'meta-spec-draft',
       systemPrompt: META_SYSTEM_PROMPT,
-      userPayload: {
-        outputContract: '{feasible: boolean, skipReason?: string, effectMeasure?: "log_or"|"log_rr"|"smd", direction?: "above"|"below", inclusionCriteria?: string}',
-        input: {
-          researchQuestion: questionText,
-          objective: plan.objective,
-          variables: plan.variables,
-          dataRequirements: plan.dataRequirements.map((d) => ({ name: d.name, availability: d.availability, variables: d.variables })),
-          decisionRules: { success: plan.decisionRules.successCriterion, falsification: plan.decisionRules.falsificationCriterion },
-          hypothesisIds: plan.hypothesisIds,
-        },
+      payload: {
+        researchQuestion: questionText,
+        objective: plan.objective,
+        variables: plan.variables,
+        dataRequirements: plan.dataRequirements.map((d) => ({ name: d.name, availability: d.availability, variables: d.variables })),
+        decisionRules: { success: plan.decisionRules.successCriterion, falsification: plan.decisionRules.falsificationCriterion },
+        hypothesisIds: plan.hypothesisIds,
       },
-      outputKind: 'json',
+      schema: MetaDraftOut,
       temperature: 0.1,
       maxTokens: 1024,
-      jsonSchema: strictSchemaOrUndefined(MetaDraftOut),
-      purpose: 'meta-spec-draft',
-    },
-    (raw) => {
-      const parsed = MetaDraftOut.safeParse(raw);
-      return parsed.success ? parsed.data : new Error(`meta draft schema failed: ${parsed.error.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 4).join('; ')}`);
-    },
-  );
-  if (!res.ok || res.data === undefined) {
-    return { kind: 'skip', reason: `meta spec drafting failed (${res.error?.kind ?? 'unknown'}): ${(res.error?.message ?? '').slice(0, 140)}` };
+    });
+    draft = res.data;
+  } catch (e) {
+    if (e instanceof RunBudgetExhaustedError) throw e;
+    return { kind: 'skip', reason: `meta spec drafting failed: ${(e instanceof Error ? e.message : String(e)).slice(0, 180)}` };
   }
-  const draft = res.data;
   if (!draft.feasible || draft.effectMeasure === undefined || draft.direction === undefined || draft.inclusionCriteria === undefined) {
     return { kind: 'skip', reason: draft.skipReason ?? 'plan is not answerable by pooling published effect estimates' };
   }

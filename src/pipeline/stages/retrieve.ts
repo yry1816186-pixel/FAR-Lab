@@ -7,6 +7,7 @@ import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash, excludeVolatile } from '../../sources/snapshot.js';
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
+import { mapBounded, STAGE_CONCURRENCY } from './shared.js';
 import { contentTokens } from './evidence.js';
 import { isCancellationError, throwIfCancelled } from './guard.js';
 
@@ -433,175 +434,211 @@ export const retrieveStage: StageHandler = {
     let variantSearches = 0;
     let failoverSearches = 0;
 
-    /** Execute one search (planned or recovery variant), receipt it, pool its records. */
+    type PendingReceipt = Parameters<StageContext['recordReceipt']>[0];
+
+    /** Records one search yields (returned, NOT recorded — the ordered flush owns writes). */
+    interface SearchYield {
+      count: number;
+      family: SourceFamily;
+      receipt: PendingReceipt;
+      records: Array<{ rank: number; record: RawSourceRecord }>;
+    }
+
+    /**
+     * Execute one search (planned or recovery variant): NETWORK IO ONLY. Receipts and
+     * pool mutations are returned as data and applied in target order by the flush
+     * phase, so bounded-concurrency execution cannot reorder the audit trail.
+     */
     const runSearch = async (
-      t: { purpose: RetrievalQuery['purpose']; family: SourceFamily },
-      targetIdx: number,
+      t: SearchTarget,
       queryText: string,
       isVariant: boolean,
-    ): Promise<number> => {
-      // Count the ATTEMPT before the call: executed means attempted, success or
-      // failure (W6 audit P3-1). The redactionNote marker distinguishes variant
-      // attempts in receipts so the eval harness can split planned vs cascade
-      // metrics without schema changes (W6 audit P2-3).
-      if (isVariant) variantSearches += 1;
+    ): Promise<SearchYield> => {
       const redactionNote = isVariant
         ? 'arxiv recovery variant search; query text and per-record content hashes retained; payloads archived content-addressed'
         : 'query text and per-record content hashes retained; payloads archived content-addressed';
       const res = await ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT });
-      ctx.recordReceipt({
-        kind: 'source_retrieval',
-        executionMode: 'live',
-        stage: 'retrieve',
-        redactionNote,
-        sourceRetrieval: {
-          family: t.family,
-          query: queryText,
-          httpStatus: res.httpStatus,
-          resultCount: res.records.length,
-          contentHashes: res.records.map((r) => snapshotHash(t.family, r)),
+      return {
+        count: res.records.length,
+        family: t.family,
+        receipt: {
+          kind: 'source_retrieval',
+          executionMode: 'live',
+          stage: 'retrieve',
+          redactionNote,
+          sourceRetrieval: {
+            family: t.family,
+            query: queryText,
+            httpStatus: res.httpStatus,
+            resultCount: res.records.length,
+            contentHashes: res.records.map((r) => snapshotHash(t.family, r)),
+          },
         },
-      });
-      for (const [rank, rec] of res.records.entries()) {
-        const key = primaryKey(rec);
-        if (key === null) {
-          droppedNoIdentifier += 1;
-          ctx.log(`retrieve: dropping record without identifiers: "${rec.title}"`);
-          continue;
-        }
-        const existing = pool.get(key);
-        if (existing) {
-          duplicates += 1;
-          existing.purposes.add(t.purpose);
-          existing.ranks.push({ target: targetIdx, rank });
-          continue;
-        }
-        pool.set(key, {
-          key,
-          record: rec,
-          family: t.family,
-          firstSeen: targetIdx,
-          purposes: new Set([t.purpose]),
-          ranks: [{ target: targetIdx, rank }],
-        });
-      }
-      return res.records.length;
+        records: res.records.map((record, rank) => ({ rank, record })),
+      };
     };
 
-    /** Receipt a FAILED variant attempt — attempts are provenance facts (P3-1). */
-    const receiptVariantFailure = (
-      t: { purpose: RetrievalQuery['purpose']; family: SourceFamily },
+    /** Receipt a FAILED search attempt — attempts are provenance facts (W6 audit P3-1). */
+    const failedReceipt = (
+      family: SourceFamily,
       queryText: string,
       e: unknown,
-    ): void => {
-      ctx.recordReceipt({
-        kind: 'source_retrieval',
-        executionMode: 'live',
-        stage: 'retrieve',
-        redactionNote: 'arxiv recovery variant search; query text and per-record content hashes retained; payloads archived content-addressed',
-        sourceRetrieval: {
-          family: t.family,
-          query: queryText,
-          httpStatus: isSourceAdapterError(e) ? e.httpStatus : 0,
-          resultCount: 0,
-          contentHashes: [],
-        },
-      });
-    };
+      variant: boolean,
+    ): PendingReceipt => ({
+      kind: 'source_retrieval',
+      executionMode: 'live',
+      stage: 'retrieve',
+      redactionNote: variant
+        ? 'arxiv recovery variant search; query text and per-record content hashes retained; payloads archived content-addressed'
+        : family === 'europepmc'
+          ? 'failover search after openalex failure; query text retained; no records'
+          : 'query text and per-record content hashes retained; payloads archived content-addressed',
+      sourceRetrieval: {
+        family,
+        query: queryText,
+        httpStatus: isSourceAdapterError(e) ? e.httpStatus : 0,
+        resultCount: 0,
+        contentHashes: [],
+      },
+    });
 
-    for (const [targetIdx, t] of targets.entries()) {
-      throwIfCancelled(ctx);
-      if (targetIdx === 0) {
-        // B3 milestone: the plan is real and its size is a REAL total — the
-        // wait narrative can say "检索 14 项计划查询" and count them down.
-        ctx.progress?.(0, targets.length, {
-          reason: 'query_plan_ready',
-          detail: { plannedQueries: targets.length, counterQueries: targets.filter((x) => x.purpose === 'counter_evidence').length },
-        });
-      }
-      executedQueries.push({ purpose: t.purpose, text: t.text, family: t.family });
-      attempted += 1;
+    /** One target's full fallback chain, executed as ONE parallelizable unit. */
+    interface TargetOutcome {
+      /** Receipts in execution order within this target. */
+      receipts: PendingReceipt[];
+      /** Successful searches whose records pool at flush time (in order). */
+      yields: SearchYield[];
+      familyFailure?: { family: SourceFamily; message: string };
+      /** europepmc failover succeeded: the extra executed query + recovered count. */
+      failover?: { query: RetrievalQuery; recovered: number };
+      notes: string[];
+      /** Cancellation observed mid-chain: flush what completed, then abort the stage. */
+      cancelledMidChain?: boolean;
+    }
+
+    const runTarget = async (
+      t: SearchTarget,
+    ): Promise<TargetOutcome> => {
+      const out: TargetOutcome = { receipts: [], yields: [], notes: [] };
       try {
-        const count = await runSearch(t, targetIdx, t.text, false);
-        succeeded += 1;
-        ctx.progress?.(targetIdx + 1, targets.length);
+        const main = await runSearch(t, t.text, false);
+        out.receipts.push(main.receipt);
+        out.yields.push(main);
         // W6/F2: arXiv AND-emptiness recovery — only when the FULL query came
         // back empty; each variant is its own receipted search and an extra RRF
         // list (a recovered doc ranks via the variant list it came from).
-        if (t.family === 'arxiv' && count === 0) {
+        if (t.family === 'arxiv' && main.count === 0) {
           for (const variant of arxivRecoveryVariants(t.text)) {
-            throwIfCancelled(ctx);
             try {
-              const vCount = await runSearch(t, targetIdx, variant, true);
-              if (vCount > 0) break; // first recovering variant wins; deeper truncation only on another zero
+              variantSearches += 1; // synchronous counter, single-threaded event loop
+              const v = await runSearch(t, variant, true);
+              out.receipts.push(v.receipt);
+              out.yields.push(v);
+              if (v.count > 0) break; // first recovering variant wins
             } catch (e) {
-              // Cancellation propagates (outer catch rethrows it); a failed variant
-              // attempt is receipted and the cascade CONTINUES to the next variant —
-              // one transient error must not kill the whole recovery (P3-1).
-              if (isCancellationError(e)) throw e;
-              receiptVariantFailure(t, variant, e);
-              ctx.log(
-                `retrieve: arxiv recovery variant failed for "${t.text}" -> "${variant}": ${e instanceof Error ? e.message : String(e)}`,
-              );
+              if (isCancellationError(e)) { out.cancelledMidChain = true; return out; }
+              // A failed variant attempt is receipted and the cascade CONTINUES to
+              // the next variant — one transient error must not kill recovery (P3-1).
+              out.receipts.push(failedReceipt(t.family, variant, e, true));
+              out.notes.push(`retrieve: arxiv recovery variant failed for "${t.text}" -> "${variant}": ${e instanceof Error ? e.message : String(e)}`);
             }
           }
         }
+        return out;
       } catch (e) {
         // Cancellation aborts the stage FIRST — a cancel mid-cascade must never
         // be bookkept as a family failure nor write a contradicting 0-result
         // receipt for a query that already succeeded (W6 audit P2-2).
-        if (isCancellationError(e)) throw e;
+        if (isCancellationError(e)) { out.cancelledMidChain = true; return out; }
         // Single-source failure stays visible (familyFailures + receipt) and the
         // stage continues; only total failure aborts (below).
         const msg = e instanceof Error ? e.message : String(e);
-        const list = failuresByFamily.get(t.family) ?? [];
-        list.push(`${t.purpose}: ${msg}`);
-        failuresByFamily.set(t.family, list);
-        ctx.recordReceipt({
-          kind: 'source_retrieval',
-          executionMode: 'live',
-          stage: 'retrieve',
-          redactionNote: 'query text and per-record content hashes retained; payloads archived content-addressed',
-          sourceRetrieval: {
-            family: t.family,
-            query: t.text,
-            httpStatus: isSourceAdapterError(e) ? e.httpStatus : 0,
-            resultCount: 0,
-            contentHashes: [],
-          },
-        });
-        ctx.log(`retrieve: source ${t.family} failed for ${t.purpose} query: ${msg}`);
+        out.familyFailure = { family: t.family, message: `${t.purpose}: ${msg}` };
+        out.receipts.push(failedReceipt(t.family, t.text, e, false));
+        out.notes.push(`retrieve: source ${t.family} failed for ${t.purpose} query: ${msg}`);
         // W-A failover (observed mode: OpenAlex keyless daily-budget exhaustion on the
         // 2026-08-22 vitamin-D run): an openalex outage must not leave its queries
         // unsearched — exactly ONE bounded retry on the keyless abstract-bearing
         // europepmc family, receipted like any real search. No cascade, no retry loop.
         if (t.family === 'openalex') {
           try {
-            const count = await runSearch({ purpose: t.purpose, family: 'europepmc' }, targetIdx, t.text, false);
-            failoverSearches += 1;
-            executedQueries.push({ purpose: t.purpose, text: t.text, family: 'europepmc' });
-            ctx.log(`retrieve: failover openalex->europepmc for ${t.purpose} query recovered ${count} record(s)`);
+            const fo = await runSearch({ purpose: t.purpose, text: t.text, family: 'europepmc' }, t.text, false);
+            out.receipts.push(fo.receipt);
+            out.yields.push(fo);
+            out.failover = { query: { purpose: t.purpose, text: t.text, family: 'europepmc' }, recovered: fo.count };
+            out.notes.push(`retrieve: failover openalex->europepmc for ${t.purpose} query recovered ${fo.count} record(s)`);
           } catch (e2) {
-            if (isCancellationError(e2)) throw e2;
-            ctx.recordReceipt({
-              kind: 'source_retrieval',
-              executionMode: 'live',
-              stage: 'retrieve',
-              redactionNote: 'failover search after openalex failure; query text retained; no records',
-              sourceRetrieval: {
-                family: 'europepmc',
-                query: t.text,
-                httpStatus: isSourceAdapterError(e2) ? e2.httpStatus : 0,
-                resultCount: 0,
-                contentHashes: [],
-              },
-            });
-            ctx.log(
-              `retrieve: failover openalex->europepmc failed for "${t.text}": ${e2 instanceof Error ? e2.message : String(e2)}`,
-            );
+            if (isCancellationError(e2)) { out.cancelledMidChain = true; return out; }
+            out.receipts.push(failedReceipt('europepmc', t.text, e2, false));
+            out.notes.push(`retrieve: failover openalex->europepmc failed for "${t.text}": ${e2 instanceof Error ? e2.message : String(e2)}`);
           }
         }
+        return out;
       }
+    };
+
+    /** Apply one search's records to the pool (deterministic: called in target order). */
+    const poolYield = (purpose: RetrievalQuery['purpose'], targetIdx: number, family: SourceFamily, records: Array<{ rank: number; record: RawSourceRecord }>): void => {
+      for (const { rank, record } of records) {
+        const key = primaryKey(record);
+        if (key === null) {
+          droppedNoIdentifier += 1;
+          ctx.log(`retrieve: dropping record without identifiers: "${record.title}"`);
+          continue;
+        }
+        const existing = pool.get(key);
+        if (existing) {
+          duplicates += 1;
+          existing.purposes.add(purpose);
+          existing.ranks.push({ target: targetIdx, rank });
+          continue;
+        }
+        pool.set(key, {
+          key,
+          record,
+          family,
+          firstSeen: targetIdx,
+          purposes: new Set([purpose]),
+          ranks: [{ target: targetIdx, rank }],
+        });
+      }
+    };
+
+    if (targets.length > 0) {
+      // B3 milestone: the plan is real and its size is a REAL total — the
+      // wait narrative can say "检索 14 项计划查询" and count them down.
+      ctx.progress?.(0, targets.length, {
+        reason: 'query_plan_ready',
+        detail: { plannedQueries: targets.length, counterQueries: targets.filter((x) => x.purpose === 'counter_evidence').length },
+      });
+    }
+
+    // Bounded overlap of the independent target chains (WP4/W8 lineage): network IO
+    // runs concurrently; EVERY persisted effect (receipts, pool entries, executed
+    // queries, family failures, progress, logs) is applied afterwards in TARGET order,
+    // keeping the audit trail byte-identical to the sequential loop.
+    const outcomes = await mapBounded(targets, STAGE_CONCURRENCY, (t) => runTarget(t));
+    for (const [targetIdx, t] of targets.entries()) {
+      const out = outcomes[targetIdx]!;
+      executedQueries.push({ purpose: t.purpose, text: t.text, family: t.family });
+      attempted += 1;
+      for (const receipt of out.receipts) ctx.recordReceipt(receipt);
+      for (const y of out.yields) poolYield(t.purpose, targetIdx, y.family, y.records);
+      // `succeeded` counts EXECUTED main queries (zero-result searches still executed —
+      // arXiv emptiness is the recovery trigger, not a failure).
+      if (out.familyFailure === undefined) succeeded += 1;
+      if (out.familyFailure !== undefined) {
+        const list = failuresByFamily.get(out.familyFailure.family) ?? [];
+        list.push(out.familyFailure.message);
+        failuresByFamily.set(out.familyFailure.family, list);
+      }
+      if (out.failover !== undefined) {
+        failoverSearches += 1;
+        executedQueries.push(out.failover.query);
+      }
+      for (const note of out.notes) ctx.log(note);
+      ctx.progress?.(targetIdx + 1, targets.length);
+      if (out.cancelledMidChain === true) throwIfCancelled(ctx); // cancellation point: prior targets fully flushed
     }
 
     // R1: user-provided seeds, loaded early so the empty-corpus guards below

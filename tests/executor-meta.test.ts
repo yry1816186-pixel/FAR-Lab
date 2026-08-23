@@ -268,7 +268,8 @@ describe('statistical_meta executor', () => {
     const spec = makeSpec(runId);
     await expect(
       run([{ forPurpose: 'meta-effect-extraction', fail: { kind: 'provider_error', message: 'fixture outage' } }], spec, runId, store, artifacts),
-    ).rejects.toThrow(/extraction failed \(provider_error\)/);
+      // Unified model plane: the failure text carries kind + stage/purpose context.
+    ).rejects.toThrow(/extraction failed: model call failed \(provider_error\) in execute\/meta-effect-extraction/);
     const failed = store.listObjects('experiment_run', runId).find((r) => r.status === 'failed');
     expect(failed?.error).toContain('fixture outage');
   });
