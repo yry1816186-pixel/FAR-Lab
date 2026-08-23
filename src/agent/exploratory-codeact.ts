@@ -33,7 +33,8 @@ export interface ExplorationViolation {
     | 'E-CONFIRMATORY' // touches the confirmatory boundary (spec/verdict fabrication)
     | 'E-NETWORK'      // network surface
     | 'E-SUBPROCESS'   // process spawn / os.system surface
-    | 'E-CREDENTIALS'; // env/secret probing
+    | 'E-CREDENTIALS'  // env/secret probing
+    | 'E-ESCAPE';      // sandbox-escape introspection (dunder traversal chains)
   line?: number;
   message: string;
 }
@@ -85,6 +86,26 @@ const CREDENTIAL_MARKERS = [
   /\bimport\s+keyring\b/, /\bimport\s+secrets\b/,
   /\bapi[_-]?key\b/i, /\bpassword\b/i, /\btoken\b\s*=/i,
 ];
+
+/**
+ * Sandbox-escape introspection (adversarial audit 2026-08-24, empirically
+ * confirmed before this ban): the restricted-namespace sandbox is defeatable
+ * by pure attribute traversal — ().__class__.__bases__[0].__subclasses__() …
+ * __init__.__globals__['__builtins__'] recovers the REAL open/__import__ with
+ * no import statement and without matching any marker above. Legitimate
+ * analysis code has no reason to touch interpreter internals, so any written
+ * reference to these dunder names (direct or inside a getattr string) is a
+ * policy violation. The Python side mirrors this at AST level
+ * (exploration.py _check_source) — this is defense in depth, and the honest
+ * boundary remains: a static ban is guardrails, process-level isolation is
+ * the real containment (tracked for the exploration lane).
+ */
+const ESCAPE_ATTRS = [
+  '__class__', '__bases__', '__base__', '__mro__', '__subclasses__',
+  '__globals__', '__builtins__', '__builtins', '__dict__', '__code__',
+  '__func__', '__closure__', '__defaults__', '__kwdefaults__',
+];
+const ESCAPE_MARKERS = ESCAPE_ATTRS.map((a) => new RegExp(a.replace(/_/g, '\\_')));
 
 const firstMatch = (code: string, patterns: RegExp[]): { line: number; matched: RegExp } | null => {
   const lines = code.split(/\r?\n/);
@@ -139,6 +160,14 @@ export const analyzeExplorationCode = (input: AnalyzeExplorationInput): Explorat
   const cred = firstMatch(input.code, CREDENTIAL_MARKERS);
   if (cred) {
     violations.push({ code: 'E-CREDENTIALS', line: cred.line, message: 'credential/env probing is forbidden in exploration code' });
+  }
+
+  const esc = firstMatch(input.code, ESCAPE_MARKERS);
+  if (esc) {
+    violations.push({
+      code: 'E-ESCAPE', line: esc.line,
+      message: 'interpreter-introspection attributes are forbidden — exploration code never needs them and they are the sandbox-escape chain',
+    });
   }
 
   return {

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Store } from '../persistence/store.js';
 import type { ArtifactStore } from '../shared/ports.js';
 import { newId } from '../domain/ids.js';
+import { ProvenanceReceipt } from '../domain/index.js';
 import { analyzeExplorationCode, type ExplorationVerdict } from './exploratory-codeact.js';
 import type { SidecarFactory } from '../experiment/python.js';
 
@@ -104,15 +105,15 @@ export const runExploration = async (input: RunExplorationInput): Promise<Explor
       },
       stage: input.stage ?? 'agent:exploration',
     };
-    // Persist via the store directly (same shape the orchestrator's recordReceipt writes);
-    // id/at normalization mirrors ProvenanceReceipt defaults.
-    const full = {
+    // Persist via the store's receipt schema (same discipline as the
+    // orchestrator's recordReceipt): zod parse, never a type escape.
+    const full = ProvenanceReceipt.parse({
       ...receipt,
       runId: input.runId,
       at: new Date().toISOString(),
       redactionNote: 'raw prompts/responses not retained; hashes only',
-    };
-    input.store.putObject('receipt', full as never);
+    });
+    input.store.putObject('receipt', full);
 
     const noteReason = execution.ok ? 'exploration_completed' : 'exploration_failed';
     input.store.appendEvent(input.runId, {

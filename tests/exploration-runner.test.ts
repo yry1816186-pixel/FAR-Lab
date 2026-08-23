@@ -108,4 +108,48 @@ describe('runExploration (real sidecar)', () => {
     expect(v.allowed).toBe(false);
     expect(v.violations.some((x) => x.code === 'E-SUBPROCESS')).toBe(true);
   });
+
+  it('dunder-traversal escape is refused before spawn AND mirrored at the Python AST layer', async () => {
+    const escapeCode = [
+      'objs = ().__class__.__bases__[0].__subclasses__()',
+      'for o in objs:',
+      '    try:',
+      '        g = o.__init__.__globals__',
+      "        bi = g['__builtins__']",
+      '        print("ESCAPED", hasattr(bi, "open"))',
+      '        break',
+      '    except Exception:',
+      '        pass',
+    ].join('\n');
+    // Layer 1: the TS gate refuses before any process spawn (fail-closed).
+    const { store, runId } = openStore();
+    let spawned = false;
+    const countingFactory: SidecarFactory = () => {
+      spawned = true;
+      return createSidecar();
+    };
+    await expect(runExploration({
+      store, runId,
+      artifacts: { put: async () => ({ ref: 'r', hash: 'h', size: 0 }), get: async () => null, path: () => '' },
+      purpose: 'recover builtins',
+      code: escapeCode,
+      maxRuntimeMs: 1000,
+      sidecarFactory: countingFactory,
+    })).rejects.toThrow(/E-ESCAPE/);
+    expect(spawned).toBe(false);
+
+    // Layer 2: even with the TS gate bypassed, the sidecar op itself rejects
+    // the traversal at AST level (defense in depth — real sidecar, direct op call).
+    const sidecar = realFactory();
+    try {
+      const r = await sidecar.call<{ exploration?: { ok: boolean; stdout?: string } }>(
+        'run_exploration', { code: escapeCode, purpose: 'recover builtins', maxRuntimeMs: 1000 }, 30_000,
+      );
+      expect(r.ok).toBe(false); // op raise surfaces as a protocol error, never as executed output
+      const stdout = JSON.stringify(r);
+      expect(stdout).not.toContain('ESCAPED');
+    } finally {
+      sidecar.close();
+    }
+  });
 });
