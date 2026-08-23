@@ -4,17 +4,21 @@ Evidence-constrained, falsifiable scientific hypothesis generation and research-
 
 ## Features
 
-- **Full research pipeline** — 11 stages: `scope` → `retrieve` → `verify_sources` → `build_evidence` → `generate_hypotheses` → `critique_falsify` → `rank` → `plan` → `feedback` → `revise` → `export`; literature sources: OpenAlex, arXiv, CrossRef, EuropePMC
+- **Full research pipeline** — 12 stages: `scope` → `retrieve` → `verify_sources` → `build_evidence` → `generate_hypotheses` → `critique_falsify` → `rank` → `plan` → `execute` → `feedback` → `revise` → `export`; literature sources: OpenAlex, arXiv, CrossRef, EuropePMC
+- **In-run falsification cascade** — a deterministic iteration controller closes experiment → feedback → revise (re-freeze) → re-experiment under bounded rounds / token budget / no-material-delta; an adaptive quality gate reopens weak hypothesis generation for one bounded round; run-level token budget treats receipts as the only spend authority
+- **Research supervisor** — read-only trajectory analysis at stage boundaries (idempotent, one observation per boundary; signals persisted for audit, action stays with the orchestrator and the human)
+- **Cross-run memory substrate** — governed memory items in the same SQLite store (no second memory DB): lifecycle governance (zod + SQL CHECK), poisoning fences (own-trust requires resolvable provenance; external content never derives own-trust), deterministic zero-LLM retrieval (FTS5 + ACT-R activation), append-only supersession
+- **Experiment execution layer** — Python sidecar (`experiment-runtime/`) with durable scheduler, dataset acquisition (ARFF/CSV/OpenML), train/eval with mechanical statistical verdicts, exploratory CodeAct analysis under a static gate + restricted sandbox namespace (candidate findings only), remote execution over stdio JSON protocol
 - **Claim-source word-by-word binding** — every evidential claim is bound to its source text span; alignment is machine-verifiable, not free-text assertion
 - **Hypothesis comparison with evidence discrimination** — structured comparison view with per-cell evidence support/contradiction states; falsification stage produces ACH-style contrastivity analysis
-- **Model-agnostic provider layer** — pluggable LLM backends via `FARLAB_MODEL_PROVIDER`; built-in adapters for Zhipu GLM (`zai`) and Alibaba DashScope/Qwen (`dashscope`)
-- **CLI workbench** (`far` binary) — 15+ commands covering the full lifecycle: create runs, inspect objects, resume from checkpoint, export reports/bundles, record feedback, run experiments, verify reproducibility
-- **Web workbench** — React SPA with real-time SSE streaming, run sidebar, hypothesis tournament table, ACH comparison canvas, command palette (`Ctrl+K`), i18n (zh/en), dark/light theme
-- **Reproducibility bundles** — self-contained export with provenance receipts, content-addressed artifacts, lockfile-based dependency pinning; verifiable independently via `far verify`
-- **Experiment execution layer** — Python sidecar (`experiment-runtime/`) with durable scheduler, dataset acquisition (ARFF/CSV), train/test splitting, remote execution over stdio JSON protocol
-- **Agent-driven refinement** — parallel sub-agent evidence-gap hunting with tool-using loops; full session audit trail
-- **Human-in-the-loop feedback** — structured feedback signals (expert judgment, new literature, experiment results, reviewer comments) that causally drive the revise stage
-- **Tauri desktop shell** — system tray, deep links, hotkey bindings (optional)
+- **Model control plane** — failover chains with verified semantics (fail-over error classes, cooldown, serving route visible in every receipt) and a receipt-derived usage ledger (cost only from user-declared pricing — unknown stays unknown); pluggable backends via `FARLAB_MODEL_PROVIDER` (Zhipu GLM `zai`, Alibaba DashScope/Qwen `dashscope`, custom)
+- **Resident conversation agent** — conversations run on the agent kernel with a read-tool plane over the workspace, `propose_action` approval cards (approve/reject/remember), and an automations engine (schedule + run-completed triggers) whose proposals always gate on the human
+- **Tool integrations (MCP)** — external MCP servers (e.g. Docling document understanding) join kernel sessions under capability-scoped admission (read-only capabilities admit read-class tools only); declarative hook rules compile to kernel permissions (strictest-wins, fail-closed when headless)
+- **Research-product export** — deterministic zero-LLM IMRaD paper projection with limitations synthesized from real counts and BibTeX from stored metadata only; reproducibility bundles verifiable independently via `far verify`
+- **CLI workbench** (`far` binary) — 15+ commands covering the full lifecycle: create runs, inspect objects, resume from checkpoint, export reports/papers/bundles, record feedback, run experiments, verify reproducibility; optional interactive TUI (`packages/tui`, isolated Ink package)
+- **Web workbench** — React SPA with real-time SSE streaming (visible reconnect state), run sidebar, hypothesis tournament table, ACH comparison canvas, research composer with offline dictation (ONNX Runtime Whisper), command palette (`Ctrl+K`), i18n (zh/en), dark/light theme
+- **Human-in-the-loop feedback** — structured feedback signals (expert judgment, new literature, experiment results, reviewer comments) that causally drive the revise stage; direct hypothesis edit enters the same causal revision chain
+- **Tauri desktop shell** — system tray, deep links, hotkey bindings, hardened CSP (optional)
 
 ## Requirements
 
@@ -193,7 +197,7 @@ far-lab/
 │   ├── agent/                # Agent runtime: loop, sub-agents, permissions, MCP, skills
 │   ├── app/                  # Orchestration: composition root, provider resolver, verification
 │   ├── domain/               # Pure domain model: Question, Hypothesis, Claim, Evidence, Plan, Run
-│   ├── pipeline/             # 11-stage research pipeline (scope → retrieve → ... → export)
+│   ├── pipeline/             # 12-stage research pipeline (scope → retrieve → ... → export)
 │   │   └── stages/           # Individual stage implementations
 │   ├── providers/            # LLM provider adapters (zai, dashscope, custom)
 │   ├── sources/              # Literature source adapters (OpenAlex, arXiv, CrossRef, fulltext)
@@ -209,7 +213,8 @@ far-lab/
 │       ├── state/            # Global state (connection, theme)
 │       └── i18n/             # Internationalization (zh/en dictionaries)
 ├── experiment-runtime/       # Python sidecar for experiment execution (uv-managed)
-├── tests/                    # 54+ test suites (Vitest, forks pool)
+├── packages/tui/             # Optional interactive terminal UI (isolated Ink package; never a Node-core dependency)
+├── tests/                    # 120 test files (Vitest, forks pool)
 ├── eval/                     # Evaluation protocols & benchmark scripts
 ├── scripts/                  # Operational scripts (serve, health checks, export)
 ├── project-spec/             # Formal specification documents & policies
@@ -273,7 +278,7 @@ Test configuration:
 - **Runner:** Vitest 3+ with `forks` pool
 - **Timeouts:** 120s per test, 60s per hook
 - **Coverage:** `tests/**/*.test.ts`, `src/**/*.test.ts`
-- **Count:** 54+ test files covering domain schemas, pipeline stages, providers, sources, agent loop, API endpoints, CLI commands, experiment execution, and regression guards
+- **Count:** 120 test files covering domain schemas, pipeline stages, providers, sources, agent kernel, memory, lineage, experiments, API endpoints, CLI commands, and regression guards
 
 ## License
 
