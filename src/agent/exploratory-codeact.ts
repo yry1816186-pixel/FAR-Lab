@@ -104,7 +104,31 @@ const ESCAPE_ATTRS = [
   '__class__', '__bases__', '__base__', '__mro__', '__subclasses__',
   '__globals__', '__builtins__', '__builtins', '__dict__', '__code__',
   '__func__', '__closure__', '__defaults__', '__kwdefaults__',
+  // P0 fix (review 06): loader/import-system surface reachable WITHOUT dunders.
+  '__loader__', '__spec__', '__import__', 'load_module', 'exec_module',
+  'get_code', 'find_module', 'create_module',
 ];
+
+/**
+ * P0 fix (adversarial review 06, live-confirmed escape): numpy auto-imports
+ * submodules that re-export os/sys — `np.f2py.os.system("...")` executed a
+ * real command with no import and no dunder. Any attribute chain of depth >= 3
+ * rooted at a pre-bound module name is rejected outright; legitimate analysis
+ * uses one or two levels (np.array(...), np.linalg.norm(x)).
+ */
+const BOUND_ROOTS = ['np', 'json', 'math', 'statistics', 're', 'itertools', 'collections', 'csv', 'datetime', 'decimal', 'fractions', 'hashlib'];
+
+const findDeepModuleChain = (code: string): { line: number } | undefined => {
+  const lines = code.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    for (const root of BOUND_ROOTS) {
+      const re = new RegExp(`\\b${root}(?:\\.[A-Za-z_]\\w*){3,}\\s*\\(`);
+      if (re.test(line)) return { line: i + 1 };
+    }
+  }
+  return undefined;
+};
 const ESCAPE_MARKERS = ESCAPE_ATTRS.map((a) => new RegExp(a.replace(/_/g, '\\_')));
 
 const firstMatch = (code: string, patterns: RegExp[]): { line: number; matched: RegExp } | null => {
@@ -167,6 +191,16 @@ export const analyzeExplorationCode = (input: AnalyzeExplorationInput): Explorat
     violations.push({
       code: 'E-ESCAPE', line: esc.line,
       message: 'interpreter-introspection attributes are forbidden — exploration code never needs them and they are the sandbox-escape chain',
+    });
+  }
+
+  // P0 (review 06): deep module chains from a bound root reach os/sys without
+  // import or dunder — np.f2py.os.system() executed a live command.
+  const deep = findDeepModuleChain(input.code);
+  if (deep) {
+    violations.push({
+      code: 'E-ESCAPE', line: deep.line,
+      message: 'deep module-attribute chain from a bound root is forbidden — bound modules re-export os/sys via auto-imported submodules',
     });
   }
 
