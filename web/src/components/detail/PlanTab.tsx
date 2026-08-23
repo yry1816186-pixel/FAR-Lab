@@ -7,6 +7,8 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, FieldList, Section, Skeleton } from '../common';
 import { ResearchActions } from './ResearchActions';
 import { InlineIdRefs, buildClaimLabels, buildHypLabels } from './InlineIdRefs';
+import { PlanDag } from './viz/PlanDag';
+import { PlanBudget } from './viz/PlanBudget';
 import { stageKey, availabilityKey, stepKindKey } from '../../i18n/keys';
 import type { DictKey } from '../../i18n/dict';
 
@@ -71,6 +73,23 @@ export function PlanTab({
         <EmptyState titleKey="plan.none" hint={t('plan.noneHint', { stage: t(stageKey(run.currentStage)) })} />
       )}
     </>
+  );
+}
+
+function DecisionExitCard({ tone, label, criterion, hypLabels, claimLabels }: {
+  tone: 'ok' | 'warn' | 'err';
+  label: string;
+  criterion: string;
+  hypLabels?: Map<string, string>;
+  claimLabels?: Map<string, string>;
+}): JSX.Element {
+  return (
+    <div className={`decision-exit-card decision-exit-card--${tone}`}>
+      <span className={`decision-exit-head tone-${tone}`}>{label}</span>
+      <p className="small">
+        <InlineIdRefs text={criterion} hypLabels={hypLabels} claimLabels={claimLabels} />
+      </p>
+    </div>
   );
 }
 
@@ -194,9 +213,11 @@ function PlanView({ plan, hypLabels, claimLabels, onChallenge, aiActions }: {
       )}
 
       <Section title={t('plan.steps')}>
+        <PlanDag steps={plan.steps} />
+        <PlanBudget plan={plan} />
         <ol className="plan-steps">
           {plan.steps.map((step, i) => (
-            <li key={step.id} className="plan-step">
+            <li key={step.id} className="plan-step" id={`step-${step.id}`}>
               <div className="plan-step-head">
                 <strong>{i + 1}. {step.title}</strong>
                 <Badge tone="muted">{t(stepKindKey(step.kind))}</Badge>
@@ -222,6 +243,22 @@ function PlanView({ plan, hypLabels, claimLabels, onChallenge, aiActions }: {
       </Section>
 
       <Section title={t('plan.decisionRules')}>
+        {/* VIZ V2 decision-exit map: the four criteria are PARALLEL evaluation
+            exits, not a nested tree — the shape reflects the data model. One
+            trunk (execute the plan, evaluate against the rules) opens into the
+            three verdict exits; the stop criterion is the gate beneath. */}
+        <div className="decision-exits">
+          <p className="decision-exits-trunk small">{t('plan.decisionTrunk')}</p>
+          <div className="decision-exits-row">
+            <DecisionExitCard tone="ok" label={t('plan.decisionRules.success')} criterion={plan.decisionRules.successCriterion} hypLabels={hypLabels} claimLabels={claimLabels} />
+            <DecisionExitCard tone="warn" label={t('plan.decisionRules.weakening')} criterion={plan.decisionRules.weakeningCriterion} hypLabels={hypLabels} claimLabels={claimLabels} />
+            <DecisionExitCard tone="err" label={t('plan.decisionRules.falsification')} criterion={plan.decisionRules.falsificationCriterion} hypLabels={hypLabels} claimLabels={claimLabels} />
+          </div>
+          <div className="decision-exits-stop callout callout--info small">
+            <strong>{t('plan.decisionRules.stop')}</strong>
+            <InlineIdRefs text={plan.decisionRules.stopCriterion} hypLabels={hypLabels} claimLabels={claimLabels} />
+          </div>
+        </div>
         <FieldList
           items={[
             { key: t('plan.decisionRules.success'), value: <InlineIdRefs text={plan.decisionRules.successCriterion} hypLabels={hypLabels} claimLabels={claimLabels} /> },
