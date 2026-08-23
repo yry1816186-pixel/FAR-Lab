@@ -21,6 +21,12 @@ export interface StageContext {
   reasoningRoute?: { style: import('../domain/model-config.js').ReasoningStyle; defaultGear: import('../domain/model-config.js').ReasoningGear; modelId: string };
   sourceFor: (family: SourceFamily) => SourceAdapter;
   /**
+   * RU-10 GO1 cross-run response cache (read-through, per-source TTL). Absent
+   * (tests/minimal harnesses) = every search hits the live adapter, exact
+   * legacy behavior.
+   */
+  responseCache?: import('../sources/response-cache.js').ResponseCacheStore;
+  /**
    * Fulltext deepening (phase A): fetch full text for a corpus document through
    * its identifiers. Absent = the live router (arXiv HTML / Europe PMC JATS);
    * tests inject deterministic fakes.
