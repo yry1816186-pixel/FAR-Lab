@@ -1,14 +1,16 @@
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, RefreshCw } from 'lucide-react';
+import { Download, FileText, RefreshCw, ScrollText } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
-import { getBundles, getPaper, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
+import { getBundles, getEvidence, getHypotheses, getPaper, getReceipts, getReport, reexportRun, verifyBundle } from '../../api/endpoints';
 import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
 import { isSettled } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton, TimeText, errorText } from '../common';
 import type { EventsState } from '../RunDetail';
+import { buildClaimLabels, buildHypLabels } from './InlineIdRefs';
+import { MarkdownDoc } from './MarkdownDoc';
 import { stageKey, receiptKindKey, executionModeKey } from '../../i18n/keys';
 
 /** Best-effort discovery kept only as a graceful fallback while the bundles API 404s on older servers (D-060). */
@@ -39,6 +41,18 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
   // download button — the report block above keeps the report-only story intact.
   const paperFetcher = useCallback((signal: AbortSignal) => getPaper(run.id, signal), [run.id]);
   const paperRes = useResource(paperFetcher, [run.id], `${run.updatedAt}:${run.status}`);
+  // HX5: deliverable prose carries bare hyp_/clm_ ids — rendered previews use
+  // the same human labels as the rest of the workbench. Best-effort fetches.
+  const hypFetcher = useCallback((signal: AbortSignal) => getHypotheses(run.id, signal), [run.id]);
+  const hypRes = useResource(hypFetcher, [run.id], `${run.updatedAt}`);
+  const evFetcher = useCallback((signal: AbortSignal) => getEvidence(run.id, signal), [run.id]);
+  const evRes = useResource(evFetcher, [run.id], `${run.updatedAt}`);
+  const hypLabels = hypRes.data !== null
+    ? buildHypLabels(hypRes.data.scorecards, new Map(hypRes.data.hypotheses.map((h) => [h.id, h.statement] as const)))
+    : undefined;
+  const claimLabels = evRes.data !== null
+    ? buildClaimLabels(evRes.data.claims.map((c) => c.id), t('idref.claim'))
+    : undefined;
 
   const modelCalls = (receiptsRes.data ?? []).filter((r) => r.kind === 'model_call');
   const nonLive = (receiptsRes.data ?? []).filter((r) => r.executionMode !== 'live');
@@ -76,7 +90,13 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
         ) : reportRes.error !== null ? (
           <ErrorBox error={reportRes.error} onRetry={reportRes.retry} />
         ) : reportRes.data !== null ? (
-          <ReportBlock runId={run.id} markdown={reportRes.data} paperMarkdown={paperRes.data} />
+          <ReportBlock
+            runId={run.id}
+            markdown={reportRes.data}
+            paperMarkdown={paperRes.data}
+            hypLabels={hypLabels}
+            claimLabels={claimLabels}
+          />
         ) : null}
       </Section>
     </>
@@ -390,30 +410,24 @@ function BundleVerify({
   );
 }
 
-function ReportBlock({ runId, markdown, paperMarkdown }: { runId: string; markdown: string; paperMarkdown: string | null }): JSX.Element {
+function ReportBlock({ runId, markdown, paperMarkdown, hypLabels, claimLabels }: {
+  runId: string;
+  markdown: string;
+  paperMarkdown: string | null;
+  hypLabels?: Map<string, string>;
+  claimLabels?: Map<string, string>;
+}): JSX.Element {
   const { t } = useI18n();
-  const [showPreview, setShowPreview] = useState(false);
+  const hasPaper = paperMarkdown !== null;
+  const [doc, setDoc] = useState<'report' | 'paper'>('report');
+  const active = doc === 'report' || !hasPaper ? markdown : paperMarkdown ?? markdown;
 
-  const download = (): void => {
-    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+  const downloadBlob = (text: string, name: string): void => {
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${runId}.report.md`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
-  // BP-3: same blob download pattern as the report button, for the paper skeleton.
-  const downloadPaper = (): void => {
-    if (paperMarkdown === null) return;
-    const blob = new Blob([paperMarkdown], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${runId}.paper.md`;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -423,20 +437,44 @@ function ReportBlock({ runId, markdown, paperMarkdown }: { runId: string; markdo
   return (
     <div className="report-block">
       <div className="report-actions">
-        <button type="button" className="btn" onClick={download}>
-          <Download size={13} aria-hidden="true" /> {t('report.download')}
-        </button>
-        {paperMarkdown !== null && (
-          <button type="button" className="btn" onClick={downloadPaper}>
-            <Download size={13} aria-hidden="true" /> {t('report.downloadPaper')}
-          </button>
+        {hasPaper ? (
+          <div className="doc-switch" role="tablist" aria-label={t('report.title')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={doc === 'report' || !hasPaper}
+              className={`doc-switch-btn${doc === 'report' || !hasPaper ? ' doc-switch-btn--active' : ''}`}
+              onClick={() => setDoc('report')}
+            >
+              <ScrollText size={13} aria-hidden="true" /> {t('report.tabReport')}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={doc === 'paper'}
+              className={`doc-switch-btn${doc === 'paper' ? ' doc-switch-btn--active' : ''}`}
+              onClick={() => setDoc('paper')}
+            >
+              <FileText size={13} aria-hidden="true" /> {t('report.tabPaper')}
+            </button>
+          </div>
+        ) : (
+          <span className="muted small">{t('report.title')}</span>
         )}
-        <button type="button" className="btn" aria-expanded={showPreview} onClick={() => setShowPreview((v) => !v)}>
-          {showPreview ? t('common.collapse') : t('report.preview')}
+        <button
+          type="button"
+          className="btn"
+          onClick={() => downloadBlob(active, doc === 'paper' && hasPaper ? `${runId}.paper.md` : `${runId}.report.md`)}
+          title={t('report.downloadHint')}
+        >
+          <Download size={13} aria-hidden="true" />
+          {doc === 'paper' && hasPaper ? t('report.downloadPaper') : t('report.download')}
         </button>
-        <span className="muted small">{t('report.chars', { n: markdown.length })}</span>
+        <span className="muted small">{t('report.chars', { n: active.length })}</span>
       </div>
-      {showPreview && <pre className="pre-block report-preview">{markdown}</pre>}
+      {/* Rendered preview (HX5): downloaded files keep raw ids; the preview
+          humanizes hyp_/clm_ references with the workbench labels. */}
+      <MarkdownDoc markdown={active} hypLabels={hypLabels} claimLabels={claimLabels} />
     </div>
   );
 }
