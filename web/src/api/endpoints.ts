@@ -17,7 +17,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, UsageAggregate, VerificationReport } from './types';
+import type { Automation, BuiltinRouteSummary, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroLibItem, ZoteroLibraryResponse } from './types';
 
 const BASE = '/api/v1';
 
@@ -176,6 +176,12 @@ export const cancelRun = async (runId: string, signal?: AbortSignal): Promise<vo
   await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/cancel`, {}, signal);
 };
 
+/** Researcher lifecycle (gap R1): hard-delete a settled run + everything it owns.
+ *  Server refuses (409 run_active) while the run is executing or status==='running'. */
+export const deleteRun = async (runId: string, signal?: AbortSignal): Promise<void> => {
+  await api.del(`${BASE}/runs/${encodeURIComponent(runId)}`, signal);
+};
+
 export const resumeRun = async (runId: string, signal?: AbortSignal): Promise<void> => {
   await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/resume`, {}, signal);
 };
@@ -271,6 +277,54 @@ export const setActiveModelConfig = async (id: string | null, signal?: AbortSign
   await api.put(`${BASE}/model-configs/active`, { id }, signal);
 };
 
+// ---- built-in env routes (zai/dashscope): modelId override + pricing + default switch ----
+
+const builtinRouteOf = (data: unknown): BuiltinRouteSummary => {
+  if (typeof data === 'object' && data !== null) {
+    const r = data as Record<string, unknown>;
+    if (typeof r.name === 'string' && (r.kind === 'live' || r.kind === 'archived')
+      && typeof r.envModelId === 'string' && typeof r.effectiveModelId === 'string') {
+      return {
+        name: r.name,
+        kind: r.kind,
+        liveReady: r.liveReady === true,
+        baseUrl: typeof r.baseUrl === 'string' ? r.baseUrl : '',
+        apiKeyEnvVar: typeof r.apiKeyEnvVar === 'string' ? r.apiKeyEnvVar : '',
+        envModelId: r.envModelId,
+        effectiveModelId: r.effectiveModelId,
+        ...(typeof r.pricing === 'object' && r.pricing !== null ? { pricing: r.pricing as BuiltinRouteSummary['pricing'] } : {}),
+        isBuiltinDefault: r.isBuiltinDefault === true,
+      };
+    }
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '内置路由结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'built-in route' } });
+};
+
+const builtinRoutesOf = (data: unknown): BuiltinRoutesResponse => {
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { routes?: unknown }).routes)) {
+    const d = data as { routes: unknown[]; defaultSource?: unknown };
+    return {
+      routes: d.routes.map(builtinRouteOf),
+      defaultSource: d.defaultSource === 'ui' ? 'ui' : 'env',
+    };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '内置路由列表响应缺少 routes 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'built-in routes envelope' } });
+};
+
+export const listBuiltinRoutes = async (signal?: AbortSignal): Promise<BuiltinRoutesResponse> =>
+  builtinRoutesOf(await api.getJson(`${BASE}/model-configs/builtin-routes`, signal));
+
+export const updateBuiltinRoute = async (
+  name: string,
+  input: BuiltinRouteUpdateInput,
+  signal?: AbortSignal,
+): Promise<BuiltinRoutesResponse> =>
+  builtinRoutesOf(await api.put(`${BASE}/model-configs/builtin-routes/${encodeURIComponent(name)}`, input, signal));
+
+/** Switch the built-in default route (applies to the next call; the env chain stays untouched). */
+export const setBuiltinDefaultRoute = async (name: string, signal?: AbortSignal): Promise<BuiltinRoutesResponse> =>
+  builtinRoutesOf(await api.put(`${BASE}/model-configs/builtin-routes`, { name }, signal));
+
 /** ONE tiny live call against the route (stored config by id, or an unsaved draft with its key). */
 export const testModelConfig = async (input: ModelConfigTestInput, signal?: AbortSignal): Promise<ModelConfigTestResult> => {
   const data: unknown = await api.post(`${BASE}/model-configs/test`, input, signal);
@@ -315,6 +369,156 @@ export const discoverModels = async (
     throw new ApiError({ code: 'unexpected_schema', message: '模型发现响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'discovered models' } });
   }
   return { models: (data as { models: DiscoveredModel[] }).models };
+};
+
+// ---- Zotero local library (server bridge; the page cannot call 23119 directly) ----
+
+const zoteroItemOf = (data: unknown): ZoteroLibItem => {
+  if (typeof data === 'object' && data !== null) {
+    const c = data as Record<string, unknown>;
+    if (typeof c.key === 'string' && typeof c.title === 'string' && typeof c.itemType === 'string') {
+      return {
+        key: c.key,
+        title: c.title,
+        itemType: c.itemType,
+        ...(typeof c.year === 'number' ? { year: c.year } : {}),
+        creators: Array.isArray(c.creators) ? c.creators.filter((x): x is string => typeof x === 'string') : [],
+        ...(typeof c.doi === 'string' ? { doi: c.doi } : {}),
+        ...(typeof c.url === 'string' ? { url: c.url } : {}),
+        tags: Array.isArray(c.tags) ? c.tags.filter((x): x is string => typeof x === 'string') : [],
+        collections: Array.isArray(c.collections) ? c.collections.filter((x): x is string => typeof x === 'string') : [],
+        relatedKeys: Array.isArray(c.relatedKeys) ? c.relatedKeys.filter((x): x is string => typeof x === 'string') : [],
+      };
+    }
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: 'Zotero 文献条目结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'zotero item' } });
+};
+
+/** Full local-library snapshot via GET /zotero/library; 503 when Zotero is not running. */
+export const getZoteroLibrary = async (signal?: AbortSignal): Promise<ZoteroLibraryResponse> => {
+  const data: unknown = await api.getJson(`${BASE}/zotero/library`, signal);
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { items?: unknown }).items)) {
+    const r = data as Record<string, unknown>;
+    return {
+      items: (r.items as unknown[]).map(zoteroItemOf),
+      total: typeof r.total === 'number' ? r.total : 0,
+      fetchedAt: typeof r.fetchedAt === 'string' ? r.fetchedAt : '',
+    };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: 'Zotero 文库响应缺少 items 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'zotero library' } });
+};
+
+// ---- conversations (conversation-first research flow) ----
+
+const conversationOf = (data: unknown): Conversation => {
+  if (typeof data !== 'object' || data === null || !Array.isArray((data as { messages?: unknown }).messages)) {
+    throw new ApiError({ code: 'unexpected_schema', message: '对话响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'conversation' } });
+  }
+  return data as Conversation;
+};
+
+export const listConversations = async (signal?: AbortSignal): Promise<Conversation[]> => {
+  const data: unknown = await api.getJson(`${BASE}/conversations`, signal);
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { conversations?: unknown }).conversations)) {
+    return (data as { conversations: Conversation[] }).conversations;
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '对话列表响应缺少 conversations 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'conversations envelope' } });
+};
+
+export const getConversation = async (id: string, signal?: AbortSignal): Promise<Conversation> =>
+  conversationOf((await api.getJson(`${BASE}/conversations/${encodeURIComponent(id)}`, signal) as { conversation?: unknown }).conversation);
+
+export const createConversation = async (input: { title?: string; providerConfigId?: string }, signal?: AbortSignal): Promise<Conversation> =>
+  conversationOf((await api.post(`${BASE}/conversations`, input, signal) as { conversation?: unknown }).conversation);
+
+/** One dialogue turn: researcher message (with materials) → the agent's real reply. */
+export const postConversationMessage = async (
+  id: string,
+  input: { text: string; seeds?: import('../utils/ingest').SeedInput[] },
+  signal?: AbortSignal,
+): Promise<Conversation> =>
+  conversationOf((await api.post(`${BASE}/conversations/${encodeURIComponent(id)}/messages`, input, signal) as { conversation?: unknown }).conversation);
+
+/** The conversation's reasoning-capability view (route-declared) and current gear. */
+export interface ConversationReasoningInfo {
+  supported: boolean;
+  style?: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget';
+  defaultGear?: 'low' | 'medium' | 'high';
+  gear?: 'low' | 'medium' | 'high' | null;
+  effectiveGear?: 'low' | 'medium' | 'high';
+}
+
+/** Read the reasoning capability/gear view for a conversation. */
+export const getConversationReasoning = async (id: string, signal?: AbortSignal): Promise<ConversationReasoningInfo> => {
+  const data = await api.getJson(`${BASE}/conversations/${encodeURIComponent(id)}/reasoning-gear`, signal);
+  if (typeof data === 'object' && data !== null && typeof (data as { supported?: unknown }).supported === 'boolean') {
+    return data as ConversationReasoningInfo;
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '思考档位响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'reasoning-gear envelope' } });
+};
+
+/** Set or clear the conversation's reasoning-effort override (null = config default). */
+export const setConversationReasoningGear = async (id: string, gear: 'low' | 'medium' | 'high' | null, signal?: AbortSignal): Promise<{ reasoningGear: 'low' | 'medium' | 'high' | null }> => {
+  const data = await api.put(`${BASE}/conversations/${encodeURIComponent(id)}/reasoning-gear`, { gear }, signal);
+  if (typeof data === 'object' && data !== null && 'reasoningGear' in (data as Record<string, unknown>)) {
+    return data as { reasoningGear: 'low' | 'medium' | 'high' | null };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '思考档位设置响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'reasoning-gear response' } });
+};
+
+/** Launch a research run from a crystallized question; all conversation materials travel with it. */
+export const launchFromConversation = async (
+  id: string,
+  input: { text: string; providerConfigId?: string },
+  signal?: AbortSignal,
+): Promise<string> => {
+  const data = await api.post(`${BASE}/conversations/${encodeURIComponent(id)}/launch`, input, signal);
+  const runId = typeof data === 'object' && data !== null ? (data as { runId?: unknown }).runId : undefined;
+  if (typeof runId === 'string' && runId.length > 0) return runId;
+  throw new ApiError({ code: 'unexpected_schema', message: '启动研究的响应缺少 runId', status: 202, retryable: false, i18nKey: 'err.createRunShape' });
+};
+
+export const deleteConversation = async (id: string, signal?: AbortSignal): Promise<void> => {
+  await api.del(`${BASE}/conversations/${encodeURIComponent(id)}`, signal);
+};
+
+/** Approve (optionally remembering the kind for this conversation) or reject a pending proposal. */
+export const resolveConversationProposal = async (
+  conversationId: string,
+  proposalId: string,
+  input: { approve: boolean; remember?: boolean },
+): Promise<Conversation> =>
+  conversationOf((await api.post(
+    `${BASE}/conversations/${encodeURIComponent(conversationId)}/proposals/${encodeURIComponent(proposalId)}`,
+    input,
+  ) as { conversation?: unknown }).conversation);
+
+// ---- automations (resident agent R3) ----
+
+const automationsOf = async (data: unknown): Promise<Automation[]> => {
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { automations?: unknown }).automations)) {
+    return (data as { automations: Automation[] }).automations;
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '自动化列表响应缺少 automations 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'automations envelope' } });
+};
+
+export const listConversationAutomations = async (conversationId: string, signal?: AbortSignal): Promise<Automation[]> =>
+  automationsOf(await api.getJson(`${BASE}/conversations/${encodeURIComponent(conversationId)}/automations`, signal));
+
+export const listAutomations = async (signal?: AbortSignal): Promise<Automation[]> =>
+  automationsOf(await api.getJson(`${BASE}/automations`, signal));
+
+export const setAutomationEnabled = async (id: string, enabled: boolean): Promise<Automation> => {
+  const data = await api.patch(`${BASE}/automations/${encodeURIComponent(id)}`, { enabled });
+  const automation = typeof data === 'object' && data !== null ? (data as { automation?: unknown }).automation : undefined;
+  if (typeof automation !== 'object' || automation === null) {
+    throw new ApiError({ code: 'unexpected_schema', message: '自动化更新响应缺少 automation 对象', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'automation' } });
+  }
+  return automation as Automation;
+};
+
+export const deleteAutomation = async (id: string, signal?: AbortSignal): Promise<void> => {
+  await api.del(`${BASE}/automations/${encodeURIComponent(id)}`, signal);
 };
 
 // ---- small helper (local, avoids repeating the 404-passthrough pattern) ----
@@ -435,3 +639,51 @@ export const connectClaim = (
   signal?: AbortSignal,
 ): Promise<HypothesisOpResult> =>
   postHypOp(runId, hypId, 'connect', { claimId, direction }, signal);
+
+// ---- tool integrations (TIS: researcher-wired external tools) ----
+
+/** Defensive projection: only fields the shapes above define survive. */
+const toolIntegrationOf = (data: unknown): ToolIntegrationView => {
+  if (typeof data !== 'object' || data === null) throw new ApiError({ code: 'tools_malformed', message: 'tool integration: malformed response' });
+  return data as ToolIntegrationView;
+};
+
+export const listToolIntegrations = async (signal?: AbortSignal): Promise<ToolIntegrationView[]> => {
+  const data: unknown = await api.getJson(`${BASE}/tools`, signal);
+  if (typeof data !== 'object' || data === null || !Array.isArray((data as { integrations?: unknown }).integrations)) {
+    throw new ApiError({ code: 'tools_malformed', message: 'tool integrations: malformed response' });
+  }
+  return ((data as { integrations: unknown[] }).integrations).map(toolIntegrationOf);
+};
+
+export const createToolIntegration = async (input: Record<string, unknown>, signal?: AbortSignal): Promise<ToolIntegrationView> =>
+  toolIntegrationOf((await api.post(`${BASE}/tools`, input, signal) as { integration?: unknown }).integration);
+
+export const updateToolIntegration = async (id: string, input: Record<string, unknown>, signal?: AbortSignal): Promise<ToolIntegrationView> =>
+  toolIntegrationOf((await api.put(`${BASE}/tools/${encodeURIComponent(id)}`, input, signal) as { integration?: unknown }).integration);
+
+export const deleteToolIntegration = async (id: string, signal?: AbortSignal): Promise<void> => {
+  await api.del(`${BASE}/tools/${encodeURIComponent(id)}`, signal);
+};
+
+export const testToolIntegration = async (id: string, signal?: AbortSignal): Promise<ToolTestRecord> => {
+  const data = await api.post(`${BASE}/tools/${encodeURIComponent(id)}/test`, {}, signal);
+  if (typeof data !== 'object' || data === null || typeof (data as { test?: unknown }).test !== 'object') {
+    throw new ApiError({ code: 'tools_malformed', message: 'tool test: malformed response' });
+  }
+  return (data as { test: ToolTestRecord }).test;
+};
+
+export interface PluginImportResponse {
+  plugin: { name: string; version: string; license: string };
+  integrations: ToolIntegrationView[];
+  warnings: string[];
+}
+
+export const importPluginFromDir = async (dir: string, signal?: AbortSignal): Promise<PluginImportResponse> => {
+  const data = await api.post(`${BASE}/tools/import-plugin`, { dir, reviewed: true }, signal);
+  if (typeof data !== 'object' || data === null || !Array.isArray((data as { integrations?: unknown }).integrations)) {
+    throw new ApiError({ code: 'tools_malformed', message: 'plugin import: malformed response' });
+  }
+  return data as PluginImportResponse;
+};

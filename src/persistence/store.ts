@@ -8,6 +8,9 @@ import {
   ModelProviderConfig, AgentSession, AgentReport,
   EvidenceBody, AchAnalysis, LedgerEntry,
   MetaAnalysisSpec, EffectEstimateRecord,
+  ConversationSchema,
+  AutomationSchema,
+  ToolIntegrationSchema,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -41,6 +44,9 @@ const KIND_SCHEMAS = {
   prediction: LedgerEntry,
   meta_spec: MetaAnalysisSpec,
   effect_estimate: EffectEstimateRecord,
+  conversation: ConversationSchema,
+  automation: AutomationSchema,
+  tool_integration: ToolIntegrationSchema,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});
@@ -90,7 +96,7 @@ export class Store {
     }
   }
 
-  private reindexFts(kind: 'question' | 'hypothesis' | 'claim'): void {
+  private reindexFts(kind: string): void {
     const rows = this.db.prepare('SELECT id, json FROM objects WHERE kind=?').all(kind);
     this.db.prepare('DELETE FROM far_search WHERE kind=?').run(kind);
     const insert = this.db.prepare('INSERT INTO far_search (kind, obj_id, body) VALUES (?,?,?)');
@@ -104,9 +110,12 @@ export class Store {
     }
   }
 
+  /** Object kinds whose text is mirrored into far_search — single source for mirror writes AND deletes. */
+  private static readonly FTS_MIRRORED_KINDS: ReadonlySet<string> = new Set(['question', 'hypothesis', 'claim']);
+
   /** Called after object writes to keep the FTS mirror fresh (best-effort). */
   private touchFts(kind: string): void {
-    if (kind !== 'question' && kind !== 'hypothesis' && kind !== 'claim') return;
+    if (!Store.FTS_MIRRORED_KINDS.has(kind)) return;
     if (!this.ftsReady) return;
     try {
       this.reindexFts(kind);
@@ -212,10 +221,45 @@ export class Store {
       .map((r) => KIND_SCHEMAS[kind].parse(JSON.parse(String(r.json))) as DomainObject<K>);
   }
 
-  /** Hard delete of one stored object; false when nothing matched (idempotent). */
+  /** Hard delete of one stored object; false when nothing matched (idempotent).
+   *  FTS mirror rows for mirrored kinds are dropped with the object, or search
+   *  would keep returning deleted questions/hypotheses/claims. */
   deleteObject(kind: ObjectKind, id: string): boolean {
     const res = this.db.prepare('DELETE FROM objects WHERE kind=? AND id=?').run(kind, id);
-    return Number(res.changes) === 1;
+    if (Number(res.changes) !== 1) return false;
+    if (Store.FTS_MIRRORED_KINDS.has(kind)) {
+      this.db.prepare('DELETE FROM far_search WHERE kind=? AND obj_id=?').run(kind, id);
+    }
+    return true;
+  }
+
+  /** Lifecycle surface for the researcher: hard-delete one run and every row it
+   *  owns — domain objects (incl. their far_search mirror rows), the append-only
+   *  event stream, and both checkpoint tables — in ONE transaction so a crash can
+   *  never leave a half-deleted run. Workspace-scoped objects (run_id='__none__',
+   *  e.g. conversations and their questions) are never touched. Returns null when
+   *  the run does not exist; callers decide the HTTP semantics. */
+  deleteRunCascade(runId: string): { events: number; objects: number; checkpoints: number; searchRows: number } | null {
+    const run = this.getRun(runId);
+    if (run === null) return null;
+    const counts = { events: 0, objects: 0, checkpoints: 0, searchRows: 0 };
+    this.db.transaction(() => {
+      const mirrored = this.db.prepare(
+        'SELECT id FROM objects WHERE run_id=? AND kind IN (\'question\',\'hypothesis\',\'claim\')',
+      ).all(runId) as Array<{ id: string }>;
+      const dropSearch = this.db.prepare('DELETE FROM far_search WHERE kind=? AND obj_id=?');
+      for (const r of mirrored) {
+        counts.searchRows += Number(dropSearch.run('question', r.id).changes)
+          + Number(dropSearch.run('hypothesis', r.id).changes)
+          + Number(dropSearch.run('claim', r.id).changes);
+      }
+      counts.objects = Number(this.db.prepare('DELETE FROM objects WHERE run_id=?').run(runId).changes);
+      counts.events = Number(this.db.prepare('DELETE FROM events WHERE run_id=?').run(runId).changes);
+      counts.checkpoints = Number(this.db.prepare('DELETE FROM step_outputs WHERE run_id=?').run(runId).changes)
+        + Number(this.db.prepare('DELETE FROM step_fingerprints WHERE run_id=?').run(runId).changes);
+      this.db.prepare('DELETE FROM runs WHERE id=?').run(runId);
+    });
+    return counts;
   }
 
   // ---- meta KV (workspace-level facts: active model config, ...) ----

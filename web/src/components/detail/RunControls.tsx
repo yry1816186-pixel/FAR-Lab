@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ApiError, withTimeout } from '../../api/client';
-import { cancelRun, resumeRun } from '../../api/endpoints';
+import { cancelRun, deleteRun, resumeRun } from '../../api/endpoints';
 import type { ResearchRun } from '../../api/types';
 import { isSettled } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
@@ -11,6 +11,8 @@ import { errorText } from '../common';
  * meaningful; every disabled state carries the honest reason (PRODUCT_HCI §2:
  * no dead controls, no fake success). Resume additionally becomes meaningful
  * for a completed run once pending feedback exists (feedback -> revision loop).
+ * Delete (research lifecycle, gap R1) is offered for non-active runs only and
+ * requires an explicit confirm; the list refresh clears the selection.
  */
 export function RunControls({
   run,
@@ -22,7 +24,7 @@ export function RunControls({
   onMutated: () => void;
 }): JSX.Element {
   const { t } = useI18n();
-  const [pending, setPending] = useState<'cancel' | 'resume' | null>(null);
+  const [pending, setPending] = useState<'cancel' | 'resume' | 'delete' | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
 
   const cancelReason = ((): string | null => {
@@ -45,12 +47,25 @@ export function RunControls({
     return null;
   })();
 
-  const act = async (action: 'cancel' | 'resume'): Promise<void> => {
+  // Deletion guards mirror the server (409 run_active): active runs must be
+  // cancelled first. 'created' (never started) is deletable — that is cleanup,
+  // not data loss a researcher would mourn.
+  const deleteReason = ((): string | null => {
+    if (run.status === 'running' || run.status === 'queued') return t('controls.deleteDisabled.running');
+    return null;
+  })();
+
+  const act = async (action: 'cancel' | 'resume' | 'delete'): Promise<void> => {
     setError(null);
+    if (action === 'delete') {
+      const label = (run.questionText ?? '').trim() || run.id;
+      if (!window.confirm(t('controls.deleteConfirm', { label }))) return;
+    }
     setPending(action);
     const controller = new AbortController();
     try {
       if (action === 'cancel') await cancelRun(run.id, withTimeout(controller.signal, 15_000));
+      else if (action === 'delete') await deleteRun(run.id, withTimeout(controller.signal, 15_000));
       else await resumeRun(run.id, withTimeout(controller.signal, 15_000));
       onMutated();
     } catch (e) {
@@ -83,9 +98,18 @@ export function RunControls({
         >
           {pending === 'resume' ? t('controls.pending') : t('controls.resume')}
         </button>
+        <button
+          type="button"
+          className="btn btn--danger"
+          disabled={deleteReason !== null || pending !== null}
+          onClick={() => void act('delete')}
+        >
+          {pending === 'delete' ? t('controls.pending') : t('controls.delete')}
+        </button>
       </div>
       {cancelReason !== null && <p className="control-reason">{t('controls.cancel')}: {cancelReason}</p>}
       {resumeReason !== null && <p className="control-reason">{t('controls.resume')}: {resumeReason}</p>}
+      {deleteReason !== null && <p className="control-reason">{t('controls.delete')}: {deleteReason}</p>}
       {error !== null && (
         <p className="field-error" role="alert">
           {t('controls.actionFailed')}：{errorText(error)}
