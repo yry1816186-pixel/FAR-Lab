@@ -31,11 +31,13 @@ const IterationTrigger = z.discriminatedUnion('kind', [
     kind: z.literal('unconsumed_feedback'),
     signalIds: z.array(z.string().min(1)).min(1),
   }),
-  /** A latest plan that passes the deterministic executability check while no
-   * experiment_run has completed for this run — execute -> feedback -> revise -> export reopens. */
+  /** The plan leg has executable unexecuted work — no completed experiment yet, or
+   * the plan was causally revised after the last one (a new frozen registration).
+   * execute -> feedback -> revise -> export reopens. */
   z.object({
     kind: z.literal('executable_plan_unexecuted'),
     planId: z.string().min(1),
+    because: z.enum(['never_executed', 'revised_since']),
   }),
 ]);
 export type IterationTrigger = z.infer<typeof IterationTrigger>;
