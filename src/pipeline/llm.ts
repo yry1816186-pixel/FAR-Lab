@@ -7,6 +7,7 @@ import type { Store } from '../persistence/store.js';
 import type { ModelProvider, StructuredCallResult } from '../shared/ports.js';
 import { strictSchemaOrUndefined } from '../providers/http.js';
 import { UNTRUSTED_DATA_RULE } from '../shared/untrusted.js';
+import { clampGearForModel, stageReasoningGear } from '../domain/model-config.js';
 import { collectEnvSecrets, describeViolation, scanOutbound } from '../shared/exfil-guard.js';
 import { RunBudgetExhaustedError } from '../app/run-budget.js';
 
@@ -19,6 +20,8 @@ export interface LlmCallOptions {
   schema: z.ZodType<unknown>;
   temperature?: number;
   maxTokens?: number;
+  /** RU-9 GO2: explicit per-call reasoning override — wins over the stage-table derivation. */
+  reasoning?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' };
 }
 
 export interface LlmResult<T> {
@@ -46,6 +49,13 @@ export interface ModelPlaneDeps {
   recordReceipt: (partial: ModelReceiptPartial) => void;
   /** Run id for the budget-exhaustion error (non-pipeline callers bound their own run). */
   runId?: string;
+  /**
+   * RU-9 GO2 effort plane: the resolved route's declared reasoning capability.
+   * Present → invokeStructured derives the per-call gear from the stage table
+   * (+ per-model clamps) unless the caller passed an explicit gear. Absent →
+   * zero reasoning fields on the wire (exact legacy behavior).
+   */
+  reasoningRoute?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; defaultGear: 'low' | 'medium' | 'high'; modelId: string };
 }
 
 /**
@@ -123,6 +133,11 @@ export async function invokeStructured<T>(deps: ModelPlaneDeps, opts: InvokeOpti
       // the beta endpoint 400s on bare-{} subschemas, live-probed 2026-08-22).
       jsonSchema: strictSchemaOrUndefined(opts.schema),
       purpose: opts.purpose,
+      ...(opts.reasoning !== undefined
+        ? { reasoning: opts.reasoning }
+        : deps.reasoningRoute !== undefined
+          ? { reasoning: { style: deps.reasoningRoute.style, gear: clampGearForModel(stageReasoningGear(opts.stage), deps.reasoningRoute.modelId) } }
+          : {}),
     },
     (raw) => validateStructured<T>(raw, opts.schema),
   ));
@@ -141,7 +156,7 @@ export async function invokeStructured<T>(deps: ModelPlaneDeps, opts: InvokeOpti
  */
 export async function callStructured<T>(ctx: StageContext, opts: LlmCallOptions): Promise<LlmResult<T>> {
   return invokeStructured(
-    { provider: ctx.provider, budget: ctx.budget, recordReceipt: ctx.recordReceipt, runId: ctx.run.id },
+    { provider: ctx.provider, budget: ctx.budget, recordReceipt: ctx.recordReceipt, runId: ctx.run.id, ...(ctx.reasoningRoute !== undefined ? { reasoningRoute: ctx.reasoningRoute } : {}) },
     { ...opts, stage: opts.stage },
   );
 }

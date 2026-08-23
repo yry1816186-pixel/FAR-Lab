@@ -1,4 +1,5 @@
 import type { Store } from '../persistence/store.js';
+import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 import type { ResearchRun } from '../domain/run.js';
 import type { ModelProvider } from '../shared/ports.js';
 import { createCustomProvider, missingConfigProvider, CUSTOM_PROVIDER_PREFIX } from '../providers/custom.js';
@@ -61,6 +62,29 @@ export const resolveRunProvider = (store: Store, run: ResearchRun): ModelProvide
   if (chain.kind === 'missing') return missingConfigProvider(configId);
   if (chain.routes.length === 1) return chain.routes[0]!.provider;
   return createFallbackProvider(chain.routes);
+};
+
+/**
+ * RU-9 GO2: the run's reasoning route — FIRST config in the resolved chain
+ * that declares a reasoning capability (style+defaultGear from its config).
+ * null for env builtin routes / undeclared configs = zero reasoning fields
+ * on the wire (exact legacy behavior).
+ */
+export const resolveRunReasoningRoute = (
+  store: Store,
+  run: ResearchRun,
+): { style: ReasoningStyle; defaultGear: ReasoningGear; modelId: string } | null => {
+  const configId = run.providerConfigId ?? store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
+  if (configId === null) return null;
+  const chain = buildChain(store, configId);
+  if (chain.kind === 'missing') return null;
+  for (const route of chain.routes) {
+    const cfg = store.getObject('model_config', route.configId);
+    if (cfg?.reasoning !== undefined) {
+      return { style: cfg.reasoning.style, defaultGear: cfg.reasoning.defaultGear, modelId: cfg.modelId };
+    }
+  }
+  return null;
 };
 
 /** Exposed for tests: the route names a resolved chain would try, in order. */
