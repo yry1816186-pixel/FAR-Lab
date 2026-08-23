@@ -1948,3 +1948,63 @@ select option { color: var(--text); background: var(--surface); }
   white-space: nowrap;
 }
 .id-ref-raw { font-size: var(--fs-data); color: var(--v2-text-2); }
+
+/* ---------- HX5: rendered deliverables (report / paper manuscript) ---------- */
+.doc-switch { display: inline-flex; border: 1px solid var(--v2-form-border); border-radius: 999px; padding: 2px; gap: 2px; }
+.doc-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--v2-text-2);
+  font: inherit;
+  font-size: var(--fs-aux);
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.doc-switch-btn--active { background: var(--v2-btn-ink); color: var(--v2-btn-ink-fg); }
+.doc-render { display: flex; gap: var(--sp-4); margin-top: var(--sp-2); align-items: flex-start; }
+.doc-outline {
+  flex: 0 0 200px;
+  position: sticky;
+  top: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 70vh;
+  overflow: auto;
+}
+.doc-outline-item {
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: var(--fs-aux);
+  color: var(--v2-text-2);
+  padding: 3px 8px;
+  border-left: 2px solid var(--v2-border);
+  cursor: pointer;
+}
+.doc-outline-item--h3 { padding-left: 16px; }
+.doc-outline-item:hover { color: var(--v2-text-1); border-left-color: var(--v2-info); }
+.doc-body { flex: 1; min-width: 0; }
+.doc-body .doc-h1 { font-family: var(--font-statement); font-size: 20px; line-height: 28px; font-weight: 600; }
+.doc-body .doc-h2 { font-size: var(--fs-h2); font-weight: 600; margin: var(--sp-5) 0 var(--sp-2); scroll-margin-top: var(--sp-4); }
+.doc-body .doc-h3 { font-size: var(--fs-h3); font-weight: 600; margin: var(--sp-4) 0 var(--sp-2); scroll-margin-top: var(--sp-4); }
+.doc-body .doc-quote {
+  margin: var(--sp-2) 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--v2-border);
+  background: var(--v2-surface);
+  color: var(--v2-text-2);
+  font-size: var(--fs-read);
+}
+.doc-body p { font-size: var(--fs-read); line-height: var(--lh-read); margin: 0 0 var(--sp-2); }
+.doc-body ul, .doc-body ol { margin: 0 0 var(--sp-2); padding-left: 20px; font-size: var(--fs-read); line-height: var(--lh-read); }
+.doc-body code { font-family: var(--font-data); font-size: var(--fs-data); background: var(--v2-surface-2); border-radius: 3px; padding: 1px 4px; }
+@media (max-width: 900px) {
+  .doc-render { flex-direction: column; }
+  .doc-outline { position: static; flex: none; max-height: 120px; flex-direction: row; flex-wrap: wrap; }
+}
