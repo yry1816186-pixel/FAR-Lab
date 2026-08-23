@@ -37,6 +37,16 @@ const VOLATILE_PATHS: Record<SourceFamily, readonly (readonly PathSegment[])[]> 
     ['reference', '*', 'deposited'],
   ],
   arxiv: [['updated']], // new author versions flip this; version itself stays in the snapshot
+  // Europe PMC search-article objects (resultType=core): citation counts and
+  // per-query relevance drift between harvests; firstPublicationDate moves on
+  // publisher corrections; fullTextUrlList tracks publisher-side link churn.
+  // All projections used downstream (title/abstract/doi/pmid) stay in the hash.
+  europepmc: [
+    ['citedByCount'],
+    ['firstPublicationDate'],
+    ['relevanceScore'],
+    ['fullTextUrlList'],
+  ],
   // User-provided seeds never enter the search-normalization path (they are
   // SourceDocuments at creation, not RawSourceRecords), but the Record must
   // stay exhaustive: an empty list is the honest no-op.

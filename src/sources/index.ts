@@ -3,6 +3,7 @@ import type { SourceAdapter } from '../shared/ports.js';
 import { type SourceAdapterOptions } from './http.js';
 import { createArxivAdapter, type ArxivAdapterOptions } from './arxiv.js';
 import { createCrossrefAdapter, type CrossrefAdapterOptions } from './crossref.js';
+import { createEuropePmcAdapter, type EuropePmcAdapterOptions } from './europepmc.js';
 import { createOpenAlexAdapter, type OpenAlexAdapterOptions } from './openalex.js';
 
 /** Union of family-specific factory options — each adapter ignores what it doesn't use. */
@@ -19,11 +20,15 @@ const FACTORIES: Record<SourceFamily, AdapterFactory | null> = {
   openalex: (o) => createOpenAlexAdapter(o satisfies OpenAlexAdapterOptions | undefined),
   arxiv: (o) => createArxivAdapter(o satisfies ArxivAdapterOptions | undefined),
   crossref: (o) => createCrossrefAdapter(o satisfies CrossrefAdapterOptions | undefined),
+  // Keyless biomed family: restores abstract-bearing redundancy when the OpenAlex
+  // keyless daily budget is exhausted (2026-08-22 live observation on the vitamin-D
+  // run: OpenAlex 429s collapsed retrieval to abstract-less Crossref metadata).
+  europepmc: (o) => createEuropePmcAdapter(o satisfies EuropePmcAdapterOptions | undefined),
   // User-provided seeds never search — no adapter can exist for this family.
   user_provided: null,
 };
 
-export const SOURCE_FAMILIES: readonly SourceFamily[] = ['openalex', 'arxiv', 'crossref'];
+export const SOURCE_FAMILIES: readonly SourceFamily[] = ['openalex', 'arxiv', 'crossref', 'europepmc'];
 
 /** Small factory registry: fetch the adapter for a family (optionally configured). */
 export const sourceAdapterFor = (family: SourceFamily, opts?: AdapterFactoryOptions): SourceAdapter => {
@@ -40,6 +45,8 @@ export {
   type ArxivAdapterOptions,
   createCrossrefAdapter,
   type CrossrefAdapterOptions,
+  createEuropePmcAdapter,
+  type EuropePmcAdapterOptions,
   createOpenAlexAdapter,
   type OpenAlexAdapterOptions,
 };

@@ -77,7 +77,7 @@ const verifyByIdentifier = async (
   ctx: StageContext,
   doc: SourceDocument,
   family: SourceFamily,
-  method: 'crossref_doi' | 'arxiv_id',
+  method: 'crossref_doi' | 'arxiv_id' | 'europepmc_id',
   identifier: SourceIdentifier,
 ): Promise<VerifyOutcome> => {
   const checkedAt = new Date().toISOString();
@@ -172,6 +172,7 @@ export const verifyStage: StageHandler = {
       if (idx === 0) ctx.progress?.(0, pending.length);
       const doi = doc.identifiers.find((i) => i.kind === 'doi');
       const arxivId = doc.identifiers.find((i) => i.kind === 'arxiv');
+      const pubmedId = doc.identifiers.find((i) => i.kind === 'pubmed');
       if (doi) {
         const outcome = await verifyByIdentifier(ctx, doc, 'crossref', 'crossref_doi', {
           kind: 'doi',
@@ -184,6 +185,16 @@ export const verifyStage: StageHandler = {
         const outcome = await verifyByIdentifier(ctx, doc, 'arxiv', 'arxiv_id', {
           kind: 'arxiv',
           value: arxivId.value,
+        });
+        if (outcome === 'resolved') resolvedCount += 1;
+        else if (outcome === 'not_found') notFoundCount += 1;
+        else errorCount += 1;
+      } else if (pubmedId) {
+        // PMID/PMCID-anchored docs (Europe PMC family) resolve against their own
+        // source of record — previously they fell into "no persistent identifier".
+        const outcome = await verifyByIdentifier(ctx, doc, 'europepmc', 'europepmc_id', {
+          kind: 'pubmed',
+          value: pubmedId.value,
         });
         if (outcome === 'resolved') resolvedCount += 1;
         else if (outcome === 'not_found') notFoundCount += 1;
