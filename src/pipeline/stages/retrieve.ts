@@ -3,6 +3,7 @@ import { CorpusSnapshot, SourceDocument, newId } from '../../domain/index.js';
 import type { RetrievalQuery, SourceFamily } from '../../domain/source.js';
 import { canonicalJson } from '../../shared/crypto.js';
 import type { RawSourceRecord } from '../../shared/ports.js';
+import { cachedSearch } from '../../sources/response-cache.js';
 import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash, excludeVolatile } from '../../sources/snapshot.js';
 import { callStructured } from '../llm.js';
@@ -503,7 +504,24 @@ export const retrieveStage: StageHandler = {
       const redactionNote = isVariant
         ? 'arxiv recovery variant search; query text and per-record content hashes retained; payloads archived content-addressed'
         : 'query text and per-record content hashes retained; payloads archived content-addressed';
-      const res = await ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT });
+      // RU-10 GO1 read-through cache: fresh hits skip the HTTP round entirely;
+      // stale-on-source-error serves the expired entry with an honest receipt flag.
+      let res;
+      let cacheState: 'miss' | 'hit' | 'stale' = 'miss';
+      if (ctx.responseCache !== undefined) {
+        const wrapped = await cachedSearch(ctx.responseCache, t.family, queryText, SEARCH_LIMIT, Date.now(),
+          () => ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT }),
+          { onErrorStale: (e) => isSourceAdapterError(e) && /429|rate|budget/i.test(e instanceof Error ? e.message : String(e)) },
+        );
+        res = wrapped.result;
+        cacheState = wrapped.stale ? 'stale' : 'hit';
+        if (cacheState === 'hit' && wrapped.cachedAt !== new Date(Date.now()).toISOString()) {
+          // fresh hit from a PRIOR run — the HTTP status of that run is replayed
+          cacheState = 'hit';
+        }
+      } else {
+        res = await ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT });
+      }
       return {
         count: res.records.length,
         family: t.family,
@@ -516,6 +534,7 @@ export const retrieveStage: StageHandler = {
             family: t.family,
             query: queryText,
             httpStatus: res.httpStatus,
+            ...(cacheState !== 'miss' ? { cache: cacheState } : {}),
             resultCount: res.records.length,
             contentHashes: res.records.map((r) => snapshotHash(t.family, r)),
           },
