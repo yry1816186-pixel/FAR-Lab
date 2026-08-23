@@ -1905,3 +1905,38 @@ select option { color: var(--text); background: var(--surface); }
 /* sidebar list hover affordance (LibreChat-form) */
 .run-item { transition: background var(--dur-fast) var(--ease-standard); }
 .run-item:hover { background: var(--v2-surface-2); }
+
+/* ---------- HX4: hypothesis workspace — evidence balance + featured card ---------- */
+.hyp-head { display: flex; flex-direction: column; gap: 4px; }
+.hyp-head-main { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hyp-head-main .hyp-actions { margin-left: auto; }
+.hyp-head-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--fs-aux); }
+.hyp-card--featured { border-color: var(--v2-form-border); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 20px rgba(0, 0, 0, 0.05); }
+.hyp-statement--featured { font-size: 18px; line-height: 27px; }
+
+/* Evidence balance: signed logLR scale — the one place color speaks (evidence semantics only) */
+.ev-balance { display: flex; flex-direction: column; gap: 4px; margin: var(--sp-2) 0 var(--sp-1); }
+.ev-balance-scale {
+  position: relative;
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--v2-surface-2);
+  overflow: hidden;
+}
+.ev-balance--featured .ev-balance-scale { height: 14px; }
+.ev-balance-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--v2-form-border); }
+.ev-balance-fill { position: absolute; top: 0; bottom: 0; }
+.ev-balance-fill--support { left: 50%; background: var(--v2-verified); border-radius: 0 999px 999px 0; }
+.ev-balance-fill--counter { right: 50%; background: var(--v2-refuted); border-radius: 999px 0 0 999px; }
+.ev-balance-meta { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ev-balance-dir { font-weight: 600; font-size: var(--fs-aux); }
+.ev-balance-dir--support { color: var(--v2-verified); }
+.ev-balance-dir--counter { color: var(--v2-refuted); }
+.ev-balance-dir--uncertain { color: var(--v2-caution); }
+
+/* methods disclosure: ranking artifacts fold away behind the story */
+.hyp-methods { border-top: 1px solid var(--v2-border); padding-top: var(--sp-3); margin-top: var(--sp-3); }
+.hyp-methods summary { cursor: pointer; color: var(--v2-text-2); font-size: var(--fs-aux); user-select: none; }
+.hyp-methods[open] summary { margin-bottom: var(--sp-2); }
+.hyp-methods-body { display: flex; flex-direction: column; gap: var(--sp-3); }
