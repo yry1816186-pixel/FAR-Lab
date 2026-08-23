@@ -488,7 +488,7 @@ export class Orchestrator {
               nextActions: [
                 'add a feedback signal (expert judgment / new literature / reviewer comment) — feedback -> revise -> export reopen automatically on the next execution',
                 'materialize report + bundle files: far export <runId>',
-                'literature-type questions cannot yet run a dataset experiment (statistical meta-analysis experiment type: designed, awaiting user gate)',
+                'literature-type questions pool published effect estimates automatically (statistical_meta); close the loop confirmatorily: far experiment approve <specId> --by <you> --hypothesis <hypId> && far experiment rerun <specId>',
               ],
             },
           });
