@@ -330,15 +330,24 @@ const main = async (): Promise<void> => {
     // Route health (D-060 phase-3). Config mode never touches the network; --live makes
     // ONE minimal chat call per route (explicit user action — no ambient probing).
     const { listProviders } = await import('../providers/index.js');
+    const { createZaiProvider } = await import('../providers/zai.js');
+    const { createDashScopeProvider } = await import('../providers/dashscope.js');
     const wanted = positional(3);
     const all = listProviders().filter((p) => wanted === undefined || p.name === wanted);
     if (all.length === 0) die(`unknown provider: ${wanted}`, 2);
+    // Env candidates per provider — must mirror the adapter's REAL resolution chain
+    // (zai.ts reads ZAI_API_KEY then legacy ZHIPU_API_KEY), not a display string.
+    const ENV_CANDIDATES: Record<string, string[]> = {
+      zai: ['ZAI_API_KEY', 'ZHIPU_API_KEY'],
+      dashscope: ['DASHSCOPE_API_KEY'],
+    };
     const results: Array<Record<string, unknown>> = [];
     for (const p of all) {
       const entry: Record<string, unknown> = {
         provider: p.name, kind: p.kind, model: p.modelId, baseUrl: p.baseUrl, apiKeyEnvVar: p.apiKeyEnvVar,
       };
-      const key = p.apiKeyEnvVar.startsWith('(') ? '' : (process.env[p.apiKeyEnvVar] ?? '');
+      const candidates = ENV_CANDIDATES[p.name] ?? [];
+      const key = candidates.map((n) => process.env[n] ?? '').find((v) => v.length > 0) ?? '';
       if (p.kind !== 'live') {
         entry.status = 'test-only';
       } else if (key.length === 0) {
@@ -346,21 +355,27 @@ const main = async (): Promise<void> => {
       } else if (!flag('--live')) {
         entry.status = 'key-present';
       } else {
+        // --live goes through the provider's own structuredCall so the probe hits the
+        // SAME wire the pipeline uses (anthropic vs openai) — a hand-rolled OpenAI-style
+        // fetch against an anthropic-wire baseUrl would always 404 and lie about health.
         try {
-          const res = await fetch(`${p.baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-            body: JSON.stringify({ model: p.modelId, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }),
-            signal: AbortSignal.timeout(20_000),
-          });
-          const bodyText = await res.text();
-          if (res.ok) {
+          const provider = p.name === 'dashscope' ? createDashScopeProvider({ apiKey: key }) : createZaiProvider({ apiKey: key });
+          const result = await provider.structuredCall(
+            {
+              task: 'model route connectivity probe',
+              userPayload: { instruction: 'Reply with exactly the JSON object {"ok":true} and nothing else.' },
+              outputKind: 'json',
+              maxTokens: 16,
+              purpose: 'cli-probe-live',
+            },
+            (raw: unknown) => raw,
+          );
+          if (result.ok) {
             entry.status = 'ready';
-            entry.httpStatus = res.status;
+            entry.latencyMs = result.receipt?.latencyMs;
           } else {
-            entry.status = 'blocked';
-            entry.httpStatus = res.status;
-            entry.detail = bodyText.slice(0, 200); // honest cause (401/402/429 …), key never echoed
+            entry.status = result.error?.kind === 'rate_limited' || result.error?.kind === 'quota_exceeded' ? 'blocked' : 'unreachable';
+            entry.detail = JSON.stringify(result.error ?? {}).slice(0, 200); // honest cause, key never echoed
           }
         } catch (e) {
           entry.status = 'unreachable';

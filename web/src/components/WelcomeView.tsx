@@ -19,10 +19,13 @@ export function WelcomeView({
   onCreated,
   runs,
   onSelectRun,
+  onOpenSettings,
 }: {
   onCreated: (runId: string) => void;
   runs: RunSummary[];
   onSelectRun: (id: string) => void;
+  /** Opens the model-management dialog from the composer's model picker. */
+  onOpenSettings: () => void;
 }): JSX.Element {
   const { t } = useI18n();
   const { health, healthError } = useHealth();
@@ -47,7 +50,7 @@ export function WelcomeView({
         </p>
 
         <div className="home-composer">
-          <ResearchComposer onCreated={onCreated} />
+          <ResearchComposer onCreated={onCreated} onOpenSettings={onOpenSettings} />
         </div>
 
         <div className="example-questions">

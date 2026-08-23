@@ -19,6 +19,21 @@ export interface SeedInput {
   authors?: string[];
 }
 
+/**
+ * Seed cap (composer attachment row): generous enough for a real literature
+ * review, small enough that one run's user_provided corpus stays reviewable.
+ */
+export const MAX_SEEDS = 12;
+
+/** One parsed citation entry from a multi-entry BibTeX/RIS payload. */
+export interface CitationEntry {
+  title: string;
+  year?: number;
+  authors: string[];
+  doi?: string;
+  keywords: string[];
+}
+
 export type PasteKind = 'doi' | 'arxiv' | 'url' | 'bibtex' | 'ris' | 'plain';
 
 const DOI_RE = /\b10\.\d{4,9}\/[^\s"<>]+/i;
@@ -173,5 +188,47 @@ export async function fetchZoteroItems(signal: AbortSignal): Promise<ZoteroItem[
     return items;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Parse a multi-entry BibTeX/RIS payload into citation entries (ZoteroPanel
+ * file import, ResearchComposer paste). Uses the same citation-js pipeline as
+ * parseCitation so single- and multi-entry paths agree on metadata shape.
+ * Returns null when the payload is not BibTeX/RIS at all; returns [] only for
+ * an empty parse (caller reports honestly).
+ */
+export async function parseCitationEntries(text: string): Promise<CitationEntry[] | null> {
+  const kind = detectPasteKind(text);
+  if (kind !== 'bibtex' && kind !== 'ris') return null;
+  try {
+    const { Cite } = await import('@citation-js/core');
+    if (kind === 'bibtex') await import('@citation-js/plugin-bibtex');
+    else await import('@citation-js/plugin-ris');
+    const cite = await Cite.async(text.trim());
+    const entries: CitationEntry[] = [];
+    for (const first of cite.data) {
+      const title = typeof first.title === 'string' ? first.title : '';
+      if (title.length === 0) continue; // untitled entry carries nothing usable
+      const authors = Array.isArray(first.author) && first.author.length > 0
+        ? first.author
+            .map((a: { given?: string; family?: string; name?: string }) =>
+              typeof a.name === 'string' ? a.name : [a.given, a.family].filter((x): x is string => typeof x === 'string').join(' '))
+            .filter((n: string) => n.length > 0)
+        : [];
+      const year = typeof first.issued?.['date-parts']?.[0]?.[0] === 'number'
+        ? (first.issued['date-parts'][0]![0] as number)
+        : undefined;
+      const doi = typeof first.DOI === 'string' && first.DOI.length > 0 ? first.DOI : undefined;
+      // citation-js types omit `keyword` (BibTeX-only field) — read it off the record safely.
+      const kwRaw = (first as { keyword?: unknown }).keyword;
+      const keywords = typeof kwRaw === 'string' && kwRaw.length > 0
+        ? kwRaw.split(/[,;]/).map((k: string) => k.trim()).filter((k: string) => k.length > 0)
+        : [];
+      entries.push({ title, ...(year !== undefined ? { year } : {}), authors, ...(doi !== undefined ? { doi } : {}), keywords });
+    }
+    return entries;
+  } catch {
+    return []; // malformed payload — caller reports the failure count honestly
   }
 }
