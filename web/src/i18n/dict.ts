@@ -47,7 +47,7 @@ export const zh = {
   'runs.filterLabel': '搜索任务',
   'runs.filterEmpty': '没有匹配的任务',
   'hyp.rankOf': '综合排名第 {rank} 位',
-  'runs.groupAttention': '需注意',
+  'runs.groupAttention': '{n} 项研究未完成或中断',
   'runs.groupDone': '研究库',
   'runs.groupOther': '其他',
 
@@ -1184,7 +1184,7 @@ export const en: Record<DictKey, string> = {
   'runs.filterLabel': 'Filter tasks',
   'runs.filterEmpty': 'No tasks match',
   'hyp.rankOf': 'Rank {rank} overall',
-  'runs.groupAttention': 'Needs attention',
+  'runs.groupAttention': '{n} studies unfinished or interrupted',
   'runs.groupDone': 'Library',
   'runs.groupOther': 'Other',
 

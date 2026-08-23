@@ -90,19 +90,16 @@ export function useDictation(onText: (fragment: string) => void): {
         const mono = mixToMono(Array.from({ length: decoded.numberOfChannels }, (_, c) => decoded.getChannelData(c)));
         const audio = resampleLinear(mono, decoded.sampleRate, ASR_SAMPLE_RATE);
         const response = await new Promise<Extract<WorkerResponse, { type: 'result' | 'error' }>>((resolve, reject) => {
-          pendingRef.current = resolve;
-          worker.postMessage({ type: 'transcribe', audio }, [audio.buffer]);
-          // decodeAudioData already consumed the gesture budget; 3 min is the
-          // outer guard for a wedged wasm session — fail visibly, never hang.
+          // Outer guard for a wedged wasm session — fail visibly, never hang.
           const guard = window.setTimeout(() => {
             pendingRef.current = null;
             reject(new Error('asr timeout'));
           }, 180_000);
-          const wrapped = (r: WorkerResponse): void => {
+          pendingRef.current = (r: WorkerResponse): void => {
             window.clearTimeout(guard);
             if (r.type === 'result' || r.type === 'error') resolve(r);
           };
-          pendingRef.current = wrapped;
+          worker.postMessage({ type: 'transcribe', audio }, [audio.buffer]);
         });
         if (response.type === 'result') {
           if (response.text.length > 0) onTextRef.current(response.text);
@@ -125,10 +122,10 @@ export function useDictation(onText: (fragment: string) => void): {
 
   const stop = useCallback((): void => {
     if (status !== 'recording') return;
+    // recorder.onstop owns the blob→transcribe handoff; stopping here twice
+    // would transcribe the same audio twice.
     teardownRecorder();
-    const blob = new Blob(chunksRef.current, { type: recorderRef.current?.mimeType ?? 'audio/webm' });
-    void transcribe(blob);
-  }, [status, teardownRecorder, transcribe]);
+  }, [status, teardownRecorder]);
 
   const cancel = useCallback((): void => {
     if (status === 'idle') return;
@@ -146,10 +143,23 @@ export function useDictation(onText: (fragment: string) => void): {
       return;
     }
     let stream: MediaStream;
+    // Embedded webviews / headless contexts can leave the permission promise
+    // pending forever — surface that honestly instead of a silent idle button.
+    const PERMISSION_GUARD_MS = 15_000;
+    const request = navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    let timedOut = false;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
+      stream = await Promise.race([
+        request,
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => {
+            timedOut = true;
+            reject(new DOMException('permission prompt unresponsive', 'TimeoutError'));
+          }, PERMISSION_GUARD_MS);
+        }),
+      ]);
     } catch (e) {
       setError({
         code: e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'SecurityError')
@@ -159,6 +169,10 @@ export function useDictation(onText: (fragment: string) => void): {
       });
       return;
     }
+    // A grant arriving after the guard fired must not keep the mic live.
+    void request.then((late) => {
+      if (timedOut) late.getTracks().forEach((t) => t.stop());
+    }).catch(() => undefined);
     streamRef.current = stream;
     chunksRef.current = [];
     discardRef.current = false;
