@@ -30,6 +30,18 @@ This file defines **what must be proven**. Live status/evidence exists only in `
 | ACC-24 | Executed experiments produce ResultSet + StatReport with effect sizes/uncertainty under the preregistered multiple-testing policy; verdicts derive mechanically from hypothesis decision rules, never LLM judgment | live_verified |
 | ACC-25 | Execution infrastructure: per-experiment environment pinning (lockfile hash), local execution with cancel/checkpoint/resume, remote device via gateway on a real Linux target | live_verified |
 | ACC-26 | Experiment results feed FeedbackSignal → traceable revision and appear in export/bundle with artifact hashes | live_verified |
+| ACC-27 | Adaptive quality gate: deterministic post-rank detection of weak hypothesis sets triggers exactly one bounded regeneration round with critique injection and a paraphrase guard; attempt counts stay honest in the timeline | tested |
+| ACC-28 | Run-level token budget: receipts are the only spend authority; exhausted budget skips stages with a truthful reason, never gates export, and re-opens exactly the skipped stages when the cap is raised | tested |
+| ACC-29 | Researcher direct hypothesis edit enters the same causal revision chain (human_expert feedback → Revision → version bump → staleness uncertainty disclosure) without a full model round-trip | live_verified |
+| ACC-30 | Export produces research products: deterministic IMRaD paper projection, limitations synthesized from real counts only, BibTeX from stored metadata only, bundled reproducibly | live_verified |
+| ACC-31 | Model control plane v2: explicit failover chains with source-verified semantics (fail-over error classes, cooldown, serving-route visible in every receipt) and a receipt-derived usage ledger with no invented prices | tested |
+| ACC-32 | Confirmatory binding: researcher binds drafted comparisons to hypotheses with declared MDE; approval snapshots the current falsification decision rule; spec re-validation is fail-closed; StatReports disclose implied power | tested |
+| ACC-33 | Research supervisor observes stage boundaries idempotently (exactly one note per boundary) as a read-only view that never becomes a second authority | tested |
+| ACC-34 | Evaluator family and evaluations projection expose run-quality signals through the API deterministically | tested |
+| ACC-35 | In-run iteration controller closes the falsification cascade experiment→feedback→revise(re-freeze)→re-experiment under bounded rounds/budget/no-material-delta, with one experimentLegStatus owner shared by the execute gate and the controller | tested |
+| ACC-36 | Cognitive-security baseline: untrusted external content is channel-separated and explicitly marked (spotlighting) on every ingestion path, kernel trust boundaries are marked, and the loopback guard is regression-locked | tested |
+| ACC-37 | Resident-agent conversation plane runs on the agent kernel with a read-tool plane, propose_action approval cards, and automated turns whose remembered grants are void (proposals always gate on the human) | tested |
+| ACC-38 | Continuous verification substrate: CI green on a real hosted runner, desktop application real build, TUI package tests plus piped smoke on the real workspace | tested |
 
 
 ## Completion gate
