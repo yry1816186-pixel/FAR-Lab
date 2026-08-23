@@ -10,6 +10,29 @@ type Verification = NonNullable<SourceDocument['verification']>;
 type VerifyOutcome = 'resolved' | 'not_found' | 'error';
 
 /**
+ * RU-6 GO1 retraction/correction status (Crossref update-to field; Retraction
+ * Watch data rides the same field with source 'retraction-watch'). Deterministic
+ * derivation from the RESOLVED record; the identifier stays authoritative —
+ * status is surfaced for downstream demotion, never flips `resolved`.
+ */
+export const retractionStatusFrom = (
+  record: RawSourceRecord | undefined,
+): 'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated' | undefined => {
+  if (record === undefined) return undefined;
+  const updates = (record.normalized as { 'update-to'?: unknown } | undefined)?.['update-to'];
+  if (!Array.isArray(updates)) return undefined;
+  let status: 'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated' | undefined;
+  for (const u of updates) {
+    const t = String((u as { type?: unknown })?.type ?? '').toLowerCase();
+    if (t.includes('reinstatement') || t.includes('reinstated')) status ??= 'reinstated';
+    else if (t.includes('retraction')) status ??= 'retracted';
+    else if (t.includes('expression of concern')) status ??= 'expression_of_concern';
+    else if (t.includes('correction') || t.includes('corrected')) status ??= 'corrected';
+  }
+  return status;
+};
+
+/**
  * W6/F3 (refchecker EXTRACT, enhanced_hybrid_checker.py:687-870): conservative
  * multi-signal wrong-paper risk grade. Only applies when the title gate already
  * FAILED; flags zero-surname-overlap AND (year gap >= 2 or unknown year) AND
@@ -42,8 +65,7 @@ const venueCompatible = (a: string | undefined, b: string | undefined): boolean 
 
 export const wrongPaperRisk = (
   doc: SourceDocument,
-  record: RawSourceRecord,
-): { suspect: boolean; note: string } => {
+  record: RawSourceRecord,): { suspect: boolean; note: string } => {
   const overlap = surnameSet(doc.authors ?? []);
   const recOverlap = surnameSet(record.authors ?? []);
   const shared = [...overlap].filter((s) => recOverlap.has(s));
@@ -102,14 +124,17 @@ const verifyByIdentifier = async (
       // W6/F3: only grade wrong-paper risk when the title gate failed — a passed
       // title with shared identifier needs no second opinion.
       const risk = titleMatch ? undefined : wrongPaperRisk(doc, res.record);
+      const retraction = retractionStatusFrom(res.record);
       writeVerification(ctx, doc, {
         method,
         resolved: true,
         titleMatch,
         ...(risk?.suspect ? { wrongPaperSuspect: true } : {}),
+        ...(retraction !== undefined ? { retractionStatus: retraction } : {}),
         detail:
           `resolved via ${family}; title jaccard=${similarity.toFixed(2)} (threshold ${TITLE_MATCH_THRESHOLD})` +
-          (risk ? `; ${risk.note}` : ''),
+          (risk ? `; ${risk.note}` : '') +
+          (retraction !== undefined ? `; update-to: ${retraction}` : ''),
         checkedAt,
       });
       return 'resolved';
