@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, IdText } from '../common';
 import { checkTone, litNoveltyKey, litNoveltyTone, noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../tones';
 import { WithMath } from '../../utils/math';
+import { EvidenceBalance } from './EvidenceBalance';
 
 /**
  * B5 lifecycle operations, wired by the owning tab (HypothesesTab owns the
@@ -34,16 +35,20 @@ export function HypothesisCard({
   clusterSize,
   isRepresentative,
   rank,
+  featured = false,
   onChallenge,
   compare,
   aiActions,
   ops,
   evidenceBody,
+  balance,
 }: {
   hypothesis: HypothesisCandidate;
   clusterSize: number;
   isRepresentative: boolean;
   rank?: number;
+  /** HX4: rank-1 card renders large — the study's leading hypothesis leads the page. */
+  featured?: boolean;
   onChallenge?: (id: string, label: string) => void;
   compare?: { selected: boolean; onToggle: () => void; disabled?: boolean };
   /** B4: grounded AI research actions (challenge/weakest-assumption/falsify/…). */
@@ -52,6 +57,8 @@ export function HypothesisCard({
   ops?: HypothesisCardOps;
   /** Wave-S g8: deterministic evidence-body rating (floor/sources/band/promotion); tooltip = full disclosure. */
   evidenceBody?: EvidenceBody;
+  /** HX4: per-hypothesis bound-relation counts (supporting vs counter) from the evidence graph. */
+  balance?: { supports: number; counters: number };
 }): JSX.Element {
   const { t } = useI18n();
   const [specOpen, setSpecOpen] = useState(false);
@@ -66,117 +73,124 @@ export function HypothesisCard({
   const claims = ops?.claims;
 
   return (
-    <article id={`hyp-${hypothesis.id}`} className={`hyp-card${isRepresentative ? '' : ' hyp-card--extra'}${compare?.selected ? ' hyp-card--compare' : ''}`}>
+    <article
+      id={`hyp-${hypothesis.id}`}
+      className={`hyp-card${isRepresentative ? '' : ' hyp-card--extra'}${compare?.selected ? ' hyp-card--compare' : ''}${featured ? ' hyp-card--featured' : ''}`}
+    >
       <header className="hyp-head">
-        {rank !== undefined && (
-          <span className={`rank-medal${rank === 1 ? ' rank-medal--first' : ''}`} title={t('hyp.rankOf', { rank })}>
-            №{rank}
-          </span>
-        )}
-        <IdText value={hypothesis.id} />
-        <span className="muted small">{t('hyp.version', { n: hypothesis.version })}</span>
-        {/* B5 triage outcome — visible only once decided; 'active' is the unmarked default */}
-        {status === 'promoted' && <Badge tone="ok">{t('hyp.statusPromoted')}</Badge>}
-        {status === 'rejected' && <Badge tone="err">{t('hyp.statusRejected')}</Badge>}
-        <Badge tone={testabilityTone(hypothesis.testability)}>{t(testabilityKey(hypothesis.testability))}</Badge>
-        <Badge tone={noveltyTone(hypothesis.noveltyLabel)}>{t(noveltyKey(hypothesis.noveltyLabel))}</Badge>
-        {/* Wave-S g8 evidence body — deterministic rating; the disclosure tooltip carries
-            the full derivation (capped sources, excluded relations, band, proof standard). */}
-        {evidenceBody !== undefined && (
-          <>
-            <Badge
-              tone={evidenceBody.promotion === 'orthogonal' ? 'ok' : evidenceBody.promotion === 'none' ? 'muted' : 'warn'}
-              title={evidenceBody.disclosure}
-            >
-              {t(`evbody.promotion.${evidenceBody.promotion}`)}
-            </Badge>
-            <Badge tone="info" title={evidenceBody.disclosure}>
-              {t('evbody.sources', { n: evidenceBody.independentSources })}
-            </Badge>
-            {evidenceBody.floorCertainty !== undefined && (
-              <Badge tone="muted" title={evidenceBody.disclosure}>
-                {t('evbody.floor', { level: evidenceBody.floorCertainty })}
-              </Badge>
-            )}
-          </>
-        )}
-        {/* W5/S4: noveltyLabel is corpus-relative — the qualifier is mandatory wherever the label is shown */}
-        <span className="muted small novelty-qualifier">{t('novelty.qualifier')}</span>
-        {completeness !== undefined ? (
-          completeness.passed ? (
-            <Badge tone="ok">{t('completeness.passed')}</Badge>
-          ) : (
-            <Badge tone="err" title={(completeness.missing ?? []).join('；')}>
-              {t('completeness.failed')}
-              {(completeness.missing ?? []).length > 0 && ` (${completeness.missing!.length})`}
-            </Badge>
-          )
-        ) : (
-          <Badge tone="muted">{t('completeness.unchecked')}</Badge>
-        )}
-        <span className="hyp-actions">
-          {compare !== undefined && (
-            <button
-              type="button"
-              className={`btn btn--small${compare.selected ? ' btn--primary' : ''}`}
-              aria-pressed={compare.selected}
-              disabled={compare.disabled && !compare.selected}
-              onClick={compare.onToggle}
-              title={compare.disabled && !compare.selected ? t('compare.limitReached') : undefined}
-            >
-              {compare.selected ? t('compare.selected') : t('compare.add')}
-            </button>
-          )}
-          {onChallenge !== undefined && (
-            <button
-              type="button"
-              className="btn btn--small"
-              onClick={() => onChallenge(hypothesis.id, hypothesis.statement)}
-              title={t('compare.challengeHint')}
-            >
-              {t('compare.challenge')}
-            </button>
-          )}
-          {aiActions}
-          {ops !== undefined && (
-            /* B5 ops row: promote/reject only while active (a decided hypothesis
-               is fork-able but not re-decidable without a revision); fork always. */
-            <span className="hyp-ops">
-              {status === 'active' && (
-                <>
-                  <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onPromote}>
-                    {t('hyp.promote')}
-                  </button>
-                  <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onReject}>
-                    {t('hyp.reject')}
-                  </button>
-                </>
-              )}
-              <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onFork}>
-                {t('hyp.fork')}
-              </button>
-              <button
-                type="button"
-                className="btn btn--small"
-                disabled={ops.busy}
-                aria-expanded={ops.connectOpen}
-                onClick={ops.onConnectToggle}
-              >
-                {t('hyp.connect')}
-              </button>
-              <button
-                type="button"
-                className="btn btn--small"
-                disabled={ops.busy}
-                aria-expanded={ops.editOpen}
-                onClick={ops.onEditToggle}
-                title={t('hyp.editHint')}
-              >
-                {t('hyp.edit')}
-              </button>
+        <div className="hyp-head-main">
+          {rank !== undefined && (
+            <span className={`rank-medal${rank === 1 ? ' rank-medal--first' : ''}`} title={t('hyp.rankOf', { rank })}>
+              №{rank}
             </span>
           )}
-        </span>
+          {/* B5 triage outcome — visible only once decided; 'active' is the unmarked default */}
+          {status === 'promoted' && <Badge tone="ok">{t('hyp.statusPromoted')}</Badge>}
+          {status === 'rejected' && <Badge tone="err">{t('hyp.statusRejected')}</Badge>}
+          <Badge tone={testabilityTone(hypothesis.testability)}>{t(testabilityKey(hypothesis.testability))}</Badge>
+          <span className="hyp-actions">
+            {compare !== undefined && (
+              <button
+                type="button"
+                className={`btn btn--small${compare.selected ? ' btn--primary' : ''}`}
+                aria-pressed={compare.selected}
+                disabled={compare.disabled && !compare.selected}
+                onClick={compare.onToggle}
+                title={compare.disabled && !compare.selected ? t('compare.limitReached') : undefined}
+              >
+                {compare.selected ? t('compare.selected') : t('compare.add')}
+              </button>
+            )}
+            {onChallenge !== undefined && (
+              <button
+                type="button"
+                className="btn btn--small"
+                onClick={() => onChallenge(hypothesis.id, hypothesis.statement)}
+                title={t('compare.challengeHint')}
+              >
+                {t('compare.challenge')}
+              </button>
+            )}
+            {aiActions}
+            {ops !== undefined && (
+              /* B5 ops row: promote/reject only while active (a decided hypothesis
+                 is fork-able but not re-decidable without a revision); fork always. */
+              <span className="hyp-ops">
+                {status === 'active' && (
+                  <>
+                    <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onPromote}>
+                      {t('hyp.promote')}
+                    </button>
+                    <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onReject}>
+                      {t('hyp.reject')}
+                    </button>
+                  </>
+                )}
+                <button type="button" className="btn btn--small" disabled={ops.busy} onClick={ops.onFork}>
+                  {t('hyp.fork')}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--small"
+                  disabled={ops.busy}
+                  aria-expanded={ops.connectOpen}
+                  onClick={ops.onConnectToggle}
+                >
+                  {t('hyp.connect')}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--small"
+                  disabled={ops.busy}
+                  aria-expanded={ops.editOpen}
+                  onClick={ops.onEditToggle}
+                  title={t('hyp.editHint')}
+                >
+                  {t('hyp.edit')}
+                </button>
+              </span>
+            )}
+          </span>
+        </div>
+        {/* Quiet metadata row (HX4 de-badging): identity + qualifiers stay
+            reachable but stop competing with the statement for attention. */}
+        <div className="hyp-head-meta muted small">
+          <IdText value={hypothesis.id} />
+          <span>{t('hyp.version', { n: hypothesis.version })}</span>
+          {clusterSize > 1 && <span>{t('hyp.clusterOf', { n: clusterSize })}</span>}
+          <Badge tone={noveltyTone(hypothesis.noveltyLabel)}>{t(noveltyKey(hypothesis.noveltyLabel))}</Badge>
+          {/* W5/S4: noveltyLabel is corpus-relative — the qualifier is mandatory wherever the label is shown */}
+          <span className="novelty-qualifier">{t('novelty.qualifier')}</span>
+          {/* Wave-S g8 evidence body — deterministic rating; the disclosure tooltip carries
+              the full derivation (capped sources, excluded relations, band, proof standard). */}
+          {evidenceBody !== undefined && (
+            <>
+              <Badge
+                tone={evidenceBody.promotion === 'orthogonal' ? 'ok' : evidenceBody.promotion === 'none' ? 'muted' : 'warn'}
+                title={evidenceBody.disclosure}
+              >
+                {t(`evbody.promotion.${evidenceBody.promotion}`)}
+              </Badge>
+              {evidenceBody.floorCertainty !== undefined && (
+                <Badge tone="muted" title={evidenceBody.disclosure}>
+                  {t('evbody.floor', { level: evidenceBody.floorCertainty })}
+                </Badge>
+              )}
+            </>
+          )}
+          {completeness !== undefined ? (
+            completeness.passed ? (
+              <Badge tone="ok">{t('completeness.passed')}</Badge>
+            ) : (
+              <Badge tone="err" title={(completeness.missing ?? []).join('；')}>
+                {t('completeness.failed')}
+                {(completeness.missing ?? []).length > 0 && ` (${completeness.missing!.length})`}
+              </Badge>
+            )
+          ) : (
+            <Badge tone="muted">{t('completeness.unchecked')}</Badge>
+          )}
+        </div>
       </header>
 
       {ops?.connectOpen === true && (
@@ -275,7 +289,7 @@ export function HypothesisCard({
       <dl className="fieldlist">
         <div className="fieldlist-row">
           <dt>{t('hyp.statement')}</dt>
-          <dd className="hyp-statement"><WithMath text={hypothesis.statement} /></dd>
+          <dd className={`hyp-statement${featured ? ' hyp-statement--featured' : ''}`}><WithMath text={hypothesis.statement} /></dd>
         </div>
         {hypothesis.mechanism.trim().length > 0 && (
           <div className="fieldlist-row">
@@ -284,6 +298,17 @@ export function HypothesisCard({
           </div>
         )}
       </dl>
+
+      {/* HX4 signature element: signed evidence scale — QBAF logLR interval
+          when the evidence body exists, honest relation counts otherwise. */}
+      {(balance !== undefined || evidenceBody !== undefined) && (
+        <EvidenceBalance
+          supports={balance?.supports ?? 0}
+          counters={balance?.counters ?? 0}
+          body={evidenceBody}
+          featured={featured}
+        />
+      )}
 
       {hypothesis.assumptions !== undefined && hypothesis.assumptions.length > 0 && (
         <div className="hyp-block">

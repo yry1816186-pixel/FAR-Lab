@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { GitCompareArrows, X } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
 import { connectClaim, editHypothesis, forkHypothesis, getEvidence, getHypotheses, promoteHypothesis, rejectHypothesis } from '../../api/endpoints';
-import type { AchAnalysis, EvidenceBody, HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
+import type { AchAnalysis, EvidenceBody, EvidenceRelation, HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
+import { RELATION_POLARITY } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
@@ -34,14 +35,14 @@ export function HypothesesTab({
   // plain browsing path).
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const evidenceFetcher = useCallback((signal: AbortSignal) => getEvidence(run.id, signal), [run.id]);
-  const compareActive = compareIds.length >= 2;
   // B5 ops state: which card's connect picker is open, in-flight op key, last error.
   const [connectOpenFor, setConnectOpenFor] = useState<string | null>(null);
   const [editOpenFor, setEditOpenFor] = useState<string | null>(null);
   const [opBusy, setOpBusy] = useState<string | null>(null);
   const [opError, setOpError] = useState<string | null>(null);
-  const evidenceNeeded = compareActive || connectOpenFor !== null;
-  const evidenceRes = useResource(evidenceFetcher, [run.id, evidenceNeeded], evidenceNeeded ? `${run.updatedAt}` : 'off');
+  // HX4: the evidence graph feeds every card's balance bar (supporting vs
+  // counter relations) — one request the tab already needs for compare/connect.
+  const evidenceRes = useResource(evidenceFetcher, [run.id], `${run.updatedAt}`);
 
   /**
    * B5 op runner: POST, then refetch the tab's resource on success (new status
@@ -164,37 +165,21 @@ export function HypothesesTab({
               />
             </Section>
           )}
-          <Section title={t('scorecards.title')}>
-            <ScorecardsTable scorecards={data.scorecards} hypotheses={data.hypotheses} />
-          </Section>
-          {data.tournament !== null && (
-            <Section title={t('tournament.title')}>
-              <TournamentView tournament={data.tournament} hypotheses={data.hypotheses} />
-            </Section>
-          )}
-          {data.achAnalysis != null && data.achAnalysis.diagnosticity.length > 0 && (
-            <Section title={t('ach.title')}>
-              <p className="muted small">{t('ach.intro')}</p>
-              <ul className="plain-list small">
-                {data.achAnalysis.diagnosticity.slice(0, 3).map((d) => (
-                  <li key={d.claimId}>
-                    <IdText value={d.claimId} /> — {t('ach.diagnosticity', { score: d.score.toFixed(2) })}
-                  </li>
-                ))}
-              </ul>
-              <p className="muted small">
-                {data.achAnalysis.removalSensitivity.stable
-                  ? t('ach.removalStable', { k: data.achAnalysis.removalSensitivity.removedTopK })
-                  : t('ach.removalUnstable', {
-                      k: data.achAnalysis.removalSensitivity.removedTopK,
-                      n: data.achAnalysis.removalSensitivity.inversions,
-                    })}
-              </p>
-            </Section>
-          )}
+
+          {/* HX4: hypotheses ARE the page — the card flow leads, one count line
+              reconciles 生成 vs 排名 (cluster representatives), and every ranking
+              artifact (scorecards/tournament/ACH) folds into a methods disclosure. */}
           <Section
-            title={data.scorecards.length > 0 ? t('hyp.representatives', { n: representativesOf(data).length }) : t('tab.hypotheses')}
-            count={data.scorecards.length === 0 ? <span className="muted small">{t('hyp.notRanked')}</span> : undefined}
+            title={t('tab.hypotheses')}
+            count={
+              <span className="muted small">
+                {t('hyp.counts', {
+                  total: data.hypotheses.length,
+                  reps: representativesOf(data).length,
+                  extras: data.hypotheses.length - representativesOf(data).length,
+                })}
+              </span>
+            }
             actions={
               compareIds.length > 0 ? (
                 <span className="compare-bar-inline muted small" aria-live="polite">
@@ -206,6 +191,7 @@ export function HypothesesTab({
             <HypothesisList
               data={data}
               runId={run.id}
+              relations={evidenceRes.data?.relations}
               compareIds={compareIds}
               compareLimit={COMPARE_LIMIT}
               onToggleCompare={toggleCompare}
@@ -215,6 +201,41 @@ export function HypothesesTab({
               opsFor={buildOps}
             />
           </Section>
+
+          <details className="hyp-methods">
+            <summary>{t('hyp.methodsTitle')}</summary>
+            <div className="hyp-methods-body">
+              <p className="muted small">{t('hyp.methodsIntro')}</p>
+              <Section title={t('scorecards.title')}>
+                <ScorecardsTable scorecards={data.scorecards} hypotheses={data.hypotheses} />
+              </Section>
+              {data.tournament !== null && (
+                <Section title={t('tournament.title')}>
+                  <TournamentView tournament={data.tournament} hypotheses={data.hypotheses} />
+                </Section>
+              )}
+              {data.achAnalysis != null && data.achAnalysis.diagnosticity.length > 0 && (
+                <Section title={t('ach.title')}>
+                  <p className="muted small">{t('ach.intro')}</p>
+                  <ul className="plain-list small">
+                    {data.achAnalysis.diagnosticity.slice(0, 3).map((d) => (
+                      <li key={d.claimId}>
+                        <IdText value={d.claimId} /> — {t('ach.diagnosticity', { score: d.score.toFixed(2) })}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="muted small">
+                    {data.achAnalysis.removalSensitivity.stable
+                      ? t('ach.removalStable', { k: data.achAnalysis.removalSensitivity.removedTopK })
+                      : t('ach.removalUnstable', {
+                          k: data.achAnalysis.removalSensitivity.removedTopK,
+                          n: data.achAnalysis.removalSensitivity.inversions,
+                        })}
+                  </p>
+                </Section>
+              )}
+            </div>
+          </details>
         </>
       )}
     </>
@@ -293,6 +314,9 @@ function TournamentView({ tournament, hypotheses }: { tournament: HypothesisTour
           ))}
         </ul>
       </details>
+      {/* Backend uncertainty text is English prose — the localized reading aid
+          leads, the verbatim original follows (audit fidelity). */}
+      <p className="muted small">{t('tournament.uncertaintyNote')}</p>
       <p className="muted small">{tournament.uncertainty}</p>
     </div>
   );
@@ -312,6 +336,7 @@ function representativesOf(data: HypoData): HypothesisCandidate[] {
 function HypothesisList({
   data,
   runId,
+  relations,
   compareIds,
   compareLimit,
   onToggleCompare,
@@ -322,6 +347,8 @@ function HypothesisList({
 }: {
   data: HypoData;
   runId: string;
+  /** HX4: the run's evidence relations — per-hypothesis supporting/counter counts. */
+  relations?: EvidenceRelation[];
   compareIds: string[];
   compareLimit: number;
   onToggleCompare: (id: string) => void;
@@ -357,6 +384,18 @@ function HypothesisList({
   }
   const rankOf = new Map(data.scorecards.map((s) => [s.hypothesisId, s.rank] as const));
   const evidenceBodyOf = new Map((data.evidenceBodies ?? []).map((b) => [b.hypothesisId, b] as const));
+  // HX4 balance counts: relations bound to each hypothesis, split by the
+  // canonical polarity table (supports/replicates → supporting; contradicts/
+  // weakens/fails_to_replicate/alternative_explanation → counter).
+  const balanceOf = new Map<string, { supports: number; counters: number }>();
+  for (const r of relations ?? []) {
+    if (r.targetHypothesisId === undefined) continue;
+    const acc = balanceOf.get(r.targetHypothesisId) ?? { supports: 0, counters: 0 };
+    const polarity = RELATION_POLARITY[r.relation];
+    if (polarity === 'supporting') acc.supports += 1;
+    else if (polarity === 'counter') acc.counters += 1;
+    balanceOf.set(r.targetHypothesisId, acc);
+  }
 
   return (
     <div>
@@ -376,6 +415,7 @@ function HypothesisList({
           clusterSize={clusterCounts.get(h.clusterKey ?? h.id) ?? 1}
           isRepresentative
           rank={rankOf.get(h.id)}
+          featured={rankOf.get(h.id) === 1}
           onChallenge={(id, label) => onChallenge(id, label)}
           aiActions={
             <ResearchActions
@@ -394,6 +434,7 @@ function HypothesisList({
           }}
           ops={opsFor(h)}
           evidenceBody={evidenceBodyOf.get(h.id)}
+          balance={balanceOf.get(h.id)}
         />
       ))}
       {extras.length > 0 && (
