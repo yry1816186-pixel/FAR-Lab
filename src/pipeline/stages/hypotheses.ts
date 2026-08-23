@@ -31,6 +31,7 @@ import {
   verifiedClaims,
 } from './shared.js';
 import { evaluateQualityGate, type QualityGateSignal } from '../../app/quality-gate.js';
+import { preMergeNearDuplicates } from './hypothesis-dedup.js';
 
 /**
  * generate_hypotheses — multi-strategy hypothesis search (mission §26, R-06).
@@ -270,8 +271,15 @@ const clusterCandidates = async (
     },
     schema: ClusterOut,
   });
-  return normalizeClusters(res.data.clusters, raws.length);
+  return preMergeNearDuplicates(
+    raws.map((r) => `${r.out.statement} ${r.out.mechanism}`),
+    normalizeClusters(res.data.clusters, raws.length),
+    NEAR_DUP_JACCARD,
+  );
 };
+
+/** Lexical near-dup bar for the deterministic pre-merge (RU-10 A4.5): high-precision verbatim-restatement band. */
+export const NEAR_DUP_JACCARD = 0.9;
 
 // ---------------------------------------------------------------------------
 // candidate persistence
