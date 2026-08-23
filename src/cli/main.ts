@@ -491,7 +491,7 @@ const main = async (): Promise<void> => {
   }
 
   const runId = positional(4);
-  const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export', 'lineage', 'supervise'] as const;
+  const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export', 'lineage', 'supervise', 'fork'] as const;
   if (sub !== undefined && (NEEDS_RUN as readonly string[]).includes(sub) && !runId) die(`${sub} requires a run id`, 2);
   const rid: string = runIdArg(runId, sub ?? 'command');
 
@@ -595,6 +595,21 @@ const main = async (): Promise<void> => {
             console.log(`    action hint: ${s.recommendation.action}`);
           }
       }
+    } finally { app.close(); }
+    return;
+  }
+
+  if (sub === 'fork') {
+    // RU-2 branch writer CLI surface: fork a settled run so a researcher can
+    // branch the trajectory (alternative direction, what-if revision) from
+    // the terminal. The API path is POST /runs/:id/fork — same store writer.
+    const app = await createApp();
+    try {
+      if (!app.store.getRun(rid)) die(`run not found: ${runId}`);
+      const reason = arg('--reason') ?? 'forked via far research fork';
+      const fork = app.store.forkRun(rid, { reason });
+      if (json()) jsonOutput({ run: { id: fork.id, parentRunId: fork.parentRunId, status: fork.status }, reason });
+      else out(`${marker()} ${ink.ok('forked')} ${rid} -> ${fork.id}  (${ink.muted(reason)})`);
     } finally { app.close(); }
     return;
   }
