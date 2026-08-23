@@ -1089,7 +1089,7 @@ describe('GET /api/v1/verify/:bundleId', () => {
     expect(status).toBe(200);
     expect(body.bundleId).toBe(bundle1);
     expect(body.runId).toBe(run1);
-    expect(body.checks).toHaveLength(10);
+    expect(body.checks).toHaveLength(11); // RU-3 T2 enforcement added claim_taint_labels_present
     expect(body.checks.map((c: { name: string }) => c.name)[0]).toBe('bundle_readable_and_schema_valid');
     expect(body.checks.every((c: { passed: boolean; detail: string }) => typeof c.passed === 'boolean' && c.detail.length > 0)).toBe(true);
     expect(['verified', 'failed', 'degraded']).toContain(body.verdict);

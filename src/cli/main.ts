@@ -438,6 +438,31 @@ const main = async (): Promise<void> => {
     }
     return;
   }
+  if (cmd === 'memory') {
+    // Re-audit queue: memory search surface (the substrate had no consumer
+    // outside generation). Reads only; trust labels always travel with items.
+    const query = process.argv[3];
+    if (query === undefined || query.trim().length === 0) die('usage: far memory <query> [--kind <k>]', 2);
+    const flagIdx = process.argv.indexOf('--kind');
+    const kind = flagIdx >= 0 ? process.argv[flagIdx + 1] : undefined;
+    if (kind !== undefined && !/^(episodic|semantic|experiment_outcome|profile)$/.test(kind)) die(`invalid kind: ${kind}`, 2);
+    const app = await createApp({});
+    try {
+      const hits = app.store.searchMemory({
+        query,
+        ...(kind !== undefined ? { kinds: [kind as 'episodic' | 'semantic' | 'experiment_outcome' | 'profile'] } : {}),
+        limit: 20,
+      });
+      if (json()) {
+        jsonOutput(hits.map((h) => ({ id: h.id, kind: h.kind, title: h.title, trustClass: h.trustClass, status: h.status })));
+      } else {
+        if (hits.length === 0) console.log('no memory items match');
+        for (const h of hits) console.log(`[${h.kind}/${h.trustClass}] ${h.title.slice(0, 100)}`);
+      }
+    } finally { app.close(); }
+    return;
+  }
+
   if (cmd === 'backup') {
     // RU-7.1 production caller (re-audit fix): VACUUM INTO snapshot — the
     // WAL-copy trap (plain file copy silently loses recent WAL commits) is
