@@ -11,10 +11,10 @@
 ## S8 剩余
 - ~~evaluator 家族显式化 (G8)~~ DONE 917f5ed (5 evaluators + /evaluations API)
 - ~~exploratory CodeAct 执行接线~~ DONE 35c99a1 (run_exploration op + runExploration 编排器, 4 真实 sidecar 测试)
-- pass-by-reference / event query API (G5/G6, P1) — 下一批
+- ~~pass-by-reference / event query API (G5/G6)~~ DONE d64f2a1 (queryRunEvents + previewFor, 7 测试)
 
-## 门禁证据 (2026-08-24 03:17 → 本轮)
-- vitest 全量: **1285 passed / 2 skipped** (114 files)
+## 门禁证据 (2026-08-24 03:17 → 本轮, 最新)
+- vitest 全量: **1300 passed / 3 skipped** (117 files; sibling 新增文件含 skip)
 - tsc --noEmit GREEN; npm run build GREEN; eslint 全仓 GREEN
 - secret-scan PASS · path-hygiene 0 errors · completion-gate PASS
 
