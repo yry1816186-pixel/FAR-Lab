@@ -5,7 +5,7 @@ import path from 'node:path';
 import { openDb } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
 import { MemoryItemSchema, deriveTrustClass, memoryActivation, newMemoryId } from '../src/domain/memory.js';
-import { consolidateRun } from '../src/app/memory.js';
+import { consolidateRun, memoryNegativeConditioning } from '../src/app/memory.js';
 import { ResearchQuestion, newId } from '../src/domain/index.js';
 
 // RU-1 memory substrate: governance gates, poisoning co-design, deterministic
@@ -90,6 +90,25 @@ describe('RU-1 deterministic consolidation', () => {
 });
 
 describe('RU-1 retrieval + supersession', () => {
+  it('memory consumer #1: negative conditioning retrieves own past outcomes for the question', () => {
+    const { store } = mkStore();
+    const q = ResearchQuestion.parse({ id: newId('q'), text: 'Does vitamin D supplementation improve depression scores?', goalType: 'explanatory', createdAt: '2026-08-24T00:00:00.000Z', scope: { domain: 'd', phenomena: ['p'] }, constraints: {} });
+    const run = store.createRun(q);
+    store.putObject('experiment_run', {
+      id: newId('xrun'), runId: run.id, specId: newId('xsp'), specHash: 'a'.repeat(64),
+      status: 'failed', attempts: 2, executor: 'local',
+      error: 'dataset lacked the depression arm', resultIds: [], statReportIds: [], createdAt: '2026-08-24T00:00:00.000Z',
+    } as never);
+    consolidateRun(store, run.id);
+
+    const conditioning = memoryNegativeConditioning(store, 'Does vitamin D supplementation improve depression?');
+    expect(conditioning.length).toBeGreaterThanOrEqual(1);
+    const failedItem = conditioning.find((m) => m.kind === 'experiment_outcome');
+    expect(failedItem).toBeDefined();
+    expect(failedItem!.trustClass).toBe('own_unverified'); // label travels
+    // irrelevant question retrieves nothing (bounded, deterministic)
+    expect(memoryNegativeConditioning(store, 'quantum computing qubit error correction')).toHaveLength(0);
+  });
   it('ranks by ACT-R activation and updates access accounting', () => {
     const { store } = mkStore();
     const FRESH = 'mem_fresh0000000000000000000000';

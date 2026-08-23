@@ -75,7 +75,9 @@ export const consolidateRun = (store: Store, runId: string, now = new Date().toI
       id: memIdFor('experiment', exp.id),
       kind: 'experiment_outcome',
       entityType: 'experiment',
-      title: `experiment ${exp.status}: spec ${exp.specId} (executor ${exp.executor})`,
+      // question context rides the title so question-keyword retrieval reaches
+      // experiment outcomes (the body is ids/hashes alone — not searchable prose)
+      title: `experiment ${exp.status} for: ${(question?.text ?? runId).slice(0, 120)}`,
       body: JSON.stringify({
         experimentRunId: exp.id, specId: exp.specId, specHash: exp.specHash,
         status: exp.status, executor: exp.executor,
@@ -93,4 +95,35 @@ export const consolidateRun = (store: Store, runId: string, now = new Date().toI
 
   for (const item of items) store.putMemory(item);
   return { runId, itemsWritten: items.length, skipped };
+};
+
+/**
+ * Memory consumer #1 (RU-1 MIGRATE CALLERS): negative conditioning for hypothesis
+ * generation. Deterministic retrieval of past OWN outcomes relevant to the
+ * question — failed experiments must not be re-proposed blind. Trust-filtered to
+ * own_* classes (external literature already conditions via claims); bounded;
+ * labels travel with every item (RU-3: memory is data, never instructions).
+ */
+export const memoryNegativeConditioning = (
+  store: Store,
+  questionText: string,
+  limit = 5,
+): Array<{ id: string; kind: string; title: string; body: string; trustClass: string }> => {
+  const words = questionText
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 4)
+    .sort((a, b) => b.length - a.length)
+    .slice(0, 3);
+  if (words.length === 0) return [];
+  // keyword OR semantics — a phrase match would demand adjacent ordered terms,
+  // which question-derived keywords never satisfy against stored titles/bodies.
+  const hits = store.searchMemory({
+    query: words.join(' '),
+    mode: 'or',
+    kinds: ['experiment_outcome', 'episodic'],
+    trustClasses: ['own_verified', 'own_unverified'],
+    limit,
+  });
+  return hits.map((h) => ({ id: h.id, kind: h.kind, title: h.title, body: h.body, trustClass: h.trustClass }));
 };
