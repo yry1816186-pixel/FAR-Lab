@@ -1,5 +1,6 @@
 import type { Db } from './db.js';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
 import {
   ResearchRun, RunEvent, RunStatus, RunStageName, StageRecord, ResearchQuestion,
   CorpusSnapshot, SourceDocument, ScientificClaim, EvidenceRelation, HypothesisCandidate,
@@ -238,6 +239,26 @@ export class Store {
     // tagged/hashed spine half-filled after a crash would under-report and
     // break tamper-evidence.
     const seq = this.db.transaction(() => {
+      // RU-7.3 backwards-clock detection: a timestamp regressing below the last
+      // persisted write time is the suspend/resume (or manual clock) shape —
+      // recorded as an honest observation, never silently accepted as order.
+      const floor = this.getMeta('storage:last_write_at');
+      if (floor !== null && Date.parse(at) < Date.parse(floor)) {
+        const regressedSeconds = Math.round((Date.parse(floor) - Date.parse(at)) / 1000);
+        const notePayload = {
+          runId, at: floor, type: 'note', status: undefined, stage: undefined,
+          detail: { kind: 'clock_backwards_jump', regressedSeconds, observedAt: at }, receiptId: undefined,
+        };
+        const noteJson = JSON.stringify(notePayload);
+        const noteParent = this.db.prepare('SELECT prev_hash, payload FROM events WHERE run_id=? ORDER BY seq DESC LIMIT 1').get(runId) as { prev_hash: string | null; payload: string } | undefined;
+        const notePrev = createHash('sha256').update(`${noteParent?.prev_hash ?? ''}|${noteParent?.payload ?? ''}|${noteJson}`).digest('hex');
+        const noteRes = this.db.prepare('INSERT INTO events (run_id, at, type, payload, prev_hash) VALUES (?,?,?,?,?)')
+          .run(runId, floor, 'note', noteJson, notePrev);
+        const insertTag = this.db.prepare('INSERT OR IGNORE INTO event_tags (tag, run_id, seq) VALUES (?,?,?)');
+        insertTag.run('kind:note', runId, Number(noteRes.lastInsertRowid));
+      }
+      this.setMeta('storage:last_write_at', at > (floor ?? '') ? at : (floor ?? at));
+
       const payloadJson = JSON.stringify(payload);
       const parent = this.db.prepare('SELECT prev_hash, payload FROM events WHERE run_id=? ORDER BY seq DESC LIMIT 1').get(runId) as { prev_hash: string | null; payload: string } | undefined;
       const prevHash = createHash('sha256').update(`${parent?.prev_hash ?? ''}|${parent?.payload ?? ''}|${payloadJson}`).digest('hex');
@@ -270,6 +291,18 @@ export class Store {
       parentPayload = String(r.payload);
     }
     return { ok: true, firstBrokenSeq: null, length: rows.length };
+  }
+
+  /**
+   * RU-7.1 backup: VACUUM INTO produces a standalone, consistent snapshot in
+   * one statement — the WAL-copy trap (copying far.db while WAL holds recent
+   * commits silently loses them) is structurally avoided. Fails closed on an
+   * existing destination (never overwrite a good backup with a possibly-bad
+   * one); schedule + integrity drills live with the caller.
+   */
+  backupTo(destPath: string): void {
+    if (fs.existsSync(destPath)) throw new Error(`backupTo: destination exists, refusing to overwrite: ${destPath}`);
+    this.db.prepare('VACUUM INTO ?').run(destPath);
   }
 
   /**
@@ -418,7 +451,14 @@ export class Store {
    *  the reference truth `far gc` sweeps against (content-addressed store). */
   referencedArtifactHashes(): Set<string> {
     const refs = new Set<string>();
-    const re = /sha256:([0-9a-f]{64})/g;
+    // Fail-safe reference vocabulary (P0 regression 2026-08-24): the product
+    // persists artifact hashes in BOTH spellings — `sha256:<hex>` (fullTextRef,
+    // paperOutlineRef, receipts' refs) and BARE `<hex>` (bundle
+    // finalArtifactHashes, sourceArtifactHashes, experimentEvidence). Matching
+    // only the prefixed form made gc delete every bundle-referenced report.
+    // Asymmetry is deliberate: a missed ref = silent data loss; an over-retained
+    // blob is swept by a later, correct pass — so accept bare hex too.
+    const re = /(?:sha256:)?\b([0-9a-f]{64})\b/g;
     for (const sql of ['SELECT json AS doc FROM objects', 'SELECT doc FROM runs']) {
       for (const row of this.db.prepare(sql).all()) {
         const text = String(Object.values(row as Record<string, unknown>)[0]);
@@ -432,7 +472,6 @@ export class Store {
     const row = this.db.prepare('SELECT value FROM meta WHERE key=?').get(key);
     return row === undefined ? null : String(row.value);
   }
-
   setMeta(key: string, value: string): void {
     this.db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)').run(key, value);
   }
@@ -784,6 +823,10 @@ export class Store {
         parsed.provenance.runId ?? null, parsed.provenance.receiptId ?? null, parsed.provenance.sourceRef ?? null,
         parsed.createdAt, parsed.lastAccessedAt, parsed.accessCount, parsed.supersedesId ?? null,
       );
+      // FTS projection mirrors the item row's lifecycle: same-id re-write
+      // (idempotent re-consolidation) must REPLACE the indexed row, never
+      // accumulate stale/duplicate index entries (delete-then-insert).
+      this.db.prepare('DELETE FROM memory_fts WHERE id = ?').run(parsed.id);
       this.db.prepare('INSERT INTO memory_fts (id, body) VALUES (?,?)').run(parsed.id, `${parsed.title}\n${parsed.body}`);
     });
   }
