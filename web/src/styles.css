@@ -2102,3 +2102,8 @@ select option { color: var(--text); background: var(--surface); }
 .stage-gantt { margin-bottom: 10px; overflow-x: auto; }
 .gantt-label { font-size: 10px; fill: var(--v2-text-2, #57606a); }
 .gantt-dur { font-size: 9px; fill: var(--v2-text-3, #8a8f98); }
+
+/* ---- VIZ V5: evidence graph upgrades ---- */
+.graph-node--draggable { cursor: grab; }
+.graph-node--draggable:active { cursor: grabbing; }
+.graph-truncated { display: inline-flex; gap: 6px; align-items: center; }

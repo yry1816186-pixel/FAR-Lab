@@ -38,11 +38,15 @@ interface GraphEdge {
   to: string;
   kind: 'locator' | 'supports' | 'counters' | 'claim_claim';
   dashed?: boolean;
+  /** claim_claim only: the store relation's strength rating (title + width). */
+  strength?: 'strong' | 'moderate' | 'weak' | 'unrated';
 }
 
 const COL_X = { source: 60, claim: 330, hypothesis: 620 };
 const ROW_H = 34;
 const MAX_NODES_PER_COL = 40;
+
+const STRENGTH_W: Record<NonNullable<GraphEdge['strength']>, number> = { strong: 2.2, moderate: 1.6, weak: 1.0, unrated: 1.2 };
 
 export function EvidenceGraph({
   run,
@@ -63,13 +67,17 @@ export function EvidenceGraph({
   const [filter, setFilter] = useState<Filter>('all');
   const [hover, setHover] = useState<string | null>(null);
   const [view, setView] = useState({ k: 1, tx: 0, ty: 0 });
-  const dragRef = { active: false, x: 0, y: 0 };
+  /** VIZ V5: per-node drag offsets (reset with the view); honest full render is opt-in. */
+  const [offsets, setOffsets] = useState<Map<string, { dx: number; dy: number }>>(new Map());
+  const [showAll, setShowAll] = useState(false);
+  const dragRef = { active: false, x: 0, y: 0, nodeId: null as string | null };
+  const svgPointRef = { k: 1, tx: 0, ty: 0 };
 
   const hypFetcher = useCallback((signal: AbortSignal) => getHypotheses(run.id, signal), [run.id]);
   const hypRes = useResource(hypFetcher, [run.id], `${run.updatedAt}:${run.status}`);
   const hypotheses = hypRes.data?.hypotheses ?? [];
 
-  const { nodes, edges, height } = useMemo(() => {
+  const { nodes, edges, height, truncated } = useMemo(() => {
     // Discriminating filter needs hypothesis bindings; claim→hyp edges come
     // from BOTH the hypothesis id-arrays (authoritative) and relations.
     const supportingOf = new Map<string, Set<string>>();
@@ -89,7 +97,8 @@ export function EvidenceGraph({
       return total === 1; // bound to exactly one hypothesis — where comparisons are decided
     };
 
-    const visibleSources = sources.slice(0, MAX_NODES_PER_COL);
+    const cap = showAll ? Number.POSITIVE_INFINITY : MAX_NODES_PER_COL;
+    const visibleSources = sources.slice(0, cap);
     const visibleClaims = claims
       .filter((c) => {
         if (filter === 'counter') return (counterOf.get(c.id)?.size ?? 0) > 0;
@@ -97,8 +106,8 @@ export function EvidenceGraph({
         if (filter === 'discriminating') return discriminating(c.id);
         return true;
       })
-      .slice(0, MAX_NODES_PER_COL);
-    const visibleHyps = hypotheses.slice(0, MAX_NODES_PER_COL);
+      .slice(0, cap);
+    const visibleHyps = hypotheses.slice(0, cap);
 
     const nodeList: GraphNode[] = [];
     visibleSources.forEach((s, i) => nodeList.push({
@@ -139,12 +148,17 @@ export function EvidenceGraph({
     }
     for (const r of relations) {
       if (r.targetClaimId !== undefined && claimIds.has(r.claimId ?? '') && claimIds.has(r.targetClaimId)) {
-        edgeList.push({ id: `cc-${r.id}`, from: r.claimId!, to: r.targetClaimId, kind: 'claim_claim', dashed: true });
+        edgeList.push({ id: `cc-${r.id}`, from: r.claimId!, to: r.targetClaimId, kind: 'claim_claim', dashed: true, ...(r.strength !== undefined ? { strength: r.strength } : {}) });
       }
     }
     const maxRows = Math.max(visibleSources.length, visibleClaims.length, visibleHyps.length);
-    return { nodes: nodeList, edges: edgeList, height: 60 + maxRows * ROW_H };
-  }, [sources, claims, relations, hypotheses, filter]);
+    const truncated = Math.max(
+      (sources.length > visibleSources.length ? sources.length - visibleSources.length : 0),
+      (claims.length > visibleClaims.length ? claims.length - visibleClaims.length : 0),
+      (hypotheses.length > visibleHyps.length ? hypotheses.length - visibleHyps.length : 0),
+    );
+    return { nodes: nodeList, edges: edgeList, height: 60 + maxRows * ROW_H, truncated };
+  }, [sources, claims, relations, hypotheses, filter, showAll]);
 
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n] as const)), [nodes]);
   const activeEdges = hover !== null
@@ -154,12 +168,52 @@ export function EvidenceGraph({
   const activate = (n: GraphNode): void => {
     if (n.kind === 'claim') onOpenClaim(n.id);
     else if (n.kind === 'hypothesis') onOpenHypothesis();
-    // sources have no dedicated surface yet — the title tooltip carries them
+    // VIZ V5: sources land on their row in the sources table above.
+    else document.getElementById(`src-${n.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const nodePos = (n: GraphNode): { x: number; y: number } => {
+    const off = offsets.get(n.id);
+    return off !== undefined ? { x: n.x + off.dx, y: n.y + off.dy } : { x: n.x, y: n.y };
   };
 
   const onWheel = (e: React.WheelEvent<SVGSVGElement>): void => {
     e.preventDefault();
     setView((v) => ({ ...v, k: Math.min(2.5, Math.max(0.4, v.k * (e.deltaY < 0 ? 1.1 : 0.9))) }));
+    svgPointRef.k = Math.min(2.5, Math.max(0.4, view.k * (e.deltaY < 0 ? 1.1 : 0.9)));
+  };
+
+  const beginNodeDrag = (e: React.MouseEvent, id: string): void => {
+    e.stopPropagation();
+    dragRef.active = true;
+    dragRef.nodeId = id;
+    dragRef.x = e.clientX;
+    dragRef.y = e.clientY;
+  };
+
+  const onSvgMouseMove = (e: React.MouseEvent<SVGSVGElement>): void => {
+    if (!dragRef.active) return;
+    const dx = e.clientX - dragRef.x;
+    const dy = e.clientY - dragRef.y;
+    dragRef.x = e.clientX;
+    dragRef.y = e.clientY;
+    if (dragRef.nodeId !== null) {
+      // Node drag: deltas are screen px; undo the view transform to stay 1:1 with the cursor.
+      const id = dragRef.nodeId;
+      setOffsets((prev) => {
+        const cur = prev.get(id) ?? { dx: 0, dy: 0 };
+        const next = new Map(prev);
+        next.set(id, { dx: cur.dx + dx / view.k, dy: cur.dy + dy / view.k });
+        return next;
+      });
+    } else {
+      setView((v) => ({ ...v, tx: v.tx + dx, ty: v.ty + dy }));
+    }
+  };
+
+  const endDrag = (): void => {
+    dragRef.active = false;
+    dragRef.nodeId = null;
   };
 
   const FILTERS: { key: Filter; labelKey: DictKey }[] = [
@@ -184,9 +238,17 @@ export function EvidenceGraph({
           </button>
         ))}
         <span className="muted small">{t('graph.counts', { s: nodes.filter((n) => n.kind === 'source').length, c: nodes.filter((n) => n.kind === 'claim').length, h: nodes.filter((n) => n.kind === 'hypothesis').length })}</span>
-        <button type="button" className="btn btn--sm" onClick={() => setView({ k: 1, tx: 0, ty: 0 })}>
+        <button type="button" className="btn btn--sm" onClick={() => { setView({ k: 1, tx: 0, ty: 0 }); setOffsets(new Map()); }}>
           {t('graph.reset')}
         </button>
+        {truncated > 0 && (
+          <span className="graph-truncated" role="status">
+            <span className="text-warn small">{t('graph.truncated', { n: truncated })}</span>
+            <button type="button" className="btn btn--sm" onClick={() => setShowAll(true)} disabled={showAll}>
+              {t('graph.showAll')}
+            </button>
+          </span>
+        )}
       </div>
       <svg
         className="graph-svg"
@@ -194,32 +256,32 @@ export function EvidenceGraph({
         role="img"
         aria-label={t('graph.aria', { s: sources.length, c: claims.length, h: hypotheses.length })}
         onWheel={onWheel}
-        onMouseDown={(e) => { dragRef.active = true; dragRef.x = e.clientX; dragRef.y = e.clientY; }}
-        onMouseMove={(e) => {
-          if (!dragRef.active) return;
-          setView((v) => ({ ...v, tx: v.tx + (e.clientX - dragRef.x), ty: v.ty + (e.clientY - dragRef.y) }));
-          dragRef.x = e.clientX; dragRef.y = e.clientY;
-        }}
-        onMouseUp={() => { dragRef.active = false; }}
-        onMouseLeave={() => { dragRef.active = false; }}
+        onMouseDown={(e) => { dragRef.active = true; dragRef.nodeId = null; dragRef.x = e.clientX; dragRef.y = e.clientY; }}
+        onMouseMove={onSvgMouseMove}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
       >
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
           {edges.map((e) => {
             const a = byId.get(e.from);
             const b = byId.get(e.to);
             if (a === undefined || b === undefined) return null;
+            const pa = nodePos(a);
+            const pb = nodePos(b);
             const dim = activeEdges !== null && !activeEdges.has(e.from) && !activeEdges.has(e.to);
             const stroke = e.kind === 'supports' ? 'var(--v2-verified)' : e.kind === 'counters' ? 'var(--v2-refuted)' : 'var(--v2-border)';
             return (
               <line
                 key={e.id}
-                x1={a.x + (a.kind === 'source' ? 8 : 10)} y1={a.y}
-                x2={b.x - (b.kind === 'hypothesis' ? 10 : 8)} y2={b.y}
+                x1={pa.x + (a.kind === 'source' ? 8 : 10)} y1={pa.y}
+                x2={pb.x - (b.kind === 'hypothesis' ? 10 : 8)} y2={pb.y}
                 stroke={stroke}
-                strokeWidth={e.kind === 'locator' ? 0.7 : 1.4}
+                strokeWidth={e.strength !== undefined ? STRENGTH_W[e.strength] : e.kind === 'locator' ? 0.7 : 1.4}
                 strokeDasharray={e.dashed === true ? '4 3' : undefined}
                 opacity={dim ? 0.08 : e.kind === 'locator' ? 0.45 : 0.85}
-              />
+              >
+                {e.strength !== undefined && <title>{`${t('graph.claimClaim')} — ${t(`graph.strength.${e.strength}`)}`}</title>}
+              </line>
             );
           })}
           {nodes.map((n) => {
@@ -232,7 +294,7 @@ export function EvidenceGraph({
             return (
               <g
                 key={n.id}
-                transform={`translate(${n.x} ${n.y})`}
+                transform={`translate(${nodePos(n).x} ${nodePos(n).y})`}
                 opacity={dim ? 0.25 : 1}
                 tabIndex={0}
                 role="button"
@@ -241,9 +303,10 @@ export function EvidenceGraph({
                 onMouseLeave={() => setHover(null)}
                 onFocus={() => setHover(n.id)}
                 onBlur={() => setHover(null)}
+                onMouseDown={(e) => beginNodeDrag(e, n.id)}
                 onClick={() => activate(n)}
                 onKeyDown={(e) => { if (e.key === 'Enter') activate(n); }}
-                className="graph-node"
+                className="graph-node graph-node--draggable"
               >
                 {n.kind === 'source' && <rect x={-8} y={-5} width={16} height={10} rx={2} fill={fill} stroke="var(--v2-border)" />}
                 {n.kind === 'claim' && <circle r={6} fill={fill} stroke={`var(--v2-${n.tone ?? 'unknown'})`} strokeWidth={2} />}
