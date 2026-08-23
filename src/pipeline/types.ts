@@ -12,6 +12,13 @@ export interface StageContext {
   store: Store;
   artifacts: ArtifactStore;
   provider: ModelProvider;
+  /**
+   * RU-9 GO2: the run's resolved reasoning route (declared-capability model
+   * configs only); absent for env builtin routes — zero reasoning fields on
+   * the wire, exact legacy behavior. callStructured derives the per-call gear
+   * from the stage table + model clamps when the caller passes none.
+   */
+  reasoningRoute?: { style: import('../domain/model-config.js').ReasoningStyle; defaultGear: import('../domain/model-config.js').ReasoningGear; modelId: string };
   sourceFor: (family: SourceFamily) => SourceAdapter;
   /**
    * Fulltext deepening (phase A): fetch full text for a corpus document through

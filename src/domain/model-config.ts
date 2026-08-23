@@ -36,6 +36,47 @@ export const REASONING_GEAR_BUDGET_TOKENS: Readonly<Record<ReasoningGear, number
 export const reasoningBudgetTokens = (gear: ReasoningGear): number => REASONING_GEAR_BUDGET_TOKENS[gear];
 
 /**
+ * RU-9 GO2 — stage→reasoning gear defaults (effort plane). Semantic classes:
+ * extraction/rerank/adjudication get HIGH (quality-critical judgments over
+ * external text); mechanical projections get LOW; the default is MEDIUM.
+ * Free-form stage strings ('action:<x>', 'agent:<y>', 'execute') fall back
+ * by prefix classes then to medium. Overridable per call (explicit wins).
+ */
+export const STAGE_REASONING_GEAR: Readonly<Record<string, ReasoningGear>> = {
+  retrieve: 'high',          // rerank windows: listwise adjudication
+  build_evidence: 'high',    // claim extraction + relation adjudication
+  verify_sources: 'low',     // deterministic-guarded checking
+  generate_hypotheses: 'high',
+  critique_falsify: 'high',
+  rank: 'high',
+  plan: 'medium',
+  execute: 'low',            // preregistered mechanical verdicts
+  feedback: 'low',
+  revise: 'high',
+  export: 'low',
+  scope: 'medium',
+};
+const STAGE_PREFIX_GEAR: ReadonlyArray<readonly [RegExp, ReasoningGear]> = [
+  [/^agent:/, 'medium'],
+  [/^action:/, 'high'],
+];
+
+export const stageReasoningGear = (stage: string): ReasoningGear => {
+  const exact = STAGE_REASONING_GEAR[stage];
+  if (exact !== undefined) return exact;
+  for (const [re, gear] of STAGE_PREFIX_GEAR) if (re.test(stage)) return gear;
+  return 'medium';
+};
+
+/**
+ * Per-model gear clamps (packet-primary-sourced): the GLM-5 family exposes
+ * effort ∈ {low, high, max} — NO medium. Clamping UP (medium→high) keeps the
+ * quality-critical stages' intent; never silently downgrades.
+ */
+export const clampGearForModel = (gear: ReasoningGear, modelId: string): ReasoningGear =>
+  /^glm-5/i.test(modelId) && gear === 'medium' ? 'high' : gear;
+
+/**
  * Dialect↔wire compatibility is validated at the config boundary so an impossible
  * combination never reaches the transport: reasoning_effort / enable_thinking are
  * OpenAI-chat-completions body extensions; thinking_budget is the Anthropic-Messages

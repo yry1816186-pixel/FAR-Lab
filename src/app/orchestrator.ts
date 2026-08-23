@@ -10,6 +10,7 @@ import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './ru
 import { evaluateQualityGate, MAX_QUALITY_ROUNDS } from './quality-gate.js';
 import { evaluateIteration, iterationRoundKey, iterationFingerprintKey } from './iteration.js';
 import { analyzeTrajectory } from './supervisor.js';
+import { resolveRunReasoningRoute } from './provider-resolver.js';
 import { consolidateRun } from './memory.js';
 import { receiptEventDetail } from '../pipeline/llm.js';
 
@@ -113,6 +114,9 @@ export class Orchestrator {
       store,
       artifacts: this.deps.artifacts,
       provider: this.deps.providerFor?.(run) ?? this.deps.provider,
+      // RU-9 GO2 effort plane: declared-capability routes derive per-stage gears
+      // (table + model clamps) inside invokeStructured; absent = legacy zero-field.
+      ...(resolveRunReasoningRoute(store, run) ?? {}),
       budget,
       sourceFor: this.deps.sourceFor,
       recordReceipt: (partial) => {
