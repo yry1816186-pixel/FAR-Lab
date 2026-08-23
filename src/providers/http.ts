@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { canonicalSha256 } from '../shared/crypto.js';
 import { repairJson } from './json-repair.js';
 import type { StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
+import { REASONING_GEAR_BUDGET_TOKENS } from '../domain/model-config.js';
 
 /**
  * Shared OpenAI-compatible /chat/completions core for the Model Execution Plane.
@@ -179,8 +180,39 @@ export const computeRequestHash = (req: StructuredCallRequest): string =>
     task: req.task,
     systemPrompt: req.systemPrompt,
     userPayload: req.userPayload,
+    ...(req.reasoning !== undefined ? { reasoning: req.reasoning } : {}),
     purpose: req.purpose,
   });
+
+/**
+ * SINGLE OWNER of the reasoning dialect map (config declares the style; this maps a
+ * call's {style, gear} onto the endpoint's body fields):
+ *   - reasoning_effort → OpenAI-chat-completions `reasoning_effort` (o-series, GPT-5,
+ *     vLLM, Ollama, Gemini-compat OpenAI routes, …)
+ *   - enable_thinking  → Qwen3 chat-completions extensions `enable_thinking` +
+ *     `thinking_budget` (budget from the single gear→tokens map in model-config.ts)
+ *   - thinking_budget  → Anthropic-Messages `thinking:{type:'enabled',budget_tokens}`
+ * A style that cannot ride the requested wire returns {} (defense in depth behind the
+ * config-schema validation — never an invalid payload). No reasoning on the request =
+ * no fields at all (exact legacy wire shape; safe for any endpoint).
+ */
+export const reasoningBodyFields = (
+  wire: 'openai' | 'anthropic',
+  reasoning: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' },
+): Record<string, unknown> => {
+  switch (reasoning.style) {
+    case 'reasoning_effort':
+      return wire === 'openai' ? { reasoning_effort: reasoning.gear } : {};
+    case 'enable_thinking':
+      return wire === 'openai'
+        ? { enable_thinking: true, thinking_budget: REASONING_GEAR_BUDGET_TOKENS[reasoning.gear] }
+        : {};
+    case 'thinking_budget':
+      return wire === 'anthropic'
+        ? { thinking: { type: 'enabled', budget_tokens: REASONING_GEAR_BUDGET_TOKENS[reasoning.gear] } }
+        : {};
+  }
+};
 
 const buildMessages = (req: StructuredCallRequest, random: () => number = Math.random): ChatMessage[] => {
   const system = req.systemPrompt ? `${req.systemPrompt}\n\n${JSON_ONLY_SUFFIX}` : JSON_ONLY_SUFFIX;
@@ -229,6 +261,7 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
   }
   if (req.temperature !== undefined) body.temperature = req.temperature;
   if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens;
+  if (req.reasoning !== undefined) Object.assign(body, reasoningBodyFields('openai', req.reasoning));
   return JSON.stringify(body);
 };
 
@@ -654,6 +687,7 @@ const buildAnthropicRequestBody = (modelId: string, messages: ChatMessage[], req
     messages: rest.map((m) => ({ role: m.role, content: m.content })),
   };
   if (req.temperature !== undefined) body.temperature = req.temperature;
+  if (req.reasoning !== undefined) Object.assign(body, reasoningBodyFields('anthropic', req.reasoning));
   return body;
 };
 
@@ -823,6 +857,7 @@ export async function runOpenAICompatStructuredCall<T>(
       ...(last200?.finishReason ? { finishReason: last200.finishReason } : {}),
       transportRetries,
       correctiveReasks: invalidOutputRetries,
+      ...(req.reasoning !== undefined ? { reasoningGear: req.reasoning.gear } : {}),
       executionMode: cfg.executionMode,
     },
   });
@@ -893,6 +928,7 @@ export async function runOpenAICompatStructuredCall<T>(
               ...(attempt.finishReason ? { finishReason: attempt.finishReason } : {}),
               transportRetries,
               correctiveReasks: invalidOutputRetries,
+              ...(req.reasoning !== undefined ? { reasoningGear: req.reasoning.gear } : {}),
               executionMode: cfg.executionMode,
             },
           };

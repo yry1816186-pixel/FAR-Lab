@@ -16,6 +16,8 @@ import { EventsTab } from './detail/EventsTab';
 import { FeedbackDrawer } from './detail/FeedbackDrawer';
 import type { FeedbackTarget } from './detail/FeedbackForm';
 import { ExperimentsTab } from './detail/ExperimentsTab';
+import { StreamStatusChip } from './detail/StreamStatusChip';
+import type { StreamSnapshot } from '../hooks/eventStreamTracker';
 
 /**
  * Research page information architecture (2026-08 product rebuild): the eight
@@ -93,6 +95,7 @@ export function RunDetail({
   onTabChange,
   focusClaimId,
   onClaimFocused,
+  stream,
 }: {
   run: ResearchRun;
   events: EventsState;
@@ -103,6 +106,8 @@ export function RunDetail({
   /** Pending claim to reveal (B2 palette search): switches to evidence and flash-highlights. */
   focusClaimId?: string | null;
   onClaimFocused?: () => void;
+  /** Realtime stream health (HX-3): drives the visible reconnect/fallback chip. */
+  stream: StreamSnapshot;
 }): JSX.Element {
   const { t } = useI18n();
   const [tabId, setTabIdState] = useState<TabId>(tab ?? 'research');
@@ -221,6 +226,7 @@ export function RunDetail({
   return (
     <div className="run-detail">
       <RunHeader run={run} />
+      {(run.status === 'running' || run.status === 'queued') && <StreamStatusChip snapshot={stream} />}
       <div className="tabs" role="tablist" aria-label={t('tab.listLabel')}>
         {TABS.map((tab, i) => (
           <button

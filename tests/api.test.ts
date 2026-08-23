@@ -1049,7 +1049,7 @@ describe('static serving', () => {
     expect(body.api).toBe('/api/v1');
   });
 
-  it('serves index, assets with correct mime, and SPA fallback from web/dist', async () => {
+  it('serves index and assets with correct mime; hash-routed app needs no path fallback', async () => {
     const index = await fetch(`${staticBase}/`);
     expect(index.status).toBe(200);
     expect(index.headers.get('content-type')).toContain('text/html');
@@ -1059,10 +1059,14 @@ describe('static serving', () => {
     expect(css.status).toBe(200);
     expect(css.headers.get('content-type')).toContain('text/css');
 
-    const spa = await fetch(`${staticBase}/runs/some-client-route`);
-    expect(spa.status).toBe(200);
-    expect(spa.headers.get('content-type')).toContain('text/html');
-    expect(await spa.text()).toContain('far workbench');
+    // Hash routing (useHashRoute) means extension-less paths are NOT client
+    // routes. They must 404 honestly — a 200 index.html here once made the ASR
+    // worker read a missing /models/* asset as present (gap-hunt G1).
+    for (const probe of ['/runs/some-client-route', '/models/whisper-base', '/models/ort/missing-dir']) {
+      const miss = await fetch(`${staticBase}${probe}`);
+      expect(miss.status).toBe(404);
+      expect(miss.headers.get('content-type')).toContain('application/json'); // error envelope, never HTML
+    }
   });
 
   it('rejects path traversal with 404 (encoded or plain)', async () => {

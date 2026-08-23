@@ -10,6 +10,14 @@ import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promot
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
 import { discoverModels } from '../providers/discovery.js';
 import { approveExperiment, ExperimentOpError } from './experiment-ops.js';
+import { fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
+import {
+  attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
+  getConversation, listConversations, postConversationMessage, resolveConversationProposal,
+  resolveConversationReasoningRoute, setConversationReasoningGear,
+  ConversationError, type ConversationDeps,
+} from './conversations.js';
+import { startAutomationEngine, type AutomationEngine } from './automations.js';
 import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
 import {
   FeedbackSignal,
@@ -19,11 +27,16 @@ import {
   ResearchQuestion,
   ScientificGoalType,
   SourceDocument,
+  ToolIntegrationSchema,
   calibrationReport,
+  integrationSemanticIssues,
   maskApiKey,
+  maskIntegrationSecrets,
   newId,
   runProgress,
 } from '../domain/index.js';
+import { McpManager } from '../agent/mcp-manager.js';
+import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plugins/import.js';
 import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
 import { canonicalSha256 } from '../shared/crypto.js';
 
@@ -39,7 +52,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable';
+  code: 'not_found' | 'validation' | 'already_running' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -63,6 +76,13 @@ export interface ApiServerOptions {
    * this server process (no new service).
    */
   watchdogIntervalMs?: number;
+  /**
+   * Resident-agent automations (R3): when enabled, the in-process engine fires
+   * approved agent tasks on schedule / on run completion into their
+   * conversations. Default off (tests drive the engine directly); the
+   * production entrypoint enables it.
+   */
+  automations?: { enabled?: boolean; tickMs?: number };
 }
 
 export interface ApiServer {
@@ -204,6 +224,7 @@ export function createApiServer(app: App, opts: ApiServerOptions = {}): ApiServe
   const adoptionBackoffMs = Math.max(watchdogIntervalMs * 10, 60_000);
   const lastAdoptedAt = new Map<string, number>();
   let watchdogTimer: NodeJS.Timeout | null = null;
+  let automationEngine: AutomationEngine | null = null;
   // Sweep-health visibility (WP2 F-007): a persistent store error would otherwise
   // silently stop adoptions forever with only a stderr line — /health reports it.
   let consecutiveSweepFailures = 0;
@@ -428,8 +449,8 @@ function parseSeedSources(raw: unknown): string | {
   authors: string[];
 }[] {
   if (raw === undefined) return [];
-  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 5) {
-    return 'field "seeds" must be an array of 1-5 seed sources';
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 50) {
+    return 'field "seeds" must be an array of 1-50 seed sources';
   }
   const out: {
     title: string; identifiers: { kind: 'doi' | 'arxiv' | 'url' | 'other'; value: string }[];
@@ -482,6 +503,15 @@ function parseSeedSources(raw: unknown): string | {
 
   const createRun = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const body = await readJsonObject(req);
+    const runId = await createRunWithSeeds(body);
+    sendJson(res, 202, { runId });
+  };
+
+  /**
+   * Shared run-creation core (POST /runs and conversation launch): question
+   * validation, optional model route, seed ingestion and async start.
+   */
+  const createRunWithSeeds = async (body: Record<string, unknown>): Promise<string> => {
     const { text, domain, goalType } = body as { text?: unknown; domain?: unknown; goalType?: unknown };
     if (typeof text !== 'string' || text.trim().length === 0) {
       throw validation('field "text" is required (non-empty string: the research question)');
@@ -541,8 +571,27 @@ function parseSeedSources(raw: unknown): string | {
       }));
     }
     startRun(run.id); // async execution — the 202 returns immediately; failures land in run state
-    sendJson(res, 202, { runId: run.id });
+    return run.id;
   };
+
+  // Resident-agent action bridge: approved conversation proposals launch runs
+  // through the SAME creation path as POST /runs and the manual launch route.
+  const conversationDeps: ConversationDeps = {
+    createRun: (input) => createRunWithSeeds({
+      text: input.text,
+      ...(input.providerConfigId !== undefined ? { providerConfigId: input.providerConfigId } : {}),
+      seeds: input.seeds,
+    }),
+  };
+
+  // Automations engine starts here (after its createRun bridge exists). Tests
+  // leave it off and drive the engine directly; the production entry enables it.
+  if (opts.automations?.enabled === true && conversationDeps.createRun !== undefined) {
+    automationEngine = startAutomationEngine(app, {
+      createRun: conversationDeps.createRun,
+      ...(opts.automations.tickMs !== undefined ? { tickMs: opts.automations.tickMs } : {}),
+    });
+  }
 
   const runDetail = (res: http.ServerResponse, runId: string): void => {
     const run = mustGetRun(runId);
@@ -822,8 +871,12 @@ function parseSeedSources(raw: unknown): string | {
       throw notFound(`no route: ${method} ${pathname}`); // traversal/malformed: 404, never a fallback
     }
     let target: string | null = resolved; // non-null only when it is a file inside the root
-    if (target === null && path.extname(pathname) === '') {
-      const index = path.join(staticRoot, 'index.html'); // SPA fallback for client-side routes
+    // The workbench is hash-routed (useHashRoute: "hash routes need no server
+    // support"), so only '/' needs index.html. Any other extension-less path
+    // (e.g. a missing /models/* asset probe) 404s honestly — a 200 HTML body
+    // here once made the ASR worker treat a missing model as present.
+    if (target === null && pathname === '/') {
+      const index = path.join(staticRoot, 'index.html');
       if (fs.existsSync(index)) target = index;
     }
     if (target === null) throw notFound(`no route: ${method} ${pathname}`);
@@ -907,6 +960,7 @@ function parseSeedSources(raw: unknown): string | {
       apiKey: body.apiKey ?? '',
       ...(Array.isArray(body.fallbackConfigIds) ? { fallbackConfigIds: body.fallbackConfigIds } : {}),
       ...(body.pricing !== undefined ? { pricing: body.pricing } : {}),
+      ...(body.reasoning !== undefined ? { reasoning: body.reasoning } : {}),
       createdAt: now,
       updatedAt: now,
     });
@@ -935,6 +989,9 @@ function parseSeedSources(raw: unknown): string | {
       ...(typeof body.modelId === 'string' ? { modelId: body.modelId } : {}),
       ...(Array.isArray(body.fallbackConfigIds) ? { fallbackConfigIds: body.fallbackConfigIds } : {}),
       ...(body.pricing !== undefined ? { pricing: body.pricing } : {}),
+      // Reasoning declaration semantics follow pricing: present = replace (schema
+      // validates style/wire compatibility), absent = keep the stored one.
+      ...(body.reasoning !== undefined ? { reasoning: body.reasoning } : {}),
       apiKey,
       updatedAt: new Date().toISOString(),
     });
@@ -944,6 +1001,138 @@ function parseSeedSources(raw: unknown): string | {
     }
     app.store.putObject('model_config', parsed.data);
     sendJson(res, 200, { config: modelConfigSummary(parsed.data, app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY)) });
+  };
+
+  // ---- tool integrations (TIS: researcher-wired external tools) ----
+
+  /** Tool integrations are workspace-global, like model configs ('__none__' run bucket). */
+  const listToolIntegrationsAll = () => app.store.listObjects('tool_integration', '__none__');
+
+  const TOOL_INTEGRATION_ID_RE = /^tint_[0-9a-z]{20,32}$/;
+  const assertToolIntegrationId = (id: string): void => {
+    if (!TOOL_INTEGRATION_ID_RE.test(id)) throw validation(`invalid tool integration id format: ${id}`);
+  };
+
+  const mustGetToolIntegration = (id: string) => {
+    const integration = app.store.getObject('tool_integration', id);
+    if (integration === null) throw notFound(`tool integration not found: ${id}`);
+    return integration;
+  };
+
+  /** Response projection — secret env/header values NEVER leave the server verbatim. */
+  const toolIntegrationView = (integration: ReturnType<typeof listToolIntegrationsAll>[number]) => ({
+    ...maskIntegrationSecrets(integration),
+    envSet: integration.kind === 'mcp_server' ? Object.keys(integration.env) : [],
+    headersSet: integration.kind === 'mcp_server' ? Object.keys(integration.headers) : [],
+  });
+
+  const invalidIntegrationMessage = (issues: { path: (string | number)[]; message: string }[]): string =>
+    `invalid tool integration: ${issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')}`;
+
+  const createToolIntegration = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+    const body = await readJsonObject(req);
+    const now = new Date().toISOString();
+    const parsed = ToolIntegrationSchema.safeParse({
+      ...body,
+      id: newId('tint'),
+      enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
+      createdBy: 'researcher',
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (!parsed.success) throw validation(invalidIntegrationMessage(parsed.error.issues));
+    const semantic = integrationSemanticIssues(parsed.data);
+    if (semantic.length > 0) throw validation(`invalid tool integration: ${semantic.join('; ')}`);
+    app.store.putObject('tool_integration', parsed.data);
+    sendJson(res, 201, { integration: toolIntegrationView(parsed.data) });
+  };
+
+  /**
+   * Secret-preserving update semantics (apiKey lineage): an absent env/headers field keeps
+   * the stored map; a present map keeps keys it omits (masked round-trip) and replaces
+   * keys it names with the given string values.
+   */
+  const mergeSecretMap = (stored: Record<string, string>, incoming: unknown): Record<string, string> => {
+    if (incoming === undefined) return stored;
+    if (typeof incoming !== 'object' || incoming === null || Array.isArray(incoming)) {
+      throw validation('env/headers must be an object of string values when present');
+    }
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(incoming as Record<string, unknown>)) {
+      if (typeof v !== 'string') throw validation(`env/headers value for '${k}' must be a string`);
+      out[k] = v;
+    }
+    return { ...stored, ...out };
+  };
+
+  const updateToolIntegration = async (req: http.IncomingMessage, res: http.ServerResponse, id: string): Promise<void> => {
+    assertToolIntegrationId(id);
+    const existing = mustGetToolIntegration(id);
+    const body = await readJsonObject(req);
+    const merged = {
+      ...existing,
+      ...(typeof body.label === 'string' ? { label: body.label } : {}),
+      ...(typeof body.enabled === 'boolean' ? { enabled: body.enabled } : {}),
+      ...(body.kind === existing.kind ? body : {}),
+      env: existing.kind === 'mcp_server' ? mergeSecretMap(existing.env, body.env) : undefined,
+      headers: existing.kind === 'mcp_server' ? mergeSecretMap(existing.headers, body.headers) : undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    const parsed = ToolIntegrationSchema.safeParse(merged);
+    if (!parsed.success) throw validation(invalidIntegrationMessage(parsed.error.issues));
+    const semantic = integrationSemanticIssues(parsed.data);
+    if (semantic.length > 0) throw validation(`invalid tool integration: ${semantic.join('; ')}`);
+    app.store.putObject('tool_integration', parsed.data);
+    sendJson(res, 200, { integration: toolIntegrationView(parsed.data) });
+  };
+
+  /**
+   * Real connectivity test for mcp_server integrations: initialize + tools/list round
+   * trip through the same clients sessions use, persisted as the integration's honest
+   * lastTest. Non-MCP kinds get a truthful 400 — there is nothing to dial.
+   */
+  const testToolIntegration = async (req: http.IncomingMessage, res: http.ServerResponse, id: string): Promise<void> => {
+    assertToolIntegrationId(id);
+    const integration = mustGetToolIntegration(id);
+    if (integration.kind !== 'mcp_server') {
+      throw validation(`test is only meaningful for mcp_server integrations (kind: ${integration.kind})`);
+    }
+    const manager = new McpManager({ listServers: () => [integration] });
+    try {
+      const record = await manager.testIntegration(integration);
+      const updated = ToolIntegrationSchema.parse({ ...integration, lastTest: record, updatedAt: new Date().toISOString() });
+      app.store.putObject('tool_integration', updated);
+      sendJson(res, 200, { test: record });
+    } finally {
+      await manager.close();
+    }
+  };
+
+  /**
+   * Plugin import (TIS T5): expand a reviewed local plugin directory into
+   * DISABLED tool integrations (the researcher activates after review). The
+   * request must carry reviewed:true — an honesty gate recording that the
+   * plugin files were reviewed before staging, not a sandbox claim.
+   */
+  const importPluginRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+    const body = await readJsonObject(req);
+    const parsedInput = PluginImportInputSchema.safeParse(body);
+    if (!parsedInput.success) {
+      throw validation(`plugin import requires { dir, reviewed: true } — staging unreviewed plugins is refused: ${parsedInput.error.issues[0]?.message}`);
+    }
+    let result;
+    try {
+      result = importPlugin(parsedInput.data);
+    } catch (e) {
+      if (e instanceof PluginImportError) throw validation(e.message);
+      throw e;
+    }
+    for (const integration of result.integrations) app.store.putObject('tool_integration', integration);
+    sendJson(res, 201, {
+      plugin: { name: result.manifest.name, version: result.manifest.version, license: result.manifest.license },
+      integrations: result.integrations.map(toolIntegrationView),
+      warnings: result.warnings,
+    });
   };
 
   /** BP-4 usage ledger: workspace-wide receipt-derived usage (tokens; cost only when user-priced). */
@@ -1235,6 +1424,31 @@ function parseSeedSources(raw: unknown): string | {
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
 
+    if (segments[2] === 'tools') {
+      if (segments.length === 3) {
+        if (method === 'GET') return sendJson(res, 200, { integrations: listToolIntegrationsAll().map(toolIntegrationView) });
+        if (method === 'POST') return createToolIntegration(req, res);
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
+      if (segments[3] === 'import-plugin' && segments.length === 4 && method === 'POST') return importPluginRoute(req, res);
+      const leaf = segments[3]!;
+      if (segments[4] === 'test' && segments.length === 5 && method === 'POST') return testToolIntegration(req, res, leaf);
+      if (segments.length === 4) {
+        if (method === 'GET') {
+          assertToolIntegrationId(leaf);
+          return sendJson(res, 200, { integration: toolIntegrationView(mustGetToolIntegration(leaf)) });
+        }
+        if (method === 'PUT') return updateToolIntegration(req, res, leaf);
+        if (method === 'DELETE') {
+          assertToolIntegrationId(leaf);
+          mustGetToolIntegration(leaf);
+          app.store.deleteObject('tool_integration', leaf);
+          return sendJson(res, 200, { deleted: leaf });
+        }
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
     if (segments[2] === 'model-configs') {
       if (segments.length === 3) {
         if (method === 'GET') return listModelConfigs(res);
@@ -1250,6 +1464,152 @@ function parseSeedSources(raw: unknown): string | {
         if (method === 'GET') return getModelConfig(res, leaf);
         if (method === 'PUT') return updateModelConfig(req, res, leaf);
         if (method === 'DELETE') return deleteModelConfig(res, leaf);
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
+    if (segments[2] === 'zotero') {
+      // Local-library bridge: the page cannot fetch Zotero directly (no CORS
+      // headers on 127.0.0.1:23119), so the server proxies the full snapshot.
+      if (segments[3] === 'library' && segments.length === 4 && method === 'GET') {
+        try {
+          sendJson(res, 200, await fetchZoteroLibrary());
+        } catch (e) {
+          if (e instanceof ZoteroUnavailableError) {
+            throw new HttpError(503, { code: 'provider_unreachable', message: e.message, retryable: true });
+          }
+          throw e;
+        }
+        return;
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
+    if (segments[2] === 'conversations') {
+      const convRoute = async (fn: () => Promise<void> | void): Promise<void> => {
+        try {
+          await fn();
+        } catch (e) {
+          if (e instanceof ConversationError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: e.code === 'conversation_model_failed' });
+          }
+          throw e;
+        }
+      };
+      if (segments.length === 3) {
+        if (method === 'GET') return convRoute(() => sendJson(res, 200, { conversations: listConversations(app) }));
+        if (method === 'POST') {
+          return convRoute(async () => {
+            const body = await readJsonObject(req);
+            sendJson(res, 201, { conversation: createConversation(app, body) });
+          });
+        }
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
+      const convId = segments[3]!;
+      if (convId === undefined) throw notFound(`no route: ${method} ${url.pathname}`);
+      if (segments.length === 4) {
+        if (method === 'GET') return convRoute(() => sendJson(res, 200, { conversation: getConversation(app, convId) }));
+        if (method === 'DELETE') return convRoute(() => { deleteConversation(app, convId); sendJson(res, 200, { ok: true }); });
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
+      if (segments[4] === 'messages' && segments.length === 5 && method === 'POST') {
+        return convRoute(async () => {
+          const body = await readJsonObject(req);
+          sendJson(res, 200, { conversation: await postConversationMessage(app, convId, body, conversationDeps) });
+        });
+      }
+      if (segments[4] === 'reasoning-gear' && segments.length === 5 && method === 'PUT') {
+        return convRoute(async () => {
+          const body = await readJsonObject(req);
+          const updated = setConversationReasoningGear(app, convId, body.gear);
+          sendJson(res, 200, { reasoningGear: updated.reasoningGear ?? null });
+        });
+      }
+      if (segments[4] === 'reasoning-gear' && segments.length === 5 && method === 'GET') {
+        return convRoute(() => {
+          const conv = getConversation(app, convId);
+          const route = resolveConversationReasoningRoute(app, conv);
+          if (route === null) return sendJson(res, 200, { supported: false });
+          return sendJson(res, 200, {
+            supported: true,
+            style: route.style,
+            defaultGear: route.defaultGear,
+            gear: conv.reasoningGear ?? null,
+            effectiveGear: conv.reasoningGear ?? route.defaultGear,
+          });
+        });
+      }
+      if (segments[4] === 'launch' && segments.length === 5 && method === 'POST') {
+        return convRoute(async () => {
+          const body = await readJsonObject(req);
+          const text = typeof body.text === 'string' ? body.text.trim() : '';
+          if (text.length === 0) throw validation('field "text" is required (the crystallized research question)');
+          // All researcher materials from the conversation travel with the run.
+          const conv = getConversation(app, convId);
+          const runId = await createRunWithSeeds({
+            text,
+            ...(typeof body.providerConfigId === 'string' ? { providerConfigId: body.providerConfigId } : {}),
+            seeds: collectConversationSeeds(conv),
+          });
+          attachRunToConversation(app, convId, runId);
+          sendJson(res, 202, { runId });
+        });
+      }
+      if (segments[4] === 'proposals' && segments.length === 6 && method === 'POST') {
+        return convRoute(async () => {
+          const proposalId = segments[5]!;
+          if (!/^act_[a-z0-9]+$/.test(proposalId)) throw validation('invalid proposal id');
+          const body = await readJsonObject(req);
+          if (typeof body.approve !== 'boolean') throw validation('field "approve" must be a boolean');
+          const conversation = await resolveConversationProposal(
+            app, convId, proposalId,
+            { approve: body.approve, remember: body.remember === true },
+            conversationDeps,
+          );
+          sendJson(res, 200, { conversation });
+        });
+      }
+      if (segments[4] === 'automations' && segments.length === 5 && method === 'GET') {
+        return convRoute(() => {
+          getConversation(app, convId); // 404 when the conversation does not exist
+          const automations = app.store.listObjects('automation', '__none__')
+            .filter((a) => a.conversationId === convId)
+            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+          return sendJson(res, 200, { automations });
+        });
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
+    if (segments[2] === 'automations') {
+      if (segments.length === 3) {
+        if (method === 'GET') {
+          const automations = app.store.listObjects('automation', '__none__')
+            .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+          return sendJson(res, 200, { automations });
+        }
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
+      const automationId = segments[3]!;
+      if (automationId === undefined || !/^auto_[a-z0-9]+$/.test(automationId)) throw validation('invalid automation id');
+      if (segments.length === 4 && method === 'GET') {
+        const automation = app.store.getObject('automation', automationId);
+        if (automation === null) throw notFound(`automation not found: ${automationId}`);
+        return sendJson(res, 200, { automation });
+      }
+      if (segments.length === 4 && method === 'PATCH') {
+        const automation = app.store.getObject('automation', automationId);
+        if (automation === null) throw notFound(`automation not found: ${automationId}`);
+        const body = await readJsonObject(req);
+        if (typeof body.enabled !== 'boolean') throw validation('field "enabled" must be a boolean');
+        app.store.putObject('automation', { ...automation, enabled: body.enabled, updatedAt: new Date().toISOString() });
+        return sendJson(res, 200, { automation: app.store.getObject('automation', automationId) });
+      }
+      if (segments.length === 4 && method === 'DELETE') {
+        if (app.store.getObject('automation', automationId) === null) throw notFound(`automation not found: ${automationId}`);
+        app.store.deleteObject('automation', automationId);
+        return sendJson(res, 200, { deleted: automationId });
       }
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
@@ -1342,6 +1702,7 @@ function parseSeedSources(raw: unknown): string | {
   const stop = (): Promise<void> =>
     new Promise((resolve) => {
       if (watchdogTimer !== null) clearInterval(watchdogTimer);
+      automationEngine?.stop();
       server.close(() => resolve());
       server.closeIdleConnections();
       server.closeAllConnections();

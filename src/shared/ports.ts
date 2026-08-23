@@ -16,6 +16,14 @@ export interface StructuredCallRequest {
    * caller's zod parse remains the semantic authority either way.
    */
   jsonSchema?: unknown;
+  /**
+   * Reasoning-effort override for THIS call (conversation gear > config default).
+   * Emitted only when the resolved model route declared a reasoning capability;
+   * undefined = zero thinking fields on the wire (legacy behavior, safe for any
+   * endpoint incl. local runtimes). The dialect map lives in providers/http.ts
+   * reasoningBodyFields; the gear→budget map in domain/model-config.ts.
+   */
+  reasoning?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' };
   /** Retry budget owned by the plane (bounded, classified). */
   purpose: string; // e.g. 'claim-extraction', recorded in provenance
 }
@@ -42,6 +50,11 @@ export interface StructuredCallResult<T> {
     /** W4-F1 retry observability: transport retries / corrective re-asks consumed by this call. */
     transportRetries?: number;
     correctiveReasks?: number;
+    /**
+     * The reasoning gear actually served for this call (absent when the route has no
+     * declared capability or the call carried no override) — reproducibility evidence.
+     */
+    reasoningGear?: 'low' | 'medium' | 'high';
     executionMode: 'live' | 'test';
   };
 }

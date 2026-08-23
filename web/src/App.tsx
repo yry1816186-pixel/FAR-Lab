@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, BellOff, RefreshCw, Search, Settings } from 'lucide-react';
 import { ApiError } from './api/client';
-import { getEvents, getRun, listRuns, searchAll } from './api/endpoints';
-import type { ResearchRun, RunEvent, RunSummary } from './api/types';
+import { getEvents, getRun, listRuns, listConversations, searchAll } from './api/endpoints';
+import type { Conversation, ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
 import { useEventStream } from './hooks/useEventStream';
@@ -14,13 +14,15 @@ import { useConnection } from './state/connection';
 import { useTheme } from './state/theme';
 import { LogoFull } from './components/Logo';
 import { WelcomeView } from './components/WelcomeView';
+import { ConversationView } from './components/ConversationView';
 import { RunsList, runLabel } from './components/RunsSidebar';
 import { AwarenessBar } from './components/AwarenessBar';
 import { RunDetail, resolveTabId } from './components/RunDetail';
 import { CommandPalette, type Command, type PaletteSearch } from './components/CommandPalette';
 import { SettingsPanel } from './components/SettingsPanel';
+import { useToolCommands } from './hooks/useToolCommands';
 import type { EventsState } from './components/RunDetail';
-import { ErrorBox } from './components/common';
+import { ErrorBox, TimeAgo } from './components/common';
 
 const RUNS_POLL_MS = 5_000;
 const DETAIL_POLL_ACTIVE_MS = 3_000;
@@ -43,6 +45,22 @@ export function App(): JSX.Element {
   const [runsError, setRunsError] = useState<ApiError | null>(null);
 
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+
+  // ---- conversations (conversation-first flow) ----
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const refreshConversations = useCallback((): Promise<void> => {
+    const controller = new AbortController();
+    return listConversations(controller.signal)
+      .then((list) => { setConversations(list); })
+      .catch(() => { /* sidebar list degrades quietly; the view itself fails visibly */ });
+  }, []);
+  useEffect(() => { void refreshConversations(); }, [refreshConversations]);
+  const openConversation = useCallback((id: string): void => {
+    setSelectedConvId(id);
+    setSelectedRunId(null);
+    void refreshConversations();
+  }, [refreshConversations]);
 
   const refreshRuns = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -186,8 +204,8 @@ export function App(): JSX.Element {
   const eventsEnabled = selectedRunId !== null && detailStatus !== 'failed' && detailStatus !== 'cancelled';
   // B3 realtime: SSE push is primary; polling continues as a safety net at a
   // slower cadence while the stream is healthy.
-  const sseActive = useEventStream(selectedRunId, eventsEnabled, applyIncomingEvents);
-  usePolling(pollEvents, sseActive ? EVENTS_POLL_SSE_MS : EVENTS_POLL_MS, eventsEnabled);
+  const stream = useEventStream(selectedRunId, eventsEnabled, applyIncomingEvents);
+  usePolling(pollEvents, stream.phase === 'live' ? EVENTS_POLL_SSE_MS : EVENTS_POLL_MS, eventsEnabled);
 
   // Initial events fetch on run selection (parity with the detail fetch above):
   // the visibility-gated poll may legitimately skip every tick while the page
@@ -210,15 +228,17 @@ export function App(): JSX.Element {
     void refreshDetail();
   }, [refreshRunsWithAbort, refreshDetail]);
 
-  const onCreated = useCallback((runId: string): void => {
+  const onCreated = useCallback((conversationId: string): void => {
+    // conversation-first: the home composer opens a brainstorming dialogue
+    openConversation(conversationId);
+  }, [openConversation]);
+
+  /** Opening a run always leaves the conversation view. */
+  const selectRun = useCallback((runId: string): void => {
     setSelectedRunId(runId);
+    setSelectedConvId(null);
     setRouteTab(null);
-    // A list refresh is now in flight: mark it so the selection guard above
-    // stays suspended until the FRESH list (containing the new run) arrives.
-    // Without this, the guard sees the stale list and deselects mid-create.
-    setRunsLoading(true);
-    void refreshRunsWithAbort();
-  }, [refreshRunsWithAbort]);
+  }, []);
 
   // ---- shareable hash route: #run/<runId>/<tab> (S3) ----
   // Mount restore + back/forward + typed links all flow through here.
@@ -230,7 +250,7 @@ export function App(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only route restore
   }, []);
   useHashRoute(selectedRunId, routeTab, (route) => {
-    if (route.runId !== null && route.runId !== selectedRunId) setSelectedRunId(route.runId);
+    if (route.runId !== null && route.runId !== selectedRunId) { setSelectedRunId(route.runId); setSelectedConvId(null); }
     if (route.runId === null && selectedRunId !== null) setSelectedRunId(null);
     setRouteTab(route.tab);
   });
@@ -248,6 +268,9 @@ export function App(): JSX.Element {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+
+  // ---- TIS user commands (prompt templates wired into palette + composer) ----
+  const { commands: userCommands } = useToolCommands();
 
   const commands = useMemo<Command[]>(() => {
     const goTab = (tab: string): void => {
@@ -272,18 +295,29 @@ export function App(): JSX.Element {
         label: text.length > 72 ? `${text.slice(0, 72)}…` : text,
         groupKey: 'palette.groupRuns' as Command['groupKey'],
         keywords: `${text} ${r.id} ${r.status}`,
-        run: () => { setSelectedRunId(r.id); setRouteTab(null); },
+        run: () => { selectRun(r.id); },
       };
     });
+    // TIS user commands: palette entry inserts the prompt template into whichever
+    // composer is mounted (conversation view or welcome screen) via a DOM event —
+    // composer state is local, so a decoupled event avoids prop-drilling inserts.
+    const userCmds: Command[] = userCommands.map((c) => ({
+      id: `cmd-${c.id}`,
+      label: `/${c.name} — ${c.label}`,
+      groupKey: 'palette.groupCommands' as Command['groupKey'],
+      keywords: `command ${c.name} ${c.label}`,
+      run: () => { window.dispatchEvent(new CustomEvent('far:insert-text', { detail: { text: c.template } })); },
+    }));
     return [
       {
         id: 'new-research',
         labelKey: 'welcome.newResearch',
         groupKey: 'palette.groupActions',
-        run: () => { setSelectedRunId(null); setRouteTab(null); },
+        run: () => { setSelectedRunId(null); setSelectedConvId(null); setRouteTab(null); },
       },
       ...navCmds,
       ...runCmds,
+      ...userCmds,
       {
         id: 'settings',
         labelKey: 'palette.openSettings',
@@ -304,7 +338,7 @@ export function App(): JSX.Element {
         run: () => setLang(lang === 'zh' ? 'en' : 'zh'),
       },
     ];
-  }, [runs, selectedRunId, cycleTheme, lang, setLang]);
+  }, [runs, selectedRunId, cycleTheme, lang, setLang, userCommands]);
 
   // ---- universal search wiring (B2): palette -> cross-run object lookup ----
   // A claim hit focuses the evidence tab and flash-highlights the claim row
@@ -313,9 +347,9 @@ export function App(): JSX.Element {
   const paletteSearch = useMemo<PaletteSearch>(() => ({
     fetch: (q, signal) => searchAll(q, signal),
     navigate: {
-      run: (runId) => { setSelectedRunId(runId); setRouteTab(null); setFocusClaimId(null); },
-      hypothesis: (runId) => { setSelectedRunId(runId); setRouteTab('hypotheses'); setFocusClaimId(null); },
-      claim: (runId, claimId) => { setSelectedRunId(runId); setRouteTab('evidence'); setFocusClaimId(claimId); },
+      run: (runId) => { selectRun(runId); setFocusClaimId(null); },
+      hypothesis: (runId) => { selectRun(runId); setRouteTab('hypotheses'); setFocusClaimId(null); },
+      claim: (runId, claimId) => { selectRun(runId); setRouteTab('evidence'); setFocusClaimId(claimId); },
     },
     // setSelectedRunId/setRouteTab are stable state setters; routeTab semantics captured per call
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -344,6 +378,7 @@ export function App(): JSX.Element {
         if (inField(el)) return;
         e.preventDefault();
         setSelectedRunId(null);
+        setSelectedConvId(null);
         setRouteTab(null);
       }
     };
@@ -359,7 +394,7 @@ export function App(): JSX.Element {
   const notifications = useNotifications(
     runs,
     selectedRunId,
-    useCallback((runId: string): void => { setSelectedRunId(runId); setRouteTab(null); }, []),
+    useCallback((runId: string): void => { selectRun(runId); }, [selectRun]),
     useCallback((): string => t('notify.doneTitle'), [t]),
   );
 
@@ -440,40 +475,84 @@ export function App(): JSX.Element {
         </div>
       )}
 
-      <AwarenessBar activeRuns={activeRuns} selectedRunId={selectedRunId} onSelect={setSelectedRunId} />
+      <AwarenessBar activeRuns={activeRuns} selectedRunId={selectedRunId} onSelect={selectRun} />
 
       <div className="app-body">
         <aside className="sidebar" aria-label={t('runs.title')}>
+          {/* conversation-first: the dialogue list leads; runs live below */}
           <div className="sidebar-head">
-            <h2 className="sidebar-title">{t('runs.title')}</h2>
+            <h2 className="sidebar-title">{t('conv.sectionTitle')}</h2>
             <div className="sidebar-head-actions">
               <button
                 type="button"
                 className="btn btn--small btn--primary"
-                onClick={() => setSelectedRunId(null)}
-                aria-label={t('welcome.newResearch')}
-                title={t('welcome.newResearch')}
+                onClick={() => { setSelectedRunId(null); setSelectedConvId(null); setRouteTab(null); }}
+                aria-label={t('conv.new')}
+                title={t('conv.new')}
               >
-                ＋ {t('welcome.newResearch')}
+                ＋ {t('conv.new')}
               </button>
-              <button type="button" className="btn btn--small" onClick={() => void refreshRunsWithAbort()}>
+              <button type="button" className="btn btn--small" onClick={() => { void refreshConversations(); void refreshRunsWithAbort(); }}>
                 <RefreshCw size={12} aria-hidden="true" /> {t('runs.refresh')}
               </button>
             </div>
+          </div>
+          <section className="runs-group conv-group">
+            <h3 className="runs-group-title">
+              <button type="button" className="runs-group-toggle" aria-expanded="true">
+                <span>{t('conv.sectionTitle')} <span className="muted small">{conversations.length}</span></span>
+              </button>
+            </h3>
+            {conversations.length === 0 ? (
+              <p className="muted small conv-side-empty">{t('conv.empty')}</p>
+            ) : (
+              <ul className="runs-list">
+                {conversations.slice(0, 12).map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      className={`run-item${selectedConvId === c.id ? ' run-item--on' : ''}`}
+                      onClick={() => openConversation(c.id)}
+                      title={`${c.title} · ${c.id}`}
+                    >
+                      <span className="run-item-top">
+                        <span className="run-item-question">{c.title}</span>
+                        <span className={`badge ${c.status === 'converged' ? 'badge--ok' : 'badge--info'}`}>
+                          {t(c.status === 'converged' ? 'conv.statusConverged' : 'conv.statusOpen')}
+                        </span>
+                      </span>
+                      <span className="run-item-mid">
+                        <span className="run-item-domain">{t('conv.turns', { n: c.turns })}</span>
+                        <time className="mono" dateTime={c.updatedAt}><TimeAgo iso={c.updatedAt} /></time>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <div className="sidebar-head sidebar-head--runs">
+            <h2 className="sidebar-title">{t('runs.title')}</h2>
           </div>
           {runsError !== null && <ErrorBox error={runsError} onRetry={() => void refreshRunsWithAbort()} />}
           <RunsList
             runs={runs}
             loading={runsLoading}
             selectedId={selectedRunId}
-            onSelect={setSelectedRunId}
+            onSelect={selectRun}
             filterRef={filterRef}
           />
         </aside>
 
         <main className="content" aria-label={t('app.title')}>
-          {selectedRunId === null ? (
-            <WelcomeView onCreated={onCreated} runs={runs} onSelectRun={setSelectedRunId} />
+          {selectedConvId !== null ? (
+            <ConversationView
+              conversationId={selectedConvId}
+              onOpenedRun={selectRun}
+              onMutated={refreshConversations}
+            />
+          ) : selectedRunId === null ? (
+            <WelcomeView onCreated={onCreated} onOpenSettings={() => setSettingsOpen(true)} runs={runs} onSelectRun={selectRun} />
           ) : runDetail === null ? (
             detailLoading ? (
               <div className="select-hint" role="status">
@@ -496,6 +575,7 @@ export function App(): JSX.Element {
               onTabChange={(tab) => setRouteTab(tab)}
               focusClaimId={focusClaimId}
               onClaimFocused={() => setFocusClaimId(null)}
+              stream={stream}
             />
           )}
         </main>
