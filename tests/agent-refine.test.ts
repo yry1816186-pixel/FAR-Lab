@@ -7,7 +7,7 @@ import { Store } from '../src/persistence/store.js';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
 import { runEvidenceGapRefinement } from '../src/agent/capabilities/refine.js';
-import { ResearchQuestion, HypothesisCandidate } from '../src/domain/index.js';
+import { ResearchQuestion, HypothesisCandidate, McpServerIntegration } from '../src/domain/index.js';
 import { newId } from '../src/domain/ids.js';
 import type { SourceAdapter, SourceFamily } from '../src/shared/ports.js';
 
@@ -226,6 +226,49 @@ describe('evidence-gap refinement capability (end-to-end on a real store)', () =
       const session = store.getObject('agent_session', first.sessionId);
       expect(session?.turns.map((t) => t.turn)).toEqual([1, 2]);
       expect(session?.config.resumed).toBe(true);
+    } finally {
+      (store as unknown as { db: { close(): void } }).db.close();
+    }
+  });
+
+  it('capability-scoped MCP admission: read-class is attempted, enabled execute-class is policy-refused, disabled stays honestly disabled', async () => {
+    const { store, artifacts, rolloutDir, run, hyp1 } = setup();
+    try {
+      const iso = new Date().toISOString();
+      const mkServer = (label: string, riskClass: 'read' | 'execute', enabled: boolean) =>
+        McpServerIntegration.parse({
+          id: newId('tint'), kind: 'mcp_server', label, enabled,
+          createdAt: iso, updatedAt: iso, createdBy: 'researcher',
+          transport: 'http', url: 'http://127.0.0.1:1/mcp', // nothing listens here: connection fails fast
+          timeoutMs: 1000, riskClass,
+        });
+      const outcome = await runEvidenceGapRefinement(
+        {
+          store, artifacts, provider: createTestStubProvider(providerFor(hyp1.id)),
+          sourceFor: fakeAdapter, rolloutDir, skillDirs: [],
+          listToolIntegrations: () => [
+            mkServer('Docling Read', 'read', true),
+            mkServer('Playwright Exec', 'execute', true),
+            mkServer('OffBrowser Exec', 'execute', false),
+          ],
+        },
+        run.id, { topK: 1, maxTurns: 4 },
+      );
+      const byLabel = new Map(outcome.mcpServers.map((s) => [s.label, s]));
+      // Enabled read-class server WAS handed to the manager — it actually attempted
+      // the connection and failed honestly (no server on 127.0.0.1:1).
+      const read = byLabel.get('Docling Read');
+      expect(read?.state).toBe('failed');
+      expect(read?.error).toBeDefined();
+      // Enabled execute-class server is policy-refused before any process/connection.
+      const exec = byLabel.get('Playwright Exec');
+      expect(exec?.state).toBe('disabled');
+      expect(exec?.error).toMatch(/admission policy: refine-evidence-gaps .*riskClass 'execute'/);
+      // A disabled execute-class server keeps the plain honest disabled state (no policy error).
+      const off = byLabel.get('OffBrowser Exec');
+      expect(off?.state).toBe('disabled');
+      expect(off?.error).toBeUndefined();
+      expect(outcome.status).toBe('completed'); // the run itself is unaffected
     } finally {
       (store as unknown as { db: { close(): void } }).db.close();
     }
