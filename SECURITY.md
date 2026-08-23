@@ -27,6 +27,7 @@ This tool reads model-provider credentials from environment variables (or a loca
 | Prompt injection via retrieved literature | Per-request random-delimiter untrusted-data fence at the transport layer; structured-output zod contracts |
 | Local server exposure | Loopback bind by default; Host/Origin/Content-Type guards; 1MB body cap |
 | CI credential exfiltration | (When CI lands) minimal `GITHUB_TOKEN` permissions, `persist-credentials: false` |
+| Malicious/hung external tool (MCP server, JS plugin) | Tool integrations (`.planning/DECISION-tool-integrations.md`): plugins and MCP servers run as separate subprocesses with timeout bounds (30s/tool, 2s/hook) — isolation against CRASHES AND HANGS ONLY, **not against malicious code**; they execute with the researcher's own OS privileges (industry-standard MCP trust model). Controls: local-directory-only plugin import with `reviewed:true` gate, staged DISABLED on import, per-integration explicit activation, `execute` risk-class default (explore mode denies non-read tools), env/header secrets write-only (masked in every API projection). |
 
 ## Scope
 
