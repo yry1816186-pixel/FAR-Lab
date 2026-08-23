@@ -285,7 +285,8 @@ describe('retrieve stage', () => {
     });
     const arxiv = fakeAdapter('arxiv', { search: async () => [] });
     const crossref = fakeAdapter('crossref', { search: async () => [] });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
 
     expect(await retrieveStage.applicable(env.ctx)).toBe(true);
     const out = await retrieveStage.execute(env.ctx);
@@ -326,13 +327,14 @@ describe('retrieve stage', () => {
     for (const s of arxiv.calls.searches) expect(s.limit).toBe(6);
 
     // receipts: exactly 1 model_call (no rerank — pool 4 <= cap) + source_retrieval:
-    // 11 planned searches (counter x2 + discovery 2x3 + supporting 1x3) PLUS W6/F2
-    // recovery variants — every empty arXiv search retries k4 then k2 (3 empty arXiv
-    // searches x 2 variants each = 6 extra receipted attempts, all still empty here).
+    // 12 planned searches (counter x3 [openalex, europepmc, crossref] + discovery
+    // 2x3 + supporting 1x3) PLUS W6/F2 recovery variants — every empty arXiv search
+    // retries k4 then k2 (3 empty arXiv searches x 2 variants each = 6 extra
+    // receipted attempts, all still empty here).
     const receipts = env.store.listObjects('receipt', env.run.id);
     expect(receipts.filter((r) => r.kind === 'model_call')).toHaveLength(1);
     const retrieval = receipts.filter((r) => r.kind === 'source_retrieval');
-    expect(retrieval).toHaveLength(17);
+    expect(retrieval).toHaveLength(18);
     for (const r of retrieval) {
       expect(r.executionMode).toBe('live');
       expect(r.stage).toBe('retrieve');
@@ -353,6 +355,11 @@ describe('retrieve stage', () => {
       'second counter receipt',
     );
     expect(counterReceipt2.sourceRetrieval?.family).toBe('crossref');
+    // W-A: the third counter list (europepmc) really executed on counter[0]
+    const counterReceiptEpmc = retrieval.find(
+      (r) => r.sourceRetrieval?.query === PLAN.counter[0] && r.sourceRetrieval?.family === 'europepmc',
+    );
+    expect(defined(counterReceiptEpmc, 'europepmc counter receipt').sourceRetrieval?.resultCount).toBe(0);
     // W6/F2: the arXiv zero-result cascade fired and each variant attempt is receipted
     const variantReceipts = retrieval.filter(
       (r) => r.sourceRetrieval?.family === 'arxiv' && !PLAN.discovery.concat(PLAN.supporting).includes(r.sourceRetrieval?.query ?? ''),
@@ -375,6 +382,46 @@ describe('retrieve stage', () => {
     expect(await retrieveStage.applicable(env.ctx)).toBe(false);
   });
 
+  it('W-A: openalex family failure fails over to europepmc — queries still searched, recovery visible', async () => {
+    const openalex = fakeAdapter('openalex', {
+      failSearch: (q) =>
+        new SourceAdapterError({
+          family: 'openalex',
+          query: q,
+          httpStatus: 429,
+          kind: 'http_status',
+          message: 'fixture daily budget exhausted',
+        }),
+    });
+    const failoverDoc = fakeRecord('Fixture Failover Recovery', '10.1000/fake.failover');
+    const europepmc = fakeAdapter('europepmc', {
+      search: async (q) => (q === PLAN.counter[0] ? [failoverDoc] : []),
+    });
+    const arxiv = fakeAdapter('arxiv', { search: async () => [] });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
+
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+
+    // openalex had 4 targets (counter[0] + discovery x2 + supporting x1): each got
+    // exactly ONE bounded europepmc retry, plus europepmc's own planned counter list.
+    expect(europepmc.calls.searches).toHaveLength(5);
+    const corpus = defined(env.store.listObjects('corpus_snapshot', env.run.id)[0], 'corpus');
+    expect(corpus.familyFailures.map((f) => f.family)).toEqual(['openalex']);
+    expect(corpus.fusion?.failoverSearches).toBe(4);
+    expect(out.summary).toContain('4 openalex->europepmc failover search(es)');
+    // the failover-recovered document entered the corpus with europepmc provenance
+    const docs = env.store.listObjects('source_document', env.run.id);
+    const rec = defined(
+      docs.find((d) => d.identifiers.some((i) => i.value === '10.1000/fake.failover')),
+      'failover doc',
+    );
+    expect(rec.family).toBe('europepmc');
+    // executedQueries records the ACTUAL family used for every failover rerun
+    expect(corpus.queries.filter((q) => q.family === 'europepmc')).toHaveLength(5);
+  });
+
   it('deduplicates records sharing a DOI across queries/families (first occurrence wins)', async () => {
     const sharedDoi = '10.1000/fake.shared';
     const oaRec = fakeRecord('Fixture Shared via OpenAlex', sharedDoi);
@@ -393,7 +440,8 @@ describe('retrieve stage', () => {
       search: async (q) => (q === PLAN.discovery[0] ? [arxivRec] : []),
     });
     const crossref = fakeAdapter('crossref', { search: async () => [] });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
 
     const out = await retrieveStage.execute(env.ctx);
     expect(out.kind).toBe('done');
@@ -422,7 +470,8 @@ describe('retrieve stage', () => {
         }),
     });
     const crossref = fakeAdapter('crossref', { search: async () => [] });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
 
     const out = await retrieveStage.execute(env.ctx);
     expect(out.kind).toBe('done');
@@ -461,7 +510,8 @@ describe('retrieve stage', () => {
     const crossref = fakeAdapter('crossref', {
       search: async (q) => (q === PLAN.counter[1] ? [fakeRecord('Fixture Counter X', '10.1000/fake.counterx')] : []),
     });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
 
     const out = await retrieveStage.execute(env.ctx);
     expect(out.kind).toBe('done');
@@ -512,7 +562,8 @@ describe('retrieve stage', () => {
     });
     const openalex = fakeAdapter('openalex', { search: async () => [] });
     const crossref = fakeAdapter('crossref', { search: async () => [] });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
 
     const out = await retrieveStage.execute(env.ctx);
     expect(out.kind).toBe('done');
@@ -539,7 +590,8 @@ describe('retrieve stage', () => {
     });
     const openalex = fakeAdapter('openalex', { search: async () => [] });
     const crossref = fakeAdapter('crossref', { search: async () => [] });
-    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
 
     const out = await retrieveStage.execute(env.ctx);
     expect(out.kind).toBe('done');
@@ -637,6 +689,7 @@ describe('retrieve stage', () => {
       search: async (q) => (q === PLAN.counter[1] ? manyDocs('ctrx', 6) : manyDocs(`x${q.replace(/\W+/g, '')}`, 3)),
     });
     const arxiv = fakeAdapter('arxiv', { search: async () => manyDocs('ax', 2) });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
     const permute = (n: number) => ({
       ranked: Array.from({ length: n }, (_, i) => ({
         index: i,
@@ -651,7 +704,7 @@ describe('retrieve stage', () => {
         { rawOutput: JSON.stringify(permute(24)) },
         { rawOutput: JSON.stringify(permute(24)) },
       ],
-      { openalex, arxiv, crossref },
+      { openalex, arxiv, crossref, europepmc },
     );
     // Drive cancellation off REAL observable state: once the plan call AND the
     // first window call have been receipted (2 model_call receipts), the next
@@ -682,6 +735,7 @@ describe('retrieve stage', () => {
       search: async (q) => (q === PLAN.counter[1] ? manyDocs('ctrx', 6) : manyDocs(`x${q.replace(/\W+/g, '')}`, 3)),
     });
     const arxiv = fakeAdapter('arxiv', { search: async (q) => manyDocs(`a${q.replace(/\W+/g, '')}`, 2) });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
     // pool: 8 + 6*3(openalex others) + 6 + 3*2(crossref others) + 2*3(arxiv) = 47
     const permute = (n: number) => ({
       ranked: Array.from({ length: n }, (_, i) => ({
@@ -697,7 +751,7 @@ describe('retrieve stage', () => {
         { rawOutput: JSON.stringify(permute(24)) },
         { rawOutput: JSON.stringify(permute(24)) },
       ],
-      { openalex, arxiv, crossref },
+      { openalex, arxiv, crossref, europepmc },
     );
 
     const out = await retrieveStage.execute(env.ctx);
@@ -730,10 +784,15 @@ describe('retrieve stage', () => {
       });
     const env = makeEnv(
       [{ rawOutput: JSON.stringify(PLAN) }],
-      { openalex: failAll('openalex'), arxiv: failAll('arxiv'), crossref: failAll('crossref') },
+      {
+        openalex: failAll('openalex'),
+        arxiv: failAll('arxiv'),
+        crossref: failAll('crossref'),
+        europepmc: failAll('europepmc'),
+      },
     );
 
-    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/all 11 source searches failed/);
+    await expect(retrieveStage.execute(env.ctx)).rejects.toThrow(/all 12 source searches failed/);
     expect(env.store.listObjects('corpus_snapshot', env.run.id)).toHaveLength(0);
     expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(0);
     expect(await retrieveStage.applicable(env.ctx)).toBe(true); // 可重试
@@ -805,17 +864,27 @@ describe('retrieve stage', () => {
     const crossref = fakeAdapter('crossref', {
       search: async (q) => (q === PLAN.counter[1] ? counterDocs(`a${slug(q)}`) : oneDoc('x')(q)),
     });
-    // Rerank script: identity permutation over the 21-candidate pool (order = fused order).
+    // W-A: europepmc contributes a THIRD counter list (counter[0], abstract-bearing
+    // family) — 6 more counter docs into the pool.
+    const europepmc = fakeAdapter('europepmc', {
+      search: async (q) => (q === PLAN.counter[0] ? counterDocs(`e${slug(q)}`) : []),
+    });
+    // Rerank script: identity permutation per window. Pool 27 > one window (24)
+    // -> rerankWindowPlan yields 2 windows, each a 24-entry slice.
     const identityRerank = {
-      ranked: Array.from({ length: 21 }, (_, i) => ({
+      ranked: Array.from({ length: 24 }, (_, i) => ({
         index: i,
         relevance: i < 12 ? ('high' as const) : ('medium' as const),
         reason: 'fixture identity rerank reason',
       })),
     };
     const env = makeEnv(
-      [{ rawOutput: JSON.stringify(PLAN) }, { rawOutput: JSON.stringify(identityRerank) }],
-      { openalex, arxiv, crossref },
+      [
+        { rawOutput: JSON.stringify(PLAN) },
+        { rawOutput: JSON.stringify(identityRerank) },
+        { rawOutput: JSON.stringify(identityRerank) },
+      ],
+      { openalex, arxiv, crossref, europepmc },
     );
 
     const out = await retrieveStage.execute(env.ctx);
@@ -827,7 +896,7 @@ describe('retrieve stage', () => {
     const corpus = defined(env.store.listObjects('corpus_snapshot', env.run.id)[0], 'corpus');
     expect(corpus.fusion).toMatchObject({
       algorithm: 'rrf-k60+llm-listwise-rerank-v1',
-      poolSize: 21,
+      poolSize: 27,
       rerankApplied: true,
     });
     // counter-evidence quota floor honored under cap pressure
@@ -841,11 +910,11 @@ describe('retrieve stage', () => {
     );
     expect(docsFromCounter1.length).toBeGreaterThanOrEqual(1);
     expect(docsFromCounter2.length).toBeGreaterThanOrEqual(1);
-    // rerank happened as a real second model call with its own receipt
+    // rerank happened as real model calls with their own receipts (plan + 2 windows)
     const modelReceipts = env.store
       .listObjects('receipt', env.run.id)
       .filter((r) => r.kind === 'model_call');
-    expect(modelReceipts).toHaveLength(2);
+    expect(modelReceipts).toHaveLength(3);
   });
 
   it('falls back VISIBLE to the RRF order when the listwise rerank fails (no silent success theater)', async () => {
@@ -854,12 +923,13 @@ describe('retrieve stage', () => {
       Array.from({ length: 4 }, (_, i) => fakeRecord(`Fixture ${prefix} ${i}`, `10.1000/fake.${prefix}.${i}`));
     const openalex = fakeAdapter('openalex', { search: async (q) => fourUnique(slug(q)) });
     const arxiv = fakeAdapter('arxiv', { search: async (q) => fourUnique(`a${slug(q)}`) });
+    const europepmc = fakeAdapter('europepmc', { search: async () => [] });
     const env = makeEnv(
       [
         { rawOutput: JSON.stringify(PLAN) },
         { fail: { kind: 'provider_error', message: 'fixture rerank outage' } },
       ],
-      { openalex, arxiv },
+      { openalex, arxiv, europepmc },
     );
 
     const out = await retrieveStage.execute(env.ctx);
@@ -1136,6 +1206,28 @@ describe('verify stage', () => {
     expect(await verifyStage.applicable(env.ctx)).toBe(true);
     const receipt = env.store.listObjects('receipt', env.run.id).find((r) => r.kind === 'source_retrieval');
     expect(receipt?.sourceRetrieval?.httpStatus).toBe(0);
+  });
+
+  it('W-A: resolves a PMID/PMCID-anchored doc via europepmc with method europepmc_id', async () => {
+    const europepmc = fakeAdapter('europepmc', {
+      resolve: async (identifier) => ({
+        found: true,
+        httpStatus: 200,
+        record: fakeRecord('Fixture EPMC Primary Record', `10.1000/fake.${identifier.value}`),
+      }),
+    });
+    const env = makeEnv([], { europepmc });
+    const doc = makeDoc(env.run.id, {
+      identifiers: [{ kind: 'pubmed', value: 'PMC11032673' }],
+      title: 'Fixture EPMC Primary Record',
+      family: 'europepmc',
+    });
+    env.store.putObject('source_document', doc);
+
+    await verifyStage.execute(env.ctx);
+    const verification = env.store.getObject('source_document', doc.id)?.verification;
+    expect(verification).toMatchObject({ method: 'europepmc_id', resolved: true, titleMatch: true });
+    expect(europepmc.calls.resolves).toEqual(['PMC11032673']);
   });
 
   it('is not applicable once every document is verified (and when there are none)', async () => {

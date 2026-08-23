@@ -11,7 +11,7 @@ export type ContentDepth = z.infer<typeof ContentDepth>;
  * (sourceAdapterFor fails closed on them), join the corpus as guaranteed
  * entries, and carry provenance explicitly.
  */
-export const SourceFamily = z.enum(['openalex', 'arxiv', 'crossref', 'user_provided']);
+export const SourceFamily = z.enum(['openalex', 'arxiv', 'crossref', 'europepmc', 'user_provided']);
 export type SourceFamily = z.infer<typeof SourceFamily>;
 
 /** Persistent external identifier types the system can resolve and cross-check. */
@@ -47,7 +47,7 @@ export const SourceDocument = z.object({
   oaUrl: z.string().url().optional(),
   /** Result of identifier-resolution verification (verify_sources stage). Absent = not yet verified. */
   verification: z.object({
-    method: z.enum(['crossref_doi', 'arxiv_id', 'openalex_id', 'url']),
+    method: z.enum(['crossref_doi', 'arxiv_id', 'openalex_id', 'europepmc_id', 'url']),
     resolved: z.boolean(),
     titleMatch: z.boolean().optional(),
     /**
@@ -89,6 +89,8 @@ export const RetrievalFusion = z.object({
    * Absent when no recovery was needed (all arXiv searches returned results).
    */
   variantSearches: z.number().int().nonnegative().optional(),
+  /** OpenAlex->Europe PMC failover searches executed after openalex target failures. */
+  failoverSearches: z.number().int().nonnegative().optional(),
   /** W6/F4: listwise-rerank sliding windows executed (absent = single window / no rerank). */
   rerankWindows: z.number().int().positive().optional(),
   /** Compact human-auditable note of the selection (e.g. "cap 12 of pool 31"). */

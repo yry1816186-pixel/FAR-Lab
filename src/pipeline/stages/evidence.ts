@@ -9,12 +9,14 @@ import {
 import { callStructured } from '../llm.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { checkQuoteAlignment } from './align.js';
+import { isCancellationError } from './guard.js';
 import { mapBounded, STAGE_CONCURRENCY } from './shared.js';
 import { toDocument } from './retrieve.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import { defaultFetchFullText } from '../../sources/fulltext.js';
 import { gradeClaimCertainty } from '../../domain/claim.js';
 import type { CorpusSnapshot, SourceFamily } from '../../domain/source.js';
+import type { RawRetrievalResult, SourceAdapter } from '../../shared/ports.js';
 
 /** Hard admission cap per source. Model output beyond the cap is dropped, never stored. */
 export const MAX_CLAIMS_PER_SOURCE = 4;
@@ -434,9 +436,13 @@ export const buildEvidenceStage: StageHandler = {
     });
 
     // ---- bounded adaptive gap-seek round (mission §30) ----
+    // W-A coverage gate: the floor rises with corpus size — a 12-source corpus
+    // yielding only 3 verified claims (the observed vitamin-D failure mode) now
+    // triggers targeted top-up instead of passing a fixed bar of 3.
+    const verifiedFloor = Math.max(GAP_SEEK_MIN_VERIFIED, Math.ceil(plan.usable.length / 2));
     let gapSeekNote = 'not triggered (enough verified evidence)';
-    if (verifiedCount < GAP_SEEK_MIN_VERIFIED) {
-      ctx.log(`verified claims ${verifiedCount} < ${GAP_SEEK_MIN_VERIFIED} — evaluating evidence gap`);
+    if (verifiedCount < verifiedFloor) {
+      ctx.log(`verified claims ${verifiedCount} < ${verifiedFloor} — evaluating evidence gap`);
       const gap = await callStructured<GapSeek>(ctx, {
         stage: 'build_evidence',
         purpose: 'evidence-gap-assessment',
@@ -456,32 +462,60 @@ export const buildEvidenceStage: StageHandler = {
       });
       if (!gap.data.enoughEvidence && gap.data.queries.length > 0) {
         gapSeekNote = `triggered: ${gap.data.gapDescription.slice(0, 120)}`;
-        const adapter = ctx.sourceFor('openalex' as SourceFamily);
+        // W-A source rotation: gap-seek must not be a single point of failure on the
+        // SAME family the corpus just degraded from (observed: OpenAlex budget
+        // exhaustion killing both retrieval AND its own recovery). Ordered fallback,
+        // first family that answers wins; per-query, bounded by the family list.
+        const gapSeekFamilies: readonly SourceFamily[] = ['openalex', 'europepmc'];
+        const gapAdapters: { family: SourceFamily; adapter: SourceAdapter }[] = [];
+        for (const f of gapSeekFamilies) {
+          try {
+            gapAdapters.push({ family: f, adapter: ctx.sourceFor(f) });
+          } catch {
+            // family unavailable in this wiring — skip honestly, try the next
+          }
+        }
         const newDocIds: string[] = [];
         const corpus = ctx.store.listObjects('corpus_snapshot', ctx.run.id).at(-1);
         for (const q of gap.data.queries.slice(0, GAP_SEEK_MAX_QUERIES)) {
           if (ctx.cancelled()) throw new Error('cancelled by user in build_evidence gap-seek');
-          const search = await adapter.search(q, { limit: GAP_SEEK_MAX_DOCS_PER_QUERY });
+          let search: RawRetrievalResult | undefined;
+          let usedFamily: SourceFamily | undefined;
+          let lastError = 'no adapter available';
+          for (const { family, adapter } of gapAdapters) {
+            try {
+              search = await adapter.search(q, { limit: GAP_SEEK_MAX_DOCS_PER_QUERY });
+              usedFamily = family;
+              break;
+            } catch (e) {
+              if (isCancellationError(e)) throw e;
+              lastError = e instanceof Error ? e.message : String(e);
+            }
+          }
+          if (search === undefined || usedFamily === undefined) {
+            ctx.log(`build_evidence: gap-seek search failed on all families for "${q}": ${lastError}`);
+            continue;
+          }
           ctx.recordReceipt({
             kind: 'source_retrieval',
             executionMode: 'live',
             stage: 'build_evidence',
             redactionNote: 'query text and result count only',
             sourceRetrieval: {
-              family: 'openalex',
+              family: usedFamily,
               query: q,
               httpStatus: search.httpStatus,
               resultCount: search.records.length,
-              contentHashes: search.records.map((r) => snapshotHash('openalex', r)),
+              contentHashes: search.records.map((r) => snapshotHash(usedFamily, r)),
             },
           });
           for (const rec of search.records) {
             if (!rec.abstractText || rec.abstractText.length < 100) continue; // gap docs must be claim-capable
-            const doc = await toDocument(ctx, 'openalex', rec);
+            const doc = await toDocument(ctx, usedFamily, rec);
             doc.verification = {
-              method: 'openalex_id',
+              method: usedFamily === 'openalex' ? 'openalex_id' : 'europepmc_id',
               resolved: true,
-              detail: 'gap-seek: record obtained directly from the OpenAlex API (primary source); no secondary DOI cross-check',
+              detail: `gap-seek: record obtained directly from the ${usedFamily} API (primary source); no secondary DOI cross-check`,
               checkedAt: new Date().toISOString(),
             };
             ctx.store.putObject('source_document', doc);

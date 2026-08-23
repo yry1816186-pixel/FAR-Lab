@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createArxivAdapter, parseArxivAtom } from '../src/sources/arxiv.js';
 import { createCrossrefAdapter } from '../src/sources/crossref.js';
+import { createEuropePmcAdapter } from '../src/sources/europepmc.js';
 import { isSourceAdapterError } from '../src/sources/error.js';
 import type { FetchLike, FetchResponseLike } from '../src/sources/http.js';
 import { createOpenAlexAdapter, rebuildInvertedAbstract } from '../src/sources/openalex.js';
@@ -590,9 +591,151 @@ describe('arxiv adapter', () => {
 
 /* ------------------------- registry ------------------------- */
 
+describe('europepmc adapter', () => {
+  const makeAdapter = (fetch: FetchLike) =>
+    createEuropePmcAdapter({ fetchImpl: fetch, baseUrl: 'https://epmc.test' });
+
+  // TEST FIXTURE shaped per the official docs (core "including abstract, full text
+  // links, and MeSH terms"; field-search names confirmed via /rest/fields).
+  const epmcArticleFixture = {
+    id: '38729648',
+    source: 'MED',
+    pmid: '38729648',
+    pmcid: 'PMC11032673',
+    doi: '10.1000/fake.2026.101',
+    title: 'Fixture Vitamin D Supplementation and Respiratory Infection Trial.',
+    authorString: 'Alice Fixture, Bob Fixture',
+    journalTitle: 'Fixture Medical Journal',
+    pubYear: '2026',
+    abstractText: '<p>Fixture abstract with markup.</p>',
+    license: 'cc-by',
+    isOpenAccess: 'Y',
+    citedByCount: 42,
+    firstPublicationDate: '2026-01-15',
+    relevanceScore: 8.4,
+    fullTextUrlList: [{ documentStyle: 'html', url: 'https://fixture.example/full' }],
+  };
+  const epmcSearchFixture = { hitCount: 1, resultList: { result: [epmcArticleFixture] } };
+
+  it('search: maps core fields, strips title period + abstract markup, parses string pubYear', async () => {
+    const { fetch, urls } = fakeFetch([jsonResponse(200, epmcSearchFixture)]);
+    const result = await makeAdapter(fetch).search('vitamin d respiratory infection', { limit: 5 });
+
+    expect(result.family).toBe('europepmc');
+    expect(result.httpStatus).toBe(200);
+    expect(urls[0]).toBe(
+      'https://epmc.test/search?query=vitamin%20d%20respiratory%20infection&format=json&resultType=core&pageSize=5',
+    );
+    expect(result.records).toHaveLength(1);
+    const rec = defined(result.records[0], 'epmc record');
+    expect(rec.title).toBe('Fixture Vitamin D Supplementation and Respiratory Infection Trial');
+    expect(rec.abstractText).toBe('Fixture abstract with markup.');
+    expect(rec.publicationYear).toBe(2026); // string "2026" -> number
+    expect(rec.authors).toEqual(['Alice Fixture', 'Bob Fixture']);
+    expect(rec.venue).toBe('Fixture Medical Journal');
+    expect(rec.contentDepth).toBe('abstract');
+    expect(rec.accessState).toBe('open');
+    expect(rec.identifiers).toEqual([
+      { kind: 'doi', value: '10.1000/fake.2026.101' },
+      { kind: 'pubmed', value: 'PMC11032673' }, // pmcid preferred over pmid
+    ]);
+  });
+
+  it('search: metadata-only article (no abstractText) degrades honestly to metadata_only', async () => {
+    const noAbstract = deepClone(epmcArticleFixture);
+    delete noAbstract.abstractText;
+    const { fetch } = fakeFetch([jsonResponse(200, { resultList: { result: [noAbstract] } })]);
+    const result = await makeAdapter(fetch).search('q');
+    expect(result.records[0]?.contentDepth).toBe('metadata_only');
+    expect(result.records[0]?.abstractText).toBeUndefined();
+  });
+
+  it('search: article without doi/pmcid/pmid is dropped, never fabricated', async () => {
+    const noIds = deepClone(epmcArticleFixture);
+    delete noIds.doi;
+    delete noIds.pmcid;
+    delete noIds.pmid;
+    const { fetch } = fakeFetch([jsonResponse(200, { resultList: { result: [noIds] } })]);
+    const result = await makeAdapter(fetch).search('q');
+    expect(result.records).toHaveLength(0);
+  });
+
+  it('search 500: structured error carrying family/query/httpStatus', async () => {
+    const { fetch } = fakeFetch([jsonResponse(500, { error: 'fixture' })]);
+    const err: unknown = await makeAdapter(fetch).search('q').catch((e: unknown) => e);
+    if (!isSourceAdapterError(err)) throw new Error('expected a thrown SourceAdapterError');
+    expect(err.message).toContain('Europe PMC search failed');
+    expect(err.httpStatus).toBe(500);
+  });
+
+  it('search: non-resultList JSON on 200 is a parse error, never fake records', async () => {
+    const { fetch } = fakeFetch([jsonResponse(200, { unexpected: true })]);
+    await expect(makeAdapter(fetch).search('q')).rejects.toThrow('no resultList.result array');
+  });
+
+  it('resolve by DOI / PMCID / PMID uses the documented field syntax', async () => {
+    const mk = () => fakeFetch([jsonResponse(200, epmcSearchFixture)]);
+    const byDoi = mk();
+    const found1 = await makeAdapter(byDoi.fetch).resolve({ kind: 'doi', value: '10.1000/fake.2026.101' });
+    expect(found1.found).toBe(true);
+    expect(decodeURIComponent(defined(byDoi.urls[0], 'doi resolve url'))).toContain('DOI:"10.1000/fake.2026.101"');
+
+    const byPmcid = mk();
+    const found2 = await makeAdapter(byPmcid.fetch).resolve({ kind: 'pubmed', value: 'PMC11032673' });
+    expect(found2.found).toBe(true);
+    expect(decodeURIComponent(defined(byPmcid.urls[0], 'pmcid resolve url'))).toContain('PMCID:PMC11032673');
+
+    const byPmid = mk();
+    const found3 = await makeAdapter(byPmid.fetch).resolve({ kind: 'pubmed', value: '38729648' });
+    expect(found3.found).toBe(true);
+    expect(decodeURIComponent(defined(byPmid.urls[0], 'pmid resolve url'))).toContain('EXT_ID:38729648');
+  });
+
+  it('resolve 200 with empty result: found=false, no throw', async () => {
+    const { fetch } = fakeFetch([jsonResponse(200, { resultList: { result: [] } })]);
+    const out = await makeAdapter(fetch).resolve({ kind: 'doi', value: '10.9999/none' });
+    expect(out.found).toBe(false);
+    expect(out.record).toBeUndefined();
+  });
+
+  it('unsupported identifier kind: visible error before any request', async () => {
+    const { fetch, urls } = fakeFetch([jsonResponse(200, epmcSearchFixture)]);
+    await expect(
+      makeAdapter(fetch).resolve({ kind: 'arxiv', value: '2601.00001' }),
+    ).rejects.toThrow(/Europe PMC resolves doi\/pubmed/);
+    expect(urls).toHaveLength(0);
+  });
+
+  it('empty query: invalid_query error before any request', async () => {
+    const { fetch, urls } = fakeFetch([]);
+    await expect(makeAdapter(fetch).search('  ')).rejects.toThrow('empty query');
+    expect(urls).toHaveLength(0);
+  });
+
+  it('snapshotHash: volatile-field drift (citedByCount/date/relevance/fullTextUrls) keeps the hash; title change breaks it', () => {
+    const record: RawSourceRecord = {
+      identifiers: [{ kind: 'doi', value: '10.1000/fake.2026.101' }],
+      title: 'Fixture',
+      authors: [],
+      contentDepth: 'abstract',
+      accessState: 'open',
+      normalized: epmcArticleFixture,
+    };
+    const drifted = deepClone(epmcArticleFixture);
+    drifted.citedByCount = 99999;
+    drifted.firstPublicationDate = '2030-08-23';
+    drifted.relevanceScore = 0.1;
+    drifted.fullTextUrlList = [{ documentStyle: 'pdf', url: 'https://drift.example/x.pdf' }];
+    expect(snapshotHash('europepmc', { ...record, normalized: drifted })).toBe(snapshotHash('europepmc', record));
+    const retitled = deepClone(epmcArticleFixture);
+    retitled.title = 'Retracted Fixture Title.';
+    expect(snapshotHash('europepmc', { ...record, normalized: retitled })).not.toBe(snapshotHash('europepmc', record));
+  });
+});
+
 describe('source adapter registry', () => {
   it('sourceAdapterFor returns the adapter of the requested family for all families', () => {
-    expect(SOURCE_FAMILIES).toEqual(['openalex', 'arxiv', 'crossref']);
+    expect(SOURCE_FAMILIES).toEqual(['openalex', 'arxiv', 'crossref', 'europepmc']);
     for (const family of SOURCE_FAMILIES) {
       const adapter = sourceAdapterFor(family);
       expect(adapter.family).toBe(family);

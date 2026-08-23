@@ -167,8 +167,13 @@ export const anchorCounterQueries = (
  */
 const buildTargets = (plan: QueryPlan, anchorText: string): readonly SearchTarget[] => {
   const [counterOpenalex, counterCrossref] = anchorCounterQueries(counterQueries(plan.counter), anchorText);
+  // Three counter lists: openalex + europepmc carry abstracts (claim-capable
+  // counter-evidence); crossref adds DOI-breadth. Observed failure behind the
+  // 2026-08-22 vitamin-D run: with openalex budget-exhausted, the only abstract
+  // source for counter queries was gone — 1/15 relations were counter-directional.
   const targets: SearchTarget[] = [
     { purpose: 'counter_evidence', text: counterOpenalex, family: 'openalex' },
+    { purpose: 'counter_evidence', text: counterOpenalex, family: 'europepmc' },
     { purpose: 'counter_evidence', text: counterCrossref, family: 'crossref' },
   ];
   for (const q of plan.discovery) {
@@ -426,6 +431,7 @@ export const retrieveStage: StageHandler = {
     let duplicates = 0;
     let droppedNoIdentifier = 0;
     let variantSearches = 0;
+    let failoverSearches = 0;
 
     /** Execute one search (planned or recovery variant), receipt it, pool its records. */
     const runSearch = async (
@@ -565,6 +571,36 @@ export const retrieveStage: StageHandler = {
           },
         });
         ctx.log(`retrieve: source ${t.family} failed for ${t.purpose} query: ${msg}`);
+        // W-A failover (observed mode: OpenAlex keyless daily-budget exhaustion on the
+        // 2026-08-22 vitamin-D run): an openalex outage must not leave its queries
+        // unsearched — exactly ONE bounded retry on the keyless abstract-bearing
+        // europepmc family, receipted like any real search. No cascade, no retry loop.
+        if (t.family === 'openalex') {
+          try {
+            const count = await runSearch({ purpose: t.purpose, family: 'europepmc' }, targetIdx, t.text, false);
+            failoverSearches += 1;
+            executedQueries.push({ purpose: t.purpose, text: t.text, family: 'europepmc' });
+            ctx.log(`retrieve: failover openalex->europepmc for ${t.purpose} query recovered ${count} record(s)`);
+          } catch (e2) {
+            if (isCancellationError(e2)) throw e2;
+            ctx.recordReceipt({
+              kind: 'source_retrieval',
+              executionMode: 'live',
+              stage: 'retrieve',
+              redactionNote: 'failover search after openalex failure; query text retained; no records',
+              sourceRetrieval: {
+                family: 'europepmc',
+                query: t.text,
+                httpStatus: isSourceAdapterError(e2) ? e2.httpStatus : 0,
+                resultCount: 0,
+                contentHashes: [],
+              },
+            });
+            ctx.log(
+              `retrieve: failover openalex->europepmc failed for "${t.text}": ${e2 instanceof Error ? e2.message : String(e2)}`,
+            );
+          }
+        }
       }
     }
 
@@ -681,6 +717,7 @@ export const retrieveStage: StageHandler = {
         ...(rerankFailure !== undefined ? { rerankFailure } : {}),
         counterSeatsKept,
         ...(variantSearches > 0 ? { variantSearches } : {}),
+        ...(failoverSearches > 0 ? { failoverSearches } : {}),
         ...(rerankWindows !== undefined ? { rerankWindows } : {}),
         selection: `cap ${selected.length} of pool ${pool.size} (RRF${rerankApplied ? ' + listwise rerank' : rerankFailure !== undefined ? ' after failed rerank' : ''})`,
       },
@@ -694,6 +731,7 @@ export const retrieveStage: StageHandler = {
     ];
     if (rerankFailure !== undefined) parts.push(`listwise rerank FAILED — deterministic RRF order used (${rerankFailure})`);
     if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
+    if (failoverSearches > 0) parts.push(`${failoverSearches} openalex->europepmc failover search(es)`);
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
     if (droppedNoIdentifier > 0) parts.push(`${droppedNoIdentifier} record(s) without identifiers dropped`);
     if (selected.length < fused.length) parts.push(`truncated at cap ${MAX_DOCUMENTS}`);
