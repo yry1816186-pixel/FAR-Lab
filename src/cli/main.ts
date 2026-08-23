@@ -410,7 +410,7 @@ const main = async (): Promise<void> => {
     // `far probe` deliberately does not cover. Reads the same store the server's
     // testModelConfig uses; --live reuses createCustomProvider so the wire matches
     // the pipeline exactly. Config mode reports key presence only — never values.
-    const { ModelProviderConfig, maskApiKey } = await import('../domain/index.js');
+    const { maskApiKey } = await import('../domain/index.js');
     const { createApp } = await import('../app/composition.js');
     const app = await createApp();
     try {
