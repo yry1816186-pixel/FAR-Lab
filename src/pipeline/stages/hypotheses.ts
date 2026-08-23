@@ -17,6 +17,7 @@ import type {
 import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash } from '../../sources/snapshot.js';
+import { memoryNegativeConditioning } from '../../app/memory.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
 import { isCancellationError } from './guard.js';
 import {
@@ -493,12 +494,17 @@ export const generateHypothesesStage: StageHandler = {
     // round must never replay round-1 cached generations as if they were new critique-
     // conditioned candidates.
     const round = regeneration ? 2 : 1;
+    // RU-1 memory consumer #1: past OWN outcomes condition generation (failed
+    // experiments must not be re-proposed blind). Deterministic retrieval; ids
+    // ride the inputs fingerprint so changed memory invalidates stale cache.
+    const priorMemory = memoryNegativeConditioning(ctx.store, question.text);
     const strategyInputs = canonicalSha256({
       question: questionForPrompt,
       claims: claimsForPrompt(claims),
       relations: relations.map((r) => ({ id: r.id, relation: r.relation })),
       instructions: STRATEGY_DEFS.map((d) => d.instruction),
       discipline: DIVERSITY_DISCIPLINE,
+      ...(priorMemory.length > 0 ? { priorMemoryIds: priorMemory.map((m) => m.id) } : {}),
       ...(regeneration && critique !== null
         ? { regenerationCritique: { reasons: critique.reasons, weakDimensions: critique.weakDimensions, priorStatements } }
         : {}),
@@ -517,6 +523,13 @@ export const generateHypothesesStage: StageHandler = {
               : ''),
           payload: {
             ...payload,
+            ...(priorMemory.length > 0
+              ? {
+                  // RU-1: past outcomes are DATA with trust labels — a failed prior
+                  // experiment is a reason to differ, not a verdict on this question.
+                  priorResearchMemory: priorMemory,
+                }
+              : {}),
             ...(raws.length > 0
               ? {
                   previouslyProposed: raws.map((r) => ({

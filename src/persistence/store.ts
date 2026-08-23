@@ -704,21 +704,45 @@ export class Store {
    * FTS5 phrase match with LIKE fallback (same degrade contract as searchText).
    * Hits update last_accessed_at/access_count (activation input) best-effort.
    */
-  searchMemory(opts: { query: string; kinds?: MemoryKind[]; trustClasses?: MemoryTrustClass[]; limit?: number }): MemoryItem[] {
+  searchMemory(opts: { query: string; kinds?: MemoryKind[]; trustClasses?: MemoryTrustClass[]; limit?: number; mode?: 'phrase' | 'or' }): MemoryItem[] {
     const limit = Math.min(opts.limit ?? 20, 100);
     const ids = new Set<string>();
-    const ftsQuery = `"${opts.query.replace(/"/g, '""')}"`;
-    try {
-      for (const r of this.db.prepare('SELECT id FROM memory_fts WHERE memory_fts MATCH ? LIMIT 200').all(ftsQuery)) {
-        ids.add(String(r.id));
+    if (opts.mode === 'or') {
+      // keyword OR semantics: sanitized bare tokens joined with OR (question-derived
+      // keywords are unordered; a phrase match would demand adjacency they lack).
+      const tokens = opts.query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 1);
+      if (tokens.length > 0) {
+        const ftsOr = tokens.map((t) => `"${t}"`).join(' OR ');
+        try {
+          for (const r of this.db.prepare('SELECT id FROM memory_fts WHERE memory_fts MATCH ? LIMIT 200').all(ftsOr)) {
+            ids.add(String(r.id));
+          }
+        } catch {
+          // FTS5 unavailable — LIKE fallback below via the per-token miss path
+        }
+        if (ids.size === 0) {
+          for (const t of tokens) {
+            const like = `%${t.replace(/[%_]/g, '')}%`;
+            for (const r of this.db.prepare('SELECT id FROM memory_items WHERE title LIKE ? OR body LIKE ? LIMIT 50').all(like, like)) {
+              ids.add(String(r.id));
+            }
+          }
+        }
       }
-    } catch {
-      // FTS5 unavailable — LIKE fallback keeps retrieval honest
-    }
-    if (ids.size === 0) {
-      const like = `%${opts.query.replace(/[%_]/g, '')}%`;
-      for (const r of this.db.prepare('SELECT id FROM memory_items WHERE title LIKE ? OR body LIKE ? LIMIT 200').all(like, like)) {
-        ids.add(String(r.id));
+    } else {
+      const ftsQuery = `"${opts.query.replace(/"/g, '""')}"`;
+      try {
+        for (const r of this.db.prepare('SELECT id FROM memory_fts WHERE memory_fts MATCH ? LIMIT 200').all(ftsQuery)) {
+          ids.add(String(r.id));
+        }
+      } catch {
+        // FTS5 unavailable — LIKE fallback keeps retrieval honest
+      }
+      if (ids.size === 0) {
+        const like = `%${opts.query.replace(/[%_]/g, '')}%`;
+        for (const r of this.db.prepare('SELECT id FROM memory_items WHERE title LIKE ? OR body LIKE ? LIMIT 200').all(like, like)) {
+          ids.add(String(r.id));
+        }
       }
     }
     if (ids.size === 0) return [];
