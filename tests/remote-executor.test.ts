@@ -1,4 +1,4 @@
-import { describe, expect, it, afterAll } from 'vitest';
+import { describe, expect, it, afterAll, beforeAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -34,6 +34,13 @@ const ready = dockerReady();
 
 afterAll(() => {
   if (!ready) return;
+  try { execFileSync('docker', ['rm', '-f', CONTAINER], { stdio: 'ignore' }); } catch { /* gone */ }
+});
+
+beforeAll(() => {
+  if (!ready) return;
+  // Idempotent fixture: a previous crashed/killed run leaves the named container
+  // behind, and docker run --name would then conflict. Force-clean up front.
   try { execFileSync('docker', ['rm', '-f', CONTAINER], { stdio: 'ignore' }); } catch { /* gone */ }
 });
 
