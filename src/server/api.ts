@@ -55,6 +55,7 @@ import {
 import { McpManager } from '../agent/mcp-manager.js';
 import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plugins/import.js';
 import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
+import { toProvJsonLd } from '../domain/prov-o.js';
 import { canonicalSha256 } from '../shared/crypto.js';
 
 /**
@@ -1563,6 +1564,29 @@ function parseSeedSources(raw: unknown): string | {
       if (segments.length === 5) {
         const leaf = segments[4]!;
         if (leaf === 'events' && method === 'GET') return runEvents(res, runId, url);
+        // RU-2 branch writer: fork a settled run (question referenced, never
+        // copied; forked_from lineage edge; step cache seeded for replay).
+        if (leaf === 'fork' && method === 'POST') {
+          const source = mustGetRun(runId);
+          if (source.status === 'running' || source.status === 'queued') {
+            throw validation(`run ${runId} is ${source.status} — fork from a settled run`);
+          }
+          const body = await readJsonObject(req);
+          const reason = typeof body.reason === 'string' && body.reason.trim().length > 0
+            ? body.reason.trim()
+            : 'forked from researcher UI';
+          const fork = app.store.forkRun(runId, { reason });
+          sendJson(res, 201, { run: { id: fork.id, parentRunId: fork.parentRunId, status: fork.status } });
+          return;
+        }
+        // RU-2 interop: PROV-O JSON-LD export from the lineage_edges single source.
+        if (leaf === 'prov' && method === 'GET') {
+          mustGetRun(runId);
+          const edges = app.store.listLineageEdges({ runId });
+          const graph = toProvJsonLd({ rootRunId: runId, runs: [{ id: runId }], edges });
+          sendJson(res, 200, graph);
+          return;
+        }
         if (leaf === 'question' && method === 'GET') return runQuestion(res, runId);
         if (leaf === 'report' && method === 'GET') return runReport(res, runId);
         if (leaf === 'paper' && method === 'GET') return runPaper(res, runId);

@@ -160,6 +160,52 @@ export class Store {
     return run;
   }
 
+  /**
+   * RU-2 branch writer (Execution-Lineage semantics): fork creates a NEW run
+   * referencing the source immutably — question referenced by id (never copied),
+   * `forked_from` lineage edge recorded, and the source's step cache seeded into
+   * the fork so unchanged (stage, family) inputs replay byte-identically while
+   * changed inputs mismatch their fingerprints and recompute (checkpointed()
+   * owns that logic). The fork reason is audited as the fork run's first note.
+   */
+  forkRun(sourceRunId: string, opts: { reason: string }, now = new Date().toISOString()): ResearchRun {
+    const source = this.getRun(sourceRunId);
+    if (source === null) throw new Error(`forkRun: no such run ${sourceRunId}`);
+    if (source.status === 'running' || source.status === 'queued') {
+      throw new Error(`forkRun: source run ${sourceRunId} is ${source.status} — fork from a settled run`);
+    }
+    const fork: ResearchRun = ResearchRun.parse({
+      id: newId('run'), questionId: source.questionId, status: 'created', currentStage: 'scope',
+      stages: STAGE_ALL.map((stage) => ({ stage, state: 'pending' })),
+      createdAt: now, updatedAt: now,
+      tags: Array.from(new Set([...source.tags, 'fork'])),
+      parentRunId: source.id,
+      ...(source.providerConfigId !== undefined ? { providerConfigId: source.providerConfigId } : {}),
+    });
+    const lastSeq = this.db.prepare('SELECT MAX(seq) AS m FROM events WHERE run_id=?').get(sourceRunId)?.m;
+    const forkPointSeq = lastSeq === undefined || lastSeq === null ? 0 : Number(lastSeq);
+    this.db.transaction(() => {
+      this.db.prepare('INSERT INTO runs (id, question_id, status, current_stage, doc, created_at, updated_at) VALUES (?,?,?,?,?,?,?)')
+        .run(fork.id, fork.questionId, fork.status, fork.currentStage, JSON.stringify(fork), now, now);
+      this.recordLineageEdge({ fromId: source.id, toId: fork.id, kind: 'forked_from', runId: fork.id, at: now });
+      // dependency-domain replay seed: copy the source's step cache under the
+      // fork's id — fingerprints gate which entries actually replay.
+      this.db.prepare(
+        `INSERT INTO step_outputs (run_id, stage, family, step_key, json, created_at)
+         SELECT ?, stage, family, step_key, json, created_at FROM step_outputs WHERE run_id=?`,
+      ).run(fork.id, source.id);
+      this.db.prepare(
+        `INSERT INTO step_fingerprints (run_id, stage, family, fingerprint)
+         SELECT ?, stage, family, fingerprint FROM step_fingerprints WHERE run_id=?`,
+      ).run(fork.id, source.id);
+      this.appendEvent(fork.id, {
+        type: 'note',
+        detail: { kind: 'run_forked', from: source.id, forkPointSeq, reason: opts.reason.slice(0, 500) },
+      }, now);
+    });
+    return fork;
+  }
+
   updateRun(run: ResearchRun): void {
     const now = new Date().toISOString();
     this.db.transaction(() => {
