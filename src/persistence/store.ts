@@ -82,6 +82,7 @@ export interface SearchHit {
 
 export class Store {
   private ftsReady = false;
+  private trigramReady = false;
 
   constructor(private readonly db: Db) {
     this.backfillLineage();
@@ -101,6 +102,17 @@ export class Store {
       this.db.prepare(
         'CREATE VIRTUAL TABLE IF NOT EXISTS far_search USING fts5(kind UNINDEXED, obj_id UNINDEXED, body, tokenize = \'unicode61\')',
       ).run();
+      // RU-10 GO3 dual-index: unicode61 (latin word tokens) + trigram (CJK
+      // phrases and substring queries >=3 chars). Query routing: CJK or >=3-char
+      // queries try trigram first; short latin stays unicode61/LIKE.
+      try {
+        this.db.prepare(
+          "CREATE VIRTUAL TABLE IF NOT EXISTS far_search_tri USING fts5(kind UNINDEXED, obj_id UNINDEXED, body, tokenize = 'trigram')",
+        ).run();
+        this.trigramReady = true;
+      } catch {
+        this.trigramReady = false; // pre-trigram SQLite: unicode61+LIKE remain
+      }
       this.reindexFts('question');
       this.reindexFts('hypothesis');
       this.reindexFts('claim');
@@ -114,14 +126,19 @@ export class Store {
   private reindexFts(kind: string): void {
     const rows = this.db.prepare('SELECT id, json FROM objects WHERE kind=?').all(kind);
     this.db.prepare('DELETE FROM far_search WHERE kind=?').run(kind);
+    if (this.trigramReady) this.db.prepare('DELETE FROM far_search_tri WHERE kind=?').run(kind);
     const insert = this.db.prepare('INSERT INTO far_search (kind, obj_id, body) VALUES (?,?,?)');
+    const insertTri = this.trigramReady ? this.db.prepare('INSERT INTO far_search_tri (kind, obj_id, body) VALUES (?,?,?)') : null;
     const textOf = (json: string): string => {
       const parsed = JSON.parse(json) as { text?: unknown; statement?: unknown; title?: unknown };
       return String(parsed.text ?? parsed.statement ?? parsed.title ?? '');
     };
     for (const r of rows) {
       const body = textOf(String(r.json));
-      if (body.length > 0) insert.run(kind, String(r.id), body);
+      if (body.length > 0) {
+        insert.run(kind, String(r.id), body);
+        insertTri?.run(kind, String(r.id), body);
+      }
     }
   }
 
@@ -428,6 +445,7 @@ export class Store {
     if (Number(res.changes) !== 1) return false;
     if (Store.FTS_MIRRORED_KINDS.has(kind) && this.ftsReady) {
       this.db.prepare('DELETE FROM far_search WHERE kind=? AND obj_id=?').run(kind, id);
+      if (this.trigramReady) this.db.prepare('DELETE FROM far_search_tri WHERE kind=? AND obj_id=?').run(kind, id);
     }
     return true;
   }
@@ -449,10 +467,14 @@ export class Store {
       ).all(runId) as Array<{ id: string }>;
       if (this.ftsReady) {
         const dropSearch = this.db.prepare('DELETE FROM far_search WHERE kind=? AND obj_id=?');
+        const dropSearchTri = this.trigramReady ? this.db.prepare('DELETE FROM far_search_tri WHERE kind=? AND obj_id=?') : null;
         for (const r of mirrored) {
           counts.searchRows += Number(dropSearch.run('question', r.id).changes)
             + Number(dropSearch.run('hypothesis', r.id).changes)
-            + Number(dropSearch.run('claim', r.id).changes);
+            + Number(dropSearch.run('claim', r.id).changes)
+            + Number(dropSearchTri?.run('question', r.id).changes ?? 0)
+            + Number(dropSearchTri?.run('hypothesis', r.id).changes ?? 0)
+            + Number(dropSearchTri?.run('claim', r.id).changes ?? 0);
         }
       }
       counts.objects = Number(this.db.prepare('DELETE FROM objects WHERE run_id=?').run(runId).changes);
@@ -552,6 +574,23 @@ export class Store {
       // obj_id=1, body=2) — a column-name expression silently resolves to 0
       // and snippets the wrong column (live-isolated during D-101).
       const ftsQuery = `"${q.replace(/"/g, '""')}"`; // phrase — substring semantics preserved per token run
+      // RU-10 GO3 routing: CJK-containing or >=3-char queries try the TRIGRAM
+      // index first (true substring semantics); 1-2 char latin stays on
+      // unicode61/LIKE (trigram cannot match needles shorter than 3).
+      const useTrigram = this.trigramReady && (/[一-鿿]/.test(q) || q.trim().length >= 3);
+      if (useTrigram) {
+        try {
+          const triRows = this.db.prepare(
+            `SELECT o.run_id AS run_id, o.id, o.json, snippet(far_search_tri, 2, '«', '»', '…', 12) AS snippet, rank
+               FROM far_search_tri f JOIN objects o ON o.id = f.obj_id AND o.kind = f.kind
+              WHERE far_search_tri MATCH ? AND f.kind = ?
+              ORDER BY rank LIMIT ?`,
+          ).all(ftsQuery, kind, limit) as unknown as Row[];
+          if (triRows.length > 0) return triRows.map(parse);
+        } catch {
+          // trigram unavailable — fall through to unicode61
+        }
+      }
       try {
         const rows = this.db.prepare(
           `SELECT o.run_id AS run_id, o.id, o.json, snippet(far_search, 2, '«', '»', '…', 12) AS snippet, rank
