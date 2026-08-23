@@ -85,6 +85,8 @@ export function EvidenceBalance({
         )}
         {body !== undefined && <span className="muted small">· {t('evbody.sources', { n: body.independentSources })}</span>}
         {body !== undefined && <span className="muted small">· {t(`evb.standard.${body.proofStandard}`)}</span>}
+        {body !== undefined && <span className="muted small" title={t('evb.bandTitle')}>· {t(`evb.band.${body.logLrBand}`)}</span>}
+        {body !== undefined && <span className="muted small" title={t('evb.qbafTitle')}>· {t('evb.qbaf', { score: body.qbafScore.toFixed(2) })}</span>}
       </span>
     </div>
   );
