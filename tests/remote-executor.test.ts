@@ -1,5 +1,5 @@
 import { describe, expect, it, afterAll, beforeAll } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -67,17 +67,25 @@ describe('P3 remote executor: device-bound queue -> remote training -> local ver
       'farlab-ssh-target',
       'sh', '-c', `echo "$AUTHORIZED_KEY" > /root/.ssh/authorized_keys && chmod 700 /root/.ssh && chmod 600 /root/.ssh/authorized_keys && exec /usr/sbin/sshd -D -e`,
     ]);
-    // Poll for sshd readiness instead of a blind sleep — under full-suite load
-    // 1500ms is not always enough and scp then fails with "Connection closed".
+    // Poll for REAL sshd readiness (an actual ssh round-trip), not a file check —
+    // the host key file exists from image build time, and under full-suite load
+    // sshd may not yet accept TCP when scp first runs ("Connection closed").
     let hostKey = '';
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 60; i++) {
       await new Promise<void>((r) => setTimeout(r, 500));
       try {
         hostKey = execFileSync('docker', ['exec', CONTAINER, 'cat', '/etc/ssh/ssh_host_ed25519_key.pub'], { encoding: 'utf8' }).trim();
-        if (hostKey) break;
+        if (!hostKey) continue;
+        const probe = spawnSync('ssh', [
+          '-i', identity,
+          '-o', 'UserKnownHostsFile=/dev/null', '-o', 'StrictHostKeyChecking=no',
+          '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=3',
+          '-p', String(PORT), 'root@localhost', 'echo ready',
+        ], { encoding: 'utf8', timeout: 10_000 });
+        if (probe.status === 0 && probe.stdout.includes('ready')) break;
       } catch { /* container starting */ }
     }
-    if (!hostKey) throw new Error('ssh target never produced a host key within 20s');
+    if (!hostKey) throw new Error('ssh target never produced a host key within 30s');
     const knownHosts = join(dir, 'known_hosts');
     writeFileSync(knownHosts, `[localhost]:${PORT} ${hostKey}\n`);
 
@@ -160,9 +168,16 @@ describe('P3 remote executor: device-bound queue -> remote training -> local ver
       const signals = store.listObjects('feedback', runId);
       expect(signals).toHaveLength(1);
       expect(signals[0]!.source).toBe('experiment');
-      // Remote artifacts were cleaned up on the device.
-      const leftovers = await registry.gatewayFor('linux-1').exec('ls /tmp/farlab 2>/dev/null | wc -l');
-      expect(leftovers.stdout.trim()).toBe('0');
+      // Remote artifacts were cleaned up on the device. An empty stdout means the
+      // ssh round-trip itself flaked (Windows Docker port-forward RESET) — retry
+      // rather than fail: the assertion is about device state, not ssh luck.
+      let leftovers = '';
+      for (let attempt = 0; attempt < 3; attempt++) {
+        leftovers = (await registry.gatewayFor('linux-1').exec('ls /tmp/farlab 2>/dev/null | wc -l')).stdout.trim();
+        if (leftovers === '0') break;
+        await new Promise<void>((r) => setTimeout(r, 1_000));
+      }
+      expect(leftovers).toBe('0');
     } finally {
       try { db.close(); scheduler.close(); } catch { /* closed */ }
       try { rmSync(dir, { recursive: true, force: true }); } catch { /* Windows lag */ }
