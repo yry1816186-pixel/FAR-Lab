@@ -1,12 +1,14 @@
 # PROPOSAL — Screening Loop (ASReview-pattern) + Desktop Release Triad + Artifact GC
 
-Status: PARTIALLY EXECUTED (round-4). The approval-free pieces have LANDED:
-desktop CSP tightened + bundle.active enabled with icons (tauri.conf.json), and
-`far gc` implemented with dry-run default, reference truth = store.referencedArtifactHashes(),
-tests/gc.test.ts 2/2 + real-workspace CLI smoke (885 blobs / 34 referenced / 851
-orphans reported, nothing deleted). REMAINING (user gate): the ASReview-pattern
-screening loop (HCI hard gate — needs design approval), the updater signing key
-(user generates), crash-report opt-in choice. Designed below unchanged.
+Status: EXECUTED (round-5/6, 2026-08-24). Screening loop: LANDED (deterministic
+TF-IDF+LR core with WSS@95-style stop rule; session/decision objects; GET/POST
+screening API; EvidenceTab workbench with keyboard I/E; stop records a
+human_expert feedback the revise stage consumes — tests 10/10 + full GUI
+walkthrough on an isolated workspace). Desktop triad: CSP + bundle LANDED;
+updater NOT-ADOPTED per user decision 2026-08-24 (no signing key). Crash
+reporting: not adopted. Artifact GC: `far gc` LANDED round-4; user ran
+`far gc --apply` on the real workspace 2026-08-24 (851 orphans removed, 34/34
+remaining blobs referenced).
 
 ## 1. Active-learning screening loop (OSS diff action #1 — biggest differentiator)
 
