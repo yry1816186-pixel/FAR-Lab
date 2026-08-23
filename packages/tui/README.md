@@ -19,5 +19,5 @@ FAR_URL=http://127.0.0.1:3196/api/v1  # 默认
 
 ## 验证状态
 - 行式模式：真实服务器端到端实测（列表/详情叙事/composer 确认流）
-- 核心逻辑：node:test 7/7（粘贴提取/IME 注入/控制序列过滤/换行-回删/就绪门/词汇表状态机）
-- Ink 全屏渲染路径：UNVERIFIED-live（需真实交互终端跑 npm start）
+- 核心逻辑：node:test 12/12（core 7：粘贴/IME/控制序列/换行回删/就绪门/词汇表；render 5：ink-testing-library 无 TTY 渲染断言——列表/详情叙事/composer 确认流/取消分支）
+- Ink 全屏渲染路径：render-verified（ink-testing-library 确定性断言组件树/布局文本/按键处理/确认流）——仅 raw-mode 交互手感（延迟/焦点）留真实终端

@@ -4,7 +4,7 @@
   "description": "FAR-Lab interactive terminal research browser (read-only v1; Ink full-screen + readline line-mode fallback)",
   "scripts": {
     "start": "node --experimental-strip-types src/main.ts",
-    "test": "node --experimental-strip-types --test test/core.test.ts"
+    "test": "node --experimental-strip-types --test test/core.test.ts test/render.test.ts"
   },
   "license": "MIT",
   "type": "module",
@@ -14,5 +14,8 @@
   "dependencies": {
     "ink": "^7.1.1",
     "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "ink-testing-library": "^4.0.0"
   }
 }
