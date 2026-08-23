@@ -24,6 +24,11 @@ jobs:
           enable-cache: true
       - name: Install root dependencies
         run: npm ci
+      # Root vitest suite imports web/src modules (dictation, ingest, lit-graph
+      # tests) — web deps must exist BEFORE `npm test`, not only for the build.
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
       - name: Typecheck (backend + CLI)
         run: npm run typecheck
       - name: Full test suite (deterministic; real uv sidecar for experiments)
