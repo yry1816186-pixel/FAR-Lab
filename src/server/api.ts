@@ -56,6 +56,7 @@ import { McpManager } from '../agent/mcp-manager.js';
 import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plugins/import.js';
 import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
 import { toProvJsonLd } from '../domain/prov-o.js';
+import { EvidenceRelationType } from '../domain/evidence.js';
 import { canonicalSha256 } from '../shared/crypto.js';
 
 /**
@@ -1583,7 +1584,14 @@ function parseSeedSources(raw: unknown): string | {
         if (leaf === 'prov' && method === 'GET') {
           mustGetRun(runId);
           const edges = app.store.listLineageEdges({ runId });
-          const graph = toProvJsonLd({ rootRunId: runId, runs: [{ id: runId }], edges });
+          // RU-6: enrich evidence edges with their original relation type so the
+          // CiTO IRI is exact (lineage edges carry the collapsed counter/support kind).
+          const relationTypes: Record<string, EvidenceRelationType> = {};
+          for (const rel of app.store.listObjects('evidence_relation', runId) as unknown as Array<{ id: string; relation: string }>) {
+            const parsedRel = EvidenceRelationType.safeParse(rel.relation);
+            if (parsedRel.success) relationTypes[rel.id] = parsedRel.data;
+          }
+          const graph = toProvJsonLd({ rootRunId: runId, runs: [{ id: runId }], edges, relationTypes });
           sendJson(res, 200, graph);
           return;
         }

@@ -1,4 +1,5 @@
 import type { LineageEdgeRecord } from './lineage.js';
+import { CITO_IRI, type EvidenceRelationType } from './evidence.js';
 
 /**
  * PROV-O serialization (RU-2 interop): W3C PROV JSON-LD over the SAME
@@ -12,6 +13,8 @@ export interface ProvExportInput {
   rootRunId: string;
   runs: Array<{ id: string; createdAt?: string; status?: string }>;
   edges: readonly LineageEdgeRecord[];
+  /** Original evidence-relation type per relation object id (lineage edges carry the collapsed counter/support kind). */
+  relationTypes?: Readonly<Record<string, EvidenceRelationType>>;
 }
 
 const ACTIVITY_KINDS = new Set(['forked_from', 'revised_into', 'delegated_to']);
@@ -42,10 +45,18 @@ export const toProvJsonLd = (input: ProvExportInput): Record<string, unknown> =>
       entities.set(e.toId, entities.get(e.toId) ?? { '@id': `far:${e.toId}`, '@type': 'prov:Entity' });
       relations.push({ '@id': `far:${e.fromId}`, 'prov:used': { '@id': `far:${e.toId}` } });
     } else {
-      // evidence/revision edges: Entity-to-Entity influence, far-namespaced
+      // evidence/revision edges: Entity-to-Entity influence, far-namespaced;
+      // evidence relations additionally carry their CiTO IRI (RU-6) so external
+      // PROV/SWAP consumers see standard citation semantics.
       entities.set(e.fromId, entities.get(e.fromId) ?? { '@id': `far:${e.fromId}`, '@type': 'prov:Entity' });
       entities.set(e.toId, entities.get(e.toId) ?? { '@id': `far:${e.toId}`, '@type': 'prov:Entity' });
       const influence: Record<string, unknown> = { '@id': `far:${e.fromId}`, [`far:${e.kind}`]: { '@id': `far:${e.toId}` } };
+      const relationType = input.relationTypes?.[e.fromId];
+      const cito = relationType !== undefined ? CITO_IRI[relationType] : undefined;
+      if (cito !== undefined) {
+        influence['cito'] = { '@id': cito.iri };
+        if (cito.exact !== true && cito.farNote !== undefined) influence['far:mappingNote'] = cito.farNote;
+      }
       relations.push(influence);
     }
   }

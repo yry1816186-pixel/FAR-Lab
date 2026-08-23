@@ -27,6 +27,28 @@ export const RELATION_POLARITY: Record<EvidenceRelationType, 'supporting' | 'cou
 export const EvidenceStrength = z.enum(['strong', 'moderate', 'weak', 'unrated']);
 export type EvidenceStrength = z.infer<typeof EvidenceStrength>;
 
+/**
+ * RU-6 CiTO alignment (CiTO v2.8, sparontologies.github.io/cito — 41
+ * cito:cites subproperties, primary-source verified 2026-08-24). Conservative
+ * mapping: only packet-verified subproperty IRIs are asserted; every other
+ * internal relation maps to cito:cites with a far: extension note so external
+ * consumers (OpenCitations/ORKG class) can upgrade when CiTO-mapped SWAP
+ * semantics land. Total by construction — every relation type has an entry.
+ */
+export const CITO_IRI: Record<EvidenceRelationType, { iri: string; exact: boolean; farNote?: string }> = {
+  supports: { iri: 'http://purl.org/spar/cito/supports', exact: true },
+  contradicts: { iri: 'http://purl.org/spar/cito/contradicts', exact: true },
+  replicates: { iri: 'http://purl.org/spar/cito/replicates', exact: true },
+  weakens: { iri: 'http://purl.org/spar/cito/cites', exact: false, farNote: 'partial refutation (weakened support)' },
+  fails_to_replicate: { iri: 'http://purl.org/spar/cito/cites', exact: false, farNote: 'failed replication attempt' },
+  alternative_explanation: { iri: 'http://purl.org/spar/cito/cites', exact: false, farNote: 'alternative explanation offered' },
+  methodological_limitation: { iri: 'http://purl.org/spar/cito/cites', exact: false, farNote: 'methodological limitation identified' },
+  qualifies: { iri: 'http://purl.org/spar/cito/cites', exact: false, farNote: 'boundary conditions qualified' },
+  depends_on: { iri: 'http://purl.org/spar/cito/cites', exact: false, farNote: 'dependency stated' },
+  derived_from: { iri: 'http://purl.org/spar/cito/cites', exact: false, farNote: 'derivation stated' },
+  unknown: { iri: 'http://purl.org/spar/cito/cites', exact: false, farNote: 'relation pending adjudication' },
+};
+
 export const EvidenceRelation = z.object({
   id: EvidenceRelationId,
   runId: RunId,
