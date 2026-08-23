@@ -807,10 +807,15 @@ describe('build_evidence fulltext deepening (phase A)', () => {
     corpusOf(ctx, [mkSource(ctx.run.id, newId('src'), ARXIV_DOC)]);
     const outcome = await buildEvidenceStage.execute(ctx);
     expect(outcome.kind).toBe('done');
+    // RU-3 T1: external text rides in the dedicated untrustedSourceContent channel.
     const extractionPayload = recordedPayloads.find((p) =>
-      JSON.stringify(p).includes('fullTextExcerpt')) as { input?: { source?: { fullTextExcerpt?: string } } } | undefined;
-    expect(extractionPayload?.input?.source?.fullTextExcerpt).toBeDefined();
-    expect(extractionPayload!.input!.source!.fullTextExcerpt!.length).toBeLessThanOrEqual(16_200);
+      JSON.stringify(p).includes('fullTextExcerpt')) as { input?: { source?: Record<string, unknown>; untrustedSourceContent?: { fullTextExcerpt?: string } } } | undefined;
+    expect(extractionPayload?.input?.untrustedSourceContent?.fullTextExcerpt).toBeDefined();
+    expect(extractionPayload!.input!.untrustedSourceContent!.fullTextExcerpt!.length).toBeLessThanOrEqual(16_200);
+    // Channel-separation regression lock: the trusted `source` object must not
+    // carry the external text (spotlighting invariant).
+    expect(extractionPayload!.input!.source!.abstract).toBeUndefined();
+    expect(extractionPayload!.input!.source!.fullTextExcerpt).toBeUndefined();
     const stored = ctx.store.listObjects('source_document', ctx.run.id)[0]!;
     const artifactText = await ctx.artifacts.get(stored.fullTextRef!);
     expect(artifactText).toBe(longText);
