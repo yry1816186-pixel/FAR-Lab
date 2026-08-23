@@ -111,11 +111,37 @@ export const MIGRATIONS: readonly { version: number; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS idx_runs_status_lease ON runs(status, lease_expires_at);
     `,
   },
+  {
+    // RU-2 lineage storage (tech-intel expedition 2026-08-24): authoritative
+    // lineage edges + deterministic event tags. Adjacency + keyset design —
+    // recursive CTEs traverse at read time (shallow forests; no closure table,
+    // see research/tech-intel/RU2-LINEAGE.md for the trade-off ruling).
+    version: 5,
+    sql: `
+      CREATE TABLE IF NOT EXISTS lineage_edges (
+        from_id TEXT NOT NULL,
+        to_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        run_id TEXT NOT NULL,
+        at TEXT NOT NULL,
+        PRIMARY KEY (from_id, to_id, kind)
+      );
+      CREATE INDEX IF NOT EXISTS idx_lineage_to ON lineage_edges(to_id, kind);
+      CREATE TABLE IF NOT EXISTS event_tags (
+        tag TEXT NOT NULL,
+        run_id TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        PRIMARY KEY (tag, run_id, seq)
+      );
+      CREATE INDEX IF NOT EXISTS idx_event_tags_run ON event_tags(run_id, seq);
+    `,
+  },
 ];
 
 export const openDb = (dbPath: string): Db => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const raw = new DatabaseSync(dbPath, { timeout: 10_000 });
+  let txDepth = 0;
   const db: Db = {
     raw,
     exec: (sql) => raw.exec(sql),
@@ -129,6 +155,26 @@ export const openDb = (dbPath: string): Db => {
       };
     },
     transaction: <T>(fn: () => T): T => {
+      // Nesting-safe (RU-2): inner transactions (e.g. appendEvent's atomic event+tags
+      // write inside createRun's transaction) become SAVEPOINTs — the outer COMMIT
+      // still owns durability; a nested failure rolls back only its own scope.
+      if (txDepth > 0) {
+        const sp = `far_sp_${txDepth}`;
+        txDepth += 1;
+        raw.exec(`SAVEPOINT ${sp}`);
+        try {
+          const out = fn();
+          raw.exec(`RELEASE SAVEPOINT ${sp}`);
+          return out;
+        } catch (e) {
+          raw.exec(`ROLLBACK TO SAVEPOINT ${sp}`);
+          raw.exec(`RELEASE SAVEPOINT ${sp}`);
+          throw e;
+        } finally {
+          txDepth -= 1;
+        }
+      }
+      txDepth += 1;
       raw.exec('BEGIN IMMEDIATE');
       try {
         const out = fn();
@@ -137,6 +183,8 @@ export const openDb = (dbPath: string): Db => {
       } catch (e) {
         raw.exec('ROLLBACK');
         throw e;
+      } finally {
+        txDepth -= 1;
       }
     },
     close: () => raw.close(),

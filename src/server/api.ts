@@ -728,6 +728,19 @@ function parseSeedSources(raw: unknown): string | {
       }
       afterSeq = Number(raw);
     }
+    // RU-2 G6 tag query plane: ?tag=kind:x&tag=stage:y (repeatable, ANY-of) routes
+    // through the indexed event_tags spine instead of the full linear scan.
+    const tags = url.searchParams.getAll('tag');
+    if (tags.length > 0) {
+      for (const t of tags) {
+        if (!/^[a-z0-9_]+:[a-z0-9_-]+$/.test(t)) throw validation(`query "tag" malformed: '${t}' (expected kind:*|stage:*)`);
+      }
+      const limitRaw = url.searchParams.get('limit');
+      const limit = limitRaw === null ? 200 : (/^\d+$/.test(limitRaw) ? Math.min(Number(limitRaw), 200) : (() => { throw validation('query "limit" must be a positive integer'); })());
+      const events = app.store.queryEvents({ tags, runId, afterSeq: afterSeq > 0 ? afterSeq : undefined, limit });
+      sendJson(res, 200, { events, query: { tags, runId, afterSeq } });
+      return;
+    }
     const events = app.store.listEvents(runId).filter((e) => e.seq > afterSeq);
     sendJson(res, 200, { events });
   };
