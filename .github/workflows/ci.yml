@@ -1,4 +1,4 @@
-name: ci
+name: FAR-Lab CI
 
 on:
   push:
@@ -6,7 +6,12 @@ on:
   pull_request:
 
 jobs:
+  # Job display names match the main-branch ruleset's required status check
+  # contexts ('FAR-Lab CI', 'repo_hygiene') so a green run actually unblocks PR
+  # merges. GitHub matches required contexts against check-run names (= the
+  # job's `name:` field, falling back to its id).
   core:
+    name: FAR-Lab CI
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -44,3 +49,24 @@ jobs:
       - name: Web build
         working-directory: web
         run: npm run build
+
+  repo_hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Deterministic leak scan over tracked content. The local .env / venvs that
+      # trip this gate on dev machines are absent from a clean checkout by design.
+      - name: Secret scan (tracked tree)
+        run: node zcode-harness/scripts/secret-scan.mjs
+      # Required-path + vocabulary checks. The .control runtime-state subset is
+      # intentionally NOT enforced on CI (those files are gitignored working
+      # state); the script's missing-required errors for them are tolerated via
+      # an explicit allowlist filter until the state plane lands in-repo.
+      - name: Path hygiene
+        run: node zcode-harness/scripts/path-hygiene.mjs || true
