@@ -7,6 +7,7 @@ import type { Store } from '../persistence/store.js';
 import type { ModelProvider, StructuredCallResult } from '../shared/ports.js';
 import { strictSchemaOrUndefined } from '../providers/http.js';
 import { UNTRUSTED_DATA_RULE } from '../shared/untrusted.js';
+import { collectEnvSecrets, describeViolation, scanOutbound } from '../shared/exfil-guard.js';
 import { RunBudgetExhaustedError } from '../app/run-budget.js';
 
 export interface LlmCallOptions {
@@ -95,6 +96,15 @@ export async function invokeStructured<T>(deps: ModelPlaneDeps, opts: InvokeOpti
   // gate keeps the NEXT call from starting (fail-visible, never a fabricated result).
   if (deps.budget !== undefined && !deps.budget.hasRemaining()) {
     throw new RunBudgetExhaustedError(deps.runId ?? 'unknown', deps.budget.cap ?? 0, deps.budget.spent);
+  }
+  // RU-3 T4 exfil tripwire (provider boundary): the request body is a legal
+  // egress carrying the whole research context — it must never contain a
+  // configured secret VALUE, an active session canary, or exceed the runaway
+  // size ceiling. Fail-closed; violation names the secret, never its value.
+  {
+    const outbound = JSON.stringify({ systemPrompt: opts.systemPrompt, input: opts.payload });
+    const violation = scanOutbound(outbound, { secrets: collectEnvSecrets() });
+    if (violation !== null) throw new Error(describeViolation(violation));
   }
   const res = await withModelSlot(() => deps.provider.structuredCall(
     {
