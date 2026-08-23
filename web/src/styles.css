@@ -2107,3 +2107,12 @@ select option { color: var(--text); background: var(--surface); }
 .graph-node--draggable { cursor: grab; }
 .graph-node--draggable:active { cursor: grabbing; }
 .graph-truncated { display: inline-flex; gap: 6px; align-items: center; }
+
+/* ---- VIZ V6: cross-cutting ---- */
+.event-filter { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.quality-trend { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.quality-step { font-size: 12px; font-weight: 600; }
+.quality-step.tone-ok { color: var(--v2-ok, #3d8b5f); }
+.quality-step.tone-err { color: var(--v2-err, #b3352c); }
+.quality-step.tone-warn { color: var(--v2-warn, #b3781d); }
+.quality-step.tone-muted { color: var(--v2-text-3, #8a8f98); }

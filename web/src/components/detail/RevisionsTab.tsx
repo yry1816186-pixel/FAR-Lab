@@ -7,6 +7,7 @@ import { Badge, EmptyState, ErrorBox, IdText, Skeleton, TimeText } from '../comm
 import type { RevisionsBundle } from '../../api/normalize';
 import { qualityKey } from '../../i18n/keys';
 import { DiffText } from '../../utils/diffview';
+import { qualitySequence } from '../../viz/cross-viz';
 import { InlineIdRefs, buildHypLabels, buildOrdinalLabels } from './InlineIdRefs';
 
 /**
@@ -51,6 +52,29 @@ function qualityTone(status: string): 'ok' | 'warn' | 'err' | 'muted' {
   }
 }
 
+/**
+ * VIZ V6: quality-delta sequence across the revision chain — one colored step
+ * per revision that HAS a qualityDelta (missing judgment is not a step). A
+ * numeric trend line would invent a scale the data doesn't have; categorical
+ * steps are the honest encoding. Renders only with 2+ steps.
+ */
+function QualityTrend({ revisions }: { revisions: { qualityDelta?: { status: string } }[] }): JSX.Element | null {
+  const { t } = useI18n();
+  const seq = qualitySequence(revisions);
+  if (seq.length < 2) return null;
+  return (
+    <div className="quality-trend" role="img" aria-label={`${t('rev.qualityTrend')} — ${seq.map((s) => t(qualityKey(s))).join(' → ')}`}>
+      <span className="muted small">{t('rev.qualityTrend')}：</span>
+      {seq.map((s, i) => (
+        <span key={i} className={`quality-step tone-${qualityTone(s)}`}>
+          {i > 0 && <span className="muted" aria-hidden="true"> → </span>}
+          {t(qualityKey(s))}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function RevisionChain({ data, hypLabels }: { data: RevisionsBundle; hypLabels?: Map<string, string> }): JSX.Element {
   const { t } = useI18n();
   const feedbackById = new Map(data.feedbacks.map((f) => [f.id, f] as const));
@@ -62,6 +86,7 @@ function RevisionChain({ data, hypLabels }: { data: RevisionsBundle; hypLabels?:
 
   return (
     <div className="revision-chain">
+      <QualityTrend revisions={data.revisions} />
       {data.feedbacks.map((f) => {
         const revision = revisionByTrigger.get(f.id);
         const diff = revision !== undefined ? diffByRevision.get(revision.id) : undefined;

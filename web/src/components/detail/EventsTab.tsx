@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import type { ResearchRun } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import type { DictKey } from '../../i18n/dict';
@@ -5,17 +6,23 @@ import { Badge, EmptyState, IdText, TimeText } from '../common';
 import type { EventsState } from '../RunDetail';
 import { runStatusKey, runStatusTone } from '../../tones';
 import { stageKey } from '../../i18n/keys';
+import { bucketEvents, eventCategory, type EventCategory } from '../../viz/cross-viz';
 
 const MAX_RENDER = 300;
 
 /**
  * Event stream view fed by the App-level 2s incremental poll (afterSeq).
  * Newest first; capped rendering with an honest "showing last N" note.
+ * VIZ V6: category filter (lifecycle/model/retrieval/tool/agent/other) with
+ * live per-bucket counts — the buckets derive from event types actually held.
  */
 export function EventsTab({ run, events }: { run: ResearchRun; events: EventsState }): JSX.Element {
   const { t } = useI18n();
-  const ordered = [...events.events].sort((a, b) => b.seq - a.seq);
-  const shown = ordered.slice(0, MAX_RENDER);
+  const [category, setCategory] = useState<EventCategory | 'all'>('all');
+  const ordered = useMemo(() => [...events.events].sort((a, b) => b.seq - a.seq), [events.events]);
+  const buckets = useMemo(() => bucketEvents(ordered.map((e) => e.type)), [ordered]);
+  const filtered = category === 'all' ? ordered : ordered.filter((e) => eventCategory(e.type) === category);
+  const shown = filtered.slice(0, MAX_RENDER);
 
   return (
     <>
@@ -32,6 +39,27 @@ export function EventsTab({ run, events }: { run: ResearchRun; events: EventsSta
         <EmptyState titleKey="events.empty" />
       ) : (
         <>
+          <div className="event-filter" role="group" aria-label={t('events.filterLabel')}>
+            <button
+              type="button"
+              className={`btn btn--sm${category === 'all' ? ' btn--primary' : ''}`}
+              aria-pressed={category === 'all'}
+              onClick={() => setCategory('all')}
+            >
+              {t('events.catAll', { n: ordered.length })}
+            </button>
+            {buckets.map((b) => (
+              <button
+                key={b.category}
+                type="button"
+                className={`btn btn--sm${category === b.category ? ' btn--primary' : ''}`}
+                aria-pressed={category === b.category}
+                onClick={() => setCategory(b.category)}
+              >
+                {t(`events.cat.${b.category}` as DictKey)} {b.count}
+              </button>
+            ))}
+          </div>
           <p className="muted small">
             {t('events.latest', { n: events.lastSeq, m: events.total, k: Math.min(shown.length, MAX_RENDER) })}
           </p>
