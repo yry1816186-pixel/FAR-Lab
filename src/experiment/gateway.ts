@@ -87,7 +87,15 @@ export class SSHGateway {
 
   /** Capability probe: interpreter presence + core scientific stack. */
   async probe(): Promise<{ reachable: boolean; pythonVersion: string | null; numpy: boolean }> {
-    const r = await this.exec('python3 -c "import sys;print(sys.version.split()[0]);import numpy;print(\'numpy\',numpy.__version__)"');
+    // Retry the capability probe: a single transient connection reset (Windows
+    // Docker NAT under load) would otherwise report a healthy device as
+    // unreachable and fail the whole experiment. The probe is read-only.
+    let r = { code: -1, stdout: '', stderr: '' };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      r = await this.exec('python3 -c "import sys;print(sys.version.split()[0]);import numpy;print(\'numpy\',numpy.__version__)"');
+      if (r.code === 0) break;
+      await new Promise<void>((res) => setTimeout(res, 500 * (attempt + 1)));
+    }
     if (r.code !== 0) return { reachable: false, pythonVersion: null, numpy: false };
     const [versionLine, numpyLine] = r.stdout.trim().split('\n');
     return { reachable: true, pythonVersion: versionLine ?? null, numpy: numpyLine?.startsWith('numpy ') ?? false };
