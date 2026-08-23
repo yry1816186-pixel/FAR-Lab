@@ -264,6 +264,20 @@ export class Store {
 
   // ---- meta KV (workspace-level facts: active model config, ...) ----
 
+  /** Every sha256:<64-hex> artifact reference persisted in objects/runs rows —
+   *  the reference truth `far gc` sweeps against (content-addressed store). */
+  referencedArtifactHashes(): Set<string> {
+    const refs = new Set<string>();
+    const re = /sha256:([0-9a-f]{64})/g;
+    for (const sql of ['SELECT json AS doc FROM objects', 'SELECT doc FROM runs']) {
+      for (const row of this.db.prepare(sql).all()) {
+        const text = String(Object.values(row as Record<string, unknown>)[0]);
+        for (const m of text.matchAll(re)) refs.add(m[1] as string);
+      }
+    }
+    return refs;
+  }
+
   getMeta(key: string): string | null {
     const row = this.db.prepare('SELECT value FROM meta WHERE key=?').get(key);
     return row === undefined ? null : String(row.value);

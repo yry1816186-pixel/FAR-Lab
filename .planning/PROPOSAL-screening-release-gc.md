@@ -1,8 +1,12 @@
 # PROPOSAL — Screening Loop (ASReview-pattern) + Desktop Release Triad + Artifact GC
 
-Status: PROPOSED (awaiting user approval per HCI hard gate). Everything below is
-designed to the point of direct implementation; zero new runtime deps in the Node
-product (deterministic TS only).
+Status: PARTIALLY EXECUTED (round-4). The approval-free pieces have LANDED:
+desktop CSP tightened + bundle.active enabled with icons (tauri.conf.json), and
+`far gc` implemented with dry-run default, reference truth = store.referencedArtifactHashes(),
+tests/gc.test.ts 2/2 + real-workspace CLI smoke (885 blobs / 34 referenced / 851
+orphans reported, nothing deleted). REMAINING (user gate): the ASReview-pattern
+screening loop (HCI hard gate — needs design approval), the updater signing key
+(user generates), crash-report opt-in choice. Designed below unchanged.
 
 ## 1. Active-learning screening loop (OSS diff action #1 — biggest differentiator)
 

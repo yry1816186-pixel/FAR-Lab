@@ -6,6 +6,7 @@ import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, Scient
 import type { ResearchRun } from '../domain/index.js';
 import { completionScript } from './completion.js';
 import { staleDistFiles } from './dist-freshness.js';
+import { runGc } from './gc.js';
 import { ink, marker, out, table, padColumns } from './term.js';
 import { isActiveStatus, statusInk, watchLines } from './watch.js';
 
@@ -65,6 +66,9 @@ Usage:
   far completion <bash|zsh|pwsh>                 Print a static shell completion script (real command
                                                   tree) — pipe into your profile, e.g.
                                                   far completion bash >> ~/.bashrc
+  far gc [--apply] [--json]                      Sweep content-addressed artifact blobs nothing
+                                                  references anymore (default: dry-run report;
+                                                  --apply deletes. Reference truth = objects/runs)
 
 Exit codes: 0 ok, 1 runtime failure, 2 usage error. Diagnostics on stderr.`;
 
@@ -429,6 +433,25 @@ const main = async (): Promise<void> => {
     return;
   }
   if (cmd === 'data') die('data requires a subcommand: info', 2);
+
+  if (cmd === 'gc') {
+    const app = await createApp();
+    try {
+      const report = runGc(app, { apply: flag('--apply') });
+      if (json()) jsonOutput(report);
+      else {
+        out(`artifacts: ${report.totalBlobs} blob(s), ${report.referenced} referenced`);
+        if (report.unreferenced.length === 0) {
+          out('gc: nothing to sweep — every blob is referenced.');
+        } else {
+          out(`gc: ${report.unreferenced.length} unreferenced blob(s), ${report.unreferencedBytes} B${report.apply ? ' — removed:' : ' (dry-run; pass --apply to delete):'}`);
+          for (const h of report.unreferenced.slice(0, 20)) out(`  sha256:${h}`);
+          if (report.unreferenced.length > 20) out(`  … +${report.unreferenced.length - 20} more`);
+        }
+      }
+    } finally { app.close(); }
+    return;
+  }
 
   if (cmd === 'verify') {
     const bundleId = positional(3);
