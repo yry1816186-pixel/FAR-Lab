@@ -1759,3 +1759,149 @@ select option { color: var(--text); background: var(--surface); }
 @media (prefers-reduced-motion: reduce) {
   .attach-spinner { animation: none; }
 }
+
+/* ---------- HX redo: conversation-first home (ChatGPT/LibreChat form) ---------- */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  max-width: 780px;
+  margin: 0 auto;
+  padding: var(--sp-7) var(--sp-5) var(--sp-6);
+  width: 100%;
+}
+.home-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--sp-2); }
+.home-greeting {
+  font-family: var(--font-statement);
+  font-size: 30px;
+  line-height: 38px;
+  font-weight: 600;
+  color: var(--v2-text-1);
+  margin: 0;
+}
+.home-sub { max-width: 580px; margin: 0; }
+.home-health { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-aux); color: var(--v2-text-2); }
+.home-composer { width: 100%; margin-top: var(--sp-3); text-align: left; }
+.home .example-questions { margin-top: var(--sp-3); display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.home .example-chips { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.home-hows {
+  list-style: none;
+  display: flex;
+  gap: var(--sp-5);
+  padding: var(--sp-3) 0 0;
+  margin: var(--sp-2) 0 0;
+  flex-wrap: wrap;
+  justify-content: center;
+  border-top: 1px solid var(--v2-border);
+  width: 100%;
+}
+.home-how { display: flex; align-items: center; gap: 6px; font-size: var(--fs-aux); color: var(--v2-text-2); }
+.home-recent { text-align: left; }
+.home-recent-title { font-size: var(--fs-h3); margin-bottom: var(--sp-2); }
+.home-recent .recent-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); }
+.recent-card-go { opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); margin-left: auto; }
+.recent-card:hover .recent-card-go { opacity: 1; }
+@media (max-width: 900px) { .home-recent .recent-cards { grid-template-columns: 1fr; } }
+
+/* ---------- Composer v2: one card, tool rail, round send ---------- */
+.composer2 { display: flex; flex-direction: column; gap: var(--sp-2); }
+.composer2-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--v2-form-border);
+  border-radius: 12px;
+  background: var(--v2-surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+  overflow: hidden;
+}
+.composer2-card:focus-within { border-color: var(--v2-info); box-shadow: 0 0 0 3px var(--v2-info-tint), 0 4px 16px rgba(0, 0, 0, 0.05); }
+.composer2--drag .composer2-card { border-color: var(--v2-info); box-shadow: 0 0 0 3px var(--v2-info-tint); }
+.composer2-input {
+  border: none;
+  outline: none;
+  resize: none;
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  font: inherit;
+  font-size: 15px;
+  line-height: 24px;
+  color: var(--v2-text-1);
+  background: transparent;
+  min-height: 56px;
+}
+.composer2-tools { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--v2-border); }
+.composer2-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--v2-text-2);
+  font: inherit;
+  font-size: var(--fs-aux);
+  padding: 5px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.composer2-tool:hover:not(:disabled) { background: var(--v2-surface-2); color: var(--v2-text-1); }
+.composer2-tool--active { background: var(--v2-surface-2); color: var(--v2-text-1); }
+.composer2-tool--model span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer2-spacer { flex: 1; }
+.composer2-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: var(--v2-btn-ink);
+  color: var(--v2-btn-ink-fg);
+  cursor: pointer;
+  transition: opacity var(--dur-fast);
+}
+.composer2-send:disabled { opacity: 0.3; cursor: default; }
+.composer2-send:not(:disabled):hover { opacity: 0.85; }
+.composer2-advanced { border-top: 1px dashed var(--v2-border); padding-top: var(--sp-2); }
+.composer2-advanced summary { cursor: pointer; color: var(--v2-text-2); font-size: var(--fs-aux); }
+.composer2-card .attach-tray { padding: var(--sp-2) var(--sp-4) 0; }
+
+/* ---------- Narrative timeline (L1 story / L3 folded telemetry) ---------- */
+.timeline { display: flex; flex-direction: column; gap: var(--sp-3); }
+.tl-now {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-s);
+  background: var(--v2-info-tint);
+  color: var(--v2-info-on-tint);
+}
+.tl-now-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; margin-top: 6px; flex: none; animation: tl-pulse 1.6s ease-in-out infinite; }
+@keyframes tl-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .tl-now-dot { animation: none; } }
+.tl-stages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.tl-stage { display: flex; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--v2-border); }
+.tl-stage:last-child { border-bottom: none; }
+.tl-stage-icon { color: var(--v2-text-3); display: inline-flex; margin-top: 2px; }
+.tl-stage--done .tl-stage-icon { color: var(--v2-verified); }
+.tl-stage--failed .tl-stage-icon { color: var(--v2-refuted); }
+.tl-stage--running .tl-stage-icon { color: var(--v2-info); }
+.tl-stage-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tl-stage-head { display: flex; align-items: baseline; gap: var(--sp-2); }
+.tl-stage-name { font-weight: 600; font-size: var(--fs-body); color: var(--v2-text-1); }
+.tl-stage-head time { margin-left: auto; }
+.tl-stage-desc { margin: 0; }
+.tl-stage-summary { margin: 0; color: var(--v2-text-1); overflow-wrap: anywhere; }
+.tl-milestone { margin: 2px 0 0; color: var(--v2-text-1); display: flex; align-items: center; gap: 2px; }
+.tl-telemetry { border: 1px solid var(--v2-border); border-radius: var(--radius-s); padding: 6px 10px; background: var(--v2-surface); }
+.tl-telemetry summary { cursor: pointer; user-select: none; }
+.tl-raw { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow: auto; }
+.tl-raw-item { display: flex; gap: 8px; align-items: baseline; }
+.tl-raw-text { color: var(--v2-text-2); overflow-wrap: anywhere; }
+
+/* sidebar list hover affordance (LibreChat-form) */
+.run-item { transition: background var(--dur-fast) var(--ease-standard); }
+.run-item:hover { background: var(--v2-surface-2); }
