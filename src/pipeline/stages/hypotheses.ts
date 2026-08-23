@@ -18,6 +18,7 @@ import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
+import { isCancellationError } from './guard.js';
 import {
   assertNotCancelled,
   bucketClaims,
@@ -316,6 +317,73 @@ const buildHypothesis = (
     distinctnessRationale: raw.out.distinctnessRationale,
     createdAt: now,
   });
+};
+
+// ---------------------------------------------------------------------------
+// W-C bilingual display layer (user-approved hybrid, 2026-08-23): one batched
+// temperature-0 call translates every representative's statement/mechanism into
+// Simplified Chinese at generation time, so zh reading is offline-stable in the
+// stored objects. Enrichment semantics: any failure returns a visible skip note
+// and leaves the objects untouched — the run never blocks on display translation.
+// ---------------------------------------------------------------------------
+
+/** Display-set cap for the batched zh call (representatives actually shown/ranked). */
+export const ZH_TRANSLATION_MAX_HYPS = 12;
+
+const HypothesisZhOut = z.object({
+  translations: z.array(
+    z.object({
+      hypothesisId: z.string().min(1),
+      statementZh: z.string().min(1),
+      mechanismZh: z.string().default(''),
+    }),
+  ).min(1),
+});
+
+const HYPOTHESIS_ZH_PROMPT = [
+  'Translate scientific hypothesis statements into Simplified Chinese for a research workbench.',
+  'Strict rules:',
+  '- One output entry per input hypothesis, echoing its hypothesisId exactly.',
+  '- statementZh/mechanismZh are faithful translations: use standard Chinese scientific terminology;',
+  ' never add interpretation, hedging, or new claims; never merge or drop entries.',
+  '- If the mechanism is empty in the input, return an empty mechanismZh.',
+].join('\n');
+
+/**
+ * Persist zh renderings onto already-stored hypotheses. Returns a summary note, or
+ * null when the display layer is off (ctx.zhDisplay absent/false — tests).
+ */
+export const translateHypothesesZh = async (
+  ctx: StageContext,
+  targets: readonly { id: string; statement: string; mechanism: string }[],
+): Promise<string | null> => {
+  if (!ctx.zhDisplay || targets.length === 0) return null;
+  try {
+    const res = await callStructured<z.infer<typeof HypothesisZhOut>>(ctx, {
+      stage: 'generate_hypotheses',
+      purpose: 'bilingual-zh:statements',
+      systemPrompt: HYPOTHESIS_ZH_PROMPT,
+      payload: { hypotheses: targets },
+      schema: HypothesisZhOut,
+      temperature: 0,
+    });
+    let filled = 0;
+    for (const t of res.data.translations) {
+      const stored = ctx.store.getObject('hypothesis', t.hypothesisId);
+      if (stored === null || stored.statementZh !== undefined) continue; // fill-once, never overwrite
+      if (t.statementZh.trim().length === 0) continue;
+      ctx.store.putObject('hypothesis', {
+        ...stored,
+        statementZh: t.statementZh,
+        ...(t.mechanismZh.trim().length > 0 ? { mechanismZh: t.mechanismZh } : {}),
+      });
+      filled += 1;
+    }
+    return `${filled}/${targets.length} representative statements translated`;
+  } catch (e) {
+    if (isCancellationError(e)) throw e;
+    return `skipped (${e instanceof Error ? e.message : String(e)})`;
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -874,6 +942,20 @@ export const generateHypothesesStage: StageHandler = {
     }
 
     const representatives = clusters.length;
+
+    // ---- W-C bilingual display layer: one batched zh translation of every
+    // representative's statement/mechanism (display aid — English stays
+    // authoritative for all evidence logic; failure degrades visibly, never blocks).
+    const zhTargets = clusters
+      .map((cl) => cl.members[0] ?? 0)
+      .slice(0, ZH_TRANSLATION_MAX_HYPS)
+      .map((i) => {
+        const raw = raws[i];
+        return raw === undefined ? undefined : { id: idOfIndex(i), statement: raw.out.statement, mechanism: raw.out.mechanism };
+      })
+      .filter((t): t is { id: string; statement: string; mechanism: string } => t !== undefined);
+    const zhNote = await translateHypothesesZh(ctx, zhTargets);
+
     const parts = [
       `generated ${raws.length} candidates via 3 strategies (${STRATEGY_DEFS.map((d) => d.strategy).join(', ')});`,
       `clustered into ${representatives} paraphrase-distinct representatives (${duplicates} duplicate(s) marked '${DUPLICATE_MARKER}<id>', stored with shared clusterKey);`,
@@ -898,6 +980,7 @@ export const generateHypothesesStage: StageHandler = {
       );
     }
     if (litNotes.length > 0) parts.push(`literature-novelty notes: ${litNotes.join(' | ')}`);
+    if (zhNote !== null) parts.push(`zh display: ${zhNote}`);
     return { kind: 'done', summary: parts.join(' ') };
   },
 };

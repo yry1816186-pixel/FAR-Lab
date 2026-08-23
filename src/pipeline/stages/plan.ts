@@ -4,6 +4,13 @@ import type { HypothesisCandidate } from '../../domain/index.js';
 import { callStructured } from '../llm.js';
 import type { StageHandler } from '../types.js';
 import { checkStructuredPreregistration, freezePlan } from './plan-formal.js';
+import { isCancellationError } from './guard.js';
+
+/** W-C bilingual display layer: zh rendering of the plan objective (one temp-0 call). */
+const ObjectiveZhOut = z.object({ objectiveZh: z.string().min(1) });
+const PLAN_OBJECTIVE_ZH_PROMPT =
+  'Translate one research-plan objective into Simplified Chinese. Use standard Chinese scientific ' +
+  'terminology; translate faithfully without adding interpretation, hedging or new claims.';
 
 /**
  * plan stage (mission §31): turn the top-ranked representative hypotheses into a
@@ -384,9 +391,37 @@ export const planStage: StageHandler = {
       );
     }
 
-    const summary = plan.executabilityCheck.passed
-      ? `plan ${plan.id} covers ${plan.hypothesisIds.length} hypothesis(es); executabilityCheck passed; frozen ${plan.planHash.slice(0, 12)}; ${plan.predictions.length} prediction(s) on ledger`
-      : `plan ${plan.id} persisted with executabilityCheck FAILED — missing: ${plan.executabilityCheck.missing.join('; ')}`;
+    // W-C bilingual display layer: one temperature-0 call renders the objective in
+    // Simplified Chinese (display aid; failure degrades visibly, never blocks).
+    let zhNote: string | null = null;
+    if (ctx.zhDisplay) {
+      try {
+        const zh = await callStructured<z.infer<typeof ObjectiveZhOut>>(ctx, {
+          stage: 'plan',
+          purpose: 'bilingual-zh:objective',
+          systemPrompt: PLAN_OBJECTIVE_ZH_PROMPT,
+          payload: { objective: plan.objective },
+          schema: ObjectiveZhOut,
+          temperature: 0,
+        });
+        if (zh.data.objectiveZh.trim().length > 0) {
+          const stored = ctx.store.getObject('plan', plan.id);
+          if (stored !== null && stored.objectiveZh === undefined) {
+            ctx.store.putObject('plan', { ...stored, objectiveZh: zh.data.objectiveZh });
+          }
+          zhNote = 'objective translated to zh';
+        }
+      } catch (e) {
+        if (isCancellationError(e)) throw e;
+        zhNote = `zh skipped (${e instanceof Error ? e.message : String(e)})`;
+      }
+    }
+
+    const summary =
+      (plan.executabilityCheck.passed
+        ? `plan ${plan.id} covers ${plan.hypothesisIds.length} hypothesis(es); executabilityCheck passed; frozen ${plan.planHash.slice(0, 12)}; ${plan.predictions.length} prediction(s) on ledger`
+        : `plan ${plan.id} persisted with executabilityCheck FAILED — missing: ${plan.executabilityCheck.missing.join('; ')}`) +
+      (zhNote !== null ? `; zh display: ${zhNote}` : '');
     ctx.log(summary);
     return { kind: 'done', summary };
   },

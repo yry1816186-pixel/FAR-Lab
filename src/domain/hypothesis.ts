@@ -126,6 +126,14 @@ export const HypothesisCandidate = z.object({
   /** Cluster of paraphrase-equivalent candidates; one representative survives ranking. */
   clusterKey: z.string().optional(),
   distinctnessRationale: z.string().optional(), // how it differs in mechanism/assumptions/predictions
+  /**
+   * W-C bilingual display layer (user-approved hybrid): Simplified-Chinese rendering of
+   * the statement/mechanism, produced at generation time (one batched call, temperature 0)
+   * so zh reading is offline-stable. Optional + absent-tolerant: translation failure
+   * never blocks the run. English stays authoritative for all evidence logic.
+   */
+  statementZh: z.string().optional(),
+  mechanismZh: z.string().optional(),
   createdAt: z.string().datetime(),
 });
 export type HypothesisCandidate = z.infer<typeof HypothesisCandidate>;
