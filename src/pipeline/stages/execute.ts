@@ -4,6 +4,7 @@ import { draftSpecFromPlan, draftMetaSpecFromPlan } from '../../experiment/spec-
 import { executeExperiment } from '../../experiment/executor.js';
 import { executeMetaAnalysis } from '../../experiment/executor-meta.js';
 import { RunBudgetExhaustedError } from '../../app/run-budget.js';
+import { experimentLegStatus } from '../../app/iteration.js';
 import type { ModelPlaneDeps } from '../llm.js';
 
 /**
@@ -27,12 +28,16 @@ import type { ModelPlaneDeps } from '../llm.js';
 export const executeStage: StageHandler = {
   stage: 'execute',
 
-  /** Applicable when a plan exists and no executed experiment is recorded for it yet. */
+  /**
+   * Applicable when the plan leg has executable unexecuted work (research-loop lane):
+   * no plan-drafted experiment completed yet, OR the plan was causally revised (re-frozen)
+   * after the last one — a new registration deserves its own experiment. Semantics
+   * owned by experimentLegStatus (src/app/iteration.ts), shared with the iteration
+   * controller so the stage gate and the loop controller can never disagree.
+   */
   async applicable(ctx) {
-    const plan = ctx.store.listObjects('plan', ctx.run.id).at(-1);
-    if (plan === undefined) return false;
-    const runs = ctx.store.listObjects('experiment_run', ctx.run.id);
-    return !runs.some((r) => r.specId.startsWith('xsp_') && r.status === 'completed');
+    const leg = experimentLegStatus(ctx.store, ctx.run.id);
+    return leg.kind === 'unexecuted' || leg.kind === 'plan_revised_since_experiment';
   },
 
   async execute(ctx: StageContext): Promise<StageOutcome> {

@@ -125,8 +125,28 @@ describe('evaluateIteration (pure decision procedure)', () => {
     const planId = addPlan(store, runId, hypId);
     const it = evaluateIteration({ store, runId, round: 1, budget: unlimitedBudget() });
     expect(it.decision).toBe('continue');
-    expect(it.record.continueTrigger).toEqual({ kind: 'executable_plan_unexecuted', planId });
+    expect(it.record.continueTrigger).toEqual({ kind: 'executable_plan_unexecuted', planId, because: 'never_executed' });
     expect(it.reopenStages).toEqual(['execute', 'feedback', 'revise', 'export']);
+  });
+
+  it('a causally REVISED plan (re-frozen after the experiment) re-arms the execute leg', () => {
+    const { store, runId } = openStore();
+    const hypId = addHypothesis(store, runId);
+    const planId = addPlan(store, runId, hypId);
+
+    // experiment completed at T0, then the plan was revised and re-frozen at T1 > T0
+    const t0 = '2026-08-24T10:00:00.000Z';
+    const t1 = '2026-08-24T11:00:00.000Z';
+    store.putObject('experiment_run', ExperimentRun.parse({
+      id: newId('xrun'), runId, specId: newId('xsp'), specHash: 'a'.repeat(64), status: 'completed',
+      startedAt: t0, endedAt: t0, createdAt: t0,
+    }));
+    const plan = store.getObject('plan', planId)!;
+    store.putObject('plan', { ...plan, frozenAt: t1, planHash: 'b'.repeat(64) });
+
+    const it = evaluateIteration({ store, runId, round: 2, budget: unlimitedBudget() });
+    expect(it.decision).toBe('continue');
+    expect(it.record.continueTrigger).toEqual({ kind: 'executable_plan_unexecuted', planId, because: 'revised_since' });
   });
 
   it('a completed experiment disables the execute-leg trigger', () => {
@@ -319,5 +339,114 @@ describe('orchestrator: iteration rounds', () => {
     // the material fingerprint moved (a Revision exists) — the epoch record differs
     expect(records[1]!.snapshot.fingerprint).not.toBe(records[0]!.snapshot.fingerprint);
     expect(records[1]!.snapshot.revisions).toBe(1);
+  });
+
+  it('full falsification cascade: experiment -> feedback -> revise(re-freeze) -> re-experiment, bounded by round cap', async () => {
+    const { store, runId } = openStore();
+    const { unconsumedSignals } = await import('../src/pipeline/stages/revise.js');
+    const { executeStage } = await import('../src/pipeline/stages/execute.js');
+
+    // deterministic clock: every persisted write is strictly later than the previous
+    let tick = 0;
+    const at = (): string => new Date(Date.parse('2026-08-24T10:00:00Z') + tick++ * 1000).toISOString();
+
+    const hypId = newId('hyp');
+    const planId = newId('pln');
+    let executeAttempts = 0;
+
+    const stages = new Map<RunStageName, StageHandler>(STAGE_ORDER.map((s) => [
+      s,
+      s === 'generate_hypotheses'
+        ? {
+            stage: s,
+            applicable: async () => store.listObjects('hypothesis', runId).length === 0,
+            execute: async () => {
+              store.putObject('hypothesis', HypothesisCandidate.parse({
+                id: hypId, runId, statement: 'X causes Y', mechanism: 'm', createdAt: at(),
+                derivation: { strategy: 'mechanism_driven', rationale: 'test', inputClaimIds: [] },
+              }));
+              return { kind: 'done', summary: 'hypothesis' };
+            },
+          }
+        : s === 'plan'
+        ? {
+            stage: s,
+            applicable: async () => store.listObjects('plan', runId).length === 0,
+            execute: async () => {
+              store.putObject('plan', ResearchPlan.parse({
+                id: planId, runId, objective: 'test', hypothesisIds: [hypId],
+                steps: [1, 2, 3].map((n) => ({
+                  id: newId('task'), title: `step ${n}`, kind: 'data_analysis' as const, method: `m${n}`,
+                  failureConditions: ['none'],
+                })),
+                metrics: ['r2', 'mae'], decisionRules: {
+                  successCriterion: 's', weakeningCriterion: 'w', falsificationCriterion: 'f', stopCriterion: 'st',
+                },
+                frozenAt: at(), planHash: 'a'.repeat(64), createdAt: at(),
+              }));
+              return { kind: 'done', summary: 'plan' };
+            },
+          }
+        : s === 'execute'
+        ? {
+            stage: s,
+            // the REAL applicability gate (shared with the iteration controller)
+            applicable: (ctx) => executeStage.applicable(ctx),
+            execute: async () => {
+              executeAttempts += 1;
+              const specId = newId('xsp');
+              store.putObject('experiment_run', ExperimentRun.parse({
+                id: newId('xrun'), runId, specId, specHash: `${executeAttempts}`.padEnd(64, '0'), status: 'completed',
+                startedAt: at(), endedAt: at(), createdAt: at(),
+              }));
+              // the executor queues experiment-verdict feedback for revise (real path does this)
+              store.putObject('feedback', FeedbackSignal.parse({
+                id: newId('fbk'), runId, source: 'experiment',
+                content: `verdict from experiment attempt ${executeAttempts}`,
+                structured: { verdict: executeAttempts === 1 ? 'refuted' : 'supported' },
+                provenance: `experiment:${specId}`, receivedAt: at(),
+              }));
+              return { kind: 'done', summary: `experiment attempt ${executeAttempts}` };
+            },
+          }
+        : s === 'revise'
+        ? {
+            stage: s,
+            applicable: async (ctx) => unconsumedSignals(ctx).length > 0,
+            execute: async (ctx) => {
+              for (const sig of unconsumedSignals(ctx)) {
+                store.putObject('revision', Revision.parse({
+                  id: newId('rev'), runId, triggerFeedbackId: sig.id,
+                  causalReason: 'experiment verdict forces a plan revision',
+                  operations: [{ objectType: 'plan', objectId: planId, operation: 'modify', reason: 'verdict' }],
+                  fromVersionLabel: `v${executeAttempts - 1}`, toVersionLabel: `v${executeAttempts}`,
+                  qualityDelta: { status: 'inconclusive', claim: 'test', evidenceRefs: [] },
+                  createdAt: at(),
+                }));
+              }
+              // causal plan revision re-freezes the plan (real revise.ts semantics)
+              const plan = store.getObject('plan', planId)!;
+              store.putObject('plan', { ...plan, frozenAt: at(), planHash: `${executeAttempts}`.padEnd(64, '1') });
+              return { kind: 'done', summary: 'revise consumed verdicts and re-froze the plan' };
+            },
+          }
+        : okHandler(s),
+    ] as const));
+
+    const run = await buildOrchestrator(store, stages).execute(runId);
+    expect(run.status).toBe('completed');
+
+    // the cascade actually ran: experiment re-executed on each revised plan version
+    expect(executeAttempts).toBe(3);
+    expect(store.listObjects('experiment_run', runId)).toHaveLength(3);
+    // the execute gate re-armed between rounds via the REAL shared leg semantics
+    const records = store.listObjects('iteration', runId);
+    expect(records.map((r) => [r.round, r.decision, r.stopReason?.kind ?? r.continueTrigger?.kind])).toEqual([
+      [1, 'continue', 'executable_plan_unexecuted'],
+      [2, 'continue', 'executable_plan_unexecuted'],
+      [3, 'stop', 'round_cap'],
+    ]);
+    // every continue was the revised-plan leg (r1: revised during the same pass; r2: likewise)
+    expect(records.filter((r) => r.decision === 'continue').every((r) => r.continueTrigger?.kind === 'executable_plan_unexecuted')).toBe(true);
   });
 });

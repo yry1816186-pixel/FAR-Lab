@@ -35,6 +35,36 @@ const EXPERIMENT_LEG: readonly RunStageName[] = ['execute', 'feedback', 'revise'
 
 const sha = (s: string): string => createHash('sha256').update(s).digest('hex');
 
+/**
+ * State of the plan-vs-experiment leg (shared by the iteration controller and the
+ * execute stage's applicability gate — ONE owner of the semantics). A plan counts
+ * as unexecuted when no plan-drafted experiment has completed, OR when the plan was
+ * causally REVISED after the last completed experiment (revise re-freezes the plan:
+ * frozenAt moves past the experiment's endedAt — a new registration deserving a new
+ * experiment, with the spec-level sequential-analysis guard disclosing re-testing).
+ */
+export type ExperimentLegStatus =
+  | { kind: 'no_plan' }
+  | { kind: 'unexecuted'; planId: string }
+  | { kind: 'plan_revised_since_experiment'; planId: string; frozenAt: string; lastExperimentEndedAt: string }
+  | { kind: 'current'; planId: string };
+
+export const experimentLegStatus = (store: Store, runId: string): ExperimentLegStatus => {
+  const plan = store.listObjects('plan', runId).at(-1);
+  if (plan === undefined) return { kind: 'no_plan' };
+  const lastCompleted = store
+    .listObjects('experiment_run', runId)
+    .filter((r) => r.specId.startsWith('xsp_') && r.status === 'completed')
+    .sort((a, b) => (b.endedAt ?? b.createdAt).localeCompare(a.endedAt ?? a.createdAt))[0];
+  if (lastCompleted === undefined) return { kind: 'unexecuted', planId: plan.id };
+  const frozenAt = plan.frozenAt ?? null;
+  const endedAt = lastCompleted.endedAt ?? null;
+  if (frozenAt !== null && endedAt !== null && frozenAt > endedAt) {
+    return { kind: 'plan_revised_since_experiment', planId: plan.id, frozenAt, lastExperimentEndedAt: endedAt };
+  }
+  return { kind: 'current', planId: plan.id };
+};
+
 /** Material domain counts of the run right now — the no-delta fingerprint input. */
 export const computeIterationSnapshot = (store: Store, runId: string, round: number): IterationSnapshot => {
   const claims = store.listObjects('claim', runId);
@@ -178,22 +208,24 @@ export const evaluateIteration = (opts: {
     };
   }
 
-  const plan = store.listObjects('plan', runId).at(-1);
-  if (plan !== undefined) {
-    const hasCompletedRun = store
-      .listObjects('experiment_run', runId)
-      .some((r) => r.specId.startsWith('xsp_') && r.status === 'completed');
+  const leg = experimentLegStatus(store, runId);
+  if (leg.kind !== 'no_plan') {
+    const plan = store.listObjects('plan', runId).at(-1)!;
     const hypothesisIds = new Set(store.listObjects('hypothesis', runId).map((h) => h.id));
     const executable = checkPlanExecutability(plan, hypothesisIds).passed;
-    if (!hasCompletedRun && executable) {
+    const because = leg.kind === 'unexecuted' ? 'never_executed' : leg.kind === 'plan_revised_since_experiment' ? 'revised_since' : null;
+    if (because !== null && executable) {
+      const rationale = leg.kind === 'plan_revised_since_experiment'
+        ? `plan ${plan.id} was causally revised (re-frozen ${leg.frozenAt.slice(0, 19)}) after the last completed experiment (${leg.lastExperimentEndedAt.slice(0, 19)}) — the revised registration deserves its own experiment`
+        : `plan ${plan.id} passes the deterministic executability check but no experiment has completed — reopening execute -> feedback -> revise -> export`;
       return {
         decision: 'continue',
         reopenStages: EXPERIMENT_LEG,
         record: buildRecord(runId, round, decidedAt, snapshot, {
           decision: 'continue',
-          continueTrigger: { kind: 'executable_plan_unexecuted', planId: plan.id },
+          continueTrigger: { kind: 'executable_plan_unexecuted', planId: plan.id, because },
           reopenStages: EXPERIMENT_LEG,
-          rationale: `plan ${plan.id} passes the deterministic executability check but no experiment has completed — reopening execute -> feedback -> revise -> export`,
+          rationale,
         }),
       };
     }
@@ -208,7 +240,7 @@ export const evaluateIteration = (opts: {
   for (const spec of approvedUnrun.slice(0, 3)) {
     unblockHints.push(`approved experiment spec ${spec.id} has no completed run: far experiment rerun ${spec.id}`);
   }
-  if (plan !== undefined && store.listObjects('experiment_run', runId).some((r) => r.status === 'completed')) {
+  if (leg.kind !== 'no_plan' && store.listObjects('experiment_run', runId).some((r) => r.status === 'completed')) {
     unblockHints.push('falsification loop has executed evidence — add expert/literature feedback to drive a causal revision round');
   }
   return {
