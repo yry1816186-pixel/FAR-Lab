@@ -375,7 +375,34 @@ export class Store {
     const createdAt = parsed.createdAt ?? new Date().toISOString();
     this.db.prepare('INSERT OR REPLACE INTO objects (kind, id, run_id, json, created_at) VALUES (?,?,?,?,?)')
       .run(kind, id, runId, JSON.stringify(parsed), createdAt);
+    // Re-audit fix (final blind-spot re-audit #1): lineage edges get a LIVE
+    // writer at the persistence choke point — post-migration runs now feed
+    // lineage_edges/PROV-O/CiTO exactly like the one-shot backfill did for
+    // history. Deterministic derivation, same fields the backfill reads.
+    if (kind === 'evidence_relation' || kind === 'revision') {
+      this.recordLineageEdgesFromPayload(kind, parsed as unknown as Record<string, unknown>, runId);
+    }
     this.touchFts(kind);
+  }
+
+  /** Shared deterministic edge derivation — backfill and live writer read identical fields. */
+  private recordLineageEdgesFromPayload(kind: 'evidence_relation' | 'revision', parsed: Record<string, unknown>, runId: string): void {
+    const at = typeof parsed.createdAt === 'string' ? parsed.createdAt : new Date().toISOString();
+    const insert = this.db.prepare('INSERT OR IGNORE INTO lineage_edges (from_id, to_id, kind, run_id, at) VALUES (?,?,?,?,?)');
+    if (kind === 'evidence_relation') {
+      const target = (parsed.targetHypothesisId as string | undefined) ?? (parsed.targetClaimId as string | undefined);
+      if (typeof parsed.id === 'string' && target !== undefined && typeof parsed.relation === 'string') {
+        insert.run(parsed.id, target, LINEAGE_COUNTER_RELATIONS.has(String(parsed.relation)) ? 'counter_evidence' : 'support_evidence', runId, at);
+      }
+      return;
+    }
+    if (typeof parsed.id === 'string') {
+      if (typeof parsed.triggerFeedbackId === 'string') insert.run(parsed.triggerFeedbackId, parsed.id, 'caused_revision', runId, at);
+      const ops = Array.isArray(parsed.operations) ? (parsed.operations as Array<{ objectId?: unknown }>) : [];
+      for (const op of ops) {
+        if (typeof op?.objectId === 'string') insert.run(parsed.id, op.objectId, 'revises', runId, at);
+      }
+    }
   }
 
   getObject<K extends ObjectKind>(kind: K, id: string): DomainObject<K> | null {

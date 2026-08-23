@@ -677,6 +677,22 @@ function parseSeedSources(raw: unknown): string | {
    * (env-presence only — never key values) + build revision. 503 when the DB
    * check fails; never a fake "ok".
    */
+  // Re-audit fix (final blind-spot #4): the audit chain was write-only —
+  // verifyEventChain had no production caller. Verified lazily ONCE per server
+  // process (O(total events), sub-second at workspace scale) and surfaced in /health.
+  let auditChainCache: { ok: boolean; brokenRuns: string[]; verifiedAt: string } | null = null;
+  const auditChainStatus = (): { ok: boolean; brokenRuns: string[]; verifiedAt: string } => {
+    if (auditChainCache === null) {
+      const broken: string[] = [];
+      for (const r of app.store.listRuns(500)) {
+        const v = app.store.verifyEventChain(r.id);
+        if (!v.ok) broken.push(r.id);
+      }
+      auditChainCache = { ok: broken.length === 0, brokenRuns: broken, verifiedAt: new Date().toISOString() };
+    }
+    return auditChainCache;
+  };
+
   const health = (res: http.ServerResponse): void => {
     const providers = listProviders().map((p) => ({ name: p.name, kind: p.kind, liveReady: p.liveReady }));
     // B12-G1: the health strip must reflect the ACTIVE route — when the user's
@@ -701,6 +717,7 @@ function parseSeedSources(raw: unknown): string | {
       sendJson(res, 200, {
         status: 'ok',
         db: 'ok',
+        auditChain: auditChainStatus(),
         watchdog,
         providers,
         ...(activeRoute !== null ? { activeRoute } : {}),

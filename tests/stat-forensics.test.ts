@@ -103,3 +103,13 @@ describe('RU-5 GO1 — split-conformal intervals', () => {
     expect(() => conformalInterval([], 0, 0.1)).toThrow(/calibration/);
   });
 });
+
+describe('conformal under-coverage regime (re-audit fix)', () => {
+  it('alpha < 1/(n+1) fails closed instead of silently clamping', () => {
+    const residuals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; // n=10; need alpha >= 1/11
+    expect(() => conformalInterval(residuals, 0, 0.05)).toThrow(/alpha=0.05 too small/);
+    expect(() => conformalInterval(residuals, 0, 0.09)).toThrow(/too small/);
+    // exactly at the boundary is fine: alpha = 1/11
+    expect(() => conformalInterval(residuals, 0, 1 / 11)).not.toThrow();
+  });
+});
