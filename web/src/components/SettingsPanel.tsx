@@ -54,6 +54,13 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
   const [discovered, setDiscovered] = useState<Record<string, DiscoveredModel[]>>({});
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // onClose identity churns on every parent poll re-render (App re-renders
+  // every 2-5s). Keeping it in a ref keeps the open-effect to one run per
+  // open — otherwise each poll tick wiped the in-progress form (setForm(null))
+  // and stole focus back to the background element: the panel appeared to
+  // "auto-close" while the researcher was configuring a model (user report).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -70,7 +77,7 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener('keydown', onKey, true);
@@ -79,7 +86,8 @@ export function SettingsPanel({ open, onClose }: { open: boolean; onClose: () =>
       restoreFocusRef.current?.focus();
       restoreFocusRef.current = null;
     };
-  }, [open, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open-transition only; onClose via ref (see above)
+  }, [open]);
 
   if (!open) return null;
 
