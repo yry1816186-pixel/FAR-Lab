@@ -93,7 +93,7 @@ describe('run deletion: store cascade + FTS mirror', () => {
     expect(counts!.objects).toBeGreaterThanOrEqual(1); // hypothesis (+ any others seeded by createRun)
     expect(counts!.events).toBeGreaterThanOrEqual(1); // run_created at minimum
     expect(counts!.checkpoints).toBeGreaterThanOrEqual(1); // the step output above
-    expect(counts!.searchRows).toBe(1); // exactly run A's hypothesis mirror row
+    expect(counts!.searchRows).toBe(2); // run A's hypothesis mirror row: unicode61 + trigram (dual-index)
 
     // Run A is gone everywhere; run B is fully intact.
     expect(app.store.getRun(a.runId)).toBeNull();
