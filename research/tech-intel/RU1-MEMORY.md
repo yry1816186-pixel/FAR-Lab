@@ -86,7 +86,11 @@ conversation agent, human researcher. Today: every run isolated, FTS5+TF-IDF onl
   FTS5-vs-hybrid A/B decides fastembed adoption.
 
 ## UNVERIFIED
-Tencent LICENSE exact text + maintenance cadence; fastembed Windows wheel size
+~~Tencent LICENSE exact text~~ RESOLVED 2026-08-24 (frontier radar, main-Agent):
+LICENSE file read directly via raw.githubusercontent — standard MIT text under
+"Tencent is pleased to support..." preamble; repo active (v2.0.1-beta.2,
+pushed 2026-08-15). GitHub API spdx=NOASSERTION is a detector false negative.
+fastembed Windows wheel size
 + offline model fetch; sqlite-vec+node:sqlite on Windows (Tencent proves
 pattern, local run pending); AutoSci eval claims; paper-only candidates
 (EvoScientist/ReasoningBank/Kosmos/MEM1) not source-read.

@@ -323,20 +323,20 @@ raw in research/tech-intel/blindspot/). New/changed leaves marked
 ~175 leaves. STRONG ~85 / PARTIAL ~28 / DESIGN ~11 / MISSING ~46 / REJ-TRIG ~8.
 MISSING clusters → Research Units (registry IDs), priority-ordered:
 
-| RU | Theme | Leaves | Priority |
+| RU | Theme | Leaves | Priority / status (2026-08-24 P1 wave) |
 |---|---|---|---|
-| RU-1 MEMORY | Cross-run research memory substrate | A12.*, B5.2-3, B5.5-9 | P0 (mandatory lead TencentDB Agent Memory; AutoSci SciMem; fastembed unlock) |
-| RU-2 LINEAGE | Trajectory graph + event query + branching | B4.*, C3.7, A8.5 | P0 (AVO G3/G6; AER schema ready) |
-| RU-3 COGSEC | Cognitive-layer agent security | F11-F17, A13.6, B5.9, C9.2 | P0 (2 independent hunters; OWASP ASI 2026) |
-| RU-4 SCHED | Scheduling authority + supervisor + CodeAct | B2.*, B3.*, C6.2 | P0 (AVO S8 continuation) |
-| RU-5 QUANT | Quantitative evidence pipeline | A2.6, A3.7, A7.2+, D1.3, D9.1 | P1 |
-| RU-6 SCISOFT | Scientific-software methodology pack | A2.12-13, A3.5 reopen, A5.6 OSF, A7.3 webR/NMA, A11.1 PRISMA, CiTO | P1 |
-| RU-7 STORAGE | Storage/reliability hardening | C3.4-6, C5.1, C11.3, C12.1 | P1 |
-| RU-8 CAMPAIGN | Multi-experiment + dataset audit + arrays + checkpoints | A6.1 audit, A6.6, A6.10, A7.5 conformal | P1 |
-| RU-9 CTXENG | Context composition + effort plane + KV-cache + prompt CI | B1.6, B6.4, B7.7, C4.3 | P1 |
-| RU-10 CORPUS | BYO-corpus + dedup + cross-run cache + multilingual + entity grounding | A2.8-9, A2.11, A2.14-15 | P1 |
-| RU-11 HCI-RESEARCHER | Reading/annotation/sensemaking/trust-calibration/screening UX | E15-E17, A2.7 UX, E13.1, E14.1, D3.3 | P1 |
-| RU-12 TOOLING | Debugger semantics + diff/merge + literate docs + session attach | A8.5 UX, B13.3, C5.2, A11.5 | P2 |
-| RU-13 SURFACE | Inverse MCP/A2A + SSE notifications + competitive watch | B8.2-3, E19 | P2 |
-| RU-14 EVAL-EXEC | Execution-side benchmarks + process evaluators + info-gain | A13.3+, B6.2-3, A8.4 | P1 |
-| RU-15 SEARCH-TIME | Inference-time search for generation | A4.7 | P2 |
+| RU-1 MEMORY | Cross-run research memory substrate | A12.*, B5.2-3, B5.5-9 | P0 — INTEGRATED (see registry; TencentDB LICENSE question closed 08-24) |
+| RU-2 LINEAGE | Trajectory graph + event query + branching | B4.*, C3.7, A8.5 | P0 — INTEGRATED storage; fork writer + PROV-O landed |
+| RU-3 COGSEC | Cognitive-layer agent security | F11-F17, A13.6, B5.9, C9.2 | P0 — T0-T6 INTEGRATED |
+| RU-4 SCHED | Scheduling authority + supervisor + CodeAct | B2.*, B3.*, C6.2 | P0 — DESIGN Route A (AVO lane) |
+| RU-5 QUANT | Quantitative evidence pipeline | A2.6, A3.7, A7.2+, D1.3, D9.1 | P1 — SHORTLISTED (packet RU5) |
+| RU-6 SCISOFT | Scientific-software methodology pack | A2.12-13, A3.5 reopen, A5.6 OSF, A7.3 webR/NMA, A11.1 PRISMA, CiTO | P1 — GO1/2/4 LANDED; GO3 queued |
+| RU-7 STORAGE | Storage/reliability hardening | C3.4-6, C5.1, C11.3, C12.1 | P1 — backup/DLQ/clock LANDED (86f12b2); packet RU7 covers residual outbox/backpressure/fault-matrix |
+| RU-8 CAMPAIGN | Multi-experiment + dataset audit + arrays + checkpoints | A6.1 audit, A6.6, A6.10, A7.5 conformal | P1 — SHORTLISTED (packet RU8) |
+| RU-9 CTXENG | Context composition + effort plane + KV-cache + prompt CI | B1.6, B6.4, B7.7, C4.3 | P1 — SHORTLISTED (packet RU9) |
+| RU-10 CORPUS | BYO-corpus + dedup + cross-run cache + multilingual + entity grounding | A2.8-9, A2.11, A2.14-15 | P1 — SHORTLISTED (packet RU10; trigram zh route probe-proven) |
+| RU-11 HCI-RESEARCHER | Reading/annotation/sensemaking/trust-calibration/screening UX | E15-E17, A2.7 UX, E13.1, E14.1, D3.3 | P1 — PROPOSAL READY, user-gated (packet RU11) |
+| RU-12 TOOLING | Debugger semantics + diff/merge + literate docs + session attach | A8.5 UX, B13.3, C5.2, A11.5 | P2 — SHORTLISTED (packet RU12) |
+| RU-13 SURFACE | Inverse MCP/A2A + SSE notifications + competitive watch | B8.2-3, E19 | P2 — SHORTLISTED (packet RU13; spec read) |
+| RU-14 EVAL-EXEC | Execution-side benchmarks + process evaluators + info-gain | A13.3+, B6.2-3, A8.4 | P1 — SHORTLISTED (packet RU14; RCB verified) |
+| RU-15 SEARCH-TIME | Inference-time search for generation | A4.7 | P2 — SHORTLISTED (packet RU15) |

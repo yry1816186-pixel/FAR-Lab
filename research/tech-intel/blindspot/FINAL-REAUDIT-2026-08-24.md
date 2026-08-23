@@ -39,10 +39,21 @@ protocol (B4.3 extension).
   unbounded (idempotent-harmless).
 
 ## Disposition (main Agent)
-FIX NOW (this batch): conformal k-hole; lineage live writer (putObject choke
-point); verifyEventChain at server health. QUEUE (tracked here): DLQ surface
-+ terminal projection + backup verb + taint enforcement + gradeCertainty
-consumes forensics + memory/?tag web surfaces + zh retrieval — next
-implementation batch, all named with file targets above. Tree rows synced.
+FIX LANDED batch 1 (db695f2): conformal k-hole; lineage live writer (putObject
+choke point); verifyEventChain at server health.
+FIX LANDED batch 2 (6ff096e): DLQ surface + terminal projection (dead-list/
+requeue CLI + onDead far.db failed projection) — queue item 1 CLOSED.
+FIX LANDED batch 3 (6873948): 'far backup' verb + docs/backup-restore.md drill
+(queue item 2 CLOSED); forensics GATE gradeCertainty — retracted/EoC floors
+very_low, GRIM/range failures step down (queue item 3a CLOSED; 3b taint
+enforcement still open).
+FIX LANDED batch 4 (bbba1a7) — ALL QUEUE ITEMS CLOSED:
+- taint enforcement: verifyBundle check 11 claim_taint_labels_present (a build
+  that drops labeling discipline FAILS the bundle; api contract 10->11)
+- zh retrieval: searchMemory or-mode owns CJK char-trigram fallback
+- memory surface: 'far memory <query> [--kind k]' CLI verb (trust labels
+  travel), real-workspace smoke verified; ?tag= plane remains API-level (web
+  consumption is HX lane scope).
+Re-audit tracked queue: EMPTY. Tree rows synced.
 Continent verdict: none missing; registry RU-14/11/10 extended with the new
 leaves (A3.10/A13.7/A2.16).

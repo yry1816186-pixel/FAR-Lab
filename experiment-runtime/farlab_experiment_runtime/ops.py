@@ -220,8 +220,58 @@ def op_abs_stats(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def op_dataset_audit(payload: dict[str, Any]) -> dict[str, Any]:
+    """RU-8 GO1: pre-execution dataset audit (verdict ceiling = data quality).
+
+    Deterministic: seeded cross_val_predict; thread counts pinned by the TS
+    executor. Findings are ADVISORY to the researcher (data is never
+    auto-mutated); verdict 'degraded' marks leakage/duplicates/label-error
+    rates that cap the trustworthiness of a preregistered verdict.
+    """
+    import hashlib
+
+    from cleanlab.filter import find_label_issues
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.model_selection import cross_val_predict
+
+    X_train, X_test, y_train, y_test, meta = _load_tabular(payload)
+    seed = int(payload.get("seed", 0))
+
+    def _row_hashes(X):
+        return [hashlib.sha256(np.asarray(row, dtype=np.float64).tobytes()).hexdigest() for row in X]
+
+    train_hashes = _row_hashes(X_train)
+    test_hashes = _row_hashes(X_test)
+    train_dup = len(train_hashes) - len(set(train_hashes))
+    test_dup = len(test_hashes) - len(set(test_hashes))
+    leak = len(set(train_hashes) & set(test_hashes))
+
+    try:
+        clf = LogisticRegression(max_iter=1000, random_state=seed)
+        probs = cross_val_predict(clf, X_train, y_train, cv=min(5, len(y_train)), method="predict_proba")
+        issue_idx = find_label_issues(
+            y_train, probs, return_indices_ranked_by="self_confidence",
+        ).tolist()
+        label_issue_rate = len(issue_idx) / max(len(y_train), 1)
+    except Exception:
+        issue_idx = []
+        label_issue_rate = float("nan")  # honest: not computable (e.g. single class)
+
+    verdict = "ok" if (leak == 0 and train_dup == 0 and test_dup == 0 and not (label_issue_rate > 0.2)) else "degraded"
+    return {
+        "rows": {"train": len(y_train), "test": len(y_test)},
+        "exactDuplicates": {"train": train_dup, "test": test_dup},
+        "trainTestLeakRows": leak,
+        "labelIssueCount": len(issue_idx),
+        "labelIssueRate": label_issue_rate,
+        "verdict": verdict,
+        **meta,
+    }
+
+
 OPS = {
     "env_info": op_env_info,
+    "dataset_audit": op_dataset_audit,
     "train_eval": op_train_eval,
     "paired_stats": op_paired_stats,
     "abs_stats": op_abs_stats,

@@ -28,7 +28,7 @@ RU-6 SCISOFT 3/4 GO 落地(GO3 排 EEL 协调)。
 
 ## 剩余队列(按 registry)
 1. RU-6 GO3 PRISMA(需 EEL lane 协调:计数必须来自管线阶段状态)
-2. ~~RU-1 semantic/profile 写入者~~ 已落地(67857cc);fastembed A/B = BLOCKED-env(hf 不可达)
+2. ~~RU-1 writers~~ 67857cc;RU-7 四项全 INTEGRATED(86f12b2+7dd6ed6 outbox);RU-5 QUANT GO1 conformal+GO2 range guard 477ea63(包与兄弟并行包已对账合并)
 3. RU-2 residual:兄弟 lineage.ts 投影 rebase(其 lane);delegation 边接线
 4. P1 研究波:RU-5 QUANT / RU-7 STORAGE / RU-8 CAMPAIGN / RU-9 CTXENG /
    RU-10 CORPUS / RU-12..15
