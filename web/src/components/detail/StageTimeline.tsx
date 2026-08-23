@@ -4,17 +4,22 @@ import { STAGE_ORDER } from '../../api/types';
 import type { ResearchRun, StageRecord } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { stageKey } from '../../i18n/keys';
+import { StageGantt } from './viz/StageGantt';
 
 /**
  * Full stage timeline: all canonical stages in STAGE_ORDER; stages without a
  * record render as pending (honest "not started" — never hidden or invented).
+ * VIZ V4: a Gantt of the real startedAt→endedAt intervals leads the table —
+ * the table stays the precise record, the bars show where the time went.
  */
 export function StageTimeline({ run }: { run: ResearchRun }): JSX.Element {
   const { t } = useI18n();
   const byStage = new Map<string, StageRecord>(run.stages.map((s) => [s.stage, s]));
 
   return (
-    <table className="data-table">
+    <div>
+      <StageGantt run={run} />
+      <table className="data-table">
       <caption className="sr-only">{t('overview.timeline')}</caption>
       <thead>
         <tr>
@@ -64,6 +69,7 @@ export function StageTimeline({ run }: { run: ResearchRun }): JSX.Element {
           );
         })}
       </tbody>
-    </table>
+      </table>
+    </div>
   );
 }
