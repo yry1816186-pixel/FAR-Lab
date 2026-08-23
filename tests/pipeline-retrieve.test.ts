@@ -1342,3 +1342,48 @@ describe('RU-10 zh fuzzy-key fix', () => {
     expect(en).toBe('vitamin d and depression a trial'); // latin behavior unchanged
   });
 });
+
+
+describe('RU-10 GO2 minhash second-chance merge', () => {
+  // The REAL near-dup class (W5 probe: republished/versioned abstracts) is near-verbatim
+  // with minor publication edits — not paraphrase. Paraphrases are genuinely different
+  // documents and must NOT merge at a high-precision threshold.
+  const LONG_ABSTRACT_A = 'Preoperative nutritional status is associated with postoperative outcomes after gastrointestinal surgery. This multicenter prospective cohort examines serum albumin and the prognostic nutritional index as predictors of complication rates in patients undergoing elective resection across twelve centers, with primary endpoint graded complications within thirty days of surgery.';
+  const LONG_ABSTRACT_A_VARIANT = 'Preoperative nutritional status is associated with postoperative outcomes after gastrointestinal surgery. This multicenter prospective cohort examines serum albumin and the prognostic nutritional index as predictors of complication rates in patients undergoing elective resection across 12 centers, with the primary endpoint of graded complications within 30 days of surgery.';
+
+  it('near-duplicate abstracts with different titles/ids merge via minhash (identifier + fuzzy gates miss)', async () => {
+    const openalex = fakeAdapter('openalex', {
+      search: byQuery({ [PLAN.discovery[0] as string]: [
+        fakeRecord('Nutrition and surgical outcomes: cohort analysis', '10.1000/mh.a', { abstractText: LONG_ABSTRACT_A }),
+      ] }),
+    });
+    const europepmc = fakeAdapter('europepmc', {
+      search: byQuery({ [PLAN.counter[0] as string]: [
+        fakeRecord('Nutritional status predicts complications after GI resection', '10.1000/mh.b', { abstractText: LONG_ABSTRACT_A_VARIANT, identifiers: [{ kind: 'pubmed', value: 'PMC999001' }] }),
+      ] }),
+    });
+    const arxiv = fakeAdapter('arxiv', { search: async () => [] });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(1); // minhash merged
+  });
+
+  it('CJK paraphrase-titled near-duplicates merge (zh path through character-bigram shingles)', async () => {
+    const zhA = '血清白蛋白水平与胃肠道手术后并发症相关性的前瞻性队列研究，纳入多中心择期切除术患者，分析预后营养指数对术后并发症发生率的影响。';
+    const zhB = '血清白蛋白水平与胃肠道手术后并发症相关性的前瞻性队列研究，纳入多中心的择期切除术患者，分析预后营养指数对术后并发症发生率的影响（补充注册号：CHiCTR-001）。';
+    const openalex = fakeAdapter('openalex', {
+      search: byQuery({ [PLAN.discovery[0] as string]: [fakeRecord('营养状况与手术结局的队列分析', '10.1000/zh.a', { abstractText: zhA })] }),
+    });
+    const europepmc = fakeAdapter('europepmc', {
+      search: byQuery({ [PLAN.counter[0] as string]: [fakeRecord('营养状况与手术结果：一项队列研究', '10.1000/zh.b', { abstractText: zhB, identifiers: [{ kind: 'pubmed', value: 'PMC999002' }] })] }),
+    });
+    const arxiv = fakeAdapter('arxiv', { search: async () => [] });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(1);
+  });
+});

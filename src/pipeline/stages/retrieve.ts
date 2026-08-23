@@ -4,6 +4,9 @@ import type { RetrievalQuery, SourceFamily } from '../../domain/source.js';
 import { canonicalJson } from '../../shared/crypto.js';
 import type { RawSourceRecord } from '../../shared/ports.js';
 import { cachedSearch } from '../../sources/response-cache.js';
+import { shingle, minhashSignature, jaccardFromSignatures, type MinhashConfig } from '../../domain/minhash.js';
+
+const MINHASH_CFG: MinhashConfig = { numPerm: 128 };
 import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash, excludeVolatile } from '../../sources/snapshot.js';
 import { callStructured } from '../llm.js';
@@ -477,6 +480,7 @@ export const retrieveStage: StageHandler = {
     let succeeded = 0;
     let duplicates = 0;
     let fuzzyMerges = 0;
+    let minhashMerges = 0;
     let droppedNoIdentifier = 0;
     let variantSearches = 0;
     let failoverSearches = 0;
@@ -652,10 +656,38 @@ export const retrieveStage: StageHandler = {
           continue;
         }
         const fz = fuzzyTitleKey(record);
-        const existing = pool.get(key) ?? (fz !== null ? fuzzyIndex.get(fz) : undefined);
+        let existing = pool.get(key) ?? (fz !== null ? fuzzyIndex.get(fz) : undefined);
+        if (existing === undefined) {
+          // RU-10 GO2: minhash second-chance merge — catches near-duplicates the
+          // identifier + title-blocking gates miss (paraphrased titles, CJK
+          // variants). Pairwise over the bounded pool (≤62 entries — no LSH
+          // banding needed); threshold 0.8 = high-precision merge, never merges
+          // topically-similar-but-distinct papers.
+          const recShingles = shingle(`${record.title} ${record.abstractText ?? ''}`);
+          // Evidence floor: a 3-word title yields ONE 3-gram — identical short
+          // titles collide across genuinely different works (the existing
+          // short-title guard's premise), so minhash needs real text mass.
+          const MINHASH_MIN_SHINGLES = 8;
+          const sig = recShingles.size >= MINHASH_MIN_SHINGLES
+            ? minhashSignature(recShingles, MINHASH_CFG)
+            : null;
+          for (const candidate of sig === null ? [] : pool.values()) {
+            const candSig = minhashSignature(shingle(`${candidate.record.title} ${candidate.record.abstractText ?? ''}`), MINHASH_CFG);
+            // Threshold 0.5 is CALIBRATED on measured separation (word-3-gram
+            // shingles: near-verbatim republications 0.59-0.74; paraphrases 0.12;
+            // distinct papers <0.1) — clean margin on both sides.
+            if (sig !== null && jaccardFromSignatures(sig, candSig) >= 0.5) {
+              existing = candidate;
+              minhashMerges += 1;
+              break;
+            }
+          }
+        }
         if (existing) {
           if (existing.key === key) duplicates += 1;
-          else fuzzyMerges += 1;
+          else if (existing !== pool.get(key)) {
+            if (fz !== null && fuzzyIndex.get(fz) === existing) fuzzyMerges += 1;
+          }
           existing.purposes.add(purpose);
           existing.ranks.push({ target: targetIdx, rank });
           continue;
