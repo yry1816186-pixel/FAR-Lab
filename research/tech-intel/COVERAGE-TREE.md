@@ -261,7 +261,7 @@ raw in research/tech-intel/blindspot/). New/changed leaves marked
 | C7.2 | batch-scheduler adapters (SLURM-class) | MISSING | [BS-hpc] P2, demand-gated |
 | C8.1 | observability | STRONG | receipts/events/narrative |
 | C9.1 | HTTP API | STRONG | 2000L contract tests |
-| C9.2 | API auth | MISSING | [BS-security] localhost-bind is false safety: DNS rebinding + browser cross-site requests; Host/Origin validation + session token = local-server standard |
+| C9.2 | API auth | PARTIAL | CORRECTED 2026-08-24: F-1 loopback guard (Host allowlist + Origin regex) already exists at api.ts:1949-1957 — source inventory had missed it; now regression-locked (tests/server-hardening.test.ts, 6 cases). Residual: session-token mechanism assessed LOW priority (Host+Origin checks block rebinding + cross-site; local malicious processes out of threat model) |
 | C10.1 | desktop packaging | STRONG | exe verified |
 | C11.1 | large-corpus scale | UNTESTED | caps 12 docs/run |
 | C11.2 | perf regression gates | PARTIAL | ad hoc |
