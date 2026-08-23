@@ -65,7 +65,12 @@ for (const rel of REQUIRED) {
 // 2. JSON validity + ACCEPTANCE_STATUS contract
 const parseJson = rel => {
   try { return JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8')); }
-  catch (e) { errors.push(`invalid-json:${rel}:${e.message}`); return null; }
+  catch (e) {
+    // Absence is section 1's concern (missing-required / CI degradation); the
+    // invalid-json class is strictly for files that EXIST but fail to parse.
+    if (e.code === 'ENOENT') return null;
+    errors.push(`invalid-json:${rel}:${e.message}`); return null;
+  }
 };
 for (const rel of ['.control/EXECUTION_STATE.json', '.control/ACCEPTANCE_STATUS.json', '.control/BLOCKERS.json']) parseJson(rel);
 if (exists('.control/DECISIONS.jsonl')) {
