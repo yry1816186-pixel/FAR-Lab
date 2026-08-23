@@ -399,12 +399,27 @@ export const buildEvidenceStage: StageHandler = {
           ],
           // GRADE-lite at admission (W-G/F-B): contradiction signals are unknown this
           // early (relations are judged later) — honestly 0 at this point.
-          gradeCertainty: gradeClaimCertainty({
-            verifiedBinding: aligned,
-            quantitative: /\d|fold|percent|%|higher|lower|increase|decrease|significant/i.test(candidate.text),
-            recentSource: doc.publicationYear != null && doc.publicationYear >= new Date().getUTCFullYear() - 15,
-            contradictionSignals: 0,
-          }).certainty,
+          // Re-audit fix (forensics GATE, not advisory): retraction status and
+          // deterministic forensics findings now DOWNGRADE certainty itself —
+          // a retracted source floors at very_low; GRIM/range failures step
+          // down one level. The uncertainty notes stay for the human-readable why.
+          gradeCertainty: (() => {
+            const base = gradeClaimCertainty({
+              verifiedBinding: aligned,
+              quantitative: /\d|fold|percent|%|higher|lower|increase|decrease|significant/i.test(candidate.text),
+              recentSource: doc.publicationYear != null && doc.publicationYear >= new Date().getUTCFullYear() - 15,
+              contradictionSignals: 0,
+            }).certainty ?? 'very_low';
+            const forensicFails =
+              extractMeanN(candidate.quote).filter((pr) => !grimCheck(pr.mean, pr.n, pr.decimals).consistent).length
+              + rangeGuard(extractStats(candidate.quote)).filter((f) => !f.ok).length;
+            const LADDER = ['high', 'moderate', 'low', 'very_low'] as const;
+            const baseIdx = LADDER.indexOf(base);
+            let idx = baseIdx >= 0 ? baseIdx : LADDER.length - 1;
+            if (doc.verification?.retractionStatus === 'retracted' || doc.verification?.retractionStatus === 'expression_of_concern') idx = LADDER.length - 1;
+            else idx = Math.min(idx + forensicFails, LADDER.length - 1);
+            return LADDER[idx]!;
+          })(),
           // T2: claims are verbatim excerpts of untrusted external literature —
           // derived_untrusted by structural position, deterministic assignment.
           taint: 'derived_untrusted',
