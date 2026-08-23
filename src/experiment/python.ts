@@ -25,6 +25,7 @@ export interface SidecarFactory {
     envInfo(): SidecarEnvInfo | null;
     lockfileHash(): string | null;
     close(): void;
+    warmup(timeoutMs: number): Promise<SidecarEnvInfo>;
   };
 }
 
