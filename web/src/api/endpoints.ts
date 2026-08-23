@@ -17,11 +17,18 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, UsageAggregate, VerificationReport } from './types';
+import type { BundleSummary, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, UsageAggregate, VerificationReport, ZoteroLibraryResponse } from './types';
 
 const BASE = '/api/v1';
 
 // ---- GET resources ----
+
+/** Zotero local-library bridge (server proxies http://localhost:23119 — browser CORS cannot). */
+export const getZoteroLibrary = async (signal?: AbortSignal): Promise<ZoteroLibraryResponse> => {
+  const data = await api.getJson(`${BASE}/zotero/library`, signal);
+  if (typeof data !== 'object' || data === null) throw new Error('malformed zotero library response');
+  return data as ZoteroLibraryResponse;
+};
 
 export const listRuns = async (signal?: AbortSignal): Promise<RunSummary[]> =>
   normalizeRunSummaries(await api.getJson(`${BASE}/runs`, signal));

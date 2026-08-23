@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    branches: [main, 'build/**', 'feat/**', 'fix/**', 'mission/**']
+  pull_request:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install
+      - name: Typecheck (strict)
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Test
+        run: npm test
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install web dependencies
+        working-directory: web
+        run: npm install
+      # This gate exists because ZoteroPanel's supporting files were committed
+      # missing (2026-08-23): the tree did not compile on a fresh checkout and
+      # nothing caught it. tsc must pass BEFORE vite so type errors are the
+      # reported failure, not rollup's less precise ones.
+      - name: Web typecheck
+        working-directory: web
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: Web build
+        working-directory: web
+        run: npm run build
