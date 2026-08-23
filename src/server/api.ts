@@ -17,6 +17,13 @@ import { discoverModels } from '../providers/discovery.js';
 import { approveExperiment, ExperimentOpError } from './experiment-ops.js';
 import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
 import {
+  buildScreeningView,
+  getOrCreateScreeningSession,
+  recordScreeningDecision,
+  ScreeningError,
+  stopScreeningSession,
+} from './screening.js';
+import {
   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
   detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
   resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
@@ -59,7 +66,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -619,6 +626,18 @@ function parseSeedSources(raw: unknown): string | {
       ...(questionText !== undefined ? { questionText } : {}),
       ...(domain !== undefined ? { domain } : {}),
       leaseInfo: { holder: lease.holder, expiresAt: lease.expiresAt ?? null, live: leaseLive },
+      // Research iteration rounds (research-loop lane): the bounded-loop decision
+      // history — every continue trigger / stop reason, in order, from the records.
+      iterations: app.store.listObjects('iteration', runId).map((it) => ({
+        id: it.id,
+        round: it.round,
+        decidedAt: it.decidedAt,
+        decision: it.decision,
+        trigger: it.continueTrigger ?? null,
+        stopReason: it.stopReason ?? null,
+        rationale: it.rationale,
+        unblockHints: it.unblockHints,
+      })),
       // BP-4 usage ledger: receipt-derived tokens/cost for THIS run (pricing only
       // when user-declared; unknown stays unknown — no invented price tables).
       usage: aggregateRunUsage(app.store, runId),
@@ -1385,6 +1404,56 @@ function parseSeedSources(raw: unknown): string | {
       // B5 hypothesis lifecycle (R3) + BP-2 direct edit: POST /runs/:id/hypotheses/:hypId/<op>.
       // Ownership (run owns the hypothesis / the linked claim) is guarded inside
       // hypothesis-ops; this branch only dispatches the known verbs.
+      if (segments[4] === 'screening' && segments.length === 5 && method === 'GET') {
+        // Active-learning screening loop (ASReview-pattern): session view with
+        // the ranked queue and the honest WSS@95-style stop estimate.
+        try {
+          sendJson(res, 200, buildScreeningView(app, getOrCreateScreeningSession(app, runId)));
+        } catch (e) {
+          if (e instanceof ScreeningError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false, runId });
+          }
+          throw e;
+        }
+        return;
+      }
+      if (segments[4] === 'screening' && segments[5] === 'decisions' && segments.length === 6 && method === 'POST') {
+        const body = await readJsonObject(req);
+        const srcId = typeof body.srcId === 'string' ? body.srcId : undefined;
+        const verdict = body.verdict;
+        if (srcId === undefined || (verdict !== 'include' && verdict !== 'exclude')) {
+          throw validation('screening decision requires { srcId, verdict: include|exclude }');
+        }
+        const reason = typeof body.reason === 'string' && body.reason.length > 0 ? body.reason.slice(0, 2000) : undefined;
+        try {
+          const { session, duplicate } = recordScreeningDecision(app, runId, { srcId, verdict, ...(reason !== undefined ? { reason } : {}) });
+          sendJson(res, duplicate ? 200 : 201, {
+            duplicate,
+            view: buildScreeningView(app, session),
+          });
+        } catch (e) {
+          if (e instanceof ScreeningError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false, runId });
+          }
+          throw e;
+        }
+        return;
+      }
+      if (segments[4] === 'screening' && segments[5] === 'stop' && segments.length === 6 && method === 'POST') {
+        try {
+          const { session, feedbackId } = stopScreeningSession(app, runId);
+          sendJson(res, 200, {
+            view: buildScreeningView(app, session),
+            ...(feedbackId !== undefined ? { feedbackId } : {}),
+          });
+        } catch (e) {
+          if (e instanceof ScreeningError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false, runId });
+          }
+          throw e;
+        }
+        return;
+      }
       if (segments.length === 7 && segments[4] === 'hypotheses') {
         const hypId = segments[5]!;
         const op = segments[6]!;
