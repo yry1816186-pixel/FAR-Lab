@@ -42,6 +42,9 @@ This file defines **what must be proven**. Live status/evidence exists only in `
 | ACC-36 | Cognitive-security baseline: untrusted external content is channel-separated and explicitly marked (spotlighting) on every ingestion path, kernel trust boundaries are marked, and the loopback guard is regression-locked | tested |
 | ACC-37 | Resident-agent conversation plane runs on the agent kernel with a read-tool plane, propose_action approval cards, and automated turns whose remembered grants are void (proposals always gate on the human) | tested |
 | ACC-38 | Continuous verification substrate: CI green on a real hosted runner, desktop application real build, TUI package tests plus piped smoke on the real workspace | tested |
+| ACC-39 | Cross-run memory substrate: far.db is the single authoritative store (no second memory DB); deterministic governance (lifecycle zod + SQL CHECK mirrors, poisoning fences own_verified to resolvable provenance, external content never derives own_* trust); retrieval is deterministic zero-LLM (FTS5 + ACT-R activation); supersession is append-only; terminal runs consolidate idempotently | tested |
+| ACC-40 | Lineage storage single authority: lineage_edges + event_tags (migration v5) with adjacency + read-time traversal, deterministic backfill from existing payloads, vocabulary owned by one domain module | tested |
+| ACC-41 | Exploratory CodeAct execution: TS static gate verdict computed and enforced before any process spawn (fail-closed); gated analysis runs in the sidecar restricted namespace; runtime failures inside the sandbox are visible candidate findings, never exceptions; outputs are candidate findings only — promotion stays behind deterministic confirmatory gates | tested |
 
 
 ## Completion gate
