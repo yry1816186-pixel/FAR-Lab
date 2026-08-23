@@ -60,6 +60,8 @@ Usage:
   far probe [provider] [--live] [--json]         Model-route health: config check by default
                                                   (key presence, never values); --live makes one
                                                   minimal real chat call per route (costs ~1 token)
+  far probe-custom [mcfg-id] [--live] [--json]   Same health surface for user-defined model configs
+                                                  (Settings / mcfg_* routes); --live = one real call
   far data info [--json]                         Data footprint: runs, db size, artifacts, exports
   far verify <bundle-id> [--json]                Independently verify a reproducibility bundle
                                                   (exit 0=verified, 1=failed/degraded)
@@ -400,6 +402,79 @@ const main = async (): Promise<void> => {
     }
     const bad = results.filter((r) => r.status === 'missing-key' || r.status === 'blocked' || r.status === 'unreachable');
     if (bad.length > 0 && (flag('--live') || all.some((p) => p.kind === 'live' && wanted !== undefined))) process.exitCode = 1;
+    return;
+  }
+
+  if (cmd === 'probe-custom') {
+    // B12-G1 CLI half: probe user-defined model-config routes (mcfg_*), which
+    // `far probe` deliberately does not cover. Reads the same store the server's
+    // testModelConfig uses; --live reuses createCustomProvider so the wire matches
+    // the pipeline exactly. Config mode reports key presence only — never values.
+    const { ModelProviderConfig, maskApiKey } = await import('../domain/index.js');
+    const { createApp } = await import('../app/composition.js');
+    const app = await createApp();
+    try {
+      // model_config objects are workspace-scoped (run_id='__none__' sentinel) — same convention as the server.
+      const configs = app.store.listObjects('model_config', '__none__');
+      const activeId = app.store.getMeta('activeModelConfigId');
+      const wanted = positional(3);
+      const selected = wanted === undefined ? configs : configs.filter((c) => c.id === wanted);
+      if (wanted !== undefined && selected.length === 0) die(`model config not found: ${wanted}`, 2);
+      const results: Array<Record<string, unknown>> = [];
+      for (const cfg of selected) {
+        const entry: Record<string, unknown> = {
+          provider: cfg.id,
+          label: cfg.label,
+          kind: 'custom',
+          model: cfg.modelId,
+          baseUrl: cfg.baseUrl,
+          wire: cfg.wire,
+          apiKeyMasked: maskApiKey(cfg.apiKey),
+          active: activeId === cfg.id,
+        };
+        if (cfg.apiKey.length === 0) {
+          entry.status = 'missing-key';
+        } else if (!flag('--live')) {
+          entry.status = 'key-present';
+        } else {
+          try {
+            const { createCustomProvider } = await import('../providers/custom.js');
+            const provider = createCustomProvider(cfg);
+            const result = await provider.structuredCall(
+              {
+                task: 'model route connectivity probe',
+                userPayload: { instruction: 'Reply with exactly the JSON object {"ok":true} and nothing else.' },
+                outputKind: 'json',
+                maxTokens: 16,
+                purpose: 'cli-probe-custom-live',
+              },
+              (raw: unknown) => raw,
+            );
+            if (result.ok) {
+              entry.status = 'ready';
+              entry.latencyMs = result.receipt?.latencyMs;
+            } else {
+              entry.status = result.error?.kind === 'rate_limited' || result.error?.kind === 'quota_exceeded' ? 'blocked' : 'unreachable';
+              entry.detail = JSON.stringify(result.error ?? {}).slice(0, 200);
+            }
+          } catch (e) {
+            entry.status = 'unreachable';
+            entry.detail = e instanceof Error ? e.message : String(e);
+          }
+        }
+        results.push(entry);
+      }
+      if (configs.length === 0 && wanted === undefined) {
+        out(ink.muted('(no custom model configs — create one in the web workbench Settings or via POST /api/v1/model-configs)'));
+      }
+      if (json()) jsonOutput(results);
+      else for (const r of results) {
+        const tone = r.status === 'ready' ? ink.ok : r.status === 'key-present' ? ink.info : ink.err;
+        out(`${padColumns(String(r.provider), 24)} ${tone(padColumns(String(r.status), 12))} model=${String(r.model)}${r.active ? ink.info(' [active]') : ''}${r.latencyMs !== undefined ? `  ${String(r.latencyMs)}ms` : ''}${r.detail !== undefined ? `\n  ${ink.muted(String(r.detail))}` : ''}`);
+      }
+      const bad = results.filter((r) => r.status === 'missing-key' || r.status === 'blocked' || r.status === 'unreachable');
+      if (bad.length > 0) process.exitCode = 1;
+    } finally { app.close(); }
     return;
   }
 
