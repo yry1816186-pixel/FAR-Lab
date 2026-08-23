@@ -1,5 +1,6 @@
 import type { Store } from '../persistence/store.js';
 import { CUSTOM_PROVIDER_PREFIX } from '../providers/custom.js';
+import { readBuiltinOverrides } from '../providers/builtin-overrides.js';
 
 /**
  * BP-4 usage/cost ledger. Receipts are the only authority (same rule as the token
@@ -7,9 +8,10 @@ import { CUSTOM_PROVIDER_PREFIX } from '../providers/custom.js';
  * resumed/audited run re-derives identical numbers.
  *
  * Cost honesty rule: FAR-Lab ships NO invented price tables. Cost is computed ONLY
- * when the researcher declared that config's real list pricing (ModelProviderConfig.
- * pricing); everything else reports tokens + pricingBasis 'unknown' — an unknown
- * price is displayed as unknown, never estimated to zero or guessed.
+ * from prices the researcher declared in the product layer — a custom config's
+ * ModelProviderConfig.pricing, or a built-in route's UI-declared pricing
+ * (builtin-overrides.ts); everything else reports tokens + pricingBasis 'unknown' —
+ * an unknown price is displayed as unknown, never estimated to zero or guessed.
  */
 
 export type PricingBasis = 'user-configured' | 'unknown';
@@ -26,11 +28,36 @@ export interface UsageAggregate {
   pricingBasis: PricingBasis;
 }
 
+interface DeclaredPrice {
+  inputUsdPerMTok: number;
+  outputUsdPerMTok: number;
+}
+
 const roundCost = (usd: number): number => Math.round(usd * 1e6) / 1e6;
+
+/**
+ * Price lookup by receipt provider name, read once per aggregation:
+ * 'custom:<id>' -> that config's declared pricing; a built-in route name
+ * ('zai'/'dashscope') -> its UI-declared pricing. Anything else -> undefined.
+ */
+const priceResolver = (store: Store): ((providerName: string) => DeclaredPrice | undefined) => {
+  const mcfg = new Map<string, DeclaredPrice>();
+  for (const cfg of store.listObjects('model_config', '__none__')) {
+    if (cfg.pricing !== undefined) mcfg.set(cfg.id, cfg.pricing);
+  }
+  const builtin = readBuiltinOverrides(store);
+  return (providerName) =>
+    providerName.startsWith(CUSTOM_PROVIDER_PREFIX)
+      ? mcfg.get(providerName.slice(CUSTOM_PROVIDER_PREFIX.length))
+      : builtin[providerName as keyof typeof builtin]?.pricing;
+};
+
+const costOf = (price: DeclaredPrice, promptTokens: number, completionTokens: number): number =>
+  roundCost((promptTokens / 1e6) * price.inputUsdPerMTok + (completionTokens / 1e6) * price.outputUsdPerMTok);
 
 /** Aggregate model-call receipts for one run, grouped by (provider, modelId). */
 export const aggregateRunUsage = (store: Store, runId: string): UsageAggregate[] => {
-  const pricing = pricingByConfigId(store);
+  const priceOf = priceResolver(store);
   const byKey = new Map<string, UsageAggregate>();
   for (const r of store.listObjects('receipt', runId)) {
     const mc = r.modelCall;
@@ -38,9 +65,6 @@ export const aggregateRunUsage = (store: Store, runId: string): UsageAggregate[]
     const key = `${mc.provider}\u0000${mc.modelId}`;
     let agg = byKey.get(key);
     if (agg === undefined) {
-      const cfgPricing = mc.provider.startsWith(CUSTOM_PROVIDER_PREFIX)
-        ? pricing.get(mc.provider.slice(CUSTOM_PROVIDER_PREFIX.length))
-        : undefined;
       agg = {
         provider: mc.provider,
         modelId: mc.modelId,
@@ -49,7 +73,7 @@ export const aggregateRunUsage = (store: Store, runId: string): UsageAggregate[]
         completionTokens: 0,
         totalTokens: 0,
         costUsd: null,
-        pricingBasis: cfgPricing !== undefined ? 'user-configured' : 'unknown',
+        pricingBasis: priceOf(mc.provider) !== undefined ? 'user-configured' : 'unknown',
       };
       byKey.set(key, agg);
     }
@@ -59,21 +83,15 @@ export const aggregateRunUsage = (store: Store, runId: string): UsageAggregate[]
     agg.totalTokens += mc.usage.totalTokens ?? (mc.usage.promptTokens ?? 0) + (mc.usage.completionTokens ?? 0);
   }
   for (const agg of byKey.values()) {
-    const p = agg.provider.startsWith(CUSTOM_PROVIDER_PREFIX)
-      ? pricing.get(agg.provider.slice(CUSTOM_PROVIDER_PREFIX.length))
-      : undefined;
-    if (p !== undefined) {
-      agg.costUsd = roundCost(
-        (agg.promptTokens / 1e6) * p.inputUsdPerMTok + (agg.completionTokens / 1e6) * p.outputUsdPerMTok,
-      );
-    }
+    const p = priceOf(agg.provider);
+    if (p !== undefined) agg.costUsd = costOf(p, agg.promptTokens, agg.completionTokens);
   }
   return [...byKey.values()].sort((a, b) => b.totalTokens - a.totalTokens);
 };
 
 /** Workspace-wide usage across ALL runs (the settings dashboard surface). */
 export const aggregateWorkspaceUsage = (store: Store): UsageAggregate[] => {
-  const pricing = pricingByConfigId(store);
+  const priceOf = priceResolver(store);
   const byKey = new Map<string, UsageAggregate>();
   for (const runSummary of store.listRuns(100_000)) {
     for (const agg of aggregateRunUsage(store, runSummary.id)) {
@@ -92,21 +110,9 @@ export const aggregateWorkspaceUsage = (store: Store): UsageAggregate[] => {
   }
   // re-price merged rows (cost merging above assumed same key -> same pricing basis)
   for (const agg of byKey.values()) {
-    const p = agg.provider.startsWith(CUSTOM_PROVIDER_PREFIX)
-      ? pricing.get(agg.provider.slice(CUSTOM_PROVIDER_PREFIX.length))
-      : undefined;
-    agg.costUsd = p !== undefined
-      ? roundCost((agg.promptTokens / 1e6) * p.inputUsdPerMTok + (agg.completionTokens / 1e6) * p.outputUsdPerMTok)
-      : null;
+    const p = priceOf(agg.provider);
+    agg.costUsd = p !== undefined ? costOf(p, agg.promptTokens, agg.completionTokens) : null;
     agg.pricingBasis = p !== undefined ? 'user-configured' : 'unknown';
   }
   return [...byKey.values()].sort((a, b) => b.totalTokens - a.totalTokens);
-};
-
-const pricingByConfigId = (store: Store): Map<string, { inputUsdPerMTok: number; outputUsdPerMTok: number }> => {
-  const map = new Map<string, { inputUsdPerMTok: number; outputUsdPerMTok: number }>();
-  for (const cfg of store.listObjects('model_config', '__none__')) {
-    if (cfg.pricing !== undefined) map.set(cfg.id, cfg.pricing);
-  }
-  return map;
 };

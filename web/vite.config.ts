@@ -33,4 +33,9 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
   },
+  // ES-module workers: the ASR worker dynamically imports transformers.js,
+  // which splits into multiple chunks — impossible under the iife default.
+  worker: {
+    format: 'es',
+  },
 });

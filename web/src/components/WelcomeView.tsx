@@ -17,10 +17,12 @@ import type { RunSummary } from '../api/types';
  */
 export function WelcomeView({
   onCreated,
+  onOpenSettings,
   runs,
   onSelectRun,
 }: {
   onCreated: (runId: string) => void;
+  onOpenSettings: () => void;
   runs: RunSummary[];
   onSelectRun: (id: string) => void;
 }): JSX.Element {
@@ -47,7 +49,7 @@ export function WelcomeView({
         </p>
 
         <div className="home-composer">
-          <ResearchComposer onCreated={onCreated} />
+          <ResearchComposer onCreated={onCreated} onOpenSettings={onOpenSettings} />
         </div>
 
         <div className="example-questions">

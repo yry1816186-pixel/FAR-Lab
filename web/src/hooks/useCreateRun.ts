@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ApiError, withTimeout } from '../api/client';
 import { createRun } from '../api/endpoints';
 import type { ScientificGoalType } from '../api/types';
-import type { SeedInput } from '../utils/ingest';
+import { MAX_SEEDS, type SeedInput } from '../utils/ingest';
 
 /**
  * Run-creation state machine shared by every creation surface (the welcome
@@ -51,7 +51,7 @@ export function useCreateRun(onCreated: (runId: string) => void): {
       if (domain.trim().length > 0) input.domain = domain.trim();
       if (goalType !== '') input.goalType = goalType as ScientificGoalType;
       if (providerConfigId !== '') input.providerConfigId = providerConfigId;
-      if (seeds.length > 0) input.seeds = seeds.slice(0, 5);
+      if (seeds.length > 0) input.seeds = seeds.slice(0, MAX_SEEDS);
       const runId = await createRun(input, withTimeout(controller.signal, 20_000));
       setText('');
       setDomain('');

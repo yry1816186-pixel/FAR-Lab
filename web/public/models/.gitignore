@@ -1,0 +1,4 @@
+# Vendored ASR binaries (50MB+) — populate with `npm run fetch:asr-model`.
+whisper-base/
+ort/
+manifest.json

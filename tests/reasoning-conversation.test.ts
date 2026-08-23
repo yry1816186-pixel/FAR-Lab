@@ -45,14 +45,14 @@ const agentActionBody = (): string =>
 let tmp: string;
 let base: string;
 let api: ApiServer;
+/** The test harness's own HTTP client — captured BEFORE the global fetch is stubbed. */
+let realFetch: typeof fetch;
 
 beforeAll(async () => {
+  realFetch = globalThis.fetch;
   vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const urlText = typeof url === 'string' ? url : url instanceof Request ? url.url : String(url);
-    // Do NOT record the test harness's own calls to the local API server.
-    if (!urlText.includes('/api/v1/')) {
-      recordedRequests.push({ url: urlText, init: init ?? {} });
-    }
+    recordedRequests.push({ url: urlText, init: init ?? {} });
     return new Response(agentActionBody(), { status: 200, headers: { 'content-type': 'application/json' } });
   }));
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'farlab-reasoning-'));
@@ -72,7 +72,7 @@ afterAll(() => {
 
 type JsonBody = Record<string, unknown>;
 const json = async (method: string, pathName: string, body?: unknown): Promise<{ status: number; data: JsonBody | null }> => {
-  const res = await fetch(`${base}/api/v1${pathName}`, {
+  const res = await realFetch(`${base}/api/v1${pathName}`, {
     method,
     ...(body !== undefined ? { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } } : {}),
   });
@@ -87,7 +87,7 @@ const createConfig = async (overrides: Record<string, unknown> = {}): Promise<st
     wire: 'openai',
     baseUrl: 'http://localhost:11434/v1',
     modelId: 'fixture-model',
-    apiKey: '',
+    apiKey: 'test-fixture-key-1234',
     ...overrides,
   });
   expect(res.status).toBe(201);
@@ -147,15 +147,16 @@ describe('conversation reasoning gear (HTTP + real transport, stubbed fetch)', (
       expect(body.reasoning_effort).toBeUndefined();
     }
 
-    // clear -> no thinking fields at all
+    // clear -> back to the CONFIG DEFAULT gear ('low' here), not zero thinking:
+    // an explicit override removal restores the declared default effort.
     await json('PUT', `/conversations/${convId}/reasoning-gear`, { gear: null });
     const mark2 = recordedRequests.length;
     await json('POST', `/conversations/${convId}/messages`, { text: '回到默认档位' });
     const bodies2 = bodiesSince(mark2);
     expect(bodies2.length).toBeGreaterThan(0);
     for (const body of bodies2) {
-      expect(body.enable_thinking).toBeUndefined();
-      expect(body.thinking_budget).toBeUndefined();
+      expect(body.enable_thinking).toBe(true);
+      expect(body.thinking_budget).toBe(8192);
     }
   });
 
