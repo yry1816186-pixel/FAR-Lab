@@ -15,6 +15,7 @@ import {
   FeedbackSignal,
   HypothesisCandidate,
   HypothesisScorecard,
+  IterationRecord,
   ProvenanceReceipt,
   ResearchPlan,
   ResearchQuestion,
@@ -530,6 +531,32 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(Array.isArray(body.stages)).toBe(true);
     expect(body.stages).toHaveLength(12); // B8: +execute
     expect(body.lastError).toBeUndefined();
+    // research-loop: the iteration decision history is a first-class projection
+    // (seeded fixtures carry none — empty is the honest shape, never absent)
+    expect(body.iterations).toEqual([]);
+  });
+
+  it('projects iteration records with trigger/stop rationale (research-loop lane)', async () => {
+    app.store.putObject('iteration', IterationRecord.parse({
+      id: newId('itr'), runId: run2, round: 1, decidedAt: ts(50), decision: 'continue',
+      continueTrigger: { kind: 'unconsumed_feedback', signalIds: [newId('fbk')] },
+      reopenStages: ['feedback', 'revise', 'export'],
+      rationale: 'fixture: feedback awaiting causal absorption',
+      snapshot: {
+        round: 1, claims: 1, verifiedClaims: 1, hypotheses: 1, hypothesisVersionSum: 0,
+        scorecards: 1, plans: 1, revisions: 0, experimentRunsCompleted: 0,
+        feedbackSignals: 1, feedbackConsumed: 0, effectEstimates: 0, fingerprint: 'f'.repeat(64),
+      },
+    }));
+    const { status, body } = await getJson(`${base}/api/v1/runs/${run2}`);
+    expect(status).toBe(200);
+    expect(body.iterations).toHaveLength(1);
+    const it = body.iterations[0];
+    expect(it.round).toBe(1);
+    expect(it.decision).toBe('continue');
+    expect(it.trigger).toEqual({ kind: 'unconsumed_feedback', signalIds: [expect.any(String)] });
+    expect(it.stopReason).toBeNull();
+    expect(typeof it.rationale).toBe('string');
   });
 
   it('404s with the error envelope for an unknown run', async () => {
