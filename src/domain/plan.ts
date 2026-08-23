@@ -148,6 +148,8 @@ export const ResearchPlan = z.object({
   id: PlanId,
   runId: RunId,
   objective: z.string().min(1),
+  /** W-C bilingual display layer: zh rendering of the objective (generation-time, optional). */
+  objectiveZh: z.string().optional(),
   hypothesisIds: z.array(HypothesisId).min(1),
   variables: z.array(z.string()).default([]),
   controls: z.array(z.string()).default([]),

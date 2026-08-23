@@ -187,6 +187,9 @@ export class Orchestrator {
       // this — a disowned worker stops BEFORE its next domain-object write (audit P1-3).
       disowned: () => lease === undefined ? false : store.getRunLease(run.id).holder !== lease,
       cancelled: () => signal.cancelled || (this.deps.store.getRun(run.id)?.cancelRequested ?? false),
+      // W-C bilingual display: default ON in production (FARLAB_ZH_DISPLAY=0 opts out);
+      // tests construct contexts directly and stay English-only by omission.
+      zhDisplay: process.env.FARLAB_ZH_DISPLAY !== '0',
       log: (msg) => process.stdout.write(`  [${run.id.slice(0, 12)} ${run.currentStage}] ${msg}\n`),
     };
   }

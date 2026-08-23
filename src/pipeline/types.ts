@@ -34,6 +34,14 @@ export interface StageContext {
    */
   budget?: RunBudgetView;
   /**
+   * W-C bilingual display layer: when true, generation stages additionally produce
+   * Simplified-Chinese renderings of primary display fields (hypothesis statements,
+   * plan objective) via one batched, temperature-0 call each — enrichment semantics,
+   * failures never block. Absent/false (tests, minimal harnesses) = English only.
+   * The orchestrator wires this from FARLAB_ZH_DISPLAY (default on; '0' disables).
+   */
+  zhDisplay?: boolean;
+  /**
    * W8 S2 intra-stage step checkpoint (dbos OAOO pattern), per FAMILY: return the
    * persisted result for (stage, family, key) when present, else run fn once and persist.
    * Keys must be stable domain ids (not loop counters) so they survive re-ordering and
