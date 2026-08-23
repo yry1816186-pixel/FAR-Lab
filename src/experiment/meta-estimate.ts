@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { zTwoSided } from './meta-math.js';
+import { TwoByTwo, type EffectEstimateRecord } from '../domain/meta.js';
 
 /**
  * W-F M2: structured effect estimates — the numeric input layer of statistical_meta
@@ -7,50 +8,23 @@ import { zTwoSided } from './meta-math.js';
  * module's DETERMINISTIC validators decide admission (fail-closed: any violation
  * drops the estimate with a countable reason, never a silent degradation).
  *
- * Scale convention: `point`/`ciLow`/`ciHigh` are stored on the RAW reported scale
+ * Scale convention: `point`/`ciLow`/`ciHigh` are on the RAW reported scale
  * (OR 1.5, RR 0.8, SMD -0.32); `toStudyEstimate` normalizes ratio measures to the
- * log scale for pooling.
+ * log scale for pooling. The persisted record schema lives in domain/meta.ts
+ * (EffectEstimateRecord) so the store validates it with the other domain objects.
  */
 
-export const EffectMeasure = z.enum(['or', 'rr', 'smd']);
-export type EffectMeasure = z.infer<typeof EffectMeasure>;
+export type { EffectEstimateRecord as EffectEstimate } from '../domain/meta.js';
 
-export const TwoByTwo = z.object({
-  /** Exposed cases / exposed non-cases / control cases / control non-cases. */
-  a: z.number().int().nonnegative(),
-  b: z.number().int().nonnegative(),
-  c: z.number().int().nonnegative(),
-  d: z.number().int().nonnegative(),
-});
-export type TwoByTwo = z.infer<typeof TwoByTwo>;
-
-/** A VALIDATED estimate as persisted (rejected proposals are never stored). */
-export const EffectEstimate = z.object({
-  id: z.string().regex(/^efx_[0-9a-z]+$/),
-  runId: z.string().min(1),
-  /** The claim whose verbatim quote grounds these numbers (provenance inheritance). */
-  claimId: z.string().min(1),
-  sourceDocumentId: z.string().min(1),
-  measure: EffectMeasure,
-  /** Raw-scale point estimate as reported. */
-  point: z.number().positive(),
-  ciLow: z.number().positive().optional(),
-  ciHigh: z.number().positive().optional(),
-  ciLevel: z.number().positive().max(0.999).default(0.95),
-  /** 2×2 reconstruction path when CI was not reported but counts were. */
-  twoByTwo: TwoByTwo.optional(),
-  nTotal: z.number().int().positive().optional(),
-  /** Provenance: which model extracted these numbers (same convention as ScientificClaim). */
-  extractionModelRef: z.string().min(1),
-  extractedAt: z.string().datetime(),
-});
-export type EffectEstimate = z.infer<typeof EffectEstimate>;
+/** Raw-scale measure of a proposal/record (the analysis-scale names live in domain/meta.ts). */
+export const EffectMeasureRaw = z.enum(['or', 'rr', 'smd']);
+export type EffectMeasureRaw = z.infer<typeof EffectMeasureRaw>;
 
 /** Raw LLM proposal shape (pre-validation): everything optional except the anchor + numbers. */
 export const EffectEstimateProposal = z.object({
   claimId: z.string().min(1),
   sourceDocumentId: z.string().min(1),
-  measure: EffectMeasure,
+  measure: EffectMeasureRaw,
   point: z.number(),
   ciLow: z.number().optional(),
   ciHigh: z.number().optional(),
@@ -162,7 +136,7 @@ export const validateEffectEstimate = (p: EffectEstimateProposal): ValidationOut
 
 /** Normalized pooling input (log scale for ratio measures; native scale for SMD). */
 export const toStudyEstimate = (
-  est: Pick<EffectEstimate, 'measure' | 'point' | 'ciLow' | 'ciHigh' | 'ciLevel' | 'twoByTwo'>,
+  est: Pick<EffectEstimateRecord, 'measure' | 'point' | 'ciLow' | 'ciHigh' | 'ciLevel' | 'twoByTwo'>,
   label: string,
 ): { theta: number; v: number } => {
   const outcome = validateEffectEstimate({ ...est, claimId: '', sourceDocumentId: '' });
@@ -184,10 +158,10 @@ export const toStudyEstimate = (
  * the rest. Overlapping-cohort detection is explicitly out of minimal scope (disclosed).
  */
 export const dedupeEstimates = (
-  estimates: readonly EffectEstimate[],
-): { kept: EffectEstimate[]; duplicatesDropped: number } => {
+  estimates: readonly EffectEstimateRecord[],
+): { kept: EffectEstimateRecord[]; duplicatesDropped: number } => {
   const seen = new Set<string>();
-  const kept: EffectEstimate[] = [];
+  const kept: EffectEstimateRecord[] = [];
   let duplicatesDropped = 0;
   for (const e of estimates) {
     const key = `${e.measure}:${e.point}:${e.ciLow ?? ''}:${e.ciHigh ?? ''}:${e.twoByTwo ? `${e.twoByTwo.a}/${e.twoByTwo.b}/${e.twoByTwo.c}/${e.twoByTwo.d}` : ''}`;

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { newId, ExperimentSpec } from '../domain/index.js';
+import { MetaAnalysisSpec } from '../domain/meta.js';
 import type { ResearchPlan } from '../domain/plan.js';
 import type { ModelProvider } from '../shared/ports.js';
 import { strictSchemaOrUndefined } from '../providers/http.js';
@@ -25,6 +26,11 @@ import { strictSchemaOrUndefined } from '../providers/http.js';
 
 export type SpecDraftOutcome =
   | { kind: 'spec'; spec: ExperimentSpec }
+  | { kind: 'skip'; reason: string };
+
+/** W-F M4: the literature-type counterpart — a statistical_meta spec draft or a skip. */
+export type MetaSpecDraftOutcome =
+  | { kind: 'meta'; spec: MetaAnalysisSpec }
   | { kind: 'skip'; reason: string };
 
 const CLASSIFIER_BUILDERS = ['logistic_regression', 'random_forest_classifier', 'gradient_boosting_classifier', 'dummy_most_frequent'] as const;
@@ -192,4 +198,103 @@ export const draftSpecFromPlan = async (
     createdAt: new Date().toISOString(),
   });
   return { kind: 'spec', spec };
+};
+
+// ---- W-F M4: literature-type (statistical_meta) drafting ----
+
+const MetaDraftOut = z.object({
+  /** false = the plan is not answerable by pooling published effect estimates. */
+  feasible: z.boolean(),
+  skipReason: z.string().min(10).optional(),
+  effectMeasure: z.enum(['log_or', 'log_rr', 'smd']).optional(),
+  /** Preregistered rule direction on the analysis scale (usually 'below' 0 for benefit). */
+  direction: z.enum(['above', 'below']).optional(),
+  inclusionCriteria: z.string().min(10).optional(),
+}).superRefine((d, ctx) => {
+  if (d.feasible && (d.effectMeasure === undefined || d.direction === undefined || d.inclusionCriteria === undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'feasible=true requires effectMeasure, direction and inclusionCriteria' });
+  }
+});
+
+const META_SYSTEM_PROMPT =
+  'You convert a research plan into ONE statistical meta-analysis spec draft, or declare it infeasible. ' +
+  'Feasible ONLY when the question is answerable by pooling PUBLISHED effect estimates from the literature ' +
+  '(intervention vs outcome with reported odds ratios, risk ratios, or standardized mean differences). ' +
+  'If the plan requires collecting new data, running models on tabular datasets, wet-lab work, or no contrast ' +
+  'of exposure vs outcome exists in the literature, set feasible=false with a skipReason naming what is missing. ' +
+  'direction states which side of the log-scale null (0) the hypothesis predicts: e.g. a PROTECTIVE effect of an ' +
+  'intervention is "below" (log OR < 0). inclusionCriteria names study designs/populations to include. Output JSON only.';
+
+/** Preregistered default floor: fewer admissible studies => INSUFFICIENT_DATA (disclosed, not tuned per run). */
+export const META_DEFAULT_MIN_STUDIES = 3;
+
+export const draftMetaSpecFromPlan = async (
+  plan: ResearchPlan,
+  questionText: string,
+  provider: ModelProvider,
+): Promise<MetaSpecDraftOutcome> => {
+  const res = await provider.structuredCall(
+    {
+      task: 'meta-spec-draft',
+      systemPrompt: META_SYSTEM_PROMPT,
+      userPayload: {
+        outputContract: '{feasible: boolean, skipReason?: string, effectMeasure?: "log_or"|"log_rr"|"smd", direction?: "above"|"below", inclusionCriteria?: string}',
+        input: {
+          researchQuestion: questionText,
+          objective: plan.objective,
+          variables: plan.variables,
+          dataRequirements: plan.dataRequirements.map((d) => ({ name: d.name, availability: d.availability, variables: d.variables })),
+          decisionRules: { success: plan.decisionRules.successCriterion, falsification: plan.decisionRules.falsificationCriterion },
+          hypothesisIds: plan.hypothesisIds,
+        },
+      },
+      outputKind: 'json',
+      temperature: 0.1,
+      maxTokens: 1024,
+      jsonSchema: strictSchemaOrUndefined(MetaDraftOut),
+      purpose: 'meta-spec-draft',
+    },
+    (raw) => {
+      const parsed = MetaDraftOut.safeParse(raw);
+      return parsed.success ? parsed.data : new Error(`meta draft schema failed: ${parsed.error.issues.map((i) => `${i.path.join('.')}:${i.message}`).slice(0, 4).join('; ')}`);
+    },
+  );
+  if (!res.ok || res.data === undefined) {
+    return { kind: 'skip', reason: `meta spec drafting failed (${res.error?.kind ?? 'unknown'}): ${(res.error?.message ?? '').slice(0, 140)}` };
+  }
+  const draft = res.data;
+  if (!draft.feasible || draft.effectMeasure === undefined || draft.direction === undefined || draft.inclusionCriteria === undefined) {
+    return { kind: 'skip', reason: draft.skipReason ?? 'plan is not answerable by pooling published effect estimates' };
+  }
+  // Deterministic discipline (the model never picks these): log-scale null boundary
+  // threshold with the strongest provenance, preregistered minStudies floor, and the
+  // DL random-effects model as primary (medical literature heterogeneity is the norm;
+  // FE runs as sensitivity inside the executor). Exploratory until an operator binds.
+  const spec = MetaAnalysisSpec.parse({
+    id: newId('xsp'),
+    runId: plan.runId,
+    planId: plan.id,
+    planStepId: plan.steps[0]?.id ?? newId('task'),
+    question: questionText.slice(0, 500),
+    experimentType: 'statistical_meta',
+    inclusionCriteria: draft.inclusionCriteria,
+    effectMeasure: draft.effectMeasure,
+    metaModel: 'random_dl',
+    minStudies: META_DEFAULT_MIN_STUDIES,
+    alpha: 0.05,
+    ciLevel: 0.95,
+    comparison: {
+      id: `cmp_meta_${plan.id.slice(4, 12)}`,
+      effectMeasure: draft.effectMeasure,
+      direction: draft.direction,
+      threshold: 0,
+      thresholdProvenance: 'null-boundary',
+      primary: true,
+    },
+    approvals: [],
+    exploratoryNote: `Plan-drafted exploratory literature pool for ${plan.id}: thresholds are the log-scale null boundary; hypothesis-bound confirmatory meta specs require operator approval.`,
+    validation: { passed: false, missing: ['pending deterministic validation at execution'] },
+    createdAt: new Date().toISOString(),
+  });
+  return { kind: 'meta', spec };
 };

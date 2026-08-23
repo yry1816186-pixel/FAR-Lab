@@ -1,7 +1,8 @@
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { ExperimentSpec } from '../../domain/index.js';
-import { draftSpecFromPlan } from '../../experiment/spec-from-plan.js';
+import { draftSpecFromPlan, draftMetaSpecFromPlan } from '../../experiment/spec-from-plan.js';
 import { executeExperiment } from '../../experiment/executor.js';
+import { executeMetaAnalysis } from '../../experiment/executor-meta.js';
 
 /**
  * B8: experiments inside the run lifecycle. After `plan`, the run tries ONE
@@ -46,7 +47,32 @@ export const executeStage: StageHandler = {
     //    happens inside executeExperiment before any resource is spent).
     const draft = await draftSpecFromPlan(plan, question.text, ctx.provider);
     if (draft.kind === 'skip') {
-      return { kind: 'skipped', reason: draft.reason };
+      // W-F M4: literature-type plans fall through to the statistical_meta path —
+      // pooling published effect estimates is their honest experiment, closing the
+      // falsification loop for medicine-style questions that map to no dataset.
+      const metaDraft = await draftMetaSpecFromPlan(plan, question.text, ctx.provider);
+      if (metaDraft.kind === 'meta') {
+        try {
+          const executed = await executeMetaAnalysis(ctx.store, ctx.artifacts, metaDraft.spec, {
+            provider: ctx.provider,
+            shouldCancel: () => ctx.cancelled() || ctx.disowned(),
+          });
+          const rep = executed.statReports[0];
+          const verdictNote = rep !== undefined
+            ? ` (k=${rep.meta?.k ?? 0} admitted studies, verdict=${rep.verdict ?? 'exploratory'})`
+            : '';
+          return {
+            kind: 'done',
+            summary:
+              `meta experiment ${executed.run.id}: pooled ${metaDraft.spec.effectMeasure}${verdictNote}` +
+              ' — plan-drafted, exploratory (null-boundary threshold; binding needs operator approval)',
+          };
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return { kind: 'skipped', reason: `meta experiment execution failed (run continues): ${msg.slice(0, 240)}` };
+        }
+      }
+      return { kind: 'skipped', reason: `tabular: ${draft.reason}; literature-pool: ${metaDraft.reason}` };
     }
 
     // 2. Execute on the local executor (real path only). Existing completed

@@ -28,6 +28,7 @@ export const ModelConfigId = idOf('mcfg');
 export const EvidenceBodyId = idOf('evb');
 export const AchAnalysisId = idOf('ach');
 export const PredictionId = idOf('prd');
+export const EffectEstimateId = idOf('efx');
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -53,6 +54,7 @@ export type ModelConfigId = z.infer<typeof ModelConfigId>;
 export type EvidenceBodyId = z.infer<typeof EvidenceBodyId>;
 export type AchAnalysisId = z.infer<typeof AchAnalysisId>;
 export type PredictionId = z.infer<typeof PredictionId>;
+export type EffectEstimateId = z.infer<typeof EffectEstimateId>;
 
 /** kind -> the ID shape that kind legitimately takes. */
 const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {

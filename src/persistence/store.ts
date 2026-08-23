@@ -7,6 +7,7 @@ import {
   ExperimentSpec, ExperimentRun, DatasetRecord, ResultSet, StatReport,
   ModelProviderConfig, AgentSession, AgentReport,
   EvidenceBody, AchAnalysis, LedgerEntry,
+  MetaAnalysisSpec, EffectEstimateRecord,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -38,6 +39,8 @@ const KIND_SCHEMAS = {
   evidence_body: EvidenceBody,
   ach_analysis: AchAnalysis,
   prediction: LedgerEntry,
+  meta_spec: MetaAnalysisSpec,
+  effect_estimate: EffectEstimateRecord,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});
