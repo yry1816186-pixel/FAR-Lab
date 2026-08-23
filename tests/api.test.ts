@@ -536,6 +536,28 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
     expect(body.iterations).toEqual([]);
   });
 
+  it('projects the lineage graph for a run (AVO fusion G3)', async () => {
+    const { status, body } = await getJson(`${base}/api/v1/runs/${run1}/lineage`);
+    expect(status).toBe(200);
+    expect(body.rootRunId).toBe(run1);
+    // at minimum the run node itself; nodes/edges are well-formed arrays
+    expect(Array.isArray(body.nodes)).toBe(true);
+    expect(Array.isArray(body.edges)).toBe(true);
+    const runNode = body.nodes.find((n: { kind: string }) => n.kind === 'run');
+    expect(runNode.id).toBe(run1);
+  });
+
+  it('projects fresh supervision analysis (AVO fusion G2) and 404s unknown runs', async () => {
+    const ok = await getJson(`${base}/api/v1/runs/${run1}/supervision`);
+    expect(ok.status).toBe(200);
+    expect(ok.body.runId).toBe(run1);
+    expect(ok.body.observation).toHaveProperty('eventCount');
+    expect(Array.isArray(ok.body.signals)).toBe(true);
+
+    const missing = await getJson(`${base}/api/v1/runs/${'run_' + 'a'.repeat(24)}/supervision`);
+    expect(missing.status).toBe(404);
+  });
+
   it('projects iteration records with trigger/stop rationale (research-loop lane)', async () => {
     app.store.putObject('iteration', IterationRecord.parse({
       id: newId('itr'), runId: run2, round: 1, decidedAt: ts(50), decision: 'continue',
