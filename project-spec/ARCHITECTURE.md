@@ -86,9 +86,11 @@ Rules:
 Use an explicit stage/state machine for the research run. “Multiple roles” are semantic responsibilities, not a requirement to spawn many Agents.
 
 Representative stages:
-`scope -> retrieve -> verify_sources -> build_evidence -> generate_hypotheses -> critique/falsify -> rank -> plan -> feedback -> revise -> export`.
+`scope -> retrieve -> verify_sources -> build_evidence -> generate_hypotheses -> critique/falsify -> rank -> plan -> execute -> feedback -> revise -> export`.
 
 Independent search/critique branches may run concurrently with bounded fan-out and merge rules. The orchestrator owns state and lifecycle; LLM actors do not own durable workflow state.
+
+**Research iteration rounds (2026-08-24).** One linear pass of the stage machine is not a closed research loop. After a pass fully completes, a deterministic iteration controller (`src/app/iteration.ts`) decides whether another bounded round has actionable work: it continues only on named falsification-loop legs (unconsumed feedback signals; an executable plan with no completed experiment) and stops on round cap / run-budget exhaustion / no-material-delta fingerprint / no actionable work, persisting an `iteration` record per decision plus audit events. Human-injected feedback on a completed run starts a fresh bounded iteration epoch. No LLM decides whether research continues — unbounded tree search was evaluated and rejected as data-dredging (see `research/oss-capability-diff-2026-08-23.md`); selection pressure stays at the hypothesis layer and iteration pressure stays on explicit loop legs.
 
 ## 8. Reliability model
 

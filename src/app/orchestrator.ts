@@ -8,6 +8,7 @@ import type { ArtifactStore, ModelProvider, SourceAdapter } from '../shared/port
 import type { SourceFamily } from '../domain/source.js';
 import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './run-budget.js';
 import { evaluateQualityGate, MAX_QUALITY_ROUNDS } from './quality-gate.js';
+import { evaluateIteration, iterationRoundKey, iterationFingerprintKey } from './iteration.js';
 import { receiptEventDetail } from '../pipeline/llm.js';
 
 /** Meta key for the persisted quality-gate round counter (round 1 = initial generation). */
@@ -221,6 +222,9 @@ export class Orchestrator {
         return r;
       }, lease);
       this.deps.store.appendEvent(runId, { type: 'run_resumed', status: 'running', detail: { reopened: 'feedback' } });
+      // Fresh iteration epoch: human-injected feedback earns a new bounded round
+      // budget (the cap bounds AUTONOMOUS rounds per injection, not per run lifetime).
+      this.deps.store.setMeta(iterationRoundKey(runId), '1');
     }
 
     const signal = this.deps.signals.get(runId) ?? { cancelled: false };
@@ -423,6 +427,55 @@ export class Orchestrator {
         return run; // stop pipeline on failure — resume continues from this stage
       }
       cursor += 1;
+    }
+
+    // ---- research iteration rounds (src/app/iteration.ts): a FULLY completed pass
+    // with actionable falsification-loop legs left reopens them as the next bounded
+    // round instead of parking the run as completed. Deterministic decision, full audit.
+    const passUnfinished = run.stages.filter((s) => s.state === 'pending' || s.state === 'running');
+    const passFailed = run.stages.some((s) => s.state === 'failed');
+    if (passUnfinished.length === 0 && !passFailed) {
+      const round = Number(this.deps.store.getMeta(iterationRoundKey(runId)) ?? '1') || 1;
+      const it = evaluateIteration({ store: this.deps.store, runId, round, budget });
+      const lastIt = this.deps.store.listObjects('iteration', runId).at(-1);
+      // Idempotent no-op resume: same round + same material fingerprint decided already.
+      const decidedAlready = lastIt !== undefined && lastIt.round === round && lastIt.snapshot.fingerprint === it.record.snapshot.fingerprint;
+      if (!decidedAlready) {
+        this.deps.store.putObject('iteration', it.record);
+        this.deps.store.appendEvent(runId, {
+          type: 'note',
+          detail: {
+            reason: 'iteration_decided', decision: it.decision, round,
+            ...(it.decision === 'continue'
+              ? { trigger: it.record.continueTrigger, reopenStages: it.reopenStages, rationale: it.record.rationale }
+              : { stopReason: it.record.stopReason, rationale: it.record.rationale, unblockHints: it.record.unblockHints }),
+          },
+        });
+      }
+      if (it.decision === 'continue') {
+        this.deps.store.setMeta(iterationRoundKey(runId), String(round + 1));
+        this.deps.store.setMeta(iterationFingerprintKey(runId), it.record.snapshot.fingerprint);
+        run = await this.transition(runId, (r) => {
+          for (const s of it.reopenStages) {
+            const rec2 = r.stages.find((x) => x.stage === s);
+            if (rec2 !== undefined) {
+              // startedAt + attempt survive (provenance facts); the next start increments.
+              rec2.state = 'pending';
+              delete rec2.endedAt;
+              delete rec2.error;
+              delete rec2.subtasks;
+            }
+          }
+          return r;
+        }, lease);
+        this.deps.store.appendEvent(runId, {
+          type: 'note',
+          detail: { reason: 'iteration_round_started', round: round + 1, reopenStages: it.reopenStages, trigger: it.record.continueTrigger },
+        });
+        // Bounded recursion (depth ≤ MAX_ITERATION_ROUNDS): the next round runs through
+        // the SAME owned stage machine — leases, checkpoints and budget governance unchanged.
+        return this.executeOwned(runId, holder, run, opts);
+      }
     }
 
     const unfinished = run.stages.filter((s) => s.state === 'pending' || s.state === 'running');
