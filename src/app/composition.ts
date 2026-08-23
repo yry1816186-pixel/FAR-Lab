@@ -7,6 +7,7 @@ import { getProvider } from '../providers/index.js';
 import { resolveBuiltinProvider } from '../providers/builtin-overrides.js';
 import { sourceAdapterFor } from '../sources/index.js';
 import { resolveRunProvider } from './provider-resolver.js';
+import { withSpendGate } from './spend-limit.js';
 import { Orchestrator } from './orchestrator.js';
 import type { StageHandler } from '../pipeline/types.js';
 import type { RunStageName } from '../domain/run.js';
@@ -87,9 +88,16 @@ export const createApp = async (opts: AppOptions = {}): Promise<App> => {
   };
   const stages = await stageModules();
   const stageMap = new Map(HANDLED_STAGES.map((s) => [s, stages[s]] as [RunStageName, StageHandler]));
+  // Spend gate (gap R5): every run-pipeline model call passes the workspace USD
+  // ceiling check — fail-closed quota_exceeded once the declared limit is spent.
+  // Re-read per call, so a settings edit applies to the next stage immediately.
+  const gated = (p: ModelProvider): ModelProvider => withSpendGate(store, p);
   const orchestrator = new Orchestrator({
-    store, artifacts, provider,
-    providerFor: (run) => resolveRunProvider(store, run),
+    store, artifacts, provider: gated(provider),
+    providerFor: (run) => {
+      const p = resolveRunProvider(store, run);
+      return p === null ? null : gated(p);
+    },
     sourceFor: (family) => sourceAdapterFor(family),
     stages: stageMap,
     signals: new Map(),

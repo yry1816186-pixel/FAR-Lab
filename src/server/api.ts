@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { App } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { listProviders, LIVE_PROVIDER_NAMES } from '../providers/index.js';
@@ -14,7 +15,7 @@ import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promot
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
 import { discoverModels } from '../providers/discovery.js';
 import { approveExperiment, ExperimentOpError } from './experiment-ops.js';
-import { fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
+import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
 import {
   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
   detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
@@ -23,7 +24,9 @@ import {
 } from './conversations.js';
 import { startAutomationEngine, type AutomationEngine } from './automations.js';
 import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
+import { workspaceSpendStatus, writeSpendLimit } from '../app/spend-limit.js';
 import {
+  ConversationSchema,
   FeedbackSignal,
   FeedbackSourceKind,
   ModelProviderConfig,
@@ -1573,6 +1576,23 @@ function parseSeedSources(raw: unknown): string | {
       if (leaf === 'active' && segments.length === 4 && method === 'PUT') return setActiveModelConfig(req, res);
       if (leaf === 'test' && segments.length === 4 && method === 'POST') return testModelConfig(req, res);
       if (leaf === 'usage' && segments.length === 4 && method === 'GET') return listWorkspaceUsage(res);
+      if (leaf === 'spend-limit' && segments.length === 4) {
+        if (method === 'GET') {
+          sendJson(res, 200, workspaceSpendStatus(app.store));
+          return;
+        }
+        if (method === 'PUT') {
+          const body = await readJsonObject(req);
+          const limitUsd = body.limitUsd;
+          if (limitUsd !== null && (typeof limitUsd !== 'number' || !Number.isFinite(limitUsd) || limitUsd <= 0)) {
+            throw new HttpError(400, { code: 'validation', message: 'field "limitUsd" must be a positive number or null', retryable: false });
+          }
+          writeSpendLimit(app.store, limitUsd);
+          sendJson(res, 200, { ok: true, ...workspaceSpendStatus(app.store) });
+          return;
+        }
+        throw notFound(`method ${method} not allowed for ${url.pathname}`);
+      }
       if (leaf === 'discover' && segments.length === 4 && method === 'POST') return discoverFromModelConfig(req, res);
       if (leaf === 'builtin-routes') {
         if (segments.length === 4) {
@@ -1597,6 +1617,18 @@ function parseSeedSources(raw: unknown): string | {
       if (segments[3] === 'library' && segments.length === 4 && method === 'GET') {
         try {
           sendJson(res, 200, await fetchZoteroLibrary());
+        } catch (e) {
+          if (e instanceof ZoteroUnavailableError) {
+            throw new HttpError(503, { code: 'provider_unreachable', message: e.message, retryable: true });
+          }
+          throw e;
+        }
+        return;
+      }
+      if (segments[3] === 'annotations' && segments.length === 4 && method === 'GET') {
+        // Researcher annotations (highlights/notes) — seed material for studies.
+        try {
+          sendJson(res, 200, await fetchZoteroAnnotations());
         } catch (e) {
           if (e instanceof ZoteroUnavailableError) {
             throw new HttpError(503, { code: 'provider_unreachable', message: e.message, retryable: true });
@@ -1737,8 +1769,61 @@ function parseSeedSources(raw: unknown): string | {
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
 
+    if (segments[2] === 'agent-policy') {
+      // Resident-agent approval posture (settings surface): the engine is
+      // fail-closed by design — every tool-class action asks once per
+      // conversation, and "remember" adds that action KIND to that one
+      // conversation's autoApprove (bounded at 10). This endpoint makes the
+      // posture visible and lets the researcher revoke remembered kinds.
+      const policyRoute = (fn: () => void): void => {
+        try {
+          fn();
+        } catch (e) {
+          if (e instanceof ConversationError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false });
+          }
+          throw e;
+        }
+      };
+      if (segments.length === 3 && method === 'GET') {
+        return policyRoute(() => {
+          const remembered = listConversations(app)
+            .filter((c) => c.autoApprove.length > 0)
+            .map((c) => ({ conversationId: c.id, conversationTitle: c.title, kinds: c.autoApprove }));
+          sendJson(res, 200, { defaultPolicy: 'ask_per_conversation', remembered });
+        });
+      }
+      if (segments[3] === 'remember' && segments.length === 5 && method === 'DELETE') {
+        const convId = segments[4]!;
+        return policyRoute(() => {
+          const conv = getConversation(app, convId); // 404 when unknown
+          if (conv.autoApprove.length === 0) {
+            sendJson(res, 200, { conversationId: convId, kinds: [] });
+            return;
+          }
+          const updated = ConversationSchema.parse({ ...conv, autoApprove: [], updatedAt: new Date().toISOString() });
+          app.store.putObject('conversation', updated);
+          sendJson(res, 200, { conversationId: convId, kinds: [] });
+        });
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
     if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
       return health(res);
+    }
+
+    if (segments[2] === 'meta' && segments.length === 3 && method === 'GET') {
+      // Server/workspace facts for the settings About section: version + data
+      // location. Env var NAMES and paths only — secret values never leave.
+      let version = 'unknown';
+      try {
+        const pkgPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
+        version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version ?? 'unknown');
+      } catch {
+        // honest unknown — never fabricate a version
+      }
+      return sendJson(res, 200, { version, dataDir: app.dataDir });
     }
 
     if (segments[2] === 'search' && segments.length === 3 && method === 'GET') {

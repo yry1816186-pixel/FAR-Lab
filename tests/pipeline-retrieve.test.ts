@@ -1272,3 +1272,61 @@ describe('retrieve -> verify chain', () => {
     expect(await verifyStage.applicable(env.ctx)).toBe(false);
   });
 });
+
+/* ---------------- cross-source fuzzy dedup (gap-hunt R8) ------------------ */
+
+describe('retrieve stage: cross-source fuzzy dedup', () => {
+  const LONG_TITLE = 'Longitudinal Effects of Intermittent Fasting on Insulin Sensitivity Markers';
+
+  it('merges the same work surfaced under different id systems by normalized title+year', async () => {
+    const openalex = fakeAdapter('openalex', {
+      search: byQuery({
+        [PLAN.discovery[0] as string]: [
+          fakeRecord(LONG_TITLE, '10.1000/fuzzy.a', { identifiers: [{ kind: 'doi', value: '10.1000/fuzzy.a' }] }),
+        ],
+      }),
+    });
+    // Same work from a different family: no DOI, native id only, different casing/punctuation.
+    const europepmc = fakeAdapter('europepmc', {
+      search: byQuery({
+        [PLAN.counter[0] as string]: [
+          fakeRecord('Longitudinal effects of Intermittent fasting on insulin-sensitivity markers', 'PMC777001', {
+            identifiers: [{ kind: 'pubmed', value: 'PMC777001' }],
+            publicationYear: 2026,
+          }),
+        ],
+      }),
+    });
+    const arxiv = fakeAdapter('arxiv', { search: async () => [] });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
+
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+
+    const docs = env.store.listObjects('source_document', env.run.id);
+    expect(docs).toHaveLength(1); // the duplicate merged into ONE document
+    expect(defined(docs[0], 'fuzzy-merged doc').identifiers.some((i) => i.value === '10.1000/fuzzy.a' || i.value === 'PMC777001')).toBe(true); // first-seen record wins; the other merged in
+  });
+
+  it('never fuzzy-merges short titles (they collide across genuinely different works)', async () => {
+    const openalex = fakeAdapter('openalex', {
+      search: byQuery({ [PLAN.discovery[0] as string]: [fakeRecord('Insulin Study A', '10.1000/short.a')] }),
+    });
+    const europepmc = fakeAdapter('europepmc', {
+      search: byQuery({
+        [PLAN.counter[0] as string]: [
+          fakeRecord('Insulin Study A', 'PMC888002', { identifiers: [{ kind: 'pubmed', value: 'PMC888002' }] }),
+        ],
+      }),
+    });
+    const arxiv = fakeAdapter('arxiv', { search: async () => [] });
+    const crossref = fakeAdapter('crossref', { search: async () => [] });
+    const env = makeEnv([{ rawOutput: JSON.stringify(PLAN) }], { openalex, arxiv, crossref, europepmc });
+
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    // Short title below the floor -> both survive as distinct documents (no false merge).
+    expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(2);
+  });
+});

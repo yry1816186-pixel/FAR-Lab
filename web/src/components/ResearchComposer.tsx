@@ -1,20 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ArrowUp, BookMarked, Check, FileText, Link2, Loader2, Paperclip, RotateCcw, Settings, SlidersHorizontal, Sparkles, X,
+  ArrowUp, BookMarked, Check, Link2, Loader2, Paperclip, RotateCcw, Settings, SlidersHorizontal, Sparkles, X,
 } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
-import { errorText } from './common';
-import { useCreateRun } from '../hooks/useCreateRun';
+import { AttachIcon, DISPLAY_KIND, errorText, type AttachKind } from './common';
+import { useConversationStart } from '../hooks/useConversationStart';
 import { listModelConfigs } from '../api/endpoints';
-import type { ModelConfigsResponse, ZoteroLibItem } from '../api/types';
+import type { ModelConfigsResponse, ZoteroImportItem } from '../api/types';
 import { ZoteroPanel } from './ZoteroPanel';
+import { DictationButton } from './DictationButton';
+import { insertAtCaret } from '../dictation/audio';
 import {
-  detectPasteKind, parseCitation, parseCitationEntries, extractPdfText, readTextFile,
-  extractDoi, extractArxivId, MAX_SEEDS, type SeedInput,
+  detectFileKind, detectPasteKind, extractFileText, parseCitation, parseCitationEntries,
+  extractIdentifiers, readTextFile, MAX_BINARY_BYTES, MAX_SEEDS, type SeedInput,
 } from '../utils/ingest';
-
-type AttachKind = 'PDF' | 'TXT' | 'REF' | 'DOI' | 'arXiv' | 'URL';
 
 interface Attachment {
   id: number;
@@ -23,6 +23,8 @@ interface Attachment {
   status: 'parsing' | 'ready' | 'failed';
   errorKey?: DictKey;
   sizeBytes?: number;
+  /** Projection hit the 50k-char ceiling — shown honestly on the card. */
+  truncated?: boolean;
   /** Re-runnable parse source so a failed card can retry without re-dropping. */
   retry?: () => Promise<void>;
 }
@@ -36,34 +38,48 @@ export function formatBytes(n: number): string {
 }
 
 /**
- * Research Composer (HX2 v2) — single card in the ChatGPT/LibreChat composer
- * form (Scout A): borderless auto-grow input inside one surface, attachment
- * row above it, tool rail at the bottom (add files / link / Zotero / model /
- * round send). Every attachment state is a real parse state; nothing is
- * decorative. Enter submits with the IME triple guard; Shift+Enter newlines.
+ * Research Composer (HX2 v3, conversation-first) — single card in the
+ * ChatGPT/LibreChat composer form: attachment row, auto-grow input, tool rail
+ * (files / link / Zotero / model / round send). Submitting now OPENS a
+ * brainstorming conversation (first message + materials); research runs are
+ * launched from inside the conversation, not from here. Every attachment
+ * state is a real parse state; nothing is decorative. Enter submits with the
+ * IME triple guard; Shift+Enter newlines.
  */
 export function ResearchComposer({
   onCreated,
   onOpenSettings,
 }: {
-  onCreated: (runId: string) => void;
+  /** Receives the id of the conversation this composer just opened. */
+  onCreated: (conversationId: string) => void;
   /** Opens the model-management dialog from the model picker's manage entry. */
   onOpenSettings: () => void;
 }): JSX.Element {
   const { t } = useI18n();
-  // domain/goalType stay in the createRun machine (API capability for
-  // CLI/advanced callers) but are deliberately NOT surfaced here — the scope
-  // model decides them (decision allocation, user directive 2026-08-23).
   const { text, setText, providerConfigId, setProviderConfigId,
-    showValidationError, submitting, error, submit, setSeeds } = useCreateRun(onCreated);
+    showValidationError, submitting, error, startConversation, setSeeds } = useConversationStart(onCreated);
 
-  // ---- attachments: local authority, projected into the createRun machine ----
+  // ---- attachments: local authority, projected into the conversation machine ----
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   useEffect(() => {
     setSeeds(attachments.filter((a) => a.status === 'ready').map((a) => a.seed).slice(0, MAX_SEEDS));
     // setSeeds is a stable useState setter; projection only runs on tray changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachments]);
+
+  // TIS user commands: palette inserts land here when the welcome composer is
+  // the mounted input surface (same DOM-event contract as ConversationView).
+  // setText is a plain setter (no functional updates), so the listener re-arms
+  // on every text change to always see the current value.
+  useEffect(() => {
+    const onInsert = (e: Event): void => {
+      const detail = (e as CustomEvent<{ text?: unknown }>).detail;
+      if (typeof detail?.text !== 'string' || detail.text.length === 0) return;
+      setText(text.trim().length > 0 ? `${text}\n${detail.text}` : detail.text);
+    };
+    window.addEventListener('far:insert-text', onInsert);
+    return () => window.removeEventListener('far:insert-text', onInsert);
+  }, [setText, text]);
 
   const [note, setNote] = useState<string | null>(null);
   const noteTimer = useRef<number | null>(null);
@@ -133,21 +149,16 @@ export function ResearchComposer({
   /** Parse one dropped/selected file into a seed card with honest failure states. */
   const ingestFile = async (file: File): Promise<void> => {
     if (capReached) { flashNote(t('composer.capReached', { n: MAX_SEEDS })); return; }
-    const name = file.name.toLowerCase();
-    const kind: AttachKind | null = name.endsWith('.pdf') ? 'PDF'
-      : name.endsWith('.txt') || name.endsWith('.md') ? 'TXT'
-      : name.endsWith('.bib') || name.endsWith('.ris') ? 'REF' : null;
+    const kind = detectFileKind(file.name);
     if (kind === null) { flashNote(t('ingest.unsupported')); return; }
+    const display: AttachKind = kind === 'odf' && /\.odp$/i.test(file.name) ? 'SLIDES' : DISPLAY_KIND[kind];
+    const binary = kind !== 'text' && kind !== 'ref' && kind !== 'html' && kind !== 'json';
     const id = ++attachSeq;
-    setAttachments((prev) => [...prev, { id, seed: { title: file.name }, kind, status: 'parsing', sizeBytes: file.size }]);
+    setAttachments((prev) => [...prev, { id, seed: { title: file.name }, kind: display, status: 'parsing', sizeBytes: file.size }]);
     const run = async (): Promise<void> => {
       upsert(id, { status: 'parsing', retry: () => run() });
       try {
-        if (kind === 'PDF') {
-          const extracted = await extractPdfText(file);
-          if (extracted === null) { upsert(id, { status: 'failed', errorKey: 'ingest.pdfFailed' }); return; }
-          upsert(id, { status: 'ready', seed: { title: file.name.replace(/\.pdf$/i, ''), text: extracted } });
-        } else if (kind === 'REF') {
+        if (kind === 'ref') {
           const content = await readTextFile(file);
           // A dropped .bib/.ris may hold a WHOLE exported library — import every entry.
           const entries = content !== null ? await parseCitationEntries(content) : null;
@@ -173,38 +184,98 @@ export function ResearchComposer({
             })),
           ]);
           return;
-        } else {
-          const content = await readTextFile(file);
-          if (content === null) { upsert(id, { status: 'failed', errorKey: 'ingest.pdfFailed' }); return; }
-          upsert(id, { status: 'ready', seed: { title: file.name, text: content } });
         }
+        if (binary && file.size > MAX_BINARY_BYTES) { upsert(id, { status: 'failed', errorKey: 'ingest.tooLarge' }); return; }
+        if (kind === 'text') {
+          if (file.size > 1_048_576) { upsert(id, { status: 'failed', errorKey: 'ingest.tooLarge' }); return; }
+          const content = await readTextFile(file);
+          if (content === null || content.trim().length === 0) { upsert(id, { status: 'failed', errorKey: 'ingest.extractFailed' }); return; }
+          upsert(id, { status: 'ready', seed: { title: file.name, text: content } });
+          return;
+        }
+        const extraction = await extractFileText(file, kind);
+        if (extraction === null) {
+          upsert(id, { status: 'failed', errorKey: kind === 'pdf' ? 'ingest.pdfFailed' : 'ingest.extractFailed' });
+          return;
+        }
+        upsert(id, {
+          status: 'ready',
+          truncated: extraction.truncated,
+          seed: { title: file.name.replace(/\.[^.]+$/, ''), text: extraction.text },
+        });
       } catch {
-        upsert(id, { status: 'failed', errorKey: 'ingest.pdfFailed' });
+        upsert(id, { status: 'failed', errorKey: 'ingest.extractFailed' });
       }
     };
     await run();
   };
 
-  const addIdentifier = (raw: string): boolean => {
-    const value = raw.trim();
-    if (value.length === 0) return false;
-    if (capReached) { flashNote(t('composer.capReached', { n: MAX_SEEDS })); return false; }
-    const doi = extractDoi(value);
-    const arxiv = extractArxivId(value);
-    if (doi !== null) {
-      setAttachments((prev) => [...prev, { id: ++attachSeq, kind: 'DOI', status: 'ready', seed: { identifiers: [{ kind: 'doi', value: doi }], title: `DOI ${doi}` } }]);
-      return true;
+  /** Append parsed citation entries as ready REF cards (cap-aware, returns added count). */
+  const importCitationEntries = (entries: { title: string; year?: number; authors: string[]; doi?: string }[], fallbackTitle?: string): number => {
+    const room = Math.max(0, MAX_SEEDS - attachments.length);
+    const kept = entries.slice(0, room);
+    if (entries.length > room) flashNote(t('composer.importTruncated', { kept: kept.length, total: entries.length, max: MAX_SEEDS }));
+    if (kept.length === 0) return 0;
+    setAttachments((prev) => [...prev, ...kept.map((entry) => ({
+      id: ++attachSeq,
+      kind: 'REF' as AttachKind,
+      status: 'ready' as const,
+      seed: {
+        title: entry.title.length > 0 ? entry.title : (fallbackTitle ?? t('ingest.untitled')),
+        ...(entry.doi !== undefined ? { identifiers: [{ kind: 'doi' as const, value: entry.doi }] } : {}),
+        ...(entry.year !== undefined ? { year: entry.year } : {}),
+        ...(entry.authors.length > 0 ? { authors: entry.authors } : {}),
+      },
+    }))]);
+    return kept.length;
+  };
+
+  /** Batch identifier attach: adds every recognized DOI/arXiv/URL as its own card. */
+  const addIdentifiers = (raw: string): { added: number; rest: string[] } => {
+    const { found, rest } = extractIdentifiers(raw);
+    if (found.length === 0) return { added: 0, rest };
+    if (capReached) { flashNote(t('composer.capReached', { n: MAX_SEEDS })); return { added: 0, rest }; }
+    const room = MAX_SEEDS - attachments.length;
+    const kept = found.slice(0, room);
+    if (found.length > room) flashNote(t('composer.capReached', { n: MAX_SEEDS }));
+    if (kept.length > 0) {
+      const kindOf: Record<(typeof kept)[number]['kind'], AttachKind> = { doi: 'DOI', arxiv: 'arXiv', url: 'URL' };
+      setAttachments((prev) => [...prev, ...kept.map((id) => {
+        const label = id.kind === 'doi' ? `DOI ${id.value}` : id.kind === 'arxiv' ? `arXiv:${id.value}` : id.value.slice(0, 80);
+        return { id: ++attachSeq, kind: kindOf[id.kind], status: 'ready' as const, seed: { identifiers: [{ kind: id.kind, value: id.value }], title: label } };
+      })]);
     }
-    if (arxiv !== null) {
-      setAttachments((prev) => [...prev, { id: ++attachSeq, kind: 'arXiv', status: 'ready', seed: { identifiers: [{ kind: 'arxiv', value: arxiv }], title: `arXiv:${arxiv}` } }]);
-      return true;
+    return { added: kept.length, rest };
+  };
+
+  /** Multi-link submit: recognize every DOI/arXiv/URL, keep unrecognized text for fixing. */
+  const submitLinks = (): void => {
+    const { added, rest } = addIdentifiers(linkInput);
+    if (added > 0) {
+      flashNote(t('composer.linksAdded', { n: added }) + (rest.length > 0 ? ` · ${t('composer.linksSkipped', { n: rest.length })}` : ''));
+      setLinkInput(rest.join(' '));
+    } else if (rest.length > 0 || linkInput.trim().length > 0) {
+      flashNote(t('composer.invalidLink'));
     }
-    if (/^https?:\/\/\S+$/i.test(value)) {
-      setAttachments((prev) => [...prev, { id: ++attachSeq, kind: 'URL', status: 'ready', seed: { identifiers: [{ kind: 'url', value }], title: value.slice(0, 80) } }]);
-      return true;
+  };
+
+  /**
+   * Text-drop ingestion (external drags often carry no files at all — e.g.
+   * dragging items out of the Zotero app delivers citation text/URIs only).
+   */
+  const ingestDroppedText = async (text: string): Promise<void> => {
+    const trimmed = text.trim();
+    if (trimmed.length === 0) { flashNote(t('composer.invalidLink')); return; }
+    const kind = detectPasteKind(trimmed);
+    if (kind === 'bibtex' || kind === 'ris') {
+      const entries = await parseCitationEntries(trimmed);
+      if (entries !== null && entries.length > 0) {
+        importCitationEntries(entries);
+        return;
+      }
     }
-    flashNote(t('composer.invalidLink'));
-    return false;
+    const { added } = addIdentifiers(trimmed);
+    if (added === 0) flashNote(t('composer.invalidLink'));
   };
 
   /** Paste routing (LibreChat pattern): citations/identifiers become attachments; prose stays the question. */
@@ -226,31 +297,49 @@ export function ResearchComposer({
       } else {
         upsert(id, { status: 'failed', errorKey: 'ingest.citationFailed' });
       }
-    } else if (kind === 'doi' || kind === 'arxiv') {
-      const ok = addIdentifier(pasted);
-      if (ok) ev.preventDefault();
+    } else {
+      // pure identifier paste (every fragment is a DOI/arXiv/URL): attach all
+      const { found, rest } = extractIdentifiers(pasted);
+      if (found.length > 0 && rest.length === 0) {
+        ev.preventDefault();
+        const { added } = addIdentifiers(pasted);
+        if (added > 0) flashNote(t('composer.linksAdded', { n: added }));
+      }
+      // mixed prose+links stays in the question (no surprise attachments)
     }
   };
 
   // ---- Zotero picker (full-library search + relation graph; real local API via server bridge) ----
   const [zoteroOpen, setZoteroOpen] = useState(false);
-  const importZotero = (imported: ZoteroLibItem[]): void => {
+  const importZotero = (imported: ZoteroImportItem[]): void => {
     const room = MAX_SEEDS - attachments.length;
     if (imported.length > room) flashNote(t('composer.capReached', { n: MAX_SEEDS }));
     const slice = imported.slice(0, Math.max(0, room));
     if (slice.length === 0) return;
-    setAttachments((prev) => [...prev, ...slice.map((it) => ({
-      id: ++attachSeq,
-      kind: 'REF' as AttachKind,
-      status: 'ready' as const,
-      seed: {
-        title: it.title,
-        ...(it.doi !== undefined ? { identifiers: [{ kind: 'doi' as const, value: it.doi }] }
-          : it.url !== undefined ? { identifiers: [{ kind: 'url' as const, value: it.url }] } : {}),
-        ...(it.year !== undefined ? { year: it.year } : {}),
-        ...(it.creators.length > 0 ? { authors: it.creators } : {}),
-      },
-    }))]);
+    setAttachments((prev) => [...prev, ...slice.map((it) => {
+      // Researcher annotations are critical-reading gold: they ride along as seed
+      // text so hypothesis generation sees WHY the researcher flagged this paper.
+      const notes = (it.annotations ?? [])
+        .map((a, i) => {
+          const parts = [a.text, a.comment].filter((x): x is string => x !== undefined);
+          return parts.length > 0 ? `[研究者注释 ${i + 1}] ${parts.join(' — ')}` : '';
+        })
+        .filter((s) => s.length > 0)
+        .join('\n');
+      return {
+        id: ++attachSeq,
+        kind: 'REF' as AttachKind,
+        status: 'ready' as const,
+        seed: {
+          title: it.title,
+          ...(it.doi !== undefined ? { identifiers: [{ kind: 'doi' as const, value: it.doi }] }
+            : it.url !== undefined ? { identifiers: [{ kind: 'url' as const, value: it.url }] } : {}),
+          ...(it.year !== undefined ? { year: it.year } : {}),
+          ...(it.creators.length > 0 ? { authors: it.creators } : {}),
+          ...(notes.length > 0 ? { text: notes } : {}),
+        },
+      };
+    })]);
   };
 
   const canSubmit = !submitting && text.trim().length > 0;
@@ -258,13 +347,20 @@ export function ResearchComposer({
   return (
     <form
       className={`composer2${dragActive ? ' composer2--drag' : ''}`}
-      onSubmit={(e) => void submit(e)}
+      onSubmit={(e) => { e.preventDefault(); void startConversation(); }}
       onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragActive(false); }}
       onDrop={(e) => {
         e.preventDefault();
         setDragActive(false);
-        void Promise.all(Array.from(e.dataTransfer.files).map((f) => ingestFile(f)));
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length > 0) {
+          void Promise.all(files.map((f) => ingestFile(f)));
+          return;
+        }
+        // OS/app drags without files (e.g. Zotero item drag) carry text/URIs
+        const dropped = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+        if (dropped.trim().length > 0) void ingestDroppedText(dropped);
       }}
       noValidate
     >
@@ -272,7 +368,7 @@ export function ResearchComposer({
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".pdf,.bib,.ris,.txt,.md"
+        accept=".pdf,.bib,.ris,.txt,.md,.docx,.xlsx,.xls,.csv,.tsv,.ods,.pptx,.odt,.odp,.html,.htm,.json,.epub"
         className="sr-only"
         aria-hidden="true"
         tabIndex={-1}
@@ -290,7 +386,7 @@ export function ResearchComposer({
             {attachments.map((a) => (
               <li key={a.id} className={`attach-card attach-card--${a.status}`}>
                 <span className="attach-icon" aria-hidden="true">
-                  {a.kind === 'PDF' || a.kind === 'TXT' ? <FileText size={14} /> : a.kind === 'REF' ? <BookMarked size={14} /> : <Link2 size={14} />}
+                  <AttachIcon kind={a.kind} />
                 </span>
                 <span className="attach-body">
                   <span className="attach-title" title={a.seed.title ?? ''}>
@@ -300,7 +396,8 @@ export function ResearchComposer({
                     {a.kind}
                     {a.sizeBytes !== undefined ? ` · ${formatBytes(a.sizeBytes)}` : ''}
                     {a.status === 'parsing' && ` · ${t('composer.parsing')}`}
-                    {a.status === 'failed' && ` · ${t(a.errorKey ?? 'ingest.pdfFailed')}`}
+                    {a.status === 'ready' && a.truncated && ` · ${t('ingest.truncated')}`}
+                    {a.status === 'failed' && ` · ${t(a.errorKey ?? 'ingest.extractFailed')}`}
                   </span>
                 </span>
                 {a.status === 'parsing' && <Loader2 size={14} className="attach-spinner" aria-hidden="true" />}
@@ -364,6 +461,20 @@ export function ResearchComposer({
             <BookMarked size={15} aria-hidden="true" />
             <span>Zotero</span>
           </button>
+          <DictationButton
+            onTranscribed={(fragment) => {
+              const el = questionRef.current;
+              const caret = el?.selectionStart ?? text.length;
+              const next = insertAtCaret(text, fragment, caret);
+              setText(next.value);
+              requestAnimationFrame(() => {
+                el?.focus();
+                el?.setSelectionRange(next.caret, next.caret);
+                autosize();
+              });
+            }}
+            onError={flashNote}
+          />
           <span className="composer2-spacer" />
           <button
             type="button"
@@ -401,14 +512,14 @@ export function ResearchComposer({
             onKeyDown={(e) => {
               if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
               e.preventDefault();
-              if (addIdentifier(linkInput)) setLinkInput('');
+              submitLinks();
             }}
           />
           <button
             type="button"
             className="btn btn--sm"
             disabled={linkInput.trim().length === 0 || capReached}
-            onClick={() => { if (addIdentifier(linkInput)) setLinkInput(''); }}
+            onClick={submitLinks}
           >
             {t('composer.add')}
           </button>

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationNodeDatum } from 'd3-force';
-import { BookMarked, FileUp, Loader2, RefreshCw } from 'lucide-react';
+import { BookMarked, ClipboardPaste, FileUp, Loader2, RefreshCw } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
-import { getZoteroLibrary } from '../api/endpoints';
-import type { ZoteroLibItem } from '../api/types';
-import { parseCitationEntries, readTextFile } from '../utils/ingest';
+import { getZoteroAnnotations, getZoteroLibrary } from '../api/endpoints';
+import type { ZoteroAnnotation, ZoteroImportItem, ZoteroLibItem } from '../api/types';
+import { parseCitationEntries, readTextFile, type CitationEntry } from '../utils/ingest';
 import { buildLitGraph, DEFAULT_GRAPH_OPTIONS, type GraphOptions, type LitGraph } from '../utils/lit-graph';
 
 /**
@@ -29,8 +29,9 @@ interface SimNode extends SimulationNodeDatum {
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** Selected items become composer seed attachments (caller enforces the cap). */
-  onImport: (items: ZoteroLibItem[]) => void;
+  /** Selected items become composer seed attachments (caller enforces the cap);
+   *  Zotero-sourced items carry their annotations for seed-text import. */
+  onImport: (items: ZoteroImportItem[]) => void;
   /** How many more seeds the composer can still accept. */
   remaining: number;
 }
@@ -38,6 +39,8 @@ interface Props {
 export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.Element | null {
   const { t } = useI18n();
   const [libItems, setLibItems] = useState<ZoteroLibItem[] | null>(null);
+  /** parentKey -> annotations (researcher highlights/notes; enhancement layer). */
+  const [annotationsByParent, setAnnotationsByParent] = useState<Map<string, ZoteroAnnotation[]>>(new Map());
   const [fileItems, setFileItems] = useState<PanelItem[]>([]);
   const [fileNote, setFileNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,6 +49,8 @@ export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.
   const [view, setView] = useState<'list' | 'graph'>('list');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [graphOpts, setGraphOpts] = useState<GraphOptions>(DEFAULT_GRAPH_OPTIONS);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -67,7 +72,41 @@ export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.
         setLoading(false);
         setError(e instanceof Error ? e.message : String(e));
       });
+    // Annotations are an ENHANCEMENT layer: a failure here degrades to "no badge,
+    // no annotation import" while the library itself still works — never blocks.
+    getZoteroAnnotations(controller.signal)
+      .then((r) => {
+        const byParent = new Map<string, ZoteroAnnotation[]>();
+        for (const a of r.annotations) {
+          const list = byParent.get(a.parentKey);
+          if (list === undefined) byParent.set(a.parentKey, [a]);
+          else list.push(a);
+        }
+        setAnnotationsByParent(byParent);
+      })
+      .catch(() => { if (!(controller.signal.aborted)) setAnnotationsByParent(new Map()); });
   }, []);
+
+  /** Shared core: merge parsed entries as file-source items (dedup by key). */
+  const addEntries = (sourceName: string, entries: CitationEntry[], existing: Set<string>, added: PanelItem[]): void => {
+    entries.forEach((e, idx) => {
+      const key = `file:${sourceName}:${idx}`;
+      if (existing.has(key)) return;
+      existing.add(key);
+      added.push({
+        key,
+        title: e.title.length > 0 ? e.title : sourceName,
+        itemType: 'journalArticle',
+        ...(e.year !== undefined ? { year: e.year } : {}),
+        creators: e.authors,
+        ...(e.doi !== undefined ? { doi: e.doi } : {}),
+        tags: e.keywords,
+        collections: [],
+        relatedKeys: [],
+        source: 'file',
+      });
+    });
+  };
 
   /** Universal import: any manager that exports BibTeX/RIS (multi-entry). */
   const importFiles = async (files: FileList): Promise<void> => {
@@ -78,23 +117,7 @@ export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.
       const text = await readTextFile(file);
       const entries = text !== null ? await parseCitationEntries(text) : null;
       if (entries === null || entries.length === 0) { failedFiles += 1; continue; }
-      entries.forEach((e, idx) => {
-        const key = `file:${file.name}:${idx}`;
-        if (existing.has(key)) return;
-        existing.add(key);
-        added.push({
-          key,
-          title: e.title.length > 0 ? e.title : file.name,
-          itemType: 'journalArticle',
-          ...(e.year !== undefined ? { year: e.year } : {}),
-          creators: e.authors,
-          ...(e.doi !== undefined ? { doi: e.doi } : {}),
-          tags: e.keywords,
-          collections: [],
-          relatedKeys: [],
-          source: 'file',
-        });
-      });
+      addEntries(file.name, entries, existing, added);
     }
     setFileItems((prev) => [...prev, ...added]);
     setFileNote(added.length > 0
@@ -102,11 +125,31 @@ export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.
       : (failedFiles > 0 ? t('zotero.fileFailed', { n: failedFiles }) : null));
   };
 
+  /** Paste import (picker-free path — works in embedded browsers that block file dialogs). */
+  const importPasted = async (): Promise<void> => {
+    const text = pasteText.trim();
+    if (text.length === 0) return;
+    const entries = await parseCitationEntries(text);
+    if (entries === null || entries.length === 0) {
+      setFileNote(t('zotero.pasteFailed'));
+      return;
+    }
+    const existing = new Set(fileItems.map((i) => i.key));
+    const added: PanelItem[] = [];
+    addEntries(t('zotero.pasteSource'), entries, existing, added);
+    setFileItems((prev) => [...prev, ...added]);
+    setFileNote(t('zotero.fileAdded', { n: added.length }));
+    setPasteText('');
+    setPasteOpen(false);
+  };
+
   useEffect(() => {
     if (!open) return undefined;
     setQuery('');
     setSelected(new Set());
     setFileNote(null);
+    setPasteOpen(false);
+    setPasteText('');
     setView('list');
     if (libItems === null && !loading) load();
     const restore = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -150,8 +193,10 @@ export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.
   };
 
   const selectedItems = useMemo(
-    (): ZoteroLibItem[] => items.filter((i) => selected.has(i.key)),
-    [items, selected],
+    (): ZoteroImportItem[] => items
+      .filter((i) => selected.has(i.key))
+      .map((i) => (i.source === 'zotero' ? { ...i, annotations: annotationsByParent.get(i.key) } : i)),
+    [items, selected, annotationsByParent],
   );
 
   if (!open) return null;
@@ -180,6 +225,15 @@ export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.
           <button
             type="button"
             className="btn btn--small"
+            onClick={() => setPasteOpen((v) => !v)}
+            aria-expanded={pasteOpen}
+            title={t('zotero.pasteHint')}
+          >
+            <ClipboardPaste size={12} aria-hidden="true" /> {t('zotero.pasteImport')}
+          </button>
+          <button
+            type="button"
+            className="btn btn--small"
             onClick={() => fileInputRef.current?.click()}
             title={t('zotero.fileHint')}
           >
@@ -204,6 +258,33 @@ export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.
             e.target.value = '';
           }}
         />
+        {pasteOpen && (
+          <div className="zotero-paste" role="group" aria-label={t('zotero.pasteImport')}>
+            <textarea
+              value={pasteText}
+              placeholder={t('zotero.pastePlaceholder')}
+              aria-label={t('zotero.pasteImport')}
+              rows={4}
+              autoFocus
+              onChange={(e) => setPasteText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void importPasted();
+                }
+              }}
+            />
+            <div className="zotero-paste-actions">
+              <span className="muted small">{t('zotero.pasteHint')}</span>
+              <span>
+                <button type="button" className="btn btn--small" onClick={() => { setPasteOpen(false); setPasteText(''); }}>{t('settings.cancel')}</button>{' '}
+                <button type="button" className="btn btn--primary btn--small" disabled={pasteText.trim().length === 0} onClick={() => void importPasted()}>
+                  {t('zotero.pasteParse')}
+                </button>
+              </span>
+            </div>
+          </div>
+        )}
         {fileNote !== null && <p className="muted small" role="status">{fileNote}</p>}
         {error !== null && <p className="field-error" role="alert">{t('ingest.zoteroUnavailable')}（{error}）— {t('zotero.fileFallback')}</p>}
 
@@ -229,6 +310,11 @@ export function ZoteroPanel({ open, onClose, onImport, remaining }: Props): JSX.
                   <span className="zotero-row-title">{it.title}</span>
                   <span className="zotero-row-meta muted small">
                     <span className={`badge${it.source === 'file' ? ' badge--info' : ''}`}>{it.source === 'file' ? t('zotero.srcFile') : 'Zotero'}</span>
+                    {annotationsByParent.get(it.key)?.length !== undefined && (
+                      <span className="badge badge--info" title={t('zotero.annotationsTitle')}>
+                        {t('zotero.annotationsBadge', { n: annotationsByParent.get(it.key)!.length })}
+                      </span>
+                    )}
                     {it.year !== undefined ? ` ${it.year} · ` : ' '}{it.creators.slice(0, 3).join(', ')}
                     {it.tags.length > 0 ? ` · ${it.tags.slice(0, 4).join(' / ')}` : ''}
                   </span>
