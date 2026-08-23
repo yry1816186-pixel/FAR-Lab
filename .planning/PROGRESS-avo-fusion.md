@@ -18,6 +18,13 @@
 - tsc --noEmit GREEN; npm run build GREEN; eslint 全仓 GREEN
 - secret-scan PASS · path-hygiene 0 errors · completion-gate PASS
 
+
+## S10a 状态 (2026-08-24 04:1x)
+- 离线可行性 DONE a70265b: 真实 sidecar 全链路 (gate->sandbox->artifact->receipt->event) 本环境验证通过
+- offline benchmark 8aba4bb: 2 个真实 workload, 行动分歧复现, plan_next_action <2ms
+- live-LLM 对比矩阵: BLOCKED-live (zai 周限额至 08-29 10:03; 无其他可用路由, 已穷尽实测)
+- adversarial review: 待 web 投影完成后与 S10b 一并执行 (Santa 双审查)
+
 ## 关键不变量 (实现中已验证)
 - supervisor/lineage 均为只读视图, 不产生第二权威
 - supervisor_observation note 每边界恰好一条 (幂等可审计)
