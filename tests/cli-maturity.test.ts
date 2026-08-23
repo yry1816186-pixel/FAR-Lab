@@ -83,6 +83,14 @@ describe('far completion: generators cover the real command tree', () => {
   });
 });
 
+
+/** Strip ANSI escapes before content assertions: picocolors enables color when
+ *  vitest injects FORCE_COLOR under CI=true, and frame CONTENT must not depend
+ *  on the process color state (found by the first real CI run). */
+// eslint-disable-next-line no-control-regex -- stripping ANSI REQUIRES matching the ESC control char by definition
+const ANSI_RE = new RegExp('\\u001b\\[[0-9;]*m', 'g');
+const plain = (t: string): string => t.replace(ANSI_RE, '');
+
 describe('far research status --watch: pure frame renderer', () => {
   it('renders id/status/stage and stage-count progress — never a percentage', () => {
     const lines = watchLines({
@@ -92,7 +100,7 @@ describe('far research status --watch: pure frame renderer', () => {
       lastEvent: { at: '2026-08-22T10:04:30.000Z', type: 'stage_done', stage: 'verify_sources' },
       now: '2026-08-22T10:07:30.000Z',
     });
-    const text = lines.join('\n');
+    const text = plain(lines.join('\n'));
     expect(text).toContain('run_abcdefghijklmnopqrstuvwxyz12');
     expect(text).toContain('running');
     expect(text).toContain('build_evidence');
@@ -112,7 +120,7 @@ describe('far research status --watch: pure frame renderer', () => {
       lastEvent: null,
       now: '2026-08-22T10:07:30.000Z',
     });
-    const text = lines.join('\n');
+    const text = plain(lines.join('\n'));
     expect(text).toContain('lease: none');
     expect(text).toContain('FROZEN — resume to recover');
     expect(text).toContain('last event: (none)');
@@ -127,7 +135,7 @@ describe('far research status --watch: pure frame renderer', () => {
       lastEvent: { at: '2026-08-22T10:30:00.000Z', type: 'receipt_recorded' },
       now: '2026-08-22T10:30:01.000Z',
     });
-    expect(lines.join('\n')).toContain('final state — watch ended');
+    expect(plain(lines.join('\n'))).toContain('final state — watch ended');
     expect(isActiveStatus('completed')).toBe(false);
     expect(isActiveStatus('failed')).toBe(false);
     expect(isActiveStatus('cancelled')).toBe(false);
@@ -154,7 +162,7 @@ describe('far research status --watch: pure frame renderer', () => {
       lastEvent: null,
       now: '2026-08-22T10:07:30.000Z',
     });
-    expect(invalidClock.join('\n')).toContain('elapsed: unknown');
+    expect(plain(invalidClock.join('\n'))).toContain('elapsed: unknown');
   });
 
   it('truncateLine caps the last-event line at the character budget', () => {

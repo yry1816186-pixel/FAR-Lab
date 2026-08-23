@@ -29,6 +29,14 @@ jobs:
       - name: Install web dependencies
         working-directory: web
         run: npm ci
+      # eval/*.mjs scripts (rediscovery-judge, retrieval-baseline tests) import
+      # compiled dist/ — the suite needs a real build, not just typecheck.
+      - name: Build backend dist
+        run: npm run build
+      # Experiment sidecar bootstrap scripts run `python -c "import numpy..."`;
+      # the runner image ships python3 without numpy.
+      - name: Install python deps for the experiment sidecar
+        run: pip install numpy --quiet
       - name: Typecheck (backend + CLI)
         run: npm run typecheck
       - name: Full test suite (deterministic; real uv sidecar for experiments)
