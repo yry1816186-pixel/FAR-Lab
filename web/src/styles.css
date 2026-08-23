@@ -2097,3 +2097,8 @@ select option { color: var(--text); background: var(--surface); }
 .exp-metric { display: inline-flex; align-items: center; gap: 5px; margin-right: 10px; white-space: nowrap; }
 .exp-metric-bar { width: 56px; display: inline-block; }
 .exp-tally { margin: 4px 0 10px; }
+
+/* ---- VIZ V4: stage gantt ---- */
+.stage-gantt { margin-bottom: 10px; overflow-x: auto; }
+.gantt-label { font-size: 10px; fill: var(--v2-text-2, #57606a); }
+.gantt-dur { font-size: 9px; fill: var(--v2-text-3, #8a8f98); }
