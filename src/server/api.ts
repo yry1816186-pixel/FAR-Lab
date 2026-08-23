@@ -19,8 +19,8 @@ import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } fr
 import {
   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
   detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
-  resolveConversationProposal, resolveConversationReasoningRoute, setConversationReasoningGear,
-  ConversationError, type ConversationDeps,
+  resolveConversationProposal, resolveConversationReasoningRoute, retryConversationTurn,
+  setConversationReasoningGear, ConversationError, type ConversationDeps,
 } from './conversations.js';
 import { startAutomationEngine, type AutomationEngine } from './automations.js';
 import { aggregateRunUsage, aggregateWorkspaceUsage } from '../app/usage-ledger.js';
@@ -59,7 +59,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -1673,6 +1673,12 @@ function parseSeedSources(raw: unknown): string | {
         return convRoute(async () => {
           const body = await readJsonObject(req);
           sendJson(res, 200, { conversation: await postConversationMessage(app, convId, body, conversationDeps) });
+        });
+      }
+      // retry re-runs the agent reply for the last (unanswered) researcher message
+      if (segments[4] === 'messages' && segments.length === 7 && segments[6] === 'retry' && method === 'POST') {
+        return convRoute(async () => {
+          sendJson(res, 200, { conversation: await retryConversationTurn(app, convId, segments[5]!, conversationDeps) });
         });
       }
       if (segments[4] === 'reasoning-gear' && segments.length === 5 && method === 'PUT') {

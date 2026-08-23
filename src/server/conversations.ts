@@ -15,9 +15,10 @@ import {
  * Conversation service (resident-agent flow, PROPOSAL-resident-agent): the
  * durable dialogue between the researcher and the resident agent. Every agent
  * turn is a REAL kernel tool-loop (conversation-agent.ts) — reads are free,
- * actions land as researcher-gated proposals. A turn is only persisted when
- * the model finished honestly (fail-visible, retryable); nothing about a
- * failed turn is kept.
+ * actions land as researcher-gated proposals. The researcher's message is
+ * persisted BEFORE the model runs and survives any model failure (recorded on
+ * the message as a visible, retryable failure); an agent reply lands only
+ * when the model finished honestly — no fake replies, ever.
  */
 
 export const MAX_MESSAGES = 500;
@@ -34,7 +35,7 @@ export interface ConversationDeps {
   createRun?: CreateRunForConversation;
 }
 
-export type ConversationErrorCode = 'not_found' | 'validation' | 'conversation_model_failed' | 'conversation_full';
+export type ConversationErrorCode = 'not_found' | 'validation' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight';
 
 export class ConversationError extends Error {
   constructor(readonly status: number, readonly code: ConversationErrorCode, message: string) {
@@ -230,30 +231,65 @@ export function collectConversationSeeds(conv: Conversation): ConversationSeed[]
     }));
 }
 
-/** One dialogue turn: persist the researcher message, run the resident agent, persist its reply. */
-export async function postConversationMessage(
+/** One model turn per conversation at a time (post + retry share this gate):
+ * turns are whole-doc read-modify-writes and must never interleave. */
+const inFlightTurns = new Set<string>();
+const serializeTurn = <T>(conversationId: string, body: () => Promise<T>): Promise<T> => {
+  if (inFlightTurns.has(conversationId)) {
+    return Promise.reject(new ConversationError(409, 'turn_in_flight', 'this conversation already has a turn running — wait for it to land'));
+  }
+  inFlightTurns.add(conversationId);
+  return body().finally(() => { inFlightTurns.delete(conversationId); });
+};
+
+const replyErrorText = (e: unknown): string =>
+  (e instanceof Error ? e.message : String(e)).slice(0, 2000);
+
+/**
+ * Record a model failure ON the persisted researcher message (visible in the
+ * transcript, retryable). Best-effort by design: the original error keeps
+ * propagating to the caller — a failure to write the marker must never mask
+ * the turn failure itself.
+ */
+const markReplyFailed = (app: App, conversationId: string, researcherMsgId: string, e: unknown): void => {
+  try {
+    const conv = app.store.getObject('conversation', conversationId);
+    if (conv === null || !conv.messages.some((m) => m.id === researcherMsgId)) return;
+    app.store.putObject('conversation', ConversationSchema.parse({
+      ...conv,
+      messages: conv.messages.map((m) => (m.id === researcherMsgId
+        ? { ...m, replyError: replyErrorText(e) }
+        : m)),
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch { /* secondary write only; the primary error already propagates */ }
+};
+
+/**
+ * Run one resident-agent model turn for an ALREADY-PERSISTED researcher
+ * message and land the reply: append the agent message, clear any failure
+ * marker, count the turn. Model failure throws ConversationError(502) — the
+ * caller records it on the researcher message (the researcher's words stay).
+ * Shared by postConversationMessage and retryConversationTurn.
+ */
+const runAndLandTurn = async (
   app: App,
   conversationId: string,
-  input: { text?: unknown; seeds?: unknown },
-  deps: ConversationDeps = {},
-): Promise<Conversation> {
-  const conv = mustGetConversation(app, conversationId);
-  if (conv.messages.length >= MAX_MESSAGES) {
-    throw new ConversationError(409, 'conversation_full', 'conversation reached the message limit — start a new conversation');
-  }
-  if (typeof input.text !== 'string' || input.text.trim().length === 0) {
-    throw new ConversationError(400, 'validation', 'field "text" is required (non-empty)');
-  }
-  const text = input.text.trim().slice(0, 20_000);
-  const seeds = parseConversationSeeds(input.seeds);
+  conv: Conversation,
+  researcherMsgId: string,
+  deps: ConversationDeps,
+): Promise<Conversation> => {
+  const idx = conv.messages.findIndex((m) => m.id === researcherMsgId);
+  if (idx < 0) throw new ConversationError(404, 'not_found', `message not found: ${researcherMsgId}`);
+  const researcherMsg = conv.messages[idx]!;
 
   const provider = resolveConversationProvider(app, conv);
   // Conversation gear > config default; null when the route declares no capability.
   const turnReasoning = effectiveConversationReasoning(app, conv);
   const generation = await generateConversationTurn(app, provider, conv, {
-    text,
-    seeds,
-    history: conv.messages.slice(-HISTORY_TURNS),
+    text: researcherMsg.content,
+    seeds: researcherMsg.seeds ?? [],
+    history: conv.messages.filter((m) => m.id !== researcherMsgId).slice(-HISTORY_TURNS),
     source: 'researcher',
     ...(turnReasoning !== null ? { reasoning: turnReasoning } : {}),
   });
@@ -266,17 +302,16 @@ export async function postConversationMessage(
   }
   const reply = generation.reply;
 
-  const now = new Date().toISOString();
-  const researcherMsg = ConversationSchema.shape.messages.element.parse({
-    id: newId('cmsg'),
-    role: 'researcher',
-    content: text,
-    ...(seeds.length > 0 ? { seeds } : {}),
-    createdAt: now,
-  });
+  // re-read: other writes (automation records, proposal resolutions) may have
+  // landed while the model ran — never build the final doc from a stale read.
+  const fresh = mustGetConversation(app, conversationId);
+  const at = fresh.messages.findIndex((m) => m.id === researcherMsgId);
+  if (at < 0) throw new ConversationError(409, 'validation', 'the answered message disappeared while the turn ran');
+  const answered = fresh.messages[at]!;
+  if (answered.replyError !== undefined) delete answered.replyError;
 
   // candidate ids are assigned by the service (monotonic per conversation)
-  const candSeq = conv.messages.reduce((n, m) => n + (m.candidates?.length ?? 0), 0);
+  const candSeq = fresh.messages.reduce((n, m) => n + (m.candidates?.length ?? 0), 0);
   const candidates: CandidateQuestion[] = reply.candidates.map((c, i) => ({
     id: `cand_${candSeq + i + 1}`,
     text: c.text,
@@ -284,13 +319,10 @@ export async function postConversationMessage(
   }));
 
   const updated = ConversationSchema.parse({
-    ...conv,
-    title: conv.messages.length === 0 && conv.title === '新对话'
-      ? text.slice(0, 60)
-      : conv.title,
+    ...fresh,
     messages: [
-      ...conv.messages,
-      researcherMsg,
+      ...fresh.messages.slice(0, at),
+      answered,
       ConversationSchema.shape.messages.element.parse({
         id: newId('cmsg'),
         role: 'agent',
@@ -304,8 +336,9 @@ export async function postConversationMessage(
         ...(generation.usage !== undefined ? { usage: generation.usage } : {}),
         createdAt: new Date().toISOString(),
       }),
+      ...fresh.messages.slice(at + 1),
     ],
-    turns: conv.turns + 1,
+    turns: fresh.turns + 1,
     updatedAt: new Date().toISOString(),
   });
   app.store.putObject('conversation', updated);
@@ -318,6 +351,86 @@ export async function postConversationMessage(
     }
   }
   return mustGetConversation(app, conversationId);
+};
+
+/**
+ * One dialogue turn. The researcher's message is persisted BEFORE the model
+ * runs — human words are history and survive any model failure (recorded on
+ * the message as a visible, retryable failure); the agent reply lands only
+ * when the model finished honestly (no fake replies).
+ */
+export async function postConversationMessage(
+  app: App,
+  conversationId: string,
+  input: { text?: unknown; seeds?: unknown },
+  deps: ConversationDeps = {},
+): Promise<Conversation> {
+  return serializeTurn(conversationId, async () => {
+    const conv = mustGetConversation(app, conversationId);
+    if (conv.messages.length >= MAX_MESSAGES) {
+      throw new ConversationError(409, 'conversation_full', 'conversation reached the message limit — start a new conversation');
+    }
+    if (typeof input.text !== 'string' || input.text.trim().length === 0) {
+      throw new ConversationError(400, 'validation', 'field "text" is required (non-empty)');
+    }
+    const text = input.text.trim().slice(0, 20_000);
+    const seeds = parseConversationSeeds(input.seeds);
+
+    const now = new Date().toISOString();
+    const researcherMsg = ConversationSchema.shape.messages.element.parse({
+      id: newId('cmsg'),
+      role: 'researcher',
+      content: text,
+      ...(seeds.length > 0 ? { seeds } : {}),
+      createdAt: now,
+    });
+    const withMessage = ConversationSchema.parse({
+      ...conv,
+      title: conv.messages.length === 0 && conv.title === '新对话'
+        ? text.slice(0, 60)
+        : conv.title,
+      messages: [...conv.messages, researcherMsg],
+      updatedAt: now,
+    });
+    app.store.putObject('conversation', withMessage);
+
+    try {
+      return await runAndLandTurn(app, conversationId, withMessage, researcherMsg.id, deps);
+    } catch (e) {
+      markReplyFailed(app, conversationId, researcherMsg.id, e);
+      throw e;
+    }
+  });
+}
+
+/**
+ * Re-run the resident agent's reply for the conversation's LAST message while
+ * it is an unanswered researcher message (a failed turn, or one whose process
+ * died mid-run — the marker is optional evidence, the dangling tail is the
+ * rule). Re-answering an already-replied message is refused honestly.
+ */
+export async function retryConversationTurn(
+  app: App,
+  conversationId: string,
+  messageId: string,
+  deps: ConversationDeps = {},
+): Promise<Conversation> {
+  return serializeTurn(conversationId, async () => {
+    const conv = mustGetConversation(app, conversationId);
+    if (conv.messages.length >= MAX_MESSAGES) {
+      throw new ConversationError(409, 'conversation_full', 'conversation reached the message limit — start a new conversation');
+    }
+    const last = conv.messages.at(-1);
+    if (last === undefined || last.id !== messageId || last.role !== 'researcher') {
+      throw new ConversationError(409, 'validation', 'only the conversation\'s last message can be retried, and only while it has no reply');
+    }
+    try {
+      return await runAndLandTurn(app, conversationId, conv, messageId, deps);
+    } catch (e) {
+      markReplyFailed(app, conversationId, messageId, e);
+      throw e;
+    }
+  });
 }
 
 /** Record a launched run on its source conversation (called by the launch route). */
