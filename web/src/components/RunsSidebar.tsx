@@ -200,7 +200,13 @@ export function RunsList({
               aria-expanded={open}
               onClick={() => setCollapsed((prev) => ({ ...prev, [g.key]: open }))}
             >
-              <span>{t(g.key)} <span className="muted small">{g.items.length}</span></span>
+              {/* The attention group says what it IS in one human phrase with the
+                  count (plan §2: no bare counters); other groups stay label + count. */}
+              <span>
+                {g.key === 'runs.groupAttention'
+                  ? t(g.key, { n: g.items.length })
+                  : <>{t(g.key)} <span className="muted small">{g.items.length}</span></>}
+              </span>
               <span className="runs-group-caret muted" aria-hidden="true">{open ? '▾' : '▸'}</span>
             </button>
           </h3>
