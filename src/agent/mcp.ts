@@ -208,11 +208,16 @@ export class McpStdioClient {
 
 const MCP_ARGS_SCHEMA = z.record(z.string(), z.unknown());
 
+/** Minimal caller surface an adapted tool needs — satisfied by both stdio and HTTP clients. */
+export interface McpToolCaller {
+  callTool(name: string, args: unknown): Promise<{ ok: boolean; content: unknown; isError: boolean }>;
+}
+
 /**
  * Adapt one remote MCP tool into the kernel AgentTool contract. Args are passed through
  * (the remote server validates); results carry the raw content payload back to the model.
  */
-export const mcpToolAdapter = (client: McpStdioClient, info: McpToolInfo, serverLabel: string): AgentTool => ({
+export const mcpToolAdapter = (client: McpToolCaller, info: McpToolInfo, serverLabel: string): AgentTool => ({
   name: info.name,
   description: info.description ?? `remote MCP tool '${info.name}' from ${serverLabel}`,
   inputSchema: MCP_ARGS_SCHEMA,

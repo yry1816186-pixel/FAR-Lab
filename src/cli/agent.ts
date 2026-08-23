@@ -83,6 +83,10 @@ export async function agentCommand(sub: string | undefined, opts: AgentCommandOp
     }
     if (outcome.error !== undefined) lines.push(`  ${ink.err('error')}: ${outcome.error}`);
     if (outcome.skillsUsed.length > 0) lines.push(`  ${ink.muted(`skills`)}: ${outcome.skillsUsed.join(', ')}`);
+    for (const m of outcome.mcpServers) {
+      const state = m.state === 'connected' ? ink.ok(`${m.state}(${m.toolCount ?? '?'} tools)`) : m.state === 'disabled' ? ink.muted(m.state) : ink.err(m.state);
+      lines.push(`  ${ink.muted('mcp')} ${m.label} ${state}${m.error !== undefined ? ` ${ink.warn(m.error)}` : ''}`);
+    }
     lines.push(`  ${ink.muted(`turns=${outcome.telemetry.turns} modelCalls=${outcome.telemetry.modelCalls} tools=${outcome.telemetry.toolCalls} wall=${outcome.telemetry.wallMs}ms`)}`);
     return { code: outcome.status === 'completed' ? 0 : 1, text: lines.join('\n') };
   } finally {

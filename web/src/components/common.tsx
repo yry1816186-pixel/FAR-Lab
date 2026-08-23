@@ -1,7 +1,34 @@
 import type { ReactNode } from 'react';
+import {
+  BookMarked, BookOpen, FileJson, FileSpreadsheet, FileText, Globe, Link2, Presentation,
+} from 'lucide-react';
 import { ApiError } from '../api/client';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
+import type { FileKind } from '../utils/ingest';
+
+/** Attachment card kind — shared by every ingest surface (home composer + conversation). */
+export type AttachKind =
+  | 'PDF' | 'DOC' | 'SHEET' | 'SLIDES' | 'WEB' | 'DATA' | 'BOOK'
+  | 'TXT' | 'REF' | 'DOI' | 'arXiv' | 'URL';
+
+/** Display card kind per ingest kind (odt is a document, odp is a slide deck). */
+export const DISPLAY_KIND: Record<FileKind, AttachKind> = {
+  pdf: 'PDF', docx: 'DOC', sheet: 'SHEET', slides: 'SLIDES',
+  odf: 'DOC', html: 'WEB', json: 'DATA', epub: 'BOOK', text: 'TXT', ref: 'REF',
+};
+
+const ATTACH_ICON: Record<AttachKind, typeof FileText> = {
+  PDF: FileText, DOC: FileText, TXT: FileText,
+  SHEET: FileSpreadsheet, SLIDES: Presentation, WEB: Globe, DATA: FileJson, BOOK: BookOpen,
+  REF: BookMarked, DOI: Link2, arXiv: Link2, URL: Link2,
+};
+
+/** Icon for an attachment kind (semantic type identity, never decoration). */
+export function AttachIcon({ kind, size = 14 }: { kind: AttachKind; size?: number }): JSX.Element {
+  const Icon = ATTACH_ICON[kind];
+  return <Icon size={size} />;
+}
 
 /** Semantic badge tone — semantic color only, never decoration (PRODUCT_HCI §10). */
 export type BadgeTone = 'ok' | 'warn' | 'err' | 'info' | 'muted';

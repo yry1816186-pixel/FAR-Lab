@@ -23,7 +23,7 @@ const port = parsePort();
 const host = process.env.HOST ?? '127.0.0.1';
 
 const app = await createApp(process.env.FARLAB_DATA_DIR ? { dataDir: process.env.FARLAB_DATA_DIR } : {});
-const api = createApiServer(app, { port, host });
+const api = createApiServer(app, { port, host, automations: { enabled: process.env.FARLAB_AUTOMATIONS !== 'off' } });
 
 try {
   const actualPort = await api.start();

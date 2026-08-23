@@ -18,6 +18,15 @@ const PRODUCTION_ROOTS = ['src','lib','core','app','apps','packages','web','fron
 const CODE_EXT = new Set(['.ts', '.js', '.mjs', '.cjs', '.json', '.yaml', '.yml', '.py', '.go', '.toml']);
 const FIXTURE_DIR_NAMES = new Set(['__fixtures__', 'fixtures', 'testdata', 'test-data', 'mockdata']);
 const TEST_DIR_NAMES = new Set(['test','tests','__tests__','spec','specs']);
+// Vendored binary artifacts (local ASR model weights/vocab, placed by
+// fetch:asr-model): scanning a Hugging Face tokenizer vocabulary with
+// text-pattern rules is meaningless — the demo-marker regex once matched the
+// legitimate BPE token "Ġdemo": 10723. Scope fix, not gate weakening.
+const VENDORED_ARTIFACT_DIRS = ['web/public/models'];
+const isVendored = full => {
+  const rel = path.relative(root, full).split(path.sep).join('/');
+  return VENDORED_ARTIFACT_DIRS.some(p => rel === p || rel.startsWith(`${p}/`));
+};
 const isTestPath = full => path.relative(root, full).split(path.sep).some(part => TEST_DIR_NAMES.has(part));
 const isTestFile = name => /(?:\.|_)(?:test|spec)\.[^.]+$/i.test(name);
 
@@ -97,6 +106,7 @@ for (const prod of PRODUCTION_ROOTS) {
     for (const e of entries) {
       if (EXCLUDE_DIRS.has(e.name)) continue;
       const full = path.join(dir, e.name);
+      if (isVendored(full)) continue;
       if (e.isDirectory()) {
         if (FIXTURE_DIR_NAMES.has(e.name) && !isTestPath(dir)) {
           errors.push(`test-fixture-in-production-root:${path.relative(root, full).split(path.sep).join('/')}`);
@@ -108,8 +118,10 @@ for (const prod of PRODUCTION_ROOTS) {
 }
 
 // 5. Demo/mock markers inside production roots (code/config only)
-const DEMO_RE = /(?:[\"']?demo(?:Mode|_mode)?[\"']?\s*[:=]\s*(?:true|1|[\"']true[\"'])|[\"']?mode[\"']?\s*[:=]\s*[\"']demo[\"'])/i;
-const MOCK_RE = /[\"']?mock[\"']?\s*[:=]\s*(?:true|1|[\"']true[\"'])(?=\s*(?:[,;}\]]|$))/i;
+// Value alternatives are word-bounded: `1` alone must not match the first
+// digit of a numeric literal like 10723 (tokenizer-vocab false positive class).
+const DEMO_RE = /(?:[\"']?demo(?:Mode|_mode)?[\"']?\s*[:=]\s*(?:true|1)(?=\s*(?:[,;}\]]|$))|[\"']?mode[\"']?\s*[:=]\s*[\"']demo[\"'])/i;
+const MOCK_RE = /[\"']?mock[\"']?\s*[:=]\s*(?:true|1)(?=\s*(?:[,;}\]]|$))/i;
 for (const prod of PRODUCTION_ROOTS) {
   const prodPath = path.join(root, prod);
   if (!fs.existsSync(prodPath)) continue;
@@ -119,6 +131,7 @@ for (const prod of PRODUCTION_ROOTS) {
     for (const e of entries) {
       if (EXCLUDE_DIRS.has(e.name)) continue;
       const full = path.join(dir, e.name);
+      if (isVendored(full)) continue;
       if (e.isDirectory()) { walkProd(full); continue; }
       if (!CODE_EXT.has(path.extname(e.name).toLowerCase()) || isTestPath(full) || isTestFile(e.name)) continue;
       const text = fs.readFileSync(full, 'utf8');

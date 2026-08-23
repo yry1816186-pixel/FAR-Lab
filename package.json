@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "far": "node dist/cli/main.js",
     "serve": "node scripts/serve.mjs",
+    "fetch:asr-model": "node scripts/fetch-asr-model.mjs",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "@types/node": "^24.0.0",
     "eslint": "^10.8.1",
     "globals": "^17.11.0",
+    "happy-dom": "^20.11.6",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.67.0",
     "vitest": "^3.0.0"

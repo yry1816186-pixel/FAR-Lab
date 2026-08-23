@@ -30,6 +30,7 @@ export const AchAnalysisId = idOf('ach');
 export const PredictionId = idOf('prd');
 export const EffectEstimateId = idOf('efx');
 export const IterationId = idOf('itr');
+export const ToolIntegrationId = idOf('tint');
 
 export type RunId = z.infer<typeof RunId>;
 export type QuestionId = z.infer<typeof QuestionId>;
@@ -57,6 +58,7 @@ export type AchAnalysisId = z.infer<typeof AchAnalysisId>;
 export type PredictionId = z.infer<typeof PredictionId>;
 export type EffectEstimateId = z.infer<typeof EffectEstimateId>;
 export type IterationId = z.infer<typeof IterationId>;
+export type ToolIntegrationId = z.infer<typeof ToolIntegrationId>;
 
 /** kind -> the ID shape that kind legitimately takes. */
 const OBJECT_REF_ID_SHAPES: Readonly<Record<ObjectRefKind, RegExp>> = {

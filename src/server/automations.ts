@@ -59,7 +59,7 @@ export function startAutomationEngine(app: App, deps: AutomationEngineDeps): Aut
       // Remembered grants are deliberately blanked in automated context: only a
       // human turn may auto-execute; automation turns propose, humans resolve.
       // The conversation's reasoning gear applies to automated turns too.
-      const __autoReasoning = effectiveConversationReasoning(app, conv);
+      const autoReasoning = effectiveConversationReasoning(app, conv);
       const turnInput: ConversationTurnGeneration = await generateConversationTurn(
         app,
         resolveConversationProvider(app, conv),
@@ -70,7 +70,7 @@ export function startAutomationEngine(app: App, deps: AutomationEngineDeps): Aut
           history: conv.messages.slice(-24),
           source: 'automation',
           maxTurns: automation.maxTurnsPerFire,
-          ...(__autoReasoning !== null ? { reasoning: __autoReasoning } : {}),
+          ...(autoReasoning !== null ? { reasoning: autoReasoning } : {}),
         },
       );
       if (turnInput.status !== 'completed' || turnInput.reply === undefined) {

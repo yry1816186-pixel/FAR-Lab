@@ -1,7 +1,7 @@
 /**
  * R1 entry upgrade — paste/drop recognition and source ingestion, all client
  * side. Every recognizer maps to a REAL downstream capability: recognized
- * citations/PDF text become SEEDS the server stores as provenance-marked
+ * citations/document text become SEEDS the server stores as provenance-marked
  * user_provided source documents (POST /runs seeds[]), not decorations.
  *
  * Reuse-first (PLAN-reuse-adoption): PDF text extraction = pdfjs-dist
@@ -9,6 +9,8 @@
  * require pdfjs-dist as a peer in browsers anyway, so we use the source);
  * BibTeX/RIS parsing = citation-js (MIT, CSL-JSON normalization). Zotero =
  * documented local REST (no client lib — the official one is AGPL).
+ * Office/web/data formats (2026-08-23): mammoth (docx), SheetJS (xlsx/csv/
+ * ods), jszip + DOMParser (pptx/odt/odp/epub) — all dynamically imported.
  */
 
 export interface SeedInput {
@@ -18,6 +20,9 @@ export interface SeedInput {
   year?: number;
   authors?: string[];
 }
+
+/** Per-run seed cap (client-side; the server only caps per-seed text length). */
+export const MAX_SEEDS = 50;
 
 export type PasteKind = 'doi' | 'arxiv' | 'url' | 'bibtex' | 'ris' | 'plain';
 
@@ -46,12 +51,66 @@ export function extractArxivId(text: string): string | null {
   return m === null ? null : m[1] ?? null;
 }
 
+const URL_RE = /^https?:\/\/\S+$/i;
+const ARXIV_EXACT_RE = /^\d{4}\.\d{4,5}(v\d+)?$/;
+
+export interface ExtractedIdentifier {
+  kind: 'doi' | 'arxiv' | 'url';
+  value: string;
+}
+
 /**
- * Parse a .bib/.ris payload (or a pasted citation block) into a seed.
- * Returns null when nothing title-bearing parses — the caller then falls back
- * to plain-text seeding instead of inventing metadata.
+ * Batch identifier extraction: split pasted/dropped text on whitespace and
+ * common separators (incl. CJK), recognize every DOI / arXiv id / URL.
+ * `rest` carries unrecognized fragments so callers can report honestly.
  */
-export async function parseCitation(text: string): Promise<SeedInput | null> {
+export function extractIdentifiers(text: string): { found: ExtractedIdentifier[]; rest: string[] } {
+  const found: ExtractedIdentifier[] = [];
+  const rest: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of text.split(/[\s,，;；、\n\r\t]+/)) {
+    const frag = raw.trim().replace(/^["'<(\[]+|["'>)\]]+$/g, '');
+    if (frag.length === 0) continue;
+    // strip a leading label before matching (doi:… / arXiv:…)
+    const body = frag.replace(/^(doi:|arxiv:)\s*/i, '');
+    const doi = extractDoi(body);
+    const arxiv = extractArxivId(body);
+    let id: ExtractedIdentifier | null = null;
+    if (URL_RE.test(body)) id = { kind: 'url', value: body };
+    else if (doi !== null && doi === body) id = { kind: 'doi', value: doi };
+    else if (arxiv !== null && (ARXIV_EXACT_RE.test(body) || body.toLowerCase().startsWith('arxiv'))) {
+      id = { kind: 'arxiv', value: arxiv };
+    }
+    if (id === null) { rest.push(frag); continue; }
+    const key = `${id.kind}:${id.value}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    found.push(id);
+  }
+  return { found, rest };
+}
+
+/** One parsed citation entry (BibTeX/RIS) — keywords feed the relation graph. */
+export interface CitationEntry {
+  title: string;
+  year?: number;
+  authors: string[];
+  doi?: string;
+  keywords: string[];
+}
+
+const splitKeywords = (raw: unknown): string[] => {
+  if (typeof raw !== 'string') return [];
+  return [...new Set(raw.split(/[,;/|]\s*/).map((s) => s.trim()).filter((s) => s.length > 0 && s.length < 60))];
+};
+
+/**
+ * Parse ALL entries from a BibTeX/RIS payload (any reference manager that
+ * exports the standard formats works: EndNote, Mendeley, JabRef, Citavi…).
+ * Returns null when the payload is not a recognized citation format — the
+ * caller falls back honestly instead of inventing metadata.
+ */
+export async function parseCitationEntries(text: string): Promise<CitationEntry[] | null> {
   const kind = detectPasteKind(text);
   if (kind !== 'bibtex' && kind !== 'ris') return null;
   try {
@@ -59,23 +118,47 @@ export async function parseCitation(text: string): Promise<SeedInput | null> {
     if (kind === 'bibtex') await import('@citation-js/plugin-bibtex');
     else await import('@citation-js/plugin-ris');
     const cite = await Cite.async(text.trim());
-    const first = cite.data[0];
-    if (first === undefined) return null;
-    const doi = first.DOI ?? undefined;
-    const seed: SeedInput = {
-      title: typeof first.title === 'string' ? first.title : undefined,
-      ...(doi !== undefined ? { identifiers: [{ kind: 'doi' as const, value: doi }] } : {}),
-      ...(first.author !== undefined && Array.isArray(first.author) && first.author.length > 0
-        ? { authors: first.author.map((a: { given?: string; family?: string }) => [a.given, a.family].filter((x): x is string => typeof x === 'string').join(' ')).filter((n: string) => n.length > 0) }
-        : {}),
-      ...(typeof first.issued?.['date-parts']?.[0]?.[0] === 'number'
-        ? { year: first.issued['date-parts'][0]![0] as number }
-        : {}),
-    };
-    return seed.title !== undefined || seed.identifiers !== undefined ? seed : null;
+    const entries: CitationEntry[] = [];
+    for (const first of cite.data) {
+      // CSL-JSON entries are an open shape: keyword/tags live outside the core typing.
+      const rec = first as unknown as Record<string, unknown>;
+      const doi = first.DOI ?? undefined;
+      const title = typeof first.title === 'string' ? first.title : undefined;
+      const authors = Array.isArray(first.author)
+        ? first.author.map((a: { given?: string; family?: string }) => [a.given, a.family].filter((x): x is string => typeof x === 'string').join(' ')).filter((n: string) => n.length > 0)
+        : [];
+      const year = typeof first.issued?.['date-parts']?.[0]?.[0] === 'number' ? first.issued['date-parts'][0]![0] as number : undefined;
+      const keywords = splitKeywords(rec.keyword ?? rec.keywords);
+      if (title === undefined && doi === undefined) continue;
+      entries.push({
+        title: title ?? doi ?? '',
+        ...(year !== undefined ? { year } : {}),
+        authors,
+        ...(doi !== undefined && doi.length > 0 ? { doi } : {}),
+        keywords,
+      });
+    }
+    return entries;
   } catch {
     return null; // malformed citation text — caller falls back honestly
   }
+}
+
+/**
+ * Parse a pasted citation block into a single seed (first entry).
+ * Returns null when nothing title-bearing parses.
+ */
+export async function parseCitation(text: string): Promise<SeedInput | null> {
+  const entries = await parseCitationEntries(text);
+  const first = entries?.[0];
+  if (first === undefined) return null;
+  const seed: SeedInput = {
+    title: first.title.length > 0 ? first.title : undefined,
+    ...(first.doi !== undefined ? { identifiers: [{ kind: 'doi' as const, value: first.doi }] } : {}),
+    ...(first.authors.length > 0 ? { authors: first.authors } : {}),
+    ...(first.year !== undefined ? { year: first.year } : {}),
+  };
+  return seed.title !== undefined || seed.identifiers !== undefined ? seed : null;
 }
 
 /** pdfjs-dist worker, lazily configured once (Vite serves the worker asset natively). */
@@ -121,57 +204,250 @@ export async function readTextFile(file: File): Promise<string | null> {
   }
 }
 
-export interface ZoteroItem {
-  key: string;
-  title: string;
-  itemType: string;
-  year?: number;
-  creators?: string[];
-  doi?: string;
+// ---------------------------------------------------------------------------
+// Multi-format file analysis (2026-08-23 user directive): common office/web/
+// data formats are projected to plain text and travel the same seeds pipeline
+// as PDFs. All heavy parsers are dynamically imported so the main bundle
+// stays lean; every failure returns honestly (null / error reason) instead of
+// inventing content. Images/scans are deliberately NOT parsed here — OCR is a
+// separate capability, and pretending to "analyze" a scan by ignoring it
+// would be a lie.
+// ---------------------------------------------------------------------------
+
+/** Extracted-text ceiling, aligned with the server's SEED_TEXT_MAX. */
+export const EXTRACT_TEXT_MAX = 50_000;
+/** Binary-format ceiling (docx/xlsx/pptx/epub/odf); larger files are rejected. */
+export const MAX_BINARY_BYTES = 25 * 1024 * 1024;
+/** Ceiling for formats read as plain text (.html/.json). */
+export const MAX_TEXTUAL_BYTES = 10 * 1024 * 1024;
+/** Rows per sheet included in the spreadsheet projection (rest is dropped, honestly truncated). */
+export const SHEET_ROW_LIMIT = 500;
+
+export type FileKind =
+  | 'pdf' | 'docx' | 'sheet' | 'slides' | 'odf' | 'html' | 'json' | 'epub'
+  | 'text' | 'ref';
+
+const EXT_KINDS: Record<string, FileKind> = {
+  '.pdf': 'pdf',
+  '.docx': 'docx',
+  '.xlsx': 'sheet', '.xls': 'sheet', '.csv': 'sheet', '.tsv': 'sheet', '.ods': 'sheet',
+  '.pptx': 'slides',
+  '.odt': 'odf', '.odp': 'odf',
+  '.html': 'html', '.htm': 'html',
+  '.json': 'json',
+  '.epub': 'epub',
+  '.txt': 'text', '.md': 'text', '.markdown': 'text',
+  '.bib': 'ref', '.ris': 'ref',
+};
+
+/** Route a filename to its ingestion kind; null = genuinely unsupported. */
+export function detectFileKind(fileName: string): FileKind | null {
+  const dot = fileName.lastIndexOf('.');
+  if (dot < 0) return null;
+  return EXT_KINDS[fileName.slice(dot).toLowerCase()] ?? null;
+}
+
+export interface Extraction {
+  text: string;
+  /** True when the source held more text than the projection ceiling allows. */
+  truncated: boolean;
+}
+
+const clampText = (raw: string): Extraction => {
+  // Collapse horizontal whitespace runs but PRESERVE newlines — paragraph and
+  // sheet-row structure is evidence, not formatting.
+  const text = raw.replace(/[^\S\n]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return text.length > EXTRACT_TEXT_MAX
+    ? { text: text.slice(0, EXTRACT_TEXT_MAX), truncated: true }
+    : { text, truncated: false };
+};
+
+/** Guard: DOMParser is browser/happy-dom only; absent environments fail honestly. */
+function parseXmlDom(xml: string): Document | null {
+  if (typeof DOMParser === 'undefined') return null;
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  return doc.getElementsByTagName('parsererror').length > 0 ? null : doc;
 }
 
 /**
- * Zotero local API (http://localhost:23119/api/). No client library: the
- * official zotero-api-node is AGPL and targets the remote web API; the local
- * REST surface is documented and needs ~30 lines. Returns null when Zotero
- * is not running (the honest degradation path — never a fake empty library).
+ * Collect text of elements whose localName is in `localNames` (optionally
+ * constrained to one namespace), in DOCUMENT order — slide/paragraph order is
+ * part of the content, not decoration.
  */
-export async function fetchZoteroItems(signal: AbortSignal): Promise<ZoteroItem[] | null> {
-  const userID = await (async (): Promise<number | null> => {
-    try {
-      const res = await fetch('http://localhost:23119/api/users/0', { signal });
-      if (!res.ok) return null;
-      return 0;
-    } catch {
-      return null;
+function xmlTextInOrder(doc: Document, localNames: ReadonlySet<string>, ns: string | null): string[] {
+  const parts: string[] = [];
+  const walk = (node: Node): void => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType !== 1) continue; // elements only
+      const el = child as Element;
+      const nsOk = ns === null || el.namespaceURI === ns;
+      if (nsOk && localNames.has(el.localName)) {
+        parts.push(el.textContent ?? '');
+      } else {
+        walk(el);
+      }
     }
-  })();
-  if (userID === null) return null;
+  };
+  walk(doc.documentElement);
+  return parts;
+}
+
+/** .docx → mammoth raw text (body prose; headers/footers are not evidence text). */
+async function extractDocx(file: File): Promise<string | null> {
   try {
-    const res = await fetch(`http://localhost:23119/api/users/${userID}/items/top?format=json&limit=25&sort=dateModified&direction=desc`, { signal });
-    if (!res.ok) return null;
-    const data: unknown = await res.json();
-    if (!Array.isArray(data)) return null;
-    const items: ZoteroItem[] = [];
-    for (const raw of data) {
-      if (typeof raw !== 'object' || raw === null) continue;
-      const d = raw as { key?: string; data?: { title?: string; itemType?: string; DOI?: string; date?: string; creators?: { firstName?: string; lastName?: string; name?: string }[] } };
-      if (d.data?.itemType === 'note' || d.data?.itemType === 'attachment') continue;
-      if (typeof d.key !== 'string' || typeof d.data?.title !== 'string') continue;
-      const yearMatch: RegExpMatchArray | null = d.data.date?.match(/(1[89]\d{2}|20\d{2})/) ?? null;
-      items.push({
-        key: d.key,
-        title: d.data.title,
-        itemType: d.data.itemType ?? 'journalArticle',
-        ...(yearMatch !== null ? { year: Number(yearMatch[0]) } : {}),
-        ...(d.data.creators !== undefined
-          ? { creators: d.data.creators.map((c) => c.name ?? [c.firstName, c.lastName].filter(Boolean).join(' ')).filter((s) => s.length > 0) }
-          : {}),
-        ...(typeof d.data.DOI === 'string' && d.data.DOI.length > 0 ? { doi: d.data.DOI } : {}),
-      });
-    }
-    return items;
+    const mammoth = await import('mammoth');
+    const arrayBuffer = await file.arrayBuffer();
+    // The browser build reads {arrayBuffer}; the Node build (used by tests)
+    // reads {buffer}. Passing both keeps one isomorphic code path.
+    const input: { arrayBuffer: ArrayBuffer; buffer?: Buffer } = { arrayBuffer };
+    if (typeof Buffer !== 'undefined') input.buffer = Buffer.from(arrayBuffer);
+    const result = await mammoth.extractRawText(input);
+    return result.value;
   } catch {
     return null;
   }
+}
+
+/** .xlsx/.xls/.csv/.tsv/.ods → per-sheet tab-separated rows via SheetJS. */
+async function extractSheet(file: File): Promise<string | null> {
+  try {
+    const XLSX = await import('xlsx');
+    const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
+    const blocks: string[] = [];
+    for (const name of wb.SheetNames) {
+      const ws = wb.Sheets[name];
+      if (ws === undefined || ws['!ref'] === undefined) continue;
+      // Row cap: narrow the sheet's own range (Sheet2CSVOpts has no range
+      // field) — the workbook is ours, local, and discarded right after.
+      // FS ' | ' keeps column boundaries readable after whitespace clamping.
+      const range = XLSX.utils.decode_range(ws['!ref'] as string);
+      range.e.r = Math.min(range.e.r, range.s.r + SHEET_ROW_LIMIT - 1);
+      ws['!ref'] = XLSX.utils.encode_range(range);
+      blocks.push(`[${name}]\n${XLSX.utils.sheet_to_csv(ws, { FS: ' | ', blankrows: false })}`);
+    }
+    return blocks.join('\n\n');
+  } catch {
+    return null;
+  }
+}
+
+const PPTX_TEXT_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const PPTX_LOCAL = new Set(['t']);
+
+/** .pptx → per-slide text runs (`<a:t>` in ppt/slides/slideN.xml). */
+async function extractPptx(file: File): Promise<string | null> {
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const slideRe = /^ppt\/slides\/slide(\d+)\.xml$/;
+    const slides = Object.keys(zip.files)
+      .map((p) => slideRe.exec(p))
+      .filter((m): m is RegExpExecArray => m !== null)
+      .sort((a, b) => Number(a[1]) - Number(b[1]));
+    const parts: string[] = [];
+    for (const match of slides) {
+      const xml = await zip.files[`ppt/slides/slide${match[1]}.xml`]!.async('string');
+      const doc = parseXmlDom(xml);
+      if (doc === null) continue;
+      parts.push(xmlTextInOrder(doc, PPTX_LOCAL, PPTX_TEXT_NS).join(' '));
+    }
+    return parts.join('\n\n');
+  } catch {
+    return null;
+  }
+}
+
+const ODF_TEXT_NS = 'urn:oasis:names:tc:opendocument:xmlns:text:1.0';
+const ODF_LOCAL = new Set(['p', 'h']);
+
+/** .odt/.odp → paragraph/heading text from content.xml. */
+async function extractOdf(file: File): Promise<string | null> {
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const entry = zip.files['content.xml'];
+    if (entry === undefined) return null;
+    const doc = parseXmlDom(await entry.async('string'));
+    if (doc === null) return null;
+    return xmlTextInOrder(doc, ODF_LOCAL, ODF_TEXT_NS).join('\n');
+  } catch {
+    return null;
+  }
+}
+
+function htmlToText(html: string): string | null {
+  if (typeof DOMParser === 'undefined') return null;
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const el of Array.from(doc.querySelectorAll('script, style, noscript, template'))) el.remove();
+  return doc.body?.textContent ?? null;
+}
+
+/** .html/.htm → body text (scripts/styles stripped). */
+async function extractHtml(file: File): Promise<string | null> {
+  try {
+    return htmlToText(await file.text());
+  } catch {
+    return null;
+  }
+}
+
+/** .json → parsed + re-serialized (fails on malformed JSON, not silently). */
+async function extractJson(file: File): Promise<string | null> {
+  try {
+    return JSON.stringify(JSON.parse(await file.text()), null, 1);
+  } catch {
+    return null;
+  }
+}
+
+/** .epub → concatenated chapter text (all xhtml/html parts, in spine-neutral zip order). */
+async function extractEpub(file: File): Promise<string | null> {
+  try {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const parts = Object.keys(zip.files)
+      .filter((p) => /\.(xhtml|html|htm)$/i.test(p) && !zip.files[p]!.dir)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const texts: string[] = [];
+    for (const path of parts) {
+      const text = htmlToText(await zip.files[path]!.async('string'));
+      if (text !== null && text.trim().length > 0) texts.push(text);
+      if (texts.join('\n\n').length > EXTRACT_TEXT_MAX) break; // stop early on big books
+    }
+    return texts.join('\n\n');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One entry point for every non-citation file kind: size gates → format
+ * parser → whitespace-normalized, capped projection. Null = parse failed or
+ * nothing extractable; callers must surface that as a failure card.
+ */
+export async function extractFileText(file: File, kind: FileKind): Promise<Extraction | null> {
+  const binaryKinds: ReadonlySet<FileKind> = new Set(['pdf', 'docx', 'sheet', 'slides', 'odf', 'epub']);
+  if (binaryKinds.has(kind) && file.size > MAX_BINARY_BYTES) return null;
+  if (kind === 'html' || kind === 'json') {
+    if (file.size > MAX_TEXTUAL_BYTES) return null;
+  }
+  let raw: string | null;
+  switch (kind) {
+    case 'pdf': {
+      const pdfText = await extractPdfText(file);
+      raw = pdfText;
+      // extractPdfText already slices at 50k; hitting the boundary means truncation.
+      return pdfText === null ? null : { text: pdfText, truncated: pdfText.length >= EXTRACT_TEXT_MAX };
+    }
+    case 'docx': raw = await extractDocx(file); break;
+    case 'sheet': raw = await extractSheet(file); break;
+    case 'slides': raw = await extractPptx(file); break;
+    case 'odf': raw = await extractOdf(file); break;
+    case 'html': raw = await extractHtml(file); break;
+    case 'json': raw = await extractJson(file); break;
+    case 'epub': raw = await extractEpub(file); break;
+    default: return null; // text/ref have their own dedicated paths
+  }
+  if (raw === null || raw.trim().length === 0) return null;
+  return clampText(raw);
 }

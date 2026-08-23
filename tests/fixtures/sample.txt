@@ -1,0 +1,1 @@
+plain seed text with a DOI 10.1234/abc.def inside
