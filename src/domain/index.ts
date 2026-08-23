@@ -16,4 +16,5 @@ export * from './formal.js';
 export * from './evidence-body.js';
 export * from './ach.js';
 export * from './prediction.js';
+export * from './meta.js';
 export * from './paper-outline.js';

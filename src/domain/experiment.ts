@@ -133,6 +133,8 @@ export type AblationFactor = z.infer<typeof AblationFactor>;
 export const MetricKey = z.enum([
   'accuracy', 'balanced_accuracy', 'f1_macro', 'roc_auc', 'log_loss',
   'mean_squared_error', 'r2',
+  // W-F statistical_meta reports: the pooled effect estimate on the analysis scale.
+  'pooled_log_or', 'pooled_log_rr', 'pooled_smd',
 ]);
 export type MetricKey = z.infer<typeof MetricKey>;
 
@@ -364,7 +366,14 @@ export const ResultSet = z.object({
 });
 export type ResultSet = z.infer<typeof ResultSet>;
 
-export const ExperimentVerdict = z.enum(['supports', 'weakens', 'falsifies', 'inconclusive']);
+/**
+ * W-F: insufficient_data = the admissible evidence base cannot mechanically test the
+ * hypothesis (fewer studies than the preregistered floor, or no validated estimates).
+ * This is a MECHANICAL verdict, not a failure: it feeds the feedback loop as a
+ * pointer to the retrieval/extraction gap, and never settles a prediction ledger
+ * entry as if something had been learned (it is excluded from VERDICT_CLASSES).
+ */
+export const ExperimentVerdict = z.enum(['supports', 'weakens', 'falsifies', 'inconclusive', 'insufficient_data']);
 export type ExperimentVerdict = z.infer<typeof ExperimentVerdict>;
 
 export const StatReport = z.object({
@@ -377,11 +386,37 @@ export const StatReport = z.object({
   pointEstimate: z.number(),
   ci: z.object({ level: z.number(), low: z.number(), high: z.number() }),
   test: z.object({
-    kind: StatisticsPlan.shape.test,
+    kind: z.union([StatisticsPlan.shape.test, z.enum(['meta_iv_fixed', 'meta_iv_random_dl'])]),
     alpha: z.number(),
     pValue: z.number().optional(),
     nBoot: z.number().int().optional(),
   }),
+  /**
+   * W-F statistical_meta disclosures (scout §5.3 — uncertainty MUST travel with the
+   * verdict): heterogeneity, robustness, bias and evidence-base shape. Present only
+   * on meta reports; absent on ML reports.
+   */
+  meta: z.object({
+    k: z.number().int().nonnegative(),
+    q: z.number().nonnegative(),
+    i2: z.number().min(0).max(100),
+    tau2: z.number().nonnegative(),
+    /** Random-effects verdicts disclose the fixed-effect sensitivity (and vice versa). */
+    sensitivityModel: z.enum(['fixed', 'random_dl']).optional(),
+    sensitivityTheta: z.number().optional(),
+    sensitivityCi: z.object({ low: z.number(), high: z.number() }).optional(),
+    egger: z.object({
+      status: z.enum(['reported', 'unreported']),
+      pValue: z.number().optional(),
+      reason: z.string().optional(),
+    }).optional(),
+    /** Studies whose exclusion flips direction or null-crossing (labels). */
+    looFlips: z.array(z.string().min(1)).default([]),
+    lowK: z.boolean().default(false),
+    duplicatesDropped: z.number().int().nonnegative().default(0),
+    rejectedProposals: z.number().int().nonnegative().default(0),
+    rejectionReasons: z.array(z.string().min(1)).default([]),
+  }).optional(),
   effect: z.object({ kind: z.string().min(1), value: z.number() }),
   /** Present only when the comparison binds a hypothesis (SCIENTIFIC_MODEL §10). */
   hypothesisId: HypothesisId.optional(),

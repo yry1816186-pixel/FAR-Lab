@@ -29,7 +29,7 @@ export type Assumption = z.infer<typeof Assumption>;
  * 'mixed' (2026-08-22 live incident run_wkncq5pvs): some thresholds have a real
  * source while others are stipulated — a truthful state the 3-value enum rejected.
  */
-export const DecisionRuleProvenance = z.enum(['evidence-derived', 'community-standard', 'model-stipulated', 'mixed']);
+export const DecisionRuleProvenance = z.enum(['evidence-derived', 'community-standard', 'model-stipulated', 'mixed', 'null-boundary']);
 export type DecisionRuleProvenance = z.infer<typeof DecisionRuleProvenance>;
 
 /** Mission §29 — a real falsification spec, not "could be tested in the future". */
