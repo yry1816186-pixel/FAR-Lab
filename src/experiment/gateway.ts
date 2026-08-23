@@ -62,14 +62,27 @@ export class SSHGateway {
 
   async putFile(localPath: string, remotePath: string): Promise<void> {
     const t = this.target;
-    await run('scp', [
-      '-i', t.identityFile,
-      '-o', `UserKnownHostsFile=${t.knownHostsFile}`,
-      '-o', 'StrictHostKeyChecking=yes',
-      '-o', 'BatchMode=yes',
-      '-P', String(t.port),
-      localPath, `${t.user}@${t.host}:${remotePath}`,
-    ], { timeout: 60_000 });
+    // Retry transient scp failures ("Connection closed by ::1"): under load the
+    // Windows Docker port-forward occasionally RESETs an established connection.
+    // The file transfer is idempotent, so a bounded retry is safe and honest.
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await run('scp', [
+          '-i', t.identityFile,
+          '-o', `UserKnownHostsFile=${t.knownHostsFile}`,
+          '-o', 'StrictHostKeyChecking=yes',
+          '-o', 'BatchMode=yes',
+          '-P', String(t.port),
+          localPath, `${t.user}@${t.host}:${remotePath}`,
+        ], { timeout: 60_000 });
+        return;
+      } catch (e) {
+        lastErr = e;
+        await new Promise<void>((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+    throw lastErr;
   }
 
   /** Capability probe: interpreter presence + core scientific stack. */
