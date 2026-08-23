@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
+import path from 'node:path';
 import { createApp } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
@@ -249,6 +250,14 @@ const printRun = (run: ResearchRun, verbose = true) => {
 };
 
 const main = async (): Promise<void> => {
+  // .env hydration (dotenv semantics: real env wins; missing file no-op) — before any
+  // command dispatch so every process.env consumer sees the credential surface the
+  // docs promise. Key names/values are never printed. FAR_DOTENV=off disables
+  // (hermetic test vacuums / deliberate keyless runs).
+  if (process.env.FAR_DOTENV !== 'off') {
+    const { hydrateEnvFromDotEnv } = await import('../platform/dotenv.js');
+    hydrateEnvFromDotEnv(process.env, path.resolve(process.cwd(), '.env'));
+  }
   const [, , cmd, sub] = process.argv;
   if (!cmd || flag('--help') || flag('-h') || cmd === 'help') { console.log(HELP); return; }
 
