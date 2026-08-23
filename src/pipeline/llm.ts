@@ -6,6 +6,7 @@ import { newId } from '../domain/ids.js';
 import type { Store } from '../persistence/store.js';
 import type { ModelProvider, StructuredCallResult } from '../shared/ports.js';
 import { strictSchemaOrUndefined } from '../providers/http.js';
+import { UNTRUSTED_DATA_RULE } from '../shared/untrusted.js';
 import { RunBudgetExhaustedError } from '../app/run-budget.js';
 
 export interface LlmCallOptions {
@@ -98,7 +99,9 @@ export async function invokeStructured<T>(deps: ModelPlaneDeps, opts: InvokeOpti
   const res = await withModelSlot(() => deps.provider.structuredCall(
     {
       task: opts.purpose,
-      systemPrompt: opts.systemPrompt,
+      // RU-3 T1: the unified entry appends the canonical untrusted-content rule so
+      // no LLM surface (stage, action, spec-draft, meta-extraction) can miss it.
+      systemPrompt: `${opts.systemPrompt}\n\n${UNTRUSTED_DATA_RULE}`,
       userPayload: { outputContract: describeShape(opts.schema), input: opts.payload },
       outputKind: 'json',
       temperature: opts.temperature,

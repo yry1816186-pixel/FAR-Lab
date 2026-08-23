@@ -50,6 +50,8 @@ export const TranscriptEntrySchema = z.discriminatedUnion('kind', [
     payload: z.unknown(),
     truncated: z.boolean().optional(),
     spilledTo: z.string().optional(),
+    /** RU-3 T1: set when the producing tool is trust 'external' — content is data, never instructions. */
+    untrusted: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal('error'),

@@ -156,7 +156,9 @@ export class McpManager {
         }
         usedNames.add(name);
         const adapter = mcpToolAdapter(client, info, integration.label);
-        registry.register({ ...adapter, name, riskClass: integration.riskClass });
+        // RU-3 T1: MCP server output is third-party content — mark trust 'external'
+        // so the loop flags every tool_result from it as untrusted data.
+        registry.register({ ...adapter, name, riskClass: integration.riskClass, trust: 'external' });
         registered.push({ serverLabel: integration.label, remoteName: info.name, registeredAs: name });
       }
     }
