@@ -33,10 +33,14 @@ export function RunListItem({
   run,
   selected,
   onSelect,
+  sourceConv,
 }: {
   run: RunSummary;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** Where this study came from (the conversation that launched it) — the
+   *  unified-timeline link: records are findable from BOTH sides. */
+  sourceConv?: { title: string; open: () => void };
 }): JSX.Element {
   const { t } = useI18n();
   const active = run.status === 'running' || run.status === 'queued';
@@ -76,6 +80,21 @@ export function RunListItem({
             </>
           )}
         </span>
+        {sourceConv !== undefined && (
+          <span className="run-item-source">
+            {/* span, not button: the parent entry is a <button>; nested buttons are invalid HTML. */}
+            <span
+              role="link"
+              tabIndex={0}
+              className="link-button small"
+              onClick={(e) => { e.stopPropagation(); sourceConv.open(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); sourceConv.open(); } }}
+              title={t('runs.sourceConvTitle', { title: sourceConv.title })}
+            >
+              ← {t('runs.sourceConv', { title: sourceConv.title.length > 18 ? `${sourceConv.title.slice(0, 18)}…` : sourceConv.title })}
+            </span>
+          </span>
+        )}
         {run.lastError !== undefined && run.lastError.length > 0 && (
           <span className="run-item-error" title={run.lastError}>
             {t('runs.errorPrefix')}: {t(errorCategoryKey(run.lastError))}
@@ -120,23 +139,36 @@ export function RunsList({
   selectedId,
   onSelect,
   filterRef,
+  query,
+  onQueryChange,
+  sourceByRunId,
 }: {
   runs: RunSummary[];
   loading: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
   filterRef?: React.RefObject<HTMLInputElement>;
+  /** Controlled search (unified sidebar: one box filters conversations AND studies). */
+  query?: string;
+  onQueryChange?: (q: string) => void;
+  /** runId -> the conversation that launched it (unified-timeline provenance). */
+  sourceByRunId?: Map<string, { title: string; open: () => void }>;
 }): JSX.Element {
   const { t } = useI18n();
-  const [query, setQuery] = useState('');
+  const [innerQuery, setInnerQuery] = useState('');
+  const effectiveQuery = query ?? innerQuery;
+  const setQuery = (q: string): void => {
+    if (onQueryChange !== undefined) onQueryChange(q);
+    else setInnerQuery(q);
+  };
   // B1 F-09: the "needs attention" wall (historical ops/probe runs) is collapsed
   // by default — it stays reachable and countable, but no longer shouts over
   // the researcher's active work. Selection or filtering re-expands a group.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ 'runs.groupAttention': true });
   const [libraryExpanded, setLibraryExpanded] = useState(false);
   const filtered = useMemo(
-    () => runs.filter((r) => matchesQuery(r, query, t)),
-    [runs, query, t],
+    () => runs.filter((r) => matchesQuery(r, effectiveQuery, t)),
+    [runs, effectiveQuery, t],
   );
   if (loading && runs.length === 0) {
     return (
@@ -159,7 +191,7 @@ export function RunsList({
     (g) => g.items.length > 0,
   );
   const isCollapsed = (key: string, items: RunSummary[]): boolean => {
-    if (query.length > 0) return false; // filtering: show everything that matches
+    if (effectiveQuery.length > 0) return false; // filtering: show everything that matches
     if (selectedId !== null && items.some((r) => r.id === selectedId)) return false; // never hide the selection
     return collapsed[key] === true;
   };
@@ -169,12 +201,12 @@ export function RunsList({
         ref={filterRef}
         type="text"
         className="runs-filter"
-        value={query}
+        value={effectiveQuery}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('runs.filterPlaceholder')}
         aria-label={t('runs.filterLabel')}
       />
-      {query.length > 0 && filtered.length === 0 && (
+      {effectiveQuery.length > 0 && filtered.length === 0 && (
         <p className="sidebar-empty">{t('runs.filterEmpty')}</p>
       )}
       {grouped.map((g) => {
@@ -184,8 +216,8 @@ export function RunsList({
         // palette navigation, or 12+ newer studies landing while one is open) —
         // widen to the full library in that case, mirroring the group guard.
         const selIdx = selectedId !== null ? g.items.findIndex((r) => r.id === selectedId) : -1;
-        const previewing = isLibrary && !libraryExpanded && query.length === 0 && selIdx >= LIBRARY_PREVIEW;
-        const visible = isLibrary && !libraryExpanded && query.length === 0 && !previewing
+        const previewing = isLibrary && !libraryExpanded && effectiveQuery.length === 0 && selIdx >= LIBRARY_PREVIEW;
+        const visible = isLibrary && !libraryExpanded && effectiveQuery.length === 0 && !previewing
           ? g.items.slice(0, LIBRARY_PREVIEW)
           : g.items;
         const hiddenCount = g.items.length - visible.length;
@@ -214,7 +246,7 @@ export function RunsList({
             <>
             <ul className="runs-list">
               {visible.map((run) => (
-                <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={onSelect} />
+                <RunListItem key={run.id} run={run} selected={run.id === selectedId} onSelect={onSelect} sourceConv={sourceByRunId?.get(run.id)} />
               ))}
             </ul>
             {hiddenCount > 0 && (

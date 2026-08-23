@@ -22,7 +22,8 @@ import { CommandPalette, type Command, type PaletteSearch } from './components/C
 import { SettingsPanel } from './components/SettingsPanel';
 import { useToolCommands } from './hooks/useToolCommands';
 import type { EventsState } from './components/RunDetail';
-import { ErrorBox, TimeAgo } from './components/common';
+import { Badge, ErrorBox, TimeAgo } from './components/common';
+import { runStatusKey, runStatusTone } from './tones';
 
 const RUNS_POLL_MS = 5_000;
 const DETAIL_POLL_ACTIVE_MS = 3_000;
@@ -49,6 +50,31 @@ export function App(): JSX.Element {
   // ---- conversations (conversation-first flow) ----
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  // ---- unified sidebar timeline (design fix 2026-08-23): ONE search box filters
+  // both conversations and studies; studies show their source conversation, and
+  // conversation entries inline the studies they launched — records are findable
+  // from both sides instead of living in two disconnected lists. ----
+  const [sidebarQuery, setSidebarQuery] = useState('');
+  const openConversationRef = useRef<((id: string) => void) | null>(null);
+  const runsById = useMemo(() => new Map(runs.map((r) => [r.id, r] as const)), [runs]);
+  const sourceByRunId = useMemo(() => {
+    const m = new Map<string, { title: string; open: () => void }>();
+    for (const c of conversations) {
+      for (const rid of c.runIds) m.set(rid, { title: c.title, open: () => { void openConversationRef.current?.(c.id); } });
+    }
+    return m;
+  }, [conversations]);
+  const visibleConversations = useMemo(() => {
+    const q = sidebarQuery.trim().toLowerCase();
+    if (q.length === 0) return conversations.slice(0, 12);
+    return conversations.filter((c) => {
+      if (c.title.toLowerCase().includes(q)) return true;
+      return c.runIds.some((rid) => {
+        const r = runsById.get(rid);
+        return r !== undefined && runLabel(r).toLowerCase().includes(q);
+      });
+    }).slice(0, 30);
+  }, [conversations, sidebarQuery, runsById]);
   const refreshConversations = useCallback((): Promise<void> => {
     const controller = new AbortController();
     return listConversations(controller.signal)
@@ -61,6 +87,7 @@ export function App(): JSX.Element {
     setSelectedRunId(null);
     void refreshConversations();
   }, [refreshConversations]);
+  openConversationRef.current = openConversation; // unified-timeline source links
 
   const refreshRuns = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -505,9 +532,11 @@ export function App(): JSX.Element {
             </h3>
             {conversations.length === 0 ? (
               <p className="muted small conv-side-empty">{t('conv.empty')}</p>
+            ) : visibleConversations.length === 0 ? (
+              <p className="muted small conv-side-empty">{t('runs.filterEmpty')}</p>
             ) : (
               <ul className="runs-list">
-                {conversations.slice(0, 12).map((c) => (
+                {visibleConversations.map((c) => (
                   <li key={c.id}>
                     <button
                       type="button"
@@ -526,6 +555,23 @@ export function App(): JSX.Element {
                         <time className="mono" dateTime={c.updatedAt}><TimeAgo iso={c.updatedAt} /></time>
                       </span>
                     </button>
+                    {/* Unified timeline: studies this conversation launched, inline —
+                        the record is findable from the conversation side too. */}
+                    {c.runIds
+                      .map((rid) => runsById.get(rid))
+                      .filter((r): r is NonNullable<typeof r> => r !== undefined)
+                      .map((r) => (
+                        <button
+                          key={`${c.id}:${r.id}`}
+                          type="button"
+                          className={`conv-run-child${selectedRunId === r.id ? ' conv-run-child--on' : ''}`}
+                          onClick={() => selectRun(r.id)}
+                          title={runLabel(r)}
+                        >
+                          <Badge tone={runStatusTone(r.status)}>{t(runStatusKey(r.status))}</Badge>
+                          <span className="conv-run-child-title">{runLabel(r)}</span>
+                        </button>
+                      ))}
                   </li>
                 ))}
               </ul>
@@ -541,6 +587,9 @@ export function App(): JSX.Element {
             selectedId={selectedRunId}
             onSelect={selectRun}
             filterRef={filterRef}
+            query={sidebarQuery}
+            onQueryChange={setSidebarQuery}
+            sourceByRunId={sourceByRunId}
           />
         </aside>
 
