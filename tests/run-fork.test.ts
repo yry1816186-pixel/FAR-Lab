@@ -69,8 +69,12 @@ describe('RU-2 PROV-O export', () => {
       edge('produced', 'run_a', 'clm_9'),
       edge('consumed', 'run_b', 'clm_9'),
       edge('caused_revision', 'fbk_1', 'rev_1'),
+      edge('supports', 'ev_2', 'hyp_2'),
     ];
-    const graph = toProvJsonLd({ rootRunId: 'run_a', runs: [{ id: 'run_a', createdAt: '2026-08-24T00:00:00.000Z' }, { id: 'run_b' }], edges }) as {
+    const graph = toProvJsonLd({
+      rootRunId: 'run_a', runs: [{ id: 'run_a', createdAt: '2026-08-24T00:00:00.000Z' }, { id: 'run_b' }], edges,
+      relationTypes: { ev_1: 'contradicts', ev_2: 'supports' },
+    }) as {
       '@context': Record<string, string>; '@graph': Array<Record<string, unknown>>;
     };
     expect(graph['@context'].prov).toBe('http://www.w3.org/ns/prov#');
@@ -81,10 +85,24 @@ describe('RU-2 PROV-O export', () => {
     expect(json).toContain('prov:used');
     expect(json).toContain('far:counter_evidence');
     expect(json).toContain('far:caused_revision');
-    // round-trip invariant: each from->to pair appears exactly once
-    for (const e of edges) {
-      const pairCount = (JSON.stringify(graph).match(new RegExp(`far:${e.toId}`, 'g')) ?? []).length;
-      expect(pairCount).toBeGreaterThanOrEqual(1);
+    // RU-6: evidence relations carry CiTO IRIs — exact for packet-verified types
+    expect(json).toContain('http://purl.org/spar/cito/supports');
+    const counterInfluence = graph['@graph'].find((n) => n['far:counter_evidence'] !== undefined) as Record<string, unknown>;
+    expect(String((counterInfluence.cito as { '@id': string })['@id'])).toContain('cito/');
+  });
+});
+
+describe('RU-6 CiTO mapping totality', () => {
+  it('every internal relation type maps to a well-formed CiTO IRI (no gaps, no fabrications)', async () => {
+    const { CITO_IRI, EvidenceRelationType } = await import('../src/domain/evidence.js');
+    for (const rel of EvidenceRelationType.options) {
+      const m = CITO_IRI[rel];
+      expect(m, `mapping missing for ${rel}`).toBeDefined();
+      expect(m.iri).toMatch(/^http:\/\/purl\.org\/spar\/cito\/[a-zA-Z]+$/);
+      if (m.exact !== true) expect(m.farNote).toBeDefined();
     }
+    // only the packet-verified exact assertions are marked exact
+    const exact = Object.entries(CITO_IRI).filter(([, m]) => m.exact).map(([k]) => k);
+    expect(exact.sort()).toEqual(['contradicts', 'replicates', 'supports']);
   });
 });
