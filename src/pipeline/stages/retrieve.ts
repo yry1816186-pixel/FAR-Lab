@@ -221,9 +221,11 @@ const primaryKey = (rec: RawSourceRecord): string | null => {
  */
 const FUZZY_MIN_TITLE_LEN = 20;
 
-const normalizeTitle = (t: string): string =>
+// RU-10 fix (zh blind spot): CJK titles normalized to EMPTY under [^a-z0-9] —
+// Chinese documents could never fuzzy-merge. Han-script runs are kept.
+export const normalizeTitle = (t: string): string =>
   t.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+    .replace(/[^a-z0-9一-鿿]+/g, ' ').trim().replace(/\s+/g, ' ');
 
 const fuzzyTitleKey = (rec: RawSourceRecord): string | null => {
   const norm = normalizeTitle(rec.title);
