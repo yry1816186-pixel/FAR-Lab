@@ -57,7 +57,6 @@ export const eValue = (rr: number): { eValue: number; detail: string } => {
  */
 export const extractMeanN = (quote: string): Array<{ mean: number; n: number; decimals: number }> => {
   const out: Array<{ mean: number; n: number; decimals: number }> = [];
-  // bounded gap: "mean 3.22", "mean = 3.22", "mean score was 3.22", "M: 40.2"
   const meanRe = /(?:mean|M)\b(?:\s+[a-z]+){0,2}[\s:=]+(\d+(?:\.\d+)?)/gi;
   const nRe = /\b(?:n|N)\s*[:=]?\s*(\d{1,6})\b/g;
   const ns: number[] = [];
@@ -70,6 +69,61 @@ export const extractMeanN = (quote: string): Array<{ mean: number; n: number; de
     if (mean > 0) {
       for (const n of ns) out.push({ mean, n, decimals });
     }
+  }
+  return out;
+};
+
+/**
+ * RU-5 GO2 — deterministic range/domain guard for reported statistics
+ * (complements GRIM's granularity check; catches impossible values GRIM
+ * cannot see). Every check is a pure function of parsed verbatim numbers;
+ * findings are advisory uncertainty notes, never verdicts.
+ */
+export interface RangeFinding {
+  ok: boolean;
+  detail: string;
+}
+
+export const rangeGuard = (input: {
+  pValue?: number;
+  percent?: number;
+  ci?: { low: number; high: number; point: number };
+  sd?: number;
+}): RangeFinding[] => {
+  const findings: RangeFinding[] = [];
+  if (input.pValue !== undefined && (input.pValue < 0 || input.pValue > 1)) {
+    findings.push({ ok: false, detail: `impossible p-value ${input.pValue} — probabilities lie in [0,1]` });
+  }
+  if (input.percent !== undefined && (input.percent < 0 || input.percent > 100)) {
+    findings.push({ ok: false, detail: `impossible percentage ${input.percent} — percentages lie in [0,100]` });
+  }
+  if (input.ci !== undefined) {
+    const { low, high, point } = input.ci;
+    if (low > high) findings.push({ ok: false, detail: `CI inverted: [${low}, ${high}]` });
+    if (point < low || point > high) findings.push({ ok: false, detail: `point estimate ${point} outside its own CI [${low}, ${high}]` });
+  }
+  if (input.sd !== undefined && input.sd < 0) {
+    findings.push({ ok: false, detail: `impossible SD ${input.sd} — dispersion is non-negative` });
+  }
+  return findings;
+};
+
+/** Extract p/percent/CI/SD from a verbatim quote (bounded deterministic regexes). */
+export const extractStats = (quote: string): { pValue?: number; percent?: number; ci?: { low: number; high: number; point: number }; sd?: number } => {
+  const out: { pValue?: number; percent?: number; ci?: { low: number; high: number; point: number }; sd?: number } = {};
+  const p = /\bp\s*(?:=|<|≤)\s*\.?(\d+)/i.exec(quote) ?? /\bp\s*(?:=|<|≤)\s*0\.(\d+)/i.exec(quote);
+  if (p !== null) {
+    const raw = p[0].includes('0.') ? Number(p[0].replace(/[^0-9.]/g, '')) : Number(`0.${p[1]}`);
+    if (Number.isFinite(raw)) out.pValue = raw;
+  }
+  const pct = /(\d+(?:\.\d+)?)\s*%(?!\s*CI)/i.exec(quote);
+  if (pct !== null) out.percent = Number(pct[1]);
+  const sd = /\bSD\s*(?:=|:)?\s*(\d+(?:\.\d+)?)/i.exec(quote) ?? /\b(?:sd|S\.D\.)\s*(?:=|:)?\s*(\d+(?:\.\d+)?)/i.exec(quote);
+  if (sd !== null) out.sd = Number(sd[1]);
+  const ci = /CI\s*[:=]?\s*[([]\s*(\d+(?:\.\d+)?)\s*[,;–-]\s*(\d+(?:\.\d+)?)\s*[)\]]/i.exec(quote);
+  const point = /(?:effect|difference|estimate)\s+(?:of\s+)?(\d+(?:\.\d+)?)/i.exec(quote);
+  if (ci !== null && point !== null) {
+    out.ci = { low: Number(ci[1]), high: Number(ci[2]), point: Number(point[1]) };
   }
   return out;
 };

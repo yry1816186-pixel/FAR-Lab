@@ -15,7 +15,7 @@ import { toDocument } from './retrieve.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import { defaultFetchFullText } from '../../sources/fulltext.js';
 import { gradeClaimCertainty } from '../../domain/claim.js';
-import { extractMeanN, grimCheck } from '../../domain/stat-forensics.js';
+import { extractMeanN, grimCheck, rangeGuard, extractStats } from '../../domain/stat-forensics.js';
 import type { CorpusSnapshot, SourceFamily } from '../../domain/source.js';
 import type { RawRetrievalResult, SourceAdapter } from '../../shared/ports.js';
 
@@ -393,6 +393,9 @@ export const buildEvidenceStage: StageHandler = {
             ...extractMeanN(candidate.quote)
               .filter((p) => !grimCheck(p.mean, p.n, p.decimals).consistent)
               .map((p) => grimCheck(p.mean, p.n, p.decimals).detail),
+            // RU-5 GO2: deterministic range/domain guard (impossible p/percent/
+            // CI/SD values that GRIM's granularity check cannot see).
+            ...rangeGuard(extractStats(candidate.quote)).map((f) => f.detail),
           ],
           // GRADE-lite at admission (W-G/F-B): contradiction signals are unknown this
           // early (relations are judged later) — honestly 0 at this point.
