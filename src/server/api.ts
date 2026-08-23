@@ -3,7 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { App } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
-import { listProviders, defaultLiveProvider } from '../providers/index.js';
+import { listProviders, LIVE_PROVIDER_NAMES } from '../providers/index.js';
+import {
+  BuiltinRoutePrice, builtinDefaultName, builtinModelIdFor, envModelIdFor,
+  readBuiltinOverrides, setBuiltinDefaultName, writeBuiltinOverrides,
+} from '../providers/builtin-overrides.js';
 import { createCustomProvider } from '../providers/custom.js';
 import { runResearchAction, ActionError } from './actions.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
@@ -13,8 +17,8 @@ import { approveExperiment, ExperimentOpError } from './experiment-ops.js';
 import { fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
 import {
   attachRunToConversation, collectConversationSeeds, createConversation, deleteConversation,
-  getConversation, listConversations, postConversationMessage, resolveConversationProposal,
-  resolveConversationReasoningRoute, setConversationReasoningGear,
+  detachRunFromAllConversations, getConversation, listConversations, postConversationMessage,
+  resolveConversationProposal, resolveConversationReasoningRoute, setConversationReasoningGear,
   ConversationError, type ConversationDeps,
 } from './conversations.js';
 import { startAutomationEngine, type AutomationEngine } from './automations.js';
@@ -52,7 +56,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -926,12 +930,18 @@ function parseSeedSources(raw: unknown): string | {
   const listModelConfigs = (res: http.ServerResponse): void => {
     const activeId = app.store.getMeta(ACTIVE_MODEL_CONFIG_META_KEY);
     const configs = listModelConfigsAll().map((c) => modelConfigSummary(c, activeId));
-    // What the env chain (competition/automation layer) would select with no user config.
-    const envDefaultView = (): { name: string; modelId: string; liveReady: boolean } | null => {
+    // Effective product-plane default: UI default switch > env chain, with the UI
+    // modelId override applied — the panel shows what a call would actually use.
+    const envDefaultView = (): { name: string; modelId: string; liveReady: boolean; defaultSource: 'ui' | 'env' } | null => {
       try {
-        const provider = defaultLiveProvider();
-        const info = listProviders().find((p) => p.name === provider.name);
-        return { name: provider.name, modelId: info?.modelId ?? '(unknown)', liveReady: info?.liveReady ?? provider.liveReady };
+        const { name, source } = builtinDefaultName(app.store);
+        const info = listProviders().find((p) => p.name === name);
+        return {
+          name,
+          modelId: builtinModelIdFor(app.store, name) ?? info?.modelId ?? '(unknown)',
+          liveReady: info?.liveReady ?? false,
+          defaultSource: source,
+        };
       } catch {
         return null; // env names an unknown/banned provider — health owns that failure story
       }
@@ -1187,6 +1197,92 @@ function parseSeedSources(raw: unknown): string | {
     sendJson(res, 200, { deleted: id });
   };
 
+  // ---- built-in env routes (zai/dashscope): product-layer overrides ----
+  // The env chain itself stays untouched; these endpoints manage the UI-declared
+  // modelId override, list pricing and the default-route switch on top of it.
+
+  const builtinRoutesView = () => {
+    const overrides = readBuiltinOverrides(app.store);
+    const def = builtinDefaultName(app.store);
+    return listProviders()
+      .filter((p) => p.kind !== 'test') // the scripted stub is not a route
+      .map((p) => {
+        const override = p.kind === 'live' ? overrides[p.name as keyof typeof overrides] : undefined;
+        const envModel = envModelIdFor(p.name);
+        return {
+          name: p.name,
+          kind: p.kind, // 'live' | 'archived' (banned: display-only, usage-history badge)
+          liveReady: p.liveReady,
+          baseUrl: p.baseUrl,
+          apiKeyEnvVar: p.apiKeyEnvVar,
+          envModelId: envModel,
+          effectiveModelId: override?.modelId ?? envModel,
+          pricing: override?.pricing,
+          isBuiltinDefault: p.name === def.name,
+        };
+      });
+  };
+
+  const listBuiltinRoutes = (res: http.ServerResponse): void => {
+    sendJson(res, 200, {
+      routes: builtinRoutesView(),
+      defaultSource: builtinDefaultName(app.store).source,
+    });
+  };
+
+  const assertLiveBuiltinRoute = (name: string): void => {
+    if (!(LIVE_PROVIDER_NAMES as readonly string[]).includes(name)) {
+      throw validation(`unknown or non-editable built-in route: ${name} (live routes: ${LIVE_PROVIDER_NAMES.join(', ')})`);
+    }
+  };
+
+  const updateBuiltinRoute = async (req: http.IncomingMessage, res: http.ServerResponse, name: string): Promise<void> => {
+    assertLiveBuiltinRoute(name);
+    const body = await readJsonObject(req);
+    const overrides = readBuiltinOverrides(app.store);
+    const next: Record<string, unknown> = { ...(overrides[name as keyof typeof overrides] ?? {}) };
+    // modelId: string = override; null or '' = clear back to env/default selection.
+    if (body.modelId !== undefined) {
+      if (body.modelId === null || body.modelId === '') delete next.modelId;
+      else if (typeof body.modelId === 'string') next.modelId = body.modelId;
+      else throw validation('field "modelId" must be a non-empty string or null');
+    }
+    // pricing: object = declare real list prices; null = clear (cost falls back to unknown).
+    if (body.pricing !== undefined) {
+      if (body.pricing === null) {
+        delete next.pricing;
+      } else {
+        const parsed = BuiltinRoutePrice.safeParse(body.pricing);
+        if (!parsed.success) throw validation(`invalid pricing: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
+        next.pricing = parsed.data;
+      }
+    }
+    if (Object.keys(body).some((k) => k !== 'modelId' && k !== 'pricing')) {
+      throw validation('only "modelId" and "pricing" are editable on a built-in route (wire/baseUrl/key come from the env layer)');
+    }
+    try {
+      writeBuiltinOverrides(app.store, { ...overrides, [name]: next });
+    } catch (e) {
+      throw validation(e instanceof Error ? e.message : String(e));
+    }
+    sendJson(res, 200, { routes: builtinRoutesView(), defaultSource: builtinDefaultName(app.store).source });
+  };
+
+  const setBuiltinDefaultRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+    const body = await readJsonObject(req);
+    if (body.name === null) {
+      setBuiltinDefaultName(app.store, null);
+      sendJson(res, 200, { routes: builtinRoutesView(), defaultSource: builtinDefaultName(app.store).source });
+      return;
+    }
+    if (typeof body.name !== 'string' || body.name.length === 0) {
+      throw validation('field "name" is required (a live built-in route name, or null to fall back to the env chain)');
+    }
+    assertLiveBuiltinRoute(body.name);
+    setBuiltinDefaultName(app.store, body.name);
+    sendJson(res, 200, { routes: builtinRoutesView(), defaultSource: 'ui' });
+  };
+
   const setActiveModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const body = await readJsonObject(req);
     if (!('id' in body)) throw validation('field "id" is required (a model config id, or null to clear the default)');
@@ -1333,6 +1429,24 @@ function parseSeedSources(raw: unknown): string | {
         }
       if (segments.length === 4) {
         if (method === 'GET') return runDetail(res, runId);
+        if (method === 'DELETE') {
+          // Researcher lifecycle (gap R1): delete a run and everything it owns.
+          // Guarded against live execution — one execution per run, one deletion per run.
+          const run = mustGetRun(runId);
+          if (run.status === 'running' || executing.has(runId)) {
+            throw new HttpError(409, {
+              code: 'run_active',
+              message: `run ${runId} is ${executing.has(runId) ? 'executing in this server' : `in status '${run.status}'`} — cancel it before deleting`,
+              retryable: false,
+              runId,
+            });
+          }
+          const deleted = app.store.deleteRunCascade(runId);
+          if (deleted === null) throw notFound(`run not found: ${runId}`, runId);
+          const conversationsUpdated = detachRunFromAllConversations(app, runId);
+          sendJson(res, 200, { ok: true, runId, deleted: { ...deleted, conversationsUpdated } });
+          return;
+        }
         throw notFound(`method ${method} not allowed for ${url.pathname}`);
       }
       if (segments.length === 5) {
@@ -1460,6 +1574,15 @@ function parseSeedSources(raw: unknown): string | {
       if (leaf === 'test' && segments.length === 4 && method === 'POST') return testModelConfig(req, res);
       if (leaf === 'usage' && segments.length === 4 && method === 'GET') return listWorkspaceUsage(res);
       if (leaf === 'discover' && segments.length === 4 && method === 'POST') return discoverFromModelConfig(req, res);
+      if (leaf === 'builtin-routes') {
+        if (segments.length === 4) {
+          if (method === 'GET') return listBuiltinRoutes(res);
+          if (method === 'PUT') return setBuiltinDefaultRoute(req, res);
+          throw notFound(`method ${method} not allowed for ${url.pathname}`);
+        }
+        if (segments.length === 5 && method === 'PUT') return updateBuiltinRoute(req, res, segments[4]!);
+        throw notFound(`no route: ${method} ${url.pathname}`);
+      }
       if (segments.length === 4) {
         if (method === 'GET') return getModelConfig(res, leaf);
         if (method === 'PUT') return updateModelConfig(req, res, leaf);

@@ -179,6 +179,24 @@ export function listConversations(app: App): Conversation[] {
   return all.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
+/** Drop a deleted run's id from every conversation that references it, so the
+ *  conversation stream never carries a dangling run link. Conversations (and
+ *  their message history) themselves are never deleted by run deletion. */
+export function detachRunFromAllConversations(app: App, runId: string): number {
+  let touched = 0;
+  for (const conv of listConversations(app)) {
+    if (!conv.runIds.includes(runId)) continue;
+    const updated: Conversation = ConversationSchema.parse({
+      ...conv,
+      runIds: conv.runIds.filter((id) => id !== runId),
+      updatedAt: new Date().toISOString(),
+    });
+    app.store.putObject('conversation', updated);
+    touched += 1;
+  }
+  return touched;
+}
+
 export function getConversation(app: App, id: string): Conversation {
   return mustGetConversation(app, id);
 }
@@ -230,12 +248,14 @@ export async function postConversationMessage(
   const seeds = parseConversationSeeds(input.seeds);
 
   const provider = resolveConversationProvider(app, conv);
+  // Conversation gear > config default; null when the route declares no capability.
+  const turnReasoning = effectiveConversationReasoning(app, conv);
   const generation = await generateConversationTurn(app, provider, conv, {
     text,
     seeds,
     history: conv.messages.slice(-HISTORY_TURNS),
     source: 'researcher',
-    ...(effectiveConversationReasoning(app, conv) ?? {}),
+    ...(turnReasoning !== null ? { reasoning: turnReasoning } : {}),
   });
   if (generation.status !== 'completed' || generation.reply === undefined) {
     throw new ConversationError(

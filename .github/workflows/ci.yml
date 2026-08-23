@@ -1,0 +1,39 @@
+name: ci
+
+# Minimal quality gate for every push and PR: the same deterministic checks the
+# local harness runs (AGENTS.md §2/§8) — typecheck, full vitest suite (incl. the
+# real-uv experiment sidecar), secret/path scans, and the web production build.
+# No live model routes are touched: tests are offline by design; any test that
+# would need a live route fails there just as it would locally.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install root dependencies
+        run: npm ci
+      - name: Typecheck (backend + CLI)
+        run: npm run typecheck
+      - name: Full test suite (deterministic; real uv sidecar for experiments)
+        run: npm test
+      - name: Secret scan
+        run: node zcode-harness/scripts/secret-scan.mjs
+      - name: Path hygiene
+        run: node zcode-harness/scripts/path-hygiene.mjs
+      - name: Web production build
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
