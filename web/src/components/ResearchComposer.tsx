@@ -1,21 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ArrowUp, BookMarked, FileText, Link2, Loader2, Paperclip, RotateCcw, SlidersHorizontal, X,
+  ArrowUp, BookMarked, Check, FileText, Link2, Loader2, Paperclip, RotateCcw, Settings, SlidersHorizontal, Sparkles, X,
 } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
 import { errorText } from './common';
-import { goalTypeKey } from '../i18n/keys';
 import { useCreateRun } from '../hooks/useCreateRun';
 import { listModelConfigs } from '../api/endpoints';
-import type { ModelConfigsResponse, ScientificGoalType } from '../api/types';
+import type { ModelConfigsResponse, ZoteroLibItem } from '../api/types';
+import { ZoteroPanel } from './ZoteroPanel';
 import {
-  detectPasteKind, parseCitation, extractPdfText, readTextFile,
-  extractDoi, extractArxivId, fetchZoteroItems, type SeedInput, type ZoteroItem,
+  detectPasteKind, parseCitation, parseCitationEntries, extractPdfText, readTextFile,
+  extractDoi, extractArxivId, MAX_SEEDS, type SeedInput,
 } from '../utils/ingest';
-
-const GOAL_TYPES: ScientificGoalType[] = ['explanatory', 'predictive', 'interventional', 'methodological', 'exploratory'];
-const MAX_SEEDS = 5;
 
 type AttachKind = 'PDF' | 'TXT' | 'REF' | 'DOI' | 'arXiv' | 'URL';
 
@@ -45,9 +42,19 @@ export function formatBytes(n: number): string {
  * round send). Every attachment state is a real parse state; nothing is
  * decorative. Enter submits with the IME triple guard; Shift+Enter newlines.
  */
-export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => void }): JSX.Element {
+export function ResearchComposer({
+  onCreated,
+  onOpenSettings,
+}: {
+  onCreated: (runId: string) => void;
+  /** Opens the model-management dialog from the model picker's manage entry. */
+  onOpenSettings: () => void;
+}): JSX.Element {
   const { t } = useI18n();
-  const { text, setText, domain, setDomain, goalType, setGoalType, providerConfigId, setProviderConfigId,
+  // domain/goalType stay in the createRun machine (API capability for
+  // CLI/advanced callers) but are deliberately NOT surfaced here — the scope
+  // model decides them (decision allocation, user directive 2026-08-23).
+  const { text, setText, providerConfigId, setProviderConfigId,
     showValidationError, submitting, error, submit, setSeeds } = useCreateRun(onCreated);
 
   // ---- attachments: local authority, projected into the createRun machine ----
@@ -66,13 +73,14 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
     noteTimer.current = window.setTimeout(() => setNote(null), 4000);
   };
 
-  // ---- model configs (fetched once; failure never blocks creation) ----
+  // ---- model configs (fetched on mount + refreshed whenever the picker opens) ----
   const [modelConfigs, setModelConfigs] = useState<ModelConfigsResponse | null>(null);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     listModelConfigs(controller.signal).then(setModelConfigs).catch(() => { /* stays on default */ });
     return () => controller.abort();
-  }, []);
+  }, [modelMenuOpen]);
   const selectedModel = providerConfigId !== ''
     ? modelConfigs?.configs.find((c) => c.id === providerConfigId)
     : undefined;
@@ -81,6 +89,25 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
     : modelConfigs?.envDefault != null
       ? `${modelConfigs.envDefault.name} · ${modelConfigs.envDefault.modelId}`
       : t('composer.modelDefault');
+
+  // ---- model picker dismissal: outside click or Escape (selection closes inline) ----
+  useEffect(() => {
+    if (!modelMenuOpen) return undefined;
+    const onDocClick = (ev: MouseEvent): void => {
+      if (ev.target instanceof Element && ev.target.closest('.model-menu, .composer2-tool--model') === null) {
+        setModelMenuOpen(false);
+      }
+    };
+    const onKey = (ev: KeyboardEvent): void => {
+      if (ev.key === 'Escape') setModelMenuOpen(false);
+    };
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('click', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [modelMenuOpen]);
 
   // ---- auto-grow question textarea ----
   const questionRef = useRef<HTMLTextAreaElement | null>(null);
@@ -96,7 +123,6 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkInput, setLinkInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const advancedRef = useRef<HTMLDetailsElement | null>(null);
 
   const capReached = attachments.length >= MAX_SEEDS;
 
@@ -123,9 +149,30 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
           upsert(id, { status: 'ready', seed: { title: file.name.replace(/\.pdf$/i, ''), text: extracted } });
         } else if (kind === 'REF') {
           const content = await readTextFile(file);
-          const seed = content !== null ? await parseCitation(content) : null;
-          if (seed === null) { upsert(id, { status: 'failed', errorKey: 'ingest.citationFailed' }); return; }
-          upsert(id, { status: 'ready', seed, sizeBytes: file.size });
+          // A dropped .bib/.ris may hold a WHOLE exported library — import every entry.
+          const entries = content !== null ? await parseCitationEntries(content) : null;
+          if (entries === null || entries.length === 0) { upsert(id, { status: 'failed', errorKey: 'ingest.citationFailed' }); return; }
+          const room = Math.max(0, MAX_SEEDS - attachments.length - 1); // placeholder occupies one slot
+          const kept = entries.slice(0, room);
+          if (entries.length > room) flashNote(t('composer.importTruncated', { kept: kept.length, total: entries.length, max: MAX_SEEDS }));
+          if (kept.length === 0) { setAttachments((prev) => prev.filter((a) => a.id !== id)); return; }
+          // one atomic swap: the parsing placeholder dissolves into per-entry cards
+          setAttachments((prev) => [
+            ...prev.filter((a) => a.id !== id),
+            ...kept.map((entry) => ({
+              id: ++attachSeq,
+              kind: 'REF' as AttachKind,
+              status: 'ready' as const,
+              sizeBytes: file.size,
+              seed: {
+                title: entry.title.length > 0 ? entry.title : file.name,
+                ...(entry.doi !== undefined ? { identifiers: [{ kind: 'doi' as const, value: entry.doi }] } : {}),
+                ...(entry.year !== undefined ? { year: entry.year } : {}),
+                ...(entry.authors.length > 0 ? { authors: entry.authors } : {}),
+              },
+            })),
+          ]);
+          return;
         } else {
           const content = await readTextFile(file);
           if (content === null) { upsert(id, { status: 'failed', errorKey: 'ingest.pdfFailed' }); return; }
@@ -185,22 +232,28 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
     }
   };
 
-  // ---- Zotero picker (real local API; honest unavailable state) ----
-  const [zotero, setZotero] = useState<{ open: boolean; status: 'loading' | 'unavailable' | 'ready'; items: ZoteroItem[] }>({ open: false, status: 'loading', items: [] });
-  const openZotero = async (): Promise<void> => {
-    setZotero({ open: true, status: 'loading', items: [] });
-    const controller = new AbortController();
-    const items = await fetchZoteroItems(controller.signal);
-    setZotero(items === null ? { open: true, status: 'unavailable', items: [] } : { open: true, status: 'ready', items });
+  // ---- Zotero picker (full-library search + relation graph; real local API via server bridge) ----
+  const [zoteroOpen, setZoteroOpen] = useState(false);
+  const importZotero = (imported: ZoteroLibItem[]): void => {
+    const room = MAX_SEEDS - attachments.length;
+    if (imported.length > room) flashNote(t('composer.capReached', { n: MAX_SEEDS }));
+    const slice = imported.slice(0, Math.max(0, room));
+    if (slice.length === 0) return;
+    setAttachments((prev) => [...prev, ...slice.map((it) => ({
+      id: ++attachSeq,
+      kind: 'REF' as AttachKind,
+      status: 'ready' as const,
+      seed: {
+        title: it.title,
+        ...(it.doi !== undefined ? { identifiers: [{ kind: 'doi' as const, value: it.doi }] }
+          : it.url !== undefined ? { identifiers: [{ kind: 'url' as const, value: it.url }] } : {}),
+        ...(it.year !== undefined ? { year: it.year } : {}),
+        ...(it.creators.length > 0 ? { authors: it.creators } : {}),
+      },
+    }))]);
   };
 
   const canSubmit = !submitting && text.trim().length > 0;
-
-  const openAdvanced = (): void => {
-    if (advancedRef.current === null) return;
-    advancedRef.current.open = true;
-    advancedRef.current.scrollIntoView({ block: 'nearest' });
-  };
 
   return (
     <form
@@ -307,12 +360,19 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
             <Link2 size={15} aria-hidden="true" />
             <span>{t('composer.addLink')}</span>
           </button>
-          <button type="button" className="composer2-tool" onClick={() => void openZotero()}>
+          <button type="button" className="composer2-tool" onClick={() => setZoteroOpen(true)}>
             <BookMarked size={15} aria-hidden="true" />
             <span>Zotero</span>
           </button>
           <span className="composer2-spacer" />
-          <button type="button" className="composer2-tool composer2-tool--model" onClick={openAdvanced} title={t('composer.modelLabel')}>
+          <button
+            type="button"
+            className={`composer2-tool composer2-tool--model${modelMenuOpen ? ' composer2-tool--active' : ''}`}
+            aria-haspopup="menu"
+            aria-expanded={modelMenuOpen}
+            onClick={() => setModelMenuOpen((v) => !v)}
+            title={t('composer.modelLabel')}
+          >
             <SlidersHorizontal size={14} aria-hidden="true" />
             <span className="mono">{modelChip}</span>
           </button>
@@ -355,49 +415,66 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
         </div>
       )}
 
-      {zotero.open && (
-        <div className="zotero-picker" role="dialog" aria-label={t('ingest.zotero')}>
-          {zotero.status === 'loading' ? (
-            <p className="muted small" role="status">{t('ingest.zoteroConnecting')}</p>
-          ) : zotero.status === 'unavailable' ? (
-            <>
-              <p className="muted small">{t('ingest.zoteroUnavailable')}</p>
-              <button type="button" className="btn btn--sm" onClick={() => setZotero({ open: false, status: 'loading', items: [] })}>{t('ingest.zoteroClose')}</button>
-            </>
-          ) : zotero.items.length === 0 ? (
-            <p className="muted small">{t('ingest.zoteroEmpty')}</p>
-          ) : (
-            <>
-              <p className="muted small">{t('ingest.zoteroPick')}</p>
-              <ul className="zotero-list">
-                {zotero.items.slice(0, 10).map((item) => (
-                  <li key={item.key}>
-                    <button
-                      type="button"
-                      className="zotero-item"
-                      onClick={() => {
-                        if (capReached) { flashNote(t('composer.capReached', { n: MAX_SEEDS })); return; }
-                        setAttachments((prev) => [...prev, {
-                          id: ++attachSeq, kind: 'REF', status: 'ready',
-                          seed: {
-                            title: item.title,
-                            ...(item.doi !== undefined ? { identifiers: [{ kind: 'doi', value: item.doi }] } : {}),
-                            ...(item.year !== undefined ? { year: item.year } : {}),
-                            ...(item.creators !== undefined ? { authors: item.creators } : {}),
-                          },
-                        }]);
-                        setZotero({ open: false, status: 'loading', items: [] });
-                      }}
-                    >
-                      <span className="zotero-item-title">{item.title.slice(0, 80)}</span>
-                      {item.year !== undefined && <span className="muted small"> ({item.year})</span>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <button type="button" className="btn btn--sm" onClick={() => setZotero({ open: false, status: 'loading', items: [] })}>{t('ingest.zoteroClose')}</button>
-            </>
+      <ZoteroPanel
+        open={zoteroOpen}
+        onClose={() => setZoteroOpen(false)}
+        onImport={importZotero}
+        remaining={MAX_SEEDS - attachments.length}
+      />
+
+      {modelMenuOpen && (
+        <div className="model-menu" role="menu" aria-label={t('composer.modelLabel')}>
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={providerConfigId === ''}
+            className={`model-option${providerConfigId === '' ? ' model-option--on' : ''}`}
+            disabled={submitting}
+            onClick={() => { setProviderConfigId(''); setModelMenuOpen(false); }}
+          >
+            <span className="model-option-glyph" aria-hidden="true">
+              {providerConfigId === '' && <Check size={13} />}
+            </span>
+            <span className="model-option-main">
+              <span className="model-option-name">{t('composer.modelDefault')}</span>
+              {modelConfigs?.envDefault != null && (
+                <span className="model-option-meta mono">{modelConfigs.envDefault.name} · {modelConfigs.envDefault.modelId}</span>
+              )}
+            </span>
+            <span className="badge">{t('composer.modelEnvBadge')}</span>
+          </button>
+          {(modelConfigs?.configs ?? []).map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={providerConfigId === c.id}
+              className={`model-option${providerConfigId === c.id ? ' model-option--on' : ''}`}
+              disabled={submitting}
+              onClick={() => { setProviderConfigId(c.id); setModelMenuOpen(false); }}
+            >
+              <span className="model-option-glyph" aria-hidden="true">
+                {providerConfigId === c.id && <Check size={13} />}
+              </span>
+              <span className="model-option-main">
+                <span className="model-option-name">{c.label}</span>
+                <span className="model-option-meta mono">{c.modelId}</span>
+              </span>
+              {!c.apiKeySet && <span className="badge badge--err">{t('settings.noKey')}</span>}
+            </button>
+          ))}
+          {(modelConfigs?.configs ?? []).length === 0 && (
+            <p className="model-menu-empty muted small">{t('composer.modelEmpty')}</p>
           )}
+          <div className="model-menu-foot">
+            <button
+              type="button"
+              className="btn btn--sm"
+              onClick={() => { setModelMenuOpen(false); onOpenSettings(); }}
+            >
+              <Settings size={12} aria-hidden="true" /> {t('composer.modelManage')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -410,26 +487,15 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
       )}
       {note !== null && <p className="muted small" role="status">{note}</p>}
 
-      <details className="composer2-advanced" ref={advancedRef}>
-        <summary>{t('composer.constraints')}</summary>
-        <div className="hero-advanced-body">
-          <label className="field-label" htmlFor="composer-domain">{t('form.domain')}</label>
-          <input id="composer-domain" type="text" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder={t('form.domainPlaceholder')} disabled={submitting} />
-          <label className="field-label" htmlFor="composer-goaltype">{t('form.goalType')}</label>
-          <select id="composer-goaltype" value={goalType} onChange={(e) => setGoalType(e.target.value)} disabled={submitting}>
-            <option value="">{t('goalType.unset')}</option>
-            {GOAL_TYPES.map((g) => <option key={g} value={g}>{t(goalTypeKey(g))}</option>)}
-          </select>
-          <label className="field-label" htmlFor="composer-model">{t('composer.modelLabel')}</label>
-          <select id="composer-model" value={providerConfigId} onChange={(e) => setProviderConfigId(e.target.value)} disabled={submitting}>
-            <option value="">
-              {t('composer.modelDefault')}
-              {modelConfigs?.envDefault != null ? `（${modelConfigs.envDefault.name} · ${modelConfigs.envDefault.modelId}）` : ''}
-            </option>
-            {(modelConfigs?.configs ?? []).map((c) => <option key={c.id} value={c.id}>{c.label}（{c.modelId}）</option>)}
-          </select>
-        </div>
-      </details>
+      {/* Decision allocation (user directive 2026-08-23): domain and goal type
+          are NOT user inputs — the scope stage's model analyzes the question
+          and decides (verified: 84/84 real runs carry an inferred domain and
+          goalType; prompt schema enforces both). The researcher sees the
+          decision on the research page and can correct it through the
+          feedback→revision chain, not through an intake form. */}
+      <p className="muted small composer-auto-note">
+        <Sparkles size={12} aria-hidden="true" /> {t('composer.autoScope')}
+      </p>
       <p aria-live="polite" className="sr-only">{submitting ? t('form.submitting') : ''}</p>
     </form>
   );
