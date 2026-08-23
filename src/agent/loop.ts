@@ -116,6 +116,12 @@ export interface AgentLoopDeps {
    * (sessions without a run, minimal harnesses).
    */
   budget?: RunBudgetView;
+  /**
+   * Reasoning effort for EVERY model call in this session (conversation gear >
+   * config default). Absent = no reasoning fields on the wire — the resolved route's
+   * declared capability decides whether this is honored or simply not sent.
+   */
+  reasoning?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' };
   hooks?: ExtensionBus;
   /** Enables spill-to-artifact for oversized tool results (content-addressed ref). */
   artifacts?: ArtifactStore;
@@ -293,6 +299,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig, deps: AgentLoopDeps): P
         outputKind: 'json',
         maxTokens: 4096,
         jsonSchema: strictSchemaOrUndefined(AgentActionSchema),
+        ...(deps.reasoning !== undefined ? { reasoning: deps.reasoning } : {}),
         purpose: `${deps.purpose}:turn`,
       },
       (raw) => validateStructured<AgentAction>(raw, AgentActionSchema),
