@@ -257,10 +257,29 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
 
   // --- tool integrations (TIS): stored MCP servers / hook rules / skills join the session ---
   const integrations = deps.listToolIntegrations?.() ?? deps.store.listObjects('tool_integration', '__none__');
-  const mcpManager = new McpManager({
-    listServers: () => integrations.filter((i): i is McpServerIntegration => i.kind === 'mcp_server'),
-  });
-  const mcpStatuses = await mcpManager.connectAll();
+  // Capability-scoped admission (least privilege for a headless autonomous agent):
+  // refine-evidence-gaps only READS evidence and searches — it has no legitimate
+  // use for edit/execute/destructive-class external tools. Enabling an integration
+  // is researcher consent for the tool plane, not a blanket grant into every kernel
+  // session, so non-read servers are refused here (visible as state='disabled' with
+  // the policy reason) instead of contributing allow rules to an autonomous loop.
+  // The schema default riskClass is 'execute' — omission fails closed until declared.
+  const mcpIntegrations = integrations.filter((i): i is McpServerIntegration => i.kind === 'mcp_server');
+  // Read-class servers go to the manager (enabled ones connect; disabled ones are
+  // still reported state='disabled' by the manager). Enabled non-read servers are
+  // policy-refused below; DISABLED non-read servers also pass through the manager
+  // so they keep their honest 'disabled' status instead of vanishing.
+  const admittedMcp = mcpIntegrations.filter((i) => i.riskClass === 'read' || !i.enabled);
+  const refusedMcp = mcpIntegrations
+    .filter((i) => i.enabled && i.riskClass !== 'read')
+    .map((i): McpServerStatus => ({
+      integrationId: i.id,
+      label: i.label,
+      state: 'disabled',
+      error: `admission policy: ${CAPABILITY} is a read-only evidence-refinement capability; MCP servers of riskClass '${i.riskClass}' are refused (only riskClass 'read' tools may join this session)`,
+    }));
+  const mcpManager = new McpManager({ listServers: () => admittedMcp });
+  const mcpStatuses = [...refusedMcp, ...(await mcpManager.connectAll())];
   const registry = makeTools();
   const mcpRegistered = await mcpManager.registerTools(registry);
   const hookRules = integrations.filter((i): i is HookRuleIntegration => i.kind === 'hook_rule');
@@ -270,8 +289,10 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       { tool: 'list_hypotheses', effect: 'allow' },
       { tool: 'read_evidence', effect: 'allow' },
       { tool: 'search_sources', effect: 'allow' },
-      // Enabled MCP servers contribute their adapted tools as allow rules; risk
-      // classes are stamped per-integration (explore mode still gates non-read tools).
+      // Admitted (read-class) MCP servers contribute their adapted tools as allow
+      // rules; risk classes are stamped per-integration (explore mode still gates
+      // non-read tools). Non-read servers were refused above — they never reach
+      // this allow expansion.
       ...mcpRegistered.registered.map((r) => ({ tool: r.registeredAs, effect: 'allow' as const })),
       // Researcher hook rules: block → bypassImmune deny, require_approval → ask
       // (engine's exact-(tool,args) approval binding; headless ask denies fail-closed).
