@@ -42,6 +42,10 @@ Usage:
                                                   Record feedback on a run (source: human_expert|new_literature|new_dataset|
                                                   tool_result|simulation|experiment|reviewer|verification_failure|
                                                   reproduction_failure); consumed causally by the revise stage
+  far research lineage <run-id> [--json]         Trajectory graph: revision family, hypotheses, evidence, causal revisions
+  far research supervise <run-id> [--json]       Live supervisor analysis: stall/repeat-failure/cycle signals with action hints
+  far research fork <run-id> [--reason <text>] [--json]
+                                                  Branch a settled run (alternative direction; question referenced, never copied)
   far runs [--json]                              List runs
   far new                                        Interactive wizard (TTY only): prompts for question /
                                                   domain / goal type, then runs the exact same pipeline
