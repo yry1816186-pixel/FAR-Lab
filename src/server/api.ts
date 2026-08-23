@@ -1944,6 +1944,24 @@ function parseSeedSources(raw: unknown): string | {
       return search(res, url);
     }
 
+    // RU-1 cross-run research memory: list + deterministic-ranked search.
+    if (segments[2] === 'memory' && segments.length === 3 && method === 'GET') {
+      const q = url.searchParams.get('q');
+      const kind = url.searchParams.get('kind');
+      if (kind !== null && !/^(episodic|semantic|experiment_outcome|profile)$/.test(kind)) {
+        throw validation('query "kind" must be a memory kind');
+      }
+      if (q !== null && q.trim().length > 0) {
+        const items = app.store.searchMemory({
+          query: q.trim(),
+          ...(kind !== null ? { kinds: [kind as 'episodic' | 'semantic' | 'experiment_outcome' | 'profile'] } : {}),
+        });
+        return sendJson(res, 200, { query: q.trim(), items });
+      }
+      const items = app.store.listMemory(kind !== null ? { kind: kind as 'episodic' } : {});
+      return sendJson(res, 200, { items });
+    }
+
     if (segments[2] === 'verify' && segments.length === 4 && method === 'GET') {
       return verify(res, segments[3]!);
     }

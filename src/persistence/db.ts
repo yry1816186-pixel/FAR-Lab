@@ -136,6 +136,50 @@ export const MIGRATIONS: readonly { version: number; sql: string }[] = [
       CREATE INDEX IF NOT EXISTS idx_event_tags_run ON event_tags(run_id, seq);
     `,
   },
+  {
+    // RU-1 memory substrate (tech-intel expedition 2026-08-24): governed cross-run
+    // research memory. Dedicated tables in far.db — the single authoritative store
+    // (no second memory DB). SQL CHECKs mirror the zod governance gates so a
+    // hand-rolled row insert cannot bypass them either.
+    version: 6,
+    sql: `
+      CREATE TABLE IF NOT EXISTS memory_items (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        status TEXT NOT NULL,
+        outcome TEXT,
+        failure_reason TEXT,
+        trust_class TEXT NOT NULL,
+        taint TEXT NOT NULL,
+        run_id TEXT,
+        receipt_id TEXT,
+        source_ref TEXT,
+        created_at TEXT NOT NULL,
+        last_accessed_at TEXT NOT NULL,
+        access_count INTEGER NOT NULL DEFAULT 0,
+        supersedes_id TEXT,
+        CHECK (kind IN ('episodic','semantic','experiment_outcome','profile')),
+        CHECK (status IN ('active','superseded','archived')),
+        CHECK (trust_class IN ('own_verified','own_unverified','external_literature','external_untrusted')),
+        CHECK (taint IN ('trusted','untrusted_literal','derived_untrusted')),
+        CHECK (kind != 'experiment_outcome' OR outcome IS NULL OR outcome != 'failed' OR IFNULL(length(failure_reason), 0) >= 3),
+        CHECK (trust_class != 'external_literature' OR source_ref IS NOT NULL)
+      );
+      CREATE INDEX IF NOT EXISTS idx_memory_kind ON memory_items(kind, status);
+      CREATE INDEX IF NOT EXISTS idx_memory_run ON memory_items(run_id);
+      CREATE TABLE IF NOT EXISTS memory_edges (
+        from_id TEXT NOT NULL,
+        to_id TEXT NOT NULL,
+        relation_type TEXT NOT NULL,
+        at TEXT NOT NULL,
+        PRIMARY KEY (from_id, to_id, relation_type)
+      );
+      CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(id UNINDEXED, body, tokenize = 'unicode61');
+    `,
+  },
 ];
 
 export const openDb = (dbPath: string): Db => {

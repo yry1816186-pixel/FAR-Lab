@@ -10,6 +10,7 @@ import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './ru
 import { evaluateQualityGate, MAX_QUALITY_ROUNDS } from './quality-gate.js';
 import { evaluateIteration, iterationRoundKey, iterationFingerprintKey } from './iteration.js';
 import { analyzeTrajectory } from './supervisor.js';
+import { consolidateRun } from './memory.js';
 import { receiptEventDetail } from '../pipeline/llm.js';
 
 /** Meta key for the persisted quality-gate round counter (round 1 = initial generation). */
@@ -501,6 +502,22 @@ export class Orchestrator {
         return r;
       }, lease);
       this.deps.store.appendEvent(runId, { type: 'run_status_changed', status: 'completed', detail: {} });
+
+      // RU-1 memory consolidation: terminal runs project their durable facts into
+      // cross-run memory (deterministic, idempotent, zero LLM). Fail-visible but
+      // non-fatal — a memory hiccup must never invalidate a completed run.
+      try {
+        const consolidated = consolidateRun(this.deps.store, runId);
+        this.deps.store.appendEvent(runId, {
+          type: 'note',
+          detail: { kind: 'memory_consolidated', itemsWritten: consolidated.itemsWritten, skipped: consolidated.skipped },
+        });
+      } catch (e) {
+        this.deps.store.appendEvent(runId, {
+          type: 'note',
+          detail: { kind: 'memory_consolidation_failed', error: e instanceof Error ? e.message : String(e) },
+        });
+      }
 
       // W-E closed-loop guidance (idempotent by loop-state fingerprint): 'completed'
       // must not mask an open falsification loop. The loop is closed iff the revise
