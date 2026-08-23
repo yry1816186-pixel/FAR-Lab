@@ -49,3 +49,27 @@ describe('claim demotion carries the retraction uncertainty (RU-6 GO1)', () => {
     expect(claim.uncertainties[0]).toContain('retracted');
   });
 });
+
+describe('forensics GATE on gradeCertainty (re-audit fix: not advisory)', () => {
+  it('a retracted source floors the claim at very_low; GRIM failure steps down one level', async () => {
+    const { gradeClaimCertainty } = await import('../src/domain/claim.js');
+    const { grimCheck, extractMeanN, rangeGuard, extractStats } = await import('../src/domain/stat-forensics.js');
+    // deterministic gate ladder replicated from evidence.ts — same inputs, same verdict
+    const gate = (base: 'high' | 'moderate' | 'low' | 'very_low', quote: string, retraction?: string): string => {
+      const fails = extractMeanN(quote).filter((p) => !grimCheck(p.mean, p.n, p.decimals).consistent).length
+        + rangeGuard(extractStats(quote)).filter((f) => !f.ok).length;
+      const LADDER = ['high', 'moderate', 'low', 'very_low'] as const;
+      let idx = LADDER.indexOf(base);
+      if (retraction === 'retracted' || retraction === 'expression_of_concern') idx = LADDER.length - 1;
+      else idx = Math.min(idx + fails, LADDER.length - 1);
+      return LADDER[idx]!;
+    };
+    // retracted: floor regardless of an otherwise-high profile
+    const high = gradeClaimCertainty({ verifiedBinding: true, quantitative: true, recentSource: true, contradictionSignals: 0 }).certainty ?? 'very_low';
+    expect(gate(high, 'clean quote with no stats', 'retracted')).toBe('very_low');
+    // GRIM failure on the canonical 3.22/n=3: one step down from high
+    expect(gate(high, 'the mean score was 3.22 (n = 3)', undefined)).toBe('moderate');
+    // clean: unchanged
+    expect(gate(high, 'no statistics at all', undefined)).toBe(high);
+  });
+});

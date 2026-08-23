@@ -438,6 +438,31 @@ const main = async (): Promise<void> => {
     }
     return;
   }
+  if (cmd === 'backup') {
+    // RU-7.1 production caller (re-audit fix): VACUUM INTO snapshot — the
+    // WAL-copy trap (plain file copy silently loses recent WAL commits) is
+    // structurally avoided. Refuses to overwrite; drill in docs/backup-restore.md.
+    const path = await import('node:path');
+    const args = (await import('node:util')).parseArgs({ allowPositionals: true, args: process.argv.slice(3) });
+    const dataDir = path.resolve(process.env.FARLAB_DATA_DIR ?? '.far-run');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const dest = typeof args.positionals[0] === 'string'
+      ? path.resolve(String(args.positionals[0]))
+      : path.join(dataDir, 'backup', `far-${stamp}.db`);
+    const fs = await import('node:fs');
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    const app = await createApp({ dataDir });
+    try {
+      app.store.backupTo(dest);
+    } catch (e) {
+      die(e instanceof Error ? e.message : String(e), 1);
+    } finally { app.close(); }
+    const bytes = fs.statSync(dest).size;
+    console.log(`backup written: ${dest} (${bytes} B)`);
+    if (!json()) console.log('restore drill: see docs/backup-restore.md');
+    return;
+  }
+
   if (cmd === 'data') die('data requires a subcommand: info', 2);
 
   if (cmd === 'gc') {

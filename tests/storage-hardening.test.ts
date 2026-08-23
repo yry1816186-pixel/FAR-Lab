@@ -62,3 +62,36 @@ describe('RU-7.3 backwards-clock detection', () => {
     store['db'].close();
   });
 });
+
+describe('RU-7.1 backup CLI verb (far backup)', () => {
+  it('end-to-end via main(): writes a restorable snapshot under backup/, refuses overwrite', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const path = await import('node:path');
+    const fsMod = await import('node:fs');
+    const { dir, store } = mkStore();
+    mkRun(store);
+    store.appendEvent(store.listRuns(1)[0]!.id, { type: 'note', detail: { i: 1 } });
+    store['db'].close();
+    const out = execFileSync(process.execPath, ['dist/cli/main.js', 'backup'], {
+      env: { ...process.env, FARLAB_DATA_DIR: dir },
+      encoding: 'utf8',
+    });
+    expect(out).toContain('backup written');
+    const backupDir = path.join(dir, 'backup');
+    const files = fsMod.readdirSync(backupDir);
+    expect(files).toHaveLength(1);
+    const snap = new (await import('../src/persistence/store.js')).Store(
+      (await import('../src/persistence/db.js')).openDb(path.join(backupDir, files[0]!)));
+    expect(snap.listRuns(10)).toHaveLength(1);
+    expect(snap['db'].prepare('PRAGMA integrity_check').get()?.integrity_check).toBe('ok');
+    snap['db'].close();
+    // second backup to the SAME explicit path must refuse
+    const dest = path.join(dir, 'explicit.db');
+    const proc = await import('node:child_process');
+    const first = proc.spawnSync(process.execPath, ['dist/cli/main.js', 'backup', dest], { env: { ...process.env, FARLAB_DATA_DIR: dir }, encoding: 'utf8' });
+    expect(first.status).toBe(0);
+    const second = proc.spawnSync(process.execPath, ['dist/cli/main.js', 'backup', dest], { env: { ...process.env, FARLAB_DATA_DIR: dir }, encoding: 'utf8' });
+    expect(second.status).toBe(1);
+    expect(second.stderr).toContain('refusing to overwrite');
+  });
+});
