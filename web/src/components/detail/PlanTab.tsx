@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
 import { isNotFound } from '../../api/client';
-import { getPlan } from '../../api/endpoints';
+import { getEvidence, getHypotheses, getPlan } from '../../api/endpoints';
 import type { ResearchPlan, ResearchRun } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, FieldList, Section, Skeleton } from '../common';
 import { ResearchActions } from './ResearchActions';
+import { InlineIdRefs, buildClaimLabels, buildHypLabels } from './InlineIdRefs';
 import { stageKey, availabilityKey, stepKindKey } from '../../i18n/keys';
 import type { DictKey } from '../../i18n/dict';
 
@@ -27,6 +28,19 @@ export function PlanTab({
   const { t } = useI18n();
   const fetcher = useCallback((signal: AbortSignal) => getPlan(run.id, signal), [run.id]);
   const res = useResource(fetcher, [run.id], `${run.updatedAt}:${run.status}`);
+  // HX4b label sources for ID discipline: plan prose cites hyp_/clm_ ids;
+  // human labels come from the run's own ranking + evidence order. Best-effort
+  // fetches — on failure ids render verbatim (never silently renumbered).
+  const hypFetcher = useCallback((signal: AbortSignal) => getHypotheses(run.id, signal), [run.id]);
+  const hypRes = useResource(hypFetcher, [run.id], `${run.updatedAt}`);
+  const evFetcher = useCallback((signal: AbortSignal) => getEvidence(run.id, signal), [run.id]);
+  const evRes = useResource(evFetcher, [run.id], `${run.updatedAt}`);
+  const hypLabels = hypRes.data !== null
+    ? buildHypLabels(hypRes.data.scorecards, new Map(hypRes.data.hypotheses.map((h) => [h.id, h.statement] as const)))
+    : undefined;
+  const claimLabels = evRes.data !== null
+    ? buildClaimLabels(evRes.data.claims.map((c) => c.id), t('idref.claim'))
+    : undefined;
 
   return (
     <>
@@ -39,6 +53,8 @@ export function PlanTab({
       ) : res.data !== null ? (
         <PlanView
           plan={res.data}
+          hypLabels={hypLabels}
+          claimLabels={claimLabels}
           onChallenge={() => onFeedback({ kind: 'plan', id: res.data!.id, label: res.data!.objective })}
           aiActions={
             <ResearchActions
@@ -58,17 +74,24 @@ export function PlanTab({
   );
 }
 
-function PlanView({ plan, onChallenge, aiActions }: { plan: ResearchPlan; onChallenge: () => void; aiActions?: React.ReactNode }): JSX.Element {
+function PlanView({ plan, hypLabels, claimLabels, onChallenge, aiActions }: {
+  plan: ResearchPlan;
+  hypLabels?: Map<string, string>;
+  claimLabels?: Map<string, string>;
+  onChallenge: () => void;
+  aiActions?: React.ReactNode;
+}): JSX.Element {
   const { t } = useI18n();
   const orNone = (items: string[] | undefined): JSX.Element | string =>
     items !== undefined && items.length > 0 ? items.join('；') : <span className="muted">{t('common.none')}</span>;
 
   const stepIds = new Set(plan.steps.map((s) => s.id));
-  /** Render-layer defense: `task_` ids not present in steps are fabrication artifacts — flag, never render as valid. */
+  /** Render-layer defense: `task_` ids not present in steps are fabrication
+   *  artifacts — flag, never render as valid. hyp_/clm_ refs get human labels. */
   const renderRef = (ref: string): JSX.Element | string =>
     ref.startsWith('task_') && !stepIds.has(ref)
       ? <span className="text-warn" title={ref}>{t('plan.invalidRef', { ref })}</span>
-      : ref;
+      : <InlineIdRefs text={ref} hypLabels={hypLabels} claimLabels={claimLabels} />;
 
   const check = plan.executabilityCheck;
 
@@ -85,10 +108,10 @@ function PlanView({ plan, onChallenge, aiActions }: { plan: ResearchPlan; onChal
           </>
         }
       >
-        <p className="plan-objective">{plan.objective}</p>
+        <p className="plan-objective"><InlineIdRefs text={plan.objective} hypLabels={hypLabels} claimLabels={claimLabels} /></p>
         <FieldList
           items={[
-            { key: t('plan.hypotheses'), value: <span className="mono">{plan.hypothesisIds.join('；')}</span> },
+            { key: t('plan.hypotheses'), value: <span className="mono">{plan.hypothesisIds.map((id) => hypLabels?.get(id) ?? id).join('；')}</span> },
             {
               key: t('plan.execCheck'),
               value: check === undefined ? <Badge tone="muted">{t('executability.unchecked')}</Badge> : check.passed ? <Badge tone="ok">{t('executability.passed')}</Badge> : <Badge tone="err" title={(check.missing ?? []).join('；')}>{t('executability.failed')}</Badge>,
@@ -132,7 +155,9 @@ function PlanView({ plan, onChallenge, aiActions }: { plan: ResearchPlan; onChal
                   <tr key={d.name}>
                     <th scope="row">{d.name}</th>
                     <td>{t(availabilityKey(d.availability))}</td>
-                    <td>{d.sourceHint ?? <span className="muted">—</span>}</td>
+                    <td>{d.sourceHint !== undefined && d.sourceHint.length > 0
+                      ? <InlineIdRefs text={d.sourceHint} hypLabels={hypLabels} claimLabels={claimLabels} />
+                      : <span className="muted">—</span>}</td>
                     <td>{d.variables.join('、')}</td>
                   </tr>
                 ))}
@@ -177,10 +202,15 @@ function PlanView({ plan, onChallenge, aiActions }: { plan: ResearchPlan; onChal
                 <Badge tone="muted">{t(stepKindKey(step.kind))}</Badge>
                 {step.estimatedCost !== undefined && <span className="muted small">{t('plan.steps.cost')}: {step.estimatedCost}</span>}
               </div>
-              <p className="plan-step-method">{step.method}</p>
+              <p className="plan-step-method"><InlineIdRefs text={step.method} hypLabels={hypLabels} claimLabels={claimLabels} /></p>
               <FieldList
                 items={[
-                  { key: t('plan.steps.inputs'), value: <span className="mono">{(step.inputs ?? []).map(renderRef).join('、') || <span className="muted">{t('common.none')}</span>}</span> },
+                  {
+                    key: t('plan.steps.inputs'),
+                    value: (step.inputs ?? []).length === 0
+                      ? <span className="muted">{t('common.none')}</span>
+                      : <span className="mono">{(step.inputs ?? []).map((r, j) => <span key={j}>{j > 0 && '、'}{renderRef(r)}</span>)}</span>,
+                  },
                   { key: t('plan.steps.outputs'), value: <span className="mono">{(step.outputs ?? []).join('、') || <span className="muted">{t('common.none')}</span>}</span> },
                   { key: t('plan.steps.failure'), value: orNone(step.failureConditions) },
                   { key: t('plan.steps.dependsOn'), value: <span className="mono">{(step.dependsOn ?? []).map(renderRef).join('、') || <span className="muted">{t('common.none')}</span>}</span> },
@@ -194,10 +224,10 @@ function PlanView({ plan, onChallenge, aiActions }: { plan: ResearchPlan; onChal
       <Section title={t('plan.decisionRules')}>
         <FieldList
           items={[
-            { key: t('plan.decisionRules.success'), value: plan.decisionRules.successCriterion },
-            { key: t('plan.decisionRules.weakening'), value: plan.decisionRules.weakeningCriterion },
-            { key: t('plan.decisionRules.falsification'), value: plan.decisionRules.falsificationCriterion },
-            { key: t('plan.decisionRules.stop'), value: plan.decisionRules.stopCriterion },
+            { key: t('plan.decisionRules.success'), value: <InlineIdRefs text={plan.decisionRules.successCriterion} hypLabels={hypLabels} claimLabels={claimLabels} /> },
+            { key: t('plan.decisionRules.weakening'), value: <InlineIdRefs text={plan.decisionRules.weakeningCriterion} hypLabels={hypLabels} claimLabels={claimLabels} /> },
+            { key: t('plan.decisionRules.falsification'), value: <InlineIdRefs text={plan.decisionRules.falsificationCriterion} hypLabels={hypLabels} claimLabels={claimLabels} /> },
+            { key: t('plan.decisionRules.stop'), value: <InlineIdRefs text={plan.decisionRules.stopCriterion} hypLabels={hypLabels} claimLabels={claimLabels} /> },
           ]}
         />
         {/* POPPER discipline (D-025, S2b): how this plan guards against multiple-hypothesis
@@ -212,7 +242,7 @@ function PlanView({ plan, onChallenge, aiActions }: { plan: ResearchPlan; onChal
               </div>
             )}
             {plan.multipleTestingNote !== undefined && plan.multipleTestingNote.length > 0 && (
-              <div className="muted">{plan.multipleTestingNote}</div>
+              <div className="muted"><InlineIdRefs text={plan.multipleTestingNote} hypLabels={hypLabels} claimLabels={claimLabels} /></div>
             )}
             {check?.statisticalDesignNote !== undefined && check.statisticalDesignNote.length > 0 && (
               <div className="muted">

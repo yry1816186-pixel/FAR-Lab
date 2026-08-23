@@ -1940,3 +1940,11 @@ select option { color: var(--text); background: var(--surface); }
 .hyp-methods summary { cursor: pointer; color: var(--v2-text-2); font-size: var(--fs-aux); user-select: none; }
 .hyp-methods[open] summary { margin-bottom: var(--sp-2); }
 .hyp-methods-body { display: flex; flex-direction: column; gap: var(--sp-3); }
+
+/* inline ID references (HX4b): human label in prose, raw id on hover */
+.id-ref {
+  border-bottom: 1px dotted var(--v2-border);
+  cursor: help;
+  white-space: nowrap;
+}
+.id-ref-raw { font-size: var(--fs-data); color: var(--v2-text-2); }
