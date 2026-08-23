@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { openDb } from '../src/persistence/db.js';
 import { Store } from '../src/persistence/store.js';
 import { MemoryItemSchema, deriveTrustClass, memoryActivation, newMemoryId } from '../src/domain/memory.js';
@@ -86,6 +87,20 @@ describe('RU-1 deterministic consolidation', () => {
     const r2 = consolidateRun(store, run.id);
     expect(r2.itemsWritten).toBe(2);
     expect(store.listMemory({})).toHaveLength(2);
+  });
+});
+
+describe('RU-1 FTS projection integrity', () => {
+  it('putMemory re-write of the same id replaces (not duplicates) the FTS row', () => {
+    const { store } = mkStore();
+    const dupId = `mem_${createHash('sha256').update('test:dup').digest('hex').slice(0, 24)}`;
+    store.putMemory(mkItem({ id: dupId, title: 'original body text', body: 'v1' }));
+    store.putMemory(mkItem({ id: dupId, title: 'replacement body text', body: 'v2' }));
+    // old text must no longer match; new text must
+    expect(store.searchMemory({ query: 'original' })).toHaveLength(0);
+    expect(store.searchMemory({ query: 'replacement' })).toHaveLength(1);
+    const ftsCount = store.db.prepare('SELECT COUNT(*) AS n FROM memory_fts WHERE id=?').get(dupId) as { n: number };
+    expect(ftsCount.n).toBe(1);
   });
 });
 

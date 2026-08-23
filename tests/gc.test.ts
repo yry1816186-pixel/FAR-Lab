@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createApp } from '../src/app/composition.js';
 import { runGc } from '../src/cli/gc.js';
-import { ResearchQuestion, SourceDocument } from '../src/domain/index.js';
+import { ResearchQuestion, ReproducibilityBundle, SourceDocument } from '../src/domain/index.js';
 import { newId } from '../src/domain/ids.js';
 import type { App } from '../src/app/composition.js';
 
@@ -13,6 +13,13 @@ import type { App } from '../src/app/composition.js';
  * references. Deterministic, idempotent; dry-run is the default and the apply
  * path only ever removes blobs the reference scan (store.referencedArtifactHashes)
  * could not see. Real fs + real store; no network.
+ *
+ * REGRESSION (2026-08-24 P0): the reference scan matched only `sha256:<hex>`
+ * prefixed refs, but bundles store `finalArtifactHashes` as BARE hex. The user's
+ * real-workspace `far gc --apply` therefore classified all 55 bundle-referenced
+ * report/paper artifacts as orphans and deleted them — every completed study's
+ * GET /report 404'd. Fail-safe direction: a missed ref is silent data loss while
+ * an over-retained blob is harmless, so the scan must accept BOTH spellings.
  */
 
 let app: App;
@@ -82,5 +89,46 @@ describe('far gc', () => {
     const report = runGc(emptyApp, { apply: true });
     expect(report.totalBlobs).toBe(0);
     expect(report.unreferenced).toHaveLength(0);
+  });
+
+  // Regression for the 2026-08-24 P0: bundles reference their report/paper
+  // artifacts via BARE hex in finalArtifactHashes (and paperOutlineRef uses the
+  // sha256: prefix) — both spellings must count as references.
+  it('keeps bundle-referenced artifacts alive: bare-hex finalArtifactHashes AND prefixed paperOutlineRef', async () => {
+    const reportPut = await app.artifacts.put('gc-regression report markdown');
+    const paperPut = await app.artifacts.put('gc-regression paper markdown');
+    expect(reportPut.hash).not.toBe(paperPut.hash);
+
+    const q = ResearchQuestion.parse({
+      id: newId('q'), text: 'gc bundle refs', background: '', goalType: 'exploratory',
+      scope: { domain: 'd', phenomena: ['p'] }, constraints: {}, createdAt: new Date().toISOString(),
+    });
+    const run = app.store.createRun(q);
+    app.store.putObject('bundle', ReproducibilityBundle.parse({
+      id: newId('bnd'),
+      runId: run.id,
+      declaredEvidenceLevel: 'replay',
+      codeRevision: 'unknown',
+      environmentFingerprint: 'node test win32',
+      dependencyLockHash: 'c'.repeat(64),
+      questionRef: q.id,
+      corpusSnapshotRef: q.id, // schema wants a resolvable-looking ref; gc must not care
+      sourceArtifactHashes: [],
+      modelMetadata: [],
+      receiptIds: [],
+      finalArtifactHashes: [reportPut.hash], // BARE hex — the exact production spelling
+      verificationInstructions: 'far verify <bundle-id> (test seed)',
+      limitations: [],
+      paperOutlineRef: paperPut.ref, // sha256:-prefixed — the other production spelling
+      createdAt: new Date().toISOString(),
+    }));
+
+    const dry = runGc(app, { apply: false });
+    expect(dry.unreferenced).toEqual([]);
+    const applied = runGc(app, { apply: true });
+    expect(applied.removed).toEqual([]);
+    // Both artifacts survive byte-identically.
+    expect(await app.artifacts.get(reportPut.ref)).toBe('gc-regression report markdown');
+    expect(await app.artifacts.get(paperPut.ref)).toBe('gc-regression paper markdown');
   });
 });

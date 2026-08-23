@@ -75,7 +75,10 @@ interface AnalysisOptions {
 
 const DEFAULT_QUIET_WINDOW_MS = 30 * 60_000; // 30 min: > provider retry budget (~120s) x headroom
 const REPEATED_FAILURE_THRESHOLD = 3;
-const CYCLE_ACTIVITY_FLOOR = 4; // fewer busy events than this cannot be a "cycle"
+/** Iteration records needed before "same fingerprint every round" is a cycle.
+ *  Aligned with the default iteration round cap (3): a full cap of rounds with
+ *  zero fingerprint variety is exactly the busy-but-flat pattern. */
+const CYCLE_ACTIVITY_FLOOR = 3;
 
 /** Collapse a failure into its comparable signature: stage + normalized error text. */
 const failureSignature = (detail: Record<string, unknown>, stage?: string): string => {
@@ -141,22 +144,23 @@ export const analyzeTrajectory = (opts: AnalysisOptions): TrajectoryObservation 
     });
   }
 
-  // ---- signal 3: unproductive_cycle (activity without material delta) ----
-  const notes = all.filter((e) => e.type === 'note');
-  if (notes.length >= CYCLE_ACTIVITY_FLOOR && !signals.some((s) => s.kind === 'stalled_horizon')) {
-    const fps = notes.map((e) => (typeof e.detail.fingerprint === 'string' ? e.detail.fingerprint : ''));
-    const distinctFps = new Set(fps.filter(Boolean));
-    // No fingerprint variety among busy steps == churn without state change.
-    // (Iteration-level material-delta detection stays in iteration.ts; this is
-    // the intra-round busy-but-flat pattern.)
-    if (fps.length >= CYCLE_ACTIVITY_FLOOR && distinctFps.size <= 1 && Boolean(fps[0])) {
+  // ---- signal 3: unproductive_cycle (work happening, nothing improving) ----
+  // P1-1 fix (adversarial review 06): consume the REAL persisted iteration
+  // fingerprints (IterationRecord.snapshot.fingerprint via store objects) — the
+  // earlier note-detail field had no production writer, making this signal dead
+  // code. >=3 iteration records sharing one fingerprint = repeated passes with
+  // zero material movement.
+  const iterations = store.listObjects('iteration', runId);
+  if (iterations.length >= CYCLE_ACTIVITY_FLOOR && !signals.some((s) => s.kind === 'stalled_horizon')) {
+    const fps = new Set(iterations.map((it) => it.snapshot.fingerprint));
+    if (fps.size <= 1) {
       signals.push({
         kind: 'unproductive_cycle',
         severity: 'medium',
-        evidence: { busyEvents: notes.length, distinctFingerprints: distinctFps.size },
+        evidence: { iterations: iterations.length, distinctFingerprints: fps.size },
         recommendation: {
           action: 'branch_or_deepen',
-          rationale: `${notes.length} activity bursts produced no material delta — branch to a different direction or deepen before spending more`,
+          rationale: `${iterations.length} completed rounds produced no material delta — branch to a different direction or deepen before spending more`,
         },
       });
     }

@@ -94,11 +94,24 @@ describe('analyzeTrajectory — repeated identical failures (AVO "unproductive c
 });
 
 describe('analyzeTrajectory — unproductive cycle (work happening, nothing improving)', () => {
-  it('flags unproductive_cycle when many turns produce no material delta', () => {
+  it('flags unproductive_cycle when completed iteration rounds share one fingerprint (P1-1: real source)', () => {
     const { store, runId } = openStore();
-    // 6 note events (busy) but every snapshot fingerprint identical -> no delta
-    for (let i = 0; i < 6; i++) {
-      store.appendEvent(runId, { type: 'note', detail: { text: `exploration step ${i}`, fingerprint: 'same' } }, at(50 - i));
+    // >=3 REAL IterationRecords with identical material fingerprints = repeated
+    // passes, zero movement. (note-detail fingerprints were a dead path — no
+    // production writer emits that field; see adversarial review 06.)
+    for (let r = 1; r <= 3; r++) {
+      store.putObject('iteration', {
+        id: newId('itr'), runId, round: r,
+        decidedAt: at(50 - r * 5), decision: 'continue',
+        reopenStages: [], rationale: `round ${r}`,
+        snapshot: {
+          round: r, claims: 0, verifiedClaims: 0, hypotheses: 0, hypothesisVersionSum: 0,
+          scorecards: 0, plans: 0, revisions: 0, experimentRunsCompleted: 0,
+          feedbackSignals: 0, feedbackConsumed: 0, effectEstimates: 0,
+          fingerprint: 'fp_identical_aabbccdd',
+        },
+        unblockHints: [],
+      });
     }
     const obs = analyzeTrajectory({ store, runId, now: new Date().toISOString(), quietWindowMs: 3_600_000 });
     const sig = obs.signals.find((s) => s.kind === 'unproductive_cycle');
@@ -107,10 +120,22 @@ describe('analyzeTrajectory — unproductive cycle (work happening, nothing impr
     expect(sig!.recommendation.action).toBe('branch_or_deepen');
   });
 
-  it('never fires unproductive_cycle below the activity floor', () => {
+  it('never fires unproductive_cycle below the iteration floor', () => {
     const { store, runId } = openStore();
-    for (let i = 0; i < 2; i++) {
-      store.appendEvent(runId, { type: 'note', detail: { text: `step ${i}`, fingerprint: 'same' } }, at(20 - i));
+    // only 2 iteration records: not yet a cycle regardless of fingerprints
+    for (let r = 1; r <= 2; r++) {
+      store.putObject('iteration', {
+        id: newId('itr'), runId, round: r,
+        decidedAt: at(30 - r), decision: 'continue',
+        reopenStages: [], rationale: `round ${r}`,
+        snapshot: {
+          round: r, claims: 0, verifiedClaims: 0, hypotheses: 0, hypothesisVersionSum: 0,
+          scorecards: 0, plans: 0, revisions: 0, experimentRunsCompleted: 0,
+          feedbackSignals: 0, feedbackConsumed: 0, effectEstimates: 0,
+          fingerprint: 'fp_identical_aabbccdd',
+        },
+        unblockHints: [],
+      });
     }
     const obs = analyzeTrajectory({ store, runId, now: new Date().toISOString(), quietWindowMs: 3_600_000 });
     expect(obs.signals.some((s) => s.kind === 'unproductive_cycle')).toBe(false);
