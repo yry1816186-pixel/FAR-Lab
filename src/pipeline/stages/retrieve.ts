@@ -826,6 +826,19 @@ export const retrieveStage: StageHandler = {
     });
     documents.push(...seeds);
 
+    // RU-10 GO4: seeds persist into the researcher's cross-run library —
+    // idempotent by content key; the run's corpus snapshot stays per-run.
+    for (const s of seeds) {
+      ctx.store.putCorpusItem({
+        title: s.title,
+        identifiers: s.identifiers,
+        ...(s.abstractText !== undefined ? { text: s.abstractText } : {}),
+        ...(s.publicationYear !== undefined ? { year: s.publicationYear } : {}),
+        ...(s.authors !== undefined ? { authors: s.authors } : {}),
+        firstSeenRun: ctx.run.id,
+      });
+    }
+
     for (const doc of documents) ctx.store.putObject('source_document', doc);
     const familyFailures = [...failuresByFamily.entries()].map(([family, msgs]) => ({
       family,

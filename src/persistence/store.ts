@@ -674,6 +674,71 @@ export class Store {
     });
   }
 
+  // ---- RU-10 GO4: persistent researcher library (corpus_items) ----
+
+  private corpusItemsReady = false;
+  private ensureCorpusItems(): void {
+    if (this.corpusItemsReady) return;
+    this.db.exec(`CREATE TABLE IF NOT EXISTS corpus_items (
+      id TEXT PRIMARY KEY,
+      family TEXT NOT NULL,
+      title TEXT NOT NULL,
+      identifiers_json TEXT NOT NULL,
+      text TEXT,
+      year INTEGER,
+      authors_json TEXT,
+      first_seen_run TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_corpus_items_family ON corpus_items(family)');
+    this.corpusItemsReady = true;
+  }
+
+  /**
+   * Persist one researcher-supplied corpus item (seed). Idempotent by a
+   * deterministic content key — re-seeding the same paper across runs never
+   * duplicates; the first_seen_run provenance is kept. Returns true when a NEW
+   * row landed.
+   */
+  putCorpusItem(item: {
+    title: string;
+    identifiers: Array<{ kind: string; value: string }>;
+    text?: string;
+    year?: number;
+    authors?: string[];
+    firstSeenRun: string;
+    at?: string;
+  }): boolean {
+    this.ensureCorpusItems();
+    const id = 'ci_' + createHash('sha256').update(
+      JSON.stringify({ title: item.title, identifiers: item.identifiers, year: item.year }),
+    ).digest('hex').slice(0, 24);
+    const res = this.db.prepare(
+      `INSERT OR IGNORE INTO corpus_items (id, family, title, identifiers_json, text, year, authors_json, first_seen_run, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+    ).run(
+      id, 'user_provided', item.title, JSON.stringify(item.identifiers), item.text ?? null,
+      item.year ?? null, JSON.stringify(item.authors ?? []), item.firstSeenRun, item.at ?? new Date().toISOString(),
+    );
+    return Number(res.changes) === 1;
+  }
+
+  listCorpusItems(filter: { limit?: number } = {}): Array<{
+    id: string; family: string; title: string; identifiers: Array<{ kind: string; value: string }>;
+    text: string | null; year: number | null; authors: string[]; firstSeenRun: string; createdAt: string;
+  }> {
+    this.ensureCorpusItems();
+    const limit = Math.min(filter.limit ?? 100, 500);
+    return (this.db.prepare('SELECT * FROM corpus_items ORDER BY created_at DESC LIMIT ?').all(limit) as Record<string, unknown>[]).map((r) => ({
+      id: String(r.id), family: String(r.family), title: String(r.title),
+      identifiers: JSON.parse(String(r.identifiers_json)) as Array<{ kind: string; value: string }>,
+      text: r.text === null ? null : String(r.text),
+      year: r.year === null ? null : Number(r.year),
+      authors: JSON.parse(String(r.authors_json ?? '[]')) as string[],
+      firstSeenRun: String(r.first_seen_run), createdAt: String(r.created_at),
+    }));
+  }
+
   /** Insert-only by intent id (first write wins); safe inside or outside a transaction. */
   recordOutbox(intentId: string, kind: string, payload: unknown, at = new Date().toISOString()): void {
     this.db.prepare('INSERT OR IGNORE INTO outbox (intent_id, kind, payload, created_at) VALUES (?,?,?,?)')
