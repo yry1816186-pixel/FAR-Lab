@@ -580,8 +580,11 @@ export class Store {
       const useTrigram = this.trigramReady && (/[一-鿿]/.test(q) || q.trim().length >= 3);
       if (useTrigram) {
         try {
+          // NOTE: the token window counts TRIGRAMS (3-char pieces), so 12 tokens
+          // ≈ 4 visible chars — the «» markers get ellipsised away. 64 trigrams
+          // ≈ a full phrase with markers intact (live-probed, RU-10 GO3).
           const triRows = this.db.prepare(
-            `SELECT o.run_id AS run_id, o.id, o.json, snippet(far_search_tri, 2, '«', '»', '…', 12) AS snippet, rank
+            `SELECT o.run_id AS run_id, o.id, o.json, snippet(far_search_tri, 2, '«', '»', '…', 64) AS snippet, rank
                FROM far_search_tri f JOIN objects o ON o.id = f.obj_id AND o.kind = f.kind
               WHERE far_search_tri MATCH ? AND f.kind = ?
               ORDER BY rank LIMIT ?`,
