@@ -796,18 +796,25 @@ function ProposalCard({
 }): JSX.Element {
   const { t } = useI18n();
   const [remember, setRemember] = useState(false);
-  const argSummary = proposal.kind === 'launch_research'
-    ? String(proposal.args.question ?? '')
-    : proposal.kind === 'cancel_automation'
-      ? String(proposal.args.automationId ?? '')
-      : String(proposal.args.task ?? '');
+  // RU-3 T6: server-computed argSummary is authoritative; the client heuristic
+  // below is a back-compat fallback for proposals persisted before the field.
+  const serverArgs = proposal.argSummary;
+  const argSummary = serverArgs !== undefined && Object.keys(serverArgs).length > 0
+    ? Object.entries(serverArgs).map(([k, v]) => `${k}: ${v}`).join(' · ')
+    : proposal.kind === 'launch_research'
+      ? String(proposal.args.question ?? '')
+      : proposal.kind === 'cancel_automation'
+        ? String(proposal.args.automationId ?? '')
+        : String(proposal.args.task ?? '');
+  const riskBadge = proposal.riskLevel === 'high' ? 'badge badge--warn' : 'badge badge--info';
   return (
     <div className={`conv-proposal conv-proposal--${proposal.status}`}>
       <p className="conv-proposal-head">
         <Check size={11} aria-hidden="true" /> <strong>{t(PROPOSAL_KIND_LABEL[proposal.kind])}</strong>
+        {proposal.riskLevel !== undefined && <span className={riskBadge}>{t(`conv.proposalRisk.${proposal.riskLevel}` as DictKey)}</span>}
         {proposal.autoApproved === true && <span className="badge badge--info">{t('conv.proposalAuto')}</span>}
       </p>
-      <p className="conv-proposal-title">{proposal.title}</p>
+      <p className="conv-proposal-title" title={t('conv.proposalModelTitle')}>{proposal.title}</p>
       {argSummary.length > 0 && <p className="conv-proposal-args muted small">{argSummary.slice(0, 200)}</p>}
       {proposal.status === 'pending' ? (
         <div className="conv-proposal-actions">

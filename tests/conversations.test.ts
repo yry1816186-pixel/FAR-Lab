@@ -217,6 +217,10 @@ describe('resident conversation flow (HTTP, stub provider, kernel action protoco
     const proposal = agent.proposals[0] as JsonBody;
     expect(proposal.kind).toBe('launch_research');
     expect(proposal.status).toBe('pending');
+    // RU-3 T6: server-computed disclosure rides every card — risk from the kind
+    // mapping, args rendered deterministically; neither is model-controllable.
+    expect(proposal.riskLevel).toBe('moderate');
+    expect(proposal.argSummary).toEqual({ question: '接合质粒如何驱动抗生素耐药基因的水平转移？', seeds: '0' });
 
     const approve = await json('POST', `/conversations/${convId}/proposals/${proposal.id}`, { approve: true, remember: true });
     expect(approve.status).toBe(200);

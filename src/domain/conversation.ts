@@ -48,6 +48,15 @@ export const ConversationProposalSchema = z.object({
   result: z.string().max(2000).optional(),
   /** True when executed under a remembered "don't ask again for this kind" grant. */
   autoApproved: z.boolean().optional(),
+  /**
+   * RU-3 T6 anti-gaming: SERVER-COMPUTED structured disclosure. `title` is
+   * model-authored free text and can never be the sole justification shown to
+   * the researcher — riskLevel comes from the action-kind mapping and
+   * argSummary is deterministically rendered from the validated args; neither
+   * is accepted from model input.
+   */
+  riskLevel: z.enum(['low', 'moderate', 'high']).optional(),
+  argSummary: z.record(z.string(), z.string()).optional(),
   createdAt: ISO,
   resolvedAt: ISO.optional(),
 });
