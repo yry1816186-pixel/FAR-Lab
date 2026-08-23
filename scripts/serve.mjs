@@ -26,9 +26,22 @@ const { createApp } = await import('../dist/app/composition.js');
 const { createApiServer } = await import('../dist/server/api.js');
 
 const port = Number(process.env.PORT ?? 3196);
-const app = await createApp();
-const api = createApiServer(app, { port });
-const actualPort = await api.start();
+// FARLAB_DATA_DIR mirrors the production entrypoint (dist/server/main.js) so a
+// dev server can run against an isolated workspace instead of ./far-run.
+const app = await createApp(process.env.FARLAB_DATA_DIR !== undefined ? { dataDir: process.env.FARLAB_DATA_DIR } : {});
+// Automations engine on for the dev server too (FARLAB_AUTOMATIONS=off to disable),
+// same default as the production entrypoint (dist/server/main.js).
+const api = createApiServer(app, { port, automations: { enabled: process.env.FARLAB_AUTOMATIONS !== 'off' } });
+let actualPort;
+try {
+  actualPort = await api.start();
+} catch (e) {
+  if (e instanceof Error && e.code === 'EADDRINUSE') {
+    console.error(`far-serve: port ${port} is already in use — another FAR-Lab server (or other process) is listening on it. Stop that process or set PORT=<other>.`);
+    process.exit(4);
+  }
+  throw e;
+}
 const webDist = resolve(cwd, 'web', 'dist');
 const hasWeb = (() => { try { statSync(resolve(webDist, 'index.html')); return true; } catch { return false; } })();
 console.log(`FAR-Lab API listening on http://127.0.0.1:${actualPort}`);
