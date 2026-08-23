@@ -56,6 +56,14 @@ describe('P3 ssh2-gateway on a real Docker/WSL2 Linux target (D-084)', { timeout
     try { rmSync(dir, { recursive: true, force: true }); } catch { /* Windows lag */ }
   });
 
+  beforeAll(() => {
+    // Idempotent fixture (same shape as remote-executor.test.ts): a crashed or
+    // killed prior run leaves the named container behind and docker run --name
+    // then conflicts. Force-clean up front.
+    if (!ready) return;
+    try { execFileSync('docker', ['rm', '-f', CONTAINER], { stdio: 'ignore' }); } catch { /* already gone */ }
+  });
+
   it.runIf(ready)('real Linux target: key-only SSH, remote training, host-key pinning', async () => {
     // 1. Dedicated keypair + target image + container (root login only via this key).
     const identity = join(dir, 'id_ed25519');
