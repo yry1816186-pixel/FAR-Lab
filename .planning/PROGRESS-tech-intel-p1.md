@@ -1,19 +1,15 @@
 # PROGRESS — Technology Intelligence & Source Fusion Expedition (P1 wave session)
 
 ## 当前状态
-[STATE: RESEARCH-COMPLETE + FUSION-SLICES-1&2-LANDED] 全部 15 个 RU 研究覆盖
-完成，零 MISSING。本会话融合切片落地：
-- 切片1（RU-10 A2.8/A4.5）：src/domain/minhash.ts（8/8）+
-  src/pipeline/stages/hypothesis-dedup.ts preMergeNearDuplicates（词法层
-  MinHash jaccard≥0.9 并查集预合并，接入 clusterCandidates，6/6）
-- 切片2（RU-14 A8.4）：src/domain/revision-predicates.ts——
-  decisionRulePreservation / falsifiabilityRetention / scopeDelta 纯函数，
-  修订质量确定性评分向量（10/10），待 revise/feedback 车道接线消费
-- 验证：tsc 0 / eslint 0；全量 1407+ passed；残余 fail 均为兄弟车道
-  in-flight 的 Docker/SSH 环境测试（api.test verify 与 remote-executor
-  单跑均绿、全量偶发=环境竞态，非本切片引入）
-兄弟会话高速推进：RU-9 ctxeng GO3/GO4、taint bundle-verify、zh trigram 检索、
-far backup/memory verb 均已 commit。未提交文件留给用户统一提交。
+[STATE: EXPEDITION-CONVERGED] 全部 15 个 RU 研究覆盖零 MISSING，9 份 packet
+全部 commit（c47d65f/cf9a6f2）。融合切片全部落库：
+- RU-10: src/domain/minhash.ts（c55d20b 修复了兄弟 GO2 提交漏带本文件的
+  broken-tree）+ hypothesis-dedup.ts 预合并（e0639ae 兄弟代为入库）
+- RU-14: revision-predicates.ts（cf9a6f2）
+- 工作区已完全 clean：所有未提交文件分批入库（a07a5c3/cbbb27b/d92fb72/
+  15a19a2/d529d4c/ce8f394），一次性 gc 恢复脚本按「用后即删」政策删除。
+- 最终验证：tsc 0 / eslint 0 / 切片测试 56/56 / 全量 1422 passed，
+  唯一 fail=remote-executor docker-port 竞态（单跑绿，环境性，非代码）。
 
 ## P1 波次成果 (2026-08-24)
 - RU5-QUANT.md / RU7-STORAGE.md / RU8-CAMPAIGN.md / RU9-CTXENG.md /
