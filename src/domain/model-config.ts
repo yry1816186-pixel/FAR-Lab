@@ -68,7 +68,7 @@ export const ModelProviderConfigBase = z.object({
    * 127.0.0.1 — same threat model as .far-run/secrets.env). NEVER serialized back
    * out: API/UI projections carry maskApiKey() output only.
    */
-  apiKey: ***,
+  apiKey: z.string(),
   /**
    * BP-4 failover chain (LiteLLM-verified semantics, adapted to one-call granularity):
    * ordered ids tried AFTER this config exhausts its own provider-plane retries with
