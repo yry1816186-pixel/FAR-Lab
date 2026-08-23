@@ -45,10 +45,28 @@ interface Args {
 const openWorld = (dataDir: string) => {
   const dir = path.resolve(dataDir);
   const db = openDb(path.join(dir, 'far.db'));
-  const scheduler = openScheduler(path.join(dir, 'far-scheduler.db'));
+  const store = new Store(db);
+  // Re-audit fix (DLQ terminal-truth split): when the scheduler dead-letters a
+  // job, the far.db experiment_run is marked failed + audited so both stores
+  // agree on the terminal state (never 'queued forever' in far.db again).
+  const scheduler = openScheduler(path.join(dir, 'far-scheduler.db'), {
+    onDead: (jobId, error) => {
+      const job = scheduler0.get(jobId);
+      if (job === null) return;
+      const run = store.getObject('experiment_run', job.experimentRunId);
+      if (run !== null && (run.status === 'queued' || run.status === 'running')) {
+        store.putObjectEvented('experiment_run', { ...run, status: 'failed', error }, {
+          type: 'experiment_failed',
+          detail: { experimentRunId: job.experimentRunId, jobId, error },
+        });
+      }
+    },
+  });
+  // small indirection so onDead can reference the scheduler being constructed
+  const scheduler0 = scheduler;
   const artifacts = openArtifactStore(path.join(dir, 'artifacts'));
   return {
-    store: new Store(db),
+    store,
     scheduler,
     artifacts,
     close: () => { db.close(); scheduler.close(); },
@@ -84,7 +102,7 @@ const statLines = (job: {
   `${job.worker ? ` worker=${job.worker}` : ''}${job.error ? `  error=${job.error}` : ''}`;
 
 export const experimentCommand = async (sub: string | undefined, a: Args): Promise<CliResult> => {
-  const usage = `far experiment requires a subcommand: run <spec.json> | enqueue <spec.json> | worker | status [--job <id>] | cancel <jobId> | logs <experimentRunId> | approve <specId> --by <operator> [--hypothesis <hypId>] [--mde <value>] | rerun <specId>`;
+  const usage = `far experiment requires a subcommand: run <spec.json> | enqueue <spec.json> | worker | status [--job <id>] | dead-list | requeue <jobId> | cancel <jobId> | logs <experimentRunId> | approve <specId> --by <operator> [--hypothesis <hypId>] [--mde <value>] | rerun <specId>`;
   try {
     return await dispatch(sub, a, usage);
   } catch (e) {
@@ -211,6 +229,32 @@ const dispatch = async (sub: string | undefined, a: Args, usage: string): Promis
     } finally {
       w.close();
     }
+  }
+
+  if (sub === 'dead-list') {
+    const w = openWorld(a.dataDir);
+    try {
+      const dead = w.scheduler.listDead();
+      return {
+        code: 0,
+        json: { dead },
+        text: dead.length === 0
+          ? 'no dead-lettered jobs'
+          : dead.map((j) => `${j.jobId} attempts=${j.attempts} ${j.experimentRunId}: ${j.error ?? ''}`).join('\n'),
+      };
+    } finally { w.close(); }
+  }
+
+  if (sub === 'requeue') {
+    const jobId = a.positional;
+    if (jobId === undefined || !JOB_ID_RE.test(jobId)) return { code: 2, text: `requeue requires a valid job id (${usage})` };
+    const w = openWorld(a.dataDir);
+    try {
+      const ok = w.scheduler.requeueDead(jobId);
+      return ok
+        ? { code: 0, text: `requeued ${jobId} with a fresh attempt budget` }
+        : { code: 1, text: `cannot requeue ${jobId}: not in dead-letter state` };
+    } finally { w.close(); }
   }
 
   if (sub === 'cancel') {

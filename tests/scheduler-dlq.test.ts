@@ -87,3 +87,48 @@ describe('RU-7.2 poison-job DLQ', () => {
     second.close();
   });
 });
+
+describe('RU-7.2 + re-audit fix: dead-letter projects far.db terminal truth', () => {
+  it('onDead fires and the store-side hook marks the experiment_run failed + audited', async () => {
+    const { openDb } = await import('../src/persistence/db.js');
+    const { Store } = await import('../src/persistence/store.js');
+    const { ResearchQuestion, newId } = await import('../src/domain/index.js');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'far-dlq-proj-'));
+    const db = openDb(path.join(dir, 'far.db'));
+    const store = new Store(db);
+    const q = ResearchQuestion.parse({ id: newId('q'), text: 'proj?', goalType: 'explanatory', createdAt: '2026-08-24T00:00:00.000Z', scope: { domain: 'd', phenomena: ['p'] }, constraints: {} });
+    const run = store.createRun(q);
+    const xrunId = newId('xrun');
+    store.putObject('experiment_run', {
+      id: xrunId, runId: run.id, specId: newId('xsp'), specHash: 'c'.repeat(64),
+      status: 'queued', attempts: 0, executor: 'local', cancelRequested: false,
+      resultIds: [], statReportIds: [], createdAt: '2026-08-24T00:00:00.000Z',
+    } as never);
+
+    const deadCalls: Array<{ jobId: string; error: string }> = [];
+    const s = openScheduler(path.join(dir, 'far-scheduler.db'), {
+      onDead: (jobId, error) => {
+        deadCalls.push({ jobId, error });
+        // the production hook shape (cli/experiment.ts openWorld): mark far.db failed
+        const r = store.getObject('experiment_run', xrunId);
+        if (r !== null && (r.status === 'queued' || r.status === 'running')) {
+          store.putObjectEvented('experiment_run', { ...r, status: 'failed', error }, {
+            type: 'experiment_failed', detail: { experimentRunId: xrunId, jobId, error },
+          });
+        }
+      },
+    });
+    s.enqueue({ experimentRunId: xrunId, runId: run.id, specId: 'xsp_p', intentId: 'job_projection00000000000000a' });
+    let t = Date.parse('2026-08-24T00:00:00.000Z');
+    for (let i = 0; i <= MAX_JOB_ATTEMPTS; i += 1) {
+      s.claimNext('w', { maxRunning: 2, heartbeatTtlMs: TTL, at: new Date(t).toISOString() });
+      t += TTL + 1000;
+    }
+    const capped = s.claimNext('w', { maxRunning: 2, heartbeatTtlMs: TTL, at: new Date(t).toISOString() });
+    expect(capped).toBeNull();
+    expect(deadCalls).toHaveLength(1);
+    expect(store.getObject('experiment_run', xrunId)!.status).toBe('failed');
+    expect(store.listEvents(run.id).some((e) => e.type === 'experiment_failed')).toBe(true);
+    s.close(); db.close();
+  });
+});

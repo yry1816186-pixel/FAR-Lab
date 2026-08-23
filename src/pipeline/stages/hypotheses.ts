@@ -17,6 +17,7 @@ import type {
 import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
 import { snapshotHash } from '../../sources/snapshot.js';
+import { cappedClaimsForPrompt } from './shared.js';
 import { memoryNegativeConditioning } from '../../app/memory.js';
 import { canonicalSha256 } from '../../shared/crypto.js';
 import { isCancellationError } from './guard.js';
@@ -464,7 +465,7 @@ export const generateHypothesesStage: StageHandler = {
         payload = {
           strategy: def.strategy,
           question: questionForPrompt,
-          supportingClaims: claimsForPrompt(base),
+          supportingClaims: cappedClaimsForPrompt(base, question.text),
           ...(supporting.length === 0 ? { note: 'no uncontested claims available; conditioning on the full verified base' } : {}),
         };
       } else if (def.strategy === 'contradiction_driven') {
@@ -472,7 +473,7 @@ export const generateHypothesesStage: StageHandler = {
         payload = {
           strategy: def.strategy,
           question: questionForPrompt,
-          counterDirectionClaims: claimsForPrompt(hasCounter ? counter : supporting),
+          counterDirectionClaims: cappedClaimsForPrompt(hasCounter ? counter : supporting, question.text),
           ...(hasCounter
             ? {}
             : {
@@ -487,7 +488,7 @@ export const generateHypothesesStage: StageHandler = {
         payload = {
           strategy: def.strategy,
           question: questionForPrompt,
-          claims: claimsForPrompt(claims),
+          claims: cappedClaimsForPrompt(claims, question.text),
         };
       }
 
@@ -508,7 +509,7 @@ export const generateHypothesesStage: StageHandler = {
     const priorMemory = memoryNegativeConditioning(ctx.store, question.text);
     const strategyInputs = canonicalSha256({
       question: questionForPrompt,
-      claims: claimsForPrompt(claims),
+      claims: cappedClaimsForPrompt(claims, question.text),
       relations: relations.map((r) => ({ id: r.id, relation: r.relation })),
       instructions: STRATEGY_DEFS.map((d) => d.instruction),
       discipline: DIVERSITY_DISCIPLINE,
@@ -625,7 +626,7 @@ export const generateHypothesesStage: StageHandler = {
           DIVERSITY_DISCIPLINE,
         payload: {
           question: questionForPrompt,
-          claims: claimsForPrompt(claims),
+          claims: cappedClaimsForPrompt(claims, question.text),
           existingCandidates: raws.map((r, i) => ({
             index: i,
             statement: r.out.statement,
@@ -672,7 +673,7 @@ export const generateHypothesesStage: StageHandler = {
         'follows mainly from those claims, "novel_speculation" if it introduces substantially new mechanism or ' +
         'premises beyond the claims, "mixed" if both. Judge only from the provided evidence.',
       payload: {
-        claims: claimsForPrompt(claims),
+        claims: cappedClaimsForPrompt(claims, question.text),
         numberedCandidates: raws.map((r, i) => ({ index: i, statement: r.out.statement, mechanism: r.out.mechanism })),
       },
       schema: NoveltyOut,

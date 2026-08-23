@@ -33,6 +33,145 @@ export const assertNotCancelled = (ctx: StageContext, stage: string): void => {
 export const claimsForPrompt = (claims: readonly ScientificClaim[]): { id: string; text: string }[] =>
   claims.map((c) => ({ id: c.id, text: c.text }));
 
+// ---------------------------------------------------------------------------
+// RU-9 GO4 — minimal context compiler (deterministic, zero LLM)
+// ---------------------------------------------------------------------------
+
+export interface BudgetedSection {
+  id: string;
+  /** 1 = highest; whole sections are kept in priority order until the budget. */
+  priority: number;
+  text: string;
+}
+
+/**
+ * Deterministic section-budget trim: keep WHOLE sections in ascending priority
+ * (ties by id) while the char budget holds; a section that does not fit whole is
+ * dropped (never silently half-truncated). Returns kept texts + dropped ids so
+ * callers can disclose what was cut.
+ */
+export const applySectionBudget = (
+  sections: readonly BudgetedSection[],
+  budgetChars: number,
+): { kept: string[]; dropped: string[] } => {
+  const ordered = [...sections].sort((a, b) => a.priority - b.priority || (a.id < b.id ? -1 : 1));
+  const kept: string[] = [];
+  const dropped: string[] = [];
+  let used = 0;
+  for (const s of ordered) {
+    if (used + s.text.length <= budgetChars) {
+      kept.push(s.text);
+      used += s.text.length;
+    } else {
+      dropped.push(s.id);
+    }
+  }
+  return { kept, dropped };
+};
+
+const STOP = new Set(['that', 'with', 'from', 'this', 'have', 'were', 'which', 'about', 'their', 'been', 'such', 'than', 'then', 'also', 'into', 'over', 'under', 'between', 'because', 'while', 'these', 'those', 'study', 'studies', 'results', 'result', 'using', 'used', 'show', 'shown', 'effect', 'effects']);
+const tokensOf = (text: string): string[] =>
+  text.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3 && !STOP.has(w));
+
+/**
+ * TF-IDF greedy diverse selection (A4.4-dispersion lineage): score =
+ * normalized relevance × (1 − max similarity to an already-selected item).
+ * Deterministic (ties by id); replaces naive top-k when the prompt cap binds,
+ * so a large evidence base conditions generation on a DIVERSE span instead of
+ * the first N claims.
+ */
+export const selectDiverseExemplars = <T extends { id: string; text: string }>(
+  items: readonly T[],
+  seedText: string,
+  k: number,
+): T[] => {
+  if (items.length <= k) return [...items];
+  const df = new Map<string, number>();
+  const itemTokens = items.map((it) => {
+    const toks = tokensOf(it.text);
+    for (const tok of new Set(toks)) df.set(tok, (df.get(tok) ?? 0) + 1);
+    return toks;
+  });
+  const seedSet = new Set(tokensOf(seedText));
+  const N = items.length;
+  const tfidf = (toks: string[], tok: string): number => {
+    const tf = toks.filter((x) => x === tok).length / Math.max(toks.length, 1);
+    const idf = Math.log(1 + N / (1 + (df.get(tok) ?? 0)));
+    return tf * idf;
+  };
+  const sim = (a: string[], b: string[]): number => {
+    if (a.length === 0 || b.length === 0) return 0;
+    const vec = (toks: string[]): Map<string, number> => {
+      const m = new Map<string, number>();
+      for (const tok of new Set(toks)) m.set(tok, tfidf(toks, tok));
+      return m;
+    };
+    const va = vec(a);
+    const vb = vec(b);
+    let dot = 0;
+    for (const [tok, w] of va) {
+      const wb = vb.get(tok);
+      if (wb !== undefined) dot += w * wb;
+    }
+    const na = Math.sqrt([...va.values()].reduce((s, w) => s + w * w, 0));
+    const nb = Math.sqrt([...vb.values()].reduce((s, w) => s + w * w, 0));
+    return na === 0 || nb === 0 ? 0 : dot / (na * nb);
+  };
+  const rawRelevance = itemTokens.map((toks) => {
+    let s = 0;
+    for (const tok of seedSet) s += tfidf(toks, tok);
+    return s;
+  });
+  // normalize relevance to [0,1] so it shares a scale with the cosine
+  // diversity penalty — otherwise a large-magnitude relevance sum drowns the
+  // penalty and the picker degrades to naive top-k (caught by the diversity test).
+  const maxRel = Math.max(...rawRelevance, 0);
+  const relevance = maxRel > 0 ? rawRelevance.map((r) => r / maxRel) : rawRelevance.map(() => 0);
+  const selected: number[] = [];
+  const remaining = items.map((_, i) => i);
+  while (selected.length < k && remaining.length > 0) {
+    let bestIdx = -1;
+    let bestScore = -Infinity;
+    for (const i of remaining) {
+      const redundancy = selected.length === 0
+        ? 0
+        : Math.max(...selected.map((j) => sim(itemTokens[i]!, itemTokens[j]!)));
+      // Multiplicative marginal gain (DPP-flavored): score = relevance × (1 − redundancy).
+      // A subtractive penalty cannot unseat a 2:1 relevance gap (proven by the
+      // diversity test failing at every additive weight); multiplication makes a
+      // near-duplicate of an already-selected item nearly worthless while a
+      // less-relevant-but-different item retains most of its value. Relevance-first
+      // is preserved: zero relevance still scores exactly zero.
+      const score = relevance[i]! * (1 - redundancy);
+      if (score > bestScore || (score === bestScore && (bestIdx === -1 || items[i]!.id < items[bestIdx]!.id))) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+    selected.push(bestIdx);
+    remaining.splice(remaining.indexOf(bestIdx), 1);
+  }
+  return selected.map((i) => items[i]!);
+};
+
+/** Prompt cap for the claim-conditioning base (GO4): diverse-trim above this. */
+export const CLAIMS_PROMPT_CAP = 16;
+
+/** claimsForPrompt with the GO4 cap: under cap = identical projection; over = diverse exemplars. */
+export const cappedClaimsForPrompt = (
+  claims: readonly ScientificClaim[],
+  seedText: string,
+): { id: string; text: string }[] => {
+  if (claims.length <= CLAIMS_PROMPT_CAP) return claimsForPrompt(claims);
+  const exemplars = selectDiverseExemplars(
+    claims.map((c) => ({ id: c.id, text: c.text })),
+    seedText,
+    CLAIMS_PROMPT_CAP,
+  );
+  const byId = new Map(exemplars.map((e) => [e.id, e]));
+  return claims.filter((c) => byId.has(c.id)).map((c) => ({ id: c.id, text: c.text }));
+};
+
 export interface ClaimBuckets {
   /** Verified claims not implicated in any counter/neutral-direction relation (default affirmative evidence). */
   supporting: ScientificClaim[];

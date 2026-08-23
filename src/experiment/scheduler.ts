@@ -151,7 +151,7 @@ const rowToJob = (r: Record<string, unknown>): SchedulerJob => ({
   error: r.error === null || r.error === undefined ? null : String(r.error),
 });
 
-export const openScheduler = (dbPath: string): Scheduler => {
+export const openScheduler = (dbPath: string, opts: { onDead?: (jobId: string, error: string) => void } = {}): Scheduler => {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath, { timeout: 10_000 });
   db.exec('PRAGMA journal_mode = WAL');
@@ -222,8 +222,13 @@ export const openScheduler = (dbPath: string): Scheduler => {
         // forever. The claim returns null (honest: nothing claimable THIS pass);
         // the next claim call proceeds to the next job.
         if (job.attempts >= MAX_JOB_ATTEMPTS) {
+          const deadError = `dead-letter: ${job.attempts} attempts exhausted (worker crash loop or poison spec)`;
           prepare("UPDATE jobs SET status='dead', ended_at=?, error=? WHERE job_id=? AND status IN ('queued','running')")
-            .run(now, `dead-letter: ${job.attempts} attempts exhausted (worker crash loop or poison spec)`, job.jobId);
+            .run(now, deadError, job.jobId);
+          // Re-audit fix (terminal-truth split): the far.db projection must hear
+          // about the dead-letter — without this the experiment_run stays 'queued'
+          // forever while the scheduler says 'dead' (two stores, one truth).
+          opts.onDead?.(job.jobId, deadError);
           return null;
         }
         const reclaimed = job.status === 'running';
