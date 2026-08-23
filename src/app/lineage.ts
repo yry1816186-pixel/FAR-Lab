@@ -1,5 +1,6 @@
 import type { Store } from '../persistence/store.js';
 import type { EvidenceRelation, HypothesisCandidate } from '../domain/index.js';
+import { LINEAGE_COUNTER_RELATIONS } from '../domain/lineage.js';
 
 /**
  * Research Lineage (AVO fusion, G3): a typed, queryable view over the research
@@ -52,9 +53,8 @@ export interface LineageGraph {
   edges: LineageEdge[];
 }
 
-const COUNTER_RELATIONS = new Set([
-  'contradicts', 'weakens', 'fails_to_replicate', 'alternative_explanation',
-]);
+// Relation vocabulary is owned by src/domain/lineage.ts (RU-2); this projection
+// consumes the shared constant so backfill and projection can never disagree.
 
 /**
  * Build the trajectory graph rooted at rootRunId, following parentRunId both
@@ -126,7 +126,7 @@ export const buildLineageGraph = (opts: { store: Store; rootRunId: string }): Li
       const target = rel.targetHypothesisId ?? rel.targetClaimId;
       if (!target) continue;
       edges.push({
-        kind: COUNTER_RELATIONS.has(rel.relation) ? 'counter_evidence' : 'support_evidence',
+        kind: LINEAGE_COUNTER_RELATIONS.has(rel.relation) ? 'counter_evidence' : 'support_evidence',
         from: rel.id, to: target,
       });
     }
