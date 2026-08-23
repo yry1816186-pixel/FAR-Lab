@@ -1,0 +1,17 @@
+{
+  "name": "@far-lab/tui",
+  "version": "0.1.0",
+  "description": "FAR-Lab interactive terminal research browser (read-only v1; Ink full-screen + readline line-mode fallback)",
+  "scripts": {
+    "start": "node --experimental-strip-types src/main.ts"
+  },
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "far-tui": "./src/main.ts"
+  },
+  "dependencies": {
+    "ink": "^7.1.1",
+    "react": "^19.2.8"
+  }
+}
