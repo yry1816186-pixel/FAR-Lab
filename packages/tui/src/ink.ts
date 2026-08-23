@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Box, render, Text, useInput } from 'ink';
-import { getEvents, listRuns, type RunSummary } from './api.ts';
+import { getEvents, listRuns, type RunEvent, type RunSummary } from './api.ts';
 import { deriveStages, relTime, STAGE_ICON, STAGE_ZH, type StageRow } from './narrative.ts';
 import { Composer, type ComposerResult } from './composer.ts';
 
@@ -17,8 +17,8 @@ const STATUS_ZH: Record<string, string> = {
   partial: '部分完成', paused: '已暂停', cancelled: '已取消',
 };
 
-function App(): El {
-  const [runs, setRuns] = useState<RunSummary[] | null>(null);
+export function App(props: { initialRuns?: RunSummary[]; initialEvents?: RunEvent[] } = {}): El {
+  const [runs, setRuns] = useState<RunSummary[] | null>(props.initialRuns ?? null);
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState(0);
   const [detail, setDetail] = useState<{ run: RunSummary; stages: StageRow[] } | null>(null);
@@ -27,13 +27,20 @@ function App(): El {
   const [composerNote, setComposerNote] = useState<string | null>(null);
 
   useEffect(() => {
+    if (props.initialRuns !== undefined) return; // injected (tests): no network
     const c = new AbortController();
     listRuns(c.signal).then(setRuns).catch((e: unknown) => setError(String(e)));
     return () => c.abort();
-  }, []);
+  }, [props.initialRuns]);
 
   const openDetail = (run: RunSummary): void => {
     setLoadingDetail(true);
+    const injected = props.initialEvents;
+    if (injected !== undefined) {
+      setDetail({ run, stages: deriveStages(injected) });
+      setLoadingDetail(false);
+      return;
+    }
     getEvents(run.id)
       .then((events) => setDetail({ run, stages: deriveStages(events) }))
       .catch((e: unknown) => setError(String(e)))
