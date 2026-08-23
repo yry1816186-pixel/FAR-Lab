@@ -57,6 +57,14 @@ export const SourceDocument = z.object({
      * never flipped); the flag makes the metadata conflict visible and countable.
      */
     wrongPaperSuspect: z.boolean().optional(),
+    /**
+     * RU-6 GO1 (Crossref Retraction Watch, update-to field): corpus-trust gate.
+     * Derived from the resolved Crossref record's update-to entries — a retracted
+     * or expression-of-concern work is still resolvable (identifier stays
+     * authoritative) but its claims are demoted downstream and the status is
+     * rendered everywhere the source appears.
+     */
+    retractionStatus: z.enum(['retracted', 'corrected', 'expression_of_concern', 'reinstated']).optional(),
     detail: z.string().optional(),
     checkedAt: z.string().datetime(),
   }).optional(),

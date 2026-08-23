@@ -378,8 +378,16 @@ export const buildEvidenceStage: StageHandler = {
           bindingStatus: aligned ? 'verified' : 'resolved_unaligned',
           alignmentChecked: aligned, // true iff the deterministic check passed
           extractionModelRef: `${result.provider}/${result.modelId}`,
-          uncertainties:
-            candidate.note && candidate.note.trim().length > 0 ? [candidate.note.trim()] : [],
+          uncertainties: [
+            ...(candidate.note && candidate.note.trim().length > 0 ? [candidate.note.trim()] : []),
+            // RU-6 GO1: retracted / expression-of-concern sources carry an explicit
+            // uncertainty note on every claim — visible demotion, never silent.
+            ...(doc.verification?.retractionStatus === 'retracted'
+              ? ['source retracted (Crossref update-to) — treat with maximal skepticism']
+              : doc.verification?.retractionStatus === 'expression_of_concern'
+                ? ['source under expression of concern — treat with elevated skepticism']
+                : []),
+          ],
           // GRADE-lite at admission (W-G/F-B): contradiction signals are unknown this
           // early (relations are judged later) — honestly 0 at this point.
           gradeCertainty: gradeClaimCertainty({
