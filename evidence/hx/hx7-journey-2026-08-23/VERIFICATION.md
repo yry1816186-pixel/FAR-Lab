@@ -38,3 +38,19 @@
 ## 门禁
 
 vitest 目标批：api 54/54、event-stream-tracker 6/6、dictation 9/9、conversations 11/11、automations 5/5、file-ingest 13/13；TUI 12/12；root tsc 0 错；web typecheck+build 绿；secret-scan 0；path-hygiene 0。（全量套件中兄弟道在途测试失败不在本批范围，见 EXECUTION_STATE 99024ea 备注。）
+
+## 增补（同日晚，深度验证轮）
+
+### 听写链真语音端到端（浏览器内、全程离线）
+
+- 修复两只 P0 后实证：① ORT 变体加载器缺失（fetch 脚本只拷 jsep 两文件；缺 3 个 .mjs → "no available backend found"）→ 脚本改为 onnxruntime-web/dist 全量 8 文件 + 现场补齐 + manifest 刷新；② ORT 1.26-dev MatMulNBits 融合与旧版 q8 量化格式不兼容（"Missing required scale … weight_merged_0_scale"）→ worker 会话选项 graphOptimizationLevel:'disabled'。
+- 探针：JFK 真实演讲 6.34s（44.1k 立体声→16k 单声道 f32，101,413 采样）直接 postMessage 给**部署产物中的真 worker chunk**。
+- 结果：`status:done, result:"And so my fellow Americans asked not what your country"`（正确转写）；模型就绪 1.4s，总耗时 40.7s；0 网络外呼（allowRemoteModels=false + 全本地资产）。
+- 边界：物理麦克风采集（getUserMedia 真设备）仍留用户首用；至此链路中所有软件环节均有浏览器级实证。
+
+### TUI 行式降级修复（管道/CI 场景三重陷阱）
+
+- 实测发现 Node v24/Windows 管道 stdin 下：readline/promises 连续第二问永不 settle；每问新建接口会预读+close 丢弃后续行；无监听期到达的 line 事件被 EventEmitter 静默丢弃（EOF 后死接口 prompt() 抛 "readline was closed"）。
+- 修复：新增 `packages/tui/src/ask.ts`（单一持久接口+常驻 line 监听+行队列+EOF 诚实空串）；fallback.ts 全部改用 ask()。
+- 走查：两条完整管道会话（问题输入→放弃→52 项真实研究列表→选择→完整阶段叙事含真实 bundle id）exit 0；TUI 套件 12/12 仍绿。
+- 发布：`npm publish --dry-run` 通过（13 文件/11.3kB/shasum 93ba24a2…）；正式发布 BLOCKED--auth（本机未 npm login，凭证属用户）。

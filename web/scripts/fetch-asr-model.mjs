@@ -58,16 +58,23 @@ async function fetchWithMirrors(rel, dest) {
 async function main() {
   mkdirSync(ortDest, { recursive: true });
 
-  // 1. ORT wasm: copy straight from the installed transformers package.
-  const ortSrc = path.resolve(here, '..', 'node_modules', '@huggingface', 'transformers', 'dist');
+  // 1. ORT wasm runtime: the FULL backend-variant set. ORT probes variants at
+  // load time and dynamically imports each variant's .mjs loader from
+  // wasmPaths — every variant needs BOTH its loader and its binary. A partial
+  // set (jsep only) leaves dictation dead in-browser with
+  // 'no available backend found' (2026-08-23 live-probe incident).
+  const ortSrc = path.resolve(here, '..', 'node_modules', 'onnxruntime-web', 'dist');
   let copiedOrt = 0;
   if (existsSync(ortSrc)) {
-    for (const f of ['ort-wasm-simd-threaded.jsep.mjs', 'ort-wasm-simd-threaded.jsep.wasm']) {
-      const src = path.join(ortSrc, f);
-      if (existsSync(src)) { copyFileSync(src, path.join(ortDest, f)); copiedOrt++; }
+    for (const variant of ['', '.asyncify', '.jsep', '.jspi']) {
+      for (const ext of ['.mjs', '.wasm']) {
+        const name = `ort-wasm-simd-threaded${variant}${ext}`;
+        const src = path.join(ortSrc, name);
+        if (existsSync(src)) { copyFileSync(src, path.join(ortDest, name)); copiedOrt++; }
+      }
     }
   }
-  console.log(`far-asr: ORT wasm files copied: ${copiedOrt}`);
+  console.log(`far-asr: ORT wasm files copied: ${copiedOrt}/8`);
 
   // 2. Whisper-base ONNX q8.
   mkdirSync(path.join(whisperDest, 'onnx'), { recursive: true });
