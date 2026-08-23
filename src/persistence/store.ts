@@ -1,4 +1,5 @@
 import type { Db } from './db.js';
+import { createHash } from 'node:crypto';
 import {
   ResearchRun, RunEvent, RunStatus, RunStageName, StageRecord, ResearchQuestion,
   CorpusSnapshot, SourceDocument, ScientificClaim, EvidenceRelation, HypothesisCandidate,
@@ -187,17 +188,42 @@ export class Store {
       runId, at, type: e.type, status: e.status, stage: e.stage,
       detail: e.detail ?? {}, receiptId: e.receiptId,
     };
-    // RU-2 G6: event + tags are one atomic write — a tagged spine half-filled
-    // after a crash would silently under-report to events.query.
+    // RU-2 G6 + RU-3 T5: event + tags + chain hash are one atomic write — a
+    // tagged/hashed spine half-filled after a crash would under-report and
+    // break tamper-evidence.
     const seq = this.db.transaction(() => {
-      const res = this.db.prepare('INSERT INTO events (run_id, at, type, payload) VALUES (?,?,?,?)')
-        .run(runId, at, e.type, JSON.stringify(payload));
+      const payloadJson = JSON.stringify(payload);
+      const parent = this.db.prepare('SELECT prev_hash, payload FROM events WHERE run_id=? ORDER BY seq DESC LIMIT 1').get(runId) as { prev_hash: string | null; payload: string } | undefined;
+      const prevHash = createHash('sha256').update(`${parent?.prev_hash ?? ''}|${parent?.payload ?? ''}|${payloadJson}`).digest('hex');
+      const res = this.db.prepare('INSERT INTO events (run_id, at, type, payload, prev_hash) VALUES (?,?,?,?,?)')
+        .run(runId, at, e.type, payloadJson, prevHash);
       const seq = Number(res.lastInsertRowid);
       const insertTag = this.db.prepare('INSERT OR IGNORE INTO event_tags (tag, run_id, seq) VALUES (?,?,?)');
       for (const tag of eventTagsFor({ type: e.type, stage: e.stage })) insertTag.run(tag, runId, seq);
       return seq;
     });
     return RunEvent.parse({ ...payload, seq });
+  }
+
+  /**
+   * RU-3 T5 tamper check: recompute the per-run hash chain and compare against
+   * the stored prev_hash values. Honest boundary: detects any edit of stored
+   * history; wholesale rewrite-with-rechain of the whole db requires the
+   * external anchor (documented in RU3-COGSEC.md, not yet built).
+   */
+  verifyEventChain(runId: string): { ok: boolean; firstBrokenSeq: number | null; length: number } {
+    const rows = this.db.prepare('SELECT seq, payload, prev_hash FROM events WHERE run_id=? ORDER BY seq ASC').all(runId);
+    let parentPrev: string | null = null;
+    let parentPayload = '';
+    for (const r of rows) {
+      const expected = createHash('sha256').update(`${parentPrev ?? ''}|${parentPayload}|${String(r.payload)}`).digest('hex');
+      if (String(r.prev_hash ?? '') !== expected) {
+        return { ok: false, firstBrokenSeq: Number(r.seq), length: rows.length };
+      }
+      parentPrev = r.prev_hash === null ? null : String(r.prev_hash);
+      parentPayload = String(r.payload);
+    }
+    return { ok: true, firstBrokenSeq: null, length: rows.length };
   }
 
   /**
@@ -315,7 +341,24 @@ export class Store {
         }
       }
       counts.objects = Number(this.db.prepare('DELETE FROM objects WHERE run_id=?').run(runId).changes);
+      // RU-3 T5 privileged deletion path: user-directed run deletion is a product
+      // feature, distinct from tampering. The audit triggers come down ONLY inside
+      // this transaction, the deletion is tombstoned, and the triggers go back up —
+      // direct edits outside this path still abort. The tombstone keeps the fact of
+      // deletion (and its extent) auditable even though the rows are gone.
+      this.db.exec('DROP TRIGGER trg_events_immutable_update');
+      this.db.exec('DROP TRIGGER trg_events_immutable_delete');
       counts.events = Number(this.db.prepare('DELETE FROM events WHERE run_id=?').run(runId).changes);
+      this.db.prepare('DELETE FROM event_tags WHERE run_id=?').run(runId);
+      this.db.exec(`CREATE TRIGGER trg_events_immutable_update BEFORE UPDATE ON events
+        WHEN NOT (OLD.prev_hash IS NULL AND NEW.prev_hash IS NOT NULL
+                  AND OLD.run_id = NEW.run_id AND OLD.at = NEW.at
+                  AND OLD.type = NEW.type AND OLD.payload = NEW.payload)
+        BEGIN SELECT RAISE(ABORT, 'events are append-only (audit spine)'); END`);
+      this.db.exec(`CREATE TRIGGER trg_events_immutable_delete BEFORE DELETE ON events
+        BEGIN SELECT RAISE(ABORT, 'events are append-only (audit spine)'); END`);
+      this.db.prepare('INSERT OR REPLACE INTO deleted_runs (run_id, deleted_at, event_count, object_count) VALUES (?,?,?,?)')
+        .run(runId, new Date().toISOString(), counts.events, counts.objects);
       counts.checkpoints = Number(this.db.prepare('DELETE FROM step_outputs WHERE run_id=?').run(runId).changes)
         + Number(this.db.prepare('DELETE FROM step_fingerprints WHERE run_id=?').run(runId).changes);
       this.db.prepare('DELETE FROM runs WHERE id=?').run(runId);
@@ -592,6 +635,25 @@ export class Store {
    * migrated db; later opens skip via the count checks.
    */
   private backfillLineage(): void {
+    // RU-3 T5 chain backfill (write-once, trigger-permitted): legacy events with
+    // NULL prev_hash get their chain computed per run in seq order, exactly as
+    // appendEvent would have.
+    const unchained = Number(this.db.prepare('SELECT COUNT(*) AS n FROM events WHERE prev_hash IS NULL').get()?.n ?? 0);
+    if (unchained > 0) {
+      this.db.transaction(() => {
+        const runs = this.db.prepare('SELECT DISTINCT run_id FROM events').all();
+        for (const r of runs) {
+          let parentPrev: string | null = null;
+          let parentPayload = '';
+      for (const e of this.db.prepare('SELECT seq, payload FROM events WHERE run_id=? ORDER BY seq ASC').all(String(r.run_id))) {
+        const prevHash: string = createHash('sha256').update(`${parentPrev ?? ''}|${parentPayload}|${String(e.payload)}`).digest('hex');
+            this.db.prepare('UPDATE events SET prev_hash=? WHERE seq=?').run(prevHash, Number(e.seq));
+            parentPrev = prevHash;
+            parentPayload = String(e.payload);
+          }
+        }
+      });
+    }
     const tagCount = Number(this.db.prepare('SELECT COUNT(*) AS n FROM event_tags').get()?.n ?? 0);
     if (tagCount === 0) {
       const eventCount = Number(this.db.prepare('SELECT COUNT(*) AS n FROM events').get()?.n ?? 0);

@@ -180,6 +180,36 @@ export const MIGRATIONS: readonly { version: number; sql: string }[] = [
       CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(id UNINDEXED, body, tokenize = 'unicode61');
     `,
   },
+  {
+    // RU-3 T5 audit tamper-evidence: per-run hash chain over the event spine +
+    // immutability triggers. Append-only was an application promise; now it is
+    // enforced by the database itself (UPDATE/DELETE on events abort), and the
+    // running prev_hash=SHA256(prev‖payload) chain makes any historical edit
+    // detectable (verify chain recomputes; local chains still need an external
+    // anchor for wholesale-rewrite resistance — documented honest boundary).
+    version: 7,
+    sql: `
+      ALTER TABLE events ADD COLUMN prev_hash TEXT;
+      CREATE TRIGGER IF NOT EXISTS trg_events_immutable_update
+        BEFORE UPDATE ON events
+        WHEN NOT (OLD.prev_hash IS NULL AND NEW.prev_hash IS NOT NULL
+                  AND OLD.run_id = NEW.run_id AND OLD.at = NEW.at
+                  AND OLD.type = NEW.type AND OLD.payload = NEW.payload)
+        BEGIN
+          SELECT RAISE(ABORT, 'events are append-only (audit spine)');
+        END;
+      CREATE TRIGGER IF NOT EXISTS trg_events_immutable_delete
+        BEFORE DELETE ON events BEGIN
+          SELECT RAISE(ABORT, 'events are append-only (audit spine)');
+        END;
+      CREATE TABLE IF NOT EXISTS deleted_runs (
+        run_id TEXT PRIMARY KEY,
+        deleted_at TEXT NOT NULL,
+        event_count INTEGER NOT NULL,
+        object_count INTEGER NOT NULL
+      );
+    `,
+  },
 ];
 
 export const openDb = (dbPath: string): Db => {
