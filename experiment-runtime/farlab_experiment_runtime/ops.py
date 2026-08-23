@@ -9,6 +9,8 @@ import numpy as np
 from scipy import stats as scipy_stats
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, log_loss, r2_score, roc_auc_score
 
+from .exploration import op_run_exploration
+
 from . import builders
 
 CLASSIFICATION_METRICS = ("accuracy", "balanced_accuracy", "f1_macro", "roc_auc", "log_loss")
@@ -223,4 +225,7 @@ OPS = {
     "train_eval": op_train_eval,
     "paired_stats": op_paired_stats,
     "abs_stats": op_abs_stats,
+    # AVO fusion G4: exploratory CodeAct (restricted namespace; TS static gate
+    # runs first; outputs are CANDIDATE findings, never confirmatory facts).
+    "run_exploration": op_run_exploration,
 }
