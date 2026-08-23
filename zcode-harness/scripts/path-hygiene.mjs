@@ -51,7 +51,15 @@ const REQUIRED = [
   'project-spec/policies/RELEASE_OPERATIONS.md',
 ];
 for (const rel of REQUIRED) {
-  if (!exists(rel)) errors.push(`missing-required:${rel}`);
+  if (!exists(rel)) {
+    // CI checkouts have no .control/ or other gitignored workspace state by
+    // design — missing-required is a workspace invariant, not a repo one.
+    if (process.env.CI !== undefined && rel.startsWith('.control/')) {
+      warnings.push(`ci-skipped-missing-required:${rel}`);
+    } else {
+      errors.push(`missing-required:${rel}`);
+    }
+  }
 }
 
 // 2. JSON validity + ACCEPTANCE_STATUS contract
