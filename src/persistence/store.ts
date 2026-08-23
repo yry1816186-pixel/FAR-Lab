@@ -17,6 +17,9 @@ import {
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
+import { LineageEdgeRecordSchema, LINEAGE_COUNTER_RELATIONS, eventTagsFor, type LineageEdgeKind, type LineageEdgeRecord } from '../domain/lineage.js';
+
+export type { LineageEdgeKind, LineageEdgeRecord };
 
 /** Domain object kinds stored in the generic objects table, with their canonical schemas (fail-closed reads). */
 const KIND_SCHEMAS = {
@@ -77,7 +80,9 @@ export interface SearchHit {
 export class Store {
   private ftsReady = false;
 
-  constructor(private readonly db: Db) {}
+  constructor(private readonly db: Db) {
+    this.backfillLineage();
+  }
 
   /**
    * FTS5 mirror for universal search (D-101): one contentless-ish table over
@@ -181,9 +186,49 @@ export class Store {
       runId, at, type: e.type, status: e.status, stage: e.stage,
       detail: e.detail ?? {}, receiptId: e.receiptId,
     };
-    const res = this.db.prepare('INSERT INTO events (run_id, at, type, payload) VALUES (?,?,?,?)')
-      .run(runId, at, e.type, JSON.stringify(payload));
-    return RunEvent.parse({ ...payload, seq: Number(res.lastInsertRowid) });
+    // RU-2 G6: event + tags are one atomic write — a tagged spine half-filled
+    // after a crash would silently under-report to events.query.
+    const seq = this.db.transaction(() => {
+      const res = this.db.prepare('INSERT INTO events (run_id, at, type, payload) VALUES (?,?,?,?)')
+        .run(runId, at, e.type, JSON.stringify(payload));
+      const seq = Number(res.lastInsertRowid);
+      const insertTag = this.db.prepare('INSERT OR IGNORE INTO event_tags (tag, run_id, seq) VALUES (?,?,?)');
+      for (const tag of eventTagsFor({ type: e.type, stage: e.stage })) insertTag.run(tag, runId, seq);
+      return seq;
+    });
+    return RunEvent.parse({ ...payload, seq });
+  }
+
+  /**
+   * Tag query plane (RU-2 G6): ANY-of tag match with optional run scoping and
+   * keyset pagination. Cross-run ordering is (run_id, seq) — per-run seq is only
+   * monotonic within its run. Limit clamps at 200 (model-facing budget guard).
+   */
+  queryEvents(opts: { tags: string[]; runId?: string; afterSeq?: number; limit?: number }): RunEvent[] {
+    if (opts.tags.length === 0) throw new Error('queryEvents: at least one tag required');
+    const limit = Math.min(Math.max(opts.limit ?? 100, 1), 200);
+    const tags = opts.tags.map((t) => {
+      if (!/^[a-z0-9_]+:[a-z0-9_-]+$/.test(t)) throw new Error(`queryEvents: malformed tag '${t}' (expected kind:*|stage:*)`);
+      return t;
+    });
+    const placeholders = tags.map(() => '?').join(',');
+    const where = [`tag IN (${placeholders})`];
+    const params: unknown[] = [...tags];
+    if (opts.runId !== undefined) { where.push('run_id=?'); params.push(opts.runId); }
+    if (opts.afterSeq !== undefined) { where.push('seq>?'); params.push(opts.afterSeq); }
+    const rows = this.db.prepare(
+      `SELECT DISTINCT run_id, seq FROM event_tags WHERE ${where.join(' AND ')} ORDER BY run_id, seq LIMIT ${limit}`,
+    ).all(...params);
+    if (rows.length === 0) return [];
+    // Fetch each matched event's payload, preserving (run_id, seq) order.
+    const out: RunEvent[] = [];
+    for (const r of rows) {
+      const row = this.db.prepare('SELECT seq, payload FROM events WHERE run_id=? AND seq=?').get(String(r.run_id), Number(r.seq));
+      if (!row) continue; // deleted-event hole: skip honestly
+      const p = JSON.parse(String(row.payload)) as Record<string, unknown>;
+      out.push(RunEvent.parse({ ...p, seq: Number(row.seq) }));
+    }
+    return out;
   }
 
   listEvents(runId: string): RunEvent[] {
@@ -515,6 +560,89 @@ export class Store {
     const res = this.db.prepare("UPDATE runs SET doc = json_set(doc, '$.cancelRequested', json('true')), updated_at = updated_at WHERE id=? AND status IN ('created','queued','running','paused','partial')")
       .run(runId);
     return Number(res.changes) === 1;
+  }
+
+  // ---- lineage edges (RU-2 G3: authoritative persisted lineage) ----
+
+  recordLineageEdge(edge: { fromId: string; toId: string; kind: LineageEdgeKind; runId: string; at?: string }): void {
+    LineageEdgeRecordSchema.parse({ fromId: edge.fromId, toId: edge.toId, kind: edge.kind, runId: edge.runId, at: edge.at ?? new Date().toISOString() });
+    this.db.prepare('INSERT OR IGNORE INTO lineage_edges (from_id, to_id, kind, run_id, at) VALUES (?,?,?,?,?)')
+      .run(edge.fromId, edge.toId, edge.kind, edge.runId, edge.at ?? new Date().toISOString());
+  }
+
+  listLineageEdges(filter: { toId?: string; fromId?: string; kind?: LineageEdgeKind; runId?: string } = {}): LineageEdgeRecord[] {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (filter.toId !== undefined) { where.push('to_id=?'); params.push(filter.toId); }
+    if (filter.fromId !== undefined) { where.push('from_id=?'); params.push(filter.fromId); }
+    if (filter.kind !== undefined) { where.push('kind=?'); params.push(filter.kind); }
+    if (filter.runId !== undefined) { where.push('run_id=?'); params.push(filter.runId); }
+    const sql = `SELECT from_id, to_id, kind, run_id, at FROM lineage_edges${where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY at`;
+    return this.db.prepare(sql).all(...params).map((r) => ({
+      fromId: String(r.from_id), toId: String(r.to_id), kind: String(r.kind) as LineageEdgeKind,
+      runId: String(r.run_id), at: String(r.at),
+    }));
+  }
+
+  /**
+   * One-time deterministic backfill (idempotent, count-guarded): populate
+   * lineage_edges from existing object payloads and event_tags from existing
+   * events so pre-v5 history joins the queryable spine. Runs on first open of a
+   * migrated db; later opens skip via the count checks.
+   */
+  private backfillLineage(): void {
+    const tagCount = Number(this.db.prepare('SELECT COUNT(*) AS n FROM event_tags').get()?.n ?? 0);
+    if (tagCount === 0) {
+      const eventCount = Number(this.db.prepare('SELECT COUNT(*) AS n FROM events').get()?.n ?? 0);
+      if (eventCount > 0) {
+        this.db.transaction(() => {
+          const insertTag = this.db.prepare('INSERT OR IGNORE INTO event_tags (tag, run_id, seq) VALUES (?,?,?)');
+          for (const r of this.db.prepare('SELECT seq, run_id, payload FROM events').all()) {
+            const p = JSON.parse(String(r.payload)) as { type?: string; stage?: string };
+            if (p.type === undefined) continue;
+            for (const tag of eventTagsFor({ type: p.type, stage: p.stage })) insertTag.run(tag, String(r.run_id), Number(r.seq));
+          }
+        });
+      }
+    }
+    const edgeCount = Number(this.db.prepare('SELECT COUNT(*) AS n FROM lineage_edges').get()?.n ?? 0);
+    if (edgeCount === 0) {
+      this.db.transaction(() => {
+        const edge = (fromId: string, toId: string, kind: LineageEdgeKind, runId: string, at: string): void => {
+          this.db.prepare('INSERT OR IGNORE INTO lineage_edges (from_id, to_id, kind, run_id, at) VALUES (?,?,?,?,?)').run(fromId, toId, kind, runId, at);
+        };
+        // evidence relations -> hypothesis/claim (counter vs support)
+        for (const r of this.db.prepare(`SELECT run_id, json FROM objects WHERE kind='evidence_relation'`).all()) {
+          const rel = JSON.parse(String(r.json)) as { id?: string; relation?: string; targetHypothesisId?: string; targetClaimId?: string; createdAt?: string };
+          const target = rel.targetHypothesisId ?? rel.targetClaimId;
+          if (rel.id === undefined || target === undefined || rel.relation === undefined) continue;
+          edge(rel.id, target, LINEAGE_COUNTER_RELATIONS.has(rel.relation) ? 'counter_evidence' : 'support_evidence', String(r.run_id), rel.createdAt ?? new Date().toISOString());
+        }
+        // revisions -> feedback + touched objects
+        for (const r of this.db.prepare(`SELECT run_id, json FROM objects WHERE kind='revision'`).all()) {
+          const rev = JSON.parse(String(r.json)) as { id?: string; triggerFeedbackId?: string; createdAt?: string; operations?: Array<{ objectId?: string }> };
+          if (rev.id === undefined) continue;
+          const at = rev.createdAt ?? new Date().toISOString();
+          if (rev.triggerFeedbackId !== undefined) edge(rev.triggerFeedbackId, rev.id, 'caused_revision', String(r.run_id), at);
+          for (const op of rev.operations ?? []) {
+            if (op.objectId !== undefined) edge(rev.id, op.objectId, 'revises', String(r.run_id), at);
+          }
+        }
+        // run revision chains (parentRunId in run docs; none written today, but
+        // backfill honestly covers any that exist). Unparseable/corrupted docs are
+        // SKIPPED here — derived-data reconstruction must not crash every open;
+        // the authoritative read path (getRun) still fails closed on them.
+        for (const r of this.db.prepare('SELECT id, doc FROM runs').all()) {
+          let run: { parentRunId?: string; createdAt?: string };
+          try {
+            run = JSON.parse(String(r.doc)) as { parentRunId?: string; createdAt?: string };
+          } catch {
+            continue;
+          }
+          if (run.parentRunId !== undefined) edge(run.parentRunId, String(r.id), 'revised_into', String(r.id), run.createdAt ?? new Date().toISOString());
+        }
+      });
+    }
   }
 }
 

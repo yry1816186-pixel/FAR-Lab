@@ -741,6 +741,17 @@ describe('GET /api/v1/runs/:id/events', () => {
     const ghost = await getJson(`${base}/api/v1/runs/run_${'0'.repeat(26)}/events`);
     expect(ghost.status).toBe(404);
   });
+
+  it('routes ?tag= through the event_tags query plane (RU-2 G6)', async () => {
+    const tagged = await getJson(`${base}/api/v1/runs/${run1}/events?tag=kind:run_created`);
+    expect(tagged.status).toBe(200);
+    expect(tagged.body.query).toEqual({ tags: ['kind:run_created'], runId: run1, afterSeq: 0 });
+    expect(tagged.body.events).toHaveLength(1);
+    expect(tagged.body.events[0].type).toBe('run_created');
+    const malformed = await getJson(`${base}/api/v1/runs/${run1}/events?tag=nonsense`);
+    expect(malformed.status).toBe(400);
+    expect(malformed.body.error.code).toBe('validation');
+  });
 });
 
 // ---- resource endpoints -----------------------------------------------------
