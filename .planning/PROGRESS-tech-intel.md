@@ -1,48 +1,44 @@
 # PROGRESS — Technology Intelligence & Source Fusion Expedition (/goal)
 
 ## 当前状态
-[STATE: FUSION-WAVE-1-COMPLETE] P0 三 RU 全部 INTEGRATED 进 production path;
-P1/P2 队列(RU-4..15)与 RU-3 剩余梯队(T3/T4/T6/T7/T8)记录在 registry。
-Suite 1305 pass / 3 skip @ c065838。
+[STATE: FUSION-WAVE-2-COMPLETE] wave1(P0 三 RU)+ wave2(T4/T6/branch writer/
+PROV-O/RU-6 三 GO)全部落地。Suite 1332 pass / 3 skip @ 715d32c。
+RU-3 防御体系七层中六层 INTEGRATED(T7 诚实 DEFER);RU-2 双导出+分支写入齐;
+RU-6 SCISOFT 3/4 GO 落地(GO3 排 EEL 协调)。
 
-## 本波落地(2026-08-24,全部命令级验证)
-1. **T0 修正**:F-1 loopback guard 原已存在(api.ts:1949)——补 6 用例回归锁
-2. **T1 认知层防御**(6264148/e54f0d3):evidence 通道分离(untrustedSourceContent)
-   + AgentTool.trust 标记 + MCP 桥接 external + transcript untrusted:true +
-   invokeStructured 统一咽喉附加 UNTRUSTED_DATA_RULE(单一 owner
-   src/shared/untrusted.ts)+ 确定性注入语料门(5 形状种子,live 门 BLOCKED-live)
-3. **RU-2 lineage 存储**(bf5b9fa):migration v5(lineage_edges+event_tags)+
-   queryEvents(ANY-of/keyset/limit)+ ?tag= API + 确定性回填 + SAVEPOINT
-   嵌套事务根治(db.ts 潜伏缺陷);domain/lineage.ts = 词汇单一 owner
-4. **RU-1 memory 衬底**(91016d3):migration v6(memory_items/edges/fts;
-   zod lifecycle + SQL CHECK 双层治理,SQLite CHECK-NULL 陷阱被测试抓出)+
-   投毒门(own_verified 溯源可解析才过,否则诚实降级)+ ACT-R 确定性排序 +
-   append-only supersession + consolidateRun(零 LLM、幂等)+
-   orchestrator 终态钩子 + GET /api/v1/memory
-5. **T2 taint 统一**(91016d3 内):ContentTaint 单一 owner=domain/memory.ts;
-   claim 结构性 derived_untrusted
-6. **消费者 #1**(1bea4ee):memoryNegativeConditioning → generate_hypotheses
-   priorResearchMemory(标签随行;ids 进指纹防 stale cache);OR 检索语义
-7. **T5 审计链**(c065838):migration v7 prev_hash 链 + 引擎级 append-only
-   触发器 + 写一次回填 + verifyEventChain(定位首个破坏 seq)+ 用户删除
-   特权路径(drop/recreate 触发器 + deleted_runs tombstone,保住 run 删除功能)
-8. **LIVE 验证**(37b0ce8,env 门控):真实 far.db 迁移到 v6;7442 events →
-   14455 tags、3020 lineage 边回填;真实 vitamin D run 整合 + 检索命中
+## 本波(2)落地(2026-08-24,全部命令级验证)
+1. **T4 exfil 绊线**(011477a):exfil-guard 模块(env 秘密收集/session canary/
+   出站扫描/命名化违规/脱敏)+ 两挂点(invokeStructured 出站体扫 + kernel
+   工具实参绝对检查,先于权限)+ **自测抓出 transcript 泄漏洞**(被拒实参仍
+   入档→随下轮出站)→ denied-args 统一脱敏
+2. **branch writer**(c7cfc91):forkRun(问题按 id 引用不复制+forked_from 边+
+   step cache 种子=Execution-Lineage 依赖域 replay+审计 note)+ POST fork API
+3. **PROV-O**(c7cfc91+6734064):toProvJsonLd(同一 lineage_edges 单源双导出;
+   wasInformedBy/wasGeneratedBy/used + CiTO IRI 注入,原始 relation type 从
+   对象补全)
+4. **T6 审批反操纵**(24332c4):riskLevel(kind 映射)+argSummary(确定性渲染)
+   服务端计算不可伪造;模型 title 标注;web 卡 risk 徽章+服务端摘要优先
+5. **T7 裁决 DEFER**:令牌需外部验证方(SSH/MCP 服务端认证);无人验证的
+   令牌=安全表演——触发器:外部面采纳令牌认证
+6. **RU-6 SCISOFT**(ad574d3 SEARCH_SATURATED):GO1 撤稿信任门 8b1a85b
+   (Crossref update-to 派生+claims 显式降权注记);GO2 CiTO 映射 6734064
+   (保守:仅主源验证过的 3 个精确 IRI,其余 cito:cites+far 注记,测试锁
+   全面对性+不伪造);GO4 GRIM+E-value 715d32c(clean-room TS,发表级
+   canonical 用例 3.22/n=3 判负);GO3 PRISMA 计数排队(EEL export 面)
 
-## Lane 事件记录
-- c0beb6b 误卷入兄弟 staged 文件(exploration-runner 等)→ 当分钟 soft-reset
-  修复为 pathspec 提交 6264148,兄弟 index 原样保留(未重写历史,自己未推送提交)
-- 兄弟 lane:EEL exploration.py/exploration-runner.ts in-flight(tsc 2 错为他们的
-  半成品,最终全绿时已修);docker 测试容器名竞争为瞬态,复跑绿
-
-## 下一步(按 registry 优先级)
-1. RU-3 剩余:T3 工具边界策略检查 → T4 exfil 绊线 → T6 审批反操纵 → T7 能力令牌
-2. RU-2 剩余:branch writer(run fork)+ PROV-O 序列化器 + 兄弟投影 rebase 协调
-3. RU-1 剩余:semantic/profile 写入者;fastembed A/B(eval 门控)
-4. P1 研究波次:RU-6 SCISOFT(lead 最厚)→ RU-7 STORAGE → RU-8 CAMPAIGN → …
-5. HCI RU-11 实施前需用户批准(用户规则)
+## 剩余队列(按 registry)
+1. RU-6 GO3 PRISMA(需 EEL lane 协调:计数必须来自管线阶段状态)
+2. RU-1 residual:semantic/profile 写入者;fastembed A/B(证据门控)
+3. RU-2 residual:兄弟 lineage.ts 投影 rebase(其 lane);delegation 边接线
+4. P1 研究波:RU-5 QUANT / RU-7 STORAGE / RU-8 CAMPAIGN / RU-9 CTXENG /
+   RU-10 CORPUS / RU-12..15
+5. 终局盲点复审(goal §22 第 11 条)
+6. live workload 验证 = BLOCKED-live(用户禁测令;zai 08-29 恢复)
 
 ## 环境事实(不变)
-- 禁 live-LLM 实测(验证离线/确定性;live 标 BLOCKED-live;zai 限流至 08-29)
-- 禁 DeepSeek;兄弟会话同树(只用显式文件列表 pathspec 提交)
+- 禁 live-LLM 实测;禁 DeepSeek;兄弟会话同树(pathspec 提交+提交前查暂存面)
 
+## 历史波次(详见 registry log 与 git log)
+- wave 1(本日早):T0 修正/T1 定界/RU-2 存储 v5/RU-1 记忆 v6+消费者/T2 taint
+  统一/T5 审计链 v7/T3 工具边界;真实 far.db live 验证(14455 tags/3020 边)。
+  Lane 事故 1 起(c0beb6b 误卷兄弟暂存,当分钟修复)。
