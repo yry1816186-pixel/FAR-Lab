@@ -40,6 +40,13 @@
 - P2 inputHash 双哈希修正: receipt 恢复第三方可验证性
 - 全量复测: 1352 passed / 3 skipped / 128 files
 
+
+## P0 逃逸修复 (0bc30c3/1439cf5, 2026-08-24 05:3x)
+- **live 实证逃逸**: np.f2py.os.system() 真实执行了命令 — numpy 自动 import 的子模块重导出 os/sys, 无需 import 语句无需 dunder
+- 双层修复: TS 门 (深链 depth>=3 从绑定根 + loader/import-system 属性 -> E-ESCAPE) + Python AST 门镜像同一策略
+- 回归测试 codeact-escape-regression.test.ts 钉死两层; 正常分析代码 (np.array/statistics.mean) 不受影响
+- 教训: dunder 封禁只挡住了经典链; 真正的边界是"从绑定根出发的属性图可达性", 静态近似 = 深度限制
+
 ## 关键不变量 (实现中已验证)
 - supervisor/lineage 均为只读视图, 不产生第二权威
 - supervisor_observation note 每边界恰好一条 (幂等可审计)
