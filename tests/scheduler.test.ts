@@ -7,6 +7,7 @@ import { Store } from '../src/persistence/store.js';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
 import { openScheduler, enqueueExperiment, runSchedulerWorker } from '../src/experiment/scheduler.js';
 import { ResearchQuestion, HypothesisCandidate, newId, type ExperimentSpec } from '../src/domain/index.js';
+import { uvAvailable } from './helpers/uv-gate.js';
 
 const makeWorld = (): { store: Store; scheduler: ReturnType<typeof openScheduler>; dir: string; cleanup: () => void } => {
   const dir = mkdtempSync(join(tmpdir(), 'farlab-sched-'));
@@ -144,7 +145,7 @@ describe('P3 scheduler: durable queue semantics', () => {
 });
 
 describe('P3 scheduler: end-to-end worker + throughput (real sidecar, real far.db)', { timeout: 300_000 }, () => {
-  it('enqueueExperiment -> worker executes -> terminal projection in BOTH stores with same run id', async () => {
+  it.runIf(uvAvailable())('enqueueExperiment -> worker executes -> terminal projection in BOTH stores with same run id', async () => {
     const w = makeWorld();
     try {
       const artifacts = openArtifactStore(join(w.dir, 'artifacts'));
@@ -178,7 +179,7 @@ describe('P3 scheduler: end-to-end worker + throughput (real sidecar, real far.d
     }
   });
 
-  it('throughput + mutual exclusion: 2 concurrent workers drain 4 jobs, each executed exactly once', async () => {
+  it.runIf(uvAvailable())('throughput + mutual exclusion: 2 concurrent workers drain 4 jobs, each executed exactly once', async () => {
     const w = makeWorld();
     try {
       const artifacts = openArtifactStore(join(w.dir, 'artifacts'));
@@ -219,7 +220,7 @@ describe('P3 scheduler: end-to-end worker + throughput (real sidecar, real far.d
     }
   });
 
-  it('crash-window idempotence: worker dies post-far.db, reclaim re-executes WITHOUT recomputing (fingerprint cache)', async () => {
+  it.runIf(uvAvailable())('crash-window idempotence: worker dies post-far.db, reclaim re-executes WITHOUT recomputing (fingerprint cache)', async () => {
     const w = makeWorld();
     try {
       const artifacts = openArtifactStore(join(w.dir, 'artifacts'));
