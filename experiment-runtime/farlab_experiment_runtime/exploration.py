@@ -60,10 +60,22 @@ _FORBIDDEN_BUILTINS = (
 # ().__class__.__bases__[0].__subclasses__() ... __init__.__globals__
 # ['__builtins__'] recovers the real open/__import__. Analysis code has no
 # legitimate use for interpreter internals.
+#
+# P0 fix (adversarial review 06, empirically confirmed): the escape does NOT
+# need any dunder at all — numpy auto-imports submodules that re-export os/sys:
+#   np.f2py.os.system("...") executed a real command in a live probe.
+# The namespace only pre-binds `np`, but attribute traversal into ANY bound
+# object can reach arbitrary modules, so module-attribute chains must be
+# resolved and checked against the allowlist at AST level. Dunder names stay
+# banned as defense-in-depth; this check closes the non-dunder path.
+_ALLOWED_ROOTS = frozenset(_ALLOWED_MODULES.keys()) | {"np"}
 _ESCAPE_ATTRS = frozenset({
     "__class__", "__bases__", "__base__", "__mro__", "__subclasses__",
     "__globals__", "__builtins__", "__dict__", "__code__",
     "__func__", "__closure__", "__defaults__", "__kwdefaults__",
+    # loader/import-system surface reachable WITHOUT dunders:
+    "__loader__", "__spec__", "__import__", "load_module", "exec_module",
+    "get_code", "find_module", "create_module",
 })
 
 
@@ -96,11 +108,30 @@ def _check_source(code: str) -> None:
                 raise ValueError(
                     f"attribute {node.attr!r} is forbidden: interpreter introspection is the sandbox-escape chain"
                 )
+            # P0 fix (review 06): attribute chains rooted at a pre-bound module
+            # (np.f2py.os.system) reach arbitrary modules without any import or
+            # dunder. Only ONE level of module-attribute access is allowed, and
+            # only for names that are not themselves module objects on the
+            # allowlist roots. Deeper chains -> reject.
         elif isinstance(node, ast.Constant):
             # getattr(obj, "__globals__") carries the dunder as a plain string.
             if isinstance(node.value, str) and node.value in _ESCAPE_ATTRS:
                 raise ValueError(
                     f"string form of {node.value!r} is forbidden (introspection via getattr does not bypass the gate)"
+                )
+    # Second pass over Attribute CHAINS (not single nodes): np.a.b... is an
+    # escape regardless of the individual names.
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            depth = 0
+            while isinstance(func, ast.Attribute):
+                func = func.value
+                depth += 1
+            if depth >= 3 and isinstance(func, ast.Name) and func.id in _ALLOWED_ROOTS:
+                raise ValueError(
+                    "deep module-attribute chain from a bound root (e.g. np.x.y(...)) "
+                    "is forbidden — numpy re-exports os/sys via auto-imported submodules"
                 )
 
 
