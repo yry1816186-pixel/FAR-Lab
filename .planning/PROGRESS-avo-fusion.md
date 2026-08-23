@@ -47,6 +47,13 @@
 - 回归测试 codeact-escape-regression.test.ts 钉死两层; 正常分析代码 (np.array/statistics.mean) 不受影响
 - 教训: dunder 封禁只挡住了经典链; 真正的边界是"从绑定根出发的属性图可达性", 静态近似 = 深度限制
 
+
+## Disconnected-PoC 审计关闭 (e0639ae)
+- grep 证明 runExploration/queryRunEvents/previewFor 无生产 caller -> research-tools capability 建立
+- wireResearchTools: G4/G5/G6 变成标准 AgentTool (zod schema + execute + riskClass + summarize)
+- refine 会话注册三工具 + permission allow 规则; gate 拒绝向模型回传违规码
+- 全量: 1389 passed / 3 skipped / 134 files; tsc/lint/build GREEN
+
 ## 关键不变量 (实现中已验证)
 - supervisor/lineage 均为只读视图, 不产生第二权威
 - supervisor_observation note 每边界恰好一条 (幂等可审计)
