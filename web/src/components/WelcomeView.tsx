@@ -1,4 +1,4 @@
-import { BookOpenCheck, Scale, SearchCheck } from 'lucide-react';
+import { ArrowRight, BookOpenCheck, Scale, SearchCheck } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import { ResearchComposer } from './ResearchComposer';
 import { healthProjection, useHealth } from '../hooks/useHealth';
@@ -10,9 +10,10 @@ import { runLabel } from './RunsSidebar';
 import type { RunSummary } from '../api/types';
 
 /**
- * Workbench home (P-IA): what this is, how to work here, and the central way
- * to start — one question in, a research run out. The status strip and recent
- * tasks are real system state (health API + runs list), never decoration.
+ * Home (HX v2) — a conversation-first landing in the ChatGPT/LibreChat form
+ * (Scout A): one centered greeting + composer card, example chips as the
+ * empty-state teacher, recent studies as quiet cards below. The old form-page
+ * layout (field label + form + side value-list) is gone.
  */
 export function WelcomeView({
   onCreated,
@@ -29,70 +30,75 @@ export function WelcomeView({
   const recent = [...runs]
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, 3);
-  const steps = [
+  const hows = [
     { key: 'welcome.step1', icon: SearchCheck, tone: 'verified' },
     { key: 'welcome.step2', icon: Scale, tone: 'unknown' },
     { key: 'welcome.step3', icon: BookOpenCheck, tone: 'caution' },
   ] as const;
 
   return (
-    <div className="welcome arrive">
-      <div className="welcome-hero">
-        <h1 className="welcome-title">{t('app.title')}</h1>
-        <p className="welcome-subtitle muted">{t('welcome.subtitle')}</p>
-        <div className={`health-strip health-strip--${hp.tone}`} role="status">
+    <div className="home arrive">
+      <div className="home-hero">
+        <h1 className="home-greeting">{t('home.greeting')}</h1>
+        <p className="home-sub muted">{t('home.greetingSub')}</p>
+        <p className={`home-health health-strip--${hp.tone}`} role="status">
           <span className="health-dot" aria-hidden="true" />
-          {hp.tone === 'err' ? (
-            t('health.unknown')
-          ) : (
-            t('health.readyPlain', { ready: hp.liveReady, total: hp.liveTotal })
-          )}
-        </div>
-      </div>
+          {hp.tone === 'err' ? t('health.unknown') : t('health.readyPlain', { ready: hp.liveReady, total: hp.liveTotal })}
+        </p>
 
-      <div className="welcome-main">
-        <div className="welcome-card">
+        <div className="home-composer">
           <ResearchComposer onCreated={onCreated} />
         </div>
 
-        {recent.length > 0 && (
-          <div className="welcome-recent">
-            <h2 className="welcome-recent-title">{t('welcome.recentTitle')}</h2>
-            <ul className="recent-cards">
-              {recent.map((run) => (
-                <li key={run.id}>
-                  <button type="button" className="recent-card" onClick={() => onSelectRun(run.id)}>
-                    <span className="recent-card-top">
-                      <span className="recent-card-question" title={runLabel(run)}>{runLabel(run)}</span>
-                      <span className={`badge badge--${runStatusTone(run.status)}`}>{t(runStatusKey(run.status))}</span>
-                    </span>
-                    <span className="recent-card-mid muted">{t(stageKey(run.currentStage))}</span>
-                    <span className="recent-card-bottom muted small">
-                      <TimeAgo iso={run.createdAt} />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+        <div className="example-questions">
+          <span className="muted small">{t('form.tryExamples')}</span>
+          <div className="example-chips">
+            {(['example.q1', 'example.q2', 'example.q3'] as const).map((k) => (
+              <button key={k} type="button" className="example-chip" onClick={() => {
+                const el = document.getElementById('composer-question') as HTMLTextAreaElement | null;
+                if (el !== null) { el.value = t(k); el.dispatchEvent(new Event('input', { bubbles: true })); el.focus(); }
+              }}>
+                {t(k).length > 64 ? `${t(k).slice(0, 64)}…` : t(k)}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
-        <ol className="welcome-steps">
-          {steps.map((s) => {
-            const Icon = s.icon;
+        <ul className="home-hows" aria-label={t('welcome.howsLabel')}>
+          {hows.map((h) => {
+            const Icon = h.icon;
             return (
-              <li key={s.key} className={`welcome-step welcome-step--${s.tone}`}>
-                <span className={`ev-glyph ev-glyph--${s.tone}`} aria-hidden="true">
-                  <Icon size={14} />
-                </span>
-                <span>{t(s.key)}</span>
+              <li key={h.key} className={`home-how home-how--${h.tone}`}>
+                <span className={`ev-glyph ev-glyph--${h.tone}`} aria-hidden="true"><Icon size={13} /></span>
+                <span>{t(h.key)}</span>
               </li>
             );
           })}
-        </ol>
-
-        <p className="welcome-foot muted">{t('welcome.foot')}</p>
+        </ul>
       </div>
+
+      {recent.length > 0 && (
+        <section className="home-recent" aria-label={t('welcome.recentTitle')}>
+          <h2 className="home-recent-title">{t('welcome.recentTitle')}</h2>
+          <ul className="recent-cards">
+            {recent.map((run) => (
+              <li key={run.id}>
+                <button type="button" className="recent-card" onClick={() => onSelectRun(run.id)}>
+                  <span className="recent-card-top">
+                    <span className="recent-card-question" title={runLabel(run)}>{runLabel(run)}</span>
+                    <span className={`badge badge--${runStatusTone(run.status)}`}>{t(runStatusKey(run.status))}</span>
+                  </span>
+                  <span className="recent-card-mid muted">{t(stageKey(run.currentStage))}</span>
+                  <span className="recent-card-bottom muted small">
+                    <TimeAgo iso={run.createdAt} />
+                    <ArrowRight size={12} aria-hidden="true" className="recent-card-go" />
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

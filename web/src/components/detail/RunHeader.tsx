@@ -1,4 +1,4 @@
-import { Badge, TimeText } from '../common';
+import { Badge, TimeAgo } from '../common';
 import { runProgress } from '../../api/types';
 import type { ResearchRun } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
@@ -25,8 +25,7 @@ export function RunHeader({ run }: { run: ResearchRun }): JSX.Element {
         {run.domain !== undefined && run.domain.length > 0 && (
           <span className="run-header-domain" title={t('runs.domain')}>{run.domain}</span>
         )}
-        <TimeText iso={run.createdAt} />
-        <span className="run-header-id mono" title={run.id}>{run.id}</span>
+        <TimeAgo iso={run.createdAt} />
       </div>
       {question !== undefined && question.length > 0 ? (
         <h1 className="run-header-question">{question}</h1>

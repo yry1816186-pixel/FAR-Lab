@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ArrowUp, BookMarked, FileText, Link2, Loader2, Paperclip, RotateCcw, X,
+  ArrowUp, BookMarked, FileText, Link2, Loader2, Paperclip, RotateCcw, SlidersHorizontal, X,
 } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
@@ -39,11 +39,11 @@ export function formatBytes(n: number): string {
 }
 
 /**
- * Research Composer (HX2) — the single creation surface: question in natural
- * language + a real attachment tray (PDF/BibTeX/RIS/TXT/MD, DOI/arXiv/URL,
- * Zotero). Every card reflects a real parse state; nothing is decorative.
- * Interaction patterns adapted from LibreChat ChatForm (MIT: IME triple guard,
- * paste-as-attachment) and Dify chat-input (input affordances), per Scout A.
+ * Research Composer (HX2 v2) — single card in the ChatGPT/LibreChat composer
+ * form (Scout A): borderless auto-grow input inside one surface, attachment
+ * row above it, tool rail at the bottom (add files / link / Zotero / model /
+ * round send). Every attachment state is a real parse state; nothing is
+ * decorative. Enter submits with the IME triple guard; Shift+Enter newlines.
  */
 export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => void }): JSX.Element {
   const { t } = useI18n();
@@ -73,6 +73,14 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
     listModelConfigs(controller.signal).then(setModelConfigs).catch(() => { /* stays on default */ });
     return () => controller.abort();
   }, []);
+  const selectedModel = providerConfigId !== ''
+    ? modelConfigs?.configs.find((c) => c.id === providerConfigId)
+    : undefined;
+  const modelChip = selectedModel !== undefined
+    ? `${selectedModel.label}`
+    : modelConfigs?.envDefault != null
+      ? `${modelConfigs.envDefault.name} · ${modelConfigs.envDefault.modelId}`
+      : t('composer.modelDefault');
 
   // ---- auto-grow question textarea ----
   const questionRef = useRef<HTMLTextAreaElement | null>(null);
@@ -83,8 +91,12 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
     el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
   };
 
-  // ---- drop-zone visual state (whole composer is the target) ----
+  // ---- drop-zone visual state (whole card is the target) ----
   const [dragActive, setDragActive] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const advancedRef = useRef<HTMLDetailsElement | null>(null);
 
   const capReached = attachments.length >= MAX_SEEDS;
 
@@ -182,14 +194,17 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
     setZotero(items === null ? { open: true, status: 'unavailable', items: [] } : { open: true, status: 'ready', items });
   };
 
-  // ---- URL / DOI quick-add row ----
-  const [linkInput, setLinkInput] = useState('');
-
   const canSubmit = !submitting && text.trim().length > 0;
+
+  const openAdvanced = (): void => {
+    if (advancedRef.current === null) return;
+    advancedRef.current.open = true;
+    advancedRef.current.scrollIntoView({ block: 'nearest' });
+  };
 
   return (
     <form
-      className={`composer${dragActive ? ' composer--drag' : ''}`}
+      className={`composer2${dragActive ? ' composer2--drag' : ''}`}
       onSubmit={(e) => void submit(e)}
       onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragActive(false); }}
@@ -200,90 +215,128 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
       }}
       noValidate
     >
-      <label className="field-label" htmlFor="composer-question">
-        {t('form.question')} <span aria-hidden="true" className="req">*</span>
-      </label>
-      <textarea
-        id="composer-question"
-        ref={questionRef}
-        className="composer-input"
-        value={text}
-        rows={3}
-        placeholder={t('form.questionPlaceholder')}
-        aria-required="true"
-        aria-invalid={showValidationError}
-        disabled={submitting}
-        autoFocus
-        onChange={(e) => { setText(e.target.value); autosize(); }}
-        onPaste={(e) => void onPaste(e)}
-        onKeyDown={(e) => {
-          // IME triple guard (LibreChat useTextarea): Enter submits, Shift+Enter
-          // newlines — but never while a CJK IME composition is open.
-          if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return;
-          e.preventDefault();
-          if (canSubmit) e.currentTarget.form?.requestSubmit();
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".pdf,.bib,.ris,.txt,.md"
+        className="sr-only"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={(e) => {
+          void Promise.all(Array.from(e.target.files ?? []).map((f) => ingestFile(f)));
+          e.target.value = '';
         }}
       />
 
-      {text.trim().length === 0 && attachments.length === 0 && (
-        <div className="example-questions">
-          <span className="muted small">{t('form.tryExamples')}</span>
-          <div className="example-chips">
-            {(['example.q1', 'example.q2', 'example.q3'] as const).map((k) => (
-              <button key={k} type="button" className="example-chip" onClick={() => { setText(t(k)); requestAnimationFrame(autosize); }}>
-                {t(k).length > 64 ? `${t(k).slice(0, 64)}…` : t(k)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {dragActive && <p className="composer-drag-note" role="status">{t('composer.dropActive')}</p>}
 
-      {attachments.length > 0 && (
-        <ul className="attach-tray" role="list" aria-label={t('composer.attachLabel')}>
-          {attachments.map((a) => (
-            <li key={a.id} className={`attach-card attach-card--${a.status}`}>
-              <span className="attach-icon" aria-hidden="true">
-                {a.kind === 'PDF' || a.kind === 'TXT' ? <FileText size={14} /> : a.kind === 'REF' ? <BookMarked size={14} /> : <Link2 size={14} />}
-              </span>
-              <span className="attach-body">
-                <span className="attach-title" title={a.seed.title ?? ''}>
-                  {(a.seed.title ?? '').slice(0, 64) || t('ingest.untitled')}
+      <div className="composer2-card">
+        {attachments.length > 0 && (
+          <ul className="attach-tray" role="list" aria-label={t('composer.attachLabel')}>
+            {attachments.map((a) => (
+              <li key={a.id} className={`attach-card attach-card--${a.status}`}>
+                <span className="attach-icon" aria-hidden="true">
+                  {a.kind === 'PDF' || a.kind === 'TXT' ? <FileText size={14} /> : a.kind === 'REF' ? <BookMarked size={14} /> : <Link2 size={14} />}
                 </span>
-                <span className="attach-meta muted small">
-                  {a.kind}
-                  {a.sizeBytes !== undefined ? ` · ${formatBytes(a.sizeBytes)}` : ''}
-                  {a.status === 'parsing' && ` · ${t('composer.parsing')}`}
-                  {a.status === 'failed' && ` · ${t(a.errorKey ?? 'ingest.pdfFailed')}`}
+                <span className="attach-body">
+                  <span className="attach-title" title={a.seed.title ?? ''}>
+                    {(a.seed.title ?? '').slice(0, 64) || t('ingest.untitled')}
+                  </span>
+                  <span className="attach-meta muted small">
+                    {a.kind}
+                    {a.sizeBytes !== undefined ? ` · ${formatBytes(a.sizeBytes)}` : ''}
+                    {a.status === 'parsing' && ` · ${t('composer.parsing')}`}
+                    {a.status === 'failed' && ` · ${t(a.errorKey ?? 'ingest.pdfFailed')}`}
+                  </span>
                 </span>
-              </span>
-              {a.status === 'parsing' && <Loader2 size={14} className="attach-spinner" aria-hidden="true" />}
-              {a.status === 'failed' && a.retry !== undefined && (
-                <button type="button" className="attach-action" aria-label={t('composer.retry')} onClick={() => void a.retry?.()}>
-                  <RotateCcw size={13} aria-hidden="true" />
+                {a.status === 'parsing' && <Loader2 size={14} className="attach-spinner" aria-hidden="true" />}
+                {a.status === 'failed' && a.retry !== undefined && (
+                  <button type="button" className="attach-action" aria-label={t('composer.retry')} onClick={() => void a.retry?.()}>
+                    <RotateCcw size={13} aria-hidden="true" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="attach-action"
+                  aria-label={t('composer.remove')}
+                  onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
+                >
+                  <X size={13} aria-hidden="true" />
                 </button>
-              )}
-              <button
-                type="button"
-                className="attach-action"
-                aria-label={t('composer.remove')}
-                onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
-              >
-                <X size={13} aria-hidden="true" />
-              </button>
-            </li>
-          ))}
-          <li className="attach-cap muted small">{t('composer.capCount', { n: attachments.length, max: MAX_SEEDS })}</li>
-        </ul>
-      )}
+              </li>
+            ))}
+            <li className="attach-cap muted small">{t('composer.capCount', { n: attachments.length, max: MAX_SEEDS })}</li>
+          </ul>
+        )}
 
-      <div className="composer-tools">
-        <label className="link-add">
+        <textarea
+          id="composer-question"
+          ref={questionRef}
+          className="composer2-input"
+          value={text}
+          rows={2}
+          placeholder={t('form.questionPlaceholder')}
+          aria-label={t('form.question')}
+          aria-required="true"
+          aria-invalid={showValidationError}
+          disabled={submitting}
+          autoFocus
+          onChange={(e) => { setText(e.target.value); autosize(); }}
+          onPaste={(e) => void onPaste(e)}
+          onKeyDown={(e) => {
+            // IME triple guard (LibreChat useTextarea): Enter submits, Shift+Enter
+            // newlines — but never while a CJK IME composition is open.
+            if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return;
+            e.preventDefault();
+            if (canSubmit) e.currentTarget.form?.requestSubmit();
+          }}
+        />
+
+        <div className="composer2-tools">
+          <button type="button" className="composer2-tool" onClick={() => fileInputRef.current?.click()} disabled={capReached} title={t('ingest.dropHint')}>
+            <Paperclip size={15} aria-hidden="true" />
+            <span>{t('composer.addFiles')}</span>
+          </button>
+          <button
+            type="button"
+            className={`composer2-tool${linkOpen ? ' composer2-tool--active' : ''}`}
+            aria-expanded={linkOpen}
+            onClick={() => setLinkOpen((v) => !v)}
+          >
+            <Link2 size={15} aria-hidden="true" />
+            <span>{t('composer.addLink')}</span>
+          </button>
+          <button type="button" className="composer2-tool" onClick={() => void openZotero()}>
+            <BookMarked size={15} aria-hidden="true" />
+            <span>Zotero</span>
+          </button>
+          <span className="composer2-spacer" />
+          <button type="button" className="composer2-tool composer2-tool--model" onClick={openAdvanced} title={t('composer.modelLabel')}>
+            <SlidersHorizontal size={14} aria-hidden="true" />
+            <span className="mono">{modelChip}</span>
+          </button>
+          <button
+            type="submit"
+            className="composer2-send"
+            disabled={!canSubmit}
+            aria-label={t('composer.startResearch')}
+            title={t('composer.enterHint')}
+          >
+            {submitting ? <Loader2 size={16} className="attach-spinner" aria-hidden="true" /> : <ArrowUp size={16} aria-hidden="true" />}
+          </button>
+        </div>
+      </div>
+
+      {linkOpen && (
+        <div className="link-add" role="group" aria-label={t('composer.addLink')}>
           <span className="link-add-icon" aria-hidden="true"><Link2 size={13} /></span>
           <input
             type="text"
             value={linkInput}
             placeholder={t('composer.addLinkPlaceholder')}
             aria-label={t('composer.addLink')}
+            autoFocus
             onChange={(e) => setLinkInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
@@ -299,15 +352,8 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
           >
             {t('composer.add')}
           </button>
-        </label>
-        <button type="button" className="btn btn--sm" onClick={() => void openZotero()}>
-          <BookMarked size={12} aria-hidden="true" /> {t('ingest.zotero')}
-        </button>
-        <span className="muted small composer-drop-hint">
-          <Paperclip size={12} aria-hidden="true" /> {t('ingest.dropHint')}
-        </span>
-      </div>
-      {dragActive && <p className="composer-drag-note" role="status">{t('composer.dropActive')}</p>}
+        </div>
+      )}
 
       {zotero.open && (
         <div className="zotero-picker" role="dialog" aria-label={t('ingest.zotero')}>
@@ -356,9 +402,16 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
       )}
 
       {showValidationError && <p className="field-error" role="alert">{t('form.questionRequired')}</p>}
+      {error !== null && (
+        <p className="field-error" role="alert">
+          {t('form.submitFailed')}：{errorText(error)}
+          {error.retryable ? `（${t('common.retryable')}）` : ''}
+        </p>
+      )}
+      {note !== null && <p className="muted small" role="status">{note}</p>}
 
-      <details className="hero-advanced">
-        <summary>{t('form.advanced')}</summary>
+      <details className="composer2-advanced" ref={advancedRef}>
+        <summary>{t('composer.constraints')}</summary>
         <div className="hero-advanced-body">
           <label className="field-label" htmlFor="composer-domain">{t('form.domain')}</label>
           <input id="composer-domain" type="text" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder={t('form.domainPlaceholder')} disabled={submitting} />
@@ -377,24 +430,7 @@ export function ResearchComposer({ onCreated }: { onCreated: (runId: string) => 
           </select>
         </div>
       </details>
-
-      {error !== null && (
-        <p className="field-error" role="alert">
-          {t('form.submitFailed')}：{errorText(error)}
-          {error.retryable ? `（${t('common.retryable')}）` : ''}
-        </p>
-      )}
-      {note !== null && <p className="muted small" role="status">{note}</p>}
-
-      <div className="composer-actions">
-        <button type="submit" className="btn btn--primary composer-submit" disabled={!canSubmit}>
-          {submitting ? t('form.submitting') : t('composer.startResearch')}
-          {!submitting && <ArrowUp size={14} aria-hidden="true" />}
-        </button>
-        <span className="hero-hint muted small">{t('composer.enterHint')}</span>
-      </div>
       <p aria-live="polite" className="sr-only">{submitting ? t('form.submitting') : ''}</p>
     </form>
   );
 }
-
