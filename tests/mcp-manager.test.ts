@@ -87,6 +87,8 @@ describe('McpManager (real child processes)', () => {
     expect(skipped).toEqual([]);
     // risk class stamped from the integration's conservative default
     expect(registry.get('mcp_live_echo')?.riskClass).toBe('execute');
+    // RU-3 T1: MCP output is third-party content — bridged tools carry trust 'external'
+    expect(registry.get('mcp_live_echo')?.trust).toBe('external');
     const out = await registry.get('mcp_live_echo')!.execute({}, { signal: { aborted: false }, emit: () => {}, recordReceipt: { record: () => {} }, depth: 0 });
     expect(out.ok).toBe(true);
   });

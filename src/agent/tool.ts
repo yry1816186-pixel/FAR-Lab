@@ -41,6 +41,13 @@ export interface AgentTool {
    * explore mode treats undeclared tools as non-read and denies them).
    */
   readonly riskClass?: 'read' | 'edit' | 'execute' | 'destructive';
+  /**
+   * Content trust (RU-3 COGSEC T1). 'external' marks tools whose outputs are
+   * untrusted external content (MCP-bridged servers, document parsing, web).
+   * The loop marks their tool_result entries `untrusted: true` and instructs
+   * the model to treat them strictly as data. Absent = 'own' (our code).
+   */
+  readonly trust?: 'own' | 'external';
   execute(args: unknown, ctx: ToolContext): Promise<ToolResult>;
 }
 
