@@ -9,6 +9,7 @@ import type { SourceFamily } from '../domain/source.js';
 import { RunBudgetExhaustedError, makeRunBudget, type RunBudgetView } from './run-budget.js';
 import { evaluateQualityGate, MAX_QUALITY_ROUNDS } from './quality-gate.js';
 import { evaluateIteration, iterationRoundKey, iterationFingerprintKey } from './iteration.js';
+import { analyzeTrajectory } from './supervisor.js';
 import { receiptEventDetail } from '../pipeline/llm.js';
 
 /** Meta key for the persisted quality-gate round counter (round 1 = initial generation). */
@@ -435,6 +436,19 @@ export class Orchestrator {
     const passUnfinished = run.stages.filter((s) => s.state === 'pending' || s.state === 'running');
     const passFailed = run.stages.some((s) => s.state === 'failed');
     if (passUnfinished.length === 0 && !passFailed) {
+      // ---- supervisor observation (AVO fusion G2): read-only trajectory analysis at
+      // every pass boundary. Signals are PERSISTED for audit + UX; acting on them stays
+      // with the orchestrator/iteration controller and the human. One note per boundary.
+      const supervision = analyzeTrajectory({ store: this.deps.store, runId });
+      this.deps.store.appendEvent(runId, {
+        type: 'note',
+        detail: {
+          reason: 'supervisor_observation',
+          signals: supervision.signals.map((s) => ({
+            kind: s.kind, severity: s.severity, evidence: s.evidence, action: s.recommendation.action,
+          })),
+        },
+      });
       const round = Number(this.deps.store.getMeta(iterationRoundKey(runId)) ?? '1') || 1;
       const it = evaluateIteration({ store: this.deps.store, runId, round, budget });
       const lastIt = this.deps.store.listObjects('iteration', runId).at(-1);
