@@ -18,6 +18,7 @@ import {
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
 import { LineageEdgeRecordSchema, LINEAGE_COUNTER_RELATIONS, eventTagsFor, type LineageEdgeKind, type LineageEdgeRecord } from '../domain/lineage.js';
+import { MemoryItemSchema, MEMORY_LIFECYCLE, memoryActivation, type MemoryItem, type MemoryKind, type MemoryStatus, type MemoryTrustClass } from '../domain/memory.js';
 
 export type { LineageEdgeKind, LineageEdgeRecord };
 
@@ -643,6 +644,135 @@ export class Store {
         }
       });
     }
+  }
+
+  // ---- research memory (RU-1: governed cross-run substrate in far.db) ----
+
+  /**
+   * Write gate (poisoning co-design, RU-1/RU-3): zod governance + SQL CHECKs +
+   * provenance resolvability. own_verified REQUIRES an existing run AND a
+   * receipt that actually exists in that run — unresolvable provenance fences
+   * to own_unverified (honest, never fabricated authority).
+   */
+  putMemory(item: MemoryItem): void {
+    const parsed = MemoryItemSchema.parse(item);
+    let trustClass = parsed.trustClass;
+    if (trustClass === 'own_verified') {
+      const runExists = this.getRun(parsed.provenance.runId ?? '') !== null;
+      const receiptExists =
+        parsed.provenance.runId !== undefined && parsed.provenance.receiptId !== undefined &&
+        this.listObjects('receipt', parsed.provenance.runId).some((r) => (r as { id?: string }).id === parsed.provenance.receiptId);
+      if (!runExists || !receiptExists) trustClass = 'own_unverified';
+    }
+    this.db.transaction(() => {
+      this.db.prepare(
+        `INSERT OR REPLACE INTO memory_items
+         (id, kind, entity_type, title, body, status, outcome, failure_reason, trust_class, taint,
+          run_id, receipt_id, source_ref, created_at, last_accessed_at, access_count, supersedes_id)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ).run(
+        parsed.id, parsed.kind, parsed.entityType, parsed.title, parsed.body, parsed.status,
+        parsed.outcome ?? null, parsed.failureReason ?? null, trustClass, parsed.taint,
+        parsed.provenance.runId ?? null, parsed.provenance.receiptId ?? null, parsed.provenance.sourceRef ?? null,
+        parsed.createdAt, parsed.lastAccessedAt, parsed.accessCount, parsed.supersedesId ?? null,
+      );
+      this.db.prepare('INSERT INTO memory_fts (id, body) VALUES (?,?)').run(parsed.id, `${parsed.title}\n${parsed.body}`);
+    });
+  }
+
+  getMemory(id: string): MemoryItem | null {
+    const r = this.db.prepare('SELECT * FROM memory_items WHERE id=?').get(id);
+    if (!r) return null;
+    return this.memoryFromRow(r);
+  }
+
+  listMemory(filter: { kind?: MemoryKind; status?: MemoryStatus; runId?: string; limit?: number } = {}): MemoryItem[] {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (filter.kind !== undefined) { where.push('kind=?'); params.push(filter.kind); }
+    if (filter.status !== undefined) { where.push('status=?'); params.push(filter.status); }
+    if (filter.runId !== undefined) { where.push('run_id=?'); params.push(filter.runId); }
+    const limit = Math.min(filter.limit ?? 100, 500);
+    const rows = this.db.prepare(
+      `SELECT * FROM memory_items${where.length > 0 ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC LIMIT ${limit}`,
+    ).all(...params);
+    return rows.map((r) => this.memoryFromRow(r));
+  }
+
+  /**
+   * Retrieval with deterministic ranking (ACT-R activation) + trust filtering.
+   * FTS5 phrase match with LIKE fallback (same degrade contract as searchText).
+   * Hits update last_accessed_at/access_count (activation input) best-effort.
+   */
+  searchMemory(opts: { query: string; kinds?: MemoryKind[]; trustClasses?: MemoryTrustClass[]; limit?: number }): MemoryItem[] {
+    const limit = Math.min(opts.limit ?? 20, 100);
+    const ids = new Set<string>();
+    const ftsQuery = `"${opts.query.replace(/"/g, '""')}"`;
+    try {
+      for (const r of this.db.prepare('SELECT id FROM memory_fts WHERE memory_fts MATCH ? LIMIT 200').all(ftsQuery)) {
+        ids.add(String(r.id));
+      }
+    } catch {
+      // FTS5 unavailable — LIKE fallback keeps retrieval honest
+    }
+    if (ids.size === 0) {
+      const like = `%${opts.query.replace(/[%_]/g, '')}%`;
+      for (const r of this.db.prepare('SELECT id FROM memory_items WHERE title LIKE ? OR body LIKE ? LIMIT 200').all(like, like)) {
+        ids.add(String(r.id));
+      }
+    }
+    if (ids.size === 0) return [];
+    const where: string[] = [`id IN (${[...ids].map(() => '?').join(',')})`];
+    const params: unknown[] = [...ids];
+    if (opts.kinds !== undefined && opts.kinds.length > 0) { where.push(`kind IN (${opts.kinds.map(() => '?').join(',')})`); params.push(...opts.kinds); }
+    if (opts.trustClasses !== undefined && opts.trustClasses.length > 0) { where.push(`trust_class IN (${opts.trustClasses.map(() => '?').join(',')})`); params.push(...opts.trustClasses); }
+    const rows = this.db.prepare(`SELECT * FROM memory_items WHERE ${where.join(' AND ')} AND status = 'active'`).all(...params);
+    const nowMs = Date.now();
+    const ranked = rows
+      .map((r) => this.memoryFromRow(r))
+      .sort((a, b) => memoryActivation(b, nowMs) - memoryActivation(a, nowMs))
+      .slice(0, limit);
+    // best-effort access accounting (activation input, not authority)
+    for (const m of ranked) {
+      this.db.prepare('UPDATE memory_items SET last_accessed_at=?, access_count=access_count+1 WHERE id=?')
+        .run(new Date().toISOString(), m.id);
+    }
+    return ranked;
+  }
+
+  /** Append-only supersession: new item replaces old; old is marked, never deleted. */
+  supersedeMemory(oldId: string, replacement: MemoryItem): void {
+    const old = this.getMemory(oldId);
+    if (old === null) throw new Error(`supersedeMemory: no such memory item ${oldId}`);
+    if (!MEMORY_LIFECYCLE[old.status].includes('superseded')) {
+      throw new Error(`supersedeMemory: lifecycle forbids ${old.status} -> superseded`);
+    }
+    const marked = MemoryItemSchema.parse({ ...old, status: 'superseded' });
+    const next = MemoryItemSchema.parse({ ...replacement, supersedesId: oldId });
+    this.db.transaction(() => {
+      this.putMemory(marked);
+      this.putMemory(next);
+      this.db.prepare('INSERT OR IGNORE INTO memory_edges (from_id, to_id, relation_type, at) VALUES (?,?,?,?)')
+        .run(oldId, next.id, 'supersedes', next.createdAt);
+    });
+  }
+
+  private memoryFromRow(r: Record<string, unknown>): MemoryItem {
+    return MemoryItemSchema.parse({
+      id: String(r.id), kind: String(r.kind), entityType: String(r.entity_type),
+      title: String(r.title), body: String(r.body), status: String(r.status),
+      ...(r.outcome !== null && r.outcome !== undefined ? { outcome: String(r.outcome) } : {}),
+      ...(r.failure_reason !== null && r.failure_reason !== undefined ? { failureReason: String(r.failure_reason) } : {}),
+      trustClass: String(r.trust_class), taint: String(r.taint),
+      provenance: {
+        ...(r.run_id !== null && r.run_id !== undefined ? { runId: String(r.run_id) } : {}),
+        ...(r.receipt_id !== null && r.receipt_id !== undefined ? { receiptId: String(r.receipt_id) } : {}),
+        ...(r.source_ref !== null && r.source_ref !== undefined ? { sourceRef: String(r.source_ref) } : {}),
+      },
+      createdAt: String(r.created_at), lastAccessedAt: String(r.last_accessed_at),
+      accessCount: Number(r.access_count ?? 0),
+      ...(r.supersedes_id !== null && r.supersedes_id !== undefined ? { supersedesId: String(r.supersedes_id) } : {}),
+    });
   }
 }
 

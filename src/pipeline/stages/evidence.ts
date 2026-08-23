@@ -388,6 +388,9 @@ export const buildEvidenceStage: StageHandler = {
             recentSource: doc.publicationYear != null && doc.publicationYear >= new Date().getUTCFullYear() - 15,
             contradictionSignals: 0,
           }).certainty,
+          // T2: claims are verbatim excerpts of untrusted external literature —
+          // derived_untrusted by structural position, deterministic assignment.
+          taint: 'derived_untrusted',
         };
         ctx.store.putObject('claim', claim);
         claimsTotal += 1;

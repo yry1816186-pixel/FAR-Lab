@@ -39,6 +39,14 @@ export const ScientificClaim = z.object({
    * Set at claim-admission time; NOT an LLM judgment and never a scientific truth claim.
    */
   gradeCertainty: z.enum(['high', 'moderate', 'low', 'very_low']).optional(),
+  /**
+   * T2 content taint (RU-3, single vocabulary owner: domain/memory.ts
+   * ContentTaint): claims extracted from retrieved literature are structurally
+   * derived_untrusted — set deterministically at extraction, never by an LLM.
+   * Hard invariant: derived-untrusted content never enters permission decisions,
+   * approval justifications, verdicts, or unlabelled exports.
+   */
+  taint: z.enum(['trusted', 'untrusted_literal', 'derived_untrusted']).optional(),
 });
 export type ScientificClaim = z.infer<typeof ScientificClaim>;
 
