@@ -15,6 +15,7 @@ import { toDocument } from './retrieve.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import { defaultFetchFullText } from '../../sources/fulltext.js';
 import { gradeClaimCertainty } from '../../domain/claim.js';
+import { extractMeanN, grimCheck } from '../../domain/stat-forensics.js';
 import type { CorpusSnapshot, SourceFamily } from '../../domain/source.js';
 import type { RawRetrievalResult, SourceAdapter } from '../../shared/ports.js';
 
@@ -387,6 +388,11 @@ export const buildEvidenceStage: StageHandler = {
               : doc.verification?.retractionStatus === 'expression_of_concern'
                 ? ['source under expression of concern — treat with elevated skepticism']
                 : []),
+            // RU-6 GO4: deterministic GRIM check on mean/n pairs in the verbatim
+            // quote — an inconsistent pair cannot come from the stated sample size.
+            ...extractMeanN(candidate.quote)
+              .filter((p) => !grimCheck(p.mean, p.n, p.decimals).consistent)
+              .map((p) => grimCheck(p.mean, p.n, p.decimals).detail),
           ],
           // GRADE-lite at admission (W-G/F-B): contradiction signals are unknown this
           // early (relations are judged later) — honestly 0 at this point.
