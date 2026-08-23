@@ -17,7 +17,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { Automation, BuiltinRouteSummary, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroLibItem, ZoteroLibraryResponse } from './types';
+import type { Automation, BuiltinRouteSummary, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
 
 const BASE = '/api/v1';
 
@@ -359,6 +359,41 @@ export const getUsage = async (signal?: AbortSignal): Promise<{ aggregates: Usag
   return { aggregates: (data as { aggregates: UsageAggregate[] }).aggregates };
 };
 
+/** Gap R5: workspace USD spend ceiling (null = unlimited). SpentUsd counts only
+ *  routes with declared pricing; unpriced calls are reported, never guessed. */
+export interface SpendLimitStatus {
+  limitUsd: number | null;
+  spentUsd: number;
+  unpricedCalls: number;
+}
+
+export const getSpendLimit = async (signal?: AbortSignal): Promise<SpendLimitStatus> => {
+  const data: unknown = await api.getJson(`${BASE}/model-configs/spend-limit`, signal);
+  if (typeof data === 'object' && data !== null && typeof (data as { spentUsd?: unknown }).spentUsd === 'number'
+    && typeof (data as { unpricedCalls?: unknown }).unpricedCalls === 'number') {
+    const limit = (data as { limitUsd?: unknown }).limitUsd;
+    return {
+      limitUsd: typeof limit === 'number' ? limit : null,
+      spentUsd: (data as { spentUsd: number }).spentUsd,
+      unpricedCalls: (data as { unpricedCalls: number }).unpricedCalls,
+    };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '支出上限响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'spend limit' } });
+};
+
+export const setSpendLimit = async (limitUsd: number | null, signal?: AbortSignal): Promise<SpendLimitStatus> => {
+  const data: unknown = await api.put(`${BASE}/model-configs/spend-limit`, { limitUsd }, signal);
+  if (typeof data === 'object' && data !== null && typeof (data as { spentUsd?: unknown }).spentUsd === 'number') {
+    const limit = (data as { limitUsd?: unknown }).limitUsd;
+    return {
+      limitUsd: typeof limit === 'number' ? limit : null,
+      spentUsd: (data as { spentUsd: number }).spentUsd,
+      unpricedCalls: typeof (data as { unpricedCalls?: unknown }).unpricedCalls === 'number' ? (data as { unpricedCalls: number }).unpricedCalls : 0,
+    };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '支出上限保存响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'spend limit response' } });
+};
+
 /** List the models an endpoint serves (POST /model-configs/discover). */
 export const discoverModels = async (
   input: { configId?: string; wire?: string; baseUrl?: string; apiKey?: string },
@@ -406,6 +441,22 @@ export const getZoteroLibrary = async (signal?: AbortSignal): Promise<ZoteroLibr
     };
   }
   throw new ApiError({ code: 'unexpected_schema', message: 'Zotero 文库响应缺少 items 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'zotero library' } });
+};
+
+/** Researcher annotations (highlights/notes) via GET /zotero/annotations — the
+ *  researcher's own critical reading, imported as seed text. 503 when Zotero is down. */
+export const getZoteroAnnotations = async (signal?: AbortSignal): Promise<ZoteroAnnotationsResponse> => {
+  const data: unknown = await api.getJson(`${BASE}/zotero/annotations`, signal);
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { annotations?: unknown }).annotations)) {
+    const r = data as Record<string, unknown>;
+    return {
+      annotations: (r.annotations as unknown[]).filter((a): a is ZoteroAnnotation =>
+        typeof a === 'object' && a !== null && typeof (a as { key?: unknown }).key === 'string'),
+      total: typeof r.total === 'number' ? r.total : 0,
+      fetchedAt: typeof r.fetchedAt === 'string' ? r.fetchedAt : '',
+    };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: 'Zotero 注释响应缺少 annotations 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'zotero annotations' } });
 };
 
 // ---- conversations (conversation-first research flow) ----
@@ -519,6 +570,58 @@ export const setAutomationEnabled = async (id: string, enabled: boolean): Promis
 
 export const deleteAutomation = async (id: string, signal?: AbortSignal): Promise<void> => {
   await api.del(`${BASE}/automations/${encodeURIComponent(id)}`, signal);
+};
+
+// ---- settings center: agent approval policy + server meta ----
+
+export interface AgentPolicyRemembered {
+  conversationId: string;
+  conversationTitle: string;
+  kinds: string[];
+}
+
+export interface AgentPolicy {
+  defaultPolicy: 'ask_per_conversation';
+  remembered: AgentPolicyRemembered[];
+}
+
+export const getAgentPolicy = async (signal?: AbortSignal): Promise<AgentPolicy> => {
+  const data: unknown = await api.getJson(`${BASE}/agent-policy`, signal);
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { remembered?: unknown }).remembered)) {
+    const d = data as { defaultPolicy?: unknown; remembered: unknown[] };
+    return {
+      defaultPolicy: 'ask_per_conversation',
+      remembered: d.remembered.map((r): AgentPolicyRemembered => {
+        const x = r as Record<string, unknown>;
+        return {
+          conversationId: typeof x.conversationId === 'string' ? x.conversationId : '',
+          conversationTitle: typeof x.conversationTitle === 'string' ? x.conversationTitle : '',
+          kinds: Array.isArray(x.kinds) ? x.kinds.filter((k): k is string => typeof k === 'string') : [],
+        };
+      }),
+    };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '审批策略响应缺少 remembered 数组', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'agent policy' } });
+};
+
+/** Revoke a conversation's remembered approval kinds (back to ask-every-time). */
+export const revokeRememberedKinds = async (conversationId: string, signal?: AbortSignal): Promise<void> => {
+  await api.del(`${BASE}/agent-policy/remember/${encodeURIComponent(conversationId)}`, signal);
+};
+
+export interface ServerMeta {
+  version: string;
+  dataDir: string;
+}
+
+export const getServerMeta = async (signal?: AbortSignal): Promise<ServerMeta> => {
+  const data: unknown = await api.getJson(`${BASE}/meta`, signal);
+  if (typeof data === 'object' && data !== null
+    && typeof (data as { version?: unknown }).version === 'string'
+    && typeof (data as { dataDir?: unknown }).dataDir === 'string') {
+    return data as ServerMeta;
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '服务器元信息结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'server meta' } });
 };
 
 // ---- small helper (local, avoids repeating the 404-passthrough pattern) ----

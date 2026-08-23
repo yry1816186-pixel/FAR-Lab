@@ -210,6 +210,27 @@ const primaryKey = (rec: RawSourceRecord): string | null => {
   return `${id.kind}:${id.kind === 'doi' ? id.value.toLowerCase() : id.value}`;
 };
 
+/**
+ * Cross-source fuzzy merge key (ASySD-style blocking, deterministic, zero deps):
+ * the same work can surface from one family with a DOI and from another with
+ * only a native id — identifier dedup misses it and the pool double-counts
+ * evidence. Normalized title + publication year merges those. Short titles
+ * (below the floor) never fuzzy-merge: they collide across genuinely different
+ * works. Fuzzy merge never OVERRIDES a primary-key match; it only catches the
+ * identifier-less duplicate of an already-pooled work.
+ */
+const FUZZY_MIN_TITLE_LEN = 20;
+
+const normalizeTitle = (t: string): string =>
+  t.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+
+const fuzzyTitleKey = (rec: RawSourceRecord): string | null => {
+  const norm = normalizeTitle(rec.title);
+  if (norm.length < FUZZY_MIN_TITLE_LEN) return null;
+  return `fz:${norm}|${rec.publicationYear ?? ''}`;
+};
+
 /** One unique document in the pre-selection pool, with its multi-list provenance. */
 export interface PoolEntry {
   readonly key: string;
@@ -427,9 +448,12 @@ export const retrieveStage: StageHandler = {
     const executedQueries: RetrievalQuery[] = [];
     const failuresByFamily = new Map<SourceFamily, string[]>();
     const pool = new Map<string, PoolEntry>();
+    /** fz-key -> pooled entry: lets an identifier-less duplicate find the titled work it repeats. */
+    const fuzzyIndex = new Map<string, PoolEntry>();
     let attempted = 0;
     let succeeded = 0;
     let duplicates = 0;
+    let fuzzyMerges = 0;
     let droppedNoIdentifier = 0;
     let variantSearches = 0;
     let failoverSearches = 0;
@@ -586,21 +610,25 @@ export const retrieveStage: StageHandler = {
           ctx.log(`retrieve: dropping record without identifiers: "${record.title}"`);
           continue;
         }
-        const existing = pool.get(key);
+        const fz = fuzzyTitleKey(record);
+        const existing = pool.get(key) ?? (fz !== null ? fuzzyIndex.get(fz) : undefined);
         if (existing) {
-          duplicates += 1;
+          if (existing.key === key) duplicates += 1;
+          else fuzzyMerges += 1;
           existing.purposes.add(purpose);
           existing.ranks.push({ target: targetIdx, rank });
           continue;
         }
-        pool.set(key, {
+        const entry: PoolEntry = {
           key,
           record,
           family,
           firstSeen: targetIdx,
           purposes: new Set([purpose]),
           ranks: [{ target: targetIdx, rank }],
-        });
+        };
+        pool.set(key, entry);
+        if (fz !== null && !fuzzyIndex.has(fz)) fuzzyIndex.set(fz, entry);
       }
     };
 
@@ -770,6 +798,7 @@ export const retrieveStage: StageHandler = {
     if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
     if (failoverSearches > 0) parts.push(`${failoverSearches} openalex->europepmc failover search(es)`);
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
+    if (fuzzyMerges > 0) parts.push(`${fuzzyMerges} duplicate record(s) merged by normalized title+year (cross-source)`);
     if (droppedNoIdentifier > 0) parts.push(`${droppedNoIdentifier} record(s) without identifiers dropped`);
     if (selected.length < fused.length) parts.push(`truncated at cap ${MAX_DOCUMENTS}`);
     if (seeds.length > 0) parts.push(`${seeds.length} user-provided source(s) included (guaranteed, provenance=user_provided)`);

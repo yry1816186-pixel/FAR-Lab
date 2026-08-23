@@ -710,6 +710,15 @@ export interface ModelConfigPricing {
   outputUsdPerMTok: number;
 }
 
+export type ReasoningStyle = 'reasoning_effort' | 'enable_thinking' | 'thinking_budget';
+export type ReasoningGear = 'low' | 'medium' | 'high';
+
+/** Declared thinking capability + default effort gear of a model config. */
+export interface ReasoningCapability {
+  style: ReasoningStyle;
+  defaultGear: ReasoningGear;
+}
+
 export interface ModelConfigSummary {
   id: string;
   label: string;
@@ -723,6 +732,8 @@ export interface ModelConfigSummary {
   fallbackConfigIds?: string[];
   /** BP-4 user-declared list pricing; absent = cost shown as unknown. */
   pricing?: ModelConfigPricing;
+  /** Declared thinking capability (absent = the endpoint gets no thinking fields). */
+  reasoning?: ReasoningCapability;
   createdAt: string;
   updatedAt: string;
 }
@@ -743,6 +754,36 @@ export interface EnvDefaultInfo {
   name: string;
   modelId: string;
   liveReady: boolean;
+  /** Where the effective built-in default came from: a UI switch or the env chain. */
+  defaultSource?: 'ui' | 'env';
+}
+
+/** One built-in env route (zai/dashscope live; archived = banned, display-only). */
+export interface BuiltinRouteSummary {
+  name: string;
+  kind: 'live' | 'archived';
+  liveReady: boolean;
+  baseUrl: string;
+  apiKeyEnvVar: string;
+  /** What the env layer alone would select (the baseline the override sits on). */
+  envModelId: string;
+  /** envModelId or the UI-declared modelId override — what a call would use. */
+  effectiveModelId: string;
+  /** UI-declared real list prices; absent = cost shows as unknown. */
+  pricing?: { inputUsdPerMTok: number; outputUsdPerMTok: number };
+  isBuiltinDefault: boolean;
+}
+
+export interface BuiltinRoutesResponse {
+  routes: BuiltinRouteSummary[];
+  defaultSource: 'ui' | 'env';
+}
+
+export interface BuiltinRouteUpdateInput {
+  /** string = override the model; null = clear back to env/default selection. */
+  modelId?: string | null;
+  /** object = declare real list prices; null = clear (cost falls back to unknown). */
+  pricing?: { inputUsdPerMTok: number; outputUsdPerMTok: number } | null;
 }
 
 /** One normalized entry of the local Zotero library (server-bridged snapshot). */
@@ -765,6 +806,117 @@ export interface ZoteroLibraryResponse {
   fetchedAt: string;
 }
 
+/** One researcher annotation (highlight/note) on a Zotero library item —
+ *  critical-reading material that imports into study seeds as text. */
+export interface ZoteroAnnotation {
+  key: string;
+  parentKey: string;
+  type: 'highlight' | 'note' | 'image' | 'other';
+  text?: string;
+  comment?: string;
+}
+
+export interface ZoteroAnnotationsResponse {
+  annotations: ZoteroAnnotation[];
+  total: number;
+  fetchedAt: string;
+}
+
+/** A library item enriched with its annotations at import time (panel-side join). */
+export type ZoteroImportItem = ZoteroLibItem & { annotations?: ZoteroAnnotation[] };
+
+// ---- conversations (conversation-first research flow) ----
+
+export interface ConversationSeed {
+  title: string;
+  identifiers: { kind: 'doi' | 'arxiv' | 'url' | 'other'; value: string }[];
+  text?: string;
+  year?: number;
+  authors: string[];
+}
+
+export interface CandidateQuestion {
+  id: string;
+  text: string;
+  rationale: string;
+}
+
+export type ConversationActionKind = 'launch_research' | 'create_automation' | 'cancel_automation';
+
+/** One agent-proposed action and its honest lifecycle (executes only on approval). */
+export interface ConversationProposal {
+  id: string;
+  kind: ConversationActionKind;
+  title: string;
+  args: Record<string, unknown>;
+  status: 'pending' | 'executed' | 'rejected' | 'failed';
+  result?: string;
+  autoApproved?: boolean;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface ToolTraceEntry {
+  tool: string;
+  ok: boolean;
+  summary?: string;
+  durationMs?: number;
+}
+
+export interface ConversationMessage {
+  id: string;
+  /** automation = deterministic system record (triggers, action outcomes) — never a model reply. */
+  role: 'researcher' | 'agent' | 'automation';
+  content: string;
+  seeds?: ConversationSeed[];
+  candidates?: CandidateQuestion[];
+  toolTrace?: ToolTraceEntry[];
+  proposals?: ConversationProposal[];
+  usage?: {
+    provider: string; modelId: string; latencyMs: number;
+    inputTokens?: number; outputTokens?: number;
+    modelCalls?: number; toolCalls?: number;
+  };
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  status: 'open' | 'converged';
+  providerConfigId?: string;
+  /** Researcher's effort override for this conversation; absent = config default. */
+  reasoningGear?: ReasoningGear;
+  messages: ConversationMessage[];
+  runIds: string[];
+  turns: number;
+  /** Action kinds remembered as "don't ask again" in this conversation. */
+  autoApprove: ConversationActionKind[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---- automations (resident agent R3) ----
+
+export type AutomationTrigger =
+  | { kind: 'run_completed' }
+  | { kind: 'schedule'; intervalMinutes: number };
+
+export interface Automation {
+  id: string;
+  conversationId: string;
+  label: string;
+  trigger: AutomationTrigger;
+  task: string;
+  enabled: boolean;
+  maxTurnsPerFire: number;
+  fireCount: number;
+  notifiedRunIds: string[];
+  lastFiredAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ModelConfigsResponse {
   configs: ModelConfigSummary[];
   activeModelConfigId: string | null;
@@ -777,6 +929,8 @@ export interface ModelConfigInput {
   baseUrl: string;
   modelId: string;
   apiKey: string;
+  /** Present = declare/replace the thinking capability. */
+  reasoning?: ReasoningCapability;
 }
 
 export interface ModelConfigTestInput {
@@ -795,4 +949,51 @@ export interface ModelConfigTestResult {
   latencyMs: number;
   sample?: unknown;
   error?: { kind: string; message: string; retryable: boolean; httpStatus?: number };
+}
+
+// ---- tool integrations (TIS: researcher-wired external tools) ----
+
+export type ToolIntegrationKind = 'mcp_server' | 'skill' | 'command' | 'hook_rule';
+
+export interface ToolTestRecord {
+  at: string;
+  ok: boolean;
+  summary: string;
+}
+
+/** Server projection — secret env/header values arrive masked (envSet/headersSet carry key names). */
+export interface ToolIntegrationView {
+  id: string;
+  kind: ToolIntegrationKind;
+  label: string;
+  enabled: boolean;
+  createdBy: 'researcher' | 'conversation' | 'plugin_import';
+  createdAt: string;
+  updatedAt: string;
+  // mcp_server
+  transport?: 'stdio' | 'http';
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  toolNamePrefix?: string;
+  riskClass?: 'read' | 'edit' | 'execute' | 'destructive';
+  timeoutMs?: number;
+  lastTest?: ToolTestRecord;
+  envSet?: string[];
+  headersSet?: string[];
+  // skill
+  name?: string;
+  description?: string;
+  whenToUse?: string;
+  priority?: number;
+  body?: string;
+  // command
+  template?: string;
+  scope?: 'palette' | 'composer' | 'both';
+  // hook_rule
+  event?: 'before_tool' | 'after_tool' | 'turn_end';
+  match?: { toolPattern?: string; riskClass?: string };
+  action?: { type: 'block' | 'require_approval' | 'log'; reason?: string; note?: string };
 }
