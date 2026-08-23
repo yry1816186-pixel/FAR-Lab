@@ -56,6 +56,7 @@ import { McpManager } from '../agent/mcp-manager.js';
 import { importPlugin, PluginImportError, PluginImportInputSchema } from '../plugins/import.js';
 import type { FeedbackSourceKind as FeedbackSource } from '../domain/index.js';
 import { toProvJsonLd } from '../domain/prov-o.js';
+import { consolidateConversationProfile } from '../app/memory.js';
 import { EvidenceRelationType } from '../domain/evidence.js';
 import { canonicalSha256 } from '../shared/crypto.js';
 
@@ -1868,6 +1869,14 @@ function parseSeedSources(raw: unknown): string | {
             { approve: body.approve, remember: body.remember === true },
             conversationDeps,
           );
+          // RU-1 profile writer: researcher preferences derive deterministically
+          // from the (now updated) proposal resolutions. Non-fatal by design — a
+          // memory hiccup must never invalidate an approval; visible in server logs.
+          try {
+            consolidateConversationProfile(app.store, conversation as unknown as Parameters<typeof consolidateConversationProfile>[1]);
+          } catch (e) {
+            process.stderr.write(`far-server: profile consolidation failed after proposal ${proposalId}: ${e instanceof Error ? e.message : String(e)}\n`);
+          }
           sendJson(res, 200, { conversation });
         });
       }
