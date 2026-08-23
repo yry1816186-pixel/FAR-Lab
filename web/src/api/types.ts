@@ -362,7 +362,10 @@ export interface EvidenceBody {
   independentSources: number;
   sumLogLrLow: number;
   sumLogLrHigh: number;
-  logLrBand: string;
+  /** Jeffreys-style band of the log10-LR midpoint — closed server enum (src/domain/formal.ts LogLrBand). */
+  logLrBand:
+    | 'very_strong_support' | 'strong_support' | 'moderate_support' | 'weak_support' | 'none'
+    | 'weak_counter' | 'moderate_counter' | 'strong_counter' | 'very_strong_counter';
   qbafScore: number;
   proofStandard: 'unproven' | 'scintilla' | 'preponderance' | 'clear_and_convincing' | 'beyond_reasonable_doubt';
   experimentalAxes: number;
@@ -740,6 +743,26 @@ export interface EnvDefaultInfo {
   name: string;
   modelId: string;
   liveReady: boolean;
+}
+
+/** One normalized entry of the local Zotero library (server-bridged snapshot). */
+export interface ZoteroLibItem {
+  key: string;
+  title: string;
+  itemType: string;
+  year?: number;
+  creators: string[];
+  doi?: string;
+  url?: string;
+  tags: string[];
+  collections: string[];
+  relatedKeys: string[];
+}
+
+export interface ZoteroLibraryResponse {
+  items: ZoteroLibItem[];
+  total: number;
+  fetchedAt: string;
 }
 
 export interface ModelConfigsResponse {

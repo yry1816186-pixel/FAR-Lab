@@ -3,15 +3,19 @@ import { GitCompareArrows, X } from 'lucide-react';
 import { ApiError, isNotFound, withTimeout } from '../../api/client';
 import { connectClaim, editHypothesis, forkHypothesis, getEvidence, getHypotheses, promoteHypothesis, rejectHypothesis } from '../../api/endpoints';
 import type { AchAnalysis, EvidenceBody, EvidenceRelation, HypothesisCandidate, HypothesisScorecard, HypothesisTournament, ResearchRun } from '../../api/types';
-import { RELATION_POLARITY } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
-import { EmptyState, ErrorBox, IdText, Section, Skeleton } from '../common';
+import { EmptyState, ErrorBox, Section, Skeleton } from '../common';
+import { buildHypothesisBalances } from '../../viz/compare-viz';
 import { HypothesisCard } from './HypothesisCard';
 import type { HypothesisCardOps } from './HypothesisCard';
 import { ScorecardsTable } from './ScorecardsTable';
 import { CompareView } from './CompareView';
 import { ResearchActions } from './ResearchActions';
+import { DimensionHeatmap } from './viz/DimensionHeatmap';
+import { AchNetTable } from './viz/AchNetTable';
+import { TournamentCrosstab } from './viz/TournamentCrosstab';
+import { buildClaimLabels } from './InlineIdRefs';
 import type { FeedbackTarget } from './FeedbackForm';
 import { stageKey } from '../../i18n/keys';
 
@@ -130,6 +134,9 @@ export function HypothesesTab({
           .filter((h): h is HypothesisCandidate => h !== undefined)
           .sort((a, b) => (rankById.get(a.id) ?? 99) - (rankById.get(b.id) ?? 99))
       : [];
+  // VIZ V1: balance row inputs for the compare view (counts + evidence bodies).
+  const compareBalances =
+    data !== null ? buildHypothesisBalances(data.evidenceBodies, evidenceRes.data?.relations) : undefined;
 
   return (
     <>
@@ -159,6 +166,7 @@ export function HypothesesTab({
                 hypotheses={compareHyps}
                 scorecards={data.scorecards}
                 claims={evidenceRes.data?.claims}
+                balances={compareBalances}
                 onRemove={(id) => setCompareIds((prev) => prev.filter((x) => x !== id))}
                 onChallenge={(id, label) => onFeedback({ kind: 'hypothesis', id, label })}
                 onOpenClaim={onOpenClaim}
@@ -206,6 +214,9 @@ export function HypothesesTab({
             <summary>{t('hyp.methodsTitle')}</summary>
             <div className="hyp-methods-body">
               <p className="muted small">{t('hyp.methodsIntro')}</p>
+              <Section title={t('viz.heatTitle')}>
+                <DimensionHeatmap hypotheses={data.hypotheses} scorecards={data.scorecards} />
+              </Section>
               <Section title={t('scorecards.title')}>
                 <ScorecardsTable scorecards={data.scorecards} hypotheses={data.hypotheses} />
               </Section>
@@ -217,13 +228,15 @@ export function HypothesesTab({
               {data.achAnalysis != null && data.achAnalysis.diagnosticity.length > 0 && (
                 <Section title={t('ach.title')}>
                   <p className="muted small">{t('ach.intro')}</p>
-                  <ul className="plain-list small">
-                    {data.achAnalysis.diagnosticity.slice(0, 3).map((d) => (
-                      <li key={d.claimId}>
-                        <IdText value={d.claimId} /> — {t('ach.diagnosticity', { score: d.score.toFixed(2) })}
-                      </li>
-                    ))}
-                  </ul>
+                  <AchNetTable
+                    ach={data.achAnalysis}
+                    scorecards={data.scorecards}
+                    claimLabels={
+                      evidenceRes.data !== null
+                        ? buildClaimLabels(evidenceRes.data.claims.map((c) => c.id), t('idref.claim'))
+                        : new Map<string, string>()
+                    }
+                  />
                   <p className="muted small">
                     {data.achAnalysis.removalSensitivity.stable
                       ? t('ach.removalStable', { k: data.achAnalysis.removalSensitivity.removedTopK })
@@ -298,6 +311,7 @@ function TournamentView({ tournament, hypotheses }: { tournament: HypothesisTour
           ))}
         </tbody>
       </table>
+      <TournamentCrosstab tournament={tournament} hypotheses={hypotheses} />
       <details className="hyp-details">
         <summary>{t('tournament.matches', { n: tournament.matches.length })}</summary>
         <ul>
@@ -383,19 +397,9 @@ function HypothesisList({
     clusterCounts.set(key, (clusterCounts.get(key) ?? 0) + 1);
   }
   const rankOf = new Map(data.scorecards.map((s) => [s.hypothesisId, s.rank] as const));
-  const evidenceBodyOf = new Map((data.evidenceBodies ?? []).map((b) => [b.hypothesisId, b] as const));
-  // HX4 balance counts: relations bound to each hypothesis, split by the
-  // canonical polarity table (supports/replicates → supporting; contradicts/
-  // weakens/fails_to_replicate/alternative_explanation → counter).
-  const balanceOf = new Map<string, { supports: number; counters: number }>();
-  for (const r of relations ?? []) {
-    if (r.targetHypothesisId === undefined) continue;
-    const acc = balanceOf.get(r.targetHypothesisId) ?? { supports: 0, counters: 0 };
-    const polarity = RELATION_POLARITY[r.relation];
-    if (polarity === 'supporting') acc.supports += 1;
-    else if (polarity === 'counter') acc.counters += 1;
-    balanceOf.set(r.targetHypothesisId, acc);
-  }
+  // HX4 balance counts feed every card's bar; the shared builder keeps the
+  // compare view's balance row and the cards on one identical computation.
+  const balancesById = buildHypothesisBalances(data.evidenceBodies, relations);
 
   return (
     <div>
@@ -433,8 +437,8 @@ function HypothesisList({
             disabled: compareIds.length >= compareLimit,
           }}
           ops={opsFor(h)}
-          evidenceBody={evidenceBodyOf.get(h.id)}
-          balance={balanceOf.get(h.id)}
+          evidenceBody={balancesById.get(h.id)?.body}
+          balance={balancesById.get(h.id)}
         />
       ))}
       {extras.length > 0 && (

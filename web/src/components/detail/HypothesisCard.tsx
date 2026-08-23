@@ -176,6 +176,11 @@ export function HypothesisCard({
                   {t('evbody.floor', { level: evidenceBody.floorCertainty })}
                 </Badge>
               )}
+              {evidenceBody.experimentalAxes > 0 && (
+                <Badge tone="muted" title={evidenceBody.disclosure}>
+                  {t('hyp.expAxes', { n: evidenceBody.experimentalAxes })}
+                </Badge>
+              )}
             </>
           )}
           {completeness !== undefined ? (

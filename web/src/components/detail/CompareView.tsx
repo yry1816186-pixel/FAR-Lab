@@ -1,9 +1,14 @@
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
-import type { Assumption, HypothesisCandidate, HypothesisScorecard, ScoreDimension, ScientificClaim } from '../../api/types';
+import type { Assumption, EvidenceBody, HypothesisCandidate, HypothesisScorecard, ScoreDimension, ScientificClaim } from '../../api/types';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge } from '../common';
 import { noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../tones';
+import { EvidenceBalance } from './EvidenceBalance';
+
+// echarts rides its own async chunk: the compare surface is opt-in, so the
+// primary bundle never pays for chart geometry until a researcher compares.
+const RadarCompare = lazy(() => import('./viz/RadarCompare'));
 
 /**
  * Side-by-side competing-hypothesis comparison (CPP-3). This is the product's
@@ -15,6 +20,10 @@ import { noveltyKey, noveltyTone, testabilityKey, testabilityTone } from '../../
  * Score dimension rows carry an inline "uncalibrated" marker: hover-only
  * calibration hints are lost on touch and in print (scientific-critique F5).
  *
+ * VIZ V1: the comparison opens with the score-dimension radar overlay and the
+ * evidence-balance row reuses the EvidenceBalance signature element (logLR
+ * interval when an evidence body exists) instead of bare counts.
+ *
  * ACH evidence analysis (S3): claim rows marked SHARED (bound to 2+ compared
  * hypotheses — cannot discriminate between them) vs DISCRIMINATING (bound to
  * exactly one). Rendered ONLY from real hypothesis claim bindings; when the
@@ -25,6 +34,7 @@ export function CompareView({
   hypotheses,
   scorecards,
   claims,
+  balances,
   onRemove,
   onChallenge,
   onOpenClaim,
@@ -32,6 +42,8 @@ export function CompareView({
   hypotheses: HypothesisCandidate[];
   scorecards: HypothesisScorecard[];
   claims?: ScientificClaim[];
+  /** VIZ V1: per-hypothesis relation counts + evidence body (when present) for the balance row. */
+  balances?: Map<string, { supports: number; counters: number; body?: EvidenceBody }>;
   onRemove: (id: string) => void;
   onChallenge: (id: string, label: string) => void;
   onOpenClaim?: (claimId: string) => void;
@@ -49,6 +61,12 @@ export function CompareView({
 
   return (
     <div className="compare" role="region" aria-label={t('compare.title')}>
+      <div className="ach-evidence">
+        <h4 className="minor-title">{t('viz.radarTitle')}</h4>
+        <Suspense fallback={<p className="muted small">{t('common.loading')}</p>}>
+          <RadarCompare hypotheses={hypotheses} scorecards={scorecards} />
+        </Suspense>
+      </div>
       <div className="table-scroll">
         <table className="data-table compare-table">
           <caption className="sr-only">{t('compare.title')}</caption>
@@ -110,14 +128,25 @@ export function CompareView({
               })}
               missingWhen={t('hyp.falsification.missing')}
             />
-            <CompareCountRow
-              label={t('compare.evidenceBalance')}
-              cols={hypotheses.map((h) => ({
-                support: h.supportingClaimIds?.length ?? 0,
-                counter: h.counterClaimIds?.length ?? 0,
-                openUncertainties: h.uncertainties?.length ?? 0,
-              }))}
-            />
+            <tr>
+              <th scope="row" className="compare-label-col">{t('compare.evidenceBalance')}</th>
+              {hypotheses.map((h) => {
+                const b = balances?.get(h.id);
+                const openUncertainties = h.uncertainties?.length ?? 0;
+                return (
+                  <td key={h.id}>
+                    {b !== undefined ? (
+                      <EvidenceBalance supports={b.supports} counters={b.counters} body={b.body} />
+                    ) : (
+                      <span className="muted small">—</span>
+                    )}
+                    {openUncertainties > 0 && (
+                      <span className="muted small"> {t('compare.openUncertaintiesN', { n: openUncertainties })}</span>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
             <CompareRow
               label={t('compare.testability')}
               cols={hypotheses.map((h) => t(testabilityKey(h.testability)))}
@@ -406,35 +435,6 @@ function CompareListRow({ label, cols }: { label: string; cols: string[][] }): J
               {items.map((item, j) => <li key={j}>{item}</li>)}
             </ul>
           )}
-        </td>
-      ))}
-    </tr>
-  );
-}
-
-/**
- * Evidence balance. support/counter count bound claims (supporting/counter
- * ClaimIds); the third number is the hypothesis's own OPEN UNCERTAINTY items,
- * not "unknown evidence" — the label says what it actually is (scientific-critique F1).
- */
-function CompareCountRow({
-  label,
-  cols,
-}: {
-  label: string;
-  cols: { support: number; counter: number; openUncertainties: number }[];
-}): JSX.Element {
-  const { t } = useI18n();
-  return (
-    <tr>
-      <th scope="row" className="compare-label-col">{label}</th>
-      {cols.map((c, i) => (
-        <td key={i}>
-          <span className="compare-counts">
-            <span className="compare-count compare-count--support">{t('compare.supportN', { n: c.support })}</span>
-            <span className="compare-count compare-count--counter">{t('compare.counterN', { n: c.counter })}</span>
-            <span className="compare-count compare-count--unknown">{t('compare.openUncertaintiesN', { n: c.openUncertainties })}</span>
-          </span>
         </td>
       ))}
     </tr>
