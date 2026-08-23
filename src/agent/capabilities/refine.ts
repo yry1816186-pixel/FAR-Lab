@@ -13,6 +13,7 @@ import { PermissionEngine } from '../permissions.js';
 import { SessionTelemetry } from '../telemetry.js';
 import { runAgentLoop, type AgentLoopConfig, type AgentLoopResult } from '../loop.js';
 import { runSubagents, type SubagentResult } from '../subagents.js';
+import { wireResearchTools } from './research-tools.js';
 import { openRolloutWriter, readRollout, reconstructSession, rolloutFile, type InterruptedTurnDisposition } from '../rollout.js';
 import { loadSkillsFromDir, selectSkills, renderSkillsPrompt, type AgentSkill } from '../skills.js';
 import { McpManager, type McpServerStatus } from '../mcp-manager.js';
@@ -252,7 +253,33 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       },
     };
 
-    return new ToolRegistry().register(listHypotheses).register(readEvidence).register(searchSources);
+    // AVO fusion (G4/G5/G6): the research-tools plane joins the session —
+    // query_run_events + preview_ref (read-class) and explore_code
+    // (execute-class, gated sandboxed analysis). explore_code is admitted but
+    // permission-gated like every execute tool; its gate rejections surface
+    // violation codes to the model. wireResearchTools adapts the plain tools
+    // into AgentTool shape with this run's deps bound.
+    const researchTools = wireResearchTools({
+      store: deps.store,
+      runId,
+      artifacts: deps.artifacts,
+    }).map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema as z.ZodType<unknown>,
+      riskClass: t.riskClass,
+      summarize: t.summarize,
+      async execute(args: unknown): Promise<ToolResult> {
+        const r = await t.execute(args);
+        return r.ok
+          ? { ok: true, data: r.data, ...(r.summary !== undefined ? { summary: r.summary } : {}) }
+          : { ok: false, error: { kind: 'execution' as const, message: r.error ?? 'research tool failed' } };
+      },
+    }));
+
+    let registry = new ToolRegistry().register(listHypotheses).register(readEvidence).register(searchSources);
+    for (const t of researchTools) registry = registry.register(t);
+    return registry;
   };
 
   // --- tool integrations (TIS): stored MCP servers / hook rules / skills join the session ---
@@ -289,6 +316,12 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       { tool: 'list_hypotheses', effect: 'allow' },
       { tool: 'read_evidence', effect: 'allow' },
       { tool: 'search_sources', effect: 'allow' },
+      // AVO fusion research-tools plane (G4/G5/G6): event queries and previews
+      // are read-class; explore_code is execute-class and additionally gated by
+      // the static analysis gate before any sandbox spawn.
+      { tool: 'query_run_events', effect: 'allow' },
+      { tool: 'preview_ref', effect: 'allow' },
+      { tool: 'explore_code', effect: 'allow' },
       // Admitted (read-class) MCP servers contribute their adapted tools as allow
       // rules; risk classes are stamped per-integration (explore mode still gates
       // non-read tools). Non-read servers were refused above — they never reach
