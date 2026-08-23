@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, render, Text, useInput } from 'ink';
 import { getEvents, listRuns, type RunSummary } from './api.ts';
 import { deriveStages, relTime, STAGE_ICON, STAGE_ZH, type StageRow } from './narrative.ts';
+import { Composer, type ComposerResult } from './composer.ts';
 
 const h = React.createElement;
 type El = React.ReactElement;
@@ -22,6 +23,8 @@ function App(): El {
   const [cursor, setCursor] = useState(0);
   const [detail, setDetail] = useState<{ run: RunSummary; stages: StageRow[] } | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [composerNote, setComposerNote] = useState<string | null>(null);
 
   useEffect(() => {
     const c = new AbortController();
@@ -38,10 +41,12 @@ function App(): El {
   };
 
   useInput((input, key) => {
+    if (composing) return; // Composer owns input while active
     if (detail !== null && !loadingDetail) {
       if (input === 'q' || key.escape) setDetail(null);
       return;
     }
+    if (input === 'n') { setComposing(true); setComposerNote(null); return; }
     if (runs === null || runs.length === 0) {
       if (input === 'q' || key.escape) process.exit(0);
       return;
@@ -51,6 +56,13 @@ function App(): El {
     else if (key.return) void openDetail(runs[cursor]!);
     else if (input === 'q') process.exit(0);
   });
+
+  const onComposed = (r: ComposerResult): void => {
+    setComposing(false);
+    setComposerNote(r.action === 'submitted-ready'
+      ? `问题已就绪（${r.question.length} 字）——真实提交按 no-live-API 纪律禁用`
+      : '已取消输入');
+  };
 
   const rows: El[] = [];
   if (error !== null) rows.push(h(Text, { key: 'err', color: 'red' }, `连接失败：${error}`));
@@ -81,9 +93,16 @@ function App(): El {
   return h(Box, { flexDirection: 'column', paddingX: 1 },
     h(Box, { borderStyle: 'round', flexDirection: 'column', paddingX: 1 },
       h(Text, { bold: true }, 'FAR-Lab · 我的研究'),
-      h(Text, { dimColor: true }, '研究浏览器（只读 v1）· ↑↓/jk 选择 · Enter 查看 · q 退出'),
+      h(Text, { dimColor: true }, composing
+        ? '研究问题输入（多行/粘贴安全/IME 安全）'
+        : '研究浏览器（只读 v1）· ↑↓/jk 选择 · Enter 查看 · n 新问题 · q 退出'),
     ),
-    ...rows,
+    composing
+      ? h(Composer, { onDone: onComposed })
+      : h(Box, { flexDirection: 'column' },
+          composerNote !== null ? h(Text, { color: 'yellow' }, composerNote) : null,
+          ...rows,
+        ),
   );
 }
 
