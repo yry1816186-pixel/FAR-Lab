@@ -1,14 +1,21 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { ResearchRun } from '../../api/types';
 import { getExperiments } from '../../api/endpoints';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, TimeText } from '../common';
+import { ForestPlot } from './viz/ForestPlot';
+import { metricShares, tallyVerdicts } from '../../viz/experiment-viz';
 
 /**
  * Executed-experiment evidence (EEL, D-081). READ-ONLY truth: experiment_run/result_set/
  * stat_report projections from far.db. Queue operations live in the CLI (`far experiment
  * …`); nothing here fakes progress — a queued/failed run renders as exactly that.
+ *
+ * VIZ V3: metric cells carry comparison-relative bars (share of the same
+ * metric's max across the compared cells — never across different metrics),
+ * stat reports gain a CI forest plot, and a verdict tally heads the section
+ * when any report exists.
  */
 interface CellLike { modelName?: string; metrics?: Record<string, number>; tags?: string[]; fingerprint?: string; nTrain?: number; nTest?: number }
 interface ReportLike {
@@ -23,6 +30,30 @@ interface ReportLike {
 
 const num = (v: unknown, digits = 4): string => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '—');
 const str = (v: unknown): string => (typeof v === 'string' ? v : '—');
+
+/** Verdict tally (VIZ V3): counts of supports/falsifies/inconclusive + the POPPER
+ *  discipline split (exploratory/secondary never count as verdicts). */
+function VerdictTallyStrip({ reports }: { reports: ReportLike[] }): JSX.Element {
+  const { t } = useI18n();
+  const tally = useMemo(() => tallyVerdicts(reports), [reports]);
+  const parts: { tone: BadgeTone; label: string; n: number }[] = [
+    { tone: 'ok', label: t('exp.tallySupports'), n: tally.supports },
+    { tone: 'err', label: t('exp.tallyFalsifies'), n: tally.falsifies },
+    { tone: 'muted', label: t('exp.tallyInconclusive'), n: tally.inconclusive },
+  ];
+  return (
+    <p className="exp-tally small" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span className="muted">{t('exp.tallyTitle')}：</span>
+      {parts.map((p) => (
+        <span key={p.label} className={`compare-count ${p.tone === 'ok' ? 'compare-count--support' : p.tone === 'err' ? 'compare-count--counter' : 'compare-count--unknown'}`}>
+          {p.label} {p.n}
+        </span>
+      ))}
+      {tally.exploratory > 0 && <span className="muted">{t('exp.tallyExploratory', { n: tally.exploratory })}</span>}
+      {tally.secondary > 0 && <span className="muted">{t('exp.tallySecondary', { n: tally.secondary })}</span>}
+    </p>
+  );
+}
 
 type BadgeTone = 'ok' | 'warn' | 'err' | 'info' | 'muted';
 const verdictTone = (v: unknown): BadgeTone =>
@@ -53,6 +84,7 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
           hint={t('exp.emptyHint')}
         />
       )}
+      {reports.length > 0 && <VerdictTallyStrip reports={reports as ReportLike[]} />}
       {runs.map((xr) => {
         const xid = str(xr.id);
         const status = str(xr.status);
@@ -76,26 +108,45 @@ export function ExperimentsTab({ run }: { run: ResearchRun }): JSX.Element {
             )}
             {xSets.map((rs) => {
               const cells = Array.isArray(rs.cells) ? (rs.cells as CellLike[]) : [];
+              const shares = metricShares(cells.map((c, i) => ({ key: c.fingerprint ?? String(i), modelName: c.modelName, metrics: c.metrics })));
               return (
                 <table key={str(rs.id)} className="table table--compact">
                   <thead>
                     <tr><th>{t('exp.colModel')}</th><th>{t('exp.colMetrics')}</th><th>train/test</th><th>{t('exp.colTags')}</th></tr>
                   </thead>
                   <tbody>
-                    {cells.map((c, i) => (
-                      <tr key={c.fingerprint ?? i}>
-                        <td className="mono">{str(c.modelName)}</td>
-                        <td className="mono">
-                          {Object.entries(c.metrics ?? {}).map(([k, v]) => `${k}=${num(v)}`).join('，') || '—'}
-                        </td>
-                        <td className="mono">{c.nTrain ?? '—'}/{c.nTest ?? '—'}</td>
-                        <td className="mono small">{(c.tags ?? []).join(', ') || '—'}</td>
-                      </tr>
-                    ))}
+                    {cells.map((c, i) => {
+                      const cellKey = c.fingerprint ?? String(i);
+                      return (
+                        <tr key={cellKey}>
+                          <td className="mono">{str(c.modelName)}</td>
+                          <td className="mono">
+                            {Object.entries(c.metrics ?? {}).length === 0
+                              ? '—'
+                              : Object.entries(c.metrics ?? {}).map(([k, v]) => {
+                                  const share = shares?.get(k)?.get(cellKey);
+                                  return (
+                                    <span key={k} className="exp-metric">
+                                      <span>{k}={num(v)}</span>
+                                      {share !== undefined && (
+                                        <span className="rank-bar exp-metric-bar" aria-hidden="true" title={t('exp.metricRelNote', { k })}>
+                                          <span className="rank-fill" style={{ width: `${Math.round(share * 100)}%` }} />
+                                        </span>
+                                      )}
+                                    </span>
+                                  );
+                                })}
+                          </td>
+                          <td className="mono">{c.nTrain ?? '—'}/{c.nTest ?? '—'}</td>
+                          <td className="mono small">{(c.tags ?? []).join(', ') || '—'}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               );
             })}
+            {xReports.length > 0 && <ForestPlot reports={xReports} />}
             {xReports.map((rep) => (
               <div key={str(rep.id)} className="card__body" style={{ borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>

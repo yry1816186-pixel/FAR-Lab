@@ -2087,3 +2087,13 @@ select option { color: var(--text); background: var(--surface); }
 .decision-exit-head.tone-err { color: var(--v2-err, #b3352c); }
 .decision-exit-card p { margin: 0; }
 .decision-exits-stop { margin: 0; }
+
+/* ---- VIZ V3: experiment forest plot / metric bars / tally ---- */
+.forest-plot { margin: 8px 0; }
+.forest-group { margin-bottom: 6px; }
+.forest-metric { margin: 0 0 2px; }
+.forest-label { font-size: 11px; fill: var(--v2-text-1, #1f2328); }
+.forest-tick { font-size: 10px; fill: var(--v2-text-3, #8a8f98); }
+.exp-metric { display: inline-flex; align-items: center; gap: 5px; margin-right: 10px; white-space: nowrap; }
+.exp-metric-bar { width: 56px; display: inline-block; }
+.exp-tally { margin: 4px 0 10px; }
