@@ -1330,3 +1330,15 @@ describe('retrieve stage: cross-source fuzzy dedup', () => {
     expect(env.store.listObjects('source_document', env.run.id)).toHaveLength(2);
   });
 });
+
+describe('RU-10 zh fuzzy-key fix', () => {
+  it('CJK titles keep their characters (non-empty key) and match across punctuation variants', async () => {
+    const { normalizeTitle } = await import('../src/pipeline/stages/retrieve.js');
+    const a = normalizeTitle('维生素D与抑郁症：一项随机对照试验');
+    const b = normalizeTitle('维生素D与抑郁症:一项随机对照试验');
+    expect(a.length).toBeGreaterThan(5); // pre-fix this was EMPTY
+    expect(a).toBe(b); // punctuation-insensitive merge works for zh
+    const en = normalizeTitle('Vitamin D and Depression: A Trial');
+    expect(en).toBe('vitamin d and depression a trial'); // latin behavior unchanged
+  });
+});
