@@ -6,6 +6,8 @@ import { getBundles, getEvidence, getHypotheses, getPaper, getReceipts, getRepor
 import type { ProvenanceReceipt, ResearchRun, VerificationReport } from '../../api/types';
 import { isSettled } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
+import { aggregateReceipts, formatTokens } from '../../viz/cross-viz';
+import { formatDuration } from '../../viz/stage-viz';
 import { useI18n } from '../../i18n/LanguageContext';
 import { Badge, EmptyState, ErrorBox, IdText, Section, Skeleton, TimeText, errorText } from '../common';
 import type { EventsState } from '../RunDetail';
@@ -73,6 +75,7 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
               {t('prov.summary', { n: receiptsRes.data.length, m: modelCalls.length, k: nonLive.length })}
             </p>
             {nonLive.length > 0 && <p className="callout callout--warn small">{t('prov.nonLiveWarn')}</p>}
+            <ReceiptTotalsStrip receipts={receiptsRes.data} />
             <ReceiptsTable receipts={receiptsRes.data} />
           </>
         ) : null}
@@ -100,6 +103,26 @@ export function ProvenanceTab({ run, events, onMutated }: { run: ResearchRun; ev
         ) : null}
       </Section>
     </>
+  );
+}
+
+/** VIZ V6: one-line aggregate over the receipts — where the tokens and latency went. */
+function ReceiptTotalsStrip({ receipts }: { receipts: ProvenanceReceipt[] }): JSX.Element | null {
+  const { t } = useI18n();
+  const totals = aggregateReceipts(receipts);
+  if (totals.modelCalls === 0 && totals.retrievals === 0 && totals.toolExecs === 0) return null;
+  return (
+    <p className="receipt-totals mono small" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '4px 0 8px' }}>
+      <span>{t('prov.totModelCalls', { n: totals.modelCalls })}</span>
+      {totals.totalTokens > 0 && <span>{t('prov.totTokens', { n: formatTokens(totals.totalTokens) })}</span>}
+      {totals.latencyMsMax > 0 && (
+        <span title={t('prov.totLatencyTitle', { sum: formatDuration(totals.latencyMsSum) })}>
+          {t('prov.totLatency', { max: formatDuration(totals.latencyMsMax), sum: formatDuration(totals.latencyMsSum) })}
+        </span>
+      )}
+      <span>{t('prov.totRetrievals', { n: totals.retrievals })}</span>
+      <span>{t('prov.totTools', { n: totals.toolExecs })}</span>
+    </p>
   );
 }
 
