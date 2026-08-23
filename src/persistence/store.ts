@@ -12,6 +12,8 @@ import {
   AutomationSchema,
   ToolIntegrationSchema,
   IterationRecord,
+  ScreeningSession,
+  ScreeningDecision,
 } from '../domain/index.js';
 import { z } from 'zod';
 import { STAGE_ORDER } from '../domain/run.js';
@@ -49,6 +51,8 @@ const KIND_SCHEMAS = {
   automation: AutomationSchema,
   tool_integration: ToolIntegrationSchema,
   iteration: IterationRecord,
+  screening_session: ScreeningSession,
+  screening_decision: ScreeningDecision,
 } as const;
 
 export type ObjectKind = keyof typeof KIND_SCHEMAS & (string & {});

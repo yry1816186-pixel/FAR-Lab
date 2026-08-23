@@ -2341,3 +2341,23 @@ select option { color: var(--text); background: var(--surface); }
     border-bottom: 1px solid var(--v2-border, var(--v2-form-border));
   }
 }
+
+/* ---- active-learning screening workbench (ASReview-pattern) ---- */
+.screening-entry { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+.screening-panel { max-width: 720px; }
+.screening-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px; overflow-y: auto; }
+.screening-progress { display: flex; align-items: center; gap: 8px; }
+.screening-progress-bar { flex: 1; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.screening-progress-fill { height: 100%; background: var(--accent); transition: width 160ms ease; }
+.screening-card { border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; background: var(--panel); }
+.screening-card-top { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.screening-card-title { margin: 0; font-size: var(--fs-md); }
+.screening-card-abs { margin: 0 0 10px; font-size: var(--fs-sm); line-height: 1.55; }
+.screening-actions { display: flex; gap: 10px; }
+.screening-actions kbd { margin-left: 4px; opacity: 0.65; }
+.screening-stop { border-top: 1px dashed var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.screening-stop--eligible { border-top-color: var(--ok, #2e7d32); }
+.screening-stop-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.screening-done { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px 8px; text-align: center; }
+.screening-pad { padding: 12px 16px 0; }
+.screening-pad-x { margin: 0 16px; }
