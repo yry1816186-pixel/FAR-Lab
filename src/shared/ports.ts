@@ -43,7 +43,7 @@ export interface StructuredCallResult<T> {
     modelId: string;
     modelVersion?: string;
     latencyMs: number;
-    usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+    usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number; cachedInputTokens?: number; cacheCreationTokens?: number; cacheReadTokens?: number; reasoningTokens?: number };
     requestHash: string;
     outputHash: string;
     finishReason?: string;

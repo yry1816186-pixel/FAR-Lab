@@ -167,6 +167,40 @@ type ChatAttempt = ChatSuccess | { ok: false; failure: ClassifiedFailure };
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
+/**
+ * RU-9 GO1 token-kind parsing (pure, offline-testable). Both wires normalize
+ * cache/reasoning token fields into the unified usage shape; absent fields
+ * stay absent (never zero-fabricated).
+ */
+export const parseOpenAIUsage = (raw: unknown): {
+  promptTokens?: number; completionTokens?: number; totalTokens?: number;
+  cachedInputTokens?: number; reasoningTokens?: number;
+} => {
+  const u = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  const promptDetails = (typeof u.prompt_tokens_details === 'object' && u.prompt_tokens_details !== null ? u.prompt_tokens_details : {}) as Record<string, unknown>;
+  const completionDetails = (typeof u.completion_tokens_details === 'object' && u.completion_tokens_details !== null ? u.completion_tokens_details : {}) as Record<string, unknown>;
+  return {
+    ...(typeof u.prompt_tokens === 'number' ? { promptTokens: u.prompt_tokens } : {}),
+    ...(typeof u.completion_tokens === 'number' ? { completionTokens: u.completion_tokens } : {}),
+    ...(typeof u.total_tokens === 'number' ? { totalTokens: u.total_tokens } : {}),
+    ...(typeof promptDetails.cached_tokens === 'number' ? { cachedInputTokens: promptDetails.cached_tokens } : {}),
+    ...(typeof completionDetails.reasoning_tokens === 'number' ? { reasoningTokens: completionDetails.reasoning_tokens } : {}),
+  };
+};
+
+export const parseAnthropicUsage = (raw: unknown): {
+  promptTokens?: number; completionTokens?: number;
+  cacheCreationTokens?: number; cacheReadTokens?: number;
+} => {
+  const u = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  return {
+    ...(typeof u.input_tokens === 'number' ? { promptTokens: u.input_tokens } : {}),
+    ...(typeof u.output_tokens === 'number' ? { completionTokens: u.output_tokens } : {}),
+    ...(typeof u.cache_creation_input_tokens === 'number' ? { cacheCreationTokens: u.cache_creation_input_tokens } : {}),
+    ...(typeof u.cache_read_input_tokens === 'number' ? { cacheReadTokens: u.cache_read_input_tokens } : {}),
+  };
+};
+
 
 const truncate = (s: string, n: number): string => (s.length <= n ? s : `${s.slice(0, n)}…[truncated]`);
 
@@ -650,11 +684,7 @@ const parseAnthropicSuccessBody = (bodyText: string, providerName: string): Chat
       },
     };
   }
-  const usageRaw = isRecord(record?.usage) ? (record?.usage as Record<string, unknown>) : {};
-  const usage = {
-    ...(typeof usageRaw.input_tokens === 'number' ? { promptTokens: usageRaw.input_tokens } : {}),
-    ...(typeof usageRaw.output_tokens === 'number' ? { completionTokens: usageRaw.output_tokens } : {}),
-  };
+  const usage = parseAnthropicUsage(record?.usage);
   const stopReason = typeof record?.stop_reason === 'string' ? record.stop_reason : undefined;
   const finishReason =
     stopReason === 'max_tokens' ? 'length' : stopReason === 'end_turn' || stopReason === 'stop_sequence' ? 'stop' : stopReason;
@@ -729,13 +759,7 @@ const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt =
       },
     };
   }
-  const usageEnvelope = record?.usage;
-  const usageRaw = isRecord(usageEnvelope) ? usageEnvelope : {};
-  const usage = {
-    ...(typeof usageRaw.prompt_tokens === 'number' ? { promptTokens: usageRaw.prompt_tokens } : {}),
-    ...(typeof usageRaw.completion_tokens === 'number' ? { completionTokens: usageRaw.completion_tokens } : {}),
-    ...(typeof usageRaw.total_tokens === 'number' ? { totalTokens: usageRaw.total_tokens } : {}),
-  };
+  const usage = parseOpenAIUsage(record?.usage);
   const respondedModel = record?.model;
   const finishReason = choice0?.finish_reason;
   return {

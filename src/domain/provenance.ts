@@ -21,6 +21,16 @@ export const ModelCallFacts = z.object({
     promptTokens: z.number().int().nonnegative().optional(),
     completionTokens: z.number().int().nonnegative().optional(),
     totalTokens: z.number().int().nonnegative().optional(),
+    /**
+     * RU-9 GO1 token-kind accounting: providers bill cached/reasoning tokens at
+     * different rates (zai implicit ~50%; dashscope explicit 10/125%; OpenAI
+     * reasoning at output rate) — dropping them understated USD-ceiling
+     * accounting by up to 80-90% on cache hits. All optional: old receipts parse.
+     */
+    cachedInputTokens: z.number().int().nonnegative().optional(),
+    cacheCreationTokens: z.number().int().nonnegative().optional(),
+    cacheReadTokens: z.number().int().nonnegative().optional(),
+    reasoningTokens: z.number().int().nonnegative().optional(),
   }).default({}),
   latencyMs: z.number().int().nonnegative(),
   requestHash: z.string().length(64),   // canonical hash of redacted request
