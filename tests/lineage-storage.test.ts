@@ -112,3 +112,19 @@ describe('event_tags + queryEvents (RU-2 G6)', () => {
     db2.close();
   });
 });
+
+describe('live lineage writer (re-audit fix)', () => {
+  it('putObject records evidence/revision edges IMMEDIATELY — no backfill needed', () => {
+    const { store } = mkDb();
+    const q = ResearchQuestion.parse({ id: newId('q'), text: 'live writer?', goalType: 'explanatory', createdAt: '2026-08-24T00:00:00.000Z', scope: { domain: 'd', phenomena: ['p'] }, constraints: {} });
+    const run = store.createRun(q);
+    store.putObject('evidence_relation', {
+      id: newId('ev'), runId: run.id, claimId: newId('clm'), relation: 'contradicts',
+      targetHypothesisId: newId('hyp'), rationale: 'live', strength: 'moderate',
+      createdAt: '2026-08-24T00:00:00.000Z', uncertainties: [],
+    } as never);
+    const edges = store.listLineageEdges({ kind: 'counter_evidence' });
+    expect(edges).toHaveLength(1); // written at putObject time, same store instance
+    expect(edges[0]!.runId).toBe(run.id);
+  });
+});

@@ -19,19 +19,6 @@ export interface ConformalInterval {
   guarantee: string;
 }
 
-const quantile = (sorted: readonly number[], q: number): number => {
-  if (sorted.length === 0) throw new Error('conformal: empty calibration set');
-  const pos = q * (sorted.length - 1);
-  const lo = Math.floor(pos);
-  const hi = Math.ceil(pos);
-  return lo === hi ? sorted[lo]! : sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (pos - lo);
-};
-
-/**
- * Split-conformal interval for a new prediction, calibrated on held-out
- * ABSOLUTE residuals |y - yhat| of the calibration split.
- * Finite-sample quantile: the ⌈(n+1)(1-α)⌉-th smallest residual.
- */
 export const conformalInterval = (
   calibrationResiduals: readonly number[],
   prediction: number,
@@ -41,9 +28,15 @@ export const conformalInterval = (
   const n = calibrationResiduals.length;
   if (n < 2) throw new Error(`conformal: need >=2 calibration residuals, got ${n}`);
   const sorted = [...calibrationResiduals].sort((a, b) => a - b);
-  const k = Math.min(n, Math.ceil((n + 1) * (1 - alpha)));
-  const q = k <= 0 ? sorted[0]! : quantile(sorted.slice(0, Math.max(k, 1)), (k - 1) / Math.max(k - 1, 1));
-  const halfWidth = k === 0 ? sorted[0]! : q;
+  const k = Math.ceil((n + 1) * (1 - alpha));
+  // Re-audit fix: when alpha < 1/(n+1) the conformal quantile is the (n+1)-th
+  // order statistic — beyond the sample. The honest finite-sample half-width
+  // is INFINITE (coverage cannot be guaranteed); clamping to n (the old
+  // Math.min) silently UNDER-covers. Fail closed with the actionable message.
+  if (k > n) {
+    throw new Error(`conformal: alpha=${alpha} too small for n=${n} calibration points — finite-sample coverage requires alpha >= 1/(n+1); add calibration data or raise alpha`);
+  }
+  const halfWidth = k === 0 ? sorted[0]! : sorted[k - 1]!;
   return {
     low: prediction - halfWidth,
     high: prediction + halfWidth,
