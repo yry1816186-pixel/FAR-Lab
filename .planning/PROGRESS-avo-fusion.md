@@ -9,12 +9,12 @@
 - cd98ec0: supervisor.ts + lineage.ts + orchestrator 接线, 18 个新测试
 
 ## S8 剩余
-- evaluator 家族显式化 (G8, P2)
+- ~~evaluator 家族显式化 (G8)~~ DONE 917f5ed (5 evaluators + /evaluations API)
 - exploratory CodeAct 执行接线（sidecar 沙箱 op + receipt 落库）——静态门已落
 - pass-by-reference / event query API (G5/G6, P1) — 可与 CodeAct 层合并推进
 
-## 门禁证据 (2026-08-24 03:17)
-- vitest 全量: **1262 passed / 2 skipped** (107 files, 新增 24 个 AVO-fusion 测试)
+## 门禁证据 (2026-08-24 03:17 → 03:28 复核)
+- vitest 全量: **1268 passed / 2 skipped** (110 files, 新增 ~30 个 AVO-fusion 测试)
 - tsc --noEmit GREEN; npm run build GREEN
 - secret-scan PASS (57 MEDIUM 全部在 .venv/桌面 target 等忽略路径, 与既有基线一致)
 - path-hygiene WARN-only (0 errors; desktop/experiment-runtime 构建产物, gitignore 覆盖)
