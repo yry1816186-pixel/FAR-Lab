@@ -93,8 +93,112 @@ export const consolidateRun = (store: Store, runId: string, now = new Date().toI
     }));
   }
 
+  // ---- semantic: durable literature findings (claims participating in relations) ----
+  items.push(...semanticFindingsForRun(store, runId, now));
+
   for (const item of items) store.putMemory(item);
   return { runId, itemsWritten: items.length, skipped };
+};
+
+/** Cap: at most this many semantic findings per run (memory-flood guard). */
+export const SEMANTIC_FINDINGS_PER_RUN = 20;
+
+/**
+ * RU-1 semantic writer: verified claims that PARTICIPATE in evidence relations
+ * (the durable literature findings of this run) become semantic memory items.
+ * Deterministic derivation, zero LLM: trust = external_literature with the
+ * source's resolvable identifier as sourceRef (the putMemory gate REQUIRES it);
+ * claims without a resolvable DOI/URL are fenced to external_untrusted honestly
+ * rather than fabricated as literature. Bounded per run.
+ */
+export const semanticFindingsForRun = (
+  store: Store,
+  runId: string,
+  now = new Date().toISOString(),
+): MemoryItem[] => {
+  const relations = store.listObjects('evidence_relation', runId) as unknown as Array<{ claimId?: string; sourceDocumentId?: string; relation: string }>;
+  const claimsById = new Map(
+    (store.listObjects('claim', runId) as unknown as Array<{ id: string; text: string; locators: Array<{ sourceDocumentId: string }> }>)
+      .map((c) => [c.id, c]),
+  );
+  const docsById = new Map(
+    (store.listObjects('source_document', runId) as unknown as Array<{ id: string; identifiers: Array<{ kind: string; value: string }> }>)
+      .map((d) => [d.id, d]),
+  );
+  const findings = new Map<string, { claim: { id: string; text: string; locators: Array<{ sourceDocumentId: string }> }; relations: string[] }>();
+  for (const rel of relations) {
+    const claim = rel.claimId !== undefined ? claimsById.get(rel.claimId) : undefined;
+    if (claim === undefined) continue;
+    const entry = findings.get(claim.id) ?? { claim, relations: [] };
+    entry.relations.push(rel.relation);
+    findings.set(claim.id, entry);
+  }
+  const out: MemoryItem[] = [];
+  for (const { claim, relations: rels } of findings.values()) {
+    if (out.length >= SEMANTIC_FINDINGS_PER_RUN) break;
+    const docId = claim.locators[0]?.sourceDocumentId;
+    const doc = docId !== undefined ? docsById.get(docId) : undefined;
+    const doi = doc?.identifiers.find((i) => i.kind === 'doi')?.value;
+    const url = doc?.identifiers.find((i) => i.kind === 'url')?.value;
+    const sourceRef = doi !== undefined ? `doi:${doi}` : url;
+    out.push(MemoryItemSchema.parse({
+      id: memIdFor('claim', claim.id),
+      kind: 'semantic',
+      entityType: 'finding',
+      title: claim.text.slice(0, 200),
+      body: JSON.stringify({ claimId: claim.id, relations: rels, sourceDocumentId: docId ?? null }),
+      status: 'active',
+      trustClass: sourceRef !== undefined ? 'external_literature' : 'external_untrusted',
+      taint: 'derived_untrusted',
+      provenance: {
+        runId,
+        ...(sourceRef !== undefined ? { sourceRef } : {}),
+      },
+      createdAt: now, lastAccessedAt: now, accessCount: 0,
+    }));
+  }
+  return out;
+};
+
+/**
+ * RU-1 profile writer: researcher preferences derived deterministically from a
+ * conversation's proposal resolutions — per action kind, the LATEST resolution
+ * decides the disposition (approved/rejected), and remembered grants surface as
+ * auto-trust. Same-id latest-wins (one preference object per kind, idempotent),
+ * consistent with deterministic consolidation ids.
+ */
+export const consolidateConversationProfile = (
+  store: Store,
+  conversation: { id: string; autoApprove: readonly string[]; messages: readonly { proposals?: Array<{ kind: string; status: string; resolvedAt?: string }> }[] },
+  now = new Date().toISOString(),
+): { itemsWritten: number } => {
+  const latest = new Map<string, { disposition: 'approved' | 'rejected'; resolvedAt: string }>();
+  for (const m of conversation.messages) {
+    for (const p of m.proposals ?? []) {
+      if (p.status !== 'executed' && p.status !== 'rejected') continue;
+      const at = p.resolvedAt ?? '';
+      const prev = latest.get(p.kind);
+      if (prev === undefined || at >= prev.resolvedAt) {
+        latest.set(p.kind, { disposition: p.status === 'executed' ? 'approved' : 'rejected', resolvedAt: at });
+      }
+    }
+  }
+  const remembered = new Set(conversation.autoApprove);
+  for (const [kind, state] of latest) {
+    store.putMemory(MemoryItemSchema.parse({
+      id: memIdFor('profile', `${conversation.id}:${kind}`),
+      kind: 'profile',
+      entityType: 'preference',
+      title: `researcher preference: ${kind} → ${state.disposition}${remembered.has(kind) ? ' (auto-trusted in this conversation)' : ''}`,
+      body: JSON.stringify({ conversationId: conversation.id, kind, disposition: state.disposition, rememberedGrant: remembered.has(kind), resolvedAt: state.resolvedAt }),
+      status: 'active',
+      trustClass: 'own_unverified', // deterministic projection of conversation state; no per-item receipt
+      taint: 'trusted',
+      provenance: {},
+      createdAt: now, lastAccessedAt: now, accessCount: 0,
+    }));
+  }
+  return { itemsWritten: latest.size };
 };
 
 /**
