@@ -73,4 +73,28 @@ print(statistics.mean(xs))
     const net = v.violations.find((x) => x.code === 'E-NETWORK');
     expect(net?.line).toBe(2);
   });
+
+  it('blocks the empirically-confirmed dunder-traversal sandbox escape (E-ESCAPE)', () => {
+    // Exact payload shape from the 2026-08-24 adversarial audit: no import
+    // statement, no marker word from other classes — pure attribute traversal
+    // that recovered the real open/__import__ inside the restricted namespace.
+    const escapePayloads = [
+      `objs = ().__class__.__bases__[0].__subclasses__()\nprint(len(objs))`,
+      `g = print.__init__.__globals__\nprint(list(g.keys())[:5])`,
+      `bi = getattr(print, '__init__').__globals__['__builtins__']\nprint(hasattr(bi, 'open'))`,
+      `cls = type('x', (), {})\nprint(cls.__mro__)`,
+    ];
+    for (const code of escapePayloads) {
+      const v = clean(code);
+      expect(v.allowed).toBe(false);
+      expect(v.violations.some((x) => x.code === 'E-ESCAPE')).toBe(true);
+    }
+    // The string-form ban also catches getattr(..., '__globals__') laundering.
+    const laundered = clean(`f = getattr(len, '__globals__')`);
+    expect(laundered.allowed).toBe(false);
+    expect(laundered.violations.some((x) => x.code === 'E-ESCAPE')).toBe(true);
+    // Ordinary analysis code that merely uses dunder-named METHODS implicitly
+    // (len(), iteration) stays allowed — the ban is on WRITTEN dunder attrs only.
+    expect(clean(`import statistics\nxs=[1,2,3]\nprint(statistics.pstdev(xs))`).allowed).toBe(true);
+  });
 });

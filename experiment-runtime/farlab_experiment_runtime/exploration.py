@@ -25,7 +25,6 @@ import ast
 import builtins
 import io
 import contextlib
-import importlib
 import json as _json
 import math as _math
 import statistics as _statistics
@@ -55,6 +54,18 @@ _FORBIDDEN_BUILTINS = (
     "globals", "locals", "breakpoint", "vars", "dir",
 )
 
+# Dunder introspection names banned at AST level (mirror of the TS gate's
+# E-ESCAPE). Adversarial audit 2026-08-24: without this ban the restricted
+# namespace is defeatable by pure attribute traversal —
+# ().__class__.__bases__[0].__subclasses__() ... __init__.__globals__
+# ['__builtins__'] recovers the real open/__import__. Analysis code has no
+# legitimate use for interpreter internals.
+_ESCAPE_ATTRS = frozenset({
+    "__class__", "__bases__", "__base__", "__mro__", "__subclasses__",
+    "__globals__", "__builtins__", "__dict__", "__code__",
+    "__func__", "__closure__", "__defaults__", "__kwdefaults__",
+})
+
 
 def _make_import(module_map: dict[str, Any]):
     def _import(name, globals=None, locals=None, fromlist=(), level=0):
@@ -80,6 +91,17 @@ def _check_source(code: str) -> None:
             root = (node.module or "").split(".")[0]
             if node.level or root not in _ALLOWED_MODULES:
                 raise ValueError(f"from-import of {node.module!r} is outside the exploration allowlist")
+        elif isinstance(node, ast.Attribute):
+            if node.attr in _ESCAPE_ATTRS:
+                raise ValueError(
+                    f"attribute {node.attr!r} is forbidden: interpreter introspection is the sandbox-escape chain"
+                )
+        elif isinstance(node, ast.Constant):
+            # getattr(obj, "__globals__") carries the dunder as a plain string.
+            if isinstance(node.value, str) and node.value in _ESCAPE_ATTRS:
+                raise ValueError(
+                    f"string form of {node.value!r} is forbidden (introspection via getattr does not bypass the gate)"
+                )
 
 
 def run_exploration(payload: dict[str, Any]) -> dict[str, Any]:
