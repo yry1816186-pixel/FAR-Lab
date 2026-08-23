@@ -24,7 +24,6 @@ import { isCancellationError } from './guard.js';
 import {
   assertNotCancelled,
   bucketClaims,
-  claimsForPrompt,
   DUPLICATE_MARKER,
   isRepresentative,
   partitionClaimRefs,
