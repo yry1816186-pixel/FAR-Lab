@@ -3,6 +3,7 @@ import { useI18n } from '../../../i18n/LanguageContext';
 import type { HypothesisCandidate, HypothesisScorecard } from '../../../api/types';
 import { init, type EChartsCoreOption } from '../../../viz/echarts';
 import { buildRadar, type RadarSpec } from '../../../viz/compare-viz';
+import { useChartTokens, type ChartInks } from '../../../viz/chart-theme';
 
 /**
  * Radar overlay of the compared hypotheses' score dimensions (VIZ V1). Drawn
@@ -24,6 +25,7 @@ export function RadarCompare({
   scorecards: HypothesisScorecard[];
 }): JSX.Element | null {
   const { t } = useI18n();
+  const inks = useChartTokens();
   const result = useMemo(() => buildRadar(hypotheses, scorecards), [hypotheses, scorecards]);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -33,12 +35,12 @@ export function RadarCompare({
     const chart = init(containerRef.current, undefined, { renderer: 'svg' });
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(containerRef.current);
-    chart.setOption(radarOption(result.spec, prefersReduced));
+    chart.setOption(radarOption(result.spec, prefersReduced, inks));
     return () => {
       observer.disconnect();
       chart.dispose();
     };
-  }, [result]);
+  }, [result, inks]);
 
   if (result.spec === undefined) {
     const { refusal } = result;
@@ -109,7 +111,7 @@ export function RadarCompare({
 /** Default export: this module is a lazy chunk (echarts rides along only when compare opens). */
 export default RadarCompare;
 
-function radarOption(spec: RadarSpec, reducedMotion: boolean): EChartsCoreOption {
+function radarOption(spec: RadarSpec, reducedMotion: boolean, ink: ChartInks): EChartsCoreOption {
   return {
     animation: !reducedMotion,
     animationDuration: 200,
@@ -118,11 +120,11 @@ function radarOption(spec: RadarSpec, reducedMotion: boolean): EChartsCoreOption
       indicator: spec.indicators,
       radius: '62%',
       center: ['50%', '54%'],
-      axisName: { color: '#8a8f98', fontSize: 10 },
+      axisName: { color: ink.text2, fontSize: 11 },
       splitNumber: 4,
-      splitLine: { lineStyle: { color: '#c3c8d0' } },
+      splitLine: { lineStyle: { color: ink.border } },
       splitArea: { show: false },
-      axisLine: { lineStyle: { color: '#c3c8d0' } },
+      axisLine: { lineStyle: { color: ink.border } },
     },
     series: [
       {
