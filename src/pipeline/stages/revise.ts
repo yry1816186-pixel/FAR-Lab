@@ -1,3 +1,4 @@
+import { diffArtifacts } from '../../domain/artifact-diff.js';
 import { z } from 'zod';
 import { canonicalJson } from '../../shared/crypto.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
@@ -188,6 +189,9 @@ interface RevisedObject {
   archiveRef: string; // content-addressed artifact holding the full pre-revision object
   changedFields: string[];
   rationale: string;
+  /** RU-12 GO-1: the post-revision OBJECT itself — the structured-diff walker
+   * diffs it against the pre-revision object to emit RFC 6902 ops. */
+  revised: unknown;
 }
 
 const reviseHypothesis = async (
@@ -283,6 +287,7 @@ const reviseHypothesis = async (
     changedFields,
     rationale: out.data.revisionRationale,
     updatedUncertainties: after.uncertainties,
+    revised: after,
   };
 };
 
@@ -365,6 +370,7 @@ const revisePlan = async (
     changedFields,
     rationale: out.data.revisionRationale,
     executabilityPassed: after.executabilityCheck?.passed,
+    revised: after,
   };
 };
 
@@ -464,11 +470,16 @@ export const reviseStage: StageHandler = {
           after: revised.after,
           reason,
         });
+        // RU-12 GO-1: id-anchored structured ops ride the diff entry — the
+        // revision chain is field-explainable (walker over archived before vs after)
+        const hypDiff = diffArtifacts(hyp, revised.revised, { idKeys: ['id', 'observable', 'label'] });
         diffEntries.push({
           objectType: 'hypothesis',
           objectId: hyp.id,
           summary: revised.rationale,
           changedFields: revised.changedFields,
+          patchOps: hypDiff.ops,
+          semanticFlags: hypDiff.semanticFlags,
         });
         versionLabels.push({ from: `${hyp.id}@v${hyp.version}`, to: `${hyp.id}@v${hyp.version + 1}` });
         remainingUncertainties.push(...revised.updatedUncertainties);
@@ -486,11 +497,14 @@ export const reviseStage: StageHandler = {
           after: `${plan.id} ${revised.after}`,
           reason,
         });
+        const planDiff = diffArtifacts(plan, revised.revised, { idKeys: ['id', 'label', 'metricKey'] });
         diffEntries.push({
           objectType: 'plan',
           objectId: plan.id,
           summary: revised.rationale,
           changedFields: revised.changedFields,
+          patchOps: planDiff.ops,
+          semanticFlags: planDiff.semanticFlags,
         });
         versionLabels.push({ from: `${plan.id}@pre-revision`, to: `${plan.id}@revised` });
         objectNotes.push(
