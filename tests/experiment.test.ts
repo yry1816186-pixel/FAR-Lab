@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { uvAvailable } from './helpers/uv-gate.js';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -240,7 +241,10 @@ describe('E2 dataset identity', () => {
 // ---- integration: real sidecar, real training (no mocks on the capability) ----
 
 describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () => {
-  it('runs a full experiment: dataset -> split -> train -> stats -> verdict -> feedback', async () => {
+  // Skipped honestly where the uv toolchain is absent (CI / bare machines) — same
+  // discipline as dockerReady() in gateway.test.ts; never a fake pass.
+
+  it.runIf(uvAvailable())('runs a full experiment: dataset -> split -> train -> stats -> verdict -> feedback', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));
@@ -284,7 +288,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('determinism gate: a fresh run with identical (spec, seed, env) reproduces identical results', async () => {
+  it.runIf(uvAvailable())('determinism gate: a fresh run with identical (spec, seed, env) reproduces identical results', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));
@@ -307,7 +311,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('sequential re-analysis on the same dataset is labelled exploratory and produces no feedback', async () => {
+  it.runIf(uvAvailable())('sequential re-analysis on the same dataset is labelled exploratory and produces no feedback', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));
@@ -328,7 +332,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('failure path: sidecar rejection marks the run failed with the verbatim error', async () => {
+  it.runIf(uvAvailable())('failure path: sidecar rejection marks the run failed with the verbatim error', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));
@@ -356,7 +360,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('dataset acquisition dedups: the same local file resolves to one dataset_record', async () => {
+  it.runIf(uvAvailable())('dataset acquisition dedups: the same local file resolves to one dataset_record', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));
@@ -373,7 +377,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('P2 alpha_spending: multi-comparison run adjusts alpha, labels all confirmatory, feeds feedback', async () => {
+  it.runIf(uvAvailable())('P2 alpha_spending: multi-comparison run adjusts alpha, labels all confirmatory, feeds feedback', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));
@@ -408,7 +412,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('P2 single_primary: secondary comparisons stay descriptive and never feed feedback', async () => {
+  it.runIf(uvAvailable())('P2 single_primary: secondary comparisons stay descriptive and never feed feedback', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));
@@ -439,7 +443,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('P2 ablation matrix: full-factorial expansion carries tags into result cells', async () => {
+  it.runIf(uvAvailable())('P2 ablation matrix: full-factorial expansion carries tags into result cells', async () => {
     const cells = expandAblationModels(
       { name: 'rf', builderId: 'random_forest_classifier', hyperparams: { n_estimators: 200 }, seed: 7, tags: [] },
       [
@@ -475,7 +479,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('export integration: executed experiment renders into report §7a and bundle experimentEvidence (ACC-26)', async () => {
+  it.runIf(uvAvailable())('export integration: executed experiment renders into report §7a and bundle experimentEvidence (ACC-26)', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));
@@ -534,7 +538,7 @@ describe('EEL executor end-to-end (real uv sidecar)', { timeout: 240_000 }, () =
     }
   });
 
-  it('traceable revision: experiment feedback consumed by revise -> causal Revision + VersionDiff (ACC-26)', async () => {
+  it.runIf(uvAvailable())('traceable revision: experiment feedback consumed by revise -> causal Revision + VersionDiff (ACC-26)', async () => {
     const { store, dir, cleanup } = makeStore();
     try {
       const artifacts = openArtifactStore(join(dir, 'artifacts'));

@@ -67,7 +67,10 @@ const stageModules = async (): Promise<Partial<Record<RunStageName, StageHandler
 const HANDLED_STAGES: RunStageName[] = ['scope','retrieve','verify_sources','build_evidence','generate_hypotheses','critique_falsify','rank','plan','execute','feedback','revise','export'];
 
 export const createApp = async (opts: AppOptions = {}): Promise<App> => {
-  const dataDir = path.resolve(opts.dataDir ?? '.far-run');
+  // FARLAB_DATA_DIR is a documented env override — honor it wherever createApp is
+  // called without an explicit dataDir, so the CLI, the server and `far data info`
+  // all agree on one data root instead of silently splitting runs across directories.
+  const dataDir = path.resolve(opts.dataDir ?? process.env.FARLAB_DATA_DIR ?? '.far-run');
   fs.mkdirSync(dataDir, { recursive: true });
   const db = openDb(path.join(dataDir, 'far.db'));
   const store = new Store(db);

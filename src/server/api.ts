@@ -738,6 +738,74 @@ function parseSeedSources(raw: unknown): string | {
     }
   };
 
+  /**
+   * Zotero local-library bridge (HX): server-side proxy for the Zotero desktop
+   * local API (http://localhost:23119/api/). The browser cannot call Zotero
+   * directly (CORS), the Node server can. Honest degradation: when Zotero is
+   * not running, respond 200 with {available:false} — never a fake empty
+   * library; the UI shows the documented fallback path.
+   */
+  const zoteroLibrary = async (res: http.ServerResponse): Promise<void> => {
+    const base = process.env.FARLAB_ZOTERO_URL ?? 'http://localhost:23119';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4_000);
+    try {
+      const probe = await fetch(`${base}/api/users/0`, { signal: controller.signal });
+      if (!probe.ok) throw new Error(`zotero local api HTTP ${probe.status}`);
+      const itemsRes = await fetch(
+        `${base}/api/users/0/items/top?format=json&limit=500&sort=dateModified&direction=desc`,
+        { signal: controller.signal },
+      );
+      if (!itemsRes.ok) throw new Error(`zotero items HTTP ${itemsRes.status}`);
+      const data: unknown = await itemsRes.json();
+      if (!Array.isArray(data)) throw new Error('zotero returned a non-array payload');
+      const items: Array<Record<string, unknown>> = [];
+      for (const raw of data) {
+        if (typeof raw !== 'object' || raw === null) continue;
+        const d = raw as {
+          key?: string; data?: {
+            title?: string; itemType?: string; DOI?: string; url?: string; date?: string;
+            creators?: { firstName?: string; lastName?: string; name?: string }[];
+            tags?: { tag?: string }[]; collections?: string[]; related?: string[];
+          };
+        };
+        if (d.data === undefined || d.data.itemType === 'note' || d.data.itemType === 'attachment') continue;
+        if (typeof d.key !== 'string' || typeof d.data.title !== 'string') continue;
+        const item = d.data; // local binding keeps narrowing across the object literal
+        if (item === undefined) continue;
+        const yearMatch: RegExpMatchArray | null = item.date?.match(/(1[89]\d{2}|20\d{2})/) ?? null;
+        items.push({
+          key: d.key,
+          title: item.title,
+          itemType: item.itemType ?? 'journalArticle',
+          ...(yearMatch !== null ? { year: Number(yearMatch[0]) } : {}),
+          ...(item.creators !== undefined
+            ? { creators: item.creators.map((c) => c.name ?? [c.firstName, c.lastName].filter(Boolean).join(' ')).filter((s) => s.length > 0) }
+            : { creators: [] }),
+          ...(typeof item.DOI === 'string' && item.DOI.length > 0 ? { doi: item.DOI } : {}),
+          ...(typeof item.url === 'string' && item.url.length > 0 ? { url: item.url } : {}),
+          tags: Array.isArray(item.tags) ? item.tags.map((t) => (typeof t?.tag === 'string' ? t.tag : '')).filter((s) => s.length > 0) : [],
+          collections: Array.isArray(item.collections) ? (item.collections as unknown[]).filter((c): c is string => typeof c === 'string') : [],
+          relatedKeys: Array.isArray(item.related)
+            ? (item.related as unknown[]).filter((r): r is string => typeof r === 'string')
+            : [],
+        });
+      }
+      sendJson(res, 200, { available: true, items, total: items.length, fetchedAt: new Date().toISOString() });
+    } catch (e) {
+      // Zotero not running / timeout / malformed — honest unavailability, not an empty library.
+      sendJson(res, 200, {
+        available: false,
+        items: [],
+        total: 0,
+        fetchedAt: new Date().toISOString(),
+        reason: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   const runEvents = (res: http.ServerResponse, runId: string, url: URL): void => {
     mustGetRun(runId);
     const raw = url.searchParams.get('afterSeq');

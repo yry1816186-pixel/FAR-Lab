@@ -12,7 +12,7 @@ import {
  * value without its translations reddens HERE — not as a raw key string in the UI
  * (which was possible for all 26 former `as never` call sites).
  */
-const STAGES = ['scope', 'retrieve', 'verify_sources', 'build_evidence', 'generate_hypotheses', 'critique_falsify', 'rank', 'plan', 'feedback', 'revise', 'export'] as const;
+const STAGES = ['scope', 'retrieve', 'verify_sources', 'build_evidence', 'generate_hypotheses', 'critique_falsify', 'rank', 'plan', 'execute', 'feedback', 'revise', 'export'] as const;
 const GOAL_TYPES = ['explanatory', 'predictive', 'interventional', 'methodological', 'exploratory'] as const;
 const QUALITY = ['improved', 'neutral', 'worse', 'inconclusive'] as const;
 const RECEIPT_KINDS = ['model_call', 'source_retrieval', 'tool_exec', 'stage_transition', 'export', 'revision'] as const;

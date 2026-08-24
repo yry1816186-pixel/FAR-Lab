@@ -8,6 +8,7 @@ import { Store } from '../src/persistence/store.js';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
 import { openScheduler } from '../src/experiment/scheduler.js';
 import { ResearchQuestion, HypothesisCandidate, newId } from '../src/domain/index.js';
+import { uvAvailable } from './helpers/uv-gate.js';
 
 const makeWorld = (): { dataDir: string; store: Store; cleanup: () => void } => {
   const dir = mkdtempSync(join(tmpdir(), 'farlab-cliexp-'));
@@ -72,7 +73,7 @@ const argv = (dataDir: string, positional?: string, flags: string[] = []) => ({
 });
 
 describe('far experiment CLI surface', { timeout: 300_000 }, () => {
-  it('run: spec file -> queue -> in-process worker -> terminal truth in status', async () => {
+  it.runIf(uvAvailable())('run: spec file -> queue -> in-process worker -> terminal truth in status', async () => {
     const w = makeWorld();
     try {
       const { runId, hypId } = seedRun(w.store);
