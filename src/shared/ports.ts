@@ -1,4 +1,4 @@
-import type { ContentDepth, SourceFamily, SourceIdentifier, AccessState } from '../domain/source.js';
+import type { ContentDepth, SourceFamily, SourceIdentifier, AccessState, PublicationType } from '../domain/source.js';
 
 /** Structured model call request — the narrow semantic boundary (INTERFACES.md §5). */
 export interface StructuredCallRequest {
@@ -87,8 +87,32 @@ export interface RawSourceRecord {
   license?: string;
   oaUrl?: string;
   fullTextUrl?: string;
+  /** Canonical publication type when the family API exposes one (optional — not all do). */
+  publicationType?: PublicationType;
   /** Normalized payload BEFORE volatile-field exclusion; adapter applies exclusion then hashes. */
   normalized: unknown;
+}
+
+/**
+ * Citation-graph capability (backward reference chasing + forward citation
+ * search), optional per adapter — families without a citation API simply omit
+ * it and callers feature-detect. All methods are read-only retrieval paths and
+ * follow the adapter's rate-limit/error discipline.
+ */
+export interface CitationChaseAdapter {
+  /**
+   * Backward: bare external work ids referenced by one work, in the API's own
+   * (typically citation-order) sequence. `workRef` accepts a bare family work id
+   * (e.g. OpenAlex W-id) or a resolvable compound like `doi:10.1234/abc`.
+   */
+  referencedWorkIds(workRef: string): Promise<string[]>;
+  /**
+   * Forward: works citing `workRef`, in a deterministic source-native order
+   * (explicitly sorted by the implementation, never default-luck).
+   */
+  citingWorks(workRef: string, limit: number): Promise<RawSourceRecord[]>;
+  /** Batch-resolve bare work ids to records in ONE request (bounded by the caller). */
+  worksByIds(ids: readonly string[]): Promise<RawSourceRecord[]>;
 }
 
 export interface SourceAdapter {
@@ -96,6 +120,8 @@ export interface SourceAdapter {
   search(query: string, opts?: { limit?: number }): Promise<RawRetrievalResult>;
   /** Resolve a persistent identifier to a record (citation resolution path). */
   resolve(identifier: SourceIdentifier): Promise<{ found: boolean; record?: RawSourceRecord; httpStatus: number }>;
+  /** Optional citation-graph capability; absent when the family exposes no citation API. */
+  readonly citations?: CitationChaseAdapter;
 }
 
 /** Immutable content-addressed artifact storage (source snapshots, exports, bundles). */

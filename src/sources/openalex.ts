@@ -3,6 +3,7 @@ import type { RawRetrievalResult, RawSourceRecord, SourceAdapter } from '../shar
 import { SourceAdapterError } from './error.js';
 import { type HttpGetResult, type SourceAdapterOptions, clampLimit, encodePathSegment, httpGet } from './http.js';
 import { asArray, asObject, boolField, numField, strField } from './json.js';
+import { fromOpenalexType } from './pubtype.js';
 
 const DEFAULT_BASE_URL = 'https://api.openalex.org';
 const DEFAULT_MAILTO = 'far-lab@example.com';
@@ -86,6 +87,7 @@ const mapWork = (work: unknown): RawSourceRecord | undefined => {
     .filter((name): name is string => name !== undefined);
 
   const abstractText = rebuildInvertedAbstract(w['abstract_inverted_index']);
+  const publicationType = fromOpenalexType(strField(w, 'type'));
 
   return {
     identifiers,
@@ -100,6 +102,7 @@ const mapWork = (work: unknown): RawSourceRecord | undefined => {
     oaUrl: bestOaPdf ?? bestOaLanding,
     // Direct PDF only — spike §1.5: OpenAlex landing pages are reachable HTML, not files.
     fullTextUrl: bestOaPdf ?? primaryPdf,
+    ...(publicationType !== undefined ? { publicationType } : {}),
     normalized: w, // full work object as returned, BEFORE volatile exclusion
   };
 };
@@ -226,5 +229,95 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
     return { found: true, record, httpStatus: res.status };
   };
 
-  return { family, search, resolve };
+  /**
+   * Citation-graph capability (RU-R GO1). workRef conventions shared by all three
+   * methods: a bare OpenAlex W-id (`W1234567`) or a resolvable compound
+   * (`doi:10.1234/abc`). Path-segment safety: W-ids are validated
+   * `^W\d+$`; compounds reuse the resolve() path building (encodePathSegment
+   * keeps legal '/' inside DOIs).
+   */
+  const WID_RE = /^W\d+$/;
+  const workPath = (workRef: string): string => {
+    const ref = workRef.trim();
+    if (WID_RE.test(ref)) return ref;
+    if (/^doi:\S+$/i.test(ref)) return `doi:${encodePathSegment(ref.slice(4))}`;
+    throw new SourceAdapterError({
+      family, query: workRef, kind: 'unsupported_identifier', httpStatus: 0,
+      message: `OpenAlex citations accept bare W-ids or 'doi:<doi>' refs, got '${workRef}'`,
+    });
+  };
+
+  const getJson = async (
+    url: string,
+    query: string,
+  ): Promise<Record<string, unknown>> => {
+    const res = await getWith429Retry(url, { family, query });
+    if (res.status !== 200) {
+      throw new SourceAdapterError({
+        family, query, kind: 'http_status', httpStatus: res.status,
+        message: `OpenAlex citation query failed`, url, bodyPreview: res.bodyText.slice(0, 300),
+      });
+    }
+    try {
+      const parsed: unknown = JSON.parse(res.bodyText);
+      const obj = asObject(parsed);
+      if (obj === undefined) throw new Error('not an object');
+      return obj;
+    } catch {
+      throw new SourceAdapterError({
+        family, query, kind: 'parse', httpStatus: res.status,
+        message: 'citation query response is not valid JSON', url, bodyPreview: res.bodyText.slice(0, 300),
+      });
+    }
+  };
+
+  const citations = {
+    async referencedWorkIds(workRef: string): Promise<string[]> {
+      // select=referenced_works minimizes payload; ids arrive as full URLs.
+      const url = requestUrl(`/works/${workPath(workRef)}?select=referenced_works&${mailtoQuery}`);
+      const json = await getJson(url, `refs:${workRef}`);
+      return asArray(json['referenced_works'])
+        .map((v) => (typeof v === 'string' ? v.replace(/^https?:\/\/openalex\.org\//i, '') : ''))
+        .filter((v) => WID_RE.test(v));
+    },
+
+    async citingWorks(workRef: string, limit: number): Promise<RawSourceRecord[]> {
+      const perPage = clampLimit(limit, 1, 200);
+      // sort=cited_by_count:desc — explicit deterministic order (influential
+      // citing works first), never API default-luck.
+      const url = requestUrl(
+        `/works?filter=${encodeURIComponent(`cites:${workPath(workRef)}`)}&sort=${encodeURIComponent('cited_by_count:desc')}&per-page=${perPage}&${mailtoQuery}`,
+      );
+      const json = await getJson(url, `cites:${workRef}`);
+      const records: RawSourceRecord[] = [];
+      for (const item of asArray(json['results'])) {
+        const record = mapWork(item);
+        if (record !== undefined) records.push(record);
+      }
+      return records;
+    },
+
+    async worksByIds(ids: readonly string[]): Promise<RawSourceRecord[]> {
+      const bare = ids.map((i) => i.trim()).filter((i) => WID_RE.test(i));
+      if (bare.length === 0) return [];
+      if (bare.length > 50) {
+        throw new SourceAdapterError({
+          family, query: `batch:${bare.length}`, kind: 'invalid_query', httpStatus: 0,
+          message: `worksByIds accepts at most 50 ids per request, got ${bare.length}`,
+        });
+      }
+      const url = requestUrl(
+        `/works?filter=${encodeURIComponent(`openalex_id:${bare.join('|')}`)}&per-page=${bare.length}&${mailtoQuery}`,
+      );
+      const json = await getJson(url, `batch:${bare.length}`);
+      const records: RawSourceRecord[] = [];
+      for (const item of asArray(json['results'])) {
+        const record = mapWork(item);
+        if (record !== undefined) records.push(record);
+      }
+      return records;
+    },
+  };
+
+  return { family, search, resolve, citations };
 };
