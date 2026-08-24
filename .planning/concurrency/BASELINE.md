@@ -7,8 +7,8 @@ the repository wins — then fix this file.
 ## Exact base
 
 - **Branch:** `integration/farlab-current`
-- **BASE SHA:** recorded at merge/fusion completion — run `git log --oneline -1 integration/farlab-current` and read the integration-fusion commit. Agents MUST `git worktree add <path> -b <lane-branch> <BASE SHA>`; do not branch from any other tip.
-- **Origin:** `build/hx-reconstruction` (product superset: 345 commits over main, includes all of main + PR #128 content) fused with `mission/gap-closure` (dotenv/env/data-dir/probe-custom/uv-gate/CI-alignment work). main and origin/main contribute nothing unique except the README, which is included.
+- **BASE SHA:** the commit carrying git tag **`baseline/2026-08-24`** (`git rev-parse baseline/2026-08-24`). Agents MUST `git worktree add <path> -b <lane-branch> baseline/2026-08-24`; do not branch from any other tip. Code tip of the fusion: `0f0f292` (fixes) on `16af2af` (fusion merge) on `91df82b` (build/hx-reconstruction).
+- **Origin:** `build/hx-reconstruction` (product superset: 345 commits over main, includes all of main + PR #128 content) fused with `mission/gap-closure` (dotenv/env/data-dir/probe-custom/uv-gate/CI-alignment work). main and origin/main contribute nothing unique except the README, which is included. Full chain evidence: `evidence/baseline-web/VERIFICATION-2026-08-24.md`.
 
 ## Fusion decisions already made (do not relitigate)
 
@@ -22,16 +22,17 @@ the repository wins — then fix this file.
 
 | Step | Command | Fresh-baseline evidence (2026-08-24) |
 |---|---|---|
-| Root install | `npm ci` | 144 packages, 5s |
-| Web install | `cd web && npm ci` | 354 packages, 11s |
-| Root typecheck (strict) | `npm run typecheck` | PASS |
-| Root build (dist/) | `npm run build` | PASS |
-| Web typecheck | `cd web && npm run typecheck` | PASS (after WelcomeView onOpenSettings dedup) |
-| Web build | `cd web && npm run build` | PASS (9.6s, chunk-size warning only) |
+| Root install | `npm ci` | 144 packages, 5s, exit 0 |
+| Web install | `cd web && npm ci` | 354 packages, 11s, exit 0 |
+| TUI install (required before its tests) | `cd packages/tui && npm ci` | 39 packages, 3s, exit 0 |
+| Root typecheck (strict) | `npm run typecheck` | exit 0 |
+| Root build (dist/) | `npm run build` | exit 0 |
+| Web typecheck | `cd web && npm run typecheck` | exit 0 |
+| Web build | `cd web && npm run build` | exit 0 (9.6s, chunk-size warning only) |
 | Lint | `npm run lint` | 0 errors / 3 unused-eslint-disable warnings |
-| Full tests | `npm test` | recorded in this round's verification log |
-| TUI tests | `cd packages/tui && npm test` | node:test, offline |
-| Secret scan | `node zcode-harness/scripts/secret-scan.mjs` | run before any push |
+| Full tests | `npm test` | **141 files / 1442 tests passed, 4 skipped, exit 0, 118.6s** (real uv sidecar RAN) |
+| TUI tests | `cd packages/tui && npm test` | 12/12 pass |
+| Secret scan | `node zcode-harness/scripts/secret-scan.mjs` | PASS (exit 0; .venv findings allowed) |
 
 ## Runtime launch paths
 
