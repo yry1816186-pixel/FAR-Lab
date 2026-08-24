@@ -356,6 +356,34 @@ describe('build_evidence stage', () => {
     expect(receipts[1]?.modelCall?.usage).toBeDefined();
   });
 
+  it('SCIENCE lane: quote carrying a risk ratio gets the E-value confounding disclosure (eValue activated)', async () => {
+    // The VanderWeele-Ding closed form existed with ZERO production callers; this
+    // locks the wiring: RR in the verbatim quote -> E-value note on the claim.
+    const ABSTRACT_RR =
+      'A cohort study of 4,000 workers found the exposure carried a risk ratio of 2.5 for the respiratory endpoint. ' +
+      'Adjustment for smoking attenuated the estimate only marginally.';
+    const { ctx, store } = bench([
+      extractionStep([
+        {
+          text: 'Exposure doubles respiratory risk (RR 2.5).',
+          quote: 'the exposure carried a risk ratio of 2.5 for the respiratory endpoint',
+          stance: 'supports',
+        },
+      ]),
+    ]);
+    const src = mkSource(ctx.run.id, newId('src'), { abstractText: ABSTRACT_RR });
+    corpusOf(ctx, [src]);
+    const outcome = await buildEvidenceStage.execute(ctx);
+    expect(outcome.kind).toBe('done');
+    const claims = store.listObjects('claim', ctx.run.id);
+    expect(claims).toHaveLength(1);
+    const claim = defined(claims[0], 'claim');
+    expect(claim.bindingStatus).toBe('verified');
+    const eNote = claim.uncertainties.find((u) => u.includes('E-value'));
+    expect(eNote).toBeDefined();
+    expect(eNote).toContain('RR');
+  });
+
   it('D-018: cross-paper claim pairs with topical overlap get adjudicated claim-claim relations (targetClaimId)', async () => {
     const ABSTRACT_B =
       'A three-year trial of CRISPR base editing of the maize DREB gene does not increase kernel yield under drought conditions. ' +
