@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { grimCheck, eValue, extractMeanN, rangeGuard, extractStats } from '../src/domain/stat-forensics.js';
+import { grimCheck, eValue, extractMeanN, rangeGuard, extractStats, extractRiskRatios } from '../src/domain/stat-forensics.js';
 import { conformalInterval } from '../src/domain/conformal.js';
 
 // RU-6 GO4 — deterministic statistical forensics (clean-room; scrutiny/statcheck
@@ -41,6 +41,16 @@ describe('quote statistics extraction (deterministic regex)', () => {
     expect(pairs).toEqual([{ mean: 3.22, n: 3, decimals: 2 }]);
     expect(extractMeanN('no statistics here at all')).toEqual([]);
     expect(extractMeanN('mean 5.22 but no sample size')).toEqual([]);
+  });
+
+  it('SCIENCE lane: extractRiskRatios feeds the (now wired) E-value — RR vocabulary only, bounded', () => {
+    expect(extractRiskRatios('the intervention showed RR 2.5 across cohorts')).toEqual([2.5]);
+    expect(extractRiskRatios('a risk ratio of 0.4 was observed')).toEqual([0.4]);
+    expect(extractRiskRatios('relative risk 1.9 in the treated arm')).toEqual([1.9]);
+    expect(extractRiskRatios('no effect size vocabulary in this sentence')).toEqual([]);
+    expect(extractRiskRatios('RR 0 (degenerate) and RR 5000 (misparse) are rejected')).toEqual([]);
+    // dedupe across synonyms of the same value
+    expect(extractRiskRatios('RR 2.5, risk ratio of 2.5')).toEqual([2.5]);
   });
 });
 
