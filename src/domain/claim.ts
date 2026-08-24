@@ -76,3 +76,37 @@ export const gradeClaimCertainty = (e: GradeEvidence): { certainty: ScientificCl
   if (e.contradictionSignals > 0) { level += 1; downgraded.push(`inconsistency:${e.contradictionSignals}_contradiction_signal(s)`); }
   return { certainty: ladder[Math.min(level, ladder.length - 1)], downgraded };
 };
+
+/** GRADE imprecision-domain probe (single owner of the quantity regex): explicit quantities/effects. */
+export const hasExplicitQuantity = (text: string): boolean =>
+  /\d|fold|percent|%|higher|lower|increase|decrease|significant/i.test(text);
+
+/** Full admission-time grade: GRADE-lite ladder + forensic downgrades + retraction floor. */
+export interface FinalGradeInput extends GradeEvidence {
+  /** GRIM + range-guard failures measured on the verbatim quote (>= 0). */
+  forensicFails: number;
+  /** Source is retracted or under expression of concern (floors at very_low). */
+  retractedOrEoc: boolean;
+}
+
+/**
+ * The complete deterministic certainty computation used at claim admission AND at
+ * the post-contradiction rescore (SCIENCE lane 2026-08-24): previously the
+ * inconsistency domain was permanently 0 because nothing recomputed a grade after
+ * claim-claim contradictions were adjudicated. One owner, two callers. Pure.
+ */
+export const finalGradeCertainty = (e: FinalGradeInput): {
+  certainty: ScientificClaim['gradeCertainty'];
+  downgraded: string[];
+} => {
+  const base = gradeClaimCertainty(e);
+  const ladder = ['high', 'moderate', 'low', 'very_low'] as const;
+  let idx = ladder.indexOf(base.certainty ?? 'very_low');
+  if (idx < 0) idx = ladder.length - 1;
+  if (e.retractedOrEoc) {
+    return { certainty: 'very_low', downgraded: [...base.downgraded, 'retraction:retracted_or_eoc_floor'] };
+  }
+  const steps = Math.min(e.forensicFails, ladder.length - 1 - idx);
+  const downgraded = steps > 0 ? [...base.downgraded, `forensics:${e.forensicFails}_grim_or_range_failure(s)`] : [...base.downgraded];
+  return { certainty: ladder[Math.min(idx + steps, ladder.length - 1)]!, downgraded };
+};
