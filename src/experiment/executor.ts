@@ -7,7 +7,7 @@ import {
   checkExperimentSpec, mechanicalVerdict, impliedPowerFor, POWER_METHOD,
   REGRESSOR_BUILDERS,
   type ExperimentRun, type ResultCell, type ResultSet, type StatReport,
-  type FeedbackSignal, type HypothesisCandidate, type SplitOutcome, type SidecarStatsResult,
+  type FeedbackSignal, type HypothesisCandidate, type SplitOutcome, type SidecarStatsResult, type Comparison,
 } from '../domain/index.js';
 import { acquireDataset } from './datasets.js';
 import { applySplit } from './split.js';
@@ -66,10 +66,12 @@ export type StatCall = (op: 'abs_stats' | 'paired_stats', payload: Record<string
 /**
  * Shared terminal statistics (P3 refactor): the preregistered comparison loop with
  * multiple-testing enforcement and mechanical verdicts — identical semantics whether
- * cells were produced locally or on a remote device.
+ * cells were produced locally or on a remote device, and (R2-10) whether the
+ * per-row outcomes come from an ML model or a Monte-Carlo simulation config
+ * (spec view: runId + statistics + Comparison-shaped rows).
  */
 export const computeStatReports = async (args: {
-  spec: ExperimentSpec;
+  spec: Pick<ExperimentSpec, 'runId' | 'statistics'> & { comparisons: Comparison[] };
   hypotheses: HypothesisCandidate[];
   priorReports: StatReport[];
   perRowByModel: Map<number, number[]>;
@@ -144,8 +146,8 @@ export const computeStatReports = async (args: {
   return statReports;
 };
 
-/** Shared feedback aggregation: confirmatory, non-sequential, non-secondary only (D-086-6 + P2 policy). */
-export const buildFeedback = (spec: ExperimentSpec, statReports: StatReport[], experimentRunId: string, specHash: string, now: () => string): FeedbackSignal[] => {
+/** Shared feedback aggregation: confirmatory, non-sequential, non-secondary only (D-086-6 + P2 policy). R2-10: id/version/runId are the only spec fields used (simulation specs reuse this). */
+export const buildFeedback = (spec: Pick<ExperimentSpec, 'runId' | 'id' | 'version'>, statReports: StatReport[], experimentRunId: string, specHash: string, now: () => string): FeedbackSignal[] => {
   const feedback: FeedbackSignal[] = [];
   const byHypothesis = new Map<string, StatReport[]>();
   for (const rep of statReports) {
