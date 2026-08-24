@@ -109,3 +109,14 @@ computational documents cache execution`, `observable notebooks reactive`,
 - nbdime merge algorithm edge-case completeness beyond published description
   (paper-level read; source deep-read deferred until merge impl wave)
 - desktop attach UX feasibility details (tray/deep-link interplay — PEX lane)
+
+## Addendum: parallel research-agent reconciliation (2026-08-24, main Agent)
+An independent agent saturated the same RU-12 in parallel. Convergences:
+tmux-attach = wiring not infrastructure (SSE Last-Event-ID equivalence);
+LangGraph/Temporal replay maps to existing step_outputs+fingerprints+forkRun;
+three-way merge waits for a merge-back caller. Agent corrections adopted:
+deep-diff is DEPRECATED on npm (prior packet said active); marimo =
+Apache-2.0 verified (closes UNVERIFIED); Quarto MIT>=1.4/GPL-2<=1.3 nuance.
+Agent's GO ranking adopted as canonical (RFC6902 id-anchored diff first —
+schema-aware walker, zero deps; then time-travel layer; far attach; qmd
+emitter). Packet remains the single source for RU-12.
