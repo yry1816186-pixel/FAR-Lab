@@ -97,8 +97,29 @@ export type SplitOutcome = z.infer<typeof SplitOutcome>;
 
 export const BuilderId = z.enum([
   'dummy_most_frequent', 'logistic_regression', 'random_forest_classifier', 'gradient_boosting_classifier',
+  'dummy_mean', 'linear_regression', 'random_forest_regressor', 'gradient_boosting_regressor',
 ]);
 export type BuilderId = z.infer<typeof BuilderId>;
+
+/** Task families (R2-10 regression closure): one target column defines ONE task —
+ * classifier and regressor builders cannot mix in a spec. Exported so the TS
+ * validator and any surface stay in lockstep with the sidecar template registry. */
+export const CLASSIFIER_BUILDERS: readonly BuilderId[] = [
+  'dummy_most_frequent', 'logistic_regression', 'random_forest_classifier', 'gradient_boosting_classifier',
+];
+export const REGRESSOR_BUILDERS: readonly BuilderId[] = [
+  'dummy_mean', 'linear_regression', 'random_forest_regressor', 'gradient_boosting_regressor',
+];
+
+/**
+ * Per-row statistics (R2-10 honesty gate): a comparison verdict bootstraps the MEAN of
+ * a per-row decomposable quantity, so the comparison's metricKey must BE that quantity.
+ * Classification per-row = 0/1 correctness (mean = accuracy); regression per-row =
+ * squared error (mean = MSE). Every other metric (f1_macro, roc_auc, r2, ...) lacks an
+ * exact per-row decomposition and is REPORT-ONLY — a mislabeled CI is worse than none.
+ */
+export const CLASSIFICATION_COMPARISON_METRICS: readonly MetricKey[] = ['accuracy'];
+export const REGRESSION_COMPARISON_METRICS: readonly MetricKey[] = ['mean_squared_error'];
 
 /** Hyperparameters are primitives only — deterministic serialization, no code injection surface. */
 export const Hyperparams = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
@@ -313,6 +334,12 @@ export const EnvInfo = z.object({
   versions: z.record(z.string(), z.string()),
   /** uv.lock hash when the pinned sidecar env was used; absent for system interpreter (recorded honestly). */
   lockfileHash: z.string().length(64).optional(),
+  /**
+   * R2-10 hardware capture: system/machine/cpu-count at execution time. Reproducibility
+   * CONTEXT only — same-device bit-identity is the determinism claim (D-086-3), never
+   * cross-device identity.
+   */
+  hardware: z.record(z.string(), z.string()).optional(),
 });
 export type EnvInfo = z.infer<typeof EnvInfo>;
 
@@ -343,7 +370,7 @@ export const ResultCell = z.object({
   modelIdx: z.number().int().nonnegative(),
   modelName: z.string().min(1),
   metrics: z.record(z.string(), z.number()),
-  /** Content-addressed per-row correctness (classification) or signed error (regression) arrays. */
+  /** Content-addressed per-row correctness (classification, mean=accuracy) or squared error (regression, mean=MSE) arrays. */
   perRowRef: z.string().regex(/^sha256:[0-9a-f]{64}$/),
   /** D-086-1: result identity — hash(specHash + dataset contentRef + env identity + modelIdx + seed). Executor dedups on it. */
   fingerprint: z.string().length(64),
@@ -564,11 +591,40 @@ export const checkExperimentSpec = (
   if (spec.statistics.multipleTestingPolicy === 'e_value_accumulation') {
     missing.push('multipleTestingPolicy=e_value_accumulation is not implemented in the executor (D-086); use single_primary or alpha_spending');
   }
-  // Classification builders + regression metrics is a semantic mismatch the sidecar would only hit mid-run.
+  // Task coherence (R2-10 regression closure): one target column defines one task.
+  // The sidecar template registry mirrors these sets (builders.py REGRESSORS).
   const regressionMetrics: MetricKey[] = ['mean_squared_error', 'r2'];
-  const classifierBuilders: BuilderId[] = ['dummy_most_frequent', 'logistic_regression', 'random_forest_classifier', 'gradient_boosting_classifier'];
-  if (spec.models.every((m) => classifierBuilders.includes(m.builderId)) && spec.metrics.some((mk) => regressionMetrics.includes(mk))) {
-    missing.push('classifier-only spec declares regression metrics');
+  const classifierBuilders: BuilderId[] = [...CLASSIFIER_BUILDERS];
+  const regressorBuilders: BuilderId[] = [...REGRESSOR_BUILDERS];
+  const nClassifiers = spec.models.filter((m) => classifierBuilders.includes(m.builderId)).length;
+  const nRegressors = spec.models.filter((m) => regressorBuilders.includes(m.builderId)).length;
+  if (nClassifiers > 0 && nRegressors > 0) {
+    missing.push('spec mixes classifier and regressor builders — one target column defines one task');
+  }
+  if (nClassifiers > 0 && nRegressors === 0) {
+    if (spec.metrics.some((mk) => regressionMetrics.includes(mk))) {
+      missing.push('classifier-only spec declares regression metrics');
+    }
+    for (const [ci, c] of spec.comparisons.entries()) {
+      if (!CLASSIFICATION_COMPARISON_METRICS.includes(c.metricKey)) {
+        missing.push(
+          `comparisons[${ci}] metricKey '${c.metricKey}' has no exact per-row decomposition on classification tasks — only 'accuracy' (per-row correctness) admits a mechanical CI/verdict; the rest are report-only metrics`,
+        );
+      }
+    }
+  }
+  if (nRegressors > 0 && nClassifiers === 0) {
+    const classificationMetrics = spec.metrics.filter((mk) => !regressionMetrics.includes(mk));
+    if (classificationMetrics.length > 0) {
+      missing.push(`regressor-only spec declares classification metrics: ${classificationMetrics.join(', ')}`);
+    }
+    for (const [ci, c] of spec.comparisons.entries()) {
+      if (!REGRESSION_COMPARISON_METRICS.includes(c.metricKey)) {
+        missing.push(
+          `comparisons[${ci}] metricKey '${c.metricKey}' has no exact per-row decomposition on regression tasks — only 'mean_squared_error' (per-row squared error) admits a mechanical CI/verdict; r2 is report-only`,
+        );
+      }
+    }
   }
   return {
     passed: missing.length === 0,
