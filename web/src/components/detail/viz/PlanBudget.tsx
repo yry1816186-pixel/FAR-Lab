@@ -8,7 +8,7 @@ import { parseBudget } from '../../../viz/plan-viz';
  * other cost string renders as text below — no unit guessing, no invented
  * totals (a total is shown only when EVERY costed step parsed).
  */
-const SEGMENT_INKS = ['rgba(45,120,189,0.55)', 'rgba(45,120,189,0.4)', 'rgba(45,120,189,0.3)', 'rgba(45,120,189,0.22)', 'rgba(45,120,189,0.16)'];
+const SEGMENT_INKS = ['55%','40%','30%','22%','16%'].map((p) => `color-mix(in oklab, var(--v2-info) ${p}, transparent)`);
 
 export function PlanBudget({ plan }: { plan: ResearchPlan }): JSX.Element | null {
   const { t } = useI18n();

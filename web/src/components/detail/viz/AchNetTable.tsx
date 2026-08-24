@@ -29,7 +29,7 @@ export function AchNetTable({
 
   const ink = (v: number): string => {
     const a = scale > 0 ? 0.08 + 0.3 * (Math.abs(v) / scale) : 0.12;
-    return v >= 0 ? `rgba(61, 139, 95, ${a})` : `rgba(179, 53, 44, ${a})`;
+    return v >= 0 ? `color-mix(in oklab, var(--v2-verified) ${Math.round(a*100)}%, transparent)` : `color-mix(in oklab, var(--v2-refuted) ${Math.round(a*100)}%, transparent)`;
   };
 
   return (
