@@ -119,6 +119,13 @@ export interface RawSourceRecord {
 export interface SourceAdapter {
   readonly family: SourceFamily;
   search(query: string, opts?: { limit?: number }): Promise<RawRetrievalResult>;
+  /**
+   * SCIENCE lane (2026-08-24) — citation-graph querying (filter= API param), e.g.
+   * OpenAlex `cites:W123` (forward snowballing) or `ids.openalex:W1|W2` (backward
+   * batch resolve). OPTIONAL: families without filter-style APIs simply omit it and
+   * the retrieve-stage citation chase skips them honestly (no degradation, disclosed).
+   */
+  searchFiltered?(filter: string, opts?: { limit?: number }): Promise<RawRetrievalResult>;
   /** Resolve a persistent identifier to a record (citation resolution path). */
   resolve(identifier: SourceIdentifier): Promise<{ found: boolean; record?: RawSourceRecord; httpStatus: number }>;
 }
