@@ -66,7 +66,7 @@ describe('g2/g3 checkStructuredPreregistration', () => {
     const r = checkStructuredPreregistration(basePlan({
       hypothesisIds: [h1],
       metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' }],
-      testSpecs: [{ id: 't1', metric: 'wrong-metric', statistic: 'permutation', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
+      testSpecs: [{ id: 't1', metric: 'wrong-metric', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
       predictions: [{ hypothesisId: h1, observable: 'precision@5', condition: 'rerank on', expectedRelation: 'increases' }],
       expectedInfoGain: { decisionAtStake: 'pick reranker', ambiguitySource: 'mixed results', discriminatingMetric: 'p@5', expectedSeparation: '>=0.1' },
     }), known);
@@ -74,11 +74,36 @@ describe('g2/g3 checkStructuredPreregistration', () => {
     expect(r.errors.some((e) => e.includes('wrong-metric'))).toBe(true);
   });
 
+  it('SCIENCE lane: rejects statistics with no executor (preregistration-integrity seam)', () => {
+    // A frozen plan promising permutation/wilson/kappa/mde_gate preregisters an
+    // analysis the executor cannot run as declared — the only inferential
+    // statistic implemented today is bootstrap_ci (paired_bootstrap_ci).
+    for (const statistic of ['permutation', 'wilson', 'kappa', 'mde_gate'] as const) {
+      const r = checkStructuredPreregistration(basePlan({
+        hypothesisIds: [h1],
+        metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' }],
+        testSpecs: [{ id: 't1', metric: 'p@5', statistic, hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
+        predictions: [{ hypothesisId: h1, observable: 'precision@5', condition: 'rerank on', expectedRelation: 'increases' }],
+      }), known);
+      expect(r.errors.some((e) => e.includes('无可执行实现')), `statistic=${statistic}`).toBe(true);
+    }
+    // descriptive + bootstrap_ci stay admissible (no inferential promise / executor exists)
+    for (const statistic of ['descriptive', 'bootstrap_ci'] as const) {
+      const r = checkStructuredPreregistration(basePlan({
+        hypothesisIds: [h1],
+        metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' }],
+        testSpecs: [{ id: 't1', metric: 'p@5', statistic, hypothesisIds: [h1], prediction: 'supports', interpretation: 'estimation_ci', threshold: 0.6, thresholdOp: '>=' }],
+        predictions: [{ hypothesisId: h1, observable: 'precision@5', condition: 'rerank on', expectedRelation: 'increases' }],
+      }), known);
+      expect(r.errors.some((e) => e.includes('无可执行实现')), `statistic=${statistic}`).toBe(false);
+    }
+  });
+
   it('catches direction-threshold contradiction: higher_better + supports + "<=" (injection fault)', () => {
     const r = checkStructuredPreregistration(basePlan({
       hypothesisIds: [h1],
       metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' }],
-      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '<=' }],
+      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '<=' }],
       predictions: [{ hypothesisId: h1, observable: 'p@5', condition: 'on', expectedRelation: 'increases' }],
       expectedInfoGain: { decisionAtStake: 'x', ambiguitySource: 'y', discriminatingMetric: 'p@5', expectedSeparation: 'z' },
     }), known);
@@ -90,8 +115,8 @@ describe('g2/g3 checkStructuredPreregistration', () => {
       hypothesisIds: [h1],
       metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' }],
       testSpecs: [
-        { id: 't1', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' },
-        { id: 't2', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1], prediction: 'excludes', interpretation: 'np_test', threshold: 0.7, thresholdOp: '<=' },
+        { id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' },
+        { id: 't2', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'excludes', interpretation: 'np_test', threshold: 0.7, thresholdOp: '<=' },
       ],
       predictions: [{ hypothesisId: h1, observable: 'p@5', condition: 'on', expectedRelation: 'increases' }],
       expectedInfoGain: { decisionAtStake: 'x', ambiguitySource: 'y', discriminatingMetric: 'p@5', expectedSeparation: 'z' },
@@ -103,7 +128,7 @@ describe('g2/g3 checkStructuredPreregistration', () => {
     const r = checkStructuredPreregistration(basePlan({
       hypothesisIds: [h1, h2],
       metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' }],
-      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1, h2], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
+      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1, h2], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
       predictions: [
         { hypothesisId: h1, observable: 'p@5', condition: 'on', expectedRelation: 'increases' },
         { hypothesisId: h2, observable: 'p@5', condition: 'on', expectedRelation: 'increases' },
@@ -117,7 +142,7 @@ describe('g2/g3 checkStructuredPreregistration', () => {
     const r = checkStructuredPreregistration(basePlan({
       hypothesisIds: [h1, h2],
       metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' }],
-      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1, h2], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
+      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1, h2], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
       predictions: [
         { hypothesisId: h1, observable: 'p@5', condition: 'on', expectedRelation: 'increases' },
         { hypothesisId: h2, observable: 'p@5', condition: 'on', expectedRelation: 'decreases' },
@@ -132,7 +157,7 @@ describe('g2/g3 checkStructuredPreregistration', () => {
     const r = checkStructuredPreregistration(basePlan({
       hypothesisIds: [h1, h2],
       metricSpecs: [{ name: 'p@5', definition: 'd', role: 'primary', direction: 'higher_better' }],
-      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
+      testSpecs: [{ id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' }],
       predictions: [{ hypothesisId: h1, observable: 'p@5', condition: 'on', expectedRelation: 'increases' }],
       expectedInfoGain: { decisionAtStake: 'x', ambiguitySource: 'y', discriminatingMetric: 'p@5', expectedSeparation: 'z' },
     }), known);
@@ -156,7 +181,7 @@ describe('g2/g3 checkStructuredPreregistration', () => {
       ...base,
       alternativeBranches: [],
       testSpecs: [
-        { id: 't1', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' },
+        { id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', threshold: 0.6, thresholdOp: '>=' },
         { id: 't2', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'weakens', interpretation: 'estimation_ci', threshold: 0.4, thresholdOp: '<=' },
       ],
       bayesianCalibrationNote: undefined,
@@ -217,10 +242,10 @@ describe('g6 alpha spend ledger', () => {
   it('accumulates per-hypothesis α across plan versions', () => {
     const h1 = hyp();
     const v1 = basePlan({ hypothesisIds: [h1], testSpecs: [
-      { id: 't1', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', alpha: 0.025, threshold: 0.6, thresholdOp: '>=' },
+      { id: 't1', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', alpha: 0.025, threshold: 0.6, thresholdOp: '>=' },
     ] });
     const v2 = basePlan({ hypothesisIds: [h1], testSpecs: [
-      { id: 't2', metric: 'p@5', statistic: 'permutation', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', alpha: 0.025, threshold: 0.65, thresholdOp: '>=' },
+      { id: 't2', metric: 'p@5', statistic: 'bootstrap_ci', hypothesisIds: [h1], prediction: 'supports', interpretation: 'np_test', alpha: 0.025, threshold: 0.65, thresholdOp: '>=' },
     ] });
     const ledger = alphaSpendLedger([v1, v2]);
     const row = ledger.find((r) => r.hypothesisId === h1);

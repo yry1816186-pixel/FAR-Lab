@@ -30,6 +30,13 @@ export interface StructuredCheckResult {
   warnings: string[];
 }
 
+/**
+ * SCIENCE lane (2026-08-24) — the ONLY plan-level statistics with a real executor
+ * today ('bootstrap_ci' -> StatisticsPlan paired_bootstrap_ci). 'descriptive' makes
+ * no inferential promise. Grow this set ONLY when an executor actually lands.
+ */
+export const IMPLEMENTABLE_PLAN_STATISTICS: ReadonlySet<string> = new Set(['bootstrap_ci', 'descriptive']);
+
 const intervalOf = (t: { threshold?: number; thresholdOp?: string }): readonly [number, number] | null => {
   if (t.threshold === undefined || t.thresholdOp === undefined) return null;
   switch (t.thresholdOp) {
@@ -71,6 +78,20 @@ export const checkStructuredPreregistration = (
   const primaryCount = plan.metricSpecs.filter((m) => m.role === 'primary').length;
   if (plan.testSpecs.length > 0 && primaryCount !== 1) {
     warnings.push(`primary 指标应为恰好 1 个（single_primary 纪律），当前 ${primaryCount} 个`);
+  }
+  // SCIENCE lane (2026-08-24) — preregistration-integrity seam: the experiment
+  // executor implements ONLY paired-bootstrap-CI inference (StatisticsPlan.test =
+  // paired_bootstrap_ci|paired_t). Freezing a plan that promises permutation/
+  // wilson/kappa/mde_gate preregisters an analysis the system cannot run as
+  // declared. Fail closed here until those executors exist. 'descriptive' makes
+  // no inferential promise and stays admissible as a descriptive entry.
+  for (const [i, t] of plan.testSpecs.entries()) {
+    if (!IMPLEMENTABLE_PLAN_STATISTICS.has(t.statistic)) {
+      errors.push(
+        `testSpecs[${i}]「${t.id}」统计量 ${t.statistic} 无可执行实现——预注册不可执行的分析违反预注册完整性` +
+          `（当前可执行集：${[...IMPLEMENTABLE_PLAN_STATISTICS].join('|')}）`,
+      );
+    }
   }
 
   // g2 — reference integrity + direction/threshold contradictions + interval V&V.
