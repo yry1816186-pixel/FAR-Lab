@@ -34,6 +34,49 @@ describe('retractionStatusFrom (deterministic derivation)', () => {
   });
 });
 
+describe('retractionStatusFrom (OpenAlex is_retracted fallback, RU-R frontier cand.1)', () => {
+  const oaRecord = (isRetracted: unknown): RawSourceRecord => ({
+    identifiers: [{ kind: 'openalex', value: 'W1' }],
+    title: 't',
+    contentDepth: 'metadata_only',
+    accessState: 'unknown',
+    normalized: { id: 'https://openalex.org/W1', is_retracted: isRetracted } as Record<string, unknown>,
+  });
+
+  it('strict boolean true classifies retracted (the primary-family coverage win)', () => {
+    expect(retractionStatusFrom(oaRecord(true))).toBe('retracted');
+  });
+
+  it('never coerces truthy-but-not-boolean shapes', () => {
+    expect(retractionStatusFrom(oaRecord(false))).toBeUndefined();
+    expect(retractionStatusFrom(oaRecord(undefined))).toBeUndefined();
+    expect(retractionStatusFrom(oaRecord('true'))).toBeUndefined();
+    expect(retractionStatusFrom(oaRecord(1))).toBeUndefined();
+  });
+
+  it('update-to classification outranks the flag (richer signal wins, flag is a hint)', () => {
+    const both: RawSourceRecord = {
+      ...oaRecord(true),
+      normalized: {
+        is_retracted: true,
+        'update-to': [{ type: 'correction' }],
+      } as Record<string, unknown>,
+    };
+    expect(retractionStatusFrom(both)).toBe('corrected');
+  });
+
+  it('a non-classifying update-to does not suppress a true flag', () => {
+    const both: RawSourceRecord = {
+      ...oaRecord(true),
+      normalized: {
+        is_retracted: true,
+        'update-to': [{ type: 'new edition' }],
+      } as Record<string, unknown>,
+    };
+    expect(retractionStatusFrom(both)).toBe('retracted');
+  });
+});
+
 describe('claim demotion carries the retraction uncertainty (RU-6 GO1)', () => {
   it('the uncertainty note parses into the claim schema (schema-level contract)', () => {
     const claim = ScientificClaim.parse({
