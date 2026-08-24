@@ -124,13 +124,22 @@ Baseline sanity (fresh worktree at `47cc373`, before any edit): `npm ci` exit 0;
 - `npm run typecheck` exit 0; `npm run build` exit 0 (after every batch).
 - Lane suites: `tests/experiment*.test.ts` (regression 8/8, simulation 13/13),
   scheduler/gateway/remote-executor/cli-experiment suites green in the full run.
-- Full suite at lane head (`npm test`, exit 1 due to the pre-existing failures only):
-  **1446 passed / 4 failed / 4 skipped (1454)** vs baseline 1425/4/4 (1433) —
-  lane delta +21 tests, +21 passed, **zero new failures**. The 4 failures are
-  PRE-EXISTING at the baseline tag and are outside this lane's ownership (identical
-  failing set verified by name: file-ingest, citation-entries ×3, storage-hardening
-  ×1; details in Conflict notes).
-- `node zcode-harness/scripts/secret-scan.mjs` exit 0 (see below).
+- Full suite at lane head (`npm test`, exit 1 due to the single pre-existing failure):
+  **1462 passed / 1 failed / 4 skipped (1467)**. The 1 failure is the
+  `storage-hardening` RU-7.3 backwards-clock time-bomb — PRE-EXISTING at the
+  baseline tag, already diagnosed and handed off to lane 13 by lane 04 (the test
+  anchors on a fixed 2026-08-24T12:00Z timestamp, so `regressedSeconds` grows with
+  wall-clock; observed 22342s ≠ expected 3600). No failures originate from this
+  lane; lane test delta +21 tests, all green.
+- Setup correction (honesty note): the first full-suite runs in this worktree
+  reported 4 failures across 3 files (`file-ingest`, `citation-entries` ×3,
+  `storage-hardening`). Root cause for the first two: **this lane initially skipped
+  `cd web && npm ci`** (INTEGRATION_RULES setup step 4 installs root AND web AND
+  tui); those test files import `web/src/utils/ingest`, which needs
+  `web/node_modules`. After installing web deps both files are green — the earlier
+  "lane 05 parser failure" reading was an environment artifact of incomplete setup,
+  retracted. (Lane 04's report already documented the same web-deps condition.)
+- `node zcode-harness/scripts/secret-scan.mjs` exit 0 (known allowances only).
 
 ## Conflict notes (shared files touched)
 
@@ -142,17 +151,15 @@ Baseline sanity (fresh worktree at `47cc373`, before any edit): `npm ci` exit 0;
   types (behavior-preserving, enables simulation reuse); regression audit-skip branch.
 - `experiment-runtime/remote/train_eval.py`, `.../builders.py`, `.../ops.py` —
   regression + simulate templates (lane-owned).
-- **Pre-existing baseline failures (NOT this lane's, recorded for the Integrator):**
-  at `baseline/parallel-r2` on this machine, `tests/citation-entries.test.ts` fails
-  3/4 (`parseCitationEntries` returns null — deterministic parser failure; lane 05's
-  ingest domain), `tests/file-ingest.test.ts` fails at file level (lane 05), and
+- **Pre-existing baseline failure (NOT this lane's, recorded for the Integrator):**
   `tests/storage-hardening.test.ts` RU-7.3 backwards-clock test fails
-  (`regressedSeconds` expected 3600 got 22342 — time-bomb test using fixed historical
-  timestamps against wall-clock now; lane 12/13). These contradict the recorded R1
-  fresh-baseline evidence (141 files/1442 pass) on the same tree — either the
-  recorded evidence predates last R1 test edits or is otherwise stale; the R2 delta
-  itself is planning-only (verified via `git diff --stat` at baseline).
-  I did not touch them (rule 2).
+  (`regressedSeconds` expected 3600, grows with wall-clock — time-bomb anchored on a
+  fixed 2026-08-24T12:00Z timestamp). Lane 04 already diagnosed the root cause and
+  filed the handoff to lane 13; this lane confirms the same observation and did not
+  touch the file (rule 2). The initially-suspected `file-ingest`/`citation-entries`
+  failures were this worktree's missing `web/node_modules` (see the setup-correction
+  note under Gates) — green after `cd web && npm ci`; no ingest defect exists at the
+  baseline.
 
 ## Handoffs
 
