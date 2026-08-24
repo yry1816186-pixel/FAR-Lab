@@ -237,14 +237,25 @@ def op_dataset_audit(payload: dict[str, Any]) -> dict[str, Any]:
     X_train, X_test, y_train, y_test, meta = _load_tabular(payload)
     seed = int(payload.get("seed", 0))
 
-    def _row_hashes(X):
+    # Leakage semantics (calibrated on a real small-discrete fixture the first,
+    # feature-only version falsely rejected): identical FEATURES alone are
+    # common in small discrete datasets and are NOT leakage. Leakage = identical
+    # features AND label across splits — that poisons the verdict. In-split
+    # duplicates are advisory (resampling is legitimate).
+    def _feat_hashes(X):
         return [hashlib.sha256(np.asarray(row, dtype=np.float64).tobytes()).hexdigest() for row in X]
 
-    train_hashes = _row_hashes(X_train)
-    test_hashes = _row_hashes(X_test)
-    train_dup = len(train_hashes) - len(set(train_hashes))
-    test_dup = len(test_hashes) - len(set(test_hashes))
-    leak = len(set(train_hashes) & set(test_hashes))
+    def _full_hashes(X, y):
+        return [
+            hashlib.sha256(np.asarray(row, dtype=np.float64).tobytes() + str(lbl).encode()).hexdigest()
+            for row, lbl in zip(X, y)
+        ]
+
+    train_feat = _feat_hashes(X_train)
+    test_feat = _feat_hashes(X_test)
+    train_dup = len(train_feat) - len(set(train_feat))
+    test_dup = len(test_feat) - len(set(test_feat))
+    leak = len(set(_full_hashes(X_train, y_train)) & set(_full_hashes(X_test, y_test)))
 
     try:
         clf = LogisticRegression(max_iter=1000, random_state=seed)
@@ -257,7 +268,7 @@ def op_dataset_audit(payload: dict[str, Any]) -> dict[str, Any]:
         issue_idx = []
         label_issue_rate = float("nan")  # honest: not computable (e.g. single class)
 
-    verdict = "ok" if (leak == 0 and train_dup == 0 and test_dup == 0 and not (label_issue_rate > 0.2)) else "degraded"
+    verdict = "ok" if (leak == 0 and not (label_issue_rate > 0.2)) else "degraded"
     return {
         "rows": {"train": len(y_train), "test": len(y_test)},
         "exactDuplicates": {"train": train_dup, "test": test_dup},
