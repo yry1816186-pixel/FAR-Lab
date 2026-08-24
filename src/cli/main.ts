@@ -2,6 +2,9 @@
 import { createInterface } from 'node:readline/promises';
 import { createApp } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { ingestSdm, ingestTextToSdm, persistDatasetProfile } from '../ingest/service.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
 import { completionScript } from './completion.js';
@@ -475,6 +478,41 @@ const main = async (): Promise<void> => {
       console.log(`artifacts: ${artifacts.files} files, ${artifacts.bytes} B`);
       console.log(`exports: ${exportsDir.files} files, ${exportsDir.bytes} B`);
     }
+    return;
+  }
+  if (cmd === 'ingest') {
+    // MULTIMODAL (2026-08-24): deterministic scientific-artifact understanding.
+    // Text-family files parse into an SDM (or dataset profile) stored as an
+    // immutable artifact; PDFs are refused honestly (text-layer collection is
+    // a web-client pdfjs capability, not a zod-only core one).
+    const target = process.argv[3];
+    if (target === undefined) die('usage: far ingest <file.(md|tex|csv|tsv|ipynb|py|ts|js|xml)>', 2);
+    if (/\.pdf$/i.test(target)) die('far ingest: PDF text-layer collection runs in the web client (pdfjs-dist) — use the workbench upload or POST /api/v1/ingest {kind:"pdf_text"}; the zod-only core cannot collect PDF text', 2);
+    let text: string;
+    try {
+      text = await readFile(target, 'utf8');
+    } catch (e) {
+      die(`cannot read ${target}: ${e instanceof Error ? e.message : String(e)}`, 1);
+    }
+    const base = path.basename(target);
+    const routed = ingestTextToSdm(base, text);
+    if (routed === null) die(`unsupported file kind: ${base} — supported: .md .tex .csv .tsv .ipynb .py .ts .js .xml (JATS/TEI)`, 2);
+    const app = await createApp({});
+    try {
+      if (routed.type === 'dataset') {
+        const artifactRef = await persistDatasetProfile(app.artifacts, routed.profile);
+        console.log(`${base}: dataset profile — ${routed.profile.rowCount} rows × ${routed.profile.columnCount} cols (${routed.profile.format})`);
+        console.log(`  columns: ${routed.profile.columns.map((c) => `${c.name}(${c.inferredType}${c.missingCount > 0 ? `, miss ${c.missingCount}` : ''})`).join(' ')}`);
+        console.log(`  artifact: ${artifactRef}`);
+      } else {
+        const out = await ingestSdm(app.artifacts, routed.doc);
+        const c = { b: out.sdm.blocks.length, f: out.sdm.figures.length, t: out.sdm.tables.length, e: out.sdm.equations.length, c: out.sdm.citations.length, x: out.sdm.xrefs.filter((x) => x.status === 'resolved').length };
+        console.log(`${base}: ${out.sdm.extractor.name} — ${out.sdm.diagnostics.parseStatus}`);
+        console.log(`  blocks=${c.b} figures=${c.f} tables=${c.t} equations=${c.e} citations=${c.c} xrefsResolved=${c.x}`);
+        for (const w of out.sdm.diagnostics.warnings.slice(0, 6)) console.log(`  note: ${w}`);
+        console.log(`  artifact: ${out.artifactRef}`);
+      }
+    } finally { app.close(); }
     return;
   }
   if (cmd === 'memory') {
