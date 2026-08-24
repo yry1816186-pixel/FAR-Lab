@@ -4,6 +4,7 @@ import {
   CHASE_TOP_SEEDS,
   isChaseAbortError,
   planCitationChase,
+  planHop2Seed,
   workRefOf,
   type ChaseSeedInput,
 } from '../src/pipeline/citation-chase.js';
@@ -125,6 +126,30 @@ describe('planCitationChase', () => {
       seedInput('counter-no-ref', [{ kind: 'arxiv', value: '2401.9' }], ['counter_evidence']),
     ];
     expect(planCitationChase(fused).map((s) => s.key)).toEqual(['top1', 'top2']);
+  });
+});
+
+/* ------------------------------- hop-2 seed ------------------------------- */
+
+describe('planHop2Seed', () => {
+  it('picks the FIRST chase-added entry with a resolvable workRef (insertion order)', () => {
+    const chaseAdded = [
+      seedInput('first-no-ref', [{ kind: 'arxiv', value: '2401.00001' }], ['citation_chase']),
+      seedInput('second', [{ kind: 'openalex', value: 'W900' }], ['citation_chase']),
+      seedInput('third', [{ kind: 'openalex', value: 'W950' }], ['citation_chase']),
+    ];
+    const seed = planHop2Seed(chaseAdded);
+    expect(seed).toMatchObject({ key: 'second', workRef: 'W900' });
+  });
+
+  it('returns null when no chase-added entry is resolvable', () => {
+    expect(planHop2Seed([seedInput('arxivonly', [{ kind: 'arxiv', value: '2401.1' }], ['citation_chase'])])).toBeNull();
+    expect(planHop2Seed([])).toBeNull();
+  });
+
+  it('DOI fallback works at hop 2 (method paper surfaced with DOI only)', () => {
+    const seed = planHop2Seed([seedInput('doi-only', [{ kind: 'doi', value: '10.1/g5' }], ['citation_chase'])]);
+    expect(seed).toMatchObject({ workRef: 'doi:10.1/g5' });
   });
 });
 
