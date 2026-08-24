@@ -227,10 +227,15 @@ far-lab/
 
 ### Environment Variables
 
+> A complete annotated template ships as [.env.example](.env.example) — copy it to `.env`
+> and fill in at least one live key. The CLI hydrates `.env` at startup (real environment
+> variables win; `FAR_DOTENV=off` disables hydration).
+
 ```bash
 # === Required (at least one) ===
 ZAI_API_KEY=                  # Zhipu GLM API key (default provider)
 DASHSCOPE_API_KEY=            # Alibaba DashScope / Qwen API key
+ZHIPU_API_KEY=                # Legacy zai key name — honored when ZAI_API_KEY is unset
 
 # === Optional ===
 FARLAB_MODEL_PROVIDER=zai     # Default model provider: zai | dashscope

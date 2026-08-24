@@ -11,6 +11,7 @@ import { executeRemoteExperiment } from '../src/experiment/remote-executor.js';
 import { openDeviceRegistry } from '../src/experiment/devices.js';
 import { generateTargetKey } from '../src/experiment/gateway.js';
 import { ResearchQuestion, HypothesisCandidate, newId } from '../src/domain/index.js';
+import { uvAvailable } from './helpers/uv-gate.js';
 
 /**
  * Full remote chain (D-084 endgame): device-registry config -> per-device queue ->
@@ -31,6 +32,7 @@ const dockerReady = (): boolean => {
 const CONTAINER = 'farlab-remote-exec-test';
 const PORT = 2224;
 const ready = dockerReady();
+const sidecarReady = uvAvailable();
 
 afterAll(() => {
   if (!ready) return;
@@ -55,7 +57,7 @@ const fixtureCsv = (): string => {
 };
 
 describe('P3 remote executor: device-bound queue -> remote training -> local verdicts', { timeout: 600_000 }, () => {
-  it.runIf(ready)('worker on the ssh device executes the full chain', async () => {
+  it.runIf(ready && sidecarReady)('worker on the ssh device executes the full chain', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'farlab-rexec-'));
     // 1. Target container (same image as gateway verification).
     const identity = join(dir, 'id_ed25519');

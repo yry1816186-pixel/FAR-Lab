@@ -1,4 +1,8 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+import { execFileSync as _execSync } from 'node:child_process';
+// Host-side numpy gate: the local bootstrap mirror shells out to `python -c` with numpy.
+const hostNumpy = (): boolean => { try { _execSync('python', ['-c', 'import numpy'], { stdio: 'ignore' }); return true; } catch { return false; } };
+
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,6 +25,8 @@ const dockerReady = (): boolean => {
     return false;
   }
 };
+
+const hostNumpyOk = hostNumpy();
 
 const CONTAINER = 'farlab-ssh-target-test';
 const PORT = 2223;
@@ -64,7 +70,7 @@ describe('P3 ssh2-gateway on a real Docker/WSL2 Linux target (D-084)', { timeout
     try { execFileSync('docker', ['rm', '-f', CONTAINER], { stdio: 'ignore' }); } catch { /* already gone */ }
   });
 
-  it.runIf(ready)('real Linux target: key-only SSH, remote training, host-key pinning', async () => {
+  it.runIf(ready && hostNumpyOk)('real Linux target: key-only SSH, remote training, host-key pinning', async () => {
     // 1. Dedicated keypair + target image + container (root login only via this key).
     const identity = join(dir, 'id_ed25519');
     await generateTargetKey(identity);

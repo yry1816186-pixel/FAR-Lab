@@ -75,6 +75,8 @@ describe('cli vendored picocolors: color discipline', () => {
 
   it('FORCE_COLOR re-enables and emits ANSI sequences', async () => {
     const prev = process.env.FORCE_COLOR;
+    const prevNoColor = process.env.NO_COLOR;
+    delete process.env.NO_COLOR; // FORCE_COLOR cannot win over NO_COLOR (standard precedence)
     process.env.FORCE_COLOR = '1';
     try {
       vi.resetModules(); // fresh module graph re-evaluates env at load time
@@ -84,6 +86,7 @@ describe('cli vendored picocolors: color discipline', () => {
     } finally {
       if (prev === undefined) delete process.env.FORCE_COLOR;
       else process.env.FORCE_COLOR = prev;
+      if (prevNoColor !== undefined) process.env.NO_COLOR = prevNoColor;
       vi.resetModules();
     }
   });

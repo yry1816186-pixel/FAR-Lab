@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from 'node:readline/promises';
+import path from 'node:path';
 import { createApp } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
@@ -66,6 +67,8 @@ Usage:
   far probe [provider] [--live] [--json]         Model-route health: config check by default
                                                   (key presence, never values); --live makes one
                                                   minimal real chat call per route (costs ~1 token)
+  far probe-custom [mcfg-id] [--live] [--json]   Same health surface for user-defined model configs
+                                                  (Settings / mcfg_* routes); --live = one real call
   far data info [--json]                         Data footprint: runs, db size, artifacts, exports
   far verify <bundle-id> [--json]                Independently verify a reproducibility bundle
                                                   (exit 0=verified, 1=failed/degraded)
@@ -259,6 +262,14 @@ const printRun = (run: ResearchRun, verbose = true) => {
 };
 
 const main = async (): Promise<void> => {
+  // .env hydration (dotenv semantics: real env wins; missing file no-op) — before any
+  // command dispatch so every process.env consumer sees the credential surface the
+  // docs promise. Key names/values are never printed. FAR_DOTENV=off disables
+  // (hermetic test vacuums / deliberate keyless runs).
+  if (process.env.FAR_DOTENV !== 'off') {
+    const { hydrateEnvFromDotEnv } = await import('../platform/dotenv.js');
+    hydrateEnvFromDotEnv(process.env, path.resolve(process.cwd(), '.env'));
+  }
   const [, , cmd, sub] = process.argv;
   if (!cmd || flag('--help') || flag('-h') || cmd === 'help') { console.log(HELP); return; }
 
@@ -340,15 +351,24 @@ const main = async (): Promise<void> => {
     // Route health (D-060 phase-3). Config mode never touches the network; --live makes
     // ONE minimal chat call per route (explicit user action — no ambient probing).
     const { listProviders } = await import('../providers/index.js');
+    const { createZaiProvider } = await import('../providers/zai.js');
+    const { createDashScopeProvider } = await import('../providers/dashscope.js');
     const wanted = positional(3);
     const all = listProviders().filter((p) => wanted === undefined || p.name === wanted);
     if (all.length === 0) die(`unknown provider: ${wanted}`, 2);
+    // Env candidates per provider — must mirror the adapter's REAL resolution chain
+    // (zai.ts reads ZAI_API_KEY then legacy ZHIPU_API_KEY), not a display string.
+    const ENV_CANDIDATES: Record<string, string[]> = {
+      zai: ['ZAI_API_KEY', 'ZHIPU_API_KEY'],
+      dashscope: ['DASHSCOPE_API_KEY'],
+    };
     const results: Array<Record<string, unknown>> = [];
     for (const p of all) {
       const entry: Record<string, unknown> = {
         provider: p.name, kind: p.kind, model: p.modelId, baseUrl: p.baseUrl, apiKeyEnvVar: p.apiKeyEnvVar,
       };
-      const key = p.apiKeyEnvVar.startsWith('(') ? '' : (process.env[p.apiKeyEnvVar] ?? '');
+      const candidates = ENV_CANDIDATES[p.name] ?? [];
+      const key = candidates.map((n) => process.env[n] ?? '').find((v) => v.length > 0) ?? '';
       if (p.kind !== 'live') {
         entry.status = 'test-only';
       } else if (key.length === 0) {
@@ -356,21 +376,27 @@ const main = async (): Promise<void> => {
       } else if (!flag('--live')) {
         entry.status = 'key-present';
       } else {
+        // --live goes through the provider's own structuredCall so the probe hits the
+        // SAME wire the pipeline uses (anthropic vs openai) — a hand-rolled OpenAI-style
+        // fetch against an anthropic-wire baseUrl would always 404 and lie about health.
         try {
-          const res = await fetch(`${p.baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-            body: JSON.stringify({ model: p.modelId, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }),
-            signal: AbortSignal.timeout(20_000),
-          });
-          const bodyText = await res.text();
-          if (res.ok) {
+          const provider = p.name === 'dashscope' ? createDashScopeProvider({ apiKey: key }) : createZaiProvider({ apiKey: key });
+          const result = await provider.structuredCall(
+            {
+              task: 'model route connectivity probe',
+              userPayload: { instruction: 'Reply with exactly the JSON object {"ok":true} and nothing else.' },
+              outputKind: 'json',
+              maxTokens: 16,
+              purpose: 'cli-probe-live',
+            },
+            (raw: unknown) => raw,
+          );
+          if (result.ok) {
             entry.status = 'ready';
-            entry.httpStatus = res.status;
+            entry.latencyMs = result.receipt?.latencyMs;
           } else {
-            entry.status = 'blocked';
-            entry.httpStatus = res.status;
-            entry.detail = bodyText.slice(0, 200); // honest cause (401/402/429 …), key never echoed
+            entry.status = result.error?.kind === 'rate_limited' || result.error?.kind === 'quota_exceeded' ? 'blocked' : 'unreachable';
+            entry.detail = JSON.stringify(result.error ?? {}).slice(0, 200); // honest cause, key never echoed
           }
         } catch (e) {
           entry.status = 'unreachable';
@@ -386,6 +412,79 @@ const main = async (): Promise<void> => {
     }
     const bad = results.filter((r) => r.status === 'missing-key' || r.status === 'blocked' || r.status === 'unreachable');
     if (bad.length > 0 && (flag('--live') || all.some((p) => p.kind === 'live' && wanted !== undefined))) process.exitCode = 1;
+    return;
+  }
+
+  if (cmd === 'probe-custom') {
+    // B12-G1 CLI half: probe user-defined model-config routes (mcfg_*), which
+    // `far probe` deliberately does not cover. Reads the same store the server's
+    // testModelConfig uses; --live reuses createCustomProvider so the wire matches
+    // the pipeline exactly. Config mode reports key presence only — never values.
+    const { maskApiKey } = await import('../domain/index.js');
+    const { createApp } = await import('../app/composition.js');
+    const app = await createApp();
+    try {
+      // model_config objects are workspace-scoped (run_id='__none__' sentinel) — same convention as the server.
+      const configs = app.store.listObjects('model_config', '__none__');
+      const activeId = app.store.getMeta('activeModelConfigId');
+      const wanted = positional(3);
+      const selected = wanted === undefined ? configs : configs.filter((c) => c.id === wanted);
+      if (wanted !== undefined && selected.length === 0) die(`model config not found: ${wanted}`, 2);
+      const results: Array<Record<string, unknown>> = [];
+      for (const cfg of selected) {
+        const entry: Record<string, unknown> = {
+          provider: cfg.id,
+          label: cfg.label,
+          kind: 'custom',
+          model: cfg.modelId,
+          baseUrl: cfg.baseUrl,
+          wire: cfg.wire,
+          apiKeyMasked: maskApiKey(cfg.apiKey),
+          active: activeId === cfg.id,
+        };
+        if (cfg.apiKey.length === 0) {
+          entry.status = 'missing-key';
+        } else if (!flag('--live')) {
+          entry.status = 'key-present';
+        } else {
+          try {
+            const { createCustomProvider } = await import('../providers/custom.js');
+            const provider = createCustomProvider(cfg);
+            const result = await provider.structuredCall(
+              {
+                task: 'model route connectivity probe',
+                userPayload: { instruction: 'Reply with exactly the JSON object {"ok":true} and nothing else.' },
+                outputKind: 'json',
+                maxTokens: 16,
+                purpose: 'cli-probe-custom-live',
+              },
+              (raw: unknown) => raw,
+            );
+            if (result.ok) {
+              entry.status = 'ready';
+              entry.latencyMs = result.receipt?.latencyMs;
+            } else {
+              entry.status = result.error?.kind === 'rate_limited' || result.error?.kind === 'quota_exceeded' ? 'blocked' : 'unreachable';
+              entry.detail = JSON.stringify(result.error ?? {}).slice(0, 200);
+            }
+          } catch (e) {
+            entry.status = 'unreachable';
+            entry.detail = e instanceof Error ? e.message : String(e);
+          }
+        }
+        results.push(entry);
+      }
+      if (configs.length === 0 && wanted === undefined) {
+        out(ink.muted('(no custom model configs — create one in the web workbench Settings or via POST /api/v1/model-configs)'));
+      }
+      if (json()) jsonOutput(results);
+      else for (const r of results) {
+        const tone = r.status === 'ready' ? ink.ok : r.status === 'key-present' ? ink.info : ink.err;
+        out(`${padColumns(String(r.provider), 24)} ${tone(padColumns(String(r.status), 12))} model=${String(r.model)}${r.active ? ink.info(' [active]') : ''}${r.latencyMs !== undefined ? `  ${String(r.latencyMs)}ms` : ''}${r.detail !== undefined ? `\n  ${ink.muted(String(r.detail))}` : ''}`);
+      }
+      const bad = results.filter((r) => r.status === 'missing-key' || r.status === 'blocked' || r.status === 'unreachable');
+      if (bad.length > 0) process.exitCode = 1;
+    } finally { app.close(); }
     return;
   }
 

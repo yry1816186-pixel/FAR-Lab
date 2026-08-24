@@ -13,7 +13,7 @@ export type RunStatus =
 
 export type RunStageName =
   | 'scope' | 'retrieve' | 'verify_sources' | 'build_evidence' | 'generate_hypotheses'
-  | 'critique_falsify' | 'rank' | 'plan' | 'feedback' | 'revise' | 'export';
+  | 'critique_falsify' | 'rank' | 'plan' | 'execute' | 'feedback' | 'revise' | 'export';
 
 export type StageState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
 
@@ -142,12 +142,12 @@ export interface RunSummary {
 
 export const STAGE_ORDER: readonly RunStageName[] = [
   'scope', 'retrieve', 'verify_sources', 'build_evidence', 'generate_hypotheses',
-  'critique_falsify', 'rank', 'plan', 'feedback', 'revise', 'export',
+  'critique_falsify', 'rank', 'plan', 'execute', 'feedback', 'revise', 'export',
 ] as const;
 
-/** Same computation as server-side runProgress: core stages only (feedback/revise excluded) -> n/9. */
+/** Same computation as server-side runProgress: core stages only (execute/feedback/revise excluded) -> n/9. */
 export function runProgress(run: ResearchRun): { done: number; total: number } {
-  const core = STAGE_ORDER.filter((s) => s !== 'feedback' && s !== 'revise');
+  const core = STAGE_ORDER.filter((s) => s !== 'feedback' && s !== 'revise' && s !== 'execute');
   const stateOf = (name: RunStageName): StageState | undefined =>
     run.stages.find((r) => r.stage === name)?.state;
   const done = core.filter((s) => {
