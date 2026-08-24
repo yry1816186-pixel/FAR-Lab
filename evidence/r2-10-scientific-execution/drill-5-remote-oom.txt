@@ -1,0 +1,10 @@
+{
+ "expected": "failed: resource-capped device (512m/2cpu) enforces its budget - device-side TERM/SIGKILL kill (exit 124/137) or MemoryError (observed: exit 124 TERM at 300s budget on the 2-cpu-capped container)",
+ "thrown": "remote experiment xrun_xa9kbwfgv2stxsz9c6ydtfvh2f failed: remote experiment xrun_xa9kbwfgv2stxsz9c6ydtfvh2f failed: remote training rf-huge timed out on the device (exit 124: TERM, budget 300000ms)",
+ "run": {
+  "status": "failed",
+  "error": "remote experiment xrun_xa9kbwfgv2stxsz9c6ydtfvh2f failed: remote training rf-huge timed out on the device (exit 124: TERM, budget 300000ms)",
+  "attempts": 1,
+  "cancelRequested": false
+ }
+}

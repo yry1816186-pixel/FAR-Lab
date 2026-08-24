@@ -1,0 +1,10 @@
+{
+ "expected": "failed with verbatim env error",
+ "thrown": "experiment xrun_6h4bvj7yfm5c59333nxhq9vxw6 failed: experiment xrun_6h4bvj7yfm5c59333nxhq9vxw6 failed: sidecar exited (code 1) before answering env_info",
+ "run": {
+  "status": "failed",
+  "error": "experiment xrun_6h4bvj7yfm5c59333nxhq9vxw6 failed: sidecar exited (code 1) before answering env_info",
+  "attempts": 1,
+  "cancelRequested": false
+ }
+}
