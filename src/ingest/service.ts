@@ -4,7 +4,14 @@ import { parseMarkdown } from './parsers/markdown.js';
 import { parseLatex } from './parsers/latex.js';
 import { parseJats } from './parsers/jats.js';
 import { parseTei } from './parsers/tei.js';
-import { profileDataset, DatasetProfileDoc } from './dataset.js';
+import { parseHtml } from './parsers/html.js';
+import { buildSdmFromPlainText } from './parsers/plaintext.js';
+import { parseDocx } from './parsers/docx.js';
+import { parsePptx } from './parsers/pptx.js';
+import { parseEpub } from './parsers/epub.js';
+import { parseSvgPlot, SdmPlotPoints } from './parsers/svgplot.js';
+import { profileDataset, profileRows, DatasetProfileDoc } from './dataset.js';
+import { jsonToRows } from './jsondata.js';
 import { buildSdmFromCode, detectCodeLanguage } from './code.js';
 import { buildSdmFromNotebook } from './notebook.js';
 import { profileXlsx } from './xlsx.js';
@@ -91,9 +98,26 @@ export const ingestTextToSdm = (fileName: string, text: string): TextIngestResul
       if (/<article[\s>]/.test(text.slice(0, 2000))) return { type: 'sdm', doc: parseJats(text, { name: fileName }) };
       if (/<TEI[\s>]/.test(text.slice(0, 2000))) return { type: 'sdm', doc: parseTei(text, { name: fileName }) };
       return null;
+    case '.html': case '.htm': case '.xhtml':
+      return { type: 'sdm', doc: parseHtml(text, { name: fileName }) };
+    case '.txt': case '.text': case '.log':
+      return { type: 'sdm', doc: buildSdmFromPlainText(text, { name: fileName }) };
+    case '.json': {
+      // JSON datasets route through the SAME dsdp-1 pipeline (records/columnar);
+      // non-tabular JSON returns null (callers surface jsonRefusalReason).
+      const rows = jsonToRows(text);
+      if (!rows.ok) return null;
+      return { type: 'dataset', profile: profileRows(rows.rows, fileName, 'json') };
+    }
     default:
       return null;
   }
+};
+
+/** Precise refusal reason for JSON that is not tabular (api/cli surface it). */
+export const jsonRefusalReason = (text: string): string => {
+  const r = jsonToRows(text);
+  return r.ok ? 'JSON is tabular (no refusal)' : `JSON not profiled as a dataset: ${r.reason}`;
 };
 
 /** Persist a dataset profile artifact (same content-addressed discipline as SDM). */
@@ -103,21 +127,81 @@ export const persistDatasetProfile = async (store: ArtifactStore, profile: Datas
 };
 
 export type BytesIngestResult =
+  | { type: 'sdm'; doc: SdmDocument }
   | { type: 'dataset'; profile: DatasetProfileDoc }
   | { type: 'refused'; reason: string };
 
 /**
- * Route a BINARY upload by extension. Today the binary surface is xlsx/xlsm
- * supplements (the real scientific workflow); everything else is refused with
- * a reason, never parsed as text. Disjoint from ingestTextToSdm by extension.
+ * Route a BINARY upload by extension (2026-08-25 extension: the zip container
+ * family — docx/pptx/epub join xlsx on the shared ZIP reader). Everything
+ * else is refused with a reason, never parsed as text. Disjoint from
+ * ingestTextToSdm by extension.
  */
-export const ingestBytesToProfile = (fileName: string, bytes: Uint8Array): BytesIngestResult => {
+export const ingestBytes = (fileName: string, bytes: Uint8Array): BytesIngestResult => {
   if (/\.(xlsx|xlsm)$/i.test(fileName)) {
     const r = profileXlsx(bytes, fileName);
     return r.ok ? { type: 'dataset', profile: r.profile } : { type: 'refused', reason: r.reason };
   }
-  return { type: 'refused', reason: `unsupported binary kind for ${fileName} — binary support today: .xlsx/.xlsm supplements; images/scans stay refused until the T4 tier` };
+  if (/\.docx$/i.test(fileName)) {
+    const r = parseDocx(bytes, fileName);
+    return r.ok ? { type: 'sdm', doc: r.sdm } : { type: 'refused', reason: r.reason };
+  }
+  if (/\.(pptx)$/i.test(fileName)) {
+    const r = parsePptx(bytes, fileName);
+    return r.ok ? { type: 'sdm', doc: r.sdm } : { type: 'refused', reason: r.reason };
+  }
+  if (/\.epub$/i.test(fileName)) {
+    const r = parseEpub(bytes, fileName);
+    return r.ok ? { type: 'sdm', doc: r.sdm } : { type: 'refused', reason: r.reason };
+  }
+  return { type: 'refused', reason: `unsupported binary kind for ${fileName} — binary support today: .xlsx/.xlsm supplements, .docx, .pptx, .epub; images/scans stay refused until the T4 tier` };
 };
+
+/** Back-compat name from the 2026-08-24 contract (xlsx-only era). */
+export const ingestBytesToProfile = ingestBytes;
+
+/**
+ * SVG plot upload: deterministic digitization + points artifact persistence.
+ * The SDM contract forbids inline unverified numbers, so the numeric points
+ * live in a content-addressed artifact and figures carry `pointsRef` — any
+ * consumer can re-verify the calibration from the artifact alone.
+ */
+export const ingestSvgPlot = async (
+  store: ArtifactStore | null,
+  fileName: string,
+  text: string,
+): Promise<{ ok: true; outcome: IngestOutcome; pointsRef?: string; points: SdmPlotPoints } | { ok: false; reason: string }> => {
+  const r = parseSvgPlot(text, { name: fileName });
+  if (!r.ok) return { ok: false, reason: r.reason };
+  const { sdm, points } = r;
+  if (store === null) {
+    // No store = no persistable verification artifact = numeric claims unusable.
+    const downgraded: SdmDocument = {
+      ...sdm,
+      figures: sdm.figures.map((f) => ({ ...f, perception: { status: 'not_extracted' } })),
+      diagnostics: { ...sdm.diagnostics, warnings: [...sdm.diagnostics.warnings, 'no artifact store available — deterministic plot points not persisted, perception downgraded (numbers without a verifiable artifact are not evidence)'] },
+    };
+    return { ok: true, outcome: await ingestSdm(store, downgraded), points };
+  }
+  const validated = SdmPlotPoints.safeParse(points);
+  if (!validated.success) return { ok: false, reason: `svg: points artifact failed its own contract: ${validated.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).slice(0, 3).join('; ')}` };
+  const { ref } = await store.put(JSON.stringify(validated.data));
+  const withRefs: SdmDocument = {
+    ...sdm,
+    figures: sdm.figures.map((f) => ({
+      ...f,
+      ...(f.perception.series !== undefined && f.perception.series.length > 0
+        ? { perception: { ...f.perception, series: f.perception.series.map((s) => ({ ...s, pointsRef: ref })) } }
+        : {}),
+    })),
+  };
+  const outcome = await ingestSdm(store, withRefs);
+  return { ok: true, outcome, pointsRef: ref, points: validated.data };
+};
+
+/** Load a persisted plot-points artifact back (fetch-by-ref family). */
+export const loadPlotPointsByRef = (store: ArtifactStore, ref: string) =>
+  loadArtifactDoc(store, ref, SdmPlotPoints, 'sdm-plot-points-1');
 
 /**
  * Fetch-by-ref contract (HCI renders from the artifact store): load a stored

@@ -17,7 +17,7 @@ import { runResearchAction, ActionError } from './actions.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
 import { discoverModels } from '../providers/discovery.js';
-import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytesToProfile, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, type IngestOutcome } from '../ingest/service.js';
+import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
 import type { DatasetProfileDoc } from '../ingest/dataset.js';
 import { approveExperiment, ExperimentOpError } from './experiment-ops.js';
 import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
@@ -957,8 +957,17 @@ function parseSeedSources(raw: unknown): string | {
       const text = body['text'];
       if (typeof text !== 'string' || text.length === 0) throw validation('ingest: text must be a non-empty string');
       if (text.length > 10 * 1024 * 1024) throw validation('ingest: text exceeds 10MB');
+      if (/\.svg$/i.test(fileName)) {
+        const r = await ingestSvgPlot(app.artifacts, fileName, text);
+        if (!r.ok) throw validation(`ingest: ${r.reason}`);
+        sendJson(res, 200, { ...ingestSummary(r.outcome), ...(r.pointsRef !== undefined ? { pointsRef: r.pointsRef, seriesCount: r.points.series.length } : {}) });
+        return;
+      }
       const routed = ingestTextToSdm(fileName, text);
-      if (routed === null) throw validation(`ingest: unsupported file kind for ${fileName} — see MULTIMODAL.md for the format matrix`);
+      if (routed === null) {
+        const detail = /\.json$/i.test(fileName) ? ` — ${jsonRefusalReason(text)}` : ' — see MULTIMODAL.md for the format matrix';
+        throw validation(`ingest: unsupported file kind for ${fileName}${detail}`);
+      }
       if (routed.type === 'dataset') {
         await sendDatasetProfile(routed.profile);
         return;
@@ -974,8 +983,13 @@ function parseSeedSources(raw: unknown): string | {
       const bytes = Buffer.from(base64, 'base64');
       if (bytes.length === 0) throw validation('ingest: base64 did not decode to any bytes');
       if (bytes.length > 15 * 1024 * 1024) throw validation('ingest: bytes exceed 15MB');
-      const routed = ingestBytesToProfile(fileName, bytes);
+      const routed = ingestBytes(fileName, bytes);
       if (routed.type === 'refused') throw validation(`ingest: ${routed.reason}`);
+      if (routed.type === 'sdm') {
+        const out = await ingestSdm(app.artifacts, routed.doc);
+        sendJson(res, 200, ingestSummary(out));
+        return;
+      }
       await sendDatasetProfile(routed.profile);
       return;
     }
@@ -1016,6 +1030,11 @@ function parseSeedSources(raw: unknown): string | {
     const profile = await loadDatasetProfileByRef(app.artifacts, ref);
     if (profile.ok) {
       sendJson(res, 200, { kind: 'dataset_profile', profile: profile.doc });
+      return;
+    }
+    const plotPoints = await loadPlotPointsByRef(app.artifacts, ref);
+    if (plotPoints.ok) {
+      sendJson(res, 200, { kind: 'plot_points', points: plotPoints.doc });
       return;
     }
     throw notFound(`ingest artifact not found: ${ref}`);

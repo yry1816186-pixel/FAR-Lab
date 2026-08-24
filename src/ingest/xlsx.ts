@@ -1,14 +1,14 @@
-import { inflateRawSync } from 'node:zlib';
 import { parseXml, findAll, childrenNamed, textOf, type XmlElement } from './xml.js';
 import { profileRows, type DatasetProfileDoc } from './dataset.js';
+import { readZip } from './zip.js';
 
 /**
  * XLSX supplement understanding (MULTIMODAL lane, 2026-08-24): supplementary
  * tables are overwhelmingly .xlsx in real scientific workflows. Zero new
- * runtime dependencies (repo zod-only invariant): a minimal ZIP reader over
- * node:zlib inflateRaw + the lane's own XML micro-parser on the SheetML
- * parts. Output is the SAME dsdp-1 profile as CSV/TSV uploads, so a dataset
- * enters the workspace identically regardless of container format.
+ * runtime dependencies (repo zod-only invariant): the shared ZIP reader
+ * (`zip.ts`, node:zlib inflateRaw) + the lane's own XML micro-parser on the
+ * SheetML parts. Output is the SAME dsdp-1 profile as CSV/TSV uploads, so a
+ * dataset enters the workspace identically regardless of container format.
  *
  * Honesty rules (inherited from the lane contract):
  * - every failure is a typed state with a precise reason, never a throw for
@@ -22,91 +22,9 @@ export type XlsxProfileResult =
   | { ok: true; profile: DatasetProfileDoc }
   | { ok: false; reason: string };
 
-const MAX_ENTRIES = 512;
-const MAX_UNCOMPRESSED_PER_ENTRY = 64 * 1024 * 1024;
-const MAX_TOTAL_UNCOMPRESSED = 256 * 1024 * 1024;
 /** Matches dataset ROW_LIMIT: collecting a few spare rows past the cap lets
  * profileRows set its own truncation flag instead of the reader guessing. */
 const MAX_ROWS_COLLECTED = 200_005;
-
-// ---------------------------------------------------------------------------
-// ZIP container (subset sufficient for real-world xlsx writers)
-// ---------------------------------------------------------------------------
-
-const readZip = (buf: Buffer): { ok: true; entries: Map<string, Buffer> } | { ok: false; reason: string } => {
-  if (buf.length < 22) {
-    return { ok: false, reason: 'not a zip archive: shorter than an end-of-central-directory record' };
-  }
-  // EOCD sits in the last 22 bytes + up to 64KiB comment.
-  let eocd = -1;
-  const scanFloor = Math.max(0, buf.length - 22 - 65_535);
-  for (let i = buf.length - 22; i >= scanFloor; i -= 1) {
-    if (buf.readUInt32LE(i) === 0x0605_4b50) { eocd = i; break; }
-  }
-  if (eocd < 0) {
-    return { ok: false, reason: 'zip end-of-central-directory signature not found — file is not xlsx or is truncated' };
-  }
-  const entryCount = buf.readUInt16LE(eocd + 10);
-  const cdOffset = buf.readUInt32LE(eocd + 16);
-  if (entryCount > MAX_ENTRIES) {
-    return { ok: false, reason: `zip declares ${entryCount} entries (cap ${MAX_ENTRIES}) — refusing` };
-  }
-  const entries = new Map<string, Buffer>();
-  let total = 0;
-  let p = cdOffset;
-  for (let n = 0; n < entryCount; n += 1) {
-    if (p + 46 > buf.length || buf.readUInt32LE(p) !== 0x0201_4b50) {
-      return { ok: false, reason: `zip central directory entry ${n} corrupt (offset ${p})` };
-    }
-    const method = buf.readUInt16LE(p + 10);
-    const csize = buf.readUInt32LE(p + 20);
-    const usize = buf.readUInt32LE(p + 24);
-    const nlen = buf.readUInt16LE(p + 28);
-    const elen = buf.readUInt16LE(p + 30);
-    const clen = buf.readUInt16LE(p + 32);
-    const lho = buf.readUInt32LE(p + 42);
-    if (csize === 0xFFFF_FFFF || usize === 0xFFFF_FFFF || lho === 0xFFFF_FFFF) {
-      return { ok: false, reason: 'zip64 archive not supported (xlsx writers rarely emit it) — refusing honestly' };
-    }
-    const name = buf.toString('utf8', p + 46, p + 46 + nlen);
-    if (usize > MAX_UNCOMPRESSED_PER_ENTRY) {
-      return { ok: false, reason: `zip entry ${name} declares ${usize} uncompressed bytes (cap ${MAX_UNCOMPRESSED_PER_ENTRY})` };
-    }
-    total += usize;
-    if (total > MAX_TOTAL_UNCOMPRESSED) {
-      return { ok: false, reason: `zip total uncompressed size exceeds ${MAX_TOTAL_UNCOMPRESSED} bytes — refusing` };
-    }
-    if (lho + 30 > buf.length || buf.readUInt32LE(lho) !== 0x0403_4b50) {
-      return { ok: false, reason: `zip local header for ${name} corrupt (offset ${lho})` };
-    }
-    const lnlen = buf.readUInt16LE(lho + 26);
-    const lelen = buf.readUInt16LE(lho + 28);
-    const dataStart = lho + 30 + lnlen + lelen;
-    const data = buf.subarray(dataStart, dataStart + csize);
-    let out: Buffer;
-    if (method === 0) {
-      out = Buffer.from(data);
-    } else if (method === 8) {
-      try {
-        out = inflateRawSync(data, { maxOutputLength: MAX_UNCOMPRESSED_PER_ENTRY + 1 });
-      } catch (e) {
-        return { ok: false, reason: `zip entry ${name} inflate failed: ${e instanceof Error ? e.message : String(e)}` };
-      }
-      if (usize > 0 && out.length !== usize) {
-        return { ok: false, reason: `zip entry ${name} inflated to ${out.length} bytes but directory declares ${usize}` };
-      }
-    } else {
-      return { ok: false, reason: `zip entry ${name}: unsupported compression method ${method} (only store/deflate)` };
-    }
-    entries.set(name, out);
-    p += 46 + nlen + elen + clen;
-  }
-  return { ok: true, entries };
-};
-
-// ---------------------------------------------------------------------------
-// SheetML helpers
-// ---------------------------------------------------------------------------
 
 /** "BC7" → 54 (0-based column index); null for refs without a column part. */
 const colOfRef = (ref: string): number | null => {
