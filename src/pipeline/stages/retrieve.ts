@@ -3,7 +3,7 @@ import { CorpusSnapshot, SourceDocument, newId } from '../../domain/index.js';
 import type { RetrievalQuery, SourceFamily } from '../../domain/source.js';
 import { canonicalJson } from '../../shared/crypto.js';
 import type { RawSourceRecord } from '../../shared/ports.js';
-import { cachedSearch } from '../../sources/response-cache.js';
+import { cachedSearch, cachedValue, ReplayCacheMissError } from '../../sources/response-cache.js';
 import { shingle, minhashSignature, jaccardFromSignatures, type MinhashConfig } from '../../domain/minhash.js';
 
 const MINHASH_CFG: MinhashConfig = { numPerm: 128 };
@@ -529,18 +529,14 @@ export const retrieveStage: StageHandler = {
       // RU-10 GO1 read-through cache: fresh hits skip the HTTP round entirely;
       // stale-on-source-error serves the expired entry with an honest receipt flag.
       let res;
-      let cacheState: 'miss' | 'hit' | 'stale' = 'miss';
+      let cacheState: 'miss' | 'hit' | 'stale' | 'replay' = 'miss';
       if (ctx.responseCache !== undefined) {
         const wrapped = await cachedSearch(ctx.responseCache, t.family, queryText, SEARCH_LIMIT, Date.now(),
           () => ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT }),
           { onErrorStale: (e) => isSourceAdapterError(e) && /429|rate|budget/i.test(e instanceof Error ? e.message : String(e)) },
         );
         res = wrapped.result;
-        cacheState = wrapped.stale ? 'stale' : 'hit';
-        if (cacheState === 'hit' && wrapped.cachedAt !== new Date(Date.now()).toISOString()) {
-          // fresh hit from a PRIOR run — the HTTP status of that run is replayed
-          cacheState = 'hit';
-        }
+        cacheState = wrapped.replay ? 'replay' : wrapped.stale ? 'stale' : 'hit';
       } else {
         res = await ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT });
       }
@@ -601,6 +597,8 @@ export const retrieveStage: StageHandler = {
       notes: string[];
       /** Cancellation observed mid-chain: flush what completed, then abort the stage. */
       cancelledMidChain?: boolean;
+      /** Replay-mode cache miss on this target's main search (explicit-failure input). */
+      replayMiss?: boolean;
     }
 
     const runTarget = async (
@@ -637,6 +635,17 @@ export const retrieveStage: StageHandler = {
         // be bookkept as a family failure nor write a contradicting 0-result
         // receipt for a query that already succeeded (W6 audit P2-2).
         if (isCancellationError(e)) { out.cancelledMidChain = true; return out; }
+        // Cache-exclusive replay: a miss on a PLANNED search is an explicit
+        // failure of the replay claim — no live fallback, no failover (every
+        // family serves the same cache). The stage-level guard below refuses
+        // the whole replay when any planned search is missing.
+        if (e instanceof ReplayCacheMissError) {
+          out.replayMiss = true;
+          out.familyFailure = { family: t.family, message: `${t.purpose}: ${e.message}` };
+          out.receipts.push(failedReceipt(t.family, t.text, e, false));
+          out.notes.push(`retrieve/replay: planned search missing from the response cache: "${t.text}" (${t.family})`);
+          return out;
+        }
         // Single-source failure stays visible (familyFailures + receipt) and the
         // stage continues; only total failure aborts (below).
         const msg = e instanceof Error ? e.message : String(e);
@@ -775,6 +784,19 @@ export const retrieveStage: StageHandler = {
       if (out.cancelledMidChain === true) throwIfCancelled(ctx); // cancellation point: prior targets fully flushed
     }
 
+    // Cache-exclusive replay refuses PARTIAL replay: one missing planned search
+    // means the corpus cannot reproduce the recorded run — fail explicitly
+    // instead of silently producing a different corpus (frontier candidate 3).
+    if (ctx.responseCache?.mode === 'replay') {
+      const missed = targets.filter((_, i) => outcomes[i]?.replayMiss === true);
+      if (missed.length > 0) {
+        throw new Error(
+          `retrieve/replay: ${missed.length} of ${targets.length} planned search(es) missing from the response cache — ` +
+            `exact replay refused (missing: ${missed.map((t) => `${t.family}:"${t.text}"`).join('; ')})`,
+        );
+      }
+    }
+
     // R1: user-provided seeds, loaded early so the empty-corpus guards below
     // know the researcher already supplied evidence — a corpus of seeds alone
     // is legitimate; the failure disclosure then lives in the summary.
@@ -802,7 +824,9 @@ export const retrieveStage: StageHandler = {
     // critiques (forward citations). Bounded: seeds capped, per-seed fetches capped,
     // whole chase stops at CHASE_MAX_NEW pool additions. Failures are visible
     // (fusion.citationChase.failure + receipts) and never block the corpus — this
-    // is enrichment. Not cached in v1 (bounded 2 requests/seed); documented follow-up.
+    // is enrichment. Chase ops ride the same response cache as planned searches
+    // (frontier candidate 3 prerequisite): repeat runs cost zero chase HTTP, and
+    // cache-exclusive replay covers them; uncached contexts keep legacy behavior.
     interface ChaseOutcome {
       seeds: number;
       backward: number;
@@ -811,6 +835,19 @@ export const retrieveStage: StageHandler = {
       hop2?: { seed: string; added: number };
       failure?: string;
     }
+    /**
+     * Cached wrapper for one chase op (refs:/cites:/batch: keys hash into the
+     * same source_response_cache table; limit 0 marks no-limit semantics).
+     * Returns the cache receipt mark when a cache context served it.
+     */
+    const chaseCall = async <T>(
+      callKey: string,
+      live: () => Promise<T>,
+    ): Promise<{ value: T; cache?: 'hit' | 'stale' | 'replay' }> => {
+      if (ctx.responseCache === undefined) return { value: await live() };
+      const wrapped = await cachedValue(ctx.responseCache, 'openalex', callKey, 0, Date.now(), live);
+      return { value: wrapped.result, cache: wrapped.replay ? 'replay' : wrapped.stale ? 'stale' : 'hit' };
+    };
     let chase: ChaseOutcome | undefined;
     let openalexCitations: import('../../shared/ports.js').CitationChaseAdapter | undefined;
     try {
@@ -830,8 +867,14 @@ export const retrieveStage: StageHandler = {
           // Every executed chase search is receipted (0 results included — attempts are
           // provenance facts, same P3-1 discipline as planned searches).
           try {
-            const refIds = (await openalexCitations.referencedWorkIds(seed.workRef)).slice(0, CHASE_REFERENCES_PER_SEED);
-            const records = refIds.length > 0 ? await openalexCitations.worksByIds(refIds) : [];
+            const refsRes = await chaseCall(`refs:${seed.workRef}`, () => openalexCitations.referencedWorkIds(seed.workRef));
+            const refIds = refsRes.value.slice(0, CHASE_REFERENCES_PER_SEED);
+            let batchRes: { value: RawSourceRecord[]; cache?: 'hit' | 'stale' | 'replay' } = { value: [] };
+            if (refIds.length > 0) {
+              batchRes = await chaseCall(`batch:${refIds.join(',')}`, () => openalexCitations.worksByIds(refIds));
+            }
+            const records = batchRes.value;
+            const refsCache = refsRes.cache ?? batchRes.cache;
             outcome.backward += records.length;
             executedQueries.push({ purpose: 'citation_chase', text: `refs:${seed.workRef}`, family: 'openalex' });
             // Success implies HTTP 200 by the adapter contract (non-200 throws).
@@ -844,6 +887,7 @@ export const retrieveStage: StageHandler = {
                 family: 'openalex',
                 query: `refs:${seed.workRef}`,
                 httpStatus: 200,
+                ...(refsCache !== undefined ? { cache: refsCache } : {}),
                 resultCount: records.length,
                 contentHashes: records.map((r) => snapshotHash('openalex', r)),
               },
@@ -855,6 +899,12 @@ export const retrieveStage: StageHandler = {
             }
           } catch (e) {
             if (isCancellationError(e)) throw e;
+            if (e instanceof ReplayCacheMissError) {
+              outcome.failure = `replay cache miss at ${seed.workRef} — chase additions of the recorded run are not replayable (pre-caching run or evicted entry)`;
+              ctx.recordReceipt(failedReceipt('openalex', `refs:${seed.workRef}`, e, false)); // attempts are provenance facts
+              ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              break chaseLoop;
+            }
             if (isChaseAbortError(e)) {
               outcome.failure = `aborted at ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
               ctx.recordReceipt(failedReceipt('openalex', `refs:${seed.workRef}`, e, false)); // attempts are provenance facts
@@ -867,7 +917,8 @@ export const retrieveStage: StageHandler = {
           if (outcome.added >= CHASE_MAX_NEW) break;
           // Forward: works citing the seed, most-cited first (deterministic sort).
           try {
-            const records = await openalexCitations.citingWorks(seed.workRef, CHASE_CITING_PER_SEED);
+            const citesRes = await chaseCall(`cites:${seed.workRef}`, () => openalexCitations.citingWorks(seed.workRef, CHASE_CITING_PER_SEED));
+            const records = citesRes.value;
             outcome.forward += records.length;
             executedQueries.push({ purpose: 'citation_chase', text: `cites:${seed.workRef}`, family: 'openalex' });
             ctx.recordReceipt({
@@ -879,6 +930,7 @@ export const retrieveStage: StageHandler = {
                 family: 'openalex',
                 query: `cites:${seed.workRef}`,
                 httpStatus: 200,
+                ...(citesRes.cache !== undefined ? { cache: citesRes.cache } : {}),
                 resultCount: records.length,
                 contentHashes: records.map((r) => snapshotHash('openalex', r)),
               },
@@ -890,6 +942,12 @@ export const retrieveStage: StageHandler = {
             }
           } catch (e) {
             if (isCancellationError(e)) throw e;
+            if (e instanceof ReplayCacheMissError) {
+              outcome.failure = `replay cache miss at ${seed.workRef} — chase additions of the recorded run are not replayable (pre-caching run or evicted entry)`;
+              ctx.recordReceipt(failedReceipt('openalex', `cites:${seed.workRef}`, e, false));
+              ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              break chaseLoop;
+            }
             if (isChaseAbortError(e)) {
               outcome.failure = `aborted at ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
               ctx.recordReceipt(failedReceipt('openalex', `cites:${seed.workRef}`, e, false)); // attempts are provenance facts
@@ -909,8 +967,14 @@ export const retrieveStage: StageHandler = {
           if (hop2Seed !== null) {
             outcome.hop2 = { seed: hop2Seed.workRef, added: 0 };
             try {
-              const refIds = (await openalexCitations.referencedWorkIds(hop2Seed.workRef)).slice(0, CHASE_HOP2_REFERENCES_PER_SEED);
-              const records = refIds.length > 0 ? await openalexCitations.worksByIds(refIds) : [];
+              const refsRes = await chaseCall(`refs2:${hop2Seed.workRef}`, () => openalexCitations.referencedWorkIds(hop2Seed.workRef));
+              const refIds = refsRes.value.slice(0, CHASE_HOP2_REFERENCES_PER_SEED);
+              let batchRes: { value: RawSourceRecord[]; cache?: 'hit' | 'stale' | 'replay' } = { value: [] };
+              if (refIds.length > 0) {
+                batchRes = await chaseCall(`batch:${refIds.join(',')}`, () => openalexCitations.worksByIds(refIds));
+              }
+              const records = batchRes.value;
+              const refs2Cache = refsRes.cache ?? batchRes.cache;
               outcome.backward += records.length;
               executedQueries.push({ purpose: 'citation_chase', text: `refs2:${hop2Seed.workRef}`, family: 'openalex' });
               ctx.recordReceipt({
@@ -922,6 +986,7 @@ export const retrieveStage: StageHandler = {
                   family: 'openalex',
                   query: `refs2:${hop2Seed.workRef}`,
                   httpStatus: 200,
+                  ...(refs2Cache !== undefined ? { cache: refs2Cache } : {}),
                   resultCount: records.length,
                   contentHashes: records.map((r) => snapshotHash('openalex', r)),
                 },
@@ -934,7 +999,11 @@ export const retrieveStage: StageHandler = {
               }
             } catch (e) {
               if (isCancellationError(e)) throw e;
-              if (isChaseAbortError(e)) {
+              if (e instanceof ReplayCacheMissError) {
+                outcome.failure = `replay cache miss at hop2 ${hop2Seed.workRef} — hop-2 addition of the recorded run is not replayable`;
+                ctx.recordReceipt(failedReceipt('openalex', `refs2:${hop2Seed.workRef}`, e, false));
+                ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              } else if (isChaseAbortError(e)) {
                 outcome.failure = `aborted at hop2 ${hop2Seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
                 ctx.recordReceipt(failedReceipt('openalex', `refs2:${hop2Seed.workRef}`, e, false)); // attempts are provenance facts
                 ctx.log(`retrieve: citation chase ${outcome.failure}`);
