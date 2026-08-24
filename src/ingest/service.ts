@@ -7,7 +7,9 @@ import { parseTei } from './parsers/tei.js';
 import { profileDataset, DatasetProfileDoc } from './dataset.js';
 import { buildSdmFromCode, detectCodeLanguage } from './code.js';
 import { buildSdmFromNotebook } from './notebook.js';
+import { profileXlsx } from './xlsx.js';
 import type { ArtifactStore } from '../shared/ports.js';
+import { z } from 'zod';
 
 /**
  * Ingest service facade (MULTIMODAL lane): one entry point per producer.
@@ -99,3 +101,51 @@ export const persistDatasetProfile = async (store: ArtifactStore, profile: Datas
   const { ref } = await store.put(JSON.stringify(profile));
   return ref;
 };
+
+export type BytesIngestResult =
+  | { type: 'dataset'; profile: DatasetProfileDoc }
+  | { type: 'refused'; reason: string };
+
+/**
+ * Route a BINARY upload by extension. Today the binary surface is xlsx/xlsm
+ * supplements (the real scientific workflow); everything else is refused with
+ * a reason, never parsed as text. Disjoint from ingestTextToSdm by extension.
+ */
+export const ingestBytesToProfile = (fileName: string, bytes: Uint8Array): BytesIngestResult => {
+  if (/\.(xlsx|xlsm)$/i.test(fileName)) {
+    const r = profileXlsx(bytes, fileName);
+    return r.ok ? { type: 'dataset', profile: r.profile } : { type: 'refused', reason: r.reason };
+  }
+  return { type: 'refused', reason: `unsupported binary kind for ${fileName} — binary support today: .xlsx/.xlsm supplements; images/scans stay refused until the T4 tier` };
+};
+
+/**
+ * Fetch-by-ref contract (HCI renders from the artifact store): load a stored
+ * ingest artifact back and re-validate against the schema that wrote it.
+ * Content-addressed refs are immutable, so a ref either round-trips exactly
+ * or the artifact was never an ingest doc — both states are typed, never thrown.
+ */
+const loadArtifactDoc = async <T extends z.ZodTypeAny>(
+  store: ArtifactStore,
+  ref: string,
+  schema: T,
+  label: string,
+): Promise<{ ok: true; doc: z.infer<T> } | { ok: false; reason: string }> => {
+  const raw = await store.get(ref);
+  if (raw === null) return { ok: false, reason: `artifact ${ref} not found` };
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return { ok: false, reason: `artifact ${ref} is not valid JSON` };
+  }
+  const r = schema.safeParse(json);
+  if (!r.success) return { ok: false, reason: `artifact ${ref} is not a ${label} document` };
+  return { ok: true, doc: r.data };
+};
+
+export const loadSdmByRef = (store: ArtifactStore, ref: string) =>
+  loadArtifactDoc(store, ref, SdmDocument, 'sdm-1');
+
+export const loadDatasetProfileByRef = (store: ArtifactStore, ref: string) =>
+  loadArtifactDoc(store, ref, DatasetProfileDoc, 'dsdp-1');

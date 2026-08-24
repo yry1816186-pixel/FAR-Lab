@@ -23,8 +23,10 @@ export const guessLanguage = (text: string): 'zh' | 'en' | undefined => {
  */
 export const panelsFromCaption = (caption: string): SdmFigurePanel[] => {
   const panels: SdmFigurePanel[] = [];
-  // Marker: (a) or （A） at start or after whitespace/punctuation.
-  const re = /(?:^|[\s;,.])\(?（?\([a-z]\)）?/g;
+  // Marker: (a) or （A） at start or after whitespace/punctuation — including
+  // full-width CJK punctuation (。，、；) which separates caption segments in
+  // Chinese/Japanese figures (found by the mixed-language payload test 2026-08-24).
+  const re = /(?:^|[\s;,.\u3002\uFF0C\u3001\uFF1B])\(?（?\([a-z]\)）?/g;
   const marks: { label: string; start: number; contentStart: number }[] = [];
   for (const m of caption.matchAll(re)) {
     const labelMatch = /\(([a-z])\)|（([a-z])）/.exec(m[0]);
@@ -88,9 +90,14 @@ export interface XrefPattern {
 }
 
 export const XREF_PATTERNS: readonly XrefPattern[] = [
-  { kind: 'figure', re: /\b(?:Fig(?:ure)?s?\.?|图)\s*(\d{1,3})([a-z])?/g },
-  { kind: 'table', re: /\b(?:Tables?\.?|表)\s*(\d{1,3})/g },
-  { kind: 'equation', re: /\b(?:Eqs?\.?|Eqs?\.?\s*\(|式)\s*\(?\(?(\d{1,3})\)?\)?/g },
+  // Boundary is "not preceded by an ASCII alnum" rather than \b: \b never
+  // holds adjacent to CJK (CJK is outside \w), so mid-sentence 图 N / 表 N /
+  // 式 (N) references in Chinese text would silently never match (fixed
+  // 2026-08-24, mixed-language payload test). For Latin prefixes the
+  // lookbehind is equivalent to the old \b (blocks mid-word matches).
+  { kind: 'figure', re: /(?<![A-Za-z0-9])(?:Fig(?:ure)?s?\.?|图)\s*(\d{1,3})([a-z])?/g },
+  { kind: 'table', re: /(?<![A-Za-z0-9])(?:Tables?\.?|表)\s*(\d{1,3})/g },
+  { kind: 'equation', re: /(?<![A-Za-z0-9])(?:Eqs?\.?|Eqs?\.?\s*\(|式)\s*\(?\(?(\d{1,3})\)?\)?/g },
   { kind: 'citation', re: /\[(\d{1,3}(?:\s*,\s*\d{1,3})*(?:\s*[-–]\s*\d{1,3})?)\]/g },
 ];
 

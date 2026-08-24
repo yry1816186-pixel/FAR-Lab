@@ -111,3 +111,33 @@ describe('parseDelimited — RFC4180 core', () => {
     expect(rows[1]).toEqual(['a,b', 'c']);
   });
 });
+
+describe('large-spreadsheet stress (BENCHMARK.md gap closed 2026-08-24)', () => {
+  const buildCsv = (dataRows: number): string => {
+    const lines: string[] = ['study,effect (g),n,group'];
+    for (let i = 0; i < dataRows; i += 1) {
+      lines.push(`s${i},0.${(i % 90 + 10)},${100 + i},${i % 2 === 0 ? 'A' : 'B'}`);
+    }
+    return `${lines.join('\n')}\n`;
+  };
+
+  it('profiles 150k rows correctly (types, stats, no truncation)', () => {
+    const p = profileDataset(buildCsv(150_000), 'big.csv');
+    expect(p.diagnostics.truncated).toBe(false);
+    expect(p.rowCount).toBe(150_000);
+    expect(p.columns.map((c) => `${c.name}:${c.inferredType}`)).toEqual(['study:string', 'effect (g):float', 'n:integer', 'group:string']);
+    expect(p.columns[1]!.unitHint).toBe('g');
+    expect(p.columns[2]!.numeric?.min).toBe(100);
+    expect(p.columns[2]!.numeric?.max).toBe(150_099);
+    expect(p.columns[3]!.categorical?.levels).toHaveLength(2);
+  });
+
+  it('row cap 200k fires honestly past the limit', () => {
+    const p = profileDataset(buildCsv(200_010), 'over.csv');
+    expect(p.diagnostics.truncated).toBe(true);
+    expect(p.diagnostics.warnings.join(' ')).toMatch(/row limit 200000 reached/);
+    // cap applies to ROWS INCLUDING the header: 200_000 total → 199_999 body
+    expect(p.rowCount).toBe(199_999);
+    expect(p.columns[0]!.rowCount).toBe(199_999);
+  });
+});

@@ -1,6 +1,8 @@
 # MULTIMODAL — Scientific Artifact Understanding Backend (handoff to HCI)
 
-Lane owner: MULTIMODAL (`work/multimodal-science/`). Landed 2026-08-24.
+Lane owner: MULTIMODAL (`work/multimodal-science/`). Landed 2026-08-24;
+**extended same day**: fetch-by-ref GET, bytes/xlsx supplements, network
+fulltext→SDM wiring, mixed-language fidelity fixes.
 Status: deterministic tiers (T2 structure + T3 dataset/panels/symbols) IMPLEMENTED and
 tested; VLM tier (T4) contract reserved, BLOCKED-live per the 2026-08-23 directive.
 
@@ -21,10 +23,15 @@ Dataset profiles: `src/ingest/dataset.ts` (`dsdp-1`).
 
 1. **Entry points**
    - `POST /api/v1/ingest` — `{ kind:'pdf_text', fileName, payload }` (web collector
-     output) or `{ kind:'text', fileName, text }` → `{ type, artifactRef, sdm|profile }`.
+     output), `{ kind:'text', fileName, text }`, or `{ kind:'bytes', fileName, base64 }`
+     (xlsx/xlsm supplements) → `{ type, artifactRef, sdm|profile }`.
      Errors: HTTP 400 with precise field messages.
-   - `far ingest <file>` (CLI) — text-family files; refuses PDF with the reason.
-   - Library: `src/ingest/index.ts` (all parsers + `ingestSdm`, `ingestTextToSdm`).
+   - `GET /api/v1/ingest/:ref` — fetch the FULL stored SDM (`{kind:'sdm', sdm}`) or
+     dataset profile (`{kind:'dataset_profile', profile}`) by sha256 ref. Render from
+     the store; 404 for non-ingest refs, 400 for malformed refs.
+   - `far ingest <file>` (CLI) — text-family + xlsx bytes; refuses PDF with the reason.
+   - Library: `src/ingest/index.ts` (all parsers + `ingestSdm`, `ingestTextToSdm`,
+     `ingestBytesToProfile`, `loadSdmByRef`, `loadDatasetProfileByRef`).
 2. **ID discipline**: `blk_*`, `fig_*`, `tab_*`, `eq_*`, `cit_*` — kind prefix guaranteed.
 3. **Provenance rule**: `page/bbox` (pdfjs), `elementPath` (XML routes), `charStart/End`
    (text formats). Absent field = "this route cannot know it" — never render a guess.
@@ -48,20 +55,33 @@ Dataset profiles: `src/ingest/dataset.ts` (`dsdp-1`).
 | .md | `markdown-structure-v1` | headings/GFM tables/$$math/images→figures/code blocks/lists |
 | .tex | `latex-source-v1` | sections/figures/tabular grids/equations verbatim LaTeX/\cite↔\bibitem |
 | .csv/.tsv | `dsdp-1` | types, missingness, units, significance flags, dupes, levels |
+| .xlsx/.xlsm | `dsdp-1` (`format:'xlsx'`, no delimiter) | first sheet profiled (others named in warnings), shared/rich/inline strings, bool/error cells preserved as literals, cell gaps, 200k row cap |
 | .ipynb | `notebook-json-v1` | cells with execution provenance, stored errors as footnotes |
 | .py/.ts/.js | `code-scan-v1` | heuristic symbol index + imports (labeled non-AST) |
 | .xml | JATS or TEI sniffed | full structure incl. equations+citations |
-| images, scans, other | **refused honestly** | reason strings, no fake |
+| images, scans, docx/pptx, other | **refused honestly** | reason strings, no fake |
 
-Network fulltext routes (already fetched by `src/sources/fulltext.ts`) gain structure
-recovery via `parseJats` / `parseTei` / `parseLatexml` — the biggest untouched win for
-the corpus: figures/tables/equations/citations the system ALREADY downloads.
+Network fulltext routes (`src/sources/fulltext.ts`) now produce an SDM for
+every fetched document — `FullTextFetch.sdm` (arxiv_html→LaTeXML,
+europepmc_jats→JATS, openalex_tei→GROBID TEI), `origin {kind:'network', url}`,
+license carried, legacy `text` byte-identical. Persistence on the corpus
+document is lane 04's one-block change: handoff
+`.planning/concurrency/handoffs/r2-2026-08-24-05-04-fulltext-sdm-persistence.md`.
+
+Mixed-language fidelity (2026-08-24 fixes, all test-locked): figure/table
+labels keep their PRINTED prefix ("图 3" is no longer normalized to "Figure 3"),
+panel markers accept full-width CJK punctuation boundaries (。，、；), and
+图/表/式 cross-references actually match mid-sentence in CJK text (the old `\b`
+boundary never holds adjacent to CJK). Forward references in pdf-text
+(mention before caption) get a second resolution pass against the final record
+pools.
 
 ## HCI integration surface (next)
 
-1. Upload flow: on file pick → `collectPdfText(file)` (PDFs) or `file.text()` → POST
-   `/api/v1/ingest` → render from the returned summary/SDM (fetch full SDM via
-   artifactRef when needed — GET-by-ref endpoint is a thin follow-up).
+1. Upload flow: on file pick → `collectPdfText(file)` (PDFs), `file.text()`
+   (text kinds), or base64 (xlsx) → POST `/api/v1/ingest` → render from the
+   summary; GET `/api/v1/ingest/:artifactRef` for full SDM detail.
+   Port record: `.planning/concurrency/handoffs/r2-2026-08-24-05-01-ingest-stopgap-port.md`.
 2. Evidence corpus: render figure cards (caption+panels+"not understood" chip), table
    grids, equation LaTeX (KaTeX already in web deps), citation lists with citedFrom.
 3. Dataset uploads: render the profile (typed columns, missingness bars, unit chips,

@@ -21,9 +21,24 @@ export interface LatexmlOrigin {
 const hasClass = (el: XmlElement, cls: string): boolean =>
   (el.attrs['class'] ?? '').split(/\s+/).includes(cls);
 
+/**
+ * Real arXiv LaTeXML pages start with `<!DOCTYPE html>` and carry
+ * `<script>`/`<style>` CDATA blocks whose content (`x < y` in JS, CSS braces)
+ * is not XML-parseable — without this strip, every REAL page fails element
+ * parsing while hand-written XHTML fixtures pass (found by the fulltext-SDM
+ * wiring test, 2026-08-24). Doctype and script/style are non-structural for
+ * document understanding (same precedent as the regex extractor's
+ * stripInertBlocks), so they are removed before parseXml; nothing else is.
+ */
+const stripHtmlInert = (html: string): string =>
+  html
+    .replace(/^\s*<!DOCTYPE[^>[]*(?:\[[\s\S]*?\])?[^>]*>/i, ' ')
+    .replace(/<script\b[\s\S]*?<\/script\s*>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style\s*>/gi, ' ');
+
 export const parseLatexml = (html: string, origin: LatexmlOrigin): SdmDocument => {
   const warnings: string[] = [];
-  const parsed = parseXml(html);
+  const parsed = parseXml(stripHtmlInert(html));
   if (parsed.status === 'error') return emptyDoc(origin, `xhtml parse error: ${parsed.message}`);
   const root = parsed.root;
 
