@@ -26,7 +26,8 @@ import { retrieveStage } from '../src/pipeline/stages/retrieve.js';
  * code, not model quality; LLM self-evaluation is never the judge.
  *
  * Fixture universe (16 unique works + 1 merged version pair + 1 hard negative):
- *   GOLD      G1,G2 supporting; G3,G4 counter; G5 foundational (chase-only).
+ *   GOLD      G1,G2 supporting; G3,G4 counter; G5 foundational (chase-only);
+ *             G7 1979 methodology (reachable ONLY via the hop-2 chase off W900).
  *   VERSION   V-pre (arXiv 2401.01234) == V-pub (doi:10.1/vpub) — must merge.
  *   HARDNEG   H1 — same topic, near title, DIFFERENT work — must NOT merge.
  *   FILLER    F1..F9 — ranked below/near gold, drive pool > cap (rerank path).
@@ -135,6 +136,20 @@ const GOLD_CHASE = rec(
   { publicationYear: 1998, publicationType: 'primary_research' as PublicationType },
 );
 
+/**
+ * Gold reachable ONLY via the DEPTH-2 chase (multi-hop): the 1979 methodology
+ * paper GOLD_CHASE itself builds on — never in keyword results, never in hop-1
+ * refs of any seed, only in W900's references.
+ */
+const GOLD_HOP2 = rec(
+  'Minimal model estimation of insulin sensitivity from glucose tolerance testing',
+  [
+    { kind: 'doi', value: '10.1/g7' },
+    { kind: 'openalex', value: 'W950' },
+  ],
+  { publicationYear: 1979, publicationType: 'primary_research' as PublicationType },
+);
+
 const FILLER = (n: number, year = 2021): RawSourceRecord =>
   rec(`Fixture filler study number ${n} on dietary interventions and metabolic outcomes`, [{ kind: 'doi', value: `10.1/f${n}` }], {
     publicationYear: year,
@@ -178,18 +193,22 @@ const PLAN = {
 
 /* ------------------------------ search universe ------------------------------ */
 // Ranks are engineered so fused order (RRF k=60) is fully determined:
-// G2 (5 lists) > G1 (3) > F1 (3x lower ranks) > G3 (2) > G4 (2) > F4/F3 > V > F5 > F7 > G5 (chase) > F2/F8/F9 > H1 > F6.
+// G2 (5 lists) > G1 (3) > F1 (3x lower ranks) > G3 (2) > G4 (2) > F4/F3 > V > F5 > F7
+// > G5 (chase r0) > G7 (hop-2 r0, later first-seen) > F8 > F9 (chase r1) > F6 > H1.
 
 const [G1, G2] = GOLD_SUPPORT;
 const [G3, G4] = GOLD_COUNTER;
 
 const SEARCHES: Record<string, RawSourceRecord[]> = {
-  // counter[0] -> openalex, europepmc; counter[1] -> crossref
+  // counter[0] -> openalex, europepmc; counter[1] -> crossref.
+  // H1/F2 deliberately NOT in counter lists: the counter-origin set must stay
+  // {G1,G3,G4,F1} so the seat floor is met inside the top-12 and no seat swap
+  // displaces the chase golds (the fixture's engineered ranks depend on it).
   'oa:intermittent fasting insulin sensitivity failed replication': [G3, G1, FILLER(1)],
-  'epmc:intermittent fasting insulin sensitivity failed replication': [G3, G4, HARD_NEG],
-  'cr:intermittent fasting insulin sensitivity limitations critique': [G4, FILLER(2)],
-  // discovery[0] -> openalex, arxiv, crossref
-  'oa:intermittent fasting insulin sensitivity trial': [G1, G2, FILLER(1), V_PUB],
+  'epmc:intermittent fasting insulin sensitivity failed replication': [G3, G4],
+  'cr:intermittent fasting insulin sensitivity limitations critique': [G4],
+  // discovery[0] -> openalex, arxiv, crossref (H1 rides along here, non-counter)
+  'oa:intermittent fasting insulin sensitivity trial': [G1, G2, FILLER(1), V_PUB, HARD_NEG],
   'arxiv:intermittent fasting insulin sensitivity trial': [V_PRE, FILLER(4)],
   'cr:intermittent fasting insulin sensitivity trial': [G2, FILLER(3), FILLER(5), FILLER(6)],
   // discovery[1] -> openalex, arxiv, crossref
@@ -219,11 +238,15 @@ const fakeAdapter = (
   ...(opts.citations !== undefined ? { citations: opts.citations } : {}),
 });
 
-/** Scripted citation graph: only G1 carries references (the chase gold path). */
+/**
+ * Scripted citation graph: G1's references carry the hop-1 gold path; GOLD_CHASE
+ * (W900) carries the hop-2 path to the 1979 minimal-model paper (W950).
+ */
 const chaseAdapter = (calls: string[]): CitationChaseAdapter => ({
   async referencedWorkIds(workRef) {
     calls.push(`refs:${workRef}`);
     if (workRef === 'W101') return ['W900', 'W777'];
+    if (workRef === 'W900') return ['W950']; // hop-2 lineage: the method behind the method
     return [];
   },
   async citingWorks(workRef) {
@@ -233,6 +256,7 @@ const chaseAdapter = (calls: string[]): CitationChaseAdapter => ({
   async worksByIds(ids) {
     calls.push(`batch:${ids.join('|')}`);
     if (ids.includes('W900')) return [GOLD_CHASE, F9];
+    if (ids.includes('W950')) return [GOLD_HOP2];
     return [];
   },
 });
@@ -325,35 +349,57 @@ describe('known-answer retrieval benchmark (offline, real stage code)', () => {
     const docIs = (needle: RawSourceRecord): boolean =>
       docs.some((d) => d !== null && d.identifiers.some((i) => needle.identifiers.some((n) => n.value === i.value)));
 
-    // --- known-answer recall@12: 5/5 gold (G1 G2 supporting, G3 G4 counter, G5 chase-only)
-    for (const gold of [...GOLD_SUPPORT, ...GOLD_COUNTER, GOLD_CHASE]) {
+    // --- known-answer recall@12: 6/6 gold (G1 G2 supporting, G3 G4 counter, G5 chase-only, G7 hop-2-only)
+    for (const gold of [...GOLD_SUPPORT, ...GOLD_COUNTER, GOLD_CHASE, GOLD_HOP2]) {
       expect(docIs(gold), `gold doc missing from corpus: ${gold.title}`).toBe(true);
     }
-    const recall = (5 / 5).toFixed(2);
+    const recall = (6 / 6).toFixed(2);
 
     // --- counter-evidence recall: both counter golds survived the cap (seat floor evidence)
     expect(docIs(G3) && docIs(G4)).toBe(true);
 
+    // --- precision@5 vs the gold set (deterministic, engineered ranks): the
+    //     fused order is G2 > G1 > F4 > V > F5 > F1 > G3 > G4 — on-topic fillers
+    //     interleave legitimately (they are relevant-not-gold), so gold-precision@5
+    //     is 0.4 here and the calibrated claim is top-heavy gold: EVERY keyword
+    //     gold (support + counter) ranks within the top 8 of a 16-pool corpus.
+    const rankOf = (needle: RawSourceRecord): number =>
+      corpus.documentIds.findIndex((id) => {
+        const d = env.store.getObject('source_document', id);
+        return d !== null && d.identifiers.some((i) => needle.identifiers.some((n) => n.value === i.value));
+      });
+    const top5 = corpus.documentIds.slice(0, 5).map((id) => env.store.getObject('source_document', id));
+    const goldInTop5 = top5.filter((d) =>
+      d !== null && [...GOLD_SUPPORT, ...GOLD_COUNTER].some((g) => g.identifiers.some((n) => d.identifiers.some((i) => i.value === n.value))),
+    ).length;
+    expect(goldInTop5 / 5).toBe(0.4);
+    for (const gold of [...GOLD_SUPPORT, ...GOLD_COUNTER]) {
+      expect(rankOf(gold)).toBeLessThan(8);
+    }
+
     // --- citation-chain recall: G5 reached ONLY via backward chase from G1
     expect(docIs(GOLD_CHASE)).toBe(true);
-    expect(corpus.fusion?.citationChase).toMatchObject({ seeds: 3, backward: 2, forward: 0, added: 2 });
+    expect(corpus.fusion?.citationChase).toMatchObject({ seeds: 3, backward: 3, forward: 0, added: 3 });
+    expect(corpus.fusion?.citationChase?.hop2).toMatchObject({ seed: 'W900', added: 1 });
     expect(corpus.queries.some((q) => q.purpose === 'citation_chase' && q.text === 'refs:W101')).toBe(true);
+    expect(corpus.queries.some((q) => q.purpose === 'citation_chase' && q.text === 'refs2:W900')).toBe(true);
     expect(chaseCalls).toContain('batch:W900|W777');
+    expect(chaseCalls).toContain('batch:W950');
 
     // --- version/preprint dedup: V-pre + V-pub are ONE pool entry (poolSize pins it)
-    expect(corpus.fusion?.poolSize).toBe(16); // 15 keyword-uniques minus the V merge (14) + 2 chase adds
+    expect(corpus.fusion?.poolSize).toBe(16); // 14 keyword records - V merge + 3 chase adds (G5, F9, G7-hop2)
     const vDocs = docs.filter((d) => d !== null && /12-week randomized study/i.test(d.title) && !/adolescents/i.test(d.title));
     expect(vDocs).toHaveLength(1); // exactly one doc for the merged version pair
 
-    // --- hard negative NOT merged with the version pair (its own pool entry kept it at 16)
-    //     (H1 itself ranks 15th and is cut by the cap — correct behavior, it is a distractor)
+    // --- hard negative NOT merged with the version pair (its own pool entry kept poolSize at 16)
+    //     (H1 itself ranks last-area and is cut by the cap — correct behavior, it is a distractor)
 
     // --- diversity: >=3 families, observed concentration, classic-vs-recent year spread
     const div = corpus.fusion?.diversity;
     expect(Object.keys(div?.familyCounts ?? {}).length).toBeGreaterThanOrEqual(3);
     expect(div?.familyConcentration).toBeGreaterThan(0);
     expect(div?.familyConcentration).toBeLessThan(1);
-    expect(div?.yearMin).toBe(1998); // the chase-reached 1998 foundational paper
+    expect(div?.yearMin).toBe(1979); // the hop-2-reached 1979 minimal-model paper
     expect(div?.yearMax).toBe(2024);
     expect(div?.publicationTypeCounts['review']).toBe(1); // G4 (systematic critique)
 
@@ -372,10 +418,10 @@ describe('known-answer retrieval benchmark (offline, real stage code)', () => {
     expect(corpus.fusion?.rerankApplied).toBe(true);
     expect(corpus.fusion?.counterSeatsKept).toBeGreaterThanOrEqual(2);
 
-    // --- provenance: chase searches receipted, chase queries in the snapshot
+    // --- provenance: chase searches receipted (hop-1 refs+cites per seed + hop-2 refs)
     const receipts = env.store.listObjects('receipt', env.run.id).filter((r) => r.kind === 'source_retrieval');
     const chaseReceipts = receipts.filter((r) => /citation-chase/.test(r.redactionNote ?? ''));
-    expect(chaseReceipts.length).toBe(6); // 3 seeds x (refs + cites)
+    expect(chaseReceipts.length).toBe(7);
 
     // benchmark number surfaced for the run log (recall@12 on the known gold set)
     expect(out.summary).toContain('citation chase');
@@ -410,5 +456,235 @@ describe('known-answer retrieval benchmark (offline, real stage code)', () => {
     expect(corpus?.fusion?.saturation).toMatchObject({ saturated: false });
     expect(corpus?.fusion?.saturation?.tailNovelty).toBe(1);
     expect(corpus?.fusion?.citationChase).toBeUndefined(); // no capable family wired -> honestly absent
+  });
+
+  // -------------------------------------------------------------------------
+  // RU-R GO2 benchmark dimensions: retracted-paper, cross-domain, multilingual.
+  // Each case runs the REAL stage over its own fixture universe.
+  // -------------------------------------------------------------------------
+
+  const anyQueryAdapter = (family: SourceFamily, records: () => RawSourceRecord[]): SourceAdapter => ({
+    family,
+    async search(query) {
+      return { family, query, httpStatus: 200, records: records(), latencyMs: 1 };
+    },
+    async resolve() {
+      return { found: false, httpStatus: 404 };
+    },
+  });
+
+  const retractedRecord = (): RawSourceRecord =>
+    rec(
+      'Intermittent fasting cures type two diabetes a landmark trial',
+      [{ kind: 'doi', value: '10.1/r1' }],
+      {
+        publicationYear: 2020,
+        normalized: {
+          title: 'Intermittent fasting cures type two diabetes a landmark trial',
+          'update-to': [{ type: 'retraction', source: 'retraction-watch' }],
+        },
+      },
+    );
+
+  it('retracted-paper (over-cap pool): a retracted top-ranked document never takes a cap seat', async () => {
+    // 13 valid serial-uniques + 1 retracted rank-1-in-every-openalex-list = pool 14 > cap 12.
+    const valid = (n: number): RawSourceRecord =>
+      rec(`Valid study ${n} on dietary interventions and insulin outcomes`, [{ kind: 'doi', value: `10.1/rv${n}` }], {
+        publicationYear: 2019 + (n % 5),
+      });
+    const heldValid = Array.from({ length: 13 }, (_, i) => valid(i + 1));
+    let pool14 = 0;
+    const env = makeEnv(
+      [
+        { forPurpose: 'query-planning', rawOutput: JSON.stringify(PLAN) },
+        {
+          forPurpose: 'listwise-rerank',
+          rawOutput: JSON.stringify({
+            ranked: Array.from({ length: 14 }, (_, i) => ({
+              index: i,
+              relevance: i < 12 ? ('high' as const) : ('low' as const),
+              reason: 'identity',
+            })),
+          }),
+        },
+      ],
+      {
+        // openalex puts the RETRACTED record first in every response (it would
+        // fuse to the very top); the other 13 valid docs fill the pool over cap.
+        openalex: anyQueryAdapter('openalex', () => {
+          pool14 += 1;
+          return [retractedRecord(), ...heldValid.slice(0, 3)];
+        }),
+        arxiv: anyQueryAdapter('arxiv', () => heldValid.slice(3, 7)),
+        crossref: anyQueryAdapter('crossref', () => heldValid.slice(7, 11)),
+        europepmc: anyQueryAdapter('europepmc', () => heldValid.slice(11, 13)),
+      },
+    );
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    const corpus = env.store.listObjects('corpus_snapshot', env.run.id)[0]!;
+    expect(corpus.fusion?.poolSize).toBe(14);
+    const docs = corpus.documentIds.map((id) => env.store.getObject('source_document', id));
+    const hasRetracted = docs.some((d) => d !== null && d.identifiers.some((i) => i.value === '10.1/r1'));
+    expect(hasRetracted).toBe(false); // demoted out of cap competition
+    expect(corpus.documentIds).toHaveLength(12); // cap filled with valid docs
+    expect(corpus.fusion?.retractedDemoted).toBe(1);
+    expect(out.summary).toContain('retracted document(s) demoted');
+    expect(pool14).toBeGreaterThan(0);
+  });
+
+  it('retracted-paper (under-cap pool): the retracted document stays visible WITH its status persisted', async () => {
+    // 4 valid + 1 retracted = pool 5 <= cap: no silent drop — the corpus keeps it,
+    // flagged, for downstream claim-level demotion (GRADE floor, uncertainty).
+    const smallValid = (n: number): RawSourceRecord =>
+      rec(`Small valid cohort ${n} on fasting and insulin`, [{ kind: 'doi', value: `10.1/sv${n}` }]);
+    const env = makeEnv(
+      [{ forPurpose: 'query-planning', rawOutput: JSON.stringify(PLAN) }],
+      {
+        openalex: anyQueryAdapter('openalex', () => [retractedRecord()]),
+        arxiv: anyQueryAdapter('arxiv', () => [smallValid(1), smallValid(2)]),
+        crossref: anyQueryAdapter('crossref', () => [smallValid(3)]),
+        europepmc: anyQueryAdapter('europepmc', () => [smallValid(4)]),
+      },
+    );
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    const corpus = env.store.listObjects('corpus_snapshot', env.run.id)[0]!;
+    const r1 = corpus.documentIds
+      .map((id) => env.store.getObject('source_document', id))
+      .find((d) => d !== null && d.identifiers.some((i) => i.value === '10.1/r1'));
+    expect(r1).toBeDefined(); // kept — visibility over silent drop
+    expect(r1?.retractionStatus).toBe('retracted'); // status travels with the document
+    expect(corpus.fusion?.retractedDemoted).toBeUndefined(); // no cap pressure -> nothing demoted
+  });
+
+  it('cross-domain: an adjacent-domain gold is found by the adjacent query and survives the cap', async () => {
+    // The plan's second discovery query is the adjacent-domain query (exercise
+    // physiology vocabulary). X1 is returned ONLY by that query (openalex + crossref,
+    // 2 lists -> RRF outranks every single-list filler) in a 13-pool over cap 12.
+    const ADJACENT_QUERY = 'skeletal muscle glucose uptake exercise physiology randomized trial';
+    const CROSS_GOLD = rec(
+      'Resistance training enhances skeletal muscle glucose uptake independent of diet',
+      [
+        { kind: 'doi', value: '10.1/x1' },
+        { kind: 'openalex', value: 'W550' },
+      ],
+      { publicationYear: 2018, publicationType: 'primary_research' as PublicationType },
+    );
+    const onFiller = (n: number): RawSourceRecord =>
+      rec(`Main domain filler ${n} on fasting insulin sensitivity`, [{ kind: 'doi', value: `10.1/xf${n}` }]);
+    const planCross = {
+      discovery: ['intermittent fasting insulin sensitivity trial', ADJACENT_QUERY],
+      supporting: ['intermittent fasting insulin sensitivity randomized trial'],
+      counter: [
+        'intermittent fasting insulin sensitivity failed replication',
+        'intermittent fasting insulin sensitivity limitations critique',
+      ],
+    };
+    // Scripted per (family, query) — the REAL target map: counter0->{oa,epmc},
+    // counter1->{cr}, each discovery/supporting query->{oa,arxiv,cr}. 12 pairs.
+    const SEARCHES_X: Record<string, RawSourceRecord[]> = {
+      // adjacent-domain query (discovery[1]): X1 on two families — RRF 2/61
+      // outranks every single-list filler, so X1 EARNS a cap seat at pool 13.
+      [`oa:${ADJACENT_QUERY}`]: [CROSS_GOLD, onFiller(10)],
+      [`arxiv:${ADJACENT_QUERY}`]: [onFiller(11)],
+      [`cr:${ADJACENT_QUERY}`]: [CROSS_GOLD, onFiller(12)],
+      'oa:intermittent fasting insulin sensitivity trial': [onFiller(1)],
+      'arxiv:intermittent fasting insulin sensitivity trial': [onFiller(2)],
+      'cr:intermittent fasting insulin sensitivity trial': [onFiller(3)],
+      'oa:intermittent fasting insulin sensitivity randomized trial': [onFiller(4)],
+      'arxiv:intermittent fasting insulin sensitivity randomized trial': [onFiller(5)],
+      'cr:intermittent fasting insulin sensitivity randomized trial': [onFiller(6)],
+      'oa:intermittent fasting insulin sensitivity failed replication': [onFiller(7)],
+      'epmc:intermittent fasting insulin sensitivity failed replication': [onFiller(8)],
+      'cr:intermittent fasting insulin sensitivity limitations critique': [onFiller(9)],
+    };
+    const keyed = (family: SourceFamily, key: string): SourceAdapter => ({
+      family,
+      async search(query) {
+        const records = SEARCHES_X[`${key}:${query}`];
+        if (records === undefined) throw new Error(`TEST FIXTURE: no scripted results for ${key}:${query}`);
+        return { family, query, httpStatus: 200, records: [...records], latencyMs: 1 };
+      },
+      async resolve() {
+        return { found: false, httpStatus: 404 };
+      },
+    });
+    const env = makeEnv(
+      [
+        { forPurpose: 'query-planning', rawOutput: JSON.stringify(planCross) },
+        {
+          forPurpose: 'listwise-rerank',
+          rawOutput: JSON.stringify({
+            ranked: Array.from({ length: 13 }, (_, i) => ({
+              index: i,
+              relevance: i < 12 ? ('high' as const) : ('low' as const),
+              reason: 'identity',
+            })),
+          }),
+        },
+      ],
+      { openalex: keyed('openalex', 'oa'), arxiv: keyed('arxiv', 'arxiv'), crossref: keyed('crossref', 'cr'), europepmc: keyed('europepmc', 'epmc') },
+    );
+    const out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    const corpus = env.store.listObjects('corpus_snapshot', env.run.id)[0]!;
+    // pool: 12 single-list fillers + X1 (2 lists) = 13 > cap 12 — X1 must EARN its seat
+    expect(corpus.fusion?.poolSize).toBe(13);
+    const docs = corpus.documentIds.map((id) => env.store.getObject('source_document', id));
+    const hasX1 = docs.some((d) => d !== null && d.identifiers.some((i) => i.value === '10.1/x1'));
+    expect(hasX1).toBe(true);
+  });
+
+  it('multilingual: same CJK title from two families merges; a translated title honestly does not', async () => {
+    const JP_TITLE = '間欠的断食法が成人のインスリン感受性に及ぼす影響に関する無作為化比較試験の検討';
+    const jpOpenalex = rec(JP_TITLE, [{ kind: 'openalex', value: 'W700' }], { publicationYear: 2023 });
+    const jpCrossref = rec(JP_TITLE, [{ kind: 'doi', value: '10.1/jp' }], { publicationYear: 2023 });
+    const enTwin = rec(
+      'Effects of intermittent fasting on insulin sensitivity in adults a randomized controlled trial',
+      [{ kind: 'doi', value: '10.1/en' }],
+      { publicationYear: 2023 },
+    );
+    const planJp = {
+      discovery: ['intermittent fasting insulin sensitivity trial', 'time restricted eating glucose metabolism'],
+      supporting: ['intermittent fasting insulin sensitivity randomized trial'],
+      counter: [
+        'intermittent fasting insulin sensitivity failed replication',
+        'intermittent fasting insulin sensitivity limitations critique',
+      ],
+    };
+
+    // Case 1: identical CJK title, different ids/families -> ONE pool entry (RU-10 CJK normalization)
+    let env = makeEnv(
+      [{ forPurpose: 'query-planning', rawOutput: JSON.stringify(planJp) }],
+      {
+        openalex: anyQueryAdapter('openalex', () => [jpOpenalex]),
+        crossref: anyQueryAdapter('crossref', () => [jpCrossref]),
+        arxiv: anyQueryAdapter('arxiv', () => [jpOpenalex]),
+        europepmc: anyQueryAdapter('europepmc', () => [jpCrossref]),
+      },
+    );
+    let out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    let corpus = env.store.listObjects('corpus_snapshot', env.run.id)[0]!;
+    expect(corpus.fusion?.poolSize).toBe(1); // the two same-title records fuzzy-merged
+    expect(corpus.documentIds).toHaveLength(1);
+
+    // Case 2 (honest limitation): the ENGLISH translation of the same work has a
+    // different normalized title and no shared id -> stays a SEPARATE entry.
+    // (Translation-level merge needs embeddings — deliberately not faked here.)
+    env = makeEnv(
+      [{ forPurpose: 'query-planning', rawOutput: JSON.stringify(planJp) }],
+      {
+        openalex: anyQueryAdapter('openalex', () => [jpOpenalex]),
+        crossref: anyQueryAdapter('crossref', () => [enTwin]),
+        arxiv: anyQueryAdapter('arxiv', () => [jpOpenalex]),
+        europepmc: anyQueryAdapter('europepmc', () => [enTwin]),
+      },
+    );
+    out = await retrieveStage.execute(env.ctx);
+    expect(out.kind).toBe('done');
+    corpus = env.store.listObjects('corpus_snapshot', env.run.id)[0]!;
+    expect(corpus.fusion?.poolSize).toBe(2); // no false merge across languages
   });
 });

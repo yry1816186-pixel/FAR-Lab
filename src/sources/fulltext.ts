@@ -111,14 +111,27 @@ const stripInertBlocks = (html: string): string => {
       .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
       .replace(/<!--[\s\S]*?-->/g, ' ')
-      .replace(/<table\b[\s\S]*?<\/table>/gi, ' '); // numeric mash; prose carries the claims
+      // numeric mash; prose carries the claims. Element-name-exact match: the
+      // old `table\b` ALSO fired on `<table-wrap` (\b holds between "e" and "-"),
+      // swallowing the JATS table-wrap <caption> as collateral (RU-R GO3).
+      .replace(/<table(?=[\s>])[\s\S]*?<\/table\s*>/gi, ' ')
     if (next === out) return out;
     out = next;
   }
 };
 
+/**
+ * RU-R GO3 (full-text §4, equations): LaTeXML carries the ORIGINAL LaTeX of every
+ * formula in the math element's alttext attribute. Replacing the MathML body with
+ * that source keeps equations readable claim material instead of glyph soup
+ * (MathML stripped tag-by-tag leaves fragmented operator/identifier text).
+ * Math without alttext degrades to plain removal — never fabricated.
+ */
+const keepMathAltText = (html: string): string =>
+  html.replace(/<math\b[^>]*\balttext="([^"]*)"[^>]*>[\s\S]*?<\/math>/gi, (_m, alt: string) => ` ${alt} `);
+
 /** Keep paragraph/heading boundaries as newlines before removing inline markup. */
-const BLOCK_END = /<\/(?:p|section|h[1-6]|li|figcaption|abstract|title)>/gi;
+const BLOCK_END = /<\/(?:p|section|h[1-6]|li|figcaption|caption|abstract|title)>/gi;
 
 const tagsToSpaces = (s: string): string =>
   s.replace(BLOCK_END, '\n\n').replace(/<[^>]+>/g, ' ');
@@ -159,7 +172,7 @@ export const extractLaTeXmlText = (html: string): string | null => {
   // attribute alone would leak a partial unclosed tag into the text).
   const bibTag = body.match(/<[^>]*class="[^"]*ltx_bibliography[^"]*"[^>]*>/i);
   if (bibTag !== null && bibTag.index !== undefined) body = body.slice(0, bibTag.index);
-  return stripCitationMarkers(collapseWs(tagsToSpaces(stripInertBlocks(body)))) || null;
+  return stripCitationMarkers(collapseWs(tagsToSpaces(stripInertBlocks(keepMathAltText(body))))) || null;
 };
 
 export interface JatsExtraction {
@@ -180,7 +193,13 @@ export const extractTeiBodyText = (xml: string): string | null => {
   let body = bodyMatch[1]!;
   const bibStart = body.search(/<listBibl\b/i);
   if (bibStart > 0) body = body.slice(0, bibStart);
-  body = body.replace(/<figure\b[\s\S]*?<\/figure>/gi, ' ');
+  // RU-R GO3 (full-text §4, figures): GROBID carries each figure's prose
+  // description in <figDesc>. The graphic payload itself is not claim material,
+  // but the description is — keep it in place as a paragraph, drop the rest.
+  body = body.replace(/<figure\b[\s\S]*?<\/figure>/gi, (figure) => {
+    const desc = figure.match(/<figDesc\b[^>]*>([\s\S]*?)<\/figDesc>/i);
+    return desc !== null ? `<p>${desc[1]!}</p>` : ' ';
+  });
   const text = stripCitationMarkers(collapseWs(tagsToSpaces(stripInertBlocks(body))));
   return text.length > 0 ? text : null;
 };

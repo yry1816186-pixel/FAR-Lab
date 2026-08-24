@@ -16,11 +16,14 @@ import { contentTokens } from './evidence.js';
 import { isCancellationError, throwIfCancelled } from './guard.js';
 import {
   CHASE_CITING_PER_SEED,
+  CHASE_HOP2_REFERENCES_PER_SEED,
   CHASE_MAX_NEW,
   CHASE_REFERENCES_PER_SEED,
   isChaseAbortError,
   planCitationChase,
+  planHop2Seed,
 } from '../citation-chase.js';
+import { retractionStatusFrom } from '../../sources/retraction.js';
 import { diversitySnapshot, diversitySummaryLine, saturationMetrics } from '../retrieval-metrics.js';
 
 /** Hard corpus cap (contract): excess documents are truncated, visibly noted in the summary. */
@@ -402,6 +405,7 @@ export const toDocument = async (
   rec: RawSourceRecord,
 ): Promise<SourceDocument> => {
   const contentHash = snapshotHash(family, rec);
+  const retraction = retractionStatusFrom(rec);
   // Store the artifact over the SAME volatile-excluded canonical payload that contentHash
   // addresses, so a third party can retrieve the snapshot by the bundle's declared hash.
   const artifact = await ctx.artifacts.put(canonicalJson(excludeVolatile(family, rec.normalized)));
@@ -424,6 +428,8 @@ export const toDocument = async (
     ...(rec.license !== undefined ? { license: rec.license } : {}),
     ...(rec.oaUrl !== undefined ? { oaUrl: rec.oaUrl } : {}),
     ...(rec.publicationType !== undefined ? { publicationType: rec.publicationType } : {}),
+    // Best-effort search-time hint (RU-R GO2); resolve-time verification stays authoritative.
+    ...(retraction !== undefined ? { retractionStatus: retraction } : {}),
   });
 };
 
@@ -802,6 +808,7 @@ export const retrieveStage: StageHandler = {
       backward: number;
       forward: number;
       added: number;
+      hop2?: { seed: string; added: number };
       failure?: string;
     }
     let chase: ChaseOutcome | undefined;
@@ -814,6 +821,7 @@ export const retrieveStage: StageHandler = {
     if (openalexCitations !== undefined) {
       const seeds = planCitationChase(fusedOrder([...pool.values()]));
       if (seeds.length > 0) {
+        const poolKeysBeforeChase = new Set(pool.keys());
         const outcome: ChaseOutcome = { seeds: seeds.length, backward: 0, forward: 0, added: 0 };
         let chaseListIdx = targets.length; // chase lists get their own RRF list indices
         chaseLoop: for (const seed of seeds) {
@@ -890,6 +898,50 @@ export const retrieveStage: StageHandler = {
             ctx.log(`retrieve: citation chase forward failed for ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`);
           }
         }
+        // ---- hop 2 (RU-R GO2): backward-only depth-2 chase off the first ----
+        // hop-1-added entry — the methodology BEHIND the method paper. One seed,
+        // <=2 refs, same receipt/abort discipline; only when budget remains.
+        if (outcome.failure === undefined && outcome.added < CHASE_MAX_NEW) {
+          const chaseAdded = [...pool.values()].filter((e) => !poolKeysBeforeChase.has(e.key));
+          const hop2Seed = planHop2Seed(chaseAdded);
+          if (hop2Seed !== null) {
+            outcome.hop2 = { seed: hop2Seed.workRef, added: 0 };
+            try {
+              const refIds = (await openalexCitations.referencedWorkIds(hop2Seed.workRef)).slice(0, CHASE_HOP2_REFERENCES_PER_SEED);
+              const records = refIds.length > 0 ? await openalexCitations.worksByIds(refIds) : [];
+              outcome.backward += records.length;
+              executedQueries.push({ purpose: 'citation_chase', text: `refs2:${hop2Seed.workRef}`, family: 'openalex' });
+              ctx.recordReceipt({
+                kind: 'source_retrieval',
+                executionMode: 'live',
+                stage: 'retrieve',
+                redactionNote: 'citation-chase hop-2 backward refs: query ref, result count, content hashes',
+                sourceRetrieval: {
+                  family: 'openalex',
+                  query: `refs2:${hop2Seed.workRef}`,
+                  httpStatus: 200,
+                  resultCount: records.length,
+                  contentHashes: records.map((r) => snapshotHash('openalex', r)),
+                },
+              });
+              if (records.length > 0) {
+                const idx = chaseListIdx++;
+                const novelty = poolYield('citation_chase', idx, 'openalex', records.map((record, rank) => ({ rank, record })));
+                outcome.added += novelty.added;
+                outcome.hop2.added += novelty.added;
+              }
+            } catch (e) {
+              if (isCancellationError(e)) throw e;
+              if (isChaseAbortError(e)) {
+                outcome.failure = `aborted at hop2 ${hop2Seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+                ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              } else {
+                ctx.recordReceipt(failedReceipt('openalex', `refs2:${hop2Seed.workRef}`, e, false));
+                ctx.log(`retrieve: citation chase hop-2 failed for ${hop2Seed.workRef}: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }
+          }
+        }
         chase = outcome;
       }
     }
@@ -933,7 +985,22 @@ export const retrieveStage: StageHandler = {
       }
     }
 
-    const selected = selectFinal(finalOrder, MAX_DOCUMENTS, COUNTER_MIN_SEATS);
+    // ---- RU-R GO2: retracted documents never COMPETE for cap seats ----
+    // A retracted paper surfacing high in fusion must not displace valid evidence
+    // from the cap; the demotion keeps visibility over silent drop (retracted
+    // docs are appended only when the pool cannot otherwise fill the cap, and
+    // the status persists on the document for downstream demotion). Corrected /
+    // expression-of-concern / reinstated docs stay eligible — they remain citable.
+    const retractedKeys = new Set(
+      [...pool.values()].filter((e) => retractionStatusFrom(e.record) === 'retracted').map((e) => e.key),
+    );
+    const eligible = finalOrder.filter((e) => !retractedKeys.has(e.key));
+    const retractedOrdered = finalOrder.filter((e) => retractedKeys.has(e.key));
+    const selected = selectFinal(eligible, MAX_DOCUMENTS, COUNTER_MIN_SEATS);
+    const fillCount = Math.max(0, MAX_DOCUMENTS - selected.length);
+    const retractedKept = retractedOrdered.slice(0, fillCount);
+    const retractedDemoted = retractedOrdered.length - retractedKept.length;
+    if (retractedKept.length > 0) selected.push(...retractedKept);
     const counterSeatsKept = selected.filter(isCounterOrigin).length;
     const saturation = saturationMetrics(noveltyRates);
     const diversity = diversitySnapshot(
@@ -996,6 +1063,7 @@ export const retrieveStage: StageHandler = {
         rerankApplied,
         ...(rerankFailure !== undefined ? { rerankFailure } : {}),
         counterSeatsKept,
+        ...(retractedDemoted > 0 ? { retractedDemoted } : {}),
         ...(variantSearches > 0 ? { variantSearches } : {}),
         ...(failoverSearches > 0 ? { failoverSearches } : {}),
         ...(rerankWindows !== undefined ? { rerankWindows } : {}),
@@ -1006,6 +1074,7 @@ export const retrieveStage: StageHandler = {
                 backward: chase.backward,
                 forward: chase.forward,
                 added: chase.added,
+                ...(chase.hop2 !== undefined ? { hop2: chase.hop2 } : {}),
                 ...(chase.failure !== undefined ? { failure: chase.failure } : {}),
               },
             }
@@ -1023,10 +1092,12 @@ export const retrieveStage: StageHandler = {
       `counter-evidence seats kept: ${counterSeatsKept}${selected.length < fused.length ? ` of ${Math.min(COUNTER_MIN_SEATS, fused.filter(isCounterOrigin).length)} reserved` : ''}`,
     ];
     if (rerankFailure !== undefined) parts.push(`listwise rerank FAILED — deterministic RRF order used (${rerankFailure})`);
+    if (retractedDemoted > 0) parts.push(`${retractedDemoted} retracted document(s) demoted out of cap competition`);
     if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
     if (chase !== undefined) {
       parts.push(
         `citation chase: ${chase.seeds} seed(s), backward ${chase.backward}, forward ${chase.forward}, +${chase.added} new pool doc(s)` +
+          (chase.hop2 !== undefined ? `, hop-2 off ${chase.hop2.seed} +${chase.hop2.added}` : '') +
           (chase.failure !== undefined ? ` — ${chase.failure}` : ''),
       );
     }

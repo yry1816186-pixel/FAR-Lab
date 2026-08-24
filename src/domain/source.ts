@@ -69,6 +69,14 @@ export const SourceDocument = z.object({
    * legacy objects and records whose family API exposes no type signal.
    */
   publicationType: PublicationType.optional(),
+  /**
+   * RU-R GO2: search-time retraction hint derived from Crossref update-to
+   * metadata in the SEARCH response (best effort — coverage depends on the
+   * family that surfaced the record). The authoritative status is
+   * verification.retractionStatus after identifier resolution; consumers should
+   * read that first and fall back to this hint.
+   */
+  retractionStatus: z.enum(['retracted', 'corrected', 'expression_of_concern', 'reinstated']).optional(),
   /** Result of identifier-resolution verification (verify_sources stage). Absent = not yet verified. */
   verification: z.object({
     method: z.enum(['crossref_doi', 'arxiv_id', 'openalex_id', 'europepmc_id', 'url']),
@@ -146,6 +154,16 @@ export const RetrievalFusion = z.object({
       forward: z.number().int().nonnegative(),
       /** New unique documents the chase added to the pool (after dedup). */
       added: z.number().int().nonnegative(),
+      /**
+       * Depth-2 backward chase (method lineage of the method paper): one hop-2
+       * seed max, references only. Absent when hop 2 did not execute.
+       */
+      hop2: z
+        .object({
+          seed: z.string(),
+          added: z.number().int().nonnegative(),
+        })
+        .optional(),
       /** Visible failure note when the chase was attempted and aborted (enrichment, non-fatal). */
       failure: z.string().optional(),
     })
@@ -176,6 +194,13 @@ export const RetrievalFusion = z.object({
       publicationTypeCounts: z.record(z.string(), z.number().int().nonnegative()),
     })
     .optional(),
+  /**
+   * RU-R GO2: retracted documents demoted out of cap competition (kept only when
+   * the pool cannot fill the cap — visibility over silent drop). Derived from
+   * search-time Crossref update-to metadata; resolve-time verification remains
+   * authoritative. Absent when no retracted document was in the pool.
+   */
+  retractedDemoted: z.number().int().nonnegative().optional(),
   /** Compact human-auditable note of the selection (e.g. "cap 12 of pool 31"). */
   selection: z.string().min(1),
 });

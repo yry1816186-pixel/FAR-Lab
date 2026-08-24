@@ -24,6 +24,10 @@ export const CHASE_REFERENCES_PER_SEED = 3;
 export const CHASE_CITING_PER_SEED = 5;
 /** Hard cap on NEW pool entries introduced by the whole chase. */
 export const CHASE_MAX_NEW = 8;
+/** Depth-2 seeds: at most ONE hop-2 seed (the first chase-added resolvable doc). */
+export const CHASE_HOP2_SEEDS = 1;
+/** Backward references resolved at hop 2 (method lineage narrows fast). */
+export const CHASE_HOP2_REFERENCES_PER_SEED = 2;
 
 export interface ChaseSeedInput {
   readonly key: string;
@@ -93,6 +97,21 @@ export const planCitationChase = (fused: readonly ChaseSeedInput[]): readonly Ch
 /** True when an adapter error means the chase should ABORT (not per-seed skip). */
 export const isChaseAbortError = (e: unknown): boolean =>
   e instanceof Error && /429|rate|budget|insufficient/i.test(e.message);
+
+/**
+ * Depth-2 seed selection: the FIRST hop-1-added entry (pool insertion order —
+ * deterministic) with a resolvable workRef. Backward-only: hop 2 answers "what
+ * methodology does the methodology paper rest on" — foundational-of-foundational
+ * lineage. Forward-of-forward (follow-ups of follow-ups) is recency noise, not
+ * lineage, and doubles budget for little evidential value.
+ */
+export const planHop2Seed = (chaseAdded: readonly ChaseSeedInput[]): ChaseSeed | null => {
+  for (const entry of chaseAdded) {
+    const workRef = workRefOf(entry);
+    if (workRef !== null) return { key: entry.key, workRef, tag: 'top' };
+  }
+  return null;
+};
 
 /** The citation capability's execution surface the retrieve stage needs. */
 export type { CitationChaseAdapter };
