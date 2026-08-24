@@ -12,6 +12,8 @@ import {
 import type { HypothesisCandidate as Hypothesis, ScientificClaim } from '../../domain/index.js';
 import { assertNotCancelled, isRepresentative, mapBounded, partitionClaimRefs, runClaimIds, STAGE_CONCURRENCY } from './shared.js';
 import { contentTokens, topicalOverlap } from './evidence.js';
+import { hasExplicitQuantity } from '../../domain/claim.js';
+import { relationStrength } from '../../domain/evidence-strength.js';
 
 /**
  * critique_falsify — falsification specs that can actually decide something (mission §29).
@@ -399,8 +401,17 @@ export const falsifyStage: StageHandler = {
         claimId: string,
         proposalFamily: 'counter' | 'supporting',
         auditNote?: string,
-      ) =>
-        EvidenceRelation.parse({
+      ) => {
+        // SCIENCE lane: deterministic strength from the linked claim's measured
+        // properties (gradeCertainty + verified binding + quantitativeness) —
+        // the same single mapping every other write point uses.
+        const claim = claimById.get(claimId);
+        const strength = relationStrength({
+          gradeCertainty: claim?.gradeCertainty,
+          bindingVerified: claim?.bindingStatus === 'verified',
+          quantitative: claim !== undefined && hasExplicitQuantity(claim.text),
+        });
+        return EvidenceRelation.parse({
           id: newId('ev'),
           runId,
           relation,
@@ -409,10 +420,14 @@ export const falsifyStage: StageHandler = {
           // rationale keyed to the PROPOSAL family so the substantive proposer argument
           // survives even when the audit relabels the link across polarity
           rationale: linkRationale(claimId, proposalFamily),
-          strength: 'unrated',
-          uncertainties: auditNote !== undefined ? [auditNote] : [],
+          strength: strength.strength,
+          uncertainties: [
+            ...(auditNote !== undefined ? [auditNote] : []),
+            strength.derivation,
+          ],
           createdAt: now,
         });
+      };
 
       // ---- W5-F5: independent adversarial audit of the proposed links ----
       // Blind re-judging measured only 11/18 supports links surviving exact agreement

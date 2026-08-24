@@ -120,5 +120,14 @@ export const CampaignSpec = z.object({
       return sum + c.priorAlphaSpent <= familyAlpha + 1e-9;
     },
     { message: 'alpha_spending: every unit covered, no foreign keys, sum(alpha)+priorAlphaSpent <= familyAlpha' },
+  )
+  // SCIENCE lane (2026-08-24): e_value_accumulation is REJECTED here exactly as the
+  // experiment-spec layer already rejects it (experiment.ts multipleTestingPolicy
+  // check) — no e-value/e-process estimator exists anywhere in the codebase, so a
+  // CampaignSpec declaring it would promise an always-valid inference the system
+  // cannot compute. Fail closed until a real e-process lands.
+  .refine(
+    (c) => c.crossUnitTesting.policy !== 'e_value_accumulation',
+    { message: 'e_value_accumulation: no e-value estimator exists yet — declare single_primary or alpha_spending (fail-closed)' },
   );
 export type CampaignSpec = z.infer<typeof CampaignSpec>;

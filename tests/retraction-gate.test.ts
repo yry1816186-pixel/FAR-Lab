@@ -27,10 +27,17 @@ describe('retractionStatusFrom (deterministic derivation)', () => {
     expect(retractionStatusFrom(mkRecord([]))).toBeUndefined();
     expect(retractionStatusFrom(mkRecord([{ type: 'new edition' }]))).toBeUndefined();
   });
-  it('retraction wins over correction when both present (strictest-first)', () => {
-    expect(retractionStatusFrom(mkRecord([{ type: 'correction' }, { type: 'retraction' }]))).toBe('corrected'); // first-classified wins deterministically
-    const retractedFirst = retractionStatusFrom(mkRecord([{ type: 'retraction' }, { type: 'correction' }]));
-    expect(retractedFirst).toBe('retracted');
+  it('status is order-INDEPENDENT by priority: reinstated > retracted > EoC > corrected (SCIENCE lane 2026-08-24)', () => {
+    // previously `??=` first-match let update-to array ORDER decide — a
+    // [correction, retraction] listing read as 'corrected'.
+    expect(retractionStatusFrom(mkRecord([{ type: 'correction' }, { type: 'retraction' }]))).toBe('retracted');
+    expect(retractionStatusFrom(mkRecord([{ type: 'retraction' }, { type: 'correction' }]))).toBe('retracted');
+    // a reinstatement resolves the retraction regardless of listing order
+    expect(retractionStatusFrom(mkRecord([{ type: 'correction' }, { type: 'reinstatement' }, { type: 'retraction' }]))).toBe('reinstated');
+    expect(retractionStatusFrom(mkRecord([{ type: 'retraction' }, { type: 'reinstatement' }]))).toBe('reinstated');
+    // EoC outranks correction; retraction outranks EoC
+    expect(retractionStatusFrom(mkRecord([{ type: 'correction' }, { type: 'expression of concern' }]))).toBe('expression_of_concern');
+    expect(retractionStatusFrom(mkRecord([{ type: 'expression of concern' }, { type: 'retraction' }]))).toBe('retracted');
   });
 });
 

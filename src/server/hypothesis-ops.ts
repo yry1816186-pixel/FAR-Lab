@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { EvidenceRelation, FeedbackSignal, HypothesisCandidate, Revision, VersionDiff } from '../domain/index.js';
 import { newId } from '../domain/ids.js';
+import { hasExplicitQuantity } from '../domain/claim.js';
+import { relationStrength } from '../domain/evidence-strength.js';
 import type { App } from '../app/composition.js';
 
 /**
@@ -14,7 +16,8 @@ import type { App } from '../app/composition.js';
  *    idempotent no-ops mutate nothing and event nothing.
  *  - connect persists a first-class EvidenceRelation with '[human] ' provenance
  *    so human links enter the ACH analysis on par with pipeline/AI relations;
- *    strength stays 'unrated' until assessed — never a fabricated grade.
+ *    strength derives deterministically from the linked claim's measured
+ *    properties (SCIENCE lane 2026-08-24) — never a fabricated grade.
  *
  * BP-2 researcher sovereignty: `edit` performs a direct content correction
  * (statement / mechanism / predictions) INTO the causal revision chain — a
@@ -291,7 +294,14 @@ export function connectClaim(app: App, runId: string, hypId: string, rawBody: un
     counterClaimIds: direction === 'counters' ? [...hyp.counterClaimIds, claimId] : hyp.counterClaimIds,
   }));
   // The human source enters the ACH evidence analysis as a first-class relation:
-  // '[human] ' marks provenance, 'unrated' keeps strength honest until assessed.
+  // '[human] ' marks provenance; strength is the SAME deterministic mapping from
+  // the linked claim's measured properties every pipeline write point uses —
+  // never a fabricated grade, never a permanent zero either.
+  const strength = relationStrength({
+    gradeCertainty: claim.gradeCertainty,
+    bindingVerified: claim.bindingStatus === 'verified',
+    quantitative: hasExplicitQuantity(claim.text),
+  });
   app.store.putObject('evidence_relation', EvidenceRelation.parse({
     id: newId('ev'),
     runId,
@@ -299,8 +309,8 @@ export function connectClaim(app: App, runId: string, hypId: string, rawBody: un
     claimId,
     targetHypothesisId: hyp.id,
     rationale: `[human] ${note ?? 'manually linked by the researcher in the workbench'}`,
-    strength: 'unrated',
-    uncertainties: [],
+    strength: strength.strength,
+    uncertainties: [strength.derivation],
     createdAt: new Date().toISOString(),
   }));
   app.store.appendEvent(runId, {
