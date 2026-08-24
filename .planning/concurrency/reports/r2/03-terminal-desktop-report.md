@@ -12,6 +12,7 @@ crossed local midnight).
 | `dd3122d` | feat(tui): v3 live research environment + resident-agent chat |
 | `847a727` | feat(cli): far serve headless entry + real-path spawn proof suite |
 | `b1afdc7` | feat(desktop): run-completion notifications (B13 background awareness) |
+| `<final>` | feat(tui): file/context references — attach local text files as message seeds |
 
 Naming deviation: the goal-pack prompt named this lane's branch
 `ws/r2-terminal-desktop/main`; the binding concurrency contract
@@ -40,7 +41,7 @@ diagnostics, `--json`, completion). Real defects found and fixed:
 
 ### TUI v3 (the lane's center of mass)
 `packages/tui` went from read-only browser + ready-only composer (12 tests)
-to a live research environment (42 tests), zero-build discipline preserved
+to a live research environment (49 tests), zero-build discipline preserved
 (node type-stripping, React.createElement, no new npm deps):
 
 - **live run attach**: SSE client over fetch — incremental parser, capped
@@ -59,6 +60,10 @@ to a live research environment (42 tests), zero-build discipline preserved
   decision and composing moves to `m`.
 - **launch flow** stops at READY unless `FAR_ALLOW_LIVE=1` (2026-08-23
   no-live-API discipline, identical to the web walkthrough).
+- **file/context references**: `s` attaches a local text/markdown file
+  (≤50 000 chars) as a conversation seed riding the next posted message —
+  inherited by launched runs; line-mode parity; honest attach failures keep
+  composing.
 - **session persistence**: `~/.far-lab/tui-state.json` (FARLAB_TUI_STATE
   override), corrupt-safe, restores the last conversation on start.
 - **slash commands**: `/refresh` `/open <id>` `/new [title]` `/back`
@@ -99,7 +104,7 @@ All from the lane worktree unless noted.
 | Root full suite | `npm test` | **1453 passed / 1 failed / 4 skipped** — the 1 failure is `tests/storage-hardening.test.ts` RU-7.3 backwards-clock, **reproduced verbatim at the pristine baseline commit in a temp worktree** (clock-anchored test; owner lanes 12/13). Initially 5 failures appeared: 3 citation/file-ingest failures were missing `web/node_modules` (INTEGRATION_RULES step 4 requires `cd web && npm ci`, which the lane had skipped) — resolved by installing web deps, all green after; 1 extra baseline failure (`far backup` e2e) also disappeared with web deps + full env. |
 | CLI spawn proof | `npx vitest run tests/cli-spawn.test.ts` | **11/11** — compiled-binary contract: exit 2 usage (stdout clean, stderr speaks), ONE JSON doc under `--json`, zero ANSI piped/NO_COLOR/TERM=dumb, completion covers full tree, `far serve --port 0` boots health-200 server |
 | Completion/help coherence | `npx vitest run tests/cli-maturity.test.ts` | 12/12 (11 baseline + coherence test, tree updated) |
-| TUI suite | `cd packages/tui && npm test` | **42/42** (core 7 + render 5 legacy preserved; liveCore 6; chatCore/state/commands 6; render-v3 10; e2e 4) |
+| TUI suite | `cd packages/tui && npm test` | **49/49** (core 7 + render 5 legacy preserved; liveCore 6; chatCore/state/commands 6; render-v3 12; seedAttach 5; e2e 4) |
 | TUI offline e2e | inside `npm test` above | real `createApiServer` (port 0) + scripted stub provider: SSE incremental delivery, closed-subscription silence, cursor-resume delivers ONLY the tail; chat post → agent reply; proposal card carries server-computed risk/args; approve → executed + `run_` created; scripted provider failure keeps the researcher message with replyError; cancel honest requested/reason contract |
 | SSE parser rigor | `liveCore.test.ts` | every single-character cut point of a wire frame reassembles without loss/duplication (found + fixed a real cross-chunk field-state bug this way) |
 | Desktop compile | `cargo build` (desktop/src-tauri) | exit 0 |
