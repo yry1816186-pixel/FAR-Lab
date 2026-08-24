@@ -1,0 +1,22 @@
+# Model-plane lane gates — 2026-08-24
+
+$ npx vitest run tests/model-plane.test.ts tests/model-plane-benchmark.test.ts
+Test Files 2 passed (2) / Tests 36 passed (36) — [ran 2026-08-24 13:28]
+
+$ npx vitest run (full suite)
+Test Files 149 passed | 1 skipped (150) / Tests 1514 passed | 3 skipped (1517) — 0 failed
+
+$ npx tsc --noEmit (scope: src/model-plane + edited files src/providers/{http,dashscope}.ts src/shared/ports.ts src/domain/provenance.ts src/pipeline/llm.ts)
+0 errors in scope (src/ingest/* errors = sibling in-flight lane, untracked, NOT this lane)
+
+$ npx eslint <same scope>
+0 problems
+
+$ npm run build
+exit 0
+
+$ node zcode-harness/scripts/secret-scan.mjs
+status: PASS
+
+$ node zcode-harness/scripts/path-hygiene.mjs
+status: WARN (pre-existing gitignored build artifacts + desktop targets only; no errors)
