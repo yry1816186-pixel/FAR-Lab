@@ -14,7 +14,8 @@ import { mapBounded, STAGE_CONCURRENCY } from './shared.js';
 import { toDocument } from './retrieve.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import { defaultFetchFullText } from '../../sources/fulltext.js';
-import { gradeClaimCertainty } from '../../domain/claim.js';
+import { finalGradeCertainty, hasExplicitQuantity } from '../../domain/claim.js';
+import { crossRelationStrength, relationStrength, type RelationStrengthInput } from '../../domain/evidence-strength.js';
 import { extractMeanN, grimCheck, rangeGuard, extractStats } from '../../domain/stat-forensics.js';
 import type { CorpusSnapshot, SourceFamily } from '../../domain/source.js';
 import type { RawRetrievalResult, SourceAdapter } from '../../shared/ports.js';
@@ -398,28 +399,22 @@ export const buildEvidenceStage: StageHandler = {
             ...rangeGuard(extractStats(candidate.quote)).map((f) => f.detail),
           ],
           // GRADE-lite at admission (W-G/F-B): contradiction signals are unknown this
-          // early (relations are judged later) — honestly 0 at this point.
-          // Re-audit fix (forensics GATE, not advisory): retraction status and
-          // deterministic forensics findings now DOWNGRADE certainty itself —
-          // a retracted source floors at very_low; GRIM/range failures step
-          // down one level. The uncertainty notes stay for the human-readable why.
-          gradeCertainty: (() => {
-            const base = gradeClaimCertainty({
-              verifiedBinding: aligned,
-              quantitative: /\d|fold|percent|%|higher|lower|increase|decrease|significant/i.test(candidate.text),
-              recentSource: doc.publicationYear != null && doc.publicationYear >= new Date().getUTCFullYear() - 15,
-              contradictionSignals: 0,
-            }).certainty ?? 'very_low';
-            const forensicFails =
+          // early (relations are judged later) — honestly 0 at this point, and the
+          // post-cross-relation rescore below feeds the real count back in. Retraction
+          // floors at very_low; GRIM/range failures step down. One owner:
+          // finalGradeCertainty (also the rescore's code path).
+          gradeCertainty: finalGradeCertainty({
+            verifiedBinding: aligned,
+            quantitative: hasExplicitQuantity(candidate.text),
+            recentSource: doc.publicationYear != null && doc.publicationYear >= new Date().getUTCFullYear() - 15,
+            contradictionSignals: 0,
+            forensicFails:
               extractMeanN(candidate.quote).filter((pr) => !grimCheck(pr.mean, pr.n, pr.decimals).consistent).length
-              + rangeGuard(extractStats(candidate.quote)).filter((f) => !f.ok).length;
-            const LADDER = ['high', 'moderate', 'low', 'very_low'] as const;
-            const baseIdx = LADDER.indexOf(base);
-            let idx = baseIdx >= 0 ? baseIdx : LADDER.length - 1;
-            if (doc.verification?.retractionStatus === 'retracted' || doc.verification?.retractionStatus === 'expression_of_concern') idx = LADDER.length - 1;
-            else idx = Math.min(idx + forensicFails, LADDER.length - 1);
-            return LADDER[idx]!;
-          })(),
+              + rangeGuard(extractStats(candidate.quote)).filter((f) => !f.ok).length,
+            retractedOrEoc:
+              doc.verification?.retractionStatus === 'retracted'
+              || doc.verification?.retractionStatus === 'expression_of_concern',
+          }).certainty,
           // T2: claims are verbatim excerpts of untrusted external literature —
           // derived_untrusted by structural position, deterministic assignment.
           taint: 'derived_untrusted',
@@ -445,8 +440,22 @@ export const buildEvidenceStage: StageHandler = {
           relation,
           claimId: claim.id, // hypothesis-targeting relations are added later by critique_falsify
           rationale,
-          strength: 'unrated',
-          uncertainties: claim.uncertainties,
+          // SCIENCE lane: deterministic strength from measured claim properties —
+          // the formal layer (Σlog-LR/QBAF/Carneades/ACH) was permanently [0,0]
+          // while every write point hard-coded 'unrated'. Derivation disclosed below.
+          strength: relationStrength({
+            gradeCertainty: claim.gradeCertainty,
+            bindingVerified: aligned,
+            quantitative: hasExplicitQuantity(candidate.text),
+          }).strength,
+          uncertainties: [
+            ...claim.uncertainties,
+            relationStrength({
+              gradeCertainty: claim.gradeCertainty,
+              bindingVerified: aligned,
+              quantitative: hasExplicitQuantity(candidate.text),
+            }).derivation,
+          ],
           createdAt: new Date().toISOString(),
         };
         ctx.store.putObject('evidence_relation', relationRecord);
@@ -633,6 +642,11 @@ export const buildEvidenceStage: StageHandler = {
           const persistable = new Set(['contradicts', 'supports', 'qualifies']);
           const byIdA = new Map(verifiedClaims.map((c) => [c.id, c] as const));
           const byIdB = new Map(verifiedClaims.map((c) => [c.id, c] as const));
+          const strengthInputOf = (c: ScientificClaim): RelationStrengthInput => ({
+            gradeCertainty: c.gradeCertainty,
+            bindingVerified: c.bindingStatus === 'verified',
+            quantitative: hasExplicitQuantity(c.text),
+          });
           let persisted = 0;
           let notComparable = 0;
           const seenPairs = new Set<string>();
@@ -648,6 +662,7 @@ export const buildEvidenceStage: StageHandler = {
             const dedupKey = [pair.a.id, pair.b.id].sort().join('|');
             if (seenPairs.has(dedupKey)) continue;
             seenPairs.add(dedupKey);
+            const crossStrength = crossRelationStrength(strengthInputOf(a), strengthInputOf(b));
             const crossRelation: EvidenceRelation = {
               id: newId('ev'),
               runId: ctx.run.id,
@@ -658,8 +673,8 @@ export const buildEvidenceStage: StageHandler = {
                 `claim-claim ${v.verdict} (shared subject: ${v.sharedSubject}` +
                 (v.conflictPoint !== undefined ? `; conflict point: ${v.conflictPoint}` : '') +
                 `; confidence: ${v.confidence}; direction A->B as extracted, pair judged as a whole)`,
-              strength: 'unrated',
-              uncertainties: [],
+              strength: crossStrength.strength,
+              uncertainties: [crossStrength.derivation],
               createdAt: new Date().toISOString(),
             };
             ctx.store.putObject('evidence_relation', crossRelation);
@@ -673,6 +688,65 @@ export const buildEvidenceStage: StageHandler = {
         }
       } else {
         crossNote = 'no topical-overlap pairs among verified claims';
+      }
+    }
+
+    // ---- SCIENCE lane (2026-08-24): close the GRADE inconsistency loop ----
+    // Claim-claim contradictions were adjudicated and stored but never fed back:
+    // the inconsistency domain was permanently 0 at admission and nothing ever
+    // recomputed a grade. A judged contradiction must measurably downgrade the
+    // claims it touches — "conflicts are never averaged away" now holds in the
+    // numbers, not only in the schema. Idempotent by construction (re-running
+    // on an already-rescored claim reproduces the same certainty).
+    {
+      const conflictRelations = ctx.store
+        .listObjects('evidence_relation', ctx.run.id)
+        .filter((r) => r.targetClaimId !== undefined && (r.relation === 'contradicts' || r.relation === 'fails_to_replicate'));
+      if (conflictRelations.length > 0) {
+        const signalsByClaim = new Map<string, number>();
+        for (const r of conflictRelations) {
+          for (const cid of [r.claimId, r.targetClaimId]) {
+            if (cid !== undefined) signalsByClaim.set(cid, (signalsByClaim.get(cid) ?? 0) + 1);
+          }
+        }
+        const docsById = new Map(
+          ctx.store.listObjects('source_document', ctx.run.id).map((d) => [d.id as string, d] as const),
+        );
+        const ladder = ['high', 'moderate', 'low', 'very_low'] as const;
+        let rescored = 0;
+        for (const [cid, signals] of signalsByClaim) {
+          const claim = ctx.store.getObject('claim', cid);
+          if (!claim) continue;
+          const doc = docsById.get(claim.locators[0]?.sourceDocumentId ?? '');
+          const quote = claim.locators[0]?.quote ?? '';
+          const grade = finalGradeCertainty({
+            verifiedBinding: claim.bindingStatus === 'verified',
+            quantitative: hasExplicitQuantity(claim.text),
+            recentSource: doc?.publicationYear != null && doc.publicationYear >= new Date().getUTCFullYear() - 15,
+            contradictionSignals: signals,
+            forensicFails:
+              extractMeanN(quote).filter((pr) => !grimCheck(pr.mean, pr.n, pr.decimals).consistent).length
+              + rangeGuard(extractStats(quote)).filter((f) => !f.ok).length,
+            retractedOrEoc:
+              doc?.verification?.retractionStatus === 'retracted'
+              || doc?.verification?.retractionStatus === 'expression_of_concern',
+          });
+          const oldIdx = ladder.indexOf(claim.gradeCertainty ?? 'very_low');
+          const newIdx = ladder.indexOf(grade.certainty ?? 'very_low');
+          if (newIdx > oldIdx) {
+            ctx.store.putObject('claim', {
+              ...claim,
+              gradeCertainty: grade.certainty,
+              uncertainties: [
+                ...claim.uncertainties,
+                `inconsistency rescore: ${signals} contradicting claim-claim relation(s) — certainty ` +
+                  `${claim.gradeCertainty ?? 'ungraded'} -> ${grade.certainty} (${grade.downgraded.join('; ')})`,
+              ],
+            });
+            rescored += 1;
+          }
+        }
+        if (rescored > 0) crossNote += `; ${rescored} claim(s) certainty-downgraded by contradiction rescore`;
       }
     }
 

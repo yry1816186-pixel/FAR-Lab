@@ -26,13 +26,26 @@ export interface DriveCampaignOptions {
   allowLocalDatasets?: boolean;
   shouldCancel?: () => boolean;
   /** Test seam: per-unit execution override (deterministic harnesses). */
-  executeUnit?: (spec: ExperimentSpec) => Promise<{ state: UnitTerminalState; alphaSpent?: number; experimentRunId: string }>;
+  executeUnit?: (spec: ExperimentSpec) => Promise<{ state: UnitTerminalState; alphaSpent?: number; experimentRunId: string; falsified?: boolean }>;
   /** Test seam: spec resolution override (default: store lookup by frozen id). */
   resolveSpec?: (specId: string) => ExperimentSpec | null;
 }
 
-const stateFromRun = (run: ExperimentRun): UnitTerminalState =>
-  run.status === 'completed' ? 'completed' : run.status === 'failed' ? 'failed' : 'canceled';
+/**
+ * SCIENCE lane (2026-08-24): terminal state now honors the decision core's
+ * documented primary_falsified contract. Previously this mapped ONLY run.status,
+ * so a completed run whose preregistered analysis mechanically produced a
+ * 'falsifies' verdict reached state 'completed' and the primary_falsified stop
+ * rule could never fire (while an infra crash fired it with the wrong meaning).
+ * A statistical falsification maps to 'failed' (failed experiments ARE findings)
+ * and is disclosed distinctly via the falsified event flag.
+ */
+export const stateFromReports = (run: ExperimentRun, verdicts: readonly string[]): { state: UnitTerminalState; falsified: boolean } => {
+  if (run.status === 'canceled') return { state: 'canceled', falsified: false };
+  const falsified = verdicts.includes('falsifies');
+  if (run.status === 'failed') return { state: 'failed', falsified: false };
+  return falsified ? { state: 'failed', falsified: true } : { state: 'completed', falsified: false };
+};
 
 export const driveCampaign = async (
   store: Store,
@@ -47,7 +60,8 @@ export const driveCampaign = async (
       allowLocalDatasets: opts.allowLocalDatasets,
       shouldCancel: opts.shouldCancel,
     });
-    return { state: stateFromRun(executed.run), alphaSpent: undefined, experimentRunId: executed.run.id };
+    const mapped = stateFromReports(executed.run, executed.statReports.map((r) => r.verdict as string));
+    return { state: mapped.state, falsified: mapped.falsified, alphaSpent: undefined, experimentRunId: executed.run.id };
   });
 
   for (let round = 0; round < spec.units.length; round += 1) {
@@ -81,6 +95,22 @@ export const driveCampaign = async (
         store.appendEvent(spec.runId, { type: 'note', detail: { kind: 'campaign_unit_failed', campaignId: spec.id, unit: label, error: `frozen spec ${unit.experimentSpecId} not found` } });
         continue;
       }
+      // SCIENCE lane (P1-3 minimal enforcement): under alpha_spending the frozen unit
+      // spec MUST run at its declared campaign share — a spec silently running at a
+      // larger alpha than the share booked in the ledger breaks the family-wise
+      // budget. Fail closed (unit failed, disclosed) instead of silently over-spending.
+      if (spec.crossUnitTesting.policy === 'alpha_spending') {
+        const share = (spec.crossUnitTesting as { alphaByUnit: Record<string, number> }).alphaByUnit[label];
+        const specAlpha = (unitSpecRaw as ExperimentSpec).statistics?.alpha;
+        if (share !== undefined && specAlpha > share + 1e-9) {
+          states.push({ label, state: 'failed' });
+          store.appendEvent(spec.runId, {
+            type: 'note',
+            detail: { kind: 'campaign_unit_failed', campaignId: spec.id, unit: label, error: `frozen spec alpha ${specAlpha} exceeds campaign share ${share} — refusing to over-spend the family budget` },
+          });
+          continue;
+        }
+      }
       states.push({ label, state: 'running' });
       store.appendEvent(spec.runId, { type: 'note', detail: { kind: 'campaign_unit_started', campaignId: spec.id, unit: label, specId: unit.experimentSpecId } });
       const result = await executeUnit(unitSpecRaw as ExperimentSpec);
@@ -96,7 +126,15 @@ export const driveCampaign = async (
       }
       store.appendEvent(spec.runId, {
         type: 'note',
-        detail: { kind: `campaign_unit_${result.state}`, campaignId: spec.id, unit: label, experimentRunId: result.experimentRunId, ...(alphaSpent !== undefined ? { alphaSpent } : {}) },
+        detail: {
+          kind: `campaign_unit_${result.state}`,
+          campaignId: spec.id,
+          unit: label,
+          experimentRunId: result.experimentRunId,
+          // statistical falsification vs operational failure stay distinguishable
+          ...(result.falsified === true ? { falsified: true, note: 'preregistered analysis produced a falsifies verdict — failed experiments are findings' } : {}),
+          ...(alphaSpent !== undefined ? { alphaSpent } : {}),
+        },
       });
     }
   }

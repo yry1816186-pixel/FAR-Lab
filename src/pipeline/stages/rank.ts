@@ -292,6 +292,68 @@ export const bradleyTerry = (ids: readonly string[], matches: readonly Contested
   });
 };
 
+// ---------------------------------------------------------------------------
+// SCIENCE lane (2026-08-24) — seeded nonparametric bootstrap CIs on BT scores.
+// Chatbot-Arena-style (bootstrap-resampled MLE) uncertainty: resample the
+// contested matches WITH replacement, re-fit Bradley-Terry per replicate,
+// report the percentile interval. Deterministic under the fixed seed — the
+// same match set always yields the same CIs (offline-testable, no API).
+// ---------------------------------------------------------------------------
+
+/** Deterministic 32-bit seeded RNG (mulberry32) — same family as screening/eval harnesses. */
+const mulberry32 = (seed: number): (() => number) => {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+export const BT_BOOTSTRAP_ROUNDS = 1000;
+export const BT_BOOTSTRAP_SEED = 20260824;
+
+export interface BtCi {
+  ciLow: number;
+  ciHigh: number;
+}
+
+/**
+ * Percentile bootstrap 95% CI per participant. Participants with zero contested
+ * matches get no interval (their score is the neutral constant, not a measurement).
+ * Pure and deterministic for a given seed.
+ */
+export const bootstrapBtCis = (
+  ids: readonly string[],
+  matches: readonly ContestedMatch[],
+  opts: { rounds?: number; seed?: number } = {},
+): Map<string, BtCi> => {
+  const rounds = opts.rounds ?? BT_BOOTSTRAP_ROUNDS;
+  const rng = mulberry32(opts.seed ?? BT_BOOTSTRAP_SEED);
+  const samples = new Map<string, number[]>(ids.map((id) => [id, [] as number[]]));
+  const contestedSet = new Set<string>();
+  for (const m of matches) { contestedSet.add(m.aId); contestedSet.add(m.bId); }
+  if (matches.length === 0) return new Map();
+  for (let r = 0; r < rounds; r += 1) {
+    const resample: ContestedMatch[] = new Array(matches.length);
+    for (let i = 0; i < matches.length; i += 1) {
+      resample[i] = matches[Math.floor(rng() * matches.length)]!;
+    }
+    const fit = bradleyTerry(ids, resample);
+    for (const s of fit) samples.get(s.hypothesisId)?.push(s.btScore);
+  }
+  const out = new Map<string, BtCi>();
+  for (const id of ids) {
+    if (!contestedSet.has(id)) continue;
+    const xs = (samples.get(id) ?? []).sort((a, b) => a - b);
+    if (xs.length === 0) continue;
+    const q = (p: number): number => xs[Math.min(xs.length - 1, Math.max(0, Math.floor(p * xs.length)))]!;
+    out.set(id, { ciLow: Math.round(q(0.025) * 1e6) / 1e6, ciHigh: Math.round(q(0.975) * 1e6) / 1e6 });
+  }
+  return out;
+};
+
 const PairJudgeOut = z.object({
   aFirstVerdict: z.enum(['a', 'b', 'tie', 'incomparable']),
   bFirstVerdict: z.enum(['a', 'b', 'tie', 'incomparable']),
@@ -391,6 +453,10 @@ export const rankStage: StageHandler = {
             availableClaims: allClaims,
           },
           schema: RankOut,
+          // SCIENCE lane: the most load-bearing numeric input of the whole ranking
+          // ran at provider-default temperature while every other judgment stage
+          // pinned its decoding. Deterministic-style scoring wants 0.
+          temperature: 0,
         }).then((r) => ({ provider: r.provider, modelId: r.modelId, data: r.data })));
     });
     const merged: z.infer<typeof RankOut> = { assessments: batchResults.flatMap((b) => b.data.assessments) };
@@ -481,6 +547,7 @@ export const rankStage: StageHandler = {
 
     // ---- D-016 pairwise tournament: selection pressure on the composite seed order ----
     let standings: Map<string, BtStanding> | null = null;
+    let btCis: Map<string, BtCi> = new Map();
     let tournamentMatches: TournamentMatch[] = [];
     let tournamentNote = 'no tournament (fewer than 2 scored hypotheses)';
     let tournamentUncertainty = '';
@@ -605,26 +672,44 @@ export const rankStage: StageHandler = {
           .map((m) => ({ aId: m.aId, bId: m.bId, outcome: m.outcome }));
         const bt = bradleyTerry(participantIds, contested);
         standings = new Map(bt.map((s) => [s.hypothesisId, s] as const));
+        // SCIENCE lane: seeded bootstrap CIs on the BT scores — the standings text
+        // previously self-described as "without confidence intervals"; now the
+        // interval is measured (resampled-MLE, Chatbot-Arena-style, deterministic seed).
+        btCis = contested.length > 0 ? bootstrapBtCis(participantIds, contested) : new Map();
         // Deterministic bias proxy from REAL match data (architecture-critic ADOPT path,
         // 2026-08-22): swap disagreement = both verdicts usable but order flipped them
         // (position bias or genuine ambiguity); ties = both orders said tie.
         const judgedPairs = tournamentMatches.filter((m) => m.aFirstVerdict !== 'incomparable' && m.bFirstVerdict !== 'incomparable');
         const swapDisagreements = judgedPairs.filter((m) => m.aFirstVerdict !== m.bFirstVerdict).length;
         const settledTies = judgedPairs.filter((m) => m.aFirstVerdict === 'tie' && m.bFirstVerdict === 'tie').length;
+        // CI overlap between the top-2: the honest near-tie signal the ordering itself cannot give.
+        const ciOverlapping = (a: string | undefined, b: string | undefined): boolean => {
+          if (a === undefined || b === undefined) return false;
+          const ca = btCis.get(a);
+          const cb = btCis.get(b);
+          if (!ca || !cb) return false;
+          return ca.ciLow <= cb.ciHigh && cb.ciLow <= ca.ciHigh;
+        };
+        const top2 = ranked.slice(0, 2).map((r) => r.hyp.id);
+        const top2Overlap = ciOverlapping(top2[0], top2[1]);
         tournamentNote =
           `tournament: ${tournamentMatches.length} pair(s) judged (${contested.length} contested, ${tournamentMatches.length - contested.length} no-contest); ` +
           `order-swap disagreement ${swapDisagreements}/${judgedPairs.length}, settled ties ${settledTies}/${judgedPairs.length}`;
         tournamentUncertainty =
           'Pairwise verdicts are uncalibrated LLM judgments with order-swap consistency filtering; ' +
           `this batch: ${swapDisagreements}/${judgedPairs.length} judged pairs disagreed under order swap (position-bias/ambiguity signal) and ` +
-          `${settledTies}/${judgedPairs.length} settled as ties. Bradley-Terry scores are ordinal decision aids without confidence intervals. ` +
-          'Coarse ordering is credible, near-ties are not — treat adjacent ranks as interchangeable unless head-to-head says otherwise.';
+          `${settledTies}/${judgedPairs.length} settled as ties. Bradley-Terry scores are ordinal decision aids; each contested score carries a ` +
+          `seeded bootstrap 95% CI (${BT_BOOTSTRAP_ROUNDS} resamples).` +
+          (top2Overlap
+            ? ' The top-2 bootstrap CIs OVERLAP — treat the final 1-vs-2 order as a coin-flip-grade distinction and decide on substance, not rank.'
+            : ' The top-2 bootstrap CIs are disjoint, though the verdicts themselves remain uncalibrated.');
         tournamentId = newId('trn');
       }
     }
 
     // ---- final ordering: tournament-first (bt desc), composite + grounding as deterministic tie-breaks ----
     const standingsRef = standings;
+    const btCisRef = btCis;
     if (standingsRef !== null) {
       ranked.sort((x, y) => {
         const bx = standingsRef.get(x.hyp.id)?.btScore ?? 0;
@@ -653,6 +738,7 @@ export const rankStage: StageHandler = {
             const l = s?.losses ?? 0;
             const t = s?.ties ?? 0;
             const contestedN = s?.contested ?? 0;
+            const ci = btCisRef?.get(r.hyp.id);
             return {
               hypothesisId: r.hyp.id,
               btScore: s?.btScore ?? 1,
@@ -661,6 +747,7 @@ export const rankStage: StageHandler = {
               ties: t,
               winRate: contestedN > 0 ? Math.round(((w + 0.5 * t) / contestedN) * 1e4) / 1e4 : 0,
               rank: i + 1,
+              ...(ci !== undefined ? { ciLow: ci.ciLow, ciHigh: ci.ciHigh } : {}),
             };
           }),
           algorithm: 'bradley-terry-ilsr-v1',
