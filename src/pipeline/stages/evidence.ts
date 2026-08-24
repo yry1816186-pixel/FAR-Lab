@@ -106,6 +106,36 @@ export const contentTokens = (text: string): Set<string> =>
       .filter((t) => t.length > 3 && !CROSS_STOPWORDS.has(t)),
   );
 
+/**
+ * RU-6 GO1 + RU-R candidate 2: the retraction uncertainty note for a corpus
+ * document. Resolve-time verification outranks the search-time hint (a CLEAN
+ * verification — present without retractionStatus — silences the hint: the
+ * OpenAlex is_retracted flag has a documented false-positive window).
+ * Retraction Watch reasons ride the wording when present.
+ */
+export const retractionUncertaintyNote = (
+  doc: Pick<SourceDocument, 'verification' | 'retractionStatus' | 'retractionReasons'>,
+): string | null => {
+  const reasonSuffix =
+    doc.retractionReasons !== undefined && doc.retractionReasons.length > 0
+      ? ` (Retraction Watch: ${doc.retractionReasons.join('; ')})`
+      : '';
+  if (doc.verification?.retractionStatus === 'retracted') {
+    return `source retracted (Crossref update-to)${reasonSuffix} — treat with maximal skepticism`;
+  }
+  if (doc.verification?.retractionStatus === 'expression_of_concern') {
+    return `source under expression of concern${reasonSuffix} — treat with elevated skepticism`;
+  }
+  const hintStatus = doc.verification === undefined ? doc.retractionStatus : undefined;
+  if (hintStatus === 'retracted') {
+    return `source flagged retracted at search time${reasonSuffix} — awaiting resolve-time verification; treat with maximal skepticism`;
+  }
+  if (hintStatus === 'expression_of_concern') {
+    return `source flagged under expression of concern at search time${reasonSuffix} — awaiting resolve-time verification; treat with elevated skepticism`;
+  }
+  return null;
+};
+
 /** Shared topical-overlap gate constants (claim-claim D-018 pairs AND claim-hypothesis critique links). */
 export const TOPICAL_CONTAINMENT_MIN = 0.25;
 export const TOPICAL_SHARED_MIN = 4;
@@ -379,6 +409,12 @@ export const buildEvidenceStage: StageHandler = {
         const alignment = checkQuoteAlignment(candidate.quote, sourceText);
         const aligned = alignment.verdict !== 'unaligned';
 
+        // RU-6 GO1: retracted / expression-of-concern sources carry an explicit
+        // uncertainty note on every claim — visible demotion, never silent.
+        // RU-R candidate 2: Retraction Watch reasons ride the wording; the
+        // search-time hint only speaks when verification has not yet run (a
+        // clean resolution outranks the hint — is_retracted false-positive window).
+        const retractionNote = retractionUncertaintyNote(doc);
         const claim: ScientificClaim = {
           id: newId('clm'),
           runId: ctx.run.id,
@@ -389,13 +425,7 @@ export const buildEvidenceStage: StageHandler = {
           extractionModelRef: `${result.provider}/${result.modelId}`,
           uncertainties: [
             ...(candidate.note && candidate.note.trim().length > 0 ? [candidate.note.trim()] : []),
-            // RU-6 GO1: retracted / expression-of-concern sources carry an explicit
-            // uncertainty note on every claim — visible demotion, never silent.
-            ...(doc.verification?.retractionStatus === 'retracted'
-              ? ['source retracted (Crossref update-to) — treat with maximal skepticism']
-              : doc.verification?.retractionStatus === 'expression_of_concern'
-                ? ['source under expression of concern — treat with elevated skepticism']
-                : []),
+            ...(retractionNote !== null ? [retractionNote] : []),
             // RU-6 GO4: deterministic GRIM check on mean/n pairs in the verbatim
             // quote — an inconsistent pair cannot come from the stated sample size.
             ...extractMeanN(candidate.quote)
