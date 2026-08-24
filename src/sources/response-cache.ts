@@ -55,6 +55,12 @@ export interface ResponseCacheStore {
    * (legacy behavior): misses go live, hits respect TTL, stale-on-error allowed.
    */
   readonly mode?: CacheMode;
+  /**
+   * Offline Retraction Watch table (frontier candidate 2), attached at
+   * composition time from the dataset CSV. Optional + feature-detected:
+   * absent = no table lookups (legacy behavior).
+   */
+  readonly retractions?: import('./retraction-watch.js').RetractionWatchTable;
 }
 
 /** Thrown by replay-mode stores on a cache miss — the live source must not be called. */
@@ -137,3 +143,9 @@ export const cachedSearch = (
   opts: { onErrorStale?: (e: unknown) => boolean } = {},
 ): Promise<CachedValue<RawRetrievalResult>> =>
   cachedValue<RawRetrievalResult>(cache, family, query, limit, nowMs, live, opts);
+
+/** Attaches the offline Retraction Watch table to a cache store (frontier candidate 2). */
+export const withRetractions = (
+  cache: ResponseCacheStore,
+  table: import('./retraction-watch.js').RetractionWatchTable,
+): ResponseCacheStore => ({ ...cache, retractions: table });

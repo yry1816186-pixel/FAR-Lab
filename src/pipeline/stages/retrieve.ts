@@ -23,7 +23,8 @@ import {
   planCitationChase,
   planHop2Seed,
 } from '../citation-chase.js';
-import { retractionStatusFrom } from '../../sources/retraction.js';
+import { retractionInfo } from '../../sources/retraction.js';
+import { classifyRetractionReasons, type RetractionWatchTable } from '../../sources/retraction-watch.js';
 import { diversitySnapshot, diversitySummaryLine, saturationMetrics } from '../retrieval-metrics.js';
 
 /** Hard corpus cap (contract): excess documents are truncated, visibly noted in the summary. */
@@ -403,9 +404,10 @@ export const toDocument = async (
   ctx: StageContext,
   family: SourceFamily,
   rec: RawSourceRecord,
+  rwTable?: RetractionWatchTable,
 ): Promise<SourceDocument> => {
   const contentHash = snapshotHash(family, rec);
-  const retraction = retractionStatusFrom(rec);
+  const retraction = retractionInfo(rec, rwTable);
   // Store the artifact over the SAME volatile-excluded canonical payload that contentHash
   // addresses, so a third party can retrieve the snapshot by the bundle's declared hash.
   const artifact = await ctx.artifacts.put(canonicalJson(excludeVolatile(family, rec.normalized)));
@@ -429,7 +431,12 @@ export const toDocument = async (
     ...(rec.oaUrl !== undefined ? { oaUrl: rec.oaUrl } : {}),
     ...(rec.publicationType !== undefined ? { publicationType: rec.publicationType } : {}),
     // Best-effort search-time hint (RU-R GO2); resolve-time verification stays authoritative.
-    ...(retraction !== undefined ? { retractionStatus: retraction } : {}),
+    ...(retraction !== undefined ? { retractionStatus: retraction.status } : {}),
+    // RU-R frontier candidate 2: Retraction Watch reasons + honest reading ride
+    // the hint tier (present only when the offline table produced the status).
+    ...(retraction?.reasons !== undefined && retraction.reasons.length > 0
+      ? { retractionReasons: [...retraction.reasons], retractionClass: classifyRetractionReasons(retraction.reasons) }
+      : {}),
   });
 };
 
@@ -1063,9 +1070,13 @@ export const retrieveStage: StageHandler = {
     // docs are appended only when the pool cannot otherwise fill the cap, and
     // the status persists on the document for downstream demotion). Corrected /
     // expression-of-concern / reinstated docs stay eligible — they remain citable.
+    const rwTable: RetractionWatchTable | undefined = ctx.responseCache?.retractions;
     const retractedKeys = new Set(
-      [...pool.values()].filter((e) => retractionStatusFrom(e.record) === 'retracted').map((e) => e.key),
+      [...pool.values()].filter((e) => retractionInfo(e.record, rwTable)?.status === 'retracted').map((e) => e.key),
     );
+    const rwRetracted = [...pool.values()].filter(
+      (e) => retractionInfo(e.record, rwTable)?.basis === 'retraction_watch',
+    ).length;
     const eligible = finalOrder.filter((e) => !retractedKeys.has(e.key));
     const retractedOrdered = finalOrder.filter((e) => retractedKeys.has(e.key));
     const selected = selectFinal(eligible, MAX_DOCUMENTS, COUNTER_MIN_SEATS);
@@ -1084,7 +1095,7 @@ export const retrieveStage: StageHandler = {
     );
 
     const documents: SourceDocument[] = [];
-    for (const entry of selected) documents.push(await toDocument(ctx, entry.family, entry.record));
+    for (const entry of selected) documents.push(await toDocument(ctx, entry.family, entry.record, rwTable));
 
     // R1 entry upgrade: user-provided seeds (family 'user_provided', created at
     // run creation) join the corpus as GUARANTEED entries — they bypass the
@@ -1164,7 +1175,12 @@ export const retrieveStage: StageHandler = {
       `counter-evidence seats kept: ${counterSeatsKept}${selected.length < fused.length ? ` of ${Math.min(COUNTER_MIN_SEATS, fused.filter(isCounterOrigin).length)} reserved` : ''}`,
     ];
     if (rerankFailure !== undefined) parts.push(`listwise rerank FAILED — deterministic RRF order used (${rerankFailure})`);
-    if (retractedDemoted > 0) parts.push(`${retractedDemoted} retracted document(s) demoted out of cap competition`);
+    if (retractedDemoted > 0) {
+      parts.push(
+        `${retractedDemoted} retracted document(s) demoted out of cap competition` +
+          (rwRetracted > 0 ? ` (${rwRetracted} via offline Retraction Watch table)` : ''),
+      );
+    }
     if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
     if (chase !== undefined) {
       parts.push(

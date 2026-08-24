@@ -77,6 +77,15 @@ export const SourceDocument = z.object({
    * read that first and fall back to this hint.
    */
   retractionStatus: z.enum(['retracted', 'corrected', 'expression_of_concern', 'reinstated']).optional(),
+  /**
+   * RU-R frontier candidate 2: retraction REASONS from the offline Retraction
+   * Watch table (search-time hint tier, present only when the table produced
+   * or enriched the status). Feeds uncertainty-note wording; empty array is
+   * never persisted.
+   */
+  retractionReasons: z.array(z.string().min(1)).optional(),
+  /** Misconduct vs honest-error reading of retractionReasons (never guessed; 'unclassified' when the vocabulary is unrecognized). */
+  retractionClass: z.enum(['misconduct', 'honest_error', 'unclassified']).optional(),
   /** Result of identifier-resolution verification (verify_sources stage). Absent = not yet verified. */
   verification: z.object({
     method: z.enum(['crossref_doi', 'arxiv_id', 'openalex_id', 'europepmc_id', 'url']),
