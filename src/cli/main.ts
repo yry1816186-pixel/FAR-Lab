@@ -4,7 +4,7 @@ import { createApp } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { ingestSdm, ingestTextToSdm, ingestBytesToProfile, persistDatasetProfile, type TextIngestResult, type BytesIngestResult } from '../ingest/service.js';
+import { ingestSdm, ingestTextToSdm, ingestBytes, ingestSvgPlot, persistDatasetProfile, type TextIngestResult, type BytesIngestResult } from '../ingest/service.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
 import { completionScript } from './completion.js';
@@ -486,18 +486,41 @@ const main = async (): Promise<void> => {
     // profile through the binary router; PDFs are refused honestly (text-layer
     // collection is a web-client pdfjs capability, not a zod-only core one).
     const target = process.argv[3];
-    if (target === undefined) die('usage: far ingest <file.(md|tex|csv|tsv|xlsx|ipynb|py|ts|js|xml)>', 2);
+    if (target === undefined) die('usage: far ingest <file.(md|tex|csv|tsv|json|xlsx|docx|pptx|epub|html|svg|txt|log|ipynb|py|ts|js|xml)>', 2);
     if (/\.pdf$/i.test(target)) die('far ingest: PDF text-layer collection runs in the web client (pdfjs-dist) — use the workbench upload or POST /api/v1/ingest {kind:"pdf_text"}; the zod-only core cannot collect PDF text', 2);
     const base = path.basename(target);
+    // SVG plots digitize deterministically and persist a re-verifiable points
+    // artifact — they need the store at parse time, so they take a dedicated path.
+    if (/\.svg$/i.test(target)) {
+      let svgText: string;
+      try {
+        svgText = await readFile(target, 'utf8');
+      } catch (e) {
+        die(`cannot read ${target}: ${e instanceof Error ? e.message : String(e)}`, 1);
+      }
+      const app = await createApp({});
+      try {
+        const r = await ingestSvgPlot(app.artifacts, base, svgText);
+        if (!r.ok) die(`far ingest: ${r.reason}`, 2);
+        const f = r.outcome.sdm.figures[0];
+        const axes = f !== undefined && f.perception.axes !== undefined ? f.perception.axes.map((a) => `${a.kind}:${a.range !== undefined ? `[${a.range[0]}, ${a.range[1]}]` : '?'}${a.scale !== undefined ? ` (${a.scale})` : ''}`).join(' ') : '';
+        console.log(`${base}: svg-plot-v1 — ${f !== undefined ? f.perception.status : 'unknown'}`);
+        console.log(`  series=${r.points.series.length} points=${r.points.series.reduce((n, sr) => n + sr.points.length, 0)} ${axes}`);
+        for (const w of r.outcome.sdm.diagnostics.warnings.slice(0, 6)) console.log(`  note: ${w}`);
+        console.log(`  artifact: ${r.outcome.artifactRef}`);
+        if (r.pointsRef !== undefined) console.log(`  points:   ${r.pointsRef}`);
+      } finally { app.close(); }
+      return;
+    }
     let routed: Exclude<TextIngestResult, null> | BytesIngestResult;
-    if (/\.(xlsx|xlsm)$/i.test(target)) {
+    if (/\.(xlsx|xlsm|docx|pptx|epub)$/i.test(target)) {
       let bytes: Buffer;
       try {
         bytes = await readFile(target);
       } catch (e) {
         die(`cannot read ${target}: ${e instanceof Error ? e.message : String(e)}`, 1);
       }
-      routed = ingestBytesToProfile(base, bytes);
+      routed = ingestBytes(base, bytes);
     } else {
       let text: string;
       try {
@@ -507,7 +530,7 @@ const main = async (): Promise<void> => {
       }
       const t = ingestTextToSdm(base, text);
       routed = t === null
-        ? { type: 'refused', reason: `unsupported file kind: ${base} — supported: .md .tex .csv .tsv .xlsx .ipynb .py .ts .js .xml (JATS/TEI)` }
+        ? { type: 'refused', reason: `unsupported file kind: ${base} — supported: .md .tex .csv .tsv .json .xlsx .docx .pptx .epub .html .svg .txt .log .ipynb .py .ts .js .xml (JATS/TEI)` }
         : t;
     }
     if (routed.type === 'refused') die(`far ingest: ${routed.reason}`, 2);

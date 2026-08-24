@@ -23,10 +23,12 @@ import { z } from 'zod';
 export const SdmExtractionStatus = z.enum(['extracted', 'not_extracted', 'unsupported', 'blocked_live']);
 export type SdmExtractionStatus = z.infer<typeof SdmExtractionStatus>;
 
-/** Which deterministic extractor produced this document (provenance of understanding). */
+/** Which deterministic extractor produced this document (provenance of understanding).
+ *  Route enum grows additively (2026-08-25: OOXML/HTML/EPUB/SVG/plain-text lane
+ *  extension) — existing values are stable, consumers must tolerate new ones. */
 export const SdmExtractor = z.object({
   name: z.string().min(1),          // e.g. 'jats-structure-v1', 'pdf-text-v1'
-  route: z.enum(['jats_xml', 'grobid_tei', 'latexml_html', 'pdf_text_layer', 'markdown', 'latex_source', 'code_scan', 'notebook_json']),
+  route: z.enum(['jats_xml', 'grobid_tei', 'latexml_html', 'pdf_text_layer', 'markdown', 'latex_source', 'code_scan', 'notebook_json', 'docx_ooxml', 'pptx_ooxml', 'html_structured', 'epub_xhtml', 'svg_plot', 'plain_text']),
 });
 export type SdmExtractor = z.infer<typeof SdmExtractor>;
 

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createApp } from '../src/app/composition.js';
 import type { App } from '../src/app/composition.js';
 import { createApiServer } from '../src/server/api.js';
+import { writeZip } from '../src/ingest/zip';
 import type { ApiServer } from '../src/server/api.js';
 
 /** POST /api/v1/ingest integration — real kernel, real artifact store, no models. */
@@ -162,7 +163,7 @@ describe('POST /api/v1/ingest kind=bytes (xlsx supplements)', () => {
     expect(back['kind']).toBe('dataset_profile');
   });
 
-  it('refuses non-xlsx binary kinds with the reason (honest 400)', async () => {
+  it('refuses unsupported binary kinds with the reason (honest 400)', async () => {
     const { status, json } = await post({ kind: 'bytes', fileName: 'img.png', base64: Buffer.from([1, 2, 3]).toString('base64') });
     expect(status).toBe(400);
     expect(JSON.stringify(json)).toMatch(/unsupported binary kind/);
@@ -171,5 +172,48 @@ describe('POST /api/v1/ingest kind=bytes (xlsx supplements)', () => {
   it('rejects empty and oversized base64 bodies', async () => {
     expect((await post({ kind: 'bytes', fileName: 's.xlsx', base64: '' })).status).toBe(400);
     expect((await post({ kind: 'bytes', fileName: 's.xlsx', base64: 42 })).status).toBe(400);
+  });
+});
+
+describe('POST /api/v1/ingest — 2026-08-25 format-matrix extension', () => {
+  it('kind=bytes .docx → SDM summary (zip container family)', async () => {
+    const docx = writeZip([
+      { name: 'word/document.xml', data: '<?xml version="1.0"?><w:document xmlns:w="u"><w:body><w:p><w:r><w:t>Word text.</w:t></w:r></w:p></w:body></w:document>' },
+    ]);
+    const { status, json } = await post({ kind: 'bytes', fileName: 'paper.docx', base64: docx.toString('base64') });
+    expect(status).toBe(200);
+    expect(json['type']).toBe('sdm');
+    const sdm = json['sdm'] as Record<string, unknown>;
+    expect(String((sdm['extractor'] as Record<string, unknown>)['name'])).toBe('docx-ooxml-v1');
+  });
+
+  it('kind=text .svg → digitized plot with a fetchable points artifact', async () => {
+    const svg = `<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg">${[0, 1, 2, 3, 4].map((v) => `<text x="${100 + v * 100}" y="430">${v}</text>`).join('')}${[0, 1, 2, 3].map((v) => `<text x="60" y="${400 - v * 100}">${v}</text>`).join('')}<polyline points="100,400 300,200"/></svg>`;
+    const { status, json } = await post({ kind: 'text', fileName: 'fig.svg', text: svg });
+    expect(status).toBe(200);
+    expect(json['seriesCount']).toBe(1);
+    const pointsRef = String(json['pointsRef']);
+    expect(pointsRef).toMatch(/^sha256:[0-9a-f]{64}$/);
+    const res = await fetch(`${base}/api/v1/ingest/${pointsRef}`);
+    expect(res.status).toBe(200);
+    const back = await res.json() as Record<string, unknown>;
+    expect(back['kind']).toBe('plot_points');
+    const pts = back['points'] as Record<string, unknown>;
+    const axes = pts['axes'] as Record<string, Record<string, Record<string, unknown>>>;
+    expect(typeof axes['x']?.['calibration']?.['slope']).toBe('number');
+  });
+
+  it('kind=text non-tabular .json → 400 quoting the precise jsonToRows reason', async () => {
+    const { status, json } = await post({ kind: 'text', fileName: 'x.json', text: JSON.stringify({ a: [{ b: 1 }] }) });
+    expect(status).toBe(400);
+    expect(JSON.stringify(json)).toMatch(/nested/);
+  });
+
+  it('kind=text .html → structured SDM', async () => {
+    const { status, json } = await post({ kind: 'text', fileName: 's1.html', text: '<!DOCTYPE html><html><head><title>T</title></head><body><h1>H</h1><p>See Figure 1.</p><figure><img src="a.png"/><figcaption>Figure 1: cap</figcaption></figure></body></html>' });
+    expect(status).toBe(200);
+    const sdm = json['sdm'] as Record<string, unknown>;
+    expect((sdm['counts'] as Record<string, number>)['figures']).toBe(1);
+    expect((sdm['counts'] as Record<string, number>)['xrefsResolved']).toBe(1);
   });
 });

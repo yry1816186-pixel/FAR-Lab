@@ -28,6 +28,8 @@ export const ColumnProfile = z.object({
   numeric: z.object({
     min: z.number(), max: z.number(), mean: z.number(),
     median: z.number(), stddev: z.number(),
+    /** Quartiles (2026-08-25, additive — stored profiles without them stay valid). */
+    p25: z.number().optional(), p75: z.number().optional(),
   }).optional(),
   categorical: z.object({
     levels: z.array(z.object({ value: z.string(), count: z.number().int().positive() })).max(10),
@@ -39,7 +41,7 @@ export type ColumnProfile = z.infer<typeof ColumnProfile>;
 export const DatasetProfileDoc = z.object({
   schemaVersion: z.literal('dsdp-1'),
   origin: z.object({ kind: z.literal('upload'), name: z.string().min(1) }),
-  format: z.enum(['csv', 'tsv', 'xlsx']),
+  format: z.enum(['csv', 'tsv', 'xlsx', 'json']),
   /** Delimiter the delimited parser used. Absent for xlsx: cells are a
    * rectangular grid from SheetML, there is no delimiter to record. */
   delimiter: z.string().min(1).optional(),
@@ -108,7 +110,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(:\d{2})?)?Z?$/;
 const SIG_RE = /[∗*†‡]{1,4}$/;
 const NUMERIC_WITH_SIG = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)[∗*†‡]{1,4}$/;
 
-const inferColumnType = (values: string[]): { type: ColumnType; numeric: { min: number; max: number; mean: number; median: number; stddev: number } | undefined; levels: Map<string, number> | undefined } => {
+const inferColumnType = (values: string[]): { type: ColumnType; numeric: { min: number; max: number; mean: number; median: number; stddev: number; p25?: number; p75?: number } | undefined; levels: Map<string, number> | undefined } => {
   let ints = 0, floats = 0, bools = 0, dates = 0;
   const nums: number[] = [];
   const levels = new Map<string, number>();
@@ -130,9 +132,15 @@ const inferColumnType = (values: string[]): { type: ColumnType; numeric: { min: 
     const sorted = nums.slice().sort((a, b) => a - b);
     const median = sorted.length % 2 === 1 ? sorted[(sorted.length - 1) / 2] as number : ((sorted[sorted.length / 2 - 1] as number) + (sorted[sorted.length / 2] as number)) / 2;
     const variance = nums.reduce((a, b) => a + (b - mean) ** 2, 0) / nums.length;
+    const q = (p: number): number => {
+      const idx = p * (sorted.length - 1);
+      const lo = Math.floor(idx), hi = Math.ceil(idx);
+      if (lo === hi) return sorted[lo] as number;
+      return (sorted[lo] as number) + ((sorted[hi] as number) - (sorted[lo] as number)) * (idx - lo);
+    };
     return {
       type: ints === nonMissing ? 'integer' : 'float',
-      numeric: { min: sorted[0] as number, max: sorted[sorted.length - 1] as number, mean, median, stddev: Math.sqrt(variance) },
+      numeric: { min: sorted[0] as number, max: sorted[sorted.length - 1] as number, mean, median, stddev: Math.sqrt(variance), p25: q(0.25), p75: q(0.75) },
       levels: undefined,
     };
   }
@@ -161,7 +169,7 @@ const ROW_LIMIT = 200_000;
 export const profileRows = (
   rowsIn: string[][],
   name: string,
-  format: 'csv' | 'tsv' | 'xlsx',
+  format: 'csv' | 'tsv' | 'xlsx' | 'json',
   delimiter?: string,
 ): DatasetProfileDoc => {
   const warnings: string[] = [];
@@ -208,7 +216,11 @@ export const profileRows = (
       uniqueCount: new Set(present.map((v) => v.trim())).size,
       ...(unitFromHeader(headerName) !== undefined ? { unitHint: unitFromHeader(headerName) } : {}),
       significanceNotation: sigNotation,
-      ...(numeric !== undefined ? { numeric: { min: round6(numeric.min), max: round6(numeric.max), mean: round6(numeric.mean), median: round6(numeric.median), stddev: round6(numeric.stddev) } } : {}),
+      ...(numeric !== undefined ? { numeric: {
+        min: round6(numeric.min), max: round6(numeric.max), mean: round6(numeric.mean), median: round6(numeric.median), stddev: round6(numeric.stddev),
+        ...(numeric.p25 !== undefined ? { p25: round6(numeric.p25) } : {}),
+        ...(numeric.p75 !== undefined ? { p75: round6(numeric.p75) } : {}),
+      } } : {}),
       ...(levels !== undefined && type === 'string'
         ? { categorical: { levels: [...levels.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([value, count]) => ({ value, count })) } }
         : {}),

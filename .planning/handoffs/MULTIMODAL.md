@@ -3,8 +3,11 @@
 Lane owner: MULTIMODAL (`work/multimodal-science/`). Landed 2026-08-24;
 **extended same day**: fetch-by-ref GET, bytes/xlsx supplements, network
 fulltext→SDM wiring, mixed-language fidelity fixes.
-Status: deterministic tiers (T2 structure + T3 dataset/panels/symbols) IMPLEMENTED and
-tested; VLM tier (T4) contract reserved, BLOCKED-live per the 2026-08-23 directive.
+**Extended 2026-08-25 (format-matrix closure)**: docx/pptx/epub/html/json/svg/
+txt-log deterministic routes; SVG vector plots digitized to verifiable numbers
+(the first REAL figure→axis→series→values path, no VLM); dsdp quartiles.
+Status: deterministic tiers (T2 structure + T3 dataset/panels/symbols/SVG plot values)
+IMPLEMENTED and tested; VLM tier (T4) for raster figures reserved, BLOCKED-live.
 
 ## TLDR for HCI
 
@@ -59,7 +62,14 @@ Dataset profiles: `src/ingest/dataset.ts` (`dsdp-1`).
 | .ipynb | `notebook-json-v1` | cells with execution provenance, stored errors as footnotes |
 | .py/.ts/.js | `code-scan-v1` | heuristic symbol index + imports (labeled non-AST) |
 | .xml | JATS or TEI sniffed | full structure incl. equations+citations |
-| images, scans, docx/pptx, other | **refused honestly** | reason strings, no fake |
+| .docx (`kind:'bytes'`) | `docx-ooxml-v1` | heading hierarchy (outlineLvl/styles.xml, locale-proof), tables w/ gridSpan+vMerge merged cells + tblHeader rows, caption-linked figures w/ resolved media targets, footnotes, core.xml meta |
+| .pptx (`kind:'bytes'`) | `pptx-ooxml-v1` | sldIdLst slide order, placeholder titles (synthetic + warning when absent), y-layout reading order, DrawingML tables, speaker notes |
+| .epub (`kind:'bytes'`) | `epub-xhtml-v1` | spine reading order (not zip order), dc:* metadata, cross-part xrefs, per-part skip warnings |
+| .html/.htm | `html-structure-v1` | spec-aligned optional-end-tag normalizer (unclosed p/li/td…), figures+captions, rowspan/colspan tables, script/style dropped+warned |
+| .svg | `svg-plot-v1` | **deterministic plot digitization**: axis ticks→linear/log calibration→series point values; numbers ONLY in a persisted points artifact (`sdm-plot-points-1`) with the full calibration audit trail; `verifiedBy:'deterministic-calibration'` |
+| .json | dsdp-1 (`format:'json'`) | record arrays + columnar objects through the same profile pipeline; nested JSON refused with reason |
+| .txt/.log | `plain-text-v1` | paragraph blocks with exact char spans, zero invented structure |
+| images, scans, legacy .doc/.xls, other | **refused honestly** | reason strings, no fake |
 
 Network fulltext routes (`src/sources/fulltext.ts`) now produce an SDM for
 every fetched document — `FullTextFetch.sdm` (arxiv_html→LaTeXML,
@@ -87,6 +97,21 @@ pools.
 3. Dataset uploads: render the profile (typed columns, missingness bars, unit chips,
    significance flags) as the dataset's workspace entry — not "file uploaded".
 
+## Contract additions (2026-08-25, all additive — no sdm-2 bump needed)
+
+1. `SdmExtractor.route` enum grew: `docx_ooxml`, `pptx_ooxml`, `html_structured`,
+   `epub_xhtml`, `svg_plot`, `plain_text`. Consumers must tolerate new values.
+2. `dsdp-1`: `format:'json'`; numeric columns gained optional `p25`/`p75`
+   (stored profiles without them remain valid).
+3. New artifact kind `sdm-plot-points-1` (points + full calibration: ticks,
+   slope/intercept/scale/residual). `GET /api/v1/ingest/:ref` serves it as
+   `{kind:'plot_points', points}`. SVG figure series carry `pointsRef` → that
+   artifact — re-verify the numbers from it alone.
+4. `ingestBytesToProfile` is now `ingestBytes` (returns `{type:'sdm'}` too);
+   the old name remains exported as an alias.
+5. CLI matrix: `far ingest` accepts .md .tex .csv .tsv .json .xlsx .docx .pptx
+   .epub .html .svg .txt .log .ipynb .py .ts .js .xml.
+
 ## Reserved T4 (BLOCKED-live): figure perception
 
 `SdmFigurePerception` (axes with units/scale/range, series with pointsRef,
@@ -95,10 +120,23 @@ sanctioned shape for numeric figure claims. Rule: VLM proposes, deterministic
 calibration (WebPlotDigitizer-style 2-point mapping) verifies; `unverified_vlm_only`
 must be treated as non-evidence by every consumer.
 
+**2026-08-25: the deterministic half is now LIVE for SVG vector plots**
+(`svg-plot-v1`, no VLM anywhere): tick clustering → linear/log calibration →
+series values in the `sdm-plot-points-1` artifact. Raster figures (PNG/JPEG
+plots, microscopy) remain T4 BLOCKED-live. Honest SVG gaps: bar tops not
+digitized, bezier paths refused whole, multi-panel SVGs digitize the primary
+panel only (others named in warnings).
+
 ## Reproduction
 
 - Tests: `tests/ingest-*.test.ts` (xml, jats, tei, latexml, md-latex, pdftext, dataset,
-  code-nb, service, api, pdf-e2e) — all green this session; real-material E2E included.
-- Reports: `work/multimodal-science/{AUDIT-BASELINE,RESEARCH-TOOLING,BENCHMARK}.md`.
+  code-nb, service, api, pdf-e2e + 2026-08-25: docx, pptx, epub, html, svgplot, routing) —
+  all green this session; real-material E2E included. Full-suite gate 2026-08-25:
+  **1744 passed / 3 skipped / 0 failed** (172 files).
+- Live CLI evidence: `node dist/cli/main.js ingest <docx>` EXIT=0 (docx-ooxml-v1 ok);
+  `<svg>` EXIT=0 (svg-plot-v1 extracted, sdm + points artifacts) — fixtures under
+  `work/multimodal-science/live-demo/`.
+- Reports: `work/multimodal-science/{AUDIT-BASELINE,RESEARCH-TOOLING,BENCHMARK}.md`
+  (BENCHMARK §6 = the 2026-08-25 extension numbers).
 - Decisions: license table + adopted architecture in RESEARCH-TOOLING.md (Docling=MIT
   future sidecar candidate; Marker GPL / PyMuPDF AGPL refused; MinerU Apache+terms).
