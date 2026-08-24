@@ -1,6 +1,11 @@
 import type { SourceDocument, SourceIdentifier, SourceFamily } from '../../domain/source.js';
 import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
+// Single derivation, two callers (verify: authoritative resolve-time; retrieve:
+// best-effort search-time demotion) — moved to sources/retraction.ts, re-exported
+// here so existing importers keep working.
+import { retractionStatusFrom } from '../../sources/retraction.js';
+export { retractionStatusFrom };
 import { snapshotHash } from '../../sources/snapshot.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { throwIfCancelled } from './guard.js';
@@ -8,29 +13,6 @@ import { TITLE_MATCH_THRESHOLD, titleJaccard } from './title-normalize.js';
 
 type Verification = NonNullable<SourceDocument['verification']>;
 type VerifyOutcome = 'resolved' | 'not_found' | 'error';
-
-/**
- * RU-6 GO1 retraction/correction status (Crossref update-to field; Retraction
- * Watch data rides the same field with source 'retraction-watch'). Deterministic
- * derivation from the RESOLVED record; the identifier stays authoritative —
- * status is surfaced for downstream demotion, never flips `resolved`.
- */
-export const retractionStatusFrom = (
-  record: RawSourceRecord | undefined,
-): 'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated' | undefined => {
-  if (record === undefined) return undefined;
-  const updates = (record.normalized as { 'update-to'?: unknown } | undefined)?.['update-to'];
-  if (!Array.isArray(updates)) return undefined;
-  let status: 'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated' | undefined;
-  for (const u of updates) {
-    const t = String((u as { type?: unknown })?.type ?? '').toLowerCase();
-    if (t.includes('reinstatement') || t.includes('reinstated')) status ??= 'reinstated';
-    else if (t.includes('retraction')) status ??= 'retracted';
-    else if (t.includes('expression of concern')) status ??= 'expression_of_concern';
-    else if (t.includes('correction') || t.includes('corrected')) status ??= 'corrected';
-  }
-  return status;
-};
 
 /**
  * W6/F3 (refchecker EXTRACT, enhanced_hybrid_checker.py:687-870): conservative
