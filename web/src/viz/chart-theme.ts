@@ -37,23 +37,26 @@ const readInks = (): ChartInks => {
 };
 
 /**
- * Token values + live re-resolution on theme change. 'auto' mode follows the
- * system preference, so both the app's broadcast event and the media query are
- * subscribed. Returns a stable object per resolved theme (state identity), safe
- * as an effect dependency for chart re-init.
+ * Token values + live re-resolution on theme change. The theme hook applies
+ * its choice by mutating <html data-theme> AFTER broadcasting its event, so
+ * listening to the event alone races and reads the PREVIOUS theme's values
+ * (observed live: radar kept light gridlines on dark). A MutationObserver on
+ * the attribute fires strictly after the DOM mutation — no race. 'auto' mode
+ * has no attribute to mutate, so the system-preference media query is watched
+ * too. Returns a stable object per resolved theme (state identity), safe as an
+ * effect dependency for chart re-init.
  */
 export function useChartTokens(): ChartInks {
   const [inks, setInks] = useState<ChartInks>(readInks);
   useEffect(() => {
-    // 'far-theme-change' is state/theme.ts's broadcast (module-private const
-    // there; this lane keeps the literal in sync rather than editing lane-01 files).
-    const onTheme = (): void => setInks(readInks());
-    window.addEventListener('far-theme-change', onTheme);
+    const observer = new MutationObserver(() => setInks(readInks()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    mq.addEventListener('change', onTheme);
+    const onSystemChange = (): void => setInks(readInks());
+    mq.addEventListener('change', onSystemChange);
     return () => {
-      window.removeEventListener('far-theme-change', onTheme);
-      mq.removeEventListener('change', onTheme);
+      observer.disconnect();
+      mq.removeEventListener('change', onSystemChange);
     };
   }, []);
   return inks;
