@@ -45,14 +45,19 @@ const conv = (over: Partial<Conversation> = {}): Conversation => ({
   ...over,
 });
 
-const fakeChatDeps = (): { deps: ChatDeps; posts: string[]; resolves: Array<{ pid: string; approve: boolean; remember: boolean }>; launches: string[] } => {
+const fakeChatDeps = (): { deps: ChatDeps; posts: string[]; postedSeeds: Array<Array<{ title: string }> | undefined>; resolves: Array<{ pid: string; approve: boolean; remember: boolean }>; launches: string[] } => {
   const posts: string[] = [];
+  const postedSeeds: Array<Array<{ title: string }> | undefined> = [];
   const resolves: Array<{ pid: string; approve: boolean; remember: boolean }> = [];
   const launches: string[] = [];
   return {
-    posts, resolves, launches,
+    posts, postedSeeds, resolves, launches,
     deps: {
-      post: async (id, text) => { posts.push(text); return conv({ id, messages: [...conv().messages, { id: 'cmsg_new', role: 'agent', content: `回复:${text}`, createdAt: '2026-08-24T02:00:00Z' }] }); },
+      post: async (id, text, opts) => {
+        posts.push(text);
+        postedSeeds.push(opts?.seeds?.map((s) => ({ title: s.title })));
+        return conv({ id, messages: [...conv().messages, { id: 'cmsg_new', role: 'agent', content: `回复:${text}`, createdAt: '2026-08-24T02:00:00Z' }] });
+      },
       resolve: async (id, pid, approve, remember) => {
         resolves.push({ pid, approve, remember });
         return conv({
@@ -170,6 +175,63 @@ test('ChatView: launch composer stops at READY without FAR_ALLOW_LIVE (no launch
   assert.equal(launches.length, 0, 'launch must NOT fire without FAR_ALLOW_LIVE=1');
   assert.ok(notes.some((n) => n.includes('no-live-API')), 'ready-only note shown');
   if (prev !== undefined) process.env.FAR_ALLOW_LIVE = prev;
+  app.unmount();
+});
+
+test('ChatView: s attaches a local file that rides the next posted message', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const file = path.join(os.tmpdir(), `farlab-attach-${process.pid}.md`);
+  fs.writeFileSync(file, '# 材料\n质粒拷贝数与耐药表型存在相关性。');
+  const { deps, posts, postedSeeds } = fakeChatDeps();
+  const notes: string[] = [];
+  const app = render(h(ChatView, {
+    initial: conv({ messages: [{ id: 'cmsg_0', role: 'researcher', content: '开始', createdAt: '2026-08-24T00:00:05Z' }] }),
+    deps, onBack: () => {}, onNote: (n) => notes.push(n), onLaunched: () => {},
+  }));
+  await tick();
+  app.stdin.write('s'); // open the path input
+  await tick();
+  assert.match(lastFrame(app), /附件路径/);
+  app.stdin.write(file);
+  await tick();
+  app.stdin.write('\r'); // attach
+  await tick(120);
+  assert.match(lastFrame(app), /附件就绪: farlab-attach/);
+  // compose + send: the seed must ride the POST
+  app.stdin.write('n');
+  await tick();
+  app.stdin.write('结合附件谈谈');
+  await tick();
+  app.stdin.write('\r');
+  await tick();
+  app.stdin.write('y');
+  await tick(150);
+  assert.deepEqual(posts, ['结合附件谈谈']);
+  assert.deepEqual(postedSeeds, [[{ title: `farlab-attach-${process.pid}.md` }]]);
+  assert.doesNotMatch(lastFrame(app), /附件就绪/); // cleared after send
+  fs.rmSync(file, { force: true });
+  app.unmount();
+});
+
+test('ChatView: s with an unreadable path surfaces the honest error and keeps composing', async () => {
+  const { deps, posts } = fakeChatDeps();
+  const notes: string[] = [];
+  const app = render(h(ChatView, {
+    initial: conv({ messages: [{ id: 'cmsg_0', role: 'researcher', content: '开始', createdAt: '2026-08-24T00:00:05Z' }] }),
+    deps, onBack: () => {}, onNote: (n) => notes.push(n), onLaunched: () => {},
+  }));
+  await tick();
+  app.stdin.write('s');
+  await tick();
+  app.stdin.write('Z:/definitely/not/here.txt');
+  await tick();
+  app.stdin.write('\r');
+  await tick(120);
+  assert.ok(notes.some((n) => n.includes('附件读取失败')), 'honest attach error surfaced');
+  assert.doesNotMatch(lastFrame(app), /附件就绪/);
+  assert.equal(posts.length, 0, 'nothing was posted');
   app.unmount();
 });
 

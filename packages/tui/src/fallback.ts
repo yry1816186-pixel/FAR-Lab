@@ -16,6 +16,7 @@ import { relTime, STAGE_ZH } from './narrative.ts';
 import { decide, VOCAB_FOOTER } from './approveCore.ts';
 import * as chatCore from './chatCore.ts';
 import type { ChatRow } from './chatCore.ts';
+import { readSeedFile } from './seedAttach.ts';
 
 const ACTIVE = new Set(['created', 'queued', 'running', 'paused']);
 const WATCH_TICK_MS = 2_000;
@@ -106,10 +107,21 @@ const chatSession = async (convId: string): Promise<void> => {
     console.log(`\n—— 对话 · ${conv.title}（${chatCore.conversationMeta(conv)}）——`);
     printConversation(conv);
     await approvePending(conv);
+    // Optional file attachment for the next message (text-only seed).
+    let seed: ReturnType<typeof readSeedFile> | undefined;
+    const attachPath = (await ask('附件路径（文本文件，Enter 跳过）: ')).trim();
+    if (attachPath.length > 0) {
+      try {
+        seed = readSeedFile(attachPath);
+        console.log(`📎 附件就绪: ${seed.title}（${seed.text.length} 字）`);
+      } catch (e) {
+        console.log(`附件读取失败: ${e instanceof Error ? e.message : String(e)}（继续无附件）`);
+      }
+    }
     const text = (await ask('发送消息（Enter 返回列表）: ')).trim();
     if (text.length === 0) return;
     try {
-      const updated = await postConversationMessage(convId, text);
+      const updated = await postConversationMessage(convId, text, { seeds: seed !== undefined ? [seed] : undefined });
       console.log('✓ 已发送');
       printConversation(updated);
       await approvePending(updated);
