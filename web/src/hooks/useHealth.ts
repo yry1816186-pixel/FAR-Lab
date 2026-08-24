@@ -49,10 +49,13 @@ export function useHealth(): HealthState {
         failures = 0;
         schedule(HEALTH_POLL_MS);
       } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return;
         if (!alive) return;
-        setHealth(null);
-        setHealthError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
+        if (!(e instanceof DOMException && e.name === 'AbortError')) {
+          setHealth(null);
+          setHealthError(e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }));
+        }
+        // Audit fix: an AbortError (transient fetch abort) must not kill the
+        // polling loop permanently — keep the cadence; `alive` guards unmount.
         failures += 1;
         schedule(failures <= FAST_RETRIES ? HEALTH_FAST_RETRY_MS : HEALTH_POLL_MS);
       } finally {

@@ -644,6 +644,13 @@ export function App(): JSX.Element {
         </aside>
 
         <main className="content" aria-label={t('app.title')}>
+          {convCreateError !== null && (
+            /* Adversarial-audit P1 fix: the create-conversation failure must be
+               visible on the PRIMARY path too — with no conversation selected
+               the dock never mounts, so this error cannot live only in the
+               dock slot. One rendering location, visible in every dock state. */
+            <ErrorBox error={convCreateError.error} onRetry={() => discussRun(convCreateError.runId)} />
+          )}
           {selectedConvId !== null && selectedRunId === null ? (
             <ConversationView
               conversationId={selectedConvId}
@@ -698,15 +705,11 @@ export function App(): JSX.Element {
                 <X size={12} aria-hidden="true" />
               </button>
             </div>
-            {convCreateError !== null ? (
-              <ErrorBox error={convCreateError.error} onRetry={() => discussRun(convCreateError.runId)} />
-            ) : (
-              <ConversationView
-                conversationId={selectedConvId!}
-                onOpenedRun={selectRun}
-                onMutated={refreshConversations}
-              />
-            )}
+            <ConversationView
+              conversationId={selectedConvId!}
+              onOpenedRun={selectRun}
+              onMutated={refreshConversations}
+            />
           </aside>
         )}
       </div>

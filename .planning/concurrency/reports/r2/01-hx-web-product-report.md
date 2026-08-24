@@ -4,6 +4,16 @@ Branch `ws/r2/01-hx-web-product` from `baseline/parallel-r2` (`47cc373`,
 verified `git rev-parse` == worktree HEAD at setup). Worktree
 `work/r2-01-hx-web-product`.
 
+**Adversarial audit (independent subagent, post-v1): ACCEPT_WITH_ISSUES.**
+One P1 accepted and FIXED in the follow-up commit (create-conversation
+failure was silent on the primary path — the error UI lived only inside the
+dock, which never mounts when nothing is selected; now rendered once at the
+top of the main area in every dock state). useHealth AbortError polling
+stall also fixed (audit P2). Remaining audit P2s: dict-key count corrected
+below, `health-strip--checking` unstyled (handed to lane 02), deleted-id
+reopen edge (visible failure, covered by the lane-08 link handoff),
+ResearchStatePanel hardcoded-zh (disclosed).
+
 ## 1. Commits
 
 - `a4bc56e` feat(web): conversation↔research seam (dock + #conv routes) + state-honesty fixes (16 files, +667/−62)
@@ -109,7 +119,7 @@ used as evidence.
 All changes are inside `web/src/**` ownership (prompt-pack boundary): no
 `styles.css` / `common.tsx` / `ui/**` / `viz/**` edits — dock styling lives
 in the new lane-01 file `web/src/conversation-dock.css` reusing existing CSS
-custom properties. `web/src/i18n/dict.ts` gained 12 keys (zh+en, kept in
+custom properties. `web/src/i18n/dict.ts` gained 10 keys (zh+en, kept in
 key-sync by its Record type). No backend files touched; no other lane's
 worktree/branch touched; primary tree never modified (worktree-only lane).
 
@@ -123,6 +133,8 @@ Given (all in `.planning/concurrency/handoffs/`):
    vs live-probe labeling.
 3. `r2-2026-08-24-from-01-to-08-run-discussion-link.md` — P2, durable
    run↔discussion link (client currently dedupes per session, honestly).
+4. `r2-2026-08-24-from-01-to-02-health-checking-tone.md` — P2, missing
+   `.health-strip--checking` style (styles.css is lane-02 authority).
 
 Received: none.
 
