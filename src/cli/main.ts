@@ -9,7 +9,7 @@ import { completionScript } from './completion.js';
 import { HELP } from './help.js';
 import { staleDistFiles } from './dist-freshness.js';
 import { runGc } from './gc.js';
-import { ink, marker, out, table, padColumns } from './term.js';
+import { ink, log, marker, out, table, padColumns } from './term.js';
 import { isActiveStatus, statusInk, watchLines } from './watch.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { buildLineageGraph } from '../app/lineage.js';
@@ -217,6 +217,52 @@ const main = async (): Promise<void> => {
   }
   const [, , cmd, sub] = process.argv;
   if (!cmd || flag('--help') || flag('-h') || cmd === 'help') { console.log(HELP); return; }
+
+  if (cmd === 'serve') {
+    // Headless/SSH entry (R2-03): a thin RUN-SURFACE wrapper over the canonical
+    // server modules (src/server/main.ts semantics: PORT/HOST env, graceful
+    // SIGINT/SIGTERM, automations on unless disabled). No second server —
+    // createApiServer is the one and only HTTP owner.
+    const portArg = arg('--port');
+    let port = 8787;
+    if (portArg !== undefined) {
+      port = Number.parseInt(portArg, 10);
+      if (!Number.isInteger(port) || port < 0 || port > 65535) die(`invalid --port "${portArg}" (must be an integer 0-65535; 0 = ephemeral)`, 2);
+    }
+    const host = arg('--host') ?? process.env.HOST ?? '127.0.0.1';
+    const automationsOff = arg('--automations') === 'off';
+    const { createApiServer } = await import('../server/api.js');
+    const serveApp = await createApp(
+      arg('--data-dir') !== undefined ? { dataDir: arg('--data-dir') } : process.env.FARLAB_DATA_DIR !== undefined ? { dataDir: process.env.FARLAB_DATA_DIR } : {},
+    );
+    const api = createApiServer(serveApp, {
+      port,
+      host,
+      automations: { enabled: !automationsOff && process.env.FARLAB_AUTOMATIONS !== 'off' },
+    });
+    try {
+      const actualPort = await api.start();
+      out(`far serve listening on http://${host}:${actualPort} (api base: /api/v1, data: ${serveApp.dataDir})`);
+    } catch (e) {
+      process.stderr.write(`far serve: failed to listen on ${host}:${port}: ${e instanceof Error ? e.message : String(e)}\n`);
+      serveApp.close();
+      process.exitCode = 1;
+      return;
+    }
+    let shuttingDown = false;
+    const shutdown = (signal: string): void => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      log(`far serve: ${signal} received — closing server and database`);
+      void api.stop().then(() => {
+        serveApp.close();
+        process.exit(0);
+      });
+    };
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    return; // the http server keeps the event loop alive
+  }
 
   if (cmd === 'experiment') {
     // EEL surface (D-081/P3): scheduler as a user-operable command. Own module so this
@@ -590,7 +636,11 @@ const main = async (): Promise<void> => {
 
   const runId = positional(4);
   const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export', 'lineage', 'supervise', 'fork'] as const;
-  if (sub !== undefined && (NEEDS_RUN as readonly string[]).includes(sub) && !runId) die(`${sub} requires a run id`, 2);
+  if (sub !== undefined && (NEEDS_RUN as readonly string[]).includes(sub) && !runId) {
+    // Same three-part error contract as the malformed-id path: what happened,
+    // plus the single next action.
+    die(`${sub} requires a run id`, 2, 'find one with: far runs');
+  }
   const rid: string = runIdArg(runId, sub ?? 'command');
 
   if (sub === 'status') {

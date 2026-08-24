@@ -49,8 +49,25 @@ FAR_URL=http://127.0.0.1:3196/api/v1  # 默认（本地服务端）
 
 ## 隔离与纪律
 - 独立 package.json + lockfile；主产品 far 依赖面零改动（zod-only 不变）
-- 远程/无头：`FAR_URL` 指向远端服务（SSH 端口转发等），TUI 全功能可用；
-  服务端 loopback 守卫与路由策略由服务端域（lane 12/13）拥有
+
+## 远程/无头使用模型（R2-03，均经真实代码核验）
+服务端事实（非本包所有，引用自 src/server/api.ts F-1 守卫 + 默认绑定）：
+默认绑定 127.0.0.1，且 Host/Origin 头校验只放行 loopback 来源（防 DNS rebinding）——
+本产品是**本地单用户**工具，没有跨网认证面，这是边界而非缺陷。
+
+三种安全形态（全部保持"服务端只见 loopback 连接"）：
+1. **SSH 上的 TUI（推荐）**：`ssh <host>` 后在远端直接 `far-tui`（FAR_URL 默认该机
+   loopback）。终端即传输层；数据目录归属 = 该 OS 用户。
+2. **SSH 隧道 + 本地 TUI/浏览器**：`ssh -L 3196:127.0.0.1:3196 <host>`（服务端
+   `far serve` 或 `node scripts/serve.mjs`），本地 `FAR_URL=http://127.0.0.1:3196/api/v1`
+   的 TUI 或浏览器打开 `http://localhost:3196`。隧道出口仍是 loopback，F-1 不被绕过。
+3. **无头服务器 + 浏览器**：同上隧道形态的 Web 工作台；无图形界面的服务器用
+   `far serve` + CLI 完整降级。
+
+会话恢复语义：TUI 附着的 SSE 流断线后按游标续接（Last-Event-ID/afterSeq）；
+run 执行体（lease）过期即"冻结"，TUI 详情以 [已冻结] 如实标注并用 `r` 恢复。
+把 API 暴露给 loopback 之外（含反向代理）需要认证层——属 lane 12/13 域，
+以 handoff 提出，本包不自行扩大攻击面。
 
 ## 验证状态
 - 离线 e2e（真实 createApiServer + 脚本化 stub provider，零网络零密钥）：
