@@ -28,8 +28,8 @@ export function WelcomeView({
   onSelectRun: (id: string) => void;
 }): JSX.Element {
   const { t } = useI18n();
-  const { health, healthError } = useHealth();
-  const hp = healthProjection(health, healthError);
+  const { health, healthError, checking } = useHealth();
+  const hp = healthProjection(health, healthError, checking);
   const recent = [...runs]
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, 3);
@@ -46,7 +46,11 @@ export function WelcomeView({
         <p className="home-sub muted">{t('home.greetingSub')}</p>
         <p className={`home-health health-strip--${hp.tone}`} role="status">
           <span className="health-dot" aria-hidden="true" />
-          {hp.tone === 'err' ? t('health.unknown') : t('health.readyPlain', { ready: hp.liveReady, total: hp.liveTotal })}
+          {hp.tone === 'err'
+            ? t('health.unknown')
+            : hp.tone === 'checking'
+              ? t('health.checking')
+              : t('health.readyPlain', { ready: hp.liveReady, total: hp.liveTotal })}
         </p>
 
         <div className="home-composer">
