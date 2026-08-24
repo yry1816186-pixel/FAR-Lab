@@ -64,3 +64,6 @@ spikes/**/tmp-*/
 *.db
 *.db-wal
 *.db-shm
+
+# Nested git worktrees (isolated lanes)
+work/
