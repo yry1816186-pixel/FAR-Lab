@@ -6,6 +6,10 @@
  * All fetch calls below are injected fixtures — no network in this suite.
  */
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { openArtifactStore } from '../src/persistence/artifacts';
 import {
   extractJatsBodyText,
   extractLaTeXmlText,
@@ -17,6 +21,8 @@ import {
   fullTextRoute,
   type FullTextRoute,
 } from '../src/sources/fulltext.js';
+import { SdmDocument } from '../src/ingest/sdm';
+import { ingestSdm, loadSdmByRef } from '../src/ingest/service';
 import type { FetchLike } from '../src/sources/http.js';
 
 // ---------------------------------------------------------------------------
@@ -83,7 +89,9 @@ const ltxHtml = (prose: string) =>
   `<!DOCTYPE html><html><head><style>.x{color:red}</style><script>bad()</script></head>` +
   `<body class="ltx_body"><section class="ltx_section"><h2 class="ltx_title">Results</h2>` +
   `<p class="ltx_p">${prose}</p>` +
-  `<table class="ltx_tabular"><tr><td>1</td><td>2</td></tr></table>` +
+  `<figure class="ltx_table"><figcaption class="ltx_caption">Measured counts.</figcaption>` +
+  `<table class="ltx_tabular"><thead><tr><th>Source</th><th>Count</th></tr></thead>` +
+  `<tbody><tr><td>arXiv</td><td>1</td></tr><tr><td>PMC</td><td>2</td></tr></tbody></table></figure>` +
   `</section>` +
   `<section id="bib.bib1" class="ltx_bibliography"><p class="ltx_p">Smith J. 1999 irrelevant reference list</p></section>` +
   `</body></html>`;
@@ -321,5 +329,82 @@ describe('fetchOpenAlexTeiFullText', () => {
     expect(notTei).toMatchObject({ status: 'not_available' });
     const err = await fetchOpenAlexTeiFullText(route, { fetchImpl: statusFetch(503, 'unavailable'), apiKey: 'k' });
     expect(err).toMatchObject({ status: 'error' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MULTIMODAL SDM wiring (2026-08-24): every fetched fulltext also carries the
+// SDM-1 structured understanding of the SAME payload. The legacy text
+// projection stays byte-identical (corpus artifacts/receipts unaffected);
+// tables/figures/equations/citations the regex text route must drop are
+// recovered by the deterministic parsers. No network — injected fixtures.
+// ---------------------------------------------------------------------------
+
+const validSdm = (sdm: unknown): boolean => SdmDocument.safeParse(JSON.parse(JSON.stringify(sdm))).success;
+
+describe('fulltext fetch SDM wiring', () => {
+  it('arxiv_html: legacy text unchanged, SDM recovers the table grid the text route drops', async () => {
+    const route: FullTextRoute = { kind: 'arxiv_html', id: '2401.04088', sourceUrl: 'https://arxiv.org/html/2401.04088' };
+    const res = await fetchArxivHtmlFullText(route, { fetchImpl: statusFetch(200, ltxHtml(LONG_PROSE)) });
+    expect(res.status).toBe('fetched');
+    if (res.status !== 'fetched') return;
+    const { text, sdm } = res.fetch;
+    expect(validSdm(sdm)).toBe(true);
+    expect(sdm.extractor.route).toBe('latexml_html');
+    expect(sdm.origin).toMatchObject({ kind: 'network', url: route.sourceUrl });
+    expect(sdm.diagnostics.parseStatus).not.toBe('failed');
+    expect(text).not.toContain('1'); // legacy projection: table numbers were always dropped here
+    expect(sdm.tables.length).toBeGreaterThanOrEqual(1);
+    expect(sdm.tables[0]!.grid.flat()).toEqual(expect.arrayContaining(['1', '2']));
+  });
+
+  it('europepmc_jats: SDM carries network origin and the extracted license', async () => {
+    const route: FullTextRoute = { kind: 'europepmc_jats', id: 'PMC11032673', sourceUrl: 'https://www.ebi.ac.uk/europepmc/webservices/rest/PMC11032673/fullTextXML' };
+    const body =
+      `<?xml version="1.0"?><article><front><permissions>` +
+      `<license license-type="open-access"><license-p>This article is distributed under CC BY 4.0 terms</license-p></license>` +
+      `</permissions><article-meta><article-title>Fixture Study</article-title></article-meta></front>` +
+      `<body><sec><title>Results</title><p>${LONG_PROSE}</p></sec></body></article>`;
+    const res = await fetchEuropePmcFullText(route, { fetchImpl: statusFetch(200, body) });
+    expect(res.status).toBe('fetched');
+    if (res.status !== 'fetched') return;
+    expect(validSdm(res.fetch.sdm)).toBe(true);
+    expect(res.fetch.sdm.extractor.route).toBe('jats_xml');
+    expect(res.fetch.sdm.origin).toMatchObject({ kind: 'network', url: route.sourceUrl });
+    expect(res.fetch.sdm.origin.license ?? '').toMatch(/CC BY 4\.0/);
+    expect(res.fetch.sdm.meta.title).toBe('Fixture Study');
+  });
+
+  it('openalex_tei: SDM route grobid_tei with network origin', async () => {
+    const route: FullTextRoute = { kind: 'openalex_tei', id: 'W3035965352', sourceUrl: 'https://content.openalex.org/works/W3035965352.grobid-xml' };
+    const res = await fetchOpenAlexTeiFullText(route, { fetchImpl: statusFetch(200, grobidTei(LONG_PROSE)), apiKey: 'test-key' });
+    expect(res.status).toBe('fetched');
+    if (res.status !== 'fetched') return;
+    expect(validSdm(res.fetch.sdm)).toBe(true);
+    expect(res.fetch.sdm.extractor.route).toBe('grobid_tei');
+    expect(res.fetch.sdm.origin).toMatchObject({ kind: 'network', url: route.sourceUrl });
+  });
+
+  it('fetched SDM persists content-addressed and round-trips via loadSdmByRef (evidence-stage persistence contract)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ft-sdm-'));
+    try {
+      const store = openArtifactStore(join(dir, 'artifacts'));
+      const route: FullTextRoute = { kind: 'arxiv_html', id: '2401.04088', sourceUrl: 'https://arxiv.org/html/2401.04088' };
+      const res = await fetchArxivHtmlFullText(route, { fetchImpl: statusFetch(200, ltxHtml(LONG_PROSE)) });
+      if (res.status !== 'fetched') throw new Error('fixture fetch must succeed');
+      // The evidence stage's exact persistence shape (05→04 handoff patch):
+      // text artifact for the corpus + SDM artifact for the structured view.
+      const textRef = (await store.put(res.fetch.text)).ref;
+      const sdmRef = (await ingestSdm(store, res.fetch.sdm)).artifactRef;
+      expect(sdmRef).toMatch(/^sha256:[0-9a-f]{64}$/);
+      expect(sdmRef).not.toBe(textRef);
+      const back = await loadSdmByRef(store, sdmRef!);
+      expect(back.ok).toBe(true);
+      if (back.ok) expect(back.doc).toEqual(res.fetch.sdm);
+      const missing = await loadSdmByRef(store, textRef);
+      expect(missing.ok).toBe(false); // a text artifact is honestly not an SDM
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

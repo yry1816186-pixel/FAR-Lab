@@ -145,7 +145,10 @@ export const buildSdmFromPdfText = (payload: PdfTextPayload, origin: PdfOrigin):
         flush();
         const isTable = (capMatch[1] ?? '') === 'Table' || (capMatch[1] ?? '') === '表';
         const num = Number(capMatch[2] ?? '0');
-        const label = `${isTable ? 'Table' : 'Figure'} ${num}`;
+        // Printed label verbatim ("图 3", "Fig. 3", "Table 2") — the schema
+        // contract says printed label; normalizing CJK captions to English
+        // would erase the document's own language (fixed 2026-08-24).
+        const label = `${capMatch[1] ?? (isTable ? 'Table' : 'Figure')} ${num}`;
         const bbox: [number, number, number, number] = [line.x0, line.y0, line.x1, line.y1];
         const captionText = line.text.slice((capMatch[0] ?? '').length).trim();
         if (isTable) {
@@ -193,12 +196,24 @@ export const buildSdmFromPdfText = (payload: PdfTextPayload, origin: PdfOrigin):
   }
 
   const bodyText = blocks.map((b) => b.text).join(' ');
+  // Forward references (the mention flushes before the caption on a later
+  // line/page registers the record) get one re-resolution pass against the
+  // FINAL pools — single-pass resolution left them unresolved even though the
+  // target exists in the same document (fixed 2026-08-24; intros routinely
+  // cite figures pages ahead).
+  const xrefsResolved = xrefs.map((x) => {
+    if (x.status === 'resolved') return x;
+    const num = numberFromLabel(x.rawText);
+    if (num === null) return x;
+    const targetId = resolveByNumber(x.targetKind, num);
+    return targetId === undefined ? x : { ...x, targetId, status: 'resolved' as const };
+  });
   return {
     schemaVersion: 'sdm-1',
     extractor: { name: 'pdf-text-layer-v1', route: 'pdf_text_layer' },
     origin: { kind: 'upload', name: origin.name },
     meta: { authors: [], language: guessLanguage(bodyText) },
-    blocks, figures, tables, equations: [], citations: [], xrefs,
+    blocks, figures, tables, equations: [], citations: [], xrefs: xrefsResolved,
     diagnostics: {
       parseStatus: blocks.length > 0 ? 'ok' : 'failed',
       warnings: [...warnings, 'equations not reconstructed from PDF text layer (requires OCR/VLM — T4)'],

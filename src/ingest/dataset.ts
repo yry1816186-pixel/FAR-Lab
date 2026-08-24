@@ -39,8 +39,10 @@ export type ColumnProfile = z.infer<typeof ColumnProfile>;
 export const DatasetProfileDoc = z.object({
   schemaVersion: z.literal('dsdp-1'),
   origin: z.object({ kind: z.literal('upload'), name: z.string().min(1) }),
-  format: z.enum(['csv', 'tsv']),
-  delimiter: z.string().min(1),
+  format: z.enum(['csv', 'tsv', 'xlsx']),
+  /** Delimiter the delimited parser used. Absent for xlsx: cells are a
+   * rectangular grid from SheetML, there is no delimiter to record. */
+  delimiter: z.string().min(1).optional(),
   rowCount: z.number().int().nonnegative(),
   columnCount: z.number().int().nonnegative(),
   columns: z.array(ColumnProfile),
@@ -150,24 +152,24 @@ const unitFromHeader = (header: string): string | undefined => {
 
 const ROW_LIMIT = 200_000;
 
-export const profileDataset = (text: string, name: string): DatasetProfileDoc => {
+/**
+ * Profiling core shared by the delimited parsers and the xlsx route: rows in
+ * (raw, still containing fully-empty rows), typed profile out. The same
+ * ROW_LIMIT cap, ragged/duplicate quality semantics and warnings apply to
+ * every producer, so an xlsx supplement and a CSV export profile identically.
+ */
+export const profileRows = (
+  rowsIn: string[][],
+  name: string,
+  format: 'csv' | 'tsv' | 'xlsx',
+  delimiter?: string,
+): DatasetProfileDoc => {
   const warnings: string[] = [];
-  const sniff = sniffDelimiter(name, text);
-  if (sniff === null) {
-    return {
-      schemaVersion: 'dsdp-1', origin: { kind: 'upload', name },
-      format: 'csv', delimiter: ',', rowCount: 0, columnCount: 0, columns: [], sampleRows: [],
-      quality: { raggedRows: 0, emptyFile: text.trim().length === 0, duplicateRowCount: 0 },
-      diagnostics: { parseStatus: 'failed', warnings: ['no delimiter detected (neither , nor \\t)'], truncated: false },
-    };
-  }
-  let rows = parseDelimited(text, sniff.delimiter);
-  // Drop fully-empty trailing rows (common CRLF tail).
-  rows = rows.filter((r) => r.some((c) => c.trim().length > 0));
+  let rows = rowsIn.filter((r) => r.some((c) => c.trim().length > 0));
   if (rows.length === 0) {
     return {
       schemaVersion: 'dsdp-1', origin: { kind: 'upload', name },
-      format: sniff.format, delimiter: sniff.delimiter, rowCount: 0, columnCount: 0, columns: [], sampleRows: [],
+      format, ...(delimiter !== undefined ? { delimiter } : {}), rowCount: 0, columnCount: 0, columns: [], sampleRows: [],
       quality: { raggedRows: 0, emptyFile: true, duplicateRowCount: 0 },
       diagnostics: { parseStatus: 'failed', warnings: ['file has no data rows'], truncated: false },
     };
@@ -217,8 +219,8 @@ export const profileDataset = (text: string, name: string): DatasetProfileDoc =>
   return {
     schemaVersion: 'dsdp-1',
     origin: { kind: 'upload', name },
-    format: sniff.format,
-    delimiter: sniff.delimiter,
+    format,
+    ...(delimiter !== undefined ? { delimiter } : {}),
     rowCount: body.length,
     columnCount,
     columns,
@@ -230,6 +232,19 @@ export const profileDataset = (text: string, name: string): DatasetProfileDoc =>
       truncated,
     },
   };
+};
+
+export const profileDataset = (text: string, name: string): DatasetProfileDoc => {
+  const sniff = sniffDelimiter(name, text);
+  if (sniff === null) {
+    return {
+      schemaVersion: 'dsdp-1', origin: { kind: 'upload', name },
+      format: 'csv', delimiter: ',', rowCount: 0, columnCount: 0, columns: [], sampleRows: [],
+      quality: { raggedRows: 0, emptyFile: text.trim().length === 0, duplicateRowCount: 0 },
+      diagnostics: { parseStatus: 'failed', warnings: ['no delimiter detected (neither , nor \\t)'], truncated: false },
+    };
+  }
+  return profileRows(parseDelimited(text, sniff.delimiter), name, sniff.format, sniff.delimiter);
 };
 
 const round6 = (n: number): number => Math.round(n * 1e6) / 1e6;

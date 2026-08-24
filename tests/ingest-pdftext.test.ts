@@ -113,4 +113,31 @@ describe('pdf text-layer understanding', () => {
     expect(doc.equations).toEqual([]);
     expect(doc.diagnostics.warnings.join(' ')).toMatch(/equations not reconstructed/);
   });
+
+  it('mixed-language document (zh+Latin): CJK captions/panels/xrefs/paragraphs survive intact', () => {
+    // BENCHMARK.md fixture gap closed 2026-08-24: a full mixed-language payload
+    // through the deterministic core (synthetic geometry — the collector is a
+    // web-client capability; a real mixed-language PDF E2E stays listed).
+    const doc = buildSdmFromPdfText(payloadOf([{ items: [
+      it_('结果与讨论', 40, 60, 18),
+      it_('如图 3 所示，记忆巩固效应显著 (p < .05)。', 40, 100, 10, 300),
+      it_('这与 Table 2 的汇总统计一致。', 40, 132, 10, 240),
+      it_('图 3: 不同睡眠条件下的保持率。(a) 对照组。(b) 剥夺组。', 40, 200, 9, 320),
+    ] }]), { name: 'mixed.pdf' });
+    const heads = doc.blocks.filter((b) => b.kind === 'heading');
+    expect(heads.map((h) => h.text)).toEqual(['结果与讨论']);
+    const fig = doc.figures[0];
+    expect(fig).toBeDefined();
+    expect(fig!.label).toBe('图 3');
+    expect(fig!.panels.map((p) => p.label)).toEqual(['a', 'b']);
+    // CJK xref pattern (图 N) resolves against the 图-labeled figure record
+    const figRef = doc.xrefs.find((x) => x.targetKind === 'figure');
+    expect(figRef?.status).toBe('resolved');
+    expect(figRef?.targetId).toBe(fig!.id);
+    const para = doc.blocks.find((b) => b.kind === 'paragraph' && b.text.includes('记忆巩固'));
+    expect(para?.text).toBe('如图 3 所示，记忆巩固效应显著 (p < .05)。');
+    // nothing mojibake'd: full-width punctuation and CJK pass through verbatim
+    expect(doc.blocks.some((b) => b.text.includes('（'))).toBe(false); // we used half-width parens in fixtures
+    expect(doc.diagnostics.parseStatus).not.toBe('failed');
+  });
 });
