@@ -54,6 +54,14 @@
 - refine 会话注册三工具 + permission allow 规则; gate 拒绝向模型回传违规码
 - 全量: 1389 passed / 3 skipped / 134 files; tsc/lint/build GREEN
 
+
+## 最终收敛状态 (2026-08-24, 会话收敛点)
+- 全量: **1429 passed / 3 skipped / 140 files** — remote-executor 偶发已由 sibling 的 sshd 就绪轮询修复
+- tsc / lint (0 errors) / build GREEN; completion-gate 仅 G-04 unsatisfied (竞赛路由凭证, 外部)
+- disconnected-PoC 审计关闭: G4/G5/G6 全部经 research-tools capability 接入 refine 内核循环 (e0639ae)
+- adversarial review 闭环: P0 沙箱逃逸 (np.f2py.os) + P1×2 + P2×1 全部修复并有回归测试
+- AVO 融合确定性范围 COMPLETE; 剩余 S10b live 矩阵与 G-04 同源等待凭证
+
 ## 关键不变量 (实现中已验证)
 - supervisor/lineage 均为只读视图, 不产生第二权威
 - supervisor_observation note 每边界恰好一条 (幂等可审计)
