@@ -41,6 +41,8 @@ import type {
 } from '../../domain/index.js';
 import { canonicalJson, canonicalSha256, sha256Hex } from '../../shared/crypto.js';
 import { buildPaperOutline, renderPaperMarkdown } from '../paper-outline.js';
+import { buildCorpusDepthFigure, buildWinRateFigure } from '../../report/figures.js';
+import { buildClaimBindingTable, buildCorpusTable, buildResultsTable, tableToCsv, tableToMarkdown } from '../../report/tables.js';
 import type { StageHandler } from '../types.js';
 
 /**
@@ -652,6 +654,27 @@ export const exportStage: StageHandler = {
     const paperOutline = buildPaperOutline(ctx.store, run.id);
     const paperPut = await ctx.artifacts.put(renderPaperMarkdown(paperOutline));
 
+    // Lane-07 scientific communication: deterministic figures/tables from the same
+    // projection (now pinned to the outline's own generatedAt for byte-stable rebuilds).
+    const figureProvenance = { runId: run.id, generatedAt: paperOutline.provenance.generatedAt };
+    const figureDefs = [
+      { name: 'win-rate', description: 'Win rate by ranked hypothesis (tournament standings)', svg: buildWinRateFigure(paperOutline, figureProvenance) },
+      { name: 'corpus-depth', description: 'Retrieved corpus by content depth', svg: buildCorpusDepthFigure(sources, figureProvenance) },
+    ];
+    const figurePuts = [];
+    for (const f of figureDefs) {
+      const put = await ctx.artifacts.put(f.svg);
+      figurePuts.push({ name: f.name, description: f.description, put });
+    }
+    const tableDefs = [buildResultsTable(paperOutline), buildCorpusTable(sources), buildClaimBindingTable(claims)];
+    const tablePuts = [];
+    for (const t of tableDefs) {
+      for (const [format, content] of [['csv', tableToCsv(t)], ['md', tableToMarkdown(t)]] as const) {
+        const put = await ctx.artifacts.put(content);
+        tablePuts.push({ name: t.name, format, put });
+      }
+    }
+
     ctx.recordReceipt({
       kind: 'export',
       executionMode: 'live', // deterministic local rendering of stored objects — actually executed
@@ -672,6 +695,26 @@ export const exportStage: StageHandler = {
           receiptIds: receipts.map((r) => r.id),
         }),
         outputHash: reportPut.hash,
+      },
+    });
+
+    ctx.recordReceipt({
+      kind: 'export',
+      executionMode: 'live', // deterministic local rendering of stored objects — actually executed
+      stage: 'export',
+      redactionNote: 'deterministic figures/tables render of stored objects; no model call involved',
+      toolExec: {
+        tool: 'pipeline/export-figures-tables',
+        inputHash: canonicalSha256({
+          runId: run.id,
+          paperHash: paperPut.hash,
+          sourceContentHashes: sources.map((s) => s.contentHash),
+          claimIds: claims.map((c) => c.id),
+        }),
+        outputHash: canonicalSha256([
+          ...figurePuts.map((f) => f.put.hash),
+          ...tablePuts.map((t) => t.put.hash),
+        ]),
       },
     });
 
@@ -697,6 +740,10 @@ export const exportStage: StageHandler = {
       // [0] stays the report (CLI/`GET /report` depend on it); [1] is the BP-3 paper markdown.
       finalArtifactHashes: [reportPut.hash, paperPut.hash],
       paperOutlineRef: paperPut.ref,
+      // Lane-07 scientific-communication artifacts: deterministic figures/tables content-
+      // addressed in the artifact store (same projection as the paper, zero LLM).
+      figures: figurePuts.map((f) => ({ name: f.name, ref: f.put.ref, description: f.description })),
+      tables: tablePuts.map((t) => ({ name: t.name, ref: t.put.ref, format: t.format })),
       verificationInstructions: `far verify --bundle ${bundleId}（第三方核验：按 receiptIds 比对 receipts、按 sourceArtifactHashes 比对来源快照、按 finalArtifactHashes 比对导出工件）`,
       limitations,
       // SWAN interchange (W-G follow-up): surviving hypotheses as JSON-LD ResearchStatements.
@@ -719,7 +766,7 @@ export const exportStage: StageHandler = {
     ctx.store.putObject('bundle', bundle);
     const bundlePut = await ctx.artifacts.put(canonicalJson(bundle));
 
-    const summary = `reproducibility bundle ${bundle.id} (${bundlePut.ref}); report ${reportPut.ref}; paper ${paperPut.ref}; declaredEvidenceLevel=replay`;
+    const summary = `reproducibility bundle ${bundle.id} (${bundlePut.ref}); report ${reportPut.ref}; paper ${paperPut.ref}; figures ${figurePuts.map((f) => f.name).join('+')}; tables ${tablePuts.map((t) => `${t.name}.${t.format}`).join('+')}; declaredEvidenceLevel=replay`;
     ctx.log(summary);
     return { kind: 'done', summary, artifacts: [reportPut.ref, bundlePut.ref, paperPut.ref] };
   },
