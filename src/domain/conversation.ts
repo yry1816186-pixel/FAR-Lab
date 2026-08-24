@@ -31,7 +31,7 @@ export const CandidateQuestionSchema = z.object({
 export type CandidateQuestion = z.infer<typeof CandidateQuestionSchema>;
 
 /** Kinds of work the resident agent can propose; execution is researcher-gated. */
-export const ConversationActionKind = z.enum(['launch_research', 'create_automation', 'cancel_automation', 'create_tool_integration']);
+export const ConversationActionKind = z.enum(['launch_research', 'cancel_run', 'create_automation', 'cancel_automation', 'create_tool_integration']);
 export type ConversationActionKind = z.infer<typeof ConversationActionKind>;
 
 const ISO = z.string().min(1);
