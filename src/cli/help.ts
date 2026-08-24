@@ -31,6 +31,10 @@ Usage:
   far new                                        Interactive wizard (TTY only): prompts for question /
                                                   domain / goal type, then runs the exact same pipeline
                                                   as research start (non-interactive: far research start)
+  far serve [--port N] [--host H] [--data-dir D] [--automations off]
+                                                  Start the local API server (headless/SSH entry;
+                                                  same engine as the web workbench; PORT/HOST env
+                                                  also honored; loopback by default)
   far experiment run|enqueue <spec.json> [--priority N] [--allow-local-datasets]
                                                   Execute / queue an ExperimentSpec through the
                                                   durable scheduler (real datasets+models+stats)

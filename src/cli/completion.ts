@@ -48,6 +48,7 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
     subs: [{ name: 'refine', help: 'iterative evidence-gap refinement' }],
   },
   { name: 'probe', help: 'model-route health check', subs: [] },
+  { name: 'serve', help: 'start the local API server (headless/SSH entry)', subs: [] },
   { name: 'probe-custom', help: 'health check for user-defined model configs', subs: [] },
   { name: 'memory', help: 'search the re-audit memory queue', subs: [] },
   { name: 'backup', help: 'VACUUM INTO snapshot of the database', subs: [] },
