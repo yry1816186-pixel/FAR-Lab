@@ -156,6 +156,8 @@ export const MetricKey = z.enum([
   'mean_squared_error', 'r2',
   // W-F statistical_meta reports: the pooled effect estimate on the analysis scale.
   'pooled_log_or', 'pooled_log_rr', 'pooled_smd',
+  // R2-10 simulation reports: per-replicate Monte-Carlo statistics.
+  'sim_mean', 'sim_variance', 'sim_threshold_prob',
 ]);
 export type MetricKey = z.infer<typeof MetricKey>;
 
@@ -467,6 +469,196 @@ export const StatReport = z.object({
   createdAt: z.string().datetime(),
 });
 export type StatReport = z.infer<typeof StatReport>;
+
+// ---- simulation experiments (R2-10) ----
+
+/**
+ * Simulation/numerical workload kind: preregistered Monte-Carlo experiments whose
+ * PER-REPLICATE outcomes ride the SAME confirmatory chain as ML per-row outcomes
+ * (abs_stats/paired_stats -> mechanical verdict -> feedback). No second statistical
+ * engine — the sidecar `simulate` op is a reviewed template registry entry (JSON
+ * params only, D-086-5 discipline), and verdicts stay mechanical.
+ *
+ * Common Random Numbers (CRN): paired comparisons are only valid variance-reduced
+ * comparisons when both configs consume the SAME seeded RNG stream — same family,
+ * seed, replicates (and blockSize). The validator rejects CRN-incompatible pairs
+ * rather than letting a meaningless "paired" CI masquerade as one.
+ */
+
+export const SimTemplateId = z.enum(['monte_carlo']);
+export type SimTemplateId = z.infer<typeof SimTemplateId>;
+
+export const SimDistribution = z.discriminatedUnion('family', [
+  z.object({ family: z.literal('normal'), mu: z.number(), sigma: z.number().positive() }),
+  z.object({ family: z.literal('uniform'), low: z.number(), high: z.number() }),
+  z.object({ family: z.literal('bernoulli'), p: z.number().min(0).max(1) }),
+]);
+export type SimDistribution = z.infer<typeof SimDistribution>;
+
+export const SimStatisticId = z.enum(['mean', 'variance', 'threshold_prob']);
+export type SimStatisticId = z.infer<typeof SimStatisticId>;
+
+/** statistic -> the MetricKey its per-replicate outcomes decompose into (report + comparisons share it). */
+export const SIM_STATISTIC_METRIC: Record<SimStatisticId, MetricKey> = {
+  mean: 'sim_mean',
+  variance: 'sim_variance',
+  threshold_prob: 'sim_threshold_prob',
+};
+
+export const SimConfig = z.object({
+  name: z.string().min(1),
+  template: SimTemplateId,
+  distribution: SimDistribution,
+  statistic: SimStatisticId,
+  /** threshold_prob only: P(X > threshold) per replicate becomes a 0/1 Bernoulli row. */
+  threshold: z.number().optional(),
+  /** variance only: draws per block (>=2); each replicate is one block's ddof=1 variance. */
+  blockSize: z.number().int().min(2).max(10_000).optional(),
+  /** Replicates = the n the confirmatory statistics chain bootstraps (>= MIN_CONFIRMATORY_NTEST). */
+  replicates: z.number().int().positive().min(MIN_CONFIRMATORY_NTEST).max(1_000_000),
+  seed: z.number().int().nonnegative(),
+});
+export type SimConfig = z.infer<typeof SimConfig>;
+
+export const SimComparison = z.object({
+  id: z.string().min(1),
+  statistic: SimStatisticId,
+  kind: z.union([z.literal('absolute'), z.literal('paired_diff')]),
+  configIdx: z.number().int().nonnegative().optional(),
+  configAIdx: z.number().int().nonnegative().optional(),
+  configBIdx: z.number().int().nonnegative().optional(),
+  direction: z.enum(['above', 'below']),
+  threshold: z.number(),
+  thresholdProvenance: DecisionRuleProvenance,
+  hypothesisId: HypothesisId.optional(),
+  primary: z.boolean().default(false),
+  mde: z.number().positive().optional(),
+});
+export type SimComparison = z.infer<typeof SimComparison>;
+
+export const SimulationSpec = z.object({
+  id: ExperimentSpecId,
+  runId: RunId,
+  planId: PlanId,
+  planStepId: TaskId,
+  version: z.number().int().nonnegative().default(1),
+  question: z.string().min(1),
+  configs: z.array(SimConfig).min(1),
+  comparisons: z.array(SimComparison).min(1),
+  statistics: StatisticsPlan,
+  compute: ComputeProfile.default({}),
+  approvals: z.array(BindingApproval).default([]),
+  /** Mirrors D-086-6: no hypothesis-bound comparison => explicit exploratory note required. */
+  exploratoryNote: z.string().min(10).optional(),
+  validation: z.object({
+    passed: z.boolean(),
+    missing: z.array(z.string()).default([]),
+  }).optional(),
+  createdAt: z.string().datetime(),
+}).superRefine((s, ctx) => {
+  const dup = s.configs.some((c, i) => s.configs.some((o, j) => j < i && o.name === c.name));
+  if (dup) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'duplicate config names' });
+  for (const [i, c] of s.configs.entries()) {
+    if (c.distribution.family === 'uniform' && !(c.distribution.high > c.distribution.low)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `configs[${i}] uniform high must exceed low`, path: ['configs', i, 'distribution'] });
+    }
+    if (c.statistic === 'threshold_prob' && c.threshold === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `configs[${i}] statistic threshold_prob requires threshold`, path: ['configs', i] });
+    }
+    if (c.statistic === 'variance' && c.blockSize === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `configs[${i}] statistic variance requires blockSize (>=2 draws per replicate block)`, path: ['configs', i] });
+    }
+  }
+});
+export type SimulationSpec = z.infer<typeof SimulationSpec>;
+
+/** CRN compatibility: same RNG stream shape => parameter-only differences pair honestly. */
+const crnCompatible = (a: SimConfig, b: SimConfig): boolean =>
+  a.template === b.template
+  && a.distribution.family === b.distribution.family
+  && a.seed === b.seed
+  && a.replicates === b.replicates
+  && a.statistic === b.statistic
+  && (a.blockSize ?? null) === (b.blockSize ?? null)
+  && (a.threshold ?? null) === (b.threshold ?? null)
+  && a.name !== b.name;
+
+export const checkSimulationSpec = (
+  spec: SimulationSpec,
+  ctx: { hypothesisIds: readonly HypothesisId[] },
+): { passed: boolean; missing: string[] } => {
+  const missing: string[] = [];
+  const nConfigs = spec.configs.length;
+  const hypSet = new Set(ctx.hypothesisIds);
+
+  const boundComparisons = new Map<string, string>();
+  for (const [ci, c] of spec.comparisons.entries()) {
+    const config = (idx: number | undefined, label: string): SimConfig | undefined => {
+      if (idx === undefined || idx >= nConfigs) {
+        missing.push(`comparisons[${ci}].${label} out of range`);
+        return undefined;
+      }
+      return spec.configs[idx];
+    };
+    let a: SimConfig | undefined;
+    let b: SimConfig | undefined;
+    if (c.kind === 'absolute') {
+      a = config(c.configIdx, 'configIdx');
+    } else {
+      a = config(c.configAIdx, 'configAIdx');
+      b = config(c.configBIdx, 'configBIdx');
+      if (c.configAIdx !== undefined && c.configAIdx === c.configBIdx) missing.push(`comparisons[${ci}] compares a config with itself`);
+    }
+    if (c.statistic !== a?.statistic) missing.push(`comparisons[${ci}].statistic does not match config statistic (per-replicate rows must be the same quantity)`);
+    if (b !== undefined && c.statistic !== b.statistic) missing.push(`comparisons[${ci}].statistic does not match config B statistic`);
+    if (c.kind === 'paired_diff' && a !== undefined && b !== undefined && !crnCompatible(a, b)) {
+      missing.push(
+        `comparisons[${ci}]: paired simulation comparison requires common random numbers — configs must share template/family/seed/replicates/statistic (and blockSize/threshold), differing only in distribution parameters`,
+      );
+    }
+    if (c.hypothesisId !== undefined && !hypSet.has(c.hypothesisId)) missing.push(`comparisons[${ci}].hypothesisId not in run`);
+    if (c.hypothesisId !== undefined) boundComparisons.set(c.id, c.hypothesisId);
+    // g5 mirror: bound comparisons declare an MDE; threshold_prob is [0,1]-bounded so
+    // the attainability floor applies with n = replicates (known at spec time).
+    if (c.hypothesisId !== undefined && c.mde === undefined) {
+      missing.push(`comparisons[${ci}] is hypothesis-bound (confirmatory) but declares no mde — the minimum detectable effect is required before a verdict may bind`);
+    }
+    if (c.hypothesisId !== undefined && c.mde !== undefined && c.statistic === 'threshold_prob' && a !== undefined) {
+      const floor = mdeFloorFor(a.replicates);
+      if (c.mde < floor) {
+        missing.push(`comparisons[${ci}] mde=${c.mde} is below the attainability floor ${floor.toFixed(4)} at replicates=${a.replicates} ([0,1] statistic, conservative worst-case SE)`);
+      }
+    }
+  }
+  // D-085 P0-1 mirror: binding approvals must cover every hypothesis-bound comparison.
+  if (boundComparisons.size > 0) {
+    const approved = new Map<string, string>();
+    for (const a of spec.approvals) {
+      if (!hypSet.has(a.hypothesisId)) missing.push(`approval for unknown hypothesis ${a.hypothesisId}`);
+      for (const cid of a.comparisonIds) {
+        const bound = boundComparisons.get(cid);
+        if (bound === undefined) missing.push(`approval covers non-hypothesis-bound comparison ${cid}`);
+        else if (bound !== a.hypothesisId) missing.push(`approval of ${cid} names hypothesis ${a.hypothesisId} but binding is ${bound}`);
+        else approved.set(cid, a.hypothesisId);
+      }
+    }
+    for (const cid of boundComparisons.keys()) {
+      if (!approved.has(cid)) missing.push(`hypothesis-bound comparison ${cid} lacks a binding approval (D-085 P0-1)`);
+    }
+  }
+  if (boundComparisons.size === 0 && spec.exploratoryNote === undefined) {
+    missing.push('no hypothesis-bound comparison and no exploratoryNote — exploratory runs must be explicit');
+  }
+  const primaries = spec.comparisons.filter((c) => c.primary);
+  if (spec.comparisons.length > 1) {
+    if (primaries.length !== 1) missing.push('multiple comparisons require exactly one primary');
+    if (spec.statistics.multipleTestingPolicy === undefined) missing.push('multiple comparisons require multipleTestingPolicy');
+  }
+  if (spec.statistics.multipleTestingPolicy === 'e_value_accumulation') {
+    missing.push('multipleTestingPolicy=e_value_accumulation is not implemented in the executor (D-086); use single_primary or alpha_spending');
+  }
+  return { passed: missing.length === 0, missing };
+};
 
 // ---- deterministic validation & verdict mapping ----
 

@@ -319,6 +319,59 @@ def op_dataset_audit(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def op_simulate(payload: dict[str, Any]) -> dict[str, Any]:
+    """R2-10 Monte-Carlo simulation template: per-REPLICATE outcomes that ride the
+    confirmatory statistics chain (abs_stats/paired_stats) exactly like ML per-row
+    outcomes. JSON params only — never code (D-086-5 discipline).
+
+    CRN discipline: the raw RNG stream depends ONLY on (family, seed, replicates,
+    blockSize) — distribution parameters transform the stream AFTER drawing, so two
+    configs sharing those four consume identical randomness and pair honestly
+    (common random numbers variance reduction). The TS validator enforces CRN
+    compatibility for paired comparisons; this op just executes the template.
+    """
+    template = payload.get("template")
+    if template != "monte_carlo":
+        raise ValueError(f"unknown simulation template {template!r} (known: ['monte_carlo'])")
+    d = payload["distribution"]
+    stat = payload["statistic"]
+    n = int(payload["replicates"])
+    seed = int(payload["seed"])
+    family = d["family"]
+    block = int(payload.get("blockSize", 1))
+    if stat == "variance":
+        if block < 2:
+            raise ValueError("variance statistic requires blockSize >= 2 (one block per replicate)")
+        count = n * block
+    else:
+        count = n
+
+    rng = np.random.default_rng(seed)
+    if family == "normal":
+        x = float(d["mu"]) + float(d["sigma"]) * rng.standard_normal(count)
+    elif family == "uniform":
+        x = float(d["low"]) + (float(d["high"]) - float(d["low"])) * rng.random(count)
+    elif family == "bernoulli":
+        x = (rng.random(count) < float(d["p"])).astype(np.float64)
+    else:
+        raise ValueError(f"unknown distribution family {family!r}")
+
+    if stat == "mean":
+        per = x.astype(np.float64)
+    elif stat == "threshold_prob":
+        per = (x > float(payload["threshold"])).astype(np.float64)
+    elif stat == "variance":
+        per = x.reshape(n, block).var(axis=1, ddof=1)
+    else:
+        raise ValueError(f"unknown statistic {stat!r}")
+    return {
+        "perReplicate": per.tolist(),
+        "pointEstimate": float(np.mean(per)),
+        "n": n,
+        "blockSize": block,
+    }
+
+
 OPS = {
     "env_info": op_env_info,
     "dataset_audit": op_dataset_audit,
@@ -328,4 +381,6 @@ OPS = {
     # AVO fusion G4: exploratory CodeAct (restricted namespace; TS static gate
     # runs first; outputs are CANDIDATE findings, never confirmatory facts).
     "run_exploration": op_run_exploration,
+    # R2-10: reviewed simulation template (per-replicate outcomes -> shared stats chain).
+    "simulate": op_simulate,
 }
