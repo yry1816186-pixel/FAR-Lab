@@ -5,7 +5,7 @@ FAR-Lab 终端研究工作台（v3：实时研究观察 + 常驻研究对话 + �
 ```
 cd packages/tui && npm install
 npm start            # node --experimental-strip-types src/main.ts
-npm test             # node:test 确定性测试 42 用例（纯核心 + 渲染 + 离线 e2e）
+npm test             # node:test 确定性测试 49 用例（纯核心 + 渲染 + 离线 e2e）
 FAR_URL=http://127.0.0.1:3196/api/v1  # 默认（本地服务端）
 ```
 
@@ -25,6 +25,9 @@ FAR_URL=http://127.0.0.1:3196/api/v1  # 默认（本地服务端）
   模型线路由服务端解析；失败如实显示 replyError 横幅且消息保留）
 - 回合渲染：角色标签 / 工具轨迹条（工具名+成败+时长，不含负载）/ 用量条
   （provider·model·latency·tokens·模型/工具调用数）/ 候选研究问题
+- **文件引用**（`s`）：把本地文本/Markdown 文件（≤50000 字符）作为 seed 附到
+  下一条消息——随对话沉淀、被启动的研究继承（`📎 附件就绪` 状态行；行式模式
+  同样支持；失败如实报错并继续编辑）
 - **审批卡**：`launch_research` / `create_automation` / `cancel_automation` /
   `create_tool_integration` 提案 → 待审批时 y 批准 · a 批准并记住此类 · n 拒绝
   （Aider io.py 词汇表血统）；卡上风险级别与参数摘要是**服务端计算**的

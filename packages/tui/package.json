@@ -4,7 +4,7 @@
   "description": "FAR-Lab terminal research workbench (live run attach via SSE + resident-agent chat with approval cards; Ink full-screen + readline line-mode fallback)",
   "scripts": {
     "start": "node --experimental-strip-types src/main.ts",
-    "test": "node --experimental-strip-types --test test/core.test.ts test/render.test.ts test/liveCore.test.ts test/chatCore.test.ts test/render-v3.test.ts test/e2e.test.ts"
+    "test": "node --experimental-strip-types --test test/core.test.ts test/render.test.ts test/liveCore.test.ts test/chatCore.test.ts test/render-v3.test.ts test/seedAttach.test.ts test/e2e.test.ts"
   },
   "license": "MIT",
   "type": "module",

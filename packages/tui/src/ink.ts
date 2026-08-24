@@ -25,6 +25,7 @@ import * as chatCore from './chatCore.ts';
 import { renderRows, renderSubView } from './chatViews.ts';
 import * as commands from './commands.ts';
 import * as sessionState from './state.ts';
+import { readSeedFile, type SeedDraft } from './seedAttach.ts';
 
 const h = React.createElement;
 type El = React.ReactElement;
@@ -58,7 +59,7 @@ export interface DetailDeps {
 }
 
 export interface ChatDeps {
-  post(conversationId: string, text: string): Promise<Conversation>;
+  post(conversationId: string, text: string, opts?: { seeds?: SeedDraft[] }): Promise<Conversation>;
   resolve(conversationId: string, proposalId: string, approve: boolean, remember: boolean): Promise<Conversation>;
   launch(conversationId: string, text: string): Promise<{ runId: string }>;
 }
@@ -100,7 +101,7 @@ export const defaultAppDeps = (): AppDeps => ({
   createConversation: (title) => api.createConversation(title),
   detail: defaultDetailDeps(),
   chat: {
-    post: (id, text) => api.postConversationMessage(id, text),
+    post: (id, text, opts) => api.postConversationMessage(id, text, opts),
     resolve: (id, pid, approve, remember) => api.resolveProposal(id, pid, approve, remember),
     launch: (id, text) => api.launchFromConversation(id, text),
   },
@@ -271,11 +272,35 @@ export function ChatView(props: {
   const [composing, setComposing] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [busy, setBusy] = useState(false);
+  // File attachment: `s` opens a one-line path input; the read draft rides
+  // the NEXT posted message as a conversation seed (text-only, ≤50k chars).
+  const [seedPath, setSeedPath] = useState<string | null>(null);
+  const [seed, setSeed] = useState<SeedDraft | null>(null);
   const pending = chatCore.pendingProposals(conv);
 
   useInput((input, key) => {
     if (composing || launching || busy) return; // Composer owns input
+    if (seedPath !== null) {
+      // One-line path input (same editing contract as the slash line).
+      if (key.return) {
+        const p = seedPath;
+        setSeedPath(null);
+        if (p.trim().length === 0) return;
+        try {
+          setSeed(readSeedFile(p));
+        } catch (e) {
+          props.onNote(`附件读取失败: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        return;
+      }
+      if (key.escape) { setSeedPath(null); return; }
+      if (key.backspace || key.delete) { setSeedPath((t) => t.slice(0, -1)); return; }
+      if (input.length > 0 && !key.ctrl && !key.meta) setSeedPath((t) => t + input);
+      return;
+    }
+    if (input === 'q' && seed !== null) { setSeed(null); props.onNote('已移除附件'); return; }
     if (input === 'q' || key.escape) { props.onBack(); return; }
+    if (input === 's') { setSeedPath(''); return; }
     // Approval focus: while a proposal is pending, y/a/n belong to the decision
     // (Aider-style vocabulary); message composing moves to m for that span.
     if (pending.length > 0) {
@@ -299,8 +324,10 @@ export function ChatView(props: {
   const onComposed = (r: ComposerResult): void => {
     setComposing(false);
     if (r.action !== 'submitted-ready') return;
+    const attached = seed;
+    setSeed(null);
     setBusy(true);
-    void props.deps.post(conv.id, r.question)
+    void props.deps.post(conv.id, r.question, { seeds: attached !== null ? [attached] : undefined })
       .then(setConv)
       .catch((e: unknown) => props.onNote(`发送失败: ${e instanceof Error ? e.message : String(e)}`))
       .finally(() => setBusy(false));
@@ -340,6 +367,13 @@ export function ChatView(props: {
       )
       : null,
     busy && !composing && !launching ? h(Text, { dimColor: true }, '等待服务端…') : null,
+    seedPath !== null
+      ? h(Box, { flexDirection: 'column' },
+        h(Text, { color: 'cyan' }, `📎 附件路径: ${seedPath}█`),
+        h(Text, { dimColor: true }, 'Enter 附上 · Esc 取消（文本/Markdown，≤50000 字符，随下一条消息发送）'))
+      : seed !== null
+        ? h(Text, { color: 'green' }, `📎 附件就绪: ${seed.title}（${seed.text.length} 字）· 随下一条消息发送 · q 移除`)
+        : null,
     composing
       ? h(Box, { flexDirection: 'column' },
         h(Text, { dimColor: true }, CHAT_LABELS.header),
@@ -349,7 +383,7 @@ export function ChatView(props: {
           h(Text, { dimColor: true }, LAUNCH_LABELS.header),
           h(Composer, { onDone: onLaunchComposed, labels: LAUNCH_LABELS }))
         : h(Text, { dimColor: true },
-          `${pending.length > 0 ? 'y/a/n 处理最上面的提案 · m 写消息 · ' : 'n 写消息 · '}l 凝结问题并启动研究 · q 返回`),
+          `${pending.length > 0 ? 'y/a/n 处理最上面的提案 · m 写消息 · ' : 'n 写消息 · '}s 附文件 · l 凝结问题并启动研究 · q 返回`),
   );
 }
 
