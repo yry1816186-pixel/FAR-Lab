@@ -14,6 +14,14 @@ import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { mapBounded, STAGE_CONCURRENCY } from './shared.js';
 import { contentTokens } from './evidence.js';
 import { isCancellationError, throwIfCancelled } from './guard.js';
+import {
+  CHASE_CITING_PER_SEED,
+  CHASE_MAX_NEW,
+  CHASE_REFERENCES_PER_SEED,
+  isChaseAbortError,
+  planCitationChase,
+} from '../citation-chase.js';
+import { diversitySnapshot, diversitySummaryLine, saturationMetrics } from '../retrieval-metrics.js';
 
 /** Hard corpus cap (contract): excess documents are truncated, visibly noted in the summary. */
 export const MAX_DOCUMENTS = 12;
@@ -343,6 +351,7 @@ export const renderRerankPayload = (questionText: string, slice: readonly PoolEn
     title: e.record.title,
     ...(e.record.publicationYear !== undefined ? { year: e.record.publicationYear } : {}),
     ...(e.record.venue !== undefined ? { venue: e.record.venue } : {}),
+    ...(e.record.publicationType !== undefined ? { publicationType: e.record.publicationType } : {}),
     abstractExcerpt: (e.record.abstractText ?? '').slice(0, 450),
     originatingPurposes: [...e.purposes],
   })),
@@ -414,6 +423,7 @@ export const toDocument = async (
     ...(rec.contentDepth === 'full_text' ? { fullTextRef: artifact.ref } : {}),
     ...(rec.license !== undefined ? { license: rec.license } : {}),
     ...(rec.oaUrl !== undefined ? { oaUrl: rec.oaUrl } : {}),
+    ...(rec.publicationType !== undefined ? { publicationType: rec.publicationType } : {}),
   });
 };
 
@@ -484,6 +494,8 @@ export const retrieveStage: StageHandler = {
     let droppedNoIdentifier = 0;
     let variantSearches = 0;
     let failoverSearches = 0;
+    /** Per record-bearing search: share of records NEW to the pool at flush time (saturation input). */
+    const noveltyRates: number[] = [];
 
     type PendingReceipt = Parameters<StageContext['recordReceipt']>[0];
 
@@ -646,8 +658,18 @@ export const retrieveStage: StageHandler = {
       }
     };
 
-    /** Apply one search's records to the pool (deterministic: called in target order). */
-    const poolYield = (purpose: RetrievalQuery['purpose'], targetIdx: number, family: SourceFamily, records: Array<{ rank: number; record: RawSourceRecord }>): void => {
+    /**
+     * Apply one search's records to the pool (deterministic: called in target order).
+     * Returns the search's novelty outcome: how many records were NEW pool entries
+     * vs already-known (merged) works — the input of the saturation observation.
+     */
+    const poolYield = (
+      purpose: RetrievalQuery['purpose'],
+      targetIdx: number,
+      family: SourceFamily,
+      records: Array<{ rank: number; record: RawSourceRecord }>,
+    ): { added: number; records: number } => {
+      let added = 0;
       for (const { rank, record } of records) {
         const key = primaryKey(record);
         if (key === null) {
@@ -702,7 +724,9 @@ export const retrieveStage: StageHandler = {
         };
         pool.set(key, entry);
         if (fz !== null && !fuzzyIndex.has(fz)) fuzzyIndex.set(fz, entry);
+        added += 1;
       }
+      return { added, records: records.length };
     };
 
     if (targets.length > 0) {
@@ -724,7 +748,10 @@ export const retrieveStage: StageHandler = {
       executedQueries.push({ purpose: t.purpose, text: t.text, family: t.family });
       attempted += 1;
       for (const receipt of out.receipts) ctx.recordReceipt(receipt);
-      for (const y of out.yields) poolYield(t.purpose, targetIdx, y.family, y.records);
+      for (const y of out.yields) {
+        const novelty = poolYield(t.purpose, targetIdx, y.family, y.records);
+        if (y.records.length > 0) noveltyRates.push(novelty.added / y.records.length);
+      }
       // `succeeded` counts EXECUTED main queries (zero-result searches still executed —
       // arXiv emptiness is the recovery trigger, not a failure).
       if (out.familyFailure === undefined) succeeded += 1;
@@ -761,6 +788,110 @@ export const retrieveStage: StageHandler = {
       throw new Error(
         `retrieve: all ${succeeded}/${attempted} searches succeeded but returned no identifiable documents — refusing to fabricate an empty corpus`,
       );
+    }
+
+    // ---- citation-graph expansion (bounded enrichment, RU-R GO1) ----
+    // Keyword search cannot reach works only connected THROUGH the citation graph:
+    // foundational method papers (backward references) and follow-ups/replications/
+    // critiques (forward citations). Bounded: seeds capped, per-seed fetches capped,
+    // whole chase stops at CHASE_MAX_NEW pool additions. Failures are visible
+    // (fusion.citationChase.failure + receipts) and never block the corpus — this
+    // is enrichment. Not cached in v1 (bounded 2 requests/seed); documented follow-up.
+    interface ChaseOutcome {
+      seeds: number;
+      backward: number;
+      forward: number;
+      added: number;
+      failure?: string;
+    }
+    let chase: ChaseOutcome | undefined;
+    let openalexCitations: import('../../shared/ports.js').CitationChaseAdapter | undefined;
+    try {
+      openalexCitations = ctx.sourceFor('openalex').citations;
+    } catch {
+      openalexCitations = undefined; // family not wired in this context — chase skipped honestly
+    }
+    if (openalexCitations !== undefined) {
+      const seeds = planCitationChase(fusedOrder([...pool.values()]));
+      if (seeds.length > 0) {
+        const outcome: ChaseOutcome = { seeds: seeds.length, backward: 0, forward: 0, added: 0 };
+        let chaseListIdx = targets.length; // chase lists get their own RRF list indices
+        chaseLoop: for (const seed of seeds) {
+          if (outcome.added >= CHASE_MAX_NEW) break;
+          // Backward: seed's referenced works, first N in citation order, one batch resolve.
+          // Every executed chase search is receipted (0 results included — attempts are
+          // provenance facts, same P3-1 discipline as planned searches).
+          try {
+            const refIds = (await openalexCitations.referencedWorkIds(seed.workRef)).slice(0, CHASE_REFERENCES_PER_SEED);
+            const records = refIds.length > 0 ? await openalexCitations.worksByIds(refIds) : [];
+            outcome.backward += records.length;
+            executedQueries.push({ purpose: 'citation_chase', text: `refs:${seed.workRef}`, family: 'openalex' });
+            // Success implies HTTP 200 by the adapter contract (non-200 throws).
+            ctx.recordReceipt({
+              kind: 'source_retrieval',
+              executionMode: 'live',
+              stage: 'retrieve',
+              redactionNote: 'citation-chase backward refs: query ref, result count, content hashes',
+              sourceRetrieval: {
+                family: 'openalex',
+                query: `refs:${seed.workRef}`,
+                httpStatus: 200,
+                resultCount: records.length,
+                contentHashes: records.map((r) => snapshotHash('openalex', r)),
+              },
+            });
+            if (records.length > 0) {
+              const idx = chaseListIdx++;
+              const novelty = poolYield('citation_chase', idx, 'openalex', records.map((record, rank) => ({ rank, record })));
+              outcome.added += novelty.added;
+            }
+          } catch (e) {
+            if (isCancellationError(e)) throw e;
+            if (isChaseAbortError(e)) {
+              outcome.failure = `aborted at ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+              ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              break chaseLoop;
+            }
+            ctx.recordReceipt(failedReceipt('openalex', `refs:${seed.workRef}`, e, false));
+            ctx.log(`retrieve: citation chase backward failed for ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          if (outcome.added >= CHASE_MAX_NEW) break;
+          // Forward: works citing the seed, most-cited first (deterministic sort).
+          try {
+            const records = await openalexCitations.citingWorks(seed.workRef, CHASE_CITING_PER_SEED);
+            outcome.forward += records.length;
+            executedQueries.push({ purpose: 'citation_chase', text: `cites:${seed.workRef}`, family: 'openalex' });
+            ctx.recordReceipt({
+              kind: 'source_retrieval',
+              executionMode: 'live',
+              stage: 'retrieve',
+              redactionNote: 'citation-chase forward cites: query ref, result count, content hashes',
+              sourceRetrieval: {
+                family: 'openalex',
+                query: `cites:${seed.workRef}`,
+                httpStatus: 200,
+                resultCount: records.length,
+                contentHashes: records.map((r) => snapshotHash('openalex', r)),
+              },
+            });
+            if (records.length > 0) {
+              const idx = chaseListIdx++;
+              const novelty = poolYield('citation_chase', idx, 'openalex', records.map((record, rank) => ({ rank, record })));
+              outcome.added += novelty.added;
+            }
+          } catch (e) {
+            if (isCancellationError(e)) throw e;
+            if (isChaseAbortError(e)) {
+              outcome.failure = `aborted at ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+              ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              break chaseLoop;
+            }
+            ctx.recordReceipt(failedReceipt('openalex', `cites:${seed.workRef}`, e, false));
+            ctx.log(`retrieve: citation chase forward failed for ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        chase = outcome;
+      }
     }
 
     // ---- D-015 fusion: deterministic RRF order, then (under cap pressure) LLM listwise rerank ----
@@ -804,6 +935,14 @@ export const retrieveStage: StageHandler = {
 
     const selected = selectFinal(finalOrder, MAX_DOCUMENTS, COUNTER_MIN_SEATS);
     const counterSeatsKept = selected.filter(isCounterOrigin).length;
+    const saturation = saturationMetrics(noveltyRates);
+    const diversity = diversitySnapshot(
+      selected.map((e) => ({
+        family: e.family,
+        ...(e.record.publicationYear !== undefined ? { publicationYear: e.record.publicationYear } : {}),
+        ...(e.record.publicationType !== undefined ? { publicationType: e.record.publicationType } : {}),
+      })),
+    );
 
     const documents: SourceDocument[] = [];
     for (const entry of selected) documents.push(await toDocument(ctx, entry.family, entry.record));
@@ -860,6 +999,19 @@ export const retrieveStage: StageHandler = {
         ...(variantSearches > 0 ? { variantSearches } : {}),
         ...(failoverSearches > 0 ? { failoverSearches } : {}),
         ...(rerankWindows !== undefined ? { rerankWindows } : {}),
+        ...(chase !== undefined
+          ? {
+              citationChase: {
+                seeds: chase.seeds,
+                backward: chase.backward,
+                forward: chase.forward,
+                added: chase.added,
+                ...(chase.failure !== undefined ? { failure: chase.failure } : {}),
+              },
+            }
+          : {}),
+        ...(saturation.searches > 0 ? { saturation } : {}),
+        diversity,
         selection: `cap ${selected.length} of pool ${pool.size} (RRF${rerankApplied ? ' + listwise rerank' : rerankFailure !== undefined ? ' after failed rerank' : ''})`,
       },
     });
@@ -872,6 +1024,19 @@ export const retrieveStage: StageHandler = {
     ];
     if (rerankFailure !== undefined) parts.push(`listwise rerank FAILED — deterministic RRF order used (${rerankFailure})`);
     if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
+    if (chase !== undefined) {
+      parts.push(
+        `citation chase: ${chase.seeds} seed(s), backward ${chase.backward}, forward ${chase.forward}, +${chase.added} new pool doc(s)` +
+          (chase.failure !== undefined ? ` — ${chase.failure}` : ''),
+      );
+    }
+    if (saturation.searches > 0) {
+      parts.push(
+        `search novelty mean=${saturation.meanNovelty} tail=${saturation.tailNovelty}` +
+          (saturation.saturated ? ' (SATURATED — a later round must change strategy, not repeat queries)' : ''),
+      );
+    }
+    parts.push(`corpus mix: ${diversitySummaryLine(diversity)}`);
     if (failoverSearches > 0) parts.push(`${failoverSearches} openalex->europepmc failover search(es)`);
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
     if (fuzzyMerges > 0) parts.push(`${fuzzyMerges} duplicate record(s) merged by normalized title+year (cross-source)`);
