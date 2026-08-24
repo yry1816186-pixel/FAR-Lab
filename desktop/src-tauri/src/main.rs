@@ -134,6 +134,126 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
+// ---- B13 run-completion awareness (background runtime) ----------------------
+// The shell polls the SAME public API the health probe uses (read-only
+// GET /api/v1/runs) and fires a native notification when a run it saw active
+// reaches a final state — the researcher can minimize the workbench and still
+// learn a long pipeline finished or failed. No engine logic lives here.
+
+/// Full-body HTTP/1.0 GET against the local server; None on any transport error.
+fn http_get_body(port: u16, path: &str) -> Option<String> {
+    let addr = format!("127.0.0.1:{port}");
+    let mut stream = TcpStream::connect_timeout(
+        &addr.parse().ok()?,
+        Duration::from_secs(3),
+    )
+    .ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+    let req = format!("GET {path} HTTP/1.0\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    stream.write_all(req.as_bytes()).ok()?;
+    let mut body = String::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        match stream.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => body.push_str(&String::from_utf8_lossy(&buf[..n])),
+            Err(_) => break,
+        }
+    }
+    // strip headers: body starts after the first CRLFCRLF
+    let split = body.find("\r\n\r\n")?;
+    Some(body[split + 4..].to_string())
+}
+
+/// id -> status from the /runs listing (best effort; missing fields skipped).
+fn parse_runs_snapshot(body: &str) -> std::collections::HashMap<String, String> {
+    let mut out = std::collections::HashMap::new();
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(body) else {
+        return out;
+    };
+    let arr = match &v {
+        serde_json::Value::Array(a) => a.clone(),
+        serde_json::Value::Object(o) => match o.get("runs") {
+            Some(serde_json::Value::Array(a)) => a.clone(),
+            _ => vec![],
+        },
+        _ => vec![],
+    };
+    for item in arr {
+        let id = item.get("id").and_then(|x| x.as_str());
+        let status = item.get("status").and_then(|x| x.as_str());
+        if let (Some(id), Some(status)) = (id, status) {
+            out.insert(id.to_string(), status.to_string());
+        }
+    }
+    out
+}
+
+/// Pure transition diff: runs that were ACTIVE before and FINAL after.
+/// (id, final_status) pairs — the notification payload.
+fn final_transitions(
+    prev: &std::collections::HashMap<String, String>,
+    next: &std::collections::HashMap<String, String>,
+) -> Vec<(String, String)> {
+    const ACTIVE: [&str; 4] = ["created", "queued", "running", "paused"];
+    const FINAL: [&str; 4] = ["completed", "failed", "partial", "cancelled"];
+    let mut out = vec![];
+    for (id, status) in next {
+        if !FINAL.contains(&status.as_str()) {
+            continue;
+        }
+        match prev.get(id) {
+            Some(p) if ACTIVE.contains(&p.as_str()) => out.push((id.clone(), status.clone())),
+            _ => {}
+        }
+    }
+    out.sort(); // deterministic for tests
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::final_transitions;
+    use std::collections::HashMap;
+
+    fn m(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
+    }
+
+    #[test]
+    fn active_to_final_fires() {
+        let prev = m(&[("run_a", "running"), ("run_b", "completed"), ("run_c", "queued")]);
+        let next = m(&[("run_a", "completed"), ("run_b", "completed"), ("run_c", "failed")]);
+        let t = final_transitions(&prev, &next);
+        assert_eq!(t, vec![("run_a".to_string(), "completed".to_string()), ("run_c".to_string(), "failed".to_string())]);
+    }
+
+    #[test]
+    fn already_final_and_new_final_do_not_fire() {
+        let prev = m(&[("run_b", "completed")]);
+        let next = m(&[("run_b", "completed"), ("run_new", "completed")]);
+        assert!(final_transitions(&prev, &next).is_empty());
+    }
+
+    #[test]
+    fn disappeared_runs_do_not_fire() {
+        let prev = m(&[("run_gone", "running")]);
+        let next = m(&[]);
+        assert!(final_transitions(&prev, &next).is_empty());
+    }
+
+    #[test]
+    fn snapshot_parses_array_and_envelope_forms() {
+        use super::parse_runs_snapshot;
+        let a = parse_runs_snapshot(r#"[{"id":"run_1","status":"running"}]"#);
+        assert_eq!(a.get("run_1").map(String::as_str), Some("running"));
+        let b = parse_runs_snapshot(r#"{"runs":[{"id":"run_2","status":"completed"}]}"#);
+        assert_eq!(b.get("run_2").map(String::as_str), Some("completed"));
+        assert!(parse_runs_snapshot("not json").is_empty());
+    }
+}
+
+
 /// Navigate the workbench to a hash route (quick capture / deep links).
 fn navigate_hash(app: &tauri::AppHandle, hash: &str) {
     if let Some(w) = app.get_webview_window("main") {
@@ -305,6 +425,7 @@ fn main() {
             }
         }))
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -319,6 +440,50 @@ fn main() {
         )
         .setup(move |app| {
             app.manage(ServerState(Mutex::new(ServerGuard(spawned))));
+
+            // B13 run-completion awareness: background poll (read-only, same
+            // public API the health probe uses) -> native notification when a
+            // run seen active reaches a final state. Best-effort by design: a
+            // transient fetch failure just skips a cycle; the notification
+            // itself is UNVERIFIED-live (needs a real GUI session to observe).
+            {
+                use tauri_plugin_notification::NotificationExt;
+                let handle = app.handle().clone();
+                let poll_ms: u64 = std::env::var("FARLAB_DESKTOP_POLL_MS")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .filter(|v| *v >= 5_000)
+                    .unwrap_or(30_000);
+                std::thread::spawn(move || {
+                    use std::collections::HashMap;
+                    let mut prev: HashMap<String, String> = HashMap::new();
+                    loop {
+                        std::thread::sleep(Duration::from_millis(poll_ms));
+                        let Some(body) = http_get_body(port, "/api/v1/runs") else {
+                            continue;
+                        };
+                        let next = parse_runs_snapshot(&body);
+                        for (run_id, status) in final_transitions(&prev, &next) {
+                            let zh = match status.as_str() {
+                                "completed" => "研究已完成",
+                                "failed" => "研究失败",
+                                "partial" => "研究部分完成",
+                                _ => "研究已取消",
+                            };
+                            let ok = handle
+                                .notification()
+                                .builder()
+                                .title(zh)
+                                .body(format!("{run_id} — 点击托盘打开工作台"))
+                                .show();
+                            if let Err(e) = ok {
+                                eprintln!("far-lab-desktop: notification for {run_id} failed: {e}");
+                            }
+                        }
+                        prev = next;
+                    }
+                });
+            }
 
             // Global hotkey: registration is best-effort (a conflicting
             // system-wide hotkey must not kill the workbench).

@@ -33,3 +33,13 @@ API server 的 loopback 安全守卫（api.ts F-1）天然只放行本机访问�
 - 发布版（非 dev）的仓库根定位依赖编译期 `CARGO_MANIFEST_DIR`，仅在源码树内构建有效；
   随安装包分发的形态需引入 sidecar 打包 Node 运行时（line-b2 方案 B），是发布工程的一部分。
 - Linux 无头环境不适用本壳（无图形界面）——CLI/API/远程 Web 是该场景的完整降级（方案 §14）。
+
+## B13 运行完成感知（R2-03）
+
+后台轮询本地 `GET /api/v1/runs`（与 health 探针同型的只读查询，默认 30s，
+`FARLAB_DESKTOP_POLL_MS` 可调，下限 5s），当**此前处于活跃态**的 run 进入终态
+（completed/failed/partial/cancelled）时发一条系统原生通知（tauri-plugin-notification，
+Rust 侧调用；页面代码不获得任何新原生能力）。瞬态拉取失败只跳过当轮，绝不重试风暴。
+- 迁移判定与快照解析是纯函数，`cargo test` 4/4 覆盖（活跃→终态触发、已终态/新出现不触发、
+  消失不触发、数组/包裹两种响应形态）
+- 通知的实际弹出为 UNVERIFIED-live（需真实 GUI 会话人工观察；编译与逻辑已验证）
