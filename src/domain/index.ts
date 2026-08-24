@@ -14,6 +14,7 @@ export * from './model-config.js';
 export * from './agent.js';
 export * from './formal.js';
 export * from './evidence-body.js';
+export * from './evidence-strength.js';
 export * from './ach.js';
 export * from './prediction.js';
 export * from './meta.js';

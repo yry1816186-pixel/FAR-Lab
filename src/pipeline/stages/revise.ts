@@ -231,6 +231,8 @@ const reviseHypothesis = async (
       },
     },
     schema: HypothesisRevisionOut,
+    // SCIENCE lane: judgment-stage decoding pinned (was provider default).
+    temperature: 0,
   });
 
   // version history is evidence: archive the exact pre-revision object before mutating
@@ -324,6 +326,8 @@ const revisePlan = async (
       },
     },
     schema: PlanRevisionOut,
+    // SCIENCE lane: judgment-stage decoding pinned (was provider default).
+    temperature: 0,
   });
 
   const before = ResearchPlan.parse({ ...plan });
@@ -433,6 +437,8 @@ export const reviseStage: StageHandler = {
           question: question ? { id: question.id, text: question.text } : null,
         },
         schema: CausalAnalysisOut,
+        // SCIENCE lane: judgment-stage decoding pinned (was provider default).
+        temperature: 0,
       });
 
       const targets = validateAffected(analysis.data.affected, {

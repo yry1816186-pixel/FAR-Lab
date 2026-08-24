@@ -661,22 +661,22 @@ export const retrieveStage: StageHandler = {
           // RU-10 GO2: minhash second-chance merge — catches near-duplicates the
           // identifier + title-blocking gates miss (paraphrased titles, CJK
           // variants). Pairwise over the bounded pool (≤62 entries — no LSH
-          // banding needed); threshold 0.8 = high-precision merge, never merges
-          // topically-similar-but-distinct papers.
+          // banding needed); merge bar MINHASH_POOL_MERGE_THRESHOLD = 0.5,
+          // calibrated on measured separation (near-verbatim republications
+          // 0.59-0.74; paraphrases 0.12; distinct papers <0.1) — the stale '0.8'
+          // that used to live in this comment drifted from the executed check.
           const recShingles = shingle(`${record.title} ${record.abstractText ?? ''}`);
           // Evidence floor: a 3-word title yields ONE 3-gram — identical short
           // titles collide across genuinely different works (the existing
           // short-title guard's premise), so minhash needs real text mass.
           const MINHASH_MIN_SHINGLES = 8;
+          const MINHASH_POOL_MERGE_THRESHOLD = 0.5;
           const sig = recShingles.size >= MINHASH_MIN_SHINGLES
             ? minhashSignature(recShingles, MINHASH_CFG)
             : null;
           for (const candidate of sig === null ? [] : pool.values()) {
             const candSig = minhashSignature(shingle(`${candidate.record.title} ${candidate.record.abstractText ?? ''}`), MINHASH_CFG);
-            // Threshold 0.5 is CALIBRATED on measured separation (word-3-gram
-            // shingles: near-verbatim republications 0.59-0.74; paraphrases 0.12;
-            // distinct papers <0.1) — clean margin on both sides.
-            if (sig !== null && jaccardFromSignatures(sig, candSig) >= 0.5) {
+            if (sig !== null && jaccardFromSignatures(sig, candSig) >= MINHASH_POOL_MERGE_THRESHOLD) {
               existing = candidate;
               minhashMerges += 1;
               break;

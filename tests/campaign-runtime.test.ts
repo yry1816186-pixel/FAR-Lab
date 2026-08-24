@@ -49,7 +49,7 @@ describe('evaluateStop (campaign-level rules, first match wins)', () => {
     expect(evaluateStop(spec, [st('root', 'completed'), st('sink', 'completed')]).stopped).toBe(false);
   });
   it('external budget/units exhaustion pass through', () => {
-    const spec = specOf({ policy: 'e_value_accumulation', eValueThreshold: 4 }, [{ kind: 'budget_exhausted' }, { kind: 'units_exhausted' }]);
+    const spec = specOf({ policy: 'single_primary', primaryUnit: 'sink' }, [{ kind: 'budget_exhausted' }, { kind: 'units_exhausted' }]);
     expect(evaluateStop(spec, [], { budgetExhausted: true }).stopReason).toBe('budget_exhausted');
     expect(evaluateStop(spec, [], { unitsExhausted: true }).stopReason).toBe('units_exhausted');
     expect(evaluateStop(spec, [], {}).stopped).toBe(false);
@@ -65,7 +65,7 @@ describe('alphaLedger + decideCampaign guard', () => {
     const led = alphaLedger(spec, [st('root', 'completed', 0.015)]);
     expect(led.root).toBeCloseTo(0.005, 9);
     expect(led.left).toBeCloseTo(0.01, 9);
-    const nullSpec = specOf({ policy: 'e_value_accumulation', eValueThreshold: 4 }, [{ kind: 'all_units_terminal' }]);
+    const nullSpec = specOf({ policy: 'single_primary', primaryUnit: 'sink' }, [{ kind: 'all_units_terminal' }]);
     expect(Object.values(alphaLedger(nullSpec, [])).every((v) => v === null)).toBe(true);
   });
   it('a unit whose alpha budget is exhausted is NOT runnable (silent multiplicity impossible)', () => {

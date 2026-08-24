@@ -342,7 +342,10 @@ describe('build_evidence stage', () => {
     expect(rel.relation).toBe('supports');
     expect(rel.claimId).toBe(claim.id);
     expect(rel.targetHypothesisId).toBeUndefined();
-    expect(rel.strength).toBe('unrated');
+    // SCIENCE lane: deterministic strength — verified + non-quantitative text grades
+    // moderate (imprecision domain) -> 'weak'; derivation note is auditable.
+    expect(rel.strength).toBe('weak');
+    expect(rel.uncertainties.some((u) => u.includes('strength-v1'))).toBe(true);
     expect(RELATION_POLARITY[rel.relation]).toBe('supporting');
 
     const receipts = store.listObjects('receipt', ctx.run.id);
@@ -418,6 +421,18 @@ describe('build_evidence stage', () => {
     expect(a?.locators[0]?.sourceDocumentId).not.toBe(b?.locators[0]?.sourceDocumentId);
     expect(cross.rationale).toContain('claim-claim contradicts');
     expect(cross.rationale).toContain('direction of the yield effect');
+
+    // SCIENCE lane (2026-08-24): the contradiction loop now CLOSES —
+    // (a) cross-relation strength derives deterministically (verified + quantitative
+    //     endpoints -> moderate), and (b) both endpoint claims' certainty is rescored
+    //     one step down (high -> moderate) with an auditable uncertainty note.
+    expect(cross.strength).toBe('moderate');
+    expect(cross.uncertainties.some((u) => u.includes('weaker endpoint'))).toBe(true);
+    expect(outcome.kind === 'done' && outcome.summary.includes('2 claim(s) certainty-downgraded by contradiction rescore')).toBe(true);
+    for (const c of [a, b]) {
+      expect(c?.gradeCertainty).toBe('moderate');
+      expect(c?.uncertainties.some((u) => u.includes('inconsistency rescore'))).toBe(true);
+    }
 
     // 4 model calls: 2 extractions + gap assessment + cross adjudication
     const modelCalls = store.listObjects('receipt', ctx.run.id).filter((r) => r.kind === 'model_call');
@@ -559,7 +574,10 @@ describe('build_evidence stage', () => {
       expect(rel.relation).toBe(e.relation);
       expect(RELATION_POLARITY[rel.relation]).toBe(e.polarity);
       expect(rel.rationale.length).toBeGreaterThan(0);
-      expect(rel.strength).toBe('unrated');
+      // 'M1'..'M4' contain digits -> quantitative -> grade high -> 'moderate'
+      // (deterministic mapping; every relation carries its derivation note).
+      expect(rel.strength).toBe('moderate');
+      expect(rel.uncertainties.some((u) => u.includes('strength-v1'))).toBe(true);
     }
     if (outcome.kind === 'done') {
       expect(outcome.summary).toContain('supports=1');
