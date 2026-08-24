@@ -142,5 +142,4 @@ immutable base as a planning-only commit series + tag, exactly as R2 did.
 
 ## Tagged commit
 
-- `baseline/parallel-r2` -> (filled immediately after tagging; see
-  `git rev-parse baseline/parallel-r2` for authoritative resolution)
+- `baseline/parallel-r2` -> `47cc373cf70f8314123816f993ef36edf3548e1f` (commit subject: "docs(concurrency): R2 reshard - 15-lane ownership contract, rules, baseline"; authoritative resolution is always `git rev-parse baseline/parallel-r2`)
