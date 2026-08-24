@@ -21,18 +21,26 @@ export interface GcReport {
   unreferencedBytes: number;
   /** Only set with --apply: blobs actually removed. */
   removed: string[];
+  /** Orphaned put-temps (`.hash.tmp-*`): crash residue from the atomic put path,
+   *  never valid data — reported always, removed only with --apply. */
+  orphanTemps: string[];
   apply: boolean;
 }
 
-const HASH_RE = /[0-9a-f]{64}/;
+// Anchored: an UNanchored /[0-9a-f]{64}/ also matched inside put-temp names
+// (".<hash>.tmp-…" contains the same 64 hex chars), corrupting the blob count and
+// hiding temps from the orphan branch below.
+const HASH_RE = /^[0-9a-f]{64}$/;
+const TEMP_RE = /^\.[0-9a-f]{64}\.tmp-/;
 
-const listBlobFiles = (root: string): string[] => {
-  const out: string[] = [];
+const listBlobFiles = (root: string): { blobs: string[]; orphanTemps: string[] } => {
+  const blobs: string[] = [];
+  const orphanTemps: string[] = [];
   let shards: fs.Dirent[];
   try {
     shards = fs.readdirSync(root, { withFileTypes: true });
   } catch {
-    return out; // no artifact store yet — nothing to sweep
+    return { blobs, orphanTemps }; // no artifact store yet — nothing to sweep
   }
   for (const shard of shards) {
     if (!shard.isDirectory()) continue;
@@ -43,17 +51,19 @@ const listBlobFiles = (root: string): string[] => {
       continue;
     }
     for (const e of entries) {
-      if (e.isFile() && HASH_RE.test(e.name)) out.push(e.name);
+      if (!e.isFile()) continue;
+      if (HASH_RE.test(e.name)) blobs.push(e.name);
+      else if (TEMP_RE.test(e.name)) orphanTemps.push(path.join(shard.name, e.name));
     }
   }
-  return out;
+  return { blobs, orphanTemps };
 };
 
 const shardPath = (root: string, hash: string): string => path.join(root, hash.slice(0, 2), hash);
 
 export function runGc(app: App, opts: { apply: boolean } = { apply: false }): GcReport {
   const root = path.join(app.dataDir, 'artifacts');
-  const blobs = listBlobFiles(root);
+  const { blobs, orphanTemps } = listBlobFiles(root);
 
   // Reference truth: objects + runs rows are the only places refs are persisted.
   const refs = app.store.referencedArtifactHashes();
@@ -73,6 +83,16 @@ export function runGc(app: App, opts: { apply: boolean } = { apply: false }): Gc
         removed.push(h);
       } catch { /* already gone — idempotent */ }
     }
+    // Orphaned put-temps are crash residue, never valid data (a landed blob's name
+    // is exactly 64 hex chars; temps carry the `.hash.tmp-` prefix by construction).
+    // Safe to sweep unconditionally under --apply — a LIVE concurrent put's temp is
+    // unlinked before its rename by the same process, and unlinking it here at worst
+    // fails that put loudly (ENONENT at rename), never corrupts a landed blob.
+    for (const t of orphanTemps) {
+      try {
+        fs.unlinkSync(path.join(root, t));
+      } catch { /* already gone — idempotent */ }
+    }
     // Drop now-empty shard dirs so the store stays tidy.
     const shardDirs = new Set(unreferenced.map((h) => h.slice(0, 2)));
     for (const shard of shardDirs) {
@@ -88,6 +108,7 @@ export function runGc(app: App, opts: { apply: boolean } = { apply: false }): Gc
     unreferenced,
     unreferencedBytes,
     removed,
+    orphanTemps,
     apply: opts.apply,
   };
 }

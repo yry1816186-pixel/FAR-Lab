@@ -254,6 +254,18 @@ export class Store {
       .map((r) => ({ id: String(r.id), status: String(r.status), currentStage: String(r.current_stage), createdAt: String(r.created_at) }));
   }
 
+  /** Workspace-level growth counters for observability/soak (reliability 2026-08-24):
+   *  O(1) aggregate queries — callers sample these repeatedly during long runs. */
+  workspaceCounts(): { runs: number; events: number; objects: number; receipts: number } {
+    const n = (sql: string): number => Number(this.db.prepare(sql).get()?.n ?? 0);
+    return {
+      runs: n('SELECT COUNT(*) AS n FROM runs'),
+      events: n('SELECT COUNT(*) AS n FROM events'),
+      objects: n('SELECT COUNT(*) AS n FROM objects'),
+      receipts: n("SELECT COUNT(*) AS n FROM objects WHERE kind='receipt'"),
+    };
+  }
+
   // ---- append-only event audit ----
 
   appendEvent(runId: string, e: { type: RunEvent['type']; status?: RunStatus; stage?: string; detail?: Record<string, unknown>; receiptId?: string }, at = new Date().toISOString()): RunEvent {

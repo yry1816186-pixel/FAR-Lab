@@ -1,0 +1,56 @@
+[
+  {
+    "t": 1787549381147,
+    "proc": {
+      "at": "2026-08-24T05:29:41.147Z",
+      "pid": 1800,
+      "uptimeMs": 121,
+      "rssMb": 64.3,
+      "heapUsedMb": 11.7,
+      "heapTotalMb": 17.3,
+      "externalMb": 2.2,
+      "activeHandles": 0,
+      "activeRequests": 0
+    },
+    "storage": {
+      "at": "2026-08-24T05:29:41.149Z",
+      "dbBytes": 4096,
+      "walBytes": 247040,
+      "schedulerDbBytes": 0,
+      "artifactsBytes": 0,
+      "artifactBlobs": 0,
+      "orphanTemps": 0,
+      "runs": 0,
+      "events": 0,
+      "objects": 0,
+      "receipts": 0
+    }
+  },
+  {
+    "t": 1787549559716,
+    "proc": {
+      "at": "2026-08-24T05:32:39.716Z",
+      "pid": 1800,
+      "uptimeMs": 178688,
+      "rssMb": 101.1,
+      "heapUsedMb": 21.3,
+      "heapTotalMb": 51.6,
+      "externalMb": 2,
+      "activeHandles": 0,
+      "activeRequests": 0
+    },
+    "storage": {
+      "at": "2026-08-24T05:32:39.774Z",
+      "dbBytes": 25681920,
+      "walBytes": 4226960,
+      "schedulerDbBytes": 0,
+      "artifactsBytes": 3491265,
+      "artifactBlobs": 7294,
+      "orphanTemps": 0,
+      "runs": 45,
+      "events": 23526,
+      "objects": 7379,
+      "receipts": 7294
+    }
+  }
+]

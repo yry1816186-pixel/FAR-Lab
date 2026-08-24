@@ -1,7 +1,20 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { sha256Hex } from '../shared/crypto.js';
 import type { ArtifactStore } from '../shared/ports.js';
+
+/** Best-effort removal of an orphaned put-temp: ENOENT is the happy path, any other
+ *  cleanup failure is made visible on stderr but never masks the primary error. */
+const removeOrphanTemp = (p: string): void => {
+  try {
+    fs.unlinkSync(p);
+  } catch (e) {
+    if (e instanceof Error && (e as NodeJS.ErrnoException).code !== 'ENOENT') {
+      process.stderr.write(`far-artifacts: orphan temp cleanup failed (${path.basename(p)}): ${e.message}\n`);
+    }
+  }
+};
 
 /** Content-addressed immutable artifact area: artifacts/<2-hex>/<sha256>. Collision => hard error (never overwrite). */
 export const openArtifactStore = (rootDir: string): ArtifactStore => {
@@ -28,8 +41,30 @@ export const openArtifactStore = (rootDir: string): ArtifactStore => {
           throw new Error(`artifact hash collision refused: ${hash} exists with different content`);
         }
       } else {
+        // Atomic landing (reliability 2026-08-24): writeFileSync('wx') directly at the
+        // content-addressed path is NOT crash-atomic — a process death mid-write leaves
+        // a truncated blob that get() would silently return as the artifact (only the
+        // bundle-verify path hashes content; fullText/revise-archive readers trust it).
+        // Write a temp sibling, then rename into place: same-directory rename(2) is
+        // atomic on POSIX and NTFS, so readers see either the old state or the complete
+        // blob — never a partial one.
+        const tmp = path.join(path.dirname(file), `.${hash}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`);
         fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, buf, { flag: 'wx' });
+        try {
+          fs.writeFileSync(tmp, buf, { flag: 'wx' });
+        } catch (e) {
+          removeOrphanTemp(tmp); // ENOSPC/EPERM can leave a partial temp behind
+          throw e;
+        }
+        try {
+          // Concurrent put of the same content racing between our existsSync and this
+          // rename: the target is replaced with byte-identical content (same hash), so
+          // the collision-refusal semantics above are preserved either way.
+          fs.renameSync(tmp, file);
+        } catch (e) {
+          removeOrphanTemp(tmp); // best effort — the primary failure below wins
+          throw e;
+        }
       }
       return { ref: `sha256:${hash}`, hash, size: buf.length };
     },

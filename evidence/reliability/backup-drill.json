@@ -1,0 +1,65 @@
+{
+  "measuredAt": "2026-08-24T05:35:09.303Z",
+  "headVersion": 8,
+  "results": [
+    {
+      "drill": "backup-restore-roundtrip",
+      "verdict": "PASS",
+      "summary": "runs 3->3, events 123->123, chain ok before=true after=true",
+      "before": {
+        "runs": 3,
+        "events": 123,
+        "chains": [
+          true,
+          true,
+          true
+        ]
+      },
+      "after": {
+        "runs": 3,
+        "events": 123,
+        "chains": true
+      }
+    },
+    {
+      "drill": "wal-copy-trap-avoided",
+      "verdict": "PASS",
+      "summary": "naive far.db copy carries -1/6 events (WAL holds the rest) — VACUUM INTO backupTo carries all 6",
+      "naiveEvents": -1,
+      "properEvents": 6,
+      "inMemoryWas": 6
+    },
+    {
+      "drill": "migration-chain-v1-to-head",
+      "verdict": "PASS",
+      "summary": "v1 db opened by current code: user_version 1->8 (HEAD=8), rows preserved runs=1 events=1 objects=1, new tables=7/7",
+      "version": 8,
+      "runs": 1,
+      "events": 1,
+      "objects": 1,
+      "tables": [
+        "step_outputs",
+        "step_fingerprints",
+        "lineage_edges",
+        "event_tags",
+        "memory_items",
+        "deleted_runs",
+        "outbox"
+      ]
+    },
+    {
+      "drill": "newer-db-fails-visibly",
+      "verdict": "PASS",
+      "summary": "user_version 999 db: open refused (far.db schema version 999 is newer than this build supports (<= 8) — the workspace was created by a newer FAR-Lab. Upgra) — forward-only, no silent downgrade",
+      "threw": true,
+      "message": "far.db schema version 999 is newer than this build supports (<= 8) — the workspace was created by a newer FAR-Lab. Upgrade FAR-Lab (or open the workspace with that version) instead of downgrading; no "
+    },
+    {
+      "drill": "gc-restore-safety",
+      "verdict": "PASS",
+      "summary": "referenced blob (54c8fc9c0ee2…) absent from gc candidates after restore+reopen (candidates=0)",
+      "referenced": "54c8fc9c0ee2e555e1ba44ef67c061de412d0a5a1ed0487d4204a44155b48a84",
+      "candidates": 0
+    }
+  ]
+}
