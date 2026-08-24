@@ -9,6 +9,7 @@ import {
 } from '../domain/index.js';
 import {
   generateConversationTurn, CreateAutomationArgsSchema, LaunchResearchArgsSchema, CancelAutomationArgsSchema,
+  CancelRunArgsSchema, conversationSessionId, planConversationResume, conversationRolloutDir,
 } from './conversation-agent.js';
 
 /**
@@ -286,11 +287,17 @@ const runAndLandTurn = async (
   const provider = resolveConversationProvider(app, conv);
   // Conversation gear > config default; null when the route declares no capability.
   const turnReasoning = effectiveConversationReasoning(app, conv);
+  // Rollout durability: deterministic session id per (conversation, message) —
+  // a crashed turn leaves an unfinished rollout that retry RESUMES instead of
+  // restarting from scratch (fresh sessions get the same id and start clean).
+  const resumePlan = planConversationResume(conversationRolloutDir(app), conversationId, researcherMsgId);
   const generation = await generateConversationTurn(app, provider, conv, {
     text: researcherMsg.content,
     seeds: researcherMsg.seeds ?? [],
     history: conv.messages.filter((m) => m.id !== researcherMsgId).slice(-HISTORY_TURNS),
     source: 'researcher',
+    sessionId: conversationSessionId(conversationId, researcherMsgId),
+    ...(resumePlan !== null ? { resumePlan } : {}),
     ...(turnReasoning !== null ? { reasoning: turnReasoning } : {}),
   });
   if (generation.status !== 'completed' || generation.reply === undefined) {
@@ -498,6 +505,22 @@ const executeProposal = async (
       });
       attachRunToConversation(app, conv.id, runId);
       return { ok: true, result: `已启动研究 ${runId}（携带本对话全部材料）` };
+    }
+    if (proposal.kind === 'cancel_run') {
+      const args = CancelRunArgsSchema.parse(proposal.args);
+      const run = app.store.getRun(args.runId);
+      if (run === null) return { ok: false, result: `研究 ${args.runId} 不存在（可能已被清理）` };
+      if (!conv.runIds.includes(args.runId)) {
+        return { ok: false, result: `研究 ${args.runId} 不是本对话启动的，不能从这里取消` };
+      }
+      // Same atomic flag the API cancel route sets; a live executor honors it at
+      // its next checkpoint, and the persisted request survives executor death.
+      const ok = app.store.requestCancel(args.runId);
+      if (!ok) {
+        return { ok: false, result: `研究 ${args.runId} 已处于终态（${run.status}），无需取消` };
+      }
+      app.store.appendEvent(args.runId, { type: 'run_cancelled', detail: { via: 'conversation-proposal' } });
+      return { ok: true, result: `已请求取消研究 ${args.runId}——执行中的进程会在下一个检查点停止，之后可随时恢复` };
     }
     if (proposal.kind === 'create_automation') {
       const args = CreateAutomationArgsSchema.parse(proposal.args);
