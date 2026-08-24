@@ -70,7 +70,15 @@ const CrossRelationOut = z.object({
     .array(
       z.object({
         pairId: z.number().int().nonnegative(),
-        verdict: z.enum(['contradicts', 'supports', 'qualifies', 'unrelated', 'not_comparable']),
+        verdict: z.enum([
+          'contradicts',
+          'supports',
+          'qualifies',
+          'replicates',
+          'fails_to_replicate',
+          'unrelated',
+          'not_comparable',
+        ]),
         sharedSubject: z.string().min(5),
         conflictPoint: z.string().min(5).optional(),
         confidence: z.enum(['low', 'moderate', 'high']),
@@ -612,7 +620,13 @@ export const buildEvidenceStage: StageHandler = {
               'population, method, dose, or organism is NOT a contradiction by itself. "supports" ONLY if the claims ' +
               'independently corroborate the same finding in the same direction — topical kinship or shared ' +
               'vocabulary is NOT support. "qualifies" ONLY if one claim restricts or bounds the conditions under ' +
-              'which the other\'s finding holds. "unrelated" if the claims are about different subjects. ' +
+              'which the other\'s finding holds. "replicates" ONLY if one claim reports an INDEPENDENT reproduction ' +
+              'of the other\'s finding — same direction, comparable measurement, newly collected/analysed data; a ' +
+              'second observational study agreeing in direction is corroboration ("supports"), not a replication. ' +
+              '"fails_to_replicate" ONLY if one claim reports an ATTEMPTED reproduction of the other\'s finding that ' +
+              'did not obtain it (explicit replication language: replication, reproducibility, re-analysis of the ' +
+              'same protocol); a merely different result on a different question is NOT a failed replication. ' +
+              '"unrelated" if the claims are about different subjects. ' +
               '"not_comparable" if they cannot be compared on the given text (missing referents, different measures, ' +
               'insufficient context) — this is the DEFAULT under any doubt, and inventing a conflict is the worst ' +
               'error you can make here. Do not stretch a claim from a different subject or mechanistic layer onto ' +
@@ -630,7 +644,7 @@ export const buildEvidenceStage: StageHandler = {
             schema: CrossRelationOut,
             temperature: 0,
           });
-          const persistable = new Set(['contradicts', 'supports', 'qualifies']);
+          const persistable = new Set(['contradicts', 'supports', 'qualifies', 'replicates', 'fails_to_replicate']);
           const byIdA = new Map(verifiedClaims.map((c) => [c.id, c] as const));
           const byIdB = new Map(verifiedClaims.map((c) => [c.id, c] as const));
           let persisted = 0;

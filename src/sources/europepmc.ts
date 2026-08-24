@@ -3,6 +3,7 @@ import type { RawRetrievalResult, RawSourceRecord, SourceAdapter } from '../shar
 import { SourceAdapterError } from './error.js';
 import { type SourceAdapterOptions, clampLimit, httpGet } from './http.js';
 import { asArray, asObject, strField } from './json.js';
+import { fromEuropepmcPubTypes } from './pubtype.js';
 import { stripMarkup } from './text.js';
 
 const DEFAULT_BASE_URL = 'https://www.ebi.ac.uk/europepmc/webservices/rest';
@@ -56,6 +57,8 @@ const mapArticle = (article: unknown): RawSourceRecord | undefined => {
   const pubYearRaw = strField(a, 'pubYear');
   const pubYear = pubYearRaw !== undefined && /^\d{4}$/.test(pubYearRaw) ? Number(pubYearRaw) : undefined;
 
+  const publicationType = fromEuropepmcPubTypes(asArray(a['pubType']).filter((t): t is string => typeof t === 'string'));
+
   return {
     identifiers,
     title,
@@ -70,6 +73,7 @@ const mapArticle = (article: unknown): RawSourceRecord | undefined => {
     // deepening routes by identifiers (fulltext.ts europepmc_jats), not by this URL.
     oaUrl: undefined,
     fullTextUrl: undefined,
+    ...(publicationType !== undefined ? { publicationType } : {}),
     normalized: a, // full article object as returned, BEFORE volatile exclusion
   };
 };
