@@ -278,6 +278,41 @@ export const executeExperiment = async (
       environment: { pythonVersion: env.pythonVersion, versions: env.versions, lockfileHash: lock ?? undefined },
     }, 'experiment_started', { id: expRun.id, python: env.pythonVersion, versions: env.versions });
 
+    // RU-8 GO1 pre-execution dataset audit (verdict ceiling = data quality):
+    // leakage or exact duplicates make a preregistered verdict MEANINGLESS —
+    // refuse before training spend. Label issues are advisory and disclosed in
+    // the audit note (data is never auto-mutated).
+    interface DatasetAuditResult {
+      rows: { train: number; test: number };
+      exactDuplicates: { train: number; test: number };
+      trainTestLeakRows: number;
+      labelIssueCount: number;
+      labelIssueRate: number | null;
+      verdict: 'ok' | 'degraded';
+    }
+    const audit = await sidecar.call<DatasetAuditResult>('dataset_audit', {
+      csvPath: artifacts.path(record.contentRef),
+      targetColumn: use.targetColumn,
+      trainIdx: outcome.trainIdx,
+      testIdx: outcome.testIdx,
+      seed: spec.models[0]?.seed ?? 0,
+    }, spec.compute.timeoutMs);
+    if (!audit.ok || audit.result === undefined) fail(audit.error?.message ?? 'dataset_audit returned no result');
+    const a = audit.result;
+    if (a.trainTestLeakRows > 0) {
+      fail(`dataset audit REFUSED execution: ${a.trainTestLeakRows} identical row(s) appear in BOTH train and test — the verdict would be meaningless (leakage)`);
+    }
+    store.appendEvent(spec.runId, {
+      type: 'note',
+      detail: {
+        kind: 'dataset_audit',
+        rows: a.rows,
+        labelIssueCount: a.labelIssueCount,
+        labelIssueRate: a.labelIssueRate,
+        verdict: a.verdict,
+      },
+    });
+
     // 4. Train/eval per model, with fingerprint dedup against earlier cells (D-086-1).
     const previousCells = (store.listObjects('result_set', spec.runId) as ResultSet[]).flatMap((rs) => rs.cells);
     const cells: ResultCell[] = [];
