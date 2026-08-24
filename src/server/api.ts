@@ -17,6 +17,7 @@ import { runResearchAction, ActionError } from './actions.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
 import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
 import { discoverModels } from '../providers/discovery.js';
+import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, persistDatasetProfile, type IngestOutcome } from '../ingest/service.js';
 import { approveExperiment, ExperimentOpError } from './experiment-ops.js';
 import { fetchZoteroAnnotations, fetchZoteroLibrary, ZoteroUnavailableError } from './zotero.js';
 import {
@@ -913,6 +914,77 @@ function parseSeedSources(raw: unknown): string | {
     const limitations = bundle?.limitations.filter((l) => l.trim().length > 0) ?? [];
     sendJson(res, 200, { ...report, ...(limitations.length > 0 ? { limitations } : {}) });
   };
+  // ---- MULTIMODAL ingest (2026-08-24): deterministic artifact understanding ----
+  // POST /api/v1/ingest — one endpoint, two producer shapes:
+  //   { kind: 'pdf_text', fileName, payload }  ← web pdfjs collector output
+  //   { kind: 'text', fileName, text }         ← server-side parse by extension
+  // Returns the SDM (or dataset profile), its immutable artifact ref, and the
+  // seeds-pipeline text projection. Failures are 422 with precise field errors.
+
+  const ingestRoute = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
+    const body = await readJsonObject(req);
+    const kind = body['kind'];
+    const fileName = typeof body['fileName'] === 'string' ? body['fileName'] : '';
+    if (typeof fileName !== 'string' || fileName.length === 0 || fileName.length > 300 || fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) {
+      throw validation('ingest: fileName must be a 1-300 char basename (no path separators)');
+    }
+    if (kind === 'pdf_text') {
+      const r = ingestPdfTextPayload(body['payload'], fileName);
+      if (!r.ok) throw validation(`ingest pdf_text payload rejected: ${r.errors.slice(0, 5).join('; ')}`);
+      const out = await ingestSdm(app.artifacts, r.sdm);
+      sendJson(res, 200, ingestSummary(out));
+      return;
+    }
+    if (kind === 'text') {
+      const text = body['text'];
+      if (typeof text !== 'string' || text.length === 0) throw validation('ingest: text must be a non-empty string');
+      if (text.length > 10 * 1024 * 1024) throw validation('ingest: text exceeds 10MB');
+      const routed = ingestTextToSdm(fileName, text);
+      if (routed === null) throw validation(`ingest: unsupported file kind for ${fileName} — see MULTIMODAL.md for the format matrix`);
+      if (routed.type === 'dataset') {
+        const artifactRef = await persistDatasetProfile(app.artifacts, routed.profile);
+        sendJson(res, 200, {
+          artifactRef,
+          type: 'dataset_profile',
+          profile: {
+            schemaVersion: routed.profile.schemaVersion,
+            format: routed.profile.format,
+            rowCount: routed.profile.rowCount,
+            columnCount: routed.profile.columnCount,
+            columns: routed.profile.columns.map((c) => ({ name: c.name, inferredType: c.inferredType, missingCount: c.missingCount, ...(c.unitHint !== undefined ? { unitHint: c.unitHint } : {}), significanceNotation: c.significanceNotation })),
+            quality: routed.profile.quality,
+            diagnostics: routed.profile.diagnostics,
+          },
+        });
+        return;
+      }
+      const out = await ingestSdm(app.artifacts, routed.doc);
+      sendJson(res, 200, ingestSummary(out));
+      return;
+    }
+    throw validation('ingest: kind must be "pdf_text" or "text"');
+  };
+
+  const ingestSummary = (out: IngestOutcome): Record<string, unknown> => ({
+    artifactRef: out.artifactRef,
+    seedTextTruncated: out.seedTextTruncated,
+    type: 'sdm',
+    sdm: {
+      schemaVersion: out.sdm.schemaVersion,
+      extractor: out.sdm.extractor,
+      meta: out.sdm.meta,
+      counts: {
+        blocks: out.sdm.blocks.length,
+        figures: out.sdm.figures.length,
+        tables: out.sdm.tables.length,
+        equations: out.sdm.equations.length,
+        citations: out.sdm.citations.length,
+        xrefs: out.sdm.xrefs.length,
+        xrefsResolved: out.sdm.xrefs.filter((x) => x.status === 'resolved').length,
+      },
+      diagnostics: out.sdm.diagnostics,
+    },
+  });
 
   // ---- static frontend (only when web/dist exists; never pretend otherwise) ----
 
@@ -1423,6 +1495,10 @@ function parseSeedSources(raw: unknown): string | {
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
     if (segments[1] !== 'v1') throw notFound(`no route: ${method} ${url.pathname}`);
+    // MULTIMODAL ingest: deterministic artifact understanding (SDM contract).
+    if (segments[2] === 'ingest' && segments.length === 3 && method === 'POST') {
+      return ingestRoute(req, res);
+    }
 
     if (segments[2] === 'runs') {
       if (segments.length === 3) {
