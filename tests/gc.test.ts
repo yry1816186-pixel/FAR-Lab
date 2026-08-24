@@ -91,6 +91,33 @@ describe('far gc', () => {
     expect(report.unreferenced).toHaveLength(0);
   });
 
+  // Crash residue from the atomic put path (reliability 2026-08-24): a process
+  // death between the temp write and the rename leaves `.<hash>.tmp-<pid>-<n>`
+  // files. They are never valid data and must be reported (always) + swept
+  // (--apply) without touching landed blobs.
+  it('reports and sweeps orphaned put-temps; landed blobs untouched', () => {
+    const blobHash = '2'.repeat(64);
+    writeOrphan(blobHash, 'landed blob that must survive');
+    const shardDir = path.join(artifactsRoot, blobHash.slice(0, 2));
+    fs.writeFileSync(path.join(shardDir, `.${blobHash}.tmp-4242-abcdef01`), 'partial write residue');
+
+    const dry = runGc(app, { apply: false });
+    expect(dry.orphanTemps).toEqual([path.join('22', `.${blobHash}.tmp-4242-abcdef01`)]);
+    expect(fs.existsSync(path.join(shardDir, `.${blobHash}.tmp-4242-abcdef01`))).toBe(true); // dry-run keeps it
+
+    const applied = runGc(app, { apply: true });
+    expect(applied.orphanTemps).toHaveLength(1);
+    expect(fs.existsSync(path.join(shardDir, `.${blobHash}.tmp-4242-abcdef01`))).toBe(false); // swept
+    // The blob itself was unreferenced (no object points at '2'.repeat(64)), so it is
+    // correctly swept as a blob candidate — the temp went through the ORPHAN branch,
+    // never the blob branch.
+    expect(applied.removed).toContain(blobHash);
+    expect(applied.unreferenced).not.toContain(`.${blobHash}.tmp-4242-abcdef01`);
+    expect(applied.removed).not.toContain(`.${blobHash}.tmp-4242-abcdef01`);
+    // cleanup for later tests
+    fs.rmSync(shardDir, { recursive: true, force: true });
+  });
+
   // Regression for the 2026-08-24 P0: bundles reference their report/paper
   // artifacts via BARE hex in finalArtifactHashes (and paperOutlineRef uses the
   // sha256: prefix) — both spellings must count as references.

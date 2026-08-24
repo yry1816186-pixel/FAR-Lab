@@ -389,6 +389,45 @@ const main = async (): Promise<void> => {
     return;
   }
 
+  if (cmd === 'data' && sub === 'obs') {
+    // Reliability observability snapshot (workstream 2026-08-24): one sample of
+    // process/storage state + per-run recovery phases + workspace error profile.
+    const path = await import('node:path');
+    const { sampleProcess, sampleStorage, errorProfileForRun, formatCorrelation } = await import('../app/observability.js');
+    const { recoveryStateForRun } = await import('../app/recovery-state.js');
+    const dataDir = path.resolve(process.env.FARLAB_DATA_DIR ?? '.far-run');
+    const app = await createApp({ dataDir });
+    try {
+      const proc = sampleProcess();
+      const storage = sampleStorage(app.store, dataDir);
+      const runs = app.store.listRuns(50);
+      const phases: Record<string, string[]> = {};
+      const errorProfile: Record<string, number> = {};
+      for (const r of runs) {
+        const doc = app.store.getRun(r.id);
+        if (doc === null) continue;
+        const state = recoveryStateForRun(app.store, doc);
+        (phases[state.phase] ??= []).push(r.id);
+        for (const [cat, n] of Object.entries(errorProfileForRun(app.store, r.id))) {
+          errorProfile[cat] = (errorProfile[cat] ?? 0) + n;
+        }
+      }
+      if (json()) jsonOutput({ process: proc, storage, phases, errorProfile });
+      else {
+        console.log(`process: pid=${proc.pid} up=${(proc.uptimeMs / 1000).toFixed(1)}s rss=${proc.rssMb}MB heap=${proc.heapUsedMb}/${proc.heapTotalMb}MB handles=${proc.activeHandles}`);
+        console.log(`storage: db=${storage.dbBytes}B wal=${storage.walBytes}B artifacts=${storage.artifactBlobs} blobs (${storage.artifactsBytes}B)${storage.orphanTemps > 0 ? ` +${storage.orphanTemps} ORPHAN TEMPS (far gc --apply sweeps)` : ''}`);
+        console.log(`state: runs=${storage.runs} events=${storage.events} objects=${storage.objects} receipts=${storage.receipts}`);
+        for (const [phase, ids] of Object.entries(phases)) {
+          const shown = ids.slice(0, 3).join(', ');
+          console.log(`  ${phase}: ${ids.length}${ids.length > 0 ? ` (${shown}${ids.length > 3 ? ' …' : ''})` : ''}`);
+        }
+        if (Object.keys(errorProfile).length > 0) console.log(`errors: ${Object.entries(errorProfile).map(([c, n]) => `${c}=${n}`).join(' ')}`);
+        console.log(`correlation format: ${formatCorrelation({ runId: 'run_x', stage: 'rank', stageAttempt: 1 })}`);
+      }
+    } finally { app.close(); }
+    return;
+  }
+
   if (cmd === 'data' && sub === 'info') {
     // Data footprint (read-only, honest numbers from the real directory).
     const fs = await import('node:fs');

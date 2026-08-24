@@ -282,6 +282,15 @@ export const openDb = (dbPath: string): Db => {
     integrityCheck: () => String(db.prepare('PRAGMA integrity_check').get()?.integrity_check ?? 'unknown'),
   };
   db.exec('PRAGMA journal_mode = WAL');
+  // WAL + synchronous=NORMAL is the SQLite-recommended pairing (perf profile
+  // 2026-08-24: FULL fsyncs the WAL on EVERY commit — 5544ms vs 83ms per 3000
+  // single-statement transactions, a 67x write bottleneck on the event spine).
+  // Durability semantics, stated honestly: a PROCESS crash loses nothing (the
+  // commit is in the OS page cache and the -wal recovers); a POWER LOSS may roll
+  // back the most recent commits — but the database can never corrupt, and every
+  // lost unit was one atomic transaction (the hash chain stays self-consistent).
+  // Full fsync-per-commit is available by setting FARLAB_DB_SYNCHRONOUS=FULL.
+  db.exec(`PRAGMA synchronous = ${process.env.FARLAB_DB_SYNCHRONOUS === 'FULL' ? 'FULL' : 'NORMAL'}`);
   db.exec('PRAGMA foreign_keys = ON');
   migrate(db);
   return db;
@@ -289,6 +298,16 @@ export const openDb = (dbPath: string): Db => {
 
 const migrate = (db: Db): void => {
   let current = Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0);
+  // Fail-visible downgrade guard (reliability 2026-08-24): a db written by a NEWER
+  // build (user_version > HEAD) may carry schema the running code does not
+  // understand — silently opening it risks misreads and corrupting writes. The
+  // honest contract is forward-only: refuse and tell the user to upgrade.
+  const head = MIGRATIONS.length > 0 ? MIGRATIONS[MIGRATIONS.length - 1]!.version : 0;
+  if (current > head) {
+    throw new Error(
+      `far.db schema version ${current} is newer than this build supports (<= ${head}) — the workspace was created by a newer FAR-Lab. Upgrade FAR-Lab (or open the workspace with that version) instead of downgrading; no changes were made.`,
+    );
+  }
   for (const m of MIGRATIONS) {
     if (m.version <= current) continue;
     db.transaction(() => {
