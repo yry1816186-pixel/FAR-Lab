@@ -6,7 +6,7 @@ verified `git rev-parse` == worktree HEAD at setup). Worktree
 
 ## 1. Commits
 
-- `<filled at commit time>` feat(web): conversation↔research seam (dock + #conv routes) + state-honesty fixes
+- `a4bc56e` feat(web): conversation↔research seam (dock + #conv routes) + state-honesty fixes (16 files, +667/−62)
 
 ## 2. What changed and why
 
