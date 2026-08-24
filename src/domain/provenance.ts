@@ -114,6 +114,21 @@ export const ReproducibilityBundle = z.object({
     artifactHashes: z.array(z.string().length(64)),
     lockfileHash: z.string().length(64).optional(),
   })).optional(),
+  /**
+   * Lane-07 scientific-communication artifacts: deterministic figures/tables rendered from
+   * the SAME stored objects as the paper outline (zero LLM, zero network). Content-
+   * addressed refs into the artifact store; absent on pre-lane-07 bundles.
+   */
+  figures: z.array(z.object({
+    name: z.string().min(1),
+    ref: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+    description: z.string().min(1),
+  })).optional(),
+  tables: z.array(z.object({
+    name: z.string().min(1),
+    ref: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+    format: z.enum(['md', 'csv']),
+  })).optional(),
   createdAt: z.string().datetime(),
 });
 export type ReproducibilityBundle = z.infer<typeof ReproducibilityBundle>;

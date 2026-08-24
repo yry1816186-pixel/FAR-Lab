@@ -27,13 +27,39 @@ export const PaperLimitation = z.object({
 });
 export type PaperLimitation = z.infer<typeof PaperLimitation>;
 
+/**
+ * Mirrors SourceDocument.verification.retractionStatus (source.ts owns the semantic).
+ * Duplicated here so the paper projection schema stays self-contained; the values MUST
+ * stay in sync with source.ts.
+ */
+export const PaperRetractionStatus = z.enum(['retracted', 'corrected', 'expression_of_concern', 'reinstated']);
+export type PaperRetractionStatus = z.infer<typeof PaperRetractionStatus>;
+
 /** One BibTeX entry generated strictly from stored SourceDocument metadata (no network). */
 export const PaperReference = z.object({
   key: z.string().regex(/^[a-zA-Z0-9_-]+$/),
   bibtex: z.string().min(1),
   sourceDocumentId: SourceDocumentId,
+  /** Present only when the stored source's verification carried one — never inferred. */
+  retractionStatus: PaperRetractionStatus.optional(),
 });
 export type PaperReference = z.infer<typeof PaperReference>;
+
+/**
+ * Related-work line: one per cited source, projected from the SAME retrieved corpus the
+ * references came from. `resolved` is undefined when the source was never verified.
+ */
+export const PaperRelatedWork = z.object({
+  key: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+  sourceDocumentId: SourceDocumentId,
+  title: z.string(),
+  year: z.number().int().optional(),
+  venue: z.string().optional(),
+  contentDepth: z.string().min(1),
+  resolved: z.boolean().optional(),
+  retractionStatus: PaperRetractionStatus.optional(),
+});
+export type PaperRelatedWork = z.infer<typeof PaperRelatedWork>;
 
 export const PaperOutline = z.object({
   /** The research question text is the title (the store's own words, never invented). */
@@ -42,6 +68,8 @@ export const PaperOutline = z.object({
   abstractPoints: z.array(z.object({
     text: z.string().min(1),
     sourceRef: PaperSourceRef,
+    /** BibTeX key of the claim's grounding source, when that source is in `references`. */
+    citationKey: z.string().regex(/^[a-zA-Z0-9_-]+$/).optional(),
   })).default([]),
   introduction: z.object({
     gapStatement: z.string(),
@@ -50,6 +78,8 @@ export const PaperOutline = z.object({
       hypothesisId: HypothesisId,
       statement: z.string().min(1),
     })).default([]),
+    /** One entry per cited source (same set as `references`), retrieved-corpus-scoped. */
+    relatedWork: z.array(PaperRelatedWork).default([]),
   }),
   methods: z.object({
     /** Null when no plan object is stored (honest degradation). */
@@ -93,6 +123,8 @@ export const PaperOutline = z.object({
       claimId: ClaimId,
       text: z.string(),
       relation: z.string(),
+      /** BibTeX key of the counter-claim's grounding source, when it is in `references`. */
+      citationKey: z.string().regex(/^[a-zA-Z0-9_-]+$/).optional(),
     })).default([]),
   }),
   conclusion: z.object({

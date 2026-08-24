@@ -68,18 +68,21 @@ interface BibtexEntry {
   key: string;
   bibtex: string;
   sourceDocumentId: string;
+  retractionStatus: NonNullable<SourceDocument['verification']>['retractionStatus'];
 }
 
 /**
  * One @article/@misc entry per cited source. @article only when BOTH venue and year are
  * on file; otherwise @misc with an honest note. Fields with no stored value are omitted —
- * authors/years are never invented.
+ * authors/years are never invented. A stored retraction status is rendered into the note
+ * (and the reference entry) so a retracted source can never read as an ordinary citation.
  */
 const buildBibtexEntry = (source: SourceDocument, disambiguate: (base: string) => string): BibtexEntry => {
   const doi = source.identifiers.find((i) => i.kind === 'doi')?.value;
   const arxiv = source.identifiers.find((i) => i.kind === 'arxiv')?.value;
   const hasVenue = source.venue !== undefined && source.venue.trim().length > 0;
   const isArticle = hasVenue && source.publicationYear !== undefined;
+  const retractionStatus = source.verification?.retractionStatus;
 
   const key = disambiguate(
     `${surnameOf(source.authors)}${source.publicationYear !== undefined ? source.publicationYear : 'nd'}${firstTitleWord(source.title)}`,
@@ -93,6 +96,7 @@ const buildBibtexEntry = (source: SourceDocument, disambiguate: (base: string) =
   if (doi !== undefined) fields.push(`  doi = {${escapeBibtex(doi)}}`);
 
   const noteParts: string[] = [];
+  if (retractionStatus !== undefined) noteParts.push(`STATUS: ${retractionStatus.toUpperCase()} — do not cite as ordinary support`);
   if (arxiv !== undefined) noteParts.push(`arXiv: ${arxiv}`);
   if (!isArticle && hasVenue && source.venue !== undefined) noteParts.push(`venue on file (year unknown): ${source.venue}`);
   if (!isArticle && doi === undefined && arxiv === undefined && !hasVenue) {
@@ -104,7 +108,7 @@ const buildBibtexEntry = (source: SourceDocument, disambiguate: (base: string) =
   }
 
   const type = isArticle ? 'article' : 'misc';
-  return { key, bibtex: `@${type}{${key},\n${fields.join(',\n')}\n}`, sourceDocumentId: source.id };
+  return { key, bibtex: `@${type}{${key},\n${fields.join(',\n')}\n}`, sourceDocumentId: source.id, retractionStatus };
 };
 
 /** Deterministic key allocation: first come first served; collisions get a/b/c suffixes. */
@@ -268,7 +272,6 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
       if (claim === undefined) return []; // dangling claim ref — dropped, never rendered
       return [{ claimId: claim.id, text: claim.text, relation: r.relation }];
     });
-
   // ---- conclusion: open falsifications + FULL uncertainty inventory (monotonic) ----
   const conclusion: PaperOutline['conclusion'] = {
     openFalsificationConditions: representatives
@@ -353,11 +356,13 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
     });
   }
 
-  // ---- references: cited sources (top hypotheses' claim grounding), BibTeX from stored metadata ----
+  // ---- references: cited sources (top hypotheses' claim grounding + counter-evidence
+  // highlights' claims), BibTeX from stored metadata ----
   const citedClaimIds = new Set<string>();
   for (const { hyp } of top) {
     for (const cid of [...hyp.supportingClaimIds, ...hyp.counterClaimIds]) citedClaimIds.add(cid);
   }
+  for (const h of counterEvidenceHighlights) citedClaimIds.add(h.claimId);
   const citedSourceIds: string[] = [];
   const seenSourceIds = new Set<string>();
   for (const cid of [...citedClaimIds].sort()) {
@@ -400,19 +405,51 @@ export const buildPaperOutline = (store: Store, runId: string, opts: BuildPaperO
       return [buildBibtexEntry(source, allocateKey)];
     })
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
-    .map(({ key, bibtex, sourceDocumentId }) => ({ key, bibtex, sourceDocumentId }));
+    .map(({ key, bibtex, sourceDocumentId, retractionStatus }) => ({ key, bibtex, sourceDocumentId, ...(retractionStatus !== undefined ? { retractionStatus } : {}) }));
+
+  // Inline citation keys: claim -> grounding source -> reference key. A claim whose source
+  // is not in the reference list renders WITHOUT a key — never an invented citation.
+  const keyBySourceId = new Map(references.map((r) => [r.sourceDocumentId, r.key] as const));
+  const claimCitationKey = (claimId: string): string | undefined => {
+    const sid = claimById.get(claimId)?.locators[0]?.sourceDocumentId;
+    return sid !== undefined ? keyBySourceId.get(sid) : undefined;
+  };
+  const withCitationKey = <T extends object>(obj: T, key: string | undefined): T & { citationKey?: string } =>
+    key === undefined ? obj : { ...obj, citationKey: key };
+  const abstractWithCitations = abstractPoints.map((p) =>
+    p.sourceRef.kind === 'claim' ? withCitationKey(p, claimCitationKey(p.sourceRef.id)) : p,
+  );
+  const counterWithCitations = counterEvidenceHighlights.map((h) => withCitationKey(h, claimCitationKey(h.claimId)));
+
+  // Related work: one line per reference entry — the SAME deduped, retrieved-corpus-scoped
+  // set the bibliography came from. Depth/verification/retraction disclosed per line.
+  const relatedWork = references.flatMap((ref) => {
+    const s = sourceById.get(ref.sourceDocumentId);
+    if (s === undefined) return [];
+    return [{
+      key: ref.key,
+      sourceDocumentId: ref.sourceDocumentId,
+      title: s.title,
+      year: s.publicationYear,
+      venue: s.venue,
+      contentDepth: s.contentDepth,
+      resolved: s.verification?.resolved,
+      ...(ref.retractionStatus !== undefined ? { retractionStatus: ref.retractionStatus } : {}),
+    }];
+  });
 
   return PaperOutline.parse({
     title: question !== null ? question.text : `Untitled research product (question object missing for run ${run.id})`,
     runId: run.id,
-    abstractPoints,
+    abstractPoints: abstractWithCitations,
     introduction: {
       gapStatement,
       contributions: top.map(({ hyp }) => ({ hypothesisId: hyp.id, statement: hyp.statement })),
+      relatedWork,
     },
     methods,
     results,
-    discussion: { orderingInterpretation, counterEvidenceHighlights },
+    discussion: { orderingInterpretation, counterEvidenceHighlights: counterWithCitations },
     conclusion,
     limitations,
     references,
@@ -454,7 +491,9 @@ export const renderPaperMarkdown = (outline: PaperOutline): string => {
   if (outline.abstractPoints.length === 0) {
     push('(No abstract points: no ranked hypotheses or verified claims are stored for this run.)');
   } else {
-    for (const p of outline.abstractPoints) push(`- ${p.text} (source: ${refLabel(p.sourceRef)})`);
+    for (const p of outline.abstractPoints) {
+      push(`- ${p.text} (source: ${refLabel(p.sourceRef)}${p.citationKey !== undefined ? ` [@${p.citationKey}]` : ''})`);
+    }
   }
   push('');
 
@@ -469,6 +508,22 @@ export const renderPaperMarkdown = (outline: PaperOutline): string => {
       push(`${i + 1}. ${c.statement} (hypothesis \`${c.hypothesisId}\`)`);
     });
   }
+  push('', '**Related work (retrieved corpus).**', '');
+  if (outline.introduction.relatedWork.length === 0) {
+    push('(No cited sources resolved from the stored claims — the related-work list is empty for this run.)');
+  } else {
+    for (const w of outline.introduction.relatedWork) {
+      const bits = [
+        w.year !== undefined ? String(w.year) : 'year unknown',
+        w.venue !== undefined && w.venue.length > 0 ? w.venue : 'no venue on file',
+        `depth=${w.contentDepth}`,
+      ];
+      if (w.resolved !== undefined) bits.push(`identifier resolved=${w.resolved}`);
+      if (w.retractionStatus !== undefined) bits.push(`⚠️ ${w.retractionStatus}`);
+      push(`- [@${w.key}] ${w.title} (${bits.join('; ')})`);
+    }
+  }
+  push('', 'Related-work scope is THIS run\'s retrieved corpus only — it is not a systematic literature review.', '');
   push('');
 
   // ---- 2 Methods ----
@@ -529,7 +584,7 @@ export const renderPaperMarkdown = (outline: PaperOutline): string => {
     );
   } else {
     for (const c of outline.discussion.counterEvidenceHighlights) {
-      push(`- [${c.relation}] ${c.text} (claim \`${c.claimId}\`)`);
+      push(`- [${c.relation}] ${c.text} (claim \`${c.claimId}\`${c.citationKey !== undefined ? ` [@${c.citationKey}]` : ''})`);
     }
   }
   push('');
@@ -564,6 +619,15 @@ export const renderPaperMarkdown = (outline: PaperOutline): string => {
 
   // ---- References ----
   push('## References', '');
+  push('> Inline citations use Pandoc-style keys `[@key]`; render with `pandoc --citeproc` for formatted citations.', '');
+  const flagged = outline.references.filter((r) => r.retractionStatus !== undefined);
+  if (flagged.length > 0) {
+    push('> ⚠️ Retraction/correction status on file — do not use as ordinary support without checking:', '');
+    for (const r of flagged) {
+      push(`> - [@${r.key}] — ${r.retractionStatus}`);
+    }
+    push('');
+  }
   if (outline.references.length === 0) {
     push('(No cited source documents resolved from the top hypotheses\' claim references.)');
   } else {
