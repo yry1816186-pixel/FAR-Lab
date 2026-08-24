@@ -16,7 +16,7 @@ import { snapshotHash } from '../../sources/snapshot.js';
 import { defaultFetchFullText } from '../../sources/fulltext.js';
 import { finalGradeCertainty, hasExplicitQuantity } from '../../domain/claim.js';
 import { crossRelationStrength, relationStrength, type RelationStrengthInput } from '../../domain/evidence-strength.js';
-import { extractMeanN, grimCheck, rangeGuard, extractStats } from '../../domain/stat-forensics.js';
+import { extractMeanN, grimCheck, rangeGuard, extractStats, eValue, extractRiskRatios } from '../../domain/stat-forensics.js';
 import type { CorpusSnapshot, SourceFamily } from '../../domain/source.js';
 import type { RawRetrievalResult, SourceAdapter } from '../../shared/ports.js';
 
@@ -397,6 +397,12 @@ export const buildEvidenceStage: StageHandler = {
             // RU-5 GO2: deterministic range/domain guard (impossible p/percent/
             // CI/SD values that GRIM's granularity check cannot see).
             ...rangeGuard(extractStats(candidate.quote)).map((f) => f.detail),
+            // SCIENCE lane (2026-08-24): E-value activation — the VanderWeele-Ding
+            // closed form was implemented but had ZERO production callers. When the
+            // verbatim quote carries a risk ratio, the minimum unmeasured-confounding
+            // strength needed to explain the association away is now disclosed on the
+            // claim (advisory transparency, no downgrade).
+            ...extractRiskRatios(candidate.quote).slice(0, 2).map((rr) => eValue(rr).detail),
           ],
           // GRADE-lite at admission (W-G/F-B): contradiction signals are unknown this
           // early (relations are judged later) — honestly 0 at this point, and the
