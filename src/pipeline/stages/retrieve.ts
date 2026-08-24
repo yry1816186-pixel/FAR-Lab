@@ -763,6 +763,89 @@ export const retrieveStage: StageHandler = {
       );
     }
 
+    // ---- SCIENCE lane (2026-08-24): citation-graph expansion (PRISMA-style snowballing) ----
+    // Single-round keyword recall structurally misses the literature CONNECTED to
+    // what it found. The two standard systematic-review snowball levers: BACKWARD
+    // (what the seed cites — OpenAlex referenced_works, one batched ids.openalex
+    // filter) and FORWARD (who cites the seed — filter=cites:, where failed
+    // replications and contradictions live). Bounded: top-3 openalex seeds by RRF,
+    // <=50 backward ids, 6 forward results per seed; every search receipted and
+    // query-logged; failures degrade visibly and never block. Chase records merge
+    // through the SAME dedup pool and compete under the SAME RRF/rerank/cap — a
+    // chased document earns its seat, it is never guaranteed one.
+    const CHASE_SEED_LIMIT = 3;
+    const CHASE_BACKWARD_IDS_CAP = 50;
+    const CHASE_FORWARD_PER_SEED = 6;
+    const chaseTargetBase = targets.length;
+    let citationChaseSearches = 0;
+    let chaseForwardRecords = 0;
+    let chaseBackwardRecords = 0;
+    const chaseNotes: string[] = [];
+    const openalexAdapter = ctx.sourceFor('openalex');
+    const openalexIdOf = (rec: RawSourceRecord): string | undefined =>
+      rec.identifiers.find((i) => i.kind === 'openalex')?.value;
+    if (typeof openalexAdapter.searchFiltered === 'function' && pool.size > 0) {
+      const seedsForChase = fusedOrder([...pool.values()])
+        .filter((e) => e.family === 'openalex' && openalexIdOf(e.record) !== undefined)
+        .slice(0, CHASE_SEED_LIMIT);
+      const chaseSearch = async (filter: string, limit: number, targetIdx: number): Promise<number> => {
+        try {
+          throwIfCancelled(ctx);
+          const res = await openalexAdapter.searchFiltered!(filter, { limit });
+          citationChaseSearches += 1;
+          executedQueries.push({ purpose: 'citation_chase', text: filter, family: 'openalex' });
+          ctx.recordReceipt({
+            kind: 'source_retrieval',
+            executionMode: 'live',
+            stage: 'retrieve',
+            redactionNote: 'citation-graph chase (PRISMA-style snowballing); per-record content hashes retained',
+            sourceRetrieval: {
+              family: 'openalex',
+              query: filter,
+              httpStatus: res.httpStatus,
+              resultCount: res.records.length,
+              contentHashes: res.records.map((r) => snapshotHash('openalex', r)),
+            },
+          });
+          poolYield('citation_chase', targetIdx, 'openalex', res.records.map((record, i) => ({ rank: i, record })));
+          return res.records.length;
+        } catch (e) {
+          if (isCancellationError(e)) throw e;
+          const msg = e instanceof Error ? e.message : String(e);
+          ctx.recordReceipt({
+            kind: 'source_retrieval',
+            executionMode: 'live',
+            stage: 'retrieve',
+            redactionNote: 'citation-graph chase FAILED (network/rate limit); enrichment only, corpus unaffected',
+            sourceRetrieval: {
+              family: 'openalex',
+              query: filter,
+              httpStatus: isSourceAdapterError(e) ? e.httpStatus : 0,
+              resultCount: 0,
+              contentHashes: [],
+            },
+          });
+          chaseNotes.push(`chase "${filter}" failed: ${msg.slice(0, 120)}`);
+          return 0;
+        }
+      };
+      for (const [i, seed] of seedsForChase.entries()) {
+        chaseForwardRecords += await chaseSearch(`cites:${openalexIdOf(seed.record)}`, CHASE_FORWARD_PER_SEED, chaseTargetBase + i);
+      }
+      const referenced = [...new Set(
+        seedsForChase.flatMap((s) => {
+          const refs = (s.record.normalized as { referenced_works?: unknown } | null)?.referenced_works;
+          return Array.isArray(refs) ? refs.filter((r): r is string => typeof r === 'string' && /^W\d+$/.test(r)) : [];
+        }),
+      )].slice(0, CHASE_BACKWARD_IDS_CAP);
+      if (referenced.length > 0) {
+        chaseBackwardRecords += await chaseSearch(`ids.openalex:${referenced.join('|')}`, CHASE_FORWARD_PER_SEED, chaseTargetBase + seedsForChase.length);
+      }
+      if (seedsForChase.length === 0) chaseNotes.push('no openalex-identified pool entries to seed the chase');
+    } else {
+      chaseNotes.push('citation chase skipped: openalex adapter lacks filter support');
+    }
+
     // ---- D-015 fusion: deterministic RRF order, then (under cap pressure) LLM listwise rerank ----
     // W6/F4: pools above one window rerank via the RankGPT bottom-up sliding window
     // (w=24, s=12) — each window is a full permutation over its slice, renumbered
@@ -860,6 +943,7 @@ export const retrieveStage: StageHandler = {
         ...(variantSearches > 0 ? { variantSearches } : {}),
         ...(failoverSearches > 0 ? { failoverSearches } : {}),
         ...(rerankWindows !== undefined ? { rerankWindows } : {}),
+        ...(citationChaseSearches > 0 ? { citationChaseSearches } : {}),
         selection: `cap ${selected.length} of pool ${pool.size} (RRF${rerankApplied ? ' + listwise rerank' : rerankFailure !== undefined ? ' after failed rerank' : ''})`,
       },
     });
@@ -873,6 +957,12 @@ export const retrieveStage: StageHandler = {
     if (rerankFailure !== undefined) parts.push(`listwise rerank FAILED — deterministic RRF order used (${rerankFailure})`);
     if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
     if (failoverSearches > 0) parts.push(`${failoverSearches} openalex->europepmc failover search(es)`);
+    if (citationChaseSearches > 0) {
+      parts.push(
+        `citation chase (PRISMA-style snowballing): ${citationChaseSearches} search(es) — ${chaseForwardRecords} forward record(s) via cites:, ${chaseBackwardRecords} backward record(s) via referenced_works; chase results compete in the same RRF/cap pool`,
+      );
+    }
+    for (const n of chaseNotes) parts.push(`citation chase note: ${n}`);
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
     if (fuzzyMerges > 0) parts.push(`${fuzzyMerges} duplicate record(s) merged by normalized title+year (cross-source)`);
     if (minhashMerges > 0) parts.push(`${minhashMerges} near-duplicate record(s) merged by MinHash (paraphrased/CJK titles)`);
