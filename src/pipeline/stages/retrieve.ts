@@ -875,6 +875,7 @@ export const retrieveStage: StageHandler = {
     if (failoverSearches > 0) parts.push(`${failoverSearches} openalex->europepmc failover search(es)`);
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
     if (fuzzyMerges > 0) parts.push(`${fuzzyMerges} duplicate record(s) merged by normalized title+year (cross-source)`);
+    if (minhashMerges > 0) parts.push(`${minhashMerges} near-duplicate record(s) merged by MinHash (paraphrased/CJK titles)`);
     if (droppedNoIdentifier > 0) parts.push(`${droppedNoIdentifier} record(s) without identifiers dropped`);
     if (selected.length < fused.length) parts.push(`truncated at cap ${MAX_DOCUMENTS}`);
     if (seeds.length > 0) parts.push(`${seeds.length} user-provided source(s) included (guaranteed, provenance=user_provided)`);
