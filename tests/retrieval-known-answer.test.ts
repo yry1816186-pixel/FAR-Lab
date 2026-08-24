@@ -350,10 +350,10 @@ describe('known-answer retrieval benchmark (offline, real stage code)', () => {
       docs.some((d) => d !== null && d.identifiers.some((i) => needle.identifiers.some((n) => n.value === i.value)));
 
     // --- known-answer recall@12: 6/6 gold (G1 G2 supporting, G3 G4 counter, G5 chase-only, G7 hop-2-only)
+    // (the per-gold loop IS the recall assertion; no derived ratio needed)
     for (const gold of [...GOLD_SUPPORT, ...GOLD_COUNTER, GOLD_CHASE, GOLD_HOP2]) {
       expect(docIs(gold), `gold doc missing from corpus: ${gold.title}`).toBe(true);
     }
-    const recall = (6 / 6).toFixed(2);
 
     // --- counter-evidence recall: both counter golds survived the cap (seat floor evidence)
     expect(docIs(G3) && docIs(G4)).toBe(true);
@@ -416,17 +416,18 @@ describe('known-answer retrieval benchmark (offline, real stage code)', () => {
 
     // --- rerank exercised (pool 16 > cap 12) and applied
     expect(corpus.fusion?.rerankApplied).toBe(true);
-    expect(corpus.fusion?.counterSeatsKept).toBeGreaterThanOrEqual(2);
+    // engineered counter-origin set {G1,G3,G4,F1} is fully inside the top-12:
+    // the seat floor is met WITHOUT displacement — pin exactly (drift-catcher)
+    expect(corpus.fusion?.counterSeatsKept).toBe(4);
 
     // --- provenance: chase searches receipted (hop-1 refs+cites per seed + hop-2 refs)
     const receipts = env.store.listObjects('receipt', env.run.id).filter((r) => r.kind === 'source_retrieval');
     const chaseReceipts = receipts.filter((r) => /citation-chase/.test(r.redactionNote ?? ''));
     expect(chaseReceipts.length).toBe(7);
 
-    // benchmark number surfaced for the run log (recall@12 on the known gold set)
+    // benchmark surfaced in the run log
     expect(out.summary).toContain('citation chase');
     expect(out.summary).toContain('corpus mix');
-    expect(Number(recall)).toBe(1);
   });
 
   it('saturation honesty (negative control): a corpus that keeps finding new docs is NOT marked saturated', async () => {
@@ -473,7 +474,22 @@ describe('known-answer retrieval benchmark (offline, real stage code)', () => {
     },
   });
 
+  /** OpenAlex-shaped retracted record: the flag is the realistic primary-family signal (RU-R cand.1). */
   const retractedRecord = (): RawSourceRecord =>
+    rec(
+      'Intermittent fasting cures type two diabetes a landmark trial',
+      [{ kind: 'doi', value: '10.1/r1' }],
+      {
+        publicationYear: 2020,
+        normalized: {
+          title: 'Intermittent fasting cures type two diabetes a landmark trial',
+          is_retracted: true,
+        },
+      },
+    );
+
+  /** Crossref-shaped: update-to carries the richer classification (kept for the under-cap case). */
+  const retractedUpdateToRecord = (): RawSourceRecord =>
     rec(
       'Intermittent fasting cures type two diabetes a landmark trial',
       [{ kind: 'doi', value: '10.1/r1' }],
@@ -536,12 +552,13 @@ describe('known-answer retrieval benchmark (offline, real stage code)', () => {
   it('retracted-paper (under-cap pool): the retracted document stays visible WITH its status persisted', async () => {
     // 4 valid + 1 retracted = pool 5 <= cap: no silent drop — the corpus keeps it,
     // flagged, for downstream claim-level demotion (GRADE floor, uncertainty).
+    // This case rides the Crossref update-to shape (richer signal path).
     const smallValid = (n: number): RawSourceRecord =>
       rec(`Small valid cohort ${n} on fasting and insulin`, [{ kind: 'doi', value: `10.1/sv${n}` }]);
     const env = makeEnv(
       [{ forPurpose: 'query-planning', rawOutput: JSON.stringify(PLAN) }],
       {
-        openalex: anyQueryAdapter('openalex', () => [retractedRecord()]),
+        openalex: anyQueryAdapter('openalex', () => [retractedUpdateToRecord()]),
         arxiv: anyQueryAdapter('arxiv', () => [smallValid(1), smallValid(2)]),
         crossref: anyQueryAdapter('crossref', () => [smallValid(3)]),
         europepmc: anyQueryAdapter('europepmc', () => [smallValid(4)]),

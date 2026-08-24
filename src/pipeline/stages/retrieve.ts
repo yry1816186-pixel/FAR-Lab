@@ -857,6 +857,7 @@ export const retrieveStage: StageHandler = {
             if (isCancellationError(e)) throw e;
             if (isChaseAbortError(e)) {
               outcome.failure = `aborted at ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+              ctx.recordReceipt(failedReceipt('openalex', `refs:${seed.workRef}`, e, false)); // attempts are provenance facts
               ctx.log(`retrieve: citation chase ${outcome.failure}`);
               break chaseLoop;
             }
@@ -891,6 +892,7 @@ export const retrieveStage: StageHandler = {
             if (isCancellationError(e)) throw e;
             if (isChaseAbortError(e)) {
               outcome.failure = `aborted at ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+              ctx.recordReceipt(failedReceipt('openalex', `cites:${seed.workRef}`, e, false)); // attempts are provenance facts
               ctx.log(`retrieve: citation chase ${outcome.failure}`);
               break chaseLoop;
             }
@@ -934,6 +936,7 @@ export const retrieveStage: StageHandler = {
               if (isCancellationError(e)) throw e;
               if (isChaseAbortError(e)) {
                 outcome.failure = `aborted at hop2 ${hop2Seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+                ctx.recordReceipt(failedReceipt('openalex', `refs2:${hop2Seed.workRef}`, e, false)); // attempts are provenance facts
                 ctx.log(`retrieve: citation chase ${outcome.failure}`);
               } else {
                 ctx.recordReceipt(failedReceipt('openalex', `refs2:${hop2Seed.workRef}`, e, false));

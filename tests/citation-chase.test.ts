@@ -17,6 +17,7 @@ import {
   fromOpenalexType,
 } from '../src/sources/pubtype.js';
 import { createOpenAlexAdapter } from '../src/sources/openalex.js';
+import { SourceAdapterError } from '../src/sources/error.js';
 import type { FetchLike, FetchResponseLike } from '../src/sources/http.js';
 import { isSourceAdapterError } from '../src/sources/error.js';
 
@@ -164,6 +165,29 @@ describe('isChaseAbortError', () => {
   it('does not abort on ordinary parse/network errors (per-seed skip instead)', () => {
     expect(isChaseAbortError(new Error('response is not valid JSON'))).toBe(false);
     expect(isChaseAbortError(new Error('http 500'))).toBe(false);
+  });
+
+  it('couples to the REAL adapter error shape: a SourceAdapterError with httpStatus 429 aborts (audit P3)', () => {
+    // isChaseAbortError matches on the message; the constructor is what puts
+    // `httpStatus=429` into it — pin that coupling so a message-format refactor
+    // cannot silently break chase aborts in production paths.
+    const rateLimited = new SourceAdapterError({
+      family: 'openalex',
+      kind: 'http_status',
+      httpStatus: 429,
+      query: 'refs:W101',
+      message: 'too many requests',
+    });
+    expect(rateLimited.message).toContain('httpStatus=429');
+    expect(isChaseAbortError(rateLimited)).toBe(true);
+    const serverError = new SourceAdapterError({
+      family: 'openalex',
+      kind: 'http_status',
+      httpStatus: 500,
+      query: 'refs:W101',
+      message: 'upstream broke',
+    });
+    expect(isChaseAbortError(serverError)).toBe(false);
   });
 });
 
