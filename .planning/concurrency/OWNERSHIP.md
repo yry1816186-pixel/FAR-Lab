@@ -61,7 +61,8 @@ never by a second implementation.
 - `src/pipeline/stages/{scope,verify,hypotheses,hypothesis-dedup,falsify,rank,plan,plan-formal,revise,guard,shared,execute,feedback}.ts`
   (`execute.ts`/`feedback.ts` runtime semantics co-signed by 10 via handoff)
 - `src/pipeline/{llm,types}.ts`
-- `src/app/{evaluators,quality-gate,iteration,verify}.ts`
+- `src/app/{evaluators,quality-gate,iteration,verify}.ts`,
+  `src/server/hypothesis-ops.ts`
 - Semantic edits to `src/domain/{iteration,formal,stat-forensics,conformal,revision-predicates,hypothesis,plan,prediction,scorecard}.ts`
   (handoff note required; 12 stewards structure)
 - Do NOT touch: orchestrator stage order (08 co-owns, handoff), experiment
