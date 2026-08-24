@@ -1,0 +1,227 @@
+{
+  "measuredAt": "2026-08-24T05:32:40.584Z",
+  "config": {
+    "rounds": 40,
+    "concurrency": 6,
+    "heavySubtasks": 14,
+    "sampleMs": 1000,
+    "elapsedMs": 178567
+  },
+  "totals": {
+    "runs": 45,
+    "events": 23526,
+    "objects": 7379,
+    "receipts": 7294,
+    "artifactBlobs": 7294,
+    "dbBytes": 25681920,
+    "walBytes": 4226960
+  },
+  "growth": {
+    "rssFirstMb": 64.3,
+    "rssLastMb": 101.1,
+    "rssGrowthMb": 36.8,
+    "rssAllowanceMb": 120,
+    "handleFirst": 0,
+    "handleLast": 0,
+    "handleGrowth": 0,
+    "dbGrowthBytes": 25677824,
+    "artifactBytesGrowth": 3491265
+  },
+  "verdicts": {
+    "rssBounded": true,
+    "handlesBounded": true,
+    "chainIntact": true,
+    "storageProportional": true
+  },
+  "storageDetail": {
+    "bytesPerRow": 831,
+    "walBytes": 4226960,
+    "walBounded": true,
+    "dbBytes": 25681920
+  },
+  "leaseRaces": 0,
+  "chainResults": [
+    {
+      "id": "run_mxzc20cg8ktjxm0jekg4shw8fk",
+      "ok": true
+    },
+    {
+      "id": "run_mj38nemh6nwngz12wjh17zzeb9",
+      "ok": true
+    },
+    {
+      "id": "run_23z9t69xbpmp2m83eqeh4v2ryx",
+      "ok": true
+    },
+    {
+      "id": "run_8nvdantthrd4npm690a5j6shdq",
+      "ok": true
+    },
+    {
+      "id": "run_3tg1edpwpsj2bp8hfebjf5ma29",
+      "ok": true
+    },
+    {
+      "id": "run_stxsfe7by3dwvx2y8c9bqhng5r",
+      "ok": true
+    },
+    {
+      "id": "run_vekp1rd25rt1pjc3qfx4tcmqm3",
+      "ok": true
+    },
+    {
+      "id": "run_fnhmc1ssryfwwfv9r6g3kkkq52",
+      "ok": true
+    },
+    {
+      "id": "run_4bcbfnyvwg2nys27syhmcafcrj",
+      "ok": true
+    },
+    {
+      "id": "run_e34vew3zy1yh9zwvfhgv6vr4h5",
+      "ok": true
+    },
+    {
+      "id": "run_8tvrv57j0eg3bmaaxa175gn0xx",
+      "ok": true
+    },
+    {
+      "id": "run_1med5fcy14695f32gr3xn0mfr8",
+      "ok": true
+    },
+    {
+      "id": "run_2xkmwxsq1pnqsh5pk451pmbnbt",
+      "ok": true
+    },
+    {
+      "id": "run_exzxfzgeyqaqbgag0kkvatfted",
+      "ok": true
+    },
+    {
+      "id": "run_mtebxxc4eae2an8tgprqsmt30j",
+      "ok": true
+    },
+    {
+      "id": "run_mvdttyge9qgqcsdpnzabc1hx9s",
+      "ok": true
+    },
+    {
+      "id": "run_ka06gzkf8xax1d3tv551f4eckv",
+      "ok": true
+    },
+    {
+      "id": "run_nevwardnmcd56jrk7j5rnj0qfb",
+      "ok": true
+    },
+    {
+      "id": "run_dbtdgcz9g5daevz17chn2heg71",
+      "ok": true
+    },
+    {
+      "id": "run_318zc81rcxw0ezkrgdq5z75qak",
+      "ok": true
+    },
+    {
+      "id": "run_qxb8gkdqjq51zd65bwb4adt2ds",
+      "ok": true
+    },
+    {
+      "id": "run_egnqwd9ekhm2h7kvzw51gm95mb",
+      "ok": true
+    },
+    {
+      "id": "run_rqhmqycecqq1msb3qmep032ns3",
+      "ok": true
+    },
+    {
+      "id": "run_dcny9qcamwvjn7n4krfhg0aw4f",
+      "ok": true
+    },
+    {
+      "id": "run_2fv5bm51jnxa5k3y2q10txpxvt",
+      "ok": true
+    },
+    {
+      "id": "run_qr35xnjrxq4wx08h5tys8brzrj",
+      "ok": true
+    },
+    {
+      "id": "run_mrqax5w2f1k4ggrt9ywwfyjdmr",
+      "ok": true
+    },
+    {
+      "id": "run_jwmb4k7gqm9dqb951ycx4arcfp",
+      "ok": true
+    },
+    {
+      "id": "run_dgx47car9x2w0svb2zk34627ge",
+      "ok": true
+    },
+    {
+      "id": "run_34rt263dbn5d891a5y0qh1fsh1",
+      "ok": true
+    },
+    {
+      "id": "run_wpy31nmx9r9ejj15trv5a9cqe0",
+      "ok": true
+    },
+    {
+      "id": "run_ewznemcdbmh0vbfy9hhst9gycr",
+      "ok": true
+    },
+    {
+      "id": "run_s2jedaew3zqt2h0jy2bzjs6g3f",
+      "ok": true
+    },
+    {
+      "id": "run_g5v4babcc3y5r5g58gmvaa5by1",
+      "ok": true
+    },
+    {
+      "id": "run_jw5k2tcznk1mmagwxbrcfy6yzk",
+      "ok": true
+    },
+    {
+      "id": "run_cqnhn8t741kajzrnrj56863x02",
+      "ok": true
+    },
+    {
+      "id": "run_h53ypfzb5wpmff7c4hg0ph2mcd",
+      "ok": true
+    },
+    {
+      "id": "run_ea15t2rb08pbq2ggyaej9hjjgc",
+      "ok": true
+    },
+    {
+      "id": "run_n26svffxxryc8ptk61qmd0tyzm",
+      "ok": true
+    },
+    {
+      "id": "run_791k5nsx634xy31pjxzs66jps5",
+      "ok": true
+    },
+    {
+      "id": "run_y3g4z065et90am3mj02z3e1f5g",
+      "ok": true
+    },
+    {
+      "id": "run_zr09fp2vq19tpyyzchmfb0mgnd",
+      "ok": true
+    },
+    {
+      "id": "run_y943fx83gry46res9ahbrrtzw0",
+      "ok": true
+    },
+    {
+      "id": "run_44ar8qwcbj7vytp5p4mgxctwh9",
+      "ok": true
+    },
+    {
+      "id": "run_kaab4td7fawcet5tr0ryew8c8n",
+      "ok": true
+    }
+  ],
+  "sampleCount": 2,
+  "verdict": "PASS"
+}

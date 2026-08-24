@@ -1,0 +1,67 @@
+{
+  "measuredAt": "2026-08-24T05:38:23.493Z",
+  "entries": [
+    {
+      "name": "cli-cold-start#1",
+      "ms": 146
+    },
+    {
+      "name": "cli-cold-start#2",
+      "ms": 133
+    },
+    {
+      "name": "cli-cold-start#3",
+      "ms": 127
+    },
+    {
+      "name": "seed-15k-appendEvent",
+      "ms": 3500,
+      "detail": "15,000 appended events (write throughput context)"
+    },
+    {
+      "name": "createApp(open+migrate+compose)",
+      "ms": 27
+    },
+    {
+      "name": "api-server-start",
+      "ms": 18
+    },
+    {
+      "name": "GET /api/v1/runs",
+      "ms": 17
+    },
+    {
+      "name": "GET /api/v1/runs/:id (15k-event run)",
+      "ms": 4
+    },
+    {
+      "name": "GET /api/v1/runs/:id/events?afterSeq=14990",
+      "ms": 79
+    },
+    {
+      "name": "GET /api/v1/health (audit-chain lazy verify)",
+      "ms": 48
+    },
+    {
+      "name": "GET /api/v1/health (cached chain)",
+      "ms": 1
+    },
+    {
+      "name": "SSE subscribe (open + first bytes)",
+      "ms": 4
+    },
+    {
+      "name": "store.listEvents(15k) full read",
+      "ms": 77,
+      "detail": "15001 rows"
+    },
+    {
+      "name": "store.verifyEventChain(15k)",
+      "ms": 33
+    },
+    {
+      "name": "store.workspaceCounts()",
+      "ms": 1
+    }
+  ]
+}

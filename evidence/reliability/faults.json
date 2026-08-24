@@ -1,0 +1,103 @@
+{
+  "measuredAt": "2026-08-24T13:38:53.588Z",
+  "results": [
+    {
+      "case": "sigint-mid-run",
+      "verdict": "PASS",
+      "summary": "child exit=null/SIGINT frozen=running chainOk=true recovered=completed",
+      "frozenStatus": "running",
+      "chainOk": true,
+      "recoveredStatus": "completed",
+      "childExit": null
+    },
+    {
+      "case": "db-busy-concurrent-writer",
+      "verdict": "PASS",
+      "summary": "append succeeded under 2.5s exclusive writer (waited 1964ms; busy_timeout 10s), chain intact",
+      "appendOk": true,
+      "waitedMs": 1964,
+      "chainOk": true
+    },
+    {
+      "case": "db-corruption-detected",
+      "verdict": "PASS",
+      "summary": "mid-file byte flip => integrity_check=*** in database main ***\nTree 21 page 21: btreeInitPage() returns error code 11",
+      "openThrew": false,
+      "integrity": "*** in database main ***\nTree 21 page 21: btreeInitPage() returns error code 11",
+      "detected": true
+    },
+    {
+      "case": "disk-full-artifact-put",
+      "verdict": "PASS",
+      "summary": "ENOSPC on 2nd write => put failed (ENOSPC), landed-blob-at-final-path=false, residue=0 temp file(s)",
+      "failVisible": true,
+      "enospcCode": "ENOSPC",
+      "partialBlob": false,
+      "files": []
+    },
+    {
+      "case": "perm-denied-artifact-put",
+      "verdict": "PASS",
+      "summary": "EACCES at mkdir => put failed visibly (code=EACCES), blobs landed=0",
+      "failVisible": true,
+      "code": "EACCES",
+      "blobs": 0
+    },
+    {
+      "case": "duplicate-execute-rejected",
+      "verdict": "PASS",
+      "summary": "cross-process concurrent execute: completed=1, RunLeaseHeldError=1, chain=true, maxStageAttempt=2 (quality-gate reopen, audited) — single-writer enforced",
+      "outcomes": [
+        {
+          "pid": 39844,
+          "outcome": "fulfilled",
+          "status": "completed"
+        },
+        {
+          "pid": 44224,
+          "outcome": "rejected",
+          "errorName": "RunLeaseHeldError"
+        }
+      ],
+      "chainOk": true,
+      "maxAttempt": 2,
+      "qualityReopens": 1
+    },
+    {
+      "case": "model-fault-sequence",
+      "verdict": "PASS",
+      "summary": "injected 429→502→ECONNRESET→malformed through the REAL retry core: faultAttempt=provider_error (fail-visible), cleanAttempt=ok, backoffSleeps=[10,2000]",
+      "attempts": [
+        "provider_error",
+        "ok"
+      ],
+      "sleeps": [
+        10,
+        2000
+      ]
+    },
+    {
+      "case": "outbox-drain-idempotent",
+      "verdict": "PASS",
+      "summary": "intent persisted, drained after reopen: first={\"drained\":1,\"failed\":[]}, second={\"drained\":0,\"failed\":[]}, pending=0",
+      "d1": {
+        "drained": 1,
+        "failed": []
+      },
+      "d2": {
+        "drained": 0,
+        "failed": []
+      },
+      "pending": 0
+    },
+    {
+      "case": "concurrent-append-two-processes",
+      "verdict": "PASS",
+      "summary": "2 procs × 40 appends: exits 0/0, raceNotes=80/80 unique=80, chain=true, seqMonotonic=true",
+      "chainOk": true,
+      "raceNotes": 80,
+      "raceUnique": 80,
+      "monotonic": true
+    }
+  ]
+}
