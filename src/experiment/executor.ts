@@ -5,6 +5,7 @@ import type { ArtifactStore } from '../shared/ports.js';
 import {
   newId, ExperimentSpec,
   checkExperimentSpec, mechanicalVerdict, impliedPowerFor, POWER_METHOD,
+  REGRESSOR_BUILDERS,
   type ExperimentRun, type ResultCell, type ResultSet, type StatReport,
   type FeedbackSignal, type HypothesisCandidate, type SplitOutcome, type SidecarStatsResult,
 } from '../domain/index.js';
@@ -275,13 +276,15 @@ export const executeExperiment = async (
     const lock = sidecar.lockfileHash();
     persist({
       ...expRun, status: 'running', startedAt: now(),
-      environment: { pythonVersion: env.pythonVersion, versions: env.versions, lockfileHash: lock ?? undefined },
+      environment: { pythonVersion: env.pythonVersion, versions: env.versions, lockfileHash: lock ?? undefined, ...(env.hardware !== undefined ? { hardware: env.hardware } : {}) },
     }, 'experiment_started', { id: expRun.id, python: env.pythonVersion, versions: env.versions });
 
     // RU-8 GO1 pre-execution dataset audit (verdict ceiling = data quality):
     // leakage or exact duplicates make a preregistered verdict MEANINGLESS —
     // refuse before training spend. Label issues are advisory and disclosed in
     // the audit note (data is never auto-mutated).
+    // R2-10: the label-issue half is classification-shaped (class-index cross-val);
+    // regression targets get leakage/duplicate checks only, with the skip disclosed.
     interface DatasetAuditResult {
       rows: { train: number; test: number };
       exactDuplicates: { train: number; test: number };
@@ -290,29 +293,41 @@ export const executeExperiment = async (
       labelIssueRate: number | null;
       verdict: 'ok' | 'degraded';
     }
-    const audit = await sidecar.call<DatasetAuditResult>('dataset_audit', {
-      csvPath: artifacts.path(record.contentRef),
-      targetColumn: use.targetColumn,
-      trainIdx: outcome.trainIdx,
-      testIdx: outcome.testIdx,
-      seed: spec.models[0]?.seed ?? 0,
-    }, spec.compute.timeoutMs);
-    if (!audit.ok || audit.result === undefined) fail(audit.error?.message ?? 'dataset_audit returned no result');
-    const a = audit.result;
-    // Findings are DISCLOSED, never execution-refusing: small discrete datasets
-    // legitimately contain identical rows, so a hard gate would reject valid
-    // specs (proven by the CLI fixture). The audit verdict rides the event and
-    // the bundle; preregistered statistics + disclosure keep the verdict honest.
-    store.appendEvent(spec.runId, {
-      type: 'note',
-      detail: {
-        kind: 'dataset_audit',
-        rows: a.rows,
-        labelIssueCount: a.labelIssueCount,
-        labelIssueRate: a.labelIssueRate,
-        verdict: a.verdict,
-      },
-    });
+    const regressionTask = spec.models.every((m) => REGRESSOR_BUILDERS.includes(m.builderId));
+    if (regressionTask) {
+      store.appendEvent(spec.runId, {
+        type: 'note',
+        detail: {
+          kind: 'dataset_audit',
+          skipped: true,
+          reason: 'regression spec: label-issue detection is classification-shaped (class-index cross-validation); no class audit applies to a float target',
+        },
+      });
+    } else {
+      const audit = await sidecar.call<DatasetAuditResult>('dataset_audit', {
+        csvPath: artifacts.path(record.contentRef),
+        targetColumn: use.targetColumn,
+        trainIdx: outcome.trainIdx,
+        testIdx: outcome.testIdx,
+        seed: spec.models[0]?.seed ?? 0,
+      }, spec.compute.timeoutMs);
+      if (!audit.ok || audit.result === undefined) fail(audit.error?.message ?? 'dataset_audit returned no result');
+      const a = audit.result;
+      // Findings are DISCLOSED, never execution-refusing: small discrete datasets
+      // legitimately contain identical rows, so a hard gate would reject valid
+      // specs (proven by the CLI fixture). The audit verdict rides the event and
+      // the bundle; preregistered statistics + disclosure keep the verdict honest.
+      store.appendEvent(spec.runId, {
+        type: 'note',
+        detail: {
+          kind: 'dataset_audit',
+          rows: a.rows,
+          labelIssueCount: a.labelIssueCount,
+          labelIssueRate: a.labelIssueRate,
+          verdict: a.verdict,
+        },
+      });
+    }
 
     // 4. Train/eval per model, with fingerprint dedup against earlier cells (D-086-1).
     const previousCells = (store.listObjects('result_set', spec.runId) as ResultSet[]).flatMap((rs) => rs.cells);
