@@ -430,7 +430,26 @@ beforeAll(async () => {
   run4 = r4.id;
 
   // main API server: staticRoot points at a directory that does not exist (no fake frontend)
-  api = createApiServer(app, { port: 0, executor, staticRoot: path.join(tmp, 'no-web-dist') });
+  api = createApiServer(app, {
+    port: 0, executor, staticRoot: path.join(tmp, 'no-web-dist'),
+    // counter-search test seam: offline fake adapters (no live source route)
+    counterSearchSourceFor: (family) => ({
+      family,
+      search: async () => ({
+        family, query: 'q', httpStatus: 200, latencyMs: 1,
+        records: [{
+          identifiers: [{ kind: 'doi', value: `10.1/counter-${family}` }],
+          title: `Counter evidence via ${family}`,
+          authors: ['T. Est'],
+          contentDepth: 'abstract' as const,
+          accessState: 'open' as const,
+          abstractText: 'contradicting findings',
+          normalized: { family },
+        }],
+      }),
+      resolve: async () => ({ found: false, httpStatus: 404 }),
+    }),
+  });
   const port = await api.start();
   base = `http://127.0.0.1:${port}`;
 
@@ -583,6 +602,27 @@ describe('GET /api/v1/runs and /api/v1/runs/:id', () => {
 
     const ghostTruth = await getJson(`${base}/api/v1/runs/${'run_' + 'a'.repeat(24)}/truth`);
     expect(ghostTruth.status).toBe(404);
+  });
+
+  it('executes a researcher-directed counter-search (§5.2) through the route with fake adapters', async () => {
+    const res = await postJson(`${base}/api/v1/runs/${run2}/counter-search`, { query: 'studies failing to replicate the effect' });
+    expect(res.status).toBe(201);
+    expect(res.body.runId).toBe(run2);
+    expect(res.body.query).toBe('studies failing to replicate the effect');
+    expect(res.body.added.length).toBeGreaterThan(0);
+    expect(res.body.receiptsRecorded).toBe(3);
+    // corpus versioned: latest snapshot contains the counter queries + new docs
+    const detail = await getJson(`${base}/api/v1/runs/${run2}`);
+    expect(detail.status).toBe(200);
+    // the truth projection sees the new live retrieval receipts; run2 also carries
+    // the replay retrieval receipt seeded by the truth test above -> honestly mixed
+    const truth = await getJson(`${base}/api/v1/runs/${run2}/truth`);
+    expect(truth.body.klass).toBe('mixed');
+    expect(truth.body.retrieval.live).toBeGreaterThanOrEqual(3);
+
+    const bad = await postJson(`${base}/api/v1/runs/${run2}/counter-search`, { query: 'ab' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('invalid_counter_search');
   });
 
   it('projects the evaluator family for a run (AVO fusion G8)', async () => {

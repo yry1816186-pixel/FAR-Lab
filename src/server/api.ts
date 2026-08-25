@@ -13,6 +13,7 @@ import {
 import { createCustomProvider } from '../providers/custom.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { runTruthProfile } from '../app/truth-profile.js';
+import { runCounterSearch, CounterSearchError } from './counter-search.js';
 import { buildLineageGraph } from '../app/lineage.js';
 import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
@@ -77,7 +78,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found';
   message: string;
   retryable: boolean;
   runId?: string;
@@ -92,6 +93,12 @@ export interface ApiServerOptions {
    * HTTP layer is exercised without live model/source routes.
    */
   executor?: (runId: string) => Promise<unknown>;
+  /**
+   * Test seam (NOT a product mock): per-family source-adapter resolver for the
+   * counter-search route. Product default is the canonical sourceAdapterFor;
+   * tests inject fakes so the HTTP layer is exercised without live source routes.
+   */
+  counterSearchSourceFor?: (family: import('../domain/source.js').SourceFamily) => import('../shared/ports.js').SourceAdapter;
   /** Static root served when present (SPA fallback to index.html). Default: <cwd>/web/dist. */
   staticRoot?: string;
   /**
@@ -1712,6 +1719,21 @@ function parseSeedSources(raw: unknown): string | {
         // incl. retrieval cache/replay composition. Read-only; receipts stay authoritative.
         mustGetRun(runId);
         sendJson(res, 200, runTruthProfile(app.store, runId));
+        return;
+      }
+      if (segments.length === 5 && segments[4] === 'counter-search' && method === 'POST') {
+        // §5.2 counter-evidence loop closure: execute ONE researcher-directed
+        // counter-evidence search against the live source plane and grow the run
+        // corpus (append-only snapshot versioning; receipts + events; lease-guarded).
+        const body = await readJsonObject(req);
+        try {
+          sendJson(res, 201, await runCounterSearch(app, runId, body, opts.counterSearchSourceFor));
+        } catch (e) {
+          if (e instanceof CounterSearchError) {
+            throw new HttpError(e.status, { code: e.code, message: e.message, retryable: false, runId });
+          }
+          throw e;
+        }
         return;
       }
       if (segments.length === 4) {

@@ -16,6 +16,7 @@ import { isActiveStatus, statusInk, watchLines } from './watch.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { buildLineageGraph } from '../app/lineage.js';
 import { runTruthProfile, truthDisclosureLine } from '../app/truth-profile.js';
+import { runCounterSearch, CounterSearchError } from '../server/counter-search.js';
 
 /** D-031: refuse to execute stages on a dist older than src (stale-build live incident). */
 const assertDistFresh = (): void => {
@@ -790,7 +791,7 @@ const main = async (): Promise<void> => {
   }
 
   const runId = positional(4);
-  const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export', 'lineage', 'supervise', 'fork'] as const;
+  const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export', 'lineage', 'supervise', 'fork', 'counter-search'] as const;
   if (sub !== undefined && (NEEDS_RUN as readonly string[]).includes(sub) && !runId) {
     // Same three-part error contract as the malformed-id path: what happened,
     // plus the single next action.
@@ -827,6 +828,29 @@ const main = async (): Promise<void> => {
         out(`  ${ink.bold('lease')}: ${lease.holder === null ? 'none' : `${lease.holder} (expires ${lease.expiresAt})`}${run.status === 'running' && !live ? `  ${ink.warn('[FROZEN — resume to recover]')}` : ''}`);
         out(`  ${truthDisclosureLine(truth)}`);
       }
+    } finally { app.close(); }
+    return;
+  }
+
+  if (sub === 'counter-search') {
+    // §5.2 counter-evidence loop closure: execute one researcher-directed
+    // counter-evidence search into the run's corpus (live sources, receipts,
+    // append-only corpus versioning). Same server capability as the API route.
+    const query = arg('--query');
+    if (query === undefined || query.trim().length < 4) die('counter-search requires --query "<missing counter-evidence search>" (min 4 chars)', 2);
+    const app = await createApp();
+    try {
+      const outcome = await runCounterSearch(app, rid, { query });
+      if (json()) jsonOutput(outcome);
+      else {
+        out(`${marker()} counter-search → ${outcome.added.length} 个新来源（重复跳过 ${outcome.duplicatesSkipped}，失败族 ${outcome.familyFailures.length}）`);
+        for (const a of outcome.added) out(`  + [${a.family}] ${a.title.slice(0, 90)}`);
+        out(`  ${ink.muted(outcome.note)}`);
+        if (outcome.familyFailures.length > 0) for (const f of outcome.familyFailures) out(`  ${ink.err('family failed')}: ${f.family} — ${f.reason.slice(0, 120)}`);
+      }
+    } catch (e) {
+      if (e instanceof CounterSearchError) die(e.message, e.status === 404 ? 4 : 2);
+      throw e;
     } finally { app.close(); }
     return;
   }
