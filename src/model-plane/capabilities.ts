@@ -90,6 +90,17 @@ const NO_MAX_TOKENS_WITH_SO =
   '官方结构化输出文档：开启结构化输出时勿设 max_tokens（截断产生无效 JSON）—— plane strips it on this route';
 const THINKING_NEEDS_STREAMING =
   '思考模式与结构化输出兼容但思考模式必须开流式；本 plane 结构化调用非流式—— 禁止组合（registry known-limitation）';
+/**
+ * Official FAQ fact (qwen-structured-output doc, re-verified 2026-08-25): on models
+ * whose json_object tier is served "非思考模式", enabling thinking while using
+ * response_format json_object "结构化输出可能失效" (may silently fail). The doc's own
+ * remediation: parse the thinking model's raw output; if json.loads fails, re-ask a
+ * cheap json-mode model with enable_thinking:false to repair. FAR-Lab's equivalent is
+ * the bounded corrective re-ask chain (http.ts) — the registry records the platform
+ * fact so callers never assume json_object+thinking is reliable.
+ */
+const THINKING_JSON_OBJECT_MAY_FAIL =
+  '官方 FAQ：json_object 档开思考「结构化输出可能失效」—— 组合不可靠，需 corrective re-ask 兜底（官方修复法=用廉价 json 模式模型 enable_thinking:false 复解析）';
 
 /**
  * Curated catalog — Qwen family on Bailian (competition-mandated base, §A1 of
@@ -136,7 +147,7 @@ const RAW_CATALOG: Array<z.input<typeof ModelCapabilities>> = [
     latencyClass: 'fast',
     priceRef: { currency: 'CNY', inputPerMTok: 0.2, outputPerMTok: 0.8, pricingNote: '≤32K 档；≤256K 0.6/2.4；≤1M 1.2/4.8', url: ALIYUN_BILLING },
     region: ['cn-beijing'],
-    knownLimitations: ['不支持 json_schema strict（仅 json_object）'],
+    knownLimitations: ['不支持 json_schema strict（仅 json_object）', THINKING_JSON_OBJECT_MAY_FAIL],
     interfaceNotes: [NO_MAX_TOKENS_WITH_SO],
     sourceRefs: src(ALIYUN_MODELS),
   },
@@ -201,7 +212,7 @@ const RAW_CATALOG: Array<z.input<typeof ModelCapabilities>> = [
     latencyClass: 'balanced',
     priceRef: { currency: 'CNY', inputPerMTok: 0.8, outputPerMTok: 2, pricingNote: '≤128K 档；思考输出 8；高档至 4.8/64', url: ALIYUN_BILLING },
     region: ['cn-beijing'],
-    knownLimitations: ['旧别名仍可路由；新工作建议 qwen3.7-plus', '不支持 json_schema strict'],
+    knownLimitations: ['旧别名仍可路由；新工作建议 qwen3.7-plus', '不支持 json_schema strict', THINKING_JSON_OBJECT_MAY_FAIL],
     interfaceNotes: [NO_MAX_TOKENS_WITH_SO],
     sourceRefs: src(ALIYUN_MODELS),
   },
@@ -374,6 +385,24 @@ export const capabilitiesForModel = (provider: string, modelId: string): ModelCa
 
 /** Is this model id a Qwen-family id (competition base-model rule)? 'qwen' not followed by another letter. */
 export const isQwenFamily = (modelId: string): boolean => /^qwen(?![a-z])/i.test(modelId.trim());
+
+/**
+ * Bailian (Model Studio) serving-endpoint fact: the DashScope global/international
+ * endpoints and the current per-workspace MaaS form ({WorkspaceId}.{region}.maas.
+ * aliyuncs.com/compatible-mode/v1) all live under *.aliyuncs.com (competition-route
+ * research §B1, re-verified 2026-08-25). Anything else — open.bigmodel.cn,
+ * api.deepseek.com, local runtimes, third-party proxies fronting Bailian — is NOT
+ * the sanctioned competition calling route; a fronting proxy can be re-admitted by
+ * the researcher by turning competition route mode off (documented trade-off).
+ */
+export const isBailianEndpoint = (baseUrl: string): boolean => {
+  try {
+    const host = new URL(baseUrl).hostname.toLowerCase();
+    return host === 'aliyuncs.com' || host.endsWith('.aliyuncs.com');
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Registry catalog view for discovery/UI: all curated entries for a provider
