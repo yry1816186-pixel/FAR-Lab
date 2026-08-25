@@ -1,0 +1,17 @@
+{
+  "probe": "p7-memory-benefit",
+  "verdict": "PASS",
+  "summary": "write OK; idempotence OK (memory=2/fts=2); compile OK; consume wiring present",
+  "findings": [],
+  "meta": {
+    "consolidated": {
+      "runId": "run_sdwjdk1kp9pxhxq24zdhmyewd3",
+      "itemsWritten": 2,
+      "skipped": []
+    },
+    "semanticCount": 1,
+    "memoryRows": 2,
+    "ftsRows": 2,
+    "priorCount": 1
+  }
+}

@@ -1,0 +1,1114 @@
+{
+  "probe": "p2-route-contract",
+  "verdict": "PASS",
+  "summary": "69 client-declared routes probed against the real server: {\"OK\":13,\"EXISTS_VALID\":46,\"EXISTS_UNAVAIL\":2,\"EXISTS_404\":8}",
+  "findings": [],
+  "meta": {
+    "routes": [
+      {
+        "route": "/api/v1/runs",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"runs\":[]}"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/events",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/sources",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/evidence",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/screening",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/screening/decisions",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/screening/stop",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/hypotheses",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/revisions",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/receipts",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/search",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "query length must be 2-200 chars (got 0)"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/experiments",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/bundles",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/reexport",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/corpus",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/report",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/paper",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/verify/:p",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"bundleId\":\"probe_x\",\"runId\":\"unknown\",\"declaredEvidenceLevel\":\"unknown\",\"verifiedAt\":\"2026-08-25T15:06:54.669Z\",\"check"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "field \"text\" is required (non-empty string: the research question)"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/cancel",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p",
+        "declaredMethod": "DELETE",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "DELETE",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/resume",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/health",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"status\":\"ok\",\"db\":\"ok\",\"auditChain\":{\"ok\":true,\"brokenRuns\":[],\"verifiedAt\":\"2026-08-25T15:06:54.677Z\"},\"watchdog\":\"ok"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/feedback",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"configs\":[],\"activeModelConfigId\":null,\"envDefault\":{\"name\":\"zai\",\"modelId\":\"glm-4.6\",\"liveReady\":true,\"defaultSource\""
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid model config: label: Required; wire: Required; baseUrl: Required; modelId: Required"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/:p",
+        "declaredMethod": "PUT",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "PUT",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid model config id format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/:p",
+        "declaredMethod": "DELETE",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "DELETE",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid model config id format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/active",
+        "declaredMethod": "PUT",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "PUT",
+            "status": 400,
+            "code": "validation",
+            "message": "field \"id\" is required (a model config id, or null to clear the default)"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/builtin-routes",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"routes\":[{\"name\":\"zai\",\"kind\":\"live\",\"liveReady\":true,\"baseUrl\":\"https://open.bigmodel.cn/api/anthropic\",\"apiKeyEnvVar"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/builtin-routes/:p",
+        "declaredMethod": "PUT",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "PUT",
+            "status": 400,
+            "code": "validation",
+            "message": "unknown or non-editable built-in route: probe_x (live routes: zai, dashscope)"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/builtin-routes",
+        "declaredMethod": "PUT",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "PUT",
+            "status": 400,
+            "code": "validation",
+            "message": "field \"name\" is required (a live built-in route name, or null to fall back to the env chain)"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/test",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid model config: wire: Required; baseUrl: Required; modelId: Required"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/usage",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"aggregates\":[]}"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/spend-limit",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"limitUsd\":null,\"spentUsd\":0,\"unpricedCalls\":0}"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/spend-limit",
+        "declaredMethod": "PUT",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "PUT",
+            "status": 400,
+            "code": "validation",
+            "message": "field \"limitUsd\" must be a positive number or null"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/model-configs/discover",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "discovery requires wire (\"openai\"|\"anthropic\") and baseUrl, or a stored configId"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/zotero/library",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_UNAVAIL",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 503,
+            "code": "provider_unreachable",
+            "message": "Zotero 本地服务不可用（fetch failed）— 请确认 Zotero 已启动"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/zotero/annotations",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_UNAVAIL",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 503,
+            "code": "provider_unreachable",
+            "message": "Zotero 本地服务不可用（fetch failed）— 请确认 Zotero 已启动"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"conversations\":[]}"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_404",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 404,
+            "code": "not_found",
+            "message": "conversation not found: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations",
+        "declaredMethod": "POST",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 201,
+            "code": null,
+            "message": "{\"conversation\":{\"id\":\"conv_xkntfad1gysp55nzfsnaa6rzsf\",\"title\":\"新对话\",\"status\":\"open\",\"messages\":[],\"runIds\":[],\"turns\":"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p/messages",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_404",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 404,
+            "code": "not_found",
+            "message": "conversation not found: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p/messages/:p/retry",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_404",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 404,
+            "code": "not_found",
+            "message": "conversation not found: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p/reasoning-gear",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_404",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 404,
+            "code": "not_found",
+            "message": "conversation not found: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p/reasoning-gear",
+        "declaredMethod": "PUT",
+        "kind": "EXISTS_404",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "PUT",
+            "status": 404,
+            "code": "not_found",
+            "message": "conversation not found: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p/launch",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "field \"text\" is required (the crystallized research question)"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p",
+        "declaredMethod": "DELETE",
+        "kind": "EXISTS_404",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "DELETE",
+            "status": 404,
+            "code": "not_found",
+            "message": "conversation not found: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p/proposals/:p",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid proposal id"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/conversations/:p/automations",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_404",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 404,
+            "code": "not_found",
+            "message": "conversation not found: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/automations",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"automations\":[]}"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/automations/:p",
+        "declaredMethod": "PATCH",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "PATCH",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid automation id"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/automations/:p",
+        "declaredMethod": "DELETE",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "DELETE",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid automation id"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/agent-policy",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"defaultPolicy\":\"ask_per_conversation\",\"remembered\":[]}"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/agent-policy/remember/:p",
+        "declaredMethod": "DELETE",
+        "kind": "EXISTS_404",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "DELETE",
+            "status": 404,
+            "code": "not_found",
+            "message": "conversation not found: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/meta",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"version\":\"0.1.0\",\"dataDir\":\"C:\\\\Users\\\\RICHAR~1\\\\AppData\\\\Local\\\\Temp\\\\r14-api-ARgaFw\"}"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/:p",
+        "declaredMethod": "GET",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/actions",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/tools",
+        "declaredMethod": "GET",
+        "kind": "OK",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 200,
+            "code": null,
+            "message": "{\"integrations\":[]}"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/tools",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid tool integration: kind: Invalid discriminator value. Expected 'mcp_server' | 'skill' | 'command' | 'hook_rule'"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/tools/:p",
+        "declaredMethod": "PUT",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "PUT",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid tool integration id format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/tools/:p",
+        "declaredMethod": "DELETE",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "DELETE",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid tool integration id format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/tools/:p/test",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid tool integration id format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/tools/import-plugin",
+        "declaredMethod": "POST",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/api/endpoints.ts"
+        ],
+        "attempts": [
+          {
+            "method": "POST",
+            "status": 400,
+            "code": "validation",
+            "message": "plugin import requires { dir, reviewed: true } — staging unreviewed plugins is refused: Required"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/lineage",
+        "declaredMethod": "PROBE",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/components/detail/ResearchStatePanel.tsx (raw literal)"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/supervision",
+        "declaredMethod": "PROBE",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/components/detail/ResearchStatePanel.tsx (raw literal)"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/evaluations",
+        "declaredMethod": "PROBE",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/components/detail/ResearchStatePanel.tsx (raw literal)"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      },
+      {
+        "route": "/api/v1/runs/:p/events/stream",
+        "declaredMethod": "PROBE",
+        "kind": "EXISTS_VALID",
+        "sources": [
+          "web/src/hooks/useEventStream.ts (raw literal)"
+        ],
+        "attempts": [
+          {
+            "method": "GET",
+            "status": 400,
+            "code": "validation",
+            "message": "invalid runId format: probe_x"
+          }
+        ]
+      }
+    ]
+  }
+}

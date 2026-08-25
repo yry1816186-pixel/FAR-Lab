@@ -1,0 +1,33 @@
+{
+  "probe": "p8-agent-isolation",
+  "verdict": "PASS",
+  "summary": "permission decisions: 4/4 as expected; loop enforcement wired; subagent policy inheritance present, depth cap present",
+  "findings": [],
+  "meta": {
+    "checks": [
+      {
+        "id": "execute-default",
+        "effect": "deny",
+        "ok": true
+      },
+      {
+        "id": "deny-beats-allow",
+        "effect": "deny",
+        "ok": true
+      },
+      {
+        "id": "explore-nonread",
+        "effect": "deny",
+        "ok": true
+      },
+      {
+        "id": "read-allow",
+        "effect": "allow",
+        "ok": true
+      }
+    ],
+    "loopWired": true,
+    "subagentSharesDeps": true,
+    "depthCap": true
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "probe": "p1-wiring",
+  "verdict": "ADVISORY",
+  "summary": "160 src modules; 6 unreachable from [src/server/main.ts, src/cli/main.ts]: 0 orphans, 6 test-only, 0 script-only; 3 files with non-literal dynamic imports",
+  "findings": [
+    {
+      "severity": "ADV",
+      "id": "P1-TEST-ONLY",
+      "detail": "src module wired only from tests: src/domain/conformal.ts (importers: test:tests/stat-forensics.test.ts)"
+    },
+    {
+      "severity": "ADV",
+      "id": "P1-TEST-ONLY",
+      "detail": "src module wired only from tests: src/domain/revision-predicates.ts (importers: test:tests/revision-predicates.test.ts)"
+    },
+    {
+      "severity": "ADV",
+      "id": "P1-TEST-ONLY",
+      "detail": "src module wired only from tests: src/domain/search-allocation.ts (importers: test:tests/search-allocation.test.ts)"
+    },
+    {
+      "severity": "ADV",
+      "id": "P1-TEST-ONLY",
+      "detail": "src module wired only from tests: src/experiment/matrix.ts (importers: test:tests/experiment-screening.test.ts, test:tests/experiment.test.ts)"
+    },
+    {
+      "severity": "ADV",
+      "id": "P1-TEST-ONLY",
+      "detail": "src module wired only from tests: src/plugins/host-main.ts (importers: test:tests/plugins.test.ts)"
+    },
+    {
+      "severity": "ADV",
+      "id": "P1-TEST-ONLY",
+      "detail": "src module wired only from tests: src/providers/deepseek.ts (importers: test:tests/providers.test.ts)"
+    },
+    {
+      "severity": "ADV",
+      "id": "P1-DYNAMIC-IMPORT",
+      "detail": "non-literal dynamic import() present — graph may under-count reachability: src/plugins/host-main.ts"
+    },
+    {
+      "severity": "ADV",
+      "id": "P1-DYNAMIC-IMPORT",
+      "detail": "non-literal dynamic import() present — graph may under-count reachability: src/plugins/import.ts"
+    },
+    {
+      "severity": "ADV",
+      "id": "P1-DYNAMIC-IMPORT",
+      "detail": "non-literal dynamic import() present — graph may under-count reachability: src/server/api.ts"
+    }
+  ],
+  "meta": {
+    "entries": [
+      "src/server/main.ts",
+      "src/cli/main.ts"
+    ],
+    "totalModules": 160,
+    "reachable": 154,
+    "unreachable": [
+      "src/domain/conformal.ts",
+      "src/domain/revision-predicates.ts",
+      "src/domain/search-allocation.ts",
+      "src/experiment/matrix.ts",
+      "src/plugins/host-main.ts",
+      "src/providers/deepseek.ts"
+    ],
+    "orphans": [],
+    "testOnly": [
+      {
+        "m": "src/domain/conformal.ts",
+        "importers": [
+          "test:tests/stat-forensics.test.ts"
+        ]
+      },
+      {
+        "m": "src/domain/revision-predicates.ts",
+        "importers": [
+          "test:tests/revision-predicates.test.ts"
+        ]
+      },
+      {
+        "m": "src/domain/search-allocation.ts",
+        "importers": [
+          "test:tests/search-allocation.test.ts"
+        ]
+      },
+      {
+        "m": "src/experiment/matrix.ts",
+        "importers": [
+          "test:tests/experiment-screening.test.ts",
+          "test:tests/experiment.test.ts"
+        ]
+      },
+      {
+        "m": "src/plugins/host-main.ts",
+        "importers": [
+          "test:tests/plugins.test.ts"
+        ]
+      },
+      {
+        "m": "src/providers/deepseek.ts",
+        "importers": [
+          "test:tests/providers.test.ts"
+        ]
+      }
+    ],
+    "scriptOnly": [],
+    "nonLiteralDynamic": [
+      "src/plugins/host-main.ts",
+      "src/plugins/import.ts",
+      "src/server/api.ts"
+    ]
+  }
+}
