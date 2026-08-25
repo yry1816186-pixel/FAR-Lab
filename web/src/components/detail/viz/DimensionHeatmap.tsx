@@ -45,7 +45,7 @@ export function DimensionHeatmap({
                 <td
                   key={i}
                   className="mono small"
-                  style={v !== null ? { background: `rgba(45, 120, 189, ${0.06 + 0.34 * v})` } : undefined}
+                  style={v !== null ? { background: `color-mix(in oklab, var(--v2-info) ${Math.round((0.06+0.34*v)*100)}%, transparent)` } : undefined}
                 >
                   {v !== null ? v.toFixed(2) : <span className="muted">—</span>}
                 </td>

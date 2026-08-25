@@ -52,7 +52,7 @@ export function PlanDag({ steps }: { steps: PlanStep[] }): JSX.Element | null {
             fill="none"
             strokeWidth={e.invalid ? 1.4 : 1.6}
             strokeDasharray={e.invalid ? '4 3' : undefined}
-            stroke={e.invalid ? '#b3352c' : focus !== null && (e.from === focus || e.to === focus) ? '#2d78bd' : '#9aa1ab'}
+            style={{ stroke: e.invalid ? 'var(--v2-refuted)' : focus !== null && (e.from === focus || e.to === focus) ? 'var(--v2-info)' : 'var(--v2-text-3)' }}
             opacity={focus === null || e.from === focus || e.to === focus || inChain(e.from) && inChain(e.to) ? 0.9 : 0.18}
           >
             {e.invalid && <title>{t('plan.dagInvalidEdge', { ref: e.from })}</title>}
@@ -88,7 +88,7 @@ export function PlanDag({ steps }: { steps: PlanStep[] }): JSX.Element | null {
                 className={`plan-dag-box${n.id === focus ? ' plan-dag-box--focus' : ''}`}
               />
               {n.invalidDeps.length > 0 && (
-                <circle cx={DAG_NODE_W - 10} cy={10} r={5} fill="#b3352c">
+                <circle cx={DAG_NODE_W - 10} cy={10} r={5} style={{ fill: 'var(--v2-refuted)' }}>
                   <title>{t('plan.dagInvalidDeps', { n: n.invalidDeps.length })}</title>
                 </circle>
               )}

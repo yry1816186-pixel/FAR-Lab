@@ -41,19 +41,21 @@ export function ForestPlot({ reports }: { reports: ForestInputReport[] }): JSX.E
                 .join('；')}`}
             >
               {g.scale.spansZero && (
-                <line x1={LABEL_W + x(0)} y1={0} x2={LABEL_W + x(0)} y2={g.rows.length * ROW_H} stroke="#9aa1ab" strokeDasharray="3 3" strokeWidth={1}>
+                <line x1={LABEL_W + x(0)} y1={0} x2={LABEL_W + x(0)} y2={g.rows.length * ROW_H} style={{ stroke: 'var(--v2-text-3)' }} strokeDasharray="3 3" strokeWidth={1}>
                   <title>0</title>
                 </line>
               )}
               {ticks.map((tv, i) => (
                 <g key={i}>
-                  <line x1={LABEL_W + x(tv)} y1={g.rows.length * ROW_H - 4} x2={LABEL_W + x(tv)} y2={g.rows.length * ROW_H} stroke="#c3c8d0" strokeWidth={1} />
+                  <line x1={LABEL_W + x(tv)} y1={g.rows.length * ROW_H - 4} x2={LABEL_W + x(tv)} y2={g.rows.length * ROW_H} style={{ stroke: 'var(--v2-border)' }} strokeWidth={1} />
                   <text x={LABEL_W + x(tv)} y={height - 6} textAnchor="middle" className="forest-tick">{fmt(tv)}</text>
                 </g>
               ))}
               {g.rows.map((r, i) => {
                 const cy = i * ROW_H + ROW_H / 2;
-                const verdictColor = r.verdict === 'supports' ? '#3d8b5f' : r.verdict === 'falsifies' ? '#b3352c' : '#2d78bd';
+                // verdict = epistemic semantics → the ONE token color family (§8.3);
+                // CSS vars resolve live, so the plot follows the theme without re-init.
+                const verdictColor = r.verdict === 'supports' ? 'var(--v2-verified)' : r.verdict === 'falsifies' ? 'var(--v2-refuted)' : 'var(--v2-info)';
                 return (
                   <g key={r.key}>
                     <text x={0} y={cy + 4} className="forest-label">
