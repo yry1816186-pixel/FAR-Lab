@@ -17,8 +17,8 @@ Usage:
   far research cancel <run-id>                   Request cancellation (checked between stage operations)
   far research resume <run-id> [--stop-after <stage>] [--json]
                                                   Resume a partial/failed run from its persisted checkpoint
-  far research export <run-id> --format report|bundle [--out <dir>] [--json]
-                                                  Export human report / reproducibility bundle to --out (default .far-run/exports)
+  far research export <run-id> --format report|bundle|package [--out <dir>]
+                                                  Export report / reproducibility bundle / full package (paper+bib+figures+tables+MANIFEST+RO-Crate; --formats docx,jats,html) to --out (default .far-run/exports)
   far research feedback <run-id> --source <kind> --content <text> [--target-kind <kind> --target-id <id>] [--json]
                                                   Record feedback on a run (source: human_expert|new_literature|new_dataset|
                                                   tool_result|simulation|experiment|reviewer|verification_failure|

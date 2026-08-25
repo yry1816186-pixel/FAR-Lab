@@ -14,6 +14,7 @@ import { mapBounded, STAGE_CONCURRENCY } from './shared.js';
 import { toDocument } from './retrieve.js';
 import { snapshotHash } from '../../sources/snapshot.js';
 import { defaultFetchFullText } from '../../sources/fulltext.js';
+import { persistSdm } from '../../ingest/service.js';
 import { finalGradeCertainty, hasExplicitQuantity } from '../../domain/claim.js';
 import { crossRelationStrength, relationStrength, type RelationStrengthInput } from '../../domain/evidence-strength.js';
 import { extractMeanN, grimCheck, rangeGuard, extractStats, eValue, extractRiskRatios, ciPairContext } from '../../domain/stat-forensics.js';
@@ -311,10 +312,19 @@ export const buildEvidenceStage: StageHandler = {
       const res = await fetchFullText(doc);
       if (res.status === 'fetched') {
         const put = await ctx.artifacts.put(res.fetch.text);
+        // 05→04 handoff 2026-08-24: persist the structured understanding next to
+        // the text artifact; failed parses are not worth an artifact (SDM carries
+        // the failure state only for fetched docs). Custom fetchers predating the
+        // sdm field keep exact legacy behavior (no sdm = nothing to persist).
+        let fullTextSdmRef: string | undefined;
+        if (res.fetch.sdm !== undefined && res.fetch.sdm.diagnostics.parseStatus !== 'failed') {
+          fullTextSdmRef = await persistSdm(ctx.artifacts, res.fetch.sdm);
+        }
         const updated: SourceDocument = {
           ...doc,
           contentDepth: 'full_text',
           fullTextRef: put.ref,
+          ...(fullTextSdmRef !== undefined ? { fullTextSdmRef } : {}),
           ...(res.fetch.license !== undefined ? { license: res.fetch.license } : {}),
         };
         ctx.store.putObject('source_document', updated);

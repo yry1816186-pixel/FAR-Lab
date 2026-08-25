@@ -47,6 +47,11 @@ export interface AssembleSessionInput {
   integrations: readonly ToolIntegration[];
   policy: CapabilityPolicy;
   skills?: AssemblySkillInput;
+  /** Builtin-tool admission into the permission engine. Default 'allow'
+   * (every builtin passes — refine semantics). 'read_class_only' admits only
+   * read-class builtins: the conversation-resident F-5 discipline (a future
+   * non-read builtin gets NO automatic allow and falls to the fail-closed default). */
+  builtinAdmission?: 'allow' | 'read_class_only';
   /** Hook-rule log sink (session event stream); absent drops log lines on the floor. */
   onHookLog?: (entry: { rule: string; event: 'before_tool' | 'after_tool' | 'turn_end'; turn: number; tool?: string; detail: string }) => void;
 }
@@ -106,7 +111,9 @@ export const assembleSessionCapabilities = async (input: AssembleSessionInput): 
   const knownTools: KnownTool[] = registry.names().map((name) => ({ name, riskClass: registry.get(name)?.riskClass }));
   const permissions = new PermissionEngine({
     rules: [
-      ...builtinTools.map((t) => ({ tool: t.name, effect: 'allow' as const })),
+      ...(input.builtinAdmission === 'read_class_only'
+        ? builtinTools.filter((t) => t.riskClass === 'read').map((t) => ({ tool: t.name, effect: 'allow' as const }))
+        : builtinTools.map((t) => ({ tool: t.name, effect: 'allow' as const }))),
       { tool: 'list_capabilities', effect: 'allow' as const },
       // Admitted (policy-passing) MCP servers contribute their adapted tools as
       // allow rules; risk classes are stamped per-integration and the explore

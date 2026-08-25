@@ -909,7 +909,27 @@ const main = async (): Promise<void> => {
       if (!run) die(`run not found: ${runId}`);
       const fs = await import('node:fs');
       fs.mkdirSync(outDir, { recursive: true });
-      if (format === 'bundle') {
+      if (format === 'package') {
+        // 07→03 handoff 2026-08-25: delegate to the lane-07 engine (no reimplementation).
+        // Same contract as scripts/export-manuscript.mjs: paper+report from the stored
+        // bundle, deterministic figures/tables/bib, MANIFEST sha256, RO-Crate 1.1.
+        const { buildReproducibilityPackage } = await import('../report/package.js');
+        const formatsRaw = arg('--formats');
+        try {
+          const result = await buildReproducibilityPackage(
+            { store: app.store, artifacts: app.artifacts }, rid,
+            { outDir, ...(formatsRaw !== undefined ? { formats: formatsRaw.split(',').map((f) => f.trim()).filter(Boolean) } : {}) },
+          );
+          if (json()) {
+            jsonOutput({ dir: result.dir, bundleId: result.bundleId, runId: result.runId, files: result.files.length, paperIncluded: result.paperIncluded, citations: result.citations, pandoc: result.pandoc });
+          } else {
+            out(`package written: ${result.dir} (${result.files.length} files · paper ${result.paperIncluded ? 'included' : 'absent'} · citations: ${result.citations ? `${result.citations.citedKeys.length} cited inline, ${result.citations.unresolved.length} unresolved, ${result.citations.uncited.length} uncited` : 'n/a'} · pandoc ${result.pandoc.version === null ? 'absent' : `v${result.pandoc.version}: produced [${result.pandoc.produced.join(', ')}]`})`);
+        for (const u of result.pandoc.unavailable) out(ink.muted(`  pandoc unavailable: ${u.format} — ${u.reason}`));
+          }
+        } catch (e) {
+          die(e instanceof Error ? e.message : String(e), 1, 'the export stage must run first: far research resume <id>');
+        }
+      } else if (format === 'bundle') {
         const bundles = app.store.listObjects('bundle', run.id);
         if (bundles.length === 0) die('no bundle stored for this run — run the export stage first (far research resume <id>)');
         const b = bundles[bundles.length - 1]!; // latest bundle (revisions may supersede earlier exports)

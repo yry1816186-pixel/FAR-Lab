@@ -62,6 +62,7 @@ export const SourceDocument = z.object({
   parseStatus: z.enum(['ok', 'partial', 'failed']),
   abstractText: z.string().optional(),
   fullTextRef: z.string().optional(), // artifact-store ref when depth=full_text
+  fullTextSdmRef: z.string().optional(), // structured fulltext understanding (sdm artifact; fetchable via GET /api/v1/ingest/:ref)
   license: z.string().optional(),
   oaUrl: z.string().url().optional(),
   /**

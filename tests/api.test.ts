@@ -1264,3 +1264,33 @@ describe('POST /api/v1/runs/:id/hypotheses/:hypId/<op> (B5)', () => {
     expect(app.store.getObject('hypothesis', ghost)).toBeNull();
   });
 });
+
+// ---- competition route gate switch (11→12 handoff) ---------------------------
+
+describe('GET/PUT /api/v1/competition-route', () => {
+  it('defaults off, PUT flips idempotently, invalid body is a 400', async () => {
+    const g0 = await getJson(`${base}/api/v1/competition-route`);
+    expect(g0.status).toBe(200);
+    expect(g0.body.competitionRouteMode).toBe('off');
+    const put = async (body: unknown): Promise<{ status: number; body: Json }> => {
+      const res = await fetch(`${base}/api/v1/competition-route`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return { status: res.status, body: (await res.json()) as Json };
+    };
+    const p1 = await put({ on: true });
+    expect(p1.status).toBe(200);
+    expect(p1.body.competitionRouteMode).toBe('on');
+    const g1 = await getJson(`${base}/api/v1/competition-route`);
+    expect(g1.body.competitionRouteMode).toBe('on');
+    const p2 = await put({ on: true }); // idempotent
+    expect(p2.status).toBe(200);
+    expect(p2.body.competitionRouteMode).toBe('on');
+    const bad = await put({ on: 'yes' });
+    expect(bad.status).toBe(400);
+    const p3 = await put({ on: false }); // restore
+    expect(p3.body.competitionRouteMode).toBe('off');
+  });
+});

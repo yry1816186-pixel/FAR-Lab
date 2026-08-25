@@ -783,6 +783,8 @@ function MessageBubble({
 
 const PROPOSAL_KIND_LABEL: Record<ConversationProposal['kind'], DictKey> = {
   launch_research: 'conv.proposal.launch_research',
+  cancel_run: 'conv.proposal.cancel_run',
+  create_tool_integration: 'conv.proposal.create_tool_integration',
   create_automation: 'conv.proposal.create_automation',
   cancel_automation: 'conv.proposal.cancel_automation',
 };

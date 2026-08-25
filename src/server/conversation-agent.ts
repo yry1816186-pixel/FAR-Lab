@@ -4,8 +4,8 @@ import { z } from 'zod';
 import type { App } from '../app/composition.js';
 import type { ModelProvider } from '../shared/ports.js';
 import { newId, CreateToolIntegrationArgsSchema, type Conversation, type ConversationMessage, type ConversationProposal, type ConversationSeed, type ToolTrace } from '../domain/index.js';
-import { ToolRegistry, type AgentTool, type ToolResult } from '../agent/tool.js';
-import { PermissionEngine } from '../agent/permissions.js';
+import type { AgentTool, ToolResult } from '../agent/tool.js';
+import { assembleSessionCapabilities } from '../agent/capabilities/assembly.js';
 import { SessionTelemetry } from '../agent/telemetry.js';
 import { runAgentLoop, type AgentLoopStatus } from '../agent/loop.js';
 import type { AgentEventSink, ReceiptSink, TranscriptEntry } from '../agent/protocol.js';
@@ -456,19 +456,6 @@ const makeProposeAction = (app: App, conv: Conversation, proposals: Conversation
 
 // ---- the turn ----
 
-/**
- * R2-13 F-5 fix: the conversation kernel's allow-expansion is keyed on the
- * registry's own risk class, not on registry membership. Read-class tools pass
- * (including propose_action — it only records an approval card; execution is
- * researcher-gated outside the loop). Anything else — an execute/edit-class
- * tool registered by a future kernel evolution — gets NO allow rule and falls
- * to the engine's fail-closed default instead of silently inheriting one.
- */
-export const conversationAllowRules = (tools: ToolRegistry): Array<{ tool: string; effect: 'allow' }> =>
-  tools.names()
-    .filter((name) => tools.get(name)?.riskClass === 'read')
-    .map((name) => ({ tool: name, effect: 'allow' as const }));
-
 export async function generateConversationTurn(
   app: App,
   provider: ModelProvider,
@@ -477,19 +464,34 @@ export async function generateConversationTurn(
 ): Promise<ConversationTurnGeneration> {
   const proposals: ConversationProposal[] = [];
   const toolTrace: ToolTrace[] = [];
-  const tools = new ToolRegistry()
-    .register(makeListRuns(app))
-    .register(makeGetRunDetails(app))
-    .register(makeGetRunPlan(app))
-    .register(makeSearchWorkspace(app))
-    .register(makeWorkspaceStatus(app))
-    .register(makeRecallMemory(app))
-    .register(makeRunSupervision(app))
-    .register(makeProposeAction(app, conv, proposals));
-  const permissions = new PermissionEngine({
-    rules: conversationAllowRules(tools),
-    defaultEffect: 'deny',
+  // 09→08 handoff 2026-08-25: the resident agent composes through the ONE
+  // authoritative session assembly — researcher-enabled MCP servers, skills and
+  // hook rules now join conversation sessions (read-class admission; refused or
+  // failed integrations stay visible to the model via list_capabilities).
+  // builtinAdmission 'read_class_only' preserves the R2-13 F-5 discipline inside
+  // the assembly: allow-expansion is keyed on risk class, so a future non-read
+  // builtin gets NO automatic allow and falls to the fail-closed default.
+  const assembly = await assembleSessionCapabilities({
+    builtinTools: [
+      makeListRuns(app),
+      makeGetRunDetails(app),
+      makeGetRunPlan(app),
+      makeSearchWorkspace(app),
+      makeWorkspaceStatus(app),
+      makeRecallMemory(app),
+      makeRunSupervision(app),
+      makeProposeAction(app, conv, proposals),
+    ],
+    integrations: app.store.listObjects('tool_integration', '__none__'),
+    policy: { capability: 'conversation-resident', admittedRiskClasses: ['read'] },
+    builtinAdmission: 'read_class_only',
+    skills: {
+      task: `${conv.title} ${input.text}`,
+      dirs: [{ dir: path.join(process.cwd(), 'skills'), tier: 'builtin' }],
+      limits: { maxCount: 3, maxChars: 4000 },
+    },
   });
+  const { registry: tools, permissions } = assembly;
 
   // Aggregating receipt collector (documented decision: conversation turns keep
   // usage on the message; full provenance receipts start when a run is launched).
@@ -553,10 +555,14 @@ export async function generateConversationTurn(
   const sessionId = input.resumePlan?.sessionId ?? input.sessionId ?? newId('ags');
   const rolloutDir = conversationRolloutDir(app);
 
-  const res = await runAgentLoop(
+  let res;
+  try {
+    res = await runAgentLoop(
     {
       capability: 'conversation-resident',
-      systemPrompt: RESIDENT_SYSTEM_PROMPT,
+      systemPrompt: assembly.skillsPrompt.length > 0
+        ? `${RESIDENT_SYSTEM_PROMPT}\n\n${assembly.skillsPrompt}`
+        : RESIDENT_SYSTEM_PROMPT,
       task,
       maxTurns: input.maxTurns ?? 8,
       resultSchema: ConversationAgentReplySchema,
@@ -604,6 +610,10 @@ export async function generateConversationTurn(
       rollout: openRolloutWriter(rolloutDir, sessionId),
     },
   );
+  } finally {
+    // session-scoped MCP clients built by the assembly never outlive the turn
+    await assembly.close();
+  }
 
   const tel = telemetry.summary();
   const usage: ConversationTurnUsage | undefined = usageModelCalls > 0 ? {
