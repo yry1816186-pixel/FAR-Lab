@@ -17,10 +17,13 @@ import { errorText } from '../common';
 export function RunControls({
   run,
   hasFeedback,
+  hasEvidenceDebt,
   onMutated,
 }: {
   run: ResearchRun;
   hasFeedback: boolean;
+  /** §5.2: unverified sources exist — resume reopens verify_sources+build_evidence. */
+  hasEvidenceDebt?: boolean;
   onMutated: () => void;
 }): JSX.Element {
   const { t } = useI18n();
@@ -37,13 +40,15 @@ export function RunControls({
   const resumeReason = ((): string | null => {
     if (run.status === 'running' || run.status === 'queued') return t('controls.resumeDisabled.running');
     if (run.status === 'created') return t('controls.resumeDisabled.createdQueued');
-    if (run.status === 'completed' && !hasFeedback) {
+    if (run.status === 'completed' && !hasFeedback && !hasEvidenceDebt) {
       // Spec example: completed + no pending feedback -> disabled with the honest reason.
       return t('controls.resumeDisabled.settled', { status: t('status.completed') });
     }
-    // paused / partial / cancelled / failed / completed-with-feedback -> resumable
-    // (cancelled resumes from checkpoint; failed retries from checkpoint; completed
-    // + feedback re-enters the feedback->revision loop).
+    // paused / partial / cancelled / failed / completed-with-feedback / completed-
+    // with-evidence-debt -> resumable (cancelled resumes from checkpoint; failed
+    // retries from checkpoint; completed + feedback re-enters the feedback->revision
+    // loop; completed + evidence debt reopens verify_sources+build_evidence for
+    // sources added after completion, e.g. counter-search).
     return null;
   })();
 

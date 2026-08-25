@@ -26,6 +26,20 @@ export interface SupervisionView {
 export interface EvaluationItem { id: string; status: 'pass' | 'warn' | 'fail'; detail: string; metrics: Record<string, number> }
 export interface EvaluationsView { runId: string; evaluations: EvaluationItem[] }
 
+/** L4 ledger stratum (server calibrationReport: n<30 honestly says insufficient). */
+export interface CalibrationStratum {
+  kind: string;
+  n: number;
+  meanRps: number;
+  meanBrier: number;
+  meanSkillVsUniform: number;
+  insufficientEvidence: boolean;
+}
+export interface CalibrationView {
+  entries: Array<{ id: string; kind: string; settledAt?: string; voidReason?: string }>;
+  report: { stratified: CalibrationStratum[]; settledTotal: number; openTotal: number };
+}
+
 const COUNTER_EDGE_KINDS = new Set(['counter_evidence', 'caused_revision']);
 
 async function getJson<T>(path: string): Promise<T> {
@@ -55,11 +69,13 @@ export function useRunTruth(runId: string | undefined): RunTruthProfile | null {
 /** One fetch per projection, abortable; failures surface per-section, never blank the page. */
 export function useResearchState(runId: string | undefined): {
   lineage: LineageGraph | null; supervision: SupervisionView | null; evaluations: EvaluationsView | null;
+  calibration: CalibrationView | null;
   error: string | null; loading: boolean;
 } {
   const [lineage, setLineage] = useState<LineageGraph | null>(null);
   const [supervision, setSupervision] = useState<SupervisionView | null>(null);
   const [evaluations, setEvaluations] = useState<EvaluationsView | null>(null);
+  const [calibration, setCalibration] = useState<CalibrationView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -70,12 +86,13 @@ export function useResearchState(runId: string | undefined): {
     setError(null);
     void (async () => {
       try {
-        const [l, s, e] = await Promise.all([
+        const [l, s, e, c] = await Promise.all([
           getJson<LineageGraph>(`/api/v1/runs/${encodeURIComponent(runId)}/lineage`),
           getJson<SupervisionView>(`/api/v1/runs/${encodeURIComponent(runId)}/supervision`),
           getJson<EvaluationsView>(`/api/v1/runs/${encodeURIComponent(runId)}/evaluations`),
+          getJson<CalibrationView>(`/api/v1/runs/${encodeURIComponent(runId)}/calibration`),
         ]);
-        setLineage(l); setSupervision(s); setEvaluations(e);
+        setLineage(l); setSupervision(s); setEvaluations(e); setCalibration(c);
       } catch (err) {
         if ((err as { name?: string }).name === 'AbortError') return;
         setError(err instanceof Error ? err.message : String(err));
@@ -86,7 +103,7 @@ export function useResearchState(runId: string | undefined): {
     return () => ctrl.abort();
   }, [runId]);
 
-  return { lineage, supervision, evaluations, error, loading };
+  return { lineage, supervision, evaluations, calibration, error, loading };
 }
 
 const SEVERITY_LABEL: Record<SupervisorSignal['severity'], string> = {
@@ -109,7 +126,7 @@ const STATUS_MARK: Record<EvaluationItem['status'], string> = { pass: '✓', war
  * fold into details for audit-grade drill-down.
  */
 export function ResearchStatePanel({ runId, runStatus }: { runId: string; runStatus?: string }): JSX.Element {
-  const { lineage, supervision, evaluations, error, loading } = useResearchState(runId);
+  const { lineage, supervision, evaluations, calibration, error, loading } = useResearchState(runId);
 
   if (loading && lineage === null && supervision === null) {
     return <div className="research-state" data-state="loading"><p>研究状态加载中…</p></div>;
@@ -219,6 +236,29 @@ export function ResearchStatePanel({ runId, runStatus }: { runId: string; runSta
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* --- L4 self-calibration ledger (forward predictions, settled by experiment verdicts) --- */}
+      {calibration !== null && calibration.entries.length > 0 && (
+        <div className="rs-calibration" data-testid="calibration">
+          <h4>前向预测账本（自校准）</h4>
+          <p>
+            {calibration.entries.length} 条前向预测 · 已结算 {calibration.report.settledTotal} · 未结算 {calibration.report.openTotal}
+            <span className="muted"> 结算以 RPS/Brier 对无知基线打分（实验判定驱动，确定性）</span>
+          </p>
+          {calibration.report.stratified.length > 0 && (
+            <ul>
+              {calibration.report.stratified.map((s) => (
+                <li key={s.kind}>
+                  [{s.kind}] n={s.n}
+                  {s.insufficientEvidence
+                    ? <span className="muted"> 样本 &lt;30——分层结论"证据不足"，不给出校准数字</span>
+                    : <> 平均技能 vs 无知基线 {s.meanSkillVsUniform >= 0 ? '+' : ''}{s.meanSkillVsUniform.toFixed(3)}（RPS {s.meanRps.toFixed(3)}）</>}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

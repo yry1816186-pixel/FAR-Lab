@@ -1163,6 +1163,15 @@ export const zh = {
   'truth.empty': '尚无外部证据',
   'truth.title': '执行真实性：{klass} — live 模型 {live} · 测试 {test} · live 检索 {rlive} · 缓存命中 {hit} · 过期 {stale} · 重放 {replay}（共 {total} 条回执）',
 
+  'counterSearch.placeholder': '找反证：输入要执行的定向检索（如某效应的重复失败研究）',
+  'counterSearch.go': '找反证',
+  'counterSearch.pending': '检索中…',
+  'counterSearch.hint': '对外部文献源执行一次定向检索，结果并入本语料（去重、上限 8 篇、全程留痕）',
+  'counterSearch.activeRun': '研究执行中——语料锁定；结束后再执行定向检索',
+  'counterSearch.added': '已并入 {n} 篇新来源（重复跳过 {dupes} 篇）。',
+  'counterSearch.emptyResult': '未新增来源：检索为空或全部重复。',
+  'counterSearch.failed': '定向检索失败',
+
   'common.retry': '重试',
   'screening.title': '文献主动筛选',
   'screening.entry': '主动筛选文献（{n} 篇待筛）',
@@ -2442,6 +2451,15 @@ export const en: Record<DictKey, string> = {
   'truth.synthetic': 'synthetic run',
   'truth.empty': 'no external evidence yet',
   'truth.title': 'Execution truth: {klass} — live models {live} · test {test} · live retrieval {rlive} · cache hits {hit} · stale {stale} · replay {replay} ({total} receipts)',
+
+  'counterSearch.placeholder': 'Find counter-evidence: a targeted search to run (e.g. failed replications of an effect)',
+  'counterSearch.go': 'Search',
+  'counterSearch.pending': 'Searching…',
+  'counterSearch.hint': 'One targeted live search against external sources; results join this corpus (deduped, capped at 8, fully receipted)',
+  'counterSearch.activeRun': 'Research is executing — corpus locked; run the targeted search after it settles',
+  'counterSearch.added': '{n} new sources joined the corpus ({dupes} duplicates skipped).',
+  'counterSearch.emptyResult': 'No new sources: empty results or all duplicates.',
+  'counterSearch.failed': 'Counter-evidence search failed',
 
   'common.retry': 'Retry',
   'screening.title': 'Active literature screening',

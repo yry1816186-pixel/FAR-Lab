@@ -125,11 +125,11 @@ export function App(): JSX.Element {
   usePolling(refreshRunsWithAbort, RUNS_POLL_MS, true);
 
   // Keep the selection honest: if the selected run vanished from a FRESH list
-  // (no delete API exists today; DB reset is the realistic path), deselect back
-  // to the welcome view. Never silently swap the researcher to a different
-  // study — context switching on their behalf breaks train of thought (B1 P0:
-  // this guard fired on the STALE list right after run creation and hijacked
-  // the selection to an unrelated run, corrupting the hash URL too).
+  // (deleted via the run-lifecycle DELETE /runs/:id — RunControls delete button),
+  // deselect back to the welcome view. Never silently swap the researcher to a
+  // different study — context switching on their behalf breaks train of thought
+  // (B1 P0: this guard fired on the STALE list right after run creation and
+  // hijacked the selection to an unrelated run, corrupting the hash URL too).
   useEffect(() => {
     if (selectedRunId !== null && !runsLoading && runs.length > 0 && !runs.some((r) => r.id === selectedRunId)) {
       setSelectedRunId(null);

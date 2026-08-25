@@ -656,6 +656,11 @@ function parseSeedSources(raw: unknown): string | {
         rationale: it.rationale,
         unblockHints: it.unblockHints,
       })),
+      // §5.2 evidence debt: unverified sources exist (counter-search / seeds landed
+      // after completion) — resume reopens verify_sources+build_evidence for them.
+      hasEvidenceDebt: app.store
+        .listObjects('source_document', runId)
+        .some((d) => d.verification === undefined),
       // BP-4 usage ledger: receipt-derived tokens/cost for THIS run (pricing only
       // when user-declared; unknown stays unknown — no invented price tables).
       usage: aggregateRunUsage(app.store, runId),

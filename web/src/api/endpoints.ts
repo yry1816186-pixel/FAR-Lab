@@ -269,6 +269,26 @@ export const resumeRun = async (runId: string, signal?: AbortSignal): Promise<vo
   await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/resume`, {}, signal);
 };
 
+/** §5.2 counter-evidence search: one researcher-directed live search into the run
+ *  corpus; returns what was added/skipped (server caps + dedups + versions corpus). */
+export interface CounterSearchOutcome {
+  runId: string;
+  query: string;
+  corpusSnapshotId: string;
+  added: Array<{ id: string; title: string; family: string; identifiers: Array<{ kind: string; value: string }> }>;
+  duplicatesSkipped: number;
+  familyFailures: Array<{ family: string; reason: string }>;
+  receiptsRecorded: number;
+  note: string;
+}
+export const counterSearch = async (runId: string, query: string, signal?: AbortSignal): Promise<CounterSearchOutcome> => {
+  const data: unknown = await api.post(`${BASE}/runs/${encodeURIComponent(runId)}/counter-search`, { query }, signal);
+  if (typeof data === 'object' && data !== null && 'added' in data && 'corpusSnapshotId' in data && 'note' in data) {
+    return data as CounterSearchOutcome;
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: 'counter-search 响应结构与预期不符', status: 200, retryable: false });
+};
+
 /** Workbench health strip (P-IA) — fail-visible: schema drift surfaces as ApiError, never as fake-ok. */
 export const getHealth = async (signal?: AbortSignal): Promise<HealthReport> => {
   const data: unknown = await api.getJson(`${BASE}/health`, signal);

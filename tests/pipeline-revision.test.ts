@@ -11,6 +11,7 @@ import { reviseStage } from '../src/pipeline/stages/revise.js';
 import {
   FeedbackSignal,
   HypothesisCandidate,
+  LedgerEntry,
   ResearchPlan,
   ResearchQuestion,
   ResearchRun,
@@ -265,6 +266,96 @@ describe('feedback stage', () => {
     const out = await feedbackStage.execute(ctx);
     expect(out.kind).toBe('done');
     expect(store.listEvents(run.id).filter((e) => e.type === 'feedback_received')).toHaveLength(1);
+  });
+
+  // ---- L4 settlement over the REAL executor feedback shape ----
+  // src/experiment/executor.ts buildFeedback writes: source 'experiment',
+  // target {kind:'hypothesis'}, structured {verdicts: [...]} (5-class array).
+
+  const seedLedger = (runId: RunId, hypId: string) => {
+    const expected = LedgerEntry.parse({
+      id: newId('prd'), runId, kind: 'expected_relation', stage: 'plan',
+      predictor: 'test',
+      assertion: { hypothesisId: hypId, observable: 'off-target count', condition: 'per-locus', expectedRelation: 'supports H1' },
+      predictedAt: ts(3), settlesWith: 'experiment_verdict',
+    });
+    const rank = LedgerEntry.parse({
+      id: newId('prd'), runId, kind: 'rank_order', stage: 'rank',
+      predictor: 'test',
+      assertion: { topHypothesisId: hypId },
+      predictedAt: ts(3), settlesWith: 'experiment_verdict',
+    });
+    store.putObject('prediction', expected);
+    store.putObject('prediction', rank);
+    return { expected, rank };
+  };
+
+  const experimentSignal = (runId: RunId, hypId: string, verdicts: string[], experimentRunId = newId('exp')) =>
+    FeedbackSignal.parse({
+      id: newId('fbk'),
+      runId,
+      source: 'experiment',
+      content: `comparison verdicts: ${verdicts.join(', ')}`,
+      structured: { experimentRunId, statReportIds: [newId('srep')], verdicts },
+      target: { kind: 'hypothesis', id: hypId },
+      provenance: `experiment-executor:${experimentRunId}`,
+      receivedAt: ts(4),
+    });
+
+  it('settles expected_relation + rank_order from the executor shape (worst verdict wins; insufficient_data ignored)', async () => {
+    const { run } = seedRun();
+    const hyp = seedHypothesis(run.id);
+    store.putObject('hypothesis', hyp);
+    const { expected, rank } = seedLedger(run.id, hyp.id);
+    store.putObject('feedback', experimentSignal(run.id, hyp.id, ['supports', 'insufficient_data', 'falsifies']));
+
+    const { ctx } = makeCtx(run, []);
+    const out = await feedbackStage.execute(ctx);
+    expect(out.kind).toBe('done');
+    expect(out.kind === 'done' ? out.summary : '').toMatch(/2 ledger prediction\(s\) settled/);
+
+    const settledExpected = store.getObject('prediction', expected.id)!;
+    expect(settledExpected.settledAt).toBeDefined();
+    // worst-first aggregation: a falsifying confirmatory comparison settles falsifies
+    expect(settledExpected.outcome).toMatchObject({ verdict: 'falsifies', verdicts: ['supports', 'falsifies'] });
+    expect(settledExpected.scores?.rps).toBeGreaterThan(0);
+
+    // rank_order for the same top hypothesis settles with the identical class
+    const settledRank = store.getObject('prediction', rank.id)!;
+    expect(settledRank.settledAt).toBeDefined();
+    expect(settledRank.outcome).toMatchObject({ verdict: 'falsifies' });
+  });
+
+  it('insufficient_data-only verdicts settle nothing (no information, entries stay open)', async () => {
+    const { run } = seedRun();
+    const hyp = seedHypothesis(run.id);
+    store.putObject('hypothesis', hyp);
+    const { expected } = seedLedger(run.id, hyp.id);
+    store.putObject('feedback', experimentSignal(run.id, hyp.id, ['insufficient_data', 'insufficient_data']));
+
+    const { ctx } = makeCtx(run, []);
+    const out = await feedbackStage.execute(ctx);
+    expect(out.kind === 'done');
+    expect(out.kind === 'done' ? out.summary : '').toMatch(/0 ledger prediction\(s\) settled/);
+    expect(store.getObject('prediction', expected.id)!.settledAt).toBeUndefined();
+  });
+
+  it('legacy singular hypothesisId/verdict shape still settles (back-compat)', async () => {
+    const { run } = seedRun();
+    const hyp = seedHypothesis(run.id);
+    store.putObject('hypothesis', hyp);
+    const { expected } = seedLedger(run.id, hyp.id);
+    store.putObject('feedback', FeedbackSignal.parse({
+      id: newId('fbk'), runId: run.id, source: 'experiment',
+      content: 'legacy shape', structured: { hypothesisId: hyp.id, verdict: 'supports' },
+      provenance: 'legacy fixture', receivedAt: ts(4),
+    }));
+
+    const { ctx } = makeCtx(run, []);
+    await feedbackStage.execute(ctx);
+    const settled = store.getObject('prediction', expected.id)!;
+    expect(settled.settledAt).toBeDefined();
+    expect(settled.outcome).toMatchObject({ verdict: 'supports' });
   });
 });
 

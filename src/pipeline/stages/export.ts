@@ -94,6 +94,8 @@ interface ExportInputs {
   feedbacks: FeedbackSignal[];
   revisions: Revision[];
   versionDiffs: VersionDiff[];
+  /** L4 self-calibration ledger (§9 disclosure: settled/open counts + skill honesty). */
+  predictions: import('../../domain/prediction.js').LedgerEntry[];
   /** EEL (D-081): executed experiment objects for §7a + bundle experimentEvidence. */
   experimentRuns: ExperimentRun[];
   resultSets: ResultSet[];
@@ -548,6 +550,16 @@ const buildReport = (d: ExportInputs, missingItems: string[], truth: RunTruthPro
     }`,
   );
   push(`- ${truthDisclosureLine(truth)}`);
+  // L4 self-calibration ledger honesty line: what was predicted, what settled,
+  // and whether the sample is even interpretable (n<30 strata say so).
+  const settledLedger = d.predictions.filter((p) => p.settledAt !== undefined).length;
+  const voidLedger = d.predictions.filter((p) => p.voidReason !== undefined).length;
+  const openLedger = d.predictions.length - settledLedger - voidLedger;
+  push(
+    `- 前向预测账本：${d.predictions.length} 条（已结算 ${settledLedger}、作废 ${voidLedger}、未结算 ${openLedger}）${
+      d.predictions.length > 0 ? '；结算采用 RPS/Brier 对无知基线打分，样本不足的分层如实标注"证据不足"' : ''
+    }`,
+  );
   push(`- 缺失项：${missingItems.length === 0 ? '无已知缺失项' : missingItems.join('；')}`);
   push('');
 
@@ -642,6 +654,7 @@ export const exportStage: StageHandler = {
 
     const inputs: ExportInputs = {
       run, question, corpus, sources, claims, relations, hypotheses, scorecards, plan, receipts, feedbacks, revisions, versionDiffs,
+      predictions: ctx.store.listObjects('prediction', run.id),
       experimentRuns: ctx.store.listObjects('experiment_run', run.id),
       resultSets: ctx.store.listObjects('result_set', run.id),
       statReports: ctx.store.listObjects('stat_report', run.id),

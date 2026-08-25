@@ -1,7 +1,8 @@
 import { ScreeningWorkbench } from '../ScreeningWorkbench.js';
 import { useCallback, useState } from 'react';
 import { isNotFound } from '../../api/client';
-import { getCorpus, getEvidence, getReceipts, getSources } from '../../api/endpoints';
+import { counterSearch, getCorpus, getEvidence, getReceipts, getSources } from '../../api/endpoints';
+import type { CounterSearchOutcome } from '../../api/endpoints';
 import type { CorpusQueryInfo, CorpusSnapshotInfo, EvidenceRelation, EvidenceRelationType, ProvenanceReceipt, ResearchRun, ScientificClaim, SourceDocument } from '../../api/types';
 import { useResource } from '../../hooks/useResource';
 import { useI18n } from '../../i18n/LanguageContext';
@@ -37,6 +38,36 @@ export function EvidenceTab({
   const { t } = useI18n();
   const refreshKey = `${run.updatedAt}:${run.status}`;
   const [screeningOpen, setScreeningOpen] = useState(false);
+
+  // §5.2 counter-evidence search: one researcher-directed live retrieval into
+  // the corpus. Disabled while the run executes (server lease-guard 409s anyway —
+  // the UI states the honest reason instead of offering a dead action).
+  const runActive = run.status === 'running' || run.status === 'queued';
+  const [csQuery, setCsQuery] = useState('');
+  const [csBusy, setCsBusy] = useState(false);
+  const [csResult, setCsResult] = useState<CounterSearchOutcome | null>(null);
+  const [csError, setCsError] = useState<string | null>(null);
+  const submitCounterSearch = (): void => {
+    const q = csQuery.trim();
+    if (q.length < 4 || csBusy || runActive) return;
+    setCsBusy(true);
+    setCsError(null);
+    setCsResult(null);
+    void (async () => {
+      try {
+        const out = await counterSearch(run.id, q);
+        setCsResult(out);
+        setCsQuery('');
+        sourcesRes.retry();
+        corpusRes.retry();
+        receiptsRes.retry();
+      } catch (e) {
+        setCsError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setCsBusy(false);
+      }
+    })();
+  };
 
 
   const sourcesFetcher = useCallback((signal: AbortSignal) => getSources(run.id, signal), [run.id]);
@@ -100,6 +131,40 @@ export function EvidenceTab({
         </div>
       )}
       {screeningOpen && <ScreeningWorkbench runId={run.id} onClose={() => setScreeningOpen(false)} />}
+
+      {/* §5.2 counter-evidence loop: execute the missing counter-evidence search
+          the counter_evidence action names (or any targeted query) into the corpus. */}
+      <div className="counter-search-entry">
+        <input
+          className="input counter-search-input"
+          type="text"
+          value={csQuery}
+          maxLength={400}
+          placeholder={t('counterSearch.placeholder')}
+          aria-label={t('counterSearch.placeholder')}
+          disabled={runActive || csBusy}
+          onChange={(e) => setCsQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitCounterSearch(); } }}
+        />
+        <button
+          type="button"
+          className="btn btn--small"
+          disabled={runActive || csBusy || csQuery.trim().length < 4}
+          title={runActive ? t('counterSearch.activeRun') : t('counterSearch.hint')}
+          onClick={submitCounterSearch}
+        >
+          {csBusy ? t('counterSearch.pending') : t('counterSearch.go')}
+        </button>
+      </div>
+      {csResult !== null && (
+        <p className="counter-search-note" role="status">
+          {csResult.added.length > 0
+            ? t('counterSearch.added', { n: csResult.added.length, dupes: csResult.duplicatesSkipped })
+            : t('counterSearch.emptyResult')}
+          {' '}{csResult.note}
+        </p>
+      )}
+      {csError !== null && <p className="field-error" role="alert">{t('counterSearch.failed')}：{csError}</p>}
 
       {/* B1 reorder: the researcher's substance leads (sources → claims →
           relations); retrieval transparency stays fully available but is a

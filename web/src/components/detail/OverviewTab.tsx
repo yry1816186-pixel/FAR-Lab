@@ -123,7 +123,7 @@ export function OverviewTab({
         <StageTimeline run={run} />
       </Section>
       <Section title={t('overview.controls')}>
-        <RunControls run={run} hasFeedback={hasFeedback} onMutated={onMutated} />
+        <RunControls run={run} hasFeedback={hasFeedback} hasEvidenceDebt={run.hasEvidenceDebt} onMutated={onMutated} />
         <div className="feedback-block">
           <h4 className="minor-title">{t('feedback.title')}</h4>
           <p className="muted small">{t('feedback.intro')}</p>
