@@ -44,29 +44,49 @@ export const feedbackStage: StageHandler = {
       appended = 1 + appended;
     }
 
-    // L4 settlement: experiment verdicts score the expected_relation ledger entries.
+    // L4 settlement: experiment verdicts score the expected_relation + rank_order
+    // ledger entries. The REAL executor shape (src/experiment/executor.ts
+    // buildFeedback) carries the hypothesis in signal.target (kind='hypothesis')
+    // and per-comparison verdicts as an ARRAY (structured.verdicts, 5-class incl.
+    // insufficient_data); the singular hypothesisId/verdict shape is kept only for
+    // back-compat with old fixtures. Aggregation is deterministic and conservative:
+    // insufficient_data carries no information (excluded), and among informative
+    // verdicts the worst news wins (falsifies > weakens > supports > inconclusive)
+    // — a hypothesis with any falsifying confirmatory comparison is settled as
+    // falsified, never averaged into ambivalence.
     let settledCount = 0;
     const openEntries = ctx.store
       .listObjects('prediction', ctx.run.id)
-      .filter((e) => e.kind === 'expected_relation' && e.settledAt === undefined && e.voidReason === undefined);
+      .filter((e) => (e.kind === 'expected_relation' || e.kind === 'rank_order') && e.settledAt === undefined && e.voidReason === undefined);
     const settledEntryIds = new Set<string>();
+    const WORST_FIRST: readonly VerdictClass[] = ['falsifies', 'weakens', 'supports', 'inconclusive'];
     for (const signal of signals) {
       if (signal.source !== 'experiment') continue;
       const st = signal.structured ?? {};
-      const hypothesisId = typeof st.hypothesisId === 'string' ? st.hypothesisId : null;
-      const verdict = typeof st.verdict === 'string' && (VERDICT_CLASSES as readonly string[]).includes(st.verdict)
-        ? (st.verdict as VerdictClass)
-        : null;
+      const hypothesisId =
+        (signal.target?.kind === 'hypothesis' ? signal.target.id : null) ??
+        (typeof st.hypothesisId === 'string' ? st.hypothesisId : null);
+      const rawVerdicts: string[] = Array.isArray(st.verdicts)
+        ? st.verdicts.filter((v): v is string => typeof v === 'string')
+        : typeof st.verdict === 'string' ? [st.verdict] : [];
+      const classes = rawVerdicts.filter((v) => (VERDICT_CLASSES as readonly string[]).includes(v)) as VerdictClass[];
+      const verdict = WORST_FIRST.find((c) => classes.includes(c)) ?? null;
       if (hypothesisId === null || verdict === null) continue;
       for (const entry of openEntries) {
         if (settledEntryIds.has(entry.id)) continue;
-        if ((entry.assertion as { hypothesisId?: unknown }).hypothesisId !== hypothesisId) continue;
+        const isExpected = entry.kind === 'expected_relation'
+          && (entry.assertion as { hypothesisId?: unknown }).hypothesisId === hypothesisId;
+        // rank_order asserted the tournament winner; it settles WITH its top
+        // hypothesis's verdict (uniform probs => honest zero claimed skill).
+        const isRankOrder = entry.kind === 'rank_order'
+          && (entry.assertion as { topHypothesisId?: unknown }).topHypothesisId === hypothesisId;
+        if (!isExpected && !isRankOrder) continue;
         ctx.store.putObject(
           'prediction',
           settleEntry(entry, {
             outcomeClass: verdict,
             settledAt: new Date().toISOString(),
-            outcome: { signalId: signal.id, verdict },
+            outcome: { signalId: signal.id, verdict, verdicts: classes },
           }),
         );
         settledEntryIds.add(entry.id);

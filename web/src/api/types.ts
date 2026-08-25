@@ -77,6 +77,8 @@ export interface ResearchRun {
   domain?: string;
   /** Present since D-060: server projects lease state on the run detail. */
   leaseInfo?: RunLeaseInfo;
+  /** §5.2: unverified sources exist — resume reopens verify_sources+build_evidence. */
+  hasEvidenceDebt?: boolean;
 }
 
 /** GET /api/v1/health projection (P-IA proactive status strip). */
