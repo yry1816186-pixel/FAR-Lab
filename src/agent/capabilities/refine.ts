@@ -8,17 +8,15 @@ import { newId, ProvenanceReceipt, AgentSession, AgentReport, type AgentTelemetr
 import { receiptEventDetail } from '../../pipeline/llm.js';
 import { makeRunBudget } from '../../app/run-budget.js';
 import { resolveRunProvider } from '../../app/provider-resolver.js';
-import { ToolRegistry, type AgentTool, type ToolContext, type ToolResult } from '../tool.js';
-import { PermissionEngine } from '../permissions.js';
+import type { AgentTool, ToolContext, ToolResult } from '../tool.js';
 import { SessionTelemetry } from '../telemetry.js';
 import { runAgentLoop, type AgentLoopConfig, type AgentLoopResult } from '../loop.js';
 import { runSubagents, type SubagentResult } from '../subagents.js';
 import { wireResearchTools } from './research-tools.js';
+import { assembleSessionCapabilities } from './assembly.js';
 import { openRolloutWriter, readRollout, reconstructSession, rolloutFile, type InterruptedTurnDisposition } from '../rollout.js';
-import { loadSkillsFromDir, selectSkills, renderSkillsPrompt, type AgentSkill } from '../skills.js';
-import { McpManager, type McpServerStatus } from '../mcp-manager.js';
-import { expandHookRulesToPermissions, composeLogHooks, type KnownTool } from '../hooks-compose.js';
-import type { ToolIntegration, McpServerIntegration, HookRuleIntegration } from '../../domain/tool-integration.js';
+import type { McpServerStatus } from '../mcp-manager.js';
+import type { ToolIntegration } from '../../domain/tool-integration.js';
 import type { AgentEventSink, ReceiptSink, TranscriptEntry } from '../protocol.js';
 
 /**
@@ -158,7 +156,7 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
   const sessionBudget = makeRunBudget(deps.store, runId);
 
   // --- tools (read-only over the run + live literature search) ---
-  const makeTools = (): ToolRegistry => {
+  const makeTools = (): AgentTool[] => {
     const listHypotheses: AgentTool = {
       name: 'list_hypotheses',
       description: 'List this run\'s hypotheses: statement, mechanism, supporting/counter claim counts, testability.',
@@ -277,62 +275,43 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       },
     }));
 
-    let registry = new ToolRegistry().register(listHypotheses).register(readEvidence).register(searchSources);
-    for (const t of researchTools) registry = registry.register(t);
-    return registry;
+    return [listHypotheses, readEvidence, searchSources, ...researchTools];
   };
 
-  // --- tool integrations (TIS): stored MCP servers / hook rules / skills join the session ---
+  // --- capability assembly (R2-09): the ONE authoritative composition of this
+  // session's capability plane — builtin refine tools plus stored integrations
+  // under the capability's least-privilege admission policy (read-class MCP
+  // only; enabling an integration is researcher consent for the tool plane,
+  // not a blanket grant into an autonomous loop), with relevance-selected
+  // skills and hook-rule compilation. Availability states stay honest per
+  // server; a refused/failed server never blocks the session.
   const integrations = deps.listToolIntegrations?.() ?? deps.store.listObjects('tool_integration', '__none__');
-  // Capability-scoped admission (least privilege for a headless autonomous agent):
-  // refine-evidence-gaps only READS evidence and searches — it has no legitimate
-  // use for edit/execute/destructive-class external tools. Enabling an integration
-  // is researcher consent for the tool plane, not a blanket grant into every kernel
-  // session, so non-read servers are refused here (visible as state='disabled' with
-  // the policy reason) instead of contributing allow rules to an autonomous loop.
-  // The schema default riskClass is 'execute' — omission fails closed until declared.
-  const mcpIntegrations = integrations.filter((i): i is McpServerIntegration => i.kind === 'mcp_server');
-  // Read-class servers go to the manager (enabled ones connect; disabled ones are
-  // still reported state='disabled' by the manager). Enabled non-read servers are
-  // policy-refused below; DISABLED non-read servers also pass through the manager
-  // so they keep their honest 'disabled' status instead of vanishing.
-  const admittedMcp = mcpIntegrations.filter((i) => i.riskClass === 'read' || !i.enabled);
-  const refusedMcp = mcpIntegrations
-    .filter((i) => i.enabled && i.riskClass !== 'read')
-    .map((i): McpServerStatus => ({
-      integrationId: i.id,
-      label: i.label,
-      state: 'disabled',
-      error: `admission policy: ${CAPABILITY} is a read-only evidence-refinement capability; MCP servers of riskClass '${i.riskClass}' are refused (only riskClass 'read' tools may join this session)`,
-    }));
-  const mcpManager = new McpManager({ listServers: () => admittedMcp });
-  const mcpStatuses = [...refusedMcp, ...(await mcpManager.connectAll())];
-  const registry = makeTools();
-  const mcpRegistered = await mcpManager.registerTools(registry);
-  const hookRules = integrations.filter((i): i is HookRuleIntegration => i.kind === 'hook_rule');
-  const knownTools: KnownTool[] = registry.names().map((name) => ({ name, riskClass: registry.get(name)?.riskClass }));
-  const permissions = new PermissionEngine({
-    rules: [
-      { tool: 'list_hypotheses', effect: 'allow' },
-      { tool: 'read_evidence', effect: 'allow' },
-      { tool: 'search_sources', effect: 'allow' },
-      // AVO fusion research-tools plane (G4/G5/G6): event queries and previews
-      // are read-class; explore_code is execute-class and additionally gated by
-      // the static analysis gate before any sandbox spawn.
-      { tool: 'query_run_events', effect: 'allow' },
-      { tool: 'preview_ref', effect: 'allow' },
-      { tool: 'explore_code', effect: 'allow' },
-      // Admitted (read-class) MCP servers contribute their adapted tools as allow
-      // rules; risk classes are stamped per-integration (explore mode still gates
-      // non-read tools). Non-read servers were refused above — they never reach
-      // this allow expansion.
-      ...mcpRegistered.registered.map((r) => ({ tool: r.registeredAs, effect: 'allow' as const })),
-      // Researcher hook rules: block → bypassImmune deny, require_approval → ask
-      // (engine's exact-(tool,args) approval binding; headless ask denies fail-closed).
-      ...expandHookRulesToPermissions(hookRules, knownTools),
-    ],
-    defaultEffect: 'deny',
+  const skillDirs = deps.skillDirs ?? [
+    { dir: path.join(process.cwd(), 'skills'), tier: 'builtin' as const },
+    { dir: path.resolve(deps.rolloutDir, '..', 'skills'), tier: 'user' as const },
+  ];
+  const sessionId = opts.resumeSessionId ?? newId('ags');
+  const assembly = await assembleSessionCapabilities({
+    builtinTools: makeTools(),
+    integrations,
+    policy: { capability: CAPABILITY, admittedRiskClasses: ['read'] },
+    skills: {
+      task: `${question.text} refine evidence gaps counter evidence hypotheses ${topHypotheses.map((h) => h.statement).join(' ')}`,
+      dirs: skillDirs,
+      limits: { maxCount: 3, maxChars: 4000 },
+    },
+    onHookLog: (entry) => {
+      emit({
+        type: 'tool_note',
+        sessionId,
+        turn: entry.turn,
+        tool: entry.tool ?? 'hook_rule',
+        note: `[hook:${entry.rule}] ${entry.detail}`,
+        at: new Date().toISOString(),
+      });
+    },
   });
+  const { registry, permissions, hookBus, skillsPrompt: skillsSection } = assembly;
 
   const baseConfig: Omit<AgentLoopConfig, 'task'> = {
     capability: CAPABILITY,
@@ -342,36 +321,8 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
     shouldAbort: () => deps.store.getRun(runId)?.cancelRequested === true,
   };
 
-  // --- skills (H4 conditional injection): repo builtin tier + user tier, relevance-selected ---
-  const skillDirs = deps.skillDirs ?? [
-    { dir: path.join(process.cwd(), 'skills'), tier: 'builtin' as const },
-    { dir: path.resolve(deps.rolloutDir, '..', 'skills'), tier: 'user' as const },
-  ];
-  const allSkills: AgentSkill[] = [];
-  for (const { dir, tier } of skillDirs) allSkills.push(...loadSkillsFromDir(dir, tier).skills);
-  // Store-backed skills (enabled only) join at user tier — managed in the product UI,
-  // never requiring filesystem access to contribute.
-  for (const integration of integrations) {
-    if (integration.kind !== 'skill' || !integration.enabled) continue;
-    allSkills.push({
-      name: integration.name,
-      description: integration.description,
-      ...(integration.whenToUse !== undefined && integration.whenToUse.length > 0 ? { whenToUse: integration.whenToUse } : {}),
-      tier: 'user',
-      priority: integration.priority,
-      body: integration.body,
-    });
-  }
-  const selectedSkills = selectSkills(
-    `${question.text} refine evidence gaps counter evidence hypotheses ${topHypotheses.map((h) => h.statement).join(' ')}`,
-    allSkills,
-    { maxCount: 3, maxChars: 4000 },
-  );
-  const skillsSection = renderSkillsPrompt(selectedSkills);
-
   try {
     // --- session + rollout (H6): fresh session, or resume of a persisted one ---
-    const sessionId = opts.resumeSessionId ?? newId('ags');
     let resumeCtx: {
       transcript: TranscriptEntry[];
       priorTurns: number;
@@ -395,19 +346,6 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       };
     }
     const telemetry = new SessionTelemetry();
-    const hookBus = composeLogHooks(hookRules, {
-      log: (entry) => {
-        emit({
-          type: 'tool_note',
-          sessionId,
-          turn: entry.turn,
-          tool: entry.tool ?? 'hook_rule',
-          note: `[hook:${entry.rule}] ${entry.detail}`,
-          at: new Date().toISOString(),
-        });
-      },
-      riskClassOf: (tool) => registry.get(tool)?.riskClass,
-    });
     const mainDeps = {
       provider: sessionProvider,
       tools: registry,
@@ -516,13 +454,13 @@ export const runEvidenceGapRefinement = async (deps: RefineDeps, runId: string, 
       ...(res.result !== undefined ? { result: RefineResultSchema.parse(res.result) } : {}),
       telemetry: telemetry.summary(),
       subagentSessions: subResults.map((s) => ({ label: s.label, sessionId: s.sessionId, status: s.status })),
-      skillsUsed: selectedSkills.map((s) => s.name),
-      mcpServers: mcpStatuses,
+      skillsUsed: assembly.selectedSkills.map((s) => s.name),
+      mcpServers: assembly.mcpStatuses,
       resumed: resumeCtx !== undefined,
       ...(res.error !== undefined ? { error: res.error } : {}),
     };
   } finally {
-    await mcpManager.close();
+    await assembly.close();
   }
 };
 
