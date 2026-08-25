@@ -16,7 +16,8 @@ import { SPEC_ID_RE } from '../experiment/approve.js';
  *
  * Commands:
  *   far experiment run     <spec.json> [--priority N] [--allow-local-datasets]
- *   far experiment enqueue <spec.json> (queue only; a worker executes later)
+ *   far experiment enqueue <spec.json> [--device <id>] (queue only; a worker executes later)
+ *   far experiment simulate <simspec.json> (direct CRN monte-carlo execution)
  *   far experiment worker  [--max-jobs N] [--max-running N] [--heartbeat-ms MS]
  *   far experiment status  [--job <id>]
  *   far experiment cancel  <jobId>
@@ -102,7 +103,7 @@ const statLines = (job: {
   `${job.worker ? ` worker=${job.worker}` : ''}${job.error ? `  error=${job.error}` : ''}`;
 
 export const experimentCommand = async (sub: string | undefined, a: Args): Promise<CliResult> => {
-  const usage = `far experiment requires a subcommand: run <spec.json> | enqueue <spec.json> | worker | status [--job <id>] | dead-list | requeue <jobId> | cancel <jobId> | logs <experimentRunId> | approve <specId> --by <operator> [--hypothesis <hypId>] [--mde <value>] | rerun <specId>`;
+  const usage = `far experiment requires a subcommand: run <spec.json> [--device <id>] | enqueue <spec.json> [--device <id>] | simulate <simspec.json> | worker | status [--job <id>] | dead-list | requeue <jobId> | cancel <jobId> | logs <experimentRunId> | approve <specId> --by <operator> [--hypothesis <hypId>] [--mde <value>] | rerun <specId>`;
   try {
     return await dispatch(sub, a, usage);
   } catch (e) {
@@ -111,6 +112,30 @@ export const experimentCommand = async (sub: string | undefined, a: Args): Promi
   }
 };
 
+/** Remote-device execution bridge (10→03 handoff 2026-08-25): one builder shared by
+ * `worker` and `run --device` so per-device dispatch stays single-sourced. */
+const executeViaFor = async (dataDir: string, device: string) => {
+  const { openDeviceRegistry } = await import('../experiment/devices.js');
+  const registry = openDeviceRegistry(path.join(dataDir, 'devices.json'));
+  if (!registry.ids().includes(device)) {
+    throw new UsageError(`unknown device '${device}' (declared: ${registry.ids().join(', ')})`);
+  }
+  if (registry.isLocal(device)) return undefined;
+  return async (
+    store: import('../persistence/store.js').Store,
+    artifacts: import('../shared/ports.js').ArtifactStore,
+    spec: import('../domain/index.js').ExperimentSpec,
+    o: { allowLocalDatasets?: boolean; existingRunId: { toString(): string }; shouldCancel: () => boolean },
+  ) => {
+    const { executeRemoteExperiment } = await import('../experiment/remote-executor.js');
+    await executeRemoteExperiment(store, artifacts, spec, {
+      gateway: registry.gatewayFor(device), deviceId: device,
+      allowLocalDatasets: o.allowLocalDatasets,
+      existingRunId: o.existingRunId as never,
+      shouldCancel: o.shouldCancel,
+    });
+  };
+};
 const dispatch = async (sub: string | undefined, a: Args, usage: string): Promise<CliResult> => {
 
   if (sub === 'run' || sub === 'enqueue') {
@@ -119,10 +144,13 @@ const dispatch = async (sub: string | undefined, a: Args, usage: string): Promis
     const spec = readSpec(specPath, a.flag('--allow-local-datasets'));
     const priority = Number(a.arg('--priority') ?? 0);
     if (!Number.isInteger(priority)) return { code: 2, text: '--priority must be an integer' };
+    const device = a.arg('--device');
     const w = openWorld(a.dataDir);
     try {
+      const executeVia = device !== undefined ? await executeViaFor(a.dataDir, device) : undefined;
       const { experimentRunId, jobId } = enqueueExperiment(w.store, w.scheduler, spec, {
         priority,
+        ...(device !== undefined ? { device } : {}),
         allowLocalDatasets: a.flag('--allow-local-datasets'),
       });
       if (sub === 'enqueue') {
@@ -133,12 +161,13 @@ const dispatch = async (sub: string | undefined, a: Args, usage: string): Promis
         };
       }
       const out = await runSchedulerWorker(w.store, w.artifacts, w.scheduler, {
-        worker: `cli-${process.pid}`,
+        worker: `cli-${process.pid}${device !== undefined ? `-${device}` : ''}`,
         maxRunning: 1,
         heartbeatTtlMs: 120_000,
         heartbeatMs: 5_000,
         allowLocalDatasets: a.flag('--allow-local-datasets'),
         maxJobs: 1,
+        ...(device !== undefined ? { device, executeVia: executeVia as never } : {}),
       });
       const job = w.scheduler.get(jobId)!;
       const run = summarizeRun(w.store, experimentRunId);
@@ -351,5 +380,36 @@ const dispatch = async (sub: string | undefined, a: Args, usage: string): Promis
     }
   }
 
+  if (sub === 'simulate') {
+    // 10→03 handoff 2026-08-25: direct execution of a SimulationSpec (CRN monte-carlo
+    // on the shared stats chain) — no queueing for v1, output mirrors `rerun`.
+    const specPath = a.positional;
+    if (specPath === undefined) return { code: 2, text: `simulate requires a simulation-spec JSON file path.\n${usage}` };
+    let spec: unknown;
+    try {
+      spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
+    } catch (e) {
+      return { code: 2, text: `cannot read simulation spec ${specPath}: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    const w = openWorld(a.dataDir);
+    try {
+      const { executeSimulationExperiment } = await import('../experiment/executor-simulation.js');
+      const out = await executeSimulationExperiment(w.store, w.artifacts, spec as never);
+      const verdicts = out.statReports.map((r) => `${r.comparisonId}=${r.verdict ?? 'exploratory'}`).join(', ');
+      return {
+        code: out.run.status === 'completed' ? 0 : 1,
+        json: {
+          specId: (spec as { id?: string }).id ?? null, experimentRunId: out.run.id, status: out.run.status,
+          statReports: out.statReports.map((r) => ({ id: r.id, comparison: r.comparisonId, verdict: r.verdict ?? null, metric: r.metricKey })),
+          feedbackSignals: out.feedback.map((f) => f.id),
+        },
+        text:
+          `simulate ${(spec as { id?: string }).id ?? '(unnamed)'} -> ${out.run.status}: ${out.statReports.length} stat report(s) [${verdicts}], ` +
+          `${out.feedback.length} feedback signal(s) queued for revision`,
+      };
+    } finally {
+      w.close();
+    }
+  }
   return { code: 2, text: usage };
 };

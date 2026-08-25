@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   logLrInterval, sumLogLr, bandOf, qbafStrength, proofStandardOf,
-  ratingExpectation, ratingEntropy, RatingDistribution,
 } from '../src/domain/formal.js';
 import {
   buildEvidenceBody, countExperimentalAxes,
@@ -84,21 +83,6 @@ describe('QBAF gradual semantics + Carneades standards', () => {
     expect(proofStandardOf(0.65)).toBe('preponderance');
     expect(proofStandardOf(0.8)).toBe('clear_and_convincing');
     expect(proofStandardOf(0.95)).toBe('beyond_reasonable_doubt');
-  });
-});
-
-describe('second-order uncertainty: rating distributions', () => {
-  it('expectation and entropy of a point mass vs a flat distribution', () => {
-    const point = RatingDistribution.parse({ high: 1, moderate: 0, low: 0, very_low: 0 });
-    expect(ratingExpectation(point)).toBe(4);
-    expect(ratingEntropy(point)).toBe(0);
-    const flat = RatingDistribution.parse({ high: 0.25, moderate: 0.25, low: 0.25, very_low: 0.25 });
-    expect(ratingExpectation(flat)).toBeCloseTo(2.5, 10);
-    expect(ratingEntropy(flat)).toBeCloseTo(1, 10);
-  });
-
-  it('rejects masses that do not sum to ~1', () => {
-    expect(RatingDistribution.safeParse({ high: 0.9, moderate: 0.9, low: 0, very_low: 0 }).success).toBe(false);
   });
 });
 

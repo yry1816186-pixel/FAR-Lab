@@ -152,4 +152,31 @@ describe('runExploration (real sidecar)', () => {
       sidecar.close();
     }
   });
+
+  it('numpy-lazy-submodule payloads execute (14-F2 regression: np ops that lazily import internals)', async () => {
+    const { store, runId } = openStore();
+    const result = await runExploration({
+      store,
+      runId,
+      artifacts: {
+        put: async (p) => ({ ref: `sha256:${'b'.repeat(56)}${String(p.length).padStart(6, '0')}`, hash: 'h', size: 0 }),
+        get: async () => null,
+        path: () => '/unused',
+      },
+      purpose: 'numpy surface regression (lazy submodule imports)',
+      code: [
+        "print(int(np.arange(4).sum()))",          // arange dispatches through numpy._core._methods
+        "print(round(float(np.linalg.det(np.eye(3))), 1))",  // nested lazy submodule (linalg)
+        "print(float(np.percentile([1, 2, 3, 4], 50)))",      // percentile (function-base lazy path)
+      ].join('\n'),
+      maxRuntimeMs: 60_000,
+      sidecarFactory: realFactory,
+    });
+
+    expect(result.gate.allowed).toBe(true);
+    expect(result.execution.ok).toBe(true);
+    expect(result.execution.stdout).toContain('6');
+    expect(result.execution.stdout).toContain('1.0');
+    expect(result.execution.stdout).toContain('2.5');
+  });
 });

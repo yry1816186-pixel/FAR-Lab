@@ -186,31 +186,3 @@ export const proofStandardOf = (strength: number): ProofStandard => {
   return 'unproven';
 };
 
-// ---------------------------------------------------------------------------
-// Second-order uncertainty: GRADE-style ratings as DISTRIBUTIONS, not single enums.
-// (Inter-rater agreement degrades with evidence complexity — a point enum hides that.)
-
-export const RatingDistribution = z.object({
-  high: z.number().min(0).max(1),
-  moderate: z.number().min(0).max(1),
-  low: z.number().min(0).max(1),
-  very_low: z.number().min(0).max(1),
-}).refine((d) => Math.abs(d.high + d.moderate + d.low + d.very_low - 1) <= 0.02, {
-  message: 'rating distribution masses must sum to ~1',
-});
-export type RatingDistribution = z.infer<typeof RatingDistribution>;
-
-const LEVEL_WEIGHTS = { high: 4, moderate: 3, low: 2, very_low: 1 } as const;
-
-/** Expectation of the 4-level scale (1..4) under the distribution. */
-export const ratingExpectation = (d: RatingDistribution): number =>
-  d.high * LEVEL_WEIGHTS.high + d.moderate * LEVEL_WEIGHTS.moderate + d.low * LEVEL_WEIGHTS.low + d.very_low * LEVEL_WEIGHTS.very_low;
-
-/** Normalized Shannon entropy of the rating distribution (0..1) — disclosed dispersion. */
-export const ratingEntropy = (d: RatingDistribution): number => {
-  let h = 0;
-  for (const p of [d.high, d.moderate, d.low, d.very_low]) {
-    if (p > 0) h -= p * Math.log2(p);
-  }
-  return h / 2; // log2(4)
-};

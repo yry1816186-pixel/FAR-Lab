@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { displayWidth, padColumns, table, marker, stageLine, subLine } from '../src/cli/term.js';
-import { pc } from '../src/cli/vendor/picocolors.js';
 
 describe('cli term: CJK-safe column math', () => {
   it('displayWidth counts CJK wide chars as 2 columns', () => {
@@ -59,18 +61,40 @@ describe('cli term: report channel', () => {
 });
 
 describe('cli vendored picocolors: color discipline', () => {
-  it('colors are disabled in non-TTY test stdout unless forced', () => {
-    // vitest pipes stdout (no TTY). Color still turns ON under CI=true: the
-    // vendored detector treats CI as an explicit force (vendor/picocolors.ts
-    // `|| !!env.CI`) — found by the first real CI run. Discipline unchanged:
-    // only explicit forcing (FORCE_COLOR/CI/--color) enables color on a pipe.
-    const forced = process.env.FORCE_COLOR !== undefined || process.env.CI !== undefined;
-    if (!forced) {
-      expect(pc.isColorSupported).toBe(false);
-      expect(pc.red('x')).toBe('x');
-    } else {
-      expect(pc.isColorSupported).toBe(true);
-    }
+  it('colors follow the vendored contract under controlled env (15→03: ambient worker env drift made the in-process assertion a hosted-CI red)', async () => {
+    // The detector is a pure function of (env, argv, stdout-isTTY) evaluated at module
+    // load. Assert it in spawned children with piped stdout and exact env — never
+    // against the ambient vitest-worker env (runner images roll; identical code went
+    // green→red→green across days on ambient assertions).
+    const vendorUrl = pathToFileURL(path.resolve(__dirname, '../src/cli/vendor/picocolors.ts')).href;
+    const probe = (envPatch: Record<string, string | undefined>): Promise<{ supported: boolean; plain: boolean }> =>
+      new Promise((resolve, reject) => {
+        const baseEnv: Record<string, string> = {};
+        for (const [k, v] of Object.entries(process.env)) {
+          if (v !== undefined && k !== 'NO_COLOR' && k !== 'FORCE_COLOR' && k !== 'CI') baseEnv[k] = v;
+        }
+        for (const [k, v] of Object.entries(envPatch)) {
+          if (v === undefined) delete baseEnv[k]; else baseEnv[k] = v;
+        }
+        const script = "import(process.argv[1]).then(m => process.stdout.write(JSON.stringify({ supported: m.pc.isColorSupported, plain: m.pc.red('x') === 'x' })))";
+        const child = spawn(process.execPath, ['-e', script, vendorUrl], { env: baseEnv, stdio: ['ignore', 'pipe', 'inherit'] });
+        let out = '';
+        child.stdout.on('data', (c: Buffer) => { out += c.toString('utf8'); });
+        child.on('error', reject);
+        child.on('close', (code) => {
+          if (code === 0) resolve(JSON.parse(out));
+          else reject(new Error(`probe exited ${code}`));
+        });
+      });
+    // piped (non-TTY) stdout, no forcing vars → disabled, styling is identity
+    const clean = await probe({});
+    expect(clean).toEqual({ supported: false, plain: true });
+    // CI=true is an explicit force → enabled
+    const ci = await probe({ CI: 'true' });
+    expect(ci.supported).toBe(true);
+    // NO_COLOR outranks CI (vendored precedence) → disabled again
+    const noColor = await probe({ CI: 'true', NO_COLOR: '1' });
+    expect(noColor).toEqual({ supported: false, plain: true });
   });
 
   it('FORCE_COLOR re-enables and emits ANSI sequences', async () => {

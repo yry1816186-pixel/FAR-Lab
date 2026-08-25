@@ -9,6 +9,8 @@ import {
   type ExperimentRun, type ResultCell, type ResultSet, type StatReport,
   type FeedbackSignal, type HypothesisCandidate, type SplitOutcome, type SidecarStatsResult, type Comparison,
 } from '../domain/index.js';
+import { conformalInterval } from '../domain/conformal.js';
+import { expandAblationModels } from './matrix.js';
 import { acquireDataset } from './datasets.js';
 import { applySplit } from './split.js';
 import { createSidecar, type Sidecar } from './python.js';
@@ -333,9 +335,20 @@ export const executeExperiment = async (
 
     // 4. Train/eval per model, with fingerprint dedup against earlier cells (D-086-1).
     const previousCells = (store.listObjects('result_set', spec.runId) as ResultSet[]).flatMap((rs) => rs.cells);
+    // 14→10 wiring: full-factorial ablation expansion (matrix.ts is the single owner).
+    // Expanded cells are APPENDED after all base models — spec comparison indices stay
+    // valid, ablation cells are report-only by construction. Cells whose (builder,
+    // hyperparams, seed) equal the declaring base are dropped (the base already runs).
+    const ablationAppend = spec.models.flatMap((m) =>
+      m.ablationFactors !== undefined && m.ablationFactors.length > 0
+        ? expandAblationModels(m, m.ablationFactors).filter((c) =>
+          !(c.builderId === m.builderId && c.seed === m.seed && canonicalJson(c.hyperparams) === canonicalJson(m.hyperparams)))
+        : [],
+    );
+    const effectiveModels = ablationAppend.length > 0 ? [...spec.models, ...ablationAppend] : spec.models;
     const cells: ResultCell[] = [];
     const perRowByModel = new Map<number, number[]>();
-    for (const [modelIdx, model] of spec.models.entries()) {
+    for (const [modelIdx, model] of effectiveModels.entries()) {
       if (opts.shouldCancel?.()) throw new Error('canceled');
       const fingerprint = createHash('sha256')
         .update(JSON.stringify({ specHash, contentRef: record.contentRef, envLock: lock, modelIdx, seed: model.seed, builder: model.builderId, hyperparams: model.hyperparams }))
@@ -364,7 +377,15 @@ export const executeExperiment = async (
       }
       const perRowRef = (await artifacts.put(JSON.stringify(res.perRowCorrect))).ref;
       perRowByModel.set(modelIdx, res.perRowCorrect);
-      cells.push({ modelIdx, modelName: model.name, metrics: res.metrics, perRowRef, fingerprint, tags: model.tags, nTrain: res.nTrain, nTest: res.nTest, timingMs: Date.now() - t0 });
+      // 06→10 handoff (§1): split-conformal band over this cell's per-row outcomes,
+      // single-owner import of domain/conformal (no copy). Precondition mirrors the
+      // module's own finite-sample contract (n >= 2, alpha >= 1/(n+1)) — absent when
+      // the sample cannot honestly support the band, never silently clamped.
+      const rows = res.perRowCorrect;
+      const cellConformal = rows.length >= 2 && spec.statistics.alpha >= 1 / (rows.length + 1)
+        ? conformalInterval(rows, rows.reduce((a, b) => a + b, 0) / rows.length, spec.statistics.alpha)
+        : undefined;
+      cells.push({ modelIdx, modelName: model.name, metrics: res.metrics, perRowRef, fingerprint, tags: model.tags, nTrain: res.nTrain, nTest: res.nTest, timingMs: Date.now() - t0, ...(cellConformal !== undefined ? { conformal: cellConformal } : {}) });
     }
 
     const resultSet: ResultSet = {

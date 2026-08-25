@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import importlib
 import io
 import contextlib
 import json as _json
@@ -81,9 +82,20 @@ _ESCAPE_ATTRS = frozenset({
 
 def _make_import(module_map: dict[str, Any]):
     def _import(name, globals=None, locals=None, fromlist=(), level=0):
-        if level or name not in module_map:
-            raise ImportError(f"exploration namespace does not provide {name!r}; allowed: {sorted(module_map)}")
-        return module_map[name]
+        if level:
+            raise ImportError(f"relative imports are not provided by the exploration namespace: {name!r}")
+        if name in module_map:
+            return module_map[name]
+        # 14-F2 (2026-08-26): numpy>=2 ops dispatch through LAZY submodule imports
+        # (e.g. numpy._core._methods) at runtime — the payload never names them,
+        # numpy's own internals do. Dotted names under an ALREADY-BOUND family
+        # root resolve through importlib so the family's own machinery completes;
+        # this does not widen the sandbox (the resolved module belongs to the
+        # allowed package; attribute-chain escapes stay closed by the AST gate).
+        root = name.split(".")[0]
+        if root in module_map or root == "np":
+            return importlib.import_module(name)
+        raise ImportError(f"exploration namespace does not provide {name!r}; allowed: {sorted(module_map)}")
     return _import
 
 
@@ -150,7 +162,7 @@ def run_exploration(payload: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"family env missing numpy: {exc}") from exc
 
     namespace: dict[str, Any] = {
-        "__builtins__": {**safe_builtins, "__import__": _make_import(_ALLOWED_MODULES)},
+        "__builtins__": {**safe_builtins, "__import__": _make_import({**_ALLOWED_MODULES, "numpy": np})},
         "print": lambda *a, **k: print(*a, file=stdout, **k),
         "np": np,
         **_ALLOWED_MODULES,
