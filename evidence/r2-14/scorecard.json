@@ -1,6 +1,6 @@
 {
   "schema": "r2-14-scorecard/1",
-  "generatedAt": "2026-08-25T15:07:16.859Z",
+  "generatedAt": "2026-08-25T16:12:30.371Z",
   "evaluatedTree": {
     "baseline": "baseline/parallel-r2",
     "commit": "47cc373",
@@ -11,7 +11,7 @@
     {
       "id": "p1-wiring",
       "verdict": "ADVISORY",
-      "summary": "160 src modules; 6 unreachable from [src/server/main.ts, src/cli/main.ts]: 0 orphans, 6 test-only, 0 script-only; 3 files with non-literal dynamic imports",
+      "summary": "209 src modules; 13 unreachable from [src/server/main.ts, src/cli/main.ts]: 0 orphans, 13 test-only, 0 script-only; 3 files with non-literal dynamic imports",
       "exit": 0
     },
     {
@@ -22,8 +22,8 @@
     },
     {
       "id": "p3-live-masquerade",
-      "verdict": "PASS",
-      "summary": "stub-in-production: clean; 14 literal 'live' receipt sites (src/agent/capabilities/refine.ts, src/agent/exploration-runner.ts, src/app/spend-limit.ts, src/pipeline/stages/evidence.ts, src/pipeline/stages/export.ts, src/pipeline/stages/hypotheses.ts, src/pipeline/stages/retrieve.ts, src/pipeline/stages/verify.ts, src/providers/custom.ts, src/providers/dashscope.ts, src/providers/deepseek.ts, src/providers/http.ts, src/providers/zai.ts, src/shared/ports.ts); DB audit: 5072/5072 live receipts, 0 masquerades; 0 fake-vocabulary lines for review",
+      "verdict": "ADVISORY",
+      "summary": "stub-in-production: clean; 17 literal 'live' receipt sites (src/agent/capabilities/refine.ts, src/agent/exploration-runner.ts, src/agent/mcp.ts, src/app/provider-resolver.ts, src/app/spend-limit.ts, src/model-plane/plane.ts, src/pipeline/stages/evidence.ts, src/pipeline/stages/export.ts, src/pipeline/stages/hypotheses.ts, src/pipeline/stages/retrieve.ts, src/pipeline/stages/verify.ts, src/providers/custom.ts, src/providers/dashscope.ts, src/providers/deepseek.ts, src/providers/http.ts, src/providers/zai.ts, src/shared/ports.ts); DB audit: 5072/5072 live receipts, 0 masquerades; 1 fake-vocabulary lines for review",
       "exit": 0
     },
     {
@@ -64,7 +64,7 @@
       "finding": {
         "severity": "ADV",
         "id": "P1-TEST-ONLY",
-        "detail": "src module wired only from tests: src/domain/conformal.ts (importers: test:tests/stat-forensics.test.ts)"
+        "detail": "src module wired only from tests: src/app/campaign-driver.ts (importers: test:tests/campaign-driver.test.ts, test:tests/science-rank-statistics.test.ts)"
       }
     },
     {
@@ -72,7 +72,23 @@
       "finding": {
         "severity": "ADV",
         "id": "P1-TEST-ONLY",
-        "detail": "src module wired only from tests: src/domain/revision-predicates.ts (importers: test:tests/revision-predicates.test.ts)"
+        "detail": "src module wired only from tests: src/app/campaign.ts (importers: test:tests/campaign-driver.test.ts, test:tests/campaign-runtime.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/domain/campaign.ts (importers: test:tests/campaign-driver.test.ts, test:tests/campaign-runtime.test.ts, test:tests/campaign-spec.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/domain/conformal.ts (importers: test:tests/stat-forensics.test.ts)"
       }
     },
     {
@@ -88,7 +104,47 @@
       "finding": {
         "severity": "ADV",
         "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/experiment/executor-simulation.ts (importers: test:tests/experiment-simulation.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
         "detail": "src module wired only from tests: src/experiment/matrix.ts (importers: test:tests/experiment-screening.test.ts, test:tests/experiment.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/model-plane/benchmark.ts (importers: test:tests/model-plane-benchmark.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/model-plane/plane.ts (importers: test:tests/model-plane.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/model-plane/prompts.ts (importers: test:tests/model-plane-benchmark.test.ts)"
+      }
+    },
+    {
+      "probe": "p1-wiring",
+      "finding": {
+        "severity": "ADV",
+        "id": "P1-TEST-ONLY",
+        "detail": "src module wired only from tests: src/model-plane/routing.ts (importers: test:tests/model-plane-benchmark.test.ts, test:tests/model-plane.test.ts)"
       }
     },
     {
@@ -132,6 +188,14 @@
       }
     },
     {
+      "probe": "p3-live-masquerade",
+      "finding": {
+        "severity": "ADV",
+        "id": "P3-FAKE-MARKER",
+        "detail": "fake-success vocabulary in production code: src/ingest/parsers/pptx.ts:188: if (title.length === 0) warnings.push(`slide ${n} has no title placeholder — synthetic \"Slide ${n}\" "
+      }
+    },
+    {
       "probe": "p6-sandbox-escape",
       "finding": {
         "severity": "ADV",
@@ -144,12 +208,12 @@
     "metrics": {
       "exit": 0,
       "stdoutTail": "=== FAR-Lab per-run ===\nP1 run_7zez1a8ezbbrrgw9begtta0gsw completed: srcVer=8/8 (100.0%) claimBind=15/15 (100.0%) counter=12/56 reps=6/11 falsif=83.3% planExec=true live=100.0% span=35.7min tokens=71939\nP2 run_yhp0m4kg6qnjmemhj9k5wbmk00 completed: srcVer=9/9 (100.0%) claimBind=4/4 (100.0%) counter=23/43 reps=9/10 falsif=100.0% planExec=true live=100.0% span=13.4min tokens=110377\nP3 run_rnjevw1teza5bmjesxybc0g98y completed: srcVer=11/11 (100.0%) claimBind=4/4 (100.0%) counter=2/21 reps=5/10 falsif=100.0% planExec=true live=100.0% span=3.3min tokens=45008\nP4 run_fr67580x6asqm0mgnncbmpppph completed: srcVer=12/12 (100.0%) claimBind=12/12 (100.0%) counter=20/51 reps=6/10 falsif=100.0% planExec=true live=100.0% span=5.0min tokens=112702\nP5 run_1egthjvkgwbssw93bz2y7yqzdk completed: srcVer=12/15 (80.0%) claimBind=0/0 (n/a) counter=0/0 reps=0/0 falsif=n/a planExec=null live=100.0% span=0.7min tokens=14787\nP6 run_tmse5hms5d60ek3299v7ceybt9 created: srcVer=0/0 (n/a) claimBind=0/0 (n/a) counter=0/0 reps=0/0 falsif=n/a planExec=null live=n/a span=0.0min tokens=0\n=== baselines (aggregate) ===\ndirect: call_ok=0/0 shape=0 zodHyp=0 zodPlan=0 falsif=n/a planExec=0 hypN=null cites=0 resolved=0 matched=0 quoteGrounded=0 unsupported=n/a\nrag: call_ok=0/0 shape=0 zodHyp=0 zodPlan=0 falsif=n/a planExec=0 hypN=null cites=0 resolved=0 matched=0 quoteGrounded=0 unsupported=n/a\nWROTE eval/results/metrics.json\n",
-      "stderrTail": "(node:2748) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      "stderrTail": "(node:29276) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
     },
     "retrieval": {
       "exit": 0,
       "stdoutTail": "runs=67 pooledVerifyRate=0.9847 counterGatePass=1 rerankApplied=0.791 truncated=0.8209\nmedians: holeRate=0 abstractCov=0.75 identResolv=1 zeroResultRate=0.4286 counterZero=1 poolSize=31\n",
-      "stderrTail": "(node:28892) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
+      "stderrTail": "(node:2816) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n"
     }
   },
   "northStarMetrics": [

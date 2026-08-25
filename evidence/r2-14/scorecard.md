@@ -1,14 +1,14 @@
 # R2-14 Independent Scorecard — evaluation/red-team lane
 
-Generated 2026-08-25T15:07:16.859Z against `47cc373` (baseline/parallel-r2).
+Generated 2026-08-25T16:12:30.371Z against `47cc373` (baseline/parallel-r2).
 
-**Overall: PASS_WITH_DIVERGENCES** — 0 invalid-claim entries, 10 divergences.
+**Overall: PASS_WITH_DIVERGENCES** — 0 invalid-claim entries, 18 divergences.
 
 | Probe | Verdict | Summary |
 |---|---|---|
-| p1-wiring | ADVISORY | 160 src modules; 6 unreachable from [src/server/main.ts, src/cli/main.ts]: 0 orphans, 6 test-only, 0 script-only; 3 files with non-literal dynamic imports |
+| p1-wiring | ADVISORY | 209 src modules; 13 unreachable from [src/server/main.ts, src/cli/main.ts]: 0 orphans, 13 test-only, 0 script-only; 3 files with non-literal dynamic imports |
 | p2-route-contract | PASS | 69 client-declared routes probed against the real server: {"OK":13,"EXISTS_VALID":46,"EXISTS_UNAVAIL":2,"EXISTS_404":8} |
-| p3-live-masquerade | PASS | stub-in-production: clean; 14 literal 'live' receipt sites (src/agent/capabilities/refine.ts, src/agent/exploration-runner.ts, src/app/spend-limit.ts, src/pipeline/stages/evidence.ts, src/pipeline/stages/export.ts, src/pipeline/stages/hypotheses.ts, src/pipeline/stages/retrieve.ts, src/pipeline/stages/verify.ts, src/providers/custom.ts, src/providers/dashscope.ts, src/providers/deepseek.ts, src/providers/http.ts, src/providers/zai.ts, src/shared/ports.ts); DB audit: 5072/5072 live receipts, 0 masquerades; 0 fake-vocabulary lines for review |
+| p3-live-masquerade | ADVISORY | stub-in-production: clean; 17 literal 'live' receipt sites (src/agent/capabilities/refine.ts, src/agent/exploration-runner.ts, src/agent/mcp.ts, src/app/provider-resolver.ts, src/app/spend-limit.ts, src/model-plane/plane.ts, src/pipeline/stages/evidence.ts, src/pipeline/stages/export.ts, src/pipeline/stages/hypotheses.ts, src/pipeline/stages/retrieve.ts, src/pipeline/stages/verify.ts, src/providers/custom.ts, src/providers/dashscope.ts, src/providers/deepseek.ts, src/providers/http.ts, src/providers/zai.ts, src/shared/ports.ts); DB audit: 5072/5072 live receipts, 0 masquerades; 1 fake-vocabulary lines for review |
 | p4-stale-web | PASS | D-031 guard: missing-dist flagged, older-dist flagged, fresh-worktree clean; real serve on stale tree refused, on fresh tree started |
 | p5-citation-grounding | PASS | 1261 verified / 5 non-verified claims; 1261 verified locators re-checked under the product's own alignment gate: 0 missing sources, 0 failing even the fuzzy bar, 21 fuzzy-aligned (near-verbatim), 0 malformed DOIs |
 | p6-sandbox-escape | ADVISORY | layer A (TS policy): 8/8; layer B (python namespace, live sidecar): 11/11 |
@@ -17,15 +17,23 @@ Generated 2026-08-25T15:07:16.859Z against `47cc373` (baseline/parallel-r2).
 
 ## Divergences (advisory, for owning-lane handoffs)
 
+- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/app/campaign-driver.ts (importers: test:tests/campaign-driver.test.ts, test:tests/science-rank-statistics.test.ts)
+- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/app/campaign.ts (importers: test:tests/campaign-driver.test.ts, test:tests/campaign-runtime.test.ts)
+- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/domain/campaign.ts (importers: test:tests/campaign-driver.test.ts, test:tests/campaign-runtime.test.ts, test:tests/campaign-spec.test.ts)
 - p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/domain/conformal.ts (importers: test:tests/stat-forensics.test.ts)
-- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/domain/revision-predicates.ts (importers: test:tests/revision-predicates.test.ts)
 - p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/domain/search-allocation.ts (importers: test:tests/search-allocation.test.ts)
+- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/experiment/executor-simulation.ts (importers: test:tests/experiment-simulation.test.ts)
 - p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/experiment/matrix.ts (importers: test:tests/experiment-screening.test.ts, test:tests/experiment.test.ts)
+- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/model-plane/benchmark.ts (importers: test:tests/model-plane-benchmark.test.ts)
+- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/model-plane/plane.ts (importers: test:tests/model-plane.test.ts)
+- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/model-plane/prompts.ts (importers: test:tests/model-plane-benchmark.test.ts)
+- p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/model-plane/routing.ts (importers: test:tests/model-plane-benchmark.test.ts, test:tests/model-plane.test.ts)
 - p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/plugins/host-main.ts (importers: test:tests/plugins.test.ts)
 - p1-wiring/P1-TEST-ONLY: src module wired only from tests: src/providers/deepseek.ts (importers: test:tests/providers.test.ts)
 - p1-wiring/P1-DYNAMIC-IMPORT: non-literal dynamic import() present — graph may under-count reachability: src/plugins/host-main.ts
 - p1-wiring/P1-DYNAMIC-IMPORT: non-literal dynamic import() present — graph may under-count reachability: src/plugins/import.ts
 - p1-wiring/P1-DYNAMIC-IMPORT: non-literal dynamic import() present — graph may under-count reachability: src/server/api.ts
+- p3-live-masquerade/P3-FAKE-MARKER: fake-success vocabulary in production code: src/ingest/parsers/pptx.ts:188: if (title.length === 0) warnings.push(`slide ${n} has no title placeholder — synthetic "Slide ${n}" 
 - p6-sandbox-escape/P6-NUMPY-LIMITED: layer B observation numpy-submodule-import-limitation: {"id":"numpy-submodule-import-limitation","ok":false,"errorKind":"ImportError","errorMessage":"exploration namespace does not provide 'numpy._core._methods'; allowed: ['collections', 'csv', 'datetime', 'decimal', 'fractions', 'hashlib', 'itertools', 'json","stdout":""} — numpy surface partially functional; submodule-importing ops fail closed (handoff to lane 10)
 
 ## Replay benchmarks

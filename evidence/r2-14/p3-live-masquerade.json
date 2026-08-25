@@ -1,13 +1,22 @@
 {
   "probe": "p3-live-masquerade",
-  "verdict": "PASS",
-  "summary": "stub-in-production: clean; 14 literal 'live' receipt sites (src/agent/capabilities/refine.ts, src/agent/exploration-runner.ts, src/app/spend-limit.ts, src/pipeline/stages/evidence.ts, src/pipeline/stages/export.ts, src/pipeline/stages/hypotheses.ts, src/pipeline/stages/retrieve.ts, src/pipeline/stages/verify.ts, src/providers/custom.ts, src/providers/dashscope.ts, src/providers/deepseek.ts, src/providers/http.ts, src/providers/zai.ts, src/shared/ports.ts); DB audit: 5072/5072 live receipts, 0 masquerades; 0 fake-vocabulary lines for review",
-  "findings": [],
+  "verdict": "ADVISORY",
+  "summary": "stub-in-production: clean; 17 literal 'live' receipt sites (src/agent/capabilities/refine.ts, src/agent/exploration-runner.ts, src/agent/mcp.ts, src/app/provider-resolver.ts, src/app/spend-limit.ts, src/model-plane/plane.ts, src/pipeline/stages/evidence.ts, src/pipeline/stages/export.ts, src/pipeline/stages/hypotheses.ts, src/pipeline/stages/retrieve.ts, src/pipeline/stages/verify.ts, src/providers/custom.ts, src/providers/dashscope.ts, src/providers/deepseek.ts, src/providers/http.ts, src/providers/zai.ts, src/shared/ports.ts); DB audit: 5072/5072 live receipts, 0 masquerades; 1 fake-vocabulary lines for review",
+  "findings": [
+    {
+      "severity": "ADV",
+      "id": "P3-FAKE-MARKER",
+      "detail": "fake-success vocabulary in production code: src/ingest/parsers/pptx.ts:188: if (title.length === 0) warnings.push(`slide ${n} has no title placeholder — synthetic \"Slide ${n}\" "
+    }
+  ],
   "meta": {
     "liveSites": [
       "src/agent/capabilities/refine.ts",
       "src/agent/exploration-runner.ts",
+      "src/agent/mcp.ts",
+      "src/app/provider-resolver.ts",
       "src/app/spend-limit.ts",
+      "src/model-plane/plane.ts",
       "src/pipeline/stages/evidence.ts",
       "src/pipeline/stages/export.ts",
       "src/pipeline/stages/hypotheses.ts",
@@ -20,7 +29,9 @@
       "src/providers/zai.ts",
       "src/shared/ports.ts"
     ],
-    "markerHits": [],
+    "markerHits": [
+      "src/ingest/parsers/pptx.ts:188: if (title.length === 0) warnings.push(`slide ${n} has no title placeholder — synthetic \"Slide ${n}\" "
+    ],
     "dbAudit": {
       "receiptsTotal": 5072,
       "liveReceipts": 5072,

@@ -305,7 +305,7 @@
             "method": "GET",
             "status": 200,
             "code": null,
-            "message": "{\"bundleId\":\"probe_x\",\"runId\":\"unknown\",\"declaredEvidenceLevel\":\"unknown\",\"verifiedAt\":\"2026-08-25T15:06:54.669Z\",\"check"
+            "message": "{\"bundleId\":\"probe_x\",\"runId\":\"unknown\",\"declaredEvidenceLevel\":\"unknown\",\"verifiedAt\":\"2026-08-25T16:12:08.437Z\",\"check"
           }
         ]
       },
@@ -385,7 +385,7 @@
             "method": "GET",
             "status": 200,
             "code": null,
-            "message": "{\"status\":\"ok\",\"db\":\"ok\",\"auditChain\":{\"ok\":true,\"brokenRuns\":[],\"verifiedAt\":\"2026-08-25T15:06:54.677Z\"},\"watchdog\":\"ok"
+            "message": "{\"status\":\"ok\",\"db\":\"ok\",\"auditChain\":{\"ok\":true,\"brokenRuns\":[],\"verifiedAt\":\"2026-08-25T16:12:08.444Z\"},\"watchdog\":\"ok"
           }
         ]
       },
@@ -689,7 +689,7 @@
             "method": "POST",
             "status": 201,
             "code": null,
-            "message": "{\"conversation\":{\"id\":\"conv_xkntfad1gysp55nzfsnaa6rzsf\",\"title\":\"新对话\",\"status\":\"open\",\"messages\":[],\"runIds\":[],\"turns\":"
+            "message": "{\"conversation\":{\"id\":\"conv_vw45sk272js1q17c4k2aw4cyab\",\"title\":\"新对话\",\"status\":\"open\",\"messages\":[],\"runIds\":[],\"turns\":"
           }
         ]
       },
@@ -913,7 +913,7 @@
             "method": "GET",
             "status": 200,
             "code": null,
-            "message": "{\"version\":\"0.1.0\",\"dataDir\":\"C:\\\\Users\\\\RICHAR~1\\\\AppData\\\\Local\\\\Temp\\\\r14-api-ARgaFw\"}"
+            "message": "{\"version\":\"0.1.0\",\"dataDir\":\"C:\\\\Users\\\\RICHAR~1\\\\AppData\\\\Local\\\\Temp\\\\r14-api-0AZD3k\"}"
           }
         ]
       },

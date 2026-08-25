@@ -17,7 +17,7 @@
     },
     "freshServe": {
       "code": "timeout-killed",
-      "out": "(node:12836) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\nFAR-Lab API listening on http://127.0.0.1:49724\nweb workbench NOT built (web/dist absent — API only)\n"
+      "out": "(node:16060) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\nFAR-Lab API listening on http://127.0.0.1:56891\nweb workbench served from C:\\Users\\RichardYuan\\Desktop\\farlab-integration\\web\\dist\n"
     }
   }
 }
