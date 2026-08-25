@@ -15,11 +15,13 @@ import { stageKey } from '../../../i18n/keys';
 const ROW_H = 22;
 const LABEL_W = 130;
 
+// Epistemic state colors = the ONE token family at tint-strength ink (§8.3);
+// CSS vars resolve live in the fill property, so bars follow the theme.
 const stateInk = (state: StageState): string =>
-  state === 'done' ? 'rgba(61,139,95,0.55)'
-    : state === 'failed' ? 'rgba(179,53,44,0.6)'
-      : state === 'running' ? 'rgba(45,120,189,0.5)'
-        : 'rgba(154,161,171,0.45)';
+  state === 'done' ? 'color-mix(in oklab, var(--v2-verified) 55%, transparent)'
+    : state === 'failed' ? 'color-mix(in oklab, var(--v2-refuted) 60%, transparent)'
+      : state === 'running' ? 'color-mix(in oklab, var(--v2-info) 50%, transparent)'
+        : 'color-mix(in oklab, var(--v2-text-3) 45%, transparent)';
 
 export function StageGantt({ run }: { run: ResearchRun }): JSX.Element | null {
   const { t } = useI18n();
@@ -67,7 +69,7 @@ export function StageGantt({ run }: { run: ResearchRun }): JSX.Element | null {
                 height={14}
                 rx={2}
                 fill={fill}
-                {...(b.running ? { stroke: '#2d78bd', strokeWidth: 1, strokeDasharray: '3 2' } : {})}
+                {...(b.running ? { style: { stroke: 'var(--v2-info)' }, strokeWidth: 1, strokeDasharray: '3 2' } : {})}
               >
                 <title>
                   {`${t(stageKey(b.stage))}: ${formatDuration(b.durationMs)}${b.running ? ` — ${t('gantt.running')}` : ''}${b.attempt !== undefined && b.attempt > 1 ? ` · ${t('gantt.retryMark', { n: b.attempt })}` : ''}${b.subtasks !== undefined ? ` · ${t('overview.subtasks', { done: b.subtasks.done, total: b.subtasks.total })}` : ''}`}
@@ -80,7 +82,7 @@ export function StageGantt({ run }: { run: ResearchRun }): JSX.Element | null {
                   width={Math.max(barW(b) * (b.subtasks.done / b.subtasks.total), 0.4)}
                   height={4}
                   rx={1}
-                  fill="rgba(31,35,40,0.45)"
+                  style={{ fill: 'color-mix(in oklab, var(--v2-text-1) 45%, transparent)' }}
                 />
               )}
               <text x={LABEL_W + b.x * plotW + Math.max(barW(b), 0.8) + 3} y={y + 11} className="gantt-dur">
