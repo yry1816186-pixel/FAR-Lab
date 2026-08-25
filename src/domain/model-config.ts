@@ -2,27 +2,32 @@ import { z } from 'zod';
 import { ModelConfigId } from './ids.js';
 
 /**
- * User-defined model route (custom provider configuration): any OpenAI-compatible
- * or Anthropic-compatible endpoint the researcher wants the pipeline to call.
- * This is the PRODUCT configuration layer (created/edited in the UI at runtime);
- * the env chain (FARLAB_MODEL_PROVIDER & per-provider env) stays untouched as the
- * automation/competition layer beneath it.
+ * User-defined model route (custom provider configuration): any OpenAI-compatible,
+ * Anthropic-compatible or Google-Gemini-native endpoint the researcher wants the
+ * pipeline to call. This is the PRODUCT configuration layer (created/edited in the
+ * UI at runtime); the env chain (FARLAB_MODEL_PROVIDER & per-provider env) stays
+ * untouched as the automation/competition layer beneath it.
  */
 
-/** Transport wire the custom endpoint speaks — exactly the two the transport core implements. */
-export const ProviderWireProtocol = z.enum(['openai', 'anthropic']);
+/**
+ * Transport wire the custom endpoint speaks — exactly the three the transport core
+ * implements. 'gemini' is the Google generativelanguage generateContent REST shape
+ * (the native path for Gemini models worldwide; OpenAI-compat also exists but the
+ * native wire carries thinkingConfig/usageMetadata faithfully).
+ */
+export const ProviderWireProtocol = z.enum(['openai', 'anthropic', 'gemini']);
 export type ProviderWireProtocol = z.infer<typeof ProviderWireProtocol>;
 
 /**
  * Per-config REASONING CAPABILITY declaration (product configuration layer):
  * the researcher declares which thinking-parameter dialect the endpoint's model
  * speaks and the default effort gear for conversations. The product is
- * model-agnostic (any OpenAI/Anthropic-compatible route worldwide, incl. local
+ * model-agnostic (any OpenAI/Anthropic/Gemini-native route worldwide, incl. local
  * runtimes) — capability is DECLARED here, never inferred from a built-in model
  * catalog. A config without a declaration sends ZERO reasoning fields on the
  * wire (exact legacy behavior).
  */
-export const ReasoningStyle = z.enum(['reasoning_effort', 'enable_thinking', 'thinking_budget']);
+export const ReasoningStyle = z.enum(['reasoning_effort', 'enable_thinking', 'thinking_budget', 'thinking_config']);
 export type ReasoningStyle = z.infer<typeof ReasoningStyle>;
 export const ReasoningGear = z.enum(['low', 'medium', 'high']);
 export type ReasoningGear = z.infer<typeof ReasoningGear>;
@@ -80,7 +85,8 @@ export const clampGearForModel = (gear: ReasoningGear, modelId: string): Reasoni
  * Dialect↔wire compatibility is validated at the config boundary so an impossible
  * combination never reaches the transport: reasoning_effort / enable_thinking are
  * OpenAI-chat-completions body extensions; thinking_budget is the Anthropic-Messages
- * `thinking` parameter. The refinement lives INSIDE a schema that already sees `wire`
+ * `thinking` parameter; thinking_config is the Gemini generationConfig.thinkingConfig
+ * parameter. The refinement lives INSIDE a schema that already sees `wire`
  * (the full config), applied after object construction.
  */
 const assertReasoningWireCompat = (
@@ -88,12 +94,15 @@ const assertReasoningWireCompat = (
   ctx: z.RefinementCtx,
 ): void => {
   if (cfg.reasoning === undefined) return;
-  const openaiOnly = cfg.reasoning.style === 'reasoning_effort' || cfg.reasoning.style === 'enable_thinking';
-  if (openaiOnly && cfg.wire !== 'openai') {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: `reasoning style "${cfg.reasoning.style}" requires wire "openai"` });
-  }
-  if (cfg.reasoning.style === 'thinking_budget' && cfg.wire !== 'anthropic') {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: 'reasoning style "thinking_budget" requires wire "anthropic"' });
+  const style = cfg.reasoning.style;
+  const requiredWire: Record<ReasoningStyle, ProviderWireProtocol> = {
+    reasoning_effort: 'openai',
+    enable_thinking: 'openai',
+    thinking_budget: 'anthropic',
+    thinking_config: 'gemini',
+  };
+  if (cfg.wire !== requiredWire[style]) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reasoning'], message: `reasoning style "${style}" requires wire "${requiredWire[style]}"` });
   }
 };
 

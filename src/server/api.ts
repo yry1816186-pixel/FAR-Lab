@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { App } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
 import { listProviders, LIVE_PROVIDER_NAMES } from '../providers/index.js';
+import { PROVIDER_TEMPLATES } from '../providers/catalog.js';
 import {
   BuiltinRoutePrice, builtinDefaultName, builtinModelIdFor, envModelIdFor,
   readBuiltinOverrides, setBuiltinDefaultName, writeBuiltinOverrides,
@@ -43,6 +44,7 @@ import {
   FeedbackSourceKind,
   ModelProviderConfig,
   ObjectRef,
+  ProviderWireProtocol,
   ResearchQuestion,
   ScientificGoalType,
   SourceDocument,
@@ -915,6 +917,7 @@ function parseSeedSources(raw: unknown): string | {
     const limitations = bundle?.limitations.filter((l) => l.trim().length > 0) ?? [];
     sendJson(res, 200, { ...report, ...(limitations.length > 0 ? { limitations } : {}) });
   };
+
   // ---- MULTIMODAL ingest (2026-08-24): deterministic artifact understanding ----
   // POST /api/v1/ingest — one endpoint, two producer shapes:
   //   { kind: 'pdf_text', fileName, payload }  ← web pdfjs collector output
@@ -1128,10 +1131,15 @@ function parseSeedSources(raw: unknown): string | {
           defaultSource: source,
         };
       } catch {
-        return null; // env names an unknown/banned provider — health owns that failure story
+        return null; // env names an unknown provider — health owns that failure story
       }
     };
     sendJson(res, 200, { configs, activeModelConfigId: activeId, envDefault: envDefaultView() });
+  };
+
+  /** Preset provider templates (catalog.ts) — one-click prefills, not a whitelist. */
+  const listProviderTemplates = (res: http.ServerResponse): void => {
+    sendJson(res, 200, { templates: PROVIDER_TEMPLATES });
   };
 
   const getModelConfig = (res: http.ServerResponse, id: string): void => {
@@ -1343,7 +1351,7 @@ function parseSeedSources(raw: unknown): string | {
    */
   const discoverFromModelConfig = async (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> => {
     const body = await readJsonObject(req);
-    let wire: 'openai' | 'anthropic';
+    let wire: ProviderWireProtocol;
     let baseUrl: string;
     let apiKey: string;
     if (typeof body.configId === 'string') {
@@ -1352,7 +1360,7 @@ function parseSeedSources(raw: unknown): string | {
       baseUrl = stored.baseUrl;
       apiKey = typeof body.apiKey === 'string' && body.apiKey.length > 0 ? body.apiKey : stored.apiKey;
     } else {
-      if (body.wire !== 'openai' && body.wire !== 'anthropic') throw validation('discovery requires wire ("openai"|"anthropic") and baseUrl, or a stored configId');
+      if (body.wire !== 'openai' && body.wire !== 'anthropic' && body.wire !== 'gemini') throw validation('discovery requires wire ("openai"|"anthropic"|"gemini") and baseUrl, or a stored configId');
       if (typeof body.baseUrl !== 'string' || body.baseUrl.length === 0) throw validation('discovery requires baseUrl');
       wire = body.wire;
       baseUrl = body.baseUrl;
@@ -1396,7 +1404,7 @@ function parseSeedSources(raw: unknown): string | {
         const envModel = envModelIdFor(p.name);
         return {
           name: p.name,
-          kind: p.kind, // 'live' | 'archived' (banned: display-only, usage-history badge)
+          kind: p.kind, // 'live' | 'test'
           liveReady: p.liveReady,
           baseUrl: p.baseUrl,
           apiKeyEnvVar: p.apiKeyEnvVar,
@@ -1549,6 +1557,7 @@ function parseSeedSources(raw: unknown): string | {
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
     if (segments[1] !== 'v1') throw notFound(`no route: ${method} ${url.pathname}`);
+
     // MULTIMODAL ingest: deterministic artifact understanding (SDM contract).
     if (segments[2] === 'ingest') {
       if (segments.length === 3 && method === 'POST') {
@@ -1718,6 +1727,27 @@ function parseSeedSources(raw: unknown): string | {
         }
         throw notFound(`method ${method} not allowed for ${url.pathname}`);
       }
+
+      // RU-12 GO-2 time travel: project the run's object-space AS OF an event seq.
+      if (segments.length === 6 && segments[4] === 'state-at' && method === 'GET') {
+        const runId2 = segments[3]!;
+        assertRunId(runId2);
+        mustGetRun(runId2);
+        const raw = segments[5]!;
+        if (!/^\d+$/.test(raw)) throw validation('seq must be a non-negative integer');
+        const seq = Number(raw);
+        const state = app.store.stateAtSeq(runId2, seq);
+        sendJson(res, 200, {
+          runId: runId2,
+          seq: state.seq,
+          stage: state.stage,
+          questionId: state.questionId,
+          objectIdsByKind: state.objectIdsByKind,
+          eventCount: state.events.length,
+          lastEvents: state.events.slice(-8).map((e) => ({ seq: e.seq, type: e.type, stage: e.stage ?? null })),
+        });
+        return;
+      }
       if (segments.length === 5) {
         const leaf = segments[4]!;
         if (leaf === 'events' && method === 'GET') return runEvents(res, runId, url);
@@ -1872,6 +1902,7 @@ function parseSeedSources(raw: unknown): string | {
       if (leaf === 'active' && segments.length === 4 && method === 'PUT') return setActiveModelConfig(req, res);
       if (leaf === 'test' && segments.length === 4 && method === 'POST') return testModelConfig(req, res);
       if (leaf === 'usage' && segments.length === 4 && method === 'GET') return listWorkspaceUsage(res);
+      if (leaf === 'templates' && segments.length === 4 && method === 'GET') return listProviderTemplates(res);
       if (leaf === 'spend-limit' && segments.length === 4) {
         if (method === 'GET') {
           sendJson(res, 200, workspaceSpendStatus(app.store));

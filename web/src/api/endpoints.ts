@@ -17,7 +17,7 @@ import {
   normalizeEvidence, normalizeEvents, normalizeHypotheses, normalizePlan, normalizeQuestion,
   normalizeReceipts, normalizeRevisions, normalizeRun, normalizeRunSummaries, normalizeSearch, normalizeSources,
 } from './normalize';
-import type { Automation, BuiltinRouteSummary, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
+import type { Automation, BuiltinRouteSummary, ProviderTemplate as ProviderTemplateInfo, BuiltinRouteUpdateInput, BuiltinRoutesResponse, BundleSummary, Conversation, CorpusSnapshotInfo, FeedbackSourceKind, HealthReport, ModelConfigsResponse, ModelConfigInput, ModelConfigSummary, ModelConfigTestInput, ModelConfigTestResult, ResearchActionResponse, ResearchRun, RunEvent, RunSummary, ScientificGoalType, ScreeningDecisionResult, ScreeningStopResult, ScreeningView, SearchResponse, ToolIntegrationView, ToolTestRecord, UsageAggregate, VerificationReport, ZoteroAnnotation, ZoteroAnnotationsResponse, ZoteroLibItem, ZoteroLibraryResponse } from './types';
 
 const BASE = '/api/v1';
 
@@ -360,12 +360,12 @@ export const setActiveModelConfig = async (id: string | null, signal?: AbortSign
   await api.put(`${BASE}/model-configs/active`, { id }, signal);
 };
 
-// ---- built-in env routes (zai/dashscope): modelId override + pricing + default switch ----
+// ---- built-in env routes (zai/dashscope/deepseek/universal): modelId override + pricing + default switch ----
 
 const builtinRouteOf = (data: unknown): BuiltinRouteSummary => {
   if (typeof data === 'object' && data !== null) {
     const r = data as Record<string, unknown>;
-    if (typeof r.name === 'string' && (r.kind === 'live' || r.kind === 'archived')
+    if (typeof r.name === 'string' && (r.kind === 'live' || r.kind === 'test')
       && typeof r.envModelId === 'string' && typeof r.effectiveModelId === 'string') {
       return {
         name: r.name,
@@ -475,6 +475,15 @@ export const setSpendLimit = async (limitUsd: number | null, signal?: AbortSigna
     };
   }
   throw new ApiError({ code: 'unexpected_schema', message: '支出上限保存响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'spend limit response' } });
+};
+
+/** Preset provider templates worldwide (GET /model-configs/templates). */
+export const getProviderTemplates = async (signal?: AbortSignal): Promise<{ templates: ProviderTemplateInfo[] }> => {
+  const data: unknown = await api.getJson(`${BASE}/model-configs/templates`, signal);
+  if (typeof data === 'object' && data !== null && Array.isArray((data as { templates?: unknown }).templates)) {
+    return { templates: (data as { templates: ProviderTemplateInfo[] }).templates };
+  }
+  throw new ApiError({ code: 'unexpected_schema', message: '模板目录响应结构与预期不符', status: 200, retryable: false, i18nKey: 'err.schema', i18nVars: { what: 'provider templates' } });
 };
 
 /** List the models an endpoint serves (POST /model-configs/discover). */

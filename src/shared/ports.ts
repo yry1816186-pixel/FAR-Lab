@@ -1,4 +1,5 @@
 import type { ContentDepth, SourceFamily, SourceIdentifier, AccessState } from '../domain/source.js';
+import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 
 /** Structured model call request — the narrow semantic boundary (INTERFACES.md §5). */
 export interface StructuredCallRequest {
@@ -31,7 +32,7 @@ export interface StructuredCallRequest {
    * endpoint incl. local runtimes). The dialect map lives in providers/http.ts
    * reasoningBodyFields; the gear→budget map in domain/model-config.ts.
    */
-  reasoning?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' };
+  reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
   /** Retry budget owned by the plane (bounded, classified). */
   purpose: string; // e.g. 'claim-extraction', recorded in provenance
 }

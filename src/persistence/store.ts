@@ -344,6 +344,55 @@ export class Store {
   }
 
   /**
+   * RU-12 GO-2 — state-at-seq projection (time travel): rebuild the run's
+   * object-space AS OF an event seq. Objects are stored current-state-only,
+   * so the projection replays the append-only spine up to `seq` and reports,
+   * per kind, the ids that existed at that point (created events) with their
+   * CURRENT payloads (honest limitation: pre-revision payloads live in
+   * content-addressed archives, referenced by the revision objects themselves).
+   * Also returns the spine slice — callers see exactly what the run knew at seq.
+   */
+  stateAtSeq(runId: string, seq: number): {
+    seq: number;
+    events: RunEvent[];
+    stage: string | null;
+    objectIdsByKind: Record<string, string[]>;
+    questionId: string | null;
+  } {
+    const all = this.listEvents(runId);
+    const upto = all.filter((e) => e.seq <= seq);
+    const created = new Map<string, Set<string>>();
+    // Creation signal: event details that carry {kind, id} itemize exactly which
+    // objects existed at that point; kinds the spine does not itemize fall back
+    // to the current projection (disclosed in the method doc).
+    for (const e of upto) {
+      const d = (typeof e.detail === 'object' && e.detail !== null ? e.detail : {}) as Record<string, unknown>;
+      for (const key of ['kind', 'objectKind']) {
+        const kind = d[key];
+        if (typeof kind === 'string' && d.id !== undefined && typeof d.id === 'string') {
+          if (!created.has(kind)) created.set(kind, new Set());
+          created.get(kind)!.add(String(d.id));
+        }
+      }
+    }
+    // fall back to current objects for kinds the spine does not itemize —
+    // disclosed via `currentProjection: true` on those kinds
+    const objectIdsByKind: Record<string, string[]> = {};
+    const runKinds = new Set<string>([
+      ...(this.db.prepare('SELECT DISTINCT kind FROM objects WHERE run_id=?').all(runId) as { kind: string }[]).map((r) => String(r.kind)),
+      ...created.keys(),
+    ]);
+    for (const kind of runKinds) {
+      const ids = (this.db.prepare('SELECT id FROM objects WHERE run_id=? AND kind=? ORDER BY created_at').all(runId, kind) as { id: string }[]).map((x) => String(x.id));
+      const spineIds = created.get(kind);
+      objectIdsByKind[kind] = spineIds !== undefined && spineIds.size > 0 ? [...spineIds].sort() : ids;
+    }
+    const lastStage = [...upto].reverse().find((e) => e.stage !== undefined && e.stage !== null)?.stage ?? null;
+    const questionId = (upto.find((e) => e.type === 'run_created')?.detail as { questionId?: string } | undefined)?.questionId ?? null;
+    return { seq, events: upto, stage: lastStage, objectIdsByKind, questionId };
+  }
+
+  /**
    * Tag query plane (RU-2 G6): ANY-of tag match with optional run scoping and
    * keyset pagination. Cross-run ordering is (run_id, seq) — per-run seq is only
    * monotonic within its run. Limit clamps at 200 (model-facing budget guard).

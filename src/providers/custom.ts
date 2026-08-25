@@ -8,10 +8,11 @@ import {
 } from './http.js';
 
 /**
- * User-defined model route: a thin generalization of the zai (anthropic wire) and
- * dashscope (openai wire) adapters around the shared transport core. The provider
- * name is `custom:<configId>` so every receipt's modelCall.provider traces back to
- * the exact stored configuration, stable across label edits.
+ * User-defined model route: a thin generalization of the zai (anthropic wire),
+ * dashscope (openai wire) and gemini-native adapters around the shared transport
+ * core. The provider name is `custom:<configId>` so every receipt's
+ * modelCall.provider traces back to the exact stored configuration, stable across
+ * label edits.
  *
  * NOT part of the provider registry (LIVE_PROVIDER_NAMES / getProvider stay a closed
  * set): custom routes are constructed per-run/per-active-config from SQLite, never
@@ -50,9 +51,11 @@ export const createCustomProvider = (
           ),
         );
       }
-      // Anthropic Messages wire has no tools/response_format concepts — same strip as zai.
-      const effective =
-        cfg.wire === 'anthropic' && req.jsonSchema !== undefined ? { ...req, jsonSchema: undefined } : req;
+      // Anthropic Messages and Gemini generateContent wires have no OpenAI
+      // tools/response_format concepts — same strip as zai (JSON-mode + prompt
+      // contract carry the output shape; the caller's zod parse stays the authority).
+      const needsStrip = cfg.wire !== 'openai' && req.jsonSchema !== undefined;
+      const effective = needsStrip ? { ...req, jsonSchema: undefined } : req;
       return runOpenAICompatStructuredCall(
         { providerName: name, baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, modelId: cfg.modelId, executionMode: 'live', wire: cfg.wire },
         effective,

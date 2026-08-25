@@ -126,13 +126,17 @@ describe('task-class routing', () => {
     expect(glm.reason).toContain('competition-policy');
   });
 
-  it('deepseek ban enforced in every mode, even by override', () => {
+  it('default mode is vendor-neutral (no project-wide ban); competition mode still pins Qwen-on-Bailian', () => {
+    // User directive 2026-08-26: the historical DeepSeek ban is REMOVED — default
+    // mode routes any provider freely; an override may select it.
     const withDeepseek = [...routes, stubRoute('deepseek', 'deepseek-chat')];
-    const d = routeCall('conversation', withDeepseek);
-    expect(d.candidates.find((c) => c.name === 'deepseek')!.reason).toContain('banned');
-    expect(() =>
-      routeCall('conversation', withDeepseek, { mode: 'default', overrides: { conversation: 'deepseek' } }),
-    ).toThrow(/banned|rejected/i);
+    const dDefault = routeCall('conversation', withDeepseek, { mode: 'default', overrides: { conversation: 'deepseek' } });
+    expect(dDefault.selectedRoute).toBe('deepseek');
+    expect(dDefault.selectedVia).toBe('override');
+    // Competition mode keeps the official-rule gate (Qwen-family base on Bailian).
+    const dComp = routeCall('conversation', withDeepseek, { mode: 'competition' });
+    expect(dComp.candidates.find((c) => c.name === 'deepseek')!.accepted).toBe(false);
+    expect(dComp.candidates.find((c) => c.name === 'deepseek')!.reason).toContain('competition-policy');
   });
 
   it('override wins among ACCEPTED routes and is recorded via selectedVia', () => {

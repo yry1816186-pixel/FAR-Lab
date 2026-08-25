@@ -13,6 +13,7 @@ import type { PermissionEngine } from './permissions.js';
 import type { SessionTelemetry } from './telemetry.js';
 import { defaultBudget, type TokenBudget } from './budget.js';
 import { microcompact, compactedTranscript, transcriptTokens, transcriptTokensBySource, HANDOFF_PROMPT } from './compaction.js';
+import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 
 /**
  * Agent kernel loop (H1) — the FAR-Lab equivalent of Codex CodexThread / Claude Code
@@ -123,7 +124,7 @@ export interface AgentLoopDeps {
    * config default). Absent = no reasoning fields on the wire — the resolved route's
    * declared capability decides whether this is honored or simply not sent.
    */
-  reasoning?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' };
+  reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
   hooks?: ExtensionBus;
   /** Enables spill-to-artifact for oversized tool results (content-addressed ref). */
   artifacts?: ArtifactStore;
