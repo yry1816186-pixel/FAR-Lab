@@ -6,6 +6,8 @@ import { openArtifactStore } from '../persistence/artifacts.js';
 import { getProvider } from '../providers/index.js';
 import { resolveBuiltinProvider } from '../providers/builtin-overrides.js';
 import { sourceAdapterFor } from '../sources/index.js';
+import { openResponseCacheStore, withRetractions, type ResponseCacheStore } from '../sources/response-cache.js';
+import { parseRetractionWatchCsv } from '../sources/retraction-watch.js';
 import { resolveRunProvider } from './provider-resolver.js';
 import { withSpendGate } from './spend-limit.js';
 import { Orchestrator } from './orchestrator.js';
@@ -91,6 +93,20 @@ export const createApp = async (opts: AppOptions = {}): Promise<App> => {
   };
   const stages = await stageModules();
   const stageMap = new Map(HANDLED_STAGES.map((s) => [s, stages[s]] as [RunStageName, StageHandler]));
+  // Retrieval response cache (04→12 handoff 2026-08-24): dedicated source-cache.db —
+  // same own-tiny-track pattern as far-scheduler.db; the table is owned solely by
+  // response-cache.ts. Absent from ctx the stages run exact legacy behavior, so the
+  // cache is pure additive QoS (planned searches + citation-chase ops ride it).
+  // FARLAB_RETRIEVAL_REPLAY=1 → cache-exclusive exact replay mode (planned-search
+  // miss refuses the run; chase miss degrades visibly; receipts say cache=replay).
+  // FARLAB_RETRACTION_WATCH_CSV=<path> → offline Retraction Watch table (manual
+  // download is the no-live-API-legal integration; parser is fixture-pinned).
+  const cacheDb = openDb(path.join(dataDir, 'source-cache.db'));
+  let responseCache: ResponseCacheStore = openResponseCacheStore(cacheDb, process.env.FARLAB_RETRIEVAL_REPLAY === '1' ? 'replay' : 'read_through');
+  const rwCsv = process.env.FARLAB_RETRACTION_WATCH_CSV;
+  if (rwCsv !== undefined && rwCsv !== '') {
+    responseCache = withRetractions(responseCache, parseRetractionWatchCsv(fs.readFileSync(rwCsv, 'utf8')));
+  }
   // Spend gate (gap R5): every run-pipeline model call passes the workspace USD
   // ceiling check — fail-closed quota_exceeded once the declared limit is spent.
   // Re-read per call, so a settings edit applies to the next stage immediately.
@@ -104,9 +120,10 @@ export const createApp = async (opts: AppOptions = {}): Promise<App> => {
     sourceFor: (family) => sourceAdapterFor(family),
     stages: stageMap,
     signals: new Map(),
+    responseCache,
   });
   return {
     store, orchestrator, artifacts, provider, dataDir,
-    close: () => db.close(),
+    close: () => { cacheDb.close(); db.close(); },
   };
 };

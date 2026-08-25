@@ -844,7 +844,7 @@ export interface CandidateQuestion {
   rationale: string;
 }
 
-export type ConversationActionKind = 'launch_research' | 'create_automation' | 'cancel_automation';
+export type ConversationActionKind = 'launch_research' | 'cancel_run' | 'create_automation' | 'cancel_automation' | 'create_tool_integration';
 
 /** One agent-proposed action and its honest lifecycle (executes only on approval). */
 export interface ConversationProposal {

@@ -15,7 +15,7 @@ import { buildLineageGraph } from '../app/lineage.js';
 import { runEvaluators } from '../app/evaluators.js';
 import { runResearchAction, ActionError } from './actions.js';
 import { connectClaim, editHypothesis, forkHypothesis, HypothesisOpError, promoteHypothesis, rejectHypothesis } from './hypothesis-ops.js';
-import { ACTIVE_MODEL_CONFIG_META_KEY } from '../app/provider-resolver.js';
+import { ACTIVE_MODEL_CONFIG_META_KEY, readCompetitionRouteMode, writeCompetitionRouteMode } from '../app/provider-resolver.js';
 import { discoverModels } from '../providers/discovery.js';
 import { ingestPdfTextPayload, ingestSdm, ingestTextToSdm, ingestBytes, persistDatasetProfile, loadSdmByRef, loadDatasetProfileByRef, ingestSvgPlot, loadPlotPointsByRef, jsonRefusalReason, type IngestOutcome } from '../ingest/service.js';
 import type { DatasetProfileDoc } from '../ingest/dataset.js';
@@ -2119,7 +2119,28 @@ function parseSeedSources(raw: unknown): string | {
       throw notFound(`no route: ${method} ${url.pathname}`);
     }
 
-    if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
+    if (segments[2] === 'competition-route' && segments.length === 3) {
+      // 11→12 handoff 2026-08-25: competition route gate switch (settings surface).
+      // GET → current mode; PUT {on:boolean} → idempotent write. Semantics live in
+      // provider-resolver (ON holds every resolved route to the official Qwen-via-Bailian
+      // rule, fail-closed on violation; re-read per resolution so edits hit live runs).
+      if (method === 'GET') {
+        return sendJson(res, 200, { competitionRouteMode: readCompetitionRouteMode(app.store) ? 'on' : 'off' });
+      }
+      if (method === 'PUT') {
+        const raw = (await readBody(req)).toString('utf8');
+        let body: unknown;
+        try { body = JSON.parse(raw); } catch { body = undefined; }
+        if (typeof body !== 'object' || body === null || typeof (body as { on?: unknown }).on !== 'boolean') {
+          throw new HttpError(400, { code: 'validation', message: 'PUT /api/v1/competition-route expects {"on": boolean}', retryable: false });
+        }
+        writeCompetitionRouteMode(app.store, (body as { on: boolean }).on);
+        return sendJson(res, 200, { competitionRouteMode: (body as { on: boolean }).on ? 'on' : 'off' });
+      }
+      throw notFound(`no route: ${method} ${url.pathname}`);
+    }
+
+        if (segments[2] === 'health' && segments.length === 3 && method === 'GET') {
       return health(res);
     }
 

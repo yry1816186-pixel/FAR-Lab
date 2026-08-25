@@ -378,29 +378,35 @@ describe('one turn per conversation at a time (concurrent turns serialized)', ()
   });
 });
 
-describe('R2-13 F-5: conversation allow-expansion is keyed on riskClass, not registry membership', () => {
-  it('read-class tools (incl. propose_action) get allow rules; execute-class and undeclared tools fall to deny', async () => {
-    const { conversationAllowRules } = await import('../src/server/conversation-agent.js');
-    const { ToolRegistry } = await import('../src/agent/tool.js');
+describe('R2-13 F-5 (assembly builtinAdmission): allow-expansion is keyed on riskClass, not registry membership', () => {
+  it('read-class builtins (incl. propose_action) get allow rules; execute-class and undeclared tools fall to deny', async () => {
+    const { assembleSessionCapabilities } = await import('../src/agent/capabilities/assembly.js');
     const { PermissionEngine } = await import('../src/agent/permissions.js');
+    const z = (await import('zod')).z;
     const mkTool = (name: string, riskClass?: 'read' | 'execute') => ({
       name, description: name,
       inputSchema: z.object({}),
       ...(riskClass !== undefined ? { riskClass } : {}),
       async execute() { return { ok: true, data: {} }; },
     });
-    const tools = new ToolRegistry()
-      .register(mkTool('list_runs', 'read'))
-      .register(mkTool('propose_action', 'read'))
-      .register(mkTool('mcp_shell_exec', 'execute')) // hypothetical future registration
-      .register(mkTool('undeclared_tool')); // no riskClass declared
-    const rules = conversationAllowRules(tools);
-    expect(rules.map((r) => r.tool).sort()).toEqual(['list_runs', 'propose_action']);
-    // The real engine with exactly this construction: execute-class is denied
-    // fail-closed; only read-class passes without an ask handler.
-    const engine = new PermissionEngine({ rules, defaultEffect: 'deny' });
-    expect((await engine.decide('list_runs', {}, 'read')).effect).toBe('allow');
-    expect((await engine.decide('mcp_shell_exec', { cmd: 'curl x.invalid' }, 'execute')).effect).toBe('deny');
-    expect((await engine.decide('undeclared_tool', {}, 'execute')).effect).toBe('deny');
+    // assembleSessionCapabilities is the authoritative composer since the 09->08
+    // handoff; the conversation kernel passes builtinAdmission: 'read_class_only'.
+    const assembly = await assembleSessionCapabilities({
+      builtinTools: [
+        mkTool('list_runs', 'read'),
+        mkTool('propose_action', 'read'),
+        mkTool('mcp_shell_exec', 'execute'), // hypothetical future builtin
+        mkTool('undeclared_tool'), // no riskClass declared
+      ] as never,
+      integrations: [],
+      policy: { capability: 'conversation-resident', admittedRiskClasses: ['read'] },
+      builtinAdmission: 'read_class_only',
+    });
+    try {
+      expect((await assembly.permissions.decide('list_runs', {}, 'read')).effect).toBe('allow');
+      expect((await assembly.permissions.decide('propose_action', {}, 'read')).effect).toBe('allow');
+      expect((await assembly.permissions.decide('mcp_shell_exec', { cmd: 'curl x.invalid' }, 'execute')).effect).toBe('deny');
+      expect((await assembly.permissions.decide('undeclared_tool', {}, 'execute')).effect).toBe('deny');
+    } finally { await assembly.close(); }
   });
 });

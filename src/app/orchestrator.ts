@@ -13,6 +13,7 @@ import { analyzeTrajectory } from './supervisor.js';
 import { resolveRunReasoningRoute } from './provider-resolver.js';
 import { consolidateRun } from './memory.js';
 import { receiptEventDetail } from '../pipeline/llm.js';
+import type { ResponseCacheStore } from '../sources/response-cache.js';
 
 /** Meta key for the persisted quality-gate round counter (round 1 = initial generation). */
 const qgRoundKey = (runId: string) => `qg:round:${runId}`;
@@ -28,6 +29,8 @@ export interface OrchestratorDeps {
   sourceFor: (family: SourceFamily) => SourceAdapter;
   stages: Map<RunStageName, StageHandler>;
   signals: Map<string, { cancelled: boolean }>;
+  /** Retrieval response cache (composition-wired; absent = legacy uncached behavior). */
+  responseCache?: ResponseCacheStore;
 }
 
 /** Cross-process execution ownership refused (another live executor holds the lease). */
@@ -119,6 +122,7 @@ export class Orchestrator {
       ...(resolveRunReasoningRoute(store, run) ?? {}),
       budget,
       sourceFor: this.deps.sourceFor,
+      ...(this.deps.responseCache !== undefined ? { responseCache: this.deps.responseCache } : {}),
       recordReceipt: (partial) => {
         const receipt = ProvenanceReceipt.parse({
           ...partial, id: newId('rcp'), runId: run.id, at: partial.at ?? new Date().toISOString(),
