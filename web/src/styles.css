@@ -317,6 +317,8 @@ a:hover { text-decoration: underline; }
 }
 .health-strip--ok   { color: var(--v2-verified-on-tint); background: var(--v2-verified-tint); border-color: var(--ok-border); }
 .health-strip--warn { color: var(--v2-caution-on-tint);  background: var(--v2-caution-tint);  border-color: var(--warn-border); }
+/* 01-02 handoff: in-flight state gets the neutral muted surface (was unstyled). */
+.health-strip--checking { color: var(--v2-text-3, gray); background: var(--v2-surface-2); border-color: var(--v2-border); }
 .health-strip--err  { color: var(--v2-refuted-on-tint);  background: var(--v2-refuted-tint);  border-color: var(--err-border); }
 .health-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
 

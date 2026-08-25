@@ -25,6 +25,8 @@ interface Attachment {
   sizeBytes?: number;
   /** Projection hit the 50k-char ceiling — shown honestly on the card. */
   truncated?: boolean;
+  /** 05-01: client-only text parse (no server SDM route for this format). */
+  clientParse?: boolean;
   /** Re-runnable parse source so a failed card can retry without re-dropping. */
   retry?: () => Promise<void>;
 }
@@ -201,6 +203,7 @@ export function ResearchComposer({
         upsert(id, {
           status: 'ready',
           truncated: extraction.truncated,
+          clientParse: extraction.origin === 'client-parse' && (kind === 'docx' || kind === 'slides' || kind === 'odf' || kind === 'epub'),
           seed: { title: file.name.replace(/\.[^.]+$/, ''), text: extraction.text },
         });
       } catch {
@@ -397,6 +400,7 @@ export function ResearchComposer({
                     {a.sizeBytes !== undefined ? ` · ${formatBytes(a.sizeBytes)}` : ''}
                     {a.status === 'parsing' && ` · ${t('composer.parsing')}`}
                     {a.status === 'ready' && a.truncated && ` · ${t('ingest.truncated')}`}
+                    {a.status === 'ready' && a.clientParse && ` · ${t('ingest.clientParse')}`}
                     {a.status === 'failed' && ` · ${t(a.errorKey ?? 'ingest.extractFailed')}`}
                   </span>
                 </span>

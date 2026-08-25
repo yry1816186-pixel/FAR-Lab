@@ -200,7 +200,7 @@ export const parsePptx = (bytes: Uint8Array, fileName: string): PptxParseResult 
       headingLevel: 2,
       provenance: { elementPath: `${slidePath}>title` },
     });
-    if (title.length === 0) warnings.push(`slide ${n} has no title placeholder — synthetic "Slide ${n}" heading emitted (never a guessed title)`);
+    if (title.length === 0) warnings.push(`slide ${n} has no title placeholder — a positional "Slide ${n}" heading stands in (never a guessed title)`);
 
     for (const s of shapes) {
       if (s === titleText) continue;
