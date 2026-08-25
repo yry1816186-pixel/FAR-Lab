@@ -232,6 +232,8 @@ export const recordModelReceipt = (
       finishReason: res.receipt.finishReason,
       ...(res.receipt.transportRetries !== undefined ? { transportRetries: res.receipt.transportRetries } : {}),
       ...(res.receipt.correctiveReasks !== undefined ? { correctiveReasks: res.receipt.correctiveReasks } : {}),
+      ...(res.receipt.params !== undefined ? { params: res.receipt.params } : {}),
+      ...(res.receipt.routing !== undefined ? { routing: res.receipt.routing } : {}),
     },
   });
 };

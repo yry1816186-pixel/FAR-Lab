@@ -149,6 +149,34 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
     const url = requestUrl(
       `/works?search=${encodeURIComponent(q)}&per-page=${perPage}&${mailtoQuery}`,
     );
+    return worksRequest(url, q);
+  };
+
+  /**
+   * SCIENCE lane (2026-08-24) — filter-param querying for the citation chase:
+   * `cites:W123` (forward snowball) / `ids.openalex:W1|W2|…` (backward batch,
+   * <=50 ids per OpenAlex filter-value limits). Same plumbing, receipts and
+   * error contract as keyword search.
+   */
+  const searchFiltered = async (
+    filter: string,
+    so?: { limit?: number },
+  ): Promise<RawRetrievalResult> => {
+    const q = filter.trim();
+    if (!q) {
+      throw new SourceAdapterError({
+        family, query: filter, kind: 'invalid_query', httpStatus: 0, message: 'empty filter',
+      });
+    }
+    const perPage = clampLimit(so?.limit, 25, 200);
+    const url = requestUrl(
+      `/works?filter=${encodeURIComponent(q)}&per-page=${perPage}&${mailtoQuery}`,
+    );
+    return worksRequest(url, q);
+  };
+
+  /** Shared /works request+parse for keyword and filter queries. */
+  const worksRequest = async (url: string, q: string): Promise<RawRetrievalResult> => {
     const res = await getWith429Retry(url, { family, query: q });
     if (res.status !== 200) {
       throw new SourceAdapterError({
@@ -226,5 +254,5 @@ export const createOpenAlexAdapter = (opts: OpenAlexAdapterOptions = {}): Source
     return { found: true, record, httpStatus: res.status };
   };
 
-  return { family, search, resolve };
+  return { family, search, searchFiltered, resolve };
 };

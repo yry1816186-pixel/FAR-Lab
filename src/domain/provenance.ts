@@ -39,6 +39,22 @@ export const ModelCallFacts = z.object({
   /** W4-F1 retry observability (bounded-retry counts actually consumed, 0 = clean first pass). */
   transportRetries: z.number().int().nonnegative().optional(),
   correctiveReasks: z.number().int().nonnegative().optional(),
+  /**
+   * Model-plane provenance (2026-08-24): generation parameters actually sent
+   * (reproducibility: requestHash covers the payload, this covers the knobs) and
+   * the routing decision that selected the serving route. Optional: legacy receipts parse.
+   */
+  params: z.object({
+    temperature: z.number().optional(),
+    maxTokens: z.number().int().positive().optional(),
+    structuredOutput: z.enum(['json_object', 'json_schema_strict', 'strict_tools', 'prompt_contract']).optional(),
+    reasoning: z.object({ style: z.string(), gear: z.string() }).optional(),
+  }).optional(),
+  routing: z.object({
+    taskClass: z.string().min(1),
+    route: z.string().min(1),
+    selectedVia: z.string().min(1),
+  }).optional(),
 });
 
 export const SourceRetrievalFacts = z.object({

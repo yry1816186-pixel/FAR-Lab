@@ -59,6 +59,20 @@ export const VersionDiffEntry = z.object({
   objectId: z.string(),
   summary: z.string().min(1),
   changedFields: z.array(z.string()).default([]),
+  /**
+   * RU-12 GO-1: RFC 6902 structured ops from the id-anchored walker
+   * (src/domain/artifact-diff.ts) — the revision chain becomes
+   * field-explainable. Optional: revisions predating the walker have summary
+   * + changedFields only.
+   */
+  patchOps: z.array(z.union([
+    z.object({ op: z.literal('add'), path: z.string(), value: z.unknown() }),
+    z.object({ op: z.literal('remove'), path: z.string() }),
+    z.object({ op: z.literal('replace'), path: z.string(), value: z.unknown() }),
+    z.object({ op: z.literal('move'), from: z.string(), path: z.string() }),
+  ])).default([]),
+  /** Deterministic semantic flags (decision-rule change, prediction added, ...). */
+  semanticFlags: z.array(z.string()).default([]),
 });
 
 export const VersionDiff = z.object({

@@ -47,6 +47,13 @@ describe('RU-7.3 backwards-clock detection', () => {
   it('records an honest observation when an event timestamp regresses below the last persisted write time', () => {
     const { store } = mkStore();
     const runId = mkRun(store);
+    // mkRun's run_created stamps the REAL wall clock into the workspace write-floor
+    // meta; the synthetic timestamps below are fixed. Without this reset the test
+    // only passes when the real clock is before 12:00Z (silent time-of-day flake,
+    // found 2026-08-24 — afternoon runs made the FIRST synthetic write look like a
+    // clock regression). The unit under test is the regression NOTE, not the floor
+    // seeding, so seed it deterministically from the first synthetic write.
+    store.deleteMeta('storage:last_write_at');
     // normal write establishes the floor
     store.appendEvent(runId, { type: 'note', detail: { i: 1 } }, '2026-08-24T12:00:00.000Z');
     // clock jumps BACK (suspend/resume shape): now < floor

@@ -73,7 +73,7 @@ describe('plan-level advisory (free-text numbers vs structured anchors)', () => 
 
   const structuredOver = {
     metricSpecs: [{ name: 'accuracy', definition: 'share correct', role: 'primary' as const, direction: 'higher_better' as const }],
-    testSpecs: [{ id: 't1', metric: 'accuracy', statistic: 'permutation' as const, hypothesisIds: [h1], prediction: 'supports' as const, interpretation: 'np_test' as const, alpha: 0.05, threshold: 0.75, thresholdOp: '>=' as const }],
+    testSpecs: [{ id: 't1', metric: 'accuracy', statistic: 'bootstrap_ci' as const, hypothesisIds: [h1], prediction: 'supports' as const, interpretation: 'np_test' as const, alpha: 0.05, threshold: 0.75, thresholdOp: '>=' as const }],
     predictions: [{ hypothesisId: h1, observable: 'accuracy', condition: 'on', expectedRelation: 'increases' }],
   };
 

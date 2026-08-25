@@ -21,15 +21,23 @@ export const retractionStatusFrom = (
   if (record === undefined) return undefined;
   const updates = (record.normalized as { 'update-to'?: unknown } | undefined)?.['update-to'];
   if (!Array.isArray(updates)) return undefined;
-  let status: 'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated' | undefined;
+  // SCIENCE lane (2026-08-24): status by PRIORITY, not by update-to array order —
+  // `??=` first-match previously let a [correction, reinstatement, retraction]
+  // listing read as 'corrected' and a reinstated paper read as its older retraction.
+  // reinstatement resolves the retraction; retraction dominates EoC/correction.
+  const present = new Set<'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated'>();
   for (const u of updates) {
     const t = String((u as { type?: unknown })?.type ?? '').toLowerCase();
-    if (t.includes('reinstatement') || t.includes('reinstated')) status ??= 'reinstated';
-    else if (t.includes('retraction')) status ??= 'retracted';
-    else if (t.includes('expression of concern')) status ??= 'expression_of_concern';
-    else if (t.includes('correction') || t.includes('corrected')) status ??= 'corrected';
+    if (t.includes('reinstatement') || t.includes('reinstated')) present.add('reinstated');
+    else if (t.includes('retraction')) present.add('retracted');
+    else if (t.includes('expression of concern')) present.add('expression_of_concern');
+    else if (t.includes('correction') || t.includes('corrected')) present.add('corrected');
   }
-  return status;
+  if (present.size === 0) return undefined;
+  if (present.has('reinstated')) return 'reinstated';
+  if (present.has('retracted')) return 'retracted';
+  if (present.has('expression_of_concern')) return 'expression_of_concern';
+  return 'corrected';
 };
 
 /**

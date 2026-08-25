@@ -3,6 +3,9 @@ import { createInterface } from 'node:readline/promises';
 import path from 'node:path';
 import { createApp } from '../app/composition.js';
 import { verifyBundle } from '../app/verify.js';
+import { readFile } from 'node:fs/promises';
+
+import { ingestSdm, ingestTextToSdm, ingestBytes, ingestSvgPlot, persistDatasetProfile, type TextIngestResult, type BytesIngestResult } from '../ingest/service.js';
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
 import { completionScript } from './completion.js';
@@ -488,6 +491,45 @@ const main = async (): Promise<void> => {
     return;
   }
 
+  if (cmd === 'data' && sub === 'obs') {
+    // Reliability observability snapshot (workstream 2026-08-24): one sample of
+    // process/storage state + per-run recovery phases + workspace error profile.
+    const path = await import('node:path');
+    const { sampleProcess, sampleStorage, errorProfileForRun, formatCorrelation } = await import('../app/observability.js');
+    const { recoveryStateForRun } = await import('../app/recovery-state.js');
+    const dataDir = path.resolve(process.env.FARLAB_DATA_DIR ?? '.far-run');
+    const app = await createApp({ dataDir });
+    try {
+      const proc = sampleProcess();
+      const storage = sampleStorage(app.store, dataDir);
+      const runs = app.store.listRuns(50);
+      const phases: Record<string, string[]> = {};
+      const errorProfile: Record<string, number> = {};
+      for (const r of runs) {
+        const doc = app.store.getRun(r.id);
+        if (doc === null) continue;
+        const state = recoveryStateForRun(app.store, doc);
+        (phases[state.phase] ??= []).push(r.id);
+        for (const [cat, n] of Object.entries(errorProfileForRun(app.store, r.id))) {
+          errorProfile[cat] = (errorProfile[cat] ?? 0) + n;
+        }
+      }
+      if (json()) jsonOutput({ process: proc, storage, phases, errorProfile });
+      else {
+        console.log(`process: pid=${proc.pid} up=${(proc.uptimeMs / 1000).toFixed(1)}s rss=${proc.rssMb}MB heap=${proc.heapUsedMb}/${proc.heapTotalMb}MB handles=${proc.activeHandles}`);
+        console.log(`storage: db=${storage.dbBytes}B wal=${storage.walBytes}B artifacts=${storage.artifactBlobs} blobs (${storage.artifactsBytes}B)${storage.orphanTemps > 0 ? ` +${storage.orphanTemps} ORPHAN TEMPS (far gc --apply sweeps)` : ''}`);
+        console.log(`state: runs=${storage.runs} events=${storage.events} objects=${storage.objects} receipts=${storage.receipts}`);
+        for (const [phase, ids] of Object.entries(phases)) {
+          const shown = ids.slice(0, 3).join(', ');
+          console.log(`  ${phase}: ${ids.length}${ids.length > 0 ? ` (${shown}${ids.length > 3 ? ' …' : ''})` : ''}`);
+        }
+        if (Object.keys(errorProfile).length > 0) console.log(`errors: ${Object.entries(errorProfile).map(([c, n]) => `${c}=${n}`).join(' ')}`);
+        console.log(`correlation format: ${formatCorrelation({ runId: 'run_x', stage: 'rank', stageAttempt: 1 })}`);
+      }
+    } finally { app.close(); }
+    return;
+  }
+
   if (cmd === 'data' && sub === 'info') {
     // Data footprint (read-only, honest numbers from the real directory).
     const fs = await import('node:fs');
@@ -535,6 +577,79 @@ const main = async (): Promise<void> => {
       console.log(`artifacts: ${artifacts.files} files, ${artifacts.bytes} B`);
       console.log(`exports: ${exportsDir.files} files, ${exportsDir.bytes} B`);
     }
+    return;
+  }
+  if (cmd === 'ingest') {
+    // MULTIMODAL (2026-08-24): deterministic scientific-artifact understanding.
+    // Text-family files parse into an SDM (or dataset profile); xlsx supplements
+    // profile through the binary router; PDFs are refused honestly (text-layer
+    // collection is a web-client pdfjs capability, not a zod-only core one).
+    const target = process.argv[3];
+    if (target === undefined) die('usage: far ingest <file.(md|tex|csv|tsv|json|xlsx|docx|pptx|epub|html|svg|txt|log|ipynb|py|ts|js|xml)>', 2);
+    if (/\.pdf$/i.test(target)) die('far ingest: PDF text-layer collection runs in the web client (pdfjs-dist) — use the workbench upload or POST /api/v1/ingest {kind:"pdf_text"}; the zod-only core cannot collect PDF text', 2);
+    const base = path.basename(target);
+    // SVG plots digitize deterministically and persist a re-verifiable points
+    // artifact — they need the store at parse time, so they take a dedicated path.
+    if (/\.svg$/i.test(target)) {
+      let svgText: string;
+      try {
+        svgText = await readFile(target, 'utf8');
+      } catch (e) {
+        die(`cannot read ${target}: ${e instanceof Error ? e.message : String(e)}`, 1);
+      }
+      const app = await createApp({});
+      try {
+        const r = await ingestSvgPlot(app.artifacts, base, svgText);
+        if (!r.ok) die(`far ingest: ${r.reason}`, 2);
+        const f = r.outcome.sdm.figures[0];
+        const axes = f !== undefined && f.perception.axes !== undefined ? f.perception.axes.map((a) => `${a.kind}:${a.range !== undefined ? `[${a.range[0]}, ${a.range[1]}]` : '?'}${a.scale !== undefined ? ` (${a.scale})` : ''}`).join(' ') : '';
+        console.log(`${base}: svg-plot-v1 — ${f !== undefined ? f.perception.status : 'unknown'}`);
+        console.log(`  series=${r.points.series.length} points=${r.points.series.reduce((n, sr) => n + sr.points.length, 0)} ${axes}`);
+        for (const w of r.outcome.sdm.diagnostics.warnings.slice(0, 6)) console.log(`  note: ${w}`);
+        console.log(`  artifact: ${r.outcome.artifactRef}`);
+        if (r.pointsRef !== undefined) console.log(`  points:   ${r.pointsRef}`);
+      } finally { app.close(); }
+      return;
+    }
+    let routed: Exclude<TextIngestResult, null> | BytesIngestResult;
+    if (/\.(xlsx|xlsm|docx|pptx|epub)$/i.test(target)) {
+      let bytes: Buffer;
+      try {
+        bytes = await readFile(target);
+      } catch (e) {
+        die(`cannot read ${target}: ${e instanceof Error ? e.message : String(e)}`, 1);
+      }
+      routed = ingestBytes(base, bytes);
+    } else {
+      let text: string;
+      try {
+        text = await readFile(target, 'utf8');
+      } catch (e) {
+        die(`cannot read ${target}: ${e instanceof Error ? e.message : String(e)}`, 1);
+      }
+      const t = ingestTextToSdm(base, text);
+      routed = t === null
+        ? { type: 'refused', reason: `unsupported file kind: ${base} — supported: .md .tex .csv .tsv .json .xlsx .docx .pptx .epub .html .svg .txt .log .ipynb .py .ts .js .xml (JATS/TEI)` }
+        : t;
+    }
+    if (routed.type === 'refused') die(`far ingest: ${routed.reason}`, 2);
+    const app = await createApp({});
+    try {
+      if (routed.type === 'dataset') {
+        const artifactRef = await persistDatasetProfile(app.artifacts, routed.profile);
+        console.log(`${base}: dataset profile — ${routed.profile.rowCount} rows × ${routed.profile.columnCount} cols (${routed.profile.format})`);
+        console.log(`  columns: ${routed.profile.columns.map((c) => `${c.name}(${c.inferredType}${c.missingCount > 0 ? `, miss ${c.missingCount}` : ''})`).join(' ')}`);
+        for (const w of routed.profile.diagnostics.warnings.slice(0, 6)) console.log(`  note: ${w}`);
+        console.log(`  artifact: ${artifactRef}`);
+      } else {
+        const out = await ingestSdm(app.artifacts, routed.doc);
+        const c = { b: out.sdm.blocks.length, f: out.sdm.figures.length, t: out.sdm.tables.length, e: out.sdm.equations.length, c: out.sdm.citations.length, x: out.sdm.xrefs.filter((x) => x.status === 'resolved').length };
+        console.log(`${base}: ${out.sdm.extractor.name} — ${out.sdm.diagnostics.parseStatus}`);
+        console.log(`  blocks=${c.b} figures=${c.f} tables=${c.t} equations=${c.e} citations=${c.c} xrefsResolved=${c.x}`);
+        for (const w of out.sdm.diagnostics.warnings.slice(0, 6)) console.log(`  note: ${w}`);
+        console.log(`  artifact: ${out.artifactRef}`);
+      }
+    } finally { app.close(); }
     return;
   }
   if (cmd === 'memory') {

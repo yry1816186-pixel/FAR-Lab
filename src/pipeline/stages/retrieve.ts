@@ -661,22 +661,22 @@ export const retrieveStage: StageHandler = {
           // RU-10 GO2: minhash second-chance merge — catches near-duplicates the
           // identifier + title-blocking gates miss (paraphrased titles, CJK
           // variants). Pairwise over the bounded pool (≤62 entries — no LSH
-          // banding needed); threshold 0.8 = high-precision merge, never merges
-          // topically-similar-but-distinct papers.
+          // banding needed); merge bar MINHASH_POOL_MERGE_THRESHOLD = 0.5,
+          // calibrated on measured separation (near-verbatim republications
+          // 0.59-0.74; paraphrases 0.12; distinct papers <0.1) — the stale '0.8'
+          // that used to live in this comment drifted from the executed check.
           const recShingles = shingle(`${record.title} ${record.abstractText ?? ''}`);
           // Evidence floor: a 3-word title yields ONE 3-gram — identical short
           // titles collide across genuinely different works (the existing
           // short-title guard's premise), so minhash needs real text mass.
           const MINHASH_MIN_SHINGLES = 8;
+          const MINHASH_POOL_MERGE_THRESHOLD = 0.5;
           const sig = recShingles.size >= MINHASH_MIN_SHINGLES
             ? minhashSignature(recShingles, MINHASH_CFG)
             : null;
           for (const candidate of sig === null ? [] : pool.values()) {
             const candSig = minhashSignature(shingle(`${candidate.record.title} ${candidate.record.abstractText ?? ''}`), MINHASH_CFG);
-            // Threshold 0.5 is CALIBRATED on measured separation (word-3-gram
-            // shingles: near-verbatim republications 0.59-0.74; paraphrases 0.12;
-            // distinct papers <0.1) — clean margin on both sides.
-            if (sig !== null && jaccardFromSignatures(sig, candSig) >= 0.5) {
+            if (sig !== null && jaccardFromSignatures(sig, candSig) >= MINHASH_POOL_MERGE_THRESHOLD) {
               existing = candidate;
               minhashMerges += 1;
               break;
@@ -761,6 +761,89 @@ export const retrieveStage: StageHandler = {
       throw new Error(
         `retrieve: all ${succeeded}/${attempted} searches succeeded but returned no identifiable documents — refusing to fabricate an empty corpus`,
       );
+    }
+
+    // ---- SCIENCE lane (2026-08-24): citation-graph expansion (PRISMA-style snowballing) ----
+    // Single-round keyword recall structurally misses the literature CONNECTED to
+    // what it found. The two standard systematic-review snowball levers: BACKWARD
+    // (what the seed cites — OpenAlex referenced_works, one batched ids.openalex
+    // filter) and FORWARD (who cites the seed — filter=cites:, where failed
+    // replications and contradictions live). Bounded: top-3 openalex seeds by RRF,
+    // <=50 backward ids, 6 forward results per seed; every search receipted and
+    // query-logged; failures degrade visibly and never block. Chase records merge
+    // through the SAME dedup pool and compete under the SAME RRF/rerank/cap — a
+    // chased document earns its seat, it is never guaranteed one.
+    const CHASE_SEED_LIMIT = 3;
+    const CHASE_BACKWARD_IDS_CAP = 50;
+    const CHASE_FORWARD_PER_SEED = 6;
+    const chaseTargetBase = targets.length;
+    let citationChaseSearches = 0;
+    let chaseForwardRecords = 0;
+    let chaseBackwardRecords = 0;
+    const chaseNotes: string[] = [];
+    const openalexAdapter = ctx.sourceFor('openalex');
+    const openalexIdOf = (rec: RawSourceRecord): string | undefined =>
+      rec.identifiers.find((i) => i.kind === 'openalex')?.value;
+    if (typeof openalexAdapter.searchFiltered === 'function' && pool.size > 0) {
+      const seedsForChase = fusedOrder([...pool.values()])
+        .filter((e) => e.family === 'openalex' && openalexIdOf(e.record) !== undefined)
+        .slice(0, CHASE_SEED_LIMIT);
+      const chaseSearch = async (filter: string, limit: number, targetIdx: number): Promise<number> => {
+        try {
+          throwIfCancelled(ctx);
+          const res = await openalexAdapter.searchFiltered!(filter, { limit });
+          citationChaseSearches += 1;
+          executedQueries.push({ purpose: 'citation_chase', text: filter, family: 'openalex' });
+          ctx.recordReceipt({
+            kind: 'source_retrieval',
+            executionMode: 'live',
+            stage: 'retrieve',
+            redactionNote: 'citation-graph chase (PRISMA-style snowballing); per-record content hashes retained',
+            sourceRetrieval: {
+              family: 'openalex',
+              query: filter,
+              httpStatus: res.httpStatus,
+              resultCount: res.records.length,
+              contentHashes: res.records.map((r) => snapshotHash('openalex', r)),
+            },
+          });
+          poolYield('citation_chase', targetIdx, 'openalex', res.records.map((record, i) => ({ rank: i, record })));
+          return res.records.length;
+        } catch (e) {
+          if (isCancellationError(e)) throw e;
+          const msg = e instanceof Error ? e.message : String(e);
+          ctx.recordReceipt({
+            kind: 'source_retrieval',
+            executionMode: 'live',
+            stage: 'retrieve',
+            redactionNote: 'citation-graph chase FAILED (network/rate limit); enrichment only, corpus unaffected',
+            sourceRetrieval: {
+              family: 'openalex',
+              query: filter,
+              httpStatus: isSourceAdapterError(e) ? e.httpStatus : 0,
+              resultCount: 0,
+              contentHashes: [],
+            },
+          });
+          chaseNotes.push(`chase "${filter}" failed: ${msg.slice(0, 120)}`);
+          return 0;
+        }
+      };
+      for (const [i, seed] of seedsForChase.entries()) {
+        chaseForwardRecords += await chaseSearch(`cites:${openalexIdOf(seed.record)}`, CHASE_FORWARD_PER_SEED, chaseTargetBase + i);
+      }
+      const referenced = [...new Set(
+        seedsForChase.flatMap((s) => {
+          const refs = (s.record.normalized as { referenced_works?: unknown } | null)?.referenced_works;
+          return Array.isArray(refs) ? refs.filter((r): r is string => typeof r === 'string' && /^W\d+$/.test(r)) : [];
+        }),
+      )].slice(0, CHASE_BACKWARD_IDS_CAP);
+      if (referenced.length > 0) {
+        chaseBackwardRecords += await chaseSearch(`ids.openalex:${referenced.join('|')}`, CHASE_FORWARD_PER_SEED, chaseTargetBase + seedsForChase.length);
+      }
+      if (seedsForChase.length === 0) chaseNotes.push('no openalex-identified pool entries to seed the chase');
+    } else {
+      chaseNotes.push('citation chase skipped: openalex adapter lacks filter support');
     }
 
     // ---- D-015 fusion: deterministic RRF order, then (under cap pressure) LLM listwise rerank ----
@@ -860,6 +943,7 @@ export const retrieveStage: StageHandler = {
         ...(variantSearches > 0 ? { variantSearches } : {}),
         ...(failoverSearches > 0 ? { failoverSearches } : {}),
         ...(rerankWindows !== undefined ? { rerankWindows } : {}),
+        ...(citationChaseSearches > 0 ? { citationChaseSearches } : {}),
         selection: `cap ${selected.length} of pool ${pool.size} (RRF${rerankApplied ? ' + listwise rerank' : rerankFailure !== undefined ? ' after failed rerank' : ''})`,
       },
     });
@@ -873,6 +957,12 @@ export const retrieveStage: StageHandler = {
     if (rerankFailure !== undefined) parts.push(`listwise rerank FAILED — deterministic RRF order used (${rerankFailure})`);
     if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
     if (failoverSearches > 0) parts.push(`${failoverSearches} openalex->europepmc failover search(es)`);
+    if (citationChaseSearches > 0) {
+      parts.push(
+        `citation chase (PRISMA-style snowballing): ${citationChaseSearches} search(es) — ${chaseForwardRecords} forward record(s) via cites:, ${chaseBackwardRecords} backward record(s) via referenced_works; chase results compete in the same RRF/cap pool`,
+      );
+    }
+    for (const n of chaseNotes) parts.push(`citation chase note: ${n}`);
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
     if (fuzzyMerges > 0) parts.push(`${fuzzyMerges} duplicate record(s) merged by normalized title+year (cross-source)`);
     if (minhashMerges > 0) parts.push(`${minhashMerges} near-duplicate record(s) merged by MinHash (paraphrased/CJK titles)`);
