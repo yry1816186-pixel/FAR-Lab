@@ -17,6 +17,13 @@ function gradeKey(level: NonNullable<ScientificClaim['gradeCertainty']>): DictKe
   return `grade.${level}` as DictKey;
 }
 
+/** The ONE counter-evidence predicate (R2-01): every surface that counts
+ *  "counter relations" uses this set — overview strip and relations section. */
+function isCounterRelation(r: EvidenceRelation): boolean {
+  return r.relation === 'contradicts' || r.relation === 'weakens'
+    || r.relation === 'fails_to_replicate' || r.relation === 'alternative_explanation';
+}
+
 export function EvidenceTab({
   run,
   onFeedback,
@@ -71,7 +78,9 @@ export function EvidenceTab({
           </div>
           <div className="evidence-stat">
             <span className="evidence-stat-num mono">
-              {relations?.filter((r) => r.relation === 'contradicts').length ?? 0}
+              {/* Same counter predicate as the relations section below — the
+                  overview and the detail must never disagree (R2-01 fix). */}
+              {relations?.filter(isCounterRelation).length ?? 0}
             </span>
             <span className="evidence-stat-label">
               <span className="ev-glyph ev-glyph--refuted" aria-hidden="true">✗</span> {t('evidence.statContradicting')}
@@ -420,8 +429,7 @@ function RelationsSummary({
   for (const r of relations) byType.set(r.relation, (byType.get(r.relation) ?? 0) + 1);
   const claimById = new Map(claims.map((c) => [c.id, c] as const));
   const sourceById = new Map(sources.map((s) => [s.id, s] as const));
-  const counter = relations.filter((r) => r.relation === 'contradicts' || r.relation === 'weakens'
-    || r.relation === 'fails_to_replicate' || r.relation === 'alternative_explanation');
+  const counter = relations.filter(isCounterRelation);
 
   const polarityTone = (p: string): 'ok' | 'err' | 'muted' => (p === 'supporting' ? 'ok' : p === 'counter' ? 'err' : 'muted');
 

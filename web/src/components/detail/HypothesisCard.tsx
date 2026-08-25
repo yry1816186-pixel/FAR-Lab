@@ -305,14 +305,19 @@ export function HypothesisCard({
       </dl>
 
       {/* HX4 signature element: signed evidence scale — QBAF logLR interval
-          when the evidence body exists, honest relation counts otherwise. */}
-      {(balance !== undefined || evidenceBody !== undefined) && (
+          when the evidence body exists, honest relation counts otherwise.
+          Zero evidence is an EXPLICIT state (R2-01): absence must not read
+          as "unknown/hidden" — the top-ranked hypothesis with no bindings
+          says so, so the reader knows the gap is real, not a UI omission. */}
+      {(balance !== undefined || evidenceBody !== undefined) ? (
         <EvidenceBalance
           supports={balance?.supports ?? 0}
           counters={balance?.counters ?? 0}
           body={evidenceBody}
           featured={featured}
         />
+      ) : (
+        <p className="muted small hyp-no-evidence">{t('hyp.noEvidence')}</p>
       )}
 
       {hypothesis.assumptions !== undefined && hypothesis.assumptions.length > 0 && (

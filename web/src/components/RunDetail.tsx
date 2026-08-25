@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { FileSearch, FlaskConical, History, Lightbulb, ListChecks, ShieldCheck } from 'lucide-react';
+import { FileSearch, FlaskConical, History, Lightbulb, ListChecks, MessageCircle, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useI18n } from '../i18n/LanguageContext';
 import type { DictKey } from '../i18n/dict';
@@ -97,6 +97,9 @@ export function RunDetail({
   focusClaimId,
   onClaimFocused,
   stream,
+  sourceConversation,
+  dockedConversation,
+  onDiscuss,
 }: {
   run: ResearchRun;
   events: EventsState;
@@ -109,6 +112,12 @@ export function RunDetail({
   onClaimFocused?: () => void;
   /** Realtime stream health (HX-3): drives the visible reconnect/fallback chip. */
   stream: StreamSnapshot;
+  /** R2-01 seam: the conversation that launched this research (sidebar mapping), if any. */
+  sourceConversation?: { title: string; open: () => void } | null;
+  /** Conversation id currently docked beside this view (same conversation = "open"). */
+  dockedConversation?: string | null;
+  /** Open (or create) the research conversation — docked beside the objects. */
+  onDiscuss?: () => void;
 }): JSX.Element {
   const { t } = useI18n();
   const [tabId, setTabIdState] = useState<TabId>(tab ?? 'research');
@@ -203,7 +212,7 @@ export function RunDetail({
             {/* AVO fusion (G2/G3/G8): living research state — supervisor health,
                 evaluator family and trajectory lineage. Progressive disclosure
                 inside; raw event stream remains one disclosure below. */}
-            <ResearchStatePanel runId={run.id} />
+            <ResearchStatePanel runId={run.id} runStatus={run.status} />
             {/* The raw event stream stays one disclosure away (audit-grade
                 transparency without making it the researcher's daily view). */}
             <details className="tech-details events-disclosure">
@@ -231,6 +240,27 @@ export function RunDetail({
   return (
     <div className="run-detail">
       <RunHeader run={run} />
+      {/* R2-01 seam: the research page carries its dialogue. Objects stay
+          primary; the conversation docks beside them — never a mode switch. */}
+      {onDiscuss !== undefined && (
+        <div className="research-conversation-bar">
+          <MessageCircle size={13} aria-hidden="true" />
+          {dockedConversation !== null && dockedConversation !== undefined ? (
+            <span className="muted small">{t('run.discussDocked')}</span>
+          ) : (
+            <>
+              <span className="muted small">
+                {sourceConversation !== null && sourceConversation !== undefined
+                  ? t('run.discussSource', { title: sourceConversation.title })
+                  : t('run.discussNone')}
+              </span>
+              <button type="button" className="btn btn--small" onClick={onDiscuss}>
+                {t('run.discussOpen')}
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {(run.status === 'running' || run.status === 'queued') && <StreamStatusChip snapshot={stream} />}
       <div className="tabs" role="tablist" aria-label={t('tab.listLabel')}>
         {TABS.map((tab, i) => (
