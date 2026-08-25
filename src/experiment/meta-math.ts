@@ -38,16 +38,75 @@ export interface PooledResult {
   readonly se: number;
   /** (1-alpha) CI on the analysis scale. */
   readonly ci: { readonly level: number; readonly low: number; readonly high: number };
+  /**
+   * How the CI was constructed. 'hartung_knapp' (random effects, k>=3): t_{k-2}
+   * quantile on the HK variance estimator — Cochrane-required since 2022 (DL
+   * z-intervals under-cover at small k, which is our regime). 'z': fixed effects;
+   * 'z_small_k': random effects with k<=2, where t_{k-2} is undefined (honest
+   * fallback, disclosed — never a silently wrong interval).
+   */
+  readonly ciMethod?: 'hartung_knapp' | 'z' | 'z_small_k';
   /** Cochran's Q heterogeneity statistic. */
   readonly q: number;
   /** I² percentage, clamped at [0,100) — 0 when Q <= df. */
   readonly i2: number;
-  /** Between-study variance (DerSimonian-Laird moment estimate), clamped at >= 0. */
+  /** Between-study variance (DerSimonian-Laird moment estimate, clamped at >= 0). */
   readonly tau2: number;
   readonly k: number;
   /** Which model produced theta/se/ci. */
   readonly model: 'fixed' | 'random_dl';
 }
+
+
+/**
+ * Student-t two-sided coverage P(|T_df| <= t) for INTEGER df via the finite
+ * closed forms (Abramowitz & Stegun 26.7.4/26.7.5, clean-room): exact sums of
+ * elementary terms — no numerical library, no convergence risk. Our only caller
+ * (Hartung-Knapp) always passes df = k-2, a positive integer.
+ */
+export const studentTCdfTwoSided = (t: number, df: number): number => {
+  if (!Number.isInteger(df) || df <= 0) throw new Error(`studentTCdfTwoSided: df must be a positive integer, got ${df}`);
+  if (t <= 0) return 0;
+  const theta = Math.atan(t / Math.sqrt(df));
+  const s = Math.sin(theta);
+  const c = Math.cos(theta);
+  if (df % 2 === 1) {
+    // df = 2m+1: P = (2/pi) * [theta + s * sum_{j=0}^{m-1} c_j * c^(2j+1)],
+    // c_j = (2*4*...*2j)/(3*5*...*(2j+1)): 1, 2/3, (2*4)/(3*5), ...
+    const m = (df - 1) / 2;
+    let sum = 0;
+    let coeff = 1; // c_0 = 1
+    for (let j = 0; j < m; j++) {
+      sum += coeff * Math.pow(c, 2 * j + 1);
+      coeff *= (2 * j + 2) / (2 * j + 3);
+    }
+    return (2 / Math.PI) * (theta + s * sum);
+  }
+  // df = 2m: P = s * sum_{j=0}^{m-1} c_j * c^(2j), c_j = (1*3*...*(2j-1))/(2*4*...*2j), c_0 = 1
+  const m = df / 2;
+  let sum = 0;
+  let coeff = 1;
+  for (let j = 0; j < m; j++) {
+    sum += coeff * Math.pow(c, 2 * j);
+    coeff *= (2 * j + 1) / (2 * j + 2);
+  }
+  return s * sum;
+};
+
+/** Two-sided t quantile t_{df,1-alpha/2} by bisection on the CDF (deterministic, 1e-9). */
+export const tTwoSided = (alpha: number, df: number): number => {
+  if (!(alpha > 0 && alpha < 1)) throw new Error(`tTwoSided: alpha must be in (0,1), got ${alpha}`);
+  if (df <= 0) throw new Error(`tTwoSided: df must be > 0, got ${df}`);
+  const target = 1 - alpha;
+  let lo = 0;
+  let hi = 100;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (studentTCdfTwoSided(mid, df) < target) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+};
 
 /** Two-sided z quantile z_{1-alpha/2} for CI construction (inverse-normal, Acklam). */
 export const zTwoSided = (alpha: number): number => {
@@ -101,6 +160,7 @@ export const poolFixed = (studies: readonly StudyEstimate[], alpha = 1 - CI_LEVE
   return {
     theta, se,
     ci: { level: 1 - alpha, low: theta - z * se, high: theta + z * se },
+    ciMethod: 'z',
     q, i2, tau2: 0, k: studies.length, model: 'fixed',
   };
 };
@@ -131,11 +191,29 @@ export const poolRandomDL = (studies: readonly StudyEstimate[], alpha = 1 - CI_L
   const sumW = wStar.reduce((a, x) => a + x, 0);
   const theta = studies.reduce((a, s, i) => a + wStar[i]! * s.theta, 0) / sumW;
   const se = Math.sqrt(1 / sumW);
+  const k = studies.length;
+  // 06→10 handoff §2: Hartung-Knapp interval for random-effects meta-analysis
+  // (Cochrane-required since 2022; the z interval under-covers at small k — our
+  // regime). SE_HK = sqrt(s2 / sumW) with s2 = sum w*(theta_i - theta)^2 / (k-1),
+  // quantile t_{k-2}. k<=2: t_{k-2} undefined -> disclosed z fallback, never a
+  // silently wrong interval.
+  if (k >= 3) {
+    const s2 = studies.reduce((a, s, i) => a + wStar[i]! * (s.theta - theta) ** 2, 0) / (k - 1);
+    const seHk = Math.sqrt(s2 / sumW);
+    const t = tTwoSided(alpha, k - 2);
+    return {
+      theta, se,
+      ci: { level: 1 - alpha, low: theta - t * seHk, high: theta + t * seHk },
+      ciMethod: 'hartung_knapp',
+      q: fe.q, i2: fe.i2, tau2, k, model: 'random_dl',
+    };
+  }
   const z = zTwoSided(alpha);
   return {
     theta, se,
     ci: { level: 1 - alpha, low: theta - z * se, high: theta + z * se },
-    q: fe.q, i2: fe.i2, tau2, k: studies.length, model: 'random_dl',
+    ciMethod: 'z_small_k',
+    q: fe.q, i2: fe.i2, tau2, k, model: 'random_dl',
   };
 };
 

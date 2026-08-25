@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { z } from 'zod';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -381,7 +380,6 @@ describe('one turn per conversation at a time (concurrent turns serialized)', ()
 describe('R2-13 F-5 (assembly builtinAdmission): allow-expansion is keyed on riskClass, not registry membership', () => {
   it('read-class builtins (incl. propose_action) get allow rules; execute-class and undeclared tools fall to deny', async () => {
     const { assembleSessionCapabilities } = await import('../src/agent/capabilities/assembly.js');
-    const { PermissionEngine } = await import('../src/agent/permissions.js');
     const z = (await import('zod')).z;
     const mkTool = (name: string, riskClass?: 'read' | 'execute') => ({
       name, description: name,

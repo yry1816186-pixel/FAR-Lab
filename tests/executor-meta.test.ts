@@ -148,8 +148,12 @@ describe('execute stage routing (M4): ML-infeasible plans fall through to the me
     expect(reports).toHaveLength(1);
     expect(reports[0]?.meta?.k).toBe(3);
     expect(reports[0]?.metricKey).toBe('pooled_log_or');
-    // three log-OR CIs all entirely negative -> pooled CI below the null boundary
-    expect(reports[0]?.ci.high).toBeLessThan(0);
+    // 06-10 §2 (Hartung-Knapp): with k=3 the honest t_{k-2}=4.30 interval is WIDER
+    // than the old z interval and now crosses zero — the previous all-negative pooled
+    // CI was the small-k under-coverage this upgrade corrects. Point estimate stays
+    // negative; the INTERVAL honestly no longer excludes the null at k=3.
+    expect(reports[0]?.pointEstimate).toBeLessThan(0);
+    expect(reports[0]?.ci.high).toBeGreaterThan(0);
     // exploratory draft: no verdict binding, no feedback signal
     expect(reports[0]?.verdict).toBeUndefined();
     expect(store.listObjects('feedback', runId)).toHaveLength(0);

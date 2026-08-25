@@ -284,7 +284,22 @@ const main = async (): Promise<void> => {
     return;
   }
 
-  if (cmd === 'agent') {
+  if (cmd === 'campaign') {
+    // RU-8 campaign surface: preregistered multi-experiment decision campaigns.
+    const { campaignCommand } = await import('./campaign.js');
+    const args = process.argv.slice(4).filter((x) => !x.startsWith('--') && x !== sub);
+    const result = await campaignCommand(sub, {
+      dataDir: arg('--data-dir') ?? '.far-run',
+      positional: args[0],
+      flag, arg,
+    });
+    if (json() && result.json !== undefined) jsonOutput(result.json);
+    else if (result.text !== undefined) out(result.text);
+    if (result.code !== 0) process.exitCode = result.code;
+    return;
+  }
+
+    if (cmd === 'agent') {
     // Agent-harness surface (H1): refinement capability. Own module so this router
     // stays a one-line hook.
     const { agentCommand } = await import('./agent.js');

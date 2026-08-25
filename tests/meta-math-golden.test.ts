@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  poolFixed, poolRandomDL, leaveOneOut, eggerTest, type StudyEstimate,
+  poolFixed, poolRandomDL, leaveOneOut, eggerTest, tTwoSided, type StudyEstimate,
 } from '../src/experiment/meta-math.js';
 import {
   lnEffectFromTable, seLnOrFromTable, seLnRrFromTable,
@@ -78,12 +78,15 @@ describe('golden: dat.bcg (k=13, log RR)', () => {
 
   it('DerSimonian-Laird random effects reproduces the published DL pool', () => {
     const r = poolRandomDL(BCG);
-    // published: estimate -0.7141, se 0.1787, CI [-1.0644, -0.3638], tau2=0.3088
+    // published DL: estimate -0.7141, se 0.1787, tau2=0.3088 (theta/tau2 unchanged by HK).
+    // CI now HARTUNG-KNAPP (06-10 handoff §2, Cochrane-required since 2022): reference values
+    // computed independently with scipy.stats (t.ppf + DL weights) — 6-decimal agreement.
     expect(r.tau2).toBeCloseTo(0.3088, 4);
     expect(r.theta).toBeCloseTo(-0.7141, 4);
     expect(r.se).toBeCloseTo(0.1787, 4);
-    expect(r.ci.low).toBeCloseTo(-1.0644, 4);
-    expect(r.ci.high).toBeCloseTo(-0.3638, 4);
+    expect(r.ciMethod).toBe('hartung_knapp');
+    expect(r.ci.low).toBeCloseTo(-1.111828, 6);
+    expect(r.ci.high).toBeCloseTo(-0.316407, 6);
   });
 
   it('leave-one-out stays well-formed over the 13-study pool', () => {
@@ -122,10 +125,11 @@ describe('golden: Borenstein Table 14.1 (k=6, SMD)', () => {
 
   it('DL random effects matches the published pool', () => {
     const r = poolRandomDL(T141);
-    // published: 0.3582, CI [0.1520, 0.5645], tau2=0.0373
+    // published DL: 0.3582, tau2=0.0373. HK CI (scipy cross-checked): [0.107703, 0.608676]
     expect(r.theta).toBeCloseTo(0.3582, 3);
-    expect(r.ci.low).toBeCloseTo(0.1520, 3);
-    expect(r.ci.high).toBeCloseTo(0.5645, 3);
+    expect(r.ciMethod).toBe('hartung_knapp');
+    expect(r.ci.low).toBeCloseTo(0.107703, 6);
+    expect(r.ci.high).toBeCloseTo(0.608676, 6);
     expect(r.tau2).toBeCloseTo(0.0373, 3);
   });
 });
@@ -149,17 +153,19 @@ const T144: StudyEstimate[] = T144_TABLE.map((t) => {
 describe('golden: Borenstein Table 14.4 (k=6, log OR)', () => {
   it('DL random effects matches the published pool and back-transformed OR', () => {
     const r = poolRandomDL(T144);
-    // published: -0.5663, CI [-1.0344, -0.0982], tau2=0.1729, I2=52.61%, Q=10.5512
+    // published DL: -0.5663, tau2=0.1729, I2=52.61%, Q=10.5512. HK CI (scipy cross-checked):
+    // [-1.112785, -0.019807] — exp() OR-scale HK interval [0.3286, 0.9804].
     expect(r.theta).toBeCloseTo(-0.5663, 4);
-    expect(r.ci.low).toBeCloseTo(-1.0344, 4);
-    expect(r.ci.high).toBeCloseTo(-0.0982, 4);
+    expect(r.ciMethod).toBe('hartung_knapp');
+    expect(r.ci.low).toBeCloseTo(-1.112785, 6);
+    expect(r.ci.high).toBeCloseTo(-0.019807, 6);
     expect(r.tau2).toBeCloseTo(0.1729, 4);
     expect(r.i2).toBeCloseTo(52.61, 2);
     expect(r.q).toBeCloseTo(10.5512, 3);
-    // exp() back to the OR scale: published OR 0.5676 [0.3554, 0.9065]
+    // exp() back to the OR scale: pooled OR 0.5676; HK interval [exp(-1.112785), exp(-0.019807)]
     expect(Math.exp(r.theta)).toBeCloseTo(0.5676, 4);
-    expect(Math.exp(r.ci.low)).toBeCloseTo(0.3554, 3);
-    expect(Math.exp(r.ci.high)).toBeCloseTo(0.9065, 3);
+    expect(Math.exp(r.ci.low)).toBeCloseTo(0.3286, 3);
+    expect(Math.exp(r.ci.high)).toBeCloseTo(0.9804, 3);
   });
 });
 
@@ -205,5 +211,17 @@ describe('golden: dat.egger2001 funnel asymmetry (detection agreement)', () => {
     // differs; the assertion is decision agreement, value-for-value equality is
     // not claimed.
     expect(r.pValue).toBeLessThan(0.05);
+  });
+});
+
+describe('t machinery for Hartung-Knapp (06-10 s2)', () => {
+  it('tTwoSided matches the standard t-table (5% two-sided) to 3 decimals', () => {
+    const table: Array<[df: number, t: number]> = [[1, 12.7062], [2, 4.3027], [3, 3.1824], [5, 2.5706], [10, 2.2281], [30, 2.0423], [100, 1.9840]];
+    for (const [df, t] of table) expect(tTwoSided(0.05, df)).toBeCloseTo(t, 3);
+  });
+  it('k<=2 pools disclose the z fallback (t_{k-2} undefined) instead of inventing an interval', () => {
+    const two = poolRandomDL([st('a', 0.1, 0.02), st('b', 0.3, 0.05)]);
+    expect(two.ciMethod).toBe('z_small_k');
+    expect(two.ci.high - two.ci.low).toBeCloseTo(2 * 1.959964 * two.se, 4);
   });
 });
