@@ -48,6 +48,25 @@ export interface AgentTool {
    * the model to treat them strictly as data. Absent = 'own' (our code).
    */
   readonly trust?: 'own' | 'external';
+  /**
+   * Capability identity (R2-09): stable version of this tool when the source
+   * exposes one (plugin manifest version, MCP serverInfo.version). Absent =
+   * unversioned builtin. Surfaced in the model-facing catalog so composition
+   * decisions can see staleness, never used for behavior gating.
+   */
+  readonly version?: string;
+  /**
+   * Provenance label (R2-09): where this tool came from — 'builtin', the MCP
+   * server label, or pluginId — so the model-facing catalog and session
+   * reports can attribute every callable capability to its source.
+   */
+  readonly source?: string;
+  /**
+   * Server-declared hints (R2-09, MCP spec annotations): UNTRUSTED metadata
+   * (readOnlyHint etc.) surfaced for display/composition only — they never
+   * override the researcher-declared riskClass or permission decisions.
+   */
+  readonly annotations?: { title?: string; readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
   execute(args: unknown, ctx: ToolContext): Promise<ToolResult>;
 }
 
@@ -83,9 +102,31 @@ export class ToolRegistry {
     return out;
   }
 
-  /** Model-facing catalog: name, one-line description, and the args contract shape. */
-  catalog(): Array<{ name: string; description: string; args: string }> {
-    return [...this.tools.values()].map((t) => ({ name: t.name, description: t.description, args: describeShape(t.inputSchema) }));
+  /**
+   * Model-facing catalog: name, one-line description, args contract shape, and
+   * the capability-identity plane (R2-09): risk class, content trust, version
+   * and source. Consumers compose capabilities on these attributes instead of
+   * implementation-specific knowledge; unknown fields are ignorable for
+   * callers built against the older {name, description, args} shape.
+   */
+  catalog(): Array<{
+    name: string;
+    description: string;
+    args: string;
+    riskClass?: 'read' | 'edit' | 'execute' | 'destructive';
+    trust?: 'own' | 'external';
+    version?: string;
+    source?: string;
+  }> {
+    return [...this.tools.values()].map((t) => ({
+      name: t.name,
+      description: t.description,
+      args: describeShape(t.inputSchema),
+      ...(t.riskClass !== undefined ? { riskClass: t.riskClass } : {}),
+      ...(t.trust !== undefined ? { trust: t.trust } : {}),
+      ...(t.version !== undefined ? { version: t.version } : {}),
+      ...(t.source !== undefined ? { source: t.source } : {}),
+    }));
   }
 }
 
