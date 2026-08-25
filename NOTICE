@@ -27,6 +27,12 @@ src/providers/http.ts (retry timing), src/sources/* (W6 retrieval fusions)
     sliding-window rerank plan (rank_gpt.py)
   No upstream code is included; the mechanisms were reimplemented.
 
+src/cli/vendor/picocolors.ts
+  Vendored from picocolors v1.1.1 (https://github.com/alexeyraspopov/picocolors)
+  Copyright (c) 2021-2024 Oleksii Raspopov, Kostiantyn Denysov, Anton Verinov —
+  ISC License. Transcribed to TypeScript; one documented local adaptation
+  (TTY as hard precondition per clig.dev; see source header).
+
 Web font bundles (built artifacts only; source pulls them via @fontsource):
   - IBM Plex Sans / IBM Plex Mono — SIL Open Font License 1.1
   - Source Serif 4 — SIL Open Font License 1.1

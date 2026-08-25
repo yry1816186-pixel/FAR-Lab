@@ -8,7 +8,7 @@ specs/docs/repository governance/licensing/CI-release/submission/competition evi
 - `2f5f743` docs(competition): adjudicate 30-vs-20 page limit (bind 20) + submission map + release blockers
 - `753fa17` feat(harness): deterministic OSS license ledger + gate; CI covers lint/TUI/CLI-smoke/release-pack
 - `3d96a86` chore(governance): Apache-2.0 metadata alignment, stray dump removal, R1 report snapshot banner
-- (this commit) docs(concurrency): R2 lane 15 governance-release report
+- (this commit) docs(governance): hosted-CI outcome, NOTICE picocolors entry, 15→03 hosted-CI handoff, report
 
 ## 2. Evidence (commands + exits, 2026-08-25, lane worktree)
 
@@ -103,8 +103,12 @@ public-release artifact. No live-API gates; no obsolete gates preserved.
 
 - Received `r2-2026-08-25-from-11-to-15-page-count-discrepancy.md` → ADJUDICATED (≤20);
   receipt written: `r2-2026-08-25-from-15-to-11-page-limit-adjudicated.md` (no action needed by 11).
+- Given `r2-2026-08-25-from-15-to-03-hosted-ci-picocolors-red.md` (high urgency): hosted-CI
+  red in `tests/cli-term.test.ts` — identical code was green on GH 2026-08-24 and red
+  2026-08-25; owner lane 03 to diagnose (suspected ambient-env drift, NO_COLOR/argv path).
 - Open (informational to Integrator, not new handoff files): lane-13/lane-05 work sits on
-  `build/hx-reconstruction` residue rather than lane branches (see §6).
+  `build/hx-reconstruction` residue rather than lane branches (see §6); RU-7.3 fix already
+  on lane 12's branch awaiting fusion.
 
 ## 9. Deviations
 
@@ -117,12 +121,18 @@ public-release artifact. No live-API gates; no obsolete gates preserved.
    file is lane 13's (reliability) ownership and the fix already exists on lane 12's branch;
    duplicating it here would violate the no-second-author rule.
 
-## 10. Unverified / honest limits
+## 10. Hosted-CI outcome (pushed branch, run 32862865855) and honest limits
 
-- GitHub-hosted CI behavior of the rewritten workflow: UNVERIFIED until the branch is pushed
-  and a hosted run completes (push itself triggers `verify`; `release-pack` needs manual
-  dispatch or a tag).
-- The two-exception copyleft allowlist reflects today's installed tree only; ledger `--check`
-  in CI will catch any future drift.
+- The rewritten `verify` job reached `Full test suite` and failed there on exactly TWO
+  pre-existing baseline reds: RU-7.3 (date-sensitive, fix on lane 12's branch) and
+  `cli-term` picocolors color-discipline (GitHub-runner env drift between 2026-08-24 green
+  run 32747734353 @`2e5c9a9` and 2026-08-25 red runs — identical test+vendor bytes; full
+  evidence chain in handoff `r2-2026-08-25-from-15-to-03-hosted-ci-picocolors-red.md`).
+  Steps after the suite (TUI tests, CLI smoke, license gate, scans, web build) could not
+  execute on GH; each is locally verified green (§2). Lane 15 introduced neither red.
+- NOTICE gap found during that investigation: vendored picocolors was missing from the
+  extracted-components list — added (ISC, v1.1.1, one documented local adaptation).
+- The two-exception copyleft allowlist reflects today's installed tree only; ledger
+  `--check` in CI will catch any future drift.
 - Competition facts are as of 2026-08-25 fetches; any later official page change supersedes
   COMPETITION.md by its own rule.
