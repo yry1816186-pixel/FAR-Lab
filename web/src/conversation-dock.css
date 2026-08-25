@@ -1,0 +1,68 @@
+/* R2-01 conversation dock (lane-01 file — styles.css belongs to lane 02).
+   Reuses the workspace's existing CSS custom properties so visual authority
+   (tokens, palette, spacing scale) stays with lane 02. */
+
+.conv-dock {
+  display: flex;
+  flex-direction: column;
+  width: min(430px, 38vw);
+  min-width: 320px;
+  border-left: 1px solid var(--border, #8884);
+  background: var(--bg, inherit);
+  overflow: hidden;
+}
+
+/* R2-01 seam bar: the research page's dialogue entry (rendered under the header). */
+.research-conversation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  margin: 0 0 4px;
+  flex-wrap: wrap;
+}
+
+.conv-dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border, #8884);
+  flex: none;
+}
+
+.conv-dock-title {
+  font-size: 0.9em;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.conv-dock > .conversation,
+.conv-dock > div:not(.conv-dock-head) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The docked ConversationView keeps its own internal scroll; give the main
+   research view room and keep both visible on typical laptop widths. */
+.app-body:has(.conv-dock) .content {
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  /* Narrow viewports: the dock overlays instead of squeezing the objects. */
+  .conv-dock {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(430px, 92vw);
+    z-index: 80;
+    box-shadow: -8px 0 24px rgb(0 0 0 / 0.18);
+  }
+}

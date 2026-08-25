@@ -16,6 +16,14 @@ export function StageTimeline({ run }: { run: ResearchRun }): JSX.Element {
   const { t } = useI18n();
   const byStage = new Map<string, StageRecord>(run.stages.map((s) => [s.stage, s]));
 
+  /** Internal refs like `step_outputs:3` are storage vocabulary, not researcher
+   *  language — project the meaning; the raw ref stays on hover (audit). */
+  const checkpointLabel = (ref: string): string => {
+    const m = /^step_outputs:(\d+)$/.exec(ref);
+    if (m !== null) return t('overview.checkpointOutputs', { n: Number(m[1]) });
+    return ref.length > 14 ? `${ref.slice(0, 14)}…` : ref;
+  };
+
   return (
     <div>
       <StageGantt run={run} />
@@ -52,7 +60,7 @@ export function StageTimeline({ run }: { run: ResearchRun }): JSX.Element {
                 )}
                 {record?.checkpointRef !== undefined && (
                   <span className="muted mono" title={record.checkpointRef}>
-                    {' '}· {t('overview.checkpoint')}: {record.checkpointRef.slice(0, 14)}…
+                    {' '}· {t('overview.checkpoint')}: {checkpointLabel(record.checkpointRef)}
                   </span>
                 )}
               </td>

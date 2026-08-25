@@ -427,7 +427,7 @@ export function ConversationView({
       <header className="conv-head">
         <h2 className="conv-title">{conversation.title}</h2>
         <span className={`badge ${conversation.status === 'converged' ? 'badge--ok' : 'badge--info'}`}>
-          {t(conversation.status === 'converged' ? 'conv.statusConverged' : 'conv.statusOpen')}
+          {t(conversation.status === 'converged' ? 'conv.statusConverged' : conversation.turns === 0 ? 'conv.statusNew' : 'conv.statusOpen')}
         </span>
         {conversation.runIds.length > 0 && (
           <span className="conv-runs">

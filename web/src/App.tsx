@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, BellOff, RefreshCw, Search, Settings } from 'lucide-react';
+import './conversation-dock.css';
+import { Bell, BellOff, RefreshCw, Search, Settings, X } from 'lucide-react';
 import { ApiError } from './api/client';
-import { getEvents, getRun, listRuns, listConversations, searchAll } from './api/endpoints';
+import { getEvents, getRun, listRuns, listConversations, createConversation, searchAll } from './api/endpoints';
 import type { Conversation, ResearchRun, RunEvent, RunSummary } from './api/types';
 import { useI18n } from './i18n/LanguageContext';
 import { usePolling } from './hooks/usePolling';
@@ -50,6 +51,11 @@ export function App(): JSX.Element {
   // ---- conversations (conversation-first flow) ----
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  // R2-01 conversation↔research seam: a conversation never *replaces* an open
+  // research view. With a run selected the conversation docks beside the
+  // objects; without one it takes the full view as before. Closing the dock
+  // clears the current conversation (it stays reachable in the sidebar).
+  const [convDocked, setConvDocked] = useState(false);
   // ---- unified sidebar timeline (design fix 2026-08-23): ONE search box filters
   // both conversations and studies; studies show their source conversation, and
   // conversation entries inline the studies they launched — records are findable
@@ -84,9 +90,13 @@ export function App(): JSX.Element {
   useEffect(() => { void refreshConversations(); }, [refreshConversations]);
   const openConversation = useCallback((id: string): void => {
     setSelectedConvId(id);
-    setSelectedRunId(null);
+    if (selectedRunId !== null) setConvDocked(true); // objects stay primary; dialogue docks
     void refreshConversations();
-  }, [refreshConversations]);
+  }, [refreshConversations, selectedRunId]);
+  const closeConversation = useCallback((): void => {
+    setSelectedConvId(null);
+    setConvDocked(false);
+  }, []);
   openConversationRef.current = openConversation; // unified-timeline source links
 
   const refreshRuns = useCallback(
@@ -260,27 +270,34 @@ export function App(): JSX.Element {
     openConversation(conversationId);
   }, [openConversation]);
 
-  /** Opening a run always leaves the conversation view. */
+  /** Opening a run keeps the current conversation docked (context preservation). */
   const selectRun = useCallback((runId: string): void => {
     setSelectedRunId(runId);
-    setSelectedConvId(null);
+    if (selectedConvId !== null) setConvDocked(true);
     setRouteTab(null);
-  }, []);
+  }, [selectedConvId]);
 
-  // ---- shareable hash route: #run/<runId>/<tab> (S3) ----
+  // ---- shareable hash route: #run/<runId>/<tab> (S3) + #conv/<convId> (R2-01) ----
   // Mount restore + back/forward + typed links all flow through here.
   const [routeTab, setRouteTab] = useState<string | null>(null);
   useEffect(() => {
     const route = parseHash(window.location.hash);
     if (route.runId !== null) setSelectedRunId(route.runId);
+    if (route.convId !== null) {
+      setSelectedConvId(route.convId);
+      setConvDocked(route.runId !== null); // ?conv= on a run route restores the docked pair
+    }
     setRouteTab(route.tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only route restore
   }, []);
+  const routedConvId = selectedConvId !== null && (selectedRunId === null || convDocked) ? selectedConvId : null;
   useHashRoute(selectedRunId, routeTab, (route) => {
-    if (route.runId !== null && route.runId !== selectedRunId) { setSelectedRunId(route.runId); setSelectedConvId(null); }
+    if (route.runId !== null && route.runId !== selectedRunId) { setSelectedRunId(route.runId); if (route.convId !== null) setConvDocked(true); }
     if (route.runId === null && selectedRunId !== null) setSelectedRunId(null);
+    if (route.convId !== null) { setSelectedConvId(route.convId); if (route.runId !== null) setConvDocked(true); }
+    else if (routedConvId !== null) { setSelectedConvId(null); setConvDocked(false); } // back/forward to a no-conv URL closes the dialogue
     setRouteTab(route.tab);
-  });
+  }, routedConvId);
 
   // ---- command palette (S5): every entry is a real capability ----
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -340,7 +357,7 @@ export function App(): JSX.Element {
         id: 'new-research',
         labelKey: 'welcome.newResearch',
         groupKey: 'palette.groupActions',
-        run: () => { setSelectedRunId(null); setSelectedConvId(null); setRouteTab(null); },
+        run: () => { setSelectedRunId(null); closeConversation(); setRouteTab(null); },
       },
       ...navCmds,
       ...runCmds,
@@ -365,7 +382,7 @@ export function App(): JSX.Element {
         run: () => setLang(lang === 'zh' ? 'en' : 'zh'),
       },
     ];
-  }, [runs, selectedRunId, cycleTheme, lang, setLang, userCommands]);
+  }, [runs, selectedRunId, selectRun, closeConversation, cycleTheme, lang, setLang, userCommands]);
 
   // ---- universal search wiring (B2): palette -> cross-run object lookup ----
   // A claim hit focuses the evidence tab and flash-highlights the claim row
@@ -425,6 +442,38 @@ export function App(): JSX.Element {
     useCallback((runId: string): void => { selectRun(runId); }, [selectRun]),
     useCallback((): string => t('notify.doneTitle'), [t]),
   );
+
+  // ---- R2-01 seam: "讨论此研究" from the run page ----
+  // Source conversation exists -> open it docked; otherwise create one titled
+  // by the research question (real POST /conversations; no silent fake-open).
+  // The server models only launched-run links (runIds), so a discussion ABOUT
+  // a run is deduped per session here — a durable run↔discussion link is a
+  // backend model change (handed off; see lane report).
+  const discussionsRef = useRef(new Map<string, string>());
+  const [convCreateError, setConvCreateError] = useState<{ error: ApiError; runId: string } | null>(null);
+  const discussRun = useCallback((runId: string): void => {
+    setConvCreateError(null);
+    const src = sourceByRunId.get(runId);
+    if (src !== undefined) { src.open(); return; }
+    const existing = discussionsRef.current.get(runId);
+    if (existing !== undefined) { openConversation(existing); return; }
+    const run = runsById.get(runId);
+    const title = run !== undefined ? runLabel(run).slice(0, 80) : undefined;
+    void createConversation({ title })
+      .then((c) => {
+        discussionsRef.current.set(runId, c.id);
+        void refreshConversations();
+        openConversation(c.id);
+      })
+      .catch((e: unknown) => {
+        setConvCreateError({
+          error: e instanceof ApiError ? e : new ApiError({ code: 'unknown', message: String(e), retryable: true }),
+          runId,
+        });
+      });
+  }, [sourceByRunId, runsById, refreshConversations, openConversation]);
+  const dockOpen = convDocked && selectedConvId !== null && selectedRunId !== null;
+  const dockedConversation = conversations.find((c) => c.id === selectedConvId) ?? null;
 
   return (
     <div className="app">
@@ -514,7 +563,7 @@ export function App(): JSX.Element {
               <button
                 type="button"
                 className="btn btn--small btn--primary"
-                onClick={() => { setSelectedRunId(null); setSelectedConvId(null); setRouteTab(null); }}
+                onClick={() => { setSelectedRunId(null); closeConversation(); setRouteTab(null); }}
                 aria-label={t('conv.new')}
                 title={t('conv.new')}
               >
@@ -548,7 +597,7 @@ export function App(): JSX.Element {
                       <span className="run-item-top">
                         <span className="run-item-question">{c.title}</span>
                         <span className={`badge ${c.status === 'converged' ? 'badge--ok' : 'badge--info'}`}>
-                          {t(c.status === 'converged' ? 'conv.statusConverged' : 'conv.statusOpen')}
+                          {t(c.status === 'converged' ? 'conv.statusConverged' : c.turns === 0 ? 'conv.statusNew' : 'conv.statusOpen')}
                         </span>
                       </span>
                       <span className="run-item-mid">
@@ -595,7 +644,14 @@ export function App(): JSX.Element {
         </aside>
 
         <main className="content" aria-label={t('app.title')}>
-          {selectedConvId !== null ? (
+          {convCreateError !== null && (
+            /* Adversarial-audit P1 fix: the create-conversation failure must be
+               visible on the PRIMARY path too — with no conversation selected
+               the dock never mounts, so this error cannot live only in the
+               dock slot. One rendering location, visible in every dock state. */
+            <ErrorBox error={convCreateError.error} onRetry={() => discussRun(convCreateError.runId)} />
+          )}
+          {selectedConvId !== null && selectedRunId === null ? (
             <ConversationView
               conversationId={selectedConvId}
               onOpenedRun={selectRun}
@@ -626,9 +682,36 @@ export function App(): JSX.Element {
               focusClaimId={focusClaimId}
               onClaimFocused={() => setFocusClaimId(null)}
               stream={stream}
+              sourceConversation={sourceByRunId.get(runDetail.id) ?? null}
+              dockedConversation={dockOpen ? selectedConvId : null}
+              onDiscuss={() => discussRun(runDetail.id)}
             />
           )}
         </main>
+        {dockOpen && (
+          <aside className="conv-dock" aria-label={t('dock.title')}>
+            <div className="conv-dock-head">
+              <span className="conv-dock-title" title={dockedConversation?.title ?? selectedConvId ?? undefined}>
+                {t('dock.title')}
+                {dockedConversation !== null && <span className="muted small"> · {dockedConversation.title}</span>}
+              </span>
+              <button
+                type="button"
+                className="btn btn--small"
+                onClick={closeConversation}
+                aria-label={t('dock.close')}
+                title={t('dock.close')}
+              >
+                <X size={12} aria-hidden="true" />
+              </button>
+            </div>
+            <ConversationView
+              conversationId={selectedConvId!}
+              onOpenedRun={selectRun}
+              onMutated={refreshConversations}
+            />
+          </aside>
+        )}
       </div>
       <CommandPalette
         open={paletteOpen}
