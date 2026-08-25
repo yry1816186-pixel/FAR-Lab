@@ -1,14 +1,16 @@
 name: ci
 
-# Minimal quality gate for every push and PR: the same deterministic checks the
-# local harness runs (AGENTS.md §2/§8) — typecheck, full vitest suite (incl. the
-# real-uv experiment sidecar), secret/path scans, and the web production build.
+# Quality gate for every push and PR: the same deterministic checks the local
+# harness runs (AGENTS.md §2/§8) — typecheck, lint, full vitest suite (incl. the
+# real-uv experiment sidecar), TUI package tests, CLI smoke, secret/path scans,
+# license ledger, and the web production build (which typechecks first).
 # No live model routes are touched: tests are offline by design; any test that
 # would need a live route fails there just as it would locally.
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -29,6 +31,10 @@ jobs:
       - name: Install web dependencies
         working-directory: web
         run: npm ci
+      # TUI package tests run on the node test runner over TypeScript sources.
+      - name: Install TUI dependencies
+        working-directory: packages/tui
+        run: npm ci
       # eval/*.mjs scripts (rediscovery-judge, retrieval-baseline tests) import
       # compiled dist/ — the suite needs a real build, not just typecheck.
       - name: Build backend dist
@@ -39,14 +45,58 @@ jobs:
         run: pip install numpy --quiet
       - name: Typecheck (backend + CLI)
         run: npm run typecheck
+      - name: Lint
+        run: npm run lint
       - name: Full test suite (deterministic; real uv sidecar for experiments)
         run: npm test
+      - name: TUI package tests
+        working-directory: packages/tui
+        run: npm test
+      - name: CLI smoke (offline help path)
+        run: node dist/cli/main.js --help
+      - name: License ledger gate (copyleft + committed-ledger drift)
+        run: node zcode-harness/scripts/license-ledger.mjs --check
       - name: Secret scan
         run: node zcode-harness/scripts/secret-scan.mjs
       - name: Path hygiene
         run: node zcode-harness/scripts/path-hygiene.mjs
+      # web build script = typecheck && vite build, so this step also enforces
+      # web typechecking.
       - name: Web production build
         working-directory: web
-        run: |
-          npm ci
-          npm run build
+        run: npm run build
+
+  # Release artifact: the public-release pack is built only on explicit demand
+  # (tag push or manual dispatch) because export-public.mjs re-verifies the
+  # copy with a fresh install + typecheck + lint + test + build inside it.
+  release-pack:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install root dependencies
+        run: npm ci
+      - name: Install web dependencies (release copy ships web sources)
+        working-directory: web
+        run: npm ci
+      - name: Install TUI dependencies (release copy ships the TUI package)
+        working-directory: packages/tui
+        run: npm ci
+      - name: Install python deps for the experiment sidecar
+        run: pip install numpy --quiet
+      - name: Build public-release pack (self-verifying exporter)
+        run: node scripts/export-public.mjs
+      - name: Upload release pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: farlab-public-release
+          path: build/public-release/
+          if-no-files-found: error
