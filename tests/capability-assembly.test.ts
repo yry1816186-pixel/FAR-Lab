@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { createTestStubProvider, type StubStep } from '../src/providers/test-stub.js';
 import { openArtifactStore } from '../src/persistence/artifacts.js';
 import { assembleSessionCapabilities } from '../src/agent/capabilities/assembly.js';
+import { importPlugin } from '../src/plugins/import.js';
 import { newId } from '../src/domain/ids.js';
 import { McpServerIntegration, HookRuleIntegration } from '../src/domain/index.js';
 import { runAgentLoop } from '../src/agent/loop.js';
@@ -310,5 +311,50 @@ describe('capability assembly (real child-process MCP through the authoritative 
     expect(entry?.source).toBe('Capability Fixture');
     const builtin = assembly.registry.catalog().find((c) => c.name === 'ping_builtin');
     expect(builtin?.source).toBe('builtin');
+  });
+
+  it('shipped domain pack flows import -> activation -> assembly: skill injected by relevance, destructive approval rule live', async () => {
+    // REAL import path over the shipped pack files (manifest validation + expansion)
+    const imported = importPlugin({ dir: path.resolve('skills/packs/counter-evidence-discipline'), reviewed: true });
+    expect(imported.warnings).toEqual([]);
+    expect(imported.integrations.length).toBe(3); // skill + hook rule + command
+    expect(imported.integrations.every((i) => !i.enabled)).toBe(true); // staged DISABLED at import
+
+    // researcher activation (settings semantics): enable everything the pack staged
+    const activated = imported.integrations.map((i) => ({ ...i, enabled: true }));
+
+    const destructiveProbe: AgentTool = {
+      name: 'purge_cache',
+      description: 'Destructive probe tool (proof only).',
+      inputSchema: z.object({}),
+      riskClass: 'destructive',
+      async execute() {
+        return { ok: true, data: { purged: true }, summary: 'purged' };
+      },
+    };
+    const assembly = await assembleSessionCapabilities({
+      builtinTools: [builtinPing, destructiveProbe],
+      integrations: activated,
+      policy: { capability: 'capability-assembly-proof', admittedRiskClasses: ['read'] },
+      skills: {
+        task: 'refine hypotheses counter evidence contradiction failed replication boundary condition',
+        dirs: [],
+        limits: { maxCount: 3, maxChars: 8000 },
+      },
+    });
+    cleanup.push(() => assembly.close());
+
+    // the pack skill was relevance-selected and injected into the prompt
+    expect(assembly.selectedSkills.map((s) => s.name)).toContain('systematic-counter-evidence');
+    expect(assembly.skillsPrompt).toContain('## Counter-evidence search discipline');
+    expect(assembly.skillsPrompt).toContain('five is a hunt');
+
+    // the pack hook rule is live: destructive tool degrades ask -> fail-closed deny (headless)
+    const decision = await assembly.permissions.decide('purge_cache', {}, 'destructive');
+    expect(decision.effect).toBe('deny');
+
+    // and it composes correctly for read tools: still allowed
+    const readDecision = await assembly.permissions.decide('ping_builtin', {}, 'read');
+    expect(readDecision.effect).toBe('allow');
   });
 });
