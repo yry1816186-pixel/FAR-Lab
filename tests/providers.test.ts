@@ -847,35 +847,38 @@ describe('TEST-ONLY stub provider', () => {
 // ---------------------------------------------------------------------------
 
 describe('provider registry', () => {
-  it('resolves known providers; deepseek (BANNED 2026-08-22) resolves to nothing', () => {
-    expect(getProvider('deepseek')).toBeUndefined(); // user directive: no DeepSeek models in this project
+  it('resolves known providers — open set incl. deepseek + universal (user directive 2026-08-26)', () => {
+    expect(getProvider('deepseek')?.name).toBe('deepseek'); // unbanned: model-agnostic product
     expect(getProvider('zai')?.name).toBe('zai');
     expect(getProvider('dashscope')?.name).toBe('dashscope');
+    expect(getProvider('universal')?.name).toBe('universal');
     expect(getProvider('test-stub')?.name).toBe('test-stub');
     expect(getProvider('nonexistent')).toBeUndefined();
   });
 
-  it('defaults to zai (post-DeepSeek-ban) and honors FARLAB_MODEL_PROVIDER for live providers only', () => {
+  it('defaults to zai and honors FARLAB_MODEL_PROVIDER across the open live set', () => {
     expect(defaultLiveProvider().name).toBe('zai');
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'dashscope');
     expect(defaultLiveProvider().name).toBe('dashscope');
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'deepseek');
-    expect(() => defaultLiveProvider()).toThrow(/BANNED in this project/); // ban is fail-visible
+    expect(defaultLiveProvider().name).toBe('deepseek'); // unbanned live route (liveReady per env key)
+    vi.stubEnv('FARLAB_MODEL_PROVIDER', 'universal');
+    expect(defaultLiveProvider().name).toBe('universal'); // any-endpoint env route
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'test-stub');
     expect(() => defaultLiveProvider()).toThrow(/does not name a live provider/);
     vi.stubEnv('FARLAB_MODEL_PROVIDER', 'openai');
-    expect(() => defaultLiveProvider()).toThrow(/does not name a live provider/);
+    expect(() => defaultLiveProvider()).toThrow(/does not name a live provider/); // not a builtin convenience name
     vi.unstubAllEnvs();
   });
 
   it('lists providers with kind and sanitized metadata (env var names, never values)', () => {
     const infos = listProviders();
-    expect(infos.map((i) => i.name)).toEqual(['zai', 'dashscope', 'deepseek', 'test-stub']);
-    expect(infos.map((i) => i.kind)).toEqual(['live', 'live', 'archived', 'test']);
+    expect(infos.map((i) => i.name)).toEqual(['zai', 'dashscope', 'deepseek', 'universal', 'test-stub']);
+    expect(infos.map((i) => i.kind)).toEqual(['live', 'live', 'live', 'live', 'test']); // no 'archived' kind anymore
     const zai = infos[0]!;
     expect(zai.baseUrl).toBe('https://open.bigmodel.cn/api/anthropic'); // Anthropic wire (D-058)
-    const deepseek = infos[2]!;
-    expect(deepseek.liveReady).toBe(false); // archived: unreachable by construction
+    const universal = infos[3]!;
+    expect(universal.baseUrl).toBe('(unset)'); // FARLAB_UNIVERSAL_BASE_URL absent in test env
     expect(JSON.stringify(infos)).not.toMatch(/sk-[A-Za-z0-9]{8,}/); // no key material
   });
 });

@@ -705,7 +705,17 @@ export interface ResearchActionResponse {
 
 // ---- user-defined model configurations (custom model routes) ----
 
-export type ProviderWireProtocol = 'openai' | 'anthropic';
+export type ProviderWireProtocol = 'openai' | 'anthropic' | 'gemini';
+
+/** Preset provider template (server catalog.ts) — one-click prefill, not a whitelist. */
+export interface ProviderTemplate {
+  id: string;
+  label: string;
+  wire: ProviderWireProtocol;
+  baseUrl: string;
+  keyUrl?: string;
+  note?: string;
+}
 
 /** Server projection of a stored model config — the plaintext key NEVER crosses the wire. */
 export interface ModelConfigPricing {
@@ -713,7 +723,7 @@ export interface ModelConfigPricing {
   outputUsdPerMTok: number;
 }
 
-export type ReasoningStyle = 'reasoning_effort' | 'enable_thinking' | 'thinking_budget';
+export type ReasoningStyle = 'reasoning_effort' | 'enable_thinking' | 'thinking_budget' | 'thinking_config';
 export type ReasoningGear = 'low' | 'medium' | 'high';
 
 /** Declared thinking capability + default effort gear of a model config. */
@@ -764,7 +774,7 @@ export interface EnvDefaultInfo {
 /** One built-in env route (zai/dashscope live; archived = banned, display-only). */
 export interface BuiltinRouteSummary {
   name: string;
-  kind: 'live' | 'archived';
+  kind: 'live' | 'test';
   liveReady: boolean;
   baseUrl: string;
   apiKeyEnvVar: string;

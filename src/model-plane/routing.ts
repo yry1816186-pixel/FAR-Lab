@@ -19,11 +19,14 @@ import {
  *    rejected with reason 'over-remaining-budget' (only when BOTH numbers are known —
  *    unknown price never silently blocks or passes a route).
  *  - policy-aware: 'competition' mode admits ONLY qwen-family models (official rule,
- *    research doc §A1); the project-wide DeepSeek ban is enforced in every mode.
+ *    research doc §A1). Default mode is model-agnostic — ANY provider/model worldwide
+ *    routes freely (user directive 2026-08-26: the product supports all models, all
+ *    protocols; no project-wide provider bans exist in the router).
  *  - reproducible: selectedVia names the exact decision rule that picked the route.
  *  - overridable: policy.overrides[taskClass] wins over scoring (selectedVia 'override');
- *    explicit override of a rejected route fails visible (it must still pass the ban +
- *    competition gates — an override is a preference, not a policy escape hatch).
+ *    explicit override of a rejected route fails visible (it must still pass the
+ *    competition gate + hard capability requirements — an override is a preference,
+ *    not a policy escape hatch).
  */
 
 export const TASK_CLASSES = [
@@ -61,7 +64,7 @@ export interface RoutingPolicy {
   mode: RoutingPolicyMode;
   /**
    * task class → route name pin. Wins over scoring; still subject to hard gates
-   * (deepseek ban, competition qwen-only, task-class hard requirements like vision).
+   * (competition qwen-only in that mode, task-class hard requirements like vision).
    */
   overrides?: Partial<Record<TaskClass, string>>;
 }
@@ -90,20 +93,22 @@ export interface RoutingDecision {
   budgetCtx?: BudgetCtx;
 }
 
-const BANNED_ROUTE_RE = /deepseek/i;
-
 /** Registry provider key for a candidate (explicit providerName > route name). */
 const providerKeyOf = (cand: RouteCandidate): string => cand.providerName ?? cand.name;
 
-/** Hard gates every route passes in every mode. Returns a rejection reason or null. */
+/**
+ * Hard gates every route passes in every mode. Returns a rejection reason or null.
+ * Default mode is provider-agnostic by design (user directive 2026-08-26): no
+ * per-vendor ban exists — the ONLY policy gate is competition mode, which pins the
+ * official-rule route (Qwen-family base on Bailian). The historical project-wide
+ * DeepSeek ban (2026-08-22) was REMOVED by that directive; git history keeps the
+ * provenance.
+ */
 const hardGate = (
   cand: RouteCandidate,
   policy: RoutingPolicy,
   taskClass: TaskClass,
 ): string | null => {
-  if (BANNED_ROUTE_RE.test(cand.name) || BANNED_ROUTE_RE.test(cand.modelId)) {
-    return 'banned:deepseek (user directive 2026-08-22, permanent)';
-  }
   if (policy.mode === 'competition') {
     if (!isQwenFamily(cand.modelId)) return 'competition-policy: base model must be Qwen-family (official rule 2026-08-24)';
     const pk = providerKeyOf(cand);
@@ -153,10 +158,12 @@ const classScore = (cand: RouteCandidate, taskClass: TaskClass): number => {
   let score = latencyPref[taskClass]!.balanced; // unverified-capability routes score as balanced
   if (caps !== undefined) {
     score = latencyPref[taskClass]![caps.latencyClass];
-    if (taskClass === 'coding' && caps.family === 'qwen' && /coder/.test(caps.modelKey)) score += 2;
+    // Vendor-agnostic capability bonuses (user directive 2026-08-26: preferences must
+    // not favor one vendor's family — match what the model IS, by its registry key).
+    if (taskClass === 'coding' && /coder|code/i.test(caps.modelKey)) score += 2;
     if (taskClass === 'high_quality_reasoning' && caps.reasoning) score += 1;
     if (taskClass === 'review' && caps.reasoning) score += 1;
-    if (taskClass === 'long_context' && caps.family === 'qwen' && /long/.test(caps.modelKey)) score += 2;
+    if (taskClass === 'long_context' && /long/i.test(caps.modelKey)) score += 2;
     if (taskClass === 'structured_output' && caps.structuredOutput === 'json_schema_strict') score += 2;
     if (taskClass === 'cheap_extraction' && caps.priceRef !== undefined && caps.priceRef.inputPerMTok <= 1) score += 1;
     if (taskClass === 'vision' && caps.structuredOutput !== undefined) score += 0; // vision gate already hard

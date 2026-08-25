@@ -18,7 +18,7 @@ export interface AppOptions {
   dataDir?: string;
   /** Provider name for the live model route. Default: no fixed name — resolved
    *  per call through the product layer (UI default route > env chain); the live
-   *  set is zai/dashscope only ('deepseek' is banned by user directive). */
+   *  set is open (zai/dashscope/deepseek/universal — see providers/index.ts). */
   providerName?: string;
   /** Test-only provider injection (tests must never hit live routes). */
   providerOverride?: ModelProvider;

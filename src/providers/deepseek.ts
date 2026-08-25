@@ -1,9 +1,8 @@
 /**
- * ARCHIVED — DEEPSEEK BANNED (user directive 2026-08-22, permanent): no DeepSeek model may be
- * used anywhere in this project. This adapter is NOT reachable from the provider
- * registry (getProvider/defaultLiveProvider refuse it); it is retained only as
- * documentation of the historical pre-ban live route for old eval provenance, with
- * its unit tests locking the archived behavior. Do NOT re-wire it.
+ * DeepSeek live adapter (UNBANNED 2026-08-26 by user directive: the product is
+ * model-agnostic — every provider worldwide routes freely; the 2026-08-22 ban
+ * applied to that era's project-internal usage policy, not to the product's
+ * capability set, and git history keeps the provenance).
  */
 import type { ModelProvider, StructuredCallRequest, StructuredCallResult } from '../shared/ports.js';
 import {

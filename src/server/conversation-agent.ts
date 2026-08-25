@@ -7,6 +7,7 @@ import { PermissionEngine } from '../agent/permissions.js';
 import { SessionTelemetry } from '../agent/telemetry.js';
 import { runAgentLoop, type AgentLoopStatus } from '../agent/loop.js';
 import type { AgentEventSink, ReceiptSink } from '../agent/protocol.js';
+import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 
 /**
  * Resident agent turn (PROPOSAL-resident-agent R1/R2): one conversation reply
@@ -69,7 +70,7 @@ export interface ConversationTurnInput {
    * (conversations.ts effectiveConversationReasoning — kept out of this module to
    * avoid an import cycle). Absent/undefined = nothing is sent on the wire.
    */
-  reasoning?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' };
+  reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
 }
 
 export interface ConversationTurnUsage {

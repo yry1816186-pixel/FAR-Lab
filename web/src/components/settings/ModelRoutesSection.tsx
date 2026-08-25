@@ -1,24 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { useI18n } from '../../i18n/LanguageContext';
-import type { DictKey } from '../../i18n/dict';
 import { useModelConfigs } from '../../hooks/useModelConfigs';
 import {
-  discoverModels, getSpendLimit, getUsage, listBuiltinRoutes, setBuiltinDefaultRoute, setSpendLimit, updateBuiltinRoute,
+  discoverModels, getSpendLimit, getProviderTemplates, getUsage, listBuiltinRoutes, setBuiltinDefaultRoute, setSpendLimit, updateBuiltinRoute,
 } from '../../api/endpoints';
 import type { UsageAggregate } from '../../api/types';
 import type { DiscoveredModel, SpendLimitStatus } from '../../api/endpoints';
 import { errorText } from '../common';
 import type {
-  BuiltinRouteSummary, ModelConfigSummary, ModelConfigTestResult, ProviderWireProtocol,
+  BuiltinRouteSummary, ModelConfigSummary, ModelConfigTestResult, ProviderTemplate, ProviderWireProtocol,
   ReasoningCapability, ReasoningGear, ReasoningStyle,
 } from '../../api/types';
 
 /**
  * Settings section: model routes. Everything model-plane in one place —
  * built-in env routes (model override / pricing / default switch), the
- * receipt-derived usage ledger, and user-defined OpenAI/Anthropic-compatible
- * configs. The API key is write-only: stored server-side, echoed back as a mask.
+ * receipt-derived usage ledger, and user-defined configs on any OpenAI /
+ * Anthropic / Gemini-native endpoint worldwide. The API key is write-only:
+ * stored server-side, echoed back as a mask.
  */
 
 interface FormState {
@@ -47,13 +47,11 @@ interface BuiltinFormState {
   pricingOut: string;
 }
 
-/** Quick-fill presets (baseUrl + wire only; label/model stay the researcher's). */
-const PRESETS: ReadonlyArray<{ key: DictKey; wire: ProviderWireProtocol; baseUrl: string }> = [
-  { key: 'settings.presetOpenai', wire: 'openai', baseUrl: 'https://api.openai.com/v1' },
-  { key: 'settings.presetAnthropic', wire: 'anthropic', baseUrl: 'https://api.anthropic.com' },
-  { key: 'settings.presetZai', wire: 'anthropic', baseUrl: 'https://open.bigmodel.cn/api/anthropic' },
-  { key: 'settings.presetDashscope', wire: 'openai', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  { key: 'settings.presetOllama', wire: 'openai', baseUrl: 'http://localhost:11434/v1' },
+/** Worldwide preset templates from the server catalog (wire+baseUrl prefills). */
+const PRESET_FALLBACK: ReadonlyArray<{ label: string; wire: ProviderWireProtocol; baseUrl: string }> = [
+  { label: 'OpenAI', wire: 'openai', baseUrl: 'https://api.openai.com/v1' },
+  { label: 'Anthropic', wire: 'anthropic', baseUrl: 'https://api.anthropic.com' },
+  { label: 'Google Gemini', wire: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com' },
 ];
 
 export function ModelRoutesSection(): JSX.Element {
@@ -79,8 +77,13 @@ export function ModelRoutesSection(): JSX.Element {
   const [spendInput, setSpendInput] = useState('');
   const [spendBusy, setSpendBusy] = useState(false);
   const [spendError, setSpendError] = useState<string | null>(null);
+  /** Worldwide preset catalog (server catalog.ts); fallback trio while/offline. */
+  const [templates, setTemplates] = useState<ReadonlyArray<{ label: string; wire: ProviderWireProtocol; baseUrl: string; note?: string; keyUrl?: string }> | null>(null);
 
   useEffect(() => {
+    void getProviderTemplates()
+      .then((r) => setTemplates(r.templates.map((t: ProviderTemplate) => ({ label: t.label, wire: t.wire, baseUrl: t.baseUrl, ...(t.note !== undefined ? { note: t.note } : {}), ...(t.keyUrl !== undefined ? { keyUrl: t.keyUrl } : {}) }))))
+      .catch(() => setTemplates(PRESET_FALLBACK));
     void getUsage().then((r) => setUsage(r.aggregates)).catch(() => setUsage([]));
     void getSpendLimit().then((r) => { setSpend(r); setSpendInput(r.limitUsd !== null ? String(r.limitUsd) : ''); }).catch(() => setSpend(null));
     void listBuiltinRoutes()
@@ -88,7 +91,8 @@ export function ModelRoutesSection(): JSX.Element {
       .catch(() => setBuiltinRoutes([]));
   }, []);
 
-  const wireLabel = (wire: ProviderWireProtocol): string => t(wire === 'openai' ? 'settings.wireOpenai' : 'settings.wireAnthropic');
+  const wireLabel = (wire: ProviderWireProtocol): string =>
+    t(wire === 'openai' ? 'settings.wireOpenai' : wire === 'anthropic' ? 'settings.wireAnthropic' : 'settings.wireGemini');
 
   const startEdit = (cfg: ModelConfigSummary): void => {
     setFormError(null);
@@ -275,7 +279,6 @@ export function ModelRoutesSection(): JSX.Element {
                     {r.name}
                     {r.isBuiltinDefault && <span className="badge badge--info">{t('settings.builtinDefaultBadge')}</span>}
                     {r.kind === 'live' && !r.liveReady && <span className="badge badge--err">{t('settings.builtinNotReady')}</span>}
-                    {r.kind === 'archived' && <span className="badge">{t('settings.bannedRoute')}</span>}
                   </span>
                   {r.kind === 'live' && (
                     <span className="muted small settings-item-meta">
@@ -423,12 +426,10 @@ export function ModelRoutesSection(): JSX.Element {
             </thead>
             <tbody>
               {usage.map((u) => {
-                const route = builtinRoutes?.find((x) => x.name === u.provider);
                 return (
                   <tr key={`${u.provider}/${u.modelId}`}>
                     <td>
                       <span className="mono">{u.provider}</span> · <span className="mono">{u.modelId}</span> · {u.calls}×
-                      {route?.kind === 'archived' && <> <span className="badge">{t('settings.bannedRoute')}</span></>}
                     </td>
                     <td>{u.totalTokens.toLocaleString()}</td>
                     <td>{u.costUsd !== null ? `$${u.costUsd.toFixed(4)}` : <span className="muted">{t('settings.usageUnknownCost')}</span>}</td>
@@ -523,6 +524,7 @@ export function ModelRoutesSection(): JSX.Element {
           <select id="mcfg-wire" value={form.wire} onChange={(e) => setForm({ ...form, wire: e.target.value as ProviderWireProtocol })}>
             <option value="openai">{t('settings.wireOpenai')}</option>
             <option value="anthropic">{t('settings.wireAnthropic')}</option>
+            <option value="gemini">{t('settings.wireGemini')}</option>
           </select>
 
           <label className="field-label" htmlFor="mcfg-baseurl">{t('settings.baseUrl')}</label>
@@ -583,6 +585,7 @@ export function ModelRoutesSection(): JSX.Element {
             <option value="reasoning_effort" disabled={form.wire !== 'openai'}>{t('settings.reasoningEffort')}</option>
             <option value="enable_thinking" disabled={form.wire !== 'openai'}>{t('settings.reasoningThinking')}</option>
             <option value="thinking_budget" disabled={form.wire !== 'anthropic'}>{t('settings.reasoningBudget')}</option>
+            <option value="thinking_config" disabled={form.wire !== 'gemini'}>{t('settings.reasoningConfig')}</option>
           </select>
           {form.reasoningStyle !== '' && (
             <>
@@ -634,14 +637,18 @@ export function ModelRoutesSection(): JSX.Element {
 
           <p className="muted small">
             {t('settings.presets')}：{' '}
-            {PRESETS.map((p) => (
+            <span className="muted small">{t('settings.presetsHint')}</span>
+          </p>
+          <p className="muted small">
+            {(templates ?? []).map((p) => (
               <button
-                key={p.key}
+                key={p.label}
                 type="button"
                 className="btn btn--small settings-preset"
+                title={[p.note, p.keyUrl].filter(Boolean).join(' · ')}
                 onClick={() => setForm({ ...form, wire: p.wire, baseUrl: p.baseUrl })}
               >
-                {t(p.key)}
+                {p.label}
               </button>
             ))}
           </p>
