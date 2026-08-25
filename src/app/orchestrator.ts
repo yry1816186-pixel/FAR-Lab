@@ -216,6 +216,7 @@ export class Orchestrator {
   private async executeOwned(runId: string, holder: string, runIn: ResearchRun, opts?: { stopAfter?: RunStageName }): Promise<ResearchRun> {
     const lease = holder;
     let run = runIn;
+    const wasCompleted = runIn.status === 'completed';
     if (run.status === 'completed' && this.deps.store.listObjects('feedback', runId).length > 0) {
       // A completed run reopens ONLY when new feedback signals arrived: feedback -> revise -> export
       // re-run so the revision chain and bundle reflect the feedback. Without signals, resume is a no-op.
@@ -235,6 +236,34 @@ export class Orchestrator {
       // Fresh iteration epoch: human-injected feedback earns a new bounded round
       // budget (the cap bounds AUTONOMOUS rounds per injection, not per run lifetime).
       this.deps.store.setMeta(iterationRoundKey(runId), '1');
+    }
+
+    // §5.2 evidence-debt reopen: a COMPLETED run whose corpus grew afterwards
+    // (counter-search / seeded docs) has unprocessed evidence — resume reopens
+    // verify_sources + build_evidence so the new sources are verified and their
+    // claims extracted. Both stages are naturally idempotent (they only process
+    // unverified / not-yet-claimed documents), so existing work is never redone
+    // and hypotheses are NOT auto-invalidated (their evidence-binding surfaces
+    // can link the new claims; causal revision stays a human/feedback act).
+    if (wasCompleted) {
+      const unverified = this.deps.store
+        .listObjects('source_document', runId)
+        .some((d) => d.verification === undefined);
+      if (unverified) {
+        run = await this.transition(runId, (r) => {
+          for (const stage of ['verify_sources', 'build_evidence'] as RunStageName[]) {
+            const rec = r.stages.find((x) => x.stage === stage);
+            if (rec && (rec.state === 'done' || rec.state === 'skipped')) {
+              rec.state = 'pending';
+              delete rec.endedAt;
+              delete rec.error;
+            }
+          }
+          r.status = 'running';
+          return r;
+        }, lease);
+        this.deps.store.appendEvent(runId, { type: 'run_resumed', status: 'running', detail: { reopened: 'evidence_debt' } });
+      }
     }
 
     const signal = this.deps.signals.get(runId) ?? { cancelled: false };

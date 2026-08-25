@@ -165,6 +165,6 @@ export async function runCounterSearch(
     receiptsRecorded,
     note: docs.length === 0
       ? '未新增文档：检索结果为空或全部与现有语料重复。'
-      : `新增 ${docs.length} 个来源（未核验——需重跑 verify_sources/build_evidence 才能提取声明）；语料快照已版本化为 ${corpus.id}。`,
+      : `新增 ${docs.length} 个来源（未核验）——运行 far research resume ${runId}（或 API resume）会自动重开 verify_sources/build_evidence 处理新证据；语料快照已版本化为 ${corpus.id}。`,
   };
 }
