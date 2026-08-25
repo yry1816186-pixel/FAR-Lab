@@ -103,3 +103,40 @@ Baseline-vs-final: the R2 baseline was already no raw pipeline viewer, but the t
 ## 8. Delivery
 
 Single authoritative branch: `integration/farlab-current` @ `a11dc19`, pushed to origin, one PR toward `main`. Lane branches are preserved (merged, not deleted). The primary worktree (`build/hx-reconstruction`) still holds the in-flight sibling session and was never modified by the Integrator.
+
+## 9. Full-closure round (2026-08-26, user mandate "彻底解决全部问题")
+
+Final SHA **5213c5e** (code) + report commits. Every deferred item from §6 was executed or adjudicated with a recorded decision:
+
+### Test-red elimination
+- **Docker pair green**: registry mirror reachable again; `node:24-slim` pulled; gateway + remote-executor pass. The suite is now **1948 passed / 0 failed / 4 skipped (1952)** — fully green including the two formerly environmental files.
+- **cli-term hermeticity (15→03)**: the picocolors color-discipline test now asserts the vendored contract in spawned children with exact env/argv (clean→off, CI→on, NO_COLOR>CI→off) — ambient worker-env drift can never redden it.
+
+### 14-F3 DeepSeek module deleted
+`src/providers/deepseek.ts` removed per the project-wide ban. The transport-mechanics suite (receipts/re-asks/truncation/classification/auth/deadline) re-homed onto the dashscope shell (same http.ts core); the strict-FC path is now locked by a DIRECT core call test (tools+strict+tool_choice + tool_calls parsing); deepseek-specific beta-routing tests died with their subject; registry ban-assertions stay. 62/62.
+
+### Dead-module wire-or-delete decisions (constitution §5)
+- **conformalInterval → WIRED** (06→10 §1): split-conformal band on every ML ResultCell (alpha + nCalibration persist verbatim; honest omission below the finite-sample floor). Real-sidecar test locks it.
+- **Hartung-Knapp → WIRED** (06→10 §2): random-effects CIs are now HK (t_{k-2} via exact integer-df closed forms, A&S 26.7 — verified against the t-table to 4 decimals and cross-checked 6-decimal against scipy on three golden datasets; k≤2 discloses a z fallback). Golden tests updated; the confirmatory fixture re-engineered so a genuine effect survives honest coverage (k=4 tight-CI studies, pre-computed HK CI [-0.772, -0.624]). Two meta tests documented the intended semantic change (small-k CIs honestly wider; one k=3 pool now correctly inconclusive).
+- **Ablation matrix → WIRED**: `ablationFactors` on ModelSpec; executor expands full-factorial cells APPENDED after base models (comparison indices stable, base-equivalent cell deduped); tags carry provenance. Real-sidecar test.
+- **campaign trio → WIRED**: `far campaign run <spec.json>` (completion tree + HELP + drift-guard updated) drives the RU-8 decision core through the REAL experiment executor.
+- **RatingDistribution/ratingEntropy → DELETED** (06→10 §4): no honest offline consumer — single-LLM judgments cannot source a rating distribution; inventing one would fabricate second-order uncertainty. Design record preserved in git + RU-6 docs.
+- **search-allocation → DELETED** (06→04): the RU-15 A4.7 allocator needs a dispersion-stratified generation loop that does not exist; wiring it to invented strata semantics would be fake science. Rebuild trigger recorded (hypotheses stage gaining per-cell generation budgets).
+- **model-plane quartet (benchmark/plane/prompts/routing) → KEEP**: lane 11 forward surface; task-class routing adoption is a recorded 12/08 product decision with a ready seam (`plane.providerFor(taskClass)`); benchmark execution is BLOCKED-live.
+- **Holm (06→10 §3) → DEFERRED with cause**: Holm needs a p-value surface; the stats chain is bootstrap-CI + mechanical thresholds. Adding it now would fabricate statistics — the preregistration-integrity gate exists precisely to prevent this. Trigger: p-value-producing statistics land.
+
+### Capability/product fixes
+- **14-F2 numpy sandbox**: dotted imports under the bound numpy family now resolve (importlib) so numpy>=2 lazy internals complete; the static AST escape gate is unchanged and re-verified (os import still refused; np.linalg/percentile/arange green). Regression payload added to the TS runner test.
+- **05→01 web ingest port**: server-authoritative first (pdf→pdf_text; md/tex/xml/notebooks/code→text; dataset files keep client parsing — the server returns a profile, not seed text); office formats without a server route render an explicit "客户端纯文本解析 · 无结构化理解" label; an unreachable server falls back with the labeled downgrade. Web tsc + 32/32 ingest tests green.
+- **01→02**: `.health-strip--checking` styled (was an unstyled state class).
+- **Lane-01 debt #8**: counter-evidence cards disclose their TARGET (claim text, or a hypothesis link into the hypotheses tab) — a weakening without its target no longer reads as an orphaned verdict.
+- **pptx warning wording**: "synthetic" → "positional … stands in" (the remaining scorecard ADV is the vocabulary heuristic matching an honest warning; reviewed and accepted).
+
+### Final gates (closure tree)
+- typecheck/build (root+web)/lint/TUI 49/49: green; secret-scan PASS; license ledger PASS; path-hygiene = documented bare-worktree class only.
+- **Full suite: 1948 / 0 failed / 4 skipped.**
+- **Red-team scorecard: PASS_WITH_DIVERGENCES, 0 invalid claims, divergences 18 → 10** (remaining: model-plane quartet + host-main plugin-host entry + 3 dynamic-import heuristic notes + the accepted pptx wording ADV; numpy now observes ok:true).
+- CLI smoke: `far campaign` surface live; `far --help` coherent (drift-guard green).
+
+### Remaining (external/user-owned, unchanged)
+B-QWEN-LIVE-ROUTE (credential), S-1 technical PDF (≤20pp), ACC-40 — plus the sibling in-flight time-travel work (untouched, primary tree).
