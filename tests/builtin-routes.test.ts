@@ -76,14 +76,17 @@ type RouteView = {
 const routesOf = (body: Json | null): RouteView[] => (body?.routes as unknown as RouteView[]) ?? [];
 
 describe('GET /model-configs/builtin-routes', () => {
-  it('lists live routes + the banned archived route, no overrides initially', async () => {
+  it('lists live routes (open set, no archived kind), no overrides initially', async () => {
     const { status, body } = await request('GET', '/api/v1/model-configs/builtin-routes');
     expect(status).toBe(200);
     const names = routesOf(body).map((r) => r.name);
     expect(names).toContain('zai');
     expect(names).toContain('dashscope');
+    expect(names).toContain('deepseek'); // unbanned 2026-08-26: editable live route
+    expect(names).toContain('universal'); // any-endpoint env route
+    expect(routesOf(body).every((r) => r.kind === 'live')).toBe(true);
     const deepseek = routesOf(body).find((r) => r.name === 'deepseek')!;
-    expect(deepseek.kind).toBe('archived'); // banned: display-only, never editable
+    expect(deepseek.kind).toBe('live');
     expect(body?.defaultSource).toBe('env');
     const defaults = routesOf(body).filter((r) => r.isBuiltinDefault);
     expect(defaults).toHaveLength(1);
@@ -120,8 +123,27 @@ describe('PUT /model-configs/builtin-routes/:name', () => {
     expect(routesOf(cleared.body).find((r) => r.name === 'zai')!.pricing).toBeUndefined();
   });
 
-  it('rejects banned/unknown routes, bad pricing and non-editable fields', async () => {
-    expect((await request('PUT', '/api/v1/model-configs/builtin-routes/deepseek', { modelId: 'x' })).status).toBe(400);
+  it('GET /model-configs/templates serves the worldwide preset catalog over HTTP', async () => {
+    const { status, body } = await request('GET', '/api/v1/model-configs/templates');
+    expect(status).toBe(200);
+    const templates = (body?.templates as Array<{ id: string; wire: string; baseUrl: string }>) ?? [];
+    expect(templates.length).toBeGreaterThanOrEqual(18);
+    const ids = templates.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // worldwide coverage over all three wires, gems: gemini-native + Chinese + local
+    const byId = new Map(templates.map((t) => [t.id, t]));
+    expect(byId.get('google-gemini')?.wire).toBe('gemini');
+    expect(byId.get('anthropic')?.wire).toBe('anthropic');
+    expect(byId.get('openai')?.wire).toBe('openai');
+    for (const id of ['deepseek', 'moonshot', 'zhipu', 'dashscope', 'openrouter', 'ollama']) {
+      expect(byId.get(id)).toBeDefined();
+    }
+  });
+
+  it('rejects unknown routes, bad pricing and non-editable fields', async () => {
+    expect((await request('PUT', '/api/v1/model-configs/builtin-routes/deepseek', { modelId: 'deepseek-chat' })).status).toBe(200); // live: editable now
+    // restore: leave no deepseek override behind for later suites
+    await request('PUT', '/api/v1/model-configs/builtin-routes/deepseek', { modelId: null });
     expect((await request('PUT', '/api/v1/model-configs/builtin-routes/nope', { modelId: 'x' })).status).toBe(400);
     expect((await request('PUT', '/api/v1/model-configs/builtin-routes/zai', { pricing: { inputUsdPerMTok: -1, outputUsdPerMTok: 1 } })).status).toBe(400);
     expect((await request('PUT', '/api/v1/model-configs/builtin-routes/zai', { baseUrl: 'https://evil.test' })).status).toBe(400);

@@ -201,6 +201,24 @@ export const parseAnthropicUsage = (raw: unknown): {
   };
 };
 
+/**
+ * Gemini generateContent usageMetadata: promptTokenCount / candidatesTokenCount /
+ * totalTokenCount / thoughtsTokenCount (Gemini 2.5 thinking models bill thoughts as
+ * output-side tokens — surfaced as reasoningTokens, same unified shape as the
+ * OpenAI wire's completion_tokens_details.reasoning_tokens).
+ */
+export const parseGeminiUsage = (raw: unknown): {
+  promptTokens?: number; completionTokens?: number; totalTokens?: number; reasoningTokens?: number;
+} => {
+  const u = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  return {
+    ...(typeof u.promptTokenCount === 'number' ? { promptTokens: u.promptTokenCount } : {}),
+    ...(typeof u.candidatesTokenCount === 'number' ? { completionTokens: u.candidatesTokenCount } : {}),
+    ...(typeof u.totalTokenCount === 'number' ? { totalTokens: u.totalTokenCount } : {}),
+    ...(typeof u.thoughtsTokenCount === 'number' ? { reasoningTokens: u.thoughtsTokenCount } : {}),
+  };
+};
+
 
 const truncate = (s: string, n: number): string => (s.length <= n ? s : `${s.slice(0, n)}…[truncated]`);
 
@@ -226,13 +244,18 @@ export const computeRequestHash = (req: StructuredCallRequest): string =>
  *   - enable_thinking  → Qwen3 chat-completions extensions `enable_thinking` +
  *     `thinking_budget` (budget from the single gear→tokens map in model-config.ts)
  *   - thinking_budget  → Anthropic-Messages `thinking:{type:'enabled',budget_tokens}`
+ *   - thinking_config  → Gemini generationConfig `thinkingConfig:{thinkingBudget}`
+ *     (returned gemini-shaped; buildGeminiRequestBody merges it into generationConfig)
  * A style that cannot ride the requested wire returns {} (defense in depth behind the
  * config-schema validation — never an invalid payload). No reasoning on the request =
  * no fields at all (exact legacy wire shape; safe for any endpoint).
  */
+export type WireName = 'openai' | 'anthropic' | 'gemini';
+export type ReasoningStyleName = 'reasoning_effort' | 'enable_thinking' | 'thinking_budget' | 'thinking_config';
+
 export const reasoningBodyFields = (
-  wire: 'openai' | 'anthropic',
-  reasoning: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' },
+  wire: WireName,
+  reasoning: { style: ReasoningStyleName; gear: 'low' | 'medium' | 'high' },
 ): Record<string, unknown> => {
   switch (reasoning.style) {
     case 'reasoning_effort':
@@ -244,6 +267,10 @@ export const reasoningBodyFields = (
     case 'thinking_budget':
       return wire === 'anthropic'
         ? { thinking: { type: 'enabled', budget_tokens: REASONING_GEAR_BUDGET_TOKENS[reasoning.gear] } }
+        : {};
+    case 'thinking_config':
+      return wire === 'gemini'
+        ? { thinkingConfig: { thinkingBudget: REASONING_GEAR_BUDGET_TOKENS[reasoning.gear] } }
         : {};
   }
 };
@@ -315,16 +342,17 @@ const buildRequestBody = (modelId: string, messages: ChatMessage[], req: Structu
  */
 export const structuredOutputModeOf = (
   req: StructuredCallRequest,
-  wire: 'openai' | 'anthropic' = 'openai',
+  wire: WireName = 'openai',
 ): 'json_object' | 'json_schema_strict' | 'strict_tools' | 'prompt_contract' => {
   if (wire === 'anthropic') return 'prompt_contract';
+  if (wire === 'gemini') return 'json_object'; // responseMimeType application/json (JSON mode)
   if (req.responseJsonSchema !== undefined) return 'json_schema_strict';
   if (req.jsonSchema !== undefined) return 'strict_tools';
   return 'json_object';
 };
 
 /** receipt.params fragment — the generation parameters actually sent on the wire. */
-const paramsEchoOf = (req: StructuredCallRequest, wire: 'openai' | 'anthropic' = 'openai') => ({
+const paramsEchoOf = (req: StructuredCallRequest, wire: WireName = 'openai') => ({
   ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
   ...(req.maxTokens !== undefined ? { maxTokens: req.maxTokens } : {}),
   structuredOutput: structuredOutputModeOf(req, wire),
@@ -753,6 +781,83 @@ const buildAnthropicRequestBody = (modelId: string, messages: ChatMessage[], req
   return body;
 };
 
+/**
+ * Gemini generateContent request body (official generativelanguage REST shape):
+ * leading system messages join into the top-level systemInstruction; remaining
+ * messages become contents[] with role 'user' (Gemini has no other caller role on
+ * this path — corrective re-asks and the task turn are all user turns). Structured
+ * output rides generationConfig.responseMimeType='application/json' (JSON mode);
+ * gemini's responseSchema accepts only an OpenAPI subset, so schema enforcement
+ * stays with the caller's zod parse + the JSON-only prompt contract (same policy
+ * as the anthropic wire — callers strip jsonSchema before this wire).
+ */
+const buildGeminiRequestBody = (modelId: string, messages: ChatMessage[], req: StructuredCallRequest): Record<string, unknown> => {
+  const systemMessages = messages.filter((m) => m.role === 'system');
+  const rest = messages.filter((m) => m.role !== 'system');
+  const generationConfig: Record<string, unknown> = { responseMimeType: 'application/json' };
+  if (req.temperature !== undefined) generationConfig.temperature = req.temperature;
+  if (req.maxTokens !== undefined) generationConfig.maxOutputTokens = req.maxTokens;
+  if (req.reasoning !== undefined) Object.assign(generationConfig, reasoningBodyFields('gemini', req.reasoning));
+  const body: Record<string, unknown> = {
+    // modelId rides the URL path (:generateContent), not the body — kept out of the
+    // body so a proxy/gateway forwarding the body verbatim cannot mismatch the route.
+    contents: rest.map((m) => ({ role: 'user', parts: [{ text: m.content }] })),
+  };
+  if (systemMessages.length > 0) {
+    body.systemInstruction = { parts: [{ text: systemMessages.map((m) => m.content).join('\n\n') }] };
+  }
+  if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
+  return body;
+};
+
+/**
+ * Gemini generateContent success body: candidates[0].content.parts[].text joined,
+ * finishReason (STOP→stop, MAX_TOKENS→length so W7-F2 truncation discipline applies),
+ * usageMetadata, modelVersion. Same malformed-body fail-closed contract as the other
+ * wires: a 200 without extractable text is a provider_error, never an empty success.
+ */
+const parseGeminiSuccessBody = (bodyText: string, providerName: string): ChatAttempt => {
+  let body: unknown;
+  try {
+    body = JSON.parse(bodyText);
+  } catch {
+    body = null;
+  }
+  const record = isRecord(body) ? body : null;
+  const candidatesRaw = record?.candidates;
+  const candidate0 = Array.isArray(candidatesRaw) && isRecord(candidatesRaw[0]) ? candidatesRaw[0] : null;
+  const content = isRecord(candidate0?.content) ? candidate0.content : null;
+  const partsRaw = content?.parts;
+  const parts: unknown[] = Array.isArray(partsRaw) ? partsRaw : [];
+  const text = parts
+    .filter((p): p is Record<string, unknown> => isRecord(p) && typeof p['text'] === 'string')
+    .map((p) => p['text'] as string)
+    .join('');
+  if (text.length === 0) {
+    return {
+      ok: false,
+      failure: {
+        kind: 'provider_error',
+        retryable: false,
+        httpStatus: 200,
+        message: `${providerName}: HTTP 200 body malformed (no candidates[0].content.parts[].text); body head: ${truncate(redactSecrets(bodyText), 200)}`,
+      },
+    };
+  }
+  const usage = parseGeminiUsage(record?.usageMetadata);
+  const finishReasonRaw = typeof candidate0?.finishReason === 'string' ? candidate0.finishReason : undefined;
+  const finishReason =
+    finishReasonRaw === 'MAX_TOKENS' ? 'length' : finishReasonRaw === 'STOP' ? 'stop' : finishReasonRaw;
+  const respondedModel = typeof record?.modelVersion === 'string' ? record.modelVersion : undefined;
+  return {
+    ok: true,
+    rawContent: text,
+    ...(respondedModel !== undefined && respondedModel.length > 0 ? { respondedModel } : {}),
+    ...(finishReason !== undefined ? { finishReason } : {}),
+    usage,
+  };
+};
+
 const parseSuccessBody = (bodyText: string, providerName: string): ChatAttempt => {
   let body: unknown;
   try {
@@ -817,11 +922,12 @@ export interface OpenAICompatCallConfig {
   /**
    * Wire protocol (default 'openai'): 'openai' = {base}/chat/completions with Bearer
    * auth; 'anthropic' = {base}/v1/messages with x-api-key + anthropic-version (the
-   * open.bigmodel.cn /api/anthropic route). Retry/timeout/redaction/re-ask machinery
-   * is protocol-independent and shared; only URL, headers, body shape and success
-   * parsing differ.
+   * open.bigmodel.cn /api/anthropic route); 'gemini' =
+   * {base}/v1beta/models/{model}:generateContent with x-goog-api-key. Retry/timeout/
+   * redaction/re-ask machinery is protocol-independent and shared; only URL, headers,
+   * body shape and success parsing differ.
    */
-  wire?: 'openai' | 'anthropic';
+  wire?: WireName;
 }
 
 export interface TransportDeps {
@@ -868,24 +974,39 @@ export async function runOpenAICompatStructuredCall<T>(
   const random: () => number = deps.random ?? Math.random;
   const totalTimeoutMs = deps.totalTimeoutMs ?? DEFAULT_TOTAL_TIMEOUT_MS;
   const wire = cfg.wire ?? 'openai';
-  const url = wire === 'anthropic' ? `${cfg.baseUrl.replace(/\/+$/, '')}/v1/messages` : `${cfg.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const base = cfg.baseUrl.replace(/\/+$/, '');
+  const url =
+    wire === 'anthropic' ? `${base}/v1/messages`
+    : wire === 'gemini' ? `${base}/v1beta/models/${encodeURIComponent(cfg.modelId)}:generateContent`
+    : `${base}/chat/completions`;
   const requestHash = computeRequestHash(req);
   const startedAt = performance.now();
   const elapsedMs = () => Math.round(performance.now() - startedAt);
 
   /** Wire-specific request construction (URL line + headers + serialized body). */
-  const wireRequest = (messages: ChatMessage[]): { headers: Record<string, string>; body: string } =>
-    wire === 'anthropic'
-      ? {
-          headers: { 'content-type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
-          body: JSON.stringify(buildAnthropicRequestBody(cfg.modelId, messages, req)),
-        }
-      : {
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.apiKey}` },
-          body: buildRequestBody(cfg.modelId, messages, req),
-        };
-  const parseWireSuccess = (bodyText: string): ChatAttempt =>
-    wire === 'anthropic' ? parseAnthropicSuccessBody(bodyText, cfg.providerName) : parseSuccessBody(bodyText, cfg.providerName);
+  const wireRequest = (messages: ChatMessage[]): { headers: Record<string, string>; body: string } => {
+    if (wire === 'anthropic') {
+      return {
+        headers: { 'content-type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify(buildAnthropicRequestBody(cfg.modelId, messages, req)),
+      };
+    }
+    if (wire === 'gemini') {
+      return {
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': cfg.apiKey },
+        body: JSON.stringify(buildGeminiRequestBody(cfg.modelId, messages, req)),
+      };
+    }
+    return {
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.apiKey}` },
+      body: buildRequestBody(cfg.modelId, messages, req),
+    };
+  };
+  const parseWireSuccess = (bodyText: string): ChatAttempt => {
+    if (wire === 'anthropic') return parseAnthropicSuccessBody(bodyText, cfg.providerName);
+    if (wire === 'gemini') return parseGeminiSuccessBody(bodyText, cfg.providerName);
+    return parseSuccessBody(bodyText, cfg.providerName);
+  };
 
   let messages = buildMessages(req, random);
   let transportRetries = 0;

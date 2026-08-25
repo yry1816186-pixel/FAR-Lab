@@ -8,6 +8,7 @@ import type { ModelProvider, StructuredCallResult } from '../shared/ports.js';
 import { strictSchemaOrUndefined } from '../providers/http.js';
 import { UNTRUSTED_DATA_RULE } from '../shared/untrusted.js';
 import { clampGearForModel, stageReasoningGear } from '../domain/model-config.js';
+import type { ReasoningStyle, ReasoningGear } from '../domain/model-config.js';
 import { collectEnvSecrets, describeViolation, scanOutbound } from '../shared/exfil-guard.js';
 import { RunBudgetExhaustedError } from '../app/run-budget.js';
 
@@ -21,7 +22,7 @@ export interface LlmCallOptions {
   temperature?: number;
   maxTokens?: number;
   /** RU-9 GO2: explicit per-call reasoning override — wins over the stage-table derivation. */
-  reasoning?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; gear: 'low' | 'medium' | 'high' };
+  reasoning?: { style: ReasoningStyle; gear: ReasoningGear };
 }
 
 export interface LlmResult<T> {
@@ -55,7 +56,7 @@ export interface ModelPlaneDeps {
    * (+ per-model clamps) unless the caller passed an explicit gear. Absent →
    * zero reasoning fields on the wire (exact legacy behavior).
    */
-  reasoningRoute?: { style: 'reasoning_effort' | 'enable_thinking' | 'thinking_budget'; defaultGear: 'low' | 'medium' | 'high'; modelId: string };
+  reasoningRoute?: { style: ReasoningStyle; defaultGear: ReasoningGear; modelId: string };
 }
 
 /**
