@@ -13,6 +13,7 @@ import {
   VersionDiff,
   newId,
 } from '../../domain/index.js';
+import { revisionPredicates, type RevisionPredicateVector } from '../../domain/revision-predicates.js';
 import type {
   FeedbackSignal,
   HypothesisCandidate as Hypothesis,
@@ -192,6 +193,10 @@ interface RevisedObject {
   /** RU-12 GO-1: the post-revision OBJECT itself — the structured-diff walker
    * diffs it against the pre-revision object to emit RFC 6902 ops. */
   revised: unknown;
+  /** Lane-06: deterministic revision-quality predicates (RU-14 A8.4, now wired) —
+   * decision-rule preservation, falsifiability retention, scope delta. Revision
+   * quality never rests on LLM self-report (qualityDelta). */
+  predicates?: RevisionPredicateVector;
 }
 
 const reviseHypothesis = async (
@@ -273,6 +278,27 @@ const reviseHypothesis = async (
       rationale: `${hyp.derivation.rationale} | causal-revision v${hyp.version + 1} via ${signal.id}: ${out.data.revisionRationale}`,
     },
   });
+
+  // ---- Lane-06: deterministic revision-quality predicates (RU-14 A8.4 wiring) ----
+  // The predicates score before→after MECHANICALLY: decision-rule preservation
+  // (silent weakening is caught), falsifiability retention (the revised hypothesis
+  // must stay testable and keep its predictions/spec), scope delta. Violations are
+  // disclosed on the object (monotonic uncertainty) — never silently absorbed.
+  const predicates = revisionPredicates(before, after);
+  const predicateNotes: string[] = [];
+  if (!predicates.falsifiabilityRetained) {
+    predicateNotes.push(
+      `revision-quality: falsifiability NOT retained (${predicates.falsifiability.detail}) — the revision must not quietly make the hypothesis untestable`,
+    );
+  }
+  if (!predicates.decisionRulesPreserved) {
+    predicateNotes.push(
+      `revision-quality: decision rules changed silently (changed: ${predicates.rulePreservation.changedRules.join(', ') || 'none'}; dropped: ${predicates.rulePreservation.droppedRules.join(', ') || 'none'}) — weakening a decision rule requires an explicit rationale`,
+    );
+  }
+  if (predicateNotes.length > 0) {
+    after.uncertainties = [...new Set([...after.uncertainties, ...predicateNotes])];
+  }
   ctx.store.putObject('hypothesis', after);
 
   // Key-order-canonical comparison (WP2 F1): JSON.stringify reflects insertion order,
@@ -290,6 +316,7 @@ const reviseHypothesis = async (
     rationale: out.data.revisionRationale,
     updatedUncertainties: after.uncertainties,
     revised: after,
+    predicates,
   };
 };
 
@@ -365,7 +392,9 @@ const revisePlan = async (
   ctx.store.putObject('plan', after);
 
   const changedFields = (['steps', 'metrics', 'decisionRules', 'executabilityCheck'] as const).filter(
-    (f) => JSON.stringify(plan[f]) !== JSON.stringify(after[f]),
+    // Lane-06: canonical key-sorted comparison (same WP2 F1 fix the hypothesis path
+    // already had) — JSON.stringify insertion order must never fabricate a change.
+    (f) => canonicalJson(plan[f]) !== canonicalJson(after[f]),
   );
   return {
     before: `pre-revision — metrics: ${truncate(before.metrics.join('; '), 120)}`,
@@ -479,14 +508,31 @@ export const reviseStage: StageHandler = {
         // RU-12 GO-1: id-anchored structured ops ride the diff entry — the
         // revision chain is field-explainable (walker over archived before vs after)
         const hypDiff = diffArtifacts(hyp, revised.revised, { idKeys: ['id', 'observable', 'label'] });
+        // Lane-06: deterministic predicate flags ride the entry so downstream
+        // consumers (iteration material-delta, audits, UI) can read revision
+        // quality without re-deriving it or trusting LLM self-report.
+        const p = revised.predicates;
+        const predicateFlags = p === undefined ? [] : [
+          `falsifiability_retained:${p.falsifiabilityRetained}`,
+          `decision_rules_preserved:${p.decisionRulesPreserved}`,
+          `scope_delta:${p.scope.changedFields.join('+') || 'none'}`,
+        ];
         diffEntries.push({
           objectType: 'hypothesis',
           objectId: hyp.id,
           summary: revised.rationale,
           changedFields: revised.changedFields,
           patchOps: hypDiff.ops,
-          semanticFlags: hypDiff.semanticFlags,
+          semanticFlags: [...hypDiff.semanticFlags, ...predicateFlags],
         });
+        if (p !== undefined && !p.falsifiabilityRetained) {
+          warnings.push(`${hyp.id}: revision v${hyp.version + 1} did NOT retain falsifiability (${p.falsifiability.detail}) — disclosed on the object`);
+        }
+        if (p !== undefined && !p.decisionRulesPreserved) {
+          warnings.push(
+            `${hyp.id}: revision v${hyp.version + 1} silently changed decision rules (changed: ${p.rulePreservation.changedRules.join(', ') || 'none'}; dropped: ${p.rulePreservation.droppedRules.join(', ') || 'none'})`,
+          );
+        }
         versionLabels.push({ from: `${hyp.id}@v${hyp.version}`, to: `${hyp.id}@v${hyp.version + 1}` });
         remainingUncertainties.push(...revised.updatedUncertainties);
         objectNotes.push(`hypothesis ${hyp.id} v${hyp.version}->v${hyp.version + 1} (${revised.changedFields.join('+')})`);
