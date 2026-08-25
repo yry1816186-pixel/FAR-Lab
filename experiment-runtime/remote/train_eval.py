@@ -12,17 +12,25 @@ import json
 import sys
 
 import numpy as np
-from sklearn.dummy import DummyClassifier
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, log_loss, roc_auc_score
+from sklearn.dummy import DummyClassifier, DummyRegressor
+from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, log_loss, r2_score, roc_auc_score
 
 ALLOWED = {
     "dummy_most_frequent": {"strategy"},
     "logistic_regression": {"C", "max_iter", "solver"},
     "random_forest_classifier": {"n_estimators", "max_depth", "min_samples_leaf"},
     "gradient_boosting_classifier": {"n_estimators", "max_depth", "learning_rate"},
+    "dummy_mean": {"strategy"},
+    "linear_regression": set(),
+    "random_forest_regressor": {"n_estimators", "max_depth", "min_samples_leaf"},
+    "gradient_boosting_regressor": {"n_estimators", "max_depth", "learning_rate"},
 }
+
+REGRESSORS = frozenset({"dummy_mean", "linear_regression", "random_forest_regressor", "gradient_boosting_regressor"})
+CLASSIFICATION_ONLY = frozenset({"accuracy", "balanced_accuracy", "f1_macro", "roc_auc", "log_loss"})
+REGRESSION_ONLY = frozenset({"mean_squared_error", "r2"})
 
 
 def build(builder_id, hyperparams, seed):
@@ -37,6 +45,14 @@ def build(builder_id, hyperparams, seed):
         return RandomForestClassifier(n_estimators=int(hyperparams.get("n_estimators", 200)), max_depth=hyperparams.get("max_depth"), min_samples_leaf=int(hyperparams.get("min_samples_leaf", 1)), random_state=seed, n_jobs=1)
     if builder_id == "gradient_boosting_classifier":
         return GradientBoostingClassifier(n_estimators=int(hyperparams.get("n_estimators", 200)), max_depth=hyperparams.get("max_depth"), learning_rate=float(hyperparams.get("learning_rate", 0.1)), random_state=seed)
+    if builder_id == "dummy_mean":
+        return DummyRegressor(strategy=str(hyperparams.get("strategy", "mean")))
+    if builder_id == "linear_regression":
+        return LinearRegression()
+    if builder_id == "random_forest_regressor":
+        return RandomForestRegressor(n_estimators=int(hyperparams.get("n_estimators", 200)), max_depth=hyperparams.get("max_depth"), min_samples_leaf=int(hyperparams.get("min_samples_leaf", 1)), random_state=seed, n_jobs=1)
+    if builder_id == "gradient_boosting_regressor":
+        return GradientBoostingRegressor(n_estimators=int(hyperparams.get("n_estimators", 200)), max_depth=hyperparams.get("max_depth"), learning_rate=float(hyperparams.get("learning_rate", 0.1)), random_state=seed)
     raise ValueError(f"unknown builder '{builder_id}'")
 
 
@@ -69,9 +85,7 @@ for i, row in enumerate(body):
         xe.append(feats)
         ye.append(label)
 
-classes = sorted(set(yr))
-if not set(ye).issubset(set(classes)):
-    raise ValueError("test split has classes unseen in train")
+regression = payload["model"]["builderId"] in REGRESSORS
 
 # Train-fitted encoding: numeric columns parsed as floats; categorical columns
 # one-hot via train vocabulary (unseen test values map to -1, never the reverse fit).
@@ -92,18 +106,39 @@ def encode(raw_rows):
     return np.column_stack(cols) if cols else np.zeros((len(raw_rows), 0))
 
 
+if regression:
+    # R2-10: float target for regressors — visible failure on non-numeric values.
+    try:
+        y_train = np.array([float(v) for v in yr], dtype=np.float64)
+        y_test = np.array([float(v) for v in ye], dtype=np.float64)
+    except ValueError as exc:
+        raise ValueError(f"regression target column contains non-numeric values: {exc}")
+    classes = []
+else:
+    classes = sorted(set(yr))
+    if not set(ye).issubset(set(classes)):
+        raise ValueError("test split has classes unseen in train")
+    y_index = {c: k for k, c in enumerate(classes)}
+    y_train = np.array([y_index[c] for c in yr], dtype=np.int64)
+    y_test = np.array([y_index[c] for c in ye], dtype=np.int64)
+
 X_train, X_test = encode(xr), encode(xe)
-y_index = {c: k for k, c in enumerate(classes)}
-y_train = np.array([y_index[c] for c in yr], dtype=np.int64)
-y_test = np.array([y_index[c] for c in ye], dtype=np.int64)
 
 model = build(payload["model"]["builderId"], payload["model"].get("hyperparams", {}), int(payload["model"]["seed"]))
 model.fit(X_train, y_train)
 prediction = model.predict(X_test)
-per_row = (prediction == y_test).astype(int).tolist()
+if regression:
+    residuals = prediction.astype(np.float64) - y_test
+    per_row = np.square(residuals).tolist()
+else:
+    per_row = (prediction == y_test).astype(int).tolist()
 
 metrics = {}
 for key in payload.get("metrics", []):
+    if regression and key in CLASSIFICATION_ONLY:
+        raise ValueError(f"metric {key!r} is classification-only; builder is a regressor")
+    if not regression and key in REGRESSION_ONLY:
+        raise ValueError(f"metric {key!r} is regression-only; builder is a classifier")
     if key == "accuracy":
         metrics["accuracy"] = float(accuracy_score(y_test, prediction))
     elif key == "balanced_accuracy":
@@ -120,6 +155,10 @@ for key in payload.get("metrics", []):
             metrics["log_loss"] = float(log_loss(y_test, model.predict_proba(X_test), labels=list(range(len(classes)))))
         else:
             metrics["log_loss"] = float("nan")
+    elif key == "r2":
+        metrics["r2"] = float(r2_score(y_test, prediction))
+    elif key == "mean_squared_error":
+        metrics["mean_squared_error"] = float(np.mean(np.square(residuals)))
     else:
         raise ValueError(f"unknown metric {key!r}")
 

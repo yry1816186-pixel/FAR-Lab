@@ -16,6 +16,8 @@ export interface SidecarCallResult<T> {
 export interface SidecarEnvInfo {
   pythonVersion: string;
   versions: Record<string, string>;
+  /** R2-10: system/machine/cpu-count context recorded into the run environment. */
+  hardware?: Record<string, string>;
 }
 
 export interface SidecarFactory {
