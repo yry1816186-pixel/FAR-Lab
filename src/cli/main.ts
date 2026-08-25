@@ -9,9 +9,10 @@ import { ingestSdm, ingestTextToSdm, ingestBytes, ingestSvgPlot, persistDatasetP
 import { FeedbackSignal, FeedbackSourceKind, ObjectRef, ResearchQuestion, ScientificGoalType, newId, runProgress } from '../domain/index.js';
 import type { ResearchRun } from '../domain/index.js';
 import { completionScript } from './completion.js';
+import { HELP } from './help.js';
 import { staleDistFiles } from './dist-freshness.js';
 import { runGc } from './gc.js';
-import { ink, marker, out, table, padColumns } from './term.js';
+import { ink, log, marker, out, table, padColumns } from './term.js';
 import { isActiveStatus, statusInk, watchLines } from './watch.js';
 import { analyzeTrajectory } from '../app/supervisor.js';
 import { buildLineageGraph } from '../app/lineage.js';
@@ -27,62 +28,6 @@ const assertDistFresh = (): void => {
   }
 };
 
-const HELP = `far — FAR-Lab research workbench (XH-202619 Track 1 Direction 1A)
-
-Usage:
-  far research start <question text> [--domain <d>] [--goal <type>] [--json]
-      Create a research run from a real scientific question and execute the full pipeline.
-      --goal: explanatory|predictive|interventional|methodological|exploratory (default explanatory)
-  far research status <run-id> [--json] [--watch]  Show run status/stages/progress (no invented percentages)
-                                                  --watch: TTY live view, repaints every 2s until a final
-                                                  state; Ctrl-C exits (non-TTY: single snapshot)
-  far research inspect <run-id> --evidence|--hypotheses|--plan|--sources [--json]
-  far research cancel <run-id>                   Request cancellation (checked between stage operations)
-  far research resume <run-id> [--stop-after <stage>] [--json]
-                                                  Resume a partial/failed run from its persisted checkpoint
-  far research export <run-id> --format report|bundle [--out <dir>] [--json]
-                                                  Export human report / reproducibility bundle to --out (default .far-run/exports)
-  far research feedback <run-id> --source <kind> --content <text> [--target-kind <kind> --target-id <id>] [--json]
-                                                  Record feedback on a run (source: human_expert|new_literature|new_dataset|
-                                                  tool_result|simulation|experiment|reviewer|verification_failure|
-                                                  reproduction_failure); consumed causally by the revise stage
-  far research lineage <run-id> [--json]         Trajectory graph: revision family, hypotheses, evidence, causal revisions
-  far research supervise <run-id> [--json]       Live supervisor analysis: stall/repeat-failure/cycle signals with action hints
-  far research fork <run-id> [--reason <text>] [--json]
-                                                  Branch a settled run (alternative direction; question referenced, never copied)
-  far runs [--json]                              List runs
-  far new                                        Interactive wizard (TTY only): prompts for question /
-                                                  domain / goal type, then runs the exact same pipeline
-                                                  as research start (non-interactive: far research start)
-  far experiment run|enqueue <spec.json> [--priority N] [--allow-local-datasets]
-                                                  Execute / queue an ExperimentSpec through the
-                                                  durable scheduler (real datasets+models+stats)
-  far experiment worker [--max-jobs N] [--max-running N]
-                                                  Drain queued experiments as a worker
-  far experiment status [--job <id>] | cancel <job-id> | logs <experiment-run-id>
-                                                  Job/experiment truth: queue state, cooperative
-                                                  cancel, content-addressed training logs
-  far agent refine <run-id> [--turns N] [--top-k N] [--max-concurrent N] [--json]
-                                                  Iterative evidence-gap refinement on a
-                                                  completed run: parallel pro/contra literature
-                                                  sub-agents + tool-using refinement loop;
-                                                  sessions/reports/events fully audited
-  far probe [provider] [--live] [--json]         Model-route health: config check by default
-                                                  (key presence, never values); --live makes one
-                                                  minimal real chat call per route (costs ~1 token)
-  far probe-custom [mcfg-id] [--live] [--json]   Same health surface for user-defined model configs
-                                                  (Settings / mcfg_* routes); --live = one real call
-  far data info [--json]                         Data footprint: runs, db size, artifacts, exports
-  far verify <bundle-id> [--json]                Independently verify a reproducibility bundle
-                                                  (exit 0=verified, 1=failed/degraded)
-  far completion <bash|zsh|pwsh>                 Print a static shell completion script (real command
-                                                  tree) — pipe into your profile, e.g.
-                                                  far completion bash >> ~/.bashrc
-  far gc [--apply] [--json]                      Sweep content-addressed artifact blobs nothing
-                                                  references anymore (default: dry-run report;
-                                                  --apply deletes. Reference truth = objects/runs)
-
-Exit codes: 0 ok, 1 runtime failure, 2 usage error. Diagnostics on stderr.`;
 
 function die(msg: string, code = 1, hint?: string): never {
   // Three-part error contract (NN/g + craft-spec §9): what happened, why it
@@ -275,6 +220,52 @@ const main = async (): Promise<void> => {
   }
   const [, , cmd, sub] = process.argv;
   if (!cmd || flag('--help') || flag('-h') || cmd === 'help') { console.log(HELP); return; }
+
+  if (cmd === 'serve') {
+    // Headless/SSH entry (R2-03): a thin RUN-SURFACE wrapper over the canonical
+    // server modules (src/server/main.ts semantics: PORT/HOST env, graceful
+    // SIGINT/SIGTERM, automations on unless disabled). No second server —
+    // createApiServer is the one and only HTTP owner.
+    const portArg = arg('--port');
+    let port = 8787;
+    if (portArg !== undefined) {
+      port = Number.parseInt(portArg, 10);
+      if (!Number.isInteger(port) || port < 0 || port > 65535) die(`invalid --port "${portArg}" (must be an integer 0-65535; 0 = ephemeral)`, 2);
+    }
+    const host = arg('--host') ?? process.env.HOST ?? '127.0.0.1';
+    const automationsOff = arg('--automations') === 'off';
+    const { createApiServer } = await import('../server/api.js');
+    const serveApp = await createApp(
+      arg('--data-dir') !== undefined ? { dataDir: arg('--data-dir') } : process.env.FARLAB_DATA_DIR !== undefined ? { dataDir: process.env.FARLAB_DATA_DIR } : {},
+    );
+    const api = createApiServer(serveApp, {
+      port,
+      host,
+      automations: { enabled: !automationsOff && process.env.FARLAB_AUTOMATIONS !== 'off' },
+    });
+    try {
+      const actualPort = await api.start();
+      out(`far serve listening on http://${host}:${actualPort} (api base: /api/v1, data: ${serveApp.dataDir})`);
+    } catch (e) {
+      process.stderr.write(`far serve: failed to listen on ${host}:${port}: ${e instanceof Error ? e.message : String(e)}\n`);
+      serveApp.close();
+      process.exitCode = 1;
+      return;
+    }
+    let shuttingDown = false;
+    const shutdown = (signal: string): void => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      log(`far serve: ${signal} received — closing server and database`);
+      void api.stop().then(() => {
+        serveApp.close();
+        process.exit(0);
+      });
+    };
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    return; // the http server keeps the event loop alive
+  }
 
   if (cmd === 'experiment') {
     // EEL surface (D-081/P3): scheduler as a user-operable command. Own module so this
@@ -760,7 +751,11 @@ const main = async (): Promise<void> => {
 
   const runId = positional(4);
   const NEEDS_RUN = ['status', 'inspect', 'cancel', 'resume', 'export', 'lineage', 'supervise', 'fork'] as const;
-  if (sub !== undefined && (NEEDS_RUN as readonly string[]).includes(sub) && !runId) die(`${sub} requires a run id`, 2);
+  if (sub !== undefined && (NEEDS_RUN as readonly string[]).includes(sub) && !runId) {
+    // Same three-part error contract as the malformed-id path: what happened,
+    // plus the single next action.
+    die(`${sub} requires a run id`, 2, 'find one with: far runs');
+  }
   const rid: string = runIdArg(runId, sub ?? 'command');
 
   if (sub === 'status') {
