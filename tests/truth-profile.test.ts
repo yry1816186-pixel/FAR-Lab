@@ -63,8 +63,9 @@ describe('classifyTruth — ordered rules over external-evidence receipts', () =
     expect(classifyTruth({ live: 2, test: 0 }, { live: 0, hit: 0, stale: 0, replay: 3 })).toBe('mixed');
   });
 
-  it('synthetic for test-only model calls', () => {
-    expect(classifyTruth({ live: 0, test: 4 }, { live: 1, hit: 0, stale: 0, replay: 0 })).toBe('synthetic');
+  it('synthetic for test-only model calls; test + live retrieval is mixed (class never contradicts its counts)', () => {
+    expect(classifyTruth({ live: 0, test: 4 }, { live: 0, hit: 0, stale: 0, replay: 0 })).toBe('synthetic');
+    expect(classifyTruth({ live: 0, test: 4 }, { live: 1, hit: 0, stale: 0, replay: 0 })).toBe('mixed');
   });
 
   it('recorded_replay when nothing touched the external world this run', () => {

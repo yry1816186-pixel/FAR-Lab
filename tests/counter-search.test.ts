@@ -33,13 +33,18 @@ afterEach(() => {
 
 const at = (i: number) => new Date(1_700_000_000_000 + i * 1000).toISOString();
 
-const mkRun = (): string => {
+const mkRun = (status = 'completed'): string => {
   const q = ResearchQuestion.parse({
     id: newId('q'), text: 'does X cause Y?', background: '', goalType: 'explanatory',
     scope: { domain: 'd', phenomena: ['p'] }, constraints: {}, createdAt: at(0),
   });
   store.putObject('question', q);
-  return store.createRun(q, {}).id;
+  const run = store.createRun(q, {});
+  if (status !== 'created') {
+    run.status = status as typeof run.status;
+    store.updateRun(run);
+  }
+  return run.id;
 };
 
 const record = (doi: string, title: string): RawSourceRecord => ({
@@ -80,7 +85,8 @@ describe('runCounterSearch — corpus growth with truth receipts', () => {
     expect(out.added).toHaveLength(3);
     expect(out.duplicatesSkipped).toBe(0);
     expect(out.familyFailures).toEqual([{ family: 'europepmc', reason: 'europepmc temporarily unreachable' }]);
-    expect(out.receiptsRecorded).toBe(2); // openalex + crossref succeeded
+    // 2 successes + 1 failed family (failed external contact also receipts, P2-4)
+    expect(out.receiptsRecorded).toBe(3);
 
     // corpus versioning: latest snapshot grew, carries the counter queries + prior fusion untouched
     const corpora = store.listObjects('corpus_snapshot', runId);
@@ -96,9 +102,9 @@ describe('runCounterSearch — corpus growth with truth receipts', () => {
     expect(docs).toHaveLength(3);
     for (const d of docs) expect(d.verification).toBeUndefined();
 
-    // receipts are live retrieval receipts -> the truth profile classifies the run live
+    // receipts are live retrieval receipts (incl. the failed family) -> truth live
     const receipts = store.listObjects('receipt', runId) as ProvenanceReceipt[];
-    expect(receipts.filter((r) => r.kind === 'source_retrieval')).toHaveLength(2);
+    expect(receipts.filter((r) => r.kind === 'source_retrieval')).toHaveLength(3);
     expect(truthProfileFromReceipts(runId, receipts).klass).toBe('live');
 
     // event discloses the growth + the unverified boundary
@@ -128,7 +134,7 @@ describe('runCounterSearch — corpus growth with truth receipts', () => {
     expect(out.added.every((a) => a.id !== undefined)).toBe(true);
   });
 
-  it('refuses while a live executor holds the run lease (409) and 404s unknown runs', async () => {
+  it('refuses while a live executor holds the run lease (409), 404s unknown runs, and 409s not-yet-started runs', async () => {
     const runId = mkRun();
     store.acquireLease(runId, 'executor-1', new Date(Date.now() + 60_000).toISOString());
     await expect(runCounterSearch({ store, artifacts: artifacts() }, runId, { query: 'anything' }))
@@ -137,6 +143,32 @@ describe('runCounterSearch — corpus growth with truth receipts', () => {
     const ghost = `run_${'0'.repeat(26)}`;
     await expect(runCounterSearch({ store, artifacts: artifacts() }, ghost, { query: 'anything' }))
       .rejects.toMatchObject({ status: 404, code: 'not_found' });
+
+    // audit P1-2: a created run has no discovery corpus yet — a counter snapshot
+    // would silently replace discovery retrieval; refused with the honest reason
+    const fresh = mkRun('created');
+    await expect(runCounterSearch({ store, artifacts: artifacts() }, fresh, { query: 'anything' }))
+      .rejects.toMatchObject({ status: 409, code: 'not_started' });
+    expect(store.listObjects('corpus_snapshot', fresh)).toHaveLength(0);
+  });
+
+  it('records a receipt even for failed family searches (audit P2-4: external contact stays visible)', async () => {
+    const runId = mkRun();
+    const sourceFor = (family: SourceFamily): SourceAdapter =>
+      family === 'openalex'
+        ? fakeAdapter(family, okResult(family, [record('10.1/only-a', 'Only winner')]))
+        : fakeAdapter(family, new Error('family down'));
+    const out = await runCounterSearch({ store, artifacts: artifacts() }, runId, { query: 'anything targeted' }, sourceFor);
+    expect(out.added).toHaveLength(1);
+    expect(out.familyFailures).toHaveLength(2);
+    // one success + two failures = three live-contact receipts
+    expect(out.receiptsRecorded).toBe(3);
+    const retrievalReceipts = store.listObjects('receipt', runId) as ProvenanceReceipt[];
+    const failed = retrievalReceipts.filter((r) => r.sourceRetrieval?.httpStatus === 0);
+    expect(failed).toHaveLength(2);
+    for (const f of failed) expect(f.redactionNote).toContain('failed before a response');
+    // truth plane sees the external contacts
+    expect(truthProfileFromReceipts(runId, retrievalReceipts).retrieval.live).toBe(3);
   });
 
   it('rejects malformed bodies (query length contract)', async () => {

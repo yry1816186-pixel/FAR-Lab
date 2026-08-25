@@ -78,7 +78,7 @@ import { canonicalSha256 } from '../shared/crypto.js';
  */
 
 export interface ApiServerError {
-  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found';
+  code: 'not_found' | 'validation' | 'already_running' | 'run_active' | 'not_started' | 'internal' | 'target_not_found' | 'question_required' | 'action_model_failed' | 'action_budget_exhausted' | 'invalid_action_request' | 'invalid_counter_search' | 'provider_unreachable' | 'conversation_model_failed' | 'conversation_full' | 'turn_in_flight' | 'no_corpus' | 'session_stopped' | 'src_not_in_pool' | 'run_not_found';
   message: string;
   retryable: boolean;
   runId?: string;

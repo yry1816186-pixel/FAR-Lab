@@ -142,12 +142,12 @@ const checkReceipts = (store: Store, bundle: ReproducibilityBundle): Verificatio
   }
 
   // §5.5 run-level truth disclosure: a bundle whose receipt set is not fully live
-  // MUST carry the execution-truth limitation line (written by the export stage).
-  // This is the regression lock that keeps synthetic/replayed/mixed runs from
-  // hiding inside a bundle that reads as reproducible-live.
+  // MUST carry the execution-truth limitation line naming its ACTUAL class (audit
+  // P2-1: presence alone could launder a wrong class). Regression lock keeping
+  // synthetic/replayed/mixed runs from hiding inside a reproducible-live bundle.
   const truth = truthProfileFromReceipts(bundle.runId, receipts);
-  if (truth.klass !== 'live' && !bundle.limitations.some((l) => l.includes('执行真实性'))) {
-    problems.push(`bundle 执行真实性为 ${truth.klass} 但 limitations 未携带执行真实性披露行`);
+  if (truth.klass !== 'live' && !bundle.limitations.some((l) => l.includes('执行真实性') && l.includes(`：${truth.klass}`))) {
+    problems.push(`bundle 执行真实性为 ${truth.klass} 但 limitations 未携带命名该类别的执行真实性披露行`);
   }
 
   const pairsText = (pairs: readonly string[]): string => `{${pairs.join(', ')}}`;
