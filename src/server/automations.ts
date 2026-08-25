@@ -1,6 +1,6 @@
 import type { App } from '../app/composition.js';
 import { ConversationSchema, newId, type Automation, type Conversation } from '../domain/index.js';
-import { generateConversationTurn, type ConversationTurnGeneration } from './conversation-agent.js';
+import { generateConversationTurn, conversationSessionId, type ConversationTurnGeneration } from './conversation-agent.js';
 import {
   appendAutomationRecord, MAX_MESSAGES, resolveConversationProvider, effectiveConversationReasoning,
   type CreateRunForConversation,
@@ -70,6 +70,10 @@ export function startAutomationEngine(app: App, deps: AutomationEngineDeps): Aut
           history: conv.messages.slice(-24),
           source: 'automation',
           maxTurns: automation.maxTurnsPerFire,
+          // Deterministic per fire: the rollout for fire N of this automation is
+          // always findable by (automationId, N) — durable audit trail, and a
+          // crashed fire never collides with the next fire's session.
+          sessionId: conversationSessionId(automation.conversationId, `${automation.id}:${automation.fireCount}`),
           ...(autoReasoning !== null ? { reasoning: autoReasoning } : {}),
         },
       );
