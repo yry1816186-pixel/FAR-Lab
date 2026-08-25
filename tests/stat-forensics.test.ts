@@ -43,6 +43,21 @@ describe('quote statistics extraction (deterministic regex)', () => {
     expect(extractMeanN('mean 5.22 but no sample size')).toEqual([]);
   });
 
+  it('lane-06 precision: no mean×n cross-product — ambiguous segments pair nothing', () => {
+    // One sentence carrying two group statistics: old code emitted 4 pairs (2 spurious
+    // GRIM failures that downgraded claim certainty). Ambiguity = honest silence.
+    expect(
+      extractMeanN('mean 3.4 (n=42) for treatment and mean 3.1 (n=40) for controls.'),
+    ).toEqual([]);
+    // mean and n in DIFFERENT sentences are never paired across the boundary
+    expect(extractMeanN('The mean accuracy was 87.3. We enrolled n=30 participants.')).toEqual([]);
+    // semicolons are segment boundaries too — "n=40" (enrollment) and the mean are
+    // in different clauses; pairing them would be the over-pairing this fix removes
+    expect(extractMeanN('enrollment: n=40; the mean score was 5.22')).toEqual([]);
+    // the clean same-segment shape still pairs: this is the check's real target
+    expect(extractMeanN('the mean score was 5.22 (n = 40) across groups')).toEqual([{ mean: 5.22, n: 40, decimals: 2 }]);
+  });
+
   it('SCIENCE lane: extractRiskRatios feeds the (now wired) E-value — RR vocabulary only, bounded', () => {
     expect(extractRiskRatios('the intervention showed RR 2.5 across cohorts')).toEqual([2.5]);
     expect(extractRiskRatios('a risk ratio of 0.4 was observed')).toEqual([0.4]);

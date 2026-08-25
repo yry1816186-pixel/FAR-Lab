@@ -54,21 +54,39 @@ export const eValue = (rr: number): { eValue: number; detail: string } => {
 /**
  * Extract mean/n pairs from a verbatim quote (deterministic regex; returns []
  * when the quote carries no such statistics). Feeds grimCheck at claim time.
+ *
+ * Lane-06 precision fix (2026-08-25): pairing was the full mean×n CROSS
+ * PRODUCT over the whole quote — a sentence-pair like "mean 3.4 (n=42) ...
+ * mean 3.1 (n=40)" produced 4 checks, 2 of them spurious, and a spurious
+ * GRIM failure steps the claim's certainty DOWN via forensicFails. Forensic
+ * checks are advisory, so precision outranks recall: a mean is paired with an
+ * n only when they appear in the SAME sentence segment and that segment
+ * contains exactly one mean and exactly one n. Ambiguous segments are skipped
+ * — a missed advisory check is honest silence; a false INCONSISTENT flag
+ * corrupts the grade.
  */
 export const extractMeanN = (quote: string): Array<{ mean: number; n: number; decimals: number }> => {
   const out: Array<{ mean: number; n: number; decimals: number }> = [];
   const meanRe = /(?:mean|M)\b(?:\s+[a-z]+){0,2}[\s:=]+(\d+(?:\.\d+)?)/gi;
   const nRe = /\b(?:n|N)\s*[:=]?\s*(\d{1,6})\b/g;
-  const ns: number[] = [];
-  for (const m of quote.matchAll(nRe)) ns.push(Number(m[1]));
-  if (ns.length === 0) return out;
-  for (const m of quote.matchAll(meanRe)) {
-    const meanStr = m[1]!;
-    const decimals = meanStr.includes('.') ? meanStr.split('.')[1]!.length : 0;
-    const mean = Number(meanStr);
-    if (mean > 0) {
-      for (const n of ns) out.push({ mean, n, decimals });
+  // Sentence-ish segmentation: terminator + whitespace, or a semicolon. Segments
+  // keep their text so the regexes anchor inside one clause, not across the quote.
+  const segments = quote.split(/(?<=[.!?;])\s+/);
+  for (const seg of segments) {
+    const ns: number[] = [];
+    for (const m of seg.matchAll(nRe)) ns.push(Number(m[1]));
+    if (ns.length !== 1) continue; // 0 or 2+ n's in one segment: ambiguous pairing
+    const means: { value: number; decimals: number }[] = [];
+    for (const m of seg.matchAll(meanRe)) {
+      const meanStr = m[1]!;
+      means.push({
+        value: Number(meanStr),
+        decimals: meanStr.includes('.') ? meanStr.split('.')[1]!.length : 0,
+      });
     }
+    if (means.length !== 1) continue; // 2+ means in one segment: ambiguous pairing
+    const mean = means[0]!;
+    if (mean.value > 0) out.push({ mean: mean.value, n: ns[0]!, decimals: mean.decimals });
   }
   return out;
 };
