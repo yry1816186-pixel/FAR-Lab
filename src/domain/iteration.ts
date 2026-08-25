@@ -61,6 +61,15 @@ export const IterationSnapshot = z.object({
   scorecards: z.number().int(),
   plans: z.number().int(),
   revisions: z.number().int(),
+  /**
+   * Lane-06 (2026-08-25): revisions whose version-diff entries carry SEMANTIC change —
+   * hypothesis scope fields (statement/mechanism/predictions), plan scope fields
+   * (steps/metrics/decisionRules), or a predicate violation (falsifiability lost,
+   * decision rules silently changed). A cosmetic rewrite changes `revisions` but not
+   * this count, so the no-material-delta fingerprint can tell them apart. Default 0
+   * so legacy snapshots (pre-lane-06 records) still parse.
+   */
+  semanticRevisionChanges: z.number().int().default(0),
   experimentRunsCompleted: z.number().int(),
   feedbackSignals: z.number().int(),
   feedbackConsumed: z.number().int(),
