@@ -135,7 +135,7 @@ export function EvidenceTab({
 
       <Section title={t('evidence.relations')}>
         {!evidenceRes.loading && evidenceRes.error === null && relations !== null ? (
-          <RelationsSummary relations={relations} claims={claims ?? []} sources={sourcesRes.data ?? []} />
+          <RelationsSummary relations={relations} claims={claims ?? []} sources={sourcesRes.data ?? []} onOpenHypotheses={onOpenHypotheses} />
         ) : null}
       </Section>
 
@@ -415,10 +415,12 @@ function RelationsSummary({
   relations,
   claims,
   sources,
+  onOpenHypotheses,
 }: {
   relations: EvidenceRelation[];
   claims: ScientificClaim[];
   sources: SourceDocument[];
+  onOpenHypotheses?: () => void;
 }): JSX.Element {
   const { t } = useI18n();
   if (relations.length === 0) {
@@ -471,6 +473,21 @@ function RelationsSummary({
                         ? source.title
                         : r.rationale}
                 </p>
+                {/* Lane-01 debt #8: disclose WHAT the counter evidence targets — a
+                 * weakening without its target reads as an orphaned verdict. */}
+                {(r.targetClaimId !== undefined || r.targetHypothesisId !== undefined) && (
+                  <p className="muted small">
+                    {t('evidence.counterTarget')}:{' '}
+                    {r.targetClaimId !== undefined
+                      ? (claimById.get(r.targetClaimId)?.text.slice(0, 80)
+                        ?? t('evidence.claimMissing', { id: r.targetClaimId }))
+                      : (
+                        <button type="button" className="link-button" onClick={() => onOpenHypotheses?.()}>
+                          {t('evidence.hypothesisTarget', { id: r.targetHypothesisId ?? '' })}
+                        </button>
+                      )}
+                  </p>
+                )}
                 <p className="muted small">
                   {t('evidence.rationale')}: {r.rationale}
                   {source !== undefined && <span> · <a className="source-link" href={`#src-${source.id}`}>{source.title.length > 48 ? `${source.title.slice(0, 48)}…` : source.title}</a></span>}

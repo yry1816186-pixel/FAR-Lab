@@ -494,6 +494,7 @@ export const zh = {
   'ingest.extractFailed': '文本提取失败（文件损坏、加密或无可提取文本）',
   'ingest.tooLarge': '文件超出大小上限（文档类 25MB / 文本类 1MB）',
   'ingest.truncated': '已截断至 5 万字符',
+  'ingest.clientParse': '客户端纯文本解析 · 无结构化理解',
   'ingest.textAdded': '已读取文本文件为种子证据',
   'ingest.unsupported': '不支持的文件类型（支持 PDF/Word/Excel/CSV/PPT/HTML/JSON/EPUB/ODF/.bib/.ris/.txt/.md）',
   // ---- Research Composer (HX2) ----
@@ -698,6 +699,8 @@ export const zh = {
   'evidence.claimMissing': '（claim 对象缺失：{id}）',
   'evidence.counterList': '反证与削弱关系（{n}）',
   'evidence.noCounterFound': '本研究检索范围内未记录反证关系 — 仅代表检索范围内未发现，不等于不存在。',
+  'evidence.counterTarget': '针对目标',
+  'evidence.hypothesisTarget': '假设 {id}（点击查看）',
   'evidence.rationale': '判定理由',
   'evidence.strength': '强度',
   'evidence.alignmentChecked': '已做对齐检查',
@@ -1761,6 +1764,7 @@ export const en: Record<DictKey, string> = {
   'ingest.extractFailed': 'text extraction failed (corrupt, encrypted, or no extractable text)',
   'ingest.tooLarge': 'file exceeds the size cap (25MB documents / 1MB plain text)',
   'ingest.truncated': 'truncated to 50k characters',
+  'ingest.clientParse': 'client-side text-only parse · no SDM',
   'ingest.textAdded': 'text file read as seed evidence',
   'ingest.unsupported': 'unsupported file type (PDF/Word/Excel/CSV/PPT/HTML/JSON/EPUB/ODF/.bib/.ris/.txt/.md)',
   // ---- Research Composer (HX2) ----
@@ -1965,6 +1969,8 @@ export const en: Record<DictKey, string> = {
   'evidence.claimMissing': '(claim object missing: {id})',
   'evidence.counterList': 'Counter & weakening relations ({n})',
   'evidence.noCounterFound': 'No counter-evidence relations recorded within this run\'s retrieval scope — meaning none was found in scope, not that none exists.',
+  'evidence.counterTarget': 'Targets',
+  'evidence.hypothesisTarget': 'hypothesis {id} (click to open)',
   'evidence.rationale': 'Rationale',
   'evidence.strength': 'Strength',
   'evidence.alignmentChecked': 'Alignment checked',

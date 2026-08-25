@@ -251,6 +251,10 @@ export interface Extraction {
   text: string;
   /** True when the source held more text than the projection ceiling allows. */
   truncated: boolean;
+  /** 05-01 port: server-sdm = authoritative server ingest seedText (SDM stored by ref);
+   * client-parse = text-only client extraction (no server route / server unreachable) -
+   * renderers label it, never pretend structural parity. */
+  origin?: 'server-sdm' | 'client-parse';
 }
 
 const clampText = (raw: string): Extraction => {
@@ -425,19 +429,62 @@ async function extractEpub(file: File): Promise<string | null> {
  * parser → whitespace-normalized, capped projection. Null = parse failed or
  * nothing extractable; callers must surface that as a failure card.
  */
+/** Extensions the server `text` route understands (MULTIMODAL contract; .txt rides
+ * along for seed parity). Dataset files (csv/tsv/xlsx) stay client-parsed here: the
+ * server returns a dataset PROFILE (no seedText), a different display surface. */
+const SERVER_TEXT_EXTS = new Set(['.md', '.markdown', '.tex', '.txt', '.xml', '.ipynb', '.py', '.ts', '.tsx', '.js', '.jsx']);
+
+/**
+ * 05→01 port: server-authoritative understanding for the kinds the API covers.
+ * PDF → collectPdfText payload (geometry preserved); text-family → raw text.
+ * Returns the SDM seedText projection, or null when this kind has no server route.
+ * A failed/rejected POST is NEVER swallowed silently — the caller falls back to the
+ * client parser AND stamps origin 'client-parse' so the UI labels the downgrade.
+ */
+async function serverIngestText(file: File, fileName: string, kind: FileKind): Promise<Extraction | null> {
+  const dot = fileName.lastIndexOf(".");
+  const ext = dot >= 0 ? fileName.slice(dot).toLowerCase() : "";
+  let body: Record<string, unknown> | null = null;
+  if (kind === 'pdf') {
+    const { collectPdfText } = await import('./pdfCollect.js');
+    const payload = await collectPdfText(file);
+    if (payload === null) return null;
+    body = { kind: 'pdf_text', fileName, payload };
+  } else if (kind === 'text' && SERVER_TEXT_EXTS.has(ext)) {
+    if (file.size > 1_048_576) return null;
+    body = { kind: 'text', fileName, text: await file.text() };
+  } else {
+    return null; // no server route for this format — client parse (labeled)
+  }
+  const { api } = await import('../api/client.js');
+  let res: { seedText?: string; seedTextTruncated?: boolean } | null | undefined;
+  try {
+    res = (await api.post('/api/v1/ingest', body)) as { seedText?: string; seedTextTruncated?: boolean } | undefined;
+  } catch {
+    // Unreachable server (offline/node test env): fall back to the client parser.
+    // The downgrade is NOT hidden — the client result is stamped origin
+    // 'client-parse' and renderers label it ("text-only parse, no SDM").
+    return null;
+  }
+  if (res === null || res === undefined || typeof res.seedText !== 'string' || res.seedText.length === 0) return null;
+  return { text: res.seedText, truncated: res.seedTextTruncated === true, origin: 'server-sdm' };
+}
+
 export async function extractFileText(file: File, kind: FileKind): Promise<Extraction | null> {
   const binaryKinds: ReadonlySet<FileKind> = new Set(['pdf', 'docx', 'sheet', 'slides', 'odf', 'epub']);
   if (binaryKinds.has(kind) && file.size > MAX_BINARY_BYTES) return null;
   if (kind === 'html' || kind === 'json') {
     if (file.size > MAX_TEXTUAL_BYTES) return null;
   }
+  const viaServer = await serverIngestText(file, file.name, kind);
+  if (viaServer !== null) return viaServer;
   let raw: string | null;
   switch (kind) {
     case 'pdf': {
       const pdfText = await extractPdfText(file);
       raw = pdfText;
       // extractPdfText already slices at 50k; hitting the boundary means truncation.
-      return pdfText === null ? null : { text: pdfText, truncated: pdfText.length >= EXTRACT_TEXT_MAX };
+      return pdfText === null ? null : { text: pdfText, truncated: pdfText.length >= EXTRACT_TEXT_MAX, origin: 'client-parse' };
     }
     case 'docx': raw = await extractDocx(file); break;
     case 'sheet': raw = await extractSheet(file); break;
@@ -449,5 +496,5 @@ export async function extractFileText(file: File, kind: FileKind): Promise<Extra
     default: return null; // text/ref have their own dedicated paths
   }
   if (raw === null || raw.trim().length === 0) return null;
-  return clampText(raw);
+  return { ...clampText(raw), origin: 'client-parse' };
 }
