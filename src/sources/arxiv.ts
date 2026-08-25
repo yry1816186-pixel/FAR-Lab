@@ -3,6 +3,7 @@ import type { RawRetrievalResult, RawSourceRecord, SourceAdapter } from '../shar
 import { SourceAdapterError } from './error.js';
 import { type SourceAdapterOptions, clampLimit, httpGet } from './http.js';
 import { collapseXmlText } from './text.js';
+import { ARXIV_PUBLICATION_TYPE } from './pubtype.js';
 
 /** arXiv Atom API endpoint. Must be https — the http host 301s (W0 spike §3.1). */
 const DEFAULT_ENDPOINT = 'https://export.arxiv.org/api/query';
@@ -112,6 +113,9 @@ const mapEntry = (e: ArxivEntry): RawSourceRecord | undefined => {
     accessState: 'open',
     oaUrl: e.landing_url ?? undefined,
     fullTextUrl: e.pdf_url ?? undefined,
+    // arXiv records are preprints by construction (Atom API has no type field);
+    // a journal DOI identifier, when present, links the published version separately.
+    publicationType: ARXIV_PUBLICATION_TYPE,
     normalized: e, // parsed entry (includes version — v1/v2 are distinct snapshots), pre-exclusion
   };
 };

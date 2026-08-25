@@ -71,7 +71,15 @@ const CrossRelationOut = z.object({
     .array(
       z.object({
         pairId: z.number().int().nonnegative(),
-        verdict: z.enum(['contradicts', 'supports', 'qualifies', 'unrelated', 'not_comparable']),
+        verdict: z.enum([
+          'contradicts',
+          'supports',
+          'qualifies',
+          'replicates',
+          'fails_to_replicate',
+          'unrelated',
+          'not_comparable',
+        ]),
         sharedSubject: z.string().min(5),
         conflictPoint: z.string().min(5).optional(),
         confidence: z.enum(['low', 'moderate', 'high']),
@@ -98,6 +106,36 @@ export const contentTokens = (text: string): Set<string> =>
       .split(/[^a-z0-9]+/)
       .filter((t) => t.length > 3 && !CROSS_STOPWORDS.has(t)),
   );
+
+/**
+ * RU-6 GO1 + RU-R candidate 2: the retraction uncertainty note for a corpus
+ * document. Resolve-time verification outranks the search-time hint (a CLEAN
+ * verification — present without retractionStatus — silences the hint: the
+ * OpenAlex is_retracted flag has a documented false-positive window).
+ * Retraction Watch reasons ride the wording when present.
+ */
+export const retractionUncertaintyNote = (
+  doc: Pick<SourceDocument, 'verification' | 'retractionStatus' | 'retractionReasons'>,
+): string | null => {
+  const reasonSuffix =
+    doc.retractionReasons !== undefined && doc.retractionReasons.length > 0
+      ? ` (Retraction Watch: ${doc.retractionReasons.join('; ')})`
+      : '';
+  if (doc.verification?.retractionStatus === 'retracted') {
+    return `source retracted (Crossref update-to)${reasonSuffix} — treat with maximal skepticism`;
+  }
+  if (doc.verification?.retractionStatus === 'expression_of_concern') {
+    return `source under expression of concern${reasonSuffix} — treat with elevated skepticism`;
+  }
+  const hintStatus = doc.verification === undefined ? doc.retractionStatus : undefined;
+  if (hintStatus === 'retracted') {
+    return `source flagged retracted at search time${reasonSuffix} — awaiting resolve-time verification; treat with maximal skepticism`;
+  }
+  if (hintStatus === 'expression_of_concern') {
+    return `source flagged under expression of concern at search time${reasonSuffix} — awaiting resolve-time verification; treat with elevated skepticism`;
+  }
+  return null;
+};
 
 /** Shared topical-overlap gate constants (claim-claim D-018 pairs AND claim-hypothesis critique links). */
 export const TOPICAL_CONTAINMENT_MIN = 0.25;
@@ -372,6 +410,12 @@ export const buildEvidenceStage: StageHandler = {
         const alignment = checkQuoteAlignment(candidate.quote, sourceText);
         const aligned = alignment.verdict !== 'unaligned';
 
+        // RU-6 GO1: retracted / expression-of-concern sources carry an explicit
+        // uncertainty note on every claim — visible demotion, never silent.
+        // RU-R candidate 2: Retraction Watch reasons ride the wording; the
+        // search-time hint only speaks when verification has not yet run (a
+        // clean resolution outranks the hint — is_retracted false-positive window).
+        const retractionNote = retractionUncertaintyNote(doc);
         const claim: ScientificClaim = {
           id: newId('clm'),
           runId: ctx.run.id,
@@ -382,13 +426,7 @@ export const buildEvidenceStage: StageHandler = {
           extractionModelRef: `${result.provider}/${result.modelId}`,
           uncertainties: [
             ...(candidate.note && candidate.note.trim().length > 0 ? [candidate.note.trim()] : []),
-            // RU-6 GO1: retracted / expression-of-concern sources carry an explicit
-            // uncertainty note on every claim — visible demotion, never silent.
-            ...(doc.verification?.retractionStatus === 'retracted'
-              ? ['source retracted (Crossref update-to) — treat with maximal skepticism']
-              : doc.verification?.retractionStatus === 'expression_of_concern'
-                ? ['source under expression of concern — treat with elevated skepticism']
-                : []),
+            ...(retractionNote !== null ? [retractionNote] : []),
             // RU-6 GO4: deterministic GRIM check on mean/n pairs in the verbatim
             // quote — an inconsistent pair cannot come from the stated sample size.
             ...extractMeanN(candidate.quote)
@@ -627,7 +665,13 @@ export const buildEvidenceStage: StageHandler = {
               'population, method, dose, or organism is NOT a contradiction by itself. "supports" ONLY if the claims ' +
               'independently corroborate the same finding in the same direction — topical kinship or shared ' +
               'vocabulary is NOT support. "qualifies" ONLY if one claim restricts or bounds the conditions under ' +
-              'which the other\'s finding holds. "unrelated" if the claims are about different subjects. ' +
+              'which the other\'s finding holds. "replicates" ONLY if one claim reports an INDEPENDENT reproduction ' +
+              'of the other\'s finding — same direction, comparable measurement, newly collected/analysed data; a ' +
+              'second observational study agreeing in direction is corroboration ("supports"), not a replication. ' +
+              '"fails_to_replicate" ONLY if one claim reports an ATTEMPTED reproduction of the other\'s finding that ' +
+              'did not obtain it (explicit replication language: replication, reproducibility, re-analysis of the ' +
+              'same protocol); a merely different result on a different question is NOT a failed replication. ' +
+              '"unrelated" if the claims are about different subjects. ' +
               '"not_comparable" if they cannot be compared on the given text (missing referents, different measures, ' +
               'insufficient context) — this is the DEFAULT under any doubt, and inventing a conflict is the worst ' +
               'error you can make here. Do not stretch a claim from a different subject or mechanistic layer onto ' +
@@ -645,7 +689,7 @@ export const buildEvidenceStage: StageHandler = {
             schema: CrossRelationOut,
             temperature: 0,
           });
-          const persistable = new Set(['contradicts', 'supports', 'qualifies']);
+          const persistable = new Set(['contradicts', 'supports', 'qualifies', 'replicates', 'fails_to_replicate']);
           const byIdA = new Map(verifiedClaims.map((c) => [c.id, c] as const));
           const byIdB = new Map(verifiedClaims.map((c) => [c.id, c] as const));
           const strengthInputOf = (c: ScientificClaim): RelationStrengthInput => ({

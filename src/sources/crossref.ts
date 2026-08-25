@@ -3,6 +3,7 @@ import type { RawRetrievalResult, RawSourceRecord, SourceAdapter } from '../shar
 import { SourceAdapterError } from './error.js';
 import { type SourceAdapterOptions, clampLimit, encodePathSegment, httpGet } from './http.js';
 import { asArray, asObject, strField } from './json.js';
+import { fromCrossrefType } from './pubtype.js';
 import { stripMarkup } from './text.js';
 
 const DEFAULT_BASE_URL = 'https://api.crossref.org';
@@ -55,6 +56,8 @@ const mapMessage = (message: unknown): RawSourceRecord | undefined => {
   const abstractRaw = strField(m, 'abstract');
   const abstractText = abstractRaw !== undefined ? stripMarkup(abstractRaw) : undefined;
 
+  const publicationType = fromCrossrefType(strField(m, 'type'));
+
   return {
     identifiers,
     title,
@@ -69,6 +72,7 @@ const mapMessage = (message: unknown): RawSourceRecord | undefined => {
     license,
     oaUrl: undefined,
     fullTextUrl: undefined,
+    ...(publicationType !== undefined ? { publicationType } : {}),
     normalized: m, // full message object as returned, BEFORE volatile exclusion
   };
 };

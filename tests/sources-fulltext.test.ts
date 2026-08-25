@@ -122,6 +122,30 @@ describe('extractLaTeXmlText', () => {
     expect(text).toContain('[Figure 3]');
     expect(text).toContain('[in review]');
   });
+
+  it('RU-R GO3: keeps equation LaTeX from math alttext, drops MathML glyph soup', () => {
+    const html =
+      `<!DOCTYPE html><html><body class="ltx_body"><section class="ltx_section">` +
+      `<p class="ltx_p">The estimator is ` +
+      `<math xmlns="http://www.w3.org/1998/Math/MathML" alttext="\\hat{\\beta} = (X'X)^{-1}X'y" display="inline">` +
+      `<mo>β</mo><mo>=</mo><mo stretchy="false">(</mo><mi>X</mi></math> by construction.</p>` +
+      `</section></body></html>`;
+    const text = extractLaTeXmlText(html)!;
+    expect(text).toContain("\\hat{\\beta} = (X'X)^{-1}X'y");
+    expect(text).toContain('by construction');
+    // the MathML operator soup no longer leaks standalone fragments
+    expect(text).not.toMatch(/β=\(/);
+  });
+
+  it('RU-R GO3: math WITHOUT alttext degrades to removal, never fabricates', () => {
+    const html =
+      `<!DOCTYPE html><html><body class="ltx_body"><section class="ltx_section">` +
+      `<p class="ltx_p">Value <math xmlns="http://www.w3.org/1998/Math/MathML"><mi>k</mi></math> holds.</p>` +
+      `</section></body></html>`;
+    const text = extractLaTeXmlText(html)!;
+    expect(text).toContain('Value');
+    expect(text).toContain('holds');
+  });
 });
 
 describe('stripCitationMarkers', () => {
@@ -178,6 +202,19 @@ describe('extractJatsBodyText', () => {
   it('returns null for non-JATS payloads', () => {
     expect(extractJatsBodyText('<html><body>not jats</body></html>')).toBeNull();
     expect(extractJatsBodyText('<article><no-body-here/></article>')).toBeNull();
+  });
+
+  it('RU-R GO3: table-wrap captions survive table stripping with a block break', () => {
+    const withTable =
+      `<?xml version="1.0"?><article><body><sec><title>Results</title>` +
+      `<p>Outcomes are summarized below.</p>` +
+      `<table-wrap id="T1"><caption>Table 1. Mean change in insulin sensitivity by arm.</caption>` +
+      `<table><tr><td>0.8</td><td>0.2</td></tr></table></table-wrap>` +
+      `</sec></body></article>`;
+    const out = extractJatsBodyText(withTable)!;
+    expect(out.text).toContain('Table 1. Mean change in insulin sensitivity by arm.');
+    expect(out.text).toContain('Outcomes are summarized below.');
+    expect(out.text).not.toMatch(/0\.8/); // numeric table body still dropped
   });
 });
 
@@ -281,6 +318,27 @@ describe('extractTeiBodyText', () => {
     expect(text).toContain('Deep sequencing');
     expect(text).not.toContain('Fixture Paper'); // teiHeader dropped
     expect(text).not.toContain('irrelevant bibliography'); // listBibl cut
+  });
+
+  it('RU-R GO3: keeps figure descriptions (figDesc), drops the graphic payload', () => {
+    const tei =
+      '<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body><div><head>Results</head>' +
+      '<p>Cohort effects are plotted in Figure 1.</p>' +
+      '<figure><head>Figure 1</head><graphic url="fig1.png"/>' +
+      '<figDesc>Scatter plot of insulin sensitivity against fasting hours; the fitted slope is negative (95% CI -0.42 to -0.11).</figDesc>' +
+      '</figure></div></body></text></TEI>';
+    const text = extractTeiBodyText(tei)!;
+    expect(text).toContain('insulin sensitivity against fasting hours');
+    expect(text).toContain('-0.42 to -0.11');
+    expect(text).not.toContain('fig1.png');
+  });
+
+  it('RU-R GO3: figures without figDesc degrade to whitespace, no fabrication', () => {
+    const tei =
+      '<TEI><text><body><div><p>Prose only.</p><figure><graphic url="x.png"/></figure></div></body></text></TEI>';
+    const text = extractTeiBodyText(tei)!;
+    expect(text).toContain('Prose only');
+    expect(text).not.toContain('x.png');
   });
 
   it('returns null for non-TEI payloads', () => {
