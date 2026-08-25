@@ -1,6 +1,11 @@
 import type { SourceDocument, SourceIdentifier, SourceFamily } from '../../domain/source.js';
 import type { RawSourceRecord } from '../../shared/ports.js';
 import { isSourceAdapterError } from '../../sources/error.js';
+// Single derivation, two callers (verify: authoritative resolve-time; retrieve:
+// best-effort search-time demotion) — moved to sources/retraction.ts, re-exported
+// here so existing importers keep working.
+import { retractionStatusFrom } from '../../sources/retraction.js';
+export { retractionStatusFrom };
 import { snapshotHash } from '../../sources/snapshot.js';
 import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { throwIfCancelled } from './guard.js';
@@ -8,37 +13,6 @@ import { TITLE_MATCH_THRESHOLD, titleJaccard } from './title-normalize.js';
 
 type Verification = NonNullable<SourceDocument['verification']>;
 type VerifyOutcome = 'resolved' | 'not_found' | 'error';
-
-/**
- * RU-6 GO1 retraction/correction status (Crossref update-to field; Retraction
- * Watch data rides the same field with source 'retraction-watch'). Deterministic
- * derivation from the RESOLVED record; the identifier stays authoritative —
- * status is surfaced for downstream demotion, never flips `resolved`.
- */
-export const retractionStatusFrom = (
-  record: RawSourceRecord | undefined,
-): 'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated' | undefined => {
-  if (record === undefined) return undefined;
-  const updates = (record.normalized as { 'update-to'?: unknown } | undefined)?.['update-to'];
-  if (!Array.isArray(updates)) return undefined;
-  // SCIENCE lane (2026-08-24): status by PRIORITY, not by update-to array order —
-  // `??=` first-match previously let a [correction, reinstatement, retraction]
-  // listing read as 'corrected' and a reinstated paper read as its older retraction.
-  // reinstatement resolves the retraction; retraction dominates EoC/correction.
-  const present = new Set<'retracted' | 'corrected' | 'expression_of_concern' | 'reinstated'>();
-  for (const u of updates) {
-    const t = String((u as { type?: unknown })?.type ?? '').toLowerCase();
-    if (t.includes('reinstatement') || t.includes('reinstated')) present.add('reinstated');
-    else if (t.includes('retraction')) present.add('retracted');
-    else if (t.includes('expression of concern')) present.add('expression_of_concern');
-    else if (t.includes('correction') || t.includes('corrected')) present.add('corrected');
-  }
-  if (present.size === 0) return undefined;
-  if (present.has('reinstated')) return 'reinstated';
-  if (present.has('retracted')) return 'retracted';
-  if (present.has('expression_of_concern')) return 'expression_of_concern';
-  return 'corrected';
-};
 
 /**
  * W6/F3 (refchecker EXTRACT, enhanced_hybrid_checker.py:687-870): conservative

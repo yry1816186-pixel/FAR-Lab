@@ -63,8 +63,13 @@ export const SourceRetrievalFacts = z.object({
   httpStatus: z.number().int(),
   resultCount: z.number().int().nonnegative(),
   contentHashes: z.array(z.string().length(64)).default([]),
-  /** RU-10 GO1: 'hit' (fresh cache served, no HTTP) | 'stale' (expired entry served during source rate-limit). Absent = live fetch. */
-  cache: z.enum(['hit', 'stale']).optional(),
+  /**
+   * RU-10 GO1: 'hit' (fresh cache served, no HTTP) | 'stale' (expired entry served
+   * during source rate-limit) | 'replay' (cache-exclusive re-execution served the
+   * recorded response; the live source was never called).
+   * Absent = live fetch.
+   */
+  cache: z.enum(['hit', 'stale', 'replay']).optional(),
 });
 
 export const ProvenanceReceipt = z.object({

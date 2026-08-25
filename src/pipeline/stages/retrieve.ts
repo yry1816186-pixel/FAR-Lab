@@ -3,7 +3,7 @@ import { CorpusSnapshot, SourceDocument, newId } from '../../domain/index.js';
 import type { RetrievalQuery, SourceFamily } from '../../domain/source.js';
 import { canonicalJson } from '../../shared/crypto.js';
 import type { RawSourceRecord } from '../../shared/ports.js';
-import { cachedSearch } from '../../sources/response-cache.js';
+import { cachedSearch, cachedValue, ReplayCacheMissError } from '../../sources/response-cache.js';
 import { shingle, minhashSignature, jaccardFromSignatures, type MinhashConfig } from '../../domain/minhash.js';
 
 const MINHASH_CFG: MinhashConfig = { numPerm: 128 };
@@ -14,6 +14,18 @@ import type { StageContext, StageHandler, StageOutcome } from '../types.js';
 import { mapBounded, STAGE_CONCURRENCY } from './shared.js';
 import { contentTokens } from './evidence.js';
 import { isCancellationError, throwIfCancelled } from './guard.js';
+import {
+  CHASE_CITING_PER_SEED,
+  CHASE_HOP2_REFERENCES_PER_SEED,
+  CHASE_MAX_NEW,
+  CHASE_REFERENCES_PER_SEED,
+  isChaseAbortError,
+  planCitationChase,
+  planHop2Seed,
+} from '../citation-chase.js';
+import { retractionInfo } from '../../sources/retraction.js';
+import { classifyRetractionReasons, type RetractionWatchTable } from '../../sources/retraction-watch.js';
+import { diversitySnapshot, diversitySummaryLine, saturationMetrics } from '../retrieval-metrics.js';
 
 /** Hard corpus cap (contract): excess documents are truncated, visibly noted in the summary. */
 export const MAX_DOCUMENTS = 12;
@@ -343,6 +355,7 @@ export const renderRerankPayload = (questionText: string, slice: readonly PoolEn
     title: e.record.title,
     ...(e.record.publicationYear !== undefined ? { year: e.record.publicationYear } : {}),
     ...(e.record.venue !== undefined ? { venue: e.record.venue } : {}),
+    ...(e.record.publicationType !== undefined ? { publicationType: e.record.publicationType } : {}),
     abstractExcerpt: (e.record.abstractText ?? '').slice(0, 450),
     originatingPurposes: [...e.purposes],
   })),
@@ -391,8 +404,10 @@ export const toDocument = async (
   ctx: StageContext,
   family: SourceFamily,
   rec: RawSourceRecord,
+  rwTable?: RetractionWatchTable,
 ): Promise<SourceDocument> => {
   const contentHash = snapshotHash(family, rec);
+  const retraction = retractionInfo(rec, rwTable);
   // Store the artifact over the SAME volatile-excluded canonical payload that contentHash
   // addresses, so a third party can retrieve the snapshot by the bundle's declared hash.
   const artifact = await ctx.artifacts.put(canonicalJson(excludeVolatile(family, rec.normalized)));
@@ -414,6 +429,14 @@ export const toDocument = async (
     ...(rec.contentDepth === 'full_text' ? { fullTextRef: artifact.ref } : {}),
     ...(rec.license !== undefined ? { license: rec.license } : {}),
     ...(rec.oaUrl !== undefined ? { oaUrl: rec.oaUrl } : {}),
+    ...(rec.publicationType !== undefined ? { publicationType: rec.publicationType } : {}),
+    // Best-effort search-time hint (RU-R GO2); resolve-time verification stays authoritative.
+    ...(retraction !== undefined ? { retractionStatus: retraction.status } : {}),
+    // RU-R frontier candidate 2: Retraction Watch reasons + honest reading ride
+    // the hint tier (present only when the offline table produced the status).
+    ...(retraction?.reasons !== undefined && retraction.reasons.length > 0
+      ? { retractionReasons: [...retraction.reasons], retractionClass: classifyRetractionReasons(retraction.reasons) }
+      : {}),
   });
 };
 
@@ -484,6 +507,8 @@ export const retrieveStage: StageHandler = {
     let droppedNoIdentifier = 0;
     let variantSearches = 0;
     let failoverSearches = 0;
+    /** Per record-bearing search: share of records NEW to the pool at flush time (saturation input). */
+    const noveltyRates: number[] = [];
 
     type PendingReceipt = Parameters<StageContext['recordReceipt']>[0];
 
@@ -511,18 +536,14 @@ export const retrieveStage: StageHandler = {
       // RU-10 GO1 read-through cache: fresh hits skip the HTTP round entirely;
       // stale-on-source-error serves the expired entry with an honest receipt flag.
       let res;
-      let cacheState: 'miss' | 'hit' | 'stale' = 'miss';
+      let cacheState: 'miss' | 'hit' | 'stale' | 'replay' = 'miss';
       if (ctx.responseCache !== undefined) {
         const wrapped = await cachedSearch(ctx.responseCache, t.family, queryText, SEARCH_LIMIT, Date.now(),
           () => ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT }),
           { onErrorStale: (e) => isSourceAdapterError(e) && /429|rate|budget/i.test(e instanceof Error ? e.message : String(e)) },
         );
         res = wrapped.result;
-        cacheState = wrapped.stale ? 'stale' : 'hit';
-        if (cacheState === 'hit' && wrapped.cachedAt !== new Date(Date.now()).toISOString()) {
-          // fresh hit from a PRIOR run — the HTTP status of that run is replayed
-          cacheState = 'hit';
-        }
+        cacheState = wrapped.replay ? 'replay' : wrapped.stale ? 'stale' : 'hit';
       } else {
         res = await ctx.sourceFor(t.family).search(queryText, { limit: SEARCH_LIMIT });
       }
@@ -583,6 +604,8 @@ export const retrieveStage: StageHandler = {
       notes: string[];
       /** Cancellation observed mid-chain: flush what completed, then abort the stage. */
       cancelledMidChain?: boolean;
+      /** Replay-mode cache miss on this target's main search (explicit-failure input). */
+      replayMiss?: boolean;
     }
 
     const runTarget = async (
@@ -619,6 +642,17 @@ export const retrieveStage: StageHandler = {
         // be bookkept as a family failure nor write a contradicting 0-result
         // receipt for a query that already succeeded (W6 audit P2-2).
         if (isCancellationError(e)) { out.cancelledMidChain = true; return out; }
+        // Cache-exclusive replay: a miss on a PLANNED search is an explicit
+        // failure of the replay claim — no live fallback, no failover (every
+        // family serves the same cache). The stage-level guard below refuses
+        // the whole replay when any planned search is missing.
+        if (e instanceof ReplayCacheMissError) {
+          out.replayMiss = true;
+          out.familyFailure = { family: t.family, message: `${t.purpose}: ${e.message}` };
+          out.receipts.push(failedReceipt(t.family, t.text, e, false));
+          out.notes.push(`retrieve/replay: planned search missing from the response cache: "${t.text}" (${t.family})`);
+          return out;
+        }
         // Single-source failure stays visible (familyFailures + receipt) and the
         // stage continues; only total failure aborts (below).
         const msg = e instanceof Error ? e.message : String(e);
@@ -646,8 +680,18 @@ export const retrieveStage: StageHandler = {
       }
     };
 
-    /** Apply one search's records to the pool (deterministic: called in target order). */
-    const poolYield = (purpose: RetrievalQuery['purpose'], targetIdx: number, family: SourceFamily, records: Array<{ rank: number; record: RawSourceRecord }>): void => {
+    /**
+     * Apply one search's records to the pool (deterministic: called in target order).
+     * Returns the search's novelty outcome: how many records were NEW pool entries
+     * vs already-known (merged) works — the input of the saturation observation.
+     */
+    const poolYield = (
+      purpose: RetrievalQuery['purpose'],
+      targetIdx: number,
+      family: SourceFamily,
+      records: Array<{ rank: number; record: RawSourceRecord }>,
+    ): { added: number; records: number } => {
+      let added = 0;
       for (const { rank, record } of records) {
         const key = primaryKey(record);
         if (key === null) {
@@ -661,22 +705,22 @@ export const retrieveStage: StageHandler = {
           // RU-10 GO2: minhash second-chance merge — catches near-duplicates the
           // identifier + title-blocking gates miss (paraphrased titles, CJK
           // variants). Pairwise over the bounded pool (≤62 entries — no LSH
-          // banding needed); merge bar MINHASH_POOL_MERGE_THRESHOLD = 0.5,
-          // calibrated on measured separation (near-verbatim republications
-          // 0.59-0.74; paraphrases 0.12; distinct papers <0.1) — the stale '0.8'
-          // that used to live in this comment drifted from the executed check.
+          // banding needed); threshold 0.8 = high-precision merge, never merges
+          // topically-similar-but-distinct papers.
           const recShingles = shingle(`${record.title} ${record.abstractText ?? ''}`);
           // Evidence floor: a 3-word title yields ONE 3-gram — identical short
           // titles collide across genuinely different works (the existing
           // short-title guard's premise), so minhash needs real text mass.
           const MINHASH_MIN_SHINGLES = 8;
-          const MINHASH_POOL_MERGE_THRESHOLD = 0.5;
           const sig = recShingles.size >= MINHASH_MIN_SHINGLES
             ? minhashSignature(recShingles, MINHASH_CFG)
             : null;
           for (const candidate of sig === null ? [] : pool.values()) {
             const candSig = minhashSignature(shingle(`${candidate.record.title} ${candidate.record.abstractText ?? ''}`), MINHASH_CFG);
-            if (sig !== null && jaccardFromSignatures(sig, candSig) >= MINHASH_POOL_MERGE_THRESHOLD) {
+            // Threshold 0.5 is CALIBRATED on measured separation (word-3-gram
+            // shingles: near-verbatim republications 0.59-0.74; paraphrases 0.12;
+            // distinct papers <0.1) — clean margin on both sides.
+            if (sig !== null && jaccardFromSignatures(sig, candSig) >= 0.5) {
               existing = candidate;
               minhashMerges += 1;
               break;
@@ -702,7 +746,9 @@ export const retrieveStage: StageHandler = {
         };
         pool.set(key, entry);
         if (fz !== null && !fuzzyIndex.has(fz)) fuzzyIndex.set(fz, entry);
+        added += 1;
       }
+      return { added, records: records.length };
     };
 
     if (targets.length > 0) {
@@ -724,7 +770,10 @@ export const retrieveStage: StageHandler = {
       executedQueries.push({ purpose: t.purpose, text: t.text, family: t.family });
       attempted += 1;
       for (const receipt of out.receipts) ctx.recordReceipt(receipt);
-      for (const y of out.yields) poolYield(t.purpose, targetIdx, y.family, y.records);
+      for (const y of out.yields) {
+        const novelty = poolYield(t.purpose, targetIdx, y.family, y.records);
+        if (y.records.length > 0) noveltyRates.push(novelty.added / y.records.length);
+      }
       // `succeeded` counts EXECUTED main queries (zero-result searches still executed —
       // arXiv emptiness is the recovery trigger, not a failure).
       if (out.familyFailure === undefined) succeeded += 1;
@@ -740,6 +789,19 @@ export const retrieveStage: StageHandler = {
       for (const note of out.notes) ctx.log(note);
       ctx.progress?.(targetIdx + 1, targets.length);
       if (out.cancelledMidChain === true) throwIfCancelled(ctx); // cancellation point: prior targets fully flushed
+    }
+
+    // Cache-exclusive replay refuses PARTIAL replay: one missing planned search
+    // means the corpus cannot reproduce the recorded run — fail explicitly
+    // instead of silently producing a different corpus (frontier candidate 3).
+    if (ctx.responseCache?.mode === 'replay') {
+      const missed = targets.filter((_, i) => outcomes[i]?.replayMiss === true);
+      if (missed.length > 0) {
+        throw new Error(
+          `retrieve/replay: ${missed.length} of ${targets.length} planned search(es) missing from the response cache — ` +
+            `exact replay refused (missing: ${missed.map((t) => `${t.family}:"${t.text}"`).join('; ')})`,
+        );
+      }
     }
 
     // R1: user-provided seeds, loaded early so the empty-corpus guards below
@@ -763,87 +825,204 @@ export const retrieveStage: StageHandler = {
       );
     }
 
-    // ---- SCIENCE lane (2026-08-24): citation-graph expansion (PRISMA-style snowballing) ----
-    // Single-round keyword recall structurally misses the literature CONNECTED to
-    // what it found. The two standard systematic-review snowball levers: BACKWARD
-    // (what the seed cites — OpenAlex referenced_works, one batched ids.openalex
-    // filter) and FORWARD (who cites the seed — filter=cites:, where failed
-    // replications and contradictions live). Bounded: top-3 openalex seeds by RRF,
-    // <=50 backward ids, 6 forward results per seed; every search receipted and
-    // query-logged; failures degrade visibly and never block. Chase records merge
-    // through the SAME dedup pool and compete under the SAME RRF/rerank/cap — a
-    // chased document earns its seat, it is never guaranteed one.
-    const CHASE_SEED_LIMIT = 3;
-    const CHASE_BACKWARD_IDS_CAP = 50;
-    const CHASE_FORWARD_PER_SEED = 6;
-    const chaseTargetBase = targets.length;
-    let citationChaseSearches = 0;
-    let chaseForwardRecords = 0;
-    let chaseBackwardRecords = 0;
-    const chaseNotes: string[] = [];
-    const openalexAdapter = ctx.sourceFor('openalex');
-    const openalexIdOf = (rec: RawSourceRecord): string | undefined =>
-      rec.identifiers.find((i) => i.kind === 'openalex')?.value;
-    if (typeof openalexAdapter.searchFiltered === 'function' && pool.size > 0) {
-      const seedsForChase = fusedOrder([...pool.values()])
-        .filter((e) => e.family === 'openalex' && openalexIdOf(e.record) !== undefined)
-        .slice(0, CHASE_SEED_LIMIT);
-      const chaseSearch = async (filter: string, limit: number, targetIdx: number): Promise<number> => {
-        try {
-          throwIfCancelled(ctx);
-          const res = await openalexAdapter.searchFiltered!(filter, { limit });
-          citationChaseSearches += 1;
-          executedQueries.push({ purpose: 'citation_chase', text: filter, family: 'openalex' });
-          ctx.recordReceipt({
-            kind: 'source_retrieval',
-            executionMode: 'live',
-            stage: 'retrieve',
-            redactionNote: 'citation-graph chase (PRISMA-style snowballing); per-record content hashes retained',
-            sourceRetrieval: {
-              family: 'openalex',
-              query: filter,
-              httpStatus: res.httpStatus,
-              resultCount: res.records.length,
-              contentHashes: res.records.map((r) => snapshotHash('openalex', r)),
-            },
-          });
-          poolYield('citation_chase', targetIdx, 'openalex', res.records.map((record, i) => ({ rank: i, record })));
-          return res.records.length;
-        } catch (e) {
-          if (isCancellationError(e)) throw e;
-          const msg = e instanceof Error ? e.message : String(e);
-          ctx.recordReceipt({
-            kind: 'source_retrieval',
-            executionMode: 'live',
-            stage: 'retrieve',
-            redactionNote: 'citation-graph chase FAILED (network/rate limit); enrichment only, corpus unaffected',
-            sourceRetrieval: {
-              family: 'openalex',
-              query: filter,
-              httpStatus: isSourceAdapterError(e) ? e.httpStatus : 0,
-              resultCount: 0,
-              contentHashes: [],
-            },
-          });
-          chaseNotes.push(`chase "${filter}" failed: ${msg.slice(0, 120)}`);
-          return 0;
+    // ---- citation-graph expansion (bounded enrichment, RU-R GO1) ----
+    // Keyword search cannot reach works only connected THROUGH the citation graph:
+    // foundational method papers (backward references) and follow-ups/replications/
+    // critiques (forward citations). Bounded: seeds capped, per-seed fetches capped,
+    // whole chase stops at CHASE_MAX_NEW pool additions. Failures are visible
+    // (fusion.citationChase.failure + receipts) and never block the corpus — this
+    // is enrichment. Chase ops ride the same response cache as planned searches
+    // (frontier candidate 3 prerequisite): repeat runs cost zero chase HTTP, and
+    // cache-exclusive replay covers them; uncached contexts keep legacy behavior.
+    interface ChaseOutcome {
+      seeds: number;
+      backward: number;
+      forward: number;
+      added: number;
+      hop2?: { seed: string; added: number };
+      failure?: string;
+    }
+    /**
+     * Cached wrapper for one chase op (refs:/cites:/batch: keys hash into the
+     * same source_response_cache table; limit 0 marks no-limit semantics).
+     * Returns the cache receipt mark when a cache context served it.
+     */
+    const chaseCall = async <T>(
+      callKey: string,
+      live: () => Promise<T>,
+    ): Promise<{ value: T; cache?: 'hit' | 'stale' | 'replay' }> => {
+      if (ctx.responseCache === undefined) return { value: await live() };
+      const wrapped = await cachedValue(ctx.responseCache, 'openalex', callKey, 0, Date.now(), live);
+      return { value: wrapped.result, cache: wrapped.replay ? 'replay' : wrapped.stale ? 'stale' : 'hit' };
+    };
+    let chase: ChaseOutcome | undefined;
+    let openalexCitations: import('../../shared/ports.js').CitationChaseAdapter | undefined;
+    try {
+      openalexCitations = ctx.sourceFor('openalex').citations;
+    } catch {
+      openalexCitations = undefined; // family not wired in this context — chase skipped honestly
+    }
+    if (openalexCitations !== undefined) {
+      const seeds = planCitationChase(fusedOrder([...pool.values()]));
+      if (seeds.length > 0) {
+        const poolKeysBeforeChase = new Set(pool.keys());
+        const outcome: ChaseOutcome = { seeds: seeds.length, backward: 0, forward: 0, added: 0 };
+        let chaseListIdx = targets.length; // chase lists get their own RRF list indices
+        chaseLoop: for (const seed of seeds) {
+          if (outcome.added >= CHASE_MAX_NEW) break;
+          // Backward: seed's referenced works, first N in citation order, one batch resolve.
+          // Every executed chase search is receipted (0 results included — attempts are
+          // provenance facts, same P3-1 discipline as planned searches).
+          try {
+            const refsRes = await chaseCall(`refs:${seed.workRef}`, () => openalexCitations.referencedWorkIds(seed.workRef));
+            const refIds = refsRes.value.slice(0, CHASE_REFERENCES_PER_SEED);
+            let batchRes: { value: RawSourceRecord[]; cache?: 'hit' | 'stale' | 'replay' } = { value: [] };
+            if (refIds.length > 0) {
+              batchRes = await chaseCall(`batch:${refIds.join(',')}`, () => openalexCitations.worksByIds(refIds));
+            }
+            const records = batchRes.value;
+            const refsCache = refsRes.cache ?? batchRes.cache;
+            outcome.backward += records.length;
+            executedQueries.push({ purpose: 'citation_chase', text: `refs:${seed.workRef}`, family: 'openalex' });
+            // Success implies HTTP 200 by the adapter contract (non-200 throws).
+            ctx.recordReceipt({
+              kind: 'source_retrieval',
+              executionMode: 'live',
+              stage: 'retrieve',
+              redactionNote: 'citation-chase backward refs: query ref, result count, content hashes',
+              sourceRetrieval: {
+                family: 'openalex',
+                query: `refs:${seed.workRef}`,
+                httpStatus: 200,
+                ...(refsCache !== undefined ? { cache: refsCache } : {}),
+                resultCount: records.length,
+                contentHashes: records.map((r) => snapshotHash('openalex', r)),
+              },
+            });
+            if (records.length > 0) {
+              const idx = chaseListIdx++;
+              const novelty = poolYield('citation_chase', idx, 'openalex', records.map((record, rank) => ({ rank, record })));
+              outcome.added += novelty.added;
+            }
+          } catch (e) {
+            if (isCancellationError(e)) throw e;
+            if (e instanceof ReplayCacheMissError) {
+              outcome.failure = `replay cache miss at ${seed.workRef} — chase additions of the recorded run are not replayable (pre-caching run or evicted entry)`;
+              ctx.recordReceipt(failedReceipt('openalex', `refs:${seed.workRef}`, e, false)); // attempts are provenance facts
+              ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              break chaseLoop;
+            }
+            if (isChaseAbortError(e)) {
+              outcome.failure = `aborted at ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+              ctx.recordReceipt(failedReceipt('openalex', `refs:${seed.workRef}`, e, false)); // attempts are provenance facts
+              ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              break chaseLoop;
+            }
+            ctx.recordReceipt(failedReceipt('openalex', `refs:${seed.workRef}`, e, false));
+            ctx.log(`retrieve: citation chase backward failed for ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          if (outcome.added >= CHASE_MAX_NEW) break;
+          // Forward: works citing the seed, most-cited first (deterministic sort).
+          try {
+            const citesRes = await chaseCall(`cites:${seed.workRef}`, () => openalexCitations.citingWorks(seed.workRef, CHASE_CITING_PER_SEED));
+            const records = citesRes.value;
+            outcome.forward += records.length;
+            executedQueries.push({ purpose: 'citation_chase', text: `cites:${seed.workRef}`, family: 'openalex' });
+            ctx.recordReceipt({
+              kind: 'source_retrieval',
+              executionMode: 'live',
+              stage: 'retrieve',
+              redactionNote: 'citation-chase forward cites: query ref, result count, content hashes',
+              sourceRetrieval: {
+                family: 'openalex',
+                query: `cites:${seed.workRef}`,
+                httpStatus: 200,
+                ...(citesRes.cache !== undefined ? { cache: citesRes.cache } : {}),
+                resultCount: records.length,
+                contentHashes: records.map((r) => snapshotHash('openalex', r)),
+              },
+            });
+            if (records.length > 0) {
+              const idx = chaseListIdx++;
+              const novelty = poolYield('citation_chase', idx, 'openalex', records.map((record, rank) => ({ rank, record })));
+              outcome.added += novelty.added;
+            }
+          } catch (e) {
+            if (isCancellationError(e)) throw e;
+            if (e instanceof ReplayCacheMissError) {
+              outcome.failure = `replay cache miss at ${seed.workRef} — chase additions of the recorded run are not replayable (pre-caching run or evicted entry)`;
+              ctx.recordReceipt(failedReceipt('openalex', `cites:${seed.workRef}`, e, false));
+              ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              break chaseLoop;
+            }
+            if (isChaseAbortError(e)) {
+              outcome.failure = `aborted at ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+              ctx.recordReceipt(failedReceipt('openalex', `cites:${seed.workRef}`, e, false)); // attempts are provenance facts
+              ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              break chaseLoop;
+            }
+            ctx.recordReceipt(failedReceipt('openalex', `cites:${seed.workRef}`, e, false));
+            ctx.log(`retrieve: citation chase forward failed for ${seed.workRef}: ${e instanceof Error ? e.message : String(e)}`);
+          }
         }
-      };
-      for (const [i, seed] of seedsForChase.entries()) {
-        chaseForwardRecords += await chaseSearch(`cites:${openalexIdOf(seed.record)}`, CHASE_FORWARD_PER_SEED, chaseTargetBase + i);
+        // ---- hop 2 (RU-R GO2): backward-only depth-2 chase off the first ----
+        // hop-1-added entry — the methodology BEHIND the method paper. One seed,
+        // <=2 refs, same receipt/abort discipline; only when budget remains.
+        if (outcome.failure === undefined && outcome.added < CHASE_MAX_NEW) {
+          const chaseAdded = [...pool.values()].filter((e) => !poolKeysBeforeChase.has(e.key));
+          const hop2Seed = planHop2Seed(chaseAdded);
+          if (hop2Seed !== null) {
+            outcome.hop2 = { seed: hop2Seed.workRef, added: 0 };
+            try {
+              const refsRes = await chaseCall(`refs2:${hop2Seed.workRef}`, () => openalexCitations.referencedWorkIds(hop2Seed.workRef));
+              const refIds = refsRes.value.slice(0, CHASE_HOP2_REFERENCES_PER_SEED);
+              let batchRes: { value: RawSourceRecord[]; cache?: 'hit' | 'stale' | 'replay' } = { value: [] };
+              if (refIds.length > 0) {
+                batchRes = await chaseCall(`batch:${refIds.join(',')}`, () => openalexCitations.worksByIds(refIds));
+              }
+              const records = batchRes.value;
+              const refs2Cache = refsRes.cache ?? batchRes.cache;
+              outcome.backward += records.length;
+              executedQueries.push({ purpose: 'citation_chase', text: `refs2:${hop2Seed.workRef}`, family: 'openalex' });
+              ctx.recordReceipt({
+                kind: 'source_retrieval',
+                executionMode: 'live',
+                stage: 'retrieve',
+                redactionNote: 'citation-chase hop-2 backward refs: query ref, result count, content hashes',
+                sourceRetrieval: {
+                  family: 'openalex',
+                  query: `refs2:${hop2Seed.workRef}`,
+                  httpStatus: 200,
+                  ...(refs2Cache !== undefined ? { cache: refs2Cache } : {}),
+                  resultCount: records.length,
+                  contentHashes: records.map((r) => snapshotHash('openalex', r)),
+                },
+              });
+              if (records.length > 0) {
+                const idx = chaseListIdx++;
+                const novelty = poolYield('citation_chase', idx, 'openalex', records.map((record, rank) => ({ rank, record })));
+                outcome.added += novelty.added;
+                outcome.hop2.added += novelty.added;
+              }
+            } catch (e) {
+              if (isCancellationError(e)) throw e;
+              if (e instanceof ReplayCacheMissError) {
+                outcome.failure = `replay cache miss at hop2 ${hop2Seed.workRef} — hop-2 addition of the recorded run is not replayable`;
+                ctx.recordReceipt(failedReceipt('openalex', `refs2:${hop2Seed.workRef}`, e, false));
+                ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              } else if (isChaseAbortError(e)) {
+                outcome.failure = `aborted at hop2 ${hop2Seed.workRef}: ${e instanceof Error ? e.message : String(e)}`;
+                ctx.recordReceipt(failedReceipt('openalex', `refs2:${hop2Seed.workRef}`, e, false)); // attempts are provenance facts
+                ctx.log(`retrieve: citation chase ${outcome.failure}`);
+              } else {
+                ctx.recordReceipt(failedReceipt('openalex', `refs2:${hop2Seed.workRef}`, e, false));
+                ctx.log(`retrieve: citation chase hop-2 failed for ${hop2Seed.workRef}: ${e instanceof Error ? e.message : String(e)}`);
+              }
+            }
+          }
+        }
+        chase = outcome;
       }
-      const referenced = [...new Set(
-        seedsForChase.flatMap((s) => {
-          const refs = (s.record.normalized as { referenced_works?: unknown } | null)?.referenced_works;
-          return Array.isArray(refs) ? refs.filter((r): r is string => typeof r === 'string' && /^W\d+$/.test(r)) : [];
-        }),
-      )].slice(0, CHASE_BACKWARD_IDS_CAP);
-      if (referenced.length > 0) {
-        chaseBackwardRecords += await chaseSearch(`ids.openalex:${referenced.join('|')}`, CHASE_FORWARD_PER_SEED, chaseTargetBase + seedsForChase.length);
-      }
-      if (seedsForChase.length === 0) chaseNotes.push('no openalex-identified pool entries to seed the chase');
-    } else {
-      chaseNotes.push('citation chase skipped: openalex adapter lacks filter support');
     }
 
     // ---- D-015 fusion: deterministic RRF order, then (under cap pressure) LLM listwise rerank ----
@@ -885,11 +1064,38 @@ export const retrieveStage: StageHandler = {
       }
     }
 
-    const selected = selectFinal(finalOrder, MAX_DOCUMENTS, COUNTER_MIN_SEATS);
+    // ---- RU-R GO2: retracted documents never COMPETE for cap seats ----
+    // A retracted paper surfacing high in fusion must not displace valid evidence
+    // from the cap; the demotion keeps visibility over silent drop (retracted
+    // docs are appended only when the pool cannot otherwise fill the cap, and
+    // the status persists on the document for downstream demotion). Corrected /
+    // expression-of-concern / reinstated docs stay eligible — they remain citable.
+    const rwTable: RetractionWatchTable | undefined = ctx.responseCache?.retractions;
+    const retractedKeys = new Set(
+      [...pool.values()].filter((e) => retractionInfo(e.record, rwTable)?.status === 'retracted').map((e) => e.key),
+    );
+    const rwRetracted = [...pool.values()].filter(
+      (e) => retractionInfo(e.record, rwTable)?.basis === 'retraction_watch',
+    ).length;
+    const eligible = finalOrder.filter((e) => !retractedKeys.has(e.key));
+    const retractedOrdered = finalOrder.filter((e) => retractedKeys.has(e.key));
+    const selected = selectFinal(eligible, MAX_DOCUMENTS, COUNTER_MIN_SEATS);
+    const fillCount = Math.max(0, MAX_DOCUMENTS - selected.length);
+    const retractedKept = retractedOrdered.slice(0, fillCount);
+    const retractedDemoted = retractedOrdered.length - retractedKept.length;
+    if (retractedKept.length > 0) selected.push(...retractedKept);
     const counterSeatsKept = selected.filter(isCounterOrigin).length;
+    const saturation = saturationMetrics(noveltyRates);
+    const diversity = diversitySnapshot(
+      selected.map((e) => ({
+        family: e.family,
+        ...(e.record.publicationYear !== undefined ? { publicationYear: e.record.publicationYear } : {}),
+        ...(e.record.publicationType !== undefined ? { publicationType: e.record.publicationType } : {}),
+      })),
+    );
 
     const documents: SourceDocument[] = [];
-    for (const entry of selected) documents.push(await toDocument(ctx, entry.family, entry.record));
+    for (const entry of selected) documents.push(await toDocument(ctx, entry.family, entry.record, rwTable));
 
     // R1 entry upgrade: user-provided seeds (family 'user_provided', created at
     // run creation) join the corpus as GUARANTEED entries — they bypass the
@@ -940,10 +1146,24 @@ export const retrieveStage: StageHandler = {
         rerankApplied,
         ...(rerankFailure !== undefined ? { rerankFailure } : {}),
         counterSeatsKept,
+        ...(retractedDemoted > 0 ? { retractedDemoted } : {}),
         ...(variantSearches > 0 ? { variantSearches } : {}),
         ...(failoverSearches > 0 ? { failoverSearches } : {}),
         ...(rerankWindows !== undefined ? { rerankWindows } : {}),
-        ...(citationChaseSearches > 0 ? { citationChaseSearches } : {}),
+        ...(chase !== undefined
+          ? {
+              citationChase: {
+                seeds: chase.seeds,
+                backward: chase.backward,
+                forward: chase.forward,
+                added: chase.added,
+                ...(chase.hop2 !== undefined ? { hop2: chase.hop2 } : {}),
+                ...(chase.failure !== undefined ? { failure: chase.failure } : {}),
+              },
+            }
+          : {}),
+        ...(saturation.searches > 0 ? { saturation } : {}),
+        diversity,
         selection: `cap ${selected.length} of pool ${pool.size} (RRF${rerankApplied ? ' + listwise rerank' : rerankFailure !== undefined ? ' after failed rerank' : ''})`,
       },
     });
@@ -955,14 +1175,28 @@ export const retrieveStage: StageHandler = {
       `counter-evidence seats kept: ${counterSeatsKept}${selected.length < fused.length ? ` of ${Math.min(COUNTER_MIN_SEATS, fused.filter(isCounterOrigin).length)} reserved` : ''}`,
     ];
     if (rerankFailure !== undefined) parts.push(`listwise rerank FAILED — deterministic RRF order used (${rerankFailure})`);
-    if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
-    if (failoverSearches > 0) parts.push(`${failoverSearches} openalex->europepmc failover search(es)`);
-    if (citationChaseSearches > 0) {
+    if (retractedDemoted > 0) {
       parts.push(
-        `citation chase (PRISMA-style snowballing): ${citationChaseSearches} search(es) — ${chaseForwardRecords} forward record(s) via cites:, ${chaseBackwardRecords} backward record(s) via referenced_works; chase results compete in the same RRF/cap pool`,
+        `${retractedDemoted} retracted document(s) demoted out of cap competition` +
+          (rwRetracted > 0 ? ` (${rwRetracted} via offline Retraction Watch table)` : ''),
       );
     }
-    for (const n of chaseNotes) parts.push(`citation chase note: ${n}`);
+    if (variantSearches > 0) parts.push(`${variantSearches} arXiv recovery variant search(es) (zero-result cascade)`);
+    if (chase !== undefined) {
+      parts.push(
+        `citation chase: ${chase.seeds} seed(s), backward ${chase.backward}, forward ${chase.forward}, +${chase.added} new pool doc(s)` +
+          (chase.hop2 !== undefined ? `, hop-2 off ${chase.hop2.seed} +${chase.hop2.added}` : '') +
+          (chase.failure !== undefined ? ` — ${chase.failure}` : ''),
+      );
+    }
+    if (saturation.searches > 0) {
+      parts.push(
+        `search novelty mean=${saturation.meanNovelty} tail=${saturation.tailNovelty}` +
+          (saturation.saturated ? ' (SATURATED — a later round must change strategy, not repeat queries)' : ''),
+      );
+    }
+    parts.push(`corpus mix: ${diversitySummaryLine(diversity)}`);
+    if (failoverSearches > 0) parts.push(`${failoverSearches} openalex->europepmc failover search(es)`);
     if (duplicates > 0) parts.push(`${duplicates} duplicate record(s) merged by identifier`);
     if (fuzzyMerges > 0) parts.push(`${fuzzyMerges} duplicate record(s) merged by normalized title+year (cross-source)`);
     if (minhashMerges > 0) parts.push(`${minhashMerges} near-duplicate record(s) merged by MinHash (paraphrased/CJK titles)`);

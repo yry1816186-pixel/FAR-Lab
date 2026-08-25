@@ -24,6 +24,25 @@ export type SourceIdentifier = z.infer<typeof SourceIdentifier>;
 export const AccessState = z.enum(['open', 'restricted', 'paywalled', 'unavailable', 'unknown']);
 export type AccessState = z.infer<typeof AccessState>;
 
+/**
+ * Canonical publication-type vocabulary, mapped per family from native API types
+ * (OpenAlex `type`, Crossref `type`, EuropePMC `pubType`; arXiv records ARE
+ * preprints by construction). Reviews vs primary research vs preprints vs
+ * corrections are different EVIDENTIAL objects: a review aggregates (secondary),
+ * an erratum corrects (must not double-count the original), a preprint has not
+ * passed peer review. Optional — legacy stored objects read fine without it.
+ */
+export const PublicationType = z.enum([
+  'primary_research',
+  'review',
+  'preprint',
+  'editorial_letter',
+  'book_chapter',
+  'correction',
+  'other',
+]);
+export type PublicationType = z.infer<typeof PublicationType>;
+
 export const SourceDocument = z.object({
   id: SourceDocumentId,
   runId: RunId,
@@ -45,6 +64,28 @@ export const SourceDocument = z.object({
   fullTextRef: z.string().optional(), // artifact-store ref when depth=full_text
   license: z.string().optional(),
   oaUrl: z.string().url().optional(),
+  /**
+   * Canonical publication type (review/preprint/correction/...). Absent on
+   * legacy objects and records whose family API exposes no type signal.
+   */
+  publicationType: PublicationType.optional(),
+  /**
+   * RU-R GO2: search-time retraction hint derived from Crossref update-to
+   * metadata in the SEARCH response (best effort — coverage depends on the
+   * family that surfaced the record). The authoritative status is
+   * verification.retractionStatus after identifier resolution; consumers should
+   * read that first and fall back to this hint.
+   */
+  retractionStatus: z.enum(['retracted', 'corrected', 'expression_of_concern', 'reinstated']).optional(),
+  /**
+   * RU-R frontier candidate 2: retraction REASONS from the offline Retraction
+   * Watch table (search-time hint tier, present only when the table produced
+   * or enriched the status). Feeds uncertainty-note wording; empty array is
+   * never persisted.
+   */
+  retractionReasons: z.array(z.string().min(1)).optional(),
+  /** Misconduct vs honest-error reading of retractionReasons (never guessed; 'unclassified' when the vocabulary is unrecognized). */
+  retractionClass: z.enum(['misconduct', 'honest_error', 'unclassified']).optional(),
   /** Result of identifier-resolution verification (verify_sources stage). Absent = not yet verified. */
   verification: z.object({
     method: z.enum(['crossref_doi', 'arxiv_id', 'openalex_id', 'europepmc_id', 'url']),
@@ -72,7 +113,16 @@ export const SourceDocument = z.object({
 export type SourceDocument = z.infer<typeof SourceDocument>;
 
 export const RetrievalQuery = z.object({
-  purpose: z.enum(['discovery', 'supporting', 'counter_evidence', 'methodological', 'identifier_resolution', 'gap_followup', 'citation_chase']),
+  purpose: z.enum([
+    'discovery',
+    'supporting',
+    'counter_evidence',
+    'methodological',
+    'identifier_resolution',
+    'gap_followup',
+    /** Citation-graph expansion (backward references / forward citations) off a pooled seed. */
+    'citation_chase',
+  ]),
   text: z.string().min(1),
   family: SourceFamily.optional(),
 });
@@ -102,11 +152,64 @@ export const RetrievalFusion = z.object({
   /** W6/F4: listwise-rerank sliding windows executed (absent = single window / no rerank). */
   rerankWindows: z.number().int().positive().optional(),
   /**
-   * SCIENCE lane (2026-08-24): citation-graph chase searches executed (PRISMA-style
-   * backward referenced_works batch + forward cites: batches). Absent when the
-   * adapter lacks filter support or the pool was empty.
+   * Citation-graph expansion (backward references + forward citations) off
+   * high-ranked pool seeds. Absent when not executed (no capable family,
+   * family failure, or no resolvable seed).
    */
-  citationChaseSearches: z.number().int().nonnegative().optional(),
+  citationChase: z
+    .object({
+      seeds: z.number().int().positive(),
+      backward: z.number().int().nonnegative(),
+      forward: z.number().int().nonnegative(),
+      /** New unique documents the chase added to the pool (after dedup). */
+      added: z.number().int().nonnegative(),
+      /**
+       * Depth-2 backward chase (method lineage of the method paper): one hop-2
+       * seed max, references only. Absent when hop 2 did not execute.
+       */
+      hop2: z
+        .object({
+          seed: z.string(),
+          added: z.number().int().nonnegative(),
+        })
+        .optional(),
+      /** Visible failure note when the chase was attempted and aborted (enrichment, non-fatal). */
+      failure: z.string().optional(),
+    })
+    .optional(),
+  /**
+   * Search-saturation observation over the executed record-bearing searches:
+   * novelty rate = share of a search's records that were NEW to the pool at
+   * flush time. `saturated` is a decision INPUT for later retrieval rounds
+   * (gap-seek, iteration), not a hard stop.
+   */
+  saturation: z
+    .object({
+      searches: z.number().int().positive(),
+      meanNovelty: z.number().min(0).max(1),
+      /** Mean novelty over the LAST half of the searches (diminishing-returns tail). */
+      tailNovelty: z.number().min(0).max(1),
+      saturated: z.boolean(),
+    })
+    .optional(),
+  /** Composition of the FINAL corpus: families, year spread, publication types. */
+  diversity: z
+    .object({
+      familyCounts: z.record(z.string(), z.number().int().nonnegative()),
+      /** Max single-family share of the corpus (0..1) — single-database bias observation. */
+      familyConcentration: z.number().min(0).max(1),
+      yearMin: z.number().int().optional(),
+      yearMax: z.number().int().optional(),
+      publicationTypeCounts: z.record(z.string(), z.number().int().nonnegative()),
+    })
+    .optional(),
+  /**
+   * RU-R GO2: retracted documents demoted out of cap competition (kept only when
+   * the pool cannot fill the cap — visibility over silent drop). Derived from
+   * search-time Crossref update-to metadata; resolve-time verification remains
+   * authoritative. Absent when no retracted document was in the pool.
+   */
+  retractedDemoted: z.number().int().nonnegative().optional(),
   /** Compact human-auditable note of the selection (e.g. "cap 12 of pool 31"). */
   selection: z.string().min(1),
 });
