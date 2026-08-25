@@ -44,14 +44,19 @@ const fromUpdateTo = (record: RawSourceRecord): RetractionFacts | undefined => {
   const normalized = record.normalized as { 'update-to'?: unknown } | undefined;
   const updates = normalized?.['update-to'];
   if (!Array.isArray(updates)) return undefined;
-  let status: RetractionStatus | undefined;
+  // Priority, not listing order: a [correction, retraction] listing reads as
+  // 'retracted' (residue 22b02db contract, locked by retraction-gate.test.ts;
+  // first-match `??=` silently let array order decide).
+  const PRIORITY: readonly RetractionStatus[] = ['reinstated', 'retracted', 'expression_of_concern', 'corrected'];
+  const present = new Set<RetractionStatus>();
   for (const u of updates) {
     const t = String((u as { type?: unknown })?.type ?? '').toLowerCase();
-    if (t.includes('reinstatement') || t.includes('reinstated')) status ??= 'reinstated';
-    else if (t.includes('retraction')) status ??= 'retracted';
-    else if (t.includes('expression of concern')) status ??= 'expression_of_concern';
-    else if (t.includes('correction') || t.includes('corrected')) status ??= 'corrected';
+    if (t.includes('reinstatement') || t.includes('reinstated')) present.add('reinstated');
+    else if (t.includes('retraction')) present.add('retracted');
+    else if (t.includes('expression of concern')) present.add('expression_of_concern');
+    else if (t.includes('correction') || t.includes('corrected')) present.add('corrected');
   }
+  const status = PRIORITY.find((s) => present.has(s));
   return status === undefined ? undefined : { status, basis: 'update_to' };
 };
 
