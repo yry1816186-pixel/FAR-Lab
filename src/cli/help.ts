@@ -36,6 +36,8 @@ Usage:
                                                   same engine as the web workbench; PORT/HOST env
                                                   also honored; loopback by default)
   far experiment run|enqueue <spec.json> [--priority N] [--allow-local-datasets]
+  far campaign run <campaign-spec.json> [--allow-local-datasets]
+                                                  RU-8 campaign driver: DAG readiness, stop rules, alpha ledger
                                                   Execute / queue an ExperimentSpec through the
                                                   durable scheduler (real datasets+models+stats)
   far experiment worker [--max-jobs N] [--max-running N]

@@ -70,7 +70,7 @@ describe('far completion: generators cover the real command tree', () => {
 
   it('tree mirrors the router dispatch surface (guards completion drift)', () => {
     expect(FAR_COMMANDS.map((c) => c.name)).toEqual(
-      ['research', 'runs', 'experiment', 'agent', 'probe', 'serve', 'probe-custom', 'memory', 'backup', 'gc', 'data', 'verify', 'new', 'completion'],
+      ['research', 'runs', 'experiment', 'campaign', 'agent', 'probe', 'serve', 'probe-custom', 'memory', 'backup', 'gc', 'data', 'verify', 'new', 'completion'],
     );
     expect(FAR_COMMANDS[0]!.subs.map((s) => s.name)).toEqual(
       ['start', 'status', 'inspect', 'cancel', 'resume', 'export', 'feedback', 'lineage', 'supervise', 'fork'],
@@ -79,6 +79,7 @@ describe('far completion: generators cover the real command tree', () => {
       ['run', 'enqueue', 'worker', 'status', 'cancel', 'logs'],
     );
     expect(FAR_COMMANDS.find((c) => c.name === 'agent')!.subs.map((s) => s.name)).toEqual(['refine']);
+    expect(FAR_COMMANDS.find((c) => c.name === 'campaign')!.subs.map((s) => s.name)).toEqual(['run']);
     expect(FAR_COMMANDS.find((c) => c.name === 'data')!.subs.map((s) => s.name)).toEqual(['info']);
     expect(FAR_COMMANDS.find((c) => c.name === 'completion')!.subs.map((s) => s.name)).toEqual(['bash', 'zsh', 'pwsh']);
   });

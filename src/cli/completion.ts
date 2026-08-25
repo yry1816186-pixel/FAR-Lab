@@ -43,6 +43,11 @@ export const FAR_COMMANDS: readonly CompletionCommand[] = [
     ],
   },
   {
+    name: 'campaign',
+    help: 'RU-8 preregistered experiment campaigns',
+    subs: [{ name: 'run', help: 'drive a CampaignSpec to a stop rule' }],
+  },
+  {
     name: 'agent',
     help: 'agent-harness surface',
     subs: [{ name: 'refine', help: 'iterative evidence-gap refinement' }],
