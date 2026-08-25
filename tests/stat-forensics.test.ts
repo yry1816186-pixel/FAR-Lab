@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { grimCheck, eValue, extractMeanN, rangeGuard, extractStats, extractRiskRatios } from '../src/domain/stat-forensics.js';
+import { grimCheck, eValue, extractMeanN, rangeGuard, extractStats, extractRiskRatios, ciPairContext } from '../src/domain/stat-forensics.js';
 import { conformalInterval } from '../src/domain/conformal.js';
 
 // RU-6 GO4 — deterministic statistical forensics (clean-room; scrutiny/statcheck
@@ -86,6 +86,23 @@ describe('RU-5 GO2 — range/domain guard', () => {
     expect(s.sd).toBe(0.8);
     expect(s.ci).toEqual({ low: 0.9, high: 2.7, point: 1.8 });
     expect(extractStats('no numbers here')).toEqual({});
+  });
+
+  it('lane-06: ciPairContext computes the arithmetic anchor between two quoted CIs', () => {
+    const disjoint = ciPairContext(
+      'an effect of 2.1 (95% CI [1.2, 3.0])',
+      'an effect of 0.4 (95% CI [0.1, 0.9])',
+    );
+    expect(disjoint).not.toBeNull();
+    expect(disjoint!.disjoint).toBe(true); // [1.2,3.0] vs [0.1,0.9] share no interval
+    expect(disjoint!.oppositeSigns).toBe(false);
+    const overlap = ciPairContext('an effect of 1.0 (95% CI [0.5, 1.5])', 'an effect of 1.2 (95% CI [0.8, 1.6])');
+    expect(overlap!.disjoint).toBe(false);
+    const opposite = ciPairContext('a difference of 1.0 (95% CI [0.4, 1.6])', 'a difference of -0.8 (95% CI [-1.5, -0.1])');
+    expect(opposite!.disjoint).toBe(true);
+    expect(opposite!.oppositeSigns).toBe(true);
+    // no CI on one side = no anchor, never fabricated
+    expect(ciPairContext('an effect of 1.8 (95% CI [0.9, 2.7])', 'no interval here')).toBeNull();
   });
 });
 

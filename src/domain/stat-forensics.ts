@@ -138,8 +138,11 @@ export const extractStats = (quote: string): { pValue?: number; percent?: number
   if (pct !== null) out.percent = Number(pct[1]);
   const sd = /\bSD\s*(?:=|:)?\s*(\d+(?:\.\d+)?)/i.exec(quote) ?? /\b(?:sd|S\.D\.)\s*(?:=|:)?\s*(\d+(?:\.\d+)?)/i.exec(quote);
   if (sd !== null) out.sd = Number(sd[1]);
-  const ci = /CI\s*[:=]?\s*[([]\s*(\d+(?:\.\d+)?)\s*[,;–-]\s*(\d+(?:\.\d+)?)\s*[)\]]/i.exec(quote);
-  const point = /(?:effect|difference|estimate)\s+(?:of\s+)?(\d+(?:\.\d+)?)/i.exec(quote);
+  // Lane-06: signed captures — difference-measure CIs legitimately span negatives
+  // ("effect of -0.8 (95% CI [-1.5, -0.1])"); dropping the sign would silently
+  // corrupt every downstream numeric check on such quotes.
+  const ci = /CI\s*[:=]?\s*[([]\s*([+-]?\d+(?:\.\d+)?)\s*[,;–-]\s*([+-]?\d+(?:\.\d+)?)\s*[)\]]/i.exec(quote);
+  const point = /(?:effect|difference|estimate)\s+(?:of\s+)?([+-]?\d+(?:\.\d+)?)/i.exec(quote);
   if (ci !== null && point !== null) {
     out.ci = { low: Number(ci[1]), high: Number(ci[2]), point: Number(point[1]) };
   }
@@ -167,4 +170,33 @@ export const extractRiskRatios = (quote: string): number[] => {
     }
   }
   return [...new Set(out)];
+};
+
+export interface CiPairContext {
+  ciA: { low: number; high: number; point?: number };
+  ciB: { low: number; high: number; point?: number };
+  /** The two intervals do not overlap — numeric heterogeneity between the quotes. */
+  disjoint: boolean;
+  /** Intervals sit on opposite sides of zero — a directional conflict (difference/ratio measures). */
+  oppositeSigns: boolean;
+}
+
+/**
+ * Lane-06 (2026-08-25): deterministic CI-vs-CI context for a claim pair. When BOTH
+ * verbatim quotes carry a confidence interval, the geometric relationship of the two
+ * intervals is pure arithmetic — it anchors the D-018 contradiction judgment instead
+ * of leaving it to unanchored text vibes, and disjoint intervals get a deterministic
+ * heterogeneity disclosure on both claims regardless of the LLM verdict. Returns null
+ * when either quote carries no CI (no anchor, no fabrication).
+ */
+export const ciPairContext = (quoteA: string, quoteB: string): CiPairContext | null => {
+  const a = extractStats(quoteA).ci;
+  const b = extractStats(quoteB).ci;
+  if (a === undefined || b === undefined) return null;
+  return {
+    ciA: a,
+    ciB: b,
+    disjoint: a.high < b.low || b.high < a.low,
+    oppositeSigns: (a.low > 0 && b.high < 0) || (a.high < 0 && b.low > 0),
+  };
 };
